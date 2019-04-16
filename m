@@ -1,11 +1,9 @@
 From: Liu Bo <bo.liu@linux.alibaba.com>
-Date: Wed, 17 Apr 2019 02:03:20 +0800
-Message-Id: <20190416180322.65113-8-bo.liu@linux.alibaba.com>
-In-Reply-To: <20190416180322.65113-1-bo.liu@linux.alibaba.com>
-References: <20190416180322.65113-1-bo.liu@linux.alibaba.com>
+Date: Wed, 17 Apr 2019 02:03:13 +0800
+Message-Id: <20190416180322.65113-1-bo.liu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 7/9] fuse: return early if punch_hole fails
+Subject: [Virtio-fs] [PATCH 0/9] virtio-fs fixes
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,27 +14,33 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-We don't have to clear FUSE_I_SIZE_UNSTABLE if punch_hole fails at
-filemap_write_and_wait_rang(), since the bit is not set yet.
+Hi,
 
-Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
----
- fs/fuse/file.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This set contains a few fixes collected by running xfstests.
 
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index 620326e..712fd97 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -3585,7 +3585,7 @@ static long __fuse_file_fallocate(struct file *file, int mode,
- 		err = filemap_write_and_wait_range(inode->i_mapping, offset,
- 							endbyte);
- 		if (err)
--			goto out;
-+			return err;
- 		fuse_sync_writes(inode);
- 	}
- 
+thanks,
+liubo
+
+Liu Bo (6):
+  virtio-fs: fix multiple tag support
+  virtio-fs: clean up dax mapping before aborting connection
+  fuse: export fuse_drop_waiting()
+  virtio-fs: let dax style override directIO style when dax+cache=none
+  fuse: return early if punch_hole fails
+  virtio-fs: honor RLIMIT_FSIZE in fuse_file_fallocate
+
+Xiaoguang Wang (3):
+  virtio-fs: fix use-after-free against virtio_fs_vq's fuse_dev info
+  fuse: do not write whole page while page straddles i_size
+  fuse: fix deadlock in __fuse_file_fallocate()
+
+ fs/fuse/dev.c       |  3 ++-
+ fs/fuse/file.c      | 31 +++++++++++++++++++++++--------
+ fs/fuse/fuse_i.h    |  3 +++
+ fs/fuse/inode.c     |  9 +++++++++
+ fs/fuse/virtio_fs.c | 13 +++++++++++--
+ 5 files changed, 48 insertions(+), 11 deletions(-)
+
 -- 
 1.8.3.1
 

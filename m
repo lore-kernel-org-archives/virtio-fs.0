@@ -1,12 +1,11 @@
 From: Liu Bo <bo.liu@linux.alibaba.com>
-Date: Wed, 17 Apr 2019 02:03:18 +0800
-Message-Id: <20190416180322.65113-6-bo.liu@linux.alibaba.com>
+Date: Wed, 17 Apr 2019 02:03:16 +0800
+Message-Id: <20190416180322.65113-4-bo.liu@linux.alibaba.com>
 In-Reply-To: <20190416180322.65113-1-bo.liu@linux.alibaba.com>
 References: <20190416180322.65113-1-bo.liu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 5/9] fuse: do not write whole page while page
-	straddles i_size
+Subject: [Virtio-fs] [PATCH 3/9] fuse: export fuse_drop_waiting()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,55 +16,50 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-From: Xiaoguang Wang <xiaoguang.wang@linux.alibaba.com>
+virtio-fs will need to do ref count against FORGET requests from
+outside fs/fuse/dev.c.  Make the symbol visible.
 
-If page straddles i_size and we write the whole page, the fuse
-user-space filesystem may extend file size, it will confuse users.
-
-Before this patch:
-xfs_io -t -f \
-        -c "truncate 5120" \
-        -c "pwrite -S 0x58 0 5120"      \
-        -c "mmap -rw 0 5120"            \
-        -c "mwrite -S 0x59 2048 3072" \
-        -c "close"      \
-        testfile
-testfile's length will be 8192 bytes, with this patch, testfile's
-length will be 5120 bytes.
-
+Reviewed-by: Liu Bo <bo.liu@linux.alibaba.com>
 Reviewed-by: Joseph Qi <joseph.qi@linux.alibaba.com>
 Signed-off-by: Xiaoguang Wang <xiaoguang.wang@linux.alibaba.com>
 ---
- fs/fuse/file.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ fs/fuse/dev.c    | 3 ++-
+ fs/fuse/fuse_i.h | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index bb45acc..c6090f5 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -2293,6 +2293,8 @@ static int fuse_writepages_fill(struct page *page,
- 	struct page *tmp_page;
- 	bool is_writeback;
- 	int err;
-+	loff_t size;
-+	unsigned int len;
+diff --git a/fs/fuse/dev.c b/fs/fuse/dev.c
+index 07ae706..7e6afd0 100644
+--- a/fs/fuse/dev.c
++++ b/fs/fuse/dev.c
+@@ -128,7 +128,7 @@ static bool fuse_block_alloc(struct fuse_conn *fc, bool for_background)
+ 	return !fc->initialized || (for_background && fc->blocked);
+ }
  
- 	if (!data->ff) {
- 		err = -EIO;
-@@ -2364,7 +2366,12 @@ static int fuse_writepages_fill(struct page *page,
- 	copy_highpage(tmp_page, page);
- 	req->pages[req->num_pages] = tmp_page;
- 	req->page_descs[req->num_pages].offset = 0;
--	req->page_descs[req->num_pages].length = PAGE_SIZE;
-+	size = i_size_read(inode);
-+	if (page->index == size >> PAGE_SHIFT)
-+		len = size & ~PAGE_MASK;
-+	else
-+		len = PAGE_SIZE;
-+	req->page_descs[req->num_pages].length = len;
+-static void fuse_drop_waiting(struct fuse_conn *fc)
++void fuse_drop_waiting(struct fuse_conn *fc)
+ {
+ 	if (fc->connected) {
+ 		atomic_dec(&fc->num_waiting);
+@@ -137,6 +137,7 @@ static void fuse_drop_waiting(struct fuse_conn *fc)
+ 		wake_up_all(&fc->blocked_waitq);
+ 	}
+ }
++EXPORT_SYMBOL_GPL(fuse_drop_waiting);
  
- 	inc_wb_stat(&inode_to_bdi(inode)->wb, WB_WRITEBACK);
- 	inc_node_page_state(tmp_page, NR_WRITEBACK_TEMP);
+ static struct fuse_req *__fuse_get_req(struct fuse_conn *fc, unsigned npages,
+ 				       bool for_background)
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index 2c32846..171aee8 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -1199,6 +1199,7 @@ ssize_t fuse_getxattr(struct inode *inode, const char *name, void *value,
+  * Get the next unique ID for a request
+  */
+ u64 fuse_get_unique(struct fuse_iqueue *fiq);
++void fuse_drop_waiting(struct fuse_conn *fc);
+ void fuse_dax_free_mem_worker(struct work_struct *work);
+ void fuse_removemapping(struct inode *inode);
+ 
 -- 
 1.8.3.1
 

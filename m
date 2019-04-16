@@ -1,14 +1,13 @@
-Date: Tue, 16 Apr 2019 14:07:56 -0400
+Date: Tue, 16 Apr 2019 14:09:08 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190416180756.GA2222@redhat.com>
+Message-ID: <20190416180908.GB2222@redhat.com>
 References: <20190416180322.65113-1-bo.liu@linux.alibaba.com>
-	<20190416180322.65113-10-bo.liu@linux.alibaba.com>
+	<20190416180322.65113-2-bo.liu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190416180322.65113-10-bo.liu@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH 9/9] fuse: fix deadlock in
- __fuse_file_fallocate()
+In-Reply-To: <20190416180322.65113-2-bo.liu@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH 1/9] virtio-fs: fix multiple tag support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,35 +19,36 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: Liu Bo <bo.liu@linux.alibaba.com>
 Cc: virtio-fs@redhat.com
 
-On Wed, Apr 17, 2019 at 02:03:22AM +0800, Liu Bo wrote:
-> From: Xiaoguang Wang <xiaoguang.wang@linux.alibaba.com>
+On Wed, Apr 17, 2019 at 02:03:14AM +0800, Liu Bo wrote:
+> While doing memremap from pci_dev's system bus address to kernel virtual
+> address, we assign a wrong value to the %end of pgmap.res, which ends up
+> with a wrong resource size in the process of memremap, and that further
+> prevent the second virtiofs pci device from being probed successfully.
 > 
-> This bug is obvious, fix it.
-> 
-> Reviewed-by: Joseph Qi <joseph.qi@linux.alibaba.com>
-> Signed-off-by: Xiaoguang Wang <xiaoguang.wang@linux.alibaba.com>
+> Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
 
-Thanks. This one I ran into late last week while testing
-fallocate(PUNCH_HOLE) and fixed it already in my internal branch.
+Thanks. Already included in my internal branch.
 
+Thanks
 Vivek
+
 > ---
->  fs/fuse/file.c | 2 +-
+>  fs/fuse/virtio_fs.c | 2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-> index 6ab23d7..0236783 100644
-> --- a/fs/fuse/file.c
-> +++ b/fs/fuse/file.c
-> @@ -3623,7 +3623,7 @@ static long __fuse_file_fallocate(struct file *file, int mode,
->  	if (mode & FALLOC_FL_PUNCH_HOLE) {
->  		down_write(&fi->i_mmap_sem);
->  		truncate_pagecache_range(inode, offset, offset + length - 1);
-> -		down_write(&fi->i_mmap_sem);
-> +		up_write(&fi->i_mmap_sem);
->  	}
->  	fuse_invalidate_attr(inode);
+> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> index d669512..68fd11b 100644
+> --- a/fs/fuse/virtio_fs.c
+> +++ b/fs/fuse/virtio_fs.c
+> @@ -589,7 +589,7 @@ static int virtio_fs_setup_dax(struct virtio_device *vdev, struct virtio_fs *fs)
+>  	pgmap->res = (struct resource){
+>  		.name = "virtio-fs dax window",
+>  		.start = (phys_addr_t) cache_reg.addr,
+> -		.end = (phys_addr_t) cache_reg.addr + cache_reg.len,
+> +		.end = (phys_addr_t) cache_reg.addr + cache_reg.len - 1,
+>  	};
 >  
+>  	fs->window_kaddr = devm_memremap_pages(&vdev->dev, pgmap);
 > -- 
 > 1.8.3.1
 > 

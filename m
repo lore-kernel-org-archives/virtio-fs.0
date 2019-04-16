@@ -1,15 +1,12 @@
-Date: Tue, 16 Apr 2019 11:43:57 -0700
 From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190416184356.dbehyhbusyhnaejr@US-160370MP2.local>
-References: <20190416180322.65113-1-bo.liu@linux.alibaba.com>
-	<20190416180322.65113-4-bo.liu@linux.alibaba.com>
-	<20190416182849.GD2222@redhat.com>
+Date: Wed, 17 Apr 2019 03:08:56 +0800
+Message-Id: <20190416190858.16833-3-bo.liu@linux.alibaba.com>
+In-Reply-To: <20190416190858.16833-1-bo.liu@linux.alibaba.com>
+References: <20190416190858.16833-1-bo.liu@linux.alibaba.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20190416182849.GD2222@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 3/9] fuse: export fuse_drop_waiting()
-Reply-To: bo.liu@linux.alibaba.com
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 2/4] virtiofsd: support nanosecond resolution
+	for file timestamp
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,71 +15,67 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com
+To: virtio-fs@redhat.com
 
-On Tue, Apr 16, 2019 at 02:28:49PM -0400, Vivek Goyal wrote:
-> On Wed, Apr 17, 2019 at 02:03:16AM +0800, Liu Bo wrote:
-> > virtio-fs will need to do ref count against FORGET requests from
-> > outside fs/fuse/dev.c.  Make the symbol visible.
-> > 
-> 
-> Who needs it? virtio-fs does not seem to be calling it?
->
+From: Jiufei Xue <jiufei.xue@linux.alibaba.com>
 
-Ah, this is a preparation for patch 4.
+Define HAVE_STRUCT_STAT_ST_ATIM to 1 if `st_atim' is member of `struct
+stat' which means support nanosecond resolution for the file timestamp
+fields.
 
-thanks,
--liubo
+Signed-off-by: Jiufei Xue <jiufei.xue@linux.alibaba.com>
+Reviewed-by: Joseph Qi <joseph.qi@linux.alibaba.com>
+---
+ configure                     | 16 ++++++++++++++++
+ contrib/virtiofsd/fuse_misc.h |  1 +
+ 2 files changed, 17 insertions(+)
 
-> Vivek
-> 
-> > Reviewed-by: Liu Bo <bo.liu@linux.alibaba.com>
-> > Reviewed-by: Joseph Qi <joseph.qi@linux.alibaba.com>
-> > Signed-off-by: Xiaoguang Wang <xiaoguang.wang@linux.alibaba.com>
-> > ---
-> >  fs/fuse/dev.c    | 3 ++-
-> >  fs/fuse/fuse_i.h | 1 +
-> >  2 files changed, 3 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/fs/fuse/dev.c b/fs/fuse/dev.c
-> > index 07ae706..7e6afd0 100644
-> > --- a/fs/fuse/dev.c
-> > +++ b/fs/fuse/dev.c
-> > @@ -128,7 +128,7 @@ static bool fuse_block_alloc(struct fuse_conn *fc, bool for_background)
-> >  	return !fc->initialized || (for_background && fc->blocked);
-> >  }
-> >  
-> > -static void fuse_drop_waiting(struct fuse_conn *fc)
-> > +void fuse_drop_waiting(struct fuse_conn *fc)
-> >  {
-> >  	if (fc->connected) {
-> >  		atomic_dec(&fc->num_waiting);
-> > @@ -137,6 +137,7 @@ static void fuse_drop_waiting(struct fuse_conn *fc)
-> >  		wake_up_all(&fc->blocked_waitq);
-> >  	}
-> >  }
-> > +EXPORT_SYMBOL_GPL(fuse_drop_waiting);
-> >  
-> >  static struct fuse_req *__fuse_get_req(struct fuse_conn *fc, unsigned npages,
-> >  				       bool for_background)
-> > diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-> > index 2c32846..171aee8 100644
-> > --- a/fs/fuse/fuse_i.h
-> > +++ b/fs/fuse/fuse_i.h
-> > @@ -1199,6 +1199,7 @@ ssize_t fuse_getxattr(struct inode *inode, const char *name, void *value,
-> >   * Get the next unique ID for a request
-> >   */
-> >  u64 fuse_get_unique(struct fuse_iqueue *fiq);
-> > +void fuse_drop_waiting(struct fuse_conn *fc);
-> >  void fuse_dax_free_mem_worker(struct work_struct *work);
-> >  void fuse_removemapping(struct inode *inode);
-> >  
-> > -- 
-> > 1.8.3.1
-> > 
-> > _______________________________________________
-> > Virtio-fs mailing list
-> > Virtio-fs@redhat.com
-> > https://www.redhat.com/mailman/listinfo/virtio-fs
+diff --git a/configure b/configure
+index 5c21a65..57336ec 100755
+--- a/configure
++++ b/configure
+@@ -5147,6 +5147,19 @@ if compile_prog "" "" ; then
+     strchrnul=yes
+ fi
+ 
++#########################################
++# check if we have st_atim
++
++st_atim=no
++cat > $TMPC << EOF
++#include <sys/stat.h>
++#include <stddef.h>
++int main(void) { return offsetof(struct stat, st_atim); }
++EOF
++if compile_prog "" "" ; then
++    st_atim=yes
++fi
++
+ ##########################################
+ # check if trace backend exists
+ 
+@@ -6757,6 +6770,9 @@ fi
+ if test "$strchrnul" = "yes" ; then
+   echo "HAVE_STRCHRNUL=y" >> $config_host_mak
+ fi
++if test "$st_atim" = "yes" ; then
++  echo "HAVE_STRUCT_STAT_ST_ATIM=y" >> $config_host_mak
++fi
+ if test "$byteswap_h" = "yes" ; then
+   echo "CONFIG_BYTESWAP_H=y" >> $config_host_mak
+ fi
+diff --git a/contrib/virtiofsd/fuse_misc.h b/contrib/virtiofsd/fuse_misc.h
+index 2f6663e..30a1d7f 100644
+--- a/contrib/virtiofsd/fuse_misc.h
++++ b/contrib/virtiofsd/fuse_misc.h
+@@ -7,6 +7,7 @@
+ */
+ 
+ #include <pthread.h>
++#include "config-host.h"
+ 
+ /*
+   Versioned symbols cannot be used in some cases because it
+-- 
+1.8.3.1
 

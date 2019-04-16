@@ -1,14 +1,14 @@
-Date: Tue, 16 Apr 2019 15:57:46 -0400
+Date: Tue, 16 Apr 2019 16:16:21 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190416195746.GG2222@redhat.com>
+Message-ID: <20190416201621.GH2222@redhat.com>
 References: <20190416180322.65113-1-bo.liu@linux.alibaba.com>
-	<20190416180322.65113-9-bo.liu@linux.alibaba.com>
+	<20190416180322.65113-6-bo.liu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190416180322.65113-9-bo.liu@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH 8/9] virtio-fs: honor RLIMIT_FSIZE in
- fuse_file_fallocate
+In-Reply-To: <20190416180322.65113-6-bo.liu@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH 5/9] fuse: do not write whole page while
+ page straddles i_size
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,44 +18,66 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Liu Bo <bo.liu@linux.alibaba.com>
-Cc: virtio-fs@redhat.com
+Cc: virtio-fs@redhat.com, Miklos Szeredi <mszeredi@redhat.com>
 
-On Wed, Apr 17, 2019 at 02:03:21AM +0800, Liu Bo wrote:
-> generic/228 reported this failure that fuse fallocate does not honor what
-> 'ulimit -f' has set.
+On Wed, Apr 17, 2019 at 02:03:18AM +0800, Liu Bo wrote:
+> From: Xiaoguang Wang <xiaoguang.wang@linux.alibaba.com>
 > 
-> This adds the necessary inode_newsize_ok() check.
+> If page straddles i_size and we write the whole page, the fuse
+> user-space filesystem may extend file size, it will confuse users.
 > 
-> Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+> Before this patch:
+> xfs_io -t -f \
+>         -c "truncate 5120" \
+>         -c "pwrite -S 0x58 0 5120"      \
+>         -c "mmap -rw 0 5120"            \
+>         -c "mwrite -S 0x59 2048 3072" \
+>         -c "close"      \
+>         testfile
+> testfile's length will be 8192 bytes, with this patch, testfile's
+> length will be 5120 bytes.
+> 
+> Reviewed-by: Joseph Qi <joseph.qi@linux.alibaba.com>
+> Signed-off-by: Xiaoguang Wang <xiaoguang.wang@linux.alibaba.com>
 
-This sounds like a generic fallocate() fixed needed in fuse as well? If
-that's the case, it will be better to send it to Miklos directly and cc
-fuse mailing list.
+[cc miklos]
+
+This sounds like a generic fuse issue as well (and not virtio-fs specic)?
+If yes, can you please send this fix separately to miklos and fuse
+mailing list.
 
 Vivek
-
 > ---
->  fs/fuse/file.c | 7 +++++++
->  1 file changed, 7 insertions(+)
+>  fs/fuse/file.c | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
 > 
 > diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-> index 712fd97..6ab23d7 100644
+> index bb45acc..c6090f5 100644
 > --- a/fs/fuse/file.c
 > +++ b/fs/fuse/file.c
-> @@ -3589,6 +3589,13 @@ static long __fuse_file_fallocate(struct file *file, int mode,
->  		fuse_sync_writes(inode);
->  	}
+> @@ -2293,6 +2293,8 @@ static int fuse_writepages_fill(struct page *page,
+>  	struct page *tmp_page;
+>  	bool is_writeback;
+>  	int err;
+> +	loff_t size;
+> +	unsigned int len;
 >  
-> +	if (!(mode & FALLOC_FL_KEEP_SIZE) &&
-> +	    offset + length > i_size_read(inode)) {
-> +		err = inode_newsize_ok(inode, offset + length);
-> +		if (err)
-> +			return err;
-> +	}
-> +
->  	if (!(mode & FALLOC_FL_KEEP_SIZE))
->  		set_bit(FUSE_I_SIZE_UNSTABLE, &fi->state);
+>  	if (!data->ff) {
+>  		err = -EIO;
+> @@ -2364,7 +2366,12 @@ static int fuse_writepages_fill(struct page *page,
+>  	copy_highpage(tmp_page, page);
+>  	req->pages[req->num_pages] = tmp_page;
+>  	req->page_descs[req->num_pages].offset = 0;
+> -	req->page_descs[req->num_pages].length = PAGE_SIZE;
+> +	size = i_size_read(inode);
+> +	if (page->index == size >> PAGE_SHIFT)
+> +		len = size & ~PAGE_MASK;
+> +	else
+> +		len = PAGE_SIZE;
+> +	req->page_descs[req->num_pages].length = len;
 >  
+>  	inc_wb_stat(&inode_to_bdi(inode)->wb, WB_WRITEBACK);
+>  	inc_node_page_state(tmp_page, NR_WRITEBACK_TEMP);
 > -- 
 > 1.8.3.1
 > 

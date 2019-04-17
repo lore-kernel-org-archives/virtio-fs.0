@@ -1,6 +1,6 @@
-Date: Wed, 17 Apr 2019 12:35:54 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190417193553.t367ekb37vnpnkd4@US-160370MP2.local>
+Date: Wed, 17 Apr 2019 16:56:53 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190417205653.GB3003@redhat.com>
 References: <20190416180322.65113-1-bo.liu@linux.alibaba.com>
 	<20190416180322.65113-7-bo.liu@linux.alibaba.com>
 	<20190416193837.GE2222@redhat.com>
@@ -11,7 +11,6 @@ Content-Disposition: inline
 In-Reply-To: <CAOssrKcnCzt9+om9=5pFqGBAeNds7U3FWpXWHLp6KNgHmVZ=Pg@mail.gmail.com>
 Subject: Re: [Virtio-fs] [PATCH 6/9] virtio-fs: let dax style override
  directIO style when dax+cache=none
-Reply-To: bo.liu@linux.alibaba.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -48,76 +47,31 @@ On Wed, Apr 17, 2019 at 10:25:53AM +0200, Miklos Szeredi wrote:
 > 
 > AFAIR the main reason was that we had performance issues with size
 > extending writes with dax.
-> 
-> There is also the question of mtime updates and atime updates, which
-> are handled properly with FOPEN_DIRECT_IO, but not with DAX I/O.
 
-Looks like fuse_iget() has set inode with NOATIME and NOCMTIME under
-the case "!fc->writeback_cache", which is true in dax mode, do we
-still case about time update?
+Finally I decided to do some measurement on performance cost of file
+extending writes. I wrote a small program to keep on writing 5 bytes
+at the end of file 16K times and measure total time.
 
-AFAICS, these metadata are maintained by host side.
+With cache=never and dax not enabled, it takes around 2.5 to 3 seconds.
+With cache=never and dax enabled (and code modified to call dax path),
+it takes around 12 to 13 seconds.
 
-thanks,
--liubo
+So fallocate() path is definitely seem to be 4-5 times slower. I tried
+replacing fallocate() with truncate operation but that does not help
+much either.
 
-> 
-> If we solve those issues then I think it makes sense to switch
-> read/write to using DAX.
-> 
-> Does that answer your question?
-> 
-> Thanks,
-> Miklos
-> 
-> >
-> > Thanks
-> > Vivek
-> >
-> > > ---
-> > >  fs/fuse/file.c | 11 ++++++-----
-> > >  1 file changed, 6 insertions(+), 5 deletions(-)
-> > >
-> > > diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-> > > index c6090f5..620326e 100644
-> > > --- a/fs/fuse/file.c
-> > > +++ b/fs/fuse/file.c
-> > > @@ -1158,12 +1158,12 @@ static ssize_t fuse_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
-> > >       struct inode *inode = file->f_mapping->host;
-> > >       struct fuse_conn *fc = get_fuse_conn(inode);
-> > >
-> > > -     if (ff->open_flags & FOPEN_DIRECT_IO)
-> > > -             return fuse_direct_read_iter(iocb, to);
-> > > -
-> > >       if (IS_DAX(inode))
-> > >               return fuse_dax_read_iter(iocb, to);
-> > >
-> > > +     if (ff->open_flags & FOPEN_DIRECT_IO)
-> > > +             return fuse_direct_read_iter(iocb, to);
-> > > +
-> > >       /*
-> > >        * In auto invalidate mode, always update attributes on read.
-> > >        * Otherwise, only update if we attempt to read past EOF (to ensure
-> > > @@ -1426,11 +1426,12 @@ static ssize_t fuse_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
-> > >       ssize_t err;
-> > >       loff_t endbyte = 0;
-> > >
-> > > -     if (ff->open_flags & FOPEN_DIRECT_IO)
-> > > -             return fuse_direct_write_iter(iocb, from);
-> > >       if (IS_DAX(inode))
-> > >               return fuse_dax_write_iter(iocb, from);
-> > >
-> > > +     if (ff->open_flags & FOPEN_DIRECT_IO)
-> > > +             return fuse_direct_write_iter(iocb, from);
-> > > +
-> > >       if (get_fuse_conn(inode)->writeback_cache) {
-> > >               /* Update size (EOF optimization) and mode (SUID clearing) */
-> > >               err = fuse_update_attributes(mapping->host, file);
-> > > --
-> > > 1.8.3.1
-> > >
-> > > _______________________________________________
-> > > Virtio-fs mailing list
-> > > Virtio-fs@redhat.com
-> > > https://www.redhat.com/mailman/listinfo/virtio-fs
+Part of the reason it being slow seems to be fallocate() operation on
+host itself is expensive. It roughly took 4 seconds to perform 16K
+fallocate() requests while it took only 100 us to perform 16K write
+requests (as received by lo_write_buf()).
+
+But that explains only about 4 seconds of extra latency. Assuming fuse
+and virtio communication latency is same between two commands (FUSE_WRITE,
+FUSE_FALLOCATE), not sure where another 5-6 seconds of latency comes
+from.
+
+Apart from latency, fallocate() also has the issue that its not atomic.
+
+Thanks
+Vivek
 

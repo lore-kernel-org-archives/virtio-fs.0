@@ -1,19 +1,16 @@
-Date: Wed, 17 Apr 2019 12:24:59 -0700
+Date: Wed, 17 Apr 2019 12:35:54 -0700
 From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190417192458.axsjuvaa2igadxvy@US-160370MP2.local>
-References: <20190416190858.16833-1-bo.liu@linux.alibaba.com>
-	<20190416190858.16833-5-bo.liu@linux.alibaba.com>
-	<20190417131848.GC2839@work-vm>
-	<CAOssrKc2EfTZyGpKCZjbcpVrO2Osa6h4UNv=kqDnOSBfXMFCcg@mail.gmail.com>
-	<20190417140527.GE2839@work-vm>
-	<CAOssrKfK9rmd5NigF0RHzENpNeagMZ+B_WoOAghse7POKNOotQ@mail.gmail.com>
-	<20190417142900.GF2839@work-vm>
+Message-ID: <20190417193553.t367ekb37vnpnkd4@US-160370MP2.local>
+References: <20190416180322.65113-1-bo.liu@linux.alibaba.com>
+	<20190416180322.65113-7-bo.liu@linux.alibaba.com>
+	<20190416193837.GE2222@redhat.com>
+	<CAOssrKcnCzt9+om9=5pFqGBAeNds7U3FWpXWHLp6KNgHmVZ=Pg@mail.gmail.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190417142900.GF2839@work-vm>
-Subject: Re: [Virtio-fs] [PATCH 4/4] virtiofsd: use fallocate(2) instead
- posix_fallocate(3)
+In-Reply-To: <CAOssrKcnCzt9+om9=5pFqGBAeNds7U3FWpXWHLp6KNgHmVZ=Pg@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 6/9] virtio-fs: let dax style override
+ directIO style when dax+cache=none
 Reply-To: bo.liu@linux.alibaba.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
@@ -23,54 +20,104 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, Miklos Szeredi <mszeredi@redhat.com>
+To: Miklos Szeredi <mszeredi@redhat.com>
+Cc: virtio-fs@redhat.com
 
-On Wed, Apr 17, 2019 at 03:29:00PM +0100, Dr. David Alan Gilbert wrote:
-> * Miklos Szeredi (mszeredi@redhat.com) wrote:
-> > On Wed, Apr 17, 2019 at 4:05 PM Dr. David Alan Gilbert
-> > <dgilbert@redhat.com> wrote:
+On Wed, Apr 17, 2019 at 10:25:53AM +0200, Miklos Szeredi wrote:
+> On Tue, Apr 16, 2019 at 9:38 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> >
+> > On Wed, Apr 17, 2019 at 02:03:19AM +0800, Liu Bo wrote:
+> > > In case of dax+cache=none, mmap uses dax style prior to directIO style,
+> > > while read/write don't, but it seems that there is no reason not to do so.
 > > >
-> > > * Miklos Szeredi (mszeredi@redhat.com) wrote:
-> > > > On Wed, Apr 17, 2019 at 3:18 PM Dr. David Alan Gilbert
-> > > > <dgilbert@redhat.com> wrote:
-> > > > >
-> > > > > * Liu Bo (bo.liu@linux.alibaba.com) wrote:
-> > > > > > From: Xiaoguang Wang <xiaoguang.wang@linux.alibaba.com>
-> > > > > >
-> > > > > > This is because posix_fallocate(3) does not support FALLOC_FL_KEEP_SIZE
-> > > > > > and FALLOC_FL_PUNCH_HOLE. Our underlying host filesystem is ext4 and
-> > > > > > ext4 supports FALLOC_FL_KEEP_SIZE and FALLOC_FL_PUNCH_HOLE well, so
-> > > > > > this change will be ok.
-> > > > > >
-> > > > > > Signed-off-by: Xiaoguang Wang <xiaoguang.wang@linux.alibaba.com>
-> > > > >
-> > > > >   We need to check what 'fuse' expects - is it defined what
-> > > > > fallocate features it has, and what the semantics are?
-> > > >
-> > > > The patch looks good to me.
-> > > >
-> > > > Fuse (the kernel part) supports FALLOC_FL_KEEP_SIZE and
-> > > > FALLOC_FL_PUNCH_HOLE, but returns EOPNOTSUPP for any other flag.
-> > > >
-> > > > Even if, at a later time, fuse starts supporting additional fallocate
-> > > > flags, then the passthrough implementation calling fallocate(2) should
-> > > > be fine.
-> > >
-> > > OK, so then I'll take this patch; would it make sense for it to be sent
-> > > to upstream fuse?
-> > 
-> > It would have to be wrapped in #ifdef HAVE_FALLOCATE to make it
-> > portable.   Otherwise I don't see why not.
+> > > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+> > > Reviewed-by: Joseph Qi <joseph.qi@linux.alibaba.com>
+> >
+> > This is interesting. I was thinking about it today itself. I noticed
+> > that ext4 and xfs also check for DAX inode first and use dax path
+> > if dax is enabled.
+> >
+> > cache=never sets FOPEN_DIRECT_IO (even if application never asked for
+> > direct IO). If dax is enabled, for data its equivalent to doing direct
+> > IO. And for mmap() we are already checking for DAX first. So it makes
+> > sense to do same thing for read/write path as well.
+> >
+> > CCing Miklos as well. He might have some thougts on this. I am curios
+> > that initially whey did he make this change only for mmap() and not
+> > for read/write paths.
 > 
-> OK, I'll take it for now.
+> AFAIR the main reason was that we had performance issues with size
+> extending writes with dax.
 > 
-> Liu Bo: Can you make it portable please and post it upstream on the fuse
-> list?
->
+> There is also the question of mtime updates and atime updates, which
+> are handled properly with FOPEN_DIRECT_IO, but not with DAX I/O.
 
-No problem, will do it.
+Looks like fuse_iget() has set inode with NOATIME and NOCMTIME under
+the case "!fc->writeback_cache", which is true in dax mode, do we
+still case about time update?
+
+AFAICS, these metadata are maintained by host side.
 
 thanks,
 -liubo
+
+> 
+> If we solve those issues then I think it makes sense to switch
+> read/write to using DAX.
+> 
+> Does that answer your question?
+> 
+> Thanks,
+> Miklos
+> 
+> >
+> > Thanks
+> > Vivek
+> >
+> > > ---
+> > >  fs/fuse/file.c | 11 ++++++-----
+> > >  1 file changed, 6 insertions(+), 5 deletions(-)
+> > >
+> > > diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+> > > index c6090f5..620326e 100644
+> > > --- a/fs/fuse/file.c
+> > > +++ b/fs/fuse/file.c
+> > > @@ -1158,12 +1158,12 @@ static ssize_t fuse_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
+> > >       struct inode *inode = file->f_mapping->host;
+> > >       struct fuse_conn *fc = get_fuse_conn(inode);
+> > >
+> > > -     if (ff->open_flags & FOPEN_DIRECT_IO)
+> > > -             return fuse_direct_read_iter(iocb, to);
+> > > -
+> > >       if (IS_DAX(inode))
+> > >               return fuse_dax_read_iter(iocb, to);
+> > >
+> > > +     if (ff->open_flags & FOPEN_DIRECT_IO)
+> > > +             return fuse_direct_read_iter(iocb, to);
+> > > +
+> > >       /*
+> > >        * In auto invalidate mode, always update attributes on read.
+> > >        * Otherwise, only update if we attempt to read past EOF (to ensure
+> > > @@ -1426,11 +1426,12 @@ static ssize_t fuse_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
+> > >       ssize_t err;
+> > >       loff_t endbyte = 0;
+> > >
+> > > -     if (ff->open_flags & FOPEN_DIRECT_IO)
+> > > -             return fuse_direct_write_iter(iocb, from);
+> > >       if (IS_DAX(inode))
+> > >               return fuse_dax_write_iter(iocb, from);
+> > >
+> > > +     if (ff->open_flags & FOPEN_DIRECT_IO)
+> > > +             return fuse_direct_write_iter(iocb, from);
+> > > +
+> > >       if (get_fuse_conn(inode)->writeback_cache) {
+> > >               /* Update size (EOF optimization) and mode (SUID clearing) */
+> > >               err = fuse_update_attributes(mapping->host, file);
+> > > --
+> > > 1.8.3.1
+> > >
+> > > _______________________________________________
+> > > Virtio-fs mailing list
+> > > Virtio-fs@redhat.com
+> > > https://www.redhat.com/mailman/listinfo/virtio-fs
 

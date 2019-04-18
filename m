@@ -1,16 +1,15 @@
-Date: Wed, 17 Apr 2019 16:56:53 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190417205653.GB3003@redhat.com>
-References: <20190416180322.65113-1-bo.liu@linux.alibaba.com>
-	<20190416180322.65113-7-bo.liu@linux.alibaba.com>
-	<20190416193837.GE2222@redhat.com>
-	<CAOssrKcnCzt9+om9=5pFqGBAeNds7U3FWpXWHLp6KNgHmVZ=Pg@mail.gmail.com>
+Date: Thu, 18 Apr 2019 13:25:27 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190418122526.GE2984@work-vm>
+References: <20190416190858.16833-1-bo.liu@linux.alibaba.com>
+	<20190416190858.16833-2-bo.liu@linux.alibaba.com>
+	<20190417172621.GJ2839@work-vm>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <CAOssrKcnCzt9+om9=5pFqGBAeNds7U3FWpXWHLp6KNgHmVZ=Pg@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH 6/9] virtio-fs: let dax style override
- directIO style when dax+cache=none
+In-Reply-To: <20190417172621.GJ2839@work-vm>
+Subject: Re: [Virtio-fs] [PATCH 1/4] virtiofsd: send reply correctly on read
+ failure
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,59 +18,118 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <mszeredi@redhat.com>
+To: Liu Bo <bo.liu@linux.alibaba.com>, eguan@linux.alibaba.com
 Cc: virtio-fs@redhat.com
 
-On Wed, Apr 17, 2019 at 10:25:53AM +0200, Miklos Szeredi wrote:
-> On Tue, Apr 16, 2019 at 9:38 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> >
-> > On Wed, Apr 17, 2019 at 02:03:19AM +0800, Liu Bo wrote:
-> > > In case of dax+cache=none, mmap uses dax style prior to directIO style,
-> > > while read/write don't, but it seems that there is no reason not to do so.
-> > >
-> > > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
-> > > Reviewed-by: Joseph Qi <joseph.qi@linux.alibaba.com>
-> >
-> > This is interesting. I was thinking about it today itself. I noticed
-> > that ext4 and xfs also check for DAX inode first and use dax path
-> > if dax is enabled.
-> >
-> > cache=never sets FOPEN_DIRECT_IO (even if application never asked for
-> > direct IO). If dax is enabled, for data its equivalent to doing direct
-> > IO. And for mmap() we are already checking for DAX first. So it makes
-> > sense to do same thing for read/write path as well.
-> >
-> > CCing Miklos as well. He might have some thougts on this. I am curios
-> > that initially whey did he make this change only for mmap() and not
-> > for read/write paths.
+* Dr. David Alan Gilbert (dgilbert@redhat.com) wrote:
+> * Liu Bo (bo.liu@linux.alibaba.com) wrote:
+> > From: Eryu Guan <eguan@linux.alibaba.com>
+> > 
+> > Currently when a lo_read() operation fails, we don't send the failure
+> > back to fuse client, and read(2) operation from guest kernel would hang
+> > on waiting for the reply.
+> > 
+> > This is easily triggered by a direct read with non-aligned length.
+> > 
+> > Fix it by detecting preadv(2) error in virtio_send_data_iov(), and
+> > teaching fuse_reply_data() to reply error on error case.
 > 
-> AFAIR the main reason was that we had performance issues with size
-> extending writes with dax.
+> Thank you for spotting this.
+> 
+> > Reviewed-by: Liu Bo <bo.liu@linux.alibaba.com>
+> > Signed-off-by: Eryu Guan <eguan@linux.alibaba.com>
+> > ---
+> >  contrib/virtiofsd/fuse_lowlevel.c |  4 ++--
+> >  contrib/virtiofsd/fuse_virtio.c   | 12 +++++++++---
+> >  2 files changed, 11 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
+> > index 111c6e1..aeb5fe2 100644
+> > --- a/contrib/virtiofsd/fuse_lowlevel.c
+> > +++ b/contrib/virtiofsd/fuse_lowlevel.c
+> > @@ -524,11 +524,11 @@ int fuse_reply_data(fuse_req_t req, struct fuse_bufvec *bufv,
+> >  	out.error = 0;
+> >  
+> >  	res = fuse_send_data_iov(req->se, req->ch, iov, 1, bufv, flags);
+> > -	if (res <= 0) {
+> > +	if (res >= 0) {
+> 
+> I need to go and ask the upstream fuse list about this; it's not clear
+> to me what fuse_send_data_iov is supposed to return;  let me clarify
+> that and get back to you.
 
-Finally I decided to do some measurement on performance cost of file
-extending writes. I wrote a small program to keep on writing 5 bytes
-at the end of file 16K times and measure total time.
+Miklos replied to me on the upstream fuse list:
+https://sourceforge.net/p/fuse/mailman/fuse-devel/thread/CAOssrKdVViWewmh3nrfKkq6eaWNJ629AR7w90KG3XT2hV9_D1w%40mail.gmail.com/#msg36642807
 
-With cache=never and dax not enabled, it takes around 2.5 to 3 seconds.
-With cache=never and dax enabled (and code modified to call dax path),
-it takes around 12 to 13 seconds.
+so this comparison is actually already correct because a negative value
+means that something is wrong with the fuse connection (or in our case
+virtio) so we can't send an error reply anyway.
 
-So fallocate() path is definitely seem to be 4-5 times slower. I tried
-replacing fallocate() with truncate operation but that does not help
-much either.
+> Dave
+> 
+> >  		fuse_free_req(req);
+> >  		return res;
+> >  	} else {
+> > -		return fuse_reply_err(req, res);
+> > +		return fuse_reply_err(req, -res);
+> >  	}
+> >  }
+> >  
+> > diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
+> > index ca988aa..0b5736d 100644
+> > --- a/contrib/virtiofsd/fuse_virtio.c
+> > +++ b/contrib/virtiofsd/fuse_virtio.c
+> > @@ -333,8 +333,13 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+> >                  ret = preadv(buf->buf[0].fd, in_sg_ptr, in_sg_cpy_count, buf->buf[0].pos);
+> >  
+> >                  if (se->debug)
+> > -                        fprintf(stderr, "%s: preadv_res=%d len=%zd\n",
+> > -                                __func__, ret, len);
+> > +                        fprintf(stderr, "%s: preadv_res=%d(%s) len=%zd\n",
+> > +                                __func__, ret, strerror(errno), len);
+> > +                if (ret == -1) {
+> > +                        ret = -errno;
 
-Part of the reason it being slow seems to be fallocate() operation on
-host itself is expensive. It roughly took 4 seconds to perform 16K
-fallocate() requests while it took only 100 us to perform 16K write
-requests (as received by lo_write_buf()).
+So this will need to be      ret = errno    to give a postive error
+response to mean that the error was on the file side on the fuse side.
+(There's also another case below that where I set ret = EIO where it
+should be EIO I think)
 
-But that explains only about 4 seconds of extra latency. Assuming fuse
-and virtio communication latency is same between two commands (FUSE_WRITE,
-FUSE_FALLOCATE), not sure where another 5-6 seconds of latency comes
-from.
+> > +                        free(in_sg_cpy);
+> > +                        goto err;
+> > +                }
+> >                  if (ret < len && ret) {
+> >                          if (se->debug)
+> >                                  fprintf(stderr, "%s: ret < len\n", __func__);
+> > @@ -379,7 +384,8 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+> >          vu_queue_notify(&se->virtio_dev->dev, q);
+> >  
+> >  err:
+> > -        ch->qi->reply_sent = true;
+> > +        if (!ret)
+> > +                ch->qi->reply_sent = true;
 
-Apart from latency, fallocate() also has the issue that its not atomic.
+Yes, I think that's OK.
 
-Thanks
-Vivek
+Dave
+
+> >  
+> >          return ret;
+> >  }
+> > -- 
+> > 1.8.3.1
+> > 
+> > _______________________________________________
+> > Virtio-fs mailing list
+> > Virtio-fs@redhat.com
+> > https://www.redhat.com/mailman/listinfo/virtio-fs
+> --
+> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

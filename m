@@ -1,18 +1,10 @@
-Date: Mon, 22 Apr 2019 11:55:56 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190422185555.scxzrkckjeicld6o@US-160370MP2.local>
-References: <20190416180322.65113-1-bo.liu@linux.alibaba.com>
-	<20190416180322.65113-7-bo.liu@linux.alibaba.com>
-	<20190416193837.GE2222@redhat.com>
-	<CAOssrKcnCzt9+om9=5pFqGBAeNds7U3FWpXWHLp6KNgHmVZ=Pg@mail.gmail.com>
-	<20190417205653.GB3003@redhat.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20190417205653.GB3003@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 6/9] virtio-fs: let dax style override
- directIO style when dax+cache=none
-Reply-To: bo.liu@linux.alibaba.com
+From: Eryu Guan <eguan@linux.alibaba.com>
+Date: Tue, 23 Apr 2019 14:27:53 +0800
+Message-Id: <20190423062753.114282-1-eguan@linux.alibaba.com>
+In-Reply-To: <20190416190858.16833-2-bo.liu@linux.alibaba.com>
+References: <20190416190858.16833-2-bo.liu@linux.alibaba.com>
+Subject: [Virtio-fs] [PATCH v2] virtiofsd: send reply correctly on read
+	failure
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,67 +13,67 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, Miklos Szeredi <mszeredi@redhat.com>
+To: virtio-fs@redhat.com
 
-On Wed, Apr 17, 2019 at 04:56:53PM -0400, Vivek Goyal wrote:
-> On Wed, Apr 17, 2019 at 10:25:53AM +0200, Miklos Szeredi wrote:
-> > On Tue, Apr 16, 2019 at 9:38 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> > >
-> > > On Wed, Apr 17, 2019 at 02:03:19AM +0800, Liu Bo wrote:
-> > > > In case of dax+cache=none, mmap uses dax style prior to directIO style,
-> > > > while read/write don't, but it seems that there is no reason not to do so.
-> > > >
-> > > > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
-> > > > Reviewed-by: Joseph Qi <joseph.qi@linux.alibaba.com>
-> > >
-> > > This is interesting. I was thinking about it today itself. I noticed
-> > > that ext4 and xfs also check for DAX inode first and use dax path
-> > > if dax is enabled.
-> > >
-> > > cache=never sets FOPEN_DIRECT_IO (even if application never asked for
-> > > direct IO). If dax is enabled, for data its equivalent to doing direct
-> > > IO. And for mmap() we are already checking for DAX first. So it makes
-> > > sense to do same thing for read/write path as well.
-> > >
-> > > CCing Miklos as well. He might have some thougts on this. I am curios
-> > > that initially whey did he make this change only for mmap() and not
-> > > for read/write paths.
-> > 
-> > AFAIR the main reason was that we had performance issues with size
-> > extending writes with dax.
-> 
-> Finally I decided to do some measurement on performance cost of file
-> extending writes. I wrote a small program to keep on writing 5 bytes
-> at the end of file 16K times and measure total time.
-> 
-> With cache=never and dax not enabled, it takes around 2.5 to 3 seconds.
-> With cache=never and dax enabled (and code modified to call dax path),
-> it takes around 12 to 13 seconds.
-> 
-> So fallocate() path is definitely seem to be 4-5 times slower. I tried
-> replacing fallocate() with truncate operation but that does not help
-> much either.
-> 
-> Part of the reason it being slow seems to be fallocate() operation on
-> host itself is expensive. It roughly took 4 seconds to perform 16K
-> fallocate() requests while it took only 100 us to perform 16K write
-> requests (as received by lo_write_buf()).
+Currently when a lo_read() operation fails, we don't send the failure
+back to fuse client, and read(2) operation from guest kernel would hang
+on waiting for the reply.
 
-Hmm, I suppose that fallocate(2) would be much faster than posix_fallocate(2) as
-posix_fallocate(2) will write zero through the range while fallocate(2) just
-allocate extents on lower fs for the range.
+This is easily triggered by a direct read with non-aligned length.
 
-thanks,
--liubo
-> 
-> But that explains only about 4 seconds of extra latency. Assuming fuse
-> and virtio communication latency is same between two commands (FUSE_WRITE,
-> FUSE_FALLOCATE), not sure where another 5-6 seconds of latency comes
-> from.
-> 
-> Apart from latency, fallocate() also has the issue that its not atomic.
-> 
-> Thanks
-> Vivek
+Fix it by detecting preadv(2) error in virtio_send_data_iov(), and
+teaching fuse_reply_data() to reply error on error case.
+
+Reviewed-by: Liu Bo <bo.liu@linux.alibaba.com>
+Signed-off-by: Eryu Guan <eguan@linux.alibaba.com>
+---
+v2:
+- return postive error number on read error
+- also return postive EIO in short read case
+- drop "-1" -> "-EOPNOTSUPP" update, which should be in a sperate patch
+
+ contrib/virtiofsd/fuse_virtio.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
+index ca988aac923f..7337f2a2c3ab 100644
+--- a/contrib/virtiofsd/fuse_virtio.c
++++ b/contrib/virtiofsd/fuse_virtio.c
+@@ -333,8 +333,13 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+                 ret = preadv(buf->buf[0].fd, in_sg_ptr, in_sg_cpy_count, buf->buf[0].pos);
+ 
+                 if (se->debug)
+-                        fprintf(stderr, "%s: preadv_res=%d len=%zd\n",
+-                                __func__, ret, len);
++                        fprintf(stderr, "%s: preadv_res=%d(%s) len=%zd\n",
++                                __func__, ret, strerror(errno), len);
++                if (ret == -1) {
++                        ret = errno;
++                        free(in_sg_cpy);
++                        goto err;
++                }
+                 if (ret < len && ret) {
+                         if (se->debug)
+                                 fprintf(stderr, "%s: ret < len\n", __func__);
+@@ -356,7 +361,7 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+                 if (ret != len) {
+                         if (se->debug)
+                                 fprintf(stderr, "%s: ret!=len\n", __func__);
+-                        ret = -EIO;
++                        ret = EIO;
+                         free(in_sg_cpy);
+                         goto err;
+                 }
+@@ -379,7 +384,8 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+         vu_queue_notify(&se->virtio_dev->dev, q);
+ 
+ err:
+-        ch->qi->reply_sent = true;
++        if (ret == 0)
++                ch->qi->reply_sent = true;
+ 
+         return ret;
+ }
+-- 
+2.14.4.44.g2045bb6
 

@@ -1,20 +1,17 @@
-Date: Fri, 26 Apr 2019 10:05:24 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190426090524.GB1249@stefanha-x1.localdomain>
-References: <20190416190858.16833-1-bo.liu@linux.alibaba.com>
-	<20190416190858.16833-4-bo.liu@linux.alibaba.com>
-	<20190417145121.GG2839@work-vm>
-	<20190423120919.GG32465@stefanha-x1.localdomain>
-	<20190423184915.pkqbggfrbazz4bfd@US-160370MP2.local>
-	<20190425143323.GC17806@stefanha-x1.localdomain>
-	<20190425212158.GA32135@redhat.com>
+Date: Fri, 26 Apr 2019 17:58:39 -0700
+From: Liu Bo <bo.liu@linux.alibaba.com>
+Message-ID: <20190427005838.gqulorwvzscpgumz@US-160370MP2.local>
+References: <20190416180322.65113-1-bo.liu@linux.alibaba.com>
+	<20190424184130.GC8962@redhat.com>
+	<20190424231258.cbpsgwicldczqck6@US-160370MP2.local>
+	<20190425145950.GB17670@redhat.com>
+	<20190425181007.ybg4376jowcly7ir@US-160370MP2.local>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha1;
-	protocol="application/pgp-signature"; boundary="kORqDWCi7qDJ0mEj"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190425212158.GA32135@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 3/4] virtiofsd: use file-backend memory
- region for virtiofsd's cache area
+In-Reply-To: <20190425181007.ybg4376jowcly7ir@US-160370MP2.local>
+Subject: Re: [Virtio-fs] [PATCH 0/9] virtio-fs fixes
+Reply-To: bo.liu@linux.alibaba.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -26,119 +23,168 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: Vivek Goyal <vgoyal@redhat.com>
 Cc: virtio-fs@redhat.com
 
+On Thu, Apr 25, 2019 at 11:10:08AM -0700, Liu Bo wrote:
+> On Thu, Apr 25, 2019 at 10:59:50AM -0400, Vivek Goyal wrote:
+> > On Wed, Apr 24, 2019 at 04:12:59PM -0700, Liu Bo wrote:
+> > > Hi Vivek,
+> > > 
+> > > On Wed, Apr 24, 2019 at 02:41:30PM -0400, Vivek Goyal wrote:
+> > > > Hi Liubo,
+> > > > 
+> > > > I have made some fixes and took some of yours and pushed latest snapshot
+> > > > of my internal tree here.
+> > > > 
+> > > > https://github.com/rhvgoyal/linux/commits/virtio-fs-dev-5.1
+> > > > 
+> > > > Patches have been rebased to 5.1-rc5 kernel. I am thinking of updating
+> > > > this branch frequently with latest code.
+> > > 
+> > > With this branch, generic/476 still got hang, and yes, it's related to
+> > > "async page fault related events" just as what you've mentioned on #irc.
+> > > 
+> > > I confirmed this with kvm and kvmmmu tracepoints.
+> > > 
+> > > The tracepoints[1] showed that
+> > > [1]: https://paste.ubuntu.com/p/N9ngrthKCf/
+> > > 
+> > > ---
+> > > handle_ept_violation
+> > >   kvm_mmu_page_fault(error_code=182)
+> > >     tdp_page_fault
+> > >       fast_page_fault # spte not present
+> > >       try_async_pf #queue a async_pf work and return RETRY
+> > > 
+> > > vcpu_run
+> > >  kvm_check_async_pf_completion
+> > >    kvm_arch_async_page_ready
+> > >      tdp_page_fault(vcpu, work->gva, 0, true);
+> > >        fast_page_fault(error_code == 0);
+> > >        try_async_pf # found hpa
+> > >        __direct_map()
+> > > 	  set_spte(error_code == 0) # won't set the write bit
+> > > 
+> > > handle_ept_violation
+> > >   kvm_mmu_page_fault(error_code=1aa)
+> > >     tdp_page_fault
+> > >       fast_page_fault # spte present but no write bit
+> > >       try_async_pf # no hpa again queue a async_pf work and return RETRY
+> > 
+> > So why there is no "hpa"?
+> >
+> 
+> TBH, I have no idea, __gfn_to_pfn_memslot() did returned a pfn
+> successfully after async pf, but during its following EPT_VIOLATION,
+> __gfn_to_pfn_memslot() returned KVM_PFN_ERR_FAULT and indicated
+> callers to do another async pf, and over and over again.
+>
 
---kORqDWCi7qDJ0mEj
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+So I think I've figured out it, here is the summary,
 
-On Thu, Apr 25, 2019 at 05:21:58PM -0400, Vivek Goyal wrote:
-> On Thu, Apr 25, 2019 at 03:33:23PM +0100, Stefan Hajnoczi wrote:
-> > On Tue, Apr 23, 2019 at 11:49:15AM -0700, Liu Bo wrote:
-> > > On Tue, Apr 23, 2019 at 01:09:19PM +0100, Stefan Hajnoczi wrote:
-> > > > On Wed, Apr 17, 2019 at 03:51:21PM +0100, Dr. David Alan Gilbert wr=
-ote:
-> > > > > * Liu Bo (bo.liu@linux.alibaba.com) wrote:
-> > > > > > From: Xiaoguang Wang <xiaoguang.wang@linux.alibaba.com>
-> > > > > >=20
-> > > > > > When running xfstests test case generic/413, we found such issu=
-e:
-> > > > > >     1, create a file in one virtiofsd mount point with dax enab=
-led
-> > > > > >     2, mmap this file, get virtual addr: A
-> > > > > >     3, write(fd, A, len), here fd comes from another file in an=
-other
-> > > > > >        virtiofsd mount point without dax enabled, also note her=
-e write(2)
-> > > > > >        is direct io.
-> > > > > >     4, this direct io will hang forever, because the virtiofsd =
-has crashed.
-> > > > > > Here is the stack:
-> > > > > > [  247.166276] "echo 0 > /proc/sys/kernel/hung_task_timeout_sec=
-s" disables this message.
-> > > > > > [  247.167171] t_mmap_dio      D    0  2335   2102 0x00000000
-> > > > > > [  247.168006] Call Trace:
-> > > > > > [  247.169067]  ? __schedule+0x3d0/0x830
-> > > > > > [  247.170219]  schedule+0x32/0x80
-> > > > > > [  247.171328]  schedule_timeout+0x1e2/0x350
-> > > > > > [  247.172416]  ? fuse_direct_io+0x2e5/0x6b0 [fuse]
-> > > > > > [  247.173516]  wait_for_completion+0x123/0x190
-> > > > > > [  247.174593]  ? wake_up_q+0x70/0x70
-> > > > > > [  247.175640]  fuse_direct_IO+0x265/0x310 [fuse]
-> > > > > > [  247.176724]  generic_file_read_iter+0xaa/0xd20
-> > > > > > [  247.177824]  fuse_file_read_iter+0x81/0x130 [fuse]
-> > > > > > [  247.178938]  ? fuse_simple_request+0x104/0x1b0 [fuse]
-> > > > > > [  247.180041]  ? fuse_fsync_common+0xad/0x240 [fuse]
-> > > > > > [  247.181136]  __vfs_read+0x108/0x190
-> > > > > > [  247.181930]  vfs_read+0x91/0x130
-> > > > > > [  247.182671]  ksys_read+0x52/0xc0
-> > > > > > [  247.183454]  do_syscall_64+0x55/0x170
-> > > > > > [  247.184200]  entry_SYSCALL_64_after_hwframe+0x44/0xa9
-> > > > > >=20
-> > > > > > And virtiofsd crashed because vu_gpa_to_va() can not handle gue=
-st physical
-> > > > > > address correctly. For a memory mapped area in dax mode, indeed=
- the page
-> > > > > > for this area points virtiofsd's cache area, or rather virtio p=
-ci device's
-> > > > > > cache bar. In qemu, currently this cache bar is implemented wit=
-h an anonymous
-> > > > > > memory and will not pass this cache bar's address info to vhost=
--user backend,
-> > > > > > so vu_gpa_to_va() will fail.
-> > > > > >=20
-> > > > > > To fix this issue, we create this vhost cache area with a file =
-backend
-> > > > > > memory area.
-> > > > >=20
-> > > > > Thanks,
-> > > > >   I know there was another case of the daemon trying to access the
-> > > > > buffer that Stefan and Vivek hit, but fixed by persuading the ker=
-nel
-> > > > > not to do it;  Stefan/Vivek: What do you think?
-> > > >=20
-> > > > That case happened with cache=3Dnone and the dax mount option.
-> > > >=20
-> > > > The general problem is when FUSE_READ/FUSE_WRITE is sent and the bu=
-ffer
-> > > > is outside guest RAM.
->=20
-> Stefan,
->=20
-> Can this be emulated by sending a request to qemu? If virtiofsd can detect
-> that source/destination of READ/WRITE is not guest RAM, can it forward
-> message to qemu to do this operation (which has access to all the DAX
-> windows)?
->=20
-> This probably will mean introducing new messages like
-> setupmapping/removemapping messages between virtiofsd/qemu. =20
+virtiofs's dax write implementation sends a fallocate request to extend inode
+size and allocate space on the underlying fs so that the underlying mmap can
+fault in pages on demands.
 
-Yes, interesting idea!
+There're two problems here,
 
-When virtiofsd is unable to map the virtqueue iovecs due to addresses
-outside guest RAM, it could forward READ/WRITE requests to QEMU along
-with the file descriptor.  It would be slow but fixes the problem.
+1) virtiofs write(2) only checks if the write range is within inode size,
+   however, this doesn't work all the time because besides write(2) and
+   fallocate(2), inode size can also be extended by truncate(2) which doesn't
+   allocate space on the underlying fs, so when guest VM writes to this address,
+   it then causes a EPT_VIOLATION which will help fault-in the necessary page
+   from the underlying %vma, and if it's a write fault, page_mkwrite() will be
+   called, if the required space is not yet allocated, page_mkwrite() then tries
+   to allocate the space, which may fail with ENOSPC if the underlying fs has
+   already been full,
 
-Implementing this is a little tricky because the libvhost-user code
-probably fails before fuse_lowlevel.c is able to parse the FUSE request
-header.  It will require reworking libvhost-user and fuse_virtio.c code,
-I think.
+2) async pf doesn't check whether gup is successful.
 
-Stefan
+-------
+the call stack analysis:
 
---kORqDWCi7qDJ0mEj
-Content-Type: application/pgp-signature; name="signature.asc"
+(vcpu thread)
+handle_ept_violation
+|->kvm_mmu_page_fault(error_code=182)
+   |->tdp_page_fault
+      |->try_async_pf  # the 1st page fault (write fault)
+         |->__gfn_to_pfn_memslot
+           |->get_user_page
+              ->faultin_page
+                ->handle_mm_fault
+                  ->ext4_filemap_fault
+                    ->ext4_page_mkwrite # return -ENOSPC, the write fault fails
+        
+	     |->kvm_arch_setup_async_pf # schedule a async_pf work on kworker
+		    ->INIT_WORK(&work->work, async_pf_execute);
 
------BEGIN PGP SIGNATURE-----
+(kworker thread)
+async_pf_execute
+  ->get_user_pages_remote # the 2nd page fault (write fault)
 
-iQEcBAEBAgAGBQJcwsnUAAoJEJykq7OBq3PIy5UH/0Uj2mMnYf8vwpUR8Gc0u613
-f2dbsQbiRxaHgh6q1JtAqY8V97ImOeqNCHpGdJ/2rgdNKQVvAubux86TeLQ6H2Fm
-QvndX7ty8unv5mYAjAiOzmbDJFyoIdj9oN7t56vaLjwMF+3lLDgiLf64zzpFwD65
-HyCXAjgRZ4E1Luq7YYOVYNHI02SNxsPswKF9DGAZH0e0P89pRG2QErUsAQzZPaUk
-FZxcVuBH1Dt545q7HpyA/Pwg7uie5897iUPp1yxtBjNhDQmtAWBm5lOq1WHHFpNS
-ZOVpBngqPj4rui2XRHQg8QXrXzMVLF43+uFQflbjBj/UkipUn4Agyr8sozo/GDg=
-=B7YB
------END PGP SIGNATURE-----
 
---kORqDWCi7qDJ0mEj--
+(vcpu thread)
+vcpu_run
+|->kvm_check_async_pf_completion
+   |->kvm_arch_async_page_ready
+      |->tdp_page_fault
+	     |->try_async_pf # the 3rd page fault (read fault, successful)
+	     |->__direct_map
+	        |->set_spte # install spte into ept
+-------
+
+So Vivek is right about async_pf not checking gup's failure, but in the meantime
+we need to deal with 'truncate'.
+
+thanks,
+-liubo
+
+> > I was running a different test. I mmaped a file in guest, then truncated
+> > file to size 0 on host and then guest tried to read/write the mmaped
+> > region.
+> > 
+> > This will trigger async page fault on host. But given file size is zero,
+> > that page fault will not succeed.
+> >
+> 
+> I see, I checked the file I used on host, I could use FIEMAP to read
+> all its extent and it wasn't truncated.
+> 
+> > Current async pf logic has no notion of failure. It assumes it will always
+> > succeed. It does not even check the return code of
+> > get_user_pages_remote(), which can return error.
+> > 
+> > So there are few things to be done.
+> > 
+> > - Modify async pf logic so that it can it capture and report error.
+> > - If guest user space mmaped() file in question, then send SIGBUS to
+> >   process.
+> > - If guest kernel is trying to access memory which async pf can't
+> >   resolve, then create an escape path and return error to user
+> >   space. (something like memcpy_mcsafe() I think).
+> >
+> 
+> I need to think more about this, in my case, guest is just doing a
+> plain write(2) or writev(2), it shouldn't get into hang like that in
+> any case.
+> 
+> Thanks for sharing the code, will take a look.
+> 
+> thanks,
+> -liubo
+> > I was playing with this and made some progress. But that work is not
+> > complete. I thought of dealing with this problem later. If you are
+> > curious, I have pushed my unfinished code here.
+> > 
+> > Kernel:
+> > https://github.com/rhvgoyal/linux/commits/virtio-fs-dev-async-pf
+> > 
+> > Qemu:
+> > https://github.com/rhvgoyal/qemu/commits/virtio-fs-async-pf
+> > 
+> > Thanks
+> > Vivek
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 

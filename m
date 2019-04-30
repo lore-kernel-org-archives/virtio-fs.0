@@ -1,14 +1,14 @@
-Date: Tue, 23 Apr 2019 15:51:41 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190423195141.GA6547@redhat.com>
-References: <20190416180322.65113-1-bo.liu@linux.alibaba.com>
-	<20190416180322.65113-5-bo.liu@linux.alibaba.com>
+Date: Tue, 30 Apr 2019 15:58:27 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190430145826.GA2724@work-vm>
+References: <20190416190858.16833-2-bo.liu@linux.alibaba.com>
+	<20190423062753.114282-1-eguan@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190416180322.65113-5-bo.liu@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH 4/9] virtio-fs: fix use-after-free against
- virtio_fs_vq's fuse_dev info
+In-Reply-To: <20190423062753.114282-1-eguan@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: send reply correctly on read
+ failure
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,206 +17,81 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Liu Bo <bo.liu@linux.alibaba.com>
+To: Eryu Guan <eguan@linux.alibaba.com>
 Cc: virtio-fs@redhat.com
 
-Hi,
+* Eryu Guan (eguan@linux.alibaba.com) wrote:
+> Currently when a lo_read() operation fails, we don't send the failure
+> back to fuse client, and read(2) operation from guest kernel would hang
+> on waiting for the reply.
+> 
+> This is easily triggered by a direct read with non-aligned length.
+> 
+> Fix it by detecting preadv(2) error in virtio_send_data_iov(), and
+> teaching fuse_reply_data() to reply error on error case.
+> 
+> Reviewed-by: Liu Bo <bo.liu@linux.alibaba.com>
+> Signed-off-by: Eryu Guan <eguan@linux.alibaba.com>
 
-fuse code does not really track forget requests. If anyting has not been
-sent to fuse daemon, that is dropped during abort connection time.
 
-So it makes sense not to wait for these forget requests even in case of
-virtio-fs. All we are doing in completion is free request and fuse
-device does not have to be around by then.
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 
-Problem seems to be dependeny on fud->fpq->lock. How about if we use
-a different lock to provide locking around sending/receiving requests
-from vq. That way we don't have to use fpq->lock in this path and
-this problem should not happen. 
-
-Can you try following patch and see if it fixes the problem.
-
-Thanks
-Vivek
-
-Subject: virtio-fs: Use virtio_fs_vq->lock for locking vq
-
-Instead of using fuse_pqueue->lock, use virtio_fs_vq->lock for locking. That
-seems more logical as well as helps decouple fuse device and virtio_fs_vq.
-
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/virtio_fs.c |   41 ++++++++++++++++++++---------------------
- 1 file changed, 20 insertions(+), 21 deletions(-)
-
-Index: rhvgoyal-linux-fuse/fs/fuse/virtio_fs.c
-===================================================================
---- rhvgoyal-linux-fuse.orig/fs/fuse/virtio_fs.c	2019-04-16 11:34:34.805036786 -0400
-+++ rhvgoyal-linux-fuse/fs/fuse/virtio_fs.c	2019-04-23 15:03:40.139017074 -0400
-@@ -24,7 +24,8 @@ enum {
- 
- /* Per-virtqueue state */
- struct virtio_fs_vq {
--	struct virtqueue *vq;     /* protected by fpq->lock */
-+	spinlock_t lock;
-+	struct virtqueue *vq;     /* protected by lock */
- 	struct work_struct done_work;
- 	struct list_head queued_reqs;
- 	struct delayed_work dispatch_work;
-@@ -180,11 +181,10 @@ static void virtio_fs_hiprio_done_work(s
- {
- 	struct virtio_fs_vq *fsvq = container_of(work, struct virtio_fs_vq,
- 						 done_work);
--	struct fuse_pqueue *fpq = &fsvq->fud->pq;
- 	struct virtqueue *vq = fsvq->vq;
- 
- 	/* Free completed FUSE_FORGET requests */
--	spin_lock(&fpq->lock);
-+	spin_lock(&fsvq->lock);
- 	do {
- 		unsigned len;
- 		void *req;
-@@ -194,7 +194,7 @@ static void virtio_fs_hiprio_done_work(s
- 		while ((req = virtqueue_get_buf(vq, &len)) != NULL)
- 			kfree(req);
- 	} while (!virtqueue_enable_cb(vq) && likely(!virtqueue_is_broken(vq)));
--	spin_unlock(&fpq->lock);
-+	spin_unlock(&fsvq->lock);
- }
- 
- static void virtio_fs_dummy_dispatch_work(struct work_struct *work)
-@@ -207,7 +207,6 @@ static void virtio_fs_hiprio_dispatch_wo
- 	struct virtio_fs_forget *forget;
- 	struct virtio_fs_vq *fsvq = container_of(work, struct virtio_fs_vq,
- 						 dispatch_work.work);
--	struct fuse_pqueue *fpq = &fsvq->fud->pq;
- 	struct virtqueue *vq = fsvq->vq;
- 	struct scatterlist sg;
- 	struct scatterlist *sgs[] = {&sg};
-@@ -216,11 +215,11 @@ static void virtio_fs_hiprio_dispatch_wo
- 
- 	pr_debug("worker virtio_fs_hiprio_dispatch_work() called.\n");
- 	while(1) {
--		spin_lock(&fpq->lock);
-+		spin_lock(&fsvq->lock);
- 		forget = list_first_entry_or_null(&fsvq->queued_reqs,
- 					struct virtio_fs_forget, list);
- 		if (!forget) {
--			spin_unlock(&fpq->lock);
-+			spin_unlock(&fsvq->lock);
- 			return;
- 		}
- 
-@@ -243,12 +242,12 @@ static void virtio_fs_hiprio_dispatch_wo
- 					 " err=%d. Dropping it.\n", ret);
- 				kfree(forget);
- 			}
--			spin_unlock(&fpq->lock);
-+			spin_unlock(&fsvq->lock);
- 			return;
- 		}
- 
- 		notify = virtqueue_kick_prepare(vq);
--		spin_unlock(&fpq->lock);
-+		spin_unlock(&fsvq->lock);
- 
- 		if (notify)
- 			virtqueue_notify(vq);
-@@ -335,7 +334,7 @@ static void virtio_fs_requests_done_work
- 	LIST_HEAD(reqs);
- 
- 	/* Collect completed requests off the virtqueue */
--	spin_lock(&fpq->lock);
-+	spin_lock(&fsvq->lock);
- 	do {
- 		unsigned len;
- 
-@@ -344,7 +343,7 @@ static void virtio_fs_requests_done_work
- 		while ((req = virtqueue_get_buf(vq, &len)) != NULL)
- 			list_move_tail(&req->list, &reqs);
- 	} while (!virtqueue_enable_cb(vq) && likely(!virtqueue_is_broken(vq)));
--	spin_unlock(&fpq->lock);
-+	spin_unlock(&fsvq->lock);
- 
- 	/* End requests */
- 	list_for_each_entry_safe(req, next, &reqs, list) {
-@@ -413,9 +412,11 @@ static int virtio_fs_setup_vqs(struct vi
- 	INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].queued_reqs);
- 	INIT_DELAYED_WORK(&fs->vqs[VQ_HIPRIO].dispatch_work,
- 			virtio_fs_hiprio_dispatch_work);
-+	spin_lock_init(&fs->vqs[VQ_HIPRIO].lock);
- 
- 	/* Initialize the requests virtqueues */
- 	for (i = VQ_REQUEST; i < fs->nvqs; i++) {
-+		spin_lock_init(&fs->vqs[i].lock);
- 		INIT_WORK(&fs->vqs[i].done_work, virtio_fs_requests_done_work);
- 		INIT_DELAYED_WORK(&fs->vqs[i].dispatch_work,
- 					virtio_fs_dummy_dispatch_work);
-@@ -744,7 +745,6 @@ __releases(fiq->waitq.lock)
- {
- 	struct fuse_forget_link *link;
- 	struct virtio_fs_forget *forget;
--	struct fuse_pqueue *fpq;
- 	struct scatterlist sg;
- 	struct scatterlist *sgs[] = {&sg};
- 	struct virtio_fs *fs;
-@@ -788,8 +788,7 @@ __releases(fiq->waitq.lock)
- 	/* Enqueue the request */
- 	vq = fsvq->vq;
- 	dev_dbg(&vq->vdev->dev, "%s\n", __func__);
--	fpq = vq_to_fpq(vq);
--	spin_lock(&fpq->lock);
-+	spin_lock(&fsvq->lock);
- 
- 	ret = virtqueue_add_sgs(vq, sgs, 1, 0, forget, GFP_ATOMIC);
- 	if (ret < 0) {
-@@ -804,13 +803,13 @@ __releases(fiq->waitq.lock)
- 				 " Dropping it.\n", ret);
- 			kfree(forget);
- 		}
--		spin_unlock(&fpq->lock);
-+		spin_unlock(&fsvq->lock);
- 		goto out;
- 	}
- 
- 	notify = virtqueue_kick_prepare(vq);
- 
--	spin_unlock(&fpq->lock);
-+	spin_unlock(&fsvq->lock);
- 
- 	if (notify)
- 		virtqueue_notify(vq);
-@@ -903,7 +902,7 @@ static int virtio_fs_enqueue_req(struct
- 	struct scatterlist stack_sg[ARRAY_SIZE(stack_sgs)];
- 	struct scatterlist **sgs = stack_sgs;
- 	struct scatterlist *sg = stack_sg;
--	struct fuse_pqueue *fpq;
-+	struct virtio_fs_vq *fsvq;
- 	unsigned argbuf_used = 0;
- 	unsigned out_sgs = 0;
- 	unsigned in_sgs = 0;
-@@ -950,19 +949,19 @@ static int virtio_fs_enqueue_req(struct
- 	for (i = 0; i < total_sgs; i++)
- 		sgs[i] = &sg[i];
- 
--	fpq = vq_to_fpq(vq);
--	spin_lock(&fpq->lock);
-+	fsvq = vq_to_fsvq(vq);
-+	spin_lock(&fsvq->lock);
- 
- 	ret = virtqueue_add_sgs(vq, sgs, out_sgs, in_sgs, req, GFP_ATOMIC);
- 	if (ret < 0) {
- 		/* TODO handle full virtqueue */
--		spin_unlock(&fpq->lock);
-+		spin_unlock(&fsvq->lock);
- 		goto out;
- 	}
- 
- 	notify = virtqueue_kick_prepare(vq);
- 
--	spin_unlock(&fpq->lock);
-+	spin_unlock(&fsvq->lock);
- 
- 	if (notify)
- 		virtqueue_notify(vq);
+Thank you, I've added that to my dev tree.
+> ---
+> v2:
+> - return postive error number on read error
+> - also return postive EIO in short read case
+> - drop "-1" -> "-EOPNOTSUPP" update, which should be in a sperate patch
+> 
+>  contrib/virtiofsd/fuse_virtio.c | 14 ++++++++++----
+>  1 file changed, 10 insertions(+), 4 deletions(-)
+> 
+> diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
+> index ca988aac923f..7337f2a2c3ab 100644
+> --- a/contrib/virtiofsd/fuse_virtio.c
+> +++ b/contrib/virtiofsd/fuse_virtio.c
+> @@ -333,8 +333,13 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+>                  ret = preadv(buf->buf[0].fd, in_sg_ptr, in_sg_cpy_count, buf->buf[0].pos);
+>  
+>                  if (se->debug)
+> -                        fprintf(stderr, "%s: preadv_res=%d len=%zd\n",
+> -                                __func__, ret, len);
+> +                        fprintf(stderr, "%s: preadv_res=%d(%s) len=%zd\n",
+> +                                __func__, ret, strerror(errno), len);
+> +                if (ret == -1) {
+> +                        ret = errno;
+> +                        free(in_sg_cpy);
+> +                        goto err;
+> +                }
+>                  if (ret < len && ret) {
+>                          if (se->debug)
+>                                  fprintf(stderr, "%s: ret < len\n", __func__);
+> @@ -356,7 +361,7 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+>                  if (ret != len) {
+>                          if (se->debug)
+>                                  fprintf(stderr, "%s: ret!=len\n", __func__);
+> -                        ret = -EIO;
+> +                        ret = EIO;
+>                          free(in_sg_cpy);
+>                          goto err;
+>                  }
+> @@ -379,7 +384,8 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+>          vu_queue_notify(&se->virtio_dev->dev, q);
+>  
+>  err:
+> -        ch->qi->reply_sent = true;
+> +        if (ret == 0)
+> +                ch->qi->reply_sent = true;
+>  
+>          return ret;
+>  }
+> -- 
+> 2.14.4.44.g2045bb6
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

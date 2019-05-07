@@ -1,16 +1,10 @@
-Date: Fri, 3 May 2019 11:22:49 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190503152249.GA8014@redhat.com>
-References: <20190416180322.65113-1-bo.liu@linux.alibaba.com>
-	<20190416180322.65113-10-bo.liu@linux.alibaba.com>
-	<20190416180756.GA2222@redhat.com>
-	<20190502221014.b2k352rb5zleadxo@US-160370MP2.local>
-MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20190502221014.b2k352rb5zleadxo@US-160370MP2.local>
-Subject: Re: [Virtio-fs] [PATCH 9/9] fuse: fix deadlock in
- __fuse_file_fallocate()
+From: Liu Bo <bo.liu@linux.alibaba.com>
+Date: Tue,  7 May 2019 13:58:10 +0800
+Message-Id: <1557208691-43817-2-git-send-email-bo.liu@linux.alibaba.com>
+In-Reply-To: <1557208691-43817-1-git-send-email-bo.liu@linux.alibaba.com>
+References: <1557208691-43817-1-git-send-email-bo.liu@linux.alibaba.com>
+Subject: [Virtio-fs] [PATCH 1/2] virtio-fs: send setupmapping with write
+	flag only if IOMAP_WRITE
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,62 +13,67 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Liu Bo <bo.liu@linux.alibaba.com>
-Cc: virtio-fs@redhat.com
+To: virtio-fs@redhat.com
 
-Hi Liu Bo,
+This is to let virtiofs daemon to do inline fallocate to preallocate
+space for this mapping.
 
-Thanks. I fixed it now. Check it out. This change was part of my
-5.1-rc rebase (and not 4.19 rebase).
+Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+---
+ fs/fuse/file.c | 21 ++++++++++++++-------
+ 1 file changed, 14 insertions(+), 7 deletions(-)
 
-Thanks
-Vivek
-
-On Thu, May 02, 2019 at 03:10:15PM -0700, Liu Bo wrote:
-> On Tue, Apr 16, 2019 at 02:07:56PM -0400, Vivek Goyal wrote:
-> > On Wed, Apr 17, 2019 at 02:03:22AM +0800, Liu Bo wrote:
-> > > From: Xiaoguang Wang <xiaoguang.wang@linux.alibaba.com>
-> > > 
-> > > This bug is obvious, fix it.
-> > > 
-> > > Reviewed-by: Joseph Qi <joseph.qi@linux.alibaba.com>
-> > > Signed-off-by: Xiaoguang Wang <xiaoguang.wang@linux.alibaba.com>
-> > 
-> > Thanks. This one I ran into late last week while testing
-> > fallocate(PUNCH_HOLE) and fixed it already in my internal branch.
-> 
-> Hi Vivek,
-> 
-> FYI, the bug still exists in
-> https://github.com/rhvgoyal/linux/tree/virtio-fs-4.19.28
-> 
-> thanks,
-> -liubo
-> 
-> > 
-> > Vivek
-> > > ---
-> > >  fs/fuse/file.c | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-> > > index 6ab23d7..0236783 100644
-> > > --- a/fs/fuse/file.c
-> > > +++ b/fs/fuse/file.c
-> > > @@ -3623,7 +3623,7 @@ static long __fuse_file_fallocate(struct file *file, int mode,
-> > >  	if (mode & FALLOC_FL_PUNCH_HOLE) {
-> > >  		down_write(&fi->i_mmap_sem);
-> > >  		truncate_pagecache_range(inode, offset, offset + length - 1);
-> > > -		down_write(&fi->i_mmap_sem);
-> > > +		up_write(&fi->i_mmap_sem);
-> > >  	}
-> > >  	fuse_invalidate_attr(inode);
-> > >  
-> > > -- 
-> > > 1.8.3.1
-> > > 
-> > > _______________________________________________
-> > > Virtio-fs mailing list
-> > > Virtio-fs@redhat.com
-> > > https://www.redhat.com/mailman/listinfo/virtio-fs
+diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+index 488e932f..6f403c8 100644
+--- a/fs/fuse/file.c
++++ b/fs/fuse/file.c
+@@ -251,8 +251,8 @@ static void free_dax_mapping(struct fuse_conn *fc,
+ 
+ /* offset passed in should be aligned to FUSE_DAX_MEM_RANGE_SZ */
+ static int fuse_setup_one_mapping(struct inode *inode,
+-				struct file *file, loff_t offset,
+-				struct fuse_dax_mapping *dmap)
++				  struct file *file, loff_t offset, unsigned flags,
++				  struct fuse_dax_mapping *dmap)
+ {
+ 	struct fuse_conn *fc = get_fuse_conn(inode);
+ 	struct fuse_inode *fi = get_fuse_inode(inode);
+@@ -276,14 +276,21 @@ static int fuse_setup_one_mapping(struct inode *inode,
+ 		inarg.fh = -1;
+ 	inarg.moffset = dmap->window_offset;
+ 	inarg.len = FUSE_DAX_MEM_RANGE_SZ;
++
++       /*
++	* with IOMAP_WRITE, virtiofs daemon will make sure space is
++	* allocated for the range.
++	*/
+ 	if (file) {
+-		inarg.flags |= (file->f_mode & FMODE_WRITE) ?
+-				FUSE_SETUPMAPPING_FLAG_WRITE : 0;
++		if (file->f_mode & FMODE_WRITE &&
++		    flags & IOMAP_WRITE)
++			inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
+ 		inarg.flags |= (file->f_mode & FMODE_READ) ?
+ 				FUSE_SETUPMAPPING_FLAG_READ : 0;
+ 	} else {
+ 		inarg.flags |= FUSE_SETUPMAPPING_FLAG_READ;
+-		inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
++		if (flags & IOMAP_WRITE)
++			inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
+ 	}
+ 	args.in.h.opcode = FUSE_SETUPMAPPING;
+ 	args.in.h.nodeid = fi->nodeid;
+@@ -1847,8 +1854,8 @@ static int fuse_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
+ 
+ 		/* Setup one mapping */
+ 		ret = fuse_setup_one_mapping(inode, NULL,
+-				ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ),
+-				alloc_dmap);
++					ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ),
++					     flags, alloc_dmap);
+ 		if (ret < 0) {
+ 			printk("fuse_setup_one_mapping() failed. err=%d"
+ 				" pos=0x%llx\n", ret, pos);
+-- 
+1.8.3.1
 

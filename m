@@ -1,23 +1,22 @@
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
 	d=hyper-sh.20150623.gappssmtp.com; s=20150623;
 	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=4/2fNVDpxxWF/iTBtgbVqnrhn7JsKH269EvQqIiJKuQ=;
-	b=to7HgVt8fctmsfQKuMMihCjDiSmcuNtnq0GfeGjR4e3JFb3M5/l2r+effD9DSnM1SU
-	6+pB8fh8OyJVrFgyxfTZeH9b+sPsJdLBVayHmgy1bskNiSX6td3H/VEkp5bQ7SLZBxWk
-	3sZXzTQilrOWFDX2N3MqrlzHrc92b1KpLH29wN/CQy2mGvxO5rACb9XrqR1/kcPnXHTD
-	+5hIzU95/GXJOgpaz3VHtmIcjlZgFcNUQ/9D79TPQ/jTrNeNDEEv6I0smkwjS0/mHLSC
-	PsmF1JlS7tj/fiAQvPAE5K7pcbbU/bbQpjGAP3J7GSXQ4hvqvPLAWEQIGa4DSOdFeCHu
-	3lcA==
+	:cc; bh=106a9+JMppwXyNEse7e2T7leKITfT4y62/qDA5OK7Pg=;
+	b=L6q8TkHsJmI12S1coL8P1tTfUJPPxAHJzfzuZbMWNWs4fOYNGehB7h7z2yTj0i1NDT
+	9/WGWNwp9zFeSRoYUUPXwBHACgrSA9ma8ohaLyXro7q8uN407cEImjWVJbyj12OwsBRg
+	2nJgUrCzFvtOOPYbe5ULUaQI8Jqot42og8zyu8dyrLFGVBSnKnk98KUcSU0ZApaLeT36
+	YoPYiIFtVn314fo2GIQG7X9K1Hf5yQxAqBzlfo2s+WlEYA4glkpZSRs+FPJ9+keaucHT
+	nto28bhrc1q9yMyJ1Gvjyyd8vc+/ncbnb9OURy3LGisJVR+Fko/i9XzklYzC0sRMQIe0
+	17OQ==
 MIME-Version: 1.0
-References: <1557208691-43817-1-git-send-email-bo.liu@linux.alibaba.com>
-	<1557208691-43817-2-git-send-email-bo.liu@linux.alibaba.com>
-In-Reply-To: <1557208691-43817-2-git-send-email-bo.liu@linux.alibaba.com>
+References: <1557208720-44561-1-git-send-email-bo.liu@linux.alibaba.com>
+In-Reply-To: <1557208720-44561-1-git-send-email-bo.liu@linux.alibaba.com>
 From: Tao Peng <bergwolf@hyper.sh>
-Date: Tue, 7 May 2019 16:06:15 +0800
-Message-ID: <CACGKRzX4fEbf_zX1-OeD83swYKxWzqRoU4DebkYkmc1qDk4Swg@mail.gmail.com>
+Date: Tue, 7 May 2019 16:06:41 +0800
+Message-ID: <CACGKRzX2UwYRYmFiAmoLf0Fo9=6kGN6vjKocVL8qxoOW2eJBDA@mail.gmail.com>
 Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH 1/2] virtio-fs: send setupmapping with write
- flag only if IOMAP_WRITE
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: do fallocate for setupmapping
+ requests with write flag
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,67 +30,51 @@ Cc: virtio-fs@redhat.com
 
 On Tue, May 7, 2019 at 1:58 PM Liu Bo <bo.liu@linux.alibaba.com> wrote:
 >
-> This is to let virtiofs daemon to do inline fallocate to preallocate
-> space for this mapping.
+> We'll have to make sure filesystem has allocated space for the dax
+> mapping, otherwise, guest writes from virtiofs may hang since write
+> page fault is not able to be resolved if host fs is full
+> (->page_mkwrite() return -ENOSPC).
 >
 > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
 Reviewed-by: Peng Tao <bergwolf@hyper.sh>
 
 > ---
->  fs/fuse/file.c | 21 ++++++++++++++-------
->  1 file changed, 14 insertions(+), 7 deletions(-)
+>  contrib/virtiofsd/passthrough_ll.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
 >
-> diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-> index 488e932f..6f403c8 100644
-> --- a/fs/fuse/file.c
-> +++ b/fs/fuse/file.c
-> @@ -251,8 +251,8 @@ static void free_dax_mapping(struct fuse_conn *fc,
+> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+> index f14f471..1ddb68f 100644
+> --- a/contrib/virtiofsd/passthrough_ll.c
+> +++ b/contrib/virtiofsd/passthrough_ll.c
+> @@ -1897,12 +1897,28 @@ static void lo_setupmapping(fuse_req_t req, fuse_ino_t ino, uint64_t foffset,
 >
->  /* offset passed in should be aligned to FUSE_DAX_MEM_RANGE_SZ */
->  static int fuse_setup_one_mapping(struct inode *inode,
-> -                               struct file *file, loff_t offset,
-> -                               struct fuse_dax_mapping *dmap)
-> +                                 struct file *file, loff_t offset, unsigned flags,
-> +                                 struct fuse_dax_mapping *dmap)
->  {
->         struct fuse_conn *fc = get_fuse_conn(inode);
->         struct fuse_inode *fi = get_fuse_inode(inode);
-> @@ -276,14 +276,21 @@ static int fuse_setup_one_mapping(struct inode *inode,
->                 inarg.fh = -1;
->         inarg.moffset = dmap->window_offset;
->         inarg.len = FUSE_DAX_MEM_RANGE_SZ;
-> +
-> +       /*
-> +       * with IOMAP_WRITE, virtiofs daemon will make sure space is
-> +       * allocated for the range.
-> +       */
->         if (file) {
-> -               inarg.flags |= (file->f_mode & FMODE_WRITE) ?
-> -                               FUSE_SETUPMAPPING_FLAG_WRITE : 0;
-> +               if (file->f_mode & FMODE_WRITE &&
-> +                   flags & IOMAP_WRITE)
-> +                       inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
->                 inarg.flags |= (file->f_mode & FMODE_READ) ?
->                                 FUSE_SETUPMAPPING_FLAG_READ : 0;
->         } else {
->                 inarg.flags |= FUSE_SETUPMAPPING_FLAG_READ;
-> -               inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
-> +               if (flags & IOMAP_WRITE)
-> +                       inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
 >         }
->         args.in.h.opcode = FUSE_SETUPMAPPING;
->         args.in.h.nodeid = fi->nodeid;
-> @@ -1847,8 +1854,8 @@ static int fuse_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
 >
->                 /* Setup one mapping */
->                 ret = fuse_setup_one_mapping(inode, NULL,
-> -                               ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ),
-> -                               alloc_dmap);
-> +                                       ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ),
-> +                                            flags, alloc_dmap);
->                 if (ret < 0) {
->                         printk("fuse_setup_one_mapping() failed. err=%d"
->                                 " pos=0x%llx\n", ret, pos);
+> +        if (flags & O_WRONLY) {
+> +                /* this may allocate more space than we need. */
+> +                ret = fallocate(fd, FALLOC_FL_KEEP_SIZE, foffset, len);
+> +                if (ret < 0) {
+> +                        ret = errno;
+> +                        fprintf(stderr, "%s: fallocate fail (ino=%" PRId64 "fd=%d foffset=0x%" PRIx64 ")\n",
+> +                                __func__, ino, fi ? (int)fi->fh : lo_fd(req, ino), foffset);
+> +                        goto err;
+> +                }
+> +
+> +                if (lo_debug(req))
+> +                        fprintf(stderr, "fallocate (foffset=%" PRIx64 "moffset=%" PRIx64 ")\n",
+> +                                foffset, moffset);
+> +        }
+> +
+>          if (fuse_virtio_map(req, &msg, fd)) {
+>                  fprintf(stderr, "%s: map over virtio failed (ino=%" PRId64 "fd=%d moffset=0x%" PRIx64 ")\n",
+>                          __func__, ino, fi ? (int)fi->fh : lo_fd(req, ino), moffset);
+>                  ret = EINVAL;
+>          }
+>
+> +err:
+>         if (!fi)
+>                 close(fd);
+>         fuse_reply_err(req, ret);
 > --
 > 1.8.3.1
 >

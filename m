@@ -1,9 +1,11 @@
 From: Peng Tao <tao.peng@linux.alibaba.com>
-Date: Mon, 13 May 2019 22:41:08 +0800
-Message-Id: <20190513144109.21463-2-tao.peng@linux.alibaba.com>
-In-Reply-To: <20190513144109.21463-1-tao.peng@linux.alibaba.com>
+Date: Mon, 13 May 2019 22:41:09 +0800
+Message-Id: <20190513144109.21463-3-tao.peng@linux.alibaba.com>
+In-Reply-To: <20190513144109.21463-2-tao.peng@linux.alibaba.com>
 References: <20190513144109.21463-1-tao.peng@linux.alibaba.com>
-Subject: [Virtio-fs] [PATCH-v2 1/2] fuse: remove dmap when truncating inode
+	<20190513144109.21463-2-tao.peng@linux.alibaba.com>
+Subject: [Virtio-fs] [PATCH-v2 2/2] virtiofs: FUSE_REMOVEMAPPING support
+	multiple removing multiple entries
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,125 +17,162 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: virtio-fs@redhat.com
 Cc: Peng Tao <tao.peng@linux.alibaba.com>
 
-The obseleted dmap entries can be put back to global free list
-immediately and we don't have to rely on reclaim code to free them.
+Change FUSE_REMOVEMAPPING wire protocol so that we can remove
+multiple mappings in one call.
 
 Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
 ---
- fs/fuse/dir.c    |  5 +++++
- fs/fuse/file.c   | 55 ++++++++++++++++++++++++++++++++++++++----------
- fs/fuse/fuse_i.h |  2 ++
- 3 files changed, 51 insertions(+), 11 deletions(-)
+ fs/fuse/file.c            | 85 +++++++++++++++++++++++++++++++++------
+ include/uapi/linux/fuse.h |  9 ++++-
+ 2 files changed, 81 insertions(+), 13 deletions(-)
 
-diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
-index 3f923fe7841a..233c3ed391f1 100644
---- a/fs/fuse/dir.c
-+++ b/fs/fuse/dir.c
-@@ -1751,6 +1751,11 @@ int fuse_do_setattr(struct dentry *dentry, struct iattr *attr,
- 		down_write(&fi->i_mmap_sem);
- 		truncate_pagecache(inode, outarg.attr.size);
- 		invalidate_inode_pages2(inode->i_mapping);
-+		// Free dmap beyond i_size
-+		if (IS_DAX(inode) && oldsize > outarg.attr.size)
-+			fuse_dax_free_mappings_range(fc, inode,
-+						     outarg.attr.size, -1);
-+
- 		up_write(&fi->i_mmap_sem);
- 	}
- 
 diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index 7362aab3ee74..b9f6688c4062 100644
+index b9f6688c4062..41ec7fdb780e 100644
 --- a/fs/fuse/file.c
 +++ b/fs/fuse/file.c
-@@ -3848,7 +3848,6 @@ int fuse_dax_reclaim_dmap_locked(struct fuse_conn *fc, struct inode *inode,
- 		return ret;
- 	}
- 
--	/* Remove dax mapping from inode interval tree now */
- 	fuse_dax_interval_tree_remove(dmap, &fi->dmap_tree);
- 	fi->nr_dmaps--;
- 	return 0;
-@@ -3927,6 +3926,49 @@ static struct fuse_dax_mapping *alloc_dax_mapping_reclaim(struct fuse_conn *fc,
- 	}
+@@ -350,25 +350,80 @@ static int fuse_mkwrite_one_mapping(struct inode *inode, struct file *file,
+ 	return __fuse_setup_one_mapping(inode, file, offset, flags, dmap, true);
  }
  
-+/* Cleanup dmap entry and add back to free list */
-+static void fuse_dax_do_free_mapping_locked(struct fuse_conn *fc, struct fuse_dax_mapping *dmap)
-+{
-+	pr_debug("fuse: freed memory range start=0x%llx end=0x%llx "
-+		"window_offset=0x%llx length=0x%llx\n", dmap->start,
-+		dmap->end, dmap->window_offset, dmap->length);
-+	spin_lock(&fc->lock);
-+	__dmap_remove_busy_list(fc, dmap);
-+	dmap->inode = NULL;
-+	dmap->start = dmap->end = 0;
-+	__free_dax_mapping(fc, dmap);
-+	spin_unlock(&fc->lock);
-+}
-+
-+/*
-+ * Free inode dmap entries whose range falls entirely inside [start, end].
-+ * Called with inode->i_rwsem and fuse_inode->i_mmap_sem held.
-+ */
-+void fuse_dax_free_mappings_range(struct fuse_conn *fc, struct inode *inode, loff_t start, loff_t end)
-+{
-+	struct fuse_inode *fi = get_fuse_inode(inode);
-+	struct fuse_dax_mapping *dmap;
-+
-+	WARN_ON(!inode_is_locked(inode));
-+	WARN_ON(!rwsem_is_locked(&fi->i_mmap_sem));
-+
-+	/* interval tree search matches intersecting entries.
-+	 * Adjust the range to avoid dropping partial valid entries. */
-+	start = ALIGN(start, FUSE_DAX_MEM_RANGE_SZ);
-+	end = ALIGN_DOWN(end, FUSE_DAX_MEM_RANGE_SZ);
-+
-+	pr_debug("fuse: fuse_dax_free_mappings_range start=0x%llx, end=0x%llx\n", start, end);
-+	/* Lock ordering follows fuse_dax_free_one_mapping() */
-+	down_write(&fi->i_dmap_sem);
-+	while ((dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, start, end))) {
-+		fuse_dax_interval_tree_remove(dmap, &fi->dmap_tree);
-+		fi->nr_dmaps--;
-+		fuse_dax_do_free_mapping_locked(fc, dmap);
-+		fuse_removemapping_one(inode, dmap);
-+	}
-+	up_write(&fi->i_dmap_sem);
-+}
-+
- int fuse_dax_free_one_mapping_locked(struct fuse_conn *fc, struct inode *inode,
- 				u64 dmap_start)
+-static int fuse_removemapping_one(struct inode *inode,
+-					struct fuse_dax_mapping *dmap)
++static int fuse_send_removemapping_request(struct inode *inode,
++		struct fuse_removemapping_in_header *header,
++		struct fuse_removemapping_in *inargp)
  {
-@@ -3948,17 +3990,8 @@ int fuse_dax_free_one_mapping_locked(struct fuse_conn *fc, struct inode *inode,
- 	if (ret < 0)
- 		return ret;
+ 	struct fuse_inode *fi = get_fuse_inode(inode);
+ 	struct fuse_conn *fc = get_fuse_conn(inode);
+-	struct fuse_removemapping_in inarg;
+ 	FUSE_ARGS(args);
  
--	/* Cleanup dmap entry and add back to free list */
--	spin_lock(&fc->lock);
--	__dmap_remove_busy_list(fc, dmap);
--	dmap->inode = NULL;
--	dmap->start = dmap->end = 0;
--	__free_dax_mapping(fc, dmap);
--	spin_unlock(&fc->lock);
-+	fuse_dax_do_free_mapping_locked(fc, dmap);
- 
--	pr_debug("fuse: freed memory range window_offset=0x%llx,"
--				" length=0x%llx\n", dmap->window_offset,
--				dmap->length);
- 	return ret;
+-	memset(&inarg, 0, sizeof(inarg));
+-	inarg.moffset = dmap->window_offset;
+-	inarg.len = dmap->length;
+ 	args.in.h.opcode = FUSE_REMOVEMAPPING;
+ 	args.in.h.nodeid = fi->nodeid;
+-	args.in.numargs = 1;
+-	args.in.args[0].size = sizeof(inarg);
+-	args.in.args[0].value = &inarg;
++	args.in.numargs = 2;
++	args.in.args[0].size = sizeof(*header);
++	args.in.args[0].value = header;
++	args.in.args[1].size = header->num * sizeof(*inargp);
++	args.in.args[1].value = inargp;
+ 	return fuse_simple_request(fc, &args);
  }
  
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 20a8bfd63b80..894fc5e78589 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -1206,5 +1206,7 @@ void fuse_dax_free_mem_worker(struct work_struct *work);
- void fuse_removemapping(struct inode *inode);
- void fuse_end_pending_request(struct fuse_conn *fc, struct fuse_pqueue *fpq,
- 			      u64 unique, int err);
-+void fuse_dax_free_mappings_range(struct fuse_conn *fc, struct inode *inode,
-+			loff_t start, loff_t end);
++static int fuse_removemappings(struct inode *inode, unsigned num,
++				struct list_head *to_remove)
++{
++	struct fuse_removemapping_in *inargp, *ptr;
++	struct fuse_removemapping_in_header header;
++	struct fuse_dax_mapping *dmap;
++	int ret, i = 0;
++
++	if (num <= FUSE_REMOVEMAPPING_MAX_ENTRY) {
++		inargp = kmalloc_array(num, sizeof(*inargp), GFP_NOIO);
++	} else {
++		inargp = kmalloc_array(FUSE_REMOVEMAPPING_MAX_ENTRY,
++					sizeof(*inargp), GFP_NOIO);
++	}
++	if (inargp == NULL)
++		return -ENOMEM;
++
++	ptr = inargp;
++	list_for_each_entry(dmap, to_remove, list) {
++		ptr->moffset = dmap->window_offset;
++		ptr->len = dmap->length;
++		ptr++;
++		i++;
++		num--;
++		if (i >= FUSE_REMOVEMAPPING_MAX_ENTRY || num == 0) {
++			memset(&header, 0, sizeof(header));
++			header.num = i;
++			ret = fuse_send_removemapping_request(inode, &header, inargp);
++			if (ret)
++				goto out;
++			ptr = inargp;
++			i = 0;
++		}
++	}
++
++out:
++	kfree(inargp);
++	return ret;
++}
++
++static int fuse_removemapping_one(struct inode *inode,
++					struct fuse_dax_mapping *dmap)
++{
++	struct fuse_removemapping_in inarg;
++	struct fuse_removemapping_in_header header;
++
++	memset(&header, 0, sizeof(header));
++	/* TODO: fill in header.fh when available */
++	header.num = 1;
++	memset(&inarg, 0, sizeof(inarg));
++	inarg.moffset = dmap->window_offset;
++	inarg.len = dmap->length;
++
++	return fuse_send_removemapping_request(inode, &header, &inarg);
++}
++
+ /*
+  * It is called from evict_inode() and by that time inode is going away. So
+  * this function does not take any locks like fi->i_dmap_sem for traversing
+@@ -3947,7 +4002,9 @@ static void fuse_dax_do_free_mapping_locked(struct fuse_conn *fc, struct fuse_da
+ void fuse_dax_free_mappings_range(struct fuse_conn *fc, struct inode *inode, loff_t start, loff_t end)
+ {
+ 	struct fuse_inode *fi = get_fuse_inode(inode);
+-	struct fuse_dax_mapping *dmap;
++	struct fuse_dax_mapping *dmap, *n;
++	int num = 0;
++	LIST_HEAD(to_remove);
  
- #endif /* _FS_FUSE_I_H */
+ 	WARN_ON(!inode_is_locked(inode));
+ 	WARN_ON(!rwsem_is_locked(&fi->i_mmap_sem));
+@@ -3962,9 +4019,13 @@ void fuse_dax_free_mappings_range(struct fuse_conn *fc, struct inode *inode, lof
+ 	down_write(&fi->i_dmap_sem);
+ 	while ((dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, start, end))) {
+ 		fuse_dax_interval_tree_remove(dmap, &fi->dmap_tree);
+-		fi->nr_dmaps--;
++		num++;
++		list_add(&dmap->list, &to_remove);
++	}
++	fi->nr_dmaps -= num;
++	fuse_removemappings(inode, num, &to_remove);
++	list_for_each_entry_safe(dmap, n, &to_remove, list) {
+ 		fuse_dax_do_free_mapping_locked(fc, dmap);
+-		fuse_removemapping_one(inode, dmap);
+ 	}
+ 	up_write(&fi->i_dmap_sem);
+ }
+diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
+index dbc5013ad747..04a4204e7f98 100644
+--- a/include/uapi/linux/fuse.h
++++ b/include/uapi/linux/fuse.h
+@@ -817,13 +817,20 @@ struct fuse_setupmapping_out {
+         uint64_t	len[FUSE_SETUPMAPPING_ENTRIES];
+ };
+ 
+-struct fuse_removemapping_in {
++struct fuse_removemapping_in_header {
+         /* An already open handle */
+         uint64_t	fh;
++	/* number of fuse_removemapping_in follows */
++	unsigned	num;
++};
++
++struct fuse_removemapping_in {
+ 	/* Offset into the dax window start the unmapping */
+ 	uint64_t        moffset;
+         /* Length of mapping required */
+         uint64_t	len;
+ };
++#define FUSE_REMOVEMAPPING_MAX_ENTRY	\
++		(PAGE_SIZE / sizeof(struct fuse_removemapping_in))
+ 
+ #endif /* _LINUX_FUSE_H */
 -- 
 2.17.1
 

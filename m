@@ -1,8 +1,14 @@
-From: Peng Tao <tao.peng@linux.alibaba.com>
-Date: Mon, 13 May 2019 22:41:44 +0800
-Message-Id: <20190513144144.21646-1-tao.peng@linux.alibaba.com>
-Subject: [Virtio-fs] [PATCH] virtiofsd: make FUSE_REMOVEMAPPING support
-	multiple entries
+Date: Wed, 15 May 2019 16:10:05 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20190515151005.GI29507@stefanha-x1.localdomain>
+References: <1557208720-44561-1-git-send-email-bo.liu@linux.alibaba.com>
+MIME-Version: 1.0
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="hABqaeELJqnDDeDE"
+Content-Disposition: inline
+In-Reply-To: <1557208720-44561-1-git-send-email-bo.liu@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: do fallocate for setupmapping
+ requests with write flag
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -11,151 +17,104 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
-Cc: Peng Tao <tao.peng@linux.alibaba.com>
+To: Liu Bo <bo.liu@linux.alibaba.com>
+Cc: virtio-fs@redhat.com
 
-The fuse wire protocol is changed so that we can unmap multiple
-mappings in a single call.
 
-Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
----
- contrib/virtiofsd/fuse_kernel.h    |  9 +++++++--
- contrib/virtiofsd/fuse_lowlevel.c  | 21 ++++++++++++++------
- contrib/virtiofsd/fuse_lowlevel.h  |  5 +++--
- contrib/virtiofsd/passthrough_ll.c | 31 ++++++++++++++++++++----------
- 4 files changed, 46 insertions(+), 20 deletions(-)
+--hABqaeELJqnDDeDE
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-diff --git a/contrib/virtiofsd/fuse_kernel.h b/contrib/virtiofsd/fuse_kernel.h
-index ce46046a4f..093cacff02 100644
---- a/contrib/virtiofsd/fuse_kernel.h
-+++ b/contrib/virtiofsd/fuse_kernel.h
-@@ -830,9 +830,14 @@ struct fuse_setupmapping_out {
-         uint64_t        len[FUSE_SETUPMAPPING_ENTRIES];
- };
- 
--struct fuse_removemapping_in {
-+struct fuse_removemapping_in_header {
-         /* An already open handle */
--	uint64_t	fh;
-+        uint64_t        fh;
-+        /* number of fuse_removemapping_in follows */
-+        unsigned        num;
-+};
-+
-+struct fuse_removemapping_in {
-         /* Offset into the dax to start the unmapping */
-         uint64_t        moffset;
-         /* Length of mapping required */
-diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
-index 111c6e1636..4619865c2c 100644
---- a/contrib/virtiofsd/fuse_lowlevel.c
-+++ b/contrib/virtiofsd/fuse_lowlevel.c
-@@ -1907,21 +1907,30 @@ static void do_setupmapping(fuse_req_t req, fuse_ino_t nodeid,
- static void do_removemapping(fuse_req_t req, fuse_ino_t nodeid,
- 			     struct fuse_mbuf_iter *iter)
- {
--	struct fuse_removemapping_in *arg;
-+	struct fuse_removemapping_in_header *header;
-+	struct fuse_removemapping_in *argp;
-         struct fuse_file_info fi;
- 
--	arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
--	if (!arg) {
-+	header = fuse_mbuf_iter_advance(iter, sizeof(*header));
-+	if (!header || header->num <= 0) {
-+		fprintf(stderr, "do_removemapping: invalid header %p\n", header);
-+		fuse_reply_err(req, EINVAL);
-+		return;
-+	}
-+
-+	argp = fuse_mbuf_iter_advance(iter, header->num * sizeof(*argp));
-+	if (!argp) {
-+		fprintf(stderr, "do_removemapping: invalid in, expected %d * %ld, has %ld - %ld\n",
-+				header->num, sizeof(*argp), iter->size, iter->pos);
- 		fuse_reply_err(req, EINVAL);
- 		return;
- 	}
- 
-         memset(&fi, 0, sizeof(fi));
--	fi.fh = arg->fh;
-+	fi.fh = header->fh;
- 
- 	if (req->se->op.removemapping)
--		req->se->op.removemapping(req, req->se, nodeid, arg->moffset,
--                                          arg->len, &fi);
-+		req->se->op.removemapping(req, req->se, nodeid, header->num, argp, &fi);
- 	else
- 		fuse_reply_err(req, ENOSYS);
- }
-diff --git a/contrib/virtiofsd/fuse_lowlevel.h b/contrib/virtiofsd/fuse_lowlevel.h
-index 6a001c4605..b2b8747074 100644
---- a/contrib/virtiofsd/fuse_lowlevel.h
-+++ b/contrib/virtiofsd/fuse_lowlevel.h
-@@ -23,6 +23,7 @@
- #endif
- 
- #include "fuse_common.h"
-+#include "fuse_kernel.h"
- 
- #include <utime.h>
- #include <fcntl.h>
-@@ -1200,8 +1201,8 @@ struct fuse_lowlevel_ops {
-          * TODO
-          */
-         void (*removemapping) (fuse_req_t req, struct fuse_session *se,
--                               fuse_ino_t ino, uint64_t moffset,
--                               uint64_t len, struct fuse_file_info *fi);
-+                               fuse_ino_t ino, unsigned num,
-+                               struct fuse_removemapping_in *args, struct fuse_file_info *fi);
- };
- 
- /**
-diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-index 1ddb68f1db..96d5468ead 100644
---- a/contrib/virtiofsd/passthrough_ll.c
-+++ b/contrib/virtiofsd/passthrough_ll.c
-@@ -1925,20 +1925,31 @@ err:
- }
- 
- static void lo_removemapping(fuse_req_t req, struct fuse_session *se,
--                             fuse_ino_t ino, uint64_t moffset,
--                             uint64_t len, struct fuse_file_info *fi)
-+                             fuse_ino_t ino, unsigned num,
-+			     struct fuse_removemapping_in *argsp,
-+			     struct fuse_file_info *fi)
- {
-         VhostUserFSSlaveMsg msg = { 0 };
- 	int ret = 0;
- 
--	msg.len[0] = len;
--	msg.c_offset[0] = moffset;
--        if (fuse_virtio_unmap(se, &msg)) {
--                fprintf(stderr,
--                        "%s: unmap over virtio failed "
--                        "(offset=0x%lx, len=0x%lx)\n", __func__, moffset, len);
--                ret = EINVAL;
--        }
-+	for (int i = 0; num > 0; i++, argsp++) {
-+		msg.len[i] = argsp->len;
-+		msg.c_offset[i] = argsp->moffset;
-+
-+		if (--num == 0 || i == VHOST_USER_FS_SLAVE_ENTRIES - 1) {
-+			if (fuse_virtio_unmap(se, &msg)) {
-+				fprintf(stderr,
-+					"%s: unmap over virtio failed "
-+					"(offset=0x%lx, len=0x%lx)\n", __func__, argsp->moffset, argsp->len);
-+				ret = EINVAL;
-+				break;
-+			}
-+			if (num > 0) {
-+				i = 0;
-+				memset(&msg, 0, sizeof(msg));
-+			}
-+		}
-+	}
- 
- 	fuse_reply_err(req, ret);
- }
--- 
-2.17.1
+On Tue, May 07, 2019 at 01:58:40PM +0800, Liu Bo wrote:
+> We'll have to make sure filesystem has allocated space for the dax
+> mapping, otherwise, guest writes from virtiofs may hang since write
+> page fault is not able to be resolved if host fs is full
+> (->page_mkwrite() return -ENOSPC).
+
+The issues I see with fallocate are:
+
+1. Space is now reserved for anything that is mapped with the write bit,
+   even pages that are never written.  This defeats sparseness, which is
+   often relied on by applications and users to minimize space usage.
+
+2. The setupmapping performance suffers from the fallocate overhead.
+
+I tend to think that KVM's fault handling should be fixed to check
+return values so that the infinite loop is avoided.  The root cause is
+in kvm.ko, not in virtiofsd, and fallocate is a workaround rather than a
+full fix.
+
+Vivek: Do you have code that stops the async pagefault infinite loop in
+kvm.ko?
+
+> Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+> ---
+>  contrib/virtiofsd/passthrough_ll.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+>=20
+> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passt=
+hrough_ll.c
+> index f14f471..1ddb68f 100644
+> --- a/contrib/virtiofsd/passthrough_ll.c
+> +++ b/contrib/virtiofsd/passthrough_ll.c
+> @@ -1897,12 +1897,28 @@ static void lo_setupmapping(fuse_req_t req, fuse_=
+ino_t ino, uint64_t foffset,
+> =20
+>  	}
+> =20
+> +        if (flags & O_WRONLY) {
+> +                /* this may allocate more space than we need. */
+> +                ret =3D fallocate(fd, FALLOC_FL_KEEP_SIZE, foffset, len);
+> +                if (ret < 0) {
+> +                        ret =3D errno;
+> +                        fprintf(stderr, "%s: fallocate fail (ino=3D%" PR=
+Id64 "fd=3D%d foffset=3D0x%" PRIx64 ")\n",
+> +                                __func__, ino, fi ? (int)fi->fh : lo_fd(=
+req, ino), foffset);
+> +                        goto err;
+> +                }
+> +
+> +                if (lo_debug(req))
+> +                        fprintf(stderr, "fallocate (foffset=3D%" PRIx64 =
+"moffset=3D%" PRIx64 ")\n",
+> +                                foffset, moffset);
+> +        }
+> +
+>          if (fuse_virtio_map(req, &msg, fd)) {
+>                  fprintf(stderr, "%s: map over virtio failed (ino=3D%" PR=
+Id64 "fd=3D%d moffset=3D0x%" PRIx64 ")\n",
+>                          __func__, ino, fi ? (int)fi->fh : lo_fd(req, ino=
+), moffset);
+>                  ret =3D EINVAL;
+>          }
+> =20
+> +err:
+>  	if (!fi)
+>  		close(fd);
+>  	fuse_reply_err(req, ret);
+> --=20
+> 1.8.3.1
+>=20
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
+
+--hABqaeELJqnDDeDE
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAlzcK80ACgkQnKSrs4Gr
+c8jn1ggApepSGeUUH67OPw0lIiMOtj1Tq2CsjA6GKGiD18JisWpwD3gMPefwXwuu
+nzh+/hywX1BUEolxnQoECsVEvvqTSjpQnoa6ATEgWDESsAEQc4hinmIvS3yhUU+f
+o8aUyd/VHVrQ7FdA3NiGRnSqlD4/nC0dxREur+JKNu6yKUFeOnZPXmVPgJPwyF6/
+d4tTmbBC1UqshbgX+/YhrQWGzIpTrurbszgza63OJKgfWDU2VPVJ2Tk4uGhhlKqT
+idXWpd5MwTLgJ/IT6bQQj42lVObCRx/vyIOTNZ/T/sxfLO67pmUSGcMzqibKSzpW
+BVXt2MVutBhgP4BFAi3MO9R8N+gl7A==
+=UF4X
+-----END PGP SIGNATURE-----
+
+--hABqaeELJqnDDeDE--
 

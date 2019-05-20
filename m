@@ -1,6 +1,6 @@
-Date: Mon, 20 May 2019 18:58:07 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190520175806.GJ2726@work-vm>
+Date: Mon, 20 May 2019 11:33:58 -0700
+From: Liu Bo <bo.liu@linux.alibaba.com>
+Message-ID: <20190520183357.ffniox6gve3of4gw@US-160370MP2.local>
 References: <20190416190858.16833-1-bo.liu@linux.alibaba.com>
 	<20190416190858.16833-4-bo.liu@linux.alibaba.com>
 	<20190417145121.GG2839@work-vm>
@@ -10,12 +10,14 @@ References: <20190416190858.16833-1-bo.liu@linux.alibaba.com>
 	<20190425212158.GA32135@redhat.com>
 	<20190426090524.GB1249@stefanha-x1.localdomain>
 	<20190518022821.zjumw623xot2ejgt@US-160370MP2.local>
+	<20190520134934.GB28008@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190518022821.zjumw623xot2ejgt@US-160370MP2.local>
+In-Reply-To: <20190520134934.GB28008@redhat.com>
 Subject: Re: [Virtio-fs] [PATCH 3/4] virtiofsd: use file-backend memory
  region for virtiofsd's cache area
+Reply-To: bo.liu@linux.alibaba.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,123 +26,77 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Liu Bo <bo.liu@linux.alibaba.com>
-Cc: virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com
 
-* Liu Bo (bo.liu@linux.alibaba.com) wrote:
-> On Fri, Apr 26, 2019 at 10:05:24AM +0100, Stefan Hajnoczi wrote:
-> > On Thu, Apr 25, 2019 at 05:21:58PM -0400, Vivek Goyal wrote:
-> > > On Thu, Apr 25, 2019 at 03:33:23PM +0100, Stefan Hajnoczi wrote:
-> > > > On Tue, Apr 23, 2019 at 11:49:15AM -0700, Liu Bo wrote:
-> > > > > On Tue, Apr 23, 2019 at 01:09:19PM +0100, Stefan Hajnoczi wrote:
-> > > > > > On Wed, Apr 17, 2019 at 03:51:21PM +0100, Dr. David Alan Gilbert wrote:
-> > > > > > > * Liu Bo (bo.liu@linux.alibaba.com) wrote:
-> > > > > > > > From: Xiaoguang Wang <xiaoguang.wang@linux.alibaba.com>
-> > > > > > > > 
-> > > > > > > > When running xfstests test case generic/413, we found such issue:
-> > > > > > > >     1, create a file in one virtiofsd mount point with dax enabled
-> > > > > > > >     2, mmap this file, get virtual addr: A
-> > > > > > > >     3, write(fd, A, len), here fd comes from another file in another
-> > > > > > > >        virtiofsd mount point without dax enabled, also note here write(2)
-> > > > > > > >        is direct io.
-> > > > > > > >     4, this direct io will hang forever, because the virtiofsd has crashed.
-> > > > > > > > Here is the stack:
-> > > > > > > > [  247.166276] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
-> > > > > > > > [  247.167171] t_mmap_dio      D    0  2335   2102 0x00000000
-> > > > > > > > [  247.168006] Call Trace:
-> > > > > > > > [  247.169067]  ? __schedule+0x3d0/0x830
-> > > > > > > > [  247.170219]  schedule+0x32/0x80
-> > > > > > > > [  247.171328]  schedule_timeout+0x1e2/0x350
-> > > > > > > > [  247.172416]  ? fuse_direct_io+0x2e5/0x6b0 [fuse]
-> > > > > > > > [  247.173516]  wait_for_completion+0x123/0x190
-> > > > > > > > [  247.174593]  ? wake_up_q+0x70/0x70
-> > > > > > > > [  247.175640]  fuse_direct_IO+0x265/0x310 [fuse]
-> > > > > > > > [  247.176724]  generic_file_read_iter+0xaa/0xd20
-> > > > > > > > [  247.177824]  fuse_file_read_iter+0x81/0x130 [fuse]
-> > > > > > > > [  247.178938]  ? fuse_simple_request+0x104/0x1b0 [fuse]
-> > > > > > > > [  247.180041]  ? fuse_fsync_common+0xad/0x240 [fuse]
-> > > > > > > > [  247.181136]  __vfs_read+0x108/0x190
-> > > > > > > > [  247.181930]  vfs_read+0x91/0x130
-> > > > > > > > [  247.182671]  ksys_read+0x52/0xc0
-> > > > > > > > [  247.183454]  do_syscall_64+0x55/0x170
-> > > > > > > > [  247.184200]  entry_SYSCALL_64_after_hwframe+0x44/0xa9
-> > > > > > > > 
-> > > > > > > > And virtiofsd crashed because vu_gpa_to_va() can not handle guest physical
-> > > > > > > > address correctly. For a memory mapped area in dax mode, indeed the page
-> > > > > > > > for this area points virtiofsd's cache area, or rather virtio pci device's
-> > > > > > > > cache bar. In qemu, currently this cache bar is implemented with an anonymous
-> > > > > > > > memory and will not pass this cache bar's address info to vhost-user backend,
-> > > > > > > > so vu_gpa_to_va() will fail.
-> > > > > > > > 
-> > > > > > > > To fix this issue, we create this vhost cache area with a file backend
-> > > > > > > > memory area.
+On Mon, May 20, 2019 at 09:49:34AM -0400, Vivek Goyal wrote:
+> On Fri, May 17, 2019 at 07:28:22PM -0700, Liu Bo wrote:
+> 
+> [..]
+> > > > > > > That case happened with cache=none and the dax mount option.
 > > > > > > > 
-> > > > > > > Thanks,
-> > > > > > >   I know there was another case of the daemon trying to access the
-> > > > > > > buffer that Stefan and Vivek hit, but fixed by persuading the kernel
-> > > > > > > not to do it;  Stefan/Vivek: What do you think?
-> > > > > > 
-> > > > > > That case happened with cache=none and the dax mount option.
-> > > > > > 
-> > > > > > The general problem is when FUSE_READ/FUSE_WRITE is sent and the buffer
-> > > > > > is outside guest RAM.
+> > > > > > > The general problem is when FUSE_READ/FUSE_WRITE is sent and the buffer
+> > > > > > > is outside guest RAM.
+> > > > 
+> > > > Stefan,
+> > > > 
+> > > > Can this be emulated by sending a request to qemu? If virtiofsd can detect
+> > > > that source/destination of READ/WRITE is not guest RAM, can it forward
+> > > > message to qemu to do this operation (which has access to all the DAX
+> > > > windows)?
+> > > > 
+> > > > This probably will mean introducing new messages like
+> > > > setupmapping/removemapping messages between virtiofsd/qemu.  
 > > > 
-> > > Stefan,
+> > > Yes, interesting idea!
 > > > 
-> > > Can this be emulated by sending a request to qemu? If virtiofsd can detect
-> > > that source/destination of READ/WRITE is not guest RAM, can it forward
-> > > message to qemu to do this operation (which has access to all the DAX
-> > > windows)?
-> > > 
-> > > This probably will mean introducing new messages like
-> > > setupmapping/removemapping messages between virtiofsd/qemu.  
+> > > When virtiofsd is unable to map the virtqueue iovecs due to addresses
+> > > outside guest RAM, it could forward READ/WRITE requests to QEMU along
+> > > with the file descriptor.  It would be slow but fixes the problem.
+> > >
 > > 
-> > Yes, interesting idea!
+> > It is probably not easy to do.
 > > 
-> > When virtiofsd is unable to map the virtqueue iovecs due to addresses
-> > outside guest RAM, it could forward READ/WRITE requests to QEMU along
-> > with the file descriptor.  It would be slow but fixes the problem.
-> >
-> 
-> It is probably not easy to do.
-> 
-> Imagine the following case,
-> // foo1 is on a dax virtiofs, foo2 is on a nondax virtiofs
-> 
-> p = mmap(foo1, ...);
-> write(foo2, p, ...);
-> 
-> virtiofsd where foo2 is using needs to interpret gpa from virtiofs
-> where foo1 exists along with fd being foo1, but a write fuse_req
-> doesn't have foo1's fd.
-> 
-> And are you suggesting that qemu goes to read the data on gpa and
-> returns via vhost-user message?  or let this virtiofsd (foo2) do mmap
-> on foo1 directly?
-
-I have a patchset I'm just tidying up that passes this case back to qemu
-to handle.  I intend to post it by the end of the week.
-
-What it does is that when the virtiofsd receives a read/write to an area
-of memory that it doesn't have a mapping for, it forms a new slave
-message back to qemu together with the fd asking qemu to read/write at
-the given GPA.  Then it's upto QEMU to deal with it.
-
-That should work even if there are two separate daemons.
-
-It's not a pretty solution; but I think it should work.
-
-Dave
-
-> thanks,
-> -liubo
-> 
-> > Implementing this is a little tricky because the libvhost-user code
-> > probably fails before fuse_lowlevel.c is able to parse the FUSE request
-> > header.  It will require reworking libvhost-user and fuse_virtio.c code,
-> > I think.
+> > Imagine the following case,
+> > // foo1 is on a dax virtiofs, foo2 is on a nondax virtiofs
 > > 
-> > Stefan
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> > p = mmap(foo1, ...);
+> > write(foo2, p, ...);
+> > 
+> > virtiofsd where foo2 is using needs to interpret gpa from virtiofs
+> > where foo1 exists along with fd being foo1, but a write fuse_req
+> > doesn't have foo1's fd.
+> > 
+> > And are you suggesting that qemu goes to read the data on gpa and
+> > returns via vhost-user message?  or let this virtiofsd (foo2) do mmap
+> > on foo1 directly?
+> 
+> Hi Liu Bo,
+> 
+> Not sure I understand the question. Assuming foo2 virtiofs instances
+> is mounted with cache=none, write(foo2), will trigger FUSE_WRITE
+> request to daemon with source address being in dax window of first
+> virtiofs instance. 
+> 
+> This request should be forwarded to qemu which can just read from
+> foo1 mmaped area in qemu address space and write to foo2. I am assuming
+> before FUSE_WRITE comes in, mapping for foo1 has already been
+> establied.
+
+Bofore sending any message to qemu, fv_queue_thread() will fail at
+vu_queue_pop()->vu_queue_map_desc()->virtqueue_map_desc()->vu_gpa_to_va(),
+because virtiofsd (where foo2 is on) doesn't have the information of
+foo1's mapping within its address space.
+
+It could be reproduced by fstests/generic/413.
+
+thanks,
+-liubo
+
+> 
+> IOW, foo1 is already mmaped in qemu address space so there is no
+> need to pass fd of foo1 in FUSE_WRITE(foo2) request. Did I miss
+> something?
+> 
+> Vivek
 

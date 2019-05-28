@@ -1,16 +1,13 @@
-Date: Thu, 25 Apr 2019 11:10:08 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190425181007.ybg4376jowcly7ir@US-160370MP2.local>
-References: <20190416180322.65113-1-bo.liu@linux.alibaba.com>
-	<20190424184130.GC8962@redhat.com>
-	<20190424231258.cbpsgwicldczqck6@US-160370MP2.local>
-	<20190425145950.GB17670@redhat.com>
+Date: Tue, 28 May 2019 17:29:33 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190528212933.GB6446@redhat.com>
+References: <1558577194-61841-1-git-send-email-bo.liu@linux.alibaba.com>
+	<20190523032254.GB15291@e18g06458.et15sqa>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190425145950.GB17670@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 0/9] virtio-fs fixes
-Reply-To: bo.liu@linux.alibaba.com
+In-Reply-To: <20190523032254.GB15291@e18g06458.et15sqa>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: handle NULL dir in lo_do_lookup
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,105 +16,47 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
+To: Eryu Guan <eguan@linux.alibaba.com>
 Cc: virtio-fs@redhat.com
 
-On Thu, Apr 25, 2019 at 10:59:50AM -0400, Vivek Goyal wrote:
-> On Wed, Apr 24, 2019 at 04:12:59PM -0700, Liu Bo wrote:
-> > Hi Vivek,
+On Thu, May 23, 2019 at 11:22:54AM +0800, Eryu Guan wrote:
+> On Thu, May 23, 2019 at 10:06:34AM +0800, Liu Bo wrote:
+> > Reported by fstests/generic/467.
 > > 
-> > On Wed, Apr 24, 2019 at 02:41:30PM -0400, Vivek Goyal wrote:
-> > > Hi Liubo,
-> > > 
-> > > I have made some fixes and took some of yours and pushed latest snapshot
-> > > of my internal tree here.
-> > > 
-> > > https://github.com/rhvgoyal/linux/commits/virtio-fs-dev-5.1
-> > > 
-> > > Patches have been rebased to 5.1-rc5 kernel. I am thinking of updating
-> > > this branch frequently with latest code.
+> > open_by_handle_at() called from fuse inside guest can carry fuse mount
+> > point to daemon but lo_do_lookup() doesn't know its inode info because
+> > it's out of fuse's scope, thus lo_inode(req, parent) ends up with
+> > returning a NULL dir and breaks virtiofsd immediately.
 > > 
-> > With this branch, generic/476 still got hang, and yes, it's related to
-> > "async page fault related events" just as what you've mentioned on #irc.
+> > Note that it'd break applications that uses open_by_handle_at.
 > > 
-> > I confirmed this with kvm and kvmmmu tracepoints.
-> > 
-> > The tracepoints[1] showed that
-> > [1]: https://paste.ubuntu.com/p/N9ngrthKCf/
-> > 
-> > ---
-> > handle_ept_violation
-> >   kvm_mmu_page_fault(error_code=182)
-> >     tdp_page_fault
-> >       fast_page_fault # spte not present
-> >       try_async_pf #queue a async_pf work and return RETRY
-> > 
-> > vcpu_run
-> >  kvm_check_async_pf_completion
-> >    kvm_arch_async_page_ready
-> >      tdp_page_fault(vcpu, work->gva, 0, true);
-> >        fast_page_fault(error_code == 0);
-> >        try_async_pf # found hpa
-> >        __direct_map()
-> > 	  set_spte(error_code == 0) # won't set the write bit
-> > 
-> > handle_ept_violation
-> >   kvm_mmu_page_fault(error_code=1aa)
-> >     tdp_page_fault
-> >       fast_page_fault # spte present but no write bit
-> >       try_async_pf # no hpa again queue a async_pf work and return RETRY
+> > It seems to me that nothing could be done to support open_by_handle_at in
+> > this case.
 > 
-> So why there is no "hpa"?
->
-
-TBH, I have no idea, __gfn_to_pfn_memslot() did returned a pfn
-successfully after async pf, but during its following EPT_VIOLATION,
-__gfn_to_pfn_memslot() returned KVM_PFN_ERR_FAULT and indicated
-callers to do another async pf, and over and over again.
-
-> I was running a different test. I mmaped a file in guest, then truncated
-> file to size 0 on host and then guest tried to read/write the mmaped
-> region.
+> Then perhaps we should consider disabling exportfs support in virtio-fs
+> case? I noticed that currently fuse set
 > 
-> This will trigger async page fault on host. But given file size is zero,
-> that page fault will not succeed.
->
-
-I see, I checked the file I used on host, I could use FIEMAP to read
-all its extent and it wasn't truncated.
-
-> Current async pf logic has no notion of failure. It assumes it will always
-> succeed. It does not even check the return code of
-> get_user_pages_remote(), which can return error.
+> 	sb->s_export_op = &fuse_export_operations
 > 
-> So there are few things to be done.
+> unconditionally, maybe we could implement a feature mask in fuse and let
+> filesystem implementation registers what features it supports, e.g.
+> exportfs in this case.
 > 
-> - Modify async pf logic so that it can it capture and report error.
-> - If guest user space mmaped() file in question, then send SIGBUS to
->   process.
-> - If guest kernel is trying to access memory which async pf can't
->   resolve, then create an escape path and return error to user
->   space. (something like memcpy_mcsafe() I think).
->
+> Or we could try adding real exportfs support to virtiofs? Though I'm not
+> sure if it's possible or worth it at the moment.
 
-I need to think more about this, in my case, guest is just doing a
-plain write(2) or writev(2), it shouldn't get into hang like that in
-any case.
+If we don't support export operations, we should disable it. Looks like
+we have enabled it in virtiofsd.
 
-Thanks for sharing the code, will take a look.
+lo_init() {
+        if(conn->capable & FUSE_CAP_EXPORT_SUPPORT)
+                conn->want |= FUSE_CAP_EXPORT_SUPPORT;
+}
 
-thanks,
--liubo
-> I was playing with this and made some progress. But that work is not
-> complete. I thought of dealing with this problem later. If you are
-> curious, I have pushed my unfinished code here.
-> 
-> Kernel:
-> https://github.com/rhvgoyal/linux/commits/virtio-fs-dev-async-pf
-> 
-> Qemu:
-> https://github.com/rhvgoyal/qemu/commits/virtio-fs-async-pf
-> 
-> Thanks
-> Vivek
+So if we were to disable it, I guess we will have to remove it.
+
+Not sure if it is possible to support export ops in virtio-fs case. Need
+to read more about it.
+
+Vivek
 

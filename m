@@ -1,16 +1,14 @@
-Date: Thu, 6 Jun 2019 09:56:30 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190606165629.37tcrdw6x4kslyyx@US-160370MP2.local>
-References: <1559695356-75503-1-git-send-email-bo.liu@linux.alibaba.com>
-	<1559695356-75503-2-git-send-email-bo.liu@linux.alibaba.com>
-	<20190606090429.GC2788@work-vm>
+Date: Fri, 31 May 2019 13:44:35 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190531174435.GB26058@redhat.com>
+References: <20190531092403.77976-1-tao.peng@linux.alibaba.com>
+	<20190531132228.GA26058@redhat.com>
+	<20190531173821.q7fkvgeuo3236ieq@US-160370MP2.local>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190606090429.GC2788@work-vm>
-Subject: Re: [Virtio-fs] [PATCH 1/5] virtiofsd: cleanup allocated resource
- in se
-Reply-To: bo.liu@linux.alibaba.com
+In-Reply-To: <20190531173821.q7fkvgeuo3236ieq@US-160370MP2.local>
+Subject: Re: [Virtio-fs] [PATCH] fuse: refcount FORGET requests
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,61 +17,57 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com
+To: Liu Bo <bo.liu@linux.alibaba.com>
+Cc: virtio-fs@redhat.com, Peng Tao <tao.peng@linux.alibaba.com>
 
-On Thu, Jun 06, 2019 at 10:04:30AM +0100, Dr. David Alan Gilbert wrote:
-> * Liu Bo (bo.liu@linux.alibaba.com) wrote:
-> > This cleans up unfreed resources in se on quiting, including
-> > se->virtio_dev, se->vu_socket_path, se->vu_socketfd.
+On Fri, May 31, 2019 at 10:38:22AM -0700, Liu Bo wrote:
+> On Fri, May 31, 2019 at 09:22:28AM -0400, Vivek Goyal wrote:
+> > On Fri, May 31, 2019 at 05:24:03PM +0800, Peng Tao wrote:
+> > > Right now FORGET requests are not tracked and they might be sent
+> > > after DESTROY request.
 > > 
-> > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
-> > ---
-> >  contrib/virtiofsd/fuse_lowlevel.c | 6 ++++++
-> >  1 file changed, 6 insertions(+)
+> > How does that happen?
 > > 
-> > diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
-> > index 0fc2880..de700ad 100644
-> > --- a/contrib/virtiofsd/fuse_lowlevel.c
-> > +++ b/contrib/virtiofsd/fuse_lowlevel.c
-> > @@ -2557,6 +2557,12 @@ void fuse_session_destroy(struct fuse_session *se)
-> >  	free(se->cuse_data);
-> >  	if (se->fd != -1)
-> >  		close(se->fd);
-> > +
-> > +        free(se->virtio_dev);
-> > +        se->virtio_dev = NULL;
-> 
-> We don't touch virtio_dev or vu_socketfd anywhere else in fuse_lowlevel.c -
-> so we should probably do this cleanup in fuse_virtio.c, and then have
-> something like:
-> 
->    if (se->vu_socket_path) {
->      virtio_session_close(se);
->      free(se->vu_socket_path);
->      se->vu_socket_path = NULL;
->    }
->
-
-I see, will fix it.  Thanks for the comments.
-
-thanks,
--liubo
-
-> 
-> > +        free(se->vu_socket_path);
-> > +        close(se->vu_socketfd);
-> > +
-> >  	free(se);
-> >  }
-> >  
-> > -- 
-> > 1.8.3.1
+> > > Normally this is OK, since user space should
+> > > be able to reject them knowing that the file system is already umounted.
+> > > But if the same file system is mounted right again and the file is
+> > > opened again, user space can be confused by the refcount decrement
+> > > carried by the old FORGET requests.
+> > > 
+> > > E.g., it can trigger an assertion in virtiofsd when running xfstests
+> > > generic/129 and generic/130 together:
+> > > 
+> > > unique: 23, opcode: FORGET (2), nodeid: 4, insize: 64, pid: 0
+> > >   forget 4 1 -2
+> > > virtiofsd: contrib/virtiofsd/passthrough_ll.c:1044: unref_inode: Assertion `inode->refcount >= n' failed.
+> > > 
+> > > To avoid confusing user space in such case, refcount FORGET requests so
+> > > that fuse_sb_destroy() waits for all inflight requests before returning.
 > > 
-> > _______________________________________________
-> > Virtio-fs mailing list
-> > Virtio-fs@redhat.com
-> > https://www.redhat.com/mailman/listinfo/virtio-fs
-> --
-> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> > forgets are optional and destroy is supposed to cleanup any pending
+> > state.
+> 
+> Since we've ensured that DESTROY is the last fuse_request sent to userspace
+> daemon, we only need to deal with those FORGET requests sent before DESTROY.
+> 
+> Given that FORGET is sent via HIGHPRI vq, in order to solve the problem, would
+> it make sense to route DESTROY to HIGHPRI vq as well?
+> 
+> Or, we can let lo_init to clear reqs in HIGHPRI vq?
+
+I am looking at another approach. Given sending forget is optional, I am
+writing a patch to not send forgets after virtio_kill_sb() has been
+called. And also flush any in flight forgets. Something like.
+
+virtio_kill_sb() {
+	disconnect fsvq. Do not send any further forgets.
+	flush in flight and pending forgets;
+	fuse_kill_sb_anon()
+}
+
+This should make sure once daemon seems destroy, after that there are
+no more forget requests.
+
+Thanks
+Vivek
 

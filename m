@@ -1,10 +1,14 @@
+Date: Fri, 31 May 2019 14:59:07 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri, 31 May 2019 14:57:06 -0400
-Message-Id: <20190531185709.10267-1-vgoyal@redhat.com>
+Message-ID: <20190531185907.GC26058@redhat.com>
+References: <20190531092403.77976-1-tao.peng@linux.alibaba.com>
+	<20190531132228.GA26058@redhat.com>
+	<20190531184454.ybk54uodcf5ozxts@US-160370MP2.local>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 0/3] virtio-fs: Flush forget requests before
-	sending destroy
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20190531184454.ybk54uodcf5ozxts@US-160370MP2.local>
+Subject: Re: [Virtio-fs] [PATCH] fuse: refcount FORGET requests
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,31 +17,28 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com, tao.peng@linux.alibaba.com
-Cc: vgoyal@redhat.com
+To: Liu Bo <bo.liu@linux.alibaba.com>
+Cc: virtio-fs@redhat.com, Peng Tao <tao.peng@linux.alibaba.com>
 
-Hi Peng Tao,
+On Fri, May 31, 2019 at 11:44:55AM -0700, Liu Bo wrote:
+> On Fri, May 31, 2019 at 09:22:28AM -0400, Vivek Goyal wrote:
+> > On Fri, May 31, 2019 at 05:24:03PM +0800, Peng Tao wrote:
+> > > Right now FORGET requests are not tracked and they might be sent
+> > > after DESTROY request.
+> > 
+> > How does that happen?
+> >
+> 
+> A bit more details, it is those FORGETs that remain in HIGHPRI vq,
+> sent before DESTROY but not yet processed by daemon before DESTROY
+> gets back to guest, then they get processed after the 2nd INIT.
 
-Can you plase try following patches and see if it helps with the issue
-you are facing.
+I just posted 3 patches to make sure forget request is not sent after
+destroy. Can you give it a try and see if it solves the problem.
 
-One of the patch is cleanup. Rest of the two patches make sure all
-forget requests requests are flushed and no forget reuqest is sent
-after destroy has been sent.
+I also pushed my changes to this branch.
 
-Thanks
+https://github.com/rhvgoyal/linux/commits/flush-forget
+
 Vivek
-
-Vivek Goyal (3):
-  Use helper function to get forget requests from fuse
-  Do not dispatch forget requests once queue is disconnected
-  virtio-fs: Waiting for pending forget requests to finish
-
- fs/fuse/dev.c       |  9 +++---
- fs/fuse/fuse_i.h    |  3 ++
- fs/fuse/virtio_fs.c | 70 ++++++++++++++++++++++++++++++++++++---------
- 3 files changed, 65 insertions(+), 17 deletions(-)
-
--- 
-2.20.1
 

@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri, 31 May 2019 14:57:07 -0400
-Message-Id: <20190531185709.10267-2-vgoyal@redhat.com>
+Date: Fri, 31 May 2019 14:57:09 -0400
+Message-Id: <20190531185709.10267-4-vgoyal@redhat.com>
 In-Reply-To: <20190531185709.10267-1-vgoyal@redhat.com>
 References: <20190531185709.10267-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 1/3] Use helper function to get forget requests
-	from fuse
+Subject: [Virtio-fs] [PATCH 3/3] virtio-fs: Waiting for pending forget
+	requests to finish
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,99 +18,99 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: virtio-fs@redhat.com, tao.peng@linux.alibaba.com
 Cc: vgoyal@redhat.com
 
-stacked file systems like virtio-fs do not have to play directly with
-forget list data structures. There is a helper function use that instead.
-
-Rename dequeue_forget() to fuse_dequeue_forget() and export it so that
-stacked filesystems can use it.
+Keep a track of pending forget requests and wait for these to finish
+during ->kill_sb()
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- fs/fuse/dev.c       | 9 +++++----
- fs/fuse/fuse_i.h    | 3 +++
- fs/fuse/virtio_fs.c | 7 +------
- 3 files changed, 9 insertions(+), 10 deletions(-)
+ fs/fuse/virtio_fs.c | 38 +++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 37 insertions(+), 1 deletion(-)
 
-diff --git a/fs/fuse/dev.c b/fs/fuse/dev.c
-index ee9dd38bc0f0..39da7ec19fa2 100644
---- a/fs/fuse/dev.c
-+++ b/fs/fuse/dev.c
-@@ -1203,7 +1203,7 @@ __releases(fiq->waitq.lock)
- 	return err ? err : reqsize;
- }
- 
--static struct fuse_forget_link *dequeue_forget(struct fuse_iqueue *fiq,
-+struct fuse_forget_link *fuse_dequeue_forget(struct fuse_iqueue *fiq,
- 					       unsigned max,
- 					       unsigned *countp)
- {
-@@ -1224,6 +1224,7 @@ static struct fuse_forget_link *dequeue_forget(struct fuse_iqueue *fiq,
- 
- 	return head;
- }
-+EXPORT_SYMBOL(fuse_dequeue_forget);
- 
- static int fuse_read_single_forget(struct fuse_iqueue *fiq,
- 				   struct fuse_copy_state *cs,
-@@ -1231,7 +1232,7 @@ static int fuse_read_single_forget(struct fuse_iqueue *fiq,
- __releases(fiq->waitq.lock)
- {
- 	int err;
--	struct fuse_forget_link *forget = dequeue_forget(fiq, 1, NULL);
-+	struct fuse_forget_link *forget = fuse_dequeue_forget(fiq, 1, NULL);
- 	struct fuse_forget_in arg = {
- 		.nlookup = forget->forget_one.nlookup,
- 	};
-@@ -1279,7 +1280,7 @@ __releases(fiq->waitq.lock)
- 	}
- 
- 	max_forgets = (nbytes - ih.len) / sizeof(struct fuse_forget_one);
--	head = dequeue_forget(fiq, max_forgets, &count);
-+	head = fuse_dequeue_forget(fiq, max_forgets, &count);
- 	spin_unlock(&fiq->waitq.lock);
- 
- 	arg.count = count;
-@@ -2249,7 +2250,7 @@ void fuse_abort_conn(struct fuse_conn *fc)
- 			clear_bit(FR_PENDING, &req->flags);
- 		list_splice_tail_init(&fiq->pending, &to_end);
- 		while (forget_pending(fiq))
--			kfree(dequeue_forget(fiq, 1, NULL));
-+			kfree(fuse_dequeue_forget(fiq, 1, NULL));
- 		wake_up_all_locked(&fiq->waitq);
- 		spin_unlock(&fiq->waitq.lock);
- 		kill_fasync(&fiq->fasync, SIGIO, POLL_IN);
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 7ac7f9a0b81b..ad8272c98c82 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -972,6 +972,9 @@ void fuse_queue_forget(struct fuse_conn *fc, struct fuse_forget_link *forget,
- 
- struct fuse_forget_link *fuse_alloc_forget(void);
- 
-+struct fuse_forget_link *fuse_dequeue_forget(struct fuse_iqueue *fiq,
-+					     unsigned max, unsigned *countp);
-+
- /* Used by READDIRPLUS */
- void fuse_force_forget(struct file *file, u64 nodeid);
- 
 diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 18fc0dca0abc..cbda7ebd5bf9 100644
+index 737e92cdc5ed..abdb58285805 100644
 --- a/fs/fuse/virtio_fs.c
 +++ b/fs/fuse/virtio_fs.c
-@@ -697,12 +697,7 @@ __releases(fiq->waitq.lock)
- 	u64 unique;
- 	int ret;
+@@ -32,6 +32,7 @@ struct virtio_fs_vq {
+ 	struct delayed_work dispatch_work;
+ 	struct fuse_dev *fud;
+ 	bool connected;
++	long in_flight;
+ 	char name[24];
+ } ____cacheline_aligned_in_smp;
  
--	BUG_ON(!fiq->forget_list_head.next);
--	link = fiq->forget_list_head.next;
--	BUG_ON(link->next);
--	fiq->forget_list_head.next = NULL;
--	fiq->forget_list_tail = &fiq->forget_list_head;
--
-+	link = fuse_dequeue_forget(fiq, 1, NULL);
- 	unique = fuse_get_unique(fiq);
+@@ -183,8 +184,10 @@ static void virtio_fs_hiprio_done_work(struct work_struct *work)
  
- 	fs = fiq->priv;
+ 		virtqueue_disable_cb(vq);
+ 
+-		while ((req = virtqueue_get_buf(vq, &len)) != NULL)
++		while ((req = virtqueue_get_buf(vq, &len)) != NULL) {
+ 			kfree(req);
++			fsvq->in_flight--;
++		}
+ 	} while (!virtqueue_enable_cb(vq) && likely(!virtqueue_is_broken(vq)));
+ 	spin_unlock(&fsvq->lock);
+ }
+@@ -244,6 +247,7 @@ static void virtio_fs_hiprio_dispatch_work(struct work_struct *work)
+ 			return;
+ 		}
+ 
++		fsvq->in_flight++;
+ 		notify = virtqueue_kick_prepare(vq);
+ 		spin_unlock(&fsvq->lock);
+ 
+@@ -753,6 +757,7 @@ __releases(fiq->waitq.lock)
+ 		goto out;
+ 	}
+ 
++	fsvq->in_flight++;
+ 	notify = virtqueue_kick_prepare(vq);
+ 
+ 	spin_unlock(&fsvq->lock);
+@@ -982,6 +987,36 @@ __releases(fiq->waitq.lock)
+ 	}
+ }
+ 
++static void virtio_fs_flush_hiprio_queue(struct virtio_fs_vq *fsvq)
++{
++	struct virtio_fs_forget *forget;
++
++	WARN_ON(fsvq->in_flight < 0);
++
++	/* Go through pending forget reuests and free them */
++	spin_lock(&fsvq->lock);
++	while(1) {
++		forget = list_first_entry_or_null(&fsvq->queued_reqs,
++					struct virtio_fs_forget, list);
++		if (!forget)
++			break;
++		kfree(forget);
++	}
++
++	spin_unlock(&fsvq->lock);
++
++	/* Wait for in flight requests to finish.*/
++	while (1) {
++		spin_lock(&fsvq->lock);
++		if (!fsvq->in_flight) {
++			spin_unlock(&fsvq->lock);
++			break;
++		}
++		spin_unlock(&fsvq->lock);
++		usleep_range(1000, 2000);
++	}
++}
++
+ const static struct fuse_iqueue_ops virtio_fs_fiq_ops = {
+ 	.wake_forget_and_unlock		= virtio_fs_wake_forget_and_unlock,
+ 	.wake_interrupt_and_unlock	= virtio_fs_wake_interrupt_and_unlock,
+@@ -1086,6 +1121,7 @@ static void virtio_kill_sb(struct super_block *sb)
+ 	spin_lock(&fsvq->lock);
+ 	fsvq->connected = false;
+ 	spin_unlock(&fsvq->lock);
++	virtio_fs_flush_hiprio_queue(fsvq);
+ 
+ 	fuse_kill_sb_anon(sb);
+ 	virtio_fs_free_devs(vfs);
 -- 
 2.20.1
 

@@ -1,14 +1,16 @@
-Date: Fri, 31 May 2019 18:05:58 +0800
-From: Eryu Guan <eguan@linux.alibaba.com>
-Message-ID: <20190531100558.GG15291@e18g06458.et15sqa>
-References: <1558577194-61841-1-git-send-email-bo.liu@linux.alibaba.com>
-	<20190523032254.GB15291@e18g06458.et15sqa>
-	<20190528212933.GB6446@redhat.com>
+Date: Mon, 3 Jun 2019 09:13:14 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190603131314.GB18585@redhat.com>
+References: <20190531092403.77976-1-tao.peng@linux.alibaba.com>
+	<20190531132228.GA26058@redhat.com>
+	<20190531184454.ybk54uodcf5ozxts@US-160370MP2.local>
+	<20190531185907.GC26058@redhat.com>
+	<20190531195356.wun4rnl6hsogsmgv@US-160370MP2.local>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190528212933.GB6446@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: handle NULL dir in lo_do_lookup
+In-Reply-To: <20190531195356.wun4rnl6hsogsmgv@US-160370MP2.local>
+Subject: Re: [Virtio-fs] [PATCH] fuse: refcount FORGET requests
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,66 +19,58 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com
+To: Liu Bo <bo.liu@linux.alibaba.com>
+Cc: virtio-fs@redhat.com, Peng Tao <tao.peng@linux.alibaba.com>
 
-On Tue, May 28, 2019 at 05:29:33PM -0400, Vivek Goyal wrote:
-> On Thu, May 23, 2019 at 11:22:54AM +0800, Eryu Guan wrote:
-> > On Thu, May 23, 2019 at 10:06:34AM +0800, Liu Bo wrote:
-> > > Reported by fstests/generic/467.
+On Fri, May 31, 2019 at 12:53:57PM -0700, Liu Bo wrote:
+> On Fri, May 31, 2019 at 02:59:07PM -0400, Vivek Goyal wrote:
+> > On Fri, May 31, 2019 at 11:44:55AM -0700, Liu Bo wrote:
+> > > On Fri, May 31, 2019 at 09:22:28AM -0400, Vivek Goyal wrote:
+> > > > On Fri, May 31, 2019 at 05:24:03PM +0800, Peng Tao wrote:
+> > > > > Right now FORGET requests are not tracked and they might be sent
+> > > > > after DESTROY request.
+> > > > 
+> > > > How does that happen?
+> > > >
 > > > 
-> > > open_by_handle_at() called from fuse inside guest can carry fuse mount
-> > > point to daemon but lo_do_lookup() doesn't know its inode info because
-> > > it's out of fuse's scope, thus lo_inode(req, parent) ends up with
-> > > returning a NULL dir and breaks virtiofsd immediately.
-> > > 
-> > > Note that it'd break applications that uses open_by_handle_at.
-> > > 
-> > > It seems to me that nothing could be done to support open_by_handle_at in
-> > > this case.
+> > > A bit more details, it is those FORGETs that remain in HIGHPRI vq,
+> > > sent before DESTROY but not yet processed by daemon before DESTROY
+> > > gets back to guest, then they get processed after the 2nd INIT.
 > > 
-> > Then perhaps we should consider disabling exportfs support in virtio-fs
-> > case? I noticed that currently fuse set
+> > I just posted 3 patches to make sure forget request is not sent after
+> > destroy. Can you give it a try and see if it solves the problem.
+> >
+> 
+> Sorry, somehow this can only be reproduced on Peng Tao's setup.
+> 
+> > I also pushed my changes to this branch.
 > > 
-> > 	sb->s_export_op = &fuse_export_operations
-> > 
-> > unconditionally, maybe we could implement a feature mask in fuse and let
-> > filesystem implementation registers what features it supports, e.g.
-> > exportfs in this case.
-> > 
-> > Or we could try adding real exportfs support to virtiofs? Though I'm not
-> > sure if it's possible or worth it at the moment.
+> > https://github.com/rhvgoyal/linux/commits/flush-forget
+> >
 > 
-> If we don't support export operations, we should disable it. Looks like
-> we have enabled it in virtiofsd.
+> The 2nd mount & INIT can only work after vq->fud is released, and
 > 
-> lo_init() {
->         if(conn->capable & FUSE_CAP_EXPORT_SUPPORT)
->                 conn->want |= FUSE_CAP_EXPORT_SUPPORT;
-> }
+> virtio_kill_sb
+>   fuse_kill_sb_anon
+>   virtio_fs_free_devs
+>     #release vq->fud
 > 
-> So if we were to disable it, I guess we will have to remove it.
+> So it's not necessary to have DESTROY to be the very last one, it only
+> matters whether we wait for inflight FORGETS before setting vq->fud to
+> NULL.
+> 
+> Peng's patch seems more fit.
 
-Looks like only removing above lines doesn't disable export support (or
-only partially disabled), the test still runs & fails. Removing the
-EXPORT_SUPPORT cap only tells fuse to set fc->export_support to 0 and
-return -ESTALE on export operations like fuse_get_parent(), but the
-name_to_handle_at(2) syscall still could encode file into handle (which
-checks sb->s_export_op->fh_to_dentry), so the test thinks virtio-fs
-supports exports.
+Peng's patch will wait for FORGET requests to complete as well? It might
+release vq->fud earlier but that does not matter anyway.
 
-I have to reset sb->s_export_op to NULL when fc->export_support is 0 to
-make test not run, as there's no point to have a "half broken" export
-operations. This makes me wonder if we could remove
-fuse_conn.export_support field all together, as it serves no purpose
-when we don't have s_export_op set.
+I think key differentiator here is that should generic fuse wait for
+FORGET request completion or it should be left to virtio-fs. Given FORGET
+command does not expect a reply and genric fuse does not wait for its
+completion in general, I chose to limit this behavior in virtio-fs.
 
-Thanks,
-Eryu
+Having said that, I am fine with implementing it fuse as well. Miklos's
+call.
 
-> 
-> Not sure if it is possible to support export ops in virtio-fs case. Need
-> to read more about it.
-> 
-> Vivek
+Vivek
 

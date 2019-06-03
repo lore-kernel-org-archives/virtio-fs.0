@@ -1,8 +1,8 @@
 From: Peng Tao <tao.peng@linux.alibaba.com>
-Date: Mon,  3 Jun 2019 10:46:51 +0800
-Message-Id: <20190603024651.47305-1-tao.peng@linux.alibaba.com>
-Subject: [Virtio-fs] [PATCH-v2] virtiofs: FUSE_REMOVEMAPPING remove multiple
-	entries in one call
+Date: Mon,  3 Jun 2019 10:47:19 +0800
+Message-Id: <20190603024719.47457-1-tao.peng@linux.alibaba.com>
+Subject: [Virtio-fs] [PATCH-v3] virtiofsd: make FUSE_REMOVEMAPPING support
+	multiple entries
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,291 +14,148 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: virtio-fs@redhat.com
 Cc: Vivek Goyal <vgoyal@redhat.com>, Peng Tao <tao.peng@linux.alibaba.com>
 
-Enhance FUSE_REMOVEMAPPING wire protocol to remove multiple mappings
-in one call. So that fuse_removemapping() can send just one fuse request
-for many dmap entries.
+The fuse wire protocol is changed so that we can unmap multiple
+mappings in a single call.
 
 Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
 ---
-v1-v2: make fuse_removemapping_in count fuse_removemapping_one
+v2-v3: make fuse_removemapping_in count fuse_removemapping_one
 
-This works with corresponding qemu virtiofsd patch:
-"[PATCH-v3] virtiofsd: make FUSE_REMOVEMAPPING support multiple entries".
+This works with corresponding kernel side virtio-fs patch:
+"[PATCH-v2] virtiofs: FUSE_REMOVEMAPPING remove multiple entries in one call"
 
- fs/fuse/file.c            | 195 +++++++++++++++++++++++++++-----------
- include/uapi/linux/fuse.h |   7 ++
- 2 files changed, 145 insertions(+), 57 deletions(-)
+ contrib/virtiofsd/fuse_kernel.h    |  9 +++++++--
+ contrib/virtiofsd/fuse_lowlevel.c  | 15 ++++++++++++---
+ contrib/virtiofsd/fuse_lowlevel.h  |  5 +++--
+ contrib/virtiofsd/passthrough_ll.c | 31 ++++++++++++++++++++----------
+ 4 files changed, 43 insertions(+), 17 deletions(-)
 
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index d0979dc32f08..adf7840f4d50 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -27,6 +27,9 @@ INTERVAL_TREE_DEFINE(struct fuse_dax_mapping, rb, __u64, __subtree_last,
+diff --git a/contrib/virtiofsd/fuse_kernel.h b/contrib/virtiofsd/fuse_kernel.h
+index ce46046a4f..04ad461b73 100644
+--- a/contrib/virtiofsd/fuse_kernel.h
++++ b/contrib/virtiofsd/fuse_kernel.h
+@@ -830,9 +830,14 @@ struct fuse_setupmapping_out {
+         uint64_t        len[FUSE_SETUPMAPPING_ENTRIES];
+ };
  
- static struct fuse_dax_mapping *alloc_dax_mapping_reclaim(struct fuse_conn *fc,
- 				struct inode *inode);
-+static void __fuse_dax_free_mappings_range(struct fuse_conn *fc,
-+				struct inode *inode, loff_t start, loff_t end);
-+
- static int fuse_send_open(struct fuse_conn *fc, u64 nodeid, struct file *file,
- 			  int opcode, struct fuse_open_out *outargp)
- {
-@@ -319,75 +322,90 @@ static int fuse_setup_one_mapping(struct inode *inode,
- 	return 0;
- }
- 
--static int fuse_removemapping_one(struct inode *inode,
--					struct fuse_dax_mapping *dmap)
-+static int fuse_send_removemapping_request(struct inode *inode,
-+		struct fuse_removemapping_in *inargp,
-+		struct fuse_removemapping_one *forget_one)
- {
- 	struct fuse_inode *fi = get_fuse_inode(inode);
- 	struct fuse_conn *fc = get_fuse_conn(inode);
--	struct fuse_removemapping_in inarg;
- 	FUSE_ARGS(args);
- 
--	memset(&inarg, 0, sizeof(inarg));
--	inarg.moffset = dmap->window_offset;
--	inarg.len = dmap->length;
- 	args.in.h.opcode = FUSE_REMOVEMAPPING;
- 	args.in.h.nodeid = fi->nodeid;
--	args.in.numargs = 1;
--	args.in.args[0].size = sizeof(inarg);
--	args.in.args[0].value = &inarg;
-+	args.in.numargs = 2;
-+	args.in.args[0].size = sizeof(*inargp);
-+	args.in.args[0].value = inargp;
-+	args.in.args[1].size = inargp->count * sizeof(*forget_one);
-+	args.in.args[1].value = forget_one;
- 	return fuse_simple_request(fc, &args);
- }
- 
--/*
-- * It is called from evict_inode() and by that time inode is going away. So
-- * this function does not take any locks like fi->i_dmap_sem for traversing
-- * that fuse inode interval tree. If that lock is taken then lock validator
-- * complains of deadlock situation w.r.t fs_reclaim lock.
-- */
--void fuse_removemapping(struct inode *inode)
-+static int fuse_do_removemappings(struct inode *inode, unsigned num,
-+				  struct list_head *to_remove)
- {
--	struct fuse_conn *fc = get_fuse_conn(inode);
--	struct fuse_inode *fi = get_fuse_inode(inode);
--	ssize_t err;
-+	struct fuse_removemapping_one *forget_one, *ptr;
-+	struct fuse_removemapping_in inarg;
- 	struct fuse_dax_mapping *dmap;
-+	int ret, i = 0;
- 
--	/* Clear the mappings list */
--	while (true) {
--		WARN_ON(fi->nr_dmaps < 0);
-+	if (num <= FUSE_REMOVEMAPPING_MAX_ENTRY) {
-+		forget_one = kmalloc_array(num, sizeof(*forget_one), GFP_NOIO);
-+	} else {
-+		forget_one = kmalloc_array(FUSE_REMOVEMAPPING_MAX_ENTRY,
-+					   sizeof(*forget_one), GFP_NOIO);
-+	}
-+	if (forget_one == NULL)
-+		return -ENOMEM;
- 
--		dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, 0,
--								-1);
--		if (dmap) {
--			fuse_dax_interval_tree_remove(dmap, &fi->dmap_tree);
--			fi->nr_dmaps--;
--			dmap_remove_busy_list(fc, dmap);
-+	ptr = forget_one;
-+	list_for_each_entry(dmap, to_remove, list) {
-+		ptr->moffset = dmap->window_offset;
-+		ptr->len = dmap->length;
-+		ptr++;
-+		i++;
-+		num--;
-+		if (i >= FUSE_REMOVEMAPPING_MAX_ENTRY || num == 0) {
-+			memset(&inarg, 0, sizeof(inarg));
-+			inarg.count = i;
-+			ret = fuse_send_removemapping_request(inode, &inarg, forget_one);
-+			if (ret)
-+				goto out;
-+			ptr = forget_one;
-+			i = 0;
- 		}
-+	}
- 
--		if (!dmap)
--			break;
-+out:
-+	kfree(forget_one);
-+	return ret;
-+}
- 
--		/*
--		 * During umount/shutdown, fuse connection is dropped first
--		 * and later evict_inode() is called later. That means any
--		 * removemapping messages are going to fail. Send messages
--		 * only if connection is up. Otherwise fuse daemon is
--		 * responsible for cleaning up any leftover references and
--		 * mappings.
--		 */
--		if (fc->connected) {
--			err = fuse_removemapping_one(inode, dmap);
--			if (err) {
--				pr_warn("Failed to removemapping. offset=0x%llx"
--					" len=0x%llx\n", dmap->window_offset,
--					dmap->length);
--			}
--		}
-+static int fuse_removemapping_one(struct inode *inode,
-+					struct fuse_dax_mapping *dmap)
-+{
-+	struct fuse_removemapping_one forget_one;
-+	struct fuse_removemapping_in inarg;
- 
--		dmap->inode = NULL;
-+	memset(&inarg, 0, sizeof(inarg));
-+	/* TODO: fill in inarg.fh when available */
-+	inarg.count = 1;
-+	memset(&forget_one, 0, sizeof(forget_one));
-+	forget_one.moffset = dmap->window_offset;
-+	forget_one.len = dmap->length;
- 
--		/* Add it back to free ranges list */
--		free_dax_mapping(fc, dmap);
--	}
-+	return fuse_send_removemapping_request(inode, &inarg, &forget_one);
-+}
-+
-+/*
-+ * It is called from evict_inode() and by that time inode is going away. So
-+ * this function does not take any locks like fi->i_dmap_sem for traversing
-+ * that fuse inode interval tree. If that lock is taken then lock validator
-+ * complains of deadlock situation w.r.t fs_reclaim lock.
-+ */
-+void fuse_removemapping(struct inode *inode)
-+{
-+	struct fuse_conn *fc = get_fuse_conn(inode);
-+	__fuse_dax_free_mappings_range(fc, inode, 0, -1);
- }
- 
- void fuse_finish_open(struct inode *inode, struct file *file)
-@@ -3980,6 +3998,75 @@ static struct fuse_dax_mapping *alloc_dax_mapping_reclaim(struct fuse_conn *fc,
- 	}
- }
- 
-+/* Cleanup dmap entry and add back to free list */
-+static void fuse_dax_do_free_mapping_locked(struct fuse_conn *fc, struct fuse_dax_mapping *dmap)
-+{
-+	pr_debug("fuse: freed memory range start=0x%llx end=0x%llx "
-+		"window_offset=0x%llx length=0x%llx\n", dmap->start,
-+		dmap->end, dmap->window_offset, dmap->length);
-+	__dmap_remove_busy_list(fc, dmap);
-+	dmap->inode = NULL;
-+	dmap->start = dmap->end = 0;
-+	__free_dax_mapping(fc, dmap);
-+}
-+
-+/*
-+ * Free inode dmap entries whose range falls entirely inside [start, end].
-+ * Does not take any locks. Caller must take care of any lock requirements.
-+ * Lock ordering follows fuse_dax_free_one_mapping().
-+ * inode->i_rwsem, fuse_inode->i_mmap_sem and fuse_inode->i_dmap_sem must be
-+ * held unless it is called from evict_inode() where no one else is accessing
-+ * the inode.
-+ */
-+static void __fuse_dax_free_mappings_range(struct fuse_conn *fc,
-+				struct inode *inode, loff_t start, loff_t end)
-+{
-+	struct fuse_inode *fi = get_fuse_inode(inode);
-+	struct fuse_dax_mapping *dmap, *n;
-+	int err, num = 0;
-+	LIST_HEAD(to_remove);
-+
-+	pr_debug("fuse: __fuse_dax_free_mappings_range "
-+		 "start=0x%llx, end=0x%llx\n", start, end);
-+	/* interval tree search matches intersecting entries.
-+	 * Adjust the range to avoid dropping partial valid entries. */
-+	start = ALIGN(start, FUSE_DAX_MEM_RANGE_SZ);
-+	end = ALIGN_DOWN(end, FUSE_DAX_MEM_RANGE_SZ);
-+
-+	while ((dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, start, end))) {
-+		fuse_dax_interval_tree_remove(dmap, &fi->dmap_tree);
-+		num++;
-+		list_add(&dmap->list, &to_remove);
-+	}
-+
-+	/* Nothing to remove */
-+	if (list_empty(&to_remove))
-+		return;
-+
-+	WARN_ON(fi->nr_dmaps < num);
-+	fi->nr_dmaps -= num;
-+	/*
-+	 * During umount/shutdown, fuse connection is dropped first
-+	 * and later evict_inode() is called later. That means any
-+	 * removemapping messages are going to fail. Send messages
-+	 * only if connection is up. Otherwise fuse daemon is
-+	 * responsible for cleaning up any leftover references and
-+	 * mappings.
-+	 */
-+	if (fc->connected) {
-+		err = fuse_do_removemappings(inode, num, &to_remove);
-+		if (err) {
-+			pr_warn("Failed to removemappings. start=0x%llx"
-+				" end=0x%llx\n", start, end);
-+		}
-+	}
-+	spin_lock(&fc->lock);
-+	list_for_each_entry_safe(dmap, n, &to_remove, list) {
-+		fuse_dax_do_free_mapping_locked(fc, dmap);
-+	}
-+	spin_unlock(&fc->lock);
-+}
-+
- int fuse_dax_free_one_mapping_locked(struct fuse_conn *fc, struct inode *inode,
- 				u64 dmap_start)
- {
-@@ -4003,15 +4090,9 @@ int fuse_dax_free_one_mapping_locked(struct fuse_conn *fc, struct inode *inode,
- 
- 	/* Cleanup dmap entry and add back to free list */
- 	spin_lock(&fc->lock);
--	__dmap_remove_busy_list(fc, dmap);
--	dmap->inode = NULL;
--	dmap->start = dmap->end = 0;
--	__free_dax_mapping(fc, dmap);
-+	fuse_dax_do_free_mapping_locked(fc, dmap);
- 	spin_unlock(&fc->lock);
- 
--	pr_debug("fuse: freed memory range window_offset=0x%llx,"
--				" length=0x%llx\n", dmap->window_offset,
--				dmap->length);
- 	return ret;
- }
- 
-diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-index 5042e227e8a8..b588a028f099 100644
---- a/include/uapi/linux/fuse.h
-+++ b/include/uapi/linux/fuse.h
-@@ -850,10 +850,17 @@ struct fuse_setupmapping_out {
- struct fuse_removemapping_in {
+-struct fuse_removemapping_in {
++struct fuse_removemapping_in{
          /* An already open handle */
-         uint64_t	fh;
-+	/* number of fuse_removemapping_one follows */
-+	uint32_t	count;
+-	uint64_t	fh;
++        uint64_t        fh;
++        /* number of fuse_removemapping_one follows */
++        uint32_t        count;
 +};
 +
 +struct fuse_removemapping_one {
- 	/* Offset into the dax window start the unmapping */
- 	uint64_t        moffset;
+         /* Offset into the dax to start the unmapping */
+         uint64_t        moffset;
          /* Length of mapping required */
-         uint64_t	len;
- };
-+#define FUSE_REMOVEMAPPING_MAX_ENTRY	\
-+		(PAGE_SIZE / sizeof(struct fuse_removemapping_one))
+diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
+index 0fc2880acd..9856eaba29 100644
+--- a/contrib/virtiofsd/fuse_lowlevel.c
++++ b/contrib/virtiofsd/fuse_lowlevel.c
+@@ -1908,10 +1908,20 @@ static void do_removemapping(fuse_req_t req, fuse_ino_t nodeid,
+ 			     struct fuse_mbuf_iter *iter)
+ {
+ 	struct fuse_removemapping_in *arg;
++	struct fuse_removemapping_one *one;
+         struct fuse_file_info fi;
  
- #endif /* _LINUX_FUSE_H */
+ 	arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
+-	if (!arg) {
++	if (!arg || arg->count <= 0) {
++		fprintf(stderr, "do_removemapping: invalid arg %p\n", arg);
++		fuse_reply_err(req, EINVAL);
++		return;
++	}
++
++	one = fuse_mbuf_iter_advance(iter, arg->count * sizeof(*one));
++	if (!one) {
++		fprintf(stderr, "do_removemapping: invalid in, expected %d * %ld, has %ld - %ld\n",
++				arg->count, sizeof(*one), iter->size, iter->pos);
+ 		fuse_reply_err(req, EINVAL);
+ 		return;
+ 	}
+@@ -1920,8 +1930,7 @@ static void do_removemapping(fuse_req_t req, fuse_ino_t nodeid,
+ 	fi.fh = arg->fh;
+ 
+ 	if (req->se->op.removemapping)
+-		req->se->op.removemapping(req, req->se, nodeid, arg->moffset,
+-                                          arg->len, &fi);
++		req->se->op.removemapping(req, req->se, nodeid, arg->count, one, &fi);
+ 	else
+ 		fuse_reply_err(req, ENOSYS);
+ }
+diff --git a/contrib/virtiofsd/fuse_lowlevel.h b/contrib/virtiofsd/fuse_lowlevel.h
+index 1b03e46dfd..e47e58062b 100644
+--- a/contrib/virtiofsd/fuse_lowlevel.h
++++ b/contrib/virtiofsd/fuse_lowlevel.h
+@@ -23,6 +23,7 @@
+ #endif
+ 
+ #include "fuse_common.h"
++#include "fuse_kernel.h"
+ 
+ #include <utime.h>
+ #include <fcntl.h>
+@@ -1197,8 +1198,8 @@ struct fuse_lowlevel_ops {
+          * TODO
+          */
+         void (*removemapping) (fuse_req_t req, struct fuse_session *se,
+-                               fuse_ino_t ino, uint64_t moffset,
+-                               uint64_t len, struct fuse_file_info *fi);
++                               fuse_ino_t ino, unsigned num,
++                               struct fuse_removemapping_one *argp, struct fuse_file_info *fi);
+ };
+ 
+ /**
+diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+index 662bee5b94..8a3adc9414 100644
+--- a/contrib/virtiofsd/passthrough_ll.c
++++ b/contrib/virtiofsd/passthrough_ll.c
+@@ -1908,20 +1908,31 @@ static void lo_setupmapping(fuse_req_t req, fuse_ino_t ino, uint64_t foffset,
+ }
+ 
+ static void lo_removemapping(fuse_req_t req, struct fuse_session *se,
+-                             fuse_ino_t ino, uint64_t moffset,
+-                             uint64_t len, struct fuse_file_info *fi)
++                             fuse_ino_t ino, unsigned num,
++                             struct fuse_removemapping_one *argp,
++                             struct fuse_file_info *fi)
+ {
+         VhostUserFSSlaveMsg msg = { 0 };
+ 	int ret = 0;
+ 
+-	msg.len[0] = len;
+-	msg.c_offset[0] = moffset;
+-        if (fuse_virtio_unmap(se, &msg)) {
+-                fprintf(stderr,
+-                        "%s: unmap over virtio failed "
+-                        "(offset=0x%lx, len=0x%lx)\n", __func__, moffset, len);
+-                ret = EINVAL;
+-        }
++	for (int i = 0; num > 0; i++, argp++) {
++		msg.len[i] = argp->len;
++		msg.c_offset[i] = argp->moffset;
++
++		if (--num == 0 || i == VHOST_USER_FS_SLAVE_ENTRIES - 1) {
++			if (fuse_virtio_unmap(se, &msg)) {
++				fprintf(stderr,
++					"%s: unmap over virtio failed "
++					"(offset=0x%lx, len=0x%lx)\n", __func__, argp->moffset, argp->len);
++				ret = EINVAL;
++				break;
++			}
++			if (num > 0) {
++				i = 0;
++				memset(&msg, 0, sizeof(msg));
++			}
++		}
++	}
+ 
+ 	fuse_reply_err(req, ret);
+ }
 -- 
 2.17.1
 

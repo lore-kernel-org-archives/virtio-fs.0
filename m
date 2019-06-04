@@ -1,15 +1,13 @@
-Date: Tue, 4 Jun 2019 09:29:36 -0400
+Date: Tue, 4 Jun 2019 17:28:31 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190604132936.GA18863@redhat.com>
-References: <20190531185709.10267-1-vgoyal@redhat.com>
-	<20190531185709.10267-4-vgoyal@redhat.com>
-	<fe5f90d3-0986-5cbb-0f1e-11f3384476ad@linux.alibaba.com>
+Message-ID: <20190604212831.GC18863@redhat.com>
+References: <20190603024651.47305-1-tao.peng@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <fe5f90d3-0986-5cbb-0f1e-11f3384476ad@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH 3/3] virtio-fs: Waiting for pending forget
- requests to finish
+In-Reply-To: <20190603024651.47305-1-tao.peng@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH-v2] virtiofs: FUSE_REMOVEMAPPING remove
+ multiple entries in one call
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,24 +19,65 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: Peng Tao <tao.peng@linux.alibaba.com>
 Cc: virtio-fs@redhat.com
 
-On Tue, Jun 04, 2019 at 12:06:40PM +0800, Peng Tao wrote:
-[..]
-> > +static void virtio_fs_flush_hiprio_queue(struct virtio_fs_vq *fsvq)
-> > +{
-> > +	struct virtio_fs_forget *forget;
-> > +
-> > +	WARN_ON(fsvq->in_flight < 0);
-> > +
-> > +	/* Go through pending forget reuests and free them */
-> > +	spin_lock(&fsvq->lock);
-> > +	while(1) {
-> > +		forget = list_first_entry_or_null(&fsvq->queued_reqs,
-> > +					struct virtio_fs_forget, list);
-> > +		if (!forget)
-> > +			break;
-> missing list_del()?
+On Mon, Jun 03, 2019 at 10:46:51AM +0800, Peng Tao wrote:
 
-Good catch. Will fix it.
+[..]
+> +static void __fuse_dax_free_mappings_range(struct fuse_conn *fc,
+> +				struct inode *inode, loff_t start, loff_t end)
+> +{
+> +	struct fuse_inode *fi = get_fuse_inode(inode);
+> +	struct fuse_dax_mapping *dmap, *n;
+> +	int err, num = 0;
+> +	LIST_HEAD(to_remove);
+> +
+> +	pr_debug("fuse: __fuse_dax_free_mappings_range "
+> +		 "start=0x%llx, end=0x%llx\n", start, end);
+> +	/* interval tree search matches intersecting entries.
+> +	 * Adjust the range to avoid dropping partial valid entries. */
+> +	start = ALIGN(start, FUSE_DAX_MEM_RANGE_SZ);
+> +	end = ALIGN_DOWN(end, FUSE_DAX_MEM_RANGE_SZ);
+> +
+> +	while ((dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, start, end))) {
+> +		fuse_dax_interval_tree_remove(dmap, &fi->dmap_tree);
+> +		num++;
+> +		list_add(&dmap->list, &to_remove);
+
+Hmm..... So normally dmap->list is used for putting an element in free list.
+Given this element is on busy list, it must not be on free list hence you
+are reusing dmap->list to put it temporarily on to_remove list.
+
+
+> +	}
+> +
+> +	/* Nothing to remove */
+> +	if (list_empty(&to_remove))
+> +		return;
+> +
+> +	WARN_ON(fi->nr_dmaps < num);
+> +	fi->nr_dmaps -= num;
+> +	/*
+> +	 * During umount/shutdown, fuse connection is dropped first
+> +	 * and later evict_inode() is called later. That means any
+> +	 * removemapping messages are going to fail. Send messages
+> +	 * only if connection is up. Otherwise fuse daemon is
+> +	 * responsible for cleaning up any leftover references and
+> +	 * mappings.
+> +	 */
+> +	if (fc->connected) {
+> +		err = fuse_do_removemappings(inode, num, &to_remove);
+> +		if (err) {
+> +			pr_warn("Failed to removemappings. start=0x%llx"
+> +				" end=0x%llx\n", start, end);
+> +		}
+> +	}
+> +	spin_lock(&fc->lock);
+> +	list_for_each_entry_safe(dmap, n, &to_remove, list) {
+> +		fuse_dax_do_free_mapping_locked(fc, dmap);
+
+What removes dmap from to_remove list. I think it gets added to free
+list and that overrides it? So an element is already part of to_remove
+list and then we are calling list_add_tail(&dmap->list, &fc->free_ranges)
+on it without removing it. That sounds wrong.
 
 Vivek
 

@@ -1,15 +1,15 @@
 References: <20190531185709.10267-1-vgoyal@redhat.com>
-	<20190531185709.10267-3-vgoyal@redhat.com>
-From: Tao Peng <tao.peng@linux.alibaba.com>
-Message-ID: <64c14e0c-2f1f-874b-6890-26d662589d76@linux.alibaba.com>
-Date: Tue, 4 Jun 2019 11:27:26 +0800
+	<20190531185709.10267-4-vgoyal@redhat.com>
+From: Peng Tao <tao.peng@linux.alibaba.com>
+Message-ID: <fe5f90d3-0986-5cbb-0f1e-11f3384476ad@linux.alibaba.com>
+Date: Tue, 4 Jun 2019 12:06:40 +0800
 MIME-Version: 1.0
-In-Reply-To: <20190531185709.10267-3-vgoyal@redhat.com>
+In-Reply-To: <20190531185709.10267-4-vgoyal@redhat.com>
 Content-Type: text/plain; charset=utf-8; format=flowed
 Content-Language: en-US
 Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH 2/3] Do not dispatch forget requests once
- queue is disconnected
+Subject: Re: [Virtio-fs] [PATCH 3/3] virtio-fs: Waiting for pending forget
+ requests to finish
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,76 +21,75 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: Vivek Goyal <vgoyal@redhat.com>, virtio-fs@redhat.com
 
 
-On 2019/6/1 02:57, Vivek Goyal wrote:
-> Keep track of virtiofs queue status and once queue is disconnected do
-> not dispatch any more forget reuqests. Queue is disconnected once unmount
-> request comes in.
-> 
-Reviewed-and-tested-by: Peng Tao <tao.peng@linux.alibaba.com>
 
+On 2019/6/1 02:57, Vivek Goyal wrote:
+> Keep a track of pending forget requests and wait for these to finish
+> during ->kill_sb()
+> 
 > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 > ---
->   fs/fuse/virtio_fs.c | 25 +++++++++++++++++++------
->   1 file changed, 19 insertions(+), 6 deletions(-)
+>   fs/fuse/virtio_fs.c | 38 +++++++++++++++++++++++++++++++++++++-
+>   1 file changed, 37 insertions(+), 1 deletion(-)
 > 
 > diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-> index cbda7ebd5bf9..737e92cdc5ed 100644
+> index 737e92cdc5ed..abdb58285805 100644
 > --- a/fs/fuse/virtio_fs.c
 > +++ b/fs/fuse/virtio_fs.c
-> @@ -31,6 +31,7 @@ struct virtio_fs_vq {
->   	struct list_head queued_reqs;
+> @@ -32,6 +32,7 @@ struct virtio_fs_vq {
 >   	struct delayed_work dispatch_work;
 >   	struct fuse_dev *fud;
-> +	bool connected;
+>   	bool connected;
+> +	long in_flight;
 >   	char name[24];
 >   } ____cacheline_aligned_in_smp;
 >   
-> @@ -215,6 +216,12 @@ static void virtio_fs_hiprio_dispatch_work(struct work_struct *work)
+> @@ -183,8 +184,10 @@ static void virtio_fs_hiprio_done_work(struct work_struct *work)
+>   
+>   		virtqueue_disable_cb(vq);
+>   
+> -		while ((req = virtqueue_get_buf(vq, &len)) != NULL)
+> +		while ((req = virtqueue_get_buf(vq, &len)) != NULL) {
+>   			kfree(req);
+> +			fsvq->in_flight--;
+> +		}
+>   	} while (!virtqueue_enable_cb(vq) && likely(!virtqueue_is_broken(vq)));
+>   	spin_unlock(&fsvq->lock);
+>   }
+> @@ -244,6 +247,7 @@ static void virtio_fs_hiprio_dispatch_work(struct work_struct *work)
+>   			return;
 >   		}
 >   
->   		list_del(&forget->list);
-> +		if (!fsvq->connected) {
-> +			spin_unlock(&fsvq->lock);
-> +			kfree(forget);
-> +			continue;
-> +		}
-> +
->   		sg_init_one(&sg, forget, sizeof(*forget));
+> +		fsvq->in_flight++;
+>   		notify = virtqueue_kick_prepare(vq);
+>   		spin_unlock(&fsvq->lock);
 >   
->   		/* Enqueue the request */
-> @@ -425,9 +432,10 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
->   	if (ret < 0)
+> @@ -753,6 +757,7 @@ __releases(fiq->waitq.lock)
 >   		goto out;
+>   	}
 >   
-> -	for (i = 0; i < fs->nvqs; i++)
-> +	for (i = 0; i < fs->nvqs; i++) {
->   		fs->vqs[i].vq = vqs[i];
-> -
-> +		fs->vqs[i].connected = true;
-> +	}
->   out:
->   	kfree(names);
->   	kfree(callbacks);
-> @@ -1071,11 +1079,16 @@ static int virtio_fs_fill_super(struct super_block *sb, void *data,
->   static void virtio_kill_sb(struct super_block *sb)
->   {
->   	struct fuse_conn *fc = get_fuse_conn_super(sb);
-> +	struct virtio_fs *vfs = fc->iq.priv;
-> +	struct virtio_fs_vq *fsvq = &vfs->vqs[VQ_HIPRIO];
-> +
-> +	/* Stop forget queue. Soon destroy will be sent */
-> +	spin_lock(&fsvq->lock);
-> +	fsvq->connected = false;
-> +	spin_unlock(&fsvq->lock);
-> +
->   	fuse_kill_sb_anon(sb);
-> -	if (fc) {
-> -		struct virtio_fs *vfs = fc->iq.priv;
-> -		virtio_fs_free_devs(vfs);
-> -	}
-> +	virtio_fs_free_devs(vfs);
+> +	fsvq->in_flight++;
+>   	notify = virtqueue_kick_prepare(vq);
+>   
+>   	spin_unlock(&fsvq->lock);
+> @@ -982,6 +987,36 @@ __releases(fiq->waitq.lock)
+>   	}
 >   }
 >   
->   static struct dentry *virtio_fs_mount(struct file_system_type *fs_type,
-> 
+> +static void virtio_fs_flush_hiprio_queue(struct virtio_fs_vq *fsvq)
+> +{
+> +	struct virtio_fs_forget *forget;
+> +
+> +	WARN_ON(fsvq->in_flight < 0);
+> +
+> +	/* Go through pending forget reuests and free them */
+> +	spin_lock(&fsvq->lock);
+> +	while(1) {
+> +		forget = list_first_entry_or_null(&fsvq->queued_reqs,
+> +					struct virtio_fs_forget, list);
+> +		if (!forget)
+> +			break;
+missing list_del()?
+
+Cheers,
+Tao
 

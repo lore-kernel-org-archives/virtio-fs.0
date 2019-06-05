@@ -1,17 +1,13 @@
-Date: Wed, 5 Jun 2019 11:50:00 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190605184959.4lddydjgcctrbgeg@US-160370MP2.local>
+Date: Wed, 5 Jun 2019 16:30:16 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190605203016.GC22236@redhat.com>
 References: <20190605030233.19567-1-tao.peng@linux.alibaba.com>
-	<20190605030233.19567-2-tao.peng@linux.alibaba.com>
-	<20190605180645.jso3eo3ype5faeh7@US-160370MP2.local>
-	<20190605183514.GA22236@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190605183514.GA22236@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofs: FUSE_REMOVEMAPPING remove
+In-Reply-To: <20190605030233.19567-1-tao.peng@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH-v3 0/1] virtiofs: FUSE_REMOVEMAPPING remove
  multiple entries in one call
-Reply-To: bo.liu@linux.alibaba.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,73 +16,53 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, Peng Tao <tao.peng@linux.alibaba.com>
+To: Peng Tao <tao.peng@linux.alibaba.com>
+Cc: virtio-fs@redhat.com
 
-On Wed, Jun 05, 2019 at 02:35:14PM -0400, Vivek Goyal wrote:
-> On Wed, Jun 05, 2019 at 11:06:46AM -0700, Liu Bo wrote:
+Hi Peng Tao,
+
+I have squashed this patch and forget request wait patches into existing
+pathces and pushed latest patches here.
+
+https://github.com/rhvgoyal/linux/commits/virtio-fs-dev-5.1
+
+Please give it a try.
+
+I have made more function name changes into existing patches. There were
+so many functions with name fuse_dax_free* that I was finding it hard
+to remember which function is doing what.
+
+Thanks
+Vivek
+
+On Wed, Jun 05, 2019 at 11:02:32AM +0800, Peng Tao wrote:
+> Hi Vivek,
 > 
-> [..]
-> > > -/*
-> > > - * It is called from evict_inode() and by that time inode is going away. So
-> > > - * this function does not take any locks like fi->i_dmap_sem for traversing
-> > > - * that fuse inode interval tree. If that lock is taken then lock validator
-> > > - * complains of deadlock situation w.r.t fs_reclaim lock.
-> > > - */
-> > > -void fuse_removemapping(struct inode *inode)
-> > > +static int dmap_list_send_removemappings(struct inode *inode, unsigned num,
-> > > +					 struct list_head *to_remove)
-> > >  {
-> > > -	struct fuse_conn *fc = get_fuse_conn(inode);
-> > > -	struct fuse_inode *fi = get_fuse_inode(inode);
-> > > -	ssize_t err;
-> > > +	struct fuse_removemapping_one *remove_one, *ptr;
-> > > +	struct fuse_removemapping_in inarg;
-> > >  	struct fuse_dax_mapping *dmap;
-> > > +	int ret, i = 0, nr_alloc;
-> > >  
-> > > -	/* Clear the mappings list */
-> > > -	while (true) {
-> > > -		WARN_ON(fi->nr_dmaps < 0);
-> > > +	nr_alloc = min_t(unsigned int, num, FUSE_REMOVEMAPPING_MAX_ENTRY);
-> > > +	remove_one = kmalloc_array(nr_alloc, sizeof(*remove_one), GFP_NOIO);
-> > 
-> > GFP_NOIO's comments implies that memalloc_noio_{save,restore} are preferred,
-> > also would GFP_NOFS be better?
+> This works with corresponding qemu virtiofsd patch:
+> "[PATCH-v3] virtiofsd: make FUSE_REMOVEMAPPING support multiple entries".
 > 
-> GFP_NOFS sounds reasonable. I am not sure how memalloc_noio_{save,restore}
-> API is better as opposed to using GFP_NOFS.
->
-
-mm devs need memalloc_nofs_{save,restore} to encourage fs to declare a
-scope that all children callees inherit the nofs attribute.
-
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=7dea19f9ee636cb244109a4dba426bbb3e5304b7
-
-thanks,
--liubo
-
-> [..]
-> > > +/*
-> > > + * Cleanup dmap entry and add back to free list. This should be called with
-> > > + * fc->lock held.
-> > > + */
-> > > +static void fuse_dax_do_free_mapping_locked(struct fuse_conn *fc,
-> > > +					    struct fuse_dax_mapping *dmap)
-> > > +{
-> > > +	__dmap_remove_busy_list(fc, dmap);
-> > > +	dmap->inode = NULL;
-> > > +	dmap->start = dmap->end = 0;
-> > > +	__free_dax_mapping(fc, dmap);
-> > > +	pr_debug("fuse: freed memory range start=0x%llx end=0x%llx "
-> > > +		"window_offset=0x%llx length=0x%llx\n", dmap->start,
-> > > +		dmap->end, dmap->window_offset, dmap->length);
-> > 
-> > pr_debug() needs to be placed at the beginning as dmap->start & end have been
-> > zero'd.
-> > 
+> v1-v2: make fuse_removemapping_in count fuse_removemapping_one
+> v2->v3:
+> 1. fold in Vivek's cleanup and rename all forget_one to remove_one
+> 2. assert dmap->list is not used by anyone when adding to temporary list
+> 3. list_del() dmap->list when removing it from to_remove list
 > 
-> Good point. Will fix.
+> Please add your SOB line as I don't see it with your cleanup and thus
+> did not add it to the patch when folding your change.
 > 
-> Vivek
+> Thanks,
+> Tao
+> 
+> Peng Tao (1):
+>   virtiofs: FUSE_REMOVEMAPPING remove multiple entries in one call
+> 
+>  fs/fuse/file.c            | 205 +++++++++++++++++++++++++++-----------
+>  fs/fuse/fuse_i.h          |   6 +-
+>  fs/fuse/inode.c           |   2 +-
+>  include/uapi/linux/fuse.h |   7 ++
+>  4 files changed, 160 insertions(+), 60 deletions(-)
+> 
+> -- 
+> 2.17.1
+> 
 

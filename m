@@ -1,13 +1,15 @@
-Date: Fri, 31 May 2019 17:18:35 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190531161834.GJ3169@work-vm>
-References: <20190524065413.10978-1-tao.peng@linux.alibaba.com>
+Date: Wed, 5 Jun 2019 11:22:22 -0700
+From: Liu Bo <bo.liu@linux.alibaba.com>
+Message-ID: <20190605182222.dzxx5a2s3as2y5af@US-160370MP2.local>
+References: <20190531185709.10267-1-vgoyal@redhat.com>
+	<20190531185709.10267-3-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190524065413.10978-1-tao.peng@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH-v2] virtiofsd: make FUSE_REMOVEMAPPING
- support multiple entries
+In-Reply-To: <20190531185709.10267-3-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 2/3] Do not dispatch forget requests once
+ queue	is disconnected
+Reply-To: bo.liu@linux.alibaba.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,173 +18,88 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Peng Tao <tao.peng@linux.alibaba.com>
-Cc: virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, tao.peng@linux.alibaba.com
 
-* Peng Tao (tao.peng@linux.alibaba.com) wrote:
-> The fuse wire protocol is changed so that we can unmap multiple
-> mappings in a single call.
+On Fri, May 31, 2019 at 02:57:08PM -0400, Vivek Goyal wrote:
+> Keep track of virtiofs queue status and once queue is disconnected do
+> not dispatch any more forget reuqests. Queue is disconnected once unmount
+> request comes in.
+
+Reviewed-by: Liu Bo <bo.liu@linux.alibaba.com>
+
+thanks,
+-liubo
 > 
-> Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
-
-Hi Peng,
-  Thanks for this.
-
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 > ---
->  contrib/virtiofsd/fuse_kernel.h    |  9 +++++++--
->  contrib/virtiofsd/fuse_lowlevel.c  | 21 ++++++++++++++------
->  contrib/virtiofsd/fuse_lowlevel.h  |  5 +++--
->  contrib/virtiofsd/passthrough_ll.c | 31 ++++++++++++++++++++----------
->  4 files changed, 46 insertions(+), 20 deletions(-)
+>  fs/fuse/virtio_fs.c | 25 +++++++++++++++++++------
+>  1 file changed, 19 insertions(+), 6 deletions(-)
 > 
-> diff --git a/contrib/virtiofsd/fuse_kernel.h b/contrib/virtiofsd/fuse_kernel.h
-> index ce46046a4f..12e1d06826 100644
-> --- a/contrib/virtiofsd/fuse_kernel.h
-> +++ b/contrib/virtiofsd/fuse_kernel.h
-> @@ -830,9 +830,14 @@ struct fuse_setupmapping_out {
->          uint64_t        len[FUSE_SETUPMAPPING_ENTRIES];
->  };
+> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> index cbda7ebd5bf9..737e92cdc5ed 100644
+> --- a/fs/fuse/virtio_fs.c
+> +++ b/fs/fuse/virtio_fs.c
+> @@ -31,6 +31,7 @@ struct virtio_fs_vq {
+>  	struct list_head queued_reqs;
+>  	struct delayed_work dispatch_work;
+>  	struct fuse_dev *fud;
+> +	bool connected;
+>  	char name[24];
+>  } ____cacheline_aligned_in_smp;
 >  
-> -struct fuse_removemapping_in {
-> +struct fuse_removemapping_in_header {
->          /* An already open handle */
-> -	uint64_t	fh;
-> +        uint64_t        fh;
-> +        /* number of fuse_removemapping_in follows */
-> +        uint32_t        count;
-
-OK, good that fixes the count.
-
-However, see my message from 22nd May replying to Miklos
-wherewe talk about how there's a:
-   fuse_batch_forget_in and 'count' fuse_forget_one
-
-we should name these using the same scheme, i.e.
-   fuse_removemapping_in and 'count'  fuse_removemapping_one
-
-If you can respin with that then I think we're good.
-
-Dave
-
-> +};
-> +
-> +struct fuse_removemapping_in {
->          /* Offset into the dax to start the unmapping */
->          uint64_t        moffset;
->          /* Length of mapping required */
-> diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
-> index 0fc2880acd..dd8954b7f1 100644
-> --- a/contrib/virtiofsd/fuse_lowlevel.c
-> +++ b/contrib/virtiofsd/fuse_lowlevel.c
-> @@ -1907,21 +1907,30 @@ static void do_setupmapping(fuse_req_t req, fuse_ino_t nodeid,
->  static void do_removemapping(fuse_req_t req, fuse_ino_t nodeid,
->  			     struct fuse_mbuf_iter *iter)
->  {
-> -	struct fuse_removemapping_in *arg;
-> +	struct fuse_removemapping_in_header *header;
-> +	struct fuse_removemapping_in *argp;
->          struct fuse_file_info fi;
+> @@ -215,6 +216,12 @@ static void virtio_fs_hiprio_dispatch_work(struct work_struct *work)
+>  		}
 >  
-> -	arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
-> -	if (!arg) {
-> +	header = fuse_mbuf_iter_advance(iter, sizeof(*header));
-> +	if (!header || header->count <= 0) {
-> +		fprintf(stderr, "do_removemapping: invalid header %p\n", header);
-> +		fuse_reply_err(req, EINVAL);
-> +		return;
-> +	}
-> +
-> +	argp = fuse_mbuf_iter_advance(iter, header->count * sizeof(*argp));
-> +	if (!argp) {
-> +		fprintf(stderr, "do_removemapping: invalid in, expected %d * %ld, has %ld - %ld\n",
-> +				header->count, sizeof(*argp), iter->size, iter->pos);
->  		fuse_reply_err(req, EINVAL);
->  		return;
->  	}
->  
->          memset(&fi, 0, sizeof(fi));
-> -	fi.fh = arg->fh;
-> +	fi.fh = header->fh;
->  
->  	if (req->se->op.removemapping)
-> -		req->se->op.removemapping(req, req->se, nodeid, arg->moffset,
-> -                                          arg->len, &fi);
-> +		req->se->op.removemapping(req, req->se, nodeid, header->count, argp, &fi);
->  	else
->  		fuse_reply_err(req, ENOSYS);
->  }
-> diff --git a/contrib/virtiofsd/fuse_lowlevel.h b/contrib/virtiofsd/fuse_lowlevel.h
-> index 1b03e46dfd..cf215c66b5 100644
-> --- a/contrib/virtiofsd/fuse_lowlevel.h
-> +++ b/contrib/virtiofsd/fuse_lowlevel.h
-> @@ -23,6 +23,7 @@
->  #endif
->  
->  #include "fuse_common.h"
-> +#include "fuse_kernel.h"
->  
->  #include <utime.h>
->  #include <fcntl.h>
-> @@ -1197,8 +1198,8 @@ struct fuse_lowlevel_ops {
->           * TODO
->           */
->          void (*removemapping) (fuse_req_t req, struct fuse_session *se,
-> -                               fuse_ino_t ino, uint64_t moffset,
-> -                               uint64_t len, struct fuse_file_info *fi);
-> +                               fuse_ino_t ino, unsigned num,
-> +                               struct fuse_removemapping_in *args, struct fuse_file_info *fi);
->  };
->  
->  /**
-> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-> index 662bee5b94..9fc55f5454 100644
-> --- a/contrib/virtiofsd/passthrough_ll.c
-> +++ b/contrib/virtiofsd/passthrough_ll.c
-> @@ -1908,20 +1908,31 @@ static void lo_setupmapping(fuse_req_t req, fuse_ino_t ino, uint64_t foffset,
->  }
->  
->  static void lo_removemapping(fuse_req_t req, struct fuse_session *se,
-> -                             fuse_ino_t ino, uint64_t moffset,
-> -                             uint64_t len, struct fuse_file_info *fi)
-> +                             fuse_ino_t ino, unsigned num,
-> +			     struct fuse_removemapping_in *argsp,
-> +			     struct fuse_file_info *fi)
->  {
->          VhostUserFSSlaveMsg msg = { 0 };
->  	int ret = 0;
->  
-> -	msg.len[0] = len;
-> -	msg.c_offset[0] = moffset;
-> -        if (fuse_virtio_unmap(se, &msg)) {
-> -                fprintf(stderr,
-> -                        "%s: unmap over virtio failed "
-> -                        "(offset=0x%lx, len=0x%lx)\n", __func__, moffset, len);
-> -                ret = EINVAL;
-> -        }
-> +	for (int i = 0; num > 0; i++, argsp++) {
-> +		msg.len[i] = argsp->len;
-> +		msg.c_offset[i] = argsp->moffset;
-> +
-> +		if (--num == 0 || i == VHOST_USER_FS_SLAVE_ENTRIES - 1) {
-> +			if (fuse_virtio_unmap(se, &msg)) {
-> +				fprintf(stderr,
-> +					"%s: unmap over virtio failed "
-> +					"(offset=0x%lx, len=0x%lx)\n", __func__, argsp->moffset, argsp->len);
-> +				ret = EINVAL;
-> +				break;
-> +			}
-> +			if (num > 0) {
-> +				i = 0;
-> +				memset(&msg, 0, sizeof(msg));
-> +			}
+>  		list_del(&forget->list);
+> +		if (!fsvq->connected) {
+> +			spin_unlock(&fsvq->lock);
+> +			kfree(forget);
+> +			continue;
 > +		}
-> +	}
+> +
+>  		sg_init_one(&sg, forget, sizeof(*forget));
 >  
->  	fuse_reply_err(req, ret);
+>  		/* Enqueue the request */
+> @@ -425,9 +432,10 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+>  	if (ret < 0)
+>  		goto out;
+>  
+> -	for (i = 0; i < fs->nvqs; i++)
+> +	for (i = 0; i < fs->nvqs; i++) {
+>  		fs->vqs[i].vq = vqs[i];
+> -
+> +		fs->vqs[i].connected = true;
+> +	}
+>  out:
+>  	kfree(names);
+>  	kfree(callbacks);
+> @@ -1071,11 +1079,16 @@ static int virtio_fs_fill_super(struct super_block *sb, void *data,
+>  static void virtio_kill_sb(struct super_block *sb)
+>  {
+>  	struct fuse_conn *fc = get_fuse_conn_super(sb);
+> +	struct virtio_fs *vfs = fc->iq.priv;
+> +	struct virtio_fs_vq *fsvq = &vfs->vqs[VQ_HIPRIO];
+> +
+> +	/* Stop forget queue. Soon destroy will be sent */
+> +	spin_lock(&fsvq->lock);
+> +	fsvq->connected = false;
+> +	spin_unlock(&fsvq->lock);
+> +
+>  	fuse_kill_sb_anon(sb);
+> -	if (fc) {
+> -		struct virtio_fs *vfs = fc->iq.priv;
+> -		virtio_fs_free_devs(vfs);
+> -	}
+> +	virtio_fs_free_devs(vfs);
 >  }
+>  
+>  static struct dentry *virtio_fs_mount(struct file_system_type *fs_type,
 > -- 
-> 2.17.1
+> 2.20.1
 > 
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 

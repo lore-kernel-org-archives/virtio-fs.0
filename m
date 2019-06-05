@@ -1,15 +1,15 @@
-Date: Wed, 5 Jun 2019 11:26:07 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190605182606.mrw4e2qobp2u4kjj@US-160370MP2.local>
-References: <20190531185709.10267-1-vgoyal@redhat.com>
-	<20190531185709.10267-4-vgoyal@redhat.com>
+Date: Wed, 5 Jun 2019 14:35:14 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190605183514.GA22236@redhat.com>
+References: <20190605030233.19567-1-tao.peng@linux.alibaba.com>
+	<20190605030233.19567-2-tao.peng@linux.alibaba.com>
+	<20190605180645.jso3eo3ype5faeh7@US-160370MP2.local>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190531185709.10267-4-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 3/3] virtio-fs: Waiting for pending
-	forget	requests to finish
-Reply-To: bo.liu@linux.alibaba.com
+In-Reply-To: <20190605180645.jso3eo3ype5faeh7@US-160370MP2.local>
+Subject: Re: [Virtio-fs] [PATCH] virtiofs: FUSE_REMOVEMAPPING remove
+ multiple entries in one call
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,117 +18,63 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, tao.peng@linux.alibaba.com
+To: Liu Bo <bo.liu@linux.alibaba.com>
+Cc: virtio-fs@redhat.com, Peng Tao <tao.peng@linux.alibaba.com>
 
-On Fri, May 31, 2019 at 02:57:09PM -0400, Vivek Goyal wrote:
-> Keep a track of pending forget requests and wait for these to finish
-> during ->kill_sb()
+On Wed, Jun 05, 2019 at 11:06:46AM -0700, Liu Bo wrote:
+
+[..]
+> > -/*
+> > - * It is called from evict_inode() and by that time inode is going away. So
+> > - * this function does not take any locks like fi->i_dmap_sem for traversing
+> > - * that fuse inode interval tree. If that lock is taken then lock validator
+> > - * complains of deadlock situation w.r.t fs_reclaim lock.
+> > - */
+> > -void fuse_removemapping(struct inode *inode)
+> > +static int dmap_list_send_removemappings(struct inode *inode, unsigned num,
+> > +					 struct list_head *to_remove)
+> >  {
+> > -	struct fuse_conn *fc = get_fuse_conn(inode);
+> > -	struct fuse_inode *fi = get_fuse_inode(inode);
+> > -	ssize_t err;
+> > +	struct fuse_removemapping_one *remove_one, *ptr;
+> > +	struct fuse_removemapping_in inarg;
+> >  	struct fuse_dax_mapping *dmap;
+> > +	int ret, i = 0, nr_alloc;
+> >  
+> > -	/* Clear the mappings list */
+> > -	while (true) {
+> > -		WARN_ON(fi->nr_dmaps < 0);
+> > +	nr_alloc = min_t(unsigned int, num, FUSE_REMOVEMAPPING_MAX_ENTRY);
+> > +	remove_one = kmalloc_array(nr_alloc, sizeof(*remove_one), GFP_NOIO);
 > 
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  fs/fuse/virtio_fs.c | 38 +++++++++++++++++++++++++++++++++++++-
->  1 file changed, 37 insertions(+), 1 deletion(-)
+> GFP_NOIO's comments implies that memalloc_noio_{save,restore} are preferred,
+> also would GFP_NOFS be better?
+
+GFP_NOFS sounds reasonable. I am not sure how memalloc_noio_{save,restore}
+API is better as opposed to using GFP_NOFS.
+
+[..]
+> > +/*
+> > + * Cleanup dmap entry and add back to free list. This should be called with
+> > + * fc->lock held.
+> > + */
+> > +static void fuse_dax_do_free_mapping_locked(struct fuse_conn *fc,
+> > +					    struct fuse_dax_mapping *dmap)
+> > +{
+> > +	__dmap_remove_busy_list(fc, dmap);
+> > +	dmap->inode = NULL;
+> > +	dmap->start = dmap->end = 0;
+> > +	__free_dax_mapping(fc, dmap);
+> > +	pr_debug("fuse: freed memory range start=0x%llx end=0x%llx "
+> > +		"window_offset=0x%llx length=0x%llx\n", dmap->start,
+> > +		dmap->end, dmap->window_offset, dmap->length);
 > 
-> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-> index 737e92cdc5ed..abdb58285805 100644
-> --- a/fs/fuse/virtio_fs.c
-> +++ b/fs/fuse/virtio_fs.c
-> @@ -32,6 +32,7 @@ struct virtio_fs_vq {
->  	struct delayed_work dispatch_work;
->  	struct fuse_dev *fud;
->  	bool connected;
-> +	long in_flight;
->  	char name[24];
->  } ____cacheline_aligned_in_smp;
->  
-> @@ -183,8 +184,10 @@ static void virtio_fs_hiprio_done_work(struct work_struct *work)
->  
->  		virtqueue_disable_cb(vq);
->  
-> -		while ((req = virtqueue_get_buf(vq, &len)) != NULL)
-> +		while ((req = virtqueue_get_buf(vq, &len)) != NULL) {
->  			kfree(req);
-> +			fsvq->in_flight--;
-> +		}
->  	} while (!virtqueue_enable_cb(vq) && likely(!virtqueue_is_broken(vq)));
->  	spin_unlock(&fsvq->lock);
->  }
-> @@ -244,6 +247,7 @@ static void virtio_fs_hiprio_dispatch_work(struct work_struct *work)
->  			return;
->  		}
->  
-> +		fsvq->in_flight++;
->  		notify = virtqueue_kick_prepare(vq);
->  		spin_unlock(&fsvq->lock);
->  
-> @@ -753,6 +757,7 @@ __releases(fiq->waitq.lock)
->  		goto out;
->  	}
->  
-> +	fsvq->in_flight++;
->  	notify = virtqueue_kick_prepare(vq);
->  
->  	spin_unlock(&fsvq->lock);
-> @@ -982,6 +987,36 @@ __releases(fiq->waitq.lock)
->  	}
->  }
->  
-> +static void virtio_fs_flush_hiprio_queue(struct virtio_fs_vq *fsvq)
-> +{
-> +	struct virtio_fs_forget *forget;
-> +
-> +	WARN_ON(fsvq->in_flight < 0);
-> +
-> +	/* Go through pending forget reuests and free them */
-> +	spin_lock(&fsvq->lock);
-> +	while(1) {
-> +		forget = list_first_entry_or_null(&fsvq->queued_reqs,
-> +					struct virtio_fs_forget, list);
-> +		if (!forget)
-> +			break;
-> +		kfree(forget);
-> +	}
-> +
-> +	spin_unlock(&fsvq->lock);
-> +
-> +	/* Wait for in flight requests to finish.*/
-> +	while (1) {
-> +		spin_lock(&fsvq->lock);
-> +		if (!fsvq->in_flight) {
-> +			spin_unlock(&fsvq->lock);
-> +			break;
-> +		}
-> +		spin_unlock(&fsvq->lock);
-> +		usleep_range(1000, 2000);
-> +	}
-
-why not a wait_queue for fsvq->in_flight == 0?
-
-Otherwise, it looks good.
-
-Reviewed-by: Liu Bo <bo.liu@linux.alibaba.com>
-
-thanks,
--liubo
-> +}
-> +
->  const static struct fuse_iqueue_ops virtio_fs_fiq_ops = {
->  	.wake_forget_and_unlock		= virtio_fs_wake_forget_and_unlock,
->  	.wake_interrupt_and_unlock	= virtio_fs_wake_interrupt_and_unlock,
-> @@ -1086,6 +1121,7 @@ static void virtio_kill_sb(struct super_block *sb)
->  	spin_lock(&fsvq->lock);
->  	fsvq->connected = false;
->  	spin_unlock(&fsvq->lock);
-> +	virtio_fs_flush_hiprio_queue(fsvq);
->  
->  	fuse_kill_sb_anon(sb);
->  	virtio_fs_free_devs(vfs);
-> -- 
-> 2.20.1
+> pr_debug() needs to be placed at the beginning as dmap->start & end have been
+> zero'd.
 > 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
+
+Good point. Will fix.
+
+Vivek
 

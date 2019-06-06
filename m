@@ -1,14 +1,12 @@
-Date: Thu, 6 Jun 2019 10:41:06 +0100
+Date: Thu, 6 Jun 2019 10:54:29 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190606094105.GH2788@work-vm>
-References: <1559695356-75503-1-git-send-email-bo.liu@linux.alibaba.com>
-	<1559695356-75503-6-git-send-email-bo.liu@linux.alibaba.com>
+Message-ID: <20190606095428.GI2788@work-vm>
+References: <1559805375-44679-1-git-send-email-tao.peng@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <1559695356-75503-6-git-send-email-bo.liu@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH 5/5] virtiofsd: add helper for lo_data
-	cleanup
+In-Reply-To: <1559805375-44679-1-git-send-email-tao.peng@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: fix lo_do_lookup panic
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,82 +15,41 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Liu Bo <bo.liu@linux.alibaba.com>
+To: Peng Tao <tao.peng@linux.alibaba.com>
 Cc: virtio-fs@redhat.com
 
-* Liu Bo (bo.liu@linux.alibaba.com) wrote:
-> This offers an helper function for lo_data's cleanup.
+* Peng Tao (tao.peng@linux.alibaba.com) wrote:
+> It needs to check for invalid parent dir.
 > 
-> Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+> Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
 
-That's ok, but will need updating when you do a new version of the
-lo.source.
+This is the same as Liu Bo's patch from 23rd May; but there
+was some discussion about what to do about open_by_handle_at.
+Did we ever get an answer to that?
 
 Dave
 
 > ---
->  contrib/virtiofsd/passthrough_ll.c | 34 +++++++++++++++++++---------------
->  1 file changed, 19 insertions(+), 15 deletions(-)
+>  contrib/virtiofsd/passthrough_ll.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
 > diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-> index 649991e..73ca09f 100644
+> index 8a3adc9..f544387 100644
 > --- a/contrib/virtiofsd/passthrough_ll.c
 > +++ b/contrib/virtiofsd/passthrough_ll.c
-> @@ -2205,6 +2205,24 @@ static gboolean lo_key_equal(gconstpointer a, gconstpointer b)
->                 la->dev == lb->dev;
->  }
+> @@ -640,6 +640,9 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+>  	struct lo_data *lo = lo_data(req);
+>  	struct lo_inode *inode, *dir = lo_inode(req, parent);
 >  
-> +static void fuse_lo_data_cleanup(struct lo_data *lo, bool free_source)
-> +{
-> +        if (lo->inodes)
-> +                g_hash_table_destroy(lo->inodes);
-> +	lo_map_destroy(&lo->fd_map);
-> +	lo_map_destroy(&lo->dirp_map);
-> +	lo_map_destroy(&lo->ino_map);
+> +	if (dir == NULL)
+> +		return EBADF;
 > +
-> +	if (lo->proc_self_fd >= 0) {
-> +		close(lo->proc_self_fd);
-> +	}
-> +
-> +	if (lo->root.fd >= 0)
-> +		close(lo->root.fd);
-> +
-> +        if (free_source)
-> +                free((char *)lo->source);
-> +}
->  
->  int main(int argc, char *argv[])
->  {
-> @@ -2325,21 +2343,7 @@ err_out2:
->  err_out1:
->  	fuse_opt_free_args(&args);
->  
-> -        if (lo.inodes)
-> -                g_hash_table_destroy(lo.inodes);
-> -	lo_map_destroy(&lo.fd_map);
-> -	lo_map_destroy(&lo.dirp_map);
-> -	lo_map_destroy(&lo.ino_map);
-> -
-> -	if (lo.proc_self_fd >= 0) {
-> -		close(lo.proc_self_fd);
-> -	}
-> -
-> -	if (lo.root.fd >= 0)
-> -		close(lo.root.fd);
-> -
-> -        if (free_source)
-> -                free((char *)lo.source);
-> +        fuse_lo_data_cleanup(&lo, free_source);
->  
->  	return ret ? 1 : 0;
->  }
+>  	memset(e, 0, sizeof(*e));
+>  	e->attr_timeout = lo->timeout;
+>  	e->entry_timeout = lo->timeout;
 > -- 
 > 1.8.3.1
 > 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
 --
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

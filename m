@@ -1,14 +1,14 @@
-Date: Fri, 7 Jun 2019 13:09:26 +0100
+Date: Fri, 7 Jun 2019 13:15:18 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190607120925.GF2631@work-vm>
+Message-ID: <20190607121518.GG2631@work-vm>
 References: <1559857436-52685-1-git-send-email-bo.liu@linux.alibaba.com>
-	<1559857436-52685-2-git-send-email-bo.liu@linux.alibaba.com>
+	<1559857436-52685-3-git-send-email-bo.liu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <1559857436-52685-2-git-send-email-bo.liu@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH v2 1/5] virtiofsd: cleanup allocated
-	resource in se
+In-Reply-To: <1559857436-52685-3-git-send-email-bo.liu@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH v2 2/5] virtiofsd: fix memory leak on
+	lo.source
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,68 +21,40 @@ To: Liu Bo <bo.liu@linux.alibaba.com>
 Cc: virtio-fs@redhat.com
 
 * Liu Bo (bo.liu@linux.alibaba.com) wrote:
-> This cleans up unfreed resources in se on quiting, including
-> se->virtio_dev, se->vu_socket_path, se->vu_socketfd.
+> valgrind reported that lo.source is leaked on quiting, but it was defined
+> as (const char*) as it may point to a const string "/".
 > 
 > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
 
 Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 
 > ---
->  contrib/virtiofsd/fuse_lowlevel.c | 7 +++++++
->  contrib/virtiofsd/fuse_virtio.c   | 7 +++++++
->  contrib/virtiofsd/fuse_virtio.h   | 2 +-
->  3 files changed, 15 insertions(+), 1 deletion(-)
+>  contrib/virtiofsd/passthrough_ll.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 > 
-> diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
-> index 0fc2880..c460c4c 100644
-> --- a/contrib/virtiofsd/fuse_lowlevel.c
-> +++ b/contrib/virtiofsd/fuse_lowlevel.c
-> @@ -2557,6 +2557,13 @@ void fuse_session_destroy(struct fuse_session *se)
->  	free(se->cuse_data);
->  	if (se->fd != -1)
->  		close(se->fd);
-> +
-> +        if (se->vu_socket_path) {
-> +                virtio_session_close(se);
-> +                free(se->vu_socket_path);
-> +                se->vu_socket_path = NULL;
-> +        }
-> +
->  	free(se);
->  }
->  
-> diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
-> index cb46558..ed6ba57 100644
-> --- a/contrib/virtiofsd/fuse_virtio.c
-> +++ b/contrib/virtiofsd/fuse_virtio.c
-> @@ -886,6 +886,13 @@ int virtio_session_mount(struct fuse_session *se)
->          return 0;
->  }
->  
-> +void virtio_session_close(struct fuse_session *se)
-> +{
-> +        close(se->vu_socketfd);
-> +        free(se->virtio_dev);
-> +        se->virtio_dev = NULL;
-> +}
-> +
->  int64_t fuse_virtio_map(fuse_req_t req, VhostUserFSSlaveMsg *msg, int fd)
->  {
->          if (!req->se->virtio_dev) return -ENODEV;
-> diff --git a/contrib/virtiofsd/fuse_virtio.h b/contrib/virtiofsd/fuse_virtio.h
-> index 19c468e..e602298 100644
-> --- a/contrib/virtiofsd/fuse_virtio.h
-> +++ b/contrib/virtiofsd/fuse_virtio.h
-> @@ -19,7 +19,7 @@
->  struct fuse_session;
->  
->  int virtio_session_mount(struct fuse_session *se);
+> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+> index b58708f..959d74d 100644
+> --- a/contrib/virtiofsd/passthrough_ll.c
+> +++ b/contrib/virtiofsd/passthrough_ll.c
+> @@ -2269,9 +2269,8 @@ int main(int argc, char *argv[])
+>  			err(1, "failed to stat source (\"%s\")", lo.source);
+>  		if (!S_ISDIR(stat.st_mode))
+>  			errx(1, "source is not a directory");
 > -
-> +void virtio_session_close(struct fuse_session *se);
->  int virtio_loop(struct fuse_session *se);
+>  	} else {
+> -		lo.source = "/";
+> +		lo.source = strdup("/");
+>  	}
+>  	lo.root.is_symlink = false;
+>  	if (!lo.timeout_set) {
+> @@ -2333,5 +2332,7 @@ err_out1:
+>  	if (lo.root.fd >= 0)
+>  		close(lo.root.fd);
 >  
->  
+> +        free((char *)lo.source);
+> +
+>  	return ret ? 1 : 0;
+>  }
 > -- 
 > 1.8.3.1
 > 

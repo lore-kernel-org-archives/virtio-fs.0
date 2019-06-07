@@ -1,13 +1,12 @@
-Date: Fri, 7 Jun 2019 16:21:47 +0100
+Date: Fri, 7 Jun 2019 17:19:57 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190607152147.GI2631@work-vm>
-References: <1559875098-9347-1-git-send-email-bo.liu@linux.alibaba.com>
+Message-ID: <20190607161957.GN2631@work-vm>
+References: <1559857436-52685-1-git-send-email-bo.liu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <1559875098-9347-1-git-send-email-bo.liu@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: enable PARALLEL_DIROPS during
-	INIT
+In-Reply-To: <1559857436-52685-1-git-send-email-bo.liu@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH v2 0/5] virtiofsd: leak fixes
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,32 +19,27 @@ To: Liu Bo <bo.liu@linux.alibaba.com>
 Cc: virtio-fs@redhat.com
 
 * Liu Bo (bo.liu@linux.alibaba.com) wrote:
-> lookup is a RO operations, PARALLEL_DIROPS can be enabled.
-> 
-> Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+> Patch 1-4 fixes memory/fd/hashmap leakage.
+> Patch 5 is a cleanup.
 
-I'm not too sure what this is doing; and why doesn't upstream libfuse
-have this?
+I've just pushed a new -dev branch that includes this and a bunch of
+other fixes.
 
 Dave
 
-> ---
->  contrib/virtiofsd/fuse_lowlevel.c | 2 ++
->  1 file changed, 2 insertions(+)
+> Liu Bo (5):
+>   virtiofsd: cleanup allocated resource in se
+>   virtiofsd: fix memory leak on lo.source
+>   virtiofsd: fix memory leak on lo.inodes hashmap
+>   virtiofsd: fix error handling in main()
+>   virtiofsd: add helper for lo_data cleanup
 > 
-> diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
-> index c460c4c..93ce788 100644
-> --- a/contrib/virtiofsd/fuse_lowlevel.c
-> +++ b/contrib/virtiofsd/fuse_lowlevel.c
-> @@ -2089,6 +2089,8 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
->  
->  	if (se->conn.want & FUSE_CAP_ASYNC_READ)
->  		outarg.flags |= FUSE_ASYNC_READ;
-> +        if (se->conn.want & FUSE_CAP_PARALLEL_DIROPS)
-> +                outarg.flags |= FUSE_PARALLEL_DIROPS;
->  	if (se->conn.want & FUSE_CAP_POSIX_LOCKS)
->  		outarg.flags |= FUSE_POSIX_LOCKS;
->  	if (se->conn.want & FUSE_CAP_ATOMIC_O_TRUNC)
+>  contrib/virtiofsd/fuse_lowlevel.c  |  7 +++++++
+>  contrib/virtiofsd/fuse_virtio.c    |  7 +++++++
+>  contrib/virtiofsd/fuse_virtio.h    |  2 +-
+>  contrib/virtiofsd/passthrough_ll.c | 36 ++++++++++++++++++++++--------------
+>  4 files changed, 37 insertions(+), 15 deletions(-)
+> 
 > -- 
 > 1.8.3.1
 > 

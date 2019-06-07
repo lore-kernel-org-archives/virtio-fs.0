@@ -1,15 +1,15 @@
-Date: Fri, 14 Jun 2019 12:08:04 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190614190803.zsuvxydzyw6hmku2@US-160370MP2.local>
-References: <1560534980-37259-1-git-send-email-bo.liu@linux.alibaba.com>
-	<20190614185825.GM2785@work-vm>
+Date: Fri, 7 Jun 2019 19:33:10 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190607183310.GY2631@work-vm>
+References: <1559875098-9347-1-git-send-email-bo.liu@linux.alibaba.com>
+	<20190607152147.GI2631@work-vm>
+	<20190607181533.r7xkszkdi377o5ha@US-160370MP2.local>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190614185825.GM2785@work-vm>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: fix typo in error message in
-	fv_queue_thread
-Reply-To: bo.liu@linux.alibaba.com
+In-Reply-To: <20190607181533.r7xkszkdi377o5ha@US-160370MP2.local>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: enable PARALLEL_DIROPS during
+	INIT
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,48 +18,86 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+To: Liu Bo <bo.liu@linux.alibaba.com>, mszeredi@redhat.com
 Cc: virtio-fs@redhat.com
 
-On Fri, Jun 14, 2019 at 07:58:25PM +0100, Dr. David Alan Gilbert wrote:
-> * Liu Bo (bo.liu@linux.alibaba.com) wrote:
-> > It's misleading that pf[0].revents is printed when there is something
-> > wrong with pf[1].revents.
+* Liu Bo (bo.liu@linux.alibaba.com) wrote:
+> On Fri, Jun 07, 2019 at 04:21:47PM +0100, Dr. David Alan Gilbert wrote:
+> > * Liu Bo (bo.liu@linux.alibaba.com) wrote:
+> > > lookup is a RO operations, PARALLEL_DIROPS can be enabled.
+> > > 
+> > > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
 > > 
-> > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+> > I'm not too sure what this is doing; and why doesn't upstream libfuse
+> > have this?
 > 
-> Ah well spotted; that's a copy-paste problem on my half.
-> 
-> For this, I've just fixed up the original patch.
+> I'm not sure why libfuse doesn't include the capability, but AFAICT this
+> is needed for practical use.
 
-Sure, that's fine.
+Miklos: Do you know what the rules are around PARALLEL_DIROPS and why
+the upstream libfuse doesn't have it eanbled?
 
-thanks,
--liubo
+Dave
 
+
+> Say that we have 100 threads doing 'ls /mnt/virtiofs/', then they are
+> serialized by a mutex in
+> ---
+> fuse_lookup
+>   fuse_lock_inode
+>     if (!get_fuse_conn(inode)->parallel_dirops)
+>       mutex_lock(&get_fuse_inode(inode)->mutex);
+> ---
 > 
-> Dave
+> What fuse_lookup does is a plain lookup with loading inode if necessary,
+> so I don't see anything wrong making operations parallel.
 > 
-> > ---
-> >  contrib/virtiofsd/fuse_virtio.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> This is found by a fsmark test,
+> ----
+> NFILES=100000
+> 
+> time $FSMARK  -D  10000  -S0  -n  $NFILES  -s  0  -L  5 -l /tmp/fs_log.txt \
+>         -d  $MNT/0  -d  $MNT/1 \
+>         -d  $MNT/2  -d  $MNT/3 \
+>         -d  $MNT/4  -d  $MNT/5 \
+>         -d  $MNT/6  -d  $MNT/7 \
+>         -d  $MNT/8  -d  $MNT/9 \
+>         -d  $MNT/10  -d  $MNT/11 \
+>         -d  $MNT/12  -d  $MNT/13 \
+>         -d  $MNT/14  -d  $MNT/15
+> ----
+> 
+> the vanilla virtiofs was super slow due to the mutex lock.
+> 
+> thanks,
+> -liubo
+> 
+> 
 > > 
-> > diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
-> > index ed6ba57..bec4105 100644
-> > --- a/contrib/virtiofsd/fuse_virtio.c
-> > +++ b/contrib/virtiofsd/fuse_virtio.c
-> > @@ -472,7 +472,7 @@ static void *fv_queue_thread(void *opaque)
-> >                 }
-> >                 if (pf[1].revents & (POLLERR | POLLHUP | POLLNVAL)) {
-> >                         fprintf(stderr, "%s: Unexpected poll revents %x Queue %d killfd\n",
-> > -                                __func__, pf[0].revents, qi->qidx);
-> > +                                __func__, pf[1].revents, qi->qidx);
-> >                         break;
-> >                 }
-> >                 if (pf[1].revents) {
-> > -- 
-> > 1.8.3.1
+> > Dave
 > > 
-> --
-> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> > > ---
+> > >  contrib/virtiofsd/fuse_lowlevel.c | 2 ++
+> > >  1 file changed, 2 insertions(+)
+> > > 
+> > > diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
+> > > index c460c4c..93ce788 100644
+> > > --- a/contrib/virtiofsd/fuse_lowlevel.c
+> > > +++ b/contrib/virtiofsd/fuse_lowlevel.c
+> > > @@ -2089,6 +2089,8 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+> > >  
+> > >  	if (se->conn.want & FUSE_CAP_ASYNC_READ)
+> > >  		outarg.flags |= FUSE_ASYNC_READ;
+> > > +        if (se->conn.want & FUSE_CAP_PARALLEL_DIROPS)
+> > > +                outarg.flags |= FUSE_PARALLEL_DIROPS;
+> > >  	if (se->conn.want & FUSE_CAP_POSIX_LOCKS)
+> > >  		outarg.flags |= FUSE_POSIX_LOCKS;
+> > >  	if (se->conn.want & FUSE_CAP_ATOMIC_O_TRUNC)
+> > > -- 
+> > > 1.8.3.1
+> > > 
+> > --
+> > Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

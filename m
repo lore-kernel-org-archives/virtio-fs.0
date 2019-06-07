@@ -1,16 +1,13 @@
-Date: Fri, 31 May 2019 11:35:04 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190531183503.wgn23m3rg2jqkyge@US-160370MP2.local>
-References: <20190531092403.77976-1-tao.peng@linux.alibaba.com>
-	<20190531132228.GA26058@redhat.com>
-	<20190531173821.q7fkvgeuo3236ieq@US-160370MP2.local>
-	<20190531174435.GB26058@redhat.com>
+Date: Fri, 7 Jun 2019 16:21:47 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190607152147.GI2631@work-vm>
+References: <1559875098-9347-1-git-send-email-bo.liu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190531174435.GB26058@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] fuse: refcount FORGET requests
-Reply-To: bo.liu@linux.alibaba.com
+In-Reply-To: <1559875098-9347-1-git-send-email-bo.liu@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: enable PARALLEL_DIROPS during
+	INIT
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,65 +16,39 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, Peng Tao <tao.peng@linux.alibaba.com>
+To: Liu Bo <bo.liu@linux.alibaba.com>
+Cc: virtio-fs@redhat.com
 
-On Fri, May 31, 2019 at 01:44:35PM -0400, Vivek Goyal wrote:
-> On Fri, May 31, 2019 at 10:38:22AM -0700, Liu Bo wrote:
-> > On Fri, May 31, 2019 at 09:22:28AM -0400, Vivek Goyal wrote:
-> > > On Fri, May 31, 2019 at 05:24:03PM +0800, Peng Tao wrote:
-> > > > Right now FORGET requests are not tracked and they might be sent
-> > > > after DESTROY request.
-> > > 
-> > > How does that happen?
-> > > 
-> > > > Normally this is OK, since user space should
-> > > > be able to reject them knowing that the file system is already umounted.
-> > > > But if the same file system is mounted right again and the file is
-> > > > opened again, user space can be confused by the refcount decrement
-> > > > carried by the old FORGET requests.
-> > > > 
-> > > > E.g., it can trigger an assertion in virtiofsd when running xfstests
-> > > > generic/129 and generic/130 together:
-> > > > 
-> > > > unique: 23, opcode: FORGET (2), nodeid: 4, insize: 64, pid: 0
-> > > >   forget 4 1 -2
-> > > > virtiofsd: contrib/virtiofsd/passthrough_ll.c:1044: unref_inode: Assertion `inode->refcount >= n' failed.
-> > > > 
-> > > > To avoid confusing user space in such case, refcount FORGET requests so
-> > > > that fuse_sb_destroy() waits for all inflight requests before returning.
-> > > 
-> > > forgets are optional and destroy is supposed to cleanup any pending
-> > > state.
-> > 
-> > Since we've ensured that DESTROY is the last fuse_request sent to userspace
-> > daemon, we only need to deal with those FORGET requests sent before DESTROY.
-> > 
-> > Given that FORGET is sent via HIGHPRI vq, in order to solve the problem, would
-> > it make sense to route DESTROY to HIGHPRI vq as well?
-> > 
-> > Or, we can let lo_init to clear reqs in HIGHPRI vq?
+* Liu Bo (bo.liu@linux.alibaba.com) wrote:
+> lookup is a RO operations, PARALLEL_DIROPS can be enabled.
 > 
-> I am looking at another approach. Given sending forget is optional, I am
-> writing a patch to not send forgets after virtio_kill_sb() has been
-> called. And also flush any in flight forgets. Something like.
+> Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+
+I'm not too sure what this is doing; and why doesn't upstream libfuse
+have this?
+
+Dave
+
+> ---
+>  contrib/virtiofsd/fuse_lowlevel.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> virtio_kill_sb() {
-> 	disconnect fsvq. Do not send any further forgets.
-> 	flush in flight and pending forgets;
-> 	fuse_kill_sb_anon()
-> }
+> diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
+> index c460c4c..93ce788 100644
+> --- a/contrib/virtiofsd/fuse_lowlevel.c
+> +++ b/contrib/virtiofsd/fuse_lowlevel.c
+> @@ -2089,6 +2089,8 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+>  
+>  	if (se->conn.want & FUSE_CAP_ASYNC_READ)
+>  		outarg.flags |= FUSE_ASYNC_READ;
+> +        if (se->conn.want & FUSE_CAP_PARALLEL_DIROPS)
+> +                outarg.flags |= FUSE_PARALLEL_DIROPS;
+>  	if (se->conn.want & FUSE_CAP_POSIX_LOCKS)
+>  		outarg.flags |= FUSE_POSIX_LOCKS;
+>  	if (se->conn.want & FUSE_CAP_ATOMIC_O_TRUNC)
+> -- 
+> 1.8.3.1
 > 
-> This should make sure once daemon seems destroy, after that there are
-> no more forget requests.
-
-Does it refer to flushing &fsvq->done_work?
-
-If so, flushing inflight only covers those returned FORGETs, doesn't it?
-
-If there are inflight forgets not coming back from daemon, I think we have to
-wait for them as well.
-
-thanks,
--liubo
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

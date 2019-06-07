@@ -1,10 +1,7 @@
 From: Liu Bo <bo.liu@linux.alibaba.com>
-Date: Fri,  7 Jun 2019 05:43:54 +0800
-Message-Id: <1559857436-52685-4-git-send-email-bo.liu@linux.alibaba.com>
-In-Reply-To: <1559857436-52685-1-git-send-email-bo.liu@linux.alibaba.com>
-References: <1559857436-52685-1-git-send-email-bo.liu@linux.alibaba.com>
-Subject: [Virtio-fs] [PATCH v2 3/5] virtiofsd: fix memory leak on lo.inodes
-	hashmap
+Date: Fri,  7 Jun 2019 10:38:18 +0800
+Message-Id: <1559875098-9347-1-git-send-email-bo.liu@linux.alibaba.com>
+Subject: [Virtio-fs] [PATCH] virtiofsd: enable PARALLEL_DIROPS during INIT
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,27 +12,26 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-lo.inodes hashmap was not unref/destroy 'd on quiting, which was caught by valgrind.
+lookup is a RO operations, PARALLEL_DIROPS can be enabled.
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
 ---
- contrib/virtiofsd/passthrough_ll.c | 2 ++
+ contrib/virtiofsd/fuse_lowlevel.c | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-index 959d74d..57508df 100644
---- a/contrib/virtiofsd/passthrough_ll.c
-+++ b/contrib/virtiofsd/passthrough_ll.c
-@@ -2321,6 +2321,8 @@ err_out2:
- err_out1:
- 	fuse_opt_free_args(&args);
+diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
+index c460c4c..93ce788 100644
+--- a/contrib/virtiofsd/fuse_lowlevel.c
++++ b/contrib/virtiofsd/fuse_lowlevel.c
+@@ -2089,6 +2089,8 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
  
-+        if (lo.inodes)
-+                g_hash_table_destroy(lo.inodes);
- 	lo_map_destroy(&lo.fd_map);
- 	lo_map_destroy(&lo.dirp_map);
- 	lo_map_destroy(&lo.ino_map);
+ 	if (se->conn.want & FUSE_CAP_ASYNC_READ)
+ 		outarg.flags |= FUSE_ASYNC_READ;
++        if (se->conn.want & FUSE_CAP_PARALLEL_DIROPS)
++                outarg.flags |= FUSE_PARALLEL_DIROPS;
+ 	if (se->conn.want & FUSE_CAP_POSIX_LOCKS)
+ 		outarg.flags |= FUSE_POSIX_LOCKS;
+ 	if (se->conn.want & FUSE_CAP_ATOMIC_O_TRUNC)
 -- 
 1.8.3.1
 

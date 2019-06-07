@@ -1,15 +1,15 @@
-Date: Tue, 18 Jun 2019 09:29:29 +0800
-From: Eric Ren <renzhen@linux.alibaba.com>
-Message-ID: <20190618012929.GA12133@ali-6c96cfe09cf9.local>
-References: <2D50E1B6-E051-42F1-8962-71B7436E4CF9@stackhpc.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="gb2312"
-Content-Disposition: inline
-Content-Transfer-Encoding: base64
-In-Reply-To: <2D50E1B6-E051-42F1-8962-71B7436E4CF9@stackhpc.com>
-Subject: Re: [Virtio-fs] Issues running fio tests against a network mount
- routed from the host
-Reply-To: Eric Ren <renzhen@linux.alibaba.com>
+References: <1559875098-9347-1-git-send-email-bo.liu@linux.alibaba.com>
+	<20190607152147.GI2631@work-vm>
+	<20190607181533.r7xkszkdi377o5ha@US-160370MP2.local>
+	<20190607183310.GY2631@work-vm>
+In-Reply-To: <20190607183310.GY2631@work-vm>
+From: Miklos Szeredi <mszeredi@redhat.com>
+Date: Fri, 7 Jun 2019 21:17:32 +0200
+Message-ID: <CAOssrKc9Z8SZOJyLv0rBthcDxiUzPhf07p0A4B9zjWQ+iHhm5A@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: enable PARALLEL_DIROPS during
+	INIT
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,35 +18,34 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Bharat Kunwar <bharat@stackhpc.com>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 Cc: virtio-fs@redhat.com
 
-T24gRnJpLCBKdW4gMTQsIDIwMTkgYXQgMDk6NDU6MjdQTSArMDEwMCwgQmhhcmF0IEt1bndhciB3
-cm90ZToKSGksCgo+IEkgYW0gaGVyZSB0byBkZXNjcmliZSBhIHByb2JsZW0gdGhhdCBJoa92ZSBy
-dW4gaW50byB3aGVuIHRyeWluZyB0byBydW4gYGZpb2AgYWdhaW5zdCBhIG5ldHdvcmsgbW91bnQg
-cm91dGVkIGZyb20gdGhlIGhvc3QgdXNpbmcgdmlydGlvZnMuIE15IHdpZGVyIGNvbnRleHQgaXMg
-dGhhdCBJIGFtIGRvaW5nIHRoaXMgaW4gYSBrYXRhLWNvbnRhaW5lcmlzZWQgS3ViZXJuZXRlcyBl
-bnZpcm9ubWVudCB1c2luZyB0aGUgbmV3IGBrYXRhLXFlbXVgIGludHJvZHVjZWQgaW4gdmVyc2lv
-biAxLjcuIEkgaGF2ZSBwcmV2aW91c2x5IHJ1biB0aGUgc2FtZSB0ZXN0cyB3aXRoIGBrYXRhLXFl
-bXVgIHJ1bnRpbWUgd2l0aCA5cCBmaWxlc3lzdGVtIGFuZCB0aGUgc2FtZSB0ZXN0cyBoYXZlIHJ1
-biB0byBjb21wbGV0aW9uLgo+IAoKQ291bGQgeW91IHBsZWFzZSBlbGVib3JhdGUgaG93IHlvdSBz
-ZXR1cCB0aGUgdGVzdCBlbnYgYW5kIHBlcmZvcm0geW91cgp0ZXN0aW5nIHNvIHRoYXQgb3RoZXJz
-IGNhbiByZXByb2R1Y2UgeW91ciBwcm9ibGVtPwoKVGhhbmtzLApFcmljCgo+IEp1c3QgdG8gY2xh
-cmlmeSwgSSBjYW4gcnVuIHRoZSBzYW1lIGZpbyB0ZXN0cyB0byBhIGxvY2FsIGZpbGVzeXN0ZW0g
-b24gdGhlIGhvc3QgYW5kIHRoaW5ncyBydW4gaGFwcGlseSB0byBjb21wbGV0aW9uLiBJIGhhdmUg
-YXR0YWNoZWQgcGVyZiBmbGFtZSBncmFwaHMgY29ycmVzcG9uZGluZyB0byB0aGUgZmFpbHVyZSBj
-YXNlcywgQmVlR0ZTIGFuZCBDZXBoRlMgYW5kIHRoZSBzdWNjZXNzZnVsIGNhc2Ugd2l0aCBob3N0
-IGZpbGVzeXN0ZW0uIFRoZSBGaGdmcyogcHJvY2VzcyBhcmUgcmVsYXRlZCB0byBCZWVHRlMuCj4g
-Cj4gSSBlbmFibGVkIGRlYnVnIG9uIHRoZSBrYXRhIHNpZGUgdGhlIHRoZSByZXN1bHRpbmcgc3lz
-dGVtZCBqb3VybmFsIGVudHJpZXMgYXJlIGNhcHR1cmVkIGluIGRlYnVnLmxvZyBhdHRhY2hlZC4g
-TGV0IG1lIGtub3cgaWYgSSBjYW4gcHJvdmlkZSBhbnkgbW9yZSBkaWFnbm9zdGljIGluZm8uIEkg
-YW0gY3VycmVudGx5IGF0dGVtcHRpbmcgdG8gYnVpbGQgYW4gaW1hZ2UgdG8gYm9vdCB1cCB3aXRo
-IHN5bWJvbHMgZW5hYmxlZCBzbyB0aGF0IEkgY2FuIGNhcHR1cmUgc29tZSBiYWNrdHJhY2VzIGJ1
-dCB0aGF0IGlzIGFsbCB0YWtpbmcgbG9uZ2VyIHRoYW4gZXhwZWN0ZWQgKGhhdmluZyBuZXZlciBi
-dWlsdCBhIGtlcm5lbCB0YXJiYWxsIGJlZm9yZSkuIElmIHRoZXJlIGlzIGEgcHJlYnVpbHQgaW1h
-Z2UgdGhhdCBJIGNhbiB1c2UgdG8gYm9vdCB1cCB0byB1c2Ugd2l0aCB2aXJ0aW9mcywgbGV0IG1l
-IGtub3cgYXMgdGhhdKGvZCBzYXZlIG1lIGEgdG9uIG9mIHRpbWUuCj4gCj4gQmVzdAo+IAo+IEJo
-YXJhdAo+IAo+IAo+IAo+IAo+IAoKCgoKPiBfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fXwo+IFZpcnRpby1mcyBtYWlsaW5nIGxpc3QKPiBWaXJ0aW8tZnNAcmVk
-aGF0LmNvbQo+IGh0dHBzOi8vd3d3LnJlZGhhdC5jb20vbWFpbG1hbi9saXN0aW5mby92aXJ0aW8t
-ZnMKCg==
+On Fri, Jun 7, 2019 at 8:33 PM Dr. David Alan Gilbert
+<dgilbert@redhat.com> wrote:
+>
+> * Liu Bo (bo.liu@linux.alibaba.com) wrote:
+> > On Fri, Jun 07, 2019 at 04:21:47PM +0100, Dr. David Alan Gilbert wrote:
+> > > * Liu Bo (bo.liu@linux.alibaba.com) wrote:
+> > > > lookup is a RO operations, PARALLEL_DIROPS can be enabled.
+> > > >
+> > > > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+> > >
+> > > I'm not too sure what this is doing; and why doesn't upstream libfuse
+> > > have this?
+> >
+> > I'm not sure why libfuse doesn't include the capability, but AFAICT this
+> > is needed for practical use.
+>
+> Miklos: Do you know what the rules are around PARALLEL_DIROPS and why
+> the upstream libfuse doesn't have it eanbled?
+
+Not sure why libfuse3 wouldn't have it enabled by default, probably an
+omission.  Having said that, the reason this is opt in is that old
+filesystems might rely on the serialized behavior, so back
+compatibility requires that we have this turned off by default, so now
+libfuse3 has the same problem...
+
+Thanks,
+Miklos
+

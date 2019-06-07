@@ -1,13 +1,17 @@
-Date: Mon, 8 Jul 2019 16:43:01 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190708204301.GB15498@redhat.com>
-References: <1562225131-23463-1-git-send-email-bo.liu@linux.alibaba.com>
+Date: Fri, 7 Jun 2019 20:23:46 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190607192346.GC2631@work-vm>
+References: <1559875098-9347-1-git-send-email-bo.liu@linux.alibaba.com>
+	<20190607152147.GI2631@work-vm>
+	<20190607181533.r7xkszkdi377o5ha@US-160370MP2.local>
+	<20190607183310.GY2631@work-vm>
+	<CAOssrKc9Z8SZOJyLv0rBthcDxiUzPhf07p0A4B9zjWQ+iHhm5A@mail.gmail.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <1562225131-23463-1-git-send-email-bo.liu@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH RFC] virtiofs: use fine-grained lock for
- dmap reclaim
+In-Reply-To: <CAOssrKc9Z8SZOJyLv0rBthcDxiUzPhf07p0A4B9zjWQ+iHhm5A@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: enable PARALLEL_DIROPS during
+	INIT
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,258 +20,41 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Liu Bo <bo.liu@linux.alibaba.com>
+To: Miklos Szeredi <mszeredi@redhat.com>
 Cc: virtio-fs@redhat.com
 
-On Thu, Jul 04, 2019 at 03:25:31PM +0800, Liu Bo wrote:
-> With free fuse dax mapping reducing, read performance is impacted
-> significantly because reads need to wait for a free fuse dax mapping.
+* Miklos Szeredi (mszeredi@redhat.com) wrote:
+> On Fri, Jun 7, 2019 at 8:33 PM Dr. David Alan Gilbert
+> <dgilbert@redhat.com> wrote:
+> >
+> > * Liu Bo (bo.liu@linux.alibaba.com) wrote:
+> > > On Fri, Jun 07, 2019 at 04:21:47PM +0100, Dr. David Alan Gilbert wrote:
+> > > > * Liu Bo (bo.liu@linux.alibaba.com) wrote:
+> > > > > lookup is a RO operations, PARALLEL_DIROPS can be enabled.
+> > > > >
+> > > > > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+> > > >
+> > > > I'm not too sure what this is doing; and why doesn't upstream libfuse
+> > > > have this?
+> > >
+> > > I'm not sure why libfuse doesn't include the capability, but AFAICT this
+> > > is needed for practical use.
+> >
+> > Miklos: Do you know what the rules are around PARALLEL_DIROPS and why
+> > the upstream libfuse doesn't have it eanbled?
 > 
-> Although reads will trigger reclaim work to try to reclaim fuse dax
-> mapping, reclaim code can barely make any progress if most of fuse dax
-> mappings are used by the file we're reading since inode lock is required
-> by reclaim code.
-> 
-> However, we don't have to take inode lock for reclaiming if dax mapping
-> has its own reference count, reference counting is to tell reclaim code to
-> skip those in use dax mappings, such that we can avoid the risk of
-> accidentally reclaiming a dax mapping that other readers are using.
-> 
-> On the other hand, holding ->i_dmap_sem during reclaim can be used to
-> prevent the follwing reads to get a dax mapping under reclaim.
-> 
-> Another reason is that reads/writes only use fuse dax mapping within
-> dax_iomap_rw(), so we can do such a trick, while mmap/faulting is a
-> different story and we have to take ->i_mmap_sem prior to reclaiming a dax
-> mapping in order to avoid the race.
+> Not sure why libfuse3 wouldn't have it enabled by default, probably an
+> omission.  Having said that, the reason this is opt in is that old
+> filesystems might rely on the serialized behavior, so back
+> compatibility requires that we have this turned off by default, so now
+> libfuse3 has the same problem...
 
-Hi Liu Bo,
+So for us (virtio-fs) is it always safe?
 
-Not sure why we can get rid of inode lock but not ->i_mmap_sem. Holding
-this lock only prevents further page fault. But existing mapped pages
-will continue to be accessed by process.
+Dave
 
-And in theory we could drop inode lock and be safe only with ->dmap_sem
-lock, can't we do something similar for ->i_mmap_sem lock.
-
-Also little worried about races w.r.t truncation and i_size update. Dax
-code assumes that i_size is stable  and filesystem is holding enough
-locks to ensure that.
-
-What kind of testing you have done to make sure this is safe. Try
-running blogbench. Possibly mix of read/write/mmap workload along
-with heavy truncation/punch hole operation in parallel as well.
-
-I will spend more time thinking about this.
-
-Thanks
-Vivek
-> 
-> This adds reference count for fuse dax mapping and removes the acquisition
-> of inode lock during reclaim.
-> 
-> 
-> RESULTS:
-> 
-> virtiofsd -cache_size=2G
-> 
-> vanilla kernel: IOPS=378
-> patched kernel: IOPS=4508
-> 
-> 
-> *********************************
-> $ cat fio-rand-read.job
-> ; fio-rand-read.job for fiotest
-> 
-> [global]
-> name=fio-rand-read
-> filename=fio_file
-> rw=randread
-> bs=4K
-> direct=1
-> numjobs=1
-> time_based=1
-> runtime=120
-> directory=/mnt/test/
-> fsync=1
-> group_reporting=1
-> 
-> [file1]
-> size=5G
-> # use sync/libaio
-> ioengine=sync
-> iodepth=1
-> 
-> 
-> Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
-> ---
->  fs/fuse/file.c   | 55 +++++++++++++++++++++++++++++++++++++------------------
->  fs/fuse/fuse_i.h |  3 +++
->  fs/fuse/inode.c  |  1 +
->  3 files changed, 41 insertions(+), 18 deletions(-)
-> 
-> diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-> index 4ed45a7..e3ec646 100644
-> --- a/fs/fuse/file.c
-> +++ b/fs/fuse/file.c
-> @@ -1870,6 +1870,17 @@ static void fuse_fill_iomap(struct inode *inode, loff_t pos, loff_t length,
->  		if (flags & IOMAP_FAULT)
->  			iomap->length = ALIGN(len, PAGE_SIZE);
->  		iomap->type = IOMAP_MAPPED;
-> +
-> +		/*
-> +		 * increace refcnt so that reclaim code knows this dmap is in
-> +		 * use.
-> +		 */
-> +		atomic_inc(&dmap->refcnt);
-> +
-> +		/* iomap->private should be NULL */
-> +		WARN_ON_ONCE(iomap->private);
-> +		iomap->private = dmap;
-> +
->  		pr_debug("%s: returns iomap: addr 0x%llx offset 0x%llx"
->  				" length 0x%llx\n", __func__, iomap->addr,
->  				iomap->offset, iomap->length);
-> @@ -2024,6 +2035,11 @@ static int fuse_iomap_end(struct inode *inode, loff_t pos, loff_t length,
->  			  ssize_t written, unsigned flags,
->  			  struct iomap *iomap)
->  {
-> +	struct fuse_dax_mapping *dmap = iomap->private;
-> +
-> +	if (dmap)
-> +		atomic_dec(&dmap->refcnt);
-> +
->  	/* DAX writes beyond end-of-file aren't handled using iomap, so the
->  	 * file size is unchanged and there is nothing to do here.
->  	 */
-> @@ -3959,6 +3975,10 @@ static int reclaim_one_dmap_locked(struct fuse_conn *fc, struct inode *inode,
->  	int ret;
->  	struct fuse_inode *fi = get_fuse_inode(inode);
->  
-> +	/*
-> +	 * igrab() was done to make sure inode won't go under us, and this
-> +	 * further avoids the race with evict().
-> +	 */
->  	ret = dmap_writeback_invalidate(inode, dmap);
->  
->  	/* TODO: What to do if above fails? For now,
-> @@ -4053,23 +4073,25 @@ static struct fuse_dax_mapping *alloc_dax_mapping_reclaim(struct fuse_conn *fc,
->  	}
->  }
->  
-> -int lookup_and_reclaim_dmap_locked(struct fuse_conn *fc, struct inode *inode,
-> -				   u64 dmap_start)
-> +static int lookup_and_reclaim_dmap_locked(struct fuse_conn *fc,
-> +					  struct inode *inode, u64 dmap_start)
->  {
->  	int ret;
->  	struct fuse_inode *fi = get_fuse_inode(inode);
->  	struct fuse_dax_mapping *dmap;
->  
-> -	WARN_ON(!inode_is_locked(inode));
-> -
->  	/* Find fuse dax mapping at file offset inode. */
->  	dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, dmap_start,
-> -							dmap_start);
-> +						 dmap_start);
->  
->  	/* Range already got cleaned up by somebody else */
->  	if (!dmap)
->  		return 0;
->  
-> +	/* still in use. */
-> +	if (atomic_read(&dmap->refcnt))
-> +		return 0;
-> +
->  	ret = reclaim_one_dmap_locked(fc, inode, dmap);
->  	if (ret < 0)
->  		return ret;
-> @@ -4084,29 +4106,21 @@ int lookup_and_reclaim_dmap_locked(struct fuse_conn *fc, struct inode *inode,
->  /*
->   * Free a range of memory.
->   * Locking.
-> - * 1. Take inode->i_rwsem to prever further read/write.
-> - * 2. Take fuse_inode->i_mmap_sem to block dax faults.
-> - * 3. Take fuse_inode->i_dmap_sem to protect interval tree. It might not
-> + * 1. Take fuse_inode->i_mmap_sem to block dax faults.
-> + * 2. Take fuse_inode->i_dmap_sem to protect interval tree. It might not
->   *    be strictly necessary as lock 1 and 2 seem sufficient.
->   */
-> -int lookup_and_reclaim_dmap(struct fuse_conn *fc, struct inode *inode,
-> -			    u64 dmap_start)
-> +static int lookup_and_reclaim_dmap(struct fuse_conn *fc, struct inode *inode,
-> +				   u64 dmap_start)
->  {
->  	int ret;
->  	struct fuse_inode *fi = get_fuse_inode(inode);
->  
-> -	/*
-> -	 * If process is blocked waiting for memory while holding inode
-> -	 * lock, we will deadlock. So continue to free next range.
-> -	 */
-> -	if (!inode_trylock(inode))
-> -		return -EAGAIN;
->  	down_write(&fi->i_mmap_sem);
->  	down_write(&fi->i_dmap_sem);
->  	ret = lookup_and_reclaim_dmap_locked(fc, inode, dmap_start);
->  	up_write(&fi->i_dmap_sem);
->  	up_write(&fi->i_mmap_sem);
-> -	inode_unlock(inode);
->  	return ret;
->  }
->  
-> @@ -4134,6 +4148,12 @@ static int try_to_free_dmap_chunks(struct fuse_conn *fc,
->  
->  		list_for_each_entry_safe(pos, temp, &fc->busy_ranges,
->  						busy_list) {
-> +			dmap = pos;
-> +
-> +			/* skip this range if it's in use. */
-> +			if (atomic_read(&dmap->refcnt))
-> +				continue;
-> +
->  			inode = igrab(pos->inode);
->  			/*
->  			 * This inode is going away. That will free
-> @@ -4147,7 +4167,6 @@ static int try_to_free_dmap_chunks(struct fuse_conn *fc,
->  			 * inode lock can't be obtained, this will help with
->  			 * selecting new element
->  			 */
-> -			dmap = pos;
->  			list_move_tail(&dmap->busy_list, &fc->busy_ranges);
->  			dmap_start = dmap->start;
->  			window_offset = dmap->window_offset;
-> diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-> index 94cfde0..31ecdac 100644
-> --- a/fs/fuse/fuse_i.h
-> +++ b/fs/fuse/fuse_i.h
-> @@ -143,6 +143,9 @@ struct fuse_dax_mapping {
->  
->  	/* indicate if the mapping is set up for write purpose */
->  	unsigned flags;
-> +
-> +	/* reference count when the mapping is used by dax iomap. */
-> +	atomic_t refcnt;
->  };
->  
->  /** FUSE inode */
-> diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-> index 288daee..27c6055 100644
-> --- a/fs/fuse/inode.c
-> +++ b/fs/fuse/inode.c
-> @@ -671,6 +671,7 @@ static int fuse_dax_mem_range_init(struct fuse_conn *fc,
->  		range->length = FUSE_DAX_MEM_RANGE_SZ;
->  		list_add_tail(&range->list, &mem_ranges);
->  		INIT_LIST_HEAD(&range->busy_list);
-> +		atomic_set(&range->refcnt, 0);
->  		allocated_ranges++;
->  	}
->  
-> -- 
-> 1.8.3.1
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
+> Thanks,
+> Miklos
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

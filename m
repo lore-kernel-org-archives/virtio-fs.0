@@ -1,13 +1,11 @@
-Date: Fri, 7 Jun 2019 14:21:29 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190607182129.GB23125@redhat.com>
-References: <20190530181141.GA9848@redhat.com> <20190607151517.GH2631@work-vm>
+Date: Mon, 10 Jun 2019 17:09:55 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20190610160955.GA19995@stefanha-x1.localdomain>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="IS0zKkzwUGydFO0o"
 Content-Disposition: inline
-In-Reply-To: <20190607151517.GH2631@work-vm>
-Subject: Re: [Virtio-fs] [RFC PATCH] virtiofsd: Provide support for posix
-	locks
+Subject: [Virtio-fs] Adding notifications vq to the virtio-fs device
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,64 +14,50 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, Miklos Szeredi <mszeredi@redhat.com>
+To: vgoyal@redhat.com
+Cc: virtio-fs@redhat.com
 
-On Fri, Jun 07, 2019 at 04:15:18PM +0100, Dr. David Alan Gilbert wrote:
-[..]
-> > Index: qemu/contrib/virtiofsd/passthrough_ll.c
-> > ===================================================================
-> > --- qemu.orig/contrib/virtiofsd/passthrough_ll.c	2019-04-25 10:49:14.103386416 -0400
-> > +++ qemu/contrib/virtiofsd/passthrough_ll.c	2019-05-30 14:02:55.598483536 -0400
-> > @@ -58,6 +58,12 @@
-> >  #include <gmodule.h>
-> >  #include "seccomp.h"
-> >  
-> > +/* Keep track of inode posix locks for each owner. */
-> > +struct lo_inode_plock {
-> > +	uint64_t	lock_owner;
-> > +	int	fd;	/* fd for OFD locks */
-> > +};
-> > +
-> >  struct lo_map_elem {
-> >  	union {
-> >  		struct lo_inode *inode;
-> > @@ -86,6 +92,8 @@ struct lo_inode {
-> >  	struct lo_key key;
-> >  	uint64_t refcount; /* protected by lo->mutex */
-> >  	fuse_ino_t fuse_ino;
-> > +	pthread_mutex_t mutex;
-> 
-> If this mutex is purely for posix_locks then there's probably a better
-> name.
 
-Hi Dave,
+--IS0zKkzwUGydFO0o
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
 
-As of now it is only for posix locks. But it could be used for locking
-other inode specific data structures as well. That's why I left it with
-a generic name. But if it bothers you, I can open to change the name
-to something else.
+Hi Vivek,
+There is discussion of adding the notifications vq to the virtio-fs
+device so that FUSE Notification messages are possible.  This was
+previously discussed on the VIRTIO mailing lists here:
+https://lists.oasis-open.org/archives/virtio-dev/201902/msg00074.html
 
-[..]
-> > @@ -1038,6 +1064,10 @@ static void unref_inode(struct lo_data *
-> >  	if (!inode->refcount) {
-> >  		lo_map_remove(&lo->ino_map, inode->fuse_ino);
-> >                  g_hash_table_remove(lo->inodes, &inode->key);
-> > +		if (g_hash_table_size(inode->posix_locks)) {
-> > +			warn("Hash table is not empty\n");
-> > +		}
-> > +		g_hash_table_destroy(inode->posix_locks);
-> >  		pthread_mutex_unlock(&lo->mutex);
-> >  		close(inode->fd);
-> 
-> pthread_mutex_destroy(&inode->mutex) ?
+The main issue is how to handle the case where the device wishes to
+raise notifications but the driver has not supplied enough buffers.
 
-So is it necessary to call this? Is it about that if same inode is
-allocated next time and if we call pthread_mutex_init(), it might
-have issues?
+FUSE requires reliable notification delivery.  We cannot drop
+notifications.
 
-IOW, trying to understand why one should call pthread_mutex_destroy()
-before freeing inode.
+The mechanism will have to support reliable delivery.  For example, the
+device may need to pause further operation until the driver makes
+buffers available again.  But this could lead to DoS or deadlocks, so
+care is needed!
 
-Vivek
+I hope this link is useful in restarting the discussion about the
+notifications vq.
+
+Stefan
+
+--IS0zKkzwUGydFO0o
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAlz+gNMACgkQnKSrs4Gr
+c8jFEwgAgxg7vWbnp+8CwpS5WVY59QcfQXzDamLh/URvagczdcRM6fffutqccIyt
+V6hLp8bS8D/HcUsck4evrxOuLoT2PCQoQSbFWqsJPXRduSA8UEtAOtsjMb1jbe/q
+cATb2WilWrVMEeM/7Yjxn6VnSA9mtZHq3po/dt1YJHUFcYHtMb2UF0uJTfzqMvBa
+rTANgOASyTMnGqaslcgzIKdl8KitV8cr0cn3B55aQ6M1WQzLBA6F6Sssi8Ew8Khi
+T+78bXYPjY+XRxeq0BIildxa0/kboEFFsimCPcbpZQUnXegaDsV2t7ixG1nuGLSp
+qIZJXr7TpSyU+HQF+XJVVqCdC+PzjA==
+=WrV/
+-----END PGP SIGNATURE-----
+
+--IS0zKkzwUGydFO0o--
 

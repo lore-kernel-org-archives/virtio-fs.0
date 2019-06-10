@@ -1,10 +1,19 @@
-Date: Fri, 7 Jun 2019 15:37:04 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190607193704.GC23125@redhat.com>
+Date: Mon, 10 Jun 2019 10:04:30 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190610090430.GA22439@work-vm>
+References: <1559875098-9347-1-git-send-email-bo.liu@linux.alibaba.com>
+	<20190607152147.GI2631@work-vm>
+	<20190607181533.r7xkszkdi377o5ha@US-160370MP2.local>
+	<20190607183310.GY2631@work-vm>
+	<CAOssrKc9Z8SZOJyLv0rBthcDxiUzPhf07p0A4B9zjWQ+iHhm5A@mail.gmail.com>
+	<20190607192346.GC2631@work-vm>
+	<CAOssrKfvXA0Mb18MW_j+3Gw2pqyvL2=9TTKodmhspfHA5mEpRw@mail.gmail.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: [Virtio-fs] [PATCH V2] virtiofsd: Support remote posix locks
+In-Reply-To: <CAOssrKfvXA0Mb18MW_j+3Gw2pqyvL2=9TTKodmhspfHA5mEpRw@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: enable PARALLEL_DIROPS during
+	INIT
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,316 +22,52 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com, "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+To: Miklos Szeredi <mszeredi@redhat.com>
+Cc: virtio-fs@redhat.com
 
-Doing posix locks with-in guest kernel are not sufficient if a file/dir
-is being shared by multiple guests. So we need the notion of daemon doing
-the locks which are visible to rest of the guests.
+* Miklos Szeredi (mszeredi@redhat.com) wrote:
+> On Fri, Jun 7, 2019 at 9:23 PM Dr. David Alan Gilbert
+> <dgilbert@redhat.com> wrote:
+> >
+> > * Miklos Szeredi (mszeredi@redhat.com) wrote:
+> > > On Fri, Jun 7, 2019 at 8:33 PM Dr. David Alan Gilbert
+> > > <dgilbert@redhat.com> wrote:
+> > > >
+> > > > * Liu Bo (bo.liu@linux.alibaba.com) wrote:
+> > > > > On Fri, Jun 07, 2019 at 04:21:47PM +0100, Dr. David Alan Gilbert wrote:
+> > > > > > * Liu Bo (bo.liu@linux.alibaba.com) wrote:
+> > > > > > > lookup is a RO operations, PARALLEL_DIROPS can be enabled.
+> > > > > > >
+> > > > > > > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+> > > > > >
+> > > > > > I'm not too sure what this is doing; and why doesn't upstream libfuse
+> > > > > > have this?
+> > > > >
+> > > > > I'm not sure why libfuse doesn't include the capability, but AFAICT this
+> > > > > is needed for practical use.
+> > > >
+> > > > Miklos: Do you know what the rules are around PARALLEL_DIROPS and why
+> > > > the upstream libfuse doesn't have it eanbled?
+> > >
+> > > Not sure why libfuse3 wouldn't have it enabled by default, probably an
+> > > omission.  Having said that, the reason this is opt in is that old
+> > > filesystems might rely on the serialized behavior, so back
+> > > compatibility requires that we have this turned off by default, so now
+> > > libfuse3 has the same problem...
+> >
+> > So for us (virtio-fs) is it always safe?
+> 
+> Yes, since no shared data is used between readdir instances.
 
-Given posix locks are per process, one can not call posix lock API on host,
-otherwise bunch of basic posix locks properties are broken. For example,
-If two processes (A and B) in guest open the file and take locks on different
-sections of file, if one of the processes closes the fd, it will close
-fd on virtiofsd and all posix locks on file will go away. This means if
-process A closes the fd, then locks of process B will go away too.
+OK, in that case
 
-Similar other problems exist too.
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 
-This patch set tries to emulate posix locks while using open file
-description locks provided on Linux.
+and added to my tree.
 
-Daemon provides two options (-o posix_lock, -o no_posix_lock) to enable
-or disable posix locking in daemon. By default it is enabled.
 
-There are few issues though.
-
-- GETLK() returns pid of process holding lock. As we are emulating locks
-  using OFD, and these locks are not per process and don't return pid
-  of process, so GETLK() in guest does not reuturn process pid.
-
-- As of now only F_SETLK is supported and not F_SETLKW. We can't block
-  the thread in virtiofsd for arbitrary long duration as there is only
-  one thread serving the queue. That means unlock request will not make
-  it to daemon and F_SETLKW will block infinitely and bring virtio-fs
-  to a halt. This is a solvable problem though and will require significant
-  changes in virtiofsd and kernel. Left as a TODO item for now.
-
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- contrib/virtiofsd/passthrough_ll.c |  186 ++++++++++++++++++++++++++++++++++++-
- 1 file changed, 185 insertions(+), 1 deletion(-)
-
-Index: qemu/contrib/virtiofsd/passthrough_ll.c
-===================================================================
---- qemu.orig/contrib/virtiofsd/passthrough_ll.c	2019-06-07 14:58:41.751371163 -0400
-+++ qemu/contrib/virtiofsd/passthrough_ll.c	2019-06-07 15:23:01.715226047 -0400
-@@ -58,6 +58,12 @@
- #include <gmodule.h>
- #include "seccomp.h"
- 
-+/* Keep track of inode posix locks for each owner. */
-+struct lo_inode_plock {
-+	uint64_t	lock_owner;
-+	int	fd;	/* fd for OFD locks */
-+};
-+
- struct lo_map_elem {
- 	union {
- 		struct lo_inode *inode;
-@@ -86,6 +92,8 @@ struct lo_inode {
- 	struct lo_key key;
- 	uint64_t refcount; /* protected by lo->mutex */
- 	fuse_ino_t fuse_ino;
-+	pthread_mutex_t plock_mutex;
-+	GHashTable *posix_locks; /* protected by lo_inode->plock_mutex */
- };
- 
- struct lo_cred {
-@@ -105,6 +113,7 @@ struct lo_data {
- 	int norace;
- 	int writeback;
- 	int flock;
-+	int posix_lock;
- 	int xattr;
- 	const char *source;
- 	double timeout;
-@@ -133,6 +142,10 @@ static const struct fuse_opt lo_opts[] =
- 	  offsetof(struct lo_data, flock), 1 },
- 	{ "no_flock",
- 	  offsetof(struct lo_data, flock), 0 },
-+	{ "posix_lock",
-+	  offsetof(struct lo_data, posix_lock), 0 },
-+	{ "no_posix_lock",
-+	  offsetof(struct lo_data, posix_lock), 0 },
- 	{ "xattr",
- 	  offsetof(struct lo_data, xattr), 1 },
- 	{ "no_xattr",
-@@ -362,13 +375,24 @@ static void lo_init(void *userdata,
- 			fprintf(stderr, "lo_init: activating flock locks\n");
- 		conn->want |= FUSE_CAP_FLOCK_LOCKS;
- 	}
-+
-+	if (conn->capable & FUSE_CAP_POSIX_LOCKS) {
-+		if (lo->posix_lock) {
-+			if (lo->debug)
-+				fprintf(stderr, "lo_init: activating posix locks\n");
-+			conn->want |= FUSE_CAP_POSIX_LOCKS;
-+		} else {
-+			if (lo->debug)
-+				fprintf(stderr, "lo_init: disabling posix locks\n");
-+			conn->want &= ~FUSE_CAP_POSIX_LOCKS;
-+		}
-+	}
- 	if ((lo->cache == CACHE_NONE && !lo->readdirplus_set) ||
- 	    lo->readdirplus_clear) {
- 		if (lo->debug)
- 			fprintf(stderr, "lo_init: disabling readdirplus\n");
- 		conn->want &= ~FUSE_CAP_READDIRPLUS;
- 	}
--
- }
- 
- static void lo_getattr(fuse_req_t req, fuse_ino_t ino,
-@@ -673,6 +697,8 @@ static int lo_do_lookup(fuse_req_t req,
- 		newfd = -1;
- 		inode->key.ino = e->attr.st_ino;
- 		inode->key.dev = e->attr.st_dev;
-+		pthread_mutex_init(&inode->plock_mutex, NULL);
-+		inode->posix_locks = g_hash_table_new(g_direct_hash, g_direct_equal);
- 
- 		pthread_mutex_lock(&lo->mutex);
- 		inode->fuse_ino = lo_add_inode_mapping(req, inode);
-@@ -1038,6 +1064,11 @@ static void unref_inode(struct lo_data *
- 	if (!inode->refcount) {
- 		lo_map_remove(&lo->ino_map, inode->fuse_ino);
-                 g_hash_table_remove(lo->inodes, &inode->key);
-+		if (g_hash_table_size(inode->posix_locks)) {
-+			warn("Hash table is not empty\n");
-+		}
-+		g_hash_table_destroy(inode->posix_locks);
-+		pthread_mutex_destroy(&inode->plock_mutex);
- 		pthread_mutex_unlock(&lo->mutex);
- 		close(inode->fd);
- 		free(inode);
-@@ -1379,6 +1410,131 @@ out:
- 		fuse_reply_create(req, &e, fi);
- }
- 
-+/* Should be called with inode->plock_mutex held */
-+static struct lo_inode_plock *lookup_create_plock_ctx(struct lo_data *lo,
-+				struct lo_inode *inode, uint64_t lock_owner,
-+				pid_t pid, int *err)
-+{
-+	struct lo_inode_plock *plock;
-+	char procname[64];
-+	int fd;
-+
-+	plock = g_hash_table_lookup(inode->posix_locks,
-+				    GUINT_TO_POINTER(lock_owner));
-+
-+	if (plock)
-+		return plock;
-+
-+	plock = malloc(sizeof(struct lo_inode_plock));
-+	if (!plock) {
-+		*err = ENOMEM;
-+		return NULL;
-+	}
-+
-+	/* Open another instance of file which can be used for ofd locks. */
-+	sprintf(procname, "%i", inode->fd);
-+
-+	/* TODO: What if file is not writable? */
-+	fd = openat(lo->proc_self_fd, procname, O_RDWR);
-+	if (fd == -1) {
-+		*err = -errno;
-+		free(plock);
-+		return NULL;
-+	}
-+
-+	plock->lock_owner = lock_owner;
-+	plock->fd = fd;
-+	g_hash_table_insert(inode->posix_locks,
-+			    GUINT_TO_POINTER(plock->lock_owner), plock);
-+	return plock;
-+}
-+
-+static void lo_getlk(fuse_req_t req, fuse_ino_t ino,
-+		     struct fuse_file_info *fi, struct flock *lock)
-+{
-+	struct lo_data *lo = lo_data(req);
-+	struct lo_inode *inode;
-+	struct lo_inode_plock *plock;
-+	int ret, saverr = 0;
-+
-+	if (lo_debug(req))
-+		fprintf(stderr, "lo_getlk(ino=%" PRIu64 ", flags=%d)"
-+			       " owner=0x%lx, l_type=%d l_start=0x%lx"
-+			      " l_len=0x%lx\n", ino, fi->flags, fi->lock_owner,
-+			      lock->l_type, lock->l_start, lock->l_len);
-+
-+	inode = lo_inode(req, ino);
-+	if (!inode) {
-+		fuse_reply_err(req, EBADF);
-+		return;
-+	}
-+
-+	pthread_mutex_lock(&inode->plock_mutex);
-+	plock = lookup_create_plock_ctx(lo, inode, fi->lock_owner, lock->l_pid,
-+			&ret);
-+	if (!plock) {
-+		pthread_mutex_unlock(&inode->plock_mutex);
-+		fuse_reply_err(req, ret);
-+		return;
-+	}
-+
-+	ret = fcntl(plock->fd, F_OFD_GETLK, lock);
-+	if (ret == -1)
-+		saverr = errno;
-+	pthread_mutex_unlock(&inode->plock_mutex);
-+
-+	if (saverr)
-+		fuse_reply_err(req, saverr);
-+	else
-+		fuse_reply_lock(req, lock);
-+}
-+
-+static void lo_setlk(fuse_req_t req, fuse_ino_t ino,
-+		     struct fuse_file_info *fi, struct flock *lock, int sleep)
-+{
-+	struct lo_data *lo = lo_data(req);
-+	struct lo_inode *inode;
-+	struct lo_inode_plock *plock;
-+	int ret, saverr = 0;
-+
-+	if (lo_debug(req))
-+		fprintf(stderr, "lo_setlk(ino=%" PRIu64 ", flags=%d)"
-+			" cmd=%d pid=%d owner=0x%lx sleep=%d l_whence=%d"
-+		        " l_start=0x%lx l_len=0x%lx\n", ino, fi->flags,
-+			lock->l_type, lock->l_pid, fi->lock_owner, sleep,
-+			lock->l_whence, lock->l_start, lock->l_len);
-+
-+	if (sleep) {
-+		fuse_reply_err(req, EOPNOTSUPP);
-+		return;
-+	}
-+
-+	inode = lo_inode(req, ino);
-+	if (!inode) {
-+		fuse_reply_err(req, EBADF);
-+		return;
-+	}
-+
-+	pthread_mutex_lock(&inode->plock_mutex);
-+	plock = lookup_create_plock_ctx(lo, inode, fi->lock_owner, lock->l_pid,
-+			&ret);
-+
-+	if (!plock) {
-+		pthread_mutex_unlock(&inode->plock_mutex);
-+		fuse_reply_err(req, ret);
-+		return;
-+	}
-+
-+	/* TODO: Is it alright to modify flock? */
-+	lock->l_pid = 0;
-+	ret = fcntl(plock->fd, F_OFD_SETLK, lock);
-+	if (ret == -1) {
-+		saverr = errno;
-+	}
-+	pthread_mutex_unlock(&inode->plock_mutex);
-+	fuse_reply_err(req, saverr);
-+}
-+
- static void lo_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
- 			struct fuse_file_info *fi)
- {
-@@ -1476,6 +1632,31 @@ static void lo_flush(fuse_req_t req, fus
- {
- 	int res;
- 	(void) ino;
-+	struct lo_inode *inode;
-+	struct lo_inode_plock *plock;
-+
-+	inode = lo_inode(req, ino);
-+	if (!inode) {
-+		fuse_reply_err(req, EBADF);
-+		return;
-+	}
-+
-+	/* An fd is going away. Cleanup associated posix locks */
-+	pthread_mutex_lock(&inode->plock_mutex);
-+	plock = g_hash_table_lookup(inode->posix_locks,
-+				    GUINT_TO_POINTER(fi->lock_owner));
-+	if (plock) {
-+		g_hash_table_remove(inode->posix_locks,
-+				    GUINT_TO_POINTER(fi->lock_owner));
-+		/*
-+		 * We had used open() for locks and had only one fd. So
-+		 * closing this fd should release all OFD locks.
-+		 */
-+		close(plock->fd);
-+		free(plock);
-+	}
-+	pthread_mutex_unlock(&inode->plock_mutex);
-+
- 	res = close(dup(lo_fi_fd(req, fi)));
- 	fuse_reply_err(req, res == -1 ? errno : 0);
- }
-@@ -1974,6 +2155,8 @@ static struct fuse_lowlevel_ops lo_oper
- 	.releasedir	= lo_releasedir,
- 	.fsyncdir	= lo_fsyncdir,
- 	.create		= lo_create,
-+	.getlk		= lo_getlk,
-+	.setlk		= lo_setlk,
- 	.open		= lo_open,
- 	.release	= lo_release,
- 	.flush		= lo_flush,
-@@ -2217,6 +2400,7 @@ int main(int argc, char *argv[])
- 	struct fuse_cmdline_opts opts;
- 	struct lo_data lo = { .debug = 0,
- 	                      .writeback = 0,
-+			      .posix_lock = 1,
- 	                      .proc_self_fd = -1,
- 	};
- 	struct lo_map_elem *root_elem;
+> Thanks,
+> Miklos
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

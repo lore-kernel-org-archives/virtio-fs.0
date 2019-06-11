@@ -1,17 +1,13 @@
-Date: Tue, 11 Jun 2019 12:11:19 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190611191118.cexn2v7c6vhd6l3e@US-160370MP2.local>
-References: <bff1bd0e0d829acacba4a10e072e4a8ccdf972b4.1560260621.git.renzhen@linux.alibaba.com>
-	<20190611173833.GH2777@work-vm>
-	<20190611180604.i6dkkhtafdr2zlax@US-160370MP2.local>
-	<20190611184315.GK2777@work-vm>
+Date: Tue, 11 Jun 2019 15:30:41 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190611193041.GB28835@redhat.com>
+References: <20190610192206.GD29869@redhat.com>
+	<20190611190846.ofc6cbn3gvfeant7@US-160370MP2.local>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190611184315.GK2777@work-vm>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: fix incorrect error handling in
- lo_do_lookup
-Reply-To: bo.liu@linux.alibaba.com
+In-Reply-To: <20190611190846.ofc6cbn3gvfeant7@US-160370MP2.local>
+Subject: Re: [Virtio-fs] [PATCH V3] virtiofsd: Support remote posix locks
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,97 +16,118 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com
+To: Liu Bo <bo.liu@linux.alibaba.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-On Tue, Jun 11, 2019 at 07:43:16PM +0100, Dr. David Alan Gilbert wrote:
-> * Liu Bo (bo.liu@linux.alibaba.com) wrote:
-> > On Tue, Jun 11, 2019 at 06:38:33PM +0100, Dr. David Alan Gilbert wrote:
-> > > * Eric Ren (renzhen@linux.alibaba.com) wrote:
-> > > > Signed-off-by: Eric Ren <renzhen@linux.alibaba.com>
-> > > > ---
-> > > >  contrib/virtiofsd/passthrough_ll.c | 3 ++-
-> > > >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-> > > > index 574e209d95..78716c8aca 100644
-> > > > --- a/contrib/virtiofsd/passthrough_ll.c
-> > > > +++ b/contrib/virtiofsd/passthrough_ll.c
-> > > > @@ -670,7 +670,6 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-> > > >  		close(newfd);
-> > > >  		newfd = -1;
-> > > >  	} else {
-> > > > -		saverr = ENOMEM;
-> > > >  		inode = calloc(1, sizeof(struct lo_inode));
-> > > >  		if (!inode)
-> > > >  			goto out_err;
-> > > 
-> > > Can you explain why you remove that?   How does it
-> > > get a sensible errno in this case?
-> > >
-> > 
-> > Are you suggesting that calloc() doesn't set errno on failure?
-> > 
-> > the manual reads that
-> > 
-> > "The UNIX 98 standard requires malloc(), calloc(), and realloc() to
-> > set errno to ENOMEM upon failure. Glibc assumes that this is done (and
-> > the glibc versions of these routines do this); if you use a private
-> > malloc implementation that does not set errno, then certain library
-> > routines may fail without having a reason in errno."
-> 
-> Oh OK, and the spec I just found also says it should; the linux manpage
-> wasn't clear to me.
-> 
-> In that case,
-> 
-> Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> 
-> and I'll merge it.
->
+On Tue, Jun 11, 2019 at 12:08:47PM -0700, Liu Bo wrote:
 
-Although the patch fixed the problem we've observed, do you think we
-should instead set errno in place to avoid any surprise in the future?
+[..]
+> > +static void lo_getlk(fuse_req_t req, fuse_ino_t ino,
+> > +		     struct fuse_file_info *fi, struct flock *lock)
+> > +{
+> > +	struct lo_data *lo = lo_data(req);
+> > +	struct lo_inode *inode;
+> > +	struct lo_inode_plock *plock;
+> > +	int ret, saverr = 0;
+> > +
+> > +	if (lo_debug(req))
+> > +		fprintf(stderr, "lo_getlk(ino=%" PRIu64 ", flags=%d)"
+> > +			       " owner=0x%lx, l_type=%d l_start=0x%lx"
+> > +			      " l_len=0x%lx\n", ino, fi->flags, fi->lock_owner,
+> > +			      lock->l_type, lock->l_start, lock->l_len);
+> > +
+> > +	inode = lo_inode(req, ino);
+> > +	if (!inode) {
+> > +		fuse_reply_err(req, EBADF);
+> > +		return;
+> > +	}
+> > +
+> > +	pthread_mutex_lock(&inode->plock_mutex);
+> > +	plock = lookup_create_plock_ctx(lo, inode, fi->lock_owner, lock->l_pid,
+> > +			&ret);
+> > +	if (!plock) {
+> > +		pthread_mutex_unlock(&inode->plock_mutex);
+> > +		fuse_reply_err(req, ret);
+> > +		return;
+> > +	}
+> > +
+> > +	ret = fcntl(plock->fd, F_OFD_GETLK, lock);
+> 
+> lock->l_pid is set to the host's process holding this lock, right?  if
+> so, would it confuse guest's processes?
 
-thanks,
--liubo
+man fcntl says following.
 
-> > 
-> > 
-> > > > @@ -691,7 +690,9 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-> > > >  	res = fstatat(inode->fd, "", &e->attr,
-> > > >  		      AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
-> > > >  	if (res == -1) {
-> > > > +		saverr = errno;
-> > > >  		unref_inode(lo, inode, 1);
-> > > > +		errno = saverr;
-> > > 
-> > > That one I agree with.
-> > >
-> > 
-> > Well...can we instead set errno in place to avoid any surprise in the future?
-> > 
-> > thanks,
-> > -liubo
-> > 
-> > > 
-> > > >  		goto out_err;
-> > > >  	}
-> > > >  
-> > > > -- 
-> > > > 2.17.2 (Apple Git-113)
-> > > > 
-> > > > _______________________________________________
-> > > > Virtio-fs mailing list
-> > > > Virtio-fs@redhat.com
-> > > > https://www.redhat.com/mailman/listinfo/virtio-fs
-> > > --
-> > > Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
-> > > 
-> > > _______________________________________________
-> > > Virtio-fs mailing list
-> > > Virtio-fs@redhat.com
-> > > https://www.redhat.com/mailman/listinfo/virtio-fs
-> --
-> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+F_GETLK (struct flock *)
+...
+...
+
+If the conflicting  lock  is  a traditional (process-associated) record
+lock, then the l_pid field is set to  the  PID  of  the  process
+holding  that  lock.   If  the  conflicting lock is an open file
+description lock, then l_pid  is  set  to  -1.   Note  that  the
+returned  information may already be out of date by the time the
+caller inspects it.
+
+daemon does not do posix locks. It might have put OFD or BSD lock. In that
+case I think -1 will be returned. If some other process has put POSIX
+lock on same file  (a process operating on shared dir exported to guest),
+I think in that case pid of that process will be returned. 
+
+I agree that it does not make much sense to return pid of a process
+outside the guest. 
+
+For now, I am inclined to leave it as it is and if this becomes an issue,
+its a simple fix anyway.
+
+[..]
+> > +static void lo_setlk(fuse_req_t req, fuse_ino_t ino,
+> > +		     struct fuse_file_info *fi, struct flock *lock, int sleep)
+> > +{
+> > +	struct lo_data *lo = lo_data(req);
+> > +	struct lo_inode *inode;
+> > +	struct lo_inode_plock *plock;
+> > +	int ret, saverr = 0;
+> > +
+> > +	if (lo_debug(req))
+> > +		fprintf(stderr, "lo_setlk(ino=%" PRIu64 ", flags=%d)"
+> > +			" cmd=%d pid=%d owner=0x%lx sleep=%d l_whence=%d"
+> > +		        " l_start=0x%lx l_len=0x%lx\n", ino, fi->flags,
+> > +			lock->l_type, lock->l_pid, fi->lock_owner, sleep,
+> > +			lock->l_whence, lock->l_start, lock->l_len);
+> > +
+> > +	if (sleep) {
+> > +		fuse_reply_err(req, EOPNOTSUPP);
+> > +		return;
+> > +	}
+> > +
+> > +	inode = lo_inode(req, ino);
+> > +	if (!inode) {
+> > +		fuse_reply_err(req, EBADF);
+> > +		return;
+> > +	}
+> > +
+> > +	pthread_mutex_lock(&inode->plock_mutex);
+> > +	plock = lookup_create_plock_ctx(lo, inode, fi->lock_owner, lock->l_pid,
+> > +			&ret);
+> > +
+> > +	if (!plock) {
+> > +		pthread_mutex_unlock(&inode->plock_mutex);
+> > +		fuse_reply_err(req, ret);
+> > +		return;
+> > +	}
+> > +
+> > +	/* TODO: Is it alright to modify flock? */
+> 
+> Guess we have to set it to 0, otherwise, fcntl would return EINVAL.
+
+Why do you think fcntl() will return EINVAL. I am not seeing that in my
+testing.
+
+I put this comment to figure out if I need to allocate another flock
+structure and copy arguments from the one passed to me. Or I can reuse
+the one passed to me, overwrite l_pid and continue.
+
+Thanks
+Vivek
 

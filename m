@@ -1,12 +1,8 @@
-Date: Fri, 14 Jun 2019 18:24:15 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190614172414.GJ2785@work-vm>
-References: <20190610160955.GA19995@stefanha-x1.localdomain>
-MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20190610160955.GA19995@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] Adding notifications vq to the virtio-fs device
+From: Liu Bo <bo.liu@linux.alibaba.com>
+Date: Sat, 15 Jun 2019 01:56:20 +0800
+Message-Id: <1560534980-37259-1-git-send-email-bo.liu@linux.alibaba.com>
+Subject: [Virtio-fs] [PATCH] virtiofsd: fix typo in error message in
+	fv_queue_thread
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,40 +11,29 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, vgoyal@redhat.com
+To: virtio-fs@redhat.com
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> Hi Vivek,
-> There is discussion of adding the notifications vq to the virtio-fs
-> device so that FUSE Notification messages are possible.  This was
-> previously discussed on the VIRTIO mailing lists here:
-> https://lists.oasis-open.org/archives/virtio-dev/201902/msg00074.html
-> 
-> The main issue is how to handle the case where the device wishes to
-> raise notifications but the driver has not supplied enough buffers.
-> 
-> FUSE requires reliable notification delivery.  We cannot drop
-> notifications.
-> 
-> The mechanism will have to support reliable delivery.  For example, the
-> device may need to pause further operation until the driver makes
-> buffers available again.  But this could lead to DoS or deadlocks, so
-> care is needed!
-> 
-> I hope this link is useful in restarting the discussion about the
-> notifications vq.
+It's misleading that pf[0].revents is printed when there is something
+wrong with pf[1].revents.
 
-In the case we were recently discussing, notification of lock
-availability, that's not necessarily a problem; if there's no
-space on the notification queue then we stop notifying about
-locks until there is some space.
+Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+---
+ contrib/virtiofsd/fuse_virtio.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Dave
-
-> Stefan
-
-
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
+index ed6ba57..bec4105 100644
+--- a/contrib/virtiofsd/fuse_virtio.c
++++ b/contrib/virtiofsd/fuse_virtio.c
+@@ -472,7 +472,7 @@ static void *fv_queue_thread(void *opaque)
+                }
+                if (pf[1].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+                        fprintf(stderr, "%s: Unexpected poll revents %x Queue %d killfd\n",
+-                                __func__, pf[0].revents, qi->qidx);
++                                __func__, pf[1].revents, qi->qidx);
+                        break;
+                }
+                if (pf[1].revents) {
+-- 
+1.8.3.1
 

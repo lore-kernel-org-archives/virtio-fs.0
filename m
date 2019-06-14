@@ -1,14 +1,15 @@
-Date: Fri, 7 Jun 2019 19:30:40 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190607183039.GX2631@work-vm>
-References: <20190530181141.GA9848@redhat.com> <20190607151517.GH2631@work-vm>
-	<20190607182129.GB23125@redhat.com>
+Date: Fri, 14 Jun 2019 12:08:04 -0700
+From: Liu Bo <bo.liu@linux.alibaba.com>
+Message-ID: <20190614190803.zsuvxydzyw6hmku2@US-160370MP2.local>
+References: <1560534980-37259-1-git-send-email-bo.liu@linux.alibaba.com>
+	<20190614185825.GM2785@work-vm>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190607182129.GB23125@redhat.com>
-Subject: Re: [Virtio-fs] [RFC PATCH] virtiofsd: Provide support for posix
-	locks
+In-Reply-To: <20190614185825.GM2785@work-vm>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: fix typo in error message in
+	fv_queue_thread
+Reply-To: bo.liu@linux.alibaba.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,75 +18,48 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, Miklos Szeredi <mszeredi@redhat.com>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> On Fri, Jun 07, 2019 at 04:15:18PM +0100, Dr. David Alan Gilbert wrote:
-> [..]
-> > > Index: qemu/contrib/virtiofsd/passthrough_ll.c
-> > > ===================================================================
-> > > --- qemu.orig/contrib/virtiofsd/passthrough_ll.c	2019-04-25 10:49:14.103386416 -0400
-> > > +++ qemu/contrib/virtiofsd/passthrough_ll.c	2019-05-30 14:02:55.598483536 -0400
-> > > @@ -58,6 +58,12 @@
-> > >  #include <gmodule.h>
-> > >  #include "seccomp.h"
-> > >  
-> > > +/* Keep track of inode posix locks for each owner. */
-> > > +struct lo_inode_plock {
-> > > +	uint64_t	lock_owner;
-> > > +	int	fd;	/* fd for OFD locks */
-> > > +};
-> > > +
-> > >  struct lo_map_elem {
-> > >  	union {
-> > >  		struct lo_inode *inode;
-> > > @@ -86,6 +92,8 @@ struct lo_inode {
-> > >  	struct lo_key key;
-> > >  	uint64_t refcount; /* protected by lo->mutex */
-> > >  	fuse_ino_t fuse_ino;
-> > > +	pthread_mutex_t mutex;
+On Fri, Jun 14, 2019 at 07:58:25PM +0100, Dr. David Alan Gilbert wrote:
+> * Liu Bo (bo.liu@linux.alibaba.com) wrote:
+> > It's misleading that pf[0].revents is printed when there is something
+> > wrong with pf[1].revents.
 > > 
-> > If this mutex is purely for posix_locks then there's probably a better
-> > name.
+> > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
 > 
-> Hi Dave,
+> Ah well spotted; that's a copy-paste problem on my half.
 > 
-> As of now it is only for posix locks. But it could be used for locking
-> other inode specific data structures as well. That's why I left it with
-> a generic name. But if it bothers you, I can open to change the name
-> to something else.
+> For this, I've just fixed up the original patch.
 
-Well the important thing is that it's not the whole lo_inode; someone
-who didn't know the code might think it was.
+Sure, that's fine.
 
-> [..]
-> > > @@ -1038,6 +1064,10 @@ static void unref_inode(struct lo_data *
-> > >  	if (!inode->refcount) {
-> > >  		lo_map_remove(&lo->ino_map, inode->fuse_ino);
-> > >                  g_hash_table_remove(lo->inodes, &inode->key);
-> > > +		if (g_hash_table_size(inode->posix_locks)) {
-> > > +			warn("Hash table is not empty\n");
-> > > +		}
-> > > +		g_hash_table_destroy(inode->posix_locks);
-> > >  		pthread_mutex_unlock(&lo->mutex);
-> > >  		close(inode->fd);
+thanks,
+-liubo
+
+> 
+> Dave
+> 
+> > ---
+> >  contrib/virtiofsd/fuse_virtio.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
 > > 
-> > pthread_mutex_destroy(&inode->mutex) ?
-> 
-> So is it necessary to call this? Is it about that if same inode is
-> allocated next time and if we call pthread_mutex_init(), it might
-> have issues?
-> 
-> IOW, trying to understand why one should call pthread_mutex_destroy()
-> before freeing inode.
-
-My understanding is that it's always best to destroy a mutex before
-freeing the memory it's allocated in.
-
-Dave
-
-> Vivek
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> > diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
+> > index ed6ba57..bec4105 100644
+> > --- a/contrib/virtiofsd/fuse_virtio.c
+> > +++ b/contrib/virtiofsd/fuse_virtio.c
+> > @@ -472,7 +472,7 @@ static void *fv_queue_thread(void *opaque)
+> >                 }
+> >                 if (pf[1].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+> >                         fprintf(stderr, "%s: Unexpected poll revents %x Queue %d killfd\n",
+> > -                                __func__, pf[0].revents, qi->qidx);
+> > +                                __func__, pf[1].revents, qi->qidx);
+> >                         break;
+> >                 }
+> >                 if (pf[1].revents) {
+> > -- 
+> > 1.8.3.1
+> > 
+> --
+> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

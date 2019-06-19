@@ -1,14 +1,13 @@
-Date: Wed, 19 Jun 2019 20:10:31 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190619191030.GI2844@work-vm>
-References: <2D50E1B6-E051-42F1-8962-71B7436E4CF9@stackhpc.com>
+Date: Wed, 19 Jun 2019 16:22:00 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190619202200.GA7406@redhat.com>
+References: <a755e6bed4962076909d037399e82fb8207c5581.camel@intel.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <2D50E1B6-E051-42F1-8962-71B7436E4CF9@stackhpc.com>
-Subject: Re: [Virtio-fs] Issues running fio tests against a network mount
- routed from the host
+In-Reply-To: <a755e6bed4962076909d037399e82fb8207c5581.camel@intel.com>
+Subject: Re: [Virtio-fs] [PATCH] virtio-fs: Allow shared memory region to be
+ empty
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,45 +16,61 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Bharat Kunwar <bharat@stackhpc.com>
-Cc: virtio-fs@redhat.com
+To: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
+Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
-* Bharat Kunwar (bharat@stackhpc.com) wrote:
-> Hello
-
-Hi,
-
-> I am here to describe a problem that I’ve run into when trying to run `fio` against a network mount routed from the host using virtiofs. My wider context is that I am doing this in a kata-containerised Kubernetes environment using the new `kata-qemu` introduced in version 1.7. I have previously run the same tests with `kata-qemu` runtime with 9p filesystem and the same tests have run to completion.
+On Tue, Jun 18, 2019 at 08:25:07PM +0000, Boeuf, Sebastien wrote:
+> >From 908b1c5660b919266379d68940815a5dea9ca6f4 Mon Sep 17 00:00:00 2001
+> From: Sebastien Boeuf <sebastien.boeuf@intel.com>
+> Date: Mon, 17 Jun 2019 11:11:10 -0700
+> Subject: [PATCH] virtio-fs: Allow shared memory region to be empty
 > 
-> Just to clarify, I can run the same fio tests to a local filesystem on the host and things run happily to completion. I have attached perf flame graphs corresponding to the failure cases, BeeGFS and CephFS and the successful case with host filesystem. The Fhgfs* process are related to BeeGFS.
+> In case the device declares an empty cache region to the driver, the
+> whole DAX setup should be simply skipped and the shared memory region
+> should never be used.
 > 
-> I enabled debug on the kata side the the resulting systemd journal entries are captured in debug.log attached. Let me know if I can provide any more diagnostic info. I am currently attempting to build an image to boot up with symbols enabled so that I can capture some backtraces but that is all taking longer than expected (having never built a kernel tarball before). If there is a prebuilt image that I can use to boot up to use with virtiofs, let me know as that’d save me a ton of time.
+> Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
 
-For some reason the SVGs don't seem to want to open for me; but they're
-probably the wrong thing anyway; and I don't see the log you say you
-attacked - those sound potentially useful.
+Hi Sebastien,
 
-Which fio test fails exactly, and with what error?
+Thanks for the patch. I am currently trying to integrate shared version
+patches and with those patches we probably can't reutrun immediately.
+We still will have to probe for shared version table. (I think it
+can be made to work even without dax).
 
-Dave
+So I will keep this in mind and integrate this patch in some form once
+I am done taking care of shared version patches.
 
-> Best
+Vivek
+
+> ---
+>  fs/fuse/virtio_fs.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> Bharat
+> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> index 3f3c018571ee..88531324fe40 100644
+> --- a/fs/fuse/virtio_fs.c
+> +++ b/fs/fuse/virtio_fs.c
+> @@ -540,8 +540,8 @@ static int virtio_fs_setup_dax(struct virtio_device
+> *vdev, struct virtio_fs *fs)
+>  					   &cache_reg,
+>  					   (u8)VIRTIO_FS_SHMCAP_ID_CACH
+> E);
+>  	if (!have_cache) {
+> -		dev_err(&vdev->dev, "%s: No cache capability\n",
+> __func__);
+> -		return -ENXIO;
+> +		dev_notice(&vdev->dev, "%s: No cache capability\n",
+> __func__);
+> +		return 0;
+>  	} else {
+>  		dev_notice(&vdev->dev, "Cache len: 0x%llx @ 0x%llx\n",
+>  			   cache_reg.len, cache_reg.addr);
+> -- 
+> 2.17.1
 > 
-> 
-> 
-> 
-> 
-
-
-
-
 > _______________________________________________
 > Virtio-fs mailing list
 > Virtio-fs@redhat.com
 > https://www.redhat.com/mailman/listinfo/virtio-fs
-
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

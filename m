@@ -1,13 +1,14 @@
-From: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
-Date: Tue, 18 Jun 2019 20:25:07 +0000
-Message-ID: <a755e6bed4962076909d037399e82fb8207c5581.camel@intel.com>
-Content-Language: en-US
-Content-Type: text/plain; charset="utf-8"
-Content-ID: <19AB983235770C4EA3377B2A184CC9C9@intel.com>
+Date: Wed, 19 Jun 2019 20:10:31 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190619191030.GI2844@work-vm>
+References: <2D50E1B6-E051-42F1-8962-71B7436E4CF9@stackhpc.com>
 MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH] virtio-fs: Allow shared memory region to be
-	empty
+In-Reply-To: <2D50E1B6-E051-42F1-8962-71B7436E4CF9@stackhpc.com>
+Subject: Re: [Virtio-fs] Issues running fio tests against a network mount
+ routed from the host
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,41 +17,45 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+To: Bharat Kunwar <bharat@stackhpc.com>
+Cc: virtio-fs@redhat.com
 
->From 908b1c5660b919266379d68940815a5dea9ca6f4 Mon Sep 17 00:00:00 2001
-From: Sebastien Boeuf <sebastien.boeuf@intel.com>
-Date: Mon, 17 Jun 2019 11:11:10 -0700
-Subject: [PATCH] virtio-fs: Allow shared memory region to be empty
+* Bharat Kunwar (bharat@stackhpc.com) wrote:
+> Hello
 
-In case the device declares an empty cache region to the driver, the
-whole DAX setup should be simply skipped and the shared memory region
-should never be used.
+Hi,
 
-Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
----
- fs/fuse/virtio_fs.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> I am here to describe a problem that I’ve run into when trying to run `fio` against a network mount routed from the host using virtiofs. My wider context is that I am doing this in a kata-containerised Kubernetes environment using the new `kata-qemu` introduced in version 1.7. I have previously run the same tests with `kata-qemu` runtime with 9p filesystem and the same tests have run to completion.
+> 
+> Just to clarify, I can run the same fio tests to a local filesystem on the host and things run happily to completion. I have attached perf flame graphs corresponding to the failure cases, BeeGFS and CephFS and the successful case with host filesystem. The Fhgfs* process are related to BeeGFS.
+> 
+> I enabled debug on the kata side the the resulting systemd journal entries are captured in debug.log attached. Let me know if I can provide any more diagnostic info. I am currently attempting to build an image to boot up with symbols enabled so that I can capture some backtraces but that is all taking longer than expected (having never built a kernel tarball before). If there is a prebuilt image that I can use to boot up to use with virtiofs, let me know as that’d save me a ton of time.
 
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 3f3c018571ee..88531324fe40 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -540,8 +540,8 @@ static int virtio_fs_setup_dax(struct virtio_device
-*vdev, struct virtio_fs *fs)
- 					   &cache_reg,
- 					   (u8)VIRTIO_FS_SHMCAP_ID_CACH
-E);
- 	if (!have_cache) {
--		dev_err(&vdev->dev, "%s: No cache capability\n",
-__func__);
--		return -ENXIO;
-+		dev_notice(&vdev->dev, "%s: No cache capability\n",
-__func__);
-+		return 0;
- 	} else {
- 		dev_notice(&vdev->dev, "Cache len: 0x%llx @ 0x%llx\n",
- 			   cache_reg.len, cache_reg.addr);
--- 
-2.17.1
+For some reason the SVGs don't seem to want to open for me; but they're
+probably the wrong thing anyway; and I don't see the log you say you
+attacked - those sound potentially useful.
+
+Which fio test fails exactly, and with what error?
+
+Dave
+
+> Best
+> 
+> Bharat
+> 
+> 
+> 
+> 
+> 
+
+
+
+
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
+
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

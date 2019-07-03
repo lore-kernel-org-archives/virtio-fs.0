@@ -1,14 +1,11 @@
-Date: Tue, 2 Jul 2019 12:00:39 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190702190038.4cnpdiyr5pyc5hft@US-160370MP2.local>
-References: <20190702055937.3ffpwph7anvohmxu@US-160370MP2.local>
-	<20190702174358.GA30547@redhat.com>
+Date: Wed, 3 Jul 2019 16:32:34 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190703203234.GB5499@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190702174358.GA30547@redhat.com>
-Subject: Re: [Virtio-fs] data integrity in dax mode
-Reply-To: bo.liu@linux.alibaba.com
+Subject: [Virtio-fs] [PATCH][virtio-fs-dev] virtiofsd: Fix
+ fuse_reply_create() to determine correct length of buffer
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,57 +14,36 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com
+To: virtio-fs-list <virtio-fs@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-On Tue, Jul 02, 2019 at 01:43:58PM -0400, Vivek Goyal wrote:
-> On Mon, Jul 01, 2019 at 10:59:38PM -0700, Liu Bo wrote:
-> > Hi,
-> > 
-> > I have a concern about data integrity in dax mode.
-> > 
-> > For now virtio_fs_copy_from_iter() (i.e. the write direction) only
-> > does copy_from_iter(), which doesn't enforce a clean_cache_range or
-> > CLWB.
-> 
-> This is an interesting question and I had been wondring about it when
-> I wrote the code.
-> 
-> I could not justify the need of calling "clwb". Whatever we write will
-> be in host page cache (assuming dir is not pmem backed). And when app
-> in guest does fsync/msync, only then there are any guarantees that
-> data is persistent.
-> 
-> IOW, we are not offering pmem programming interface where msync can 
-> be avoided by applications. Apps still need to call in fsync/msync
-> to ensure that data has been saved to persistent storage. And if
-> that happens, I am not sure why clwb needs to be called.
->
+Hi Dave,
 
-I agree. As long as fuse_dax_writepages is calling
-dax_writeback_mapping_range, data integrity can be ensured via
-fsync/msync.
+Following patch needs to be applied on virtio-fs-dev branch to make it
+work with latest kernel. Otherwise file creation reply returns error.
 
-> > And even worse, virtio-fs doesn't have a dax_writepages like,
-> > which can calls dax_writeback_mapping_range().
-> > 
-> > Correct me if I'm wrong, but did virtio-fs solve it in some way?
-> 
-> We define address space operations for dax.
-> 
-> static const struct address_space_operations fuse_dax_file_aops  = {
->         .writepages     = fuse_dax_writepages,
->         .direct_IO      = noop_direct_IO,
->         .set_page_dirty = noop_set_page_dirty,
->         .invalidatepage = noop_invalidatepage,
-> };
-> 
-> And fuse_dax_writepages() will call dax_writeback_mapping_range().
+Thanks
+Vivek
 
-Good point, somehow I missed this part, now we're good.
+Put conditional express in brackets. Otherwise expression being evaluated
+becomes (entrysize + sizeof(struct fuse_open_out) + shared) instead and
+which obviously results in wrong size calculation.
 
-Thanks for the clarification.
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ contrib/virtiofsd/fuse_lowlevel.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-thanks,
--liubo
+Index: qemu/contrib/virtiofsd/fuse_lowlevel.c
+===================================================================
+--- qemu.orig/contrib/virtiofsd/fuse_lowlevel.c	2019-07-01 13:22:55.489623969 -0400
++++ qemu/contrib/virtiofsd/fuse_lowlevel.c	2019-07-01 13:23:56.338143585 -0400
+@@ -413,7 +413,7 @@ int fuse_reply_create(fuse_req_t req, co
+ 	ever->version_index = e->version_offset;
+ 	return send_reply_ok(req, buf,
+ 			     entrysize + sizeof(struct fuse_open_out) +
+-                             shared ? sizeof(struct fuse_entryver_out) : 0);
++                             (shared ? sizeof(struct fuse_entryver_out) : 0));
+ }
+ 
+ int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
 

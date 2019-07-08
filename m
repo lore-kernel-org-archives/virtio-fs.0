@@ -1,6 +1,6 @@
-Date: Mon, 8 Jul 2019 09:55:56 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190708135556.GA15498@redhat.com>
+Date: Mon, 8 Jul 2019 16:08:22 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190708150822.GK2746@work-vm>
 References: <20190704104650.GF1609@stefanha-x1.localdomain>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
@@ -18,7 +18,7 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: Stefan Hajnoczi <stefanha@redhat.com>
 Cc: virtio-fs@redhat.com
 
-On Thu, Jul 04, 2019 at 11:46:50AM +0100, Stefan Hajnoczi wrote:
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
 > Hi,
 > Here are my plans for achieving parallelism in virtiofsd.  This will
 > improve performance for workloads that keep more than one request in
@@ -32,7 +32,9 @@ On Thu, Jul 04, 2019 at 11:46:50AM +0100, Stefan Hajnoczi wrote:
 > time.  A request that blocks should not prevent the next request from
 > executing.  The FUSE protocol is asynchronous so it's just a question of
 > adjusting virtiofsd.
-> 
+
+Are there any ordering constraints? Or barriers etc?
+
 > Multiqueue means providing several request virtqueues instead of just
 > one.  This can be used with CPU and NUMA pinning so that request
 > processing takes place on a core and NUMA node.  Better locality can
@@ -52,17 +54,37 @@ On Thu, Jul 04, 2019 at 11:46:50AM +0100, Stefan Hajnoczi wrote:
 > 
 > Feedback is appreciated!
 
-Hi Stefan,
+I think that should work; it probably needs a bit more abstraction for
+some concept of a current command; 
 
-I agree that virtiofsd needs to probably offer both the models. It
-will be nice if we implement processing multiple parallel requests
-on same queue now. And offer multiqueue support later (that will
-require kernel changes as well).
+I think currently we have that:
 
-/me is hoping that allowing processing multiple requests in parallel
-will give us decent performance improvement, and also help solve the
-issue of implementing *waiting* remote posix locks.
+  fuse_req_t req
+has  fuse_chan *ch
+has     fv_QueueInfo *qi
+has       VuVirtqElement *qe
 
-Thanks
-Vivek
+(There's also reply_sent and elem_bad_in that relate to the current
+request)
+
+and the filesystem code just passes 'req' in to calls where it wants
+to return data; with multiple threads you could have multiple
+fuse_chan's and thus multiple fv_QueueInfo's; but for a thread pool
+you really need to tie the qe directly to the req.
+
+It's a bit structurally differnt from normal fuse, since they just
+write on an fd, there's no concept of having to use particularly
+storage to return the result of a particular request.
+
+Perhaps the easiest thing would be to keep a hash of virtqelement's
+based on the unique id in each request?
+
+Dave
+
+> 
+> Stefan
+
+
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

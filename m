@@ -1,15 +1,11 @@
-From: "Liu, Changpeng" <changpeng.liu@intel.com>
-Date: Fri, 5 Jul 2019 09:56:42 +0000
-Message-ID: <FF7FC980937D6342B9D289F5F3C7C2625B82A0F6@SHSMSX103.ccr.corp.intel.com>
+Date: Mon, 8 Jul 2019 09:55:56 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190708135556.GA15498@redhat.com>
 References: <20190704104650.GF1609@stefanha-x1.localdomain>
-	<5D1ED564.6040705@huawei.com>
-	<20190705080401.GC10995@stefanha-x1.localdomain>
-	<CACGKRzUCvUsghMR5t3aC4XRgi14xbRVFz+gZEnA+s63tShn1Pg@mail.gmail.com>
-In-Reply-To: <CACGKRzUCvUsghMR5t3aC4XRgi14xbRVFz+gZEnA+s63tShn1Pg@mail.gmail.com>
-Content-Language: en-US
-Content-Type: text/plain; charset="Windows-1252"
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20190704104650.GF1609@stefanha-x1.localdomain>
 Subject: Re: [Virtio-fs] Achieving parallelism in virtiofsd
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
@@ -19,48 +15,54 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Peng Tao <bergwolf@hyper.sh>, Stefan Hajnoczi <stefanha@redhat.com>
-Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com
 
+On Thu, Jul 04, 2019 at 11:46:50AM +0100, Stefan Hajnoczi wrote:
+> Hi,
+> Here are my plans for achieving parallelism in virtiofsd.  This will
+> improve performance for workloads that keep more than one request in
+> flight at a time.
+> 
+> Today virtiofsd performance is limited because it only processes 1
+> request at a time.  This can be improved in two independent ways:
+> parallel request processing and multiqueue.
+> 
+> Parallel request processing means working on more than one request at a
+> time.  A request that blocks should not prevent the next request from
+> executing.  The FUSE protocol is asynchronous so it's just a question of
+> adjusting virtiofsd.
+> 
+> Multiqueue means providing several request virtqueues instead of just
+> one.  This can be used with CPU and NUMA pinning so that request
+> processing takes place on a core and NUMA node.  Better locality can
+> result in higher performance.
+> 
+> virtiofsd needs to offer both of these features.  The model I'm
+> proposing is one thread per virtqueue which distributes requests to a
+> thread pool for execution.  Each virtqueue thread and its thread pool
+> can be bound to a subset of CPUs.
+> 
+> Separate optimizations such as virtqueue polling could be added later to
+> reduce latency.
+> 
+> I plan to use the glib thread pool, which offers the basic functionality
+> that virtiofsd requires.  In the process of this work I will also audit
+> and fix passthrough_ll.c's thread-safety.
+> 
+> Feedback is appreciated!
 
+Hi Stefan,
 
-> -----Original Message-----
-> From: virtio-fs-bounces@redhat.com [mailto:virtio-fs-bounces@redhat.com] On
-> Behalf Of Peng Tao
-> Sent: Friday, July 5, 2019 4:14 PM
-> To: Stefan Hajnoczi <stefanha@redhat.com>
-> Cc: virtio-fs@redhat.com
-> Subject: Re: [Virtio-fs] Achieving parallelism in virtiofsd
-> 
-> On Fri, Jul 5, 2019 at 4:04 PM Stefan Hajnoczi <stefanha@redhat.com> wrote:
-> >
-> > On Fri, Jul 05, 2019 at 12:43:16PM +0800, piaojun wrote:
-> > > From your description, virtiofsd does the same work as SPDK, and I
-> > > wonder if we could adapt it to SPDK-vhost-fs which is widely used.
-> >
-> > I don't see 9P code in spdk.git/master.  How does the guest access
-> > SPDK's vhost-fs device and where is the code?
-> >
-> > A quick look at blobfs suggests additional work is needed to introduce
-> > the concept of inodes instead of performing path name traversal on most
-> > operations.  This also changes the semantics of the file system since
-> > POSIX files can still be accessed after they are unlinked or renamed.
-> >
-> > In theory SPDK can implement the vhost-user-fs device interface and
-> > replace virtiofsd but SPDK needs a POSIX file system implementation
-> > first.
-> Intel has presented virtiofsd+blobfs+SPDK in KubeCon Shanghai last
-> month. As you have spotted, the main problem is on blobfs side and
-> virtio-fs DAX sharing is not working because of blobfs limitation.
-> 
-I'm planning to add similar mmap API in SPDK, hopefully it can work in next few weeks.
-> Cheers,
-> Tao
-> --
-> Into something rich and strange.
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
+I agree that virtiofsd needs to probably offer both the models. It
+will be nice if we implement processing multiple parallel requests
+on same queue now. And offer multiqueue support later (that will
+require kernel changes as well).
+
+/me is hoping that allowing processing multiple requests in parallel
+will give us decent performance improvement, and also help solve the
+issue of implementing *waiting* remote posix locks.
+
+Thanks
+Vivek
 

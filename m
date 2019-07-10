@@ -1,19 +1,15 @@
-Date: Fri, 7 Jun 2019 12:29:37 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190607192936.ffzpccykdb2czxvt@US-160370MP2.local>
-References: <1559875098-9347-1-git-send-email-bo.liu@linux.alibaba.com>
-	<20190607152147.GI2631@work-vm>
-	<20190607181533.r7xkszkdi377o5ha@US-160370MP2.local>
-	<20190607183310.GY2631@work-vm>
-	<CAOssrKc9Z8SZOJyLv0rBthcDxiUzPhf07p0A4B9zjWQ+iHhm5A@mail.gmail.com>
-	<20190607192346.GC2631@work-vm>
+Date: Wed, 10 Jul 2019 16:37:14 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190710203714.GA25146@redhat.com>
+References: <1562225131-23463-1-git-send-email-bo.liu@linux.alibaba.com>
+	<20190708204301.GB15498@redhat.com>
+	<20190710184128.k6qg7d2p3za5a7e7@US-160370MP2.local>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190607192346.GC2631@work-vm>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: enable PARALLEL_DIROPS during
-	INIT
-Reply-To: bo.liu@linux.alibaba.com
+In-Reply-To: <20190710184128.k6qg7d2p3za5a7e7@US-160370MP2.local>
+Subject: Re: [Virtio-fs] [PATCH RFC] virtiofs: use fine-grained lock for
+ dmap reclaim
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,41 +18,114 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, Miklos Szeredi <mszeredi@redhat.com>
+To: Liu Bo <bo.liu@linux.alibaba.com>
+Cc: virtio-fs@redhat.com
 
-On Fri, Jun 07, 2019 at 08:23:46PM +0100, Dr. David Alan Gilbert wrote:
-> * Miklos Szeredi (mszeredi@redhat.com) wrote:
-> > On Fri, Jun 7, 2019 at 8:33 PM Dr. David Alan Gilbert
-> > <dgilbert@redhat.com> wrote:
-> > >
-> > > * Liu Bo (bo.liu@linux.alibaba.com) wrote:
-> > > > On Fri, Jun 07, 2019 at 04:21:47PM +0100, Dr. David Alan Gilbert wrote:
-> > > > > * Liu Bo (bo.liu@linux.alibaba.com) wrote:
-> > > > > > lookup is a RO operations, PARALLEL_DIROPS can be enabled.
-> > > > > >
-> > > > > > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
-> > > > >
-> > > > > I'm not too sure what this is doing; and why doesn't upstream libfuse
-> > > > > have this?
-> > > >
-> > > > I'm not sure why libfuse doesn't include the capability, but AFAICT this
-> > > > is needed for practical use.
-> > >
-> > > Miklos: Do you know what the rules are around PARALLEL_DIROPS and why
-> > > the upstream libfuse doesn't have it eanbled?
+On Wed, Jul 10, 2019 at 11:41:29AM -0700, Liu Bo wrote:
+> On Mon, Jul 08, 2019 at 04:43:01PM -0400, Vivek Goyal wrote:
+> > On Thu, Jul 04, 2019 at 03:25:31PM +0800, Liu Bo wrote:
+> > > With free fuse dax mapping reducing, read performance is impacted
+> > > significantly because reads need to wait for a free fuse dax mapping.
+> > > 
+> > > Although reads will trigger reclaim work to try to reclaim fuse dax
+> > > mapping, reclaim code can barely make any progress if most of fuse dax
+> > > mappings are used by the file we're reading since inode lock is required
+> > > by reclaim code.
+> > > 
+> > > However, we don't have to take inode lock for reclaiming if dax mapping
+> > > has its own reference count, reference counting is to tell reclaim code to
+> > > skip those in use dax mappings, such that we can avoid the risk of
+> > > accidentally reclaiming a dax mapping that other readers are using.
+> > > 
+> > > On the other hand, holding ->i_dmap_sem during reclaim can be used to
+> > > prevent the follwing reads to get a dax mapping under reclaim.
+> > > 
+> > > Another reason is that reads/writes only use fuse dax mapping within
+> > > dax_iomap_rw(), so we can do such a trick, while mmap/faulting is a
+> > > different story and we have to take ->i_mmap_sem prior to reclaiming a dax
+> > > mapping in order to avoid the race.
 > > 
-> > Not sure why libfuse3 wouldn't have it enabled by default, probably an
-> > omission.  Having said that, the reason this is opt in is that old
-> > filesystems might rely on the serialized behavior, so back
-> > compatibility requires that we have this turned off by default, so now
-> > libfuse3 has the same problem...
+> > Hi Liu Bo,
+> > 
+> > Not sure why we can get rid of inode lock but not ->i_mmap_sem. Holding
+> > this lock only prevents further page fault. But existing mapped pages
+> > will continue to be accessed by process.
+> >
 > 
-> So for us (virtio-fs) is it always safe?
->
+> The idea is that for reads/writes, it always goes thru fuse_iomap_{begin,end}
+> during the whole IO process, while for mmap, once fault-in finishes, it can
+> read/write to the area without fuse_iomap_{begin,end}.
+> 
+> > And in theory we could drop inode lock and be safe only with ->dmap_sem
+> > lock, can't we do something similar for ->i_mmap_sem lock.
+> > 
+> > Also little worried about races w.r.t truncation and i_size update. Dax
+> > code assumes that i_size is stable  and filesystem is holding enough
+> > locks to ensure that.
+> >
+> 
+> typically i_mmap_sem is held by truncate to avoid the race with dax code.
+> 
+> but the race between truncate and isize changes seems to be unrelated to this
+> patch, as the patch only does updates how the background reclaim worker
+> manipulates locks.
+> 
+> I went thru fuse_setattr(), we don't remove dax mapping ranges in truncate, either.
+> 
+> > What kind of testing you have done to make sure this is safe. Try
+> > running blogbench. Possibly mix of read/write/mmap workload along
+> > with heavy truncation/punch hole operation in parallel as well.
+> >
+> 
+> Not yet, but surely I'm planning to run a whole round of regression test against
+> it.
 
-FYI, my first round of limited testing (dbench4, fsmark, fstests) didn't say no.
+I ran bunch of fio jobs and compared the results with vanilla kernel and
+with your patch. Looks like randwrite jobs are showing some regression. 
 
-thanks,
--liubo
+Here are my scripts.
+
+https://github.com/rhvgoyal/virtiofs-tests
+
+I rand tests with cache=always, cache size=2G, dax enabled.
+
+
+NAME                    I/O Operation           BW(Read/Write)
+virtiofs-vanilla        seqread                 164(MiB/s)
+virtiofs-liubo-patch    seqread                 163(MiB/s)
+
+virtiofs-vanilla        seqread-mmap-single     200(MiB/s)
+virtiofs-liubo-patch    seqread-mmap-single     220(MiB/s)
+
+virtiofs-vanilla        seqread-mmap-multi      736(MiB/s)
+virtiofs-liubo-patch    seqread-mmap-multi      771(MiB/s)
+
+virtiofs-vanilla        randread                1406(KiB/s)
+virtiofs-liubo-patch    randread                15(MiB/s)
+
+virtiofs-vanilla        randread-mmap-single    13(MiB/s)
+virtiofs-liubo-patch    randread-mmap-single    11(MiB/s)
+
+virtiofs-vanilla        randread-mmap-multi     8934(KiB/s)
+virtiofs-liubo-patch    randread-mmap-multi     9264(KiB/s)
+
+virtiofs-vanilla        seqwrite                120(MiB/s)
+virtiofs-liubo-patch    seqwrite                110(MiB/s)
+
+virtiofs-vanilla        seqwrite-mmap-single    242(MiB/s)
+virtiofs-liubo-patch    seqwrite-mmap-single    250(MiB/s)
+
+virtiofs-vanilla        seqwrite-mmap-multi     595(MiB/s)
+virtiofs-liubo-patch    seqwrite-mmap-multi     646(MiB/s)
+
+virtiofs-vanilla        randwrite               20(MiB/s)
+virtiofs-liubo-patch    randwrite               15(MiB/s)
+
+virtiofs-vanilla        randwrite-mmap-single   12(MiB/s)
+virtiofs-liubo-patch    randwrite-mmap-single   10(MiB/s)
+
+virtiofs-vanilla        randwrite-mmap-multi    11(MiB/s)
+virtiofs-liubo-patch    randwrite-mmap-multi    8246(KiB/s)
+
+Vivek
 

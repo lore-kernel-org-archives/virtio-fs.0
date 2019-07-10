@@ -1,12 +1,12 @@
-Date: Wed, 10 Jul 2019 11:41:29 -0700
+Date: Wed, 10 Jul 2019 11:59:11 -0700
 From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190710184128.k6qg7d2p3za5a7e7@US-160370MP2.local>
+Message-ID: <20190710185910.esef6543th3d533e@US-160370MP2.local>
 References: <1562225131-23463-1-git-send-email-bo.liu@linux.alibaba.com>
-	<20190708204301.GB15498@redhat.com>
+	<20190710133818.GA30007@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190708204301.GB15498@redhat.com>
+In-Reply-To: <20190710133818.GA30007@redhat.com>
 Subject: Re: [Virtio-fs] [PATCH RFC] virtiofs: use fine-grained lock for
  dmap reclaim
 Reply-To: bo.liu@linux.alibaba.com
@@ -21,10 +21,46 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: Vivek Goyal <vgoyal@redhat.com>
 Cc: virtio-fs@redhat.com
 
-On Mon, Jul 08, 2019 at 04:43:01PM -0400, Vivek Goyal wrote:
+On Wed, Jul 10, 2019 at 09:38:18AM -0400, Vivek Goyal wrote:
 > On Thu, Jul 04, 2019 at 03:25:31PM +0800, Liu Bo wrote:
 > > With free fuse dax mapping reducing, read performance is impacted
 > > significantly because reads need to wait for a free fuse dax mapping.
+> 
+> I am not sure how are you getting so much of performance gain. Basically,
+> you are not taking inode lock in reclaim path and skip the range. But
+> reads will still block on ->i_dmap_sem if free range is not available. So
+> in terms of waiting this should be similar to waiting on inode lock.
+> 
+> If performance is low due to lock contention, then lock contention
+> basically moves from inode lock to ->i_dmap_sem, isn't it? If that's
+> the case, I am wondring how does that improve performance.
+
+Yes, it's the case, the gain comes from the fact that i_dmap_sem is held much
+shorter than inode lock, so it's a more fine-grained lock.
+
+After commit "virtio-fs: Fix a race in range reclaim", reads are no longer able
+to reclaim dax ranges within inode_lock, so it has to depend on the reclaim
+worker to do the job.  But the reclaim code also needs to acquire inode lock
+(write lock) prior to reclaiming ranges.
+
+   read                       reclaim thread
+inode_lock
+dax_iomap_rw
+  wake up reclaim worker
+                        --->  inode_try_lock //failed 20 times and queued a delayed work in 10ms
+inode_unlock
+retry and wait 
+
+
+when dax ranges are exhausted, reclaim thread gets woken up very frequently but
+only can reclaim at most 10 ranges or just queue a delayed work.
+
+thanks,
+-liubo
+
+> 
+> Vivek
+> 
 > > 
 > > Although reads will trigger reclaim work to try to reclaim fuse dax
 > > mapping, reclaim code can barely make any progress if most of fuse dax
@@ -43,49 +79,6 @@ On Mon, Jul 08, 2019 at 04:43:01PM -0400, Vivek Goyal wrote:
 > > dax_iomap_rw(), so we can do such a trick, while mmap/faulting is a
 > > different story and we have to take ->i_mmap_sem prior to reclaiming a dax
 > > mapping in order to avoid the race.
-> 
-> Hi Liu Bo,
-> 
-> Not sure why we can get rid of inode lock but not ->i_mmap_sem. Holding
-> this lock only prevents further page fault. But existing mapped pages
-> will continue to be accessed by process.
->
-
-The idea is that for reads/writes, it always goes thru fuse_iomap_{begin,end}
-during the whole IO process, while for mmap, once fault-in finishes, it can
-read/write to the area without fuse_iomap_{begin,end}.
-
-> And in theory we could drop inode lock and be safe only with ->dmap_sem
-> lock, can't we do something similar for ->i_mmap_sem lock.
-> 
-> Also little worried about races w.r.t truncation and i_size update. Dax
-> code assumes that i_size is stable  and filesystem is holding enough
-> locks to ensure that.
->
-
-typically i_mmap_sem is held by truncate to avoid the race with dax code.
-
-but the race between truncate and isize changes seems to be unrelated to this
-patch, as the patch only does updates how the background reclaim worker
-manipulates locks.
-
-I went thru fuse_setattr(), we don't remove dax mapping ranges in truncate, either.
-
-> What kind of testing you have done to make sure this is safe. Try
-> running blogbench. Possibly mix of read/write/mmap workload along
-> with heavy truncation/punch hole operation in parallel as well.
->
-
-Not yet, but surely I'm planning to run a whole round of regression test against
-it.
-
-thanks,
--liubo
-
-> I will spend more time thinking about this.
-> 
-> Thanks
-> Vivek
 > > 
 > > This adds reference count for fuse dax mapping and removes the acquisition
 > > of inode lock during reclaim.

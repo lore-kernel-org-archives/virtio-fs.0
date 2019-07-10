@@ -1,13 +1,8 @@
-MIME-Version: 1.0
-References: <20190704104650.GF1609@stefanha-x1.localdomain>
-	<20190708150822.GK2746@work-vm>
-	<20190709081520.GC25663@stefanha-x1.localdomain>
-In-Reply-To: <20190709081520.GC25663@stefanha-x1.localdomain>
-From: Miklos Szeredi <mszeredi@redhat.com>
-Date: Tue, 9 Jul 2019 11:31:39 +0200
-Message-ID: <CAOssrKfm25cQex19UVpCiBKbxTiNaH6QeCE4_dfobJCV=Qeb8A@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] Achieving parallelism in virtiofsd
+From: Eric Ren <renzhen@linux.alibaba.com>
+Date: Wed, 10 Jul 2019 21:06:42 +0800
+Message-Id: <5e2722ade8346b09cbc4a147757a45b527b5a846.1562763758.git.renzhen@linux.alibaba.com>
+Subject: [Virtio-fs] [PATCH] virtiofsd: conditional compile seccomp flag
+	support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,43 +11,42 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com
+To: virtio-fs@redhat.com
 
-On Tue, Jul 9, 2019 at 10:15 AM Stefan Hajnoczi <stefanha@redhat.com> wrote:
->
-> On Mon, Jul 08, 2019 at 04:08:22PM +0100, Dr. David Alan Gilbert wrote:
-> > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> > > Hi,
-> > > Here are my plans for achieving parallelism in virtiofsd.  This will
-> > > improve performance for workloads that keep more than one request in
-> > > flight at a time.
-> > >
-> > > Today virtiofsd performance is limited because it only processes 1
-> > > request at a time.  This can be improved in two independent ways:
-> > > parallel request processing and multiqueue.
-> > >
-> > > Parallel request processing means working on more than one request at a
-> > > time.  A request that blocks should not prevent the next request from
-> > > executing.  The FUSE protocol is asynchronous so it's just a question of
-> > > adjusting virtiofsd.
-> >
-> > Are there any ordering constraints? Or barriers etc?
->
-> FUSE_INIT must be processed before the session is usable for
-> general-purpose requests.  So there is at least one ordering constraint
-> in the FUSE protocol :).
->
-> Miklos: Can you confirm that fuse.ko does not assume ordering
-> constraints on general-purpose requests (lookup, create, read, write,
-> etc)?  For example, does it ever queue up requests and expect them to be
-> processed in order?
+SCMP_FLTATTR_CTL_TSYNC flag is only available on
+Linux Kernel 3.17 or greater. So, conditional compile
+to make virtio-fs work on older host kernel.
 
-Fuse does not assume that requests will be processed in order of queuing.
+Signed-off-by: Eric Ren <renzhen@linux.alibaba.com>
+---
+ contrib/virtiofsd/seccomp.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-If request B is dependent on request A, then B is only queued if reply
-for A is received.
-
-Thanks,
-Miklos
+diff --git a/contrib/virtiofsd/seccomp.c b/contrib/virtiofsd/seccomp.c
+index 4e388adc9c..5a28a90859 100644
+--- a/contrib/virtiofsd/seccomp.c
++++ b/contrib/virtiofsd/seccomp.c
+@@ -11,6 +11,7 @@
+ #include <errno.h>
+ #include <seccomp.h>
+ #include <glib.h>
++#include <linux/version.h>
+ #include "seccomp.h"
+ 
+ static const int syscall_whitelist[] = {
+@@ -92,9 +93,12 @@ void setup_seccomp(void)
+ 		err(1, "seccomp_init()");
+ 	}
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0)
++	// SCMP_FLTATR_CTL_TSYNC flag is only available on Linux Kernel 3.17 or greater
+ 	if (seccomp_attr_set(ctx, SCMP_FLTATR_CTL_TSYNC, 1) != 0) {
+ 		err(1, "seccomp_attr_set(ctx, SCMP_FLTATTR_CTL_TSYNC, 1)");
+ 	}
++#endif
+ 
+ 	for (i = 0; i < G_N_ELEMENTS(syscall_whitelist); i++) {
+ 		if (seccomp_rule_add(ctx, SCMP_ACT_ALLOW,
+-- 
+2.17.2 (Apple Git-113)
 

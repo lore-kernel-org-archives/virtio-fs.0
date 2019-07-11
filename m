@@ -1,16 +1,13 @@
-Date: Thu, 11 Jul 2019 09:49:58 +0100
+Date: Thu, 11 Jul 2019 12:25:58 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190711084958.GC3971@work-vm>
-References: <1562225131-23463-1-git-send-email-bo.liu@linux.alibaba.com>
-	<20190708204301.GB15498@redhat.com>
-	<20190710184128.k6qg7d2p3za5a7e7@US-160370MP2.local>
-	<20190710203714.GA25146@redhat.com>
+Message-ID: <20190711112558.GJ3971@work-vm>
+References: <5e2722ade8346b09cbc4a147757a45b527b5a846.1562763758.git.renzhen@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190710203714.GA25146@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH RFC] virtiofs: use fine-grained lock for
- dmap reclaim
+In-Reply-To: <5e2722ade8346b09cbc4a147757a45b527b5a846.1562763758.git.renzhen@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: conditional compile seccomp flag
+	support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,129 +16,65 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
+To: Eric Ren <renzhen@linux.alibaba.com>
 Cc: virtio-fs@redhat.com
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> On Wed, Jul 10, 2019 at 11:41:29AM -0700, Liu Bo wrote:
-> > On Mon, Jul 08, 2019 at 04:43:01PM -0400, Vivek Goyal wrote:
-> > > On Thu, Jul 04, 2019 at 03:25:31PM +0800, Liu Bo wrote:
-> > > > With free fuse dax mapping reducing, read performance is impacted
-> > > > significantly because reads need to wait for a free fuse dax mapping.
-> > > > 
-> > > > Although reads will trigger reclaim work to try to reclaim fuse dax
-> > > > mapping, reclaim code can barely make any progress if most of fuse dax
-> > > > mappings are used by the file we're reading since inode lock is required
-> > > > by reclaim code.
-> > > > 
-> > > > However, we don't have to take inode lock for reclaiming if dax mapping
-> > > > has its own reference count, reference counting is to tell reclaim code to
-> > > > skip those in use dax mappings, such that we can avoid the risk of
-> > > > accidentally reclaiming a dax mapping that other readers are using.
-> > > > 
-> > > > On the other hand, holding ->i_dmap_sem during reclaim can be used to
-> > > > prevent the follwing reads to get a dax mapping under reclaim.
-> > > > 
-> > > > Another reason is that reads/writes only use fuse dax mapping within
-> > > > dax_iomap_rw(), so we can do such a trick, while mmap/faulting is a
-> > > > different story and we have to take ->i_mmap_sem prior to reclaiming a dax
-> > > > mapping in order to avoid the race.
-> > > 
-> > > Hi Liu Bo,
-> > > 
-> > > Not sure why we can get rid of inode lock but not ->i_mmap_sem. Holding
-> > > this lock only prevents further page fault. But existing mapped pages
-> > > will continue to be accessed by process.
-> > >
-> > 
-> > The idea is that for reads/writes, it always goes thru fuse_iomap_{begin,end}
-> > during the whole IO process, while for mmap, once fault-in finishes, it can
-> > read/write to the area without fuse_iomap_{begin,end}.
-> > 
-> > > And in theory we could drop inode lock and be safe only with ->dmap_sem
-> > > lock, can't we do something similar for ->i_mmap_sem lock.
-> > > 
-> > > Also little worried about races w.r.t truncation and i_size update. Dax
-> > > code assumes that i_size is stable  and filesystem is holding enough
-> > > locks to ensure that.
-> > >
-> > 
-> > typically i_mmap_sem is held by truncate to avoid the race with dax code.
-> > 
-> > but the race between truncate and isize changes seems to be unrelated to this
-> > patch, as the patch only does updates how the background reclaim worker
-> > manipulates locks.
-> > 
-> > I went thru fuse_setattr(), we don't remove dax mapping ranges in truncate, either.
-> > 
-> > > What kind of testing you have done to make sure this is safe. Try
-> > > running blogbench. Possibly mix of read/write/mmap workload along
-> > > with heavy truncation/punch hole operation in parallel as well.
-> > >
-> > 
-> > Not yet, but surely I'm planning to run a whole round of regression test against
-> > it.
+* Eric Ren (renzhen@linux.alibaba.com) wrote:
+> SCMP_FLTATTR_CTL_TSYNC flag is only available on
+> Linux Kernel 3.17 or greater. So, conditional compile
+> to make virtio-fs work on older host kernel.
 > 
-> I ran bunch of fio jobs and compared the results with vanilla kernel and
-> with your patch. Looks like randwrite jobs are showing some regression. 
+> Signed-off-by: Eric Ren <renzhen@linux.alibaba.com>
+> ---
+>  contrib/virtiofsd/seccomp.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/contrib/virtiofsd/seccomp.c b/contrib/virtiofsd/seccomp.c
+> index 4e388adc9c..5a28a90859 100644
+> --- a/contrib/virtiofsd/seccomp.c
+> +++ b/contrib/virtiofsd/seccomp.c
+> @@ -11,6 +11,7 @@
+>  #include <errno.h>
+>  #include <seccomp.h>
+>  #include <glib.h>
+> +#include <linux/version.h>
+>  #include "seccomp.h"
+>  
+>  static const int syscall_whitelist[] = {
+> @@ -92,9 +93,12 @@ void setup_seccomp(void)
+>  		err(1, "seccomp_init()");
+>  	}
+>  
+> +#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0)
 
-But...
+I don't really like using kernel versions, because sometimes downstreams
+backport stuff (I checked and it looks like RHEL7 did this somewhere
+around 7.5).
 
-> Here are my scripts.
-> 
-> https://github.com/rhvgoyal/virtiofs-tests
-> 
-> I rand tests with cache=always, cache size=2G, dax enabled.
-> 
-> 
-> NAME                    I/O Operation           BW(Read/Write)
-> virtiofs-vanilla        seqread                 164(MiB/s)
-> virtiofs-liubo-patch    seqread                 163(MiB/s)
-> 
-> virtiofs-vanilla        seqread-mmap-single     200(MiB/s)
-> virtiofs-liubo-patch    seqread-mmap-single     220(MiB/s)
-> 
-> virtiofs-vanilla        seqread-mmap-multi      736(MiB/s)
-> virtiofs-liubo-patch    seqread-mmap-multi      771(MiB/s)
-> 
-> virtiofs-vanilla        randread                1406(KiB/s)
-> virtiofs-liubo-patch    randread                15(MiB/s)
+If I understand correctly the right thing to do is check the
+SCMP_VER_MAJOR/MINOR/MICRO version defines; and I think tsync came in
+with 2.3.1.
 
-That's a hell of an improvement for randread; perhaps the write
-regression is worth it?
+> +	// SCMP_FLTATR_CTL_TSYNC flag is only available on Linux Kernel 3.17 or greater
+>  	if (seccomp_attr_set(ctx, SCMP_FLTATR_CTL_TSYNC, 1) != 0) {
+>  		err(1, "seccomp_attr_set(ctx, SCMP_FLTATTR_CTL_TSYNC, 1)");
+
+Also, what happens if this fails?  e.g. I run it on an older kernel than
+it's built for;  do we actually fail here or just print the error.
+
+Eithe rway, is it actually safe without this define - or does the thread
+which actually runs the work not get the support?
 
 Dave
 
-> virtiofs-vanilla        randread-mmap-single    13(MiB/s)
-> virtiofs-liubo-patch    randread-mmap-single    11(MiB/s)
+>  	}
+> +#endif
+>  
+>  	for (i = 0; i < G_N_ELEMENTS(syscall_whitelist); i++) {
+>  		if (seccomp_rule_add(ctx, SCMP_ACT_ALLOW,
+> -- 
+> 2.17.2 (Apple Git-113)
 > 
-> virtiofs-vanilla        randread-mmap-multi     8934(KiB/s)
-> virtiofs-liubo-patch    randread-mmap-multi     9264(KiB/s)
-> 
-> virtiofs-vanilla        seqwrite                120(MiB/s)
-> virtiofs-liubo-patch    seqwrite                110(MiB/s)
-> 
-> virtiofs-vanilla        seqwrite-mmap-single    242(MiB/s)
-> virtiofs-liubo-patch    seqwrite-mmap-single    250(MiB/s)
-> 
-> virtiofs-vanilla        seqwrite-mmap-multi     595(MiB/s)
-> virtiofs-liubo-patch    seqwrite-mmap-multi     646(MiB/s)
-> 
-> virtiofs-vanilla        randwrite               20(MiB/s)
-> virtiofs-liubo-patch    randwrite               15(MiB/s)
-> 
-> virtiofs-vanilla        randwrite-mmap-single   12(MiB/s)
-> virtiofs-liubo-patch    randwrite-mmap-single   10(MiB/s)
-> 
-> virtiofs-vanilla        randwrite-mmap-multi    11(MiB/s)
-> virtiofs-liubo-patch    randwrite-mmap-multi    8246(KiB/s)
-> 
-> Vivek
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
 --
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

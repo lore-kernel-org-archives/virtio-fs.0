@@ -1,10 +1,14 @@
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Date: Fri, 12 Jul 2019 06:35:42 +0800
-Message-Id: <1562884542-72462-1-git-send-email-bo.liu@linux.alibaba.com>
+Date: Fri, 12 Jul 2019 10:04:46 +0200
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20190712080446.GC24428@stefanha-x1.localdomain>
+References: <5e2722ade8346b09cbc4a147757a45b527b5a846.1562763758.git.renzhen@linux.alibaba.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH] Virtiofs: fix null pointer deference in directIO
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="iFRdW5/EC4oqxDHL"
+Content-Disposition: inline
+In-Reply-To: <5e2722ade8346b09cbc4a147757a45b527b5a846.1562763758.git.renzhen@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: conditional compile seccomp flag
+ support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,94 +17,72 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Eric Ren <renzhen@linux.alibaba.com>
+Cc: virtio-fs@redhat.com
 
-Virtiofs has used memremap to create page structs for its managed memory
-and set pagemap's type to MEMORY_DEVICE_FS_DAX.  Thus, the page from
-virtiofs's managed memory is a ZONE_DEVICE page, if %devmap_managed_key
-was enabled by pmem drivers, put_page() will run into
-__put_devmap_managed_page().  However, as page_free ops is not defined, it
-ends up with a NULL pointer dereference.
 
-As virtiofs presents its managed memory range as a dax device, this patch
-makes virtiofs mimic how nvdimm/pmem.c setups pagemap fsdax.
+--iFRdW5/EC4oqxDHL
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-=================
+On Wed, Jul 10, 2019 at 09:06:42PM +0800, Eric Ren wrote:
+> SCMP_FLTATTR_CTL_TSYNC flag is only available on
+> Linux Kernel 3.17 or greater. So, conditional compile
+> to make virtio-fs work on older host kernel.
+>=20
+> Signed-off-by: Eric Ren <renzhen@linux.alibaba.com>
+> ---
+>  contrib/virtiofsd/seccomp.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+>=20
+> diff --git a/contrib/virtiofsd/seccomp.c b/contrib/virtiofsd/seccomp.c
+> index 4e388adc9c..5a28a90859 100644
+> --- a/contrib/virtiofsd/seccomp.c
+> +++ b/contrib/virtiofsd/seccomp.c
+> @@ -11,6 +11,7 @@
+>  #include <errno.h>
+>  #include <seccomp.h>
+>  #include <glib.h>
+> +#include <linux/version.h>
+>  #include "seccomp.h"
+> =20
+>  static const int syscall_whitelist[] =3D {
+> @@ -92,9 +93,12 @@ void setup_seccomp(void)
+>  		err(1, "seccomp_init()");
+>  	}
+> =20
+> +#if LINUX_VERSION_CODE >=3D KERNEL_VERSION(3,17,0)
+> +	// SCMP_FLTATR_CTL_TSYNC flag is only available on Linux Kernel 3.17 or=
+ greater
+>  	if (seccomp_attr_set(ctx, SCMP_FLTATR_CTL_TSYNC, 1) !=3D 0) {
+>  		err(1, "seccomp_attr_set(ctx, SCMP_FLTATTR_CTL_TSYNC, 1)");
+>  	}
+> +#endif
 
-[ 1223.732964] BUG: unable to handle kernel NULL pointer dereference at 0000000000000000
-[ 1223.733043] PGD 800000026bd91067 P4D 800000026bd91067 PUD 27631e067 PMD 0
-[ 1223.733085] Oops: 0010 [#1] SMP PTI
-[ 1223.733114] CPU: 1 PID: 16505 Comm: build Not tainted 4.19.48-dff9509 #1
-[ 1223.733157] RIP: 0010:          (null)
-[ 1223.733179] Code: Bad RIP value.
-..
-[ 1223.733671] Call Trace:
-[ 1223.733704]  fuse_release_user_pages+0xad/0xb0
-[ 1223.733751]  fuse_direct_io+0x3ec/0x6a0
-[ 1223.733823]  fuse_dax_direct_write+0x3c/0x70
-[ 1223.733863]  fuse_file_write_iter+0x2ea/0x4c0
-[ 1223.733978]  __vfs_write+0xde/0x160
-[ 1223.734009]  vfs_write+0xab/0x190
-[ 1223.734061]  ksys_write+0x45/0xc0
-[ 1223.734094]  do_syscall_64+0x6b/0x330
-[ 1223.734214]  entry_SYSCALL_64_after_hwframe+0x44/0xa9
-[ 1223.734261] RIP: 0033:0x15536bcddfd0
+There are no threads when setup_seccomp() is invoked so the TSYNC
+attribute is not required.
 
-The reproducer could be as simply as,
+Please remove the TSYNC call.  Then we don't need to worry about version
+or feature checks.
 
-addr = mmap(..., fileA, ...);
-fdB = open(fileB, O_DIRECT);
-write(fdB, addr);
+Thanks,
+Stefan
 
-Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
----
- fs/fuse/virtio_fs.c | 26 +++++++++++++++++++++++++-
- 1 file changed, 25 insertions(+), 1 deletion(-)
+--iFRdW5/EC4oqxDHL
+Content-Type: application/pgp-signature; name="signature.asc"
 
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 05ea28c..9b3f2e9 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -538,6 +538,28 @@ static void virtio_fs_cleanup_dax(void *data)
- 	put_dax(fs->dax_dev);
- }
- 
-+static void virtio_fs_release_pgmap_ops(void *_pgmap)
-+{
-+	dev_pagemap_put_ops();
-+}
-+
-+static void virtio_fs_fsdax_pagefree(struct page *page, void *data)
-+{
-+	wake_up_var(&page->_refcount);
-+}
-+
-+static int virtio_fs_setup_pagemap_fsdax(struct device *dev,
-+					 struct dev_pagemap *pgmap)
-+{
-+	dev_pagemap_get_ops();
-+	if (devm_add_action_or_reset(dev, virtio_fs_release_pgmap_ops, pgmap))
-+		return -ENOMEM;
-+	pgmap->type = MEMORY_DEVICE_FS_DAX;
-+	pgmap->page_free = virtio_fs_fsdax_pagefree;
-+
-+	return 0;
-+}
-+
- static int virtio_fs_setup_dax(struct virtio_device *vdev, struct virtio_fs *fs)
- {
- 	struct virtio_shm_region cache_reg, journal_reg, vertab_reg;
-@@ -600,7 +622,9 @@ static int virtio_fs_setup_dax(struct virtio_device *vdev, struct virtio_fs *fs)
- 	pgmap->altmap_valid = false;
- 	pgmap->ref = &mi->ref;
- 	pgmap->kill = virtio_fs_percpu_kill;
--	pgmap->type = MEMORY_DEVICE_FS_DAX;
-+
-+	if (virtio_fs_setup_pagemap_fsdax(&vdev->dev, pgmap))
-+		return -ENOMEM;
- 
- 	/* Ideally we would directly use the PCI BAR resource but
- 	 * devm_memremap_pages() wants its own copy in pgmap.  So
--- 
-1.8.3.1
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl0oPx4ACgkQnKSrs4Gr
+c8iT6QgAmDvIZMSNvQ6MTCQlGHuNRYULC5O0uyqT7bBDNxXQbDiplVZkILa9dQ0E
+Y0yji8/XIJ9sv7a6Juyv5SJkkjyygBJ3D2umW1VQ3ML/AeHkAgMLQ2YFqWOOMUt5
+eTDPWlzSZOigib0Krv9ECNUVAMGF71FGvqJet+urPwLCJMjOxz2uv7N4CT/nSxcA
+761cUT8ZUJltFKwlKUz2QitudChl6+4q7gTvpG053diIWY1qTkR1G4iKD85qBHZU
+g40DUf4ZyNuVDIqcf5JCES07JhOkusrQ7yxozg40UVZfbYqvF1XDmKyBWareYZR+
+u0GjiERlkNSgigwedYBGdpjCtjBkKg==
+=eG+7
+-----END PGP SIGNATURE-----
+
+--iFRdW5/EC4oqxDHL--
 

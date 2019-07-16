@@ -1,14 +1,12 @@
-Date: Tue, 16 Jul 2019 16:30:09 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190716153009.GC21625@stefanha-x1.localdomain>
-References: <690c7f0afc449d8e843cc3b271035966628df450.1563159705.git.renzhen@linux.alibaba.com>
+Date: Wed, 17 Jul 2019 01:49:10 +0800
+From: Eric Ren <renzhen@linux.alibaba.com>
+Message-ID: <20190716174910.GA19673@localhost>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="9Ek0hoCL9XbhcSqy"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <690c7f0afc449d8e843cc3b271035966628df450.1563159705.git.renzhen@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: remove SCMP_FLTATTR_CTL_TSYNC
- flag
+Subject: [Virtio-fs] virtiofsd permission problem to work with KATA on older
+	host kernel
+Reply-To: Eric Ren <renzhen@linux.alibaba.com>
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,50 +15,65 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Eric Ren <renzhen@linux.alibaba.com>
-Cc: virtio-fs@redhat.com
+To: virtio-fs@redhat.com
 
+Hi,
 
---9Ek0hoCL9XbhcSqy
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+I'm trying virtio-fs with KATA container on older kernel (3.10) host.
+I failed to run container as follows:
 
-On Mon, Jul 15, 2019 at 11:09:51AM +0800, Eric Ren wrote:
-> SCMP_FLTATTR_CTL_TSYNC flag is only available on
-> Linux Kernel 3.17 or greater. Older host kernel
-> fails virtiofsd, limiting virtiofsd use.
->=20
-> And, confirmed from Stefan Hajnoczi:
-> """
-> There are no threads when setup_seccomp() is invoked so the TSYNC
-> attribute is not required.
->=20
-> Please remove the TSYNC call.  Then we don't need to worry about version
-> or feature checks.
-> """
->=20
-> Signed-off-by: Eric Ren <renzhen@linux.alibaba.com>
-> ---
->  contrib/virtiofsd/seccomp.c | 4 ----
->  1 file changed, 4 deletions(-)
+```
+$sudo docker run --it busybox sh
+standard_init_linux.go:190: exec user process caused "read-only file system"
+ERRO[0001] init failed                                   error="standard_init_linux.go:190: exec user process caused \"read-only file system\"" name=kata-agent pid=1 source=agent
+panic: --this line should have never been executed, congratulations--
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+goroutine 1 [running, locked to thread]:
+main.init.0()
+	/home/admin/rpmbuild/BUILD/go/src/github.com/kata-containers/agent/agent.go:1228 +0x10f
+```
 
---9Ek0hoCL9XbhcSqy
-Content-Type: application/pgp-signature; name="signature.asc"
+After some troubleshooting, I find it's OK to read/write within
+virtio-fs dir, and no problem happens if no overlayfs in between.
 
------BEGIN PGP SIGNATURE-----
+However, it fails with EROFS error when executing binary on overlayfs,
+which can reproduce as below:
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl0t7YEACgkQnKSrs4Gr
-c8gGbwgAi5Z6g9yDUmaJ+PVrFwBk3zcXbx2Ge3UToHRsra39cC6y/AiHAuyCnwey
-xW4ZZWgi7j4YA5PWFCkclSuDDYMChMYS5x5R8a8utA9Oc+nERktmjWP5UqO0JiBp
-Yd+9ykoWnG8ili+GcOufoGlaGM4jvLti3Ac4PbA2L47kMlcN1EhNNv011i4UV2eq
-V/Uv7iDCvr3TtOlVPdPoqwsuSWMOFw3A6REyX0Qx+peRE7vI8IB/0nWRhVr1dZls
-Ton4IXiyejwTwGby+aMa1eRArGnLHfuJ568Hv4bTFlYaC1yrz5a0MFA6PJhNUC/a
-pNsEdae8rK4E8PDUX5N9f8klNojxaw==
-=X+et
------END PGP SIGNATURE-----
+```
+$mv hello lowdir/
+$mkdir uppperdir workdir merged
+$sudo mount -t overlay overlay -olowerdir=lowdir,upperdir=upperdir,workdir=workdir merged
+$sudo docker run --name=virtio-fs-1 -v /home/eric/lab/merged:/mnt/ --runtime=kata-runtime -it busybox sh
 
---9Ek0hoCL9XbhcSqy--
+[hack kata-agent to sleep in deadloop, and login the VM]
+
+/run/kata-containers/shared/containers/833c4dad342ecd55a25d6470faf99b57c1057fe854b2309bd8efc41b26d10627-840ec5db9825b5ac-mnt # ./hello
+/bin/sh: ./hello: Read-only file system
+```
+
+The problem seems that `lowdir` of overlay is readonly, but we relax
+`open` to use O_RDWR, so they conflict when `execve` syscall to open
+executable binary.
+
+This test patch fixes this problem for me:
+```
+git diff
+diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+index 78716c8aca..eaba3db22c 100644
+--- a/contrib/virtiofsd/passthrough_ll.c
++++ b/contrib/virtiofsd/passthrough_ll.c
+@@ -1898,7 +1898,17 @@ static void lo_setupmapping(fuse_req_t req, fuse_ino_t ino, uint64_t foffset,
+                 * TODO: O_RDWR might not be allowed if file is read only or
+                 * write only. Fix it.
+                 */
+-               fd = openat(lo->proc_self_fd, buf, O_RDWR);
++               #define RW_MASK 0x3
++               fd = openat(lo->proc_self_fd, buf, flags & RW_MASK);
+```
+
+But, it's intersting why newer host kernel like 4.19 is free of this
+problem?
+
+Regards,
+Eric
 

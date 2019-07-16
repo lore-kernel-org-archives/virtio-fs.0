@@ -1,12 +1,15 @@
-Date: Wed, 17 Jul 2019 01:49:10 +0800
-From: Eric Ren <renzhen@linux.alibaba.com>
-Message-ID: <20190716174910.GA19673@localhost>
+Date: Tue, 16 Jul 2019 14:36:35 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190716183635.GA16790@redhat.com>
+References: <1562225131-23463-1-git-send-email-bo.liu@linux.alibaba.com>
+	<20190715203739.GB22193@redhat.com>
+	<20190715213805.crgid6njeq6faavs@US-160370MP2.local>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: [Virtio-fs] virtiofsd permission problem to work with KATA on older
-	host kernel
-Reply-To: Eric Ren <renzhen@linux.alibaba.com>
+In-Reply-To: <20190715213805.crgid6njeq6faavs@US-160370MP2.local>
+Subject: Re: [Virtio-fs] [PATCH RFC] virtiofs: use fine-grained lock for
+ dmap reclaim
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,65 +18,78 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Liu Bo <bo.liu@linux.alibaba.com>
+Cc: virtio-fs@redhat.com
 
-Hi,
+On Mon, Jul 15, 2019 at 02:38:06PM -0700, Liu Bo wrote:
+> On Mon, Jul 15, 2019 at 04:37:39PM -0400, Vivek Goyal wrote:
+> > On Thu, Jul 04, 2019 at 03:25:31PM +0800, Liu Bo wrote:
+> > > With free fuse dax mapping reducing, read performance is impacted
+> > > significantly because reads need to wait for a free fuse dax mapping.
+> > > 
+> > > Although reads will trigger reclaim work to try to reclaim fuse dax
+> > > mapping, reclaim code can barely make any progress if most of fuse dax
+> > > mappings are used by the file we're reading since inode lock is required
+> > > by reclaim code.
+> > > 
+> > > However, we don't have to take inode lock for reclaiming if dax mapping
+> > > has its own reference count, reference counting is to tell reclaim code to
+> > > skip those in use dax mappings, such that we can avoid the risk of
+> > > accidentally reclaiming a dax mapping that other readers are using.
+> > > 
+> > > On the other hand, holding ->i_dmap_sem during reclaim can be used to
+> > > prevent the follwing reads to get a dax mapping under reclaim.
+> > > 
+> > > Another reason is that reads/writes only use fuse dax mapping within
+> > > dax_iomap_rw(), so we can do such a trick, while mmap/faulting is a
+> > > different story and we have to take ->i_mmap_sem prior to reclaiming a dax
+> > > mapping in order to avoid the race.
+> > > 
+> > > This adds reference count for fuse dax mapping and removes the acquisition
+> > > of inode lock during reclaim.
+> > 
+> > I am not sure that this reference count implementation is safe. For
+> > example, what prevents atomic_dec() from being reordered so that it
+> > could be executed before actually copying to user space is finished.
+> > 
+> > Say cpu1 is reading a dax page and cpu 2 is freeing memory. 
+> > 
+> > cpu1 read				cpu2 free dmap
+> > ---------				-------------
+> > atomic_inc()				atomic_read()			
+> > copy data to user space
+> > atomic_dec
+> > 
+> > Say atomic_dec() gets reordered w.r.t copy_data_to_user_space.
+> > 
+> > cpu1 read				cpu2 free dmap
+> > ---------				-------------
+> > atomic_inc()				atomic_read()			
+> > atomic_dec
+> > copy data to user space
+> > 
+> > Now cpu2 will free up dax range while it is still being read?
+> 
+> Yep, I think this is possible.
+> 
+> For this specific reorder, barriers like smp_mb__{before,after}_atomic could fix
+> it.
 
-I'm trying virtio-fs with KATA container on older kernel (3.10) host.
-I failed to run container as follows:
+Hi Liu Bo,
 
-```
-$sudo docker run --it busybox sh
-standard_init_linux.go:190: exec user process caused "read-only file system"
-ERRO[0001] init failed                                   error="standard_init_linux.go:190: exec user process caused \"read-only file system\"" name=kata-agent pid=1 source=agent
-panic: --this line should have never been executed, congratulations--
+I have modified the patch to use refcount_t. Our use case is little
+different than typical reference counts. I hope that are no bugs there.
 
-goroutine 1 [running, locked to thread]:
-main.init.0()
-	/home/admin/rpmbuild/BUILD/go/src/github.com/kata-containers/agent/agent.go:1228 +0x10f
-```
+I have also fixed bunch of other issues and enabled inline range reclaim
+for read path. (It became possible with dmap refcount patch).
 
-After some troubleshooting, I find it's OK to read/write within
-virtio-fs dir, and no problem happens if no overlayfs in between.
+Pushed my changes here for now. 
 
-However, it fails with EROFS error when executing binary on overlayfs,
-which can reproduce as below:
+https://github.com/rhvgoyal/linux/commits/virtio-fs-dev-5.1
 
-```
-$mv hello lowdir/
-$mkdir uppperdir workdir merged
-$sudo mount -t overlay overlay -olowerdir=lowdir,upperdir=upperdir,workdir=workdir merged
-$sudo docker run --name=virtio-fs-1 -v /home/eric/lab/merged:/mnt/ --runtime=kata-runtime -it busybox sh
+Please have a look and test. If everything looks good, I will squash these
+new patches into existing patches.
 
-[hack kata-agent to sleep in deadloop, and login the VM]
-
-/run/kata-containers/shared/containers/833c4dad342ecd55a25d6470faf99b57c1057fe854b2309bd8efc41b26d10627-840ec5db9825b5ac-mnt # ./hello
-/bin/sh: ./hello: Read-only file system
-```
-
-The problem seems that `lowdir` of overlay is readonly, but we relax
-`open` to use O_RDWR, so they conflict when `execve` syscall to open
-executable binary.
-
-This test patch fixes this problem for me:
-```
-git diff
-diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-index 78716c8aca..eaba3db22c 100644
---- a/contrib/virtiofsd/passthrough_ll.c
-+++ b/contrib/virtiofsd/passthrough_ll.c
-@@ -1898,7 +1898,17 @@ static void lo_setupmapping(fuse_req_t req, fuse_ino_t ino, uint64_t foffset,
-                 * TODO: O_RDWR might not be allowed if file is read only or
-                 * write only. Fix it.
-                 */
--               fd = openat(lo->proc_self_fd, buf, O_RDWR);
-+               #define RW_MASK 0x3
-+               fd = openat(lo->proc_self_fd, buf, flags & RW_MASK);
-```
-
-But, it's intersting why newer host kernel like 4.19 is free of this
-problem?
-
-Regards,
-Eric
+Thanks
+Vivek
 

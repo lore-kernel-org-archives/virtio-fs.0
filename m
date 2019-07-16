@@ -1,17 +1,12 @@
-Date: Tue, 16 Jul 2019 15:15:02 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190716191502.GB16790@redhat.com>
-References: <1562225131-23463-1-git-send-email-bo.liu@linux.alibaba.com>
-	<20190715203739.GB22193@redhat.com>
-	<20190715213805.crgid6njeq6faavs@US-160370MP2.local>
-	<20190716183635.GA16790@redhat.com>
-	<20190716190737.mukpr5bd4ur3v4hp@US-160370MP2.local>
+Date: Tue, 16 Jul 2019 17:00:47 -0400
+Message-Id: <20190716210051.11724-3-vgoyal@redhat.com>
+In-Reply-To: <20190716210051.11724-1-vgoyal@redhat.com>
+References: <20190716210051.11724-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20190716190737.mukpr5bd4ur3v4hp@US-160370MP2.local>
-Subject: Re: [Virtio-fs] [PATCH RFC] virtiofs: use fine-grained lock for
- dmap reclaim
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 2/6] fuse: Requeue work if number of free ranges
+	is not above threshold
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,99 +15,98 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Liu Bo <bo.liu@linux.alibaba.com>
-Cc: virtio-fs@redhat.com
+To: virtio-fs@redhat.com
 
-On Tue, Jul 16, 2019 at 12:07:38PM -0700, Liu Bo wrote:
-> Hi Vivek,
-> 
-> On Tue, Jul 16, 2019 at 02:36:35PM -0400, Vivek Goyal wrote:
-> > On Mon, Jul 15, 2019 at 02:38:06PM -0700, Liu Bo wrote:
-> > > On Mon, Jul 15, 2019 at 04:37:39PM -0400, Vivek Goyal wrote:
-> > > > On Thu, Jul 04, 2019 at 03:25:31PM +0800, Liu Bo wrote:
-> > > > > With free fuse dax mapping reducing, read performance is impacted
-> > > > > significantly because reads need to wait for a free fuse dax mapping.
-> > > > > 
-> > > > > Although reads will trigger reclaim work to try to reclaim fuse dax
-> > > > > mapping, reclaim code can barely make any progress if most of fuse dax
-> > > > > mappings are used by the file we're reading since inode lock is required
-> > > > > by reclaim code.
-> > > > > 
-> > > > > However, we don't have to take inode lock for reclaiming if dax mapping
-> > > > > has its own reference count, reference counting is to tell reclaim code to
-> > > > > skip those in use dax mappings, such that we can avoid the risk of
-> > > > > accidentally reclaiming a dax mapping that other readers are using.
-> > > > > 
-> > > > > On the other hand, holding ->i_dmap_sem during reclaim can be used to
-> > > > > prevent the follwing reads to get a dax mapping under reclaim.
-> > > > > 
-> > > > > Another reason is that reads/writes only use fuse dax mapping within
-> > > > > dax_iomap_rw(), so we can do such a trick, while mmap/faulting is a
-> > > > > different story and we have to take ->i_mmap_sem prior to reclaiming a dax
-> > > > > mapping in order to avoid the race.
-> > > > > 
-> > > > > This adds reference count for fuse dax mapping and removes the acquisition
-> > > > > of inode lock during reclaim.
-> > > > 
-> > > > I am not sure that this reference count implementation is safe. For
-> > > > example, what prevents atomic_dec() from being reordered so that it
-> > > > could be executed before actually copying to user space is finished.
-> > > > 
-> > > > Say cpu1 is reading a dax page and cpu 2 is freeing memory. 
-> > > > 
-> > > > cpu1 read				cpu2 free dmap
-> > > > ---------				-------------
-> > > > atomic_inc()				atomic_read()			
-> > > > copy data to user space
-> > > > atomic_dec
-> > > > 
-> > > > Say atomic_dec() gets reordered w.r.t copy_data_to_user_space.
-> > > > 
-> > > > cpu1 read				cpu2 free dmap
-> > > > ---------				-------------
-> > > > atomic_inc()				atomic_read()			
-> > > > atomic_dec
-> > > > copy data to user space
-> > > > 
-> > > > Now cpu2 will free up dax range while it is still being read?
-> > > 
-> > > Yep, I think this is possible.
-> > > 
-> > > For this specific reorder, barriers like smp_mb__{before,after}_atomic could fix
-> > > it.
-> > 
-> > Hi Liu Bo,
-> > 
-> > I have modified the patch to use refcount_t. Our use case is little
-> > different than typical reference counts. I hope that are no bugs there.
-> > 
-> > I have also fixed bunch of other issues and enabled inline range reclaim
-> > for read path. (It became possible with dmap refcount patch).
-> >
-> > Pushed my changes here for now. 
-> > 
-> > https://github.com/rhvgoyal/linux/commits/virtio-fs-dev-5.1
-> > 
-> > Please have a look and test. If everything looks good, I will squash these
-> > new patches into existing patches.
-> 
-> That's nice, I'll check it out.
-> 
-> Can you please send your patches out to this maillist?
+If number of free ranges is not above threshold, requeue work (from
+worker context itself). This will make sure worker continues to run
+till we hit threshold.
 
-Ok, I will. 
+Otherwise, we could be below threshold and still worker exits until
+and some memory allocation kicks the worker again.
 
-> 
-> (In fact it's difficult for us to track patches/changes on github,
-> esp. when they're squashed and we need to rebase our internal virtiofs
-> base by looking at the code line by line.)
+As a side affect, it also solves one race where where with nr_dmaps=1,
+it is possible that worker starts but exits as there are no busy ranges,
+and soon after busy range count goes up (dmap has been taken off free
+list already). In that case, worker never runs again, sleepers continue
+to sleep and caller who added dmap to busy list has exited. Busy range
+remains in busy list of the inode and application hangs.
 
-Ideally there should not be many patches/changes outside of development
-tree. 
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/file.c | 39 +++++++++++++++++++++++++++++++--------
+ 1 file changed, 31 insertions(+), 8 deletions(-)
 
-But I have to squash patches because none of this is upstream. And if
-I post too many patches upstream, nobody is going to look at the patch
-series.
-
-Vivek
+diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+index 310fb22b31bd..6e351fed6d65 100644
+--- a/fs/fuse/file.c
++++ b/fs/fuse/file.c
+@@ -179,9 +179,30 @@ static void fuse_link_write_file(struct file *file)
+ 	spin_unlock(&fi->lock);
+ }
+ 
+-static struct fuse_dax_mapping *alloc_dax_mapping(struct fuse_conn *fc)
++static void
++__kick_dmap_free_worker(struct fuse_conn *fc, unsigned long delay_ms)
+ {
+ 	unsigned long free_threshold;
++
++	/* If number of free ranges are below threshold, start reclaim */
++	free_threshold = max((fc->nr_ranges * FUSE_DAX_RECLAIM_THRESHOLD)/100,
++				(unsigned long)1);
++	if (fc->nr_free_ranges < free_threshold) {
++		pr_debug("fuse: Kicking dax memory reclaim worker. nr_free_ranges=0x%ld nr_total_ranges=%ld\n", fc->nr_free_ranges, fc->nr_ranges);
++		queue_delayed_work(system_long_wq, &fc->dax_free_work,
++				   msecs_to_jiffies(delay_ms));
++	}
++}
++
++static void kick_dmap_free_worker(struct fuse_conn *fc, unsigned long delay_ms)
++{
++	spin_lock(&fc->lock);
++	__kick_dmap_free_worker(fc, delay_ms);
++	spin_unlock(&fc->lock);
++}
++
++static struct fuse_dax_mapping *alloc_dax_mapping(struct fuse_conn *fc)
++{
+ 	struct fuse_dax_mapping *dmap = NULL;
+ 
+ 	spin_lock(&fc->lock);
+@@ -202,13 +223,7 @@ static struct fuse_dax_mapping *alloc_dax_mapping(struct fuse_conn *fc)
+ 	spin_unlock(&fc->lock);
+ 
+ out_kick:
+-	/* If number of free ranges are below threshold, start reclaim */
+-	free_threshold = max((fc->nr_ranges * FUSE_DAX_RECLAIM_THRESHOLD)/100,
+-				(unsigned long)1);
+-	if (fc->nr_free_ranges < free_threshold) {
+-		pr_debug("fuse: Kicking dax memory reclaim worker. nr_free_ranges=0x%ld nr_total_ranges=%ld\n", fc->nr_free_ranges, fc->nr_ranges);
+-		queue_delayed_work(system_long_wq, &fc->dax_free_work, 0);
+-	}
++	kick_dmap_free_worker(fc, 0);
+ 	return dmap;
+ }
+ 
+@@ -4170,6 +4185,11 @@ static int try_to_free_dmap_chunks(struct fuse_conn *fc,
+ 		dmap = NULL;
+ 		spin_lock(&fc->lock);
+ 
++		if (!fc->nr_busy_ranges) {
++			spin_unlock(&fc->lock);
++			return 0;
++		}
++
+ 		list_for_each_entry_safe(pos, temp, &fc->busy_ranges,
+ 						busy_list) {
+ 			inode = igrab(pos->inode);
+@@ -4228,4 +4248,7 @@ void fuse_dax_free_mem_worker(struct work_struct *work)
+ 		pr_debug("fuse: try_to_free_dmap_chunks() failed with err=%d\n",
+ 			 ret);
+ 	}
++
++	/* If number of free ranges are still below threhold, requeue */
++	kick_dmap_free_worker(fc, 1);
+ }
+-- 
+2.20.1
 

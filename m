@@ -1,12 +1,10 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue, 16 Jul 2019 17:00:48 -0400
-Message-Id: <20190716210051.11724-4-vgoyal@redhat.com>
-In-Reply-To: <20190716210051.11724-1-vgoyal@redhat.com>
-References: <20190716210051.11724-1-vgoyal@redhat.com>
+Date: Tue, 16 Jul 2019 17:00:45 -0400
+Message-Id: <20190716210051.11724-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 3/6] fuse: Do cond_resched() if we can't get
-	inode lock
+Subject: [Virtio-fs] [PATCH 0/6] virtio-fs: Get rid of inode lock and misc
+	fixes
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,48 +15,31 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-cond_resched() might be better as opposed
+Hi Liu Bo,
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/file.c | 10 ++--------
- 1 file changed, 2 insertions(+), 8 deletions(-)
+I am proposing following patches and fixes. I have modified your patch
+a bit to use refcount_t. 
 
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index 6e351fed6d65..fc40e0f44578 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -4167,7 +4167,7 @@ static int try_to_free_dmap_chunks(struct fuse_conn *fc,
- 				   unsigned long nr_to_free)
- {
- 	struct fuse_dax_mapping *dmap, *pos, *temp;
--	int ret, nr_freed = 0, nr_eagain = 0;
-+	int ret, nr_freed = 0;
- 	u64 dmap_start = 0, window_offset = 0;
- 	struct inode *inode = NULL;
- 
-@@ -4176,12 +4176,6 @@ static int try_to_free_dmap_chunks(struct fuse_conn *fc,
- 		if (nr_freed >= nr_to_free)
- 			break;
- 
--		if (nr_eagain > 20) {
--			queue_delayed_work(system_long_wq, &fc->dax_free_work,
--						msecs_to_jiffies(10));
--			return 0;
--		}
--
- 		dmap = NULL;
- 		spin_lock(&fc->lock);
- 
-@@ -4225,7 +4219,7 @@ static int try_to_free_dmap_chunks(struct fuse_conn *fc,
- 
- 		/* Could not get inode lock. Try next element */
- 		if (ret == -EAGAIN) {
--			nr_eagain++;
-+			cond_resched();
- 			continue;
- 		}
- 		nr_freed++;
+I have done few other cleanup and fixes as well.
+
+If things look good, I will squash these patches into exisitng patches.
+
+Thanks
+Vivek
+
+Vivek Goyal (6):
+  fuse: Continue to wait if inline reclaim returns null
+  fuse: Requeue work if number of free ranges is not above threshold
+  fuse: Do cond_resched() if we can't get inode lock
+  fuse: Get rid of inode lock in range reclaim path
+  fuse: Get rid of -EAGAIN logic in dmap free worker thread
+  fuse: Dax read can now do range reclaim inline
+
+ fs/fuse/file.c   | 161 ++++++++++++++++++++++++++---------------------
+ fs/fuse/fuse_i.h |   3 +
+ fs/fuse/inode.c  |   1 +
+ 3 files changed, 93 insertions(+), 72 deletions(-)
+
 -- 
 2.20.1
 

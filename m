@@ -1,12 +1,14 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Thu, 18 Jul 2019 16:13:55 +0100
-Message-Id: <20190718151355.11461-3-dgilbert@redhat.com>
-In-Reply-To: <20190718151355.11461-1-dgilbert@redhat.com>
-References: <20190718151355.11461-1-dgilbert@redhat.com>
+Date: Thu, 18 Jul 2019 14:18:39 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190718181839.GA30636@redhat.com>
+References: <1562884542-72462-1-git-send-email-bo.liu@linux.alibaba.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 2/2] virto/shared memory: Rework for
-	standardised id field
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+In-Reply-To: <1562884542-72462-1-git-send-email-bo.liu@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH] Virtiofs: fix null pointer deference in
+ directIO
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,94 +17,120 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com, vgoyal@redhat.com
+To: Liu Bo <bo.liu@linux.alibaba.com>
+Cc: virtio-fs@redhat.com
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+On Fri, Jul 12, 2019 at 06:35:42AM +0800, Liu Bo wrote:
+> Virtiofs has used memremap to create page structs for its managed memory
+> and set pagemap's type to MEMORY_DEVICE_FS_DAX.  Thus, the page from
+> virtiofs's managed memory is a ZONE_DEVICE page, if %devmap_managed_key
+> was enabled by pmem drivers, put_page() will run into
+> __put_devmap_managed_page().  However, as page_free ops is not defined, it
+> ends up with a NULL pointer dereference.
+>=20
+> As virtiofs presents its managed memory range as a dax device, this patch
+> makes virtiofs mimic how nvdimm/pmem.c setups pagemap fsdax.
+>=20
+> =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+>=20
+> [ 1223.732964] BUG: unable to handle kernel NULL pointer dereference at 0=
+000000000000000
+> [ 1223.733043] PGD 800000026bd91067 P4D 800000026bd91067 PUD 27631e067 PM=
+D 0
+> [ 1223.733085] Oops: 0010 [#1] SMP PTI
+> [ 1223.733114] CPU: 1 PID: 16505 Comm: build Not tainted 4.19.48-dff9509 =
+#1
+> [ 1223.733157] RIP: 0010:=A0 =A0 =A0 =A0 =A0 (null)
+> [ 1223.733179] Code: Bad RIP value.
+> ..
+> [ 1223.733671] Call Trace:
+> [ 1223.733704]=A0 fuse_release_user_pages+0xad/0xb0
+> [ 1223.733751]=A0 fuse_direct_io+0x3ec/0x6a0
+> [ 1223.733823]=A0 fuse_dax_direct_write+0x3c/0x70
+> [ 1223.733863]=A0 fuse_file_write_iter+0x2ea/0x4c0
+> [ 1223.733978]=A0 __vfs_write+0xde/0x160
+> [ 1223.734009]=A0 vfs_write+0xab/0x190
+> [ 1223.734061]=A0 ksys_write+0x45/0xc0
+> [ 1223.734094]=A0 do_syscall_64+0x6b/0x330
+> [ 1223.734214]=A0 entry_SYSCALL_64_after_hwframe+0x44/0xa9
+> [ 1223.734261] RIP: 0033:0x15536bcddfd0
+>=20
+> The reproducer could be as simply as,
+>=20
+> addr =3D mmap(..., fileA, ...);
+> fdB =3D open(fileB, O_DIRECT);
+> write(fdB, addr);
+>=20
+> Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
 
-During virtio shared memory standardisation we've
-moved the 'id' field, out of a special capability
-and into the main virtio_pci_cap.
+I am looking at this now and trying to understand it better. One problem
+I see is with page pinning. If a page is pinned, how do we make sure it
+is not evicted by reclaim logic. IIUC, right now memory range relciam
+logic is not aware about page pinning.
 
-The name of the new 64 bit extensions have changes
-as well.
+For instance, in above example, write(fdB, addr) will pin pages in fileA.
+While write is going on we need to make sure dax memory ranges covering
+those pages are not reclaimed.
 
-Fixup these changes;  this commit can probably be
-squahed into:
-   3d2660c667307350d17fdfb7148c8751a442aa6b   virtio: Implement get_shm_region for PCI transport
+/me needs to spend more time understanding this.
 
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
----
- drivers/virtio/virtio_pci_modern.c |  8 ++++----
- include/uapi/linux/virtio_pci.h    | 14 ++++++--------
- 2 files changed, 10 insertions(+), 12 deletions(-)
+Vivek
 
-diff --git a/drivers/virtio/virtio_pci_modern.c b/drivers/virtio/virtio_pci_modern.c
-index 51c9e6eca5ac..d7838bf0f237 100644
---- a/drivers/virtio/virtio_pci_modern.c
-+++ b/drivers/virtio/virtio_pci_modern.c
-@@ -468,13 +468,13 @@ static int virtio_pci_find_shm_cap(struct pci_dev *dev,
- 		pci_read_config_byte(dev, pos + offsetof(struct virtio_pci_cap,
-                                                          cap_len),
-                                      &cap_len);
--                if (cap_len != sizeof(struct virtio_pci_shm_cap)) {
-+                if (cap_len != sizeof(struct virtio_pci_cap64)) {
- 		        printk(KERN_ERR "%s: shm cap with bad size offset: %d size: %d\n",
-                                __func__, pos, cap_len);
-                         continue;
-                 };
- 
--		pci_read_config_byte(dev, pos + offsetof(struct virtio_pci_shm_cap,
-+		pci_read_config_byte(dev, pos + offsetof(struct virtio_pci_cap,
-                                                          id),
-                                      &id);
-                 if (id != required_id)
-@@ -495,12 +495,12 @@ static int virtio_pci_find_shm_cap(struct pci_dev *dev,
- 
-                 /* and now the top half */
-                 pci_read_config_dword(dev,
--                                      pos + offsetof(struct virtio_pci_shm_cap,
-+                                      pos + offsetof(struct virtio_pci_cap64,
-                                                      offset_hi),
-                                       &tmp32);
-                 res_offset |= ((u64)tmp32) << 32;
-                 pci_read_config_dword(dev,
--                                      pos + offsetof(struct virtio_pci_shm_cap,
-+                                      pos + offsetof(struct virtio_pci_cap64,
-                                                      length_hi),
-                                       &tmp32);
-                 res_length |= ((u64)tmp32) << 32;
-diff --git a/include/uapi/linux/virtio_pci.h b/include/uapi/linux/virtio_pci.h
-index 961bb6e6315c..fe9f43680a1d 100644
---- a/include/uapi/linux/virtio_pci.h
-+++ b/include/uapi/linux/virtio_pci.h
-@@ -129,6 +129,12 @@ struct virtio_pci_cap {
- 	__le32 length;		/* Length of the structure, in bytes. */
- };
- 
-+struct virtio_pci_cap64 {
-+       struct virtio_pci_cap cap;
-+       __le32 offset_hi;             /* Most sig 32 bits of offset */
-+       __le32 length_hi;             /* Most sig 32 bits of length */
-+};
-+
- struct virtio_pci_notify_cap {
- 	struct virtio_pci_cap cap;
- 	__le32 notify_off_multiplier;	/* Multiplier for queue_notify_off. */
-@@ -166,14 +172,6 @@ struct virtio_pci_cfg_cap {
- 	__u8 pci_cfg_data[4]; /* Data for BAR access. */
- };
- 
--/* Fields in VIRTIO_PCI_CAP_SHARED_MEMORY_CFG */
--struct virtio_pci_shm_cap {
--       struct virtio_pci_cap cap;
--       __le32 offset_hi;             /* Most sig 32 bits of offset */
--       __le32 length_hi;             /* Most sig 32 bits of length */
--        __u8   id;                    /* To distinguish shm chunks */
--};
--
- /* Macro versions of offsets for the Old Timers! */
- #define VIRTIO_PCI_CAP_VNDR		0
- #define VIRTIO_PCI_CAP_NEXT		1
--- 
-2.21.0
+> ---
+>  fs/fuse/virtio_fs.c | 26 +++++++++++++++++++++++++-
+>  1 file changed, 25 insertions(+), 1 deletion(-)
+>=20
+> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> index 05ea28c..9b3f2e9 100644
+> --- a/fs/fuse/virtio_fs.c
+> +++ b/fs/fuse/virtio_fs.c
+> @@ -538,6 +538,28 @@ static void virtio_fs_cleanup_dax(void *data)
+>  	put_dax(fs->dax_dev);
+>  }
+> =20
+> +static void virtio_fs_release_pgmap_ops(void *_pgmap)
+> +{
+> +	dev_pagemap_put_ops();
+> +}
+> +
+> +static void virtio_fs_fsdax_pagefree(struct page *page, void *data)
+> +{
+> +	wake_up_var(&page->_refcount);
+> +}
+> +
+> +static int virtio_fs_setup_pagemap_fsdax(struct device *dev,
+> +					 struct dev_pagemap *pgmap)
+> +{
+> +	dev_pagemap_get_ops();
+> +	if (devm_add_action_or_reset(dev, virtio_fs_release_pgmap_ops, pgmap))
+> +		return -ENOMEM;
+> +	pgmap->type =3D MEMORY_DEVICE_FS_DAX;
+> +	pgmap->page_free =3D virtio_fs_fsdax_pagefree;
+> +
+> +	return 0;
+> +}
+> +
+>  static int virtio_fs_setup_dax(struct virtio_device *vdev, struct virtio=
+_fs *fs)
+>  {
+>  	struct virtio_shm_region cache_reg, journal_reg, vertab_reg;
+> @@ -600,7 +622,9 @@ static int virtio_fs_setup_dax(struct virtio_device *=
+vdev, struct virtio_fs *fs)
+>  	pgmap->altmap_valid =3D false;
+>  	pgmap->ref =3D &mi->ref;
+>  	pgmap->kill =3D virtio_fs_percpu_kill;
+> -	pgmap->type =3D MEMORY_DEVICE_FS_DAX;
+> +
+> +	if (virtio_fs_setup_pagemap_fsdax(&vdev->dev, pgmap))
+> +		return -ENOMEM;
+> =20
+>  	/* Ideally we would directly use the PCI BAR resource but
+>  	 * devm_memremap_pages() wants its own copy in pgmap.  So
+> --=20
+> 1.8.3.1
+>=20
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 

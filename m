@@ -1,20 +1,13 @@
-Date: Fri, 19 Jul 2019 19:34:55 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190720023455.vw3ptwrma45l72jq@US-160370MP2.local>
-References: <1562884542-72462-1-git-send-email-bo.liu@linux.alibaba.com>
-	<20190718181839.GA30636@redhat.com>
-	<20190718185800.yu24umzaajo42aft@US-160370MP2.local>
-	<20190718205110.GB30636@redhat.com>
-	<20190718233912.ukfrpykr77nne6e2@US-160370MP2.local>
-	<20190719195130.GC13636@redhat.com>
+Date: Mon, 22 Jul 2019 17:47:09 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190722164709.GE3035@work-vm>
+References: <4221bd26-c6a0-6853-e455-aee8239349bd@gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <20190719195130.GC13636@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] Virtiofs: fix null pointer deference in
- directIO
-Reply-To: bo.liu@linux.alibaba.com
+In-Reply-To: <4221bd26-c6a0-6853-e455-aee8239349bd@gmail.com>
+Subject: Re: [Virtio-fs] Failure as Operation not permitted on aarch64
+	machine
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,183 +16,138 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
+To: Masayoshi Mizuma <msys.mizuma@gmail.com>
 Cc: virtio-fs@redhat.com
 
-On Fri, Jul 19, 2019 at 03:51:30PM -0400, Vivek Goyal wrote:
-> On Thu, Jul 18, 2019 at 04:39:12PM -0700, Liu Bo wrote:
-> > On Thu, Jul 18, 2019 at 04:51:10PM -0400, Vivek Goyal wrote:
-> > > On Thu, Jul 18, 2019 at 11:58:01AM -0700, Liu Bo wrote:
-> > > > On Thu, Jul 18, 2019 at 02:18:39PM -0400, Vivek Goyal wrote:
-> > > > > On Fri, Jul 12, 2019 at 06:35:42AM +0800, Liu Bo wrote:
-> > > > > > Virtiofs has used memremap to create page structs for its manag=
-ed memory
-> > > > > > and set pagemap's type to MEMORY_DEVICE_FS_DAX.  Thus, the page=
- from
-> > > > > > virtiofs's managed memory is a ZONE_DEVICE page, if %devmap_man=
-aged_key
-> > > > > > was enabled by pmem drivers, put_page() will run into
-> > > > > > __put_devmap_managed_page().  However, as page_free ops is not =
-defined, it
-> > > > > > ends up with a NULL pointer dereference.
-> > > > > >=20
-> > > > > > As virtiofs presents its managed memory range as a dax device, =
-this patch
-> > > > > > makes virtiofs mimic how nvdimm/pmem.c setups pagemap fsdax.
-> > > > > >=20
-> > > > > > =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
-> > > > > >=20
-> > > > > > [ 1223.732964] BUG: unable to handle kernel NULL pointer derefe=
-rence at 0000000000000000
-> > > > > > [ 1223.733043] PGD 800000026bd91067 P4D 800000026bd91067 PUD 27=
-631e067 PMD 0
-> > > > > > [ 1223.733085] Oops: 0010 [#1] SMP PTI
-> > > > > > [ 1223.733114] CPU: 1 PID: 16505 Comm: build Not tainted 4.19.4=
-8-dff9509 #1
-> > > > > > [ 1223.733157] RIP: 0010:=A0 =A0 =A0 =A0 =A0 (null)
-> > > > > > [ 1223.733179] Code: Bad RIP value.
-> > > > > > ..
-> > > > > > [ 1223.733671] Call Trace:
-> > > > > > [ 1223.733704]=A0 fuse_release_user_pages+0xad/0xb0
-> > > > > > [ 1223.733751]=A0 fuse_direct_io+0x3ec/0x6a0
-> > > > > > [ 1223.733823]=A0 fuse_dax_direct_write+0x3c/0x70
-> > > > > > [ 1223.733863]=A0 fuse_file_write_iter+0x2ea/0x4c0
-> > > > > > [ 1223.733978]=A0 __vfs_write+0xde/0x160
-> > > > > > [ 1223.734009]=A0 vfs_write+0xab/0x190
-> > > > > > [ 1223.734061]=A0 ksys_write+0x45/0xc0
-> > > > > > [ 1223.734094]=A0 do_syscall_64+0x6b/0x330
-> > > > > > [ 1223.734214]=A0 entry_SYSCALL_64_after_hwframe+0x44/0xa9
-> > > > > > [ 1223.734261] RIP: 0033:0x15536bcddfd0
-> > > > > >=20
-> > > > > > The reproducer could be as simply as,
-> > > > > >=20
-> > > > > > addr =3D mmap(..., fileA, ...);
-> > > > > > fdB =3D open(fileB, O_DIRECT);
-> > > > > > write(fdB, addr);
-> > > > > >=20
-> > > > > > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
-> > > > >=20
-> > > > > I am looking at this now and trying to understand it better. One =
-problem
-> > > > > I see is with page pinning. If a page is pinned, how do we make s=
-ure it
-> > > > > is not evicted by reclaim logic. IIUC, right now memory range rel=
-ciam
-> > > > > logic is not aware about page pinning.
-> > > > >=20
-> > > > > For instance, in above example, write(fdB, addr) will pin pages i=
-n fileA.
-> > > > > While write is going on we need to make sure dax memory ranges co=
-vering
-> > > > > those pages are not reclaimed.
-> > > >=20
-> > > > Good question, it is indeed a problem, i_mmap_sem is not held by pa=
-ge
-> > > > pinning so that dax range reclaim is free to go, nor page pinning in
-> > > > within iomap_begin() and iomap_end() pair.
-> > > >=20
-> > > > While that is a problem, this patch is fixing a different one becau=
-se
-> > > > of the lack of ->page_free definition.
-> > >=20
-> > > Sure, but in the definition of ->page_free, you are calling
-> > > "wake_up_var(page->_refcount)". This will make sense only if somebody
-> > > is waiting on this.
-> > >
-> >=20
-> > Right, looks like we also need to follow this patch[1], but looks like
-> > the fix for the whole problem is still WIP[2].
-> >=20
-> > > I am checking xfs code and it seems to be waiting for this. We probab=
-ly
-> > > will have to modify virtio-fs to fix get_user_pages()/DMA races.
-> > >=20
-> > > So give me some time to go through and understand what xfs/dax/mm sta=
-ck
-> > > is doing for these races and try to fix it properly.=20
-> >=20
-> > Right, I didn't realize the race with dax mapping reclaim.
-> >=20
-> > So there're two things to fix,
-> > a) the race between pinned entries/pages and fs fallocate/truncate.
-> > b) the race between pinned entries/pages and dax ranges background recl=
-aim.
->=20
-> Right.
->=20
-> I think we can take care of both the races by calling
-> dax_layout_busy_page() in path a) and path b)?
->
+* Masayoshi Mizuma (msys.mizuma@gmail.com) wrote:
+> Hello,
 
-I think so, that's what we have for now.
+Hi Masa,
 
-> >=20
-> > In terms of a), page->_refcount can be used to avoid the race between
-> > dma and dax.
-> >=20
-> > a "dmap->refcnt--" is actually what we need to add for b) at ->page_fre=
-e.
->=20
-> I am not seeing any callback where we can increment dmap->refcnt. That
-> probably means we will have to reply on calling dax_layout_busy_page()
-> in reclaim path. This is expected to be called with inode lock held.
->=20
-> I am thinking of following sequence.
->=20
-> 1. inode_trylock(inode)
-> 2. Take i_mmap_sem
-> 3. call dax_layout_busy_page() to make sure no pages on this inode are id=
-le.
-> 4. Take i_dmap_sem
-> 5. Reclaim range
+> I would appreciate if you could help me to resolve following failure.
+> 
+> I tried to use virtio-fs on aarch64 [1], however, qemu [2] failed to boot
+> as Operation not permitted.
+> 
+>   ---
+>   # ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o source=/tmp/share -o cache=none &
+> 
+>   # qemu-system-aarch64 -machine virt,accel=kvm,gic-version=3 -cpu host -smp 8 ... [3]
+> 
+>   UEFI firmware starting.
+>   kvm_set_phys_mem: error registering slot: Operation not permitted
+>   ---
+> 
+> >From the ftrace log, the error happened because kvm_set_user_memory_region()
+> returned as -1 (EPERM).
+> 
+>   ---
+>   qemu-system-aar-28381 [003] ....  6683.601097: tracing_mark_write: kvm_set_user_memory Slot#3 flags=0x0 gpa=0x8000000000 size=0x40000000 ua=0xfffe0ba00000 ret=-1
+>   ---
+> 
+> kvm_set_user_memory_region() returned -1 because kvm_arch_prepare_memory_region()
+> in kernel returned as -EPERM.
 
-I realized that callers of dax_layout_busy_page() only need to block
-any new mapping creation, which means a down_read(&i_mmap_sem) is
-enough for the protection.
+Right, yes we know this is a problem on aarch64;  for aarch we disable
+the DAX mode;  if you check out our -dev branches and apply the
+following hack to the kernel:
 
-If dax_layout_busy_page() returns any pinned entry, we can skip the
-reclaim.
 
-Although dax_layout_busy_page() does unmap_mapping_range() to
-disassociate the dax pfn and its mapped pte, next time when the pte is
-walked by mmu, it will refault in the dax pfn.
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index 3f3c018571ee..60a9724f9c71 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -541,7 +541,7 @@ static int virtio_fs_setup_dax(struct virtio_device *vdev, struct virtio_fs *fs)
+                                           (u8)VIRTIO_FS_SHMCAP_ID_CACHE);
+        if (!have_cache) {
+                dev_err(&vdev->dev, "%s: No cache capability\n", __func__);
+-               return -ENXIO;
++               return 0;
+        } else {
+                dev_notice(&vdev->dev, "Cache len: 0x%llx @ 0x%llx\n",
+                           cache_reg.len, cache_reg.addr);
 
-The whole assumption of using dax_layout_busy_page() is that pinned memory
-will be released very soon, I think it's also matching our virtiofs case,
-e.g. a direct IO.
+and start the qemu with:
+-device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs,cache-size=0
 
-thanks,
--liubo
->=20
-> This means that we can't drop inode lock in range reclaim path as your
-> dmap refcount patches are currently doing.
->=20
-> This probably means that range reclaim might get enen more slower. I=20
-> am thinking that once we get hold of a inode lock and have been
-> able to do dax_layout_busy_page(), we should reclaim multiple ranges
-> from same inode (using one FUSE_REMOVEMAPPING()) command, instead
-> of freeing one range at a time.
->=20
-> And that might provide some speed up with range reclaim.
->=20
-> /me is not 100% sure yet if we need to keep inode lock held when we=20
-> call dax_layout_busy_page(). As of now truncate/punch_hole seems
-> to hold it. Also we are waiting for pages to become idle, so it
-> kind of makes sense to not start more read/writes while we are
-> waiting for pages to become idle.
->=20
-> Thanks
-> Vivek
->=20
-> >=20
-> >=20
-> > [1]: "mm, fs, dax: handle layout changes to pinned dax mappings"
-> > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/comm=
-it/?id=3D5fac7408d828719db6d3fdba63e3c3726a6d1ee5
-> >=20
-> > [2]: "mm: introduce put_user_page*(), placeholder versions"
-> > https://patchwork.kernel.org/patch/10637929/
-> >=20
-> > thanks,
-> > -liubo
+it should start up for you.
+
+>    ---
+>    int kvm_arch_prepare_memory_region(struct kvm *kvm,
+>                                    struct kvm_memory_slot *memslot,
+>                                    const struct kvm_userspace_memory_region *mem,
+>                                    enum kvm_mr_change change)
+>    {
+>    ...
+>                    if (writable && !(vma->vm_flags & VM_WRITE)) {
+>                            ret = -EPERM;
+>                            break;
+>                    }
+>    ---
+> 
+> Actually, the /proc/PID/maps showed ua=0xfffe0ba00000 didn't have PROT_WRITE.
+> 
+>   ---
+>   ...
+>   014b0000-014f0000 rw-p 00000000 00:00 0 
+>   1c840000-1d470000 rw-p 00000000 00:00 0                                  [heap]
+>   fffe0ba00000-fffe4ba00000 ---p 00000000 00:00 0 <===
+>   fffe4ba00000-fffe4ba10000 ---p 00000000 00:00 0 
+>   fffe4bc00000-fffe4fc00000 rw-p 00000000 00:00 0 
+>   fffe4fc00000-fffe4fc10000 ---p 00000000 00:00 0 
+>   fffe4fe00000-fffe53e00000 rw-p 00000000 00:00 0 
+>   fffe53e00000-fffe53e10000 ---p 00000000 00:00 0 
+>   ...
+>   ---
+> 
+> I'm not sure why ua=0xfffe0ba00000 didn't have PROT_WRITE because the memory
+> was allocated by qemu_anon_ram_alloc() and it should set PROT_READ | PROT_WRITE.
+
+Because we explicitly mprotect it later (and in current versions we
+allocate with PROT_NONE) - on x86 this works fine, but aarch doesn't
+like it; we've not quite figured the rules why yet.
+
+Dave
+
+> 
+>   ---
+>   qemu-system-aar-28372 [022] ....  6674.795027: tracing_mark_write: qemu_anon_ram_alloc size 1073741824 ptr 0xfffe0ba00000
+>   ---
+> 
+> qemu boots successfully if I remove "-device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs",
+> so I suppose the option is related to the failure...
+> 
+> 
+> [1]: host kernel is 5.2.0.
+>      guest kernel is https://github.com/rhvgoyal/linux/, branch: virtio-fs-dev-5.1.
+> 
+> [2]: I got the qemu from:
+>      https://gitlab.com/virtio-fs/qemu.git
+> 
+> [3]: Qemu option is:
+> 
+> $QEMU -machine virt,accel=kvm,gic-version=3 \
+> 	-cpu host \
+> 	-smp 8 \
+>         -m 4G,maxmem=4G \
+> 	-object memory-backend-file,id=mem,size=4G,mem-path=/dev/shm,share=on \
+> 	-numa node,memdev=mem \
+>         -drive file=/usr/share/AAVMF/AAVMF_CODE.fd,if=pflash,format=raw,unit=0,readonly=on \
+>         -drive file=$VARS,if=pflash,format=raw,unit=1 \
+> 	-chardev socket,id=char0,path=/tmp/vhostqemu \
+> 	-device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs \
+> 	-nographic \
+> 	-serial mon:stdio \
+> 	--trace events=/tmp/qemu-trace-events \
+> 	-drive if=virtio,file=/var/lib/libvirt/images/guest.qcow2
+> 
+> Thanks,
+> Masa
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

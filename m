@@ -1,14 +1,13 @@
-Date: Tue, 23 Jul 2019 10:36:11 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190723093611.GE2719@work-vm>
-References: <5D36C4EB.4010805@huawei.com> <20190723083150.GC2719@work-vm>
-	<5D36C93A.5060908@huawei.com> <20190723090150.GD2719@work-vm>
-	<5D36CE46.2090307@huawei.com>
+Date: Tue, 23 Jul 2019 14:20:08 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20190723132008.GF5445@stefanha-x1.localdomain>
+References: <20190718151355.11461-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="cpvLTH7QU4gwfq3S"
 Content-Disposition: inline
-In-Reply-To: <5D36CE46.2090307@huawei.com>
-Subject: Re: [Virtio-fs] mount failed in virtio_fs dev 5.1
+In-Reply-To: <20190718151355.11461-1-dgilbert@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 0/2] Fixes to id field for virtio-spec change
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,91 +16,63 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>
-Cc: virtio-fs@redhat.com
+To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
-* piaojun (piaojun@huawei.com) wrote:
-> Hi Dave,
-> 
-> It works when adding "-o rootmode=040000,user_id=0,group_id=0,dax".
 
-OK, great.  Hmm I wonder which option is the required one.
+--cpvLTH7QU4gwfq3S
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Dave
+On Thu, Jul 18, 2019 at 04:13:53PM +0100, Dr. David Alan Gilbert (git) wrot=
+e:
+> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+>=20
+> Hi,
+>   The current edition of the virtio spec changes for the
+> shared memory capability change how we find our DAX
+> (and version) mappings.
+>=20
+>   We now use a byte in the existing capability header
+> as 'id', and now the new capability structure is a
+> generic 64 bit structure.
+>=20
+>   This set goes with the current -dev qemu/virtiofsd branch.
+>=20
+>=20
+> Dr. David Alan Gilbert (2):
+>   virito: Add 'id' field to capability header
+>   virto/shared memory: Rework for standardised id field
+>=20
+>  drivers/virtio/virtio_pci_modern.c |  8 ++++----
+>  include/uapi/linux/virtio_pci.h    | 17 ++++++++---------
+>  2 files changed, 12 insertions(+), 13 deletions(-)
+>=20
+> --=20
+> 2.21.0
+>=20
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 
-> Thanks,
-> Jun
-> 
-> On 2019/7/23 17:01, Dr. David Alan Gilbert wrote:
-> > * piaojun (piaojun@huawei.com) wrote:
-> >> Hi Dave,
-> >>
-> >> Thanks for your quick reply, and still mount failed. But I can not get
-> >> some useful message from dmesg.
-> >>
-> >> # mount -t virtio_fs myfs /mnt/virtiofs/
-> >> mount: wrong fs type, bad option, bad superblock on myfs,
-> >> missing codepage or helper program, or other error
-> >>
-> >> In some cases useful info is found in syslog - try
-> >> dmesg | tail or so.
-> > 
-> > This is working for me - but with the latest -dev qemu/virtiofsd as
-> > well; please make sure both are up to date:
-> > 
-> > I used:
-> > 
-> > mount -t virtio_fs myfs /sysroot -o rootmode=040000,user_id=0,group_id=0,dax
-> > 
-> > Dave
-> > 
-> >> On 2019/7/23 16:31, Dr. David Alan Gilbert wrote:
-> >>> * piaojun (piaojun@huawei.com) wrote:
-> >>>> Hi,
-> >>>>
-> >>>> I got a problem when mounting virtiofs in kernel5.1 as below:
-> >>>>
-> >>>> fuse: loading out-of-tree module taints kernel.
-> >>>> fuse: module verification failed: signature and/or required key missing - tainting kernel
-> >>>> fuse init (API version 7.29)
-> >>>> virtio_fs virtio1: Cache len: 0x80000000 @ 0x180000000
-> >>>> virtio1 initialised, 524288 pages in 12ms
-> >>>> virtio_fs_find_instance: fs->tag myfs, tag /dev/null
-> >>>> virtio-fs: tag </dev/null> not found
-> >>>> Mounting FUSE Control File System...
-> >>>> [/bin/bash]: [mount -t virtio_fs /dev/null /mnt/virtiofs/ -o tag=myfs] return code=[32], execute failed by [root(uid=0)] from [pts/0 (9.4.90.78)]
-> >>>>
-> >>>> And my kernel code is:
-> >>>> https://github.com/rhvgoyal/linux/commits/virtio-fs-dev-5.1
-> >>>>
-> >>>> I wonder if the mount command has been changed?
-> >>>
-> >>> There was a change that went in last night, I believe the new format is:
-> >>>
-> >>> mount -t virtio_fs myfs /mnt/virtiofs/
-> >>>
-> >>> with the tagname going into the device position.
-> >>>
-> >>> Does that work?
-> >>>
-> >>> Dave
-> >>>
-> >>>
-> >>>> Thanks,
-> >>>> Jun
-> >>>>
-> >>>> _______________________________________________
-> >>>> Virtio-fs mailing list
-> >>>> Virtio-fs@redhat.com
-> >>>> https://www.redhat.com/mailman/listinfo/virtio-fs
-> >>> --
-> >>> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
-> >>> .
-> >>>
-> > --
-> > Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
-> > .
-> > 
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+
+--cpvLTH7QU4gwfq3S
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl03CYgACgkQnKSrs4Gr
+c8jedgf+LGHYDSXdDyrnz1eZ+7QyWVtlyD6FwBYPJz5UJel09p3IaNvaOSEaJypL
+9MKytS24WE2F3GYQdBIuFsRnzNq9ITA0fvAhZlOsVAntB0fO3b0Rybz18+8hhADc
+Pw4mYpWIgF5MpXYXocj+2nzU+ofDI6g3TtjjeAS9SkG4++u7yEsMvvbS0mpVmsvY
+RAPhIa4hGEOn3Wuex53MCVeGrb7B6upx7c5j/D+b6hAe4PrSr0m6J7xQaawNSye9
+MyXdqCV582AKRZCRXSMEhqjG/aocq7QrTZKZ3TxlQFeoVcPoiDMI0jisHN0qZxjN
+tOzvLiDPEP/i3tEPsqg84sh3Cn2RnA==
+=Ht59
+-----END PGP SIGNATURE-----
+
+--cpvLTH7QU4gwfq3S--
 

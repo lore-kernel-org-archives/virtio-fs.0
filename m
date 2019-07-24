@@ -1,10 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 24 Jul 2019 17:07:18 -0400
-Message-Id: <20190724210721.9185-1-vgoyal@redhat.com>
+Date: Wed, 24 Jul 2019 17:07:19 -0400
+Message-Id: <20190724210721.9185-2-vgoyal@redhat.com>
+In-Reply-To: <20190724210721.9185-1-vgoyal@redhat.com>
+References: <20190724210721.9185-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 0/3] virtio-fs: Create a read-write mapping only
-	if needed
+Subject: [Virtio-fs] [PATCH 1/3] fuse: Get rid of file parameter from setup
+	mapping
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,23 +17,77 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-This should apply on top of.
+There is only one caller of fuse_setup_one_mapping() and that passes file
+argument as NULL. So get rid of this parameter as there are no callers.
 
-https://gitlab.com/virtio-fs/linux/commits/virtio-fs-dev
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/file.c | 30 +++++++-----------------------
+ 1 file changed, 7 insertions(+), 23 deletions(-)
 
-Do not always create a read-write mapping. Create it read-write only if
-caller asked for it. Otherwise create a read-only mapping and upgrade
-it to read-write later when needed.
-
-Vivek Goyal (3):
-  fuse: Get rid of file parameter from setup mapping
-  fuse: Move new mapping setup code in a function
-  fuse: Add logic to upgrade a read-only mapping to read-write
-
- fs/fuse/file.c   | 246 +++++++++++++++++++++++++++++------------------
- fs/fuse/fuse_i.h |   3 +
- 2 files changed, 155 insertions(+), 94 deletions(-)
-
+diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+index fc40e0f44578..93f8e62e2b5b 100644
+--- a/fs/fuse/file.c
++++ b/fs/fuse/file.c
+@@ -264,41 +264,26 @@ static void dmap_add_to_free_pool(struct fuse_conn *fc,
+ }
+ 
+ /* offset passed in should be aligned to FUSE_DAX_MEM_RANGE_SZ */
+-static int fuse_setup_one_mapping(struct inode *inode,
+-				struct file *file, loff_t offset,
+-				struct fuse_dax_mapping *dmap)
++static int fuse_setup_one_mapping(struct inode *inode, loff_t offset,
++				  struct fuse_dax_mapping *dmap)
+ {
+ 	struct fuse_conn *fc = get_fuse_conn(inode);
+ 	struct fuse_inode *fi = get_fuse_inode(inode);
+-	struct fuse_file *ff = NULL;
+ 	struct fuse_setupmapping_in inarg;
+ 	FUSE_ARGS(args);
+ 	ssize_t err;
+ 
+-	if (file)
+-		ff = file->private_data;
+-
+ 	WARN_ON(offset % FUSE_DAX_MEM_RANGE_SZ);
+ 	WARN_ON(fc->nr_free_ranges < 0);
+ 
+ 	/* Ask fuse daemon to setup mapping */
+ 	memset(&inarg, 0, sizeof(inarg));
+ 	inarg.foffset = offset;
+-	if (ff)
+-		inarg.fh = ff->fh;
+-	else
+-		inarg.fh = -1;
++	inarg.fh = -1;
+ 	inarg.moffset = dmap->window_offset;
+ 	inarg.len = FUSE_DAX_MEM_RANGE_SZ;
+-	if (file) {
+-		inarg.flags |= (file->f_mode & FMODE_WRITE) ?
+-				FUSE_SETUPMAPPING_FLAG_WRITE : 0;
+-		inarg.flags |= (file->f_mode & FMODE_READ) ?
+-				FUSE_SETUPMAPPING_FLAG_READ : 0;
+-	} else {
+-		inarg.flags |= FUSE_SETUPMAPPING_FLAG_READ;
+-		inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
+-	}
++	inarg.flags |= FUSE_SETUPMAPPING_FLAG_READ;
++	inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
+ 	args.in.h.opcode = FUSE_SETUPMAPPING;
+ 	args.in.h.nodeid = fi->nodeid;
+ 	args.in.numargs = 1;
+@@ -1985,9 +1970,8 @@ static int fuse_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
+ 		}
+ 
+ 		/* Setup one mapping */
+-		ret = fuse_setup_one_mapping(inode, NULL,
+-				ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ),
+-				alloc_dmap);
++		ret = fuse_setup_one_mapping(inode,
++			ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ), alloc_dmap);
+ 		if (ret < 0) {
+ 			printk("fuse_setup_one_mapping() failed. err=%d"
+ 				" pos=0x%llx\n", ret, pos);
 -- 
 2.17.2
 

@@ -1,15 +1,12 @@
-Date: Wed, 31 Jul 2019 10:48:22 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190731174821.huiokivwch3ffglo@US-160370MP2.local>
-References: <1564465872-60404-1-git-send-email-bo.liu@linux.alibaba.com>
-	<ceef880a-1b0d-c1a8-eb85-5c0bf4dfb023@huawei.com>
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Wed, 24 Jul 2019 17:07:21 -0400
+Message-Id: <20190724210721.9185-4-vgoyal@redhat.com>
+In-Reply-To: <20190724210721.9185-1-vgoyal@redhat.com>
+References: <20190724210721.9185-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <ceef880a-1b0d-c1a8-eb85-5c0bf4dfb023@huawei.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofs: reduce lock contention on
-	fpq->lock
-Reply-To: bo.liu@linux.alibaba.com
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 3/3] fuse: Add logic to upgrade a read-only
+	mapping to read-write
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,86 +15,214 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>
-Cc: virtio-fs@redhat.com
+To: virtio-fs@redhat.com
 
-Hi Jun,
+Do not always map a dax mapping read-write. There are use cases like
+executing a file where we want to map file read-only. virtio-fs dir on
+host might be backed by overlayfs. We don't want to open file read-write
+on overlayfs otherwise it will unnecessariliy be copied-up nullyifying
+the advantages of sharing page cache between vms for unmodified files.
 
-On Wed, Jul 31, 2019 at 08:05:03PM +0800, piaojun wrote:
-> Hi liubo,
-> 
-> This change has already committed in rhvgoyal's branch:
->
-> https://github.com/rhvgoyal/linux/tree/virtio-fs-dev-5.1
->
+Hence, create a read-only mapping if user did not ask for writable mapping.
+Later upgrade it to read-write mapping when users requests it.
 
-Thanks for the link, the patch here does one more thing beyond Vivek's current
-code, i.e. the lock protection around req is also removed as it's not necessary.
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/file.c   | 114 ++++++++++++++++++++++++++++++++++++-----------
+ fs/fuse/fuse_i.h |   3 ++
+ 2 files changed, 91 insertions(+), 26 deletions(-)
 
-thanks,
--liubo
-
-> Thanks,
-> Jun
-> 
-> On 2019/7/30 13:51, Liu Bo wrote:
-> > Right now within virtio_fs_requests_done_work(), virtqueue is protected by
-> > both fsvq->lock and fpq->lock for processing both virtqueue and
-> > fpq->processing_list, however, it is fine for them to be protected
-> > separately.
-> > 
-> > Also since %req has been removed from fpq->processing_list, no one except
-> > request_wait_answer() is looking at this %req and request_wait_answer()
-> > waits only on FINISH flag, it's OK to remove fpq->lock after %req is
-> > dropped from the list.
-> > 
-> > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
-> > ---
-> >  fs/fuse/virtio_fs.c | 13 ++++++-------
-> >  1 file changed, 6 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-> > index 9b3f2e9..d88bb6c 100644
-> > --- a/fs/fuse/virtio_fs.c
-> > +++ b/fs/fuse/virtio_fs.c
-> > @@ -347,21 +347,22 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
-> >  
-> >  	/* Collect completed requests off the virtqueue */
-> >  	spin_lock(&fsvq->lock);
-> > -	/* grab fpq->lock as req is on fpq->processing list */
-> > -	spin_lock(&fpq->lock);
-> >  	do {
-> >  		unsigned len;
-> >  
-> >  		virtqueue_disable_cb(vq);
-> >  
-> >  		while ((req = virtqueue_get_buf(vq, &len)) != NULL) {
-> > +			/* grab fpq->lock as req is on fpq->processing list */
-> > +			spin_lock(&fpq->lock);
-> > +
-> >  			/* If !connected, req is freed by fuse_abort_conn. */
-> > -			if (fpq->connected) {
-> > +			if (fpq->connected)
-> >  				list_move_tail(&req->list, &reqs);
-> > -			}
-> > +
-> > +			spin_unlock(&fpq->lock);
-> >  		}
-> >  	} while (!virtqueue_enable_cb(vq) && likely(!virtqueue_is_broken(vq)));
-> > -	spin_unlock(&fpq->lock);
-> >  	spin_unlock(&fsvq->lock);
-> >  
-> >  	/* End requests */
-> > @@ -373,10 +374,8 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
-> >  
-> >  		/* TODO zeroing? */
-> >  
-> > -		spin_lock(&fpq->lock);
-> >  		clear_bit(FR_SENT, &req->flags);
-> >  		list_del_init(&req->list);
-> > -		spin_unlock(&fpq->lock);
-> >  
-> >  		fuse_request_end(fc, req);
-> >  	}
-> > 
+diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+index a2c19e4a28b5..bcd8ddcc0fdf 100644
+--- a/fs/fuse/file.c
++++ b/fs/fuse/file.c
+@@ -265,7 +265,8 @@ static void dmap_add_to_free_pool(struct fuse_conn *fc,
+ 
+ /* offset passed in should be aligned to FUSE_DAX_MEM_RANGE_SZ */
+ static int fuse_setup_one_mapping(struct inode *inode, loff_t offset,
+-				  struct fuse_dax_mapping *dmap)
++				  struct fuse_dax_mapping *dmap, bool writable,
++				  bool upgrade)
+ {
+ 	struct fuse_conn *fc = get_fuse_conn(inode);
+ 	struct fuse_inode *fi = get_fuse_inode(inode);
+@@ -283,7 +284,8 @@ static int fuse_setup_one_mapping(struct inode *inode, loff_t offset,
+ 	inarg.moffset = dmap->window_offset;
+ 	inarg.len = FUSE_DAX_MEM_RANGE_SZ;
+ 	inarg.flags |= FUSE_SETUPMAPPING_FLAG_READ;
+-	inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
++	if (writable)
++		inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
+ 	args.in.h.opcode = FUSE_SETUPMAPPING;
+ 	args.in.h.nodeid = fi->nodeid;
+ 	args.in.numargs = 1;
+@@ -296,26 +298,30 @@ static int fuse_setup_one_mapping(struct inode *inode, loff_t offset,
+ 		return err;
+ 	}
+ 
+-	pr_debug("fuse_setup_one_mapping() succeeded. offset=0x%llx err=%zd\n", offset, err);
++	pr_debug("fuse_setup_one_mapping() succeeded. offset=0x%llx writable=%d"
++		 " err=%zd\n", offset, writable, err);
+ 
+-	/*
+-	 * We don't take a refernce on inode. inode is valid right now and
+-	 * when inode is going away, cleanup logic should first cleanup
+-	 * dmap entries.
+-	 *
+-	 * TODO: Do we need to ensure that we are holding inode lock
+-	 * as well.
+-	 */
+-	dmap->inode = inode;
+-	dmap->start = offset;
+-	dmap->end = offset + FUSE_DAX_MEM_RANGE_SZ - 1;
+-	/* Protected by fi->i_dmap_sem */
+-	fuse_dax_interval_tree_insert(dmap, &fi->dmap_tree);
+-	fi->nr_dmaps++;
+-	spin_lock(&fc->lock);
+-	list_add_tail(&dmap->busy_list, &fc->busy_ranges);
+-	fc->nr_busy_ranges++;
+-	spin_unlock(&fc->lock);
++	dmap->writable = writable;
++	if (!upgrade) {
++		/*
++		 * We don't take a refernce on inode. inode is valid right now
++		 * and when inode is going away, cleanup logic should first
++		 * cleanup dmap entries.
++		 *
++		 * TODO: Do we need to ensure that we are holding inode lock
++		 * as well.
++		 */
++		dmap->inode = inode;
++		dmap->start = offset;
++		dmap->end = offset + FUSE_DAX_MEM_RANGE_SZ - 1;
++		/* Protected by fi->i_dmap_sem */
++		fuse_dax_interval_tree_insert(dmap, &fi->dmap_tree);
++		fi->nr_dmaps++;
++		spin_lock(&fc->lock);
++		list_add_tail(&dmap->busy_list, &fc->busy_ranges);
++		fc->nr_busy_ranges++;
++		spin_unlock(&fc->lock);
++	}
+ 	return 0;
+ }
+ 
+@@ -1890,6 +1896,7 @@ static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
+ 	struct fuse_conn *fc = get_fuse_conn(inode);
+ 	struct fuse_dax_mapping *dmap, *alloc_dmap = NULL;
+ 	int ret;
++	bool writable = flags & IOMAP_WRITE;
+ 
+ 	/* Can't do reclaim in fault path yet due to lock ordering.
+ 	 * Read path takes shared inode lock and that's not sufficient
+@@ -1930,10 +1937,11 @@ static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
+ 
+ 	/* Setup one mapping */
+ 	ret = fuse_setup_one_mapping(inode,
+-		ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ), alloc_dmap);
++				     ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ),
++				     alloc_dmap, writable, false);
+ 	if (ret < 0) {
+ 		printk("fuse_setup_one_mapping() failed. err=%d"
+-			" pos=0x%llx\n", ret, pos);
++			" pos=0x%llx, writable=%d\n", ret, pos, writable);
+ 		dmap_add_to_free_pool(fc, alloc_dmap);
+ 		up_write(&fi->i_dmap_sem);
+ 		return ret;
+@@ -1943,6 +1951,45 @@ static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
+ 	return 0;
+ }
+ 
++static int iomap_begin_upgrade_mapping(struct inode *inode, loff_t pos,
++					 loff_t length, unsigned flags,
++					 struct iomap *iomap)
++{
++	struct fuse_inode *fi = get_fuse_inode(inode);
++	struct fuse_dax_mapping *dmap;
++	int ret;
++
++	/*
++	 * Take exclusive lock so that only one caller can try to setup
++	 * mapping and others wait.
++	 */
++	down_write(&fi->i_dmap_sem);
++	dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, pos, pos);
++
++	/* We are holding either inode lock or i_mmap_sem, and that should
++	 * ensure that dmap can't reclaimed or truncated and it should still
++	 * be there in tree despite the fact we dropped and re-acquired the
++	 * lock.
++	 */
++	if (WARN_ON(!dmap))
++		return -EIO;
++
++	WARN_ON(dmap->writable);
++	ret = fuse_setup_one_mapping(inode,
++				     ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ),
++				     dmap, true, true);
++	if (ret < 0) {
++		printk("fuse_setup_one_mapping() failed. err=%d pos=0x%llx\n",
++		       ret, pos);
++		up_write(&fi->i_dmap_sem);
++		return ret;
++	}
++
++	fuse_fill_iomap(inode, pos, length, iomap, dmap, flags);
++	up_write(&fi->i_dmap_sem);
++	return 0;
++}
++
+ /* This is just for DAX and the mapping is ephemeral, do not use it for other
+  * purposes since there is no block device with a permanent mapping.
+  */
+@@ -1952,6 +1999,7 @@ static int fuse_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
+ 	struct fuse_inode *fi = get_fuse_inode(inode);
+ 	struct fuse_conn *fc = get_fuse_conn(inode);
+ 	struct fuse_dax_mapping *dmap;
++	bool writable = flags & IOMAP_WRITE;
+ 
+ 	/* We don't support FIEMAP */
+ 	BUG_ON(flags & IOMAP_REPORT);
+@@ -1982,9 +2030,23 @@ static int fuse_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
+ 	dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, pos, pos);
+ 
+ 	if (dmap) {
+-		fuse_fill_iomap(inode, pos, length, iomap, dmap, flags);
+-		up_read(&fi->i_dmap_sem);
+-		return 0;
++		if (writable && !dmap->writable) {
++			/* Upgrade read-only mapping to read-write. This will
++			 * require exclusive i_dmap_sem lock as we don't want
++			 * two threads to be trying to this simultaneously
++			 * for same dmap. So drop shared lock and acquire
++			 * exclusive lock.
++			 */
++			up_read(&fi->i_dmap_sem);
++			pr_debug("%s: Upgrading mapping at offset 0x%llx"
++				 " length 0x%llx\n", __func__, pos, length);
++			return iomap_begin_upgrade_mapping(inode, pos, length,
++							   flags, iomap);
++		} else {
++			fuse_fill_iomap(inode, pos, length, iomap, dmap, flags);
++			up_read(&fi->i_dmap_sem);
++			return 0;
++		}
+ 	} else {
+ 		up_read(&fi->i_dmap_sem);
+ 		pr_debug("%s: no mapping at offset 0x%llx length 0x%llx\n",
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index e899a06e29d7..34ca8b90a1e1 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -134,6 +134,9 @@ struct fuse_dax_mapping {
+ 
+ 	/** Length of mapping, in bytes */
+ 	loff_t length;
++
++	/* Is this mapping read-only or read-write */
++	bool writable;
+ };
+ 
+ /** FUSE inode */
+-- 
+2.17.2
 

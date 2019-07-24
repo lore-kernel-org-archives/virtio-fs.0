@@ -1,12 +1,11 @@
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Fri, 26 Jul 2019 09:33:22 +0100
-Message-Id: <20190726083322.13637-4-stefanha@redhat.com>
-In-Reply-To: <20190726083322.13637-1-stefanha@redhat.com>
-References: <20190726083322.13637-1-stefanha@redhat.com>
+Date: Wed, 24 Jul 2019 17:10:24 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190724211024.GA31096@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 3/3] virtiofsd: implement FUSE_INIT
-	map_alignment field
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: [Virtio-fs] [PATCH] virtiofsd: During setup mapping,
+ open file O_RDWR only if needed
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,43 +14,52 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com
+To: virtio-fs-list <virtio-fs@redhat.com>
 
-Communicate the host page size to the FUSE client so that
-FUSE_SETUPMAPPING/FUSE_REMOVEMAPPING requests are aware of our alignment
-constraints.
+As of now we always open file O_RDWR (even if writable mappings are not
+required). This leads to copy up of file if file is backed by overlayfs
+and hence nullying advantages of overlayfs.
 
-Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+So open file O_RDONLY if writable mappings are not required. Open O_RDWR
+if writable mappings are needed.
+
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- contrib/virtiofsd/fuse_lowlevel.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ contrib/virtiofsd/passthrough_ll.c |    9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
-index dbbfda78bf..452dd6b2b0 100644
---- a/contrib/virtiofsd/fuse_lowlevel.c
-+++ b/contrib/virtiofsd/fuse_lowlevel.c
-@@ -2131,6 +2131,12 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
- 	}
- 	if (se->conn.proto_minor >= 23)
- 		outarg.time_gran = se->conn.time_gran;
-+	if (arg->flags & FUSE_MAP_ALIGNMENT) {
-+		outarg.flags |= FUSE_MAP_ALIGNMENT;
-+
-+		/* This constraint comes from mmap(2) and munmap(2) */
-+		outarg.map_alignment = sysconf(_SC_PAGE_SIZE);
-+	}
+Index: qemu/contrib/virtiofsd/passthrough_ll.c
+===================================================================
+--- qemu.orig/contrib/virtiofsd/passthrough_ll.c	2019-07-24 16:31:07.014871768 -0400
++++ qemu/contrib/virtiofsd/passthrough_ll.c	2019-07-24 16:32:10.064412722 -0400
+@@ -2197,15 +2197,15 @@ static void lo_setupmapping(fuse_req_t r
+         VhostUserFSSlaveMsg msg = { 0 };
+         uint64_t vhu_flags;
+ 	char *buf;
++	bool writable = flags & FUSE_SETUPMAPPING_FLAG_WRITE;
  
- 	if (se->debug) {
- 		fuse_debug("   INIT: %u.%u\n", outarg.major, outarg.minor);
-@@ -2144,6 +2150,8 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
- 			   outarg.congestion_threshold);
- 		fuse_debug("   time_gran=%u\n",
- 			   outarg.time_gran);
-+		fuse_debug("   map_alignment=%u\n",
-+			   outarg.map_alignment);
- 	}
- 	if (arg->minor < 5)
- 		outargsize = FUSE_COMPAT_INIT_OUT_SIZE;
--- 
-2.21.0
+ 	if (lo_debug(req))
+ 		fuse_debug("lo_setupmapping(ino=%" PRIu64 ", fi=0x%p)\n", ino,
+ 			   (void *)fi);
+ 
+         vhu_flags = VHOST_USER_FS_FLAG_MAP_R;
+-        if (flags & O_WRONLY) {
++	if (writable)
+                 vhu_flags |= VHOST_USER_FS_FLAG_MAP_W;
+-        }
+ 
+ 	msg.fd_offset[0] = foffset;
+ 	msg.len[0] = len;
+@@ -2223,7 +2223,10 @@ static void lo_setupmapping(fuse_req_t r
+ 		 * TODO: O_RDWR might not be allowed if file is read only or
+ 		 * write only. Fix it.
+ 		 */
+-		fd = openat(lo->proc_self_fd, buf, O_RDWR);
++		if (writable)
++			fd = openat(lo->proc_self_fd, buf, O_RDWR);
++		else
++			fd = openat(lo->proc_self_fd, buf, O_RDONLY);
+ 		free(buf);
+ 		if (fd == -1)
+ 			return (void) fuse_reply_err(req, errno);
 

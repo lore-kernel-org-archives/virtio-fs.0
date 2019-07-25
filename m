@@ -1,13 +1,12 @@
-Date: Wed, 31 Jul 2019 18:27:16 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190731172716.GK3203@work-vm>
-References: <20190726091103.23503-1-stefanha@redhat.com>
-	<20190726091103.23503-5-stefanha@redhat.com>
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Date: Thu, 25 Jul 2019 15:20:13 +0100
+Message-Id: <20190725142014.1726-2-stefanha@redhat.com>
+In-Reply-To: <20190725142014.1726-1-stefanha@redhat.com>
+References: <20190725142014.1726-1-stefanha@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20190726091103.23503-5-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 4/5] virtiofsd: drop lo_dirp->fd field
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 1/2] fuse: drop unused struct
+	fuse_setupmapping_out
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,81 +15,44 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: virtio-fs@redhat.com
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> fdopendir(3) takes ownership of the file descriptor.  The presence of
-> the lo_dirp->fd field could lead to someone incorrectly adding a
-> close(d->fd) cleanup call in the future.
-> 
-> Do not store the file descriptor in struct lo_dirp since it is unused.
-> 
-> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+Originally the idea was that FUSE_SETUPMAPPING returns a list of
+addresses where the mmaps were made.  But then we decided to let the
+FUSE client decide where to map so it already knows the address.
+Consequently this struct is unused.
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ include/uapi/linux/fuse.h | 8 --------
+ 1 file changed, 8 deletions(-)
 
-
-Thanks, applied; note:
-  a) This looks like it can go into upstream libfuse
-  b) I think we're probably leaking DIR *'s if we do an lo_shutdown;
-I've added that to my todo
-
-> ---
->  contrib/virtiofsd/passthrough_ll.c | 13 +++++++------
->  1 file changed, 7 insertions(+), 6 deletions(-)
-> 
-> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-> index c1500e092d..ad3abdd532 100644
-> --- a/contrib/virtiofsd/passthrough_ll.c
-> +++ b/contrib/virtiofsd/passthrough_ll.c
-> @@ -1293,7 +1293,6 @@ static void lo_readlink(fuse_req_t req, fuse_ino_t ino)
->  }
->  
->  struct lo_dirp {
-> -	int fd;
->  	DIR *dp;
->  	struct dirent *entry;
->  	off_t offset;
-> @@ -1319,16 +1318,17 @@ static void lo_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi
->  	struct lo_data *lo = lo_data(req);
->  	struct lo_dirp *d;
->  	ssize_t fh;
-> +	int fd = -1;
->  
->  	d = calloc(1, sizeof(struct lo_dirp));
->  	if (d == NULL)
->  		goto out_err;
->  
-> -	d->fd = openat(lo_fd(req, ino), ".", O_RDONLY);
-> -	if (d->fd == -1)
-> +	fd = openat(lo_fd(req, ino), ".", O_RDONLY);
-> +	if (fd == -1)
->  		goto out_errno;
->  
-> -	d->dp = fdopendir(d->fd);
-> +	d->dp = fdopendir(fd);
->  	if (d->dp == NULL)
->  		goto out_errno;
->  
-> @@ -1348,11 +1348,12 @@ static void lo_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi
->  out_errno:
->  	error = errno;
->  out_err:
-> +	if (fd != -1) {
-> +		close(fd);
-> +	}
->  	if (d) {
->  		if (d->dp)
->  			closedir(d->dp);
-> -		if (d->fd != -1)
-> -			close(d->fd);
->  		free(d);
->  	}
->  	fuse_reply_err(req, error);
-> -- 
-> 2.21.0
-> 
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
+index 562a36add1e2..8c36aadb6294 100644
+--- a/include/uapi/linux/fuse.h
++++ b/include/uapi/linux/fuse.h
+@@ -824,7 +824,6 @@ struct fuse_copy_file_range_in {
+ 	uint64_t	flags;
+ };
+ 
+-#define FUSE_SETUPMAPPING_ENTRIES 8
+ #define FUSE_SETUPMAPPING_FLAG_WRITE (1ull << 0)
+ #define FUSE_SETUPMAPPING_FLAG_READ (1ull << 1)
+ struct fuse_setupmapping_in {
+@@ -840,13 +839,6 @@ struct fuse_setupmapping_in {
+ 	uint64_t	moffset;
+ };
+ 
+-struct fuse_setupmapping_out {
+-	/* Offsets into the cache of mappings */
+-	uint64_t	coffset[FUSE_SETUPMAPPING_ENTRIES];
+-        /* Lengths of each mapping */
+-        uint64_t	len[FUSE_SETUPMAPPING_ENTRIES];
+-};
+-
+ struct fuse_removemapping_in {
+         /* An already open handle */
+         uint64_t	fh;
+-- 
+2.21.0
 

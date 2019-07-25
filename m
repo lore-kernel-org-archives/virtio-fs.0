@@ -1,9 +1,15 @@
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Thu,  1 Aug 2019 17:54:05 +0100
-Message-Id: <20190801165409.20121-1-stefanha@redhat.com>
+Date: Thu, 25 Jul 2019 11:21:19 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190725152119.GA15543@redhat.com>
+References: <20190724211024.GA31096@redhat.com>
+	<20190724232927.wzjx6rihcqr44vug@US-160370MP2.local>
+	<20190725132743.GH2656@work-vm>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 0/4] virtiofsd: multithreading preparation part 3
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20190725132743.GH2656@work-vm>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: During setup mapping,
+ open file O_RDWR only if needed
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -12,65 +18,53 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-This patch series introduces the virtiofsd --thread-pool-size=NUM and sets the
-default value to 64.  Each virtqueue has its own thread pool for processing
-requests.  Blocking requests no longer pause virtqueue processing and I/O
-performance should be greatly improved when the queue depth is greater than 1.
+On Thu, Jul 25, 2019 at 02:27:43PM +0100, Dr. David Alan Gilbert wrote:
+> * Liu Bo (bo.liu@linux.alibaba.com) wrote:
+> > On Wed, Jul 24, 2019 at 05:10:24PM -0400, Vivek Goyal wrote:
+> > > As of now we always open file O_RDWR (even if writable mappings are not
+> > > required). This leads to copy up of file if file is backed by overlayfs
+> > > and hence nullying advantages of overlayfs.
+> > > 
+> > > So open file O_RDONLY if writable mappings are not required. Open O_RDWR
+> > > if writable mappings are needed.
+> > > 
+> > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > > ---
+> > >  contrib/virtiofsd/passthrough_ll.c |    9 ++++++---
+> > >  1 file changed, 6 insertions(+), 3 deletions(-)
+> > > 
+> > > Index: qemu/contrib/virtiofsd/passthrough_ll.c
+> > > ===================================================================
+> > > --- qemu.orig/contrib/virtiofsd/passthrough_ll.c	2019-07-24 16:31:07.014871768 -0400
+> > > +++ qemu/contrib/virtiofsd/passthrough_ll.c	2019-07-24 16:32:10.064412722 -0400
+> > > @@ -2197,15 +2197,15 @@ static void lo_setupmapping(fuse_req_t r
+> > >          VhostUserFSSlaveMsg msg = { 0 };
+> > >          uint64_t vhu_flags;
+> > >  	char *buf;
+> > > +	bool writable = flags & FUSE_SETUPMAPPING_FLAG_WRITE;
+> > 
+> > typo? flags is set to O_WRONLY or 0 in do_lookup, although this may work as same.
+> 
+> Right; that should be O_WRONLY;  
+> do_setupmapping does:
+> 
+>         genflags = 0;
+>         genflags |= (arg->flags & FUSE_SETUPMAPPING_FLAG_WRITE) ? O_WRONLY : 0;
+> 
+> to convert from the fuse definition on the wire to the O_ notation
+> before calling the filesstem code.
 
-Linux boot and pjdfstest have been tested with these patches and the default
-thread pool size of 64.
+So I have two questions.
 
-I have now concluded the thread-safety code audit.  Please let me know if you
-have concerns about things I missed.
+- O_WRONLY does not sound like correct mapping. FUSE_SETUPMAPPING_FLAG_WRITE
+  only says that write behavior is required. It does not say *write only*.
 
-Performance
------------
-Please try these patches out and share your results.
+- Is it must that we need to translate fuse message specific flag
+  to O_* notation. How about let filesystem code parse it?
 
-Scalability
------------
-There are several synchronization primitives that are taken by the virtqueue
-processing thread or the thread pool worker.  Unfortunately this is necessary
-to protect shared state.  It means that thread pool workers contend on or at
-least access thread synchronization primitives.  If anyone has suggestions for
-improving this situation, please discuss.
-
-1. vu_dispatch_rwlock - libvhost-user from races between the vhost-user
-   protocol thread and the virtqueue processing and thread pool worker threads.
-
-2. vq_lock - protects the virtqueue from races between the virtqueue processing
-   thread and thread pool workers.
-
-3. init_rwlock - protects FUSE_INIT/FUSE_DESTROY from races with other
-   requests.
-
-4. se->lock - protects se->list and the FUSE_INTERRUPT shared state.
-
-Ideally we could avoid hitting all of these locks on each request.  That would
-make the code scale better.
-
-Future work
------------
-This series does not complete the multithreading effort yet.  Two items are
-still missing:
-1. Multiqueue support
-2. CPU affinity for virtqueue processing threads and thread pools
-
-Stefan Hajnoczi (4):
-  virtiofsd: process requests in a thread pool
-  virtiofsd: prevent FUSE_INIT/FUSE_DESTROY races
-  virtiofsd: fix lo_destroy() resource leaks
-  virtiofsd: add --thread-pool-size=NUM option
-
- contrib/virtiofsd/fuse_i.h         |   2 +
- contrib/virtiofsd/fuse_lowlevel.c  |  25 +-
- contrib/virtiofsd/fuse_virtio.c    | 491 ++++++++++++++++-------------
- contrib/virtiofsd/passthrough_ll.c |  43 ++-
- contrib/virtiofsd/seccomp.c        |   1 +
- 5 files changed, 318 insertions(+), 244 deletions(-)
-
--- 
-2.21.0
+Thanks
+Vivek
 

@@ -1,16 +1,14 @@
-Date: Tue, 30 Jul 2019 15:29:39 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190730222938.ipnojus4euucg4yj@US-160370MP2.local>
-References: <1562884542-72462-1-git-send-email-bo.liu@linux.alibaba.com>
-	<20190730153041.GA3109@redhat.com>
+Date: Thu, 25 Jul 2019 14:27:43 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190725132743.GH2656@work-vm>
+References: <20190724211024.GA31096@redhat.com>
+	<20190724232927.wzjx6rihcqr44vug@US-160370MP2.local>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <20190730153041.GA3109@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] Virtiofs: fix null pointer deference in
- directIO
-Reply-To: bo.liu@linux.alibaba.com
+In-Reply-To: <20190724232927.wzjx6rihcqr44vug@US-160370MP2.local>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: During setup mapping,
+ open file O_RDWR only if needed
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,150 +17,73 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com
+To: Liu Bo <bo.liu@linux.alibaba.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
-On Tue, Jul 30, 2019 at 11:30:41AM -0400, Vivek Goyal wrote:
-> Hi Liu Bo,
->=20
-> I have committed your patch for now here.
->=20
-> https://github.com/rhvgoyal/linux/commits/virtio-fs-dev-5.1
->=20
-> I also added a patch to wait for page reference count to drop to 1 before
-> range is reclaimed. It slows down mmap() workload very significantly
-> though.
->
-
-Yes, the impact on mmap is expected because of the 'unmap' in layout checki=
-ng,
-it'd be helpful to check layout on the dmap range instead of the whole inod=
-e.
-
-However, there is a race bug in the current code between mmap workloads and=
- dmap
-reclaim, since the reclaim does not unmap the dmap range at all, such that =
-the
-dmap range might still stay in some process's page table, if such a dmap is
-reclaimed, the situation would be worse.  So with unmapping the whole inode=
- in
-layout checking, at least it is correct in term of that race.
-
-> Right now dmap reference patches are not there. This branch is still WIP
-> and once I have done more testing and possible dax optimization, I will
-> look into re-applying dmap reference changes on top of it and see if
-> it can be done reasonably without breaking other things.
->=20
-> Will be good if you give this branch a try.
-
-Sure, I've already made similar changes internally.
-
-thanks,
--liubo
-
->=20
-> Thanks
-> Vivek
->=20
-> On Fri, Jul 12, 2019 at 06:35:42AM +0800, Liu Bo wrote:
-> > Virtiofs has used memremap to create page structs for its managed memory
-> > and set pagemap's type to MEMORY_DEVICE_FS_DAX.  Thus, the page from
-> > virtiofs's managed memory is a ZONE_DEVICE page, if %devmap_managed_key
-> > was enabled by pmem drivers, put_page() will run into
-> > __put_devmap_managed_page().  However, as page_free ops is not defined,=
- it
-> > ends up with a NULL pointer dereference.
-> >=20
-> > As virtiofs presents its managed memory range as a dax device, this pat=
-ch
-> > makes virtiofs mimic how nvdimm/pmem.c setups pagemap fsdax.
-> >=20
-> > =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
-> >=20
-> > [ 1223.732964] BUG: unable to handle kernel NULL pointer dereference at=
- 0000000000000000
-> > [ 1223.733043] PGD 800000026bd91067 P4D 800000026bd91067 PUD 27631e067 =
-PMD 0
-> > [ 1223.733085] Oops: 0010 [#1] SMP PTI
-> > [ 1223.733114] CPU: 1 PID: 16505 Comm: build Not tainted 4.19.48-dff950=
-9 #1
-> > [ 1223.733157] RIP: 0010:=A0 =A0 =A0 =A0 =A0 (null)
-> > [ 1223.733179] Code: Bad RIP value.
-> > ..
-> > [ 1223.733671] Call Trace:
-> > [ 1223.733704]=A0 fuse_release_user_pages+0xad/0xb0
-> > [ 1223.733751]=A0 fuse_direct_io+0x3ec/0x6a0
-> > [ 1223.733823]=A0 fuse_dax_direct_write+0x3c/0x70
-> > [ 1223.733863]=A0 fuse_file_write_iter+0x2ea/0x4c0
-> > [ 1223.733978]=A0 __vfs_write+0xde/0x160
-> > [ 1223.734009]=A0 vfs_write+0xab/0x190
-> > [ 1223.734061]=A0 ksys_write+0x45/0xc0
-> > [ 1223.734094]=A0 do_syscall_64+0x6b/0x330
-> > [ 1223.734214]=A0 entry_SYSCALL_64_after_hwframe+0x44/0xa9
-> > [ 1223.734261] RIP: 0033:0x15536bcddfd0
-> >=20
-> > The reproducer could be as simply as,
-> >=20
-> > addr =3D mmap(..., fileA, ...);
-> > fdB =3D open(fileB, O_DIRECT);
-> > write(fdB, addr);
-> >=20
-> > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+* Liu Bo (bo.liu@linux.alibaba.com) wrote:
+> On Wed, Jul 24, 2019 at 05:10:24PM -0400, Vivek Goyal wrote:
+> > As of now we always open file O_RDWR (even if writable mappings are not
+> > required). This leads to copy up of file if file is backed by overlayfs
+> > and hence nullying advantages of overlayfs.
+> > 
+> > So open file O_RDONLY if writable mappings are not required. Open O_RDWR
+> > if writable mappings are needed.
+> > 
+> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 > > ---
-> >  fs/fuse/virtio_fs.c | 26 +++++++++++++++++++++++++-
-> >  1 file changed, 25 insertions(+), 1 deletion(-)
-> >=20
-> > diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-> > index 05ea28c..9b3f2e9 100644
-> > --- a/fs/fuse/virtio_fs.c
-> > +++ b/fs/fuse/virtio_fs.c
-> > @@ -538,6 +538,28 @@ static void virtio_fs_cleanup_dax(void *data)
-> >  	put_dax(fs->dax_dev);
-> >  }
-> > =20
-> > +static void virtio_fs_release_pgmap_ops(void *_pgmap)
-> > +{
-> > +	dev_pagemap_put_ops();
-> > +}
-> > +
-> > +static void virtio_fs_fsdax_pagefree(struct page *page, void *data)
-> > +{
-> > +	wake_up_var(&page->_refcount);
-> > +}
-> > +
-> > +static int virtio_fs_setup_pagemap_fsdax(struct device *dev,
-> > +					 struct dev_pagemap *pgmap)
-> > +{
-> > +	dev_pagemap_get_ops();
-> > +	if (devm_add_action_or_reset(dev, virtio_fs_release_pgmap_ops, pgmap))
-> > +		return -ENOMEM;
-> > +	pgmap->type =3D MEMORY_DEVICE_FS_DAX;
-> > +	pgmap->page_free =3D virtio_fs_fsdax_pagefree;
-> > +
-> > +	return 0;
-> > +}
-> > +
-> >  static int virtio_fs_setup_dax(struct virtio_device *vdev, struct virt=
-io_fs *fs)
-> >  {
-> >  	struct virtio_shm_region cache_reg, journal_reg, vertab_reg;
-> > @@ -600,7 +622,9 @@ static int virtio_fs_setup_dax(struct virtio_device=
- *vdev, struct virtio_fs *fs)
-> >  	pgmap->altmap_valid =3D false;
-> >  	pgmap->ref =3D &mi->ref;
-> >  	pgmap->kill =3D virtio_fs_percpu_kill;
-> > -	pgmap->type =3D MEMORY_DEVICE_FS_DAX;
-> > +
-> > +	if (virtio_fs_setup_pagemap_fsdax(&vdev->dev, pgmap))
-> > +		return -ENOMEM;
-> > =20
-> >  	/* Ideally we would directly use the PCI BAR resource but
-> >  	 * devm_memremap_pages() wants its own copy in pgmap.  So
-> > --=20
-> > 1.8.3.1
-> >=20
-> > _______________________________________________
-> > Virtio-fs mailing list
-> > Virtio-fs@redhat.com
-> > https://www.redhat.com/mailman/listinfo/virtio-fs
+> >  contrib/virtiofsd/passthrough_ll.c |    9 ++++++---
+> >  1 file changed, 6 insertions(+), 3 deletions(-)
+> > 
+> > Index: qemu/contrib/virtiofsd/passthrough_ll.c
+> > ===================================================================
+> > --- qemu.orig/contrib/virtiofsd/passthrough_ll.c	2019-07-24 16:31:07.014871768 -0400
+> > +++ qemu/contrib/virtiofsd/passthrough_ll.c	2019-07-24 16:32:10.064412722 -0400
+> > @@ -2197,15 +2197,15 @@ static void lo_setupmapping(fuse_req_t r
+> >          VhostUserFSSlaveMsg msg = { 0 };
+> >          uint64_t vhu_flags;
+> >  	char *buf;
+> > +	bool writable = flags & FUSE_SETUPMAPPING_FLAG_WRITE;
+> 
+> typo? flags is set to O_WRONLY or 0 in do_lookup, although this may work as same.
+
+Right; that should be O_WRONLY;  
+do_setupmapping does:
+
+        genflags = 0;
+        genflags |= (arg->flags & FUSE_SETUPMAPPING_FLAG_WRITE) ? O_WRONLY : 0;
+
+to convert from the fuse definition on the wire to the O_ notation
+before calling the filesstem code.
+
+Dave
+
+> thanks,
+> -liubo
+> >  
+> >  	if (lo_debug(req))
+> >  		fuse_debug("lo_setupmapping(ino=%" PRIu64 ", fi=0x%p)\n", ino,
+> >  			   (void *)fi);
+> >  
+> >          vhu_flags = VHOST_USER_FS_FLAG_MAP_R;
+> > -        if (flags & O_WRONLY) {
+> > +	if (writable)
+> >                  vhu_flags |= VHOST_USER_FS_FLAG_MAP_W;
+> > -        }
+> >  
+> >  	msg.fd_offset[0] = foffset;
+> >  	msg.len[0] = len;
+> > @@ -2223,7 +2223,10 @@ static void lo_setupmapping(fuse_req_t r
+> >  		 * TODO: O_RDWR might not be allowed if file is read only or
+> >  		 * write only. Fix it.
+> >  		 */
+> > -		fd = openat(lo->proc_self_fd, buf, O_RDWR);
+> > +		if (writable)
+> > +			fd = openat(lo->proc_self_fd, buf, O_RDWR);
+> > +		else
+> > +			fd = openat(lo->proc_self_fd, buf, O_RDONLY);
+> >  		free(buf);
+> >  		if (fd == -1)
+> >  			return (void) fuse_reply_err(req, errno);
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

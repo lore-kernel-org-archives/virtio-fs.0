@@ -1,16 +1,15 @@
-Date: Thu, 8 Aug 2019 10:45:46 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190808094546.GC31963@stefanha-x1.localdomain>
-References: <20190807093152.10964-1-dgilbert@redhat.com>
-	<20190807124537.GA18557@redhat.com> <20190807131715.GE2867@work-vm>
-	<20190807132955.GC18557@redhat.com>
+Date: Thu, 25 Jul 2019 18:34:00 -0700
+From: Liu Bo <bo.liu@linux.alibaba.com>
+Message-ID: <20190726013359.cxvscotpmlxix7ou@US-160370MP2.local>
+References: <20190724210721.9185-1-vgoyal@redhat.com>
+	<20190724210721.9185-3-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="GPJrCs/72TxItFYR"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190807132955.GC18557@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Fix lo_destroy crash in
- g_hash_table_foreach_remove
+In-Reply-To: <20190724210721.9185-3-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 2/3] fuse: Move new mapping setup code in a
+	function
+Reply-To: bo.liu@linux.alibaba.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,95 +21,161 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: Vivek Goyal <vgoyal@redhat.com>
 Cc: virtio-fs@redhat.com
 
+On Wed, Jul 24, 2019 at 05:07:20PM -0400, Vivek Goyal wrote:
+> Move new mapping setup code in a separate function. More code will come
+> in fuse_iomap_begin() and its becoming too big.
 
---GPJrCs/72TxItFYR
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Reviewed-by: Liu Bo <bo.liu@linux.alibaba.com>
 
-On Wed, Aug 07, 2019 at 09:29:55AM -0400, Vivek Goyal wrote:
-> On Wed, Aug 07, 2019 at 02:17:15PM +0100, Dr. David Alan Gilbert wrote:
-> > * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > > On Wed, Aug 07, 2019 at 10:31:52AM +0100, Dr. David Alan Gilbert (git=
-) wrote:
-> > > > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-> > > >=20
-> > > > This fixes a crash in lo_destroy since g_hash_table_foreach_remove
-> > > > doesn't like the hashtable changing as it iterates, and unref_inode
-> > > > will remove entries.
-> > >=20
-> > > Hi David,
-> > >=20
-> > > Got two questions.
-> > >=20
-> > > - Shouldn't we take a lo->mutex to make sure parallel hash table
-> > >   modifications are not happening.
-> >=20
-> > See Stefan's big comment (which I just changed the function name in)
-> > which explains that we can't take lo->mutex
->=20
-> That comment says that unref_inode() takes the lock and that's why
-> we can't take it.
->=20
-> But that's easy to fix. We just have to come up with another helper which
-> does not take lock and asssumes lock has already been taken.
->=20
-> /* This assumes lo->lock is already held */
-> __unref_inode()
-> {
-> }
-
-Nice idea.  It would be cleaner to drop the comments and introduce a
-unref_inode_locked() function so we can follow the usual locking regime.
-
-(Linux uses __foo() but double underscore identifiers are reserved in
-the C language standard, so IMO it's better to avoid them).
-
-> >=20
-> > > - Also before destroying lo, should we sever connection so that any
-> > >   requests which come after lo_destroy() are not entertained.
-> >=20
-> > No, because in some situations lo_destroy does not happen at the end;
-> > e.g. it happens during a umount and we still have the connection
-> > to be able to remount it.
->=20
-> Ok, so we don't sever the connection completely. But we don't expect to
-> process further requests till a new INIT has been done, isn't it?
->=20
-> IOW, once lo_destroy() is received, we cleanup any pending state from
-> the mount and if any requests are received from client, we error them
-> out.
->=20
-> And start processing requests normally when a new INIT has been
-> received.
->=20
-> Atleast that was my understanding of the design.
-
-There is a state machine that does:
-
-1. Drain in-flight requests when DESTROY is received.
-2. Process DESTROY in a serialized fashion.
-3. Forbid any requests until the next INIT.  <-- requests queued after
-						 DESTROY are rejected
-						 here
-4. Process INIT in a serialized fashion.
-
-Stefan
-
---GPJrCs/72TxItFYR
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1L70oACgkQnKSrs4Gr
-c8gGyggAipwO3zB83GmAfa2ZFy8lnUwx/p4EKpdnIdy2dk6Cz1zrd0xVXfJsw4/t
-XQbUuidkohaFgittzCMnBp039/6sOw05RyKIVax8YCMoGvZ1SmVPqMn/QFzqj8dW
-PkgSc5tCNAjuGO4Fea7nXcWKeoAcmPHiTZvmiL/uSJxtWsZNQKFg9XEV+USFAhcn
-/eGGHL/6O753LHcQoF9Jn56fmckSn4WTwMzNyWCGTBS5+wTjzhpeaabMKhkJw0VT
-J356Cir4DpfqZ1qse7emtNbAJAuaGepTpzlPpGjpgVyJQXQD9EoDsgSNYx2KCiOY
-coR6AiKuxkaTF3d00Pf3kNv3zGc5Sg==
-=BFGF
------END PGP SIGNATURE-----
-
---GPJrCs/72TxItFYR--
+thanks,
+-liubo
+> 
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  fs/fuse/file.c | 116 +++++++++++++++++++++++++++----------------------
+>  1 file changed, 64 insertions(+), 52 deletions(-)
+> 
+> diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+> index 93f8e62e2b5b..a2c19e4a28b5 100644
+> --- a/fs/fuse/file.c
+> +++ b/fs/fuse/file.c
+> @@ -1882,6 +1882,67 @@ static void fuse_fill_iomap(struct inode *inode, loff_t pos, loff_t length,
+>  	}
+>  }
+>  
+> +static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
+> +					 loff_t length, unsigned flags,
+> +					 struct iomap *iomap)
+> +{
+> +	struct fuse_inode *fi = get_fuse_inode(inode);
+> +	struct fuse_conn *fc = get_fuse_conn(inode);
+> +	struct fuse_dax_mapping *dmap, *alloc_dmap = NULL;
+> +	int ret;
+> +
+> +	/* Can't do reclaim in fault path yet due to lock ordering.
+> +	 * Read path takes shared inode lock and that's not sufficient
+> +	 * for inline range reclaim. Caller needs to drop lock, wait
+> +	 * and retry.
+> +	 */
+> +	if (flags & IOMAP_FAULT || !(flags & IOMAP_WRITE)) {
+> +		alloc_dmap = alloc_dax_mapping(fc);
+> +		if (!alloc_dmap)
+> +			return -ENOSPC;
+> +	} else {
+> +		alloc_dmap = alloc_dax_mapping_reclaim(fc, inode);
+> +		if (IS_ERR(alloc_dmap))
+> +			return PTR_ERR(alloc_dmap);
+> +	}
+> +
+> +	/* If we are here, we should have memory allocated */
+> +	if (WARN_ON(!alloc_dmap))
+> +		return -EBUSY;
+> +
+> +	/*
+> +	 * Drop read lock and take write lock so that only one
+> +	 * caller can try to setup mapping and other waits
+> +	 */
+> +	down_write(&fi->i_dmap_sem);
+> +	/*
+> +	 * We dropped lock. Check again if somebody else setup
+> +	 * mapping already.
+> +	 */
+> +	dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, pos,
+> +						pos);
+> +	if (dmap) {
+> +		fuse_fill_iomap(inode, pos, length, iomap, dmap, flags);
+> +		dmap_add_to_free_pool(fc, alloc_dmap);
+> +		up_write(&fi->i_dmap_sem);
+> +		return 0;
+> +	}
+> +
+> +	/* Setup one mapping */
+> +	ret = fuse_setup_one_mapping(inode,
+> +		ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ), alloc_dmap);
+> +	if (ret < 0) {
+> +		printk("fuse_setup_one_mapping() failed. err=%d"
+> +			" pos=0x%llx\n", ret, pos);
+> +		dmap_add_to_free_pool(fc, alloc_dmap);
+> +		up_write(&fi->i_dmap_sem);
+> +		return ret;
+> +	}
+> +	fuse_fill_iomap(inode, pos, length, iomap, alloc_dmap, flags);
+> +	up_write(&fi->i_dmap_sem);
+> +	return 0;
+> +}
+> +
+>  /* This is just for DAX and the mapping is ephemeral, do not use it for other
+>   * purposes since there is no block device with a permanent mapping.
+>   */
+> @@ -1890,8 +1951,7 @@ static int fuse_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
+>  {
+>  	struct fuse_inode *fi = get_fuse_inode(inode);
+>  	struct fuse_conn *fc = get_fuse_conn(inode);
+> -	struct fuse_dax_mapping *dmap, *alloc_dmap = NULL;
+> -	int ret;
+> +	struct fuse_dax_mapping *dmap;
+>  
+>  	/* We don't support FIEMAP */
+>  	BUG_ON(flags & IOMAP_REPORT);
+> @@ -1932,56 +1992,8 @@ static int fuse_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
+>  		if (pos >= i_size_read(inode))
+>  			goto iomap_hole;
+>  
+> -		/* Can't do reclaim in fault path yet due to lock ordering.
+> -		 * Read path takes shared inode lock and that's not sufficient
+> -		 * for inline range reclaim. Caller needs to drop lock, wait
+> -		 * and retry.
+> -		 */
+> -		if (flags & IOMAP_FAULT || !(flags & IOMAP_WRITE)) {
+> -			alloc_dmap = alloc_dax_mapping(fc);
+> -			if (!alloc_dmap)
+> -				return -ENOSPC;
+> -		} else {
+> -			alloc_dmap = alloc_dax_mapping_reclaim(fc, inode);
+> -			if (IS_ERR(alloc_dmap))
+> -				return PTR_ERR(alloc_dmap);
+> -		}
+> -
+> -		/* If we are here, we should have memory allocated */
+> -		if (WARN_ON(!alloc_dmap))
+> -			return -EBUSY;
+> -
+> -		/*
+> -		 * Drop read lock and take write lock so that only one
+> -		 * caller can try to setup mapping and other waits
+> -		 */
+> -		down_write(&fi->i_dmap_sem);
+> -		/*
+> -		 * We dropped lock. Check again if somebody else setup
+> -		 * mapping already.
+> -		 */
+> -		dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, pos,
+> -							pos);
+> -		if (dmap) {
+> -			fuse_fill_iomap(inode, pos, length, iomap, dmap, flags);
+> -			dmap_add_to_free_pool(fc, alloc_dmap);
+> -			up_write(&fi->i_dmap_sem);
+> -			return 0;
+> -		}
+> -
+> -		/* Setup one mapping */
+> -		ret = fuse_setup_one_mapping(inode,
+> -			ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ), alloc_dmap);
+> -		if (ret < 0) {
+> -			printk("fuse_setup_one_mapping() failed. err=%d"
+> -				" pos=0x%llx\n", ret, pos);
+> -			dmap_add_to_free_pool(fc, alloc_dmap);
+> -			up_write(&fi->i_dmap_sem);
+> -			return ret;
+> -		}
+> -		fuse_fill_iomap(inode, pos, length, iomap, alloc_dmap, flags);
+> -		up_write(&fi->i_dmap_sem);
+> -		return 0;
+> +		return iomap_begin_setup_new_mapping(inode, pos, length, flags,
+> +						    iomap);
+>  	}
+>  
+>  	/*
+> -- 
+> 2.17.2
 

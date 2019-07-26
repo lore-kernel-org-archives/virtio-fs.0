@@ -1,14 +1,9 @@
-References: <20190809082536.56402-1-eguan@linux.alibaba.com>
-	<20190809082536.56402-2-eguan@linux.alibaba.com>
-From: piaojun <piaojun@huawei.com>
-Message-ID: <5D4D3FA8.707@huawei.com>
-Date: Fri, 9 Aug 2019 17:40:56 +0800
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Date: Fri, 26 Jul 2019 09:29:33 +0100
+Message-Id: <20190726082933.13314-1-stefanha@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20190809082536.56402-2-eguan@linux.alibaba.com>
-Content-Type: text/plain; charset="windows-1252"
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH 2/2] virtiofsd: convert more fprintf and
- perror to use fuse log infra
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH] fuse: implement FUSE_INIT map_alignment field
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,177 +12,131 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Eryu Guan <eguan@linux.alibaba.com>, virtio-fs@redhat.com
+To: virtio-fs@redhat.com
+Cc: Miklos Szeredi <mszeredi@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
-Hi Eryu,
+The device communicates FUSE_SETUPMAPPING/FUSE_REMOVMAPPING alignment
+constraints via the FUST_INIT map_alignment field.  Parse this field and
+ensure our DAX mappings meet the alignment constraints.
 
-Could fuse_err() print to stderr as well?
+We don't actually align anything differently since our mappings are
+already 2MB aligned.  Just check the value when the connection is
+established.  If it becomes necessary to honor arbitrary alignments in
+the future we'll have to adjust how mappings are sized.
 
-Jun
+The upshot of this commit is that we can be confident that mappings will
+work even when emulating x86 on Power and similar combinations where the
+host page sizes are different.
 
-On 2019/8/9 16:25, Eryu Guan wrote:
-> Signed-off-by: Eryu Guan <eguan@linux.alibaba.com>
-> ---
->  contrib/virtiofsd/fuse_lowlevel.c |  6 +++---
->  contrib/virtiofsd/fuse_signals.c  |  7 +++++--
->  contrib/virtiofsd/fuse_virtio.c   | 16 ++++++++--------
->  contrib/virtiofsd/helper.c        |  6 +++---
->  4 files changed, 19 insertions(+), 16 deletions(-)
-> 
-> diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
-> index 7eec2680b6de..8ef800239f1e 100644
-> --- a/contrib/virtiofsd/fuse_lowlevel.c
-> +++ b/contrib/virtiofsd/fuse_lowlevel.c
-> @@ -1901,15 +1901,15 @@ static void do_removemapping(fuse_req_t req, fuse_ino_t nodeid,
->  
->  	arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
->  	if (!arg || arg->count <= 0) {
-> -		fprintf(stderr, "do_removemapping: invalid arg %p\n", arg);
-> +		fuse_err("do_removemapping: invalid arg %p\n", arg);
->  		fuse_reply_err(req, EINVAL);
->  		return;
->  	}
->  
->  	one = fuse_mbuf_iter_advance(iter, arg->count * sizeof(*one));
->  	if (!one) {
-> -		fprintf(stderr, "do_removemapping: invalid in, expected %d * %ld, has %ld - %ld\n",
-> -				arg->count, sizeof(*one), iter->size, iter->pos);
-> +		fuse_err("do_removemapping: invalid in, expected %d * %ld, has %ld - %ld\n",
-> +			 arg->count, sizeof(*one), iter->size, iter->pos);
->  		fuse_reply_err(req, EINVAL);
->  		return;
->  	}
-> diff --git a/contrib/virtiofsd/fuse_signals.c b/contrib/virtiofsd/fuse_signals.c
-> index aa3bdba7daaf..9d34f6b04025 100644
-> --- a/contrib/virtiofsd/fuse_signals.c
-> +++ b/contrib/virtiofsd/fuse_signals.c
-> @@ -12,6 +12,7 @@
->  #include "fuse_log.h"
->  #include "fuse_lowlevel.h"
->  
-> +#include <errno.h>
->  #include <stdio.h>
->  #include <string.h>
->  #include <signal.h>
-> @@ -47,13 +48,15 @@ static int set_one_signal_handler(int sig, void (*handler)(int), int remove)
->  	sa.sa_flags = 0;
->  
->  	if (sigaction(sig, NULL, &old_sa) == -1) {
-> -		perror("fuse: cannot get old signal handler");
-> +		fuse_err("fuse: cannot get old signal handler: %s\n",
-> +			 strerror(errno));
->  		return -1;
->  	}
->  
->  	if (old_sa.sa_handler == (remove ? handler : SIG_DFL) &&
->  	    sigaction(sig, &sa, NULL) == -1) {
-> -		perror("fuse: cannot set signal handler");
-> +		fuse_err("fuse: cannot set signal handler: %s\n",
-> +			 strerror(errno));
->  		return -1;
->  	}
->  	return 0;
-> diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
-> index 5b3174e4c74c..2ce0a9cf816e 100644
-> --- a/contrib/virtiofsd/fuse_virtio.c
-> +++ b/contrib/virtiofsd/fuse_virtio.c
-> @@ -675,7 +675,7 @@ static void *fv_queue_thread(void *opaque)
->                                 fuse_info("%s: ppoll interrupted, going around\n", __func__);
->                                 continue;
->                         }
-> -                       perror("fv_queue_thread ppoll");
-> +                       fuse_err("fv_queue_thread ppoll: %s\n", strerror(errno));
->                         break;
->                 }
->                 assert(poll_res >= 1);
-> @@ -700,7 +700,7 @@ static void *fv_queue_thread(void *opaque)
->  
->                 eventfd_t evalue;
->                 if (eventfd_read(qi->kick_fd, &evalue)) {
-> -                       perror("Eventfd_read for queue");
-> +                       fuse_err("Eventfd_read for queue: %s\n", strerror(errno));
->                         break;
->                 }
->  
-> @@ -805,7 +805,7 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
->  
->                  /* Kill the thread */
->                  if (eventfd_write(ourqi->kill_fd, 1)) {
-> -                       perror("Eventfd_read for queue");
-> +                       fuse_err("Eventfd_read for queue: %s\n", strerror(errno));
->                  }
->                  ret = pthread_join(ourqi->thread, NULL);
->                  if (ret) {
-> @@ -859,7 +859,7 @@ int virtio_loop(struct fuse_session *se)
->                                 fuse_info("%s: ppoll interrupted, going around\n", __func__);
->                                 continue;
->                         }
-> -                       perror("virtio_loop ppoll");
-> +                       fuse_err("virtio_loop ppoll: %s\n", strerror(errno));
->                         break;
->                 }
->                 assert(poll_res == 1);
-> @@ -913,18 +913,18 @@ static int fv_create_listen_socket(struct fuse_session *se)
->  
->          int listen_sock = socket(AF_UNIX, SOCK_STREAM, 0);
->          if (listen_sock == -1) {
-> -               perror("vhost socket creation");
-> +               fuse_err("vhost socket creation: %s\n", strerror(errno));
->                 return -1;
->          }
->          un.sun_family = AF_UNIX;
->  
->          if (bind(listen_sock, (struct sockaddr *) &un, addr_len) == -1) {
-> -                perror("vhost socket bind");
-> +                fuse_err("vhost socket bind: %s\n", strerror(errno));
->                  return -1;
->          }
->  
->          if (listen(listen_sock, 1) == -1) {
-> -                perror("vhost socket listen");
-> +                fuse_err("vhost socket listen: %s\n", strerror(errno));
->                  return -1;
->          }
->  
-> @@ -949,7 +949,7 @@ int virtio_session_mount(struct fuse_session *se)
->          fuse_err("%s: Waiting for vhost-user socket connection...\n", __func__);
->          int data_sock = accept(se->vu_listen_fd, NULL, NULL);
->          if (data_sock == -1) {
-> -                perror("vhost socket accept");
-> +                fuse_err("vhost socket accept: %s\n", strerror(errno));
->                  close(se->vu_listen_fd);
->                  return -1;
->          }
-> diff --git a/contrib/virtiofsd/helper.c b/contrib/virtiofsd/helper.c
-> index dc80100e8594..4c7145208028 100644
-> --- a/contrib/virtiofsd/helper.c
-> +++ b/contrib/virtiofsd/helper.c
-> @@ -189,7 +189,7 @@ int fuse_daemonize(int foreground)
->  		char completed;
->  
->  		if (pipe(waiter)) {
-> -			perror("fuse_daemonize: pipe");
-> +			fuse_err("fuse_daemonize: pipe: %s\n", strerror(errno));
->  			return -1;
->  		}
->  
-> @@ -199,7 +199,7 @@ int fuse_daemonize(int foreground)
->  		 */
->  		switch(fork()) {
->  		case -1:
-> -			perror("fuse_daemonize: fork");
-> +			fuse_err("fuse_daemonize: fork: %s\n", strerror(errno));
->  			return -1;
->  		case 0:
->  			break;
-> @@ -209,7 +209,7 @@ int fuse_daemonize(int foreground)
->  		}
->  
->  		if (setsid() == -1) {
-> -			perror("fuse_daemonize: setsid");
-> +			fuse_err("fuse_daemonize: setsid: %s\n", strerror(errno));
->  			return -1;
->  		}
->  
-> 
+Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+Please see separate virtiofsd patch for the server-side implementation.
+
+ fs/fuse/fuse_i.h          |  5 ++++-
+ include/uapi/linux/fuse.h |  7 ++++++-
+ fs/fuse/inode.c           | 18 ++++++++++++++++--
+ 3 files changed, 26 insertions(+), 4 deletions(-)
+
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index edcc4a3e119b..988ea5c39d41 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -46,7 +46,10 @@
+ /** Number of page pointers embedded in fuse_req */
+ #define FUSE_REQ_INLINE_PAGES 1
+ 
+-/* Default memory range size, 2MB */
++/*
++ * Default memory range size.  A power of 2 so it agrees with common FUSE_INIT
++ * map_alignment values 4KB and 64KB.
++ */
+ #define FUSE_DAX_MEM_RANGE_SZ	(2*1024*1024)
+ #define FUSE_DAX_MEM_RANGE_PAGES	(FUSE_DAX_MEM_RANGE_SZ/PAGE_SIZE)
+ 
+diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
+index 0f4b69b9c751..41d384b189b6 100644
+--- a/include/uapi/linux/fuse.h
++++ b/include/uapi/linux/fuse.h
+@@ -263,6 +263,9 @@ struct fuse_file_lock {
+  * FUSE_MAX_PAGES: init_out.max_pages contains the max number of req pages
+  * FUSE_CACHE_SYMLINKS: cache READLINK responses
+  * FUSE_NO_OPENDIR_SUPPORT: kernel supports zero-message opendir
++ * FUSE_MAP_ALIGNMENT: init_out.map_alignment contains byte alignment for
++ *                     foffset and moffset fields in struct
++ *                     fuse_setupmapping_out and fuse_removemapping_one.
+  */
+ #define FUSE_ASYNC_READ		(1 << 0)
+ #define FUSE_POSIX_LOCKS	(1 << 1)
+@@ -289,6 +292,7 @@ struct fuse_file_lock {
+ #define FUSE_MAX_PAGES		(1 << 22)
+ #define FUSE_CACHE_SYMLINKS	(1 << 23)
+ #define FUSE_NO_OPENDIR_SUPPORT (1 << 24)
++#define FUSE_MAP_ALIGNMENT      (1 << 25)
+ 
+ /**
+  * CUSE INIT request/reply flags
+@@ -632,7 +636,8 @@ struct fuse_init_out {
+ 	uint32_t	time_gran;
+ 	uint16_t	max_pages;
+ 	uint16_t	padding;
+-	uint32_t	unused[8];
++	uint32_t	map_alignment;
++	uint32_t	unused[7];
+ };
+ 
+ #define CUSE_INIT_INFO_MAX 4096
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index ffa00caeea01..ecb47c65f514 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -969,9 +969,10 @@ static void process_init_limits(struct fuse_conn *fc, struct fuse_init_out *arg)
+ static void process_init_reply(struct fuse_conn *fc, struct fuse_req *req)
+ {
+ 	struct fuse_init_out *arg = &req->misc.init_out;
++	bool ok = true;
+ 
+ 	if (req->out.h.error || arg->major != FUSE_KERNEL_VERSION)
+-		fc->conn_error = 1;
++		ok = false;
+ 	else {
+ 		unsigned long ra_pages;
+ 
+@@ -1032,6 +1033,13 @@ static void process_init_reply(struct fuse_conn *fc, struct fuse_req *req)
+ 					min_t(unsigned int, FUSE_MAX_MAX_PAGES,
+ 					max_t(unsigned int, arg->max_pages, 1));
+ 			}
++			if ((arg->flags & FUSE_MAP_ALIGNMENT) &&
++			    (FUSE_DAX_MEM_RANGE_SZ % arg->map_alignment)) {
++				printk(KERN_ERR "FUSE: map_alignment %u incompatible with dax mem range size %u\n",
++				       arg->map_alignment,
++				       FUSE_DAX_MEM_RANGE_SZ);
++				ok = false;
++			}
+ 		} else {
+ 			ra_pages = fc->max_read / PAGE_SIZE;
+ 			fc->no_lock = 1;
+@@ -1045,6 +1053,12 @@ static void process_init_reply(struct fuse_conn *fc, struct fuse_req *req)
+ 		fc->max_write = max_t(unsigned, 4096, fc->max_write);
+ 		fc->conn_init = 1;
+ 	}
++
++	if (!ok) {
++		fc->conn_init = 0;
++		fc->conn_error = 1;
++	}
++
+ 	fuse_set_initialized(fc);
+ 	wake_up_all(&fc->blocked_waitq);
+ }
+@@ -1064,7 +1078,7 @@ void fuse_send_init(struct fuse_conn *fc, struct fuse_req *req)
+ 		FUSE_WRITEBACK_CACHE | FUSE_NO_OPEN_SUPPORT |
+ 		FUSE_PARALLEL_DIROPS | FUSE_HANDLE_KILLPRIV | FUSE_POSIX_ACL |
+ 		FUSE_ABORT_ERROR | FUSE_MAX_PAGES | FUSE_CACHE_SYMLINKS |
+-		FUSE_NO_OPENDIR_SUPPORT;
++		FUSE_NO_OPENDIR_SUPPORT | FUSE_MAP_ALIGNMENT;
+ 	req->in.h.opcode = FUSE_INIT;
+ 	req->in.numargs = 1;
+ 	req->in.args[0].size = sizeof(*arg);
+-- 
+2.21.0
 

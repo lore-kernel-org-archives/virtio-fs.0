@@ -1,11 +1,12 @@
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Fri, 26 Jul 2019 10:11:03 +0100
-Message-Id: <20190726091103.23503-6-stefanha@redhat.com>
-In-Reply-To: <20190726091103.23503-1-stefanha@redhat.com>
-References: <20190726091103.23503-1-stefanha@redhat.com>
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Fri, 26 Jul 2019 11:49:47 -0400
+Message-Id: <20190726154948.28540-3-vgoyal@redhat.com>
+In-Reply-To: <20190726154948.28540-1-vgoyal@redhat.com>
+References: <20190726154948.28540-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 5/5] virtiofsd: prevent races with lo_dirp_put()
+Subject: [Virtio-fs] [PATCH 2/3] fuse: Move new mapping setup code in a
+	function
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,130 +15,157 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: virtio-fs@redhat.com
 
-Introduce lo_dirp_put() so that FUSE_RELEASEDIR does not cause
-use-after-free races with other threads that are accessing lo_dirp.
+Move new mapping setup code in a separate function. More code will come
+in fuse_iomap_begin() and its becoming too big.
 
-Also make lo_releasedir() atomic to prevent FUSE_RELEASEDIR racing with
-itself.  This prevents double-frees.
-
-Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- contrib/virtiofsd/passthrough_ll.c | 42 +++++++++++++++++++++++++-----
- 1 file changed, 36 insertions(+), 6 deletions(-)
+ fs/fuse/file.c | 116 +++++++++++++++++++++++++++----------------------
+ 1 file changed, 64 insertions(+), 52 deletions(-)
 
-diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-index ad3abdd532..f74e7d2d21 100644
---- a/contrib/virtiofsd/passthrough_ll.c
-+++ b/contrib/virtiofsd/passthrough_ll.c
-@@ -1293,11 +1293,28 @@ static void lo_readlink(fuse_req_t req, fuse_ino_t ino)
+diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+index 93f8e62e2b5b..a2c19e4a28b5 100644
+--- a/fs/fuse/file.c
++++ b/fs/fuse/file.c
+@@ -1882,6 +1882,67 @@ static void fuse_fill_iomap(struct inode *inode, loff_t pos, loff_t length,
+ 	}
  }
  
- struct lo_dirp {
-+	gint refcount;
- 	DIR *dp;
- 	struct dirent *entry;
- 	off_t offset;
- };
- 
-+static void lo_dirp_put(struct lo_dirp **dp)
++static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
++					 loff_t length, unsigned flags,
++					 struct iomap *iomap)
 +{
-+	struct lo_dirp *d = *dp;
++	struct fuse_inode *fi = get_fuse_inode(inode);
++	struct fuse_conn *fc = get_fuse_conn(inode);
++	struct fuse_dax_mapping *dmap, *alloc_dmap = NULL;
++	int ret;
 +
-+	if (!d) {
-+		return;
++	/* Can't do reclaim in fault path yet due to lock ordering.
++	 * Read path takes shared inode lock and that's not sufficient
++	 * for inline range reclaim. Caller needs to drop lock, wait
++	 * and retry.
++	 */
++	if (flags & IOMAP_FAULT || !(flags & IOMAP_WRITE)) {
++		alloc_dmap = alloc_dax_mapping(fc);
++		if (!alloc_dmap)
++			return -ENOSPC;
++	} else {
++		alloc_dmap = alloc_dax_mapping_reclaim(fc, inode);
++		if (IS_ERR(alloc_dmap))
++			return PTR_ERR(alloc_dmap);
 +	}
-+	*dp = NULL;
 +
-+	if (g_atomic_int_dec_and_test(&d->refcount)) {
-+		closedir(d->dp);
-+		free(d);
++	/* If we are here, we should have memory allocated */
++	if (WARN_ON(!alloc_dmap))
++		return -EBUSY;
++
++	/*
++	 * Drop read lock and take write lock so that only one
++	 * caller can try to setup mapping and other waits
++	 */
++	down_write(&fi->i_dmap_sem);
++	/*
++	 * We dropped lock. Check again if somebody else setup
++	 * mapping already.
++	 */
++	dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, pos,
++						pos);
++	if (dmap) {
++		fuse_fill_iomap(inode, pos, length, iomap, dmap, flags);
++		dmap_add_to_free_pool(fc, alloc_dmap);
++		up_write(&fi->i_dmap_sem);
++		return 0;
 +	}
++
++	/* Setup one mapping */
++	ret = fuse_setup_one_mapping(inode,
++		ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ), alloc_dmap);
++	if (ret < 0) {
++		printk("fuse_setup_one_mapping() failed. err=%d"
++			" pos=0x%llx\n", ret, pos);
++		dmap_add_to_free_pool(fc, alloc_dmap);
++		up_write(&fi->i_dmap_sem);
++		return ret;
++	}
++	fuse_fill_iomap(inode, pos, length, iomap, alloc_dmap, flags);
++	up_write(&fi->i_dmap_sem);
++	return 0;
 +}
 +
-+/* Call lo_dirp_put() on the return value when no longer needed */
- static struct lo_dirp *lo_dirp(fuse_req_t req, struct fuse_file_info *fi)
+ /* This is just for DAX and the mapping is ephemeral, do not use it for other
+  * purposes since there is no block device with a permanent mapping.
+  */
+@@ -1890,8 +1951,7 @@ static int fuse_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
  {
- 	struct lo_data *lo = lo_data(req);
-@@ -1305,6 +1322,9 @@ static struct lo_dirp *lo_dirp(fuse_req_t req, struct fuse_file_info *fi)
+ 	struct fuse_inode *fi = get_fuse_inode(inode);
+ 	struct fuse_conn *fc = get_fuse_conn(inode);
+-	struct fuse_dax_mapping *dmap, *alloc_dmap = NULL;
+-	int ret;
++	struct fuse_dax_mapping *dmap;
  
- 	pthread_mutex_lock(&lo->mutex);
- 	elem = lo_map_get(&lo->dirp_map, fi->fh);
-+	if (elem) {
-+		g_atomic_int_inc(&elem->dirp->refcount);
-+	}
- 	pthread_mutex_unlock(&lo->mutex);
- 	if (!elem)
- 		return NULL;
-@@ -1335,6 +1355,8 @@ static void lo_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi
- 	d->offset = 0;
- 	d->entry = NULL;
+ 	/* We don't support FIEMAP */
+ 	BUG_ON(flags & IOMAP_REPORT);
+@@ -1932,56 +1992,8 @@ static int fuse_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
+ 		if (pos >= i_size_read(inode))
+ 			goto iomap_hole;
  
-+	g_atomic_int_set(&d->refcount, 1); /* paired with lo_releasedir() */
-+
- 	fh = lo_add_dirp_mapping(req, d);
- 	if (fh == -1)
- 		goto out_err;
-@@ -1363,7 +1385,7 @@ static void lo_do_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
- 			  off_t offset, struct fuse_file_info *fi, int plus)
- {
- 	struct lo_data *lo = lo_data(req);
--	struct lo_dirp *d;
-+	struct lo_dirp *d = NULL;
- 	struct lo_inode *dinode;
- 	char *buf = NULL;
- 	char *p;
-@@ -1451,6 +1473,8 @@ static void lo_do_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
- 
-     err = 0;
- error:
-+    lo_dirp_put(&d);
-+
-     // If there's an error, we can only signal it if we haven't stored
-     // any entries yet - otherwise we'd end up with wrong lookup
-     // counts for the entries that are already in the buffer. So we
-@@ -1477,22 +1501,25 @@ static void lo_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size,
- static void lo_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
- {
- 	struct lo_data *lo = lo_data(req);
-+	struct lo_map_elem *elem;
- 	struct lo_dirp *d;
- 
- 	(void) ino;
- 
--	d = lo_dirp(req, fi);
--	if (!d) {
-+	pthread_mutex_lock(&lo->mutex);
-+	elem = lo_map_get(&lo->dirp_map, fi->fh);
-+	if (!elem) {
-+		pthread_mutex_unlock(&lo->mutex);
- 		fuse_reply_err(req, EBADF);
- 		return;
+-		/* Can't do reclaim in fault path yet due to lock ordering.
+-		 * Read path takes shared inode lock and that's not sufficient
+-		 * for inline range reclaim. Caller needs to drop lock, wait
+-		 * and retry.
+-		 */
+-		if (flags & IOMAP_FAULT || !(flags & IOMAP_WRITE)) {
+-			alloc_dmap = alloc_dax_mapping(fc);
+-			if (!alloc_dmap)
+-				return -ENOSPC;
+-		} else {
+-			alloc_dmap = alloc_dax_mapping_reclaim(fc, inode);
+-			if (IS_ERR(alloc_dmap))
+-				return PTR_ERR(alloc_dmap);
+-		}
+-
+-		/* If we are here, we should have memory allocated */
+-		if (WARN_ON(!alloc_dmap))
+-			return -EBUSY;
+-
+-		/*
+-		 * Drop read lock and take write lock so that only one
+-		 * caller can try to setup mapping and other waits
+-		 */
+-		down_write(&fi->i_dmap_sem);
+-		/*
+-		 * We dropped lock. Check again if somebody else setup
+-		 * mapping already.
+-		 */
+-		dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, pos,
+-							pos);
+-		if (dmap) {
+-			fuse_fill_iomap(inode, pos, length, iomap, dmap, flags);
+-			dmap_add_to_free_pool(fc, alloc_dmap);
+-			up_write(&fi->i_dmap_sem);
+-			return 0;
+-		}
+-
+-		/* Setup one mapping */
+-		ret = fuse_setup_one_mapping(inode,
+-			ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ), alloc_dmap);
+-		if (ret < 0) {
+-			printk("fuse_setup_one_mapping() failed. err=%d"
+-				" pos=0x%llx\n", ret, pos);
+-			dmap_add_to_free_pool(fc, alloc_dmap);
+-			up_write(&fi->i_dmap_sem);
+-			return ret;
+-		}
+-		fuse_fill_iomap(inode, pos, length, iomap, alloc_dmap, flags);
+-		up_write(&fi->i_dmap_sem);
+-		return 0;
++		return iomap_begin_setup_new_mapping(inode, pos, length, flags,
++						    iomap);
  	}
  
--	pthread_mutex_lock(&lo->mutex);
-+	d = elem->dirp;
- 	lo_map_remove(&lo->dirp_map, fi->fh);
- 	pthread_mutex_unlock(&lo->mutex);
- 
--	closedir(d->dp);
--	free(d);
-+	lo_dirp_put(&d); /* paired with lo_opendir() */
-+
- 	fuse_reply_err(req, 0);
- }
- 
-@@ -1701,6 +1728,9 @@ static void lo_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
- 		res = fdatasync(fd);
- 	else
- 		res = fsync(fd);
-+
-+	lo_dirp_put(&d);
-+
- 	fuse_reply_err(req, res == -1 ? errno : 0);
- }
- 
+ 	/*
 -- 
-2.21.0
+2.17.2
 

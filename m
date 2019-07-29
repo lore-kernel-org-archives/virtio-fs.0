@@ -1,16 +1,15 @@
-Date: Mon, 29 Jul 2019 09:15:55 +0100
+Date: Mon, 29 Jul 2019 09:21:49 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190729081555.GA3369@stefanha-x1.localdomain>
-References: <20190726091103.23503-1-stefanha@redhat.com>
-	<20190726091103.23503-3-stefanha@redhat.com>
-	<20190726212613.24lionrtvt3kz2g3@US-160370MP2.local>
+Message-ID: <20190729082149.GB3369@stefanha-x1.localdomain>
+References: <20190726082933.13314-1-stefanha@redhat.com>
+	<20190726203941.GA3706@redhat.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="r5Pyd7+fXNt84Ff3"
+	protocol="application/pgp-signature"; boundary="A6N2fC+uXW/VQSAv"
 Content-Disposition: inline
-In-Reply-To: <20190726212613.24lionrtvt3kz2g3@US-160370MP2.local>
-Subject: Re: [Virtio-fs] [PATCH 2/5] virtiofsd: prevent lo_lookup() NULL
- pointer	dereference
+In-Reply-To: <20190726203941.GA3706@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] fuse: implement FUSE_INIT map_alignment
+	field
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,54 +18,52 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Liu Bo <bo.liu@linux.alibaba.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, Miklos Szeredi <mszeredi@redhat.com>
 
 
---r5Pyd7+fXNt84Ff3
+--A6N2fC+uXW/VQSAv
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Fri, Jul 26, 2019 at 02:26:14PM -0700, Liu Bo wrote:
-> On Fri, Jul 26, 2019 at 10:11:00AM +0100, Stefan Hajnoczi wrote:
-> > Most lo_do_lookup() have already checked that the parent inode exists.
-> > lo_lookup() hasn't and can therefore hit a NULL pointer dereference when
-> > lo_inode(req, parent) returns NULL.
-> >
+On Fri, Jul 26, 2019 at 04:39:41PM -0400, Vivek Goyal wrote:
+> On Fri, Jul 26, 2019 at 09:29:33AM +0100, Stefan Hajnoczi wrote:
+> > The device communicates FUSE_SETUPMAPPING/FUSE_REMOVMAPPING alignment
+> > constraints via the FUST_INIT map_alignment field.  Parse this field and
+> > ensure our DAX mappings meet the alignment constraints.
 >=20
-> Sigh...this one has been fixed by 3 different developers...Me, Pengtao an=
-d Stefan.
+> Hi Stefan,
 >=20
-> The following one on the ML did the exactly same thing.
-> ---
-> Subject: [Virtio-fs] [PATCH] virtiofsd: fix lo_do_lookup panic
->=20
-> It needs to check for invalid parent dir.
->=20
-> Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
-> ---
+> To meet alignment constraints, we also need to make sure dax window
+> start/end address is 2MB aligned as well?
 
-One of the previously posted patches will be merged before mine.  It's a
-shame that work has been duplicated.  As a contributor I will send a
-ping email if there has been no response to a patch after a few days.
+No, because the mmap on the host is independent of the guest virtual
+address at which the BAR is mapped inside the guest.
+
+QEMU hw/virtio/vhost-user-fs.c:vuf_device_realize() mmaps the DAX window
+on the host side and that's where the mmap alignment requirement is in
+effect.
+
+The guest can map the DAX window at any address compatible with its own
+virtual memory constraints (i.e. page size).
 
 Stefan
 
---r5Pyd7+fXNt84Ff3
+--A6N2fC+uXW/VQSAv
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl0+qzsACgkQnKSrs4Gr
-c8iJXgf/U/VBNuvKL5LjEl5+H6xgeDHD1ZgRS47yfQQbb1wC9RcEUptTYcR7xtcc
-AUcoV/kfg+kLHxxUljUWAJ5mznHQ0GPB4LmZ+DQVYjUny3SyMLn8lNqQqzoObzFV
-d1sntaJVR7NA1n+UT2j96pjbFMemCRY5wwAs7JJyd/CzDbSoYf7PZNTNuEx94ZMo
-6Jp20u5bZ/kTR0kQ/e4ctdBOPMZgeDYQDlNedl2vee/B/tMW03+0Fh5fpRqS2fMV
-5ZfYM4Lyl2r1tBOgx/vNtm0fDsS7B/uZ/YDesF0ZyqyY9ke9hgxdVzJKGatypz3I
-ZJZwkWcz9fDtLbFowfKYGj30Vnbe0w==
-=uqIi
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl0+rJ0ACgkQnKSrs4Gr
+c8gw5Af7BMrjnBVenwkd3atS6jscLpzTVpASPVoJa+PAQmWTUhi4c8nxiwMNPeE0
+7AGgNSzlXKuFDZID0N9DQegvIh2IUkaNc+fEPDoeHwydUZBeuQLI9gyxTCeTbrAW
+h3PhfbsZk/H44GWtSJumuC3i1fAtgzYKjwasRseuSIUvDPg4xhg6kmHGFnVb2y0R
+GvvssfwDJOTGKuGcYAPpOcIncdlQuVVNmqgCJPawqRMdjS2AXY0uG6koDJnZMwJe
+ANWgMEyZbzxWp9qJSLz7nrv5We/XF7z9WuBqrsfWbTpBoVjUgti/Xsy5adTw3zeK
+mP53UnppGEr6PVHYfL9lphyF71pw2A==
+=Axqc
 -----END PGP SIGNATURE-----
 
---r5Pyd7+fXNt84Ff3--
+--A6N2fC+uXW/VQSAv--
 

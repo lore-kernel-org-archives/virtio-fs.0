@@ -1,15 +1,16 @@
-Date: Fri, 26 Jul 2019 14:35:40 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190726213540.mpqdzjrtn6mbcst6@US-160370MP2.local>
+Date: Mon, 29 Jul 2019 09:15:55 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20190729081555.GA3369@stefanha-x1.localdomain>
 References: <20190726091103.23503-1-stefanha@redhat.com>
-	<20190726091103.23503-2-stefanha@redhat.com>
+	<20190726091103.23503-3-stefanha@redhat.com>
+	<20190726212613.24lionrtvt3kz2g3@US-160370MP2.local>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="r5Pyd7+fXNt84Ff3"
 Content-Disposition: inline
-In-Reply-To: <20190726091103.23503-2-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 1/5] virtiofsd: skip
-	unnecessary	vu_queue_get_avail_bytes()
-Reply-To: bo.liu@linux.alibaba.com
+In-Reply-To: <20190726212613.24lionrtvt3kz2g3@US-160370MP2.local>
+Subject: Re: [Virtio-fs] [PATCH 2/5] virtiofsd: prevent lo_lookup() NULL
+ pointer	dereference
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,67 +19,54 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
+To: Liu Bo <bo.liu@linux.alibaba.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Fri, Jul 26, 2019 at 10:10:59AM +0100, Stefan Hajnoczi wrote:
-> When debug output is disabled there is no need to calculate the number
-> of in/out bytes available.
-> 
-> There is also no need to skip a request if there are 0 out bytes.  The
-> request parsing code already handles invalid requests.
-> 
-> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+
+--r5Pyd7+fXNt84Ff3
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Fri, Jul 26, 2019 at 02:26:14PM -0700, Liu Bo wrote:
+> On Fri, Jul 26, 2019 at 10:11:00AM +0100, Stefan Hajnoczi wrote:
+> > Most lo_do_lookup() have already checked that the parent inode exists.
+> > lo_lookup() hasn't and can therefore hit a NULL pointer dereference when
+> > lo_inode(req, parent) returns NULL.
+> >
+>=20
+> Sigh...this one has been fixed by 3 different developers...Me, Pengtao an=
+d Stefan.
+>=20
+> The following one on the ML did the exactly same thing.
 > ---
->  contrib/virtiofsd/fuse_virtio.c | 13 +++++--------
->  1 file changed, 5 insertions(+), 8 deletions(-)
-> 
-> diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
-> index 083e4fc317..d543c6d30f 100644
-> --- a/contrib/virtiofsd/fuse_virtio.c
-> +++ b/contrib/virtiofsd/fuse_virtio.c
-> @@ -507,18 +507,16 @@ static void *fv_queue_thread(void *opaque)
->                 ret = pthread_rwlock_rdlock(&qi->virtio_dev->vu_dispatch_rwlock);
->                 assert(ret == 0); /* there is no possible error case */
->  
-> -               /* out is from guest, in is too guest */
-> -               unsigned int in_bytes, out_bytes;
-> -               vu_queue_get_avail_bytes(dev, q, &in_bytes, &out_bytes, ~0, ~0);
-> +               if (se->debug) {
-> +                       /* out is from guest, in is too guest */
-> +                       unsigned int in_bytes, out_bytes;
-> +                       vu_queue_get_avail_bytes(dev, q, &in_bytes, &out_bytes, ~0, ~0);
->  
-> -               if (se->debug)
->                         fuse_debug("%s: Queue %d gave evalue: %zx available: in: %u out: %u\n",
->  				  __func__, qi->qidx, (size_t)evalue, in_bytes,
->  				  out_bytes);
-> -
-> -               if (!out_bytes) {
-> -                       goto next;
->                 }
-> +
->                 while (1) {
->                         bool allocated_bufv = false;
->                         struct fuse_bufvec bufv;
-> @@ -708,7 +706,6 @@ static void *fv_queue_thread(void *opaque)
->                         elem = NULL;
->                  }
->  
-> -next:
->                  pthread_rwlock_unlock(&qi->virtio_dev->vu_dispatch_rwlock);
->          }
->          pthread_mutex_destroy(&ch.lock);
-> -- 
-> 2.21.0
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
+> Subject: [Virtio-fs] [PATCH] virtiofsd: fix lo_do_lookup panic
+>=20
+> It needs to check for invalid parent dir.
+>=20
+> Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
+> ---
 
-Reviewed-by: Liu Bo <bo.liu@linux.alibaba.com>
+One of the previously posted patches will be merged before mine.  It's a
+shame that work has been duplicated.  As a contributor I will send a
+ping email if there has been no response to a patch after a few days.
 
-thanks,
--liubo
+Stefan
+
+--r5Pyd7+fXNt84Ff3
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl0+qzsACgkQnKSrs4Gr
+c8iJXgf/U/VBNuvKL5LjEl5+H6xgeDHD1ZgRS47yfQQbb1wC9RcEUptTYcR7xtcc
+AUcoV/kfg+kLHxxUljUWAJ5mznHQ0GPB4LmZ+DQVYjUny3SyMLn8lNqQqzoObzFV
+d1sntaJVR7NA1n+UT2j96pjbFMemCRY5wwAs7JJyd/CzDbSoYf7PZNTNuEx94ZMo
+6Jp20u5bZ/kTR0kQ/e4ctdBOPMZgeDYQDlNedl2vee/B/tMW03+0Fh5fpRqS2fMV
+5ZfYM4Lyl2r1tBOgx/vNtm0fDsS7B/uZ/YDesF0ZyqyY9ke9hgxdVzJKGatypz3I
+ZJZwkWcz9fDtLbFowfKYGj30Vnbe0w==
+=uqIi
+-----END PGP SIGNATURE-----
+
+--r5Pyd7+fXNt84Ff3--
 

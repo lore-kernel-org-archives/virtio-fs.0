@@ -1,18 +1,18 @@
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
 	h=from:to:cc:subject:date:message-id:in-reply-to:references;
-	bh=X6a1gKsSc1q+lIOWiQa6owt0PGrufoPBL2I1ppRQSXY=;
-	b=pbWQyifjWiAjZEKtY0lOvusIpuFzyMzyO7Aw+QE8p9U30jGCSEZgZIo8dLjkI5dgZJ
-	PM5JxV08Pw/4euXnbjE/Z5pNno3nedhwHSGkA7AVo3oEn4a/MfniQQBpkMI710q5+nWe
-	diD0omy7cNtnrk14y4CoOnlxb+YnmdItAPT5rM2EuqNr/skvhWssdou1n2nw+jFBUWzS
-	xiN3fGLYCfFgPCrqRq7Q3DhHkNAZEmQDtk14wXZwq2Qobl/XWbFlr0WjfYvgYpEV6btd
-	z18H+CzjR8XaRJ+IKkb+eZS2VoFCfQS7bmsnbfXOOhP/R42R843XeaHW77WxowJCx6IU
-	djUw==
+	bh=BTUK/VLGXMWp1MCxbbn+ZqjsLnAXmWWgx9zkvLcCxpg=;
+	b=UPyT0O+FYIKlt1RxJX7cBN3jzBn645Uw8D51kgjcA49eNkg2iG4YLJ8qz/nVj670Mc
+	SLRWUMxZLyUi4sYZXNLGa9qqCTEtTDr7sMishQ4lF+IWgXoe06a6sb7vNjhpnNY5ttwq
+	vJsNVKv50oQoxocr1zrpyahCsmhmmUeYD+ixoJxiR0K/UwQgg/MWSTSubXH0GM175aAH
+	097D7BV6VjnsLskHHyTxJfg7Tknn2L77KhLyibzZssg+IyxLhKn96vnRpsyyP98ADqCA
+	/LAxcUgb5ORDKs9EzBqyJCAZoeS82BLhE4ePBo74AbA7r9sQ3EWfU4ZG8UxtJde1EMOh
+	6q9w==
 From: Masayoshi Mizuma <msys.mizuma@gmail.com>
-Date: Mon, 29 Jul 2019 17:34:30 -0400
-Message-Id: <20190729213431.10821-2-msys.mizuma@gmail.com>
+Date: Mon, 29 Jul 2019 17:34:31 -0400
+Message-Id: <20190729213431.10821-3-msys.mizuma@gmail.com>
 In-Reply-To: <20190729213431.10821-1-msys.mizuma@gmail.com>
 References: <20190729213431.10821-1-msys.mizuma@gmail.com>
-Subject: [Virtio-fs] [PATCH 1/2][RFC] virtio-fs: add ftrace events
+Subject: [Virtio-fs] [PATCH 2/2][RFC] virtio-fs: add tracepoints
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -26,220 +26,94 @@ Cc: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
 From: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
-Introduce the following ftrace events. 
+Add tracepoint to the following function. It will be useful
+to debug the I/O request flow.
 
-  - virtiofs_request_dispatched
-  - virtiofs_request_done
-  - virtiofs_hiprio_request_dispatched
-  - virtiofs_hiprio_request_done
+  - virtio_fs_enqueue_req
+  - virtio_fs_requests_done_work
+  - virtio_fs_hiprio_dispatch_work
+  - virtio_fs_hiprio_done_work
+
+Example of the trace record:
+
+  cat-1420        [002] .... 34.687462: virtiofs_request_dispatched: opcode
+      FUSE_READ unique 0x1a nodeid 0x2 in.len 80 flags ISREPLY|WAITING|SENT
+      notify 1
+  kworker/4:1-67  [004] .... 34.687531: virtiofs_request_done: opcode FUSE_READ
+      unique 0x1a nodeid 0x2 in.len 80 flags ISREPLY|WAITING
 
 Signed-off-by: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 ---
- include/trace/events/virtiofs.h | 195 ++++++++++++++++++++++++++++++++
- 1 file changed, 195 insertions(+)
- create mode 100644 include/trace/events/virtiofs.h
+ fs/fuse/virtio_fs.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/include/trace/events/virtiofs.h b/include/trace/events/virtiofs.h
-new file mode 100644
-index 000000000..50269d7de
---- /dev/null
-+++ b/include/trace/events/virtiofs.h
-@@ -0,0 +1,195 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+#undef TRACE_SYSTEM
-+#define TRACE_SYSTEM virtiofs
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index 558d090af..611da2765 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -14,6 +14,9 @@
+ #include <linux/delay.h>
+ #include "fuse_i.h"
+ 
++#define CREATE_TRACE_POINTS
++#include <trace/events/virtiofs.h>
 +
-+#if !defined(_TRACE_VIRTIOFS_H) || defined(TRACE_HEADER_MULTI_READ)
-+#define _TRACE_VIRTIOFS_H
+ /* List of virtio-fs device instances and a lock for the list */
+ static DEFINE_MUTEX(virtio_fs_mutex);
+ static LIST_HEAD(virtio_fs_instances);
+@@ -175,6 +178,7 @@ static void virtio_fs_hiprio_done_work(struct work_struct *work)
+ 	struct virtio_fs_vq *fsvq = container_of(work, struct virtio_fs_vq,
+ 						 done_work);
+ 	struct virtqueue *vq = fsvq->vq;
++	struct virtio_fs_forget *forget;
+ 
+ 	/* Free completed FUSE_FORGET requests */
+ 	spin_lock(&fsvq->lock);
+@@ -185,6 +189,10 @@ static void virtio_fs_hiprio_done_work(struct work_struct *work)
+ 		virtqueue_disable_cb(vq);
+ 
+ 		while ((req = virtqueue_get_buf(vq, &len)) != NULL) {
++			forget = (struct virtio_fs_forget *)req;
++			trace_virtiofs_hiprio_request_done(
++				forget->ih.opcode, forget->ih.unique,
++				forget->ih.nodeid, forget->ih.len);
+ 			kfree(req);
+ 			fsvq->in_flight--;
+ 		}
+@@ -251,6 +259,11 @@ static void virtio_fs_hiprio_dispatch_work(struct work_struct *work)
+ 		notify = virtqueue_kick_prepare(vq);
+ 		spin_unlock(&fsvq->lock);
+ 
++		trace_virtiofs_hiprio_request_dispatched(
++			forget->ih.opcode, forget->ih.unique,
++			forget->ih.nodeid, forget->ih.len,
++			notify);
 +
-+#include <linux/tracepoint.h>
-+#include <uapi/linux/fuse.h>
+ 		if (notify)
+ 			virtqueue_notify(vq);
+ 		pr_debug("worker virtio_fs_hiprio_dispatch_work() dispatched one forget request.\n");
+@@ -364,6 +377,10 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
+ 		list_del_init(&req->list);
+ 		spin_unlock(&fpq->lock);
+ 
++		trace_virtiofs_request_done(
++			req->in.h.opcode, req->in.h.unique,
++			req->in.h.nodeid, req->in.h.len, req->flags);
 +
-+#define fuse_opcode_name(opcode)	{ opcode, #opcode }
-+#define show_opcode_name(val)				\
-+	__print_symbolic(val,				\
-+		fuse_opcode_name(FUSE_LOOKUP),		\
-+		fuse_opcode_name(FUSE_FORGET),		\
-+		fuse_opcode_name(FUSE_GETATTR),		\
-+		fuse_opcode_name(FUSE_SETATTR),		\
-+		fuse_opcode_name(FUSE_READLINK),	\
-+		fuse_opcode_name(FUSE_SYMLINK),		\
-+		fuse_opcode_name(FUSE_MKNOD),		\
-+		fuse_opcode_name(FUSE_MKDIR),		\
-+		fuse_opcode_name(FUSE_UNLINK),		\
-+		fuse_opcode_name(FUSE_RMDIR),		\
-+		fuse_opcode_name(FUSE_RENAME),		\
-+		fuse_opcode_name(FUSE_LINK),		\
-+		fuse_opcode_name(FUSE_OPEN),		\
-+		fuse_opcode_name(FUSE_READ),		\
-+		fuse_opcode_name(FUSE_WRITE),		\
-+		fuse_opcode_name(FUSE_STATFS),		\
-+		fuse_opcode_name(FUSE_RELEASE),		\
-+		fuse_opcode_name(FUSE_FSYNC),		\
-+		fuse_opcode_name(FUSE_SETXATTR),	\
-+		fuse_opcode_name(FUSE_GETXATTR),	\
-+		fuse_opcode_name(FUSE_LISTXATTR),	\
-+		fuse_opcode_name(FUSE_REMOVEXATTR),	\
-+		fuse_opcode_name(FUSE_FLUSH),		\
-+		fuse_opcode_name(FUSE_INIT),		\
-+		fuse_opcode_name(FUSE_OPENDIR),		\
-+		fuse_opcode_name(FUSE_READDIR),		\
-+		fuse_opcode_name(FUSE_RELEASEDIR),	\
-+		fuse_opcode_name(FUSE_FSYNCDIR),	\
-+		fuse_opcode_name(FUSE_GETLK),		\
-+		fuse_opcode_name(FUSE_SETLK),		\
-+		fuse_opcode_name(FUSE_SETLKW),		\
-+		fuse_opcode_name(FUSE_ACCESS),		\
-+		fuse_opcode_name(FUSE_CREATE),		\
-+		fuse_opcode_name(FUSE_INTERRUPT),	\
-+		fuse_opcode_name(FUSE_BMAP),		\
-+		fuse_opcode_name(FUSE_DESTROY),		\
-+		fuse_opcode_name(FUSE_IOCTL),		\
-+		fuse_opcode_name(FUSE_POLL),		\
-+		fuse_opcode_name(FUSE_NOTIFY_REPLY),	\
-+		fuse_opcode_name(FUSE_BATCH_FORGET),	\
-+		fuse_opcode_name(FUSE_FALLOCATE),	\
-+		fuse_opcode_name(FUSE_READDIRPLUS),	\
-+		fuse_opcode_name(FUSE_RENAME2),		\
-+		fuse_opcode_name(FUSE_LSEEK),		\
-+		fuse_opcode_name(FUSE_COPY_FILE_RANGE),	\
-+		fuse_opcode_name(FUSE_SETUPMAPPING),	\
-+		fuse_opcode_name(FUSE_REMOVEMAPPING))
+ 		fuse_request_end(fc, req);
+ 	}
+ }
+@@ -914,6 +931,10 @@ static int virtio_fs_enqueue_req(struct virtqueue *vq, struct fuse_req *req)
+ 
+ 	spin_unlock(&fsvq->lock);
+ 
++	trace_virtiofs_request_dispatched(
++		req->in.h.opcode, req->in.h.unique,
++		req->in.h.nodeid, req->in.h.len, req->flags, notify);
 +
-+#define show_req_flag(flags) __print_flags(flags, "|",	\
-+	{ (1UL << FR_ISREPLY),		"ISREPLY"},	\
-+	{ (1UL << FR_FORCE),		"FORCE"},	\
-+	{ (1UL << FR_BACKGROUND),	"BACKGROUND"},	\
-+	{ (1UL << FR_WAITING),		"WAITING"},	\
-+	{ (1UL << FR_ABORTED),		"ABORTED"},	\
-+	{ (1UL << FR_INTERRUPTED),	"INTERRUPTED"},	\
-+	{ (1UL << FR_LOCKED),		"LOCKED"},	\
-+	{ (1UL << FR_PENDING),		"PENDING"},	\
-+	{ (1UL << FR_SENT),		"SENT"},	\
-+	{ (1UL << FR_FINISHED),		"FINISHED"},	\
-+	{ (1UL << FR_PRIVATE),		"PRIVATE"})
-+
-+TRACE_EVENT(virtiofs_request_dispatched,
-+
-+	TP_PROTO(uint32_t opcode, uint64_t unique, uint64_t nodeid,
-+		uint32_t inlen, unsigned long flags, bool notify),
-+
-+	TP_ARGS(opcode, unique, nodeid, inlen, flags, notify),
-+
-+	TP_STRUCT__entry(
-+		__field(uint32_t,	opcode)
-+		__field(uint64_t,	unique)
-+		__field(uint64_t,	nodeid)
-+		__field(uint32_t,	inlen)
-+		__field(unsigned long,	flags)
-+		__field(bool,		notify)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->opcode	=	opcode;
-+		__entry->unique	=	unique;
-+		__entry->nodeid	=	nodeid;
-+		__entry->inlen	=	inlen;
-+		__entry->flags	=	flags;
-+		__entry->notify	=	notify;
-+	),
-+
-+	TP_printk("opcode %s unique %#llx nodeid %#llx in.len %u flags %s notify %d\n",
-+			show_opcode_name(__entry->opcode),
-+			__entry->unique, __entry->nodeid,
-+			__entry->inlen, show_req_flag(__entry->flags),
-+			__entry->notify)
-+);
-+
-+TRACE_EVENT(virtiofs_request_done,
-+
-+	TP_PROTO(uint32_t opcode, uint64_t unique, uint64_t nodeid,
-+		uint32_t inlen, unsigned long flags),
-+
-+	TP_ARGS(opcode, unique, nodeid, inlen, flags),
-+
-+	TP_STRUCT__entry(
-+		__field(uint32_t,	opcode)
-+		__field(uint64_t,	unique)
-+		__field(uint64_t,	nodeid)
-+		__field(uint32_t,	inlen)
-+		__field(unsigned long,	flags)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->opcode	=	opcode;
-+		__entry->unique	=	unique;
-+		__entry->nodeid	=	nodeid;
-+		__entry->inlen	=	inlen;
-+		__entry->flags	=	flags;
-+	),
-+
-+	TP_printk("opcode %s unique %#llx nodeid %#llx in.len %u flags %s\n",
-+			show_opcode_name(__entry->opcode),
-+			__entry->unique, __entry->nodeid,
-+			__entry->inlen, show_req_flag(__entry->flags))
-+);
-+
-+TRACE_EVENT(virtiofs_hiprio_request_dispatched,
-+
-+	TP_PROTO(uint32_t opcode, uint64_t unique, uint64_t nodeid,
-+		uint32_t inlen, bool notify),
-+
-+	TP_ARGS(opcode, unique, nodeid, inlen, notify),
-+
-+	TP_STRUCT__entry(
-+		__field(uint32_t,	opcode)
-+		__field(uint64_t,	unique)
-+		__field(uint64_t,	nodeid)
-+		__field(uint32_t,	inlen)
-+		__field(bool,		notify)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->opcode	=	opcode;
-+		__entry->unique	=	unique;
-+		__entry->nodeid	=	nodeid;
-+		__entry->inlen	=	inlen;
-+		__entry->notify	=	notify;
-+	),
-+
-+	TP_printk("opcode %s unique %#llx nodeid %#llx in.len %u notify %d\n",
-+			show_opcode_name(__entry->opcode),
-+			__entry->unique, __entry->nodeid,
-+			__entry->inlen,  __entry->notify)
-+);
-+
-+TRACE_EVENT(virtiofs_hiprio_request_done,
-+
-+	TP_PROTO(uint32_t opcode, uint64_t unique, uint64_t nodeid,
-+		uint32_t inlen),
-+
-+	TP_ARGS(opcode, unique, nodeid, inlen),
-+
-+	TP_STRUCT__entry(
-+		__field(uint32_t,	opcode)
-+		__field(uint64_t,	unique)
-+		__field(uint64_t,	nodeid)
-+		__field(uint32_t,	inlen)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->opcode	=	opcode;
-+		__entry->unique	=	unique;
-+		__entry->nodeid	=	nodeid;
-+		__entry->inlen	=	inlen;
-+	),
-+
-+	TP_printk("opcode %s unique %#llx nodeid %#llx in.len %u\n",
-+			show_opcode_name(__entry->opcode),
-+			__entry->unique, __entry->nodeid,
-+			__entry->inlen)
-+);
-+
-+#endif /* _TRACE_VIRTIOFS_H */
-+
-+/* This part must be outside protection */
-+#include <trace/define_trace.h>
+ 	if (notify)
+ 		virtqueue_notify(vq);
+ 
 -- 
 2.18.1
 

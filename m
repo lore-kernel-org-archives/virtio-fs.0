@@ -1,14 +1,14 @@
-References: <5D3F8F04.3030404@huawei.com>
-From: Eric Blake <eblake@redhat.com>
-Message-ID: <4ec43f2f-1d72-5fe1-3b93-2c75ee6f87b4@redhat.com>
-Date: Tue, 30 Jul 2019 08:28:57 -0500
+Date: Tue, 30 Jul 2019 11:30:41 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190730153041.GA3109@redhat.com>
+References: <1562884542-72462-1-git-send-email-bo.liu@linux.alibaba.com>
 MIME-Version: 1.0
-In-Reply-To: <5D3F8F04.3030404@huawei.com>
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature";
-	boundary="G4wL2rF1o6vpwhEDCMPunA4sSWwLrOu2n"
-Subject: Re: [Virtio-fs] [Qemu-devel] [PATCH] virtiofsd: fix compile error
- if 'F_OFD_GETLK' not defined
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+In-Reply-To: <1562884542-72462-1-git-send-email-bo.liu@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH] Virtiofs: fix null pointer deference in
+ directIO
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,95 +17,126 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>, virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Liu Bo <bo.liu@linux.alibaba.com>
+Cc: virtio-fs@redhat.com
 
-This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
---G4wL2rF1o6vpwhEDCMPunA4sSWwLrOu2n
-Content-Type: multipart/mixed; boundary="jySfH6if46EYLNKEEZbVY2a8IdMEQcgDX";
-	protected-headers="v1"
-From: Eric Blake <eblake@redhat.com>
-To: piaojun <piaojun@huawei.com>, virtio-fs@redhat.com, qemu-devel@nongnu.org
-Message-ID: <4ec43f2f-1d72-5fe1-3b93-2c75ee6f87b4@redhat.com>
-Subject: Re: [Qemu-devel] [PATCH] virtiofsd: fix compile error if
-	'F_OFD_GETLK' not defined
-References: <5D3F8F04.3030404@huawei.com>
-In-Reply-To: <5D3F8F04.3030404@huawei.com>
+Hi Liu Bo,
 
---jySfH6if46EYLNKEEZbVY2a8IdMEQcgDX
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
-Content-Transfer-Encoding: quoted-printable
+I have committed your patch for now here.
 
-On 7/29/19 7:27 PM, piaojun wrote:
-> Use F_GETLK for fcntl when F_OFD_GETLK not defined.
+https://github.com/rhvgoyal/linux/commits/virtio-fs-dev-5.1
 
-Which system are you hitting this problem on?
+I also added a patch to wait for page reference count to drop to 1 before
+range is reclaimed. It slows down mmap() workload very significantly
+though.
 
-The problem with F_GETLK is that it is NOT as safe as F_OFD_GETLK.
+Right now dmap reference patches are not there. This branch is still WIP
+and once I have done more testing and possible dax optimization, I will
+look into re-applying dmap reference changes on top of it and see if
+it can be done reasonably without breaking other things.
 
-We already have fcntl_op_getlk and qemu_probe_lock_ops() in util/osdep.c
-to not only determine which form to use, but also to emit a warning to
-the end user if we had to fall back to the unsafe F_GETLK. Why is your
-code not reusing that logic?
+Will be good if you give this branch a try.
 
+Thanks
+Vivek
+
+On Fri, Jul 12, 2019 at 06:35:42AM +0800, Liu Bo wrote:
+> Virtiofs has used memremap to create page structs for its managed memory
+> and set pagemap's type to MEMORY_DEVICE_FS_DAX.  Thus, the page from
+> virtiofs's managed memory is a ZONE_DEVICE page, if %devmap_managed_key
+> was enabled by pmem drivers, put_page() will run into
+> __put_devmap_managed_page().  However, as page_free ops is not defined, it
+> ends up with a NULL pointer dereference.
 >=20
-> Signed-off-by: Jun Piao <piaojun@huawei.com>
+> As virtiofs presents its managed memory range as a dax device, this patch
+> makes virtiofs mimic how nvdimm/pmem.c setups pagemap fsdax.
+>=20
+> =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+>=20
+> [ 1223.732964] BUG: unable to handle kernel NULL pointer dereference at 0=
+000000000000000
+> [ 1223.733043] PGD 800000026bd91067 P4D 800000026bd91067 PUD 27631e067 PM=
+D 0
+> [ 1223.733085] Oops: 0010 [#1] SMP PTI
+> [ 1223.733114] CPU: 1 PID: 16505 Comm: build Not tainted 4.19.48-dff9509 =
+#1
+> [ 1223.733157] RIP: 0010:=A0 =A0 =A0 =A0 =A0 (null)
+> [ 1223.733179] Code: Bad RIP value.
+> ..
+> [ 1223.733671] Call Trace:
+> [ 1223.733704]=A0 fuse_release_user_pages+0xad/0xb0
+> [ 1223.733751]=A0 fuse_direct_io+0x3ec/0x6a0
+> [ 1223.733823]=A0 fuse_dax_direct_write+0x3c/0x70
+> [ 1223.733863]=A0 fuse_file_write_iter+0x2ea/0x4c0
+> [ 1223.733978]=A0 __vfs_write+0xde/0x160
+> [ 1223.734009]=A0 vfs_write+0xab/0x190
+> [ 1223.734061]=A0 ksys_write+0x45/0xc0
+> [ 1223.734094]=A0 do_syscall_64+0x6b/0x330
+> [ 1223.734214]=A0 entry_SYSCALL_64_after_hwframe+0x44/0xa9
+> [ 1223.734261] RIP: 0033:0x15536bcddfd0
+>=20
+> The reproducer could be as simply as,
+>=20
+> addr =3D mmap(..., fileA, ...);
+> fdB =3D open(fileB, O_DIRECT);
+> write(fdB, addr);
+>=20
+> Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
 > ---
->  contrib/virtiofsd/passthrough_ll.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
+>  fs/fuse/virtio_fs.c | 26 +++++++++++++++++++++++++-
+>  1 file changed, 25 insertions(+), 1 deletion(-)
 >=20
-> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/pas=
-sthrough_ll.c
-> index 9ae1381..757785b 100644
-> --- a/contrib/virtiofsd/passthrough_ll.c
-> +++ b/contrib/virtiofsd/passthrough_ll.c
-> @@ -1619,7 +1619,11 @@ static void lo_getlk(fuse_req_t req, fuse_ino_t =
-ino,
->  		return;
->  	}
+> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> index 05ea28c..9b3f2e9 100644
+> --- a/fs/fuse/virtio_fs.c
+> +++ b/fs/fuse/virtio_fs.c
+> @@ -538,6 +538,28 @@ static void virtio_fs_cleanup_dax(void *data)
+>  	put_dax(fs->dax_dev);
+>  }
+> =20
+> +static void virtio_fs_release_pgmap_ops(void *_pgmap)
+> +{
+> +	dev_pagemap_put_ops();
+> +}
+> +
+> +static void virtio_fs_fsdax_pagefree(struct page *page, void *data)
+> +{
+> +	wake_up_var(&page->_refcount);
+> +}
+> +
+> +static int virtio_fs_setup_pagemap_fsdax(struct device *dev,
+> +					 struct dev_pagemap *pgmap)
+> +{
+> +	dev_pagemap_get_ops();
+> +	if (devm_add_action_or_reset(dev, virtio_fs_release_pgmap_ops, pgmap))
+> +		return -ENOMEM;
+> +	pgmap->type =3D MEMORY_DEVICE_FS_DAX;
+> +	pgmap->page_free =3D virtio_fs_fsdax_pagefree;
+> +
+> +	return 0;
+> +}
+> +
+>  static int virtio_fs_setup_dax(struct virtio_device *vdev, struct virtio=
+_fs *fs)
+>  {
+>  	struct virtio_shm_region cache_reg, journal_reg, vertab_reg;
+> @@ -600,7 +622,9 @@ static int virtio_fs_setup_dax(struct virtio_device *=
+vdev, struct virtio_fs *fs)
+>  	pgmap->altmap_valid =3D false;
+>  	pgmap->ref =3D &mi->ref;
+>  	pgmap->kill =3D virtio_fs_percpu_kill;
+> -	pgmap->type =3D MEMORY_DEVICE_FS_DAX;
+> +
+> +	if (virtio_fs_setup_pagemap_fsdax(&vdev->dev, pgmap))
+> +		return -ENOMEM;
+> =20
+>  	/* Ideally we would directly use the PCI BAR resource but
+>  	 * devm_memremap_pages() wants its own copy in pgmap.  So
+> --=20
+> 1.8.3.1
 >=20
-> +#ifdef F_OFD_GETLK
->  	ret =3D fcntl(plock->fd, F_OFD_GETLK, lock);
-> +#else
-> +	ret =3D fcntl(plock->fd, F_GETLK, lock);
-> +#endif
-
-Hmm. Since this is in contrib, you are trying to compile something that
-is independent of util/osdep.c (at least, I assume that's the case, as
-contrib/virtiofsd/ is not even part of qemu.git master yet - in which
-case, why is this not being squashed in to the patch introducing that
-file, rather than sent standalone).  On the other hand, that raises the
-question - who is trying to use virtiofsd on a kernel that is too old to
-provid F_OFD_GETLK?  Isn't the whole point of virtiofsd to be speeding
-up modern usage, at which point an old kernel is just gumming up the
-works?  It seems like you are better off letting compilation fail on a
-system that is too old to support decent F_OFD_GETLK, rather than
-silently falling back to something that is unsafe.
-
---=20
-Eric Blake, Principal Software Engineer
-Red Hat, Inc.           +1-919-301-3226
-Virtualization:  qemu.org | libvirt.org
-
-
---jySfH6if46EYLNKEEZbVY2a8IdMEQcgDX--
-
---G4wL2rF1o6vpwhEDCMPunA4sSWwLrOu2n
-Content-Type: application/pgp-signature; name="signature.asc"
-Content-Description: OpenPGP digital signature
-Content-Disposition: attachment; filename="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEccLMIrHEYCkn0vOqp6FrSiUnQ2oFAl1ARhkACgkQp6FrSiUn
-Q2rs9wgAqMSwVxi/vv9H+ERxszJDYt/TV+N1VBrB9Od43A61XiwxFy5gyTzp3yvn
-1rUnz522LlXars9vD1wVsQYhbGgKn//UlAsJtpSZ4nwDZ+sJy2M2yHjvokveM1nM
-nVmwszfYjwBsyH57a1OcKgO7POi7etJuInCBrFIjg9ZLVlqSTiXDV97MM31LB9Vr
-Z6fjdHH12Za1BBhQh2yNpQmH0kzhhnXlOAyb2d1WSOMwk3bvF1QTFQNOIqiatIpL
-da9FOzwBH+tqTyixNCDPuQMJ0OMExQQlItJJn/Q7C9CajY3P9MBnxx8EsCz6n74e
-sjw8pQBZm1QV3OXbSKLsfp39I7GmGQ==
-=m/4i
------END PGP SIGNATURE-----
-
---G4wL2rF1o6vpwhEDCMPunA4sSWwLrOu2n--
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 

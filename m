@@ -1,7 +1,25 @@
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Date: Tue, 30 Jul 2019 13:51:12 +0800
-Message-Id: <1564465872-60404-1-git-send-email-bo.liu@linux.alibaba.com>
-Subject: [Virtio-fs] [PATCH] virtiofs: reduce lock contention on fpq->lock
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
+	h=subject : to :
+	references : from : message-id : date : mime-version : in-reply-to :
+	content-type : content-transfer-encoding; s=corp-2018-07-02;
+	bh=TdL8lYAbo8VRfghnHW9UAHDiOlDzL3xO1gRPLcN8n58=;
+	b=mdmf6V358bPDUopEO9NVonUYx6XwfPFfoZ1sZEii9FJz6a4k646Pr2iEOlGYopsZQlgQ
+	siIzHB10d5GSfAd6wRTVpMbZqPxtM0fyGvSYkTy45e7jBMK67NPCC8Hj1wLX6LkRBMaU
+	0I03vTwsLDsMD69eTX0FErFQ30tfinFJLqP3yakya9v9oOtttnkvcflJ3hBwkqGk8Isl
+	MBNMbuLVuuxNx3Q0worQmIMv3M4Ctlu482x91Vcem8xNDyth8MFj2MjW0VSDl0aR1LPe
+	JkzS/ZIAUqjqJjolYGcDIFmP/6LiQbZyMYb0V5PQzMXHX5dHXibETsik1w1bUAdlc9uS
+	kQ== 
+References: <5D3F8F04.3030404@huawei.com>
+From: Liam Merwick <liam.merwick@oracle.com>
+Message-ID: <8748798a-ac4f-4c0a-96fa-190e24dca52b@oracle.com>
+Date: Tue, 30 Jul 2019 13:22:56 +0100
+MIME-Version: 1.0
+In-Reply-To: <5D3F8F04.3030404@huawei.com>
+Content-Type: text/plain; charset=utf-8; format=flowed
+Content-Language: en-GB
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [Qemu-devel] [PATCH] virtiofsd: fix compile error
+ if 'F_OFD_GETLK' not defined
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -10,66 +28,59 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: piaojun <piaojun@huawei.com>, virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-Right now within virtio_fs_requests_done_work(), virtqueue is protected by
-both fsvq->lock and fpq->lock for processing both virtqueue and
-fpq->processing_list, however, it is fine for them to be protected
-separately.
+On 30/07/2019 01:27, piaojun wrote:
+> Use F_GETLK for fcntl when F_OFD_GETLK not defined.
 
-Also since %req has been removed from fpq->processing_list, no one except
-request_wait_answer() is looking at this %req and request_wait_answer()
-waits only on FINISH flag, it's OK to remove fpq->lock after %req is
-dropped from the list.
 
-Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
----
- fs/fuse/virtio_fs.c | 13 ++++++-------
- 1 file changed, 6 insertions(+), 7 deletions(-)
+Use F_GETLK/F_SETLK for fcntl when F_OFD_GETLK/F_OFD_SETLK not defined.
 
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 9b3f2e9..d88bb6c 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -347,21 +347,22 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
- 
- 	/* Collect completed requests off the virtqueue */
- 	spin_lock(&fsvq->lock);
--	/* grab fpq->lock as req is on fpq->processing list */
--	spin_lock(&fpq->lock);
- 	do {
- 		unsigned len;
- 
- 		virtqueue_disable_cb(vq);
- 
- 		while ((req = virtqueue_get_buf(vq, &len)) != NULL) {
-+			/* grab fpq->lock as req is on fpq->processing list */
-+			spin_lock(&fpq->lock);
-+
- 			/* If !connected, req is freed by fuse_abort_conn. */
--			if (fpq->connected) {
-+			if (fpq->connected)
- 				list_move_tail(&req->list, &reqs);
--			}
-+
-+			spin_unlock(&fpq->lock);
- 		}
- 	} while (!virtqueue_enable_cb(vq) && likely(!virtqueue_is_broken(vq)));
--	spin_unlock(&fpq->lock);
- 	spin_unlock(&fsvq->lock);
- 
- 	/* End requests */
-@@ -373,10 +374,8 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
- 
- 		/* TODO zeroing? */
- 
--		spin_lock(&fpq->lock);
- 		clear_bit(FR_SENT, &req->flags);
- 		list_del_init(&req->list);
--		spin_unlock(&fpq->lock);
- 
- 		fuse_request_end(fc, req);
- 	}
--- 
-1.8.3.1
+> 
+> Signed-off-by: Jun Piao <piaojun@huawei.com>
+> ---
+>   contrib/virtiofsd/passthrough_ll.c | 9 +++++++++
+>   1 file changed, 9 insertions(+)
+> 
+> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+> index 9ae1381..757785b 100644
+> --- a/contrib/virtiofsd/passthrough_ll.c
+> +++ b/contrib/virtiofsd/passthrough_ll.c
+> @@ -1619,7 +1619,11 @@ static void lo_getlk(fuse_req_t req, fuse_ino_t ino,
+>   		return;
+>   	}
+> 
+> +#ifdef F_OFD_GETLK
+>   	ret = fcntl(plock->fd, F_OFD_GETLK, lock);
+> +#else
+> +	ret = fcntl(plock->fd, F_GETLK, lock);
+> +#endif
+>   	if (ret == -1)
+>   		saverr = errno;
+>   	pthread_mutex_unlock(&inode->plock_mutex);
+> @@ -1668,7 +1672,12 @@ static void lo_setlk(fuse_req_t req, fuse_ino_t ino,
+> 
+>   	/* TODO: Is it alright to modify flock? */
+>   	lock->l_pid = 0;
+> +
+> +#ifdef F_OFD_GETLK
+
+
+This checks for F_OFD_GETLK but uses F_OFD_SETLK (albeit unlikely one 
+being defined without the other)
+
+
+>   	ret = fcntl(plock->fd, F_OFD_SETLK, lock);
+> +#else
+> +	ret = fcntl(plock->fd, F_SETLK, lock);
+> +#endif
+>   	if (ret == -1) {
+>   		saverr = errno;
+>   	}
+>
+Might qemu_lock_fd()/qemu_unlock_fd() in util/osdep.c be useful to hide 
+this instead?
+
+Regards,
+Liam
 

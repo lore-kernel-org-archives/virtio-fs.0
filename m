@@ -1,13 +1,15 @@
-Date: Wed, 31 Jul 2019 11:34:08 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190731103408.GB3203@work-vm>
-References: <20190726082131.6739-1-stefanha@redhat.com>
+Date: Wed, 31 Jul 2019 08:39:38 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190731123938.GA4405@redhat.com>
+References: <1562884542-72462-1-git-send-email-bo.liu@linux.alibaba.com>
+	<20190730153041.GA3109@redhat.com>
+	<20190730222938.ipnojus4euucg4yj@US-160370MP2.local>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190726082131.6739-1-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] init/do_mounts.c: add virtio_fs root fs
- support
+In-Reply-To: <20190730222938.ipnojus4euucg4yj@US-160370MP2.local>
+Subject: Re: [Virtio-fs] [PATCH] Virtiofs: fix null pointer deference in
+ directIO
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,54 +18,40 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
+To: Liu Bo <bo.liu@linux.alibaba.com>
+Cc: virtio-fs@redhat.com
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> It is useful to mount the root file system via virtio_fs.  During
-> testing a monolithic kernel is more convenient than an initramfs but
-> we'll need to teach the kernel how to boot directly from virtio_fs.
+On Tue, Jul 30, 2019 at 03:29:39PM -0700, Liu Bo wrote:
+> On Tue, Jul 30, 2019 at 11:30:41AM -0400, Vivek Goyal wrote:
+> > Hi Liu Bo,
+> > 
+> > I have committed your patch for now here.
+> > 
+> > https://github.com/rhvgoyal/linux/commits/virtio-fs-dev-5.1
+> > 
+> > I also added a patch to wait for page reference count to drop to 1 before
+> > range is reclaimed. It slows down mmap() workload very significantly
+> > though.
+> >
 > 
-> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-> ---
->  init/do_mounts.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+> Yes, the impact on mmap is expected because of the 'unmap' in layout checking,
+> it'd be helpful to check layout on the dmap range instead of the whole inode.
 > 
-> diff --git a/init/do_mounts.c b/init/do_mounts.c
-> index f8c230c77035..b2d9650488d7 100644
-> --- a/init/do_mounts.c
-> +++ b/init/do_mounts.c
-> @@ -553,6 +553,16 @@ void __init mount_root(void)
->  			change_floppy("root floppy");
->  	}
->  #endif
-> +#ifdef CONFIG_VIRTIO_FS
-> +	if (root_fs_names && !strcmp(root_fs_names, "virtio_fs")) {
-> +		if (!do_mount_root(root_device_name, "virtio_fs",
-> +				   root_mountflags, root_mount_data))
-> +			return;
-> +
-> +		panic("VFS: Unable to mount root fs \"%s\" from virtio_fs",
-> +		      root_device_name);
-> +	}
-> +#endif
+> However, there is a race bug in the current code between mmap workloads and dmap
+> reclaim, since the reclaim does not unmap the dmap range at all, such that the
+> dmap range might still stay in some process's page table, if such a dmap is
+> reclaimed, the situation would be worse.  So with unmapping the whole inode in
+> layout checking, at least it is correct in term of that race.
 
-I wonder if it's possible to make this more generic; I see that
-filesystems have a flag, FS_REQUIRES_DEV - should this
-work for most filesystems that don't have that set?
+Can you elaborate more on this. I am not sure I am able to see the race
+you are talking about. Assume we implemented logic to unmap only pages
+which are in dmap (and not whole inode).
 
-Dave
+dmap is something internal to virtio-fs. If we unmap all pages which are
+in a dmap, then dmap is free to be reclaimed. We are holding fi->i_mmap_sem,
+and that should make sure that unmapped pages don't get mapped again (page
+fault code will block on fi->i_mmap_sem).
 
->  #ifdef CONFIG_BLOCK
->  	{
->  		int err = create_dev("/dev/root", ROOT_DEV);
-> -- 
-> 2.21.0
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+Thanks
+Vivek
 

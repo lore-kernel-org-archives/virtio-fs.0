@@ -1,15 +1,14 @@
-Date: Wed, 31 Jul 2019 15:59:05 +0100
+Date: Wed, 31 Jul 2019 16:04:43 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190731145905.GB7363@stefanha-x1.localdomain>
-References: <20190726082131.6739-1-stefanha@redhat.com>
-	<20190731103408.GB3203@work-vm>
+Message-ID: <20190731150443.GC7363@stefanha-x1.localdomain>
+References: <20190730215000.15660-1-msys.mizuma@gmail.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="xXmbgvnjoT4axfJE"
+	protocol="application/pgp-signature"; boundary="p2kqVDKq5asng8Dg"
 Content-Disposition: inline
-In-Reply-To: <20190731103408.GB3203@work-vm>
-Subject: Re: [Virtio-fs] [PATCH] init/do_mounts.c: add virtio_fs root fs
- support
+In-Reply-To: <20190730215000.15660-1-msys.mizuma@gmail.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Add gettimeofday to the seccomp
+ whitelist
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,67 +17,67 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
+To: Masayoshi Mizuma <msys.mizuma@gmail.com>
+Cc: virtio-fs@redhat.com, Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
 
---xXmbgvnjoT4axfJE
+--p2kqVDKq5asng8Dg
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Wed, Jul 31, 2019 at 11:34:08AM +0100, Dr. David Alan Gilbert wrote:
-> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> > It is useful to mount the root file system via virtio_fs.  During
-> > testing a monolithic kernel is more convenient than an initramfs but
-> > we'll need to teach the kernel how to boot directly from virtio_fs.
-> >=20
-> > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-> > ---
-> >  init/do_mounts.c | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> >=20
-> > diff --git a/init/do_mounts.c b/init/do_mounts.c
-> > index f8c230c77035..b2d9650488d7 100644
-> > --- a/init/do_mounts.c
-> > +++ b/init/do_mounts.c
-> > @@ -553,6 +553,16 @@ void __init mount_root(void)
-> >  			change_floppy("root floppy");
-> >  	}
-> >  #endif
-> > +#ifdef CONFIG_VIRTIO_FS
-> > +	if (root_fs_names && !strcmp(root_fs_names, "virtio_fs")) {
-> > +		if (!do_mount_root(root_device_name, "virtio_fs",
-> > +				   root_mountflags, root_mount_data))
-> > +			return;
-> > +
-> > +		panic("VFS: Unable to mount root fs \"%s\" from virtio_fs",
-> > +		      root_device_name);
-> > +	}
-> > +#endif
+On Tue, Jul 30, 2019 at 05:50:00PM -0400, Masayoshi Mizuma wrote:
+> From: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 >=20
-> I wonder if it's possible to make this more generic; I see that
-> filesystems have a flag, FS_REQUIRES_DEV - should this
-> work for most filesystems that don't have that set?
+> When I run fsstress on the virtio filesystem, virtiofsd sometimes
+> exits abnormally because it receives SIGSYS.
+>=20
+> >From strace:
+>   195852 15:07:47.799331 read(8, "\1\0\0\0\0\0\0\0", 8) =3D 8 <0.000011>
+>   195852 15:07:47.799379 gettimeofday( <unfinished ...>
+>   195852 15:07:53.354340 <... gettimeofday resumed> <unfinished ...>) =3D=
+ ?
+>   195852 15:07:53.400243 +++ killed by SIGSYS (core dumped) +++
+>=20
+> That is because virtiofsd calls gettimeofday() system call but
+> the system call isn't in the seccomp whitelist.
+>=20
+> virtiofsd doesn't call gettimeofday() directly. glib library
+> function may call g_get_current_time() and g_get_current_time()
+> calls the system call.
+>=20
+> Add gettimeofday() to the seccomp whitelist.
+>=20
+> Signed-off-by: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+> ---
+>  contrib/virtiofsd/seccomp.c | 1 +
+>  1 file changed, 1 insertion(+)
 
-I don't know the answer.  We'll have to ask when upstreaming.
+Have you checked that your guest is using the vdso gettimeofday()
+implementation?  gettimeofday() is implemented in userspace without a
+syscall using vdso to improve performance.  If your guest isn't using it
+then performance will be worse.  (There is a fallback code path in the
+vdso that invokes the syscall but I'm not sure it is taken in normal
+cases.)
 
-Stefan
+The patch is fine though:
 
---xXmbgvnjoT4axfJE
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+
+--p2kqVDKq5asng8Dg
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1BrLkACgkQnKSrs4Gr
-c8jKOwgAhilW3R9aEuDiwH6RShjGnvowZFvDUWKBKI52dHydVWu1ReoDY/CBjaI7
-0tXLs5dAnRerDtC0lqc2s6atFVMHlSix6rgIdrNbJ7eLyxZpBO6z4sdNACwuw5l0
-XO0FPNe9C54SUUWYrkkq/zzMUGCceyKZ/YR3MD0ptaQ6kDJfpAVw1BeVU0FqDc9b
-SvIaze7BhE+f/yznVj82dlwyPhk9PZvO1KTYXqEIh+mZR+mK+ozgXJ8cRPypFVUY
-grHB26+modbnZiDtU4FcfOCs6YlHaVHZCtwfbx+QVh1ScSBSuuE2LP/Hc3WJ0hHe
-ZGrzG1KRBiFZRBJP5BueYdV+001rpw==
-=F7Gw
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1BrgsACgkQnKSrs4Gr
+c8iU3AgAmRUbiQAK41hT3sZ8lzwZgZcNISfw6bzvmKs5vRdLeOLwpoimA888Oyqs
+YmSZzs7zuOq/7/MLL27gNGBDnPOdyIzQSgFhjG1wXY6b1vGHC1fyNiJaHTPra0fS
+BozoUNWT0YpNM0SsKZSMHn0wFrUdKUHtYSp7w9tjJkXNppGqBmLg/NN8nOChAP8W
+6+njwtvOJ0C0GGsif4AX5FJISfcLjqwfTxiyp/GVDs+lbLpHyP91x5Dst2COLNrP
+YfYWKlCCq5Vv98lyHmQqE5+7E2L0r9Bc+/2YWGrOClU2pmyq9VGkFrtncbkiArH0
+nzWTgDUDB5SxFqoohntEz93ykjajeA==
+=w5q0
 -----END PGP SIGNATURE-----
 
---xXmbgvnjoT4axfJE--
+--p2kqVDKq5asng8Dg--
 

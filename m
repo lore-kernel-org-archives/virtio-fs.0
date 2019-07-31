@@ -1,15 +1,13 @@
-Date: Wed, 31 Jul 2019 08:39:38 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190731123938.GA4405@redhat.com>
-References: <1562884542-72462-1-git-send-email-bo.liu@linux.alibaba.com>
-	<20190730153041.GA3109@redhat.com>
-	<20190730222938.ipnojus4euucg4yj@US-160370MP2.local>
+Date: Wed, 31 Jul 2019 14:01:21 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20190731130121.GB22809@stefanha-x1.localdomain>
+References: <1558577194-61841-1-git-send-email-bo.liu@linux.alibaba.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="z6Eq5LdranGa6ru8"
 Content-Disposition: inline
-In-Reply-To: <20190730222938.ipnojus4euucg4yj@US-160370MP2.local>
-Subject: Re: [Virtio-fs] [PATCH] Virtiofs: fix null pointer deference in
- directIO
+In-Reply-To: <1558577194-61841-1-git-send-email-bo.liu@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: handle NULL dir in lo_do_lookup
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,37 +19,49 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: Liu Bo <bo.liu@linux.alibaba.com>
 Cc: virtio-fs@redhat.com
 
-On Tue, Jul 30, 2019 at 03:29:39PM -0700, Liu Bo wrote:
-> On Tue, Jul 30, 2019 at 11:30:41AM -0400, Vivek Goyal wrote:
-> > Hi Liu Bo,
-> > 
-> > I have committed your patch for now here.
-> > 
-> > https://github.com/rhvgoyal/linux/commits/virtio-fs-dev-5.1
-> > 
-> > I also added a patch to wait for page reference count to drop to 1 before
-> > range is reclaimed. It slows down mmap() workload very significantly
-> > though.
-> >
-> 
-> Yes, the impact on mmap is expected because of the 'unmap' in layout checking,
-> it'd be helpful to check layout on the dmap range instead of the whole inode.
-> 
-> However, there is a race bug in the current code between mmap workloads and dmap
-> reclaim, since the reclaim does not unmap the dmap range at all, such that the
-> dmap range might still stay in some process's page table, if such a dmap is
-> reclaimed, the situation would be worse.  So with unmapping the whole inode in
-> layout checking, at least it is correct in term of that race.
 
-Can you elaborate more on this. I am not sure I am able to see the race
-you are talking about. Assume we implemented logic to unmap only pages
-which are in dmap (and not whole inode).
+--z6Eq5LdranGa6ru8
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-dmap is something internal to virtio-fs. If we unmap all pages which are
-in a dmap, then dmap is free to be reclaimed. We are holding fi->i_mmap_sem,
-and that should make sure that unmapped pages don't get mapped again (page
-fault code will block on fi->i_mmap_sem).
+On Thu, May 23, 2019 at 10:06:34AM +0800, Liu Bo wrote:
+> Reported by fstests/generic/467.
+>=20
+> open_by_handle_at() called from fuse inside guest can carry fuse mount
+> point to daemon but lo_do_lookup() doesn't know its inode info because
+> it's out of fuse's scope, thus lo_inode(req, parent) ends up with
+> returning a NULL dir and breaks virtiofsd immediately.
+>=20
+> Note that it'd break applications that uses open_by_handle_at.
+>=20
+> It seems to me that nothing could be done to support open_by_handle_at in
+> this case.
+>=20
+> This simply tells fuse a ENOENT error so that open_by_handle_at() in guest
+> can get a ESTALE.
+>=20
+> Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+> ---
+>  contrib/virtiofsd/passthrough_ll.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 
-Thanks
-Vivek
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+
+--z6Eq5LdranGa6ru8
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1BkSEACgkQnKSrs4Gr
+c8gIrAf/SuEP+iwEe+MJ4WycHzMES9T/Eb/xhmxe9j41HYsZJjlQo4FWyObr1Y24
+/XZAv3LQskdc0grrdyghIWpE9nFyh7jvQyziaowJUaSfAphF/RIIppP31oV+W2UA
+jKLxlgjYXbIO1Dp7cw16WveA6f6CgAAK6acgwFSuHxjtT8tQ7CivMzOAwLP9i1bm
+zasN5FQyNIv8NbuD7vMwOy97kkEevMkFyhV3eMlwUNjGMWK05Ul063Mnj7Hb+QWA
+CWgVkSgDwtaxj4E3W95Aw1ZCeFWaoRcEp70fMznZcsISItjZG8iUiLoI00gDqT79
+k/CVFyb1DWmhf/m4mzdG1q1MrmMEhw==
+=u1yW
+-----END PGP SIGNATURE-----
+
+--z6Eq5LdranGa6ru8--
 

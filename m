@@ -1,14 +1,14 @@
-Date: Wed, 31 Jul 2019 17:29:41 +0100
+Date: Wed, 31 Jul 2019 17:50:46 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190731162941.GH3203@work-vm>
-References: <20190730215000.15660-1-msys.mizuma@gmail.com>
-	<20190731150443.GC7363@stefanha-x1.localdomain>
+Message-ID: <20190731165046.GI3203@work-vm>
+References: <20190726091103.23503-1-stefanha@redhat.com>
+	<20190726091103.23503-2-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190731150443.GC7363@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Add gettimeofday to the seccomp
- whitelist
+In-Reply-To: <20190726091103.23503-2-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 1/5] virtiofsd: skip unnecessary
+ vu_queue_get_avail_bytes()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,56 +18,64 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
 * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> On Tue, Jul 30, 2019 at 05:50:00PM -0400, Masayoshi Mizuma wrote:
-> > From: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
-> > 
-> > When I run fsstress on the virtio filesystem, virtiofsd sometimes
-> > exits abnormally because it receives SIGSYS.
-> > 
-> > >From strace:
-> >   195852 15:07:47.799331 read(8, "\1\0\0\0\0\0\0\0", 8) = 8 <0.000011>
-> >   195852 15:07:47.799379 gettimeofday( <unfinished ...>
-> >   195852 15:07:53.354340 <... gettimeofday resumed> <unfinished ...>) = ?
-> >   195852 15:07:53.400243 +++ killed by SIGSYS (core dumped) +++
-> > 
-> > That is because virtiofsd calls gettimeofday() system call but
-> > the system call isn't in the seccomp whitelist.
-> > 
-> > virtiofsd doesn't call gettimeofday() directly. glib library
-> > function may call g_get_current_time() and g_get_current_time()
-> > calls the system call.
-> > 
-> > Add gettimeofday() to the seccomp whitelist.
-> > 
-> > Signed-off-by: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
-> > ---
-> >  contrib/virtiofsd/seccomp.c | 1 +
-> >  1 file changed, 1 insertion(+)
+> When debug output is disabled there is no need to calculate the number
+> of in/out bytes available.
 > 
-> Have you checked that your guest is using the vdso gettimeofday()
-> implementation?  gettimeofday() is implemented in userspace without a
-> syscall using vdso to improve performance.  If your guest isn't using it
-> then performance will be worse.  (There is a fallback code path in the
-> vdso that invokes the syscall but I'm not sure it is taken in normal
-> cases.)
+> There is also no need to skip a request if there are 0 out bytes.  The
+> request parsing code already handles invalid requests.
 > 
-> The patch is fine though:
+> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+
+Thanks, I've squashed this in to existing commits.
+
+Dave
+
+> ---
+>  contrib/virtiofsd/fuse_virtio.c | 13 +++++--------
+>  1 file changed, 5 insertions(+), 8 deletions(-)
 > 
-> Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-
-Thanks,
-Applied.
-
-
-
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
-
+> diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
+> index 083e4fc317..d543c6d30f 100644
+> --- a/contrib/virtiofsd/fuse_virtio.c
+> +++ b/contrib/virtiofsd/fuse_virtio.c
+> @@ -507,18 +507,16 @@ static void *fv_queue_thread(void *opaque)
+>                 ret = pthread_rwlock_rdlock(&qi->virtio_dev->vu_dispatch_rwlock);
+>                 assert(ret == 0); /* there is no possible error case */
+>  
+> -               /* out is from guest, in is too guest */
+> -               unsigned int in_bytes, out_bytes;
+> -               vu_queue_get_avail_bytes(dev, q, &in_bytes, &out_bytes, ~0, ~0);
+> +               if (se->debug) {
+> +                       /* out is from guest, in is too guest */
+> +                       unsigned int in_bytes, out_bytes;
+> +                       vu_queue_get_avail_bytes(dev, q, &in_bytes, &out_bytes, ~0, ~0);
+>  
+> -               if (se->debug)
+>                         fuse_debug("%s: Queue %d gave evalue: %zx available: in: %u out: %u\n",
+>  				  __func__, qi->qidx, (size_t)evalue, in_bytes,
+>  				  out_bytes);
+> -
+> -               if (!out_bytes) {
+> -                       goto next;
+>                 }
+> +
+>                 while (1) {
+>                         bool allocated_bufv = false;
+>                         struct fuse_bufvec bufv;
+> @@ -708,7 +706,6 @@ static void *fv_queue_thread(void *opaque)
+>                         elem = NULL;
+>                  }
+>  
+> -next:
+>                  pthread_rwlock_unlock(&qi->virtio_dev->vu_dispatch_rwlock);
+>          }
+>          pthread_mutex_destroy(&ch.lock);
+> -- 
+> 2.21.0
+> 
 --
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

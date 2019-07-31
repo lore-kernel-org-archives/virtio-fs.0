@@ -1,14 +1,13 @@
-Date: Wed, 31 Jul 2019 17:50:46 +0100
+Date: Wed, 31 Jul 2019 17:56:33 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190731165046.GI3203@work-vm>
+Message-ID: <20190731165633.GJ3203@work-vm>
 References: <20190726091103.23503-1-stefanha@redhat.com>
-	<20190726091103.23503-2-stefanha@redhat.com>
+	<20190726091103.23503-4-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190726091103.23503-2-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 1/5] virtiofsd: skip unnecessary
- vu_queue_get_avail_bytes()
+In-Reply-To: <20190726091103.23503-4-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 3/5] virtiofsd: make lo_release() atomic
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,58 +20,52 @@ To: Stefan Hajnoczi <stefanha@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
 * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> When debug output is disabled there is no need to calculate the number
-> of in/out bytes available.
-> 
-> There is also no need to skip a request if there are 0 out bytes.  The
-> request parsing code already handles invalid requests.
+> Hold the lock across both lo_map_get() and lo_map_remove() to prevent
+> races between two FUSE_RELEASE requests.  In this case I don't see a
+> serious bug but it's safer to do things atomically.
 > 
 > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 
-Thanks, I've squashed this in to existing commits.
+OK, although I suspect there are lots of places the inode pointers 
+are passed without the lock, so it might not help much.
 
-Dave
+
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+
+
+and applied
 
 > ---
->  contrib/virtiofsd/fuse_virtio.c | 13 +++++--------
->  1 file changed, 5 insertions(+), 8 deletions(-)
+>  contrib/virtiofsd/passthrough_ll.c | 12 ++++++++----
+>  1 file changed, 8 insertions(+), 4 deletions(-)
 > 
-> diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
-> index 083e4fc317..d543c6d30f 100644
-> --- a/contrib/virtiofsd/fuse_virtio.c
-> +++ b/contrib/virtiofsd/fuse_virtio.c
-> @@ -507,18 +507,16 @@ static void *fv_queue_thread(void *opaque)
->                 ret = pthread_rwlock_rdlock(&qi->virtio_dev->vu_dispatch_rwlock);
->                 assert(ret == 0); /* there is no possible error case */
+> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+> index 277a17fc03..c1500e092d 100644
+> --- a/contrib/virtiofsd/passthrough_ll.c
+> +++ b/contrib/virtiofsd/passthrough_ll.c
+> @@ -1759,14 +1759,18 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+>  static void lo_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+>  {
+>  	struct lo_data *lo = lo_data(req);
+> -	int fd;
+> +	struct lo_map_elem *elem;
+> +	int fd = -1;
 >  
-> -               /* out is from guest, in is too guest */
-> -               unsigned int in_bytes, out_bytes;
-> -               vu_queue_get_avail_bytes(dev, q, &in_bytes, &out_bytes, ~0, ~0);
-> +               if (se->debug) {
-> +                       /* out is from guest, in is too guest */
-> +                       unsigned int in_bytes, out_bytes;
-> +                       vu_queue_get_avail_bytes(dev, q, &in_bytes, &out_bytes, ~0, ~0);
+>  	(void) ino;
 >  
-> -               if (se->debug)
->                         fuse_debug("%s: Queue %d gave evalue: %zx available: in: %u out: %u\n",
->  				  __func__, qi->qidx, (size_t)evalue, in_bytes,
->  				  out_bytes);
+> -	fd = lo_fi_fd(req, fi);
 > -
-> -               if (!out_bytes) {
-> -                       goto next;
->                 }
-> +
->                 while (1) {
->                         bool allocated_bufv = false;
->                         struct fuse_bufvec bufv;
-> @@ -708,7 +706,6 @@ static void *fv_queue_thread(void *opaque)
->                         elem = NULL;
->                  }
+>  	pthread_mutex_lock(&lo->mutex);
+> -	lo_map_remove(&lo->fd_map, fi->fh);
+> +	elem = lo_map_get(&lo->fd_map, fi->fh);
+> +	if (elem) {
+> +		fd = elem->fd;
+> +		elem = NULL;
+> +		lo_map_remove(&lo->fd_map, fi->fh);
+> +	}
+>  	pthread_mutex_unlock(&lo->mutex);
 >  
-> -next:
->                  pthread_rwlock_unlock(&qi->virtio_dev->vu_dispatch_rwlock);
->          }
->          pthread_mutex_destroy(&ch.lock);
+>  	close(fd);
 > -- 
 > 2.21.0
 > 

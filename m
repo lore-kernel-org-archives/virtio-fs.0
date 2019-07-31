@@ -1,17 +1,24 @@
-Date: Wed, 31 Jul 2019 10:53:15 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190731175314.mxawter6mj5fyvto@US-160370MP2.local>
-References: <1562884542-72462-1-git-send-email-bo.liu@linux.alibaba.com>
-	<20190730153041.GA3109@redhat.com>
-	<20190730222938.ipnojus4euucg4yj@US-160370MP2.local>
-	<20190731123938.GA4405@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=date:from:to:cc:subject:message-id:references:mime-version
+	:content-disposition:in-reply-to:user-agent;
+	bh=LQpq7O1YMaucXfqNE42ffNAF5BWjyrNNE20lAZY18P4=;
+	b=TQovYW/QQsSnR+f64MSbpnLajeBdM6NQgrTcQ3MsDIg1h3qg5Xs1UmwIs4HMjaI1zd
+	lhYbOWSwYhDqv8/nGqCIPJL0MJSUkYOHiWsj+bniro5EtirBov2xLZIbeCZ/3hJJxmWd
+	Ul8dHLHajM3PfCbC1whknSQVxcQYvxq0cf6F+V05S73yRIuCEZLdn0RxktLsDXl50Wv0
+	ijaxJSAf+e2QwasInUOJkyDUdaMuQcPaPPFiXGF5ucvW0cC+ArhbLY81S1vb4CMotnUL
+	Km7QGXTG1ah5+el5ZmklGbnz70rAI9M3Ja2/+16N/02ziV2O0nNF64SHTYFHnRQTdMCU
+	zNpQ==
+Date: Wed, 31 Jul 2019 14:43:25 -0400
+From: Masayoshi Mizuma <msys.mizuma@gmail.com>
+Message-ID: <20190731184325.zkldifrl2erbmact@gabell>
+References: <20190730215000.15660-1-msys.mizuma@gmail.com>
+	<20190731150443.GC7363@stefanha-x1.localdomain>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190731123938.GA4405@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] Virtiofs: fix null pointer deference in
- directIO
-Reply-To: bo.liu@linux.alibaba.com
+In-Reply-To: <20190731150443.GC7363@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Add gettimeofday to the seccomp
+ whitelist
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,50 +27,54 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
-On Wed, Jul 31, 2019 at 08:39:38AM -0400, Vivek Goyal wrote:
-> On Tue, Jul 30, 2019 at 03:29:39PM -0700, Liu Bo wrote:
-> > On Tue, Jul 30, 2019 at 11:30:41AM -0400, Vivek Goyal wrote:
-> > > Hi Liu Bo,
-> > > 
-> > > I have committed your patch for now here.
-> > > 
-> > > https://github.com/rhvgoyal/linux/commits/virtio-fs-dev-5.1
-> > > 
-> > > I also added a patch to wait for page reference count to drop to 1 before
-> > > range is reclaimed. It slows down mmap() workload very significantly
-> > > though.
-> > >
+On Wed, Jul 31, 2019 at 04:04:43PM +0100, Stefan Hajnoczi wrote:
+> On Tue, Jul 30, 2019 at 05:50:00PM -0400, Masayoshi Mizuma wrote:
+> > From: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 > > 
-> > Yes, the impact on mmap is expected because of the 'unmap' in layout checking,
-> > it'd be helpful to check layout on the dmap range instead of the whole inode.
+> > When I run fsstress on the virtio filesystem, virtiofsd sometimes
+> > exits abnormally because it receives SIGSYS.
 > > 
-> > However, there is a race bug in the current code between mmap workloads and dmap
-> > reclaim, since the reclaim does not unmap the dmap range at all, such that the
-> > dmap range might still stay in some process's page table, if such a dmap is
-> > reclaimed, the situation would be worse.  So with unmapping the whole inode in
-> > layout checking, at least it is correct in term of that race.
+> > >From strace:
+> >   195852 15:07:47.799331 read(8, "\1\0\0\0\0\0\0\0", 8) = 8 <0.000011>
+> >   195852 15:07:47.799379 gettimeofday( <unfinished ...>
+> >   195852 15:07:53.354340 <... gettimeofday resumed> <unfinished ...>) = ?
+> >   195852 15:07:53.400243 +++ killed by SIGSYS (core dumped) +++
+> > 
+> > That is because virtiofsd calls gettimeofday() system call but
+> > the system call isn't in the seccomp whitelist.
+> > 
+> > virtiofsd doesn't call gettimeofday() directly. glib library
+> > function may call g_get_current_time() and g_get_current_time()
+> > calls the system call.
+> > 
+> > Add gettimeofday() to the seccomp whitelist.
+> > 
+> > Signed-off-by: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+> > ---
+> >  contrib/virtiofsd/seccomp.c | 1 +
+> >  1 file changed, 1 insertion(+)
 > 
-> Can you elaborate more on this. I am not sure I am able to see the race
-> you are talking about. Assume we implemented logic to unmap only pages
-> which are in dmap (and not whole inode).
->
+> Have you checked that your guest is using the vdso gettimeofday()
+> implementation?  gettimeofday() is implemented in userspace without a
+> syscall using vdso to improve performance.  If your guest isn't using it
+> then performance will be worse.  (There is a fallback code path in the
+> vdso that invokes the syscall but I'm not sure it is taken in normal
+> cases.)
 
-Sorry for confusing you, what I was trying to say is that the above
-problem exists without doing unmapping pages (no matter within the
-whole inode or only the dmap range), IOW, before commit "fuse: Free
-dax mapping range only if page refcount is 1", the race bug exists.
+Yes, my guest is using the vdso gettimeofday().
+I'm not sure why virtiofsd calls gettimeofday(), probably the glib
+library function calls g_get_current_time() and the glib function
+calls gettimeofday().
 
-thanks,
--liubo
-
-> dmap is something internal to virtio-fs. If we unmap all pages which are
-> in a dmap, then dmap is free to be reclaimed. We are holding fi->i_mmap_sem,
-> and that should make sure that unmapped pages don't get mapped again (page
-> fault code will block on fi->i_mmap_sem).
 > 
-> Thanks
-> Vivek
+> The patch is fine though:
+> 
+> Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+
+Thank you so much!
+
+- Masa
 

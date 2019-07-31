@@ -1,14 +1,15 @@
-Date: Wed, 31 Jul 2019 18:44:52 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190731174452.GL3203@work-vm>
-References: <20190726091103.23503-1-stefanha@redhat.com>
-	<20190726091103.23503-6-stefanha@redhat.com>
+Date: Wed, 31 Jul 2019 10:48:22 -0700
+From: Liu Bo <bo.liu@linux.alibaba.com>
+Message-ID: <20190731174821.huiokivwch3ffglo@US-160370MP2.local>
+References: <1564465872-60404-1-git-send-email-bo.liu@linux.alibaba.com>
+	<ceef880a-1b0d-c1a8-eb85-5c0bf4dfb023@huawei.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190726091103.23503-6-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 5/5] virtiofsd: prevent races with
-	lo_dirp_put()
+In-Reply-To: <ceef880a-1b0d-c1a8-eb85-5c0bf4dfb023@huawei.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofs: reduce lock contention on
+	fpq->lock
+Reply-To: bo.liu@linux.alibaba.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,146 +18,86 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: piaojun <piaojun@huawei.com>
+Cc: virtio-fs@redhat.com
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> Introduce lo_dirp_put() so that FUSE_RELEASEDIR does not cause
-> use-after-free races with other threads that are accessing lo_dirp.
+Hi Jun,
+
+On Wed, Jul 31, 2019 at 08:05:03PM +0800, piaojun wrote:
+> Hi liubo,
 > 
-> Also make lo_releasedir() atomic to prevent FUSE_RELEASEDIR racing with
-> itself.  This prevents double-frees.
+> This change has already committed in rhvgoyal's branch:
+>
+> https://github.com/rhvgoyal/linux/tree/virtio-fs-dev-5.1
+>
+
+Thanks for the link, the patch here does one more thing beyond Vivek's current
+code, i.e. the lock protection around req is also removed as it's not necessary.
+
+thanks,
+-liubo
+
+> Thanks,
+> Jun
 > 
-> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-> ---
->  contrib/virtiofsd/passthrough_ll.c | 42 +++++++++++++++++++++++++-----
->  1 file changed, 36 insertions(+), 6 deletions(-)
-> 
-> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-> index ad3abdd532..f74e7d2d21 100644
-> --- a/contrib/virtiofsd/passthrough_ll.c
-> +++ b/contrib/virtiofsd/passthrough_ll.c
-> @@ -1293,11 +1293,28 @@ static void lo_readlink(fuse_req_t req, fuse_ino_t ino)
->  }
->  
->  struct lo_dirp {
-> +	gint refcount;
->  	DIR *dp;
->  	struct dirent *entry;
->  	off_t offset;
->  };
->  
-> +static void lo_dirp_put(struct lo_dirp **dp)
-> +{
-> +	struct lo_dirp *d = *dp;
-> +
-> +	if (!d) {
-> +		return;
-> +	}
-> +	*dp = NULL;
-> +
-> +	if (g_atomic_int_dec_and_test(&d->refcount)) {
-> +		closedir(d->dp);
-> +		free(d);
-> +	}
-> +}
-> +
-> +/* Call lo_dirp_put() on the return value when no longer needed */
->  static struct lo_dirp *lo_dirp(fuse_req_t req, struct fuse_file_info *fi)
->  {
->  	struct lo_data *lo = lo_data(req);
-> @@ -1305,6 +1322,9 @@ static struct lo_dirp *lo_dirp(fuse_req_t req, struct fuse_file_info *fi)
->  
->  	pthread_mutex_lock(&lo->mutex);
->  	elem = lo_map_get(&lo->dirp_map, fi->fh);
-> +	if (elem) {
-> +		g_atomic_int_inc(&elem->dirp->refcount);
-
-I don't understand what protects against reading the elem->dirp
-here at the same time it's free'd by lo_releasedir's call to lo_dirp_put
-
-> +	}
->  	pthread_mutex_unlock(&lo->mutex);
->  	if (!elem)
->  		return NULL;
-> @@ -1335,6 +1355,8 @@ static void lo_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi
->  	d->offset = 0;
->  	d->entry = NULL;
->  
-> +	g_atomic_int_set(&d->refcount, 1); /* paired with lo_releasedir() */
-> +
->  	fh = lo_add_dirp_mapping(req, d);
->  	if (fh == -1)
->  		goto out_err;
-> @@ -1363,7 +1385,7 @@ static void lo_do_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
->  			  off_t offset, struct fuse_file_info *fi, int plus)
->  {
->  	struct lo_data *lo = lo_data(req);
-> -	struct lo_dirp *d;
-> +	struct lo_dirp *d = NULL;
->  	struct lo_inode *dinode;
->  	char *buf = NULL;
->  	char *p;
-> @@ -1451,6 +1473,8 @@ static void lo_do_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
->  
->      err = 0;
->  error:
-> +    lo_dirp_put(&d);
-> +
->      // If there's an error, we can only signal it if we haven't stored
->      // any entries yet - otherwise we'd end up with wrong lookup
->      // counts for the entries that are already in the buffer. So we
-> @@ -1477,22 +1501,25 @@ static void lo_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size,
->  static void lo_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
->  {
->  	struct lo_data *lo = lo_data(req);
-> +	struct lo_map_elem *elem;
->  	struct lo_dirp *d;
->  
->  	(void) ino;
->  
-> -	d = lo_dirp(req, fi);
-> -	if (!d) {
-> +	pthread_mutex_lock(&lo->mutex);
-> +	elem = lo_map_get(&lo->dirp_map, fi->fh);
-> +	if (!elem) {
-> +		pthread_mutex_unlock(&lo->mutex);
->  		fuse_reply_err(req, EBADF);
->  		return;
->  	}
->  
-> -	pthread_mutex_lock(&lo->mutex);
-> +	d = elem->dirp;
->  	lo_map_remove(&lo->dirp_map, fi->fh);
->  	pthread_mutex_unlock(&lo->mutex);
->  
-> -	closedir(d->dp);
-> -	free(d);
-> +	lo_dirp_put(&d); /* paired with lo_opendir() */
-
-Is the &d really what's intended? That's the local stack variable, so
-lo_dirp_put will set that local to NULL rather than the elem->dirp wont
-it?
-
-Dave
-
-> +
->  	fuse_reply_err(req, 0);
->  }
->  
-> @@ -1701,6 +1728,9 @@ static void lo_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
->  		res = fdatasync(fd);
->  	else
->  		res = fsync(fd);
-> +
-> +	lo_dirp_put(&d);
-> +
->  	fuse_reply_err(req, res == -1 ? errno : 0);
->  }
->  
-> -- 
-> 2.21.0
-> 
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> On 2019/7/30 13:51, Liu Bo wrote:
+> > Right now within virtio_fs_requests_done_work(), virtqueue is protected by
+> > both fsvq->lock and fpq->lock for processing both virtqueue and
+> > fpq->processing_list, however, it is fine for them to be protected
+> > separately.
+> > 
+> > Also since %req has been removed from fpq->processing_list, no one except
+> > request_wait_answer() is looking at this %req and request_wait_answer()
+> > waits only on FINISH flag, it's OK to remove fpq->lock after %req is
+> > dropped from the list.
+> > 
+> > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+> > ---
+> >  fs/fuse/virtio_fs.c | 13 ++++++-------
+> >  1 file changed, 6 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> > index 9b3f2e9..d88bb6c 100644
+> > --- a/fs/fuse/virtio_fs.c
+> > +++ b/fs/fuse/virtio_fs.c
+> > @@ -347,21 +347,22 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
+> >  
+> >  	/* Collect completed requests off the virtqueue */
+> >  	spin_lock(&fsvq->lock);
+> > -	/* grab fpq->lock as req is on fpq->processing list */
+> > -	spin_lock(&fpq->lock);
+> >  	do {
+> >  		unsigned len;
+> >  
+> >  		virtqueue_disable_cb(vq);
+> >  
+> >  		while ((req = virtqueue_get_buf(vq, &len)) != NULL) {
+> > +			/* grab fpq->lock as req is on fpq->processing list */
+> > +			spin_lock(&fpq->lock);
+> > +
+> >  			/* If !connected, req is freed by fuse_abort_conn. */
+> > -			if (fpq->connected) {
+> > +			if (fpq->connected)
+> >  				list_move_tail(&req->list, &reqs);
+> > -			}
+> > +
+> > +			spin_unlock(&fpq->lock);
+> >  		}
+> >  	} while (!virtqueue_enable_cb(vq) && likely(!virtqueue_is_broken(vq)));
+> > -	spin_unlock(&fpq->lock);
+> >  	spin_unlock(&fsvq->lock);
+> >  
+> >  	/* End requests */
+> > @@ -373,10 +374,8 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
+> >  
+> >  		/* TODO zeroing? */
+> >  
+> > -		spin_lock(&fpq->lock);
+> >  		clear_bit(FR_SENT, &req->flags);
+> >  		list_del_init(&req->list);
+> > -		spin_unlock(&fpq->lock);
+> >  
+> >  		fuse_request_end(fc, req);
+> >  	}
+> > 
 

@@ -1,14 +1,13 @@
-Date: Thu, 25 Jul 2019 14:27:43 +0100
+Date: Wed, 31 Jul 2019 11:34:08 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190725132743.GH2656@work-vm>
-References: <20190724211024.GA31096@redhat.com>
-	<20190724232927.wzjx6rihcqr44vug@US-160370MP2.local>
+Message-ID: <20190731103408.GB3203@work-vm>
+References: <20190726082131.6739-1-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190724232927.wzjx6rihcqr44vug@US-160370MP2.local>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: During setup mapping,
- open file O_RDWR only if needed
+In-Reply-To: <20190726082131.6739-1-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] init/do_mounts.c: add virtio_fs root fs
+ support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,73 +16,54 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Liu Bo <bo.liu@linux.alibaba.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
-* Liu Bo (bo.liu@linux.alibaba.com) wrote:
-> On Wed, Jul 24, 2019 at 05:10:24PM -0400, Vivek Goyal wrote:
-> > As of now we always open file O_RDWR (even if writable mappings are not
-> > required). This leads to copy up of file if file is backed by overlayfs
-> > and hence nullying advantages of overlayfs.
-> > 
-> > So open file O_RDONLY if writable mappings are not required. Open O_RDWR
-> > if writable mappings are needed.
-> > 
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > ---
-> >  contrib/virtiofsd/passthrough_ll.c |    9 ++++++---
-> >  1 file changed, 6 insertions(+), 3 deletions(-)
-> > 
-> > Index: qemu/contrib/virtiofsd/passthrough_ll.c
-> > ===================================================================
-> > --- qemu.orig/contrib/virtiofsd/passthrough_ll.c	2019-07-24 16:31:07.014871768 -0400
-> > +++ qemu/contrib/virtiofsd/passthrough_ll.c	2019-07-24 16:32:10.064412722 -0400
-> > @@ -2197,15 +2197,15 @@ static void lo_setupmapping(fuse_req_t r
-> >          VhostUserFSSlaveMsg msg = { 0 };
-> >          uint64_t vhu_flags;
-> >  	char *buf;
-> > +	bool writable = flags & FUSE_SETUPMAPPING_FLAG_WRITE;
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> It is useful to mount the root file system via virtio_fs.  During
+> testing a monolithic kernel is more convenient than an initramfs but
+> we'll need to teach the kernel how to boot directly from virtio_fs.
 > 
-> typo? flags is set to O_WRONLY or 0 in do_lookup, although this may work as same.
+> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> ---
+>  init/do_mounts.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/init/do_mounts.c b/init/do_mounts.c
+> index f8c230c77035..b2d9650488d7 100644
+> --- a/init/do_mounts.c
+> +++ b/init/do_mounts.c
+> @@ -553,6 +553,16 @@ void __init mount_root(void)
+>  			change_floppy("root floppy");
+>  	}
+>  #endif
+> +#ifdef CONFIG_VIRTIO_FS
+> +	if (root_fs_names && !strcmp(root_fs_names, "virtio_fs")) {
+> +		if (!do_mount_root(root_device_name, "virtio_fs",
+> +				   root_mountflags, root_mount_data))
+> +			return;
+> +
+> +		panic("VFS: Unable to mount root fs \"%s\" from virtio_fs",
+> +		      root_device_name);
+> +	}
+> +#endif
 
-Right; that should be O_WRONLY;  
-do_setupmapping does:
-
-        genflags = 0;
-        genflags |= (arg->flags & FUSE_SETUPMAPPING_FLAG_WRITE) ? O_WRONLY : 0;
-
-to convert from the fuse definition on the wire to the O_ notation
-before calling the filesstem code.
+I wonder if it's possible to make this more generic; I see that
+filesystems have a flag, FS_REQUIRES_DEV - should this
+work for most filesystems that don't have that set?
 
 Dave
 
-> thanks,
-> -liubo
-> >  
-> >  	if (lo_debug(req))
-> >  		fuse_debug("lo_setupmapping(ino=%" PRIu64 ", fi=0x%p)\n", ino,
-> >  			   (void *)fi);
-> >  
-> >          vhu_flags = VHOST_USER_FS_FLAG_MAP_R;
-> > -        if (flags & O_WRONLY) {
-> > +	if (writable)
-> >                  vhu_flags |= VHOST_USER_FS_FLAG_MAP_W;
-> > -        }
-> >  
-> >  	msg.fd_offset[0] = foffset;
-> >  	msg.len[0] = len;
-> > @@ -2223,7 +2223,10 @@ static void lo_setupmapping(fuse_req_t r
-> >  		 * TODO: O_RDWR might not be allowed if file is read only or
-> >  		 * write only. Fix it.
-> >  		 */
-> > -		fd = openat(lo->proc_self_fd, buf, O_RDWR);
-> > +		if (writable)
-> > +			fd = openat(lo->proc_self_fd, buf, O_RDWR);
-> > +		else
-> > +			fd = openat(lo->proc_self_fd, buf, O_RDONLY);
-> >  		free(buf);
-> >  		if (fd == -1)
-> >  			return (void) fuse_reply_err(req, errno);
+>  #ifdef CONFIG_BLOCK
+>  	{
+>  		int err = create_dev("/dev/root", ROOT_DEV);
+> -- 
+> 2.21.0
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 --
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

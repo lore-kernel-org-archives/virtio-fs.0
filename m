@@ -1,16 +1,14 @@
-Date: Thu, 1 Aug 2019 12:14:44 +0100
+Date: Thu, 1 Aug 2019 12:45:13 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190801111444.GB2773@work-vm>
-References: <20190726091103.23503-1-stefanha@redhat.com>
-	<20190726091103.23503-6-stefanha@redhat.com>
-	<20190731174452.GL3203@work-vm>
-	<20190801091527.GB15179@stefanha-x1.localdomain>
+Message-ID: <20190801114513.GE2773@work-vm>
+References: <20190731161006.9447-1-stefanha@redhat.com>
+	<20190731161006.9447-3-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190801091527.GB15179@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH 5/5] virtiofsd: prevent races with
-	lo_dirp_put()
+In-Reply-To: <20190731161006.9447-3-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 2/5] virtiofsd: take lo->mutex around
+ lo_add_dirp_mapping()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,154 +21,34 @@ To: Stefan Hajnoczi <stefanha@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
 * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> On Wed, Jul 31, 2019 at 06:44:52PM +0100, Dr. David Alan Gilbert wrote:
-> > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> > > Introduce lo_dirp_put() so that FUSE_RELEASEDIR does not cause
-> > > use-after-free races with other threads that are accessing lo_dirp.
-> > > 
-> > > Also make lo_releasedir() atomic to prevent FUSE_RELEASEDIR racing with
-> > > itself.  This prevents double-frees.
-> > > 
-> > > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-> > > ---
-> > >  contrib/virtiofsd/passthrough_ll.c | 42 +++++++++++++++++++++++++-----
-> > >  1 file changed, 36 insertions(+), 6 deletions(-)
-> > > 
-> > > diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-> > > index ad3abdd532..f74e7d2d21 100644
-> > > --- a/contrib/virtiofsd/passthrough_ll.c
-> > > +++ b/contrib/virtiofsd/passthrough_ll.c
-> > > @@ -1293,11 +1293,28 @@ static void lo_readlink(fuse_req_t req, fuse_ino_t ino)
-> > >  }
-> > >  
-> > >  struct lo_dirp {
-> > > +	gint refcount;
-> > >  	DIR *dp;
-> > >  	struct dirent *entry;
-> > >  	off_t offset;
-> > >  };
-> > >  
-> > > +static void lo_dirp_put(struct lo_dirp **dp)
-> > > +{
-> > > +	struct lo_dirp *d = *dp;
-> > > +
-> > > +	if (!d) {
-> > > +		return;
-> > > +	}
-> > > +	*dp = NULL;
-> > > +
-> > > +	if (g_atomic_int_dec_and_test(&d->refcount)) {
-> > > +		closedir(d->dp);
-> > > +		free(d);
-> > > +	}
-> > > +}
-> > > +
-> > > +/* Call lo_dirp_put() on the return value when no longer needed */
-> > >  static struct lo_dirp *lo_dirp(fuse_req_t req, struct fuse_file_info *fi)
-> > >  {
-> > >  	struct lo_data *lo = lo_data(req);
-> > > @@ -1305,6 +1322,9 @@ static struct lo_dirp *lo_dirp(fuse_req_t req, struct fuse_file_info *fi)
-> > >  
-> > >  	pthread_mutex_lock(&lo->mutex);
-> > >  	elem = lo_map_get(&lo->dirp_map, fi->fh);
-> > > +	if (elem) {
-> > > +		g_atomic_int_inc(&elem->dirp->refcount);
-> > 
-> > I don't understand what protects against reading the elem->dirp
-> > here at the same time it's free'd by lo_releasedir's call to lo_dirp_put
+> The lo_add_dirp_mapping() function assumes lo->mutex is held, so we
+> should acquire it.
 > 
-> It is lo->mutex and not the refcount that prevents the race with
-> lo_releasedir().  Two cases:
+> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+
+Squashed into:
+passthrough_ll: add dirp_map to hide lo_dirp pointers
+> ---
+>  contrib/virtiofsd/passthrough_ll.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> 1. lo_releasedir() runs before lo_dirp().  lo_map_get() returns NULL and
->    lo_dirp() fails.
-
-Ah that's what I was missing; it's that the lo_releasedir doesn't need
-to have completed before lo_dirp runs, it's just that it's lo_map_remove
-has happened.
-
-> 2. lo_releasedir() runs after lo_dirp().  lo_map_get() succeeds and the
->    lo_dirp() caller keeps the object alive until lo_dirp_put(), when we
->    finally free it.
+> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+> index 417a104218..e1d729d26b 100644
+> --- a/contrib/virtiofsd/passthrough_ll.c
+> +++ b/contrib/virtiofsd/passthrough_ll.c
+> @@ -1357,7 +1357,9 @@ static void lo_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi
+>  
+>  	g_atomic_int_set(&d->refcount, 1); /* paired with lo_releasedir() */
+>  
+> +	pthread_mutex_lock(&lo->mutex);
+>  	fh = lo_add_dirp_mapping(req, d);
+> +	pthread_mutex_unlock(&lo->mutex);
+>  	if (fh == -1)
+>  		goto out_err;
+>  
+> -- 
+> 2.21.0
 > 
-> There is no third case since lo->mutex ensures that lo_releasedir() and
-> lo_dirp() are serialized in the dirp_map lookup.
-
-> > > +	}
-> > >  	pthread_mutex_unlock(&lo->mutex);
-> > >  	if (!elem)
-> > >  		return NULL;
-> > > @@ -1335,6 +1355,8 @@ static void lo_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi
-> > >  	d->offset = 0;
-> > >  	d->entry = NULL;
-> > >  
-> > > +	g_atomic_int_set(&d->refcount, 1); /* paired with lo_releasedir() */
-> > > +
-> > >  	fh = lo_add_dirp_mapping(req, d);
-> > >  	if (fh == -1)
-> > >  		goto out_err;
-> > > @@ -1363,7 +1385,7 @@ static void lo_do_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
-> > >  			  off_t offset, struct fuse_file_info *fi, int plus)
-> > >  {
-> > >  	struct lo_data *lo = lo_data(req);
-> > > -	struct lo_dirp *d;
-> > > +	struct lo_dirp *d = NULL;
-> > >  	struct lo_inode *dinode;
-> > >  	char *buf = NULL;
-> > >  	char *p;
-> > > @@ -1451,6 +1473,8 @@ static void lo_do_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
-> > >  
-> > >      err = 0;
-> > >  error:
-> > > +    lo_dirp_put(&d);
-> > > +
-> > >      // If there's an error, we can only signal it if we haven't stored
-> > >      // any entries yet - otherwise we'd end up with wrong lookup
-> > >      // counts for the entries that are already in the buffer. So we
-> > > @@ -1477,22 +1501,25 @@ static void lo_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size,
-> > >  static void lo_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
-> > >  {
-> > >  	struct lo_data *lo = lo_data(req);
-> > > +	struct lo_map_elem *elem;
-> > >  	struct lo_dirp *d;
-> > >  
-> > >  	(void) ino;
-> > >  
-> > > -	d = lo_dirp(req, fi);
-> > > -	if (!d) {
-> > > +	pthread_mutex_lock(&lo->mutex);
-> > > +	elem = lo_map_get(&lo->dirp_map, fi->fh);
-> > > +	if (!elem) {
-> > > +		pthread_mutex_unlock(&lo->mutex);
-> > >  		fuse_reply_err(req, EBADF);
-> > >  		return;
-> > >  	}
-> > >  
-> > > -	pthread_mutex_lock(&lo->mutex);
-> > > +	d = elem->dirp;
-> > >  	lo_map_remove(&lo->dirp_map, fi->fh);
-> > >  	pthread_mutex_unlock(&lo->mutex);
-> > >  
-> > > -	closedir(d->dp);
-> > > -	free(d);
-> > > +	lo_dirp_put(&d); /* paired with lo_opendir() */
-> > 
-> > Is the &d really what's intended? That's the local stack variable, so
-> > lo_dirp_put will set that local to NULL rather than the elem->dirp wont
-> > it?
-> 
-> Yes, the put(&ptr) pattern prevents user-after-free in the caller.  It's
-> slightly safer than put(ptr) since that leaves ptr initialized and the
-> caller might access it later by accident.
-> 
-> elem has already been returned to the freelist by lo_map_remove() and we
-> must not touch it anymore.
-
-OK, thanks.
-
-> Stefan
-
-
 --
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

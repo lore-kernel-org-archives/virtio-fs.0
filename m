@@ -1,15 +1,9 @@
-References: <1564465872-60404-1-git-send-email-bo.liu@linux.alibaba.com>
-	<ceef880a-1b0d-c1a8-eb85-5c0bf4dfb023@huawei.com>
-	<20190731174821.huiokivwch3ffglo@US-160370MP2.local>
-From: piaojun <piaojun@huawei.com>
-Message-ID: <5D42386B.7090208@huawei.com>
-Date: Thu, 1 Aug 2019 08:55:07 +0800
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Date: Thu,  1 Aug 2019 17:54:05 +0100
+Message-Id: <20190801165409.20121-1-stefanha@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20190731174821.huiokivwch3ffglo@US-160370MP2.local>
-Content-Type: text/plain; charset="windows-1252"
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH] virtiofs: reduce lock contention on
-	fpq->lock
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 0/4] virtiofsd: multithreading preparation part 3
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,97 +12,65 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: bo.liu@linux.alibaba.com
-Cc: virtio-fs@redhat.com
+To: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
+This patch series introduces the virtiofsd --thread-pool-size=NUM and sets the
+default value to 64.  Each virtqueue has its own thread pool for processing
+requests.  Blocking requests no longer pause virtqueue processing and I/O
+performance should be greatly improved when the queue depth is greater than 1.
 
+Linux boot and pjdfstest have been tested with these patches and the default
+thread pool size of 64.
 
-On 2019/8/1 1:48, Liu Bo wrote:
-> Hi Jun,
-> 
-> On Wed, Jul 31, 2019 at 08:05:03PM +0800, piaojun wrote:
->> Hi liubo,
->>
->> This change has already committed in rhvgoyal's branch:
->>
->> https://github.com/rhvgoyal/linux/tree/virtio-fs-dev-5.1
->>
-> 
-> Thanks for the link, the patch here does one more thing beyond Vivek's current
-> code, i.e. the lock protection around req is also removed as it's not necessary.
+I have now concluded the thread-safety code audit.  Please let me know if you
+have concerns about things I missed.
 
-Agreed, and it could save some CPU time.
+Performance
+-----------
+Please try these patches out and share your results.
 
-Thanks,
-Jun
+Scalability
+-----------
+There are several synchronization primitives that are taken by the virtqueue
+processing thread or the thread pool worker.  Unfortunately this is necessary
+to protect shared state.  It means that thread pool workers contend on or at
+least access thread synchronization primitives.  If anyone has suggestions for
+improving this situation, please discuss.
 
-> 
-> thanks,
-> -liubo
-> 
->> Thanks,
->> Jun
->>
->> On 2019/7/30 13:51, Liu Bo wrote:
->>> Right now within virtio_fs_requests_done_work(), virtqueue is protected by
->>> both fsvq->lock and fpq->lock for processing both virtqueue and
->>> fpq->processing_list, however, it is fine for them to be protected
->>> separately.
->>>
->>> Also since %req has been removed from fpq->processing_list, no one except
->>> request_wait_answer() is looking at this %req and request_wait_answer()
->>> waits only on FINISH flag, it's OK to remove fpq->lock after %req is
->>> dropped from the list.
->>>
->>> Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
->>> ---
->>>  fs/fuse/virtio_fs.c | 13 ++++++-------
->>>  1 file changed, 6 insertions(+), 7 deletions(-)
->>>
->>> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
->>> index 9b3f2e9..d88bb6c 100644
->>> --- a/fs/fuse/virtio_fs.c
->>> +++ b/fs/fuse/virtio_fs.c
->>> @@ -347,21 +347,22 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
->>>  
->>>  	/* Collect completed requests off the virtqueue */
->>>  	spin_lock(&fsvq->lock);
->>> -	/* grab fpq->lock as req is on fpq->processing list */
->>> -	spin_lock(&fpq->lock);
->>>  	do {
->>>  		unsigned len;
->>>  
->>>  		virtqueue_disable_cb(vq);
->>>  
->>>  		while ((req = virtqueue_get_buf(vq, &len)) != NULL) {
->>> +			/* grab fpq->lock as req is on fpq->processing list */
->>> +			spin_lock(&fpq->lock);
->>> +
->>>  			/* If !connected, req is freed by fuse_abort_conn. */
->>> -			if (fpq->connected) {
->>> +			if (fpq->connected)
->>>  				list_move_tail(&req->list, &reqs);
->>> -			}
->>> +
->>> +			spin_unlock(&fpq->lock);
->>>  		}
->>>  	} while (!virtqueue_enable_cb(vq) && likely(!virtqueue_is_broken(vq)));
->>> -	spin_unlock(&fpq->lock);
->>>  	spin_unlock(&fsvq->lock);
->>>  
->>>  	/* End requests */
->>> @@ -373,10 +374,8 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
->>>  
->>>  		/* TODO zeroing? */
->>>  
->>> -		spin_lock(&fpq->lock);
->>>  		clear_bit(FR_SENT, &req->flags);
->>>  		list_del_init(&req->list);
->>> -		spin_unlock(&fpq->lock);
->>>  
->>>  		fuse_request_end(fc, req);
->>>  	}
->>>
-> .
-> 
+1. vu_dispatch_rwlock - libvhost-user from races between the vhost-user
+   protocol thread and the virtqueue processing and thread pool worker threads.
+
+2. vq_lock - protects the virtqueue from races between the virtqueue processing
+   thread and thread pool workers.
+
+3. init_rwlock - protects FUSE_INIT/FUSE_DESTROY from races with other
+   requests.
+
+4. se->lock - protects se->list and the FUSE_INTERRUPT shared state.
+
+Ideally we could avoid hitting all of these locks on each request.  That would
+make the code scale better.
+
+Future work
+-----------
+This series does not complete the multithreading effort yet.  Two items are
+still missing:
+1. Multiqueue support
+2. CPU affinity for virtqueue processing threads and thread pools
+
+Stefan Hajnoczi (4):
+  virtiofsd: process requests in a thread pool
+  virtiofsd: prevent FUSE_INIT/FUSE_DESTROY races
+  virtiofsd: fix lo_destroy() resource leaks
+  virtiofsd: add --thread-pool-size=NUM option
+
+ contrib/virtiofsd/fuse_i.h         |   2 +
+ contrib/virtiofsd/fuse_lowlevel.c  |  25 +-
+ contrib/virtiofsd/fuse_virtio.c    | 491 ++++++++++++++++-------------
+ contrib/virtiofsd/passthrough_ll.c |  43 ++-
+ contrib/virtiofsd/seccomp.c        |   1 +
+ 5 files changed, 318 insertions(+), 244 deletions(-)
+
+-- 
+2.21.0
 

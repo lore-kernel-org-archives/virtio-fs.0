@@ -1,15 +1,17 @@
-Date: Thu, 1 Aug 2019 15:26:37 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190801142637.GJ2773@work-vm>
-References: <5D3F8F04.3030404@huawei.com>
-	<4ec43f2f-1d72-5fe1-3b93-2c75ee6f87b4@redhat.com>
-	<20190801142016.GI2773@work-vm>
-MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20190801142016.GI2773@work-vm>
-Subject: Re: [Virtio-fs] [Qemu-devel] [PATCH] virtiofsd: fix compile error
- if 'F_OFD_GETLK' not defined
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=from:to:cc:subject:date:message-id;
+	bh=ZmGIGRyQgEw1eVbcCdiGmxCP8QD0XwROamoNMi0o15c=;
+	b=cwi/qvfsIJHUmH16iyeNsf2YEsw4PGVD5y7WvrIy7AopftqL7Jhz6jftjjiEuvTn/W
+	ODnSDezMB3RIJ6oUQ1OgYHsUrmwPiErDmzstn6iQ4vWy0ppozwrNF2Jo8YKpOCTgvs6J
+	vz7yVPFUj5GLsFZQxQRjgq+94j/u0BWRuczfC/Um8eIfnN4ajvIt/sMKse/s48t0WL8A
+	4msTIlNSkyjhY400eR89+wKpcBVXGSqCIKu/CZs7Qps8w8lq+m/FKsyCG/sH2n2bJRuJ
+	kiVOMbFSOE7ecci4i5sjSEDM8E6kCfXQQL5f7zOhBMUpW0CPlPA4ESTdo99BSUnKFF3X
+	K28w==
+From: Masayoshi Mizuma <msys.mizuma@gmail.com>
+Date: Thu,  1 Aug 2019 11:13:48 -0400
+Message-Id: <20190801151348.14947-1-msys.mizuma@gmail.com>
+Subject: [Virtio-fs] [PATCH] virtiofsd: Prevent multiply running with same
+	vhost_user_socket
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,85 +20,60 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Eric Blake <eblake@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: virtio-fs@redhat.com
+Cc: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
-* Dr. David Alan Gilbert (dgilbert@redhat.com) wrote:
-> * Eric Blake (eblake@redhat.com) wrote:
-> > On 7/29/19 7:27 PM, piaojun wrote:
-> > > Use F_GETLK for fcntl when F_OFD_GETLK not defined.
-> > 
-> > Which system are you hitting this problem on?
-> > 
-> > The problem with F_GETLK is that it is NOT as safe as F_OFD_GETLK.
-> > 
-> > We already have fcntl_op_getlk and qemu_probe_lock_ops() in util/osdep.c
-> > to not only determine which form to use, but also to emit a warning to
-> > the end user if we had to fall back to the unsafe F_GETLK. Why is your
-> > code not reusing that logic?
-> > 
-> > > 
-> > > Signed-off-by: Jun Piao <piaojun@huawei.com>
-> > > ---
-> > >  contrib/virtiofsd/passthrough_ll.c | 9 +++++++++
-> > >  1 file changed, 9 insertions(+)
-> > > 
-> > > diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-> > > index 9ae1381..757785b 100644
-> > > --- a/contrib/virtiofsd/passthrough_ll.c
-> > > +++ b/contrib/virtiofsd/passthrough_ll.c
-> > > @@ -1619,7 +1619,11 @@ static void lo_getlk(fuse_req_t req, fuse_ino_t ino,
-> > >  		return;
-> > >  	}
-> > > 
-> > > +#ifdef F_OFD_GETLK
-> > >  	ret = fcntl(plock->fd, F_OFD_GETLK, lock);
-> > > +#else
-> > > +	ret = fcntl(plock->fd, F_GETLK, lock);
-> > > +#endif
-> > 
-> > Hmm. Since this is in contrib, you are trying to compile something that
-> > is independent of util/osdep.c (at least, I assume that's the case, as
-> > contrib/virtiofsd/ is not even part of qemu.git master yet - in which
-> > case, why is this not being squashed in to the patch introducing that
-> > file, rather than sent standalone).  On the other hand, that raises the
-> > question - who is trying to use virtiofsd on a kernel that is too old to
-> > provid F_OFD_GETLK?  Isn't the whole point of virtiofsd to be speeding
-> > up modern usage, at which point an old kernel is just gumming up the
-> > works?  It seems like you are better off letting compilation fail on a
-> > system that is too old to support decent F_OFD_GETLK, rather than
-> > silently falling back to something that is unsafe.
-> 
-> It is, but I guess the answer here is someone wanted to build on RHEL7.
+From: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
-although looking at the tools it went in 7.6
+virtiofsd can run multiply even if the vhost_user_socket is
+same path.
 
-Dave
+  ]# ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o source=/tmp/share &
+  [1] 244965
+  virtio_session_mount: Waiting for vhost-user socket connection...
+  ]# ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o source=/tmp/share &
+  [2] 244966
+  virtio_session_mount: Waiting for vhost-user socket connection...
+  ]#
 
-> Dave
-> 
-> > 
-> > -- 
-> > Eric Blake, Principal Software Engineer
-> > Red Hat, Inc.           +1-919-301-3226
-> > Virtualization:  qemu.org | libvirt.org
-> > 
-> 
-> 
-> 
-> 
-> > _______________________________________________
-> > Virtio-fs mailing list
-> > Virtio-fs@redhat.com
-> > https://www.redhat.com/mailman/listinfo/virtio-fs
-> 
-> --
-> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+The file access from the guest works because the second virtiofsd
+handles that, however, the user will get confused the situation
+and may be the cause of unexpected problem. So it's better to
+prevent the multiple running.
+
+Change unlink() of the socket to the exit of virtiofsd so that the
+latter virtiofsd can fail on bind() as EADDRINUSE.
+
+Signed-off-by: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+---
+ contrib/virtiofsd/fuse_lowlevel.c | 1 +
+ contrib/virtiofsd/fuse_virtio.c   | 1 -
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
+index 8adc4b1ab8..0624d26ffc 100644
+--- a/contrib/virtiofsd/fuse_lowlevel.c
++++ b/contrib/virtiofsd/fuse_lowlevel.c
+@@ -2584,6 +2584,7 @@ void fuse_session_destroy(struct fuse_session *se)
+ 		virtio_session_close(se);
+ 	}
+ 
++	unlink(se->vu_socket_path);
+ 	free(se->vu_socket_path);
+ 	se->vu_socket_path = NULL;
+ 
+diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
+index 083e4fc317..54ba7cbbcb 100644
+--- a/contrib/virtiofsd/fuse_virtio.c
++++ b/contrib/virtiofsd/fuse_virtio.c
+@@ -879,7 +879,6 @@ static int fv_create_listen_socket(struct fuse_session *se)
+         /* Create the Unix socket to communicate with qemu
+          * based on QEMU's vhost-user-bridge
+          */
+-        unlink(se->vu_socket_path);
+         strcpy(un.sun_path, se->vu_socket_path);
+         size_t addr_len = sizeof(un.sun_family) + strlen(se->vu_socket_path);
+ 
+-- 
+2.18.1
 

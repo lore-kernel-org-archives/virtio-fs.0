@@ -1,11 +1,11 @@
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Thu,  1 Aug 2019 17:54:08 +0100
-Message-Id: <20190801165409.20121-4-stefanha@redhat.com>
+Date: Thu,  1 Aug 2019 17:54:09 +0100
+Message-Id: <20190801165409.20121-5-stefanha@redhat.com>
 In-Reply-To: <20190801165409.20121-1-stefanha@redhat.com>
 References: <20190801165409.20121-1-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 3/4] virtiofsd: fix lo_destroy() resource leaks
+Subject: [Virtio-fs] [PATCH 4/4] virtiofsd: add --thread-pool-size=NUM option
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,82 +16,83 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-Now that lo_destroy() is serialized we can call unref_inode() so that
-all inode resources are freed.
+Add an option to control the size of the thread pool.  Requests are now
+processed in parallel by default.
 
 Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- contrib/virtiofsd/passthrough_ll.c | 43 ++++++++++++++----------------
- 1 file changed, 20 insertions(+), 23 deletions(-)
+ contrib/virtiofsd/fuse_i.h        | 1 +
+ contrib/virtiofsd/fuse_lowlevel.c | 8 ++++++--
+ contrib/virtiofsd/fuse_virtio.c   | 4 ++--
+ 3 files changed, 9 insertions(+), 4 deletions(-)
 
-diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-index a81c01d0d1..02a5e97326 100644
---- a/contrib/virtiofsd/passthrough_ll.c
-+++ b/contrib/virtiofsd/passthrough_ll.c
-@@ -1340,28 +1340,6 @@ static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
+diff --git a/contrib/virtiofsd/fuse_i.h b/contrib/virtiofsd/fuse_i.h
+index dcde9feb97..5c82cf2eac 100644
+--- a/contrib/virtiofsd/fuse_i.h
++++ b/contrib/virtiofsd/fuse_i.h
+@@ -74,6 +74,7 @@ struct fuse_session {
+         int   vu_listen_fd;
+         int   vu_socketfd;
+         struct fv_VuDev *virtio_dev;
++        int thread_pool_size;
+ };
+ 
+ struct fuse_chan {
+diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
+index 483a1bc9be..b692791fbc 100644
+--- a/contrib/virtiofsd/fuse_lowlevel.c
++++ b/contrib/virtiofsd/fuse_lowlevel.c
+@@ -26,7 +26,7 @@
+ #include <assert.h>
+ #include <sys/file.h>
+ 
+-
++#define THREAD_POOL_SIZE 64
+ 
+ #define OFFSET_MAX 0x7fffffffffffffffLL
+ 
+@@ -2556,6 +2556,7 @@ static const struct fuse_opt fuse_ll_opts[] = {
+ 	LL_OPTION("--socket-path=%s", vu_socket_path, 0),
+         LL_OPTION("vhost_user_socket=%s", vu_socket_path, 0),
+ 	LL_OPTION("--fd=%d", vu_listen_fd, 0),
++	LL_OPTION("--thread-pool-size=%d", thread_pool_size, 0),
+ 	FUSE_OPT_END
+ };
+ 
+@@ -2575,7 +2576,9 @@ void fuse_lowlevel_help(void)
+ "    --socket-path=PATH         path for the vhost-user socket\n"
+ "    -o vhost_user_socket=PATH  path for the vhost-user socket\n"
+ "    --fd=FDNUM                 fd number of vhost-user socket\n"
+-"    -o auto_unmount            auto unmount on process termination\n");
++"    -o auto_unmount            auto unmount on process termination\n"
++"    --thread-pool-size=NUM     thread pool size limit (default %d)\n",
++	       THREAD_POOL_SIZE);
+ }
+ 
+ void fuse_session_destroy(struct fuse_session *se)
+@@ -2629,6 +2632,7 @@ struct fuse_session *fuse_session_new(struct fuse_args *args,
  	}
- }
+ 	se->fd = -1;
+ 	se->vu_listen_fd = -1;
++	se->thread_pool_size = THREAD_POOL_SIZE;
+ 	se->conn.max_write = UINT_MAX;
+ 	se->conn.max_readahead = UINT_MAX;
  
--static int unref_all_inodes_cb(gpointer key, gpointer value,
--			       gpointer user_data)
--{
--	struct lo_inode *inode  = value;
--	struct lo_data *lo = user_data;
--
--	inode->nlookup = 0;
--	lo_map_remove(&lo->ino_map, inode->fuse_ino);
--	close(inode->fd);
--	lo_inode_put(lo, &inode); /* Drop our refcount from lo_do_lookup() */
--
--	return TRUE;
--}
--
--static void unref_all_inodes(struct lo_data *lo)
--{
--	pthread_mutex_lock(&lo->mutex);
--	g_hash_table_foreach_remove(lo->inodes, unref_all_inodes_cb, lo);
--	pthread_mutex_unlock(&lo->mutex);
--
--}
--
- static void lo_forget_one(fuse_req_t req, fuse_ino_t ino, uint64_t nlookup)
- {
- 	struct lo_data *lo = lo_data(req);
-@@ -2462,6 +2440,18 @@ static void lo_removemapping(fuse_req_t req, struct fuse_session *se,
- 	fuse_reply_err(req, ret);
- }
+diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
+index 0c52911144..e13b3cc2e6 100644
+--- a/contrib/virtiofsd/fuse_virtio.c
++++ b/contrib/virtiofsd/fuse_virtio.c
+@@ -663,8 +663,8 @@ static void *fv_queue_thread(void *opaque)
+         struct fuse_session *se = qi->virtio_dev->se;
+         GThreadPool *pool;
  
-+static int destroy_inode_cb(gpointer key, gpointer value, gpointer user_data)
-+{
-+        struct lo_inode *inode = value;
-+        struct lo_data *lo = user_data;
-+
-+        /* inode->nlookup is normally protected by lo->mutex but see the
-+         * comment in lo_destroy().
-+         */
-+        unref_inode(lo, inode, inode->nlookup);
-+        return TRUE;
-+}
-+
- static void lo_destroy(void *userdata, struct fuse_session *se)
- {
- 	struct lo_data *lo = (struct lo_data*) userdata;
-@@ -2475,7 +2465,14 @@ static void lo_destroy(void *userdata, struct fuse_session *se)
-                         fuse_err("%s: unmap during destroy failed\n", __func__);
-                 }
-         }
--	unref_all_inodes(lo);
-+
-+        /* Normally lo->mutex must be taken when traversing lo->inodes but
-+         * lo_destroy() is a serialized request so no races are possible here.
-+         *
-+         * In addition, we cannot acquire lo->mutex since destroy_inode_cb() takes it
-+         * too and this would result in a recursive lock.
-+         */
-+        g_hash_table_foreach_remove(lo->inodes, destroy_inode_cb, lo);
- }
- 
- static struct fuse_lowlevel_ops lo_oper = {
+-        pool = g_thread_pool_new(fv_queue_worker, qi, 1 /* TODO max_threads */,
+-                        TRUE, NULL);
++        pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size,
++                                 TRUE, NULL);
+         if (!pool) {
+                 fuse_err("%s: g_thread_pool_new failed\n", __func__);
+                 return NULL;
 -- 
 2.21.0
 

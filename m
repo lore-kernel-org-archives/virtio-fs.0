@@ -1,11 +1,13 @@
-From: piaojun <piaojun@huawei.com>
-Message-ID: <5D43F688.8000607@huawei.com>
-Date: Fri, 2 Aug 2019 16:38:32 +0800
+Date: Fri, 2 Aug 2019 11:53:52 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190802105352.GF2899@work-vm>
+References: <5D43F688.8000607@huawei.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 7bit
-Subject: [Virtio-fs] [PATCH v2] virtiofsd: fix compile error if
-	'F_OFD_GETLK' not defined
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <5D43F688.8000607@huawei.com>
+Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: fix compile error if
+ 'F_OFD_GETLK' not defined
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,47 +16,71 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com, qemu-devel@nongnu.org
-Cc: eblake@redhat.com
+To: piaojun <piaojun@huawei.com>
+Cc: virtio-fs@redhat.com, eblake@redhat.com, qemu-devel@nongnu.org
 
-Use F_GETLK for fcntl when F_OFD_GETLK not defined, such as kernel 3.10.
+* piaojun (piaojun@huawei.com) wrote:
+> Use F_GETLK for fcntl when F_OFD_GETLK not defined, such as kernel 3.10.
+> 
+> Signed-off-by: Jun Piao <piaojun@huawei.com>
 
-Signed-off-by: Jun Piao <piaojun@huawei.com>
----
-v2:
-- Use F_OFD_SETLK to replace F_OFD_GETLK in #ifdef.
 
----
- contrib/virtiofsd/passthrough_ll.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+> ---
+> v2:
+> - Use F_OFD_SETLK to replace F_OFD_GETLK in #ifdef.
+> 
+> ---
+>  contrib/virtiofsd/passthrough_ll.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+> index a81c01d..c69f2f3 100644
+> --- a/contrib/virtiofsd/passthrough_ll.c
+> +++ b/contrib/virtiofsd/passthrough_ll.c
+> @@ -1780,7 +1780,11 @@ static void lo_getlk(fuse_req_t req, fuse_ino_t ino,
+>  		goto out;
+>  	}
+> 
+> +#ifdef F_OFD_GETLK
+>  	ret = fcntl(plock->fd, F_OFD_GETLK, lock);
+> +#else
+> +	ret = fcntl(plock->fd, F_GETLK, lock);
+> +#endif
+>  	if (ret == -1)
+>  		saverr = errno;
+> 
+> @@ -1831,7 +1835,11 @@ static void lo_setlk(fuse_req_t req, fuse_ino_t ino,
+> 
+>  	/* TODO: Is it alright to modify flock? */
+>  	lock->l_pid = 0;
+> +#ifdef F_OFD_SETLK
+>  	ret = fcntl(plock->fd, F_OFD_SETLK, lock);
+> +#else
+> +	ret = fcntl(plock->fd, F_GETLK, lock);
+                               ^^^^^^^
 
-diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-index a81c01d..c69f2f3 100644
---- a/contrib/virtiofsd/passthrough_ll.c
-+++ b/contrib/virtiofsd/passthrough_ll.c
-@@ -1780,7 +1780,11 @@ static void lo_getlk(fuse_req_t req, fuse_ino_t ino,
- 		goto out;
- 	}
+Typo! You've got GETLK rather than SETLK.
 
-+#ifdef F_OFD_GETLK
- 	ret = fcntl(plock->fd, F_OFD_GETLK, lock);
-+#else
-+	ret = fcntl(plock->fd, F_GETLK, lock);
-+#endif
- 	if (ret == -1)
- 		saverr = errno;
+But, a bigger question - does this actually work!
+The manpage says:
+   'If a process closes any file descriptor referring to a file, then
+   all of the process's locks on that file are released, regardless of the
+   file descriptor(s) on which the locks were obtained.'
 
-@@ -1831,7 +1835,11 @@ static void lo_setlk(fuse_req_t req, fuse_ino_t ino,
+the fd we're using here came from lookup_create_plock_ctx which did
+a new openat to get this fd; so we've already got multiple fd's
+referring to this file; and thus I worry we're going to close
+one of them and lose all our locks on it.
 
- 	/* TODO: Is it alright to modify flock? */
- 	lock->l_pid = 0;
-+#ifdef F_OFD_SETLK
- 	ret = fcntl(plock->fd, F_OFD_SETLK, lock);
-+#else
-+	ret = fcntl(plock->fd, F_GETLK, lock);
-+#endif
- 	if (ret == -1) {
- 		saverr = errno;
- 	}
--- 
+Dave
+
+
+> +#endif
+
+>  	if (ret == -1) {
+>  		saverr = errno;
+>  	}
+> -- 
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

@@ -1,11 +1,15 @@
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Thu,  1 Aug 2019 17:54:09 +0100
-Message-Id: <20190801165409.20121-5-stefanha@redhat.com>
-In-Reply-To: <20190801165409.20121-1-stefanha@redhat.com>
-References: <20190801165409.20121-1-stefanha@redhat.com>
+References: <5D3F8F04.3030404@huawei.com>
+	<4ec43f2f-1d72-5fe1-3b93-2c75ee6f87b4@redhat.com>
+	<20190801142016.GI2773@work-vm> <20190801142637.GJ2773@work-vm>
+From: piaojun <piaojun@huawei.com>
+Message-ID: <5D43F143.6060901@huawei.com>
+Date: Fri, 2 Aug 2019 16:16:03 +0800
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 4/4] virtiofsd: add --thread-pool-size=NUM option
+In-Reply-To: <20190801142637.GJ2773@work-vm>
+Content-Type: text/plain; charset="windows-1252"
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [Qemu-devel] [PATCH] virtiofsd: fix compile error
+ if 'F_OFD_GETLK' not defined
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,85 +18,107 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Eric Blake <eblake@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-Add an option to control the size of the thread pool.  Requests are now
-processed in parallel by default.
+Hi Dave and Eric,
 
-Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
----
- contrib/virtiofsd/fuse_i.h        | 1 +
- contrib/virtiofsd/fuse_lowlevel.c | 8 ++++++--
- contrib/virtiofsd/fuse_virtio.c   | 4 ++--
- 3 files changed, 9 insertions(+), 4 deletions(-)
+On 2019/8/1 22:26, Dr. David Alan Gilbert wrote:
+> * Dr. David Alan Gilbert (dgilbert@redhat.com) wrote:
+>> * Eric Blake (eblake@redhat.com) wrote:
+>>> On 7/29/19 7:27 PM, piaojun wrote:
+>>>> Use F_GETLK for fcntl when F_OFD_GETLK not defined.
+>>>
+>>> Which system are you hitting this problem on?
+>>>
+>>> The problem with F_GETLK is that it is NOT as safe as F_OFD_GETLK.
+>>>
+>>> We already have fcntl_op_getlk and qemu_probe_lock_ops() in util/osdep.c
+>>> to not only determine which form to use, but also to emit a warning to
+>>> the end user if we had to fall back to the unsafe F_GETLK. Why is your
+>>> code not reusing that logic?
+>>>
+>>>>
+>>>> Signed-off-by: Jun Piao <piaojun@huawei.com>
+>>>> ---
+>>>>  contrib/virtiofsd/passthrough_ll.c | 9 +++++++++
+>>>>  1 file changed, 9 insertions(+)
+>>>>
+>>>> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+>>>> index 9ae1381..757785b 100644
+>>>> --- a/contrib/virtiofsd/passthrough_ll.c
+>>>> +++ b/contrib/virtiofsd/passthrough_ll.c
+>>>> @@ -1619,7 +1619,11 @@ static void lo_getlk(fuse_req_t req, fuse_ino_t ino,
+>>>>  		return;
+>>>>  	}
+>>>>
+>>>> +#ifdef F_OFD_GETLK
+>>>>  	ret = fcntl(plock->fd, F_OFD_GETLK, lock);
+>>>> +#else
+>>>> +	ret = fcntl(plock->fd, F_GETLK, lock);
+>>>> +#endif
+>>>
+>>> Hmm. Since this is in contrib, you are trying to compile something that
+>>> is independent of util/osdep.c (at least, I assume that's the case, as
+>>> contrib/virtiofsd/ is not even part of qemu.git master yet - in which
+>>> case, why is this not being squashed in to the patch introducing that
+>>> file, rather than sent standalone).  On the other hand, that raises the
+>>> question - who is trying to use virtiofsd on a kernel that is too old to
+>>> provid F_OFD_GETLK?  Isn't the whole point of virtiofsd to be speeding
+>>> up modern usage, at which point an old kernel is just gumming up the
+>>> works?  It seems like you are better off letting compilation fail on a
+>>> system that is too old to support decent F_OFD_GETLK, rather than
+>>> silently falling back to something that is unsafe.
+>>
+>> It is, but I guess the answer here is someone wanted to build on RHEL7.
+> 
+> although looking at the tools it went in 7.6
+> 
+> Dave
+> 
 
-diff --git a/contrib/virtiofsd/fuse_i.h b/contrib/virtiofsd/fuse_i.h
-index dcde9feb97..5c82cf2eac 100644
---- a/contrib/virtiofsd/fuse_i.h
-+++ b/contrib/virtiofsd/fuse_i.h
-@@ -74,6 +74,7 @@ struct fuse_session {
-         int   vu_listen_fd;
-         int   vu_socketfd;
-         struct fv_VuDev *virtio_dev;
-+        int thread_pool_size;
- };
- 
- struct fuse_chan {
-diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
-index 483a1bc9be..b692791fbc 100644
---- a/contrib/virtiofsd/fuse_lowlevel.c
-+++ b/contrib/virtiofsd/fuse_lowlevel.c
-@@ -26,7 +26,7 @@
- #include <assert.h>
- #include <sys/file.h>
- 
--
-+#define THREAD_POOL_SIZE 64
- 
- #define OFFSET_MAX 0x7fffffffffffffffLL
- 
-@@ -2556,6 +2556,7 @@ static const struct fuse_opt fuse_ll_opts[] = {
- 	LL_OPTION("--socket-path=%s", vu_socket_path, 0),
-         LL_OPTION("vhost_user_socket=%s", vu_socket_path, 0),
- 	LL_OPTION("--fd=%d", vu_listen_fd, 0),
-+	LL_OPTION("--thread-pool-size=%d", thread_pool_size, 0),
- 	FUSE_OPT_END
- };
- 
-@@ -2575,7 +2576,9 @@ void fuse_lowlevel_help(void)
- "    --socket-path=PATH         path for the vhost-user socket\n"
- "    -o vhost_user_socket=PATH  path for the vhost-user socket\n"
- "    --fd=FDNUM                 fd number of vhost-user socket\n"
--"    -o auto_unmount            auto unmount on process termination\n");
-+"    -o auto_unmount            auto unmount on process termination\n"
-+"    --thread-pool-size=NUM     thread pool size limit (default %d)\n",
-+	       THREAD_POOL_SIZE);
- }
- 
- void fuse_session_destroy(struct fuse_session *se)
-@@ -2629,6 +2632,7 @@ struct fuse_session *fuse_session_new(struct fuse_args *args,
- 	}
- 	se->fd = -1;
- 	se->vu_listen_fd = -1;
-+	se->thread_pool_size = THREAD_POOL_SIZE;
- 	se->conn.max_write = UINT_MAX;
- 	se->conn.max_readahead = UINT_MAX;
- 
-diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
-index 0c52911144..e13b3cc2e6 100644
---- a/contrib/virtiofsd/fuse_virtio.c
-+++ b/contrib/virtiofsd/fuse_virtio.c
-@@ -663,8 +663,8 @@ static void *fv_queue_thread(void *opaque)
-         struct fuse_session *se = qi->virtio_dev->se;
-         GThreadPool *pool;
- 
--        pool = g_thread_pool_new(fv_queue_worker, qi, 1 /* TODO max_threads */,
--                        TRUE, NULL);
-+        pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size,
-+                                 TRUE, NULL);
-         if (!pool) {
-                 fuse_err("%s: g_thread_pool_new failed\n", __func__);
-                 return NULL;
--- 
-2.21.0
+Yes, the compile error comes from kernel 3.10, and it seems necessary
+to solve this. I try to reuse qemu_lock_fd() to compat F_GETLK/F_SETLK,
+but its semantics differs from fcntl, so I think using #ifdef will be
+easier.
+
+We could delete F_GETLK/F_SETLK compat when virtiofsd is limited to be
+built in newer kernel. And I'm glad to hear from other developers.
+
+Thanks,
+Jun
+
+>> Dave
+>>
+>>>
+>>> -- 
+>>> Eric Blake, Principal Software Engineer
+>>> Red Hat, Inc.           +1-919-301-3226
+>>> Virtualization:  qemu.org | libvirt.org
+>>>
+>>
+>>
+>>
+>>
+>>> _______________________________________________
+>>> Virtio-fs mailing list
+>>> Virtio-fs@redhat.com
+>>> https://www.redhat.com/mailman/listinfo/virtio-fs
+>>
+>> --
+>> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+>>
+>> _______________________________________________
+>> Virtio-fs mailing list
+>> Virtio-fs@redhat.com
+>> https://www.redhat.com/mailman/listinfo/virtio-fs
+> --
+> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
+> .
+> 
 

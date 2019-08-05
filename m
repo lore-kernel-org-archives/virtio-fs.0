@@ -1,17 +1,14 @@
-Date: Thu, 25 Jul 2019 12:32:50 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190725193249.hczgmg776lfdjcr6@US-160370MP2.local>
-References: <20190724210721.9185-1-vgoyal@redhat.com>
-	<20190724210721.9185-4-vgoyal@redhat.com>
-	<20190725000858.qhyh5qncg727u5vr@US-160370MP2.local>
-	<20190725153521.GB15543@redhat.com>
+Date: Mon, 5 Aug 2019 16:17:08 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190805151708.GN13734@work-vm>
+References: <20190801165409.20121-1-stefanha@redhat.com>
+	<20190801165409.20121-4-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190725153521.GB15543@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 3/3] fuse: Add logic to upgrade a read-only
- mapping to read-write
-Reply-To: bo.liu@linux.alibaba.com
+In-Reply-To: <20190801165409.20121-4-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 3/4] virtiofsd: fix lo_destroy() resource
+	leaks
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,191 +17,92 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Thu, Jul 25, 2019 at 11:35:21AM -0400, Vivek Goyal wrote:
-> On Wed, Jul 24, 2019 at 05:08:58PM -0700, Liu Bo wrote:
-> > On Wed, Jul 24, 2019 at 05:07:21PM -0400, Vivek Goyal wrote:
-> > > Do not always map a dax mapping read-write. There are use cases like
-> > > executing a file where we want to map file read-only. virtio-fs dir on
-> > > host might be backed by overlayfs. We don't want to open file read-write
-> > > on overlayfs otherwise it will unnecessariliy be copied-up nullyifying
-> > > the advantages of sharing page cache between vms for unmodified files.
-> > > 
-> > > Hence, create a read-only mapping if user did not ask for writable mapping.
-> > > Later upgrade it to read-write mapping when users requests it.
-> > > 
-> > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > > ---
-> > >  fs/fuse/file.c   | 114 ++++++++++++++++++++++++++++++++++++-----------
-> > >  fs/fuse/fuse_i.h |   3 ++
-> > >  2 files changed, 91 insertions(+), 26 deletions(-)
-> > > 
-> > > diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-> > > index a2c19e4a28b5..bcd8ddcc0fdf 100644
-> > > --- a/fs/fuse/file.c
-> > > +++ b/fs/fuse/file.c
-> > > @@ -265,7 +265,8 @@ static void dmap_add_to_free_pool(struct fuse_conn *fc,
-> > >  
-> > >  /* offset passed in should be aligned to FUSE_DAX_MEM_RANGE_SZ */
-> > >  static int fuse_setup_one_mapping(struct inode *inode, loff_t offset,
-> > > -				  struct fuse_dax_mapping *dmap)
-> > > +				  struct fuse_dax_mapping *dmap, bool writable,
-> > > +				  bool upgrade)
-> > >  {
-> > >  	struct fuse_conn *fc = get_fuse_conn(inode);
-> > >  	struct fuse_inode *fi = get_fuse_inode(inode);
-> > > @@ -283,7 +284,8 @@ static int fuse_setup_one_mapping(struct inode *inode, loff_t offset,
-> > >  	inarg.moffset = dmap->window_offset;
-> > >  	inarg.len = FUSE_DAX_MEM_RANGE_SZ;
-> > >  	inarg.flags |= FUSE_SETUPMAPPING_FLAG_READ;
-> > > -	inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
-> > > +	if (writable)
-> > > +		inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
-> > >  	args.in.h.opcode = FUSE_SETUPMAPPING;
-> > >  	args.in.h.nodeid = fi->nodeid;
-> > >  	args.in.numargs = 1;
-> > > @@ -296,26 +298,30 @@ static int fuse_setup_one_mapping(struct inode *inode, loff_t offset,
-> > >  		return err;
-> > >  	}
-> > >  
-> > > -	pr_debug("fuse_setup_one_mapping() succeeded. offset=0x%llx err=%zd\n", offset, err);
-> > > +	pr_debug("fuse_setup_one_mapping() succeeded. offset=0x%llx writable=%d"
-> > > +		 " err=%zd\n", offset, writable, err);
-> > >  
-> > > -	/*
-> > > -	 * We don't take a refernce on inode. inode is valid right now and
-> > > -	 * when inode is going away, cleanup logic should first cleanup
-> > > -	 * dmap entries.
-> > > -	 *
-> > > -	 * TODO: Do we need to ensure that we are holding inode lock
-> > > -	 * as well.
-> > > -	 */
-> > > -	dmap->inode = inode;
-> > > -	dmap->start = offset;
-> > > -	dmap->end = offset + FUSE_DAX_MEM_RANGE_SZ - 1;
-> > > -	/* Protected by fi->i_dmap_sem */
-> > > -	fuse_dax_interval_tree_insert(dmap, &fi->dmap_tree);
-> > > -	fi->nr_dmaps++;
-> > > -	spin_lock(&fc->lock);
-> > > -	list_add_tail(&dmap->busy_list, &fc->busy_ranges);
-> > > -	fc->nr_busy_ranges++;
-> > > -	spin_unlock(&fc->lock);
-> > > +	dmap->writable = writable;
-> > > +	if (!upgrade) {
-> > > +		/*
-> > > +		 * We don't take a refernce on inode. inode is valid right now
-> > > +		 * and when inode is going away, cleanup logic should first
-> > > +		 * cleanup dmap entries.
-> > > +		 *
-> > > +		 * TODO: Do we need to ensure that we are holding inode lock
-> > > +		 * as well.
-> > > +		 */
-> > > +		dmap->inode = inode;
-> > > +		dmap->start = offset;
-> > > +		dmap->end = offset + FUSE_DAX_MEM_RANGE_SZ - 1;
-> > > +		/* Protected by fi->i_dmap_sem */
-> > > +		fuse_dax_interval_tree_insert(dmap, &fi->dmap_tree);
-> > > +		fi->nr_dmaps++;
-> > > +		spin_lock(&fc->lock);
-> > > +		list_add_tail(&dmap->busy_list, &fc->busy_ranges);
-> > > +		fc->nr_busy_ranges++;
-> > > +		spin_unlock(&fc->lock);
-> > > +	}
-> > >  	return 0;
-> > >  }
-> > >  
-> > > @@ -1890,6 +1896,7 @@ static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
-> > >  	struct fuse_conn *fc = get_fuse_conn(inode);
-> > >  	struct fuse_dax_mapping *dmap, *alloc_dmap = NULL;
-> > >  	int ret;
-> > > +	bool writable = flags & IOMAP_WRITE;
-> > >  
-> > >  	/* Can't do reclaim in fault path yet due to lock ordering.
-> > >  	 * Read path takes shared inode lock and that's not sufficient
-> > > @@ -1930,10 +1937,11 @@ static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
-> > >  
-> > >  	/* Setup one mapping */
-> > >  	ret = fuse_setup_one_mapping(inode,
-> > > -		ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ), alloc_dmap);
-> > > +				     ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ),
-> > > +				     alloc_dmap, writable, false);
-> > >  	if (ret < 0) {
-> > >  		printk("fuse_setup_one_mapping() failed. err=%d"
-> > > -			" pos=0x%llx\n", ret, pos);
-> > > +			" pos=0x%llx, writable=%d\n", ret, pos, writable);
-> > >  		dmap_add_to_free_pool(fc, alloc_dmap);
-> > >  		up_write(&fi->i_dmap_sem);
-> > >  		return ret;
-> > > @@ -1943,6 +1951,45 @@ static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
-> > >  	return 0;
-> > >  }
-> > >  
-> > > +static int iomap_begin_upgrade_mapping(struct inode *inode, loff_t pos,
-> > > +					 loff_t length, unsigned flags,
-> > > +					 struct iomap *iomap)
-> > > +{
-> > > +	struct fuse_inode *fi = get_fuse_inode(inode);
-> > > +	struct fuse_dax_mapping *dmap;
-> > > +	int ret;
-> > > +
-> > > +	/*
-> > > +	 * Take exclusive lock so that only one caller can try to setup
-> > > +	 * mapping and others wait.
-> > > +	 */
-> > > +	down_write(&fi->i_dmap_sem);
-> > > +	dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, pos, pos);
-> > > +
-> > > +	/* We are holding either inode lock or i_mmap_sem, and that should
-> > > +	 * ensure that dmap can't reclaimed or truncated and it should still
-> > > +	 * be there in tree despite the fact we dropped and re-acquired the
-> > > +	 * lock.
-> > > +	 */
-> > > +	if (WARN_ON(!dmap))
-> > > +		return -EIO;
-> > 
-> > up_write() is missed here.
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> Now that lo_destroy() is serialized we can call unref_inode() so that
+> all inode resources are freed.
 > 
-> Good catch. Will fix it.
+> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+
+> ---
+>  contrib/virtiofsd/passthrough_ll.c | 43 ++++++++++++++----------------
+>  1 file changed, 20 insertions(+), 23 deletions(-)
 > 
-> > 
-> > And I posted a similar patch[1] but with inode_lock being dropped in
-> > mind, anything wrong with that patch?
+> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+> index a81c01d0d1..02a5e97326 100644
+> --- a/contrib/virtiofsd/passthrough_ll.c
+> +++ b/contrib/virtiofsd/passthrough_ll.c
+> @@ -1340,28 +1340,6 @@ static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
+>  	}
+>  }
+>  
+> -static int unref_all_inodes_cb(gpointer key, gpointer value,
+> -			       gpointer user_data)
+> -{
+> -	struct lo_inode *inode  = value;
+> -	struct lo_data *lo = user_data;
+> -
+> -	inode->nlookup = 0;
+> -	lo_map_remove(&lo->ino_map, inode->fuse_ino);
+> -	close(inode->fd);
+> -	lo_inode_put(lo, &inode); /* Drop our refcount from lo_do_lookup() */
+> -
+> -	return TRUE;
+> -}
+> -
+> -static void unref_all_inodes(struct lo_data *lo)
+> -{
+> -	pthread_mutex_lock(&lo->mutex);
+> -	g_hash_table_foreach_remove(lo->inodes, unref_all_inodes_cb, lo);
+> -	pthread_mutex_unlock(&lo->mutex);
+> -
+> -}
+> -
+>  static void lo_forget_one(fuse_req_t req, fuse_ino_t ino, uint64_t nlookup)
+>  {
+>  	struct lo_data *lo = lo_data(req);
+> @@ -2462,6 +2440,18 @@ static void lo_removemapping(fuse_req_t req, struct fuse_session *se,
+>  	fuse_reply_err(req, ret);
+>  }
+>  
+> +static int destroy_inode_cb(gpointer key, gpointer value, gpointer user_data)
+> +{
+> +        struct lo_inode *inode = value;
+> +        struct lo_data *lo = user_data;
+> +
+> +        /* inode->nlookup is normally protected by lo->mutex but see the
+> +         * comment in lo_destroy().
+> +         */
+> +        unref_inode(lo, inode, inode->nlookup);
+> +        return TRUE;
+> +}
+> +
+>  static void lo_destroy(void *userdata, struct fuse_session *se)
+>  {
+>  	struct lo_data *lo = (struct lo_data*) userdata;
+> @@ -2475,7 +2465,14 @@ static void lo_destroy(void *userdata, struct fuse_session *se)
+>                          fuse_err("%s: unmap during destroy failed\n", __func__);
+>                  }
+>          }
+> -	unref_all_inodes(lo);
+> +
+> +        /* Normally lo->mutex must be taken when traversing lo->inodes but
+> +         * lo_destroy() is a serialized request so no races are possible here.
+> +         *
+> +         * In addition, we cannot acquire lo->mutex since destroy_inode_cb() takes it
+> +         * too and this would result in a recursive lock.
+> +         */
+> +        g_hash_table_foreach_remove(lo->inodes, destroy_inode_cb, lo);
+>  }
+>  
+>  static struct fuse_lowlevel_ops lo_oper = {
+> -- 
+> 2.21.0
 > 
-> It was an old posting so did not pay much attention to it. Looking at
-> it now and few things I notice.
-> 
-> - That patch will allocate and possibly wait for memory range and free
->   it up when upgrading from read-only to read-write. That's not required.
->
-
-What I was trying to say is that the above assumption about "dmap is still in
-tree despite dropping-acquiring lock" is doubtful if inode lock is not held by
-reclaim code.
-
-There is a window between dropping and reacquiring lock, if it gets reclaimed,
-we're supposed to continue on the allocation path.
-
-
-> - dmap->flags is not required at this point of time. If we add more
->   states later, we can convert it to a flag.
-> 
-> - Code structure seems little simpler in this patch (in
->   fuse_iomap_begin()).
-
-I like the cleanups.
-
-thanks,
--liubo
-
-> 
-> W.r.t dropping inode lock, I think we should still be able to do with this
-> patch and take reference on dmap under shared lock. And drop that
-> reference later. Taking that reference should make sure dmap will not
-> be reclaimed when we don't have i_dmap_sem. And truncate/punch_hole
-> can't reclaim anyway because of inode_lock/i_mmap_sem lock.
-> 
-> Thanks
-> Vivek
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

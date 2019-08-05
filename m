@@ -1,26 +1,14 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-	d=plexistor-com.20150623.gappssmtp.com; s=20150623;
-	h=subject:to:cc:references:from:message-id:date:user-agent
-	:mime-version:in-reply-to:content-language:content-transfer-encoding;
-	bh=MSEFUn+zJ9lWrXGkPUtwAP7Ktu03TxUAHzcVzGIcTF0=;
-	b=N05j3MmRLF3evphEMwVzucDNXsLRSnsdv/awwci4zbq7QIwOPLXt3iLd8b84PDqisL
-	vGx6wOrcjxl/hiLos9rciSZUlE8VtI22BMPNNFJHtPJNjEGc0URlZehBtAiYWUeczkEb
-	5SVBzEDDBjhKEqUks05aXyq8xGo2ZCFxaI3GxwnQ5CutZb5qgSeReOK3nf709SYWTrZT
-	QTiW3O8ziZO/IwRbQH/BCboe8UXAklCCpxtkMrOO7aVFgjGOTzwvw9zDmrNEm1maPkDb
-	cQYRE+dy9ZBBN0Vi/du972H1Gd17LWkrP7lifgiAiRJhgtr4Ycoko68GbHEvJIXMjVVg
-	dDCg==
-References: <20190802192956.GA3032@redhat.com>
-	<CAPcyv4jxknEGq9FzGpsMJ6E7jC51d1W9KbNg4HX6Cj6vqt7dqg@mail.gmail.com>
-From: Boaz Harrosh <boaz@plexistor.com>
-Message-ID: <9678e812-08c1-fab7-f358-eaf123af14e5@plexistor.com>
-Date: Mon, 5 Aug 2019 14:53:06 +0300
+Date: Mon, 5 Aug 2019 13:02:31 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190805120231.GL13734@work-vm>
+References: <20190801165409.20121-1-stefanha@redhat.com>
+	<20190801165409.20121-2-stefanha@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <CAPcyv4jxknEGq9FzGpsMJ6E7jC51d1W9KbNg4HX6Cj6vqt7dqg@mail.gmail.com>
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-MW
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH] dax: dax_layout_busy_page() should not
-	unmap cow pages
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20190801165409.20121-2-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 1/4] virtiofsd: process requests in a thread
+	pool
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -29,60 +17,106 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Dan Williams <dan.j.williams@intel.com>, Vivek Goyal <vgoyal@redhat.com>
-Cc: linux-fsdevel <linux-fsdevel@vger.kernel.org>, virtio-fs@redhat.com, linux-nvdimm <linux-nvdimm@lists.01.org>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On 02/08/2019 22:37, Dan Williams wrote:
-> On Fri, Aug 2, 2019 at 12:30 PM Vivek Goyal <vgoyal@redhat.com> wrote:
->>
->> As of now dax_layout_busy_page() calls unmap_mapping_range() with last
->> argument as 1, which says even unmap cow pages. I am wondering who needs
->> to get rid of cow pages as well.
->>
->> I noticed one interesting side affect of this. I mount xfs with -o dax and
->> mmaped a file with MAP_PRIVATE and wrote some data to a page which created
->> cow page. Then I called fallocate() on that file to zero a page of file.
->> fallocate() called dax_layout_busy_page() which unmapped cow pages as well
->> and then I tried to read back the data I wrote and what I get is old
->> data from persistent memory. I lost the data I had written. This
->> read basically resulted in new fault and read back the data from
->> persistent memory.
->>
->> This sounds wrong. Are there any users which need to unmap cow pages
->> as well? If not, I am proposing changing it to not unmap cow pages.
->>
->> I noticed this while while writing virtio_fs code where when I tried
->> to reclaim a memory range and that corrupted the executable and I
->> was running from virtio-fs and program got segment violation.
->>
->> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
->> ---
->>  fs/dax.c |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> Index: rhvgoyal-linux/fs/dax.c
->> ===================================================================
->> --- rhvgoyal-linux.orig/fs/dax.c        2019-08-01 17:03:10.574675652 -0400
->> +++ rhvgoyal-linux/fs/dax.c     2019-08-02 14:32:28.809639116 -0400
->> @@ -600,7 +600,7 @@ struct page *dax_layout_busy_page(struct
->>          * guaranteed to either see new references or prevent new
->>          * references from being established.
->>          */
->> -       unmap_mapping_range(mapping, 0, 0, 1);
->> +       unmap_mapping_range(mapping, 0, 0, 0);
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> Introduce a thread pool so that fv_queue_thread() just pops
+> VuVirtqElements and hands them to the thread pool.  For the time being
+> only one worker thread is allowed since passthrough_ll.c is not
+> thread-safe yet.  Future patches will lift this restriction so that
+> multiple FUSE requests can be processed in parallel.
 > 
-> Good find, yes, this looks correct to me and should also go to -stable.
+> The main new concept is struct FVRequest, which contains both
+> VuVirtqElement and struct fuse_chan.  We now have fv_VuDev for a device,
+> fv_QueueInfo for a virtqueue, and FVRequest for a request.  Some of
+> fv_QueueInfo's fields are moved into FVRequest because they are
+> per-request.  The name FVRequest conforms to QEMU coding style and I
+> expect the struct fv_* types will be renamed in a future refactoring.
 > 
+> This patch series is not optimal.  fbuf reuse is dropped so each request
+> does malloc(se->bufsize), but there is no clean and cheap way to keep
+> this with a thread pool.  The vq_lock mutex is held for longer than
+> necessary, especially during the eventfd_write() syscall.  Performance
+> can be improved in the future.
+> 
+> prctl(2) had to be added to the seccomp whitelist because glib invokes
+> it.
+> 
+> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 
-Please pay attention that unmap_mapping_range(mapping, ..., 1) is for the truncate case and friends
+Thanks, applied; some comments below.
 
-So as I understand the man page:
-fallocate(FL_PUNCH_HOLE); means user is asking to get rid also of COW pages.
-On the other way fallocate(FL_ZERO_RANGE) only the pmem portion is zeroed and COW (private pages) stays
+> +
+> +        pthread_rwlock_rdlock(&qi->virtio_dev->vu_dispatch_rwlock);
+> +        pthread_mutex_lock(&qi->vq_lock);
+> +        vu_queue_push(dev, q, elem, tosend_len);
+> +        vu_queue_notify(dev, q);
+> +        pthread_mutex_unlock(&qi->vq_lock);
+> +        pthread_rwlock_unlock(&qi->virtio_dev->vu_dispatch_rwlock);
 
-Just saying I have not followed the above code path
-(We should have an xfstest for this?)
+It surprises me that these paired locks are so common.
+>  
+>  err:
+>  
+> @@ -249,9 +268,12 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+>                           struct iovec *iov, int count,
+>                           struct fuse_bufvec *buf, size_t len)
+>  {
+> +        FVRequest *req = container_of(ch, FVRequest, ch);
 
-Cheers
-Boaz
+I can't think of a better answer than the container_of but it does make
+me a bit nervous; I guess we need it because 'ch' comes from the generic
+fs code so can't be FVRequest*
+> +        struct VuDev *dev = &qi->virtio_dev->dev;
+> +        FVRequest *req = data;
+> +        VuVirtqElement *elem = &req->elem;
+> +        struct fuse_buf fbuf = {};
+> +        bool allocated_bufv = false;
+> +        struct fuse_bufvec bufv;
+> +        struct fuse_bufvec *pbufv;
+> +
+> +        assert(se->bufsize > sizeof(struct fuse_in_header));
+> +
+> +        /* An element contains one request and the space to send our response
+> +         * They're spread over multiple descriptors in a scatter/gather set
+> +         * and we can't trust the guest to keep them still; so copy in/out.
+> +         */
+> +        fbuf.mem = malloc(se->bufsize);
+> +        assert(fbuf.mem);
+
+Now we're using thread pools etc, maybe it's time to switch to glib's
+g_new/g_malloc etc that never return NULL?
+
+> +        if (se->debug)
+> +                fuse_debug("%s: elem %d: with %d out desc of length %zd"
+> +                           " bad_in_num=%u bad_out_num=%u\n",
+> +                           __func__, elem->index, out_num,
+> +                           out_len, req->bad_in_num, req->bad_out_num);
+
+Are the debug/logging calls thread safe?
+
+
+> diff --git a/contrib/virtiofsd/seccomp.c b/contrib/virtiofsd/seccomp.c
+> index cea4cc5f60..5f1c873b82 100644
+> --- a/contrib/virtiofsd/seccomp.c
+> +++ b/contrib/virtiofsd/seccomp.c
+> @@ -58,6 +58,7 @@ static const int syscall_whitelist[] = {
+>  	SCMP_SYS(open),
+>  	SCMP_SYS(openat),
+>  	SCMP_SYS(ppoll),
+> +	SCMP_SYS(prctl), /* TODO restrict to just PR_SET_NAME? */
+
+Would seem a good idea because prctl can do lots of crazy things.
+
+Dave
+
+>  	SCMP_SYS(preadv),
+>  	SCMP_SYS(pwrite64),
+>  	SCMP_SYS(read),
+> -- 
+> 2.21.0
+> 
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

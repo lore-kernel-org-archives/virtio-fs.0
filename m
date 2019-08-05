@@ -1,14 +1,13 @@
-Date: Mon, 5 Aug 2019 16:17:08 +0100
+Date: Mon, 5 Aug 2019 17:16:43 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190805151708.GN13734@work-vm>
-References: <20190801165409.20121-1-stefanha@redhat.com>
-	<20190801165409.20121-4-stefanha@redhat.com>
+Message-ID: <20190805161643.GO13734@work-vm>
+References: <1564744343-8087-1-git-send-email-tao.peng@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190801165409.20121-4-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 3/4] virtiofsd: fix lo_destroy() resource
-	leaks
+In-Reply-To: <1564744343-8087-1-git-send-email-tao.peng@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: do not always set
+	FUSE_FLOCK_LOCKS
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,92 +16,53 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Peng Tao <tao.peng@linux.alibaba.com>
+Cc: virtio-fs@redhat.com
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> Now that lo_destroy() is serialized we can call unref_inode() so that
-> all inode resources are freed.
+* Peng Tao (tao.peng@linux.alibaba.com) wrote:
+> Right now we always enable it regardless of given commandlines.
+> Fix it by setting the flag relying on the lo->flock bit.
 > 
-> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Thanks, applied.
 
 > ---
->  contrib/virtiofsd/passthrough_ll.c | 43 ++++++++++++++----------------
->  1 file changed, 20 insertions(+), 23 deletions(-)
+>  contrib/virtiofsd/passthrough_ll.c | 14 ++++++++++----
+>  1 file changed, 10 insertions(+), 4 deletions(-)
 > 
 > diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-> index a81c01d0d1..02a5e97326 100644
+> index a81c01d..be75cb8 100644
 > --- a/contrib/virtiofsd/passthrough_ll.c
 > +++ b/contrib/virtiofsd/passthrough_ll.c
-> @@ -1340,28 +1340,6 @@ static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
+> @@ -440,10 +440,16 @@ static void lo_init(void *userdata,
+>  			fuse_debug("lo_init: activating writeback\n");
+>  		conn->want |= FUSE_CAP_WRITEBACK_CACHE;
 >  	}
->  }
+> -	if (lo->flock && conn->capable & FUSE_CAP_FLOCK_LOCKS) {
+> -		if (lo->debug)
+> -			fuse_debug("lo_init: activating flock locks\n");
+> -		conn->want |= FUSE_CAP_FLOCK_LOCKS;
+> +	if (conn->capable & FUSE_CAP_FLOCK_LOCKS) {
+> +		if (lo->flock) {
+> +			if (lo->debug)
+> +				fuse_debug("lo_init: activating flock locks\n");
+> +			conn->want |= FUSE_CAP_FLOCK_LOCKS;
+> +		} else {
+> +			if (lo->debug)
+> +				fuse_debug("lo_init: disabling flock locks\n");
+> +			conn->want &= ~FUSE_CAP_FLOCK_LOCKS;
+> +		}
+>  	}
+>  	/* TODO: shared version support for readdirplus */
 >  
-> -static int unref_all_inodes_cb(gpointer key, gpointer value,
-> -			       gpointer user_data)
-> -{
-> -	struct lo_inode *inode  = value;
-> -	struct lo_data *lo = user_data;
-> -
-> -	inode->nlookup = 0;
-> -	lo_map_remove(&lo->ino_map, inode->fuse_ino);
-> -	close(inode->fd);
-> -	lo_inode_put(lo, &inode); /* Drop our refcount from lo_do_lookup() */
-> -
-> -	return TRUE;
-> -}
-> -
-> -static void unref_all_inodes(struct lo_data *lo)
-> -{
-> -	pthread_mutex_lock(&lo->mutex);
-> -	g_hash_table_foreach_remove(lo->inodes, unref_all_inodes_cb, lo);
-> -	pthread_mutex_unlock(&lo->mutex);
-> -
-> -}
-> -
->  static void lo_forget_one(fuse_req_t req, fuse_ino_t ino, uint64_t nlookup)
->  {
->  	struct lo_data *lo = lo_data(req);
-> @@ -2462,6 +2440,18 @@ static void lo_removemapping(fuse_req_t req, struct fuse_session *se,
->  	fuse_reply_err(req, ret);
->  }
->  
-> +static int destroy_inode_cb(gpointer key, gpointer value, gpointer user_data)
-> +{
-> +        struct lo_inode *inode = value;
-> +        struct lo_data *lo = user_data;
-> +
-> +        /* inode->nlookup is normally protected by lo->mutex but see the
-> +         * comment in lo_destroy().
-> +         */
-> +        unref_inode(lo, inode, inode->nlookup);
-> +        return TRUE;
-> +}
-> +
->  static void lo_destroy(void *userdata, struct fuse_session *se)
->  {
->  	struct lo_data *lo = (struct lo_data*) userdata;
-> @@ -2475,7 +2465,14 @@ static void lo_destroy(void *userdata, struct fuse_session *se)
->                          fuse_err("%s: unmap during destroy failed\n", __func__);
->                  }
->          }
-> -	unref_all_inodes(lo);
-> +
-> +        /* Normally lo->mutex must be taken when traversing lo->inodes but
-> +         * lo_destroy() is a serialized request so no races are possible here.
-> +         *
-> +         * In addition, we cannot acquire lo->mutex since destroy_inode_cb() takes it
-> +         * too and this would result in a recursive lock.
-> +         */
-> +        g_hash_table_foreach_remove(lo->inodes, destroy_inode_cb, lo);
->  }
->  
->  static struct fuse_lowlevel_ops lo_oper = {
 > -- 
-> 2.21.0
+> 1.8.3.1
 > 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 --
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

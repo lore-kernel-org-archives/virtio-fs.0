@@ -1,14 +1,15 @@
-Date: Mon, 5 Aug 2019 13:02:31 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190805120231.GL13734@work-vm>
-References: <20190801165409.20121-1-stefanha@redhat.com>
-	<20190801165409.20121-2-stefanha@redhat.com>
+Date: Mon, 5 Aug 2019 08:25:10 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190805122510.GA13994@redhat.com>
+References: <20190726154948.28540-1-vgoyal@redhat.com>
+	<20190726154948.28540-4-vgoyal@redhat.com>
+	<81f96837-59bc-872d-2187-1bd1e74bf9e5@huawei.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190801165409.20121-2-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 1/4] virtiofsd: process requests in a thread
-	pool
+In-Reply-To: <81f96837-59bc-872d-2187-1bd1e74bf9e5@huawei.com>
+Subject: Re: [Virtio-fs] [PATCH 3/3] fuse: Add logic to upgrade a read-only
+ mapping to read-write
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,106 +18,244 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: piaojun <piaojun@huawei.com>
+Cc: virtio-fs@redhat.com
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> Introduce a thread pool so that fv_queue_thread() just pops
-> VuVirtqElements and hands them to the thread pool.  For the time being
-> only one worker thread is allowed since passthrough_ll.c is not
-> thread-safe yet.  Future patches will lift this restriction so that
-> multiple FUSE requests can be processed in parallel.
+On Sun, Aug 04, 2019 at 09:56:55AM +0800, piaojun wrote:
+> Hi Vivek,
 > 
-> The main new concept is struct FVRequest, which contains both
-> VuVirtqElement and struct fuse_chan.  We now have fv_VuDev for a device,
-> fv_QueueInfo for a virtqueue, and FVRequest for a request.  Some of
-> fv_QueueInfo's fields are moved into FVRequest because they are
-> per-request.  The name FVRequest conforms to QEMU coding style and I
-> expect the struct fv_* types will be renamed in a future refactoring.
+> Shall we downgrade dax mapping from rw to read-only, if current user
+> open with O_RDONLY, and last user opened with O_RDWR? This will minimize
+> the access authority.
 > 
-> This patch series is not optimal.  fbuf reuse is dropped so each request
-> does malloc(se->bufsize), but there is no clean and cheap way to keep
-> this with a thread pool.  The vq_lock mutex is held for longer than
-> necessary, especially during the eventfd_write() syscall.  Performance
-> can be improved in the future.
+> I wonder if my concern is necessary. And if it will cause frequent dax
+> mapping?
+
+There is a chance that memory mapping will be reclaimed and setup as
+read-only again.
+
+I will not worry about this at this point of time.
+
+Thanks
+Vivek
+
 > 
-> prctl(2) had to be added to the seccomp whitelist because glib invokes
-> it.
+> Thanks,
+> Jun
 > 
-> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-
-Thanks, applied; some comments below.
-
-> +
-> +        pthread_rwlock_rdlock(&qi->virtio_dev->vu_dispatch_rwlock);
-> +        pthread_mutex_lock(&qi->vq_lock);
-> +        vu_queue_push(dev, q, elem, tosend_len);
-> +        vu_queue_notify(dev, q);
-> +        pthread_mutex_unlock(&qi->vq_lock);
-> +        pthread_rwlock_unlock(&qi->virtio_dev->vu_dispatch_rwlock);
-
-It surprises me that these paired locks are so common.
->  
->  err:
->  
-> @@ -249,9 +268,12 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
->                           struct iovec *iov, int count,
->                           struct fuse_bufvec *buf, size_t len)
->  {
-> +        FVRequest *req = container_of(ch, FVRequest, ch);
-
-I can't think of a better answer than the container_of but it does make
-me a bit nervous; I guess we need it because 'ch' comes from the generic
-fs code so can't be FVRequest*
-> +        struct VuDev *dev = &qi->virtio_dev->dev;
-> +        FVRequest *req = data;
-> +        VuVirtqElement *elem = &req->elem;
-> +        struct fuse_buf fbuf = {};
-> +        bool allocated_bufv = false;
-> +        struct fuse_bufvec bufv;
-> +        struct fuse_bufvec *pbufv;
-> +
-> +        assert(se->bufsize > sizeof(struct fuse_in_header));
-> +
-> +        /* An element contains one request and the space to send our response
-> +         * They're spread over multiple descriptors in a scatter/gather set
-> +         * and we can't trust the guest to keep them still; so copy in/out.
-> +         */
-> +        fbuf.mem = malloc(se->bufsize);
-> +        assert(fbuf.mem);
-
-Now we're using thread pools etc, maybe it's time to switch to glib's
-g_new/g_malloc etc that never return NULL?
-
-> +        if (se->debug)
-> +                fuse_debug("%s: elem %d: with %d out desc of length %zd"
-> +                           " bad_in_num=%u bad_out_num=%u\n",
-> +                           __func__, elem->index, out_num,
-> +                           out_len, req->bad_in_num, req->bad_out_num);
-
-Are the debug/logging calls thread safe?
-
-
-> diff --git a/contrib/virtiofsd/seccomp.c b/contrib/virtiofsd/seccomp.c
-> index cea4cc5f60..5f1c873b82 100644
-> --- a/contrib/virtiofsd/seccomp.c
-> +++ b/contrib/virtiofsd/seccomp.c
-> @@ -58,6 +58,7 @@ static const int syscall_whitelist[] = {
->  	SCMP_SYS(open),
->  	SCMP_SYS(openat),
->  	SCMP_SYS(ppoll),
-> +	SCMP_SYS(prctl), /* TODO restrict to just PR_SET_NAME? */
-
-Would seem a good idea because prctl can do lots of crazy things.
-
-Dave
-
->  	SCMP_SYS(preadv),
->  	SCMP_SYS(pwrite64),
->  	SCMP_SYS(read),
-> -- 
-> 2.21.0
-> 
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> On 2019/7/26 23:49, Vivek Goyal wrote:
+> > Do not always map a dax mapping read-write. There are use cases like
+> > executing a file where we want to map file read-only. virtio-fs dir on
+> > host might be backed by overlayfs. We don't want to open file read-write
+> > on overlayfs otherwise it will unnecessariliy be copied-up nullyifying
+> > the advantages of sharing page cache between vms for unmodified files.
+> > 
+> > Hence, create a read-only mapping if user did not ask for writable mapping.
+> > Later upgrade it to read-write mapping when users requests it.
+> > 
+> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > ---
+> >  fs/fuse/file.c   | 121 +++++++++++++++++++++++++++++++++++++----------
+> >  fs/fuse/fuse_i.h |   3 ++
+> >  2 files changed, 98 insertions(+), 26 deletions(-)
+> > 
+> > diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+> > index a2c19e4a28b5..5277de7028a6 100644
+> > --- a/fs/fuse/file.c
+> > +++ b/fs/fuse/file.c
+> > @@ -265,7 +265,8 @@ static void dmap_add_to_free_pool(struct fuse_conn *fc,
+> >  
+> >  /* offset passed in should be aligned to FUSE_DAX_MEM_RANGE_SZ */
+> >  static int fuse_setup_one_mapping(struct inode *inode, loff_t offset,
+> > -				  struct fuse_dax_mapping *dmap)
+> > +				  struct fuse_dax_mapping *dmap, bool writable,
+> > +				  bool upgrade)
+> >  {
+> >  	struct fuse_conn *fc = get_fuse_conn(inode);
+> >  	struct fuse_inode *fi = get_fuse_inode(inode);
+> > @@ -283,7 +284,8 @@ static int fuse_setup_one_mapping(struct inode *inode, loff_t offset,
+> >  	inarg.moffset = dmap->window_offset;
+> >  	inarg.len = FUSE_DAX_MEM_RANGE_SZ;
+> >  	inarg.flags |= FUSE_SETUPMAPPING_FLAG_READ;
+> > -	inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
+> > +	if (writable)
+> > +		inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
+> >  	args.in.h.opcode = FUSE_SETUPMAPPING;
+> >  	args.in.h.nodeid = fi->nodeid;
+> >  	args.in.numargs = 1;
+> > @@ -296,26 +298,30 @@ static int fuse_setup_one_mapping(struct inode *inode, loff_t offset,
+> >  		return err;
+> >  	}
+> >  
+> > -	pr_debug("fuse_setup_one_mapping() succeeded. offset=0x%llx err=%zd\n", offset, err);
+> > +	pr_debug("fuse_setup_one_mapping() succeeded. offset=0x%llx writable=%d"
+> > +		 " err=%zd\n", offset, writable, err);
+> >  
+> > -	/*
+> > -	 * We don't take a refernce on inode. inode is valid right now and
+> > -	 * when inode is going away, cleanup logic should first cleanup
+> > -	 * dmap entries.
+> > -	 *
+> > -	 * TODO: Do we need to ensure that we are holding inode lock
+> > -	 * as well.
+> > -	 */
+> > -	dmap->inode = inode;
+> > -	dmap->start = offset;
+> > -	dmap->end = offset + FUSE_DAX_MEM_RANGE_SZ - 1;
+> > -	/* Protected by fi->i_dmap_sem */
+> > -	fuse_dax_interval_tree_insert(dmap, &fi->dmap_tree);
+> > -	fi->nr_dmaps++;
+> > -	spin_lock(&fc->lock);
+> > -	list_add_tail(&dmap->busy_list, &fc->busy_ranges);
+> > -	fc->nr_busy_ranges++;
+> > -	spin_unlock(&fc->lock);
+> > +	dmap->writable = writable;
+> > +	if (!upgrade) {
+> > +		/*
+> > +		 * We don't take a refernce on inode. inode is valid right now
+> > +		 * and when inode is going away, cleanup logic should first
+> > +		 * cleanup dmap entries.
+> > +		 *
+> > +		 * TODO: Do we need to ensure that we are holding inode lock
+> > +		 * as well.
+> > +		 */
+> > +		dmap->inode = inode;
+> > +		dmap->start = offset;
+> > +		dmap->end = offset + FUSE_DAX_MEM_RANGE_SZ - 1;
+> > +		/* Protected by fi->i_dmap_sem */
+> > +		fuse_dax_interval_tree_insert(dmap, &fi->dmap_tree);
+> > +		fi->nr_dmaps++;
+> > +		spin_lock(&fc->lock);
+> > +		list_add_tail(&dmap->busy_list, &fc->busy_ranges);
+> > +		fc->nr_busy_ranges++;
+> > +		spin_unlock(&fc->lock);
+> > +	}
+> >  	return 0;
+> >  }
+> >  
+> > @@ -1890,6 +1896,7 @@ static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
+> >  	struct fuse_conn *fc = get_fuse_conn(inode);
+> >  	struct fuse_dax_mapping *dmap, *alloc_dmap = NULL;
+> >  	int ret;
+> > +	bool writable = flags & IOMAP_WRITE;
+> >  
+> >  	/* Can't do reclaim in fault path yet due to lock ordering.
+> >  	 * Read path takes shared inode lock and that's not sufficient
+> > @@ -1930,10 +1937,11 @@ static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
+> >  
+> >  	/* Setup one mapping */
+> >  	ret = fuse_setup_one_mapping(inode,
+> > -		ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ), alloc_dmap);
+> > +				     ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ),
+> > +				     alloc_dmap, writable, false);
+> >  	if (ret < 0) {
+> >  		printk("fuse_setup_one_mapping() failed. err=%d"
+> > -			" pos=0x%llx\n", ret, pos);
+> > +			" pos=0x%llx, writable=%d\n", ret, pos, writable);
+> >  		dmap_add_to_free_pool(fc, alloc_dmap);
+> >  		up_write(&fi->i_dmap_sem);
+> >  		return ret;
+> > @@ -1943,6 +1951,52 @@ static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
+> >  	return 0;
+> >  }
+> >  
+> > +static int iomap_begin_upgrade_mapping(struct inode *inode, loff_t pos,
+> > +					 loff_t length, unsigned flags,
+> > +					 struct iomap *iomap)
+> > +{
+> > +	struct fuse_inode *fi = get_fuse_inode(inode);
+> > +	struct fuse_dax_mapping *dmap;
+> > +	int ret;
+> > +
+> > +	/*
+> > +	 * Take exclusive lock so that only one caller can try to setup
+> > +	 * mapping and others wait.
+> > +	 */
+> > +	down_write(&fi->i_dmap_sem);
+> > +	dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, pos, pos);
+> > +
+> > +	/* We are holding either inode lock or i_mmap_sem, and that should
+> > +	 * ensure that dmap can't reclaimed or truncated and it should still
+> > +	 * be there in tree despite the fact we dropped and re-acquired the
+> > +	 * lock.
+> > +	 */
+> > +	ret = -EIO;
+> > +	if (WARN_ON(!dmap))
+> > +		goto out_err;
+> > +
+> > +	/* Maybe another thread already upgraded mapping while we were not
+> > +	 * holding lock.
+> > +	 */
+> > +	if (dmap->writable)
+> > +		goto out_fill_iomap;
+> > +
+> > +	ret = fuse_setup_one_mapping(inode,
+> > +				     ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ),
+> > +				     dmap, true, true);
+> > +	if (ret < 0) {
+> > +		printk("fuse_setup_one_mapping() failed. err=%d pos=0x%llx\n",
+> > +		       ret, pos);
+> > +		goto out_err;
+> > +	}
+> > +
+> > +out_fill_iomap:
+> > +	fuse_fill_iomap(inode, pos, length, iomap, dmap, flags);
+> > +out_err:
+> > +	up_write(&fi->i_dmap_sem);
+> > +	return ret;
+> > +}
+> > +
+> >  /* This is just for DAX and the mapping is ephemeral, do not use it for other
+> >   * purposes since there is no block device with a permanent mapping.
+> >   */
+> > @@ -1952,6 +2006,7 @@ static int fuse_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
+> >  	struct fuse_inode *fi = get_fuse_inode(inode);
+> >  	struct fuse_conn *fc = get_fuse_conn(inode);
+> >  	struct fuse_dax_mapping *dmap;
+> > +	bool writable = flags & IOMAP_WRITE;
+> >  
+> >  	/* We don't support FIEMAP */
+> >  	BUG_ON(flags & IOMAP_REPORT);
+> > @@ -1982,9 +2037,23 @@ static int fuse_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
+> >  	dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, pos, pos);
+> >  
+> >  	if (dmap) {
+> > -		fuse_fill_iomap(inode, pos, length, iomap, dmap, flags);
+> > -		up_read(&fi->i_dmap_sem);
+> > -		return 0;
+> > +		if (writable && !dmap->writable) {
+> > +			/* Upgrade read-only mapping to read-write. This will
+> > +			 * require exclusive i_dmap_sem lock as we don't want
+> > +			 * two threads to be trying to this simultaneously
+> > +			 * for same dmap. So drop shared lock and acquire
+> > +			 * exclusive lock.
+> > +			 */
+> > +			up_read(&fi->i_dmap_sem);
+> > +			pr_debug("%s: Upgrading mapping at offset 0x%llx"
+> > +				 " length 0x%llx\n", __func__, pos, length);
+> > +			return iomap_begin_upgrade_mapping(inode, pos, length,
+> > +							   flags, iomap);
+> > +		} else {
+> > +			fuse_fill_iomap(inode, pos, length, iomap, dmap, flags);
+> > +			up_read(&fi->i_dmap_sem);
+> > +			return 0;
+> > +		}
+> >  	} else {
+> >  		up_read(&fi->i_dmap_sem);
+> >  		pr_debug("%s: no mapping at offset 0x%llx length 0x%llx\n",
+> > diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+> > index e899a06e29d7..34ca8b90a1e1 100644
+> > --- a/fs/fuse/fuse_i.h
+> > +++ b/fs/fuse/fuse_i.h
+> > @@ -134,6 +134,9 @@ struct fuse_dax_mapping {
+> >  
+> >  	/** Length of mapping, in bytes */
+> >  	loff_t length;
+> > +
+> > +	/* Is this mapping read-only or read-write */
+> > +	bool writable;
+> >  };
+> >  
+> >  /** FUSE inode */
+> > 
 

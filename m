@@ -1,17 +1,11 @@
-Date: Thu, 25 Jul 2019 16:30:13 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190725203013.GF15543@redhat.com>
-References: <20190724210721.9185-1-vgoyal@redhat.com>
-	<20190724210721.9185-4-vgoyal@redhat.com>
-	<20190725000858.qhyh5qncg727u5vr@US-160370MP2.local>
-	<20190725153521.GB15543@redhat.com>
-	<20190725193249.hczgmg776lfdjcr6@US-160370MP2.local>
+From: piaojun <piaojun@huawei.com>
+Message-ID: <5D48EEAB.7000100@huawei.com>
+Date: Tue, 6 Aug 2019 11:06:19 +0800
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20190725193249.hczgmg776lfdjcr6@US-160370MP2.local>
-Subject: Re: [Virtio-fs] [PATCH 3/3] fuse: Add logic to upgrade a read-only
- mapping to read-write
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+Subject: [Virtio-fs] [PATCH RFC] virtiofs: improve io bandwidth by replacing
+ pwrite with pwritev
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,181 +14,447 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Liu Bo <bo.liu@linux.alibaba.com>
-Cc: virtio-fs@redhat.com
+To: virtio-fs@redhat.com
 
-On Thu, Jul 25, 2019 at 12:32:50PM -0700, Liu Bo wrote:
-> On Thu, Jul 25, 2019 at 11:35:21AM -0400, Vivek Goyal wrote:
-> > On Wed, Jul 24, 2019 at 05:08:58PM -0700, Liu Bo wrote:
-> > > On Wed, Jul 24, 2019 at 05:07:21PM -0400, Vivek Goyal wrote:
-> > > > Do not always map a dax mapping read-write. There are use cases like
-> > > > executing a file where we want to map file read-only. virtio-fs dir on
-> > > > host might be backed by overlayfs. We don't want to open file read-write
-> > > > on overlayfs otherwise it will unnecessariliy be copied-up nullyifying
-> > > > the advantages of sharing page cache between vms for unmodified files.
-> > > > 
-> > > > Hence, create a read-only mapping if user did not ask for writable mapping.
-> > > > Later upgrade it to read-write mapping when users requests it.
-> > > > 
-> > > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > > > ---
-> > > >  fs/fuse/file.c   | 114 ++++++++++++++++++++++++++++++++++++-----------
-> > > >  fs/fuse/fuse_i.h |   3 ++
-> > > >  2 files changed, 91 insertions(+), 26 deletions(-)
-> > > > 
-> > > > diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-> > > > index a2c19e4a28b5..bcd8ddcc0fdf 100644
-> > > > --- a/fs/fuse/file.c
-> > > > +++ b/fs/fuse/file.c
-> > > > @@ -265,7 +265,8 @@ static void dmap_add_to_free_pool(struct fuse_conn *fc,
-> > > >  
-> > > >  /* offset passed in should be aligned to FUSE_DAX_MEM_RANGE_SZ */
-> > > >  static int fuse_setup_one_mapping(struct inode *inode, loff_t offset,
-> > > > -				  struct fuse_dax_mapping *dmap)
-> > > > +				  struct fuse_dax_mapping *dmap, bool writable,
-> > > > +				  bool upgrade)
-> > > >  {
-> > > >  	struct fuse_conn *fc = get_fuse_conn(inode);
-> > > >  	struct fuse_inode *fi = get_fuse_inode(inode);
-> > > > @@ -283,7 +284,8 @@ static int fuse_setup_one_mapping(struct inode *inode, loff_t offset,
-> > > >  	inarg.moffset = dmap->window_offset;
-> > > >  	inarg.len = FUSE_DAX_MEM_RANGE_SZ;
-> > > >  	inarg.flags |= FUSE_SETUPMAPPING_FLAG_READ;
-> > > > -	inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
-> > > > +	if (writable)
-> > > > +		inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
-> > > >  	args.in.h.opcode = FUSE_SETUPMAPPING;
-> > > >  	args.in.h.nodeid = fi->nodeid;
-> > > >  	args.in.numargs = 1;
-> > > > @@ -296,26 +298,30 @@ static int fuse_setup_one_mapping(struct inode *inode, loff_t offset,
-> > > >  		return err;
-> > > >  	}
-> > > >  
-> > > > -	pr_debug("fuse_setup_one_mapping() succeeded. offset=0x%llx err=%zd\n", offset, err);
-> > > > +	pr_debug("fuse_setup_one_mapping() succeeded. offset=0x%llx writable=%d"
-> > > > +		 " err=%zd\n", offset, writable, err);
-> > > >  
-> > > > -	/*
-> > > > -	 * We don't take a refernce on inode. inode is valid right now and
-> > > > -	 * when inode is going away, cleanup logic should first cleanup
-> > > > -	 * dmap entries.
-> > > > -	 *
-> > > > -	 * TODO: Do we need to ensure that we are holding inode lock
-> > > > -	 * as well.
-> > > > -	 */
-> > > > -	dmap->inode = inode;
-> > > > -	dmap->start = offset;
-> > > > -	dmap->end = offset + FUSE_DAX_MEM_RANGE_SZ - 1;
-> > > > -	/* Protected by fi->i_dmap_sem */
-> > > > -	fuse_dax_interval_tree_insert(dmap, &fi->dmap_tree);
-> > > > -	fi->nr_dmaps++;
-> > > > -	spin_lock(&fc->lock);
-> > > > -	list_add_tail(&dmap->busy_list, &fc->busy_ranges);
-> > > > -	fc->nr_busy_ranges++;
-> > > > -	spin_unlock(&fc->lock);
-> > > > +	dmap->writable = writable;
-> > > > +	if (!upgrade) {
-> > > > +		/*
-> > > > +		 * We don't take a refernce on inode. inode is valid right now
-> > > > +		 * and when inode is going away, cleanup logic should first
-> > > > +		 * cleanup dmap entries.
-> > > > +		 *
-> > > > +		 * TODO: Do we need to ensure that we are holding inode lock
-> > > > +		 * as well.
-> > > > +		 */
-> > > > +		dmap->inode = inode;
-> > > > +		dmap->start = offset;
-> > > > +		dmap->end = offset + FUSE_DAX_MEM_RANGE_SZ - 1;
-> > > > +		/* Protected by fi->i_dmap_sem */
-> > > > +		fuse_dax_interval_tree_insert(dmap, &fi->dmap_tree);
-> > > > +		fi->nr_dmaps++;
-> > > > +		spin_lock(&fc->lock);
-> > > > +		list_add_tail(&dmap->busy_list, &fc->busy_ranges);
-> > > > +		fc->nr_busy_ranges++;
-> > > > +		spin_unlock(&fc->lock);
-> > > > +	}
-> > > >  	return 0;
-> > > >  }
-> > > >  
-> > > > @@ -1890,6 +1896,7 @@ static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
-> > > >  	struct fuse_conn *fc = get_fuse_conn(inode);
-> > > >  	struct fuse_dax_mapping *dmap, *alloc_dmap = NULL;
-> > > >  	int ret;
-> > > > +	bool writable = flags & IOMAP_WRITE;
-> > > >  
-> > > >  	/* Can't do reclaim in fault path yet due to lock ordering.
-> > > >  	 * Read path takes shared inode lock and that's not sufficient
-> > > > @@ -1930,10 +1937,11 @@ static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
-> > > >  
-> > > >  	/* Setup one mapping */
-> > > >  	ret = fuse_setup_one_mapping(inode,
-> > > > -		ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ), alloc_dmap);
-> > > > +				     ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ),
-> > > > +				     alloc_dmap, writable, false);
-> > > >  	if (ret < 0) {
-> > > >  		printk("fuse_setup_one_mapping() failed. err=%d"
-> > > > -			" pos=0x%llx\n", ret, pos);
-> > > > +			" pos=0x%llx, writable=%d\n", ret, pos, writable);
-> > > >  		dmap_add_to_free_pool(fc, alloc_dmap);
-> > > >  		up_write(&fi->i_dmap_sem);
-> > > >  		return ret;
-> > > > @@ -1943,6 +1951,45 @@ static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
-> > > >  	return 0;
-> > > >  }
-> > > >  
-> > > > +static int iomap_begin_upgrade_mapping(struct inode *inode, loff_t pos,
-> > > > +					 loff_t length, unsigned flags,
-> > > > +					 struct iomap *iomap)
-> > > > +{
-> > > > +	struct fuse_inode *fi = get_fuse_inode(inode);
-> > > > +	struct fuse_dax_mapping *dmap;
-> > > > +	int ret;
-> > > > +
-> > > > +	/*
-> > > > +	 * Take exclusive lock so that only one caller can try to setup
-> > > > +	 * mapping and others wait.
-> > > > +	 */
-> > > > +	down_write(&fi->i_dmap_sem);
-> > > > +	dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, pos, pos);
-> > > > +
-> > > > +	/* We are holding either inode lock or i_mmap_sem, and that should
-> > > > +	 * ensure that dmap can't reclaimed or truncated and it should still
-> > > > +	 * be there in tree despite the fact we dropped and re-acquired the
-> > > > +	 * lock.
-> > > > +	 */
-> > > > +	if (WARN_ON(!dmap))
-> > > > +		return -EIO;
-> > > 
-> > > up_write() is missed here.
-> > 
-> > Good catch. Will fix it.
-> > 
-> > > 
+>From my test, write bandwidth will be improved greatly by replacing
+pwrite with pwritev, and the test result as below:
 
-[..]
-> > > And I posted a similar patch[1] but with inode_lock being dropped in
-> > > mind, anything wrong with that patch?
-> > 
-> > It was an old posting so did not pay much attention to it. Looking at
-> > it now and few things I notice.
-> > 
-> > - That patch will allocate and possibly wait for memory range and free
-> >   it up when upgrading from read-only to read-write. That's not required.
-> >
-> 
-> What I was trying to say is that the above assumption about "dmap is still in
-> tree despite dropping-acquiring lock" is doubtful if inode lock is not held by
-> reclaim code.
+---
+pwrite:
+# fio -direct=1 -time_based -iodepth=64 -rw=randwrite -ioengine=libaio -bs=1M -size=1G -numjob=16 -runtime=30 -group_reporting -name=file -filename=/mnt/virtiofs/file
+file: (g=0): rw=randwrite, bs=1M-1M/1M-1M/1M-1M, ioengine=libaio, iodepth=64
+...
+fio-2.13
+Starting 16 processes
+Jobs: 16 (f=16): [w(16)] [100.0% done] [0KB/886.0MB/0KB /s] [0/886/0 iops] [eta 00m:00s]
+file: (groupid=0, jobs=16): err= 0: pid=5799: Tue Aug 6 18:48:26 2019
+write: io=26881MB, bw=916988KB/s, iops=895, runt= 30018msec
 
-In that case we will take reference on dmap before dropping the lock to
-make sure dmap is not reclaimed in the time we dropped the lock and
-re-acquired it? And that means there is no need to allocate dmap for
-upgrade case.
+pwritev:
+# fio -direct=1 -time_based -iodepth=64 -rw=randwrite -ioengine=libaio -bs=1M -size=1G -numjob=16 -runtime=30 -group_reporting -name=file -filename=/mnt/virtiofs/file
+file: (g=0): rw=randwrite, bs=1M-1M/1M-1M/1M-1M, ioengine=libaio, iodepth=64
+...
+fio-2.13
+Starting 16 processes
+Jobs: 16 (f=16): [w(16)] [100.0% done] [0KB/1793MB/0KB /s] [0/1793/0 iops] [eta 00m:00s]
+file: (groupid=0, jobs=16): err= 0: pid=6328: Tue Aug 6 18:22:17 2019
+write: io=52775MB, bw=1758.7MB/s, iops=1758, runt= 30009msec
+---
 
-> 
-> There is a window between dropping and reacquiring lock, if it gets reclaimed,
-> we're supposed to continue on the allocation path.
+This patch introduces writev and pwritev and clean up *fuse_buf_copy*
+and its related code. I wonder if I'd better split it into two patches
+or other modification. I'm very glad for your suggestions.
 
-Thanks
-Vivek
+Thanks,
+Jun
+
+Signed-off-by: Jun Piao <piaojun@huawei.com>
+---
+ contrib/virtiofsd/buffer.c         | 310 ++++---------------------------------
+ contrib/virtiofsd/fuse_common.h    |  15 +-
+ contrib/virtiofsd/passthrough_ll.c |   2 +-
+ contrib/virtiofsd/seccomp.c        |   2 +
+ 4 files changed, 37 insertions(+), 292 deletions(-)
+
+diff --git a/contrib/virtiofsd/buffer.c b/contrib/virtiofsd/buffer.c
+index 655be137..78f8d3e 100644
+--- a/contrib/virtiofsd/buffer.c
++++ b/contrib/virtiofsd/buffer.c
+@@ -15,6 +15,7 @@
+ #include <unistd.h>
+ #include <errno.h>
+ #include <assert.h>
++#include <stdlib.h>
+
+ size_t fuse_buf_size(const struct fuse_bufvec *bufv)
+ {
+@@ -31,299 +32,40 @@ size_t fuse_buf_size(const struct fuse_bufvec *bufv)
+ 	return size;
+ }
+
+-static size_t min_size(size_t s1, size_t s2)
++ssize_t fuse_buf_writev(fuse_req_t req,
++		struct fuse_bufvec *out_buf,
++		struct fuse_bufvec *in_buf,
++		enum fuse_buf_copy_flags flags)
+ {
+-	return s1 < s2 ? s1 : s2;
+-}
+-
+-static ssize_t fuse_buf_write(const struct fuse_buf *dst, size_t dst_off,
+-			      const struct fuse_buf *src, size_t src_off,
+-			      size_t len)
+-{
+-	ssize_t res = 0;
+-	size_t copied = 0;
+-
+-        assert(!(src->flags & FUSE_BUF_PHYS_ADDR));
+-	while (len) {
+-		if (dst->flags & FUSE_BUF_FD_SEEK) {
+-			res = pwrite(dst->fd, src->mem + src_off, len,
+-				     dst->pos + dst_off);
+-		} else {
+-			res = write(dst->fd, src->mem + src_off, len);
+-		}
+-		if (res == -1) {
+-			if (!copied)
+-				return -errno;
+-			break;
+-		}
+-		if (res == 0)
+-			break;
+-
+-		copied += res;
+-		if (!(dst->flags & FUSE_BUF_FD_RETRY))
+-			break;
+-
+-		src_off += res;
+-		dst_off += res;
+-		len -= res;
+-	}
+-
+-	return copied;
+-}
+-
+-static ssize_t fuse_buf_read(const struct fuse_buf *dst, size_t dst_off,
+-			     const struct fuse_buf *src, size_t src_off,
+-			     size_t len)
+-{
+-	ssize_t res = 0;
+-	size_t copied = 0;
+-
+-	while (len) {
+-		if (src->flags & FUSE_BUF_FD_SEEK) {
+-			res = pread(src->fd, dst->mem + dst_off, len,
+-				     src->pos + src_off);
+-		} else {
+-			res = read(src->fd, dst->mem + dst_off, len);
+-		}
+-		if (res == -1) {
+-			if (!copied)
+-				return -errno;
+-			break;
+-		}
+-		if (res == 0)
+-			break;
+-
+-		copied += res;
+-		if (!(src->flags & FUSE_BUF_FD_RETRY))
+-			break;
+-
+-		dst_off += res;
+-		src_off += res;
+-		len -= res;
+-	}
+-
+-	return copied;
+-}
+-
+-static ssize_t fuse_buf_fd_to_fd(const struct fuse_buf *dst, size_t dst_off,
+-				 const struct fuse_buf *src, size_t src_off,
+-				 size_t len)
+-{
+-	char buf[4096];
+-	struct fuse_buf tmp = {
+-		.size = sizeof(buf),
+-		.flags = 0,
+-	};
+-	ssize_t res;
+-	size_t copied = 0;
+-
+-	tmp.mem = buf;
+-
+-	while (len) {
+-		size_t this_len = min_size(tmp.size, len);
+-		size_t read_len;
+-
+-		res = fuse_buf_read(&tmp, 0, src, src_off, this_len);
+-		if (res < 0) {
+-			if (!copied)
+-				return res;
+-			break;
+-		}
+-		if (res == 0)
+-			break;
+-
+-		read_len = res;
+-		res = fuse_buf_write(dst, dst_off, &tmp, 0, read_len);
+-		if (res < 0) {
+-			if (!copied)
+-				return res;
+-			break;
+-		}
+-		if (res == 0)
+-			break;
+-
+-		copied += res;
+-
+-		if (res < this_len)
+-			break;
+-
+-		dst_off += res;
+-		src_off += res;
+-		len -= res;
+-	}
+-
+-	return copied;
+-}
+-
+-#ifdef HAVE_SPLICE
+-static ssize_t fuse_buf_splice(const struct fuse_buf *dst, size_t dst_off,
+-			       const struct fuse_buf *src, size_t src_off,
+-			       size_t len, enum fuse_buf_copy_flags flags)
+-{
+-	int splice_flags = 0;
+-	off_t *srcpos = NULL;
+-	off_t *dstpos = NULL;
+-	off_t srcpos_val;
+-	off_t dstpos_val;
+-	ssize_t res;
+-	size_t copied = 0;
+-
+-	if (flags & FUSE_BUF_SPLICE_MOVE)
+-		splice_flags |= SPLICE_F_MOVE;
+-	if (flags & FUSE_BUF_SPLICE_NONBLOCK)
+-		splice_flags |= SPLICE_F_NONBLOCK;
+-
+-	if (src->flags & FUSE_BUF_FD_SEEK) {
+-		srcpos_val = src->pos + src_off;
+-		srcpos = &srcpos_val;
+-	}
+-	if (dst->flags & FUSE_BUF_FD_SEEK) {
+-		dstpos_val = dst->pos + dst_off;
+-		dstpos = &dstpos_val;
+-	}
+-
+-	while (len) {
+-		res = splice(src->fd, srcpos, dst->fd, dstpos, len,
+-			     splice_flags);
+-		if (res == -1) {
+-			if (copied)
+-				break;
+-
+-			if (errno != EINVAL || (flags & FUSE_BUF_FORCE_SPLICE))
+-				return -errno;
+-
+-			/* Maybe splice is not supported for this combination */
+-			return fuse_buf_fd_to_fd(dst, dst_off, src, src_off,
+-						 len);
+-		}
+-		if (res == 0)
+-			break;
+-
+-		copied += res;
+-		if (!(src->flags & FUSE_BUF_FD_RETRY) &&
+-		    !(dst->flags & FUSE_BUF_FD_RETRY)) {
+-			break;
+-		}
+-
+-		len -= res;
+-	}
+-
+-	return copied;
+-}
+-#else
+-static ssize_t fuse_buf_splice(const struct fuse_buf *dst, size_t dst_off,
+-			       const struct fuse_buf *src, size_t src_off,
+-			       size_t len, enum fuse_buf_copy_flags flags)
+-{
+-	(void) flags;
+-
+-	return fuse_buf_fd_to_fd(dst, dst_off, src, src_off, len);
+-}
+-#endif
+-
+-
+-static ssize_t fuse_buf_copy_one(fuse_req_t req,
+-                                 const struct fuse_buf *dst, size_t dst_off,
+-				 const struct fuse_buf *src, size_t src_off,
+-				 size_t len, enum fuse_buf_copy_flags flags)
+-{
+-	int src_is_fd = src->flags & FUSE_BUF_IS_FD;
+-	int dst_is_fd = dst->flags & FUSE_BUF_IS_FD;
+-	int src_is_phys = src->flags & FUSE_BUF_PHYS_ADDR;
+-	int dst_is_phys = src->flags & FUSE_BUF_PHYS_ADDR;
+-
+-	if (src_is_phys && !src_is_fd && dst_is_fd) {
+-		return fuse_virtio_write(req, dst, dst_off, src, src_off, len);
+-	}
+-
+-	assert(!src_is_phys && !dst_is_phys);
+-	if (!src_is_fd && !dst_is_fd) {
+-		void *dstmem = dst->mem + dst_off;
+-		void *srcmem = src->mem + src_off;
++	ssize_t res, i, buf_index, iovcnt;
++	struct iovec * iov;
++	int fd = out_buf->buf[0].fd;
++	off_t pos = out_buf->buf[0].pos;
+
+-		if (dstmem != srcmem) {
+-			if (dstmem + len <= srcmem || srcmem + len <= dstmem)
+-				memcpy(dstmem, srcmem, len);
+-			else
+-				memmove(dstmem, srcmem, len);
+-		}
+-
+-		return len;
+-	} else if (!src_is_fd) {
+-		return fuse_buf_write(dst, dst_off, src, src_off, len);
+-	} else if (!dst_is_fd) {
+-		return fuse_buf_read(dst, dst_off, src, src_off, len);
+-	} else if (flags & FUSE_BUF_NO_SPLICE) {
+-		return fuse_buf_fd_to_fd(dst, dst_off, src, src_off, len);
+-	} else {
+-		return fuse_buf_splice(dst, dst_off, src, src_off, len, flags);
+-	}
+-}
+-
+-static const struct fuse_buf *fuse_bufvec_current(struct fuse_bufvec *bufv)
+-{
+-	if (bufv->idx < bufv->count)
+-		return &bufv->buf[bufv->idx];
++	if (in_buf->count > 2)
++		iovcnt = in_buf->count - 1;
+ 	else
+-		return NULL;
+-}
++		iovcnt = 1;
+
+-static int fuse_bufvec_advance(struct fuse_bufvec *bufv, size_t len)
+-{
+-	const struct fuse_buf *buf = fuse_bufvec_current(bufv);
++	iov = malloc(iovcnt * sizeof(struct iovec));
++	if (!iov)
++		return -ENOMEM;
+
+-	bufv->off += len;
+-	assert(bufv->off <= buf->size);
+-	if (bufv->off == buf->size) {
+-		assert(bufv->idx < bufv->count);
+-		bufv->idx++;
+-		if (bufv->idx == bufv->count)
+-			return 0;
+-		bufv->off = 0;
++	for (i = 0, buf_index = 1; i < iovcnt; i++, buf_index++) {
++		iov[i].iov_base = in_buf->buf[buf_index].mem;
++		iov[i].iov_len = in_buf->buf[buf_index].size;
+ 	}
+-	return 1;
+-}
+
+-ssize_t fuse_buf_copy(fuse_req_t req, struct fuse_bufvec *dstv, struct fuse_bufvec *srcv,
+-		      enum fuse_buf_copy_flags flags)
+-{
+-	size_t copied = 0;
+-
+-	if (dstv == srcv)
+-		return fuse_buf_size(dstv);
+-
+-	for (;;) {
+-		const struct fuse_buf *src = fuse_bufvec_current(srcv);
+-		const struct fuse_buf *dst = fuse_bufvec_current(dstv);
+-		size_t src_len;
+-		size_t dst_len;
+-		size_t len;
+-		ssize_t res;
+-
+-		if (src == NULL || dst == NULL)
+-			break;
+-
+-		src_len = src->size - srcv->off;
+-		dst_len = dst->size - dstv->off;
+-		len = min_size(src_len, dst_len);
+-
+-		res = fuse_buf_copy_one(req, dst, dstv->off, src, srcv->off, len, flags);
+-		if (res < 0) {
+-			if (!copied)
+-				return res;
+-			break;
+-		}
+-		copied += res;
+-
+-		if (!fuse_bufvec_advance(srcv, res) ||
+-		    !fuse_bufvec_advance(dstv, res))
+-			break;
++	if (flags & FUSE_BUF_FD_SEEK)
++		res = pwritev(fd, iov, iovcnt, pos);
++	else
++		res = writev(fd, iov, iovcnt);
+
+-		if (res < len)
+-			break;
+-	}
++	if (res == -1 || res == 0)
++		res = -errno;
+
+-	return copied;
++	free(iov);
++	return res;
+ }
+
+ void *fuse_mbuf_iter_advance(struct fuse_mbuf_iter *iter, size_t len)
+diff --git a/contrib/virtiofsd/fuse_common.h b/contrib/virtiofsd/fuse_common.h
+index 001e6d6..c715e52 100644
+--- a/contrib/virtiofsd/fuse_common.h
++++ b/contrib/virtiofsd/fuse_common.h
+@@ -717,17 +717,18 @@ struct fuse_bufvec {
+ size_t fuse_buf_size(const struct fuse_bufvec *bufv);
+
+ /**
+- * Copy data from one buffer vector to another
++ * Write data from one buffer vector to another
+  *
+  * @param req The request this copy is part of
+- * @param dst destination buffer vector
+- * @param src source buffer vector
++ * @param out_buf destination buffer vector
++ * @param in_buf source buffer vector
+  * @param flags flags controlling the copy
+- * @return actual number of bytes copied or -errno on error
++ * @return actual number of bytes written or -errno on error
+  */
+-ssize_t fuse_buf_copy(fuse_req_t req,
+-                      struct fuse_bufvec *dst, struct fuse_bufvec *src,
+-		      enum fuse_buf_copy_flags flags);
++ssize_t fuse_buf_writev(fuse_req_t req,
++			struct fuse_bufvec *out_buf,
++			struct fuse_bufvec *in_buf,
++			enum fuse_buf_copy_flags flags);
+
+ /**
+  * Memory buffer iterator
+diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+index cc9c175..3082683 100644
+--- a/contrib/virtiofsd/passthrough_ll.c
++++ b/contrib/virtiofsd/passthrough_ll.c
+@@ -2023,7 +2023,7 @@ static void lo_write_buf(fuse_req_t req, fuse_ino_t ino,
+ 		fuse_debug("lo_write_buf(ino=%" PRIu64 ", size=%zd, off=%lu)\n",
+ 			   ino, out_buf.buf[0].size, (unsigned long) off);
+
+-	res = fuse_buf_copy(req, &out_buf, in_buf, 0);
++	res = fuse_buf_writev(req, &out_buf, in_buf, out_buf.buf[0].flags);
+ 	if(res < 0) {
+ 		fuse_reply_err(req, -res);
+ 	} else {
+diff --git a/contrib/virtiofsd/seccomp.c b/contrib/virtiofsd/seccomp.c
+index 5f1c873..4bba30b 100644
+--- a/contrib/virtiofsd/seccomp.c
++++ b/contrib/virtiofsd/seccomp.c
+@@ -60,6 +60,7 @@ static const int syscall_whitelist[] = {
+ 	SCMP_SYS(ppoll),
+ 	SCMP_SYS(prctl), /* TODO restrict to just PR_SET_NAME? */
+ 	SCMP_SYS(preadv),
++	SCMP_SYS(pwritev),
+ 	SCMP_SYS(pwrite64),
+ 	SCMP_SYS(read),
+ 	SCMP_SYS(readlinkat),
+@@ -78,6 +79,7 @@ static const int syscall_whitelist[] = {
+ 	SCMP_SYS(unlinkat),
+ 	SCMP_SYS(utimensat),
+ 	SCMP_SYS(write),
++	SCMP_SYS(writev),
+ };
+
+ /* Syscalls used when --syslog is enabled */
+-- 
 

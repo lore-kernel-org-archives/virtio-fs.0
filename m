@@ -1,14 +1,13 @@
-References: <5D4A7641.9080400@huawei.com>
-	<20190807091817.GA13267@stefanha-x1.localdomain>
-From: piaojun <piaojun@huawei.com>
-Message-ID: <5D4A97F8.6090307@huawei.com>
-Date: Wed, 7 Aug 2019 17:20:56 +0800
+Date: Wed, 7 Aug 2019 10:21:42 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20190807092142.GB13267@stefanha-x1.localdomain>
+References: <5D4A7952.4010707@huawei.com>
 MIME-Version: 1.0
-In-Reply-To: <20190807091817.GA13267@stefanha-x1.localdomain>
-Content-Type: text/plain; charset="windows-1252"
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH v2 0/2][RFC] virtiofsd: Improve io bandwidth
- by replacing pwrite with pwritev
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <5D4A7952.4010707@huawei.com>
+Subject: Re: [Virtio-fs] [PATCH v2 2/2][RFC] use fuse_buf_writev to replace
+ fuse_buf_write for better performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,50 +16,41 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
+To: piaojun <piaojun@huawei.com>
 Cc: virtio-fs@redhat.com
 
-Hi Stefan,
-
-On 2019/8/7 17:18, Stefan Hajnoczi wrote:
-> On Wed, Aug 07, 2019 at 02:57:05PM +0800, piaojun wrote:
+On Wed, Aug 07, 2019 at 03:10:10PM +0800, piaojun wrote:
+> fuse_buf_writev() only handles the normal write in which src is buffer
+> and dest is fd. Specially if src buffer represents guest physical
+> address that can't be mapped by the daemon process, IO must be bounced
+> back to the VMM to do it by fuse_buf_copy().
 > 
-> Hi,
-> Please use git send-email --thread so that each patch is part of the
-> same email thread.  This makes it easier to locate the entire patch
-> series in an email client and to apply the patches together.
-
-Good suggestion, I will try using 'git send-email'.
-
-Thanks,
-Jun
-
+> Signed-off-by: Jun Piao <piaojun@huawei.com>
+> Suggested-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> ---
+>  contrib/virtiofsd/passthrough_ll.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 > 
->> >From my test, write bandwidth will be improved greatly by replacing
->> pwrite with pwritev, and the test result as below:
->>
->> ---
->> pwrite:
->> # fio -direct=1 -time_based -iodepth=64 -rw=randwrite -ioengine=libaio -bs=1M -size=1G -numjob=16 -runtime=30 -group_reporting -name=file -filename=/mnt/virtiofs/file
->> file: (g=0): rw=randwrite, bs=1M-1M/1M-1M/1M-1M, ioengine=libaio, iodepth=64
->> ...
->> fio-2.13
->> Starting 16 processes
->> Jobs: 16 (f=16): [w(16)] [100.0% done] [0KB/886.0MB/0KB /s] [0/886/0 iops] [eta 00m:00s]
->> file: (groupid=0, jobs=16): err= 0: pid=5799: Tue Aug 6 18:48:26 2019
->> write: io=26881MB, bw=916988KB/s, iops=895, runt= 30018msec
->>
->> pwritev:
->> # fio -direct=1 -time_based -iodepth=64 -rw=randwrite -ioengine=libaio -bs=1M -size=1G -numjob=16 -runtime=30 -group_reporting -name=file -filename=/mnt/virtiofs/file
->> file: (g=0): rw=randwrite, bs=1M-1M/1M-1M/1M-1M, ioengine=libaio, iodepth=64
->> ...
->> fio-2.13
->> Starting 16 processes
->> Jobs: 16 (f=16): [w(16)] [100.0% done] [0KB/1793MB/0KB /s] [0/1793/0 iops] [eta 00m:00s]
->> file: (groupid=0, jobs=16): err= 0: pid=6328: Tue Aug 6 18:22:17 2019
->> write: io=52775MB, bw=1758.7MB/s, iops=1758, runt= 30009msec
+> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+> index cc9c175..c1bbc53 100644
+> --- a/contrib/virtiofsd/passthrough_ll.c
+> +++ b/contrib/virtiofsd/passthrough_ll.c
+> @@ -2023,7 +2023,10 @@ static void lo_write_buf(fuse_req_t req, fuse_ino_t ino,
+>  		fuse_debug("lo_write_buf(ino=%" PRIu64 ", size=%zd, off=%lu)\n",
+>  			   ino, out_buf.buf[0].size, (unsigned long) off);
 > 
-> Nice performance improvement!
-> .
-> 
+> -	res = fuse_buf_copy(req, &out_buf, in_buf, 0);
+> +	if (!(in_buf->buf[0].flags & FUSE_BUF_PHYS_ADDR))
+> +		res = fuse_buf_writev(req, &out_buf, in_buf, out_buf.buf[0].flags);
+> +	else
+> +		res = fuse_buf_copy(req, &out_buf, in_buf, 0);
+
+Can you move the check inside fuse_buf_copy() and make fuse_buf_writev()
+a static function?  This way all fuse_buf_copy() callers automatically
+benefit from the improvement (when possible).
+
+By the way, this improvement can be sent upstream to libfuse so that
+other FUSE file systems also get improved performance.
+
+Stefan
 

@@ -1,12 +1,14 @@
+Date: Wed, 7 Aug 2019 16:57:15 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 24 Jul 2019 17:07:20 -0400
-Message-Id: <20190724210721.9185-3-vgoyal@redhat.com>
-In-Reply-To: <20190724210721.9185-1-vgoyal@redhat.com>
-References: <20190724210721.9185-1-vgoyal@redhat.com>
+Message-ID: <20190807205715.GE18557@redhat.com>
+References: <20190801165409.20121-1-stefanha@redhat.com>
+	<20190807180355.GA22758@stefanha-x1.localdomain>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 2/3] fuse: Move new mapping setup code in a
-	function
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20190807180355.GA22758@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH 0/4] virtiofsd: multithreading preparation
+ part 3
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,157 +17,55 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-Move new mapping setup code in a separate function. More code will come
-in fuse_iomap_begin() and its becoming too big.
+On Wed, Aug 07, 2019 at 07:03:55PM +0100, Stefan Hajnoczi wrote:
+> On Thu, Aug 01, 2019 at 05:54:05PM +0100, Stefan Hajnoczi wrote:
+> > Performance
+> > -----------
+> > Please try these patches out and share your results.
+> 
+> Here are the performance numbers:
+> 
+>   Threadpool | iodepth | iodepth
+>      size    |    1    |   64
+>   -----------+---------+--------
+>   None       |   4451  |  4876
+>   1          |   4360  |  4858
+>   64         |   4359  | 33,266
+> 
+> A graph is available here:
+> https://vmsplice.net/~stefan/virtiofsd-threadpool-performance.png
+> 
+> Summary:
+> 
+>  * iodepth=64 performance is increased by 6.8 times.
+>  * iodepth=1 performance degrades by 2%.
+>  * DAX is bottlenecked by QEMU's single-threaded
+>    VHOST_USER_SLAVE_FS_MAP/UNMAP handler.
+> 
+> Threadpool size "none" is virtiofsd commit 813a824b707 ("virtiofsd: use
+> fuse_lowlevel_is_virtio() in fuse_session_destroy()") without any of the
+> multithreading preparation patches.  I benchmarked this to check whether
+> the patches introduce a regression for iodepth=1.  They do, but it's
+> only around 2%.
+> 
+> I also ran with DAX but found there was not much difference between
+> iodepth=1 and iodepth=64.  This might be because the host mmap(2)
+> syscall becomes the bottleneck and a serialization point.  QEMU only
+> processes one VHOST_USER_SLAVE_FS_MAP/UNMAP at a time.  If we want to
+> accelerate DAX it may be necessary to parallelize mmap, assuming the
+> host kernel can do them in parallel on a single file.  This performance
+> optimization is future work and not directly related to this patch
+> series.
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/file.c | 116 +++++++++++++++++++++++++++----------------------
- 1 file changed, 64 insertions(+), 52 deletions(-)
+Good to see nice improvement with higher queue depth.
 
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index 93f8e62e2b5b..a2c19e4a28b5 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -1882,6 +1882,67 @@ static void fuse_fill_iomap(struct inode *inode, loff_t pos, loff_t length,
- 	}
- }
- 
-+static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
-+					 loff_t length, unsigned flags,
-+					 struct iomap *iomap)
-+{
-+	struct fuse_inode *fi = get_fuse_inode(inode);
-+	struct fuse_conn *fc = get_fuse_conn(inode);
-+	struct fuse_dax_mapping *dmap, *alloc_dmap = NULL;
-+	int ret;
-+
-+	/* Can't do reclaim in fault path yet due to lock ordering.
-+	 * Read path takes shared inode lock and that's not sufficient
-+	 * for inline range reclaim. Caller needs to drop lock, wait
-+	 * and retry.
-+	 */
-+	if (flags & IOMAP_FAULT || !(flags & IOMAP_WRITE)) {
-+		alloc_dmap = alloc_dax_mapping(fc);
-+		if (!alloc_dmap)
-+			return -ENOSPC;
-+	} else {
-+		alloc_dmap = alloc_dax_mapping_reclaim(fc, inode);
-+		if (IS_ERR(alloc_dmap))
-+			return PTR_ERR(alloc_dmap);
-+	}
-+
-+	/* If we are here, we should have memory allocated */
-+	if (WARN_ON(!alloc_dmap))
-+		return -EBUSY;
-+
-+	/*
-+	 * Drop read lock and take write lock so that only one
-+	 * caller can try to setup mapping and other waits
-+	 */
-+	down_write(&fi->i_dmap_sem);
-+	/*
-+	 * We dropped lock. Check again if somebody else setup
-+	 * mapping already.
-+	 */
-+	dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, pos,
-+						pos);
-+	if (dmap) {
-+		fuse_fill_iomap(inode, pos, length, iomap, dmap, flags);
-+		dmap_add_to_free_pool(fc, alloc_dmap);
-+		up_write(&fi->i_dmap_sem);
-+		return 0;
-+	}
-+
-+	/* Setup one mapping */
-+	ret = fuse_setup_one_mapping(inode,
-+		ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ), alloc_dmap);
-+	if (ret < 0) {
-+		printk("fuse_setup_one_mapping() failed. err=%d"
-+			" pos=0x%llx\n", ret, pos);
-+		dmap_add_to_free_pool(fc, alloc_dmap);
-+		up_write(&fi->i_dmap_sem);
-+		return ret;
-+	}
-+	fuse_fill_iomap(inode, pos, length, iomap, alloc_dmap, flags);
-+	up_write(&fi->i_dmap_sem);
-+	return 0;
-+}
-+
- /* This is just for DAX and the mapping is ephemeral, do not use it for other
-  * purposes since there is no block device with a permanent mapping.
-  */
-@@ -1890,8 +1951,7 @@ static int fuse_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
- {
- 	struct fuse_inode *fi = get_fuse_inode(inode);
- 	struct fuse_conn *fc = get_fuse_conn(inode);
--	struct fuse_dax_mapping *dmap, *alloc_dmap = NULL;
--	int ret;
-+	struct fuse_dax_mapping *dmap;
- 
- 	/* We don't support FIEMAP */
- 	BUG_ON(flags & IOMAP_REPORT);
-@@ -1932,56 +1992,8 @@ static int fuse_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
- 		if (pos >= i_size_read(inode))
- 			goto iomap_hole;
- 
--		/* Can't do reclaim in fault path yet due to lock ordering.
--		 * Read path takes shared inode lock and that's not sufficient
--		 * for inline range reclaim. Caller needs to drop lock, wait
--		 * and retry.
--		 */
--		if (flags & IOMAP_FAULT || !(flags & IOMAP_WRITE)) {
--			alloc_dmap = alloc_dax_mapping(fc);
--			if (!alloc_dmap)
--				return -ENOSPC;
--		} else {
--			alloc_dmap = alloc_dax_mapping_reclaim(fc, inode);
--			if (IS_ERR(alloc_dmap))
--				return PTR_ERR(alloc_dmap);
--		}
--
--		/* If we are here, we should have memory allocated */
--		if (WARN_ON(!alloc_dmap))
--			return -EBUSY;
--
--		/*
--		 * Drop read lock and take write lock so that only one
--		 * caller can try to setup mapping and other waits
--		 */
--		down_write(&fi->i_dmap_sem);
--		/*
--		 * We dropped lock. Check again if somebody else setup
--		 * mapping already.
--		 */
--		dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, pos,
--							pos);
--		if (dmap) {
--			fuse_fill_iomap(inode, pos, length, iomap, dmap, flags);
--			dmap_add_to_free_pool(fc, alloc_dmap);
--			up_write(&fi->i_dmap_sem);
--			return 0;
--		}
--
--		/* Setup one mapping */
--		ret = fuse_setup_one_mapping(inode,
--			ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ), alloc_dmap);
--		if (ret < 0) {
--			printk("fuse_setup_one_mapping() failed. err=%d"
--				" pos=0x%llx\n", ret, pos);
--			dmap_add_to_free_pool(fc, alloc_dmap);
--			up_write(&fi->i_dmap_sem);
--			return ret;
--		}
--		fuse_fill_iomap(inode, pos, length, iomap, alloc_dmap, flags);
--		up_write(&fi->i_dmap_sem);
--		return 0;
-+		return iomap_begin_setup_new_mapping(inode, pos, length, flags,
-+						    iomap);
- 	}
- 
- 	/*
--- 
-2.17.2
+Kernel also serializes MAP/UNMAP on one inode. So you will need to run
+multiple jobs operating on different inodes to see parallel MAP/UNMAP
+(atleast from kernel's point of view).
+
+Thanks
+Vivek
 

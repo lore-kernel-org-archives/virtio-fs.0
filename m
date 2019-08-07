@@ -1,13 +1,14 @@
-Date: Wed, 7 Aug 2019 16:42:45 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190807154245.GH2867@work-vm>
-References: <5D4A7771.8010207@huawei.com>
+Date: Wed, 7 Aug 2019 19:03:55 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20190807180355.GA22758@stefanha-x1.localdomain>
+References: <20190801165409.20121-1-stefanha@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="RnlQjJ0d97Da+TV1"
 Content-Disposition: inline
-In-Reply-To: <5D4A7771.8010207@huawei.com>
-Subject: Re: [Virtio-fs] [PATCH v2 1/2][RFC] virtiofsd: virtiofsd: add
- definition of fuse_buf_writev()
+In-Reply-To: <20190801165409.20121-1-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 0/4] virtiofsd: multithreading preparation
+	part 3
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,133 +17,95 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>
-Cc: virtio-fs@redhat.com
+To: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-* piaojun (piaojun@huawei.com) wrote:
-> Define fuse_buf_writev() which use pwritev and writev to improve io
-> bandwidth.
-> 
-> Signed-off-by: Jun Piao <piaojun@huawei.com>
-> Suggested-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> ---
->  contrib/virtiofsd/buffer.c      | 37 +++++++++++++++++++++++++++++++++++++
->  contrib/virtiofsd/fuse_common.h | 14 ++++++++++++++
->  contrib/virtiofsd/seccomp.c     |  2 ++
->  3 files changed, 53 insertions(+)
-> 
-> diff --git a/contrib/virtiofsd/buffer.c b/contrib/virtiofsd/buffer.c
-> index 655be137..642830f 100644
-> --- a/contrib/virtiofsd/buffer.c
-> +++ b/contrib/virtiofsd/buffer.c
-> @@ -15,6 +15,7 @@
->  #include <unistd.h>
->  #include <errno.h>
->  #include <assert.h>
-> +#include <stdlib.h>
-> 
->  size_t fuse_buf_size(const struct fuse_bufvec *bufv)
->  {
-> @@ -71,6 +72,42 @@ static ssize_t fuse_buf_write(const struct fuse_buf *dst, size_t dst_off,
->  	return copied;
->  }
-> 
-> +ssize_t fuse_buf_writev(fuse_req_t req,
-> +			     struct fuse_bufvec *out_buf,
-> +			     struct fuse_bufvec *in_buf,
-> +			     enum fuse_buf_copy_flags flags)
-> +{
-> +	ssize_t res, i, buf_index, iovcnt;
-> +	struct iovec * iov;
-> +	int fd = out_buf->buf[0].fd;
-> +	off_t pos = out_buf->buf[0].pos;
 
-That's again assuming that the 'pos' in subsequent elements of out_buf
-is sequential; is it?
-What about any other flags on in_buf?
+--RnlQjJ0d97Da+TV1
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
 
-> +	if (in_buf->count > 2)
-> +		iovcnt = in_buf->count - 1;
-> +	else
-> +		iovcnt = 1;
-> +
-> +	iov = malloc(iovcnt * sizeof(struct iovec));
+On Thu, Aug 01, 2019 at 05:54:05PM +0100, Stefan Hajnoczi wrote:
+> Performance
+> -----------
+> Please try these patches out and share your results.
 
-You could use calloc.
+Here are the performance numbers:
 
-> +	if (!iov)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0, buf_index = 1; i < iovcnt; i++, buf_index++) {
-> +		iov[i].iov_base = in_buf->buf[buf_index].mem;
-> +		iov[i].iov_len = in_buf->buf[buf_index].size;
-> +	}
-> +
-> +	if (flags & FUSE_BUF_FD_SEEK)
-> +		res = pwritev(fd, iov, iovcnt, pos);
-> +	else
-> +		res = writev(fd, iov, iovcnt);
-> +
-> +	if (res == -1 || res == 0)
-> +		res = -errno;
+  Threadpool | iodepth | iodepth
+     size    |    1    |   64
+  -----------+---------+--------
+  None       |   4451  |  4876
+  1          |   4360  |  4858
+  64         |   4359  | 33,266
 
-Does errno get set on a res == 0 ?
+A graph is available here:
+https://vmsplice.net/~stefan/virtiofsd-threadpool-performance.png
 
-Dave
+Summary:
 
-> +	free(iov);
-> +	return res;
-> +}
-> +
->  static ssize_t fuse_buf_read(const struct fuse_buf *dst, size_t dst_off,
->  			     const struct fuse_buf *src, size_t src_off,
->  			     size_t len)
-> diff --git a/contrib/virtiofsd/fuse_common.h b/contrib/virtiofsd/fuse_common.h
-> index 001e6d6..7c07da7 100644
-> --- a/contrib/virtiofsd/fuse_common.h
-> +++ b/contrib/virtiofsd/fuse_common.h
-> @@ -730,6 +730,20 @@ ssize_t fuse_buf_copy(fuse_req_t req,
->  		      enum fuse_buf_copy_flags flags);
-> 
->  /**
-> + * Write data from one buffer vector to another
-> + *
-> + * @param req The request this copy is part of
-> + * @param out_buf destination buffer vector
-> + * @param in_buf source buffer vector
-> + * @param flags flags controlling the copy
-> + * @return actual number of bytes written or -errno on error
-> + */
-> +ssize_t fuse_buf_writev(fuse_req_t req,
-> +		      struct fuse_bufvec *out_buf,
-> +		      struct fuse_bufvec *in_buf,
-> +		      enum fuse_buf_copy_flags flags);
-> +
-> +/**
->   * Memory buffer iterator
->   *
->   */
-> diff --git a/contrib/virtiofsd/seccomp.c b/contrib/virtiofsd/seccomp.c
-> index 5f1c873..4bba30b 100644
-> --- a/contrib/virtiofsd/seccomp.c
-> +++ b/contrib/virtiofsd/seccomp.c
-> @@ -60,6 +60,7 @@ static const int syscall_whitelist[] = {
->  	SCMP_SYS(ppoll),
->  	SCMP_SYS(prctl), /* TODO restrict to just PR_SET_NAME? */
->  	SCMP_SYS(preadv),
-> +	SCMP_SYS(pwritev),
->  	SCMP_SYS(pwrite64),
->  	SCMP_SYS(read),
->  	SCMP_SYS(readlinkat),
-> @@ -78,6 +79,7 @@ static const int syscall_whitelist[] = {
->  	SCMP_SYS(unlinkat),
->  	SCMP_SYS(utimensat),
->  	SCMP_SYS(write),
-> +	SCMP_SYS(writev),
->  };
-> 
->  /* Syscalls used when --syslog is enabled */
-> -- 
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+ * iodepth=64 performance is increased by 6.8 times.
+ * iodepth=1 performance degrades by 2%.
+ * DAX is bottlenecked by QEMU's single-threaded
+   VHOST_USER_SLAVE_FS_MAP/UNMAP handler.
+
+Threadpool size "none" is virtiofsd commit 813a824b707 ("virtiofsd: use
+fuse_lowlevel_is_virtio() in fuse_session_destroy()") without any of the
+multithreading preparation patches.  I benchmarked this to check whether
+the patches introduce a regression for iodepth=1.  They do, but it's
+only around 2%.
+
+I also ran with DAX but found there was not much difference between
+iodepth=1 and iodepth=64.  This might be because the host mmap(2)
+syscall becomes the bottleneck and a serialization point.  QEMU only
+processes one VHOST_USER_SLAVE_FS_MAP/UNMAP at a time.  If we want to
+accelerate DAX it may be necessary to parallelize mmap, assuming the
+host kernel can do them in parallel on a single file.  This performance
+optimization is future work and not directly related to this patch
+series.
+
+The following fio job was run with cache=none and no DAX:
+
+  [global]
+  runtime=60
+  ramp_time=30
+  filename=/var/tmp/fio.dat
+  direct=1
+  rw=randread
+  bs=4k
+  size=4G
+  ioengine=libaio
+  iodepth=1
+
+  [read]
+
+Guest configuration:
+1 vCPU
+4 GB RAM
+Linux 5.1 (vivek-aug-06-2019)
+
+Host configuration:
+Intel(R) Core(TM) i7-5600U CPU @ 2.60GHz (2 cores x 2 threads)
+8 GB RAM
+Linux 5.1.20-300.fc30.x86_64
+XFS + dm-thin + dm-crypt
+Toshiba THNSFJ256GDNU (256 GB SATA SSD)
+
+Stefan
+
+--RnlQjJ0d97Da+TV1
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1LEmwACgkQnKSrs4Gr
+c8gLjQf/UBAHjyJ/mHomkCbE3SaeaZIwfXNA9Zm278DVu9a2vAOhjZ1shtV5b21g
+yDlesefwzFb9u/McYTwf1hbUiYweSy2bNqaRFb9ZsI4EWxqDJRirpTGlioWESzjy
+kdQ3Gh9PRwgdgfXZMBUN01ut07dQKEDSTzlBISHkS5GT56to9NbzprHZh+bwy8NG
+9UenaGzcvEwTxGxEjSekF/UkGwXVnsBOE4Do1MsBK5WJf+T919kUW5043yz1HUyB
+7YfoTtKMo+cyUJaQcyGOOXCs2vhoAVqY/KUYM92RH31shnwbBZK5nAa9wVACGcu2
+fslfzmFxRovmbI6U+QjZrfs+lgQGCg==
+=swFN
+-----END PGP SIGNATURE-----
+
+--RnlQjJ0d97Da+TV1--
 

@@ -1,10 +1,13 @@
-Date: Wed, 7 Aug 2019 17:26:10 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190807212610.GG18557@redhat.com>
+From: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
+Date: Wed, 7 Aug 2019 22:52:08 +0000
+Message-ID: <1E91073893EF8F498411079ED374F912460D57A6@ORSMSX115.amr.corp.intel.com>
+References: <20190807212610.GG18557@redhat.com>
+In-Reply-To: <20190807212610.GG18557@redhat.com>
+Content-Language: en-US
+Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: [Virtio-fs] Rebased kernel patches to 5.3-rc kernel
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] Rebased kernel patches to 5.3-rc kernel
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,8 +16,18 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs-list <virtio-fs@redhat.com>
-Cc: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
+To: Vivek Goyal <vgoyal@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>
+
+Thank you Vivek! I'm definitely gonna try this new branch soon, and I'll let you know if I run into any issue :)
+
+Thanks,
+Sebastien
+________________________________________
+From: Vivek Goyal [vgoyal@redhat.com]
+Sent: Wednesday, August 07, 2019 2:26 PM
+To: virtio-fs-list
+Cc: Boeuf, Sebastien
+Subject: Rebased kernel patches to 5.3-rc kernel
 
 Hi All,
 
@@ -32,4 +45,5 @@ Give it a try and let us know if you face issues.
 
 Thanks
 Vivek
+
 

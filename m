@@ -1,11 +1,10 @@
-Date: Wed, 7 Aug 2019 17:10:57 -0400
+Date: Wed, 7 Aug 2019 17:26:10 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190807211057.GF18557@redhat.com>
+Message-ID: <20190807212610.GG18557@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: [Virtio-fs] [PATCH] virtiofsd: Change FUSE_MAP_ALIGNMENT bit
- position for 5.3 kernel
+Subject: [Virtio-fs] Rebased kernel patches to 5.3-rc kernel
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,25 +14,22 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs-list <virtio-fs@redhat.com>
+Cc: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
 
-Due to rebase to 5.3-rc kernel, change bit position of FUSE_MAP_ALIGNMENT.
+Hi All,
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- contrib/virtiofsd/fuse_kernel.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I have rebased virtio_fs kernel patches to 5.3-rc kernel and pushed it to my
+github repo.
 
-Index: qemu/contrib/virtiofsd/fuse_kernel.h
-===================================================================
---- qemu.orig/contrib/virtiofsd/fuse_kernel.h	2019-08-05 16:32:14.358564755 -0400
-+++ qemu/contrib/virtiofsd/fuse_kernel.h	2019-08-07 16:31:27.882640763 -0400
-@@ -292,7 +292,7 @@ struct fuse_file_lock {
- #define FUSE_MAX_PAGES		(1 << 22)
- #define FUSE_CACHE_SYMLINKS	(1 << 23)
- #define FUSE_NO_OPENDIR_SUPPORT (1 << 24)
--#define FUSE_MAP_ALIGNMENT      (1 << 25)
-+#define FUSE_MAP_ALIGNMENT      (1 << 26)
- 
- /**
-  * CUSE INIT request/reply flags
+https://github.com/rhvgoyal/linux/commits/vivek-5.3-aug-07-2019
+
+This compiles and passes basic tests. It needs more testing though.
+
+It needs one patch in virtiofsd to change bit position of MAP_ALIGNMENT
+flag. I posted a patch for that.
+
+Give it a try and let us know if you face issues.
+
+Thanks
+Vivek
 

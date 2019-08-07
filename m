@@ -1,11 +1,11 @@
-Date: Thu, 25 Jul 2019 16:49:34 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190725204934.GG15543@redhat.com>
+From: piaojun <piaojun@huawei.com>
+Message-ID: <5D4A7641.9080400@huawei.com>
+Date: Wed, 7 Aug 2019 14:57:05 +0800
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: [Virtio-fs] [RFC][PATCH] init: Allow mounting virtio_fs instance as
-	rootfs
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+Subject: [Virtio-fs] [PATCH v2 0/2][RFC] virtiofsd: Improve io bandwidth by
+ replacing pwrite with pwritev
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,47 +14,53 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: virtio-fs@redhat.com
 
-Hi Stefan,
+>From my test, write bandwidth will be improved greatly by replacing
+pwrite with pwritev, and the test result as below:
 
-I think following patch might allow you to mount virtio_fs as rootfs
-with new syntax.
-
-I have only compiled it and not tested it. Plase have a look.
-
-Thanks
-Vivek
-
-virtio_fs passes root=<fs-instance-name> as identifier of virtio_fs instance
-to be mounted. None of the existing primitives seems to fit virito_fs needs.
-
-So check rootfstype and if it is "virtio_fs", do not parse root= further
-and call mount_block_root().
-
-This is similar to carving out special paths for ubifs. Now virtio_fs
-users should be able to pass "root=myfs rootfstype=virtio_fs" and be
-able to mount that particular instance of virtio_fs as rootfs.
- 
-Yet-To-Be-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- init/do_mounts.c |    4 ++++
- 1 file changed, 4 insertions(+)
+pwrite:
+# fio -direct=1 -time_based -iodepth=64 -rw=randwrite -ioengine=libaio -bs=1M -size=1G -numjob=16 -runtime=30 -group_reporting -name=file -filename=/mnt/virtiofs/file
+file: (g=0): rw=randwrite, bs=1M-1M/1M-1M/1M-1M, ioengine=libaio, iodepth=64
+...
+fio-2.13
+Starting 16 processes
+Jobs: 16 (f=16): [w(16)] [100.0% done] [0KB/886.0MB/0KB /s] [0/886/0 iops] [eta 00m:00s]
+file: (groupid=0, jobs=16): err= 0: pid=5799: Tue Aug 6 18:48:26 2019
+write: io=26881MB, bw=916988KB/s, iops=895, runt= 30018msec
 
-Index: rhvgoyal-linux-fuse/init/do_mounts.c
-===================================================================
---- rhvgoyal-linux-fuse.orig/init/do_mounts.c	2019-04-09 15:42:17.096602971 -0400
-+++ rhvgoyal-linux-fuse/init/do_mounts.c	2019-07-25 16:40:29.226348627 -0400
-@@ -595,6 +595,10 @@ void __init prepare_namespace(void)
- 			mount_block_root(root_device_name, root_mountflags);
- 			goto out;
- 		}
-+		if (root_fs_names && !strncmp(root_fs_names, "virtio_fs", 3)) {
-+			mount_block_root(root_device_name, root_mountflags);
-+			goto out;
-+		}
- 		ROOT_DEV = name_to_dev_t(root_device_name);
- 		if (strncmp(root_device_name, "/dev/", 5) == 0)
- 			root_device_name += 5;
+pwritev:
+# fio -direct=1 -time_based -iodepth=64 -rw=randwrite -ioengine=libaio -bs=1M -size=1G -numjob=16 -runtime=30 -group_reporting -name=file -filename=/mnt/virtiofs/file
+file: (g=0): rw=randwrite, bs=1M-1M/1M-1M/1M-1M, ioengine=libaio, iodepth=64
+...
+fio-2.13
+Starting 16 processes
+Jobs: 16 (f=16): [w(16)] [100.0% done] [0KB/1793MB/0KB /s] [0/1793/0 iops] [eta 00m:00s]
+file: (groupid=0, jobs=16): err= 0: pid=6328: Tue Aug 6 18:22:17 2019
+write: io=52775MB, bw=1758.7MB/s, iops=1758, runt= 30009msec
+---
+
+This patch introduces writev and pwritev for lo_write_buf(). I tried my
+best not doing harm to the origin code construct, and there will be
+some *useless* branches in fuse_buf_copy_one() which are hard to judge
+if they will be useful in the future. So I just leave them alone
+safely. If the cleanup work is necessary, please let me know.
+
+v2
+  - Split into two patches
+  - Add the lost flags support, such as FUSE_BUF_PHYS_ADDR
+
+Jun Piao (2):
+  add definition of fuse_buf_writev().
+  use fuse_buf_writev to replace fuse_buf_write for better performance
+
+Signed-off-by: Jun Piao <piaojun@huawei.com>
+Suggested-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+---
+ buffer.c         |   37 +++++++++++++++++++++++++++++++++++++
+ fuse_common.h    |   14 ++++++++++++++
+ passthrough_ll.c |    5 ++++-
+ seccomp.c        |    2 +
+--
 

@@ -1,17 +1,11 @@
-From: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
-Date: Thu, 8 Aug 2019 05:01:58 +0000
-Message-ID: <22afcc67ede15da63905665ae0bd8a7ca8757226.camel@intel.com>
-References: <20190807212610.GG18557@redhat.com>
-	<1E91073893EF8F498411079ED374F912460D57A6@ORSMSX115.amr.corp.intel.com>
-	<1E91073893EF8F498411079ED374F912460D57F0@ORSMSX115.amr.corp.intel.com>
-	<20190808002305.GB24807@redhat.com>
-In-Reply-To: <20190808002305.GB24807@redhat.com>
-Content-Language: en-US
-Content-Type: text/plain; charset="utf-8"
-Content-ID: <611F35BA94E3804D996E4C2BB6C7610C@intel.com>
+From: piaojun <piaojun@huawei.com>
+Message-ID: <5D4BBDB7.2000005@huawei.com>
+Date: Thu, 8 Aug 2019 14:14:15 +0800
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] Rebased kernel patches to 5.3-rc kernel
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+Subject: [Virtio-fs] [PATCH v3 0/2] virtiofsd: Improve io bandwidth by
+ replacing pwrite with pwritev
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,71 +14,61 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "vgoyal@redhat.com" <vgoyal@redhat.com>
-Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+To: virtio-fs@redhat.com
 
-Hi Vivek,
+>From my test, write bandwidth will be improved greatly by replacing
+pwrite with pwritev, and the test result as below:
 
-On Wed, 2019-08-07 at 20:23 -0400, Vivek Goyal wrote:
-> On Wed, Aug 07, 2019 at 11:23:35PM +0000, Boeuf, Sebastien wrote:
-> > Hi Vivek, I just tried the new kernel and I run into issues with my
-> > VMM.
-> > When I try to mount from inside the guest with the following
-> > command:
-> > # mount -t virtio_fs /dev/null mount_dir/ -o
-> > tag=myfs,rootmode=040000,user_id=0,group_id=0,dax
-> > 
-> > I realized the mount command changed into this:
-> > mount -t virtio_fs myfs mount_dir/ -o
-> > rootmode=040000,user_id=0,group_id=0,dax
-> 
-> Hi Sebastien,
-> 
-> Adding virtio-fs list back. I think its a good idea to keep
-> conversation
-> on list, just in case others face similar issues.
+---
+pwrite:
+# fio -direct=1 -time_based -iodepth=64 -rw=randwrite -ioengine=libaio -bs=1M -size=1G -numjob=16 -runtime=30 -group_reporting -name=file -filename=/mnt/virtiofs/file
+file: (g=0): rw=randwrite, bs=1M-1M/1M-1M/1M-1M, ioengine=libaio, iodepth=64
+...
+fio-2.13
+Starting 16 processes
+Jobs: 16 (f=16): [w(16)] [100.0% done] [0KB/886.0MB/0KB /s] [0/886/0 iops] [eta 00m:00s]
+file: (groupid=0, jobs=16): err= 0: pid=5799: Tue Aug 6 18:48:26 2019
+write: io=26881MB, bw=916988KB/s, iops=895, runt= 30018msec
 
-Oh yes sorry about that.
+pwritev:
+# fio -direct=1 -time_based -iodepth=64 -rw=randwrite -ioengine=libaio -bs=1M -size=1G -numjob=16 -runtime=30 -group_reporting -name=file -filename=/mnt/virtiofs/file
+file: (g=0): rw=randwrite, bs=1M-1M/1M-1M/1M-1M, ioengine=libaio, iodepth=64
+...
+fio-2.13
+Starting 16 processes
+Jobs: 16 (f=16): [w(16)] [100.0% done] [0KB/1793MB/0KB /s] [0/1793/0 iops] [eta 00m:00s]
+file: (groupid=0, jobs=16): err= 0: pid=6328: Tue Aug 6 18:22:17 2019
+write: io=52775MB, bw=1758.7MB/s, iops=1758, runt= 30009msec
+---
 
-> 
-> > 
-> > It'd be nice to update it from the official documentation.
-> 
-> Yes it will be nice to update doc.
+This patch introduces writev and pwritev for lo_write_buf(). I tried my
+best not doing harm to the origin code construct, and there will be
+some *useless* branches in fuse_buf_copy_one() which are hard to judge
+if they will be useful in the future. So I just leave them alone
+safely. If the cleanup work is necessary, please let me know.
 
-:)
+v2
+  - Split into two patches
+  - Add the lost flags support, such as FUSE_BUF_PHYS_ADDR
 
-> 
-> Stefan, can you please take care of updating docs. We will have to
-> mention
-> for 4.19 kernel syntax is different and for latest kernel syntax is
-> different.
-> 
-> > 
-> > Now, when I try to read from my files, I get nothing. I see the
-> > mmap happening,
-> > but the output of `cat` is empty.
-> > Can you think of anything that changed that could affect the
-> > mapping?
-> 
-> For me it works. Which virtiofsd are you using. I am using virtio-fs-
-> dev
-> branch of qemu.
-> 
-> https://gitlab.com/virtio-fs/qemu/commits/virtio-fs-dev
-> 
-> If it still does not work, try disabling dax and see if it helps.
+v3
+  - use git send-email to make the patch set in one thread
+  - move fuse_buf_writev() into fuse_buf_copy()
+  - use writev for the src buffers when they're alread already mapped by the daemon process
+  - use calloc to replace malloc
+  - set res 0 if writev() returns 0
 
-Yes I'm using the same branch as you. I got it working eventually. I
-was ignoring the flags passed by virtiofsd to do the mmap and it caused
-the mmap to fail since I was trying to mmap R/W when virtiofsd was
-telling me to do RO.
+Jun Piao (2):
+  add definition of fuse_buf_writev().
+  use fuse_buf_writev to replace fuse_buf_write for better performance
 
-Anyway, I confirm it's all working now :)
-
-Thanks,
-Sebastien
-> 
-> Thanks
-> Vivek
+Signed-off-by: Jun Piao <piaojun@huawei.com>
+Suggested-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ buffer.c      |   48 ++++++++++++++++++++++++++++++++++++++++++++++++
+ fuse_common.h |   14 ++++++++++++++
+ seccomp.c     |    2 ++
+ 3 files changed, 64 insertions(+)
+--
 

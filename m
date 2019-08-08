@@ -1,13 +1,17 @@
-References: <5D4A7771.8010207@huawei.com> <20190807154245.GH2867@work-vm>
-From: piaojun <piaojun@huawei.com>
-Message-ID: <5D4B7CEA.4090005@huawei.com>
-Date: Thu, 8 Aug 2019 09:37:46 +0800
+From: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
+Date: Thu, 8 Aug 2019 05:01:58 +0000
+Message-ID: <22afcc67ede15da63905665ae0bd8a7ca8757226.camel@intel.com>
+References: <20190807212610.GG18557@redhat.com>
+	<1E91073893EF8F498411079ED374F912460D57A6@ORSMSX115.amr.corp.intel.com>
+	<1E91073893EF8F498411079ED374F912460D57F0@ORSMSX115.amr.corp.intel.com>
+	<20190808002305.GB24807@redhat.com>
+In-Reply-To: <20190808002305.GB24807@redhat.com>
+Content-Language: en-US
+Content-Type: text/plain; charset="utf-8"
+Content-ID: <611F35BA94E3804D996E4C2BB6C7610C@intel.com>
 MIME-Version: 1.0
-In-Reply-To: <20190807154245.GH2867@work-vm>
-Content-Type: text/plain; charset="windows-1252"
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH v2 1/2][RFC] virtiofsd: virtiofsd: add
- definition of fuse_buf_writev()
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] Rebased kernel patches to 5.3-rc kernel
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,150 +20,71 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com
+To: "vgoyal@redhat.com" <vgoyal@redhat.com>
+Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
-Hi Dave,
+Hi Vivek,
 
-On 2019/8/7 23:42, Dr. David Alan Gilbert wrote:
-> * piaojun (piaojun@huawei.com) wrote:
->> Define fuse_buf_writev() which use pwritev and writev to improve io
->> bandwidth.
->>
->> Signed-off-by: Jun Piao <piaojun@huawei.com>
->> Suggested-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
->> ---
->>  contrib/virtiofsd/buffer.c      | 37 +++++++++++++++++++++++++++++++++++++
->>  contrib/virtiofsd/fuse_common.h | 14 ++++++++++++++
->>  contrib/virtiofsd/seccomp.c     |  2 ++
->>  3 files changed, 53 insertions(+)
->>
->> diff --git a/contrib/virtiofsd/buffer.c b/contrib/virtiofsd/buffer.c
->> index 655be137..642830f 100644
->> --- a/contrib/virtiofsd/buffer.c
->> +++ b/contrib/virtiofsd/buffer.c
->> @@ -15,6 +15,7 @@
->>  #include <unistd.h>
->>  #include <errno.h>
->>  #include <assert.h>
->> +#include <stdlib.h>
->>
->>  size_t fuse_buf_size(const struct fuse_bufvec *bufv)
->>  {
->> @@ -71,6 +72,42 @@ static ssize_t fuse_buf_write(const struct fuse_buf *dst, size_t dst_off,
->>  	return copied;
->>  }
->>
->> +ssize_t fuse_buf_writev(fuse_req_t req,
->> +			     struct fuse_bufvec *out_buf,
->> +			     struct fuse_bufvec *in_buf,
->> +			     enum fuse_buf_copy_flags flags)
->> +{
->> +	ssize_t res, i, buf_index, iovcnt;
->> +	struct iovec * iov;
->> +	int fd = out_buf->buf[0].fd;
->> +	off_t pos = out_buf->buf[0].pos;
+On Wed, 2019-08-07 at 20:23 -0400, Vivek Goyal wrote:
+> On Wed, Aug 07, 2019 at 11:23:35PM +0000, Boeuf, Sebastien wrote:
+> > Hi Vivek, I just tried the new kernel and I run into issues with my
+> > VMM.
+> > When I try to mount from inside the guest with the following
+> > command:
+> > # mount -t virtio_fs /dev/null mount_dir/ -o
+> > tag=myfs,rootmode=040000,user_id=0,group_id=0,dax
+> > 
+> > I realized the mount command changed into this:
+> > mount -t virtio_fs myfs mount_dir/ -o
+> > rootmode=040000,user_id=0,group_id=0,dax
 > 
-> That's again assuming that the 'pos' in subsequent elements of out_buf
-> is sequential; is it?
-> What about any other flags on in_buf?
+> Hi Sebastien,
+> 
+> Adding virtio-fs list back. I think its a good idea to keep
+> conversation
+> on list, just in case others face similar issues.
 
-out_buf->buf[0].pos records the offset which the write starts, and I
-just moved it from lo_write_buf() without changing the logic. Then I
-will handle all the flags just as the last reply.
+Oh yes sorry about that.
 
 > 
->> +	if (in_buf->count > 2)
->> +		iovcnt = in_buf->count - 1;
->> +	else
->> +		iovcnt = 1;
->> +
->> +	iov = malloc(iovcnt * sizeof(struct iovec));
+> > 
+> > It'd be nice to update it from the official documentation.
 > 
-> You could use calloc.
+> Yes it will be nice to update doc.
 
-Accepted.
+:)
 
 > 
->> +	if (!iov)
->> +		return -ENOMEM;
->> +
->> +	for (i = 0, buf_index = 1; i < iovcnt; i++, buf_index++) {
->> +		iov[i].iov_base = in_buf->buf[buf_index].mem;
->> +		iov[i].iov_len = in_buf->buf[buf_index].size;
->> +	}
->> +
->> +	if (flags & FUSE_BUF_FD_SEEK)
->> +		res = pwritev(fd, iov, iovcnt, pos);
->> +	else
->> +		res = writev(fd, iov, iovcnt);
->> +
->> +	if (res == -1 || res == 0)
->> +		res = -errno;
+> Stefan, can you please take care of updating docs. We will have to
+> mention
+> for 4.19 kernel syntax is different and for latest kernel syntax is
+> different.
 > 
-> Does errno get set on a res == 0 ?
+> > 
+> > Now, when I try to read from my files, I get nothing. I see the
+> > mmap happening,
+> > but the output of `cat` is empty.
+> > Can you think of anything that changed that could affect the
+> > mapping?
+> 
+> For me it works. Which virtiofsd are you using. I am using virtio-fs-
+> dev
+> branch of qemu.
+> 
+> https://gitlab.com/virtio-fs/qemu/commits/virtio-fs-dev
+> 
+> If it still does not work, try disabling dax and see if it helps.
 
-No, this should be fixed and I plan returning res when it's 0. Could we
-just consider this as copied none bytes?
+Yes I'm using the same branch as you. I got it working eventually. I
+was ignoring the flags passed by virtiofsd to do the mmap and it caused
+the mmap to fail since I was trying to mmap R/W when virtiofsd was
+telling me to do RO.
 
+Anyway, I confirm it's all working now :)
+
+Thanks,
+Sebastien
 > 
-> Dave
-> 
->> +	free(iov);
->> +	return res;
->> +}
->> +
->>  static ssize_t fuse_buf_read(const struct fuse_buf *dst, size_t dst_off,
->>  			     const struct fuse_buf *src, size_t src_off,
->>  			     size_t len)
->> diff --git a/contrib/virtiofsd/fuse_common.h b/contrib/virtiofsd/fuse_common.h
->> index 001e6d6..7c07da7 100644
->> --- a/contrib/virtiofsd/fuse_common.h
->> +++ b/contrib/virtiofsd/fuse_common.h
->> @@ -730,6 +730,20 @@ ssize_t fuse_buf_copy(fuse_req_t req,
->>  		      enum fuse_buf_copy_flags flags);
->>
->>  /**
->> + * Write data from one buffer vector to another
->> + *
->> + * @param req The request this copy is part of
->> + * @param out_buf destination buffer vector
->> + * @param in_buf source buffer vector
->> + * @param flags flags controlling the copy
->> + * @return actual number of bytes written or -errno on error
->> + */
->> +ssize_t fuse_buf_writev(fuse_req_t req,
->> +		      struct fuse_bufvec *out_buf,
->> +		      struct fuse_bufvec *in_buf,
->> +		      enum fuse_buf_copy_flags flags);
->> +
->> +/**
->>   * Memory buffer iterator
->>   *
->>   */
->> diff --git a/contrib/virtiofsd/seccomp.c b/contrib/virtiofsd/seccomp.c
->> index 5f1c873..4bba30b 100644
->> --- a/contrib/virtiofsd/seccomp.c
->> +++ b/contrib/virtiofsd/seccomp.c
->> @@ -60,6 +60,7 @@ static const int syscall_whitelist[] = {
->>  	SCMP_SYS(ppoll),
->>  	SCMP_SYS(prctl), /* TODO restrict to just PR_SET_NAME? */
->>  	SCMP_SYS(preadv),
->> +	SCMP_SYS(pwritev),
->>  	SCMP_SYS(pwrite64),
->>  	SCMP_SYS(read),
->>  	SCMP_SYS(readlinkat),
->> @@ -78,6 +79,7 @@ static const int syscall_whitelist[] = {
->>  	SCMP_SYS(unlinkat),
->>  	SCMP_SYS(utimensat),
->>  	SCMP_SYS(write),
->> +	SCMP_SYS(writev),
->>  };
->>
->>  /* Syscalls used when --syslog is enabled */
->> -- 
-> --
-> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
-> .
-> 
+> Thanks
+> Vivek
 

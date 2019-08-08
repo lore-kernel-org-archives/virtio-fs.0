@@ -1,10 +1,17 @@
-From: wangyan <wangyan122@huawei.com>
-Message-ID: <484b6fd5-fa26-ce94-a18f-63c8c41692ee@huawei.com>
-Date: Thu, 8 Aug 2019 19:25:25 +0800
+Date: Thu, 8 Aug 2019 08:53:20 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190808125320.GB3147@redhat.com>
+References: <20190801165409.20121-1-stefanha@redhat.com>
+	<20190807180355.GA22758@stefanha-x1.localdomain>
+	<20190807205715.GE18557@redhat.com>
+	<20190808090213.GD31476@stefanha-x1.localdomain>
+	<20190808095316.GC2852@work-vm>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"; format=flowed
-Content-Transfer-Encoding: 7bit
-Subject: [Virtio-fs] A performance problem for buffer write
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20190808095316.GC2852@work-vm>
+Subject: Re: [Virtio-fs] [PATCH 0/4] virtiofsd: multithreading preparation
+ part 3
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,87 +20,63 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
-Cc: "Fangyi (C)" <eric.fangyi@huawei.com>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-Hi all,
-	I meet a performance problem when I test buffer write.
-	
-	Test environment:
-		Guest Kernel:
-			https://github.com/rhvgoyal/linux/tree/virtio-fs-dev-5.1
-		Host Qemu:
-			https://gitlab.com/virtio-fs/qemu/tree/virtio-fs-dev
+On Thu, Aug 08, 2019 at 10:53:16AM +0100, Dr. David Alan Gilbert wrote:
+> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > On Wed, Aug 07, 2019 at 04:57:15PM -0400, Vivek Goyal wrote:
+> > > Kernel also serializes MAP/UNMAP on one inode. So you will need to run
+> > > multiple jobs operating on different inodes to see parallel MAP/UNMAP
+> > > (atleast from kernel's point of view).
+> > 
+> > Okay, there is still room to experiment with how MAP and UNMAP are
+> > handled by virtiofsd and QEMU even if the host kernel ultimately becomes
+> > the bottleneck.
+> > 
+> > One possible optimization is to eliminate REMOVEMAPPING requests when
+> > the guest driver knows a SETUPMAPPING will follow immediately.  I see
+> > the following request pattern in a fio randread iodepth=64 job:
+> > 
+> >   unique: 995348, opcode: SETUPMAPPING (48), nodeid: 135, insize: 80, pid: 1351
+> >   lo_setupmapping(ino=135, fi=0x(nil), foffset=3860856832, len=2097152, moffset=859832320, flags=0)
+> >      unique: 995348, success, outsize: 16
+> >   unique: 995350, opcode: REMOVEMAPPING (49), nodeid: 135, insize: 60, pid: 12
+> >      unique: 995350, success, outsize: 16
+> >   unique: 995352, opcode: SETUPMAPPING (48), nodeid: 135, insize: 80, pid: 1351
+> >   lo_setupmapping(ino=135, fi=0x(nil), foffset=16777216, len=2097152, moffset=861929472, flags=0)
+> >      unique: 995352, success, outsize: 16
+> >   unique: 995354, opcode: REMOVEMAPPING (49), nodeid: 135, insize: 60, pid: 12
+> >      unique: 995354, success, outsize: 16
+> >   virtio_send_msg: elem 9: with 1 in desc of length 16
+> >   unique: 995356, opcode: SETUPMAPPING (48), nodeid: 135, insize: 80, pid: 1351
+> >   lo_setupmapping(ino=135, fi=0x(nil), foffset=383778816, len=2097152, moffset=864026624, flags=0)
+> >      unique: 995356, success, outsize: 16
+> >   unique: 995358, opcode: REMOVEMAPPING (49), nodeid: 135, insize: 60, pid: 12
+> > 
+> > The REMOVEMAPPING requests are unnecessary since we can map over the top
+> > of the old mapping instead of taking the extra step of removing it
+> > first.
+> 
+> Yep, those should go - I think Vivek likes to keep them for testing
+> since they make things fail more completely if there's a screwup.
 
-	I format a ramdisk to be a ext4 filesystem, and mount it for a shared 
-folder.
-	In the qemu build directory, run:
-		./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o 
-source=/mnt/9pshare/ -o cache=always -o writeback
-	and
-		./x86_64-softmmu/qemu-system-x86_64 -M pc -cpu host --enable-kvm -smp 
-2 -m 8G,maxmem=8G -object 
-memory-backend-file,id=mem,size=8G,mem-path=/dev/hugepages,share=on 
--numa node,memdev=mem -drive 
-if=none,id=root,format=qcow2,file=/mnt/sdb/mirrors/os.qcow2 -device 
-virtio-scsi -device scsi-disk,drive=root,bootindex=1 -object 
-iothread,id=io -device virtio-scsi-pci,iothread=io -net nic,model=virtio 
--net tap,ifname=tap0,script=/etc/qemu-ifup,downscript=no -vnc 0.0.0.0:0 
--chardev socket,id=char0,path=/tmp/vhostqemu -device 
-vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs,cache-size=2G
+I like to keep them because otherwise they keep the resources busy
+on host. If DAX range is being used immediately, then this optimization
+makes more sense. I will keep this in mind.
 
-	Test Result:
-		1. the bandwidth of buffer write is just 691894KB/s, it is very bad. 
-The test model:
-			fio -filename=/mnt/virtiofs/test -rw=write -bs=1M -size=1G -iodepth=1 
--ioengine=psync -numjobs=1 -group_reporting -name=1M -time_based -runtime=30
-			1M: (g=0): rw=write, bs=1M-1M/1M-1M/1M-1M, ioengine=psync, iodepth=1
-			fio-2.13
-			Starting 1 process
-			4K: Laying out IO file(s) (1 file(s) / 1024MB)
-			Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/695.2MB/0KB /s] [0/695/0 
-iops] [eta 00m:00s]
-			4K: (groupid=0, jobs=1): err= 0: pid=5580: Thu Aug  8 18:29:20 2019
-			  write: io=20271MB, bw=691894KB/s, iops=675, runt= 30001msec
-				clat (usec): min=359, max=12348, avg=1423.88, stdev=1587.96
-				 lat (usec): min=407, max=12399, avg=1475.98, stdev=1588.17
+> 
+> > Some more questions to consider for DAX performance optimization:
+> > 
+> > 1. Is FUSE_READ/FUSE_WRITE more efficient than DAX for some I/O patterns?
+> 
+> Probably for cases where the data is only accessed once, and you can't
+> preemptively map.
+> Another variant on (1) is whether we could do read/writes while the mmap
+> is happening to absorb the latency.
 
+For small random I/O, dax might not be very effective. Overhead of
+setting up mapping and tearing it down is significant.
 
-		2. the avg lat is 6.64usec, it is very high. The test model:
-			fio -filename=/mnt/virtiofs/test -rw=write -bs=4K -size=1G -iodepth=1 
--ioengine=psync -numjobs=1 -group_reporting -name=4K -time_based -runtime=30
-			4K: (g=0): rw=write, bs=4K-4K/4K-4K/4K-4K, ioengine=psync, iodepth=1
-			fio-2.13
-			Starting 1 process
-			Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/478.9MB/0KB /s] [0/123K/0 
-iops] [eta 00m:00s]
-			4K: (groupid=0, jobs=1): err= 0: pid=5685: Thu Aug  8 18:35:51 2019
-			  write: io=13302MB, bw=454013KB/s, iops=113503, runt= 30001msec
-				clat (usec): min=2, max=7196, avg= 6.03, stdev=75.27
-				lat (usec): min=3, max=7196, avg= 6.64, stdev=75.27
-
-	I found that the judgement statement 'if (!TestSetPageDirty(page))' 
-always true in function '__set_page_dirty_nobuffers', it will waste much 
-time to mark inode dirty, no one page is dirty when write it the second 
-time.
-	The buffer write stack:
-		fuse_file_write_iter
-			->fuse_cache_write_iter
-				->generic_file_write_iter
-					->__generic_file_write_iter
-						->generic_perform_write
-							->fuse_write_end
-								->set_page_dirty
-									->__set_page_dirty_nobuffers
-	
-	The reason for 'if (!TestSetPageDirty(page))' always true may be the 
-pdflush process will call the function fuse_writepages, and it will 
-clean the page's dirty sign in write_cache_pages, and call 
-fuse_writepages_send to flush all pages to the disk of the host. So when 
-the page is write the second time, it always not dirty.
-	
-	I want to know is there any problems in this write-back procedure.
-
-Thanks,
-Yan wang
+Vivek
 

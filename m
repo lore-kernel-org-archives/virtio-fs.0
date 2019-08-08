@@ -1,15 +1,13 @@
-Date: Thu, 25 Jul 2019 18:23:25 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190726012324.bxpqjimogfhrrxkh@US-160370MP2.local>
-References: <20190724210721.9185-1-vgoyal@redhat.com>
-	<20190724210721.9185-2-vgoyal@redhat.com>
+References: <5D4BBDB7.2000005@huawei.com> <5D4BBDFF.6060106@huawei.com>
+From: piaojun <piaojun@huawei.com>
+Message-ID: <5D4BBE9A.8020103@huawei.com>
+Date: Thu, 8 Aug 2019 14:18:02 +0800
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20190724210721.9185-2-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 1/3] fuse: Get rid of file parameter from
-	setup mapping
-Reply-To: bo.liu@linux.alibaba.com
+In-Reply-To: <5D4BBDFF.6060106@huawei.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+Subject: [Virtio-fs] [PATCH v3 2/2] virtiofsd: use fuse_buf_writev to
+ replace fuse_buf_write for better performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,87 +16,46 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com
+To: virtio-fs@redhat.com
 
-On Wed, Jul 24, 2019 at 05:07:19PM -0400, Vivek Goyal wrote:
-> There is only one caller of fuse_setup_one_mapping() and that passes file
-> argument as NULL. So get rid of this parameter as there are no callers.
-> 
+fuse_buf_writev() only handles the normal write in which src is buffer
+and dest is fd. Specially if src buffer represents guest physical
+address that can't be mapped by the daemon process, IO must be bounced
+back to the VMM to do it by fuse_buf_copy().
 
-Reviewed-by: Liu Bo <bo.liu@linux.alibaba.com>
+Signed-off-by: Jun Piao <piaojun@huawei.com>
+Suggested-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ contrib/virtiofsd/buffer.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-thanks,
--liubo
+diff --git a/contrib/virtiofsd/buffer.c b/contrib/virtiofsd/buffer.c
+index 3920cbf..f09d43c 100644
+--- a/contrib/virtiofsd/buffer.c
++++ b/contrib/virtiofsd/buffer.c
+@@ -324,11 +324,22 @@ static int fuse_bufvec_advance(struct fuse_bufvec *bufv, size_t len)
+ ssize_t fuse_buf_copy(fuse_req_t req, struct fuse_bufvec *dstv, struct fuse_bufvec *srcv,
+ 		      enum fuse_buf_copy_flags flags)
+ {
++	size_t i;
+ 	size_t copied = 0;
 
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  fs/fuse/file.c | 30 +++++++-----------------------
->  1 file changed, 7 insertions(+), 23 deletions(-)
-> 
-> diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-> index fc40e0f44578..93f8e62e2b5b 100644
-> --- a/fs/fuse/file.c
-> +++ b/fs/fuse/file.c
-> @@ -264,41 +264,26 @@ static void dmap_add_to_free_pool(struct fuse_conn *fc,
->  }
->  
->  /* offset passed in should be aligned to FUSE_DAX_MEM_RANGE_SZ */
-> -static int fuse_setup_one_mapping(struct inode *inode,
-> -				struct file *file, loff_t offset,
-> -				struct fuse_dax_mapping *dmap)
-> +static int fuse_setup_one_mapping(struct inode *inode, loff_t offset,
-> +				  struct fuse_dax_mapping *dmap)
->  {
->  	struct fuse_conn *fc = get_fuse_conn(inode);
->  	struct fuse_inode *fi = get_fuse_inode(inode);
-> -	struct fuse_file *ff = NULL;
->  	struct fuse_setupmapping_in inarg;
->  	FUSE_ARGS(args);
->  	ssize_t err;
->  
-> -	if (file)
-> -		ff = file->private_data;
-> -
->  	WARN_ON(offset % FUSE_DAX_MEM_RANGE_SZ);
->  	WARN_ON(fc->nr_free_ranges < 0);
->  
->  	/* Ask fuse daemon to setup mapping */
->  	memset(&inarg, 0, sizeof(inarg));
->  	inarg.foffset = offset;
-> -	if (ff)
-> -		inarg.fh = ff->fh;
-> -	else
-> -		inarg.fh = -1;
-> +	inarg.fh = -1;
->  	inarg.moffset = dmap->window_offset;
->  	inarg.len = FUSE_DAX_MEM_RANGE_SZ;
-> -	if (file) {
-> -		inarg.flags |= (file->f_mode & FMODE_WRITE) ?
-> -				FUSE_SETUPMAPPING_FLAG_WRITE : 0;
-> -		inarg.flags |= (file->f_mode & FMODE_READ) ?
-> -				FUSE_SETUPMAPPING_FLAG_READ : 0;
-> -	} else {
-> -		inarg.flags |= FUSE_SETUPMAPPING_FLAG_READ;
-> -		inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
-> -	}
-> +	inarg.flags |= FUSE_SETUPMAPPING_FLAG_READ;
-> +	inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
->  	args.in.h.opcode = FUSE_SETUPMAPPING;
->  	args.in.h.nodeid = fi->nodeid;
->  	args.in.numargs = 1;
-> @@ -1985,9 +1970,8 @@ static int fuse_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
->  		}
->  
->  		/* Setup one mapping */
-> -		ret = fuse_setup_one_mapping(inode, NULL,
-> -				ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ),
-> -				alloc_dmap);
-> +		ret = fuse_setup_one_mapping(inode,
-> +			ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ), alloc_dmap);
->  		if (ret < 0) {
->  			printk("fuse_setup_one_mapping() failed. err=%d"
->  				" pos=0x%llx\n", ret, pos);
-> -- 
-> 2.17.2
+ 	if (dstv == srcv)
+ 		return fuse_buf_size(dstv);
+
++	/* use writev to improve bandwidth when all the
++	 * src buffers already mapped by the daemon
++	 * process */
++	for (i = 0; i < srcv->count; i++) {
++		if (srcv->buf[i].flags & FUSE_BUF_PHYS_ADDR)
++			break;
++	}
++	if (i == srcv->count)
++		return fuse_buf_writev(req, dstv, srcv, dstv->buf[0].flags);
++
+ 	for (;;) {
+ 		const struct fuse_buf *src = fuse_bufvec_current(srcv);
+ 		const struct fuse_buf *dst = fuse_bufvec_current(dstv);
+-- 
 

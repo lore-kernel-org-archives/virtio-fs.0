@@ -1,15 +1,16 @@
-Date: Thu, 25 Jul 2019 18:34:00 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190726013359.cxvscotpmlxix7ou@US-160370MP2.local>
-References: <20190724210721.9185-1-vgoyal@redhat.com>
-	<20190724210721.9185-3-vgoyal@redhat.com>
+Date: Thu, 8 Aug 2019 10:53:16 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190808095316.GC2852@work-vm>
+References: <20190801165409.20121-1-stefanha@redhat.com>
+	<20190807180355.GA22758@stefanha-x1.localdomain>
+	<20190807205715.GE18557@redhat.com>
+	<20190808090213.GD31476@stefanha-x1.localdomain>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190724210721.9185-3-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 2/3] fuse: Move new mapping setup code in a
-	function
-Reply-To: bo.liu@linux.alibaba.com
+In-Reply-To: <20190808090213.GD31476@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH 0/4] virtiofsd: multithreading preparation
+ part 3
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,164 +19,98 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
 
-On Wed, Jul 24, 2019 at 05:07:20PM -0400, Vivek Goyal wrote:
-> Move new mapping setup code in a separate function. More code will come
-> in fuse_iomap_begin() and its becoming too big.
-
-Reviewed-by: Liu Bo <bo.liu@linux.alibaba.com>
-
-thanks,
--liubo
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> On Wed, Aug 07, 2019 at 04:57:15PM -0400, Vivek Goyal wrote:
+> > Kernel also serializes MAP/UNMAP on one inode. So you will need to run
+> > multiple jobs operating on different inodes to see parallel MAP/UNMAP
+> > (atleast from kernel's point of view).
 > 
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  fs/fuse/file.c | 116 +++++++++++++++++++++++++++----------------------
->  1 file changed, 64 insertions(+), 52 deletions(-)
+> Okay, there is still room to experiment with how MAP and UNMAP are
+> handled by virtiofsd and QEMU even if the host kernel ultimately becomes
+> the bottleneck.
 > 
-> diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-> index 93f8e62e2b5b..a2c19e4a28b5 100644
-> --- a/fs/fuse/file.c
-> +++ b/fs/fuse/file.c
-> @@ -1882,6 +1882,67 @@ static void fuse_fill_iomap(struct inode *inode, loff_t pos, loff_t length,
->  	}
->  }
->  
-> +static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
-> +					 loff_t length, unsigned flags,
-> +					 struct iomap *iomap)
-> +{
-> +	struct fuse_inode *fi = get_fuse_inode(inode);
-> +	struct fuse_conn *fc = get_fuse_conn(inode);
-> +	struct fuse_dax_mapping *dmap, *alloc_dmap = NULL;
-> +	int ret;
-> +
-> +	/* Can't do reclaim in fault path yet due to lock ordering.
-> +	 * Read path takes shared inode lock and that's not sufficient
-> +	 * for inline range reclaim. Caller needs to drop lock, wait
-> +	 * and retry.
-> +	 */
-> +	if (flags & IOMAP_FAULT || !(flags & IOMAP_WRITE)) {
-> +		alloc_dmap = alloc_dax_mapping(fc);
-> +		if (!alloc_dmap)
-> +			return -ENOSPC;
-> +	} else {
-> +		alloc_dmap = alloc_dax_mapping_reclaim(fc, inode);
-> +		if (IS_ERR(alloc_dmap))
-> +			return PTR_ERR(alloc_dmap);
-> +	}
-> +
-> +	/* If we are here, we should have memory allocated */
-> +	if (WARN_ON(!alloc_dmap))
-> +		return -EBUSY;
-> +
-> +	/*
-> +	 * Drop read lock and take write lock so that only one
-> +	 * caller can try to setup mapping and other waits
-> +	 */
-> +	down_write(&fi->i_dmap_sem);
-> +	/*
-> +	 * We dropped lock. Check again if somebody else setup
-> +	 * mapping already.
-> +	 */
-> +	dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, pos,
-> +						pos);
-> +	if (dmap) {
-> +		fuse_fill_iomap(inode, pos, length, iomap, dmap, flags);
-> +		dmap_add_to_free_pool(fc, alloc_dmap);
-> +		up_write(&fi->i_dmap_sem);
-> +		return 0;
-> +	}
-> +
-> +	/* Setup one mapping */
-> +	ret = fuse_setup_one_mapping(inode,
-> +		ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ), alloc_dmap);
-> +	if (ret < 0) {
-> +		printk("fuse_setup_one_mapping() failed. err=%d"
-> +			" pos=0x%llx\n", ret, pos);
-> +		dmap_add_to_free_pool(fc, alloc_dmap);
-> +		up_write(&fi->i_dmap_sem);
-> +		return ret;
-> +	}
-> +	fuse_fill_iomap(inode, pos, length, iomap, alloc_dmap, flags);
-> +	up_write(&fi->i_dmap_sem);
-> +	return 0;
-> +}
-> +
->  /* This is just for DAX and the mapping is ephemeral, do not use it for other
->   * purposes since there is no block device with a permanent mapping.
->   */
-> @@ -1890,8 +1951,7 @@ static int fuse_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
->  {
->  	struct fuse_inode *fi = get_fuse_inode(inode);
->  	struct fuse_conn *fc = get_fuse_conn(inode);
-> -	struct fuse_dax_mapping *dmap, *alloc_dmap = NULL;
-> -	int ret;
-> +	struct fuse_dax_mapping *dmap;
->  
->  	/* We don't support FIEMAP */
->  	BUG_ON(flags & IOMAP_REPORT);
-> @@ -1932,56 +1992,8 @@ static int fuse_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
->  		if (pos >= i_size_read(inode))
->  			goto iomap_hole;
->  
-> -		/* Can't do reclaim in fault path yet due to lock ordering.
-> -		 * Read path takes shared inode lock and that's not sufficient
-> -		 * for inline range reclaim. Caller needs to drop lock, wait
-> -		 * and retry.
-> -		 */
-> -		if (flags & IOMAP_FAULT || !(flags & IOMAP_WRITE)) {
-> -			alloc_dmap = alloc_dax_mapping(fc);
-> -			if (!alloc_dmap)
-> -				return -ENOSPC;
-> -		} else {
-> -			alloc_dmap = alloc_dax_mapping_reclaim(fc, inode);
-> -			if (IS_ERR(alloc_dmap))
-> -				return PTR_ERR(alloc_dmap);
-> -		}
-> -
-> -		/* If we are here, we should have memory allocated */
-> -		if (WARN_ON(!alloc_dmap))
-> -			return -EBUSY;
-> -
-> -		/*
-> -		 * Drop read lock and take write lock so that only one
-> -		 * caller can try to setup mapping and other waits
-> -		 */
-> -		down_write(&fi->i_dmap_sem);
-> -		/*
-> -		 * We dropped lock. Check again if somebody else setup
-> -		 * mapping already.
-> -		 */
-> -		dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, pos,
-> -							pos);
-> -		if (dmap) {
-> -			fuse_fill_iomap(inode, pos, length, iomap, dmap, flags);
-> -			dmap_add_to_free_pool(fc, alloc_dmap);
-> -			up_write(&fi->i_dmap_sem);
-> -			return 0;
-> -		}
-> -
-> -		/* Setup one mapping */
-> -		ret = fuse_setup_one_mapping(inode,
-> -			ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ), alloc_dmap);
-> -		if (ret < 0) {
-> -			printk("fuse_setup_one_mapping() failed. err=%d"
-> -				" pos=0x%llx\n", ret, pos);
-> -			dmap_add_to_free_pool(fc, alloc_dmap);
-> -			up_write(&fi->i_dmap_sem);
-> -			return ret;
-> -		}
-> -		fuse_fill_iomap(inode, pos, length, iomap, alloc_dmap, flags);
-> -		up_write(&fi->i_dmap_sem);
-> -		return 0;
-> +		return iomap_begin_setup_new_mapping(inode, pos, length, flags,
-> +						    iomap);
->  	}
->  
->  	/*
-> -- 
-> 2.17.2
+> One possible optimization is to eliminate REMOVEMAPPING requests when
+> the guest driver knows a SETUPMAPPING will follow immediately.  I see
+> the following request pattern in a fio randread iodepth=64 job:
+> 
+>   unique: 995348, opcode: SETUPMAPPING (48), nodeid: 135, insize: 80, pid: 1351
+>   lo_setupmapping(ino=135, fi=0x(nil), foffset=3860856832, len=2097152, moffset=859832320, flags=0)
+>      unique: 995348, success, outsize: 16
+>   unique: 995350, opcode: REMOVEMAPPING (49), nodeid: 135, insize: 60, pid: 12
+>      unique: 995350, success, outsize: 16
+>   unique: 995352, opcode: SETUPMAPPING (48), nodeid: 135, insize: 80, pid: 1351
+>   lo_setupmapping(ino=135, fi=0x(nil), foffset=16777216, len=2097152, moffset=861929472, flags=0)
+>      unique: 995352, success, outsize: 16
+>   unique: 995354, opcode: REMOVEMAPPING (49), nodeid: 135, insize: 60, pid: 12
+>      unique: 995354, success, outsize: 16
+>   virtio_send_msg: elem 9: with 1 in desc of length 16
+>   unique: 995356, opcode: SETUPMAPPING (48), nodeid: 135, insize: 80, pid: 1351
+>   lo_setupmapping(ino=135, fi=0x(nil), foffset=383778816, len=2097152, moffset=864026624, flags=0)
+>      unique: 995356, success, outsize: 16
+>   unique: 995358, opcode: REMOVEMAPPING (49), nodeid: 135, insize: 60, pid: 12
+> 
+> The REMOVEMAPPING requests are unnecessary since we can map over the top
+> of the old mapping instead of taking the extra step of removing it
+> first.
+
+Yep, those should go - I think Vivek likes to keep them for testing
+since they make things fail more completely if there's a screwup.
+
+> Some more questions to consider for DAX performance optimization:
+> 
+> 1. Is FUSE_READ/FUSE_WRITE more efficient than DAX for some I/O patterns?
+
+Probably for cases where the data is only accessed once, and you can't
+preemptively map.
+Another variant on (1) is whether we could do read/writes while the mmap
+is happening to absorb the latency.
+
+> 2. Can MAP/UNMAP be performed directly in QEMU via a separate virtqueue?
+
+I think there's two things to solve here that I don't currently know the
+answer to:
+  2a) We'd need to get the fd to qemu for the thing to mmap;
+      we might be able to cache the fd on the qemu side for existing
+      mappings, so when asking for a new mapping for an existing file then
+      it would already have the fd.
+
+  2b) Running a device with a mix of queues inside QEMU and on
+      vhost-user; I don't think we have anything with that mix
+ 
+> 3. Can READ/WRITE be performed directly in QEMU via a separate virtqueue
+>    to eliminate the bad address problem?
+
+Are you thinking of doing all read/writes that way, or just the corner
+cases? It doesn't seem worth it for the corner cases unless you're
+finding them cropping up in real work loads.
+
+> 4. Can OPEN+MAP be fused into a single request for small files, avoiding
+>    the 2nd request?
+
+Sounds possible.
+
+> I'm not going to tackle DAX optimization myself right now but wanted to
+> share these ideas.
+
+One I was thinking about that feels easier than (2) was to change the
+vhost slave protocol to be split transaction; it wouldn't do anything
+for the latency but it would be able to do some in parallel if we can
+get the kernel to feed it.
+
+Dave
+
+> Stefan
+
+
+
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
+
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

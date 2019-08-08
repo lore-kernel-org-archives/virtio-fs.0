@@ -1,13 +1,15 @@
-Date: Thu, 8 Aug 2019 10:10:52 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190808091052.GB2852@work-vm>
-References: <20190807211057.GF18557@redhat.com>
+Date: Thu, 8 Aug 2019 10:38:25 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20190808093825.GB31963@stefanha-x1.localdomain>
+References: <5D4BBDB7.2000005@huawei.com>
+ <5D4BBDFF.6060106@huawei.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="OwLcNYc0lM97+oe1"
 Content-Disposition: inline
-In-Reply-To: <20190807211057.GF18557@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Change FUSE_MAP_ALIGNMENT bit
- position for 5.3 kernel
+In-Reply-To: <5D4BBDFF.6060106@huawei.com>
+Subject: Re: [Virtio-fs] [PATCH v3 1/2] virtiofsd: add definition of
+	fuse_buf_writev()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,38 +18,85 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: piaojun <piaojun@huawei.com>
+Cc: virtio-fs@redhat.com
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> Due to rebase to 5.3-rc kernel, change bit position of FUSE_MAP_ALIGNMENT.
 
-Thanks,
-yes this matches the position I sent upstream last week:
-https://lore.kernel.org/linux-fsdevel/20190802171521.21807-4-dgilbert@redhat.com/
+--OwLcNYc0lM97+oe1
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-I've squashed it into 'virtiofsd: add map_alignment to fuse_kernel.h'
+On Thu, Aug 08, 2019 at 02:15:27PM +0800, piaojun wrote:
+> @@ -71,6 +72,42 @@ static ssize_t fuse_buf_write(const struct fuse_buf *d=
+st, size_t dst_off,
+>  	return copied;
+>  }
+>=20
+> +ssize_t fuse_buf_writev(fuse_req_t req,
+> +			     struct fuse_bufvec *out_buf,
+> +			     struct fuse_bufvec *in_buf,
+> +			     enum fuse_buf_copy_flags flags)
 
-Dave
+FUSE_BUF_FD_SEEK is defined in enum fuse_buf_flags, not enum
+fuse_buf_copy_flags.  This argument can be removed and the check below
+can be changed from:
 
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  contrib/virtiofsd/fuse_kernel.h |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> Index: qemu/contrib/virtiofsd/fuse_kernel.h
-> ===================================================================
-> --- qemu.orig/contrib/virtiofsd/fuse_kernel.h	2019-08-05 16:32:14.358564755 -0400
-> +++ qemu/contrib/virtiofsd/fuse_kernel.h	2019-08-07 16:31:27.882640763 -0400
-> @@ -292,7 +292,7 @@ struct fuse_file_lock {
->  #define FUSE_MAX_PAGES		(1 << 22)
->  #define FUSE_CACHE_SYMLINKS	(1 << 23)
->  #define FUSE_NO_OPENDIR_SUPPORT (1 << 24)
-> -#define FUSE_MAP_ALIGNMENT      (1 << 25)
-> +#define FUSE_MAP_ALIGNMENT      (1 << 26)
->  
->  /**
->   * CUSE INIT request/reply flags
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+  if (flags & FUSE_BUF_FD_SEEK)
+
+to
+
+  if (out_buf->buf[0].flags & FUSE_BUF_FD_SEEK)
+
+> +{
+> +	ssize_t res, i, buf_index, iovcnt;
+> +	struct iovec * iov;
+> +	int fd =3D out_buf->buf[0].fd;
+> +	off_t pos =3D out_buf->buf[0].pos;
+
+A struct fuse_bufvec may have multiple elements but this function
+assumes it only has 1.  Please use struct fuse_buf *out_buf instead.
+This way it's clear that only 1 fuse_buf will be written.
+
+> +
+> +	if (in_buf->count > 2)
+> +		iovcnt =3D in_buf->count - 1;
+> +	else
+> +		iovcnt =3D 1;
+> +
+> +	iov =3D calloc(iovcnt, sizeof(struct iovec));
+> +	if (!iov)
+> +		return -ENOMEM;
+> +
+> +	for (i =3D 0, buf_index =3D 1; i < iovcnt; i++, buf_index++) {
+> +		iov[i].iov_base =3D in_buf->buf[buf_index].mem;
+> +		iov[i].iov_len =3D in_buf->buf[buf_index].size;
+> +	}
+
+Why is in_buf->buf[0] is skipped?
+
+> +
+> +	if (flags & FUSE_BUF_FD_SEEK)
+> +		res =3D pwritev(fd, iov, iovcnt, pos);
+
+Please move off_t pos =3D out_buf->buf[0].pos into this if statement body
+to avoid a possible uninitialized memory access when !(flags &
+FUSE_BUF_FD_SEEK).  This makes valgrind and other tools happy.
+
+--OwLcNYc0lM97+oe1
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1L7ZEACgkQnKSrs4Gr
+c8hVvgf/fXuUGT3u/ByY8oAfx6FeUvQtiXPXXXc8Gy+67TITKpEqREHOh3ZuQCzk
+oeu2U3rYAM0M62iC9znyssHdqUmJ2yeCZXO2urromi+tzg+qXnYIcku9lM8iXfao
+NlwPIjkNwBwphwSXdWSnvlbjVe4OY2OryxujMGdZhHsDVlM51A6ykb+H3QEBKgDH
+yl46x9BRcC8UzoWLN407gWzQ/BqpM6SNUX3/GM+EwYwl6Ajsj+CMReE0BHXGyOm3
+4uPUgfbe/bdPd3b+fHVuW/2jPIZWv6/Nh7JOBXq+Cu4HaS5tpWozyR0HoAaW3xuo
+O/3sbghUg+MuMBTjMc7v2iP3l6kiHw==
+=SGkJ
+-----END PGP SIGNATURE-----
+
+--OwLcNYc0lM97+oe1--
 

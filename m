@@ -1,16 +1,18 @@
-Date: Fri, 9 Aug 2019 09:14:58 +0100
+Date: Fri, 9 Aug 2019 09:21:02 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190809081458.GA25286@stefanha-x1.localdomain>
-References: <5D4BBDB7.2000005@huawei.com> <5D4BBDFF.6060106@huawei.com>
-	<20190808093825.GB31963@stefanha-x1.localdomain>
-	<99a1f006-8e5c-0c1c-2cc5-9579ccf0495d@huawei.com>
+Message-ID: <20190809082102.GB25286@stefanha-x1.localdomain>
+References: <20190801165409.20121-1-stefanha@redhat.com>
+	<20190807180355.GA22758@stefanha-x1.localdomain>
+	<20190807205715.GE18557@redhat.com>
+	<20190808090213.GD31476@stefanha-x1.localdomain>
+	<20190808095316.GC2852@work-vm>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="nFreZHaLTZJo0R7j"
+	protocol="application/pgp-signature"; boundary="8GpibOaaTibBMecb"
 Content-Disposition: inline
-In-Reply-To: <99a1f006-8e5c-0c1c-2cc5-9579ccf0495d@huawei.com>
-Subject: Re: [Virtio-fs] [PATCH v3 1/2] virtiofsd: add definition of
-	fuse_buf_writev()
+In-Reply-To: <20190808095316.GC2852@work-vm>
+Subject: Re: [Virtio-fs] [PATCH 0/4] virtiofsd: multithreading preparation
+ part 3
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,81 +21,81 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>
-Cc: virtio-fs@redhat.com
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
 
 
---nFreZHaLTZJo0R7j
+--8GpibOaaTibBMecb
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Thu, Aug 08, 2019 at 10:28:26PM +0800, piaojun wrote:
-> On 2019/8/8 17:38, Stefan Hajnoczi wrote:
-> > On Thu, Aug 08, 2019 at 02:15:27PM +0800, piaojun wrote:
-> >> +{
-> >> +	ssize_t res, i, buf_index, iovcnt;
-> >> +	struct iovec * iov;
-> >> +	int fd =3D out_buf->buf[0].fd;
-> >> +	off_t pos =3D out_buf->buf[0].pos;
-> >=20
-> > A struct fuse_bufvec may have multiple elements but this function
-> > assumes it only has 1.  Please use struct fuse_buf *out_buf instead.
-> > This way it's clear that only 1 fuse_buf will be written.
+On Thu, Aug 08, 2019 at 10:53:16AM +0100, Dr. David Alan Gilbert wrote:
+> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > On Wed, Aug 07, 2019 at 04:57:15PM -0400, Vivek Goyal wrote:
+> > 2. Can MAP/UNMAP be performed directly in QEMU via a separate virtqueue?
 >=20
-> Do you mean that assign *out_buf with &out_buf->buf[0] in
-> fuse_buf_writev() and then operate out_buf in the following process?
-
-Since this function assumes that out_buf is only a single struct
-fuse_buf, please change the argument to struct fuse_buf instead of
-struct fuse_bufvec.  This way it's clear what the function expects.
-
-> >=20
-> >> +
-> >> +	if (in_buf->count > 2)
-> >> +		iovcnt =3D in_buf->count - 1;
-> >> +	else
-> >> +		iovcnt =3D 1;
-> >> +
-> >> +	iov =3D calloc(iovcnt, sizeof(struct iovec));
-> >> +	if (!iov)
-> >> +		return -ENOMEM;
-> >> +
-> >> +	for (i =3D 0, buf_index =3D 1; i < iovcnt; i++, buf_index++) {
-> >> +		iov[i].iov_base =3D in_buf->buf[buf_index].mem;
-> >> +		iov[i].iov_len =3D in_buf->buf[buf_index].size;
-> >> +	}
-> >=20
-> > Why is in_buf->buf[0] is skipped?
+> I think there's two things to solve here that I don't currently know the
+> answer to:
+>   2a) We'd need to get the fd to qemu for the thing to mmap;
+>       we might be able to cache the fd on the qemu side for existing
+>       mappings, so when asking for a new mapping for an existing file then
+>       it would already have the fd.
 >=20
-> This part of code seems a little complex and in_buf->buf[0].count just
-> tricks me. Maybe I need handle two situations:
-> 1. Iterate from in_buf->buf[0].mem when in_buf->buf[0].count is 1;
-> 2. buf[0].size is set 0 in do_write_buf() when in_buf->buf[0].count > 1,
-> and it's better to skip it. Perhaps it's also ok to iterate from buf[0],
-> as writev skip the iov with zero len. This looks like a hack.
+>   2b) Running a device with a mix of queues inside QEMU and on
+>       vhost-user; I don't think we have anything with that mix
 
-I would perform writev() with all of in_buf's buffers, even if some of
-them have 0 length.  That way this function does not make any
-assumptions about in_buf's layout.
+vhost-user-net works in the same way.  The ctrl queue is handled by QEMU
+and the rx/tx queues by the vhost device.  This is in fact how vhost was
+initially designed: the vhost device is not a full virtio device, only
+the dataplane.
 
-The only requirement is that in_buf buffers are all memory buffers (not
-file descriptors).
+> > 3. Can READ/WRITE be performed directly in QEMU via a separate virtqueue
+> >    to eliminate the bad address problem?
+>=20
+> Are you thinking of doing all read/writes that way, or just the corner
+> cases? It doesn't seem worth it for the corner cases unless you're
+> finding them cropping up in real work loads.
 
---nFreZHaLTZJo0R7j
+Send all READ/WRITE requests to QEMU instead of virtiofsd.
+
+Only handle metadata requests in virtiofsd (OPEN, RELEASE, READDIR,
+MKDIR, etc).
+
+> > I'm not going to tackle DAX optimization myself right now but wanted to
+> > share these ideas.
+>=20
+> One I was thinking about that feels easier than (2) was to change the
+> vhost slave protocol to be split transaction; it wouldn't do anything
+> for the latency but it would be able to do some in parallel if we can
+> get the kernel to feed it.
+
+There are two cases:
+1. mmapping multiple inode.  This should benefit from parallelism,
+   although mmap is still expensive because it involves TLB shootdown
+   for all other threads running this process.
+2. mmapping the same inode.  Here the host kernel is likely to serialize
+   mmaps even more, making it hard to gain performance.
+
+It's probably worth writing a tiny benchmark first to evaluate the
+potential gains.
+
+Stefan
+
+--8GpibOaaTibBMecb
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1NK4EACgkQnKSrs4Gr
-c8hh3Af+IgMyb/Tu9/EyF2VSSKZff0DxwYbVVX3Pdbi7DKXqZ/b37mwD9lL95cA6
-8MGi0gtp8WS/StYx8AqUSRBH6w70gMyj+YI2/YDFQ5lQM4bwbFQQLAJGYZLVvdG0
-cH0CP8hj77j44JKXAxRdWa7NLfwYSrokerMgnGBvSultLwjzznBq6xPfLwex69PW
-i3TMhyCnrqY/wQM+wjioKiriAkWJTmZwpqWCxbnxCNRzA7Oh+9tcCxYatXWPT2ZC
-89z4TfLGscX/FzlG51CRkiERIThO8D68VSph65nZwM2egZfHq7n2IPUZA9LinwJQ
-2EtfJIiGLfyf5gFcXC3i4xlXUhq7Gg==
-=o1Nl
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1NLO4ACgkQnKSrs4Gr
+c8jYDQf/XN0ZXJtQPCKujLwEvslkkiEkk+qyHbfXikVQJZHvYQgV7hWU8jNIcs6s
+xMJDkbHp2fm6aOGj3f5Aihuzj41zHRfTgdPdsnQKZqB4X6nuCrkza63cC3GSdEpV
+o6tfk3ef38OM17H7bDy5A25GVXYVsmfD2uR+8EPL55Zgjs6G/luZOx40tV340fZY
+XchZsrGqNpcgxPK0pUk/mjb6PaZ0nnMGh7ggaWmx5VnLDM6DDu5A23twEqHRCJtM
+uQ/Dc89oe1s2vSPeeiwapsXZK1lf3VE/5HUd20GcfMDbPuDflarTNB0Elj5p+zeU
+ZeEDcjN8KnZ6vq0VmBWe3Z89duEYYA==
+=2wte
 -----END PGP SIGNATURE-----
 
---nFreZHaLTZJo0R7j--
+--8GpibOaaTibBMecb--
 

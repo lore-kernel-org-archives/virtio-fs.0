@@ -1,15 +1,11 @@
-Date: Fri, 26 Jul 2019 09:07:50 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190726080750.GA2657@work-vm>
-References: <4221bd26-c6a0-6853-e455-aee8239349bd@gmail.com>
-	<20190722164709.GE3035@work-vm>
-	<b558cba1-dc0b-7576-44a2-3733d005cc36@gmail.com>
+From: wangyan <wangyan122@huawei.com>
+Message-ID: <bde41716-f695-d9f9-300a-1df759a9eeb4@huawei.com>
+Date: Fri, 9 Aug 2019 12:45:04 +0800
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <b558cba1-dc0b-7576-44a2-3733d005cc36@gmail.com>
-Subject: Re: [Virtio-fs] Failure as Operation not permitted on aarch64
-	machine
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [QUESTION RESEND] A performance problem for buffer
+ write compared with 9p
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,157 +14,153 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Masayoshi Mizuma <msys.mizuma@gmail.com>
-Cc: virtio-fs@redhat.com
+To: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
-* Masayoshi Mizuma (msys.mizuma@gmail.com) wrote:
-> Hi Dave,
-> 
-> On 7/22/19 12:47 PM, Dr. David Alan Gilbert wrote:
-> > * Masayoshi Mizuma (msys.mizuma@gmail.com) wrote:
-> >> Hello,
-> > 
-> > Hi Masa,
-> > 
-> >> I would appreciate if you could help me to resolve following failure.
-> >>
-> >> I tried to use virtio-fs on aarch64 [1], however, qemu [2] failed to boot
-> >> as Operation not permitted.
-> >>
-> >>   ---
-> >>   # ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o source=/tmp/share -o cache=none &
-> >>
-> >>   # qemu-system-aarch64 -machine virt,accel=kvm,gic-version=3 -cpu host -smp 8 ... [3]
-> >>
-> >>   UEFI firmware starting.
-> >>   kvm_set_phys_mem: error registering slot: Operation not permitted
-> >>   ---
-> >>
-> >> >From the ftrace log, the error happened because kvm_set_user_memory_region()
-> >> returned as -1 (EPERM).
-> >>
-> >>   ---
-> >>   qemu-system-aar-28381 [003] ....  6683.601097: tracing_mark_write: kvm_set_user_memory Slot#3 flags=0x0 gpa=0x8000000000 size=0x40000000 ua=0xfffe0ba00000 ret=-1
-> >>   ---
-> >>
-> >> kvm_set_user_memory_region() returned -1 because kvm_arch_prepare_memory_region()
-> >> in kernel returned as -EPERM.
-> > 
-> > Right, yes we know this is a problem on aarch64;  for aarch we disable
-> > the DAX mode;  if you check out our -dev branches and apply the
-> > following hack to the kernel:
-> > 
-> > 
-> > diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-> > index 3f3c018571ee..60a9724f9c71 100644
-> > --- a/fs/fuse/virtio_fs.c
-> > +++ b/fs/fuse/virtio_fs.c
-> > @@ -541,7 +541,7 @@ static int virtio_fs_setup_dax(struct virtio_device *vdev, struct virtio_fs *fs)
-> >                                            (u8)VIRTIO_FS_SHMCAP_ID_CACHE);
-> >         if (!have_cache) {
-> >                 dev_err(&vdev->dev, "%s: No cache capability\n", __func__);
-> > -               return -ENXIO;
-> > +               return 0;
-> >         } else {
-> >                 dev_notice(&vdev->dev, "Cache len: 0x%llx @ 0x%llx\n",
-> >                            cache_reg.len, cache_reg.addr);
-> > 
-> > and start the qemu with:
-> > -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs,cache-size=0
-> > 
-> > it should start up for you.
-> 
-> Thanks and the cache-size=0 option works for me!
-> qemu boots successfully and I can mount the myfs.
+Hi all,
 
-That's great;  our dev world has that fix in, so it'll be in our next
-release as well.
+I met a performance problem when I tested buffer write compared with 9p.
+	
+Guest configuration:
+	Kernel: https://github.com/rhvgoyal/linux/tree/virtio-fs-dev-5.1
+	2vCPU
+	8GB RAM
+Host configuration:
+	Intel(R) Xeon(R) CPU E5-2620 v2 @ 2.10GHz
+	128GB RAM
+	Linux 3.10.0
+	Qemu: https://gitlab.com/virtio-fs/qemu/tree/virtio-fs-dev
+	EXT4 + ramdisk for shared folder
+	
+------------------------------------------------------------------------
 
-Dave
+For virtiofs:
+virtiofsd cmd:
+	./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o source=/mnt/share/ 
+-o cache=always -o writeback
+mount cmd:
+	mount -t virtio_fs myfs /mnt/virtiofs -o 
+rootmode=040000,user_id=0,group_id=0
+	
+For 9p:
+mount cmd:
+	mount -t 9p -o 
+trans=virtio,version=9p2000.L,rw,dirsync,nodev,msize=1000000000,cache=fscache 
+sharedir /mnt/virtiofs/
 
-> Thanks!
-> Masa
-> 
-> > 
-> >>    ---
-> >>    int kvm_arch_prepare_memory_region(struct kvm *kvm,
-> >>                                    struct kvm_memory_slot *memslot,
-> >>                                    const struct kvm_userspace_memory_region *mem,
-> >>                                    enum kvm_mr_change change)
-> >>    {
-> >>    ...
-> >>                    if (writable && !(vma->vm_flags & VM_WRITE)) {
-> >>                            ret = -EPERM;
-> >>                            break;
-> >>                    }
-> >>    ---
-> >>
-> >> Actually, the /proc/PID/maps showed ua=0xfffe0ba00000 didn't have PROT_WRITE.
-> >>
-> >>   ---
-> >>   ...
-> >>   014b0000-014f0000 rw-p 00000000 00:00 0 
-> >>   1c840000-1d470000 rw-p 00000000 00:00 0                                  [heap]
-> >>   fffe0ba00000-fffe4ba00000 ---p 00000000 00:00 0 <===
-> >>   fffe4ba00000-fffe4ba10000 ---p 00000000 00:00 0 
-> >>   fffe4bc00000-fffe4fc00000 rw-p 00000000 00:00 0 
-> >>   fffe4fc00000-fffe4fc10000 ---p 00000000 00:00 0 
-> >>   fffe4fe00000-fffe53e00000 rw-p 00000000 00:00 0 
-> >>   fffe53e00000-fffe53e10000 ---p 00000000 00:00 0 
-> >>   ...
-> >>   ---
-> >>
-> >> I'm not sure why ua=0xfffe0ba00000 didn't have PROT_WRITE because the memory
-> >> was allocated by qemu_anon_ram_alloc() and it should set PROT_READ | PROT_WRITE.
-> > 
-> > Because we explicitly mprotect it later (and in current versions we
-> > allocate with PROT_NONE) - on x86 this works fine, but aarch doesn't
-> > like it; we've not quite figured the rules why yet.
-> > 
-> > Dave
-> > 
-> >>
-> >>   ---
-> >>   qemu-system-aar-28372 [022] ....  6674.795027: tracing_mark_write: qemu_anon_ram_alloc size 1073741824 ptr 0xfffe0ba00000
-> >>   ---
-> >>
-> >> qemu boots successfully if I remove "-device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs",
-> >> so I suppose the option is related to the failure...
-> >>
-> >>
-> >> [1]: host kernel is 5.2.0.
-> >>      guest kernel is https://github.com/rhvgoyal/linux/, branch: virtio-fs-dev-5.1.
-> >>
-> >> [2]: I got the qemu from:
-> >>      https://gitlab.com/virtio-fs/qemu.git
-> >>
-> >> [3]: Qemu option is:
-> >>
-> >> $QEMU -machine virt,accel=kvm,gic-version=3 \
-> >> 	-cpu host \
-> >> 	-smp 8 \
-> >>         -m 4G,maxmem=4G \
-> >> 	-object memory-backend-file,id=mem,size=4G,mem-path=/dev/shm,share=on \
-> >> 	-numa node,memdev=mem \
-> >>         -drive file=/usr/share/AAVMF/AAVMF_CODE.fd,if=pflash,format=raw,unit=0,readonly=on \
-> >>         -drive file=$VARS,if=pflash,format=raw,unit=1 \
-> >> 	-chardev socket,id=char0,path=/tmp/vhostqemu \
-> >> 	-device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs \
-> >> 	-nographic \
-> >> 	-serial mon:stdio \
-> >> 	--trace events=/tmp/qemu-trace-events \
-> >> 	-drive if=virtio,file=/var/lib/libvirt/images/guest.qcow2
-> >>
-> >> Thanks,
-> >> Masa
-> >>
-> >> _______________________________________________
-> >> Virtio-fs mailing list
-> >> Virtio-fs@redhat.com
-> >> https://www.redhat.com/mailman/listinfo/virtio-fs
-> > --
-> > Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
-> > 
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+------------------------------------------------------------------------
+
+Compared with 9p, the test result:
+1. Latency
+	Test model：
+		fio -filename=/mnt/virtiofs/test -rw=write -bs=4K -size=1G -iodepth=1 \
+			-ioengine=psync -numjobs=1 -group_reporting -name=4K -time_based 
+-runtime=30
+
+	virtiofs: avg-lat is 6.37 usec
+		4K: (g=0): rw=write, bs=4K-4K/4K-4K/4K-4K, ioengine=psync, iodepth=1
+		fio-2.13
+		Starting 1 process
+		Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/471.9MB/0KB /s] [0/121K/0 
+iops] [eta 00m:00s]
+		4K: (groupid=0, jobs=1): err= 0: pid=5558: Fri Aug  9 09:21:13 2019
+		  write: io=13758MB, bw=469576KB/s, iops=117394, runt= 30001msec
+			clat (usec): min=2, max=10316, avg= 5.75, stdev=81.80
+			 lat (usec): min=3, max=10317, avg= 6.37, stdev=81.80
+	
+	9p: avg-lat is 3.94 usec
+		4K: (g=0): rw=write, bs=4K-4K/4K-4K/4K-4K, ioengine=psync, iodepth=1
+		fio-2.13
+		Starting 1 process
+		Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/634.2MB/0KB /s] [0/162K/0 
+iops] [eta 00m:00s]
+		4K: (groupid=0, jobs=1): err= 0: pid=5873: Fri Aug  9 09:53:46 2019
+		  write: io=19700MB, bw=672414KB/s, iops=168103, runt= 30001msec
+			clat (usec): min=2, max=632, avg= 3.34, stdev= 3.77
+			 lat (usec): min=2, max=633, avg= 3.94, stdev= 3.82
+		
+
+2. Bandwidth
+	Test model:
+		fio -filename=/mnt/virtiofs/test -rw=write -bs=1M -size=1G -iodepth=1 \
+		    -ioengine=psync -numjobs=1 -group_reporting -name=1M -time_based 
+-runtime=30
+	
+	virtiofs: bandwidth is 718961KB/s
+		1M: (g=0): rw=write, bs=1M-1M/1M-1M/1M-1M, ioengine=psync, iodepth=1
+		fio-2.13
+		Starting 1 process
+		Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/753.8MB/0KB /s] [0/753/0 
+iops] [eta 00m:00s]
+		1M: (groupid=0, jobs=1): err= 0: pid=5648: Fri Aug  9 09:24:36 2019
+			write: io=21064MB, bw=718961KB/s, iops=702, runt= 30001msec
+			 clat (usec): min=390, max=11127, avg=1361.41, stdev=1551.50
+			  lat (usec): min=432, max=11170, avg=1414.72, stdev=1553.28
+	
+	9p: bandwidth is 2305.5MB/s
+		1M: (g=0): rw=write, bs=1M-1M/1M-1M/1M-1M, ioengine=psync, iodepth=1
+		fio-2.13
+		Starting 1 process
+		Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/2406MB/0KB /s] [0/2406/0 
+iops] [eta 00m:00s]
+		1M: (groupid=0, jobs=1): err= 0: pid=5907: Fri Aug  9 09:55:14 2019
+		  write: io=69166MB, bw=2305.5MB/s, iops=2305, runt= 30001msec
+			clat (usec): min=287, max=17678, avg=352.00, stdev=503.43
+			 lat (usec): min=330, max=17721, avg=402.76, stdev=503.41
+			
+9p has a lower latency and higher bandwidth than virtiofs.
+
+------------------------------------------------------------------------			
+
+I found that the judgement statement 'if (!TestSetPageDirty(page))' always
+true in function '__set_page_dirty_nobuffers', it will waste much time
+to mark inode dirty, no one page is dirty when write it the second time.
+The buffer write stack:
+	fuse_file_write_iter
+	  ->fuse_cache_write_iter
+		->generic_file_write_iter
+		  ->__generic_file_write_iter
+			->generic_perform_write
+			  ->fuse_write_end
+				->set_page_dirty
+				  ->__set_page_dirty_nobuffers
+	
+The reason for 'if (!TestSetPageDirty(page))' always true may be the pdflush
+process will clean the page's dirty flags in clear_page_dirty_for_io(),
+and call fuse_writepages_send() to flush all pages to the disk of the host.
+So when the page is written the second time, it always not dirty.
+The pdflush stack for fuse:
+	pdflush
+	  ->...
+	    ->do_writepages
+		  ->fuse_writepages
+		    ->write_cache_pages         // will clear all page's dirty flags
+			  ->clear_page_dirty_for_io // clear page's dirty flags
+			->fuse_writepages_send      // write all pages to the host, but don't 
+wait the result
+Why not wait for getting the result of writing back pages to the host
+before cleaning all page's dirty flags?
+
+As for 9p, pdflush will call clear_page_dirty_for_io() to clean the page's
+dirty flags. Then call p9_client_write() to write the page to the host,
+waiting for the result, and then flush the next page. In this case, buffer
+write of 9p will hit the dirty page many times before it is being write
+back to the host by pdflush process.
+The pdflush stack for 9p:
+	pdflush
+	  ->...
+	    ->do_writepages
+		  ->generic_writepages
+		    ->write_cache_pages
+			  ->clear_page_dirty_for_io // clear page's dirty flags
+			  ->__writepage
+				->v9fs_vfs_writepage
+				  ->v9fs_vfs_writepage_locked
+					->p9_client_write   // it will get the writing back page's result
+
+
+According to the test result, is the handling method of 9p for page writing
+back more reasonable than virtiofs?
+
+Thanks,
+Yan Wang
 

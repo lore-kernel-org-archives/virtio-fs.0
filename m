@@ -1,11 +1,11 @@
-From: wangyan <wangyan122@huawei.com>
-Message-ID: <bde41716-f695-d9f9-300a-1df759a9eeb4@huawei.com>
-Date: Fri, 9 Aug 2019 12:45:04 +0800
+From: piaojun <piaojun@huawei.com>
+Message-ID: <5D4D0D06.1090602@huawei.com>
+Date: Fri, 9 Aug 2019 14:04:54 +0800
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [QUESTION RESEND] A performance problem for buffer
- write compared with 9p
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+Subject: [Virtio-fs] [PATCH][RFC] Support multiqueue mode by setting cpu
+	affinity
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,153 +14,191 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+To: virtio-fs@redhat.com
 
-Hi all,
+Set cpu affinity for each queue in multiqueue mode to improve the iops
+performance.
 
-I met a performance problem when I tested buffer write compared with 9p.
-	
+>From my test, the iops is increased by adding multiqueues as below,
+but it has not achieved my expect yet due to some reason. So I'm
+considering if we could drop some locks when operating vq as it is
+binded to one vCPU. I'm very glad to have a discuss with other
+developers.
+
+Further more, I modified virtiofsd to support multiqueue which just for
+testing.
+
+Test Environment:
 Guest configuration:
-	Kernel: https://github.com/rhvgoyal/linux/tree/virtio-fs-dev-5.1
-	2vCPU
-	8GB RAM
+8 vCPU
+8GB RAM
+Linux 5.1 (vivek-aug-06-2019)
+
 Host configuration:
-	Intel(R) Xeon(R) CPU E5-2620 v2 @ 2.10GHz
-	128GB RAM
-	Linux 3.10.0
-	Qemu: https://gitlab.com/virtio-fs/qemu/tree/virtio-fs-dev
-	EXT4 + ramdisk for shared folder
-	
-------------------------------------------------------------------------
+Intel(R) Xeon(R) CPU E5-2670 0 @ 2.60GHz (8 cores x 4 threads)
+32GB RAM
+Linux 3.10.0
+EXT4 + 4G Ramdisk
 
-For virtiofs:
-virtiofsd cmd:
-	./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o source=/mnt/share/ 
--o cache=always -o writeback
-mount cmd:
-	mount -t virtio_fs myfs /mnt/virtiofs -o 
-rootmode=040000,user_id=0,group_id=0
-	
-For 9p:
-mount cmd:
-	mount -t 9p -o 
-trans=virtio,version=9p2000.L,rw,dirsync,nodev,msize=1000000000,cache=fscache 
-sharedir /mnt/virtiofs/
+---
+Single-queue:
+# fio -direct=1 -time_based -iodepth=128 -rw=randwrite -ioengine=libaio -bs=4k -size=1G -numjob=8 -runtime=30 -group_reporting -name=file -filename=/mnt/virtiofs/file
+file: (g=0): rw=randwrite, bs=4K-4K/4K-4K/4K-4K, ioengine=libaio, iodepth=128
+...
+fio-2.13
+Starting 8 processes
+Jobs: 8 (f=8): [w(8)] [100.0% done] [0KB/316.5MB/0KB /s] [0/81.2K/0 iops] [eta 00m:00s]
+file: (groupid=0, jobs=8): err= 0: pid=5808: Fri Aug  9 20:35:22 2019
+  write: io=9499.9MB, bw=324251KB/s, iops=81062, runt= 30001msec
 
-------------------------------------------------------------------------
+Multi-queues:
+# fio -direct=1 -time_based -iodepth=128 -rw=randwrite -ioengine=libaio -bs=4k -size=1G -numjob=8 -runtime=30 -group_reporting -name=file -filename=/mnt/virtiofs/file
+file: (g=0): rw=randwrite, bs=4K-4K/4K-4K/4K-4K, ioengine=libaio, iodepth=128
+...
+fio-2.13
+Starting 8 processes
+Jobs: 8 (f=8): [w(8)] [100.0% done] [0KB/444.6MB/0KB /s] [0/114K/0 iops] [eta 00m:00s]
+file: (groupid=0, jobs=8): err= 0: pid=5704: Fri Aug  9 20:38:47 2019
+  write: io=12967MB, bw=442582KB/s, iops=110645, runt= 30001msec
+---
 
-Compared with 9p, the test result:
-1. Latency
-	Test model：
-		fio -filename=/mnt/virtiofs/test -rw=write -bs=4K -size=1G -iodepth=1 \
-			-ioengine=psync -numjobs=1 -group_reporting -name=4K -time_based 
--runtime=30
+Signed-off-by: Jun Piao <piaojun@huawei.com>
+---
+ fs/fuse/virtio_fs.c | 68 +++++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 66 insertions(+), 2 deletions(-)
 
-	virtiofs: avg-lat is 6.37 usec
-		4K: (g=0): rw=write, bs=4K-4K/4K-4K/4K-4K, ioengine=psync, iodepth=1
-		fio-2.13
-		Starting 1 process
-		Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/471.9MB/0KB /s] [0/121K/0 
-iops] [eta 00m:00s]
-		4K: (groupid=0, jobs=1): err= 0: pid=5558: Fri Aug  9 09:21:13 2019
-		  write: io=13758MB, bw=469576KB/s, iops=117394, runt= 30001msec
-			clat (usec): min=2, max=10316, avg= 5.75, stdev=81.80
-			 lat (usec): min=3, max=10317, avg= 6.37, stdev=81.80
-	
-	9p: avg-lat is 3.94 usec
-		4K: (g=0): rw=write, bs=4K-4K/4K-4K/4K-4K, ioengine=psync, iodepth=1
-		fio-2.13
-		Starting 1 process
-		Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/634.2MB/0KB /s] [0/162K/0 
-iops] [eta 00m:00s]
-		4K: (groupid=0, jobs=1): err= 0: pid=5873: Fri Aug  9 09:53:46 2019
-		  write: io=19700MB, bw=672414KB/s, iops=168103, runt= 30001msec
-			clat (usec): min=2, max=632, avg= 3.34, stdev= 3.77
-			 lat (usec): min=2, max=633, avg= 3.94, stdev= 3.82
-		
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index a04c320..7ba36fc 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -12,6 +12,7 @@
+ #include <linux/virtio.h>
+ #include <linux/virtio_fs.h>
+ #include <linux/delay.h>
++#include <linux/cpu.h>
+ #include "fuse_i.h"
 
-2. Bandwidth
-	Test model:
-		fio -filename=/mnt/virtiofs/test -rw=write -bs=1M -size=1G -iodepth=1 \
-		    -ioengine=psync -numjobs=1 -group_reporting -name=1M -time_based 
--runtime=30
-	
-	virtiofs: bandwidth is 718961KB/s
-		1M: (g=0): rw=write, bs=1M-1M/1M-1M/1M-1M, ioengine=psync, iodepth=1
-		fio-2.13
-		Starting 1 process
-		Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/753.8MB/0KB /s] [0/753/0 
-iops] [eta 00m:00s]
-		1M: (groupid=0, jobs=1): err= 0: pid=5648: Fri Aug  9 09:24:36 2019
-			write: io=21064MB, bw=718961KB/s, iops=702, runt= 30001msec
-			 clat (usec): min=390, max=11127, avg=1361.41, stdev=1551.50
-			  lat (usec): min=432, max=11170, avg=1414.72, stdev=1553.28
-	
-	9p: bandwidth is 2305.5MB/s
-		1M: (g=0): rw=write, bs=1M-1M/1M-1M/1M-1M, ioengine=psync, iodepth=1
-		fio-2.13
-		Starting 1 process
-		Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/2406MB/0KB /s] [0/2406/0 
-iops] [eta 00m:00s]
-		1M: (groupid=0, jobs=1): err= 0: pid=5907: Fri Aug  9 09:55:14 2019
-		  write: io=69166MB, bw=2305.5MB/s, iops=2305, runt= 30001msec
-			clat (usec): min=287, max=17678, avg=352.00, stdev=503.43
-			 lat (usec): min=330, max=17721, avg=402.76, stdev=503.41
-			
-9p has a lower latency and higher bandwidth than virtiofs.
+ /* List of virtio-fs device instances and a lock for the list */
+@@ -61,6 +62,9 @@ struct virtio_fs {
+ 	void *window_kaddr;
+ 	phys_addr_t window_phys_addr;
+ 	size_t window_len;
++
++	/* Does the affinity hint is set for virtqueues? */
++	bool affinity_hint_set;
+ };
 
-------------------------------------------------------------------------			
+ struct virtio_fs_forget {
+@@ -378,6 +382,44 @@ static void virtio_fs_vq_done(struct virtqueue *vq)
+ 	schedule_work(&fsvq->done_work);
+ }
 
-I found that the judgement statement 'if (!TestSetPageDirty(page))' always
-true in function '__set_page_dirty_nobuffers', it will waste much time
-to mark inode dirty, no one page is dirty when write it the second time.
-The buffer write stack:
-	fuse_file_write_iter
-	  ->fuse_cache_write_iter
-		->generic_file_write_iter
-		  ->__generic_file_write_iter
-			->generic_perform_write
-			  ->fuse_write_end
-				->set_page_dirty
-				  ->__set_page_dirty_nobuffers
-	
-The reason for 'if (!TestSetPageDirty(page))' always true may be the pdflush
-process will clean the page's dirty flags in clear_page_dirty_for_io(),
-and call fuse_writepages_send() to flush all pages to the disk of the host.
-So when the page is written the second time, it always not dirty.
-The pdflush stack for fuse:
-	pdflush
-	  ->...
-	    ->do_writepages
-		  ->fuse_writepages
-		    ->write_cache_pages         // will clear all page's dirty flags
-			  ->clear_page_dirty_for_io // clear page's dirty flags
-			->fuse_writepages_send      // write all pages to the host, but don't 
-wait the result
-Why not wait for getting the result of writing back pages to the host
-before cleaning all page's dirty flags?
++static void virtio_fs_clean_affinity(struct virtio_fs *fs)
++{
++	int i;
++
++	if (fs->affinity_hint_set) {
++		for (i = 0; i < fs->num_queues; i++)
++			virtqueue_set_affinity(fs->vqs[i].vq, NULL);
++
++		fs->affinity_hint_set = false;
++	}
++}
++
++static void virtio_fs_set_affinity(struct virtio_fs *fs)
++{
++	int i = 0, cpu;
++
++	/*
++	 * In single queue mode, we don't set the cpu affinity.
++	 */
++	if (fs->num_queues == 1) {
++		virtio_fs_clean_affinity(fs);
++		fs->affinity_hint_set = false;
++		return;
++	}
++
++	/*
++	 * In multiqueue mode, we let the queue to be private to one cpu
++	 * by setting the affinity hint to eliminate the contention.
++	 */
++	for_each_online_cpu(cpu) {
++		virtqueue_set_affinity(fs->vqs[i].vq, cpumask_of(cpu));
++		if (++i >= fs->num_queues)
++			break;
++	}
++
++	fs->affinity_hint_set = true;
++}
++
+ /* Initialize virtqueues */
+ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 			       struct virtio_fs *fs)
+@@ -440,6 +482,11 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 		fs->vqs[i].vq = vqs[i];
+ 		fs->vqs[i].connected = true;
+ 	}
++
++	/* set affinity for vqs */
++	get_online_cpus();
++	virtio_fs_set_affinity(fs);
++	put_online_cpus();
+ out:
+ 	kfree(names);
+ 	kfree(callbacks);
+@@ -451,6 +498,7 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ static void virtio_fs_cleanup_vqs(struct virtio_device *vdev,
+ 				  struct virtio_fs *fs)
+ {
++	virtio_fs_clean_affinity(fs);
+ 	vdev->config->del_vqs(vdev);
+ }
 
-As for 9p, pdflush will call clear_page_dirty_for_io() to clean the page's
-dirty flags. Then call p9_client_write() to write the page to the host,
-waiting for the result, and then flush the next page. In this case, buffer
-write of 9p will hit the dirty page many times before it is being write
-back to the host by pdflush process.
-The pdflush stack for 9p:
-	pdflush
-	  ->...
-	    ->do_writepages
-		  ->generic_writepages
-		    ->write_cache_pages
-			  ->clear_page_dirty_for_io // clear page's dirty flags
-			  ->__writepage
-				->v9fs_vfs_writepage
-				  ->v9fs_vfs_writepage_locked
-					->p9_client_write   // it will get the writing back page's result
+@@ -954,10 +1002,22 @@ static int virtio_fs_enqueue_req(struct virtqueue *vq, struct fuse_req *req)
+ 	return ret;
+ }
 
++static unsigned virtio_fs_pick_vq_mq(struct virtio_fs *fs)
++{
++	unsigned queue_id;
++	unsigned long flags;
++
++	local_irq_save(flags);
++	queue_id = (smp_processor_id() % fs->num_queues) + VQ_REQUEST;
++	local_irq_restore(flags);
++
++	return queue_id;
++}
++
+ static void virtio_fs_wake_pending_and_unlock(struct fuse_iqueue *fiq)
+ __releases(fiq->waitq.lock)
+ {
+-	unsigned queue_id = VQ_REQUEST; /* TODO multiqueue */
++	unsigned queue_id = VQ_REQUEST;
+ 	struct virtio_fs *fs;
+ 	struct fuse_conn *fc;
+ 	struct fuse_req *req;
+@@ -972,6 +1032,8 @@ static void virtio_fs_wake_pending_and_unlock(struct fuse_iqueue *fiq)
+ 	spin_unlock(&fiq->waitq.lock);
 
-According to the test result, is the handling method of 9p for page writing
-back more reasonable than virtiofs?
+ 	fs = fiq->priv;
++	if (fs->num_queues > 1)
++		queue_id = virtio_fs_pick_vq_mq(fs);
+ 	fc = fs->vqs[queue_id].fud->fc;
 
-Thanks,
-Yan Wang
+ 	dev_dbg(&fs->vqs[queue_id].vq->vdev->dev,
+@@ -1066,9 +1128,11 @@ static int virtio_fs_fill_super(struct super_block *sb, char *opts,
+
+ 	err = -ENOMEM;
+ 	/* Allocate fuse_dev for hiprio and notification queues */
+-	for (i = 0; i < VQ_REQUEST; i++) {
++	for (i = 0; i < VQ_REQUEST + fs->num_queues; i++) {
+ 		struct virtio_fs_vq *fsvq = &fs->vqs[i];
+
++		if (i == VQ_REQUEST)
++			continue;  /* will be allocated in fuse_fill_super_common */
+ 		fsvq->fud = fuse_dev_alloc();
+ 		if (!fsvq->fud)
+ 			goto err_free_fuse_devs;
+-- 
 

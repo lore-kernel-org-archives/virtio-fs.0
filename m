@@ -1,10 +1,18 @@
-From: Eryu Guan <eguan@linux.alibaba.com>
-Date: Fri,  9 Aug 2019 16:25:36 +0800
-Message-Id: <20190809082536.56402-2-eguan@linux.alibaba.com>
-In-Reply-To: <20190809082536.56402-1-eguan@linux.alibaba.com>
-References: <20190809082536.56402-1-eguan@linux.alibaba.com>
-Subject: [Virtio-fs] [PATCH 2/2] virtiofsd: convert more fprintf and perror
-	to use fuse log infra
+Date: Fri, 9 Aug 2019 09:27:59 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20190809082759.GD25286@stefanha-x1.localdomain>
+References: <20190807093152.10964-1-dgilbert@redhat.com>
+	<20190807124537.GA18557@redhat.com> <20190807131715.GE2867@work-vm>
+	<20190807132955.GC18557@redhat.com>
+	<20190808094546.GC31963@stefanha-x1.localdomain>
+	<20190808102651.GD2852@work-vm>
+MIME-Version: 1.0
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="UoPmpPX/dBe4BELn"
+Content-Disposition: inline
+In-Reply-To: <20190808102651.GD2852@work-vm>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Fix lo_destroy crash in
+ g_hash_table_foreach_remove
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,171 +21,80 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
-Signed-off-by: Eryu Guan <eguan@linux.alibaba.com>
----
- contrib/virtiofsd/fuse_lowlevel.c |  6 +++---
- contrib/virtiofsd/fuse_signals.c  |  7 +++++--
- contrib/virtiofsd/fuse_virtio.c   | 16 ++++++++--------
- contrib/virtiofsd/helper.c        |  6 +++---
- 4 files changed, 19 insertions(+), 16 deletions(-)
 
-diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
-index 7eec2680b6de..8ef800239f1e 100644
---- a/contrib/virtiofsd/fuse_lowlevel.c
-+++ b/contrib/virtiofsd/fuse_lowlevel.c
-@@ -1901,15 +1901,15 @@ static void do_removemapping(fuse_req_t req, fuse_ino_t nodeid,
- 
- 	arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
- 	if (!arg || arg->count <= 0) {
--		fprintf(stderr, "do_removemapping: invalid arg %p\n", arg);
-+		fuse_err("do_removemapping: invalid arg %p\n", arg);
- 		fuse_reply_err(req, EINVAL);
- 		return;
- 	}
- 
- 	one = fuse_mbuf_iter_advance(iter, arg->count * sizeof(*one));
- 	if (!one) {
--		fprintf(stderr, "do_removemapping: invalid in, expected %d * %ld, has %ld - %ld\n",
--				arg->count, sizeof(*one), iter->size, iter->pos);
-+		fuse_err("do_removemapping: invalid in, expected %d * %ld, has %ld - %ld\n",
-+			 arg->count, sizeof(*one), iter->size, iter->pos);
- 		fuse_reply_err(req, EINVAL);
- 		return;
- 	}
-diff --git a/contrib/virtiofsd/fuse_signals.c b/contrib/virtiofsd/fuse_signals.c
-index aa3bdba7daaf..9d34f6b04025 100644
---- a/contrib/virtiofsd/fuse_signals.c
-+++ b/contrib/virtiofsd/fuse_signals.c
-@@ -12,6 +12,7 @@
- #include "fuse_log.h"
- #include "fuse_lowlevel.h"
- 
-+#include <errno.h>
- #include <stdio.h>
- #include <string.h>
- #include <signal.h>
-@@ -47,13 +48,15 @@ static int set_one_signal_handler(int sig, void (*handler)(int), int remove)
- 	sa.sa_flags = 0;
- 
- 	if (sigaction(sig, NULL, &old_sa) == -1) {
--		perror("fuse: cannot get old signal handler");
-+		fuse_err("fuse: cannot get old signal handler: %s\n",
-+			 strerror(errno));
- 		return -1;
- 	}
- 
- 	if (old_sa.sa_handler == (remove ? handler : SIG_DFL) &&
- 	    sigaction(sig, &sa, NULL) == -1) {
--		perror("fuse: cannot set signal handler");
-+		fuse_err("fuse: cannot set signal handler: %s\n",
-+			 strerror(errno));
- 		return -1;
- 	}
- 	return 0;
-diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
-index 5b3174e4c74c..2ce0a9cf816e 100644
---- a/contrib/virtiofsd/fuse_virtio.c
-+++ b/contrib/virtiofsd/fuse_virtio.c
-@@ -675,7 +675,7 @@ static void *fv_queue_thread(void *opaque)
-                                fuse_info("%s: ppoll interrupted, going around\n", __func__);
-                                continue;
-                        }
--                       perror("fv_queue_thread ppoll");
-+                       fuse_err("fv_queue_thread ppoll: %s\n", strerror(errno));
-                        break;
-                }
-                assert(poll_res >= 1);
-@@ -700,7 +700,7 @@ static void *fv_queue_thread(void *opaque)
- 
-                eventfd_t evalue;
-                if (eventfd_read(qi->kick_fd, &evalue)) {
--                       perror("Eventfd_read for queue");
-+                       fuse_err("Eventfd_read for queue: %s\n", strerror(errno));
-                        break;
-                }
- 
-@@ -805,7 +805,7 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
- 
-                 /* Kill the thread */
-                 if (eventfd_write(ourqi->kill_fd, 1)) {
--                       perror("Eventfd_read for queue");
-+                       fuse_err("Eventfd_read for queue: %s\n", strerror(errno));
-                 }
-                 ret = pthread_join(ourqi->thread, NULL);
-                 if (ret) {
-@@ -859,7 +859,7 @@ int virtio_loop(struct fuse_session *se)
-                                fuse_info("%s: ppoll interrupted, going around\n", __func__);
-                                continue;
-                        }
--                       perror("virtio_loop ppoll");
-+                       fuse_err("virtio_loop ppoll: %s\n", strerror(errno));
-                        break;
-                }
-                assert(poll_res == 1);
-@@ -913,18 +913,18 @@ static int fv_create_listen_socket(struct fuse_session *se)
- 
-         int listen_sock = socket(AF_UNIX, SOCK_STREAM, 0);
-         if (listen_sock == -1) {
--               perror("vhost socket creation");
-+               fuse_err("vhost socket creation: %s\n", strerror(errno));
-                return -1;
-         }
-         un.sun_family = AF_UNIX;
- 
-         if (bind(listen_sock, (struct sockaddr *) &un, addr_len) == -1) {
--                perror("vhost socket bind");
-+                fuse_err("vhost socket bind: %s\n", strerror(errno));
-                 return -1;
-         }
- 
-         if (listen(listen_sock, 1) == -1) {
--                perror("vhost socket listen");
-+                fuse_err("vhost socket listen: %s\n", strerror(errno));
-                 return -1;
-         }
- 
-@@ -949,7 +949,7 @@ int virtio_session_mount(struct fuse_session *se)
-         fuse_err("%s: Waiting for vhost-user socket connection...\n", __func__);
-         int data_sock = accept(se->vu_listen_fd, NULL, NULL);
-         if (data_sock == -1) {
--                perror("vhost socket accept");
-+                fuse_err("vhost socket accept: %s\n", strerror(errno));
-                 close(se->vu_listen_fd);
-                 return -1;
-         }
-diff --git a/contrib/virtiofsd/helper.c b/contrib/virtiofsd/helper.c
-index dc80100e8594..4c7145208028 100644
---- a/contrib/virtiofsd/helper.c
-+++ b/contrib/virtiofsd/helper.c
-@@ -189,7 +189,7 @@ int fuse_daemonize(int foreground)
- 		char completed;
- 
- 		if (pipe(waiter)) {
--			perror("fuse_daemonize: pipe");
-+			fuse_err("fuse_daemonize: pipe: %s\n", strerror(errno));
- 			return -1;
- 		}
- 
-@@ -199,7 +199,7 @@ int fuse_daemonize(int foreground)
- 		 */
- 		switch(fork()) {
- 		case -1:
--			perror("fuse_daemonize: fork");
-+			fuse_err("fuse_daemonize: fork: %s\n", strerror(errno));
- 			return -1;
- 		case 0:
- 			break;
-@@ -209,7 +209,7 @@ int fuse_daemonize(int foreground)
- 		}
- 
- 		if (setsid() == -1) {
--			perror("fuse_daemonize: setsid");
-+			fuse_err("fuse_daemonize: setsid: %s\n", strerror(errno));
- 			return -1;
- 		}
- 
--- 
-2.14.4.44.g2045bb6
+--UoPmpPX/dBe4BELn
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Thu, Aug 08, 2019 at 11:26:51AM +0100, Dr. David Alan Gilbert wrote:
+> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > On Wed, Aug 07, 2019 at 09:29:55AM -0400, Vivek Goyal wrote:
+> > > On Wed, Aug 07, 2019 at 02:17:15PM +0100, Dr. David Alan Gilbert wrot=
+e:
+> > > > * Vivek Goyal (vgoyal@redhat.com) wrote:
+> > > > > On Wed, Aug 07, 2019 at 10:31:52AM +0100, Dr. David Alan Gilbert =
+(git) wrote:
+> > > > > - Also before destroying lo, should we sever connection so that a=
+ny
+> > > > >   requests which come after lo_destroy() are not entertained.
+> > > >=20
+> > > > No, because in some situations lo_destroy does not happen at the en=
+d;
+> > > > e.g. it happens during a umount and we still have the connection
+> > > > to be able to remount it.
+> > >=20
+> > > Ok, so we don't sever the connection completely. But we don't expect =
+to
+> > > process further requests till a new INIT has been done, isn't it?
+> > >=20
+> > > IOW, once lo_destroy() is received, we cleanup any pending state from
+> > > the mount and if any requests are received from client, we error them
+> > > out.
+> > >=20
+> > > And start processing requests normally when a new INIT has been
+> > > received.
+> > >=20
+> > > Atleast that was my understanding of the design.
+> >=20
+> > There is a state machine that does:
+> >=20
+> > 1. Drain in-flight requests when DESTROY is received.
+>=20
+> Hmm does that drain happen in the reboot case where there wasn't
+> actually a destroy message? (fuse_session_process_buf_int=20
+> where it calls se->op.destroy explicitly)
+
+struct fuse_session::init_rwlock has these semantics:
+
+INIT and DESTROY requests acquire a write lock.  All other requests
+acquire a read lock.
+
+A write lock must wait for in-progress readers to complete.  This is the
+drain.  New readers must wait for writers (even for waiting writers, to
+ensure fairness).
+
+In the reboot case INIT message acts as the drain operation.
+
+Stefan
+
+--UoPmpPX/dBe4BELn
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1NLo8ACgkQnKSrs4Gr
+c8h3KAgAqUhCANQC5NvZcFpMLyRIN/I8DI9Zees+rEnxjUPDBib/GW7bGFOazgi1
+eAg8WhgJzzKAdYMMSJqB4Tioxa9oeZ0N4fvwGe1qrqavZ9r84d8Q9XFBQPrHTIJS
+vQ2RsrHaCutCQAKyYeIJSW+oMXqCb1gUeus52iY8WQjuiZOBy48G4PuRiAIdv6ya
+psuJtXX4lTjj3YwyWQHM15JosHBKWgeEpYWTN7MzSPa6aN0euLEKxnCxi/9Ciz4u
+lzVTjnO9m5lOt/4h3YRT4CM/nqLZct7SOQMuQiWm0M9Vt8uxa+1J7EmFUE9usani
+BQFXaJr422DCM3Q6+ZCCXOXpEq4p0A==
+=cjIz
+-----END PGP SIGNATURE-----
+
+--UoPmpPX/dBe4BELn--
 

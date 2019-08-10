@@ -1,14 +1,18 @@
-References: <1566367838-47809-1-git-send-email-bo.liu@linux.alibaba.com>
-	<20190821061700.GR52397@e18g06458.et15sqa>
-From: piaojun <piaojun@huawei.com>
-Message-ID: <5D5CE284.6060609@huawei.com>
-Date: Wed, 21 Aug 2019 14:19:48 +0800
+Date: Sat, 10 Aug 2019 14:35:55 -0700
+From: Liu Bo <bo.liu@linux.alibaba.com>
+Message-ID: <20190810213555.hqdkm4yio4asnh5t@US-160370MP2.local>
+References: <20190801165409.20121-1-stefanha@redhat.com>
+	<20190807180355.GA22758@stefanha-x1.localdomain>
+	<20190807205715.GE18557@redhat.com>
+	<20190808090213.GD31476@stefanha-x1.localdomain>
+	<20190808095316.GC2852@work-vm> <20190808125320.GB3147@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20190821061700.GR52397@e18g06458.et15sqa>
-Content-Type: text/plain; charset="windows-1252"
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH] virtiofs: fix return value of
- iomap_begin_upgrade_mapping
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20190808125320.GB3147@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 0/4] virtiofsd: multithreading preparation
+ part 3
+Reply-To: bo.liu@linux.alibaba.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,44 +21,78 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Eryu Guan <eguan@linux.alibaba.com>, Liu Bo <bo.liu@linux.alibaba.com>
-Cc: virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-
-
-On 2019/8/21 14:17, Eryu Guan wrote:
-> On Wed, Aug 21, 2019 at 02:10:38PM +0800, Liu Bo wrote:
->> Set ret = 0 if everything runs fine.
->>
->> Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+On Thu, Aug 08, 2019 at 08:53:20AM -0400, Vivek Goyal wrote:
+> On Thu, Aug 08, 2019 at 10:53:16AM +0100, Dr. David Alan Gilbert wrote:
+> > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > > On Wed, Aug 07, 2019 at 04:57:15PM -0400, Vivek Goyal wrote:
+> > > > Kernel also serializes MAP/UNMAP on one inode. So you will need to run
+> > > > multiple jobs operating on different inodes to see parallel MAP/UNMAP
+> > > > (atleast from kernel's point of view).
+> > > 
+> > > Okay, there is still room to experiment with how MAP and UNMAP are
+> > > handled by virtiofsd and QEMU even if the host kernel ultimately becomes
+> > > the bottleneck.
+> > > 
+> > > One possible optimization is to eliminate REMOVEMAPPING requests when
+> > > the guest driver knows a SETUPMAPPING will follow immediately.  I see
+> > > the following request pattern in a fio randread iodepth=64 job:
+> > > 
+> > >   unique: 995348, opcode: SETUPMAPPING (48), nodeid: 135, insize: 80, pid: 1351
+> > >   lo_setupmapping(ino=135, fi=0x(nil), foffset=3860856832, len=2097152, moffset=859832320, flags=0)
+> > >      unique: 995348, success, outsize: 16
+> > >   unique: 995350, opcode: REMOVEMAPPING (49), nodeid: 135, insize: 60, pid: 12
+> > >      unique: 995350, success, outsize: 16
+> > >   unique: 995352, opcode: SETUPMAPPING (48), nodeid: 135, insize: 80, pid: 1351
+> > >   lo_setupmapping(ino=135, fi=0x(nil), foffset=16777216, len=2097152, moffset=861929472, flags=0)
+> > >      unique: 995352, success, outsize: 16
+> > >   unique: 995354, opcode: REMOVEMAPPING (49), nodeid: 135, insize: 60, pid: 12
+> > >      unique: 995354, success, outsize: 16
+> > >   virtio_send_msg: elem 9: with 1 in desc of length 16
+> > >   unique: 995356, opcode: SETUPMAPPING (48), nodeid: 135, insize: 80, pid: 1351
+> > >   lo_setupmapping(ino=135, fi=0x(nil), foffset=383778816, len=2097152, moffset=864026624, flags=0)
+> > >      unique: 995356, success, outsize: 16
+> > >   unique: 995358, opcode: REMOVEMAPPING (49), nodeid: 135, insize: 60, pid: 12
+> > > 
+> > > The REMOVEMAPPING requests are unnecessary since we can map over the top
+> > > of the old mapping instead of taking the extra step of removing it
+> > > first.
+> > 
+> > Yep, those should go - I think Vivek likes to keep them for testing
+> > since they make things fail more completely if there's a screwup.
 > 
-> FYI, this fixes generic/344 failure.
-> 
->> ---
->>  fs/fuse/file.c | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/fs/fuse/file.c b/fs/fuse/file.c
->> index eb7543a..d3c5e45 100644
->> --- a/fs/fuse/file.c
->> +++ b/fs/fuse/file.c
->> @@ -1985,6 +1985,7 @@ static int iomap_begin_upgrade_mapping(struct inode *inode, loff_t pos,
->>  
->>  out_fill_iomap:
->>  	fuse_fill_iomap(inode, pos, length, iomap, dmap, flags);
->> +	ret = 0;
-> 
-> I'd prefer setting ret in the if (dmap->writable) case, which seems more
-> clear to me. i.e.
-> 
-> 	if (dmap->writable) {
-> 		ret = 0;
-> 		goto out_fill_iomap;
-> 	}
+> I like to keep them because otherwise they keep the resources busy
+> on host. If DAX range is being used immediately, then this optimization
+> makes more sense. I will keep this in mind.
+>
 
-Agreed, and feel free to add:
+Other than the resource not being released, do you think there'll be
+any stale data problem if we don't do removemapping at all, neither
+background reclaim nor inline reclaim?
+(truncate/punch_hole/evict_inode still needs to remove mapping though)
 
-Reviewed-by: Jun Piao <piaojun@huawei.com>
+thanks,
+-liubo
 
-Jun
+> > 
+> > > Some more questions to consider for DAX performance optimization:
+> > > 
+> > > 1. Is FUSE_READ/FUSE_WRITE more efficient than DAX for some I/O patterns?
+> > 
+> > Probably for cases where the data is only accessed once, and you can't
+> > preemptively map.
+> > Another variant on (1) is whether we could do read/writes while the mmap
+> > is happening to absorb the latency.
+> 
+> For small random I/O, dax might not be very effective. Overhead of
+> setting up mapping and tearing it down is significant.
+> 
+> Vivek
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 

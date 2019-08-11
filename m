@@ -1,15 +1,25 @@
-Date: Wed, 14 Aug 2019 14:17:04 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190814131704.GI2920@work-vm>
-References: <20190813192944.26009-1-vgoyal@redhat.com>
-	<20190813192944.26009-5-vgoyal@redhat.com>
-	<20190814095216.GD2920@work-vm> <20190814124339.GA32294@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=date:from:to:cc:subject:message-id:references:mime-version
+	:content-disposition:in-reply-to:user-agent;
+	bh=Z49weHbkxKsyGMa3fRF3lUxhzLcc4zTFfgmx7UPUwGA=;
+	b=iJGHU/iXD+vy0sj/x1WlX4UVZAarbYNr5Bkrdhee0zOEwkgaPWggtnBANoww7dFpoV
+	5fScpdeCvye+dB5c3XpHG14aKoirZbAgb6xQmF8KcmyayuRQwXkco6O/9JbPcXhffsH6
+	2+gR2fjLv9EeLdqY/cAMrRU667PAKC1gx3K05exTAdKVOu2cJxC5q1+R6nRCpmPmhfht
+	S0pyEOr+fSR1kLyudDH5Ngr26nBb3wuMTXZnsYn5T5gqyq3Vg8IMwoQe20BVahTeXroZ
+	CAfe+RVOctgFLa+aMQK0rubmfYYJJkxH+jQ3+zybQkWwPeQMa7NDVf3DJa7Km2qe2TpS
+	NTIQ==
+Date: Sun, 11 Aug 2019 21:21:26 +0800
+From: Eryu Guan <guaneryu@gmail.com>
+Message-ID: <20190811132126.GC2665@desktop>
+References: <20190809082536.56402-1-eguan@linux.alibaba.com>
+	<20190809082536.56402-2-eguan@linux.alibaba.com>
+	<5D4D3FA8.707@huawei.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190814124339.GA32294@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 4/4] virtiofsd: Drop CAP_FSETID if client
-	asked for it
+In-Reply-To: <5D4D3FA8.707@huawei.com>
+Subject: Re: [Virtio-fs] [PATCH 2/2] virtiofsd: convert more fprintf and
+ perror to use fuse log infra
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,285 +28,190 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
+To: piaojun <piaojun@huawei.com>
 Cc: virtio-fs@redhat.com
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> On Wed, Aug 14, 2019 at 10:52:16AM +0100, Dr. David Alan Gilbert wrote:
-> > * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > > If client requested killing setuid/setgid bits on file being written, drop
-> > > CAP_FSETID capability so that setuid/setgid bits are cleared upon write
-> > > automatically.
-> > > 
-> > > pjdfstest chown/12.t needs this.
-> > > 
-> > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > 
-> > Some high level questions:
-> >   a) This is going to be *really* expensive isn't it - that's a lot of
-> > syscalls for each write
-> > 
-> >   b) and isn't this the normal case, i.e. a non-root guest writing to a
-> > normal file?
+On Fri, Aug 09, 2019 at 05:40:56PM +0800, piaojun wrote:
+> Hi Eryu,
 > 
-> Hi David,
-> 
-> FUSE_WRITE_KILL_PRIV flag will not be set frequently. It is set only
-> if a write happens to a file which has setuid/setgid bit set. Very
-> few files in filesystem typically have this bit set and for those
-> also it will be set only for first write and not subsequent writes.
->
-> So I will not be worried about performance impact of it.
+> Could fuse_err() print to stderr as well?
 
-OK, that makes me a lot less worried.
+Yes, when "--syslog" is not used :)
+
+Thanks,
+Eryu
 
 > 
+> Jun
+> 
+> On 2019/8/9 16:25, Eryu Guan wrote:
+> > Signed-off-by: Eryu Guan <eguan@linux.alibaba.com>
+> > ---
+> >  contrib/virtiofsd/fuse_lowlevel.c |  6 +++---
+> >  contrib/virtiofsd/fuse_signals.c  |  7 +++++--
+> >  contrib/virtiofsd/fuse_virtio.c   | 16 ++++++++--------
+> >  contrib/virtiofsd/helper.c        |  6 +++---
+> >  4 files changed, 19 insertions(+), 16 deletions(-)
 > > 
-> >   c) I guess an unpriv virtiofsd still works OK because the cap is
-> > already gone.
+> > diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
+> > index 7eec2680b6de..8ef800239f1e 100644
+> > --- a/contrib/virtiofsd/fuse_lowlevel.c
+> > +++ b/contrib/virtiofsd/fuse_lowlevel.c
+> > @@ -1901,15 +1901,15 @@ static void do_removemapping(fuse_req_t req, fuse_ino_t nodeid,
+> >  
+> >  	arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
+> >  	if (!arg || arg->count <= 0) {
+> > -		fprintf(stderr, "do_removemapping: invalid arg %p\n", arg);
+> > +		fuse_err("do_removemapping: invalid arg %p\n", arg);
+> >  		fuse_reply_err(req, EINVAL);
+> >  		return;
+> >  	}
+> >  
+> >  	one = fuse_mbuf_iter_advance(iter, arg->count * sizeof(*one));
+> >  	if (!one) {
+> > -		fprintf(stderr, "do_removemapping: invalid in, expected %d * %ld, has %ld - %ld\n",
+> > -				arg->count, sizeof(*one), iter->size, iter->pos);
+> > +		fuse_err("do_removemapping: invalid in, expected %d * %ld, has %ld - %ld\n",
+> > +			 arg->count, sizeof(*one), iter->size, iter->pos);
+> >  		fuse_reply_err(req, EINVAL);
+> >  		return;
+> >  	}
+> > diff --git a/contrib/virtiofsd/fuse_signals.c b/contrib/virtiofsd/fuse_signals.c
+> > index aa3bdba7daaf..9d34f6b04025 100644
+> > --- a/contrib/virtiofsd/fuse_signals.c
+> > +++ b/contrib/virtiofsd/fuse_signals.c
+> > @@ -12,6 +12,7 @@
+> >  #include "fuse_log.h"
+> >  #include "fuse_lowlevel.h"
+> >  
+> > +#include <errno.h>
+> >  #include <stdio.h>
+> >  #include <string.h>
+> >  #include <signal.h>
+> > @@ -47,13 +48,15 @@ static int set_one_signal_handler(int sig, void (*handler)(int), int remove)
+> >  	sa.sa_flags = 0;
+> >  
+> >  	if (sigaction(sig, NULL, &old_sa) == -1) {
+> > -		perror("fuse: cannot get old signal handler");
+> > +		fuse_err("fuse: cannot get old signal handler: %s\n",
+> > +			 strerror(errno));
+> >  		return -1;
+> >  	}
+> >  
+> >  	if (old_sa.sa_handler == (remove ? handler : SIG_DFL) &&
+> >  	    sigaction(sig, &sa, NULL) == -1) {
+> > -		perror("fuse: cannot set signal handler");
+> > +		fuse_err("fuse: cannot set signal handler: %s\n",
+> > +			 strerror(errno));
+> >  		return -1;
+> >  	}
+> >  	return 0;
+> > diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
+> > index 5b3174e4c74c..2ce0a9cf816e 100644
+> > --- a/contrib/virtiofsd/fuse_virtio.c
+> > +++ b/contrib/virtiofsd/fuse_virtio.c
+> > @@ -675,7 +675,7 @@ static void *fv_queue_thread(void *opaque)
+> >                                 fuse_info("%s: ppoll interrupted, going around\n", __func__);
+> >                                 continue;
+> >                         }
+> > -                       perror("fv_queue_thread ppoll");
+> > +                       fuse_err("fv_queue_thread ppoll: %s\n", strerror(errno));
+> >                         break;
+> >                 }
+> >                 assert(poll_res >= 1);
+> > @@ -700,7 +700,7 @@ static void *fv_queue_thread(void *opaque)
+> >  
+> >                 eventfd_t evalue;
+> >                 if (eventfd_read(qi->kick_fd, &evalue)) {
+> > -                       perror("Eventfd_read for queue");
+> > +                       fuse_err("Eventfd_read for queue: %s\n", strerror(errno));
+> >                         break;
+> >                 }
+> >  
+> > @@ -805,7 +805,7 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
+> >  
+> >                  /* Kill the thread */
+> >                  if (eventfd_write(ourqi->kill_fd, 1)) {
+> > -                       perror("Eventfd_read for queue");
+> > +                       fuse_err("Eventfd_read for queue: %s\n", strerror(errno));
+> >                  }
+> >                  ret = pthread_join(ourqi->thread, NULL);
+> >                  if (ret) {
+> > @@ -859,7 +859,7 @@ int virtio_loop(struct fuse_session *se)
+> >                                 fuse_info("%s: ppoll interrupted, going around\n", __func__);
+> >                                 continue;
+> >                         }
+> > -                       perror("virtio_loop ppoll");
+> > +                       fuse_err("virtio_loop ppoll: %s\n", strerror(errno));
+> >                         break;
+> >                 }
+> >                 assert(poll_res == 1);
+> > @@ -913,18 +913,18 @@ static int fv_create_listen_socket(struct fuse_session *se)
+> >  
+> >          int listen_sock = socket(AF_UNIX, SOCK_STREAM, 0);
+> >          if (listen_sock == -1) {
+> > -               perror("vhost socket creation");
+> > +               fuse_err("vhost socket creation: %s\n", strerror(errno));
+> >                 return -1;
+> >          }
+> >          un.sun_family = AF_UNIX;
+> >  
+> >          if (bind(listen_sock, (struct sockaddr *) &un, addr_len) == -1) {
+> > -                perror("vhost socket bind");
+> > +                fuse_err("vhost socket bind: %s\n", strerror(errno));
+> >                  return -1;
+> >          }
+> >  
+> >          if (listen(listen_sock, 1) == -1) {
+> > -                perror("vhost socket listen");
+> > +                fuse_err("vhost socket listen: %s\n", strerror(errno));
+> >                  return -1;
+> >          }
+> >  
+> > @@ -949,7 +949,7 @@ int virtio_session_mount(struct fuse_session *se)
+> >          fuse_err("%s: Waiting for vhost-user socket connection...\n", __func__);
+> >          int data_sock = accept(se->vu_listen_fd, NULL, NULL);
+> >          if (data_sock == -1) {
+> > -                perror("vhost socket accept");
+> > +                fuse_err("vhost socket accept: %s\n", strerror(errno));
+> >                  close(se->vu_listen_fd);
+> >                  return -1;
+> >          }
+> > diff --git a/contrib/virtiofsd/helper.c b/contrib/virtiofsd/helper.c
+> > index dc80100e8594..4c7145208028 100644
+> > --- a/contrib/virtiofsd/helper.c
+> > +++ b/contrib/virtiofsd/helper.c
+> > @@ -189,7 +189,7 @@ int fuse_daemonize(int foreground)
+> >  		char completed;
+> >  
+> >  		if (pipe(waiter)) {
+> > -			perror("fuse_daemonize: pipe");
+> > +			fuse_err("fuse_daemonize: pipe: %s\n", strerror(errno));
+> >  			return -1;
+> >  		}
+> >  
+> > @@ -199,7 +199,7 @@ int fuse_daemonize(int foreground)
+> >  		 */
+> >  		switch(fork()) {
+> >  		case -1:
+> > -			perror("fuse_daemonize: fork");
+> > +			fuse_err("fuse_daemonize: fork: %s\n", strerror(errno));
+> >  			return -1;
+> >  		case 0:
+> >  			break;
+> > @@ -209,7 +209,7 @@ int fuse_daemonize(int foreground)
+> >  		}
+> >  
+> >  		if (setsid() == -1) {
+> > -			perror("fuse_daemonize: setsid");
+> > +			fuse_err("fuse_daemonize: setsid: %s\n", strerror(errno));
+> >  			return -1;
+> >  		}
+> >  
 > > 
-> >   d) How is this thread safe?  My reading is cap_set_proc is process
-> > wide; you'd have other writesin other threads doing non-kill-priv
-> > writes; also you'd have multiple threads doing   (clear) write (set) -
-> > that feels like they'd interact badly.
 > 
-> man page of capabilities says that its a per thread property.
-> 
-> **************************
->        Starting with kernel 2.2, Linux divides  the  privileges  traditionally
->        associated  with  superuser into distinct units, known as capabilities,
->        which can be independently enabled and disabled.   Capabilities  are  a
->        per-thread attribute.
-> **************************
-> 
-> So dropping capability per thread and enabling it back should be fine.
-
-Huh OK; the man page of cap_get_proc/cap_set_proc say process
-everywhere.
-
-> 
-> > 
-> >   e) I think you could share some stuff between the drop and the
-> > restore;  for example you only ever need to do cap_from_name once
-> > in the entire run.   You can probably also do teh cap_get_proc when
-> > you drop it, keep that 'caps' around and then set it again.
-> 
-> Given its not a very frequent operation, I am not too worried about
-> it. It will just make code structure little more complicated. 
-> 
-> But if you have strong opinion about it, I am open to change it.
-
-No that's fine given your explanation above.
-
-Dave
-
-> Thanks
-> Vivek
-> 
-> > 
-> > 
-> > Dave
-> > 
-> > > ---
-> > >  contrib/virtiofsd/Makefile.objs    |   2 +
-> > >  contrib/virtiofsd/passthrough_ll.c | 127 +++++++++++++++++++++++++++++
-> > >  contrib/virtiofsd/seccomp.c        |   2 +
-> > >  3 files changed, 131 insertions(+)
-> > > 
-> > > diff --git a/contrib/virtiofsd/Makefile.objs b/contrib/virtiofsd/Makefile.objs
-> > > index 941b19f18e..25f1e8dd73 100644
-> > > --- a/contrib/virtiofsd/Makefile.objs
-> > > +++ b/contrib/virtiofsd/Makefile.objs
-> > > @@ -11,3 +11,5 @@ virtiofsd-obj-y = buffer.o \
-> > >  
-> > >  seccomp.o-cflags := $(SECCOMP_CFLAGS)
-> > >  seccomp.o-libs := $(SECCOMP_LIBS)
-> > > +
-> > > +passthrough_ll.o-libs += -lcap
-> > > diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-> > > index 321bbb20be..412663653a 100644
-> > > --- a/contrib/virtiofsd/passthrough_ll.c
-> > > +++ b/contrib/virtiofsd/passthrough_ll.c
-> > > @@ -56,6 +56,7 @@
-> > >  #include <sys/mman.h>
-> > >  #include <sys/socket.h>
-> > >  #include <sys/un.h>
-> > > +#include <sys/capability.h>
-> > >  
-> > >  #include "ireg.h"
-> > >  #include <sys/mount.h>
-> > > @@ -230,6 +231,115 @@ static struct lo_data *lo_data(fuse_req_t req)
-> > >  	return (struct lo_data *) fuse_req_userdata(req);
-> > >  }
-> > >  
-> > > +/* Helpers for dropping and regaining effective capabilities. Returns 0
-> > > + * on success, error otherwise  */
-> > > +static int drop_effective_cap(const char *cap_name, bool *cap_dropped)
-> > > +{
-> > > +	cap_t caps;
-> > > +	cap_value_t cap;
-> > > +	cap_flag_value_t cap_value;
-> > > +	int ret = 0;
-> > > +
-> > > +	ret = cap_from_name(cap_name, &cap);
-> > > +	if (ret == -1) {
-> > > +		ret = errno;
-> > > +		fuse_err("cap_from_name(%s) failed:%s\n", cap_name,
-> > > +			 strerror(errno));
-> > > +		goto out;
-> > > +	}
-> > > +
-> > > +	if (!CAP_IS_SUPPORTED(cap)) {
-> > > +		fuse_err("capability(%s) is not supported\n", cap_name);
-> > > +		return EINVAL;
-> > > +	}
-> > > +
-> > > +	caps = cap_get_proc();
-> > > +	if (caps == NULL) {
-> > > +		ret = errno;
-> > > +		fuse_err("cap_get_proc() failed\n");
-> > > +		goto out;
-> > > +	}
-> > > +
-> > > +	if (cap_get_flag(caps, cap, CAP_EFFECTIVE, &cap_value) == -1) {
-> > > +		ret = errno;
-> > > +		fuse_err("cap_get_flag() failed\n");
-> > > +		goto out_cap_free;
-> > > +	}
-> > > +
-> > > +	/* We dont have this capability in effective set already. */
-> > > +	if (cap_value == CAP_CLEAR) {
-> > > +		ret = 0;
-> > > +		goto out_cap_free;
-> > > +	}
-> > > +
-> > > +	if (cap_set_flag(caps, CAP_EFFECTIVE, 1, &cap, CAP_CLEAR) == -1) {
-> > > +		ret = errno;
-> > > +		fuse_err("cap_set_flag() failed\n");
-> > > +		goto out_cap_free;
-> > > +	}
-> > > +
-> > > +	if (cap_set_proc(caps) == -1) {
-> > > +		ret = errno;
-> > > +		fuse_err("cap_set_procs() failed\n");
-> > > +		goto out_cap_free;
-> > > +	}
-> > > +
-> > > +	ret = 0;
-> > > +	if (cap_dropped)
-> > > +		*cap_dropped = true;
-> > > +
-> > > +out_cap_free:
-> > > +	cap_free(caps);
-> > > +out:
-> > > +	return ret;
-> > > +}
-> > > +
-> > > +static int gain_effective_cap(const char *cap_name)
-> > > +{
-> > > +	cap_t caps;
-> > > +	cap_value_t cap;
-> > > +	int ret = 0;
-> > > +
-> > > +	ret = cap_from_name(cap_name, &cap);
-> > > +	if (ret == -1) {
-> > > +		ret = errno;
-> > > +		fuse_err("cap_from_name(%s) failed:%s\n", cap_name,
-> > > +			 strerror(errno));
-> > > +		goto out;
-> > > +	}
-> > > +
-> > > +	if (!CAP_IS_SUPPORTED(cap)) {
-> > > +		fuse_err("capability(%s) is not supported\n", cap_name);
-> > > +		return EINVAL;
-> > > +	}
-> > > +
-> > > +	caps = cap_get_proc();
-> > > +	if (caps == NULL) {
-> > > +		ret = errno;
-> > > +		fuse_err("cap_get_proc() failed\n");
-> > > +		goto out;
-> > > +	}
-> > > +
-> > > +
-> > > +	if (cap_set_flag(caps, CAP_EFFECTIVE, 1, &cap, CAP_SET) == -1) {
-> > > +		ret = errno;
-> > > +		fuse_err("cap_set_flag() failed\n");
-> > > +		goto out_cap_free;
-> > > +	}
-> > > +
-> > > +	if (cap_set_proc(caps) == -1) {
-> > > +		ret = errno;
-> > > +		fuse_err("cap_set_procs() failed\n");
-> > > +		goto out_cap_free;
-> > > +	}
-> > > +	ret = 0;
-> > > +
-> > > +out_cap_free:
-> > > +	cap_free(caps);
-> > > +out:
-> > > +	return ret;
-> > > +}
-> > > +
-> > >  static void lo_map_init(struct lo_map *map)
-> > >  {
-> > >  	map->elems = NULL;
-> > > @@ -2014,6 +2124,7 @@ static void lo_write_buf(fuse_req_t req, fuse_ino_t ino,
-> > >  	ssize_t res;
-> > >  	struct fuse_bufvec out_buf = FUSE_BUFVEC_INIT(fuse_buf_size(in_buf));
-> > >  	struct lo_data *lo = lo_data(req);
-> > > +	bool cap_fsetid_dropped = false;
-> > >  
-> > >  	out_buf.buf[0].flags = FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK;
-> > >  	out_buf.buf[0].fd = lo_fi_fd(req, fi);
-> > > @@ -2023,6 +2134,16 @@ static void lo_write_buf(fuse_req_t req, fuse_ino_t ino,
-> > >  		fuse_debug("lo_write_buf(ino=%" PRIu64 ", size=%zd, off=%lu)\n",
-> > >  			   ino, out_buf.buf[0].size, (unsigned long) off);
-> > >  
-> > > +	/*
-> > > +	 * If kill_priv is set, drop CAP_FSETID which should lead to kernel
-> > > +	 * clearing setuid/setgid on file.
-> > > +	 */
-> > > +	if (fi->kill_priv) {
-> > > +		res = drop_effective_cap("cap_fsetid", &cap_fsetid_dropped);
-> > > +		if (res != 0)
-> > > +			fuse_reply_err(req, res);
-> > > +	}
-> > > +
-> > >  	res = fuse_buf_copy(req, &out_buf, in_buf, 0);
-> > >  	if(res < 0) {
-> > >  		fuse_reply_err(req, -res);
-> > > @@ -2037,6 +2158,12 @@ static void lo_write_buf(fuse_req_t req, fuse_ino_t ino,
-> > >  
-> > >  		fuse_reply_write(req, (size_t) res);
-> > >  	}
-> > > +
-> > > +	if (cap_fsetid_dropped) {
-> > > +		res = gain_effective_cap("cap_fsetid");
-> > > +		if (res)
-> > > +			fuse_err("Failed to gain CAP_FSETID\n");
-> > > +	}
-> > >  }
-> > >  
-> > >  static void lo_statfs(fuse_req_t req, fuse_ino_t ino)
-> > > diff --git a/contrib/virtiofsd/seccomp.c b/contrib/virtiofsd/seccomp.c
-> > > index 5f1c873b82..7384ebee0a 100644
-> > > --- a/contrib/virtiofsd/seccomp.c
-> > > +++ b/contrib/virtiofsd/seccomp.c
-> > > @@ -78,6 +78,8 @@ static const int syscall_whitelist[] = {
-> > >  	SCMP_SYS(unlinkat),
-> > >  	SCMP_SYS(utimensat),
-> > >  	SCMP_SYS(write),
-> > > +	SCMP_SYS(capget),
-> > > +	SCMP_SYS(capset),
-> > >  };
-> > >  
-> > >  /* Syscalls used when --syslog is enabled */
-> > > -- 
-> > > 2.17.2
-> > > 
-> > --
-> > Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 

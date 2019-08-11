@@ -1,14 +1,17 @@
-Date: Tue, 20 Aug 2019 19:03:22 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190820180322.GH9855@stefanha-x1.localdomain>
-References: <20190813200645.13819-1-msys.mizuma@gmail.com>
-MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="2xzXx3ruJf7hsAzo"
-Content-Disposition: inline
-In-Reply-To: <20190813200645.13819-1-msys.mizuma@gmail.com>
-Subject: Re: [Virtio-fs] [PATCH v3] virtiofsd: Prevent multiply running with
- same vhost_user_socket
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=from:to:cc:subject:date:message-id;
+	bh=UWg65z64Ib+yiJMxWdlMiKxa8eaqEMG/lcBL+eW6r/Q=;
+	b=MelLAdfHrwBevGO15VwlvTc5AVSXv3sqmr8/IdmNqaMI7e127tnuAgSXivYrpd0nnr
+	YMRM6ZgPE77XSijK4KAdMddlOKHTGP/UtVwOsib2fFpHE1c8gPXW67vOJR34h8gBjHo+
+	jnsoKOHl3yT+JFm3IpkG2bdQZJ63aWiDMCkT1o7BPgmPUIpugwuiS8Cz7rRkzef8IoF6
+	8FexesEGdiBCAb4orkiu3dBVVzUYk/uDBoaXpvXz1O8F2VDg6FhqurpohtdlOLlLP94U
+	kE8VwGEmnQS37EnDgDHqm99lb1w36i2kRCrO/bwu1RWQWcWXS1y/pwZRBOv6Qt2+lpWz
+	Ws+Q==
+From: Masayoshi Mizuma <msys.mizuma@gmail.com>
+Date: Sun, 11 Aug 2019 18:55:34 -0400
+Message-Id: <20190811225534.9040-1-msys.mizuma@gmail.com>
+Subject: [Virtio-fs] [PATCH v2] virtiofsd: Prevent multiply running with
+	same vhost_user_socket
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,65 +20,137 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Masayoshi Mizuma <msys.mizuma@gmail.com>
-Cc: virtio-fs@redhat.com, Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+To: piaojun <piaojun@huawei.com>, Stefan Hajnoczi <stefanha@redhat.com>, virtio-fs@redhat.com
+Cc: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
+From: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
---2xzXx3ruJf7hsAzo
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+virtiofsd can run multiply even if the vhost_user_socket is
+same path.
 
-On Tue, Aug 13, 2019 at 04:06:45PM -0400, Masayoshi Mizuma wrote:
+  ]# ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o source=/tmp/share &
+  [1] 244965
+  virtio_session_mount: Waiting for vhost-user socket connection...
+  ]# ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o source=/tmp/share &
+  [2] 244966
+  virtio_session_mount: Waiting for vhost-user socket connection...
+  ]#
 
-Two minor comments below.  They can be squashed in when merging this
-patch.
+The user will get confused about the situation and maybe the cause of the
+unexpected problem. So it's better to prevent the multiple running.
 
-If users find it problematic that pid files are never deleted we could
-make this feature optional with --pidfile=3DPATH.  But I think we can
-merge this patch for now and see if anyone encounters issues before the
-next virtio-fs release.
+Create a regular file under localstatedir directory to exclude the
+vhost_user_socket. To create and lock the file, use qemu_write_pidfile()
+because the API has some sanity checks and file lock.
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+Signed-off-by: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+---
+ contrib/virtiofsd/fuse_i.h        |  1 +
+ contrib/virtiofsd/fuse_lowlevel.c |  3 ++
+ contrib/virtiofsd/fuse_virtio.c   | 50 +++++++++++++++++++++++++++++++
+ 3 files changed, 54 insertions(+)
 
-> +static int fv_socket_lock(struct fuse_session *se)
-> +{
-> +        char *dir, *sk_name;
-> +        Error *local_err =3D NULL;
-> +        int ret =3D -1;
-> +
-> +        dir =3D qemu_get_local_state_pathname("run/virtiofsd");
-> +
-> +        if (g_mkdir_with_parents(dir, S_IRWXU) < -1) {
-> +                fuse_err("%s: Failed to create directory %s: %s",
-> +                        __func__, dir, strerror(errno));
-
-Missing g_free(dir).
-
-> @@ -876,6 +916,17 @@ static int fv_create_listen_socket(struct fuse_sessi=
-on *se)
->                  return -1;
->          }
-> =20
-> +        if (!strlen(se->vu_socket_path)) {
-> +                fuse_err("Socket path is NULL\n");
-
-s/NULL/empty/
-
---2xzXx3ruJf7hsAzo
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1cNeoACgkQnKSrs4Gr
-c8g6Owf+PIbne1lpQNuvlYjzt+cpYSnBD93R4+aBTnczips8p4bD91gDOUOC1a27
-09+miVLqhGyhyBHgJtNgFQfo8X1EFJLce/v8kCK5vN/AEU59xuFqBu8NKuG/IEQL
-GIVUF/Gk6qPvQIiZfEYXziiIiJ+FKwsJzCQExM5TsQuwWwr0u3Bn2g1TAgWsvoSv
-9piSQWjxpURzdn1R/xcSMi7a4uPbWvqMhmUEKL+IVRH4uEZsdlhsqiBiYvur1xVe
-XEozEueEjR0j1VH2CAsM9bSp2PA6tzq4txHma0hQJom/RFjzu19i/ZNd+ecUz9fN
-J3bC3KzV9/f3VWCS1Lic5xI4T3nr0w==
-=aBfl
------END PGP SIGNATURE-----
-
---2xzXx3ruJf7hsAzo--
+diff --git a/contrib/virtiofsd/fuse_i.h b/contrib/virtiofsd/fuse_i.h
+index ff6e1b75ba..d31c675469 100644
+--- a/contrib/virtiofsd/fuse_i.h
++++ b/contrib/virtiofsd/fuse_i.h
+@@ -72,6 +72,7 @@ struct fuse_session {
+         char *vu_socket_path;
+         int   vu_listen_fd;
+         int   vu_socketfd;
++        char *vu_socket_lock_file;
+         struct fv_VuDev *virtio_dev;
+ };
+ 
+diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
+index 8adc4b1ab8..ab18b86435 100644
+--- a/contrib/virtiofsd/fuse_lowlevel.c
++++ b/contrib/virtiofsd/fuse_lowlevel.c
+@@ -2587,6 +2587,9 @@ void fuse_session_destroy(struct fuse_session *se)
+ 	free(se->vu_socket_path);
+ 	se->vu_socket_path = NULL;
+ 
++	unlink(se->vu_socket_lock_file);
++	free(se->vu_socket_lock_file);
++
+ 	free(se);
+ }
+ 
+diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
+index 083e4fc317..4999f95b63 100644
+--- a/contrib/virtiofsd/fuse_virtio.c
++++ b/contrib/virtiofsd/fuse_virtio.c
+@@ -32,6 +32,9 @@
+ 
+ #include "contrib/libvhost-user/libvhost-user.h"
+ 
++#include "qemu/osdep.h"
++#include "qapi/error.h"
++
+ struct fv_VuDev;
+ struct fv_QueueInfo {
+         pthread_t thread;
+@@ -862,6 +865,47 @@ int virtio_loop(struct fuse_session *se)
+        return 0;
+ }
+ 
++static void strreplace(char *s, char old, char new)
++{
++        for (; *s; ++s)
++                if (*s == old)
++                        *s = new;
++}
++
++static int fv_create_socket_lock_file(struct fuse_session *se)
++{
++        char *dir, *socket_name;
++        Error *local_err = NULL;
++
++        dir = qemu_get_local_state_pathname("run/virtiofsd");
++
++        if (g_mkdir_with_parents(dir, S_IRWXU) < -1) {
++                fuse_err("%s: Failed to create directory %s: %s",
++                        __func__, dir, strerror(errno));
++                return -1;
++        }
++
++        socket_name = malloc(strlen(se->vu_socket_path) + 1);
++        memset(socket_name, 0, strlen(se->vu_socket_path) + 1);
++        memcpy(socket_name, se->vu_socket_path, strlen(se->vu_socket_path));
++        strreplace(socket_name, '/', '.');
++
++        se->vu_socket_lock_file = malloc(NAME_MAX);
++        memset(se->vu_socket_lock_file, 0, NAME_MAX);
++        snprintf(se->vu_socket_lock_file, NAME_MAX, "%s/%s.pid",
++			dir, socket_name);
++
++        if (!qemu_write_pidfile(se->vu_socket_lock_file, &local_err)) {
++                error_report_err(local_err);
++                return -1;
++        }
++
++        free(socket_name);
++        g_free(dir);
++
++        return 0;
++}
++
+ static int fv_create_listen_socket(struct fuse_session *se)
+ {
+         struct sockaddr_un un;
+@@ -876,6 +920,12 @@ static int fv_create_listen_socket(struct fuse_session *se)
+                 return -1;
+         }
+ 
++        /* Check the vu_socket_path is already used */
++        if (fv_create_socket_lock_file(se) == -1) {
++                fuse_err("%s: Socket lock file creation failed\n", __func__);
++                return -1;
++        }
++
+         /* Create the Unix socket to communicate with qemu
+          * based on QEMU's vhost-user-bridge
+          */
+-- 
+2.18.1
 

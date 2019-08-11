@@ -1,17 +1,17 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
-	h=from:to:cc:subject:date:message-id;
-	bh=pzOk7WV9d9M+uZRq6CAI5T4X0VA1g5jlWhhL6CFx8AE=;
-	b=mKU5lRvGsO2AFWc2FlaOkBtRZRo9rQAVT1yStuUCbBrCjj2uvIqM6nrNHElHEsWFgo
-	uWjtWN4BX6v/ZAIzB7KqnM4wpCHW/ldeqEJaYfBaYLVl5fpPwUdDG1UydS95eSX5ypJ0
-	p7hy+XuClgJ8yP79sxzY+F9yDSKs0hPdL/QQYhQEmZmURO+vpppfsWZw2gKWvphAjCkY
-	K6AwJ5qrEOOjDN9V2T96V37OLOdy9aSxPqAqMKbT2LLC/6J6jgS8g4rWA8IbuvCACV5A
-	Tw3dH4HNuxMdAMOjlidpRciuiUKenReYJhWF6pGbXnj29BuXRADi596rYwwaZUXGzpH+
-	1Lcw==
-From: Masayoshi Mizuma <msys.mizuma@gmail.com>
-Date: Tue, 13 Aug 2019 16:06:45 -0400
-Message-Id: <20190813200645.13819-1-msys.mizuma@gmail.com>
-Subject: [Virtio-fs] [PATCH v3] virtiofsd: Prevent multiply running with
-	same vhost_user_socket
+Date: Sun, 11 Aug 2019 19:15:56 +0800
+From: Eric Ren <renzhen@linux.alibaba.com>
+Message-ID: <20190811111556.GC13456@ali-6c96cfe09cf9.local>
+References: <5D4CC344.7030706@huawei.com>
+	<20190811020659.GB13456@ali-6c96cfe09cf9.local>
+	<ba984781-dc70-8633-7cb4-6ccd00e4e23e@huawei.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="gb2312"
+Content-Disposition: inline
+Content-Transfer-Encoding: base64
+In-Reply-To: <ba984781-dc70-8633-7cb4-6ccd00e4e23e@huawei.com>
+Subject: Re: [Virtio-fs] [PATCH v4 0/2] virtiofsd: Improve io bandwidth by
+ replacing pwrite with pwritev
+Reply-To: Eric Ren <renzhen@linux.alibaba.com>
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,148 +20,96 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>, piaojun <piaojun@huawei.com>
-Cc: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+To: piaojun <piaojun@huawei.com>
+Cc: virtio-fs@redhat.com
 
-From: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
-
-virtiofsd can run multiply even if the vhost_user_socket is same path.
-
-  ]# ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o source=/tmp/share &
-  [1] 244965
-  virtio_session_mount: Waiting for vhost-user socket connection...
-  ]# ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o source=/tmp/share &
-  [2] 244966
-  virtio_session_mount: Waiting for vhost-user socket connection...
-  ]#
-
-The user will get confused about the situation and maybe the cause of the
-unexpected problem. So it's better to prevent the multiple running.
-
-Create a regular file under localstatedir directory to exclude the
-vhost_user_socket. To create and lock the file, use qemu_write_pidfile()
-because the API has some sanity checks and file lock.
-
-Signed-off-by: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
-Reviewed-by: Jun Piao <piaojun@huawei.com>
----
- contrib/virtiofsd/fuse_i.h        |  1 +
- contrib/virtiofsd/fuse_lowlevel.c |  6 ++++
- contrib/virtiofsd/fuse_virtio.c   | 51 +++++++++++++++++++++++++++++++
- 3 files changed, 58 insertions(+)
-
-diff --git a/contrib/virtiofsd/fuse_i.h b/contrib/virtiofsd/fuse_i.h
-index ff6e1b75ba..89cc20a787 100644
---- a/contrib/virtiofsd/fuse_i.h
-+++ b/contrib/virtiofsd/fuse_i.h
-@@ -72,6 +72,7 @@ struct fuse_session {
-         char *vu_socket_path;
-         int   vu_listen_fd;
-         int   vu_socketfd;
-+        char *vu_socket_lock;
-         struct fv_VuDev *virtio_dev;
- };
- 
-diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
-index 8adc4b1ab8..9d41b48d73 100644
---- a/contrib/virtiofsd/fuse_lowlevel.c
-+++ b/contrib/virtiofsd/fuse_lowlevel.c
-@@ -16,6 +16,7 @@
- #include "fuse_misc.h"
- #include "fuse_virtio.h"
- 
-+#include <glib.h>
- #include <stdio.h>
- #include <stdlib.h>
- #include <stddef.h>
-@@ -2587,6 +2588,11 @@ void fuse_session_destroy(struct fuse_session *se)
- 	free(se->vu_socket_path);
- 	se->vu_socket_path = NULL;
- 
-+	if (se->vu_socket_lock) {
-+		g_free(se->vu_socket_lock);
-+		se->vu_socket_lock = NULL;
-+	}
-+
- 	free(se);
- }
- 
-diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
-index 083e4fc317..927f379f7a 100644
---- a/contrib/virtiofsd/fuse_virtio.c
-+++ b/contrib/virtiofsd/fuse_virtio.c
-@@ -32,6 +32,9 @@
- 
- #include "contrib/libvhost-user/libvhost-user.h"
- 
-+#include "qemu/osdep.h"
-+#include "qapi/error.h"
-+
- struct fv_VuDev;
- struct fv_QueueInfo {
-         pthread_t thread;
-@@ -862,6 +865,43 @@ int virtio_loop(struct fuse_session *se)
-        return 0;
- }
- 
-+static void strreplace(char *s, char old, char new)
-+{
-+        for (; *s; ++s)
-+                if (*s == old)
-+                        *s = new;
-+}
-+
-+static int fv_socket_lock(struct fuse_session *se)
-+{
-+        char *dir, *sk_name;
-+        Error *local_err = NULL;
-+        int ret = -1;
-+
-+        dir = qemu_get_local_state_pathname("run/virtiofsd");
-+
-+        if (g_mkdir_with_parents(dir, S_IRWXU) < -1) {
-+                fuse_err("%s: Failed to create directory %s: %s",
-+                        __func__, dir, strerror(errno));
-+                return ret;
-+        }
-+
-+        sk_name = g_strdup(se->vu_socket_path);
-+        strreplace(sk_name, '/', '.');
-+        se->vu_socket_lock = g_strdup_printf("%s/%s.pid", dir, sk_name);
-+
-+        if (!qemu_write_pidfile(se->vu_socket_lock, &local_err)) {
-+                error_report_err(local_err);
-+        } else {
-+                ret = 0;
-+        }
-+
-+        g_free(sk_name);
-+        g_free(dir);
-+
-+        return ret;
-+}
-+
- static int fv_create_listen_socket(struct fuse_session *se)
- {
-         struct sockaddr_un un;
-@@ -876,6 +916,17 @@ static int fv_create_listen_socket(struct fuse_session *se)
-                 return -1;
-         }
- 
-+        if (!strlen(se->vu_socket_path)) {
-+                fuse_err("Socket path is NULL\n");
-+                return -1;
-+        }
-+
-+        /* Check the vu_socket_path is already used */
-+        if (fv_socket_lock(se) == -1) {
-+                fuse_err("%s: Socket lock file creation failed\n", __func__);
-+                return -1;
-+        }
-+
-         /* Create the Unix socket to communicate with qemu
-          * based on QEMU's vhost-user-bridge
-          */
--- 
-2.18.1
-
+SGksCgpPbiBTdW4sIEF1ZyAxMSwgMjAxOSBhdCAxMDo0NjowMkFNICswODAwLCBwaWFvanVuIHdy
+b3RlOgo+IAo+IAo+IE9uIDIwMTkvOC8xMSAxMDowNiwgRXJpYyBSZW4gd3JvdGU6Cj4gPiBIaSBq
+dW4sCj4gPiAKPiA+IE9uIEZyaSwgQXVnIDA5LCAyMDE5IGF0IDA4OjUwOjEyQU0gKzA4MDAsIHBp
+YW9qdW4gd3JvdGU6Cj4gPj4gPkZyb20gbXkgdGVzdCwgd3JpdGUgYmFuZHdpZHRoIHdpbGwgYmUg
+aW1wcm92ZWQgZ3JlYXRseSBieSByZXBsYWNpbmcKPiA+PiBwd3JpdGUgd2l0aCBwd3JpdGV2LCBh
+bmQgdGhlIHRlc3QgcmVzdWx0IGFzIGJlbG93Ogo+ID4gCj4gPiBDb3VsZCB5b3Ugc2hhcmUgbW9y
+ZSBpbmZvcm1hdGlvbiBhYm91dCB0aGlzIHRlc3Rpbmc/Cj4gPiAKPiA+IC0gYXJncyBmb3IgcWVt
+dTogY2FjaGUgc2l6ZT8KPiA+IC0gYXJncyBmb3IgdmlydGlvZnNkOiB3aGljaCBjYWNoZSBtb2Rl
+o78KPiA+IC0gREFYIGlzIHVzZWQsIHJpZ2h0Pwo+IAo+IERBWCBpcyBkaXNhYmxlZCwgYXMgdGhp
+cyBvcHRpbWl6YXRpb24gb25seSB3b3JrcyBvbiBIb3N0IHNpZGUuCgoKT0ssIHRoYW5rcyBmb3Ig
+dGhlIGluZm8uCgpUaGUgdGVzdCBydW5zIGluIEtBVEEgY29udGFpbmVyLCB3aGljaCB1c2UgREFY
+IGFzIGl0cyBkZWZhdWx0IG1vdW50Cm9wdGlvbi4KCj4gCj4gPiAKPiA+IC0gd2hpY2gga2luZCBv
+ZiBkaXNrIGFyZSB5b3UgdXNpbmcsIHdoYXQncyB0aGVuIElPUFMvQlcgbGltaXQ/Cj4gPiAKPiA+
+IEkgdHJpZWQgdGhpcyBwYXRjaCB3aXRoIEhERCBkaXNrIC0gSU9QUzo1MDAwLCBCVzogMTQwTUIv
+cy4KPiAKPiBJIHVzZWQgRVhUNCBhbmQgcmFtZGlzayBhcyBiYWNrZW5kIGRldmljZS4KPiAKPiA+
+IAo+ID4gLSBWTTogNCB2Y3B1cywgOEcgbWVtCj4gPiAtIGNhY2hlPWFsd2F5cywgY2FjaGUtc2l6
+ZT04RywgREFYCj4gPiAtIGZpbyBqb2IKPiA+IAo+ID4gYGBgCj4gPiBbZ2xvYmFsXQo+ID4gZnN5
+bmM9MAo+ID4gbmFtZT12aXJ0aW9mcy10ZXN0Cj4gPiBmaWxlbmFtZT1maW8tdGVzdAo+ID4gZGly
+ZWN0b3J5PSRtbnRkaXIgICAjIHNoYXJlIGRpciBmb3IgdGVzdCBzaXR0aW5nIG9uIHRoZSBkaXNr
+Cj4gPiBydz1yYW5kd3JpdGUKPiA+IGJzPTRLCj4gCj4gKmJzKiBzaG91bGQgYmUgMU0gZm9yIGJh
+bmR3aWR0aCB0ZXN0IHdoaWNoIG1ha2VzIHdyaXRldiB3b3JrcyB3ZWxsLgoKWWVzLCBidXQgc2Vx
+IHdyaXRlICJydz13cml0ZSIgaXMgYWxzbyBnb29kIGZyIEJXIHRlc3QsIHJpZ2h0PwoKPiAKPiA+
+IGRpcmVjdD0xCj4gPiBudW1qb2JzPTEKPiA+IHRpbWVfYmFzZWQ9MAo+ID4gCj4gPiBbZmlsZTFd
+Cj4gPiBzaXplPTJHCj4gPiBpb19zaXplPTQwTQo+ID4gaW9lbmdpbmU9bGliYWlvCj4gPiBpb2Rl
+cHRoPTEyOAo+ID4gYGBgCj4gPiAtIHdpdGhvdXQgdGhpcyBwYXRjaAo+ID4gCj4gPiBgYGAKPiA+
+IGZpbGUxOiAoZz0wKTogcnc9cmFuZHdyaXRlLCBicz0oUikgNDA5NkItNDA5NkIsIChXKSA0MDk2
+Qi00MDk2QiwgKFQpIDQwOTZCLTQwOTZCLCBpb2VuZ2luZT1saWJhaW8sIGlvZGVwdGg9MTI4Cj4g
+PiBmaW8tMy4xCj4gPiBTdGFydGluZyAxIHByb2Nlc3MKPiA+IAo+ID4gZmlsZTE6IChncm91cGlk
+PTAsIGpvYnM9MSk6IGVycj0gMDogcGlkPTExOiBTYXQgQXVnIDEwIDExOjMzOjI5IDIwMTkKPiA+
+ICAgd3JpdGU6IElPUFM9OTg1LCBCVz0zOTQyS2lCL3MgKDQwMzdrQi9zKSg0MC4wTWlCLzEwMzkw
+bXNlYykKPiA+IGBgYAo+ID4gCj4gPiAtIHdpdGggdGhpcyBwYXRjaCBhcHBsaWVkCj4gPiAKPiA+
+IGBgYAo+ID4gZmlsZTE6IChnPTApOiBydz1yYW5kd3JpdGUsIGJzPShSKSA0MDk2Qi00MDk2Qiwg
+KFcpIDQwOTZCLTQwOTZCLCAoVCkgNDA5NkItNDA5NkIsIGlvZW5naW5lPWxpYmFpbywgaW9kZXB0
+aD0xMjgKPiA+IGZpby0zLjEKPiA+IFN0YXJ0aW5nIDEgcHJvY2Vzcwo+ID4gCj4gPiBmaWxlMTog
+KGdyb3VwaWQ9MCwgam9icz0xKTogZXJyPSAwOiBwaWQ9MTA6IFNhdCBBdWcgMTAgMTU6MzE6NTcg
+MjAxOQo+ID4gICB3cml0ZTogSU9QUz0xMDU2LCBCVz00MjI0S2lCL3MgKDQzMjZrQi9zKSg0MC4w
+TWlCLzk2OTZtc2VjKQo+ID4gCj4gPiBgYGAKPiA+IAo+ID4gdGhlIG51bWJlciBpcyBldmVuIHdv
+cnNlIHRoYW4gOXBmcy4KPiAKPiBQbGVhc2UgbW9kaWZ5IHlvdXIgdGVzdGNhc2UgYXMgbWVudGlv
+bmVkIGFib3ZlLCBhbmQgc2hhcmUgeW91ciByZXN1bHQKPiBhZ2Fpbi4gSSdtIGdsYWQgdG8gZmlu
+ZCBvdXQgd2hlcmUgdGhlIHByb2JsZW0gaXMuCgpXaWxsIGNvbWUgYmFjayBpZiBJIGdldCB0aGUg
+bnVtYmVyLgoKVGhhbmtzLApFcmljCgo+IAo+IEp1bgo+IAo+ID4gCj4gPiBUaGFua3MsCj4gPiBF
+cmljCj4gPiAKPiA+Pgo+ID4+IC0tLQo+ID4+IHB3cml0ZToKPiA+PiAjIGZpbyAtZGlyZWN0PTEg
+LXRpbWVfYmFzZWQgLWlvZGVwdGg9NjQgLXJ3PXJhbmR3cml0ZSAtaW9lbmdpbmU9bGliYWlvIC1i
+cz0xTSAtc2l6ZT0xRyAtbnVtam9iPTE2IC1ydW50aW1lPTMwIC1ncm91cF9yZXBvcnRpbmcgLW5h
+bWU9ZmlsZSAtZmlsZW5hbWU9L21udC92aXJ0aW9mcy9maWxlCj4gPj4gZmlsZTogKGc9MCk6IHJ3
+PXJhbmR3cml0ZSwgYnM9MU0tMU0vMU0tMU0vMU0tMU0sIGlvZW5naW5lPWxpYmFpbywgaW9kZXB0
+aD02NAo+ID4+IC4uLgo+ID4+IGZpby0yLjEzCj4gPj4gU3RhcnRpbmcgMTYgcHJvY2Vzc2VzCj4g
+Pj4gSm9iczogMTYgKGY9MTYpOiBbdygxNildIFsxMDAuMCUgZG9uZV0gWzBLQi84ODYuME1CLzBL
+QiAvc10gWzAvODg2LzAgaW9wc10gW2V0YSAwMG06MDBzXQo+ID4+IGZpbGU6IChncm91cGlkPTAs
+IGpvYnM9MTYpOiBlcnI9IDA6IHBpZD01Nzk5OiBUdWUgQXVnIDYgMTg6NDg6MjYgMjAxOQo+ID4+
+IHdyaXRlOiBpbz0yNjg4MU1CLCBidz05MTY5ODhLQi9zLCBpb3BzPTg5NSwgcnVudD0gMzAwMTht
+c2VjCj4gPj4KPiA+PiBwd3JpdGV2Ogo+ID4+ICMgZmlvIC1kaXJlY3Q9MSAtdGltZV9iYXNlZCAt
+aW9kZXB0aD02NCAtcnc9cmFuZHdyaXRlIC1pb2VuZ2luZT1saWJhaW8gLWJzPTFNIC1zaXplPTFH
+IC1udW1qb2I9MTYgLXJ1bnRpbWU9MzAgLWdyb3VwX3JlcG9ydGluZyAtbmFtZT1maWxlIC1maWxl
+bmFtZT0vbW50L3ZpcnRpb2ZzL2ZpbGUKPiA+PiBmaWxlOiAoZz0wKTogcnc9cmFuZHdyaXRlLCBi
+cz0xTS0xTS8xTS0xTS8xTS0xTSwgaW9lbmdpbmU9bGliYWlvLCBpb2RlcHRoPTY0Cj4gPj4gLi4u
+Cj4gPj4gZmlvLTIuMTMKPiA+PiBTdGFydGluZyAxNiBwcm9jZXNzZXMKPiA+PiBKb2JzOiAxNiAo
+Zj0xNik6IFt3KDE2KV0gWzEwMC4wJSBkb25lXSBbMEtCLzE3OTNNQi8wS0IgL3NdIFswLzE3OTMv
+MCBpb3BzXSBbZXRhIDAwbTowMHNdCj4gPj4gZmlsZTogKGdyb3VwaWQ9MCwgam9icz0xNik6IGVy
+cj0gMDogcGlkPTYzMjg6IFR1ZSBBdWcgNiAxODoyMjoxNyAyMDE5Cj4gPj4gd3JpdGU6IGlvPTUy
+Nzc1TUIsIGJ3PTE3NTguN01CL3MsIGlvcHM9MTc1OCwgcnVudD0gMzAwMDltc2VjCj4gPj4gLS0t
+Cj4gPj4KPiA+PiBUaGlzIHBhdGNoIGludHJvZHVjZXMgd3JpdGV2IGFuZCBwd3JpdGV2IGZvciBs
+b193cml0ZV9idWYoKS4gSSB0cmllZCBteQo+ID4+IGJlc3Qgbm90IGRvaW5nIGhhcm0gdG8gdGhl
+IG9yaWdpbiBjb2RlIGNvbnN0cnVjdCwgYW5kIHRoZXJlIHdpbGwgYmUKPiA+PiBzb21lICp1c2Vs
+ZXNzKiBicmFuY2hlcyBpbiBmdXNlX2J1Zl9jb3B5X29uZSgpIHdoaWNoIGFyZSBoYXJkIHRvIGp1
+ZGdlCj4gPj4gaWYgdGhleSB3aWxsIGJlIHVzZWZ1bCBpbiB0aGUgZnV0dXJlLiBTbyBJIGp1c3Qg
+bGVhdmUgdGhlbSBhbG9uZQo+ID4+IHNhZmVseS4gSWYgdGhlIGNsZWFudXAgd29yayBpcyBuZWNl
+c3NhcnksIHBsZWFzZSBsZXQgbWUga25vdy4KPiA+Pgo+ID4+IHYyCj4gPj4gICAtIFNwbGl0IGlu
+dG8gdHdvIHBhdGNoZXMKPiA+PiAgIC0gQWRkIHRoZSBsb3N0IGZsYWdzIHN1cHBvcnQsIHN1Y2gg
+YXMgRlVTRV9CVUZfUEhZU19BRERSCj4gPj4KPiA+PiB2Mwo+ID4+ICAgLSB1c2UgZ2l0IHNlbmQt
+ZW1haWwgdG8gbWFrZSB0aGUgcGF0Y2ggc2V0IGluIG9uZSB0aHJlYWQKPiA+PiAgIC0gbW92ZSBm
+dXNlX2J1Zl93cml0ZXYoKSBpbnRvIGZ1c2VfYnVmX2NvcHkoKQo+ID4+ICAgLSB1c2Ugd3JpdGV2
+IGZvciB0aGUgc3JjIGJ1ZmZlcnMgd2hlbiB0aGV5J3JlIGFscmVhZCBhbHJlYWR5IG1hcHBlZCBi
+eSB0aGUgZGFlbW9uIHByb2Nlc3MKPiA+PiAgIC0gdXNlIGNhbGxvYyB0byByZXBsYWNlIG1hbGxv
+Ywo+ID4+ICAgLSBzZXQgcmVzIDAgaWYgd3JpdGV2KCkgcmV0dXJucyAwCj4gPj4KPiA+PiB2NAo+
+ID4+ICAgLSBpdGVyYXRlIGZyb20gaW5fYnVmLT5idWZbMF0gcmF0aGVyIHRoYW4gYnVmWzFdCj4g
+Pj4gICAtIG9wdGltaXplIHRoZSBjb2RlIHRvIG1ha2UgaXQgbW9yZSBlbGVnYW50Cj4gPj4KPiA+
+PiBKdW4gUGlhbyAoMik6Cj4gPj4gICBhZGQgZGVmaW5pdGlvbiBvZiBmdXNlX2J1Zl93cml0ZXYo
+KS4KPiA+PiAgIHVzZSBmdXNlX2J1Zl93cml0ZXYgdG8gcmVwbGFjZSBmdXNlX2J1Zl93cml0ZSBm
+b3IgYmV0dGVyIHBlcmZvcm1hbmNlCj4gPj4KPiA+PiBTaWduZWQtb2ZmLWJ5OiBKdW4gUGlhbyA8
+cGlhb2p1bkBodWF3ZWkuY29tPgo+ID4+IFN1Z2dlc3RlZC1ieTogRHIuIERhdmlkIEFsYW4gR2ls
+YmVydCA8ZGdpbGJlcnRAcmVkaGF0LmNvbT4KPiA+PiBTdWdnZXN0ZWQtYnk6IFN0ZWZhbiBIYWpu
+b2N6aSA8c3RlZmFuaGFAcmVkaGF0LmNvbT4KPiA+PiAtLS0KPiA+PiAgYnVmZmVyLmMgICAgICB8
+ICAgNDggKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrCj4g
+Pj4gIGZ1c2VfY29tbW9uLmggfCAgIDE0ICsrKysrKysrKysrKysrCj4gPj4gIHNlY2NvbXAuYyAg
+ICAgfCAgICAyICsrCj4gPj4gIDMgZmlsZXMgY2hhbmdlZCwgNjQgaW5zZXJ0aW9ucygrKQo+ID4+
+IC0tCj4gPj4KPiA+PiBfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fXwo+ID4+IFZpcnRpby1mcyBtYWlsaW5nIGxpc3QKPiA+PiBWaXJ0aW8tZnNAcmVkaGF0LmNv
+bQo+ID4+IGh0dHBzOi8vd3d3LnJlZGhhdC5jb20vbWFpbG1hbi9saXN0aW5mby92aXJ0aW8tZnMK
+PiA+IC4KPiA+IAoK

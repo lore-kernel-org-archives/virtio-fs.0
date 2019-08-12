@@ -1,12 +1,21 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 21 Aug 2019 13:37:31 -0400
-Message-Id: <20190821173742.24574-3-vgoyal@redhat.com>
-In-Reply-To: <20190821173742.24574-1-vgoyal@redhat.com>
-References: <20190821173742.24574-1-vgoyal@redhat.com>
+References: <20190801165409.20121-1-stefanha@redhat.com>
+	<20190807180355.GA22758@stefanha-x1.localdomain>
+	<20190807205715.GE18557@redhat.com>
+	<20190808090213.GD31476@stefanha-x1.localdomain>
+	<20190808095316.GC2852@work-vm>
+	<20190809082102.GB25286@stefanha-x1.localdomain>
+	<277d9cd6-a8fa-fa1f-9cbc-7a7cd0897c84@huawei.com>
+	<20190812100546.GB9959@stefanha-x1.localdomain>
+From: piaojun <piaojun@huawei.com>
+Message-ID: <d2dde785-5b25-751f-0385-8c229fc03e57@huawei.com>
+Date: Mon, 12 Aug 2019 19:58:02 +0800
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 02/13] fuse: Use default_file_splice_read for
-	direct IO
+In-Reply-To: <20190812100546.GB9959@stefanha-x1.localdomain>
+Content-Type: text/plain; charset="windows-1252"
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH 0/4] virtiofsd: multithreading preparation
+ part 3
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,84 +24,55 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, miklos@szeredi.hu
-Cc: virtio-fs@redhat.com, Miklos Szeredi <mszeredi@redhat.com>, vgoyal@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>, qemu-devel@nongnu.org
 
-From: Miklos Szeredi <mszeredi@redhat.com>
 
----
- fs/fuse/file.c     | 15 ++++++++++++++-
- fs/splice.c        |  3 ++-
- include/linux/fs.h |  2 ++
- 3 files changed, 18 insertions(+), 2 deletions(-)
 
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index 5ae2828beb00..c45ffe6f1ecb 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -2172,6 +2172,19 @@ static int fuse_file_mmap(struct file *file, struct vm_area_struct *vma)
- 	return 0;
- }
- 
-+static ssize_t fuse_file_splice_read(struct file *in, loff_t *ppos,
-+				     struct pipe_inode_info *pipe, size_t len,
-+				     unsigned int flags)
-+{
-+	struct fuse_file *ff = in->private_data;
-+
-+	if (ff->open_flags & FOPEN_DIRECT_IO)
-+		return default_file_splice_read(in, ppos, pipe, len, flags);
-+	else
-+		return generic_file_splice_read(in, ppos, pipe, len, flags);
-+
-+}
-+
- static int convert_fuse_file_lock(struct fuse_conn *fc,
- 				  const struct fuse_file_lock *ffl,
- 				  struct file_lock *fl)
-@@ -3228,7 +3241,7 @@ static const struct file_operations fuse_file_operations = {
- 	.fsync		= fuse_fsync,
- 	.lock		= fuse_file_lock,
- 	.flock		= fuse_file_flock,
--	.splice_read	= generic_file_splice_read,
-+	.splice_read	= fuse_file_splice_read,
- 	.splice_write	= iter_file_splice_write,
- 	.unlocked_ioctl	= fuse_file_ioctl,
- 	.compat_ioctl	= fuse_file_compat_ioctl,
-diff --git a/fs/splice.c b/fs/splice.c
-index 98412721f056..652f541d953d 100644
---- a/fs/splice.c
-+++ b/fs/splice.c
-@@ -362,7 +362,7 @@ static ssize_t kernel_readv(struct file *file, const struct kvec *vec,
- 	return res;
- }
- 
--static ssize_t default_file_splice_read(struct file *in, loff_t *ppos,
-+ssize_t default_file_splice_read(struct file *in, loff_t *ppos,
- 				 struct pipe_inode_info *pipe, size_t len,
- 				 unsigned int flags)
- {
-@@ -426,6 +426,7 @@ static ssize_t default_file_splice_read(struct file *in, loff_t *ppos,
- 	iov_iter_advance(&to, copied);	/* truncates and discards */
- 	return res;
- }
-+EXPORT_SYMBOL(default_file_splice_read);
- 
- /*
-  * Send 'sd->len' bytes to socket from 'sd->file' at position 'sd->pos'
-diff --git a/include/linux/fs.h b/include/linux/fs.h
-index 997a530ff4e9..15ae8f5dd24e 100644
---- a/include/linux/fs.h
-+++ b/include/linux/fs.h
-@@ -3062,6 +3062,8 @@ extern void block_sync_page(struct page *page);
- /* fs/splice.c */
- extern ssize_t generic_file_splice_read(struct file *, loff_t *,
- 		struct pipe_inode_info *, size_t, unsigned int);
-+extern ssize_t default_file_splice_read(struct file *, loff_t *,
-+		struct pipe_inode_info *, size_t, unsigned int);
- extern ssize_t iter_file_splice_write(struct pipe_inode_info *,
- 		struct file *, loff_t *, size_t, unsigned int);
- extern ssize_t generic_splice_sendpage(struct pipe_inode_info *pipe,
--- 
-2.20.1
+On 2019/8/12 18:05, Stefan Hajnoczi wrote:
+> On Sun, Aug 11, 2019 at 10:26:18AM +0800, piaojun wrote:
+>> On 2019/8/9 16:21, Stefan Hajnoczi wrote:
+>>> On Thu, Aug 08, 2019 at 10:53:16AM +0100, Dr. David Alan Gilbert wrote:
+>>>> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+>>>>> On Wed, Aug 07, 2019 at 04:57:15PM -0400, Vivek Goyal wrote:
+>>>>> 3. Can READ/WRITE be performed directly in QEMU via a separate virtqueue
+>>>>>    to eliminate the bad address problem?
+>>>>
+>>>> Are you thinking of doing all read/writes that way, or just the corner
+>>>> cases? It doesn't seem worth it for the corner cases unless you're
+>>>> finding them cropping up in real work loads.
+>>>
+>>> Send all READ/WRITE requests to QEMU instead of virtiofsd.
+>>>
+>>> Only handle metadata requests in virtiofsd (OPEN, RELEASE, READDIR,
+>>> MKDIR, etc).
+>>>
+>>
+>> Sorry for not catching your point, and I like the virtiofsd to do
+>> READ/WRITE requests and qemu handle metadata requests, as virtiofsd is
+>> good at processing dataplane things due to thread-pool and CPU
+>> affinity(maybe in the future). As you said, virtiofsd is just acting as
+>> a vhost-user device which should care less about ctrl request.
+>>
+>> If our concern is improving mmap/write/read performance, why not adding
+>> a delay worker for unmmap which could decrease the ummap times. Maybe
+>> virtiofsd could still handle both data and meta requests by this way.
+> 
+> Doing READ/WRITE in QEMU solves the problem that vhost-user slaves only
+> have access to guest RAM regions.  If a guest transfers other memory,
+> like an address in the DAX Window, to/from the vhost-user device then
+> virtqueue buffer address translation fails.
+> 
+> Dave added a code path that bounces such accesses through the QEMU
+> process using the VHOST_USER_SLAVE_FS_IO slavefd request, but it would
+> be simpler, faster, and cleaner to do I/O in QEMU in the first place.
+> 
+> What I don't like about moving READ/WRITE into QEMU is that we need to
+> use even more virtqueues for multiqueue operation :).
+> 
+> Stefan
+
+Thanks for your detailed explanation. If DAX is not good at small files,
+shall we just let the users choose the I/O path according to their user
+cases?
 

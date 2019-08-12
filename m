@@ -1,10 +1,24 @@
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Date: Tue, 13 Aug 2019 02:58:55 +0800
-Message-Id: <1565636335-120345-2-git-send-email-bo.liu@linux.alibaba.com>
-In-Reply-To: <1565636335-120345-1-git-send-email-bo.liu@linux.alibaba.com>
-References: <1565636335-120345-1-git-send-email-bo.liu@linux.alibaba.com>
-Subject: [Virtio-fs] [PATCH 2/2] Virtio-fs: align down start offset when
-	reclaim dmap range
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=date:from:to:cc:subject:message-id:references:mime-version
+	:content-disposition:in-reply-to:user-agent;
+	bh=dUaOZ31mexcDbr9HgIuPP6g2epPrkma6jMXvZQkbMmU=;
+	b=NCMU3+zh1o2LJmkzPQYlj5hrISLRbVbqe0VdP6e1NOnVniaNtUi54rapc3bJ9IHLbG
+	sLqlK1qSNzKw5uz+00pvsSxtqHgqg0BcFZLvesUQPWzmDsNQ7mXXINlMpxW+JvVKQlAW
+	IqUSkTsyv7UjSNI9aesBlIVnmT8FcHMiKVXJp2sBGvllzLwdRwIMYlEga6PkOUmqh8nt
+	OtEKEkaMNAVFxLGd+FHjaFvK53iqCbreeiZHXXBhh0+KYzvd0E7mZFy70hp8bkFd9j54
+	neKqOO1lwwJ13jbhDzg0n236XqgJY3DShsrQqK0WQJghozdHQBPctl29KJCnuao/oAdQ
+	pOKw==
+Date: Mon, 12 Aug 2019 15:02:51 -0400
+From: Masayoshi Mizuma <msys.mizuma@gmail.com>
+Message-ID: <20190812190250.7ghmdxpnvz3u7ec6@gabell>
+References: <20190811225534.9040-1-msys.mizuma@gmail.com>
+	<5D50D934.3010908@huawei.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <5D50D934.3010908@huawei.com>
+Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: Prevent multiply running with
+ same vhost_user_socket
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,59 +27,168 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: piaojun <piaojun@huawei.com>
+Cc: virtio-fs@redhat.com, Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
-Given a share directory is mounted on host like,
----
-Filesystem     1K-blocks    Used Available Use% Mounted on
-/dev/loop1       1998672 1982288         0 100% /home/b.liu/1_source/2_github/virtio-fs-all/qemu/share_dir2
----
+Hi Jun,
 
-Here is the reproducer,
----
+On Mon, Aug 12, 2019 at 11:12:52AM +0800, piaojun wrote:
+> Hi Masayoshi,
+> 
+> On 2019/8/12 6:55, Masayoshi Mizuma wrote:
+> > From: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+> > 
+> > virtiofsd can run multiply even if the vhost_user_socket is
+> > same path.
+> > 
+> >   ]# ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o source=/tmp/share &
+> >   [1] 244965
+> >   virtio_session_mount: Waiting for vhost-user socket connection...
+> >   ]# ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o source=/tmp/share &
+> >   [2] 244966
+> >   virtio_session_mount: Waiting for vhost-user socket connection...
+> >   ]#
+> > 
+> > The user will get confused about the situation and maybe the cause of the
+> > unexpected problem. So it's better to prevent the multiple running.
+> > 
+> > Create a regular file under localstatedir directory to exclude the
+> > vhost_user_socket. To create and lock the file, use qemu_write_pidfile()
+> > because the API has some sanity checks and file lock.
+> > 
+> > Signed-off-by: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+> > ---
+> >  contrib/virtiofsd/fuse_i.h        |  1 +
+> >  contrib/virtiofsd/fuse_lowlevel.c |  3 ++
+> >  contrib/virtiofsd/fuse_virtio.c   | 50 +++++++++++++++++++++++++++++++
+> >  3 files changed, 54 insertions(+)
+> > 
+> > diff --git a/contrib/virtiofsd/fuse_i.h b/contrib/virtiofsd/fuse_i.h
+> > index ff6e1b75ba..d31c675469 100644
+> > --- a/contrib/virtiofsd/fuse_i.h
+> > +++ b/contrib/virtiofsd/fuse_i.h
+> > @@ -72,6 +72,7 @@ struct fuse_session {
+> >          char *vu_socket_path;
+> >          int   vu_listen_fd;
+> >          int   vu_socketfd;
+> > +        char *vu_socket_lock_file;
+> 
+> I prefer char *vu_socket_lock which is just a personal habit.
+> 
+> >          struct fv_VuDev *virtio_dev;
+> >  };
+> >  
+> > diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
+> > index 8adc4b1ab8..ab18b86435 100644
+> > --- a/contrib/virtiofsd/fuse_lowlevel.c
+> > +++ b/contrib/virtiofsd/fuse_lowlevel.c
+> > @@ -2587,6 +2587,9 @@ void fuse_session_destroy(struct fuse_session *se)
+> >  	free(se->vu_socket_path);
+> >  	se->vu_socket_path = NULL;
+> >  
+> > +	unlink(se->vu_socket_lock_file);
+> > +	free(se->vu_socket_lock_file);
+> > +
+> >  	free(se);
+> >  }
+> >  
+> > diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
+> > index 083e4fc317..4999f95b63 100644
+> > --- a/contrib/virtiofsd/fuse_virtio.c
+> > +++ b/contrib/virtiofsd/fuse_virtio.c
+> > @@ -32,6 +32,9 @@
+> >  
+> >  #include "contrib/libvhost-user/libvhost-user.h"
+> >  
+> > +#include "qemu/osdep.h"
+> > +#include "qapi/error.h"
+> > +
+> >  struct fv_VuDev;
+> >  struct fv_QueueInfo {
+> >          pthread_t thread;
+> > @@ -862,6 +865,47 @@ int virtio_loop(struct fuse_session *se)
+> >         return 0;
+> >  }
+> >  
+> > +static void strreplace(char *s, char old, char new)
+> > +{
+> > +        for (; *s; ++s)
+> > +                if (*s == old)
+> > +                        *s = new;
+> > +}
+> > +
+> > +static int fv_create_socket_lock_file(struct fuse_session *se)
+> > +{
+> > +        char *dir, *socket_name;
+> > +        Error *local_err = NULL;
+> > +
+> > +        dir = qemu_get_local_state_pathname("run/virtiofsd");
+> > +
+> > +        if (g_mkdir_with_parents(dir, S_IRWXU) < -1) {
+> > +                fuse_err("%s: Failed to create directory %s: %s",
+> > +                        __func__, dir, strerror(errno));
+> > +                return -1;
+> > +        }
+> > +
+> > +        socket_name = malloc(strlen(se->vu_socket_path) + 1);
+> > +        memset(socket_name, 0, strlen(se->vu_socket_path) + 1);
+> > +        memcpy(socket_name, se->vu_socket_path, strlen(se->vu_socket_path));
+> > +        strreplace(socket_name, '/', '.');
+> 
+> Shall we use a local var to replace the long *se->vu_socket_path*? And
 
-umount /mnt/test/
-mount -t virtio_fs btest /mnt/test/ -otag=myfs-2,rootmode=040000,user_id=0,group_id=0,dax
+I'll add a local var to replace strlen(se->vu_socket_path).
 
-rm -f /mnt/test/*
-fallocate -l 1500M /mnt/test/dummy
+> I wonder if we could just place the lock file in the same dir level of
+> socket file which could save some code work?
 
-truncate -s 10G /mnt/test/foobar
-xfs_io -c "pwrite 0 2G" /mnt/test/foobar
-truncate -s 4k /mnt/test/foobar
+Thank you for the suggestion but I prefer the lock file is in
+localstatedir, for example /var/run/virtiofsd, because if the
+lock file in the same dir and the dir is used in common, for example
+/tmp, users may delete the lock file...
 
-fallocate -l 2G /mnt/test/foo1
+> 
+> > +
+> > +        se->vu_socket_lock_file = malloc(NAME_MAX);
+> > +        memset(se->vu_socket_lock_file, 0, NAME_MAX);
+> > +        snprintf(se->vu_socket_lock_file, NAME_MAX, "%s/%s.pid",
+> > +			dir, socket_name);
+> > +
+> > +        if (!qemu_write_pidfile(se->vu_socket_lock_file, &local_err)) {
+> > +                error_report_err(local_err);
+> 
+> Memory leak here.
 
-truncate -s 10G /mnt/test/foobar
-xfs_io -c "pwrite 0 2M" /mnt/test/foobar
----
+I'll fix this.
 
-File 'foobar' is truncated down from 10G to 4k but the dmap [0, 2M] is
-still in fi->dmap_tree.  Now that all space has been allocated for file
-'dummy' and 'foo1', the very last write to file 'foobar' will hang since
-the underlying page_mkwrite encounters -ENOSPC error.
+Thanks!
+Masa
 
-This fixes the problem by aligning down the start offset in
-inode_reclaim_dmap_range().
-
-Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
----
- fs/fuse/file.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index 4f2d908..0033ace 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -414,7 +414,7 @@ static void inode_reclaim_dmap_range(struct fuse_conn *fc, struct inode *inode,
- 	 * Interval tree search matches intersecting entries. Adjust the range
- 	 * to avoid dropping partial valid entries.
- 	 */
--	start = ALIGN(start, FUSE_DAX_MEM_RANGE_SZ);
-+	start = ALIGN_DOWN(start, FUSE_DAX_MEM_RANGE_SZ);
- 	end = ALIGN_DOWN(end, FUSE_DAX_MEM_RANGE_SZ);
- 
- 	down_write(&fi->i_dmap_sem);
--- 
-1.8.3.1
+> 
+> > +                return -1;
+> > +        }
+> > +
+> > +        free(socket_name);
+> > +        g_free(dir);
+> > +
+> > +        return 0;
+> > +}
+> > +
+> >  static int fv_create_listen_socket(struct fuse_session *se)
+> >  {
+> >          struct sockaddr_un un;
+> > @@ -876,6 +920,12 @@ static int fv_create_listen_socket(struct fuse_session *se)
+> >                  return -1;
+> >          }
+> >  
+> > +        /* Check the vu_socket_path is already used */
+> > +        if (fv_create_socket_lock_file(se) == -1) {
+> > +                fuse_err("%s: Socket lock file creation failed\n", __func__);
+> > +                return -1;
+> > +        }
+> > +
+> >          /* Create the Unix socket to communicate with qemu
+> >           * based on QEMU's vhost-user-bridge
+> >           */
+> > 
 

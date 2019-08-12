@@ -1,24 +1,16 @@
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
-	h=date:from:to:cc:subject:message-id:references:mime-version
-	:content-disposition:in-reply-to:user-agent;
-	bh=dUaOZ31mexcDbr9HgIuPP6g2epPrkma6jMXvZQkbMmU=;
-	b=NCMU3+zh1o2LJmkzPQYlj5hrISLRbVbqe0VdP6e1NOnVniaNtUi54rapc3bJ9IHLbG
-	sLqlK1qSNzKw5uz+00pvsSxtqHgqg0BcFZLvesUQPWzmDsNQ7mXXINlMpxW+JvVKQlAW
-	IqUSkTsyv7UjSNI9aesBlIVnmT8FcHMiKVXJp2sBGvllzLwdRwIMYlEga6PkOUmqh8nt
-	OtEKEkaMNAVFxLGd+FHjaFvK53iqCbreeiZHXXBhh0+KYzvd0E7mZFy70hp8bkFd9j54
-	neKqOO1lwwJ13jbhDzg0n236XqgJY3DShsrQqK0WQJghozdHQBPctl29KJCnuao/oAdQ
-	pOKw==
-Date: Mon, 12 Aug 2019 15:02:51 -0400
+	h=from:to:cc:subject:date:message-id;
+	bh=kbf6z6doASWsA/pz9P7o8Emrmc7QSHbokl2FNz2NUgA=;
+	b=KtXYjXeF4iz+JCljlEVcduksDHEVmDHtZDwqLmnSRD7G3vxuNPpRum35Fq3aUgEX+E
+	6kPLkmko1oFrV19gb1nQ1klX2vz4rxIrUKAS2T2Lmg+6u41q1hzyz90Pyz3GarGcN9qO
+	0K/uPW05EU0iq/Hq7S1yK61sqZg3b0eDeEPPYTY954COgHs8C7k84VU3oCDgv9VFUq/c
+	ES64LfqMHM5+CpvC+pgMKHt1GsSLzAb4jFNi0iDSshku5DiOedBUSevln3VqX0OoHiwy
+	d3z2/ZUkoF0Pk++PLQwABskjobnbPDUmFScbZEfIFLrq6zMaPDLI67HkGdwH+a/tbWqd
+	iuag==
 From: Masayoshi Mizuma <msys.mizuma@gmail.com>
-Message-ID: <20190812190250.7ghmdxpnvz3u7ec6@gabell>
-References: <20190811225534.9040-1-msys.mizuma@gmail.com>
-	<5D50D934.3010908@huawei.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <5D50D934.3010908@huawei.com>
-Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: Prevent multiply running with
- same vhost_user_socket
+Date: Mon, 12 Aug 2019 17:04:52 -0400
+Message-Id: <20190812210455.12540-1-msys.mizuma@gmail.com>
+Subject: [Virtio-fs] [PATCH 0/3] virtio-fs: Add some tracepoints
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,168 +19,56 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>
-Cc: virtio-fs@redhat.com, Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+To: Vivek Goyal <vgoyal@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, virtio-fs@redhat.com
+Cc: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
-Hi Jun,
+From: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
-On Mon, Aug 12, 2019 at 11:12:52AM +0800, piaojun wrote:
-> Hi Masayoshi,
-> 
-> On 2019/8/12 6:55, Masayoshi Mizuma wrote:
-> > From: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
-> > 
-> > virtiofsd can run multiply even if the vhost_user_socket is
-> > same path.
-> > 
-> >   ]# ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o source=/tmp/share &
-> >   [1] 244965
-> >   virtio_session_mount: Waiting for vhost-user socket connection...
-> >   ]# ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o source=/tmp/share &
-> >   [2] 244966
-> >   virtio_session_mount: Waiting for vhost-user socket connection...
-> >   ]#
-> > 
-> > The user will get confused about the situation and maybe the cause of the
-> > unexpected problem. So it's better to prevent the multiple running.
-> > 
-> > Create a regular file under localstatedir directory to exclude the
-> > vhost_user_socket. To create and lock the file, use qemu_write_pidfile()
-> > because the API has some sanity checks and file lock.
-> > 
-> > Signed-off-by: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
-> > ---
-> >  contrib/virtiofsd/fuse_i.h        |  1 +
-> >  contrib/virtiofsd/fuse_lowlevel.c |  3 ++
-> >  contrib/virtiofsd/fuse_virtio.c   | 50 +++++++++++++++++++++++++++++++
-> >  3 files changed, 54 insertions(+)
-> > 
-> > diff --git a/contrib/virtiofsd/fuse_i.h b/contrib/virtiofsd/fuse_i.h
-> > index ff6e1b75ba..d31c675469 100644
-> > --- a/contrib/virtiofsd/fuse_i.h
-> > +++ b/contrib/virtiofsd/fuse_i.h
-> > @@ -72,6 +72,7 @@ struct fuse_session {
-> >          char *vu_socket_path;
-> >          int   vu_listen_fd;
-> >          int   vu_socketfd;
-> > +        char *vu_socket_lock_file;
-> 
-> I prefer char *vu_socket_lock which is just a personal habit.
-> 
-> >          struct fv_VuDev *virtio_dev;
-> >  };
-> >  
-> > diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
-> > index 8adc4b1ab8..ab18b86435 100644
-> > --- a/contrib/virtiofsd/fuse_lowlevel.c
-> > +++ b/contrib/virtiofsd/fuse_lowlevel.c
-> > @@ -2587,6 +2587,9 @@ void fuse_session_destroy(struct fuse_session *se)
-> >  	free(se->vu_socket_path);
-> >  	se->vu_socket_path = NULL;
-> >  
-> > +	unlink(se->vu_socket_lock_file);
-> > +	free(se->vu_socket_lock_file);
-> > +
-> >  	free(se);
-> >  }
-> >  
-> > diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
-> > index 083e4fc317..4999f95b63 100644
-> > --- a/contrib/virtiofsd/fuse_virtio.c
-> > +++ b/contrib/virtiofsd/fuse_virtio.c
-> > @@ -32,6 +32,9 @@
-> >  
-> >  #include "contrib/libvhost-user/libvhost-user.h"
-> >  
-> > +#include "qemu/osdep.h"
-> > +#include "qapi/error.h"
-> > +
-> >  struct fv_VuDev;
-> >  struct fv_QueueInfo {
-> >          pthread_t thread;
-> > @@ -862,6 +865,47 @@ int virtio_loop(struct fuse_session *se)
-> >         return 0;
-> >  }
-> >  
-> > +static void strreplace(char *s, char old, char new)
-> > +{
-> > +        for (; *s; ++s)
-> > +                if (*s == old)
-> > +                        *s = new;
-> > +}
-> > +
-> > +static int fv_create_socket_lock_file(struct fuse_session *se)
-> > +{
-> > +        char *dir, *socket_name;
-> > +        Error *local_err = NULL;
-> > +
-> > +        dir = qemu_get_local_state_pathname("run/virtiofsd");
-> > +
-> > +        if (g_mkdir_with_parents(dir, S_IRWXU) < -1) {
-> > +                fuse_err("%s: Failed to create directory %s: %s",
-> > +                        __func__, dir, strerror(errno));
-> > +                return -1;
-> > +        }
-> > +
-> > +        socket_name = malloc(strlen(se->vu_socket_path) + 1);
-> > +        memset(socket_name, 0, strlen(se->vu_socket_path) + 1);
-> > +        memcpy(socket_name, se->vu_socket_path, strlen(se->vu_socket_path));
-> > +        strreplace(socket_name, '/', '.');
-> 
-> Shall we use a local var to replace the long *se->vu_socket_path*? And
+This patch series introduce some tracepoints. It will be
+useful to debug the I/O request flow.
 
-I'll add a local var to replace strlen(se->vu_socket_path).
+New trace events:
 
-> I wonder if we could just place the lock file in the same dir level of
-> socket file which could save some code work?
+  - virtio_fs_request_dispatched
+  - virtio_fs_request_done
+  - virtio_fs_hiprio_request_dispatched
+  - virtio_fs_hiprio_request_done
 
-Thank you for the suggestion but I prefer the lock file is in
-localstatedir, for example /var/run/virtiofsd, because if the
-lock file in the same dir and the dir is used in common, for example
-/tmp, users may delete the lock file...
+Above trace events is added to the following functions as
+the tracepoints:
 
-> 
-> > +
-> > +        se->vu_socket_lock_file = malloc(NAME_MAX);
-> > +        memset(se->vu_socket_lock_file, 0, NAME_MAX);
-> > +        snprintf(se->vu_socket_lock_file, NAME_MAX, "%s/%s.pid",
-> > +			dir, socket_name);
-> > +
-> > +        if (!qemu_write_pidfile(se->vu_socket_lock_file, &local_err)) {
-> > +                error_report_err(local_err);
-> 
-> Memory leak here.
+  - virtio_fs_enqueue_req
+  - virtio_fs_requests_done_work
+  - virtio_fs_hiprio_dispatch_work
+  - virtio_fs_hiprio_done_work
 
-I'll fix this.
+Example of the trace record:
 
-Thanks!
-Masa
+  cat-1432        [006] .... 37.592694: virtio_fs_request_dispatched:
+      opcode FUSE_READ unique 0x1a nodeid 0x2 in.len 80 flags
+      ISREPLY|WAITING|SENT notify 1
+  kworker/4:1-103 [004] .... 37.592809: virtio_fs_request_done:
+      opcode FUSE_READ unique 0x1a nodeid 0x2 in.len 80 flags
+      ISREPLY|WAITING
 
-> 
-> > +                return -1;
-> > +        }
-> > +
-> > +        free(socket_name);
-> > +        g_free(dir);
-> > +
-> > +        return 0;
-> > +}
-> > +
-> >  static int fv_create_listen_socket(struct fuse_session *se)
-> >  {
-> >          struct sockaddr_un un;
-> > @@ -876,6 +920,12 @@ static int fv_create_listen_socket(struct fuse_session *se)
-> >                  return -1;
-> >          }
-> >  
-> > +        /* Check the vu_socket_path is already used */
-> > +        if (fv_create_socket_lock_file(se) == -1) {
-> > +                fuse_err("%s: Socket lock file creation failed\n", __func__);
-> > +                return -1;
-> > +        }
-> > +
-> >          /* Create the Unix socket to communicate with qemu
-> >           * based on QEMU's vhost-user-bridge
-> >           */
-> > 
+Changelog:
+ From RFC:
+ - Change the string and the file name from virtiofs to virtio_fs.
+ - Separate the fuse macros to the other file to get useful for
+   generic fuse trace.
+
+Masayoshi Mizuma (3):
+  fuse: add some macros for ftrace
+  virtio-fs: add ftrace events
+  virtio-fs: add tracepoints
+
+ fs/fuse/virtio_fs.c                |  21 +++++
+ include/trace/events/fuse_common.h |  67 +++++++++++++++
+ include/trace/events/virtio_fs.h   | 131 +++++++++++++++++++++++++++++
+ 3 files changed, 219 insertions(+)
+ create mode 100644 include/trace/events/fuse_common.h
+ create mode 100644 include/trace/events/virtio_fs.h
+
+-- 
+2.18.1
 

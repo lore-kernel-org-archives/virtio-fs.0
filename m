@@ -1,10 +1,23 @@
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Date: Tue, 13 Aug 2019 02:32:05 +0800
-Message-Id: <1565634725-89726-2-git-send-email-bo.liu@linux.alibaba.com>
-In-Reply-To: <1565634725-89726-1-git-send-email-bo.liu@linux.alibaba.com>
-References: <1565634725-89726-1-git-send-email-bo.liu@linux.alibaba.com>
-Subject: [Virtio-fs] [PATCH 2/2] virtio-fs: do not removemapping if dmap
-	will be used immediately
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=date:from:to:cc:subject:message-id:references:mime-version
+	:content-disposition:in-reply-to:user-agent;
+	bh=IkrbhFPcSnPtvS5/vf2c0eVumWCFB+tfToMfYL0Dg2E=;
+	b=mq6fq5QknTVFJf/KljuIiU6zL00IJZyr/JRZy6CWy5b7YyeY4pLaKQc2UFrBbO6OmR
+	mJdubkU0zFiY6sRllYieympJi4uxdZL+4FyLPuhmgoIHAy0Z+XWnNfPUj+ReRvXH7ceg
+	HKhOn/cPt6JW3P2WqHmOzxjWYipEARO8/Iz//bPYnmqbWUN4/VghhIMrVJAuKrltzQ6n
+	NpQb5CK9Oug9bSkSUqFkx7RWR5NOYSotkUfNWDnePXDOS1/VI5xXQKOIxugzt/W71Z7q
+	sNXcHoHbFRmKb84lZK5wNwQ3lD5t8iTrbhEzlX/RkNXDYE6t40Ys3oeHx1xWpMqXQLw1
+	r61Q==
+Date: Mon, 12 Aug 2019 14:50:41 -0400
+From: Masayoshi Mizuma <msys.mizuma@gmail.com>
+Message-ID: <20190812185040.dggjt3ou4524yn7z@gabell>
+References: <20190729213431.10821-1-msys.mizuma@gmail.com>
+	<20190807132836.GD32432@stefanha-x1.localdomain>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20190807132836.GD32432@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH 0/2][RFC] virtio-fs: Add some tracepoints
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,122 +26,66 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>, Vivek Goyal <vgoyal@redhat.com>
 
-According to how we implement REMOVEMAPPING in daemon, it's unnecessary to
-involve a REMOVEMAPPING to reuse a dmap when doing inline reclaim because
-dmaps got from inline reclaim get reused for another mapping without being
-added back to 'free' dmap pool.
+Hi Stefan,
 
-This skips REMOVEMAPPING for inline reclaim only and we don't do
-REMOVEMAPPING unless someone has raced in to add a dmap to the range.
+On Wed, Aug 07, 2019 at 02:28:36PM +0100, Stefan Hajnoczi wrote:
+> On Mon, Jul 29, 2019 at 05:34:29PM -0400, Masayoshi Mizuma wrote:
+> > From: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+> > 
+> > This patch series introduce some tracepoints. It will be
+> > useful to debug the I/O request flow.
+> > 
+> > New trace events:
+> > 
+> >   - virtiofs_request_dispatched
+> >   - virtiofs_request_done
+> >   - virtiofs_hiprio_request_dispatched
+> >   - virtiofs_hiprio_request_done
+> > 
+> > Above trace events is added to the following functions as
+> > the tracepoints:
+> > 
+> >   - virtio_fs_enqueue_req
+> >   - virtio_fs_requests_done_work
+> >   - virtio_fs_hiprio_dispatch_work
+> >   - virtio_fs_hiprio_done_work
+> > 
+> > Example of the trace record:
+> > 
+> >   cat-1420       [002] .... 34.687462: virtiofs_request_dispatched: opcode
+> >       FUSE_READ unique 0x1a nodeid 0x2 in.len 80 flags ISREPLY|WAITING|SENT
+> >       notify 1
+> >   kworker/4:1-67 [004] .... 34.687531: virtiofs_request_done: opcode FUSE_READ
+> >       unique 0x1a nodeid 0x2 in.len 80 flags ISREPLY|WAITING
+> > 
+> > Masayoshi Mizuma (2):
+> >   add ftrace events
+> >   add tracepoints
+> > 
+> >  fs/fuse/virtio_fs.c             |  21 ++++
+> >  include/trace/events/virtiofs.h | 195 ++++++++++++++++++++++++++++++++
+> >  2 files changed, 216 insertions(+)
+> >  create mode 100644 include/trace/events/virtiofs.h
+> 
+> Looks good.  Two suggestions although I don't have a strong opinion:
+> 
+> 1. Please use "virtio_fs" instead of "virtiofs" for consistency with the
+>    existing kernel code.
 
-With the following two patches applied,
-"virtio-fs: do not removemapping if dmap will be used immediately"
-"virtio-fs: try hard to do inline reclaim",
+OK, I use virtio_fs.
 
-fio fio-tmp.job
-read: IOPS=8055, BW=31.5MiB/s (32.0MB/s)(3776MiB/120001msec)
-clat (usec): min=6, max=1842, avg=113.75, stdev=83.78
-clat percentiles (usec):
-95.00th=[  202]
-99.00th=[  221]
+> 
+> 2. Please consider adding generic fuse.ko trace events for the request
+>    lifecycle so both traditional FUSE and virtio-fs can benefit.  The
+>    argument against this is that your patches correspond more closely to
+>    virtqueue activity than tracepoints in the shared FUSE code, but I
+>    wanted to mention the idea.
 
-w/o
-read: IOPS=4312, BW=16.8MiB/s (17.7MB/s)(2021MiB/120001msec)
-clat (usec): min=10, max=3415, avg=220.98, stdev=102.85
-clat percentiles (usec):
-95.00th=[  359]
-99.00th=[  392]
+Yeah, it's a good idea to add generic fuse.ko trace events.
 
-[1]:
-virtiofsd -o cache="always"
-qemu -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs-1,cache-size=4G
-
-[2]:
-cat fio-tmp.job
-
-; fio-rand-read.job for fiotest
-
-[global]
-name=fio-rand-read
-filename=fio_file
-rw=randread
-bs=4K
-direct=1
-numjobs=1
-time_based=1
-runtime=120
-directory=/mnt/test/
-
-[file1]
-size=10G
-ioengine=psync
-iodepth=1
-
-Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
----
- fs/fuse/file.c | 18 +++++++++++++++---
- 1 file changed, 15 insertions(+), 3 deletions(-)
-
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index 2ea670a..b5239b1 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -1933,7 +1933,11 @@ static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
- 	if (ret < 0) {
- 		printk("fuse_setup_one_mapping() failed. err=%d"
- 			" pos=0x%llx, writable=%d\n", ret, pos, writable);
-+
-+		/* liubo: ignore failure if removemapping fails. */
-+		dmap_removemapping_one(inode, dmap);
- 		dmap_add_to_free_pool(fc, alloc_dmap);
-+
- 		up_write(&fi->i_dmap_sem);
- 		return ret;
- 	}
-@@ -3996,7 +4000,8 @@ static int dmap_writeback_invalidate(struct inode *inode,
- }
- 
- static int reclaim_one_dmap_locked(struct fuse_conn *fc, struct inode *inode,
--				   struct fuse_dax_mapping *dmap)
-+				   struct fuse_dax_mapping *dmap,
-+				   bool inline_reclaim)
- {
- 	int ret;
- 	struct fuse_inode *fi = get_fuse_inode(inode);
-@@ -4021,6 +4026,13 @@ static int reclaim_one_dmap_locked(struct fuse_conn *fc, struct inode *inode,
- 	fuse_dax_interval_tree_remove(dmap, &fi->dmap_tree);
- 	fi->nr_dmaps--;
- 
-+	/*
-+	 * for inline reclaim, it's unnecessary to removing mapping since it'll
-+	 * be used by another range immediately.
-+	 */
-+	if (inline_reclaim)
-+		return 0;
-+
- 	ret = dmap_removemapping_one(inode, dmap);
- 	if (ret) {
- 		pr_warn("Failed to remove mapping. offset=0x%llx len=0x%llx\n",
-@@ -4051,7 +4063,7 @@ static int reclaim_one_dmap_locked(struct fuse_conn *fc, struct inode *inode,
- 	if (!dmap)
- 		return NULL;
- 
--	ret = reclaim_one_dmap_locked(fc, inode, dmap);
-+	ret = reclaim_one_dmap_locked(fc, inode, dmap, true);
- 	if (ret < 0)
- 		return ERR_PTR(ret);
- 
-@@ -4136,7 +4148,7 @@ int lookup_and_reclaim_dmap_locked(struct fuse_conn *fc, struct inode *inode,
- 	if (refcount_read(&dmap->refcnt) > 1)
- 		return 0;
- 
--	ret = reclaim_one_dmap_locked(fc, inode, dmap);
-+	ret = reclaim_one_dmap_locked(fc, inode, dmap, false);
- 	if (ret < 0)
- 		return ret;
- 
--- 
-1.8.3.1
+Thanks!
+Masa
 

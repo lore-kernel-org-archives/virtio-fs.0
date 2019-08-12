@@ -1,25 +1,16 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
-	h=date:from:to:cc:subject:message-id:references:mime-version
-	:content-disposition:in-reply-to:user-agent;
-	bh=iJAkkTEIs4JoPWZb4eJQZms9eIL92uePApVl/b8FalE=;
-	b=ttwc/E3gWA7nkBnkfp7/4VgPjufCFQUaT+g7VV7rlzyDLtKY7T4Hq9qHMo6WfSOz9a
-	bgQXb8PF8UK2B3souh3NvO861Ofm1U1Yp0cyPRioK4y0IlVLGkxM9MSJxgyxa7AA3+/r
-	1801/lYexOtGQzWspGlexPQu/yq9Uu0RSEINzXrj0pMMs/QaqXlt0GM7Ml7ZAapx5xVm
-	kEVn6HWPoIO+Qd8QWu/LlPgwpX1HPeVgJMFkWlXoNIGdLAVrPwtYqa54wuwDfNWp1rpX
-	7AUd0DAkT5HtR7lRlLl2esvTh4Pr0PwXNGuku2E58fvuveKUtdTqkPP1J8hTNbPWFNu6
-	Z0IA==
-Date: Tue, 20 Aug 2019 23:42:26 -0400
-From: Masayoshi Mizuma <msys.mizuma@gmail.com>
-Message-ID: <20190821034225.kfo46pviyf6edqfc@gabell>
-References: <20190813200645.13819-1-msys.mizuma@gmail.com>
-	<20190820180322.GH9855@stefanha-x1.localdomain>
-	<20190820190520.GR2867@work-vm>
+References: <20190809082536.56402-1-eguan@linux.alibaba.com>
+	<5D4D3E0E.10609@huawei.com> <20190811132042.GB2665@desktop>
+	<3d1f5a7e-fd00-2b46-994c-99d07b3c94ce@huawei.com>
+	<20190811153517.GF2665@desktop>
+From: piaojun <piaojun@huawei.com>
+Message-ID: <5D50CECC.4000701@huawei.com>
+Date: Mon, 12 Aug 2019 10:28:28 +0800
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20190820190520.GR2867@work-vm>
-Subject: Re: [Virtio-fs] [PATCH v3] virtiofsd: Prevent multiply running with
- same vhost_user_socket
+In-Reply-To: <20190811153517.GF2665@desktop>
+Content-Type: text/plain; charset="windows-1252"
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH 1/2] virtiofsd: print log only when priority
+ is high enough
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -28,52 +19,77 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+To: Eryu Guan <guaneryu@gmail.com>
+Cc: virtio-fs@redhat.com
 
-On Tue, Aug 20, 2019 at 08:05:20PM +0100, Dr. David Alan Gilbert wrote:
-> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> > On Tue, Aug 13, 2019 at 04:06:45PM -0400, Masayoshi Mizuma wrote:
-> > 
-> > Two minor comments below.  They can be squashed in when merging this
-> > patch.
-> > 
-> > If users find it problematic that pid files are never deleted we could
-> > make this feature optional with --pidfile=PATH.  But I think we can
-> > merge this patch for now and see if anyone encounters issues before the
-> > next virtio-fs release.
-> > 
-> > Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-> > 
-> > > +static int fv_socket_lock(struct fuse_session *se)
-> > > +{
-> > > +        char *dir, *sk_name;
-> > > +        Error *local_err = NULL;
-> > > +        int ret = -1;
-> > > +
-> > > +        dir = qemu_get_local_state_pathname("run/virtiofsd");
-> > > +
-> > > +        if (g_mkdir_with_parents(dir, S_IRWXU) < -1) {
-> > > +                fuse_err("%s: Failed to create directory %s: %s",
-> > > +                        __func__, dir, strerror(errno));
-> > 
-> > Missing g_free(dir).
-> > 
-> > > @@ -876,6 +916,17 @@ static int fv_create_listen_socket(struct fuse_session *se)
-> > >                  return -1;
-> > >          }
-> > >  
-> > > +        if (!strlen(se->vu_socket_path)) {
-> > > +                fuse_err("Socket path is NULL\n");
-> > 
-> > s/NULL/empty/
+
+
+On 2019/8/11 23:35, Eryu Guan wrote:
+> On Sun, Aug 11, 2019 at 10:32:16PM +0800, piaojun wrote:
+>>
+>>
+>> On 2019/8/11 21:20, Eryu Guan wrote:
+>>> On Fri, Aug 09, 2019 at 05:34:06PM +0800, piaojun wrote:
+>>>> Hi Eryu,
+>>>>
+>>>> A very big patch, and I prefer spliting into several ones.
+>>>
+>>> Most of the changes are replacing
+>>>
+>>> 	if (lo->debug)
+>>> 		fuse_debug(...);
+>>>
+>>> to
+>>> 	fuse_debug(...);
+>>>
+>>> But yeah, it's fine to split, one patches introduce current_log_level
+>>> related code, one does the replacements.
+>>
+>> Sounds reasonable.
+>>
+>>>
+>>>>
+>>>> On 2019/8/9 16:25, Eryu Guan wrote:
+>>>>> Introduce "-o log_level=" command line option to specify current log
+>>>>> level (priority), valid values are "debug info warn err", e.g.
+>>>>>
+>>>>>     ./virtiofsd -o log_level=debug ...
+>>>>>
+>>>>> So only log priority higher than "debug" will be printed to
+>>>>> stderr/syslog. And the default level is info.
+>>>>>
+>>>>> The "-o debug"/"-d" options are kept, and imply debug log level.
+>>>>
+>>>> I wonder if this will make user confused when there are two options for
+>>>> debug.
+>>>
+>>> Forgot to mention, one reason to keep "-o debug/-d" options is try not
+>>> to break existing users, e.g. kata-runtime. But I have no strong
+>>> preference on this.
+>>
+>> Yes, compat is always important, and I have little knowledge about kata,
+>> so it would be best to reach an agreement with it.
+>>
+>> After looking though all the fuse_log codes, I come up with a new idea
+>> to do this.
+>> 1. Expand the debug in struct lo_data to *log_level* which represent
+>> err, warn, info and debug;
+>>
+>> struct lo_data {
+>> 	pthread_mutex_t mutex;
+>> 	int debug -> *log_level*;
 > 
-> 
-> Thanks; applied with those changes, plus also I found I had
-> to move the #include of osdep.h and error.h to the top of the include
-> list to avoid glib compilation errors.
+> I thought about this too, but that means that fuse_debug/info/warn/err
+> functions should take lo_data or fuse_session as argument as well, and I
+> don't think it's worth to introduce such complexity, a global log level
+> would be easier. And I think it's possible & easier to add support to
+> change the log level (as a global variable) when virtiofsd is running,
+> e.g. on SIGHUP.
 
-Thank you for fixing it and merging the patch!
+Perhaps you did not get my point, and we may just use lo_data to set
+*current_log_level* once, no need always pass it.
 
-- Masa
+We'd better do little harm do the origin code struct if possible.
+
+Jun
 

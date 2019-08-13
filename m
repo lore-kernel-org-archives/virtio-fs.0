@@ -1,14 +1,15 @@
-Date: Tue, 13 Aug 2019 16:51:53 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190813155153.GD32090@stefanha-x1.localdomain>
-References: <20190811225534.9040-1-msys.mizuma@gmail.com>
+Date: Tue, 13 Aug 2019 11:24:39 -0700
+From: Liu Bo <bo.liu@linux.alibaba.com>
+Message-ID: <20190813182438.sbkpt4ps62iwzrbg@US-160370MP2.local>
+References: <1565636335-120345-1-git-send-email-bo.liu@linux.alibaba.com>
+	<f48e0d71-d633-79a6-8b17-94ae9274ff6f@huawei.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="pZs/OQEoSSbxGlYw"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190811225534.9040-1-msys.mizuma@gmail.com>
-Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: Prevent multiply running with
- same vhost_user_socket
+In-Reply-To: <f48e0d71-d633-79a6-8b17-94ae9274ff6f@huawei.com>
+Subject: Re: [Virtio-fs] [PATCH 1/2] Virtio-fs: fix hang due to ENOSPC in
+ shared backend fs
+Reply-To: bo.liu@linux.alibaba.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,71 +18,122 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Masayoshi Mizuma <msys.mizuma@gmail.com>
-Cc: virtio-fs@redhat.com, Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+To: piaojun <piaojun@huawei.com>
+Cc: virtio-fs@redhat.com
 
+On Tue, Aug 13, 2019 at 11:41:23PM +0800, piaojun wrote:
+> Hi Bo,
+> 
+> On 2019/8/13 2:58, Liu Bo wrote:
+> > Currently fuse/virtio-fs de-allocation doesn't clean up dax mapping range,
+> > which may result in hang problems when the shared backend fs experiences
+> > "NO Space Error".
+> > 
+> > The root cause is that the first writing to a dax mapping range triggers a
+> > WRITE page fault on host side, which calls ->page_mkwrite() where block
+> > allocation is required, if the fs is already full, ->page_mkwrite() returns
+> > error so that page fault fails, however, for kvm is not able to propogate
+> > errors while handling EPT_VIOLATION, thus guest keeps trying to resolve the
+> > fault.
+> > 
+> > Fortunately, we can fix/work around the problem by dropping dax mapping
+> > range for de-allocation operations.
+> > 
+> > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+> > ---
+> >  fs/fuse/dir.c    | 3 +++
+> >  fs/fuse/file.c   | 9 +++++++--
+> >  fs/fuse/fuse_i.h | 2 +-
+> >  fs/fuse/inode.c  | 2 +-
+> >  4 files changed, 12 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
+> > index ed740a5..99a218c 100644
+> > --- a/fs/fuse/dir.c
+> > +++ b/fs/fuse/dir.c
+> > @@ -1805,6 +1805,9 @@ int fuse_do_setattr(struct dentry *dentry, struct iattr *attr,
+> >  
+> >  		truncate_pagecache(inode, outarg.attr.size);
+> >  		invalidate_inode_pages2(inode->i_mapping);
+> > +		if (IS_DAX(inode) && oldsize > outarg.attr.size)
+> > +			fuse_cleanup_inode_mappings(inode, outarg.attr.size,
+> > +						    (loff_t)-1);
+> >  		up_write(&fi->i_mmap_sem);
+> >  	}
+> >  
+> > diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+> > index c52260c..4f2d908 100644
+> > --- a/fs/fuse/file.c
+> > +++ b/fs/fuse/file.c
+> > @@ -417,6 +417,7 @@ static void inode_reclaim_dmap_range(struct fuse_conn *fc, struct inode *inode,
+> >  	start = ALIGN(start, FUSE_DAX_MEM_RANGE_SZ);
+> >  	end = ALIGN_DOWN(end, FUSE_DAX_MEM_RANGE_SZ);
+> >  
+> > +	down_write(&fi->i_dmap_sem);
+> 
+> I'm not sure if this is related with the hang bug. Or it's another lock
+> missing bug which could be extracted as a new patch.
+>
 
---pZs/OQEoSSbxGlYw
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+inode_reclaim_dmap_range was only used in inode evict path where
+others are unable to access fi->dmap_tree.
 
-On Sun, Aug 11, 2019 at 06:55:34PM -0400, Masayoshi Mizuma wrote:
-> diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_l=
-owlevel.c
-> index 8adc4b1ab8..ab18b86435 100644
-> --- a/contrib/virtiofsd/fuse_lowlevel.c
-> +++ b/contrib/virtiofsd/fuse_lowlevel.c
-> @@ -2587,6 +2587,9 @@ void fuse_session_destroy(struct fuse_session *se)
->  	free(se->vu_socket_path);
->  	se->vu_socket_path =3D NULL;
-> =20
-> +	unlink(se->vu_socket_lock_file);
+This patch adds two callers for the function, as such we need the lock
+to protect the tree operations.
 
-Are you sure this works?  We should be inside the chroot here, so this
-is probably not the same file that we created!
+> >  	while (1) {
+> >  		dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, start,
+> >  							 end);
+> > @@ -426,6 +427,7 @@ static void inode_reclaim_dmap_range(struct fuse_conn *fc, struct inode *inode,
+> >  		num++;
+> >  		list_add(&dmap->list, &to_remove);
+> >  	}
+> > +	up_write(&fi->i_dmap_sem);
+> >  
+> >  	/* Nothing to remove */
+> >  	if (list_empty(&to_remove))
+> > @@ -478,7 +480,7 @@ static int dmap_removemapping_one(struct inode *inode,
+> >   * that fuse inode interval tree. If that lock is taken then lock validator
+> >   * complains of deadlock situation w.r.t fs_reclaim lock.
+> >   */
+> > -void fuse_cleanup_inode_mappings(struct inode *inode)
+> > +void fuse_cleanup_inode_mappings(struct inode *inode, loff_t start, loff_t end)
+> >  {
+> >  	struct fuse_conn *fc = get_fuse_conn(inode);
+> >  	/*
+> > @@ -486,7 +488,7 @@ void fuse_cleanup_inode_mappings(struct inode *inode)
+> >  	 * before we arrive here. So we should not have to worry about
+> >  	 * any pages/exception entries still associated with inode.
+> >  	 */
+> > -	inode_reclaim_dmap_range(fc, inode, 0, -1);
+> > +	inode_reclaim_dmap_range(fc, inode, start, end);
+> >  }
+> >  
+> >  void fuse_finish_open(struct inode *inode, struct file *file)
+> > @@ -3867,6 +3869,9 @@ static long __fuse_file_fallocate(struct file *file, int mode,
+> 
+> It's strange that I could not find *__fuse_file_fallocate()* at
+> virtio-fs-dev-5.1 code.
+>
 
-> +        socket_name =3D malloc(strlen(se->vu_socket_path) + 1);
-> +        memset(socket_name, 0, strlen(se->vu_socket_path) + 1);
-> +        memcpy(socket_name, se->vu_socket_path, strlen(se->vu_socket_pat=
-h));
+Oh OK, I didn't realize that this piece of code has been refactored,
+it was also used by dax write path, anyway __fuse_file_fallocate() was
+basically identical to fuse_file_fallocate().
 
-These lines can be replaced with:
+> >  		}
+> >  
+> >  		truncate_pagecache_range(inode, offset, offset + length - 1);
+> > +		if (IS_DAX(inode))
+> > +			fuse_cleanup_inode_mappings(inode, offset,
+> > +						    offset + length - 1);
+> 
+> I prefer using "loff_t endbyte" to replace "offset + length - 1" which
+> makes code easier.
+>
 
-  socket_name =3D g_strdup(se->vu_socket_path);
-  ...
-  g_free(socket_name);
+Well, I'd like to leave it for a later cleanup patch in which I'll
+convert all (offset+length-1) here.
 
-> +        strreplace(socket_name, '/', '.');
-> +
-> +        se->vu_socket_lock_file =3D malloc(NAME_MAX);
-> +        memset(se->vu_socket_lock_file, 0, NAME_MAX);
-> +        snprintf(se->vu_socket_lock_file, NAME_MAX, "%s/%s.pid",
-> +			dir, socket_name);
-
-These lines can be replaced with:
-
-  se->vu_socket_lock_file =3D g_strdup_printf("%s/%s.pid", dir, socket_name=
-);
-
-The difference here is that it won't silently truncate to NAME_MAX.
-This is probably a good thing since an ENAMETOOLONG error should be
-reported instead of silently truncating the path.
-
---pZs/OQEoSSbxGlYw
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1S3JkACgkQnKSrs4Gr
-c8iDhAgAlNH6rtnbCqFCQgRqFavGgVy2e2S//brq9HWVepuUrsc5PmTvisZuHg2f
-Dt9rIEpuCxxLunJ+yW0bJ4UAgVJyX+srKhsLBxXTeAofonKjCNIZCkn3wkn0b2BW
-zY1Ld6QN/lXPdBH+IJCIF37fK0Ej75duKTIgwSRLlzosyZp4+F2u23fQFcCpKgz0
-rZj5v4VpPdzIuNK7A00YOgX1WyQpIYzx4+iby9R+LrA6yXnaBwRE2NjjAwDd4uIv
-Egt05Fzc4pLdvl9mo7ZTMXE3R4UXmGNNc/q8LXrNV1rqutkXi8kKhVWiOvle3m00
-TfrIYYZUZqzypGeYf6pzcVcmmmJeDw==
-=AY0R
------END PGP SIGNATURE-----
-
---pZs/OQEoSSbxGlYw--
+thanks,
+-liubo
 

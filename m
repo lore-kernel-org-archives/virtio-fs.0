@@ -1,14 +1,19 @@
-References: <1565634725-89726-1-git-send-email-bo.liu@linux.alibaba.com>
-	<1565634725-89726-2-git-send-email-bo.liu@linux.alibaba.com>
-From: piaojun <piaojun@huawei.com>
-Message-ID: <5D5214FC.4060804@huawei.com>
-Date: Tue, 13 Aug 2019 09:40:12 +0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+	d=devninja.online; s=google;
+	h=from:to:subject:date:message-id:mime-version:thread-index
+	:content-language;
+	bh=Fu7wT5Zq3De3ZdSedvCMB17WmtedhD9eR6qDeeRem6M=;
+	b=i2HFPa8GI49RRE08+TirYwR7eIjMJsCv9FqE0u+UgWr23SttN6HFBG1KesM68sv+y6
+	ONqciEiLjp/7Wzvfl4AqI1eYimk3abuyBWkdUNhth8fdxjifjkvcNGx1QONIIq1/mYmP
+	3rg+B//9BivKcIT7kZnCZ7ZoDvaoAkDbusjL4=
+From: "James" <james@devninja.online>
+Date: Tue, 13 Aug 2019 10:44:08 +0530
+Message-ID: <3c4b01d55195$fe30ddd0$fa929970$@online>
 MIME-Version: 1.0
-In-Reply-To: <1565634725-89726-2-git-send-email-bo.liu@linux.alibaba.com>
-Content-Type: text/plain; charset="windows-1252"
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH 2/2] virtio-fs: do not removemapping if dmap
- will be used immediately
+Content-Type: multipart/alternative;
+	boundary="----=_NextPart_000_3C4C_01D551C4.17E919D0"
+Content-Language: en-us
+Subject: [Virtio-fs] App Proposal !!
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,130 +22,131 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Liu Bo <bo.liu@linux.alibaba.com>, virtio-fs@redhat.com
+To: virtio-fs@redhat.com
 
-Hi Bo,
+This is a multipart message in MIME format.
 
-On 2019/8/13 2:32, Liu Bo wrote:
-> According to how we implement REMOVEMAPPING in daemon, it's unnecessary to
-> involve a REMOVEMAPPING to reuse a dmap when doing inline reclaim because
-> dmaps got from inline reclaim get reused for another mapping without being
-> added back to 'free' dmap pool.
-> 
-> This skips REMOVEMAPPING for inline reclaim only and we don't do
-> REMOVEMAPPING unless someone has raced in to add a dmap to the range.
-> 
-> With the following two patches applied,
-> "virtio-fs: do not removemapping if dmap will be used immediately"
-> "virtio-fs: try hard to do inline reclaim",
-> 
-> fio fio-tmp.job
-> read: IOPS=8055, BW=31.5MiB/s (32.0MB/s)(3776MiB/120001msec)
+------=_NextPart_000_3C4C_01D551C4.17E919D0
+Content-Type: text/plain;
+	charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 
-Do you mean the before result is 31.5MB/s and after is 32MB/s? I wonder
-what is your backend storage?
+Hi  virtio-fs@redhat.com
 
-Jun
+My name is James, and we are a team of Professional IOS & Android Apps
+developer with 6+ years' experience based in India. Do you need a great App
+adjusted or built from scratch?
 
-> clat (usec): min=6, max=1842, avg=113.75, stdev=83.78
-> clat percentiles (usec):
-> 95.00th=[  202]
-> 99.00th=[  221]
-> 
-> w/o
-> read: IOPS=4312, BW=16.8MiB/s (17.7MB/s)(2021MiB/120001msec)
-> clat (usec): min=10, max=3415, avg=220.98, stdev=102.85
-> clat percentiles (usec):
-> 95.00th=[  359]
-> 99.00th=[  392]
-> 
-> [1]:
-> virtiofsd -o cache="always"
-> qemu -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs-1,cache-size=4G
-> 
-> [2]:
-> cat fio-tmp.job
-> 
-> ; fio-rand-read.job for fiotest
-> 
-> [global]
-> name=fio-rand-read
-> filename=fio_file
-> rw=randread
-> bs=4K
-> direct=1
-> numjobs=1
-> time_based=1
-> runtime=120
-> directory=/mnt/test/
-> 
-> [file1]
-> size=10G
-> ioengine=psync
-> iodepth=1
-> 
-> Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
-> ---
->  fs/fuse/file.c | 18 +++++++++++++++---
->  1 file changed, 15 insertions(+), 3 deletions(-)
-> 
-> diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-> index 2ea670a..b5239b1 100644
-> --- a/fs/fuse/file.c
-> +++ b/fs/fuse/file.c
-> @@ -1933,7 +1933,11 @@ static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
->  	if (ret < 0) {
->  		printk("fuse_setup_one_mapping() failed. err=%d"
->  			" pos=0x%llx, writable=%d\n", ret, pos, writable);
-> +
-> +		/* liubo: ignore failure if removemapping fails. */
-> +		dmap_removemapping_one(inode, dmap);
->  		dmap_add_to_free_pool(fc, alloc_dmap);
-> +
->  		up_write(&fi->i_dmap_sem);
->  		return ret;
->  	}
-> @@ -3996,7 +4000,8 @@ static int dmap_writeback_invalidate(struct inode *inode,
->  }
->  
->  static int reclaim_one_dmap_locked(struct fuse_conn *fc, struct inode *inode,
-> -				   struct fuse_dax_mapping *dmap)
-> +				   struct fuse_dax_mapping *dmap,
-> +				   bool inline_reclaim)
->  {
->  	int ret;
->  	struct fuse_inode *fi = get_fuse_inode(inode);
-> @@ -4021,6 +4026,13 @@ static int reclaim_one_dmap_locked(struct fuse_conn *fc, struct inode *inode,
->  	fuse_dax_interval_tree_remove(dmap, &fi->dmap_tree);
->  	fi->nr_dmaps--;
->  
-> +	/*
-> +	 * for inline reclaim, it's unnecessary to removing mapping since it'll
-> +	 * be used by another range immediately.
-> +	 */
-> +	if (inline_reclaim)
-> +		return 0;
-> +
->  	ret = dmap_removemapping_one(inode, dmap);
->  	if (ret) {
->  		pr_warn("Failed to remove mapping. offset=0x%llx len=0x%llx\n",
-> @@ -4051,7 +4063,7 @@ static int reclaim_one_dmap_locked(struct fuse_conn *fc, struct inode *inode,
->  	if (!dmap)
->  		return NULL;
->  
-> -	ret = reclaim_one_dmap_locked(fc, inode, dmap);
-> +	ret = reclaim_one_dmap_locked(fc, inode, dmap, true);
->  	if (ret < 0)
->  		return ERR_PTR(ret);
->  
-> @@ -4136,7 +4148,7 @@ int lookup_and_reclaim_dmap_locked(struct fuse_conn *fc, struct inode *inode,
->  	if (refcount_read(&dmap->refcnt) > 1)
->  		return 0;
->  
-> -	ret = reclaim_one_dmap_locked(fc, inode, dmap);
-> +	ret = reclaim_one_dmap_locked(fc, inode, dmap, false);
->  	if (ret < 0)
->  		return ret;
->  
-> 
+Reply me if you need any kinds of help in mobile Apps.
+
+Thanks & Regards,
+
+James,
+
+Web Development Manager
+
+
+------=_NextPart_000_3C4C_01D551C4.17E919D0
+Content-Type: text/html;
+	charset="us-ascii"
+Content-Transfer-Encoding: quoted-printable
+
+<html xmlns:v=3D"urn:schemas-microsoft-com:vml" =
+xmlns:o=3D"urn:schemas-microsoft-com:office:office" =
+xmlns:w=3D"urn:schemas-microsoft-com:office:word" =
+xmlns:m=3D"http://schemas.microsoft.com/office/2004/12/omml" =
+xmlns=3D"http://www.w3.org/TR/REC-html40">
+
+<head>
+<META HTTP-EQUIV=3D"Content-Type" CONTENT=3D"text/html; =
+charset=3Dus-ascii">
+<meta name=3DGenerator content=3D"Microsoft Word 12 (filtered medium)">
+<style>
+<!--
+ /* Font Definitions */
+ @font-face
+	{font-family:"Cambria Math";
+	panose-1:2 4 5 3 5 4 6 3 2 4;}
+@font-face
+	{font-family:Calibri;
+	panose-1:2 15 5 2 2 2 4 3 2 4;}
+ /* Style Definitions */
+ p.MsoNormal, li.MsoNormal, div.MsoNormal
+	{margin:0in;
+	margin-bottom:.0001pt;
+	font-size:12.0pt;
+	font-family:"Times New Roman","serif";}
+a:link, span.MsoHyperlink
+	{mso-style-priority:99;
+	color:blue;
+	text-decoration:underline;}
+a:visited, span.MsoHyperlinkFollowed
+	{mso-style-priority:99;
+	color:purple;
+	text-decoration:underline;}
+.MsoChpDefault
+	{mso-style-type:export-only;}
+.MsoPapDefault
+	{mso-style-type:export-only;
+	margin-bottom:10.0pt;
+	line-height:115%;}
+@page Section1
+	{size:8.5in 11.0in;
+	margin:1.0in 1.0in 1.0in 1.0in;}
+div.Section1
+	{page:Section1;}
+-->
+</style>
+<!--[if gte mso 9]><xml>
+ <o:shapedefaults v:ext=3D"edit" spidmax=3D"1026" />
+</xml><![endif]--><!--[if gte mso 9]><xml>
+ <o:shapelayout v:ext=3D"edit">
+  <o:idmap v:ext=3D"edit" data=3D"1" />
+ </o:shapelayout></xml><![endif]-->
+</head>
+
+<body lang=3DEN-US link=3Dblue vlink=3Dpurple>
+
+<div class=3DSection1>
+
+<p class=3DMsoNormal =
+style=3D'mso-margin-top-alt:auto;margin-bottom:10.0pt;
+line-height:115%'><span style=3D'color:#7030A0'>Hi&nbsp; =
+<b><u>virtio-fs@redhat.com</u></b></span></p>
+
+<p class=3DMsoNormal =
+style=3D'mso-margin-top-alt:auto;margin-bottom:10.0pt;
+line-height:115%'><span style=3D'color:#7030A0'>My name is <b>James</b>, =
+and we
+are a team of Professional IOS &amp; Android Apps developer with <b>6+
+years&#8217;</b> experience based in<b> India</b>. Do you need a great =
+App
+adjusted or built from scratch?</span></p>
+
+<p class=3DMsoNormal =
+style=3D'mso-margin-top-alt:auto;margin-bottom:10.0pt;
+line-height:115%'><span style=3D'color:#7030A0'>Reply me if you need any =
+kinds of
+help in mobile Apps.</span></p>
+
+<p class=3DMsoNormal =
+style=3D'mso-margin-top-alt:auto;mso-margin-bottom-alt:auto;
+line-height:115%'><span style=3D'color:#7030A0'>Thanks &amp; =
+Regards,</span></p>
+
+<p class=3DMsoNormal =
+style=3D'mso-margin-top-alt:auto;mso-margin-bottom-alt:auto;
+line-height:115%'><b><span style=3D'color:#7030A0'>James</span></b><span
+style=3D'color:#7030A0'>,</span></p>
+
+<p class=3DMsoNormal><span style=3D'color:#7030A0'>Web Development =
+Manager</span></p>
+
+</div>
+
+</body>
+
+</html>
+
+------=_NextPart_000_3C4C_01D551C4.17E919D0--
 

@@ -1,10 +1,11 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue, 13 Aug 2019 15:29:40 -0400
-Message-Id: <20190813192944.26009-1-vgoyal@redhat.com>
+Date: Tue, 13 Aug 2019 15:29:43 -0400
+Message-Id: <20190813192944.26009-4-vgoyal@redhat.com>
+In-Reply-To: <20190813192944.26009-1-vgoyal@redhat.com>
+References: <20190813192944.26009-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 0/4] Drop CAP_FSETID if client needs to kill
-	setuid/setgid bits
+Subject: [Virtio-fs] [PATCH 3/4] virtiofsd: Parse flag FUSE_WRITE_KILL_PRIV
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,34 +16,65 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-If a file has setuid/setuid bit set and a writer writes to file without
-having CAP_FSETID capability, kernel clears setuid/setgid bit on file.
+Caller can set FUSE_WRITE_KILL_PRIV in write_flags. Parse it and pass it
+to the filesystem.
 
-pjdfstest test chmod/12.t tests for this. With moving to 5.3 kernel and
-cache=none this test fails. 
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ contrib/virtiofsd/fuse_common.h   | 5 ++++-
+ contrib/virtiofsd/fuse_kernel.h   | 1 +
+ contrib/virtiofsd/fuse_lowlevel.c | 2 ++
+ 3 files changed, 7 insertions(+), 1 deletion(-)
 
-Now Miklos has introducd a commit where if client thinks that
-setuid/setgid bit should be cleared, it sets FUSE_KILL_PRIV flag
-in fuse_write_in->write_flags. This is an indication to daemon to
-clear setuid/setgid bit atomically.
-
-So drop CAP_FSETID capability and then proceed with write and that
-should automatically clear setuid bit.
-
-Vivek Goyal (4):
-  virtiofsd: Fix number of padding bits in fuse_file_info
-  virtiofsd: Use macros for write_flag parsing
-  virtiofsd: Parse flag FUSE_WRITE_KILL_PRIV
-  virtiofsd: Drop CAP_FSETID if client asked for it
-
- contrib/virtiofsd/Makefile.objs    |   2 +
- contrib/virtiofsd/fuse_common.h    |   5 +-
- contrib/virtiofsd/fuse_kernel.h    |   1 +
- contrib/virtiofsd/fuse_lowlevel.c  |   6 +-
- contrib/virtiofsd/passthrough_ll.c | 127 +++++++++++++++++++++++++++++
- contrib/virtiofsd/seccomp.c        |   2 +
- 6 files changed, 140 insertions(+), 3 deletions(-)
-
+diff --git a/contrib/virtiofsd/fuse_common.h b/contrib/virtiofsd/fuse_common.h
+index 4d95f6f28b..5f4af98999 100644
+--- a/contrib/virtiofsd/fuse_common.h
++++ b/contrib/virtiofsd/fuse_common.h
+@@ -64,8 +64,11 @@ struct fuse_file_info {
+ 	   May only be set in ->release(). */
+ 	unsigned int flock_release : 1;
+ 
++	/* Indicates that suid/sgid bits should be removed upon write */
++	unsigned int kill_priv : 1;
++
+ 	/** Padding.  Do not use*/
+-	unsigned int padding : 26;
++	unsigned int padding : 25;
+ 
+ 	/** File handle.  May be filled in by filesystem in open().
+ 	    Available in all other file operations */
+diff --git a/contrib/virtiofsd/fuse_kernel.h b/contrib/virtiofsd/fuse_kernel.h
+index d477c70028..d2b7ccf96b 100644
+--- a/contrib/virtiofsd/fuse_kernel.h
++++ b/contrib/virtiofsd/fuse_kernel.h
+@@ -325,6 +325,7 @@ struct fuse_file_lock {
+  */
+ #define FUSE_WRITE_CACHE	(1 << 0)
+ #define FUSE_WRITE_LOCKOWNER	(1 << 1)
++#define FUSE_WRITE_KILL_PRIV    (1 << 2)
+ 
+ /**
+  * Read flags
+diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
+index 417f99e8dc..ce27a6dd16 100644
+--- a/contrib/virtiofsd/fuse_lowlevel.c
++++ b/contrib/virtiofsd/fuse_lowlevel.c
+@@ -1162,6 +1162,7 @@ static void do_write(fuse_req_t req, fuse_ino_t nodeid,
+ 	memset(&fi, 0, sizeof(fi));
+ 	fi.fh = arg->fh;
+ 	fi.writepage = (arg->write_flags & FUSE_WRITE_CACHE) != 0;
++	fi.kill_priv = !!(arg->write_flags & FUSE_WRITE_KILL_PRIV);
+ 
+ 	if (!compat) {
+ 		fi.lock_owner = arg->lock_owner;
+@@ -1209,6 +1210,7 @@ static void do_write_buf(fuse_req_t req, fuse_ino_t nodeid,
+ 
+ 	fi.fh = arg->fh;
+ 	fi.writepage = !!(arg->write_flags & FUSE_WRITE_CACHE);
++	fi.kill_priv = !!(arg->write_flags & FUSE_WRITE_KILL_PRIV);
+ 
+         if (ibufv->count == 1) {
+ 		assert(!(tmpbufv.buf[0].flags & FUSE_BUF_IS_FD));
 -- 
 2.17.2
 

@@ -1,16 +1,24 @@
-Date: Tue, 13 Aug 2019 11:29:46 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190813182945.w3of5ftnho2k7t5l@US-160370MP2.local>
-References: <1565634725-89726-1-git-send-email-bo.liu@linux.alibaba.com>
-	<1565634725-89726-2-git-send-email-bo.liu@linux.alibaba.com>
-	<5D5214FC.4060804@huawei.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=date:from:to:cc:subject:message-id:references:mime-version
+	:content-disposition:in-reply-to:user-agent;
+	bh=YTSoKdzG15IclUaVeclY6UnOmRKJnRQSxaUgUe43OGE=;
+	b=WamyOoBPhQl4aR/I2S9hb2dSFH0TZDMKGZsasN0a+KYduV8hbPM1rI5GHYAFFZvwUz
+	NyovioVmgsvPHyUQPe4X/eSjitoJGtybboIHRvg9AE08nEt41jparSDYjE42OcQu12mL
+	3eQ01QP/sSh/OvM2hQye68ergBsyClFuGNjTGO5TQp+QHpOpH2fOV6vUUkCYd57KWOe1
+	j4I6I2iWnjupQ5ayC4MKiYNNZh+P97KHx9ItMzSb5ps+bo/p6nLTFl6x1+eBT5ZviKIj
+	lShBjfOKmDamowFFA+kCZ1pPYPKlaJtkBH90t3w4ep0y4vueRc/pc8hk77EvHfHziULr
+	4L8Q==
+Date: Tue, 13 Aug 2019 14:33:09 -0400
+From: Masayoshi Mizuma <msys.mizuma@gmail.com>
+Message-ID: <20190813183307.uxpimpmxau3nhwgb@gabell>
+References: <20190811225534.9040-1-msys.mizuma@gmail.com>
+	<20190813155153.GD32090@stefanha-x1.localdomain>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <5D5214FC.4060804@huawei.com>
-Subject: Re: [Virtio-fs] [PATCH 2/2] virtio-fs: do not removemapping if dmap
- will be used immediately
-Reply-To: bo.liu@linux.alibaba.com
+In-Reply-To: <20190813155153.GD32090@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: Prevent multiply running with
+ same vhost_user_socket
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,138 +27,60 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>
-Cc: virtio-fs@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
-On Tue, Aug 13, 2019 at 09:40:12AM +0800, piaojun wrote:
-> Hi Bo,
+On Tue, Aug 13, 2019 at 04:51:53PM +0100, Stefan Hajnoczi wrote:
+> On Sun, Aug 11, 2019 at 06:55:34PM -0400, Masayoshi Mizuma wrote:
+> > diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
+> > index 8adc4b1ab8..ab18b86435 100644
+> > --- a/contrib/virtiofsd/fuse_lowlevel.c
+> > +++ b/contrib/virtiofsd/fuse_lowlevel.c
+> > @@ -2587,6 +2587,9 @@ void fuse_session_destroy(struct fuse_session *se)
+> >  	free(se->vu_socket_path);
+> >  	se->vu_socket_path = NULL;
+> >  
+> > +	unlink(se->vu_socket_lock_file);
 > 
-> On 2019/8/13 2:32, Liu Bo wrote:
-> > According to how we implement REMOVEMAPPING in daemon, it's unnecessary to
-> > involve a REMOVEMAPPING to reuse a dmap when doing inline reclaim because
-> > dmaps got from inline reclaim get reused for another mapping without being
-> > added back to 'free' dmap pool.
-> > 
-> > This skips REMOVEMAPPING for inline reclaim only and we don't do
-> > REMOVEMAPPING unless someone has raced in to add a dmap to the range.
-> > 
-> > With the following two patches applied,
-> > "virtio-fs: do not removemapping if dmap will be used immediately"
-> > "virtio-fs: try hard to do inline reclaim",
-> > 
-> > fio fio-tmp.job
-> > read: IOPS=8055, BW=31.5MiB/s (32.0MB/s)(3776MiB/120001msec)
+> Are you sure this works?  We should be inside the chroot here, so this
+> is probably not the same file that we created!
+
+Ah, thank you for pointing it out. You're right.
+The namespace is changed into the sandbox after the vhost-user
+socket connection is established.
+I'll remove the unlink().
+
 > 
-> Do you mean the before result is 31.5MB/s and after is 32MB/s? I wonder
-> what is your backend storage?
->
-
-hmm...the 'w/o/ results are listed in the below 'w/o' section.
-
-thanks,
--liubo
-
-> Jun
+> > +        socket_name = malloc(strlen(se->vu_socket_path) + 1);
+> > +        memset(socket_name, 0, strlen(se->vu_socket_path) + 1);
+> > +        memcpy(socket_name, se->vu_socket_path, strlen(se->vu_socket_path));
 > 
-> > clat (usec): min=6, max=1842, avg=113.75, stdev=83.78
-> > clat percentiles (usec):
-> > 95.00th=[  202]
-> > 99.00th=[  221]
-> > 
-> > w/o
-> > read: IOPS=4312, BW=16.8MiB/s (17.7MB/s)(2021MiB/120001msec)
-> > clat (usec): min=10, max=3415, avg=220.98, stdev=102.85
-> > clat percentiles (usec):
-> > 95.00th=[  359]
-> > 99.00th=[  392]
-> > 
-> > [1]:
-> > virtiofsd -o cache="always"
-> > qemu -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs-1,cache-size=4G
-> > 
-> > [2]:
-> > cat fio-tmp.job
-> > 
-> > ; fio-rand-read.job for fiotest
-> > 
-> > [global]
-> > name=fio-rand-read
-> > filename=fio_file
-> > rw=randread
-> > bs=4K
-> > direct=1
-> > numjobs=1
-> > time_based=1
-> > runtime=120
-> > directory=/mnt/test/
-> > 
-> > [file1]
-> > size=10G
-> > ioengine=psync
-> > iodepth=1
-> > 
-> > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
-> > ---
-> >  fs/fuse/file.c | 18 +++++++++++++++---
-> >  1 file changed, 15 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-> > index 2ea670a..b5239b1 100644
-> > --- a/fs/fuse/file.c
-> > +++ b/fs/fuse/file.c
-> > @@ -1933,7 +1933,11 @@ static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
-> >  	if (ret < 0) {
-> >  		printk("fuse_setup_one_mapping() failed. err=%d"
-> >  			" pos=0x%llx, writable=%d\n", ret, pos, writable);
+> These lines can be replaced with:
+> 
+>   socket_name = g_strdup(se->vu_socket_path);
+>   ...
+>   g_free(socket_name);
+
+Thanks.
+
+> 
+> > +        strreplace(socket_name, '/', '.');
 > > +
-> > +		/* liubo: ignore failure if removemapping fails. */
-> > +		dmap_removemapping_one(inode, dmap);
-> >  		dmap_add_to_free_pool(fc, alloc_dmap);
-> > +
-> >  		up_write(&fi->i_dmap_sem);
-> >  		return ret;
-> >  	}
-> > @@ -3996,7 +4000,8 @@ static int dmap_writeback_invalidate(struct inode *inode,
-> >  }
-> >  
-> >  static int reclaim_one_dmap_locked(struct fuse_conn *fc, struct inode *inode,
-> > -				   struct fuse_dax_mapping *dmap)
-> > +				   struct fuse_dax_mapping *dmap,
-> > +				   bool inline_reclaim)
-> >  {
-> >  	int ret;
-> >  	struct fuse_inode *fi = get_fuse_inode(inode);
-> > @@ -4021,6 +4026,13 @@ static int reclaim_one_dmap_locked(struct fuse_conn *fc, struct inode *inode,
-> >  	fuse_dax_interval_tree_remove(dmap, &fi->dmap_tree);
-> >  	fi->nr_dmaps--;
-> >  
-> > +	/*
-> > +	 * for inline reclaim, it's unnecessary to removing mapping since it'll
-> > +	 * be used by another range immediately.
-> > +	 */
-> > +	if (inline_reclaim)
-> > +		return 0;
-> > +
-> >  	ret = dmap_removemapping_one(inode, dmap);
-> >  	if (ret) {
-> >  		pr_warn("Failed to remove mapping. offset=0x%llx len=0x%llx\n",
-> > @@ -4051,7 +4063,7 @@ static int reclaim_one_dmap_locked(struct fuse_conn *fc, struct inode *inode,
-> >  	if (!dmap)
-> >  		return NULL;
-> >  
-> > -	ret = reclaim_one_dmap_locked(fc, inode, dmap);
-> > +	ret = reclaim_one_dmap_locked(fc, inode, dmap, true);
-> >  	if (ret < 0)
-> >  		return ERR_PTR(ret);
-> >  
-> > @@ -4136,7 +4148,7 @@ int lookup_and_reclaim_dmap_locked(struct fuse_conn *fc, struct inode *inode,
-> >  	if (refcount_read(&dmap->refcnt) > 1)
-> >  		return 0;
-> >  
-> > -	ret = reclaim_one_dmap_locked(fc, inode, dmap);
-> > +	ret = reclaim_one_dmap_locked(fc, inode, dmap, false);
-> >  	if (ret < 0)
-> >  		return ret;
-> >  
-> > 
+> > +        se->vu_socket_lock_file = malloc(NAME_MAX);
+> > +        memset(se->vu_socket_lock_file, 0, NAME_MAX);
+> > +        snprintf(se->vu_socket_lock_file, NAME_MAX, "%s/%s.pid",
+> > +			dir, socket_name);
+> 
+> These lines can be replaced with:
+> 
+>   se->vu_socket_lock_file = g_strdup_printf("%s/%s.pid", dir, socket_name);
+> 
+> The difference here is that it won't silently truncate to NAME_MAX.
+> This is probably a good thing since an ENAMETOOLONG error should be
+> reported instead of silently truncating the path.
+
+Got it. I'll fix this.
+
+Thanks!
+Masa
 

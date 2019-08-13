@@ -1,19 +1,11 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-	d=devninja.online; s=google;
-	h=from:to:subject:date:message-id:mime-version:thread-index
-	:content-language;
-	bh=Fu7wT5Zq3De3ZdSedvCMB17WmtedhD9eR6qDeeRem6M=;
-	b=i2HFPa8GI49RRE08+TirYwR7eIjMJsCv9FqE0u+UgWr23SttN6HFBG1KesM68sv+y6
-	ONqciEiLjp/7Wzvfl4AqI1eYimk3abuyBWkdUNhth8fdxjifjkvcNGx1QONIIq1/mYmP
-	3rg+B//9BivKcIT7kZnCZ7ZoDvaoAkDbusjL4=
-From: "James" <james@devninja.online>
-Date: Tue, 13 Aug 2019 10:44:08 +0530
-Message-ID: <3c4b01d55195$fe30ddd0$fa929970$@online>
+From: Cao jin <caoj.fnst@cn.fujitsu.com>
+Message-ID: <16b9edb2-002c-46b8-981b-39323e918cf0@cn.fujitsu.com>
+Date: Tue, 13 Aug 2019 17:03:00 +0800
 MIME-Version: 1.0
-Content-Type: multipart/alternative;
-	boundary="----=_NextPart_000_3C4C_01D551C4.17E919D0"
-Content-Language: en-us
-Subject: [Virtio-fs] App Proposal !!
+Content-Type: text/plain; charset="utf-8"
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: [Virtio-fs] issues with accessing 2 directory trees
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,130 +15,36 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
+Cc: =?UTF-8?B?UWksIEZ1bGkv5paJIOemjw==?=, =?UTF-8?B?5Yip?= <qi.fuli@fujitsu.com>
 
-This is a multipart message in MIME format.
+Hi,
 
-------=_NextPart_000_3C4C_01D551C4.17E919D0
-Content-Type: text/plain;
-	charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+I am trying virtio fs for accessing 2 directory trees, but find it has
+problem when mounting the 2nd one. Hoping to get some hints whether I made
+mistakes or anything else.
 
-Hi  virtio-fs@redhat.com
+steps:
+1. start 2 daemons:
+sudo ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu1 -o source=~/shareguest1/ -o cache=always
+sudo ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu2 -o source=~/shareguest2/ -o cache=always
 
-My name is James, and we are a team of Professional IOS & Android Apps
-developer with 6+ years' experience based in India. Do you need a great App
-adjusted or built from scratch?
+2. qemu command line:
+sudo ./qemu-system-x86_64 -M q35 -cpu host --enable-kvm -smp 2 -m 4G,slots=4,maxmem=8G \
+     -object memory-backend-file,id=mem,size=4G,mem-path=/dev/shm,share=on -numa node,memdev=mem \
+     -chardev socket,id=char0,path=/tmp/vhostqemu1 -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs1,cache-size=1G \
+     -chardev socket,id=char1,path=/tmp/vhostqemu2 -device vhost-user-fs-pci,queue-size=1024,chardev=char1,tag=myfs2,cache-size=1G \
+     --serial stdio -netdev tap,id=net0 -device virtio-net-pci,netdev=net0,id=net0,mac=52:54:00:72:20:55
+     -drive if=virtio,file=~/iso/f28s.qcow2
 
-Reply me if you need any kinds of help in mobile Apps.
+Then, guest console report error when probing 2nd virtiofs device with:
+[    2.809341] virtio_fs virtio1: Cache len: 0x40000000 @ 0x3c0000000
+[    2.811204] x86/PAT: systemd-udevd:266 conflicting memory types 3c0000000-408000000 write-back<->uncached-minus
+[    2.813309] x86/PAT: reserve_memtype failed [mem 0x3c0000000-0x407ffffff], track write-back, req write-back
+[    2.924576] virtio_fs: probe of virtio1 failed with error -16
 
-Thanks & Regards,
+So, mount will not success on the 2nd directory tree.
+-- 
+Sincerely,
+Cao jin
 
-James,
-
-Web Development Manager
-
-
-------=_NextPart_000_3C4C_01D551C4.17E919D0
-Content-Type: text/html;
-	charset="us-ascii"
-Content-Transfer-Encoding: quoted-printable
-
-<html xmlns:v=3D"urn:schemas-microsoft-com:vml" =
-xmlns:o=3D"urn:schemas-microsoft-com:office:office" =
-xmlns:w=3D"urn:schemas-microsoft-com:office:word" =
-xmlns:m=3D"http://schemas.microsoft.com/office/2004/12/omml" =
-xmlns=3D"http://www.w3.org/TR/REC-html40">
-
-<head>
-<META HTTP-EQUIV=3D"Content-Type" CONTENT=3D"text/html; =
-charset=3Dus-ascii">
-<meta name=3DGenerator content=3D"Microsoft Word 12 (filtered medium)">
-<style>
-<!--
- /* Font Definitions */
- @font-face
-	{font-family:"Cambria Math";
-	panose-1:2 4 5 3 5 4 6 3 2 4;}
-@font-face
-	{font-family:Calibri;
-	panose-1:2 15 5 2 2 2 4 3 2 4;}
- /* Style Definitions */
- p.MsoNormal, li.MsoNormal, div.MsoNormal
-	{margin:0in;
-	margin-bottom:.0001pt;
-	font-size:12.0pt;
-	font-family:"Times New Roman","serif";}
-a:link, span.MsoHyperlink
-	{mso-style-priority:99;
-	color:blue;
-	text-decoration:underline;}
-a:visited, span.MsoHyperlinkFollowed
-	{mso-style-priority:99;
-	color:purple;
-	text-decoration:underline;}
-.MsoChpDefault
-	{mso-style-type:export-only;}
-.MsoPapDefault
-	{mso-style-type:export-only;
-	margin-bottom:10.0pt;
-	line-height:115%;}
-@page Section1
-	{size:8.5in 11.0in;
-	margin:1.0in 1.0in 1.0in 1.0in;}
-div.Section1
-	{page:Section1;}
--->
-</style>
-<!--[if gte mso 9]><xml>
- <o:shapedefaults v:ext=3D"edit" spidmax=3D"1026" />
-</xml><![endif]--><!--[if gte mso 9]><xml>
- <o:shapelayout v:ext=3D"edit">
-  <o:idmap v:ext=3D"edit" data=3D"1" />
- </o:shapelayout></xml><![endif]-->
-</head>
-
-<body lang=3DEN-US link=3Dblue vlink=3Dpurple>
-
-<div class=3DSection1>
-
-<p class=3DMsoNormal =
-style=3D'mso-margin-top-alt:auto;margin-bottom:10.0pt;
-line-height:115%'><span style=3D'color:#7030A0'>Hi&nbsp; =
-<b><u>virtio-fs@redhat.com</u></b></span></p>
-
-<p class=3DMsoNormal =
-style=3D'mso-margin-top-alt:auto;margin-bottom:10.0pt;
-line-height:115%'><span style=3D'color:#7030A0'>My name is <b>James</b>, =
-and we
-are a team of Professional IOS &amp; Android Apps developer with <b>6+
-years&#8217;</b> experience based in<b> India</b>. Do you need a great =
-App
-adjusted or built from scratch?</span></p>
-
-<p class=3DMsoNormal =
-style=3D'mso-margin-top-alt:auto;margin-bottom:10.0pt;
-line-height:115%'><span style=3D'color:#7030A0'>Reply me if you need any =
-kinds of
-help in mobile Apps.</span></p>
-
-<p class=3DMsoNormal =
-style=3D'mso-margin-top-alt:auto;mso-margin-bottom-alt:auto;
-line-height:115%'><span style=3D'color:#7030A0'>Thanks &amp; =
-Regards,</span></p>
-
-<p class=3DMsoNormal =
-style=3D'mso-margin-top-alt:auto;mso-margin-bottom-alt:auto;
-line-height:115%'><b><span style=3D'color:#7030A0'>James</span></b><span
-style=3D'color:#7030A0'>,</span></p>
-
-<p class=3DMsoNormal><span style=3D'color:#7030A0'>Web Development =
-Manager</span></p>
-
-</div>
-
-</body>
-
-</html>
-
-------=_NextPart_000_3C4C_01D551C4.17E919D0--
 

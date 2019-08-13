@@ -1,15 +1,12 @@
-References: <5D4CC344.7030706@huawei.com>
-	<20190811020659.GB13456@ali-6c96cfe09cf9.local>
-From: piaojun <piaojun@huawei.com>
-Message-ID: <ba984781-dc70-8633-7cb4-6ccd00e4e23e@huawei.com>
-Date: Sun, 11 Aug 2019 10:46:02 +0800
+Date: Tue, 13 Aug 2019 09:06:15 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190813130615.GA24174@redhat.com>
+References: <16b9edb2-002c-46b8-981b-39323e918cf0@cn.fujitsu.com>
 MIME-Version: 1.0
-In-Reply-To: <20190811020659.GB13456@ali-6c96cfe09cf9.local>
-Content-Type: text/plain; charset="gbk"
-Content-Language: en-US
-Content-Transfer-Encoding: base64
-Subject: Re: [Virtio-fs] [PATCH v4 0/2] virtiofsd: Improve io bandwidth by
- replacing pwrite with pwritev
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <16b9edb2-002c-46b8-981b-39323e918cf0@cn.fujitsu.com>
+Subject: Re: [Virtio-fs] issues with accessing 2 directory trees
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,86 +15,49 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Eric Ren <renzhen@linux.alibaba.com>
-Cc: virtio-fs@redhat.com
+To: Cao jin <caoj.fnst@cn.fujitsu.com>
+Cc: virtio-fs@redhat.com, =?utf-8?B?5Yip?= <qi.fuli@fujitsu.com>, =?UTF-8?B?UWksIEZ1bGkv5paJIOemjw==?=@redhat.com
 
-CgpPbiAyMDE5LzgvMTEgMTA6MDYsIEVyaWMgUmVuIHdyb3RlOgo+IEhpIGp1biwKPiAKPiBPbiBG
-cmksIEF1ZyAwOSwgMjAxOSBhdCAwODo1MDoxMkFNICswODAwLCBwaWFvanVuIHdyb3RlOgo+PiA+
-RnJvbSBteSB0ZXN0LCB3cml0ZSBiYW5kd2lkdGggd2lsbCBiZSBpbXByb3ZlZCBncmVhdGx5IGJ5
-IHJlcGxhY2luZwo+PiBwd3JpdGUgd2l0aCBwd3JpdGV2LCBhbmQgdGhlIHRlc3QgcmVzdWx0IGFz
-IGJlbG93Ogo+IAo+IENvdWxkIHlvdSBzaGFyZSBtb3JlIGluZm9ybWF0aW9uIGFib3V0IHRoaXMg
-dGVzdGluZz8KPiAKPiAtIGFyZ3MgZm9yIHFlbXU6IGNhY2hlIHNpemU/Cj4gLSBhcmdzIGZvciB2
-aXJ0aW9mc2Q6IHdoaWNoIGNhY2hlIG1vZGWjvwo+IC0gREFYIGlzIHVzZWQsIHJpZ2h0PwoKREFY
-IGlzIGRpc2FibGVkLCBhcyB0aGlzIG9wdGltaXphdGlvbiBvbmx5IHdvcmtzIG9uIEhvc3Qgc2lk
-ZS4KCj4gCj4gLSB3aGljaCBraW5kIG9mIGRpc2sgYXJlIHlvdSB1c2luZywgd2hhdCdzIHRoZW4g
-SU9QUy9CVyBsaW1pdD8KPiAKPiBJIHRyaWVkIHRoaXMgcGF0Y2ggd2l0aCBIREQgZGlzayAtIElP
-UFM6NTAwMCwgQlc6IDE0ME1CL3MuCgpJIHVzZWQgRVhUNCBhbmQgcmFtZGlzayBhcyBiYWNrZW5k
-IGRldmljZS4KCj4gCj4gLSBWTTogNCB2Y3B1cywgOEcgbWVtCj4gLSBjYWNoZT1hbHdheXMsIGNh
-Y2hlLXNpemU9OEcsIERBWAo+IC0gZmlvIGpvYgo+IAo+IGBgYAo+IFtnbG9iYWxdCj4gZnN5bmM9
-MAo+IG5hbWU9dmlydGlvZnMtdGVzdAo+IGZpbGVuYW1lPWZpby10ZXN0Cj4gZGlyZWN0b3J5PSRt
-bnRkaXIgICAjIHNoYXJlIGRpciBmb3IgdGVzdCBzaXR0aW5nIG9uIHRoZSBkaXNrCj4gcnc9cmFu
-ZHdyaXRlCj4gYnM9NEsKCipicyogc2hvdWxkIGJlIDFNIGZvciBiYW5kd2lkdGggdGVzdCB3aGlj
-aCBtYWtlcyB3cml0ZXYgd29ya3Mgd2VsbC4KCj4gZGlyZWN0PTEKPiBudW1qb2JzPTEKPiB0aW1l
-X2Jhc2VkPTAKPiAKPiBbZmlsZTFdCj4gc2l6ZT0yRwo+IGlvX3NpemU9NDBNCj4gaW9lbmdpbmU9
-bGliYWlvCj4gaW9kZXB0aD0xMjgKPiBgYGAKPiAtIHdpdGhvdXQgdGhpcyBwYXRjaAo+IAo+IGBg
-YAo+IGZpbGUxOiAoZz0wKTogcnc9cmFuZHdyaXRlLCBicz0oUikgNDA5NkItNDA5NkIsIChXKSA0
-MDk2Qi00MDk2QiwgKFQpIDQwOTZCLTQwOTZCLCBpb2VuZ2luZT1saWJhaW8sIGlvZGVwdGg9MTI4
-Cj4gZmlvLTMuMQo+IFN0YXJ0aW5nIDEgcHJvY2Vzcwo+IAo+IGZpbGUxOiAoZ3JvdXBpZD0wLCBq
-b2JzPTEpOiBlcnI9IDA6IHBpZD0xMTogU2F0IEF1ZyAxMCAxMTozMzoyOSAyMDE5Cj4gICB3cml0
-ZTogSU9QUz05ODUsIEJXPTM5NDJLaUIvcyAoNDAzN2tCL3MpKDQwLjBNaUIvMTAzOTBtc2VjKQo+
-IGBgYAo+IAo+IC0gd2l0aCB0aGlzIHBhdGNoIGFwcGxpZWQKPiAKPiBgYGAKPiBmaWxlMTogKGc9
-MCk6IHJ3PXJhbmR3cml0ZSwgYnM9KFIpIDQwOTZCLTQwOTZCLCAoVykgNDA5NkItNDA5NkIsIChU
-KSA0MDk2Qi00MDk2QiwgaW9lbmdpbmU9bGliYWlvLCBpb2RlcHRoPTEyOAo+IGZpby0zLjEKPiBT
-dGFydGluZyAxIHByb2Nlc3MKPiAKPiBmaWxlMTogKGdyb3VwaWQ9MCwgam9icz0xKTogZXJyPSAw
-OiBwaWQ9MTA6IFNhdCBBdWcgMTAgMTU6MzE6NTcgMjAxOQo+ICAgd3JpdGU6IElPUFM9MTA1Niwg
-Qlc9NDIyNEtpQi9zICg0MzI2a0IvcykoNDAuME1pQi85Njk2bXNlYykKPiAKPiBgYGAKPiAKPiB0
-aGUgbnVtYmVyIGlzIGV2ZW4gd29yc2UgdGhhbiA5cGZzLgoKUGxlYXNlIG1vZGlmeSB5b3VyIHRl
-c3RjYXNlIGFzIG1lbnRpb25lZCBhYm92ZSwgYW5kIHNoYXJlIHlvdXIgcmVzdWx0CmFnYWluLiBJ
-J20gZ2xhZCB0byBmaW5kIG91dCB3aGVyZSB0aGUgcHJvYmxlbSBpcy4KCkp1bgoKPiAKPiBUaGFu
-a3MsCj4gRXJpYwo+IAo+Pgo+PiAtLS0KPj4gcHdyaXRlOgo+PiAjIGZpbyAtZGlyZWN0PTEgLXRp
-bWVfYmFzZWQgLWlvZGVwdGg9NjQgLXJ3PXJhbmR3cml0ZSAtaW9lbmdpbmU9bGliYWlvIC1icz0x
-TSAtc2l6ZT0xRyAtbnVtam9iPTE2IC1ydW50aW1lPTMwIC1ncm91cF9yZXBvcnRpbmcgLW5hbWU9
-ZmlsZSAtZmlsZW5hbWU9L21udC92aXJ0aW9mcy9maWxlCj4+IGZpbGU6IChnPTApOiBydz1yYW5k
-d3JpdGUsIGJzPTFNLTFNLzFNLTFNLzFNLTFNLCBpb2VuZ2luZT1saWJhaW8sIGlvZGVwdGg9NjQK
-Pj4gLi4uCj4+IGZpby0yLjEzCj4+IFN0YXJ0aW5nIDE2IHByb2Nlc3Nlcwo+PiBKb2JzOiAxNiAo
-Zj0xNik6IFt3KDE2KV0gWzEwMC4wJSBkb25lXSBbMEtCLzg4Ni4wTUIvMEtCIC9zXSBbMC84ODYv
-MCBpb3BzXSBbZXRhIDAwbTowMHNdCj4+IGZpbGU6IChncm91cGlkPTAsIGpvYnM9MTYpOiBlcnI9
-IDA6IHBpZD01Nzk5OiBUdWUgQXVnIDYgMTg6NDg6MjYgMjAxOQo+PiB3cml0ZTogaW89MjY4ODFN
-QiwgYnc9OTE2OTg4S0IvcywgaW9wcz04OTUsIHJ1bnQ9IDMwMDE4bXNlYwo+Pgo+PiBwd3JpdGV2
-Ogo+PiAjIGZpbyAtZGlyZWN0PTEgLXRpbWVfYmFzZWQgLWlvZGVwdGg9NjQgLXJ3PXJhbmR3cml0
-ZSAtaW9lbmdpbmU9bGliYWlvIC1icz0xTSAtc2l6ZT0xRyAtbnVtam9iPTE2IC1ydW50aW1lPTMw
-IC1ncm91cF9yZXBvcnRpbmcgLW5hbWU9ZmlsZSAtZmlsZW5hbWU9L21udC92aXJ0aW9mcy9maWxl
-Cj4+IGZpbGU6IChnPTApOiBydz1yYW5kd3JpdGUsIGJzPTFNLTFNLzFNLTFNLzFNLTFNLCBpb2Vu
-Z2luZT1saWJhaW8sIGlvZGVwdGg9NjQKPj4gLi4uCj4+IGZpby0yLjEzCj4+IFN0YXJ0aW5nIDE2
-IHByb2Nlc3Nlcwo+PiBKb2JzOiAxNiAoZj0xNik6IFt3KDE2KV0gWzEwMC4wJSBkb25lXSBbMEtC
-LzE3OTNNQi8wS0IgL3NdIFswLzE3OTMvMCBpb3BzXSBbZXRhIDAwbTowMHNdCj4+IGZpbGU6IChn
-cm91cGlkPTAsIGpvYnM9MTYpOiBlcnI9IDA6IHBpZD02MzI4OiBUdWUgQXVnIDYgMTg6MjI6MTcg
-MjAxOQo+PiB3cml0ZTogaW89NTI3NzVNQiwgYnc9MTc1OC43TUIvcywgaW9wcz0xNzU4LCBydW50
-PSAzMDAwOW1zZWMKPj4gLS0tCj4+Cj4+IFRoaXMgcGF0Y2ggaW50cm9kdWNlcyB3cml0ZXYgYW5k
-IHB3cml0ZXYgZm9yIGxvX3dyaXRlX2J1ZigpLiBJIHRyaWVkIG15Cj4+IGJlc3Qgbm90IGRvaW5n
-IGhhcm0gdG8gdGhlIG9yaWdpbiBjb2RlIGNvbnN0cnVjdCwgYW5kIHRoZXJlIHdpbGwgYmUKPj4g
-c29tZSAqdXNlbGVzcyogYnJhbmNoZXMgaW4gZnVzZV9idWZfY29weV9vbmUoKSB3aGljaCBhcmUg
-aGFyZCB0byBqdWRnZQo+PiBpZiB0aGV5IHdpbGwgYmUgdXNlZnVsIGluIHRoZSBmdXR1cmUuIFNv
-IEkganVzdCBsZWF2ZSB0aGVtIGFsb25lCj4+IHNhZmVseS4gSWYgdGhlIGNsZWFudXAgd29yayBp
-cyBuZWNlc3NhcnksIHBsZWFzZSBsZXQgbWUga25vdy4KPj4KPj4gdjIKPj4gICAtIFNwbGl0IGlu
-dG8gdHdvIHBhdGNoZXMKPj4gICAtIEFkZCB0aGUgbG9zdCBmbGFncyBzdXBwb3J0LCBzdWNoIGFz
-IEZVU0VfQlVGX1BIWVNfQUREUgo+Pgo+PiB2Mwo+PiAgIC0gdXNlIGdpdCBzZW5kLWVtYWlsIHRv
-IG1ha2UgdGhlIHBhdGNoIHNldCBpbiBvbmUgdGhyZWFkCj4+ICAgLSBtb3ZlIGZ1c2VfYnVmX3dy
-aXRldigpIGludG8gZnVzZV9idWZfY29weSgpCj4+ICAgLSB1c2Ugd3JpdGV2IGZvciB0aGUgc3Jj
-IGJ1ZmZlcnMgd2hlbiB0aGV5J3JlIGFscmVhZCBhbHJlYWR5IG1hcHBlZCBieSB0aGUgZGFlbW9u
-IHByb2Nlc3MKPj4gICAtIHVzZSBjYWxsb2MgdG8gcmVwbGFjZSBtYWxsb2MKPj4gICAtIHNldCBy
-ZXMgMCBpZiB3cml0ZXYoKSByZXR1cm5zIDAKPj4KPj4gdjQKPj4gICAtIGl0ZXJhdGUgZnJvbSBp
-bl9idWYtPmJ1ZlswXSByYXRoZXIgdGhhbiBidWZbMV0KPj4gICAtIG9wdGltaXplIHRoZSBjb2Rl
-IHRvIG1ha2UgaXQgbW9yZSBlbGVnYW50Cj4+Cj4+IEp1biBQaWFvICgyKToKPj4gICBhZGQgZGVm
-aW5pdGlvbiBvZiBmdXNlX2J1Zl93cml0ZXYoKS4KPj4gICB1c2UgZnVzZV9idWZfd3JpdGV2IHRv
-IHJlcGxhY2UgZnVzZV9idWZfd3JpdGUgZm9yIGJldHRlciBwZXJmb3JtYW5jZQo+Pgo+PiBTaWdu
-ZWQtb2ZmLWJ5OiBKdW4gUGlhbyA8cGlhb2p1bkBodWF3ZWkuY29tPgo+PiBTdWdnZXN0ZWQtYnk6
-IERyLiBEYXZpZCBBbGFuIEdpbGJlcnQgPGRnaWxiZXJ0QHJlZGhhdC5jb20+Cj4+IFN1Z2dlc3Rl
-ZC1ieTogU3RlZmFuIEhham5vY3ppIDxzdGVmYW5oYUByZWRoYXQuY29tPgo+PiAtLS0KPj4gIGJ1
-ZmZlci5jICAgICAgfCAgIDQ4ICsrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysr
-KysrKysrKysrKwo+PiAgZnVzZV9jb21tb24uaCB8ICAgMTQgKysrKysrKysrKysrKysKPj4gIHNl
-Y2NvbXAuYyAgICAgfCAgICAyICsrCj4+ICAzIGZpbGVzIGNoYW5nZWQsIDY0IGluc2VydGlvbnMo
-KykKPj4gLS0KPj4KPj4gX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX18KPj4gVmlydGlvLWZzIG1haWxpbmcgbGlzdAo+PiBWaXJ0aW8tZnNAcmVkaGF0LmNvbQo+
-PiBodHRwczovL3d3dy5yZWRoYXQuY29tL21haWxtYW4vbGlzdGluZm8vdmlydGlvLWZzCj4gLgo+
-IAoK
+On Tue, Aug 13, 2019 at 05:03:00PM +0800, Cao jin wrote:
+> Hi,
+> 
+> I am trying virtio fs for accessing 2 directory trees, but find it has
+> problem when mounting the 2nd one. Hoping to get some hints whether I made
+> mistakes or anything else.
+> 
+> steps:
+> 1. start 2 daemons:
+> sudo ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu1 -o source=~/shareguest1/ -o cache=always
+> sudo ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu2 -o source=~/shareguest2/ -o cache=always
+> 
+> 2. qemu command line:
+> sudo ./qemu-system-x86_64 -M q35 -cpu host --enable-kvm -smp 2 -m 4G,slots=4,maxmem=8G \
+>      -object memory-backend-file,id=mem,size=4G,mem-path=/dev/shm,share=on -numa node,memdev=mem \
+>      -chardev socket,id=char0,path=/tmp/vhostqemu1 -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs1,cache-size=1G \
+>      -chardev socket,id=char1,path=/tmp/vhostqemu2 -device vhost-user-fs-pci,queue-size=1024,chardev=char1,tag=myfs2,cache-size=1G \
+>      --serial stdio -netdev tap,id=net0 -device virtio-net-pci,netdev=net0,id=net0,mac=52:54:00:72:20:55
+>      -drive if=virtio,file=~/iso/f28s.qcow2
+> 
+> Then, guest console report error when probing 2nd virtiofs device with:
+> [    2.809341] virtio_fs virtio1: Cache len: 0x40000000 @ 0x3c0000000
+> [    2.811204] x86/PAT: systemd-udevd:266 conflicting memory types 3c0000000-408000000 write-back<->uncached-minus
+> [    2.813309] x86/PAT: reserve_memtype failed [mem 0x3c0000000-0x407ffffff], track write-back, req write-back
+> [    2.924576] virtio_fs: probe of virtio1 failed with error -16
+> 
+> So, mount will not success on the 2nd directory tree.
+
+I have seen similar issues even with single device if I try to use
+very small cache size (say 16M). 
+
+Can you paste your /proc/iomem output. I think basic problem seems to
+be that some other component already reserved resource with certain
+properties and what we are trying reserve somehow overlaps a bit
+(due to alignement etc) with already reserved resource and hence
+reservation fails.
+
+Can you try cache-size=4G or cache-size=8G on both the devices and see
+if that works.
+
+Thanks
+Vivek
+

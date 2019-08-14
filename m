@@ -1,12 +1,12 @@
-Date: Wed, 14 Aug 2019 18:14:43 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190814171443.GR2920@work-vm>
-References: <5D478C13.3020406@huawei.com>
+Date: Wed, 14 Aug 2019 13:35:30 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190814173530.GA7475@redhat.com>
+References: <1565634725-89726-1-git-send-email-bo.liu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <5D478C13.3020406@huawei.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: move assert just after calloc()
+In-Reply-To: <1565634725-89726-1-git-send-email-bo.liu@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH 1/2] virtio-fs: try hard to do inline reclaim
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,43 +15,92 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>
+To: Liu Bo <bo.liu@linux.alibaba.com>
 Cc: virtio-fs@redhat.com
 
-* piaojun (piaojun@huawei.com) wrote:
-> It's better to assert NULL pointer just after calloc().
+On Tue, Aug 13, 2019 at 02:32:04AM +0800, Liu Bo wrote:
+> The difference between inline dmap reclaim and background dmap reclaim is
+> that dmaps got from inline reclaim get reused for another mapping
+> immediately, according to how we implement REMOVEMAPPING in daemon, it's
+> unnecessary to involve a REMOVEMAPPING to reuse a dmap.
 > 
-> Signed-off-by: Jun Piao <piaojun@huawei.com>
+> Currently we always kick background reclaim before doing inline reclaim,
+> but some lock contention on i_dmap_lock from background reclaim results in
+> performance loss for dax read/write.
 
-Thanks, squashed into 'virtiofsd: Start queue threads'
+How much is the performance gain by preferring inline reclaim?
 
-Dave
+Given how complex dax range reclaim code is becoming, I prefer to
+avoid taking anything which comes only with very small gains.
 
+Thanks
+Vivek
+
+> 
+> This makes read/write first try hard to do inline reclaim, then kick
+> background reclaim if it makes no progress.
+> 
+> Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
 > ---
->  contrib/virtiofsd/fuse_virtio.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  fs/fuse/file.c | 17 ++++++++++++++---
+>  1 file changed, 14 insertions(+), 3 deletions(-)
 > 
-> diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
-> index d543c6d..8a4f627 100644
-> --- a/contrib/virtiofsd/fuse_virtio.c
-> +++ b/contrib/virtiofsd/fuse_virtio.c
-> @@ -748,9 +748,9 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
->                  }
->                  if (!vud->qi[qidx]) {
->                          vud->qi[qidx] = calloc(sizeof(struct fv_QueueInfo), 1);
-> +                        assert(vud->qi[qidx]);
->                          vud->qi[qidx]->virtio_dev = vud;
->                          vud->qi[qidx]->qidx = qidx;
-> -                        assert(vud->qi[qidx]);
->                  } else {
->                          /* Shouldn't have been started */
->                          assert(vud->qi[qidx]->kick_fd == -1);
+> diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+> index ae197be..2ea670a 100644
+> --- a/fs/fuse/file.c
+> +++ b/fs/fuse/file.c
+> @@ -203,7 +203,8 @@ static void kick_dmap_free_worker(struct fuse_conn *fc, unsigned long delay_ms)
+>  	spin_unlock(&fc->lock);
+>  }
+>  
+> -static struct fuse_dax_mapping *alloc_dax_mapping(struct fuse_conn *fc)
+> +static struct fuse_dax_mapping *__alloc_dax_mapping(struct fuse_conn *fc,
+> +						    bool bg_reclaim)
+>  {
+>  	struct fuse_dax_mapping *dmap = NULL;
+>  
+> @@ -224,9 +225,14 @@ static struct fuse_dax_mapping *alloc_dax_mapping(struct fuse_conn *fc)
+>  	spin_unlock(&fc->lock);
+>  
+>  out_kick:
+> -	kick_dmap_free_worker(fc, 0);
+> +	if (bg_reclaim)
+> +		kick_dmap_free_worker(fc, 0);
+>  	return dmap;
+>  }
+> +static struct fuse_dax_mapping *alloc_dax_mapping(struct fuse_conn *fc)
+> +{
+> +	return __alloc_dax_mapping(fc, true);
+> +}
+>  
+>  /* This assumes fc->lock is held */
+>  static void __dmap_remove_busy_list(struct fuse_conn *fc,
+> @@ -4085,7 +4091,7 @@ static struct fuse_dax_mapping *alloc_dax_mapping_reclaim(struct fuse_conn *fc,
+>  	struct fuse_inode *fi = get_fuse_inode(inode);
+>  
+>  	while(1) {
+> -		dmap = alloc_dax_mapping(fc);
+> +		dmap = __alloc_dax_mapping(fc, false);
+>  		if (dmap)
+>  			return dmap;
+>  
+> @@ -4099,6 +4105,11 @@ static struct fuse_dax_mapping *alloc_dax_mapping_reclaim(struct fuse_conn *fc,
+>  		 * Wait for one.
+>  		 */
+>  		if (!(fc->nr_free_ranges > 0)) {
+> +			/* try again with background reclaim. */
+> +			dmap = alloc_dax_mapping(fc);
+> +			if (dmap)
+> +				return dmap;
+> +
+>  			if (wait_event_killable_exclusive(fc->dax_range_waitq,
+>  					(fc->nr_free_ranges > 0)))
+>  				return ERR_PTR(-EINTR);
 > -- 
+> 1.8.3.1
 > 
 > _______________________________________________
 > Virtio-fs mailing list
 > Virtio-fs@redhat.com
 > https://www.redhat.com/mailman/listinfo/virtio-fs
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

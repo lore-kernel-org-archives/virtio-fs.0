@@ -1,15 +1,13 @@
-Date: Wed, 14 Aug 2019 13:52:35 +0100
+Date: Wed, 14 Aug 2019 13:53:45 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190814125235.GC23970@stefanha-x1.localdomain>
-References: <5D4CC344.7030706@huawei.com>
- <5D4CC400.9040606@huawei.com>
+Message-ID: <20190814125345.GD23970@stefanha-x1.localdomain>
+References: <5D53919A.4@huawei.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="wxDdMuZNg1r63Hyj"
+	protocol="application/pgp-signature"; boundary="Q0rSlbzrZN6k9QnT"
 Content-Disposition: inline
-In-Reply-To: <5D4CC400.9040606@huawei.com>
-Subject: Re: [Virtio-fs] [PATCH v4 2/2] virtiofsd: use fuse_buf_writev to
- replace fuse_buf_write for better performance
+In-Reply-To: <5D53919A.4@huawei.com>
+Subject: Re: [Virtio-fs] [PATCH] virtio: clean up unused 'char *bar_name'
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,65 +20,35 @@ To: piaojun <piaojun@huawei.com>
 Cc: virtio-fs@redhat.com
 
 
---wxDdMuZNg1r63Hyj
+--Q0rSlbzrZN6k9QnT
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Fri, Aug 09, 2019 at 08:53:20AM +0800, piaojun wrote:
-> diff --git a/contrib/virtiofsd/buffer.c b/contrib/virtiofsd/buffer.c
-> index cec762f..d127c45 100644
-> --- a/contrib/virtiofsd/buffer.c
-> +++ b/contrib/virtiofsd/buffer.c
-> @@ -318,11 +318,22 @@ static int fuse_bufvec_advance(struct fuse_bufvec *=
-bufv, size_t len)
->  ssize_t fuse_buf_copy(fuse_req_t req, struct fuse_bufvec *dstv, struct f=
-use_bufvec *srcv,
->  		      enum fuse_buf_copy_flags flags)
->  {
-> +	size_t i;
->  	size_t copied =3D 0;
+On Wed, Aug 14, 2019 at 12:44:10PM +0800, piaojun wrote:
+> Clean up 'char *bar_name' to avoid compile warning.
 >=20
->  	if (dstv =3D=3D srcv)
->  		return fuse_buf_size(dstv);
->=20
-> +	/* use writev to improve bandwidth when all the
-> +	 * src buffers already mapped by the daemon
-> +	 * process */
+> Signed-off-by: Jun Piao <piaojun@huawei.com>
+> ---
+>  drivers/virtio/virtio_pci_modern.c | 1 -
+>  1 file changed, 1 deletion(-)
 
-Some more checks to make this generic:
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
-> +	for (i =3D 0; i < srcv->count; i++) {
-> +		if (srcv->buf[i].flags & FUSE_BUF_PHYS_ADDR)
-> +			break;
-
-                if (srcv->buf[i].flags & FUSE_BUF_IS_FD)
-		        break;
-
-> +	}
-> +	if (i =3D=3D srcv->count)
-
-Please verify the preconditions for the destination buffer too:
-
-  && dstv->count =3D=3D 1 && dstv->idx =3D=3D 0 && dstv->off =3D=3D 0 &&
-  (dstv->buf[0].flags & FUSE_BUF_IS_FD)
-
-> +		return fuse_buf_writev(req, &dstv->buf[0], srcv);
-
---wxDdMuZNg1r63Hyj
+--Q0rSlbzrZN6k9QnT
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1UBBMACgkQnKSrs4Gr
-c8iIiQf9GiZUe4iKHBbLTsmFN6BdXfxgpb4WhmlibBMkdPAe97BK9uXr3ayDs7Lw
-w01dTwMc3OQ6qaaBiMcv5UYNVFhfvl3rmEd003bzbKX9R16oaHd1Fi6GWlK5otLP
-KGl6wYohboZYbubXk3o21ekYqTxCPDtRZKI/REA1EWi8Ptlx6RE9Pq77uLRlOSr8
-VquS8XN9eCUr3/yl3Uop/Rq+bzwBH1q6XR5jZpfGa4ScNpm/PYO7xRBe5jTKPSjD
-l9wn6D8+wdwcBaPLQyPPdIxkbrCiAt7/Zrkr2P+OA4nSIMW/hN9IPjP7gXApi6h9
-LoteORD+4sh37135QGB/YO3WReaKEw==
-=RfvT
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1UBFkACgkQnKSrs4Gr
+c8j/awf/dMeTuZhYgHaHq7r79ouk9NUiALuiq3GJThfH/A3z4l9Z3p6cO28iu0/T
+qubOb1XT2PDoMbRgPAVeyLHxO1240NVdOGnrShT8ZJtccJBaYpE9NATcIwg1vx2r
+hnEHPsmf176OC1zQ4EblzeqBWTzU2/qr5xf5BoRy9ELObpvKzAOXpq9gzwsAXFwM
+lGWjztfWes5oaRQXKfBUv9n8SAHRKE0VYervW6lSpxBGU2ZoaGteDieh7NlwsDPQ
+N6qA3yw3IOIcb+D57Ws2SGj5TFlVS4TMSz5stIK1n/oVLVgT41zkJZkA6BJhk7zm
+FCK7wHmNxP48q1FX/BzxcM+qvqqUzw==
+=zEK9
 -----END PGP SIGNATURE-----
 
---wxDdMuZNg1r63Hyj--
+--Q0rSlbzrZN6k9QnT--
 

@@ -1,14 +1,11 @@
-Date: Wed, 14 Aug 2019 10:28:52 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190814092852.GC2920@work-vm>
-References: <20190813192944.26009-1-vgoyal@redhat.com>
-	<20190813192944.26009-4-vgoyal@redhat.com>
+From: piaojun <piaojun@huawei.com>
+Message-ID: <5D53D882.5090803@huawei.com>
+Date: Wed, 14 Aug 2019 17:46:42 +0800
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20190813192944.26009-4-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 3/4] virtiofsd: Parse flag
-	FUSE_WRITE_KILL_PRIV
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+Subject: [Virtio-fs] [PATCH][RFC] viriofsd: do not fall back to buffer io
+	when cache=auto
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,75 +14,38 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com
+To: virtio-fs@redhat.com
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> Caller can set FUSE_WRITE_KILL_PRIV in write_flags. Parse it and pass it
-> to the filesystem.
-> 
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Direct io flags will be tured off even if cache=auto, which seems a
+little bit strange. It's better to keep the open flags set by user. If
+I missed the discussion about this issue, please let me know, thanks.
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Signed-off-by: Jun Piao <piaojun@huawei.com>
+---
+ contrib/virtiofsd/passthrough_ll.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> ---
->  contrib/virtiofsd/fuse_common.h   | 5 ++++-
->  contrib/virtiofsd/fuse_kernel.h   | 1 +
->  contrib/virtiofsd/fuse_lowlevel.c | 2 ++
->  3 files changed, 7 insertions(+), 1 deletion(-)
-> 
-> diff --git a/contrib/virtiofsd/fuse_common.h b/contrib/virtiofsd/fuse_common.h
-> index 4d95f6f28b..5f4af98999 100644
-> --- a/contrib/virtiofsd/fuse_common.h
-> +++ b/contrib/virtiofsd/fuse_common.h
-> @@ -64,8 +64,11 @@ struct fuse_file_info {
->  	   May only be set in ->release(). */
->  	unsigned int flock_release : 1;
->  
-> +	/* Indicates that suid/sgid bits should be removed upon write */
-> +	unsigned int kill_priv : 1;
-> +
->  	/** Padding.  Do not use*/
-> -	unsigned int padding : 26;
-> +	unsigned int padding : 25;
->  
->  	/** File handle.  May be filled in by filesystem in open().
->  	    Available in all other file operations */
-> diff --git a/contrib/virtiofsd/fuse_kernel.h b/contrib/virtiofsd/fuse_kernel.h
-> index d477c70028..d2b7ccf96b 100644
-> --- a/contrib/virtiofsd/fuse_kernel.h
-> +++ b/contrib/virtiofsd/fuse_kernel.h
-> @@ -325,6 +325,7 @@ struct fuse_file_lock {
->   */
->  #define FUSE_WRITE_CACHE	(1 << 0)
->  #define FUSE_WRITE_LOCKOWNER	(1 << 1)
-> +#define FUSE_WRITE_KILL_PRIV    (1 << 2)
->  
->  /**
->   * Read flags
-> diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
-> index 417f99e8dc..ce27a6dd16 100644
-> --- a/contrib/virtiofsd/fuse_lowlevel.c
-> +++ b/contrib/virtiofsd/fuse_lowlevel.c
-> @@ -1162,6 +1162,7 @@ static void do_write(fuse_req_t req, fuse_ino_t nodeid,
->  	memset(&fi, 0, sizeof(fi));
->  	fi.fh = arg->fh;
->  	fi.writepage = (arg->write_flags & FUSE_WRITE_CACHE) != 0;
-> +	fi.kill_priv = !!(arg->write_flags & FUSE_WRITE_KILL_PRIV);
->  
->  	if (!compat) {
->  		fi.lock_owner = arg->lock_owner;
-> @@ -1209,6 +1210,7 @@ static void do_write_buf(fuse_req_t req, fuse_ino_t nodeid,
->  
->  	fi.fh = arg->fh;
->  	fi.writepage = !!(arg->write_flags & FUSE_WRITE_CACHE);
-> +	fi.kill_priv = !!(arg->write_flags & FUSE_WRITE_KILL_PRIV);
->  
->          if (ibufv->count == 1) {
->  		assert(!(tmpbufv.buf[0].flags & FUSE_BUF_IS_FD));
-> -- 
-> 2.17.2
-> 
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+index 321bbb2..a080f0d 100644
+--- a/contrib/virtiofsd/passthrough_ll.c
++++ b/contrib/virtiofsd/passthrough_ll.c
+@@ -1687,6 +1687,8 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+ 		fi->direct_io = 1;
+ 	else if (lo->cache == CACHE_ALWAYS)
+ 		fi->keep_cache = 1;
++	else
++		fi->direct_io = !!(fi->flags & O_DIRECT);
+
+ out:
+ 	lo_inode_put(lo, &parent_inode);
+@@ -1899,6 +1901,8 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+ 		fi->direct_io = 1;
+ 	else if (lo->cache == CACHE_ALWAYS)
+ 		fi->keep_cache = 1;
++	else
++		fi->direct_io = !!(fi->flags & O_DIRECT);
+ 	fuse_reply_open(req, fi);
+ }
+
+-- 
 

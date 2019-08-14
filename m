@@ -1,15 +1,13 @@
-Date: Wed, 14 Aug 2019 13:30:12 -0700
+Date: Wed, 14 Aug 2019 13:51:14 -0700
 From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190814203012.v4azojizk224iv3y@US-160370MP2.local>
+Message-ID: <20190814205113.oy7ioyejl5ddktn7@US-160370MP2.local>
 References: <1565634725-89726-1-git-send-email-bo.liu@linux.alibaba.com>
-	<1565634725-89726-2-git-send-email-bo.liu@linux.alibaba.com>
-	<20190814195718.GD7475@redhat.com>
+	<20190814195338.GC7475@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190814195718.GD7475@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 2/2] virtio-fs: do not removemapping if dmap
- will be used immediately
+In-Reply-To: <20190814195338.GC7475@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 1/2] virtio-fs: try hard to do inline reclaim
 Reply-To: bo.liu@linux.alibaba.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
@@ -22,139 +20,111 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: Vivek Goyal <vgoyal@redhat.com>
 Cc: virtio-fs@redhat.com
 
-On Wed, Aug 14, 2019 at 03:57:18PM -0400, Vivek Goyal wrote:
-> On Tue, Aug 13, 2019 at 02:32:05AM +0800, Liu Bo wrote:
-> > According to how we implement REMOVEMAPPING in daemon, it's unnecessary to
-> > involve a REMOVEMAPPING to reuse a dmap when doing inline reclaim because
-> > dmaps got from inline reclaim get reused for another mapping without being
-> > added back to 'free' dmap pool.
+On Wed, Aug 14, 2019 at 03:53:38PM -0400, Vivek Goyal wrote:
+> On Tue, Aug 13, 2019 at 02:32:04AM +0800, Liu Bo wrote:
+> > The difference between inline dmap reclaim and background dmap reclaim is
+> > that dmaps got from inline reclaim get reused for another mapping
+> > immediately, according to how we implement REMOVEMAPPING in daemon, it's
+> > unnecessary to involve a REMOVEMAPPING to reuse a dmap.
 > > 
-> > This skips REMOVEMAPPING for inline reclaim only and we don't do
-> > REMOVEMAPPING unless someone has raced in to add a dmap to the range.
+> > Currently we always kick background reclaim before doing inline reclaim,
+> > but some lock contention on i_dmap_lock from background reclaim results in
+> > performance loss for dax read/write.
+> > 
+> > This makes read/write first try hard to do inline reclaim, then kick
+> > background reclaim if it makes no progress.
+> > 
+> > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+> > ---
+> >  fs/fuse/file.c | 17 ++++++++++++++---
+> >  1 file changed, 14 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+> > index ae197be..2ea670a 100644
+> > --- a/fs/fuse/file.c
+> > +++ b/fs/fuse/file.c
+> > @@ -203,7 +203,8 @@ static void kick_dmap_free_worker(struct fuse_conn *fc, unsigned long delay_ms)
+> >  	spin_unlock(&fc->lock);
+> >  }
+> >  
+> > -static struct fuse_dax_mapping *alloc_dax_mapping(struct fuse_conn *fc)
+> > +static struct fuse_dax_mapping *__alloc_dax_mapping(struct fuse_conn *fc,
+> > +						    bool bg_reclaim)
+> >  {
+> >  	struct fuse_dax_mapping *dmap = NULL;
+> >  
+> > @@ -224,9 +225,14 @@ static struct fuse_dax_mapping *alloc_dax_mapping(struct fuse_conn *fc)
+> >  	spin_unlock(&fc->lock);
+> >  
+> >  out_kick:
+> > -	kick_dmap_free_worker(fc, 0);
+> > +	if (bg_reclaim)
+> > +		kick_dmap_free_worker(fc, 0);
+> >  	return dmap;
+> >  }
+> > +static struct fuse_dax_mapping *alloc_dax_mapping(struct fuse_conn *fc)
+> > +{
+> > +	return __alloc_dax_mapping(fc, true);
+> > +}
+> >  
+> >  /* This assumes fc->lock is held */
+> >  static void __dmap_remove_busy_list(struct fuse_conn *fc,
+> > @@ -4085,7 +4091,7 @@ static struct fuse_dax_mapping *alloc_dax_mapping_reclaim(struct fuse_conn *fc,
+> >  	struct fuse_inode *fi = get_fuse_inode(inode);
+> >  
+> >  	while(1) {
+> > -		dmap = alloc_dax_mapping(fc);
+> > +		dmap = __alloc_dax_mapping(fc, false);
 > 
-> Given inline reclaims are enabled only for writes, how does this benefit
-> a random read workload.
+> So all you are doing is first try inline reclaim before kicking in worker
+> thread. Well it might work well for a single inode case but if more than
+> one inodes are consuming free memory, might not help much.
 >
 
-Oh, I thought your branch has done it, anyway I've made read take inline
-reclaim as well locally before these two patches, and all tests I have
-didn't complain yet.
+I'll verify that.
 
-I'm testing a kernel build with dmap=1, can you please elaborate more
-on why these might end up deadlock?
+> Also, as of now inline reclaims are enabled only for writes. (no reads, no
+> mmap). So this should not help with the randread improvements you posted
+> in second patch.
+>
+
+I explained it in another email under the thread.
+
+> Does this work without deadlocks with cache_size=2M.
+
+Well, with or without these 2 changes, on cache_size=2M kernel build end up with
+waiting for dmap "forever", at least lockdep didn't report deadlocks.
+
+IMO this patch doesn't change the current reclaim logic,
+1) try inline reclaim first
+2) wait for background reclaim to make progress
+
+The only difference is that this changes step 1) to not kick background thread,
+I think the performance gain mainly comes from less lock contention on
+fi->i_dmap_sem, which we can easily observe without these two patches.
 
 thanks,
 -liubo
 
+> 
+> Thanks
 > Vivek
 > 
-> > 
-> > With the following two patches applied,
-> > "virtio-fs: do not removemapping if dmap will be used immediately"
-> > "virtio-fs: try hard to do inline reclaim",
-> > 
-> > fio fio-tmp.job
-> > read: IOPS=8055, BW=31.5MiB/s (32.0MB/s)(3776MiB/120001msec)
-> > clat (usec): min=6, max=1842, avg=113.75, stdev=83.78
-> > clat percentiles (usec):
-> > 95.00th=[  202]
-> > 99.00th=[  221]
-> > 
-> > w/o
-> > read: IOPS=4312, BW=16.8MiB/s (17.7MB/s)(2021MiB/120001msec)
-> > clat (usec): min=10, max=3415, avg=220.98, stdev=102.85
-> > clat percentiles (usec):
-> > 95.00th=[  359]
-> > 99.00th=[  392]
-> > 
-> > [1]:
-> > virtiofsd -o cache="always"
-> > qemu -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs-1,cache-size=4G
-> > 
-> > [2]:
-> > cat fio-tmp.job
-> > 
-> > ; fio-rand-read.job for fiotest
-> > 
-> > [global]
-> > name=fio-rand-read
-> > filename=fio_file
-> > rw=randread
-> > bs=4K
-> > direct=1
-> > numjobs=1
-> > time_based=1
-> > runtime=120
-> > directory=/mnt/test/
-> > 
-> > [file1]
-> > size=10G
-> > ioengine=psync
-> > iodepth=1
-> > 
-> > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
-> > ---
-> >  fs/fuse/file.c | 18 +++++++++++++++---
-> >  1 file changed, 15 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-> > index 2ea670a..b5239b1 100644
-> > --- a/fs/fuse/file.c
-> > +++ b/fs/fuse/file.c
-> > @@ -1933,7 +1933,11 @@ static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
-> >  	if (ret < 0) {
-> >  		printk("fuse_setup_one_mapping() failed. err=%d"
-> >  			" pos=0x%llx, writable=%d\n", ret, pos, writable);
+> >  		if (dmap)
+> >  			return dmap;
+> >  
+> > @@ -4099,6 +4105,11 @@ static struct fuse_dax_mapping *alloc_dax_mapping_reclaim(struct fuse_conn *fc,
+> >  		 * Wait for one.
+> >  		 */
+> >  		if (!(fc->nr_free_ranges > 0)) {
+> > +			/* try again with background reclaim. */
+> > +			dmap = alloc_dax_mapping(fc);
+> > +			if (dmap)
+> > +				return dmap;
 > > +
-> > +		/* liubo: ignore failure if removemapping fails. */
-> > +		dmap_removemapping_one(inode, dmap);
-> >  		dmap_add_to_free_pool(fc, alloc_dmap);
-> > +
-> >  		up_write(&fi->i_dmap_sem);
-> >  		return ret;
-> >  	}
-> > @@ -3996,7 +4000,8 @@ static int dmap_writeback_invalidate(struct inode *inode,
-> >  }
-> >  
-> >  static int reclaim_one_dmap_locked(struct fuse_conn *fc, struct inode *inode,
-> > -				   struct fuse_dax_mapping *dmap)
-> > +				   struct fuse_dax_mapping *dmap,
-> > +				   bool inline_reclaim)
-> >  {
-> >  	int ret;
-> >  	struct fuse_inode *fi = get_fuse_inode(inode);
-> > @@ -4021,6 +4026,13 @@ static int reclaim_one_dmap_locked(struct fuse_conn *fc, struct inode *inode,
-> >  	fuse_dax_interval_tree_remove(dmap, &fi->dmap_tree);
-> >  	fi->nr_dmaps--;
-> >  
-> > +	/*
-> > +	 * for inline reclaim, it's unnecessary to removing mapping since it'll
-> > +	 * be used by another range immediately.
-> > +	 */
-> > +	if (inline_reclaim)
-> > +		return 0;
-> > +
-> >  	ret = dmap_removemapping_one(inode, dmap);
-> >  	if (ret) {
-> >  		pr_warn("Failed to remove mapping. offset=0x%llx len=0x%llx\n",
-> > @@ -4051,7 +4063,7 @@ static int reclaim_one_dmap_locked(struct fuse_conn *fc, struct inode *inode,
-> >  	if (!dmap)
-> >  		return NULL;
-> >  
-> > -	ret = reclaim_one_dmap_locked(fc, inode, dmap);
-> > +	ret = reclaim_one_dmap_locked(fc, inode, dmap, true);
-> >  	if (ret < 0)
-> >  		return ERR_PTR(ret);
-> >  
-> > @@ -4136,7 +4148,7 @@ int lookup_and_reclaim_dmap_locked(struct fuse_conn *fc, struct inode *inode,
-> >  	if (refcount_read(&dmap->refcnt) > 1)
-> >  		return 0;
-> >  
-> > -	ret = reclaim_one_dmap_locked(fc, inode, dmap);
-> > +	ret = reclaim_one_dmap_locked(fc, inode, dmap, false);
-> >  	if (ret < 0)
-> >  		return ret;
-> >  
+> >  			if (wait_event_killable_exclusive(fc->dax_range_waitq,
+> >  					(fc->nr_free_ranges > 0)))
+> >  				return ERR_PTR(-EINTR);
 > > -- 
 > > 1.8.3.1
 > > 

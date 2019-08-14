@@ -1,14 +1,14 @@
-Date: Wed, 14 Aug 2019 10:13:29 +0100
+Date: Wed, 14 Aug 2019 10:28:52 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190814091329.GB2920@work-vm>
+Message-ID: <20190814092852.GC2920@work-vm>
 References: <20190813192944.26009-1-vgoyal@redhat.com>
-	<20190813192944.26009-3-vgoyal@redhat.com>
+	<20190813192944.26009-4-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190813192944.26009-3-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 2/4] virtiofsd: Use macros for write_flag
-	parsing
+In-Reply-To: <20190813192944.26009-4-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 3/4] virtiofsd: Parse flag
+	FUSE_WRITE_KILL_PRIV
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,38 +21,65 @@ To: Vivek Goyal <vgoyal@redhat.com>
 Cc: virtio-fs@redhat.com
 
 * Vivek Goyal (vgoyal@redhat.com) wrote:
-> Use macros instead of hard coded bit positions.
+> Caller can set FUSE_WRITE_KILL_PRIV in write_flags. Parse it and pass it
+> to the filesystem.
 > 
 > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-
-OK, this is part of upstream 1b7d2b8
-
 
 Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 
 > ---
->  contrib/virtiofsd/fuse_lowlevel.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  contrib/virtiofsd/fuse_common.h   | 5 ++++-
+>  contrib/virtiofsd/fuse_kernel.h   | 1 +
+>  contrib/virtiofsd/fuse_lowlevel.c | 2 ++
+>  3 files changed, 7 insertions(+), 1 deletion(-)
 > 
+> diff --git a/contrib/virtiofsd/fuse_common.h b/contrib/virtiofsd/fuse_common.h
+> index 4d95f6f28b..5f4af98999 100644
+> --- a/contrib/virtiofsd/fuse_common.h
+> +++ b/contrib/virtiofsd/fuse_common.h
+> @@ -64,8 +64,11 @@ struct fuse_file_info {
+>  	   May only be set in ->release(). */
+>  	unsigned int flock_release : 1;
+>  
+> +	/* Indicates that suid/sgid bits should be removed upon write */
+> +	unsigned int kill_priv : 1;
+> +
+>  	/** Padding.  Do not use*/
+> -	unsigned int padding : 26;
+> +	unsigned int padding : 25;
+>  
+>  	/** File handle.  May be filled in by filesystem in open().
+>  	    Available in all other file operations */
+> diff --git a/contrib/virtiofsd/fuse_kernel.h b/contrib/virtiofsd/fuse_kernel.h
+> index d477c70028..d2b7ccf96b 100644
+> --- a/contrib/virtiofsd/fuse_kernel.h
+> +++ b/contrib/virtiofsd/fuse_kernel.h
+> @@ -325,6 +325,7 @@ struct fuse_file_lock {
+>   */
+>  #define FUSE_WRITE_CACHE	(1 << 0)
+>  #define FUSE_WRITE_LOCKOWNER	(1 << 1)
+> +#define FUSE_WRITE_KILL_PRIV    (1 << 2)
+>  
+>  /**
+>   * Read flags
 > diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
-> index 8d3f141d23..417f99e8dc 100644
+> index 417f99e8dc..ce27a6dd16 100644
 > --- a/contrib/virtiofsd/fuse_lowlevel.c
 > +++ b/contrib/virtiofsd/fuse_lowlevel.c
-> @@ -1161,7 +1161,7 @@ static void do_write(fuse_req_t req, fuse_ino_t nodeid,
->  
+> @@ -1162,6 +1162,7 @@ static void do_write(fuse_req_t req, fuse_ino_t nodeid,
 >  	memset(&fi, 0, sizeof(fi));
 >  	fi.fh = arg->fh;
-> -	fi.writepage = (arg->write_flags & 1) != 0;
-> +	fi.writepage = (arg->write_flags & FUSE_WRITE_CACHE) != 0;
+>  	fi.writepage = (arg->write_flags & FUSE_WRITE_CACHE) != 0;
+> +	fi.kill_priv = !!(arg->write_flags & FUSE_WRITE_KILL_PRIV);
 >  
 >  	if (!compat) {
 >  		fi.lock_owner = arg->lock_owner;
-> @@ -1208,7 +1208,7 @@ static void do_write_buf(fuse_req_t req, fuse_ino_t nodeid,
->  	}
+> @@ -1209,6 +1210,7 @@ static void do_write_buf(fuse_req_t req, fuse_ino_t nodeid,
 >  
 >  	fi.fh = arg->fh;
-> -	fi.writepage = arg->write_flags & 1;
-> +	fi.writepage = !!(arg->write_flags & FUSE_WRITE_CACHE);
+>  	fi.writepage = !!(arg->write_flags & FUSE_WRITE_CACHE);
+> +	fi.kill_priv = !!(arg->write_flags & FUSE_WRITE_KILL_PRIV);
 >  
 >          if (ibufv->count == 1) {
 >  		assert(!(tmpbufv.buf[0].flags & FUSE_BUF_IS_FD));

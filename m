@@ -1,13 +1,13 @@
-Date: Wed, 14 Aug 2019 13:53:45 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190814125345.GD23970@stefanha-x1.localdomain>
-References: <5D53919A.4@huawei.com>
+Date: Wed, 14 Aug 2019 13:57:02 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190814125702.GH2920@work-vm>
+References: <20190814022751.116741-1-tao.peng@linux.alibaba.com>
+	<20190814123618.GA23970@stefanha-x1.localdomain>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="Q0rSlbzrZN6k9QnT"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <5D53919A.4@huawei.com>
-Subject: Re: [Virtio-fs] [PATCH] virtio: clean up unused 'char *bar_name'
+In-Reply-To: <20190814123618.GA23970@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: simplify setup_remount_slave
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,39 +16,33 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>
-Cc: virtio-fs@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, Peng Tao <tao.peng@linux.alibaba.com>
+
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> On Wed, Aug 14, 2019 at 10:27:51AM +0800, Peng Tao wrote:
+> > We can just use MS_REC to propagate MS_SLAVE. This would also allow us
+> > to close a race window between reading proc mountinfo and calling
+> > mount(MS_SLAVE) for each entry, vs. others umounting the mount point in
+> > parallel.
+> > 
+> > Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
+> > ---
+> >  contrib/virtiofsd/passthrough_ll.c | 53 ++----------------------------
+> >  1 file changed, 3 insertions(+), 50 deletions(-)
+> 
+> Let's try it!
+> 
+> Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+
+OK thanks, merged in my local world
 
 
---Q0rSlbzrZN6k9QnT
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 
-On Wed, Aug 14, 2019 at 12:44:10PM +0800, piaojun wrote:
-> Clean up 'char *bar_name' to avoid compile warning.
->=20
-> Signed-off-by: Jun Piao <piaojun@huawei.com>
-> ---
->  drivers/virtio/virtio_pci_modern.c | 1 -
->  1 file changed, 1 deletion(-)
-
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-
---Q0rSlbzrZN6k9QnT
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1UBFkACgkQnKSrs4Gr
-c8j/awf/dMeTuZhYgHaHq7r79ouk9NUiALuiq3GJThfH/A3z4l9Z3p6cO28iu0/T
-qubOb1XT2PDoMbRgPAVeyLHxO1240NVdOGnrShT8ZJtccJBaYpE9NATcIwg1vx2r
-hnEHPsmf176OC1zQ4EblzeqBWTzU2/qr5xf5BoRy9ELObpvKzAOXpq9gzwsAXFwM
-lGWjztfWes5oaRQXKfBUv9n8SAHRKE0VYervW6lSpxBGU2ZoaGteDieh7NlwsDPQ
-N6qA3yw3IOIcb+D57Ws2SGj5TFlVS4TMSz5stIK1n/oVLVgT41zkJZkA6BJhk7zm
-FCK7wHmNxP48q1FX/BzxcM+qvqqUzw==
-=zEK9
------END PGP SIGNATURE-----
-
---Q0rSlbzrZN6k9QnT--
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

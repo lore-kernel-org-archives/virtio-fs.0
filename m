@@ -1,11 +1,14 @@
-Date: Wed, 14 Aug 2019 14:51:58 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190814135158.GA2357@stefanha-x1.localdomain>
+Date: Wed, 14 Aug 2019 18:07:38 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190814170738.GQ2920@work-vm>
+References: <5D4CC344.7030706@huawei.com>
+ <5D4CC39D.7040001@huawei.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="GvXjxJ+pjyke8COw"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: [Virtio-fs] Tracking todos with GitLab Issues
+In-Reply-To: <5D4CC39D.7040001@huawei.com>
+Subject: Re: [Virtio-fs] [PATCH v4 1/2] virtiofsd: add definition of
+	fuse_buf_writev()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,39 +17,97 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: piaojun <piaojun@huawei.com>
+Cc: virtio-fs@redhat.com
+
+* piaojun (piaojun@huawei.com) wrote:
+> Define fuse_buf_writev() which use pwritev and writev to improve io
+> bandwidth.
+> 
+> Signed-off-by: Jun Piao <piaojun@huawei.com>
+> Suggested-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
+
+Yep, this part looks OK,
 
 
---GvXjxJ+pjyke8COw
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 
-Hi,
-I have added todos to GitLab:
-https://gitlab.com/groups/virtio-fs/-/boards
-
-This includes future features like live migration, inotify, testing
-SELinux, and testing Kata Containers volumes.
-
-Feel free to add long-term todos or discuss how to implement features
-you are interested in.
-
-Stefan
-
---GvXjxJ+pjyke8COw
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1UEf4ACgkQnKSrs4Gr
-c8ji9AgAvjyT5bEhFPuCh/LlR+THuZoevlx4wTC0AJ4ggfA77QXidsjF1lFwDksL
-xjCf9K+VY74xVB705ZXkH6J7vQ1RpkIYUrDETJkmxP5QhmNR9z4jLzIk+Fa07TwL
-3Dd0osoc5TD6qIlyCtchMBqGNw/GYNYoz7/Z4jQuZ33FXbHoi3O/Opa3DFXTOGjM
-MRvaNq3f/v6HYtKAaZ3R9Pks65agYaJ/Wa2Cs+yCYbuIV2+t8GcEp25pesX5NBqm
-WbMYIsAStpx431MEOoCQzWfaogok+VERJWWx9SZ2OsZzxmJahiRTknB0ZAfN2Omp
-DNRrHQYlZSHqjxj6FibJVLHI8Wh+pw==
-=oUdr
------END PGP SIGNATURE-----
-
---GvXjxJ+pjyke8COw--
+> ---
+>  contrib/virtiofsd/buffer.c  | 31 +++++++++++++++++++++++++++++++
+>  contrib/virtiofsd/seccomp.c |  2 ++
+>  2 files changed, 33 insertions(+)
+> 
+> diff --git a/contrib/virtiofsd/buffer.c b/contrib/virtiofsd/buffer.c
+> index 655be137..cec762f 100644
+> --- a/contrib/virtiofsd/buffer.c
+> +++ b/contrib/virtiofsd/buffer.c
+> @@ -15,6 +15,7 @@
+>  #include <unistd.h>
+>  #include <errno.h>
+>  #include <assert.h>
+> +#include <stdlib.h>
+> 
+>  size_t fuse_buf_size(const struct fuse_bufvec *bufv)
+>  {
+> @@ -71,6 +72,36 @@ static ssize_t fuse_buf_write(const struct fuse_buf *dst, size_t dst_off,
+>  	return copied;
+>  }
+> 
+> +static ssize_t fuse_buf_writev(fuse_req_t req,
+> +			     struct fuse_buf *out_buf,
+> +			     struct fuse_bufvec *in_buf)
+> +{
+> +	ssize_t res, i;
+> +	size_t iovcnt = in_buf->count;
+> +	struct iovec * iov;
+> +	int fd = out_buf->fd;
+> +
+> +	iov = calloc(iovcnt, sizeof(struct iovec));
+> +	if (!iov)
+> +		return -ENOMEM;
+> +
+> +	for (i = 0; i < iovcnt; i++) {
+> +		iov[i].iov_base = in_buf->buf[i].mem;
+> +		iov[i].iov_len = in_buf->buf[i].size;
+> +	}
+> +
+> +	if (out_buf->flags & FUSE_BUF_FD_SEEK)
+> +		res = pwritev(fd, iov, iovcnt, out_buf->pos);
+> +	else
+> +		res = writev(fd, iov, iovcnt);
+> +
+> +	if (res == -1)
+> +		res = -errno;
+> +
+> +	free(iov);
+> +	return res;
+> +}
+> +
+>  static ssize_t fuse_buf_read(const struct fuse_buf *dst, size_t dst_off,
+>  			     const struct fuse_buf *src, size_t src_off,
+>  			     size_t len)
+> diff --git a/contrib/virtiofsd/seccomp.c b/contrib/virtiofsd/seccomp.c
+> index 5f1c873..4bba30b 100644
+> --- a/contrib/virtiofsd/seccomp.c
+> +++ b/contrib/virtiofsd/seccomp.c
+> @@ -60,6 +60,7 @@ static const int syscall_whitelist[] = {
+>  	SCMP_SYS(ppoll),
+>  	SCMP_SYS(prctl), /* TODO restrict to just PR_SET_NAME? */
+>  	SCMP_SYS(preadv),
+> +	SCMP_SYS(pwritev),
+>  	SCMP_SYS(pwrite64),
+>  	SCMP_SYS(read),
+>  	SCMP_SYS(readlinkat),
+> @@ -78,6 +79,7 @@ static const int syscall_whitelist[] = {
+>  	SCMP_SYS(unlinkat),
+>  	SCMP_SYS(utimensat),
+>  	SCMP_SYS(write),
+> +	SCMP_SYS(writev),
+>  };
+> 
+>  /* Syscalls used when --syslog is enabled */
+> -- 
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

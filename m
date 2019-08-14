@@ -1,15 +1,16 @@
-References: <1565636335-120345-1-git-send-email-bo.liu@linux.alibaba.com>
-	<f48e0d71-d633-79a6-8b17-94ae9274ff6f@huawei.com>
-	<20190813182438.sbkpt4ps62iwzrbg@US-160370MP2.local>
+References: <1565634725-89726-1-git-send-email-bo.liu@linux.alibaba.com>
+	<1565634725-89726-2-git-send-email-bo.liu@linux.alibaba.com>
+	<5D5214FC.4060804@huawei.com>
+	<20190813182945.w3of5ftnho2k7t5l@US-160370MP2.local>
 From: piaojun <piaojun@huawei.com>
-Message-ID: <5D5355FB.4000801@huawei.com>
-Date: Wed, 14 Aug 2019 08:29:47 +0800
+Message-ID: <5D53598C.8050202@huawei.com>
+Date: Wed, 14 Aug 2019 08:45:00 +0800
 MIME-Version: 1.0
-In-Reply-To: <20190813182438.sbkpt4ps62iwzrbg@US-160370MP2.local>
+In-Reply-To: <20190813182945.w3of5ftnho2k7t5l@US-160370MP2.local>
 Content-Type: text/plain; charset="windows-1252"
 Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH 1/2] Virtio-fs: fix hang due to ENOSPC in
- shared backend fs
+Subject: Re: [Virtio-fs] [PATCH 2/2] virtio-fs: do not removemapping if dmap
+ will be used immediately
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,124 +24,146 @@ Cc: virtio-fs@redhat.com
 
 
 
-On 2019/8/14 2:24, Liu Bo wrote:
-> On Tue, Aug 13, 2019 at 11:41:23PM +0800, piaojun wrote:
+On 2019/8/14 2:29, Liu Bo wrote:
+> On Tue, Aug 13, 2019 at 09:40:12AM +0800, piaojun wrote:
 >> Hi Bo,
 >>
->> On 2019/8/13 2:58, Liu Bo wrote:
->>> Currently fuse/virtio-fs de-allocation doesn't clean up dax mapping range,
->>> which may result in hang problems when the shared backend fs experiences
->>> "NO Space Error".
+>> On 2019/8/13 2:32, Liu Bo wrote:
+>>> According to how we implement REMOVEMAPPING in daemon, it's unnecessary to
+>>> involve a REMOVEMAPPING to reuse a dmap when doing inline reclaim because
+>>> dmaps got from inline reclaim get reused for another mapping without being
+>>> added back to 'free' dmap pool.
 >>>
->>> The root cause is that the first writing to a dax mapping range triggers a
->>> WRITE page fault on host side, which calls ->page_mkwrite() where block
->>> allocation is required, if the fs is already full, ->page_mkwrite() returns
->>> error so that page fault fails, however, for kvm is not able to propogate
->>> errors while handling EPT_VIOLATION, thus guest keeps trying to resolve the
->>> fault.
+>>> This skips REMOVEMAPPING for inline reclaim only and we don't do
+>>> REMOVEMAPPING unless someone has raced in to add a dmap to the range.
 >>>
->>> Fortunately, we can fix/work around the problem by dropping dax mapping
->>> range for de-allocation operations.
+>>> With the following two patches applied,
+>>> "virtio-fs: do not removemapping if dmap will be used immediately"
+>>> "virtio-fs: try hard to do inline reclaim",
+>>>
+>>> fio fio-tmp.job
+>>> read: IOPS=8055, BW=31.5MiB/s (32.0MB/s)(3776MiB/120001msec)
+>>
+>> Do you mean the before result is 31.5MB/s and after is 32MB/s? I wonder
+>> what is your backend storage?
+>>
+> 
+> hmm...the 'w/o/ results are listed in the below 'w/o' section.
+
+"w/o=without" plays a joke with me, :)
+
+> 
+> thanks,
+> -liubo
+> 
+>> Jun
+>>
+>>> clat (usec): min=6, max=1842, avg=113.75, stdev=83.78
+>>> clat percentiles (usec):
+>>> 95.00th=[  202]
+>>> 99.00th=[  221]
+>>>
+>>> w/o
+>>> read: IOPS=4312, BW=16.8MiB/s (17.7MB/s)(2021MiB/120001msec)
+>>> clat (usec): min=10, max=3415, avg=220.98, stdev=102.85
+>>> clat percentiles (usec):
+>>> 95.00th=[  359]
+>>> 99.00th=[  392]
+>>>
+>>> [1]:
+>>> virtiofsd -o cache="always"
+>>> qemu -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs-1,cache-size=4G
+>>>
+>>> [2]:
+>>> cat fio-tmp.job
+>>>
+>>> ; fio-rand-read.job for fiotest
+>>>
+>>> [global]
+>>> name=fio-rand-read
+>>> filename=fio_file
+>>> rw=randread
+>>> bs=4K
+>>> direct=1
+>>> numjobs=1
+>>> time_based=1
+>>> runtime=120
+>>> directory=/mnt/test/
+>>>
+>>> [file1]
+>>> size=10G
+>>> ioengine=psync
+>>> iodepth=1
 >>>
 >>> Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
 >>> ---
->>>  fs/fuse/dir.c    | 3 +++
->>>  fs/fuse/file.c   | 9 +++++++--
->>>  fs/fuse/fuse_i.h | 2 +-
->>>  fs/fuse/inode.c  | 2 +-
->>>  4 files changed, 12 insertions(+), 4 deletions(-)
+>>>  fs/fuse/file.c | 18 +++++++++++++++---
+>>>  1 file changed, 15 insertions(+), 3 deletions(-)
 >>>
->>> diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
->>> index ed740a5..99a218c 100644
->>> --- a/fs/fuse/dir.c
->>> +++ b/fs/fuse/dir.c
->>> @@ -1805,6 +1805,9 @@ int fuse_do_setattr(struct dentry *dentry, struct iattr *attr,
->>>  
->>>  		truncate_pagecache(inode, outarg.attr.size);
->>>  		invalidate_inode_pages2(inode->i_mapping);
->>> +		if (IS_DAX(inode) && oldsize > outarg.attr.size)
->>> +			fuse_cleanup_inode_mappings(inode, outarg.attr.size,
->>> +						    (loff_t)-1);
->>>  		up_write(&fi->i_mmap_sem);
->>>  	}
->>>  
 >>> diff --git a/fs/fuse/file.c b/fs/fuse/file.c
->>> index c52260c..4f2d908 100644
+>>> index 2ea670a..b5239b1 100644
 >>> --- a/fs/fuse/file.c
 >>> +++ b/fs/fuse/file.c
->>> @@ -417,6 +417,7 @@ static void inode_reclaim_dmap_range(struct fuse_conn *fc, struct inode *inode,
->>>  	start = ALIGN(start, FUSE_DAX_MEM_RANGE_SZ);
->>>  	end = ALIGN_DOWN(end, FUSE_DAX_MEM_RANGE_SZ);
->>>  
->>> +	down_write(&fi->i_dmap_sem);
->>
->> I'm not sure if this is related with the hang bug. Or it's another lock
->> missing bug which could be extracted as a new patch.
->>
-> 
-> inode_reclaim_dmap_range was only used in inode evict path where
-> others are unable to access fi->dmap_tree.
-> 
-> This patch adds two callers for the function, as such we need the lock
-> to protect the tree operations.
+>>> @@ -1933,7 +1933,11 @@ static int iomap_begin_setup_new_mapping(struct inode *inode, loff_t pos,
+>>>  	if (ret < 0) {
+>>>  		printk("fuse_setup_one_mapping() failed. err=%d"
+>>>  			" pos=0x%llx, writable=%d\n", ret, pos, writable);
+>>> +
+>>> +		/* liubo: ignore failure if removemapping fails. */
+>>> +		dmap_removemapping_one(inode, dmap);
 
-Got it, thanks.
-
-> 
->>>  	while (1) {
->>>  		dmap = fuse_dax_interval_tree_iter_first(&fi->dmap_tree, start,
->>>  							 end);
->>> @@ -426,6 +427,7 @@ static void inode_reclaim_dmap_range(struct fuse_conn *fc, struct inode *inode,
->>>  		num++;
->>>  		list_add(&dmap->list, &to_remove);
->>>  	}
->>> +	up_write(&fi->i_dmap_sem);
->>>  
->>>  	/* Nothing to remove */
->>>  	if (list_empty(&to_remove))
->>> @@ -478,7 +480,7 @@ static int dmap_removemapping_one(struct inode *inode,
->>>   * that fuse inode interval tree. If that lock is taken then lock validator
->>>   * complains of deadlock situation w.r.t fs_reclaim lock.
->>>   */
->>> -void fuse_cleanup_inode_mappings(struct inode *inode)
->>> +void fuse_cleanup_inode_mappings(struct inode *inode, loff_t start, loff_t end)
->>>  {
->>>  	struct fuse_conn *fc = get_fuse_conn(inode);
->>>  	/*
->>> @@ -486,7 +488,7 @@ void fuse_cleanup_inode_mappings(struct inode *inode)
->>>  	 * before we arrive here. So we should not have to worry about
->>>  	 * any pages/exception entries still associated with inode.
->>>  	 */
->>> -	inode_reclaim_dmap_range(fc, inode, 0, -1);
->>> +	inode_reclaim_dmap_range(fc, inode, start, end);
->>>  }
->>>  
->>>  void fuse_finish_open(struct inode *inode, struct file *file)
->>> @@ -3867,6 +3869,9 @@ static long __fuse_file_fallocate(struct file *file, int mode,
->>
->> It's strange that I could not find *__fuse_file_fallocate()* at
->> virtio-fs-dev-5.1 code.
->>
-> 
-> Oh OK, I didn't realize that this piece of code has been refactored,
-> it was also used by dax write path, anyway __fuse_file_fallocate() was
-> basically identical to fuse_file_fallocate().
-> 
->>>  		}
->>>  
->>>  		truncate_pagecache_range(inode, offset, offset + length - 1);
->>> +		if (IS_DAX(inode))
->>> +			fuse_cleanup_inode_mappings(inode, offset,
->>> +						    offset + length - 1);
->>
->> I prefer using "loff_t endbyte" to replace "offset + length - 1" which
->> makes code easier.
->>
-> 
-> Well, I'd like to leave it for a later cleanup patch in which I'll
-> convert all (offset+length-1) here.
-
-OK, that will be good to me.
+Why do we need remove mapping if the setup has not been done?
 
 Jun
+
+>>>  		dmap_add_to_free_pool(fc, alloc_dmap);
+>>> +
+>>>  		up_write(&fi->i_dmap_sem);
+>>>  		return ret;
+>>>  	}
+>>> @@ -3996,7 +4000,8 @@ static int dmap_writeback_invalidate(struct inode *inode,
+>>>  }
+>>>  
+>>>  static int reclaim_one_dmap_locked(struct fuse_conn *fc, struct inode *inode,
+>>> -				   struct fuse_dax_mapping *dmap)
+>>> +				   struct fuse_dax_mapping *dmap,
+>>> +				   bool inline_reclaim)
+>>>  {
+>>>  	int ret;
+>>>  	struct fuse_inode *fi = get_fuse_inode(inode);
+>>> @@ -4021,6 +4026,13 @@ static int reclaim_one_dmap_locked(struct fuse_conn *fc, struct inode *inode,
+>>>  	fuse_dax_interval_tree_remove(dmap, &fi->dmap_tree);
+>>>  	fi->nr_dmaps--;
+>>>  
+>>> +	/*
+>>> +	 * for inline reclaim, it's unnecessary to removing mapping since it'll
+>>> +	 * be used by another range immediately.
+>>> +	 */
+>>> +	if (inline_reclaim)
+>>> +		return 0;
+>>> +
+>>>  	ret = dmap_removemapping_one(inode, dmap);
+>>>  	if (ret) {
+>>>  		pr_warn("Failed to remove mapping. offset=0x%llx len=0x%llx\n",
+>>> @@ -4051,7 +4063,7 @@ static int reclaim_one_dmap_locked(struct fuse_conn *fc, struct inode *inode,
+>>>  	if (!dmap)
+>>>  		return NULL;
+>>>  
+>>> -	ret = reclaim_one_dmap_locked(fc, inode, dmap);
+>>> +	ret = reclaim_one_dmap_locked(fc, inode, dmap, true);
+>>>  	if (ret < 0)
+>>>  		return ERR_PTR(ret);
+>>>  
+>>> @@ -4136,7 +4148,7 @@ int lookup_and_reclaim_dmap_locked(struct fuse_conn *fc, struct inode *inode,
+>>>  	if (refcount_read(&dmap->refcnt) > 1)
+>>>  		return 0;
+>>>  
+>>> -	ret = reclaim_one_dmap_locked(fc, inode, dmap);
+>>> +	ret = reclaim_one_dmap_locked(fc, inode, dmap, false);
+>>>  	if (ret < 0)
+>>>  		return ret;
+>>>  
+>>>
+> .
+> 
 

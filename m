@@ -1,14 +1,12 @@
-Date: Wed, 14 Aug 2019 18:07:38 +0100
+Date: Wed, 14 Aug 2019 18:14:43 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190814170738.GQ2920@work-vm>
-References: <5D4CC344.7030706@huawei.com>
- <5D4CC39D.7040001@huawei.com>
+Message-ID: <20190814171443.GR2920@work-vm>
+References: <5D478C13.3020406@huawei.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <5D4CC39D.7040001@huawei.com>
-Subject: Re: [Virtio-fs] [PATCH v4 1/2] virtiofsd: add definition of
-	fuse_buf_writev()
+In-Reply-To: <5D478C13.3020406@huawei.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: move assert just after calloc()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,93 +19,39 @@ To: piaojun <piaojun@huawei.com>
 Cc: virtio-fs@redhat.com
 
 * piaojun (piaojun@huawei.com) wrote:
-> Define fuse_buf_writev() which use pwritev and writev to improve io
-> bandwidth.
+> It's better to assert NULL pointer just after calloc().
 > 
 > Signed-off-by: Jun Piao <piaojun@huawei.com>
-> Suggested-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
 
-Yep, this part looks OK,
+Thanks, squashed into 'virtiofsd: Start queue threads'
 
-
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Dave
 
 > ---
->  contrib/virtiofsd/buffer.c  | 31 +++++++++++++++++++++++++++++++
->  contrib/virtiofsd/seccomp.c |  2 ++
->  2 files changed, 33 insertions(+)
+>  contrib/virtiofsd/fuse_virtio.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/contrib/virtiofsd/buffer.c b/contrib/virtiofsd/buffer.c
-> index 655be137..cec762f 100644
-> --- a/contrib/virtiofsd/buffer.c
-> +++ b/contrib/virtiofsd/buffer.c
-> @@ -15,6 +15,7 @@
->  #include <unistd.h>
->  #include <errno.h>
->  #include <assert.h>
-> +#include <stdlib.h>
-> 
->  size_t fuse_buf_size(const struct fuse_bufvec *bufv)
->  {
-> @@ -71,6 +72,36 @@ static ssize_t fuse_buf_write(const struct fuse_buf *dst, size_t dst_off,
->  	return copied;
->  }
-> 
-> +static ssize_t fuse_buf_writev(fuse_req_t req,
-> +			     struct fuse_buf *out_buf,
-> +			     struct fuse_bufvec *in_buf)
-> +{
-> +	ssize_t res, i;
-> +	size_t iovcnt = in_buf->count;
-> +	struct iovec * iov;
-> +	int fd = out_buf->fd;
-> +
-> +	iov = calloc(iovcnt, sizeof(struct iovec));
-> +	if (!iov)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; i < iovcnt; i++) {
-> +		iov[i].iov_base = in_buf->buf[i].mem;
-> +		iov[i].iov_len = in_buf->buf[i].size;
-> +	}
-> +
-> +	if (out_buf->flags & FUSE_BUF_FD_SEEK)
-> +		res = pwritev(fd, iov, iovcnt, out_buf->pos);
-> +	else
-> +		res = writev(fd, iov, iovcnt);
-> +
-> +	if (res == -1)
-> +		res = -errno;
-> +
-> +	free(iov);
-> +	return res;
-> +}
-> +
->  static ssize_t fuse_buf_read(const struct fuse_buf *dst, size_t dst_off,
->  			     const struct fuse_buf *src, size_t src_off,
->  			     size_t len)
-> diff --git a/contrib/virtiofsd/seccomp.c b/contrib/virtiofsd/seccomp.c
-> index 5f1c873..4bba30b 100644
-> --- a/contrib/virtiofsd/seccomp.c
-> +++ b/contrib/virtiofsd/seccomp.c
-> @@ -60,6 +60,7 @@ static const int syscall_whitelist[] = {
->  	SCMP_SYS(ppoll),
->  	SCMP_SYS(prctl), /* TODO restrict to just PR_SET_NAME? */
->  	SCMP_SYS(preadv),
-> +	SCMP_SYS(pwritev),
->  	SCMP_SYS(pwrite64),
->  	SCMP_SYS(read),
->  	SCMP_SYS(readlinkat),
-> @@ -78,6 +79,7 @@ static const int syscall_whitelist[] = {
->  	SCMP_SYS(unlinkat),
->  	SCMP_SYS(utimensat),
->  	SCMP_SYS(write),
-> +	SCMP_SYS(writev),
->  };
-> 
->  /* Syscalls used when --syslog is enabled */
+> diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
+> index d543c6d..8a4f627 100644
+> --- a/contrib/virtiofsd/fuse_virtio.c
+> +++ b/contrib/virtiofsd/fuse_virtio.c
+> @@ -748,9 +748,9 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
+>                  }
+>                  if (!vud->qi[qidx]) {
+>                          vud->qi[qidx] = calloc(sizeof(struct fv_QueueInfo), 1);
+> +                        assert(vud->qi[qidx]);
+>                          vud->qi[qidx]->virtio_dev = vud;
+>                          vud->qi[qidx]->qidx = qidx;
+> -                        assert(vud->qi[qidx]);
+>                  } else {
+>                          /* Shouldn't have been started */
+>                          assert(vud->qi[qidx]->kick_fd == -1);
 > -- 
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 --
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

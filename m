@@ -1,17 +1,13 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=aol.com; s=a2048;
-	t=1565830576; bh=x17L5Sqy2ZSt8rwbeOibabFQ+XtkAaG8z2OsU6HiUsA=;
-	h=Date:From:To:Cc:Subject:References:In-Reply-To:From:Subject;
-	b=kUck1hwkfUXgt5FTMUxSRNWo/aRpa0EcpBdcBxUQ7WqyH22C0zpWR/RpJx1vk6fiULVNc+BQHCfjnQqg8uy40QUXCt0zFuR/saUSidLutPa09bwGvecppNEzJiR62IdoER+WgIT8YxJq0bn8SvIb65tQH4kq3FMVPe9fb2bD36462Meeh7dhWOP9IUrBsMpqBdI6GfoetKuO8uDbFOf6SW2Ab4rR/Q2xdCL2j7Z7qR6IOu2T/34iV/v9bHsEDIDgMoWURMLxRH96UDr1ZUIAyPijWD1tr1/yUQLyGwVO7/G6UfuXrW9CNJ8Y4XpxCIY9Mh8AK8fAylbSo5m58uIIBA==
-Date: Thu, 15 Aug 2019 08:56:05 +0800
-From: Gao Xiang <hsiangkao@aol.com>
-Message-ID: <20190815005559.GA14118@hsiangkao-HP-ZHAN-66-Pro-G1>
-References: <5abd7616-5351-761c-0c14-21d511251006@huawei.com>
+References: <5D54AD38.3060008@huawei.com>
+From: piaojun <piaojun@huawei.com>
+Message-ID: <5D54ADFC.8060106@huawei.com>
+Date: Thu, 15 Aug 2019 08:57:32 +0800
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <5abd7616-5351-761c-0c14-21d511251006@huawei.com>
-Subject: Re: [Virtio-fs] [QUESTION] A performance problem for buffer write
- compared with 9p
+In-Reply-To: <5D54AD38.3060008@huawei.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+Subject: [Virtio-fs] [PATCH v5 1/2] virtiofsd: add definition of
+	fuse_buf_writev()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,73 +16,87 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: wangyan <wangyan122@huawei.com>
-Cc: linux-fsdevel@vger.kernel.org, "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+To: virtio-fs@redhat.com
 
-On Thu, Aug 15, 2019 at 08:30:43AM +0800, wangyan wrote:
+Define fuse_buf_writev() which use pwritev and writev to improve io
+bandwidth.
 
-[]
+Signed-off-by: Jun Piao <piaojun@huawei.com>
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ contrib/virtiofsd/buffer.c  | 31 +++++++++++++++++++++++++++++++
+ contrib/virtiofsd/seccomp.c |  2 ++
+ 2 files changed, 33 insertions(+)
 
-> 
-> I found that the judgement statement 'if (!TestSetPageDirty(page))' always
-> true in function '__set_page_dirty_nobuffers', it will waste much time
-> to mark inode dirty, no one page is dirty when write it the second time.
-> The buffer write stack:
->     fuse_file_write_iter
->       ->fuse_cache_write_iter
->         ->generic_file_write_iter
->           ->__generic_file_write_iter
->             ->generic_perform_write
->               ->fuse_write_end
->                 ->set_page_dirty
->                   ->__set_page_dirty_nobuffers
-> 
-> The reason for 'if (!TestSetPageDirty(page))' always true may be the pdflush
-> process will clean the page's dirty flags in clear_page_dirty_for_io(),
-> and call fuse_writepages_send() to flush all pages to the disk of the host.
-> So when the page is written the second time, it always not dirty.
-> The pdflush stack for fuse:
->     pdflush
->       ->...
->         ->do_writepages
->           ->fuse_writepages
->             ->write_cache_pages         // will clear all page's dirty flags
->               ->clear_page_dirty_for_io // clear page's dirty flags
->             ->fuse_writepages_send      // write all pages to the host, but
-> don't wait the result
-> Why not wait for getting the result of writing back pages to the host
-> before cleaning all page's dirty flags?
-> 
+diff --git a/contrib/virtiofsd/buffer.c b/contrib/virtiofsd/buffer.c
+index 655be137..cec762f 100644
+--- a/contrib/virtiofsd/buffer.c
++++ b/contrib/virtiofsd/buffer.c
+@@ -15,6 +15,7 @@
+ #include <unistd.h>
+ #include <errno.h>
+ #include <assert.h>
++#include <stdlib.h>
 
-As my understanding, I personally think there's nothing wrong with
-the above process from your words above.
+ size_t fuse_buf_size(const struct fuse_bufvec *bufv)
+ {
+@@ -71,6 +72,36 @@ static ssize_t fuse_buf_write(const struct fuse_buf *dst, size_t dst_off,
+ 	return copied;
+ }
 
-Thanks,
-Gao Xiang
++static ssize_t fuse_buf_writev(fuse_req_t req,
++			     struct fuse_buf *out_buf,
++			     struct fuse_bufvec *in_buf)
++{
++	ssize_t res, i;
++	size_t iovcnt = in_buf->count;
++	struct iovec * iov;
++	int fd = out_buf->fd;
++
++	iov = calloc(iovcnt, sizeof(struct iovec));
++	if (!iov)
++		return -ENOMEM;
++
++	for (i = 0; i < iovcnt; i++) {
++		iov[i].iov_base = in_buf->buf[i].mem;
++		iov[i].iov_len = in_buf->buf[i].size;
++	}
++
++	if (out_buf->flags & FUSE_BUF_FD_SEEK)
++		res = pwritev(fd, iov, iovcnt, out_buf->pos);
++	else
++		res = writev(fd, iov, iovcnt);
++
++	if (res == -1)
++		res = -errno;
++
++	free(iov);
++	return res;
++}
++
+ static ssize_t fuse_buf_read(const struct fuse_buf *dst, size_t dst_off,
+ 			     const struct fuse_buf *src, size_t src_off,
+ 			     size_t len)
+diff --git a/contrib/virtiofsd/seccomp.c b/contrib/virtiofsd/seccomp.c
+index 5f1c873..4bba30b 100644
+--- a/contrib/virtiofsd/seccomp.c
++++ b/contrib/virtiofsd/seccomp.c
+@@ -60,6 +60,7 @@ static const int syscall_whitelist[] = {
+ 	SCMP_SYS(ppoll),
+ 	SCMP_SYS(prctl), /* TODO restrict to just PR_SET_NAME? */
+ 	SCMP_SYS(preadv),
++	SCMP_SYS(pwritev),
+ 	SCMP_SYS(pwrite64),
+ 	SCMP_SYS(read),
+ 	SCMP_SYS(readlinkat),
+@@ -78,6 +79,7 @@ static const int syscall_whitelist[] = {
+ 	SCMP_SYS(unlinkat),
+ 	SCMP_SYS(utimensat),
+ 	SCMP_SYS(write),
++	SCMP_SYS(writev),
+ };
 
-> As for 9p, pdflush will call clear_page_dirty_for_io() to clean the page's
-> dirty flags. Then call p9_client_write() to write the page to the host,
-> waiting for the result, and then flush the next page. In this case, buffer
-> write of 9p will hit the dirty page many times before it is being write
-> back to the host by pdflush process.
-> The pdflush stack for 9p:
->     pdflush
->       ->...
->         ->do_writepages
->           ->generic_writepages
->             ->write_cache_pages
->               ->clear_page_dirty_for_io // clear page's dirty flags
->               ->__writepage
->                 ->v9fs_vfs_writepage
->                   ->v9fs_vfs_writepage_locked
->                     ->p9_client_write   // it will get the writing back
-> page's result
-> 
-> 
-> According to the test result, is the handling method of 9p for page writing
-> back more reasonable than virtiofs?
-> 
-> Thanks,
-> Yan Wang
-> 
+ /* Syscalls used when --syslog is enabled */
+-- 
 

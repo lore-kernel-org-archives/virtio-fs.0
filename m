@@ -1,12 +1,13 @@
-References: <5D54AD38.3060008@huawei.com>
+References: <5D4CC344.7030706@huawei.com> <5D4CC400.9040606@huawei.com>
+	<20190814125235.GC23970@stefanha-x1.localdomain>
 From: piaojun <piaojun@huawei.com>
-Message-ID: <5D54AE67.7020307@huawei.com>
-Date: Thu, 15 Aug 2019 08:59:19 +0800
+Message-ID: <5D54B155.90101@huawei.com>
+Date: Thu, 15 Aug 2019 09:11:49 +0800
 MIME-Version: 1.0
-In-Reply-To: <5D54AD38.3060008@huawei.com>
-Content-Type: text/plain; charset="utf-8"
+In-Reply-To: <20190814125235.GC23970@stefanha-x1.localdomain>
+Content-Type: text/plain; charset="windows-1252"
 Content-Transfer-Encoding: 7bit
-Subject: [Virtio-fs] [PATCH v5 2/2] virtiofsd: use fuse_buf_writev to
+Subject: Re: [Virtio-fs] [PATCH v4 2/2] virtiofsd: use fuse_buf_writev to
  replace fuse_buf_write for better performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
@@ -16,47 +17,56 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com
 
-fuse_buf_writev() only handles the normal write in which src is buffer
-and dest is fd. Specially if src buffer represents guest physical
-address that can't be mapped by the daemon process, IO must be bounced
-back to the VMM to do it by fuse_buf_copy().
+Hi Stefan,
 
-Signed-off-by: Jun Piao <piaojun@huawei.com>
-Suggested-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
----
- contrib/virtiofsd/buffer.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+On 2019/8/14 20:52, Stefan Hajnoczi wrote:
+> On Fri, Aug 09, 2019 at 08:53:20AM +0800, piaojun wrote:
+>> diff --git a/contrib/virtiofsd/buffer.c b/contrib/virtiofsd/buffer.c
+>> index cec762f..d127c45 100644
+>> --- a/contrib/virtiofsd/buffer.c
+>> +++ b/contrib/virtiofsd/buffer.c
+>> @@ -318,11 +318,22 @@ static int fuse_bufvec_advance(struct fuse_bufvec *bufv, size_t len)
+>>  ssize_t fuse_buf_copy(fuse_req_t req, struct fuse_bufvec *dstv, struct fuse_bufvec *srcv,
+>>  		      enum fuse_buf_copy_flags flags)
+>>  {
+>> +	size_t i;
+>>  	size_t copied = 0;
+>>
+>>  	if (dstv == srcv)
+>>  		return fuse_buf_size(dstv);
+>>
+>> +	/* use writev to improve bandwidth when all the
+>> +	 * src buffers already mapped by the daemon
+>> +	 * process */
+> 
+> Some more checks to make this generic:
+> 
+>> +	for (i = 0; i < srcv->count; i++) {
+>> +		if (srcv->buf[i].flags & FUSE_BUF_PHYS_ADDR)
+>> +			break;
+> 
+>                 if (srcv->buf[i].flags & FUSE_BUF_IS_FD)
+> 		        break;
+> 
+>> +	}
+>> +	if (i == srcv->count)
+> 
+> Please verify the preconditions for the destination buffer too:
+> 
+>   && dstv->count == 1 && dstv->idx == 0 && dstv->off == 0 &&
+>   (dstv->buf[0].flags & FUSE_BUF_IS_FD)
 
-diff --git a/contrib/virtiofsd/buffer.c b/contrib/virtiofsd/buffer.c
-index cec762f..ee28367 100644
---- a/contrib/virtiofsd/buffer.c
-+++ b/contrib/virtiofsd/buffer.c
-@@ -318,11 +318,23 @@ static int fuse_bufvec_advance(struct fuse_bufvec *bufv, size_t len)
- ssize_t fuse_buf_copy(fuse_req_t req, struct fuse_bufvec *dstv, struct fuse_bufvec *srcv,
- 		      enum fuse_buf_copy_flags flags)
- {
-+	size_t i;
- 	size_t copied = 0;
+Thanks for your comments, and I prefer adding checker just for
+FUSE_BUF_IS_FD as fuse_buf_writev() does not care much about the other
+parts. And I personally think so many preconditions will make
+fuse_buf_writev() so specific.
 
- 	if (dstv == srcv)
- 		return fuse_buf_size(dstv);
+Thanks,
+Jun
 
-+	/* use writev to improve bandwidth when all the
-+	 * src buffers already mapped by the daemon
-+	 * process */
-+	for (i = 0; i < srcv->count; i++) {
-+		if ((srcv->buf[i].flags & FUSE_BUF_PHYS_ADDR) ||
-+		    (srcv->buf[i].flags & FUSE_BUF_IS_FD))
-+			break;
-+	}
-+	if ((i == srcv->count) && (dstv->buf[0].flags & FUSE_BUF_IS_FD))
-+		return fuse_buf_writev(req, &dstv->buf[0], srcv);
-+
- 	for (;;) {
- 		const struct fuse_buf *src = fuse_bufvec_current(srcv);
- 		const struct fuse_buf *dst = fuse_bufvec_current(dstv);
--- 
+> 
+>> +		return fuse_buf_writev(req, &dstv->buf[0], srcv);
 

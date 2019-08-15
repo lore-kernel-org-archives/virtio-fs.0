@@ -1,17 +1,17 @@
-References: <5D4CC344.7030706@huawei.com>
-	<20190811020659.GB13456@ali-6c96cfe09cf9.local>
-	<ba984781-dc70-8633-7cb4-6ccd00e4e23e@huawei.com>
-	<20190811111556.GC13456@ali-6c96cfe09cf9.local>
-From: piaojun <piaojun@huawei.com>
-Message-ID: <769b4025-b973-6107-f9f2-c65f72701bf2@huawei.com>
-Date: Sun, 11 Aug 2019 21:55:17 +0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=aol.com; s=a2048;
+	t=1565830576; bh=x17L5Sqy2ZSt8rwbeOibabFQ+XtkAaG8z2OsU6HiUsA=;
+	h=Date:From:To:Cc:Subject:References:In-Reply-To:From:Subject;
+	b=kUck1hwkfUXgt5FTMUxSRNWo/aRpa0EcpBdcBxUQ7WqyH22C0zpWR/RpJx1vk6fiULVNc+BQHCfjnQqg8uy40QUXCt0zFuR/saUSidLutPa09bwGvecppNEzJiR62IdoER+WgIT8YxJq0bn8SvIb65tQH4kq3FMVPe9fb2bD36462Meeh7dhWOP9IUrBsMpqBdI6GfoetKuO8uDbFOf6SW2Ab4rR/Q2xdCL2j7Z7qR6IOu2T/34iV/v9bHsEDIDgMoWURMLxRH96UDr1ZUIAyPijWD1tr1/yUQLyGwVO7/G6UfuXrW9CNJ8Y4XpxCIY9Mh8AK8fAylbSo5m58uIIBA==
+Date: Thu, 15 Aug 2019 08:56:05 +0800
+From: Gao Xiang <hsiangkao@aol.com>
+Message-ID: <20190815005559.GA14118@hsiangkao-HP-ZHAN-66-Pro-G1>
+References: <5abd7616-5351-761c-0c14-21d511251006@huawei.com>
 MIME-Version: 1.0
-In-Reply-To: <20190811111556.GC13456@ali-6c96cfe09cf9.local>
-Content-Type: text/plain; charset="gbk"
-Content-Language: en-US
-Content-Transfer-Encoding: base64
-Subject: Re: [Virtio-fs] [PATCH v4 0/2] virtiofsd: Improve io bandwidth by
- replacing pwrite with pwritev
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <5abd7616-5351-761c-0c14-21d511251006@huawei.com>
+Subject: Re: [Virtio-fs] [QUESTION] A performance problem for buffer write
+ compared with 9p
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,97 +20,73 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Eric Ren <renzhen@linux.alibaba.com>
-Cc: virtio-fs@redhat.com
+To: wangyan <wangyan122@huawei.com>
+Cc: linux-fsdevel@vger.kernel.org, "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
-CgpPbiAyMDE5LzgvMTEgMTk6MTUsIEVyaWMgUmVuIHdyb3RlOgo+IEhpLAo+IAo+IE9uIFN1biwg
-QXVnIDExLCAyMDE5IGF0IDEwOjQ2OjAyQU0gKzA4MDAsIHBpYW9qdW4gd3JvdGU6Cj4+Cj4+Cj4+
-IE9uIDIwMTkvOC8xMSAxMDowNiwgRXJpYyBSZW4gd3JvdGU6Cj4+PiBIaSBqdW4sCj4+Pgo+Pj4g
-T24gRnJpLCBBdWcgMDksIDIwMTkgYXQgMDg6NTA6MTJBTSArMDgwMCwgcGlhb2p1biB3cm90ZToK
-Pj4+PiA+RnJvbSBteSB0ZXN0LCB3cml0ZSBiYW5kd2lkdGggd2lsbCBiZSBpbXByb3ZlZCBncmVh
-dGx5IGJ5IHJlcGxhY2luZwo+Pj4+IHB3cml0ZSB3aXRoIHB3cml0ZXYsIGFuZCB0aGUgdGVzdCBy
-ZXN1bHQgYXMgYmVsb3c6Cj4+Pgo+Pj4gQ291bGQgeW91IHNoYXJlIG1vcmUgaW5mb3JtYXRpb24g
-YWJvdXQgdGhpcyB0ZXN0aW5nPwo+Pj4KPj4+IC0gYXJncyBmb3IgcWVtdTogY2FjaGUgc2l6ZT8K
-Pj4+IC0gYXJncyBmb3IgdmlydGlvZnNkOiB3aGljaCBjYWNoZSBtb2Rlo78KPj4+IC0gREFYIGlz
-IHVzZWQsIHJpZ2h0Pwo+Pgo+PiBEQVggaXMgZGlzYWJsZWQsIGFzIHRoaXMgb3B0aW1pemF0aW9u
-IG9ubHkgd29ya3Mgb24gSG9zdCBzaWRlLgo+IAo+IAo+IE9LLCB0aGFua3MgZm9yIHRoZSBpbmZv
-Lgo+IAo+IFRoZSB0ZXN0IHJ1bnMgaW4gS0FUQSBjb250YWluZXIsIHdoaWNoIHVzZSBEQVggYXMg
-aXRzIGRlZmF1bHQgbW91bnQKPiBvcHRpb24uCj4gCj4+Cj4+Pgo+Pj4gLSB3aGljaCBraW5kIG9m
-IGRpc2sgYXJlIHlvdSB1c2luZywgd2hhdCdzIHRoZW4gSU9QUy9CVyBsaW1pdD8KPj4+Cj4+PiBJ
-IHRyaWVkIHRoaXMgcGF0Y2ggd2l0aCBIREQgZGlzayAtIElPUFM6NTAwMCwgQlc6IDE0ME1CL3Mu
-Cj4+Cj4+IEkgdXNlZCBFWFQ0IGFuZCByYW1kaXNrIGFzIGJhY2tlbmQgZGV2aWNlLgo+Pgo+Pj4K
-Pj4+IC0gVk06IDQgdmNwdXMsIDhHIG1lbQo+Pj4gLSBjYWNoZT1hbHdheXMsIGNhY2hlLXNpemU9
-OEcsIERBWAo+Pj4gLSBmaW8gam9iCj4+Pgo+Pj4gYGBgCj4+PiBbZ2xvYmFsXQo+Pj4gZnN5bmM9
-MAo+Pj4gbmFtZT12aXJ0aW9mcy10ZXN0Cj4+PiBmaWxlbmFtZT1maW8tdGVzdAo+Pj4gZGlyZWN0
-b3J5PSRtbnRkaXIgICAjIHNoYXJlIGRpciBmb3IgdGVzdCBzaXR0aW5nIG9uIHRoZSBkaXNrCj4+
-PiBydz1yYW5kd3JpdGUKPj4+IGJzPTRLCj4+Cj4+ICpicyogc2hvdWxkIGJlIDFNIGZvciBiYW5k
-d2lkdGggdGVzdCB3aGljaCBtYWtlcyB3cml0ZXYgd29ya3Mgd2VsbC4KPiAKPiBZZXMsIGJ1dCBz
-ZXEgd3JpdGUgInJ3PXdyaXRlIiBpcyBhbHNvIGdvb2QgZnIgQlcgdGVzdCwgcmlnaHQ/CgpSaWdo
-dC4KCkp1bgoKPiAKPj4KPj4+IGRpcmVjdD0xCj4+PiBudW1qb2JzPTEKPj4+IHRpbWVfYmFzZWQ9
-MAo+Pj4KPj4+IFtmaWxlMV0KPj4+IHNpemU9MkcKPj4+IGlvX3NpemU9NDBNCj4+PiBpb2VuZ2lu
-ZT1saWJhaW8KPj4+IGlvZGVwdGg9MTI4Cj4+PiBgYGAKPj4+IC0gd2l0aG91dCB0aGlzIHBhdGNo
-Cj4+Pgo+Pj4gYGBgCj4+PiBmaWxlMTogKGc9MCk6IHJ3PXJhbmR3cml0ZSwgYnM9KFIpIDQwOTZC
-LTQwOTZCLCAoVykgNDA5NkItNDA5NkIsIChUKSA0MDk2Qi00MDk2QiwgaW9lbmdpbmU9bGliYWlv
-LCBpb2RlcHRoPTEyOAo+Pj4gZmlvLTMuMQo+Pj4gU3RhcnRpbmcgMSBwcm9jZXNzCj4+Pgo+Pj4g
-ZmlsZTE6IChncm91cGlkPTAsIGpvYnM9MSk6IGVycj0gMDogcGlkPTExOiBTYXQgQXVnIDEwIDEx
-OjMzOjI5IDIwMTkKPj4+ICAgd3JpdGU6IElPUFM9OTg1LCBCVz0zOTQyS2lCL3MgKDQwMzdrQi9z
-KSg0MC4wTWlCLzEwMzkwbXNlYykKPj4+IGBgYAo+Pj4KPj4+IC0gd2l0aCB0aGlzIHBhdGNoIGFw
-cGxpZWQKPj4+Cj4+PiBgYGAKPj4+IGZpbGUxOiAoZz0wKTogcnc9cmFuZHdyaXRlLCBicz0oUikg
-NDA5NkItNDA5NkIsIChXKSA0MDk2Qi00MDk2QiwgKFQpIDQwOTZCLTQwOTZCLCBpb2VuZ2luZT1s
-aWJhaW8sIGlvZGVwdGg9MTI4Cj4+PiBmaW8tMy4xCj4+PiBTdGFydGluZyAxIHByb2Nlc3MKPj4+
-Cj4+PiBmaWxlMTogKGdyb3VwaWQ9MCwgam9icz0xKTogZXJyPSAwOiBwaWQ9MTA6IFNhdCBBdWcg
-MTAgMTU6MzE6NTcgMjAxOQo+Pj4gICB3cml0ZTogSU9QUz0xMDU2LCBCVz00MjI0S2lCL3MgKDQz
-MjZrQi9zKSg0MC4wTWlCLzk2OTZtc2VjKQo+Pj4KPj4+IGBgYAo+Pj4KPj4+IHRoZSBudW1iZXIg
-aXMgZXZlbiB3b3JzZSB0aGFuIDlwZnMuCj4+Cj4+IFBsZWFzZSBtb2RpZnkgeW91ciB0ZXN0Y2Fz
-ZSBhcyBtZW50aW9uZWQgYWJvdmUsIGFuZCBzaGFyZSB5b3VyIHJlc3VsdAo+PiBhZ2Fpbi4gSSdt
-IGdsYWQgdG8gZmluZCBvdXQgd2hlcmUgdGhlIHByb2JsZW0gaXMuCj4gCj4gV2lsbCBjb21lIGJh
-Y2sgaWYgSSBnZXQgdGhlIG51bWJlci4KPiAKPiBUaGFua3MsCj4gRXJpYwo+IAo+Pgo+PiBKdW4K
-Pj4KPj4+Cj4+PiBUaGFua3MsCj4+PiBFcmljCj4+Pgo+Pj4+Cj4+Pj4gLS0tCj4+Pj4gcHdyaXRl
-Ogo+Pj4+ICMgZmlvIC1kaXJlY3Q9MSAtdGltZV9iYXNlZCAtaW9kZXB0aD02NCAtcnc9cmFuZHdy
-aXRlIC1pb2VuZ2luZT1saWJhaW8gLWJzPTFNIC1zaXplPTFHIC1udW1qb2I9MTYgLXJ1bnRpbWU9
-MzAgLWdyb3VwX3JlcG9ydGluZyAtbmFtZT1maWxlIC1maWxlbmFtZT0vbW50L3ZpcnRpb2ZzL2Zp
-bGUKPj4+PiBmaWxlOiAoZz0wKTogcnc9cmFuZHdyaXRlLCBicz0xTS0xTS8xTS0xTS8xTS0xTSwg
-aW9lbmdpbmU9bGliYWlvLCBpb2RlcHRoPTY0Cj4+Pj4gLi4uCj4+Pj4gZmlvLTIuMTMKPj4+PiBT
-dGFydGluZyAxNiBwcm9jZXNzZXMKPj4+PiBKb2JzOiAxNiAoZj0xNik6IFt3KDE2KV0gWzEwMC4w
-JSBkb25lXSBbMEtCLzg4Ni4wTUIvMEtCIC9zXSBbMC84ODYvMCBpb3BzXSBbZXRhIDAwbTowMHNd
-Cj4+Pj4gZmlsZTogKGdyb3VwaWQ9MCwgam9icz0xNik6IGVycj0gMDogcGlkPTU3OTk6IFR1ZSBB
-dWcgNiAxODo0ODoyNiAyMDE5Cj4+Pj4gd3JpdGU6IGlvPTI2ODgxTUIsIGJ3PTkxNjk4OEtCL3Ms
-IGlvcHM9ODk1LCBydW50PSAzMDAxOG1zZWMKPj4+Pgo+Pj4+IHB3cml0ZXY6Cj4+Pj4gIyBmaW8g
-LWRpcmVjdD0xIC10aW1lX2Jhc2VkIC1pb2RlcHRoPTY0IC1ydz1yYW5kd3JpdGUgLWlvZW5naW5l
-PWxpYmFpbyAtYnM9MU0gLXNpemU9MUcgLW51bWpvYj0xNiAtcnVudGltZT0zMCAtZ3JvdXBfcmVw
-b3J0aW5nIC1uYW1lPWZpbGUgLWZpbGVuYW1lPS9tbnQvdmlydGlvZnMvZmlsZQo+Pj4+IGZpbGU6
-IChnPTApOiBydz1yYW5kd3JpdGUsIGJzPTFNLTFNLzFNLTFNLzFNLTFNLCBpb2VuZ2luZT1saWJh
-aW8sIGlvZGVwdGg9NjQKPj4+PiAuLi4KPj4+PiBmaW8tMi4xMwo+Pj4+IFN0YXJ0aW5nIDE2IHBy
-b2Nlc3Nlcwo+Pj4+IEpvYnM6IDE2IChmPTE2KTogW3coMTYpXSBbMTAwLjAlIGRvbmVdIFswS0Iv
-MTc5M01CLzBLQiAvc10gWzAvMTc5My8wIGlvcHNdIFtldGEgMDBtOjAwc10KPj4+PiBmaWxlOiAo
-Z3JvdXBpZD0wLCBqb2JzPTE2KTogZXJyPSAwOiBwaWQ9NjMyODogVHVlIEF1ZyA2IDE4OjIyOjE3
-IDIwMTkKPj4+PiB3cml0ZTogaW89NTI3NzVNQiwgYnc9MTc1OC43TUIvcywgaW9wcz0xNzU4LCBy
-dW50PSAzMDAwOW1zZWMKPj4+PiAtLS0KPj4+Pgo+Pj4+IFRoaXMgcGF0Y2ggaW50cm9kdWNlcyB3
-cml0ZXYgYW5kIHB3cml0ZXYgZm9yIGxvX3dyaXRlX2J1ZigpLiBJIHRyaWVkIG15Cj4+Pj4gYmVz
-dCBub3QgZG9pbmcgaGFybSB0byB0aGUgb3JpZ2luIGNvZGUgY29uc3RydWN0LCBhbmQgdGhlcmUg
-d2lsbCBiZQo+Pj4+IHNvbWUgKnVzZWxlc3MqIGJyYW5jaGVzIGluIGZ1c2VfYnVmX2NvcHlfb25l
-KCkgd2hpY2ggYXJlIGhhcmQgdG8ganVkZ2UKPj4+PiBpZiB0aGV5IHdpbGwgYmUgdXNlZnVsIGlu
-IHRoZSBmdXR1cmUuIFNvIEkganVzdCBsZWF2ZSB0aGVtIGFsb25lCj4+Pj4gc2FmZWx5LiBJZiB0
-aGUgY2xlYW51cCB3b3JrIGlzIG5lY2Vzc2FyeSwgcGxlYXNlIGxldCBtZSBrbm93Lgo+Pj4+Cj4+
-Pj4gdjIKPj4+PiAgIC0gU3BsaXQgaW50byB0d28gcGF0Y2hlcwo+Pj4+ICAgLSBBZGQgdGhlIGxv
-c3QgZmxhZ3Mgc3VwcG9ydCwgc3VjaCBhcyBGVVNFX0JVRl9QSFlTX0FERFIKPj4+Pgo+Pj4+IHYz
-Cj4+Pj4gICAtIHVzZSBnaXQgc2VuZC1lbWFpbCB0byBtYWtlIHRoZSBwYXRjaCBzZXQgaW4gb25l
-IHRocmVhZAo+Pj4+ICAgLSBtb3ZlIGZ1c2VfYnVmX3dyaXRldigpIGludG8gZnVzZV9idWZfY29w
-eSgpCj4+Pj4gICAtIHVzZSB3cml0ZXYgZm9yIHRoZSBzcmMgYnVmZmVycyB3aGVuIHRoZXkncmUg
-YWxyZWFkIGFscmVhZHkgbWFwcGVkIGJ5IHRoZSBkYWVtb24gcHJvY2Vzcwo+Pj4+ICAgLSB1c2Ug
-Y2FsbG9jIHRvIHJlcGxhY2UgbWFsbG9jCj4+Pj4gICAtIHNldCByZXMgMCBpZiB3cml0ZXYoKSBy
-ZXR1cm5zIDAKPj4+Pgo+Pj4+IHY0Cj4+Pj4gICAtIGl0ZXJhdGUgZnJvbSBpbl9idWYtPmJ1Zlsw
-XSByYXRoZXIgdGhhbiBidWZbMV0KPj4+PiAgIC0gb3B0aW1pemUgdGhlIGNvZGUgdG8gbWFrZSBp
-dCBtb3JlIGVsZWdhbnQKPj4+Pgo+Pj4+IEp1biBQaWFvICgyKToKPj4+PiAgIGFkZCBkZWZpbml0
-aW9uIG9mIGZ1c2VfYnVmX3dyaXRldigpLgo+Pj4+ICAgdXNlIGZ1c2VfYnVmX3dyaXRldiB0byBy
-ZXBsYWNlIGZ1c2VfYnVmX3dyaXRlIGZvciBiZXR0ZXIgcGVyZm9ybWFuY2UKPj4+Pgo+Pj4+IFNp
-Z25lZC1vZmYtYnk6IEp1biBQaWFvIDxwaWFvanVuQGh1YXdlaS5jb20+Cj4+Pj4gU3VnZ2VzdGVk
-LWJ5OiBEci4gRGF2aWQgQWxhbiBHaWxiZXJ0IDxkZ2lsYmVydEByZWRoYXQuY29tPgo+Pj4+IFN1
-Z2dlc3RlZC1ieTogU3RlZmFuIEhham5vY3ppIDxzdGVmYW5oYUByZWRoYXQuY29tPgo+Pj4+IC0t
-LQo+Pj4+ICBidWZmZXIuYyAgICAgIHwgICA0OCArKysrKysrKysrKysrKysrKysrKysrKysrKysr
-KysrKysrKysrKysrKysrKysrKysKPj4+PiAgZnVzZV9jb21tb24uaCB8ICAgMTQgKysrKysrKysr
-KysrKysKPj4+PiAgc2VjY29tcC5jICAgICB8ICAgIDIgKysKPj4+PiAgMyBmaWxlcyBjaGFuZ2Vk
-LCA2NCBpbnNlcnRpb25zKCspCj4+Pj4gLS0KPj4+Pgo+Pj4+IF9fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fCj4+Pj4gVmlydGlvLWZzIG1haWxpbmcgbGlzdAo+
-Pj4+IFZpcnRpby1mc0ByZWRoYXQuY29tCj4+Pj4gaHR0cHM6Ly93d3cucmVkaGF0LmNvbS9tYWls
-bWFuL2xpc3RpbmZvL3ZpcnRpby1mcwo+Pj4gLgo+Pj4KPiAuCj4gCgo=
+On Thu, Aug 15, 2019 at 08:30:43AM +0800, wangyan wrote:
+
+[]
+
+> 
+> I found that the judgement statement 'if (!TestSetPageDirty(page))' always
+> true in function '__set_page_dirty_nobuffers', it will waste much time
+> to mark inode dirty, no one page is dirty when write it the second time.
+> The buffer write stack:
+>     fuse_file_write_iter
+>       ->fuse_cache_write_iter
+>         ->generic_file_write_iter
+>           ->__generic_file_write_iter
+>             ->generic_perform_write
+>               ->fuse_write_end
+>                 ->set_page_dirty
+>                   ->__set_page_dirty_nobuffers
+> 
+> The reason for 'if (!TestSetPageDirty(page))' always true may be the pdflush
+> process will clean the page's dirty flags in clear_page_dirty_for_io(),
+> and call fuse_writepages_send() to flush all pages to the disk of the host.
+> So when the page is written the second time, it always not dirty.
+> The pdflush stack for fuse:
+>     pdflush
+>       ->...
+>         ->do_writepages
+>           ->fuse_writepages
+>             ->write_cache_pages         // will clear all page's dirty flags
+>               ->clear_page_dirty_for_io // clear page's dirty flags
+>             ->fuse_writepages_send      // write all pages to the host, but
+> don't wait the result
+> Why not wait for getting the result of writing back pages to the host
+> before cleaning all page's dirty flags?
+> 
+
+As my understanding, I personally think there's nothing wrong with
+the above process from your words above.
+
+Thanks,
+Gao Xiang
+
+> As for 9p, pdflush will call clear_page_dirty_for_io() to clean the page's
+> dirty flags. Then call p9_client_write() to write the page to the host,
+> waiting for the result, and then flush the next page. In this case, buffer
+> write of 9p will hit the dirty page many times before it is being write
+> back to the host by pdflush process.
+> The pdflush stack for 9p:
+>     pdflush
+>       ->...
+>         ->do_writepages
+>           ->generic_writepages
+>             ->write_cache_pages
+>               ->clear_page_dirty_for_io // clear page's dirty flags
+>               ->__writepage
+>                 ->v9fs_vfs_writepage
+>                   ->v9fs_vfs_writepage_locked
+>                     ->p9_client_write   // it will get the writing back
+> page's result
+> 
+> 
+> According to the test result, is the handling method of 9p for page writing
+> back more reasonable than virtiofs?
+> 
+> Thanks,
+> Yan Wang
+> 
+

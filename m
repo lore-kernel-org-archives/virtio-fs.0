@@ -1,11 +1,11 @@
-From: wangyan <wangyan122@huawei.com>
-Message-ID: <5abd7616-5351-761c-0c14-21d511251006@huawei.com>
-Date: Thu, 15 Aug 2019 08:30:43 +0800
+From: piaojun <piaojun@huawei.com>
+Message-ID: <5D54AD38.3060008@huawei.com>
+Date: Thu, 15 Aug 2019 08:54:16 +0800
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [QUESTION] A performance problem for buffer write
-	compared with 9p
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+Subject: [Virtio-fs] [PATCH v5 0/2] virtiofsd: Improve io bandwidth by
+ replacing pwrite with pwritev
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,163 +14,61 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org
-Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+To: virtio-fs@redhat.com
 
-Hi all,
+>From my test, write bandwidth will be improved greatly by replacing
+pwrite with pwritev, and the test result as below:
 
-I met a performance problem when I tested buffer write compared with 9p.
+---
+pwrite:
+# fio -direct=1 -time_based -iodepth=64 -rw=randwrite -ioengine=libaio -bs=1M -size=1G -numjob=16 -runtime=30 -group_reporting -name=file -filename=/mnt/virtiofs/file
+file: (g=0): rw=randwrite, bs=1M-1M/1M-1M/1M-1M, ioengine=libaio, iodepth=64
+...
+fio-2.13
+Starting 16 processes
+Jobs: 16 (f=16): [w(16)] [100.0% done] [0KB/886.0MB/0KB /s] [0/886/0 iops] [eta 00m:00s]
+file: (groupid=0, jobs=16): err= 0: pid=5799: Tue Aug 6 18:48:26 2019
+write: io=26881MB, bw=916988KB/s, iops=895, runt= 30018msec
 
-Guest configuration:
-     Kernel: https://github.com/rhvgoyal/linux/tree/virtio-fs-dev-5.1
-     2vCPU
-     8GB RAM
-Host configuration:
-     Intel(R) Xeon(R) CPU E5-2620 v2 @ 2.10GHz
-     128GB RAM
-     Linux 3.10.0
-     Qemu: https://gitlab.com/virtio-fs/qemu/tree/virtio-fs-dev
-     EXT4 + ramdisk for shared folder
+pwritev:
+# fio -direct=1 -time_based -iodepth=64 -rw=randwrite -ioengine=libaio -bs=1M -size=1G -numjob=16 -runtime=30 -group_reporting -name=file -filename=/mnt/virtiofs/file
+file: (g=0): rw=randwrite, bs=1M-1M/1M-1M/1M-1M, ioengine=libaio, iodepth=64
+...
+fio-2.13
+Starting 16 processes
+Jobs: 16 (f=16): [w(16)] [100.0% done] [0KB/1793MB/0KB /s] [0/1793/0 iops] [eta 00m:00s]
+file: (groupid=0, jobs=16): err= 0: pid=6328: Tue Aug 6 18:22:17 2019
+write: io=52775MB, bw=1758.7MB/s, iops=1758, runt= 30009msec
+---
 
-------------------------------------------------------------------------
+This patch introduces writev and pwritev for lo_write_buf().
 
-For virtiofs:
-virtiofsd cmd:
-     ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o 
-source=/mnt/share/ -o cache=always -o writeback
-mount cmd:
-     mount -t virtio_fs myfs /mnt/virtiofs -o 
-rootmode=040000,user_id=0,group_id=0
+v2
+  - Split into two patches
+  - Add the lost flags support, such as FUSE_BUF_PHYS_ADDR
 
-For 9p:
-mount cmd:
-     mount -t 9p -o 
-trans=virtio,version=9p2000.L,rw,dirsync,nodev,msize=1000000000,cache=fscache 
-sharedir /mnt/virtiofs/
+v3
+  - use git send-email to make the patch set in one thread
+  - move fuse_buf_writev() into fuse_buf_copy()
+  - use writev for the src buffers when they're alread already mapped by the daemon process
+  - use calloc to replace malloc
+  - set res 0 if writev() returns 0
 
-------------------------------------------------------------------------
+v4
+  - iterate from in_buf->buf[0] rather than buf[1]
+  - optimize the code to make it more elegant
 
-Compared with 9p, the test result:
-1. Latency
-     Test model：
-         fio -filename=/mnt/virtiofs/test -rw=write -bs=4K -size=1G 
--iodepth=1 \
-             -ioengine=psync -numjobs=1 -group_reporting -name=4K 
--time_based -runtime=30
+v5
+  - add some check for preconditions of the buffers
 
-     virtiofs: avg-lat is 6.37 usec
-         4K: (g=0): rw=write, bs=4K-4K/4K-4K/4K-4K, ioengine=psync, 
-iodepth=1
-         fio-2.13
-         Starting 1 process
-         Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/471.9MB/0KB /s] 
-[0/121K/0 iops] [eta 00m:00s]
-         4K: (groupid=0, jobs=1): err= 0: pid=5558: Fri Aug  9 09:21:13 2019
-           write: io=13758MB, bw=469576KB/s, iops=117394, runt= 30001msec
-             clat (usec): min=2, max=10316, avg= 5.75, stdev=81.80
-              lat (usec): min=3, max=10317, avg= 6.37, stdev=81.80
+Jun Piao (2):
+  add definition of fuse_buf_writev().
+  use fuse_buf_writev to replace fuse_buf_write for better performance
 
-     9p: avg-lat is 3.94 usec
-         4K: (g=0): rw=write, bs=4K-4K/4K-4K/4K-4K, ioengine=psync, 
-iodepth=1
-         fio-2.13
-         Starting 1 process
-         Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/634.2MB/0KB /s] 
-[0/162K/0 iops] [eta 00m:00s]
-         4K: (groupid=0, jobs=1): err= 0: pid=5873: Fri Aug  9 09:53:46 2019
-           write: io=19700MB, bw=672414KB/s, iops=168103, runt= 30001msec
-             clat (usec): min=2, max=632, avg= 3.34, stdev= 3.77
-              lat (usec): min=2, max=633, avg= 3.94, stdev= 3.82
-
-
-2. Bandwidth
-     Test model:
-         fio -filename=/mnt/virtiofs/test -rw=write -bs=1M -size=1G 
--iodepth=1 \
-             -ioengine=psync -numjobs=1 -group_reporting -name=1M 
--time_based -runtime=30
-
-     virtiofs: bandwidth is 718961KB/s
-         1M: (g=0): rw=write, bs=1M-1M/1M-1M/1M-1M, ioengine=psync, 
-iodepth=1
-         fio-2.13
-         Starting 1 process
-         Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/753.8MB/0KB /s] 
-[0/753/0 iops] [eta 00m:00s]
-         1M: (groupid=0, jobs=1): err= 0: pid=5648: Fri Aug  9 09:24:36 2019
-             write: io=21064MB, bw=718961KB/s, iops=702, runt= 30001msec
-              clat (usec): min=390, max=11127, avg=1361.41, stdev=1551.50
-               lat (usec): min=432, max=11170, avg=1414.72, stdev=1553.28
-
-     9p: bandwidth is 2305.5MB/s
-         1M: (g=0): rw=write, bs=1M-1M/1M-1M/1M-1M, ioengine=psync, 
-iodepth=1
-         fio-2.13
-         Starting 1 process
-         Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/2406MB/0KB /s] 
-[0/2406/0 iops] [eta 00m:00s]
-         1M: (groupid=0, jobs=1): err= 0: pid=5907: Fri Aug  9 09:55:14 2019
-           write: io=69166MB, bw=2305.5MB/s, iops=2305, runt= 30001msec
-             clat (usec): min=287, max=17678, avg=352.00, stdev=503.43
-              lat (usec): min=330, max=17721, avg=402.76, stdev=503.41
-
-9p has a lower latency and higher bandwidth than virtiofs.
-
------------------------------------------------------------------------- 
-
-
-I found that the judgement statement 'if (!TestSetPageDirty(page))' always
-true in function '__set_page_dirty_nobuffers', it will waste much time
-to mark inode dirty, no one page is dirty when write it the second time.
-The buffer write stack:
-     fuse_file_write_iter
-       ->fuse_cache_write_iter
-         ->generic_file_write_iter
-           ->__generic_file_write_iter
-             ->generic_perform_write
-               ->fuse_write_end
-                 ->set_page_dirty
-                   ->__set_page_dirty_nobuffers
-
-The reason for 'if (!TestSetPageDirty(page))' always true may be the pdflush
-process will clean the page's dirty flags in clear_page_dirty_for_io(),
-and call fuse_writepages_send() to flush all pages to the disk of the host.
-So when the page is written the second time, it always not dirty.
-The pdflush stack for fuse:
-     pdflush
-       ->...
-         ->do_writepages
-           ->fuse_writepages
-             ->write_cache_pages         // will clear all page's dirty 
-flags
-               ->clear_page_dirty_for_io // clear page's dirty flags
-             ->fuse_writepages_send      // write all pages to the host, 
-but don't wait the result
-Why not wait for getting the result of writing back pages to the host
-before cleaning all page's dirty flags?
-
-As for 9p, pdflush will call clear_page_dirty_for_io() to clean the page's
-dirty flags. Then call p9_client_write() to write the page to the host,
-waiting for the result, and then flush the next page. In this case, buffer
-write of 9p will hit the dirty page many times before it is being write
-back to the host by pdflush process.
-The pdflush stack for 9p:
-     pdflush
-       ->...
-         ->do_writepages
-           ->generic_writepages
-             ->write_cache_pages
-               ->clear_page_dirty_for_io // clear page's dirty flags
-               ->__writepage
-                 ->v9fs_vfs_writepage
-                   ->v9fs_vfs_writepage_locked
-                     ->p9_client_write   // it will get the writing back 
-page's result
-
-
-According to the test result, is the handling method of 9p for page writing
-back more reasonable than virtiofs?
-
-Thanks,
-Yan Wang
+Signed-off-by: Jun Piao <piaojun@huawei.com>
+---
+ buffer.c  |   43 +++++++++++++++++++++++++++++++++++++++++++
+ seccomp.c |    2 ++
+ 2 files changed, 45 insertions(+)
+--
 

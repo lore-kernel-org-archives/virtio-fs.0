@@ -1,14 +1,11 @@
-Date: Wed, 14 Aug 2019 13:51:14 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190814205113.oy7ioyejl5ddktn7@US-160370MP2.local>
-References: <1565634725-89726-1-git-send-email-bo.liu@linux.alibaba.com>
-	<20190814195338.GC7475@redhat.com>
+From: wangyan <wangyan122@huawei.com>
+Message-ID: <5abd7616-5351-761c-0c14-21d511251006@huawei.com>
+Date: Thu, 15 Aug 2019 08:30:43 +0800
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20190814195338.GC7475@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 1/2] virtio-fs: try hard to do inline reclaim
-Reply-To: bo.liu@linux.alibaba.com
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [QUESTION] A performance problem for buffer write
+	compared with 9p
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,119 +14,163 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com
+To: linux-fsdevel@vger.kernel.org
+Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
-On Wed, Aug 14, 2019 at 03:53:38PM -0400, Vivek Goyal wrote:
-> On Tue, Aug 13, 2019 at 02:32:04AM +0800, Liu Bo wrote:
-> > The difference between inline dmap reclaim and background dmap reclaim is
-> > that dmaps got from inline reclaim get reused for another mapping
-> > immediately, according to how we implement REMOVEMAPPING in daemon, it's
-> > unnecessary to involve a REMOVEMAPPING to reuse a dmap.
-> > 
-> > Currently we always kick background reclaim before doing inline reclaim,
-> > but some lock contention on i_dmap_lock from background reclaim results in
-> > performance loss for dax read/write.
-> > 
-> > This makes read/write first try hard to do inline reclaim, then kick
-> > background reclaim if it makes no progress.
-> > 
-> > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
-> > ---
-> >  fs/fuse/file.c | 17 ++++++++++++++---
-> >  1 file changed, 14 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-> > index ae197be..2ea670a 100644
-> > --- a/fs/fuse/file.c
-> > +++ b/fs/fuse/file.c
-> > @@ -203,7 +203,8 @@ static void kick_dmap_free_worker(struct fuse_conn *fc, unsigned long delay_ms)
-> >  	spin_unlock(&fc->lock);
-> >  }
-> >  
-> > -static struct fuse_dax_mapping *alloc_dax_mapping(struct fuse_conn *fc)
-> > +static struct fuse_dax_mapping *__alloc_dax_mapping(struct fuse_conn *fc,
-> > +						    bool bg_reclaim)
-> >  {
-> >  	struct fuse_dax_mapping *dmap = NULL;
-> >  
-> > @@ -224,9 +225,14 @@ static struct fuse_dax_mapping *alloc_dax_mapping(struct fuse_conn *fc)
-> >  	spin_unlock(&fc->lock);
-> >  
-> >  out_kick:
-> > -	kick_dmap_free_worker(fc, 0);
-> > +	if (bg_reclaim)
-> > +		kick_dmap_free_worker(fc, 0);
-> >  	return dmap;
-> >  }
-> > +static struct fuse_dax_mapping *alloc_dax_mapping(struct fuse_conn *fc)
-> > +{
-> > +	return __alloc_dax_mapping(fc, true);
-> > +}
-> >  
-> >  /* This assumes fc->lock is held */
-> >  static void __dmap_remove_busy_list(struct fuse_conn *fc,
-> > @@ -4085,7 +4091,7 @@ static struct fuse_dax_mapping *alloc_dax_mapping_reclaim(struct fuse_conn *fc,
-> >  	struct fuse_inode *fi = get_fuse_inode(inode);
-> >  
-> >  	while(1) {
-> > -		dmap = alloc_dax_mapping(fc);
-> > +		dmap = __alloc_dax_mapping(fc, false);
-> 
-> So all you are doing is first try inline reclaim before kicking in worker
-> thread. Well it might work well for a single inode case but if more than
-> one inodes are consuming free memory, might not help much.
->
+Hi all,
 
-I'll verify that.
+I met a performance problem when I tested buffer write compared with 9p.
 
-> Also, as of now inline reclaims are enabled only for writes. (no reads, no
-> mmap). So this should not help with the randread improvements you posted
-> in second patch.
->
+Guest configuration:
+     Kernel: https://github.com/rhvgoyal/linux/tree/virtio-fs-dev-5.1
+     2vCPU
+     8GB RAM
+Host configuration:
+     Intel(R) Xeon(R) CPU E5-2620 v2 @ 2.10GHz
+     128GB RAM
+     Linux 3.10.0
+     Qemu: https://gitlab.com/virtio-fs/qemu/tree/virtio-fs-dev
+     EXT4 + ramdisk for shared folder
 
-I explained it in another email under the thread.
+------------------------------------------------------------------------
 
-> Does this work without deadlocks with cache_size=2M.
+For virtiofs:
+virtiofsd cmd:
+     ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o 
+source=/mnt/share/ -o cache=always -o writeback
+mount cmd:
+     mount -t virtio_fs myfs /mnt/virtiofs -o 
+rootmode=040000,user_id=0,group_id=0
 
-Well, with or without these 2 changes, on cache_size=2M kernel build end up with
-waiting for dmap "forever", at least lockdep didn't report deadlocks.
+For 9p:
+mount cmd:
+     mount -t 9p -o 
+trans=virtio,version=9p2000.L,rw,dirsync,nodev,msize=1000000000,cache=fscache 
+sharedir /mnt/virtiofs/
 
-IMO this patch doesn't change the current reclaim logic,
-1) try inline reclaim first
-2) wait for background reclaim to make progress
+------------------------------------------------------------------------
 
-The only difference is that this changes step 1) to not kick background thread,
-I think the performance gain mainly comes from less lock contention on
-fi->i_dmap_sem, which we can easily observe without these two patches.
+Compared with 9p, the test result:
+1. Latency
+     Test model：
+         fio -filename=/mnt/virtiofs/test -rw=write -bs=4K -size=1G 
+-iodepth=1 \
+             -ioengine=psync -numjobs=1 -group_reporting -name=4K 
+-time_based -runtime=30
 
-thanks,
--liubo
+     virtiofs: avg-lat is 6.37 usec
+         4K: (g=0): rw=write, bs=4K-4K/4K-4K/4K-4K, ioengine=psync, 
+iodepth=1
+         fio-2.13
+         Starting 1 process
+         Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/471.9MB/0KB /s] 
+[0/121K/0 iops] [eta 00m:00s]
+         4K: (groupid=0, jobs=1): err= 0: pid=5558: Fri Aug  9 09:21:13 2019
+           write: io=13758MB, bw=469576KB/s, iops=117394, runt= 30001msec
+             clat (usec): min=2, max=10316, avg= 5.75, stdev=81.80
+              lat (usec): min=3, max=10317, avg= 6.37, stdev=81.80
 
-> 
-> Thanks
-> Vivek
-> 
-> >  		if (dmap)
-> >  			return dmap;
-> >  
-> > @@ -4099,6 +4105,11 @@ static struct fuse_dax_mapping *alloc_dax_mapping_reclaim(struct fuse_conn *fc,
-> >  		 * Wait for one.
-> >  		 */
-> >  		if (!(fc->nr_free_ranges > 0)) {
-> > +			/* try again with background reclaim. */
-> > +			dmap = alloc_dax_mapping(fc);
-> > +			if (dmap)
-> > +				return dmap;
-> > +
-> >  			if (wait_event_killable_exclusive(fc->dax_range_waitq,
-> >  					(fc->nr_free_ranges > 0)))
-> >  				return ERR_PTR(-EINTR);
-> > -- 
-> > 1.8.3.1
-> > 
-> > _______________________________________________
-> > Virtio-fs mailing list
-> > Virtio-fs@redhat.com
-> > https://www.redhat.com/mailman/listinfo/virtio-fs
+     9p: avg-lat is 3.94 usec
+         4K: (g=0): rw=write, bs=4K-4K/4K-4K/4K-4K, ioengine=psync, 
+iodepth=1
+         fio-2.13
+         Starting 1 process
+         Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/634.2MB/0KB /s] 
+[0/162K/0 iops] [eta 00m:00s]
+         4K: (groupid=0, jobs=1): err= 0: pid=5873: Fri Aug  9 09:53:46 2019
+           write: io=19700MB, bw=672414KB/s, iops=168103, runt= 30001msec
+             clat (usec): min=2, max=632, avg= 3.34, stdev= 3.77
+              lat (usec): min=2, max=633, avg= 3.94, stdev= 3.82
+
+
+2. Bandwidth
+     Test model:
+         fio -filename=/mnt/virtiofs/test -rw=write -bs=1M -size=1G 
+-iodepth=1 \
+             -ioengine=psync -numjobs=1 -group_reporting -name=1M 
+-time_based -runtime=30
+
+     virtiofs: bandwidth is 718961KB/s
+         1M: (g=0): rw=write, bs=1M-1M/1M-1M/1M-1M, ioengine=psync, 
+iodepth=1
+         fio-2.13
+         Starting 1 process
+         Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/753.8MB/0KB /s] 
+[0/753/0 iops] [eta 00m:00s]
+         1M: (groupid=0, jobs=1): err= 0: pid=5648: Fri Aug  9 09:24:36 2019
+             write: io=21064MB, bw=718961KB/s, iops=702, runt= 30001msec
+              clat (usec): min=390, max=11127, avg=1361.41, stdev=1551.50
+               lat (usec): min=432, max=11170, avg=1414.72, stdev=1553.28
+
+     9p: bandwidth is 2305.5MB/s
+         1M: (g=0): rw=write, bs=1M-1M/1M-1M/1M-1M, ioengine=psync, 
+iodepth=1
+         fio-2.13
+         Starting 1 process
+         Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/2406MB/0KB /s] 
+[0/2406/0 iops] [eta 00m:00s]
+         1M: (groupid=0, jobs=1): err= 0: pid=5907: Fri Aug  9 09:55:14 2019
+           write: io=69166MB, bw=2305.5MB/s, iops=2305, runt= 30001msec
+             clat (usec): min=287, max=17678, avg=352.00, stdev=503.43
+              lat (usec): min=330, max=17721, avg=402.76, stdev=503.41
+
+9p has a lower latency and higher bandwidth than virtiofs.
+
+------------------------------------------------------------------------ 
+
+
+I found that the judgement statement 'if (!TestSetPageDirty(page))' always
+true in function '__set_page_dirty_nobuffers', it will waste much time
+to mark inode dirty, no one page is dirty when write it the second time.
+The buffer write stack:
+     fuse_file_write_iter
+       ->fuse_cache_write_iter
+         ->generic_file_write_iter
+           ->__generic_file_write_iter
+             ->generic_perform_write
+               ->fuse_write_end
+                 ->set_page_dirty
+                   ->__set_page_dirty_nobuffers
+
+The reason for 'if (!TestSetPageDirty(page))' always true may be the pdflush
+process will clean the page's dirty flags in clear_page_dirty_for_io(),
+and call fuse_writepages_send() to flush all pages to the disk of the host.
+So when the page is written the second time, it always not dirty.
+The pdflush stack for fuse:
+     pdflush
+       ->...
+         ->do_writepages
+           ->fuse_writepages
+             ->write_cache_pages         // will clear all page's dirty 
+flags
+               ->clear_page_dirty_for_io // clear page's dirty flags
+             ->fuse_writepages_send      // write all pages to the host, 
+but don't wait the result
+Why not wait for getting the result of writing back pages to the host
+before cleaning all page's dirty flags?
+
+As for 9p, pdflush will call clear_page_dirty_for_io() to clean the page's
+dirty flags. Then call p9_client_write() to write the page to the host,
+waiting for the result, and then flush the next page. In this case, buffer
+write of 9p will hit the dirty page many times before it is being write
+back to the host by pdflush process.
+The pdflush stack for 9p:
+     pdflush
+       ->...
+         ->do_writepages
+           ->generic_writepages
+             ->write_cache_pages
+               ->clear_page_dirty_for_io // clear page's dirty flags
+               ->__writepage
+                 ->v9fs_vfs_writepage
+                   ->v9fs_vfs_writepage_locked
+                     ->p9_client_write   // it will get the writing back 
+page's result
+
+
+According to the test result, is the handling method of 9p for page writing
+back more reasonable than virtiofs?
+
+Thanks,
+Yan Wang
 

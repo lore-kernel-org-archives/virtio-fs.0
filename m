@@ -1,14 +1,14 @@
-Date: Thu, 15 Aug 2019 15:50:38 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190815145038.GI10996@stefanha-x1.localdomain>
 References: <5D4CC344.7030706@huawei.com> <5D4CC400.9040606@huawei.com>
 	<20190814125235.GC23970@stefanha-x1.localdomain>
 	<5D54B155.90101@huawei.com>
+	<20190815145038.GI10996@stefanha-x1.localdomain>
+From: piaojun <piaojun@huawei.com>
+Message-ID: <5D55FD7B.3080909@huawei.com>
+Date: Fri, 16 Aug 2019 08:48:59 +0800
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="BghK6+krpKHjj+jk"
-Content-Disposition: inline
-In-Reply-To: <5D54B155.90101@huawei.com>
+In-Reply-To: <20190815145038.GI10996@stefanha-x1.localdomain>
+Content-Type: text/plain; charset="windows-1252"
+Content-Transfer-Encoding: 7bit
 Subject: Re: [Virtio-fs] [PATCH v4 2/2] virtiofsd: use fuse_buf_writev to
  replace fuse_buf_write for better performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -19,85 +19,84 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
 Cc: virtio-fs@redhat.com
 
 
---BghK6+krpKHjj+jk
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
 
-On Thu, Aug 15, 2019 at 09:11:49AM +0800, piaojun wrote:
-> Hi Stefan,
->=20
-> On 2019/8/14 20:52, Stefan Hajnoczi wrote:
-> > On Fri, Aug 09, 2019 at 08:53:20AM +0800, piaojun wrote:
-> >> diff --git a/contrib/virtiofsd/buffer.c b/contrib/virtiofsd/buffer.c
-> >> index cec762f..d127c45 100644
-> >> --- a/contrib/virtiofsd/buffer.c
-> >> +++ b/contrib/virtiofsd/buffer.c
-> >> @@ -318,11 +318,22 @@ static int fuse_bufvec_advance(struct fuse_bufve=
-c *bufv, size_t len)
-> >>  ssize_t fuse_buf_copy(fuse_req_t req, struct fuse_bufvec *dstv, struc=
-t fuse_bufvec *srcv,
-> >>  		      enum fuse_buf_copy_flags flags)
-> >>  {
-> >> +	size_t i;
-> >>  	size_t copied =3D 0;
-> >>
-> >>  	if (dstv =3D=3D srcv)
-> >>  		return fuse_buf_size(dstv);
-> >>
-> >> +	/* use writev to improve bandwidth when all the
-> >> +	 * src buffers already mapped by the daemon
-> >> +	 * process */
-> >=20
-> > Some more checks to make this generic:
-> >=20
-> >> +	for (i =3D 0; i < srcv->count; i++) {
-> >> +		if (srcv->buf[i].flags & FUSE_BUF_PHYS_ADDR)
-> >> +			break;
-> >=20
-> >                 if (srcv->buf[i].flags & FUSE_BUF_IS_FD)
-> > 		        break;
-> >=20
-> >> +	}
-> >> +	if (i =3D=3D srcv->count)
-> >=20
-> > Please verify the preconditions for the destination buffer too:
-> >=20
-> >   && dstv->count =3D=3D 1 && dstv->idx =3D=3D 0 && dstv->off =3D=3D 0 &&
-> >   (dstv->buf[0].flags & FUSE_BUF_IS_FD)
->=20
-> Thanks for your comments, and I prefer adding checker just for
-> FUSE_BUF_IS_FD as fuse_buf_writev() does not care much about the other
-> parts. And I personally think so many preconditions will make
-> fuse_buf_writev() so specific.
+On 2019/8/15 22:50, Stefan Hajnoczi wrote:
+> On Thu, Aug 15, 2019 at 09:11:49AM +0800, piaojun wrote:
+>> Hi Stefan,
+>>
+>> On 2019/8/14 20:52, Stefan Hajnoczi wrote:
+>>> On Fri, Aug 09, 2019 at 08:53:20AM +0800, piaojun wrote:
+>>>> diff --git a/contrib/virtiofsd/buffer.c b/contrib/virtiofsd/buffer.c
+>>>> index cec762f..d127c45 100644
+>>>> --- a/contrib/virtiofsd/buffer.c
+>>>> +++ b/contrib/virtiofsd/buffer.c
+>>>> @@ -318,11 +318,22 @@ static int fuse_bufvec_advance(struct fuse_bufvec *bufv, size_t len)
+>>>>  ssize_t fuse_buf_copy(fuse_req_t req, struct fuse_bufvec *dstv, struct fuse_bufvec *srcv,
+>>>>  		      enum fuse_buf_copy_flags flags)
+>>>>  {
+>>>> +	size_t i;
+>>>>  	size_t copied = 0;
+>>>>
+>>>>  	if (dstv == srcv)
+>>>>  		return fuse_buf_size(dstv);
+>>>>
+>>>> +	/* use writev to improve bandwidth when all the
+>>>> +	 * src buffers already mapped by the daemon
+>>>> +	 * process */
+>>>
+>>> Some more checks to make this generic:
+>>>
+>>>> +	for (i = 0; i < srcv->count; i++) {
+>>>> +		if (srcv->buf[i].flags & FUSE_BUF_PHYS_ADDR)
+>>>> +			break;
+>>>
+>>>                 if (srcv->buf[i].flags & FUSE_BUF_IS_FD)
+>>> 		        break;
+>>>
+>>>> +	}
+>>>> +	if (i == srcv->count)
+>>>
+>>> Please verify the preconditions for the destination buffer too:
+>>>
+>>>   && dstv->count == 1 && dstv->idx == 0 && dstv->off == 0 &&
+>>>   (dstv->buf[0].flags & FUSE_BUF_IS_FD)
+>>
+>> Thanks for your comments, and I prefer adding checker just for
+>> FUSE_BUF_IS_FD as fuse_buf_writev() does not care much about the other
+>> parts. And I personally think so many preconditions will make
+>> fuse_buf_writev() so specific.
+> 
+> I think these preconditions are necessary.  This function won't do the
+> right thing if dstv has multiple elements or has been previously
+> modified (idx/off).
+> 
+> Can you explain why these cases will never happen or why the code is
+> correct under these cases?
+> 
+> Stefan
+> 
 
-I think these preconditions are necessary.  This function won't do the
-right thing if dstv has multiple elements or has been previously
-modified (idx/off).
+We have already reached an agreement with the src buf and need discuss
+with the dst buf. So I spent some time looking into libfuse code, and
+found your suggestion really make sense. My previous thought was that
+idx/off only works when dst is buf. So I will make these preconditions
+more generic like this:
 
-Can you explain why these cases will never happen or why the code is
-correct under these cases?
+In fuse_buf_copy():
+if (i == srcv->count) {
+dstv->buf[0].pos += dstv->off; // add dst offset even if it's always 0
+fuse_buf_writev(req, &dstv->buf[0], srcv);
+}
 
-Stefan
+In fuse_buf_writev():
 
---BghK6+krpKHjj+jk
-Content-Type: application/pgp-signature; name="signature.asc"
+// modify the preconditions
+if (i == srcv->count && dstv->count == 1 &&
+dstv->idx == 0 && (dstv->buf[0].flags & FUSE_BUF_IS_FD))
 
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1VcT4ACgkQnKSrs4Gr
-c8ifbAf+MA4q/mzMpRXpj6ZmQTpJNzSUaX3LNLTNH3NRbRonZ7M8sI+cNLPBbkCi
-2X5lTSN068PmXj5/wtjXeTOauDmokcpracUg+VXKdDzyWoAkxYKx02NLF75RVMt6
-k+oujyqcpJcrJpBXDM0UJCq310cQDM5JkTNtEf4jFpR+6YZ2rUgVOXwvFWGZx+3K
-o0cPksB3LCkl7+4/seWeN3YtQCUsLF+qN0T5EohCfWL3eZSM/3Ub85KlmvyaW2Ka
-r/cV4rk0zy1JloBqI4EMOOTrjFhoaWsmIdUpQYCAltg930Je/gFlccOTWeefQmee
-6Xl1ahf7rNBfX2E6/8NWbOY94yYWmw==
-=edGF
------END PGP SIGNATURE-----
-
---BghK6+krpKHjj+jk--
+Jun
 

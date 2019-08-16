@@ -1,13 +1,14 @@
-References: <5D5649EA.20509@huawei.com>
-	<20190816063921.GI52397@e18g06458.et15sqa>
-From: piaojun <piaojun@huawei.com>
-Message-ID: <5D5650C0.2090000@huawei.com>
-Date: Fri, 16 Aug 2019 14:44:16 +0800
+Date: Fri, 16 Aug 2019 16:52:23 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190816155223.GE2769@work-vm>
+References: <5D56248A.5040000@huawei.com>
+ <5D56261D.30902@huawei.com>
 MIME-Version: 1.0
-In-Reply-To: <20190816063921.GI52397@e18g06458.et15sqa>
-Content-Type: text/plain; charset="windows-1252"
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [QUESTION] lots of testcases failed in pjdfstest
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <5D56261D.30902@huawei.com>
+Subject: Re: [Virtio-fs] [PATCH v6 2/2] virtiofsd: use fuse_buf_writev to
+ replace fuse_buf_write for better performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,32 +17,62 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Eryu Guan <eguan@linux.alibaba.com>
+To: piaojun <piaojun@huawei.com>
 Cc: virtio-fs@redhat.com
 
-Hi Eryu,
-
-On 2019/8/16 14:39, Eryu Guan wrote:
-> On Fri, Aug 16, 2019 at 02:15:06PM +0800, piaojun wrote:
->> Hi,
->>
->> I got a lot of failed testcases when using pjdfstest, and I wonder if
->> my mount command is wrong? Most failed testcases are related with
->> authority.
->>
->> HostOS:
->> # ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o source=/mnt/virtiofs/ -o cache=always -o writeback
->>
->> GuestOS:
->> # mount -t virtio_fs myfs /mnt/virtiofs -o rootmode=040000,user_id=0,group_id=0
+* piaojun (piaojun@huawei.com) wrote:
+> fuse_buf_writev() only handles the normal write in which src is buffer
+> and dest is fd. Specially if src buffer represents guest physical
+> address that can't be mapped by the daemon process, IO must be bounced
+> back to the VMM to do it by fuse_buf_copy().
 > 
-> Try adding "-o default_permissions,allow_other" mount options?
+> Signed-off-by: Jun Piao <piaojun@huawei.com>
+> Suggested-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
+> ---
+>  contrib/virtiofsd/buffer.c | 17 ++++++++++++++++-
+>  1 file changed, 16 insertions(+), 1 deletion(-)
 > 
-> Thanks,
-> Eryu
+> diff --git a/contrib/virtiofsd/buffer.c b/contrib/virtiofsd/buffer.c
+> index 0ed284f..072b5dc 100644
+> --- a/contrib/virtiofsd/buffer.c
+> +++ b/contrib/virtiofsd/buffer.c
+> @@ -322,11 +322,26 @@ static int fuse_bufvec_advance(struct fuse_bufvec *bufv, size_t len)
+>  ssize_t fuse_buf_copy(fuse_req_t req, struct fuse_bufvec *dstv, struct fuse_bufvec *srcv,
+>  		      enum fuse_buf_copy_flags flags)
+>  {
+> -	size_t copied = 0;
+> +	size_t copied = 0, i;
+> 
+>  	if (dstv == srcv)
+>  		return fuse_buf_size(dstv);
+> 
+> +	/* use writev to improve bandwidth when all the
+> +	 * src buffers already mapped by the daemon
+> +	 * process */
+> +	for (i = 0; i < srcv->count; i++) {
+> +		if ((srcv->buf[i].flags & FUSE_BUF_PHYS_ADDR) ||
+> +		    (srcv->buf[i].flags & FUSE_BUF_IS_FD))
+> +			break;
+> +	}
+> +	if ((i == srcv->count) && (dstv->count == 1) &&
+> +	    (dstv->idx == 0) &&
+> +	    (dstv->buf[0].flags & FUSE_BUF_IS_FD)) {
+> +		dstv->buf[0].pos += dstv->off;
+> +		return fuse_buf_writev(req, &dstv->buf[0], srcv);
+> +	}
+> +
 
-Thanks for your reply and most of the testcases get passed. And I will
-look into the very few failed cases.
+OK, thanks, I think that's actually a strong enough check, so I'll merge
+these now.
 
-Jun
+
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+
+>  	for (;;) {
+>  		const struct fuse_buf *src = fuse_bufvec_current(srcv);
+>  		const struct fuse_buf *dst = fuse_bufvec_current(dstv);
+> -- 
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

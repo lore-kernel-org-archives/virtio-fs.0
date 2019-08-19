@@ -1,14 +1,18 @@
-Date: Mon, 19 Aug 2019 15:34:53 +0800
-From: Eryu Guan <eguan@linux.alibaba.com>
-Message-ID: <20190819073453.GN52397@e18g06458.et15sqa>
-References: <5D53D882.5090803@huawei.com>
- <5D5A4692.9060006@huawei.com>
+Date: Mon, 19 Aug 2019 11:08:44 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20190819100844.GC28081@stefanha-x1.localdomain>
+References: <5D4CC344.7030706@huawei.com> <5D4CC400.9040606@huawei.com>
+	<20190814125235.GC23970@stefanha-x1.localdomain>
+	<5D54B155.90101@huawei.com>
+	<20190815145038.GI10996@stefanha-x1.localdomain>
+	<5D55FD7B.3080909@huawei.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="f0KYrhQ4vYSV2aJu"
 Content-Disposition: inline
-In-Reply-To: <5D5A4692.9060006@huawei.com>
-Subject: Re: [Virtio-fs] [PATCH RESEND][RFC] virtiofsd: do not fall back to
- buffer io when cache=auto/always
+In-Reply-To: <5D55FD7B.3080909@huawei.com>
+Subject: Re: [Virtio-fs] [PATCH v4 2/2] virtiofsd: use fuse_buf_writev to
+ replace fuse_buf_write for better performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,86 +24,105 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: piaojun <piaojun@huawei.com>
 Cc: virtio-fs@redhat.com
 
-On Mon, Aug 19, 2019 at 02:49:54PM +0800, piaojun wrote:
-> When O_DIRECT flags is set by Guest, virtiofsd will open file with
-> O_DIRECT, but unset 'fi->direct_io' which makes Guest go buffer io path.
-> That causes inconsistency between Guest and Host.
-> 
-> The cache option in virtiofsd should not affect the file io mode, so
-> set 'fi->direct_io' according to 'fi->flags'.
-> 
-> Signed-off-by: Jun Piao <piaojun@huawei.com>
-> ---
->  contrib/virtiofsd/passthrough_ll.c | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-> index ca11764..a9c98d0 100644
-> --- a/contrib/virtiofsd/passthrough_ll.c
-> +++ b/contrib/virtiofsd/passthrough_ll.c
-> @@ -1774,8 +1774,10 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
->  		fi->fh = fh;
->  		err = lo_do_lookup(req, parent, name, &e);
->  	}
-> -	if (lo->cache == CACHE_NONE)
-> +	if (fi->flags & O_DIRECT)
 
-Looks like this changes cache=none behavior. Previously, we set
-direct_io when cache=none and guest will go to dio path even when the
-file is opened for buffer io.
+--f0KYrhQ4vYSV2aJu
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-But with this change, guest could do buffer io in cache=none case.
+On Fri, Aug 16, 2019 at 08:48:59AM +0800, piaojun wrote:
+> On 2019/8/15 22:50, Stefan Hajnoczi wrote:
+> > On Thu, Aug 15, 2019 at 09:11:49AM +0800, piaojun wrote:
+> >> Hi Stefan,
+> >>
+> >> On 2019/8/14 20:52, Stefan Hajnoczi wrote:
+> >>> On Fri, Aug 09, 2019 at 08:53:20AM +0800, piaojun wrote:
+> >>>> diff --git a/contrib/virtiofsd/buffer.c b/contrib/virtiofsd/buffer.c
+> >>>> index cec762f..d127c45 100644
+> >>>> --- a/contrib/virtiofsd/buffer.c
+> >>>> +++ b/contrib/virtiofsd/buffer.c
+> >>>> @@ -318,11 +318,22 @@ static int fuse_bufvec_advance(struct fuse_buf=
+vec *bufv, size_t len)
+> >>>>  ssize_t fuse_buf_copy(fuse_req_t req, struct fuse_bufvec *dstv, str=
+uct fuse_bufvec *srcv,
+> >>>>  		      enum fuse_buf_copy_flags flags)
+> >>>>  {
+> >>>> +	size_t i;
+> >>>>  	size_t copied =3D 0;
+> >>>>
+> >>>>  	if (dstv =3D=3D srcv)
+> >>>>  		return fuse_buf_size(dstv);
+> >>>>
+> >>>> +	/* use writev to improve bandwidth when all the
+> >>>> +	 * src buffers already mapped by the daemon
+> >>>> +	 * process */
+> >>>
+> >>> Some more checks to make this generic:
+> >>>
+> >>>> +	for (i =3D 0; i < srcv->count; i++) {
+> >>>> +		if (srcv->buf[i].flags & FUSE_BUF_PHYS_ADDR)
+> >>>> +			break;
+> >>>
+> >>>                 if (srcv->buf[i].flags & FUSE_BUF_IS_FD)
+> >>> 		        break;
+> >>>
+> >>>> +	}
+> >>>> +	if (i =3D=3D srcv->count)
+> >>>
+> >>> Please verify the preconditions for the destination buffer too:
+> >>>
+> >>>   && dstv->count =3D=3D 1 && dstv->idx =3D=3D 0 && dstv->off =3D=3D 0=
+ &&
+> >>>   (dstv->buf[0].flags & FUSE_BUF_IS_FD)
+> >>
+> >> Thanks for your comments, and I prefer adding checker just for
+> >> FUSE_BUF_IS_FD as fuse_buf_writev() does not care much about the other
+> >> parts. And I personally think so many preconditions will make
+> >> fuse_buf_writev() so specific.
+> >=20
+> > I think these preconditions are necessary.  This function won't do the
+> > right thing if dstv has multiple elements or has been previously
+> > modified (idx/off).
+> >=20
+> > Can you explain why these cases will never happen or why the code is
+> > correct under these cases?
+> >=20
+> > Stefan
+> >=20
+>=20
+> We have already reached an agreement with the src buf and need discuss
+> with the dst buf. So I spent some time looking into libfuse code, and
+> found your suggestion really make sense. My previous thought was that
+> idx/off only works when dst is buf. So I will make these preconditions
+> more generic like this:
+>=20
+> In fuse_buf_copy():
+> if (i =3D=3D srcv->count) {
+> dstv->buf[0].pos +=3D dstv->off; // add dst offset even if it's always 0
+> fuse_buf_writev(req, &dstv->buf[0], srcv);
+> }
 
->  		fi->direct_io = 1;
-> +	if (lo->cache == CACHE_NONE)
-> +		fi->keep_cache = 0;
+The caller doesn't expect dstv->buf[0].pos to change, so it is safer to
+use a local variable for the file position inside fuse_buf_writev()
+instead of doing this in fuse_buf_copy().
 
-And this only causes guest to invalidate page cache at open(2) time, but
-still go buffer io path on cache=none.
+Hope this makes sense,
+Stefan
 
->  	else if (lo->cache == CACHE_ALWAYS)
->  		fi->keep_cache = 1;
+--f0KYrhQ4vYSV2aJu
+Content-Type: application/pgp-signature; name="signature.asc"
 
-I'm thinking about something like (totally untested):
+-----BEGIN PGP SIGNATURE-----
 
---- a/contrib/virtiofsd/passthrough_ll.c
-+++ b/contrib/virtiofsd/passthrough_ll.c
-@@ -1774,7 +1774,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
-                fi->fh = fh;
-                err = lo_do_lookup(req, parent, name, &e);
-        }
--       if (lo->cache == CACHE_NONE)
-+       if (lo->cache == CACHE_NONE || fi->flags & O_DIRECT)
-                fi->direct_io = 1;
-        else if (lo->cache == CACHE_ALWAYS)
-                fi->keep_cache = 1;
-@@ -1982,7 +1982,7 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
-        }
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1adSwACgkQnKSrs4Gr
+c8jgXAgAmwv+1hWn5Oh7ARMZ9fNfCIyNDNF/s6r/t6lSBoUPqV9n+fKRCNdttxw3
+Yon+2WKMixZwhnq+IJoQ/4YRBG5Fl6Va7YJ1ezdCxzh+XAqyIM+mrIlL8wADKFOV
++oBdGDaIFTK/ymkYPh4yLFcs8KgwpdDr3ARLMMC4FOduQH9YOALKyZPec+cMIDEO
+FB5Ua2wl52HvkLAtvSHdNn30SUBHBUzdqRb8crbs+dg5yNzFtLE4rnUpv5JMoF7G
+u2eybUnfDTp25oFA/hGmvXyCgP+KV0UHLnx+3cMdjyvuc7gi4j/PEBDQTfQeu0pY
+GitcEKx3aKD1jPoZASqImfpwnXyKKA==
+=n0qu
+-----END PGP SIGNATURE-----
 
-        fi->fh = fh;
--       if (lo->cache == CACHE_NONE)
-+       if (lo->cache == CACHE_NONE || fi->flags & O_DIRECT)
-                fi->direct_io = 1;
-        else if (lo->cache == CACHE_ALWAYS)
-                fi->keep_cache = 1;
-
-> 
-> @@ -1982,8 +1984,11 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
->  	}
-> 
->  	fi->fh = fh;
-> -	if (lo->cache == CACHE_NONE)
-> +
-> +	if (fi->flags & O_DIRECT)
->  		fi->direct_io = 1;
-> +	if (lo->cache == CACHE_NONE)
-> +		fi->keep_cache = 0;
->  	else if (lo->cache == CACHE_ALWAYS)
->  		fi->keep_cache = 1;
-
-And this code snippet duplicates with lo_create(), maybe we could factor
-it into a new helper function.
-
-Thanks,
-Eryu
+--f0KYrhQ4vYSV2aJu--
 

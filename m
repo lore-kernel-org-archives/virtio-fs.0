@@ -1,15 +1,11 @@
-Date: Sun, 11 Aug 2019 10:06:59 +0800
-From: Eric Ren <renzhen@linux.alibaba.com>
-Message-ID: <20190811020659.GB13456@ali-6c96cfe09cf9.local>
-References: <5D4CC344.7030706@huawei.com>
+Date: Mon, 19 Aug 2019 17:04:26 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20190819160426.GB2625@stefanha-x1.localdomain>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="gb2312"
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="dc+cDN39EJAMEtIO"
 Content-Disposition: inline
-Content-Transfer-Encoding: base64
-In-Reply-To: <5D4CC344.7030706@huawei.com>
-Subject: Re: [Virtio-fs] [PATCH v4 0/2] virtiofsd: Improve io bandwidth by
- replacing pwrite with pwritev
-Reply-To: Eric Ren <renzhen@linux.alibaba.com>
+Subject: [Virtio-fs] [ANNOUNCE] virtio-fs v0.3 release
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,76 +14,93 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>
-Cc: virtio-fs@redhat.com
+To: virtio-fs@redhat.com
+Cc: qemu-devel@nongnu.org, kata-dev@lists.katacontainers.io
 
-SGkganVuLAoKT24gRnJpLCBBdWcgMDksIDIwMTkgYXQgMDg6NTA6MTJBTSArMDgwMCwgcGlhb2p1
-biB3cm90ZToKPiA+RnJvbSBteSB0ZXN0LCB3cml0ZSBiYW5kd2lkdGggd2lsbCBiZSBpbXByb3Zl
-ZCBncmVhdGx5IGJ5IHJlcGxhY2luZwo+IHB3cml0ZSB3aXRoIHB3cml0ZXYsIGFuZCB0aGUgdGVz
-dCByZXN1bHQgYXMgYmVsb3c6CgpDb3VsZCB5b3Ugc2hhcmUgbW9yZSBpbmZvcm1hdGlvbiBhYm91
-dCB0aGlzIHRlc3Rpbmc/CgotIGFyZ3MgZm9yIHFlbXU6IGNhY2hlIHNpemU/Ci0gYXJncyBmb3Ig
-dmlydGlvZnNkOiB3aGljaCBjYWNoZSBtb2Rlo78KLSBEQVggaXMgdXNlZCwgcmlnaHQ/CgotIHdo
-aWNoIGtpbmQgb2YgZGlzayBhcmUgeW91IHVzaW5nLCB3aGF0J3MgdGhlbiBJT1BTL0JXIGxpbWl0
-PwoKSSB0cmllZCB0aGlzIHBhdGNoIHdpdGggSEREIGRpc2sgLSBJT1BTOjUwMDAsIEJXOiAxNDBN
-Qi9zLgoKLSBWTTogNCB2Y3B1cywgOEcgbWVtCi0gY2FjaGU9YWx3YXlzLCBjYWNoZS1zaXplPThH
-LCBEQVgKLSBmaW8gam9iCgpgYGAKW2dsb2JhbF0KZnN5bmM9MApuYW1lPXZpcnRpb2ZzLXRlc3QK
-ZmlsZW5hbWU9ZmlvLXRlc3QKZGlyZWN0b3J5PSRtbnRkaXIgICAjIHNoYXJlIGRpciBmb3IgdGVz
-dCBzaXR0aW5nIG9uIHRoZSBkaXNrCnJ3PXJhbmR3cml0ZQpicz00SwpkaXJlY3Q9MQpudW1qb2Jz
-PTEKdGltZV9iYXNlZD0wCgpbZmlsZTFdCnNpemU9MkcKaW9fc2l6ZT00ME0KaW9lbmdpbmU9bGli
-YWlvCmlvZGVwdGg9MTI4CmBgYAotIHdpdGhvdXQgdGhpcyBwYXRjaAoKYGBgCmZpbGUxOiAoZz0w
-KTogcnc9cmFuZHdyaXRlLCBicz0oUikgNDA5NkItNDA5NkIsIChXKSA0MDk2Qi00MDk2QiwgKFQp
-IDQwOTZCLTQwOTZCLCBpb2VuZ2luZT1saWJhaW8sIGlvZGVwdGg9MTI4CmZpby0zLjEKU3RhcnRp
-bmcgMSBwcm9jZXNzCgpmaWxlMTogKGdyb3VwaWQ9MCwgam9icz0xKTogZXJyPSAwOiBwaWQ9MTE6
-IFNhdCBBdWcgMTAgMTE6MzM6MjkgMjAxOQogIHdyaXRlOiBJT1BTPTk4NSwgQlc9Mzk0MktpQi9z
-ICg0MDM3a0IvcykoNDAuME1pQi8xMDM5MG1zZWMpCmBgYAoKLSB3aXRoIHRoaXMgcGF0Y2ggYXBw
-bGllZAoKYGBgCmZpbGUxOiAoZz0wKTogcnc9cmFuZHdyaXRlLCBicz0oUikgNDA5NkItNDA5NkIs
-IChXKSA0MDk2Qi00MDk2QiwgKFQpIDQwOTZCLTQwOTZCLCBpb2VuZ2luZT1saWJhaW8sIGlvZGVw
-dGg9MTI4CmZpby0zLjEKU3RhcnRpbmcgMSBwcm9jZXNzCgpmaWxlMTogKGdyb3VwaWQ9MCwgam9i
-cz0xKTogZXJyPSAwOiBwaWQ9MTA6IFNhdCBBdWcgMTAgMTU6MzE6NTcgMjAxOQogIHdyaXRlOiBJ
-T1BTPTEwNTYsIEJXPTQyMjRLaUIvcyAoNDMyNmtCL3MpKDQwLjBNaUIvOTY5Nm1zZWMpCgpgYGAK
-CnRoZSBudW1iZXIgaXMgZXZlbiB3b3JzZSB0aGFuIDlwZnMuCgpUaGFua3MsCkVyaWMKCj4gCj4g
-LS0tCj4gcHdyaXRlOgo+ICMgZmlvIC1kaXJlY3Q9MSAtdGltZV9iYXNlZCAtaW9kZXB0aD02NCAt
-cnc9cmFuZHdyaXRlIC1pb2VuZ2luZT1saWJhaW8gLWJzPTFNIC1zaXplPTFHIC1udW1qb2I9MTYg
-LXJ1bnRpbWU9MzAgLWdyb3VwX3JlcG9ydGluZyAtbmFtZT1maWxlIC1maWxlbmFtZT0vbW50L3Zp
-cnRpb2ZzL2ZpbGUKPiBmaWxlOiAoZz0wKTogcnc9cmFuZHdyaXRlLCBicz0xTS0xTS8xTS0xTS8x
-TS0xTSwgaW9lbmdpbmU9bGliYWlvLCBpb2RlcHRoPTY0Cj4gLi4uCj4gZmlvLTIuMTMKPiBTdGFy
-dGluZyAxNiBwcm9jZXNzZXMKPiBKb2JzOiAxNiAoZj0xNik6IFt3KDE2KV0gWzEwMC4wJSBkb25l
-XSBbMEtCLzg4Ni4wTUIvMEtCIC9zXSBbMC84ODYvMCBpb3BzXSBbZXRhIDAwbTowMHNdCj4gZmls
-ZTogKGdyb3VwaWQ9MCwgam9icz0xNik6IGVycj0gMDogcGlkPTU3OTk6IFR1ZSBBdWcgNiAxODo0
-ODoyNiAyMDE5Cj4gd3JpdGU6IGlvPTI2ODgxTUIsIGJ3PTkxNjk4OEtCL3MsIGlvcHM9ODk1LCBy
-dW50PSAzMDAxOG1zZWMKPiAKPiBwd3JpdGV2Ogo+ICMgZmlvIC1kaXJlY3Q9MSAtdGltZV9iYXNl
-ZCAtaW9kZXB0aD02NCAtcnc9cmFuZHdyaXRlIC1pb2VuZ2luZT1saWJhaW8gLWJzPTFNIC1zaXpl
-PTFHIC1udW1qb2I9MTYgLXJ1bnRpbWU9MzAgLWdyb3VwX3JlcG9ydGluZyAtbmFtZT1maWxlIC1m
-aWxlbmFtZT0vbW50L3ZpcnRpb2ZzL2ZpbGUKPiBmaWxlOiAoZz0wKTogcnc9cmFuZHdyaXRlLCBi
-cz0xTS0xTS8xTS0xTS8xTS0xTSwgaW9lbmdpbmU9bGliYWlvLCBpb2RlcHRoPTY0Cj4gLi4uCj4g
-ZmlvLTIuMTMKPiBTdGFydGluZyAxNiBwcm9jZXNzZXMKPiBKb2JzOiAxNiAoZj0xNik6IFt3KDE2
-KV0gWzEwMC4wJSBkb25lXSBbMEtCLzE3OTNNQi8wS0IgL3NdIFswLzE3OTMvMCBpb3BzXSBbZXRh
-IDAwbTowMHNdCj4gZmlsZTogKGdyb3VwaWQ9MCwgam9icz0xNik6IGVycj0gMDogcGlkPTYzMjg6
-IFR1ZSBBdWcgNiAxODoyMjoxNyAyMDE5Cj4gd3JpdGU6IGlvPTUyNzc1TUIsIGJ3PTE3NTguN01C
-L3MsIGlvcHM9MTc1OCwgcnVudD0gMzAwMDltc2VjCj4gLS0tCj4gCj4gVGhpcyBwYXRjaCBpbnRy
-b2R1Y2VzIHdyaXRldiBhbmQgcHdyaXRldiBmb3IgbG9fd3JpdGVfYnVmKCkuIEkgdHJpZWQgbXkK
-PiBiZXN0IG5vdCBkb2luZyBoYXJtIHRvIHRoZSBvcmlnaW4gY29kZSBjb25zdHJ1Y3QsIGFuZCB0
-aGVyZSB3aWxsIGJlCj4gc29tZSAqdXNlbGVzcyogYnJhbmNoZXMgaW4gZnVzZV9idWZfY29weV9v
-bmUoKSB3aGljaCBhcmUgaGFyZCB0byBqdWRnZQo+IGlmIHRoZXkgd2lsbCBiZSB1c2VmdWwgaW4g
-dGhlIGZ1dHVyZS4gU28gSSBqdXN0IGxlYXZlIHRoZW0gYWxvbmUKPiBzYWZlbHkuIElmIHRoZSBj
-bGVhbnVwIHdvcmsgaXMgbmVjZXNzYXJ5LCBwbGVhc2UgbGV0IG1lIGtub3cuCj4gCj4gdjIKPiAg
-IC0gU3BsaXQgaW50byB0d28gcGF0Y2hlcwo+ICAgLSBBZGQgdGhlIGxvc3QgZmxhZ3Mgc3VwcG9y
-dCwgc3VjaCBhcyBGVVNFX0JVRl9QSFlTX0FERFIKPiAKPiB2Mwo+ICAgLSB1c2UgZ2l0IHNlbmQt
-ZW1haWwgdG8gbWFrZSB0aGUgcGF0Y2ggc2V0IGluIG9uZSB0aHJlYWQKPiAgIC0gbW92ZSBmdXNl
-X2J1Zl93cml0ZXYoKSBpbnRvIGZ1c2VfYnVmX2NvcHkoKQo+ICAgLSB1c2Ugd3JpdGV2IGZvciB0
-aGUgc3JjIGJ1ZmZlcnMgd2hlbiB0aGV5J3JlIGFscmVhZCBhbHJlYWR5IG1hcHBlZCBieSB0aGUg
-ZGFlbW9uIHByb2Nlc3MKPiAgIC0gdXNlIGNhbGxvYyB0byByZXBsYWNlIG1hbGxvYwo+ICAgLSBz
-ZXQgcmVzIDAgaWYgd3JpdGV2KCkgcmV0dXJucyAwCj4gCj4gdjQKPiAgIC0gaXRlcmF0ZSBmcm9t
-IGluX2J1Zi0+YnVmWzBdIHJhdGhlciB0aGFuIGJ1ZlsxXQo+ICAgLSBvcHRpbWl6ZSB0aGUgY29k
-ZSB0byBtYWtlIGl0IG1vcmUgZWxlZ2FudAo+IAo+IEp1biBQaWFvICgyKToKPiAgIGFkZCBkZWZp
-bml0aW9uIG9mIGZ1c2VfYnVmX3dyaXRldigpLgo+ICAgdXNlIGZ1c2VfYnVmX3dyaXRldiB0byBy
-ZXBsYWNlIGZ1c2VfYnVmX3dyaXRlIGZvciBiZXR0ZXIgcGVyZm9ybWFuY2UKPiAKPiBTaWduZWQt
-b2ZmLWJ5OiBKdW4gUGlhbyA8cGlhb2p1bkBodWF3ZWkuY29tPgo+IFN1Z2dlc3RlZC1ieTogRHIu
-IERhdmlkIEFsYW4gR2lsYmVydCA8ZGdpbGJlcnRAcmVkaGF0LmNvbT4KPiBTdWdnZXN0ZWQtYnk6
-IFN0ZWZhbiBIYWpub2N6aSA8c3RlZmFuaGFAcmVkaGF0LmNvbT4KPiAtLS0KPiAgYnVmZmVyLmMg
-ICAgICB8ICAgNDggKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysr
-KysrCj4gIGZ1c2VfY29tbW9uLmggfCAgIDE0ICsrKysrKysrKysrKysrCj4gIHNlY2NvbXAuYyAg
-ICAgfCAgICAyICsrCj4gIDMgZmlsZXMgY2hhbmdlZCwgNjQgaW5zZXJ0aW9ucygrKQo+IC0tCj4g
-Cj4gX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KPiBWaXJ0
-aW8tZnMgbWFpbGluZyBsaXN0Cj4gVmlydGlvLWZzQHJlZGhhdC5jb20KPiBodHRwczovL3d3dy5y
-ZWRoYXQuY29tL21haWxtYW4vbGlzdGluZm8vdmlydGlvLWZzCgo=
+
+--dc+cDN39EJAMEtIO
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+
+I am delighted to announce the release of virtio-fs v0.3, a shared file
+system that lets virtual machines access a directory tree on the host.
+This release is based on QEMU 4.1.0 and Linux 5.3-rc3.
+
+For more information about virtio-fs: https://virtio-fs.gitlab.io/
+
+This is a development release aimed at early adopters of virtio-fs.  Work is
+being done to upstream the code into Linux and QEMU.  We expect to stop
+publishing virtio-fs releases once the code has been merged by these upstream
+projects.
+
+Where to get it:
+
+  https://gitlab.com/virtio-fs/linux/-/tags/virtio-fs-v0.3
+  https://gitlab.com/virtio-fs/qemu/-/tags/virtio-fs-v0.3
+
+Changes:
+
+ * Please note that the mount syntax has changed to:
+
+     # mount -t virtio_fs myfs /mnt -o ...
+
+   The old syntax was "mount -t virtio_fs none /mnt -o tag=myfs,...".
+
+ * virtiofsd --fd=FDNUM takes a listen socket file descriptor number.  File
+   descriptor passing is an alternative way to manage the vhost-user UNIX
+   domain socket.  The parent process no longer needs to wait for virtiofsd to
+   create the listen socket before spawning the VM.
+
+ * virtiofsd --syslog logs to syslog(2) instead of stderr.  Useful for unifying
+   logging and when the virtiofsd process is not being supervised.
+
+ * virtiofsd --thread-pool-size=NUM sets the maximum number of worker threads
+   for FUSE request processing.  This can be used to control the host queue
+   depth.  The default is 64.
+
+ * Performance improvements and bug fixes.
+
+Note for Kata Containers: the new kernel is not compatible with existing
+Kata Containers releases due to the mount syntax change.  To try it out,
+please apply the following kata-runtime patch:
+
+  https://gitlab.com/virtio-fs/runtime/commit/a2e44de817e438c02a495cf258039774527e3178
+
+Kata Containers patches for virtio-fs v0.3 are under development and will be
+submitted to Kata soon.
+
+Thanks to the following people for contributing code and to many more
+for helping the virtio-fs effort:
+
+Dr. David Alan Gilbert <dgilbert@redhat.com>
+Eric Ren <renzhen@linux.alibaba.com>
+Eryu Guan <eguan@linux.alibaba.com>
+Ganesh Maharaj Mahalingam <ganesh.mahalingam@intel.com>
+Jiufei Xue <jiufei.xue@linux.alibaba.com>
+Liu Bo <bo.liu@linux.alibaba.com>
+Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+Miklos Szeredi <mszeredi@redhat.com>
+Peng Tao <tao.peng@linux.alibaba.com>
+piaojun <piaojun@huawei.com>
+Sebastien Boeuf <sebastien.boeuf@intel.com>
+Stefan Hajnoczi <stefanha@redhat.com>
+Vivek Goyal <vgoyal@redhat.com>
+Xiaoguang Wang <xiaoguang.wang@linux.alibaba.com>
+
+--dc+cDN39EJAMEtIO
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1ayIkACgkQnKSrs4Gr
+c8hAzQf9E4PbRDszsY7PdMkSP1YTi+I3Nv+dejPOnv98yeUdhv+vJFrrmsi4ZT0c
+403/aP5zUg6+iIPUu8kjF1yCBeLNK5a6mNKtZT5k0o3uyUlHk1cNKAZaJimOm1UD
+MYzgKTwvHkPd8ZLKwo1Ion1L597neZnF3SqhJE7pMbkKBNJvRPduY531zl2NwdJ8
++gH3MxPqyIlu0lwCdE1kdYe9gFP+CvWK9g0PMvkD+XhjdO21JxBNFaTu4jjzc+WV
+MRndGHtT0fbqj75bS6coe8CMnaWUDoRbH03ByK048YjTidlYL2z5SVOLFKIidSmo
+cA6OS1FyZs8XDU+GwvoHPvpCff8iJw==
+=zbZx
+-----END PGP SIGNATURE-----
+
+--dc+cDN39EJAMEtIO--
+

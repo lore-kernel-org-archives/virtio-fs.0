@@ -1,15 +1,11 @@
-References: <20190809082536.56402-1-eguan@linux.alibaba.com>
-	<5D4D3E0E.10609@huawei.com> <20190811132042.GB2665@desktop>
-From: piaojun <piaojun@huawei.com>
-Message-ID: <3d1f5a7e-fd00-2b46-994c-99d07b3c94ce@huawei.com>
-Date: Sun, 11 Aug 2019 22:32:16 +0800
+From: Gang Deng <gavin.dg@linux.alibaba.com>
+Date: Mon, 19 Aug 2019 11:41:13 +0800
+Message-Id: <09680e84da8a43ee8fa69ed4ec7d1a5a5ffa9130.1566185612.git.gavin.dg@linux.alibaba.com>
+In-Reply-To: <cover.1566185612.git.gavin.dg@linux.alibaba.com>
+References: <cover.1566185612.git.gavin.dg@linux.alibaba.com>
 MIME-Version: 1.0
-In-Reply-To: <20190811132042.GB2665@desktop>
-Content-Type: text/plain; charset="utf-8"
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH 1/2] virtiofsd: print log only when priority
- is high enough
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs]  [RFC PATCH 1/2] virtiofsd: add stat tools
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,892 +14,915 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Eryu Guan <guaneryu@gmail.com>
-Cc: virtio-fs@redhat.com
+To: virtio-fs@redhat.com
+Cc: gavin.dg@linux.alibaba.com
 
+There exist two components: vtrace && vstat. vtrace is embeded in virtiofsd,
+it will put raw statistics data into share memory. Then the vstat tool could
+parse it and do some post processing works. The performance overhead of
+vtrace is very small because it does very simple things.
 
+For example, if we call open(2)/close(2) frequently in guest, and
+randwite a file whose length is greater than the size of dax window.
+We'll get the output as below:
 
-On 2019/8/11 21:20, Eryu Guan wrote:
-> On Fri, Aug 09, 2019 at 05:34:06PM +0800, piaojun wrote:
->> Hi Eryu,
->>
->> A very big patch, and I prefer spliting into several ones.
-> 
-> Most of the changes are replacing
-> 
-> 	if (lo->debug)
-> 		fuse_debug(...);
-> 
-> to
-> 	fuse_debug(...);
-> 
-> But yeah, it's fine to split, one patches introduce current_log_level
-> related code, one does the replacements.
+op                        inflt         op/s     svctm/us   %util
+FUSE_OPEN(14)                 0      8379.87         3.24   2.71%
+FUSE_RELEASE(18)              0      8379.87         1.77   1.48%
+FUSE_FLUSH(25)                0      8379.87         2.04   1.71%
+FUSE_SETUPMAPPING(48)         1      6393.90        34.72  22.20%
+FUSE_REMOVEMAPPING(49)        0      6404.90        37.61  24.09%
+TOTAL                         1     37938.39        13.76  52.20%
 
-Sounds reasonable.
+The meaning of fields:
 
-> 
->>
->> On 2019/8/9 16:25, Eryu Guan wrote:
->>> Introduce "-o log_level=" command line option to specify current log
->>> level (priority), valid values are "debug info warn err", e.g.
->>>
->>>     ./virtiofsd -o log_level=debug ...
->>>
->>> So only log priority higher than "debug" will be printed to
->>> stderr/syslog. And the default level is info.
->>>
->>> The "-o debug"/"-d" options are kept, and imply debug log level.
->>
->> I wonder if this will make user confused when there are two options for
->> debug.
-> 
-> Forgot to mention, one reason to keep "-o debug/-d" options is try not
-> to break existing users, e.g. kata-runtime. But I have no strong
-> preference on this.
+- op
+  The type of fuse requests, 'TOTAL' is sum of all.
 
-Yes, compat is always important, and I have little knowledge about kata,
-so it would be best to reach an agreement with it.
+- inflt
+  The number of the inflight requests, it must be ethier 0 or 1 because
+  virtiofsd can only process fuse requests serially.
 
-After looking though all the fuse_log codes, I come up with a new idea
-to do this.
-1. Expand the debug in struct lo_data to *log_level* which represent
-err, warn, info and debug;
+- op/s
+  The number of fuse requests completed per second.
 
-struct lo_data {
-	pthread_mutex_t mutex;
-	int debug -> *log_level*;
+- svctm/us
+  The average service time (in microseconds) for fuse requests.
 
-2. Define a fuse_log_set_level() in fuse_log.c and called by
-passthrough_ll.c or other files.
+- %util
+  Percentage of elapsed time during which virtiofsd was processing the fuse
+  requests.
 
-3. As for the "-o debug/-d", I prefer to clean it up to make the usage
-easier. Maybe this won't do harm to the compat as virtiofsd is still in
-development now. But this change will need a discuss with other developers.
+when virtiofsd is hang, e.g. we support flock in host (just for example,
+this has been fxied), we'll get this:
 
-Jun
+op                        inflt         op/s     svctm/us   %util
+FUSE_SETLKW(33)               1         0.00         0.00 100.00%
+TOTAL                         1         0.00         0.00 100.00%
 
-> 
->>
->>>
->>> Signed-off-by: Eryu Guan <eguan@linux.alibaba.com>
->>> ---
->>>  contrib/virtiofsd/fuse_log.c       |   9 ++-
->>>  contrib/virtiofsd/fuse_log.h       |   4 +
->>>  contrib/virtiofsd/fuse_lowlevel.c  |  77 +++++++-----------
->>>  contrib/virtiofsd/fuse_lowlevel.h  |   1 +
->>>  contrib/virtiofsd/fuse_virtio.c    | 104 ++++++++++---------------
->>>  contrib/virtiofsd/helper.c         |  10 ++-
->>>  contrib/virtiofsd/passthrough_ll.c | 156 +++++++++++++++----------------------
->>>  7 files changed, 153 insertions(+), 208 deletions(-)
->>>
->>> diff --git a/contrib/virtiofsd/fuse_log.c b/contrib/virtiofsd/fuse_log.c
->>> index 4eb25328721e..d54b64099a2b 100644
->>> --- a/contrib/virtiofsd/fuse_log.c
->>> +++ b/contrib/virtiofsd/fuse_log.c
->>> @@ -9,10 +9,10 @@
->>>  #include <stdbool.h>
->>>  #include <stdio.h>
->>>  #include <stdarg.h>
->>> -#include <syslog.h>
->>>  #include "fuse_log.h"
->>>  
->>>  static bool use_syslog;
->>> +int current_log_level = LOG_INFO;
->>
->> Shall we make it static var which won't populate other files?
-> 
-> It's used in passthrouth_ll.c (the end of this patch), "-d" sets
-> current_log_level to LOG_DEBUG.
-> 
->>
->> Jun
-> 
-> Thanks for the review!
-> 
-> Eryu
-> 
->>
->>>  
->>>  void fuse_log_enable_syslog(void)
->>>  {
->>> @@ -24,10 +24,13 @@ void fuse_log_enable_syslog(void)
->>>      openlog("virtiofsd", LOG_PID, LOG_DAEMON);
->>>  }
->>>  
->>> -static void fuse_vlog(int priority, const char *fmt, va_list ap)
->>> +static void fuse_vlog(int target_level, const char *fmt, va_list ap)
->>>  {
->>> +    if (current_log_level < target_level)
->>> +        return;
->>> +
->>>      if (use_syslog) {
->>> -        vsyslog(priority, fmt, ap);
->>> +        vsyslog(target_level, fmt, ap);
->>>      } else {
->>>          vfprintf(stderr, fmt, ap);
->>>      }
->>> diff --git a/contrib/virtiofsd/fuse_log.h b/contrib/virtiofsd/fuse_log.h
->>> index 3c22928d2b1d..c4dfc921b6d8 100644
->>> --- a/contrib/virtiofsd/fuse_log.h
->>> +++ b/contrib/virtiofsd/fuse_log.h
->>> @@ -9,8 +9,12 @@
->>>  #ifndef FUSE_LOG_H
->>>  #define FUSE_LOG_H
->>>  
->>> +#include <syslog.h>
->>>  #include "qemu/compiler.h"
->>>  
->>> +/* Current log level */
->>> +extern int current_log_level;
->>> +
->>>  void fuse_log_enable_syslog(void);
->>>  void fuse_err(const char *fmt, ...) GCC_FMT_ATTR(1, 2);
->>>  void fuse_warning(const char *fmt, ...) GCC_FMT_ATTR(1, 2);
->>> diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
->>> index 8d3f141d23cf..7eec2680b6de 100644
->>> --- a/contrib/virtiofsd/fuse_lowlevel.c
->>> +++ b/contrib/virtiofsd/fuse_lowlevel.c
->>> @@ -155,19 +155,17 @@ static int fuse_send_msg(struct fuse_session *se, struct fuse_chan *ch,
->>>  	struct fuse_out_header *out = iov[0].iov_base;
->>>  
->>>  	out->len = iov_length(iov, count);
->>> -	if (se->debug) {
->>> -		if (out->unique == 0) {
->>> -			fuse_debug("NOTIFY: code=%d length=%u\n",
->>> -				   out->error, out->len);
->>> -		} else if (out->error) {
->>> -			fuse_debug("   unique: %llu, error: %i (%s), outsize: %i\n",
->>> -				   (unsigned long long) out->unique,
->>> -				   out->error, strerror(-out->error),
->>> -				   out->len);
->>> -		} else {
->>> -			fuse_debug("   unique: %llu, success, outsize: %i\n",
->>> -				   (unsigned long long) out->unique, out->len);
->>> -		}
->>> +	if (out->unique == 0) {
->>> +		fuse_debug("NOTIFY: code=%d length=%u\n",
->>> +			   out->error, out->len);
->>> +	} else if (out->error) {
->>> +		fuse_debug("   unique: %llu, error: %i (%s), outsize: %i\n",
->>> +			   (unsigned long long) out->unique,
->>> +			   out->error, strerror(-out->error),
->>> +			   out->len);
->>> +	} else {
->>> +		fuse_debug("   unique: %llu, success, outsize: %i\n",
->>> +			   (unsigned long long) out->unique, out->len);
->>>  	}
->>>  
->>>          if (fuse_lowlevel_is_virtio(se)) {
->>> @@ -1668,9 +1666,7 @@ static void do_interrupt(fuse_req_t req, fuse_ino_t nodeid,
->>>  		return;
->>>  	}
->>>  
->>> -	if (se->debug)
->>> -		fuse_debug("INTERRUPT: %llu\n",
->>> -			   (unsigned long long) arg->unique);
->>> +	fuse_debug("INTERRUPT: %llu\n", (unsigned long long) arg->unique);
->>>  
->>>  	req->u.i.unique = arg->unique;
->>>  
->>> @@ -1952,13 +1948,10 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
->>>  		}
->>>  	}
->>>  
->>> -	if (se->debug) {
->>> -		fuse_debug("INIT: %u.%u\n", arg->major, arg->minor);
->>> -		if (arg->major == 7 && arg->minor >= 6) {
->>> -			fuse_debug("flags=0x%08x\n", arg->flags);
->>> -			fuse_debug("max_readahead=0x%08x\n",
->>> -				   arg->max_readahead);
->>> -		}
->>> +	fuse_debug("INIT: %u.%u\n", arg->major, arg->minor);
->>> +	if (arg->major == 7 && arg->minor >= 6) {
->>> +		fuse_debug("flags=0x%08x\n", arg->flags);
->>> +		fuse_debug("max_readahead=0x%08x\n", arg->max_readahead);
->>>  	}
->>>  	se->conn.proto_major = arg->major;
->>>  	se->conn.proto_minor = arg->minor;
->>> @@ -2135,21 +2128,14 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
->>>  		outarg.map_alignment = sysconf(_SC_PAGE_SIZE);
->>>  	}
->>>  
->>> -	if (se->debug) {
->>> -		fuse_debug("   INIT: %u.%u\n", outarg.major, outarg.minor);
->>> -		fuse_debug("   flags=0x%08x\n", outarg.flags);
->>> -		fuse_debug("   max_readahead=0x%08x\n",
->>> -			   outarg.max_readahead);
->>> -		fuse_debug("   max_write=0x%08x\n", outarg.max_write);
->>> -		fuse_debug("   max_background=%i\n",
->>> -			   outarg.max_background);
->>> -		fuse_debug("   congestion_threshold=%i\n",
->>> -			   outarg.congestion_threshold);
->>> -		fuse_debug("   time_gran=%u\n",
->>> -			   outarg.time_gran);
->>> -		fuse_debug("   map_alignment=%u\n",
->>> -			   outarg.map_alignment);
->>> -	}
->>> +	fuse_debug("   INIT: %u.%u\n", outarg.major, outarg.minor);
->>> +	fuse_debug("   flags=0x%08x\n", outarg.flags);
->>> +	fuse_debug("   max_readahead=0x%08x\n", outarg.max_readahead);
->>> +	fuse_debug("   max_write=0x%08x\n", outarg.max_write);
->>> +	fuse_debug("   max_background=%i\n", outarg.max_background);
->>> +	fuse_debug("   congestion_threshold=%i\n", outarg.congestion_threshold);
->>> +	fuse_debug("   time_gran=%u\n", outarg.time_gran);
->>> +	fuse_debug("   map_alignment=%u\n", outarg.map_alignment);
->>>  	if (arg->minor < 5)
->>>  		outargsize = FUSE_COMPAT_INIT_OUT_SIZE;
->>>  	else if (arg->minor < 23)
->>> @@ -2440,13 +2426,11 @@ void fuse_session_process_buf_int(struct fuse_session *se,
->>>  	in = fuse_mbuf_iter_advance(&iter, sizeof(*in));
->>>  	assert(in); /* caller guarantees the input buffer is large enough */
->>>  
->>> -	if (se->debug) {
->>> -		fuse_debug("unique: %llu, opcode: %s (%i), nodeid: %llu, insize: %zu, pid: %u\n",
->>> -			   (unsigned long long) in->unique,
->>> -			   opname((enum fuse_opcode) in->opcode), in->opcode,
->>> -			   (unsigned long long) in->nodeid, buf->size,
->>> -			   in->pid);
->>> -	}
->>> +	fuse_debug("unique: %llu, opcode: %s (%i), nodeid: %llu, insize: %zu, pid: %u\n",
->>> +		   (unsigned long long) in->unique,
->>> +		   opname((enum fuse_opcode) in->opcode), in->opcode,
->>> +		   (unsigned long long) in->nodeid, buf->size,
->>> +		   in->pid);
->>>  
->>>  	req = fuse_ll_alloc_req(se);
->>>  	if (req == NULL) {
->>> @@ -2493,8 +2477,7 @@ void fuse_session_process_buf_int(struct fuse_session *se,
->>>  			// TODO: This is after a hard reboot typically, we need to do
->>>  			// a destroy, but we can't reply to this request yet so
->>>  			// we can't use do_destroy
->>> -	                if (se->debug)
->>> -				fuse_debug("%s: reinit\n", __func__);
->>> +			fuse_debug("%s: reinit\n", __func__);
->>>  			se->got_destroy = 1;
->>>  			se->got_init = 0;
->>>                          if (se->op.destroy)
->>> diff --git a/contrib/virtiofsd/fuse_lowlevel.h b/contrib/virtiofsd/fuse_lowlevel.h
->>> index e761d8d0e5ec..b441d3dfedeb 100644
->>> --- a/contrib/virtiofsd/fuse_lowlevel.h
->>> +++ b/contrib/virtiofsd/fuse_lowlevel.h
->>> @@ -1798,6 +1798,7 @@ struct fuse_cmdline_opts {
->>>  	int show_help;
->>>  	int clone_fd;
->>>  	int syslog;
->>> +	int log_level;
->>>  	unsigned int max_idle_threads;
->>>  };
->>>  
->>> diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
->>> index 72ddf703c9d4..5b3174e4c74c 100644
->>> --- a/contrib/virtiofsd/fuse_virtio.c
->>> +++ b/contrib/virtiofsd/fuse_virtio.c
->>> @@ -223,9 +223,8 @@ int virtio_send_msg(struct fuse_session *se, struct fuse_chan *ch,
->>>          unsigned int in_num = elem->in_num;
->>>          struct iovec *in_sg = elem->in_sg;
->>>          size_t in_len = iov_length(in_sg, in_num);
->>> -        if (se->debug)
->>> -                fuse_debug("%s: elem %d: with %d in desc of length %zd\n",
->>> -                           __func__, elem->index, in_num,  in_len);
->>> +	fuse_debug("%s: elem %d: with %d in desc of length %zd\n",
->>> +		   __func__, elem->index, in_num,  in_len);
->>>  
->>>          /* The elem should have room for a 'fuse_out_header' (out from fuse)
->>>           * plus the data based on the len in the header.
->>> @@ -286,9 +285,8 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
->>>  
->>>          out->len = tosend_len;
->>>  
->>> -        if (se->debug)
->>> -                fuse_debug("%s: count=%d len=%zd iov_len=%zd \n",
->>> -                           __func__, count, len, iov_len);
->>> +	fuse_debug("%s: count=%d len=%zd iov_len=%zd \n",
->>> +		   __func__, count, len, iov_len);
->>>  
->>>          /* unique == 0 is notification which we don't support */
->>>          assert (out->unique);
->>> @@ -301,9 +299,8 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
->>>          struct iovec *in_sg = elem->in_sg;
->>>          size_t in_len = iov_length(in_sg, in_num);
->>>          size_t in_len_writeable = iov_length(in_sg, in_num - bad_in_num);
->>> -        if (se->debug)
->>> -                fuse_debug("%s: elem %d: with %d in desc of length %zd\n",
->>> -                           __func__, elem->index, in_num,  in_len);
->>> +	fuse_debug("%s: elem %d: with %d in desc of length %zd\n",
->>> +		   __func__, elem->index, in_num,  in_len);
->>>  
->>>          /* The elem should have room for a 'fuse_out_header' (out from fuse)
->>>           * plus the data based on the len in the header.
->>> @@ -356,23 +353,19 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
->>>                  for (i = 0, in_sg_left = 0; i < in_sg_cpy_count; i++) {
->>>                          in_sg_left += in_sg_ptr[i].iov_len;
->>>                  }
->>> -                if (se->debug)
->>> -                        fuse_debug("%s: after skip skip_size=%zd in_sg_cpy_count=%d in_sg_left=%zd\n",
->>> -				   __func__, skip_size, in_sg_cpy_count,
->>> -				   in_sg_left);
->>> +		fuse_debug("%s: after skip skip_size=%zd in_sg_cpy_count=%d in_sg_left=%zd\n",
->>> +			   __func__, skip_size, in_sg_cpy_count, in_sg_left);
->>>                  ret = preadv(buf->buf[0].fd, in_sg_ptr, in_sg_cpy_count, buf->buf[0].pos);
->>>  
->>> -                if (se->debug)
->>> -                        fuse_debug("%s: preadv_res=%d(%s) len=%zd\n",
->>> -                                   __func__, ret, strerror(errno), len);
->>> +		fuse_debug("%s: preadv_res=%d(%s) len=%zd\n",
->>> +			   __func__, ret, strerror(errno), len);
->>>                  if (ret == -1) {
->>>                          ret = errno;
->>>                          free(in_sg_cpy);
->>>                          goto err;
->>>                  }
->>>                  if (ret < len && ret) {
->>> -                        if (se->debug)
->>> -                                fuse_debug("%s: ret < len\n", __func__);
->>> +                        fuse_debug("%s: ret < len\n", __func__);
->>>                          /* Skip over this much next time around */
->>>                          skip_size = ret;
->>>                          buf->buf[0].pos += ret;
->>> @@ -383,14 +376,12 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
->>>                  }
->>>                  if (!ret) {
->>>                          /* EOF case? */
->>> -                        if (se->debug)
->>> -                                fuse_debug("%s: !ret in_sg_left=%zd\n",
->>> -                                           __func__, in_sg_left);
->>> +			fuse_debug("%s: !ret in_sg_left=%zd\n",
->>> +				   __func__, in_sg_left);
->>>                          break;
->>>                  }
->>>                  if (ret != len) {
->>> -                        if (se->debug)
->>> -                                fuse_debug("%s: ret!=len\n", __func__);
->>> +			fuse_debug("%s: ret!=len\n", __func__);
->>>                          ret = EIO;
->>>                          free(in_sg_cpy);
->>>                          goto err;
->>> @@ -410,11 +401,10 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
->>>                                  msg.len[0] = len;
->>>                          }
->>>                          int64_t req_res =fuse_virtio_io(se, &msg, buf->buf[0].fd);
->>> -                        if (se->debug)
->>> -                                fuse_debug("%s: bad loop; len=%zd bad_in_num=%d fd_offset=%zd c_offset=%p req_res=%ld\n",
->>> -					   __func__, len, bad_in_num,
->>> -					   buf->buf[0].pos,
->>> -					   in_sg_ptr[0].iov_base, req_res);
->>> +			fuse_debug("%s: bad loop; len=%zd bad_in_num=%d fd_offset=%zd c_offset=%p req_res=%ld\n",
->>> +				   __func__, len, bad_in_num,
->>> +				   buf->buf[0].pos,
->>> +				   in_sg_ptr[0].iov_base, req_res);
->>>                          if (req_res > 0) {
->>>                                  len -= msg.len[0];
->>>                                  buf->buf[0].pos += msg.len[0];
->>> @@ -488,11 +478,10 @@ static void fv_queue_worker(gpointer data, gpointer user_data)
->>>          struct iovec *out_sg = elem->out_sg;
->>>          size_t out_len = iov_length(out_sg, out_num);
->>>          size_t out_len_readable = iov_length(out_sg, out_num_readable);
->>> -        if (se->debug)
->>> -                fuse_debug("%s: elem %d: with %d out desc of length %zd"
->>> -                           " bad_in_num=%u bad_out_num=%u\n",
->>> -                           __func__, elem->index, out_num,
->>> -                           out_len, req->bad_in_num, req->bad_out_num);
->>> +	fuse_debug("%s: elem %d: with %d out desc of length %zd"
->>> +		   " bad_in_num=%u bad_out_num=%u\n",
->>> +		   __func__, elem->index, out_num,
->>> +		   out_len, req->bad_in_num, req->bad_out_num);
->>>  
->>>          /* The elem should contain a 'fuse_in_header' (in to fuse)
->>>           * plus the data based on the len in the header.
->>> @@ -555,11 +544,9 @@ static void fv_queue_worker(gpointer data, gpointer user_data)
->>>                                  ((struct fuse_in_header *)fbuf.mem)->opcode ==
->>>                                  FUSE_READ &&
->>>                                  out_sg[1].iov_len == sizeof(struct fuse_read_in)) {
->>> -                        if (se->debug) {
->>> -                                fuse_debug("Unmappable read case "
->>> -                                           "in_num=%d bad_in_num=%d\n",
->>> -                                           elem->in_num, req->bad_in_num);
->>> -                        }
->>> +			fuse_debug("Unmappable read case "
->>> +				   "in_num=%d bad_in_num=%d\n",
->>> +				   elem->in_num, req->bad_in_num);
->>>                          handled_unmappable = true;
->>>                  }
->>>  
->>> @@ -581,8 +568,7 @@ static void fv_queue_worker(gpointer data, gpointer user_data)
->>>                          // data, we can just do it straight out of guest memory
->>>                          // but we must sitll copy the headers in case the guest
->>>                          // was nasty and changed them while we were using them.
->>> -                        if (se->debug)
->>> -                                fuse_debug("%s: Write special case\n", __func__);
->>> +			fuse_debug("%s: Write special case\n", __func__);
->>>  
->>>                          // copy the fuse_write_in header afte rthe fuse_in_header
->>>                          fbuf.mem += out_sg->iov_len;
->>> @@ -636,10 +622,8 @@ static void fv_queue_worker(gpointer data, gpointer user_data)
->>>          if (!req->reply_sent) {
->>>                  struct VuVirtq *q = vu_get_queue(dev, qi->qidx);
->>>  
->>> -                if (se->debug) {
->>> -                        fuse_debug("%s: elem %d no reply sent\n",
->>> -                                   __func__, elem->index);
->>> -                }
->>> +		fuse_debug("%s: elem %d no reply sent\n",
->>> +			   __func__, elem->index);
->>>  
->>>                  pthread_rwlock_rdlock(&qi->virtio_dev->vu_dispatch_rwlock);
->>>                  pthread_mutex_lock(&qi->vq_lock);
->>> @@ -683,8 +667,7 @@ static void *fv_queue_thread(void *opaque)
->>>                 pf[1].events = POLLIN;
->>>                 pf[1].revents = 0;
->>>  
->>> -               if (qi->virtio_dev->se->debug)
->>> -                       fuse_debug("%s: Waiting for Queue %d event\n", __func__, qi->qidx);
->>> +	       fuse_debug("%s: Waiting for Queue %d event\n", __func__, qi->qidx);
->>>                 int poll_res = ppoll(pf, 2, NULL, NULL);
->>>  
->>>                 if (poll_res == -1) {
->>> @@ -712,9 +695,8 @@ static void *fv_queue_thread(void *opaque)
->>>                         break;
->>>                 }
->>>                 assert(pf[0].revents & POLLIN);
->>> -               if (qi->virtio_dev->se->debug)
->>> -                       fuse_debug("%s: Got queue event on Queue %d\n",
->>> -				  __func__, qi->qidx);
->>> +	       fuse_debug("%s: Got queue event on Queue %d\n",
->>> +			  __func__, qi->qidx);
->>>  
->>>                 eventfd_t evalue;
->>>                 if (eventfd_read(qi->kick_fd, &evalue)) {
->>> @@ -728,15 +710,13 @@ static void *fv_queue_thread(void *opaque)
->>>  
->>>                 pthread_mutex_lock(&qi->vq_lock);
->>>  
->>> -               if (se->debug) {
->>> -                       /* out is from guest, in is too guest */
->>> -                       unsigned int in_bytes, out_bytes;
->>> -                       vu_queue_get_avail_bytes(dev, q, &in_bytes, &out_bytes, ~0, ~0);
->>> +	       /* out is from guest, in is too guest */
->>> +	       unsigned int in_bytes, out_bytes;
->>> +	       vu_queue_get_avail_bytes(dev, q, &in_bytes, &out_bytes, ~0, ~0);
->>>  
->>> -                       fuse_debug("%s: Queue %d gave evalue: %zx available: in: %u out: %u\n",
->>> -				  __func__, qi->qidx, (size_t)evalue, in_bytes,
->>> -				  out_bytes);
->>> -               }
->>> +	       fuse_debug("%s: Queue %d gave evalue: %zx available: in: %u out: %u\n",
->>> +			  __func__, qi->qidx, (size_t)evalue, in_bytes,
->>> +			  out_bytes);
->>>  
->>>                 while (1) {
->>>                         unsigned int bad_in_num = 0, bad_out_num = 0;
->>> @@ -871,8 +851,7 @@ int virtio_loop(struct fuse_session *se)
->>>                 pf[0].events = POLLIN;
->>>                 pf[0].revents = 0;
->>>  
->>> -               if (se->debug)
->>> -                       fuse_debug("%s: Waiting for VU event\n", __func__);
->>> +	       fuse_debug("%s: Waiting for VU event\n", __func__);
->>>                 int poll_res = ppoll(pf, 1, NULL, NULL);
->>>  
->>>                 if (poll_res == -1) {
->>> @@ -890,8 +869,7 @@ int virtio_loop(struct fuse_session *se)
->>>                         break;
->>>                 }
->>>                 assert(pf[0].revents & POLLIN);
->>> -               if (se->debug)
->>> -                       fuse_debug("%s: Got VU event\n", __func__);
->>> +	       fuse_debug("%s: Got VU event\n", __func__);
->>>  
->>>                 /* Mutual exclusion with fv_queue_thread() */
->>>                 ret = pthread_rwlock_wrlock(&se->virtio_dev->vu_dispatch_rwlock);
->>> @@ -1058,9 +1036,7 @@ ssize_t fuse_virtio_write(fuse_req_t req,
->>>  	msg.flags[0] = VHOST_USER_FS_FLAG_MAP_W;
->>>  
->>>  	int64_t result = fuse_virtio_io(req->se, &msg, dst->fd);
->>> -        if (req->se->debug) {
->>> -                fuse_debug("%s: result=%ld\n", __func__, result);
->>> -        }
->>> +	fuse_debug("%s: result=%ld\n", __func__, result);
->>>  	return result;
->>>  }
->>>  
->>> diff --git a/contrib/virtiofsd/helper.c b/contrib/virtiofsd/helper.c
->>> index 5eae1f530aae..dc80100e8594 100644
->>> --- a/contrib/virtiofsd/helper.c
->>> +++ b/contrib/virtiofsd/helper.c
->>> @@ -27,6 +27,8 @@
->>>  
->>>  #define FUSE_HELPER_OPT(t, p) \
->>>  	{ t, offsetof(struct fuse_cmdline_opts, p), 1 }
->>> +#define FUSE_HELPER_OPT_VALUE(t, p, v) \
->>> +	{ t, offsetof(struct fuse_cmdline_opts, p), v }
->>>  
->>>  static const struct fuse_opt fuse_helper_opts[] = {
->>>  	FUSE_HELPER_OPT("-h",		show_help),
->>> @@ -50,6 +52,10 @@ static const struct fuse_opt fuse_helper_opts[] = {
->>>  	FUSE_HELPER_OPT("clone_fd",	clone_fd),
->>>  	FUSE_HELPER_OPT("max_idle_threads=%u", max_idle_threads),
->>>  	FUSE_HELPER_OPT("--syslog",	syslog),
->>> +	FUSE_HELPER_OPT_VALUE("log_level=debug", log_level, LOG_DEBUG),
->>> +	FUSE_HELPER_OPT_VALUE("log_level=info", log_level, LOG_INFO),
->>> +	FUSE_HELPER_OPT_VALUE("log_level=warn", log_level, LOG_WARNING),
->>> +	FUSE_HELPER_OPT_VALUE("log_level=err", log_level, LOG_ERR),
->>>  	FUSE_OPT_END
->>>  };
->>>  
->>> @@ -137,7 +143,9 @@ void fuse_cmdline_help(void)
->>>  	       "    -o clone_fd                use separate fuse device fd for each thread\n"
->>>  	       "                               (may improve performance)\n"
->>>  	       "    -o max_idle_threads        the maximum number of idle worker threads\n"
->>> -	       "                               allowed (default: 10)\n");
->>> +	       "                               allowed (default: 10)\n"
->>> +	       "    -o log_level=<level>       log level, default to \"info\"\n"
->>> +	       "                               level could be one of \"debug, info, warn, err\"\n");
->>>  }
->>>  
->>>  static int fuse_helper_opt_proc(void *data, const char *arg, int key,
->>> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
->>> index 321bbb20be65..583e9685161f 100644
->>> --- a/contrib/virtiofsd/passthrough_ll.c
->>> +++ b/contrib/virtiofsd/passthrough_ll.c
->>> @@ -36,6 +36,7 @@
->>>  
->>>  #include "fuse_virtio.h"
->>>  #include "fuse_lowlevel.h"
->>> +#include "fuse_log.h"
->>>  #include <unistd.h>
->>>  #include <stdlib.h>
->>>  #include <stdio.h>
->>> @@ -421,11 +422,6 @@ static int lo_fd(fuse_req_t req, fuse_ino_t ino)
->>>  	return fd;
->>>  }
->>>  
->>> -static bool lo_debug(fuse_req_t req)
->>> -{
->>> -	return lo_data(req)->debug != 0;
->>> -}
->>> -
->>>  static void lo_init(void *userdata,
->>>  		    struct fuse_conn_info *conn)
->>>  {
->>> @@ -436,18 +432,15 @@ static void lo_init(void *userdata,
->>>  
->>>  	if (lo->writeback &&
->>>  	    conn->capable & FUSE_CAP_WRITEBACK_CACHE) {
->>> -		if (lo->debug)
->>> -			fuse_debug("lo_init: activating writeback\n");
->>> +		fuse_debug("lo_init: activating writeback\n");
->>>  		conn->want |= FUSE_CAP_WRITEBACK_CACHE;
->>>  	}
->>>  	if (conn->capable & FUSE_CAP_FLOCK_LOCKS) {
->>>  		if (lo->flock) {
->>> -			if (lo->debug)
->>> -				fuse_debug("lo_init: activating flock locks\n");
->>> +			fuse_debug("lo_init: activating flock locks\n");
->>>  			conn->want |= FUSE_CAP_FLOCK_LOCKS;
->>>  		} else {
->>> -			if (lo->debug)
->>> -				fuse_debug("lo_init: disabling flock locks\n");
->>> +			fuse_debug("lo_init: disabling flock locks\n");
->>>  			conn->want &= ~FUSE_CAP_FLOCK_LOCKS;
->>>  		}
->>>  	}
->>> @@ -455,20 +448,17 @@ static void lo_init(void *userdata,
->>>  
->>>  	if (conn->capable & FUSE_CAP_POSIX_LOCKS) {
->>>  		if (lo->posix_lock) {
->>> -			if (lo->debug)
->>> -				fuse_debug("lo_init: activating posix locks\n");
->>> +			fuse_debug("lo_init: activating posix locks\n");
->>>  			conn->want |= FUSE_CAP_POSIX_LOCKS;
->>>  		} else {
->>> -			if (lo->debug)
->>> -				fuse_debug("lo_init: disabling posix locks\n");
->>> +			fuse_debug("lo_init: disabling posix locks\n");
->>>  			conn->want &= ~FUSE_CAP_POSIX_LOCKS;
->>>  		}
->>>  	}
->>>  
->>>  	if ((lo->cache == CACHE_NONE && !lo->readdirplus_set) ||
->>>  	    lo->readdirplus_clear || lo->shared) {
->>> -		if (lo->debug)
->>> -			fuse_debug("lo_init: disabling readdirplus\n");
->>> +		fuse_debug("lo_init: disabling readdirplus\n");
->>>  		conn->want &= ~FUSE_CAP_READDIRPLUS;
->>>  	}
->>>  }
->>> @@ -909,12 +899,11 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
->>>  	lo_inode_put(lo, &inode);
->>>  	lo_inode_put(lo, &dir);
->>>  
->>> -	if (lo_debug(req))
->>> -		fuse_debug("  %lli/%s -> %lli (version_table[%lli]=%lli)\n",
->>> -			   (unsigned long long) parent, name,
->>> -			   (unsigned long long) e->ino,
->>> -			   (unsigned long long) e->version_offset,
->>> -			   (unsigned long long) e->initial_version);
->>> +	fuse_debug("  %lli/%s -> %lli (version_table[%lli]=%lli)\n",
->>> +		   (unsigned long long) parent, name,
->>> +		   (unsigned long long) e->ino,
->>> +		   (unsigned long long) e->version_offset,
->>> +		   (unsigned long long) e->initial_version);
->>>  
->>>  	return 0;
->>>  
->>> @@ -932,9 +921,7 @@ static void lo_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
->>>  	struct fuse_entry_param e;
->>>  	int err;
->>>  
->>> -	if (lo_debug(req))
->>> -		fuse_debug("lo_lookup(parent=%" PRIu64 ", name=%s)\n",
->>> -			   parent, name);
->>> +	fuse_debug("lo_lookup(parent=%" PRIu64 ", name=%s)\n", parent, name);
->>>  
->>>  	/* Don't use is_safe_path_component(), allow "." and ".." for NFS export
->>>  	 * support.
->>> @@ -1040,10 +1027,9 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
->>>  	if (saverr)
->>>  		goto out;
->>>  
->>> -	if (lo_debug(req))
->>> -		fuse_debug("  %lli/%s -> %lli\n",
->>> -			   (unsigned long long) parent, name,
->>> -			   (unsigned long long) e.ino);
->>> +	fuse_debug("  %lli/%s -> %lli\n",
->>> +		   (unsigned long long) parent, name,
->>> +		   (unsigned long long) e.ino);
->>>  
->>>  	fuse_reply_entry(req, &e, lo->shared);
->>>  	lo_inode_put(lo, &dir);
->>> @@ -1149,10 +1135,9 @@ static void lo_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t parent,
->>>  	update_version(lo, inode);
->>>  	update_version(lo, parent_inode);
->>>  
->>> -	if (lo_debug(req))
->>> -		fuse_debug("  %lli/%s -> %lli\n",
->>> -			   (unsigned long long) parent, name,
->>> -			   (unsigned long long) e.ino);
->>> +	fuse_debug("  %lli/%s -> %lli\n",
->>> +		   (unsigned long long) parent, name,
->>> +		   (unsigned long long) e.ino);
->>>  
->>>  	fuse_reply_entry(req, &e, lo->shared);
->>>  	lo_inode_put(lo, &parent_inode);
->>> @@ -1355,12 +1340,10 @@ static void lo_forget_one(fuse_req_t req, fuse_ino_t ino, uint64_t nlookup)
->>>  	if (!inode)
->>>  		return;
->>>  
->>> -	if (lo_debug(req)) {
->>> -		fuse_debug("  forget %lli %lli -%lli\n",
->>> -			   (unsigned long long) ino,
->>> -			   (unsigned long long) inode->nlookup,
->>> -			   (unsigned long long) nlookup);
->>> -	}
->>> +	fuse_debug("  forget %lli %lli -%lli\n",
->>> +		   (unsigned long long) ino,
->>> +		   (unsigned long long) inode->nlookup,
->>> +		   (unsigned long long) nlookup);
->>>  
->>>  	unref_inode(lo, inode, nlookup);
->>>  	lo_inode_put(lo, &inode);
->>> @@ -1642,9 +1625,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
->>>  	int err;
->>>  	struct lo_cred old = {};
->>>  
->>> -	if (lo_debug(req))
->>> -		fuse_debug("lo_create(parent=%" PRIu64 ", name=%s)\n",
->>> -			   parent, name);
->>> +	fuse_debug("lo_create(parent=%" PRIu64 ", name=%s)\n", parent, name);
->>>  
->>>  	if (!is_safe_path_component(name)) {
->>>  		fuse_reply_err(req, EINVAL);
->>> @@ -1744,11 +1725,10 @@ static void lo_getlk(fuse_req_t req, fuse_ino_t ino,
->>>  	struct lo_inode_plock *plock;
->>>  	int ret, saverr = 0;
->>>  
->>> -	if (lo_debug(req))
->>> -		fuse_debug("lo_getlk(ino=%" PRIu64 ", flags=%d)"
->>> -			   " owner=0x%lx, l_type=%d l_start=0x%lx"
->>> -			   " l_len=0x%lx\n", ino, fi->flags, fi->lock_owner,
->>> -			   lock->l_type, lock->l_start, lock->l_len);
->>> +	fuse_debug("lo_getlk(ino=%" PRIu64 ", flags=%d)"
->>> +		   " owner=0x%lx, l_type=%d l_start=0x%lx"
->>> +		   " l_len=0x%lx\n", ino, fi->flags, fi->lock_owner,
->>> +		   lock->l_type, lock->l_start, lock->l_len);
->>>  
->>>  	inode = lo_inode(req, ino);
->>>  	if (!inode) {
->>> @@ -1786,12 +1766,11 @@ static void lo_setlk(fuse_req_t req, fuse_ino_t ino,
->>>  	struct lo_inode_plock *plock;
->>>  	int ret, saverr = 0;
->>>  
->>> -	if (lo_debug(req))
->>> -		fuse_debug("lo_setlk(ino=%" PRIu64 ", flags=%d)"
->>> -			   " cmd=%d pid=%d owner=0x%lx sleep=%d l_whence=%d"
->>> -		           " l_start=0x%lx l_len=0x%lx\n", ino, fi->flags,
->>> -			   lock->l_type, lock->l_pid, fi->lock_owner, sleep,
->>> -			   lock->l_whence, lock->l_start, lock->l_len);
->>> +	fuse_debug("lo_setlk(ino=%" PRIu64 ", flags=%d)"
->>> +		   " cmd=%d pid=%d owner=0x%lx sleep=%d l_whence=%d"
->>> +		   " l_start=0x%lx l_len=0x%lx\n", ino, fi->flags,
->>> +		   lock->l_type, lock->l_pid, fi->lock_owner, sleep,
->>> +		   lock->l_whence, lock->l_start, lock->l_len);
->>>  
->>>  	if (sleep) {
->>>  		fuse_reply_err(req, EOPNOTSUPP);
->>> @@ -1860,9 +1839,7 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
->>>  	char buf[64];
->>>  	struct lo_data *lo = lo_data(req);
->>>  
->>> -	if (lo_debug(req))
->>> -		fuse_debug("lo_open(ino=%" PRIu64 ", flags=%d)\n",
->>> -			   ino, fi->flags);
->>> +	fuse_debug("lo_open(ino=%" PRIu64 ", flags=%d)\n", ino, fi->flags);
->>>  
->>>  	/* With writeback cache, kernel may send read requests even
->>>  	   when userspace opened write-only */
->>> @@ -1965,9 +1942,7 @@ static void lo_fsync(fuse_req_t req, fuse_ino_t ino, int datasync,
->>>  	int fd;
->>>  	char *buf;
->>>  
->>> -	if (lo_debug(req))
->>> -		fuse_debug("lo_fsync(ino=%" PRIu64 ", fi=0x%p)\n", ino,
->>> -			   (void *)fi);
->>> +	fuse_debug("lo_fsync(ino=%" PRIu64 ", fi=0x%p)\n", ino, (void *)fi);
->>>  
->>>  	if (!fi) {
->>>  		res = asprintf(&buf, "%i", lo_fd(req, ino));
->>> @@ -1995,9 +1970,8 @@ static void lo_read(fuse_req_t req, fuse_ino_t ino, size_t size,
->>>  {
->>>  	struct fuse_bufvec buf = FUSE_BUFVEC_INIT(size);
->>>  
->>> -	if (lo_debug(req))
->>> -		fuse_debug("lo_read(ino=%" PRIu64 ", size=%zd, "
->>> -			   "off=%lu)\n", ino, size, (unsigned long) offset);
->>> +	fuse_debug("lo_read(ino=%" PRIu64 ", size=%zd, "
->>> +		   "off=%lu)\n", ino, size, (unsigned long) offset);
->>>  
->>>  	buf.buf[0].flags = FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK;
->>>  	buf.buf[0].fd = lo_fi_fd(req, fi);
->>> @@ -2019,9 +1993,8 @@ static void lo_write_buf(fuse_req_t req, fuse_ino_t ino,
->>>  	out_buf.buf[0].fd = lo_fi_fd(req, fi);
->>>  	out_buf.buf[0].pos = off;
->>>  
->>> -	if (lo_debug(req))
->>> -		fuse_debug("lo_write_buf(ino=%" PRIu64 ", size=%zd, off=%lu)\n",
->>> -			   ino, out_buf.buf[0].size, (unsigned long) off);
->>> +	fuse_debug("lo_write_buf(ino=%" PRIu64 ", size=%zd, off=%lu)\n",
->>> +		   ino, out_buf.buf[0].size, (unsigned long) off);
->>>  
->>>  	res = fuse_buf_copy(req, &out_buf, in_buf, 0);
->>>  	if(res < 0) {
->>> @@ -2105,10 +2078,8 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
->>>  	if (!lo_data(req)->xattr)
->>>  		goto out;
->>>  
->>> -	if (lo_debug(req)) {
->>> -		fuse_debug("lo_getxattr(ino=%" PRIu64 ", name=%s size=%zd)\n",
->>> -			   ino, name, size);
->>> -	}
->>> +	fuse_debug("lo_getxattr(ino=%" PRIu64 ", name=%s size=%zd)\n",
->>> +		   ino, name, size);
->>>  
->>>  	if (inode->is_symlink) {
->>>  		/* Sorry, no race free way to getxattr on symlink. */
->>> @@ -2180,10 +2151,7 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
->>>  	if (!lo_data(req)->xattr)
->>>  		goto out;
->>>  
->>> -	if (lo_debug(req)) {
->>> -		fuse_debug("lo_listxattr(ino=%" PRIu64 ", size=%zd)\n",
->>> -			   ino, size);
->>> -	}
->>> +	fuse_debug("lo_listxattr(ino=%" PRIu64 ", size=%zd)\n", ino, size);
->>>  
->>>  	if (inode->is_symlink) {
->>>  		/* Sorry, no race free way to listxattr on symlink. */
->>> @@ -2255,10 +2223,8 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
->>>  	if (!lo_data(req)->xattr)
->>>  		goto out;
->>>  
->>> -	if (lo_debug(req)) {
->>> -		fuse_debug("lo_setxattr(ino=%" PRIu64 ", name=%s value=%s size=%zd)\n",
->>> -			   ino, name, value, size);
->>> -	}
->>> +	fuse_debug("lo_setxattr(ino=%" PRIu64 ", name=%s value=%s size=%zd)\n",
->>> +		   ino, name, value, size);
->>>  
->>>  	if (inode->is_symlink) {
->>>  		/* Sorry, no race free way to removexattr on symlink. */
->>> @@ -2306,10 +2272,7 @@ static void lo_removexattr(fuse_req_t req, fuse_ino_t ino, const char *name)
->>>  	if (!lo_data(req)->xattr)
->>>  		goto out;
->>>  
->>> -	if (lo_debug(req)) {
->>> -		fuse_debug("lo_removexattr(ino=%" PRIu64 ", name=%s)\n",
->>> -			   ino, name);
->>> -	}
->>> +	fuse_debug("lo_removexattr(ino=%" PRIu64 ", name=%s)\n", ino, name);
->>>  
->>>  	if (inode->is_symlink) {
->>>  		/* Sorry, no race free way to setxattr on symlink. */
->>> @@ -2351,12 +2314,11 @@ static void lo_copy_file_range(fuse_req_t req, fuse_ino_t ino_in, off_t off_in,
->>>  	in_fd = lo_fi_fd(req, fi_in);
->>>  	out_fd = lo_fi_fd(req, fi_out);
->>>  
->>> -	if (lo_debug(req))
->>> -		fuse_debug("lo_copy_file_range(ino=%" PRIu64 "/fd=%d, "
->>> -				"off=%lu, ino=%" PRIu64 "/fd=%d, "
->>> -				"off=%lu, size=%zd, flags=0x%x)\n",
->>> -			   ino_in, in_fd, off_in, ino_out, out_fd, off_out, len,
->>> -			   flags);
->>> +	fuse_debug("lo_copy_file_range(ino=%" PRIu64 "/fd=%d, "
->>> +	           "off=%lu, ino=%" PRIu64 "/fd=%d, "
->>> +		   "off=%lu, size=%zd, flags=0x%x)\n",
->>> +		   ino_in, in_fd, off_in, ino_out, out_fd, off_out, len,
->>> +		   flags);
->>>  
->>>  	res = copy_file_range(in_fd, &off_in, out_fd, &off_out, len, flags);
->>>  	if (res < 0)
->>> @@ -2377,11 +2339,10 @@ static void lo_setupmapping(fuse_req_t req, fuse_ino_t ino, uint64_t foffset,
->>>  	char *buf;
->>>          bool writable = flags & O_RDWR;
->>>  
->>> -	if (lo_debug(req))
->>> -		fuse_debug("lo_setupmapping(ino=%" PRIu64 ", fi=0x%p,"
->>> -			   " foffset=%" PRIu64 ", len=%" PRIu64
->>> -			   ", moffset=%" PRIu64 ", flags=%" PRIu64 ")\n", ino,
->>> -			   (void *)fi, foffset, len, moffset, flags);
->>> +	fuse_debug("lo_setupmapping(ino=%" PRIu64 ", fi=0x%p,"
->>> +		   " foffset=%" PRIu64 ", len=%" PRIu64
->>> +		   ", moffset=%" PRIu64 ", flags=%" PRIu64 ")\n", ino,
->>> +		   (void *)fi, foffset, len, moffset, flags);
->>>   
->>>          vhu_flags = VHOST_USER_FS_FLAG_MAP_R;
->>>          if (writable)
->>> @@ -2878,7 +2839,16 @@ int main(int argc, char *argv[])
->>>  	if (fuse_opt_parse(&args, &lo, lo_opts, NULL)== -1)
->>>  		goto err_out1;
->>>  
->>> +	/*
->>> +	 * log_level is 0 if not configured via cmd options (0 is LOG_EMERG,
->>> +	 * and we don't use this log level).
->>> +	 */
->>> +	if (opts.log_level != 0)
->>> +		current_log_level = opts.log_level;
->>>  	lo.debug = opts.debug;
->>> +	if (lo.debug)
->>> +		current_log_level = LOG_DEBUG;
->>> +
->>>  	if (lo.source) {
->>>  		struct stat stat;
->>>  		int res;
->>>
->>
->> _______________________________________________
->> Virtio-fs mailing list
->> Virtio-fs@redhat.com
->> https://www.redhat.com/mailman/listinfo/virtio-fs
-> .
-> 
+the utilization is 100% and op/s equals zero, it indicates hang.
+
+If virtiofsd is idle, then the output looks like this:
+
+op                        inflt         op/s     svctm/us   %util
+TOTAL                         0         0.00         0.00   0.00%
+
+Signed-off-by: Gang Deng <gavin.dg@linux.alibaba.com>
+---
+ contrib/virtiofsd/vstat.c  | 680 +++++++++++++++++++++++++++++++++++++
+ contrib/virtiofsd/vtrace.c |  95 ++++++
+ contrib/virtiofsd/vtrace.h |  53 +++
+ 3 files changed, 828 insertions(+)
+ create mode 100644 contrib/virtiofsd/vstat.c
+ create mode 100644 contrib/virtiofsd/vtrace.c
+ create mode 100644 contrib/virtiofsd/vtrace.h
+
+diff --git a/contrib/virtiofsd/vstat.c b/contrib/virtiofsd/vstat.c
+new file mode 100644
+index 0000000000..aa7048fba4
+--- /dev/null
++++ b/contrib/virtiofsd/vstat.c
+@@ -0,0 +1,680 @@
++#include <assert.h>
++#include <dirent.h>
++#include <errno.h>
++#include <fcntl.h>
++#include <inttypes.h>
++#include <signal.h>
++#include <stdbool.h>
++#include <stdio.h>
++#include <stdint.h>
++#include <stdlib.h>
++#include <string.h>
++#include <sys/mman.h>
++#include <sys/queue.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <sys/time.h>
++#include <time.h>
++#include <unistd.h>
++
++#include "fuse_kernel.h"
++#include "vtrace.h"
++
++/*
++ * There exist two components: vtrace && vstat. vtrace is embeded in virtiofsd,
++ * it will put raw statistics data into share memory. Then the vstat tool could
++ * parse it and do some post processing works. The performance overhead of
++ * vtrace is very small because it does very simple things.
++ *
++ * For example, if we call open(2)/close(2) frequently in guest, and
++ * randwite a file whose length is greater than the size of dax window.
++ * We'll get the output as below:
++ *
++ * op                        inflt         op/s     svctm/us   %util
++ * FUSE_OPEN(14)                 0      8379.87         3.24   2.71%
++ * FUSE_RELEASE(18)              0      8379.87         1.77   1.48%
++ * FUSE_FLUSH(25)                0      8379.87         2.04   1.71%
++ * FUSE_SETUPMAPPING(48)         1      6393.90        34.72  22.20%
++ * FUSE_REMOVEMAPPING(49)        0      6404.90        37.61  24.09%
++ * TOTAL                         1     37938.39        13.76  52.20%
++ *
++ * The meaning of fields:
++ *
++ * - op
++ *   The type of fuse requests, 'TOTAL' is sum of all.
++ *
++ * - inflt
++ *   The number of the inflight requests, it must be ethier 0 or 1 because
++ *   virtiofsd can only process fuse requests serially.
++ *
++ * - op/s
++ *   The number of fuse requests completed per second.
++ *
++ * - svctm/us
++ *   The average service time (in microseconds) for fuse requests.
++ *
++ * - %util
++ *   Percentage of elapsed time during which virtiofsd was processing the fuse
++ *   requests.
++ *
++ * when virtiofsd is hang, e.g. we support flock in host (just for example,
++ * this has been fxied), we'll get this:
++ *
++ * op                        inflt         op/s     svctm/us   %util
++ * FUSE_SETLKW(33)               1         0.00         0.00 100.00%
++ * TOTAL                         1         0.00         0.00 100.00%
++ *
++ * the utilization is 100% and op/s equals zero, it indicates hang.
++ *
++ * If virtiofsd is idle, then the output looks like this:
++ *
++ * op                        inflt         op/s     svctm/us   %util
++ * TOTAL                         0         0.00         0.00   0.00%
++ *
++ *
++ *TODO:
++ * Vstat was designed to scan VIRTIOFS_TRACE_DIR directory to get all virtiofs
++ * devices. However it's not supported yet. Because virtiofsd couldn't unlink
++ * the trace file when exited due to the sandboxing, actually we unlink the
++ * trace file when inited. Then vstat can only access the trace file through
++ * the /proc/<virtiofs-pid>/fd/<trace-file> (which needs root privilege)
++ * This should be refactored later if virtiofsd could access /dev/shm
++ * directory, then vstat can run as nobody and be able to scan all devices
++ * like iostat tool.
++ */
++
++#define MS_PER_SEC 			1000
++#define US_PER_SEC 			1000000
++#define NS_PER_SEC			1000000000
++#define SEC_PER_DAY			(3600 * 24)
++#define usec_to_sec(usec)		((double)(usec) / US_PER_SEC)
++#define usec_to_nsec(usec)		(usec * MS_PER_SEC)
++#define sec_to_usec(sec)		(sec * US_PER_SEC)
++
++struct trace_entry {
++	int				valid;
++	struct virtiofs_trace		trace[2];
++	char				trace_path[PATH_MAX];
++
++	TAILQ_ENTRY(trace_entry)	entries;
++};
++
++static uint64_t tsc_resolution_hz;
++static bool g_print_timestamp = false;
++static int g_interval = 1;
++static struct timeval g_ts[2];
++
++TAILQ_HEAD(, trace_entry) g_trace_head;
++
++
++static inline double us_to_tick(uint64_t us)
++{
++	return ((double)us) / US_PER_SEC * tsc_resolution_hz;
++}
++static inline double tick_to_us(uint64_t tick)
++{
++	return ((double)tick) / tsc_resolution_hz * US_PER_SEC;
++}
++
++static inline double tick_to_ms(uint64_t tick)
++{
++	return ((double)tick) / tsc_resolution_hz * MS_PER_SEC;
++}
++
++#define __case_ret_str(val)     case(val): return #val
++static const char *fuse_op2str(int op)
++{
++	switch(op) {
++	__case_ret_str(FUSE_LOOKUP);
++	__case_ret_str(FUSE_FORGET);
++	__case_ret_str(FUSE_GETATTR);
++	__case_ret_str(FUSE_SETATTR);
++	__case_ret_str(FUSE_READLINK);
++	__case_ret_str(FUSE_SYMLINK);
++	__case_ret_str(FUSE_MKNOD);
++	__case_ret_str(FUSE_MKDIR);
++	__case_ret_str(FUSE_UNLINK);
++	__case_ret_str(FUSE_RMDIR);
++	__case_ret_str(FUSE_RENAME);
++	__case_ret_str(FUSE_LINK);
++	__case_ret_str(FUSE_OPEN);
++	__case_ret_str(FUSE_READ);
++	__case_ret_str(FUSE_WRITE);
++	__case_ret_str(FUSE_STATFS);
++	__case_ret_str(FUSE_RELEASE);
++	__case_ret_str(FUSE_FSYNC);
++	__case_ret_str(FUSE_SETXATTR);
++	__case_ret_str(FUSE_GETXATTR);
++	__case_ret_str(FUSE_LISTXATTR);
++	__case_ret_str(FUSE_REMOVEXATTR);
++	__case_ret_str(FUSE_FLUSH);
++	__case_ret_str(FUSE_INIT);
++	__case_ret_str(FUSE_OPENDIR);
++	__case_ret_str(FUSE_READDIR);
++	__case_ret_str(FUSE_RELEASEDIR);
++	__case_ret_str(FUSE_FSYNCDIR);
++	__case_ret_str(FUSE_GETLK);
++	__case_ret_str(FUSE_SETLK);
++	__case_ret_str(FUSE_SETLKW);
++	__case_ret_str(FUSE_ACCESS);
++	__case_ret_str(FUSE_CREATE);
++	__case_ret_str(FUSE_INTERRUPT);
++	__case_ret_str(FUSE_BMAP);
++	__case_ret_str(FUSE_DESTROY);
++	__case_ret_str(FUSE_IOCTL);
++	__case_ret_str(FUSE_POLL);
++	__case_ret_str(FUSE_NOTIFY_REPLY);
++	__case_ret_str(FUSE_BATCH_FORGET);
++	__case_ret_str(FUSE_FALLOCATE);
++	__case_ret_str(FUSE_READDIRPLUS);
++	__case_ret_str(FUSE_RENAME2);
++	__case_ret_str(FUSE_LSEEK);
++	__case_ret_str(FUSE_COPY_FILE_RANGE);
++	__case_ret_str(FUSE_SETUPMAPPING);
++	__case_ret_str(FUSE_REMOVEMAPPING);
++	default: return "OP_UNKNOWN";
++	}
++}
++
++static void virtiofs_dump_trace(struct virtiofs_trace *trace)
++{
++	int op;
++	char op_buf[24];
++	struct fuse_op_stat *stat;
++
++	fprintf(stdout, "mountpoint %s\n", trace->mountpoint);
++	fprintf(stdout, "version 0x%x\n", trace->version);
++	fprintf(stdout, "%-24s %6s %16s %16s\n",
++		"op", "inflt", "done", "elapsed(ms)");
++	for (op = 0; op < VIRTIOFS_MAX_OP; op++) {
++		stat = &trace->stats[op];
++
++		/* filter noop */
++		if (!stat->done && !stat->inflight)
++			continue;
++		snprintf(op_buf, sizeof(op_buf), "%s(%d)", fuse_op2str(op), op);
++		fprintf(stdout, "%-24s %6"PRIu64" %16"PRIu64" %16.2f\n",
++			op_buf,
++			stat->inflight,
++			stat->done,
++			tick_to_ms(stat->elapsed_ticks));
++	}
++}
++
++
++/*
++ * TODO: trace_lookup/add/del was supposed to be used when vstat scan and show
++ * multiple devices.
++ */
++static inline struct trace_entry *trace_lookup(const char *trace_path)
++{
++	struct trace_entry *entry;
++
++	TAILQ_FOREACH(entry, &g_trace_head, entries) {
++		if (!strncmp(trace_path, entry->trace_path,
++			     sizeof(entry->trace_path)))
++			return entry;
++	}
++
++	return NULL;
++}
++
++static inline void trace_add(struct trace_entry *entry)
++{
++	TAILQ_INSERT_TAIL(&g_trace_head, entry, entries);
++}
++
++static inline void trace_del(struct trace_entry *entry)
++{
++	TAILQ_REMOVE(&g_trace_head, entry, entries);
++}
++
++static struct trace_entry *get_trace_by_path(const char *trace_path)
++{
++	struct trace_entry *entry = trace_lookup(trace_path);
++	if (entry)
++		return entry;
++
++	entry = (struct trace_entry *)malloc(sizeof(*entry));
++	if (entry == NULL)
++		return NULL;
++	memset(entry, 0, sizeof(*entry));
++	snprintf(entry->trace_path, sizeof(entry->trace_path),
++		 "%s", trace_path);
++	trace_add(entry);
++	return entry;
++}
++
++static void trace_put(struct trace_entry *entry)
++{
++	trace_del(entry);
++	free(entry);
++}
++
++static int virtiofs_read_trace_one_int(const char *trace_path,
++				       struct virtiofs_trace *trace)
++{
++	int trace_fd, ret;
++	struct stat s;
++	ssize_t read_len;
++
++	if (!trace_path)
++		return -1;
++
++	trace_fd = open(trace_path, O_RDONLY);
++	if (trace_fd == -1) {
++		fprintf(stderr, "open %s failed [%d]\n", trace_path, -errno);
++		return -1;
++	}
++
++	ret = fstat(trace_fd, &s);
++	if (ret != 0) {
++		fprintf(stderr, "fstat %s failed [%d]\n", trace_path, -errno);
++		goto failed;
++	}
++
++	/*
++	 * Treat it as version not compatible, just a stub because we have only
++	 * one version.
++	 */
++	if ((size_t)s.st_size != (sizeof(struct virtiofs_trace))) {
++		fprintf(stderr, "size %zu != %zu miss matched\n",
++			s.st_size, sizeof(struct virtiofs_trace));
++		goto failed;
++	}
++
++	/* read stat file */
++	read_len = read(trace_fd, trace, s.st_size);
++	if (read_len != s.st_size) {
++		fprintf(stderr, "read failed %ld(%ld)\n", read_len, s.st_size);
++		goto failed;
++	}
++
++	/*
++	 * Check version, vstat must be compatible to old vtrace version if
++	 * it exist.
++	 */
++	if (trace->version != VIRTIOFS_TRACE_VERSION) {
++		fprintf(stderr, "version 0x%x != 0x%x miss matched\n",
++			trace->version, VIRTIOFS_TRACE_VERSION);
++		goto failed;
++	}
++
++	close(trace_fd);
++	return 0;
++failed:
++	close(trace_fd);
++	return -1;
++}
++
++static int virtiofs_read_trace_one(const char *trace_path, int curr)
++{
++	struct trace_entry *entry = get_trace_by_path(trace_path);
++	if (entry == NULL)
++		return -1;
++	if (!virtiofs_read_trace_one_int(trace_path, &entry->trace[curr]))
++		entry->valid = 1;
++	return 0;
++}
++
++/* Detect whether it's a trace file. */
++static bool is_virtiofs_pci(const char *trace_path)
++{
++	int fd;
++	uint64_t val;
++	ssize_t len;
++
++	if (access(trace_path, R_OK))
++		return false;
++
++	fd = open(trace_path, O_RDONLY);
++	if (fd == -1)
++		return false;
++	len = read(fd, &val, sizeof(val));
++	close(fd);
++
++	if (len != sizeof(val))
++		return false;
++
++	return (val == VIRTIOFS_TRACE_MAGIC);
++}
++
++static void destroy_invalid_trace(void)
++{
++	struct trace_entry *entry;
++	TAILQ_FOREACH(entry, &g_trace_head, entries) {
++		if (!entry->valid) {
++			trace_put(entry);
++			continue;
++		}
++		/* mark invalid for next round */
++		entry->valid = 0;
++	}
++}
++
++static void virtiofs_read_trace(int curr, const char *trace_path)
++{
++	virtiofs_read_trace_one(trace_path, curr);
++	destroy_invalid_trace();
++}
++
++static void alarm_handler(int sig)
++{
++	alarm(g_interval);
++}
++
++static time_t get_localtime(struct tm *rectime, int d_off)
++{
++	time_t timer;
++	struct tm *ltm;
++
++	time(&timer);
++	timer -= SEC_PER_DAY * d_off;
++	ltm = localtime(&timer);
++
++	if (ltm)
++		*rectime = *ltm;
++	return timer;
++}
++
++static inline uint64_t timeval_sub(struct timeval t1, struct timeval t2)
++{
++	int64_t ret;
++
++	t1.tv_usec -= t2.tv_usec;
++	t1.tv_sec -= t2.tv_sec;
++
++	ret = sec_to_usec(t1.tv_sec) + t1.tv_usec;
++	return (ret < 0) ? 0 : ret;
++}
++
++/* clamp_positive */
++static inline int64_t cp(int64_t n)
++{
++	return (n < 0)  ?  0 : n;
++}
++
++#define SUM_FIELD(i, j, field) (((i)->field) += ((j)->field))
++#define DIFF_FIELD(i, j, field) (cp(((i)->field) - ((j)->field)))
++#define DIV(m, n) (((n) == 0) ?  0 : ((double)(m) / (n)))
++#define DVDF_FIELD(i, j, field, n) \
++	DIV((DIFF_FIELD(i, j, field)), (n))
++#define DVDFF_FIELD(i, j, field0, field1) \
++	DIV((DIFF_FIELD(i, j, field0)), (DIFF_FIELD(i, j, field1)))
++
++static void virtiofs_trace_output_one(struct trace_entry *entry,
++				      int curr,
++				      uint64_t dur /* in us */)
++{
++	struct virtiofs_trace *t_curr = &entry->trace[curr],
++			      *t_prev = &entry->trace[(curr ^ 1)];
++	struct fuse_op_stat *s_curr, *s_prev, tot_curr = {0}, tot_prev = {0};
++	int op;
++	char op_buf[24];
++	uint64_t deco_ticks;
++
++	fprintf(stdout, "%-24s %6s %12s %12s %7s\n",
++		"op", "inflt", "op/s", "svctm/us", "%util");
++	for (op = 0; op < VIRTIOFS_MAX_OP; op++) {
++		s_curr = &t_curr->stats[op];
++		s_prev = &t_prev->stats[op];
++
++		/* filter noop */
++		if (!DIFF_FIELD(s_curr, s_prev, done) && !s_curr->inflight)
++			continue;
++
++		/* To detect hung */
++		if ((s_curr->done == s_prev->done) &&
++		    (s_curr->inflight >= s_prev->inflight) &&
++		    (s_prev->inflight > 0))
++			deco_ticks = us_to_tick(dur);
++		else
++			deco_ticks = 0;
++		s_curr->elapsed_ticks += deco_ticks;
++		snprintf(op_buf, sizeof(op_buf), "%s(%d)", fuse_op2str(op), op);
++#define __OUTPUT_ONE(curr, prev)			do {		    \
++		fprintf(stdout, "%-24s %6"PRIu64" %12.2f %12.2f %6.2f%%\n", \
++			op_buf,						    \
++			(curr)->inflight,				    \
++			DVDF_FIELD(curr, prev, done, usec_to_sec(dur)),     \
++			tick_to_us(DVDFF_FIELD(curr, prev, elapsed_ticks, done)), \
++			DVDF_FIELD(curr, prev, elapsed_ticks, us_to_tick(dur)) * 100);\
++} while (0)
++		__OUTPUT_ONE(s_curr, s_prev);
++
++#define __ACCUMULATE(tot, s) 	do {			\
++		SUM_FIELD(tot, s, inflight);		\
++		SUM_FIELD(tot, s, done);		\
++		SUM_FIELD(tot, s, elapsed_ticks);	\
++} while (0)
++		__ACCUMULATE(&tot_curr, s_curr);
++		__ACCUMULATE(&tot_prev, s_prev);
++		s_curr->elapsed_ticks -= deco_ticks;
++	}
++
++	snprintf(op_buf, sizeof(op_buf), "%s", "TOTAL");
++	__OUTPUT_ONE(&tot_curr, &tot_prev);
++}
++
++static void virtiofs_trace_output(int curr, struct tm *rectime)
++{
++	struct trace_entry *entry;
++	uint64_t duration;
++	char timestamp[64];
++
++	duration = timeval_sub(g_ts[curr], g_ts[curr^1]);
++	if (duration == 0) {
++		fprintf(stderr, "duration is zero, impossible\n");
++		return;
++	}
++
++	fprintf(stdout, "\n");
++	if (g_print_timestamp) {
++		strftime(timestamp, sizeof(timestamp),
++			 "%Y-%m-%d %H:%M:%S", rectime);
++		fprintf(stdout, "%s\n", timestamp);
++	}
++
++	/* output body */
++	TAILQ_FOREACH(entry, &g_trace_head, entries)
++		virtiofs_trace_output_one(entry, curr, duration);
++}
++
++static int do_stat_summary(const char *trace_path)
++{
++	struct virtiofs_trace trace;
++	int ret;
++
++	ret = virtiofs_read_trace_one_int(trace_path, &trace);
++	if (ret)
++		return ret;
++	virtiofs_dump_trace(&trace);
++	return 0;
++}
++
++static int do_stat_loop(int interval, int count, const char *trace_path)
++{
++	int curr = 0;
++	struct sigaction alrm_act;
++	struct tm rectime;
++
++	TAILQ_INIT(&g_trace_head);
++
++	if (interval <= 0)
++		return -1;
++
++	g_interval = interval;
++	memset(&alrm_act, 0, sizeof(alrm_act));
++	alrm_act.sa_handler = alarm_handler;
++	sigaction(SIGALRM, &alrm_act, NULL);
++	alarm(g_interval);
++
++	get_localtime(&rectime, 0);
++
++	do {
++		/* read traces */
++		gettimeofday(&g_ts[curr], NULL);
++		virtiofs_read_trace(curr, trace_path);
++
++		/* write stats */
++		get_localtime(&rectime, 0);
++		virtiofs_trace_output(curr, &rectime);
++		if (count > 0)
++			count--;
++
++		if (count) {
++			curr ^= 1;
++			pause();
++		}
++	} while (count);
++	return 0;
++
++}
++
++static void vstat_usage(void)
++{
++	fprintf(stderr,
++		"\tvstat [-t] [-s] <trace_path> [interval [count]]\n");
++}
++
++/* parse the interval and count like iostat */
++static int get_interval_count(int *argcp, char **argv, int *iv, int *cnt)
++{
++	long interval = 1, count = 0;
++	int argc = *argcp;
++
++	/* Determin if the last argument is an virtio-fs-pci device id */
++	if (argc > 0 && !is_virtiofs_pci(argv[argc - 1])) {
++		char *end;
++
++		errno = 0;
++		interval = strtoul(argv[argc - 1], &end, 10);
++
++		if (*end == '\0' && errno == 0) {
++			if (interval == 0) {
++				fprintf(stderr, "interval cannot be zero\n");
++				vstat_usage();
++				return 1;
++			}
++			/* Ignore the last parameter */
++			argc--;
++
++			/* run until CTRL^c */
++			count = -1;
++		} else {
++			/*
++			 * If this is not a valid number, just plow on.  The
++			 * user will get a more informative error message later
++			 * on.
++			 */
++			interval = 0;
++		}
++	}
++
++	/*
++	 * If the last argument is also an integer, then we have both a count
++	 * and an interval.
++	 */
++	if (argc > 0 && !is_virtiofs_pci(argv[argc - 1])) {
++		char *end;
++
++		errno = 0;
++		count = interval;
++		interval = strtoul(argv[argc - 1], &end, 10);
++
++		if (*end == '\0' && errno == 0) {
++			if (interval == 0) {
++				fprintf(stderr, "interval cannot be zero\n");
++				vstat_usage();
++				return 1;
++			}
++			/* Ignore the last parameter */
++			argc--;
++		} else
++			interval = 0;
++	}
++
++	/* might be overflow.  someone is insane! */
++	*iv = (int)interval;
++	*cnt = (int)count;
++	*argcp = argc;
++
++	return 0;
++}
++
++/* Most code are copied from DPDK. */
++static uint64_t get_tsc_freq(void)
++{
++	struct timespec sleeptime = {.tv_nsec = 5E8 }; /* 1/2 second */
++
++	struct timespec t_start, t_end;
++	uint64_t tsc_hz;
++
++	if (clock_gettime(CLOCK_MONOTONIC_RAW, &t_start) == 0) {
++		uint64_t ns, end, start = vtrace_rdtsc();
++		nanosleep(&sleeptime,NULL);
++		clock_gettime(CLOCK_MONOTONIC_RAW, &t_end);
++		end = vtrace_rdtsc();
++		ns = ((t_end.tv_sec - t_start.tv_sec) * NS_PER_SEC);
++		ns += (t_end.tv_nsec - t_start.tv_nsec);
++
++		double secs = (double)ns/NS_PER_SEC;
++		tsc_hz = (uint64_t)((end - start)/secs);
++		return tsc_hz;
++	} else {
++		uint64_t start = vtrace_rdtsc();
++		sleep(1);
++		return vtrace_rdtsc() - start;
++	}
++}
++
++int main(int argc, char *argv[])
++{
++	char *trace_path = NULL;
++	bool summary = false;
++	int interval = 1, count = -1;
++	int c, ret;
++
++	while ((c = getopt(argc, argv, "sth")) != -1) {
++		switch (c) {
++		case 's':
++			summary = true;
++			break;
++		case 't':
++			g_print_timestamp = true;
++			break;
++		case 'h':
++			vstat_usage();
++			return 0;
++		default:
++			vstat_usage();
++			return 1;
++		}
++	}
++
++	argc -= optind;
++	argv += optind;
++
++	ret = get_interval_count(&argc, argv, &interval, &count);
++	if (ret)
++		return ret;
++
++	if (argc) {
++		assert(argc == 1);
++		trace_path = argv[0];
++	}
++
++	/* Trace_path must be supplied currently, maybe refactored later. */
++	if (!trace_path || !is_virtiofs_pci(trace_path)) {
++		fprintf(stderr, "Must specify correct trace path.\n");
++		vstat_usage();
++		return -1;
++	}
++
++	tsc_resolution_hz = get_tsc_freq();
++
++	if (summary)
++		return do_stat_summary(trace_path);
++	else
++		return do_stat_loop(interval, count, trace_path);
++}
+diff --git a/contrib/virtiofsd/vtrace.c b/contrib/virtiofsd/vtrace.c
+new file mode 100644
+index 0000000000..b94f9c68f5
+--- /dev/null
++++ b/contrib/virtiofsd/vtrace.c
+@@ -0,0 +1,95 @@
++#include <errno.h>
++#include <fcntl.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <sys/mman.h>
++#include <sys/stat.h>
++#include <sys/types.h>
++#include <unistd.h>
++
++#include "fuse_log.h"
++#include "vtrace.h"
++
++struct virtiofs_trace *virtiofs_trace_init(const char *mountpoint)
++{
++	struct virtiofs_trace *trace = NULL;
++	char trace_path[PATH_MAX];
++	size_t trace_size = sizeof(struct virtiofs_trace);
++	int trace_fd;
++
++	if (!mountpoint) {
++		fuse_err("virtiofs_trace null mountpoint\n");
++		return NULL;
++	}
++
++	/* TODO: vm id and the tag may be more suitable */
++	snprintf(trace_path, sizeof(trace_path), "/vtrace%d", getpid());
++	trace_fd = shm_open(trace_path, O_CREAT | O_RDWR, 0644);
++	if (trace_fd == -1) {
++		fuse_err("shm_open: %s failed[%d]\n", trace_path, -errno);
++		return NULL;
++	}
++	if (ftruncate(trace_fd, trace_size) != 0) {
++		fuse_err("ftruncate: %s failed[%d]\n", trace_path, -errno);
++		goto fail;
++	}
++	trace = mmap(0, trace_size, PROT_READ | PROT_WRITE,
++		     MAP_SHARED | MAP_LOCKED, trace_fd, 0);
++	if (trace == MAP_FAILED) {
++		fuse_err("mmap: %s failed[%d]\n", trace_path, -errno);
++		goto fail;
++	}
++	memset(trace, 0, trace_size);
++	strncpy(trace->mountpoint, mountpoint, sizeof(trace->mountpoint));
++	trace->version = VIRTIOFS_TRACE_VERSION;
++	trace->trace_fd = trace_fd;
++	trace->magic = VIRTIOFS_TRACE_MAGIC;
++	shm_unlink(trace_path);
++	fuse_info("create virtiofs trace %s succeed\n", trace_path);
++	return trace;
++
++fail:
++	if (trace && (trace != MAP_FAILED))
++		munmap(trace, trace_size);
++	if (trace_fd != -1)
++		close(trace_fd);
++	shm_unlink(trace_path);
++	return NULL;
++}
++
++void virtiofs_trace_fin(struct virtiofs_trace *trace)
++{
++	if (!trace)
++		return;
++
++	close(trace->trace_fd);
++	munmap(trace, sizeof(struct virtiofs_trace));
++}
++
++void virtiofs_trace_account_op_begin(struct virtiofs_trace *trace, int op)
++{
++	struct fuse_op_stat *stat;
++
++	if (op >= VIRTIOFS_MAX_OP)
++		return;
++
++	stat = &trace->stats[op];
++	stat->inflight++;
++}
++
++void virtiofs_trace_account_op_end(struct virtiofs_trace *trace, int op,
++				   int64_t ticks)
++{
++	struct fuse_op_stat *stat;
++
++	if (op >= VIRTIOFS_MAX_OP)
++		return;
++
++	if (ticks < 0) /* tsc overflow */
++		ticks = 0;
++	stat = &trace->stats[op];
++	stat->inflight--;
++	stat->done++;
++	stat->elapsed_ticks += ticks;
++}
+diff --git a/contrib/virtiofsd/vtrace.h b/contrib/virtiofsd/vtrace.h
+new file mode 100644
+index 0000000000..5ca1b966d6
+--- /dev/null
++++ b/contrib/virtiofsd/vtrace.h
+@@ -0,0 +1,53 @@
++#ifndef _VIRTIOFS_TRACE_H_
++#define _VIRTIOFS_TRACE_H_
++
++#include <linux/limits.h>
++#include <stdint.h>
++
++#define VIRTIOFS_TRACE_VERSION	0x1
++#define VIRTIOFS_TRACE_DIR	"/dev/shm"
++/* hexadecimal format of 'vtrace' */
++#define VIRTIOFS_TRACE_MAGIC	0x767472616365
++
++
++/* Reserve op num for new added fuse operation. */
++#define VIRTIOFS_MAX_OP		64
++
++struct fuse_op_stat {
++	uint64_t		inflight;
++	uint64_t		done;
++	uint64_t		elapsed_ticks;
++};
++
++struct virtiofs_trace {
++	uint64_t		magic;
++	uint32_t		version;
++	int			trace_fd;
++	struct fuse_op_stat	stats[VIRTIOFS_MAX_OP];
++	char			mountpoint[PATH_MAX];
++};
++
++struct virtiofs_trace *virtiofs_trace_init(const char *mountpoint);
++void virtiofs_trace_fin(struct virtiofs_trace *trace);
++void virtiofs_trace_account_op_begin(struct virtiofs_trace *trace, int op);
++void virtiofs_trace_account_op_end(struct virtiofs_trace *trace, int op,
++				   int64_t ticks);
++
++/* NOTE: only x86_64 implementation, copied from DPDK.*/
++static inline uint64_t vtrace_rdtsc(void)
++{
++	union {
++		uint64_t tsc_64;
++		struct {
++			uint32_t lo_32;
++			uint32_t hi_32;
++		};
++	} tsc;
++
++	asm volatile("rdtsc" :
++		     "=a" (tsc.lo_32),
++		     "=d" (tsc.hi_32));
++	return tsc.tsc_64;
++}
++
++#endif /* _VIRTIOFS_TRACE_H_ */
+-- 
+2.20.1.7.g153144c
 

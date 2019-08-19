@@ -1,15 +1,15 @@
-References: <5D53D882.5090803@huawei.com> <5D5A4692.9060006@huawei.com>
-	<20190819073453.GN52397@e18g06458.et15sqa>
+References: <cover.1566185612.git.gavin.dg@linux.alibaba.com>
+	<09680e84da8a43ee8fa69ed4ec7d1a5a5ffa9130.1566185612.git.gavin.dg@linux.alibaba.com>
+	<20190819051443.GM52397@e18g06458.et15sqa>
 From: piaojun <piaojun@huawei.com>
-Message-ID: <df40b580-8ffe-cee7-0994-bfe1d1579ee6@huawei.com>
-Date: Mon, 19 Aug 2019 22:16:16 +0800
+Message-ID: <44010515-d5c9-b4dc-fa4f-ba689f27909c@huawei.com>
+Date: Mon, 19 Aug 2019 22:20:23 +0800
 MIME-Version: 1.0
-In-Reply-To: <20190819073453.GN52397@e18g06458.et15sqa>
+In-Reply-To: <20190819051443.GM52397@e18g06458.et15sqa>
 Content-Type: text/plain; charset="utf-8"
 Content-Language: en-US
 Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH RESEND][RFC] virtiofsd: do not fall back to
- buffer io when cache=auto/always
+Subject: Re: [Virtio-fs] [RFC PATCH 1/2] virtiofsd: add stat tools
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,108 +18,70 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Eryu Guan <eguan@linux.alibaba.com>
+To: Eryu Guan <eguan@linux.alibaba.com>, Gang Deng <gavin.dg@linux.alibaba.com>
 Cc: virtio-fs@redhat.com
 
 
 
-On 2019/8/19 15:34, Eryu Guan wrote:
-> On Mon, Aug 19, 2019 at 02:49:54PM +0800, piaojun wrote:
->> When O_DIRECT flags is set by Guest, virtiofsd will open file with
->> O_DIRECT, but unset 'fi->direct_io' which makes Guest go buffer io path.
->> That causes inconsistency between Guest and Host.
+On 2019/8/19 13:14, Eryu Guan wrote:
+> On Mon, Aug 19, 2019 at 11:41:13AM +0800, Gang Deng wrote:
+>> There exist two components: vtrace && vstat. vtrace is embeded in virtiofsd,
+>> it will put raw statistics data into share memory. Then the vstat tool could
+>> parse it and do some post processing works. The performance overhead of
+>> vtrace is very small because it does very simple things.
 >>
->> The cache option in virtiofsd should not affect the file io mode, so
->> set 'fi->direct_io' according to 'fi->flags'.
+>> For example, if we call open(2)/close(2) frequently in guest, and
+>> randwite a file whose length is greater than the size of dax window.
+>> We'll get the output as below:
 >>
->> Signed-off-by: Jun Piao <piaojun@huawei.com>
->> ---
->>  contrib/virtiofsd/passthrough_ll.c | 9 +++++++--
->>  1 file changed, 7 insertions(+), 2 deletions(-)
+>> op                        inflt         op/s     svctm/us   %util
+>> FUSE_OPEN(14)                 0      8379.87         3.24   2.71%
+>> FUSE_RELEASE(18)              0      8379.87         1.77   1.48%
+>> FUSE_FLUSH(25)                0      8379.87         2.04   1.71%
+>> FUSE_SETUPMAPPING(48)         1      6393.90        34.72  22.20%
+>> FUSE_REMOVEMAPPING(49)        0      6404.90        37.61  24.09%
+>> TOTAL                         1     37938.39        13.76  52.20%
 >>
->> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
->> index ca11764..a9c98d0 100644
->> --- a/contrib/virtiofsd/passthrough_ll.c
->> +++ b/contrib/virtiofsd/passthrough_ll.c
->> @@ -1774,8 +1774,10 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
->>  		fi->fh = fh;
->>  		err = lo_do_lookup(req, parent, name, &e);
->>  	}
->> -	if (lo->cache == CACHE_NONE)
->> +	if (fi->flags & O_DIRECT)
-> 
-> Looks like this changes cache=none behavior. Previously, we set
-> direct_io when cache=none and guest will go to dio path even when the
-> file is opened for buffer io.
-> 
-> But with this change, guest could do buffer io in cache=none case.
-> 
-
-IMO, the cache option is only used for determining whether using the
-last inode's cache when do open(). The user could choose direct or
-buffer io no matter if the cache exists.
-
-Moreover, the cache option only works for the first time buffer io, and
-has little effect on subsequent ones.
-
->>  		fi->direct_io = 1;
->> +	if (lo->cache == CACHE_NONE)
->> +		fi->keep_cache = 0;
-> 
-> And this only causes guest to invalidate page cache at open(2) time, but
-> still go buffer io path on cache=none.
-
-As my comments above, io path has nothing to do with inode's current
-page cache.
-
-> 
->>  	else if (lo->cache == CACHE_ALWAYS)
->>  		fi->keep_cache = 1;
-> 
-> I'm thinking about something like (totally untested):
-> 
-> --- a/contrib/virtiofsd/passthrough_ll.c
-> +++ b/contrib/virtiofsd/passthrough_ll.c
-> @@ -1774,7 +1774,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
->                 fi->fh = fh;
->                 err = lo_do_lookup(req, parent, name, &e);
->         }
-> -       if (lo->cache == CACHE_NONE)
-> +       if (lo->cache == CACHE_NONE || fi->flags & O_DIRECT)
->                 fi->direct_io = 1;
->         else if (lo->cache == CACHE_ALWAYS)
->                 fi->keep_cache = 1;
-> @@ -1982,7 +1982,7 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
->         }
-> 
->         fi->fh = fh;
-> -       if (lo->cache == CACHE_NONE)
-> +       if (lo->cache == CACHE_NONE || fi->flags & O_DIRECT)
->                 fi->direct_io = 1;
->         else if (lo->cache == CACHE_ALWAYS)
->                 fi->keep_cache = 1;
-
-This will mix cache option with io flags which seems weird.
-
-> 
+>> The meaning of fields:
 >>
->> @@ -1982,8 +1984,11 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
->>  	}
+>> - op
+>>   The type of fuse requests, 'TOTAL' is sum of all.
 >>
->>  	fi->fh = fh;
->> -	if (lo->cache == CACHE_NONE)
->> +
->> +	if (fi->flags & O_DIRECT)
->>  		fi->direct_io = 1;
->> +	if (lo->cache == CACHE_NONE)
->> +		fi->keep_cache = 0;
->>  	else if (lo->cache == CACHE_ALWAYS)
->>  		fi->keep_cache = 1;
+>> - inflt
+>>   The number of the inflight requests, it must be ethier 0 or 1 because
+>>   virtiofsd can only process fuse requests serially.
+>>
+>> - op/s
+>>   The number of fuse requests completed per second.
+>>
+>> - svctm/us
+>>   The average service time (in microseconds) for fuse requests.
+>>
+>> - %util
+>>   Percentage of elapsed time during which virtiofsd was processing the fuse
+>>   requests.
+>>
+>> when virtiofsd is hang, e.g. we support flock in host (just for example,
+>> this has been fxied), we'll get this:
+>>
+>> op                        inflt         op/s     svctm/us   %util
+>> FUSE_SETLKW(33)               1         0.00         0.00 100.00%
+>> TOTAL                         1         0.00         0.00 100.00%
+>>
+>> the utilization is 100% and op/s equals zero, it indicates hang.
+>>
+>> If virtiofsd is idle, then the output looks like this:
+>>
+>> op                        inflt         op/s     svctm/us   %util
+>> TOTAL                         0         0.00         0.00   0.00%
+>>
+>> Signed-off-by: Gang Deng <gavin.dg@linux.alibaba.com>
 > 
-> And this code snippet duplicates with lo_create(), maybe we could factor
-> it into a new helper function.
+> This looks useful to me! Would you like to provide an example command
+> line usage in commit log too? Because I find that it's not obvious how
+> the vtrace/vstat are used.
 
-It makes sense and I will consider adding a helper.
+Agreed, and I wonder if they could be documented somewhere?
 
 Jun
 

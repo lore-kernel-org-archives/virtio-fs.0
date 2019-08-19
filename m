@@ -1,16 +1,13 @@
 References: <5D53D882.5090803@huawei.com>
-	<20190819031537.GK52397@e18g06458.et15sqa>
-	<5D5A1CD7.6070202@huawei.com>
-	<20190819050732.GL52397@e18g06458.et15sqa>
 From: piaojun <piaojun@huawei.com>
-Message-ID: <5D5A3C94.9050103@huawei.com>
-Date: Mon, 19 Aug 2019 14:07:16 +0800
+Message-ID: <5D5A4692.9060006@huawei.com>
+Date: Mon, 19 Aug 2019 14:49:54 +0800
 MIME-Version: 1.0
-In-Reply-To: <20190819050732.GL52397@e18g06458.et15sqa>
-Content-Type: text/plain; charset="windows-1252"
+In-Reply-To: <5D53D882.5090803@huawei.com>
+Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH][RFC] viriofsd: do not fall back to buffer
- io when cache=auto
+Subject: [Virtio-fs] [PATCH RESEND][RFC] virtiofsd: do not fall back to
+ buffer io when cache=auto/always
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,65 +16,48 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Eryu Guan <eguan@linux.alibaba.com>
-Cc: virtio-fs@redhat.com
+To: virtio-fs@redhat.com
 
+When O_DIRECT flags is set by Guest, virtiofsd will open file with
+O_DIRECT, but unset 'fi->direct_io' which makes Guest go buffer io path.
+That causes inconsistency between Guest and Host.
 
+The cache option in virtiofsd should not affect the file io mode, so
+set 'fi->direct_io' according to 'fi->flags'.
 
-On 2019/8/19 13:07, Eryu Guan wrote:
-> On Mon, Aug 19, 2019 at 11:51:51AM +0800, piaojun wrote:
->>
->>
->> On 2019/8/19 11:15, Eryu Guan wrote:
->>> On Wed, Aug 14, 2019 at 05:46:42PM +0800, piaojun wrote:
->>>> Direct io flags will be tured off even if cache=auto, which seems a
->>>> little bit strange. It's better to keep the open flags set by user. If
->>>> I missed the discussion about this issue, please let me know, thanks.
->>>>
->>>> Signed-off-by: Jun Piao <piaojun@huawei.com>
->>>> ---
->>>>  contrib/virtiofsd/passthrough_ll.c | 4 ++++
->>>>  1 file changed, 4 insertions(+)
->>>>
->>>> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
->>>> index 321bbb2..a080f0d 100644
->>>> --- a/contrib/virtiofsd/passthrough_ll.c
->>>> +++ b/contrib/virtiofsd/passthrough_ll.c
->>>> @@ -1687,6 +1687,8 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
->>>>  		fi->direct_io = 1;
->>>>  	else if (lo->cache == CACHE_ALWAYS)
->>>>  		fi->keep_cache = 1;
->>>> +	else
->>>> +		fi->direct_io = !!(fi->flags & O_DIRECT);
->>>>
->>>>  out:
->>>>  	lo_inode_put(lo, &parent_inode);
->>>> @@ -1899,6 +1901,8 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
->>>>  		fi->direct_io = 1;
->>>>  	else if (lo->cache == CACHE_ALWAYS)
->>>>  		fi->keep_cache = 1;
->>>> +	else
->>>> +		fi->direct_io = !!(fi->flags & O_DIRECT);
->>>>  	fuse_reply_open(req, fi);
->>>
->>> IMHO, this is necessary, it seems that in the case cache=auto/always,
-> 
-> Huge typo here, I meant "not necessary" here..
-> 
->>> virtiofsd already follows what guest requests, i.e.  virtiofsd only does
->>> direct I/O when guest opens file with O_DIRECT.
->>
->> From my testing, virtiofsd won't do direct io even if guest opens file
->> with O_DIRECT when cache=auto/alway. It's weird to convert direct io to
->> buffer io at host side.
-> 
-> That doesn't match what's in my mind, I think FUSE_OPEN will pass guest
-> open flags to virtiofsd and virtiofsd saves the fd (which is opened with
-> O_DIRECT) in fd map, then subsequent FUSE_WRITE does direct write to
-> that fd.
+Signed-off-by: Jun Piao <piaojun@huawei.com>
+---
+ contrib/virtiofsd/passthrough_ll.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-Yes, I agree with this. And my comment was a little confuing, so I have
-to resend the patch later to make it more clear.
+diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+index ca11764..a9c98d0 100644
+--- a/contrib/virtiofsd/passthrough_ll.c
++++ b/contrib/virtiofsd/passthrough_ll.c
+@@ -1774,8 +1774,10 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+ 		fi->fh = fh;
+ 		err = lo_do_lookup(req, parent, name, &e);
+ 	}
+-	if (lo->cache == CACHE_NONE)
++	if (fi->flags & O_DIRECT)
+ 		fi->direct_io = 1;
++	if (lo->cache == CACHE_NONE)
++		fi->keep_cache = 0;
+ 	else if (lo->cache == CACHE_ALWAYS)
+ 		fi->keep_cache = 1;
 
-Jun
+@@ -1982,8 +1984,11 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+ 	}
+
+ 	fi->fh = fh;
+-	if (lo->cache == CACHE_NONE)
++
++	if (fi->flags & O_DIRECT)
+ 		fi->direct_io = 1;
++	if (lo->cache == CACHE_NONE)
++		fi->keep_cache = 0;
+ 	else if (lo->cache == CACHE_ALWAYS)
+ 		fi->keep_cache = 1;
+ 	fuse_reply_open(req, fi);
+-- 
 

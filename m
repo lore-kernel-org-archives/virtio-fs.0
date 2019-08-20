@@ -1,14 +1,11 @@
-Date: Tue, 20 Aug 2019 14:36:14 -0400
+Date: Tue, 20 Aug 2019 14:37:46 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190820183614.GE4233@redhat.com>
-References: <20190820134545.GA4233@redhat.com>
-	<d6fe5b15-5ca4-c189-3319-2b90150704d2@huawei.com>
+Message-ID: <20190820183746.GF4233@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <d6fe5b15-5ca4-c189-3319-2b90150704d2@huawei.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Reset O_DIRECT flag during file
- open
+Subject: [Virtio-fs] [PATCH V2] virtiofsd: Reset O_DIRECT flag during file
+	open
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,59 +14,52 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, aneesh.kumar@linux.vnet.ibm.com
+To: virtio-fs-list <virtio-fs@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-On Tue, Aug 20, 2019 at 10:33:29PM +0800, piaojun wrote:
-> Hi Vivek & Aneesh,
-> 
-> On 2019/8/20 21:45, Vivek Goyal wrote:
-> > If an application wants to do direct IO and opens a file with O_DIRECT
-> > in guest, that does not necessarily mean that we need to bypass page
-> > cache on host as well. So reset this flag on host.
-> 
-> I have a different understanding about this. The I/O mode should be kept
-> same both in Guest and Host. When doing direct io in Guest, the user may
-> want the data go to disk rather than kept in Host page cache which means
-> volatile. So it seems more reasonable that Guest and Host have the same
-> file I/0 semantics.
+If an application wants to do direct IO and opens a file with O_DIRECT
+in guest, that does not necessarily mean that we need to bypass page
+cache on host as well. So reset this flag on host.
 
-I look at it other way. If we open a file O_DIRECT, it should bypass
-page cache on kernel it is running on. It does not guarantee anything
-on underlying storage stack. For example, virtual block device or physical
-disks could still be caching data with O_DIRECT.
+If somebody needs to bypass page cache on host as well (and it is safe to
+do so), we can add a knob in daemon later to control this behavior.
 
-To me same analogy should apply for caching on host. Atleast by default
-O_DIRECT should only mean bypassing page cache in guest. If there is
-an application which requires bypassing page cache on host as well, then
-it should be a server option to control this behavior. But we can do when
-there is a real user.
+I check virtio-9p and they do reset O_DIRECT flag.
 
-> 
-> > 
-> > If somebody needs to bypass page cache on host as well (and it is safe to
-> > do so), we can add a knob in daemon later to control this behavior.
-> 
-> This discussion has some relationship with my RFC PATCH "virtiofsd: do
-> not fall back to buffer io when cache=auto/always", and we could involve
-> the issue mentioned in that email if you do not mind.
-> 
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ contrib/virtiofsd/passthrough_ll.c |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-I responded to your patch separately and that seems completely unrelated
-to this patch.
-
-[..]
-> > +	/*
-> > +	 * O_DIRECT in guest should not necessarily mean bypassing page
-> > +	 * cache on host as well. If somebody needs that behavior, it
-> > +	 * probably should be a configuration knob in daemon.
-> > +	 */
-> > +	fi->flags &= ~O_DIRECT;
-> > +
-> 
-> We need do the same thing for lo_create().
-
-That's a good point. I have fixed it and will post V2.
-
-Vivek
+Index: qemu/contrib/virtiofsd/passthrough_ll.c
+===================================================================
+--- qemu.orig/contrib/virtiofsd/passthrough_ll.c	2019-08-20 09:33:07.900975145 -0400
++++ qemu/contrib/virtiofsd/passthrough_ll.c	2019-08-20 14:31:39.725781357 -0400
+@@ -1752,6 +1752,13 @@ static void lo_create(fuse_req_t req, fu
+ 	if (err)
+ 		goto out;
+ 
++	/*
++	 * O_DIRECT in guest should not necessarily mean bypassing page
++	 * cache on host as well. If somebody needs that behavior, it
++	 * probably should be a configuration knob in daemon.
++	 */
++	fi->flags &= ~O_DIRECT;
++
+ 	fd = openat(parent_inode->fd, name,
+ 		    (fi->flags | O_CREAT) & ~O_NOFOLLOW, mode);
+ 	err = fd == -1 ? errno : 0;
+@@ -1967,6 +1974,13 @@ static void lo_open(fuse_req_t req, fuse
+ 	if (lo->writeback && (fi->flags & O_APPEND))
+ 		fi->flags &= ~O_APPEND;
+ 
++	/*
++	 * O_DIRECT in guest should not necessarily mean bypassing page
++	 * cache on host as well. If somebody needs that behavior, it
++	 * probably should be a configuration knob in daemon.
++	 */
++	fi->flags &= ~O_DIRECT;
++
+ 	sprintf(buf, "%i", lo_fd(req, ino));
+ 	fd = openat(lo->proc_self_fd, buf, fi->flags & ~O_NOFOLLOW);
+ 	if (fd == -1)
 

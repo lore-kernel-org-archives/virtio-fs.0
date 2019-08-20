@@ -1,14 +1,14 @@
-Date: Tue, 20 Aug 2019 13:56:10 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190820175610.GD4233@redhat.com>
-References: <5D53D882.5090803@huawei.com> <5D5A4692.9060006@huawei.com>
-	<20190820153926.GC4233@redhat.com>
+Date: Tue, 20 Aug 2019 19:03:22 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20190820180322.GH9855@stefanha-x1.localdomain>
+References: <20190813200645.13819-1-msys.mizuma@gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="2xzXx3ruJf7hsAzo"
 Content-Disposition: inline
-In-Reply-To: <20190820153926.GC4233@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH RESEND][RFC] virtiofsd: do not fall back to
- buffer io when cache=auto/always
+In-Reply-To: <20190813200645.13819-1-msys.mizuma@gmail.com>
+Subject: Re: [Virtio-fs] [PATCH v3] virtiofsd: Prevent multiply running with
+ same vhost_user_socket
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,75 +17,65 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>
-Cc: virtio-fs@redhat.com
+To: Masayoshi Mizuma <msys.mizuma@gmail.com>
+Cc: virtio-fs@redhat.com, Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
-On Tue, Aug 20, 2019 at 11:39:26AM -0400, Vivek Goyal wrote:
-> On Mon, Aug 19, 2019 at 02:49:54PM +0800, piaojun wrote:
-> > When O_DIRECT flags is set by Guest, virtiofsd will open file with
-> > O_DIRECT, but unset 'fi->direct_io' which makes Guest go buffer io path.
-> 
-> Where is virtiofsd unset fi->direct_io flag? All I can see is that it
-> sets this flag if cache=none?
-> 
 
-Ok, I looked at it little bit more closely and I don't think it is a
-problem. With cache=always/auto, we don't set fi->direct_io. That means
-server is not enforcing a direct I/O policy on client.
+--2xzXx3ruJf7hsAzo
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Now if client decides to direct I/O by opening file with O_DIRECT, it
-will still take direct I/O path and call fuse_direct_IO(). Look at
-fuse_file_aops->fuse_direct_IO().
+On Tue, Aug 13, 2019 at 04:06:45PM -0400, Masayoshi Mizuma wrote:
 
-Thanks
-Vivek
+Two minor comments below.  They can be squashed in when merging this
+patch.
 
-> Thanks
-> Vivek
-> 
-> > That causes inconsistency between Guest and Host.
-> > 
-> > The cache option in virtiofsd should not affect the file io mode, so
-> > set 'fi->direct_io' according to 'fi->flags'.
-> > 
-> > Signed-off-by: Jun Piao <piaojun@huawei.com>
-> > ---
-> >  contrib/virtiofsd/passthrough_ll.c | 9 +++++++--
-> >  1 file changed, 7 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-> > index ca11764..a9c98d0 100644
-> > --- a/contrib/virtiofsd/passthrough_ll.c
-> > +++ b/contrib/virtiofsd/passthrough_ll.c
-> > @@ -1774,8 +1774,10 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
-> >  		fi->fh = fh;
-> >  		err = lo_do_lookup(req, parent, name, &e);
-> >  	}
-> > -	if (lo->cache == CACHE_NONE)
-> > +	if (fi->flags & O_DIRECT)
-> >  		fi->direct_io = 1;
-> > +	if (lo->cache == CACHE_NONE)
-> > +		fi->keep_cache = 0;
-> >  	else if (lo->cache == CACHE_ALWAYS)
-> >  		fi->keep_cache = 1;
-> > 
-> > @@ -1982,8 +1984,11 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
-> >  	}
-> > 
-> >  	fi->fh = fh;
-> > -	if (lo->cache == CACHE_NONE)
-> > +
-> > +	if (fi->flags & O_DIRECT)
-> >  		fi->direct_io = 1;
-> > +	if (lo->cache == CACHE_NONE)
-> > +		fi->keep_cache = 0;
-> >  	else if (lo->cache == CACHE_ALWAYS)
-> >  		fi->keep_cache = 1;
-> >  	fuse_reply_open(req, fi);
-> > -- 
-> > 
-> > _______________________________________________
-> > Virtio-fs mailing list
-> > Virtio-fs@redhat.com
-> > https://www.redhat.com/mailman/listinfo/virtio-fs
+If users find it problematic that pid files are never deleted we could
+make this feature optional with --pidfile=3DPATH.  But I think we can
+merge this patch for now and see if anyone encounters issues before the
+next virtio-fs release.
+
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+
+> +static int fv_socket_lock(struct fuse_session *se)
+> +{
+> +        char *dir, *sk_name;
+> +        Error *local_err =3D NULL;
+> +        int ret =3D -1;
+> +
+> +        dir =3D qemu_get_local_state_pathname("run/virtiofsd");
+> +
+> +        if (g_mkdir_with_parents(dir, S_IRWXU) < -1) {
+> +                fuse_err("%s: Failed to create directory %s: %s",
+> +                        __func__, dir, strerror(errno));
+
+Missing g_free(dir).
+
+> @@ -876,6 +916,17 @@ static int fv_create_listen_socket(struct fuse_sessi=
+on *se)
+>                  return -1;
+>          }
+> =20
+> +        if (!strlen(se->vu_socket_path)) {
+> +                fuse_err("Socket path is NULL\n");
+
+s/NULL/empty/
+
+--2xzXx3ruJf7hsAzo
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1cNeoACgkQnKSrs4Gr
+c8g6Owf+PIbne1lpQNuvlYjzt+cpYSnBD93R4+aBTnczips8p4bD91gDOUOC1a27
+09+miVLqhGyhyBHgJtNgFQfo8X1EFJLce/v8kCK5vN/AEU59xuFqBu8NKuG/IEQL
+GIVUF/Gk6qPvQIiZfEYXziiIiJ+FKwsJzCQExM5TsQuwWwr0u3Bn2g1TAgWsvoSv
+9piSQWjxpURzdn1R/xcSMi7a4uPbWvqMhmUEKL+IVRH4uEZsdlhsqiBiYvur1xVe
+XEozEueEjR0j1VH2CAsM9bSp2PA6tzq4txHma0hQJom/RFjzu19i/ZNd+ecUz9fN
+J3bC3KzV9/f3VWCS1Lic5xI4T3nr0w==
+=aBfl
+-----END PGP SIGNATURE-----
+
+--2xzXx3ruJf7hsAzo--
 

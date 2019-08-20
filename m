@@ -1,15 +1,14 @@
-References: <20190819160426.GB2625@stefanha-x1.localdomain>
-	<335d2ae6-4d06-9fb3-e1f6-fbef8aee946f@linux.alibaba.com>
-	<20190820080952.GA2867@work-vm>
-From: Peng Tao <tao.peng@linux.alibaba.com>
-Message-ID: <5bd1c212-e74c-ecd2-1472-ae91aaa2061d@linux.alibaba.com>
-Date: Tue, 20 Aug 2019 22:07:10 +0800
+References: <20190820134545.GA4233@redhat.com>
+From: piaojun <piaojun@huawei.com>
+Message-ID: <d6fe5b15-5ca4-c189-3319-2b90150704d2@huawei.com>
+Date: Tue, 20 Aug 2019 22:33:29 +0800
 MIME-Version: 1.0
-In-Reply-To: <20190820080952.GA2867@work-vm>
-Content-Type: text/plain; charset=utf-8; format=flowed
+In-Reply-To: <20190820134545.GA4233@redhat.com>
+Content-Type: text/plain; charset="utf-8"
 Content-Language: en-US
 Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [kata-dev] [ANNOUNCE] virtio-fs v0.3 release
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Reset O_DIRECT flag during file
+ open
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,115 +17,87 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, kata-dev@lists.katacontainers.io
+To: Vivek Goyal <vgoyal@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: aneesh.kumar@linux.vnet.ibm.com
 
+Hi Vivek & Aneesh,
 
+On 2019/8/20 21:45, Vivek Goyal wrote:
+> If an application wants to do direct IO and opens a file with O_DIRECT
+> in guest, that does not necessarily mean that we need to bypass page
+> cache on host as well. So reset this flag on host.
 
-On 2019/8/20 16:09, Dr. David Alan Gilbert wrote:
-> * Peng Tao (tao.peng@linux.alibaba.com) wrote:
->>
->>
->> On 2019/8/20 00:04, Stefan Hajnoczi wrote:
->>> I am delighted to announce the release of virtio-fs v0.3, a shared file
->>> system that lets virtual machines access a directory tree on the host.
->>> This release is based on QEMU 4.1.0 and Linux 5.3-rc3.
->>>
->> Good news! As virtio-fs is maturing and stabilizing, what's the plan for
->> upstreaming both qemu and kernel part of it?
+I have a different understanding about this. The I/O mode should be kept
+same both in Guest and Host. When doing direct io in Guest, the user may
+want the data go to disk rather than kept in Host page cache which means
+volatile. So it seems more reasonable that Guest and Host have the same
+file I/0 semantics.
+
 > 
-> We're working on that.
-> A few days ago I sent the core qemu code to qemu-devel marked as
-> experiemental;  Vivek is planning on sending another kernel version out.
-> 
-Cool. Looking forward to seeing them in upstream code base;)
+> If somebody needs to bypass page cache on host as well (and it is safe to
+> do so), we can add a knob in daemon later to control this behavior.
 
-Cheers,
-Tao
-> Dave
-> 
->> Cheers,
->> Tao
->>
->>> For more information about virtio-fs: https://virtio-fs.gitlab.io/
->>>
->>> This is a development release aimed at early adopters of virtio-fs.  Work is
->>> being done to upstream the code into Linux and QEMU.  We expect to stop
->>> publishing virtio-fs releases once the code has been merged by these upstream
->>> projects.
->>>
->>> Where to get it:
->>>
->>>     https://gitlab.com/virtio-fs/linux/-/tags/virtio-fs-v0.3
->>>     https://gitlab.com/virtio-fs/qemu/-/tags/virtio-fs-v0.3
->>>
->>> Changes:
->>>
->>>    * Please note that the mount syntax has changed to:
->>>
->>>        # mount -t virtio_fs myfs /mnt -o ...
->>>
->>>      The old syntax was "mount -t virtio_fs none /mnt -o tag=myfs,...".
->>>
->>>    * virtiofsd --fd=FDNUM takes a listen socket file descriptor number.  File
->>>      descriptor passing is an alternative way to manage the vhost-user UNIX
->>>      domain socket.  The parent process no longer needs to wait for virtiofsd to
->>>      create the listen socket before spawning the VM.
->>>
->>>    * virtiofsd --syslog logs to syslog(2) instead of stderr.  Useful for unifying
->>>      logging and when the virtiofsd process is not being supervised.
->>>
->>>    * virtiofsd --thread-pool-size=NUM sets the maximum number of worker threads
->>>      for FUSE request processing.  This can be used to control the host queue
->>>      depth.  The default is 64.
->>>
->>>    * Performance improvements and bug fixes.
->>>
->>> Note for Kata Containers: the new kernel is not compatible with existing
->>> Kata Containers releases due to the mount syntax change.  To try it out,
->>> please apply the following kata-runtime patch:
->>>
->>>     https://gitlab.com/virtio-fs/runtime/commit/a2e44de817e438c02a495cf258039774527e3178
->>>
->>> Kata Containers patches for virtio-fs v0.3 are under development and will be
->>> submitted to Kata soon.
->>>
->>> Thanks to the following people for contributing code and to many more
->>> for helping the virtio-fs effort:
->>>
->>> Dr. David Alan Gilbert <dgilbert@redhat.com>
->>> Eric Ren <renzhen@linux.alibaba.com>
->>> Eryu Guan <eguan@linux.alibaba.com>
->>> Ganesh Maharaj Mahalingam <ganesh.mahalingam@intel.com>
->>> Jiufei Xue <jiufei.xue@linux.alibaba.com>
->>> Liu Bo <bo.liu@linux.alibaba.com>
->>> Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
->>> Miklos Szeredi <mszeredi@redhat.com>
->>> Peng Tao <tao.peng@linux.alibaba.com>
->>> piaojun <piaojun@huawei.com>
->>> Sebastien Boeuf <sebastien.boeuf@intel.com>
->>> Stefan Hajnoczi <stefanha@redhat.com>
->>> Vivek Goyal <vgoyal@redhat.com>
->>> Xiaoguang Wang <xiaoguang.wang@linux.alibaba.com>
->>>
->>>
->>> _______________________________________________
->>> kata-dev mailing list
->>> kata-dev@lists.katacontainers.io
->>> http://lists.katacontainers.io/cgi-bin/mailman/listinfo/kata-dev
->>>
->>
->> -- 
->> Into something rich and strange.
->>
->> _______________________________________________
->> kata-dev mailing list
->> kata-dev@lists.katacontainers.io
->> http://lists.katacontainers.io/cgi-bin/mailman/listinfo/kata-dev
-> --
-> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
-> 
+This discussion has some relationship with my RFC PATCH "virtiofsd: do
+not fall back to buffer io when cache=auto/always", and we could involve
+the issue mentioned in that email if you do not mind.
 
--- 
-Into something rich and strange.
+> 
+> I check virtio-9p and they do reset O_DIRECT flag.
+
+I just checked the virtio-9p code and found some strange comments which
+seemed to say the server could not support direct I/O temporary. With
+all these questions, I will CC the author of the code, and discuss them
+together.
+
+static int get_dotl_openflags(V9fsState *s, int oflags)
+{
+    int flags;
+    /*
+     * Filter the client open flags
+     */
+    flags = dotl_to_open_flags(oflags);
+    flags &= ~(O_NOCTTY | O_ASYNC | O_CREAT);
+    /*
+     * Ignore direct disk access hint until the server supports it.
+     */
+    flags &= ~O_DIRECT;
+    return flags;
+}
+
+> 
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  contrib/virtiofsd/passthrough_ll.c |    7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> Index: qemu/contrib/virtiofsd/passthrough_ll.c
+> ===================================================================
+> --- qemu.orig/contrib/virtiofsd/passthrough_ll.c	2019-08-20 09:33:07.900975145 -0400
+> +++ qemu/contrib/virtiofsd/passthrough_ll.c	2019-08-20 09:35:45.829414412 -0400
+> @@ -1967,6 +1967,13 @@ static void lo_open(fuse_req_t req, fuse
+>  	if (lo->writeback && (fi->flags & O_APPEND))
+>  		fi->flags &= ~O_APPEND;
+>  
+> +	/*
+> +	 * O_DIRECT in guest should not necessarily mean bypassing page
+> +	 * cache on host as well. If somebody needs that behavior, it
+> +	 * probably should be a configuration knob in daemon.
+> +	 */
+> +	fi->flags &= ~O_DIRECT;
+> +
+
+We need do the same thing for lo_create().
+
+Thanks,
+Jun
+
+>  	sprintf(buf, "%i", lo_fd(req, ino));
+>  	fd = openat(lo->proc_self_fd, buf, fi->flags & ~O_NOFOLLOW);
+>  	if (fd == -1)
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
+> 
 

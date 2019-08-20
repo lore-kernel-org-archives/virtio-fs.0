@@ -1,11 +1,14 @@
-Date: Tue, 20 Aug 2019 14:37:46 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190820183746.GF4233@redhat.com>
+Date: Tue, 20 Aug 2019 20:05:20 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190820190520.GR2867@work-vm>
+References: <20190813200645.13819-1-msys.mizuma@gmail.com>
+	<20190820180322.GH9855@stefanha-x1.localdomain>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: [Virtio-fs] [PATCH V2] virtiofsd: Reset O_DIRECT flag during file
-	open
+In-Reply-To: <20190820180322.GH9855@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH v3] virtiofsd: Prevent multiply running with
+ same vhost_user_socket
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,52 +17,57 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs-list <virtio-fs@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
-If an application wants to do direct IO and opens a file with O_DIRECT
-in guest, that does not necessarily mean that we need to bypass page
-cache on host as well. So reset this flag on host.
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> On Tue, Aug 13, 2019 at 04:06:45PM -0400, Masayoshi Mizuma wrote:
+> 
+> Two minor comments below.  They can be squashed in when merging this
+> patch.
+> 
+> If users find it problematic that pid files are never deleted we could
+> make this feature optional with --pidfile=PATH.  But I think we can
+> merge this patch for now and see if anyone encounters issues before the
+> next virtio-fs release.
+> 
+> Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+> 
+> > +static int fv_socket_lock(struct fuse_session *se)
+> > +{
+> > +        char *dir, *sk_name;
+> > +        Error *local_err = NULL;
+> > +        int ret = -1;
+> > +
+> > +        dir = qemu_get_local_state_pathname("run/virtiofsd");
+> > +
+> > +        if (g_mkdir_with_parents(dir, S_IRWXU) < -1) {
+> > +                fuse_err("%s: Failed to create directory %s: %s",
+> > +                        __func__, dir, strerror(errno));
+> 
+> Missing g_free(dir).
+> 
+> > @@ -876,6 +916,17 @@ static int fv_create_listen_socket(struct fuse_session *se)
+> >                  return -1;
+> >          }
+> >  
+> > +        if (!strlen(se->vu_socket_path)) {
+> > +                fuse_err("Socket path is NULL\n");
+> 
+> s/NULL/empty/
 
-If somebody needs to bypass page cache on host as well (and it is safe to
-do so), we can add a knob in daemon later to control this behavior.
 
-I check virtio-9p and they do reset O_DIRECT flag.
+Thanks; applied with those changes, plus also I found I had
+to move the #include of osdep.h and error.h to the top of the include
+list to avoid glib compilation errors.
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- contrib/virtiofsd/passthrough_ll.c |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+Dave
 
-Index: qemu/contrib/virtiofsd/passthrough_ll.c
-===================================================================
---- qemu.orig/contrib/virtiofsd/passthrough_ll.c	2019-08-20 09:33:07.900975145 -0400
-+++ qemu/contrib/virtiofsd/passthrough_ll.c	2019-08-20 14:31:39.725781357 -0400
-@@ -1752,6 +1752,13 @@ static void lo_create(fuse_req_t req, fu
- 	if (err)
- 		goto out;
- 
-+	/*
-+	 * O_DIRECT in guest should not necessarily mean bypassing page
-+	 * cache on host as well. If somebody needs that behavior, it
-+	 * probably should be a configuration knob in daemon.
-+	 */
-+	fi->flags &= ~O_DIRECT;
-+
- 	fd = openat(parent_inode->fd, name,
- 		    (fi->flags | O_CREAT) & ~O_NOFOLLOW, mode);
- 	err = fd == -1 ? errno : 0;
-@@ -1967,6 +1974,13 @@ static void lo_open(fuse_req_t req, fuse
- 	if (lo->writeback && (fi->flags & O_APPEND))
- 		fi->flags &= ~O_APPEND;
- 
-+	/*
-+	 * O_DIRECT in guest should not necessarily mean bypassing page
-+	 * cache on host as well. If somebody needs that behavior, it
-+	 * probably should be a configuration knob in daemon.
-+	 */
-+	fi->flags &= ~O_DIRECT;
-+
- 	sprintf(buf, "%i", lo_fd(req, ino));
- 	fd = openat(lo->proc_self_fd, buf, fi->flags & ~O_NOFOLLOW);
- 	if (fd == -1)
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
+
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

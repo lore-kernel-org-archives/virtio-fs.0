@@ -1,14 +1,13 @@
-Date: Tue, 20 Aug 2019 11:06:43 +0100
+Date: Tue, 20 Aug 2019 11:07:49 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190820100643.GF9855@stefanha-x1.localdomain>
+Message-ID: <20190820100749.GG9855@stefanha-x1.localdomain>
 References: <20190812210455.12540-1-msys.mizuma@gmail.com>
-	<20190812210455.12540-4-msys.mizuma@gmail.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="0rSojgWGcpz+ezC3"
+	protocol="application/pgp-signature"; boundary="UTZ8bGhNySVQ9LYl"
 Content-Disposition: inline
-In-Reply-To: <20190812210455.12540-4-msys.mizuma@gmail.com>
-Subject: Re: [Virtio-fs] [PATCH 3/3] virtio-fs: add tracepoints
+In-Reply-To: <20190812210455.12540-1-msys.mizuma@gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 0/3] virtio-fs: Add some tracepoints
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,61 +20,80 @@ To: Masayoshi Mizuma <msys.mizuma@gmail.com>
 Cc: virtio-fs@redhat.com, Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>, Vivek Goyal <vgoyal@redhat.com>
 
 
---0rSojgWGcpz+ezC3
+--UTZ8bGhNySVQ9LYl
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Mon, Aug 12, 2019 at 05:04:55PM -0400, Masayoshi Mizuma wrote:
-> @@ -251,6 +259,11 @@ static void virtio_fs_hiprio_dispatch_work(struct wo=
-rk_struct *work)
->  		notify =3D virtqueue_kick_prepare(vq);
->  		spin_unlock(&fsvq->lock);
-> =20
-> +		trace_virtio_fs_hiprio_request_dispatched(
-> +			forget->ih.opcode, forget->ih.unique,
-> +			forget->ih.nodeid, forget->ih.len,
-> +			notify);
-> +
+On Mon, Aug 12, 2019 at 05:04:52PM -0400, Masayoshi Mizuma wrote:
+> From: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+>=20
+> This patch series introduce some tracepoints. It will be
+> useful to debug the I/O request flow.
+>=20
+> New trace events:
+>=20
+>   - virtio_fs_request_dispatched
+>   - virtio_fs_request_done
+>   - virtio_fs_hiprio_request_dispatched
+>   - virtio_fs_hiprio_request_done
+>=20
+> Above trace events is added to the following functions as
+> the tracepoints:
+>=20
+>   - virtio_fs_enqueue_req
+>   - virtio_fs_requests_done_work
+>   - virtio_fs_hiprio_dispatch_work
+>   - virtio_fs_hiprio_done_work
+>=20
+> Example of the trace record:
+>=20
+>   cat-1432        [006] .... 37.592694: virtio_fs_request_dispatched:
+>       opcode FUSE_READ unique 0x1a nodeid 0x2 in.len 80 flags
+>       ISREPLY|WAITING|SENT notify 1
+>   kworker/4:1-103 [004] .... 37.592809: virtio_fs_request_done:
+>       opcode FUSE_READ unique 0x1a nodeid 0x2 in.len 80 flags
+>       ISREPLY|WAITING
+>=20
+> Changelog:
+>  From RFC:
+>  - Change the string and the file name from virtiofs to virtio_fs.
+>  - Separate the fuse macros to the other file to get useful for
+>    generic fuse trace.
+>=20
+> Masayoshi Mizuma (3):
+>   fuse: add some macros for ftrace
+>   virtio-fs: add ftrace events
+>   virtio-fs: add tracepoints
+>=20
+>  fs/fuse/virtio_fs.c                |  21 +++++
+>  include/trace/events/fuse_common.h |  67 +++++++++++++++
+>  include/trace/events/virtio_fs.h   | 131 +++++++++++++++++++++++++++++
+>  3 files changed, 219 insertions(+)
+>  create mode 100644 include/trace/events/fuse_common.h
+>  create mode 100644 include/trace/events/virtio_fs.h
+>=20
+> --=20
+> 2.18.1
+>=20
 
-It is safer to trace the request before placing it in the queue and
-before releasing fsvq->lock.  I'm concerned that a fast device may
-complete the request and invoke virtio_fs_hiprio_done_work() so that
-kfree(req) is called before we've finished tracing it.
+Looks useful, thanks.  I'm concerned about use-after-frees, please see
+my other email reply.
 
-(We cannot rely on virtqueue_notify() because devices may poll the
-virtqueue, so as soon as the request has been added to the virtqueue it
-may be completed.)
-
-> @@ -914,6 +931,10 @@ static int virtio_fs_enqueue_req(struct virtqueue *v=
-q, struct fuse_req *req)
-> =20
->  	spin_unlock(&fsvq->lock);
-> =20
-> +	trace_virtio_fs_request_dispatched(
-> +		req->in.h.opcode, req->in.h.unique,
-> +		req->in.h.nodeid, req->in.h.len, req->flags, notify);
-> +
->  	if (notify)
->  		virtqueue_notify(vq);
-
-Same here, we no longer control the lifetime of req so it's not safe to
-access it after virtqueue_add_sgs() + spin_unlock(&fsvq->lock).
-
---0rSojgWGcpz+ezC3
+--UTZ8bGhNySVQ9LYl
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1bxjMACgkQnKSrs4Gr
-c8hSWwgAuI3+nMDrFczxg4eZjNxA+13a3+YllARvTB0AFuV8jzIO8HS5yE7KIFPj
-Nne7VHMZ+78OJrXm4NguTDccRu1jSIHTk9W0mr85FekzBGdDWtyeuyWnL7YKv5ZA
-1oz70NSEDtEdGmxKGSYZ/iZ9qHYfQJz803G6VKmJo9hpwREGLU4i01h4XcGg5Doi
-P8fZ3iMq3LxwovqlQ825GYoZJNeyJfQIenVUU88b1HGV1K599oRp1vxqqrdFpEZ7
-hZff6aus2krtfT7uBPesCNntQqD5AsQs2/aOri7yujnWAYS7nCTngTvJ/DmDUJAX
-gggwJzWiAzgR5nbhRNekyKPxUIx/Yw==
-=n8so
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1bxnUACgkQnKSrs4Gr
+c8h9DwgAs553sff1t9Xm7cznH03we6xg99xC6sL5ZgebTAieIVlWhB/oXUDdLWQE
+mxkDur9/ukPvjXNxut70i0/90xTYdFPf1bDPQxg9jks6eXcvD0c+9AdN/tiRABG9
+V0/rGxlyPHRmny388j82r/U9tQrOx6ZLX9nTceln7W+ZvKPVcpgN48oU/wIdBcl4
+m5mq+QflGLMEFI1u1TS3Ci41F8L25KJzcgzk5PCCjbrdORNMGF4R8KtZcORPu/Ij
+XxW7hEZyO/wyTUh0JW0BlG5owd3mdRwWyiZK5Nv9y3X9Z764ZI+k4rRfECLCMdEP
+bmCET8RWcmJArI2bT8QvFi0gEC7moA==
+=ekje
 -----END PGP SIGNATURE-----
 
---0rSojgWGcpz+ezC3--
+--UTZ8bGhNySVQ9LYl--
 

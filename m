@@ -1,16 +1,24 @@
-References: <cover.1566185612.git.gavin.dg@linux.alibaba.com>
-	<09680e84da8a43ee8fa69ed4ec7d1a5a5ffa9130.1566185612.git.gavin.dg@linux.alibaba.com>
-	<20190819051443.GM52397@e18g06458.et15sqa>
-	<44010515-d5c9-b4dc-fa4f-ba689f27909c@huawei.com>
-From: Gang Deng <gavin.dg@linux.alibaba.com>
-Message-ID: <94e577c4-06c4-6583-5736-a9d29f56d1ac@linux.alibaba.com>
-Date: Tue, 20 Aug 2019 09:24:45 +0800
-MIME-Version: 1.0
-In-Reply-To: <44010515-d5c9-b4dc-fa4f-ba689f27909c@huawei.com>
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [RFC PATCH 1/2] virtiofsd: add stat tools
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+	d=hyper-sh.20150623.gappssmtp.com; s=20150623;
+	h=mime-version:subject:from:in-reply-to:date:cc
+	:content-transfer-encoding:message-id:references:to;
+	bh=BOrCHPbDmj29GjvyK+AXUXnogCx8AnGY5D7ncKnRZe0=;
+	b=FCTNARznRU0/LMEaWtcLVI4mQrmxjHaWwJr1Y5h8C5A1XrDEyA9pBmNVWsrV48Q0Ja
+	Lumz6bnXjmzfgQniEKu4tY/zlnfAc50VOhlcVa7zanAE6B/x1BLYZEsttJHWuZTdTmUJ
+	I4sdihEvnZn8Cq2Q96Qe1l1D+J5t6Bg65Jb+dsF31c7ujiuD85tGi2W01ICBcFyFI/4H
+	fsEkvjZIf/GaVfzLvYKFL4SUMK/rbZ+jRd4/C/Mrrb/a9Xd3+JgiIP7Xl8Wqr6nt+9Pi
+	COd6/iY7ve1yFChEWrhnA5gXyL6iK153YZnsc4WkowmDYC9cyh4QxHb3I3XifhdbQMrr
+	Zs3g==
+Content-Type: text/plain;
+	charset=us-ascii
+Mime-Version: 1.0 (Mac OS X Mail 12.4 \(3445.104.11\))
+From: Xu Wang <xu@hyper.sh>
+In-Reply-To: <20190819160426.GB2625@stefanha-x1.localdomain>
+Date: Tue, 20 Aug 2019 10:24:48 +0800
+Message-Id: <9C829E80-50E4-496D-82AF-FCA46C5DEE3D@hyper.sh>
+References: <20190819160426.GB2625@stefanha-x1.localdomain>
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [kata-dev] [ANNOUNCE] virtio-fs v0.3 release
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,202 +27,80 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>, Eryu Guan <eguan@linux.alibaba.com>
-Cc: virtio-fs@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, kata-dev@lists.katacontainers.io
 
+Thanks all the contributors, looking forward to having a product virtio-fs deployment shortly.
 
-
-On 2019/8/19 22:20, piaojun wrote:
+> On Aug 20, 2019, at 12:04 AM, Stefan Hajnoczi <stefanha@redhat.com> wrote:
 > 
+> I am delighted to announce the release of virtio-fs v0.3, a shared file
+> system that lets virtual machines access a directory tree on the host.
+> This release is based on QEMU 4.1.0 and Linux 5.3-rc3.
 > 
-> On 2019/8/19 13:14, Eryu Guan wrote:
->> On Mon, Aug 19, 2019 at 11:41:13AM +0800, Gang Deng wrote:
->>> There exist two components: vtrace && vstat. vtrace is embeded in virtiofsd,
->>> it will put raw statistics data into share memory. Then the vstat tool could
->>> parse it and do some post processing works. The performance overhead of
->>> vtrace is very small because it does very simple things.
->>>
->>> For example, if we call open(2)/close(2) frequently in guest, and
->>> randwite a file whose length is greater than the size of dax window.
->>> We'll get the output as below:
->>>
->>> op                        inflt         op/s     svctm/us   %util
->>> FUSE_OPEN(14)                 0      8379.87         3.24   2.71%
->>> FUSE_RELEASE(18)              0      8379.87         1.77   1.48%
->>> FUSE_FLUSH(25)                0      8379.87         2.04   1.71%
->>> FUSE_SETUPMAPPING(48)         1      6393.90        34.72  22.20%
->>> FUSE_REMOVEMAPPING(49)        0      6404.90        37.61  24.09%
->>> TOTAL                         1     37938.39        13.76  52.20%
->>>
->>> The meaning of fields:
->>>
->>> - op
->>>   The type of fuse requests, 'TOTAL' is sum of all.
->>>
->>> - inflt
->>>   The number of the inflight requests, it must be ethier 0 or 1 because
->>>   virtiofsd can only process fuse requests serially.
->>>
->>> - op/s
->>>   The number of fuse requests completed per second.
->>>
->>> - svctm/us
->>>   The average service time (in microseconds) for fuse requests.
->>>
->>> - %util
->>>   Percentage of elapsed time during which virtiofsd was processing the fuse
->>>   requests.
->>>
->>> when virtiofsd is hang, e.g. we support flock in host (just for example,
->>> this has been fxied), we'll get this:
->>>
->>> op                        inflt         op/s     svctm/us   %util
->>> FUSE_SETLKW(33)               1         0.00         0.00 100.00%
->>> TOTAL                         1         0.00         0.00 100.00%
->>>
->>> the utilization is 100% and op/s equals zero, it indicates hang.
->>>
->>> If virtiofsd is idle, then the output looks like this:
->>>
->>> op                        inflt         op/s     svctm/us   %util
->>> TOTAL                         0         0.00         0.00   0.00%
->>>
->>> Signed-off-by: Gang Deng <gavin.dg@linux.alibaba.com>
->>
->> This looks useful to me! Would you like to provide an example command
->> line usage in commit log too? Because I find that it's not obvious how
->> the vtrace/vstat are used.
+> For more information about virtio-fs: https://virtio-fs.gitlab.io/
 > 
-> Agreed, and I wonder if they could be documented somewhere?
+> This is a development release aimed at early adopters of virtio-fs.  Work is
+> being done to upstream the code into Linux and QEMU.  We expect to stop
+> publishing virtio-fs releases once the code has been merged by these upstream
+> projects.
 > 
-> Jun
+> Where to get it:
 > 
+>  https://gitlab.com/virtio-fs/linux/-/tags/virtio-fs-v0.3
+>  https://gitlab.com/virtio-fs/qemu/-/tags/virtio-fs-v0.3
+> 
+> Changes:
+> 
+> * Please note that the mount syntax has changed to:
+> 
+>     # mount -t virtio_fs myfs /mnt -o ...
+> 
+>   The old syntax was "mount -t virtio_fs none /mnt -o tag=myfs,...".
+> 
+> * virtiofsd --fd=FDNUM takes a listen socket file descriptor number.  File
+>   descriptor passing is an alternative way to manage the vhost-user UNIX
+>   domain socket.  The parent process no longer needs to wait for virtiofsd to
+>   create the listen socket before spawning the VM.
+> 
+> * virtiofsd --syslog logs to syslog(2) instead of stderr.  Useful for unifying
+>   logging and when the virtiofsd process is not being supervised.
+> 
+> * virtiofsd --thread-pool-size=NUM sets the maximum number of worker threads
+>   for FUSE request processing.  This can be used to control the host queue
+>   depth.  The default is 64.
+> 
+> * Performance improvements and bug fixes.
+> 
+> Note for Kata Containers: the new kernel is not compatible with existing
+> Kata Containers releases due to the mount syntax change.  To try it out,
+> please apply the following kata-runtime patch:
+> 
+>  https://gitlab.com/virtio-fs/runtime/commit/a2e44de817e438c02a495cf258039774527e3178
+> 
+> Kata Containers patches for virtio-fs v0.3 are under development and will be
+> submitted to Kata soon.
+> 
+> Thanks to the following people for contributing code and to many more
+> for helping the virtio-fs effort:
+> 
+> Dr. David Alan Gilbert <dgilbert@redhat.com>
+> Eric Ren <renzhen@linux.alibaba.com>
+> Eryu Guan <eguan@linux.alibaba.com>
+> Ganesh Maharaj Mahalingam <ganesh.mahalingam@intel.com>
+> Jiufei Xue <jiufei.xue@linux.alibaba.com>
+> Liu Bo <bo.liu@linux.alibaba.com>
+> Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+> Miklos Szeredi <mszeredi@redhat.com>
+> Peng Tao <tao.peng@linux.alibaba.com>
+> piaojun <piaojun@huawei.com>
+> Sebastien Boeuf <sebastien.boeuf@intel.com>
+> Stefan Hajnoczi <stefanha@redhat.com>
+> Vivek Goyal <vgoyal@redhat.com>
+> Xiaoguang Wang <xiaoguang.wang@linux.alibaba.com>
+> _______________________________________________
+> kata-dev mailing list
+> kata-dev@lists.katacontainers.io
+> http://lists.katacontainers.io/cgi-bin/mailman/listinfo/kata-dev
 
-Add the document below. It's just a skeleton currently.
-
-vtrace
-======
-
-This document explains the usage of vtrace feature. vtrace is used for
-performance diagnostics or to assist in performance optimization of virtiofsd.
-It works as below:
-
-     +----------------+
-     |                |                               human readable
-     | virtiofsd      |                                     ^
-     |                |                                     |
-     |     +----------+                               +-----+-----+
-     |     |  vtrace  |-----------+         +-------->|    vstat  |
-     +-----+----------+           |         |         +-----------+
-                                  |         |
-                                  v         |
-                              +------------------+
-                              |   share memory   |
-                              +------------------+
-
-There exist two components: vtrace && vstat. vtrace is embeded in virtiofsd,
-it will put raw statistics data into share memory. Then the vstat tool could
-parse it directly without communicating with virtiofsd, and do some post
-processing works, output human readable format.
-
-What's the difference between vtrace and virtiofsd's debug output? Vtrace was
-designed to be used online when we run some real workloads, because the
-performance overhead of vtrace is small. It does very simple things, only
-calls virtiofs_trace_account_op_begin() && void virtiofs_trace_account_op_end()
-in data plane. And we can get more detailed statistics, see it in later section.
-
-
-Basic Usage
------------
-To view the statistics, run virtiofsd with vtrace enabled, add the '-o trace'
-option, e.g.
-
- $ sudo ./virtiofsd -o vhost_user_socket=$SOCKET_PATH -o source=$DIR -o trace
-
-After qemu was connected and we mounted the filesystem in guest, then we can
-run vstat to view the output, command as below:
-
- $ sudo ./vstat /proc/<virtiofs-pid>/fd/<trace-file> 1
-
-the <trace-file> fd points to the share memory path, it looks like
-"/dev/shm/vtrace35117 (deleted)". The output was refreshed every second.
-
-Fist, there is no workload running, the output looks like this:
-
-op                        inflt         op/s     svctm/us   %util
-TOTAL                         0         0.00         0.00   0.00%
-
-It means the virtiofsd was idle.
-
-The meaning of fields:
-
-- op
-  The type of fuse requests, 'TOTAL' is sum of all.
-
-- inflt
-  The number of the inflight requests, it must be ethier 0 or 1 because
-  virtiofsd can only process fuse requests serially.
-
-- op/s
-  The number of fuse requests completed per second.
-
-- svctm/us
-  The average service time (in microseconds) for fuse requests which didn't
-  include the time of parsing fuse requests from virtqueue.
-
-- %util
-  Percentage of elapsed time during which virtiofsd was processing the fuse
-  requests. Note it's different from CPU utilization of virtiofsd.
-
-Now we run some workloads in guest. We call open(2)/close(2) frequently in
-guest, it works like this:
-
-      while (true) {
-        fd = open("testfile", O_RDONLY);
-        close(fd);
-      }
-
-And run fio to randwrite a file whose length is greater than the size of dax
-window. We'll get the output as below:
-
-op                        inflt         op/s     svctm/us   %util
-FUSE_OPEN(14)                 0      8379.87         3.24   2.71%
-FUSE_RELEASE(18)              0      8379.87         1.77   1.48%
-FUSE_FLUSH(25)                0      8379.87         2.04   1.71%
-FUSE_SETUPMAPPING(48)         1      6393.90        34.72  22.20%
-FUSE_REMOVEMAPPING(49)        0      6404.90        37.61  24.09%
-TOTAL                         1     37938.39        13.76  52.20%
-
-The FUSE_OPEN/RELEASE/FLUSE requests are mainly due to the open(2)/close(2)
-syscalls in guest. Guest executed 8379.87 open(2) syscalls every second, each
-FUSE_OPEN consumed 3.24us in virtiofsd.
-
-The FUSE_SETUPMAPPING/REMOVEMAPPING are expensive, they consumed ten times
-more than FUSE_OPEN. If we observe this in host (no need to login to guest),
-it may indicates the size of dax window was not properly set.
-
-When virtiofsd is hang, e.g. we support flock in host (just for example,
-this has been fixed), we'll get this:
-
-op                        inflt         op/s     svctm/us   %util
-FUSE_SETLKW(33)               1         0.00         0.00 100.00%
-TOTAL                         1         0.00         0.00 100.00%
-
-the utilization is 100% and op/s equals zero, it indicates hang.
-
-
-TODO
-----
-Vstat was designed to scan /dev/shm directory to get all virtiofs devices.
-However it's not supported yet. Because virtiofsd couldn't unlink
-the trace file when exited due to the sandboxing, actually we unlink the
-trace file when inited. Then vstat can only access the trace file through
-the /proc/<virtiofs-pid>/fd/<trace-file> (which needs root privilege)
-This should be refactored later if virtiofsd could access /dev/shm
-directory, then vstat can run as nobody and be able to scan all devices
-like iostat tool.
-
-
-Thanks,
-Gang
 

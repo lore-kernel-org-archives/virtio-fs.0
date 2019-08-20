@@ -1,14 +1,12 @@
-Date: Tue, 20 Aug 2019 10:16:50 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190820091650.GE9855@stefanha-x1.localdomain>
-References: <5abd7616-5351-761c-0c14-21d511251006@huawei.com>
+Date: Tue, 20 Aug 2019 10:28:16 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190820092816.GE2867@work-vm>
+References: <cover.1566185612.git.gavin.dg@linux.alibaba.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="Qz2CZ664xQdCRdPu"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <5abd7616-5351-761c-0c14-21d511251006@huawei.com>
-Subject: Re: [Virtio-fs] [QUESTION] A performance problem for buffer write
- compared with 9p
+In-Reply-To: <cover.1566185612.git.gavin.dg@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [RFC PATCH 0/2] add stat tools for virtiofsd
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,220 +15,112 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: wangyan <wangyan122@huawei.com>
-Cc: linux-fsdevel@vger.kernel.org, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, mszeredi@redhat.com
+To: Gang Deng <gavin.dg@linux.alibaba.com>
+Cc: virtio-fs@redhat.com
 
+* Gang Deng (gavin.dg@linux.alibaba.com) wrote:
+> There exist two components: vtrace && vstat. vtrace is embeded in virtiofsd,
+> it will put raw statistics data into share memory. Then the vstat tool could
+> parse it and do some post processing works. The performance overhead of
+> vtrace is very small because it does very simple things.
+> 
+> For example, if we call open(2)/close(2) frequently in guest, and
+> randwite a file whose length is greater than the size of dax window.
+> We'll get the output as below:
+> 
+> op                        inflt         op/s     svctm/us   %util
+> FUSE_OPEN(14)                 0      8379.87         3.24   2.71%
+> FUSE_RELEASE(18)              0      8379.87         1.77   1.48%
+> FUSE_FLUSH(25)                0      8379.87         2.04   1.71%
+> FUSE_SETUPMAPPING(48)         1      6393.90        34.72  22.20%
+> FUSE_REMOVEMAPPING(49)        0      6404.90        37.61  24.09%
+> TOTAL                         1     37938.39        13.76  52.20%
+> 
+> The meaning of fields:
+> 
+> - op
+>   The type of fuse requests, 'TOTAL' is sum of all.
+> 
+> - inflt
+>   The number of the inflight requests, it must be ethier 0 or 1 because
+>   virtiofsd can only process fuse requests serially.
+> 
+> - op/s
+>   The number of fuse requests completed per second.
+> 
+> - svctm/us
+>   The average service time (in microseconds) for fuse requests.
+> 
+> - %util
+>   Percentage of elapsed time during which virtiofsd was processing the fuse
+>   requests.
+> 
+> when virtiofsd is hang, e.g. we support flock in host (just for example,
+> this has been fxied), we'll get this:
+> 
+> op                        inflt         op/s     svctm/us   %util
+> FUSE_SETLKW(33)               1         0.00         0.00 100.00%
+> TOTAL                         1         0.00         0.00 100.00%
+> 
+> the utilization is 100% and op/s equals zero, it indicates hang.
+> 
+> If virtiofsd is idle, then the output looks like this:
+> 
+> op                        inflt         op/s     svctm/us   %util
+> TOTAL                         0         0.00         0.00   0.00%
+> 
+> TODO:
+>  Vstat was designed to scan VIRTIOFS_TRACE_DIR directory to get all virtiofs
+>  devices. However it's not supported yet. Because virtiofsd couldn't unlink
+>  the trace file when exited due to the sandboxing, actually we unlink the
+>  trace file when inited. Then vstat can only access the trace file through
+>  the /proc/<virtiofs-pid>/fd/<trace-file> (which needs root privilege)
+>  This should be refactored later if virtiofsd could access /dev/shm
+>  directory, then vstat can run as nobody and be able to scan all devices
+>  like iostat tool.
 
---Qz2CZ664xQdCRdPu
-Content-Type: text/plain; charset=utf-8
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+This looks nice - thanks!; some questions:
 
-On Thu, Aug 15, 2019 at 08:30:43AM +0800, wangyan wrote:
-> Hi all,
->=20
-> I met a performance problem when I tested buffer write compared with 9p.
+  a) Would it be easier to pass -o trace=/a/path  to let the caller say
+where the shared file should be?  Then the caller can do the cleanup 
+and we don't need to worry about using /proc/.../fd
 
-CCing Miklos, FUSE maintainer, since this is mostly a FUSE file system
-writeback question.
+  b) Then perhaps we can also simplify the code for finding trace
+files; If vstat was a lot simpler for just displaying one trace file
+then I think the simplicty would be worth it.
 
->=20
-> Guest configuration:
->     Kernel: https://github.com/rhvgoyal/linux/tree/virtio-fs-dev-5.1
->     2vCPU
->     8GB RAM
-> Host configuration:
->     Intel(R) Xeon(R) CPU E5-2620 v2 @ 2.10GHz
->     128GB RAM
->     Linux 3.10.0
->     Qemu: https://gitlab.com/virtio-fs/qemu/tree/virtio-fs-dev
->     EXT4 + ramdisk for shared folder
->=20
-> ------------------------------------------------------------------------
->=20
-> For virtiofs:
-> virtiofsd cmd:
->     ./virtiofsd -o vhost_user_socket=3D/tmp/vhostqemu -o source=3D/mnt/sh=
-are/ -o
-> cache=3Dalways -o writeback
-> mount cmd:
->     mount -t virtio_fs myfs /mnt/virtiofs -o
-> rootmode=3D040000,user_id=3D0,group_id=3D0
->=20
-> For 9p:
-> mount cmd:
->     mount -t 9p -o
-> trans=3Dvirtio,version=3D9p2000.L,rw,dirsync,nodev,msize=3D1000000000,cac=
-he=3Dfscache
-> sharedir /mnt/virtiofs/
->=20
-> ------------------------------------------------------------------------
->=20
-> Compared with 9p, the test result:
-> 1. Latency
->     Test model=EF=BC=9A
->         fio -filename=3D/mnt/virtiofs/test -rw=3Dwrite -bs=3D4K -size=3D1G
-> -iodepth=3D1 \
->             -ioengine=3Dpsync -numjobs=3D1 -group_reporting -name=3D4K -t=
-ime_based
-> -runtime=3D30
->=20
->     virtiofs: avg-lat is 6.37 usec
->         4K: (g=3D0): rw=3Dwrite, bs=3D4K-4K/4K-4K/4K-4K, ioengine=3Dpsync=
-, iodepth=3D1
->         fio-2.13
->         Starting 1 process
->         Jobs: 1 (f=3D1): [W(1)] [100.0% done] [0KB/471.9MB/0KB /s] [0/121=
-K/0
-> iops] [eta 00m:00s]
->         4K: (groupid=3D0, jobs=3D1): err=3D 0: pid=3D5558: Fri Aug  9 09:=
-21:13 2019
->           write: io=3D13758MB, bw=3D469576KB/s, iops=3D117394, runt=3D 30=
-001msec
->             clat (usec): min=3D2, max=3D10316, avg=3D 5.75, stdev=3D81.80
->              lat (usec): min=3D3, max=3D10317, avg=3D 6.37, stdev=3D81.80
->=20
->     9p: avg-lat is 3.94 usec
->         4K: (g=3D0): rw=3Dwrite, bs=3D4K-4K/4K-4K/4K-4K, ioengine=3Dpsync=
-, iodepth=3D1
->         fio-2.13
->         Starting 1 process
->         Jobs: 1 (f=3D1): [W(1)] [100.0% done] [0KB/634.2MB/0KB /s] [0/162=
-K/0
-> iops] [eta 00m:00s]
->         4K: (groupid=3D0, jobs=3D1): err=3D 0: pid=3D5873: Fri Aug  9 09:=
-53:46 2019
->           write: io=3D19700MB, bw=3D672414KB/s, iops=3D168103, runt=3D 30=
-001msec
->             clat (usec): min=3D2, max=3D632, avg=3D 3.34, stdev=3D 3.77
->              lat (usec): min=3D2, max=3D633, avg=3D 3.94, stdev=3D 3.82
->=20
->=20
-> 2. Bandwidth
->     Test model:
->         fio -filename=3D/mnt/virtiofs/test -rw=3Dwrite -bs=3D1M -size=3D1G
-> -iodepth=3D1 \
->             -ioengine=3Dpsync -numjobs=3D1 -group_reporting -name=3D1M -t=
-ime_based
-> -runtime=3D30
->=20
->     virtiofs: bandwidth is 718961KB/s
->         1M: (g=3D0): rw=3Dwrite, bs=3D1M-1M/1M-1M/1M-1M, ioengine=3Dpsync=
-, iodepth=3D1
->         fio-2.13
->         Starting 1 process
->         Jobs: 1 (f=3D1): [W(1)] [100.0% done] [0KB/753.8MB/0KB /s] [0/753=
-/0
-> iops] [eta 00m:00s]
->         1M: (groupid=3D0, jobs=3D1): err=3D 0: pid=3D5648: Fri Aug  9 09:=
-24:36 2019
->             write: io=3D21064MB, bw=3D718961KB/s, iops=3D702, runt=3D 300=
-01msec
->              clat (usec): min=3D390, max=3D11127, avg=3D1361.41, stdev=3D=
-1551.50
->               lat (usec): min=3D432, max=3D11170, avg=3D1414.72, stdev=3D=
-1553.28
->=20
->     9p: bandwidth is 2305.5MB/s
->         1M: (g=3D0): rw=3Dwrite, bs=3D1M-1M/1M-1M/1M-1M, ioengine=3Dpsync=
-, iodepth=3D1
->         fio-2.13
->         Starting 1 process
->         Jobs: 1 (f=3D1): [W(1)] [100.0% done] [0KB/2406MB/0KB /s] [0/2406=
-/0
-> iops] [eta 00m:00s]
->         1M: (groupid=3D0, jobs=3D1): err=3D 0: pid=3D5907: Fri Aug  9 09:=
-55:14 2019
->           write: io=3D69166MB, bw=3D2305.5MB/s, iops=3D2305, runt=3D 3000=
-1msec
->             clat (usec): min=3D287, max=3D17678, avg=3D352.00, stdev=3D50=
-3.43
->              lat (usec): min=3D330, max=3D17721, avg=3D402.76, stdev=3D50=
-3.41
->=20
-> 9p has a lower latency and higher bandwidth than virtiofs.
->=20
-> ------------------------------------------------------------------------
->=20
->=20
-> I found that the judgement statement 'if (!TestSetPageDirty(page))' always
-> true in function '__set_page_dirty_nobuffers', it will waste much time
-> to mark inode dirty, no one page is dirty when write it the second time.
-> The buffer write stack:
->     fuse_file_write_iter
->       ->fuse_cache_write_iter
->         ->generic_file_write_iter
->           ->__generic_file_write_iter
->             ->generic_perform_write
->               ->fuse_write_end
->                 ->set_page_dirty
->                   ->__set_page_dirty_nobuffers
->=20
-> The reason for 'if (!TestSetPageDirty(page))' always true may be the pdfl=
-ush
-> process will clean the page's dirty flags in clear_page_dirty_for_io(),
-> and call fuse_writepages_send() to flush all pages to the disk of the hos=
-t.
-> So when the page is written the second time, it always not dirty.
-> The pdflush stack for fuse:
->     pdflush
->       ->...
->         ->do_writepages
->           ->fuse_writepages
->             ->write_cache_pages         // will clear all page's dirty fl=
-ags
->               ->clear_page_dirty_for_io // clear page's dirty flags
->             ->fuse_writepages_send      // write all pages to the host, b=
-ut
-> don't wait the result
-> Why not wait for getting the result of writing back pages to the host
-> before cleaning all page's dirty flags?
->=20
-> As for 9p, pdflush will call clear_page_dirty_for_io() to clean the page's
-> dirty flags. Then call p9_client_write() to write the page to the host,
-> waiting for the result, and then flush the next page. In this case, buffer
-> write of 9p will hit the dirty page many times before it is being write
-> back to the host by pdflush process.
-> The pdflush stack for 9p:
->     pdflush
->       ->...
->         ->do_writepages
->           ->generic_writepages
->             ->write_cache_pages
->               ->clear_page_dirty_for_io // clear page's dirty flags
->               ->__writepage
->                 ->v9fs_vfs_writepage
->                   ->v9fs_vfs_writepage_locked
->                     ->p9_client_write   // it will get the writing back
-> page's result
->=20
->=20
-> According to the test result, is the handling method of 9p for page writi=
-ng
-> back more reasonable than virtiofs?
->=20
-> Thanks,
-> Yan Wang
->=20
+  c) You use a rdtsc; is using clock_gettime(CLOCK_REALTIME) really much
+worse?   rdtsc is very specific.
+
+Dave
+
+> Gang Deng (2):
+>   virtiofsd: add stat tools
+>   virtiofsd: support vstat&&vtrace
+> 
+>  Makefile                           |   3 +
+>  Makefile.objs                      |   1 +
+>  contrib/virtiofsd/Makefile.objs    |   5 +-
+>  contrib/virtiofsd/fuse_i.h         |   1 +
+>  contrib/virtiofsd/fuse_lowlevel.c  |  11 +
+>  contrib/virtiofsd/fuse_lowlevel.h  |   1 +
+>  contrib/virtiofsd/helper.c         |   4 +-
+>  contrib/virtiofsd/passthrough_ll.c |   7 +
+>  contrib/virtiofsd/vstat.c          | 680 +++++++++++++++++++++++++++++
+>  contrib/virtiofsd/vtrace.c         |  95 ++++
+>  contrib/virtiofsd/vtrace.h         |  53 +++
+>  11 files changed, 859 insertions(+), 2 deletions(-)
+>  create mode 100644 contrib/virtiofsd/vstat.c
+>  create mode 100644 contrib/virtiofsd/vtrace.c
+>  create mode 100644 contrib/virtiofsd/vtrace.h
+> 
+> -- 
+> 2.20.1.7.g153144c
+> 
 > _______________________________________________
 > Virtio-fs mailing list
 > Virtio-fs@redhat.com
 > https://www.redhat.com/mailman/listinfo/virtio-fs
-
---Qz2CZ664xQdCRdPu
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1buoIACgkQnKSrs4Gr
-c8jWqggAiKTazBsZGkUXZAbi8fbS7WSQrSGR+Fg+7EcRZfghcJCALIXtFe70W6L3
-dHZYDEc0t/eO8SU5ZpmpXfr3hAZUomJg03VLtHDF7vEfYuoBOyDRcUayp92PvP0H
-JwG2hOEjnbV1ryvJfQmczWKEpk8hXK8zw/u4tdc9Dd3saqIUE1eFitDAqZdloiPB
-7LYICR7zDuR7B7QA0WS1A6xVGIYkP+HcSD7MDZQzs5ifN9Az2GIIjPUWyaV0B12h
-5UqytPJn0uqxnn9moKGiVybzrFMzeTvZPPm1EP3Py/6J6oHZ7+/hSCxMbHVtkf9K
-4Oshfphar41lnhwBywZtYhwDzkXYnQ==
-=FuXv
------END PGP SIGNATURE-----
-
---Qz2CZ664xQdCRdPu--
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

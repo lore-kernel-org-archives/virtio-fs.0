@@ -1,11 +1,11 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 21 Aug 2019 13:57:04 -0400
-Message-Id: <20190821175720.25901-4-vgoyal@redhat.com>
+Date: Wed, 21 Aug 2019 13:57:07 -0400
+Message-Id: <20190821175720.25901-7-vgoyal@redhat.com>
 In-Reply-To: <20190821175720.25901-1-vgoyal@redhat.com>
 References: <20190821175720.25901-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 03/19] virtio: Add get_shm_region method
+Subject: [Virtio-fs] [PATCH 06/19] fuse, dax: add fuse_conn->dax_dev field
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,70 +15,127 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org
-Cc: miklos@szeredi.hu, virtio-fs@redhat.com, Sebastien Boeuf <sebastien.boeuf@intel.com>, vgoyal@redhat.com
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com, miklos@szeredi.hu
 
-From: Sebastien Boeuf <sebastien.boeuf@intel.com>
+From: Stefan Hajnoczi <stefanha@redhat.com>
 
-Virtio defines 'shared memory regions' that provide a continuously
-shared region between the host and guest.
+A struct dax_device instance is a prerequisite for the DAX filesystem
+APIs.  Let virtio_fs associate a dax_device with a fuse_conn.  Classic
+FUSE and CUSE set the pointer to NULL, disabling DAX.
 
-Provide a method to find a particular region on a device.
-
-Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- include/linux/virtio_config.h | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ fs/fuse/cuse.c      | 3 ++-
+ fs/fuse/fuse_i.h    | 9 ++++++++-
+ fs/fuse/inode.c     | 9 ++++++---
+ fs/fuse/virtio_fs.c | 5 +++--
+ 4 files changed, 19 insertions(+), 7 deletions(-)
 
-diff --git a/include/linux/virtio_config.h b/include/linux/virtio_config.h
-index bb4cc4910750..c859f000a751 100644
---- a/include/linux/virtio_config.h
-+++ b/include/linux/virtio_config.h
-@@ -10,6 +10,11 @@
+diff --git a/fs/fuse/cuse.c b/fs/fuse/cuse.c
+index 04727540bdbb..0f9e3c93b056 100644
+--- a/fs/fuse/cuse.c
++++ b/fs/fuse/cuse.c
+@@ -504,7 +504,8 @@ static int cuse_channel_open(struct inode *inode, struct file *file)
+ 	 * Limit the cuse channel to requests that can
+ 	 * be represented in file->f_cred->user_ns.
+ 	 */
+-	fuse_conn_init(&cc->fc, file->f_cred->user_ns, &fuse_dev_fiq_ops, NULL);
++	fuse_conn_init(&cc->fc, file->f_cred->user_ns, NULL, &fuse_dev_fiq_ops,
++					NULL);
  
- struct irq_affinity;
+ 	fud = fuse_dev_alloc_install(&cc->fc);
+ 	if (!fud) {
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index 25a6da6ee8c3..ecd9dbc3312e 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -77,6 +77,9 @@ struct fuse_mount_data {
+ 	unsigned max_read;
+ 	unsigned blksize;
  
-+struct virtio_shm_region {
-+       u64 addr;
-+       u64 len;
-+};
++	/* DAX device, may be NULL */
++	struct dax_device *dax_dev;
 +
- /**
-  * virtio_config_ops - operations for configuring a virtio device
-  * Note: Do not assume that a transport implements all of the operations
-@@ -65,6 +70,7 @@ struct irq_affinity;
-  *      the caller can then copy.
-  * @set_vq_affinity: set the affinity for a virtqueue (optional).
-  * @get_vq_affinity: get the affinity for a virtqueue (optional).
-+ * @get_shm_region: get a shared memory region based on the index.
-  */
- typedef void vq_callback_t(struct virtqueue *);
- struct virtio_config_ops {
-@@ -88,6 +94,8 @@ struct virtio_config_ops {
- 			       const struct cpumask *cpu_mask);
- 	const struct cpumask *(*get_vq_affinity)(struct virtio_device *vdev,
- 			int index);
-+	bool (*get_shm_region)(struct virtio_device *vdev,
-+			       struct virtio_shm_region *region, u8 id);
+ 	/* fuse input queue operations */
+ 	const struct fuse_iqueue_ops *fiq_ops;
+ 
+@@ -831,6 +834,9 @@ struct fuse_conn {
+ 
+ 	/** List of device instances belonging to this connection */
+ 	struct list_head devices;
++
++	/** DAX device, non-NULL if DAX is supported */
++	struct dax_device *dax_dev;
  };
  
- /* If driver didn't advertise the feature, it will never appear. */
-@@ -250,6 +258,15 @@ int virtqueue_set_affinity(struct virtqueue *vq, const struct cpumask *cpu_mask)
- 	return 0;
+ static inline struct fuse_conn *get_fuse_conn_super(struct super_block *sb)
+@@ -1061,7 +1067,8 @@ struct fuse_conn *fuse_conn_get(struct fuse_conn *fc);
+  * Initialize fuse_conn
+  */
+ void fuse_conn_init(struct fuse_conn *fc, struct user_namespace *user_ns,
+-		    const struct fuse_iqueue_ops *fiq_ops, void *fiq_priv);
++			struct dax_device *dax_dev,
++			const struct fuse_iqueue_ops *fiq_ops, void *fiq_priv);
+ 
+ /**
+  * Release reference to fuse_conn
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index 16bcf0f95979..6d9258a4091a 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -591,7 +591,8 @@ static void fuse_pqueue_init(struct fuse_pqueue *fpq)
  }
  
-+static inline
-+bool virtio_get_shm_region(struct virtio_device *vdev,
-+                         struct virtio_shm_region *region, u8 id)
-+{
-+	if (!vdev->config->get_shm_region)
-+		return false;
-+	return vdev->config->get_shm_region(vdev, region, id);
-+}
-+
- static inline bool virtio_is_little_endian(struct virtio_device *vdev)
+ void fuse_conn_init(struct fuse_conn *fc, struct user_namespace *user_ns,
+-		    const struct fuse_iqueue_ops *fiq_ops, void *fiq_priv)
++			struct dax_device *dax_dev,
++			const struct fuse_iqueue_ops *fiq_ops, void *fiq_priv)
  {
- 	return virtio_has_feature(vdev, VIRTIO_F_VERSION_1) ||
+ 	memset(fc, 0, sizeof(*fc));
+ 	spin_lock_init(&fc->lock);
+@@ -616,6 +617,7 @@ void fuse_conn_init(struct fuse_conn *fc, struct user_namespace *user_ns,
+ 	atomic64_set(&fc->attr_version, 1);
+ 	get_random_bytes(&fc->scramble_key, sizeof(fc->scramble_key));
+ 	fc->pid_ns = get_pid_ns(task_active_pid_ns(current));
++	fc->dax_dev = dax_dev;
+ 	fc->user_ns = get_user_ns(user_ns);
+ 	fc->max_pages = FUSE_DEFAULT_MAX_PAGES_PER_REQ;
+ }
+@@ -1132,8 +1134,8 @@ int fuse_fill_super_common(struct super_block *sb,
+ 		err = -ENOMEM;
+ 		if (!fc)
+ 			goto err;
+-		fuse_conn_init(fc, sb->s_user_ns, mount_data->fiq_ops,
+-			       mount_data->fiq_priv);
++		fuse_conn_init(fc, sb->s_user_ns, mount_data->dax_dev,
++			       mount_data->fiq_ops, mount_data->fiq_priv);
+ 		fc->release = fuse_free_conn;
+ 	}
+ 
+@@ -1237,6 +1239,7 @@ static int fuse_fill_super(struct super_block *sb, void *data, int silent)
+ 		goto err_fput;
+ 	__set_bit(FR_BACKGROUND, &init_req->flags);
+ 
++	d.dax_dev = NULL;
+ 	d.fiq_ops = &fuse_dev_fiq_ops;
+ 	d.fiq_priv = NULL;
+ 	d.fudptr = &file->private_data;
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index ce1de9acde84..706b27e0502a 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -986,8 +986,9 @@ static struct dentry *virtio_fs_mount(struct file_system_type *fs_type,
+ 	fc = kzalloc(sizeof(struct fuse_conn), GFP_KERNEL);
+ 	if (!fc)
+ 		return ERR_PTR(-ENOMEM);
+-	fuse_conn_init(fc, get_user_ns(current_user_ns()), &virtio_fs_fiq_ops,
+-		       fs);
++	d.dax_dev = NULL;
++	fuse_conn_init(fc, get_user_ns(current_user_ns()), d.dax_dev,
++		       &virtio_fs_fiq_ops, fs);
+ 	fc->release = fuse_free_conn;
+ 
+ 	s = sget(fs_type, virtio_fs_test_super, virtio_fs_set_super, flags, fc);
 -- 
 2.20.1
 

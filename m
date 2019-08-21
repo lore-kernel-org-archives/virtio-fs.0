@@ -1,24 +1,25 @@
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
 	h=date:from:to:cc:subject:message-id:references:mime-version
 	:content-disposition:in-reply-to:user-agent;
-	bh=oIi1GHUFdymipFlvelj7mlsATXjI3kgLh7fJzjvsheg=;
-	b=qFTK1cBatOCayKKFmla3gPaZPVriPrSEDbff8X5OSUmhaBZnpk8ygmbZCBpgCtp9kA
-	s3oOIHr0kEgCz6usOXWGA44vJYEB8m83OKgYZiX9DXlfy2DuKcxu4NJj5xspe5tY21Hp
-	vmiu6Oi2T+MSOhmsDpe+mrPZYl8KOv6jVYudYiQwMPaB8VEwteJubo04GLWFfzrJPlrz
-	DmnFPXkmUXplnQt1qY7L/B3LPyOyi6iyXho5A/ckpyi6faB1gdlGkl9jRWojwRos3dMx
-	Y1w1weobd7Hqzz22ZjaJei2EFrBwDtoxasXbEbVt2yrVdZQ9Q8iiIHFtMXmcahqKk9Fq
-	QuZQ==
-Date: Tue, 20 Aug 2019 23:40:31 -0400
+	bh=iJAkkTEIs4JoPWZb4eJQZms9eIL92uePApVl/b8FalE=;
+	b=ttwc/E3gWA7nkBnkfp7/4VgPjufCFQUaT+g7VV7rlzyDLtKY7T4Hq9qHMo6WfSOz9a
+	bgQXb8PF8UK2B3souh3NvO861Ofm1U1Yp0cyPRioK4y0IlVLGkxM9MSJxgyxa7AA3+/r
+	1801/lYexOtGQzWspGlexPQu/yq9Uu0RSEINzXrj0pMMs/QaqXlt0GM7Ml7ZAapx5xVm
+	kEVn6HWPoIO+Qd8QWu/LlPgwpX1HPeVgJMFkWlXoNIGdLAVrPwtYqa54wuwDfNWp1rpX
+	7AUd0DAkT5HtR7lRlLl2esvTh4Pr0PwXNGuku2E58fvuveKUtdTqkPP1J8hTNbPWFNu6
+	Z0IA==
+Date: Tue, 20 Aug 2019 23:42:26 -0400
 From: Masayoshi Mizuma <msys.mizuma@gmail.com>
-Message-ID: <20190821034030.loduniymb6wja4qm@gabell>
-References: <20190812210455.12540-1-msys.mizuma@gmail.com>
-	<20190812210455.12540-4-msys.mizuma@gmail.com>
-	<20190820100643.GF9855@stefanha-x1.localdomain>
+Message-ID: <20190821034225.kfo46pviyf6edqfc@gabell>
+References: <20190813200645.13819-1-msys.mizuma@gmail.com>
+	<20190820180322.GH9855@stefanha-x1.localdomain>
+	<20190820190520.GR2867@work-vm>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190820100643.GF9855@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH 3/3] virtio-fs: add tracepoints
+In-Reply-To: <20190820190520.GR2867@work-vm>
+Subject: Re: [Virtio-fs] [PATCH v3] virtiofsd: Prevent multiply running with
+ same vhost_user_socket
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,47 +28,52 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>, Vivek Goyal <vgoyal@redhat.com>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
-On Tue, Aug 20, 2019 at 11:06:43AM +0100, Stefan Hajnoczi wrote:
-> On Mon, Aug 12, 2019 at 05:04:55PM -0400, Masayoshi Mizuma wrote:
-> > @@ -251,6 +259,11 @@ static void virtio_fs_hiprio_dispatch_work(struct work_struct *work)
-> >  		notify = virtqueue_kick_prepare(vq);
-> >  		spin_unlock(&fsvq->lock);
-> >  
-> > +		trace_virtio_fs_hiprio_request_dispatched(
-> > +			forget->ih.opcode, forget->ih.unique,
-> > +			forget->ih.nodeid, forget->ih.len,
-> > +			notify);
-> > +
+On Tue, Aug 20, 2019 at 08:05:20PM +0100, Dr. David Alan Gilbert wrote:
+> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > On Tue, Aug 13, 2019 at 04:06:45PM -0400, Masayoshi Mizuma wrote:
+> > 
+> > Two minor comments below.  They can be squashed in when merging this
+> > patch.
+> > 
+> > If users find it problematic that pid files are never deleted we could
+> > make this feature optional with --pidfile=PATH.  But I think we can
+> > merge this patch for now and see if anyone encounters issues before the
+> > next virtio-fs release.
+> > 
+> > Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+> > 
+> > > +static int fv_socket_lock(struct fuse_session *se)
+> > > +{
+> > > +        char *dir, *sk_name;
+> > > +        Error *local_err = NULL;
+> > > +        int ret = -1;
+> > > +
+> > > +        dir = qemu_get_local_state_pathname("run/virtiofsd");
+> > > +
+> > > +        if (g_mkdir_with_parents(dir, S_IRWXU) < -1) {
+> > > +                fuse_err("%s: Failed to create directory %s: %s",
+> > > +                        __func__, dir, strerror(errno));
+> > 
+> > Missing g_free(dir).
+> > 
+> > > @@ -876,6 +916,17 @@ static int fv_create_listen_socket(struct fuse_session *se)
+> > >                  return -1;
+> > >          }
+> > >  
+> > > +        if (!strlen(se->vu_socket_path)) {
+> > > +                fuse_err("Socket path is NULL\n");
+> > 
+> > s/NULL/empty/
 > 
-> It is safer to trace the request before placing it in the queue and
-> before releasing fsvq->lock.  I'm concerned that a fast device may
-> complete the request and invoke virtio_fs_hiprio_done_work() so that
-> kfree(req) is called before we've finished tracing it.
 > 
-> (We cannot rely on virtqueue_notify() because devices may poll the
-> virtqueue, so as soon as the request has been added to the virtqueue it
-> may be completed.)
-> 
-> > @@ -914,6 +931,10 @@ static int virtio_fs_enqueue_req(struct virtqueue *vq, struct fuse_req *req)
-> >  
-> >  	spin_unlock(&fsvq->lock);
-> >  
-> > +	trace_virtio_fs_request_dispatched(
-> > +		req->in.h.opcode, req->in.h.unique,
-> > +		req->in.h.nodeid, req->in.h.len, req->flags, notify);
-> > +
-> >  	if (notify)
-> >  		virtqueue_notify(vq);
-> 
-> Same here, we no longer control the lifetime of req so it's not safe to
-> access it after virtqueue_add_sgs() + spin_unlock(&fsvq->lock).
+> Thanks; applied with those changes, plus also I found I had
+> to move the #include of osdep.h and error.h to the top of the include
+> list to avoid glib compilation errors.
 
-Thank you for your review. I'll move the trace before
-spin_unlock(&fsvq->lock).
+Thank you for fixing it and merging the patch!
 
-Thanks!
-Masa
+- Masa
 

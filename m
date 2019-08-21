@@ -1,21 +1,9 @@
-References: <20190801165409.20121-1-stefanha@redhat.com>
-	<20190807180355.GA22758@stefanha-x1.localdomain>
-	<20190807205715.GE18557@redhat.com>
-	<20190808090213.GD31476@stefanha-x1.localdomain>
-	<20190808095316.GC2852@work-vm>
-	<20190809082102.GB25286@stefanha-x1.localdomain>
-	<277d9cd6-a8fa-fa1f-9cbc-7a7cd0897c84@huawei.com>
-	<20190812100546.GB9959@stefanha-x1.localdomain>
-From: piaojun <piaojun@huawei.com>
-Message-ID: <d2dde785-5b25-751f-0385-8c229fc03e57@huawei.com>
-Date: Mon, 12 Aug 2019 19:58:02 +0800
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Wed, 21 Aug 2019 13:57:01 -0400
+Message-Id: <20190821175720.25901-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20190812100546.GB9959@stefanha-x1.localdomain>
-Content-Type: text/plain; charset="windows-1252"
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH 0/4] virtiofsd: multithreading preparation
- part 3
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v3 00/19][RFC] virtio-fs: Enable DAX support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,55 +12,73 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>, qemu-devel@nongnu.org
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com, miklos@szeredi.hu
 
+Hi,
 
+This patch series enables DAX support for virtio-fs filesystem. Patches
+are based on 5.3-rc5 kernel and need first patch series posted for
+virtio-fs support with subject "virtio-fs: shared file system for virtual
+machines".
 
-On 2019/8/12 18:05, Stefan Hajnoczi wrote:
-> On Sun, Aug 11, 2019 at 10:26:18AM +0800, piaojun wrote:
->> On 2019/8/9 16:21, Stefan Hajnoczi wrote:
->>> On Thu, Aug 08, 2019 at 10:53:16AM +0100, Dr. David Alan Gilbert wrote:
->>>> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
->>>>> On Wed, Aug 07, 2019 at 04:57:15PM -0400, Vivek Goyal wrote:
->>>>> 3. Can READ/WRITE be performed directly in QEMU via a separate virtqueue
->>>>>    to eliminate the bad address problem?
->>>>
->>>> Are you thinking of doing all read/writes that way, or just the corner
->>>> cases? It doesn't seem worth it for the corner cases unless you're
->>>> finding them cropping up in real work loads.
->>>
->>> Send all READ/WRITE requests to QEMU instead of virtiofsd.
->>>
->>> Only handle metadata requests in virtiofsd (OPEN, RELEASE, READDIR,
->>> MKDIR, etc).
->>>
->>
->> Sorry for not catching your point, and I like the virtiofsd to do
->> READ/WRITE requests and qemu handle metadata requests, as virtiofsd is
->> good at processing dataplane things due to thread-pool and CPU
->> affinity(maybe in the future). As you said, virtiofsd is just acting as
->> a vhost-user device which should care less about ctrl request.
->>
->> If our concern is improving mmap/write/read performance, why not adding
->> a delay worker for unmmap which could decrease the ummap times. Maybe
->> virtiofsd could still handle both data and meta requests by this way.
-> 
-> Doing READ/WRITE in QEMU solves the problem that vhost-user slaves only
-> have access to guest RAM regions.  If a guest transfers other memory,
-> like an address in the DAX Window, to/from the vhost-user device then
-> virtqueue buffer address translation fails.
-> 
-> Dave added a code path that bounces such accesses through the QEMU
-> process using the VHOST_USER_SLAVE_FS_IO slavefd request, but it would
-> be simpler, faster, and cleaner to do I/O in QEMU in the first place.
-> 
-> What I don't like about moving READ/WRITE into QEMU is that we need to
-> use even more virtqueues for multiqueue operation :).
-> 
-> Stefan
+https://www.redhat.com/archives/virtio-fs/2019-August/msg00281.html
 
-Thanks for your detailed explanation. If DAX is not good at small files,
-shall we just let the users choose the I/O path according to their user
-cases?
+Enabling DAX seems to improve performance for most of the operations
+in general a great deal. I have reported performance numbers in first patch
+series so I am not repeating these here.
+
+Any comments or feedback is welcome.
+
+Thanks
+Vivek
+
+Sebastien Boeuf (3):
+  virtio: Add get_shm_region method
+  virtio: Implement get_shm_region for PCI transport
+  virtio: Implement get_shm_region for MMIO transport
+
+Stefan Hajnoczi (4):
+  dax: remove block device dependencies
+  fuse, dax: add fuse_conn->dax_dev field
+  virtio_fs, dax: Set up virtio_fs dax_device
+  fuse, dax: add DAX mmap support
+
+Vivek Goyal (12):
+  dax: Pass dax_dev to dax_writeback_mapping_range()
+  fuse: Keep a list of free dax memory ranges
+  fuse: implement FUSE_INIT map_alignment field
+  fuse: Introduce setupmapping/removemapping commands
+  fuse, dax: Implement dax read/write operations
+  fuse: Define dax address space operations
+  fuse, dax: Take ->i_mmap_sem lock during dax page fault
+  fuse: Maintain a list of busy elements
+  dax: Create a range version of dax_layout_busy_page()
+  fuse: Add logic to free up a memory range
+  fuse: Release file in process context
+  fuse: Take inode lock for dax inode truncation
+
+ drivers/dax/super.c                |    3 +-
+ drivers/virtio/virtio_mmio.c       |   32 +
+ drivers/virtio/virtio_pci_modern.c |  108 +++
+ fs/dax.c                           |   89 +-
+ fs/ext2/inode.c                    |    2 +-
+ fs/ext4/inode.c                    |    2 +-
+ fs/fuse/cuse.c                     |    3 +-
+ fs/fuse/dir.c                      |    2 +
+ fs/fuse/file.c                     | 1206 +++++++++++++++++++++++++++-
+ fs/fuse/fuse_i.h                   |   99 ++-
+ fs/fuse/inode.c                    |  138 +++-
+ fs/fuse/virtio_fs.c                |  134 +++-
+ fs/xfs/xfs_aops.c                  |    2 +-
+ include/linux/dax.h                |   12 +-
+ include/linux/virtio_config.h      |   17 +
+ include/uapi/linux/fuse.h          |   47 +-
+ include/uapi/linux/virtio_fs.h     |    3 +
+ include/uapi/linux/virtio_mmio.h   |   11 +
+ include/uapi/linux/virtio_pci.h    |   11 +-
+ 19 files changed, 1868 insertions(+), 53 deletions(-)
+
+-- 
+2.20.1
 

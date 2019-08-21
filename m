@@ -1,11 +1,11 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 21 Aug 2019 13:37:33 -0400
-Message-Id: <20190821173742.24574-5-vgoyal@redhat.com>
+Date: Wed, 21 Aug 2019 13:37:32 -0400
+Message-Id: <20190821173742.24574-4-vgoyal@redhat.com>
 In-Reply-To: <20190821173742.24574-1-vgoyal@redhat.com>
 References: <20190821173742.24574-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 04/13] fuse: export fuse_len_args()
+Subject: [Virtio-fs] [PATCH 03/13] fuse: export fuse_end_request()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,68 +19,121 @@ Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
 From: Stefan Hajnoczi <stefanha@redhat.com>
 
-virtio-fs will need to query the length of fuse_arg lists.  Make the
-symbol visible.
+virtio-fs will need to complete requests from outside fs/fuse/dev.c.
+Make the symbol visible.
 
 Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- fs/fuse/dev.c    | 7 ++++---
- fs/fuse/fuse_i.h | 5 +++++
- 2 files changed, 9 insertions(+), 3 deletions(-)
+ fs/fuse/dev.c    | 19 ++++++++++---------
+ fs/fuse/fuse_i.h |  5 +++++
+ 2 files changed, 15 insertions(+), 9 deletions(-)
 
 diff --git a/fs/fuse/dev.c b/fs/fuse/dev.c
-index 34dd1436cec2..d90dba54f0d4 100644
+index ea8237513dfa..34dd1436cec2 100644
 --- a/fs/fuse/dev.c
 +++ b/fs/fuse/dev.c
-@@ -350,7 +350,7 @@ void fuse_put_request(struct fuse_conn *fc, struct fuse_req *req)
+@@ -427,7 +427,7 @@ static void flush_bg_queue(struct fuse_conn *fc)
+  * the 'end' callback is called if given, else the reference to the
+  * request is released
+  */
+-static void request_end(struct fuse_conn *fc, struct fuse_req *req)
++void fuse_request_end(struct fuse_conn *fc, struct fuse_req *req)
+ {
+ 	struct fuse_iqueue *fiq = &fc->iq;
+ 
+@@ -480,6 +480,7 @@ static void request_end(struct fuse_conn *fc, struct fuse_req *req)
+ put_request:
+ 	fuse_put_request(fc, req);
  }
- EXPORT_SYMBOL_GPL(fuse_put_request);
++EXPORT_SYMBOL_GPL(fuse_request_end);
  
--static unsigned len_args(unsigned numargs, struct fuse_arg *args)
-+unsigned fuse_len_args(unsigned numargs, struct fuse_arg *args)
+ static int queue_interrupt(struct fuse_iqueue *fiq, struct fuse_req *req)
  {
- 	unsigned nbytes = 0;
- 	unsigned i;
-@@ -360,6 +360,7 @@ static unsigned len_args(unsigned numargs, struct fuse_arg *args)
+@@ -567,12 +568,12 @@ static void __fuse_request_send(struct fuse_conn *fc, struct fuse_req *req)
+ 		req->in.h.unique = fuse_get_unique(fiq);
+ 		queue_request(fiq, req);
+ 		/* acquire extra reference, since request is still needed
+-		   after request_end() */
++		   after fuse_request_end() */
+ 		__fuse_get_request(req);
+ 		spin_unlock(&fiq->waitq.lock);
  
- 	return nbytes;
+ 		request_wait_answer(fc, req);
+-		/* Pairs with smp_wmb() in request_end() */
++		/* Pairs with smp_wmb() in fuse_request_end() */
+ 		smp_rmb();
+ 	}
  }
-+EXPORT_SYMBOL_GPL(fuse_len_args);
+@@ -1302,7 +1303,7 @@ __releases(fiq->waitq.lock)
+  * the pending list and copies request data to userspace buffer.  If
+  * no reply is needed (FORGET) or request has been aborted or there
+  * was an error during the copying then it's finished by calling
+- * request_end().  Otherwise add it to the processing list, and set
++ * fuse_request_end().  Otherwise add it to the processing list, and set
+  * the 'sent' flag.
+  */
+ static ssize_t fuse_dev_do_read(struct fuse_dev *fud, struct file *file,
+@@ -1362,7 +1363,7 @@ static ssize_t fuse_dev_do_read(struct fuse_dev *fud, struct file *file,
+ 		/* SETXATTR is special, since it may contain too large data */
+ 		if (in->h.opcode == FUSE_SETXATTR)
+ 			req->out.h.error = -E2BIG;
+-		request_end(fc, req);
++		fuse_request_end(fc, req);
+ 		goto restart;
+ 	}
+ 	spin_lock(&fpq->lock);
+@@ -1405,7 +1406,7 @@ static ssize_t fuse_dev_do_read(struct fuse_dev *fud, struct file *file,
+ 	if (!test_bit(FR_PRIVATE, &req->flags))
+ 		list_del_init(&req->list);
+ 	spin_unlock(&fpq->lock);
+-	request_end(fc, req);
++	fuse_request_end(fc, req);
+ 	return err;
  
- static u64 fuse_get_unique(struct fuse_iqueue *fiq)
- {
-@@ -375,7 +376,7 @@ static unsigned int fuse_req_hash(u64 unique)
- static void queue_request(struct fuse_iqueue *fiq, struct fuse_req *req)
- {
- 	req->in.h.len = sizeof(struct fuse_in_header) +
--		len_args(req->in.numargs, (struct fuse_arg *) req->in.args);
-+		fuse_len_args(req->in.numargs, (struct fuse_arg *) req->in.args);
- 	list_add_tail(&req->list, &fiq->pending);
- 	wake_up_locked(&fiq->waitq);
- 	kill_fasync(&fiq->fasync, SIGIO, POLL_IN);
-@@ -1894,7 +1895,7 @@ static int copy_out_args(struct fuse_copy_state *cs, struct fuse_out *out,
- 	if (out->h.error)
- 		return nbytes != reqsize ? -EINVAL : 0;
+  err_unlock:
+@@ -1913,7 +1914,7 @@ static int copy_out_args(struct fuse_copy_state *cs, struct fuse_out *out,
+  * the write buffer.  The request is then searched on the processing
+  * list by the unique ID found in the header.  If found, then remove
+  * it from the list and copy the rest of the buffer to the request.
+- * The request is finished by calling request_end()
++ * The request is finished by calling fuse_request_end().
+  */
+ static ssize_t fuse_dev_do_write(struct fuse_dev *fud,
+ 				 struct fuse_copy_state *cs, size_t nbytes)
+@@ -2000,7 +2001,7 @@ static ssize_t fuse_dev_do_write(struct fuse_dev *fud,
+ 		list_del_init(&req->list);
+ 	spin_unlock(&fpq->lock);
  
--	reqsize += len_args(out->numargs, out->args);
-+	reqsize += fuse_len_args(out->numargs, out->args);
+-	request_end(fc, req);
++	fuse_request_end(fc, req);
+ out:
+ 	return err ? err : nbytes;
  
- 	if (reqsize < nbytes || (reqsize > nbytes && !out->argvar))
- 		return -EINVAL;
+@@ -2140,7 +2141,7 @@ static void end_requests(struct fuse_conn *fc, struct list_head *head)
+ 		req->out.h.error = -ECONNABORTED;
+ 		clear_bit(FR_SENT, &req->flags);
+ 		list_del_init(&req->list);
+-		request_end(fc, req);
++		fuse_request_end(fc, req);
+ 	}
+ }
+ 
 diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 67521103d3b2..f41ce8f39006 100644
+index 24dbca777775..67521103d3b2 100644
 --- a/fs/fuse/fuse_i.h
 +++ b/fs/fuse/fuse_i.h
-@@ -1098,4 +1098,9 @@ int fuse_set_acl(struct inode *inode, struct posix_acl *acl, int type);
- /* readdir.c */
- int fuse_readdir(struct file *file, struct dir_context *ctx);
+@@ -956,6 +956,11 @@ ssize_t fuse_simple_request(struct fuse_conn *fc, struct fuse_args *args);
+ void fuse_request_send_background(struct fuse_conn *fc, struct fuse_req *req);
+ bool fuse_request_queue_background(struct fuse_conn *fc, struct fuse_req *req);
  
 +/**
-+ * Return the number of bytes in an arguments list
++ * End a finished request
 + */
-+unsigned fuse_len_args(unsigned numargs, struct fuse_arg *args);
++void fuse_request_end(struct fuse_conn *fc, struct fuse_req *req);
 +
- #endif /* _FS_FUSE_I_H */
+ /* Abort all requests */
+ void fuse_abort_conn(struct fuse_conn *fc);
+ void fuse_wait_aborted(struct fuse_conn *fc);
 -- 
 2.20.1
 

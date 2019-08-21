@@ -1,13 +1,14 @@
-Date: Wed, 21 Aug 2019 16:04:29 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190821150429.GH3309@work-vm>
-References: <20190821085659.8448-1-eguan@linux.alibaba.com>
+Date: Wed, 21 Aug 2019 16:38:02 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20190821153802.GB9095@stefanha-x1.localdomain>
+References: <5D4D0D06.1090602@huawei.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="/NkBOFFp2J2Af1nK"
 Content-Disposition: inline
-In-Reply-To: <20190821085659.8448-1-eguan@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: add support to change log level
- on fly
+In-Reply-To: <5D4D0D06.1090602@huawei.com>
+Subject: Re: [Virtio-fs] [PATCH][RFC] Support multiqueue mode by setting cpu
+ affinity
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,271 +17,245 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Eryu Guan <eguan@linux.alibaba.com>
+To: piaojun <piaojun@huawei.com>
 Cc: virtio-fs@redhat.com
 
-* Eryu Guan (eguan@linux.alibaba.com) wrote:
-> Introduce a file which contains the target log level, and
-> current_log_level will be reloaded to the target log level on SIGHUP.
-> 
-> The file is set to "/run/virtiofsd/log_level.<pid>". Due to
-> sandboxing in virtiofsd, this file can only be read/write via
-> /proc/<pid>/fd/<fd> for now.
-> 
-> Example usage:
-> 
->   # view current log level
->   cat /proc/<pid>/fd/<fd>
->   # change log level to debug
->   echo debug > /proc/<pid>/fd/<fd>
->   kill -HUP <pid>
-> 
-> Signed-off-by: Eryu Guan <eguan@linux.alibaba.com>
 
-This looks really complex for something that can only be used for
-changing log levels.
+--/NkBOFFp2J2Af1nK
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Perhaps it's time we started reading stdin for some sort of simple
-commands?
-
-Dave
-
+On Fri, Aug 09, 2019 at 02:04:54PM +0800, piaojun wrote:
+> Set cpu affinity for each queue in multiqueue mode to improve the iops
+> performance.
+>=20
+> >From my test, the iops is increased by adding multiqueues as below,
+> but it has not achieved my expect yet due to some reason. So I'm
+> considering if we could drop some locks when operating vq as it is
+> binded to one vCPU. I'm very glad to have a discuss with other
+> developers.
+>=20
+> Further more, I modified virtiofsd to support multiqueue which just for
+> testing.
+>=20
+> Test Environment:
+> Guest configuration:
+> 8 vCPU
+> 8GB RAM
+> Linux 5.1 (vivek-aug-06-2019)
+>=20
+> Host configuration:
+> Intel(R) Xeon(R) CPU E5-2670 0 @ 2.60GHz (8 cores x 4 threads)
+> 32GB RAM
+> Linux 3.10.0
+> EXT4 + 4G Ramdisk
+>=20
 > ---
->  contrib/virtiofsd/fuse_log.c       | 144 +++++++++++++++++++++++++++++++++++++
->  contrib/virtiofsd/fuse_log.h       |   4 ++
->  contrib/virtiofsd/fuse_signals.c   |   4 +-
->  contrib/virtiofsd/passthrough_ll.c |   4 ++
->  4 files changed, 154 insertions(+), 2 deletions(-)
-> 
-> diff --git a/contrib/virtiofsd/fuse_log.c b/contrib/virtiofsd/fuse_log.c
-> index d54b64099a2b..adfcbb84bfb3 100644
-> --- a/contrib/virtiofsd/fuse_log.c
-> +++ b/contrib/virtiofsd/fuse_log.c
-> @@ -6,12 +6,24 @@
->   * See the COPYING.LIB file in the top-level directory.
->   */
->  
-> +#include <sys/stat.h>
-> +#include <sys/types.h>
-> +#include <errno.h>
-> +#include <fcntl.h>
-> +#include <limits.h>
->  #include <stdbool.h>
->  #include <stdio.h>
->  #include <stdarg.h>
-> +#include <stdlib.h>
-> +#include <string.h>
-> +#include <unistd.h>
->  #include "fuse_log.h"
->  
-> +#define FUSE_DYN_LOG_BASE "/run/virtiofsd"
+> Single-queue:
+> # fio -direct=3D1 -time_based -iodepth=3D128 -rw=3Drandwrite -ioengine=3D=
+libaio -bs=3D4k -size=3D1G -numjob=3D8 -runtime=3D30 -group_reporting -name=
+=3Dfile -filename=3D/mnt/virtiofs/file
+> file: (g=3D0): rw=3Drandwrite, bs=3D4K-4K/4K-4K/4K-4K, ioengine=3Dlibaio,=
+ iodepth=3D128
+> ...
+> fio-2.13
+> Starting 8 processes
+> Jobs: 8 (f=3D8): [w(8)] [100.0% done] [0KB/316.5MB/0KB /s] [0/81.2K/0 iop=
+s] [eta 00m:00s]
+> file: (groupid=3D0, jobs=3D8): err=3D 0: pid=3D5808: Fri Aug  9 20:35:22 =
+2019
+>   write: io=3D9499.9MB, bw=3D324251KB/s, iops=3D81062, runt=3D 30001msec
+>=20
+> Multi-queues:
+> # fio -direct=3D1 -time_based -iodepth=3D128 -rw=3Drandwrite -ioengine=3D=
+libaio -bs=3D4k -size=3D1G -numjob=3D8 -runtime=3D30 -group_reporting -name=
+=3Dfile -filename=3D/mnt/virtiofs/file
+> file: (g=3D0): rw=3Drandwrite, bs=3D4K-4K/4K-4K/4K-4K, ioengine=3Dlibaio,=
+ iodepth=3D128
+> ...
+> fio-2.13
+> Starting 8 processes
+> Jobs: 8 (f=3D8): [w(8)] [100.0% done] [0KB/444.6MB/0KB /s] [0/114K/0 iops=
+] [eta 00m:00s]
+> file: (groupid=3D0, jobs=3D8): err=3D 0: pid=3D5704: Fri Aug  9 20:38:47 =
+2019
+>   write: io=3D12967MB, bw=3D442582KB/s, iops=3D110645, runt=3D 30001msec
+> ---
+
+How does the same fio command-line perform on the host when bound to 8
+CPUs?
+
+What about the virtiofsd changes?  Did you implement host CPU affinity
+for the virtqueue processing threads and their workqueues?
+
+I wonder if numbers are better if you use 8 files instead of 1 file.
+
+> Signed-off-by: Jun Piao <piaojun@huawei.com>
+> ---
+>  fs/fuse/virtio_fs.c | 68 +++++++++++++++++++++++++++++++++++++++++++++++=
+++++--
+>  1 file changed, 66 insertions(+), 2 deletions(-)
+>=20
+> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> index a04c320..7ba36fc 100644
+> --- a/fs/fuse/virtio_fs.c
+> +++ b/fs/fuse/virtio_fs.c
+> @@ -12,6 +12,7 @@
+>  #include <linux/virtio.h>
+>  #include <linux/virtio_fs.h>
+>  #include <linux/delay.h>
+> +#include <linux/cpu.h>
+>  #include "fuse_i.h"
+>=20
+>  /* List of virtio-fs device instances and a lock for the list */
+> @@ -61,6 +62,9 @@ struct virtio_fs {
+>  	void *window_kaddr;
+>  	phys_addr_t window_phys_addr;
+>  	size_t window_len;
 > +
->  static bool use_syslog;
-> +static char *dyn_log_file = NULL;
-> +static int dyn_log_fd = -1;
->  int current_log_level = LOG_INFO;
->  
->  void fuse_log_enable_syslog(void)
-> @@ -71,3 +83,135 @@ void fuse_debug(const char *fmt, ...)
->      fuse_vlog(LOG_DEBUG, fmt, ap);
->      va_end(ap);
+> +	/* Does the affinity hint is set for virtqueues? */
+> +	bool affinity_hint_set;
+>  };
+>=20
+>  struct virtio_fs_forget {
+> @@ -378,6 +382,44 @@ static void virtio_fs_vq_done(struct virtqueue *vq)
+>  	schedule_work(&fsvq->done_work);
 >  }
-> +
-> +static const char *fuse_log_level_str(int level)
+>=20
+> +static void virtio_fs_clean_affinity(struct virtio_fs *fs)
 > +{
-> +    switch (level) {
-> +    case LOG_DEBUG:
-> +        return "debug";
-> +    case LOG_INFO:
-> +        return "info";
-> +    case LOG_WARNING:
-> +        return "warn";
-> +    case LOG_ERR:
-> +        return "err";
-> +    default:
-> +        return NULL;
-> +    }
+> +	int i;
+> +
+> +	if (fs->affinity_hint_set) {
+> +		for (i =3D 0; i < fs->num_queues; i++)
+> +			virtqueue_set_affinity(fs->vqs[i].vq, NULL);
+> +
+> +		fs->affinity_hint_set =3D false;
+> +	}
 > +}
 > +
-> +void fuse_dyn_log_init(void)
+> +static void virtio_fs_set_affinity(struct virtio_fs *fs)
 > +{
-> +    struct stat stbuf;
-> +    char buf[PATH_MAX];
-> +    const char *p;
+> +	int i =3D 0, cpu;
 > +
-> +    /* Prepare FUSE_DYN_LOG_BASE */
-> +    if (mkdir(FUSE_DYN_LOG_BASE, 0755) == -1) {
-> +        if (errno != EEXIST) {
-> +            fuse_warning("Fail to mkdir(%s): %s\n", FUSE_DYN_LOG_BASE,
-> +                         strerror(errno));
-> +            goto err;
-> +        }
-> +    }
-> +    if (stat(FUSE_DYN_LOG_BASE, &stbuf) == -1) {
-> +        fuse_warning("Fail to stat(%s): %s\n", FUSE_DYN_LOG_BASE,
-> +                     strerror(errno));
-> +        goto err;
-> +    }
-> +    if (!S_ISDIR(stbuf.st_mode)) {
-> +        fuse_warning("%s is not a directory\n", FUSE_DYN_LOG_BASE);
-> +        goto err;
-> +    }
-> +    if (!(stbuf.st_mode & S_IRUSR) || !(stbuf.st_mode & S_IWUSR)) {
-> +        fuse_warning("Require rw permission on %s\n", FUSE_DYN_LOG_BASE);
-> +        goto err;
-> +    }
+> +	/*
+> +	 * In single queue mode, we don't set the cpu affinity.
+> +	 */
+> +	if (fs->num_queues =3D=3D 1) {
+> +		virtio_fs_clean_affinity(fs);
+> +		fs->affinity_hint_set =3D false;
+> +		return;
+> +	}
 > +
-> +    /* Prepare log level file */
-> +    snprintf(buf, sizeof(buf), FUSE_DYN_LOG_BASE "/log_level.%d",
-> +             getpid());
-> +    dyn_log_file = strdup(buf);
-> +    if (dyn_log_file == NULL) {
-> +        fuse_warning("Fail to duplicate str %s: %s\n", buf, strerror(errno));
-> +        goto err;
-> +    }
-> +    dyn_log_fd = open(dyn_log_file, O_CREAT | O_TRUNC | O_RDWR, 0644);
-> +    if (dyn_log_fd == -1) {
-> +        fuse_warning("Fail to open %s: %s\n", dyn_log_file, strerror(errno));
-> +        goto err;
-> +    }
-> +    /*
-> +     * TODO: Due to sandboxing, unlink won't work in
-> +     * fuse_dyn_log_fin(), we have to unlink log file here and access
-> +     * it via /proc/<pid>/fd/<fd>
-> +     */
-> +    if (unlink(dyn_log_file) == -1)
-> +        fuse_warning("Fail to unlink %s: %s\n", dyn_log_file, strerror(errno));
+> +	/*
+> +	 * In multiqueue mode, we let the queue to be private to one cpu
+> +	 * by setting the affinity hint to eliminate the contention.
+> +	 */
+> +	for_each_online_cpu(cpu) {
+> +		virtqueue_set_affinity(fs->vqs[i].vq, cpumask_of(cpu));
+> +		if (++i >=3D fs->num_queues)
+> +			break;
+> +	}
 > +
-> +    p = fuse_log_level_str(current_log_level);
-> +    if (p == NULL) {
-> +        fuse_warning("Unknown initial log level %d\n", current_log_level);
-> +        goto err;
-> +    }
-> +    if (write(dyn_log_fd, p, strlen(p)) == -1) {
-> +        fuse_warning("Fail to write (\"%s\") to %s: %s\n", p, dyn_log_file,
-> +                     strerror(errno));
-> +    }
-> +
-> +    fuse_info("Dynamic log level adjustment is enabled, entry file %s\n",
-> +              dyn_log_file);
-> +    return;
-> +err:
-> +    fuse_warning("Dynamic log level adjustment is disabled\n");
-> +    return;
+> +	fs->affinity_hint_set =3D true;
 > +}
 > +
-> +void fuse_dyn_log_fin(void)
-> +{
-> +    if (dyn_log_fd != -1) {
-> +        close(dyn_log_fd);
-> +        dyn_log_fd = -1;
-> +    }
-> +    if (dyn_log_file) {
-> +        free(dyn_log_file);
-> +        dyn_log_file = NULL;
-> +    }
-> +    return;
-> +}
-> +
-> +void fuse_log_handler(int sig)
-> +{
-> +    char buf[16] = { 0 };
-> +
-> +    /* FIXME: pread() causes read to hang, use lseek & read here */
-> +    if (lseek(dyn_log_fd, 0, SEEK_SET) == -1) {
-> +        fuse_warning("Fail to seek %s: %s\n", dyn_log_file, strerror(errno));
-> +        goto err;
-> +    }
-> +    if (read(dyn_log_fd, buf, 16) == -1 ) {
-> +        fuse_warning("Fail to read %s: %s\n", dyn_log_file, strerror(errno));
-> +        goto err;
-> +    }
-> +    buf[15] = '\0';
-> +    buf[strcspn(buf, "\n")] = '\0';
-> +
-> +    if (!strncmp(buf, "debug", 5)) {
-> +        current_log_level = LOG_DEBUG;
-> +    } else if (!strncmp(buf, "info", 4)) {
-> +        current_log_level = LOG_INFO;
-> +    } else if (!strncmp(buf, "warn", 4)) {
-> +        current_log_level = LOG_WARNING;
-> +    } else if (!strncmp(buf, "err", 3)) {
-> +        current_log_level = LOG_ERR;
-> +    } else {
-> +        fuse_warning("Unknown log level \"%s\"\n", buf);
-> +        goto err;
-> +    }
-> +
-> +    fuse_info("Changed current log level to %s(%d)\n", buf, current_log_level);
-> +    return;
-> +err:
-> +    fuse_warning("Reload log level failed\n");
-> +    return;
-> +}
-> diff --git a/contrib/virtiofsd/fuse_log.h b/contrib/virtiofsd/fuse_log.h
-> index c4dfc921b6d8..532a6d66e296 100644
-> --- a/contrib/virtiofsd/fuse_log.h
-> +++ b/contrib/virtiofsd/fuse_log.h
-> @@ -21,4 +21,8 @@ void fuse_warning(const char *fmt, ...) GCC_FMT_ATTR(1, 2);
->  void fuse_info(const char *fmt, ...) GCC_FMT_ATTR(1, 2);
->  void fuse_debug(const char *fmt, ...) GCC_FMT_ATTR(1, 2);
->  
-> +void fuse_dyn_log_init(void);
-> +void fuse_dyn_log_fin(void);
-> +void fuse_log_handler(int sig);
-> +
->  #endif /* FUSE_LOG_H */
-> diff --git a/contrib/virtiofsd/fuse_signals.c b/contrib/virtiofsd/fuse_signals.c
-> index 9d34f6b04025..862ba1852eff 100644
-> --- a/contrib/virtiofsd/fuse_signals.c
-> +++ b/contrib/virtiofsd/fuse_signals.c
-> @@ -69,7 +69,7 @@ int fuse_set_signal_handlers(struct fuse_session *se)
->  	   thus should reset to SIG_DFL in fuse_remove_signal_handlers)
->  	   or if it was already set to SIG_IGN (and should be left
->  	   untouched. */
-> -	if (set_one_signal_handler(SIGHUP, exit_handler, 0) == -1 ||
-> +	if (set_one_signal_handler(SIGHUP, fuse_log_handler, 0) == -1 ||
->  	    set_one_signal_handler(SIGINT, exit_handler, 0) == -1 ||
->  	    set_one_signal_handler(SIGTERM, exit_handler, 0) == -1 ||
->  	    set_one_signal_handler(SIGPIPE, do_nothing, 0) == -1)
-> @@ -86,7 +86,7 @@ void fuse_remove_signal_handlers(struct fuse_session *se)
->  	else
->  		fuse_instance = NULL;
->  
-> -	set_one_signal_handler(SIGHUP, exit_handler, 1);
-> +	set_one_signal_handler(SIGHUP, fuse_log_handler, 1);
->  	set_one_signal_handler(SIGINT, exit_handler, 1);
->  	set_one_signal_handler(SIGTERM, exit_handler, 1);
->  	set_one_signal_handler(SIGPIPE, do_nothing, 1);
-> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-> index ca11764feb88..5f32227a0712 100644
-> --- a/contrib/virtiofsd/passthrough_ll.c
-> +++ b/contrib/virtiofsd/passthrough_ll.c
-> @@ -2987,6 +2987,9 @@ int main(int argc, char *argv[])
->  		get_shared(&lo, &lo.root);
+>  /* Initialize virtqueues */
+>  static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+>  			       struct virtio_fs *fs)
+> @@ -440,6 +482,11 @@ static int virtio_fs_setup_vqs(struct virtio_device =
+*vdev,
+>  		fs->vqs[i].vq =3D vqs[i];
+>  		fs->vqs[i].connected =3D true;
 >  	}
->  
-> +	/* Initialize dynamic log level infra, after SIGHUP handler is set. */
-> +	fuse_dyn_log_init();
 > +
->  	/* Must be after daemonize to get the right /proc/self/fd */
->  	setup_proc_self_fd(&lo);
->  
-> @@ -2997,6 +3000,7 @@ int main(int argc, char *argv[])
->  	/* Block until ctrl+c or fusermount -u */
->          ret = virtio_loop(se);
->  
-> +	fuse_dyn_log_fin();
->  err_out4:
->  	fuse_session_unmount(se);
->  err_out3:
-> -- 
-> 2.14.4.44.g2045bb6
-> 
+> +	/* set affinity for vqs */
+> +	get_online_cpus();
+> +	virtio_fs_set_affinity(fs);
+> +	put_online_cpus();
+>  out:
+>  	kfree(names);
+>  	kfree(callbacks);
+> @@ -451,6 +498,7 @@ static int virtio_fs_setup_vqs(struct virtio_device *=
+vdev,
+>  static void virtio_fs_cleanup_vqs(struct virtio_device *vdev,
+>  				  struct virtio_fs *fs)
+>  {
+> +	virtio_fs_clean_affinity(fs);
+>  	vdev->config->del_vqs(vdev);
+>  }
+>=20
+> @@ -954,10 +1002,22 @@ static int virtio_fs_enqueue_req(struct virtqueue =
+*vq, struct fuse_req *req)
+>  	return ret;
+>  }
+>=20
+> +static unsigned virtio_fs_pick_vq_mq(struct virtio_fs *fs)
+> +{
+> +	unsigned queue_id;
+> +	unsigned long flags;
+> +
+> +	local_irq_save(flags);
+> +	queue_id =3D (smp_processor_id() % fs->num_queues) + VQ_REQUEST;
+> +	local_irq_restore(flags);
+> +
+> +	return queue_id;
+> +}
+> +
+>  static void virtio_fs_wake_pending_and_unlock(struct fuse_iqueue *fiq)
+>  __releases(fiq->waitq.lock)
+>  {
+> -	unsigned queue_id =3D VQ_REQUEST; /* TODO multiqueue */
+> +	unsigned queue_id =3D VQ_REQUEST;
+>  	struct virtio_fs *fs;
+>  	struct fuse_conn *fc;
+>  	struct fuse_req *req;
+> @@ -972,6 +1032,8 @@ static void virtio_fs_wake_pending_and_unlock(struct=
+ fuse_iqueue *fiq)
+>  	spin_unlock(&fiq->waitq.lock);
+>=20
+>  	fs =3D fiq->priv;
+> +	if (fs->num_queues > 1)
+> +		queue_id =3D virtio_fs_pick_vq_mq(fs);
+>  	fc =3D fs->vqs[queue_id].fud->fc;
+>=20
+>  	dev_dbg(&fs->vqs[queue_id].vq->vdev->dev,
+> @@ -1066,9 +1128,11 @@ static int virtio_fs_fill_super(struct super_block=
+ *sb, char *opts,
+>=20
+>  	err =3D -ENOMEM;
+>  	/* Allocate fuse_dev for hiprio and notification queues */
+> -	for (i =3D 0; i < VQ_REQUEST; i++) {
+> +	for (i =3D 0; i < VQ_REQUEST + fs->num_queues; i++) {
+>  		struct virtio_fs_vq *fsvq =3D &fs->vqs[i];
+>=20
+> +		if (i =3D=3D VQ_REQUEST)
+> +			continue;  /* will be allocated in fuse_fill_super_common */
+>  		fsvq->fud =3D fuse_dev_alloc();
+>  		if (!fsvq->fud)
+>  			goto err_free_fuse_devs;
+> --=20
+>=20
 > _______________________________________________
 > Virtio-fs mailing list
 > Virtio-fs@redhat.com
 > https://www.redhat.com/mailman/listinfo/virtio-fs
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+
+--/NkBOFFp2J2Af1nK
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1dZVoACgkQnKSrs4Gr
+c8gzDQgAgNfxrYw9km4YBkY0cXzuZh2foRK/ib0KkZK/URHLmOmtorpwgfOrr2B3
+NCATJvaJUQlwsWC0Oht3AimjNYLzXuDP31msUgEERwQsB4koFNPyPIqbozjNmloB
+nApnru1naRi2Fhv35GkXH/XYfzWwqYX3oBbEOT35MxMKrnHNrXVrINN/KsGmVdjk
+wf/j9vEps9NPZV3hbQjSi6h8gl8jm7a7XKw3Xzl3fjG0/cK6AWjSk+enmPEiHLV3
+/2iCYQq8eHq/QgDtx1vHrIcMu2iBuJm2Po67UR62O+li+NE4iZX3Md0wj1iwR+mj
+XrV5ak/Q/9o9FGF/g7RMBWhQTPC4pw==
+=ocUI
+-----END PGP SIGNATURE-----
+
+--/NkBOFFp2J2Af1nK--
 

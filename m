@@ -1,12 +1,11 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 21 Aug 2019 13:57:20 -0400
-Message-Id: <20190821175720.25901-20-vgoyal@redhat.com>
+Date: Wed, 21 Aug 2019 13:57:02 -0400
+Message-Id: <20190821175720.25901-2-vgoyal@redhat.com>
 In-Reply-To: <20190821175720.25901-1-vgoyal@redhat.com>
 References: <20190821175720.25901-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 19/19] fuse: Take inode lock for dax inode
-	truncation
+Subject: [Virtio-fs] [PATCH 01/19] dax: remove block device dependencies
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,40 +15,60 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org
-Cc: virtio-fs@redhat.com, vgoyal@redhat.com, miklos@szeredi.hu
+Cc: miklos@szeredi.hu, virtio-fs@redhat.com, Dan Williams <dan.j.williams@intel.com>, vgoyal@redhat.com
 
-When a file is opened with O_TRUNC, we need to make sure that any other
-DAX operation is not in progress. DAX expects i_size to be stable.
+From: Stefan Hajnoczi <stefanha@redhat.com>
 
-In fuse_iomap_begin() we check for i_size at multiple places and we expect
-i_size to not change.
+Although struct dax_device itself is not tied to a block device, some
+DAX code assumes there is a block device.  Make block devices optional
+by allowing bdev to be NULL in commonly used DAX APIs.
 
-Another problem is, if we setup a mapping in fuse_iomap_begin(), and
-file gets truncated and dax read/write happens, KVM currently hangs.
-It tries to fault in a page which does not exist on host (file got
-truncated). It probably requries fixing in KVM.
+When there is no block device:
+ * Skip the partition offset calculation in bdev_dax_pgoff()
+ * Skip the blkdev_issue_zeroout() optimization
 
-So for now, take inode lock. Once KVM is fixed, we might have to
-have a look at it again.
+Note that more block device assumptions remain but I haven't reach those
+code paths yet.
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- fs/fuse/file.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/dax/super.c | 3 ++-
+ fs/dax.c            | 7 ++++++-
+ 2 files changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index e369a1f92d85..794c55131bd0 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -524,7 +524,7 @@ int fuse_open_common(struct inode *inode, struct file *file, bool isdir)
- 	int err;
- 	bool lock_inode = (file->f_flags & O_TRUNC) &&
- 			  fc->atomic_o_trunc &&
--			  fc->writeback_cache;
-+			  (fc->writeback_cache || IS_DAX(inode));
+diff --git a/drivers/dax/super.c b/drivers/dax/super.c
+index 26a654dbc69a..3cbc97f3e653 100644
+--- a/drivers/dax/super.c
++++ b/drivers/dax/super.c
+@@ -46,7 +46,8 @@ EXPORT_SYMBOL_GPL(dax_read_unlock);
+ int bdev_dax_pgoff(struct block_device *bdev, sector_t sector, size_t size,
+ 		pgoff_t *pgoff)
+ {
+-	phys_addr_t phys_off = (get_start_sect(bdev) + sector) * 512;
++	sector_t start_sect = bdev ? get_start_sect(bdev) : 0;
++	phys_addr_t phys_off = (start_sect + sector) * 512;
  
- 	err = generic_file_open(inode, file);
- 	if (err)
+ 	if (pgoff)
+ 		*pgoff = PHYS_PFN(phys_off);
+diff --git a/fs/dax.c b/fs/dax.c
+index 6bf81f931de3..a11147bbaf9e 100644
+--- a/fs/dax.c
++++ b/fs/dax.c
+@@ -1046,7 +1046,12 @@ static vm_fault_t dax_load_hole(struct xa_state *xas,
+ static bool dax_range_is_aligned(struct block_device *bdev,
+ 				 unsigned int offset, unsigned int length)
+ {
+-	unsigned short sector_size = bdev_logical_block_size(bdev);
++	unsigned short sector_size;
++
++	if (!bdev)
++		return false;
++
++	sector_size = bdev_logical_block_size(bdev);
+ 
+ 	if (!IS_ALIGNED(offset, sector_size))
+ 		return false;
 -- 
 2.20.1
 

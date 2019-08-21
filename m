@@ -1,12 +1,11 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 21 Aug 2019 13:57:17 -0400
-Message-Id: <20190821175720.25901-17-vgoyal@redhat.com>
+Date: Wed, 21 Aug 2019 13:57:19 -0400
+Message-Id: <20190821175720.25901-19-vgoyal@redhat.com>
 In-Reply-To: <20190821175720.25901-1-vgoyal@redhat.com>
 References: <20190821175720.25901-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 16/19] dax: Create a range version of
-	dax_layout_busy_page()
+Subject: [Virtio-fs] [PATCH 18/19] fuse: Release file in process context
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,149 +15,64 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org
-Cc: miklos@szeredi.hu, virtio-fs@redhat.com, Dan Williams <dan.j.williams@intel.com>, vgoyal@redhat.com
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com, miklos@szeredi.hu
 
-While reclaiming a dax range, we do not want to unamap whole file instead
-want to make sure pages in a certain range do not have references taken
-on them. Hence create a version of the function which allows to pass in
-a range.
+fuse_file_put(sync) can be called with sync=true/false. If sync=true,
+it waits for release request response and then calls iput() in the
+caller's context. If sync=false, it does not wait for release request
+response, frees the fuse_file struct immediately and req->end function
+does the iput().
 
-Cc: Dan Williams <dan.j.williams@intel.com>
+iput() can be a problem with DAX if called in req->end context. If this
+is last reference to inode (VFS has let go its reference already), then
+iput() will clean DAX mappings as well and send REMOVEMAPPING requests
+and wait for completion. (All the the worker thread context which is
+processing fuse replies from daemon on the host).
+
+That means it blocks worker thread and it stops processing further
+replies and system deadlocks.
+
+So for now, force sync release of file in case of DAX inodes.
+
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- fs/dax.c            | 66 ++++++++++++++++++++++++++++++++-------------
- include/linux/dax.h |  6 +++++
- 2 files changed, 54 insertions(+), 18 deletions(-)
+ fs/fuse/file.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-diff --git a/fs/dax.c b/fs/dax.c
-index 60620a37030c..435f5b67e828 100644
---- a/fs/dax.c
-+++ b/fs/dax.c
-@@ -557,27 +557,20 @@ static void *grab_mapping_entry(struct xa_state *xas,
- 	return xa_mk_internal(VM_FAULT_FALLBACK);
- }
+diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+index 2ff7624d58c0..e369a1f92d85 100644
+--- a/fs/fuse/file.c
++++ b/fs/fuse/file.c
+@@ -579,6 +579,7 @@ void fuse_release_common(struct file *file, bool isdir)
+ 	struct fuse_file *ff = file->private_data;
+ 	struct fuse_req *req = ff->reserved_req;
+ 	int opcode = isdir ? FUSE_RELEASEDIR : FUSE_RELEASE;
++	bool sync = false;
  
--/**
-- * dax_layout_busy_page - find first pinned page in @mapping
-- * @mapping: address space to scan for a page with ref count > 1
-- *
-- * DAX requires ZONE_DEVICE mapped pages. These pages are never
-- * 'onlined' to the page allocator so they are considered idle when
-- * page->count == 1. A filesystem uses this interface to determine if
-- * any page in the mapping is busy, i.e. for DMA, or other
-- * get_user_pages() usages.
-- *
-- * It is expected that the filesystem is holding locks to block the
-- * establishment of new mappings in this address_space. I.e. it expects
-- * to be able to run unmap_mapping_range() and subsequently not race
-- * mapping_mapped() becoming true.
-+/*
-+ * Partial pages are included. If end is 0, pages in the range from start
-+ * to end of the file are inluded.
-  */
--struct page *dax_layout_busy_page(struct address_space *mapping)
-+struct page *dax_layout_busy_page_range(struct address_space *mapping,
-+					loff_t start, loff_t end)
- {
--	XA_STATE(xas, &mapping->i_pages, 0);
- 	void *entry;
- 	unsigned int scanned = 0;
- 	struct page *page = NULL;
-+	pgoff_t start_idx = start >> PAGE_SHIFT;
-+	pgoff_t end_idx = end >> PAGE_SHIFT;
-+	XA_STATE(xas, &mapping->i_pages, start_idx);
-+	loff_t len, lstart = round_down(start, PAGE_SIZE);
+ 	fuse_prepare_release(fi, ff, file->f_flags, opcode);
  
- 	/*
- 	 * In the 'limited' case get_user_pages() for dax is disabled.
-@@ -588,6 +581,22 @@ struct page *dax_layout_busy_page(struct address_space *mapping)
- 	if (!dax_mapping(mapping) || !mapping_mapped(mapping))
- 		return NULL;
- 
-+	/* If end == 0, all pages from start to till end of file */
-+	if (!end) {
-+		end_idx = ULONG_MAX;
-+		len = 0;
-+	} else {
-+		/* length is being calculated from lstart and not start.
-+		 * This is due to behavior of unmap_mapping_range(). If
-+		 * start is say 4094 and end is on 4093 then want to
-+		 * unamp two pages, idx 0 and 1. But unmap_mapping_range()
-+		 * will unmap only page at idx 0. If we calculate len
-+		 * from the rounded down start, this problem should not
-+		 * happen.
-+		 */
-+		len = end - lstart + 1;
-+	}
-+
- 	/*
- 	 * If we race get_user_pages_fast() here either we'll see the
- 	 * elevated page count in the iteration and wait, or
-@@ -600,10 +609,10 @@ struct page *dax_layout_busy_page(struct address_space *mapping)
- 	 * guaranteed to either see new references or prevent new
- 	 * references from being established.
+@@ -599,8 +600,20 @@ void fuse_release_common(struct file *file, bool isdir)
+ 	 * Make the release synchronous if this is a fuseblk mount,
+ 	 * synchronous RELEASE is allowed (and desirable) in this case
+ 	 * because the server can be trusted not to screw up.
++	 *
++	 * For DAX, fuse server is trusted. So it should be fine to
++	 * do a sync file put. Doing async file put is creating
++	 * problems right now because when request finish, iput()
++	 * can lead to freeing of inode. That means it tears down
++	 * mappings backing DAX memory and sends REMOVEMAPPING message
++	 * to server and blocks for completion. Currently, waiting
++	 * in req->end context deadlocks the system as same worker thread
++	 * can't process REMOVEMAPPING reply it is waiting for.
  	 */
--	unmap_mapping_range(mapping, 0, 0, 0);
-+	unmap_mapping_range(mapping, start, len, 0);
- 
- 	xas_lock_irq(&xas);
--	xas_for_each(&xas, entry, ULONG_MAX) {
-+	xas_for_each(&xas, entry, end_idx) {
- 		if (WARN_ON_ONCE(!xa_is_value(entry)))
- 			continue;
- 		if (unlikely(dax_is_locked(entry)))
-@@ -624,6 +633,27 @@ struct page *dax_layout_busy_page(struct address_space *mapping)
- 	xas_unlock_irq(&xas);
- 	return page;
- }
-+EXPORT_SYMBOL_GPL(dax_layout_busy_page_range);
+-	fuse_file_put(ff, ff->fc->destroy_req != NULL, isdir);
++	if (IS_DAX(req->misc.release.inode) || ff->fc->destroy_req != NULL)
++		sync = true;
 +
-+/**
-+ * dax_layout_busy_page - find first pinned page in @mapping
-+ * @mapping: address space to scan for a page with ref count > 1
-+ *
-+ * DAX requires ZONE_DEVICE mapped pages. These pages are never
-+ * 'onlined' to the page allocator so they are considered idle when
-+ * page->count == 1. A filesystem uses this interface to determine if
-+ * any page in the mapping is busy, i.e. for DMA, or other
-+ * get_user_pages() usages.
-+ *
-+ * It is expected that the filesystem is holding locks to block the
-+ * establishment of new mappings in this address_space. I.e. it expects
-+ * to be able to run unmap_mapping_range() and subsequently not race
-+ * mapping_mapped() becoming true.
-+ */
-+struct page *dax_layout_busy_page(struct address_space *mapping)
-+{
-+	return dax_layout_busy_page_range(mapping, 0, 0);
-+}
- EXPORT_SYMBOL_GPL(dax_layout_busy_page);
- 
- static int __dax_invalidate_entry(struct address_space *mapping,
-diff --git a/include/linux/dax.h b/include/linux/dax.h
-index e7f40108f2c9..3ef6686c080b 100644
---- a/include/linux/dax.h
-+++ b/include/linux/dax.h
-@@ -145,6 +145,7 @@ int dax_writeback_mapping_range(struct address_space *mapping,
- 		struct writeback_control *wbc);
- 
- struct page *dax_layout_busy_page(struct address_space *mapping);
-+struct page *dax_layout_busy_page_range(struct address_space *mapping, loff_t start, loff_t end);
- dax_entry_t dax_lock_page(struct page *page);
- void dax_unlock_page(struct page *page, dax_entry_t cookie);
- #else
-@@ -180,6 +181,11 @@ static inline struct page *dax_layout_busy_page(struct address_space *mapping)
- 	return NULL;
++	fuse_file_put(ff, sync, isdir);
  }
  
-+static inline struct page *dax_layout_busy_page_range(struct address_space *mapping, pgoff_t start, pgoff_t nr_pages)
-+{
-+	return NULL;
-+}
-+
- static inline int dax_writeback_mapping_range(struct address_space *mapping,
- 		struct block_device *bdev, struct dax_device *dax_dev,
- 		struct writeback_control *wbc)
+ static int fuse_open(struct inode *inode, struct file *file)
 -- 
 2.20.1
 

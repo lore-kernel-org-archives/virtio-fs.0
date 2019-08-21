@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 21 Aug 2019 13:57:03 -0400
-Message-Id: <20190821175720.25901-3-vgoyal@redhat.com>
+Date: Wed, 21 Aug 2019 13:57:06 -0400
+Message-Id: <20190821175720.25901-6-vgoyal@redhat.com>
 In-Reply-To: <20190821175720.25901-1-vgoyal@redhat.com>
 References: <20190821175720.25901-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 02/19] dax: Pass dax_dev to
-	dax_writeback_mapping_range()
+Subject: [Virtio-fs] [PATCH 05/19] virtio: Implement get_shm_region for MMIO
+	transport
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,133 +16,92 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org
-Cc: miklos@szeredi.hu, virtio-fs@redhat.com, Dan Williams <dan.j.williams@intel.com>, vgoyal@redhat.com
+Cc: kvm@vger.kernel.org, miklos@szeredi.hu, virtio-fs@redhat.com, Sebastien Boeuf <sebastien.boeuf@intel.com>, vgoyal@redhat.com
 
-Right now dax_writeback_mapping_range() is passed a bdev and dax_dev
-is searched from that bdev name.
+From: Sebastien Boeuf <sebastien.boeuf@intel.com>
 
-virtio-fs does not have a bdev. So pass in dax_dev also to
-dax_writeback_mapping_range(). If dax_dev is passed in, bdev is not
-used otherwise dax_dev is searched using bdev.
+On MMIO a new set of registers is defined for finding SHM
+regions.  Add their definitions and use them to find the region.
 
-Cc: Dan Williams <dan.j.williams@intel.com>
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Cc: kvm@vger.kernel.org
+Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
 ---
- fs/dax.c            | 16 ++++++++++------
- fs/ext2/inode.c     |  2 +-
- fs/ext4/inode.c     |  2 +-
- fs/xfs/xfs_aops.c   |  2 +-
- include/linux/dax.h |  6 ++++--
- 5 files changed, 17 insertions(+), 11 deletions(-)
+ drivers/virtio/virtio_mmio.c     | 32 ++++++++++++++++++++++++++++++++
+ include/uapi/linux/virtio_mmio.h | 11 +++++++++++
+ 2 files changed, 43 insertions(+)
 
-diff --git a/fs/dax.c b/fs/dax.c
-index a11147bbaf9e..60620a37030c 100644
---- a/fs/dax.c
-+++ b/fs/dax.c
-@@ -936,12 +936,12 @@ static int dax_writeback_one(struct xa_state *xas, struct dax_device *dax_dev,
-  * on persistent storage prior to completion of the operation.
-  */
- int dax_writeback_mapping_range(struct address_space *mapping,
--		struct block_device *bdev, struct writeback_control *wbc)
-+		struct block_device *bdev, struct dax_device *dax_dev,
-+		struct writeback_control *wbc)
- {
- 	XA_STATE(xas, &mapping->i_pages, wbc->range_start >> PAGE_SHIFT);
- 	struct inode *inode = mapping->host;
- 	pgoff_t end_index = wbc->range_end >> PAGE_SHIFT;
--	struct dax_device *dax_dev;
- 	void *entry;
- 	int ret = 0;
- 	unsigned int scanned = 0;
-@@ -952,9 +952,12 @@ int dax_writeback_mapping_range(struct address_space *mapping,
- 	if (!mapping->nrexceptional || wbc->sync_mode != WB_SYNC_ALL)
- 		return 0;
+diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
+index e09edb5c5e06..5c07985c8cb8 100644
+--- a/drivers/virtio/virtio_mmio.c
++++ b/drivers/virtio/virtio_mmio.c
+@@ -500,6 +500,37 @@ static const char *vm_bus_name(struct virtio_device *vdev)
+ 	return vm_dev->pdev->name;
+ }
  
--	dax_dev = dax_get_by_host(bdev->bd_disk->disk_name);
--	if (!dax_dev)
--		return -EIO;
-+	if (bdev) {
-+		WARN_ON(dax_dev);
-+		dax_dev = dax_get_by_host(bdev->bd_disk->disk_name);
-+		if (!dax_dev)
-+			return -EIO;
++static bool vm_get_shm_region(struct virtio_device *vdev,
++			      struct virtio_shm_region *region, u8 id)
++{
++	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
++	u64 len, addr;
++
++	/* Select the region we're interested in */
++	writel(id, vm_dev->base + VIRTIO_MMIO_SHM_SEL);
++
++	/* Read the region size */
++	len = (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_LEN_LOW);
++	len |= (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_LEN_HIGH) << 32;
++
++	region->len = len;
++
++	/* Check if region length is -1. If that's the case, the shared memory
++	 * region does not exist and there is no need to proceed further.
++	 */
++	if (len == ~(u64)0) {
++		return false;
 +	}
++
++	/* Read the region base address */
++	addr = (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_BASE_LOW);
++	addr |= (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_BASE_HIGH) << 32;
++
++	region->addr = addr;
++
++	return true;
++}
++
+ static const struct virtio_config_ops virtio_mmio_config_ops = {
+ 	.get		= vm_get,
+ 	.set		= vm_set,
+@@ -512,6 +543,7 @@ static const struct virtio_config_ops virtio_mmio_config_ops = {
+ 	.get_features	= vm_get_features,
+ 	.finalize_features = vm_finalize_features,
+ 	.bus_name	= vm_bus_name,
++	.get_shm_region = vm_get_shm_region,
+ };
  
- 	trace_dax_writeback_range(inode, xas.xa_index, end_index);
  
-@@ -976,7 +979,8 @@ int dax_writeback_mapping_range(struct address_space *mapping,
- 		xas_lock_irq(&xas);
- 	}
- 	xas_unlock_irq(&xas);
--	put_dax(dax_dev);
-+	if (bdev)
-+		put_dax(dax_dev);
- 	trace_dax_writeback_range_done(inode, xas.xa_index, end_index);
- 	return ret;
- }
-diff --git a/fs/ext2/inode.c b/fs/ext2/inode.c
-index 7004ce581a32..4e3870c4e255 100644
---- a/fs/ext2/inode.c
-+++ b/fs/ext2/inode.c
-@@ -958,7 +958,7 @@ static int
- ext2_dax_writepages(struct address_space *mapping, struct writeback_control *wbc)
- {
- 	return dax_writeback_mapping_range(mapping,
--			mapping->host->i_sb->s_bdev, wbc);
-+			mapping->host->i_sb->s_bdev, NULL, wbc);
- }
+diff --git a/include/uapi/linux/virtio_mmio.h b/include/uapi/linux/virtio_mmio.h
+index c4b09689ab64..0650f91bea6c 100644
+--- a/include/uapi/linux/virtio_mmio.h
++++ b/include/uapi/linux/virtio_mmio.h
+@@ -122,6 +122,17 @@
+ #define VIRTIO_MMIO_QUEUE_USED_LOW	0x0a0
+ #define VIRTIO_MMIO_QUEUE_USED_HIGH	0x0a4
  
- const struct address_space_operations ext2_aops = {
-diff --git a/fs/ext4/inode.c b/fs/ext4/inode.c
-index 420fe3deed39..75b85c56c732 100644
---- a/fs/ext4/inode.c
-+++ b/fs/ext4/inode.c
-@@ -2992,7 +2992,7 @@ static int ext4_dax_writepages(struct address_space *mapping,
- 	percpu_down_read(&sbi->s_journal_flag_rwsem);
- 	trace_ext4_writepages(inode, wbc);
++/* Shared memory region id */
++#define VIRTIO_MMIO_SHM_SEL             0x0ac
++
++/* Shared memory region length, 64 bits in two halves */
++#define VIRTIO_MMIO_SHM_LEN_LOW         0x0b0
++#define VIRTIO_MMIO_SHM_LEN_HIGH        0x0b4
++
++/* Shared memory region base address, 64 bits in two halves */
++#define VIRTIO_MMIO_SHM_BASE_LOW        0x0b8
++#define VIRTIO_MMIO_SHM_BASE_HIGH       0x0bc
++
+ /* Configuration atomicity value */
+ #define VIRTIO_MMIO_CONFIG_GENERATION	0x0fc
  
--	ret = dax_writeback_mapping_range(mapping, inode->i_sb->s_bdev, wbc);
-+	ret = dax_writeback_mapping_range(mapping, inode->i_sb->s_bdev, NULL, wbc);
- 	trace_ext4_writepages_result(inode, wbc, ret,
- 				     nr_to_write - wbc->nr_to_write);
- 	percpu_up_read(&sbi->s_journal_flag_rwsem);
-diff --git a/fs/xfs/xfs_aops.c b/fs/xfs/xfs_aops.c
-index f16d5f196c6b..71a7007509c4 100644
---- a/fs/xfs/xfs_aops.c
-+++ b/fs/xfs/xfs_aops.c
-@@ -1120,7 +1120,7 @@ xfs_dax_writepages(
- {
- 	xfs_iflags_clear(XFS_I(mapping->host), XFS_ITRUNCATED);
- 	return dax_writeback_mapping_range(mapping,
--			xfs_find_bdev_for_inode(mapping->host), wbc);
-+			xfs_find_bdev_for_inode(mapping->host), NULL, wbc);
- }
- 
- STATIC int
-diff --git a/include/linux/dax.h b/include/linux/dax.h
-index 9bd8528bd305..e7f40108f2c9 100644
---- a/include/linux/dax.h
-+++ b/include/linux/dax.h
-@@ -141,7 +141,8 @@ static inline void fs_put_dax(struct dax_device *dax_dev)
- 
- struct dax_device *fs_dax_get_by_bdev(struct block_device *bdev);
- int dax_writeback_mapping_range(struct address_space *mapping,
--		struct block_device *bdev, struct writeback_control *wbc);
-+		struct block_device *bdev, struct dax_device *dax_dev,
-+		struct writeback_control *wbc);
- 
- struct page *dax_layout_busy_page(struct address_space *mapping);
- dax_entry_t dax_lock_page(struct page *page);
-@@ -180,7 +181,8 @@ static inline struct page *dax_layout_busy_page(struct address_space *mapping)
- }
- 
- static inline int dax_writeback_mapping_range(struct address_space *mapping,
--		struct block_device *bdev, struct writeback_control *wbc)
-+		struct block_device *bdev, struct dax_device *dax_dev,
-+		struct writeback_control *wbc)
- {
- 	return -EOPNOTSUPP;
- }
 -- 
 2.20.1
 

@@ -1,18 +1,19 @@
-Date: Sat, 10 Aug 2019 14:35:55 -0700
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20190810213555.hqdkm4yio4asnh5t@US-160370MP2.local>
-References: <20190801165409.20121-1-stefanha@redhat.com>
-	<20190807180355.GA22758@stefanha-x1.localdomain>
-	<20190807205715.GE18557@redhat.com>
-	<20190808090213.GD31476@stefanha-x1.localdomain>
-	<20190808095316.GC2852@work-vm> <20190808125320.GB3147@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=mZvfNhyGscpkSZ3ArnN1Kn2Ohroj07E84u704Jirwf8=;
+	b=CocCV7FT+vvRNv2WTAn65V30KzegW/8Wk/kvkKfN55wq3gpMeRFTLjdgzO8aZVdbwD
+	jFD8DaMSQgqlXLPddVzX1pno2H45JX0LyiqJjxvBzVrBJgSSHJ1455S8XTeosJnFgsaw
+	QQ3Iut++Ff0sTuIcBgiQSVw04Wzblj08sFkPY=
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20190808125320.GB3147@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 0/4] virtiofsd: multithreading preparation
- part 3
-Reply-To: bo.liu@linux.alibaba.com
+References: <5abd7616-5351-761c-0c14-21d511251006@huawei.com>
+	<20190820091650.GE9855@stefanha-x1.localdomain>
+In-Reply-To: <20190820091650.GE9855@stefanha-x1.localdomain>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Wed, 21 Aug 2019 09:51:20 +0200
+Message-ID: <CAJfpegs8fSLoUaWKhC1543Hoy9821vq8=nYZy-pw1+95+Yv4gQ@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [QUESTION] A performance problem for buffer write
+ compared with 9p
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,78 +22,28 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: linux-fsdevel@vger.kernel.org, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, Miklos Szeredi <mszeredi@redhat.com>
 
-On Thu, Aug 08, 2019 at 08:53:20AM -0400, Vivek Goyal wrote:
-> On Thu, Aug 08, 2019 at 10:53:16AM +0100, Dr. David Alan Gilbert wrote:
-> > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> > > On Wed, Aug 07, 2019 at 04:57:15PM -0400, Vivek Goyal wrote:
-> > > > Kernel also serializes MAP/UNMAP on one inode. So you will need to run
-> > > > multiple jobs operating on different inodes to see parallel MAP/UNMAP
-> > > > (atleast from kernel's point of view).
-> > > 
-> > > Okay, there is still room to experiment with how MAP and UNMAP are
-> > > handled by virtiofsd and QEMU even if the host kernel ultimately becomes
-> > > the bottleneck.
-> > > 
-> > > One possible optimization is to eliminate REMOVEMAPPING requests when
-> > > the guest driver knows a SETUPMAPPING will follow immediately.  I see
-> > > the following request pattern in a fio randread iodepth=64 job:
-> > > 
-> > >   unique: 995348, opcode: SETUPMAPPING (48), nodeid: 135, insize: 80, pid: 1351
-> > >   lo_setupmapping(ino=135, fi=0x(nil), foffset=3860856832, len=2097152, moffset=859832320, flags=0)
-> > >      unique: 995348, success, outsize: 16
-> > >   unique: 995350, opcode: REMOVEMAPPING (49), nodeid: 135, insize: 60, pid: 12
-> > >      unique: 995350, success, outsize: 16
-> > >   unique: 995352, opcode: SETUPMAPPING (48), nodeid: 135, insize: 80, pid: 1351
-> > >   lo_setupmapping(ino=135, fi=0x(nil), foffset=16777216, len=2097152, moffset=861929472, flags=0)
-> > >      unique: 995352, success, outsize: 16
-> > >   unique: 995354, opcode: REMOVEMAPPING (49), nodeid: 135, insize: 60, pid: 12
-> > >      unique: 995354, success, outsize: 16
-> > >   virtio_send_msg: elem 9: with 1 in desc of length 16
-> > >   unique: 995356, opcode: SETUPMAPPING (48), nodeid: 135, insize: 80, pid: 1351
-> > >   lo_setupmapping(ino=135, fi=0x(nil), foffset=383778816, len=2097152, moffset=864026624, flags=0)
-> > >      unique: 995356, success, outsize: 16
-> > >   unique: 995358, opcode: REMOVEMAPPING (49), nodeid: 135, insize: 60, pid: 12
-> > > 
-> > > The REMOVEMAPPING requests are unnecessary since we can map over the top
-> > > of the old mapping instead of taking the extra step of removing it
-> > > first.
-> > 
-> > Yep, those should go - I think Vivek likes to keep them for testing
-> > since they make things fail more completely if there's a screwup.
-> 
-> I like to keep them because otherwise they keep the resources busy
-> on host. If DAX range is being used immediately, then this optimization
-> makes more sense. I will keep this in mind.
+On Tue, Aug 20, 2019 at 11:16 AM Stefan Hajnoczi <stefanha@redhat.com> wrote:
 >
+> On Thu, Aug 15, 2019 at 08:30:43AM +0800, wangyan wrote:
+> > Hi all,
+> >
+> > I met a performance problem when I tested buffer write compared with 9p.
+>
+> CCing Miklos, FUSE maintainer, since this is mostly a FUSE file system
+> writeback question.
 
-Other than the resource not being released, do you think there'll be
-any stale data problem if we don't do removemapping at all, neither
-background reclaim nor inline reclaim?
-(truncate/punch_hole/evict_inode still needs to remove mapping though)
+This is expected.   FUSE contains lots of complexity in the buffered
+write path related to preventing DoS caused by the userspace server.
 
-thanks,
--liubo
+This added complexity, which causes the performance issue, could be
+disabled in virtio-fs, since the server lives on a different kernel
+than the filesystem.
 
-> > 
-> > > Some more questions to consider for DAX performance optimization:
-> > > 
-> > > 1. Is FUSE_READ/FUSE_WRITE more efficient than DAX for some I/O patterns?
-> > 
-> > Probably for cases where the data is only accessed once, and you can't
-> > preemptively map.
-> > Another variant on (1) is whether we could do read/writes while the mmap
-> > is happening to absorb the latency.
-> 
-> For small random I/O, dax might not be very effective. Overhead of
-> setting up mapping and tearing it down is significant.
-> 
-> Vivek
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
+I'll do a patch..
+
+Thanks,
+Miklos
 

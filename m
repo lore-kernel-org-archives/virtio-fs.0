@@ -1,11 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 21 Aug 2019 13:57:07 -0400
-Message-Id: <20190821175720.25901-7-vgoyal@redhat.com>
+Date: Wed, 21 Aug 2019 13:57:10 -0400
+Message-Id: <20190821175720.25901-10-vgoyal@redhat.com>
 In-Reply-To: <20190821175720.25901-1-vgoyal@redhat.com>
 References: <20190821175720.25901-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 06/19] fuse, dax: add fuse_conn->dax_dev field
+Subject: [Virtio-fs] [PATCH 09/19] fuse: implement FUSE_INIT map_alignment
+	field
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,125 +18,127 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org
 Cc: virtio-fs@redhat.com, vgoyal@redhat.com, miklos@szeredi.hu
 
-From: Stefan Hajnoczi <stefanha@redhat.com>
+The device communicates FUSE_SETUPMAPPING/FUSE_REMOVMAPPING alignment
+constraints via the FUST_INIT map_alignment field.  Parse this field and
+ensure our DAX mappings meet the alignment constraints.
 
-A struct dax_device instance is a prerequisite for the DAX filesystem
-APIs.  Let virtio_fs associate a dax_device with a fuse_conn.  Classic
-FUSE and CUSE set the pointer to NULL, disabling DAX.
+We don't actually align anything differently since our mappings are
+already 2MB aligned.  Just check the value when the connection is
+established.  If it becomes necessary to honor arbitrary alignments in
+the future we'll have to adjust how mappings are sized.
+
+The upshot of this commit is that we can be confident that mappings will
+work even when emulating x86 on Power and similar combinations where the
+host page sizes are different.
 
 Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- fs/fuse/cuse.c      | 3 ++-
- fs/fuse/fuse_i.h    | 9 ++++++++-
- fs/fuse/inode.c     | 9 ++++++---
- fs/fuse/virtio_fs.c | 5 +++--
- 4 files changed, 19 insertions(+), 7 deletions(-)
+ fs/fuse/fuse_i.h          |  5 ++++-
+ fs/fuse/inode.c           | 19 +++++++++++++++++--
+ include/uapi/linux/fuse.h |  7 ++++++-
+ 3 files changed, 27 insertions(+), 4 deletions(-)
 
-diff --git a/fs/fuse/cuse.c b/fs/fuse/cuse.c
-index 04727540bdbb..0f9e3c93b056 100644
---- a/fs/fuse/cuse.c
-+++ b/fs/fuse/cuse.c
-@@ -504,7 +504,8 @@ static int cuse_channel_open(struct inode *inode, struct file *file)
- 	 * Limit the cuse channel to requests that can
- 	 * be represented in file->f_cred->user_ns.
- 	 */
--	fuse_conn_init(&cc->fc, file->f_cred->user_ns, &fuse_dev_fiq_ops, NULL);
-+	fuse_conn_init(&cc->fc, file->f_cred->user_ns, NULL, &fuse_dev_fiq_ops,
-+					NULL);
- 
- 	fud = fuse_dev_alloc_install(&cc->fc);
- 	if (!fud) {
 diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 25a6da6ee8c3..ecd9dbc3312e 100644
+index f1059b51c539..b020a4071f80 100644
 --- a/fs/fuse/fuse_i.h
 +++ b/fs/fuse/fuse_i.h
-@@ -77,6 +77,9 @@ struct fuse_mount_data {
- 	unsigned max_read;
- 	unsigned blksize;
+@@ -50,7 +50,10 @@
+ /** Number of page pointers embedded in fuse_req */
+ #define FUSE_REQ_INLINE_PAGES 1
  
-+	/* DAX device, may be NULL */
-+	struct dax_device *dax_dev;
-+
- 	/* fuse input queue operations */
- 	const struct fuse_iqueue_ops *fiq_ops;
+-/* Default memory range size, 2MB */
++/*
++ * Default memory range size.  A power of 2 so it agrees with common FUSE_INIT
++ * map_alignment values 4KB and 64KB.
++ */
+ #define FUSE_DAX_MEM_RANGE_SZ	(2*1024*1024)
+ #define FUSE_DAX_MEM_RANGE_PAGES	(FUSE_DAX_MEM_RANGE_SZ/PAGE_SIZE)
  
-@@ -831,6 +834,9 @@ struct fuse_conn {
- 
- 	/** List of device instances belonging to this connection */
- 	struct list_head devices;
-+
-+	/** DAX device, non-NULL if DAX is supported */
-+	struct dax_device *dax_dev;
- };
- 
- static inline struct fuse_conn *get_fuse_conn_super(struct super_block *sb)
-@@ -1061,7 +1067,8 @@ struct fuse_conn *fuse_conn_get(struct fuse_conn *fc);
-  * Initialize fuse_conn
-  */
- void fuse_conn_init(struct fuse_conn *fc, struct user_namespace *user_ns,
--		    const struct fuse_iqueue_ops *fiq_ops, void *fiq_priv);
-+			struct dax_device *dax_dev,
-+			const struct fuse_iqueue_ops *fiq_ops, void *fiq_priv);
- 
- /**
-  * Release reference to fuse_conn
 diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index 16bcf0f95979..6d9258a4091a 100644
+index 0af147c70558..d5d134a01117 100644
 --- a/fs/fuse/inode.c
 +++ b/fs/fuse/inode.c
-@@ -591,7 +591,8 @@ static void fuse_pqueue_init(struct fuse_pqueue *fpq)
- }
- 
- void fuse_conn_init(struct fuse_conn *fc, struct user_namespace *user_ns,
--		    const struct fuse_iqueue_ops *fiq_ops, void *fiq_priv)
-+			struct dax_device *dax_dev,
-+			const struct fuse_iqueue_ops *fiq_ops, void *fiq_priv)
+@@ -949,9 +949,10 @@ static void process_init_limits(struct fuse_conn *fc, struct fuse_init_out *arg)
+ static void process_init_reply(struct fuse_conn *fc, struct fuse_req *req)
  {
- 	memset(fc, 0, sizeof(*fc));
- 	spin_lock_init(&fc->lock);
-@@ -616,6 +617,7 @@ void fuse_conn_init(struct fuse_conn *fc, struct user_namespace *user_ns,
- 	atomic64_set(&fc->attr_version, 1);
- 	get_random_bytes(&fc->scramble_key, sizeof(fc->scramble_key));
- 	fc->pid_ns = get_pid_ns(task_active_pid_ns(current));
-+	fc->dax_dev = dax_dev;
- 	fc->user_ns = get_user_ns(user_ns);
- 	fc->max_pages = FUSE_DEFAULT_MAX_PAGES_PER_REQ;
- }
-@@ -1132,8 +1134,8 @@ int fuse_fill_super_common(struct super_block *sb,
- 		err = -ENOMEM;
- 		if (!fc)
- 			goto err;
--		fuse_conn_init(fc, sb->s_user_ns, mount_data->fiq_ops,
--			       mount_data->fiq_priv);
-+		fuse_conn_init(fc, sb->s_user_ns, mount_data->dax_dev,
-+			       mount_data->fiq_ops, mount_data->fiq_priv);
- 		fc->release = fuse_free_conn;
+ 	struct fuse_init_out *arg = &req->misc.init_out;
++	bool ok = true;
+ 
+ 	if (req->out.h.error || arg->major != FUSE_KERNEL_VERSION)
+-		fc->conn_error = 1;
++		ok = false;
+ 	else {
+ 		unsigned long ra_pages;
+ 
+@@ -1014,6 +1015,13 @@ static void process_init_reply(struct fuse_conn *fc, struct fuse_req *req)
+ 					min_t(unsigned int, FUSE_MAX_MAX_PAGES,
+ 					max_t(unsigned int, arg->max_pages, 1));
+ 			}
++			if ((arg->flags & FUSE_MAP_ALIGNMENT) &&
++			    (FUSE_DAX_MEM_RANGE_SZ % arg->map_alignment)) {
++				printk(KERN_ERR "FUSE: map_alignment %u incompatible with dax mem range size %u\n",
++				       arg->map_alignment,
++				       FUSE_DAX_MEM_RANGE_SZ);
++				ok = false;
++			}
+ 		} else {
+ 			ra_pages = fc->max_read / PAGE_SIZE;
+ 			fc->no_lock = 1;
+@@ -1027,6 +1035,12 @@ static void process_init_reply(struct fuse_conn *fc, struct fuse_req *req)
+ 		fc->max_write = max_t(unsigned, 4096, fc->max_write);
+ 		fc->conn_init = 1;
  	}
++
++	if (!ok) {
++		fc->conn_init = 0;
++		fc->conn_error = 1;
++	}
++
+ 	fuse_set_initialized(fc);
+ 	wake_up_all(&fc->blocked_waitq);
+ }
+@@ -1046,7 +1060,8 @@ void fuse_send_init(struct fuse_conn *fc, struct fuse_req *req)
+ 		FUSE_WRITEBACK_CACHE | FUSE_NO_OPEN_SUPPORT |
+ 		FUSE_PARALLEL_DIROPS | FUSE_HANDLE_KILLPRIV | FUSE_POSIX_ACL |
+ 		FUSE_ABORT_ERROR | FUSE_MAX_PAGES | FUSE_CACHE_SYMLINKS |
+-		FUSE_NO_OPENDIR_SUPPORT | FUSE_EXPLICIT_INVAL_DATA;
++		FUSE_NO_OPENDIR_SUPPORT | FUSE_EXPLICIT_INVAL_DATA |
++		FUSE_MAP_ALIGNMENT;
+ 	req->in.h.opcode = FUSE_INIT;
+ 	req->in.numargs = 1;
+ 	req->in.args[0].size = sizeof(*arg);
+diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
+index 2971d29a42e4..4461fd640cf2 100644
+--- a/include/uapi/linux/fuse.h
++++ b/include/uapi/linux/fuse.h
+@@ -274,6 +274,9 @@ struct fuse_file_lock {
+  * FUSE_CACHE_SYMLINKS: cache READLINK responses
+  * FUSE_NO_OPENDIR_SUPPORT: kernel supports zero-message opendir
+  * FUSE_EXPLICIT_INVAL_DATA: only invalidate cached pages on explicit request
++ * FUSE_MAP_ALIGNMENT: init_out.map_alignment contains byte alignment for
++ *		       foffset and moffset fields in struct
++ *		       fuse_setupmapping_out and fuse_removemapping_one.
+  */
+ #define FUSE_ASYNC_READ		(1 << 0)
+ #define FUSE_POSIX_LOCKS	(1 << 1)
+@@ -301,6 +304,7 @@ struct fuse_file_lock {
+ #define FUSE_CACHE_SYMLINKS	(1 << 23)
+ #define FUSE_NO_OPENDIR_SUPPORT (1 << 24)
+ #define FUSE_EXPLICIT_INVAL_DATA (1 << 25)
++#define FUSE_MAP_ALIGNMENT      (1 << 26)
  
-@@ -1237,6 +1239,7 @@ static int fuse_fill_super(struct super_block *sb, void *data, int silent)
- 		goto err_fput;
- 	__set_bit(FR_BACKGROUND, &init_req->flags);
+ /**
+  * CUSE INIT request/reply flags
+@@ -653,7 +657,8 @@ struct fuse_init_out {
+ 	uint32_t	time_gran;
+ 	uint16_t	max_pages;
+ 	uint16_t	padding;
+-	uint32_t	unused[8];
++	uint32_t	map_alignment;
++	uint32_t	unused[7];
+ };
  
-+	d.dax_dev = NULL;
- 	d.fiq_ops = &fuse_dev_fiq_ops;
- 	d.fiq_priv = NULL;
- 	d.fudptr = &file->private_data;
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index ce1de9acde84..706b27e0502a 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -986,8 +986,9 @@ static struct dentry *virtio_fs_mount(struct file_system_type *fs_type,
- 	fc = kzalloc(sizeof(struct fuse_conn), GFP_KERNEL);
- 	if (!fc)
- 		return ERR_PTR(-ENOMEM);
--	fuse_conn_init(fc, get_user_ns(current_user_ns()), &virtio_fs_fiq_ops,
--		       fs);
-+	d.dax_dev = NULL;
-+	fuse_conn_init(fc, get_user_ns(current_user_ns()), d.dax_dev,
-+		       &virtio_fs_fiq_ops, fs);
- 	fc->release = fuse_free_conn;
- 
- 	s = sget(fs_type, virtio_fs_test_super, virtio_fs_set_super, flags, fc);
+ #define CUSE_INIT_INFO_MAX 4096
 -- 
 2.20.1
 

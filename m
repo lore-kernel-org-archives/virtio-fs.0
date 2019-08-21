@@ -1,11 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 21 Aug 2019 13:57:19 -0400
-Message-Id: <20190821175720.25901-19-vgoyal@redhat.com>
+Date: Wed, 21 Aug 2019 13:57:20 -0400
+Message-Id: <20190821175720.25901-20-vgoyal@redhat.com>
 In-Reply-To: <20190821175720.25901-1-vgoyal@redhat.com>
 References: <20190821175720.25901-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 18/19] fuse: Release file in process context
+Subject: [Virtio-fs] [PATCH 19/19] fuse: Take inode lock for dax inode
+	truncation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,62 +18,38 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org
 Cc: virtio-fs@redhat.com, vgoyal@redhat.com, miklos@szeredi.hu
 
-fuse_file_put(sync) can be called with sync=true/false. If sync=true,
-it waits for release request response and then calls iput() in the
-caller's context. If sync=false, it does not wait for release request
-response, frees the fuse_file struct immediately and req->end function
-does the iput().
+When a file is opened with O_TRUNC, we need to make sure that any other
+DAX operation is not in progress. DAX expects i_size to be stable.
 
-iput() can be a problem with DAX if called in req->end context. If this
-is last reference to inode (VFS has let go its reference already), then
-iput() will clean DAX mappings as well and send REMOVEMAPPING requests
-and wait for completion. (All the the worker thread context which is
-processing fuse replies from daemon on the host).
+In fuse_iomap_begin() we check for i_size at multiple places and we expect
+i_size to not change.
 
-That means it blocks worker thread and it stops processing further
-replies and system deadlocks.
+Another problem is, if we setup a mapping in fuse_iomap_begin(), and
+file gets truncated and dax read/write happens, KVM currently hangs.
+It tries to fault in a page which does not exist on host (file got
+truncated). It probably requries fixing in KVM.
 
-So for now, force sync release of file in case of DAX inodes.
+So for now, take inode lock. Once KVM is fixed, we might have to
+have a look at it again.
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- fs/fuse/file.c | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+ fs/fuse/file.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index 2ff7624d58c0..e369a1f92d85 100644
+index e369a1f92d85..794c55131bd0 100644
 --- a/fs/fuse/file.c
 +++ b/fs/fuse/file.c
-@@ -579,6 +579,7 @@ void fuse_release_common(struct file *file, bool isdir)
- 	struct fuse_file *ff = file->private_data;
- 	struct fuse_req *req = ff->reserved_req;
- 	int opcode = isdir ? FUSE_RELEASEDIR : FUSE_RELEASE;
-+	bool sync = false;
+@@ -524,7 +524,7 @@ int fuse_open_common(struct inode *inode, struct file *file, bool isdir)
+ 	int err;
+ 	bool lock_inode = (file->f_flags & O_TRUNC) &&
+ 			  fc->atomic_o_trunc &&
+-			  fc->writeback_cache;
++			  (fc->writeback_cache || IS_DAX(inode));
  
- 	fuse_prepare_release(fi, ff, file->f_flags, opcode);
- 
-@@ -599,8 +600,20 @@ void fuse_release_common(struct file *file, bool isdir)
- 	 * Make the release synchronous if this is a fuseblk mount,
- 	 * synchronous RELEASE is allowed (and desirable) in this case
- 	 * because the server can be trusted not to screw up.
-+	 *
-+	 * For DAX, fuse server is trusted. So it should be fine to
-+	 * do a sync file put. Doing async file put is creating
-+	 * problems right now because when request finish, iput()
-+	 * can lead to freeing of inode. That means it tears down
-+	 * mappings backing DAX memory and sends REMOVEMAPPING message
-+	 * to server and blocks for completion. Currently, waiting
-+	 * in req->end context deadlocks the system as same worker thread
-+	 * can't process REMOVEMAPPING reply it is waiting for.
- 	 */
--	fuse_file_put(ff, ff->fc->destroy_req != NULL, isdir);
-+	if (IS_DAX(req->misc.release.inode) || ff->fc->destroy_req != NULL)
-+		sync = true;
-+
-+	fuse_file_put(ff, sync, isdir);
- }
- 
- static int fuse_open(struct inode *inode, struct file *file)
+ 	err = generic_file_open(inode, file);
+ 	if (err)
 -- 
 2.20.1
 

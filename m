@@ -1,11 +1,11 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 21 Aug 2019 13:57:13 -0400
-Message-Id: <20190821175720.25901-13-vgoyal@redhat.com>
+Date: Wed, 21 Aug 2019 13:57:16 -0400
+Message-Id: <20190821175720.25901-16-vgoyal@redhat.com>
 In-Reply-To: <20190821175720.25901-1-vgoyal@redhat.com>
 References: <20190821175720.25901-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 12/19] fuse, dax: add DAX mmap support
+Subject: [Virtio-fs] [PATCH 15/19] fuse: Maintain a list of busy elements
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,110 +17,118 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org
 Cc: virtio-fs@redhat.com, vgoyal@redhat.com, miklos@szeredi.hu
 
-From: Stefan Hajnoczi <stefanha@redhat.com>
+This list will be used selecting fuse_dax_mapping to free when number of
+free mappings drops below a threshold.
 
-Add DAX mmap() support.
-
-Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- fs/fuse/file.c | 64 +++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 63 insertions(+), 1 deletion(-)
+ fs/fuse/file.c   | 22 ++++++++++++++++++++++
+ fs/fuse/fuse_i.h |  8 ++++++++
+ fs/fuse/inode.c  |  4 ++++
+ 3 files changed, 34 insertions(+)
 
 diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index f323b7b04414..32870bb862e7 100644
+index 7b70b5ea7f94..8c1777fb61f7 100644
 --- a/fs/fuse/file.c
 +++ b/fs/fuse/file.c
-@@ -2730,10 +2730,15 @@ static const struct vm_operations_struct fuse_file_vm_ops = {
- 	.page_mkwrite	= fuse_page_mkwrite,
- };
- 
-+static int fuse_dax_mmap(struct file *file, struct vm_area_struct *vma);
- static int fuse_file_mmap(struct file *file, struct vm_area_struct *vma)
- {
- 	struct fuse_file *ff = file->private_data;
- 
-+	/* DAX mmap is superior to direct_io mmap */
-+	if (IS_DAX(file_inode(file)))
-+		return fuse_dax_mmap(file, vma);
-+
- 	if (ff->open_flags & FOPEN_DIRECT_IO) {
- 		/* Can't provide the coherency needed for MAP_SHARED */
- 		if (vma->vm_flags & VM_MAYSHARE)
-@@ -2765,9 +2770,65 @@ static ssize_t fuse_file_splice_read(struct file *in, loff_t *ppos,
- 
+@@ -200,6 +200,23 @@ static struct fuse_dax_mapping *alloc_dax_mapping(struct fuse_conn *fc)
+ 	return dmap;
  }
  
-+static int __fuse_dax_fault(struct vm_fault *vmf, enum page_entry_size pe_size,
-+			    bool write)
++/* This assumes fc->lock is held */
++static void __dmap_remove_busy_list(struct fuse_conn *fc,
++				    struct fuse_dax_mapping *dmap)
 +{
-+	vm_fault_t ret;
-+	struct inode *inode = file_inode(vmf->vma->vm_file);
-+	struct super_block *sb = inode->i_sb;
-+	pfn_t pfn;
-+
-+	if (write)
-+		sb_start_pagefault(sb);
-+
-+	/* TODO inode semaphore to protect faults vs truncate */
-+
-+	ret = dax_iomap_fault(vmf, pe_size, &pfn, NULL, &fuse_iomap_ops);
-+
-+	if (ret & VM_FAULT_NEEDDSYNC)
-+		ret = dax_finish_sync_fault(vmf, pe_size, pfn);
-+
-+	if (write)
-+		sb_end_pagefault(sb);
-+
-+	return ret;
++	list_del_init(&dmap->busy_list);
++	WARN_ON(fc->nr_busy_ranges == 0);
++	fc->nr_busy_ranges--;
 +}
 +
-+static vm_fault_t fuse_dax_fault(struct vm_fault *vmf)
++static void dmap_remove_busy_list(struct fuse_conn *fc,
++				  struct fuse_dax_mapping *dmap)
 +{
-+	return __fuse_dax_fault(vmf, PE_SIZE_PTE,
-+				vmf->flags & FAULT_FLAG_WRITE);
++	spin_lock(&fc->lock);
++	__dmap_remove_busy_list(fc, dmap);
++	spin_unlock(&fc->lock);
 +}
 +
-+static vm_fault_t fuse_dax_huge_fault(struct vm_fault *vmf,
-+			       enum page_entry_size pe_size)
-+{
-+	return __fuse_dax_fault(vmf, pe_size, vmf->flags & FAULT_FLAG_WRITE);
-+}
-+
-+static vm_fault_t fuse_dax_page_mkwrite(struct vm_fault *vmf)
-+{
-+	return __fuse_dax_fault(vmf, PE_SIZE_PTE, true);
-+}
-+
-+static vm_fault_t fuse_dax_pfn_mkwrite(struct vm_fault *vmf)
-+{
-+	return __fuse_dax_fault(vmf, PE_SIZE_PTE, true);
-+}
-+
-+static const struct vm_operations_struct fuse_dax_vm_ops = {
-+	.fault		= fuse_dax_fault,
-+	.huge_fault	= fuse_dax_huge_fault,
-+	.page_mkwrite	= fuse_dax_page_mkwrite,
-+	.pfn_mkwrite	= fuse_dax_pfn_mkwrite,
-+};
-+
- static int fuse_dax_mmap(struct file *file, struct vm_area_struct *vma)
- {
--	return -EINVAL; /* TODO */
-+	file_accessed(file);
-+	vma->vm_ops = &fuse_dax_vm_ops;
-+	vma->vm_flags |= VM_MIXEDMAP | VM_HUGEPAGE;
-+	return 0;
+ /* This assumes fc->lock is held */
+ static void __dmap_add_to_free_pool(struct fuse_conn *fc,
+ 				struct fuse_dax_mapping *dmap)
+@@ -265,6 +282,10 @@ static int fuse_setup_one_mapping(struct inode *inode, loff_t offset,
+ 		/* Protected by fi->i_dmap_sem */
+ 		fuse_dax_interval_tree_insert(dmap, &fi->dmap_tree);
+ 		fi->nr_dmaps++;
++		spin_lock(&fc->lock);
++		list_add_tail(&dmap->busy_list, &fc->busy_ranges);
++		fc->nr_busy_ranges++;
++		spin_unlock(&fc->lock);
+ 	}
+ 	return 0;
  }
+@@ -334,6 +355,7 @@ static void dmap_reinit_add_to_free_pool(struct fuse_conn *fc,
+ 	pr_debug("fuse: freeing memory range start=0x%llx end=0x%llx "
+ 		 "window_offset=0x%llx length=0x%llx\n", dmap->start,
+ 		 dmap->end, dmap->window_offset, dmap->length);
++	__dmap_remove_busy_list(fc, dmap);
+ 	dmap->start = dmap->end = 0;
+ 	__dmap_add_to_free_pool(fc, dmap);
+ }
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index 125bb7123651..070a5c2b6498 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -119,6 +119,10 @@ struct fuse_dax_mapping {
+ 	/** End Position in file */
+ 	__u64 end;
+ 	__u64 __subtree_last;
++
++	/* Will connect in fc->busy_ranges to keep track busy memory */
++	struct list_head busy_list;
++
+ 	/** Position in DAX window */
+ 	u64 window_offset;
  
- static int convert_fuse_file_lock(struct fuse_conn *fc,
-@@ -3825,6 +3886,7 @@ static const struct file_operations fuse_file_operations = {
- 	.release	= fuse_release,
- 	.fsync		= fuse_fsync,
- 	.lock		= fuse_file_lock,
-+	.get_unmapped_area = thp_get_unmapped_area,
- 	.flock		= fuse_file_flock,
- 	.splice_read	= fuse_file_splice_read,
- 	.splice_write	= iter_file_splice_write,
+@@ -887,6 +891,10 @@ struct fuse_conn {
+ 	/** DAX device, non-NULL if DAX is supported */
+ 	struct dax_device *dax_dev;
+ 
++	/* List of memory ranges which are busy */
++	unsigned long nr_busy_ranges;
++	struct list_head busy_ranges;
++
+ 	/*
+ 	 * DAX Window Free Ranges. TODO: This might not be best place to store
+ 	 * this free list
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index 52135b4616d2..b80e76a307f3 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -614,6 +614,8 @@ static void fuse_free_dax_mem_ranges(struct list_head *mem_list)
+ 	/* Free All allocated elements */
+ 	list_for_each_entry_safe(range, temp, mem_list, list) {
+ 		list_del(&range->list);
++		if (!list_empty(&range->busy_list))
++			list_del(&range->busy_list);
+ 		kfree(range);
+ 	}
+ }
+@@ -658,6 +660,7 @@ static int fuse_dax_mem_range_init(struct fuse_conn *fc,
+ 		 */
+ 		range->window_offset = i * FUSE_DAX_MEM_RANGE_SZ;
+ 		range->length = FUSE_DAX_MEM_RANGE_SZ;
++		INIT_LIST_HEAD(&range->busy_list);
+ 		list_add_tail(&range->list, &mem_ranges);
+ 	}
+ 
+@@ -708,6 +711,7 @@ void fuse_conn_init(struct fuse_conn *fc, struct user_namespace *user_ns,
+ 	fc->user_ns = get_user_ns(user_ns);
+ 	fc->max_pages = FUSE_DEFAULT_MAX_PAGES_PER_REQ;
+ 	INIT_LIST_HEAD(&fc->free_ranges);
++	INIT_LIST_HEAD(&fc->busy_ranges);
+ }
+ EXPORT_SYMBOL_GPL(fuse_conn_init);
+ 
 -- 
 2.20.1
 

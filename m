@@ -1,20 +1,11 @@
-Date: Mon, 12 Aug 2019 11:05:46 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190812100546.GB9959@stefanha-x1.localdomain>
-References: <20190801165409.20121-1-stefanha@redhat.com>
-	<20190807180355.GA22758@stefanha-x1.localdomain>
-	<20190807205715.GE18557@redhat.com>
-	<20190808090213.GD31476@stefanha-x1.localdomain>
-	<20190808095316.GC2852@work-vm>
-	<20190809082102.GB25286@stefanha-x1.localdomain>
-	<277d9cd6-a8fa-fa1f-9cbc-7a7cd0897c84@huawei.com>
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Wed, 21 Aug 2019 13:37:36 -0400
+Message-Id: <20190821173742.24574-8-vgoyal@redhat.com>
+In-Reply-To: <20190821173742.24574-1-vgoyal@redhat.com>
+References: <20190821173742.24574-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="EuxKj2iCbKjpUGkD"
-Content-Disposition: inline
-In-Reply-To: <277d9cd6-a8fa-fa1f-9cbc-7a7cd0897c84@huawei.com>
-Subject: Re: [Virtio-fs] [PATCH 0/4] virtiofsd: multithreading preparation
- part 3
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 07/13] Export fuse_dequeue_forget() function
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,72 +14,83 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>
-Cc: virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>, qemu-devel@nongnu.org
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, miklos@szeredi.hu
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
+File systems like virtio-fs need to do not have to play directly with
+forget list data structures. There is a helper function use that instead.
 
---EuxKj2iCbKjpUGkD
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Rename dequeue_forget() to fuse_dequeue_forget() and export it so that
+stacked filesystems can use it.
 
-On Sun, Aug 11, 2019 at 10:26:18AM +0800, piaojun wrote:
-> On 2019/8/9 16:21, Stefan Hajnoczi wrote:
-> > On Thu, Aug 08, 2019 at 10:53:16AM +0100, Dr. David Alan Gilbert wrote:
-> >> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> >>> On Wed, Aug 07, 2019 at 04:57:15PM -0400, Vivek Goyal wrote:
-> >>> 3. Can READ/WRITE be performed directly in QEMU via a separate virtqu=
-eue
-> >>>    to eliminate the bad address problem?
-> >>
-> >> Are you thinking of doing all read/writes that way, or just the corner
-> >> cases? It doesn't seem worth it for the corner cases unless you're
-> >> finding them cropping up in real work loads.
-> >=20
-> > Send all READ/WRITE requests to QEMU instead of virtiofsd.
-> >=20
-> > Only handle metadata requests in virtiofsd (OPEN, RELEASE, READDIR,
-> > MKDIR, etc).
-> >=20
->=20
-> Sorry for not catching your point, and I like the virtiofsd to do
-> READ/WRITE requests and qemu handle metadata requests, as virtiofsd is
-> good at processing dataplane things due to thread-pool and CPU
-> affinity(maybe in the future). As you said, virtiofsd is just acting as
-> a vhost-user device which should care less about ctrl request.
->=20
-> If our concern is improving mmap/write/read performance, why not adding
-> a delay worker for unmmap which could decrease the ummap times. Maybe
-> virtiofsd could still handle both data and meta requests by this way.
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/dev.c    | 9 +++++----
+ fs/fuse/fuse_i.h | 3 +++
+ 2 files changed, 8 insertions(+), 4 deletions(-)
 
-Doing READ/WRITE in QEMU solves the problem that vhost-user slaves only
-have access to guest RAM regions.  If a guest transfers other memory,
-like an address in the DAX Window, to/from the vhost-user device then
-virtqueue buffer address translation fails.
-
-Dave added a code path that bounces such accesses through the QEMU
-process using the VHOST_USER_SLAVE_FS_IO slavefd request, but it would
-be simpler, faster, and cleaner to do I/O in QEMU in the first place.
-
-What I don't like about moving READ/WRITE into QEMU is that we need to
-use even more virtqueues for multiqueue operation :).
-
-Stefan
-
---EuxKj2iCbKjpUGkD
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1ROfoACgkQnKSrs4Gr
-c8i7pAf/UJVpVsfhaGANERAC2RS0451GRendQAyY7OIsHn/AcPA3FPs3trDolMFc
-HH5/5KXVoXYdBNxmD2Y+k8snYxE/oIfACdOtxtcrv6UXz0qkd1AuJZPCofFReqhm
-GpTrurV6GiITCQy4wa2rKSmLArsag6SZF/M6DJnHttuvqyPAphGsueP6yVF4ya5/
-elPfokel4IgsoWUr1apQ1dFA4CQ4bZT3ETs9+gy0QnIf707qnaEnsGFfGopwYAXi
-NVpVyBqSWERHpGvMZ588wBMXHcQmwrjuhK3JbXapae26uyaG0YhTxwQWpEsz+AdV
-SA5gybi8yPaNdYoTXR2hNbPpHzPG/Q==
-=NNAf
------END PGP SIGNATURE-----
-
---EuxKj2iCbKjpUGkD--
+diff --git a/fs/fuse/dev.c b/fs/fuse/dev.c
+index 6215bc7d4255..2bbfc1f77875 100644
+--- a/fs/fuse/dev.c
++++ b/fs/fuse/dev.c
+@@ -1185,7 +1185,7 @@ __releases(fiq->waitq.lock)
+ 	return err ? err : reqsize;
+ }
+ 
+-static struct fuse_forget_link *dequeue_forget(struct fuse_iqueue *fiq,
++struct fuse_forget_link *fuse_dequeue_forget(struct fuse_iqueue *fiq,
+ 					       unsigned max,
+ 					       unsigned *countp)
+ {
+@@ -1206,6 +1206,7 @@ static struct fuse_forget_link *dequeue_forget(struct fuse_iqueue *fiq,
+ 
+ 	return head;
+ }
++EXPORT_SYMBOL(fuse_dequeue_forget);
+ 
+ static int fuse_read_single_forget(struct fuse_iqueue *fiq,
+ 				   struct fuse_copy_state *cs,
+@@ -1213,7 +1214,7 @@ static int fuse_read_single_forget(struct fuse_iqueue *fiq,
+ __releases(fiq->waitq.lock)
+ {
+ 	int err;
+-	struct fuse_forget_link *forget = dequeue_forget(fiq, 1, NULL);
++	struct fuse_forget_link *forget = fuse_dequeue_forget(fiq, 1, NULL);
+ 	struct fuse_forget_in arg = {
+ 		.nlookup = forget->forget_one.nlookup,
+ 	};
+@@ -1261,7 +1262,7 @@ __releases(fiq->waitq.lock)
+ 	}
+ 
+ 	max_forgets = (nbytes - ih.len) / sizeof(struct fuse_forget_one);
+-	head = dequeue_forget(fiq, max_forgets, &count);
++	head = fuse_dequeue_forget(fiq, max_forgets, &count);
+ 	spin_unlock(&fiq->waitq.lock);
+ 
+ 	arg.count = count;
+@@ -2231,7 +2232,7 @@ void fuse_abort_conn(struct fuse_conn *fc)
+ 			clear_bit(FR_PENDING, &req->flags);
+ 		list_splice_tail_init(&fiq->pending, &to_end);
+ 		while (forget_pending(fiq))
+-			kfree(dequeue_forget(fiq, 1, NULL));
++			kfree(fuse_dequeue_forget(fiq, 1, NULL));
+ 		wake_up_all_locked(&fiq->waitq);
+ 		spin_unlock(&fiq->waitq.lock);
+ 		kill_fasync(&fiq->fasync, SIGIO, POLL_IN);
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index 7da756e2859e..d4b27f048d81 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -820,6 +820,9 @@ void fuse_queue_forget(struct fuse_conn *fc, struct fuse_forget_link *forget,
+ 
+ struct fuse_forget_link *fuse_alloc_forget(void);
+ 
++struct fuse_forget_link *fuse_dequeue_forget(struct fuse_iqueue *fiq,
++					     unsigned max, unsigned *countp);
++
+ /* Used by READDIRPLUS */
+ void fuse_force_forget(struct file *file, u64 nodeid);
+ 
+-- 
+2.20.1
 

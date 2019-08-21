@@ -1,18 +1,18 @@
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
 	h=from:to:cc:subject:date:message-id:in-reply-to:references;
-	bh=JUQWNdqvXaR9CisJRzGQ0NQKqVojyOo+nCZzrizmZWw=;
-	b=TjqHqorE5TIYX1K3Lt51uO1KmO+MRpvqPN6PQFjL6OVPtvcD8JDvsvxMTXD6Sh9Hq8
-	CEUmStxuHcoQIgLdnSBW7v/p10BecT7hF+wlfmGDRXumy4eUqjxMVEAZwzTtpu6g59zB
-	KlmRCUbBP1qCHsxgQzX+Dp/iMNj+lBwC1agkBk2ude753B920nFlHPMg0J2n4xURgAbu
-	jvhW5DWYCnDcoKCrYjiNK9FH+08eCSpOA9wU1TM92GEf41Eb7Vq4usPCvdZGjb5Ag49+
-	7OAAM23KOUtWOUW7UH3BQaE90lkotrdpbSet9NOt8/R6fHkk1XhuN1CpKYuqnjEbkUHm
-	VDzQ==
+	bh=IUWeGub1/eD07NC3el/NuPWrCbEc7ymBNNKQAxobRKk=;
+	b=ZUtut8jlYeN/0D9MozDEmR0eh38M2dyukZ+v5Eoc6jqkVPxhkHznL1CLQQrARWQuHv
+	Co5zarQZBMyldJJgpYOd2y8JHeQMCCFCtYcwiTb53Ho1FITQIw+AV/P5qpq8CjAks+ON
+	dDw3ubLqnFEmPsrjiVsb4mPBuCjzJBesezPF8kFRB+bX5EAiLL3UC6AS6IqTSzTGLl/f
+	4yQ+QGaDfxLePNewqXZc49LrGiwznz8VKSUNIx7dHeNfIUWa063TxGNbZtgXqgJrudsq
+	mRrG2e0MqjPOD8wM9YtFwGt0ZuJ58/5nk+ZWmfPmKOgGk3lgBOI7vxZIdqjCca73kRld
+	wu2A==
 From: Masayoshi Mizuma <msys.mizuma@gmail.com>
-Date: Wed, 21 Aug 2019 00:40:12 -0400
-Message-Id: <20190821044014.26369-2-msys.mizuma@gmail.com>
+Date: Wed, 21 Aug 2019 00:40:14 -0400
+Message-Id: <20190821044014.26369-4-msys.mizuma@gmail.com>
 In-Reply-To: <20190821044014.26369-1-msys.mizuma@gmail.com>
 References: <20190821044014.26369-1-msys.mizuma@gmail.com>
-Subject: [Virtio-fs] [PATCH v2 1/3] fuse: add some macros for ftrace
+Subject: [Virtio-fs] [PATCH v2 3/3] virtio-fs: add tracepoints
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -26,87 +26,97 @@ Cc: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
 From: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
-Add some macros for ftrace. These macros is useful for generic fuse.
+Add tracepoint to the following function. It will be useful
+to debug the I/O request flow.
+
+  - virtio_fs_enqueue_req
+  - virtio_fs_requests_done_work
+  - virtio_fs_hiprio_dispatch_work
+  - virtio_fs_hiprio_done_work
+
+Example of the trace record:
+
+  cat-4491         [006] .... 72.414799: virtio_fs_request_dispatched:
+      opcode FUSE_READ unique 0x13b30 nodeid 0x2 in.len 80 flags
+      ISREPLY|WAITING|SENT notify 1
+  kworker/0:12-448 [000] .... 72.414807: virtio_fs_request_done:
+      opcode FUSE_READ unique 0x13b30 nodeid 0x2 in.len 80 flags
+      ISREPLY|WAITING
 
 Signed-off-by: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 ---
- include/trace/events/fuse_common.h | 67 ++++++++++++++++++++++++++++++
- 1 file changed, 67 insertions(+)
- create mode 100644 include/trace/events/fuse_common.h
+ fs/fuse/virtio_fs.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/include/trace/events/fuse_common.h b/include/trace/events/fuse_common.h
-new file mode 100644
-index 000000000..0805ec4ab
---- /dev/null
-+++ b/include/trace/events/fuse_common.h
-@@ -0,0 +1,67 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index 558d090af..83055d22a 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -14,6 +14,9 @@
+ #include <linux/delay.h>
+ #include "fuse_i.h"
+ 
++#define CREATE_TRACE_POINTS
++#include <trace/events/virtio_fs.h>
 +
-+#include <uapi/linux/fuse.h>
+ /* List of virtio-fs device instances and a lock for the list */
+ static DEFINE_MUTEX(virtio_fs_mutex);
+ static LIST_HEAD(virtio_fs_instances);
+@@ -175,6 +178,7 @@ static void virtio_fs_hiprio_done_work(struct work_struct *work)
+ 	struct virtio_fs_vq *fsvq = container_of(work, struct virtio_fs_vq,
+ 						 done_work);
+ 	struct virtqueue *vq = fsvq->vq;
++	struct virtio_fs_forget *forget;
+ 
+ 	/* Free completed FUSE_FORGET requests */
+ 	spin_lock(&fsvq->lock);
+@@ -185,6 +189,10 @@ static void virtio_fs_hiprio_done_work(struct work_struct *work)
+ 		virtqueue_disable_cb(vq);
+ 
+ 		while ((req = virtqueue_get_buf(vq, &len)) != NULL) {
++			forget = (struct virtio_fs_forget *)req;
++			trace_virtio_fs_hiprio_request_done(
++				forget->ih.opcode, forget->ih.unique,
++				forget->ih.nodeid, forget->ih.len);
+ 			kfree(req);
+ 			fsvq->in_flight--;
+ 		}
+@@ -249,6 +257,12 @@ static void virtio_fs_hiprio_dispatch_work(struct work_struct *work)
+ 
+ 		fsvq->in_flight++;
+ 		notify = virtqueue_kick_prepare(vq);
 +
-+#define fuse_opcode_name(opcode)	{ opcode, #opcode }
-+#define show_opcode_name(val)				\
-+	__print_symbolic(val,				\
-+		fuse_opcode_name(FUSE_LOOKUP),		\
-+		fuse_opcode_name(FUSE_FORGET),		\
-+		fuse_opcode_name(FUSE_GETATTR),		\
-+		fuse_opcode_name(FUSE_SETATTR),		\
-+		fuse_opcode_name(FUSE_READLINK),	\
-+		fuse_opcode_name(FUSE_SYMLINK),		\
-+		fuse_opcode_name(FUSE_MKNOD),		\
-+		fuse_opcode_name(FUSE_MKDIR),		\
-+		fuse_opcode_name(FUSE_UNLINK),		\
-+		fuse_opcode_name(FUSE_RMDIR),		\
-+		fuse_opcode_name(FUSE_RENAME),		\
-+		fuse_opcode_name(FUSE_LINK),		\
-+		fuse_opcode_name(FUSE_OPEN),		\
-+		fuse_opcode_name(FUSE_READ),		\
-+		fuse_opcode_name(FUSE_WRITE),		\
-+		fuse_opcode_name(FUSE_STATFS),		\
-+		fuse_opcode_name(FUSE_RELEASE),		\
-+		fuse_opcode_name(FUSE_FSYNC),		\
-+		fuse_opcode_name(FUSE_SETXATTR),	\
-+		fuse_opcode_name(FUSE_GETXATTR),	\
-+		fuse_opcode_name(FUSE_LISTXATTR),	\
-+		fuse_opcode_name(FUSE_REMOVEXATTR),	\
-+		fuse_opcode_name(FUSE_FLUSH),		\
-+		fuse_opcode_name(FUSE_INIT),		\
-+		fuse_opcode_name(FUSE_OPENDIR),		\
-+		fuse_opcode_name(FUSE_READDIR),		\
-+		fuse_opcode_name(FUSE_RELEASEDIR),	\
-+		fuse_opcode_name(FUSE_FSYNCDIR),	\
-+		fuse_opcode_name(FUSE_GETLK),		\
-+		fuse_opcode_name(FUSE_SETLK),		\
-+		fuse_opcode_name(FUSE_SETLKW),		\
-+		fuse_opcode_name(FUSE_ACCESS),		\
-+		fuse_opcode_name(FUSE_CREATE),		\
-+		fuse_opcode_name(FUSE_INTERRUPT),	\
-+		fuse_opcode_name(FUSE_BMAP),		\
-+		fuse_opcode_name(FUSE_DESTROY),		\
-+		fuse_opcode_name(FUSE_IOCTL),		\
-+		fuse_opcode_name(FUSE_POLL),		\
-+		fuse_opcode_name(FUSE_NOTIFY_REPLY),	\
-+		fuse_opcode_name(FUSE_BATCH_FORGET),	\
-+		fuse_opcode_name(FUSE_FALLOCATE),	\
-+		fuse_opcode_name(FUSE_READDIRPLUS),	\
-+		fuse_opcode_name(FUSE_RENAME2),		\
-+		fuse_opcode_name(FUSE_LSEEK),		\
-+		fuse_opcode_name(FUSE_COPY_FILE_RANGE),	\
-+		fuse_opcode_name(FUSE_SETUPMAPPING),	\
-+		fuse_opcode_name(FUSE_REMOVEMAPPING))
++		trace_virtio_fs_hiprio_request_dispatched(
++			forget->ih.opcode, forget->ih.unique,
++			forget->ih.nodeid, forget->ih.len,
++			notify);
 +
-+#define show_req_flag(flags) __print_flags(flags, "|",	\
-+	{ (1UL << FR_ISREPLY),		"ISREPLY"},	\
-+	{ (1UL << FR_FORCE),		"FORCE"},	\
-+	{ (1UL << FR_BACKGROUND),	"BACKGROUND"},	\
-+	{ (1UL << FR_WAITING),		"WAITING"},	\
-+	{ (1UL << FR_ABORTED),		"ABORTED"},	\
-+	{ (1UL << FR_INTERRUPTED),	"INTERRUPTED"},	\
-+	{ (1UL << FR_LOCKED),		"LOCKED"},	\
-+	{ (1UL << FR_PENDING),		"PENDING"},	\
-+	{ (1UL << FR_SENT),		"SENT"},	\
-+	{ (1UL << FR_FINISHED),		"FINISHED"},	\
-+	{ (1UL << FR_PRIVATE),		"PRIVATE"})
+ 		spin_unlock(&fsvq->lock);
+ 
+ 		if (notify)
+@@ -362,6 +376,11 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
+ 		spin_lock(&fpq->lock);
+ 		clear_bit(FR_SENT, &req->flags);
+ 		list_del_init(&req->list);
++
++		trace_virtio_fs_request_done(
++			req->in.h.opcode, req->in.h.unique,
++			req->in.h.nodeid, req->in.h.len, req->flags);
++
+ 		spin_unlock(&fpq->lock);
+ 
+ 		fuse_request_end(fc, req);
+@@ -912,6 +931,10 @@ static int virtio_fs_enqueue_req(struct virtqueue *vq, struct fuse_req *req)
+ 
+ 	notify = virtqueue_kick_prepare(vq);
+ 
++	trace_virtio_fs_request_dispatched(
++		req->in.h.opcode, req->in.h.unique,
++		req->in.h.nodeid, req->in.h.len, req->flags, notify);
++
+ 	spin_unlock(&fsvq->lock);
+ 
+ 	if (notify)
 -- 
 2.18.1
 

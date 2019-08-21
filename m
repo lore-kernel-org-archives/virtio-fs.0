@@ -1,12 +1,12 @@
-Date: Mon, 12 Aug 2019 08:48:18 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190812124818.GA19506@redhat.com>
-References: <20190809192708.GA2431@redhat.com>
+Date: Wed, 21 Aug 2019 13:57:15 -0400
+Message-Id: <20190821175720.25901-15-vgoyal@redhat.com>
+In-Reply-To: <20190821175720.25901-1-vgoyal@redhat.com>
+References: <20190821175720.25901-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20190809192708.GA2431@redhat.com>
-Subject: Re: [Virtio-fs] Vivek's Status (Week starting 5th August, 2019)
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 14/19] fuse,
+	dax: Take ->i_mmap_sem lock during dax page fault
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,50 +15,116 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs-list <virtio-fs@redhat.com>
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com, miklos@szeredi.hu
 
-Oops, posted to wrong list. Please ignore.
+We need some kind of locking mechanism here. Normal file systems like
+ext4 and xfs seems to take their own semaphore to protect agains
+truncate while fault is going on.
 
-Vivek
+We have additional requirement to protect against fuse dax memory range
+reclaim. When a range has been selected for reclaim, we need to make sure
+no other read/write/fault can try to access that memory range while
+reclaim is in progress. Once reclaim is complete, lock will be released
+and read/write/fault will trigger allocation of fresh dax range.
 
-On Fri, Aug 09, 2019 at 03:27:08PM -0400, Vivek Goyal wrote:
-> virtio_fs
-> =========
-> - Fixed bunch of issues and rebased virtio_fs patches to 5.3-rc kernel
->   and pushed to private branch.
-> 
->   https://github.com/rhvgoyal/linux/commits/vivek-5.3-aug-07-2019
-> 
-> - Took care of some of the issues Liu Bo pointed in virtio_fs.
-> 
->   https://github.com/rhvgoyal/linux/commit/0434504ec11dc2b884939b32d6dde6c9c92def94
->   https://github.com/rhvgoyal/linux/commit/127e2551f263a0cc7c6a4f18cbbd55693dfee4d9
-> 
-> - Reviwed ftrace event patch for virtio_fs.
-> 
->   https://www.redhat.com/archives/virtio-fs/2019-August/msg00072.html
-> 
-> - Bunch of other activity on virtio-fs list.
-> 
->   https://www.redhat.com/archives/virtio-fs/2019-August/msg00103.html
->   https://www.redhat.com/archives/virtio-fs/2019-August/msg00080.html
->   https://www.redhat.com/archives/virtio-fs/2019-August/msg00074.html
->   https://www.redhat.com/archives/virtio-fs/2019-August/msg00054.html
->   https://www.redhat.com/archives/virtio-fs/2019-August/msg00044.html
-> 
-> Containers + Overlayfs
-> ======================
-> - Spent some time debugging the overlayfs issue Dan Walsh pointed to where
->   mounter does not have CAP_DAC_OVERRIDE and then chmod fails.
-> 
->   https://github.com/containers/libpod/issues/3684#issuecomment-519574675
-> 
-> - Looked into the issue of overlayfs not working on top of virtio-fs.
-> 
->   https://github.com/kata-containers/runtime/issues/1888#issuecomment-518259095 
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
+Taking inode_lock() is not an option in fault path as lockdep complains
+about circular dependencies. So define a new fuse_inode->i_mmap_sem.
+
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/dir.c    |  2 ++
+ fs/fuse/file.c   | 17 +++++++++++++----
+ fs/fuse/fuse_i.h |  7 +++++++
+ fs/fuse/inode.c  |  1 +
+ 4 files changed, 23 insertions(+), 4 deletions(-)
+
+diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
+index fd8636e67ae9..84c0b638affb 100644
+--- a/fs/fuse/dir.c
++++ b/fs/fuse/dir.c
+@@ -1559,8 +1559,10 @@ int fuse_do_setattr(struct dentry *dentry, struct iattr *attr,
+ 	 */
+ 	if ((is_truncate || !is_wb) &&
+ 	    S_ISREG(inode->i_mode) && oldsize != outarg.attr.size) {
++		down_write(&fi->i_mmap_sem);
+ 		truncate_pagecache(inode, outarg.attr.size);
+ 		invalidate_inode_pages2(inode->i_mapping);
++		up_write(&fi->i_mmap_sem);
+ 	}
+ 
+ 	clear_bit(FUSE_I_SIZE_UNSTABLE, &fi->state);
+diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+index b8bcf49f007f..7b70b5ea7f94 100644
+--- a/fs/fuse/file.c
++++ b/fs/fuse/file.c
+@@ -2792,13 +2792,20 @@ static int __fuse_dax_fault(struct vm_fault *vmf, enum page_entry_size pe_size,
+ 	if (write)
+ 		sb_start_pagefault(sb);
+ 
+-	/* TODO inode semaphore to protect faults vs truncate */
+-
++	/*
++	 * We need to serialize against not only truncate but also against
++	 * fuse dax memory range reclaim. While a range is being reclaimed,
++	 * we do not want any read/write/mmap to make progress and try
++	 * to populate page cache or access memory we are trying to free.
++	 */
++	down_read(&get_fuse_inode(inode)->i_mmap_sem);
+ 	ret = dax_iomap_fault(vmf, pe_size, &pfn, NULL, &fuse_iomap_ops);
+ 
+ 	if (ret & VM_FAULT_NEEDDSYNC)
+ 		ret = dax_finish_sync_fault(vmf, pe_size, pfn);
+ 
++	up_read(&get_fuse_inode(inode)->i_mmap_sem);
++
+ 	if (write)
+ 		sb_end_pagefault(sb);
+ 
+@@ -3767,9 +3774,11 @@ static long fuse_file_fallocate(struct file *file, int mode, loff_t offset,
+ 			file_update_time(file);
+ 	}
+ 
+-	if (mode & FALLOC_FL_PUNCH_HOLE)
++	if (mode & FALLOC_FL_PUNCH_HOLE) {
++		down_write(&fi->i_mmap_sem);
+ 		truncate_pagecache_range(inode, offset, offset + length - 1);
+-
++		up_write(&fi->i_mmap_sem);
++	}
+ 	fuse_invalidate_attr(inode);
+ 
+ out:
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index 37b31c5435ff..125bb7123651 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -220,6 +220,13 @@ struct fuse_inode {
+ 	 */
+ 	struct rw_semaphore i_dmap_sem;
+ 
++	/**
++	 * Can't take inode lock in fault path (leads to circular dependency).
++	 * So take this in fuse dax fault path to make sure truncate and
++	 * punch hole etc. can't make progress in parallel.
++	 */
++	struct rw_semaphore i_mmap_sem;
++
+ 	/** Sorted rb tree of struct fuse_dax_mapping elements */
+ 	struct rb_root_cached dmap_tree;
+ 	unsigned long nr_dmaps;
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index 7e0ed5f3f7e6..52135b4616d2 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -83,6 +83,7 @@ static struct inode *fuse_alloc_inode(struct super_block *sb)
+ 	fi->state = 0;
+ 	fi->nr_dmaps = 0;
+ 	mutex_init(&fi->mutex);
++	init_rwsem(&fi->i_mmap_sem);
+ 	init_rwsem(&fi->i_dmap_sem);
+ 	spin_lock_init(&fi->lock);
+ 	fi->forget = fuse_alloc_forget();
+-- 
+2.20.1
 

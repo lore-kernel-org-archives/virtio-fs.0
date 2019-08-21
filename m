@@ -1,9 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 21 Aug 2019 13:57:01 -0400
-Message-Id: <20190821175720.25901-1-vgoyal@redhat.com>
+Date: Wed, 21 Aug 2019 13:57:03 -0400
+Message-Id: <20190821175720.25901-3-vgoyal@redhat.com>
+In-Reply-To: <20190821175720.25901-1-vgoyal@redhat.com>
+References: <20190821175720.25901-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 00/19][RFC] virtio-fs: Enable DAX support
+Subject: [Virtio-fs] [PATCH 02/19] dax: Pass dax_dev to
+	dax_writeback_mapping_range()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,72 +16,133 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org
-Cc: virtio-fs@redhat.com, vgoyal@redhat.com, miklos@szeredi.hu
+Cc: miklos@szeredi.hu, virtio-fs@redhat.com, Dan Williams <dan.j.williams@intel.com>, vgoyal@redhat.com
 
-Hi,
+Right now dax_writeback_mapping_range() is passed a bdev and dax_dev
+is searched from that bdev name.
 
-This patch series enables DAX support for virtio-fs filesystem. Patches
-are based on 5.3-rc5 kernel and need first patch series posted for
-virtio-fs support with subject "virtio-fs: shared file system for virtual
-machines".
+virtio-fs does not have a bdev. So pass in dax_dev also to
+dax_writeback_mapping_range(). If dax_dev is passed in, bdev is not
+used otherwise dax_dev is searched using bdev.
 
-https://www.redhat.com/archives/virtio-fs/2019-August/msg00281.html
+Cc: Dan Williams <dan.j.williams@intel.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/dax.c            | 16 ++++++++++------
+ fs/ext2/inode.c     |  2 +-
+ fs/ext4/inode.c     |  2 +-
+ fs/xfs/xfs_aops.c   |  2 +-
+ include/linux/dax.h |  6 ++++--
+ 5 files changed, 17 insertions(+), 11 deletions(-)
 
-Enabling DAX seems to improve performance for most of the operations
-in general a great deal. I have reported performance numbers in first patch
-series so I am not repeating these here.
-
-Any comments or feedback is welcome.
-
-Thanks
-Vivek
-
-Sebastien Boeuf (3):
-  virtio: Add get_shm_region method
-  virtio: Implement get_shm_region for PCI transport
-  virtio: Implement get_shm_region for MMIO transport
-
-Stefan Hajnoczi (4):
-  dax: remove block device dependencies
-  fuse, dax: add fuse_conn->dax_dev field
-  virtio_fs, dax: Set up virtio_fs dax_device
-  fuse, dax: add DAX mmap support
-
-Vivek Goyal (12):
-  dax: Pass dax_dev to dax_writeback_mapping_range()
-  fuse: Keep a list of free dax memory ranges
-  fuse: implement FUSE_INIT map_alignment field
-  fuse: Introduce setupmapping/removemapping commands
-  fuse, dax: Implement dax read/write operations
-  fuse: Define dax address space operations
-  fuse, dax: Take ->i_mmap_sem lock during dax page fault
-  fuse: Maintain a list of busy elements
-  dax: Create a range version of dax_layout_busy_page()
-  fuse: Add logic to free up a memory range
-  fuse: Release file in process context
-  fuse: Take inode lock for dax inode truncation
-
- drivers/dax/super.c                |    3 +-
- drivers/virtio/virtio_mmio.c       |   32 +
- drivers/virtio/virtio_pci_modern.c |  108 +++
- fs/dax.c                           |   89 +-
- fs/ext2/inode.c                    |    2 +-
- fs/ext4/inode.c                    |    2 +-
- fs/fuse/cuse.c                     |    3 +-
- fs/fuse/dir.c                      |    2 +
- fs/fuse/file.c                     | 1206 +++++++++++++++++++++++++++-
- fs/fuse/fuse_i.h                   |   99 ++-
- fs/fuse/inode.c                    |  138 +++-
- fs/fuse/virtio_fs.c                |  134 +++-
- fs/xfs/xfs_aops.c                  |    2 +-
- include/linux/dax.h                |   12 +-
- include/linux/virtio_config.h      |   17 +
- include/uapi/linux/fuse.h          |   47 +-
- include/uapi/linux/virtio_fs.h     |    3 +
- include/uapi/linux/virtio_mmio.h   |   11 +
- include/uapi/linux/virtio_pci.h    |   11 +-
- 19 files changed, 1868 insertions(+), 53 deletions(-)
-
+diff --git a/fs/dax.c b/fs/dax.c
+index a11147bbaf9e..60620a37030c 100644
+--- a/fs/dax.c
++++ b/fs/dax.c
+@@ -936,12 +936,12 @@ static int dax_writeback_one(struct xa_state *xas, struct dax_device *dax_dev,
+  * on persistent storage prior to completion of the operation.
+  */
+ int dax_writeback_mapping_range(struct address_space *mapping,
+-		struct block_device *bdev, struct writeback_control *wbc)
++		struct block_device *bdev, struct dax_device *dax_dev,
++		struct writeback_control *wbc)
+ {
+ 	XA_STATE(xas, &mapping->i_pages, wbc->range_start >> PAGE_SHIFT);
+ 	struct inode *inode = mapping->host;
+ 	pgoff_t end_index = wbc->range_end >> PAGE_SHIFT;
+-	struct dax_device *dax_dev;
+ 	void *entry;
+ 	int ret = 0;
+ 	unsigned int scanned = 0;
+@@ -952,9 +952,12 @@ int dax_writeback_mapping_range(struct address_space *mapping,
+ 	if (!mapping->nrexceptional || wbc->sync_mode != WB_SYNC_ALL)
+ 		return 0;
+ 
+-	dax_dev = dax_get_by_host(bdev->bd_disk->disk_name);
+-	if (!dax_dev)
+-		return -EIO;
++	if (bdev) {
++		WARN_ON(dax_dev);
++		dax_dev = dax_get_by_host(bdev->bd_disk->disk_name);
++		if (!dax_dev)
++			return -EIO;
++	}
+ 
+ 	trace_dax_writeback_range(inode, xas.xa_index, end_index);
+ 
+@@ -976,7 +979,8 @@ int dax_writeback_mapping_range(struct address_space *mapping,
+ 		xas_lock_irq(&xas);
+ 	}
+ 	xas_unlock_irq(&xas);
+-	put_dax(dax_dev);
++	if (bdev)
++		put_dax(dax_dev);
+ 	trace_dax_writeback_range_done(inode, xas.xa_index, end_index);
+ 	return ret;
+ }
+diff --git a/fs/ext2/inode.c b/fs/ext2/inode.c
+index 7004ce581a32..4e3870c4e255 100644
+--- a/fs/ext2/inode.c
++++ b/fs/ext2/inode.c
+@@ -958,7 +958,7 @@ static int
+ ext2_dax_writepages(struct address_space *mapping, struct writeback_control *wbc)
+ {
+ 	return dax_writeback_mapping_range(mapping,
+-			mapping->host->i_sb->s_bdev, wbc);
++			mapping->host->i_sb->s_bdev, NULL, wbc);
+ }
+ 
+ const struct address_space_operations ext2_aops = {
+diff --git a/fs/ext4/inode.c b/fs/ext4/inode.c
+index 420fe3deed39..75b85c56c732 100644
+--- a/fs/ext4/inode.c
++++ b/fs/ext4/inode.c
+@@ -2992,7 +2992,7 @@ static int ext4_dax_writepages(struct address_space *mapping,
+ 	percpu_down_read(&sbi->s_journal_flag_rwsem);
+ 	trace_ext4_writepages(inode, wbc);
+ 
+-	ret = dax_writeback_mapping_range(mapping, inode->i_sb->s_bdev, wbc);
++	ret = dax_writeback_mapping_range(mapping, inode->i_sb->s_bdev, NULL, wbc);
+ 	trace_ext4_writepages_result(inode, wbc, ret,
+ 				     nr_to_write - wbc->nr_to_write);
+ 	percpu_up_read(&sbi->s_journal_flag_rwsem);
+diff --git a/fs/xfs/xfs_aops.c b/fs/xfs/xfs_aops.c
+index f16d5f196c6b..71a7007509c4 100644
+--- a/fs/xfs/xfs_aops.c
++++ b/fs/xfs/xfs_aops.c
+@@ -1120,7 +1120,7 @@ xfs_dax_writepages(
+ {
+ 	xfs_iflags_clear(XFS_I(mapping->host), XFS_ITRUNCATED);
+ 	return dax_writeback_mapping_range(mapping,
+-			xfs_find_bdev_for_inode(mapping->host), wbc);
++			xfs_find_bdev_for_inode(mapping->host), NULL, wbc);
+ }
+ 
+ STATIC int
+diff --git a/include/linux/dax.h b/include/linux/dax.h
+index 9bd8528bd305..e7f40108f2c9 100644
+--- a/include/linux/dax.h
++++ b/include/linux/dax.h
+@@ -141,7 +141,8 @@ static inline void fs_put_dax(struct dax_device *dax_dev)
+ 
+ struct dax_device *fs_dax_get_by_bdev(struct block_device *bdev);
+ int dax_writeback_mapping_range(struct address_space *mapping,
+-		struct block_device *bdev, struct writeback_control *wbc);
++		struct block_device *bdev, struct dax_device *dax_dev,
++		struct writeback_control *wbc);
+ 
+ struct page *dax_layout_busy_page(struct address_space *mapping);
+ dax_entry_t dax_lock_page(struct page *page);
+@@ -180,7 +181,8 @@ static inline struct page *dax_layout_busy_page(struct address_space *mapping)
+ }
+ 
+ static inline int dax_writeback_mapping_range(struct address_space *mapping,
+-		struct block_device *bdev, struct writeback_control *wbc)
++		struct block_device *bdev, struct dax_device *dax_dev,
++		struct writeback_control *wbc)
+ {
+ 	return -EOPNOTSUPP;
+ }
 -- 
 2.20.1
 

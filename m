@@ -1,14 +1,15 @@
+Date: Wed, 21 Aug 2019 10:47:57 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190821144757.GC2304@redhat.com>
 References: <5D53D882.5090803@huawei.com> <5D5A4692.9060006@huawei.com>
-	<20190820153926.GC4233@redhat.com> <20190820175610.GD4233@redhat.com>
-	<5D5CA2E2.9000802@huawei.com> <20190821131136.GA2304@redhat.com>
-From: piaojun <piaojun@huawei.com>
-Message-ID: <826341e2-6641-1673-3d43-e7e593251c6c@huawei.com>
-Date: Wed, 21 Aug 2019 22:38:39 +0800
+	<20190820153926.GC4233@redhat.com>
+	<20190820175610.GD4233@redhat.com> <5D5CA2E2.9000802@huawei.com>
+	<20190821131136.GA2304@redhat.com>
+	<826341e2-6641-1673-3d43-e7e593251c6c@huawei.com>
 MIME-Version: 1.0
-In-Reply-To: <20190821131136.GA2304@redhat.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <826341e2-6641-1673-3d43-e7e593251c6c@huawei.com>
 Subject: Re: [Virtio-fs] [PATCH RESEND][RFC] virtiofsd: do not fall back to
  buffer io when cache=auto/always
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -19,87 +20,35 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
+To: piaojun <piaojun@huawei.com>
 Cc: virtio-fs@redhat.com
 
+On Wed, Aug 21, 2019 at 10:38:39PM +0800, piaojun wrote:
 
+[..]
+> >>
+> >> You cleared my first doubt that 'fi->direct_io' and 'fi->keep_cache'
+> >> are used to control Guest I/O mode together, and there may be different
+> >> I/O modes between Guest and Host if I undersatnd it correctly. I admit
+> >> this offers a more flexible config to user, but also introduces more
+> >> complex option. Maybe we could just use *keep_cache* to handle all
+> >> these options.
+> >>
+> >> My second doubt is that *keep_cache* is used to control whether reusing
+> >> the cache of last open(). IMO, it has nothing to do with the following
+> >> I/O path.
+> > 
+> > FOPEN_KEEP_CACHE is already part of fuse protocol. cache=always is just
+> > making use of that option so that cache contents are not discarded upon
+> > next open.
+> 
+> It still confused me that probably we needn't set fi->direct_io if
+> CACHE_NONE is set to indicate Guest go direct I/O path. As Guest could
+> also go direct I/O through regular path you have mentioned above.
 
-On 2019/8/21 21:11, Vivek Goyal wrote:
-> On Wed, Aug 21, 2019 at 09:48:18AM +0800, piaojun wrote:
->>
->>
->> On 2019/8/21 1:56, Vivek Goyal wrote:
->>> On Tue, Aug 20, 2019 at 11:39:26AM -0400, Vivek Goyal wrote:
->>>> On Mon, Aug 19, 2019 at 02:49:54PM +0800, piaojun wrote:
->>>>> When O_DIRECT flags is set by Guest, virtiofsd will open file with
->>>>> O_DIRECT, but unset 'fi->direct_io' which makes Guest go buffer io path.
->>>>
->>>> Where is virtiofsd unset fi->direct_io flag? All I can see is that it
->>>> sets this flag if cache=none?
->>>>
->>>
->>> Ok, I looked at it little bit more closely and I don't think it is a
->>> problem. With cache=always/auto, we don't set fi->direct_io. That means
->>> server is not enforcing a direct I/O policy on client.
->>>
->>> Now if client decides to direct I/O by opening file with O_DIRECT, it
->>> will still take direct I/O path and call fuse_direct_IO(). Look at
->>> fuse_file_aops->fuse_direct_IO().
->>
->> The problem is that when Guest open with O_DIRECT, the Host won't set
->> open_flags with FOPEN_DIRECT_IO if CACHE_AUTO is set. It makes Guest
->> goes into fuse_cache_write_iter() rather than fuse_direct_write_iter().
->> In other words, the Guest's I/O mode will be changed by virtiofsd.
-> 
-> I think there are two direct I/O paths. One is where server requests
-> that direct I/O be done on the file and in that case FOPEN_DIRECT_IO
-> is set.
-> 
-> Other case is where client initiates direct I/O and in that case
-> FOPEN_DIRECT_IO is not set and we take regular path which is
-> capable of doing both direct and buffered I/O. For example, for
-> reads we do following.
-> 
-> fuse_file_read_iter()
->    fuse_cache_read_iter()
->       generic_file_read_iter()
-> 	mapping->a_ops->direct_IO() <--- (If iocb->ki_flags & IOCB_DIRECT)
-> 	  fuse_direct_IO()
-> 
-> Similary for write path.
-> 
-> fuse_file_write_iter()
->   fuse_cache_write_iter()
->      generic_file_direct_write() <----- (If iocb->ki_flags & IOCB_DIRECT)
->         mapping->a_ops->direct_IO()
-> 	   fuse_direct_IO()
-> 
-> Can you give it a try. I don't think we have the problem what you
-> are describing.
+fi->direct_io is needed so that server can *enforce* direct I/O on guest.
+If guest applications are not doing direct I/O, without fi->direct_io,
+you can't force client to do direct I/O.
 
-Thanks for your detailed explanation, and perhaps I missed the regular
-path you mentioned above, so I will have a try to confirm this later.
-
-> 
->>
->> You cleared my first doubt that 'fi->direct_io' and 'fi->keep_cache'
->> are used to control Guest I/O mode together, and there may be different
->> I/O modes between Guest and Host if I undersatnd it correctly. I admit
->> this offers a more flexible config to user, but also introduces more
->> complex option. Maybe we could just use *keep_cache* to handle all
->> these options.
->>
->> My second doubt is that *keep_cache* is used to control whether reusing
->> the cache of last open(). IMO, it has nothing to do with the following
->> I/O path.
-> 
-> FOPEN_KEEP_CACHE is already part of fuse protocol. cache=always is just
-> making use of that option so that cache contents are not discarded upon
-> next open.
-
-It still confused me that probably we needn't set fi->direct_io if
-CACHE_NONE is set to indicate Guest go direct I/O path. As Guest could
-also go direct I/O through regular path you have mentioned above.
-
-Jun
+Vivek
 

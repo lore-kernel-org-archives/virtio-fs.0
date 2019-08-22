@@ -1,12 +1,24 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Thu,  5 Sep 2019 15:48:42 -0400
-Message-Id: <20190905194859.16219-2-vgoyal@redhat.com>
-In-Reply-To: <20190905194859.16219-1-vgoyal@redhat.com>
-References: <20190905194859.16219-1-vgoyal@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=UU9SQ34gGkQXgmf2SemOA6HtI5mrNhrFcQkyd5D8SMg=;
+	b=imZQ/lEMvuyYOJiH2l3PvBzEEtdFxbOeq0YuIvqUjoeuiF0KlT3vr8gJUCbc03vAwC
+	5JUlj8GTCzkUvQH9KRJ8ykRfwN0QVJyFG7aezy2pTGOcrOu+pN2VVdzpcZbSKtmDsRiZ
+	1DbhF8xwgDw0tZgsegHzpb6MmdyOkw4maf6gI=
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 01/18] virtiofs: Remove request from processing
-	list before calling end
+References: <5abd7616-5351-761c-0c14-21d511251006@huawei.com>
+	<20190820091650.GE9855@stefanha-x1.localdomain>
+	<CAJfpegs8fSLoUaWKhC1543Hoy9821vq8=nYZy-pw1+95+Yv4gQ@mail.gmail.com>
+	<20190821160551.GD9095@stefanha-x1.localdomain>
+	<954b5f8a-4007-f29c-f38e-dd5585879541@huawei.com>
+	<CAJfpegtBYLJLWM8GJ1h66PMf2J9o38FG6udcd2hmamEEQddf5w@mail.gmail.com>
+	<0e8090c7-0c7c-bcbe-af75-33054d3a3efb@huawei.com>
+In-Reply-To: <0e8090c7-0c7c-bcbe-af75-33054d3a3efb@huawei.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Thu, 22 Aug 2019 15:07:18 +0200
+Message-ID: <CAJfpegurYLAApon5Ai6Q33vEy+GPxtOTUwDCCbJ2JAbg4csDSg@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [QUESTION] A performance problem for buffer write
+ compared with 9p
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,33 +27,55 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org, miklos@szeredi.hu
-Cc: mst@redhat.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, vgoyal@redhat.com
+To: wangyan <wangyan122@huawei.com>
+Cc: linux-fsdevel@vger.kernel.org, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, Miklos Szeredi <mszeredi@redhat.com>
 
-In error path we are calling fuse_request_end() but we need to clear
-FR_SENT bit as well as remove request from processing queue. Otherwise
-fuse_request_end() triggers a warning as well as other issues show up.
+On Thu, Aug 22, 2019 at 2:48 PM wangyan <wangyan122@huawei.com> wrote:
+>
+> On 2019/8/22 19:43, Miklos Szeredi wrote:
+> > On Thu, Aug 22, 2019 at 2:59 AM wangyan <wangyan122@huawei.com> wrote:
+> >> I will test it when I get the patch, and post the compared result with
+> >> 9p.
+> >
+> > Could you please try the attached patch?  My guess is that it should
+> > improve the performance, perhaps by a big margin.
+> >
+> > Further improvement is possible by eliminating page copies, but that
+> > is less trivial.
+> >
+> > Thanks,
+> > Miklos
+> >
+> Using the same test model. And the test result is:
+>         1. Latency
+>                 virtiofs: avg-lat is 15.40 usec, bigger than before(6.64 usec).
+>                 4K: (g=0): rw=write, bs=4K-4K/4K-4K/4K-4K, ioengine=psync, iodepth=1
+>                 fio-2.13
+>                 Starting 1 process
+>                 Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/142.4MB/0KB /s] [0/36.5K/0
+> iops] [eta 00m:00s]
+>                 4K: (groupid=0, jobs=1): err= 0: pid=5528: Thu Aug 22 20:39:07 2019
+>                   write: io=6633.2MB, bw=226404KB/s, iops=56600, runt= 30001msec
+>                         clat (usec): min=2, max=40403, avg=14.77, stdev=33.71
+>                          lat (usec): min=3, max=40404, avg=15.40, stdev=33.74
+>
+>         2. Bandwidth
+>                 virtiofs: bandwidth is 280840KB/s, lower than before(691894KB/s).
+>                 1M: (g=0): rw=write, bs=1M-1M/1M-1M/1M-1M, ioengine=psync, iodepth=1
+>                 fio-2.13
+>                 Starting 1 process
+>                 Jobs: 1 (f=1): [f(1)] [100.0% done] [0KB/29755KB/0KB /s] [0/29/0 iops]
+> [eta 00m:00s]
+>                 1M: (groupid=0, jobs=1): err= 0: pid=5550: Thu Aug 22 20:41:28 2019
+>                   write: io=8228.0MB, bw=280840KB/s, iops=274, runt= 30001msec
+>                         clat (usec): min=362, max=11038, avg=3571.33, stdev=1062.72
+>                          lat (usec): min=411, max=11093, avg=3628.39, stdev=1064.53
+>
+> According to the result, the patch doesn't work and make it worse than
+> before.
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/virtio_fs.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Is server started with "-owriteback"?
 
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 197e79e536f9..a708ccb65662 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -826,6 +826,10 @@ __releases(fiq->waitq.lock)
- 		}
- 		req->out.h.error = ret;
- 		pr_err("virtio-fs: virtio_fs_enqueue_req() failed %d\n", ret);
-+		spin_lock(&fpq->lock);
-+		clear_bit(FR_SENT, &req->flags);
-+		list_del_init(&req->list);
-+		spin_unlock(&fpq->lock);
- 		fuse_request_end(fc, req);
- 		return;
- 	}
--- 
-2.20.1
+Thanks,
+Miklos
 

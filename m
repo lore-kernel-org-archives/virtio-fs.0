@@ -1,22 +1,15 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=7kmZfKphmPDJyPhB1aEwSutJQo/nVZHIpGqlV62NkC0=;
-	b=CQYTV7T/6dptI2gBfu2uXwU4RqC1UIrULXwa1LcNs212HPvwiKRj5wzH9w17HNj1/S
-	xgABLrdaMQrQKih8MZ3en05XSPZ6cYtpvN8zEPBJT0wL6K+HI44uIDZofAFjGDHjjwcZ
-	LWo+0RcMIe0icmrDfhi9RpZ6cZJmo1ANKTqLA=
+References: <5D4D0D06.1090602@huawei.com>
+	<20190821153802.GB9095@stefanha-x1.localdomain>
+From: piaojun <piaojun@huawei.com>
+Message-ID: <d43b9104-d207-0a15-e0f7-45c66af03089@huawei.com>
+Date: Thu, 22 Aug 2019 13:18:00 +0800
 MIME-Version: 1.0
-References: <20190821173742.24574-1-vgoyal@redhat.com>
-	<CAJfpegv_XS=kLxw_FzWNM2Xao5wsn7oGbk3ow78gU8tpXwo-sg@mail.gmail.com>
-	<20190829132949.GA6744@redhat.com>
-	<CAJfpegtd-MQNbUW9YuL4xdXDkGR8K6LMHCqDG2Ppu9F_Hyk2RQ@mail.gmail.com>
-	<20190829143107.GB6744@redhat.com>
-In-Reply-To: <20190829143107.GB6744@redhat.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Thu, 29 Aug 2019 16:47:17 +0200
-Message-ID: <CAJfpegtOC8dHofLmpYpryKv9+93KHwn9Xb-NCyvgg0rG8XspTw@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH v3 00/13] virtio-fs: shared file system for
-	virtual machines
+In-Reply-To: <20190821153802.GB9095@stefanha-x1.localdomain>
+Content-Type: text/plain; charset="windows-1252"
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH][RFC] Support multiqueue mode by setting cpu
+ affinity
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,25 +18,225 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, linux-kernel@vger.kernel.org
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com
 
-On Thu, Aug 29, 2019 at 4:31 PM Vivek Goyal <vgoyal@redhat.com> wrote:
 
-> Cool. That works. Faced another compilation error with "make allmodconfig"
-> config file.
->
->   HDRINST usr/include/linux/virtio_fs.h
-> error: include/uapi/linux/virtio_fs.h: missing "WITH Linux-syscall-note" for SPDX-License-Identifier
-> make[1]: *** [scripts/Makefile.headersinst:66: usr/include/linux/virtio_fs.h] Error 1
->
-> Looks like include/uapi/linux/virtio_fs.h needs following.
->
-> -/* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
-> +/* SPDX-License-Identifier: ((GPL-2.0 WITH Linux-syscall-note) OR BSD-3-Clause) */
 
-Fixed and pushed.
+On 2019/8/21 23:38, Stefan Hajnoczi wrote:
+> On Fri, Aug 09, 2019 at 02:04:54PM +0800, piaojun wrote:
+>> Set cpu affinity for each queue in multiqueue mode to improve the iops
+>> performance.
+>>
+>> >From my test, the iops is increased by adding multiqueues as below,
+>> but it has not achieved my expect yet due to some reason. So I'm
+>> considering if we could drop some locks when operating vq as it is
+>> binded to one vCPU. I'm very glad to have a discuss with other
+>> developers.
+>>
+>> Further more, I modified virtiofsd to support multiqueue which just for
+>> testing.
+>>
+>> Test Environment:
+>> Guest configuration:
+>> 8 vCPU
+>> 8GB RAM
+>> Linux 5.1 (vivek-aug-06-2019)
+>>
+>> Host configuration:
+>> Intel(R) Xeon(R) CPU E5-2670 0 @ 2.60GHz (8 cores x 4 threads)
+>> 32GB RAM
+>> Linux 3.10.0
+>> EXT4 + 4G Ramdisk
+>>
+>> ---
+>> Single-queue:
+>> # fio -direct=1 -time_based -iodepth=128 -rw=randwrite -ioengine=libaio -bs=4k -size=1G -numjob=8 -runtime=30 -group_reporting -name=file -filename=/mnt/virtiofs/file
+>> file: (g=0): rw=randwrite, bs=4K-4K/4K-4K/4K-4K, ioengine=libaio, iodepth=128
+>> ...
+>> fio-2.13
+>> Starting 8 processes
+>> Jobs: 8 (f=8): [w(8)] [100.0% done] [0KB/316.5MB/0KB /s] [0/81.2K/0 iops] [eta 00m:00s]
+>> file: (groupid=0, jobs=8): err= 0: pid=5808: Fri Aug  9 20:35:22 2019
+>>   write: io=9499.9MB, bw=324251KB/s, iops=81062, runt= 30001msec
+>>
+>> Multi-queues:
+>> # fio -direct=1 -time_based -iodepth=128 -rw=randwrite -ioengine=libaio -bs=4k -size=1G -numjob=8 -runtime=30 -group_reporting -name=file -filename=/mnt/virtiofs/file
+>> file: (g=0): rw=randwrite, bs=4K-4K/4K-4K/4K-4K, ioengine=libaio, iodepth=128
+>> ...
+>> fio-2.13
+>> Starting 8 processes
+>> Jobs: 8 (f=8): [w(8)] [100.0% done] [0KB/444.6MB/0KB /s] [0/114K/0 iops] [eta 00m:00s]
+>> file: (groupid=0, jobs=8): err= 0: pid=5704: Fri Aug  9 20:38:47 2019
+>>   write: io=12967MB, bw=442582KB/s, iops=110645, runt= 30001msec
+>> ---
+> 
+> How does the same fio command-line perform on the host when bound to 8
+> CPUs?
 
-Thanks,
-Miklos
+Not test yet.
+
+> 
+> What about the virtiofsd changes?  Did you implement host CPU affinity
+> for the virtqueue processing threads and their workqueues?
+
+I just delete the limit code for single queue:
+
+fv_queue_set_started()
+  if (qidx > 1) // delete this check
+
+And I have not implemented host CPU affinity yet, but I'm interested in it.
+
+> 
+> I wonder if numbers are better if you use 8 files instead of 1 file.
+
+I will test as you suggest, and share the result again.
+
+Jun
+
+> 
+>> Signed-off-by: Jun Piao <piaojun@huawei.com>
+>> ---
+>>  fs/fuse/virtio_fs.c | 68 +++++++++++++++++++++++++++++++++++++++++++++++++++--
+>>  1 file changed, 66 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+>> index a04c320..7ba36fc 100644
+>> --- a/fs/fuse/virtio_fs.c
+>> +++ b/fs/fuse/virtio_fs.c
+>> @@ -12,6 +12,7 @@
+>>  #include <linux/virtio.h>
+>>  #include <linux/virtio_fs.h>
+>>  #include <linux/delay.h>
+>> +#include <linux/cpu.h>
+>>  #include "fuse_i.h"
+>>
+>>  /* List of virtio-fs device instances and a lock for the list */
+>> @@ -61,6 +62,9 @@ struct virtio_fs {
+>>  	void *window_kaddr;
+>>  	phys_addr_t window_phys_addr;
+>>  	size_t window_len;
+>> +
+>> +	/* Does the affinity hint is set for virtqueues? */
+>> +	bool affinity_hint_set;
+>>  };
+>>
+>>  struct virtio_fs_forget {
+>> @@ -378,6 +382,44 @@ static void virtio_fs_vq_done(struct virtqueue *vq)
+>>  	schedule_work(&fsvq->done_work);
+>>  }
+>>
+>> +static void virtio_fs_clean_affinity(struct virtio_fs *fs)
+>> +{
+>> +	int i;
+>> +
+>> +	if (fs->affinity_hint_set) {
+>> +		for (i = 0; i < fs->num_queues; i++)
+>> +			virtqueue_set_affinity(fs->vqs[i].vq, NULL);
+>> +
+>> +		fs->affinity_hint_set = false;
+>> +	}
+>> +}
+>> +
+>> +static void virtio_fs_set_affinity(struct virtio_fs *fs)
+>> +{
+>> +	int i = 0, cpu;
+>> +
+>> +	/*
+>> +	 * In single queue mode, we don't set the cpu affinity.
+>> +	 */
+>> +	if (fs->num_queues == 1) {
+>> +		virtio_fs_clean_affinity(fs);
+>> +		fs->affinity_hint_set = false;
+>> +		return;
+>> +	}
+>> +
+>> +	/*
+>> +	 * In multiqueue mode, we let the queue to be private to one cpu
+>> +	 * by setting the affinity hint to eliminate the contention.
+>> +	 */
+>> +	for_each_online_cpu(cpu) {
+>> +		virtqueue_set_affinity(fs->vqs[i].vq, cpumask_of(cpu));
+>> +		if (++i >= fs->num_queues)
+>> +			break;
+>> +	}
+>> +
+>> +	fs->affinity_hint_set = true;
+>> +}
+>> +
+>>  /* Initialize virtqueues */
+>>  static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+>>  			       struct virtio_fs *fs)
+>> @@ -440,6 +482,11 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+>>  		fs->vqs[i].vq = vqs[i];
+>>  		fs->vqs[i].connected = true;
+>>  	}
+>> +
+>> +	/* set affinity for vqs */
+>> +	get_online_cpus();
+>> +	virtio_fs_set_affinity(fs);
+>> +	put_online_cpus();
+>>  out:
+>>  	kfree(names);
+>>  	kfree(callbacks);
+>> @@ -451,6 +498,7 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+>>  static void virtio_fs_cleanup_vqs(struct virtio_device *vdev,
+>>  				  struct virtio_fs *fs)
+>>  {
+>> +	virtio_fs_clean_affinity(fs);
+>>  	vdev->config->del_vqs(vdev);
+>>  }
+>>
+>> @@ -954,10 +1002,22 @@ static int virtio_fs_enqueue_req(struct virtqueue *vq, struct fuse_req *req)
+>>  	return ret;
+>>  }
+>>
+>> +static unsigned virtio_fs_pick_vq_mq(struct virtio_fs *fs)
+>> +{
+>> +	unsigned queue_id;
+>> +	unsigned long flags;
+>> +
+>> +	local_irq_save(flags);
+>> +	queue_id = (smp_processor_id() % fs->num_queues) + VQ_REQUEST;
+>> +	local_irq_restore(flags);
+>> +
+>> +	return queue_id;
+>> +}
+>> +
+>>  static void virtio_fs_wake_pending_and_unlock(struct fuse_iqueue *fiq)
+>>  __releases(fiq->waitq.lock)
+>>  {
+>> -	unsigned queue_id = VQ_REQUEST; /* TODO multiqueue */
+>> +	unsigned queue_id = VQ_REQUEST;
+>>  	struct virtio_fs *fs;
+>>  	struct fuse_conn *fc;
+>>  	struct fuse_req *req;
+>> @@ -972,6 +1032,8 @@ static void virtio_fs_wake_pending_and_unlock(struct fuse_iqueue *fiq)
+>>  	spin_unlock(&fiq->waitq.lock);
+>>
+>>  	fs = fiq->priv;
+>> +	if (fs->num_queues > 1)
+>> +		queue_id = virtio_fs_pick_vq_mq(fs);
+>>  	fc = fs->vqs[queue_id].fud->fc;
+>>
+>>  	dev_dbg(&fs->vqs[queue_id].vq->vdev->dev,
+>> @@ -1066,9 +1128,11 @@ static int virtio_fs_fill_super(struct super_block *sb, char *opts,
+>>
+>>  	err = -ENOMEM;
+>>  	/* Allocate fuse_dev for hiprio and notification queues */
+>> -	for (i = 0; i < VQ_REQUEST; i++) {
+>> +	for (i = 0; i < VQ_REQUEST + fs->num_queues; i++) {
+>>  		struct virtio_fs_vq *fsvq = &fs->vqs[i];
+>>
+>> +		if (i == VQ_REQUEST)
+>> +			continue;  /* will be allocated in fuse_fill_super_common */
+>>  		fsvq->fud = fuse_dev_alloc();
+>>  		if (!fsvq->fud)
+>>  			goto err_free_fuse_devs;
+>> -- 
+>>
+>> _______________________________________________
+>> Virtio-fs mailing list
+>> Virtio-fs@redhat.com
+>> https://www.redhat.com/mailman/listinfo/virtio-fs
 

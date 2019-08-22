@@ -1,13 +1,12 @@
-Date: Thu, 22 Aug 2019 19:54:40 +0100
+Date: Thu, 22 Aug 2019 20:17:10 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190822185440.GN3277@work-vm>
-References: <20190820183746.GF4233@redhat.com>
+Message-ID: <20190822191450.GP3277@work-vm>
+References: <16b9edb2-002c-46b8-981b-39323e918cf0@cn.fujitsu.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190820183746.GF4233@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH V2] virtiofsd: Reset O_DIRECT flag during
-	file open
+In-Reply-To: <16b9edb2-002c-46b8-981b-39323e918cf0@cn.fujitsu.com>
+Subject: Re: [Virtio-fs] issues with accessing 2 directory trees
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,60 +15,53 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: Cao jin <caoj.fnst@cn.fujitsu.com>
+Cc: virtio-fs@redhat.com, qi.fuli@fujitsu.com
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> If an application wants to do direct IO and opens a file with O_DIRECT
-> in guest, that does not necessarily mean that we need to bypass page
-> cache on host as well. So reset this flag on host.
+* Cao jin (caoj.fnst@cn.fujitsu.com) wrote:
+> Hi,
 > 
-> If somebody needs to bypass page cache on host as well (and it is safe to
-> do so), we can add a knob in daemon later to control this behavior.
+> I am trying virtio fs for accessing 2 directory trees, but find it has
+> problem when mounting the 2nd one. Hoping to get some hints whether I made
+> mistakes or anything else.
 > 
-> I check virtio-9p and they do reset O_DIRECT flag.
+> steps:
+> 1. start 2 daemons:
+> sudo ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu1 -o source=~/shareguest1/ -o cache=always
+> sudo ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu2 -o source=~/shareguest2/ -o cache=always
 > 
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> 2. qemu command line:
+> sudo ./qemu-system-x86_64 -M q35 -cpu host --enable-kvm -smp 2 -m 4G,slots=4,maxmem=8G \
+>      -object memory-backend-file,id=mem,size=4G,mem-path=/dev/shm,share=on -numa node,memdev=mem \
+>      -chardev socket,id=char0,path=/tmp/vhostqemu1 -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs1,cache-size=1G \
+>      -chardev socket,id=char1,path=/tmp/vhostqemu2 -device vhost-user-fs-pci,queue-size=1024,chardev=char1,tag=myfs2,cache-size=1G \
+>      --serial stdio -netdev tap,id=net0 -device virtio-net-pci,netdev=net0,id=net0,mac=52:54:00:72:20:55
+>      -drive if=virtio,file=~/iso/f28s.qcow2
+> 
+> Then, guest console report error when probing 2nd virtiofs device with:
+> [    2.809341] virtio_fs virtio1: Cache len: 0x40000000 @ 0x3c0000000
+> [    2.811204] x86/PAT: systemd-udevd:266 conflicting memory types 3c0000000-408000000 write-back<->uncached-minus
+> [    2.813309] x86/PAT: reserve_memtype failed [mem 0x3c0000000-0x407ffffff], track write-back, req write-back
 
-Merged; thanks
+Looking at your other mail you can see why it's upset - the range
+includes both the DAX mapping (that's RAM like) and the virtio registers
+(that aren't) - now the question is who/what is building that range that
+includes both of them.
 
+Dave
 
-> ---
->  contrib/virtiofsd/passthrough_ll.c |   14 ++++++++++++++
->  1 file changed, 14 insertions(+)
+> [    2.924576] virtio_fs: probe of virtio1 failed with error -16
 > 
-> Index: qemu/contrib/virtiofsd/passthrough_ll.c
-> ===================================================================
-> --- qemu.orig/contrib/virtiofsd/passthrough_ll.c	2019-08-20 09:33:07.900975145 -0400
-> +++ qemu/contrib/virtiofsd/passthrough_ll.c	2019-08-20 14:31:39.725781357 -0400
-> @@ -1752,6 +1752,13 @@ static void lo_create(fuse_req_t req, fu
->  	if (err)
->  		goto out;
->  
-> +	/*
-> +	 * O_DIRECT in guest should not necessarily mean bypassing page
-> +	 * cache on host as well. If somebody needs that behavior, it
-> +	 * probably should be a configuration knob in daemon.
-> +	 */
-> +	fi->flags &= ~O_DIRECT;
-> +
->  	fd = openat(parent_inode->fd, name,
->  		    (fi->flags | O_CREAT) & ~O_NOFOLLOW, mode);
->  	err = fd == -1 ? errno : 0;
-> @@ -1967,6 +1974,13 @@ static void lo_open(fuse_req_t req, fuse
->  	if (lo->writeback && (fi->flags & O_APPEND))
->  		fi->flags &= ~O_APPEND;
->  
-> +	/*
-> +	 * O_DIRECT in guest should not necessarily mean bypassing page
-> +	 * cache on host as well. If somebody needs that behavior, it
-> +	 * probably should be a configuration knob in daemon.
-> +	 */
-> +	fi->flags &= ~O_DIRECT;
-> +
->  	sprintf(buf, "%i", lo_fd(req, ino));
->  	fd = openat(lo->proc_self_fd, buf, fi->flags & ~O_NOFOLLOW);
->  	if (fd == -1)
+> So, mount will not success on the 2nd directory tree.
+> -- 
+> Sincerely,
+> Cao jin
+> 
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 --
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

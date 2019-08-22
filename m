@@ -1,16 +1,27 @@
-Date: Thu, 22 Aug 2019 14:55:04 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190822135504.GK20491@stefanha-x1.localdomain>
-References: <20190821085659.8448-1-eguan@linux.alibaba.com>
-	<20190821150429.GH3309@work-vm>
-	<3ca44559-d2ad-f72c-62ae-f44d13c1e0e4@huawei.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=1D/stRInaG/B0oiGaQ/Y2em5iSkjBb4j7/1WQmQSPlk=;
+	b=kX1t1pYVzDBtynIeNroUD+4pMZ+Sk7MQpN01u5fmTOX37BYSYS25U5qhauO+bU7vaD
+	RNGigmtEuXj1wGLyFC32YIYBySSbD2EwU26/0HRM18LvR9BsE8UB3Va8SyfNvEYzdNhY
+	l2B4zj1oReaTshSU2ktuvvzIczvOyoxH9kMN8=
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="M9kwpIYUMbI/2cCx"
-Content-Disposition: inline
-In-Reply-To: <3ca44559-d2ad-f72c-62ae-f44d13c1e0e4@huawei.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: add support to change log level
- on fly
+References: <5abd7616-5351-761c-0c14-21d511251006@huawei.com>
+	<20190820091650.GE9855@stefanha-x1.localdomain>
+	<CAJfpegs8fSLoUaWKhC1543Hoy9821vq8=nYZy-pw1+95+Yv4gQ@mail.gmail.com>
+	<20190821160551.GD9095@stefanha-x1.localdomain>
+	<954b5f8a-4007-f29c-f38e-dd5585879541@huawei.com>
+	<CAJfpegtBYLJLWM8GJ1h66PMf2J9o38FG6udcd2hmamEEQddf5w@mail.gmail.com>
+	<0e8090c7-0c7c-bcbe-af75-33054d3a3efb@huawei.com>
+	<CAJfpegurYLAApon5Ai6Q33vEy+GPxtOTUwDCCbJ2JAbg4csDSg@mail.gmail.com>
+	<a19866be-3693-648e-ee6c-8d302c830834@huawei.com>
+	<CAOssrKd7bKts2tCAZaXLJt+BVoQtqWoJV6HfT76-qxg7W4g9PQ@mail.gmail.com>
+In-Reply-To: <CAOssrKd7bKts2tCAZaXLJt+BVoQtqWoJV6HfT76-qxg7W4g9PQ@mail.gmail.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Thu, 22 Aug 2019 16:02:06 +0200
+Message-ID: <CAJfpegt574w1Rzge-59-1dRVtfPgCrFuCpJ5DjLQwSWg+G3ArA@mail.gmail.com>
+Content-Type: multipart/mixed; boundary="0000000000003042650590b5237e"
+Subject: Re: [Virtio-fs] [QUESTION] A performance problem for buffer write
+ compared with 9p
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,71 +30,49 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>
-Cc: virtio-fs@redhat.com
+To: Miklos Szeredi <mszeredi@redhat.com>
+Cc: linux-fsdevel <linux-fsdevel@vger.kernel.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
+--0000000000003042650590b5237e
+Content-Type: text/plain; charset="UTF-8"
 
---M9kwpIYUMbI/2cCx
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+On Thu, Aug 22, 2019 at 3:30 PM Miklos Szeredi <mszeredi@redhat.com> wrote:
+>
+> On Thu, Aug 22, 2019 at 3:18 PM wangyan <wangyan122@huawei.com> wrote:
+>
+> > I used these commands:
+> > virtiofsd cmd:
+> >         ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o source=/mnt/share/
+> > -o cache=always -o writeback
+> > mount cmd:
+> >         mount -t virtio_fs myfs /mnt/virtiofs -o
+> > rootmode=040000,user_id=0,group_id=0
+>
+> Good.
+>
+> I think I got it now, updated patch attached.
+>
+> Thanks for your patience!
+>
+> Miklos
 
-On Thu, Aug 22, 2019 at 01:07:18PM +0800, piaojun wrote:
-> On 2019/8/21 23:04, Dr. David Alan Gilbert wrote:
-> > * Eryu Guan (eguan@linux.alibaba.com) wrote:
-> >> Introduce a file which contains the target log level, and
-> >> current_log_level will be reloaded to the target log level on SIGHUP.
-> >>
-> >> The file is set to "/run/virtiofsd/log_level.<pid>". Due to
-> >> sandboxing in virtiofsd, this file can only be read/write via
-> >> /proc/<pid>/fd/<fd> for now.
-> >>
-> >> Example usage:
-> >>
-> >>   # view current log level
-> >>   cat /proc/<pid>/fd/<fd>
-> >>   # change log level to debug
-> >>   echo debug > /proc/<pid>/fd/<fd>
-> >>   kill -HUP <pid>
-> >>
-> >> Signed-off-by: Eryu Guan <eguan@linux.alibaba.com>
-> >=20
-> > This looks really complex for something that can only be used for
-> > changing log levels.
->=20
-> I have the same opinion with Dave, and I wonder if we have some easier
-> channel to tell virtiofsd to change log level. And making the channel
-> more generic is good for the expansibility of virtiofsd.
+Previous one was broken as well.   I hope this one works...
 
-There is code for QMP (a JSON RPC-style protocol) in the QEMU codebase
-that can be reused.
+--0000000000003042650590b5237e
+Content-Type: text/x-patch; charset="US-ASCII";
+	name="virtio-fs-nostrict-v3.patch"
+Content-Disposition: attachment; filename="virtio-fs-nostrict-v3.patch"
+Content-Transfer-Encoding: base64
+Content-ID: <f_jzmr81lb0>
+X-Attachment-Id: f_jzmr81lb0
 
-An option that is more widely used but I have little experience with is
-DBus.  It is easy to access from most programming languages, including
-the command-line.
-
-Although both of these approaches are somewhat heavyweight, they scale
-to much more complex management commands and already have existing
-tooling available.
-
-I think we should choose one instead of inventing another RPC system.
-
-Stefan
-
---M9kwpIYUMbI/2cCx
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1enrgACgkQnKSrs4Gr
-c8gbnggAjToS1k8OVkpBbiaDvLFPYLAvExTnphC1K4SVD2SlkNL78MZFo7AxPF86
-8gs1/dMMOaFvvrl8n0CCxfhfcTVMg0vlqLB4cOyawQdJ0BlV2bUg02GuKoKJnnNp
-hs19M2K9MspPFNYKjrDVw1iB1+TjFMUktvrh7THiQzvKskMHVTE/6U2Q0wVAM428
-rGJIB9UkN5dairBTjRQzC0q6iGt4P9TfEaR1VZ9y+VdCeyENofdNbKR4Xv0IbPyv
-B/Tgkc5a+8BNJu3+oElGC2lN1/Mu2qUPMZ7/3LbeqmphWG5sR0qyy4FbjmdkNk7r
-qbbxP6tOHBmBDan3IQGRUfBhi3e8SA==
-=fc3E
------END PGP SIGNATURE-----
-
---M9kwpIYUMbI/2cCx--
+LS0tCiBmcy9mdXNlL3ZpcnRpb19mcy5jIHwgICAgNCArKysrCiAxIGZpbGUgY2hhbmdlZCwgNCBp
+bnNlcnRpb25zKCspCgotLS0gYS9mcy9mdXNlL3ZpcnRpb19mcy5jCisrKyBiL2ZzL2Z1c2Uvdmly
+dGlvX2ZzLmMKQEAgLTg5MSw2ICs4OTEsMTAgQEAgc3RhdGljIGludCB2aXJ0aW9fZnNfZmlsbF9z
+dXBlcihzdHJ1Y3QgcwogCWlmIChlcnIgPCAwKQogCQlnb3RvIGVycl9mcmVlX2luaXRfcmVxOwog
+CisJLyogTm8gc3RyaWN0IGFjY291bnRpbmcgbmVlZGVkIGZvciB2aXJ0aW8tZnMgKi8KKwlzYi0+
+c19iZGktPmNhcGFiaWxpdGllcyA9IEJESV9DQVBfTk9fQUNDVF9XQjsKKwliZGlfc2V0X21heF9y
+YXRpbyhzYi0+c19iZGksIDEwMCk7CisKIAlmYyA9IGZzLT52cXNbVlFfUkVRVUVTVF0uZnVkLT5m
+YzsKIAogCS8qIFRPRE8gdGFrZSBmdXNlX211dGV4IGFyb3VuZCB0aGlzIGxvb3A/ICovCg==
+--0000000000003042650590b5237e--
 

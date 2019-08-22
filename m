@@ -1,15 +1,20 @@
-Date: Fri, 6 Sep 2019 12:51:58 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190906115158.GT5900@stefanha-x1.localdomain>
-References: <20190905194859.16219-1-vgoyal@redhat.com>
-	<20190905194859.16219-13-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="yypaS3FvPkEUiGyo"
-Content-Disposition: inline
-In-Reply-To: <20190905194859.16219-13-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 12/18] virtiofs: Use virtio_fs_free_devs()
-	in error path
+References: <5abd7616-5351-761c-0c14-21d511251006@huawei.com>
+	<20190820091650.GE9855@stefanha-x1.localdomain>
+	<CAJfpegs8fSLoUaWKhC1543Hoy9821vq8=nYZy-pw1+95+Yv4gQ@mail.gmail.com>
+	<20190821160551.GD9095@stefanha-x1.localdomain>
+	<954b5f8a-4007-f29c-f38e-dd5585879541@huawei.com>
+	<CAJfpegtBYLJLWM8GJ1h66PMf2J9o38FG6udcd2hmamEEQddf5w@mail.gmail.com>
+	<0e8090c7-0c7c-bcbe-af75-33054d3a3efb@huawei.com>
+	<CAJfpegurYLAApon5Ai6Q33vEy+GPxtOTUwDCCbJ2JAbg4csDSg@mail.gmail.com>
+	<a19866be-3693-648e-ee6c-8d302c830834@huawei.com>
+In-Reply-To: <a19866be-3693-648e-ee6c-8d302c830834@huawei.com>
+From: Miklos Szeredi <mszeredi@redhat.com>
+Date: Thu, 22 Aug 2019 15:29:46 +0200
+Message-ID: <CAOssrKd7bKts2tCAZaXLJt+BVoQtqWoJV6HfT76-qxg7W4g9PQ@mail.gmail.com>
+Content-Type: multipart/mixed; boundary="0000000000009451d30590b4afb3"
+Subject: Re: [Virtio-fs] [QUESTION] A performance problem for buffer write
+ compared with 9p
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,40 +23,45 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: miklos@szeredi.hu, mst@redhat.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org
+To: wangyan <wangyan122@huawei.com>
+Cc: linux-fsdevel <linux-fsdevel@vger.kernel.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>
 
+--0000000000009451d30590b4afb3
+Content-Type: text/plain; charset="UTF-8"
 
---yypaS3FvPkEUiGyo
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+On Thu, Aug 22, 2019 at 3:18 PM wangyan <wangyan122@huawei.com> wrote:
 
-On Thu, Sep 05, 2019 at 03:48:53PM -0400, Vivek Goyal wrote:
-> We already have an helper to cleanup fuse devices. Use that instead of
-> duplicating the code.
->=20
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  fs/fuse/virtio_fs.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
+> I used these commands:
+> virtiofsd cmd:
+>         ./virtiofsd -o vhost_user_socket=/tmp/vhostqemu -o source=/mnt/share/
+> -o cache=always -o writeback
+> mount cmd:
+>         mount -t virtio_fs myfs /mnt/virtiofs -o
+> rootmode=040000,user_id=0,group_id=0
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+Good.
 
---yypaS3FvPkEUiGyo
-Content-Type: application/pgp-signature; name="signature.asc"
+I think I got it now, updated patch attached.
 
------BEGIN PGP SIGNATURE-----
+Thanks for your patience!
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1ySF4ACgkQnKSrs4Gr
-c8hVlggAupQb9gfTAr4egGumTVeZNasLSgBakY+MqFVWz6P9M1eU0+mtx0t+LTvK
-6hPYtUtYRNcR4U4LWcuAf30gKaYbr5UFDYmQ8zp8sCouPeTZChlnd35T2Aez6RQw
-lTlB2cAikH0aAjaLU1ldhLnx/+NkO8KkPh5tEYfCOHPEgpZSz1BQ5ce5iwVY9s5a
-2OZEet0IehG38kKsyXW88H+F/p8vHVLRrUkhi5CCezvlim7HFWRLFhj4Dc6Eu0sT
-HQmMvhppnlYqoDj8+Nkhs2Xv87KZxK2E6k2Z5NLle7vl1H6HbROZPMJB0WPLLZ2y
-+yZpbk5cezyZigVO/ES7VBTJc6IZyA==
-=OijB
------END PGP SIGNATURE-----
+Miklos
 
---yypaS3FvPkEUiGyo--
+--0000000000009451d30590b4afb3
+Content-Type: text/x-patch; charset="US-ASCII";
+	name="virtio-fs-nostrict-v2.patch"
+Content-Disposition: attachment; filename="virtio-fs-nostrict-v2.patch"
+Content-Transfer-Encoding: base64
+Content-ID: <f_jzmq2zcx0>
+X-Attachment-Id: f_jzmq2zcx0
+
+LS0tCiBmcy9mdXNlL3ZpcnRpb19mcy5jIHwgICAgNCArKysrCiAxIGZpbGUgY2hhbmdlZCwgNCBp
+bnNlcnRpb25zKCspCgotLS0gYS9mcy9mdXNlL3ZpcnRpb19mcy5jCisrKyBiL2ZzL2Z1c2Uvdmly
+dGlvX2ZzLmMKQEAgLTg5MSw2ICs4OTEsMTAgQEAgc3RhdGljIGludCB2aXJ0aW9fZnNfZmlsbF9z
+dXBlcihzdHJ1Y3QgcwogCWlmIChlcnIgPCAwKQogCQlnb3RvIGVycl9mcmVlX2luaXRfcmVxOwog
+CisJLyogTm8gc3RyaWN0IGFjY291bnRpbmcgbmVlZGVkIGZvciB2aXJ0aW8tZnMgKi8KKwlzYi0+
+c19iZGktPmNhcGFiaWxpdGllcyA9IDA7CisJYmRpX3NldF9tYXhfcmF0aW8oc2ItPnNfYmRpLCAx
+MDApOworCiAJZmMgPSBmcy0+dnFzW1ZRX1JFUVVFU1RdLmZ1ZC0+ZmM7CiAKIAkvKiBUT0RPIHRh
+a2UgZnVzZV9tdXRleCBhcm91bmQgdGhpcyBsb29wPyAqLwo=
+--0000000000009451d30590b4afb3--
 

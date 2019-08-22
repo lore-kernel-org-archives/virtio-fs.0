@@ -1,12 +1,22 @@
-Date: Tue, 3 Sep 2019 16:35:39 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190903153539.GM2744@work-vm>
-References: <20190829104133.17418-1-stefanha@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=yYstloyjSDBsfXqj0xN9y3n2xT5TvhmuPjIH/+3aQXs=;
+	b=CN6h+SZZXGMRL7xBGgzsqNmrvEMzQZtY/l6+bBIlxzyo85Z91S646qkO7ZW9BJ6Zr2
+	V2mVw7VxaBpyszHjNPwsTjexhpGKLwwimgF5d4ZT/Zsv4pK7sNmHP9DP71/9MBk82TXA
+	RC9aA2v3IjW4Xejpuup1XbPdkGeX2kC8gkTpQ=
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20190829104133.17418-1-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: add man page
+References: <5abd7616-5351-761c-0c14-21d511251006@huawei.com>
+	<20190820091650.GE9855@stefanha-x1.localdomain>
+	<CAJfpegs8fSLoUaWKhC1543Hoy9821vq8=nYZy-pw1+95+Yv4gQ@mail.gmail.com>
+	<20190821160551.GD9095@stefanha-x1.localdomain>
+	<954b5f8a-4007-f29c-f38e-dd5585879541@huawei.com>
+In-Reply-To: <954b5f8a-4007-f29c-f38e-dd5585879541@huawei.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Thu, 22 Aug 2019 13:43:27 +0200
+Message-ID: <CAJfpegtBYLJLWM8GJ1h66PMf2J9o38FG6udcd2hmamEEQddf5w@mail.gmail.com>
+Content-Type: multipart/mixed; boundary="0000000000005d57bb0590b33322"
+Subject: Re: [Virtio-fs] [QUESTION] A performance problem for buffer write
+ compared with 9p
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,158 +25,40 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: wangyan <wangyan122@huawei.com>
+Cc: linux-fsdevel@vger.kernel.org, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, Miklos Szeredi <mszeredi@redhat.com>
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-> ---
->  Makefile                         |  7 +++
->  contrib/virtiofsd/virtiofsd.texi | 85 ++++++++++++++++++++++++++++++++
->  2 files changed, 92 insertions(+)
->  create mode 100644 contrib/virtiofsd/virtiofsd.texi
-> 
-> diff --git a/Makefile b/Makefile
-> index a3dfdd6fa8..cc18025753 100644
-> --- a/Makefile
-> +++ b/Makefile
-> @@ -334,6 +334,9 @@ DOCS+=docs/qemu-cpu-models.7
->  ifdef CONFIG_VIRTFS
->  DOCS+=fsdev/virtfs-proxy-helper.1
->  endif
-> +ifdef CONFIG_LINUX
+--0000000000005d57bb0590b33322
+Content-Type: text/plain; charset="UTF-8"
 
-Is there a reason that's CONFIG_LINUX not CONFIG_VHOST_USER_FS ?
-(Although I guess it's guest vs daemon so the two are independent?)
+On Thu, Aug 22, 2019 at 2:59 AM wangyan <wangyan122@huawei.com> wrote:
+> I will test it when I get the patch, and post the compared result with
+> 9p.
 
-> +DOCS+=contrib/virtiofsd/virtiofsd.1
-> +endif
->  ifdef CONFIG_TRACE_SYSTEMTAP
->  DOCS+=scripts/qemu-trace-stap.1
->  endif
-> @@ -834,6 +837,9 @@ ifdef CONFIG_VIRTFS
->  	$(INSTALL_DIR) "$(DESTDIR)$(mandir)/man1"
->  	$(INSTALL_DATA) fsdev/virtfs-proxy-helper.1 "$(DESTDIR)$(mandir)/man1"
->  endif
-> +ifdef CONFIG_LINUX
-> +	$(INSTALL_DATA) contrib/virtiofsd.1 "$(DESTDIR)$(mandir)/man1"
+Could you please try the attached patch?  My guess is that it should
+improve the performance, perhaps by a big margin.
 
-I had to fix that to contrib/virtiofsd/virtiofsd.1 to get make install
-happy.
+Further improvement is possible by eliminating page copies, but that
+is less trivial.
 
-> +endif
->  
->  install-datadir:
->  	$(INSTALL_DIR) "$(DESTDIR)$(qemu_datadir)"
-> @@ -1018,6 +1024,7 @@ qemu.1: qemu-doc.texi qemu-options.texi qemu-monitor.texi qemu-monitor-info.texi
->  qemu.1: qemu-option-trace.texi
->  qemu-img.1: qemu-img.texi qemu-option-trace.texi qemu-img-cmds.texi
->  fsdev/virtfs-proxy-helper.1: fsdev/virtfs-proxy-helper.texi
-> +contrib/virtiofsd/virtiofsd.1: contrib/virtiofsd/virtiofsd.texi
->  qemu-nbd.8: qemu-nbd.texi qemu-option-trace.texi
->  qemu-ga.8: qemu-ga.texi
->  docs/qemu-block-drivers.7: docs/qemu-block-drivers.texi
-> diff --git a/contrib/virtiofsd/virtiofsd.texi b/contrib/virtiofsd/virtiofsd.texi
-> new file mode 100644
-> index 0000000000..eec7fbf4e6
-> --- /dev/null
-> +++ b/contrib/virtiofsd/virtiofsd.texi
-> @@ -0,0 +1,85 @@
-> +@example
-> +@c man begin SYNOPSIS
-> +@command{virtiofsd} [OPTION] @option{--socket-path=}@var{path}|@option{--fd=}@var{fdnum} @option{-o source=}@var{path}
-> +@c man end
-> +@end example
-> +
-> +@c man begin DESCRIPTION
-> +
-> +Share a host directory tree with a guest through a virtio-fs device.  This
-> +program is a vhost-user backend that implements the virtio-fs device.  Each
-> +virtio-fs device instance requires its own virtiofsd process.
-> +
-> +This program is designed to work with QEMU's @code{--device vhost-user-fs-pci}
+Thanks,
+Miklos
 
-Should we include the -pci there?
+--0000000000005d57bb0590b33322
+Content-Type: text/x-patch; charset="US-ASCII"; name="virtio-fs-nostrict.patch"
+Content-Disposition: attachment; filename="virtio-fs-nostrict.patch"
+Content-Transfer-Encoding: base64
+Content-ID: <f_jzmm8sy40>
+X-Attachment-Id: f_jzmm8sy40
 
-(Merged with the path fix above)
-
-Dave
-
-> +but should work with any virtual machine monitor (VMM) that supports
-> +vhost-user.  See the EXAMPLES section below.
-> +
-> +This program must be run as the root user.  Upon startup the program will
-> +switch into a new file system namespace with the shared directory tree as its
-> +root.  This prevents "file system escapes" due to symlinks and other file
-> +system objects that might lead to files outside the shared directory.  The
-> +program also sandboxes itself using seccomp(2) to prevent ptrace(2) and other
-> +vectors that could allow an attacker to compromise the system after gaining
-> +control of the virtiofsd process.
-> +
-> +@c man end
-> +
-> +@c man begin OPTIONS
-> +@table @option
-> +@item -h, --help
-> +Print help.
-> +@item -V, --version
-> +Print version.
-> +@item -d, -o debug
-> +Enable debug output.
-> +@item --syslog
-> +Print log messages to syslog instead of stderr.
-> +@item -o log_level=@var{level}
-> +Print only log messages matching @var{level} or more severe.  @var{level} is
-> +one of @code{err}, @code{warn}, @code{info}, or @code{debug}.  The default is
-> +@var{info}.
-> +@item -o source=@var{path}
-> +Share host directory tree located at @var{path}.  This option is required.
-> +@item --socket-path=@var{path}, -o vhost_user_socket=@var{path}
-> +Listen on vhost-user UNIX domain socket at @var{path}.
-> +@item --fd=@var{fdnum}
-> +Accept connections from vhost-user UNIX domain socket file descriptor @var{fdnum}.  The file descriptor must already be listening for connections.
-> +@item --thread-pool-size=@var{num}
-> +Restrict the number of worker threads per request queue to @var{num}.  The default is 64.
-> +@item --cache=@code{none}|@code{auto}|@code{always}
-> +Select the desired trade-off between coherency and performance.  @code{none}
-> +forbids the FUSE client from caching to achieve best coherency at the cost of
-> +performance.  @code{auto} acts similar to NFS with a 1 second metadata cache
-> +timeout.  @code{always} sets a long cache lifetime at the expense of coherency.
-> +@item --writeback
-> +Enable writeback cache, allowing the FUSE client to buffer and merge write requests.
-> +@end table
-> +@c man end
-> +
-> +@c man begin EXAMPLES
-> +Export @code{/var/lib/fs/vm001/} on vhost-user UNIX domain socket @code{/var/run/vm001-vhost-fs.sock}:
-> +
-> +@example
-> +host# virtiofsd --socket-path=/var/run/vm001-vhost-fs.sock -o source=/var/lib/fs/vm001
-> +host# qemu-system-x86_64 \
-> +    -chardev socket,id=char0,path=/var/run/vm001-vhost-fs.sock \
-> +    -device vhost-user-fs-pci,chardev=char0,tag=myfs \
-> +    -object memory-backend-file,id=mem,size=4G,mem-path=/dev/shm,share=on \
-> +    -numa node,memdev=mem \
-> +    ...
-> +guest# mount -t virtio_fs \
-> +    -o default_permissions,allow_other,user_id=0,group_id=0,rootmode=040000,dax \
-> +    myfs /mnt
-> +@end example
-> +@c man end
-> +
-> +@ignore
-> +@setfilename virtiofsd
-> +@settitle QEMU virtio-fs shared file system daemon
-> +
-> +@c man begin AUTHOR
-> +Copyright (C) 2019 Red Hat, Inc.
-> +This is free software; see the source for copying conditions.  There is NO
-> +warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-> +@c man end
-> +@end ignore
-> -- 
-> 2.21.0
-> 
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+SW5kZXg6IGxpbnV4L2ZzL2Z1c2UvdmlydGlvX2ZzLmMKPT09PT09PT09PT09PT09PT09PT09PT09
+PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQotLS0gbGludXgub3Jp
+Zy9mcy9mdXNlL3ZpcnRpb19mcy5jCTIwMTktMDgtMjIgMTM6Mzg6MzEuNzgyODMzNTY0ICswMjAw
+CisrKyBsaW51eC9mcy9mdXNlL3ZpcnRpb19mcy5jCTIwMTktMDgtMjIgMTM6Mzc6NTUuNDM2NDA2
+MjYxICswMjAwCkBAIC04OTEsNiArODkxLDkgQEAgc3RhdGljIGludCB2aXJ0aW9fZnNfZmlsbF9z
+dXBlcihzdHJ1Y3QgcwogCWlmIChlcnIgPCAwKQogCQlnb3RvIGVycl9mcmVlX2luaXRfcmVxOwog
+CisJLyogTm8gc3RyaWN0IGFjY291bnRpbmcgbmVlZGVkIGZvciB2aXJ0aW8tZnMgKi8KKwlzYi0+
+c19iZGktPmNhcGFiaWxpdGllcyA9IDA7CisKIAlmYyA9IGZzLT52cXNbVlFfUkVRVUVTVF0uZnVk
+LT5mYzsKIAogCS8qIFRPRE8gdGFrZSBmdXNlX211dGV4IGFyb3VuZCB0aGlzIGxvb3A/ICovCg==
+--0000000000005d57bb0590b33322--
 

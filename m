@@ -1,14 +1,18 @@
-References: <cover.1566185612.git.gavin.dg@linux.alibaba.com>
-	<20190822134018.GJ20491@stefanha-x1.localdomain>
-From: Gang Deng <gavin.dg@linux.alibaba.com>
-Message-ID: <d9757234-dacd-9366-bcc7-19afe5af84a6@linux.alibaba.com>
-Date: Thu, 22 Aug 2019 22:41:48 +0800
+Date: Thu, 22 Aug 2019 16:22:31 +0100
+From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+Message-ID: <20190822152231.GW3267@redhat.com>
+References: <20190821085659.8448-1-eguan@linux.alibaba.com>
+	<20190821150429.GH3309@work-vm>
+	<3ca44559-d2ad-f72c-62ae-f44d13c1e0e4@huawei.com>
+	<20190822141603.GA4553@stefanha-x1.localdomain>
 MIME-Version: 1.0
-In-Reply-To: <20190822134018.GJ20491@stefanha-x1.localdomain>
-Content-Type: text/plain; charset=windows-1252
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [RFC PATCH 0/2] add stat tools for virtiofsd
+Content-Type: text/plain; charset="utf-8"
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <20190822141603.GA4553@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: add support to change log level
+ on fly
+Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,142 +22,122 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com
+Cc: virtio-fs@redhat.com, =?utf-8?Q?Marc-Andr=C3=A9?= Lureau <marcandre.lureau@redhat.com>
 
-
-
-On 2019/8/22 21:40, Stefan Hajnoczi wrote:
-> On Mon, Aug 19, 2019 at 11:41:12AM +0800, Gang Deng wrote:
->> There exist two components: vtrace && vstat. vtrace is embeded in virtiofsd,
->> it will put raw statistics data into share memory. Then the vstat tool could
->> parse it and do some post processing works. The performance overhead of
->> vtrace is very small because it does very simple things.
+On Thu, Aug 22, 2019 at 03:16:03PM +0100, Stefan Hajnoczi wrote:
+> On Thu, Aug 22, 2019 at 01:07:18PM +0800, piaojun wrote:
+> > On 2019/8/21 23:04, Dr. David Alan Gilbert wrote:
+> > > * Eryu Guan (eguan@linux.alibaba.com) wrote:
+> > >> Introduce a file which contains the target log level, and
+> > >> current_log_level will be reloaded to the target log level on SIGHUP.
+> > >>
+> > >> The file is set to "/run/virtiofsd/log_level.<pid>". Due to
+> > >> sandboxing in virtiofsd, this file can only be read/write via
+> > >> /proc/<pid>/fd/<fd> for now.
+> > >>
+> > >> Example usage:
+> > >>
+> > >>   # view current log level
+> > >>   cat /proc/<pid>/fd/<fd>
+> > >>   # change log level to debug
+> > >>   echo debug > /proc/<pid>/fd/<fd>
+> > >>   kill -HUP <pid>
+> > >>
+> > >> Signed-off-by: Eryu Guan <eguan@linux.alibaba.com>
+> > > 
+> > > This looks really complex for something that can only be used for
+> > > changing log levels.
+> > 
+> > I have the same opinion with Dave, and I wonder if we have some easier
+> > channel to tell virtiofsd to change log level. And making the channel
+> > more generic is good for the expansibility of virtiofsd.
 > 
-> The QEMU source tree already contains support for DTrace/SystemTap,
-> LTTng Userspace Tracer, ftrace, and other tracers via tracetool.  See
-> docs/devel/tracing.txt and scripts/tracetool.py.
-> 
-> It would be good to use that tracing infrastructure instead of writing
-> tracing code from scratch.  Soon someone will want to record FUSE
-> request arguments and other information and then the trace file format
-> and code will become complex and duplicate what tracetool already does.
-> 
-> With tracetool all trace events are defined in a trace-events file
-> (contrib/virtiofsd/trace-events):
-> 
->   virtiofs_op_begin(int opcode) "opcode 0x%x"
->   virtiofs_op_end(int opcode, int64_t ns) "opcode 0x%x ns %" PRId64
-> 
-> It would be nice to capture more information: fuse_in_header->unique (to
-> identify the request) and fuse_in_header->nodeid (the inode).
-> 
-> The lowest overhead tracer that tracetool supports is LTTng UST (it uses
-> shared memory) and would be suitable for vstat.
-> 
-> Adding tracetool to virtiofsd will require a little work to verify it
-> works with your tracer of choice (e.g. LTTng UST) despite the process
-> sandboxing, but in the long term I don't think writing tracing code from
-> scratch again makes sense.
-> 
+> Adding Dan and Marc-André, who have dealt with DBus and QMP.  They can
+> share their experience.
 
-Thanks for your comments!
+Back when QMP was first proposed I argued in favour of using a binary
+protocol similar to libvirt's use of XDR. We're still suffering long
+term pain from our use of JSON for QMP due to the inability to handle
+64-bit integers in a portable manner.  In retrospect I really wish that
+QEMU uses DBus for its machine monitor interface.
 
-The name of vtrace may be confused. We want the stat tool meets the following
-constraints:
+Since that time the use of DBus has only expanded across the open source
+software space, and is most definitely not just for desktop apps.
 
-*). has very small overhead;
-*). can be always on (e.g. detect hang, it's too late to enable trace when hang
-    was already occurred);
-*). can output the latency histogram if needed in future, to detect performance
-    jitter.
+It is very compelling
 
-I think the difference of vtrae && qemu's tracing infrastructure looks like
-that of /proc/diskstats(iostat) && blktrace(blkparse) for linux kernel's block
-device. It depends on the use case. I'll measure the cost later to see whether
-qemu's tracer can meet our needs and whether it's enough to get statistics.
+  - there are convenient APIs to use DBus from any common programming
+    languages.
+  - the wide usage makes it familiar to many developers
+  - there are many tools for helping with debugging
+  - it is easily consumed my mgmt apps like cockpit which use dbus
+    for everything they mange
 
-Gang
+Overall I would recommend DBus over QMP every time.
 
->> For example, if we call open(2)/close(2) frequently in guest, and
->> randwite a file whose length is greater than the size of dax window.
->> We'll get the output as below:
->>
->> op                        inflt         op/s     svctm/us   %util
->> FUSE_OPEN(14)                 0      8379.87         3.24   2.71%
->> FUSE_RELEASE(18)              0      8379.87         1.77   1.48%
->> FUSE_FLUSH(25)                0      8379.87         2.04   1.71%
->> FUSE_SETUPMAPPING(48)         1      6393.90        34.72  22.20%
->> FUSE_REMOVEMAPPING(49)        0      6404.90        37.61  24.09%
->> TOTAL                         1     37938.39        13.76  52.20%
->>
->> The meaning of fields:
->>
->> - op
->>   The type of fuse requests, 'TOTAL' is sum of all.
->>
->> - inflt
->>   The number of the inflight requests, it must be ethier 0 or 1 because
->>   virtiofsd can only process fuse requests serially.
->>
->> - op/s
->>   The number of fuse requests completed per second.
->>
->> - svctm/us
->>   The average service time (in microseconds) for fuse requests.
->>
->> - %util
->>   Percentage of elapsed time during which virtiofsd was processing the fuse
->>   requests.
->>
->> when virtiofsd is hang, e.g. we support flock in host (just for example,
->> this has been fxied), we'll get this:
->>
->> op                        inflt         op/s     svctm/us   %util
->> FUSE_SETLKW(33)               1         0.00         0.00 100.00%
->> TOTAL                         1         0.00         0.00 100.00%
->>
->> the utilization is 100% and op/s equals zero, it indicates hang.
->>
->> If virtiofsd is idle, then the output looks like this:
->>
->> op                        inflt         op/s     svctm/us   %util
->> TOTAL                         0         0.00         0.00   0.00%
->>
->> TODO:
->>  Vstat was designed to scan VIRTIOFS_TRACE_DIR directory to get all virtiofs
->>  devices. However it's not supported yet. Because virtiofsd couldn't unlink
->>  the trace file when exited due to the sandboxing, actually we unlink the
->>  trace file when inited. Then vstat can only access the trace file through
->>  the /proc/<virtiofs-pid>/fd/<trace-file> (which needs root privilege)
->>  This should be refactored later if virtiofsd could access /dev/shm
->>  directory, then vstat can run as nobody and be able to scan all devices
->>  like iostat tool.
->>
->> Gang Deng (2):
->>   virtiofsd: add stat tools
->>   virtiofsd: support vstat&&vtrace
->>
->>  Makefile                           |   3 +
->>  Makefile.objs                      |   1 +
->>  contrib/virtiofsd/Makefile.objs    |   5 +-
->>  contrib/virtiofsd/fuse_i.h         |   1 +
->>  contrib/virtiofsd/fuse_lowlevel.c  |  11 +
->>  contrib/virtiofsd/fuse_lowlevel.h  |   1 +
->>  contrib/virtiofsd/helper.c         |   4 +-
->>  contrib/virtiofsd/passthrough_ll.c |   7 +
->>  contrib/virtiofsd/vstat.c          | 680 +++++++++++++++++++++++++++++
->>  contrib/virtiofsd/vtrace.c         |  95 ++++
->>  contrib/virtiofsd/vtrace.h         |  53 +++
->>  11 files changed, 859 insertions(+), 2 deletions(-)
->>  create mode 100644 contrib/virtiofsd/vstat.c
->>  create mode 100644 contrib/virtiofsd/vtrace.c
->>  create mode 100644 contrib/virtiofsd/vtrace.h
->>
->> -- 
->> 2.20.1.7.g153144c
->>
->> _______________________________________________
->> Virtio-fs mailing list
->> Virtio-fs@redhat.com
->> https://www.redhat.com/mailman/listinfo/virtio-fs
+In retrospect I also wish that libvirt's own RPC was using DBus
+instead of our XDR based protocol.
+
+> The long-term concern we should think about is whether vhost-user
+> backends should have standardized management commands.  They would be
+> defined in docs/interop/vhost-user.rst and all backends implementing a
+> device type would implement a subset of them (plus additional
+> "vendor-specific commands" if they really don't fit into the vhost-user
+> specification).
+> 
+> In order to have standard commands we need to choose a standard RPC
+> mechanism.  I'm pretty sure that DBus is a good choice based on my
+> previous discussions with Dan and Marc-André.  It is easy to use from
+> most programming languages and therefore easier to integrate than a
+> custom management channel.
+> 
+> Dan and Marc-André: The first commands we would like to offer in
+> virtiofsd are:
+> 
+>   get-log-level -> NUM
+>   Return the current logging threshold level.
+> 
+>   set-log-level NUM
+>   Set the logging threshold level.
+> 
+> If you have time to give a quick overview of how this looks in DBus that
+> would be very helpful.  The virtiofsd code is written in C and currently
+> does not use glib/gobject/gio heavily, so I think we'd prefer a
+> lightweight approach without a lot of gobject boilerplate, if possible.
+
+I'd venture to suggest that avoiding gobject / gio is actually the
+heavyweight approach, as you will inevitably be re-inventing the
+wheel to a large extent !
+
+The boilerplate for creating gobject classes these days is not
+anywhere near as verbose as people might have seen in the past,
+from looking at much historical application code/docs. IMHO it
+is more time efficient & less error/crash prone to write C apps
+using GLib than to stick with plain C [1].
+
+The GDBus APIs provided by GIO are a very nice & easy way to
+provide DBus services and clients.
+
+There's an example here:
+
+  https://github.com/mikebrady/gdbus-tutorial/tree/master/src
+
+note that most of the dbus boilerplate is autogenerated by
+the gdbus-codegen command, from the DBus service specification,
+so you only have to focus on writing the interesting code.
+
+It goes with this presentation:
+
+  https://aleksander.es/data/GNOMEASIA2014%20-%20Introduction%20to%20DBus.pdf
+  https://www.youtube.com/watch?v=egj4UMPaylk
+
+Regards,
+Daniel
+
+[1] its even more efficient to not use C, but that's a whole other
+    can or worms :-)
+-- 
+|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
+|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
+|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
 

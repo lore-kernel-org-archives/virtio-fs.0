@@ -1,12 +1,9 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Fri, 23 Aug 2019 16:02:45 +0100
-Message-Id: <20190823150245.17246-3-dgilbert@redhat.com>
-In-Reply-To: <20190823150245.17246-1-dgilbert@redhat.com>
-References: <20190823150245.17246-1-dgilbert@redhat.com>
+Date: Fri, 23 Aug 2019 18:56:55 +0100
+Message-Id: <20190823175657.12085-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 2/2] virtiofsd: Convert lo_destroy to take the
-	lo->mutex lock itself
+Subject: [Virtio-fs] [PATCH v2 0/2] Add virtio-fs (experimental)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,90 +12,54 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com, stefanha@redhat.com, vgoyal@redhat.com
+To: qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com
+Cc: virtio-fs@redhat.com
 
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-lo_destroy was relying on some implicit knowledge of the locking;
-we can avoid this if we create an unref_inode that doesn't take
-the lock and then grab it for the whole of the lo_destroy.
+Hi,
+  This pair of patches adds the core of the virtio-fs support to qemu;
+it's marked experimental since the kernel patch and spec changes aren't
+in yet; but they're bubbling along.
 
-Suggested-by: Vivek Goyal <vgoyal@redhat.com>
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
----
- contrib/virtiofsd/passthrough_ll.c | 27 +++++++++++++++------------
- 1 file changed, 15 insertions(+), 12 deletions(-)
+  While the spec change is still in progress; the ID number is already
+reserved.
 
-diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-index 20b6c7ae91..0ef01b7e3f 100644
---- a/contrib/virtiofsd/passthrough_ll.c
-+++ b/contrib/virtiofsd/passthrough_ll.c
-@@ -1416,12 +1416,12 @@ static void lo_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
- 	lo_inode_put(lo, &inode);
- }
- 
--static void unref_inode_lolocked(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
-+/* To be called with lo->mutex held */
-+static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
- {
- 	if (!inode)
- 		return;
- 
--	pthread_mutex_lock(&lo->mutex);
- 	assert(inode->nlookup >= n);
- 	inode->nlookup -= n;
- 	if (!inode->nlookup) {
-@@ -1432,15 +1432,22 @@ static void unref_inode_lolocked(struct lo_data *lo, struct lo_inode *inode, uin
- 		}
- 		g_hash_table_destroy(inode->posix_locks);
- 		pthread_mutex_destroy(&inode->plock_mutex);
--		pthread_mutex_unlock(&lo->mutex);
- 
- 		/* Drop our refcount from lo_do_lookup() */
- 		lo_inode_put(lo, &inode);
--	} else {
--		pthread_mutex_unlock(&lo->mutex);
- 	}
- }
- 
-+static void unref_inode_lolocked(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
-+{
-+	if (!inode)
-+		return;
-+
-+	pthread_mutex_lock(&lo->mutex);
-+	unref_inode(lo, inode, n);
-+	pthread_mutex_unlock(&lo->mutex);
-+}
-+
- static void lo_forget_one(fuse_req_t req, fuse_ino_t ino, uint64_t nlookup)
- {
- 	struct lo_data *lo = lo_data(req);
-@@ -2561,12 +2568,7 @@ static void lo_destroy(void *userdata, struct fuse_session *se)
-                 }
-         }
- 
--        /* Normally lo->mutex must be taken when traversing lo->inodes but
--         * lo_destroy() is a serialized request so no races are possible here.
--         *
--         * In addition, we cannot acquire lo->mutex since unref_inode() takes it
--         * too and this would result in a recursive lock.
--         */
-+        pthread_mutex_lock(&lo->mutex);
-         while (true) {
-                 GHashTableIter iter;
-                 gpointer key, value;
-@@ -2577,8 +2579,9 @@ static void lo_destroy(void *userdata, struct fuse_session *se)
-                 }
- 
-                 struct lo_inode *inode = value;
--                unref_inode_lolocked(lo, inode, inode->nlookup);
-+                unref_inode(lo, inode, inode->nlookup);
-         }
-+        pthread_mutex_unlock(&lo->mutex);
- }
- 
- static struct fuse_lowlevel_ops lo_oper = {
+  A future set of patches will add the optional DAX mapping support.
+
+  The actual qemu change is pretty minimal, since it's really only
+a virtio device with some queues.
+
+Some links:
+  Mailing list: https://www.redhat.com/mailman/listinfo/virtio-fs
+  Dev tree: Including filesystem daemon: https://gitlab.com/virtio-fs/qemu
+  kernel: https://gitlab.com/virtio-fs/linux
+  virtio spec changes: https://lists.oasis-open.org/archives/virtio-dev/201908/msg00104.html
+
+v2:
+  Renamed num_queues to num_request_queues
+  Add a not-reached assert to vuf_handle_output
+  Kill the one bit of notification queue off
+  Use the same trick as vhost-user-scsi to calculate the number
+    of vectors for the PCI device
+
+Dr. David Alan Gilbert (2):
+  virtio: add vhost-user-fs base device
+  virtio: add vhost-user-fs-pci device
+
+ configure                                   |  13 +
+ hw/virtio/Makefile.objs                     |   2 +
+ hw/virtio/vhost-user-fs-pci.c               |  85 ++++++
+ hw/virtio/vhost-user-fs.c                   | 297 ++++++++++++++++++++
+ include/hw/virtio/vhost-user-fs.h           |  45 +++
+ include/standard-headers/linux/virtio_fs.h  |  41 +++
+ include/standard-headers/linux/virtio_ids.h |   1 +
+ 7 files changed, 484 insertions(+)
+ create mode 100644 hw/virtio/vhost-user-fs-pci.c
+ create mode 100644 hw/virtio/vhost-user-fs.c
+ create mode 100644 include/hw/virtio/vhost-user-fs.h
+ create mode 100644 include/standard-headers/linux/virtio_fs.h
+
 -- 
 2.21.0
 

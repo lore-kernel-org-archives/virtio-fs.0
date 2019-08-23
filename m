@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Fri, 23 Aug 2019 16:02:44 +0100
-Message-Id: <20190823150245.17246-2-dgilbert@redhat.com>
+Date: Fri, 23 Aug 2019 16:02:45 +0100
+Message-Id: <20190823150245.17246-3-dgilbert@redhat.com>
 In-Reply-To: <20190823150245.17246-1-dgilbert@redhat.com>
 References: <20190823150245.17246-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 1/2] virtiofsd: Rename unref_inode to indicate
-	lock
+Subject: [Virtio-fs] [PATCH 2/2] virtiofsd: Convert lo_destroy to take the
+	lo->mutex lock itself
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,125 +19,86 @@ To: virtio-fs@redhat.com, stefanha@redhat.com, vgoyal@redhat.com
 
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Rename unref_inode to unref_inode_lolocked to indicate
-that it takes & releases the lo->mutex;  the next patch
-will create a version that doesn't.
+lo_destroy was relying on some implicit knowledge of the locking;
+we can avoid this if we create an unref_inode that doesn't take
+the lock and then grab it for the whole of the lo_destroy.
 
+Suggested-by: Vivek Goyal <vgoyal@redhat.com>
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 ---
- contrib/virtiofsd/passthrough_ll.c | 26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+ contrib/virtiofsd/passthrough_ll.c | 27 +++++++++++++++------------
+ 1 file changed, 15 insertions(+), 12 deletions(-)
 
 diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-index 1175349037..20b6c7ae91 100644
+index 20b6c7ae91..0ef01b7e3f 100644
 --- a/contrib/virtiofsd/passthrough_ll.c
 +++ b/contrib/virtiofsd/passthrough_ll.c
-@@ -206,7 +206,7 @@ static const struct fuse_opt lo_opts[] = {
- 	  offsetof(struct lo_data, readdirplus_clear), 1 },
- 	FUSE_OPT_END
- };
--static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n);
-+static void unref_inode_lolocked(struct lo_data *lo, struct lo_inode *inode, uint64_t n);
- static void put_shared(struct lo_data *lo, struct lo_inode *inode);
- 
- static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st);
-@@ -683,7 +683,7 @@ retry:
- 	return 0;
- 
- fail_unref:
--	unref_inode(lo, p, 1);
-+	unref_inode_lolocked(lo, p, 1);
- fail:
- 	if (retries) {
- 		retries--;
-@@ -720,7 +720,7 @@ fallback:
- 	res = lo_parent_and_name(lo, inode, path, &parent);
- 	if (res != -1) {
- 		res = utimensat(parent->fd, path, tv, AT_SYMLINK_NOFOLLOW);
--		unref_inode(lo, parent, 1);
-+		unref_inode_lolocked(lo, parent, 1);
- 		lo_inode_put(lo, &parent);
- 	}
- 
-@@ -975,7 +975,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
- 
- 		inode->is_symlink = S_ISLNK(e->attr.st_mode);
- 
--		/* One for the caller and one for nlookup (released in unref_inode()) */
-+		/* One for the caller and one for nlookup (released in unref_inode_lolocked()) */
- 		g_atomic_int_set(&inode->refcount, 2);
- 
- 		inode->nlookup = 1;
-@@ -999,7 +999,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
- 		      AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
- 	if (res == -1) {
- 		saverr = errno;
--		unref_inode(lo, inode, 1);
-+		unref_inode_lolocked(lo, inode, 1);
- 		errno = saverr;
- 		goto out_err;
- 	}
-@@ -1197,7 +1197,7 @@ fallback:
- 	res = lo_parent_and_name(lo, inode, path, &parent);
- 	if (res != -1) {
- 		res = linkat(parent->fd, path, dfd, name, 0);
--		unref_inode(lo, parent, 1);
-+		unref_inode_lolocked(lo, parent, 1);
- 		lo_inode_put(lo, &parent);
- 	}
- 
-@@ -1309,7 +1309,7 @@ static void lo_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name)
- 
- 		fuse_reply_err(req, 0);
- 	}
--	unref_inode(lo, inode, 1);
-+	unref_inode_lolocked(lo, inode, 1);
+@@ -1416,12 +1416,12 @@ static void lo_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
  	lo_inode_put(lo, &inode);
  }
  
-@@ -1371,8 +1371,8 @@ static void lo_rename(fuse_req_t req, fuse_ino_t parent, const char *name,
- 		fuse_reply_err(req, 0);
- 	}
- out:
--	unref_inode(lo, oldinode, 1);
--	unref_inode(lo, newinode, 1);
-+	unref_inode_lolocked(lo, oldinode, 1);
-+	unref_inode_lolocked(lo, newinode, 1);
- 	lo_inode_put(lo, &oldinode);
- 	lo_inode_put(lo, &newinode);
- 	lo_inode_put(lo, &parent_inode);
-@@ -1412,11 +1412,11 @@ static void lo_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
- 
- 		fuse_reply_err(req, 0);
- 	}
--	unref_inode(lo, inode, 1);
-+	unref_inode_lolocked(lo, inode, 1);
- 	lo_inode_put(lo, &inode);
- }
- 
--static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
-+static void unref_inode_lolocked(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
+-static void unref_inode_lolocked(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
++/* To be called with lo->mutex held */
++static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
  {
  	if (!inode)
  		return;
-@@ -1455,7 +1455,7 @@ static void lo_forget_one(fuse_req_t req, fuse_ino_t ino, uint64_t nlookup)
- 		   (unsigned long long) inode->nlookup,
- 		   (unsigned long long) nlookup);
  
--	unref_inode(lo, inode, nlookup);
-+	unref_inode_lolocked(lo, inode, nlookup);
- 	lo_inode_put(lo, &inode);
+-	pthread_mutex_lock(&lo->mutex);
+ 	assert(inode->nlookup >= n);
+ 	inode->nlookup -= n;
+ 	if (!inode->nlookup) {
+@@ -1432,15 +1432,22 @@ static void unref_inode_lolocked(struct lo_data *lo, struct lo_inode *inode, uin
+ 		}
+ 		g_hash_table_destroy(inode->posix_locks);
+ 		pthread_mutex_destroy(&inode->plock_mutex);
+-		pthread_mutex_unlock(&lo->mutex);
+ 
+ 		/* Drop our refcount from lo_do_lookup() */
+ 		lo_inode_put(lo, &inode);
+-	} else {
+-		pthread_mutex_unlock(&lo->mutex);
+ 	}
  }
  
-@@ -2577,7 +2577,7 @@ static void lo_destroy(void *userdata, struct fuse_session *se)
++static void unref_inode_lolocked(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
++{
++	if (!inode)
++		return;
++
++	pthread_mutex_lock(&lo->mutex);
++	unref_inode(lo, inode, n);
++	pthread_mutex_unlock(&lo->mutex);
++}
++
+ static void lo_forget_one(fuse_req_t req, fuse_ino_t ino, uint64_t nlookup)
+ {
+ 	struct lo_data *lo = lo_data(req);
+@@ -2561,12 +2568,7 @@ static void lo_destroy(void *userdata, struct fuse_session *se)
+                 }
+         }
+ 
+-        /* Normally lo->mutex must be taken when traversing lo->inodes but
+-         * lo_destroy() is a serialized request so no races are possible here.
+-         *
+-         * In addition, we cannot acquire lo->mutex since unref_inode() takes it
+-         * too and this would result in a recursive lock.
+-         */
++        pthread_mutex_lock(&lo->mutex);
+         while (true) {
+                 GHashTableIter iter;
+                 gpointer key, value;
+@@ -2577,8 +2579,9 @@ static void lo_destroy(void *userdata, struct fuse_session *se)
                  }
  
                  struct lo_inode *inode = value;
--                unref_inode(lo, inode, inode->nlookup);
-+                unref_inode_lolocked(lo, inode, inode->nlookup);
+-                unref_inode_lolocked(lo, inode, inode->nlookup);
++                unref_inode(lo, inode, inode->nlookup);
          }
++        pthread_mutex_unlock(&lo->mutex);
  }
  
+ static struct fuse_lowlevel_ops lo_oper = {
 -- 
 2.21.0
 

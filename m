@@ -1,15 +1,13 @@
-References: <5D53D882.5090803@huawei.com> <5D5A4692.9060006@huawei.com>
-	<20190820153926.GC4233@redhat.com> <20190820175610.GD4233@redhat.com>
-	<5D5CA2E2.9000802@huawei.com> <20190821131136.GA2304@redhat.com>
-From: piaojun <piaojun@huawei.com>
-Message-ID: <5D5F47A5.3020109@huawei.com>
-Date: Fri, 23 Aug 2019 09:55:49 +0800
+Date: Fri, 23 Aug 2019 10:57:43 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190823095743.GD2784@work-vm>
+References: <cover.1566185612.git.gavin.dg@linux.alibaba.com>
+	<20190822134018.GJ20491@stefanha-x1.localdomain>
 MIME-Version: 1.0
-In-Reply-To: <20190821131136.GA2304@redhat.com>
-Content-Type: text/plain; charset="windows-1252"
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH RESEND][RFC] virtiofsd: do not fall back to
- buffer io when cache=auto/always
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20190822134018.GJ20491@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [RFC PATCH 0/2] add stat tools for virtiofsd
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,68 +16,138 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, Gang Deng <gavin.dg@linux.alibaba.com>
+
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> On Mon, Aug 19, 2019 at 11:41:12AM +0800, Gang Deng wrote:
+> > There exist two components: vtrace && vstat. vtrace is embeded in virtiofsd,
+> > it will put raw statistics data into share memory. Then the vstat tool could
+> > parse it and do some post processing works. The performance overhead of
+> > vtrace is very small because it does very simple things.
+> 
+> The QEMU source tree already contains support for DTrace/SystemTap,
+> LTTng Userspace Tracer, ftrace, and other tracers via tracetool.  See
+> docs/devel/tracing.txt and scripts/tracetool.py.
+> 
+> It would be good to use that tracing infrastructure instead of writing
+> tracing code from scratch.  Soon someone will want to record FUSE
+> request arguments and other information and then the trace file format
+> and code will become complex and duplicate what tracetool already does.
+> 
+> With tracetool all trace events are defined in a trace-events file
+> (contrib/virtiofsd/trace-events):
+> 
+>   virtiofs_op_begin(int opcode) "opcode 0x%x"
+>   virtiofs_op_end(int opcode, int64_t ns) "opcode 0x%x ns %" PRId64
+> 
+> It would be nice to capture more information: fuse_in_header->unique (to
+> identify the request) and fuse_in_header->nodeid (the inode).
+> 
+> The lowest overhead tracer that tracetool supports is LTTng UST (it uses
+> shared memory) and would be suitable for vstat.
+> 
+> Adding tracetool to virtiofsd will require a little work to verify it
+> works with your tracer of choice (e.g. LTTng UST) despite the process
+> sandboxing, but in the long term I don't think writing tracing code from
+> scratch again makes sense.
+
+I'm used to using tracing as event logging; but how do they work for the
+type of measurement that Gang Deng is doing, where it's not really about
+logging each event; just being a place to hold some stats?
+
+Dave
+
+> > For example, if we call open(2)/close(2) frequently in guest, and
+> > randwite a file whose length is greater than the size of dax window.
+> > We'll get the output as below:
+> > 
+> > op                        inflt         op/s     svctm/us   %util
+> > FUSE_OPEN(14)                 0      8379.87         3.24   2.71%
+> > FUSE_RELEASE(18)              0      8379.87         1.77   1.48%
+> > FUSE_FLUSH(25)                0      8379.87         2.04   1.71%
+> > FUSE_SETUPMAPPING(48)         1      6393.90        34.72  22.20%
+> > FUSE_REMOVEMAPPING(49)        0      6404.90        37.61  24.09%
+> > TOTAL                         1     37938.39        13.76  52.20%
+> > 
+> > The meaning of fields:
+> > 
+> > - op
+> >   The type of fuse requests, 'TOTAL' is sum of all.
+> > 
+> > - inflt
+> >   The number of the inflight requests, it must be ethier 0 or 1 because
+> >   virtiofsd can only process fuse requests serially.
+> > 
+> > - op/s
+> >   The number of fuse requests completed per second.
+> > 
+> > - svctm/us
+> >   The average service time (in microseconds) for fuse requests.
+> > 
+> > - %util
+> >   Percentage of elapsed time during which virtiofsd was processing the fuse
+> >   requests.
+> > 
+> > when virtiofsd is hang, e.g. we support flock in host (just for example,
+> > this has been fxied), we'll get this:
+> > 
+> > op                        inflt         op/s     svctm/us   %util
+> > FUSE_SETLKW(33)               1         0.00         0.00 100.00%
+> > TOTAL                         1         0.00         0.00 100.00%
+> > 
+> > the utilization is 100% and op/s equals zero, it indicates hang.
+> > 
+> > If virtiofsd is idle, then the output looks like this:
+> > 
+> > op                        inflt         op/s     svctm/us   %util
+> > TOTAL                         0         0.00         0.00   0.00%
+> > 
+> > TODO:
+> >  Vstat was designed to scan VIRTIOFS_TRACE_DIR directory to get all virtiofs
+> >  devices. However it's not supported yet. Because virtiofsd couldn't unlink
+> >  the trace file when exited due to the sandboxing, actually we unlink the
+> >  trace file when inited. Then vstat can only access the trace file through
+> >  the /proc/<virtiofs-pid>/fd/<trace-file> (which needs root privilege)
+> >  This should be refactored later if virtiofsd could access /dev/shm
+> >  directory, then vstat can run as nobody and be able to scan all devices
+> >  like iostat tool.
+> > 
+> > Gang Deng (2):
+> >   virtiofsd: add stat tools
+> >   virtiofsd: support vstat&&vtrace
+> > 
+> >  Makefile                           |   3 +
+> >  Makefile.objs                      |   1 +
+> >  contrib/virtiofsd/Makefile.objs    |   5 +-
+> >  contrib/virtiofsd/fuse_i.h         |   1 +
+> >  contrib/virtiofsd/fuse_lowlevel.c  |  11 +
+> >  contrib/virtiofsd/fuse_lowlevel.h  |   1 +
+> >  contrib/virtiofsd/helper.c         |   4 +-
+> >  contrib/virtiofsd/passthrough_ll.c |   7 +
+> >  contrib/virtiofsd/vstat.c          | 680 +++++++++++++++++++++++++++++
+> >  contrib/virtiofsd/vtrace.c         |  95 ++++
+> >  contrib/virtiofsd/vtrace.h         |  53 +++
+> >  11 files changed, 859 insertions(+), 2 deletions(-)
+> >  create mode 100644 contrib/virtiofsd/vstat.c
+> >  create mode 100644 contrib/virtiofsd/vtrace.c
+> >  create mode 100644 contrib/virtiofsd/vtrace.h
+> > 
+> > -- 
+> > 2.20.1.7.g153144c
+> > 
+> > _______________________________________________
+> > Virtio-fs mailing list
+> > Virtio-fs@redhat.com
+> > https://www.redhat.com/mailman/listinfo/virtio-fs
 
 
 
-On 2019/8/21 21:11, Vivek Goyal wrote:
-> On Wed, Aug 21, 2019 at 09:48:18AM +0800, piaojun wrote:
->>
->>
->> On 2019/8/21 1:56, Vivek Goyal wrote:
->>> On Tue, Aug 20, 2019 at 11:39:26AM -0400, Vivek Goyal wrote:
->>>> On Mon, Aug 19, 2019 at 02:49:54PM +0800, piaojun wrote:
->>>>> When O_DIRECT flags is set by Guest, virtiofsd will open file with
->>>>> O_DIRECT, but unset 'fi->direct_io' which makes Guest go buffer io path.
->>>>
->>>> Where is virtiofsd unset fi->direct_io flag? All I can see is that it
->>>> sets this flag if cache=none?
->>>>
->>>
->>> Ok, I looked at it little bit more closely and I don't think it is a
->>> problem. With cache=always/auto, we don't set fi->direct_io. That means
->>> server is not enforcing a direct I/O policy on client.
->>>
->>> Now if client decides to direct I/O by opening file with O_DIRECT, it
->>> will still take direct I/O path and call fuse_direct_IO(). Look at
->>> fuse_file_aops->fuse_direct_IO().
->>
->> The problem is that when Guest open with O_DIRECT, the Host won't set
->> open_flags with FOPEN_DIRECT_IO if CACHE_AUTO is set. It makes Guest
->> goes into fuse_cache_write_iter() rather than fuse_direct_write_iter().
->> In other words, the Guest's I/O mode will be changed by virtiofsd.
-> 
-> I think there are two direct I/O paths. One is where server requests
-> that direct I/O be done on the file and in that case FOPEN_DIRECT_IO
-> is set.
-> 
-> Other case is where client initiates direct I/O and in that case
-> FOPEN_DIRECT_IO is not set and we take regular path which is
-> capable of doing both direct and buffered I/O. For example, for
-> reads we do following.
-> 
-> fuse_file_read_iter()
->    fuse_cache_read_iter()
->       generic_file_read_iter()
-> 	mapping->a_ops->direct_IO() <--- (If iocb->ki_flags & IOCB_DIRECT)
-> 	  fuse_direct_IO()
-> 
-> Similary for write path.
-> 
-> fuse_file_write_iter()
->   fuse_cache_write_iter()
->      generic_file_direct_write() <----- (If iocb->ki_flags & IOCB_DIRECT)
->         mapping->a_ops->direct_IO()
-> 	   fuse_direct_IO()
-> 
-> Can you give it a try. I don't think we have the problem what you
-> are describing.
-> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 
-I make a try as you said, and it indeed goes direct path in guest even
-if cache=always. So my doubt has been cleared.
-
-Thanks,
-Jun
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

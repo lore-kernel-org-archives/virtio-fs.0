@@ -1,14 +1,10 @@
-Date: Fri, 23 Aug 2019 08:52:23 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190823125223.GA11009@redhat.com>
-References: <1566367838-47809-1-git-send-email-bo.liu@linux.alibaba.com>
-	<20190822201627.GD8999@redhat.com> <5D5F31BC.1020704@huawei.com>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Fri, 23 Aug 2019 16:02:43 +0100
+Message-Id: <20190823150245.17246-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <5D5F31BC.1020704@huawei.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofs: fix return value of
- iomap_begin_upgrade_mapping
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 0/2] Remove implicit lock knowledge from
+	lo_destroy
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,36 +13,23 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>
-Cc: virtio-fs@redhat.com
+To: virtio-fs@redhat.com, stefanha@redhat.com, vgoyal@redhat.com
 
-On Fri, Aug 23, 2019 at 08:22:20AM +0800, piaojun wrote:
-> 
-> 
-> On 2019/8/23 4:16, Vivek Goyal wrote:
-> > On Wed, Aug 21, 2019 at 02:10:38PM +0800, Liu Bo wrote:
-> >> Set ret = 0 if everything runs fine.
-> >>
-> >> Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
-> >> ---
-> >>  fs/fuse/file.c | 1 +
-> >>  1 file changed, 1 insertion(+)
-> >>
-> >> diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-> >> index eb7543a..d3c5e45 100644
-> >> --- a/fs/fuse/file.c
-> >> +++ b/fs/fuse/file.c
-> >> @@ -1985,6 +1985,7 @@ static int iomap_begin_upgrade_mapping(struct inode *inode, loff_t pos,
-> >>  
-> >>  out_fill_iomap:
-> >>  	fuse_fill_iomap(inode, pos, length, iomap, dmap, flags);
-> >> +	ret = 0;
-> > 
-> > Thanks. I initialized ret = 0 in the beginning itself now. 
-> 
-> This probably would not work as ret will be set -EIO again immediately.
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-I changed that ret = -EIO as well. I now set it only when error happens.
+This comes from a comment by Vivek on an earlier review of lo_destroy
+fixes.  In this pair I split unref_inode into a locked and unlocked
+version and use the unlocked version in lo_destroy with an outer lock.
+Note this does move the lo_inode_put inside the lock, but I don't
+think that's an issue.
 
-Vivek
+Dr. David Alan Gilbert (2):
+  virtiofsd: Rename unref_inode to indicate lock
+  virtiofsd: Convert lo_destroy to take the lo->mutex lock itself
+
+ contrib/virtiofsd/passthrough_ll.c | 45 ++++++++++++++++--------------
+ 1 file changed, 24 insertions(+), 21 deletions(-)
+
+-- 
+2.21.0
 

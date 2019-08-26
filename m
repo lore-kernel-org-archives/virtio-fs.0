@@ -1,14 +1,14 @@
+References: <20190821175720.25901-1-vgoyal@redhat.com>
+	<20190821175720.25901-5-vgoyal@redhat.com>
 From: piaojun <piaojun@huawei.com>
-References: <5D4D0D06.1090602@huawei.com>
-	<20190821153802.GB9095@stefanha-x1.localdomain>
-Message-ID: <5D633104.6030000@huawei.com>
-Date: Mon, 26 Aug 2019 09:08:20 +0800
+Message-ID: <5D63392C.3030404@huawei.com>
+Date: Mon, 26 Aug 2019 09:43:08 +0800
 MIME-Version: 1.0
-In-Reply-To: <20190821153802.GB9095@stefanha-x1.localdomain>
+In-Reply-To: <20190821175720.25901-5-vgoyal@redhat.com>
 Content-Type: text/plain; charset="windows-1252"
 Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH][RFC] Support multiqueue mode by setting cpu
- affinity
+Subject: Re: [Virtio-fs] [PATCH 04/19] virtio: Implement get_shm_region for
+ PCI transport
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,231 +17,116 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>, linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org
+Cc: virtio-fs@redhat.com, Sebastien Boeuf <sebastien.boeuf@intel.com>, kbuild test robot <lkp@intel.com>, kvm@vger.kernel.org, miklos@szeredi.hu
 
 
 
-On 2019/8/21 23:38, Stefan Hajnoczi wrote:
-> On Fri, Aug 09, 2019 at 02:04:54PM +0800, piaojun wrote:
->> Set cpu affinity for each queue in multiqueue mode to improve the iops
->> performance.
->>
->> >From my test, the iops is increased by adding multiqueues as below,
->> but it has not achieved my expect yet due to some reason. So I'm
->> considering if we could drop some locks when operating vq as it is
->> binded to one vCPU. I'm very glad to have a discuss with other
->> developers.
->>
->> Further more, I modified virtiofsd to support multiqueue which just for
->> testing.
->>
->> Test Environment:
->> Guest configuration:
->> 8 vCPU
->> 8GB RAM
->> Linux 5.1 (vivek-aug-06-2019)
->>
->> Host configuration:
->> Intel(R) Xeon(R) CPU E5-2670 0 @ 2.60GHz (8 cores x 4 threads)
->> 32GB RAM
->> Linux 3.10.0
->> EXT4 + 4G Ramdisk
->>
->> ---
->> Single-queue:
->> # fio -direct=1 -time_based -iodepth=128 -rw=randwrite -ioengine=libaio -bs=4k -size=1G -numjob=8 -runtime=30 -group_reporting -name=file -filename=/mnt/virtiofs/file
->> file: (g=0): rw=randwrite, bs=4K-4K/4K-4K/4K-4K, ioengine=libaio, iodepth=128
->> ...
->> fio-2.13
->> Starting 8 processes
->> Jobs: 8 (f=8): [w(8)] [100.0% done] [0KB/316.5MB/0KB /s] [0/81.2K/0 iops] [eta 00m:00s]
->> file: (groupid=0, jobs=8): err= 0: pid=5808: Fri Aug  9 20:35:22 2019
->>   write: io=9499.9MB, bw=324251KB/s, iops=81062, runt= 30001msec
->>
->> Multi-queues:
->> # fio -direct=1 -time_based -iodepth=128 -rw=randwrite -ioengine=libaio -bs=4k -size=1G -numjob=8 -runtime=30 -group_reporting -name=file -filename=/mnt/virtiofs/file
->> file: (g=0): rw=randwrite, bs=4K-4K/4K-4K/4K-4K, ioengine=libaio, iodepth=128
->> ...
->> fio-2.13
->> Starting 8 processes
->> Jobs: 8 (f=8): [w(8)] [100.0% done] [0KB/444.6MB/0KB /s] [0/114K/0 iops] [eta 00m:00s]
->> file: (groupid=0, jobs=8): err= 0: pid=5704: Fri Aug  9 20:38:47 2019
->>   write: io=12967MB, bw=442582KB/s, iops=110645, runt= 30001msec
->> ---
+On 2019/8/22 1:57, Vivek Goyal wrote:
+> From: Sebastien Boeuf <sebastien.boeuf@intel.com>
 > 
-> How does the same fio command-line perform on the host when bound to 8
-> CPUs?
-
-fio has great performance on host side, so the bottleneck should be at virtiofsd.
-
----
-Run status group 0 (all jobs):
-  WRITE: bw=12.7GiB/s (13.6GB/s), 12.7GiB/s-12.7GiB/s (13.6GB/s-13.6GB/s), io=381GiB (409GB), run=30001-30001msec
-
+> On PCI the shm regions are found using capability entries;
+> find a region by searching for the capability.
 > 
-> What about the virtiofsd changes?  Did you implement host CPU affinity
-> for the virtqueue processing threads and their workqueues?
+> Cc: kvm@vger.kernel.org
+> Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
+> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> Signed-off-by: kbuild test robot <lkp@intel.com>
+> ---
+>  drivers/virtio/virtio_pci_modern.c | 108 +++++++++++++++++++++++++++++
+>  include/uapi/linux/virtio_pci.h    |  11 ++-
+>  2 files changed, 118 insertions(+), 1 deletion(-)
 > 
-> I wonder if numbers are better if you use 8 files instead of 1 file.
-> 
-I implement host CPU affinity and re-design the testcase with 8 files,
-the result looks better:
+> diff --git a/drivers/virtio/virtio_pci_modern.c b/drivers/virtio/virtio_pci_modern.c
+> index 7abcc50838b8..1cdedd93f42a 100644
+> --- a/drivers/virtio/virtio_pci_modern.c
+> +++ b/drivers/virtio/virtio_pci_modern.c
+> @@ -443,6 +443,112 @@ static void del_vq(struct virtio_pci_vq_info *info)
+>  	vring_del_virtqueue(vq);
+>  }
+>  
+> +static int virtio_pci_find_shm_cap(struct pci_dev *dev,
+> +                                   u8 required_id,
+> +                                   u8 *bar, u64 *offset, u64 *len)
+> +{
+> +	int pos;
+> +
+> +        for (pos = pci_find_capability(dev, PCI_CAP_ID_VNDR);
+> +             pos > 0;
+> +             pos = pci_find_next_capability(dev, pos, PCI_CAP_ID_VNDR)) {
+> +		u8 type, cap_len, id;
+> +                u32 tmp32;
+> +                u64 res_offset, res_length;
+> +
+> +		pci_read_config_byte(dev, pos + offsetof(struct virtio_pci_cap,
+> +                                                         cfg_type),
+> +                                     &type);
+> +                if (type != VIRTIO_PCI_CAP_SHARED_MEMORY_CFG)
+> +                        continue;
+> +
+> +		pci_read_config_byte(dev, pos + offsetof(struct virtio_pci_cap,
+> +                                                         cap_len),
+> +                                     &cap_len);
+> +		if (cap_len != sizeof(struct virtio_pci_cap64)) {
+> +		        printk(KERN_ERR "%s: shm cap with bad size offset: %d size: %d\n",
+> +                               __func__, pos, cap_len);
+> +                        continue;
+> +                }
+> +
+> +		pci_read_config_byte(dev, pos + offsetof(struct virtio_pci_cap,
+> +                                                         id),
+> +                                     &id);
+> +                if (id != required_id)
+> +                        continue;
+> +
+> +                /* Type, and ID match, looks good */
+> +                pci_read_config_byte(dev, pos + offsetof(struct virtio_pci_cap,
+> +                                                         bar),
+> +                                     bar);
+> +
+> +                /* Read the lower 32bit of length and offset */
+> +                pci_read_config_dword(dev, pos + offsetof(struct virtio_pci_cap, offset),
+> +                                      &tmp32);
+> +                res_offset = tmp32;
+> +                pci_read_config_dword(dev, pos + offsetof(struct virtio_pci_cap, length),
+> +                                      &tmp32);
+> +                res_length = tmp32;
+> +
+> +                /* and now the top half */
+> +                pci_read_config_dword(dev,
+> +                                      pos + offsetof(struct virtio_pci_cap64,
+> +                                                     offset_hi),
+> +                                      &tmp32);
+> +                res_offset |= ((u64)tmp32) << 32;
+> +                pci_read_config_dword(dev,
+> +                                      pos + offsetof(struct virtio_pci_cap64,
+> +                                                     length_hi),
+> +                                      &tmp32);
+> +                res_length |= ((u64)tmp32) << 32;
+> +
+> +                *offset = res_offset;
+> +                *len = res_length;
+> +
+> +                return pos;
+> +        }
+> +        return 0;
+> +}
+> +
+> +static bool vp_get_shm_region(struct virtio_device *vdev,
+> +			      struct virtio_shm_region *region, u8 id)
+> +{
+> +	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
+> +	struct pci_dev *pci_dev = vp_dev->pci_dev;
+> +	u8 bar;
+> +	u64 offset, len;
+> +	phys_addr_t phys_addr;
+> +	size_t bar_len;
+> +	char *bar_name;
 
----
-[global]
-runtime=30
-time_based
-group_reporting
-direct=1
-bs=1M
-size=1G
-ioengine=libaio
-rw=write
-numjobs=8
-iodepth=128
-thread=1
-
-[file1]
-filename=/mnt/virtiofs/file1
-numjobs=1
-[file2]
-filename=/mnt/virtiofs/file2
-numjobs=1
-[file3]
-filename=/mnt/virtiofs/file3
-numjobs=1
-[file4]
-filename=/mnt/virtiofs/file4
-numjobs=1
-[file5]
-filename=/mnt/virtiofs/file5
-numjobs=1
-[file6]
-filename=/mnt/virtiofs/file6
-numjobs=1
-[file7]
-filename=/mnt/virtiofs/file7
-numjobs=1
-[file8]
-filename=/mnt/virtiofs/file8
-numjobs=1
-
-Single-Queue:
-Jobs: 8 (f=8): [W(8)] [100.0% done] [0KB/1594MB/0KB /s] [0/1594/0 iops] [eta 00m:00s]
-file1: (groupid=0, jobs=8): err= 0: pid=6379: Mon Aug 26 16:24:10 2019
-  write: io=46676MB, bw=1555.6MB/s, iops=1555, runt= 30007msec
-
-Multi-Queues(8):
-Jobs: 8 (f=8): [W(8)] [100.0% done] [0KB/4064MB/0KB /s] [0/4064/0 iops] [eta 00m:00s]
-file1: (groupid=0, jobs=8): err= 0: pid=5785: Mon Aug 26 16:26:46 2019
-  write: io=115421MB, bw=3847.2MB/s, iops=3847, runt= 30002msec
-
-I write a draft patch for virtiofsd, but the sandbox make it hard to
-set affinity for each vq, as _SC_NPROCESSORS_ONLN always equals 1. So I
-just delete the related code for testing. Maybe we could create a
-thread pool before setup_sandbox() or some effective way. I'm glad to
-help finding out the solution.
+'char *bar_name' should be cleaned up to avoid compiling warning. And I
+wonder if you mix tab and blankspace for code indent? Or it's just my
+email display problem?
 
 Thanks,
 Jun
-
----
- contrib/virtiofsd/fuse_virtio.c    | 23 ++++++++++++++++++-----
- contrib/virtiofsd/passthrough_ll.c |  4 ++--
- contrib/virtiofsd/seccomp.c        |  2 ++
- 3 files changed, 22 insertions(+), 7 deletions(-)
-
-diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
-index bd50723..efc4ba7 100644
---- a/contrib/virtiofsd/fuse_virtio.c
-+++ b/contrib/virtiofsd/fuse_virtio.c
-@@ -748,8 +748,11 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
- {
-         struct fv_VuDev *vud = container_of(dev, struct fv_VuDev, dev);
-         struct fv_QueueInfo *ourqi;
-+        cpu_set_t mask;
-+        int num = sysconf(_SC_NPROCESSORS_ONLN);
-
--        fuse_info("%s: qidx=%d started=%d\n", __func__, qidx, started);
-+        fuse_info("%s: nqueues %lu, qidx=%d, started=%d, cpunum %d\n",
-+                  __func__, vud->nqueues, qidx, started, num);
-         assert(qidx>=0);
-
-         /*
-@@ -759,9 +762,9 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
-          * races yet.
-          */
-         if (qidx > 1) {
--                fuse_err("%s: multiple request queues not yet implemented, please only configure 1 request queue\n",
--                         __func__);
--                exit(EXIT_FAILURE);
-+                //fuse_err("%s: multiple request queues not yet implemented, please only configure 1 request queue\n",
-+                //         __func__);
-+                //exit(EXIT_FAILURE);
-         }
-
-         if (started) {
-@@ -798,6 +801,16 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
-                                  __func__, qidx);
-                         assert(0);
-                 }
-+		if (qidx > 0) {
-+			fuse_info("%s: thread[%ld], set CPU[%d] affinity for vq[%d]\n", __func__, ourqi->thread, qidx, qidx);
-+			/* set CPU affinity for vqs */
-+			CPU_ZERO(&mask);
-+			CPU_SET(qidx, &mask);
-+			if (pthread_setaffinity_np(ourqi->thread, sizeof(mask), &mask) < 0) {
-+				fuse_err("%s: Failed to setaffinity for vq[%d]\n", __func__, qidx);
-+                        	assert(0);
-+			}
-+		}
-         } else {
-                 int ret;
-                 assert(qidx < vud->nqueues);
-@@ -962,7 +975,7 @@ int virtio_session_mount(struct fuse_session *se)
-         se->virtio_dev = calloc(sizeof(struct fv_VuDev), 1);
-         se->virtio_dev->se = se;
-         pthread_rwlock_init(&se->virtio_dev->vu_dispatch_rwlock, NULL);
--        vu_init(&se->virtio_dev->dev, 2, se->vu_socketfd,
-+        vu_init(&se->virtio_dev->dev, 16, se->vu_socketfd,
-                 fv_panic,
-                 fv_set_watch, fv_remove_watch,
-                 &fv_iface);
-diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-index ca11764..7eabe73 100644
---- a/contrib/virtiofsd/passthrough_ll.c
-+++ b/contrib/virtiofsd/passthrough_ll.c
-@@ -2773,7 +2773,7 @@ static void setup_root(struct lo_data *lo, struct lo_inode *root)
- 	int fd, res;
- 	struct stat stat;
-
--	fd = open("/", O_PATH);
-+	fd = open(lo->source, O_PATH);
- 	if (fd == -1)
- 		err(1, "open(%s, O_PATH)", lo->source);
-
-@@ -2990,7 +2990,7 @@ int main(int argc, char *argv[])
- 	/* Must be after daemonize to get the right /proc/self/fd */
- 	setup_proc_self_fd(&lo);
-
--	setup_sandbox(&lo, opts.syslog);
-+	//setup_sandbox(&lo, opts.syslog);
-
- 	setup_root(&lo, &lo.root);
-
-diff --git a/contrib/virtiofsd/seccomp.c b/contrib/virtiofsd/seccomp.c
-index 3b92c6e..e9f0737 100644
---- a/contrib/virtiofsd/seccomp.c
-+++ b/contrib/virtiofsd/seccomp.c
-@@ -82,6 +82,8 @@ static const int syscall_whitelist[] = {
- 	SCMP_SYS(writev),
- 	SCMP_SYS(capget),
- 	SCMP_SYS(capset),
-+	SCMP_SYS(sched_setaffinity),
-+	SCMP_SYS(sched_getaffinity),
- };
-
- /* Syscalls used when --syslog is enabled */
--- 
 

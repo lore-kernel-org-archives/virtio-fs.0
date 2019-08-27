@@ -1,15 +1,13 @@
-Date: Tue, 27 Aug 2019 07:54:09 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190827115409.GB30873@redhat.com>
-References: <20190821175720.25901-1-vgoyal@redhat.com>
-	<20190821175720.25901-6-vgoyal@redhat.com>
-	<20190827103943.4c6c9342.cohuck@redhat.com>
+Date: Tue, 27 Aug 2019 14:02:07 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20190827130207.GC4290@stefanha-x1.localdomain>
+References: <5f49cefd-a051-8af4-86a2-3ea94acd9eee@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="oJ71EGRlYNjSvfq7"
 Content-Disposition: inline
-In-Reply-To: <20190827103943.4c6c9342.cohuck@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 05/19] virtio: Implement get_shm_region for
-	MMIO transport
+In-Reply-To: <5f49cefd-a051-8af4-86a2-3ea94acd9eee@redhat.com>
+Subject: Re: [Virtio-fs] basic questions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,59 +16,112 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Cornelia Huck <cohuck@redhat.com>
-Cc: kvm@vger.kernel.org, miklos@szeredi.hu, linux-nvdimm@lists.01.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, Sebastien Boeuf <sebastien.boeuf@intel.com>, linux-fsdevel@vger.kernel.org
+To: Laszlo Ersek <lersek@redhat.com>
+Cc: virtio-fs@redhat.com
 
-On Tue, Aug 27, 2019 at 10:39:43AM +0200, Cornelia Huck wrote:
-> On Wed, 21 Aug 2019 13:57:06 -0400
-> Vivek Goyal <vgoyal@redhat.com> wrote:
-> 
-> > From: Sebastien Boeuf <sebastien.boeuf@intel.com>
-> > 
-> > On MMIO a new set of registers is defined for finding SHM
-> > regions.  Add their definitions and use them to find the region.
-> > 
-> > Cc: kvm@vger.kernel.org
-> > Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
-> > ---
-> >  drivers/virtio/virtio_mmio.c     | 32 ++++++++++++++++++++++++++++++++
-> >  include/uapi/linux/virtio_mmio.h | 11 +++++++++++
-> >  2 files changed, 43 insertions(+)
-> > 
-> > diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
-> > index e09edb5c5e06..5c07985c8cb8 100644
-> > --- a/drivers/virtio/virtio_mmio.c
-> > +++ b/drivers/virtio/virtio_mmio.c
-> > @@ -500,6 +500,37 @@ static const char *vm_bus_name(struct virtio_device *vdev)
-> >  	return vm_dev->pdev->name;
-> >  }
-> >  
-> > +static bool vm_get_shm_region(struct virtio_device *vdev,
-> > +			      struct virtio_shm_region *region, u8 id)
-> > +{
-> > +	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
-> > +	u64 len, addr;
-> > +
-> > +	/* Select the region we're interested in */
-> > +	writel(id, vm_dev->base + VIRTIO_MMIO_SHM_SEL);
-> > +
-> > +	/* Read the region size */
-> > +	len = (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_LEN_LOW);
-> > +	len |= (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_LEN_HIGH) << 32;
-> > +
-> > +	region->len = len;
-> > +
-> > +	/* Check if region length is -1. If that's the case, the shared memory
-> > +	 * region does not exist and there is no need to proceed further.
-> > +	 */
-> > +	if (len == ~(u64)0) {
-> > +		return false;
-> > +	}
-> 
-> I think the curly braces should be dropped here.
 
-Will do.
+--oJ71EGRlYNjSvfq7
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Thanks
-Vivek
+On Sat, Aug 24, 2019 at 01:09:18PM +0200, Laszlo Ersek wrote:
+> Hi,
+>=20
+> (1) The howto document at <https://virtio-fs.gitlab.io/howto-qemu.html>
+> contains the following snippet:
+>=20
+> > force use of memory sharable with the fuse daemon.
+> >
+> >   -m 4G,maxmem=3D4G -object memory-backend-file,id=3Dmem,size=3D4G,mem-=
+path=3D/dev/shm,share=3Don -numa node,memdev=3Dmem
+>=20
+> Why is the "maxmem" property necessary? It's not larger than the
+> (implicit) "size" property of "-m", and I don't think memory hotplug is
+> relevant here.
+
+Right, maxmem is not necessary.  I have updated the howto.  It takes a
+few minutes for GitLab to regenerate the website, so you might not see
+the changes yet if you access it right away.
+
+>=20
+> (2) what is the "fuse daemon"? Is that a reference to "virtiofsd"?
+
+Yes, I have updated the howto to use "virtiofsd" instead.
+
+>=20
+> (3) Why is a NUMA node necessary, with a memory backend file explicitly
+> allocated under /dev/shm?
+>=20
+> Will the virtio-fs device model exchange such references, over the
+> socket, with virtiofsd, that point into shared memory?
+
+The guest RAM file descriptor is sent by QEMU over the vhost-user UNIX
+domain socket to virtiofsd.  virtiofsd must be able to mmap guest RAM
+with the MAP_SHARED flag.
+
+> (4) Couldn't we point mem-path to a normal (host disk based) directory?
+>=20
+> Performance aside, that should put less pressure on host RAM, and
+> otherwise work the same. Is that correct?
+
+Yes, that should work too.
+
+> (5) Is the shared memory area necessary for the most basic virtio-fs
+> usage?
+
+Yes, it's required because shared memory access to guest RAM allows
+virtiofsd to process the virtqueues.
+
+> (6) I seem to recall that virtio-fs allows guests to notice if files
+> have changed since they last looked.
+>=20
+> Is that functionality tied to "ireg" daemon, and to the "versiontable"
+> property added in commit 8fb5b17bea63 ("virtio-fs: Allow mapping of meta
+> data version table", 2019-08-23)?
+
+Currently only virtiofsd -o cache=3Dnone guarantees fresh metadata (at a
+performance cost).  The ireg daemon is experimental and incomplete, but
+it will make coherent metadata cheaper in the future.
+
+There is currently no inotify support in FUSE, so the guest does not
+receive notifications when the file system changes.  Right now guests
+would have to poll for changes.
+
+> (7) Are guests required to access the virtio-fs device at the PCI level
+> -- such as an MMIO region -- in order to observe async file changes, or
+> is this functionality available purely at the virtio communication level
+> (i.e., transport-independently)?
+>=20
+> It doesn't seem to be explained at
+> <https://stefanha.github.io/virtio/virtio-fs.html>.
+
+Coherent shared file system access is not supported yet (that's where
+the ireg daemon comes in and it's still under development).  Today
+virtio-fs is good for the use case where the guest is the only one
+accessing the file system.
+
+In terms of the VIRTIO spec, everything is done at the device model
+level.  Even the DAX Window is a "shared memory region", which is a
+well-defined device model concept.  The MMIO and PCI transports
+implement shared memory regions differently, though.
+
+Stefan
+
+--oJ71EGRlYNjSvfq7
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1lKc8ACgkQnKSrs4Gr
+c8gf7wgAjBCTWUZzZRDd2rHAyN2/GG8ngBu1h5NjIE1d8130toaFOw1dpy5VX0vO
+xB4DFu2De4i+90ETrG+lwgdQRT7K7KNqA7LQseuEXIPh89C50H33LWqCr32ZG5n2
+8PS0iwgiyNoGk//A6Jt8KHGDR5YiTe8Rq8v09zIx3jirrggQoMqtD6XD9Jmo7ORI
+xkT695P3a71YRhyplEl2E86IjYZ1OeclfdXezRgdvTexR42PRbVgb6lxjpk8HKYy
+RVBTfsBHJZkAqV97VKxrff1X4+5mf64zQq/b7R7/abRabNYGzbFbJhnsRrUnts4g
+Zyruuf4xczUisKwOVC65cZHS+VWXoQ==
+=UcvB
+-----END PGP SIGNATURE-----
+
+--oJ71EGRlYNjSvfq7--
 

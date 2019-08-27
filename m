@@ -1,11 +1,15 @@
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Tue, 27 Aug 2019 10:54:37 +0100
-Message-Id: <20190827095437.18819-5-stefanha@redhat.com>
-In-Reply-To: <20190827095437.18819-1-stefanha@redhat.com>
-References: <20190827095437.18819-1-stefanha@redhat.com>
+Date: Tue, 27 Aug 2019 07:53:17 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190827115317.GA30873@redhat.com>
+References: <20190821175720.25901-1-vgoyal@redhat.com>
+	<20190821175720.25901-5-vgoyal@redhat.com>
+	<20190827103457.35927d9d.cohuck@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 4/4] virtiofsd: add vhost-user.json file
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20190827103457.35927d9d.cohuck@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 04/19] virtio: Implement get_shm_region for
+	PCI transport
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,56 +18,182 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com, qemu-devel@nongnu.org
-Cc: =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>
+To: Cornelia Huck <cohuck@redhat.com>
+Cc: kbuild test robot <lkp@intel.com>, kvm@vger.kernel.org, miklos@szeredi.hu, linux-nvdimm@lists.01.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, Sebastien Boeuf <sebastien.boeuf@intel.com>, linux-fsdevel@vger.kernel.org
 
-Install a vhost-user.json file describing virtiofsd.  This allows
-libvirt and other management tools to enumerate vhost-user backend
-programs.
+On Tue, Aug 27, 2019 at 10:34:57AM +0200, Cornelia Huck wrote:
+> On Wed, 21 Aug 2019 13:57:05 -0400
+> Vivek Goyal <vgoyal@redhat.com> wrote:
+> 
+> > From: Sebastien Boeuf <sebastien.boeuf@intel.com>
+> > 
+> > On PCI the shm regions are found using capability entries;
+> > find a region by searching for the capability.
+> > 
+> > Cc: kvm@vger.kernel.org
+> > Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
+> > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> > Signed-off-by: kbuild test robot <lkp@intel.com>
+> 
+> An s-o-b by a test robot looks a bit odd.
 
-Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
----
- Makefile                                    | 1 +
- .gitignore                                  | 1 +
- contrib/virtiofsd/50-qemu-virtiofsd.json.in | 5 +++++
- 3 files changed, 7 insertions(+)
- create mode 100644 contrib/virtiofsd/50-qemu-virtiofsd.json.in
+I think one of the fixes came from the robot and that's why I put s-o-b
+from the robot as well. 
 
-diff --git a/Makefile b/Makefile
-index ef6eca07cc..c6e2f4e7a0 100644
---- a/Makefile
-+++ b/Makefile
-@@ -318,6 +318,7 @@ HELPERS-$(call land,$(CONFIG_SOFTMMU),$(CONFIG_LINUX)) = qemu-bridge-helper$(EXE
- 
- ifdef CONFIG_LINUX
- HELPERS-y += virtiofsd$(EXESUF)
-+vhost-user-json-y += contrib/virtiofsd/50-qemu-virtiofsd.json
- 
- ifdef CONFIG_VIRGL
- ifdef CONFIG_GBM
-diff --git a/.gitignore b/.gitignore
-index fd6e6c38c7..554c7abe81 100644
---- a/.gitignore
-+++ b/.gitignore
-@@ -6,6 +6,7 @@
- /config-target.*
- /config.status
- /config-temp
-+/contrib/virtiofsd/50-qemu-virtiofsd.json
- /elf2dmp
- /trace-events-all
- /trace/generated-events.h
-diff --git a/contrib/virtiofsd/50-qemu-virtiofsd.json.in b/contrib/virtiofsd/50-qemu-virtiofsd.json.in
-new file mode 100644
-index 0000000000..9bcd86f8dc
---- /dev/null
-+++ b/contrib/virtiofsd/50-qemu-virtiofsd.json.in
-@@ -0,0 +1,5 @@
-+{
-+  "description": "QEMU virtiofsd vhost-user-fs",
-+  "type": "fs",
-+  "binary": "@libexecdir@/virtiofsd"
-+}
--- 
-2.21.0
+I will review the whole patch and fix all the intendation issues.
+
+Vivek
+
+> 
+> > ---
+> >  drivers/virtio/virtio_pci_modern.c | 108 +++++++++++++++++++++++++++++
+> >  include/uapi/linux/virtio_pci.h    |  11 ++-
+> >  2 files changed, 118 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/virtio/virtio_pci_modern.c b/drivers/virtio/virtio_pci_modern.c
+> > index 7abcc50838b8..1cdedd93f42a 100644
+> > --- a/drivers/virtio/virtio_pci_modern.c
+> > +++ b/drivers/virtio/virtio_pci_modern.c
+> > @@ -443,6 +443,112 @@ static void del_vq(struct virtio_pci_vq_info *info)
+> >  	vring_del_virtqueue(vq);
+> >  }
+> >  
+> > +static int virtio_pci_find_shm_cap(struct pci_dev *dev,
+> > +                                   u8 required_id,
+> > +                                   u8 *bar, u64 *offset, u64 *len)
+> > +{
+> > +	int pos;
+> > +
+> > +        for (pos = pci_find_capability(dev, PCI_CAP_ID_VNDR);
+> 
+> Indentation looks a bit off here.
+> 
+> > +             pos > 0;
+> > +             pos = pci_find_next_capability(dev, pos, PCI_CAP_ID_VNDR)) {
+> > +		u8 type, cap_len, id;
+> > +                u32 tmp32;
+> 
+> Here as well.
+> 
+> > +                u64 res_offset, res_length;
+> > +
+> > +		pci_read_config_byte(dev, pos + offsetof(struct virtio_pci_cap,
+> > +                                                         cfg_type),
+> > +                                     &type);
+> > +                if (type != VIRTIO_PCI_CAP_SHARED_MEMORY_CFG)
+> 
+> And here.
+> 
+> > +                        continue;
+> > +
+> > +		pci_read_config_byte(dev, pos + offsetof(struct virtio_pci_cap,
+> > +                                                         cap_len),
+> > +                                     &cap_len);
+> > +		if (cap_len != sizeof(struct virtio_pci_cap64)) {
+> > +		        printk(KERN_ERR "%s: shm cap with bad size offset: %d size: %d\n",
+> > +                               __func__, pos, cap_len);
+> 
+> Probably better to use dev_warn() instead of printk.
+> 
+> > +                        continue;
+> > +                }
+> 
+> Indentation looks off again (might be a space vs tabs issue; maybe
+> check the whole patch for indentation problems?)
+> 
+> > +
+> > +		pci_read_config_byte(dev, pos + offsetof(struct virtio_pci_cap,
+> > +                                                         id),
+> > +                                     &id);
+> > +                if (id != required_id)
+> > +                        continue;
+> > +
+> > +                /* Type, and ID match, looks good */
+> > +                pci_read_config_byte(dev, pos + offsetof(struct virtio_pci_cap,
+> > +                                                         bar),
+> > +                                     bar);
+> > +
+> > +                /* Read the lower 32bit of length and offset */
+> > +                pci_read_config_dword(dev, pos + offsetof(struct virtio_pci_cap, offset),
+> > +                                      &tmp32);
+> > +                res_offset = tmp32;
+> > +                pci_read_config_dword(dev, pos + offsetof(struct virtio_pci_cap, length),
+> > +                                      &tmp32);
+> > +                res_length = tmp32;
+> > +
+> > +                /* and now the top half */
+> > +                pci_read_config_dword(dev,
+> > +                                      pos + offsetof(struct virtio_pci_cap64,
+> > +                                                     offset_hi),
+> > +                                      &tmp32);
+> > +                res_offset |= ((u64)tmp32) << 32;
+> > +                pci_read_config_dword(dev,
+> > +                                      pos + offsetof(struct virtio_pci_cap64,
+> > +                                                     length_hi),
+> > +                                      &tmp32);
+> > +                res_length |= ((u64)tmp32) << 32;
+> > +
+> > +                *offset = res_offset;
+> > +                *len = res_length;
+> > +
+> > +                return pos;
+> > +        }
+> > +        return 0;
+> > +}
+> > +
+> > +static bool vp_get_shm_region(struct virtio_device *vdev,
+> > +			      struct virtio_shm_region *region, u8 id)
+> > +{
+> > +	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
+> 
+> This whole function looks like it is indented incorrectly.
+> 
+> > +	struct pci_dev *pci_dev = vp_dev->pci_dev;
+> > +	u8 bar;
+> > +	u64 offset, len;
+> > +	phys_addr_t phys_addr;
+> > +	size_t bar_len;
+> > +	char *bar_name;
+> > +	int ret;
+> > +
+> > +	if (!virtio_pci_find_shm_cap(pci_dev, id, &bar, &offset, &len)) {
+> > +		return false;
+> > +	}
+> 
+> You can drop the curly braces.
+> 
+> > +
+> > +	ret = pci_request_region(pci_dev, bar, "virtio-pci-shm");
+> > +	if (ret < 0) {
+> > +		dev_err(&pci_dev->dev, "%s: failed to request BAR\n",
+> > +			__func__);
+> > +		return false;
+> > +	}
+> > +
+> > +	phys_addr = pci_resource_start(pci_dev, bar);
+> > +	bar_len = pci_resource_len(pci_dev, bar);
+> > +
+> > +        if (offset + len > bar_len) {
+> > +                dev_err(&pci_dev->dev,
+> > +                        "%s: bar shorter than cap offset+len\n",
+> > +                        __func__);
+> > +                return false;
+> > +        }
+> > +
+> > +	region->len = len;
+> > +	region->addr = (u64) phys_addr + offset;
+> > +
+> > +	return true;
+> > +}
+> > +
+> >  static const struct virtio_config_ops virtio_pci_config_nodev_ops = {
+> >  	.get		= NULL,
+> >  	.set		= NULL,
+> 
+> Apart from the coding style nits, the logic of the patch looks sane to
+> me.
+> 
+> (...)
+> 
+> As does the rest of the patch.
 

@@ -1,14 +1,14 @@
-Date: Tue, 27 Aug 2019 12:38:28 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190827163828.GA6859@redhat.com>
-References: <20190821175720.25901-1-vgoyal@redhat.com>
-	<20190821175720.25901-2-vgoyal@redhat.com>
-	<20190826115152.GA21051@infradead.org>
+References: <5f49cefd-a051-8af4-86a2-3ea94acd9eee@redhat.com>
+	<20190827130207.GC4290@stefanha-x1.localdomain>
+From: Laszlo Ersek <lersek@redhat.com>
+Message-ID: <b2d18411-d518-788a-0783-1d55a11407c6@redhat.com>
+Date: Tue, 27 Aug 2019 23:05:45 +0200
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20190826115152.GA21051@infradead.org>
-Subject: Re: [Virtio-fs] [PATCH 01/19] dax: remove block device dependencies
+In-Reply-To: <20190827130207.GC4290@stefanha-x1.localdomain>
+Content-Type: text/plain; charset=windows-1252
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] basic questions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,68 +17,75 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Christoph Hellwig <hch@infradead.org>
-Cc: miklos@szeredi.hu, linux-nvdimm@lists.01.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Dan Williams <dan.j.williams@intel.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com
 
-On Mon, Aug 26, 2019 at 04:51:52AM -0700, Christoph Hellwig wrote:
-> On Wed, Aug 21, 2019 at 01:57:02PM -0400, Vivek Goyal wrote:
-> > From: Stefan Hajnoczi <stefanha@redhat.com>
-> > 
-> > Although struct dax_device itself is not tied to a block device, some
-> > DAX code assumes there is a block device.  Make block devices optional
-> > by allowing bdev to be NULL in commonly used DAX APIs.
-> > 
-> > When there is no block device:
-> >  * Skip the partition offset calculation in bdev_dax_pgoff()
-> >  * Skip the blkdev_issue_zeroout() optimization
-> > 
-> > Note that more block device assumptions remain but I haven't reach those
-> > code paths yet.
+On 08/27/19 15:02, Stefan Hajnoczi wrote:
+> On Sat, Aug 24, 2019 at 01:09:18PM +0200, Laszlo Ersek wrote:
+>> [...]
+> [...]
+
+Thanks for the updates for / answers to my questions (1) through (5). In
+particular I hadn't realized that it's virtiofsd to process the virtqueues!
+
+>> (6) I seem to recall that virtio-fs allows guests to notice if files
+>> have changed since they last looked.
+>>
+>> Is that functionality tied to "ireg" daemon, and to the "versiontable"
+>> property added in commit 8fb5b17bea63 ("virtio-fs: Allow mapping of meta
+>> data version table", 2019-08-23)?
 > 
-> I think this should be split into two patches.
-
-Hi Christoph,
-
-Ok, will split in two patches. In fact, I think will completley drop
-the second change right now as I think we might not be hitting that
-path yet.
-
-> For bdev_dax_pgoff
-> I'd much rather have the partition offset if there is on in the daxdev
-> somehow so that we can get rid of the block device entirely.
-
-IIUC, there is one block_device per partition while there is only one
-dax_device for the whole disk. So we can't directly move bdev logical
-offset into dax_device.
-
-We probably could put this in "iomap" and leave it to filesystems to
-report offset into dax_dev in iomap that way dax generic code does not
-have to deal with it. But that probably will be a bigger change.
-
-Did I misunderstand your suggestion.
-
+> Currently only virtiofsd -o cache=none guarantees fresh metadata (at a
+> performance cost).  The ireg daemon is experimental and incomplete, but
+> it will make coherent metadata cheaper in the future.
 > 
-> Similarly for dax_range_is_aligned I'd rather have a pure dax way
-> to offload zeroing rather than this bdev hack.
+> There is currently no inotify support in FUSE, so the guest does not
+> receive notifications when the file system changes.  Right now guests
+> would have to poll for changes.
 
-Following commig introduced the change to write zeros through block
-device path.
+Sorry, I was unclear. It's fine for my use case if the guest has to ask
+actively about intermittent metadata changes. My interest is not in
+notifications.
 
-commit 4b0228fa1d753f77fe0e6cf4c41398ec77dfbd2a
-Author: Vishal Verma <vishal.l.verma@intel.com>
-Date:   Thu Apr 21 15:13:46 2016 -0400
+E.g. assume the guest tries to read or write a file it has opened
+earlier. (With explicit FUSE_READ / FUSE_WRITE requests, wrapped into
+the usual virtio descriptor chains.) Can the guest ask, in the read or
+write request, "please reject this request of mine if the file has
+changed since I last looked"? [1]
 
- dax: for truncate/hole-punch, do zeroing through the driver if possible
+Is the "ireg" daemon, or "-o cache=none", required for that?
 
-IIUC, they are doing it so that they can clear gendisk->badblocks list.
+>> (7) Are guests required to access the virtio-fs device at the PCI level
+>> -- such as an MMIO region -- in order to observe async file changes, or
+>> is this functionality available purely at the virtio communication level
+>> (i.e., transport-independently)?
+>>
+>> It doesn't seem to be explained at
+>> <https://stefanha.github.io/virtio/virtio-fs.html>.
+> 
+> Coherent shared file system access is not supported yet (that's where
+> the ireg daemon comes in and it's still under development).  Today
+> virtio-fs is good for the use case where the guest is the only one
+> accessing the file system.
 
-So even if there is pure dax way to do it, there will have to some
-involvment of block layer to clear gendisk->badblocks list.
+Understood, thanks!
 
-I am not sure I fully understand your suggestion. But I am hoping its
-not a must for these changes to make a progress. For now, I will drop
-change to dax_range_is_aligned().
+> In terms of the VIRTIO spec, everything is done at the device model
+> level.  Even the DAX Window is a "shared memory region", which is a
+> well-defined device model concept.  The MMIO and PCI transports
+> implement shared memory regions differently, though.
 
-Thanks
-Vivek
+Ah, that makes a lot of sense. I've now read the shared memory region
+sections at <https://stefanha.github.io/virtio/virtio-fs.html>. So this
+is a new generic virtio facility.
+
+It looks like virtio-fs defines shmid#0 for the time being, namely for
+the DAX Window. The DAX window is not important for my use case (I plan
+to use FUSE_READ/FUSE_WRITE).
+
+However: is another (different) shared memory region planned, for the
+kind of stale metadata detection that I describe above, at [1]?
+
+Thank you!
+Laszlo
 

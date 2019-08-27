@@ -1,14 +1,14 @@
-Date: Tue, 27 Aug 2019 10:34:57 +0200
+Date: Tue, 27 Aug 2019 10:39:43 +0200
 From: Cornelia Huck <cohuck@redhat.com>
-Message-ID: <20190827103457.35927d9d.cohuck@redhat.com>
-In-Reply-To: <20190821175720.25901-5-vgoyal@redhat.com>
+Message-ID: <20190827103943.4c6c9342.cohuck@redhat.com>
+In-Reply-To: <20190821175720.25901-6-vgoyal@redhat.com>
 References: <20190821175720.25901-1-vgoyal@redhat.com>
-	<20190821175720.25901-5-vgoyal@redhat.com>
+	<20190821175720.25901-6-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=US-ASCII
 Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH 04/19] virtio: Implement get_shm_region for
- PCI transport
+Subject: Re: [Virtio-fs] [PATCH 05/19] virtio: Implement get_shm_region for
+ MMIO transport
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,172 +18,68 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: kbuild test robot <lkp@intel.com>, kvm@vger.kernel.org, miklos@szeredi.hu, linux-nvdimm@lists.01.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, Sebastien Boeuf <sebastien.boeuf@intel.com>, linux-fsdevel@vger.kernel.org
+Cc: kvm@vger.kernel.org, miklos@szeredi.hu, linux-nvdimm@lists.01.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, Sebastien Boeuf <sebastien.boeuf@intel.com>, linux-fsdevel@vger.kernel.org
 
-On Wed, 21 Aug 2019 13:57:05 -0400
+On Wed, 21 Aug 2019 13:57:06 -0400
 Vivek Goyal <vgoyal@redhat.com> wrote:
 
 > From: Sebastien Boeuf <sebastien.boeuf@intel.com>
 > 
-> On PCI the shm regions are found using capability entries;
-> find a region by searching for the capability.
+> On MMIO a new set of registers is defined for finding SHM
+> regions.  Add their definitions and use them to find the region.
 > 
 > Cc: kvm@vger.kernel.org
 > Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> Signed-off-by: kbuild test robot <lkp@intel.com>
-
-An s-o-b by a test robot looks a bit odd.
-
 > ---
->  drivers/virtio/virtio_pci_modern.c | 108 +++++++++++++++++++++++++++++
->  include/uapi/linux/virtio_pci.h    |  11 ++-
->  2 files changed, 118 insertions(+), 1 deletion(-)
+>  drivers/virtio/virtio_mmio.c     | 32 ++++++++++++++++++++++++++++++++
+>  include/uapi/linux/virtio_mmio.h | 11 +++++++++++
+>  2 files changed, 43 insertions(+)
 > 
-> diff --git a/drivers/virtio/virtio_pci_modern.c b/drivers/virtio/virtio_pci_modern.c
-> index 7abcc50838b8..1cdedd93f42a 100644
-> --- a/drivers/virtio/virtio_pci_modern.c
-> +++ b/drivers/virtio/virtio_pci_modern.c
-> @@ -443,6 +443,112 @@ static void del_vq(struct virtio_pci_vq_info *info)
->  	vring_del_virtqueue(vq);
+> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
+> index e09edb5c5e06..5c07985c8cb8 100644
+> --- a/drivers/virtio/virtio_mmio.c
+> +++ b/drivers/virtio/virtio_mmio.c
+> @@ -500,6 +500,37 @@ static const char *vm_bus_name(struct virtio_device *vdev)
+>  	return vm_dev->pdev->name;
 >  }
 >  
-> +static int virtio_pci_find_shm_cap(struct pci_dev *dev,
-> +                                   u8 required_id,
-> +                                   u8 *bar, u64 *offset, u64 *len)
-> +{
-> +	int pos;
-> +
-> +        for (pos = pci_find_capability(dev, PCI_CAP_ID_VNDR);
-
-Indentation looks a bit off here.
-
-> +             pos > 0;
-> +             pos = pci_find_next_capability(dev, pos, PCI_CAP_ID_VNDR)) {
-> +		u8 type, cap_len, id;
-> +                u32 tmp32;
-
-Here as well.
-
-> +                u64 res_offset, res_length;
-> +
-> +		pci_read_config_byte(dev, pos + offsetof(struct virtio_pci_cap,
-> +                                                         cfg_type),
-> +                                     &type);
-> +                if (type != VIRTIO_PCI_CAP_SHARED_MEMORY_CFG)
-
-And here.
-
-> +                        continue;
-> +
-> +		pci_read_config_byte(dev, pos + offsetof(struct virtio_pci_cap,
-> +                                                         cap_len),
-> +                                     &cap_len);
-> +		if (cap_len != sizeof(struct virtio_pci_cap64)) {
-> +		        printk(KERN_ERR "%s: shm cap with bad size offset: %d size: %d\n",
-> +                               __func__, pos, cap_len);
-
-Probably better to use dev_warn() instead of printk.
-
-> +                        continue;
-> +                }
-
-Indentation looks off again (might be a space vs tabs issue; maybe
-check the whole patch for indentation problems?)
-
-> +
-> +		pci_read_config_byte(dev, pos + offsetof(struct virtio_pci_cap,
-> +                                                         id),
-> +                                     &id);
-> +                if (id != required_id)
-> +                        continue;
-> +
-> +                /* Type, and ID match, looks good */
-> +                pci_read_config_byte(dev, pos + offsetof(struct virtio_pci_cap,
-> +                                                         bar),
-> +                                     bar);
-> +
-> +                /* Read the lower 32bit of length and offset */
-> +                pci_read_config_dword(dev, pos + offsetof(struct virtio_pci_cap, offset),
-> +                                      &tmp32);
-> +                res_offset = tmp32;
-> +                pci_read_config_dword(dev, pos + offsetof(struct virtio_pci_cap, length),
-> +                                      &tmp32);
-> +                res_length = tmp32;
-> +
-> +                /* and now the top half */
-> +                pci_read_config_dword(dev,
-> +                                      pos + offsetof(struct virtio_pci_cap64,
-> +                                                     offset_hi),
-> +                                      &tmp32);
-> +                res_offset |= ((u64)tmp32) << 32;
-> +                pci_read_config_dword(dev,
-> +                                      pos + offsetof(struct virtio_pci_cap64,
-> +                                                     length_hi),
-> +                                      &tmp32);
-> +                res_length |= ((u64)tmp32) << 32;
-> +
-> +                *offset = res_offset;
-> +                *len = res_length;
-> +
-> +                return pos;
-> +        }
-> +        return 0;
-> +}
-> +
-> +static bool vp_get_shm_region(struct virtio_device *vdev,
+> +static bool vm_get_shm_region(struct virtio_device *vdev,
 > +			      struct virtio_shm_region *region, u8 id)
 > +{
-> +	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
-
-This whole function looks like it is indented incorrectly.
-
-> +	struct pci_dev *pci_dev = vp_dev->pci_dev;
-> +	u8 bar;
-> +	u64 offset, len;
-> +	phys_addr_t phys_addr;
-> +	size_t bar_len;
-> +	char *bar_name;
-> +	int ret;
+> +	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
+> +	u64 len, addr;
 > +
-> +	if (!virtio_pci_find_shm_cap(pci_dev, id, &bar, &offset, &len)) {
-> +		return false;
-> +	}
-
-You can drop the curly braces.
-
+> +	/* Select the region we're interested in */
+> +	writel(id, vm_dev->base + VIRTIO_MMIO_SHM_SEL);
 > +
-> +	ret = pci_request_region(pci_dev, bar, "virtio-pci-shm");
-> +	if (ret < 0) {
-> +		dev_err(&pci_dev->dev, "%s: failed to request BAR\n",
-> +			__func__);
-> +		return false;
-> +	}
-> +
-> +	phys_addr = pci_resource_start(pci_dev, bar);
-> +	bar_len = pci_resource_len(pci_dev, bar);
-> +
-> +        if (offset + len > bar_len) {
-> +                dev_err(&pci_dev->dev,
-> +                        "%s: bar shorter than cap offset+len\n",
-> +                        __func__);
-> +                return false;
-> +        }
+> +	/* Read the region size */
+> +	len = (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_LEN_LOW);
+> +	len |= (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_LEN_HIGH) << 32;
 > +
 > +	region->len = len;
-> +	region->addr = (u64) phys_addr + offset;
+> +
+> +	/* Check if region length is -1. If that's the case, the shared memory
+> +	 * region does not exist and there is no need to proceed further.
+> +	 */
+> +	if (len == ~(u64)0) {
+> +		return false;
+> +	}
+
+I think the curly braces should be dropped here.
+
+> +
+> +	/* Read the region base address */
+> +	addr = (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_BASE_LOW);
+> +	addr |= (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_BASE_HIGH) << 32;
+> +
+> +	region->addr = addr;
 > +
 > +	return true;
 > +}
 > +
->  static const struct virtio_config_ops virtio_pci_config_nodev_ops = {
->  	.get		= NULL,
->  	.set		= NULL,
+>  static const struct virtio_config_ops virtio_mmio_config_ops = {
+>  	.get		= vm_get,
+>  	.set		= vm_set,
 
-Apart from the coding style nits, the logic of the patch looks sane to
-me.
-
-(...)
-
-As does the rest of the patch.
+Reviewed-by: Cornelia Huck <cohuck@redhat.com>
 

@@ -1,10 +1,11 @@
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Tue, 27 Aug 2019 10:54:33 +0100
-Message-Id: <20190827095437.18819-1-stefanha@redhat.com>
+Date: Tue, 27 Aug 2019 10:54:34 +0100
+Message-Id: <20190827095437.18819-2-stefanha@redhat.com>
+In-Reply-To: <20190827095437.18819-1-stefanha@redhat.com>
+References: <20190827095437.18819-1-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 0/4] virtiofsd: implement vhost-user.rst
-	"Backend program conventions"
+Subject: [Virtio-fs] [PATCH 1/4] virtiofsd: make -f (foreground) the default
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,32 +17,44 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: virtio-fs@redhat.com, qemu-devel@nongnu.org
 Cc: =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>
 
-This series implements the conventions for vhost-user backend programs
-described in vhost-user.rst:
-1. Run in the foreground by default.
-2. Show vhost-user.json capabilities when --print-capabilities is given.
-3. Ship a vhost-user.json file so the program can be discovered.
+According to vhost-user.rst "Backend program conventions", backend
+programs should run in the foregound by default.  Follow the
+conventions so libvirt and other management tools can control virtiofsd
+in a standard way.
 
-No command-line options or VHostUserBackendCapabilities are defined for the
-'fs' backend type yet.  Let's until it becomes clear what should be standard
-for all 'fs' backends and what is specific to virtiofsd.
+Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ contrib/virtiofsd/helper.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Stefan Hajnoczi (4):
-  virtiofsd: make -f (foreground) the default
-  virtiofsd: add --print-capabilities option
-  virtiofsd: install virtiofsd in libexec
-  virtiofsd: add vhost-user.json file
-
- docs/interop/vhost-user.json                |  4 +++-
- Makefile                                    |  3 +++
- contrib/virtiofsd/fuse_lowlevel.h           |  1 +
- contrib/virtiofsd/helper.c                  |  5 +++++
- contrib/virtiofsd/passthrough_ll.c          | 12 ++++++++++++
- .gitignore                                  |  1 +
- contrib/virtiofsd/50-qemu-virtiofsd.json.in |  5 +++++
- 7 files changed, 30 insertions(+), 1 deletion(-)
- create mode 100644 contrib/virtiofsd/50-qemu-virtiofsd.json.in
-
+diff --git a/contrib/virtiofsd/helper.c b/contrib/virtiofsd/helper.c
+index 4c71452080..8d8bca889b 100644
+--- a/contrib/virtiofsd/helper.c
++++ b/contrib/virtiofsd/helper.c
+@@ -42,6 +42,7 @@ static const struct fuse_opt fuse_helper_opts[] = {
+ 	FUSE_OPT_KEY("-d",		FUSE_OPT_KEY_KEEP),
+ 	FUSE_OPT_KEY("debug",		FUSE_OPT_KEY_KEEP),
+ 	FUSE_HELPER_OPT("-f",		foreground),
++	FUSE_HELPER_OPT_VALUE("--daemonize", foreground, 0),
+ 	FUSE_HELPER_OPT("-s",		singlethread),
+ 	FUSE_HELPER_OPT("fsname=",	nodefault_subtype),
+ 	FUSE_OPT_KEY("fsname=",		FUSE_OPT_KEY_KEEP),
+@@ -139,6 +140,7 @@ void fuse_cmdline_help(void)
+ 	       "    -d   -o debug              enable debug output (implies -f)\n"
+ 	       "    --syslog                   log to syslog (default stderr)\n"
+ 	       "    -f                         foreground operation\n"
++	       "    --daemonize                run in background\n"
+ 	       "    -s                         disable multi-threaded operation\n"
+ 	       "    -o clone_fd                use separate fuse device fd for each thread\n"
+ 	       "                               (may improve performance)\n"
+@@ -171,6 +173,7 @@ int fuse_parse_cmdline(struct fuse_args *args,
+ 	memset(opts, 0, sizeof(struct fuse_cmdline_opts));
+ 
+ 	opts->max_idle_threads = 10;
++	opts->foreground = 1;
+ 
+ 	if (fuse_opt_parse(args, opts, fuse_helper_opts,
+ 			   fuse_helper_opt_proc) == -1)
 -- 
 2.21.0
 

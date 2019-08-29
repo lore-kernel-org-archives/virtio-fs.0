@@ -1,33 +1,9 @@
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=infradead.org; s=bombadil.20170209;
-	h=In-Reply-To:Content-Type:MIME-Version
-	:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
-	List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
-	bh=jXWv6rxcD/Ytdxuw9oCBSvjHqSotwy8H8FiFgT6NRRg=;
-	b=eNdor4/fygoZH6Xvs2bMeOvXp
-	tLJNYDfk1cimf7+kbTn2BtXDWxLqRI4BEoxvkM59QMQwbcBMvCELCNq/zJkLCXbTBzuB4qK60s7R/
-	haWdRVRaEqnJlYuCV4UwO8CFnpN8keiifEYRocm9hSV7hdJbuhyANoVbu4fvGSZZTtQWctl+4PkEQ
-	/oN+phe7MFMf78kAF3jl7VDQ4vwdv93FRJN87qRsxSrA+o2vNKwsWkTPjLWfJ6jdO987prP1KZI6Z
-	19zNadIV1LWue77KVSIM1O13lgtmraWBA1EkdjuK6SDKTpSqH94t7Ag5Ad+KKj2s3isfBEvJQ6hgD
-	xAZ0rNRsA==;
-Date: Thu, 29 Aug 2019 02:32:38 -0700
-From: Christoph Hellwig <hch@infradead.org>
-Message-ID: <20190829093238.GA23102@infradead.org>
-References: <20190821175720.25901-1-vgoyal@redhat.com>
-	<20190821175720.25901-2-vgoyal@redhat.com>
-	<20190826115152.GA21051@infradead.org>
-	<20190827163828.GA6859@redhat.com>
-	<20190828065809.GA27426@infradead.org>
-	<20190828175843.GB912@redhat.com>
-	<20190828225322.GA7777@dread.disaster.area>
-	<CAPcyv4jGEAbYSJef2zLzgg6Arozsuz7eN_vZL1iTcd1XQuNT4Q@mail.gmail.com>
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Date: Thu, 29 Aug 2019 11:41:33 +0100
+Message-Id: <20190829104133.17418-1-stefanha@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <CAPcyv4jGEAbYSJef2zLzgg6Arozsuz7eN_vZL1iTcd1XQuNT4Q@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH 01/19] dax: remove block device dependencies
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH] virtiofsd: add man page
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -36,20 +12,138 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Dan Williams <dan.j.williams@intel.com>
-Cc: virtio-fs@redhat.com, linux-nvdimm <linux-nvdimm@lists.01.org>, Miklos Szeredi <miklos@szeredi.hu>, Dave Chinner <david@fromorbit.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Christoph Hellwig <hch@infradead.org>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Vivek Goyal <vgoyal@redhat.com>
+To: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Wed, Aug 28, 2019 at 05:04:11PM -0700, Dan Williams wrote:
-> Agree. In retrospect it was my laziness in the dax-device
-> implementation to expect the block-device to be available.
-> 
-> It looks like fs_dax_get_by_bdev() is an intercept point where a
-> dax_device could be dynamically created to represent the subset range
-> indicated by the block-device partition. That would open up more
-> cleanup opportunities.
+Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ Makefile                         |  7 +++
+ contrib/virtiofsd/virtiofsd.texi | 85 ++++++++++++++++++++++++++++++++
+ 2 files changed, 92 insertions(+)
+ create mode 100644 contrib/virtiofsd/virtiofsd.texi
 
-That seems like a decent short-term plan.  But in the long I'd just let
-dax call into the partition table parser directly, as we might want to
-support partitions without first having to create a block device on top
-of the dax device.  Same for the badblocks handling story.
+diff --git a/Makefile b/Makefile
+index a3dfdd6fa8..cc18025753 100644
+--- a/Makefile
++++ b/Makefile
+@@ -334,6 +334,9 @@ DOCS+=docs/qemu-cpu-models.7
+ ifdef CONFIG_VIRTFS
+ DOCS+=fsdev/virtfs-proxy-helper.1
+ endif
++ifdef CONFIG_LINUX
++DOCS+=contrib/virtiofsd/virtiofsd.1
++endif
+ ifdef CONFIG_TRACE_SYSTEMTAP
+ DOCS+=scripts/qemu-trace-stap.1
+ endif
+@@ -834,6 +837,9 @@ ifdef CONFIG_VIRTFS
+ 	$(INSTALL_DIR) "$(DESTDIR)$(mandir)/man1"
+ 	$(INSTALL_DATA) fsdev/virtfs-proxy-helper.1 "$(DESTDIR)$(mandir)/man1"
+ endif
++ifdef CONFIG_LINUX
++	$(INSTALL_DATA) contrib/virtiofsd.1 "$(DESTDIR)$(mandir)/man1"
++endif
+ 
+ install-datadir:
+ 	$(INSTALL_DIR) "$(DESTDIR)$(qemu_datadir)"
+@@ -1018,6 +1024,7 @@ qemu.1: qemu-doc.texi qemu-options.texi qemu-monitor.texi qemu-monitor-info.texi
+ qemu.1: qemu-option-trace.texi
+ qemu-img.1: qemu-img.texi qemu-option-trace.texi qemu-img-cmds.texi
+ fsdev/virtfs-proxy-helper.1: fsdev/virtfs-proxy-helper.texi
++contrib/virtiofsd/virtiofsd.1: contrib/virtiofsd/virtiofsd.texi
+ qemu-nbd.8: qemu-nbd.texi qemu-option-trace.texi
+ qemu-ga.8: qemu-ga.texi
+ docs/qemu-block-drivers.7: docs/qemu-block-drivers.texi
+diff --git a/contrib/virtiofsd/virtiofsd.texi b/contrib/virtiofsd/virtiofsd.texi
+new file mode 100644
+index 0000000000..eec7fbf4e6
+--- /dev/null
++++ b/contrib/virtiofsd/virtiofsd.texi
+@@ -0,0 +1,85 @@
++@example
++@c man begin SYNOPSIS
++@command{virtiofsd} [OPTION] @option{--socket-path=}@var{path}|@option{--fd=}@var{fdnum} @option{-o source=}@var{path}
++@c man end
++@end example
++
++@c man begin DESCRIPTION
++
++Share a host directory tree with a guest through a virtio-fs device.  This
++program is a vhost-user backend that implements the virtio-fs device.  Each
++virtio-fs device instance requires its own virtiofsd process.
++
++This program is designed to work with QEMU's @code{--device vhost-user-fs-pci}
++but should work with any virtual machine monitor (VMM) that supports
++vhost-user.  See the EXAMPLES section below.
++
++This program must be run as the root user.  Upon startup the program will
++switch into a new file system namespace with the shared directory tree as its
++root.  This prevents "file system escapes" due to symlinks and other file
++system objects that might lead to files outside the shared directory.  The
++program also sandboxes itself using seccomp(2) to prevent ptrace(2) and other
++vectors that could allow an attacker to compromise the system after gaining
++control of the virtiofsd process.
++
++@c man end
++
++@c man begin OPTIONS
++@table @option
++@item -h, --help
++Print help.
++@item -V, --version
++Print version.
++@item -d, -o debug
++Enable debug output.
++@item --syslog
++Print log messages to syslog instead of stderr.
++@item -o log_level=@var{level}
++Print only log messages matching @var{level} or more severe.  @var{level} is
++one of @code{err}, @code{warn}, @code{info}, or @code{debug}.  The default is
++@var{info}.
++@item -o source=@var{path}
++Share host directory tree located at @var{path}.  This option is required.
++@item --socket-path=@var{path}, -o vhost_user_socket=@var{path}
++Listen on vhost-user UNIX domain socket at @var{path}.
++@item --fd=@var{fdnum}
++Accept connections from vhost-user UNIX domain socket file descriptor @var{fdnum}.  The file descriptor must already be listening for connections.
++@item --thread-pool-size=@var{num}
++Restrict the number of worker threads per request queue to @var{num}.  The default is 64.
++@item --cache=@code{none}|@code{auto}|@code{always}
++Select the desired trade-off between coherency and performance.  @code{none}
++forbids the FUSE client from caching to achieve best coherency at the cost of
++performance.  @code{auto} acts similar to NFS with a 1 second metadata cache
++timeout.  @code{always} sets a long cache lifetime at the expense of coherency.
++@item --writeback
++Enable writeback cache, allowing the FUSE client to buffer and merge write requests.
++@end table
++@c man end
++
++@c man begin EXAMPLES
++Export @code{/var/lib/fs/vm001/} on vhost-user UNIX domain socket @code{/var/run/vm001-vhost-fs.sock}:
++
++@example
++host# virtiofsd --socket-path=/var/run/vm001-vhost-fs.sock -o source=/var/lib/fs/vm001
++host# qemu-system-x86_64 \
++    -chardev socket,id=char0,path=/var/run/vm001-vhost-fs.sock \
++    -device vhost-user-fs-pci,chardev=char0,tag=myfs \
++    -object memory-backend-file,id=mem,size=4G,mem-path=/dev/shm,share=on \
++    -numa node,memdev=mem \
++    ...
++guest# mount -t virtio_fs \
++    -o default_permissions,allow_other,user_id=0,group_id=0,rootmode=040000,dax \
++    myfs /mnt
++@end example
++@c man end
++
++@ignore
++@setfilename virtiofsd
++@settitle QEMU virtio-fs shared file system daemon
++
++@c man begin AUTHOR
++Copyright (C) 2019 Red Hat, Inc.
++This is free software; see the source for copying conditions.  There is NO
++warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
++@c man end
++@end ignore
+-- 
+2.21.0
 

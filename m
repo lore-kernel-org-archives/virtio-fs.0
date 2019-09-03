@@ -1,13 +1,13 @@
-Date: Tue, 3 Sep 2019 18:31:12 +0100
+Date: Tue, 3 Sep 2019 18:32:31 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20190903173112.GU2744@work-vm>
+Message-ID: <20190903173231.GV2744@work-vm>
 References: <20190827095437.18819-1-stefanha@redhat.com>
-	<20190827095437.18819-5-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190827095437.18819-5-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 4/4] virtiofsd: add vhost-user.json file
+In-Reply-To: <20190827095437.18819-1-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 0/4] virtiofsd: implement vhost-user.rst
+ "Backend program conventions"
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,56 +20,36 @@ To: Stefan Hajnoczi <stefanha@redhat.com>
 Cc: virtio-fs@redhat.com, =?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@redhat.com>, qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>
 
 * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> Install a vhost-user.json file describing virtiofsd.  This allows
-> libvirt and other management tools to enumerate vhost-user backend
-> programs.
+> This series implements the conventions for vhost-user backend programs
+> described in vhost-user.rst:
+> 1. Run in the foreground by default.
+> 2. Show vhost-user.json capabilities when --print-capabilities is given.
+> 3. Ship a vhost-user.json file so the program can be discovered.
 > 
-> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> No command-line options or VHostUserBackendCapabilities are defined for the
+> 'fs' backend type yet.  Let's until it becomes clear what should be standard
+> for all 'fs' backends and what is specific to virtiofsd.
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+1,3,4 merged; 2 waiting on reivew from someone who understands the json
+requirement.
 
-> ---
->  Makefile                                    | 1 +
->  .gitignore                                  | 1 +
->  contrib/virtiofsd/50-qemu-virtiofsd.json.in | 5 +++++
->  3 files changed, 7 insertions(+)
+> 
+> Stefan Hajnoczi (4):
+>   virtiofsd: make -f (foreground) the default
+>   virtiofsd: add --print-capabilities option
+>   virtiofsd: install virtiofsd in libexec
+>   virtiofsd: add vhost-user.json file
+> 
+>  docs/interop/vhost-user.json                |  4 +++-
+>  Makefile                                    |  3 +++
+>  contrib/virtiofsd/fuse_lowlevel.h           |  1 +
+>  contrib/virtiofsd/helper.c                  |  5 +++++
+>  contrib/virtiofsd/passthrough_ll.c          | 12 ++++++++++++
+>  .gitignore                                  |  1 +
+>  contrib/virtiofsd/50-qemu-virtiofsd.json.in |  5 +++++
+>  7 files changed, 30 insertions(+), 1 deletion(-)
 >  create mode 100644 contrib/virtiofsd/50-qemu-virtiofsd.json.in
 > 
-> diff --git a/Makefile b/Makefile
-> index ef6eca07cc..c6e2f4e7a0 100644
-> --- a/Makefile
-> +++ b/Makefile
-> @@ -318,6 +318,7 @@ HELPERS-$(call land,$(CONFIG_SOFTMMU),$(CONFIG_LINUX)) = qemu-bridge-helper$(EXE
->  
->  ifdef CONFIG_LINUX
->  HELPERS-y += virtiofsd$(EXESUF)
-> +vhost-user-json-y += contrib/virtiofsd/50-qemu-virtiofsd.json
->  
->  ifdef CONFIG_VIRGL
->  ifdef CONFIG_GBM
-> diff --git a/.gitignore b/.gitignore
-> index fd6e6c38c7..554c7abe81 100644
-> --- a/.gitignore
-> +++ b/.gitignore
-> @@ -6,6 +6,7 @@
->  /config-target.*
->  /config.status
->  /config-temp
-> +/contrib/virtiofsd/50-qemu-virtiofsd.json
->  /elf2dmp
->  /trace-events-all
->  /trace/generated-events.h
-> diff --git a/contrib/virtiofsd/50-qemu-virtiofsd.json.in b/contrib/virtiofsd/50-qemu-virtiofsd.json.in
-> new file mode 100644
-> index 0000000000..9bcd86f8dc
-> --- /dev/null
-> +++ b/contrib/virtiofsd/50-qemu-virtiofsd.json.in
-> @@ -0,0 +1,5 @@
-> +{
-> +  "description": "QEMU virtiofsd vhost-user-fs",
-> +  "type": "fs",
-> +  "binary": "@libexecdir@/virtiofsd"
-> +}
 > -- 
 > 2.21.0
 > 

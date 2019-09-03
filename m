@@ -1,18 +1,20 @@
-References: <5f49cefd-a051-8af4-86a2-3ea94acd9eee@redhat.com>
-	<20190827130207.GC4290@stefanha-x1.localdomain>
-	<b2d18411-d518-788a-0783-1d55a11407c6@redhat.com>
-	<20190828113639.GI5573@stefanha-x1.localdomain>
-	<bf9d73ed-0533-1cc1-9884-3c08281dd961@redhat.com>
-	<20190902102149.GH9069@stefanha-x1.localdomain>
-From: Laszlo Ersek <lersek@redhat.com>
-Message-ID: <def8239b-94b3-10d2-ccfa-4e71e80c8a17@redhat.com>
-Date: Mon, 2 Sep 2019 19:27:35 +0200
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc:content-transfer-encoding;
+	bh=pYYZchTkTnHaaYUPZ9aSFMmI9ZgRbXHQopY1f0OJvLU=;
+	b=D85dO2rkGDxWItS4+Vv6mrgY+n6ZYU+qG9cJ24pWQe71OTpSk7O/m7HqQ/yhvUnGP/
+	2UcDj48UswSDkOTqNSEHCfqubDGVKHbe+tnzR8pHH+soD/2kZWId08ePrtSabQqhXxpl
+	S+A5SStZdKvklHl7z2L6boDBMXQcxdTNjNi8o=
 MIME-Version: 1.0
-In-Reply-To: <20190902102149.GH9069@stefanha-x1.localdomain>
-Content-Type: text/plain; charset=windows-1252
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] basic questions
+References: <20190821173742.24574-1-vgoyal@redhat.com>
+In-Reply-To: <20190821173742.24574-1-vgoyal@redhat.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Tue, 3 Sep 2019 10:05:02 +0200
+Message-ID: <CAJfpegvPTxkaNhXWhiQSprSJqyW1cLXeZEz6x_f0PxCd-yzHQg@mail.gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH v3 00/13] virtio-fs: shared file system for
+	virtual machines
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,206 +23,320 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Jason Wang <jasowang@redhat.com>
+Cc: linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org
 
-On 09/02/19 12:21, Stefan Hajnoczi wrote:
+[Cc:  virtualization@lists.linux-foundation.org, "Michael S. Tsirkin"
+<mst@redhat.com>, Jason Wang <jasowang@redhat.com>]
 
-> Another topic:
-> Does UEFI have a standard interface for configuring and storing boot
-> devices and information
+It'd be nice to have an ACK for this from the virtio maintainers.
 
-Yes; UEFI (the spec) defines the BootOrder and Boot#### UEFI variables.
+Thanks,
+Miklos
 
-For example, Boot0003 could point to the boot loader of an installed OS,
-Boot0004 could point to the boot loader of another installed OS,
-Boot0001 could point to a NIC (for PXE or HTTP(S) booting), and then
-BootOrder (an array of uint16_t objects) would collect these into an
-arbitrary sequence. (The numbers in the Boot#### variable names do not
-dictate ordering, they just make variable names unique.)
-
-With OVMF, the question becomes tricky. Things revolve around QEMU's
-"bootorder" fw_cfg file, which contains OpenFirmware (OFW) device paths
-that identify boot devices. QEMU generates this fw_cfg file based on the
-"bootindex" device properties.
-
-The OFW device paths in the "bootorder" fw_cfg file are not as
-expressive as UEFI boot options (not to mention the entirely different
-representation). OVMF has some quite complex platform code that does the
-following:
-
-(a) It translates the entries in the "bootorder" fw_cfg file, from OFW
-notation, to UEFI device path notation. Importantly, such a translated
-UEFI device path cannot contain a filesystem pathname -- it unavoidably
-stops at the device granularity where the information content from the
-OFW entry ends.
-
-(b) The translated UEFI device paths are used as *prefixes*, and OVMF
-connects all devices in the devpath *subtrees* that are rooted at the
-prefixes. (This roughly means that OVMF makes UEFI drivers bind such
-devices that are selected directly, or indirectly as a part of a
-sub-hierarchy, by the translated UEFI device path prefixes.)
-
-(c) We now have a set of "bound" devices in the system. OVMF invokes
-some core edk2 code for auto-generating boot options for these devices.
-If a boot option (Boot#### variable) for such a device exists already,
-no new option is added. Otherwise, a new Boot#### variable (boot option)
-is created, and appended to the end of the UEFI boot order (= referenced
-from the end of the BootOrder variable). This may happen e.g. if you add
-the "bootindex" property to an otherwise bootable device (such as
-virtio-blk or virtio-net) which did not to have that property
-previously.
-
-(d) Finally, OVMF filters and reorders the above augmented set of UEFI
-boot options, against the translated UEFI device path prefixes. For
-example, this step will erase the boot option for such a device that you
-have removed from the QEMU command line, or for which you removed the
-"bootindex" property (while some other devices still have the property).
-And reordering is useful e.g. if you have an installed UEFI image, but
-for once, you prioritize netboot for some reason.
-
-(e) If no device has the bootindex property (because the "bootorder"
-fw_cfg file is nonexistent or empty), then OVMF doesn't touch the
-Boot#### / BootOrder variables.
-
-(f) Universal (platform-independent) logic in edk2 takes control, for
-processing (booting) the UEFI boot order.
-
-
-To give you an example (from
-"OvmfPkg/Library/QemuBootOrderLib/QemuBootOrderLib.c"), an OFW device
-path in the "bootorder" fw_cfg file, for a virtio-scsi disk, might look
-like
-
-    //   /pci@i0cf8/scsi@7[,3]/channel@0/disk@2,3
-    //        ^          ^             ^      ^ ^
-    //        |          |             |      | LUN
-    //        |          |             |      target
-    //        |          |             channel (unused, fixed 0)
-    //        |          PCI slot[, function] holding SCSI controller
-    //        PCI root at system bus port, PIO
-
-and the translated UEFI device path prefix would be
-
-    //   PciRoot(0x0)/Pci(0x7,0x0)/Scsi(0x2,0x3)
-    //                                        -- if PCI function is 0 or absent
-    //   PciRoot(0x0)/Pci(0x7,0x3)/Scsi(0x2,0x3)
-    //                                -- if PCI function is present and nonzero
-
-Step (c) would generate a UEFI boot option with just this UEFI device
-path, and append it to the end of the UEFI boot order (unless it already
-existed somewhere in the UEFI boot order).
-
-
-Typically, following a UEFI guest installation to the same virtio-scsi
-disk, this auto-generated boot option would be *preceded* by another,
-namely of the form
-
-  PciRoot(0x0)/Pci(0x7,0x3)/Scsi(0x2,0x3)/HD(1,GPT,7CFAA999-DFF7-441E-A73A-7C596A600DDF,0x800,0x40000)/\EFI\fedora\shimx64.efi
-
-because this more specific UEFI device path -- including a filesystem
-pathname -- would have been established earlier by Anaconda /
-efibootmgr, with highest priority, at guest installation time. In that
-case, after step (d), the boot option
-
-  PciRoot(0x0)/Pci(0x7,0x3)/Scsi(0x2,0x3)/HD(1,GPT,7CFAA999-DFF7-441E-A73A-7C596A600DDF,0x800,0x40000)/\EFI\fedora\shimx64.efi
-
-would take priority over the auto-generated
-
-  PciRoot(0x0)/Pci(0x7,0x3)/Scsi(0x2,0x3)
-
-because the reordering in step (d) is "stable".
-
-
-In the atypical case however, it's possible that you only have the
-auto-generated UEFI boot option for
-
-  PciRoot(0x0)/Pci(0x7,0x3)/Scsi(0x2,0x3)
-
-When processing that option, UEFI silently attempts to boot
-
-  PciRoot(0x0)/Pci(0x7,0x3)/Scsi(0x2,0x3)/.../\EFI\BOOT\BOOTX64.EFI
-
-(note the fallback filesystem pathname '\EFI\BOOT\BOOTX64.EFI').
-
-This applies when:
-
-- you are booting removable media (for example an installer ISO)
-
-- you have an installed system but you lost the UEFI Boot#### /
-BootOrder variables for some reason, including the one pointing at
-"shimx64.efi".
-
-
-What's furthermore relevant is that the last device path node, just
-before the filesystem pathname node (such as '\EFI\fedora\shimx64.efi'
-or '\EFI\BOOT\BOOTX64.EFI'), identifies a UEFI handle that carries an
-EFI_SIMPLE_FILE_SYSTEM_PROTOCOL instance. In the above case,
-
-  PciRoot(0x0)/Pci(0x7,0x3)/Scsi(0x2,0x3)/HD(1,GPT,7CFAA999-DFF7-441E-A73A-7C596A600DDF,0x800,0x40000)
-
-is a hard disk partition with a FAT filesystem, and so the handle
-underlying the HD() node carries an EFI_SIMPLE_FILE_SYSTEM_PROTOCOL
-instance.
-
-
-When using virtio-fs with OVMF, the OFW device path in the "bootorder"
-fw_cfg file would be expected to look something like
-
-  /pci@i0cf8/virtio-fs@7[,3]
-
-(The "driver-name" component in the OFW node would be "virtio-fs".)
-
-The translated UEFI devpath prefix would simply be
-
-  PciRoot(0x0)/Pci(0x7,0x3)
-
-in OVMF. OVMF's driver for virtio-fs would install
-EFI_SIMPLE_FILE_SYSTEM_PROTOCOL directly on the Pci() node -- no need
-for HD(), there are no partitions --, so ultimately the following would
-be the "full" device path examples:
-
-  PciRoot(0x0)/Pci(0x7,0x3)/\EFI\fedora\shimx64.efi [from Anaconda / efibootmgr]
-  PciRoot(0x0)/Pci(0x7,0x3)/\EFI\BOOT\BOOTX64.EFI   [fallback, per spec]
-
-
-In short, the filesystem exposed with virtio-fs to the OVMF guest, for
-the purposes of UEFI booting, should look like a bootable UEFI system
-partition -- namely, it should include an \EFI directory tree. In other
-words, the "only" thing that virtio-fs abstracted away, in this regard,
-would be the block device layer (such as IDE, AHCI, virtio-blk or
-virtio-scsi), from between the "PCI" and "filesystem" layers.
-
-> (e.g. kernel filename, initramfs, command-line)? This information is
-> necessary when booting directly from virtio-fs.
-
-In the described scenario, the kernel, initramfs, and kernel command
-line would be handled by the UEFI boot loader, namely grub2. (Grub2
-itself would exist as part of the \EFI directory tree.)
-
-Of course the question is what we *want* here. The above targets the
-case when a user specifically wants to access virtio-fs *from within*
-UEFI (including the UEFI boot manager, the UEFI shell, and UEFI
-applications, such as grub2-efi).
-
-
-Other goals can be imagined. For example, the following goal is slightly
-different: "I want a guest kernel running on virtio-fs, and that guest
-kernel should find a UEFI environment underneath itself". This use case
-should be covered right now, because OVMF supports kernel / initramfs /
-cmdline via fw_cfg already. You would launch OVMF from pflash (like
-always), and instruct QEMU to load the kernel / initramfs / cmdline into
-fw_cfg from files located within the virtio-fs directory tree. OVMF
-would fetch the kernel / initramfs / cmdline from fw_cfg -- note: *no*
-firmware-level access to virtio-fs --, OVMF would launch the kernel, and
-the kernel would use its own smart driver for talking to virtio-fs. The
-kernel would also find a UEFI environment.
-
-This would eliminate shim/grub2 from the picture. For some cases, that
-could be seen as a benefit. For other cases, as a limitation; for
-example, if you needed Secure Boot with the Machine Owner Key management
-that shim implements.
-
-Thanks
-Laszlo
+On Wed, Aug 21, 2019 at 7:38 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> Hi,
+>
+> Here are the V3 patches for virtio-fs filesystem. This time I have
+> broken the patch series in two parts. This is first part which does
+> not contain DAX support. Second patch series will contain the patches
+> for DAX support.
+>
+> I have also dropped RFC tag from first patch series as we believe its
+> in good enough shape that it should get a consideration for inclusion
+> upstream.
+>
+> These patches apply on top of 5.3-rc5 kernel and are also available
+> here.
+>
+> https://github.com/rhvgoyal/linux/commits/vivek-5.3-aug-21-2019
+>
+> Patches for V1 and V2 were posted here.
+>
+> https://lwn.net/ml/linux-fsdevel/20181210171318.16998-1-vgoyal@redhat.com/
+> http://lkml.iu.edu/hypermail/linux/kernel/1905.1/07232.html
+>
+> More information about the project can be found here.
+>
+> https://virtio-fs.gitlab.io
+>
+> Changes from V2
+> ===============
+> - Various bug fixes and performance improvements.
+>
+> HOWTO
+> ======
+> We have put instructions on how to use it here.
+>
+> https://virtio-fs.gitlab.io/
+>
+> Some Performance Numbers
+> ========================
+> I have basically run bunch of fio jobs to get a sense of speed of
+> various operations. I wrote a simple wrapper script to run fio jobs
+> 3 times and take their average and report it. These scripts are available
+> here.
+>
+> https://github.com/rhvgoyal/virtiofs-tests
+>
+> I set up a directory on ramfs on host and exported that directory inside
+> guest using virtio-9p and virtio-fs and ran tests inside guests. Ran
+> tests with cache=none both for virtio-9p and virtio-fs so that no caching
+> happens in guest. For virtio-fs, I ran an additional set of tests with
+> dax enabled. Dax is not part of first patch series but I included
+> results here because dax seems to get the maximum performance advantage
+> and its shows the real potential of virtio-fs.
+>
+> Test Setup
+> -----------
+> - A fedora 28 host with 32G RAM, 2 sockets (6 cores per socket, 2
+>   threads per core)
+>
+> - Using ramfs on host as backing store. 4 fio files of 2G each.
+>
+> - Created a VM with 16 VCPUS and 8GB memory. An 8GB cache window (for dax
+>   mmap).
+>
+> Test Results
+> ------------
+> - Results in three configurations have been reported. 9p (cache=none),
+>   virtio-fs (cache=none) and virtio-fs (cache=none + dax).
+>
+>   There are other caching modes as well but to me cache=none seemed most
+>   interesting for now because it does not cache anything in guest
+>   and provides strong coherence. Other modes which provide less strong
+>   coherence and hence are faster are yet to be benchmarked.
+>
+> - Three fio ioengines psync, libaio and mmap have been used.
+>
+> - I/O Workload of randread, radwrite, seqread and seqwrite have been run.
+>
+> - Each file size is 2G. Block size 4K. iodepth=16
+>
+> - "multi" means same operation was done with 4 jobs and each job is
+>   operating on a file of size 2G.
+>
+> - Some results are "0 (KiB/s)". That means that particular operation is
+>   not supported in that configuration.
+>
+> NAME                    I/O Operation           BW(Read/Write)
+>
+> 9p-cache-none           seqread-psync           27(MiB/s)
+> virtiofs-cache-none     seqread-psync           35(MiB/s)
+> virtiofs-dax-cache-none seqread-psync           245(MiB/s)
+>
+> 9p-cache-none           seqread-psync-multi     117(MiB/s)
+> virtiofs-cache-none     seqread-psync-multi     162(MiB/s)
+> virtiofs-dax-cache-none seqread-psync-multi     894(MiB/s)
+>
+> 9p-cache-none           seqread-mmap            24(MiB/s)
+> virtiofs-cache-none     seqread-mmap            0(KiB/s)
+> virtiofs-dax-cache-none seqread-mmap            168(MiB/s)
+>
+> 9p-cache-none           seqread-mmap-multi      115(MiB/s)
+> virtiofs-cache-none     seqread-mmap-multi      0(KiB/s)
+> virtiofs-dax-cache-none seqread-mmap-multi      614(MiB/s)
+>
+> 9p-cache-none           seqread-libaio          26(MiB/s)
+> virtiofs-cache-none     seqread-libaio          139(MiB/s)
+> virtiofs-dax-cache-none seqread-libaio          160(MiB/s)
+>
+> 9p-cache-none           seqread-libaio-multi    129(MiB/s)
+> virtiofs-cache-none     seqread-libaio-multi    142(MiB/s)
+> virtiofs-dax-cache-none seqread-libaio-multi    577(MiB/s)
+>
+> 9p-cache-none           randread-psync          29(MiB/s)
+> virtiofs-cache-none     randread-psync          34(MiB/s)
+> virtiofs-dax-cache-none randread-psync          256(MiB/s)
+>
+> 9p-cache-none           randread-psync-multi    139(MiB/s)
+> virtiofs-cache-none     randread-psync-multi    153(MiB/s)
+> virtiofs-dax-cache-none randread-psync-multi    245(MiB/s)
+>
+> 9p-cache-none           randread-mmap           22(MiB/s)
+> virtiofs-cache-none     randread-mmap           0(KiB/s)
+> virtiofs-dax-cache-none randread-mmap           162(MiB/s)
+>
+> 9p-cache-none           randread-mmap-multi     111(MiB/s)
+> virtiofs-cache-none     randread-mmap-multi     0(KiB/s)
+> virtiofs-dax-cache-none randread-mmap-multi     215(MiB/s)
+>
+> 9p-cache-none           randread-libaio         26(MiB/s)
+> virtiofs-cache-none     randread-libaio         135(MiB/s)
+> virtiofs-dax-cache-none randread-libaio         157(MiB/s)
+>
+> 9p-cache-none           randread-libaio-multi   133(MiB/s)
+> virtiofs-cache-none     randread-libaio-multi   245(MiB/s)
+> virtiofs-dax-cache-none randread-libaio-multi   163(MiB/s)
+>
+> 9p-cache-none           seqwrite-psync          28(MiB/s)
+> virtiofs-cache-none     seqwrite-psync          34(MiB/s)
+> virtiofs-dax-cache-none seqwrite-psync          203(MiB/s)
+>
+> 9p-cache-none           seqwrite-psync-multi    128(MiB/s)
+> virtiofs-cache-none     seqwrite-psync-multi    155(MiB/s)
+> virtiofs-dax-cache-none seqwrite-psync-multi    717(MiB/s)
+>
+> 9p-cache-none           seqwrite-mmap           0(KiB/s)
+> virtiofs-cache-none     seqwrite-mmap           0(KiB/s)
+> virtiofs-dax-cache-none seqwrite-mmap           165(MiB/s)
+>
+> 9p-cache-none           seqwrite-mmap-multi     0(KiB/s)
+> virtiofs-cache-none     seqwrite-mmap-multi     0(KiB/s)
+> virtiofs-dax-cache-none seqwrite-mmap-multi     511(MiB/s)
+>
+> 9p-cache-none           seqwrite-libaio         27(MiB/s)
+> virtiofs-cache-none     seqwrite-libaio         128(MiB/s)
+> virtiofs-dax-cache-none seqwrite-libaio         141(MiB/s)
+>
+> 9p-cache-none           seqwrite-libaio-multi   119(MiB/s)
+> virtiofs-cache-none     seqwrite-libaio-multi   242(MiB/s)
+> virtiofs-dax-cache-none seqwrite-libaio-multi   505(MiB/s)
+>
+> 9p-cache-none           randwrite-psync         27(MiB/s)
+> virtiofs-cache-none     randwrite-psync         34(MiB/s)
+> virtiofs-dax-cache-none randwrite-psync         189(MiB/s)
+>
+> 9p-cache-none           randwrite-psync-multi   137(MiB/s)
+> virtiofs-cache-none     randwrite-psync-multi   150(MiB/s)
+> virtiofs-dax-cache-none randwrite-psync-multi   233(MiB/s)
+>
+> 9p-cache-none           randwrite-mmap          0(KiB/s)
+> virtiofs-cache-none     randwrite-mmap          0(KiB/s)
+> virtiofs-dax-cache-none randwrite-mmap          120(MiB/s)
+>
+> 9p-cache-none           randwrite-mmap-multi    0(KiB/s)
+> virtiofs-cache-none     randwrite-mmap-multi    0(KiB/s)
+> virtiofs-dax-cache-none randwrite-mmap-multi    200(MiB/s)
+>
+> 9p-cache-none           randwrite-libaio        25(MiB/s)
+> virtiofs-cache-none     randwrite-libaio        124(MiB/s)
+> virtiofs-dax-cache-none randwrite-libaio        131(MiB/s)
+>
+> 9p-cache-none           randwrite-libaio-multi  125(MiB/s)
+> virtiofs-cache-none     randwrite-libaio-multi  241(MiB/s)
+> virtiofs-dax-cache-none randwrite-libaio-multi  163(MiB/s)
+>
+> Conclusions
+> ===========
+> - In general virtio-fs seems faster than virtio-9p. Using dax makes it
+>   really interesting.
+>
+> Note:
+>   Right now dax window is 8G and max fio file size is 8G as well (4
+>   files of 2G each). That means everything fits into dax window and no
+>   reclaim is needed. Dax window reclaim logic is slower and if file
+>   size is bigger than dax window size, performance slows down.
+>
+> Description from previous postings
+> ==================================
+>
+> Design Overview
+> ===============
+> With the goal of designing something with better performance and local file
+> system semantics, a bunch of ideas were proposed.
+>
+> - Use fuse protocol (instead of 9p) for communication between guest
+>   and host. Guest kernel will be fuse client and a fuse server will
+>   run on host to serve the requests.
+>
+> - For data access inside guest, mmap portion of file in QEMU address
+>   space and guest accesses this memory using dax. That way guest page
+>   cache is bypassed and there is only one copy of data (on host). This
+>   will also enable mmap(MAP_SHARED) between guests.
+>
+> - For metadata coherency, there is a shared memory region which contains
+>   version number associated with metadata and any guest changing metadata
+>   updates version number and other guests refresh metadata on next
+>   access. This is yet to be implemented.
+>
+> How virtio-fs differs from existing approaches
+> ==============================================
+> The unique idea behind virtio-fs is to take advantage of the co-location
+> of the virtual machine and hypervisor to avoid communication (vmexits).
+>
+> DAX allows file contents to be accessed without communication with the
+> hypervisor. The shared memory region for metadata avoids communication in
+> the common case where metadata is unchanged.
+>
+> By replacing expensive communication with cheaper shared memory accesses,
+> we expect to achieve better performance than approaches based on network
+> file system protocols. In addition, this also makes it easier to achieve
+> local file system semantics (coherency).
+>
+> These techniques are not applicable to network file system protocols since
+> the communications channel is bypassed by taking advantage of shared memory
+> on a local machine. This is why we decided to build virtio-fs rather than
+> focus on 9P or NFS.
+>
+> Caching Modes
+> =============
+> Like virtio-9p, different caching modes are supported which determine the
+> coherency level as well. The “cache=FOO” and “writeback” options control the
+> level of coherence between the guest and host filesystems.
+>
+> - cache=none
+>   metadata, data and pathname lookup are not cached in guest. They are always
+>   fetched from host and any changes are immediately pushed to host.
+>
+> - cache=always
+>   metadata, data and pathname lookup are cached in guest and never expire.
+>
+> - cache=auto
+>   metadata and pathname lookup cache expires after a configured amount of time
+>   (default is 1 second). Data is cached while the file is open (close to open
+>   consistency).
+>
+> - writeback/no_writeback
+>   These options control the writeback strategy.  If writeback is disabled,
+>   then normal writes will immediately be synchronized with the host fs. If
+>   writeback is enabled, then writes may be cached in the guest until the file
+>   is closed or an fsync(2) performed. This option has no effect on mmap-ed
+>   writes or writes going through the DAX mechanism.
+>
+> Thanks
+> Vivek
+>
+> Miklos Szeredi (2):
+>   fuse: delete dentry if timeout is zero
+>   fuse: Use default_file_splice_read for direct IO
+>
+> Stefan Hajnoczi (6):
+>   fuse: export fuse_end_request()
+>   fuse: export fuse_len_args()
+>   fuse: export fuse_get_unique()
+>   fuse: extract fuse_fill_super_common()
+>   fuse: add fuse_iqueue_ops callbacks
+>   virtio_fs: add skeleton virtio_fs.ko module
+>
+> Vivek Goyal (5):
+>   fuse: Export fuse_send_init_request()
+>   Export fuse_dequeue_forget() function
+>   fuse: Separate fuse device allocation and installation in fuse_conn
+>   virtio-fs: Do not provide abort interface in fusectl
+>   init/do_mounts.c: add virtio_fs root fs support
+>
+>  fs/fuse/Kconfig                 |   11 +
+>  fs/fuse/Makefile                |    1 +
+>  fs/fuse/control.c               |    4 +-
+>  fs/fuse/cuse.c                  |    4 +-
+>  fs/fuse/dev.c                   |   89 ++-
+>  fs/fuse/dir.c                   |   26 +-
+>  fs/fuse/file.c                  |   15 +-
+>  fs/fuse/fuse_i.h                |  120 +++-
+>  fs/fuse/inode.c                 |  203 +++---
+>  fs/fuse/virtio_fs.c             | 1061 +++++++++++++++++++++++++++++++
+>  fs/splice.c                     |    3 +-
+>  include/linux/fs.h              |    2 +
+>  include/uapi/linux/virtio_fs.h  |   41 ++
+>  include/uapi/linux/virtio_ids.h |    1 +
+>  init/do_mounts.c                |   10 +
+>  15 files changed, 1462 insertions(+), 129 deletions(-)
+>  create mode 100644 fs/fuse/virtio_fs.c
+>  create mode 100644 include/uapi/linux/virtio_fs.h
+>
+> --
+> 2.20.1
+>
 

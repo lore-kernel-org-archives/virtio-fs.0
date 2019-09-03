@@ -1,18 +1,14 @@
-Date: Tue, 3 Sep 2019 13:15:16 -0400
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20190903111628-mutt-send-email-mst@kernel.org>
-References: <20190821173742.24574-1-vgoyal@redhat.com>
-	<CAJfpegvPTxkaNhXWhiQSprSJqyW1cLXeZEz6x_f0PxCd-yzHQg@mail.gmail.com>
-	<20190903041507-mutt-send-email-mst@kernel.org>
-	<20190903140752.GA10983@redhat.com>
-	<20190903101001-mutt-send-email-mst@kernel.org>
-	<20190903141851.GC10983@redhat.com>
+Date: Tue, 3 Sep 2019 18:17:33 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190903171733.GR2744@work-vm>
+References: <20190827095437.18819-1-stefanha@redhat.com>
+	<20190827095437.18819-2-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20190903141851.GC10983@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 00/13] virtio-fs: shared file system for
- virtual machines
+In-Reply-To: <20190827095437.18819-2-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 1/4] virtiofsd: make -f (foreground) the
+	default
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,50 +17,54 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: Miklos Szeredi <miklos@szeredi.hu>, Jason Wang <jasowang@redhat.com>, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, =?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@redhat.com>, qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>
 
-On Tue, Sep 03, 2019 at 10:18:51AM -0400, Vivek Goyal wrote:
-> On Tue, Sep 03, 2019 at 10:12:16AM -0400, Michael S. Tsirkin wrote:
-> > On Tue, Sep 03, 2019 at 10:07:52AM -0400, Vivek Goyal wrote:
-> > > On Tue, Sep 03, 2019 at 04:31:38AM -0400, Michael S. Tsirkin wrote:
-> > > 
-> > > [..]
-> > > > +	/* TODO lock */
-> > > > give me pause.
-> > > > 
-> > > > Cleanup generally seems broken to me - what pauses the FS
-> > > 
-> > > I am looking into device removal aspect of it now. Thinking of adding
-> > > a reference count to virtiofs device and possibly also a bit flag to
-> > > indicate if device is still alive. That way, we should be able to cleanup
-> > > device more gracefully.
-> > 
-> > Generally, the way to cleanup things is to first disconnect device from
-> > linux so linux won't send new requests, wait for old ones to finish.
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> According to vhost-user.rst "Backend program conventions", backend
+> programs should run in the foregound by default.  Follow the
+> conventions so libvirt and other management tools can control virtiofsd
+> in a standard way.
 > 
-> I was thinking of following.
-> 
-> - Set a flag on device to indicate device is dead and not queue new
->   requests. Device removal call can set this flag.
-> 
-> - Return errors when fs code tries to queue new request.
-> 
-> - Drop device creation reference in device removal path. If device is
->   mounted at the time of removal, that reference will still be active
->   and device state will not be cleaned up in kernel yet.
-> 
-> - User unmounts the fs, and that will drop last reference to device and
->   will lead to cleanup of in kernel state of the device.
-> 
-> Does that sound reasonable.
-> 
-> Vivek
+> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 
-Just we aware of the fact that virtio device, all vqs etc
-will be gone by the time remove returns.
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 
-
--- 
-MST
+> ---
+>  contrib/virtiofsd/helper.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/contrib/virtiofsd/helper.c b/contrib/virtiofsd/helper.c
+> index 4c71452080..8d8bca889b 100644
+> --- a/contrib/virtiofsd/helper.c
+> +++ b/contrib/virtiofsd/helper.c
+> @@ -42,6 +42,7 @@ static const struct fuse_opt fuse_helper_opts[] = {
+>  	FUSE_OPT_KEY("-d",		FUSE_OPT_KEY_KEEP),
+>  	FUSE_OPT_KEY("debug",		FUSE_OPT_KEY_KEEP),
+>  	FUSE_HELPER_OPT("-f",		foreground),
+> +	FUSE_HELPER_OPT_VALUE("--daemonize", foreground, 0),
+>  	FUSE_HELPER_OPT("-s",		singlethread),
+>  	FUSE_HELPER_OPT("fsname=",	nodefault_subtype),
+>  	FUSE_OPT_KEY("fsname=",		FUSE_OPT_KEY_KEEP),
+> @@ -139,6 +140,7 @@ void fuse_cmdline_help(void)
+>  	       "    -d   -o debug              enable debug output (implies -f)\n"
+>  	       "    --syslog                   log to syslog (default stderr)\n"
+>  	       "    -f                         foreground operation\n"
+> +	       "    --daemonize                run in background\n"
+>  	       "    -s                         disable multi-threaded operation\n"
+>  	       "    -o clone_fd                use separate fuse device fd for each thread\n"
+>  	       "                               (may improve performance)\n"
+> @@ -171,6 +173,7 @@ int fuse_parse_cmdline(struct fuse_args *args,
+>  	memset(opts, 0, sizeof(struct fuse_cmdline_opts));
+>  
+>  	opts->max_idle_threads = 10;
+> +	opts->foreground = 1;
+>  
+>  	if (fuse_opt_parse(args, opts, fuse_helper_opts,
+>  			   fuse_helper_opt_proc) == -1)
+> -- 
+> 2.21.0
+> 
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

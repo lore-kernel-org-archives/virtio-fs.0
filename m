@@ -1,16 +1,17 @@
-Date: Wed, 4 Sep 2019 16:51:21 +0100
+Date: Wed, 4 Sep 2019 16:54:19 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190904155121.GA25679@stefanha-x1.localdomain>
-References: <20190827095437.18819-1-stefanha@redhat.com>
-	<20190827095437.18819-3-stefanha@redhat.com>
-	<20190903172644.GS2744@work-vm>
+Message-ID: <20190904155419.GB25679@stefanha-x1.localdomain>
+References: <20190821173742.24574-1-vgoyal@redhat.com>
+	<CAJfpegvPTxkaNhXWhiQSprSJqyW1cLXeZEz6x_f0PxCd-yzHQg@mail.gmail.com>
+	<20190903041507-mutt-send-email-mst@kernel.org>
+	<CAJfpeguB6fFhghuFS420ZQ+JuQvTLc5TgsGjoB_RvFrSVf+v5w@mail.gmail.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="xHFwDpU9dbj6ez1V"
+	protocol="application/pgp-signature"; boundary="GID0FwUMdk1T2AWN"
 Content-Disposition: inline
-In-Reply-To: <20190903172644.GS2744@work-vm>
-Subject: Re: [Virtio-fs] [PATCH 2/4] virtiofsd: add --print-capabilities
-	option
+In-Reply-To: <CAJfpeguB6fFhghuFS420ZQ+JuQvTLc5TgsGjoB_RvFrSVf+v5w@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH v3 00/13] virtio-fs: shared file system for
+ virtual machines
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,48 +20,67 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, =?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@redhat.com>, qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: "Michael S. Tsirkin" <mst@redhat.com>, Jason Wang <jasowang@redhat.com>, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
 
 
---xHFwDpU9dbj6ez1V
+--GID0FwUMdk1T2AWN
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Tue, Sep 03, 2019 at 06:26:44PM +0100, Dr. David Alan Gilbert wrote:
-> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> > Add the --print-capabilities option as per vhost-user.rst "Backend
-> > programs conventions".  Currently there are no advertised features.
-> >=20
-> > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+On Tue, Sep 03, 2019 at 11:17:35AM +0200, Miklos Szeredi wrote:
+> On Tue, Sep 3, 2019 at 10:31 AM Michael S. Tsirkin <mst@redhat.com> wrote:
+> > > >  fs/fuse/Kconfig                 |   11 +
+> > > >  fs/fuse/Makefile                |    1 +
+> > > >  fs/fuse/control.c               |    4 +-
+> > > >  fs/fuse/cuse.c                  |    4 +-
+> > > >  fs/fuse/dev.c                   |   89 ++-
+> > > >  fs/fuse/dir.c                   |   26 +-
+> > > >  fs/fuse/file.c                  |   15 +-
+> > > >  fs/fuse/fuse_i.h                |  120 +++-
+> > > >  fs/fuse/inode.c                 |  203 +++---
+> > > >  fs/fuse/virtio_fs.c             | 1061 +++++++++++++++++++++++++++=
+++++
+> > > >  fs/splice.c                     |    3 +-
+> > > >  include/linux/fs.h              |    2 +
+> > > >  include/uapi/linux/virtio_fs.h  |   41 ++
+> > > >  include/uapi/linux/virtio_ids.h |    1 +
+> > > >  init/do_mounts.c                |   10 +
+> > > >  15 files changed, 1462 insertions(+), 129 deletions(-)
+> > > >  create mode 100644 fs/fuse/virtio_fs.c
+> > > >  create mode 100644 include/uapi/linux/virtio_fs.h
+> >
+> > Don't the new files need a MAINTAINERS entry?
+> > I think we want virtualization@lists.linux-foundation.org to be
+> > copied.
 >=20
-> That looks OK to me, but can someone who understands the json
-> requirement explain what says whether a 'features' entry is optional?
+> Yep.
+>=20
+> Stefan, do you want to formally maintain this file?
 
-I have defined a VHostUserBackendType ('fs') but no
-VHostUserBackendCapabilities union field.
+Vivek has been doing most of the kernel work lately and I would suggest
+that he acts as maintainer.
 
-I guess this is allowed since many other VIRTIO device types are also
-defined without a VHostUserBackendCapabilities union field (only 'gpu'
-and 'input' have one).
+But I'm happy to be added if you want two people or if Vivek is
+unwilling.
 
 Stefan
 
---xHFwDpU9dbj6ez1V
+--GID0FwUMdk1T2AWN
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1v3XkACgkQnKSrs4Gr
-c8iPfQf9HxxowHmNAnWfUjP//GSjlfFJ9nQ6vXCm/RSY/74X+ZLQ8ldhNMk6872A
-Bd5QFMhMYsvVelNVLwQP92IpPwlaUiPT/MR7mu75Gd0ZXY0xvCJEiDGdUQwBPAu/
-rayK80/Q2CSBhz2aTyMI6M0RKAZk2Nau3CC991bhcW5zRwU+iC5mpftnfa31Ymwp
-zYDrA2Kryc/WuDW0B6TtCDnbGaqTjP6brXfVxjKJcXTxVI2W4X3OttyyZvYbhcuC
-AOLZeJaG4L51NwAnxRy81BT3iP1299i4o7QfnpDs6q8hL1lADgDhRdauDTDwGP2Z
-+h4ZA44OUYOqwn6gNpC2vTqRj9akLw==
-=gnzr
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1v3isACgkQnKSrs4Gr
+c8i3IwgAkPNsvQFn07eQEq84FvAQliEAhVlQPhZtCsVbch+9uZMEFLknwvu44nDV
+4jl49BomGl8bnL2zO9Fw3v8TDw2mcmvzIwGrb3r+TF1fX/Hdgt6I/GLk9sGX6Pnx
+zaCOEFRPRWzo/wC//ljow5suXYiIhGkE9JrxRrTjgxSPbYIKTnoMxIJmXvsa/JWl
+pnWGDMmMMH5ZucxT8iXJozyGqo/KKM04NtKxREt+Qdt1VvVvB92eevZ0uFiA/iah
+ZlVDb+uBVx1t8hbXOOeb85HSUqL/qCQdm0e7FzBxhIg/dIGQgKqQb8Vw5cjEJu/i
+Lb/NaWqBPfAHYb4ZRwHMznYrZBDaKQ==
+=9DaP
 -----END PGP SIGNATURE-----
 
---xHFwDpU9dbj6ez1V--
+--GID0FwUMdk1T2AWN--
 

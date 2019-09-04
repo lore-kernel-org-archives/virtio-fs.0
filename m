@@ -1,18 +1,14 @@
-References: <5abd7616-5351-761c-0c14-21d511251006@huawei.com>
-	<20190820091650.GE9855@stefanha-x1.localdomain>
-	<CAJfpegs8fSLoUaWKhC1543Hoy9821vq8=nYZy-pw1+95+Yv4gQ@mail.gmail.com>
-	<20190821160551.GD9095@stefanha-x1.localdomain>
-	<954b5f8a-4007-f29c-f38e-dd5585879541@huawei.com>
-	<CAJfpegtBYLJLWM8GJ1h66PMf2J9o38FG6udcd2hmamEEQddf5w@mail.gmail.com>
-From: wangyan <wangyan122@huawei.com>
-Message-ID: <0e8090c7-0c7c-bcbe-af75-33054d3a3efb@huawei.com>
-Date: Thu, 22 Aug 2019 20:48:23 +0800
+Date: Wed, 4 Sep 2019 19:10:30 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20190904181030.GA26826@stefanha-x1.localdomain>
+References: <20190829104133.17418-1-stefanha@redhat.com>
+	<20190903153539.GM2744@work-vm>
 MIME-Version: 1.0
-In-Reply-To: <CAJfpegtBYLJLWM8GJ1h66PMf2J9o38FG6udcd2hmamEEQddf5w@mail.gmail.com>
-Content-Type: text/plain; charset="windows-1252"; format=flowed
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [QUESTION] A performance problem for buffer write
- compared with 9p
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="45Z9DzgjV8m4Oswq"
+Content-Disposition: inline
+In-Reply-To: <20190903153539.GM2744@work-vm>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: add man page
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,48 +17,91 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: linux-fsdevel@vger.kernel.org, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, Miklos Szeredi <mszeredi@redhat.com>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On 2019/8/22 19:43, Miklos Szeredi wrote:
-> On Thu, Aug 22, 2019 at 2:59 AM wangyan <wangyan122@huawei.com> wrote:
->> I will test it when I get the patch, and post the compared result with
->> 9p.
->
-> Could you please try the attached patch?  My guess is that it should
-> improve the performance, perhaps by a big margin.
->
-> Further improvement is possible by eliminating page copies, but that
-> is less trivial.
->
-> Thanks,
-> Miklos
->
-Using the same test model. And the test result is:
-	1. Latency
-		virtiofs: avg-lat is 15.40 usec, bigger than before(6.64 usec).
-		4K: (g=0): rw=write, bs=4K-4K/4K-4K/4K-4K, ioengine=psync, iodepth=1
-		fio-2.13
-		Starting 1 process
-		Jobs: 1 (f=1): [W(1)] [100.0% done] [0KB/142.4MB/0KB /s] [0/36.5K/0 
-iops] [eta 00m:00s]
-		4K: (groupid=0, jobs=1): err= 0: pid=5528: Thu Aug 22 20:39:07 2019
-		  write: io=6633.2MB, bw=226404KB/s, iops=56600, runt= 30001msec
-			clat (usec): min=2, max=40403, avg=14.77, stdev=33.71
-			 lat (usec): min=3, max=40404, avg=15.40, stdev=33.74
 
-	2. Bandwidth
-		virtiofs: bandwidth is 280840KB/s, lower than before(691894KB/s).
-		1M: (g=0): rw=write, bs=1M-1M/1M-1M/1M-1M, ioengine=psync, iodepth=1
-		fio-2.13
-		Starting 1 process
-		Jobs: 1 (f=1): [f(1)] [100.0% done] [0KB/29755KB/0KB /s] [0/29/0 iops] 
-[eta 00m:00s]
-		1M: (groupid=0, jobs=1): err= 0: pid=5550: Thu Aug 22 20:41:28 2019
-		  write: io=8228.0MB, bw=280840KB/s, iops=274, runt= 30001msec
-			clat (usec): min=362, max=11038, avg=3571.33, stdev=1062.72
-			 lat (usec): min=411, max=11093, avg=3628.39, stdev=1064.53
+--45Z9DzgjV8m4Oswq
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-According to the result, the patch doesn't work and make it worse than 
-before.
+On Tue, Sep 03, 2019 at 04:35:39PM +0100, Dr. David Alan Gilbert wrote:
+> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> > ---
+> >  Makefile                         |  7 +++
+> >  contrib/virtiofsd/virtiofsd.texi | 85 ++++++++++++++++++++++++++++++++
+> >  2 files changed, 92 insertions(+)
+> >  create mode 100644 contrib/virtiofsd/virtiofsd.texi
+> >=20
+> > diff --git a/Makefile b/Makefile
+> > index a3dfdd6fa8..cc18025753 100644
+> > --- a/Makefile
+> > +++ b/Makefile
+> > @@ -334,6 +334,9 @@ DOCS+=3Ddocs/qemu-cpu-models.7
+> >  ifdef CONFIG_VIRTFS
+> >  DOCS+=3Dfsdev/virtfs-proxy-helper.1
+> >  endif
+> > +ifdef CONFIG_LINUX
+>=20
+> Is there a reason that's CONFIG_LINUX not CONFIG_VHOST_USER_FS ?
+> (Although I guess it's guest vs daemon so the two are independent?)
+
+Yes, this is virtiofsd, not vhost-user-fs-pci.  We don't have a
+CONFIG_VIRTIOFSD.
+
+> > +DOCS+=3Dcontrib/virtiofsd/virtiofsd.1
+> > +endif
+> >  ifdef CONFIG_TRACE_SYSTEMTAP
+> >  DOCS+=3Dscripts/qemu-trace-stap.1
+> >  endif
+> > @@ -834,6 +837,9 @@ ifdef CONFIG_VIRTFS
+> >  	$(INSTALL_DIR) "$(DESTDIR)$(mandir)/man1"
+> >  	$(INSTALL_DATA) fsdev/virtfs-proxy-helper.1 "$(DESTDIR)$(mandir)/man1"
+> >  endif
+> > +ifdef CONFIG_LINUX
+> > +	$(INSTALL_DATA) contrib/virtiofsd.1 "$(DESTDIR)$(mandir)/man1"
+>=20
+> I had to fix that to contrib/virtiofsd/virtiofsd.1 to get make install
+> happy.
+
+Thanks for spotting it!
+
+> > +@c man begin DESCRIPTION
+> > +
+> > +Share a host directory tree with a guest through a virtio-fs device.  =
+This
+> > +program is a vhost-user backend that implements the virtio-fs device. =
+ Each
+> > +virtio-fs device instance requires its own virtiofsd process.
+> > +
+> > +This program is designed to work with QEMU's @code{--device vhost-user=
+-fs-pci}
+>=20
+> Should we include the -pci there?
+>=20
+> (Merged with the path fix above)
+
+We could also be more general and say "vhost-user virtio-fs device" to
+avoid the issue.
+
+Stefan
+
+--45Z9DzgjV8m4Oswq
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1v/hYACgkQnKSrs4Gr
+c8jtAQgAna0dQRA6RKpt4vAGNm9rRvw0sQ7/Vua3kBzhTp6kQPk5W7VIpLh+HHcs
+STKfJ5Fvy7nH0FV8w9vrJmv6BsrP6/Jw3I2ZRv+I2/usHLA1sZRcYdX+a7nk3w+/
+y1HkwJeG9NOkoYWBBEvUHN+aZlVcefypy1aH3NdSTTvi8vNcABXXu+vMfLVN/rGO
+h0nX/3mFs7IFYI3DY45wFT3fQavVo5tSo7pjM5WeIx3I3JppxdhxWtTMzQoBIpCC
+LcSZ8SX9Sxc6rNWWpAFtbCGAzrDCFpO0SdrrcownX2ryXvGeW8pD4Uz209VZUwIB
+tpANPWJpOghUCN1FeMl+BF9QEQOpFw==
+=NByF
+-----END PGP SIGNATURE-----
+
+--45Z9DzgjV8m4Oswq--
 

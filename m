@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Thu,  5 Sep 2019 15:48:50 -0400
-Message-Id: <20190905194859.16219-10-vgoyal@redhat.com>
+Date: Thu,  5 Sep 2019 15:48:46 -0400
+Message-Id: <20190905194859.16219-6-vgoyal@redhat.com>
 In-Reply-To: <20190905194859.16219-1-vgoyal@redhat.com>
 References: <20190905194859.16219-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 09/18] virtiofs: Add an helper to start all the
-	queues
+Subject: [Virtio-fs] [PATCH 05/18] Maintain count of in flight requests for
+	VQ_REQUEST queue
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,52 +18,37 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org, miklos@szeredi.hu
 Cc: mst@redhat.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, vgoyal@redhat.com
 
-This just marks are the queues are connected and ready to accept the
-request.
+As of now we maintain this count only for VQ_HIPRIO. Maintain it for
+VQ_REQUEST as well so that later it can be used to drain VQ_REQUEST
+queue.
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- fs/fuse/virtio_fs.c | 19 ++++++++++++++++---
- 1 file changed, 16 insertions(+), 3 deletions(-)
+ fs/fuse/virtio_fs.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index d5730a50b303..f2936daca39c 100644
+index c46dd4d284d6..5df97dfee37d 100644
 --- a/fs/fuse/virtio_fs.c
 +++ b/fs/fuse/virtio_fs.c
-@@ -112,6 +112,19 @@ static void virtio_fs_drain_all_queues(struct virtio_fs *fs)
+@@ -360,6 +360,9 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
+ 		spin_unlock(&fpq->lock);
+ 
+ 		fuse_request_end(fc, req);
++		spin_lock(&fsvq->lock);
++		fsvq->in_flight--;
++		spin_unlock(&fsvq->lock);
  	}
  }
  
-+static void virtio_fs_start_all_queues(struct virtio_fs *fs)
-+{
-+	struct virtio_fs_vq *fsvq;
-+	int i;
-+
-+	for (i = 0; i < fs->nvqs; i++) {
-+		fsvq = &fs->vqs[i];
-+		spin_lock(&fsvq->lock);
-+		fsvq->connected = true;
-+		spin_unlock(&fsvq->lock);
-+	}
-+}
-+
- /* Add a new instance to the list or return -EEXIST if tag name exists*/
- static int virtio_fs_add_instance(struct virtio_fs *fs)
- {
-@@ -483,10 +496,10 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
- 	if (ret < 0)
+@@ -769,6 +772,7 @@ static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
  		goto out;
+ 	}
  
--	for (i = 0; i < fs->nvqs; i++) {
-+	for (i = 0; i < fs->nvqs; i++)
- 		fs->vqs[i].vq = vqs[i];
--		fs->vqs[i].connected = true;
--	}
-+
-+	virtio_fs_start_all_queues(fs);
- out:
- 	kfree(names);
- 	kfree(callbacks);
++	fsvq->in_flight++;
+ 	notify = virtqueue_kick_prepare(vq);
+ 
+ 	spin_unlock(&fsvq->lock);
 -- 
 2.20.1
 

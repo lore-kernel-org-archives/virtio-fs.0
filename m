@@ -1,12 +1,14 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Thu,  5 Sep 2019 15:48:46 -0400
-Message-Id: <20190905194859.16219-6-vgoyal@redhat.com>
-In-Reply-To: <20190905194859.16219-1-vgoyal@redhat.com>
-References: <20190905194859.16219-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 05/18] Maintain count of in flight requests for
-	VQ_REQUEST queue
+References: <20190905152136.30637-1-stefanha@redhat.com>
+	<20190905152136.30637-4-stefanha@redhat.com>
+	<20190905171248.GP2700@work-vm>
+In-Reply-To: <20190905171248.GP2700@work-vm>
+From: =?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>
+Date: Fri, 6 Sep 2019 00:03:15 +0400
+Message-ID: <CAMxuvaw_Vyy8Xya9dCP_K9acqZmmUCK7-=GcJJJ_mv7CZiM3wQ@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [RFC 3/3] virtiofsd: add virtiofsctl command-line
+	management tool
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,40 +17,161 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org, miklos@szeredi.hu
-Cc: mst@redhat.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, vgoyal@redhat.com
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel <qemu-devel@nongnu.org>
 
-As of now we maintain this count only for VQ_HIPRIO. Maintain it for
-VQ_REQUEST as well so that later it can be used to drain VQ_REQUEST
-queue.
+Hi
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/virtio_fs.c | 4 ++++
- 1 file changed, 4 insertions(+)
+On Thu, Sep 5, 2019 at 9:13 PM Dr. David Alan Gilbert
+<dgilbert@redhat.com> wrote:
+>
+> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > virtiofsctl can control a running virtiofsd process:
+> >
+> >   usage: ./virtiofsctl COMMAND [args...]
+> >
+> >   Commands:
+> >     get-log-level       - show current log level
+> >     set-log-level LEVEL - set current log level to one of
+> >                           "err", "warning", "info", "debug"
+> >
+> > Make sure it is running in the same DBus session as virtiofsd.  This may
+> > require setting the DBUS_SESSION_BUS_ADDRESS environment variable to the
+> > same value as used by virtiofsd.
+> >
+> > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> > ---
+> >  Makefile                        |  3 ++
+> >  Makefile.objs                   |  1 +
+> >  contrib/virtiofsd/Makefile.objs |  3 ++
+> >  contrib/virtiofsd/virtiofsctl.c | 55 +++++++++++++++++++++++++++++++++
+> >  4 files changed, 62 insertions(+)
+> >  create mode 100644 contrib/virtiofsd/virtiofsctl.c
+> >
+> > diff --git a/Makefile b/Makefile
+> > index 6b1af33348..d7ed9e7669 100644
+> > --- a/Makefile
+> > +++ b/Makefile
+> > @@ -419,6 +419,7 @@ dummy := $(call unnest-vars,, \
+> >                  ivshmem-client-obj-y \
+> >                  ivshmem-server-obj-y \
+> >                  virtiofsd-obj-y \
+> > +                virtiofsctl-obj-y \
+> >                  rdmacm-mux-obj-y \
+> >                  libvhost-user-obj-y \
+> >                  vhost-user-scsi-obj-y \
+> > @@ -661,6 +662,8 @@ contrib/virtiofsd/gdbus_generated.c-timestamp: $(SRC_PATH)/contrib/virtiofsd/org
+> >
+> >  virtiofsd$(EXESUF): $(virtiofsd-obj-y) libvhost-user.a $(COMMON_LDADDS)
+> >       $(call LINK, $^)
+> > +virtiofsctl$(EXESUF): $(virtiofsctl-obj-y)
+> > +     $(call LINK, $^)
+> >  endif
+> >
+> >  vhost-user-gpu$(EXESUF): $(vhost-user-gpu-obj-y) $(libvhost-user-obj-y) libqemuutil.a libqemustub.a
+> > diff --git a/Makefile.objs b/Makefile.objs
+> > index dfdd7d56ea..326a8abb8e 100644
+> > --- a/Makefile.objs
+> > +++ b/Makefile.objs
+> > @@ -126,6 +126,7 @@ rdmacm-mux-obj-y = contrib/rdmacm-mux/
+> >  vhost-user-input-obj-y = contrib/vhost-user-input/
+> >  vhost-user-gpu-obj-y = contrib/vhost-user-gpu/
+> >  virtiofsd-obj-y = contrib/virtiofsd/
+> > +virtiofsctl-obj-y = contrib/virtiofsd/
+> >
+> >  ######################################################################
+> >  trace-events-subdirs =
+> > diff --git a/contrib/virtiofsd/Makefile.objs b/contrib/virtiofsd/Makefile.objs
+> > index d59ab60f3d..3f944d493e 100644
+> > --- a/contrib/virtiofsd/Makefile.objs
+> > +++ b/contrib/virtiofsd/Makefile.objs
+> > @@ -11,6 +11,9 @@ virtiofsd-obj-y = buffer.o \
+> >                    gdbus_generated.o \
+> >                    dbus.o
+> >
+> > +virtiofsctl-obj-y = virtiofsctl.o \
+> > +                    gdbus_generated.o
+> > +
+> >  seccomp.o-cflags := $(SECCOMP_CFLAGS)
+> >  seccomp.o-libs := $(SECCOMP_LIBS)
+> >
+> > diff --git a/contrib/virtiofsd/virtiofsctl.c b/contrib/virtiofsd/virtiofsctl.c
+> > new file mode 100644
+> > index 0000000000..39bee2b881
+> > --- /dev/null
+> > +++ b/contrib/virtiofsd/virtiofsctl.c
+> > @@ -0,0 +1,55 @@
+> > +#include <stdio.h>
+> > +#include "gdbus_generated.h"
+> > +
+> > +static void get_log_level(Virtiofsd *virtiofsd)
+> > +{
+> > +    const char *value = virtiofsd_get_log_level(virtiofsd);
+> > +
+> > +    printf("%s\n", value ? value : "(null)");
+> > +}
+> > +
+> > +static void set_log_level(Virtiofsd *virtiofsd, const char *value)
+> > +{
+> > +    virtiofsd_set_log_level(virtiofsd, value);
+> > +}
+> > +
+> > +static void usage(const char *progname)
+> > +{
+> > +    printf("usage: %s COMMAND [args...]\n", progname);
+> > +    printf("\n");
+> > +    printf("Commands:\n");
+> > +    printf("  get-log-level       - show current log level\n");
+> > +    printf("  set-log-level LEVEL - set current log level to one of\n");
+> > +    printf("                        \"err\", \"warning\", \"info\", \"debug\"\n");
+> > +    exit(0);
+> > +}
+> > +
+> > +int main(int argc, char **argv)
+> > +{
+> > +    Virtiofsd *virtiofsd;
+> > +    GError *error = NULL;
+> > +
+> > +    if (argc < 2) {
+> > +        usage(argv[0]);
+> > +    }
+> > +
+> > +    virtiofsd = virtiofsd_proxy_new_for_bus_sync(G_BUS_TYPE_SESSION,
+> > +            G_DBUS_PROXY_FLAGS_NONE, "org.qemu.virtiofsd",
+> > +            "/org/qemu/virtiofsd", NULL, &error);
+> > +    if (error) {
+> > +        fprintf(stderr, "%s\n", error->message);
+> > +        g_error_free(error);
+> > +        return 1;
+> > +    }
+> > +
+> > +    if (strcmp(argv[0], "get-log-level") == 0) {
+>
+> This and the one below works a lot better with argv[1] !
+>
+> (I wonder if a little python script would be better for these type of
+> wrappers).
 
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index c46dd4d284d6..5df97dfee37d 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -360,6 +360,9 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
- 		spin_unlock(&fpq->lock);
- 
- 		fuse_request_end(fc, req);
-+		spin_lock(&fsvq->lock);
-+		fsvq->in_flight--;
-+		spin_unlock(&fsvq->lock);
- 	}
- }
- 
-@@ -769,6 +772,7 @@ static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
- 		goto out;
- 	}
- 
-+	fsvq->in_flight++;
- 	notify = virtqueue_kick_prepare(vq);
- 
- 	spin_unlock(&fsvq->lock);
--- 
-2.20.1
+Or just plain gdbus/busctl calls (which already has bash completion
+fwiw), and/or eventually a shell script.
+
+>
+> Dave
+>
+> > +        get_log_level(virtiofsd);
+> > +    } else if (strcmp(argv[0], "set-log-level") == 0) {
+>
+> > +        if (argc != 3) {
+> > +            usage(argv[0]);
+> > +        }
+> > +        set_log_level(virtiofsd, argv[2]);
+> > +    }
+> > +    g_object_unref(virtiofsd);
+> > +    return 0;
+> > +}
+> > --
+> > 2.21.0
+> >
+> --
+> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

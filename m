@@ -1,12 +1,12 @@
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Thu,  5 Sep 2019 09:29:46 +0100
-Message-Id: <20190905082947.6633-2-stefanha@redhat.com>
+Date: Thu,  5 Sep 2019 09:29:47 +0100
+Message-Id: <20190905082947.6633-3-stefanha@redhat.com>
 In-Reply-To: <20190905082947.6633-1-stefanha@redhat.com>
 References: <20190905082947.6633-1-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH RESEND 1/2] virtiofsd: replace warn(3) and
-	warnx(3) with fuse_warning()
+Subject: [Virtio-fs] [PATCH RESEND 2/2] virtiofsd: replace err(3) and
+	errx(3) with fuse_err()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,148 +17,300 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 
-Do not use warn(3) and warnx(3) since they print to stderr.  When
---syslog is used these messages must go to syslog(3) instead.
+Do not use err(3) and errx(3) since they print to stderr.  When --syslog
+is used these messages must go to syslog(3) instead.
 
 Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- contrib/virtiofsd/passthrough_ll.c | 36 +++++++++++++++---------------
- 1 file changed, 18 insertions(+), 18 deletions(-)
+ contrib/virtiofsd/passthrough_ll.c | 107 +++++++++++++++++++----------
+ contrib/virtiofsd/seccomp.c        |  15 ++--
+ 2 files changed, 81 insertions(+), 41 deletions(-)
 
 diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-index 0ef01b7e3f..7fab0bf6c1 100644
+index 7fab0bf6c1..9c6f60ef5a 100644
 --- a/contrib/virtiofsd/passthrough_ll.c
 +++ b/contrib/virtiofsd/passthrough_ll.c
-@@ -628,12 +628,12 @@ retry:
+@@ -47,7 +47,6 @@
+ #include <dirent.h>
+ #include <assert.h>
+ #include <errno.h>
+-#include <err.h>
+ #include <semaphore.h>
+ #include <inttypes.h>
+ #include <pthread.h>
+@@ -1081,12 +1080,16 @@ static void lo_restore_cred(struct lo_cred *old)
+ 	int res;
  
- 	res = readlinkat(lo->proc_self_fd, procname, path, PATH_MAX);
- 	if (res < 0) {
--		warn("lo_parent_and_name: readlink failed");
-+		fuse_warning("lo_parent_and_name: readlink failed: %m\n");
- 		goto fail_noretry;
- 	}
+ 	res = syscall(SYS_setresuid, -1, old->euid, -1);
+-	if (res == -1)
+-		err(1, "seteuid(%u)", old->euid);
++	if (res == -1) {
++		fuse_err("seteuid(%u): %m\n", old->euid);
++		exit(1);
++	}
  
- 	if (res >= PATH_MAX) {
--		warnx("lo_parent_and_name: readlink overflowed");
-+		fuse_warning("lo_parent_and_name: readlink overflowed\n");
- 		goto fail_noretry;
- 	}
- 	path[res] = '\0';
-@@ -641,7 +641,7 @@ retry:
- 	last = strrchr(path, '/');
- 	if (last == NULL) {
- 		/* Shouldn't happen */
--		warnx("lo_parent_and_name: INTERNAL ERROR: bad path read from proc");
-+		fuse_warning("lo_parent_and_name: INTERNAL ERROR: bad path read from proc\n");
- 		goto fail_noretry;
- 	}
- 	if (last == path) {
-@@ -655,13 +655,13 @@ retry:
- 		res = fstatat(AT_FDCWD, last == path ? "/" : path, &stat, 0);
- 		if (res == -1) {
- 			if (!retries)
--				warn("lo_parent_and_name: failed to stat parent");
-+				fuse_warning("lo_parent_and_name: failed to stat parent: %m\n");
- 			goto fail;
- 		}
- 		p = lo_find(lo, &stat);
- 		if (p == NULL) {
- 			if (!retries)
--				warnx("lo_parent_and_name: failed to find parent");
-+				fuse_warning("lo_parent_and_name: failed to find parent\n");
- 			goto fail;
- 		}
- 	}
-@@ -669,12 +669,12 @@ retry:
- 	res = fstatat(p->fd, last, &stat, AT_SYMLINK_NOFOLLOW);
- 	if (res == -1) {
- 		if (!retries)
--			warn("lo_parent_and_name: failed to stat last");
-+			fuse_warning("lo_parent_and_name: failed to stat last: %m\n");
- 		goto fail_unref;
- 	}
- 	if (stat.st_dev != inode->key.dev || stat.st_ino != inode->key.ino) {
- 		if (!retries)
--			warnx("lo_parent_and_name: filed to match last");
-+			fuse_warning("lo_parent_and_name: filed to match last\n");
- 		goto fail_unref;
- 	}
- 	*parent = p;
-@@ -895,9 +895,9 @@ static void get_shared(struct lo_data *lo, struct lo_inode *inode)
- 	res = write(lo->ireg_sock, &msg, sizeof(msg));
- 	if (res != sizeof(msg)) {
- 		if (res == -1)
--			warn("write(lo->ireg_sock, {IREG_GET, ...})");
-+			fuse_warning("write(lo->ireg_sock, {IREG_GET, ...}): %m\n");
- 		else
--			warnx("short write to ireg_sock: %i", res);
-+			fuse_warning("short write to ireg_sock: %i\n", res);
+ 	res = syscall(SYS_setresgid, -1, old->egid, -1);
+-	if (res == -1)
+-		err(1, "setegid(%u)", old->egid);
++	if (res == -1) {
++		fuse_err("setegid(%u): %m\n", old->egid);
++		exit(1);
++	}
+ }
+ 
+ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
+@@ -2677,8 +2680,10 @@ static void setup_shared_versions(struct lo_data *lo)
  		return;
+ 
+ 	sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
+-	if (sock == -1)
+-		err(1, "socket(AF_UNIX, SOCK_SEQPACKET, 0)");
++	if (sock == -1) {
++		fuse_err("socket(AF_UNIX, SOCK_SEQPACKET, 0): %m\n");
++		exit(1);
++	}
+ 
+ 	strncpy(name.sun_path, socket_name, sizeof(name.sun_path) - 1);
+ 
+@@ -2694,18 +2699,25 @@ static void setup_shared_versions(struct lo_data *lo)
+ 	lo->ireg_sock = sock;
+ 
+ 	fd = open(version_path, O_RDWR);
+-	if (sock == -1)
+-		err(1, "open(%s, O_RDWR)", version_path);
++	if (sock == -1) {
++		fuse_err("open(%s, O_RDWR): %m\n", version_path);
++		exit(1);
++	}
+ 
+ 	res = fstat(fd, &stat);
+-	if (res == -1)
+-		err(1, "fstat(%i, &stat)", fd);
++	if (res == -1) {
++		fuse_err("fstat(%i, &stat): %m\n", fd);
++		exit(1);
++	}
+ 
+ 	lo->version_table_size = stat.st_size / sizeof(lo->version_table[0]);
+ 
+ 	addr = mmap(NULL, stat.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+-	if (addr == MAP_FAILED)
+-		err(1, "mmap(NULL, %li, PROT_READ | PROT_WRITE, MAP_SHARED, %i, 0", stat.st_size, fd);
++	if (addr == MAP_FAILED) {
++		fuse_err("mmap(NULL, %li, PROT_READ | PROT_WRITE, MAP_SHARED, %i, 0): %m\n",
++			 stat.st_size, fd);
++		exit(1);
++	}
+ 
+ 	lo->version_table = addr;
+ }
+@@ -2718,36 +2730,44 @@ static void setup_pivot_root(const char *source)
+ 
+ 	oldroot = open("/", O_DIRECTORY | O_RDONLY | O_CLOEXEC);
+ 	if (oldroot < 0) {
+-		err(1, "open(/)");
++		fuse_err("open(/): %m\n");
++		exit(1);
  	}
  
-@@ -919,9 +919,9 @@ static void put_shared(struct lo_data *lo, struct lo_inode *inode)
- 	res = write(lo->ireg_sock, &msg, sizeof(msg));
- 	if (res != sizeof(msg)) {
- 		if (res == -1)
--			warn("write(lo->ireg_sock, {IREG_PUT, ...})");
-+			fuse_warning("write(lo->ireg_sock, {IREG_PUT, ...}): %m\n");
- 		else
--			warnx("short write to ireg_sock: %i", res);
-+			fuse_warning("short write to ireg_sock: %i\n", res);
- 		return;
+ 	newroot = open(source, O_DIRECTORY | O_RDONLY | O_CLOEXEC);
+ 	if (newroot < 0) {
+-		err(1, "open(%s)", source);
++		fuse_err("open(%s): %m\n", source);
++		exit(1);
+ 	}
+ 
+ 	if (fchdir(newroot) < 0) {
+-		err(1, "fchdir(newroot)");
++		fuse_err("fchdir(newroot): %m\n");
++		exit(1);
+ 	}
+ 
+ 	if (syscall(__NR_pivot_root, ".", ".") < 0){
+-		err(1, "pivot_root(., .)");
++		fuse_err("pivot_root(., .): %m\n");
++		exit(1);
+ 	}
+ 
+ 	if (fchdir(oldroot) < 0) {
+-		err(1, "fchdir(oldroot)");
++		fuse_err("fchdir(oldroot): %m\n");
++		exit(1);
+ 	}
+ 
+ 	if (mount("", ".", "", MS_SLAVE | MS_REC, NULL) < 0) {
+-		err(1, "mount(., MS_SLAVE | MS_REC)");
++		fuse_err("mount(., MS_SLAVE | MS_REC): %m\n");
++		exit(1);
+ 	}
+ 
+ 	if (umount2(".", MNT_DETACH) < 0) {
+-		err(1, "umount2(., MNT_DETACH)");
++		fuse_err("umount2(., MNT_DETACH): %m\n");
++		exit(1);
+ 	}
+ 
+ 	if (fchdir(newroot) < 0) {
+-		err(1, "fchdir(newroot)");
++		fuse_err("fchdir(newroot): %m\n");
++		exit(1);
+ 	}
+ 
+ 	close(newroot);
+@@ -2761,15 +2781,18 @@ static void setup_pivot_root(const char *source)
+ static void setup_mount_namespace(const char *source)
+ {
+ 	if (unshare(CLONE_NEWNS) != 0) {
+-		err(1, "unshare(CLONE_NEWNS)");
++		fuse_err("unshare(CLONE_NEWNS): %m\n");
++		exit(1);
+ 	}
+ 
+ 	if (mount(NULL, "/", NULL, MS_REC|MS_SLAVE, NULL) < 0) {
+-		err(1, "mount(/, MS_REC|MS_PRIVATE)");
++		fuse_err("mount(/, MS_REC|MS_PRIVATE): %m\n");
++		exit(1);
+ 	}
+ 
+ 	if (mount(source, source, NULL, MS_BIND, NULL) < 0) {
+-		err(1, "mount(%s, %s, MS_BIND)", source, source);
++		fuse_err("mount(%s, %s, MS_BIND): %m\n", source, source);
++		exit(1);
+ 	}
+ 
+ 	setup_pivot_root(source);
+@@ -2791,12 +2814,15 @@ static void setup_root(struct lo_data *lo, struct lo_inode *root)
+ 	struct stat stat;
+ 
+ 	fd = open("/", O_PATH);
+-	if (fd == -1)
+-		err(1, "open(%s, O_PATH)", lo->source);
++	if (fd == -1) {
++		fuse_err("open(%s, O_PATH): %m\n", lo->source);
++	}
+ 
+ 	res = fstatat(fd, "", &stat, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
+-	if (res == -1)
+-		err(1, "fstatat(%s)", lo->source);
++	if (res == -1) {
++		fuse_err("fstatat(%s): %m\n", lo->source);
++		exit(1);
++	}
+ 
+ 	root->fd = fd;
+ 	root->key.ino = stat.st_ino;
+@@ -2809,7 +2835,8 @@ static void setup_proc_self_fd(struct lo_data *lo)
+ {
+ 	lo->proc_self_fd = open("/proc/self/fd", O_PATH);
+ 	if (lo->proc_self_fd == -1) {
+-		err(1, "open(/proc/self/fd, O_PATH)");
++		fuse_err("open(/proc/self/fd, O_PATH): %m\n");
++		exit(1);
  	}
  }
-@@ -1428,7 +1428,7 @@ static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
- 		lo_map_remove(&lo->ino_map, inode->fuse_ino);
-                 g_hash_table_remove(lo->inodes, &inode->key);
- 		if (g_hash_table_size(inode->posix_locks)) {
--			warn("Hash table is not empty\n");
-+			fuse_warning("Hash table is not empty\n");
- 		}
- 		g_hash_table_destroy(inode->posix_locks);
- 		pthread_mutex_destroy(&inode->plock_mutex);
-@@ -2640,19 +2640,19 @@ static void *ireg_do(void *data)
- 		res = read(lo->ireg_sock, buf, sizeof(buf));
- 		if (res <= 0) {
- 			if (res == -1)
--				warn("read(lo->ireg_sock, ...)");
-+				fuse_warning("read(lo->ireg_sock, ...): %m\n");
- 			else
--				warnx("disconnected from ireg");
-+				fuse_warning("disconnected from ireg\n");
- 			return NULL;
- 		}
- 		if (res != sizeof(reply)) {
--			warnx("bad size message: %i", res);
-+			fuse_warning("bad size message: %i\n", res);
- 			continue;
- 		}
  
- 		memcpy(&reply, buf, sizeof(reply));
- 		if (reply.op != SRV_VERSION) {
--			warn("bad reply to IREG_GET: %i", reply.op);
-+			fuse_warning("bad reply to IREG_GET: %i\n", reply.op);
- 			continue;
- 		}
+@@ -2828,14 +2855,16 @@ static void setup_nofile_rlimit(void)
+ 	errno = 0;
+ 	max = strtoll(nr_open, NULL, 0);
+ 	if (errno) {
+-		err(1, "strtoll(%s)", nr_open);
++		fuse_err("strtoll(%s): %m\n", nr_open);
++		exit(1);
+ 	}
  
-@@ -2685,7 +2685,7 @@ static void setup_shared_versions(struct lo_data *lo)
- 	res = connect(sock, (const struct sockaddr *) &name,
- 		      sizeof(struct sockaddr_un));
- 	if (res == -1) {
--		warn("connect to ireg");
-+		fuse_warning("connect to ireg: %m\n");
- 		close(sock);
- 		lo->ireg_sock = -1;
- 		return;
-@@ -2996,7 +2996,7 @@ int main(int argc, char *argv[])
+ 	rlim.rlim_cur = max;
+ 	rlim.rlim_max = max;
  
- 		ret = pthread_create(&ireg_thread, NULL, ireg_do, &lo);
- 		if (ret) {
--			warnx("pthread_create: %s", strerror(ret));
-+			fuse_warning("pthread_create: %s\n", strerror(ret));
- 			ret = 1;
- 			goto err_out4;
+ 	if (setrlimit(RLIMIT_NOFILE, &rlim) < 0) {
+-		err(1, "setrlimit(RLIMIT_NOFILE)");
++		fuse_err("setrlimit(RLIMIT_NOFILE): %m\n");
++		exit(1);
+ 	}
+ 
+ 	g_free(nr_open);
+@@ -2951,10 +2980,15 @@ int main(int argc, char *argv[])
+ 		int res;
+ 
+ 		res = lstat(lo.source, &stat);
+-		if (res == -1)
+-			err(1, "failed to stat source (\"%s\")", lo.source);
+-		if (!S_ISDIR(stat.st_mode))
+-			errx(1, "source is not a directory");
++		if (res == -1) {
++			fuse_err("failed to stat source (\"%s\"): %m\n",
++				 lo.source);
++			exit(1);
++		}
++		if (!S_ISDIR(stat.st_mode)) {
++			fuse_err("source is not a directory\n");
++			exit(1);
++		}
+ 	} else {
+ 		lo.source = strdup("/");
+ 	}
+@@ -2974,7 +3008,8 @@ int main(int argc, char *argv[])
+ 			break;
  		}
+ 	} else if (lo.timeout < 0) {
+-		errx(1, "timeout is negative (%lf)", lo.timeout);
++		fuse_err("timeout is negative (%lf)\n", lo.timeout);
++		exit(1);
+ 	}
+ 
+ 	setup_shared_versions(&lo);
+diff --git a/contrib/virtiofsd/seccomp.c b/contrib/virtiofsd/seccomp.c
+index 3b92c6ee13..c4d9cd6fab 100644
+--- a/contrib/virtiofsd/seccomp.c
++++ b/contrib/virtiofsd/seccomp.c
+@@ -7,10 +7,10 @@
+  */
+ 
+ #include <stdlib.h>
+-#include <err.h>
+ #include <errno.h>
+ #include <seccomp.h>
+ #include <glib.h>
++#include "fuse_log.h"
+ #include "seccomp.h"
+ 
+ static const int syscall_whitelist[] = {
+@@ -97,7 +97,9 @@ static void add_whitelist(scmp_filter_ctx ctx, const int syscalls[],
+ 	for (i = 0; i < len; i++) {
+ 		if (seccomp_rule_add(ctx, SCMP_ACT_ALLOW,
+ 				     syscalls[i], 0) != 0) {
+-			err(1, "seccomp_rule_add syscall %d", syscalls[i]);
++			fuse_err("seccomp_rule_add syscall %d failed\n",
++				 syscalls[i]);
++			exit(1);
+ 		}
+ 	}
+ }
+@@ -112,7 +114,8 @@ void setup_seccomp(bool enable_syslog)
+ 	ctx = seccomp_init(SCMP_ACT_KILL);
+ #endif
+ 	if (!ctx) {
+-		err(1, "seccomp_init()");
++		fuse_err("seccomp_init() failed\n");
++		exit(1);
+ 	}
+ 
+ 	add_whitelist(ctx, syscall_whitelist, G_N_ELEMENTS(syscall_whitelist));
+@@ -123,11 +126,13 @@ void setup_seccomp(bool enable_syslog)
+ 
+ 	/* libvhost-user calls this for post-copy migration, we don't need it */
+ 	if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOSYS), SCMP_SYS(userfaultfd), 0) != 0) {
+-		err(1, "seccomp_rule_add userfaultfd");
++		fuse_err("seccomp_rule_add userfaultfd failed\n");
++		exit(1);
+ 	}
+ 
+ 	if (seccomp_load(ctx) < 0) {
+-		err(1, "seccomp_load()");
++		fuse_err("seccomp_load() failed\n");
++		exit(1);
+ 	}
+ 
+ 	seccomp_release(ctx);
 -- 
 2.21.0
 

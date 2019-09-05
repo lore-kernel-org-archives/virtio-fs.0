@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Thu,  5 Sep 2019 15:48:49 -0400
-Message-Id: <20190905194859.16219-9-vgoyal@redhat.com>
+Date: Thu,  5 Sep 2019 15:48:52 -0400
+Message-Id: <20190905194859.16219-12-vgoyal@redhat.com>
 In-Reply-To: <20190905194859.16219-1-vgoyal@redhat.com>
 References: <20190905194859.16219-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 08/18] virtiofs: Drain all pending requests
-	during ->remove time
+Subject: [Virtio-fs] [PATCH 11/18] virtiofs: stop and drain queues after
+	sending DESTROY
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,128 +18,55 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org, miklos@szeredi.hu
 Cc: mst@redhat.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, vgoyal@redhat.com
 
-When device is going away, drain all pending requests.
+During virtio_kill_sb() we first stop forget queue and drain it and then
+call fuse_kill_sb_anon(). This will result in sending DESTROY request to
+fuse server. Once finished, stop all the queues and drain one more time
+just to be sure and then free up the devices.
+
+Given drain queues will call flush_work() on various workers, remove this
+logic from virtio_free_devs().
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- fs/fuse/virtio_fs.c | 83 ++++++++++++++++++++++++++++-----------------
- 1 file changed, 51 insertions(+), 32 deletions(-)
+ fs/fuse/virtio_fs.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
 diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 90e7b2f345e5..d5730a50b303 100644
+index 1ea0f889e804..a76bd5a04521 100644
 --- a/fs/fuse/virtio_fs.c
 +++ b/fs/fuse/virtio_fs.c
-@@ -63,6 +63,55 @@ static inline struct fuse_pqueue *vq_to_fpq(struct virtqueue *vq)
- 	return &vq_to_fsvq(vq)->fud->pq;
- }
+@@ -180,9 +180,6 @@ static void virtio_fs_free_devs(struct virtio_fs *fs)
+ 		if (!fsvq->fud)
+ 			continue;
  
-+static void virtio_fs_drain_queue(struct virtio_fs_vq *fsvq)
-+{
-+	WARN_ON(fsvq->in_flight < 0);
-+
-+	/* Wait for in flight requests to finish.*/
-+	while (1) {
-+		spin_lock(&fsvq->lock);
-+		if (!fsvq->in_flight) {
-+			spin_unlock(&fsvq->lock);
-+			break;
-+		}
-+		spin_unlock(&fsvq->lock);
-+		usleep_range(1000, 2000);
-+	}
-+
-+	flush_work(&fsvq->done_work);
-+	flush_delayed_work(&fsvq->dispatch_work);
-+}
-+
-+static inline void drain_hiprio_queued_reqs(struct virtio_fs_vq *fsvq)
-+{
-+	struct virtio_fs_forget *forget;
-+
-+	spin_lock(&fsvq->lock);
-+	while (1) {
-+		forget = list_first_entry_or_null(&fsvq->queued_reqs,
-+						struct virtio_fs_forget, list);
-+		if (!forget)
-+			break;
-+		list_del(&forget->list);
-+		kfree(forget);
-+	}
-+	spin_unlock(&fsvq->lock);
-+}
-+
-+static void virtio_fs_drain_all_queues(struct virtio_fs *fs)
-+{
-+	struct virtio_fs_vq *fsvq;
-+	int i;
-+
-+	for (i = 0; i < fs->nvqs; i++) {
-+		fsvq = &fs->vqs[i];
-+		if (i == VQ_HIPRIO)
-+			drain_hiprio_queued_reqs(fsvq);
-+
-+		virtio_fs_drain_queue(fsvq);
-+	}
-+}
-+
- /* Add a new instance to the list or return -EEXIST if tag name exists*/
- static int virtio_fs_add_instance(struct virtio_fs *fs)
- {
-@@ -511,6 +560,7 @@ static void virtio_fs_remove(struct virtio_device *vdev)
- 	struct virtio_fs *fs = vdev->priv;
- 
- 	virtio_fs_stop_all_queues(fs);
-+	virtio_fs_drain_all_queues(fs);
- 	vdev->config->reset(vdev);
- 	virtio_fs_cleanup_vqs(vdev, fs);
- 
-@@ -865,37 +915,6 @@ __releases(fiq->waitq.lock)
+-		flush_work(&fsvq->done_work);
+-		flush_delayed_work(&fsvq->dispatch_work);
+-
+ 		/* TODO need to quiesce/end_requests/decrement dev_count */
+ 		fuse_dev_free(fsvq->fud);
+ 		fsvq->fud = NULL;
+@@ -994,6 +991,8 @@ static int virtio_fs_fill_super(struct super_block *sb)
+ 		atomic_inc(&fc->dev_count);
  	}
- }
  
--static void virtio_fs_flush_hiprio_queue(struct virtio_fs_vq *fsvq)
--{
--	struct virtio_fs_forget *forget;
--
--	WARN_ON(fsvq->in_flight < 0);
--
--	/* Go through pending forget requests and free them */
--	spin_lock(&fsvq->lock);
--	while (1) {
--		forget = list_first_entry_or_null(&fsvq->queued_reqs,
--					struct virtio_fs_forget, list);
--		if (!forget)
--			break;
--		list_del(&forget->list);
--		kfree(forget);
--	}
--
--	spin_unlock(&fsvq->lock);
--
--	/* Wait for in flight requests to finish.*/
--	while (1) {
--		spin_lock(&fsvq->lock);
--		if (!fsvq->in_flight) {
--			spin_unlock(&fsvq->lock);
--			break;
--		}
--		spin_unlock(&fsvq->lock);
--		usleep_range(1000, 2000);
--	}
--}
--
- const static struct fuse_iqueue_ops virtio_fs_fiq_ops = {
- 	.wake_forget_and_unlock		= virtio_fs_wake_forget_and_unlock,
- 	.wake_interrupt_and_unlock	= virtio_fs_wake_interrupt_and_unlock,
-@@ -988,7 +1007,7 @@ static void virtio_kill_sb(struct super_block *sb)
- 	spin_lock(&fsvq->lock);
- 	fsvq->connected = false;
- 	spin_unlock(&fsvq->lock);
--	virtio_fs_flush_hiprio_queue(fsvq);
-+	virtio_fs_drain_all_queues(vfs);
++	/* Previous unmount will stop all queues. Start these again */
++	virtio_fs_start_all_queues(fs);
+ 	fuse_send_init(fc, init_req);
+ 	return 0;
+ 
+@@ -1026,6 +1025,12 @@ static void virtio_kill_sb(struct super_block *sb)
+ 	virtio_fs_drain_all_queues(vfs);
  
  	fuse_kill_sb_anon(sb);
++
++	/* fuse_kill_sb_anon() must have sent destroy. Stop all queues
++	 * and drain one more time and free fuse devices.
++	 */
++	virtio_fs_stop_all_queues(vfs);
++	virtio_fs_drain_all_queues(vfs);
  	virtio_fs_free_devs(vfs);
+ }
+ 
 -- 
 2.20.1
 

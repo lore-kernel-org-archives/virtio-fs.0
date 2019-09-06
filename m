@@ -1,22 +1,15 @@
-Date: Wed, 16 Oct 2019 19:37:00 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20191016183700.GC14762@stefanha-x1.localdomain>
-References: <CAJFHJrq6bQo=yvO0tAxH7RWg=U=ftpsePs3c7y-AcE90Wh4afg@mail.gmail.com>
-	<20191011203647.GC13861@redhat.com>
-	<20191014091108.GH22963@stefanha-x1.localdomain>
-	<CAJFHJrrqfjQqMu-K99DiBYNmD1=hB710wRZ88w--SQ0GxQv9Tw@mail.gmail.com>
-	<20191015155749.GH3073@work-vm>
-	<CAJFHJroxYvu_cfwCCxdWV_mN-0pxZ4qBbXdjiJEzPECui-ygrA@mail.gmail.com>
-	<20191015162634.GI3073@work-vm>
-	<ac410eee095de0faf2e8ccd3f917e322c7d68384.camel@intel.com>
-	<CAJFHJrpwkry6r9WDf=4aY2ONUvXKvm_BqWrONFfgRboqGony9g@mail.gmail.com>
-	<2d69ee09a42387241f027af2f75356f375058df5.camel@intel.com>
+Date: Fri, 6 Sep 2019 09:50:32 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190906135032.GD22083@redhat.com>
+References: <20190905194859.16219-1-vgoyal@redhat.com>
+	<20190905194859.16219-16-vgoyal@redhat.com>
+	<20190906120309.GW5900@stefanha-x1.localdomain>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="uh9ZiVrAOUUm9fzH"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <2d69ee09a42387241f027af2f75356f375058df5.camel@intel.com>
-Subject: Re: [Virtio-fs] xfstest results for virtio-fs on aarch64
+In-Reply-To: <20190906120309.GW5900@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH 15/18] virtiofs: Make virtio_fs object
+	refcounted
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,100 +18,216 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
-Cc: "slp@redhat.com" <slp@redhat.com>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>, "masayoshi.mizuma@fujitsu.com" <masayoshi.mizuma@fujitsu.com>, "vgoyal@redhat.com" <vgoyal@redhat.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: miklos@szeredi.hu, mst@redhat.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org
+
+On Fri, Sep 06, 2019 at 01:03:09PM +0100, Stefan Hajnoczi wrote:
+> On Thu, Sep 05, 2019 at 03:48:56PM -0400, Vivek Goyal wrote:
+> > This object is used both by fuse_connection as well virt device. So make
+> > this object reference counted and that makes it easy to define life cycle
+> > of the object.
+> > 
+> > Now deivce can be removed while filesystem is still mounted. This will
+> > cleanup all the virtqueues but virtio_fs object will still be around and
+> > will be cleaned when filesystem is unmounted and sb/fc drops its reference.
+> > 
+> > Removing a device also stops all virt queues and any new reuqest gets
+> > error -ENOTCONN. All existing in flight requests are drained before
+> > ->remove returns.
+> > 
+> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > ---
+> >  fs/fuse/virtio_fs.c | 52 +++++++++++++++++++++++++++++++++++++--------
+> >  1 file changed, 43 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> > index 01bbf2c0e144..29ec2f5bbbe2 100644
+> > --- a/fs/fuse/virtio_fs.c
+> > +++ b/fs/fuse/virtio_fs.c
+> > @@ -37,6 +37,7 @@ struct virtio_fs_vq {
+> >  
+> >  /* A virtio-fs device instance */
+> >  struct virtio_fs {
+> > +	struct kref refcount;
+> >  	struct list_head list;    /* on virtio_fs_instances */
+> >  	char *tag;
+> >  	struct virtio_fs_vq *vqs;
+> > @@ -63,6 +64,27 @@ static inline struct fuse_pqueue *vq_to_fpq(struct virtqueue *vq)
+> >  	return &vq_to_fsvq(vq)->fud->pq;
+> >  }
+> >  
+> > +static void release_virtiofs_obj(struct kref *ref)
+> > +{
+> > +	struct virtio_fs *vfs = container_of(ref, struct virtio_fs, refcount);
+> > +
+> > +	kfree(vfs->vqs);
+> > +	kfree(vfs);
+> > +}
+> > +
+> > +static void virtiofs_put(struct virtio_fs *fs)
+> 
+> Why do the two function names above contain "virtiofs" instead
+> of "virtio_fs"?  I'm not sure if this is intentional and is supposed to
+> mean something, but it's confusing.
+> 
+> > +{
+> > +	mutex_lock(&virtio_fs_mutex);
+> > +	kref_put(&fs->refcount, release_virtiofs_obj);
+> > +	mutex_unlock(&virtio_fs_mutex);
+> > +}
+> > +
+> > +static void virtio_fs_put(struct fuse_iqueue *fiq)
+> 
+> Minor issue: this function name is confusingly similar to
+> virtiofs_put().  Please rename to virtio_fs_fiq_put().
+
+Fixed with ->release semantics. Replaced "virtiofs" with "virtio_fs".
 
 
---uh9ZiVrAOUUm9fzH
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Subject: virtiofs: Make virtio_fs object refcounted
 
-On Wed, Oct 16, 2019 at 04:11:48PM +0000, Boeuf, Sebastien wrote:
-> On Wed, 2019-10-16 at 03:21 +0900, Chirantan Ekbote wrote:
-> > On Wed, Oct 16, 2019 at 2:28 AM Boeuf, Sebastien
-> > <sebastien.boeuf@intel.com> wrote:
-> > > Thanks Dave for adding me to the loop here!
-> > >=20
-> > > On Tue, 2019-10-15 at 17:26 +0100, Dr. David Alan Gilbert wrote:
-> > > > * Chirantan Ekbote (chirantan@chromium.org) wrote:
-> > > > > On Wed, Oct 16, 2019 at 12:58 AM Dr. David Alan Gilbert
-> > > > > <dgilbert@redhat.com> wrote:
-> > > > > > * Chirantan Ekbote (chirantan@chromium.org) wrote:
-> > > > > > > I'm not using virtiofsd.  We have our own server for
-> > > > > > > crosvm,
-> > > > > > > which
-> > > > > > > supports multiple queues.
-> > > > > >=20
-> > > > > > Ah excellent; is that public anywhere?
-> > > > > >=20
-> > > > >=20
-> > > > > It's currently under review here:
-> > > > > https://chromium-review.googlesource.com/c/chromiumos/platform/cr=
-osvm/+/1758103
-> > > > >=20
-> > > > > I expect to have it merged sometime this week.
-> > >=20
-> > > Oh that's very nice to hear. We have some code from the cloud-
-> > > hypervisor project where we have a vhost-user-net implementation
-> > > relying on some sort of a wrapper code similar to what all vhost-
-> > > user
-> > > daemon implementations would reuse (libvhost-user kind of thing).
-> > >=20
-> > > We're planning to see this wrapper code land on Rust-VMM at some
-> > > point,
-> > > which is why it would be interesting if you could rebase this
-> > > virtio-fs
-> > > daemon code on top of this small library. If you don't have the
-> > > bandwidth, we could probably look at it if that's something you
-> > > would
-> > > be interested in.
-> > >=20
-> > > Here is the code for the small wrapper crate:
-> > > https://github.com/intel/cloud-hypervisor/blob/master/vhost_user_back=
-end/src/lib.rs
-> > >=20
-> > > And here is the vhost-user-net example using it:
-> > > https://github.com/intel/cloud-hypervisor/blob/master/src/bin/vhost_u=
-ser_net.rs
-> > >=20
-> >=20
-> > Our virtio-fs server is not a vhost-user device (this was one of the
-> > reasons we didn't want to use virtiofsd).  It currently just runs
-> > directly as a child process of crosvm (like all other crosvm
-> > devices).
-> > So unless I'm missing something I don't think there's much to be
-> > gained by rebasing on vhost_user_backend.
->=20
-> Oh I didn't realize it was not a separate daemon. So yes, from your
-> perspective, there's no point in rebasing on top of vhost_user_backend.
-> I still believe it might be interesting for us to share as much code as
-> possible between projects, which is why we might reuse your code to
-> create a standalone daemon in Rust.
+This object is used both by fuse_connection as well virt device. So make
+this object reference counted and that makes it easy to define life cycle
+of the object. 
 
-I think the server code can be shared and it can live in rust-vmm.
+Now deivce can be removed while filesystem is still mounted. This will
+cleanup all the virtqueues but virtio_fs object will still be around and
+will be cleaned when filesystem is unmounted and sb/fc drops its reference.
 
-I haven't looked in detail but crosvm just has a slightly different
-out-of-process device model from vhost-user, but effectively they are
-both doing the same thing.  We'll need a bit of vhost-user glue but the
-core server code should be the same.
+Removing a device also stops all virt queues and any new reuqest gets
+error -ENOTCONN. All existing in flight requests are drained before
+->remove returns.
 
-Stefan
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/virtio_fs.c |   52 +++++++++++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 43 insertions(+), 9 deletions(-)
 
---uh9ZiVrAOUUm9fzH
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl2nY0wACgkQnKSrs4Gr
-c8g1Dwf/dmJZh9wKtwB0Z3fugzBEhctYJi5g4fXLRtAAskp+XOUcgSYPuvBkmpg5
-5I139lv26i2umH9qgvebCI0pXMG2NxOHsZ8q4NInI/2ZMWW6sNzYtjQFmn0KAFVi
-xSb+LzxeBgL+omd3BE1DqhEiiT6H9lY/hFhqRzbvucNAt3X/go5oP0TC7vHFIX0k
-RLFxvZjLU19bCFYduiyjfBh9+k4ZsEsmMEq4hesajsEWT0y0z1lr2ZpRA8S+Tq/s
-oaPZ3waaiZpb4by42g+K8MMDzx+YAkCp6qHBXKzeC+AZEbsfl5H+JRfuwhi6q8tq
-SmSEcmoiTHQKEhTZRI3wGtdEj+GmqA==
-=QiVB
------END PGP SIGNATURE-----
-
---uh9ZiVrAOUUm9fzH--
+Index: rhvgoyal-linux-fuse/fs/fuse/virtio_fs.c
+===================================================================
+--- rhvgoyal-linux-fuse.orig/fs/fuse/virtio_fs.c	2019-09-06 09:24:21.177245246 -0400
++++ rhvgoyal-linux-fuse/fs/fuse/virtio_fs.c	2019-09-06 09:40:53.309245246 -0400
+@@ -37,6 +37,7 @@ struct virtio_fs_vq {
+ 
+ /* A virtio-fs device instance */
+ struct virtio_fs {
++	struct kref refcount;
+ 	struct list_head list;    /* on virtio_fs_instances */
+ 	char *tag;
+ 	struct virtio_fs_vq *vqs;
+@@ -63,6 +64,27 @@ static inline struct fuse_pqueue *vq_to_
+ 	return &vq_to_fsvq(vq)->fud->pq;
+ }
+ 
++static void release_virtio_fs_obj(struct kref *ref)
++{
++	struct virtio_fs *vfs = container_of(ref, struct virtio_fs, refcount);
++
++	kfree(vfs->vqs);
++	kfree(vfs);
++}
++
++static void virtio_fs_put(struct virtio_fs *fs)
++{
++	mutex_lock(&virtio_fs_mutex);
++	kref_put(&fs->refcount, release_virtio_fs_obj);
++	mutex_unlock(&virtio_fs_mutex);
++}
++
++static void virtio_fs_fiq_release(struct fuse_iqueue *fiq)
++{
++	struct virtio_fs *vfs = fiq->priv;
++	virtio_fs_put(vfs);
++}
++
+ static void virtio_fs_drain_queue(struct virtio_fs_vq *fsvq)
+ {
+ 	WARN_ON(fsvq->in_flight < 0);
+@@ -156,8 +178,10 @@ static struct virtio_fs *virtio_fs_find_
+ 	mutex_lock(&virtio_fs_mutex);
+ 
+ 	list_for_each_entry(fs, &virtio_fs_instances, list) {
+-		if (strcmp(fs->tag, tag) == 0)
++		if (strcmp(fs->tag, tag) == 0) {
++			kref_get(&fs->refcount);
+ 			goto found;
++		}
+ 	}
+ 
+ 	fs = NULL; /* not found */
+@@ -519,6 +543,7 @@ static int virtio_fs_probe(struct virtio
+ 	fs = kzalloc(sizeof(*fs), GFP_KERNEL);
+ 	if (!fs)
+ 		return -ENOMEM;
++	kref_init(&fs->refcount);
+ 	vdev->priv = fs;
+ 
+ 	ret = virtio_fs_read_tag(vdev, fs);
+@@ -570,18 +595,18 @@ static void virtio_fs_remove(struct virt
+ {
+ 	struct virtio_fs *fs = vdev->priv;
+ 
++	mutex_lock(&virtio_fs_mutex);
++	list_del_init(&fs->list);
++	mutex_unlock(&virtio_fs_mutex);
++
+ 	virtio_fs_stop_all_queues(fs);
+ 	virtio_fs_drain_all_queues(fs);
+ 	vdev->config->reset(vdev);
+ 	virtio_fs_cleanup_vqs(vdev, fs);
+ 
+-	mutex_lock(&virtio_fs_mutex);
+-	list_del(&fs->list);
+-	mutex_unlock(&virtio_fs_mutex);
+-
+ 	vdev->priv = NULL;
+-	kfree(fs->vqs);
+-	kfree(fs);
++	/* Put device reference on virtio_fs object */
++	virtio_fs_put(fs);
+ }
+ 
+ #ifdef CONFIG_PM_SLEEP
+@@ -932,6 +957,7 @@ const static struct fuse_iqueue_ops virt
+ 	.wake_forget_and_unlock		= virtio_fs_wake_forget_and_unlock,
+ 	.wake_interrupt_and_unlock	= virtio_fs_wake_interrupt_and_unlock,
+ 	.wake_pending_and_unlock	= virtio_fs_wake_pending_and_unlock,
++	.release			= virtio_fs_fiq_release,
+ };
+ 
+ static int virtio_fs_fill_super(struct super_block *sb)
+@@ -1026,7 +1052,9 @@ static void virtio_kill_sb(struct super_
+ 	fuse_kill_sb_anon(sb);
+ 
+ 	/* fuse_kill_sb_anon() must have sent destroy. Stop all queues
+-	 * and drain one more time and free fuse devices.
++	 * and drain one more time and free fuse devices. Freeing fuse
++	 * devices will drop their reference on fuse_conn and that in
++	 * turn will drop its reference on virtio_fs object.
+ 	 */
+ 	virtio_fs_stop_all_queues(vfs);
+ 	virtio_fs_drain_all_queues(vfs);
+@@ -1060,6 +1088,10 @@ static int virtio_fs_get_tree(struct fs_
+ 	struct fuse_conn *fc;
+ 	int err;
+ 
++	/* This gets a reference on virtio_fs object. This ptr gets installed
++	 * in fc->iq->priv. Once fuse_conn is going away, it calls ->put()
++	 * to drop the reference to this object.
++	 */
+ 	fs = virtio_fs_find_instance(fsc->source);
+ 	if (!fs) {
+ 		pr_info("virtio-fs: tag <%s> not found\n", fsc->source);
+@@ -1067,8 +1099,10 @@ static int virtio_fs_get_tree(struct fs_
+ 	}
+ 
+ 	fc = kzalloc(sizeof(struct fuse_conn), GFP_KERNEL);
+-	if (!fc)
++	if (!fc) {
++		virtio_fs_put(fs);
+ 		return -ENOMEM;
++	}
+ 
+ 	fuse_conn_init(fc, get_user_ns(current_user_ns()), &virtio_fs_fiq_ops,
+ 		       fs);
 

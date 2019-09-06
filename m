@@ -1,20 +1,15 @@
-Date: Tue, 15 Oct 2019 16:57:49 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20191015155749.GH3073@work-vm>
-References: <7331fd60-10c6-6076-4cf5-f5cce7bc6ef1@jp.fujitsu.com>
-	<20191007143444.GA174343@work-vm> <20191009165116.GJ2893@work-vm>
-	<27035e4a-bd12-e5d8-30d0-0df45e75457c@jp.fujitsu.com>
-	<CAJFHJrr5Esq=cjZNW4qZRABtCCh_vpkFJEQO9kYb=Pg62O+weQ@mail.gmail.com>
-	<20191011195935.GB13861@redhat.com>
-	<CAJFHJrq6bQo=yvO0tAxH7RWg=U=ftpsePs3c7y-AcE90Wh4afg@mail.gmail.com>
-	<20191011203647.GC13861@redhat.com>
-	<20191014091108.GH22963@stefanha-x1.localdomain>
-	<CAJFHJrrqfjQqMu-K99DiBYNmD1=hB710wRZ88w--SQ0GxQv9Tw@mail.gmail.com>
+Date: Fri, 6 Sep 2019 09:35:55 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20190906133555.GC22083@redhat.com>
+References: <20190905194859.16219-1-vgoyal@redhat.com>
+	<20190905194859.16219-15-vgoyal@redhat.com>
+	<20190906120009.GV5900@stefanha-x1.localdomain>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <CAJFHJrrqfjQqMu-K99DiBYNmD1=hB710wRZ88w--SQ0GxQv9Tw@mail.gmail.com>
-Subject: Re: [Virtio-fs] xfstest results for virtio-fs on aarch64
+In-Reply-To: <20190906120009.GV5900@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH 14/18] virtiofs: Add a fuse_iqueue operation
+ to put() reference
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,71 +18,100 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Chirantan Ekbote <chirantan@chromium.org>
-Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>, "masayoshi.mizuma@fujitsu.com" <masayoshi.mizuma@fujitsu.com>, Vivek Goyal <vgoyal@redhat.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: miklos@szeredi.hu, mst@redhat.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org
 
-* Chirantan Ekbote (chirantan@chromium.org) wrote:
-> On Mon, Oct 14, 2019 at 6:11 PM Stefan Hajnoczi <stefanha@redhat.com> wrote:
-> >
-> > On Fri, Oct 11, 2019 at 04:36:47PM -0400, Vivek Goyal wrote:
-> > > On Sat, Oct 12, 2019 at 05:13:51AM +0900, Chirantan Ekbote wrote:
-> > > > On Sat, Oct 12, 2019 at 4:59 AM Vivek Goyal <vgoyal@redhat.com> wrote:
-> > > > @@ -922,7 +990,8 @@ static int virtio_fs_enqueue_req(struct virtqueue
-> > > > *vq, struct fuse_req *req)
-> > > >  static void virtio_fs_wake_pending_and_unlock(struct fuse_iqueue *fiq)
-> > > >  __releases(fiq->waitq.lock)
-> > > >  {
-> > > > -       unsigned queue_id = VQ_REQUEST; /* TODO multiqueue */
-> > > > +       /* unsigned queue_id = VQ_REQUEST; /\* TODO multiqueue *\/ */
-> > > > +       unsigned queue_id;
-> > > >         struct virtio_fs *fs;
-> > > >         struct fuse_conn *fc;
-> > > >         struct fuse_req *req;
-> > > > @@ -937,6 +1006,7 @@ __releases(fiq->waitq.lock)
-> > > >         spin_unlock(&fiq->waitq.lock);
-> > > >
-> > > >         fs = fiq->priv;
-> > > > +       queue_id = (req->in.h.unique % (fs->nvqs - 1)) + 1;
-> > > >         fc = fs->vqs[queue_id].fud->fc;
-> > > >
-> > > >         dev_dbg(&fs->vqs[queue_id].vq->vdev->dev,
-> > > >
-> > > >
-> > > > This is simply round-robin scheduling but even going from one to two
-> > > > queues gives a significant performance improvement (especially because
-> > > > crosvm doesn't support shared memory regions yet).
-> > >
-> > > Interesting. I thought virtiofsd is hard coded right now to support
-> > > only one queue. Did you modify virtiofsd to support more than one
-> > > request queue?
-> >
-> > Right, virtiofsd currently refuses to bring up more than 1 request
-> > queue.  The code can actually handle multiqueue now but there is no
-> > command-line support for it yet.  The ability to set CPU affinity for
-> > virtqueue threads could be introduced at the same time as enabling
-> > multiqueue.
-> >
+On Fri, Sep 06, 2019 at 01:00:09PM +0100, Stefan Hajnoczi wrote:
+> On Thu, Sep 05, 2019 at 03:48:55PM -0400, Vivek Goyal wrote:
+> > diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+> > index 85e2dcad68c1..04e2c000d63f 100644
+> > --- a/fs/fuse/fuse_i.h
+> > +++ b/fs/fuse/fuse_i.h
+> > @@ -479,6 +479,11 @@ struct fuse_iqueue_ops {
+> >  	 */
+> >  	void (*wake_pending_and_unlock)(struct fuse_iqueue *fiq)
+> >  		__releases(fiq->waitq.lock);
+> > +
+> > +	/**
+> > +	 * Put a reference on fiq_priv.
 > 
-> I'm not using virtiofsd.  We have our own server for crosvm, which
-> supports multiple queues.
-
-Ah excellent; is that public anywhere?
-
-> As for the performance numbers, I don't have my test device with me
-> but if I remember correctly the blogbench scores almost doubled when
-> going from one queue to two queues.
-
-Very nice.
-
-Dave
-
+> I'm a bit confused about fiq->priv's role in this.  The callback takes
+> struct fuse_iqueue *fiq as the argument, not void *priv, so it could
+> theoretically do more than just release priv.
 > 
-> Chirantan
+> I think one of the following would be clearer:
 > 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+>  /**
+>   * Drop a reference to fiq->priv.
+>   */
+>  void (*put_priv)(void *priv);
+> 
+> Or:
+> 
+>  /**
+>   * Clean up when fuse_iqueue is destroyed.
+>   */
+>  void (*release)(struct fuse_iqueue *fiq);
+> 
+> In the second case fuse_conn_put() shouldn't check fiq->priv.
+
+Hi Stefan,
+
+I like using ->release() method sounds better. Here is the updated patch.
+This also changes the next patch, so will post that as well.
+
+Thanks
+Vivek
+
+Subject: virtiofs: Add a fuse_iqueue operation to put() reference
+
+Soon I will make virtio_fs object reference counted, where reference will
+be taken by device as well as by fuse_conn (fuse_conn->fuse_iqueue->fiq_priv).
+
+When fuse_connection is going away, it should put its reference on virtio_fs
+object.
+
+So add a fuse_iqueue method which can be used to call into virtio_fs to
+put the reference on the object (fiq_priv).
+
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/fuse_i.h |    5 +++++
+ fs/fuse/inode.c  |    4 ++++
+ 2 files changed, 9 insertions(+)
+
+Index: rhvgoyal-linux-fuse/fs/fuse/fuse_i.h
+===================================================================
+--- rhvgoyal-linux-fuse.orig/fs/fuse/fuse_i.h	2019-09-06 08:46:41.846086544 -0400
++++ rhvgoyal-linux-fuse/fs/fuse/fuse_i.h	2019-09-06 09:24:32.752245246 -0400
+@@ -479,6 +479,11 @@ struct fuse_iqueue_ops {
+ 	 */
+ 	void (*wake_pending_and_unlock)(struct fuse_iqueue *fiq)
+ 		__releases(fiq->waitq.lock);
++
++	/**
++	 * Cleanup up when fuse_iqueue is destroyed
++	 */
++	void (*release)(struct fuse_iqueue *fiq);
+ };
+ 
+ /** /dev/fuse input queue operations */
+Index: rhvgoyal-linux-fuse/fs/fuse/inode.c
+===================================================================
+--- rhvgoyal-linux-fuse.orig/fs/fuse/inode.c	2019-09-06 08:46:41.847086544 -0400
++++ rhvgoyal-linux-fuse/fs/fuse/inode.c	2019-09-06 09:24:32.754245246 -0400
+@@ -631,8 +631,12 @@ EXPORT_SYMBOL_GPL(fuse_conn_init);
+ void fuse_conn_put(struct fuse_conn *fc)
+ {
+ 	if (refcount_dec_and_test(&fc->count)) {
++		struct fuse_iqueue *fiq = &fc->iq;
++
+ 		if (fc->destroy_req)
+ 			fuse_request_free(fc->destroy_req);
++		if (fiq->ops->release)
++			fiq->ops->release(fiq);
+ 		put_pid_ns(fc->pid_ns);
+ 		put_user_ns(fc->user_ns);
+ 		fc->release(fc);
+
 

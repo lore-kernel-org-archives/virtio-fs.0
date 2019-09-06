@@ -1,16 +1,18 @@
-Date: Fri, 6 Sep 2019 12:03:01 +0100
-From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
-Message-ID: <20190906110301.GW5119@redhat.com>
+Date: Fri, 6 Sep 2019 12:12:23 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20190906111223.GD2699@work-vm>
 References: <20190905152136.30637-1-stefanha@redhat.com>
-	<20190905174021.GR2700@work-vm>
-	<20190906102926.GF5900@stefanha-x1.localdomain>
+	<20190905152136.30637-3-stefanha@redhat.com>
+	<20190905172732.GQ2700@work-vm>
+	<20190906102328.GE5900@stefanha-x1.localdomain>
+	<20190906104953.GV5119@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=utf-8
+Content-Type: text/plain; charset="iso-8859-1"
 Content-Disposition: inline
-In-Reply-To: <20190906102926.GF5900@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [Qemu-devel] [RFC 0/3] virtiofsd: get/set log level
-	via DBus
-Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+Content-Transfer-Encoding: quoted-printable
+In-Reply-To: <20190906104953.GV5119@redhat.com>
+Subject: Re: [Virtio-fs] [Qemu-devel] [RFC 2/3] virtiofsd: add DBus server
+ to handle log level changes
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,70 +21,56 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, =?utf-8?Q?Marc-Andr=C3=A9?= Lureau <marcandre.lureau@redhat.com>, qemu-devel@nongnu.org
+To: Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>
+Cc: virtio-fs@redhat.com, =?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@redhat.com>, qemu-devel@nongnu.org
 
-On Fri, Sep 06, 2019 at 11:29:26AM +0100, Stefan Hajnoczi wrote:
-> On Thu, Sep 05, 2019 at 06:40:21PM +0100, Dr. David Alan Gilbert wrote:
-> > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> > > It is likely that virtiofsd will need to support "management commands" for
-> > > reconfiguring it at runtime.  The first use case was proposed by Eryu Guan for
-> > > getting/setting the current log level.
-> > > 
-> > > I promised to try out DBus as the management interface because it has a rich
-> > > feature set and is accessible from most programming languages.  It should be
-> > > able to support all the use cases we come up with.
-> > > 
-> > > This patch series is a prototype that implements the get-log-level and
-> > > set-log-level management commands via DBus.  Use the new virtiofsctl tool to
-> > > talk to a running virtiofsd process:
-> > > 
-> > >   # dbus-run-session ./virtiofsd ...
-> > >   ...
-> > >   Using dbus address unix:abstract=/tmp/dbus-H9WBbpjk3O,guid=0be16acefb868e6025a8737f5d7124d2
-> > >   # export DBUS_SESSION_BUS_ADDRESS=unix:abstract=/tmp/dbus-H9WBbpjk3O,guid=0be16acefb868e6025a8737f5d7124d2
-> > >   # ./virtiofsctl set-log-level err
-> > > 
-> > > Most of the work is done by gdbus-codegen(1).  It generates code for the
-> > > org.qemu.Virtiofsd.xml interface definition.  Our code can use the simple
-> > > virtiofsd_get/set_log_level() APIs and it will make corresponding DBus calls.
-> > > 
-> > > I'm pretty happy with this approach because the code is straightforward.  It
-> > > hasn't even triggered seccomp failures yet :).
-> > 
-> > Yes it's less complex than I'd worried.
-> > Now, I do think we've got to think about how qemu in general is going to
-> > use dbus as people were discussing it, because then we have to think
-> > what the security aspects are - do we need to look at some calls only
-> > available to some clients etc.
-> 
-> The approach I took in this patch series is to launch a session bus just
-> for this virtiofsd.  The abstract socket unix(7) namespace used by GDBus
-> by default does not offer any security.  I think any process on the host
-> can connect to it, regardless of uid/gid.
+* Daniel P. Berrang=E9 (berrange@redhat.com) wrote:
+> On Fri, Sep 06, 2019 at 11:23:28AM +0100, Stefan Hajnoczi wrote:
+> > On Thu, Sep 05, 2019 at 06:27:32PM +0100, Dr. David Alan Gilbert wrote:
+> > > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > > > Introduce a DBus server thread that runs alongside the other virtio=
+fsd
+> > > > threads.  It processes changes to the /org/qemu/virtiofsd object wh=
+ich
+> > > > can be accessed at the org.qemu.virtiofsd location on the bus.
+> > > >=20
+> > > > This code does not use locking because we are the only writer to the
+> > > > int current_log_level variable.  More advanced management commands =
+would
+> > > > require locking to prevent race conditions with the other threads.
+> > > >=20
+> > > > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> > >=20
+> > > OK, that is less complex than I'd feared.
+> > > I guess there's something probably nice to do with name/integer mappi=
+ng
+> > > for warning levels that we could use from one of the libraries.
+> >=20
+> > I used a free-form string because it's what systemd's LogLevel property
+> > also does.  But I can investigate the cleanest approach for limiting it
+> > to a set of string constants.
+>=20
+> There's no concept of "enums" at the DBus protocol level. Sending enums
+> in string form is the normal practice - avoiding integer values means
+> you are not vulnerable to enum values changing if someone inserts a new
+> constant in the middlle of the enum. This same reason is why QAPI uses
+> strings for enums instead of ints.
 
-Other users will be able to connect(), but you'll find that the dbus
-policy causes their connections to be dropped immediately - even if
-they are the root user in fact.
+Oh, I wasn't talking aobut changing protocol; I just meant there was
+probably a neater way of doing the string look up than the opencoded way
+it was done.
 
-> A path like unix:path=/tmp/foo would allow us to use UNIX Domain Socket
-> permissions as the main security mechanism.  I'm not enthusiastic about
-> using SELinux or some kind of DBus-specific policy language if we can
-> avoid it because it's complex and obscure.
+Dave
 
-Yep, that just needs you to supply a config file when launching to
-specify a desired filesystem path.
-
-I don't think it is an either/or matter - I think we'll  want all
-three in general - DAC controls on the socket, and DBus policy and
-SELinux policy. DAC controls on the socket alone are not sufficient
-if you want to separate each QEMU from each other and they're running
-the same UID which is common.
-
-Regards,
-Daniel
--- 
-|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
-|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
-|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
+> Regards,
+> Daniel
+> --=20
+> |: https://berrange.com      -o-    https://www.flickr.com/photos/dberran=
+ge :|
+> |: https://libvirt.org         -o-            https://fstop138.berrange.c=
+om :|
+> |: https://entangle-photo.org    -o-    https://www.instagram.com/dberran=
+ge :|
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

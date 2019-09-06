@@ -1,15 +1,15 @@
-Date: Fri, 6 Sep 2019 12:50:26 +0100
+Date: Fri, 6 Sep 2019 12:51:58 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190906115026.GS5900@stefanha-x1.localdomain>
+Message-ID: <20190906115158.GT5900@stefanha-x1.localdomain>
 References: <20190905194859.16219-1-vgoyal@redhat.com>
-	<20190905194859.16219-12-vgoyal@redhat.com>
+	<20190905194859.16219-13-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="6zn93sY2JrH9m7VZ"
+	protocol="application/pgp-signature"; boundary="yypaS3FvPkEUiGyo"
 Content-Disposition: inline
-In-Reply-To: <20190905194859.16219-12-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 11/18] virtiofs: stop and drain queues after
- sending DESTROY
+In-Reply-To: <20190905194859.16219-13-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 12/18] virtiofs: Use virtio_fs_free_devs()
+	in error path
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,41 +22,36 @@ To: Vivek Goyal <vgoyal@redhat.com>
 Cc: miklos@szeredi.hu, mst@redhat.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org
 
 
---6zn93sY2JrH9m7VZ
+--yypaS3FvPkEUiGyo
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Thu, Sep 05, 2019 at 03:48:52PM -0400, Vivek Goyal wrote:
-> During virtio_kill_sb() we first stop forget queue and drain it and then
-> call fuse_kill_sb_anon(). This will result in sending DESTROY request to
-> fuse server. Once finished, stop all the queues and drain one more time
-> just to be sure and then free up the devices.
->=20
-> Given drain queues will call flush_work() on various workers, remove this
-> logic from virtio_free_devs().
+On Thu, Sep 05, 2019 at 03:48:53PM -0400, Vivek Goyal wrote:
+> We already have an helper to cleanup fuse devices. Use that instead of
+> duplicating the code.
 >=20
 > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 > ---
->  fs/fuse/virtio_fs.c | 11 ++++++++---
->  1 file changed, 8 insertions(+), 3 deletions(-)
+>  fs/fuse/virtio_fs.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
---6zn93sY2JrH9m7VZ
+--yypaS3FvPkEUiGyo
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1ySAIACgkQnKSrs4Gr
-c8hPCggAqxxAtpxUlxuyJ1JMZVearCJpL7Y98Ts25vXNZJKaGv/Z7w+0b1YNHE04
-RuXVOEqhwAG5VKOIpPYs+SJwTEwWTgsHEdAgtprbwW+v/vrOlf3LEaC9QS7+Z6bZ
-altTVdvWHQiqulsObNYVrgm/alLh75y8skYmwHHAK0EtbLoOwBnwzYNHyuOsH7tk
-YdpXmipXCBBtjQrC9rWXSt0ug0xCm29uK/voTea5mrDVFTpTixcKJ2LM6jnT6r4v
-mXBtZwegQNYew2LLapEqG+GNE2SSbMD765Z/MFyR48cksq/5mEbCOavSmN8S1HfH
-zelxUzsGNaQAsRXvt+wUI8Y94D+aoQ==
-=OYfd
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1ySF4ACgkQnKSrs4Gr
+c8hVlggAupQb9gfTAr4egGumTVeZNasLSgBakY+MqFVWz6P9M1eU0+mtx0t+LTvK
+6hPYtUtYRNcR4U4LWcuAf30gKaYbr5UFDYmQ8zp8sCouPeTZChlnd35T2Aez6RQw
+lTlB2cAikH0aAjaLU1ldhLnx/+NkO8KkPh5tEYfCOHPEgpZSz1BQ5ce5iwVY9s5a
+2OZEet0IehG38kKsyXW88H+F/p8vHVLRrUkhi5CCezvlim7HFWRLFhj4Dc6Eu0sT
+HQmMvhppnlYqoDj8+Nkhs2Xv87KZxK2E6k2Z5NLle7vl1H6HbROZPMJB0WPLLZ2y
++yZpbk5cezyZigVO/ES7VBTJc6IZyA==
+=OijB
 -----END PGP SIGNATURE-----
 
---6zn93sY2JrH9m7VZ--
+--yypaS3FvPkEUiGyo--
 

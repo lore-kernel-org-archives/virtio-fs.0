@@ -1,16 +1,19 @@
-Date: Sun, 27 Oct 2019 13:36:23 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20191027123623.GO4472@stefanha-x1.localdomain>
-References: <20191025100152.6638-1-stefanha@redhat.com>
-	<20191025100152.6638-2-stefanha@redhat.com>
-	<20191026174745-mutt-send-email-mst@kernel.org>
+Date: Fri, 6 Sep 2019 10:17:44 -0400
+From: "Michael S. Tsirkin" <mst@redhat.com>
+Message-ID: <20190906101339-mutt-send-email-mst@kernel.org>
+References: <20190905194859.16219-1-vgoyal@redhat.com>
+	<CAJfpegu8POz9gC4MDEcXxDWBD0giUNFgJhMEzntJX_u4+cS9Zw@mail.gmail.com>
+	<20190906103613.GH5900@stefanha-x1.localdomain>
+	<CAJfpegudNVZitQ5L8gPvA45mRPFDk9fhyboceVW6xShpJ4mLww@mail.gmail.com>
+	<20190906120817.GA22083@redhat.com>
+	<20190906095428-mutt-send-email-mst@kernel.org>
+	<CAJfpeguVvwRCi7+23W2qA+KHeoaYaR7uKsX+JykC3HK00uGSNQ@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="HFD/Dq8JdnjNvyuv"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20191026174745-mutt-send-email-mst@kernel.org>
-Subject: Re: [Virtio-fs] [RFC 1/3] WIP virtiofsd: import Linux <fuse.h>
-	header file
+In-Reply-To: <CAJfpeguVvwRCi7+23W2qA+KHeoaYaR7uKsX+JykC3HK00uGSNQ@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 00/18] virtiofs: Fix various races and
+	cleanups round 1
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,45 +22,14 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Michael S. Tsirkin" <mst@redhat.com>
-Cc: Laurent Vivier <lvivier@redhat.com>, Thomas Huth <thuth@redhat.com>, Cornelia Huck <cohuck@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, Paolo Bonzini <pbonzini@redhat.com>, vgoyal@redhat.com
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
 
+On Fri, Sep 06, 2019 at 04:11:45PM +0200, Miklos Szeredi wrote:
+> This is not a drop in replacement for blk and scsi transports.  More
+> for virtio-9p.  Does that have anything similar?
 
---HFD/Dq8JdnjNvyuv
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Sat, Oct 26, 2019 at 05:49:11PM -0400, Michael S. Tsirkin wrote:
-> On Fri, Oct 25, 2019 at 12:01:50PM +0200, Stefan Hajnoczi wrote:
-> > tests/vhost-user-fs-test.c needs fuse.h.  The private copy that
-> > virtiofsd has can be replaced with a properly imported file using
-> > update-linux-headers.sh.
-> >=20
-> > TODO rerun update-linux-headers.sh with upstream kernel tree!
-> >=20
-> > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
->=20
-> OK I would just add this with the virtiofsd patchset.
-
-Yes, I'll talk to David.
-
-Stefan
-
---HFD/Dq8JdnjNvyuv
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl21j0cACgkQnKSrs4Gr
-c8j6ugf/SwP+Qyw7qmyQInH0iArUl4QbSR98SvctUVw066Vw109WHPpDr8v3LFbE
-xJ90vnF6s+yaKbvMeFCtJMpJ0nRosEhjc20XjrpfINvvlUQANgkPl4NUpqD3gxeg
-daqXIoOux2Yi5gi5m/VyQdNf71u/Y4VU4mImXN+0WnFUfko4VkH28N+JTwT4Bkng
-NjspBEVSTDMfqS2BPPwT8tvITpOFlVNb2skkR8qngT0Dq3bEp5NelxKVMdGgMA8x
-4D1AvV52BU2pRyiWocCjelJXsXRCKDOX+LYNt15c2GIeVPDOmaCa+1fvzxdHYMOT
-eoC+xLolTWudUHY6b1etEmQGHqwRXg==
-=RCds
------END PGP SIGNATURE-----
-
---HFD/Dq8JdnjNvyuv--
+9p seems to supports unplug, yes. It's not great in that it
+blocks until we close the channel, but it's there and
+it does not crash or leak memory.
 

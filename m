@@ -1,9 +1,16 @@
+Date: Fri, 6 Sep 2019 11:23:28 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Fri,  6 Sep 2019 11:03:24 +0100
-Message-Id: <20190906100324.8492-1-stefanha@redhat.com>
+Message-ID: <20190906102328.GE5900@stefanha-x1.localdomain>
+References: <20190905152136.30637-1-stefanha@redhat.com>
+	<20190905152136.30637-3-stefanha@redhat.com>
+	<20190905172732.GQ2700@work-vm>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH] init/do_mounts.c: add virtiofs root fs support
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="k3qmt+ucFURmlhDS"
+Content-Disposition: inline
+In-Reply-To: <20190905172732.GQ2700@work-vm>
+Subject: Re: [Virtio-fs] [RFC 2/3] virtiofsd: add DBus server to handle log
+	level changes
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -12,47 +19,51 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
-Cc: mszeredi@redhat.com, David Howells <dhowells@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, =?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@redhat.com>, qemu-devel@nongnu.org
 
-Make it possible to boot directly from a virtiofs file system with tag
-'myfs' using the following kernel parameters:
 
-  rootfstype=virtiofs root=myfs rw
+--k3qmt+ucFURmlhDS
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Booting directly from virtiofs makes it possible to use a directory on
-the host as the root file system.  This is convenient for testing and
-situations where manipulating disk image files is cumbersome.
+On Thu, Sep 05, 2019 at 06:27:32PM +0100, Dr. David Alan Gilbert wrote:
+> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > Introduce a DBus server thread that runs alongside the other virtiofsd
+> > threads.  It processes changes to the /org/qemu/virtiofsd object which
+> > can be accessed at the org.qemu.virtiofsd location on the bus.
+> >=20
+> > This code does not use locking because we are the only writer to the
+> > int current_log_level variable.  More advanced management commands would
+> > require locking to prevent race conditions with the other threads.
+> >=20
+> > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+>=20
+> OK, that is less complex than I'd feared.
+> I guess there's something probably nice to do with name/integer mapping
+> for warning levels that we could use from one of the libraries.
 
-Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
----
-This patch is based on linux-next (next-20190904) but should apply
-cleanly to other virtiofs trees.
+I used a free-form string because it's what systemd's LogLevel property
+also does.  But I can investigate the cleanest approach for limiting it
+to a set of string constants.
 
- init/do_mounts.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Stefan
 
-diff --git a/init/do_mounts.c b/init/do_mounts.c
-index 9634ecf3743d..030be2f1999a 100644
---- a/init/do_mounts.c
-+++ b/init/do_mounts.c
-@@ -554,6 +554,16 @@ void __init mount_root(void)
- 			change_floppy("root floppy");
- 	}
- #endif
-+#ifdef CONFIG_VIRTIO_FS
-+	if (root_fs_names && !strcmp(root_fs_names, "virtiofs")) {
-+		if (!do_mount_root(root_device_name, "virtiofs",
-+				   root_mountflags, root_mount_data))
-+			return;
-+
-+		panic("VFS: Unable to mount root fs \"%s\" from virtiofs",
-+		      root_device_name);
-+	}
-+#endif
- #ifdef CONFIG_BLOCK
- 	{
- 		int err = create_dev("/dev/root", ROOT_DEV);
--- 
-2.21.0
+--k3qmt+ucFURmlhDS
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1yM6AACgkQnKSrs4Gr
+c8ibkQf/dj60BBfKOmis/SmblMlFBwmZEnKcUwgfEso5mZwoRf+ONf+2pC3Gn3GQ
+gPB45AL1qvAiSxRlZ4K4AKB+tUkPShjAEwGNMM1kp1HHO1fL3gL9wGwxejjkPXVI
+44xHJqq5F9Hst2YRwGwU3UwoE3AoTphy/FvGjfU2yNCJOu7L3ftUnpIvl/xjmSgi
+pUZN1j9Z6zWHm8gAaIgX4UGsDRD4vbTPeAsA9D+D7LdJN64WknmcmjU/wENjaWSn
+4R1yJe2p5avYtiXEfQsF/mFMW+oF/bZLorbta7lcmK2vfeqz84APfeJORLtbal8l
+AXTthC8gchi8FsxxClxOC6Gjr8HjSA==
+=LCwc
+-----END PGP SIGNATURE-----
+
+--k3qmt+ucFURmlhDS--
 

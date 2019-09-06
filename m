@@ -1,15 +1,15 @@
-Date: Fri, 6 Sep 2019 11:52:10 +0100
+Date: Fri, 6 Sep 2019 11:54:48 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190906105210.GP5900@stefanha-x1.localdomain>
+Message-ID: <20190906105448.GQ5900@stefanha-x1.localdomain>
 References: <20190905194859.16219-1-vgoyal@redhat.com>
-	<20190905194859.16219-9-vgoyal@redhat.com>
+	<20190905194859.16219-10-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="4IFtMBbmeqbTM/ox"
+	protocol="application/pgp-signature"; boundary="zywvytGCXzdVpkje"
 Content-Disposition: inline
-In-Reply-To: <20190905194859.16219-9-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 08/18] virtiofs: Drain all pending requests
- during ->remove time
+In-Reply-To: <20190905194859.16219-10-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 09/18] virtiofs: Add an helper to start all
+	the queues
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,43 +22,36 @@ To: Vivek Goyal <vgoyal@redhat.com>
 Cc: miklos@szeredi.hu, mst@redhat.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org
 
 
---4IFtMBbmeqbTM/ox
+--zywvytGCXzdVpkje
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-On Thu, Sep 05, 2019 at 03:48:49PM -0400, Vivek Goyal wrote:
-> +static void virtio_fs_drain_queue(struct virtio_fs_vq *fsvq)
-> +{
-> +	WARN_ON(fsvq->in_flight < 0);
-> +
-> +	/* Wait for in flight requests to finish.*/
-> +	while (1) {
-> +		spin_lock(&fsvq->lock);
-> +		if (!fsvq->in_flight) {
-> +			spin_unlock(&fsvq->lock);
-> +			break;
-> +		}
-> +		spin_unlock(&fsvq->lock);
-> +		usleep_range(1000, 2000);
-> +	}
+On Thu, Sep 05, 2019 at 03:48:50PM -0400, Vivek Goyal wrote:
+> This just marks are the queues are connected and ready to accept the
+> request.
+>=20
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  fs/fuse/virtio_fs.c | 19 ++++++++++++++++---
+>  1 file changed, 16 insertions(+), 3 deletions(-)
 
-I think all contexts that call this allow sleeping so we could avoid
-usleep here.
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
---4IFtMBbmeqbTM/ox
+--zywvytGCXzdVpkje
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1yOloACgkQnKSrs4Gr
-c8gmeQgAoJQJeQAjTj+aeNGzBdb4oLsqKKM6Q+4z3dqyaIM7pOTsdgiPZ/q1DA5U
-3/e2c4UFDTEg+r9xvEx5FFgBiPFrpwGU3N8mroPEUY9yueCllNsIZmS0y8n76YDb
-dCAPCksGMF4o9AWlHAMnxFoao+EfbsJd1mNU/7f7hFqFQoAuCu64321mwhqtOO+V
-PXUqk6wTZtWxPAzvZCO93D4DuUfrW7jzHRNyvCvgPiJLCTU43uptr1PDJKuDCxAp
-Sqpb5jJevhxuwbc84hIEnKY/0ERKxjky+XWBsHHc1Yy/CWAdNCyU0tW8OuUaG5+k
-FF9UbW4BK3wqyzMhWOd/4jDbTz6oyA==
-=x8L/
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1yOvgACgkQnKSrs4Gr
+c8gpQQgAmqp0vUor8BWsHmF4f+In/ZlxHyIx8n3wydsF7FDmfDqnXBAAB1qRRErW
+2msRa5bwjkk9CUJdE9qVsrep5CjgqpApmNEGuCREhZcRpS7RFyZJaXbPhRI4ipII
+VjAcP0OhH1iVnyy2kWy4EaTdmDAgqjCLZjB3rDKldsYq37sfwAlX0xWyWBwKgRLm
+3g0KmiJa8E4aVlG01KfLrGd7+aschTC8Jm5p6XPVE8yN4tFCf0Ax3DbZ6PZen+ah
++BQQSXjYiyszHGT+F0E70ihwnaxZkqtiSOluPk0+db+DAvRC11OgYv54YdGXv6Gf
+g2HoRAtGSvMStmfuZfboifUBFXVhyw==
+=cHMM
 -----END PGP SIGNATURE-----
 
---4IFtMBbmeqbTM/ox--
+--zywvytGCXzdVpkje--
 

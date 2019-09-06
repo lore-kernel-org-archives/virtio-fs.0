@@ -1,15 +1,16 @@
-Date: Fri, 6 Sep 2019 11:56:58 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190906105658.GR5900@stefanha-x1.localdomain>
-References: <20190905194859.16219-1-vgoyal@redhat.com>
-	<20190905194859.16219-11-vgoyal@redhat.com>
+Date: Fri, 6 Sep 2019 12:03:01 +0100
+From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+Message-ID: <20190906110301.GW5119@redhat.com>
+References: <20190905152136.30637-1-stefanha@redhat.com>
+	<20190905174021.GR2700@work-vm>
+	<20190906102926.GF5900@stefanha-x1.localdomain>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="Sf3MmCJcUNNLokcm"
+Content-Type: text/plain; charset=utf-8
 Content-Disposition: inline
-In-Reply-To: <20190905194859.16219-11-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 10/18] virtiofs: Do not use device managed
- mem for virtio_fs and virtio_fs_vq
+In-Reply-To: <20190906102926.GF5900@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [Qemu-devel] [RFC 0/3] virtiofsd: get/set log level
+	via DBus
+Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,49 +19,70 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: miklos@szeredi.hu, mst@redhat.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, =?utf-8?Q?Marc-Andr=C3=A9?= Lureau <marcandre.lureau@redhat.com>, qemu-devel@nongnu.org
 
+On Fri, Sep 06, 2019 at 11:29:26AM +0100, Stefan Hajnoczi wrote:
+> On Thu, Sep 05, 2019 at 06:40:21PM +0100, Dr. David Alan Gilbert wrote:
+> > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > > It is likely that virtiofsd will need to support "management commands" for
+> > > reconfiguring it at runtime.  The first use case was proposed by Eryu Guan for
+> > > getting/setting the current log level.
+> > > 
+> > > I promised to try out DBus as the management interface because it has a rich
+> > > feature set and is accessible from most programming languages.  It should be
+> > > able to support all the use cases we come up with.
+> > > 
+> > > This patch series is a prototype that implements the get-log-level and
+> > > set-log-level management commands via DBus.  Use the new virtiofsctl tool to
+> > > talk to a running virtiofsd process:
+> > > 
+> > >   # dbus-run-session ./virtiofsd ...
+> > >   ...
+> > >   Using dbus address unix:abstract=/tmp/dbus-H9WBbpjk3O,guid=0be16acefb868e6025a8737f5d7124d2
+> > >   # export DBUS_SESSION_BUS_ADDRESS=unix:abstract=/tmp/dbus-H9WBbpjk3O,guid=0be16acefb868e6025a8737f5d7124d2
+> > >   # ./virtiofsctl set-log-level err
+> > > 
+> > > Most of the work is done by gdbus-codegen(1).  It generates code for the
+> > > org.qemu.Virtiofsd.xml interface definition.  Our code can use the simple
+> > > virtiofsd_get/set_log_level() APIs and it will make corresponding DBus calls.
+> > > 
+> > > I'm pretty happy with this approach because the code is straightforward.  It
+> > > hasn't even triggered seccomp failures yet :).
+> > 
+> > Yes it's less complex than I'd worried.
+> > Now, I do think we've got to think about how qemu in general is going to
+> > use dbus as people were discussing it, because then we have to think
+> > what the security aspects are - do we need to look at some calls only
+> > available to some clients etc.
+> 
+> The approach I took in this patch series is to launch a session bus just
+> for this virtiofsd.  The abstract socket unix(7) namespace used by GDBus
+> by default does not offer any security.  I think any process on the host
+> can connect to it, regardless of uid/gid.
 
---Sf3MmCJcUNNLokcm
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Other users will be able to connect(), but you'll find that the dbus
+policy causes their connections to be dropped immediately - even if
+they are the root user in fact.
 
-On Thu, Sep 05, 2019 at 03:48:51PM -0400, Vivek Goyal wrote:
-> These data structures should go away when virtio_fs object is going away.
-> When deivce is going away, we need to just make sure virtqueues can go
-> away and after that none of the code accesses vq and all the requests
-> get error.
->=20
-> So allocate memory for virtio_fs and virtio_fs_vq normally and free it
-> at right time.
->=20
-> This patch still frees up memory during device remove time. A later patch
-> will make virtio_fs object reference counted and this memory will be
-> freed when last reference to object is dropped.
->=20
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  fs/fuse/virtio_fs.c | 13 ++++++++-----
->  1 file changed, 8 insertions(+), 5 deletions(-)
+> A path like unix:path=/tmp/foo would allow us to use UNIX Domain Socket
+> permissions as the main security mechanism.  I'm not enthusiastic about
+> using SELinux or some kind of DBus-specific policy language if we can
+> avoid it because it's complex and obscure.
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+Yep, that just needs you to supply a config file when launching to
+specify a desired filesystem path.
 
---Sf3MmCJcUNNLokcm
-Content-Type: application/pgp-signature; name="signature.asc"
+I don't think it is an either/or matter - I think we'll  want all
+three in general - DAC controls on the socket, and DBus policy and
+SELinux policy. DAC controls on the socket alone are not sufficient
+if you want to separate each QEMU from each other and they're running
+the same UID which is common.
 
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1yO3oACgkQnKSrs4Gr
-c8gsdQgAw8es95r3jldWITNK2HV3hQUadAUD6wcJTqh47Co/1pn1JWttU9UhsGCs
-wlgovlHxIO9oPsjaBc+Vcyczu7QtV+5x4r2lAsxHBH0idZnq6H8T+Om+iM9F3Bhs
-hlXTBKrjDt3anxgGHZ/EysPRolxSBPr3W81uqVOATwsS8zKO0liMr6z6brUc12Jx
-a9w/zciAljgcusrSgVkQ5C1JwCvMxgGctU1rqzPE1QwPHOT+1/+f7KqJYmTvCYHJ
-NfWPrl8z3I68LSE9XkSL6oVU9NDNbey1lzpGIBOpOmZZqucUU67jXy8HO3z2iNB6
-UUKV1kzQjkeYn8GGRSqyyJhao8stKw==
-=d30F
------END PGP SIGNATURE-----
-
---Sf3MmCJcUNNLokcm--
+Regards,
+Daniel
+-- 
+|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
+|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
+|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
 

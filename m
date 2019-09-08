@@ -1,15 +1,15 @@
-Date: Fri, 22 Nov 2019 10:53:24 +0000
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20191122105324.GE464656@stefanha-x1.localdomain>
-References: <20191115205543.1816-1-vgoyal@redhat.com>
-	<20191115205543.1816-5-vgoyal@redhat.com>
+References: <20190905194859.16219-1-vgoyal@redhat.com>
+	<20190905194859.16219-17-vgoyal@redhat.com>
+From: piaojun <piaojun@huawei.com>
+Message-ID: <62d8b7fb-9024-a6c9-73b8-727aacfe8544@huawei.com>
+Date: Sun, 8 Sep 2019 19:19:13 +0800
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="PGNNI9BzQDUtgA2J"
-Content-Disposition: inline
-In-Reply-To: <20191115205543.1816-5-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 4/4] virtiofsd: Implement blocking posix
-	locks
+In-Reply-To: <20190905194859.16219-17-vgoyal@redhat.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH 16/18] virtiofs: Use virtio_fs_mutex for
+ races w.r.t ->remove and mount path
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,89 +18,136 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, miklos@szeredi.hu, qemu-devel@nongnu.org
+To: Vivek Goyal <vgoyal@redhat.com>, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org, miklos@szeredi.hu
+Cc: virtio-fs@redhat.com, linux-kernel@vger.kernel.org, mst@redhat.com
 
 
---PGNNI9BzQDUtgA2J
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
 
-On Fri, Nov 15, 2019 at 03:55:43PM -0500, Vivek Goyal wrote:
-> diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_l=
-owlevel.c
-> index d4a42d9804..f706e440bf 100644
-> --- a/contrib/virtiofsd/fuse_lowlevel.c
-> +++ b/contrib/virtiofsd/fuse_lowlevel.c
-> @@ -183,7 +183,8 @@ int fuse_send_reply_iov_nofree(fuse_req_t req, int er=
-ror, struct iovec *iov,
+On 2019/9/6 3:48, Vivek Goyal wrote:
+> It is possible that a mount is in progress and device is being removed at
+> the same time. Use virtio_fs_mutex to avoid races.
+> 
+> This also takes care of bunch of races and removes some TODO items.
+> 
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  fs/fuse/virtio_fs.c | 32 ++++++++++++++++++++++----------
+>  1 file changed, 22 insertions(+), 10 deletions(-)
+> 
+> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> index 29ec2f5bbbe2..c483482185b6 100644
+> --- a/fs/fuse/virtio_fs.c
+> +++ b/fs/fuse/virtio_fs.c
+> @@ -13,7 +13,9 @@
+>  #include <linux/highmem.h>
+>  #include "fuse_i.h"
+>  
+> -/* List of virtio-fs device instances and a lock for the list */
+> +/* List of virtio-fs device instances and a lock for the list. Also provides
+> + * mutual exclusion in device removal and mounting path
+> + */
+>  static DEFINE_MUTEX(virtio_fs_mutex);
+>  static LIST_HEAD(virtio_fs_instances);
+>  
+> @@ -72,17 +74,19 @@ static void release_virtiofs_obj(struct kref *ref)
+>  	kfree(vfs);
+>  }
+>  
+> +/* Make sure virtiofs_mutex is held */
+
+Typo? virtiofs_mutex->virtio_fs_mutex
+
+Jun
+
+>  static void virtiofs_put(struct virtio_fs *fs)
 >  {
->  	struct fuse_out_header out;
-> =20
-> -	if (error <=3D -1000 || error > 0) {
-> +	/* error =3D 1 has been used to signal client to wait for notificaiton =
-*/
-> +	if (error <=3D -1000 || error > 1) {
->  		fuse_log(FUSE_LOG_ERR, "fuse: bad error value: %i\n",	error);
->  		error =3D -ERANGE;
->  	}
-
-What is this?
-
-> +int fuse_lowlevel_notify_lock(struct fuse_session *se, uint64_t req_id,
-> +			      int32_t error)
-> +{
-> +	struct fuse_notify_lock_out outarg;
-
-Missing =3D {} initialization to avoid information leaks to the guest.
-
-> @@ -1704,6 +1720,15 @@ int fuse_lowlevel_notify_delete(struct fuse_sessio=
-n *se,
->  int fuse_lowlevel_notify_store(struct fuse_session *se, fuse_ino_t ino,
->  			       off_t offset, struct fuse_bufvec *bufv,
->  			       enum fuse_buf_copy_flags flags);
-> +/**
-> + * Notify event related to previous lock request
-> + *
-> + * @param se the session object
-> + * @param req_id the id of the request which requested setlkw
-
-The rest of the code calls this id "unique":
-
-  + * @param req_unique the unique id of the setlkw request
-
-> +    /* Pop an element from queue */
-> +    req =3D vu_queue_pop(dev, q, sizeof(FVRequest), &bad_in_num, &bad_ou=
-t_num);
-> +    if (!req) {
-> +        /* TODO: Implement some sort of ring buffer and queue notificati=
-ons
-> +	 * on that and send these later when notification queue has space
-> +	 * available.
+> -	mutex_lock(&virtio_fs_mutex);
+>  	kref_put(&fs->refcount, release_virtiofs_obj);
+> -	mutex_unlock(&virtio_fs_mutex);
+>  }
+>  
+>  static void virtio_fs_put(struct fuse_iqueue *fiq)
+>  {
+>  	struct virtio_fs *vfs = fiq->priv;
+> +
+> +	mutex_lock(&virtio_fs_mutex);
+>  	virtiofs_put(vfs);
+> +	mutex_unlock(&virtio_fs_mutex);
+>  }
+>  
+>  static void virtio_fs_drain_queue(struct virtio_fs_vq *fsvq)
+> @@ -596,9 +600,8 @@ static void virtio_fs_remove(struct virtio_device *vdev)
+>  	struct virtio_fs *fs = vdev->priv;
+>  
+>  	mutex_lock(&virtio_fs_mutex);
+> +	/* This device is going away. No one should get new reference */
+>  	list_del_init(&fs->list);
+> -	mutex_unlock(&virtio_fs_mutex);
+> -
+>  	virtio_fs_stop_all_queues(fs);
+>  	virtio_fs_drain_all_queues(fs);
+>  	vdev->config->reset(vdev);
+> @@ -607,6 +610,7 @@ static void virtio_fs_remove(struct virtio_device *vdev)
+>  	vdev->priv = NULL;
+>  	/* Put device reference on virtio_fs object */
+>  	virtiofs_put(fs);
+> +	mutex_unlock(&virtio_fs_mutex);
+>  }
+>  
+>  #ifdef CONFIG_PM_SLEEP
+> @@ -978,10 +982,15 @@ static int virtio_fs_fill_super(struct super_block *sb)
+>  		.no_force_umount = true,
+>  	};
+>  
+> -	/* TODO lock */
+> -	if (fs->vqs[VQ_REQUEST].fud) {
+> -		pr_err("virtio-fs: device already in use\n");
+> -		err = -EBUSY;
+> +	mutex_lock(&virtio_fs_mutex);
+> +
+> +	/* After holding mutex, make sure virtiofs device is still there.
+> +	 * Though we are holding a refernce to it, drive ->remove might
+> +	 * still have cleaned up virtual queues. In that case bail out.
 > +	 */
-> +        return -ENOSPC;
-
-Ah, I thought the point of the notifications processing thread was
-exactly this case.  It could wake any threads waiting for buffers.
-
-This wakeup could be implemented with a condvar - no ring buffer
-necessary.
-
---PGNNI9BzQDUtgA2J
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl3XviQACgkQnKSrs4Gr
-c8g5LQf+N8ESaD28Mf2cGPPZObPij/PeF22lT7FxU2vFcdg4vgUtR8dZ34jgJYrs
-vPZe4V2KVGzWaO9beRGnh7XcCFRGaG3aFcJePYVcPddqdcvnxBRdSTPF0gGrGooZ
-2pphDCRfhJmGdB/heRUX3pKy/t++2boypXCLBMos0hbQSbmF52Bbdyo7wvtkU/Sl
-2UKMUxmI4REf0UVZ6MHuGbH3GmCxD/8KquCTGZK/+KKnPlgQtYB7AMuvtGiIlVhY
-3tYuGLNzysF3M/sTYS0n+KeAdpQDe5MyVJw7b3vOb8tYV6uehNcGxg/7odzJ/OI5
-e3h7UHbUqFQrAHkOgVnT91fD0AuQuQ==
-=UkZX
------END PGP SIGNATURE-----
-
---PGNNI9BzQDUtgA2J--
+> +	err = -EINVAL;
+> +	if (list_empty(&fs->list)) {
+> +		pr_info("virtio-fs: tag <%s> not found\n", fs->tag);
+>  		goto err;
+>  	}
+>  
+> @@ -1007,7 +1016,6 @@ static int virtio_fs_fill_super(struct super_block *sb)
+>  
+>  	fc = fs->vqs[VQ_REQUEST].fud->fc;
+>  
+> -	/* TODO take fuse_mutex around this loop? */
+>  	for (i = 0; i < fs->nvqs; i++) {
+>  		struct virtio_fs_vq *fsvq = &fs->vqs[i];
+>  
+> @@ -1020,6 +1028,7 @@ static int virtio_fs_fill_super(struct super_block *sb)
+>  	/* Previous unmount will stop all queues. Start these again */
+>  	virtio_fs_start_all_queues(fs);
+>  	fuse_send_init(fc, init_req);
+> +	mutex_unlock(&virtio_fs_mutex);
+>  	return 0;
+>  
+>  err_free_init_req:
+> @@ -1027,6 +1036,7 @@ static int virtio_fs_fill_super(struct super_block *sb)
+>  err_free_fuse_devs:
+>  	virtio_fs_free_devs(fs);
+>  err:
+> +	mutex_unlock(&virtio_fs_mutex);
+>  	return err;
+>  }
+>  
+> @@ -1100,7 +1110,9 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
+>  
+>  	fc = kzalloc(sizeof(struct fuse_conn), GFP_KERNEL);
+>  	if (!fc) {
+> +		mutex_lock(&virtio_fs_mutex);
+>  		virtiofs_put(fs);
+> +		mutex_unlock(&virtio_fs_mutex);
+>  		return -ENOMEM;
+>  	}
+>  
+> 
 

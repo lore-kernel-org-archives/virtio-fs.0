@@ -1,12 +1,15 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri, 15 Nov 2019 15:57:03 -0500
-Message-Id: <20191115205705.2046-3-vgoyal@redhat.com>
-In-Reply-To: <20191115205705.2046-1-vgoyal@redhat.com>
-References: <20191115205705.2046-1-vgoyal@redhat.com>
+References: <20190905194859.16219-1-vgoyal@redhat.com>
+	<20190905194859.16219-16-vgoyal@redhat.com>
+From: piaojun <piaojun@huawei.com>
+Message-ID: <a8ddb168-5fdb-b35a-5357-3c75e0226049@huawei.com>
+Date: Sun, 8 Sep 2019 19:10:03 +0800
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 2/4] virtiofs: Add an index to keep track of
-	first request queue
+In-Reply-To: <20190905194859.16219-16-vgoyal@redhat.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH 15/18] virtiofs: Make virtio_fs object
+ refcounted
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,110 +18,69 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org
-Cc: miklos@szeredi.hu, vgoyal@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org, miklos@szeredi.hu
+Cc: virtio-fs@redhat.com, linux-kernel@vger.kernel.org, mst@redhat.com
 
-We have many virtqueues and first queue which carries fuse normal requests
-(except forget requests) has index pointed to by enum VQ_REQUEST. This works
-fine as long as number of queues are not dynamic.
 
-I am about to introduce one more virtqueue, called notification queue, which
-will be present only if device on host supports it. That means index of
-request queue will change depending on if notification queue is present
-or not.
 
-So, add a variable to keep track of that index and this will help when
-notification queue is added in next patch.
+On 2019/9/6 3:48, Vivek Goyal wrote:
+> This object is used both by fuse_connection as well virt device. So make
+> this object reference counted and that makes it easy to define life cycle
+> of the object.
+> 
+> Now deivce can be removed while filesystem is still mounted. This will
+> cleanup all the virtqueues but virtio_fs object will still be around and
+> will be cleaned when filesystem is unmounted and sb/fc drops its reference.
+> 
+> Removing a device also stops all virt queues and any new reuqest gets
+> error -ENOTCONN. All existing in flight requests are drained before
+> ->remove returns.
+> 
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  fs/fuse/virtio_fs.c | 52 +++++++++++++++++++++++++++++++++++++--------
+>  1 file changed, 43 insertions(+), 9 deletions(-)
+> 
+> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> index 01bbf2c0e144..29ec2f5bbbe2 100644
+> --- a/fs/fuse/virtio_fs.c
+> +++ b/fs/fuse/virtio_fs.c
+> @@ -37,6 +37,7 @@ struct virtio_fs_vq {
+>  
+>  /* A virtio-fs device instance */
+>  struct virtio_fs {
+> +	struct kref refcount;
+>  	struct list_head list;    /* on virtio_fs_instances */
+>  	char *tag;
+>  	struct virtio_fs_vq *vqs;
+> @@ -63,6 +64,27 @@ static inline struct fuse_pqueue *vq_to_fpq(struct virtqueue *vq)
+>  	return &vq_to_fsvq(vq)->fud->pq;
+>  }
+>  
+> +static void release_virtiofs_obj(struct kref *ref)
+> +{
+> +	struct virtio_fs *vfs = container_of(ref, struct virtio_fs, refcount);
+> +
+> +	kfree(vfs->vqs);
+> +	kfree(vfs);
+> +}
+> +
+> +static void virtio_fs_put(struct virtio_fs *fs)
+> +{
+> +	mutex_lock(&virtio_fs_mutex);
+> +	kref_put(&fs->refcount, release_virtiofs_obj);
+> +	mutex_unlock(&virtio_fs_mutex);
+> +}
+> +
+> +static void virtio_fs_put(struct fuse_iqueue *fiq)
+> +{
+> +	struct virtio_fs *vfs = fiq->priv;
+> +	virtiofs_put(vfs);
+> +}
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/virtio_fs.c | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+It's a little confusing that virtiofs_put() looks like virtiofs_put(),
+and could we use __virtio_fs_put to replace virtio_fs_put?
 
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index a0fb0a93980c..1ab4b7b83707 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -49,6 +49,7 @@ struct virtio_fs {
- 	struct virtio_fs_vq *vqs;
- 	unsigned int nvqs;               /* number of virtqueues */
- 	unsigned int num_request_queues; /* number of request queues */
-+	unsigned int first_reqq_idx;	/* First request queue idx */
- };
- 
- struct virtio_fs_forget_req {
-@@ -597,7 +598,9 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
- 	if (fs->num_request_queues == 0)
- 		return -EINVAL;
- 
--	fs->nvqs = VQ_REQUEST + fs->num_request_queues;
-+	/* One hiprio queue and rest are request queues */
-+	fs->nvqs = 1 + fs->num_request_queues;
-+	fs->first_reqq_idx = 1;
- 	fs->vqs = kcalloc(fs->nvqs, sizeof(fs->vqs[VQ_HIPRIO]), GFP_KERNEL);
- 	if (!fs->vqs)
- 		return -ENOMEM;
-@@ -617,10 +620,11 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
- 	names[VQ_HIPRIO] = fs->vqs[VQ_HIPRIO].name;
- 
- 	/* Initialize the requests virtqueues */
--	for (i = VQ_REQUEST; i < fs->nvqs; i++) {
-+	for (i = fs->first_reqq_idx; i < fs->nvqs; i++) {
- 		char vq_name[VQ_NAME_LEN];
- 
--		snprintf(vq_name, VQ_NAME_LEN, "requests.%u", i - VQ_REQUEST);
-+		snprintf(vq_name, VQ_NAME_LEN, "requests.%u",
-+			 i - fs->first_reqq_idx);
- 		virtio_fs_init_vq(&fs->vqs[i], vq_name, VQ_REQUEST);
- 		callbacks[i] = virtio_fs_vq_done;
- 		names[i] = fs->vqs[i].name;
-@@ -990,7 +994,7 @@ static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
- static void virtio_fs_wake_pending_and_unlock(struct fuse_iqueue *fiq)
- __releases(fiq->lock)
- {
--	unsigned int queue_id = VQ_REQUEST; /* TODO multiqueue */
-+	unsigned int queue_id;
- 	struct virtio_fs *fs;
- 	struct fuse_req *req;
- 	struct virtio_fs_vq *fsvq;
-@@ -1004,6 +1008,7 @@ __releases(fiq->lock)
- 	spin_unlock(&fiq->lock);
- 
- 	fs = fiq->priv;
-+	queue_id = fs->first_reqq_idx;
- 
- 	pr_debug("%s: opcode %u unique %#llx nodeid %#llx in.len %u out.len %u\n",
- 		  __func__, req->in.h.opcode, req->in.h.unique,
-@@ -1077,7 +1082,7 @@ static int virtio_fs_fill_super(struct super_block *sb)
- 
- 	err = -ENOMEM;
- 	/* Allocate fuse_dev for hiprio and notification queues */
--	for (i = 0; i < VQ_REQUEST; i++) {
-+	for (i = 0; i < fs->first_reqq_idx; i++) {
- 		struct virtio_fs_vq *fsvq = &fs->vqs[i];
- 
- 		fsvq->fud = fuse_dev_alloc();
-@@ -1085,17 +1090,17 @@ static int virtio_fs_fill_super(struct super_block *sb)
- 			goto err_free_fuse_devs;
- 	}
- 
--	ctx.fudptr = (void **)&fs->vqs[VQ_REQUEST].fud;
-+	ctx.fudptr = (void **)&fs->vqs[fs->first_reqq_idx].fud;
- 	err = fuse_fill_super_common(sb, &ctx);
- 	if (err < 0)
- 		goto err_free_fuse_devs;
- 
--	fc = fs->vqs[VQ_REQUEST].fud->fc;
-+	fc = fs->vqs[fs->first_reqq_idx].fud->fc;
- 
- 	for (i = 0; i < fs->nvqs; i++) {
- 		struct virtio_fs_vq *fsvq = &fs->vqs[i];
- 
--		if (i == VQ_REQUEST)
-+		if (i == fs->first_reqq_idx)
- 			continue; /* already initialized */
- 		fuse_dev_install(fsvq->fud, fc);
- 	}
--- 
-2.20.1
+Thanks,
+Jun
 

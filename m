@@ -1,15 +1,13 @@
-Date: Mon, 9 Sep 2019 09:00:39 +0200
+Date: Mon, 9 Sep 2019 14:37:35 +0200
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190909070039.GB13708@stefanha-x1.localdomain>
-References: <20190906100324.8492-1-stefanha@redhat.com>
-	<CAFLxGvw-n2VYcYR9kei7Hu2RBhCG9PeWuW7Z+SaiyDQVBRiugw@mail.gmail.com>
+Message-ID: <20190909123735.GE13708@stefanha-x1.localdomain>
+References: <20190905152136.30637-1-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="5/uDoXvLw7AC5HRs"
+	protocol="application/pgp-signature"; boundary="AsxXAMtlQ5JHofzM"
 Content-Disposition: inline
-In-Reply-To: <CAFLxGvw-n2VYcYR9kei7Hu2RBhCG9PeWuW7Z+SaiyDQVBRiugw@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH] init/do_mounts.c: add virtiofs root fs
-	support
+In-Reply-To: <20190905152136.30637-1-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [RFC 0/3] virtiofsd: get/set log level via DBus
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,104 +16,81 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Richard Weinberger <richard.weinberger@gmail.com>
-Cc: Miklos Szeredi <mszeredi@redhat.com>, David Howells <dhowells@redhat.com>, virtio-fs@redhat.com, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Vivek Goyal <vgoyal@redhat.com>
+To: Eryu Guan <eguan@linux.alibaba.com>
+Cc: virtio-fs@redhat.com, =?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@redhat.com>, qemu-devel@nongnu.org
 
 
---5/uDoXvLw7AC5HRs
+--AsxXAMtlQ5JHofzM
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Fri, Sep 06, 2019 at 09:16:04PM +0200, Richard Weinberger wrote:
-> On Fri, Sep 6, 2019 at 1:15 PM Stefan Hajnoczi <stefanha@redhat.com> wrot=
-e:
-> >
-> > Make it possible to boot directly from a virtiofs file system with tag
-> > 'myfs' using the following kernel parameters:
-> >
-> >   rootfstype=3Dvirtiofs root=3Dmyfs rw
-> >
-> > Booting directly from virtiofs makes it possible to use a directory on
-> > the host as the root file system.  This is convenient for testing and
-> > situations where manipulating disk image files is cumbersome.
-> >
-> > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-> > ---
-> > This patch is based on linux-next (next-20190904) but should apply
-> > cleanly to other virtiofs trees.
-> >
-> >  init/do_mounts.c | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> >
-> > diff --git a/init/do_mounts.c b/init/do_mounts.c
-> > index 9634ecf3743d..030be2f1999a 100644
-> > --- a/init/do_mounts.c
-> > +++ b/init/do_mounts.c
-> > @@ -554,6 +554,16 @@ void __init mount_root(void)
-> >                         change_floppy("root floppy");
-> >         }
-> >  #endif
-> > +#ifdef CONFIG_VIRTIO_FS
-> > +       if (root_fs_names && !strcmp(root_fs_names, "virtiofs")) {
-> > +               if (!do_mount_root(root_device_name, "virtiofs",
-> > +                                  root_mountflags, root_mount_data))
-> > +                       return;
-> > +
-> > +               panic("VFS: Unable to mount root fs \"%s\" from virtiof=
-s",
-> > +                     root_device_name);
-> > +       }
-> > +#endif
+On Thu, Sep 05, 2019 at 04:21:33PM +0100, Stefan Hajnoczi wrote:
+> It is likely that virtiofsd will need to support "management commands" for
+> reconfiguring it at runtime.  The first use case was proposed by Eryu Gua=
+n for
+> getting/setting the current log level.
 >=20
-> I think you don't need this, you can abuse a hack for mtd/ubi in
-> prepare_namespace().
-> At least for 9p it works well:
-> qemu-system-x86_64 -m 4G -M pc,accel=3Dkvm -nographic -kernel
-> arch/x86/boot/bzImage -append "rootfstype=3D9p
-> rootflags=3Dtrans=3Dvirtio,version=3D9p2000.L root=3Dmtdfake console=3Dtt=
-yS0 ro
-> init=3D/bin/sh" -virtfs
-> local,id=3Drootfs,path=3D/,security_model=3Dpassthrough,mount_tag=3Dmtdfa=
-ke
+> I promised to try out DBus as the management interface because it has a r=
+ich
+> feature set and is accessible from most programming languages.  It should=
+ be
+> able to support all the use cases we come up with.
+>=20
+> This patch series is a prototype that implements the get-log-level and
+> set-log-level management commands via DBus.  Use the new virtiofsctl tool=
+ to
+> talk to a running virtiofsd process:
+>=20
+>   # dbus-run-session ./virtiofsd ...
+>   ...
+>   Using dbus address unix:abstract=3D/tmp/dbus-H9WBbpjk3O,guid=3D0be16ace=
+fb868e6025a8737f5d7124d2
+>   # export DBUS_SESSION_BUS_ADDRESS=3Dunix:abstract=3D/tmp/dbus-H9WBbpjk3=
+O,guid=3D0be16acefb868e6025a8737f5d7124d2
+>   # ./virtiofsctl set-log-level err
+>=20
+> Most of the work is done by gdbus-codegen(1).  It generates code for the
+> org.qemu.Virtiofsd.xml interface definition.  Our code can use the simple
+> virtiofsd_get/set_log_level() APIs and it will make corresponding DBus ca=
+lls.
+>=20
+> I'm pretty happy with this approach because the code is straightforward. =
+ It
+> hasn't even triggered seccomp failures yet :).
+>=20
+> Error handling is a little problematic.  I noticed that virtiofsctl silen=
+tly
+> returns success even if it cannot talk to virtiofsd.  This is due to the =
+code
+> generated by gdbus-codegen(1) which has no error reporting :(.  This can =
+be
+> solved by writing more low-level GDBus code instead of using the high-lev=
+el
+> generated bindings.
+>=20
+> What do you think about this approach?
 
-That is worse because:
-1. The file system must be named "mtd*" or "ubi*".
-2. When mounting fails you get confusing error messages about block
-   devices and partitions.  These do not apply to virtio-fs or
-   virtio-9p.
-
-> If this works too for virtiofs I suggest to cleanup the hack and
-> generalize it. B-)
-
-Why mtd and ubi block devices even have a special case?  Maybe this code
-was added because ROOT_DEV =3D name_to_dev_t(root_device_name) doesn't
-work for "mtd:partition" device names so the regular CONFIG_BLOCK code
-path doesn't work for these devices.
-
-Given the ordering/fallback logic in prepare_namespace()/mount_root() I
-don't feel comfortable changing other code paths.  It's likely to break
-something.
-
-If you or others have a concrete suggestion for how to generalize this
-I'm happy to try implementing it.
+Hi Eryu Guan,
+Have you had a chance to try these patches?  Do they meet your
+requirements for being able to get/set the log level at runtime?
 
 Stefan
 
---5/uDoXvLw7AC5HRs
+--AsxXAMtlQ5JHofzM
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl11+JcACgkQnKSrs4Gr
-c8jD+ggAtec2VK6HTVZXWnVz7jhRkR+8bfbgzrlDBG3uGx9qQjlWFeFJyfMW2a5p
-wyITms/GEETqo9W3n7oEOIlGhU8O+A1W265yc46JS9jEHai2Kx128I0ZnWp/3ncd
-/irYhXPNNDG8dScLruAzltY9XkiMvAUFMbTwx4PRuZZTV60EQtKDoZ2wJar9y4uD
-rGVNJqTaF3mLcGZdw/0w3nRKtR6XhX+O29OP4D/o7tt9FWnffh00adB9OQDUyXf5
-DkwHtrWdiLxiOAsSCZklA9Ps39U7LfCmnja2IUkYJdDyfmKsYMOj3bTxf79VCBOC
-Z0lm/US2an7287f+Y7/ReC6vG2uKbg==
-=zPN2
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl12R48ACgkQnKSrs4Gr
+c8inMwf/S33Jzq9qoUqyhtPqOS/dzEtmMg9hxfQ7jLb/HWdi0HRvJSIzeEwst1GV
+3LGOFZcpvYx3oYPP24gwfrUg1HCziPT5B+qMNWzAWaSbGpiGKBK0FbqXFk07HLst
+eEkYIGh/dNGnSgVEV6qDcVULUUhQdPJeCYUQrVYZoUajKnT/gHIHSuL3slhrko9o
+XQnANtllc8KgGp4UVcTUQRhCbfjKfPRF2XzfRlQv2qd5kADgRc+hZeYReCS8UZNR
+MYze0/S16FFQEmbayWWlXkkNTKtAQ9cP4fO7Xpt0ujLtylQp5oxOI+PMKwvbS77y
+gGteeGdDFdybFoSr1+KVp28aGREgKw==
+=OKkS
 -----END PGP SIGNATURE-----
 
---5/uDoXvLw7AC5HRs--
+--AsxXAMtlQ5JHofzM--
 

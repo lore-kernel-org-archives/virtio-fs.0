@@ -1,15 +1,18 @@
-Date: Mon, 9 Sep 2019 11:35:37 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190909153537.GA25501@redhat.com>
+Date: Mon, 9 Sep 2019 18:10:45 +0200
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20190909161045.GD20875@stefanha-x1.localdomain>
 References: <20190905194859.16219-1-vgoyal@redhat.com>
-	<20190905194859.16219-16-vgoyal@redhat.com>
-	<a8ddb168-5fdb-b35a-5357-3c75e0226049@huawei.com>
+	<20190905194859.16219-9-vgoyal@redhat.com>
+	<20190906105210.GP5900@stefanha-x1.localdomain>
+	<20190906141705.GF22083@redhat.com>
+	<20190906101819-mutt-send-email-mst@kernel.org>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="d01dLTUuW90fS44H"
 Content-Disposition: inline
-In-Reply-To: <a8ddb168-5fdb-b35a-5357-3c75e0226049@huawei.com>
-Subject: Re: [Virtio-fs] [PATCH 15/18] virtiofs: Make virtio_fs object
- refcounted
+In-Reply-To: <20190906101819-mutt-send-email-mst@kernel.org>
+Subject: Re: [Virtio-fs] [PATCH 08/18] virtiofs: Drain all pending requests
+ during ->remove time
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,73 +21,69 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>
-Cc: miklos@szeredi.hu, mst@redhat.com, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
+To: "Michael S. Tsirkin" <mst@redhat.com>
+Cc: miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
 
-On Sun, Sep 08, 2019 at 07:10:03PM +0800, piaojun wrote:
-> 
-> 
-> On 2019/9/6 3:48, Vivek Goyal wrote:
-> > This object is used both by fuse_connection as well virt device. So make
-> > this object reference counted and that makes it easy to define life cycle
-> > of the object.
-> > 
-> > Now deivce can be removed while filesystem is still mounted. This will
-> > cleanup all the virtqueues but virtio_fs object will still be around and
-> > will be cleaned when filesystem is unmounted and sb/fc drops its reference.
-> > 
-> > Removing a device also stops all virt queues and any new reuqest gets
-> > error -ENOTCONN. All existing in flight requests are drained before
-> > ->remove returns.
-> > 
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > ---
-> >  fs/fuse/virtio_fs.c | 52 +++++++++++++++++++++++++++++++++++++--------
-> >  1 file changed, 43 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-> > index 01bbf2c0e144..29ec2f5bbbe2 100644
-> > --- a/fs/fuse/virtio_fs.c
-> > +++ b/fs/fuse/virtio_fs.c
-> > @@ -37,6 +37,7 @@ struct virtio_fs_vq {
-> >  
-> >  /* A virtio-fs device instance */
-> >  struct virtio_fs {
-> > +	struct kref refcount;
-> >  	struct list_head list;    /* on virtio_fs_instances */
-> >  	char *tag;
-> >  	struct virtio_fs_vq *vqs;
-> > @@ -63,6 +64,27 @@ static inline struct fuse_pqueue *vq_to_fpq(struct virtqueue *vq)
-> >  	return &vq_to_fsvq(vq)->fud->pq;
-> >  }
-> >  
-> > +static void release_virtiofs_obj(struct kref *ref)
-> > +{
-> > +	struct virtio_fs *vfs = container_of(ref, struct virtio_fs, refcount);
-> > +
-> > +	kfree(vfs->vqs);
-> > +	kfree(vfs);
-> > +}
-> > +
-> > +static void virtio_fs_put(struct virtio_fs *fs)
-> > +{
-> > +	mutex_lock(&virtio_fs_mutex);
-> > +	kref_put(&fs->refcount, release_virtiofs_obj);
-> > +	mutex_unlock(&virtio_fs_mutex);
-> > +}
-> > +
-> > +static void virtio_fs_put(struct fuse_iqueue *fiq)
-> > +{
-> > +	struct virtio_fs *vfs = fiq->priv;
-> > +	virtiofs_put(vfs);
-> > +}
-> 
-> It's a little confusing that virtiofs_put() looks like virtiofs_put(),
-> and could we use __virtio_fs_put to replace virtio_fs_put?
 
-Fixed this in follow up patch I posted.
+--d01dLTUuW90fS44H
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-https://www.redhat.com/archives/virtio-fs/2019-September/msg00091.html
+On Fri, Sep 06, 2019 at 10:18:49AM -0400, Michael S. Tsirkin wrote:
+> On Fri, Sep 06, 2019 at 10:17:05AM -0400, Vivek Goyal wrote:
+> > On Fri, Sep 06, 2019 at 11:52:10AM +0100, Stefan Hajnoczi wrote:
+> > > On Thu, Sep 05, 2019 at 03:48:49PM -0400, Vivek Goyal wrote:
+> > > > +static void virtio_fs_drain_queue(struct virtio_fs_vq *fsvq)
+> > > > +{
+> > > > +	WARN_ON(fsvq->in_flight < 0);
+> > > > +
+> > > > +	/* Wait for in flight requests to finish.*/
+> > > > +	while (1) {
+> > > > +		spin_lock(&fsvq->lock);
+> > > > +		if (!fsvq->in_flight) {
+> > > > +			spin_unlock(&fsvq->lock);
+> > > > +			break;
+> > > > +		}
+> > > > +		spin_unlock(&fsvq->lock);
+> > > > +		usleep_range(1000, 2000);
+> > > > +	}
+> > >=20
+> > > I think all contexts that call this allow sleeping so we could avoid
+> > > usleep here.
+> >=20
+> > usleep_range() is supposed to be used from non-atomic context.
+> >=20
+> > https://github.com/torvalds/linux/blob/master/Documentation/timers/time=
+rs-howto.rst
+> >=20
+> > What construct you are thinking of?
+> >=20
+> > Vivek
+>=20
+> completion + signal on vq callback?
 
-Vivek
+Yes.  Time-based sleep() is sub-optimal because we could wake up exactly
+when in_flight is decremented from the vq callback.  This avoids
+unnecessary sleep wakeups and the extra time spent sleeping after
+in_flight has been decremented.
+
+Stefan
+
+--d01dLTUuW90fS44H
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl12eYUACgkQnKSrs4Gr
+c8gSKQgAnEAvX9YIhk4yOMGl/UMlOnxBybw15xYg29qYtIPTCBl5Px/k0kPkDeK/
+iHnhS/2epJz36c5DV0GEfGGX1HCzcKt9zLHZ5RI7NKV5HV5pBKsftliW6gY0yo/p
+z0+lghQwP7izbE1EpPGWHichCu+hctoBnwlckg6TFmJxs+xWeSwdsDJ8Vya28tQl
+IXvedRgLh0fOX8F7ZkH0pRrmAkzcERWoXjf17QeOEsntwzWWZ9/1LYOwzMo/1imn
+exUSUMA7NFgVr4esi8G1LM3kHJRoaQcwCmSN9GGAc2dpUblNzwW04kmD6wAMpOXA
+DvrZS9U0BxnNqVjpKlNjyH7fRY7epA==
+=8+oH
+-----END PGP SIGNATURE-----
+
+--d01dLTUuW90fS44H--
 

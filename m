@@ -1,18 +1,22 @@
-References: <20190905194859.16219-1-vgoyal@redhat.com>
-	<CAJfpegu8POz9gC4MDEcXxDWBD0giUNFgJhMEzntJX_u4+cS9Zw@mail.gmail.com>
-	<20190906103613.GH5900@stefanha-x1.localdomain>
-	<CAJfpegudNVZitQ5L8gPvA45mRPFDk9fhyboceVW6xShpJ4mLww@mail.gmail.com>
-	<866a1469-2c4b-59ce-cf3f-32f65e861b99@huawei.com>
-	<20190909161455.GG20875@stefanha-x1.localdomain>
-From: piaojun <piaojun@huawei.com>
-Message-ID: <5D76E5AE.3090006@huawei.com>
-Date: Tue, 10 Sep 2019 07:52:14 +0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+	d=itleadsonline-com.20150623.gappssmtp.com; s=20150623;
+	h=from:to:subject:date:message-id:mime-version:thread-index
+	:content-language:disposition-notification-to;
+	bh=82os3Ao4mJM/9KSuh3p/c7Kujis6bX1VKuO9KaWCIJ8=;
+	b=nviwBjPB8aB3iew5hx+hy69kljlIwL/mUPc4G4nd8Xbr0NetvYYTRcm9IDcl+mQpYW
+	Y2hA9WuIIkl22SzGr4FH7GdTl6dseLb8uaaqdNOxzydTV90qtRwetYC7VyhZCPiOWqPU
+	Wxqyi+gho/yxFd1maOAsRxP9TE6e79uXjRIZBUPKpxZl4Tmd8GRBGSZPs/4ag2of7hj9
+	lUO4+a6i+5qTNLluDjIa13sHesuP/KrDzPIL5SxlgRGN9uxmT4SgxMWn/cM6SpSWlAAs
+	9wkqMvGYkcqq6Gg78i0Z7n/kznbYadCTDjQi0gUxJqw3Nu/6BcD/UCvokw/f14VCklfF
+	vmAQ==
+From: Cornel Warren <cornel@itleadsonline.com>
+Date: Tue, 10 Sep 2019 12:56:30 -0400
+Message-ID: <!&!AAAAAAAAAAAYAAAAAAAAAL4nqeLPclZGv8wtneDlyQjCgAAAEAAAAEOzl5KbP7hDpCrIWimX27EBAAAAAA==@itleadsonline.com>
 MIME-Version: 1.0
-In-Reply-To: <20190909161455.GG20875@stefanha-x1.localdomain>
-Content-Type: text/plain; charset="windows-1252"
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH 00/18] virtiofs: Fix various races and
- cleanups round 1
+Content-Type: multipart/alternative;
+	boundary="----=_NextPart_000_0D70_01D567D7.2AB03C00"
+Content-Language: en-us
+Subject: [Virtio-fs] Schedule Call
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,56 +25,111 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: "Michael S. Tsirkin" <mst@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
+To: virtio-fs@redhat.com
+
+This is a multipart message in MIME format.
+
+------=_NextPart_000_0D70_01D567D7.2AB03C00
+Content-Type: text/plain;
+	charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+
+Hi,
+
+ 
+
+I would like to know if you are interested in acquiring contacts of Software
+Programmers and Developers across worldwide.
+
+  
+
+Let me know your target geography and I will get back to you with counts and
+pricing details.
+
+ 
+
+Regards
+
+Cornel Warren
+
+ 
+
+Note: We can also provide marketing database for all the industries if your
+target marketing different feel free to get in touch with me.
+
+ 
 
 
+------=_NextPart_000_0D70_01D567D7.2AB03C00
+Content-Type: text/html;
+	charset="us-ascii"
+Content-Transfer-Encoding: quoted-printable
 
-On 2019/9/10 0:14, Stefan Hajnoczi wrote:
-> On Sun, Sep 08, 2019 at 07:53:55PM +0800, piaojun wrote:
->>
->>
->> On 2019/9/6 19:52, Miklos Szeredi wrote:
->>> On Fri, Sep 6, 2019 at 12:36 PM Stefan Hajnoczi <stefanha@redhat.com> wrote:
->>>>
->>>> On Fri, Sep 06, 2019 at 10:15:14AM +0200, Miklos Szeredi wrote:
->>>>> On Thu, Sep 5, 2019 at 9:49 PM Vivek Goyal <vgoyal@redhat.com> wrote:
->>>>>>
->>>>>> Hi,
->>>>>>
->>>>>> Michael Tsirkin pointed out issues w.r.t various locking related TODO
->>>>>> items and races w.r.t device removal.
->>>>>>
->>>>>> In this first round of cleanups, I have taken care of most pressing
->>>>>> issues.
->>>>>>
->>>>>> These patches apply on top of following.
->>>>>>
->>>>>> git://git.kernel.org/pub/scm/linux/kernel/git/mszeredi/fuse.git#virtiofs-v4
->>>>>>
->>>>>> I have tested these patches with mount/umount and device removal using
->>>>>> qemu monitor. For example.
->>>>>
->>>>> Is device removal mandatory?  Can't this be made a non-removable
->>>>> device?  Is there a good reason why removing the virtio-fs device
->>>>> makes sense?
->>>>
->>>> Hot plugging and unplugging virtio PCI adapters is common.  I'd very
->>>> much like removal to work from the beginning.
->>>
->>> Can you give an example use case?
->>
->> I think VirtFS migration need hot plugging, or it may cause QEMU crash
->> or some problems.
-> 
-> Live migration is currently unsupported.  Hot unplugging the virtio-fs
-> device would allow the guest to live migrate successfully, so it's a
-> useful feature to work around the missing live migration support.
-> 
-> Is this what you mean?
-
-Agreed, migration support is necessary for user, and hot
-plugging/unplugging is also common for virtio device.
-
-Jun
+<html xmlns:v=3D"urn:schemas-microsoft-com:vml" =
+xmlns:o=3D"urn:schemas-microsoft-com:office:office" =
+xmlns:w=3D"urn:schemas-microsoft-com:office:word" =
+xmlns:m=3D"http://schemas.microsoft.com/office/2004/12/omml" =
+xmlns=3D"http://www.w3.org/TR/REC-html40"><head><META =
+HTTP-EQUIV=3D"Content-Type" CONTENT=3D"text/html; =
+charset=3Dus-ascii"><meta name=3DGenerator content=3D"Microsoft Word 15 =
+(filtered medium)"><style><!--
+/* Font Definitions */
+@font-face
+	{font-family:"Cambria Math";
+	panose-1:2 4 5 3 5 4 6 3 2 4;}
+@font-face
+	{font-family:Calibri;
+	panose-1:2 15 5 2 2 2 4 3 2 4;}
+/* Style Definitions */
+p.MsoNormal, li.MsoNormal, div.MsoNormal
+	{margin:0in;
+	margin-bottom:.0001pt;
+	font-size:11.0pt;
+	font-family:"Calibri","sans-serif";}
+a:link, span.MsoHyperlink
+	{mso-style-priority:99;
+	color:#0563C1;
+	text-decoration:underline;}
+a:visited, span.MsoHyperlinkFollowed
+	{mso-style-priority:99;
+	color:#954F72;
+	text-decoration:underline;}
+span.EmailStyle17
+	{mso-style-type:personal-compose;
+	font-family:"Calibri","sans-serif";
+	color:windowtext;}
+.MsoChpDefault
+	{mso-style-type:export-only;
+	font-family:"Calibri","sans-serif";}
+@page WordSection1
+	{size:8.5in 11.0in;
+	margin:1.0in 1.0in 1.0in 1.0in;}
+div.WordSection1
+	{page:WordSection1;}
+--></style><!--[if gte mso 9]><xml>
+<o:shapedefaults v:ext=3D"edit" spidmax=3D"1026" />
+</xml><![endif]--><!--[if gte mso 9]><xml>
+<o:shapelayout v:ext=3D"edit">
+<o:idmap v:ext=3D"edit" data=3D"1" />
+</o:shapelayout></xml><![endif]--></head><body lang=3DEN-US =
+link=3D"#0563C1" vlink=3D"#954F72"><div class=3DWordSection1><p =
+class=3DMsoNormal style=3D'text-autospace:none'>Hi,<o:p></o:p></p><p =
+class=3DMsoNormal style=3D'text-autospace:none'><o:p>&nbsp;</o:p></p><p =
+class=3DMsoNormal style=3D'text-autospace:none'>I would like to know if =
+you are interested in acquiring contacts of <b>Software Programmers and =
+Developers</b>&nbsp;across worldwide.<o:p></o:p></p><p class=3DMsoNormal =
+style=3D'text-autospace:none'>&nbsp; <o:p></o:p></p><p class=3DMsoNormal =
+style=3D'text-autospace:none'>Let me know your target geography and I =
+will get back to you with counts and pricing details.<o:p></o:p></p><p =
+class=3DMsoNormal style=3D'text-autospace:none'><o:p>&nbsp;</o:p></p><p =
+class=3DMsoNormal style=3D'text-autospace:none'>Regards<o:p></o:p></p><p =
+class=3DMsoNormal style=3D'text-autospace:none'>Cornel =
+Warren<o:p></o:p></p><p class=3DMsoNormal><span lang=3DEN-IN =
+style=3D'font-size:9.0pt'><o:p>&nbsp;</o:p></span></p><p =
+class=3DMsoNormal><span style=3D'font-size:8.0pt'>Note: We can also =
+provide marketing database for all the industries if your target =
+marketing different feel free to get in touch with =
+me</span>.<o:p></o:p></p><p =
+class=3DMsoNormal><o:p>&nbsp;</o:p></p></div></body></html>
+------=_NextPart_000_0D70_01D567D7.2AB03C00--
 

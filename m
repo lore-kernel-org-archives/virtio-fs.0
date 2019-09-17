@@ -1,11 +1,23 @@
-Date: Tue, 17 Sep 2019 16:42:10 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190917154210.GA18511@stefanha-x1.localdomain>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=9gMPmMtjRZPxIw/k279+mMi8Jf2DvDPBfQpmjNzYywc=;
+	b=PB4L/yK8ulPV/nukp8omko4ITQzK80cpdJv6/4eo7jZoMK0K9TF024+t3Lr7ueJhXg
+	lXk62P2B+U5xWo+pk7W39Cr1yFn/UIOFtY+s/IPA3xLBCg7+6vGnDf+ay2K12mXoxY24
+	AIjbKhOEIz5cadqECbfC5bZTNlK9DyqO289AxHhOH/tCS6yh0AXYH+fcqGKIY4VmWWfy
+	hN382HenaOcBQG88l0Pd927QjeFeCCkXtwrbbvmq/W1crlpdMJqxUcTF4Q5cV/dPQtJu
+	euUTyUxQAha+QzWYXf3apcBksPzXwn1yN1BxgTXAjS2hsZidgenJ5soQNTsIkQbuEqaP
+	ltBg==
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="envbJBWh7q8WU6mo"
-Content-Disposition: inline
-Subject: [Virtio-fs] virtio-fs needs option parsing?
+References: <20190906100324.8492-1-stefanha@redhat.com>
+	<CAFLxGvw-n2VYcYR9kei7Hu2RBhCG9PeWuW7Z+SaiyDQVBRiugw@mail.gmail.com>
+	<20190909070039.GB13708@stefanha-x1.localdomain>
+In-Reply-To: <20190909070039.GB13708@stefanha-x1.localdomain>
+From: Richard Weinberger <richard.weinberger@gmail.com>
+Date: Tue, 17 Sep 2019 20:19:55 +0200
+Message-ID: <CAFLxGvw51qeifCLwhV-8DKXNwC9=_5hFf==e7h4YCvFE5_Wz0A@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PATCH] init/do_mounts.c: add virtiofs root fs
+	support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,48 +26,53 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <mszeredi@redhat.com>
-Cc: virtio-fs@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: Miklos Szeredi <mszeredi@redhat.com>, David Howells <dhowells@redhat.com>, virtio-fs@redhat.com, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Vivek Goyal <vgoyal@redhat.com>
 
+On Mon, Sep 9, 2019 at 9:00 AM Stefan Hajnoczi <stefanha@redhat.com> wrote:
+> On Fri, Sep 06, 2019 at 09:16:04PM +0200, Richard Weinberger wrote:
+> > On Fri, Sep 6, 2019 at 1:15 PM Stefan Hajnoczi <stefanha@redhat.com> wrote:
+> > I think you don't need this, you can abuse a hack for mtd/ubi in
+> > prepare_namespace().
+> > At least for 9p it works well:
+> > qemu-system-x86_64 -m 4G -M pc,accel=kvm -nographic -kernel
+> > arch/x86/boot/bzImage -append "rootfstype=9p
+> > rootflags=trans=virtio,version=9p2000.L root=mtdfake console=ttyS0 ro
+> > init=/bin/sh" -virtfs
+> > local,id=rootfs,path=/,security_model=passthrough,mount_tag=mtdfake
+>
+> That is worse because:
+> 1. The file system must be named "mtd*" or "ubi*".
+> 2. When mounting fails you get confusing error messages about block
+>    devices and partitions.  These do not apply to virtio-fs or
+>    virtio-9p.
 
---envbJBWh7q8WU6mo
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
+This is the current situation, I'm not saying it is perfect. But
+before we add another
+special case for a filesystem we should at least try to consolidate this stuff.
 
-Hi Miklos,
-While testing the latest virtio-fs kernel patches I noticed that
-/proc/mounts says:
+> > If this works too for virtiofs I suggest to cleanup the hack and
+> > generalize it. B-)
+>
+> Why mtd and ubi block devices even have a special case?  Maybe this code
+> was added because ROOT_DEV = name_to_dev_t(root_device_name) doesn't
+> work for "mtd:partition" device names so the regular CONFIG_BLOCK code
+> path doesn't work for these devices.
 
-  myfs / virtiofs rw,relatime,user_id=0,group_id=0,default_permissions,allow_other 0 0
+ubi and mtd are not block devices, they are character devices.
+That's why the hack with name matching was added a long time ago.
 
-And this causes an error when shutting down the guest:
+> Given the ordering/fallback logic in prepare_namespace()/mount_root() I
+> don't feel comfortable changing other code paths.  It's likely to break
+> something.
+>
+> If you or others have a concrete suggestion for how to generalize this
+> I'm happy to try implementing it.
 
-  [2339]: Remounting '/' read-only in with options 'user_id=0,group_id=0,default_permissions,allow_other'.
-  virtiofs: Unknown parameter 'user_id'
-  [2339]: Failed to remount '/' read-only: Invalid argument
+mtd, ubi, virtiofs and 9p have one thing in common, they are not block devices.
+What about a new miscroot= kernel parameter?
 
-I guess that either options shouldn't be reported in /proc/mounts or the
-'virtiofs' file system should parse options.
-
-This isn't a show-stopper but I think it should be fixed eventually.
-Thoughts?
-
-Stefan
-
---envbJBWh7q8WU6mo
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl2A/tIACgkQnKSrs4Gr
-c8gGSQgAwu7RrW5t2q8KuSMEZ15p9zA/K7yr9xiC+Rl/V9sqXEGsLHR1LKUB/KKP
-XU7LvSZKWpf79pX434yRQk1pm8Gm+JGx1iU8G8hyO5uJhu0Ri73lZbmeABFIdzHw
-jpu8mw1o6/Qa/zpK2FgbrsXFb+AiQqlZ1zhBxJgsCHOZzsHhL8j6XPHU2DI5/7T6
-hdi8lA6erO+y0a+6qR5QJcWFxGGj2t5JQBTi8/rUx6nSBNApEJFc4+dFsypWQxBr
-e/Jxl4s7VszoMEjcao7rlrHxsmX7D90+UxUYFEkwHBofgFL78ce9fyuCF1yu1/6B
-okpsL0Knazo8dXkGWptUp9wdfUhMuw==
-=rVns
------END PGP SIGNATURE-----
-
---envbJBWh7q8WU6mo--
+-- 
+Thanks,
+//richard
 

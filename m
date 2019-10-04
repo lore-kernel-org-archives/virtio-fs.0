@@ -1,15 +1,11 @@
-Date: Fri, 6 Sep 2019 13:06:57 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20190906120657.GZ5900@stefanha-x1.localdomain>
-References: <20190905194859.16219-1-vgoyal@redhat.com>
-	<20190905194859.16219-19-vgoyal@redhat.com>
+From: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+Date: Fri, 4 Oct 2019 20:07:58 +0900
+Message-ID: <20191004110759.32665-1-misono.tomohiro@jp.fujitsu.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="H7BIH7T1fRJ3RGOi"
-Content-Disposition: inline
-In-Reply-To: <20190905194859.16219-19-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 18/18] virtiofs: Remove TODO item from
- virtio_fs_free_devs()
+Content-Transfer-Encoding: 8bit
+Content-Type: text/plain
+Subject: [Virtio-fs] [PATCH] virtiofsd: Add pread64() to seccomp list for
+	posix_fallocate()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,48 +14,42 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: miklos@szeredi.hu, mst@redhat.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org
+To: virtio-fs@redhat.com
+Cc: qemu-devel@nongnu.org, misono.tomohiro@jp.fujitsu.com
 
+I test virtiofs with NFS 4.0 as backend and notice that fallocate
+causes system hang (kernel: 5.4-rc1, qemu: virtio-fs-dev branch):
+ $ mount -t virtiofs myfs /mnt
+ $ dd if=/dev/urandom bs=1000 seek=1 count=1 of=/mnt/file
+ $ fallocate -l 2000 /mnt/file # system hang
 
---H7BIH7T1fRJ3RGOi
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+This is because:
+ 1. virtiofs supports fallocate syscall while NFS 4.0 does not.
+ 2. virtiofsd uses posix_fallocate() and it fallbacks to pread64()/
+    pwrite64() sequence to reserve blocks if fallocate syscall is
+    not available.
+ 3. pread64() syscall is prohibited by seccomp and virtiofsd thread
+    is killed by SIGSYS.
 
-On Thu, Sep 05, 2019 at 03:48:59PM -0400, Vivek Goyal wrote:
-> virtio_fs_free_devs() is now called from ->kill_sb(). By this time
-> all device queues have been quiesced. I am assuming that while
-> ->kill_sb() is in progress, another mount instance will wait for
-> it to finish (sb->s_umount mutex provides mutual exclusion).
->=20
-> W.r.t ->remove path, we should be fine as we are not touching vdev
-> or virtqueues. And we have reference on virtio_fs object, so we know
-> rest of the data structures are valid.
->=20
-> So I can't see the need of any additional locking yet.
->=20
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  fs/fuse/virtio_fs.c | 2 --
->  1 file changed, 2 deletions(-)
+So, just add pread64() to seccomp white list to fix this problem.
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+Signed-off-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+---
+ contrib/virtiofsd/seccomp.c | 1 +
+ 1 file changed, 1 insertion(+)
 
---H7BIH7T1fRJ3RGOi
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl1yS+EACgkQnKSrs4Gr
-c8hs9gf+K5gZQL97pXObXjA7p0E5N+4Mu7Z87yZAklDhpHu9q0fe3y4R1Mgfbav4
-2LIQdjT1jkJl0MxWr5p90E65k9EIXHqDWalOtCobxdFYDbw9IOKOtm6cbp6qbQQX
-iURNmLJIf7q4+rIu5ekeRtb8/DmshZJ1zWdbYvegrvMcaRIP+PT2NcBiccFSKX24
-yZ0VlxNOfXZIvXSirKuKn29sKtaLlqbmwtsLGIctcryosKZAS6TP7SJ0iUIh1q83
-v3jAjTJE+YIybDSFbuFE0bkKHNm2zKrZLKoUL+tI4GC6l0FoE1zk5yJPU+qNKTr+
-nx5oaJ/l0rx/cb7cpVXU9vB5xXNlSA==
-=mSQ0
------END PGP SIGNATURE-----
-
---H7BIH7T1fRJ3RGOi--
+diff --git a/contrib/virtiofsd/seccomp.c b/contrib/virtiofsd/seccomp.c
+index 93b679271d..88b61bca42 100644
+--- a/contrib/virtiofsd/seccomp.c
++++ b/contrib/virtiofsd/seccomp.c
+@@ -61,6 +61,7 @@ static const int syscall_whitelist[] = {
+ 	SCMP_SYS(ppoll),
+ 	SCMP_SYS(prctl), /* TODO restrict to just PR_SET_NAME? */
+ 	SCMP_SYS(preadv),
++	SCMP_SYS(pread64),
+ 	SCMP_SYS(pwritev),
+ 	SCMP_SYS(pwrite64),
+ 	SCMP_SYS(read),
+-- 
+2.21.0
 

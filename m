@@ -1,16 +1,21 @@
-Date: Fri, 6 Sep 2019 08:08:17 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190906120817.GA22083@redhat.com>
-References: <20190905194859.16219-1-vgoyal@redhat.com>
-	<CAJfpegu8POz9gC4MDEcXxDWBD0giUNFgJhMEzntJX_u4+cS9Zw@mail.gmail.com>
-	<20190906103613.GH5900@stefanha-x1.localdomain>
-	<CAJfpegudNVZitQ5L8gPvA45mRPFDk9fhyboceVW6xShpJ4mLww@mail.gmail.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=MLfYQaUR+5cu0cTYL31hHw9QEvr/1p0Vt1jATuQYdq0=;
+	b=FvCU1wkPgnjyjgEvoFBeoivJY7qPHaBqL8NQA+FJfUvsT+1BVHWXz0x4B4P9qEr8SG
+	sG/MAyq7Vvo3g2ZUsC5RSGOG3ogmnQZPciSUGeIRrLBRqn4fR1JWpfgb3dY2my0wZ6CT
+	u7xPaFOX03u2ZRjB28OBjks9wsDmKoycGVUU8=
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <CAJfpegudNVZitQ5L8gPvA45mRPFDk9fhyboceVW6xShpJ4mLww@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH 00/18] virtiofs: Fix various races and
-	cleanups round 1
+References: <7331fd60-10c6-6076-4cf5-f5cce7bc6ef1@jp.fujitsu.com>
+	<20191007143444.GA174343@work-vm> <20191009165116.GJ2893@work-vm>
+	<27035e4a-bd12-e5d8-30d0-0df45e75457c@jp.fujitsu.com>
+	<CAJFHJrr5Esq=cjZNW4qZRABtCCh_vpkFJEQO9kYb=Pg62O+weQ@mail.gmail.com>
+	<20191011195935.GB13861@redhat.com>
+In-Reply-To: <20191011195935.GB13861@redhat.com>
+From: Chirantan Ekbote <chirantan@chromium.org>
+Date: Sat, 12 Oct 2019 05:13:51 +0900
+Message-ID: <CAJFHJrq6bQo=yvO0tAxH7RWg=U=ftpsePs3c7y-AcE90Wh4afg@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] xfstest results for virtio-fs on aarch64
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,54 +24,78 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: "Michael S. Tsirkin" <mst@redhat.com>, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>, "masayoshi.mizuma@fujitsu.com" <masayoshi.mizuma@fujitsu.com>
 
-On Fri, Sep 06, 2019 at 01:52:41PM +0200, Miklos Szeredi wrote:
-> On Fri, Sep 6, 2019 at 12:36 PM Stefan Hajnoczi <stefanha@redhat.com> wrote:
+On Sat, Oct 12, 2019 at 4:59 AM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> On Sat, Oct 12, 2019 at 03:45:01AM +0900, Chirantan Ekbote wrote:
+> > This is unrelated but there's also a nullptr dereference in the driver
+> > if the device advertises more than request queue.  This is problematic
+> > code:
 > >
-> > On Fri, Sep 06, 2019 at 10:15:14AM +0200, Miklos Szeredi wrote:
-> > > On Thu, Sep 5, 2019 at 9:49 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> > > >
-> > > > Hi,
-> > > >
-> > > > Michael Tsirkin pointed out issues w.r.t various locking related TODO
-> > > > items and races w.r.t device removal.
-> > > >
-> > > > In this first round of cleanups, I have taken care of most pressing
-> > > > issues.
-> > > >
-> > > > These patches apply on top of following.
-> > > >
-> > > > git://git.kernel.org/pub/scm/linux/kernel/git/mszeredi/fuse.git#virtiofs-v4
-> > > >
-> > > > I have tested these patches with mount/umount and device removal using
-> > > > qemu monitor. For example.
-> > >
-> > > Is device removal mandatory?  Can't this be made a non-removable
-> > > device?  Is there a good reason why removing the virtio-fs device
-> > > makes sense?
+> > /* Allocate fuse_dev for hiprio and notification queues */
+> > for (i = 0; i < VQ_REQUEST; i++) {
+> >     struct virtio_fs_vq *fsvq = &fs->vqs[i];
 > >
-> > Hot plugging and unplugging virtio PCI adapters is common.  I'd very
-> > much like removal to work from the beginning.
-> 
-> Can you give an example use case?
+> >     fsvq->fud = fuse_dev_alloc();
+> >     if (!fsvq->fud)
+> >         goto err_free_fuse_devs;
+> > }
+> >
+> > ctx.fudptr = (void **)&fs->vqs[VQ_REQUEST].fud;
+> > err = fuse_fill_super_common(sb, &ctx);
+> > if (err < 0)
+> >     goto err_free_fuse_devs;
+> >
+> > fc = fs->vqs[VQ_REQUEST].fud->fc;
+> >
+> > for (i = 0; i < fs->nvqs; i++) {
+> >     struct virtio_fs_vq *fsvq = &fs->vqs[i];
+> >
+> >     if (i == VQ_REQUEST)
+> >         continue; /* already initialized */
+> >     fuse_dev_install(fsvq->fud, fc);
+> > }
+> >
+> > The first loop only initializes fsvq->fud for queues up to VQ_REQUEST
+> > but then the second loop calls fuse_dev_install with fsvq->fud for all
+> > queues up to fs->nvqs.  When fs->nvqs is greater than VQ_REQUEST this
+> > will end up dereferencing an uninitialized pointer.  I think the fix
+> > is to skip calling fuse_dev_alloc for the VQ_REQUEST queue but then
+> > call it for all the other queues up to fs->nvqs.
+>
+> Right now we support only 1 request queue and multi queue support is
+> not there. Planning to add multiqueue support in future releases though.
+>
 
-David Gilbert mentioned this could be useful if daemon stops responding
-or dies. One could remove device. That will fail all future requests
-and allow unmounting filesystem.
+Could you elaborate on what is missing for multiqueue support?  For
+reference, this patch was enough to get it working for me:
 
-Havind said that, current implementation will help in above situation
-only if there are no pending requests. If there are pending requests
-and daemon stops responding, then removal will hang too, as we wait
-for draining the queues.
+@@ -922,7 +990,8 @@ static int virtio_fs_enqueue_req(struct virtqueue
+*vq, struct fuse_req *req)
+ static void virtio_fs_wake_pending_and_unlock(struct fuse_iqueue *fiq)
+ __releases(fiq->waitq.lock)
+ {
+-       unsigned queue_id = VQ_REQUEST; /* TODO multiqueue */
++       /* unsigned queue_id = VQ_REQUEST; /\* TODO multiqueue *\/ */
++       unsigned queue_id;
+        struct virtio_fs *fs;
+        struct fuse_conn *fc;
+        struct fuse_req *req;
+@@ -937,6 +1006,7 @@ __releases(fiq->waitq.lock)
+        spin_unlock(&fiq->waitq.lock);
 
-So at some point of time, we also need some sort of timeout functionality
-where we end requests with error after a timeout.
+        fs = fiq->priv;
++       queue_id = (req->in.h.unique % (fs->nvqs - 1)) + 1;
+        fc = fs->vqs[queue_id].fud->fc;
 
-I feel we should support removing device at some point of time. But its
-not necessarily a must have feature for first round.
+        dev_dbg(&fs->vqs[queue_id].vq->vdev->dev,
 
-Thanks
-Vivek
+
+This is simply round-robin scheduling but even going from one to two
+queues gives a significant performance improvement (especially because
+crosvm doesn't support shared memory regions yet).
+
+Chirantan
 

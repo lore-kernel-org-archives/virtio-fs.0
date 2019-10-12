@@ -1,17 +1,22 @@
-Date: Fri, 11 Oct 2019 16:36:47 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20191011203647.GC13861@redhat.com>
-References: <7331fd60-10c6-6076-4cf5-f5cce7bc6ef1@jp.fujitsu.com>
-	<20191007143444.GA174343@work-vm> <20191009165116.GJ2893@work-vm>
-	<27035e4a-bd12-e5d8-30d0-0df45e75457c@jp.fujitsu.com>
-	<CAJFHJrr5Esq=cjZNW4qZRABtCCh_vpkFJEQO9kYb=Pg62O+weQ@mail.gmail.com>
-	<20191011195935.GB13861@redhat.com>
-	<CAJFHJrq6bQo=yvO0tAxH7RWg=U=ftpsePs3c7y-AcE90Wh4afg@mail.gmail.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=date:from:to:cc:subject:message-id:references:mime-version
+	:content-disposition:in-reply-to:user-agent;
+	bh=+FrUC66hBMWPncut2Shl80U8fQ0hJ+GFsb37ZtZ2jlk=;
+	b=P5dSwqRHVOVUbA546m2ofsVN6fSI2g0WmfIfGEkQNMBQuur/5Iky9CPcvjtH72FjHH
+	6tgNQOLRJuj6jwfIJb2F1iDHzCIi2TJlF+hBVDknp6bKpWAtw7/IohK5zzRCOld7vM4S
+	sQpYrO7OLRAfpzecYK4lL/GYg6TJUE2Es5OsjHwxi+Q8DD/aR73iQBNCoC/IKWUxuqqA
+	mDI9r2FhdP4hp4MuDwizSNqOWSmkvYavH9vn6X0wd5tP/LU+AAQF8k5EU4CT9fd0yGbR
+	ZcmQ05IN/2RrWSeaU7YuDU54afvwWW5rO3WlZLnRiJQmw4AZbdXUq+p91Vvvx5LdjtY6
+	MD9w==
+Date: Fri, 11 Oct 2019 21:50:41 -0400
+From: Masayoshi Mizuma <msys.mizuma@gmail.com>
+Message-ID: <20191012015040.rqb6buo5snmxmq74@gabell>
+References: <20191011181826.GA13861@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <CAJFHJrq6bQo=yvO0tAxH7RWg=U=ftpsePs3c7y-AcE90Wh4afg@mail.gmail.com>
-Subject: Re: [Virtio-fs] xfstest results for virtio-fs on aarch64
+In-Reply-To: <20191011181826.GA13861@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtio_fs: Change module name to virtiofs.ko
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,92 +25,57 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Chirantan Ekbote <chirantan@chromium.org>
-Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>, "masayoshi.mizuma@fujitsu.com" <masayoshi.mizuma@fujitsu.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, Miklos Szeredi <miklos@szeredi.hu>
 
-On Sat, Oct 12, 2019 at 05:13:51AM +0900, Chirantan Ekbote wrote:
-> On Sat, Oct 12, 2019 at 4:59 AM Vivek Goyal <vgoyal@redhat.com> wrote:
-> >
-> > On Sat, Oct 12, 2019 at 03:45:01AM +0900, Chirantan Ekbote wrote:
-> > > This is unrelated but there's also a nullptr dereference in the driver
-> > > if the device advertises more than request queue.  This is problematic
-> > > code:
-> > >
-> > > /* Allocate fuse_dev for hiprio and notification queues */
-> > > for (i = 0; i < VQ_REQUEST; i++) {
-> > >     struct virtio_fs_vq *fsvq = &fs->vqs[i];
-> > >
-> > >     fsvq->fud = fuse_dev_alloc();
-> > >     if (!fsvq->fud)
-> > >         goto err_free_fuse_devs;
-> > > }
-> > >
-> > > ctx.fudptr = (void **)&fs->vqs[VQ_REQUEST].fud;
-> > > err = fuse_fill_super_common(sb, &ctx);
-> > > if (err < 0)
-> > >     goto err_free_fuse_devs;
-> > >
-> > > fc = fs->vqs[VQ_REQUEST].fud->fc;
-> > >
-> > > for (i = 0; i < fs->nvqs; i++) {
-> > >     struct virtio_fs_vq *fsvq = &fs->vqs[i];
-> > >
-> > >     if (i == VQ_REQUEST)
-> > >         continue; /* already initialized */
-> > >     fuse_dev_install(fsvq->fud, fc);
-> > > }
-> > >
-> > > The first loop only initializes fsvq->fud for queues up to VQ_REQUEST
-> > > but then the second loop calls fuse_dev_install with fsvq->fud for all
-> > > queues up to fs->nvqs.  When fs->nvqs is greater than VQ_REQUEST this
-> > > will end up dereferencing an uninitialized pointer.  I think the fix
-> > > is to skip calling fuse_dev_alloc for the VQ_REQUEST queue but then
-> > > call it for all the other queues up to fs->nvqs.
-> >
-> > Right now we support only 1 request queue and multi queue support is
-> > not there. Planning to add multiqueue support in future releases though.
-> >
+Hi Vivek,
+
+On Fri, Oct 11, 2019 at 02:18:26PM -0400, Vivek Goyal wrote:
+> We have been calling it virtio_fs and even file name is virtio_fs.c. Module
+> name is virtio_fs.ko but when registering file system user is supposed to
+> specify filesystem type as "virtiofs".
 > 
-> Could you elaborate on what is missing for multiqueue support?  For
-> reference, this patch was enough to get it working for me:
+> Masayoshi Mizuma reported that he specified filesytem type as "virtio_fs" and
+> got this warning on console.
+> 
+>   ------------[ cut here ]------------
+>   request_module fs-virtio_fs succeeded, but still no fs?
+>   WARNING: CPU: 1 PID: 1234 at fs/filesystems.c:274 get_fs_type+0x12c/0x138
+>   Modules linked in: ... virtio_fs fuse virtio_net net_failover ...
+>   CPU: 1 PID: 1234 Comm: mount Not tainted 5.4.0-rc1 #1
+> 
+> So looks like kernel could find the module virtio_fs.ko but could not find
+> filesystem type after that.
+> 
+> It probably is better to rename module name to virtiofs.ko so that above
+> warning goes away in case user ends up specifying wrong fs name.
 
-May be not much is missing. Just that were focussed on first getting a
-basic version of virtiofs upstream and then start looking at performance
-improvement features.
+The warning is gone after applied this patch, thanks!
+Please feel free to add:
+
+    Tested-by: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+
+- Masa
 
 > 
-> @@ -922,7 +990,8 @@ static int virtio_fs_enqueue_req(struct virtqueue
-> *vq, struct fuse_req *req)
->  static void virtio_fs_wake_pending_and_unlock(struct fuse_iqueue *fiq)
->  __releases(fiq->waitq.lock)
->  {
-> -       unsigned queue_id = VQ_REQUEST; /* TODO multiqueue */
-> +       /* unsigned queue_id = VQ_REQUEST; /\* TODO multiqueue *\/ */
-> +       unsigned queue_id;
->         struct virtio_fs *fs;
->         struct fuse_conn *fc;
->         struct fuse_req *req;
-> @@ -937,6 +1006,7 @@ __releases(fiq->waitq.lock)
->         spin_unlock(&fiq->waitq.lock);
+> Reported-by: Masayoshi Mizuma <msys.mizuma@gmail.com>
+> Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  fs/fuse/Makefile |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
->         fs = fiq->priv;
-> +       queue_id = (req->in.h.unique % (fs->nvqs - 1)) + 1;
->         fc = fs->vqs[queue_id].fud->fc;
-> 
->         dev_dbg(&fs->vqs[queue_id].vq->vdev->dev,
-> 
-> 
-> This is simply round-robin scheduling but even going from one to two
-> queues gives a significant performance improvement (especially because
-> crosvm doesn't support shared memory regions yet).
-
-Interesting. I thought virtiofsd is hard coded right now to support
-only one queue. Did you modify virtiofsd to support more than one
-request queue?
-
-Can you give some concrete numbers. How much performance improvement
-do you see with multiqueue. What workload you are using for testing.
-
-Thanks
-Vivek
+> Index: rhvgoyal-linux/fs/fuse/Makefile
+> ===================================================================
+> --- rhvgoyal-linux.orig/fs/fuse/Makefile	2019-10-11 13:53:43.905757435 -0400
+> +++ rhvgoyal-linux/fs/fuse/Makefile	2019-10-11 13:54:24.147757435 -0400
+> @@ -5,6 +5,7 @@
+>  
+>  obj-$(CONFIG_FUSE_FS) += fuse.o
+>  obj-$(CONFIG_CUSE) += cuse.o
+> -obj-$(CONFIG_VIRTIO_FS) += virtio_fs.o
+> +obj-$(CONFIG_VIRTIO_FS) += virtiofs.o
+>  
+>  fuse-objs := dev.o dir.o file.o inode.o control.o xattr.o acl.o readdir.o
+> +virtiofs-y += virtio_fs.o
 

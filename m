@@ -1,12 +1,16 @@
-Date: Sat, 12 Oct 2019 11:23:47 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20191012102347.GB17940@stefanha-x1.localdomain>
-References: <20191011181826.GA13861@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=dzjiSE/0Hpa/u2YaEx0I4w/Q55oG4EeAA+DOe/kfQpI=;
+	b=NvAaWST2THpyF4Kn9wSoX+o2whIh7NEn/hw3uOSfYQN6I5Zjb67L3LF7wQkB5GvQ9J
+	5jfuDUsqLN40UPKCAexpgPCIU2CH3gsQlekwOQKCFOrEWQ7ZiVHybUIB3XSycxxozVFH
+	FsQjec16Q2eU/NP5AF6OusDF0wf0SsXUCy9l4=
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="4SFOXa2GPu3tIq4H"
-Content-Disposition: inline
+References: <20191011181826.GA13861@redhat.com>
 In-Reply-To: <20191011181826.GA13861@redhat.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Mon, 14 Oct 2019 10:25:51 +0200
+Message-ID: <CAJfpegv8p--fS5LeVJB2zpon1iXzqTYccyJRojd2Ef_Dv_U84w@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
 Subject: Re: [Virtio-fs] [PATCH] virtio_fs: Change module name to virtiofs.ko
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
@@ -17,78 +21,34 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, Miklos Szeredi <miklos@szeredi.hu>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com
 
-
---4SFOXa2GPu3tIq4H
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Fri, Oct 11, 2019 at 02:18:26PM -0400, Vivek Goyal wrote:
-> We have been calling it virtio_fs and even file name is virtio_fs.c. Modu=
-le
+On Fri, Oct 11, 2019 at 8:18 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> We have been calling it virtio_fs and even file name is virtio_fs.c. Module
 > name is virtio_fs.ko but when registering file system user is supposed to
 > specify filesystem type as "virtiofs".
->=20
-> Masayoshi Mizuma reported that he specified filesytem type as "virtio_fs"=
- and
+>
+> Masayoshi Mizuma reported that he specified filesytem type as "virtio_fs" and
 > got this warning on console.
->=20
+>
 >   ------------[ cut here ]------------
 >   request_module fs-virtio_fs succeeded, but still no fs?
->   WARNING: CPU: 1 PID: 1234 at fs/filesystems.c:274 get_fs_type+0x12c/0x1=
-38
+>   WARNING: CPU: 1 PID: 1234 at fs/filesystems.c:274 get_fs_type+0x12c/0x138
 >   Modules linked in: ... virtio_fs fuse virtio_net net_failover ...
 >   CPU: 1 PID: 1234 Comm: mount Not tainted 5.4.0-rc1 #1
->=20
+>
 > So looks like kernel could find the module virtio_fs.ko but could not find
 > filesystem type after that.
->=20
+>
 > It probably is better to rename module name to virtiofs.ko so that above
 > warning goes away in case user ends up specifying wrong fs name.
->=20
+>
 > Reported-by: Masayoshi Mizuma <msys.mizuma@gmail.com>
 > Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
 > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  fs/fuse/Makefile |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->=20
-> Index: rhvgoyal-linux/fs/fuse/Makefile
-> =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
-=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
-=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
-> --- rhvgoyal-linux.orig/fs/fuse/Makefile	2019-10-11 13:53:43.905757435 -0=
-400
-> +++ rhvgoyal-linux/fs/fuse/Makefile	2019-10-11 13:54:24.147757435 -0400
-> @@ -5,6 +5,7 @@
-> =20
->  obj-$(CONFIG_FUSE_FS) +=3D fuse.o
->  obj-$(CONFIG_CUSE) +=3D cuse.o
-> -obj-$(CONFIG_VIRTIO_FS) +=3D virtio_fs.o
-> +obj-$(CONFIG_VIRTIO_FS) +=3D virtiofs.o
-> =20
->  fuse-objs :=3D dev.o dir.o file.o inode.o control.o xattr.o acl.o readdi=
-r.o
-> +virtiofs-y +=3D virtio_fs.o
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+Thanks, applied.
 
---4SFOXa2GPu3tIq4H
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl2hqbMACgkQnKSrs4Gr
-c8hzPwf9EGq7n78zLI7WXmZzLq+aRRmqpXomJeVpspfpdsQp2HXEEWqxK/IbDysk
-VKjiZJnyTQLGujvxy5+rSs2evsgEc1MMcpFAzqK/iXK5HqhH43XBsfbNa/ojQeZL
-WBC8y7hallEQjJZbxo0eL9KvGjCPw7PgfXyVXp31CSgdtX/HnFZITpcEk5D0FcE0
-9MJs6vGNnrto7oKGuQdnAMDeL6B/OwDeAz/GJ9tUsZyNjWIfxLGBRroqiLY1jAcP
-t7IrCuLDxpE3lLPApfQLHuSHuuhCaQSeVPWk13+0KQWGRyWk6/qvIoaQxU5eevT1
-ckHZ5lcucX2cJlkNn/6w1wkSaE//+g==
-=hmmz
------END PGP SIGNATURE-----
-
---4SFOXa2GPu3tIq4H--
+Miklos
 

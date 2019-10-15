@@ -1,12 +1,28 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue, 15 Oct 2019 13:46:26 -0400
-Message-Id: <20191015174626.11593-6-vgoyal@redhat.com>
-In-Reply-To: <20191015174626.11593-1-vgoyal@redhat.com>
-References: <20191015174626.11593-1-vgoyal@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=B5Bm7W5csmckUq3YRgALpHATmsShcZhXi2v+ZOE3R/Q=;
+	b=QPKB9AoTC6k1VL7XCqyCtNFpu6V3GwxYCBwjs9bXDSIzYPjKsSazRHMkwyDZgwjx/Q
+	KstSyaMFs5nzmQ2ZXFjIhXG/JzTJF0UpSqqLqZ/ZAMuWOAicdKGPvHZRb0w6tXXk0tHj
+	cFIkX+FZhz7ozqj+llAdDBaHekWnv6+5EXMFw=
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 5/5] virtiofs: Retry request submission from
-	worker context
+References: <20191009165116.GJ2893@work-vm>
+	<27035e4a-bd12-e5d8-30d0-0df45e75457c@jp.fujitsu.com>
+	<CAJFHJrr5Esq=cjZNW4qZRABtCCh_vpkFJEQO9kYb=Pg62O+weQ@mail.gmail.com>
+	<20191011195935.GB13861@redhat.com>
+	<CAJFHJrq6bQo=yvO0tAxH7RWg=U=ftpsePs3c7y-AcE90Wh4afg@mail.gmail.com>
+	<20191011203647.GC13861@redhat.com>
+	<20191014091108.GH22963@stefanha-x1.localdomain>
+	<CAJFHJrrqfjQqMu-K99DiBYNmD1=hB710wRZ88w--SQ0GxQv9Tw@mail.gmail.com>
+	<20191015155749.GH3073@work-vm>
+	<CAJFHJroxYvu_cfwCCxdWV_mN-0pxZ4qBbXdjiJEzPECui-ygrA@mail.gmail.com>
+	<20191015162634.GI3073@work-vm>
+	<ac410eee095de0faf2e8ccd3f917e322c7d68384.camel@intel.com>
+In-Reply-To: <ac410eee095de0faf2e8ccd3f917e322c7d68384.camel@intel.com>
+From: Chirantan Ekbote <chirantan@chromium.org>
+Date: Wed, 16 Oct 2019 03:21:52 +0900
+Message-ID: <CAJFHJrpwkry6r9WDf=4aY2ONUvXKvm_BqWrONFfgRboqGony9g@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] xfstest results for virtio-fs on aarch64
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,144 +31,54 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com
-Cc: miklos@szeredi.hu, virtualization@lists.linux-foundation.org, vgoyal@redhat.com
+To: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
+Cc: "slp@redhat.com" <slp@redhat.com>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>, "masayoshi.mizuma@fujitsu.com" <masayoshi.mizuma@fujitsu.com>, "vgoyal@redhat.com" <vgoyal@redhat.com>
 
-If regular request queue gets full, currently we sleep for a bit and
-retrying submission in submitter's context. This assumes submitter is
-not holding any spin lock. But this assumption is not true for background
-requests. For background requests, we are called with fc->bg_lock held.
+On Wed, Oct 16, 2019 at 2:28 AM Boeuf, Sebastien
+<sebastien.boeuf@intel.com> wrote:
+>
+> Thanks Dave for adding me to the loop here!
+>
+> On Tue, 2019-10-15 at 17:26 +0100, Dr. David Alan Gilbert wrote:
+> > * Chirantan Ekbote (chirantan@chromium.org) wrote:
+> > > On Wed, Oct 16, 2019 at 12:58 AM Dr. David Alan Gilbert
+> > > <dgilbert@redhat.com> wrote:
+> > > > * Chirantan Ekbote (chirantan@chromium.org) wrote:
+> > > > > I'm not using virtiofsd.  We have our own server for crosvm,
+> > > > > which
+> > > > > supports multiple queues.
+> > > >
+> > > > Ah excellent; is that public anywhere?
+> > > >
+> > >
+> > > It's currently under review here:
+> > > https://chromium-review.googlesource.com/c/chromiumos/platform/crosvm/+/1758103
+> > >
+> > > I expect to have it merged sometime this week.
+>
+> Oh that's very nice to hear. We have some code from the cloud-
+> hypervisor project where we have a vhost-user-net implementation
+> relying on some sort of a wrapper code similar to what all vhost-user
+> daemon implementations would reuse (libvhost-user kind of thing).
+>
+> We're planning to see this wrapper code land on Rust-VMM at some point,
+> which is why it would be interesting if you could rebase this virtio-fs
+> daemon code on top of this small library. If you don't have the
+> bandwidth, we could probably look at it if that's something you would
+> be interested in.
+>
+> Here is the code for the small wrapper crate:
+> https://github.com/intel/cloud-hypervisor/blob/master/vhost_user_backend/src/lib.rs
+>
+> And here is the vhost-user-net example using it:
+> https://github.com/intel/cloud-hypervisor/blob/master/src/bin/vhost_user_net.rs
+>
 
-This can lead to deadlock where one thread is trying submission with
-fc->bg_lock held while request completion thread has called fuse_request_end()
-which tries to acquire fc->bg_lock and gets blocked. As request completion
-thread gets blocked, it does not make further progress and that means queue
-does not get empty and submitter can't submit more requests.
+Our virtio-fs server is not a vhost-user device (this was one of the
+reasons we didn't want to use virtiofsd).  It currently just runs
+directly as a child process of crosvm (like all other crosvm devices).
+So unless I'm missing something I don't think there's much to be
+gained by rebasing on vhost_user_backend.
 
-To solve this issue, retry submission with the help of a worker, instead of
-retrying in submitter's context. We already do this for hiprio/forget
-requests.
-
-Reported-by: Chirantan Ekbote <chirantan@chromium.org>
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/virtio_fs.c | 59 ++++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 50 insertions(+), 9 deletions(-)
-
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 625de45fa471..58e568ef54ef 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -55,6 +55,9 @@ struct virtio_fs_forget {
- 	struct list_head list;
- };
- 
-+static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
-+				 struct fuse_req *req, bool in_flight);
-+
- static inline struct virtio_fs_vq *vq_to_fsvq(struct virtqueue *vq)
- {
- 	struct virtio_fs *fs = vq->vdev->priv;
-@@ -260,6 +263,7 @@ static void virtio_fs_request_dispatch_work(struct work_struct *work)
- 	struct virtio_fs_vq *fsvq = container_of(work, struct virtio_fs_vq,
- 						 dispatch_work.work);
- 	struct fuse_conn *fc = fsvq->fud->fc;
-+	int ret;
- 
- 	pr_debug("virtio-fs: worker %s called.\n", __func__);
- 	while (1) {
-@@ -268,13 +272,43 @@ static void virtio_fs_request_dispatch_work(struct work_struct *work)
- 					       list);
- 		if (!req) {
- 			spin_unlock(&fsvq->lock);
--			return;
-+			break;
- 		}
- 
- 		list_del_init(&req->list);
- 		spin_unlock(&fsvq->lock);
- 		fuse_request_end(fc, req);
- 	}
-+
-+	/* Dispatch pending requests */
-+	while (1) {
-+		spin_lock(&fsvq->lock);
-+		req = list_first_entry_or_null(&fsvq->queued_reqs,
-+					       struct fuse_req, list);
-+		if (!req) {
-+			spin_unlock(&fsvq->lock);
-+			return;
-+		}
-+		list_del_init(&req->list);
-+		spin_unlock(&fsvq->lock);
-+
-+		ret = virtio_fs_enqueue_req(fsvq, req, true);
-+		if (ret < 0) {
-+			if (ret == -ENOMEM || ret == -ENOSPC) {
-+				spin_lock(&fsvq->lock);
-+				list_add_tail(&req->list, &fsvq->queued_reqs);
-+				schedule_delayed_work(&fsvq->dispatch_work,
-+						      msecs_to_jiffies(1));
-+				spin_unlock(&fsvq->lock);
-+				return;
-+			}
-+			req->out.h.error = ret;
-+			dec_in_flight_req(fsvq);
-+			pr_err("virtio-fs: virtio_fs_enqueue_req() failed %d\n",
-+			       ret);
-+			fuse_request_end(fc, req);
-+		}
-+	}
- }
- 
- static void virtio_fs_hiprio_dispatch_work(struct work_struct *work)
-@@ -837,7 +871,7 @@ static unsigned int sg_init_fuse_args(struct scatterlist *sg,
- 
- /* Add a request to a virtqueue and kick the device */
- static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
--				 struct fuse_req *req)
-+				 struct fuse_req *req, bool in_flight)
- {
- 	/* requests need at least 4 elements */
- 	struct scatterlist *stack_sgs[6];
-@@ -917,7 +951,8 @@ static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
- 	/* matches barrier in request_wait_answer() */
- 	smp_mb__after_atomic();
- 
--	inc_in_flight_req(fsvq);
-+	if (!in_flight)
-+		inc_in_flight_req(fsvq);
- 	notify = virtqueue_kick_prepare(vq);
- 
- 	spin_unlock(&fsvq->lock);
-@@ -963,15 +998,21 @@ __releases(fiq->lock)
- 		 req->in.h.nodeid, req->in.h.len,
- 		 fuse_len_args(req->args->out_numargs, req->args->out_args));
- 
--retry:
- 	fsvq = &fs->vqs[queue_id];
--	ret = virtio_fs_enqueue_req(fsvq, req);
-+	ret = virtio_fs_enqueue_req(fsvq, req, false);
- 	if (ret < 0) {
- 		if (ret == -ENOMEM || ret == -ENOSPC) {
--			/* Virtqueue full. Retry submission */
--			/* TODO use completion instead of timeout */
--			usleep_range(20, 30);
--			goto retry;
-+			/*
-+			 * Virtqueue full. Retry submission from worker
-+			 * context as we might be holding fc->bg_lock.
-+			 */
-+			spin_lock(&fsvq->lock);
-+			list_add_tail(&req->list, &fsvq->queued_reqs);
-+			inc_in_flight_req(fsvq);
-+			schedule_delayed_work(&fsvq->dispatch_work,
-+						msecs_to_jiffies(1));
-+			spin_unlock(&fsvq->lock);
-+			return;
- 		}
- 		req->out.h.error = ret;
- 		pr_err("virtio-fs: virtio_fs_enqueue_req() failed %d\n", ret);
--- 
-2.20.1
+Chirantan
 

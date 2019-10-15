@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue, 15 Oct 2019 13:46:23 -0400
-Message-Id: <20191015174626.11593-3-vgoyal@redhat.com>
+Date: Tue, 15 Oct 2019 13:46:26 -0400
+Message-Id: <20191015174626.11593-6-vgoyal@redhat.com>
 In-Reply-To: <20191015174626.11593-1-vgoyal@redhat.com>
 References: <20191015174626.11593-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 2/5] virtiofs: No need to check fpq->connected
-	state
+Subject: [Virtio-fs] [PATCH 5/5] virtiofs: Retry request submission from
+	worker context
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,36 +18,141 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com
 Cc: miklos@szeredi.hu, virtualization@lists.linux-foundation.org, vgoyal@redhat.com
 
-In virtiofs we keep per queue connected state in virtio_fs_vq->connected
-and use that to end request if queue is not connected. And virtiofs does
-not even touch fpq->connected state.
+If regular request queue gets full, currently we sleep for a bit and
+retrying submission in submitter's context. This assumes submitter is
+not holding any spin lock. But this assumption is not true for background
+requests. For background requests, we are called with fc->bg_lock held.
 
-We probably need to merge these two at some point of time. For now, simplify
-the code a bit and do not worry about checking state of fpq->connected.
+This can lead to deadlock where one thread is trying submission with
+fc->bg_lock held while request completion thread has called fuse_request_end()
+which tries to acquire fc->bg_lock and gets blocked. As request completion
+thread gets blocked, it does not make further progress and that means queue
+does not get empty and submitter can't submit more requests.
 
+To solve this issue, retry submission with the help of a worker, instead of
+retrying in submitter's context. We already do this for hiprio/forget
+requests.
+
+Reported-by: Chirantan Ekbote <chirantan@chromium.org>
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- fs/fuse/virtio_fs.c | 7 -------
- 1 file changed, 7 deletions(-)
+ fs/fuse/virtio_fs.c | 59 ++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 50 insertions(+), 9 deletions(-)
 
 diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 24ac6f8bf3f7..3b7f7409e77b 100644
+index 625de45fa471..58e568ef54ef 100644
 --- a/fs/fuse/virtio_fs.c
 +++ b/fs/fuse/virtio_fs.c
-@@ -960,13 +960,6 @@ __releases(fiq->lock)
+@@ -55,6 +55,9 @@ struct virtio_fs_forget {
+ 	struct list_head list;
+ };
  
- 	fpq = &fs->vqs[queue_id].fud->pq;
- 	spin_lock(&fpq->lock);
--	if (!fpq->connected) {
--		spin_unlock(&fpq->lock);
--		req->out.h.error = -ENODEV;
--		pr_err("virtio-fs: %s disconnected\n", __func__);
--		fuse_request_end(fc, req);
--		return;
--	}
- 	list_add_tail(&req->list, fpq->processing);
- 	spin_unlock(&fpq->lock);
- 	set_bit(FR_SENT, &req->flags);
++static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
++				 struct fuse_req *req, bool in_flight);
++
+ static inline struct virtio_fs_vq *vq_to_fsvq(struct virtqueue *vq)
+ {
+ 	struct virtio_fs *fs = vq->vdev->priv;
+@@ -260,6 +263,7 @@ static void virtio_fs_request_dispatch_work(struct work_struct *work)
+ 	struct virtio_fs_vq *fsvq = container_of(work, struct virtio_fs_vq,
+ 						 dispatch_work.work);
+ 	struct fuse_conn *fc = fsvq->fud->fc;
++	int ret;
+ 
+ 	pr_debug("virtio-fs: worker %s called.\n", __func__);
+ 	while (1) {
+@@ -268,13 +272,43 @@ static void virtio_fs_request_dispatch_work(struct work_struct *work)
+ 					       list);
+ 		if (!req) {
+ 			spin_unlock(&fsvq->lock);
+-			return;
++			break;
+ 		}
+ 
+ 		list_del_init(&req->list);
+ 		spin_unlock(&fsvq->lock);
+ 		fuse_request_end(fc, req);
+ 	}
++
++	/* Dispatch pending requests */
++	while (1) {
++		spin_lock(&fsvq->lock);
++		req = list_first_entry_or_null(&fsvq->queued_reqs,
++					       struct fuse_req, list);
++		if (!req) {
++			spin_unlock(&fsvq->lock);
++			return;
++		}
++		list_del_init(&req->list);
++		spin_unlock(&fsvq->lock);
++
++		ret = virtio_fs_enqueue_req(fsvq, req, true);
++		if (ret < 0) {
++			if (ret == -ENOMEM || ret == -ENOSPC) {
++				spin_lock(&fsvq->lock);
++				list_add_tail(&req->list, &fsvq->queued_reqs);
++				schedule_delayed_work(&fsvq->dispatch_work,
++						      msecs_to_jiffies(1));
++				spin_unlock(&fsvq->lock);
++				return;
++			}
++			req->out.h.error = ret;
++			dec_in_flight_req(fsvq);
++			pr_err("virtio-fs: virtio_fs_enqueue_req() failed %d\n",
++			       ret);
++			fuse_request_end(fc, req);
++		}
++	}
+ }
+ 
+ static void virtio_fs_hiprio_dispatch_work(struct work_struct *work)
+@@ -837,7 +871,7 @@ static unsigned int sg_init_fuse_args(struct scatterlist *sg,
+ 
+ /* Add a request to a virtqueue and kick the device */
+ static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
+-				 struct fuse_req *req)
++				 struct fuse_req *req, bool in_flight)
+ {
+ 	/* requests need at least 4 elements */
+ 	struct scatterlist *stack_sgs[6];
+@@ -917,7 +951,8 @@ static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
+ 	/* matches barrier in request_wait_answer() */
+ 	smp_mb__after_atomic();
+ 
+-	inc_in_flight_req(fsvq);
++	if (!in_flight)
++		inc_in_flight_req(fsvq);
+ 	notify = virtqueue_kick_prepare(vq);
+ 
+ 	spin_unlock(&fsvq->lock);
+@@ -963,15 +998,21 @@ __releases(fiq->lock)
+ 		 req->in.h.nodeid, req->in.h.len,
+ 		 fuse_len_args(req->args->out_numargs, req->args->out_args));
+ 
+-retry:
+ 	fsvq = &fs->vqs[queue_id];
+-	ret = virtio_fs_enqueue_req(fsvq, req);
++	ret = virtio_fs_enqueue_req(fsvq, req, false);
+ 	if (ret < 0) {
+ 		if (ret == -ENOMEM || ret == -ENOSPC) {
+-			/* Virtqueue full. Retry submission */
+-			/* TODO use completion instead of timeout */
+-			usleep_range(20, 30);
+-			goto retry;
++			/*
++			 * Virtqueue full. Retry submission from worker
++			 * context as we might be holding fc->bg_lock.
++			 */
++			spin_lock(&fsvq->lock);
++			list_add_tail(&req->list, &fsvq->queued_reqs);
++			inc_in_flight_req(fsvq);
++			schedule_delayed_work(&fsvq->dispatch_work,
++						msecs_to_jiffies(1));
++			spin_unlock(&fsvq->lock);
++			return;
+ 		}
+ 		req->out.h.error = ret;
+ 		pr_err("virtio-fs: virtio_fs_enqueue_req() failed %d\n", ret);
 -- 
 2.20.1
 

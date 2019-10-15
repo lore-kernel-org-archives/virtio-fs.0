@@ -1,24 +1,12 @@
-From: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
-Date: Tue, 15 Oct 2019 17:28:10 +0000
-Message-ID: <ac410eee095de0faf2e8ccd3f917e322c7d68384.camel@intel.com>
-References: <20191009165116.GJ2893@work-vm>
-	<27035e4a-bd12-e5d8-30d0-0df45e75457c@jp.fujitsu.com>
-	<CAJFHJrr5Esq=cjZNW4qZRABtCCh_vpkFJEQO9kYb=Pg62O+weQ@mail.gmail.com>
-	<20191011195935.GB13861@redhat.com>
-	<CAJFHJrq6bQo=yvO0tAxH7RWg=U=ftpsePs3c7y-AcE90Wh4afg@mail.gmail.com>
-	<20191011203647.GC13861@redhat.com>
-	<20191014091108.GH22963@stefanha-x1.localdomain>
-	<CAJFHJrrqfjQqMu-K99DiBYNmD1=hB710wRZ88w--SQ0GxQv9Tw@mail.gmail.com>
-	<20191015155749.GH3073@work-vm>
-	<CAJFHJroxYvu_cfwCCxdWV_mN-0pxZ4qBbXdjiJEzPECui-ygrA@mail.gmail.com>
-	<20191015162634.GI3073@work-vm>
-In-Reply-To: <20191015162634.GI3073@work-vm>
-Content-Language: en-US
-Content-Type: text/plain; charset="utf-8"
-Content-ID: <8D495077FC0F604F944E3F61C81D47A3@intel.com>
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Tue, 15 Oct 2019 13:46:25 -0400
+Message-Id: <20191015174626.11593-5-vgoyal@redhat.com>
+In-Reply-To: <20191015174626.11593-1-vgoyal@redhat.com>
+References: <20191015174626.11593-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] xfstest results for virtio-fs on aarch64
+Subject: [Virtio-fs] [PATCH 4/5] virtiofs: Count pending forgets as
+	in_flight forgets
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,55 +15,157 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "dgilbert@redhat.com" <dgilbert@redhat.com>, "slp@redhat.com" <slp@redhat.com>, "chirantan@chromium.org" <chirantan@chromium.org>
-Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "masayoshi.mizuma@fujitsu.com" <masayoshi.mizuma@fujitsu.com>, "vgoyal@redhat.com" <vgoyal@redhat.com>, "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>
+To: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com
+Cc: miklos@szeredi.hu, virtualization@lists.linux-foundation.org, vgoyal@redhat.com
 
-Thanks Dave for adding me to the loop here!
+If virtqueue is full, we put forget requests on a list and these forgets
+are dispatched later using a worker. As of now we don't count these
+forgets in fsvq->in_flight variable. This means when queue is being drained,
+we have to have special logic to first drain these pending requests and
+then wait for fsvq->in_flight to go to zero.
 
-On Tue, 2019-10-15 at 17:26 +0100, Dr. David Alan Gilbert wrote:
-> * Chirantan Ekbote (chirantan@chromium.org) wrote:
-> > On Wed, Oct 16, 2019 at 12:58 AM Dr. David Alan Gilbert
-> > <dgilbert@redhat.com> wrote:
-> > > * Chirantan Ekbote (chirantan@chromium.org) wrote:
-> > > > I'm not using virtiofsd.  We have our own server for crosvm,
-> > > > which
-> > > > supports multiple queues.
-> > > 
-> > > Ah excellent; is that public anywhere?
-> > > 
-> > 
-> > It's currently under review here:
-> > https://chromium-review.googlesource.com/c/chromiumos/platform/crosvm/+/1758103
-> > 
-> > I expect to have it merged sometime this week.
+By counting pending forgets in fsvq->in_flight, we can get rid of special
+logic and just wait for in_flight to go to zero. Worker thread will
+kick and drain all the forgets anyway, leading in_flight to zero.
 
-Oh that's very nice to hear. We have some code from the cloud-
-hypervisor project where we have a vhost-user-net implementation
-relying on some sort of a wrapper code similar to what all vhost-user
-daemon implementations would reuse (libvhost-user kind of thing).
+I also need similar logic for normal request queue in next patch where
+I am about to defer request submission in the worker context if queue is
+full.
 
-We're planning to see this wrapper code land on Rust-VMM at some point,
-which is why it would be interesting if you could rebase this virtio-fs 
-daemon code on top of this small library. If you don't have the
-bandwidth, we could probably look at it if that's something you would
-be interested in.
+This simplifies the code a bit.
 
-Here is the code for the small wrapper crate: 
-https://github.com/intel/cloud-hypervisor/blob/master/vhost_user_backend/src/lib.rs
+Also add two helper functions to inc/dec in_flight. Decrement in_flight
+helper will later used to call completion when in_flight reaches zero.
 
-And here is the vhost-user-net example using it:
-https://github.com/intel/cloud-hypervisor/blob/master/src/bin/vhost_user_net.rs
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/virtio_fs.c | 44 ++++++++++++++++++++------------------------
+ 1 file changed, 20 insertions(+), 24 deletions(-)
 
-Thanks,
-Sebastien
-
-> 
-> Very nice; copying in Seb and Sergio.
-> 
-> I'll try and have a look through that.
-> 
-> Dave
-> 
-> --
-> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index e0fcf3030951..625de45fa471 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -67,6 +67,19 @@ static inline struct fuse_pqueue *vq_to_fpq(struct virtqueue *vq)
+ 	return &vq_to_fsvq(vq)->fud->pq;
+ }
+ 
++/* Should be called with fsvq->lock held. */
++static inline void inc_in_flight_req(struct virtio_fs_vq *fsvq)
++{
++	fsvq->in_flight++;
++}
++
++/* Should be called with fsvq->lock held. */
++static inline void dec_in_flight_req(struct virtio_fs_vq *fsvq)
++{
++	WARN_ON(fsvq->in_flight <= 0);
++	fsvq->in_flight--;
++}
++
+ static void release_virtio_fs_obj(struct kref *ref)
+ {
+ 	struct virtio_fs *vfs = container_of(ref, struct virtio_fs, refcount);
+@@ -110,22 +123,6 @@ static void virtio_fs_drain_queue(struct virtio_fs_vq *fsvq)
+ 	flush_delayed_work(&fsvq->dispatch_work);
+ }
+ 
+-static inline void drain_hiprio_queued_reqs(struct virtio_fs_vq *fsvq)
+-{
+-	struct virtio_fs_forget *forget;
+-
+-	spin_lock(&fsvq->lock);
+-	while (1) {
+-		forget = list_first_entry_or_null(&fsvq->queued_reqs,
+-						struct virtio_fs_forget, list);
+-		if (!forget)
+-			break;
+-		list_del(&forget->list);
+-		kfree(forget);
+-	}
+-	spin_unlock(&fsvq->lock);
+-}
+-
+ static void virtio_fs_drain_all_queues(struct virtio_fs *fs)
+ {
+ 	struct virtio_fs_vq *fsvq;
+@@ -133,9 +130,6 @@ static void virtio_fs_drain_all_queues(struct virtio_fs *fs)
+ 
+ 	for (i = 0; i < fs->nvqs; i++) {
+ 		fsvq = &fs->vqs[i];
+-		if (i == VQ_HIPRIO)
+-			drain_hiprio_queued_reqs(fsvq);
+-
+ 		virtio_fs_drain_queue(fsvq);
+ 	}
+ }
+@@ -254,7 +248,7 @@ static void virtio_fs_hiprio_done_work(struct work_struct *work)
+ 
+ 		while ((req = virtqueue_get_buf(vq, &len)) != NULL) {
+ 			kfree(req);
+-			fsvq->in_flight--;
++			dec_in_flight_req(fsvq);
+ 		}
+ 	} while (!virtqueue_enable_cb(vq) && likely(!virtqueue_is_broken(vq)));
+ 	spin_unlock(&fsvq->lock);
+@@ -306,6 +300,7 @@ static void virtio_fs_hiprio_dispatch_work(struct work_struct *work)
+ 
+ 		list_del(&forget->list);
+ 		if (!fsvq->connected) {
++			dec_in_flight_req(fsvq);
+ 			spin_unlock(&fsvq->lock);
+ 			kfree(forget);
+ 			continue;
+@@ -327,13 +322,13 @@ static void virtio_fs_hiprio_dispatch_work(struct work_struct *work)
+ 			} else {
+ 				pr_debug("virtio-fs: Could not queue FORGET: err=%d. Dropping it.\n",
+ 					 ret);
++				dec_in_flight_req(fsvq);
+ 				kfree(forget);
+ 			}
+ 			spin_unlock(&fsvq->lock);
+ 			return;
+ 		}
+ 
+-		fsvq->in_flight++;
+ 		notify = virtqueue_kick_prepare(vq);
+ 		spin_unlock(&fsvq->lock);
+ 
+@@ -472,7 +467,7 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
+ 
+ 		fuse_request_end(fc, req);
+ 		spin_lock(&fsvq->lock);
+-		fsvq->in_flight--;
++		dec_in_flight_req(fsvq);
+ 		spin_unlock(&fsvq->lock);
+ 	}
+ }
+@@ -730,6 +725,7 @@ __releases(fiq->lock)
+ 			list_add_tail(&forget->list, &fsvq->queued_reqs);
+ 			schedule_delayed_work(&fsvq->dispatch_work,
+ 					msecs_to_jiffies(1));
++			inc_in_flight_req(fsvq);
+ 		} else {
+ 			pr_debug("virtio-fs: Could not queue FORGET: err=%d. Dropping it.\n",
+ 				 ret);
+@@ -739,7 +735,7 @@ __releases(fiq->lock)
+ 		goto out;
+ 	}
+ 
+-	fsvq->in_flight++;
++	inc_in_flight_req(fsvq);
+ 	notify = virtqueue_kick_prepare(vq);
+ 
+ 	spin_unlock(&fsvq->lock);
+@@ -921,7 +917,7 @@ static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
+ 	/* matches barrier in request_wait_answer() */
+ 	smp_mb__after_atomic();
+ 
+-	fsvq->in_flight++;
++	inc_in_flight_req(fsvq);
+ 	notify = virtqueue_kick_prepare(vq);
+ 
+ 	spin_unlock(&fsvq->lock);
+-- 
+2.20.1
 

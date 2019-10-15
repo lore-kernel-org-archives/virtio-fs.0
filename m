@@ -1,12 +1,9 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue, 15 Oct 2019 13:46:25 -0400
-Message-Id: <20191015174626.11593-5-vgoyal@redhat.com>
-In-Reply-To: <20191015174626.11593-1-vgoyal@redhat.com>
-References: <20191015174626.11593-1-vgoyal@redhat.com>
+Date: Tue, 15 Oct 2019 13:46:21 -0400
+Message-Id: <20191015174626.11593-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 4/5] virtiofs: Count pending forgets as
-	in_flight forgets
+Subject: [Virtio-fs] [PATCH 0/5] virtiofs: Fix couple of deadlocks
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,154 +15,40 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com
 Cc: miklos@szeredi.hu, virtualization@lists.linux-foundation.org, vgoyal@redhat.com
 
-If virtqueue is full, we put forget requests on a list and these forgets
-are dispatched later using a worker. As of now we don't count these
-forgets in fsvq->in_flight variable. This means when queue is being drained,
-we have to have special logic to first drain these pending requests and
-then wait for fsvq->in_flight to go to zero.
+Hi,
 
-By counting pending forgets in fsvq->in_flight, we can get rid of special
-logic and just wait for in_flight to go to zero. Worker thread will
-kick and drain all the forgets anyway, leading in_flight to zero.
+We have couple of places which can result in deadlock. This patch series
+fixes these.
 
-I also need similar logic for normal request queue in next patch where
-I am about to defer request submission in the worker context if queue is
-full.
+We can be called with fc->bg_lock (for background requests) while
+submitting a request. This leads to two constraints.
 
-This simplifies the code a bit.
+- We can't end requests in submitter's context and call fuse_end_request()
+  as it tries to take fc->bg_lock as well. So queue these requests on a
+  list and use a worker to end these requests.
 
-Also add two helper functions to inc/dec in_flight. Decrement in_flight
-helper will later used to call completion when in_flight reaches zero.
+- If virtqueue is full, we can wait with fc->bg_lock held for queue to
+  have space. Worker which is completing the request gets blocked on
+  fc->bg_lock as well. And that means requests are not completing, that
+  means descriptors are not being freed and that means submitter can't
+  make progress. Deadlock. 
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/virtio_fs.c | 44 ++++++++++++++++++++------------------------
- 1 file changed, 20 insertions(+), 24 deletions(-)
+  Fix this by punting the requests to a list and retry submission later
+  with the help of a worker.
 
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index e0fcf3030951..625de45fa471 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -67,6 +67,19 @@ static inline struct fuse_pqueue *vq_to_fpq(struct virtqueue *vq)
- 	return &vq_to_fsvq(vq)->fud->pq;
- }
- 
-+/* Should be called with fsvq->lock held. */
-+static inline void inc_in_flight_req(struct virtio_fs_vq *fsvq)
-+{
-+	fsvq->in_flight++;
-+}
-+
-+/* Should be called with fsvq->lock held. */
-+static inline void dec_in_flight_req(struct virtio_fs_vq *fsvq)
-+{
-+	WARN_ON(fsvq->in_flight <= 0);
-+	fsvq->in_flight--;
-+}
-+
- static void release_virtio_fs_obj(struct kref *ref)
- {
- 	struct virtio_fs *vfs = container_of(ref, struct virtio_fs, refcount);
-@@ -110,22 +123,6 @@ static void virtio_fs_drain_queue(struct virtio_fs_vq *fsvq)
- 	flush_delayed_work(&fsvq->dispatch_work);
- }
- 
--static inline void drain_hiprio_queued_reqs(struct virtio_fs_vq *fsvq)
--{
--	struct virtio_fs_forget *forget;
--
--	spin_lock(&fsvq->lock);
--	while (1) {
--		forget = list_first_entry_or_null(&fsvq->queued_reqs,
--						struct virtio_fs_forget, list);
--		if (!forget)
--			break;
--		list_del(&forget->list);
--		kfree(forget);
--	}
--	spin_unlock(&fsvq->lock);
--}
--
- static void virtio_fs_drain_all_queues(struct virtio_fs *fs)
- {
- 	struct virtio_fs_vq *fsvq;
-@@ -133,9 +130,6 @@ static void virtio_fs_drain_all_queues(struct virtio_fs *fs)
- 
- 	for (i = 0; i < fs->nvqs; i++) {
- 		fsvq = &fs->vqs[i];
--		if (i == VQ_HIPRIO)
--			drain_hiprio_queued_reqs(fsvq);
--
- 		virtio_fs_drain_queue(fsvq);
- 	}
- }
-@@ -254,7 +248,7 @@ static void virtio_fs_hiprio_done_work(struct work_struct *work)
- 
- 		while ((req = virtqueue_get_buf(vq, &len)) != NULL) {
- 			kfree(req);
--			fsvq->in_flight--;
-+			dec_in_flight_req(fsvq);
- 		}
- 	} while (!virtqueue_enable_cb(vq) && likely(!virtqueue_is_broken(vq)));
- 	spin_unlock(&fsvq->lock);
-@@ -306,6 +300,7 @@ static void virtio_fs_hiprio_dispatch_work(struct work_struct *work)
- 
- 		list_del(&forget->list);
- 		if (!fsvq->connected) {
-+			dec_in_flight_req(fsvq);
- 			spin_unlock(&fsvq->lock);
- 			kfree(forget);
- 			continue;
-@@ -327,13 +322,13 @@ static void virtio_fs_hiprio_dispatch_work(struct work_struct *work)
- 			} else {
- 				pr_debug("virtio-fs: Could not queue FORGET: err=%d. Dropping it.\n",
- 					 ret);
-+				dec_in_flight_req(fsvq);
- 				kfree(forget);
- 			}
- 			spin_unlock(&fsvq->lock);
- 			return;
- 		}
- 
--		fsvq->in_flight++;
- 		notify = virtqueue_kick_prepare(vq);
- 		spin_unlock(&fsvq->lock);
- 
-@@ -472,7 +467,7 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
- 
- 		fuse_request_end(fc, req);
- 		spin_lock(&fsvq->lock);
--		fsvq->in_flight--;
-+		dec_in_flight_req(fsvq);
- 		spin_unlock(&fsvq->lock);
- 	}
- }
-@@ -730,6 +725,7 @@ __releases(fiq->lock)
- 			list_add_tail(&forget->list, &fsvq->queued_reqs);
- 			schedule_delayed_work(&fsvq->dispatch_work,
- 					msecs_to_jiffies(1));
-+			inc_in_flight_req(fsvq);
- 		} else {
- 			pr_debug("virtio-fs: Could not queue FORGET: err=%d. Dropping it.\n",
- 				 ret);
-@@ -739,7 +735,7 @@ __releases(fiq->lock)
- 		goto out;
- 	}
- 
--	fsvq->in_flight++;
-+	inc_in_flight_req(fsvq);
- 	notify = virtqueue_kick_prepare(vq);
- 
- 	spin_unlock(&fsvq->lock);
-@@ -921,7 +917,7 @@ static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
- 	/* matches barrier in request_wait_answer() */
- 	smp_mb__after_atomic();
- 
--	fsvq->in_flight++;
-+	inc_in_flight_req(fsvq);
- 	notify = virtqueue_kick_prepare(vq);
- 
- 	spin_unlock(&fsvq->lock);
+Thanks
+Vivek
+
+Vivek Goyal (5):
+  virtiofs: Do not end request in submission context
+  virtiofs: No need to check fpq->connected state
+  virtiofs: Set FR_SENT flag only after request has been sent
+  virtiofs: Count pending forgets as in_flight forgets
+  virtiofs: Retry request submission from worker context
+
+ fs/fuse/virtio_fs.c | 165 +++++++++++++++++++++++++++++---------------
+ 1 file changed, 111 insertions(+), 54 deletions(-)
+
 -- 
 2.20.1
 

@@ -1,10 +1,12 @@
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Wed, 16 Oct 2019 17:01:55 +0100
-Message-Id: <20191016160157.12414-1-stefanha@redhat.com>
+Date: Wed, 16 Oct 2019 17:01:56 +0100
+Message-Id: <20191016160157.12414-2-stefanha@redhat.com>
+In-Reply-To: <20191016160157.12414-1-stefanha@redhat.com>
+References: <20191016160157.12414-1-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 0/2] virtiofsd: add net and pid namespace
-	sandboxing
+Subject: [Virtio-fs] [PATCH 1/2] virtiofsd: move to an empty network
+	namespace
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,29 +18,46 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org
 Cc: virtio-fs@redhat.com
 
-These patches are based on gitlab.com/virtio-fs/qemu.git virtio-fs-dev.
+If the process is compromised there should be no network access.  Use an
+empty network namespace to sandbox networking.
 
-virtiofsd is sandboxed so that it does not have access to the system in the
-event that the process is compromised.  At the moment we use seccomp and mount
-namespaces to restrict the list of allowed syscalls and only give access to the
-shared directory.
+Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ contrib/virtiofsd/passthrough_ll.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-This patch series enhances sandboxing by putting virtiofsd into an empty
-network and pid namespace.  If the process is compromised it will be unable to
-perform network activity, even to localhost services running on the host.  It
-will also be unable to see other processes running on the system since it runs
-as pid 1 in a new pid namespace.
-
-These enhancements are inspired by the Crosvm virtio-fs device's jail
-configuration.
-
-Stefan Hajnoczi (2):
-  virtiofsd: move to an empty network namespace
-  virtiofsd: move to a new pid namespace
-
- contrib/virtiofsd/passthrough_ll.c | 109 +++++++++++++++++++++++------
- 1 file changed, 86 insertions(+), 23 deletions(-)
-
+diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+index 84b60d85bd..c27ff7d800 100644
+--- a/contrib/virtiofsd/passthrough_ll.c
++++ b/contrib/virtiofsd/passthrough_ll.c
+@@ -2736,6 +2736,19 @@ static void setup_shared_versions(struct lo_data *lo)
+ 	lo->version_table = addr;
+ }
+ 
++/*
++ * Called after our UNIX domain sockets have been created, now we can move to
++ * an empty network namespace to prevent TCP/IP and other network activity in
++ * case this process is compromised.
++ */
++static void setup_net_namespace(void)
++{
++	if (unshare(CLONE_NEWNET) != 0) {
++		fuse_log(FUSE_LOG_ERR, "unshare(CLONE_NEWNET): %m\n");
++		exit(1);
++	}
++}
++
+ /* This magic is based on lxc's lxc_pivot_root() */
+ static void setup_pivot_root(const char *source)
+ {
+@@ -2818,6 +2831,7 @@ static void setup_mount_namespace(const char *source)
+  */
+ static void setup_sandbox(struct lo_data *lo, bool enable_syslog)
+ {
++	setup_net_namespace();
+ 	setup_mount_namespace(lo->source);
+ 	setup_seccomp(enable_syslog);
+ }
 -- 
 2.21.0
 

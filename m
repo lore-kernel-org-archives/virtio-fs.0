@@ -1,15 +1,15 @@
-Date: Fri, 6 Sep 2019 09:51:31 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20190906135131.GE22083@redhat.com>
-References: <20190905194859.16219-1-vgoyal@redhat.com>
-	<20190905194859.16219-17-vgoyal@redhat.com>
-	<20190906120534.GX5900@stefanha-x1.localdomain>
+Date: Thu, 17 Oct 2019 17:09:53 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20191017160953.GC1266@stefanha-x1.localdomain>
+References: <20191016103754.2047-1-misono.tomohiro@jp.fujitsu.com>
+	<20191017100528.GA24790@stefanha-x1.localdomain>
+	<CAOssrKfR=sfE1RzOXzvPbdQg-g7i5-f8W9y8bWFnO=gyJ2VMsg@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="zCKi3GIZzVBPywwA"
 Content-Disposition: inline
-In-Reply-To: <20190906120534.GX5900@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH 16/18] virtiofs: Use virtio_fs_mutex for
- races w.r.t ->remove and mount path
+In-Reply-To: <CAOssrKfR=sfE1RzOXzvPbdQg-g7i5-f8W9y8bWFnO=gyJ2VMsg@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: Two fix for xattr operation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,148 +18,74 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: miklos@szeredi.hu, mst@redhat.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org
+To: Miklos Szeredi <mszeredi@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Fri, Sep 06, 2019 at 01:05:34PM +0100, Stefan Hajnoczi wrote:
-> On Thu, Sep 05, 2019 at 03:48:57PM -0400, Vivek Goyal wrote:
-> > It is possible that a mount is in progress and device is being removed at
-> > the same time. Use virtio_fs_mutex to avoid races.
-> > 
-> > This also takes care of bunch of races and removes some TODO items.
-> > 
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > ---
-> >  fs/fuse/virtio_fs.c | 32 ++++++++++++++++++++++----------
-> >  1 file changed, 22 insertions(+), 10 deletions(-)
-> 
-> Let's move to a per-device mutex in the future.  That way a single
-> device that fails to drain/complete requests will not hang all other
-> virtio-fs instances.  This is fine for now.
 
-Good point. For now I updated the patch so that it applies cleanly
-after previous two patches changed.
+--zCKi3GIZzVBPywwA
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Subject: virtiofs: Use virtio_fs_mutex for races w.r.t ->remove and mount path
+On Thu, Oct 17, 2019 at 01:23:57PM +0200, Miklos Szeredi wrote:
+> On Thu, Oct 17, 2019 at 12:05 PM Stefan Hajnoczi <stefanha@redhat.com> wr=
+ote:
+> >
+> > On Wed, Oct 16, 2019 at 07:37:52PM +0900, Misono Tomohiro wrote:
+> > > Hello,
+> > >
+> > > I test xattr operation on virtiofs using xfstest generic/062
+> > > (with -o xattr option and XFS backend) and see some problems.
+> > >
+> > > These patches fixes the two of the problems.
+> > >
+> > > The remaining problems are:
+> > >  1. we cannot xattr to block device created by mknod
+> > >     which does not have actual device (since open in virtiofsd fails)
+> > >  2. we cannot xattr to symbolic link
+> > >
+> > > I don't think 1 is a big problem but can we fix 2?
+> >
+> > Sorry, I don't know the answer.  Maybe it would be necessary to add a
+> > new O_SYMLINK open flag to open(2) so that fgetxattr()/fsetxattr()
+> > operations can be performed.  A kernel change like that would take some
+> > time to get accepted upstream and shipped by distros, but it might be
+> > the only way since the current syscall interface doesn't seem to offer a
+> > way to do this.
+>=20
+> The real problem is that open() on a non-regular, non-directory file
+> may have side effects (unless O_PATH is used).  These patches try to
+> paper over that, but the fact is: opening special files from a file
+> server is forbidden.
+>=20
+> I see why this is being done, and it's not easy to fix properly
+> without the ..at() versions of these syscalls.  One idea is to fork()
+> + fchdir(lo->proc_self_fd) + ..xattr().  Another related idea is to do
+> a unshare(CLONE_FS) after each thread's startup (will pthread library
+> balk?  I don't know) so that it's safe to do fchdir(lo->proc_self_fd)
+> + ...xattr() + fchdir(lo->root_fd).
 
-It is possible that a mount is in progress and device is being removed at
-the same time. Use virtio_fs_mutex to avoid races. 
+Looking at the f*xattr() code in the kernel, it doesn't really care
+about the file descriptor, it wants the inode instead.  So the O_SYMLINK
+idea I mentioned could also be called O_XATTR and be similar to O_PATH,
+except that only f*xattr() calls are allowed on this file descriptor.
 
-This also takes care of bunch of races and removes some TODO items.
+Stefan
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/virtio_fs.c |   32 ++++++++++++++++++++++----------
- 1 file changed, 22 insertions(+), 10 deletions(-)
+--zCKi3GIZzVBPywwA
+Content-Type: application/pgp-signature; name="signature.asc"
 
-Index: rhvgoyal-linux-fuse/fs/fuse/virtio_fs.c
-===================================================================
---- rhvgoyal-linux-fuse.orig/fs/fuse/virtio_fs.c	2019-09-06 09:40:53.309245246 -0400
-+++ rhvgoyal-linux-fuse/fs/fuse/virtio_fs.c	2019-09-06 09:43:25.335245246 -0400
-@@ -13,7 +13,9 @@
- #include <linux/highmem.h>
- #include "fuse_i.h"
- 
--/* List of virtio-fs device instances and a lock for the list */
-+/* List of virtio-fs device instances and a lock for the list. Also provides
-+ * mutual exclusion in device removal and mounting path
-+ */
- static DEFINE_MUTEX(virtio_fs_mutex);
- static LIST_HEAD(virtio_fs_instances);
- 
-@@ -72,17 +74,19 @@ static void release_virtio_fs_obj(struct
- 	kfree(vfs);
- }
- 
-+/* Make sure virtiofs_mutex is held */
- static void virtio_fs_put(struct virtio_fs *fs)
- {
--	mutex_lock(&virtio_fs_mutex);
- 	kref_put(&fs->refcount, release_virtio_fs_obj);
--	mutex_unlock(&virtio_fs_mutex);
- }
- 
- static void virtio_fs_fiq_release(struct fuse_iqueue *fiq)
- {
- 	struct virtio_fs *vfs = fiq->priv;
-+
-+	mutex_lock(&virtio_fs_mutex);
- 	virtio_fs_put(vfs);
-+	mutex_unlock(&virtio_fs_mutex);
- }
- 
- static void virtio_fs_drain_queue(struct virtio_fs_vq *fsvq)
-@@ -596,9 +600,8 @@ static void virtio_fs_remove(struct virt
- 	struct virtio_fs *fs = vdev->priv;
- 
- 	mutex_lock(&virtio_fs_mutex);
-+	/* This device is going away. No one should get new reference */
- 	list_del_init(&fs->list);
--	mutex_unlock(&virtio_fs_mutex);
--
- 	virtio_fs_stop_all_queues(fs);
- 	virtio_fs_drain_all_queues(fs);
- 	vdev->config->reset(vdev);
-@@ -607,6 +610,7 @@ static void virtio_fs_remove(struct virt
- 	vdev->priv = NULL;
- 	/* Put device reference on virtio_fs object */
- 	virtio_fs_put(fs);
-+	mutex_unlock(&virtio_fs_mutex);
- }
- 
- #ifdef CONFIG_PM_SLEEP
-@@ -978,10 +982,15 @@ static int virtio_fs_fill_super(struct s
- 		.no_force_umount = true,
- 	};
- 
--	/* TODO lock */
--	if (fs->vqs[VQ_REQUEST].fud) {
--		pr_err("virtio-fs: device already in use\n");
--		err = -EBUSY;
-+	mutex_lock(&virtio_fs_mutex);
-+
-+	/* After holding mutex, make sure virtiofs device is still there.
-+	 * Though we are holding a refernce to it, drive ->remove might
-+	 * still have cleaned up virtual queues. In that case bail out.
-+	 */
-+	err = -EINVAL;
-+	if (list_empty(&fs->list)) {
-+		pr_info("virtio-fs: tag <%s> not found\n", fs->tag);
- 		goto err;
- 	}
- 
-@@ -1007,7 +1016,6 @@ static int virtio_fs_fill_super(struct s
- 
- 	fc = fs->vqs[VQ_REQUEST].fud->fc;
- 
--	/* TODO take fuse_mutex around this loop? */
- 	for (i = 0; i < fs->nvqs; i++) {
- 		struct virtio_fs_vq *fsvq = &fs->vqs[i];
- 
-@@ -1020,6 +1028,7 @@ static int virtio_fs_fill_super(struct s
- 	/* Previous unmount will stop all queues. Start these again */
- 	virtio_fs_start_all_queues(fs);
- 	fuse_send_init(fc, init_req);
-+	mutex_unlock(&virtio_fs_mutex);
- 	return 0;
- 
- err_free_init_req:
-@@ -1027,6 +1036,7 @@ err_free_init_req:
- err_free_fuse_devs:
- 	virtio_fs_free_devs(fs);
- err:
-+	mutex_unlock(&virtio_fs_mutex);
- 	return err;
- }
- 
-@@ -1100,7 +1110,9 @@ static int virtio_fs_get_tree(struct fs_
- 
- 	fc = kzalloc(sizeof(struct fuse_conn), GFP_KERNEL);
- 	if (!fc) {
-+		mutex_lock(&virtio_fs_mutex);
- 		virtio_fs_put(fs);
-+		mutex_unlock(&virtio_fs_mutex);
- 		return -ENOMEM;
- 	}
- 
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl2oklEACgkQnKSrs4Gr
+c8iiaAgAhKZnZLjRSpcFf1nJFWVOr+mJG0FqTEaivYCCOF73tUkhrRdfYz2J45Km
+kkOJen8ZDZuNZPFl+y9WVn1OH7qtHHzYpNKXbmhyEa1FB1nPStM5+AGs5qNHIQgf
+sXpFoQ56an1JyXg1IBqsH9V0blNVbH1vwlSsy7IkTXSNNFLz314CinvYe1RcfaWe
+1EGL15xV8pEw1Zw5rHmhNx4c/E4HOcI5vBz9FwO/HGI9Z/Dui/bAyatb/Ko54YAS
+lWObKy1P4ugUmz5COJzX/utS0SBEeidbjWhr81qs4p42fQYrDYZj/JsG2U/Ys8+H
+t6XaGP9hT3Hoghq0e39FkATwyF72TQ==
+=qReH
+-----END PGP SIGNATURE-----
+
+--zCKi3GIZzVBPywwA--
 

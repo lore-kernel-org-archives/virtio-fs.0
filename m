@@ -1,13 +1,13 @@
+Date: Thu, 17 Oct 2019 10:45:53 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20191017144553.GA12588@redhat.com>
+References: <20191016160157.12414-1-stefanha@redhat.com>
+	<20191016160157.12414-3-stefanha@redhat.com>
 MIME-Version: 1.0
-References: <20191016103754.2047-1-misono.tomohiro@jp.fujitsu.com>
-	<20191017100528.GA24790@stefanha-x1.localdomain>
-	<CAOssrKfR=sfE1RzOXzvPbdQg-g7i5-f8W9y8bWFnO=gyJ2VMsg@mail.gmail.com>
-In-Reply-To: <CAOssrKfR=sfE1RzOXzvPbdQg-g7i5-f8W9y8bWFnO=gyJ2VMsg@mail.gmail.com>
-From: Miklos Szeredi <mszeredi@redhat.com>
-Date: Thu, 17 Oct 2019 15:01:08 +0200
-Message-ID: <CAOssrKc7j5jvg9gSJdzOZOW8NWipWU+MKbonZ6Mv-1+TpENMxg@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: Two fix for xattr operation
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20191016160157.12414-3-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 2/2] virtiofsd: move to a new pid namespace
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,15 +19,26 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: Stefan Hajnoczi <stefanha@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Thu, Oct 17, 2019 at 1:23 PM Miklos Szeredi <mszeredi@redhat.com> wrote:
+On Wed, Oct 16, 2019 at 05:01:57PM +0100, Stefan Hajnoczi wrote:
 
-> I see why this is being done, and it's not easy to fix properly
-> without the ..at() versions of these syscalls.  One idea is to fork()
-> + fchdir(lo->proc_self_fd) + ..xattr().  Another related idea is to do
-> a unshare(CLONE_FS) after each thread's startup (will pthread library
+[..]
+> +	/*
+> +	 * If the mounts have shared propagation then we want to opt out so our
+> +	 * mount changes don't affect the parent mount namespace.
+> +	 */
+> +	if (mount(NULL, "/", NULL, MS_REC|MS_SLAVE, NULL) < 0) {
+> +		fuse_log(FUSE_LOG_ERR, "mount(/, MS_REC|MS_SLAVE): %m\n");
+> +		exit(1);
+> +	}
 
-Apparently Samba does this, so it should be safe.
+So we will get mount propogation form parent but our mounts will not
+propagate back. Sounds reasonable.
 
-Thanks,
-Miklos
+Can we take away CAP_SYS_ADMIN from virtiofsd? That way it will not be 
+able to do mount at all. 
+
+I am wondering are we dependent on daemon having CAP_SYS_ADMIN. 
+
+Thanks
+Vivek
 

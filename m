@@ -1,23 +1,21 @@
-From: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
-Date: Thu, 17 Oct 2019 05:19:22 +0000
-Message-ID: <355e94f29d7a4cab4b95769b635ad0bb64f293c5.camel@intel.com>
-References: <20191011203647.GC13861@redhat.com>
+Date: Thu, 17 Oct 2019 10:23:39 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20191017092339.GB23557@stefanha-x1.localdomain>
+References: <20191009165116.GJ2893@work-vm>
+	<27035e4a-bd12-e5d8-30d0-0df45e75457c@jp.fujitsu.com>
+	<CAJFHJrr5Esq=cjZNW4qZRABtCCh_vpkFJEQO9kYb=Pg62O+weQ@mail.gmail.com>
+	<20191011195935.GB13861@redhat.com>
+	<CAJFHJrq6bQo=yvO0tAxH7RWg=U=ftpsePs3c7y-AcE90Wh4afg@mail.gmail.com>
+	<20191011203647.GC13861@redhat.com>
 	<20191014091108.GH22963@stefanha-x1.localdomain>
 	<CAJFHJrrqfjQqMu-K99DiBYNmD1=hB710wRZ88w--SQ0GxQv9Tw@mail.gmail.com>
-	<20191015155749.GH3073@work-vm>
-	<CAJFHJroxYvu_cfwCCxdWV_mN-0pxZ4qBbXdjiJEzPECui-ygrA@mail.gmail.com>
-	<20191015162634.GI3073@work-vm>
-	<ac410eee095de0faf2e8ccd3f917e322c7d68384.camel@intel.com>
-	<CAJFHJrpwkry6r9WDf=4aY2ONUvXKvm_BqWrONFfgRboqGony9g@mail.gmail.com>
-	<20191016141407.GB5487@stefanha-x1.localdomain>
-	<59aa4481a68fe627ee7dfa34f01f4c8f16b1e969.camel@intel.com>
-	<20191016183815.GD14762@stefanha-x1.localdomain>
-In-Reply-To: <20191016183815.GD14762@stefanha-x1.localdomain>
-Content-Language: en-US
-Content-Type: text/plain; charset="utf-8"
-Content-ID: <B1802FF61B5142449D2A9196EDCEE9ED@intel.com>
+	<20191016140959.GA5487@stefanha-x1.localdomain>
+	<CAJFHJrrtVHJQr6tCRYJmL-roVo_dMekOLQPsb4ryc96Bf6hAJA@mail.gmail.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="FkmkrVfFsRoUs1wW"
+Content-Disposition: inline
+In-Reply-To: <CAJFHJrrtVHJQr6tCRYJmL-roVo_dMekOLQPsb4ryc96Bf6hAJA@mail.gmail.com>
 Subject: Re: [Virtio-fs] xfstest results for virtio-fs on aarch64
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
@@ -27,97 +25,65 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "stefanha@redhat.com" <stefanha@redhat.com>
-Cc: "slp@redhat.com" <slp@redhat.com>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>, "masayoshi.mizuma@fujitsu.com" <masayoshi.mizuma@fujitsu.com>, "vgoyal@redhat.com" <vgoyal@redhat.com>
+To: Chirantan Ekbote <chirantan@chromium.org>
+Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>, "masayoshi.mizuma@fujitsu.com" <masayoshi.mizuma@fujitsu.com>, Vivek Goyal <vgoyal@redhat.com>
 
-On Wed, 2019-10-16 at 19:38 +0100, Stefan Hajnoczi wrote:
-> On Wed, Oct 16, 2019 at 04:14:25PM +0000, Boeuf, Sebastien wrote:
-> > On Wed, 2019-10-16 at 15:14 +0100, Stefan Hajnoczi wrote:
-> > > On Wed, Oct 16, 2019 at 03:21:52AM +0900, Chirantan Ekbote wrote:
-> > > > On Wed, Oct 16, 2019 at 2:28 AM Boeuf, Sebastien
-> > > > <sebastien.boeuf@intel.com> wrote:
-> > > > > Thanks Dave for adding me to the loop here!
-> > > > > 
-> > > > > On Tue, 2019-10-15 at 17:26 +0100, Dr. David Alan Gilbert
-> > > > > wrote:
-> > > > > > * Chirantan Ekbote (chirantan@chromium.org) wrote:
-> > > > > > > On Wed, Oct 16, 2019 at 12:58 AM Dr. David Alan Gilbert
-> > > > > > > <dgilbert@redhat.com> wrote:
-> > > > > > > > * Chirantan Ekbote (chirantan@chromium.org) wrote:
-> > > > > > > > > I'm not using virtiofsd.  We have our own server for
-> > > > > > > > > crosvm,
-> > > > > > > > > which
-> > > > > > > > > supports multiple queues.
-> > > > > > > > 
-> > > > > > > > Ah excellent; is that public anywhere?
-> > > > > > > > 
-> > > > > > > 
-> > > > > > > It's currently under review here:
-> > > > > > > https://chromium-review.googlesource.com/c/chromiumos/platform/crosvm/+/1758103
-> > > > > > > 
-> > > > > > > I expect to have it merged sometime this week.
-> > > > > 
-> > > > > Oh that's very nice to hear. We have some code from the
-> > > > > cloud-
-> > > > > hypervisor project where we have a vhost-user-net
-> > > > > implementation
-> > > > > relying on some sort of a wrapper code similar to what all
-> > > > > vhost-
-> > > > > user
-> > > > > daemon implementations would reuse (libvhost-user kind of
-> > > > > thing).
-> > > > > 
-> > > > > We're planning to see this wrapper code land on Rust-VMM at
-> > > > > some
-> > > > > point,
-> > > > > which is why it would be interesting if you could rebase this
-> > > > > virtio-fs
-> > > > > daemon code on top of this small library. If you don't have
-> > > > > the
-> > > > > bandwidth, we could probably look at it if that's something
-> > > > > you
-> > > > > would
-> > > > > be interested in.
-> > > > > 
-> > > > > Here is the code for the small wrapper crate:
-> > > > > https://github.com/intel/cloud-hypervisor/blob/master/vhost_user_backend/src/lib.rs
-> > > > > 
-> > > > > And here is the vhost-user-net example using it:
-> > > > > https://github.com/intel/cloud-hypervisor/blob/master/src/bin/vhost_user_net.rs
-> > > > > 
-> > > > 
-> > > > Our virtio-fs server is not a vhost-user device (this was one
-> > > > of
-> > > > the
-> > > > reasons we didn't want to use virtiofsd).  It currently just
-> > > > runs
-> > > > directly as a child process of crosvm (like all other crosvm
-> > > > devices).
-> > > > So unless I'm missing something I don't think there's much to
-> > > > be
-> > > > gained by rebasing on vhost_user_backend.
-> > > 
-> > > I'm also interested in porting the server over to vhost-user so
-> > > that
-> > > other VMMs like QEMU and cloud-hypervisor can use it.
-> > 
-> > Yes I agree that'd be awesome!
-> > Are you planning to start working on this soon? Just asking as I
-> > want
-> > to avoid potential duplicated efforts :)
-> 
-> Not immediately.  If you are ready to work on it and make your branch
-> public then we can follow along.
 
-Unfortunately, I don't have free cycles right now either. I'll ask
-internally if we can have someone looking at it, and also I might have
-some time later next week.
+--FkmkrVfFsRoUs1wW
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-I'll keep you posted!
+On Thu, Oct 17, 2019 at 04:36:33AM +0900, Chirantan Ekbote wrote:
+> On Wed, Oct 16, 2019 at 11:10 PM Stefan Hajnoczi <stefanha@redhat.com> wr=
+ote:
+> >
+> > On Tue, Oct 15, 2019 at 11:58:46PM +0900, Chirantan Ekbote wrote:
+> > >
+> > > As for the performance numbers, I don't have my test device with me
+> > > but if I remember correctly the blogbench scores almost doubled when
+> > > going from one queue to two queues.
+> >
+> > If I understand the code correctly each virtqueue is processed by a
+> > worker and the number of virtqueues is the vcpu count.  This means that
+> > requests are processed in a blocking fashion and the disk is unlikely to
+> > reach its maximum queue depth (e.g. often 64 requests).
+> >
+> > Going from 1 virtqueue to 2 virtqueues will improve performance, but
+> > it's still a far cry from the maximum queue depth that the host kernel
+> > and hardware supports.  This is why virtiofsd processes multiple
+> > requests in parallel on a single virtqueue using a thread pool.
+>=20
+> Hmm, maybe I'm missing something but isn't this still limited by the
+> number of requests that can fit in the virtqueue?
 
-Thanks,
-Sebastien
+Yes, but not a practical issue.  The maximum virtqueue size is chosen by
+the VIRTIO device.  QEMU sets it to 128 and that's larger than the
+typical queue depth of a disk.  So in practice the virtqueue size is not
+the bottleneck.
 
-> 
-> Stefan
+It makes sense to set the number of virtqueues to the number of vCPUs to
+achieve good CPU and interrupt scalability, but this number will be
+lower than the disk's queue depth.  So in order to saturate the disk
+it's necessary to process a virtqueue's requests in parallel (e.g.
+thread pool, aio, etc).
+
+Stefan
+
+--FkmkrVfFsRoUs1wW
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl2oMxsACgkQnKSrs4Gr
+c8is4ggAoPD6fnemSE6A4RmUVRPVX+ZMR3VBrhDdeFJlFBPr9xKHrArCaWoMnkEM
+ZFG0ScmgTIMO/5ONztmFNLU3jfcMgbsIgIJojfsTcid95bQSLpuS9U0zvWa/4p4W
+cRprke8NkrClY52MFPwmm2brhjF0h9oE7GCcgtU6zBaVlXKTCLPogyp/u3+EB3CM
+V0L8C7bW/7j16hXJ0JDcxlInhsoBLcqOvKqLHP077hos3bMcJINHaRBfDJrxLXgE
+rBNmbGBxgsYwNVZOHo4j1zvc94562qr3bKKSXIggmdUWLY6HFgLBbHpg6D+u38Ur
+9pHMw4a3Lro4rSiycmUVr1toS8idJQ==
+=tm1s
+-----END PGP SIGNATURE-----
+
+--FkmkrVfFsRoUs1wW--
 

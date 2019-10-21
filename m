@@ -1,19 +1,19 @@
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
 	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=hfAvAuNrbwm7BBpI2yh2o5/hOFM6ooN8i+aI4cgImbE=;
-	b=eNBHBEk+Ds5KG91wCPgmQhRnJHnVUZ6PPNl67IkipXVm0N0/ANIu52fvOFMqpMfkIq
-	tn672n4wLOzEitu6rmcAeeK4qPU1mAZAqhz5p2YZX9RsvZYUqUzgCcG4QT+88jhVm5TI
-	tdPF53MplgJIV/2TK0C+gpvzKCTZW01EcxjxE=
+	:cc; bh=s/p0brgLtCKJc4XZUqCU1tU91KmMfXp9mypLm9emXKA=;
+	b=nScQrbDVZs3W36gCGh5Hde+pfCvRGvVRoUTTl70IBhLlBViXK2JhGRVexWzJbPfLQb
+	rpGga7bJQzM5MNF32iUOa1CGDSKpyzv9oOFB0KhM25aYdUgoX4GTq+SU7zEMIRUpqZ6z
+	cT9p81E8Fc4+tWeFdHFsd+lkCKZ7swa5jGYCY=
 MIME-Version: 1.0
 References: <20191015174626.11593-1-vgoyal@redhat.com>
-	<20191015174626.11593-2-vgoyal@redhat.com>
-In-Reply-To: <20191015174626.11593-2-vgoyal@redhat.com>
+	<20191015174626.11593-6-vgoyal@redhat.com>
+In-Reply-To: <20191015174626.11593-6-vgoyal@redhat.com>
 From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Mon, 21 Oct 2019 10:03:39 +0200
-Message-ID: <CAJfpegtrFvuBUuQ7B+ynCLVmgZ8zRjbUYZYg+BzG6HDmt5RyXw@mail.gmail.com>
+Date: Mon, 21 Oct 2019 10:15:18 +0200
+Message-ID: <CAJfpegvg1ePA7=Fm3499bKsZBv_98j817KCDxOU18j=BdVfHyA@mail.gmail.com>
 Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH 1/5] virtiofs: Do not end request in
-	submission context
+Subject: Re: [Virtio-fs] [PATCH 5/5] virtiofs: Retry request submission from
+	worker context
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,132 +27,88 @@ Cc: virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdev
 
 On Tue, Oct 15, 2019 at 7:46 PM Vivek Goyal <vgoyal@redhat.com> wrote:
 >
-> Submission context can hold some locks which end request code tries to
-> hold again and deadlock can occur. For example, fc->bg_lock. If a background
-> request is being submitted, it might hold fc->bg_lock and if we could not
-> submit request (because device went away) and tried to end request,
-> then deadlock happens. During testing, I also got a warning from deadlock
-> detection code.
+> If regular request queue gets full, currently we sleep for a bit and
+> retrying submission in submitter's context. This assumes submitter is
+> not holding any spin lock. But this assumption is not true for background
+> requests. For background requests, we are called with fc->bg_lock held.
 >
-> So put requests on a list and end requests from a worker thread.
+> This can lead to deadlock where one thread is trying submission with
+> fc->bg_lock held while request completion thread has called fuse_request_end()
+> which tries to acquire fc->bg_lock and gets blocked. As request completion
+> thread gets blocked, it does not make further progress and that means queue
+> does not get empty and submitter can't submit more requests.
 >
-> I got following warning from deadlock detector.
+> To solve this issue, retry submission with the help of a worker, instead of
+> retrying in submitter's context. We already do this for hiprio/forget
+> requests.
 >
-> [  603.137138] WARNING: possible recursive locking detected
-> [  603.137142] --------------------------------------------
-> [  603.137144] blogbench/2036 is trying to acquire lock:
-> [  603.137149] 00000000f0f51107 (&(&fc->bg_lock)->rlock){+.+.}, at: fuse_request_end+0xdf/0x1c0 [fuse]
-> [  603.140701]
-> [  603.140701] but task is already holding lock:
-> [  603.140703] 00000000f0f51107 (&(&fc->bg_lock)->rlock){+.+.}, at: fuse_simple_background+0x92/0x1d0 [fuse]
-> [  603.140713]
-> [  603.140713] other info that might help us debug this:
-> [  603.140714]  Possible unsafe locking scenario:
-> [  603.140714]
-> [  603.140715]        CPU0
-> [  603.140716]        ----
-> [  603.140716]   lock(&(&fc->bg_lock)->rlock);
-> [  603.140718]   lock(&(&fc->bg_lock)->rlock);
-> [  603.140719]
-> [  603.140719]  *** DEADLOCK ***
->
+> Reported-by: Chirantan Ekbote <chirantan@chromium.org>
 > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 > ---
->  fs/fuse/virtio_fs.c | 38 ++++++++++++++++++++++++++++++++++----
->  1 file changed, 34 insertions(+), 4 deletions(-)
+>  fs/fuse/virtio_fs.c | 59 ++++++++++++++++++++++++++++++++++++++-------
+>  1 file changed, 50 insertions(+), 9 deletions(-)
 >
 > diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-> index 6af3f131e468..24ac6f8bf3f7 100644
+> index 625de45fa471..58e568ef54ef 100644
 > --- a/fs/fuse/virtio_fs.c
 > +++ b/fs/fuse/virtio_fs.c
-> @@ -30,6 +30,7 @@ struct virtio_fs_vq {
->         struct virtqueue *vq;     /* protected by ->lock */
->         struct work_struct done_work;
->         struct list_head queued_reqs;
-> +       struct list_head end_reqs;      /* End these requests */
->         struct delayed_work dispatch_work;
->         struct fuse_dev *fud;
->         bool connected;
-> @@ -259,8 +260,27 @@ static void virtio_fs_hiprio_done_work(struct work_struct *work)
->         spin_unlock(&fsvq->lock);
->  }
+> @@ -55,6 +55,9 @@ struct virtio_fs_forget {
+>         struct list_head list;
+>  };
 >
-> -static void virtio_fs_dummy_dispatch_work(struct work_struct *work)
-> +static void virtio_fs_request_dispatch_work(struct work_struct *work)
->  {
-> +       struct fuse_req *req;
-> +       struct virtio_fs_vq *fsvq = container_of(work, struct virtio_fs_vq,
-> +                                                dispatch_work.work);
-> +       struct fuse_conn *fc = fsvq->fud->fc;
+> +static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
+> +                                struct fuse_req *req, bool in_flight);
 > +
-> +       pr_debug("virtio-fs: worker %s called.\n", __func__);
+>  static inline struct virtio_fs_vq *vq_to_fsvq(struct virtqueue *vq)
+>  {
+>         struct virtio_fs *fs = vq->vdev->priv;
+> @@ -260,6 +263,7 @@ static void virtio_fs_request_dispatch_work(struct work_struct *work)
+>         struct virtio_fs_vq *fsvq = container_of(work, struct virtio_fs_vq,
+>                                                  dispatch_work.work);
+>         struct fuse_conn *fc = fsvq->fud->fc;
+> +       int ret;
+>
+>         pr_debug("virtio-fs: worker %s called.\n", __func__);
+>         while (1) {
+> @@ -268,13 +272,43 @@ static void virtio_fs_request_dispatch_work(struct work_struct *work)
+>                                                list);
+>                 if (!req) {
+>                         spin_unlock(&fsvq->lock);
+> -                       return;
+> +                       break;
+>                 }
+>
+>                 list_del_init(&req->list);
+>                 spin_unlock(&fsvq->lock);
+>                 fuse_request_end(fc, req);
+>         }
+> +
+> +       /* Dispatch pending requests */
 > +       while (1) {
 > +               spin_lock(&fsvq->lock);
-> +               req = list_first_entry_or_null(&fsvq->end_reqs, struct fuse_req,
-> +                                              list);
+> +               req = list_first_entry_or_null(&fsvq->queued_reqs,
+> +                                              struct fuse_req, list);
 > +               if (!req) {
 > +                       spin_unlock(&fsvq->lock);
 > +                       return;
 > +               }
-> +
 > +               list_del_init(&req->list);
 > +               spin_unlock(&fsvq->lock);
-> +               fuse_request_end(fc, req);
-> +       }
->  }
->
->  static void virtio_fs_hiprio_dispatch_work(struct work_struct *work)
-> @@ -502,6 +522,7 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
->         names[VQ_HIPRIO] = fs->vqs[VQ_HIPRIO].name;
->         INIT_WORK(&fs->vqs[VQ_HIPRIO].done_work, virtio_fs_hiprio_done_work);
->         INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].queued_reqs);
-> +       INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].end_reqs);
->         INIT_DELAYED_WORK(&fs->vqs[VQ_HIPRIO].dispatch_work,
->                         virtio_fs_hiprio_dispatch_work);
->         spin_lock_init(&fs->vqs[VQ_HIPRIO].lock);
-> @@ -511,8 +532,9 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
->                 spin_lock_init(&fs->vqs[i].lock);
->                 INIT_WORK(&fs->vqs[i].done_work, virtio_fs_requests_done_work);
->                 INIT_DELAYED_WORK(&fs->vqs[i].dispatch_work,
-> -                                       virtio_fs_dummy_dispatch_work);
-> +                                 virtio_fs_request_dispatch_work);
->                 INIT_LIST_HEAD(&fs->vqs[i].queued_reqs);
-> +               INIT_LIST_HEAD(&fs->vqs[i].end_reqs);
->                 snprintf(fs->vqs[i].name, sizeof(fs->vqs[i].name),
->                          "requests.%u", i - VQ_REQUEST);
->                 callbacks[i] = virtio_fs_vq_done;
-> @@ -918,6 +940,7 @@ __releases(fiq->lock)
->         struct fuse_conn *fc;
->         struct fuse_req *req;
->         struct fuse_pqueue *fpq;
-> +       struct virtio_fs_vq *fsvq;
->         int ret;
->
->         WARN_ON(list_empty(&fiq->pending));
-> @@ -951,7 +974,8 @@ __releases(fiq->lock)
->         smp_mb__after_atomic();
->
->  retry:
-> -       ret = virtio_fs_enqueue_req(&fs->vqs[queue_id], req);
-> +       fsvq = &fs->vqs[queue_id];
-> +       ret = virtio_fs_enqueue_req(fsvq, req);
->         if (ret < 0) {
->                 if (ret == -ENOMEM || ret == -ENOSPC) {
->                         /* Virtqueue full. Retry submission */
-> @@ -965,7 +989,13 @@ __releases(fiq->lock)
->                 clear_bit(FR_SENT, &req->flags);
->                 list_del_init(&req->list);
->                 spin_unlock(&fpq->lock);
-> -               fuse_request_end(fc, req);
 > +
-> +               /* Can't end request in submission context. Use a worker */
-> +               spin_lock(&fsvq->lock);
-> +               list_add_tail(&req->list, &fsvq->end_reqs);
-> +               schedule_delayed_work(&fsvq->dispatch_work,
-> +                                     msecs_to_jiffies(1));
+> +               ret = virtio_fs_enqueue_req(fsvq, req, true);
+> +               if (ret < 0) {
+> +                       if (ret == -ENOMEM || ret == -ENOSPC) {
+> +                               spin_lock(&fsvq->lock);
+> +                               list_add_tail(&req->list, &fsvq->queued_reqs);
+> +                               schedule_delayed_work(&fsvq->dispatch_work,
+> +                                                     msecs_to_jiffies(1));
+> +                               spin_unlock(&fsvq->lock);
+> +                               return;
+> +                       }
+> +                       req->out.h.error = ret;
+> +                       dec_in_flight_req(fsvq);
 
-What's the reason to delay by one msec?  If this is purely for
-deadlock avoidance, then a zero delay would work better, no?
+Missing locking.  Fixed.
 
 Thanks,
 Miklos

@@ -1,19 +1,19 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=s/p0brgLtCKJc4XZUqCU1tU91KmMfXp9mypLm9emXKA=;
-	b=nScQrbDVZs3W36gCGh5Hde+pfCvRGvVRoUTTl70IBhLlBViXK2JhGRVexWzJbPfLQb
-	rpGga7bJQzM5MNF32iUOa1CGDSKpyzv9oOFB0KhM25aYdUgoX4GTq+SU7zEMIRUpqZ6z
-	cT9p81E8Fc4+tWeFdHFsd+lkCKZ7swa5jGYCY=
+Date: Mon, 21 Oct 2019 10:40:47 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20191021094047.GF22659@stefanha-x1.localdomain>
+References: <20191016103754.2047-1-misono.tomohiro@jp.fujitsu.com>
+	<20191017100528.GA24790@stefanha-x1.localdomain>
+	<CAOssrKfR=sfE1RzOXzvPbdQg-g7i5-f8W9y8bWFnO=gyJ2VMsg@mail.gmail.com>
+	<20191017160953.GC1266@stefanha-x1.localdomain>
+	<CAOssrKejcfVWXw6Nu1owyEeofTdVp6BNx4bL91ma2g7bg9-nmg@mail.gmail.com>
+	<CAOssrKdbAT5s=CYG6PBtE6OYdqgwG8vp9T6QMJpwZ7X3tKjPmg@mail.gmail.com>
+	<OSBPR01MB37835DC3A2F179AFD3A9074BE56C0@OSBPR01MB3783.jpnprd01.prod.outlook.com>
 MIME-Version: 1.0
-References: <20191015174626.11593-1-vgoyal@redhat.com>
-	<20191015174626.11593-6-vgoyal@redhat.com>
-In-Reply-To: <20191015174626.11593-6-vgoyal@redhat.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Mon, 21 Oct 2019 10:15:18 +0200
-Message-ID: <CAJfpegvg1ePA7=Fm3499bKsZBv_98j817KCDxOU18j=BdVfHyA@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH 5/5] virtiofs: Retry request submission from
-	worker context
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="rMWmSaSbD7nr+du9"
+Content-Disposition: inline
+In-Reply-To: <OSBPR01MB37835DC3A2F179AFD3A9074BE56C0@OSBPR01MB3783.jpnprd01.prod.outlook.com>
+Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: Two fix for xattr operation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,94 +22,66 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
+To: "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>
+Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>, 'Miklos Szeredi' <mszeredi@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>
 
-On Tue, Oct 15, 2019 at 7:46 PM Vivek Goyal <vgoyal@redhat.com> wrote:
->
-> If regular request queue gets full, currently we sleep for a bit and
-> retrying submission in submitter's context. This assumes submitter is
-> not holding any spin lock. But this assumption is not true for background
-> requests. For background requests, we are called with fc->bg_lock held.
->
-> This can lead to deadlock where one thread is trying submission with
-> fc->bg_lock held while request completion thread has called fuse_request_end()
-> which tries to acquire fc->bg_lock and gets blocked. As request completion
-> thread gets blocked, it does not make further progress and that means queue
-> does not get empty and submitter can't submit more requests.
->
-> To solve this issue, retry submission with the help of a worker, instead of
-> retrying in submitter's context. We already do this for hiprio/forget
-> requests.
->
-> Reported-by: Chirantan Ekbote <chirantan@chromium.org>
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  fs/fuse/virtio_fs.c | 59 ++++++++++++++++++++++++++++++++++++++-------
->  1 file changed, 50 insertions(+), 9 deletions(-)
->
-> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-> index 625de45fa471..58e568ef54ef 100644
-> --- a/fs/fuse/virtio_fs.c
-> +++ b/fs/fuse/virtio_fs.c
-> @@ -55,6 +55,9 @@ struct virtio_fs_forget {
->         struct list_head list;
->  };
->
-> +static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
-> +                                struct fuse_req *req, bool in_flight);
-> +
->  static inline struct virtio_fs_vq *vq_to_fsvq(struct virtqueue *vq)
->  {
->         struct virtio_fs *fs = vq->vdev->priv;
-> @@ -260,6 +263,7 @@ static void virtio_fs_request_dispatch_work(struct work_struct *work)
->         struct virtio_fs_vq *fsvq = container_of(work, struct virtio_fs_vq,
->                                                  dispatch_work.work);
->         struct fuse_conn *fc = fsvq->fud->fc;
-> +       int ret;
->
->         pr_debug("virtio-fs: worker %s called.\n", __func__);
->         while (1) {
-> @@ -268,13 +272,43 @@ static void virtio_fs_request_dispatch_work(struct work_struct *work)
->                                                list);
->                 if (!req) {
->                         spin_unlock(&fsvq->lock);
-> -                       return;
-> +                       break;
->                 }
->
->                 list_del_init(&req->list);
->                 spin_unlock(&fsvq->lock);
->                 fuse_request_end(fc, req);
->         }
-> +
-> +       /* Dispatch pending requests */
-> +       while (1) {
-> +               spin_lock(&fsvq->lock);
-> +               req = list_first_entry_or_null(&fsvq->queued_reqs,
-> +                                              struct fuse_req, list);
-> +               if (!req) {
-> +                       spin_unlock(&fsvq->lock);
-> +                       return;
-> +               }
-> +               list_del_init(&req->list);
-> +               spin_unlock(&fsvq->lock);
-> +
-> +               ret = virtio_fs_enqueue_req(fsvq, req, true);
-> +               if (ret < 0) {
-> +                       if (ret == -ENOMEM || ret == -ENOSPC) {
-> +                               spin_lock(&fsvq->lock);
-> +                               list_add_tail(&req->list, &fsvq->queued_reqs);
-> +                               schedule_delayed_work(&fsvq->dispatch_work,
-> +                                                     msecs_to_jiffies(1));
-> +                               spin_unlock(&fsvq->lock);
-> +                               return;
-> +                       }
-> +                       req->out.h.error = ret;
-> +                       dec_in_flight_req(fsvq);
 
-Missing locking.  Fixed.
+--rMWmSaSbD7nr+du9
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Thanks,
-Miklos
+On Fri, Oct 18, 2019 at 08:51:20AM +0000, misono.tomohiro@fujitsu.com wrote:
+> > Doing unshare(CLONE_FS) after thread startup seems safe, though must be=
+ careful to change the working directory to the root of
+> > the mount
+> > *before* starting any threads.
+>=20
+> I think working directry is changed in setup_sandbox() -> setup_mount_nam=
+espace() -> setup_pivot_root().
+> So, can we just add unshare(CLONE_FS) in fv_queue_worker()?
+
+fv_queue_worker() is the thread pool worker function that is called for
+each request.  Calling unshare(CLONE_FS) for each request is not
+necessary and will reduce performance.
+
+A thread-local variable can be used to avoid repeated calls to
+unshare(CLONE_FS) from the same worker thread:
+
+  static __thread bool clone_fs_called;
+
+  static void fv_queue_worker(gpointer data, gpointer user_data)
+  {
+      ...
+      if (!clone_fs_called) {
+          int ret;
+
+	  ret =3D unshare(CLONE_FS);
+	  assert(ret =3D=3D 0); /* errors not expected according to man page */
+
+	  clone_fs_called =3D true;
+      }
+
+Another issue is the seccomp policy.  Since worker threads are spawned
+at runtime it is necessary to add the unshare(2) syscall to the seccomp
+whitelist in contrib/virtiofsd/seccomp.c.
+
+Stefan
+
+--rMWmSaSbD7nr+du9
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl2tfR8ACgkQnKSrs4Gr
+c8izkQf9HxlTQy7DcT+pdpRQd6UUnU5d8j/LAJQKySzzdGOYE6xf84D/YZy2AevH
+rJOFV20qZJxzDWUvlSrLD9se98SE6pcnBSTAom+RR+XOjZm4/+9pzax5Ss3vbgqK
+74hv+d7rLPwNEqs/CZMzt1GaM7YyRycTGzbTosRwVfpBOO5oAcjHGjco2TelyrsF
+kdjvSgTd+jTfr+KdUbB0NOX+58RpiA4Yn1MQpEctkh0wOJZdL2kSqpTiwiRu5qDm
+jqPlPsIpdkCRxbvzn4bcEWfoRchgvtJ/L3CQJ1zHL14IJ3LmG5wat0Bn0tMdH/eU
+Tq37p22dYRjkN3twX6S/+Tmu+PlfMQ==
+=u3k2
+-----END PGP SIGNATURE-----
+
+--rMWmSaSbD7nr+du9--
 

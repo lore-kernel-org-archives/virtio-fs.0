@@ -1,22 +1,19 @@
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
 	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=dcmyyYxsqdiEv0SNbtEtPLVRqtn2jGS9PqXA4dwbE3U=;
-	b=B4OSDpddWZe47ugichOkX/imLBvNKswCV0dbKstPAw/+U+9vciLm6xStunfZCickyP
-	Ho3A6tqbPWmU/Ws8P02JF3IyY4fVNkq6SEkJ4pKqhntGCsLpsEcOFwtH17Hn6ejrIZWE
-	eBWLNXul50+Hjrpq1Th64M8qE4oAdLPO1tk9c=
+	:cc; bh=hfAvAuNrbwm7BBpI2yh2o5/hOFM6ooN8i+aI4cgImbE=;
+	b=eNBHBEk+Ds5KG91wCPgmQhRnJHnVUZ6PPNl67IkipXVm0N0/ANIu52fvOFMqpMfkIq
+	tn672n4wLOzEitu6rmcAeeK4qPU1mAZAqhz5p2YZX9RsvZYUqUzgCcG4QT+88jhVm5TI
+	tdPF53MplgJIV/2TK0C+gpvzKCTZW01EcxjxE=
 MIME-Version: 1.0
-References: <20190905194859.16219-1-vgoyal@redhat.com>
-	<CAJfpegu8POz9gC4MDEcXxDWBD0giUNFgJhMEzntJX_u4+cS9Zw@mail.gmail.com>
-	<20190906103613.GH5900@stefanha-x1.localdomain>
-	<CAJfpegudNVZitQ5L8gPvA45mRPFDk9fhyboceVW6xShpJ4mLww@mail.gmail.com>
-	<20190906120817.GA22083@redhat.com>
-In-Reply-To: <20190906120817.GA22083@redhat.com>
+References: <20191015174626.11593-1-vgoyal@redhat.com>
+	<20191015174626.11593-2-vgoyal@redhat.com>
+In-Reply-To: <20191015174626.11593-2-vgoyal@redhat.com>
 From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Fri, 6 Sep 2019 15:55:21 +0200
-Message-ID: <CAJfpegsL4PLvROr58vtjmyvQu-F17X3xoKCztP2H0fog0xUXhA@mail.gmail.com>
+Date: Mon, 21 Oct 2019 10:03:39 +0200
+Message-ID: <CAJfpegtrFvuBUuQ7B+ynCLVmgZ8zRjbUYZYg+BzG6HDmt5RyXw@mail.gmail.com>
 Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH 00/18] virtiofs: Fix various races and
-	cleanups round 1
+Subject: Re: [Virtio-fs] [PATCH 1/5] virtiofs: Do not end request in
+	submission context
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -26,57 +23,136 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: "Michael S. Tsirkin" <mst@redhat.com>, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org
+Cc: virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
 
-On Fri, Sep 6, 2019 at 2:08 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+On Tue, Oct 15, 2019 at 7:46 PM Vivek Goyal <vgoyal@redhat.com> wrote:
 >
-> On Fri, Sep 06, 2019 at 01:52:41PM +0200, Miklos Szeredi wrote:
-> > On Fri, Sep 6, 2019 at 12:36 PM Stefan Hajnoczi <stefanha@redhat.com> wrote:
-> > >
-> > > On Fri, Sep 06, 2019 at 10:15:14AM +0200, Miklos Szeredi wrote:
-> > > > On Thu, Sep 5, 2019 at 9:49 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> > > > >
-> > > > > Hi,
-> > > > >
-> > > > > Michael Tsirkin pointed out issues w.r.t various locking related TODO
-> > > > > items and races w.r.t device removal.
-> > > > >
-> > > > > In this first round of cleanups, I have taken care of most pressing
-> > > > > issues.
-> > > > >
-> > > > > These patches apply on top of following.
-> > > > >
-> > > > > git://git.kernel.org/pub/scm/linux/kernel/git/mszeredi/fuse.git#virtiofs-v4
-> > > > >
-> > > > > I have tested these patches with mount/umount and device removal using
-> > > > > qemu monitor. For example.
-> > > >
-> > > > Is device removal mandatory?  Can't this be made a non-removable
-> > > > device?  Is there a good reason why removing the virtio-fs device
-> > > > makes sense?
-> > >
-> > > Hot plugging and unplugging virtio PCI adapters is common.  I'd very
-> > > much like removal to work from the beginning.
-> >
-> > Can you give an example use case?
+> Submission context can hold some locks which end request code tries to
+> hold again and deadlock can occur. For example, fc->bg_lock. If a background
+> request is being submitted, it might hold fc->bg_lock and if we could not
+> submit request (because device went away) and tried to end request,
+> then deadlock happens. During testing, I also got a warning from deadlock
+> detection code.
 >
-> David Gilbert mentioned this could be useful if daemon stops responding
-> or dies. One could remove device. That will fail all future requests
-> and allow unmounting filesystem.
+> So put requests on a list and end requests from a worker thread.
 >
-> Havind said that, current implementation will help in above situation
-> only if there are no pending requests. If there are pending requests
-> and daemon stops responding, then removal will hang too, as we wait
-> for draining the queues.
+> I got following warning from deadlock detector.
 >
-> So at some point of time, we also need some sort of timeout functionality
-> where we end requests with error after a timeout.
+> [  603.137138] WARNING: possible recursive locking detected
+> [  603.137142] --------------------------------------------
+> [  603.137144] blogbench/2036 is trying to acquire lock:
+> [  603.137149] 00000000f0f51107 (&(&fc->bg_lock)->rlock){+.+.}, at: fuse_request_end+0xdf/0x1c0 [fuse]
+> [  603.140701]
+> [  603.140701] but task is already holding lock:
+> [  603.140703] 00000000f0f51107 (&(&fc->bg_lock)->rlock){+.+.}, at: fuse_simple_background+0x92/0x1d0 [fuse]
+> [  603.140713]
+> [  603.140713] other info that might help us debug this:
+> [  603.140714]  Possible unsafe locking scenario:
+> [  603.140714]
+> [  603.140715]        CPU0
+> [  603.140716]        ----
+> [  603.140716]   lock(&(&fc->bg_lock)->rlock);
+> [  603.140718]   lock(&(&fc->bg_lock)->rlock);
+> [  603.140719]
+> [  603.140719]  *** DEADLOCK ***
 >
-> I feel we should support removing device at some point of time. But its
-> not necessarily a must have feature for first round.
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  fs/fuse/virtio_fs.c | 38 ++++++++++++++++++++++++++++++++++----
+>  1 file changed, 34 insertions(+), 4 deletions(-)
+>
+> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> index 6af3f131e468..24ac6f8bf3f7 100644
+> --- a/fs/fuse/virtio_fs.c
+> +++ b/fs/fuse/virtio_fs.c
+> @@ -30,6 +30,7 @@ struct virtio_fs_vq {
+>         struct virtqueue *vq;     /* protected by ->lock */
+>         struct work_struct done_work;
+>         struct list_head queued_reqs;
+> +       struct list_head end_reqs;      /* End these requests */
+>         struct delayed_work dispatch_work;
+>         struct fuse_dev *fud;
+>         bool connected;
+> @@ -259,8 +260,27 @@ static void virtio_fs_hiprio_done_work(struct work_struct *work)
+>         spin_unlock(&fsvq->lock);
+>  }
+>
+> -static void virtio_fs_dummy_dispatch_work(struct work_struct *work)
+> +static void virtio_fs_request_dispatch_work(struct work_struct *work)
+>  {
+> +       struct fuse_req *req;
+> +       struct virtio_fs_vq *fsvq = container_of(work, struct virtio_fs_vq,
+> +                                                dispatch_work.work);
+> +       struct fuse_conn *fc = fsvq->fud->fc;
+> +
+> +       pr_debug("virtio-fs: worker %s called.\n", __func__);
+> +       while (1) {
+> +               spin_lock(&fsvq->lock);
+> +               req = list_first_entry_or_null(&fsvq->end_reqs, struct fuse_req,
+> +                                              list);
+> +               if (!req) {
+> +                       spin_unlock(&fsvq->lock);
+> +                       return;
+> +               }
+> +
+> +               list_del_init(&req->list);
+> +               spin_unlock(&fsvq->lock);
+> +               fuse_request_end(fc, req);
+> +       }
+>  }
+>
+>  static void virtio_fs_hiprio_dispatch_work(struct work_struct *work)
+> @@ -502,6 +522,7 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+>         names[VQ_HIPRIO] = fs->vqs[VQ_HIPRIO].name;
+>         INIT_WORK(&fs->vqs[VQ_HIPRIO].done_work, virtio_fs_hiprio_done_work);
+>         INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].queued_reqs);
+> +       INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].end_reqs);
+>         INIT_DELAYED_WORK(&fs->vqs[VQ_HIPRIO].dispatch_work,
+>                         virtio_fs_hiprio_dispatch_work);
+>         spin_lock_init(&fs->vqs[VQ_HIPRIO].lock);
+> @@ -511,8 +532,9 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+>                 spin_lock_init(&fs->vqs[i].lock);
+>                 INIT_WORK(&fs->vqs[i].done_work, virtio_fs_requests_done_work);
+>                 INIT_DELAYED_WORK(&fs->vqs[i].dispatch_work,
+> -                                       virtio_fs_dummy_dispatch_work);
+> +                                 virtio_fs_request_dispatch_work);
+>                 INIT_LIST_HEAD(&fs->vqs[i].queued_reqs);
+> +               INIT_LIST_HEAD(&fs->vqs[i].end_reqs);
+>                 snprintf(fs->vqs[i].name, sizeof(fs->vqs[i].name),
+>                          "requests.%u", i - VQ_REQUEST);
+>                 callbacks[i] = virtio_fs_vq_done;
+> @@ -918,6 +940,7 @@ __releases(fiq->lock)
+>         struct fuse_conn *fc;
+>         struct fuse_req *req;
+>         struct fuse_pqueue *fpq;
+> +       struct virtio_fs_vq *fsvq;
+>         int ret;
+>
+>         WARN_ON(list_empty(&fiq->pending));
+> @@ -951,7 +974,8 @@ __releases(fiq->lock)
+>         smp_mb__after_atomic();
+>
+>  retry:
+> -       ret = virtio_fs_enqueue_req(&fs->vqs[queue_id], req);
+> +       fsvq = &fs->vqs[queue_id];
+> +       ret = virtio_fs_enqueue_req(fsvq, req);
+>         if (ret < 0) {
+>                 if (ret == -ENOMEM || ret == -ENOSPC) {
+>                         /* Virtqueue full. Retry submission */
+> @@ -965,7 +989,13 @@ __releases(fiq->lock)
+>                 clear_bit(FR_SENT, &req->flags);
+>                 list_del_init(&req->list);
+>                 spin_unlock(&fpq->lock);
+> -               fuse_request_end(fc, req);
+> +
+> +               /* Can't end request in submission context. Use a worker */
+> +               spin_lock(&fsvq->lock);
+> +               list_add_tail(&req->list, &fsvq->end_reqs);
+> +               schedule_delayed_work(&fsvq->dispatch_work,
+> +                                     msecs_to_jiffies(1));
 
-If there's no compelling reason to do it in the first round, than I'd
-prefer to not do it.   More complexity -> more bugs.
+What's the reason to delay by one msec?  If this is purely for
+deadlock avoidance, then a zero delay would work better, no?
 
 Thanks,
 Miklos

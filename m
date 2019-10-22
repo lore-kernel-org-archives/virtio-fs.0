@@ -1,11 +1,17 @@
-Date: Mon, 21 Oct 2019 16:04:14 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20191021150414.GD5837@work-vm>
-MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] Upstreaming virtiofsd
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=qq.com; s=s201512;
+	t=1571727397; bh=Q5Zge0ane2lTJRrCpY71BBo0pjAxKY2AomdsAiUswhk=;
+	h=From:To:Subject:Mime-Version:Date:Message-ID;
+	b=f50WGBSPFwsv9cRwhfP0C3dYFfkjDOfkJX9lKR96KAsvYZhoIwnyNHiqpC35NpgE5
+	joCrb6K2VTxYUzzcW/ly1NCQMP0cIxX8JEh1zQUNu+XcfBNyzdpl2rVqrs6PAlf9tz
+	CGsqYOFyx6ny/ZMcZjBSiISwXsk75H6Ml8B2+yBM=
+From: "=?gb18030?B?sNfT7g==?=" <bekars@qq.com>
+Mime-Version: 1.0
+Content-Type: multipart/alternative;
+	boundary="----=_NextPart_5DAEA825_0C980E70_789348F5"
+Content-Transfer-Encoding: 8Bit
+Date: Tue, 22 Oct 2019 14:56:37 +0800
+Message-ID: <tencent_83EAD77D96CB166D185BBAAAC08318A7B308@qq.com>
+Subject: [Virtio-fs] add no-pivot option to virtiofsd process
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,25 +20,89 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: =?gb18030?B?dmlydGlvLWZz?= <virtio-fs@redhat.com>
 
-Hi,
-  I've started upstreaming virtiofsd to qemu's contrib directory;
-my first set (
-https://lists.gnu.org/archive/html/qemu-devel/2019-10/msg05200.html )
-is a minimal base set of patches that mounts and basically works - it
-has none of the security work, the performance or many of the fixes.
+This is a multi-part message in MIME format.
 
-In parallel with responding to any comments on that set, I'll be
-working up the security set to be sent next; then performance and then
-fixes.
+------=_NextPart_5DAEA825_0C980E70_789348F5
+Content-Type: text/plain;
+	charset="gb18030"
+Content-Transfer-Encoding: base64
 
-Note, some of the patches that many of you have sent have been squashed
-into other patches; I've kept a signed off (with something like 'fixes
-from' or similar).  Many of the patches have been reformatted a bit.
+VmlydGlvZnNkIGNhbid0IGJlIHN0YXJ0ZWQgb24gcm9vdGZzIHN5c3RlbSAoLyBpcyByb290
+ZnMgZmlsZXN5c3RlbSksIHN1Y2ggYXMgZGlza2xlc3Mgc3lzdGVtLCBiZWNhdXNlIHJvb3Rm
+cyBkb24ndCBhbGxvdyBwaXZvdF9yb290LiBJIGNvbW1pdCB0aGUgaXNzdWUgaGVyZToga2F0
+YS1jb250YWluZXJzL3J1bnRpbWUjMjA2NyAgZm9yIGthdGEgcHJvamVjdC4gSSBhZGQgYSBu
+by1waXZvdCBvcHRpb24gdG8gYWxsb3cgdGhlIHZpcnRpb2ZzZCBkYWVtb24gcHJvY2VzcyB0
+byBydW4gaW4gYSByb290ZnMgc3lzdGVtLCBpdCBpcyB0dXJuZWQgb2ZmIGJ5IGRlZmF1bHQu
+IFRoZSBhdHRhY2hlZCBmaWxlIGlzIHRoZSBwYXRjaCBmaWxlLg0KDQoNCkkgc3VibWl0dGVk
+IHRoZSBwYXRjaCB0byBrYXRhLCB0aGV5IHN1Z2dlc3QgbWUgdG8gZGlzY3VzcyBpbiB2aXJ0
+aW9mcyB1cHN0cmVhbSBwcm9qZWN0IGZpcnN0bHkuICBodHRwczovL2dpdGh1Yi5jb20va2F0
+YS1jb250YWluZXJzL3BhY2thZ2luZy9wdWxsLzc2NQ0KDQoNCkNvdWxkIGl0IGJlIG1lcmdl
+ZCB0byB0aGUgdmlydGlvZnMgcHJvamVjdCA/
 
-Dave
+------=_NextPart_5DAEA825_0C980E70_789348F5
+Content-Type: text/html;
+	charset="gb18030"
+Content-Transfer-Encoding: base64
 
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+PGRpdj48c3BhbiBzdHlsZT0iY29sb3I6IHJnYigzNiwgNDEsIDQ2KTsgZm9udC1mYW1pbHk6
+IC1hcHBsZS1zeXN0ZW0sIHN5c3RlbS11aSwgJnF1b3Q7U2Vnb2UgVUkmcXVvdDssIEhlbHZl
+dGljYSwgQXJpYWwsIHNhbnMtc2VyaWYsICZxdW90O0FwcGxlIENvbG9yIEVtb2ppJnF1b3Q7
+LCAmcXVvdDtTZWdvZSBVSSBFbW9qaSZxdW90OzsiPlZpcnRpb2ZzZCBjYW4ndCBiZSBzdGFy
+dGVkIG9uIHJvb3RmcyBzeXN0ZW0gKC8gaXMgcm9vdGZzIGZpbGVzeXN0ZW0pLCBzdWNoIGFz
+IGRpc2tsZXNzIHN5c3RlbSwgYmVjYXVzZSByb290ZnMgZG9uJ3QgYWxsb3cgcGl2b3Rfcm9v
+dC4gSSBjb21taXQgdGhlIGlzc3VlIGhlcmU6Jm5ic3A7PC9zcGFuPjxhIGNsYXNzPSJpc3N1
+ZS1saW5rIGpzLWlzc3VlLWxpbmsiIGRhdGEtZXJyb3ItdGV4dD0iRmFpbGVkIHRvIGxvYWQg
+aXNzdWUgdGl0bGUiIGRhdGEtaWQ9IjQ5NDk2MjM0MSIgZGF0YS1wZXJtaXNzaW9uLXRleHQ9
+Iklzc3VlIHRpdGxlIGlzIHByaXZhdGUiIGRhdGEtaG92ZXJjYXJkLXR5cGU9Imlzc3VlIiBk
+YXRhLWhvdmVyY2FyZC11cmw9Ii9rYXRhLWNvbnRhaW5lcnMvcnVudGltZS9pc3N1ZXMvMjA2
+Ny9ob3ZlcmNhcmQiIGhyZWY9Imh0dHBzOi8vZ2l0aHViLmNvbS9rYXRhLWNvbnRhaW5lcnMv
+cnVudGltZS9pc3N1ZXMvMjA2NyIgYXJpYS1sYWJlbD0ia2F0YS1jb250YWluZXJzL3J1bnRp
+bWUjMjA2Nywgdmhvc3RfZGV2X2luaXQgZmFpbGVkIHdoZW4gcnVuIGthdGEtbmVtdSBjb250
+YWluZXIiIHN0eWxlPSJib3gtc2l6aW5nOiBib3JkZXItYm94OyBjb2xvcjogcmdiKDMsIDEw
+MiwgMjE0KTsgdGV4dC1kZWNvcmF0aW9uLWxpbmU6IG5vbmU7IGZvbnQtZmFtaWx5OiAtYXBw
+bGUtc3lzdGVtLCBzeXN0ZW0tdWksICZxdW90O1NlZ29lIFVJJnF1b3Q7LCBIZWx2ZXRpY2Es
+IEFyaWFsLCBzYW5zLXNlcmlmLCAmcXVvdDtBcHBsZSBDb2xvciBFbW9qaSZxdW90OywgJnF1
+b3Q7U2Vnb2UgVUkgRW1vamkmcXVvdDs7Ij5rYXRhLWNvbnRhaW5lcnMvcnVudGltZSMyMDY3
+PC9hPiZuYnNwOzxzcGFuIHN0eWxlPSJjb2xvcjogcmdiKDM2LCA0MSwgNDYpOyBmb250LWZh
+bWlseTogLWFwcGxlLXN5c3RlbSwgc3lzdGVtLXVpLCAmcXVvdDtTZWdvZSBVSSZxdW90Oywg
+SGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiwgJnF1b3Q7QXBwbGUgQ29sb3IgRW1vamkm
+cXVvdDssICZxdW90O1NlZ29lIFVJIEVtb2ppJnF1b3Q7OyI+PC9zcGFuPjxzcGFuIHN0eWxl
+PSJjb2xvcjogcmdiKDM2LCA0MSwgNDYpOyBmb250LWZhbWlseTogLWFwcGxlLXN5c3RlbSwg
+c3lzdGVtLXVpLCAmcXVvdDtTZWdvZSBVSSZxdW90OywgSGVsdmV0aWNhLCBBcmlhbCwgc2Fu
+cy1zZXJpZiwgJnF1b3Q7QXBwbGUgQ29sb3IgRW1vamkmcXVvdDssICZxdW90O1NlZ29lIFVJ
+IEVtb2ppJnF1b3Q7OyI+Jm5ic3A7Zm9yIGthdGEgcHJvamVjdC4mbmJzcDs8L3NwYW4+PHNw
+YW4gc3R5bGU9ImNvbG9yOiByZ2IoMzYsIDQxLCA0Nik7IGZvbnQtZmFtaWx5OiAtYXBwbGUt
+c3lzdGVtLCBzeXN0ZW0tdWksICZxdW90O1NlZ29lIFVJJnF1b3Q7LCBIZWx2ZXRpY2EsIEFy
+aWFsLCBzYW5zLXNlcmlmLCAmcXVvdDtBcHBsZSBDb2xvciBFbW9qaSZxdW90OywgJnF1b3Q7
+U2Vnb2UgVUkgRW1vamkmcXVvdDs7Ij5JIGFkZCBhIG5vLXBpdm90IG9wdGlvbiB0byBhbGxv
+dyB0aGUgdmlydGlvZnNkIGRhZW1vbiBwcm9jZXNzIHRvIHJ1biBpbiBhIHJvb3RmcyBzeXN0
+ZW0sIGl0IGlzIHR1cm5lZCBvZmYgYnkgZGVmYXVsdC4gVGhlIGF0dGFjaGVkIGZpbGUgaXMg
+dGhlIHBhdGNoIGZpbGUuPC9zcGFuPjwvZGl2PjxkaXY+PHNwYW4gc3R5bGU9ImNvbG9yOiBy
+Z2IoMzYsIDQxLCA0Nik7IGZvbnQtZmFtaWx5OiAtYXBwbGUtc3lzdGVtLCBzeXN0ZW0tdWks
+ICZxdW90O1NlZ29lIFVJJnF1b3Q7LCBIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmLCAm
+cXVvdDtBcHBsZSBDb2xvciBFbW9qaSZxdW90OywgJnF1b3Q7U2Vnb2UgVUkgRW1vamkmcXVv
+dDs7Ij48YnI+PC9zcGFuPjwvZGl2PjxkaXY+PHNwYW4gc3R5bGU9ImNvbG9yOiByZ2IoMzYs
+IDQxLCA0Nik7IGZvbnQtZmFtaWx5OiAtYXBwbGUtc3lzdGVtLCBzeXN0ZW0tdWksICZxdW90
+O1NlZ29lIFVJJnF1b3Q7LCBIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmLCAmcXVvdDtB
+cHBsZSBDb2xvciBFbW9qaSZxdW90OywgJnF1b3Q7U2Vnb2UgVUkgRW1vamkmcXVvdDs7Ij5J
+IHN1Ym1pdHRlZCB0aGUgcGF0Y2ggdG8ga2F0YSwgdGhleSBzdWdnZXN0IG1lIHRvIGRpc2N1
+c3MgaW4gdmlydGlvZnMgdXBzdHJlYW0gcHJvamVjdCBmaXJzdGx5LiZuYnNwOzwvc3Bhbj48
+c3BhbiBzdHlsZT0iY29sb3I6IHJnYigzNiwgNDEsIDQ2KTsgZm9udC1mYW1pbHk6IC1hcHBs
+ZS1zeXN0ZW0sIHN5c3RlbS11aSwgJnF1b3Q7U2Vnb2UgVUkmcXVvdDssIEhlbHZldGljYSwg
+QXJpYWwsIHNhbnMtc2VyaWYsICZxdW90O0FwcGxlIENvbG9yIEVtb2ppJnF1b3Q7LCAmcXVv
+dDtTZWdvZSBVSSBFbW9qaSZxdW90OzsiPiZuYnNwOzwvc3Bhbj48YSBocmVmPSJodHRwczov
+L2dpdGh1Yi5jb20va2F0YS1jb250YWluZXJzL3BhY2thZ2luZy9wdWxsLzc2NSI+aHR0cHM6
+Ly9naXRodWIuY29tL2thdGEtY29udGFpbmVycy9wYWNrYWdpbmcvcHVsbC83NjU8L2E+PC9k
+aXY+PGRpdj48YnI+PC9kaXY+PGRpdj48c3BhbiBzdHlsZT0iY29sb3I6IHJnYigzNiwgNDEs
+IDQ2KTsgZm9udC1mYW1pbHk6IC1hcHBsZS1zeXN0ZW0sIHN5c3RlbS11aSwgJnF1b3Q7U2Vn
+b2UgVUkmcXVvdDssIEhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYsICZxdW90O0FwcGxl
+IENvbG9yIEVtb2ppJnF1b3Q7LCAmcXVvdDtTZWdvZSBVSSBFbW9qaSZxdW90OzsiPkNvdWxk
+IGl0IGJlIG1lcmdlZCB0byB0aGUgdmlydGlvZnMgcHJvamVjdCA/Jm5ic3A7PC9zcGFuPjwv
+ZGl2Pg==
+
+------=_NextPart_5DAEA825_0C980E70_789348F5--
+
+
 

@@ -1,13 +1,14 @@
-Date: Tue, 22 Oct 2019 16:56:41 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20191022155641.GA762@stefanha-x1.localdomain>
-References: <20191021150414.GD5837@work-vm>
+Date: Wed, 23 Oct 2019 10:34:15 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20191023093415.GA2834@work-vm>
+References: <20191016160157.12414-1-stefanha@redhat.com>
+	<20191016160157.12414-2-stefanha@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="pWyiEgJYm5f9v55/"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20191021150414.GD5837@work-vm>
-Subject: Re: [Virtio-fs] Upstreaming virtiofsd
+In-Reply-To: <20191016160157.12414-2-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 1/2] virtiofsd: move to an empty network
+	namespace
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,48 +17,56 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> If the process is compromised there should be no network access.  Use an
+> empty network namespace to sandbox networking.
+> 
+> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 
---pWyiEgJYm5f9v55/
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 
-On Mon, Oct 21, 2019 at 04:04:14PM +0100, Dr. David Alan Gilbert wrote:
-> Hi,
->   I've started upstreaming virtiofsd to qemu's contrib directory;
-> my first set (
-> https://lists.gnu.org/archive/html/qemu-devel/2019-10/msg05200.html )
-> is a minimal base set of patches that mounts and basically works - it
-> has none of the security work, the performance or many of the fixes.
->=20
-> In parallel with responding to any comments on that set, I'll be
-> working up the security set to be sent next; then performance and then
-> fixes.
-
-Please include "[PATCH 0/2] virtiofsd: add net and pid namespace
-sandboxing" (<20191016160157.12414-1-stefanha@redhat.com>) in the
-security patch series.
-
-Thanks,
-Stefan
-
---pWyiEgJYm5f9v55/
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl2vJrkACgkQnKSrs4Gr
-c8hzZQgAjtW9POdPnGpRE4MOllD9ARZ7699bEpCUD1QNDaqBb4AjWoOsWFdWc5LO
-l1yNuFtrrUHF70t7d4GT2OA7fdohwSYlIrfWXTdhXQnm8q1RFFnqWwKcoKndMfhn
-xO356GzTuhysLU3V3xLJuOdKEohkXg2gk8ju7ShTma4NZJdcT94FCTtHT30M2Rzq
-uYyyxNJ/mlccZKaNUPrwJXmLvkxGeN11ql+E5MGpd9kQtHUAb/ooT1P9RFZOeRcq
-r1+vchjBQy8QtgpQ9EFi4KzF0HPE+K4pfZu/4LDqXLeppkRCda9Pfjs1q2wwAPYG
-G2CKRav0uHs7GmLhh3Sft14Jlka7WA==
-=wzWq
------END PGP SIGNATURE-----
-
---pWyiEgJYm5f9v55/--
+> ---
+>  contrib/virtiofsd/passthrough_ll.c | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+> index 84b60d85bd..c27ff7d800 100644
+> --- a/contrib/virtiofsd/passthrough_ll.c
+> +++ b/contrib/virtiofsd/passthrough_ll.c
+> @@ -2736,6 +2736,19 @@ static void setup_shared_versions(struct lo_data *lo)
+>  	lo->version_table = addr;
+>  }
+>  
+> +/*
+> + * Called after our UNIX domain sockets have been created, now we can move to
+> + * an empty network namespace to prevent TCP/IP and other network activity in
+> + * case this process is compromised.
+> + */
+> +static void setup_net_namespace(void)
+> +{
+> +	if (unshare(CLONE_NEWNET) != 0) {
+> +		fuse_log(FUSE_LOG_ERR, "unshare(CLONE_NEWNET): %m\n");
+> +		exit(1);
+> +	}
+> +}
+> +
+>  /* This magic is based on lxc's lxc_pivot_root() */
+>  static void setup_pivot_root(const char *source)
+>  {
+> @@ -2818,6 +2831,7 @@ static void setup_mount_namespace(const char *source)
+>   */
+>  static void setup_sandbox(struct lo_data *lo, bool enable_syslog)
+>  {
+> +	setup_net_namespace();
+>  	setup_mount_namespace(lo->source);
+>  	setup_seccomp(enable_syslog);
+>  }
+> -- 
+> 2.21.0
+> 
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

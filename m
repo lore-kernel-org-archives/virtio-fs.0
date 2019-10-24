@@ -1,14 +1,14 @@
-Date: Thu, 24 Oct 2019 11:26:11 +0100
-From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
-Message-ID: <20191024102611.GF3700@redhat.com>
-References: <20191016160157.12414-1-stefanha@redhat.com>
-	<20191016160157.12414-3-stefanha@redhat.com>
+Date: Thu, 24 Oct 2019 11:02:25 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20191024150225.GB6903@redhat.com>
+References: <20191023122523.1816-1-misono.tomohiro@jp.fujitsu.com>
+	<20191023200752.GB6942@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=utf-8
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20191016160157.12414-3-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 2/2] virtiofsd: move to a new pid namespace
-Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+In-Reply-To: <20191023200752.GB6942@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Fix data corruption with
+ O_APPEND wirte in writeback mode
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,212 +17,154 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
+To: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Wed, Oct 16, 2019 at 05:01:57PM +0100, Stefan Hajnoczi wrote:
-> virtiofsd needs access to /proc/self/fd.  Let's move to a new pid
-> namespace so that a compromised process cannot see another other
-> processes running on the system.
+On Wed, Oct 23, 2019 at 04:07:52PM -0400, Vivek Goyal wrote:
+> On Wed, Oct 23, 2019 at 09:25:23PM +0900, Misono Tomohiro wrote:
+> > When writeback mode is enabled (-o writeback), O_APPEND handling is
+> > done in kernel. Therefore virtiofsd clears O_APPEND flag when open.
+> > Otherwise O_APPEND flag takes precedence over pwrite() and write
+> > data may corrupt.
+> > 
+> > Currently clearing O_APPEND flag is done in lo_open(), but we also
+> > need the same operation in lo_create().
 > 
-> One wrinkle in this approach: unshare(CLONE_NEWPID) affects *child*
-> processes and not the current process.  Therefore we need to fork the
-> pid 1 process that will actually run virtiofsd and leave a parent in
-> waitpid(2).  This is not the same thing as daemonization and parent
-> processes should not notice a difference.
+> > So, factor out the flag
+> > update operation in lo_open() to update_open_flags() and call it
+> > in both lo_open() and lo_create().
+> > 
+> > This fixes the failure of xfstest generic/069 in writeback mode
+> > (which tests O_APPEND write data integrity).
+> > 
+
+Hi Misono,
+
+Have you tried running pjdfstests. Looks like with the patch applied I
+see following tests failing which were passing without the patch. Can
+you please have a look. I ran daemon with options "-o cache=always -o
+writeback"
+
+/root/git/pjdfstest/tests/chmod/00.t          (Wstat: 0 Tests: 119 Failed: 1)
+  Failed test:  64
+/root/git/pjdfstest/tests/chown/00.t          (Wstat: 0 Tests: 1323 Failed: 1)
+  Failed test:  946
+  TODO passed:   1107, 1112, 1116, 1122, 1127, 1131, 1137
+                1142, 1146, 1152, 1157, 1161, 1167, 1172
+                1176, 1182, 1187
+/root/git/pjdfstest/tests/link/00.t           (Wstat: 0 Tests: 202 Failed: 1)
+  Failed test:  134
+/root/git/pjdfstest/tests/utimensat/01.t      (Wstat: 0 Tests: 7 Failed: 1)
+  Failed test:  4
+Files=232, Tests=8789, 375 wallclock secs ( 4.00 usr  2.65 sys + 51.48 cusr 262.19 csys = 320.32 CPU)
+Thanks
+Vivek
+
 > 
-> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-> ---
->  contrib/virtiofsd/passthrough_ll.c | 95 ++++++++++++++++++++++--------
->  1 file changed, 72 insertions(+), 23 deletions(-)
+> Hi,
 > 
-> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-> index c27ff7d800..b6ee9b2e90 100644
-> --- a/contrib/virtiofsd/passthrough_ll.c
-> +++ b/contrib/virtiofsd/passthrough_ll.c
-> @@ -56,9 +56,12 @@
->  #include <sys/xattr.h>
->  #include <sys/mman.h>
->  #include <sys/socket.h>
-> +#include <sys/types.h>
->  #include <sys/un.h>
-> +#include <sys/wait.h>
->  #include <sys/capability.h>
->  
-> +
->  #include "ireg.h"
->  #include <sys/mount.h>
->  #include <sys/resource.h>
-> @@ -2749,6 +2752,72 @@ static void setup_net_namespace(void)
->  	}
->  }
->  
-> +/*
-> + * Move to a new pid namespace to prevent access to other processes if this
-> + * process is compromised.
-> + */
-> +static void setup_pid_namespace(void)
-> +{
-> +	pid_t child;
-> +
-> +	/*
-> +	 * Create a new pid namespace for *child* processes.  We'll have to
-> +	 * fork in order to enter the new pid namespace.  A new mount namespace
-> +	 * is also needed so that we can remount /proc for the new pid
-> +	 * namespace.
-> +	 */
-> +	if (unshare(CLONE_NEWPID | CLONE_NEWNS) != 0) {
-> +		fuse_log(FUSE_LOG_ERR, "unshare(CLONE_NEWPID | CLONE_NEWNS): %m\n");
-> +		exit(1);
-> +	}
-> +
-> +	child = fork();
-> +	if (child < 0) {
-> +		fuse_log(FUSE_LOG_ERR, "fork() failed: %m\n");
-> +		exit(1);
-> +	}
-> +	if (child > 0) {
-> +		pid_t waited;
-> +		int wstatus;
-> +
-> +		/* The parent waits for the child */
-> +		do {
-> +			waited = waitpid(child, &wstatus, 0);
-> +		} while (waited < 0 && errno == EINTR);
-> +
-> +		if (WIFEXITED(wstatus)) {
-> +			exit(WEXITSTATUS(wstatus));
-> +		}
-> +
-> +		exit(1);
-> +	}
-
-It might be useful to call prctl(PR_SET_PDEATHSIG) here, so that
-if the parent process exits for any reason, the child will be killed
-off too.
-
-> +
-> +	/*
-> +	 * If the mounts have shared propagation then we want to opt out so our
-> +	 * mount changes don't affect the parent mount namespace.
-> +	 */
-> +	if (mount(NULL, "/", NULL, MS_REC|MS_SLAVE, NULL) < 0) {
-> +		fuse_log(FUSE_LOG_ERR, "mount(/, MS_REC|MS_SLAVE): %m\n");
-> +		exit(1);
-> +	}
-> +
-> +	/* The child must remount /proc to use the new pid namespace */
-> +	if (mount("proc", "/proc", "proc",
-> +		  MS_NODEV | MS_NOEXEC | MS_NOSUID | MS_RELATIME, NULL) < 0) {
-> +		fuse_log(FUSE_LOG_ERR, "mount(/proc): %m\n");
-> +		exit(1);
-> +	}
-> +}
-
-I feel like this is making things a bit misleading.
-
- setup_pid_namespace()
-
-is now creating the mount namespace and pid namespace, and doing
-some mount point config
-
- setup_mount_namespace()
-
-is not creating the mount namespace, but is doing some more mount
-point config.
-
-And then there's setup_net_namespace() too.
-
-I think there could be a  single
-
-  setup_namespaces()
-
-method that does the unshare(CLONE_NEWNS|CLONE_NEWNET|CLONE_NEWPID)
-and forking the child.
-
-And a setup_mounts()
-
-method that does all the mount() calls.
-
-> +
-> +static void setup_proc_self_fd(struct lo_data *lo)
-> +{
-> +	lo->proc_self_fd = open("/proc/self/fd", O_PATH);
-> +	if (lo->proc_self_fd == -1) {
-> +		fuse_log(FUSE_LOG_ERR, "open(/proc/self/fd, O_PATH): %m\n");
-> +		exit(1);
-> +	}
-> +}
-> +
->  /* This magic is based on lxc's lxc_pivot_root() */
->  static void setup_pivot_root(const char *source)
->  {
-> @@ -2803,20 +2872,10 @@ static void setup_pivot_root(const char *source)
->  
->  /*
->   * Make the source directory our root so symlinks cannot escape and no other
-> - * files are accessible.
-> + * files are accessible.  Assumes unshare(CLONE_NEWNS) was already called.
->   */
->  static void setup_mount_namespace(const char *source)
->  {
-> -	if (unshare(CLONE_NEWNS) != 0) {
-> -		fuse_log(FUSE_LOG_ERR, "unshare(CLONE_NEWNS): %m\n");
-> -		exit(1);
-> -	}
-> -
-> -	if (mount(NULL, "/", NULL, MS_REC|MS_SLAVE, NULL) < 0) {
-> -		fuse_log(FUSE_LOG_ERR, "mount(/, MS_REC|MS_PRIVATE): %m\n");
-> -		exit(1);
-> -	}
-> -
->  	if (mount(source, source, NULL, MS_BIND, NULL) < 0) {
->  		fuse_log(FUSE_LOG_ERR, "mount(%s, %s, MS_BIND): %m\n", source, source);
->  		exit(1);
-> @@ -2831,6 +2890,8 @@ static void setup_mount_namespace(const char *source)
->   */
->  static void setup_sandbox(struct lo_data *lo, bool enable_syslog)
->  {
-> +	setup_pid_namespace();
-> +	setup_proc_self_fd(lo);
->  	setup_net_namespace();
->  	setup_mount_namespace(lo->source);
->  	setup_seccomp(enable_syslog);
-> @@ -2860,15 +2921,6 @@ static void setup_root(struct lo_data *lo, struct lo_inode *root)
->  	g_atomic_int_set(&root->refcount, 2);
->  }
->  
-> -static void setup_proc_self_fd(struct lo_data *lo)
-> -{
-> -	lo->proc_self_fd = open("/proc/self/fd", O_PATH);
-> -	if (lo->proc_self_fd == -1) {
-> -		fuse_log(FUSE_LOG_ERR, "open(/proc/self/fd, O_PATH): %m\n");
-> -		exit(1);
-> -	}
-> -}
-> -
->  /* Raise the maximum number of open file descriptors to the system limit */
->  static void setup_nofile_rlimit(void)
->  {
-> @@ -3110,9 +3162,6 @@ int main(int argc, char *argv[])
->  		get_shared(&lo, &lo.root);
->  	}
->  
-> -	/* Must be after daemonize to get the right /proc/self/fd */
-> -	setup_proc_self_fd(&lo);
-> -
->  	setup_sandbox(&lo, opts.syslog);
->  
->  	setup_root(&lo, &lo.root);
-> -- 
-> 2.21.0
+> Consolidating updation of flags both for lo_create() and lo_open() makes
+> sense to me. I will test it tomorrow.
 > 
+> Thanks
+> Vivek
 > 
-
-Regards,
-Daniel
--- 
-|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
-|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
-|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
+> > Signed-off-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+> > ---
+> >  contrib/virtiofsd/passthrough_ll.c | 56 +++++++++++++++---------------
+> >  1 file changed, 28 insertions(+), 28 deletions(-)
+> > 
+> > diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+> > index e8892c3c32..79fb78ecce 100644
+> > --- a/contrib/virtiofsd/passthrough_ll.c
+> > +++ b/contrib/virtiofsd/passthrough_ll.c
+> > @@ -1733,6 +1733,32 @@ static void lo_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info
+> >  	fuse_reply_err(req, 0);
+> >  }
+> >  
+> > +static void update_open_flags(int writeback, struct fuse_file_info *fi)
+> > +{
+> > +	/* With writeback cache, kernel may send read requests even
+> > +	   when userspace opened write-only */
+> > +	if (writeback && (fi->flags & O_ACCMODE) == O_WRONLY) {
+> > +		fi->flags &= ~O_ACCMODE;
+> > +		fi->flags |= O_RDWR;
+> > +	}
+> > +
+> > +	/* With writeback cache, O_APPEND is handled by the kernel.
+> > +	   This breaks atomicity (since the file may change in the
+> > +	   underlying filesystem, so that the kernel's idea of the
+> > +	   end of the file isn't accurate anymore). In this example,
+> > +	   we just accept that. A more rigorous filesystem may want
+> > +	   to return an error here */
+> > +	if (writeback && (fi->flags & O_APPEND))
+> > +		fi->flags &= ~O_APPEND;
+> > +
+> > +	/*
+> > +	 * O_DIRECT in guest should not necessarily mean bypassing page
+> > +	 * cache on host as well. If somebody needs that behavior, it
+> > +	 * probably should be a configuration knob in daemon.
+> > +	 */
+> > +	fi->flags &= ~O_DIRECT;
+> > +}
+> > +
+> >  static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+> >  		      mode_t mode, struct fuse_file_info *fi)
+> >  {
+> > @@ -1760,12 +1786,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+> >  	if (err)
+> >  		goto out;
+> >  
+> > -	/*
+> > -	 * O_DIRECT in guest should not necessarily mean bypassing page
+> > -	 * cache on host as well. If somebody needs that behavior, it
+> > -	 * probably should be a configuration knob in daemon.
+> > -	 */
+> > -	fi->flags &= ~O_DIRECT;
+> > +	update_open_flags(lo->writeback, fi);
+> >  
+> >  	fd = openat(parent_inode->fd, name,
+> >  		    (fi->flags | O_CREAT) & ~O_NOFOLLOW, mode);
+> > @@ -1966,28 +1987,7 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+> >  
+> >  	fuse_log(FUSE_LOG_DEBUG, "lo_open(ino=%" PRIu64 ", flags=%d)\n", ino, fi->flags);
+> >  
+> > -	/* With writeback cache, kernel may send read requests even
+> > -	   when userspace opened write-only */
+> > -	if (lo->writeback && (fi->flags & O_ACCMODE) == O_WRONLY) {
+> > -		fi->flags &= ~O_ACCMODE;
+> > -		fi->flags |= O_RDWR;
+> > -	}
+> > -
+> > -	/* With writeback cache, O_APPEND is handled by the kernel.
+> > -	   This breaks atomicity (since the file may change in the
+> > -	   underlying filesystem, so that the kernel's idea of the
+> > -	   end of the file isn't accurate anymore). In this example,
+> > -	   we just accept that. A more rigorous filesystem may want
+> > -	   to return an error here */
+> > -	if (lo->writeback && (fi->flags & O_APPEND))
+> > -		fi->flags &= ~O_APPEND;
+> > -
+> > -	/*
+> > -	 * O_DIRECT in guest should not necessarily mean bypassing page
+> > -	 * cache on host as well. If somebody needs that behavior, it
+> > -	 * probably should be a configuration knob in daemon.
+> > -	 */
+> > -	fi->flags &= ~O_DIRECT;
+> > +	update_open_flags(lo->writeback, fi);
+> >  
+> >  	sprintf(buf, "%i", lo_fd(req, ino));
+> >  	fd = openat(lo->proc_self_fd, buf, fi->flags & ~O_NOFOLLOW);
+> > -- 
+> > 2.21.0
+> > 
+> > _______________________________________________
+> > Virtio-fs mailing list
+> > Virtio-fs@redhat.com
+> > https://www.redhat.com/mailman/listinfo/virtio-fs
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 

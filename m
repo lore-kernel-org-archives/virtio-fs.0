@@ -1,14 +1,15 @@
-Date: Fri, 25 Oct 2019 11:41:26 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20191025104126.GB3008@work-vm>
-References: <OSBPR01MB37837B4AB38461063F645019E56A0@OSBPR01MB3783.jpnprd01.prod.outlook.com>
-	<20191024171334.GN2877@work-vm>
-	<OSBPR01MB378398B279F6E2257A978C9FE5650@OSBPR01MB3783.jpnprd01.prod.outlook.com>
+Date: Fri, 25 Oct 2019 14:53:23 +0200
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20191025125323.GD13314@stefanha-x1.localdomain>
+References: <20191016160157.12414-1-stefanha@redhat.com>
+	<20191016160157.12414-3-stefanha@redhat.com>
+	<20191024102611.GF3700@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="FFoLq8A0u+X9iRU8"
 Content-Disposition: inline
-In-Reply-To: <OSBPR01MB378398B279F6E2257A978C9FE5650@OSBPR01MB3783.jpnprd01.prod.outlook.com>
-Subject: Re: [Virtio-fs] False error message when DAX cache is disabled
+In-Reply-To: <20191024102611.GF3700@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 2/2] virtiofsd: move to a new pid namespace
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,107 +18,65 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>
-Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+To: Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-* misono.tomohiro@fujitsu.com (misono.tomohiro@fujitsu.com) wrote:
-> > * misono.tomohiro@fujitsu.com (misono.tomohiro@fujitsu.com) wrote:
-> > > Hi,
-> > 
-> > Hi Misono,
-> > 
-> > > I'm testing virtiofs on ARM enviroment.
-> > > Since current ARM does not support DAX, I use cache-size=0 for vhost-user-fs-pci parameter.
-> > >
-> > > This results in the following error message during unmount:
-> > > ```
-> > > vhost_user_fs_slave_unmap: unmap when DAX cache not present
-> > > lo_destroy: unmap during destroy failed ```
-> > 
-> > Thanks for reporting this,
-> > 
-> > > This is because lo_destroy() always calls fuse_virtio_unmap().
-> > > So, I want to fix this by not calling fuse_virtio_unmap() when cache
-> > > is not used, but is there any good way for virtiofsd to know vhost-user's cahce-size?
-> > 
-> > Unfortunately not; that's why I used the special ~0 as a 'unmap all'.
-> > It feels easier to fix the qemu side to be happy unmapping everything when everything is actually nothing :-)
-> > 
-> > Does the following (build tested only) patch fix it:
-> > 
-> > diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c index 6cacdb24b0..07a04d9b21 100644
-> > --- a/hw/virtio/vhost-user-fs.c
-> > +++ b/hw/virtio/vhost-user-fs.c
-> > @@ -92,10 +92,6 @@ uint64_t vhost_user_fs_slave_unmap(struct vhost_dev *dev, VhostUserFSSlaveMsg *s
-> >          return -1;
-> >      }
-> >      size_t cache_size = fs->conf.cache_size;
-> > -    if (!cache_size) {
-> > -        fprintf(stderr, "%s: unmap when DAX cache not present\n", __func__);
-> > -        return (uint64_t)-1;
-> > -    }
-> >      void *cache_host = memory_region_get_ram_ptr(&fs->cache);
-> > 
-> >      unsigned int i;
-> > @@ -106,13 +102,19 @@ uint64_t vhost_user_fs_slave_unmap(struct vhost_dev *dev, VhostUserFSSlaveMsg *s
-> >       */
-> >      for (i = 0; i < VHOST_USER_FS_SLAVE_ENTRIES; i++) {
-> >          void *ptr;
-> > +        if (sm->len[i] == ~(uint64_t)0) {
-> > +            /* Special case meaning the whole arena */
-> > +            sm->len[i] = cache_size;
-> > +        }
-> > +
-> >          if (sm->len[i] == 0) {
-> >              continue;
-> >          }
-> > 
-> > -        if (sm->len[i] == ~(uint64_t)0) {
-> > -            /* Special case meaning the whole arena */
-> > -            sm->len[i] = cache_size;
-> > +        if (!cache_size) {
-> > +            fprintf(stderr, "%s: unmap when DAX cache not present\n", __func__);
-> > +            res = -1;
-> > +            break;
-> >          }
-> > 
-> >          if ((sm->c_offset[i] + sm->len[i]) < sm->len[i] ||
-> > 
-> 
-> Thanks for the patch, but I got qemu crash during umount:
->   qemu/memory.c:2187: memory_region_get_ram_ptr: Assertion `mr->ram_block' failed.
 
-Oops yes, I missed that.
+--FFoLq8A0u+X9iRU8
+Content-Type: text/plain; charset=iso-8859-1
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-> Obviously we don't setup fs->cache when cache_size is zero...
-> So, maybe we can just do something like this?
-> 
-> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-> index 6cacdb24b0..459dce5bde 100644
-> --- a/hw/virtio/vhost-user-fs.c
-> +++ b/hw/virtio/vhost-user-fs.c
-> @@ -93,6 +93,14 @@ uint64_t vhost_user_fs_slave_unmap(struct vhost_dev *dev, VhostUserFSSlaveMsg *s
->      }
->      size_t cache_size = fs->conf.cache_size;
->      if (!cache_size) {
-> +        /*
-> +         * Since dax cache is disabled, there should be no unmap request.
-> +         * Howerver we still receives whole range unmap request during umount
-> +         * for cleanup. Ignore it.
-> +         */
-> +        if (sm->len[0] == ~(uint64_t)0)
-> +            return 0;
-> +
->          fprintf(stderr, "%s: unmap when DAX cache not present\n", __func__);
->          return (uint64_t)-1;
->      }
+On Thu, Oct 24, 2019 at 11:26:11AM +0100, Daniel P. Berrang=E9 wrote:
+> On Wed, Oct 16, 2019 at 05:01:57PM +0100, Stefan Hajnoczi wrote:
+> It might be useful to call prctl(PR_SET_PDEATHSIG) here, so that
+> if the parent process exits for any reason, the child will be killed
+> off too.
+[...]
+> I feel like this is making things a bit misleading.
+>=20
+>  setup_pid_namespace()
+>=20
+> is now creating the mount namespace and pid namespace, and doing
+> some mount point config
+>=20
+>  setup_mount_namespace()
+>=20
+> is not creating the mount namespace, but is doing some more mount
+> point config.
+>=20
+> And then there's setup_net_namespace() too.
+>=20
+> I think there could be a  single
+>=20
+>   setup_namespaces()
+>=20
+> method that does the unshare(CLONE_NEWNS|CLONE_NEWNET|CLONE_NEWPID)
+> and forking the child.
+>=20
+> And a setup_mounts()
+>=20
+> method that does all the mount() calls.
 
-Yes, that's simpler; I'll take that - thank you!
+Thanks for your suggestions.  I'll implement both of them as follow-up
+patches since this has already been included in the virtiofsd code.
 
-Dave
+Stefan
 
-> Thanks,
-> Misono
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+--FFoLq8A0u+X9iRU8
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl2y8EMACgkQnKSrs4Gr
+c8jRvQf/WTMG6gI+jzx5Ytr7ApU7nlx516Kmq/BtgD0DPng+qO/+VRLEH5uvCXAv
+jfVP2dHA9LMwlH1YyyVXdvpkfb7JF/LMY6ZR85D43fRV43LRcgrsuVfXLbw8E56d
+kKS6t7EziGQH9Qdp3rNKa1tvDliRa9Iwgqbxk83xGJEDeONo3AFry+L5jQroLXH5
+3kCiXAHlPeFfQGmDo1CW7U1h7sIKtJ6SQLHyIB4+gMjDjKzN3aO00EahWg65Daqn
+pPCW7Wdmt0kSJE7oxMLri2NphsLanaFpOgD8+Qag8olxg62JU5hmnRdiG3G19xzZ
++UmiuS7fXAPTDECy6mvMm/7uLCnkLA==
+=TwjB
+-----END PGP SIGNATURE-----
+
+--FFoLq8A0u+X9iRU8--
 

@@ -1,10 +1,12 @@
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Fri, 25 Oct 2019 12:01:49 +0200
-Message-Id: <20191025100152.6638-1-stefanha@redhat.com>
+Date: Fri, 25 Oct 2019 12:01:50 +0200
+Message-Id: <20191025100152.6638-2-stefanha@redhat.com>
+In-Reply-To: <20191025100152.6638-1-stefanha@redhat.com>
+References: <20191025100152.6638-1-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [RFC 0/3] tests/vhost-user-fs-test: add vhost-user-fs
-	test case
+Subject: [Virtio-fs] [RFC 1/3] WIP virtiofsd: import Linux <fuse.h> header
+	file
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,82 +18,93 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org
 Cc: Laurent Vivier <lvivier@redhat.com>, Thomas Huth <thuth@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Cornelia Huck <cohuck@redhat.com>, virtio-fs@redhat.com, Paolo Bonzini <pbonzini@redhat.com>, vgoyal@redhat.com
 
-This patch series adds an automated test for the vhost-user-fs device using
-virtiofsd.  This makes low-level testing of FUSE messages and even VIRTIO
-possible.  These things can be hard to do inside a normal guest environment
-where such tests require building kernel modules and can result in kernel
-panics.
+tests/vhost-user-fs-test.c needs fuse.h.  The private copy that
+virtiofsd has can be replaced with a properly imported file using
+update-linux-headers.sh.
 
-To get a feel for how vhost-user-fs-test.c test cases work, here is an example:
+TODO rerun update-linux-headers.sh with upstream kernel tree!
 
-  /* Create file on host and check its contents and metadata in guest */
-  static void test_file_from_host(void *parent, void *arg, QGuestAllocator *alloc)
-  {
-      g_autofree gchar *filename = g_strdup_printf("%s/%s", shared_dir, "foo");
-      const char *str = "This is a test\n";
-      char buf[strlen(str)];
-      QVirtioFS *vfs = parent;
-      struct fuse_entry_out entry;
-      int32_t error;
-      uint64_t nodeid;
-      uint64_t fh;
-      ssize_t nread;
-      gboolean ok;
-
-      SKIP_TEST_IF_CROSS_ENDIAN();
-
-      /* Create the test file in the shared directory */
-      ok = g_file_set_contents(filename, str, strlen(str), NULL);
-      g_assert(ok);
-
-      fuse_init(vfs);
-
-      error = fuse_lookup(vfs, FUSE_ROOT_ID, "foo", &entry);
-      g_assert_cmpint(error, ==, 0);
-      g_assert_cmpint(guest64(entry.attr.size), ==, strlen(str));
-      nodeid = guest64(entry.nodeid);
-
-      error = fuse_open(vfs, nodeid, O_RDONLY, &fh);
-      g_assert_cmpint(error, ==, 0);
-
-      nread = fuse_read(vfs, fh, 0, buf, sizeof(buf));
-      g_assert_cmpint(nread, ==, sizeof(buf));
-      g_assert_cmpint(memcmp(buf, str, sizeof(buf)), ==, 0);
-
-      fuse_release(vfs, fh);
-      fuse_forget(vfs, nodeid);
-  }
-
-This patch series is based on "[PATCH v4 00/16] libqos: add VIRTIO PCI 1.0
-support" and the https://gitlab.com/virtio-fs/qemu virtio-fs-dev branch.  I
-expect conflicts and will resend again once these dependencies have landed in
-qemu.git/master.
-
-Stefan Hajnoczi (3):
-  WIP virtiofsd: import Linux <fuse.h> header file
-  qgraph: add an "after" test callback function
-  tests/vhost-user-fs-test: add vhost-user-fs test case
-
- tests/Makefile.include                        |   8 +-
- contrib/virtiofsd/fuse_lowlevel.h             |   2 +-
- .../standard-headers/linux/fuse.h             |   0
- tests/libqos/qgraph.h                         |   2 +
- tests/libqos/qgraph_internal.h                |   1 +
- tests/libqos/virtio-fs.h                      |  46 ++
- contrib/virtiofsd/fuse_loop_mt.c              |   2 +-
- contrib/virtiofsd/fuse_lowlevel.c             |   2 +-
- contrib/virtiofsd/fuse_virtio.c               |   2 +-
- tests/libqos/qgraph.c                         |   1 +
- tests/libqos/virtio-fs.c                      | 104 +++
- tests/qos-test.c                              |   6 +
- tests/vhost-user-fs-test.c                    | 660 ++++++++++++++++++
- scripts/update-linux-headers.sh               |   3 +-
- 14 files changed, 832 insertions(+), 7 deletions(-)
+Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ contrib/virtiofsd/fuse_lowlevel.h                              | 2 +-
+ .../fuse_kernel.h => include/standard-headers/linux/fuse.h     | 0
+ contrib/virtiofsd/fuse_loop_mt.c                               | 2 +-
+ contrib/virtiofsd/fuse_lowlevel.c                              | 2 +-
+ contrib/virtiofsd/fuse_virtio.c                                | 2 +-
+ scripts/update-linux-headers.sh                                | 3 ++-
+ 6 files changed, 6 insertions(+), 5 deletions(-)
  rename contrib/virtiofsd/fuse_kernel.h => include/standard-headers/linux/fuse.h (100%)
- create mode 100644 tests/libqos/virtio-fs.h
- create mode 100644 tests/libqos/virtio-fs.c
- create mode 100644 tests/vhost-user-fs-test.c
 
+diff --git a/contrib/virtiofsd/fuse_lowlevel.h b/contrib/virtiofsd/fuse_lowlevel.h
+index 79fb30a1c2..a8c92ff7e0 100644
+--- a/contrib/virtiofsd/fuse_lowlevel.h
++++ b/contrib/virtiofsd/fuse_lowlevel.h
+@@ -23,7 +23,7 @@
+ #endif
+ 
+ #include "fuse_common.h"
+-#include "fuse_kernel.h"
++#include "standard-headers/linux/fuse.h"
+ 
+ #include <utime.h>
+ #include <fcntl.h>
+diff --git a/contrib/virtiofsd/fuse_kernel.h b/include/standard-headers/linux/fuse.h
+similarity index 100%
+rename from contrib/virtiofsd/fuse_kernel.h
+rename to include/standard-headers/linux/fuse.h
+diff --git a/contrib/virtiofsd/fuse_loop_mt.c b/contrib/virtiofsd/fuse_loop_mt.c
+index 2000a8902a..af7b501fac 100644
+--- a/contrib/virtiofsd/fuse_loop_mt.c
++++ b/contrib/virtiofsd/fuse_loop_mt.c
+@@ -11,7 +11,7 @@
+ #include "fuse_i.h"
+ #include "fuse_lowlevel.h"
+ #include "fuse_misc.h"
+-#include "fuse_kernel.h"
++#include "standard-headers/linux/fuse.h"
+ #include "fuse_virtio.h"
+ 
+ #include <stdio.h>
+diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
+index 78ccfe3a27..c1a901cb4d 100644
+--- a/contrib/virtiofsd/fuse_lowlevel.c
++++ b/contrib/virtiofsd/fuse_lowlevel.c
+@@ -10,7 +10,7 @@
+ */
+ 
+ #include "fuse_i.h"
+-#include "fuse_kernel.h"
++#include "standard-headers/linux/fuse.h"
+ #include "fuse_opt.h"
+ #include "fuse_misc.h"
+ #include "fuse_virtio.h"
+diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
+index 533ef24bb7..7a0d0b2603 100644
+--- a/contrib/virtiofsd/fuse_virtio.c
++++ b/contrib/virtiofsd/fuse_virtio.c
+@@ -15,7 +15,7 @@
+ #include "qapi/error.h"
+ 
+ #include "fuse_i.h"
+-#include "fuse_kernel.h"
++#include "standard-headers/linux/fuse.h"
+ #include "fuse_misc.h"
+ #include "fuse_opt.h"
+ #include "fuse_virtio.h"
+diff --git a/scripts/update-linux-headers.sh b/scripts/update-linux-headers.sh
+index f76d77363b..1a627ccd73 100755
+--- a/scripts/update-linux-headers.sh
++++ b/scripts/update-linux-headers.sh
+@@ -184,7 +184,8 @@ EOF
+ 
+ rm -rf "$output/include/standard-headers/linux"
+ mkdir -p "$output/include/standard-headers/linux"
+-for i in "$tmpdir"/include/linux/*virtio*.h \
++for i in "$tmpdir/include/linux/fuse.h" \
++         "$tmpdir"/include/linux/*virtio*.h \
+          "$tmpdir/include/linux/qemu_fw_cfg.h" \
+          "$tmpdir/include/linux/input.h" \
+          "$tmpdir/include/linux/input-event-codes.h" \
 -- 
 2.21.0
 

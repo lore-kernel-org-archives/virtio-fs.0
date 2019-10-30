@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 30 Oct 2019 11:07:19 -0400
-Message-Id: <20191030150719.29048-4-vgoyal@redhat.com>
+Date: Wed, 30 Oct 2019 11:07:17 -0400
+Message-Id: <20191030150719.29048-2-vgoyal@redhat.com>
 In-Reply-To: <20191030150719.29048-1-vgoyal@redhat.com>
 References: <20191030150719.29048-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 3/3] virtiofs: Use completions while waiting for
-	queue to be drained
+Subject: [Virtio-fs] [PATCH 1/3] virtiofs: Use a common function to send
+	forget
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,112 +18,207 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
 Cc: miklos@szeredi.hu, vgoyal@redhat.com, virtualization@lists.linux-foundation.org
 
-While we wait for queue to finish draining, use completions instead of
-uslee_range(). This is better way of waiting for event.
+Currently we are duplicating logic to send forgets at two places. Consolidate
+the code by calling one helper function.
+
+This also uses virtqueue_add_outbuf() instead of virtqueue_add_sgs(). Former
+is simpler to call.
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- fs/fuse/virtio_fs.c | 39 +++++++++++++++++++++++++++++----------
- 1 file changed, 29 insertions(+), 10 deletions(-)
+ fs/fuse/virtio_fs.c | 150 +++++++++++++++++++-------------------------
+ 1 file changed, 63 insertions(+), 87 deletions(-)
 
 diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 43224db8d9ed..b5ba83ef1914 100644
+index a5c86048b96e..6cc7be170cb8 100644
 --- a/fs/fuse/virtio_fs.c
 +++ b/fs/fuse/virtio_fs.c
-@@ -35,6 +35,7 @@ struct virtio_fs_vq {
- 	struct fuse_dev *fud;
- 	bool connected;
- 	long in_flight;
-+	struct completion in_flight_zero; /* No inflight requests */
- 	char name[24];
- } ____cacheline_aligned_in_smp;
- 
-@@ -85,6 +86,8 @@ static inline void dec_in_flight_req(struct virtio_fs_vq *fsvq)
- {
- 	WARN_ON(fsvq->in_flight <= 0);
- 	fsvq->in_flight--;
-+	if (!fsvq->in_flight)
-+		complete(&fsvq->in_flight_zero);
- }
- 
- static void release_virtio_fs_obj(struct kref *ref)
-@@ -115,22 +118,23 @@ static void virtio_fs_drain_queue(struct virtio_fs_vq *fsvq)
- 	WARN_ON(fsvq->in_flight < 0);
- 
- 	/* Wait for in flight requests to finish.*/
--	while (1) {
--		spin_lock(&fsvq->lock);
--		if (!fsvq->in_flight) {
--			spin_unlock(&fsvq->lock);
--			break;
--		}
-+	spin_lock(&fsvq->lock);
-+	if (fsvq->in_flight) {
-+		/* We are holding virtio_fs_mutex. There should not be any
-+		 * waiters waiting for completion.
-+		 */
-+		reinit_completion(&fsvq->in_flight_zero);
-+		spin_unlock(&fsvq->lock);
-+		wait_for_completion(&fsvq->in_flight_zero);
-+	} else {
- 		spin_unlock(&fsvq->lock);
--		/* TODO use completion instead of timeout */
--		usleep_range(1000, 2000);
- 	}
- 
- 	flush_work(&fsvq->done_work);
- 	flush_delayed_work(&fsvq->dispatch_work);
- }
- 
--static void virtio_fs_drain_all_queues(struct virtio_fs *fs)
-+static void virtio_fs_drain_all_queues_locked(struct virtio_fs *fs)
- {
- 	struct virtio_fs_vq *fsvq;
- 	int i;
-@@ -141,6 +145,19 @@ static void virtio_fs_drain_all_queues(struct virtio_fs *fs)
+@@ -313,17 +313,71 @@ static void virtio_fs_request_dispatch_work(struct work_struct *work)
  	}
  }
  
-+static void virtio_fs_drain_all_queues(struct virtio_fs *fs)
++/*
++ * Returns 1 if queue is full and sender should wait a bit before sending
++ * next request, 0 otherwise.
++ */
++static int send_forget_request(struct virtio_fs_vq *fsvq,
++			       struct virtio_fs_forget *forget,
++			       bool in_flight)
 +{
-+	/* Provides mutual exclusion between ->remove and ->kill_sb
-+	 * paths. We don't want both of these draining queue at the
-+	 * same time. Current completion logic reinits completion
-+	 * and that means there should not be any other thread
-+	 * doing reinit or waiting for completion already.
-+	 */
-+	mutex_lock(&virtio_fs_mutex);
-+	virtio_fs_drain_all_queues_locked(fs);
-+	mutex_unlock(&virtio_fs_mutex);
++	struct scatterlist sg;
++	struct virtqueue *vq;
++	int ret = 0;
++	bool notify;
++
++	spin_lock(&fsvq->lock);
++	if (!fsvq->connected) {
++		if (in_flight)
++			dec_in_flight_req(fsvq);
++		kfree(forget);
++		goto out;
++	}
++
++	sg_init_one(&sg, forget, sizeof(*forget));
++	vq = fsvq->vq;
++	dev_dbg(&vq->vdev->dev, "%s\n", __func__);
++
++	ret = virtqueue_add_outbuf(vq, &sg, 1, forget, GFP_ATOMIC);
++	if (ret < 0) {
++		if (ret == -ENOMEM || ret == -ENOSPC) {
++			pr_debug("virtio-fs: Could not queue FORGET: err=%d."
++				 " Will try later\n", ret);
++			list_add_tail(&forget->list, &fsvq->queued_reqs);
++			schedule_delayed_work(&fsvq->dispatch_work,
++					      msecs_to_jiffies(1));
++			if (!in_flight)
++				inc_in_flight_req(fsvq);
++			/* Queue is full */
++			ret = 1;
++		} else {
++			pr_debug("virtio-fs: Could not queue FORGET: err=%d."
++				 " Dropping it.\n", ret);
++			kfree(forget);
++			if (in_flight)
++				dec_in_flight_req(fsvq);
++		}
++		goto out;
++	}
++
++	if (!in_flight)
++		inc_in_flight_req(fsvq);
++	notify = virtqueue_kick_prepare(vq);
++	spin_unlock(&fsvq->lock);
++
++	if (notify)
++		virtqueue_notify(vq);
++	return ret;
++out:
++	spin_unlock(&fsvq->lock);
++	return ret;
 +}
 +
- static void virtio_fs_start_all_queues(struct virtio_fs *fs)
+ static void virtio_fs_hiprio_dispatch_work(struct work_struct *work)
  {
- 	struct virtio_fs_vq *fsvq;
-@@ -581,6 +598,7 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
- 	INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].end_reqs);
- 	INIT_DELAYED_WORK(&fs->vqs[VQ_HIPRIO].dispatch_work,
- 			virtio_fs_hiprio_dispatch_work);
-+	init_completion(&fs->vqs[VQ_HIPRIO].in_flight_zero);
- 	spin_lock_init(&fs->vqs[VQ_HIPRIO].lock);
+ 	struct virtio_fs_forget *forget;
+ 	struct virtio_fs_vq *fsvq = container_of(work, struct virtio_fs_vq,
+ 						 dispatch_work.work);
+-	struct virtqueue *vq = fsvq->vq;
+-	struct scatterlist sg;
+-	struct scatterlist *sgs[] = {&sg};
+-	bool notify;
+-	int ret;
+-
+ 	pr_debug("virtio-fs: worker %s called.\n", __func__);
+ 	while (1) {
+ 		spin_lock(&fsvq->lock);
+@@ -335,43 +389,9 @@ static void virtio_fs_hiprio_dispatch_work(struct work_struct *work)
+ 		}
  
- 	/* Initialize the requests virtqueues */
-@@ -591,6 +609,7 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
- 				  virtio_fs_request_dispatch_work);
- 		INIT_LIST_HEAD(&fs->vqs[i].queued_reqs);
- 		INIT_LIST_HEAD(&fs->vqs[i].end_reqs);
-+		init_completion(&fs->vqs[i].in_flight_zero);
- 		snprintf(fs->vqs[i].name, sizeof(fs->vqs[i].name),
- 			 "requests.%u", i - VQ_REQUEST);
- 		callbacks[i] = virtio_fs_vq_done;
-@@ -684,7 +703,7 @@ static void virtio_fs_remove(struct virtio_device *vdev)
- 	/* This device is going away. No one should get new reference */
- 	list_del_init(&fs->list);
- 	virtio_fs_stop_all_queues(fs);
--	virtio_fs_drain_all_queues(fs);
-+	virtio_fs_drain_all_queues_locked(fs);
- 	vdev->config->reset(vdev);
- 	virtio_fs_cleanup_vqs(vdev, fs);
+ 		list_del(&forget->list);
+-		if (!fsvq->connected) {
+-			dec_in_flight_req(fsvq);
+-			spin_unlock(&fsvq->lock);
+-			kfree(forget);
+-			continue;
+-		}
+-
+-		sg_init_one(&sg, forget, sizeof(*forget));
+-
+-		/* Enqueue the request */
+-		dev_dbg(&vq->vdev->dev, "%s\n", __func__);
+-		ret = virtqueue_add_sgs(vq, sgs, 1, 0, forget, GFP_ATOMIC);
+-		if (ret < 0) {
+-			if (ret == -ENOMEM || ret == -ENOSPC) {
+-				pr_debug("virtio-fs: Could not queue FORGET: err=%d. Will try later\n",
+-					 ret);
+-				list_add_tail(&forget->list,
+-						&fsvq->queued_reqs);
+-				schedule_delayed_work(&fsvq->dispatch_work,
+-						msecs_to_jiffies(1));
+-			} else {
+-				pr_debug("virtio-fs: Could not queue FORGET: err=%d. Dropping it.\n",
+-					 ret);
+-				dec_in_flight_req(fsvq);
+-				kfree(forget);
+-			}
+-			spin_unlock(&fsvq->lock);
+-			return;
+-		}
+-
+-		notify = virtqueue_kick_prepare(vq);
+ 		spin_unlock(&fsvq->lock);
+-
+-		if (notify)
+-			virtqueue_notify(vq);
+-		pr_debug("virtio-fs: worker %s dispatched one forget request.\n",
+-			 __func__);
++		if (send_forget_request(fsvq, forget, true))
++			return;
+ 	}
+ }
+ 
+@@ -710,14 +730,9 @@ __releases(fiq->lock)
+ {
+ 	struct fuse_forget_link *link;
+ 	struct virtio_fs_forget *forget;
+-	struct scatterlist sg;
+-	struct scatterlist *sgs[] = {&sg};
+ 	struct virtio_fs *fs;
+-	struct virtqueue *vq;
+ 	struct virtio_fs_vq *fsvq;
+-	bool notify;
+ 	u64 unique;
+-	int ret;
+ 
+ 	link = fuse_dequeue_forget(fiq, 1, NULL);
+ 	unique = fuse_get_unique(fiq);
+@@ -739,46 +754,7 @@ __releases(fiq->lock)
+ 		.nlookup = link->forget_one.nlookup,
+ 	};
+ 
+-	sg_init_one(&sg, forget, sizeof(*forget));
+-
+-	/* Enqueue the request */
+-	spin_lock(&fsvq->lock);
+-
+-	if (!fsvq->connected) {
+-		kfree(forget);
+-		spin_unlock(&fsvq->lock);
+-		goto out;
+-	}
+-
+-	vq = fsvq->vq;
+-	dev_dbg(&vq->vdev->dev, "%s\n", __func__);
+-
+-	ret = virtqueue_add_sgs(vq, sgs, 1, 0, forget, GFP_ATOMIC);
+-	if (ret < 0) {
+-		if (ret == -ENOMEM || ret == -ENOSPC) {
+-			pr_debug("virtio-fs: Could not queue FORGET: err=%d. Will try later.\n",
+-				 ret);
+-			list_add_tail(&forget->list, &fsvq->queued_reqs);
+-			schedule_delayed_work(&fsvq->dispatch_work,
+-					msecs_to_jiffies(1));
+-			inc_in_flight_req(fsvq);
+-		} else {
+-			pr_debug("virtio-fs: Could not queue FORGET: err=%d. Dropping it.\n",
+-				 ret);
+-			kfree(forget);
+-		}
+-		spin_unlock(&fsvq->lock);
+-		goto out;
+-	}
+-
+-	inc_in_flight_req(fsvq);
+-	notify = virtqueue_kick_prepare(vq);
+-
+-	spin_unlock(&fsvq->lock);
+-
+-	if (notify)
+-		virtqueue_notify(vq);
+-out:
++	send_forget_request(fsvq, forget, false);
+ 	kfree(link);
+ }
  
 -- 
 2.20.1

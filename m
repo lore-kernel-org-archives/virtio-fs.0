@@ -1,9 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 30 Oct 2019 11:07:16 -0400
-Message-Id: <20191030150719.29048-1-vgoyal@redhat.com>
+Date: Wed, 30 Oct 2019 11:07:19 -0400
+Message-Id: <20191030150719.29048-4-vgoyal@redhat.com>
+In-Reply-To: <20191030150719.29048-1-vgoyal@redhat.com>
+References: <20191030150719.29048-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 0/3] virtiofs: Small Cleanups for 5.5
+Subject: [Virtio-fs] [PATCH 3/3] virtiofs: Use completions while waiting for
+	queue to be drained
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,23 +18,113 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
 Cc: miklos@szeredi.hu, vgoyal@redhat.com, virtualization@lists.linux-foundation.org
 
-Hi Miklos,
+While we wait for queue to finish draining, use completions instead of
+uslee_range(). This is better way of waiting for event.
 
-Here are few small cleanups for virtiofs for 5.5. I had received some
-comments from Michael Tsirkin on original virtiofs patches and these
-cleanups are result of these comments.
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/virtio_fs.c | 39 +++++++++++++++++++++++++++++----------
+ 1 file changed, 29 insertions(+), 10 deletions(-)
 
-Thanks
-Vivek
-
-Vivek Goyal (3):
-  virtiofs: Use a common function to send forget
-  virtiofs: Do not send forget request "struct list_head" element
-  virtiofs: Use completions while waiting for queue to be drained
-
- fs/fuse/virtio_fs.c | 204 ++++++++++++++++++++++----------------------
- 1 file changed, 103 insertions(+), 101 deletions(-)
-
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index 43224db8d9ed..b5ba83ef1914 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -35,6 +35,7 @@ struct virtio_fs_vq {
+ 	struct fuse_dev *fud;
+ 	bool connected;
+ 	long in_flight;
++	struct completion in_flight_zero; /* No inflight requests */
+ 	char name[24];
+ } ____cacheline_aligned_in_smp;
+ 
+@@ -85,6 +86,8 @@ static inline void dec_in_flight_req(struct virtio_fs_vq *fsvq)
+ {
+ 	WARN_ON(fsvq->in_flight <= 0);
+ 	fsvq->in_flight--;
++	if (!fsvq->in_flight)
++		complete(&fsvq->in_flight_zero);
+ }
+ 
+ static void release_virtio_fs_obj(struct kref *ref)
+@@ -115,22 +118,23 @@ static void virtio_fs_drain_queue(struct virtio_fs_vq *fsvq)
+ 	WARN_ON(fsvq->in_flight < 0);
+ 
+ 	/* Wait for in flight requests to finish.*/
+-	while (1) {
+-		spin_lock(&fsvq->lock);
+-		if (!fsvq->in_flight) {
+-			spin_unlock(&fsvq->lock);
+-			break;
+-		}
++	spin_lock(&fsvq->lock);
++	if (fsvq->in_flight) {
++		/* We are holding virtio_fs_mutex. There should not be any
++		 * waiters waiting for completion.
++		 */
++		reinit_completion(&fsvq->in_flight_zero);
++		spin_unlock(&fsvq->lock);
++		wait_for_completion(&fsvq->in_flight_zero);
++	} else {
+ 		spin_unlock(&fsvq->lock);
+-		/* TODO use completion instead of timeout */
+-		usleep_range(1000, 2000);
+ 	}
+ 
+ 	flush_work(&fsvq->done_work);
+ 	flush_delayed_work(&fsvq->dispatch_work);
+ }
+ 
+-static void virtio_fs_drain_all_queues(struct virtio_fs *fs)
++static void virtio_fs_drain_all_queues_locked(struct virtio_fs *fs)
+ {
+ 	struct virtio_fs_vq *fsvq;
+ 	int i;
+@@ -141,6 +145,19 @@ static void virtio_fs_drain_all_queues(struct virtio_fs *fs)
+ 	}
+ }
+ 
++static void virtio_fs_drain_all_queues(struct virtio_fs *fs)
++{
++	/* Provides mutual exclusion between ->remove and ->kill_sb
++	 * paths. We don't want both of these draining queue at the
++	 * same time. Current completion logic reinits completion
++	 * and that means there should not be any other thread
++	 * doing reinit or waiting for completion already.
++	 */
++	mutex_lock(&virtio_fs_mutex);
++	virtio_fs_drain_all_queues_locked(fs);
++	mutex_unlock(&virtio_fs_mutex);
++}
++
+ static void virtio_fs_start_all_queues(struct virtio_fs *fs)
+ {
+ 	struct virtio_fs_vq *fsvq;
+@@ -581,6 +598,7 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 	INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].end_reqs);
+ 	INIT_DELAYED_WORK(&fs->vqs[VQ_HIPRIO].dispatch_work,
+ 			virtio_fs_hiprio_dispatch_work);
++	init_completion(&fs->vqs[VQ_HIPRIO].in_flight_zero);
+ 	spin_lock_init(&fs->vqs[VQ_HIPRIO].lock);
+ 
+ 	/* Initialize the requests virtqueues */
+@@ -591,6 +609,7 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 				  virtio_fs_request_dispatch_work);
+ 		INIT_LIST_HEAD(&fs->vqs[i].queued_reqs);
+ 		INIT_LIST_HEAD(&fs->vqs[i].end_reqs);
++		init_completion(&fs->vqs[i].in_flight_zero);
+ 		snprintf(fs->vqs[i].name, sizeof(fs->vqs[i].name),
+ 			 "requests.%u", i - VQ_REQUEST);
+ 		callbacks[i] = virtio_fs_vq_done;
+@@ -684,7 +703,7 @@ static void virtio_fs_remove(struct virtio_device *vdev)
+ 	/* This device is going away. No one should get new reference */
+ 	list_del_init(&fs->list);
+ 	virtio_fs_stop_all_queues(fs);
+-	virtio_fs_drain_all_queues(fs);
++	virtio_fs_drain_all_queues_locked(fs);
+ 	vdev->config->reset(vdev);
+ 	virtio_fs_cleanup_vqs(vdev, fs);
+ 
 -- 
 2.20.1
 

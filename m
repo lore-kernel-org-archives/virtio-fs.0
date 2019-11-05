@@ -1,24 +1,26 @@
-From: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
-Date: Fri, 1 Nov 2019 22:26:54 +0000
-Message-ID: <923a5ab7b17371fe1b702717c125d89f7e76bf5b.camel@intel.com>
-References: <20191011203647.GC13861@redhat.com>
-	<20191014091108.GH22963@stefanha-x1.localdomain>
-	<CAJFHJrrqfjQqMu-K99DiBYNmD1=hB710wRZ88w--SQ0GxQv9Tw@mail.gmail.com>
-	<20191015155749.GH3073@work-vm>
-	<CAJFHJroxYvu_cfwCCxdWV_mN-0pxZ4qBbXdjiJEzPECui-ygrA@mail.gmail.com>
-	<20191015162634.GI3073@work-vm>
-	<ac410eee095de0faf2e8ccd3f917e322c7d68384.camel@intel.com>
-	<CAJFHJrpwkry6r9WDf=4aY2ONUvXKvm_BqWrONFfgRboqGony9g@mail.gmail.com>
-	<20191016141407.GB5487@stefanha-x1.localdomain>
-	<59aa4481a68fe627ee7dfa34f01f4c8f16b1e969.camel@intel.com>
-	<20191016183815.GD14762@stefanha-x1.localdomain>
-In-Reply-To: <20191016183815.GD14762@stefanha-x1.localdomain>
-Content-Language: en-US
-Content-Type: text/plain; charset="utf-8"
-Content-ID: <B5ACC29A5239B245A2687B3D706F9F56@intel.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=date:from:to:cc:subject:message-id:references:mime-version
+	:content-disposition:in-reply-to:user-agent;
+	bh=qQXriDAmGVYWmDIQ5Z6gRehd77sJ5yWG2d1HzcVfMzQ=;
+	b=IDHzbuxWN6TQMmuxKO0FuR0cGlEVDsvezOKU/RE+Du5P+5KdT3fYFLDNuAB8QpOFfS
+	hTUGw8xp+s3CJu7Ye9Dfmhq2FnOyGB4b1rc/z8ZctWzOGRY4/GYgYg4blKkdQJm8hzXU
+	ByPIfK06VC6Q6inKj9poEn5ZcwWO6jOiy9dCP+yt0CXspNUtpeVD2qB2dAbjqf3cf4IF
+	HXp7DwAZVqGvrYk4ob9TNX9hYENfXHNKDJzBbw3R7pjANBlzW2ZYp6atLuAsRQjZyNvz
+	K7Y7s+kcHfn3r+DndoDz7a7oE2j4Cv6PiEle8uvXTX55NfI8NDKWpu+ifWSwzflZOXDr
+	6VSw==
+Date: Tue, 5 Nov 2019 17:02:52 +0100
+From: Stefan Hajnoczi <stefanha@gmail.com>
+Message-ID: <20191105160252.GF166646@stefanha-x1.localdomain>
+References: <20191025100152.6638-1-stefanha@redhat.com>
+	<20191025100152.6638-4-stefanha@redhat.com>
+	<20191029003605.GC2508@work-vm>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] xfstest results for virtio-fs on aarch64
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="iBwuxWUsK/REspAd"
+Content-Disposition: inline
+In-Reply-To: <20191029003605.GC2508@work-vm>
+Subject: Re: [Virtio-fs] [RFC 3/3] tests/vhost-user-fs-test: add
+	vhost-user-fs test case
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,123 +29,84 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "stefanha@redhat.com" <stefanha@redhat.com>, "dgilbert@redhat.com" <dgilbert@redhat.com>, "Ortiz, Samuel" <samuel.ortiz@intel.com>, "Bradford,
-	Robert" <robert.bradford@intel.com>
-Cc: "slp@redhat.com" <slp@redhat.com>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>, "masayoshi.mizuma@fujitsu.com" <masayoshi.mizuma@fujitsu.com>, "vgoyal@redhat.com" <vgoyal@redhat.com>
-
-+Samuel
-+Rob
-
-Hi Stefan, Dave,
-
-I had some time to get started on the virtiofsd in Rust, based on the
-code from Chirantan. So basically I relied on the following Crosvm
-branch (code not merged yet):
-https://chromium-review.googlesource.com/c/chromiumos/platform/crosvm/+/1705654
-
->From there I have ported the code that was needed to rely on the nice
-implementation from Chirantan. I had to make it fit the vm-virtio crate
-from Cloud-Hypervisor (since it's not yet complete on rust-vmm), and
-also the vm-memory crate from rust-vmm.
-
-Once the porting done, I created a dedicated vhost-user-fs daemon
-binary relying on the vhost_user_backend crate. I connected all the
-dots together and the result is here:
-https://github.com/intel/cloud-hypervisor/pull/404
-
-I have listed the remaining tasks here: 
-https://github.com/intel/cloud-hypervisor/pull/404#issue-335636924
-(some can be quite big and should come as a follow up PR IMO).
-
-I'll be in vacation next week, but if you have some time, it'd be very
-nice to get everybody's feedback on this.
-
-And of course, if you have more time to continue working on this, feel
-free to reuse my branch 'vhost_user_fs_daemon' from my forked repo 
-https://github.com/sboeuf/cloud-hypervisor-1.git
-
-Thanks,
-Sebastien
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: Laurent Vivier <lvivier@redhat.com>, Thomas Huth <thuth@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Cornelia Huck <cohuck@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, Paolo Bonzini <pbonzini@redhat.com>, vgoyal@redhat.com
 
 
-On Wed, 2019-10-16 at 19:38 +0100, Stefan Hajnoczi wrote:
-> On Wed, Oct 16, 2019 at 04:14:25PM +0000, Boeuf, Sebastien wrote:
-> > On Wed, 2019-10-16 at 15:14 +0100, Stefan Hajnoczi wrote:
-> > > On Wed, Oct 16, 2019 at 03:21:52AM +0900, Chirantan Ekbote wrote:
-> > > > On Wed, Oct 16, 2019 at 2:28 AM Boeuf, Sebastien
-> > > > <sebastien.boeuf@intel.com> wrote:
-> > > > > Thanks Dave for adding me to the loop here!
-> > > > > 
-> > > > > On Tue, 2019-10-15 at 17:26 +0100, Dr. David Alan Gilbert
-> > > > > wrote:
-> > > > > > * Chirantan Ekbote (chirantan@chromium.org) wrote:
-> > > > > > > On Wed, Oct 16, 2019 at 12:58 AM Dr. David Alan Gilbert
-> > > > > > > <dgilbert@redhat.com> wrote:
-> > > > > > > > * Chirantan Ekbote (chirantan@chromium.org) wrote:
-> > > > > > > > > I'm not using virtiofsd.  We have our own server for
-> > > > > > > > > crosvm,
-> > > > > > > > > which
-> > > > > > > > > supports multiple queues.
-> > > > > > > > 
-> > > > > > > > Ah excellent; is that public anywhere?
-> > > > > > > > 
-> > > > > > > 
-> > > > > > > It's currently under review here:
-> > > > > > > https://chromium-review.googlesource.com/c/chromiumos/platform/crosvm/+/1758103
-> > > > > > > 
-> > > > > > > I expect to have it merged sometime this week.
-> > > > > 
-> > > > > Oh that's very nice to hear. We have some code from the
-> > > > > cloud-
-> > > > > hypervisor project where we have a vhost-user-net
-> > > > > implementation
-> > > > > relying on some sort of a wrapper code similar to what all
-> > > > > vhost-
-> > > > > user
-> > > > > daemon implementations would reuse (libvhost-user kind of
-> > > > > thing).
-> > > > > 
-> > > > > We're planning to see this wrapper code land on Rust-VMM at
-> > > > > some
-> > > > > point,
-> > > > > which is why it would be interesting if you could rebase this
-> > > > > virtio-fs
-> > > > > daemon code on top of this small library. If you don't have
-> > > > > the
-> > > > > bandwidth, we could probably look at it if that's something
-> > > > > you
-> > > > > would
-> > > > > be interested in.
-> > > > > 
-> > > > > Here is the code for the small wrapper crate:
-> > > > > https://github.com/intel/cloud-hypervisor/blob/master/vhost_user_backend/src/lib.rs
-> > > > > 
-> > > > > And here is the vhost-user-net example using it:
-> > > > > https://github.com/intel/cloud-hypervisor/blob/master/src/bin/vhost_user_net.rs
-> > > > > 
-> > > > 
-> > > > Our virtio-fs server is not a vhost-user device (this was one
-> > > > of
-> > > > the
-> > > > reasons we didn't want to use virtiofsd).  It currently just
-> > > > runs
-> > > > directly as a child process of crosvm (like all other crosvm
-> > > > devices).
-> > > > So unless I'm missing something I don't think there's much to
-> > > > be
-> > > > gained by rebasing on vhost_user_backend.
-> > > 
-> > > I'm also interested in porting the server over to vhost-user so
-> > > that
-> > > other VMMs like QEMU and cloud-hypervisor can use it.
-> > 
-> > Yes I agree that'd be awesome!
-> > Are you planning to start working on this soon? Just asking as I
-> > want
-> > to avoid potential duplicated efforts :)
-> 
-> Not immediately.  If you are ready to work on it and make your branch
-> public then we can follow along.
-> 
-> Stefan
+--iBwuxWUsK/REspAd
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Tue, Oct 29, 2019 at 12:36:05AM +0000, Dr. David Alan Gilbert wrote:
+> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > +static void after_test(void *arg G_GNUC_UNUSED)
+> > +{
+> > +    unlink(socket_path);
+> > +
+> > +    remove_dir_and_children(shared_dir);
+>=20
+> This scares me. Especially since it's running as root.
+> Can we add a bunch of paranoid checks to make sure it doesn't
+> end up rm -rf / ?
+
+Yes, we can resolve the path and check it is not "/".
+
+> > +/* Open a file by nodeid using FUSE_OPEN */
+> > +static int32_t fuse_open(QVirtioFS *vfs, uint64_t nodeid, uint32_t fla=
+gs,
+> > +                         uint64_t *fh)
+> > +{
+> > +    struct fuse_in_header in_hdr =3D {
+> > +        .opcode =3D guest32(FUSE_OPEN),
+> > +        .unique =3D guest64(virtio_fs_get_unique(vfs)),
+> > +        .nodeid =3D guest64(nodeid),
+> > +    };
+> > +    struct fuse_open_in in =3D {
+> > +        .flags =3D guest32(flags),
+> > +    };
+> > +    struct iovec sg_in[] =3D {
+> > +        { .iov_base =3D &in_hdr, .iov_len =3D sizeof(in_hdr) },
+> > +        { .iov_base =3D &in, .iov_len =3D sizeof(in) },
+> > +    };
+> > +    struct fuse_out_header out_hdr;
+> > +    struct fuse_open_out out;
+> > +    struct iovec sg_out[] =3D {
+> > +        { .iov_base =3D &out_hdr, .iov_len =3D sizeof(out_hdr) },
+> > +        { .iov_base =3D &out, .iov_len =3D sizeof(out) },
+> > +    };
+>=20
+> I wonder if anything can be done to reduce the size of the iovec boiler
+> plate?
+
+I'm not aware of a clean way to build the iovec array automatically but
+we could do this if you prefer it:
+
+  #define IOVEC(elem) { .iov_base =3D &elem, .iov_len =3D sizeof(elem) }
+
+  struct iovec sg_in[] =3D {
+    IOVEC(in_hdr),
+    IOVEC(in),
+  };
+
+Do you find this nicer?
+
+Stefan
+
+--iBwuxWUsK/REspAd
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl3BnSwACgkQnKSrs4Gr
+c8jMdwf/dPuWyPiILgjVQyqoBW4i4LYRi2NqilkJDN5b9Is1n1dmVvfhtTnH748o
+Ex2by9FJVrRcaP7cENH6wQEJgN4IlrUfKn28Y+Ge42aDFjkHm3N7/BlgJJojrJmh
+89hcnr1n2eEVD/GrLbEfIxLCNZ64379gvlGZCPd3WQJ0nOUD1R4CeaJRRYODg6gK
+sXUJqIXAzi62k0OfiSibvSPTnlf5XK1mh9VbSC2K2NNIgW1fmaxt3q2jr1gknt0/
+k72CZENM6Jjhyb5GEzykXigCIrrJBAnO5sxNbp0xzdD3z/UxI8WtBkodDDEZjB0S
+DxXnVgUawY4sos0uEjaK6Zp8W2i92g==
+=wxgU
+-----END PGP SIGNATURE-----
+
+--iBwuxWUsK/REspAd--
 

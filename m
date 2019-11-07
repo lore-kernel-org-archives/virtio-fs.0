@@ -1,14 +1,16 @@
-Date: Thu, 7 Nov 2019 10:52:27 +0000
+Date: Thu, 7 Nov 2019 12:26:12 +0000
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20191107105227.GD2816@work-vm>
-References: <20191106190602.14522-1-msys.mizuma@gmail.com>
-	<20191106190602.14522-3-msys.mizuma@gmail.com>
+Message-ID: <20191107122612.GJ2816@work-vm>
+References: <20191025100152.6638-1-stefanha@redhat.com>
+	<20191025100152.6638-4-stefanha@redhat.com>
+	<20191029003605.GC2508@work-vm>
+	<20191105160252.GF166646@stefanha-x1.localdomain>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20191106190602.14522-3-msys.mizuma@gmail.com>
-Subject: Re: [Virtio-fs] [PATCH 2/2] virtiofsd: Add timestamp to the log
- with FUSE_LOG_DEBUG level
+In-Reply-To: <20191105160252.GF166646@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [RFC 3/3] tests/vhost-user-fs-test: add
+	vhost-user-fs test case
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,71 +19,72 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Masayoshi Mizuma <msys.mizuma@gmail.com>
-Cc: virtio-fs@redhat.com, Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+To: Stefan Hajnoczi <stefanha@gmail.com>
+Cc: Laurent Vivier <lvivier@redhat.com>, Thomas Huth <thuth@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Cornelia Huck <cohuck@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, Paolo Bonzini <pbonzini@redhat.com>, vgoyal@redhat.com
 
-* Masayoshi Mizuma (msys.mizuma@gmail.com) wrote:
-> From: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+* Stefan Hajnoczi (stefanha@gmail.com) wrote:
+> On Tue, Oct 29, 2019 at 12:36:05AM +0000, Dr. David Alan Gilbert wrote:
+> > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > > +static void after_test(void *arg G_GNUC_UNUSED)
+> > > +{
+> > > +    unlink(socket_path);
+> > > +
+> > > +    remove_dir_and_children(shared_dir);
+> > 
+> > This scares me. Especially since it's running as root.
+> > Can we add a bunch of paranoid checks to make sure it doesn't
+> > end up rm -rf / ?
 > 
-> virtiofsd has some threads, so we see a lot of logs with debug option.
-> It would be useful for debugging if we can see the timestamp.
-> 
-> Add nano second timestamp, which got by get_clock(), to the log with
-> FUSE_LOG_DEBUG level if the syslog option isn't set.
-> 
-> The log is like as:
-> 
->   ]# ./virtiofsd -d -o vhost_user_socket=/tmp/vhostqemu0 -o source=/tmp/share0 -o cache=auto
->   ...
->   [5365943125463727] [ID: 00000002] fv_queue_thread: Start for queue 0 kick_fd 9
->   [5365943125568644] [ID: 00000002] fv_queue_thread: Waiting for Queue 0 event
->   [5365943125573561] [ID: 00000002] fv_queue_thread: Got queue event on Queue 0
-> 
-> Signed-off-by: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
+> Yes, we can resolve the path and check it is not "/".
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+I suggest checking for "/", ".", ".." and ""
+if any of those get in it's probably bad.
 
-> ---
->  contrib/virtiofsd/passthrough_ll.c | 11 +++++++++--
->  1 file changed, 9 insertions(+), 2 deletions(-)
+> > > +/* Open a file by nodeid using FUSE_OPEN */
+> > > +static int32_t fuse_open(QVirtioFS *vfs, uint64_t nodeid, uint32_t flags,
+> > > +                         uint64_t *fh)
+> > > +{
+> > > +    struct fuse_in_header in_hdr = {
+> > > +        .opcode = guest32(FUSE_OPEN),
+> > > +        .unique = guest64(virtio_fs_get_unique(vfs)),
+> > > +        .nodeid = guest64(nodeid),
+> > > +    };
+> > > +    struct fuse_open_in in = {
+> > > +        .flags = guest32(flags),
+> > > +    };
+> > > +    struct iovec sg_in[] = {
+> > > +        { .iov_base = &in_hdr, .iov_len = sizeof(in_hdr) },
+> > > +        { .iov_base = &in, .iov_len = sizeof(in) },
+> > > +    };
+> > > +    struct fuse_out_header out_hdr;
+> > > +    struct fuse_open_out out;
+> > > +    struct iovec sg_out[] = {
+> > > +        { .iov_base = &out_hdr, .iov_len = sizeof(out_hdr) },
+> > > +        { .iov_base = &out, .iov_len = sizeof(out) },
+> > > +    };
+> > 
+> > I wonder if anything can be done to reduce the size of the iovec boiler
+> > plate?
 > 
-> diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
-> index 0e85d5ea74..406f62ab37 100644
-> --- a/contrib/virtiofsd/passthrough_ll.c
-> +++ b/contrib/virtiofsd/passthrough_ll.c
-> @@ -37,6 +37,8 @@
->  #include "fuse_virtio.h"
->  #include "fuse_lowlevel.h"
->  #include "fuse_log.h"
-> +#include "qemu/osdep.h"
-> +#include "qemu/timer.h"
->  #include <unistd.h>
->  #include <stdlib.h>
->  #include <stdio.h>
-> @@ -2856,9 +2858,14 @@ static void log_func(enum fuse_log_level level,
->  	if (current_log_level < level)
->  		return;
->  
-> -	if (current_log_level == FUSE_LOG_DEBUG)
-> -		fmt = g_strdup_printf("[ID: %08ld] %s",
-> +	if (current_log_level == FUSE_LOG_DEBUG) {
-> +		if (!use_syslog)
-> +			fmt = g_strdup_printf("[%ld] [ID: %08ld] %s",
-> +				get_clock(), syscall(__NR_gettid), _fmt);
-> +		else
-> +			fmt = g_strdup_printf("[ID: %08ld] %s",
->  				syscall(__NR_gettid), _fmt);
-> +	}
->  
->  	if (use_syslog) {
->  		int priority = LOG_ERR;
-> -- 
-> 2.18.1
+> I'm not aware of a clean way to build the iovec array automatically but
+> we could do this if you prefer it:
 > 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
+>   #define IOVEC(elem) { .iov_base = &elem, .iov_len = sizeof(elem) }
+> 
+>   struct iovec sg_in[] = {
+>     IOVEC(in_hdr),
+>     IOVEC(in),
+>   };
+> 
+> Do you find this nicer?
+
+Only a little; probably not worth it.
+
+Dave
+
+> Stefan
+
+
 --
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

@@ -1,21 +1,19 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=+aO/6jXNqNXXcS6p9tmtZukCpuO9djKLRLCvoL9fw9w=;
-	b=CPEdVtfz1sgH31piL52ESoHaZuSFy/Ud5evLE2wfsAFP4EpHEngY9+aSlwZGLFTGjg
-	t7h+LoforL25lp+jxOSpgwqETxQalIQAVRAdcsUXCOUvUxWjqoxYB4oDBLwZk1d//pXb
-	AFLDeKck81gDkcR7C3A8rPLsygAnqnBflbA108pvtILpCddM3Yqd47a2oilbkrgJfd9H
-	4tNfzPCOoArhAkv2gNbbogOy6Bbp0NtbhZRwPgUOr2m6qdX8jcWnPe8y9tqSl+LpOFtO
-	bNAy+w0is8FJXKq3XT0Y7BH7cVJoa3anDwa7+h025PK2DZqIbNiGAJq9K8gO/put5cvL
-	75Nw==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+	d=fujitsu.onmicrosoft.com; s=selector2-fujitsu-onmicrosoft-com;
+	h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+	bh=LW9iI821/xJSwupKP3hAvo89HaSGrW16JKe4cQxwZ58=;
+	b=EMH6X4F3L2eJix0JQOcYkpLDi83y+T+ezp+PGrhuWT2gw9MMNUwFG/CHL0xkRunkX7ttyblw9+5tmm9+XcC2+RNC6c3kYGriWXGGQRP0wW3LEzJbmjUjwn4nl6zZ4LvSjwae7vXaiszBoPfPcwlkiSk4a9e1TryHCzxdA8NBZUM=
+From: "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>
+Date: Thu, 7 Nov 2019 08:03:02 +0000
+Message-ID: <OSBPR01MB3783BF39AA8A2C16CC94CDDEE5780@OSBPR01MB3783.jpnprd01.prod.outlook.com>
+References: <7331fd60-10c6-6076-4cf5-f5cce7bc6ef1@jp.fujitsu.com>
+	<20191106121348.GA5701@work-vm>
+In-Reply-To: <20191106121348.GA5701@work-vm>
+Content-Language: ja-JP
+Content-Type: text/plain; charset="iso-2022-jp"
 MIME-Version: 1.0
-References: <20190906100324.8492-1-stefanha@redhat.com>
-In-Reply-To: <20190906100324.8492-1-stefanha@redhat.com>
-From: Richard Weinberger <richard.weinberger@gmail.com>
-Date: Fri, 6 Sep 2019 21:16:04 +0200
-Message-ID: <CAFLxGvw-n2VYcYR9kei7Hu2RBhCG9PeWuW7Z+SaiyDQVBRiugw@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH] init/do_mounts.c: add virtiofs root fs
-	support
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] xfstest results for virtio-fs on aarch64
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,60 +22,131 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: Miklos Szeredi <mszeredi@redhat.com>, David Howells <dhowells@redhat.com>, virtio-fs@redhat.com, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Vivek Goyal <vgoyal@redhat.com>
+To: "'Dr. David Alan Gilbert'" <dgilbert@redhat.com>, "qi.fuli@fujitsu.com" <qi.fuli@fujitsu.com>
+Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "masayoshi.mizuma@fujitsu.com" <masayoshi.mizuma@fujitsu.com>
 
-On Fri, Sep 6, 2019 at 1:15 PM Stefan Hajnoczi <stefanha@redhat.com> wrote:
->
-> Make it possible to boot directly from a virtiofs file system with tag
-> 'myfs' using the following kernel parameters:
->
->   rootfstype=virtiofs root=myfs rw
->
-> Booting directly from virtiofs makes it possible to use a directory on
-> the host as the root file system.  This is convenient for testing and
-> situations where manipulating disk image files is cumbersome.
->
-> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-> ---
-> This patch is based on linux-next (next-20190904) but should apply
-> cleanly to other virtiofs trees.
->
->  init/do_mounts.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/init/do_mounts.c b/init/do_mounts.c
-> index 9634ecf3743d..030be2f1999a 100644
-> --- a/init/do_mounts.c
-> +++ b/init/do_mounts.c
-> @@ -554,6 +554,16 @@ void __init mount_root(void)
->                         change_floppy("root floppy");
->         }
->  #endif
-> +#ifdef CONFIG_VIRTIO_FS
-> +       if (root_fs_names && !strcmp(root_fs_names, "virtiofs")) {
-> +               if (!do_mount_root(root_device_name, "virtiofs",
-> +                                  root_mountflags, root_mount_data))
-> +                       return;
-> +
-> +               panic("VFS: Unable to mount root fs \"%s\" from virtiofs",
-> +                     root_device_name);
-> +       }
-> +#endif
+> > Hello,
+> >
+> > We have run the generic tests of xfstest for virtio-fs[1] on
+> > aarch64[2], here we selected some tests that did not run or failed to
+> > run, and we categorized them, basing on the reasons in our understanding.
+> 
+> Hi,
+>   Apologies for taking a while to respond.
+> What I've done is to repeat these and create gitlab issues for each categroy that you defined.  Now we can go and look at these
+> inidividually.
 
-I think you don't need this, you can abuse a hack for mtd/ubi in
-prepare_namespace().
-At least for 9p it works well:
-qemu-system-x86_64 -m 4G -M pc,accel=kvm -nographic -kernel
-arch/x86/boot/bzImage -append "rootfstype=9p
-rootflags=trans=virtio,version=9p2000.L root=mtdfake console=ttyS0 ro
-init=/bin/sh" -virtfs
-local,id=rootfs,path=/,security_model=passthrough,mount_tag=mtdfake
+Hi,
 
-If this works too for virtiofs I suggest to cleanup the hack and
-generalize it. B-)
+Thanks for making gitlab issues. I have collected some clues so I will comment on each issue.
 
--- 
-Thanks,
-//richard
+Misono
+
+> 
+> >   * Category 1: generic/003, generic/192
+> >     Error: access time error
+> >     Reason: file_accessed() not run
+> 
+> https://gitlab.com/virtio-fs/qemu/issues/8
+> 
+> >   * Category 2: generic/089, generic/478, generic/484, generic/504
+> >     Error: lock error
+> 
+> https://gitlab.com/virtio-fs/qemu/issues/9
+> 
+> >   * Category 3: generic/426, generic/467, generic/477
+> >     Error: open_by_handle error
+> 
+> https://gitlab.com/virtio-fs/qemu/issues/10
+> 
+> >   * Category 4: generic/551
+> >     Error: kvm panic
+> 
+> This for me just caused an OOM; when I increased the guest size to 32G it was fine; can you retest?  I'm not sure how much RAM
+> xfstests expects.
+> 
+> >   * Category 5: generic/011, generic/013
+> >     Error: cannot remove file
+> >     Reason: NFS backend
+> 
+> https://gitlab.com/virtio-fs/qemu/issues/11
+> 
+> >   * Category 6: generic/035
+> >     Error: nlink is 1, should be 0
+> 
+> https://gitlab.com/virtio-fs/qemu/issues/12
+> 
+> >   * Category 7: generic/125, generic/193, generic/314
+> >     Error: open/chown/mkdir permission error
+> 
+> There were OK for me after I'd created the users/groups that the xfstests manual asked for (fsgqa, and 123456-fsgqa) - can you
+> confirm the error you saw.
+> 
+> >   * Category 8: generic/469
+> >     Error: fallocate keep_size is needed
+> 
+> https://gitlab.com/virtio-fs/qemu/issues/13
+> 
+> >     Reason: NFS4.0 backend
+> >   * Category 9: generic/323
+> >     Error: system hang
+> >     Reason: fd is close before AIO finished
+> 
+> https://gitlab.com/virtio-fs/qemu/issues/14
+> 
+> I reproduced all these on x86, so they're not aarch specific.
+> 
+> > We would like to know if virtio-fs does not support these tests in the
+> > specification or they are bugs that need to be fixed.
+> > It would be very appreciated if anyone could give some comments.
+> 
+> Now I've got them reproduced easily and also on x86, we'll dig into them and figure out what's going on.
+> 
+> Dave
+> 
+> > [1] qemu: https://gitlab.com/virtio-fs/qemu/tree/virtio-fs-dev
+> >      start qemu script:
+> >      $VIRTIOFSD -o vhost_user_socket=/tmp/vhostqemu1 -o
+> > source=/root/virtio-fs/test1/ -o cache=always -o xattr -o flock -d &
+> >      $VIRTIOFSD -o vhost_user_socket=/tmp/vhostqemu2 -o
+> > source=/root/virtio-fs/test2/ -o cache=always -o xattr -o flock -d &
+> >      $QEMU -M virt,accel=kvm,gic_version=3 \
+> >          -cpu host \
+> >          -smp 8 \
+> >          -m 8192\
+> >          -nographic \
+> >          -serial mon:stdio \
+> >          -netdev tap,id=net0 -device
+> > virtio-net-pci,netdev=net0,id=net0,mac=XX:XX:XX:XX:XX:XX \
+> >          -object
+> > memory-backend-file,id=mem,size=8G,mem-path=/dev/shm,share=on \
+> >          -numa node,memdev=mem \
+> >          -drive
+> > file=/root/virtio-fs/AAVMF/AAVMF_CODE.fd,if=pflash,format=raw,unit=0,r
+> > eadonly=on
+> > \
+> >          -drive file=$VARS,if=pflash,format=raw,unit=1 \
+> >          -chardev socket,id=char1,path=/tmp/vhostqemu1 \
+> >          -device
+> > vhost-user-fs-pci,queue-size=1024,chardev=char1,tag=myfs1,cache-size=0 \
+> >          -chardev socket,id=char2,path=/tmp/vhostqemu2 \
+> >          -device
+> > vhost-user-fs-pci,queue-size=1024,chardev=char2,tag=myfs2,cache-size=0 \
+> >          -drive if=virtio,file=/var/lib/libvirt/images/guest.img
+> >
+> > [2] host kernel: 4.18.0-80.4.2.el8_0.aarch64
+> >      guest kernel: 5.4-rc1
+> >      Arch: Arm64
+> >      backend: NFS 4.0
+> >
+> > Thanks,
+> > QI Fuli
+> >
+> > _______________________________________________
+> > Virtio-fs mailing list
+> > Virtio-fs@redhat.com
+> > https://www.redhat.com/mailman/listinfo/virtio-fs
+> --
+> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+
 

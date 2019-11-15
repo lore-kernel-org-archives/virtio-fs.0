@@ -1,15 +1,12 @@
-References: <20190905194859.16219-1-vgoyal@redhat.com>
-	<20190905194859.16219-16-vgoyal@redhat.com>
-From: piaojun <piaojun@huawei.com>
-Message-ID: <a8ddb168-5fdb-b35a-5357-3c75e0226049@huawei.com>
-Date: Sun, 8 Sep 2019 19:10:03 +0800
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Fri, 15 Nov 2019 15:57:02 -0500
+Message-Id: <20191115205705.2046-2-vgoyal@redhat.com>
+In-Reply-To: <20191115205705.2046-1-vgoyal@redhat.com>
+References: <20191115205705.2046-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20190905194859.16219-16-vgoyal@redhat.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH 15/18] virtiofs: Make virtio_fs object
- refcounted
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 1/4] virtiofs: Provide a helper function for
+	virtqueue initialization
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,69 +15,110 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org, miklos@szeredi.hu
-Cc: virtio-fs@redhat.com, linux-kernel@vger.kernel.org, mst@redhat.com
+To: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org
+Cc: miklos@szeredi.hu, vgoyal@redhat.com
 
+This reduces code duplication and make it little easier to read code.
 
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/virtio_fs.c | 50 +++++++++++++++++++++++++++------------------
+ 1 file changed, 30 insertions(+), 20 deletions(-)
 
-On 2019/9/6 3:48, Vivek Goyal wrote:
-> This object is used both by fuse_connection as well virt device. So make
-> this object reference counted and that makes it easy to define life cycle
-> of the object.
-> 
-> Now deivce can be removed while filesystem is still mounted. This will
-> cleanup all the virtqueues but virtio_fs object will still be around and
-> will be cleaned when filesystem is unmounted and sb/fc drops its reference.
-> 
-> Removing a device also stops all virt queues and any new reuqest gets
-> error -ENOTCONN. All existing in flight requests are drained before
-> ->remove returns.
-> 
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  fs/fuse/virtio_fs.c | 52 +++++++++++++++++++++++++++++++++++++--------
->  1 file changed, 43 insertions(+), 9 deletions(-)
-> 
-> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-> index 01bbf2c0e144..29ec2f5bbbe2 100644
-> --- a/fs/fuse/virtio_fs.c
-> +++ b/fs/fuse/virtio_fs.c
-> @@ -37,6 +37,7 @@ struct virtio_fs_vq {
->  
->  /* A virtio-fs device instance */
->  struct virtio_fs {
-> +	struct kref refcount;
->  	struct list_head list;    /* on virtio_fs_instances */
->  	char *tag;
->  	struct virtio_fs_vq *vqs;
-> @@ -63,6 +64,27 @@ static inline struct fuse_pqueue *vq_to_fpq(struct virtqueue *vq)
->  	return &vq_to_fsvq(vq)->fud->pq;
->  }
->  
-> +static void release_virtiofs_obj(struct kref *ref)
-> +{
-> +	struct virtio_fs *vfs = container_of(ref, struct virtio_fs, refcount);
-> +
-> +	kfree(vfs->vqs);
-> +	kfree(vfs);
-> +}
-> +
-> +static void virtio_fs_put(struct virtio_fs *fs)
-> +{
-> +	mutex_lock(&virtio_fs_mutex);
-> +	kref_put(&fs->refcount, release_virtiofs_obj);
-> +	mutex_unlock(&virtio_fs_mutex);
-> +}
-> +
-> +static void virtio_fs_put(struct fuse_iqueue *fiq)
-> +{
-> +	struct virtio_fs *vfs = fiq->priv;
-> +	virtiofs_put(vfs);
-> +}
-
-It's a little confusing that virtiofs_put() looks like virtiofs_put(),
-and could we use __virtio_fs_put to replace virtio_fs_put?
-
-Thanks,
-Jun
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index b5ba83ef1914..a0fb0a93980c 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -24,6 +24,8 @@ enum {
+ 	VQ_REQUEST
+ };
+ 
++#define VQ_NAME_LEN	24
++
+ /* Per-virtqueue state */
+ struct virtio_fs_vq {
+ 	spinlock_t lock;
+@@ -36,7 +38,7 @@ struct virtio_fs_vq {
+ 	bool connected;
+ 	long in_flight;
+ 	struct completion in_flight_zero; /* No inflight requests */
+-	char name[24];
++	char name[VQ_NAME_LEN];
+ } ____cacheline_aligned_in_smp;
+ 
+ /* A virtio-fs device instance */
+@@ -560,6 +562,26 @@ static void virtio_fs_vq_done(struct virtqueue *vq)
+ 	schedule_work(&fsvq->done_work);
+ }
+ 
++static void virtio_fs_init_vq(struct virtio_fs_vq *fsvq, char *name,
++			      int vq_type)
++{
++	strncpy(fsvq->name, name, VQ_NAME_LEN);
++	spin_lock_init(&fsvq->lock);
++	INIT_LIST_HEAD(&fsvq->queued_reqs);
++	INIT_LIST_HEAD(&fsvq->end_reqs);
++	init_completion(&fsvq->in_flight_zero);
++
++	if (vq_type == VQ_REQUEST) {
++		INIT_WORK(&fsvq->done_work, virtio_fs_requests_done_work);
++		INIT_DELAYED_WORK(&fsvq->dispatch_work,
++				  virtio_fs_request_dispatch_work);
++	} else {
++		INIT_WORK(&fsvq->done_work, virtio_fs_hiprio_done_work);
++		INIT_DELAYED_WORK(&fsvq->dispatch_work,
++				  virtio_fs_hiprio_dispatch_work);
++	}
++}
++
+ /* Initialize virtqueues */
+ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 			       struct virtio_fs *fs)
+@@ -575,7 +597,7 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 	if (fs->num_request_queues == 0)
+ 		return -EINVAL;
+ 
+-	fs->nvqs = 1 + fs->num_request_queues;
++	fs->nvqs = VQ_REQUEST + fs->num_request_queues;
+ 	fs->vqs = kcalloc(fs->nvqs, sizeof(fs->vqs[VQ_HIPRIO]), GFP_KERNEL);
+ 	if (!fs->vqs)
+ 		return -ENOMEM;
+@@ -589,29 +611,17 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 		goto out;
+ 	}
+ 
++	/* Initialize the hiprio/forget request virtqueue */
+ 	callbacks[VQ_HIPRIO] = virtio_fs_vq_done;
+-	snprintf(fs->vqs[VQ_HIPRIO].name, sizeof(fs->vqs[VQ_HIPRIO].name),
+-			"hiprio");
++	virtio_fs_init_vq(&fs->vqs[VQ_HIPRIO], "hiprio", VQ_HIPRIO);
+ 	names[VQ_HIPRIO] = fs->vqs[VQ_HIPRIO].name;
+-	INIT_WORK(&fs->vqs[VQ_HIPRIO].done_work, virtio_fs_hiprio_done_work);
+-	INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].queued_reqs);
+-	INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].end_reqs);
+-	INIT_DELAYED_WORK(&fs->vqs[VQ_HIPRIO].dispatch_work,
+-			virtio_fs_hiprio_dispatch_work);
+-	init_completion(&fs->vqs[VQ_HIPRIO].in_flight_zero);
+-	spin_lock_init(&fs->vqs[VQ_HIPRIO].lock);
+ 
+ 	/* Initialize the requests virtqueues */
+ 	for (i = VQ_REQUEST; i < fs->nvqs; i++) {
+-		spin_lock_init(&fs->vqs[i].lock);
+-		INIT_WORK(&fs->vqs[i].done_work, virtio_fs_requests_done_work);
+-		INIT_DELAYED_WORK(&fs->vqs[i].dispatch_work,
+-				  virtio_fs_request_dispatch_work);
+-		INIT_LIST_HEAD(&fs->vqs[i].queued_reqs);
+-		INIT_LIST_HEAD(&fs->vqs[i].end_reqs);
+-		init_completion(&fs->vqs[i].in_flight_zero);
+-		snprintf(fs->vqs[i].name, sizeof(fs->vqs[i].name),
+-			 "requests.%u", i - VQ_REQUEST);
++		char vq_name[VQ_NAME_LEN];
++
++		snprintf(vq_name, VQ_NAME_LEN, "requests.%u", i - VQ_REQUEST);
++		virtio_fs_init_vq(&fs->vqs[i], vq_name, VQ_REQUEST);
+ 		callbacks[i] = virtio_fs_vq_done;
+ 		names[i] = fs->vqs[i].name;
+ 	}
+-- 
+2.20.1
 

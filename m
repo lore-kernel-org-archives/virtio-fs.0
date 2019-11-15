@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri, 15 Nov 2019 15:57:02 -0500
-Message-Id: <20191115205705.2046-2-vgoyal@redhat.com>
+Date: Fri, 15 Nov 2019 15:57:05 -0500
+Message-Id: <20191115205705.2046-5-vgoyal@redhat.com>
 In-Reply-To: <20191115205705.2046-1-vgoyal@redhat.com>
 References: <20191115205705.2046-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 1/4] virtiofs: Provide a helper function for
-	virtqueue initialization
+Subject: [Virtio-fs] [PATCH 4/4] virtiofs: Support blocking posix locks
+	(fcntl(F_SETLKW))
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,107 +18,186 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org
 Cc: miklos@szeredi.hu, vgoyal@redhat.com
 
-This reduces code duplication and make it little easier to read code.
+As of now we don't support blocking variant of posix locks and daemon returns
+-EOPNOTSUPP. Reason being that it can lead to deadlocks. Virtqueue size is
+limited and it is possible we fill virtqueue with all the requests of
+fcntl(F_SETLKW) and wait for reply. And later a subsequent unlock request
+can't make progress because virtqueue is full. And that means F_SETLKW can't
+make progress and we are deadlocked.
+
+Use notification queue to solve this problem. After submitting lock request
+device will send a reply asking requester to wait. Once lock is available,
+requester will get a notification saying locking is available. That way
+we don't keep the request virtueue busy while we are waiting for lock
+and further unlock requests can make progress.
+
+When we get a reply in response to lock request, we need a way to know if
+we need to wait for notification or not. I have overloaded the
+fuse_out_header->error field. If value is ->error is 1, that's a signal
+to caller to wait for lock notification.
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- fs/fuse/virtio_fs.c | 50 +++++++++++++++++++++++++++------------------
- 1 file changed, 30 insertions(+), 20 deletions(-)
+ fs/fuse/virtio_fs.c       | 78 ++++++++++++++++++++++++++++++++++++++-
+ include/uapi/linux/fuse.h |  7 ++++
+ 2 files changed, 84 insertions(+), 1 deletion(-)
 
 diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index b5ba83ef1914..a0fb0a93980c 100644
+index 21d8d9d7d317..8aa9fc996556 100644
 --- a/fs/fuse/virtio_fs.c
 +++ b/fs/fuse/virtio_fs.c
-@@ -24,6 +24,8 @@ enum {
- 	VQ_REQUEST
- };
+@@ -35,6 +35,7 @@ struct virtio_fs_vq {
+ 	struct work_struct done_work;
+ 	struct list_head queued_reqs;
+ 	struct list_head end_reqs;	/* End these requests */
++	struct list_head wait_reqs;	/* requests waiting for notification */
+ 	struct virtio_fs_notify_node *notify_nodes;
+ 	struct list_head notify_reqs;	/* List for queuing notify requests */
+ 	struct delayed_work dispatch_work;
+@@ -85,7 +86,6 @@ struct virtio_fs_notify_node {
  
-+#define VQ_NAME_LEN	24
-+
- /* Per-virtqueue state */
- struct virtio_fs_vq {
- 	spinlock_t lock;
-@@ -36,7 +38,7 @@ struct virtio_fs_vq {
- 	bool connected;
- 	long in_flight;
- 	struct completion in_flight_zero; /* No inflight requests */
--	char name[24];
-+	char name[VQ_NAME_LEN];
- } ____cacheline_aligned_in_smp;
+ static int virtio_fs_enqueue_all_notify(struct virtio_fs_vq *fsvq);
  
- /* A virtio-fs device instance */
-@@ -560,6 +562,26 @@ static void virtio_fs_vq_done(struct virtqueue *vq)
- 	schedule_work(&fsvq->done_work);
+-
+ static inline struct virtio_fs_vq *vq_to_fsvq(struct virtqueue *vq)
+ {
+ 	struct virtio_fs *fs = vq->vdev->priv;
+@@ -513,13 +513,75 @@ static int virtio_fs_enqueue_all_notify(struct virtio_fs_vq *fsvq)
+ 	return 0;
  }
  
-+static void virtio_fs_init_vq(struct virtio_fs_vq *fsvq, char *name,
-+			      int vq_type)
++static int notify_complete_waiting_req(struct virtio_fs *vfs,
++				       struct fuse_notify_lock_out *out_args)
 +{
-+	strncpy(fsvq->name, name, VQ_NAME_LEN);
-+	spin_lock_init(&fsvq->lock);
-+	INIT_LIST_HEAD(&fsvq->queued_reqs);
-+	INIT_LIST_HEAD(&fsvq->end_reqs);
-+	init_completion(&fsvq->in_flight_zero);
++	struct virtio_fs_vq *fsvq = &vfs->vqs[VQ_REQUEST];
++	struct fuse_req *req, *next;
++	bool found = false;
++	struct fuse_conn *fc = fsvq->fud->fc;
 +
-+	if (vq_type == VQ_REQUEST) {
-+		INIT_WORK(&fsvq->done_work, virtio_fs_requests_done_work);
-+		INIT_DELAYED_WORK(&fsvq->dispatch_work,
-+				  virtio_fs_request_dispatch_work);
-+	} else {
-+		INIT_WORK(&fsvq->done_work, virtio_fs_hiprio_done_work);
-+		INIT_DELAYED_WORK(&fsvq->dispatch_work,
-+				  virtio_fs_hiprio_dispatch_work);
-+	}
++	/* Find waiting request with the unique number and end it */
++	spin_lock(&fsvq->lock);
++		list_for_each_entry_safe(req, next, &fsvq->wait_reqs, list) {
++			if (req->in.h.unique == out_args->id) {
++				list_del_init(&req->list);
++				clear_bit(FR_SENT, &req->flags);
++				/* Transfer error code from notify */
++				req->out.h.error = out_args->error;
++				found = true;
++				break;
++			}
++		}
++	spin_unlock(&fsvq->lock);
++
++	/*
++	 * TODO: It is possible that some re-ordering happens in notify
++	 * comes before request is complete. Deal with it.
++	 */
++	if (found) {
++		fuse_request_end(fc, req);
++		spin_lock(&fsvq->lock);
++		dec_in_flight_req(fsvq);
++		spin_unlock(&fsvq->lock);
++	} else
++		pr_debug("virtio-fs: Did not find waiting request with"
++		       " unique=0x%llx\n", out_args->id);
++
++	return 0;
 +}
 +
- /* Initialize virtqueues */
- static int virtio_fs_setup_vqs(struct virtio_device *vdev,
- 			       struct virtio_fs *fs)
-@@ -575,7 +597,7 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
- 	if (fs->num_request_queues == 0)
- 		return -EINVAL;
- 
--	fs->nvqs = 1 + fs->num_request_queues;
-+	fs->nvqs = VQ_REQUEST + fs->num_request_queues;
- 	fs->vqs = kcalloc(fs->nvqs, sizeof(fs->vqs[VQ_HIPRIO]), GFP_KERNEL);
- 	if (!fs->vqs)
- 		return -ENOMEM;
-@@ -589,29 +611,17 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
- 		goto out;
- 	}
- 
-+	/* Initialize the hiprio/forget request virtqueue */
- 	callbacks[VQ_HIPRIO] = virtio_fs_vq_done;
--	snprintf(fs->vqs[VQ_HIPRIO].name, sizeof(fs->vqs[VQ_HIPRIO].name),
--			"hiprio");
-+	virtio_fs_init_vq(&fs->vqs[VQ_HIPRIO], "hiprio", VQ_HIPRIO);
- 	names[VQ_HIPRIO] = fs->vqs[VQ_HIPRIO].name;
--	INIT_WORK(&fs->vqs[VQ_HIPRIO].done_work, virtio_fs_hiprio_done_work);
--	INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].queued_reqs);
--	INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].end_reqs);
--	INIT_DELAYED_WORK(&fs->vqs[VQ_HIPRIO].dispatch_work,
--			virtio_fs_hiprio_dispatch_work);
--	init_completion(&fs->vqs[VQ_HIPRIO].in_flight_zero);
--	spin_lock_init(&fs->vqs[VQ_HIPRIO].lock);
- 
- 	/* Initialize the requests virtqueues */
- 	for (i = VQ_REQUEST; i < fs->nvqs; i++) {
--		spin_lock_init(&fs->vqs[i].lock);
--		INIT_WORK(&fs->vqs[i].done_work, virtio_fs_requests_done_work);
--		INIT_DELAYED_WORK(&fs->vqs[i].dispatch_work,
--				  virtio_fs_request_dispatch_work);
--		INIT_LIST_HEAD(&fs->vqs[i].queued_reqs);
--		INIT_LIST_HEAD(&fs->vqs[i].end_reqs);
--		init_completion(&fs->vqs[i].in_flight_zero);
--		snprintf(fs->vqs[i].name, sizeof(fs->vqs[i].name),
--			 "requests.%u", i - VQ_REQUEST);
-+		char vq_name[VQ_NAME_LEN];
++static int virtio_fs_handle_notify(struct virtio_fs *vfs,
++				   struct virtio_fs_notify *notify)
++{
++	int ret = 0;
++	struct fuse_out_header *oh = &notify->out_hdr;
++	struct fuse_notify_lock_out *lo;
 +
-+		snprintf(vq_name, VQ_NAME_LEN, "requests.%u", i - VQ_REQUEST);
-+		virtio_fs_init_vq(&fs->vqs[i], vq_name, VQ_REQUEST);
- 		callbacks[i] = virtio_fs_vq_done;
- 		names[i] = fs->vqs[i].name;
- 	}
++	/*
++	 * For notifications, oh.unique is 0 and oh->error contains code
++	 * for which notification as arrived.
++	 */
++	switch(oh->error) {
++	case FUSE_NOTIFY_LOCK:
++		lo = (struct fuse_notify_lock_out *) &notify->outarg;
++		notify_complete_waiting_req(vfs, lo);
++		break;
++	default:
++		printk("virtio-fs: Unexpected notification %d\n", oh->error);
++	}
++	return ret;
++}
++
+ static void virtio_fs_notify_done_work(struct work_struct *work)
+ {
+ 	struct virtio_fs_vq *fsvq = container_of(work, struct virtio_fs_vq,
+ 						 done_work);
+ 	struct virtqueue *vq = fsvq->vq;
++	struct virtio_fs *vfs = vq->vdev->priv;
+ 	LIST_HEAD(reqs);
+ 	struct virtio_fs_notify_node *notify, *next;
++	struct fuse_out_header *oh;
+ 
+ 	spin_lock(&fsvq->lock);
+ 	do {
+@@ -535,6 +597,10 @@ static void virtio_fs_notify_done_work(struct work_struct *work)
+ 
+ 	/* Process notify */
+ 	list_for_each_entry_safe(notify, next, &reqs, list) {
++		oh = &notify->notify.out_hdr;
++		WARN_ON(oh->unique);
++		/* Handle notification */
++		virtio_fs_handle_notify(vfs, &notify->notify);
+ 		spin_lock(&fsvq->lock);
+ 		dec_in_flight_req(fsvq);
+ 		list_del_init(&notify->list);
+@@ -656,6 +722,15 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
+ 		 * TODO verify that server properly follows FUSE protocol
+ 		 * (oh.uniq, oh.len)
+ 		 */
++		if (req->out.h.error == 1) {
++			/* Wait for notification to complete request */
++			list_del_init(&req->list);
++			spin_lock(&fsvq->lock);
++			list_add_tail(&req->list, &fsvq->wait_reqs);
++			spin_unlock(&fsvq->lock);
++			continue;
++		}
++
+ 		args = req->args;
+ 		copy_args_from_argbuf(args, req);
+ 
+@@ -705,6 +780,7 @@ static int virtio_fs_init_vq(struct virtio_fs *fs, struct virtio_fs_vq *fsvq,
+ 	strncpy(fsvq->name, name, VQ_NAME_LEN);
+ 	spin_lock_init(&fsvq->lock);
+ 	INIT_LIST_HEAD(&fsvq->queued_reqs);
++	INIT_LIST_HEAD(&fsvq->wait_reqs);
+ 	INIT_LIST_HEAD(&fsvq->end_reqs);
+ 	INIT_LIST_HEAD(&fsvq->notify_reqs);
+ 	init_completion(&fsvq->in_flight_zero);
+diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
+index 373cada89815..45f0c4efec8e 100644
+--- a/include/uapi/linux/fuse.h
++++ b/include/uapi/linux/fuse.h
+@@ -481,6 +481,7 @@ enum fuse_notify_code {
+ 	FUSE_NOTIFY_STORE = 4,
+ 	FUSE_NOTIFY_RETRIEVE = 5,
+ 	FUSE_NOTIFY_DELETE = 6,
++	FUSE_NOTIFY_LOCK = 7,
+ 	FUSE_NOTIFY_CODE_MAX,
+ };
+ 
+@@ -868,6 +869,12 @@ struct fuse_notify_retrieve_in {
+ 	uint64_t	dummy4;
+ };
+ 
++struct fuse_notify_lock_out {
++	uint64_t	id;
++	int32_t		error;
++	int32_t		padding;
++};
++
+ /* Device ioctls: */
+ #define FUSE_DEV_IOC_CLONE	_IOR(229, 0, uint32_t)
+ 
 -- 
 2.20.1
 

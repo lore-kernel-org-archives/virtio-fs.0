@@ -1,12 +1,11 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri, 15 Nov 2019 15:55:42 -0500
-Message-Id: <20191115205543.1816-4-vgoyal@redhat.com>
+Date: Fri, 15 Nov 2019 15:55:40 -0500
+Message-Id: <20191115205543.1816-2-vgoyal@redhat.com>
 In-Reply-To: <20191115205543.1816-1-vgoyal@redhat.com>
 References: <20191115205543.1816-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 3/4] virtiofsd: Specify size of notification
-	buffer using config space
+Subject: [Virtio-fs] [PATCH 1/4] virtiofsd: Release file locks using F_UNLCK
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,158 +17,103 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: virtio-fs@redhat.com, qemu-devel@nongnu.org
 Cc: miklos@szeredi.hu, vgoyal@redhat.com
 
-Daemon specifies size of notification buffer needed and that should be done
-using config space.
+We are emulating posix locks for guest using open file description locks
+in virtiofsd. When any of the fd is closed in guest, we find associated
+OFD lock fd (if there is one) and close it to release all the locks.
 
-Only ->notify_buf_size value of config space comes from daemon. Rest of
-it is filled by qemu device emulation code.
+Assumption here is that there is no other thread using lo_inode_plock
+structure or plock->fd, hence it is safe to do so.
+
+But now we are about to introduce blocking variant of locks (SETLKW),
+and that means we might be waiting to a lock to be available and
+using plock->fd. And that means there are still users of plock structure.
+
+So release locks using fcntl(SETLK, F_UNLCK) instead and plock will
+be freed later.
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- contrib/virtiofsd/fuse_virtio.c            | 26 +++++++++++++++++++++-
- hw/virtio/vhost-user-fs.c                  | 26 ++++++++++++++++++++++
- include/hw/virtio/vhost-user-fs.h          |  2 ++
- include/standard-headers/linux/virtio_fs.h |  2 ++
- 4 files changed, 55 insertions(+), 1 deletion(-)
+ contrib/virtiofsd/passthrough_ll.c | 30 ++++++++++++++++++++----------
+ 1 file changed, 20 insertions(+), 10 deletions(-)
 
-diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
-index 411114c9b3..982b6ad0bd 100644
---- a/contrib/virtiofsd/fuse_virtio.c
-+++ b/contrib/virtiofsd/fuse_virtio.c
-@@ -109,7 +109,8 @@ static uint64_t fv_get_features(VuDev *dev)
-     uint64_t features;
- 
-     features = 1ull << VIRTIO_F_VERSION_1 |
--               1ull << VIRTIO_FS_F_NOTIFICATION;
-+               1ull << VIRTIO_FS_F_NOTIFICATION |
-+               1ull << VHOST_USER_F_PROTOCOL_FEATURES;
- 
-     return features;
- }
-@@ -927,6 +928,27 @@ static bool fv_queue_order(VuDev *dev, int qidx)
-     return false;
+diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+index bc214df0c7..028e7da273 100644
+--- a/contrib/virtiofsd/passthrough_ll.c
++++ b/contrib/virtiofsd/passthrough_ll.c
+@@ -936,6 +936,14 @@ static void put_shared(struct lo_data *lo, struct lo_inode *inode)
+ 	}
  }
  
-+static uint64_t fv_get_protocol_features(VuDev *dev)
++static void release_plock(gpointer data)
 +{
-+	return 1ull << VHOST_USER_PROTOCOL_F_CONFIG;
++	struct lo_inode_plock *plock = data;
++
++	close(plock->fd);
++	free(plock);
 +}
 +
-+static int fv_get_config(VuDev *dev, uint8_t *config, uint32_t len)
-+{
-+	struct virtio_fs_config fscfg = {};
-+
-+	fuse_log(FUSE_LOG_DEBUG, "%s:Setting notify_buf_size=%d\n", __func__,
-+                 sizeof(struct fuse_notify_lock_out));
-+	/*
-+	 * As of now only notification related to lock is supported. As more
-+	 * notification types are supported, bump up the size accordingly.
-+	 */
-+	fscfg.notify_buf_size = sizeof(struct fuse_notify_lock_out);
-+
-+	memcpy(config, &fscfg, len);
-+	return 0;
-+}
-+
- static const VuDevIface fv_iface = {
-     .get_features = fv_get_features,
-     .set_features = fv_set_features,
-@@ -935,6 +957,8 @@ static const VuDevIface fv_iface = {
-     .queue_set_started = fv_queue_set_started,
+ /* Increments nlookup and caller must release refcount using
+  * lo_inode_put(&parent).
+  */
+@@ -994,7 +1002,8 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+ 		inode->key.ino = e->attr.st_ino;
+ 		inode->key.dev = e->attr.st_dev;
+ 		pthread_mutex_init(&inode->plock_mutex, NULL);
+-		inode->posix_locks = g_hash_table_new(g_direct_hash, g_direct_equal);
++		inode->posix_locks = g_hash_table_new_full(g_direct_hash,
++					g_direct_equal, NULL, release_plock);
  
-     .queue_is_processed_in_order = fv_queue_order,
-+    .get_protocol_features = fv_get_protocol_features,
-+    .get_config = fv_get_config,
- };
+ 		get_shared(lo, inode);
  
- /*
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index 5555fe9dbe..8dd9b1496f 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -277,16 +277,40 @@ uint64_t vhost_user_fs_slave_io(struct vhost_dev *dev, VhostUserFSSlaveMsg *sm,
-     return (uint64_t)done;
+@@ -1436,9 +1445,6 @@ static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
+ 	if (!inode->nlookup) {
+ 		lo_map_remove(&lo->ino_map, inode->fuse_ino);
+                 g_hash_table_remove(lo->inodes, &inode->key);
+-		if (g_hash_table_size(inode->posix_locks)) {
+-			fuse_log(FUSE_LOG_WARNING, "Hash table is not empty\n");
+-		}
+ 		g_hash_table_destroy(inode->posix_locks);
+ 		pthread_mutex_destroy(&inode->plock_mutex);
+ 
+@@ -1868,6 +1874,7 @@ static struct lo_inode_plock *lookup_create_plock_ctx(struct lo_data *lo,
+ 	plock->fd = fd;
+ 	g_hash_table_insert(inode->posix_locks,
+ 			    GUINT_TO_POINTER(plock->lock_owner), plock);
++	fuse_log(FUSE_LOG_DEBUG, "lookup_create_plock_ctx(): Inserted element in posix_locks hash table with value pointer %p\n", plock);
+ 	return plock;
  }
  
-+static int vhost_user_fs_handle_config_change(struct vhost_dev *dev)
-+{
-+    return 0;
-+}
-+
-+const VhostDevConfigOps fs_ops = {
-+    .vhost_dev_config_notifier = vhost_user_fs_handle_config_change,
-+};
+@@ -2046,6 +2053,7 @@ static void lo_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+ 	(void) ino;
+ 	struct lo_inode *inode;
+ 	struct lo_inode_plock *plock;
++	struct flock flock;
  
- static void vuf_get_config(VirtIODevice *vdev, uint8_t *config)
- {
-     VHostUserFS *fs = VHOST_USER_FS(vdev);
-     struct virtio_fs_config fscfg = {};
-+    int ret;
-+
-+    /*
-+     * As of now we only get notification buffer size from device. And that's
-+     * needed only if notification queue is enabled.
-+     */
-+    if (fs->notify_enabled) {
-+        ret = vhost_dev_get_config(&fs->vhost_dev, (uint8_t *)&fs->fscfg,
-+                                   sizeof(struct virtio_fs_config));
-+	if (ret < 0) {
-+            error_report("vhost-user-fs: get device config space failed."
-+                         " ret=%d\n", ret);
-+            return;
-+        }
-+    }
+ 	inode = lo_inode(req, ino);
+ 	if (!inode) {
+@@ -2058,14 +2066,16 @@ static void lo_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+ 	plock = g_hash_table_lookup(inode->posix_locks,
+ 				    GUINT_TO_POINTER(fi->lock_owner));
+ 	if (plock) {
+-		g_hash_table_remove(inode->posix_locks,
+-				    GUINT_TO_POINTER(fi->lock_owner));
+ 		/*
+-		 * We had used open() for locks and had only one fd. So
+-		 * closing this fd should release all OFD locks.
++		 * An fd is being closed. For posix locks, this means
++		 * drop all the associated locks.
+ 		 */
+-		close(plock->fd);
+-		free(plock);
++		memset(&flock, 0, sizeof(struct flock));
++		flock.l_type = F_UNLCK;
++		flock.l_whence = SEEK_SET;
++		/* Unlock whole file */
++		flock.l_start = flock.l_len = 0;
++		fcntl(plock->fd, F_SETLK, &flock);
+ 	}
+ 	pthread_mutex_unlock(&inode->plock_mutex);
  
-     memcpy((char *)fscfg.tag, fs->conf.tag,
-            MIN(strlen(fs->conf.tag) + 1, sizeof(fscfg.tag)));
- 
-     virtio_stl_p(vdev, &fscfg.num_request_queues, fs->conf.num_request_queues);
-+    virtio_stl_p(vdev, &fscfg.notify_buf_size, fs->fscfg.notify_buf_size);
- 
-     memcpy(config, &fscfg, sizeof(fscfg));
- }
-@@ -545,6 +569,8 @@ static void vuf_device_realize(DeviceState *dev, Error **errp)
-     fs->vhost_dev.nvqs = 2 + fs->conf.num_request_queues;
- 
-     fs->vhost_dev.vqs = g_new0(struct vhost_virtqueue, fs->vhost_dev.nvqs);
-+
-+    vhost_dev_set_config_notifier(&fs->vhost_dev, &fs_ops);
-     ret = vhost_dev_init(&fs->vhost_dev, &fs->vhost_user,
-                          VHOST_BACKEND_TYPE_USER, 0);
-     if (ret < 0) {
-diff --git a/include/hw/virtio/vhost-user-fs.h b/include/hw/virtio/vhost-user-fs.h
-index bd47e0da98..f667cc4b5a 100644
---- a/include/hw/virtio/vhost-user-fs.h
-+++ b/include/hw/virtio/vhost-user-fs.h
-@@ -14,6 +14,7 @@
- #ifndef _QEMU_VHOST_USER_FS_H
- #define _QEMU_VHOST_USER_FS_H
- 
-+#include "standard-headers/linux/virtio_fs.h"
- #include "hw/virtio/virtio.h"
- #include "hw/virtio/vhost.h"
- #include "hw/virtio/vhost-user.h"
-@@ -58,6 +59,7 @@ typedef struct {
-     struct vhost_virtqueue *vhost_vqs;
-     struct vhost_dev vhost_dev;
-     VhostUserState vhost_user;
-+    struct virtio_fs_config fscfg;
- 
-     /*< public >*/
-     MemoryRegion cache;
-diff --git a/include/standard-headers/linux/virtio_fs.h b/include/standard-headers/linux/virtio_fs.h
-index 9ee95f584f..719216a262 100644
---- a/include/standard-headers/linux/virtio_fs.h
-+++ b/include/standard-headers/linux/virtio_fs.h
-@@ -17,6 +17,8 @@ struct virtio_fs_config {
- 
- 	/* Number of request queues */
- 	uint32_t num_request_queues;
-+	/* Size of notification buffer */
-+	uint32_t notify_buf_size;
- } QEMU_PACKED;
- 
- #define VIRTIO_FS_PCI_CACHE_BAR 2
 -- 
 2.20.1
 

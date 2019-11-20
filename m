@@ -1,12 +1,21 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri, 15 Nov 2019 15:57:05 -0500
-Message-Id: <20191115205705.2046-5-vgoyal@redhat.com>
-In-Reply-To: <20191115205705.2046-1-vgoyal@redhat.com>
-References: <20191115205705.2046-1-vgoyal@redhat.com>
+Date: Wed, 20 Nov 2019 16:53:14 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20191120165314.GD2858@work-vm>
+References: <20191015162634.GI3073@work-vm>
+	<ac410eee095de0faf2e8ccd3f917e322c7d68384.camel@intel.com>
+	<CAJFHJrpwkry6r9WDf=4aY2ONUvXKvm_BqWrONFfgRboqGony9g@mail.gmail.com>
+	<20191016141407.GB5487@stefanha-x1.localdomain>
+	<59aa4481a68fe627ee7dfa34f01f4c8f16b1e969.camel@intel.com>
+	<20191016183815.GD14762@stefanha-x1.localdomain>
+	<923a5ab7b17371fe1b702717c125d89f7e76bf5b.camel@intel.com>
+	<20191112094514.GA463128@stefanha-x1.localdomain>
+	<5238b860a8d544e59c9a827fbc26418d53482ccf.camel@intel.com>
+	<20191113113920.GA538417@stefanha-x1.localdomain>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 4/4] virtiofs: Support blocking posix locks
-	(fcntl(F_SETLKW))
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20191113113920.GA538417@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] xfstest results for virtio-fs on aarch64
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,189 +24,96 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org
-Cc: miklos@szeredi.hu, vgoyal@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>, "Bradford,
+	Robert" <robert.bradford@intel.com>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "Ortiz,
+	Samuel" <samuel.ortiz@intel.com>, "masayoshi.mizuma@fujitsu.com" <masayoshi.mizuma@fujitsu.com>, "vgoyal@redhat.com" <vgoyal@redhat.com>
 
-As of now we don't support blocking variant of posix locks and daemon returns
--EOPNOTSUPP. Reason being that it can lead to deadlocks. Virtqueue size is
-limited and it is possible we fill virtqueue with all the requests of
-fcntl(F_SETLKW) and wait for reply. And later a subsequent unlock request
-can't make progress because virtqueue is full. And that means F_SETLKW can't
-make progress and we are deadlocked.
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> On Wed, Nov 13, 2019 at 06:40:54AM +0000, Boeuf, Sebastien wrote:
+> > On Tue, 2019-11-12 at 09:45 +0000, Stefan Hajnoczi wrote:
+> > > On Fri, Nov 01, 2019 at 10:26:54PM +0000, Boeuf, Sebastien wrote:
+> > > > +Samuel
+> > > > +Rob
+> > > > 
+> > > > Hi Stefan, Dave,
+> > > > 
+> > > > I had some time to get started on the virtiofsd in Rust, based on
+> > > > the
+> > > > code from Chirantan. So basically I relied on the following Crosvm
+> > > > branch (code not merged yet):
+> > > > https://chromium-review.googlesource.com/c/chromiumos/platform/crosvm/+/1705654
+> > > > 
+> > > > From there I have ported the code that was needed to rely on the
+> > > > nice
+> > > > implementation from Chirantan. I had to make it fit the vm-virtio
+> > > > crate
+> > > > from Cloud-Hypervisor (since it's not yet complete on rust-vmm),
+> > > > and
+> > > > also the vm-memory crate from rust-vmm.
+> > > > 
+> > > > Once the porting done, I created a dedicated vhost-user-fs daemon
+> > > > binary relying on the vhost_user_backend crate. I connected all the
+> > > > dots together and the result is here:
+> > > > https://github.com/intel/cloud-hypervisor/pull/404
+> > > > 
+> > > > I have listed the remaining tasks here: 
+> > > > https://github.com/intel/cloud-hypervisor/pull/404#issue-335636924
+> > > > (some can be quite big and should come as a follow up PR IMO).
+> > > > 
+> > > > I'll be in vacation next week, but if you have some time, it'd be
+> > > > very
+> > > > nice to get everybody's feedback on this.
+> > > > 
+> > > > And of course, if you have more time to continue working on this,
+> > > > feel
+> > > > free to reuse my branch 'vhost_user_fs_daemon' from my forked repo 
+> > > > https://github.com/sboeuf/cloud-hypervisor-1.git
+> > > 
+> > > Awesome, thanks!
+> > 
+> > I've been trying to make this work today, unfortunately I'm running
+> > into some issues. Basically what happens is that I don't get a writable
+> > descriptor, which means the reply to the FUSE init() cannot be sent.
+> > 
+> > Chirantan, I was wondering if your code in Crosvm is working properly
+> > with virtio-fs? And if that's the case, have you ever get the problem
+> > I'm describing where the virtio descriptor does not have the write only
+> > flag, which prevents the Writer from being provisioned with buffers.
+> > 
+> > Stefan, do you know if the virtio-fs driver actually tags some
+> > descriptor as write_only? I'm trying to understand what is missing
+> > here.
+> 
+> A vring descriptor is either driver->device ("out") or device->driver
+> ("in").
+> 
+> A virtio-fs request typically contains both descriptor types because it
+> consists of a request (e.g. struct fuse_in_header + struct fuse_init_in)
+> and a response (e.g.  struct fuse_out_header + struct fuse_init_out).
+> 
+> By the way, VIRTIO and FUSE use the terms "in"/"out" in the opposite
+> sense.  VIRTIO "out" is driver->device and "in" is device->driver.  FUSE
+> "out" is device->driver and "in" is driver->device.  Just wanted to
+> point that out to prevent confusion :-).
 
-Use notification queue to solve this problem. After submitting lock request
-device will send a reply asking requester to wait. Once lock is available,
-requester will get a notification saying locking is available. That way
-we don't keep the request virtueue busy while we are waiting for lock
-and further unlock requests can make progress.
+Yes, it's pretty confusing; I'd got into the habit of adding comments
+where ever I'm using in/out; e.g.:
+   '/* out is from guest, in is too guest */'
+in the corresponding C code.
 
-When we get a reply in response to lock request, we need a way to know if
-we need to wait for notification or not. I have overloaded the
-fuse_out_header->error field. If value is ->error is 1, that's a signal
-to caller to wait for lock notification.
+Dave
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/virtio_fs.c       | 78 ++++++++++++++++++++++++++++++++++++++-
- include/uapi/linux/fuse.h |  7 ++++
- 2 files changed, 84 insertions(+), 1 deletion(-)
+> If you are only seeing a driver->device descriptor but not the
+> device->driver descriptor, then something is wrong with the vring
+> processing code in the device.
+> 
+> The guest driver places requests into the virtqueue in
+> fs/fuse/virtio_fs.c:virtio_fs_enqueue_req().
+> 
+> Stefan
 
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 21d8d9d7d317..8aa9fc996556 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -35,6 +35,7 @@ struct virtio_fs_vq {
- 	struct work_struct done_work;
- 	struct list_head queued_reqs;
- 	struct list_head end_reqs;	/* End these requests */
-+	struct list_head wait_reqs;	/* requests waiting for notification */
- 	struct virtio_fs_notify_node *notify_nodes;
- 	struct list_head notify_reqs;	/* List for queuing notify requests */
- 	struct delayed_work dispatch_work;
-@@ -85,7 +86,6 @@ struct virtio_fs_notify_node {
- 
- static int virtio_fs_enqueue_all_notify(struct virtio_fs_vq *fsvq);
- 
--
- static inline struct virtio_fs_vq *vq_to_fsvq(struct virtqueue *vq)
- {
- 	struct virtio_fs *fs = vq->vdev->priv;
-@@ -513,13 +513,75 @@ static int virtio_fs_enqueue_all_notify(struct virtio_fs_vq *fsvq)
- 	return 0;
- }
- 
-+static int notify_complete_waiting_req(struct virtio_fs *vfs,
-+				       struct fuse_notify_lock_out *out_args)
-+{
-+	struct virtio_fs_vq *fsvq = &vfs->vqs[VQ_REQUEST];
-+	struct fuse_req *req, *next;
-+	bool found = false;
-+	struct fuse_conn *fc = fsvq->fud->fc;
-+
-+	/* Find waiting request with the unique number and end it */
-+	spin_lock(&fsvq->lock);
-+		list_for_each_entry_safe(req, next, &fsvq->wait_reqs, list) {
-+			if (req->in.h.unique == out_args->id) {
-+				list_del_init(&req->list);
-+				clear_bit(FR_SENT, &req->flags);
-+				/* Transfer error code from notify */
-+				req->out.h.error = out_args->error;
-+				found = true;
-+				break;
-+			}
-+		}
-+	spin_unlock(&fsvq->lock);
-+
-+	/*
-+	 * TODO: It is possible that some re-ordering happens in notify
-+	 * comes before request is complete. Deal with it.
-+	 */
-+	if (found) {
-+		fuse_request_end(fc, req);
-+		spin_lock(&fsvq->lock);
-+		dec_in_flight_req(fsvq);
-+		spin_unlock(&fsvq->lock);
-+	} else
-+		pr_debug("virtio-fs: Did not find waiting request with"
-+		       " unique=0x%llx\n", out_args->id);
-+
-+	return 0;
-+}
-+
-+static int virtio_fs_handle_notify(struct virtio_fs *vfs,
-+				   struct virtio_fs_notify *notify)
-+{
-+	int ret = 0;
-+	struct fuse_out_header *oh = &notify->out_hdr;
-+	struct fuse_notify_lock_out *lo;
-+
-+	/*
-+	 * For notifications, oh.unique is 0 and oh->error contains code
-+	 * for which notification as arrived.
-+	 */
-+	switch(oh->error) {
-+	case FUSE_NOTIFY_LOCK:
-+		lo = (struct fuse_notify_lock_out *) &notify->outarg;
-+		notify_complete_waiting_req(vfs, lo);
-+		break;
-+	default:
-+		printk("virtio-fs: Unexpected notification %d\n", oh->error);
-+	}
-+	return ret;
-+}
-+
- static void virtio_fs_notify_done_work(struct work_struct *work)
- {
- 	struct virtio_fs_vq *fsvq = container_of(work, struct virtio_fs_vq,
- 						 done_work);
- 	struct virtqueue *vq = fsvq->vq;
-+	struct virtio_fs *vfs = vq->vdev->priv;
- 	LIST_HEAD(reqs);
- 	struct virtio_fs_notify_node *notify, *next;
-+	struct fuse_out_header *oh;
- 
- 	spin_lock(&fsvq->lock);
- 	do {
-@@ -535,6 +597,10 @@ static void virtio_fs_notify_done_work(struct work_struct *work)
- 
- 	/* Process notify */
- 	list_for_each_entry_safe(notify, next, &reqs, list) {
-+		oh = &notify->notify.out_hdr;
-+		WARN_ON(oh->unique);
-+		/* Handle notification */
-+		virtio_fs_handle_notify(vfs, &notify->notify);
- 		spin_lock(&fsvq->lock);
- 		dec_in_flight_req(fsvq);
- 		list_del_init(&notify->list);
-@@ -656,6 +722,15 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
- 		 * TODO verify that server properly follows FUSE protocol
- 		 * (oh.uniq, oh.len)
- 		 */
-+		if (req->out.h.error == 1) {
-+			/* Wait for notification to complete request */
-+			list_del_init(&req->list);
-+			spin_lock(&fsvq->lock);
-+			list_add_tail(&req->list, &fsvq->wait_reqs);
-+			spin_unlock(&fsvq->lock);
-+			continue;
-+		}
-+
- 		args = req->args;
- 		copy_args_from_argbuf(args, req);
- 
-@@ -705,6 +780,7 @@ static int virtio_fs_init_vq(struct virtio_fs *fs, struct virtio_fs_vq *fsvq,
- 	strncpy(fsvq->name, name, VQ_NAME_LEN);
- 	spin_lock_init(&fsvq->lock);
- 	INIT_LIST_HEAD(&fsvq->queued_reqs);
-+	INIT_LIST_HEAD(&fsvq->wait_reqs);
- 	INIT_LIST_HEAD(&fsvq->end_reqs);
- 	INIT_LIST_HEAD(&fsvq->notify_reqs);
- 	init_completion(&fsvq->in_flight_zero);
-diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-index 373cada89815..45f0c4efec8e 100644
---- a/include/uapi/linux/fuse.h
-+++ b/include/uapi/linux/fuse.h
-@@ -481,6 +481,7 @@ enum fuse_notify_code {
- 	FUSE_NOTIFY_STORE = 4,
- 	FUSE_NOTIFY_RETRIEVE = 5,
- 	FUSE_NOTIFY_DELETE = 6,
-+	FUSE_NOTIFY_LOCK = 7,
- 	FUSE_NOTIFY_CODE_MAX,
- };
- 
-@@ -868,6 +869,12 @@ struct fuse_notify_retrieve_in {
- 	uint64_t	dummy4;
- };
- 
-+struct fuse_notify_lock_out {
-+	uint64_t	id;
-+	int32_t		error;
-+	int32_t		padding;
-+};
-+
- /* Device ioctls: */
- #define FUSE_DEV_IOC_CLONE	_IOR(229, 0, uint32_t)
- 
--- 
-2.20.1
+
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

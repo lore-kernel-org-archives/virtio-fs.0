@@ -1,14 +1,15 @@
-References: <20191118022410.21023-1-msys.mizuma@gmail.com>
-From: Cao jin <caoj.fnst@cn.fujitsu.com>
-Message-ID: <c80528c2-31ee-ccfc-127b-66bc7f93b669@cn.fujitsu.com>
-Date: Thu, 21 Nov 2019 13:51:31 +0800
+Date: Thu, 21 Nov 2019 16:00:01 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20191121160001.GC445244@stefanha-x1.localdomain>
+References: <20191115205705.2046-1-vgoyal@redhat.com>
+	<20191115205705.2046-3-vgoyal@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20191118022410.21023-1-msys.mizuma@gmail.com>
-Content-Language: en-US
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH] fuse: Fix the return code of
- fuse_direct_IO() to deal with the error for aio
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="tqI+Z3u+9OQ7kwn0"
+Content-Disposition: inline
+In-Reply-To: <20191115205705.2046-3-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 2/4] virtiofs: Add an index to keep track of
+ first request queue
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,58 +18,38 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Masayoshi Mizuma <msys.mizuma@gmail.com>, Miklos Szeredi <miklos@szeredi.hu>, linux-fsdevel@vger.kernel.org
-Cc: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>, virtio-fs@redhat.com, linux-kernel@vger.kernel.org
-
-On 11/18/19 10:24 AM, Masayoshi Mizuma wrote:
-> From: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
-> 
-> exit_aio() is sometimes stuck in wait_for_completion() after aio is issued
-> with direct IO and the task receives a signal.
-> 
-> That is because kioctx in mm->ioctx_table is in use by aio_kiocb.
-> aio_kiocb->ki_refcnt is 1 at that time. That means iocb_put() isn't
-> called correctly.
-> 
-> fuse_get_req() returns as -EINTR when it's blocked and receives a signal.
-> fuse_direct_IO() deals with the -EINTER as -EIOCBQUEUED and returns as
-> -EIOCBQUEUED even though the aio isn't queued.
-> As the result, aio_rw_done() doesn't handle the error, so iocb_put() isn't
-> called via aio_complete_rw(), which is the callback.
-> 
-> The flow is something like as:
-> 
->   io_submit
->     aio_get_req
->       refcount_set(&req->ki_refcnt, 2)
->     __io_submit_one
->       aio_read
->       ...
->         fuse_direct_IO # return as -EIOCBQUEUED
->           __fuse_direct_read
->           ...
->             fuse_get_req # return as -EINTR
->         aio_rw_done
->           # Nothing to do because ret is -EIOCBQUEUED...
->     iocb_put
->       refcount_dec_and_test(&iocb->ki_refcnt) # 2->1
-> 
-> Return as the error code of fuse_direct_io() or __fuse_direct_read() in
-> fuse_direct_IO() so that aio_rw_done() can handle the error and call
-> iocb_put().
-> 
-> This issue is trucked as a virtio-fs issue:
-> https://gitlab.com/virtio-fs/qemu/issues/14
-> 
-
-I didn't reproduce this issue on kernel v5.4-rc7, but did on 5.4-rc8.
-And verified this patch fixed the case in issue 14 on v5.4-rc8 and
-virtiofsd (virtio-fs-dev 5f068fa9).
-
-Tested-by: Cao jin <caoj.fnst@cn.fujitsu.com>
--- 
-Sincerely,
-Cao jin
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, miklos@szeredi.hu, linux-kernel@vger.kernel.org
 
 
+--tqI+Z3u+9OQ7kwn0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Fri, Nov 15, 2019 at 03:57:03PM -0500, Vivek Goyal wrote:
+> @@ -1004,6 +1008,7 @@ __releases(fiq->lock)
+>  	spin_unlock(&fiq->lock);
+> =20
+>  	fs =3D fiq->priv;
+> +	queue_id =3D fs->first_reqq_idx;
+
+The TODO should be moved here.
+
+--tqI+Z3u+9OQ7kwn0
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl3WtIEACgkQnKSrs4Gr
+c8gp1wf9FsjNknItwwiYqgaMkCFsD/lJY+7ZWvz25GCPp4aHChGQMvg/GBxEXbUs
+d2n5sxD4UcV/wmUt3amPMondoXmfLu//QOg0X5+ftyWLbVK7Tq0rO+hPkysOeP+6
+2svIACl5UtYuzU3SxRS5nY3CGZ3/HxLKgJyLVhorSNXacI6ijRHZLnLDEqXU/90o
+GCVuxTJfvf8UMQ42KSjwmCM+hyWb9HlNj/NoSZ63K8Zq6Y41N45bx+36k9J8LIlQ
+UaFITc5HT6wWTHN0tVJxRQVsV5ZEBx1lauzDLxKCsD47+AJOMDhX/5mbVkndJZS/
+xuPiSOtg8Is+zto/rTm+wN9K4/gEAw==
+=Cosk
+-----END PGP SIGNATURE-----
+
+--tqI+Z3u+9OQ7kwn0--
 

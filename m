@@ -1,14 +1,15 @@
-Date: Fri, 22 Nov 2019 10:19:03 +0000
+Date: Fri, 22 Nov 2019 10:33:00 +0000
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20191122101903.GC464656@stefanha-x1.localdomain>
+Message-ID: <20191122103300.GD464656@stefanha-x1.localdomain>
 References: <20191115205543.1816-1-vgoyal@redhat.com>
-	<20191115205543.1816-3-vgoyal@redhat.com>
+	<20191115205543.1816-4-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="B4IIlcmfBL/1gGOG"
+	protocol="application/pgp-signature"; boundary="AbQceqfdZEv+FvjW"
 Content-Disposition: inline
-In-Reply-To: <20191115205543.1816-3-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 2/4] virtiofd: Create a notification queue
+In-Reply-To: <20191115205543.1816-4-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 3/4] virtiofsd: Specify size of notification
+ buffer using config space
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,153 +22,150 @@ To: Vivek Goyal <vgoyal@redhat.com>
 Cc: virtio-fs@redhat.com, miklos@szeredi.hu, qemu-devel@nongnu.org
 
 
---B4IIlcmfBL/1gGOG
+--AbQceqfdZEv+FvjW
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Fri, Nov 15, 2019 at 03:55:41PM -0500, Vivek Goyal wrote:
->  /* Callback from libvhost-user */
->  static void fv_set_features(VuDev *dev, uint64_t features)
->  {
-> +    struct fv_VuDev *vud =3D container_of(dev, struct fv_VuDev, dev);
-> +    struct fuse_session *se =3D vud->se;
-> +
-> +    if ((1 << VIRTIO_FS_F_NOTIFICATION) & features) {
+On Fri, Nov 15, 2019 at 03:55:42PM -0500, Vivek Goyal wrote:
+> diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_vir=
+tio.c
+> index 411114c9b3..982b6ad0bd 100644
+> --- a/contrib/virtiofsd/fuse_virtio.c
+> +++ b/contrib/virtiofsd/fuse_virtio.c
+> @@ -109,7 +109,8 @@ static uint64_t fv_get_features(VuDev *dev)
+>      uint64_t features;
+> =20
+>      features =3D 1ull << VIRTIO_F_VERSION_1 |
+> -               1ull << VIRTIO_FS_F_NOTIFICATION;
+> +               1ull << VIRTIO_FS_F_NOTIFICATION |
+> +               1ull << VHOST_USER_F_PROTOCOL_FEATURES;
 
-For consistency 1ull should be used.  That way the reader does not have
-to check the bit position to verify that the bitmap isn't truncated at
-32 bits.
+This is not needed since VHOST_USER_F_PROTOCOL_FEATURES is already added
+by vu_get_features_exec():
 
-> +        vud->notify_enabled =3D true;
-> +        se->notify_enabled =3D true;
+  vu_get_features_exec(VuDev *dev, VhostUserMsg *vmsg)
+  {
+      vmsg->payload.u64 =3D
+          1ULL << VHOST_F_LOG_ALL |
+          1ULL << VHOST_USER_F_PROTOCOL_FEATURES;
 
-Only one copy of this field is needed.  vud has a pointer to se.
+      if (dev->iface->get_features) {
+          vmsg->payload.u64 |=3D dev->iface->get_features(dev);
+      }
 
-> +    }
+> =20
+>      return features;
+>  }
+> @@ -927,6 +928,27 @@ static bool fv_queue_order(VuDev *dev, int qidx)
+>      return false;
 >  }
 > =20
->  /*
-> @@ -662,6 +671,65 @@ static void fv_queue_worker(gpointer data, gpointer =
-user_data)
->      free(req);
->  }
-> =20
-> +static void *fv_queue_notify_thread(void *opaque)
+> +static uint64_t fv_get_protocol_features(VuDev *dev)
 > +{
-> +    struct fv_QueueInfo *qi =3D opaque;
-> +
-> +    fuse_log(FUSE_LOG_INFO, "%s: Start for queue %d kick_fd %d\n", __fun=
-c__,
-> +             qi->qidx, qi->kick_fd);
-> +
-> +    while (1) {
-> +        struct pollfd pf[2];
-> +
-> +        pf[0].fd =3D qi->kick_fd;
-> +        pf[0].events =3D POLLIN;
-> +        pf[0].revents =3D 0;
-> +        pf[1].fd =3D qi->kill_fd;
-> +        pf[1].events =3D POLLIN;
-> +        pf[1].revents =3D 0;
-> +
-> +        fuse_log(FUSE_LOG_DEBUG, "%s: Waiting for Queue %d event\n", __f=
-unc__,
-> +                 qi->qidx);
-> +        int poll_res =3D ppoll(pf, 2, NULL, NULL);
-> +
-> +        if (poll_res =3D=3D -1) {
-> +            if (errno =3D=3D EINTR) {
-> +                fuse_log(FUSE_LOG_INFO, "%s: ppoll interrupted, going ar=
-ound\n",
-> +                         __func__);
-> +                continue;
-> +            }
-> +            fuse_log(FUSE_LOG_ERR, "fv_queue_thread ppoll: %m\n");
-> +            break;
-> +        }
-> +        assert(poll_res >=3D 1);
-> +        if (pf[0].revents & (POLLERR | POLLHUP | POLLNVAL)) {
-> +            fuse_log(FUSE_LOG_ERR, "%s: Unexpected poll revents %x Queue=
- %d\n",
-> +                     __func__, pf[0].revents, qi->qidx);
-> +             break;
-> +        }
-> +        if (pf[1].revents & (POLLERR | POLLHUP | POLLNVAL)) {
-> +            fuse_log(FUSE_LOG_ERR, "%s: Unexpected poll revents %x Queue=
- %d"
-> +                     "killfd\n", __func__, pf[1].revents, qi->qidx);
-> +            break;
-> +        }
-> +        if (pf[1].revents) {
-> +            fuse_log(FUSE_LOG_INFO, "%s: kill event on queue %d - quitti=
-ng\n",
-> +                     __func__, qi->qidx);
-> +            break;
-> +        }
-> +        assert(pf[0].revents & POLLIN);
-> +        fuse_log(FUSE_LOG_DEBUG, "%s: Got queue event on Queue %d\n", __=
-func__,
-> +                 qi->qidx);
-> +
-> +        eventfd_t evalue;
-> +        if (eventfd_read(qi->kick_fd, &evalue)) {
-> +            fuse_log(FUSE_LOG_ERR, "Eventfd_read for queue: %m\n");
-> +            break;
-> +        }
-> +    }
-> +    return NULL;
+> +	return 1ull << VHOST_USER_PROTOCOL_F_CONFIG;
 > +}
 
-It's difficult to review function without any actual functionality using
-the virtqueue.  I'm not sure a thread is even needed since the device
-only needs to get a buffer when it has a notification for the driver.
-I'll have to wait for the following patches to see what happens here...
+Please change vu_get_protocol_features_exec() in a separate patch so
+that devices don't need this boilerplate .get_protocol_features() code:
 
-> @@ -378,12 +382,23 @@ static void vuf_set_status(VirtIODevice *vdev, uint=
-8_t status)
->      }
->  }
-> =20
-> -static uint64_t vuf_get_features(VirtIODevice *vdev,
-> -                                      uint64_t requested_features,
-> -                                      Error **errp)
-> +static uint64_t vuf_get_features(VirtIODevice *vdev, uint64_t features,
-> +                                 Error **errp)
->  {
-> -    /* No feature bits used yet */
-> -    return requested_features;
-> +    VHostUserFS *fs =3D VHOST_USER_FS(vdev);
+  static bool
+  vu_get_protocol_features_exec(VuDev *dev, VhostUserMsg *vmsg)
+  {
+      ...
+ -    if (dev->iface->get_config && dev->iface->set_config) {
+ +    if (dev->iface->get_config || dev->iface->set_config) {
+          features |=3D 1ULL << VHOST_USER_PROTOCOL_F_CONFIG;
+      }
+
 > +
-> +    virtio_add_feature(&features, VIRTIO_FS_F_NOTIFICATION);
-> +
-> +    return vhost_get_features(&fs->vhost_dev, user_feature_bits, feature=
-s);
-> +}
-> +
-> +static void vuf_set_features(VirtIODevice *vdev, uint64_t features)
+> +static int fv_get_config(VuDev *dev, uint8_t *config, uint32_t len)
 > +{
-> +    VHostUserFS *fs =3D VHOST_USER_FS(vdev);
+> +	struct virtio_fs_config fscfg =3D {};
 > +
-> +    if (virtio_has_feature(features, VIRTIO_FS_F_NOTIFICATION)) {
-> +        fs->notify_enabled =3D true;
+> +	fuse_log(FUSE_LOG_DEBUG, "%s:Setting notify_buf_size=3D%d\n", __func__,
+> +                 sizeof(struct fuse_notify_lock_out));
+> +	/*
+> +	 * As of now only notification related to lock is supported. As more
+> +	 * notification types are supported, bump up the size accordingly.
+> +	 */
+> +	fscfg.notify_buf_size =3D sizeof(struct fuse_notify_lock_out);
 
-This field is unused, please remove it.
+Missing cpu_to_le32().
 
---B4IIlcmfBL/1gGOG
+I'm not sure about specifying the size precisely down to the last byte
+because any change to guest-visible aspects of the device (like VIRTIO
+Configuration Space) are not compatible across live migration.  It will
+be necessary to introduce a device version command-line option for live
+migration compatibility so that existing guests can be migrated to a new
+virtiofsd without the device changing underneath them.
+
+How about rounding this up to 4 KB?
+
+>  static void vuf_get_config(VirtIODevice *vdev, uint8_t *config)
+>  {
+>      VHostUserFS *fs =3D VHOST_USER_FS(vdev);
+>      struct virtio_fs_config fscfg =3D {};
+> +    int ret;
+> +
+> +    /*
+> +     * As of now we only get notification buffer size from device. And t=
+hat's
+> +     * needed only if notification queue is enabled.
+> +     */
+> +    if (fs->notify_enabled) {
+> +        ret =3D vhost_dev_get_config(&fs->vhost_dev, (uint8_t *)&fs->fsc=
+fg,
+> +                                   sizeof(struct virtio_fs_config));
+> +	if (ret < 0) {
+
+Indentation.
+
+> +            error_report("vhost-user-fs: get device config space failed."
+> +                         " ret=3D%d\n", ret);
+> +            return;
+> +        }
+
+Missing le32_to_cpu() for notify_buf_size.
+
+> +    }
+> =20
+>      memcpy((char *)fscfg.tag, fs->conf.tag,
+>             MIN(strlen(fs->conf.tag) + 1, sizeof(fscfg.tag)));
+> =20
+>      virtio_stl_p(vdev, &fscfg.num_request_queues, fs->conf.num_request_q=
+ueues);
+> +    virtio_stl_p(vdev, &fscfg.notify_buf_size, fs->fscfg.notify_buf_size=
+);
+> =20
+>      memcpy(config, &fscfg, sizeof(fscfg));
+>  }
+> @@ -545,6 +569,8 @@ static void vuf_device_realize(DeviceState *dev, Erro=
+r **errp)
+>      fs->vhost_dev.nvqs =3D 2 + fs->conf.num_request_queues;
+> =20
+>      fs->vhost_dev.vqs =3D g_new0(struct vhost_virtqueue, fs->vhost_dev.n=
+vqs);
+> +
+> +    vhost_dev_set_config_notifier(&fs->vhost_dev, &fs_ops);
+
+Is this really needed since vhost_user_fs_handle_config_change() ignores
+it?
+
+--AbQceqfdZEv+FvjW
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl3XthcACgkQnKSrs4Gr
-c8gs5Qf+LyPnQ5S6B38Cg32zP4Ue8WZjyuFmlqBTKJ46vyg7gWkF6vDxWRDt/qu1
-Q1cG3ErePIynsgV1rQyWTRKY0Yx82eahfFeh0QjOJYWwgfWbcRwb+oPUgCUQutXh
-slBJu7InNwyhHnVQYNgXJoltwRVHdg7GA/sUqTbf1pEuocyFoFXInGWGppEystT4
-R9cpoEEtDUqxUvES0DHGZ4f67qXQyAm8WGxfRC/wPZURActXeBEryqt2aShJ7dl2
-FU7OdYj6Fr8XoCSdCLLsEOl5JOEk/ECkYLai3ZBaq+LHARXF68vSlwj8u81M6ffK
-vSQaMpxLrn43n16CieagYSw2XTPqEw==
-=oibv
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl3XuVsACgkQnKSrs4Gr
+c8j4VggAi4w8EWBDE1nc8SdYJWXqXT0eFyXBrX9mIEcJ6pWiISozM5q8hpaUfwuu
+yNM9kc1LNMHjbMULZRDncuQnJFmNyWnveseerrFktRyu+CnZs2dVtGcc/yMmRQhf
+PlnCfInyMVwC7gP7MMqyrVYVW7ut0ROue2IggeCYw163pz9/zjWoTDGQTY7IzC3j
+8zYw4WxCeF296HS/KOOcgoYzqAg80s6lU019SLmkHRtaZ6N/Gec6NiDlwYpacxRU
+2YGhbbEUVuRo+q1fSHayH3ADUbPEel/rgNtH45Csxk+4xmpT8hXGWS0VhwP/eNA+
+zDkAE33WTkLyXCHFh0STAWxFpqfT0w==
+=OEYD
 -----END PGP SIGNATURE-----
 
---B4IIlcmfBL/1gGOG--
+--AbQceqfdZEv+FvjW--
 

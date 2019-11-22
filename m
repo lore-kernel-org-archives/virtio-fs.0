@@ -1,15 +1,9 @@
-References: <20190905194859.16219-1-vgoyal@redhat.com>
-	<20190905194859.16219-17-vgoyal@redhat.com>
-From: piaojun <piaojun@huawei.com>
-Message-ID: <62d8b7fb-9024-a6c9-73b8-727aacfe8544@huawei.com>
-Date: Sun, 8 Sep 2019 19:19:13 +0800
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Date: Fri, 22 Nov 2019 11:31:30 +0000
+Message-Id: <20191122113130.481113-1-stefanha@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20190905194859.16219-17-vgoyal@redhat.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH 16/18] virtiofs: Use virtio_fs_mutex for
- races w.r.t ->remove and mount path
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH] virtiofsd: fix libfuse information leaks
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,136 +12,307 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org, miklos@szeredi.hu
-Cc: virtio-fs@redhat.com, linux-kernel@vger.kernel.org, mst@redhat.com
+To: qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com
 
+Some FUSE message replies contain padding fields that are not
+initialized by libfuse.  This is fine in traditional FUSE applications
+because the kernel is trusted.  virtiofsd does not trust the guest and
+must not expose uninitialized memory.
 
+Use C struct initializers to automatically zero out memory.  Not all of
+these code changes are strictly necessary but they will prevent future
+information leaks if the structs are extended.
 
-On 2019/9/6 3:48, Vivek Goyal wrote:
-> It is possible that a mount is in progress and device is being removed at
-> the same time. Use virtio_fs_mutex to avoid races.
-> 
-> This also takes care of bunch of races and removes some TODO items.
-> 
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  fs/fuse/virtio_fs.c | 32 ++++++++++++++++++++++----------
->  1 file changed, 22 insertions(+), 10 deletions(-)
-> 
-> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-> index 29ec2f5bbbe2..c483482185b6 100644
-> --- a/fs/fuse/virtio_fs.c
-> +++ b/fs/fuse/virtio_fs.c
-> @@ -13,7 +13,9 @@
->  #include <linux/highmem.h>
->  #include "fuse_i.h"
->  
-> -/* List of virtio-fs device instances and a lock for the list */
-> +/* List of virtio-fs device instances and a lock for the list. Also provides
-> + * mutual exclusion in device removal and mounting path
-> + */
->  static DEFINE_MUTEX(virtio_fs_mutex);
->  static LIST_HEAD(virtio_fs_instances);
->  
-> @@ -72,17 +74,19 @@ static void release_virtiofs_obj(struct kref *ref)
->  	kfree(vfs);
->  }
->  
-> +/* Make sure virtiofs_mutex is held */
+Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ contrib/virtiofsd/fuse_lowlevel.c | 150 +++++++++++++++---------------
+ 1 file changed, 76 insertions(+), 74 deletions(-)
 
-Typo? virtiofs_mutex->virtio_fs_mutex
-
-Jun
-
->  static void virtiofs_put(struct virtio_fs *fs)
->  {
-> -	mutex_lock(&virtio_fs_mutex);
->  	kref_put(&fs->refcount, release_virtiofs_obj);
-> -	mutex_unlock(&virtio_fs_mutex);
->  }
->  
->  static void virtio_fs_put(struct fuse_iqueue *fiq)
->  {
->  	struct virtio_fs *vfs = fiq->priv;
-> +
-> +	mutex_lock(&virtio_fs_mutex);
->  	virtiofs_put(vfs);
-> +	mutex_unlock(&virtio_fs_mutex);
->  }
->  
->  static void virtio_fs_drain_queue(struct virtio_fs_vq *fsvq)
-> @@ -596,9 +600,8 @@ static void virtio_fs_remove(struct virtio_device *vdev)
->  	struct virtio_fs *fs = vdev->priv;
->  
->  	mutex_lock(&virtio_fs_mutex);
-> +	/* This device is going away. No one should get new reference */
->  	list_del_init(&fs->list);
-> -	mutex_unlock(&virtio_fs_mutex);
-> -
->  	virtio_fs_stop_all_queues(fs);
->  	virtio_fs_drain_all_queues(fs);
->  	vdev->config->reset(vdev);
-> @@ -607,6 +610,7 @@ static void virtio_fs_remove(struct virtio_device *vdev)
->  	vdev->priv = NULL;
->  	/* Put device reference on virtio_fs object */
->  	virtiofs_put(fs);
-> +	mutex_unlock(&virtio_fs_mutex);
->  }
->  
->  #ifdef CONFIG_PM_SLEEP
-> @@ -978,10 +982,15 @@ static int virtio_fs_fill_super(struct super_block *sb)
->  		.no_force_umount = true,
->  	};
->  
-> -	/* TODO lock */
-> -	if (fs->vqs[VQ_REQUEST].fud) {
-> -		pr_err("virtio-fs: device already in use\n");
-> -		err = -EBUSY;
-> +	mutex_lock(&virtio_fs_mutex);
-> +
-> +	/* After holding mutex, make sure virtiofs device is still there.
-> +	 * Though we are holding a refernce to it, drive ->remove might
-> +	 * still have cleaned up virtual queues. In that case bail out.
-> +	 */
-> +	err = -EINVAL;
-> +	if (list_empty(&fs->list)) {
-> +		pr_info("virtio-fs: tag <%s> not found\n", fs->tag);
->  		goto err;
->  	}
->  
-> @@ -1007,7 +1016,6 @@ static int virtio_fs_fill_super(struct super_block *sb)
->  
->  	fc = fs->vqs[VQ_REQUEST].fud->fc;
->  
-> -	/* TODO take fuse_mutex around this loop? */
->  	for (i = 0; i < fs->nvqs; i++) {
->  		struct virtio_fs_vq *fsvq = &fs->vqs[i];
->  
-> @@ -1020,6 +1028,7 @@ static int virtio_fs_fill_super(struct super_block *sb)
->  	/* Previous unmount will stop all queues. Start these again */
->  	virtio_fs_start_all_queues(fs);
->  	fuse_send_init(fc, init_req);
-> +	mutex_unlock(&virtio_fs_mutex);
->  	return 0;
->  
->  err_free_init_req:
-> @@ -1027,6 +1036,7 @@ static int virtio_fs_fill_super(struct super_block *sb)
->  err_free_fuse_devs:
->  	virtio_fs_free_devs(fs);
->  err:
-> +	mutex_unlock(&virtio_fs_mutex);
->  	return err;
->  }
->  
-> @@ -1100,7 +1110,9 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
->  
->  	fc = kzalloc(sizeof(struct fuse_conn), GFP_KERNEL);
->  	if (!fc) {
-> +		mutex_lock(&virtio_fs_mutex);
->  		virtiofs_put(fs);
-> +		mutex_unlock(&virtio_fs_mutex);
->  		return -ENOMEM;
->  	}
->  
-> 
+diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
+index 7fa8861f5d..8a4234630d 100644
+--- a/contrib/virtiofsd/fuse_lowlevel.c
++++ b/contrib/virtiofsd/fuse_lowlevel.c
+@@ -45,21 +45,23 @@ static __attribute__((constructor)) void fuse_ll_init_pagesize(void)
+ 
+ static void convert_stat(const struct stat *stbuf, struct fuse_attr *attr)
+ {
+-	attr->ino	= stbuf->st_ino;
+-	attr->mode	= stbuf->st_mode;
+-	attr->nlink	= stbuf->st_nlink;
+-	attr->uid	= stbuf->st_uid;
+-	attr->gid	= stbuf->st_gid;
+-	attr->rdev	= stbuf->st_rdev;
+-	attr->size	= stbuf->st_size;
+-	attr->blksize	= stbuf->st_blksize;
+-	attr->blocks	= stbuf->st_blocks;
+-	attr->atime	= stbuf->st_atime;
+-	attr->mtime	= stbuf->st_mtime;
+-	attr->ctime	= stbuf->st_ctime;
+-	attr->atimensec = ST_ATIM_NSEC(stbuf);
+-	attr->mtimensec = ST_MTIM_NSEC(stbuf);
+-	attr->ctimensec = ST_CTIM_NSEC(stbuf);
++	*attr = (struct fuse_attr) {
++		.ino		= stbuf->st_ino,
++		.mode		= stbuf->st_mode,
++		.nlink		= stbuf->st_nlink,
++		.uid		= stbuf->st_uid,
++		.gid		= stbuf->st_gid,
++		.rdev		= stbuf->st_rdev,
++		.size		= stbuf->st_size,
++		.blksize	= stbuf->st_blksize,
++		.blocks		= stbuf->st_blocks,
++		.atime		= stbuf->st_atime,
++		.mtime		= stbuf->st_mtime,
++		.ctime		= stbuf->st_ctime,
++		.atimensec	= ST_ATIM_NSEC(stbuf),
++		.mtimensec	= ST_MTIM_NSEC(stbuf),
++		.ctimensec	= ST_CTIM_NSEC(stbuf),
++	};
+ }
+ 
+ static void convert_attr(const struct fuse_setattr_in *attr, struct stat *stbuf)
+@@ -181,16 +183,16 @@ static int fuse_send_msg(struct fuse_session *se, struct fuse_chan *ch,
+ int fuse_send_reply_iov_nofree(fuse_req_t req, int error, struct iovec *iov,
+ 			       int count)
+ {
+-	struct fuse_out_header out;
++	struct fuse_out_header out = {
++		.unique = req->unique,
++		.error = error,
++	};
+ 
+ 	if (error <= -1000 || error > 0) {
+ 		fuse_log(FUSE_LOG_ERR, "fuse: bad error value: %i\n",	error);
+ 		error = -ERANGE;
+ 	}
+ 
+-	out.unique = req->unique;
+-	out.error = error;
+-
+ 	iov[0].iov_base = &out;
+ 	iov[0].iov_len = sizeof(struct fuse_out_header);
+ 
+@@ -271,14 +273,16 @@ size_t fuse_add_direntry(fuse_req_t req, char *buf, size_t bufsize,
+ static void convert_statfs(const struct statvfs *stbuf,
+ 			   struct fuse_kstatfs *kstatfs)
+ {
+-	kstatfs->bsize	 = stbuf->f_bsize;
+-	kstatfs->frsize	 = stbuf->f_frsize;
+-	kstatfs->blocks	 = stbuf->f_blocks;
+-	kstatfs->bfree	 = stbuf->f_bfree;
+-	kstatfs->bavail	 = stbuf->f_bavail;
+-	kstatfs->files	 = stbuf->f_files;
+-	kstatfs->ffree	 = stbuf->f_ffree;
+-	kstatfs->namelen = stbuf->f_namemax;
++	*kstatfs = (struct fuse_kstatfs) {
++		.bsize	 = stbuf->f_bsize,
++		.frsize	 = stbuf->f_frsize,
++		.blocks	 = stbuf->f_blocks,
++		.bfree	 = stbuf->f_bfree,
++		.bavail	 = stbuf->f_bavail,
++		.files	 = stbuf->f_files,
++		.ffree	 = stbuf->f_ffree,
++		.namelen = stbuf->f_namemax,
++	};
+ }
+ 
+ static int send_reply_ok(fuse_req_t req, const void *arg, size_t argsize)
+@@ -320,12 +324,14 @@ static unsigned int calc_timeout_nsec(double t)
+ static void fill_entry(struct fuse_entry_out *arg,
+ 		       const struct fuse_entry_param *e)
+ {
+-	arg->nodeid = e->ino;
+-	arg->generation = e->generation;
+-	arg->entry_valid = calc_timeout_sec(e->entry_timeout);
+-	arg->entry_valid_nsec = calc_timeout_nsec(e->entry_timeout);
+-	arg->attr_valid = calc_timeout_sec(e->attr_timeout);
+-	arg->attr_valid_nsec = calc_timeout_nsec(e->attr_timeout);
++	*arg = (struct fuse_entry_out) {
++		.nodeid = e->ino,
++		.generation = e->generation,
++		.entry_valid = calc_timeout_sec(e->entry_timeout),
++		.entry_valid_nsec = calc_timeout_nsec(e->entry_timeout),
++		.attr_valid = calc_timeout_sec(e->attr_timeout),
++		.attr_valid_nsec = calc_timeout_nsec(e->attr_timeout),
++	};
+ 	convert_stat(&e->attr, &arg->attr);
+ }
+ 
+@@ -351,10 +357,12 @@ size_t fuse_add_direntry_plus(fuse_req_t req, char *buf, size_t bufsize,
+ 	fill_entry(&dp->entry_out, e);
+ 
+ 	struct fuse_dirent *dirent = &dp->dirent;
+-	dirent->ino = e->attr.st_ino;
+-	dirent->off = off;
+-	dirent->namelen = namelen;
+-	dirent->type = (e->attr.st_mode & S_IFMT) >> 12;
++	*dirent = (struct fuse_dirent) {
++		.ino = e->attr.st_ino,
++		.off = off,
++		.namelen = namelen,
++		.type = (e->attr.st_mode & S_IFMT) >> 12,
++	};
+ 	memcpy(dirent->name, name, namelen);
+ 	memset(dirent->name + namelen, 0, entlen_padded - entlen);
+ 
+@@ -504,15 +512,14 @@ int fuse_reply_data(fuse_req_t req, struct fuse_bufvec *bufv,
+ 		    enum fuse_buf_copy_flags flags)
+ {
+ 	struct iovec iov[2];
+-	struct fuse_out_header out;
++	struct fuse_out_header out = {
++		.unique = req->unique,
++	};
+ 	int res;
+ 
+ 	iov[0].iov_base = &out;
+ 	iov[0].iov_len = sizeof(struct fuse_out_header);
+ 
+-	out.unique = req->unique;
+-	out.error = 0;
+-
+ 	res = fuse_send_data_iov(req->se, req->ch, iov, 1, bufv, flags);
+ 	if (res <= 0) {
+ 		fuse_free_req(req);
+@@ -2203,13 +2210,13 @@ static void do_destroy(fuse_req_t req, fuse_ino_t nodeid,
+ static int send_notify_iov(struct fuse_session *se, int notify_code,
+ 			   struct iovec *iov, int count)
+ {
+-	struct fuse_out_header out;
++	struct fuse_out_header out = {
++		.error = notify_code,
++	};
+ 
+ 	if (!se->got_init)
+ 		return -ENOTCONN;
+ 
+-	out.unique = 0;
+-	out.error = notify_code;
+ 	iov[0].iov_base = &out;
+ 	iov[0].iov_len = sizeof(struct fuse_out_header);
+ 
+@@ -2219,11 +2226,11 @@ static int send_notify_iov(struct fuse_session *se, int notify_code,
+ int fuse_lowlevel_notify_poll(struct fuse_pollhandle *ph)
+ {
+ 	if (ph != NULL) {
+-		struct fuse_notify_poll_wakeup_out outarg;
++		struct fuse_notify_poll_wakeup_out outarg = {
++			.kh = ph->kh,
++		};
+ 		struct iovec iov[2];
+ 
+-		outarg.kh = ph->kh;
+-
+ 		iov[1].iov_base = &outarg;
+ 		iov[1].iov_len = sizeof(outarg);
+ 
+@@ -2236,7 +2243,11 @@ int fuse_lowlevel_notify_poll(struct fuse_pollhandle *ph)
+ int fuse_lowlevel_notify_inval_inode(struct fuse_session *se, fuse_ino_t ino,
+ 				     off_t off, off_t len)
+ {
+-	struct fuse_notify_inval_inode_out outarg;
++	struct fuse_notify_inval_inode_out outarg = {
++		.ino = ino,
++		.off = off,
++		.len = len,
++	};
+ 	struct iovec iov[2];
+ 
+ 	if (!se)
+@@ -2244,10 +2255,6 @@ int fuse_lowlevel_notify_inval_inode(struct fuse_session *se, fuse_ino_t ino,
+ 
+ 	if (se->conn.proto_major < 6 || se->conn.proto_minor < 12)
+ 		return -ENOSYS;
+-	
+-	outarg.ino = ino;
+-	outarg.off = off;
+-	outarg.len = len;
+ 
+ 	iov[1].iov_base = &outarg;
+ 	iov[1].iov_len = sizeof(outarg);
+@@ -2258,7 +2265,10 @@ int fuse_lowlevel_notify_inval_inode(struct fuse_session *se, fuse_ino_t ino,
+ int fuse_lowlevel_notify_inval_entry(struct fuse_session *se, fuse_ino_t parent,
+ 				     const char *name, size_t namelen)
+ {
+-	struct fuse_notify_inval_entry_out outarg;
++	struct fuse_notify_inval_entry_out outarg = {
++		.parent = parent,
++		.namelen = namelen,
++	};
+ 	struct iovec iov[3];
+ 
+ 	if (!se)
+@@ -2267,10 +2277,6 @@ int fuse_lowlevel_notify_inval_entry(struct fuse_session *se, fuse_ino_t parent,
+ 	if (se->conn.proto_major < 6 || se->conn.proto_minor < 12)
+ 		return -ENOSYS;
+ 
+-	outarg.parent = parent;
+-	outarg.namelen = namelen;
+-	outarg.padding = 0;
+-
+ 	iov[1].iov_base = &outarg;
+ 	iov[1].iov_len = sizeof(outarg);
+ 	iov[2].iov_base = (void *)name;
+@@ -2283,7 +2289,11 @@ int fuse_lowlevel_notify_delete(struct fuse_session *se,
+ 				fuse_ino_t parent, fuse_ino_t child,
+ 				const char *name, size_t namelen)
+ {
+-	struct fuse_notify_delete_out outarg;
++	struct fuse_notify_delete_out outarg = {
++		.parent = parent,
++		.child = child,
++		.namelen = namelen,
++	};
+ 	struct iovec iov[3];
+ 
+ 	if (!se)
+@@ -2292,11 +2302,6 @@ int fuse_lowlevel_notify_delete(struct fuse_session *se,
+ 	if (se->conn.proto_major < 6 || se->conn.proto_minor < 18)
+ 		return -ENOSYS;
+ 
+-	outarg.parent = parent;
+-	outarg.child = child;
+-	outarg.namelen = namelen;
+-	outarg.padding = 0;
+-
+ 	iov[1].iov_base = &outarg;
+ 	iov[1].iov_len = sizeof(outarg);
+ 	iov[2].iov_base = (void *)name;
+@@ -2309,10 +2314,15 @@ int fuse_lowlevel_notify_store(struct fuse_session *se, fuse_ino_t ino,
+ 			       off_t offset, struct fuse_bufvec *bufv,
+ 			       enum fuse_buf_copy_flags flags)
+ {
+-	struct fuse_out_header out;
+-	struct fuse_notify_store_out outarg;
++	struct fuse_out_header out = {
++		.error = FUSE_NOTIFY_STORE,
++	};
++	struct fuse_notify_store_out outarg = {
++		.nodeid = ino,
++		.offset = offset,
++		.size = fuse_buf_size(bufv),
++	};
+ 	struct iovec iov[3];
+-	size_t size = fuse_buf_size(bufv);
+ 	int res;
+ 
+ 	if (!se)
+@@ -2321,14 +2331,6 @@ int fuse_lowlevel_notify_store(struct fuse_session *se, fuse_ino_t ino,
+ 	if (se->conn.proto_major < 6 || se->conn.proto_minor < 15)
+ 		return -ENOSYS;
+ 
+-	out.unique = 0;
+-	out.error = FUSE_NOTIFY_STORE;
+-
+-	outarg.nodeid = ino;
+-	outarg.offset = offset;
+-	outarg.size = size;
+-	outarg.padding = 0;
+-
+ 	iov[0].iov_base = &out;
+ 	iov[0].iov_len = sizeof(out);
+ 	iov[1].iov_base = &outarg;
+-- 
+2.23.0
 

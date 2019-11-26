@@ -1,12 +1,15 @@
-Date: Thu, 12 Dec 2019 18:59:00 +0000
+Date: Tue, 26 Nov 2019 13:02:29 +0000
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20191212185900.GE4282@work-vm>
-References: <OFEFF035BA.8C1142AF-ON002584CE.006405E7-852584CE.0067F3AB@notes.na.collabserv.com>
+Message-ID: <20191126130229.GG2928@work-vm>
+References: <20191115205543.1816-1-vgoyal@redhat.com>
+	<20191115205543.1816-5-vgoyal@redhat.com>
+	<20191122174732.GL2785@work-vm> <20191125154414.GC13247@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <OFEFF035BA.8C1142AF-ON002584CE.006405E7-852584CE.0067F3AB@notes.na.collabserv.com>
-Subject: Re: [Virtio-fs] virtio-fs on zLinux (s390x)
+In-Reply-To: <20191125154414.GC13247@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 4/4] virtiofsd: Implement blocking posix
+	locks
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,52 +18,116 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Gong Su <gongsu@us.ibm.com>
-Cc: virtio-fs@redhat.com, Cornelia Huck <cohuck@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, miklos@szeredi.hu
 
-* Gong Su (gongsu@us.ibm.com) wrote:
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> On Fri, Nov 22, 2019 at 05:47:32PM +0000, Dr. David Alan Gilbert wrote:
 > 
+> [..]
+> > > +static int virtio_send_notify_msg(struct fuse_session *se, struct iovec *iov,
+> > > +				  int count)
+> > > +{
+> > > +    struct fv_QueueInfo *qi;
+> > > +    VuDev *dev = &se->virtio_dev->dev;
+> > > +    VuVirtq *q;
+> > > +    FVRequest *req;
+> > > +    VuVirtqElement *elem;
+> > > +    unsigned int in_num, bad_in_num = 0, bad_out_num = 0;
+> > > +    struct fuse_out_header *out = iov[0].iov_base;
+> > > +    size_t in_len, tosend_len = iov_size(iov, count);
+> > > +    struct iovec *in_sg;
+> > > +    int ret = 0;
+> > > +
+> > > +    /* Notifications have unique == 0 */
+> > > +    assert (!out->unique);
+> > > +
+> > > +    if (!se->notify_enabled)
+> > > +        return -EOPNOTSUPP;
+> > > +
+> > > +    /* If notifications are enabled, queue index 1 is notification queue */
+> > > +    qi = se->virtio_dev->qi[1];
+> > > +    q = vu_get_queue(dev, qi->qidx);
+> > > +
+> > > +    pthread_rwlock_rdlock(&qi->virtio_dev->vu_dispatch_rwlock);
+> > > +    pthread_mutex_lock(&qi->vq_lock);
+> > > +    /* Pop an element from queue */
+> > > +    req = vu_queue_pop(dev, q, sizeof(FVRequest), &bad_in_num, &bad_out_num);
+> > 
+> > You don't need bad_in_num/bad_out_num - just pass NULL for both; they're
+> > only needed if you expect to read/write data that's not mappable (i.e.
+> > in our direct write case).
 > 
-> Hi Stefan, I'm resending my questions to the list per your request.
+> Will do.
 > 
-> Basically, I'm trying to see if I can get virtio-fs to work on zLinux.
-> Following the instructions on https://virtio-fs.gitlab.io/howto-qemu.html I
-> was able to compile all the pieces but when I tried to run qemu I realized
-> that it needs -numa option which isn't supported on s390x yet.
+> [..]
+> > > @@ -1950,21 +1948,54 @@ static void lo_setlk(fuse_req_t req, fuse_ino_t ino,
+> > >  
+> > >  	if (!plock) {
+> > >  		saverr = ret;
+> > > +		pthread_mutex_unlock(&inode->plock_mutex);
+> > >  		goto out;
+> > >  	}
+> > >  
+> > > +	/*
+> > > +	 * plock is now released when inode is going away. We already have
+> > > +	 * a reference on inode, so it is guaranteed that plock->fd is
+> > > +	 * still around even after dropping inode->plock_mutex lock
+> > > +	 */
+> > > +	ofd = plock->fd;
+> > > +	pthread_mutex_unlock(&inode->plock_mutex);
+> > > +
+> > > +	/*
+> > > +	 * If this lock request can block, request caller to wait for
+> > > +	 * notification. Do not access req after this. Once lock is
+> > > +	 * available, send a notification instead.
+> > > +	 */
+> > > +	if (sleep && lock->l_type != F_UNLCK) {
+> > > +		/*
+> > > +		 * If notification queue is not enabled, can't support async
+> > > +		 * locks.
+> > > +		 */
+> > > +		if (!se->notify_enabled) {
+> > > +			saverr = EOPNOTSUPP;
+> > > +			goto out;
+> > > +		}
+> > > +		async_lock = true;
+> > > +		unique = req->unique;
+> > > +		fuse_reply_wait(req);
+> > > +	}
+> > >  	/* TODO: Is it alright to modify flock? */
+> > >  	lock->l_pid = 0;
+> > > -	ret = fcntl(plock->fd, F_OFD_SETLK, lock);
+> > > +	if (async_lock)
+> > > +		ret = fcntl(ofd, F_OFD_SETLKW, lock);
+> > > +	else
+> > > +		ret = fcntl(ofd, F_OFD_SETLK, lock);
+> > 
+> > What happens if the guest is rebooted after it's asked
+> > for, but not been granted a lock?
 > 
-> I have talked to Christian Borntraeger (whom I worked with on other
-> projects before) and he indicated that he had a plan to add -numa support
-> for s390x but currently is busy on other things.
+> I think a regular reboot can't be done till a request is pending, because
+> virtio-fs can't be unmounted and unmount will wait for all pending
+> requests to finish.
 > 
-> So I'm trying to see if there are other ways for me to go forward without
-> having to wait for Christian. I see two options:
+> Destroying qemu will destroy deamon too.
 > 
-> 1. Merge virtiofsd into qemu itself. In the "Interchangeability" section of
-> the virtio-fs design page (https://virtio-fs.gitlab.io/design.html), it
-> mentioned that "It is also possible to forego vhost-user and emulate the
-> virtio-fs device directly inside the hypervisor, although this may result
-> in poor isolation and security." Since each guest typically gets its own
-> qemu process, maybe this is acceptable for some use cases. In exchange, you
-> get the benefit of not having to carve out a chunk of memory from /dev/shm
-> (and maybe simpler communication between virtiofsd and qemu).
-> 2. Use something other than -numa to share memory between virtiofsd and
-> qemu that's supported on zLinux. I'm not entirely familiar with qemu so I
-> have no idea whether this is possible or not.
+> Are there any other reboot paths I have missed.
 
-Hi,
-  My understanding is that Igor Mammedov (imammedo@redhat.com) has plans
-to allow 'shared' to be set on main memory, so we wouldn't need the numa
-code.
+Yes, there are a few other ways the guest can reboot:
+  a) A echo b > /proc/sysrq-trigger
+  b) Telling qemu to do a reset
+
+probably a few more as well; but they all end up with the daemon
+still running over the same connection.   See
+'virtiofsd: Handle hard reboot' where I handle that case where
+a FUSE_INIT turns up unexpectedly.
 
 Dave
 
-> Thanks.
 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
-
+> Thanks
+> Vivek
 --
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

@@ -1,15 +1,16 @@
-Date: Mon, 25 Nov 2019 09:57:59 -0500
+Date: Wed, 27 Nov 2019 14:08:08 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20191125145759.GA13247@redhat.com>
+Message-ID: <20191127190808.GA18507@redhat.com>
 References: <20191115205543.1816-1-vgoyal@redhat.com>
-	<20191115205543.1816-4-vgoyal@redhat.com>
-	<20191122103300.GD464656@stefanha-x1.localdomain>
+	<20191115205543.1816-5-vgoyal@redhat.com>
+	<20191122174732.GL2785@work-vm> <20191125154414.GC13247@redhat.com>
+	<20191126130229.GG2928@work-vm>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20191122103300.GD464656@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH 3/4] virtiofsd: Specify size of notification
- buffer using config space
+In-Reply-To: <20191126130229.GG2928@work-vm>
+Subject: Re: [Virtio-fs] [PATCH 4/4] virtiofsd: Implement blocking posix
+	locks
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,165 +19,74 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, miklos@szeredi.hu, qemu-devel@nongnu.org
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, miklos@szeredi.hu
 
-On Fri, Nov 22, 2019 at 10:33:00AM +0000, Stefan Hajnoczi wrote:
-> On Fri, Nov 15, 2019 at 03:55:42PM -0500, Vivek Goyal wrote:
-> > diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
-> > index 411114c9b3..982b6ad0bd 100644
-> > --- a/contrib/virtiofsd/fuse_virtio.c
-> > +++ b/contrib/virtiofsd/fuse_virtio.c
-> > @@ -109,7 +109,8 @@ static uint64_t fv_get_features(VuDev *dev)
-> >      uint64_t features;
-> >  
-> >      features = 1ull << VIRTIO_F_VERSION_1 |
-> > -               1ull << VIRTIO_FS_F_NOTIFICATION;
-> > +               1ull << VIRTIO_FS_F_NOTIFICATION |
-> > +               1ull << VHOST_USER_F_PROTOCOL_FEATURES;
-> 
-> This is not needed since VHOST_USER_F_PROTOCOL_FEATURES is already added
-> by vu_get_features_exec():
-
-Will do.
-
-> 
->   vu_get_features_exec(VuDev *dev, VhostUserMsg *vmsg)
->   {
->       vmsg->payload.u64 =
->           1ULL << VHOST_F_LOG_ALL |
->           1ULL << VHOST_USER_F_PROTOCOL_FEATURES;
-> 
->       if (dev->iface->get_features) {
->           vmsg->payload.u64 |= dev->iface->get_features(dev);
->       }
-> 
-> >  
-> >      return features;
-> >  }
-> > @@ -927,6 +928,27 @@ static bool fv_queue_order(VuDev *dev, int qidx)
-> >      return false;
-> >  }
-> >  
-> > +static uint64_t fv_get_protocol_features(VuDev *dev)
-> > +{
-> > +	return 1ull << VHOST_USER_PROTOCOL_F_CONFIG;
-> > +}
-> 
-> Please change vu_get_protocol_features_exec() in a separate patch so
-> that devices don't need this boilerplate .get_protocol_features() code:
-> 
->   static bool
->   vu_get_protocol_features_exec(VuDev *dev, VhostUserMsg *vmsg)
->   {
->       ...
->  -    if (dev->iface->get_config && dev->iface->set_config) {
->  +    if (dev->iface->get_config || dev->iface->set_config) {
->           features |= 1ULL << VHOST_USER_PROTOCOL_F_CONFIG;
-
-This seems more like a nice to have thing. Can we leave it for sometime
-later.
-
->       }
-> 
-> > +
-> > +static int fv_get_config(VuDev *dev, uint8_t *config, uint32_t len)
-> > +{
-> > +	struct virtio_fs_config fscfg = {};
-> > +
-> > +	fuse_log(FUSE_LOG_DEBUG, "%s:Setting notify_buf_size=%d\n", __func__,
-> > +                 sizeof(struct fuse_notify_lock_out));
-> > +	/*
-> > +	 * As of now only notification related to lock is supported. As more
-> > +	 * notification types are supported, bump up the size accordingly.
-> > +	 */
-> > +	fscfg.notify_buf_size = sizeof(struct fuse_notify_lock_out);
-> 
-> Missing cpu_to_le32().
-
-Not sure. Deivce converts to le32 when guests asks for it. So there should
-not be any need to do this conversion between vhost-user daemon and
-device. I am assuming that both daemon and qemu are using same endianess
-and if that's the case, first converting it to le32 and undoing this
-operation on other end (if we are running on an architecture with big
-endian), seems unnecessary and confusing.
-
-static void vuf_get_config(VirtIODevice *vdev, uint8_t *config)
-{
-    ...
-    ...
-    virtio_stl_p(vdev, &fscfg.notify_buf_size, fs->fscfg.notify_buf_size);
-}
-
-> 
-> I'm not sure about specifying the size precisely down to the last byte
-> because any change to guest-visible aspects of the device (like VIRTIO
-> Configuration Space) are not compatible across live migration.  It will
-> be necessary to introduce a device version command-line option for live
-> migration compatibility so that existing guests can be migrated to a new
-> virtiofsd without the device changing underneath them.
-
-I am not sure I understand this point. If we were to support live
-migration, will we not have to reset the queue and regoniate with
-device again on destination host.
-> 
-> How about rounding this up to 4 KB?
-
-Not sure how will that help. Right now it feels just wasteful of memory.
-
-> 
-> >  static void vuf_get_config(VirtIODevice *vdev, uint8_t *config)
-> >  {
-> >      VHostUserFS *fs = VHOST_USER_FS(vdev);
-> >      struct virtio_fs_config fscfg = {};
-> > +    int ret;
-> > +
-> > +    /*
-> > +     * As of now we only get notification buffer size from device. And that's
-> > +     * needed only if notification queue is enabled.
-> > +     */
-> > +    if (fs->notify_enabled) {
-> > +        ret = vhost_dev_get_config(&fs->vhost_dev, (uint8_t *)&fs->fscfg,
-> > +                                   sizeof(struct virtio_fs_config));
-> > +	if (ret < 0) {
-> 
-> Indentation.
-
-Will fix.
-
-> 
-> > +            error_report("vhost-user-fs: get device config space failed."
-> > +                         " ret=%d\n", ret);
-> > +            return;
-> > +        }
-> 
-> Missing le32_to_cpu() for notify_buf_size.
-
-See above.
+On Tue, Nov 26, 2019 at 01:02:29PM +0000, Dr. David Alan Gilbert wrote:
 
 [..]
-> > @@ -545,6 +569,8 @@ static void vuf_device_realize(DeviceState *dev, Error **errp)
-> >      fs->vhost_dev.nvqs = 2 + fs->conf.num_request_queues;
-> >  
-> >      fs->vhost_dev.vqs = g_new0(struct vhost_virtqueue, fs->vhost_dev.nvqs);
-> > +
-> > +    vhost_dev_set_config_notifier(&fs->vhost_dev, &fs_ops);
+> > > > @@ -1950,21 +1948,54 @@ static void lo_setlk(fuse_req_t req, fuse_ino_t ino,
+> > > >  
+> > > >  	if (!plock) {
+> > > >  		saverr = ret;
+> > > > +		pthread_mutex_unlock(&inode->plock_mutex);
+> > > >  		goto out;
+> > > >  	}
+> > > >  
+> > > > +	/*
+> > > > +	 * plock is now released when inode is going away. We already have
+> > > > +	 * a reference on inode, so it is guaranteed that plock->fd is
+> > > > +	 * still around even after dropping inode->plock_mutex lock
+> > > > +	 */
+> > > > +	ofd = plock->fd;
+> > > > +	pthread_mutex_unlock(&inode->plock_mutex);
+> > > > +
+> > > > +	/*
+> > > > +	 * If this lock request can block, request caller to wait for
+> > > > +	 * notification. Do not access req after this. Once lock is
+> > > > +	 * available, send a notification instead.
+> > > > +	 */
+> > > > +	if (sleep && lock->l_type != F_UNLCK) {
+> > > > +		/*
+> > > > +		 * If notification queue is not enabled, can't support async
+> > > > +		 * locks.
+> > > > +		 */
+> > > > +		if (!se->notify_enabled) {
+> > > > +			saverr = EOPNOTSUPP;
+> > > > +			goto out;
+> > > > +		}
+> > > > +		async_lock = true;
+> > > > +		unique = req->unique;
+> > > > +		fuse_reply_wait(req);
+> > > > +	}
+> > > >  	/* TODO: Is it alright to modify flock? */
+> > > >  	lock->l_pid = 0;
+> > > > -	ret = fcntl(plock->fd, F_OFD_SETLK, lock);
+> > > > +	if (async_lock)
+> > > > +		ret = fcntl(ofd, F_OFD_SETLKW, lock);
+> > > > +	else
+> > > > +		ret = fcntl(ofd, F_OFD_SETLK, lock);
+> > > 
+> > > What happens if the guest is rebooted after it's asked
+> > > for, but not been granted a lock?
+> > 
+> > I think a regular reboot can't be done till a request is pending, because
+> > virtio-fs can't be unmounted and unmount will wait for all pending
+> > requests to finish.
+> > 
+> > Destroying qemu will destroy deamon too.
+> > 
+> > Are there any other reboot paths I have missed.
 > 
-> Is this really needed since vhost_user_fs_handle_config_change() ignores
-> it?
+> Yes, there are a few other ways the guest can reboot:
+>   a) A echo b > /proc/sysrq-trigger
 
-Initially I did not introduce it but code did not work. Looked little
-closer and noticed following code in vhost_user_backend_init().
+I tried it. Both qemu and virtiofsd hang. virtiofsd wants to stop a 
+queue. And that tries to stop thrad pool. But one of the threads in
+thread pool is blocked on setlkw. So g_thread_pool_free() hangs.
 
-        if (!dev->config_ops || !dev->config_ops->vhost_dev_config_notifier) {
-            /* Don't acknowledge CONFIG feature if device doesn't support it */
-            dev->protocol_features &= ~(1ULL << VHOST_USER_PROTOCOL_F_CONFIG);
-
-So if dev->config_ops->vhost_dev_config_notifier is not provided, 
-feature VHOST_USER_PROTOCOL_F_CONFIG will be reset.
-
-Its kind of odd that its a hard requirement. Anyway, that's the reason
-I added it so that VHOST_USER_PROTOCOL_F_CONFIG continues to work.
+I am not seeing any option in glib thread pool API to stop or send
+signal to threads which are blocked.
 
 Thanks
 Vivek

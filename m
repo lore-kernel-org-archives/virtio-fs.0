@@ -1,35 +1,11 @@
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=infradead.org; s=bombadil.20170209;
-	h=In-Reply-To:Content-Type:MIME-Version
-	:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
-	List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
-	bh=2kBnL5gA8Hu2OCxhQ/ljIeIBv2eKrh+kqk+I83yZiPg=;
-	b=ZWBdCh+xKxFQSUSue/qfzQHsj
-	6T5S7vMsw+xLZ62ufe9Nw3VxsvMHHudJaF8KytEMMXsDhKtJIMWpsjy+CQ2AaJlNh+CZM7spuk1qi
-	/GG/VNY7ofqvL8y2h70Tkp7c2xkCRxKZ1rFFxsF9ewZVdfm5fMyeHS7JZqUgbOIVcUM4enC/7CPfL
-	YvahSVPFgA+tsvy8E7FsjcEDyCoXQ7NeHHA9vZPIY3RKwvTq97SGhEeSWoA7Sbe4ZJF+SklJGS433
-	rfYX021bytGaEdqU7+9n2lMTY4eAmfRy/GoDNiu+qsLx1wh+rUf9RelcB0PwHzVtNjAEn/Sepic4P
-	CyVpuzEdg==;
-Date: Tue, 7 Jan 2020 04:51:59 -0800
-From: Christoph Hellwig <hch@infradead.org>
-Message-ID: <20200107125159.GA15745@infradead.org>
-References: <20190821175720.25901-1-vgoyal@redhat.com>
-	<20190821175720.25901-2-vgoyal@redhat.com>
-	<20190826115152.GA21051@infradead.org>
-	<20190827163828.GA6859@redhat.com>
-	<20190828065809.GA27426@infradead.org>
-	<20190828175843.GB912@redhat.com>
-	<20190828225322.GA7777@dread.disaster.area>
-	<CAPcyv4jGEAbYSJef2zLzgg6Arozsuz7eN_vZL1iTcd1XQuNT4Q@mail.gmail.com>
-	<20191216181014.GA30106@redhat.com>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Tue,  3 Dec 2019 13:14:22 +0000
+Message-Id: <20191203131423.40962-2-dgilbert@redhat.com>
+In-Reply-To: <20191203131423.40962-1-dgilbert@redhat.com>
+References: <20191203131423.40962-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20191216181014.GA30106@redhat.com>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 01/19] dax: remove block device dependencies
+Subject: [Virtio-fs] [PATCH 1/2] virtiofsd: cap-ng helpers
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -38,38 +14,151 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, linux-nvdimm <linux-nvdimm@lists.01.org>, Miklos Szeredi <miklos@szeredi.hu>, Dave Chinner <david@fromorbit.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Christoph Hellwig <hch@infradead.org>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Dan Williams <dan.j.williams@intel.com>
+To: virtio-fs@redhat.com, vgoyal@redhat.com
 
-On Mon, Dec 16, 2019 at 01:10:14PM -0500, Vivek Goyal wrote:
-> > Agree. In retrospect it was my laziness in the dax-device
-> > implementation to expect the block-device to be available.
-> > 
-> > It looks like fs_dax_get_by_bdev() is an intercept point where a
-> > dax_device could be dynamically created to represent the subset range
-> > indicated by the block-device partition. That would open up more
-> > cleanup opportunities.
-> 
-> Hi Dan,
-> 
-> After a long time I got time to look at it again. Want to work on this
-> cleanup so that I can make progress with virtiofs DAX paches.
-> 
-> I am not sure I understand the requirements fully. I see that right now
-> dax_device is created per device and all block partitions refer to it. If
-> we want to create one dax_device per partition, then it looks like this
-> will be structured more along the lines how block layer handles disk and
-> partitions. (One gendisk for disk and block_devices for partitions,
-> including partition 0). That probably means state belong to whole device
-> will be in common structure say dax_device_common, and per partition state
-> will be in dax_device and dax_device can carry a pointer to
-> dax_device_common.
-> 
-> I am also not sure what does it mean to partition dax devices. How will
-> partitions be exported to user space.
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Dan, last time we talked you agreed that partitioned dax devices are
-rather pointless IIRC.  Should we just deprecate partitions on DAX
-devices and then remove them after a cycle or two?
+libcap-ng reads /proc during capng_get_caps_process, and virtiofsd's
+sandboxing doesn't have /proc mounted; thus we have to do the
+caps read before we sandbox it and save/restore the state.
 
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+---
+ Makefile                           |  2 +-
+ contrib/virtiofsd/passthrough_ll.c | 72 ++++++++++++++++++++++++++++++
+ 2 files changed, 73 insertions(+), 1 deletion(-)
+
+diff --git a/Makefile b/Makefile
+index 237cbdfee1..1484c23a9b 100644
+--- a/Makefile
++++ b/Makefile
+@@ -323,7 +323,7 @@ HELPERS-$(call land,$(CONFIG_SOFTMMU),$(CONFIG_LINUX)) = qemu-bridge-helper$(EXE
+ 
+ ifdef CONFIG_LINUX
+ ifdef CONFIG_SECCOMP
+-ifdef CONFIG_LIBCAP
++ifdef CONFIG_LIBCAP_NG
+ HELPERS-y += virtiofsd$(EXESUF)
+ vhost-user-json-y += contrib/virtiofsd/50-qemu-virtiofsd.json
+ endif
+diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+index 1688071c10..139261efc1 100644
+--- a/contrib/virtiofsd/passthrough_ll.c
++++ b/contrib/virtiofsd/passthrough_ll.c
+@@ -47,6 +47,7 @@
+ #include <string.h>
+ #include <syslog.h>
+ #include <limits.h>
++#include <cap-ng.h>
+ #include <dirent.h>
+ #include <assert.h>
+ #include <errno.h>
+@@ -216,6 +217,13 @@ static const struct fuse_opt lo_opts[] = {
+ };
+ static bool use_syslog = false;
+ static int current_log_level;
++static struct {
++	pthread_mutex_t mutex;
++	void *saved;
++} cap;
++/* That we loaded cap-ng in the current thread from the saved */
++static __thread bool cap_loaded = 0;
++
+ static void unref_inode_lolocked(struct lo_data *lo, struct lo_inode *inode, uint64_t n);
+ static void put_shared(struct lo_data *lo, struct lo_inode *inode);
+ 
+@@ -242,6 +250,37 @@ static struct lo_data *lo_data(fuse_req_t req)
+ 	return (struct lo_data *) fuse_req_userdata(req);
+ }
+ 
++/*
++ * Load capng's state from our saved state if the current thread
++ * hadn't previously been loaded.
++ * returns 0 on success
++ */
++static int load_capng(void)
++{
++	if (!cap_loaded) {
++		pthread_mutex_lock(&cap.mutex);
++		capng_restore_state(&cap.saved);
++		/*
++		 * restore_state free's the saved copy
++		 * so make another.
++		 */
++		cap.saved = capng_save_state();
++		if (!cap.saved) {
++			fuse_log(FUSE_LOG_ERR, "capng_save_state (thread)\n");
++			return -EINVAL;
++		}
++		pthread_mutex_unlock(&cap.mutex);
++
++		/*
++		 * We want to use the loaded state for our pid,
++		 * not the original
++		 */
++		capng_setpid(gettid());
++		cap_loaded = true;
++	}
++	return 0;
++}
++
+ /* Helpers for dropping and regaining effective capabilities. Returns 0
+  * on success, error otherwise  */
+ static int drop_effective_cap(const char *cap_name, bool *cap_dropped)
+@@ -2754,6 +2793,35 @@ static void setup_namespaces(struct lo_data *lo, struct fuse_session *se)
+ 	}
+ }
+ 
++/*
++ * Capture the capability state, we'll need to restore this for individual
++ * threads later; see load_capng.
++ */
++static void setup_capng(void)
++{
++	/* Note this accesses /proc so has to happen before the sandbox */
++	if (capng_get_caps_process()) {
++		fuse_log(FUSE_LOG_ERR, "capng_get_caps_process\n");
++		exit(1);
++	}
++	pthread_mutex_init(&cap.mutex, NULL);
++	pthread_mutex_lock(&cap.mutex);
++	cap.saved = capng_save_state();
++	if (!cap.saved) {
++		fuse_log(FUSE_LOG_ERR, "capng_save_state\n");
++		exit(1);
++	}
++	pthread_mutex_unlock(&cap.mutex);
++}
++
++static void cleanup_capng(void)
++{
++	free(cap.saved);
++	cap.saved = NULL;
++	pthread_mutex_destroy(&cap.mutex);
++}
++
++
+ /*
+  * Make the source directory our root so symlinks cannot escape and no other
+  * files are accessible.  Assumes unshare(CLONE_NEWNS) was already called.
+@@ -3173,6 +3241,9 @@ int main(int argc, char *argv[])
+ 
+ 	setup_nofile_rlimit();
+ 
++	/* Must be before sandbox since it wants /proc */
++	setup_capng();
++
+ 	setup_sandbox(&lo, se, opts.syslog);
+ 
+ 	setup_root(&lo, &lo.root);
+@@ -3195,6 +3266,7 @@ int main(int argc, char *argv[])
+ 
+ err_out4:
+ 	fuse_session_unmount(se);
++	cleanup_capng();
+ err_out3:
+ 	fuse_remove_signal_handlers(se);
+ err_out2:
+-- 
+2.23.0
 

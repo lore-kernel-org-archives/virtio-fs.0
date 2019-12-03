@@ -1,14 +1,13 @@
-Date: Thu, 2 Jan 2020 11:13:42 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200102161342.GD6051@redhat.com>
-References: <68b2f70664616734f98f572a9d70d0a8fe4627d6.camel@intel.com>
-	<20200102135505.GC6051@redhat.com>
-	<fc1e89f565bb14906e05a31a9a1729b759f77bd0.camel@intel.com>
+Date: Tue, 3 Dec 2019 10:07:08 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20191203100708.GA3078@work-vm>
+References: <20191202202639.102322-1-farosas@linux.ibm.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <fc1e89f565bb14906e05a31a9a1729b759f77bd0.camel@intel.com>
-Subject: Re: [Virtio-fs] virtio-fs kernel patches
+In-Reply-To: <20191202202639.102322-1-farosas@linux.ibm.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofs: Relax DAX window protection for
+	ppc
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,37 +16,95 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
-Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+To: Fabiano Rosas <farosas@linux.ibm.com>
+Cc: virtio-fs@redhat.com, qemu-ppc@nongnu.org, qemu-devel@nongnu.org
 
-On Thu, Jan 02, 2020 at 03:55:11PM +0000, Boeuf, Sebastien wrote:
-> On Thu, 2020-01-02 at 08:55 -0500, Vivek Goyal wrote:
-> > On Mon, Dec 23, 2019 at 10:37:13PM +0000, Boeuf, Sebastien wrote:
-> > > Hi folks,
-> > > 
-> > > I was wondering what was the status regarding the linux kernel
-> > > patches
-> > > for virtio-fs?
-> > > Do you have a series ready on top of 5.5-rcX?
-> > 
-> > Hi Sebastien,
-> > 
-> > Its not ready yet. I was planning to work on it before start of
-> > holidays
-> > but I could not. I am planning to work on it now. Will let you know
-> > as
-> > soon as its ready.
+* Fabiano Rosas (farosas@linux.ibm.com) wrote:
+> When setting up the DAX window during the virtiofs driver probe inside
+> the guest, the Linux arch-specific function arch_add_memory is called,
+> which on ppc tries to do a cache flush [1] of the recently added
+> memory. At this point the window is mmap'ed PROT_NONE by QEMU, which
+> causes the following:
 > 
-> Great, thank you :)
+> <snip>
+> [   10.136703] virtio_fs virtio0: Cache len: 0x80000000 @ 0x210000000000
+> [   10.165106] radix-mmu: Mapped 0xc000210000000000-0xc000210080000000 with 1.00 GiB pages
+> error: kvm run failed Bad address
+> NIP c000000000072350   LR c000000000072304 CTR 0000000001000000 XER 0000000020040000 CPU#0
+> MSR 8000000002009033 HID0 0000000000000000  HF 8000000000000000 iidx 3 didx 3
+> TB 00000000 00000000 DECR 0
+> GPR00 c000000000072304 c0000000fa383100 c000000001190300 0000000000000000
+> GPR04 0000000000000001 0000000000000000 c0000000fa383208 0000000000000080
+> GPR08 c000210000000000 000000008000007f 0000000001000000 6874697720303030
+> <snip>
+> 
+> The problem is the same for the memory device removal path
+> (e.g. during filesystem unmount).
+> 
+> Since powerpc expects the memory to be accessible during device
+> addition/removal, this patch makes the DAX window readable at creation
+> and after virtio-fs unmap.
+> 
+> 1 - https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=fb5924fd
+> 
+> Signed-off-by: Fabiano Rosas <farosas@linux.ibm.com>
 
-Hi Sebastien,
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 
-I pushed DAX pathces for 5.5-rc4 here.
+Thanks, I'll do a pull after the tree opens again.
 
-https://github.com/rhvgoyal/linux/commits/virtiofs-dax-5.5
+Dave
 
-Give it a try and let me know if you face issues.
-
-Thanks
-Vivek
+> ---
+>  hw/virtio/vhost-user-fs.c | 17 ++++++++++++++---
+>  1 file changed, 14 insertions(+), 3 deletions(-)
+> 
+> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+> index 455e97beea..92958797d0 100644
+> --- a/hw/virtio/vhost-user-fs.c
+> +++ b/hw/virtio/vhost-user-fs.c
+> @@ -24,6 +24,16 @@
+>  #include "exec/address-spaces.h"
+>  #include "trace.h"
+>  
+> +/*
+> + * The powerpc kernel code expects the memory to be accessible during
+> + * addition/removal.
+> + */
+> +#if defined(TARGET_PPC64) && defined(CONFIG_LINUX)
+> +#define DAX_WINDOW_PROT PROT_READ
+> +#else
+> +#define DAX_WINDOW_PROT PROT_NONE
+> +#endif
+> +
+>  uint64_t vhost_user_fs_slave_map(struct vhost_dev *dev, VhostUserFSSlaveMsg *sm,
+>                                   int fd)
+>  {
+> @@ -133,8 +143,8 @@ uint64_t vhost_user_fs_slave_unmap(struct vhost_dev *dev, VhostUserFSSlaveMsg *s
+>              continue;
+>          }
+>  
+> -        ptr = mmap(cache_host + sm->c_offset[i], sm->len[i],
+> -                PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+> +        ptr = mmap(cache_host + sm->c_offset[i], sm->len[i], DAX_WINDOW_PROT,
+> +                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+>          if (ptr != (cache_host + sm->c_offset[i])) {
+>              res = -errno;
+>              fprintf(stderr, "%s: mmap failed (%s) [%d] %"
+> @@ -485,8 +495,9 @@ static void vuf_device_realize(DeviceState *dev, Error **errp)
+>  
+>      if (fs->conf.cache_size) {
+>          /* Anonymous, private memory is not counted as overcommit */
+> -        cache_ptr = mmap(NULL, fs->conf.cache_size, PROT_NONE,
+> +        cache_ptr = mmap(NULL, fs->conf.cache_size, DAX_WINDOW_PROT,
+>                           MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+> +
+>          if (cache_ptr == MAP_FAILED) {
+>              error_setg(errp, "Unable to mmap blank cache");
+>              return;
+> -- 
+> 2.23.0
+> 
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

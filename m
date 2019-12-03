@@ -1,14 +1,12 @@
-Date: Thu, 9 Jan 2020 10:23:03 +0800
-From: Eryu Guan <eguan@linux.alibaba.com>
-Message-ID: <20200109022303.GA79586@e18g06458.et15sqa>
-References: <20200108202422.GF1995@redhat.com>
+Date: Tue, 3 Dec 2019 09:17:59 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20191203141759.GA7810@redhat.com>
+References: <20191203131423.40962-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20200108202422.GF1995@redhat.com>
-Content-Type: text/plain; charset=WINDOWS-1252
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Open fd O_RDONLY in
- setxattr/removexattr
+In-Reply-To: <20191203131423.40962-1-dgilbert@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 0/2] Convert to cap-ng
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,55 +15,40 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com
 
-On Wed, Jan 08, 2020 at 03:24:22PM -0500, Vivek Goyal wrote:
-> Do not open fd O_RDWR as it will fail for directories with EISDIR. This
-> code can be called both for regular files as well as directories.
+On Tue, Dec 03, 2019 at 01:14:21PM +0000, Dr. David Alan Gilbert (git) wrote:
+> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 > 
-> I noticed this when I tried "setfattr -n user.foo -v test <dir>" inside
-> the guest and got EISDIR.
+> Hi,
+>   This changes virtiofsd to use cap-ng rather than cap
+> (qemu is moving in that direction).  It's a little painful
+> because of an interaction with our sandboxing.
 > 
-> To write xattr, we don't have to open fd with write permissions. Looks
-> like kernel will do permission checks on inode.
-> 
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> I intend to flatten the conversion into Vivek's patch that
+> adds the libcap use.
 
-Looks good to me.
+It feels ugly that we store the parent process's state in a global
+variable and all the threads load their state from there. At the
+same time I don't have any good idea how to solve this problem given
+libcap-ng relies on /proc being there. So I am fine with the patches.
 
-Reviewed-by: Eryu Guan <eguan@linux.alibaba.com>
-
-> ---
->  contrib/virtiofsd/passthrough_ll.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+Thanks
+Vivek
 > 
-> Index: qemu/contrib/virtiofsd/passthrough_ll.c
-> ===================================================================
-> --- qemu.orig/contrib/virtiofsd/passthrough_ll.c	2020-01-08 15:01:03.821980889 -0500
-> +++ qemu/contrib/virtiofsd/passthrough_ll.c	2020-01-08 15:05:15.209384352 -0500
-> @@ -2424,7 +2424,7 @@ static void lo_setxattr(fuse_req_t req,
->  	}
->  
->  	sprintf(procname, "%i", inode->fd);
-> -	fd = openat(lo->proc_self_fd, procname, O_RDWR);
-> +	fd = openat(lo->proc_self_fd, procname, O_RDONLY);
->  	if (fd < 0) {
->  		saverr = errno;
->  		goto out;
-> @@ -2473,7 +2473,7 @@ static void lo_removexattr(fuse_req_t re
->  	}
->  
->  	sprintf(procname, "%i", inode->fd);
-> -	fd = openat(lo->proc_self_fd, procname, O_RDWR);
-> +	fd = openat(lo->proc_self_fd, procname, O_RDONLY);
->  	if (fd < 0) {
->  		saverr = errno;
->  		goto out;
+> Dave
 > 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
-
+> Dr. David Alan Gilbert (2):
+>   virtiofsd: cap-ng helpers
+>   virtiofsd: Convert to libcap-ng
+> 
+>  Makefile                           |   2 +-
+>  contrib/virtiofsd/Makefile.objs    |   2 -
+>  contrib/virtiofsd/passthrough_ll.c | 162 +++++++++++++++++++----------
+>  3 files changed, 106 insertions(+), 60 deletions(-)
+> 
+> -- 
+> 2.23.0
+> 
 

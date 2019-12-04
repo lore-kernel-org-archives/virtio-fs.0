@@ -1,11 +1,14 @@
-From: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
-Date: Mon, 20 Jan 2020 21:43:05 +0900
-Message-ID: <20200120124307.20020-1-misono.tomohiro@jp.fujitsu.com>
+Date: Wed, 4 Dec 2019 19:42:50 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20191204194250.GN3325@work-vm>
+References: <20191204190836.31324-1-vgoyal@redhat.com>
+	<20191204190836.31324-2-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=WINDOWS-1252
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 0/2] virtiofsd: Remove fuse_loop_mt.c and
-	clone_fd option
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20191204190836.31324-2-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v2 1/5] virtiofsd: Get rid of unused fields
+ in fv_QueueInfo
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,33 +17,44 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, mszeredi@redhat.com, qemu-devel@nongnu.org
 
-While reviewing virtiofsd code, I noticed fuse_loop_mt.c became not
-needed for virtiofs. As it seems that it is easier to remove them on top
-of current virtiofs branch, I made these patches.
-Feel free to squash or rebase if convenient.
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> There are some unused fields in "struct fv_QueueInfo". Get rid of these fields.
+> 
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  contrib/virtiofsd/fuse_virtio.c | 6 ------
+>  1 file changed, 6 deletions(-)
+> 
+> diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
+> index 31c8542b6c..2a9cd60a01 100644
+> --- a/contrib/virtiofsd/fuse_virtio.c
+> +++ b/contrib/virtiofsd/fuse_virtio.c
+> @@ -50,12 +50,6 @@ struct fv_QueueInfo {
+>      int qidx;
+>      int kick_fd;
+>      int kill_fd; /* For killing the thread */
+> -
+> -    /* The element for the command currently being processed */
+> -    VuVirtqElement *qe;
+> -    /* If any of the qe vec elements (towards vmm) are unmappable */
+> -    unsigned int elem_bad_in;
+> -    bool reply_sent;
 
-Thanks,
-Misono
+Yep, those last two got moved into FVRequest as part of the thread pool
+stuff.
 
-Misono Tomohiro (2):
-  virtiofsd: fuse_lowevel: remove call of fuse_chan_{get,put}
-  virtiofsd: Remove fuse_loop_mt.c
 
- tools/virtiofsd/Makefile.objs   |  1 -
- tools/virtiofsd/fuse.h          | 38 ----------------------
- tools/virtiofsd/fuse_common.h   | 24 --------------
- tools/virtiofsd/fuse_i.h        | 19 -----------
- tools/virtiofsd/fuse_loop_mt.c  | 56 ---------------------------------
- tools/virtiofsd/fuse_lowlevel.c |  3 +-
- tools/virtiofsd/fuse_lowlevel.h | 20 ------------
- tools/virtiofsd/fuse_virtio.c   |  1 -
- tools/virtiofsd/helper.c        |  3 --
- 9 files changed, 1 insertion(+), 164 deletions(-)
- delete mode 100644 tools/virtiofsd/fuse_loop_mt.c
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 
--- 
-2.21.1
-
+>  };
+>  
+>  /* A FUSE request */
+> -- 
+> 2.20.1
+> 
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

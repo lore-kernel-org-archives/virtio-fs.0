@@ -1,22 +1,12 @@
-References: <410cfe7a-5d38-7670-7e34-6eeae4b5a4fc@redhat.com>
-	<CAOssrKc2ESAiQmE8GSqkh6_rtcSqX2ok=Rm=bnG5MGcaJs-31g@mail.gmail.com>
-	<6d763002-258b-1bec-43a5-8ab5ae1f63de@redhat.com>
-	<CAOssrKeDEjEjBGMD+qXpGzA680TYKDie++whKp25S4x8v-MxOQ@mail.gmail.com>
-	<19bfff9f-5024-a104-a639-d02bea178440@redhat.com>
-	<CAOssrKcXKb5B=9mTaPxXwNLSZWpUAZ=3UdcDQ8wCWVbEg0A2-w@mail.gmail.com>
-	<CAOssrKf8DN68+5aAseBYsnSXr+zWHy0UqNdVHMU5cSu0b-EvQw@mail.gmail.com>
-	<9dfafbc1-6b64-ed12-a950-19dbf7b1eda2@redhat.com>
-	<CAOssrKdXxN5iUpMocenvQZoHYinzVBYZEADersU7RHRy5Tf2tA@mail.gmail.com>
-	<CAOssrKdU=+A9kkdwFiHAJRRFesER1hFT3eATQmZO3=x7Bs1ong@mail.gmail.com>
-From: Max Reitz <mreitz@redhat.com>
-Message-ID: <4baf208d-66fb-4759-8fac-691c853d7154@redhat.com>
-Date: Wed, 15 Jan 2020 16:19:06 +0100
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Wed,  4 Dec 2019 14:08:33 -0500
+Message-Id: <20191204190836.31324-3-vgoyal@redhat.com>
+In-Reply-To: <20191204190836.31324-1-vgoyal@redhat.com>
+References: <20191204190836.31324-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <CAOssrKdU=+A9kkdwFiHAJRRFesER1hFT3eATQmZO3=x7Bs1ong@mail.gmail.com>
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature";
-	boundary="MtrfCRNMg664dtFKlvr5Ek8bkIriNfon7"
-Subject: Re: [Virtio-fs] Ways to uniquely and persistently identify nodes
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2 2/5] virtiofsd: Release file locks using
+	F_UNLCK
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,100 +15,107 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <mszeredi@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: virtio-fs@redhat.com, qemu-devel@nongnu.org
+Cc: mszeredi@redhat.com
 
-This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
---MtrfCRNMg664dtFKlvr5Ek8bkIriNfon7
-Content-Type: multipart/mixed; boundary="WgAHIrZoGmv7Av5WirjaTjDIhtSuDE8ww"
+We are emulating posix locks for guest using open file description locks
+in virtiofsd. When any of the fd is closed in guest, we find associated
+OFD lock fd (if there is one) and close it to release all the locks.
 
---WgAHIrZoGmv7Av5WirjaTjDIhtSuDE8ww
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
-Content-Transfer-Encoding: quoted-printable
+Assumption here is that there is no other thread using lo_inode_plock
+structure or plock->fd, hence it is safe to do so.
 
-On 15.01.20 16:05, Miklos Szeredi wrote:
-> On Wed, Jan 15, 2020 at 3:58 PM Miklos Szeredi <mszeredi@redhat.com> wr=
-ote:
->>
->> On Wed, Jan 15, 2020 at 1:51 PM Max Reitz <mreitz@redhat.com> wrote:
->>>
->>> On 15.01.20 12:51, Miklos Szeredi wrote:
->>>> On Wed, Jan 15, 2020 at 11:10 AM Miklos Szeredi <mszeredi@redhat.com=
-> wrote:
->>>>
->>>>> New operations needed:
->>>>>
->>>>> LOOKUP_WITH_HANDLE: same as LOOKUP, but returns handle in addition =
-to
->>>>> fuse_ino_t and attributes.
->>>>> LOOKUP_BY_HANDLE: same as LOOKUP, but gets a handle as input.
->>>>
->>>> And that can be reduced further to a single extended LOOKUP_HANDLE,
->>>> which takes a handle as input and returns a handle in addition to th=
-e
->>>> usual stuff.  The lookup-by-handle case can be done with a special
->>>> name.  Currently "." is used for this purpose in the fuse protocol,
->>>> which is a bit confusing since it has nothing to do the "." director=
-y
->>>> entry, but at least we don't have to introduce a new concept for thi=
-s.
->>>
->>> I=E2=80=99m afraid I don=E2=80=99t quite understand.  What handle wou=
-ld LOOKUP_HANDLE
->>> take as input when I want to open a new file (as in, LOOKUP_WITH_HAND=
-LE)?
->>
->> For example open("/foo/bar", ...) would do:
->>
->> lookup_handle($ROOT_HANDLE, "foo") -> { FOO_HANDLE, FOO_NODEID }
->> lookup_handle($FOO_HANDLE, "bar") -> { BAR_HANDLE, BAR_NODEID }
->> open($BAR_NODEID, ...)
->=20
-> Note also that this scheme makes fuse_ino_t values non-reusable,
-> otherwise there could be messy conflicts with client using an old
-> value that the server interprets as a new value.
+But now we are about to introduce blocking variant of locks (SETLKW),
+and that means we might be waiting to a lock to be available and
+using plock->fd. And that means there are still users of plock structure.
 
-But wouldn=E2=80=99t it just be against the protocol to use a dropped or
-invalidated fuse_ino_t value?
+So release locks using fcntl(SETLK, F_UNLCK) instead and plock will
+be freed later.
 
-> But with the 64bit fuse_ino_t space wraparound shouldn't be an issue.
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ contrib/virtiofsd/passthrough_ll.c | 31 ++++++++++++++++++++----------
+ 1 file changed, 21 insertions(+), 10 deletions(-)
 
-I don=E2=80=99t really see the problem with the current solution of havin=
-g
-fuse_ino_t be an index into a vector, and old values being reused.  As
-far as I understand, there is a protocol for refcount fuse_ino_t values
-and the clients should not reuse values whose refcount has gone to zero.
-
-(And we=E2=80=99d add to that protocol by adding a way for the server to =
-make
-the client invalidate an existing fuse_ino_t value and request a new
-one.  I suppose we=E2=80=99d do that just by responding e.g. EINVAL if a
-fuse_ino_t value is used that the server doesn=E2=80=99t recognize, and t=
-hen the
-client has to invoke lookup_(by_)handle to get a new value.)
-
-Max
-
-
---WgAHIrZoGmv7Av5WirjaTjDIhtSuDE8ww--
-
---MtrfCRNMg664dtFKlvr5Ek8bkIriNfon7
-Content-Type: application/pgp-signature; name="signature.asc"
-Content-Description: OpenPGP digital signature
-Content-Disposition: attachment; filename="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEkb62CjDbPohX0Rgp9AfbAGHVz0AFAl4fLWoACgkQ9AfbAGHV
-z0BtIwf9HcpJXeheCDFxG+t0i1fpwTFvNY6lInXGaSAUgcaWcpSDnZAI1pLtmnH/
-ab6g9cs9zfjvti9NNQNwbWKU771LqkgPEtWAx0UvfO6VaIlhMMnloDLhjCo3Xef4
-a/RF9CrYfMmpgSbv+hZvLWdmJT59Tj/kuF8Od4xx0ORqP3ymzHijb/soRNDCob50
-9onGyvA3FrS8qnBRSYLPVhmPotLqtNQE7NAahiZy6Sc9GFrNQHf7W1xtGoQ7qwHr
-4kl+5oeocqvoYNGLswzT9T4oIO7ND6QiuBCBYuzZ7MCcf+WCbiBV84rPPD85qUEc
-XOCBe/60k37vBKf2dsNNdwot4xawVw==
-=Ljpr
------END PGP SIGNATURE-----
-
---MtrfCRNMg664dtFKlvr5Ek8bkIriNfon7--
+diff --git a/contrib/virtiofsd/passthrough_ll.c b/contrib/virtiofsd/passthrough_ll.c
+index bc214df0c7..6aa56882e8 100644
+--- a/contrib/virtiofsd/passthrough_ll.c
++++ b/contrib/virtiofsd/passthrough_ll.c
+@@ -936,6 +936,14 @@ static void put_shared(struct lo_data *lo, struct lo_inode *inode)
+ 	}
+ }
+ 
++static void posix_locks_value_destroy(gpointer data)
++{
++	struct lo_inode_plock *plock = data;
++
++	close(plock->fd);
++	free(plock);
++}
++
+ /* Increments nlookup and caller must release refcount using
+  * lo_inode_put(&parent).
+  */
+@@ -994,7 +1002,9 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+ 		inode->key.ino = e->attr.st_ino;
+ 		inode->key.dev = e->attr.st_dev;
+ 		pthread_mutex_init(&inode->plock_mutex, NULL);
+-		inode->posix_locks = g_hash_table_new(g_direct_hash, g_direct_equal);
++		inode->posix_locks = g_hash_table_new_full(g_direct_hash,
++					g_direct_equal, NULL,
++					posix_locks_value_destroy);
+ 
+ 		get_shared(lo, inode);
+ 
+@@ -1436,9 +1446,6 @@ static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
+ 	if (!inode->nlookup) {
+ 		lo_map_remove(&lo->ino_map, inode->fuse_ino);
+                 g_hash_table_remove(lo->inodes, &inode->key);
+-		if (g_hash_table_size(inode->posix_locks)) {
+-			fuse_log(FUSE_LOG_WARNING, "Hash table is not empty\n");
+-		}
+ 		g_hash_table_destroy(inode->posix_locks);
+ 		pthread_mutex_destroy(&inode->plock_mutex);
+ 
+@@ -1868,6 +1875,7 @@ static struct lo_inode_plock *lookup_create_plock_ctx(struct lo_data *lo,
+ 	plock->fd = fd;
+ 	g_hash_table_insert(inode->posix_locks,
+ 			    GUINT_TO_POINTER(plock->lock_owner), plock);
++	fuse_log(FUSE_LOG_DEBUG, "lookup_create_plock_ctx(): Inserted element in posix_locks hash table with value pointer %p\n", plock);
+ 	return plock;
+ }
+ 
+@@ -2046,6 +2054,7 @@ static void lo_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+ 	(void) ino;
+ 	struct lo_inode *inode;
+ 	struct lo_inode_plock *plock;
++	struct flock flock;
+ 
+ 	inode = lo_inode(req, ino);
+ 	if (!inode) {
+@@ -2058,14 +2067,16 @@ static void lo_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+ 	plock = g_hash_table_lookup(inode->posix_locks,
+ 				    GUINT_TO_POINTER(fi->lock_owner));
+ 	if (plock) {
+-		g_hash_table_remove(inode->posix_locks,
+-				    GUINT_TO_POINTER(fi->lock_owner));
+ 		/*
+-		 * We had used open() for locks and had only one fd. So
+-		 * closing this fd should release all OFD locks.
++		 * An fd is being closed. For posix locks, this means
++		 * drop all the associated locks.
+ 		 */
+-		close(plock->fd);
+-		free(plock);
++		memset(&flock, 0, sizeof(struct flock));
++		flock.l_type = F_UNLCK;
++		flock.l_whence = SEEK_SET;
++		/* Unlock whole file */
++		flock.l_start = flock.l_len = 0;
++		fcntl(plock->fd, F_OFD_SETLK, &flock);
+ 	}
+ 	pthread_mutex_unlock(&inode->plock_mutex);
+ 
+-- 
+2.20.1
 

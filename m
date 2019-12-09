@@ -1,15 +1,16 @@
-Date: Fri, 6 Dec 2019 15:55:38 +0000
+Date: Mon, 9 Dec 2019 11:06:17 +0000
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20191206155538.GH2878@work-vm>
-References: <20191204190836.31324-1-vgoyal@redhat.com>
-	<20191204190836.31324-2-vgoyal@redhat.com>
-	<20191204194250.GN3325@work-vm>
+Message-ID: <20191209110617.GE3403@work-vm>
+References: <20191115205543.1816-1-vgoyal@redhat.com>
+	<20191115205543.1816-5-vgoyal@redhat.com>
+	<20191122174732.GL2785@work-vm> <20191125154414.GC13247@redhat.com>
+	<20191126130229.GG2928@work-vm> <20191127190808.GA18507@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20191204194250.GN3325@work-vm>
-Subject: Re: [Virtio-fs] [PATCH v2 1/5] virtiofsd: Get rid of unused fields
- in fv_QueueInfo
+In-Reply-To: <20191127190808.GA18507@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 4/4] virtiofsd: Implement blocking posix
+	locks
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,53 +20,83 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, mszeredi@redhat.com, qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, miklos@szeredi.hu
 
-* Dr. David Alan Gilbert (dgilbert@redhat.com) wrote:
-> * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > There are some unused fields in "struct fv_QueueInfo". Get rid of these fields.
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> On Tue, Nov 26, 2019 at 01:02:29PM +0000, Dr. David Alan Gilbert wrote:
+> 
+> [..]
+> > > > > @@ -1950,21 +1948,54 @@ static void lo_setlk(fuse_req_t req, fuse_ino_t ino,
+> > > > >  
+> > > > >  	if (!plock) {
+> > > > >  		saverr = ret;
+> > > > > +		pthread_mutex_unlock(&inode->plock_mutex);
+> > > > >  		goto out;
+> > > > >  	}
+> > > > >  
+> > > > > +	/*
+> > > > > +	 * plock is now released when inode is going away. We already have
+> > > > > +	 * a reference on inode, so it is guaranteed that plock->fd is
+> > > > > +	 * still around even after dropping inode->plock_mutex lock
+> > > > > +	 */
+> > > > > +	ofd = plock->fd;
+> > > > > +	pthread_mutex_unlock(&inode->plock_mutex);
+> > > > > +
+> > > > > +	/*
+> > > > > +	 * If this lock request can block, request caller to wait for
+> > > > > +	 * notification. Do not access req after this. Once lock is
+> > > > > +	 * available, send a notification instead.
+> > > > > +	 */
+> > > > > +	if (sleep && lock->l_type != F_UNLCK) {
+> > > > > +		/*
+> > > > > +		 * If notification queue is not enabled, can't support async
+> > > > > +		 * locks.
+> > > > > +		 */
+> > > > > +		if (!se->notify_enabled) {
+> > > > > +			saverr = EOPNOTSUPP;
+> > > > > +			goto out;
+> > > > > +		}
+> > > > > +		async_lock = true;
+> > > > > +		unique = req->unique;
+> > > > > +		fuse_reply_wait(req);
+> > > > > +	}
+> > > > >  	/* TODO: Is it alright to modify flock? */
+> > > > >  	lock->l_pid = 0;
+> > > > > -	ret = fcntl(plock->fd, F_OFD_SETLK, lock);
+> > > > > +	if (async_lock)
+> > > > > +		ret = fcntl(ofd, F_OFD_SETLKW, lock);
+> > > > > +	else
+> > > > > +		ret = fcntl(ofd, F_OFD_SETLK, lock);
+> > > > 
+> > > > What happens if the guest is rebooted after it's asked
+> > > > for, but not been granted a lock?
+> > > 
+> > > I think a regular reboot can't be done till a request is pending, because
+> > > virtio-fs can't be unmounted and unmount will wait for all pending
+> > > requests to finish.
+> > > 
+> > > Destroying qemu will destroy deamon too.
+> > > 
+> > > Are there any other reboot paths I have missed.
 > > 
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > ---
-> >  contrib/virtiofsd/fuse_virtio.c | 6 ------
-> >  1 file changed, 6 deletions(-)
-> > 
-> > diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
-> > index 31c8542b6c..2a9cd60a01 100644
-> > --- a/contrib/virtiofsd/fuse_virtio.c
-> > +++ b/contrib/virtiofsd/fuse_virtio.c
-> > @@ -50,12 +50,6 @@ struct fv_QueueInfo {
-> >      int qidx;
-> >      int kick_fd;
-> >      int kill_fd; /* For killing the thread */
-> > -
-> > -    /* The element for the command currently being processed */
-> > -    VuVirtqElement *qe;
-> > -    /* If any of the qe vec elements (towards vmm) are unmappable */
-> > -    unsigned int elem_bad_in;
-> > -    bool reply_sent;
+> > Yes, there are a few other ways the guest can reboot:
+> >   a) A echo b > /proc/sysrq-trigger
 > 
-> Yep, those last two got moved into FVRequest as part of the thread pool
-> stuff.
+> I tried it. Both qemu and virtiofsd hang. virtiofsd wants to stop a 
+> queue. And that tries to stop thrad pool. But one of the threads in
+> thread pool is blocked on setlkw. So g_thread_pool_free() hangs.
 > 
-> 
-> Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> I am not seeing any option in glib thread pool API to stop or send
+> signal to threads which are blocked.
 
-I've merged that 1/5 into my world.
+Is there a way to setup pthread_cancel ?  The upstream libfuse code
+has somec ases where it enables cancellation very carefully around
+something that might block, does it, then disables cancellation.
 
-> >  };
-> >  
-> >  /* A FUSE request */
-> > -- 
-> > 2.20.1
-> > 
-> --
-> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
+Dave
+
+> Thanks
+> Vivek
 --
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

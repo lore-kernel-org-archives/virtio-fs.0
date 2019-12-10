@@ -1,12 +1,12 @@
 From: Fabiano Rosas <farosas@linux.ibm.com>
-Date: Tue, 10 Dec 2019 11:51:15 -0300
-Message-Id: <20191210145119.329731-2-farosas@linux.ibm.com>
+Date: Tue, 10 Dec 2019 11:51:19 -0300
+Message-Id: <20191210145119.329731-6-farosas@linux.ibm.com>
 In-Reply-To: <20191210145119.329731-1-farosas@linux.ibm.com>
 References: <20191210145119.329731-1-farosas@linux.ibm.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=WINDOWS-1252
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 1/5] build-qemu: Add support for ppc64le
+Subject: [Virtio-fs] [PATCH 5/5] run-test: Add support for ppc64le
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,77 +17,55 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Allow running the script on a ppc64le machine to build a ppc64le QEMU
-binary.
-
-The configuration differs from x86 in the following:
-
---enable-fdt:
-We need to build with device-tree support because ppc relies on it.
-
---enable-tcg:
-The ppc build without TCG is currently broken.
-
 Signed-off-by: Fabiano Rosas <farosas@linux.ibm.com>
 ---
- build-qemu.sh | 25 +++++++++++++++++++++----
- 1 file changed, 21 insertions(+), 4 deletions(-)
+ run-test.sh | 23 ++++++++++++++++++-----
+ 1 file changed, 18 insertions(+), 5 deletions(-)
 
-diff --git a/build-qemu.sh b/build-qemu.sh
-index 2dc0580..ff78df9 100755
---- a/build-qemu.sh
-+++ b/build-qemu.sh
-@@ -7,6 +7,8 @@
+diff --git a/run-test.sh b/run-test.sh
+index 65168df..2d16284 100755
+--- a/run-test.sh
++++ b/run-test.sh
+@@ -24,11 +24,24 @@ if [ ! -f qemu.tar.xz ]; then
+ 	exit 1
+ fi
  
- set -e
+-if [ ! -f bzImage ]; then
+-	echo 'A bzImage Linux kernel is required'
++if [ ! -f bzImage -a ! -f vmlinux ]; then
++	echo 'A Linux kernel image is required'
+ 	exit 1
+ fi
  
 +arch=$(uname -m)
-+
- if [ ! -f vl.c ]; then
- 	echo 'This script must be run from a QEMU source tree.'
- 	exit 1
-@@ -15,8 +17,23 @@ fi
- rm -rf qemu
- mkdir qemu
- 
--./configure --target-list=x86_64-softmmu \
--	--disable-fdt \
 +case ${arch} in
++	x86_64)
++		kernel_image=bzImage
++		serial_console=ttyS0
++		;;
 +	ppc64le)
 +		arch=${arch/le/}
-+		arch_config_opts=(
-+			--enable-fdt
-+			--enable-tcg
-+		)
-+		;;
-+	*)
-+		arch_config_opts=(
-+			--disable-fdt
-+			--disable-tcg
-+		)
++		kernel_image=vmlinux
++		serial_console=hvc0
 +		;;
 +esac
 +
-+./configure --target-list=${arch}-softmmu \
- 	--disable-glusterfs \
- 	--disable-guest-agent \
- 	--disable-numa \
-@@ -89,13 +106,13 @@ mkdir qemu
- 	--disable-mpath \
- 	--disable-virglrenderer \
- 	--disable-xen-pci-passthrough \
--	--disable-tcg \
- 	--disable-sanitizers \
- 	--disable-hvf \
- 	--disable-whpx \
- 	--enable-malloc-trim \
- 	--disable-membarrier \
--	--disable-vhost-crypto
-+	--disable-vhost-crypto \
-+	${arch_config_opts[@]}
- 
- make "DESTDIR=$PWD/qemu" -j$(nproc) install
- 
+ log "Unpacking rootfs..."
+ rm -rf rootfs
+ tar xf rootfs.tar.xz
+@@ -54,9 +67,9 @@ done
+ log "Starting QEMU..."
+ rm -f qmp.sock
+ rm -f serial.log
+-qemu/usr/local/bin/qemu-system-x86_64 \
+-	-kernel bzImage \
+-	-append 'rootfstype=virtio_fs rootflags=default_permissions,allow_other,user_id=0,group_id=0,rootmode=040000,tag=myfs,dax root=none rw console=ttyS0 systemd.unit=run-test.service' \
++qemu/usr/local/bin/qemu-system-${arch} \
++	-kernel ${kernel_image} \
++	-append 'rootfstype=virtio_fs rootflags=default_permissions,allow_other,user_id=0,group_id=0,rootmode=040000,tag=myfs,dax root=none rw console=${serial_console} systemd.unit=run-test.service' \
+ 	-M accel=kvm \
+ 	-cpu host \
+ 	-m 1G,maxmem=4G \
 -- 
 2.23.0
 

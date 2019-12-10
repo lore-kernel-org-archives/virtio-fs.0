@@ -1,12 +1,13 @@
 From: Fabiano Rosas <farosas@linux.ibm.com>
-Date: Tue, 10 Dec 2019 11:51:19 -0300
-Message-Id: <20191210145119.329731-6-farosas@linux.ibm.com>
+Date: Tue, 10 Dec 2019 11:51:18 -0300
+Message-Id: <20191210145119.329731-5-farosas@linux.ibm.com>
 In-Reply-To: <20191210145119.329731-1-farosas@linux.ibm.com>
 References: <20191210145119.329731-1-farosas@linux.ibm.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=WINDOWS-1252
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 5/5] run-test: Add support for ppc64le
+Subject: [Virtio-fs] [PATCH 4/5] build-rootfs: Download latest config.guess
+	for blogbench
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,55 +18,27 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
+Blogbench has an outdated config.guess which does not recognize the
+ppc64le platform. Download the latest one.
+
+https://www.gnu.org/software/gettext/manual/html_node/config_002eguess.html
+
 Signed-off-by: Fabiano Rosas <farosas@linux.ibm.com>
 ---
- run-test.sh | 23 ++++++++++++++++++-----
- 1 file changed, 18 insertions(+), 5 deletions(-)
+ build-rootfs.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/run-test.sh b/run-test.sh
-index 65168df..2d16284 100755
---- a/run-test.sh
-+++ b/run-test.sh
-@@ -24,11 +24,24 @@ if [ ! -f qemu.tar.xz ]; then
- 	exit 1
- fi
- 
--if [ ! -f bzImage ]; then
--	echo 'A bzImage Linux kernel is required'
-+if [ ! -f bzImage -a ! -f vmlinux ]; then
-+	echo 'A Linux kernel image is required'
- 	exit 1
- fi
- 
-+arch=$(uname -m)
-+case ${arch} in
-+	x86_64)
-+		kernel_image=bzImage
-+		serial_console=ttyS0
-+		;;
-+	ppc64le)
-+		arch=${arch/le/}
-+		kernel_image=vmlinux
-+		serial_console=hvc0
-+		;;
-+esac
-+
- log "Unpacking rootfs..."
- rm -rf rootfs
- tar xf rootfs.tar.xz
-@@ -54,9 +67,9 @@ done
- log "Starting QEMU..."
- rm -f qmp.sock
- rm -f serial.log
--qemu/usr/local/bin/qemu-system-x86_64 \
--	-kernel bzImage \
--	-append 'rootfstype=virtio_fs rootflags=default_permissions,allow_other,user_id=0,group_id=0,rootmode=040000,tag=myfs,dax root=none rw console=ttyS0 systemd.unit=run-test.service' \
-+qemu/usr/local/bin/qemu-system-${arch} \
-+	-kernel ${kernel_image} \
-+	-append 'rootfstype=virtio_fs rootflags=default_permissions,allow_other,user_id=0,group_id=0,rootmode=040000,tag=myfs,dax root=none rw console=${serial_console} systemd.unit=run-test.service' \
- 	-M accel=kvm \
- 	-cpu host \
- 	-m 1G,maxmem=4G \
+diff --git a/build-rootfs.sh b/build-rootfs.sh
+index 3b109a8..470973e 100755
+--- a/build-rootfs.sh
++++ b/build-rootfs.sh
+@@ -36,5 +36,5 @@ fi
+ install -D -m 0755 run-test-in-guest.sh "$PWD/rootfs/root/"
+ install -D -m 0644 run-test.service "$PWD/rootfs/etc/systemd/system/"
+ run_in_rootfs /bin/bash -c "cd /root && git clone https://github.com/pjd/pjdfstest && cd pjdfstest && autoreconf -ifs && ./configure && make pjdfstest"
+-run_in_rootfs /bin/bash -c "cd /root && wget -O blogbench-1.1.tar.gz https://download.pureftpd.org/pub/blogbench/blogbench-1.1.tar.gz && tar xf blogbench-1.1.tar.gz && cd blogbench-1.1 && ./configure && make"
++run_in_rootfs /bin/bash -c "cd /root && wget -O blogbench-1.1.tar.gz https://download.pureftpd.org/pub/blogbench/blogbench-1.1.tar.gz && tar xf blogbench-1.1.tar.gz && cd blogbench-1.1 && wget -O config.guess 'https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess;hb=HEAD' && ./configure && make"
+ tar cJf rootfs.tar.xz rootfs
 -- 
 2.23.0
 

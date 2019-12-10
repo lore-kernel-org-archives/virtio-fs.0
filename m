@@ -1,16 +1,12 @@
-Date: Mon, 9 Dec 2019 11:06:17 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20191209110617.GE3403@work-vm>
-References: <20191115205543.1816-1-vgoyal@redhat.com>
-	<20191115205543.1816-5-vgoyal@redhat.com>
-	<20191122174732.GL2785@work-vm> <20191125154414.GC13247@redhat.com>
-	<20191126130229.GG2928@work-vm> <20191127190808.GA18507@redhat.com>
+From: Fabiano Rosas <farosas@linux.ibm.com>
+Date: Tue, 10 Dec 2019 11:51:04 -0300
+Message-Id: <20191210145105.329680-2-farosas@linux.ibm.com>
+In-Reply-To: <20191210145105.329680-1-farosas@linux.ibm.com>
+References: <20191210145105.329680-1-farosas@linux.ibm.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20191127190808.GA18507@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 4/4] virtiofsd: Implement blocking posix
-	locks
+Content-Type: text/plain; charset=WINDOWS-1252
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 1/2] build-rootfs: Fix fedora build
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,84 +15,43 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, miklos@szeredi.hu
+To: virtio-fs@redhat.com
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> On Tue, Nov 26, 2019 at 01:02:29PM +0000, Dr. David Alan Gilbert wrote:
-> 
-> [..]
-> > > > > @@ -1950,21 +1948,54 @@ static void lo_setlk(fuse_req_t req, fuse_ino_t ino,
-> > > > >  
-> > > > >  	if (!plock) {
-> > > > >  		saverr = ret;
-> > > > > +		pthread_mutex_unlock(&inode->plock_mutex);
-> > > > >  		goto out;
-> > > > >  	}
-> > > > >  
-> > > > > +	/*
-> > > > > +	 * plock is now released when inode is going away. We already have
-> > > > > +	 * a reference on inode, so it is guaranteed that plock->fd is
-> > > > > +	 * still around even after dropping inode->plock_mutex lock
-> > > > > +	 */
-> > > > > +	ofd = plock->fd;
-> > > > > +	pthread_mutex_unlock(&inode->plock_mutex);
-> > > > > +
-> > > > > +	/*
-> > > > > +	 * If this lock request can block, request caller to wait for
-> > > > > +	 * notification. Do not access req after this. Once lock is
-> > > > > +	 * available, send a notification instead.
-> > > > > +	 */
-> > > > > +	if (sleep && lock->l_type != F_UNLCK) {
-> > > > > +		/*
-> > > > > +		 * If notification queue is not enabled, can't support async
-> > > > > +		 * locks.
-> > > > > +		 */
-> > > > > +		if (!se->notify_enabled) {
-> > > > > +			saverr = EOPNOTSUPP;
-> > > > > +			goto out;
-> > > > > +		}
-> > > > > +		async_lock = true;
-> > > > > +		unique = req->unique;
-> > > > > +		fuse_reply_wait(req);
-> > > > > +	}
-> > > > >  	/* TODO: Is it alright to modify flock? */
-> > > > >  	lock->l_pid = 0;
-> > > > > -	ret = fcntl(plock->fd, F_OFD_SETLK, lock);
-> > > > > +	if (async_lock)
-> > > > > +		ret = fcntl(ofd, F_OFD_SETLKW, lock);
-> > > > > +	else
-> > > > > +		ret = fcntl(ofd, F_OFD_SETLK, lock);
-> > > > 
-> > > > What happens if the guest is rebooted after it's asked
-> > > > for, but not been granted a lock?
-> > > 
-> > > I think a regular reboot can't be done till a request is pending, because
-> > > virtio-fs can't be unmounted and unmount will wait for all pending
-> > > requests to finish.
-> > > 
-> > > Destroying qemu will destroy deamon too.
-> > > 
-> > > Are there any other reboot paths I have missed.
-> > 
-> > Yes, there are a few other ways the guest can reboot:
-> >   a) A echo b > /proc/sysrq-trigger
-> 
-> I tried it. Both qemu and virtiofsd hang. virtiofsd wants to stop a 
-> queue. And that tries to stop thrad pool. But one of the threads in
-> thread pool is blocked on setlkw. So g_thread_pool_free() hangs.
-> 
-> I am not seeing any option in glib thread pool API to stop or send
-> signal to threads which are blocked.
+Ensure that the rootfs build in Fedora finishes without errors.
 
-Is there a way to setup pthread_cancel ?  The upstream libfuse code
-has somec ases where it enables cancellation very carefully around
-something that might block, does it, then disables cancellation.
+- include wget in the rootfs
+- fix dnf install command line
+- include a resolv.conf
 
-Dave
+Signed-off-by: Fabiano Rosas <farosas@linux.ibm.com>
+---
+ build-rootfs.sh | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-> Thanks
-> Vivek
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+diff --git a/build-rootfs.sh b/build-rootfs.sh
+index c23656c..f616981 100755
+--- a/build-rootfs.sh
++++ b/build-rootfs.sh
+@@ -6,7 +6,7 @@
+ # Copyright (C) 2019 Red Hat, Inc.
+ 
+ FEDORA_RELEASE=30
+-FEDORA_PACKAGES="system-release vim-minimal systemd passwd dnf rootfiles autoconf automake gcc make git perl-Test-Harness tar"
++FEDORA_PACKAGES="system-release vim-minimal systemd passwd dnf rootfiles autoconf automake gcc make git perl-Test-Harness tar wget"
+ 
+ DEBIAN_PACKAGES="vim-tiny autoconf automake gcc libc6-dev make git perl tar ca-certificates wget"
+ 
+@@ -24,7 +24,8 @@ run_in_rootfs() {
+ umask 022
+ rm -rf rootfs
+ mkdir rootfs
+-#dnf "--installroot=$PWD/rootfs" "--releasever=$FEDORA_RELEASE" --assumeyes install $PACKAGES
++#dnf "--installroot=$PWD/rootfs" "--releasever=$FEDORA_RELEASE" --assumeyes install $FEDORA_PACKAGES
++#install -D -m 0644 /etc/resolv.conf "$PWD/rootfs/etc/"
+ debootstrap --include="$DEBIAN_PACKAGES" stable "$PWD/rootfs"
+ install -D -m 0755 run-test-in-guest.sh "$PWD/rootfs/root/"
+ install -D -m 0644 run-test.service "$PWD/rootfs/etc/systemd/system/"
+-- 
+2.23.0
+
 

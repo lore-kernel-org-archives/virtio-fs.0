@@ -1,12 +1,12 @@
-Date: Fri, 13 Dec 2019 11:44:39 +0100
-From: Cornelia Huck <cohuck@redhat.com>
-Message-ID: <20191213114439.7b3e5068.cohuck@redhat.com>
-In-Reply-To: <20191212185900.GE4282@work-vm>
+Date: Fri, 13 Dec 2019 11:02:24 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20191213110224.GE1180977@stefanha-x1.localdomain>
 References: <OFEFF035BA.8C1142AF-ON002584CE.006405E7-852584CE.0067F3AB@notes.na.collabserv.com>
-	<20191212185900.GE4282@work-vm>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=US-ASCII
-Content-Transfer-Encoding: 7bit
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="d8Lz2Tf5e5STOWUP"
+Content-Disposition: inline
+In-Reply-To: <OFEFF035BA.8C1142AF-ON002584CE.006405E7-852584CE.0067F3AB@notes.na.collabserv.com>
 Subject: Re: [Virtio-fs] virtio-fs on zLinux (s390x)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
@@ -16,55 +16,42 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Gong Su <gongsu@us.ibm.com>
-Cc: virtio-fs@redhat.com
+To: Gong Su <gongsu@us.ibm.com>
+Cc: virtio-fs@redhat.com, Cornelia Huck <cohuck@redhat.com>
 
-On Thu, 12 Dec 2019 18:59:00 +0000
-"Dr. David Alan Gilbert" <dgilbert@redhat.com> wrote:
 
-> * Gong Su (gongsu@us.ibm.com) wrote:
-> > 
-> > 
-> > Hi Stefan, I'm resending my questions to the list per your request.
-> > 
-> > Basically, I'm trying to see if I can get virtio-fs to work on zLinux.
-> > Following the instructions on https://virtio-fs.gitlab.io/howto-qemu.html I
-> > was able to compile all the pieces but when I tried to run qemu I realized
-> > that it needs -numa option which isn't supported on s390x yet.
-> > 
-> > I have talked to Christian Borntraeger (whom I worked with on other
-> > projects before) and he indicated that he had a plan to add -numa support
-> > for s390x but currently is busy on other things.
-> > 
-> > So I'm trying to see if there are other ways for me to go forward without
-> > having to wait for Christian. I see two options:
-> > 
-> > 1. Merge virtiofsd into qemu itself. In the "Interchangeability" section of
-> > the virtio-fs design page (https://virtio-fs.gitlab.io/design.html), it
-> > mentioned that "It is also possible to forego vhost-user and emulate the
-> > virtio-fs device directly inside the hypervisor, although this may result
-> > in poor isolation and security." Since each guest typically gets its own
-> > qemu process, maybe this is acceptable for some use cases. In exchange, you
-> > get the benefit of not having to carve out a chunk of memory from /dev/shm
-> > (and maybe simpler communication between virtiofsd and qemu).
-> > 2. Use something other than -numa to share memory between virtiofsd and
-> > qemu that's supported on zLinux. I'm not entirely familiar with qemu so I
-> > have no idea whether this is possible or not.  
-> 
-> Hi,
->   My understanding is that Igor Mammedov (imammedo@redhat.com) has plans
-> to allow 'shared' to be set on main memory, so we wouldn't need the numa
-> code.
+--d8Lz2Tf5e5STOWUP
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
 
-Yes, that was my understanding as well.
+On Thu, Dec 12, 2019 at 01:55:25PM -0500, Gong Su wrote:
+> Basically, I'm trying to see if I can get virtio-fs to work on zLinux.
+> Following the instructions on https://virtio-fs.gitlab.io/howto-qemu.html I
+> was able to compile all the pieces but when I tried to run qemu I realized
+> that it needs -numa option which isn't supported on s390x yet.
 
-Obviously, nobody has actually tested virtio-fs on s390x so far :)
-Wiring it up for virtio-ccw looks straightforward, though, and I did
-not spot any obvious problems when looking at the code a while back.
+Does s390 support vhost-user?
 
-One thing that needs more thought is DAX support in the future (i.e.
-where to put the shared regions for ccw etc.) There had been some
-discussion on that topic in the past, but I currently don't have any
-spare cycles for continuing there. That said, more s390x folks looking
-at this would certainly be a good idea :)
+virtio-fs is implemented as a vhost-user device so this is a
+requirement.  Shared memory is a vhost-user requirement and that's where
+the -numa command-line option dependency comes from.
+
+Stefan
+
+--d8Lz2Tf5e5STOWUP
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl3zb78ACgkQnKSrs4Gr
+c8g0nggAmvXk0jPn9JcFsHalABGSOnotu1kCrJxIcOTtTtn1IE6HidIT/DpZTXWY
+x5bt9RuM1V4RcYA49/61Nc6otUgvEc1p5bJ3qRJhkzOpMc7NmXoYhDa3hqOoHtBt
+DwdwpA0GeafPHB/gLgDfY75tsZG16QgJWXw75zZqBjScfXo9OnXD2bNxISJIqw4z
+Va8i7Zlv/aZZE4KuwXYy3TUCSOQlREKvcNc2fOhs6ki26s2T1nEz507FjfY71G0T
+c0yk6rGBBPC5fpJSAJRAv6je1dR6crg4ACB8/m2YQYIDpNs/YxMm3zpGEDX/lfqd
+O5UAW7xTlZ2o1xCmUocbDDH3Eu/7YQ==
+=F1WA
+-----END PGP SIGNATURE-----
+
+--d8Lz2Tf5e5STOWUP--
 

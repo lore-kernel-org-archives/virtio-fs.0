@@ -1,12 +1,19 @@
-Date: Mon, 16 Dec 2019 09:54:58 -0500
+Date: Mon, 16 Dec 2019 13:10:14 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20191216145458.GB6106@redhat.com>
-References: <20191213175733.txnfv6bxxf4vauzb@gabell>
+Message-ID: <20191216181014.GA30106@redhat.com>
+References: <20190821175720.25901-1-vgoyal@redhat.com>
+	<20190821175720.25901-2-vgoyal@redhat.com>
+	<20190826115152.GA21051@infradead.org>
+	<20190827163828.GA6859@redhat.com>
+	<20190828065809.GA27426@infradead.org>
+	<20190828175843.GB912@redhat.com>
+	<20190828225322.GA7777@dread.disaster.area>
+	<CAPcyv4jGEAbYSJef2zLzgg6Arozsuz7eN_vZL1iTcd1XQuNT4Q@mail.gmail.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20191213175733.txnfv6bxxf4vauzb@gabell>
-Subject: Re: [Virtio-fs] Question: atime update behavior of virtiofs
+In-Reply-To: <CAPcyv4jGEAbYSJef2zLzgg6Arozsuz7eN_vZL1iTcd1XQuNT4Q@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 01/19] dax: remove block device dependencies
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,91 +22,102 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Masayoshi Mizuma <msys.mizuma@gmail.com>
-Cc: virtio-fs@redhat.com, Miklos Szeredi <miklos@szeredi.hu>
+To: Dan Williams <dan.j.williams@intel.com>
+Cc: virtio-fs@redhat.com, linux-nvdimm <linux-nvdimm@lists.01.org>, Miklos Szeredi <miklos@szeredi.hu>, Dave Chinner <david@fromorbit.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Christoph Hellwig <hch@infradead.org>, linux-fsdevel <linux-fsdevel@vger.kernel.org>
 
-On Fri, Dec 13, 2019 at 12:57:33PM -0500, Masayoshi Mizuma wrote:
-> Hello,
+On Wed, Aug 28, 2019 at 05:04:11PM -0700, Dan Williams wrote:
+> On Wed, Aug 28, 2019 at 3:53 PM Dave Chinner <david@fromorbit.com> wrote:
+> >
+> > On Wed, Aug 28, 2019 at 01:58:43PM -0400, Vivek Goyal wrote:
+> > > On Tue, Aug 27, 2019 at 11:58:09PM -0700, Christoph Hellwig wrote:
+> > > > On Tue, Aug 27, 2019 at 12:38:28PM -0400, Vivek Goyal wrote:
+> > > > > > For bdev_dax_pgoff
+> > > > > > I'd much rather have the partition offset if there is on in the daxdev
+> > > > > > somehow so that we can get rid of the block device entirely.
+> > > > >
+> > > > > IIUC, there is one block_device per partition while there is only one
+> > > > > dax_device for the whole disk. So we can't directly move bdev logical
+> > > > > offset into dax_device.
+> > > >
+> > > > Well, then we need to find a way to get partitions for dax devices,
+> > > > as we really should not expect a block device hiding behind a dax
+> > > > dev.  That is just a weird legacy assumption - block device need to
+> > > > layer on top of the dax device optionally.
+> > > >
+> > > > >
+> > > > > We probably could put this in "iomap" and leave it to filesystems to
+> > > > > report offset into dax_dev in iomap that way dax generic code does not
+> > > > > have to deal with it. But that probably will be a bigger change.
+> > > >
+> > > > And where would the file system get that information from?
+> > >
+> > > File system knows about block device, can it just call get_start_sect()
+> > > while filling iomap->addr. And this means we don't have to have
+> > > parition information in dax device. Will something like following work?
+> > > (Just a proof of concept patch).
+> > >
+> > >
+> > > ---
+> > >  drivers/dax/super.c |   11 +++++++++++
+> > >  fs/dax.c            |    6 +++---
+> > >  fs/ext4/inode.c     |    6 +++++-
+> > >  include/linux/dax.h |    1 +
+> > >  4 files changed, 20 insertions(+), 4 deletions(-)
+> > >
+> > > Index: rhvgoyal-linux/fs/ext4/inode.c
+> > > ===================================================================
+> > > --- rhvgoyal-linux.orig/fs/ext4/inode.c       2019-08-28 13:51:16.051937204 -0400
+> > > +++ rhvgoyal-linux/fs/ext4/inode.c    2019-08-28 13:51:44.453937204 -0400
+> > > @@ -3589,7 +3589,11 @@ retry:
+> > >                       WARN_ON_ONCE(1);
+> > >                       return -EIO;
+> > >               }
+> > > -             iomap->addr = (u64)map.m_pblk << blkbits;
+> > > +             if (IS_DAX(inode))
+> > > +                     iomap->addr = ((u64)map.m_pblk << blkbits) +
+> > > +                                   (get_start_sect(iomap->bdev) * 512);
+> > > +             else
+> > > +                     iomap->addr = (u64)map.m_pblk << blkbits;
+> >
+> > I'm not a fan of returning a physical device sector address from an
+> > interface where ever other user/caller expects this address to be a
+> > logical block address into the block device. It creates a landmine
+> > in the iomap API that callers may not be aware of and that's going
+> > to cause bugs. We're trying really hard to keep special case hacks
+> > like this out of the iomap infrastructure, so on those grounds alone
+> > I'd suggest this is a dead end approach.
+> >
+> > Hence I think that if the dax device needs a physical offset from
+> > the start of the block device the filesystem sits on, it should be
+> > set up at dax device instantiation time and so the filesystem/bdev
+> > never needs to be queried again for this information.
+> >
 > 
-> Let me ask questions about atime update behavior of virtiofs.
+> Agree. In retrospect it was my laziness in the dax-device
+> implementation to expect the block-device to be available.
 > 
-> Background:
-> 
-> I believe the atime update behavior of virtiofs is same as
-> the underlying filesystem and the atime mount option of virtiofs
-> is ignored.
+> It looks like fs_dax_get_by_bdev() is an intercept point where a
+> dax_device could be dynamically created to represent the subset range
+> indicated by the block-device partition. That would open up more
+> cleanup opportunities.
 
-[ CC Miklos. He does not seem to be on virtio-fs list yet ]
+Hi Dan,
 
-Hi Masayoshi,
+After a long time I got time to look at it again. Want to work on this
+cleanup so that I can make progress with virtiofs DAX paches.
 
-I have not paid too much of attention to atime behavior but I think it
-will be a combination of atime settings on virtio-fs as well as underlying
-filesystem.
+I am not sure I understand the requirements fully. I see that right now
+dax_device is created per device and all block partitions refer to it. If
+we want to create one dax_device per partition, then it looks like this
+will be structured more along the lines how block layer handles disk and
+partitions. (One gendisk for disk and block_devices for partitions,
+including partition 0). That probably means state belong to whole device
+will be in common structure say dax_device_common, and per partition state
+will be in dax_device and dax_device can carry a pointer to
+dax_device_common.
 
-In this particular case read request will go to virtiofsd server
-(especially in case of cache=none) and when virtiofsd access file
-on host, atime will be updated according to the atime settings on
-host filesystem.
-
-
-> 
-> For example, the underlying fileysystem is XFS and the atime option
-> is strictatime Then, mount the filesystem from the guest with noatime.
-> 
-> # mount -t virtiofs -o noatime myfs0 /mnt/myfs0
-> 
-> # cat /proc/mounts
-> ...
-> myfs0 /mnt/myfs0 virtiofs rw,noatime 0 0
-> ...
-> 
-> Check the atime as following script atime.h:
-> ============
-> #!/bin/bash
-> 
-> FILE=/mnt/myfs0/foo
-> 
-> rm -f $FILE
-> 
-> echo "hello" > $FILE
-> stat --format=%x $FILE
-> 
-> sleep 10
-> 
-> cat $FILE > /dev/null
-> stat --format=%x $FILE
-> ============
-> 
-> I can see the following result. The atime is updated even if the mount
-> option is noatime.
-> 
-> ~]# ./atime.sh
-> 2019-12-13 12:32:46.733024358 -0500
-> 2019-12-13 12:32:56.752898507 -0500
-> ~]#
-> 
-> Questions:
-> 
-> Q1. Is the atime behavior a specification for virtiofs, that means
->     it's not a bug?
-> 
-
-I will not call it a bug. We have not actually defined atime behavior of
-virtio-fs as such and its dependency on host filesystem.
-
-> Q2. If Q1 is yes, I think it would be better if the atime behavior
->     could be described to documents so that user can know the behavior.
->     What is the appropriate document?
->     - man page of virtiofsd which Dave is trying to merge?
->       https://lists.gnu.org/archive/html/qemu-devel/2019-12/msg02475.html
->     - man page of mount(8)?
->     - The official page (https://virtio-fs.gitlab.io/)?
->     - Or...?
-
-It probably is a good idea to atleast add a section in
-Documentation/filesystem/virtiofs.rst and talk about atime behavior in
-different configurations.
+I am also not sure what does it mean to partition dax devices. How will
+partitions be exported to user space.
 
 Thanks
 Vivek

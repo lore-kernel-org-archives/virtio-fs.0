@@ -1,19 +1,13 @@
-Date: Mon, 16 Dec 2019 13:10:14 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20191216181014.GA30106@redhat.com>
-References: <20190821175720.25901-1-vgoyal@redhat.com>
-	<20190821175720.25901-2-vgoyal@redhat.com>
-	<20190826115152.GA21051@infradead.org>
-	<20190827163828.GA6859@redhat.com>
-	<20190828065809.GA27426@infradead.org>
-	<20190828175843.GB912@redhat.com>
-	<20190828225322.GA7777@dread.disaster.area>
-	<CAPcyv4jGEAbYSJef2zLzgg6Arozsuz7eN_vZL1iTcd1XQuNT4Q@mail.gmail.com>
+Date: Tue, 17 Dec 2019 19:18:27 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20191217191827.GA1335010@stefanha-x1.localdomain>
+References: <20191210145105.329680-1-farosas@linux.ibm.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="a8Wt8u1KmwUX3Y2C"
 Content-Disposition: inline
-In-Reply-To: <CAPcyv4jGEAbYSJef2zLzgg6Arozsuz7eN_vZL1iTcd1XQuNT4Q@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH 01/19] dax: remove block device dependencies
+In-Reply-To: <20191210145105.329680-1-farosas@linux.ibm.com>
+Subject: Re: [Virtio-fs] [PATCH 0/2] virtio-fs-ci: build-rootfs tweaks
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,103 +16,53 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Dan Williams <dan.j.williams@intel.com>
-Cc: virtio-fs@redhat.com, linux-nvdimm <linux-nvdimm@lists.01.org>, Miklos Szeredi <miklos@szeredi.hu>, Dave Chinner <david@fromorbit.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Christoph Hellwig <hch@infradead.org>, linux-fsdevel <linux-fsdevel@vger.kernel.org>
+To: Fabiano Rosas <farosas@linux.ibm.com>
+Cc: virtio-fs@redhat.com
 
-On Wed, Aug 28, 2019 at 05:04:11PM -0700, Dan Williams wrote:
-> On Wed, Aug 28, 2019 at 3:53 PM Dave Chinner <david@fromorbit.com> wrote:
-> >
-> > On Wed, Aug 28, 2019 at 01:58:43PM -0400, Vivek Goyal wrote:
-> > > On Tue, Aug 27, 2019 at 11:58:09PM -0700, Christoph Hellwig wrote:
-> > > > On Tue, Aug 27, 2019 at 12:38:28PM -0400, Vivek Goyal wrote:
-> > > > > > For bdev_dax_pgoff
-> > > > > > I'd much rather have the partition offset if there is on in the daxdev
-> > > > > > somehow so that we can get rid of the block device entirely.
-> > > > >
-> > > > > IIUC, there is one block_device per partition while there is only one
-> > > > > dax_device for the whole disk. So we can't directly move bdev logical
-> > > > > offset into dax_device.
-> > > >
-> > > > Well, then we need to find a way to get partitions for dax devices,
-> > > > as we really should not expect a block device hiding behind a dax
-> > > > dev.  That is just a weird legacy assumption - block device need to
-> > > > layer on top of the dax device optionally.
-> > > >
-> > > > >
-> > > > > We probably could put this in "iomap" and leave it to filesystems to
-> > > > > report offset into dax_dev in iomap that way dax generic code does not
-> > > > > have to deal with it. But that probably will be a bigger change.
-> > > >
-> > > > And where would the file system get that information from?
-> > >
-> > > File system knows about block device, can it just call get_start_sect()
-> > > while filling iomap->addr. And this means we don't have to have
-> > > parition information in dax device. Will something like following work?
-> > > (Just a proof of concept patch).
-> > >
-> > >
-> > > ---
-> > >  drivers/dax/super.c |   11 +++++++++++
-> > >  fs/dax.c            |    6 +++---
-> > >  fs/ext4/inode.c     |    6 +++++-
-> > >  include/linux/dax.h |    1 +
-> > >  4 files changed, 20 insertions(+), 4 deletions(-)
-> > >
-> > > Index: rhvgoyal-linux/fs/ext4/inode.c
-> > > ===================================================================
-> > > --- rhvgoyal-linux.orig/fs/ext4/inode.c       2019-08-28 13:51:16.051937204 -0400
-> > > +++ rhvgoyal-linux/fs/ext4/inode.c    2019-08-28 13:51:44.453937204 -0400
-> > > @@ -3589,7 +3589,11 @@ retry:
-> > >                       WARN_ON_ONCE(1);
-> > >                       return -EIO;
-> > >               }
-> > > -             iomap->addr = (u64)map.m_pblk << blkbits;
-> > > +             if (IS_DAX(inode))
-> > > +                     iomap->addr = ((u64)map.m_pblk << blkbits) +
-> > > +                                   (get_start_sect(iomap->bdev) * 512);
-> > > +             else
-> > > +                     iomap->addr = (u64)map.m_pblk << blkbits;
-> >
-> > I'm not a fan of returning a physical device sector address from an
-> > interface where ever other user/caller expects this address to be a
-> > logical block address into the block device. It creates a landmine
-> > in the iomap API that callers may not be aware of and that's going
-> > to cause bugs. We're trying really hard to keep special case hacks
-> > like this out of the iomap infrastructure, so on those grounds alone
-> > I'd suggest this is a dead end approach.
-> >
-> > Hence I think that if the dax device needs a physical offset from
-> > the start of the block device the filesystem sits on, it should be
-> > set up at dax device instantiation time and so the filesystem/bdev
-> > never needs to be queried again for this information.
-> >
-> 
-> Agree. In retrospect it was my laziness in the dax-device
-> implementation to expect the block-device to be available.
-> 
-> It looks like fs_dax_get_by_bdev() is an intercept point where a
-> dax_device could be dynamically created to represent the subset range
-> indicated by the block-device partition. That would open up more
-> cleanup opportunities.
 
-Hi Dan,
+--a8Wt8u1KmwUX3Y2C
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-After a long time I got time to look at it again. Want to work on this
-cleanup so that I can make progress with virtiofs DAX paches.
+On Tue, Dec 10, 2019 at 11:51:03AM -0300, Fabiano Rosas wrote:
+> Some improvements for the rootfs build:
+>=20
+> - first patch fixes the rootfs build in Fedora
+>=20
+> - second patch makes the bootstrap tool selection according to distro
+>   automatically
+>=20
+>=20
+> Fabiano Rosas (2):
+>   build-rootfs: Fix fedora build
+>   build-rootfs: Select bootstrap command based on build machine distro
+>=20
+>  build-rootfs.sh | 13 ++++++++++---
+>  1 file changed, 10 insertions(+), 3 deletions(-)
+>=20
+> --
+> 2.23.0
+>=20
 
-I am not sure I understand the requirements fully. I see that right now
-dax_device is created per device and all block partitions refer to it. If
-we want to create one dax_device per partition, then it looks like this
-will be structured more along the lines how block layer handles disk and
-partitions. (One gendisk for disk and block_devices for partitions,
-including partition 0). That probably means state belong to whole device
-will be in common structure say dax_device_common, and per partition state
-will be in dax_device and dax_device can carry a pointer to
-dax_device_common.
+Thanks, applied!
 
-I am also not sure what does it mean to partition dax devices. How will
-partitions be exported to user space.
+Stefan
 
-Thanks
-Vivek
+--a8Wt8u1KmwUX3Y2C
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl35KgMACgkQnKSrs4Gr
+c8gy5AgArSzm01FywowbdwagIGtWJTun4vDZKp4UIkTL3u0UEjR73OzdePBM7oQm
+00y+a8GsZftHCXZBXv7q3SiAM/wnXPPeoAnLs/yRoicOC3BIE/ueCi9ZUuPQ1hGQ
+2sJT8AwrlMDJ7JZ2SzSawu8kB1DC8OM9jgP7gyMRyhJ9uY1qFcgSOhcB3dLlI+gc
+1dh1aqFq2Eod3E6+2twevERIOOxNazSIAY9dBBxGTauGAvitmk13WcpNUEPZUzSa
+XHZ/WLjleks1Vi8qf3matSpdX9xDBtbK56W87cNTfrrQV42sA4Yil+tYMm6HbUO4
+qdvirTBADuZ3PsTw59Yc33V1njmdQg==
+=C5DF
+-----END PGP SIGNATURE-----
+
+--a8Wt8u1KmwUX3Y2C--
 

@@ -1,10 +1,20 @@
-From: Eryu Guan <eguan@linux.alibaba.com>
-Date: Wed, 18 Dec 2019 17:22:58 +0800
-Message-Id: <20191218092258.76554-1-eguan@linux.alibaba.com>
-Content-Type: text/plain; charset=WINDOWS-1252
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=from:to:cc:subject:date:message-id:in-reply-to:references;
+	bh=52unQB593LIYSJKeJILg0hZ6B5EJz0Z5q3DyqC35Io4=;
+	b=XrGcuRE96wVWOX9QWN8q6Zsdw3tA8bPZSVotPXMcE/IlBS61yJ3F0kKO6Zq5LXhBB1
+	YAW0Ug3dMfcT7ZgvzoqMT2LrgI+BCsEYKnCNwsR7jFaNw+g0ODhbZu4qsLVI6DDwGbTM
+	TfjRP6KbIpsfI0iNtBYaFsspyEI2wdG2WvRsMq1hvERoKXdeB3HxU/XWrwL4LxlP+Ly0
+	bLZWYE76oaGHr2AvLA00X1wX+BGglHbPM3c3cdHa7h/hnIDpQsLojXqBNfdxhXtPvlfC
+	FjgDwgkWluH/IaMANAQsJ3ckrfvIBzhLnEfsD0DvKatGR8tJn9UAk/E6tDrDldv7YgK0
+	CQUg==
+From: Masayoshi Mizuma <msys.mizuma@gmail.com>
+Date: Wed, 18 Dec 2019 15:08:32 -0500
+Message-Id: <20191218200833.10368-3-msys.mizuma@gmail.com>
+In-Reply-To: <20191218200833.10368-1-msys.mizuma@gmail.com>
+References: <20191218200833.10368-1-msys.mizuma@gmail.com>
+Content-Type: text/plain; charset=US-ASCII
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH] virtiofsd: sync FUSE_DESTROY with session
-	destroy
+Subject: [Virtio-fs] [PATCH 2/3] virtiofsd: add some options to the man page
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,46 +24,64 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
-Cc: qingming.su@linux.alibaba.com
+Cc: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
-Normally on guest shutdown, guest umounts virtiofs (FUSE_DESTROY) and
-waits for umount to return then cleans up virtio device.
+From: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
-But if guest gets killed, for whatever reason, right after sending
-FUSE_DESTROY, it's possible that virtiofsd cleans up session and virtio
-dev first, then fv_queue_worker() wants to send reply to guest and hits
-abort() in fuse_send_msg(), because fuse_lowlevel_is_virtio() returns
-false.
+Add following options to the man page:
+- flock|no_flock
+- norace
+- posix_lock|no_posix_lock
+- readdirplus|no_readdirplus
+- timeout
+- writeback|no_writeback
+- xattr|no_xattr
 
-Fix it by acquiring se->init_rwlock first in fuse_session_destroy() to
-wait for inflight FUSE_DESTROY to be completed, then clean up session
-and virtio dev.
-
-Reported-by: Qingming Su <qingming.su@linux.alibaba.com>
-Signed-off-by: Eryu Guan <eguan@linux.alibaba.com>
+Signed-off-by: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 ---
- tools/virtiofsd/fuse_lowlevel.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ tools/virtiofsd/virtiofsd.texi | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index 29b9b1cad979..e345b0bae7c2 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -2660,6 +2660,13 @@ void fuse_session_destroy(struct fuse_session *se)
-             se->op.destroy(se->userdata, se);
-         }
-     }
-+
-+    /*
-+     * Wait for inflight FUSE_DESTROY to be completed before cleaning up
-+     * session and virtio dev.
-+     */
-+    pthread_rwlock_wrlock(&se->init_rwlock);
-+
-     pthread_rwlock_destroy(&se->init_rwlock);
-     pthread_mutex_destroy(&se->lock);
-     free(se->cuse_data);
+diff --git a/tools/virtiofsd/virtiofsd.texi b/tools/virtiofsd/virtiofsd.texi
+index eec7fbf4e6..76eb219676 100644
+--- a/tools/virtiofsd/virtiofsd.texi
++++ b/tools/virtiofsd/virtiofsd.texi
+@@ -34,12 +34,34 @@ Print version.
+ Enable debug output.
+ @item --syslog
+ Print log messages to syslog instead of stderr.
++@item -o flock|no_flock
++enable/disable flock.
++The default is @var{no_flock}.
+ @item -o log_level=@var{level}
+ Print only log messages matching @var{level} or more severe.  @var{level} is
+ one of @code{err}, @code{warn}, @code{info}, or @code{debug}.  The default is
+ @var{info}.
++@item -o norace
++Disable racy fallback.
++The default is false.
++@item -o posix_lock|no_posix_lock
++Enable/Disable remote posix lock.
++The default is @var{posix_lock}.
++@item -o readdirplus|no_readdirplus
++Enable/Disable readdirplus.
++The default is @var{readdirplus}
+ @item -o source=@var{path}
+ Share host directory tree located at @var{path}.  This option is required.
++@item -o timeout=<number>
++I/O timeout (second).
++The default depends on cache= option.
++@item -o writeback|no_writeback
++Enable/Disable writeback cache. The cache alows the FUSE client
++to buffer and merge write requests.
++The default is @var{no_writeback}.
++@item -o xattr|no_xattr
++Enable/Disable Extended attributes (xattr) of the files and directories.
++The default is @var{no_xattr}.
+ @item --socket-path=@var{path}, -o vhost_user_socket=@var{path}
+ Listen on vhost-user UNIX domain socket at @var{path}.
+ @item --fd=@var{fdnum}
 -- 
-2.14.4.44.g2045bb6
+2.18.1
 
 

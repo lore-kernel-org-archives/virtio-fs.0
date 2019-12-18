@@ -1,20 +1,19 @@
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
-	h=from:to:cc:subject:date:message-id:in-reply-to:references;
-	bh=52unQB593LIYSJKeJILg0hZ6B5EJz0Z5q3DyqC35Io4=;
-	b=XrGcuRE96wVWOX9QWN8q6Zsdw3tA8bPZSVotPXMcE/IlBS61yJ3F0kKO6Zq5LXhBB1
-	YAW0Ug3dMfcT7ZgvzoqMT2LrgI+BCsEYKnCNwsR7jFaNw+g0ODhbZu4qsLVI6DDwGbTM
-	TfjRP6KbIpsfI0iNtBYaFsspyEI2wdG2WvRsMq1hvERoKXdeB3HxU/XWrwL4LxlP+Ly0
-	bLZWYE76oaGHr2AvLA00X1wX+BGglHbPM3c3cdHa7h/hnIDpQsLojXqBNfdxhXtPvlfC
-	FjgDwgkWluH/IaMANAQsJ3ckrfvIBzhLnEfsD0DvKatGR8tJn9UAk/E6tDrDldv7YgK0
-	CQUg==
+	h=from:to:cc:subject:date:message-id;
+	bh=H/8f8ewvLT5DiNos1/61ARNfau2OnjKw96m7KybRoY0=;
+	b=I93i6kCD4wW7PcgxSuFocfZz5hbfr5BZUm63OoCU1QenqrA7DR8gukntSyb+aKCk6y
+	bNXcl8dgi/LXUBcqt62eaUDFkwuqF2NOUn3SwAwBESyM2joXXhGa+FKViN2/faWGZMgm
+	fnf4C/BRFjCACR8R81twYDC5ExnV+/zxCq2jUj6WfKTJqKRr+1UUZEi9Ax5/Jw6UCSrr
+	rlup2aURRF0hBvt56J05/EAGS1AnHenkIdUAlUtHkrPNgliAsPqD+fZSsWcKHfrl5Vh/
+	IGhEz7A0+rqQwvcHRxDd0DtKRWoQxMYnO4fk4aMiNck/22E69OJB/TH8o9T9zwD+ANeD
+	YKYg==
 From: Masayoshi Mizuma <msys.mizuma@gmail.com>
-Date: Wed, 18 Dec 2019 15:08:32 -0500
-Message-Id: <20191218200833.10368-3-msys.mizuma@gmail.com>
-In-Reply-To: <20191218200833.10368-1-msys.mizuma@gmail.com>
-References: <20191218200833.10368-1-msys.mizuma@gmail.com>
+Date: Wed, 18 Dec 2019 15:08:30 -0500
+Message-Id: <20191218200833.10368-1-msys.mizuma@gmail.com>
 Content-Type: text/plain; charset=US-ASCII
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 2/3] virtiofsd: add some options to the man page
+Subject: [Virtio-fs] [PATCH 0/3] Add some option descriptions to help and
+	man page
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -28,59 +27,18 @@ Cc: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
 From: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
-Add following options to the man page:
-- flock|no_flock
-- norace
-- posix_lock|no_posix_lock
-- readdirplus|no_readdirplus
-- timeout
-- writeback|no_writeback
-- xattr|no_xattr
+Add some options to the help message and man page so that
+users can set them.
 
-Signed-off-by: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
----
- tools/virtiofsd/virtiofsd.texi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+Masayoshi Mizuma (3):
+  virtiofsd: add some options to the help message
+  virtiofsd: add some options to the man page
+  virtiofsd: remove --writeback option from the man page
 
-diff --git a/tools/virtiofsd/virtiofsd.texi b/tools/virtiofsd/virtiofsd.texi
-index eec7fbf4e6..76eb219676 100644
---- a/tools/virtiofsd/virtiofsd.texi
-+++ b/tools/virtiofsd/virtiofsd.texi
-@@ -34,12 +34,34 @@ Print version.
- Enable debug output.
- @item --syslog
- Print log messages to syslog instead of stderr.
-+@item -o flock|no_flock
-+enable/disable flock.
-+The default is @var{no_flock}.
- @item -o log_level=@var{level}
- Print only log messages matching @var{level} or more severe.  @var{level} is
- one of @code{err}, @code{warn}, @code{info}, or @code{debug}.  The default is
- @var{info}.
-+@item -o norace
-+Disable racy fallback.
-+The default is false.
-+@item -o posix_lock|no_posix_lock
-+Enable/Disable remote posix lock.
-+The default is @var{posix_lock}.
-+@item -o readdirplus|no_readdirplus
-+Enable/Disable readdirplus.
-+The default is @var{readdirplus}
- @item -o source=@var{path}
- Share host directory tree located at @var{path}.  This option is required.
-+@item -o timeout=<number>
-+I/O timeout (second).
-+The default depends on cache= option.
-+@item -o writeback|no_writeback
-+Enable/Disable writeback cache. The cache alows the FUSE client
-+to buffer and merge write requests.
-+The default is @var{no_writeback}.
-+@item -o xattr|no_xattr
-+Enable/Disable Extended attributes (xattr) of the files and directories.
-+The default is @var{no_xattr}.
- @item --socket-path=@var{path}, -o vhost_user_socket=@var{path}
- Listen on vhost-user UNIX domain socket at @var{path}.
- @item --fd=@var{fdnum}
+ tools/virtiofsd/helper.c       | 26 +++++++++++++++++++++++---
+ tools/virtiofsd/virtiofsd.texi | 24 ++++++++++++++++++++++--
+ 2 files changed, 45 insertions(+), 5 deletions(-)
+
 -- 
 2.18.1
 

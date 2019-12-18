@@ -1,10 +1,21 @@
-From: Fabiano Rosas <farosas@linux.ibm.com>
-Date: Mon,  2 Dec 2019 17:26:39 -0300
-Message-Id: <20191202202639.102322-1-farosas@linux.ibm.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset=WINDOWS-1252
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=from:to:cc:subject:date:message-id:in-reply-to:references;
+	bh=ZnGdFs9E5wLUWWOg1JMa9N0QyNluznmWNATzsYknr0Q=;
+	b=LIyec0NIOuJKDWMGboMgkmgmkhn67EglsthCxsWmlf9RYTC//WJDLr7Vy9B6akgFy5
+	/pY8TEPsvmcaRRf0Mp7xTHdl2RZTsSGImaeyocnAgynzWcxGvsLqsREwJiTgBuXVeMKR
+	gCX/eNXCSerXwv28pkeyih+4fi8sD4Dbr+3JHb8YpKgbmiPdQV54lnwYlKTNCEhx8yi0
+	4n8YVsu2R6tDYipZaKvr4rjwo9hB0LVyA7fqh/T0Hmja21mfIEtIrQ0mgHyQ+frb5BI6
+	1epveEqLL/UvxxR5B9RJai/8Z8CrvJ+3syulR+CWooNjO7tLF8XdnXufnjN3/8Ag+UYa
+	uB/g==
+From: Masayoshi Mizuma <msys.mizuma@gmail.com>
+Date: Wed, 18 Dec 2019 15:08:31 -0500
+Message-Id: <20191218200833.10368-2-msys.mizuma@gmail.com>
+In-Reply-To: <20191218200833.10368-1-msys.mizuma@gmail.com>
+References: <20191218200833.10368-1-msys.mizuma@gmail.com>
+Content-Type: text/plain; charset=US-ASCII
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH] virtiofs: Relax DAX window protection for ppc
+Subject: [Virtio-fs] [PATCH 1/3] virtiofsd: add some options to the help
+	message
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,84 +25,69 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
-Cc: qemu-ppc@nongnu.org, qemu-devel@nongnu.org
+Cc: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
-When setting up the DAX window during the virtiofs driver probe inside
-the guest, the Linux arch-specific function arch_add_memory is called,
-which on ppc tries to do a cache flush [1] of the recently added
-memory. At this point the window is mmap'ed PROT_NONE by QEMU, which
-causes the following:
+From: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 
-<snip>
-[   10.136703] virtio_fs virtio0: Cache len: 0x80000000 @ 0x210000000000
-[   10.165106] radix-mmu: Mapped 0xc000210000000000-0xc000210080000000 with 1.00 GiB pages
-error: kvm run failed Bad address
-NIP c000000000072350   LR c000000000072304 CTR 0000000001000000 XER 0000000020040000 CPU#0
-MSR 8000000002009033 HID0 0000000000000000  HF 8000000000000000 iidx 3 didx 3
-TB 00000000 00000000 DECR 0
-GPR00 c000000000072304 c0000000fa383100 c000000001190300 0000000000000000
-GPR04 0000000000000001 0000000000000000 c0000000fa383208 0000000000000080
-GPR08 c000210000000000 000000008000007f 0000000001000000 6874697720303030
-<snip>
+Add following options to the help message:
+- cache
+- flock|no_flock
+- norace
+- posix_lock|no_posix_lock
+- readdirplus|no_readdirplus
+- timeout
+- writeback|no_writeback
+- xattr|no_xattr
 
-The problem is the same for the memory device removal path
-(e.g. during filesystem unmount).
-
-Since powerpc expects the memory to be accessible during device
-addition/removal, this patch makes the DAX window readable at creation
-and after virtio-fs unmap.
-
-1 - https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=fb5924fd
-
-Signed-off-by: Fabiano Rosas <farosas@linux.ibm.com>
+Signed-off-by: Masayoshi Mizuma <m.mizuma@jp.fujitsu.com>
 ---
- hw/virtio/vhost-user-fs.c | 17 ++++++++++++++---
- 1 file changed, 14 insertions(+), 3 deletions(-)
+ tools/virtiofsd/helper.c | 26 +++++++++++++++++++++++---
+ 1 file changed, 23 insertions(+), 3 deletions(-)
 
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index 455e97beea..92958797d0 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -24,6 +24,16 @@
- #include "exec/address-spaces.h"
- #include "trace.h"
+diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
+index bcb8c05063..339d806e7c 100644
+--- a/tools/virtiofsd/helper.c
++++ b/tools/virtiofsd/helper.c
+@@ -147,15 +147,35 @@ void fuse_cmdline_help(void)
+            "    -f                         foreground operation\n"
+            "    --daemonize                run in background\n"
+            "    -s                         disable multi-threaded operation\n"
++           "    -o cache=<mode>            cache mode. could be one of \"auto, "
++           "always, none\"\n"
++           "                               default: auto\n"
+            "    -o clone_fd                use separate fuse device fd for "
+            "each thread\n"
+            "                               (may improve performance)\n"
++           "    -o flock|no_flock          enable/disable flock\n"
++           "                               default: no_flock\n"
++           "    -o log_level=<level>       log level, default to \"info\"\n"
++           "                               level could be one of \"debug, "
++           "info, warn, err\"\n"
+            "    -o max_idle_threads        the maximum number of idle worker "
+            "threads\n"
+            "                               allowed (default: 10)\n"
+-           "    -o log_level=<level>       log level, default to \"info\"\n"
+-           "                               level could be one of \"debug, "
+-           "info, warn, err\"\n");
++           "    -o norace                  disable racy fallback\n"
++           "                               default: false\n"
++           "    -o posix_lock|no_posix_lock\n"
++           "                               enable/disable remote posix lock\n"
++           "                               default: posix_lock\n"
++           "    -o readdirplus|no_readdirplus\n"
++           "                               enable/disable readirplus\n"
++           "                               default: readdirplus\n"
++           "    -o timeout=<number>        I/O timeout (second)\n"
++           "                               default: depends on cache= option.\n"
++           "    -o writeback|no_writeback  enable/disable writeback cache\n"
++           "                               default: no_writeback\n"
++           "    -o xattr|no_xattr          enable/disable xattr\n"
++           "                               default: no_xattr\n"
++           );
+ }
  
-+/*
-+ * The powerpc kernel code expects the memory to be accessible during
-+ * addition/removal.
-+ */
-+#if defined(TARGET_PPC64) && defined(CONFIG_LINUX)
-+#define DAX_WINDOW_PROT PROT_READ
-+#else
-+#define DAX_WINDOW_PROT PROT_NONE
-+#endif
-+
- uint64_t vhost_user_fs_slave_map(struct vhost_dev *dev, VhostUserFSSlaveMsg *sm,
-                                  int fd)
- {
-@@ -133,8 +143,8 @@ uint64_t vhost_user_fs_slave_unmap(struct vhost_dev *dev, VhostUserFSSlaveMsg *s
-             continue;
-         }
- 
--        ptr = mmap(cache_host + sm->c_offset[i], sm->len[i],
--                PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
-+        ptr = mmap(cache_host + sm->c_offset[i], sm->len[i], DAX_WINDOW_PROT,
-+                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
-         if (ptr != (cache_host + sm->c_offset[i])) {
-             res = -errno;
-             fprintf(stderr, "%s: mmap failed (%s) [%d] %"
-@@ -485,8 +495,9 @@ static void vuf_device_realize(DeviceState *dev, Error **errp)
- 
-     if (fs->conf.cache_size) {
-         /* Anonymous, private memory is not counted as overcommit */
--        cache_ptr = mmap(NULL, fs->conf.cache_size, PROT_NONE,
-+        cache_ptr = mmap(NULL, fs->conf.cache_size, DAX_WINDOW_PROT,
-                          MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-+
-         if (cache_ptr == MAP_FAILED) {
-             error_setg(errp, "Unable to mmap blank cache");
-             return;
+ static int fuse_helper_opt_proc(void *data, const char *arg, int key,
 -- 
-2.23.0
+2.18.1
 
 

@@ -1,12 +1,9 @@
-From: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
-Date: Mon, 23 Dec 2019 22:37:13 +0000
-Message-ID: <68b2f70664616734f98f572a9d70d0a8fe4627d6.camel@intel.com>
-Content-Language: en-US
-Content-ID: <1FBCB3D32D39B6419D738A58463EFC19@intel.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
+From: Eryu Guan <eguan@linux.alibaba.com>
+Date: Tue, 24 Dec 2019 11:31:51 +0800
+Message-Id: <20191224033151.2459-1-eguan@linux.alibaba.com>
+Content-Type: text/plain; charset=WINDOWS-1252
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] virtio-fs kernel patches
+Subject: [Virtio-fs] [PATCH] virtiofsd: fix eventfd_write failure message
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,26 +12,27 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
-Cc: "vgoyal@redhat.com" <vgoyal@redhat.com>
+To: virtio-fs@redhat.com
 
-Hi folks,
+Signed-off-by: Eryu Guan <eguan@linux.alibaba.com>
+---
+ tools/virtiofsd/fuse_virtio.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I was wondering what was the status regarding the linux kernel patches
-for virtio-fs?
-Do you have a series ready on top of 5.5-rcX?
+diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+index 2ae38758567e..775f32bdaae2 100644
+--- a/tools/virtiofsd/fuse_virtio.c
++++ b/tools/virtiofsd/fuse_virtio.c
+@@ -843,7 +843,7 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
+ 
+         /* Kill the thread */
+         if (eventfd_write(ourqi->kill_fd, 1)) {
+-            fuse_log(FUSE_LOG_ERR, "Eventfd_read for queue: %m\n");
++            fuse_log(FUSE_LOG_ERR, "Eventfd_write for queue: %m\n");
+         }
+         ret = pthread_join(ourqi->thread, NULL);
+         if (ret) {
+-- 
+2.14.4.44.g2045bb6
 
-Thanks,
-Sebastien
----------------------------------------------------------------------
-Intel Corporation SAS (French simplified joint stock company)
-Registered headquarters: "Les Montalets"- 2, rue de Paris, 
-92196 Meudon Cedex, France
-Registration Number:  302 456 199 R.C.S. NANTERRE
-Capital: 4,572,000 Euros
-
-This e-mail and any attachments may contain confidential material for
-the sole use of the intended recipient(s). Any review or distribution
-by others is strictly prohibited. If you are not the intended
-recipient, please contact the sender and delete all copies.
 

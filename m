@@ -1,17 +1,13 @@
-From: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
-Date: Thu, 2 Jan 2020 18:22:05 +0000
-Message-ID: <0a656518eb1064784db4d282801612b787ecc9cc.camel@intel.com>
-References: <68b2f70664616734f98f572a9d70d0a8fe4627d6.camel@intel.com>
-	<20200102135505.GC6051@redhat.com>
-	<fc1e89f565bb14906e05a31a9a1729b759f77bd0.camel@intel.com>
-	<20200102161342.GD6051@redhat.com>
-In-Reply-To: <20200102161342.GD6051@redhat.com>
-Content-Language: en-US
-Content-ID: <0F68F89EB791504CBE4D0054B985388C@intel.com>
+Date: Thu, 2 Jan 2020 18:55:40 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20200102185540.GL2927@work-vm>
+References: <20200102035312.18507-1-yangx.jy@cn.fujitsu.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] virtio-fs kernel patches
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20200102035312.18507-1-yangx.jy@cn.fujitsu.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd/passthrough_ll: Pass errno to
+ fuse_reply_err()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,63 +16,55 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "vgoyal@redhat.com" <vgoyal@redhat.com>
-Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+To: Xiao Yang <yangx.jy@cn.fujitsu.com>, ndevos@redhat.com
+Cc: virtio-fs@redhat.com
 
-On Thu, 2020-01-02 at 11:13 -0500, Vivek Goyal wrote:
-> On Thu, Jan 02, 2020 at 03:55:11PM +0000, Boeuf, Sebastien wrote:
-> > On Thu, 2020-01-02 at 08:55 -0500, Vivek Goyal wrote:
-> > > On Mon, Dec 23, 2019 at 10:37:13PM +0000, Boeuf, Sebastien wrote:
-> > > > Hi folks,
-> > > > 
-> > > > I was wondering what was the status regarding the linux kernel
-> > > > patches
-> > > > for virtio-fs?
-> > > > Do you have a series ready on top of 5.5-rcX?
-> > > 
-> > > Hi Sebastien,
-> > > 
-> > > Its not ready yet. I was planning to work on it before start of
-> > > holidays
-> > > but I could not. I am planning to work on it now. Will let you
-> > > know
-> > > as
-> > > soon as its ready.
-> > 
-> > Great, thank you :)
+* Xiao Yang (yangx.jy@cn.fujitsu.com) wrote:
+> lo_copy_file_range() passes -errno to fuse_reply_err() and then fuse_reply_err()
+> changes it to errno again, so that subsequent fuse_send_reply_iov_nofree() catches
+> the wrong errno.(i.e. reports "fuse: bad error value: ...").
 > 
-> Hi Sebastien,
+> Make fuse_send_reply_iov_nofree() accept the correct -errno by passing errno
+> directly in lo_copy_file_range().
 > 
-> I pushed DAX pathces for 5.5-rc4 here.
-> 
-> https://github.com/rhvgoyal/linux/commits/virtiofs-dax-5.5
-> 
-> Give it a try and let me know if you face issues.
+> Signed-off-by: Xiao Yang <yangx.jy@cn.fujitsu.com>
 
-Oh that's perfect! I did apply those patches, and after I took care of
-modifying my "mount" command in the guest, virtio-fs still seems to
-work like a charm.
+Yes, I think you're right - FUSE does use +ve errno's for some things,
+normally the failure of the fuse channel itself; but in this case it
+looks like 'errno' is consistent with the other calls; this comes
+straight from upstream libfuse commit 2548c4b8, so lets cc in Niels.
 
-I'll run FIO performance tests tomorrow, based on your test repo 
-https://github.com/rhvgoyal/virtiofs-tests to validate everything's
-alright!
+I'll take it into virtiofsd for the moment; thanks!
 
-Thanks,
-Sebastien
+Dave
 
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Thanks
-> Vivek
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 83dd0084b4..a77bed655e 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -2615,7 +2615,7 @@ static void lo_copy_file_range(fuse_req_t req, fuse_ino_t ino_in, off_t off_in,
+>  
+>      res = copy_file_range(in_fd, &off_in, out_fd, &off_out, len, flags);
+>      if (res < 0) {
+> -        fuse_reply_err(req, -errno);
+> +        fuse_reply_err(req, errno);
+>      } else {
+>          fuse_reply_write(req, res);
+>      }
+> -- 
+> 2.21.0
 > 
----------------------------------------------------------------------
-Intel Corporation SAS (French simplified joint stock company)
-Registered headquarters: "Les Montalets"- 2, rue de Paris, 
-92196 Meudon Cedex, France
-Registration Number:  302 456 199 R.C.S. NANTERRE
-Capital: 4,572,000 Euros
-
-This e-mail and any attachments may contain confidential material for
-the sole use of the intended recipient(s). Any review or distribution
-by others is strictly prohibited. If you are not the intended
-recipient, please contact the sender and delete all copies.
+> 
+> 
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

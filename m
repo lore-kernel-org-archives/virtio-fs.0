@@ -1,13 +1,12 @@
-Date: Thu, 2 Jan 2020 18:55:40 +0000
+Date: Fri, 3 Jan 2020 10:41:39 +0000
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200102185540.GL2927@work-vm>
-References: <20200102035312.18507-1-yangx.jy@cn.fujitsu.com>
+Message-ID: <20200103104139.GB3804@work-vm>
+References: <20191224033151.2459-1-eguan@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20200102035312.18507-1-yangx.jy@cn.fujitsu.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd/passthrough_ll: Pass errno to
- fuse_reply_err()
+In-Reply-To: <20191224033151.2459-1-eguan@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: fix eventfd_write failure message
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,50 +15,36 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Xiao Yang <yangx.jy@cn.fujitsu.com>, ndevos@redhat.com
+To: Eryu Guan <eguan@linux.alibaba.com>
 Cc: virtio-fs@redhat.com
 
-* Xiao Yang (yangx.jy@cn.fujitsu.com) wrote:
-> lo_copy_file_range() passes -errno to fuse_reply_err() and then fuse_reply_err()
-> changes it to errno again, so that subsequent fuse_send_reply_iov_nofree() catches
-> the wrong errno.(i.e. reports "fuse: bad error value: ...").
-> 
-> Make fuse_send_reply_iov_nofree() accept the correct -errno by passing errno
-> directly in lo_copy_file_range().
-> 
-> Signed-off-by: Xiao Yang <yangx.jy@cn.fujitsu.com>
-
-Yes, I think you're right - FUSE does use +ve errno's for some things,
-normally the failure of the fuse channel itself; but in this case it
-looks like 'errno' is consistent with the other calls; this comes
-straight from upstream libfuse commit 2548c4b8, so lets cc in Niels.
-
-I'll take it into virtiofsd for the moment; thanks!
-
-Dave
-
+* Eryu Guan (eguan@linux.alibaba.com) wrote:
+> Signed-off-by: Eryu Guan <eguan@linux.alibaba.com>
 > ---
->  tools/virtiofsd/passthrough_ll.c | 2 +-
+>  tools/virtiofsd/fuse_virtio.c | 2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 83dd0084b4..a77bed655e 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2615,7 +2615,7 @@ static void lo_copy_file_range(fuse_req_t req, fuse_ino_t ino_in, off_t off_in,
+> diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+> index 2ae38758567e..775f32bdaae2 100644
+> --- a/tools/virtiofsd/fuse_virtio.c
+> +++ b/tools/virtiofsd/fuse_virtio.c
+> @@ -843,7 +843,7 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
 >  
->      res = copy_file_range(in_fd, &off_in, out_fd, &off_out, len, flags);
->      if (res < 0) {
-> -        fuse_reply_err(req, -errno);
-> +        fuse_reply_err(req, errno);
->      } else {
->          fuse_reply_write(req, res);
->      }
+>          /* Kill the thread */
+>          if (eventfd_write(ourqi->kill_fd, 1)) {
+> -            fuse_log(FUSE_LOG_ERR, "Eventfd_read for queue: %m\n");
+> +            fuse_log(FUSE_LOG_ERR, "Eventfd_write for queue: %m\n");
+>          }
+>          ret = pthread_join(ourqi->thread, NULL);
+>          if (ret) {
 > -- 
-> 2.21.0
-> 
-> 
-> 
+> 2.14.4.44.g2045bb6
+
+
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+
+Thanks, merged into 'virtiofsd: Kill threads when queues are stopped'
+
 > 
 > _______________________________________________
 > Virtio-fs mailing list

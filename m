@@ -1,9 +1,14 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Tue,  3 Dec 2019 13:14:21 +0000
-Message-Id: <20191203131423.40962-1-dgilbert@redhat.com>
+Date: Mon, 6 Jan 2020 12:21:54 +0100
+From: Niels de Vos <ndevos@redhat.com>
+Message-ID: <20200106112154.GC3163@ndevos-x270.lan.nixpanic.net>
+References: <20200102035312.18507-1-yangx.jy@cn.fujitsu.com>
+	<20200102185540.GL2927@work-vm>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 0/2] Convert to cap-ng
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20200102185540.GL2927@work-vm>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd/passthrough_ll: Pass errno to
+ fuse_reply_err()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -12,29 +17,64 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com, vgoyal@redhat.com
+To: Xiao Yang <yangx.jy@cn.fujitsu.com>
+Cc: virtio-fs@redhat.com
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+On Thu, Jan 02, 2020 at 06:55:40PM +0000, Dr. David Alan Gilbert wrote:
+> * Xiao Yang (yangx.jy@cn.fujitsu.com) wrote:
+> > lo_copy_file_range() passes -errno to fuse_reply_err() and then fuse_reply_err()
+> > changes it to errno again, so that subsequent fuse_send_reply_iov_nofree() catches
+> > the wrong errno.(i.e. reports "fuse: bad error value: ...").
+> > 
+> > Make fuse_send_reply_iov_nofree() accept the correct -errno by passing errno
+> > directly in lo_copy_file_range().
+> > 
+> > Signed-off-by: Xiao Yang <yangx.jy@cn.fujitsu.com>
+> 
+> Yes, I think you're right - FUSE does use +ve errno's for some things,
+> normally the failure of the fuse channel itself; but in this case it
+> looks like 'errno' is consistent with the other calls; this comes
+> straight from upstream libfuse commit 2548c4b8, so lets cc in Niels.
 
-Hi,
-  This changes virtiofsd to use cap-ng rather than cap
-(qemu is moving in that direction).  It's a little painful
-because of an interaction with our sandboxing.
+Indeed, setting a negative errno is a mistake. Could you send the fix to
+https://github.com/libfuse/libfuse (example/passthrough_ll.c) as well? I
+am happy to do so if you prefer, just let me know.
 
-I intend to flatten the conversion into Vivek's patch that
-adds the libcap use.
+Thanks,
+Niels
 
-Dave
-
-Dr. David Alan Gilbert (2):
-  virtiofsd: cap-ng helpers
-  virtiofsd: Convert to libcap-ng
-
- Makefile                           |   2 +-
- contrib/virtiofsd/Makefile.objs    |   2 -
- contrib/virtiofsd/passthrough_ll.c | 162 +++++++++++++++++++----------
- 3 files changed, 106 insertions(+), 60 deletions(-)
-
--- 
-2.23.0
+> 
+> I'll take it into virtiofsd for the moment; thanks!
+> 
+> Dave
+> 
+> > ---
+> >  tools/virtiofsd/passthrough_ll.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> > index 83dd0084b4..a77bed655e 100644
+> > --- a/tools/virtiofsd/passthrough_ll.c
+> > +++ b/tools/virtiofsd/passthrough_ll.c
+> > @@ -2615,7 +2615,7 @@ static void lo_copy_file_range(fuse_req_t req, fuse_ino_t ino_in, off_t off_in,
+> >  
+> >      res = copy_file_range(in_fd, &off_in, out_fd, &off_out, len, flags);
+> >      if (res < 0) {
+> > -        fuse_reply_err(req, -errno);
+> > +        fuse_reply_err(req, errno);
+> >      } else {
+> >          fuse_reply_write(req, res);
+> >      }
+> > -- 
+> > 2.21.0
+> > 
+> > 
+> > 
+> > 
+> > _______________________________________________
+> > Virtio-fs mailing list
+> > Virtio-fs@redhat.com
+> > https://www.redhat.com/mailman/listinfo/virtio-fs
+> --
+> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

@@ -1,14 +1,33 @@
-Date: Tue, 7 Jan 2020 16:58:02 +0000
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20200107165802.GC410801@stefanha-x1.localdomain>
-References: <20200107041521.75833-1-eguan@linux.alibaba.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
+	h=date : from : to : cc
+	: subject : message-id : references : mime-version : content-type :
+	in-reply-to; s=corp-2019-08-05;
+	bh=TonZdKs5flBwONqESEptkzUdNDu8nb8volKmuzA6Cz0=;
+	b=Dg5eAnULbmvdHQzXt/MZgtHB0R/zWD0HQ+5s3azeZp8EEZ34ay8U8IXHjZGsgK27rehS
+	bb8ffV2JEBwuogOZg4wcANMgdMBKS97CpXpWk7KU7SVlPQgFUWlVHu1DAfnGryIv1LKI
+	M5AvVllmupEsFvrHYTNamVFhNzc87ByL1gWOw0iTmEuPoX1/m7tYqFY+EvYYNZUwGLxG
+	1Lo8F+6TNJ6Q1EeRhKR2XXV7l75GPDLV1kYwFuGmzfY9nlZh5W1Im1qMYi7elyFGtzp+
+	gnwn6VDCbHk8N4C5wW46kKsyxAWes1ui6aXftOTsyPgLj2wHtLqD0FgPkvrqcDbM/whH
+	9A==
+Date: Tue, 7 Jan 2020 09:07:31 -0800
+From: "Darrick J. Wong" <darrick.wong@oracle.com>
+Message-ID: <20200107170731.GA472641@magnolia>
+References: <20190821175720.25901-2-vgoyal@redhat.com>
+	<20190826115152.GA21051@infradead.org>
+	<20190827163828.GA6859@redhat.com>
+	<20190828065809.GA27426@infradead.org>
+	<20190828175843.GB912@redhat.com>
+	<20190828225322.GA7777@dread.disaster.area>
+	<CAPcyv4jGEAbYSJef2zLzgg6Arozsuz7eN_vZL1iTcd1XQuNT4Q@mail.gmail.com>
+	<20191216181014.GA30106@redhat.com>
+	<20200107125159.GA15745@infradead.org>
+	<CAPcyv4jZE35sbDo6J4ihioEUFTuekJ3_h0=2Ra4PY+xn2xn1cQ@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="B4IIlcmfBL/1gGOG"
+In-Reply-To: <CAPcyv4jZE35sbDo6J4ihioEUFTuekJ3_h0=2Ra4PY+xn2xn1cQ@mail.gmail.com>
+Content-Type: text/plain; charset=WINDOWS-1252
 Content-Disposition: inline
-In-Reply-To: <20200107041521.75833-1-eguan@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH v3] virtiofsd: stop all queue threads on
- exit in virtio_loop()
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH 01/19] dax: remove block device dependencies
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,64 +36,50 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Eryu Guan <eguan@linux.alibaba.com>
-Cc: virtio-fs@redhat.com, qingming.su@linux.alibaba.com
+To: Dan Williams <dan.j.williams@intel.com>
+Cc: virtio-fs@redhat.com, linux-nvdimm <linux-nvdimm@lists.01.org>, Miklos Szeredi <miklos@szeredi.hu>, Dave Chinner <david@fromorbit.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Christoph Hellwig <hch@infradead.org>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Vivek Goyal <vgoyal@redhat.com>
 
+On Tue, Jan 07, 2020 at 06:22:54AM -0800, Dan Williams wrote:
+> On Tue, Jan 7, 2020 at 4:52 AM Christoph Hellwig <hch@infradead.org> wrote:
+> >
+> > On Mon, Dec 16, 2019 at 01:10:14PM -0500, Vivek Goyal wrote:
+> > > > Agree. In retrospect it was my laziness in the dax-device
+> > > > implementation to expect the block-device to be available.
+> > > >
+> > > > It looks like fs_dax_get_by_bdev() is an intercept point where a
+> > > > dax_device could be dynamically created to represent the subset range
+> > > > indicated by the block-device partition. That would open up more
+> > > > cleanup opportunities.
+> > >
+> > > Hi Dan,
+> > >
+> > > After a long time I got time to look at it again. Want to work on this
+> > > cleanup so that I can make progress with virtiofs DAX paches.
+> > >
+> > > I am not sure I understand the requirements fully. I see that right now
+> > > dax_device is created per device and all block partitions refer to it. If
+> > > we want to create one dax_device per partition, then it looks like this
+> > > will be structured more along the lines how block layer handles disk and
+> > > partitions. (One gendisk for disk and block_devices for partitions,
+> > > including partition 0). That probably means state belong to whole device
+> > > will be in common structure say dax_device_common, and per partition state
+> > > will be in dax_device and dax_device can carry a pointer to
+> > > dax_device_common.
+> > >
+> > > I am also not sure what does it mean to partition dax devices. How will
+> > > partitions be exported to user space.
+> >
+> > Dan, last time we talked you agreed that partitioned dax devices are
+> > rather pointless IIRC.  Should we just deprecate partitions on DAX
+> > devices and then remove them after a cycle or two?
+> 
+> That does seem a better plan than trying to force partition support
+> where it is not needed.
 
---B4IIlcmfBL/1gGOG
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Question: if one /did/ have a partitioned DAX device and used kpartx to
+create dm-linear devices for each partition, will DAX still work through
+that?
 
-On Tue, Jan 07, 2020 at 12:15:21PM +0800, Eryu Guan wrote:
-> On guest graceful shutdown, virtiofsd receives VHOST_USER_GET_VRING_BASE
-> request from VMM and shuts down virtqueues by calling fv_set_started(),
-> which joins fv_queue_thread() threads. So when virtio_loop() returns,
-> there should be no thread is still accessing data in fuse session and/or
-> virtio dev.
->=20
-> But on abnormal exit, e.g. guest got killed for whatever reason,
-> vhost-user socket is closed and virtio_loop() breaks out the main loop
-> and returns to main(). But it's possible fv_queue_worker()s are still
-> working and accessing fuse session and virtio dev, which results in
-> crash or use-after-free.
->=20
-> Fix it by stopping fv_queue_thread()s before virtio_loop() returns,
-> to make sure there's no-one could access fuse session and virtio dev.
->=20
-> Reported-by: Qingming Su <qingming.su@linux.alibaba.com>
-> Signed-off-by: Eryu Guan <eguan@linux.alibaba.com>
-> ---
-> v3:
-> - stopping fv_queue_thread by writing to qi->kill_fd instead of
->   cancelling thread, as suggested by Stefan Hajnoczi
->=20
-> v2:
-> - cancelling fv_queue_thread before exit
->=20
-> v1: virtiofsd: sync FUSE_DESTROY with session destroy
-> https://www.redhat.com/archives/virtio-fs/2019-December/msg00051.html
->=20
->  tools/virtiofsd/fuse_virtio.c | 56 +++++++++++++++++++++++++++++--------=
-------
->  1 file changed, 38 insertions(+), 18 deletions(-)
+--D
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-
---B4IIlcmfBL/1gGOG
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl4UuJoACgkQnKSrs4Gr
-c8g5KAf+MpoPnPV2VnWYRCGY++bfVuNs/Bm+rpZv4uHLSyZ/U7ldFTfOTrbXUrIi
-xEx5qWoh/yCE/u16IEdNRKORMcKPqP3vgRjn4P0wqvFHbe5Kn0pCEmFCfvu8oNjF
-ChtSekuil9L6gP5Y7G1jZ9mZNQ7heXfTFht12hO4piaY5ICFXvgegS8g6orU9385
-TgayhzGWd1wOS2pWei9gyu1YeN/Au3WrxF/zcMkZUgCeR4n/DHGtvnV3t9sL2lNZ
-EfZUQA7VvTQ0QeUNJ/6Y/LVGbjicMFUvM3wgE2Bj0hIgwxRdW7AQywKgyn5wXHo6
-jNBZ/aSNA517Yw1gVrzVGpFI2lJTUg==
-=/WcL
------END PGP SIGNATURE-----
-
---B4IIlcmfBL/1gGOG--
 

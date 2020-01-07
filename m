@@ -1,10 +1,35 @@
-From: Eryu Guan <eguan@linux.alibaba.com>
-Date: Tue,  7 Jan 2020 12:15:21 +0800
-Message-Id: <20200107041521.75833-1-eguan@linux.alibaba.com>
-Content-Type: text/plain; charset=WINDOWS-1252
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+	d=infradead.org; s=bombadil.20170209;
+	h=In-Reply-To:Content-Type:MIME-Version
+	:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+	List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+	bh=2kBnL5gA8Hu2OCxhQ/ljIeIBv2eKrh+kqk+I83yZiPg=;
+	b=ZWBdCh+xKxFQSUSue/qfzQHsj
+	6T5S7vMsw+xLZ62ufe9Nw3VxsvMHHudJaF8KytEMMXsDhKtJIMWpsjy+CQ2AaJlNh+CZM7spuk1qi
+	/GG/VNY7ofqvL8y2h70Tkp7c2xkCRxKZ1rFFxsF9ewZVdfm5fMyeHS7JZqUgbOIVcUM4enC/7CPfL
+	YvahSVPFgA+tsvy8E7FsjcEDyCoXQ7NeHHA9vZPIY3RKwvTq97SGhEeSWoA7Sbe4ZJF+SklJGS433
+	rfYX021bytGaEdqU7+9n2lMTY4eAmfRy/GoDNiu+qsLx1wh+rUf9RelcB0PwHzVtNjAEn/Sepic4P
+	CyVpuzEdg==;
+Date: Tue, 7 Jan 2020 04:51:59 -0800
+From: Christoph Hellwig <hch@infradead.org>
+Message-ID: <20200107125159.GA15745@infradead.org>
+References: <20190821175720.25901-1-vgoyal@redhat.com>
+	<20190821175720.25901-2-vgoyal@redhat.com>
+	<20190826115152.GA21051@infradead.org>
+	<20190827163828.GA6859@redhat.com>
+	<20190828065809.GA27426@infradead.org>
+	<20190828175843.GB912@redhat.com>
+	<20190828225322.GA7777@dread.disaster.area>
+	<CAPcyv4jGEAbYSJef2zLzgg6Arozsuz7eN_vZL1iTcd1XQuNT4Q@mail.gmail.com>
+	<20191216181014.GA30106@redhat.com>
+MIME-Version: 1.0
+In-Reply-To: <20191216181014.GA30106@redhat.com>
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3] virtiofsd: stop all queue threads on exit in
-	virtio_loop()
+Subject: Re: [Virtio-fs] [PATCH 01/19] dax: remove block device dependencies
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,122 +38,38 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
-Cc: qingming.su@linux.alibaba.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, linux-nvdimm <linux-nvdimm@lists.01.org>, Miklos Szeredi <miklos@szeredi.hu>, Dave Chinner <david@fromorbit.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Christoph Hellwig <hch@infradead.org>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Dan Williams <dan.j.williams@intel.com>
 
-On guest graceful shutdown, virtiofsd receives VHOST_USER_GET_VRING_BASE
-request from VMM and shuts down virtqueues by calling fv_set_started(),
-which joins fv_queue_thread() threads. So when virtio_loop() returns,
-there should be no thread is still accessing data in fuse session and/or
-virtio dev.
+On Mon, Dec 16, 2019 at 01:10:14PM -0500, Vivek Goyal wrote:
+> > Agree. In retrospect it was my laziness in the dax-device
+> > implementation to expect the block-device to be available.
+> > 
+> > It looks like fs_dax_get_by_bdev() is an intercept point where a
+> > dax_device could be dynamically created to represent the subset range
+> > indicated by the block-device partition. That would open up more
+> > cleanup opportunities.
+> 
+> Hi Dan,
+> 
+> After a long time I got time to look at it again. Want to work on this
+> cleanup so that I can make progress with virtiofs DAX paches.
+> 
+> I am not sure I understand the requirements fully. I see that right now
+> dax_device is created per device and all block partitions refer to it. If
+> we want to create one dax_device per partition, then it looks like this
+> will be structured more along the lines how block layer handles disk and
+> partitions. (One gendisk for disk and block_devices for partitions,
+> including partition 0). That probably means state belong to whole device
+> will be in common structure say dax_device_common, and per partition state
+> will be in dax_device and dax_device can carry a pointer to
+> dax_device_common.
+> 
+> I am also not sure what does it mean to partition dax devices. How will
+> partitions be exported to user space.
 
-But on abnormal exit, e.g. guest got killed for whatever reason,
-vhost-user socket is closed and virtio_loop() breaks out the main loop
-and returns to main(). But it's possible fv_queue_worker()s are still
-working and accessing fuse session and virtio dev, which results in
-crash or use-after-free.
-
-Fix it by stopping fv_queue_thread()s before virtio_loop() returns,
-to make sure there's no-one could access fuse session and virtio dev.
-
-Reported-by: Qingming Su <qingming.su@linux.alibaba.com>
-Signed-off-by: Eryu Guan <eguan@linux.alibaba.com>
----
-v3:
-- stopping fv_queue_thread by writing to qi->kill_fd instead of
-  cancelling thread, as suggested by Stefan Hajnoczi
-
-v2:
-- cancelling fv_queue_thread before exit
-
-v1: virtiofsd: sync FUSE_DESTROY with session destroy
-https://www.redhat.com/archives/virtio-fs/2019-December/msg00051.html
-
- tools/virtiofsd/fuse_virtio.c | 56 +++++++++++++++++++++++++++++--------------
- 1 file changed, 38 insertions(+), 18 deletions(-)
-
-diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-index b6edd88b00fd..b93faa963fa2 100644
---- a/tools/virtiofsd/fuse_virtio.c
-+++ b/tools/virtiofsd/fuse_virtio.c
-@@ -775,6 +775,31 @@ static void *fv_queue_thread(void *opaque)
-     return NULL;
- }
- 
-+static void fv_queue_cleanup_thread(struct fv_VuDev *vud, int qidx)
-+{
-+    int ret;
-+    struct fv_QueueInfo *ourqi;
-+
-+    assert(qidx < vud->nqueues);
-+    ourqi = vud->qi[qidx];
-+
-+    /* Kill the thread */
-+    if (eventfd_write(ourqi->kill_fd, 1)) {
-+        fuse_log(FUSE_LOG_ERR, "Eventfd_write for queue %d: %s\n",
-+	         qidx, strerror(errno));
-+    }
-+    ret = pthread_join(ourqi->thread, NULL);
-+    if (ret) {
-+        fuse_log(FUSE_LOG_ERR, "%s: Failed to join thread idx %d err %d\n",
-+	         __func__, qidx, ret);
-+    }
-+    pthread_mutex_destroy(&ourqi->vq_lock);
-+    close(ourqi->kill_fd);
-+    ourqi->kick_fd = -1;
-+    free(vud->qi[qidx]);
-+    vud->qi[qidx] = NULL;
-+}
-+
- /* Callback from libvhost-user on start or stop of a queue */
- static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
- {
-@@ -830,24 +855,7 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
-             assert(0);
-         }
-     } else {
--        int ret;
--        assert(qidx < vud->nqueues);
--        ourqi = vud->qi[qidx];
--
--        /* Kill the thread */
--        if (eventfd_write(ourqi->kill_fd, 1)) {
--            fuse_log(FUSE_LOG_ERR, "Eventfd_write for queue: %m\n");
--        }
--        ret = pthread_join(ourqi->thread, NULL);
--        if (ret) {
--            fuse_log(FUSE_LOG_ERR, "%s: Failed to join thread idx %d err %d\n",
--                     __func__, qidx, ret);
--        }
--        pthread_mutex_destroy(&ourqi->vq_lock);
--        close(ourqi->kill_fd);
--        ourqi->kick_fd = -1;
--        free(vud->qi[qidx]);
--        vud->qi[qidx] = NULL;
-+        fv_queue_cleanup_thread(vud, qidx);
-     }
- }
- 
-@@ -916,6 +924,18 @@ int virtio_loop(struct fuse_session *se)
-         }
-     }
- 
-+    /*
-+     * Make sure all fv_queue_thread()s quit on exit, as we're about to
-+     * free virtio dev and fuse session, no one should access them anymore.
-+     */
-+    for (int i = 0; i < se->virtio_dev->nqueues; i++) {
-+        if (!se->virtio_dev->qi[i])
-+            continue;
-+
-+        fuse_log(FUSE_LOG_INFO, "%s: Stopping queue %d thread\n", __func__, i);
-+        fv_queue_cleanup_thread(se->virtio_dev, i);
-+    }
-+
-     fuse_log(FUSE_LOG_INFO, "%s: Exit\n", __func__);
- 
-     return 0;
--- 
-2.14.4.44.g2045bb6
+Dan, last time we talked you agreed that partitioned dax devices are
+rather pointless IIRC.  Should we just deprecate partitions on DAX
+devices and then remove them after a cycle or two?
 
 

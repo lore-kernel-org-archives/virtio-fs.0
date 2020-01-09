@@ -1,6 +1,6 @@
-Date: Thu, 9 Jan 2020 12:56:34 -0500
+Date: Thu, 9 Jan 2020 14:10:28 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200109175634.GA17952@redhat.com>
+Message-ID: <20200109191028.GC1964@redhat.com>
 References: <20200108202422.GF1995@redhat.com>
 	<20200109022303.GA79586@e18g06458.et15sqa>
 	<OSBPR01MB4582182B3FFD047E2FEC6326E5390@OSBPR01MB4582.jpnprd01.prod.outlook.com>
@@ -76,17 +76,6 @@ On Thu, Jan 09, 2020 at 09:27:15AM +0000, misono.tomohiro@fujitsu.com wrote:
 > So I sent the same patch last October[1] and got comments
 > that it's would be better to fix the fundamental problem
 > (do not call openat() to non regular file/directory) [2].
-
-Right. So this patch is only solving the issue for directories (and not
-for symlinks other special files). We will need more improvements in
-this area.
-
-I am trying to make overlayfs work on top of virtiofs so that it can
-be tested and see if it works well or not. Overlayfs does bunch of
-xattr operations on work/work directory and it fails. So this patch
-will atleast fix that and allow me to make progress.
-
-
 >   [1] https://www.redhat.com/archives/virtio-fs/2019-October/msg00030.html
 >   [2] https://www.redhat.com/archives/virtio-fs/2019-October/msg00046.html
 > =A0
@@ -100,26 +89,20 @@ will atleast fix that and allow me to make progress.
 > So I think hybrid approach is better:=20
 >   For regular file/directory: use f...xattr
 >   For other file types: use fchdir + ...xattr + fchdir=20
+> =A0
+> Attached patch adopts the above solution.
 
-This sounds reasonable. I will give it a try.  In fact Miklos's patch
-for allowing fsetxattr() on O_PATH is still being reviewed upstream. Once
-that is merged, our approach should probably be.
+Hi Misono,
 
-1. Try fsetxattr(O_PATH fd).
-2. If 1 fails, try openat() followed by fsetxattr() for regular files
-   and dirs.
-3. For other file types use fchdir + ...xattr() + fchdir.=20
+Can you post this patch again separately so that it is easier to give
+comments and discuss this patch. I have a quick look and this patch
+does look reasonable.
+
+Only minor concern I have is that now each thread has done unshare(CLONE_FS=
+).
+Will we run into use cases where we want to enforce a particular change
+aross all threads.
 
 Thanks
 Vivek
-
-> =A0
-> Attached patch adopts the above solution.
-> So could you check the patch's approach? If it is fine, I will send it as=
- a formal patch
-> (and I apologize that my response is delayed).
->=20
-> Thanks,
-> Misono
-
 

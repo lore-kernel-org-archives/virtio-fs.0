@@ -1,22 +1,16 @@
-Date: Thu, 9 Jan 2020 12:24:47 +0100
-From: Jan Kara <jack@suse.cz>
-Message-ID: <20200109112447.GG27035@quack2.suse.cz>
-References: <CAPcyv4jGEAbYSJef2zLzgg6Arozsuz7eN_vZL1iTcd1XQuNT4Q@mail.gmail.com>
-	<20191216181014.GA30106@redhat.com>
-	<20200107125159.GA15745@infradead.org>
-	<CAPcyv4jZE35sbDo6J4ihioEUFTuekJ3_h0=2Ra4PY+xn2xn1cQ@mail.gmail.com>
-	<20200107170731.GA472641@magnolia>
-	<CAPcyv4ggH7-QhYg+YOOWn_m25uds+-0L46=N09ap-LALeGuU_A@mail.gmail.com>
-	<20200107180101.GC15920@redhat.com>
-	<CAPcyv4gmdoqpwwwy4dS3D2eZFjmJ_Zi39k=1a4wn-_ksm-UV4A@mail.gmail.com>
-	<20200107183307.GD15920@redhat.com>
-	<CAPcyv4ggoS4dWjq-1KbcuaDtroHKEi5Vu19ggJ-qgycs6w1eCA@mail.gmail.com>
+Date: Thu, 9 Jan 2020 12:56:34 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200109175634.GA17952@redhat.com>
+References: <20200108202422.GF1995@redhat.com>
+	<20200109022303.GA79586@e18g06458.et15sqa>
+	<OSBPR01MB4582182B3FFD047E2FEC6326E5390@OSBPR01MB4582.jpnprd01.prod.outlook.com>
 MIME-Version: 1.0
-In-Reply-To: <CAPcyv4ggoS4dWjq-1KbcuaDtroHKEi5Vu19ggJ-qgycs6w1eCA@mail.gmail.com>
-Content-Type: text/plain; charset=WINDOWS-1252
+Content-Type: text/plain; charset="iso-8859-1"
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 01/19] dax: remove block device dependencies
+Content-Transfer-Encoding: quoted-printable
+In-Reply-To: <OSBPR01MB4582182B3FFD047E2FEC6326E5390@OSBPR01MB4582.jpnprd01.prod.outlook.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Open fd O_RDONLY in
+ setxattr/removexattr
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,51 +19,107 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Dan Williams <dan.j.williams@intel.com>
-Cc: virtio-fs@redhat.com, linux-nvdimm <linux-nvdimm@lists.01.org>, Miklos Szeredi <miklos@szeredi.hu>, Dave Chinner <david@fromorbit.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Christoph Hellwig <hch@infradead.org>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, "Darrick J. Wong" <darrick.wong@oracle.com>, Vivek Goyal <vgoyal@redhat.com>
+To: "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-On Tue 07-01-20 10:49:55, Dan Williams wrote:
-> On Tue, Jan 7, 2020 at 10:33 AM Vivek Goyal <vgoyal@redhat.com> wrote:
-> > W.r.t partitioning, bdev_dax_pgoff() seems to be the pain point where
-> > dax code refers back to block device to figure out partition offset in
-> > dax device. If we create a dax object corresponding to "struct block_device"
-> > and store sector offset in that, then we could pass that object to dax
-> > code and not worry about referring back to bdev. I have written some
-> > proof of concept code and called that object "dax_handle". I can post
-> > that code if there is interest.
-> 
-> I don't think it's worth it in the end especially considering
-> filesystems are looking to operate on /dev/dax devices directly and
-> remove block entanglements entirely.
-> 
-> > IMHO, it feels useful to be able to partition and use a dax capable
-> > block device in same way as non-dax block device. It will be really
-> > odd to think that if filesystem is on /dev/pmem0p1, then dax can't
-> > be enabled but if filesystem is on /dev/mapper/pmem0p1, then dax
-> > will work.
-> 
-> That can already happen today. If you do not properly align the
-> partition then dax operations will be disabled. This proposal just
-> extends that existing failure domain to make all partitions fail to
-> support dax.
+On Thu, Jan 09, 2020 at 09:27:15AM +0000, misono.tomohiro@fujitsu.com wrote:
+> > On Wed, Jan 08, 2020 at 03:24:22PM -0500, Vivek Goyal wrote:
+> > > Do not open fd O_RDWR as it will fail for directories with EISDIR.
+> > > This code can be called both for regular files as well as directories.
+> > >
+> > > I noticed this when I tried "setfattr -n user.foo -v test <dir>"
+> > > inside the guest and got EISDIR.
+> > >
+> > > To write xattr, we don't have to open fd with write permissions. Looks
+> > > like kernel will do permission checks on inode.
+> > >
+> > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> >=20
+> > Looks good to me.
+> >=20
+> > Reviewed-by: Eryu Guan <eguan@linux.alibaba.com>
+> >=20
+> > > ---
+> > >  contrib/virtiofsd/passthrough_ll.c |    4 ++--
+> > >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > >
+> > > Index: qemu/contrib/virtiofsd/passthrough_ll.c
+> > > =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+> > > --- qemu.orig/contrib/virtiofsd/passthrough_ll.c	2020-01-08 15:01:03.=
+821980889 -0500
+> > > +++ qemu/contrib/virtiofsd/passthrough_ll.c	2020-01-08 15:05:15.20938=
+4352 -0500
+> > > @@ -2424,7 +2424,7 @@ static void lo_setxattr(fuse_req_t req,
+> > >  	}
+> > >
+> > >  	sprintf(procname, "%i", inode->fd);
+> > > -	fd =3D openat(lo->proc_self_fd, procname, O_RDWR);
+> > > +	fd =3D openat(lo->proc_self_fd, procname, O_RDONLY);
+> > >  	if (fd < 0) {
+> > >  		saverr =3D errno;
+> > >  		goto out;
+> > > @@ -2473,7 +2473,7 @@ static void lo_removexattr(fuse_req_t re
+> > >  	}
+> > >
+> > >  	sprintf(procname, "%i", inode->fd);
+> > > -	fd =3D openat(lo->proc_self_fd, procname, O_RDWR);
+> > > +	fd =3D openat(lo->proc_self_fd, procname, O_RDONLY);
+> > >  	if (fd < 0) {
+> > >  		saverr =3D errno;
+> > >  		goto out;
+> > >
+>=20
+> Hello,
+>=20
+> So I sent the same patch last October[1] and got comments
+> that it's would be better to fix the fundamental problem
+> (do not call openat() to non regular file/directory) [2].
 
-Well, I have some sympathy with the sysadmin that has /dev/pmem0 device,
-decides to create partitions on it for whatever (possibly misguided)
-reason and then ponders why the hell DAX is not working? And PAGE_SIZE
-partition alignment is so obvious and widespread that I don't count it as a
-realistic error case sysadmins would be pondering about currently.
+Right. So this patch is only solving the issue for directories (and not
+for symlinks other special files). We will need more improvements in
+this area.
 
-So I'd find two options reasonably consistent:
-1) Keep status quo where partitions are created and support DAX.
-2) Stop partition creation altogether, if anyones wants to split pmem
-device further, he can use dm-linear for that (i.e., kpartx).
+I am trying to make overlayfs work on top of virtiofs so that it can
+be tested and see if it works well or not. Overlayfs does bunch of
+xattr operations on work/work directory and it fails. So this patch
+will atleast fix that and allow me to make progress.
 
-But I'm not sure if the ship hasn't already sailed for option 2) to be
-feasible without angry users and Linus reverting the change.
 
-								Honza
--- 
-Jan Kara <jack@suse.com>
-SUSE Labs, CR
+>   [1] https://www.redhat.com/archives/virtio-fs/2019-October/msg00030.html
+>   [2] https://www.redhat.com/archives/virtio-fs/2019-October/msg00046.html
+> =A0
+> I tried the suggested approach which uses fchdir(proc_self_fd) + ...xattr=
+() + fchdir(root.fd)
+> combination instead of current openat() + f...xattr().=20
+> However, it seems that always fchdir on xattr operation for regular files=
+ too incurs
+> some performance overhead (~10% or more).
+> =A0
+> So I think hybrid approach is better:=20
+>   For regular file/directory: use f...xattr
+>   For other file types: use fchdir + ...xattr + fchdir=20
+
+This sounds reasonable. I will give it a try.  In fact Miklos's patch
+for allowing fsetxattr() on O_PATH is still being reviewed upstream. Once
+that is merged, our approach should probably be.
+
+1. Try fsetxattr(O_PATH fd).
+2. If 1 fails, try openat() followed by fsetxattr() for regular files
+   and dirs.
+3. For other file types use fchdir + ...xattr() + fchdir.=20
+
+Thanks
+Vivek
+
+> =A0
+> Attached patch adopts the above solution.
+> So could you check the patch's approach? If it is fine, I will send it as=
+ a formal patch
+> (and I apologize that my response is delayed).
+>=20
+> Thanks,
+> Misono
 
 

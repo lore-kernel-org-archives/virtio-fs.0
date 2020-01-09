@@ -1,13 +1,32 @@
-Date: Tue, 3 Dec 2019 14:52:58 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20191203145258.GI3078@work-vm>
-References: <20191203131423.40962-1-dgilbert@redhat.com>
-	<20191203141759.GA7810@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+	d=intel-com.20150623.gappssmtp.com; s=20150623;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=aEPP3QvZTscWYv3Miihx0fBYyJilXweNv6Guj9B9KD8=;
+	b=tavN+wgvdGNcOGcjKHqkAn5BjiXAReV94+OSH9Ri1PEiPT4LHVwg6b1hXbJyjtNOio
+	yt+3CISS4TMH86U9kKgU8YPArehaT0FusWvpSVefSqnA63GewXNc+iMnr6ZN89GHlxNa
+	I9xtBLZtZiieLaHNV/YWCS5IF2kdx6cBLmi6/YRneC/5UTcL8YKTe0qVGWfehSZnrWv9
+	YsnAn85tdplqslZaJiAyOUvkKc3WlQ6ZG+UvCzJ00JIQxKAKUKINJoyIUTQOONSw3QOj
+	1W72+PiwSitSGIes31XNdQt0P0T6DKzDvCP6YPxL/5GB664MG6OsTA5BfZF4LBGWHzr7
+	Jvig==
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20191203141759.GA7810@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 0/2] Convert to cap-ng
+References: <CAPcyv4jGEAbYSJef2zLzgg6Arozsuz7eN_vZL1iTcd1XQuNT4Q@mail.gmail.com>
+	<20191216181014.GA30106@redhat.com>
+	<20200107125159.GA15745@infradead.org>
+	<CAPcyv4jZE35sbDo6J4ihioEUFTuekJ3_h0=2Ra4PY+xn2xn1cQ@mail.gmail.com>
+	<20200107170731.GA472641@magnolia>
+	<CAPcyv4ggH7-QhYg+YOOWn_m25uds+-0L46=N09ap-LALeGuU_A@mail.gmail.com>
+	<20200107180101.GC15920@redhat.com>
+	<CAPcyv4gmdoqpwwwy4dS3D2eZFjmJ_Zi39k=1a4wn-_ksm-UV4A@mail.gmail.com>
+	<20200107183307.GD15920@redhat.com>
+	<CAPcyv4ggoS4dWjq-1KbcuaDtroHKEi5Vu19ggJ-qgycs6w1eCA@mail.gmail.com>
+	<20200109112447.GG27035@quack2.suse.cz>
+In-Reply-To: <20200109112447.GG27035@quack2.suse.cz>
+From: Dan Williams <dan.j.williams@intel.com>
+Date: Thu, 9 Jan 2020 12:03:01 -0800
+Message-ID: <CAPcyv4j5Mra8qeLO3=+BYZMeXNAxFXv7Ex7tL9gra1TbhOgiqg@mail.gmail.com>
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH 01/19] dax: remove block device dependencies
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,49 +35,59 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com
+To: Jan Kara <jack@suse.cz>
+Cc: virtio-fs@redhat.com, linux-nvdimm <linux-nvdimm@lists.01.org>, Miklos Szeredi <miklos@szeredi.hu>, Dave Chinner <david@fromorbit.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Christoph Hellwig <hch@infradead.org>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, "Darrick J. Wong" <darrick.wong@oracle.com>, Vivek Goyal <vgoyal@redhat.com>
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> On Tue, Dec 03, 2019 at 01:14:21PM +0000, Dr. David Alan Gilbert (git) wrote:
-> > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-> > 
-> > Hi,
-> >   This changes virtiofsd to use cap-ng rather than cap
-> > (qemu is moving in that direction).  It's a little painful
-> > because of an interaction with our sandboxing.
-> > 
-> > I intend to flatten the conversion into Vivek's patch that
-> > adds the libcap use.
-> 
-> It feels ugly that we store the parent process's state in a global
-> variable and all the threads load their state from there. At the
-> same time I don't have any good idea how to solve this problem given
-> libcap-ng relies on /proc being there. So I am fine with the patches.
+On Thu, Jan 9, 2020 at 3:27 AM Jan Kara <jack@suse.cz> wrote:
+>
+> On Tue 07-01-20 10:49:55, Dan Williams wrote:
+> > On Tue, Jan 7, 2020 at 10:33 AM Vivek Goyal <vgoyal@redhat.com> wrote:
+> > > W.r.t partitioning, bdev_dax_pgoff() seems to be the pain point where
+> > > dax code refers back to block device to figure out partition offset in
+> > > dax device. If we create a dax object corresponding to "struct block_device"
+> > > and store sector offset in that, then we could pass that object to dax
+> > > code and not worry about referring back to bdev. I have written some
+> > > proof of concept code and called that object "dax_handle". I can post
+> > > that code if there is interest.
+> >
+> > I don't think it's worth it in the end especially considering
+> > filesystems are looking to operate on /dev/dax devices directly and
+> > remove block entanglements entirely.
+> >
+> > > IMHO, it feels useful to be able to partition and use a dax capable
+> > > block device in same way as non-dax block device. It will be really
+> > > odd to think that if filesystem is on /dev/pmem0p1, then dax can't
+> > > be enabled but if filesystem is on /dev/mapper/pmem0p1, then dax
+> > > will work.
+> >
+> > That can already happen today. If you do not properly align the
+> > partition then dax operations will be disabled. This proposal just
+> > extends that existing failure domain to make all partitions fail to
+> > support dax.
+>
+> Well, I have some sympathy with the sysadmin that has /dev/pmem0 device,
+> decides to create partitions on it for whatever (possibly misguided)
+> reason and then ponders why the hell DAX is not working? And PAGE_SIZE
+> partition alignment is so obvious and widespread that I don't count it as a
+> realistic error case sysadmins would be pondering about currently.
+>
+> So I'd find two options reasonably consistent:
+> 1) Keep status quo where partitions are created and support DAX.
+> 2) Stop partition creation altogether, if anyones wants to split pmem
+> device further, he can use dm-linear for that (i.e., kpartx).
+>
+> But I'm not sure if the ship hasn't already sailed for option 2) to be
+> feasible without angry users and Linus reverting the change.
 
-Yep; I raised a cap-ng bug to show the issue, and Steve agrees it's a
-pain; so at least it's recorded.
+Christoph? I feel myself leaning more and more to the "keep pmem
+partitions" camp.
 
-Dave
+I don't see "drop partition support" effort ending well given the long
+standing "ext4 fails to mount when dax is not available" precedent.
 
-> 
-> Thanks
-> Vivek
-> > 
-> > Dave
-> > 
-> > Dr. David Alan Gilbert (2):
-> >   virtiofsd: cap-ng helpers
-> >   virtiofsd: Convert to libcap-ng
-> > 
-> >  Makefile                           |   2 +-
-> >  contrib/virtiofsd/Makefile.objs    |   2 -
-> >  contrib/virtiofsd/passthrough_ll.c | 162 +++++++++++++++++++----------
-> >  3 files changed, 106 insertions(+), 60 deletions(-)
-> > 
-> > -- 
-> > 2.23.0
-> > 
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+I think the next least bad option is to have a dax_get_by_host()
+variant that passes an offset and length pair rather than requiring a
+later bdev_dax_pgoff() to recall the offset. This also prevents
+needing to add another dax-device object representation.
+
 

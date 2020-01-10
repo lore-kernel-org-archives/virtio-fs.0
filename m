@@ -1,36 +1,12 @@
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=infradead.org; s=bombadil.20170209;
-	h=In-Reply-To:Content-Type:MIME-Version
-	:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
-	List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
-	bh=f/42qAPbVsW+72MUlq6/DiKhzWxy8T8Hdkwap/qT96A=;
-	b=fEApSJolHaXmpdLYBb+Kkv8Df
-	BGQz3JHJbvpYxwghgcQ6w2GqDx37gBdlNAcBRR2IhHq7bLXUI0kKJMEKsa0vIsqtORSOf/CH4cE5T
-	Xwsj1uGAQtxR/yLpUOSiwVEBEYdzPgHAUs1ofiX1hdTQu1EHvg1Xy/6nf0/BV6/6Z1co1P+6cHxk4
-	Xnqyp0cPEwm83h6/DTRS+riPEzRcEw3vnnEH/NSQGzCNmLwpBofZFEikltSBx+l2HJgHLATqQTKvr
-	Z23nhy3IejVYasyMnB5v/3udsJnqEdFD3lfUFeQnEoms+RUyXa2IO2K0GKHmbFdvlPMuh4SZezxpr
-	LkSZT0k7A==;
-Date: Fri, 10 Jan 2020 04:36:31 -0800
-From: Christoph Hellwig <hch@infradead.org>
-Message-ID: <20200110123631.GA16268@infradead.org>
-References: <20200107125159.GA15745@infradead.org>
-	<CAPcyv4jZE35sbDo6J4ihioEUFTuekJ3_h0=2Ra4PY+xn2xn1cQ@mail.gmail.com>
-	<20200107170731.GA472641@magnolia>
-	<CAPcyv4ggH7-QhYg+YOOWn_m25uds+-0L46=N09ap-LALeGuU_A@mail.gmail.com>
-	<20200107180101.GC15920@redhat.com>
-	<CAPcyv4gmdoqpwwwy4dS3D2eZFjmJ_Zi39k=1a4wn-_ksm-UV4A@mail.gmail.com>
-	<20200107183307.GD15920@redhat.com>
-	<CAPcyv4ggoS4dWjq-1KbcuaDtroHKEi5Vu19ggJ-qgycs6w1eCA@mail.gmail.com>
-	<20200109112447.GG27035@quack2.suse.cz>
-	<CAPcyv4j5Mra8qeLO3=+BYZMeXNAxFXv7Ex7tL9gra1TbhOgiqg@mail.gmail.com>
+Date: Fri, 10 Jan 2020 11:13:34 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200110161334.GD28043@redhat.com>
+References: <20200110010722.27491-1-misono.tomohiro@jp.fujitsu.com>
 MIME-Version: 1.0
-In-Reply-To: <CAPcyv4j5Mra8qeLO3=+BYZMeXNAxFXv7Ex7tL9gra1TbhOgiqg@mail.gmail.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 01/19] dax: remove block device dependencies
+In-Reply-To: <20200110010722.27491-1-misono.tomohiro@jp.fujitsu.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Fix xattr operations
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -39,35 +15,82 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Dan Williams <dan.j.williams@intel.com>
-Cc: virtio-fs@redhat.com, Jan Kara <jack@suse.cz>, linux-nvdimm <linux-nvdimm@lists.01.org>, Miklos Szeredi <miklos@szeredi.hu>, Dave Chinner <david@fromorbit.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Christoph Hellwig <hch@infradead.org>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, "Darrick J. Wong" <darrick.wong@oracle.com>
+To: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+Cc: virtio-fs@redhat.com
 
-On Thu, Jan 09, 2020 at 12:03:01PM -0800, Dan Williams wrote:
-> > So I'd find two options reasonably consistent:
-> > 1) Keep status quo where partitions are created and support DAX.
-> > 2) Stop partition creation altogether, if anyones wants to split pmem
-> > device further, he can use dm-linear for that (i.e., kpartx).
-> >
-> > But I'm not sure if the ship hasn't already sailed for option 2) to be
-> > feasible without angry users and Linus reverting the change.
-> 
-> Christoph? I feel myself leaning more and more to the "keep pmem
-> partitions" camp.
-> 
-> I don't see "drop partition support" effort ending well given the long
-> standing "ext4 fails to mount when dax is not available" precedent.
+On Fri, Jan 10, 2020 at 10:07:22AM +0900, Misono Tomohiro wrote:
+[..]
+> @@ -2345,6 +2347,7 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
+>      ssize_t ret;
+>      int saverr;
+>      int fd = -1;
+> +    bool dir_changed = false;
+>  
+>      inode = lo_inode(req, ino);
+>      if (!inode) {
 
-Do we have any evidence of existing setups with DAX and partitions?
-Can we just throw in a patch to reject that case for now before actually
-removing the code and see if anyone screams.  And fix ext4 up while
-we are at it.
+> @@ -2360,16 +2363,20 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
+>      fuse_log(FUSE_LOG_DEBUG, "lo_getxattr(ino=%" PRIu64 ", name=%s size=%zd)\n",
+>               ino, name, size);
+>  
+> -    if (inode->is_symlink) {
+> -        /* Sorry, no race free way to getxattr on symlink. */
+> -        saverr = EPERM;
+> -        goto out;
+> -    }
+> -
 
-> I think the next least bad option is to have a dax_get_by_host()
-> variant that passes an offset and length pair rather than requiring a
-> later bdev_dax_pgoff() to recall the offset. This also prevents
-> needing to add another dax-device object representation.
+What was the race previously on symlinks and how does this code get rid
+of that race?
 
-IFF we have to keep partition support, yes.  But keeping it just seems
-like a really bad idea.
+>      sprintf(procname, "%i", inode->fd);
+> -    fd = openat(lo->proc_self_fd, procname, O_RDONLY);
+> -    if (fd < 0) {
+> -        goto out_err;
+> +    if (inode->is_regular) {
+> +        fd = openat(lo->proc_self_fd, procname, O_RDONLY);
+> +        if (fd < 0) {
+> +          goto out_err;
+> +        }
+> +    } else {
+> +        ret = fchdir(lo->proc_self_fd);
+> +        if (ret < 0) {
+> +            /* should not happen */
+> +            fuse_log(FUSE_LOG_ERR, "lo_getxattr: fail fchdir to proc_self_fd\n");
+> +            goto out_err;
+> +        }
+> +        dir_changed = true;
+>      }
+>  
+>      if (size) {
+> @@ -2378,7 +2385,11 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
+>              goto out_err;
+>          }
+>  
+> -        ret = fgetxattr(fd, name, value, size);
+> +        if (inode->is_regular) {
+> +            ret = fgetxattr(fd, name, value, size);
+> +        } else {
+> +            ret = getxattr(procname, name, value, size);
+> +        }
 
+Do we need "lgetxattr()" instead of "getxattr()" for symlinks?
+
+Say I have following setup.
+
+foo-symlink -> foo.txt
+
+Now lo_lookup(foo-symlink.txt, O_PATH | O_NOFOLLOW), will get fd on
+symlink, say 3. And proc should show something similar.
+
+And /proc/self/fd/3 -> /foo-symlink.txt
+
+Now if we do getxattr(3), will it not resolve symlinks and get xattr value
+from "foo.txt" instead?
+
+I think in practice that's not happening. So I am misunderstanding
+something. What's that?
+
+Thanks
+Vivek
 

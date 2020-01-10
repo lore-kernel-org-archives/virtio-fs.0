@@ -1,32 +1,22 @@
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-	d=intel-com.20150623.gappssmtp.com; s=20150623;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=aEPP3QvZTscWYv3Miihx0fBYyJilXweNv6Guj9B9KD8=;
-	b=tavN+wgvdGNcOGcjKHqkAn5BjiXAReV94+OSH9Ri1PEiPT4LHVwg6b1hXbJyjtNOio
-	yt+3CISS4TMH86U9kKgU8YPArehaT0FusWvpSVefSqnA63GewXNc+iMnr6ZN89GHlxNa
-	I9xtBLZtZiieLaHNV/YWCS5IF2kdx6cBLmi6/YRneC/5UTcL8YKTe0qVGWfehSZnrWv9
-	YsnAn85tdplqslZaJiAyOUvkKc3WlQ6ZG+UvCzJ00JIQxKAKUKINJoyIUTQOONSw3QOj
-	1W72+PiwSitSGIes31XNdQt0P0T6DKzDvCP6YPxL/5GB664MG6OsTA5BfZF4LBGWHzr7
-	Jvig==
+	d=fujitsu.onmicrosoft.com; s=selector2-fujitsu-onmicrosoft-com;
+	h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+	bh=OUoINOaJPVctmAdwWdTs4x4MO9cqUIkC05X7XVRS7go=;
+	b=Cg4q/DKAzg+efK9GXT9vKZ11tqCMxXokt7mGy010kugW0aAveWzCQs1+AcF18iVH5WMSYbMJKYlduUlSL2j0ktTWlqw7BogiInuJP2RF8RFaX41zo4cdn12OJIJN5jUGeXi8/FcXlQZ8eL/KrcGBZjN9Kpcqky3MDGOQrL2JbXg=
+From: "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>
+Date: Fri, 10 Jan 2020 00:50:19 +0000
+Message-ID: <OSBPR01MB4582ED38FD140E1CA1592966E5380@OSBPR01MB4582.jpnprd01.prod.outlook.com>
+References: <20200108202422.GF1995@redhat.com>
+	<20200109022303.GA79586@e18g06458.et15sqa>
+	<OSBPR01MB4582182B3FFD047E2FEC6326E5390@OSBPR01MB4582.jpnprd01.prod.outlook.com>
+	<20200109191028.GC1964@redhat.com>
+In-Reply-To: <20200109191028.GC1964@redhat.com>
+Content-Language: ja-JP
 MIME-Version: 1.0
-References: <CAPcyv4jGEAbYSJef2zLzgg6Arozsuz7eN_vZL1iTcd1XQuNT4Q@mail.gmail.com>
-	<20191216181014.GA30106@redhat.com>
-	<20200107125159.GA15745@infradead.org>
-	<CAPcyv4jZE35sbDo6J4ihioEUFTuekJ3_h0=2Ra4PY+xn2xn1cQ@mail.gmail.com>
-	<20200107170731.GA472641@magnolia>
-	<CAPcyv4ggH7-QhYg+YOOWn_m25uds+-0L46=N09ap-LALeGuU_A@mail.gmail.com>
-	<20200107180101.GC15920@redhat.com>
-	<CAPcyv4gmdoqpwwwy4dS3D2eZFjmJ_Zi39k=1a4wn-_ksm-UV4A@mail.gmail.com>
-	<20200107183307.GD15920@redhat.com>
-	<CAPcyv4ggoS4dWjq-1KbcuaDtroHKEi5Vu19ggJ-qgycs6w1eCA@mail.gmail.com>
-	<20200109112447.GG27035@quack2.suse.cz>
-In-Reply-To: <20200109112447.GG27035@quack2.suse.cz>
-From: Dan Williams <dan.j.williams@intel.com>
-Date: Thu, 9 Jan 2020 12:03:01 -0800
-Message-ID: <CAPcyv4j5Mra8qeLO3=+BYZMeXNAxFXv7Ex7tL9gra1TbhOgiqg@mail.gmail.com>
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 01/19] dax: remove block device dependencies
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Open fd O_RDONLY in
+ setxattr/removexattr
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -35,59 +25,79 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Jan Kara <jack@suse.cz>
-Cc: virtio-fs@redhat.com, linux-nvdimm <linux-nvdimm@lists.01.org>, Miklos Szeredi <miklos@szeredi.hu>, Dave Chinner <david@fromorbit.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Christoph Hellwig <hch@infradead.org>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, "Darrick J. Wong" <darrick.wong@oracle.com>, Vivek Goyal <vgoyal@redhat.com>
+To: 'Vivek Goyal' <vgoyal@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-On Thu, Jan 9, 2020 at 3:27 AM Jan Kara <jack@suse.cz> wrote:
->
-> On Tue 07-01-20 10:49:55, Dan Williams wrote:
-> > On Tue, Jan 7, 2020 at 10:33 AM Vivek Goyal <vgoyal@redhat.com> wrote:
-> > > W.r.t partitioning, bdev_dax_pgoff() seems to be the pain point where
-> > > dax code refers back to block device to figure out partition offset in
-> > > dax device. If we create a dax object corresponding to "struct block_device"
-> > > and store sector offset in that, then we could pass that object to dax
-> > > code and not worry about referring back to bdev. I have written some
-> > > proof of concept code and called that object "dax_handle". I can post
-> > > that code if there is interest.
+> On Thu, Jan 09, 2020 at 09:27:15AM +0000, misono.tomohiro@fujitsu.com wrote:
+> > > On Wed, Jan 08, 2020 at 03:24:22PM -0500, Vivek Goyal wrote:
+> > > > Do not open fd O_RDWR as it will fail for directories with EISDIR.
+> > > > This code can be called both for regular files as well as directories.
+> > > >
+> > > > I noticed this when I tried "setfattr -n user.foo -v test <dir>"
+> > > > inside the guest and got EISDIR.
+> > > >
+> > > > To write xattr, we don't have to open fd with write permissions.
+> > > > Looks like kernel will do permission checks on inode.
+> > > >
+> > > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > >
+> > > Looks good to me.
+> > >
+> > > Reviewed-by: Eryu Guan <eguan@linux.alibaba.com>
+> > >
+> > > > ---
+> > > >  contrib/virtiofsd/passthrough_ll.c |    4 ++--
+> > > >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > > >
+> > > > Index: qemu/contrib/virtiofsd/passthrough_ll.c
+> > > > ===================================================================
+> > > > --- qemu.orig/contrib/virtiofsd/passthrough_ll.c	2020-01-08 15:01:03.821980889 -0500
+> > > > +++ qemu/contrib/virtiofsd/passthrough_ll.c	2020-01-08 15:05:15.209384352 -0500
+> > > > @@ -2424,7 +2424,7 @@ static void lo_setxattr(fuse_req_t req,
+> > > >  	}
+> > > >
+> > > >  	sprintf(procname, "%i", inode->fd);
+> > > > -	fd = openat(lo->proc_self_fd, procname, O_RDWR);
+> > > > +	fd = openat(lo->proc_self_fd, procname, O_RDONLY);
+> > > >  	if (fd < 0) {
+> > > >  		saverr = errno;
+> > > >  		goto out;
+> > > > @@ -2473,7 +2473,7 @@ static void lo_removexattr(fuse_req_t re
+> > > >  	}
+> > > >
+> > > >  	sprintf(procname, "%i", inode->fd);
+> > > > -	fd = openat(lo->proc_self_fd, procname, O_RDWR);
+> > > > +	fd = openat(lo->proc_self_fd, procname, O_RDONLY);
+> > > >  	if (fd < 0) {
+> > > >  		saverr = errno;
+> > > >  		goto out;
+> > > >
 > >
-> > I don't think it's worth it in the end especially considering
-> > filesystems are looking to operate on /dev/dax devices directly and
-> > remove block entanglements entirely.
+> > Hello,
 > >
-> > > IMHO, it feels useful to be able to partition and use a dax capable
-> > > block device in same way as non-dax block device. It will be really
-> > > odd to think that if filesystem is on /dev/pmem0p1, then dax can't
-> > > be enabled but if filesystem is on /dev/mapper/pmem0p1, then dax
-> > > will work.
+> > So I sent the same patch last October[1] and got comments that it's
+> > would be better to fix the fundamental problem (do not call openat()
+> > to non regular file/directory) [2].
+> >   [1] https://www.redhat.com/archives/virtio-fs/2019-October/msg00030.html
+> >   [2]
+> > https://www.redhat.com/archives/virtio-fs/2019-October/msg00046.html
 > >
-> > That can already happen today. If you do not properly align the
-> > partition then dax operations will be disabled. This proposal just
-> > extends that existing failure domain to make all partitions fail to
-> > support dax.
->
-> Well, I have some sympathy with the sysadmin that has /dev/pmem0 device,
-> decides to create partitions on it for whatever (possibly misguided)
-> reason and then ponders why the hell DAX is not working? And PAGE_SIZE
-> partition alignment is so obvious and widespread that I don't count it as a
-> realistic error case sysadmins would be pondering about currently.
->
-> So I'd find two options reasonably consistent:
-> 1) Keep status quo where partitions are created and support DAX.
-> 2) Stop partition creation altogether, if anyones wants to split pmem
-> device further, he can use dm-linear for that (i.e., kpartx).
->
-> But I'm not sure if the ship hasn't already sailed for option 2) to be
-> feasible without angry users and Linus reverting the change.
+> > I tried the suggested approach which uses fchdir(proc_self_fd) +
+> > ...xattr() + fchdir(root.fd) combination instead of current openat() + f...xattr().
+> > However, it seems that always fchdir on xattr operation for regular
+> > files too incurs some performance overhead (~10% or more).
+> >
+> > So I think hybrid approach is better:
+> >   For regular file/directory: use f...xattr
+> >   For other file types: use fchdir + ...xattr + fchdir
+> >
+> > Attached patch adopts the above solution.
+> 
+> Hi Misono,
+> 
+> Can you post this patch again separately so that it is easier to give comments and discuss this patch. I have a quick look and
+> this patch does look reasonable.
 
-Christoph? I feel myself leaning more and more to the "keep pmem
-partitions" camp.
-
-I don't see "drop partition support" effort ending well given the long
-standing "ext4 fails to mount when dax is not available" precedent.
-
-I think the next least bad option is to have a dax_get_by_host()
-variant that passes an offset and length pair rather than requiring a
-later bdev_dax_pgoff() to recall the offset. This also prevents
-needing to add another dax-device object representation.
-
+Thanks for the check, I will post it shortly.
+Misono
 

@@ -1,14 +1,11 @@
-From: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
-Date: Mon, 13 Jan 2020 07:55:07 +0000
-Message-ID: <4dcf854ab5133f4bc77191bd3f49aa8e9a96c57d.camel@intel.com>
-References: <20200110190347.GA3855@work-vm>
-In-Reply-To: <20200110190347.GA3855@work-vm>
-Content-Language: en-US
-Content-ID: <15A67E48BA56684E9DB5D7A2E38CCAEC@intel.com>
+From: Xiao Yang <yangx.jy@cn.fujitsu.com>
+Date: Mon, 13 Jan 2020 17:37:34 +0800
+Message-ID: <20200113093735.4610-1-yangx.jy@cn.fujitsu.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
+Content-Type: text/plain; charset=WINDOWS-1252
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] Changes in -dev branch
+Subject: [Virtio-fs] [PATCH 1/2] vitriofsd/passthrough_ll: Make fallocate()
+	work
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,63 +14,35 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "dgilbert@redhat.com" <dgilbert@redhat.com>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+To: virtio-fs@redhat.com
 
-Hi Dave,
+1) Use correct CONFIG_FALLOCATE macro to check if fallocate() is supported.(i.e configure
+   script sets CONFIG_FALLOCATE intead of HAVE_FALLOCATE if fallocate() is supported)
+2) Avoid 'Bad file descriptor' error by passing correct fd to fallocate().
 
-On Fri, 2020-01-10 at 19:03 +0000, Dr. David Alan Gilbert wrote:
-> Hi,
->    I've just pushed a new version of the virtio-fs-dev branch in
->  https://gitlab.com/virtio-fs/qemu
->  
-> some things to note:
-> 
->   a) The old '-o vhost_user_socket' syntax has now been replaced
->      by the syntax matching qemu's standardised vhost-user interface
->      which is;
-> 
->      ./virtiofsd --socket-path=/path/whereever
+Signed-off-by: Xiao Yang <yangx.jy@cn.fujitsu.com>
+---
+ tools/virtiofsd/passthrough_ll.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-I was expecting that "./virtiofsd --socket-path /path/whereever" would
-work too, but it doesn't. Is this the expected behavior?
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 42a3e182f9..a19823caaf 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -2313,8 +2313,8 @@ static void lo_fallocate(fuse_req_t req, fuse_ino_t ino, int mode, off_t offset,
+     struct lo_data *lo = lo_data(req);
+     (void)ino;
+ 
+-#ifdef HAVE_FALLOCATE
+-    err = fallocate(fi->fh, mode, offset, length);
++#ifdef CONFIG_FALLOCATE
++    err = fallocate(lo_fi_fd(req, fi), mode, offset, length);
+     if (err < 0) {
+         err = errno;
+     }
+-- 
+2.21.0
 
-Just asking cause it feels weird that we must add "=" here.
 
-Thanks,
-Sebastien
 
-> 
->   b) It's got about 64 of the main patches reviewed by Daniel
-> Berrangé
->      - about another 40 that need reviewing; please leap in
->      and review any patches on the qemu-devel thread for any patches
->      that are missing reviews.
-> 
->   c) The set that I've just pushed has fixes for all the things
->      Daniel spotted; so there's a bunch of mostly minor changes.
-> 
->   d) It's also got patches that were received on list since
->      mid December.
-> 
-> Dave
-> 
-> --
-> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
-> 
----------------------------------------------------------------------
-Intel Corporation SAS (French simplified joint stock company)
-Registered headquarters: "Les Montalets"- 2, rue de Paris, 
-92196 Meudon Cedex, France
-Registration Number:  302 456 199 R.C.S. NANTERRE
-Capital: 4,572,000 Euros
-
-This e-mail and any attachments may contain confidential material for
-the sole use of the intended recipient(s). Any review or distribution
-by others is strictly prohibited. If you are not the intended
-recipient, please contact the sender and delete all copies.
 

@@ -1,13 +1,11 @@
-From: Xiao Yang <yangx.jy@cn.fujitsu.com>
-Date: Mon, 13 Jan 2020 17:37:35 +0800
-Message-ID: <20200113093735.4610-2-yangx.jy@cn.fujitsu.com>
-In-Reply-To: <20200113093735.4610-1-yangx.jy@cn.fujitsu.com>
-References: <20200113093735.4610-1-yangx.jy@cn.fujitsu.com>
+From: Max Reitz <mreitz@redhat.com>
+Message-ID: <410cfe7a-5d38-7670-7e34-6eeae4b5a4fc@redhat.com>
+Date: Mon, 13 Jan 2020 18:46:49 +0100
 MIME-Version: 1.0
-Content-Type: text/plain; charset=WINDOWS-1252
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 2/2] virtiofsd/passthrough_ll: Only call
-	posix_fallocate() when it is supported
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature";
+	boundary="IoX7BXWzQmGJ7O5YtIlcUOePICZpf4dzA"
+Subject: [Virtio-fs] Ways to uniquely and persistently identify nodes
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,40 +16,253 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-passthrough_ll sets HAVE_POSIX_FALLOCATE macro compulsively so posix_fallocate()
-is always called even if it is not supported.  Replace HAVE_POSIX_FALLOCATE with
-CONFIG_POSIX_FALLOCATE.
+This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
+--IoX7BXWzQmGJ7O5YtIlcUOePICZpf4dzA
+Content-Type: multipart/mixed; boundary="U9VwCIxznpEbkBvJIx7q0v4ajFnDgXjn4"
 
-Signed-off-by: Xiao Yang <yangx.jy@cn.fujitsu.com>
----
- tools/virtiofsd/passthrough_ll.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+--U9VwCIxznpEbkBvJIx7q0v4ajFnDgXjn4
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: quoted-printable
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index a19823caaf..196664d52b 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -72,8 +72,6 @@
- #include "passthrough_helpers.h"
- #include "seccomp.h"
- 
--#define HAVE_POSIX_FALLOCATE 1
--
- /* Keep track of inode posix locks for each owner. */
- struct lo_inode_plock {
-     uint64_t lock_owner;
-@@ -2319,7 +2317,7 @@ static void lo_fallocate(fuse_req_t req, fuse_ino_t ino, int mode, off_t offset,
-         err = errno;
-     }
- 
--#elif defined(HAVE_POSIX_FALLOCATE)
-+#elif defined(CONFIG_POSIX_FALLOCATE)
-     if (mode) {
-         fuse_reply_err(req, EOPNOTSUPP);
-         return;
--- 
-2.21.0
+Hi,
+
+As discussed in today=E2=80=99s meeting, there is a problem with uniquely=
+ and
+persistently identifying nodes in the guest.
+
+Actually, there are multiple problems:
+
+(1) stat=E2=80=99s st_ino in the guest is not necessarily unique.  Curren=
+tly, it
+just the st_ino from the host file, so if you have mounted multiple
+different filesystems in the exported directory tree, you may get
+collisions.
+
+(2) The FUSE 64-bit fuse_ino_t (which identifies an open file,
+basically) is not persistent.  It is just an index into a vector that
+contains all open inodes, and whenever virtiofsd is restarted, the
+vector is renewed.  That means that whenever this happens, all
+fuse_ino_t values the guest holds will become invalid.  (And when
+virtiofsd starts handing out new fuse_ino_t values, those will probably
+not point to the same inodes as before.)
+
+(3) name_to_handle_at()/open_by_handle_at() are implemented by FUSE just
+by handing out the fuse_ino_t value as the handle.  This is not only a
+problem as long as fuse_ino_t is not persistent (see (2)), but also in
+general, because the fuse_ino_t value is only valid (per FUSE protocol)
+as long as the inode is referenced by the guest.
+
+
+The first question that I think needs to be asked is whether we care
+about each of this points at all.
+
+(1) Maybe it just doesn=E2=80=99t matter whether the st_ino values are un=
+ique.
+
+(2) Maybe we don=E2=80=99t care about virtiofsd being restarted while the=
+ guest
+is running or only paused.  (=E2=80=9CRestarting=E2=80=9D includes migrat=
+ion of the
+daemon to a different host.)
+
+(3) I suppose we do care about this.
+
+
+Assuming we do care about the points, here are some ways I have
+considered of addressing them:
+
+(1)
+
+(a)
+
+If we could make the 64-bit fuse_ino_t unique and persistent (see (2)),
+we could use that for st_ino (also a 64-bit field).
+
+(This is the case if we keep the current schema for fuse_ino_t, be it
+because we don=E2=80=99t care about (2) or because we want (2a).)
+
+(b)
+
+Otherwise, we probably want to continue passing through st_ino and then
+ensure that stat=E2=80=99s st_dev is unique for each submount in the expo=
+rted
+tree.  We can achieve that by extending the FUSE protocol for virtiofsd
+to announce submounts and then the FUSE kernel driver to automount them.
+ (This means that these submounts in the guest are then technically
+unrelated filesystems.  It also means that the FUSE driver would need to
+automount them with the =E2=80=9Cvirtiofs=E2=80=9D fs type, which is kind=
+ of weird, and
+restricts this solution to virtiofs.)
+
+
+(2)
+
+(a)
+
+We can keep the current way if we just store the in-memory mapping while
+virtiofsd is suspended (and migrate it it if we want to migrate the
+virtiofsd instance).  The table may grow to be very large, though, and
+it contains for example file descriptors that we would need to migrate,
+too (perhaps as file handles?).
+
+(b)
+
+We could extend the fuse_ino_t type to an arbitrary size basically, to
+be negotiated between FUSE server and client.  This would require
+extensive modification of the FUSE protocol and kernel driver (and would
+ask for respective modification of libfuse, too), though.  Such a larger
+value could then capture both a submount ID and a unique identifier for
+inodes on the respective host filesystems, such as st_ino.  This would
+ensure that every virtiofsd instance would generate the same fuse_ino_t
+values for the same nodes on the same exported tree.
+
+However, note that this doesn=E2=80=99t auto-populate the fuse_ino_t mapp=
+ings:
+When after restarting virtiofsd the server wants to access an existing
+inode, it can=E2=80=99t, because there is no good way to translate even l=
+arger
+fuse_ino_t values to a file descriptor.  (We could do that if the
+fuse_ino_t value encapsulated a handle.  (As in open_by_handle_at().)
+The problem is that we can=E2=80=99t trust the guest to keep a handle, so=
+ we
+must ensure that the handle returned points to a file the guest is
+allowed to access.  Doing that cryptographically (e.g. with a MAC) is
+probably out of the question, because that would make fuse_ino_t really
+big.  Another idea would be to set a flag on the host FS for files that
+the guest has a handle to.  But this flag would need to be
+guest-specific...  So we=E2=80=99d probably again end up with a large dat=
+abase
+just as in (2a).  (It doesn=E2=80=99t need to be a flag on the FS, it cou=
+ld also
+be a database, I suppose.))
+
+We could also re-enumerate the exported tree after reopening (perhaps
+lazily for each exported filesystem) and thus recreate the mapping.  But
+this would take as much time as a =E2=80=9Cfind=E2=80=9D over the whole e=
+xported tree.
+
+(c)
+
+We could complement the fuse_ino_t value by a context ID, that in our
+case would probably be derived from the submount ID (e.g. the relative
+mount point).  This would only require minor modification of the FUSE
+protocol: Detecting mount points in lookups; a new command to retrieve a
+mount point=E2=80=99s context ID; and some way to set this context ID.
+
+We could set the context ID either explicitly with a new command; or as
+part of every FUSE request (a field in the request header); or just as
+part of virtio-fs (be it with one virtqueue per context (which may or
+may not be feasible), or just by prefixing every FUSE request on the
+line with a context ID).
+
+One of the questions here is: If we just choose the context ID to be 32
+or 64 bit in size, will we ever run into the same problem of =E2=80=9C96/=
+128
+bits aren=E2=80=99t enough=E2=80=9D?
+
+The other problem is the same as in (2b): We cannot get an FD from a
+context ID + fuse_ino_t alone, so if virtiofsd is restarted, the guest
+cannot keep using existing inodes without reopening them.
+
+The only way I see here to get around this problem is to re-enumerate
+the whole exported tree (or at least lazily by context ID a.k.a.
+filesystem) and thus reconstruct the mapping from ID to inode after
+resuming virtiofsd.
+
+
+(3)
+
+(a)
+
+If the fuse_ino_t keeps to be 64 bit and persistent (we don=E2=80=99t reu=
+se IDs
+and we keep existing mappings around even when their refcount drops to 0
+(but why would we do that?)), we don=E2=80=99t have to change anything.
+
+(b)
+
+We probably just want new FUSE commands to query handles and open
+handles.  We could then decide whether we want them to use persistent
+IDs that we get from solving (2), or just pass through the handles from
+the host.
+
+If we do the latter, we have the same problem I mentioned in (2b): We
+can=E2=80=99t trust the guest to keep the handle unmodified, and if it do=
+es
+modify it, we have to keep the guest from accessing files it must not see=
+=2E
+
+The two ways that have been proposed so far are
+
+(I) Enrich the host=E2=80=99s file handle by cryptographic information to=
+ prove
+its integrity, e.g. a MAC based on a randomly generated
+virtiofsd-internal symmetric key.  The two problems I see are that the
+file handle gets rather big, and that the guest might be able to guess
+the MAC (very improbable, though, especially if we were to terminate the
+connection when the guest tries to use a file handle with an invalid MAC)=
+=2E
+
+(II) Keep notes somewhere of what file handles the guest may use.  This
+could be implemented by storing a virtiofsd instance ID as metadata in
+the filesystem (attached to the file, so virtiofsd can read it when
+opening the file by its handle); or as a database for each virtiofsd
+instance (where it puts all handles handed out to a guest).
 
 
 
+You can see that all of these problems are kind of intertwined, but not
+really.  Many solutions look similar, and some solutions can solve
+multiple problems; but it doesn=E2=80=99t mean we have to think about eve=
+rything
+at once.  I think we should first think about how to handle the
+identification problem (1/2).  Maybe there isn=E2=80=99t much to do there=
+ anyway
+because we don=E2=80=99t care about it and can just use the existing fuse=
+_ino_t
+as st_ino for the guest.
+
+Then we can think about (3).  If we decide to add new FUSE commands for
+getting/opening file handles, then this works with pretty much every way
+we go about (1) and (2).
+
+
+
+Side note:
+
+As for migrating a virtiofsd instance: Note that everything above that
+depends on host file handles or host ino_t values will make it
+impossible to migrate to a different filesystem.  But maybe doing that
+would lead to all kind of other problems anyway.
+
+
+Another note:
+
+It took rather long to write this, so I probably forgot a whole bunch of
+stuff...
+
+Max
+
+
+--U9VwCIxznpEbkBvJIx7q0v4ajFnDgXjn4--
+
+--IoX7BXWzQmGJ7O5YtIlcUOePICZpf4dzA
+Content-Type: application/pgp-signature; name="signature.asc"
+Content-Description: OpenPGP digital signature
+Content-Disposition: attachment; filename="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEkb62CjDbPohX0Rgp9AfbAGHVz0AFAl4crQkACgkQ9AfbAGHV
+z0C9wggAg9RUwLNtlMDFK4onevhm+Pt0WBS3dGbX+ojeuMauKRYAs4+QFK1u72Vp
+sx0o4SmJbNxIJn97nyIa27R73uQia7r+A9QgA+wCcxP8Vl+wwiIHGoYOgZv8t6uH
+YE4C/OTNcGi+9a3cY0APHmC6Ty5wiMdHsaE9inchFmsoKiOUgCPNezGLy6JHYyvb
+M5+iOGx2nQ01tchNzkdFGvpmwcq76NdWFgPh55K4QbQ8O/hUrn+aSOXlHw9ymm1p
+oX83Jo7ktVLlpEkaL0EOZhopo6j8tzds6xssZ+7Vq9OLqNq4A+NfYn4kiOXvLIB6
+EjpIG1oUQdQ+fsGJ4+k9QzVY4MtM4g==
+=YJ11
+-----END PGP SIGNATURE-----
+
+--IoX7BXWzQmGJ7O5YtIlcUOePICZpf4dzA--
 

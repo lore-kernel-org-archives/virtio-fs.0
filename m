@@ -1,14 +1,21 @@
+Date: Tue, 14 Jan 2020 15:31:38 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200114203138.GA3145@redhat.com>
+References: <20200107125159.GA15745@infradead.org>
+	<CAPcyv4jZE35sbDo6J4ihioEUFTuekJ3_h0=2Ra4PY+xn2xn1cQ@mail.gmail.com>
+	<20200107170731.GA472641@magnolia>
+	<CAPcyv4ggH7-QhYg+YOOWn_m25uds+-0L46=N09ap-LALeGuU_A@mail.gmail.com>
+	<20200107180101.GC15920@redhat.com>
+	<CAPcyv4gmdoqpwwwy4dS3D2eZFjmJ_Zi39k=1a4wn-_ksm-UV4A@mail.gmail.com>
+	<20200107183307.GD15920@redhat.com>
+	<CAPcyv4ggoS4dWjq-1KbcuaDtroHKEi5Vu19ggJ-qgycs6w1eCA@mail.gmail.com>
+	<20200109112447.GG27035@quack2.suse.cz>
+	<CAPcyv4j5Mra8qeLO3=+BYZMeXNAxFXv7Ex7tL9gra1TbhOgiqg@mail.gmail.com>
 MIME-Version: 1.0
-References: <410cfe7a-5d38-7670-7e34-6eeae4b5a4fc@redhat.com>
-	<CAOssrKc2ESAiQmE8GSqkh6_rtcSqX2ok=Rm=bnG5MGcaJs-31g@mail.gmail.com>
-	<6d763002-258b-1bec-43a5-8ab5ae1f63de@redhat.com>
-In-Reply-To: <6d763002-258b-1bec-43a5-8ab5ae1f63de@redhat.com>
-From: Miklos Szeredi <mszeredi@redhat.com>
-Date: Tue, 14 Jan 2020 20:24:51 +0100
-Message-ID: <CAOssrKeDEjEjBGMD+qXpGzA680TYKDie++whKp25S4x8v-MxOQ@mail.gmail.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] Ways to uniquely and persistently identify nodes
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAPcyv4j5Mra8qeLO3=+BYZMeXNAxFXv7Ex7tL9gra1TbhOgiqg@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 01/19] dax: remove block device dependencies
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,43 +24,66 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: Dan Williams <dan.j.williams@intel.com>
+Cc: virtio-fs@redhat.com, Jan Kara <jack@suse.cz>, linux-nvdimm <linux-nvdimm@lists.01.org>, Miklos Szeredi <miklos@szeredi.hu>, Dave Chinner <david@fromorbit.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Christoph Hellwig <hch@infradead.org>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, "Darrick J. Wong" <darrick.wong@oracle.com>
 
-On Tue, Jan 14, 2020 at 6:13 PM Max Reitz <mreitz@redhat.com> wrote:
-> What worries me most is how to pass that object around to all FUSE
-> functions, and that they all need a new interface.
+On Thu, Jan 09, 2020 at 12:03:01PM -0800, Dan Williams wrote:
+> On Thu, Jan 9, 2020 at 3:27 AM Jan Kara <jack@suse.cz> wrote:
+> >
+> > On Tue 07-01-20 10:49:55, Dan Williams wrote:
+> > > On Tue, Jan 7, 2020 at 10:33 AM Vivek Goyal <vgoyal@redhat.com> wrote:
+> > > > W.r.t partitioning, bdev_dax_pgoff() seems to be the pain point where
+> > > > dax code refers back to block device to figure out partition offset in
+> > > > dax device. If we create a dax object corresponding to "struct block_device"
+> > > > and store sector offset in that, then we could pass that object to dax
+> > > > code and not worry about referring back to bdev. I have written some
+> > > > proof of concept code and called that object "dax_handle". I can post
+> > > > that code if there is interest.
+> > >
+> > > I don't think it's worth it in the end especially considering
+> > > filesystems are looking to operate on /dev/dax devices directly and
+> > > remove block entanglements entirely.
+> > >
+> > > > IMHO, it feels useful to be able to partition and use a dax capable
+> > > > block device in same way as non-dax block device. It will be really
+> > > > odd to think that if filesystem is on /dev/pmem0p1, then dax can't
+> > > > be enabled but if filesystem is on /dev/mapper/pmem0p1, then dax
+> > > > will work.
+> > >
+> > > That can already happen today. If you do not properly align the
+> > > partition then dax operations will be disabled. This proposal just
+> > > extends that existing failure domain to make all partitions fail to
+> > > support dax.
+> >
+> > Well, I have some sympathy with the sysadmin that has /dev/pmem0 device,
+> > decides to create partitions on it for whatever (possibly misguided)
+> > reason and then ponders why the hell DAX is not working? And PAGE_SIZE
+> > partition alignment is so obvious and widespread that I don't count it as a
+> > realistic error case sysadmins would be pondering about currently.
+> >
+> > So I'd find two options reasonably consistent:
+> > 1) Keep status quo where partitions are created and support DAX.
+> > 2) Stop partition creation altogether, if anyones wants to split pmem
+> > device further, he can use dm-linear for that (i.e., kpartx).
+> >
+> > But I'm not sure if the ship hasn't already sailed for option 2) to be
+> > feasible without angry users and Linus reverting the change.
+> 
+> Christoph? I feel myself leaning more and more to the "keep pmem
+> partitions" camp.
+> 
+> I don't see "drop partition support" effort ending well given the long
+> standing "ext4 fails to mount when dax is not available" precedent.
+> 
+> I think the next least bad option is to have a dax_get_by_host()
+> variant that passes an offset and length pair rather than requiring a
+> later bdev_dax_pgoff() to recall the offset. This also prevents
+> needing to add another dax-device object representation.
 
-You mean libfuse API?
+I am wondering what's the conclusion on this. I want to this to make
+progress in some direction so that I can make progress on virtiofs DAX
+support.
 
-> I just had a very fuzzy (and maybe stupid) idea: Maybe we could keep an
-> internal vector of currently active handles and then when variable-size
-> handles are enabled, fuse_ino_t would just act as an index into that vector?
->
-> I suppose we could then use the full-size handles in all messages and
-> just hand out temporary indices to existing functions (just so we don’t
-> have to change their interface).  Server and client have their own
-> vectors, because when they communicate, only the full handles have meaning.
->
-> Or we could implement the table on top of the current system by sharing
-> it between the client and server.  Whenever the server creates a
-> fuse_ino_t value, it then also creates a full-size handle, and returns
-> both the handle and its corresponding fuse_ino_t value to the server.
-> The server can use the fuse_ino_t normally most of the time, but with a
-> catch: The client would be able to invalidate it.  Then the server needs
-> to obtain a new fuse_ino_t value for the existing handle.
-> (Invalidating and reacquiring a fuse_ino_t value would be new FUSE
-> operations.)
-
-I think you may have accidentally switched "server" and "client" in
-the above description a couple of times.
-
-But if I'm reading this correctly, your idea is to keep the 64bit
-value on the interface (this could be just libfuse or both libfuse and
-the kernel API) and add new interfaces to establish and reestablish
-the mapping from (non-persistent) fuse_ino_t to (persistent) handle.
-
-Thanks,
-Miklos
-
+Thanks
+Vivek
 

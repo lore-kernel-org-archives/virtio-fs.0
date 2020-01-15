@@ -1,24 +1,21 @@
-References: <410cfe7a-5d38-7670-7e34-6eeae4b5a4fc@redhat.com>
-	<CAOssrKc2ESAiQmE8GSqkh6_rtcSqX2ok=Rm=bnG5MGcaJs-31g@mail.gmail.com>
-	<6d763002-258b-1bec-43a5-8ab5ae1f63de@redhat.com>
-	<CAOssrKeDEjEjBGMD+qXpGzA680TYKDie++whKp25S4x8v-MxOQ@mail.gmail.com>
-	<19bfff9f-5024-a104-a639-d02bea178440@redhat.com>
-	<CAOssrKcXKb5B=9mTaPxXwNLSZWpUAZ=3UdcDQ8wCWVbEg0A2-w@mail.gmail.com>
-	<CAOssrKf8DN68+5aAseBYsnSXr+zWHy0UqNdVHMU5cSu0b-EvQw@mail.gmail.com>
-	<9dfafbc1-6b64-ed12-a950-19dbf7b1eda2@redhat.com>
-	<CAOssrKdXxN5iUpMocenvQZoHYinzVBYZEADersU7RHRy5Tf2tA@mail.gmail.com>
-	<CAOssrKdU=+A9kkdwFiHAJRRFesER1hFT3eATQmZO3=x7Bs1ong@mail.gmail.com>
-	<4baf208d-66fb-4759-8fac-691c853d7154@redhat.com>
-	<CAOssrKfnCdeEGjnU3a7CgF-+-SahhOG7d-wnvOuvtZag4F1HBw@mail.gmail.com>
-From: Max Reitz <mreitz@redhat.com>
-Message-ID: <7401a034-3f5e-068c-1732-01ef78a93665@redhat.com>
-Date: Wed, 15 Jan 2020 17:12:29 +0100
+Date: Wed, 15 Jan 2020 14:56:17 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200115195617.GA4133@redhat.com>
+References: <20200107180101.GC15920@redhat.com>
+	<CAPcyv4gmdoqpwwwy4dS3D2eZFjmJ_Zi39k=1a4wn-_ksm-UV4A@mail.gmail.com>
+	<20200107183307.GD15920@redhat.com>
+	<CAPcyv4ggoS4dWjq-1KbcuaDtroHKEi5Vu19ggJ-qgycs6w1eCA@mail.gmail.com>
+	<20200109112447.GG27035@quack2.suse.cz>
+	<CAPcyv4j5Mra8qeLO3=+BYZMeXNAxFXv7Ex7tL9gra1TbhOgiqg@mail.gmail.com>
+	<20200114203138.GA3145@redhat.com>
+	<CAPcyv4iXKFt207Pen+E1CnqCFtC1G85fxw5EXFVx+jtykGWMXA@mail.gmail.com>
+	<20200114212805.GB3145@redhat.com>
+	<CAPcyv4igrs40uWuCB163PPBLqyGVaVbaNfE=kCfHRPRuvZdxQA@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <CAOssrKfnCdeEGjnU3a7CgF-+-SahhOG7d-wnvOuvtZag4F1HBw@mail.gmail.com>
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature";
-	boundary="pvFFaeQzxDN8xHzXczNxaatflzayQ2RMg"
-Subject: Re: [Virtio-fs] Ways to uniquely and persistently identify nodes
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAPcyv4igrs40uWuCB163PPBLqyGVaVbaNfE=kCfHRPRuvZdxQA@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 01/19] dax: remove block device dependencies
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,127 +24,149 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <mszeredi@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: Dan Williams <dan.j.williams@intel.com>
+Cc: virtio-fs@redhat.com, Jan Kara <jack@suse.cz>, linux-nvdimm <linux-nvdimm@lists.01.org>, Miklos Szeredi <miklos@szeredi.hu>, Dave Chinner <david@fromorbit.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Christoph Hellwig <hch@infradead.org>, Jeff Moyer <jmoyer@redhat.com>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, "Darrick J. Wong" <darrick.wong@oracle.com>
 
-This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
---pvFFaeQzxDN8xHzXczNxaatflzayQ2RMg
-Content-Type: multipart/mixed; boundary="3SagoTpxdFvqGWGqhgY8ArL88sNmnwfXr"
+On Tue, Jan 14, 2020 at 02:23:04PM -0800, Dan Williams wrote:
+> On Tue, Jan 14, 2020 at 1:28 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> >
+> > On Tue, Jan 14, 2020 at 12:39:00PM -0800, Dan Williams wrote:
+> > > On Tue, Jan 14, 2020 at 12:31 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> > > >
+> > > > On Thu, Jan 09, 2020 at 12:03:01PM -0800, Dan Williams wrote:
+> > > > > On Thu, Jan 9, 2020 at 3:27 AM Jan Kara <jack@suse.cz> wrote:
+> > > > > >
+> > > > > > On Tue 07-01-20 10:49:55, Dan Williams wrote:
+> > > > > > > On Tue, Jan 7, 2020 at 10:33 AM Vivek Goyal <vgoyal@redhat.com> wrote:
+> > > > > > > > W.r.t partitioning, bdev_dax_pgoff() seems to be the pain point where
+> > > > > > > > dax code refers back to block device to figure out partition offset in
+> > > > > > > > dax device. If we create a dax object corresponding to "struct block_device"
+> > > > > > > > and store sector offset in that, then we could pass that object to dax
+> > > > > > > > code and not worry about referring back to bdev. I have written some
+> > > > > > > > proof of concept code and called that object "dax_handle". I can post
+> > > > > > > > that code if there is interest.
+> > > > > > >
+> > > > > > > I don't think it's worth it in the end especially considering
+> > > > > > > filesystems are looking to operate on /dev/dax devices directly and
+> > > > > > > remove block entanglements entirely.
+> > > > > > >
+> > > > > > > > IMHO, it feels useful to be able to partition and use a dax capable
+> > > > > > > > block device in same way as non-dax block device. It will be really
+> > > > > > > > odd to think that if filesystem is on /dev/pmem0p1, then dax can't
+> > > > > > > > be enabled but if filesystem is on /dev/mapper/pmem0p1, then dax
+> > > > > > > > will work.
+> > > > > > >
+> > > > > > > That can already happen today. If you do not properly align the
+> > > > > > > partition then dax operations will be disabled. This proposal just
+> > > > > > > extends that existing failure domain to make all partitions fail to
+> > > > > > > support dax.
+> > > > > >
+> > > > > > Well, I have some sympathy with the sysadmin that has /dev/pmem0 device,
+> > > > > > decides to create partitions on it for whatever (possibly misguided)
+> > > > > > reason and then ponders why the hell DAX is not working? And PAGE_SIZE
+> > > > > > partition alignment is so obvious and widespread that I don't count it as a
+> > > > > > realistic error case sysadmins would be pondering about currently.
+> > > > > >
+> > > > > > So I'd find two options reasonably consistent:
+> > > > > > 1) Keep status quo where partitions are created and support DAX.
+> > > > > > 2) Stop partition creation altogether, if anyones wants to split pmem
+> > > > > > device further, he can use dm-linear for that (i.e., kpartx).
+> > > > > >
+> > > > > > But I'm not sure if the ship hasn't already sailed for option 2) to be
+> > > > > > feasible without angry users and Linus reverting the change.
+> > > > >
+> > > > > Christoph? I feel myself leaning more and more to the "keep pmem
+> > > > > partitions" camp.
+> > > > >
+> > > > > I don't see "drop partition support" effort ending well given the long
+> > > > > standing "ext4 fails to mount when dax is not available" precedent.
+> > > > >
+> > > > > I think the next least bad option is to have a dax_get_by_host()
+> > > > > variant that passes an offset and length pair rather than requiring a
+> > > > > later bdev_dax_pgoff() to recall the offset. This also prevents
+> > > > > needing to add another dax-device object representation.
+> > > >
+> > > > I am wondering what's the conclusion on this. I want to this to make
+> > > > progress in some direction so that I can make progress on virtiofs DAX
+> > > > support.
+> > >
+> > > I think we should at least try to delete the partition support and see
+> > > if anyone screams. Have a module option to revert the behavior so
+> > > people are not stuck waiting for the revert to land, but if it stays
+> > > quiet then we're in a better place with that support pushed out of the
+> > > dax core.
+> >
+> > Hi Dan,
+> >
+> > So basically keep partition support code just that disable it by default
+> > and it is enabled by some knob say kernel command line option/module
+> > option.
+> 
+> Yes.
+> 
+> > At what point of time will we remove that code completely. I mean what
+> > if people scream after two kernel releases, after we have removed the
+> > code.
+> 
+> I'd follow the typical timelines of Documentation/ABI/obsolete which
+> is a year or more.
+> 
+> >
+> > Also, from distribution's perspective, we might not hear from our
+> > customers for a very long time (till we backport that code in to
+> > existing releases or release this new code in next major release). From
+> > that view point I will not like to break existing user visible behavior.
+> >
+> > How bad it is to keep partition support around. To me it feels reasonaly
+> > simple where we just have to store offset into dax device into another
+> > dax object:
+> 
+> If we end up keeping partition support, we're not adding another object.
+> 
+> > and pass that object around (instead of dax_device). If that's
+> > the case, I am not sure why to even venture into a direction where some
+> > user's setup might be broken.
+> 
+> It was a mistake to support them. If that mistake can be undone
+> without breaking existing deployments the code base is better off
+> without the concept.
+> 
+> > Also from an application perspective, /dev/pmem is a block device, so it
+> > should behave like a block device, (including kernel partition table support).
+> > From that view, dax looks like just an additional feature of that device
+> > which can be enabled by passing option "-o dax".
+> 
+> dax via block devices was a crutch that we leaned on too heavily, and
+> the implementation has slowly been moving away from it ever since.
+> 
+> > IOW, can we reconsider the idea of not supporting kernel partition tables
+> > for dax capable block devices. I can only see downsides of removing kernel
+> > partition table support and only upside seems to be little cleanup of dax
+> > core code.
+> 
+> Can you help find end users that depend on it?
 
---3SagoTpxdFvqGWGqhgY8ArL88sNmnwfXr
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
-Content-Transfer-Encoding: quoted-printable
+I can't think of a real user at this point of time. Just that I am
+concerned, once the change goes in, somebody will get affected at later
+point of time and comes out complainig and this change will be seen as
+breaking user space and hence regression.
 
-On 15.01.20 17:01, Miklos Szeredi wrote:
-> On Wed, Jan 15, 2020 at 4:30 PM Max Reitz <mreitz@redhat.com> wrote:
->>
->> On 15.01.20 16:05, Miklos Szeredi wrote:
->>> On Wed, Jan 15, 2020 at 3:58 PM Miklos Szeredi <mszeredi@redhat.com> =
-wrote:
->>>>
->>>> On Wed, Jan 15, 2020 at 1:51 PM Max Reitz <mreitz@redhat.com> wrote:=
+> Even the Red Hat
+> installation guide example shows mounting on pmem0 directly. [1]
 
->>>>>
->>>>> On 15.01.20 12:51, Miklos Szeredi wrote:
->>>>>> On Wed, Jan 15, 2020 at 11:10 AM Miklos Szeredi <mszeredi@redhat.c=
-om> wrote:
->>>>>>
->>>>>>> New operations needed:
->>>>>>>
->>>>>>> LOOKUP_WITH_HANDLE: same as LOOKUP, but returns handle in additio=
-n to
->>>>>>> fuse_ino_t and attributes.
->>>>>>> LOOKUP_BY_HANDLE: same as LOOKUP, but gets a handle as input.
->>>>>>
->>>>>> And that can be reduced further to a single extended LOOKUP_HANDLE=
-,
->>>>>> which takes a handle as input and returns a handle in addition to =
-the
->>>>>> usual stuff.  The lookup-by-handle case can be done with a special=
+Below that example it also says.
 
->>>>>> name.  Currently "." is used for this purpose in the fuse protocol=
-,
->>>>>> which is a bit confusing since it has nothing to do the "." direct=
-ory
->>>>>> entry, but at least we don't have to introduce a new concept for t=
-his.
->>>>>
->>>>> I=E2=80=99m afraid I don=E2=80=99t quite understand.  What handle w=
-ould LOOKUP_HANDLE
->>>>> take as input when I want to open a new file (as in, LOOKUP_WITH_HA=
-NDLE)?
->>>>
->>>> For example open("/foo/bar", ...) would do:
->>>>
->>>> lookup_handle($ROOT_HANDLE, "foo") -> { FOO_HANDLE, FOO_NODEID }
->>>> lookup_handle($FOO_HANDLE, "bar") -> { BAR_HANDLE, BAR_NODEID }
->>>> open($BAR_NODEID, ...)
->>>
->>> Note also that this scheme makes fuse_ino_t values non-reusable,
->>> otherwise there could be messy conflicts with client using an old
->>> value that the server interprets as a new value.
->>
->> But wouldn=E2=80=99t it just be against the protocol to use a dropped =
-or
->> invalidated fuse_ino_t value?
->>
->>> But with the 64bit fuse_ino_t space wraparound shouldn't be an issue.=
+"When creating partitions on a pmem device to be used for direct access,
+partitions must be aligned on page boundaries. On the Intel 64 and AMD64
+architecture, at least 4KiB alignment for the start and end of the
+partition, but 2MiB is the preferred alignment. By default, the parted
+tool aligns partitions on 1MiB boundaries. For the first partition,
+specify 2MiB as the start of the partition. If the size of the partition
+is a multiple of 2MiB, all other partitions are also aligned."
 
->>
->> I don=E2=80=99t really see the problem with the current solution of ha=
-ving
->> fuse_ino_t be an index into a vector, and old values being reused.  As=
+So documentation is clearly saying dax will work with partitions as well.
+And some user might decide to just do that.
 
->> far as I understand, there is a protocol for refcount fuse_ino_t value=
-s
->> and the clients should not reuse values whose refcount has gone to zer=
-o.
->=20
-> I'm saying that one big advantage of having the client keep hold of
-> the persistent handle is that the server is free to drop its cached
-> objects even before the refcount drops to zero.  At that point the
-> client is holding onto an invalid fuse_ino_t value and if that value
-> is reused by the server, that will result in a mess.
-
-Oh, yes, sure.
-
->> (And we=E2=80=99d add to that protocol by adding a way for the server =
-to make
->> the client invalidate an existing fuse_ino_t value and request a new
->> one.  I suppose we=E2=80=99d do that just by responding e.g. EINVAL if=
- a
->> fuse_ino_t value is used that the server doesn=E2=80=99t recognize, an=
-d then the
->> client has to invoke lookup_(by_)handle to get a new value.)
->=20
-> Yes, except we'd better use something more specific (EFUSEINOINVALID)
-> instead of EINVAL to make sure it doesn't conflict with real errors
-> returned from the operation.
-
-If we can do that, sure, that=E2=80=99s better.
-
-Max
-
-
---3SagoTpxdFvqGWGqhgY8ArL88sNmnwfXr--
-
---pvFFaeQzxDN8xHzXczNxaatflzayQ2RMg
-Content-Type: application/pgp-signature; name="signature.asc"
-Content-Description: OpenPGP digital signature
-Content-Disposition: attachment; filename="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEkb62CjDbPohX0Rgp9AfbAGHVz0AFAl4fOe0ACgkQ9AfbAGHV
-z0CtRAgAw5iO+yBfpWFb0v3KWSrHSdOSZrffz5MpeCpZZ38UdoXnHwvTs4Mg+fPX
-cJitXeJgyhiFYD83d3i8OqokV3UEdtBr0nTTYSXbkDGEtEFKqPDKjfLu6Vfkj3QT
-abZEmG5qpy/ldvrF6N2aNvxLzHOsn6wQCPNiDyx98Q+w0s8Oh84dVekxikCqNqW7
-b/x36hRP03mU3YrqVKWpgAXvGxVgDTU1l2/INF4EYiR3lrRH49AaCSkZ2Vz5Z7Ex
-66CYOx6oZVz1dP9UaRNNP3l6/Pp1SFq69fANNRQpF0bsZ910N/UGnBcmIP0/Zk/E
-/kHCCCTc7eHkrPs6J/wTncHsbO2mtA==
-=2Pwe
------END PGP SIGNATURE-----
-
---pvFFaeQzxDN8xHzXczNxaatflzayQ2RMg--
+Thanks
+Vivek
 

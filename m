@@ -1,12 +1,17 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed,  4 Dec 2019 14:08:35 -0500
-Message-Id: <20191204190836.31324-5-vgoyal@redhat.com>
-In-Reply-To: <20191204190836.31324-1-vgoyal@redhat.com>
-References: <20191204190836.31324-1-vgoyal@redhat.com>
 MIME-Version: 1.0
+References: <410cfe7a-5d38-7670-7e34-6eeae4b5a4fc@redhat.com>
+	<CAOssrKc2ESAiQmE8GSqkh6_rtcSqX2ok=Rm=bnG5MGcaJs-31g@mail.gmail.com>
+	<6d763002-258b-1bec-43a5-8ab5ae1f63de@redhat.com>
+	<CAOssrKeDEjEjBGMD+qXpGzA680TYKDie++whKp25S4x8v-MxOQ@mail.gmail.com>
+	<19bfff9f-5024-a104-a639-d02bea178440@redhat.com>
+	<CAOssrKcXKb5B=9mTaPxXwNLSZWpUAZ=3UdcDQ8wCWVbEg0A2-w@mail.gmail.com>
+In-Reply-To: <CAOssrKcXKb5B=9mTaPxXwNLSZWpUAZ=3UdcDQ8wCWVbEg0A2-w@mail.gmail.com>
+From: Miklos Szeredi <mszeredi@redhat.com>
+Date: Wed, 15 Jan 2020 12:51:24 +0100
+Message-ID: <CAOssrKf8DN68+5aAseBYsnSXr+zWHy0UqNdVHMU5cSu0b-EvQw@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 4/5] virtiofsd: Specify size of notification
-	buffer using config space
+Subject: Re: [Virtio-fs] Ways to uniquely and persistently identify nodes
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,159 +20,25 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com, qemu-devel@nongnu.org
-Cc: mszeredi@redhat.com
+To: Max Reitz <mreitz@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-Daemon specifies size of notification buffer needed and that should be done
-using config space.
+On Wed, Jan 15, 2020 at 11:10 AM Miklos Szeredi <mszeredi@redhat.com> wrote:
 
-Only ->notify_buf_size value of config space comes from daemon. Rest of
-it is filled by qemu device emulation code.
+> New operations needed:
+>
+> LOOKUP_WITH_HANDLE: same as LOOKUP, but returns handle in addition to
+> fuse_ino_t and attributes.
+> LOOKUP_BY_HANDLE: same as LOOKUP, but gets a handle as input.
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- contrib/virtiofsd/fuse_virtio.c            | 31 ++++++++++++++++++++++
- hw/virtio/vhost-user-fs.c                  | 26 ++++++++++++++++++
- include/hw/virtio/vhost-user-fs.h          |  2 ++
- include/standard-headers/linux/virtio_fs.h |  2 ++
- 4 files changed, 61 insertions(+)
+And that can be reduced further to a single extended LOOKUP_HANDLE,
+which takes a handle as input and returns a handle in addition to the
+usual stuff.  The lookup-by-handle case can be done with a special
+name.  Currently "." is used for this purpose in the fuse protocol,
+which is a bit confusing since it has nothing to do the "." directory
+entry, but at least we don't have to introduce a new concept for this.
 
-diff --git a/contrib/virtiofsd/fuse_virtio.c b/contrib/virtiofsd/fuse_virtio.c
-index b1eebcf054..94cf9b3791 100644
---- a/contrib/virtiofsd/fuse_virtio.c
-+++ b/contrib/virtiofsd/fuse_virtio.c
-@@ -869,6 +869,35 @@ static bool fv_queue_order(VuDev *dev, int qidx)
-     return false;
- }
- 
-+static uint64_t fv_get_protocol_features(VuDev *dev)
-+{
-+	return 1ull << VHOST_USER_PROTOCOL_F_CONFIG;
-+}
-+
-+static int fv_get_config(VuDev *dev, uint8_t *config, uint32_t len)
-+{
-+	struct virtio_fs_config fscfg = {};
-+	unsigned notify_size, roundto = 64;
-+	union fuse_notify_union {
-+		struct fuse_notify_poll_wakeup_out	wakeup_out;
-+		struct fuse_notify_inval_inode_out	inode_out;
-+		struct fuse_notify_inval_entry_out	entry_out;
-+		struct fuse_notify_delete_out		delete_out;
-+		struct fuse_notify_store_out		store_out;
-+		struct fuse_notify_retrieve_out		retrieve_out;
-+	};
-+
-+	notify_size = sizeof(struct fuse_out_header) +
-+		      sizeof(union fuse_notify_union);
-+	notify_size = ((notify_size + roundto)/roundto) * roundto;
-+
-+	fscfg.notify_buf_size = notify_size;
-+	memcpy(config, &fscfg, len);
-+	fuse_log(FUSE_LOG_DEBUG, "%s:Setting notify_buf_size=%d\n", __func__,
-+                 fscfg.notify_buf_size);
-+	return 0;
-+}
-+
- static const VuDevIface fv_iface = {
-     .get_features = fv_get_features,
-     .set_features = fv_set_features,
-@@ -877,6 +906,8 @@ static const VuDevIface fv_iface = {
-     .queue_set_started = fv_queue_set_started,
- 
-     .queue_is_processed_in_order = fv_queue_order,
-+    .get_protocol_features = fv_get_protocol_features,
-+    .get_config = fv_get_config,
- };
- 
- /*
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index 5555fe9dbe..5a6d244b98 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -277,16 +277,40 @@ uint64_t vhost_user_fs_slave_io(struct vhost_dev *dev, VhostUserFSSlaveMsg *sm,
-     return (uint64_t)done;
- }
- 
-+static int vhost_user_fs_handle_config_change(struct vhost_dev *dev)
-+{
-+    return 0;
-+}
-+
-+const VhostDevConfigOps fs_ops = {
-+    .vhost_dev_config_notifier = vhost_user_fs_handle_config_change,
-+};
- 
- static void vuf_get_config(VirtIODevice *vdev, uint8_t *config)
- {
-     VHostUserFS *fs = VHOST_USER_FS(vdev);
-     struct virtio_fs_config fscfg = {};
-+    int ret;
-+
-+    /*
-+     * As of now we only get notification buffer size from device. And that's
-+     * needed only if notification queue is enabled.
-+     */
-+    if (fs->notify_enabled) {
-+        ret = vhost_dev_get_config(&fs->vhost_dev, (uint8_t *)&fs->fscfg,
-+                                   sizeof(struct virtio_fs_config));
-+        if (ret < 0) {
-+            error_report("vhost-user-fs: get device config space failed."
-+                         " ret=%d\n", ret);
-+            return;
-+        }
-+    }
- 
-     memcpy((char *)fscfg.tag, fs->conf.tag,
-            MIN(strlen(fs->conf.tag) + 1, sizeof(fscfg.tag)));
- 
-     virtio_stl_p(vdev, &fscfg.num_request_queues, fs->conf.num_request_queues);
-+    virtio_stl_p(vdev, &fscfg.notify_buf_size, fs->fscfg.notify_buf_size);
- 
-     memcpy(config, &fscfg, sizeof(fscfg));
- }
-@@ -545,6 +569,8 @@ static void vuf_device_realize(DeviceState *dev, Error **errp)
-     fs->vhost_dev.nvqs = 2 + fs->conf.num_request_queues;
- 
-     fs->vhost_dev.vqs = g_new0(struct vhost_virtqueue, fs->vhost_dev.nvqs);
-+
-+    vhost_dev_set_config_notifier(&fs->vhost_dev, &fs_ops);
-     ret = vhost_dev_init(&fs->vhost_dev, &fs->vhost_user,
-                          VHOST_BACKEND_TYPE_USER, 0);
-     if (ret < 0) {
-diff --git a/include/hw/virtio/vhost-user-fs.h b/include/hw/virtio/vhost-user-fs.h
-index bd47e0da98..f667cc4b5a 100644
---- a/include/hw/virtio/vhost-user-fs.h
-+++ b/include/hw/virtio/vhost-user-fs.h
-@@ -14,6 +14,7 @@
- #ifndef _QEMU_VHOST_USER_FS_H
- #define _QEMU_VHOST_USER_FS_H
- 
-+#include "standard-headers/linux/virtio_fs.h"
- #include "hw/virtio/virtio.h"
- #include "hw/virtio/vhost.h"
- #include "hw/virtio/vhost-user.h"
-@@ -58,6 +59,7 @@ typedef struct {
-     struct vhost_virtqueue *vhost_vqs;
-     struct vhost_dev vhost_dev;
-     VhostUserState vhost_user;
-+    struct virtio_fs_config fscfg;
- 
-     /*< public >*/
-     MemoryRegion cache;
-diff --git a/include/standard-headers/linux/virtio_fs.h b/include/standard-headers/linux/virtio_fs.h
-index 9ee95f584f..719216a262 100644
---- a/include/standard-headers/linux/virtio_fs.h
-+++ b/include/standard-headers/linux/virtio_fs.h
-@@ -17,6 +17,8 @@ struct virtio_fs_config {
- 
- 	/* Number of request queues */
- 	uint32_t num_request_queues;
-+	/* Size of notification buffer */
-+	uint32_t notify_buf_size;
- } QEMU_PACKED;
- 
- #define VIRTIO_FS_PCI_CACHE_BAR 2
--- 
-2.20.1
+Thanks,
+Miklos
+
 

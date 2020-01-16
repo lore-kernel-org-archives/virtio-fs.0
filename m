@@ -1,21 +1,18 @@
-Date: Thu, 16 Jan 2020 14:23:53 -0500
+Date: Thu, 16 Jan 2020 15:32:10 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200116192353.GD25291@redhat.com>
-References: <20200114203138.GA3145@redhat.com>
-	<CAPcyv4iXKFt207Pen+E1CnqCFtC1G85fxw5EXFVx+jtykGWMXA@mail.gmail.com>
-	<20200114212805.GB3145@redhat.com>
-	<CAPcyv4igrs40uWuCB163PPBLqyGVaVbaNfE=kCfHRPRuvZdxQA@mail.gmail.com>
-	<20200115195617.GA4133@redhat.com>
-	<CAPcyv4iEoN9SnBveG7-Mhvd+wQApi1XKVnuYpyYxDybrFv_YYw@mail.gmail.com>
-	<x49wo9smnqc.fsf@segfault.boston.devel.redhat.com>
-	<CAPcyv4hCR9NV+2MF0iAJ5rHS2uiOgTnu=+yQRfpieDJQpQz22w@mail.gmail.com>
-	<20200116183900.GC25291@redhat.com>
-	<CAPcyv4irezimk8m4hysrd0rst_f0Rr+iiNxeFesqbxQnWYA2Xw@mail.gmail.com>
+Message-ID: <20200116203210.GE25291@redhat.com>
+References: <410cfe7a-5d38-7670-7e34-6eeae4b5a4fc@redhat.com>
+	<CAOssrKc2ESAiQmE8GSqkh6_rtcSqX2ok=Rm=bnG5MGcaJs-31g@mail.gmail.com>
+	<6d763002-258b-1bec-43a5-8ab5ae1f63de@redhat.com>
+	<CAOssrKeDEjEjBGMD+qXpGzA680TYKDie++whKp25S4x8v-MxOQ@mail.gmail.com>
+	<20200115120118.GC163546@stefanha-x1.localdomain>
+	<d5546de3-e02b-ccee-fa63-1889250d0738@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
-In-Reply-To: <CAPcyv4irezimk8m4hysrd0rst_f0Rr+iiNxeFesqbxQnWYA2Xw@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH 01/19] dax: remove block device dependencies
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <d5546de3-e02b-ccee-fa63-1889250d0738@redhat.com>
+Subject: Re: [Virtio-fs] Ways to uniquely and persistently identify nodes
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,32 +21,83 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Dan Williams <dan.j.williams@intel.com>
-Cc: virtio-fs@redhat.com, Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, "Darrick J. Wong" <darrick.wong@oracle.com>, Dave Chinner <david@fromorbit.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Christoph Hellwig <hch@infradead.org>, linux-nvdimm <linux-nvdimm@lists.01.org>, Jeff Moyer <jmoyer@redhat.com>, linux-fsdevel <linux-fsdevel@vger.kernel.org>
+To: Max Reitz <mreitz@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-On Thu, Jan 16, 2020 at 11:09:00AM -0800, Dan Williams wrote:
-
-[..]
-> > > True, but if kpartx + udev can make this transparent then I don't
-> > > think users lose any functionality. They just gain a device-mapper
-> > > dependency.
-> >
-> > So udev rules will trigger when a /dev/pmemX device shows up and run
-> > kpartx which in turn will create dm-linear devices and device nodes
-> > will show up in /dev/mapper/pmemXpY.
-> >
-> > IOW, /dev/pmemXpY device nodes will be gone. So if any of the scripts or
-> > systemd unit files are depenent on /dev/pmemXpY, these will still be
-> > broken out of the box and will have to be modified to use device nodes
-> > in /dev/mapper/ directory instead. Do I understand it right, Or I missed
-> > the idea completely.
+On Wed, Jan 15, 2020 at 02:00:27PM +0100, Max Reitz wrote:
+> On 15.01.20 13:01, Stefan Hajnoczi wrote:
+> > On Tue, Jan 14, 2020 at 08:24:51PM +0100, Miklos Szeredi wrote:
+> >> On Tue, Jan 14, 2020 at 6:13 PM Max Reitz <mreitz@redhat.com> wrote:
+> >>> What worries me most is how to pass that object around to all FUSE
+> >>> functions, and that they all need a new interface.
+> >>
+> >> You mean libfuse API?
+> >>
+> >>> I just had a very fuzzy (and maybe stupid) idea: Maybe we could keep an
+> >>> internal vector of currently active handles and then when variable-size
+> >>> handles are enabled, fuse_ino_t would just act as an index into that vector?
+> >>>
+> >>> I suppose we could then use the full-size handles in all messages and
+> >>> just hand out temporary indices to existing functions (just so we don’t
+> >>> have to change their interface).  Server and client have their own
+> >>> vectors, because when they communicate, only the full handles have meaning.
+> >>>
+> >>> Or we could implement the table on top of the current system by sharing
+> >>> it between the client and server.  Whenever the server creates a
+> >>> fuse_ino_t value, it then also creates a full-size handle, and returns
+> >>> both the handle and its corresponding fuse_ino_t value to the server.
+> >>> The server can use the fuse_ino_t normally most of the time, but with a
+> >>> catch: The client would be able to invalidate it.  Then the server needs
+> >>> to obtain a new fuse_ino_t value for the existing handle.
+> >>> (Invalidating and reacquiring a fuse_ino_t value would be new FUSE
+> >>> operations.)
+> >>
+> >> I think you may have accidentally switched "server" and "client" in
+> >> the above description a couple of times.
+> >>
+> >> But if I'm reading this correctly, your idea is to keep the 64bit
+> >> value on the interface (this could be just libfuse or both libfuse and
+> >> the kernel API) and add new interfaces to establish and reestablish
+> >> the mapping from (non-persistent) fuse_ino_t to (persistent) handle.
+> > 
+> > I'm not sure I understand Max's idea.
+> > 
+> > Miklos, I think you're saying keep fuse_ino_t semantics unchanged (not
+> > persistent, can be reused after the last reference is dropped) and add a
+> > separate struct export_operations-style FUSE API to map fuse_ino_t <->
+> > struct file_handle.
 > 
-> No, I'd write the udev rule to create links from /dev/pmemXpY to the
-> /dev/mapper device, and that rule would be gated by a new pmem device
-> attribute to trigger when kpartx needs to run vs the kernel native
-> partitions.
+> Yes, that’d be the idea.
+> 
+> > We'd need to use submounts to avoid st_ino collisions in that case.
+> 
+> Yes, because that idea wouldn’t solve the st_ino problem.  (Only
+> persistent fuse_ino_t values would solve it.  This proposal is exactly
+> the opposite, we want them to be absolutely not persistent.)
+> 
+> So we’d still want submounts with separate st_devs and pass through
+> st_ino from the host.
 
-Got it. This sounds much better.
+I am not sure I understand whole of the discussion. Here is my
+understanding. Please correct me if I got it wrong.
 
+So we seem to have two main problems.
+
+- st_inode number collision as seen by user space in case of multiple
+  submounts at host in directory being exported. And solution for this
+  seems to be supporting submounts where st_dev is reported from
+  submount in guest and st_ino is passthrough from host.
+
+- Being able have a persistent handle for inode on host. This will allow
+  us to support export API on virtiofs and also allow server to trim
+  cache despite the fact that client still has reference to that inode.
+
+IIUC, first one is more pressing for us and second one can wait. Have
+I got it right?
+
+Having said that, I don't know how complex it is to support submounts
+and what are other implications.
+
+Thanks
 Vivek
 

@@ -1,11 +1,12 @@
-Date: Tue, 21 Jan 2020 10:02:35 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200121100235.GA2929@work-vm>
-References: <20200121073236.9067-1-yangx.jy@cn.fujitsu.com>
+Message-ID: <5E26D634.6000905@cn.fujitsu.com>
+Date: Tue, 21 Jan 2020 18:45:08 +0800
+From: Xiao Yang <yangx.jy@cn.fujitsu.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200121073236.9067-1-yangx.jy@cn.fujitsu.com>
+References: <20200121073236.9067-1-yangx.jy@cn.fujitsu.com>
+	<20200121100235.GA2929@work-vm>
+In-Reply-To: <20200121100235.GA2929@work-vm>
+Content-Type: text/plain; charset=WINDOWS-1252; format=flowed
+Content-Transfer-Encoding: 8bit
 Subject: Re: [Virtio-fs] [PATCH] virtiofsd/passthrough_ll: Fix wrong output
  format in lo_setxattr()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -16,54 +17,24 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Xiao Yang <yangx.jy@cn.fujitsu.com>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 Cc: virtio-fs@redhat.com
 
-* Xiao Yang (yangx.jy@cn.fujitsu.com) wrote:
-> Actual debug output:
-> -------------------------------
-> [2778114403742] [ID: 00000033] lo_setxattr(ino=93998909307364[2778114466291] [ID: 00000033]    unique: 56, success, outsize: 16
-> -------------------------------
-> Correct debug output:
-> -------------------------------
-> 383 [2341816212531] [ID: 00000098] lo_setxattr(ino=3, name=user.test value=test size=4)
-> -------------------------------
-> 
-> Fixes: 63bc560920ad ("virtiofsd: print log only when priority is high enough)"
-> Signed-off-by: Xiao Yang <yangx.jy@cn.fujitsu.com>
-> ---
->  tools/virtiofsd/passthrough_ll.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 57f58aef26..ff34e77a23 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2528,7 +2528,7 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
->          goto out;
->      }
->  
-> -    fuse_log(FUSE_LOG_DEBUG, "lo_setxattr(ino=%" PRIu64,
-> +    fuse_log(FUSE_LOG_DEBUG, "lo_setxattr(ino=%" PRIu64
->               ", name=%s value=%s size=%zd)\n", ino, name, value, size);
->  
->      if (inode->is_symlink) {
+On 2020/1/21 18:02, Dr. David Alan Gilbert wrote:
+> Thank you for the fix!  I think we need to mark fuse_log as being printf
+> format so hopefully it will spot more of these errors automatically.
+Hi Dave,
 
-Thank you for the fix!  I think we need to mark fuse_log as being printf
-format so hopefully it will spot more of these errors automatically.
+Do you perfer to write output to stdout rather than stderr? right?(e.g. 
+replace vfprintf with vprintf?)
 
-Dave
+BTW: Perhaps, log_func() needs to call g_free() after using 
+g_strdup_printf().
 
-> -- 
-> 2.21.0
-> 
-> 
-> 
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+Thanks,
+Xiao Yang
+> Dave
+
+
+
 

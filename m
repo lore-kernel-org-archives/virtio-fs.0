@@ -1,23 +1,14 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=69ujJbtlPdE8oHv4nVIHA9iuyZRWDdoY3VvgQ+IBL2s=;
-	b=cGM2MeQBmZSBuReLBU5d5sTRAoFDL2XQyMomBEOKrqeyIMkpsthwL9Qv2AhBzaksHC
-	FZlfcVPmnf9pOrb3hqBmXEtqtUjv86fzG9yFxvtSAhUSNpTVjDmB73wbXrbIMMTcJZ9W
-	zNerL5x3klshUWu2R6Mt6dC6OSXgWwOaqpPMg=
 MIME-Version: 1.0
-References: <20200304165845.3081-1-vgoyal@redhat.com>
-	<20200304165845.3081-13-vgoyal@redhat.com>
-	<CAJfpeguY8gDYVp_q3-W6JNA24zCry+SfWmEW2zuHLQLhmyUB3Q@mail.gmail.com>
-	<20200310203321.GF38440@redhat.com>
-	<CAOQ4uxh2WdLdbcMp+qvQCX2hiBx+hLO1z5wkZtc-7GCuDdsthw@mail.gmail.com>
-In-Reply-To: <CAOQ4uxh2WdLdbcMp+qvQCX2hiBx+hLO1z5wkZtc-7GCuDdsthw@mail.gmail.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Wed, 11 Mar 2020 15:19:18 +0100
-Message-ID: <CAJfpeguwqEsPLtph73AG7bhm1Dp4ahyJtyW=Ud7L-OFwyEmwWg@mail.gmail.com>
-Content-Type: text/plain; charset=UTF-8
+References: <20200120025330.32140-1-misono.tomohiro@jp.fujitsu.com>
+	<20200122184125.GR3263@work-vm>
+In-Reply-To: <20200122184125.GR3263@work-vm>
+From: Miklos Szeredi <mszeredi@redhat.com>
+Date: Wed, 22 Jan 2020 19:55:57 +0100
+Message-ID: <CAOssrKevW+OAwU04kuTN0OorzqVm=n8cb7pWZBFWxU4x9AhjvQ@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 12/20] fuse: Introduce
-	setupmapping/removemapping commands
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: passthrough_ll: Use
+ cache_readdir for directory open
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -26,84 +17,51 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Amir Goldstein <amir73il@gmail.com>
-Cc: linux-nvdimm <linux-nvdimm@lists.01.org>, "Michael S. Tsirkin" <mst@redhat.com>, linux-kernel <linux-kernel@vger.kernel.org>, virtio-fs@redhat.com, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Vivek Goyal <vgoyal@redhat.com>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-On Wed, Mar 11, 2020 at 8:03 AM Amir Goldstein <amir73il@gmail.com> wrote:
+On Wed, Jan 22, 2020 at 7:41 PM Dr. David Alan Gilbert
+<dgilbert@redhat.com> wrote:
 >
-> On Tue, Mar 10, 2020 at 10:34 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> * Misono Tomohiro (misono.tomohiro@jp.fujitsu.com) wrote:
+> > Since keep_cache(FOPEN_KEEP_CACHE) has no effect for directory as
+> > described in fuse_common.h, use cache_readdir(FOPNE_CACHE_DIR) for
+> > diretory open when cache=always mode.
 > >
-> > On Tue, Mar 10, 2020 at 08:49:49PM +0100, Miklos Szeredi wrote:
-> > > On Wed, Mar 4, 2020 at 5:59 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> > > >
-> > > > Introduce two new fuse commands to setup/remove memory mappings. This
-> > > > will be used to setup/tear down file mapping in dax window.
-> > > >
-> > > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > > > Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
-> > > > ---
-> > > >  include/uapi/linux/fuse.h | 37 +++++++++++++++++++++++++++++++++++++
-> > > >  1 file changed, 37 insertions(+)
-> > > >
-> > > > diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-> > > > index 5b85819e045f..62633555d547 100644
-> > > > --- a/include/uapi/linux/fuse.h
-> > > > +++ b/include/uapi/linux/fuse.h
-> > > > @@ -894,4 +894,41 @@ struct fuse_copy_file_range_in {
-> > > >         uint64_t        flags;
-> > > >  };
-> > > >
-> > > > +#define FUSE_SETUPMAPPING_ENTRIES 8
-> > > > +#define FUSE_SETUPMAPPING_FLAG_WRITE (1ull << 0)
-> > > > +struct fuse_setupmapping_in {
-> > > > +       /* An already open handle */
-> > > > +       uint64_t        fh;
-> > > > +       /* Offset into the file to start the mapping */
-> > > > +       uint64_t        foffset;
-> > > > +       /* Length of mapping required */
-> > > > +       uint64_t        len;
-> > > > +       /* Flags, FUSE_SETUPMAPPING_FLAG_* */
-> > > > +       uint64_t        flags;
-> > > > +       /* Offset in Memory Window */
-> > > > +       uint64_t        moffset;
-> > > > +};
-> > > > +
-> > > > +struct fuse_setupmapping_out {
-> > > > +       /* Offsets into the cache of mappings */
-> > > > +       uint64_t        coffset[FUSE_SETUPMAPPING_ENTRIES];
-> > > > +        /* Lengths of each mapping */
-> > > > +        uint64_t       len[FUSE_SETUPMAPPING_ENTRIES];
-> > > > +};
-> > >
-> > > fuse_setupmapping_out together with FUSE_SETUPMAPPING_ENTRIES seem to be unused.
+> > Signed-off-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+>
+> cc'ing Miklos.
+
+Looks good, ack.
+
+>
+> > ---
+> >  tools/virtiofsd/passthrough_ll.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
 > >
-> > This looks like leftover from the old code. I will get rid of it. Thanks.
+> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> > index 5519682daa..088fef08f1 100644
+> > --- a/tools/virtiofsd/passthrough_ll.c
+> > +++ b/tools/virtiofsd/passthrough_ll.c
+> > @@ -1674,7 +1674,7 @@ static void lo_opendir(fuse_req_t req, fuse_ino_t ino,
 > >
+> >      fi->fh = fh;
+> >      if (lo->cache == CACHE_ALWAYS) {
+> > -        fi->keep_cache = 1;
+> > +        fi->cache_readdir = 1;
+> >      }
+> >      fuse_reply_open(req, fi);
+> >      return;
+> > --
+> > 2.21.1
+> >
+> >
+> > _______________________________________________
+> > Virtio-fs mailing list
+> > Virtio-fs@redhat.com
+> > https://www.redhat.com/mailman/listinfo/virtio-fs
+> --
+> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 >
-> Hmm. I wonder if we should keep some out args for future extensions.
-> Maybe return the mapped size even though it is all or nothing at this
-> point?
->
-> I have interest in a similar FUSE mapping functionality that was prototyped
-> by Miklos and published here:
-> https://lore.kernel.org/linux-fsdevel/CAJfpegtjEoE7H8tayLaQHG9fRSBiVuaspnmPr2oQiOZXVB1+7g@mail.gmail.com/
->
-> In this prototype, a FUSE_MAP command is used by the server to map a
-> range of file to the kernel for io. The command in args are quite similar to
-> those in fuse_setupmapping_in, but since the server is on the same host,
-> the mapping response is {mapfd, offset, size}.
-
-Right.  So the difference is in which entity allocates the mapping.
-IOW whether the {fd, offset, size} is input or output in the protocol.
-
-I don't remember the reasons for going with the mapping being
-allocated by the client, not the other way round.   Vivek?
-
-If the allocation were to be by the server, we could share the request
-type and possibly some code between the two, although the I/O
-mechanism would still be different.
-
-Thanks,
-Miklos
 
 

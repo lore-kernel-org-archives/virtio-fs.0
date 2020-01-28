@@ -1,15 +1,10 @@
-Date: Tue, 10 Mar 2020 14:47:20 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200310184720.GD38440@redhat.com>
-References: <20200304165845.3081-1-vgoyal@redhat.com>
-	<20200304165845.3081-5-vgoyal@redhat.com>
-	<20200310071043-mutt-send-email-mst@kernel.org>
+From: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+Date: Tue, 28 Jan 2020 19:18:17 +0900
+Message-ID: <20200128101819.21766-1-misono.tomohiro@jp.fujitsu.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200310071043-mutt-send-email-mst@kernel.org>
-Subject: Re: [Virtio-fs] [PATCH 04/20] virtio: Implement get_shm_region for
-	PCI transport
+Content-Type: text/plain; charset=WINDOWS-1252
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2 0/2] virtiofsd: Fix xattr and ACL
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,58 +13,51 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Michael S. Tsirkin" <mst@redhat.com>
-Cc: kbuild test robot <lkp@intel.com>, miklos@szeredi.hu, linux-nvdimm@lists.01.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
+To: virtio-fs@redhat.com
+Cc: vgoyal@redhat.com
 
-On Tue, Mar 10, 2020 at 07:12:25AM -0400, Michael S. Tsirkin wrote:
-[..]
-> > +static bool vp_get_shm_region(struct virtio_device *vdev,
-> > +			      struct virtio_shm_region *region, u8 id)
-> > +{
-> > +	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
-> > +	struct pci_dev *pci_dev = vp_dev->pci_dev;
-> > +	u8 bar;
-> > +	u64 offset, len;
-> > +	phys_addr_t phys_addr;
-> > +	size_t bar_len;
-> > +	int ret;
-> > +
-> > +	if (!virtio_pci_find_shm_cap(pci_dev, id, &bar, &offset, &len)) {
-> > +		return false;
-> > +	}
-> > +
-> > +	ret = pci_request_region(pci_dev, bar, "virtio-pci-shm");
-> > +	if (ret < 0) {
-> > +		dev_err(&pci_dev->dev, "%s: failed to request BAR\n",
-> > +			__func__);
-> > +		return false;
-> > +	}
-> > +
-> > +	phys_addr = pci_resource_start(pci_dev, bar);
-> > +	bar_len = pci_resource_len(pci_dev, bar);
-> > +
-> > +        if (offset + len > bar_len) {
-> > +                dev_err(&pci_dev->dev,
-> > +                        "%s: bar shorter than cap offset+len\n",
-> > +                        __func__);
-> > +                return false;
-> > +        }
-> > +
-> 
-> Something wrong with indentation here.
+Hi,
 
-Will fix all indentation related issues in this patch.
+This is a second version of xattr fix for virtiofsd.
+I included ACL fix (which introduces new option posix_acl) in this version
+too as ACL mostly depends on xattr.
 
-> Also as long as you are validating things, it's worth checking
-> offset + len does not overflow.
+I run xfstests with XFS backend using "-o xattr -o posix_acl" option and
+only new failure is generic/375 which checks if sgid bit is cleared after
+setfacl. I'll try to investigate it.
 
-Something like addition of following lines?
+change in v1 -> v2
+ - rebased to current dev branch
 
-+       if ((offset + len) < offset) {
-+               dev_err(&pci_dev->dev, "%s: cap offset+len overflow detected\n",
-+                       __func__);
-+               return false;
-+       }
+ - Always chdir for xattr (1st patch)
+   In v1, I keep current implementation for regular file/dir since it
+   show better performance in my environment. But I notice opening file
+   for xattr causes seek sanity test fails (xfstest generic/285, 436).
 
-Vivek
+   I'm not sure what is the fundamental problem here but I believe
+   performance can be improved by introducing some caching mechanism
+   in general. So I change the code to always fchdir to avoid the
+   problem for now. This results in simpler code too.
+
+ - Add ACL fix (2nd patch)
+   ACL mostly works if xattr option is enabled.
+   To support default ACL behavior, add new option posix_acl which
+   handles umasking in virtiofsd instead of guest kernel.
+
+Thanks,
+Misono
+
+Misono Tomohiro (2):
+  virtiofsd: Fix xattr operations
+  virtiofsd: Add support of posix_acl
+
+ tools/virtiofsd/fuse_virtio.c    |  13 +++
+ tools/virtiofsd/helper.c         |   3 +
+ tools/virtiofsd/passthrough_ll.c | 136 +++++++++++++++++++++----------
+ tools/virtiofsd/seccomp.c        |  11 ++-
+ 4 files changed, 115 insertions(+), 48 deletions(-)
+
+-- 
+2.21.1
+
 

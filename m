@@ -1,12 +1,13 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed,  4 Mar 2020 11:58:30 -0500
-Message-Id: <20200304165845.3081-6-vgoyal@redhat.com>
-In-Reply-To: <20200304165845.3081-1-vgoyal@redhat.com>
-References: <20200304165845.3081-1-vgoyal@redhat.com>
+Date: Tue, 28 Jan 2020 17:50:13 +0800
+From: Eryu Guan <eguan@linux.alibaba.com>
+Message-ID: <20200128095013.GC47669@e18g06458.et15sqa>
+References: <20200124112950.GA2969@work-vm>
 MIME-Version: 1.0
+In-Reply-To: <20200124112950.GA2969@work-vm>
+Content-Type: text/plain; charset=WINDOWS-1252
+Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 05/20] virtio: Implement get_shm_region for MMIO
-	transport
+Subject: Re: [Virtio-fs] virtiofsd merged in qemu
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,92 +16,36 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com, miklos@szeredi.hu
-Cc: mst@redhat.com, vgoyal@redhat.com
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com
 
-From: Sebastien Boeuf <sebastien.boeuf@intel.com>
+On Fri, Jan 24, 2020 at 11:29:50AM +0000, Dr. David Alan Gilbert wrote:
+> Hi,
+>   virtiofsd just got merged upstream in qemu's git.
+> Thank you to all those who have contributed code, reviewed
+> and tested it!
 
-On MMIO a new set of registers is defined for finding SHM
-regions.  Add their definitions and use them to find the region.
+Good news! Nice work!
 
-Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
----
- drivers/virtio/virtio_mmio.c     | 32 ++++++++++++++++++++++++++++++++
- include/uapi/linux/virtio_mmio.h | 11 +++++++++++
- 2 files changed, 43 insertions(+)
+> 
+> I've updated the virtio-fs-dev tree with a tree based on latest
+> qemu; it's still got the experimental DAX code in and it's got
+> a few other patches that haven't gone upstream to qemu yet.
+> (In particular the man page and docs need reworking a bit).
+> 
+> Thanks again everyone!
+> 
+> Dave
 
-diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
-index 97d5725fd9a2..4922a1a9e3a7 100644
---- a/drivers/virtio/virtio_mmio.c
-+++ b/drivers/virtio/virtio_mmio.c
-@@ -500,6 +500,37 @@ static const char *vm_bus_name(struct virtio_device *vdev)
- 	return vm_dev->pdev->name;
- }
- 
-+static bool vm_get_shm_region(struct virtio_device *vdev,
-+			      struct virtio_shm_region *region, u8 id)
-+{
-+	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
-+	u64 len, addr;
-+
-+	/* Select the region we're interested in */
-+	writel(id, vm_dev->base + VIRTIO_MMIO_SHM_SEL);
-+
-+	/* Read the region size */
-+	len = (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_LEN_LOW);
-+	len |= (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_LEN_HIGH) << 32;
-+
-+	region->len = len;
-+
-+	/* Check if region length is -1. If that's the case, the shared memory
-+	 * region does not exist and there is no need to proceed further.
-+	 */
-+	if (len == ~(u64)0) {
-+		return false;
-+	}
-+
-+	/* Read the region base address */
-+	addr = (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_BASE_LOW);
-+	addr |= (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_BASE_HIGH) << 32;
-+
-+	region->addr = addr;
-+
-+	return true;
-+}
-+
- static const struct virtio_config_ops virtio_mmio_config_ops = {
- 	.get		= vm_get,
- 	.set		= vm_set,
-@@ -512,6 +543,7 @@ static const struct virtio_config_ops virtio_mmio_config_ops = {
- 	.get_features	= vm_get_features,
- 	.finalize_features = vm_finalize_features,
- 	.bus_name	= vm_bus_name,
-+	.get_shm_region = vm_get_shm_region,
- };
- 
- 
-diff --git a/include/uapi/linux/virtio_mmio.h b/include/uapi/linux/virtio_mmio.h
-index c4b09689ab64..0650f91bea6c 100644
---- a/include/uapi/linux/virtio_mmio.h
-+++ b/include/uapi/linux/virtio_mmio.h
-@@ -122,6 +122,17 @@
- #define VIRTIO_MMIO_QUEUE_USED_LOW	0x0a0
- #define VIRTIO_MMIO_QUEUE_USED_HIGH	0x0a4
- 
-+/* Shared memory region id */
-+#define VIRTIO_MMIO_SHM_SEL             0x0ac
-+
-+/* Shared memory region length, 64 bits in two halves */
-+#define VIRTIO_MMIO_SHM_LEN_LOW         0x0b0
-+#define VIRTIO_MMIO_SHM_LEN_HIGH        0x0b4
-+
-+/* Shared memory region base address, 64 bits in two halves */
-+#define VIRTIO_MMIO_SHM_BASE_LOW        0x0b8
-+#define VIRTIO_MMIO_SHM_BASE_HIGH       0x0bc
-+
- /* Configuration atomicity value */
- #define VIRTIO_MMIO_CONFIG_GENERATION	0x0fc
- 
--- 
-2.20.1
+Eryu
+
+> 
+> --
+> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
+
 

@@ -1,14 +1,14 @@
-Date: Fri, 14 Feb 2020 20:31:56 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200214203156.GR3283@work-vm>
-References: <20200214191753.GC18654@redhat.com> <20200214194437.GQ3283@work-vm>
-	<b703d3ec-b48a-776a-a525-4acb16a27ac4@redhat.com>
+Date: Fri, 14 Feb 2020 15:37:25 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200214203725.GA31140@redhat.com>
+References: <20200128101819.21766-1-misono.tomohiro@jp.fujitsu.com>
+	<20200130141350.GA21264@redhat.com>
+	<OSBPR01MB458283800922F1C74C094ABDE5070@OSBPR01MB4582.jpnprd01.prod.outlook.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <b703d3ec-b48a-776a-a525-4acb16a27ac4@redhat.com>
-Subject: Re: [Virtio-fs] fedora packages for virtiofsd
+In-Reply-To: <OSBPR01MB458283800922F1C74C094ABDE5070@OSBPR01MB4582.jpnprd01.prod.outlook.com>
+Subject: Re: [Virtio-fs] [PATCH v2 0/2] virtiofsd: Fix xattr and ACL
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,49 +17,44 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Daniel Walsh <dwalsh@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Mrunal Patel <mpatel@redhat.com>, Vivek Goyal <vgoyal@redhat.com>, crobinso@redhat.com
+To: "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>
+Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
-* Daniel Walsh (dwalsh@redhat.com) wrote:
-> On 2/14/20 2:44 PM, Dr. David Alan Gilbert wrote:
-> > * Vivek Goyal (vgoyal@redhat.com) wrote:
-> >> Hi David,
-> >>
-> >> Are fedora packages for latest qemu with virtiofsd now available. Can =
-one
-> >> try it?
-> >>
-> >> Dan Walsh and Mrunal are looking for it (CCed in email).
-> >>
-> >> Keeping this thread on virtio-fs list as others might be interested as
-> >> well.
-> > Cole has got it into the virt-preview copr:
-> >
-> >  https://copr.fedorainfracloud.org/coprs/g/virtmaint-sig/virt-preview
-> >
-> > Dave
-> >
-> >> Thanks
-> >> Vivek
-> > --
-> > Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
->=20
-> How soon can we get this into Fedora.=A0 I really do not want to have to
-> deal with special packages, that users can not easily get a hold of.=A0 I
-> am real apprehensive on giving the go-ahead on a project as being
-> Enterprise ready until it gets some soak time in Fedora.=A0 I would love
-> to see this available in Fedora 32, so people can start experimenting
-> with it.
+On Fri, Jan 31, 2020 at 02:06:51AM +0000, misono.tomohiro@fujitsu.com wrote:
+> > On Tue, Jan 28, 2020 at 07:18:17PM +0900, Misono Tomohiro wrote:
+> > > Hi,
+> > >
+> > > This is a second version of xattr fix for virtiofsd.
+> > > I included ACL fix (which introduces new option posix_acl) in this
+> > > version too as ACL mostly depends on xattr.
+> > >
+> > > I run xfstests with XFS backend using "-o xattr -o posix_acl" option
+> > > and only new failure is generic/375 which checks if sgid bit is
+> > > cleared after setfacl. I'll try to investigate it.
+> > >
+> > > change in v1 -> v2
+> > >  - rebased to current dev branch
+> > >
+> > >  - Always chdir for xattr (1st patch)
+> > >    In v1, I keep current implementation for regular file/dir since it
+> > >    show better performance in my environment. But I notice opening file
+> > >    for xattr causes seek sanity test fails (xfstest generic/285, 436).
+> > >
+> > >    I'm not sure what is the fundamental problem here but I believe
+> > >    performance can be improved by introducing some caching mechanism
+> > >    in general.
+> > 
+> > Hi Misono,
+> > 
+> > How much is performance degradation due to fchdir(). If it is significant, then I will be inclined to keep original code for dir/file
+> > till some other mechanism is introduced to offset the perofrmance loss.
+> 
+> Please refer this replay: https://www.redhat.com/archives/virtio-fs/2020-January/msg00063.html
 
-Understood.
-It's upstream in the current QEMU tree, but it's due for release end of
-April which is I assume too late for F32.
- (libvirt is still a work in progress).
+As per your email, regression due to fchdir() seems to be in the range of
+5% to 10%. It is not trivial, IMO. May be its a good idea to keep original
+logic and use fchdir() only when need be.
 
-I'll leave Cole to comment on Fedora backporting.
-
-Dave
-
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+Thanks
+Vivek
 

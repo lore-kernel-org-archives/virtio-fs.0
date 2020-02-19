@@ -1,19 +1,13 @@
-Date: Wed, 19 Feb 2020 09:06:28 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200219140628.GA19402@redhat.com>
-References: <20200214192705.GE18654@redhat.com> <20200214194130.GP3283@work-vm>
-	<20200218133821.GE786556@stefanha-x1.localdomain>
-	<a3880c0b-32b2-0197-822c-d78fcbfe177c@redhat.com>
-	<47f62cf4-5b44-b2f0-52f3-5b889d1c3ac8@redhat.com>
-	<20200218185831.GV3080@work-vm>
-	<cfab5633-baa7-8dec-e5d3-3d660a8f8694@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <cfab5633-baa7-8dec-e5d3-3d660a8f8694@redhat.com>
-Subject: [Virtio-fs] Effect of nodev, noexec,
- nosuid mount options (Was: Re: One virtiofs daemon per exported dir
- requirement)
+References: <20200210160639.GA411895@stefanha-x1.localdomain>
+	<bbcbd9a0-a036-1c1e-ed66-ac2aaca454a5@redhat.com>
+In-Reply-To: <bbcbd9a0-a036-1c1e-ed66-ac2aaca454a5@redhat.com>
+From: Ondrej Mosnacek <omosnace@redhat.com>
+Date: Wed, 19 Feb 2020 17:11:21 +0100
+Message-ID: <CAFqZXNsL4nC4N2XKgMmTNJGCayJ1E=ppiKCBhv2yFCt39dLWqg@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [selinux-internal] SELinux support in virtio-fs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,34 +17,49 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Daniel Walsh <dwalsh@redhat.com>
-Cc: virtio-fs@redhat.com
+Cc: virtio-fs@redhat.com, SElinux list <selinux@vger.kernel.org>
 
-On Tue, Feb 18, 2020 at 04:39:07PM -0500, Daniel Walsh wrote:
-
-[..]
+On Wed, Feb 12, 2020 at 4:29 PM Daniel Walsh <dwalsh@redhat.com> wrote:
+> On 2/10/20 11:06 AM, Stefan Hajnoczi wrote:
+> > Hi Dan,
+> > I've CCed the public virtio-fs mailing list because SELinux support in
+> > virtio-fs has been asked about recently.
 > >
-> What about noexec? nodev? nosuid?
+> > It's time to figure out what level of SELinux support will be available
+> > in virtio-fs.  The file system client shares most of its code with FUSE
+> > and SELinux labels on files are currently not supported in FUSE.
+> >
+> > It would be possible to pass through extended attributes to the
+> > virtiofsd daemon running on the host.  However, passing through xattrs
+> > allows the client to relabel files on the host file system and this
+> > could pose a security problem.  virtiofsd already allows the client to
+> > set the uid/gid and permissions, but is passing through SELinux xattrs a
+> > bad idea?
+> >
+> > virtiofsd is in a position to mangle extended attribute names
+> > ("security.selinux" -> "virtiofs.security.selinux") in order to separate
+> > guest SELinux labels from host SELinux labels.
+> >
+> > As someone who knows very little about SELinux I'm eager to hear what
+> > you think would be a good approach.  Secure containers (e.g. Kata
+> > Containers) are an important use case but virtio-fs can also be used as
+> > the root file system for a guest (a scenario where full SELinux support
+> > is needed).
+> >
+> > Thanks,
+> > Stefan
+>
+> I am traveling right now.  We should add in the SELinux team, and I will
+> be able to look at this on Friday.
 
-These flags will take affect on host (but not inside guest). These will
-protect host from guest (in case guest process drops some file in shared dir,
-escapes from guest somehow and take over host system).
+Cc'ing the upstream SELinux mailing list for more insight. Here is a
+public archive of the full thread:
 
-nodev will make sure even if guest drops a device file in shared dir,
-it can't open it (if running on host directly). If running inside guest,
-it will fail as device will not be in guest to begin with. If matching
-device in guest is available, guest process should be able to open it.
+https://www.redhat.com/archives/virtio-fs/2020-February/msg00005.html
 
-nosuid, also will take affect on host. So if guest process drops a setuid
-root bindary and tries to execute it on host, setuid will not take affect.
-But running same setuid binary inside guest will continue to work.
+-- 
+Ondrej Mosnacek <omosnace at redhat dot com>
+Software Engineer, Security Technologies
+Red Hat, Inc.
 
-noexec also takes affect on host. If guest drops an executable in shared
-directory and some process on host tries to execute it, it will fail. But
-if guest tries to execute that file inside guest, it works.
-
-IOW, all these flags work on host but have no affect inside guest, as of
-now.
-
-Thanks
-Vivek
 

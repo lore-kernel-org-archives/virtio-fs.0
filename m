@@ -1,22 +1,14 @@
-References: <20200214192705.GE18654@redhat.com> <20200214194130.GP3283@work-vm>
-	<20200218133821.GE786556@stefanha-x1.localdomain>
-	<a3880c0b-32b2-0197-822c-d78fcbfe177c@redhat.com>
-	<47f62cf4-5b44-b2f0-52f3-5b889d1c3ac8@redhat.com>
-	<20200218185831.GV3080@work-vm>
-	<cfab5633-baa7-8dec-e5d3-3d660a8f8694@redhat.com>
-	<20200219140628.GA19402@redhat.com>
-From: Daniel Walsh <dwalsh@redhat.com>
-Message-ID: <05c71006-38e9-f0b7-6bc5-dd4c79871510@redhat.com>
-Date: Fri, 21 Feb 2020 10:38:02 -0500
+Date: Fri, 21 Feb 2020 10:49:23 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200221154923.GC25974@redhat.com>
+References: <20200220114704.11592-1-misono.tomohiro@jp.fujitsu.com>
+	<20200220114704.11592-2-misono.tomohiro@jp.fujitsu.com>
 MIME-Version: 1.0
-In-Reply-To: <20200219140628.GA19402@redhat.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Content-Language: en-US
-Subject: Re: [Virtio-fs] Effect of nodev, noexec,
- nosuid mount options (Was: Re: One virtiofs daemon per exported dir
- requirement)
-Reply-To: dwalsh@redhat.com
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20200220114704.11592-2-misono.tomohiro@jp.fujitsu.com>
+Subject: Re: [Virtio-fs] [PATCH v3 1/2] virtiofs: passthrough_ll: cleanup
+ getxattr/listxattr
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,51 +17,171 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
+To: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
 Cc: virtio-fs@redhat.com
 
-On 2/19/20 9:06 AM, Vivek Goyal wrote:
-> On Tue, Feb 18, 2020 at 04:39:07PM -0500, Daniel Walsh wrote:
->
-> [..]
->> What about noexec? nodev? nosuid?
-> These flags will take affect on host (but not inside guest). These will
-> protect host from guest (in case guest process drops some file in shared dir,
-> escapes from guest somehow and take over host system).
->
-> nodev will make sure even if guest drops a device file in shared dir,
-> it can't open it (if running on host directly). If running inside guest,
-> it will fail as device will not be in guest to begin with. If matching
-> device in guest is available, guest process should be able to open it.
+On Thu, Feb 20, 2020 at 08:47:03PM +0900, Misono Tomohiro wrote:
+> This is a cleanup patch to simplify the following xattr fix and
+> there is no functional changes.
+> 
+> - Move memory allocation to head of the function
+> - Unify fgetxattr/flistxattr call for both size == 0 and
+>   size != 0 case
+> - Remove redundant lo_inode_put call in error path
+>   (Note: second call is ignored now since @inode is already NULL)
+> 
+> Signed-off-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 62 ++++++++++++++------------------
+>  1 file changed, 26 insertions(+), 36 deletions(-)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 9772823066..33cff8c2c8 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -2370,8 +2370,8 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
+>          return;
+>      }
+>  
+> -    saverr = ENOSYS;
+>      if (!lo_data(req)->xattr) {
+> +        saverr = ENOSYS;
 
-As we discussed in my office, this is unexpected behavior by the user.
+What's the advange of moving saverr inside bracket. I thougt this is
+not needed.
 
-I actually believe Kata inside of the container might be able to take
-care of
+>          goto out;
+>      }
+>  
+> @@ -2384,34 +2384,30 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
+>          goto out;
+>      }
+>  
+> +    if (size) {
+> +        value = malloc(size);
+> +        if (!value) {
+> +            goto out_err;
+> +        }
+> +    }
+> +
+>      sprintf(procname, "%i", inode->fd);
+>      fd = openat(lo->proc_self_fd, procname, O_RDONLY);
+>      if (fd < 0) {
+>          goto out_err;
+>      }
+>  
+> +    ret = fgetxattr(fd, name, value, size);
+> +    if (ret == -1) {
+> +        goto out_err;
+> +    }
+>      if (size) {
+> -        value = malloc(size);
+> -        if (!value) {
+> -            goto out_err;
+> -        }
+> -
+> -        ret = fgetxattr(fd, name, value, size);
+> -        if (ret == -1) {
+> -            goto out_err;
+> -        }
+> -        saverr = 0;
+>          if (ret == 0) {
+> +            saverr = 0;
 
-some of these inside of the VM, but we really need to think in the long
-run of
+Same here. Why to move saverr inside the brackets.
 
-propagating this information to the kernel inside of the VM, so it will
-act properly.
+Have same question for lo_listxattr() modifications.
 
-> nosuid, also will take affect on host. So if guest process drops a setuid
-> root bindary and tries to execute it on host, setuid will not take affect.
-> But running same setuid binary inside guest will continue to work.
-Which as I pointed out above is a problem.
-> noexec also takes affect on host. If guest drops an executable in shared
-> directory and some process on host tries to execute it, it will fail. But
-> if guest tries to execute that file inside guest, it works.
-Same issue.
-> IOW, all these flags work on host but have no affect inside guest, as of
-> now.
+Thanks
+Vivek
 
-Users will not view a virtiofs as a networked protocol.  So at least we
-need to document these in
-
-Kata as shortcomings when using virtiofs.
-
-> Thanks
-> Vivek
-
+>              goto out;
+>          }
+> -
+>          fuse_reply_buf(req, value, ret);
+>      } else {
+> -        ret = fgetxattr(fd, name, NULL, 0);
+> -        if (ret == -1) {
+> -            goto out_err;
+> -        }
+> -
+>          fuse_reply_xattr(req, ret);
+>      }
+>  out_free:
+> @@ -2427,7 +2423,6 @@ out_free:
+>  out_err:
+>      saverr = errno;
+>  out:
+> -    lo_inode_put(lo, &inode);
+>      fuse_reply_err(req, saverr);
+>      goto out_free;
+>  }
+> @@ -2448,8 +2443,8 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
+>          return;
+>      }
+>  
+> -    saverr = ENOSYS;
+>      if (!lo_data(req)->xattr) {
+> +        saverr = ENOSYS;
+>          goto out;
+>      }
+>  
+> @@ -2462,34 +2457,30 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
+>          goto out;
+>      }
+>  
+> +    if (size) {
+> +        value = malloc(size);
+> +        if (!value) {
+> +            goto out_err;
+> +        }
+> +    }
+> +
+>      sprintf(procname, "%i", inode->fd);
+>      fd = openat(lo->proc_self_fd, procname, O_RDONLY);
+>      if (fd < 0) {
+>          goto out_err;
+>      }
+>  
+> +    ret = flistxattr(fd, value, size);
+> +    if (ret == -1) {
+> +        goto out_err;
+> +    }
+>      if (size) {
+> -        value = malloc(size);
+> -        if (!value) {
+> -            goto out_err;
+> -        }
+> -
+> -        ret = flistxattr(fd, value, size);
+> -        if (ret == -1) {
+> -            goto out_err;
+> -        }
+> -        saverr = 0;
+>          if (ret == 0) {
+> +            saverr = 0;
+>              goto out;
+>          }
+> -
+>          fuse_reply_buf(req, value, ret);
+>      } else {
+> -        ret = flistxattr(fd, NULL, 0);
+> -        if (ret == -1) {
+> -            goto out_err;
+> -        }
+> -
+>          fuse_reply_xattr(req, ret);
+>      }
+>  out_free:
+> @@ -2505,7 +2496,6 @@ out_free:
+>  out_err:
+>      saverr = errno;
+>  out:
+> -    lo_inode_put(lo, &inode);
+>      fuse_reply_err(req, saverr);
+>      goto out_free;
+>  }
+> -- 
+> 2.21.1
+> 
 

@@ -1,12 +1,13 @@
-Date: Fri, 21 Feb 2020 13:50:47 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200221185047.GE25974@redhat.com>
-References: <20200220114704.11592-1-misono.tomohiro@jp.fujitsu.com>
+Message-ID: <5E53380A.5050403@cn.fujitsu.com>
+Date: Mon, 24 Feb 2020 10:42:18 +0800
+From: Xiao Yang <yangx.jy@cn.fujitsu.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200220114704.11592-1-misono.tomohiro@jp.fujitsu.com>
-Subject: Re: [Virtio-fs] [PATCH v3 0/2] Fix xattr operation
+References: <20200210104451.20036-1-ice_yangxiao@163.com>
+In-Reply-To: <20200210104451.20036-1-ice_yangxiao@163.com>
+Content-Type: text/plain; charset=GBK
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd/helper: Add shared/no_shared
+ options to help message
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,64 +16,43 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
-Cc: virtio-fs@redhat.com
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Thu, Feb 20, 2020 at 08:47:02PM +0900, Misono Tomohiro wrote:
-> This fixes the xattr operation for directory and special files
-> (which can be tested by xfstests generic/062 with -o xattr option).
-> 
-> The overall logic is switched back to the same as v1 in favor of performance
-> (i.e. keep original implementation for regular files/directories)
-> but I add a cleanup patch to improve readability as requested by Vivek.
-> 
-> Known issue is that if xattr enabled, seek sanity tests (generic/285,
-> 436) will fail. However, I understand this is not a very serious bug
-> like data corruption so leave it for now.
-> 
-> One question; I remove error handling of fchdir() in v3 since
-> I believe fchdir to proc_self_fd/root.fd cannot fail in the situation
-> but should I add error handling?
-> 
-> change v2 -> v3:
->  - rebased to current dev branch
->  - add cleanup path (first one) to simplify main patch (second patch)
->  - restore the logic of v1 in favor of performance
->    (as a result seek sanity test failure is not fixed by this series) 
->  - remove error handling of fchdir
->  - drop ACL fix included in v2 for now to focus xattr
+Hi David,
+
+Do you have any comment on this patch? :-)
+Cc qemu-devel@nongnu.org
+
+Best Regards,
+Xiao Yang
+
+On 2020/2/10 18:44, Xiao Yang wrote:
+> From: Xiao Yang <yangx.jy@cn.fujitsu.com>
+>
+> Also add a hint that user should start 'ireg' daemon before using shared cache.
+>
+> Signed-off-by: Xiao Yang <yangx.jy@cn.fujitsu.com>
+> ---
+>  tools/virtiofsd/helper.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
+> index 819c2bc13c..0aa02b99b0 100644
+> --- a/tools/virtiofsd/helper.c
+> +++ b/tools/virtiofsd/helper.c
+> @@ -171,6 +171,10 @@ void fuse_cmdline_help(void)
+>             "                               default: no_writeback\n"
+>             "    -o xattr|no_xattr          enable/disable xattr\n"
+>             "                               default: no_xattr\n"
+> +           "    -o shared|no_shared        enable/disable shared cache\n"
+> +           "                               default: no_shared\n"
+> +           "                               please start 'ireg' daemon before "
+> +           "using shared cache\n"
+>             );
+>  }
 >  
-> v2 patch: https://www.redhat.com/archives/virtio-fs/2020-January/msg00131.html
 
-Hi Misono,
 
-This patchset passes my basic test. I have not run xfstests. I am relying
-on your testing.
 
-Can you please take care of minor nits I had and repost patces. I will
-ack it.
-
-Thanks
-Vivek
-
-> 
-> Thanks!
-> 
-> Misono Tomohiro (2):
->   virtiofs: passthrough_ll: cleanup getxattr/listxattr
->   virtiofs: Fix xattr operations
-> 
->  tools/virtiofsd/fuse_virtio.c    |  13 +++
->  tools/virtiofsd/passthrough_ll.c | 141 +++++++++++++++----------------
->  tools/virtiofsd/seccomp.c        |   6 ++
->  3 files changed, 87 insertions(+), 73 deletions(-)
-> 
-> -- 
-> 2.21.1
-> 
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
 

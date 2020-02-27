@@ -1,13 +1,19 @@
-Date: Fri, 24 Jan 2020 14:57:03 +0000
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20200124145703.GA741815@stefanha-x1.localdomain>
-References: <20200124112950.GA2969@work-vm>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+	d=fujitsu.onmicrosoft.com; s=selector2-fujitsu-onmicrosoft-com;
+	h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+	bh=Xjv4zXdAY9jn9uIxUYsqbC+VpGkusRQsrmDMoonPCMI=;
+	b=KmWZKZZ8eeOMu9E8hRybeMsGfBH+EVqNjTS/W+Wlj7DiR7f8VMzP86IptbVTItOgLFGkKsRpDeD9ooZqUYhS+PROzU/Q2I+flgJSO+5h/vcpsyhMVLQumDgpWxb01RET6Kin8s8CPCe8KLiqEI9zEVzfepIOcQck/0PQoW+iL8Y=
+From: "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>
+Date: Thu, 27 Feb 2020 05:16:21 +0000
+Message-ID: <OSBPR01MB45820867DC2EBE6B20CFDDCAE5EB0@OSBPR01MB4582.jpnprd01.prod.outlook.com>
+References: <20200220114704.11592-1-misono.tomohiro@jp.fujitsu.com>
+	<20200221151835.GB25974@redhat.com>
+In-Reply-To: <20200221151835.GB25974@redhat.com>
+Content-Language: ja-JP
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="FL5UXtIhxfXey3p5"
-Content-Disposition: inline
-In-Reply-To: <20200124112950.GA2969@work-vm>
-Subject: Re: [Virtio-fs] virtiofsd merged in qemu
+Content-Type: text/plain; charset=ISO-2022-JP
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH v3 0/2] Fix xattr operation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,48 +22,90 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com
+To: 'Vivek Goyal' <vgoyal@redhat.com>
+Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
+> On Thu, Feb 20, 2020 at 08:47:02PM +0900, Misono Tomohiro wrote:
+> > This fixes the xattr operation for directory and special files (which
+> > can be tested by xfstests generic/062 with -o xattr option).
+> >
+> > The overall logic is switched back to the same as v1 in favor of
+> > performance (i.e. keep original implementation for regular
+> > files/directories) but I add a cleanup patch to improve readability as requested by Vivek.
+> >
+> > Known issue is that if xattr enabled, seek sanity tests (generic/285,
+> > 436) will fail. However, I understand this is not a very serious bug
+> > like data corruption so leave it for now.
+> 
+> Hi Misono,
+> 
+> Do you know why generic/285 and generic/436 fail with xattr enabled.  Is it something easily fixable later.
 
---FL5UXtIhxfXey3p5
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Not sure if it can be fixed easily, but here is what I figured out:
 
-On Fri, Jan 24, 2020 at 11:29:50AM +0000, Dr. David Alan Gilbert wrote:
-> Hi,
->   virtiofsd just got merged upstream in qemu's git.
-> Thank you to all those who have contributed code, reviewed
-> and tested it!
->=20
-> I've updated the virtio-fs-dev tree with a tree based on latest
-> qemu; it's still got the experimental DAX code in and it's got
-> a few other patches that haven't gone upstream to qemu yet.
-> (In particular the man page and docs need reworking a bit).
->=20
-> Thanks again everyone!
+The failure case checks lseek SEEK_DATA/SEEK_HOLE with some unwritten extent (by fallocate).
+I notice that open/close affects lseek behavior in that case on xfs: 
 
-Thank you for this monumental effort!
+# on xfs
+ xfs_io> open -ft temp
+ xfs_io> falloc 0 40k
+ xfs_io> seek -a 0 # show both SEEK_HOLE/SEEK_DATA with offset 0
+ Whence  Result
+ HOLE    0      # hole only (fallocated block is treated as hole at this time)
 
-Please let me know if there are pieces that I should pick up.
+# close and open again
+ xfs_io> close
+ xfs_io> open temp
+ xfs_io> seek -a 0
+ Whence  Result
+ DATA    0       # fallocated block is treated as data now
+ HOLE    40960  # hole position is now EOF
 
-Stefan
+I have not yet understand what really causes this in detail (didn't check other fs neither).
 
---FL5UXtIhxfXey3p5
-Content-Type: application/pgp-signature; name="signature.asc"
+Since getxattr operation happens during the test to check "security.capability"
+file attribute when writing some data, it seems this behavior affects the test on virtiofs with xfs.
 
------BEGIN PGP SIGNATURE-----
+Thanks.
+Misono
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl4rBb8ACgkQnKSrs4Gr
-c8isuAgAouVgtjreP2/Rmcn+f5hE5uB5bhIO+yWz1D6iFn+Z77iGvBcAp8bEHAkM
-nR1DPzxoV4QvVYOzkJUwV9DDAS2S3d7Ps2M0ZOqc6yafuhOIlh/akaYDw7h7QXI9
-h5I0O6F0j/eExxUQ6frMNX9/KRkjy9pkqX1sBfiwabJc+RTuXwDyG8pHh7f9w6qE
-F6yng1Pi59KLRXmsyi2A5Yb+i0tmRpQaM+UXnleZ7MOHSeden8NRpiDtpuqY4sm4
-ELBqjlkUJDQlfYMcnhgPg89QPKYR6HZy6tufAMCoPjk/SjQOtvzZSIBBz+KdLh+t
-Qsl1GRK0x/evBJPCT627l1UOtSkclA==
-=rY9k
------END PGP SIGNATURE-----
+> 
+> >
+> > One question; I remove error handling of fchdir() in v3 since I
+> > believe fchdir to proc_self_fd/root.fd cannot fail in the situation
+> > but should I add error handling?
+> 
+> I would think its good to have error handling for fchdir() case. We don't expect it, but if something goes wrong, we will like
+> to catch it.
+> 
+> Thanks
+> Vivek
+> 
+> >
+> > change v2 -> v3:
+> >  - rebased to current dev branch
+> >  - add cleanup path (first one) to simplify main patch (second patch)
+> >  - restore the logic of v1 in favor of performance
+> >    (as a result seek sanity test failure is not fixed by this series)
+> >  - remove error handling of fchdir
+> >  - drop ACL fix included in v2 for now to focus xattr
+> >
+> > v2 patch:
+> > https://www.redhat.com/archives/virtio-fs/2020-January/msg00131.html
+> >
+> > Thanks!
+> >
+> > Misono Tomohiro (2):
+> >   virtiofs: passthrough_ll: cleanup getxattr/listxattr
+> >   virtiofs: Fix xattr operations
+> >
+> >  tools/virtiofsd/fuse_virtio.c    |  13 +++
+> >  tools/virtiofsd/passthrough_ll.c | 141 +++++++++++++++----------------
+> >  tools/virtiofsd/seccomp.c        |   6 ++
+> >  3 files changed, 87 insertions(+), 73 deletions(-)
+> >
+> > --
+> > 2.21.1
+> >
 
---FL5UXtIhxfXey3p5--
 

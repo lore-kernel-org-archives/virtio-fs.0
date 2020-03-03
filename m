@@ -1,12 +1,9 @@
-Date: Tue, 3 Mar 2020 11:37:17 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200303113717.GD3170@work-vm>
-References: <20200227055927.24566-1-misono.tomohiro@jp.fujitsu.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200227055927.24566-1-misono.tomohiro@jp.fujitsu.com>
-Subject: Re: [Virtio-fs] [PATCH v4 0/2] virtiofsd: Fix xattr operations
+From: Liu Bo <bo.liu@linux.alibaba.com>
+Date: Wed,  4 Mar 2020 05:15:11 +0800
+Message-Id: <1583270111-76859-1-git-send-email-bo.liu@linux.alibaba.com>
+Content-Type: text/plain; charset=WINDOWS-1252
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH] fuse: make written data persistent after writing
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,55 +12,33 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
+To: linux-fsdevel@vger.kernel.org
+Cc: virtio-fs@redhat.com
 
-* Misono Tomohiro (misono.tomohiro@jp.fujitsu.com) wrote:
-> Currently xattr operations on virtiofs does not work properly in some case:
->  - directory ... cannot set
->  - special files (pipe) ... cause hang
-> 
-> This fixes these problems and now xfstests generic/062 passes on virtiofs
-> with -o xattr option (I tested with xfs).
-> 
-> v3 -> v4:
->  - No logic change
->  - Some code style fix/update comments and commit log as suggested by Vivek
->  - CC qemu-devel ML too
-> 
-> Previous versions can be found in virtiofs ML:
->  v3: https://www.redhat.com/archives/virtio-fs/2020-February/msg00032.html
-> 
-> Thanks,
+If this is a DSYNC write, make sure we push it to stable storage now
+that we've written data.
 
-Thanks,
+Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+---
+This patch is based on 5.5-rc5.
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+ fs/fuse/file.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-and queued.
+diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+index a63d779eac10..08e3df618d7f 100644
+--- a/fs/fuse/file.c
++++ b/fs/fuse/file.c
+@@ -1541,6 +1541,8 @@ static ssize_t fuse_direct_write_iter(struct kiocb *iocb, struct iov_iter *from)
+ 	if (res > 0)
+ 		fuse_write_update_size(inode, iocb->ki_pos);
+ 	inode_unlock(inode);
++	if (res > 0)
++		res = generic_write_sync(iocb, res);
+ 
+ 	return res;
+ }
+-- 
+1.8.3.1
 
-(I suspect there's some more cleanup involved in the error paths in
-those functions; I'll have a look another time).
-
-Dave
-
-> Misono Tomohiro (2):
->   virtiofsd: passthrough_ll: cleanup getxattr/listxattr
->   virtiofsd: Fix xattr operations
-> 
->  tools/virtiofsd/fuse_virtio.c    |  13 +++
->  tools/virtiofsd/passthrough_ll.c | 139 ++++++++++++++++---------------
->  tools/virtiofsd/seccomp.c        |   6 ++
->  3 files changed, 89 insertions(+), 69 deletions(-)
-> 
-> -- 
-> 2.21.1
-> 
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

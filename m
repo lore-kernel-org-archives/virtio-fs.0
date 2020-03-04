@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed,  4 Mar 2020 11:58:42 -0500
-Message-Id: <20200304165845.3081-18-vgoyal@redhat.com>
+Date: Wed,  4 Mar 2020 11:58:44 -0500
+Message-Id: <20200304165845.3081-20-vgoyal@redhat.com>
 In-Reply-To: <20200304165845.3081-1-vgoyal@redhat.com>
 References: <20200304165845.3081-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 17/20] fuse,
-	virtiofs: Maintain a list of busy elements
+Subject: [Virtio-fs] [PATCH 19/20] fuse: Take inode lock for dax inode
+	truncation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,118 +18,38 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com, miklos@szeredi.hu
 Cc: mst@redhat.com, vgoyal@redhat.com
 
-This list will be used selecting fuse_dax_mapping to free when number of
-free mappings drops below a threshold.
+When a file is opened with O_TRUNC, we need to make sure that any other
+DAX operation is not in progress. DAX expects i_size to be stable.
+
+In fuse_iomap_begin() we check for i_size at multiple places and we expect
+i_size to not change.
+
+Another problem is, if we setup a mapping in fuse_iomap_begin(), and
+file gets truncated and dax read/write happens, KVM currently hangs.
+It tries to fault in a page which does not exist on host (file got
+truncated). It probably requries fixing in KVM.
+
+So for now, take inode lock. Once KVM is fixed, we might have to
+have a look at it again.
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- fs/fuse/file.c   | 22 ++++++++++++++++++++++
- fs/fuse/fuse_i.h |  8 ++++++++
- fs/fuse/inode.c  |  4 ++++
- 3 files changed, 34 insertions(+)
+ fs/fuse/file.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index 619aff6b5f44..afabeb1acd50 100644
+index 561428b66101..8b264fcb9b3c 100644
 --- a/fs/fuse/file.c
 +++ b/fs/fuse/file.c
-@@ -215,6 +215,23 @@ static struct fuse_dax_mapping *alloc_dax_mapping(struct fuse_conn *fc)
- 	return dmap;
- }
+@@ -483,7 +483,7 @@ int fuse_open_common(struct inode *inode, struct file *file, bool isdir)
+ 	int err;
+ 	bool is_wb_truncate = (file->f_flags & O_TRUNC) &&
+ 			  fc->atomic_o_trunc &&
+-			  fc->writeback_cache;
++			  (fc->writeback_cache || IS_DAX(inode));
  
-+/* This assumes fc->lock is held */
-+static void __dmap_remove_busy_list(struct fuse_conn *fc,
-+				    struct fuse_dax_mapping *dmap)
-+{
-+	list_del_init(&dmap->busy_list);
-+	WARN_ON(fc->nr_busy_ranges == 0);
-+	fc->nr_busy_ranges--;
-+}
-+
-+static void dmap_remove_busy_list(struct fuse_conn *fc,
-+				  struct fuse_dax_mapping *dmap)
-+{
-+	spin_lock(&fc->lock);
-+	__dmap_remove_busy_list(fc, dmap);
-+	spin_unlock(&fc->lock);
-+}
-+
- /* This assumes fc->lock is held */
- static void __dmap_add_to_free_pool(struct fuse_conn *fc,
- 				struct fuse_dax_mapping *dmap)
-@@ -277,6 +294,10 @@ static int fuse_setup_one_mapping(struct inode *inode, loff_t offset,
- 		/* Protected by fi->i_dmap_sem */
- 		fuse_dax_interval_tree_insert(dmap, &fi->dmap_tree);
- 		fi->nr_dmaps++;
-+		spin_lock(&fc->lock);
-+		list_add_tail(&dmap->busy_list, &fc->busy_ranges);
-+		fc->nr_busy_ranges++;
-+		spin_unlock(&fc->lock);
- 	}
- 	return 0;
- }
-@@ -346,6 +367,7 @@ static void dmap_reinit_add_to_free_pool(struct fuse_conn *fc,
- 	pr_debug("fuse: freeing memory range start=0x%llx end=0x%llx "
- 		 "window_offset=0x%llx length=0x%llx\n", dmap->start,
- 		 dmap->end, dmap->window_offset, dmap->length);
-+	__dmap_remove_busy_list(fc, dmap);
- 	dmap->start = dmap->end = 0;
- 	__dmap_add_to_free_pool(fc, dmap);
- }
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 3fea84411401..de213a7e1b0e 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -85,6 +85,10 @@ struct fuse_dax_mapping {
- 	/** End Position in file */
- 	__u64 end;
- 	__u64 __subtree_last;
-+
-+	/* Will connect in fc->busy_ranges to keep track busy memory */
-+	struct list_head busy_list;
-+
- 	/** Position in DAX window */
- 	u64 window_offset;
- 
-@@ -814,6 +818,10 @@ struct fuse_conn {
- 	/** DAX device, non-NULL if DAX is supported */
- 	struct dax_device *dax_dev;
- 
-+	/* List of memory ranges which are busy */
-+	unsigned long nr_busy_ranges;
-+	struct list_head busy_ranges;
-+
- 	/*
- 	 * DAX Window Free Ranges
- 	 */
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index abc881e6acb0..d4770e7fb7eb 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -616,6 +616,8 @@ static void fuse_free_dax_mem_ranges(struct list_head *mem_list)
- 	/* Free All allocated elements */
- 	list_for_each_entry_safe(range, temp, mem_list, list) {
- 		list_del(&range->list);
-+		if (!list_empty(&range->busy_list))
-+			list_del(&range->busy_list);
- 		kfree(range);
- 	}
- }
-@@ -660,6 +662,7 @@ static int fuse_dax_mem_range_init(struct fuse_conn *fc,
- 		 */
- 		range->window_offset = i * FUSE_DAX_MEM_RANGE_SZ;
- 		range->length = FUSE_DAX_MEM_RANGE_SZ;
-+		INIT_LIST_HEAD(&range->busy_list);
- 		list_add_tail(&range->list, &mem_ranges);
- 	}
- 
-@@ -707,6 +710,7 @@ void fuse_conn_init(struct fuse_conn *fc, struct user_namespace *user_ns,
- 	fc->user_ns = get_user_ns(user_ns);
- 	fc->max_pages = FUSE_DEFAULT_MAX_PAGES_PER_REQ;
- 	INIT_LIST_HEAD(&fc->free_ranges);
-+	INIT_LIST_HEAD(&fc->busy_ranges);
- }
- EXPORT_SYMBOL_GPL(fuse_conn_init);
- 
+ 	err = generic_file_open(inode, file);
+ 	if (err)
 -- 
 2.20.1
 

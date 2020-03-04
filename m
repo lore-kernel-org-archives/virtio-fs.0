@@ -1,12 +1,11 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed,  4 Mar 2020 11:58:31 -0500
-Message-Id: <20200304165845.3081-7-vgoyal@redhat.com>
+Date: Wed,  4 Mar 2020 11:58:43 -0500
+Message-Id: <20200304165845.3081-19-vgoyal@redhat.com>
 In-Reply-To: <20200304165845.3081-1-vgoyal@redhat.com>
 References: <20200304165845.3081-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 06/20] virtiofs: Provide a helper function for
-	virtqueue initialization
+Subject: [Virtio-fs] [PATCH 18/20] fuse: Release file in process context
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,107 +17,61 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com, miklos@szeredi.hu
 Cc: mst@redhat.com, vgoyal@redhat.com
 
-This reduces code duplication and make it little easier to read code.
+fuse_file_put(sync) can be called with sync=true/false. If sync=true,
+it waits for release request response and then calls iput() in the
+caller's context. If sync=false, it does not wait for release request
+response, frees the fuse_file struct immediately and req->end function
+does the iput().
+
+iput() can be a problem with DAX if called in req->end context. If this
+is last reference to inode (VFS has let go its reference already), then
+iput() will clean DAX mappings as well and send REMOVEMAPPING requests
+and wait for completion. (All the the worker thread context which is
+processing fuse replies from daemon on the host).
+
+That means it blocks worker thread and it stops processing further
+replies and system deadlocks.
+
+So for now, force sync release of file in case of DAX inodes.
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- fs/fuse/virtio_fs.c | 50 +++++++++++++++++++++++++++------------------
- 1 file changed, 30 insertions(+), 20 deletions(-)
+ fs/fuse/file.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index bade74768903..a16cc9195087 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -24,6 +24,8 @@ enum {
- 	VQ_REQUEST
- };
+diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+index afabeb1acd50..561428b66101 100644
+--- a/fs/fuse/file.c
++++ b/fs/fuse/file.c
+@@ -543,6 +543,7 @@ void fuse_release_common(struct file *file, bool isdir)
+ 	struct fuse_file *ff = file->private_data;
+ 	struct fuse_release_args *ra = ff->release_args;
+ 	int opcode = isdir ? FUSE_RELEASEDIR : FUSE_RELEASE;
++	bool sync = false;
  
-+#define VQ_NAME_LEN	24
-+
- /* Per-virtqueue state */
- struct virtio_fs_vq {
- 	spinlock_t lock;
-@@ -36,7 +38,7 @@ struct virtio_fs_vq {
- 	bool connected;
- 	long in_flight;
- 	struct completion in_flight_zero; /* No inflight requests */
--	char name[24];
-+	char name[VQ_NAME_LEN];
- } ____cacheline_aligned_in_smp;
+ 	fuse_prepare_release(fi, ff, file->f_flags, opcode);
  
- /* A virtio-fs device instance */
-@@ -560,6 +562,26 @@ static void virtio_fs_vq_done(struct virtqueue *vq)
- 	schedule_work(&fsvq->done_work);
+@@ -562,8 +563,19 @@ void fuse_release_common(struct file *file, bool isdir)
+ 	 * Make the release synchronous if this is a fuseblk mount,
+ 	 * synchronous RELEASE is allowed (and desirable) in this case
+ 	 * because the server can be trusted not to screw up.
++	 *
++	 * For DAX, fuse server is trusted. So it should be fine to
++	 * do a sync file put. Doing async file put is creating
++	 * problems right now because when request finish, iput()
++	 * can lead to freeing of inode. That means it tears down
++	 * mappings backing DAX memory and sends REMOVEMAPPING message
++	 * to server and blocks for completion. Currently, waiting
++	 * in req->end context deadlocks the system as same worker thread
++	 * can't process REMOVEMAPPING reply it is waiting for.
+ 	 */
+-	fuse_file_put(ff, ff->fc->destroy, isdir);
++	if (IS_DAX(file_inode(file)) || ff->fc->destroy)
++		sync = true;
++	fuse_file_put(ff, sync, isdir);
  }
  
-+static void virtio_fs_init_vq(struct virtio_fs_vq *fsvq, char *name,
-+			      int vq_type)
-+{
-+	strncpy(fsvq->name, name, VQ_NAME_LEN);
-+	spin_lock_init(&fsvq->lock);
-+	INIT_LIST_HEAD(&fsvq->queued_reqs);
-+	INIT_LIST_HEAD(&fsvq->end_reqs);
-+	init_completion(&fsvq->in_flight_zero);
-+
-+	if (vq_type == VQ_REQUEST) {
-+		INIT_WORK(&fsvq->done_work, virtio_fs_requests_done_work);
-+		INIT_DELAYED_WORK(&fsvq->dispatch_work,
-+				  virtio_fs_request_dispatch_work);
-+	} else {
-+		INIT_WORK(&fsvq->done_work, virtio_fs_hiprio_done_work);
-+		INIT_DELAYED_WORK(&fsvq->dispatch_work,
-+				  virtio_fs_hiprio_dispatch_work);
-+	}
-+}
-+
- /* Initialize virtqueues */
- static int virtio_fs_setup_vqs(struct virtio_device *vdev,
- 			       struct virtio_fs *fs)
-@@ -575,7 +597,7 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
- 	if (fs->num_request_queues == 0)
- 		return -EINVAL;
- 
--	fs->nvqs = 1 + fs->num_request_queues;
-+	fs->nvqs = VQ_REQUEST + fs->num_request_queues;
- 	fs->vqs = kcalloc(fs->nvqs, sizeof(fs->vqs[VQ_HIPRIO]), GFP_KERNEL);
- 	if (!fs->vqs)
- 		return -ENOMEM;
-@@ -589,29 +611,17 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
- 		goto out;
- 	}
- 
-+	/* Initialize the hiprio/forget request virtqueue */
- 	callbacks[VQ_HIPRIO] = virtio_fs_vq_done;
--	snprintf(fs->vqs[VQ_HIPRIO].name, sizeof(fs->vqs[VQ_HIPRIO].name),
--			"hiprio");
-+	virtio_fs_init_vq(&fs->vqs[VQ_HIPRIO], "hiprio", VQ_HIPRIO);
- 	names[VQ_HIPRIO] = fs->vqs[VQ_HIPRIO].name;
--	INIT_WORK(&fs->vqs[VQ_HIPRIO].done_work, virtio_fs_hiprio_done_work);
--	INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].queued_reqs);
--	INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].end_reqs);
--	INIT_DELAYED_WORK(&fs->vqs[VQ_HIPRIO].dispatch_work,
--			virtio_fs_hiprio_dispatch_work);
--	init_completion(&fs->vqs[VQ_HIPRIO].in_flight_zero);
--	spin_lock_init(&fs->vqs[VQ_HIPRIO].lock);
- 
- 	/* Initialize the requests virtqueues */
- 	for (i = VQ_REQUEST; i < fs->nvqs; i++) {
--		spin_lock_init(&fs->vqs[i].lock);
--		INIT_WORK(&fs->vqs[i].done_work, virtio_fs_requests_done_work);
--		INIT_DELAYED_WORK(&fs->vqs[i].dispatch_work,
--				  virtio_fs_request_dispatch_work);
--		INIT_LIST_HEAD(&fs->vqs[i].queued_reqs);
--		INIT_LIST_HEAD(&fs->vqs[i].end_reqs);
--		init_completion(&fs->vqs[i].in_flight_zero);
--		snprintf(fs->vqs[i].name, sizeof(fs->vqs[i].name),
--			 "requests.%u", i - VQ_REQUEST);
-+		char vq_name[VQ_NAME_LEN];
-+
-+		snprintf(vq_name, VQ_NAME_LEN, "requests.%u", i - VQ_REQUEST);
-+		virtio_fs_init_vq(&fs->vqs[i], vq_name, VQ_REQUEST);
- 		callbacks[i] = virtio_fs_vq_done;
- 		names[i] = fs->vqs[i].name;
- 	}
+ static int fuse_open(struct inode *inode, struct file *file)
 -- 
 2.20.1
 

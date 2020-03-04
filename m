@@ -1,9 +1,9 @@
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Date: Wed,  4 Mar 2020 05:15:11 +0800
-Message-Id: <1583270111-76859-1-git-send-email-bo.liu@linux.alibaba.com>
-Content-Type: text/plain; charset=WINDOWS-1252
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Wed,  4 Mar 2020 11:58:25 -0500
+Message-Id: <20200304165845.3081-1-vgoyal@redhat.com>
+MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH] fuse: make written data persistent after writing
+Subject: [Virtio-fs] [PATCH 00/20] virtiofs: Add DAX support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -12,33 +12,212 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org
-Cc: virtio-fs@redhat.com
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com, miklos@szeredi.hu
+Cc: mst@redhat.com, vgoyal@redhat.com
 
-If this is a DSYNC write, make sure we push it to stable storage now
-that we've written data.
+Hi,
 
-Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
----
-This patch is based on 5.5-rc5.
+This patch series adds DAX support to virtiofs filesystem. This allows
+bypassing guest page cache and allows mapping host page cache directly
+in guest address space.
 
- fs/fuse/file.c | 2 ++
- 1 file changed, 2 insertions(+)
+When a page of file is needed, guest sends a request to map that page
+(in host page cache) in qemu address space. Inside guest this is
+a physical memory range controlled by virtiofs device. And guest
+directly maps this physical address range using DAX and hence gets
+access to file data on host.
 
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index a63d779eac10..08e3df618d7f 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -1541,6 +1541,8 @@ static ssize_t fuse_direct_write_iter(struct kiocb *iocb, struct iov_iter *from)
- 	if (res > 0)
- 		fuse_write_update_size(inode, iocb->ki_pos);
- 	inode_unlock(inode);
-+	if (res > 0)
-+		res = generic_write_sync(iocb, res);
- 
- 	return res;
- }
+This can speed up things considerably in many situations. Also this
+can result in substantial memory savings as file data does not have
+to be copied in guest and it is directly accessed from host page
+cache.
+
+Most of the changes are limited to fuse/virtiofs. There are couple
+of changes needed in generic dax infrastructure and couple of changes
+in virtio to be able to access shared memory region.
+
+These patches apply on top of 5.6-rc4 and are also available here.
+
+https://github.com/rhvgoyal/linux/commits/vivek-04-march-2020
+
+Any review or feedback is welcome.
+
+Performance
+===========
+I have basically run bunch of fio jobs to get a sense of speed of
+various operations. I wrote a simple wrapper script to run fio jobs
+3 times and take their average and report it. These scripts and fio
+jobs are available here.
+
+https://github.com/rhvgoyal/virtiofs-tests
+
+I set up a directory on ramfs on host and exported that directory inside
+guest using virtio-fs and ran tests inside guests. Ran tests with
+cache=none both with dax enabled and disabled. cache=none option
+enforces no caching happens in guest both for data and metadata.
+
+Test Setup
+-----------
+- A fedora 29 host with 376Gi RAM, 2 sockets (20 cores per socket, 2
+  threads per core)
+
+- Using ramfs on host as backing store. 4 fio files of 8G each.
+
+- Created a VM with 64 VCPUS and 64GB memory. An 64GB cache window (for dax
+  mmap).
+
+Test Results
+------------
+- Results in two configurations have been reported. 
+  virtio-fs (cache=none) and virtio-fs (cache=none + dax).
+
+  There are other caching modes as well but to me cache=none seemed most
+  interesting for now because it does not cache anything in guest
+  and provides strong coherence. Other modes which provide less strong
+  coherence and hence are faster are yet to be benchmarked.
+
+- Three fio ioengines psync, libaio and mmap have been used.
+
+- I/O Workload of randread, radwrite, seqread and seqwrite have been run.
+
+- Each file size is 8G. Block size 4K. iodepth=16 
+
+- "multi" means same operation was done with 4 jobs and each job is
+  operating on a file of size 8G. 
+
+- Some results are "0 (KiB/s)". That means that particular operation is
+  not supported in that configuration.
+
+NAME                    I/O Operation           BW(Read/Write)
+virtiofs-cache-none     seqread-psync           35(MiB/s)
+virtiofs-cache-none-dax seqread-psync           643(MiB/s)
+
+virtiofs-cache-none     seqread-psync-multi     219(MiB/s)
+virtiofs-cache-none-dax seqread-psync-multi     2132(MiB/s)
+
+virtiofs-cache-none     seqread-mmap            0(KiB/s)
+virtiofs-cache-none-dax seqread-mmap            741(MiB/s)
+
+virtiofs-cache-none     seqread-mmap-multi      0(KiB/s)
+virtiofs-cache-none-dax seqread-mmap-multi      2530(MiB/s)
+
+virtiofs-cache-none     seqread-libaio          293(MiB/s)
+virtiofs-cache-none-dax seqread-libaio          425(MiB/s)
+
+virtiofs-cache-none     seqread-libaio-multi    207(MiB/s)
+virtiofs-cache-none-dax seqread-libaio-multi    1543(MiB/s)
+
+virtiofs-cache-none     randread-psync          36(MiB/s)
+virtiofs-cache-none-dax randread-psync          572(MiB/s)
+
+virtiofs-cache-none     randread-psync-multi    211(MiB/s)
+virtiofs-cache-none-dax randread-psync-multi    1764(MiB/s)
+
+virtiofs-cache-none     randread-mmap           0(KiB/s)
+virtiofs-cache-none-dax randread-mmap           719(MiB/s)
+
+virtiofs-cache-none     randread-mmap-multi     0(KiB/s)
+virtiofs-cache-none-dax randread-mmap-multi     2005(MiB/s)
+
+virtiofs-cache-none     randread-libaio         300(MiB/s)
+virtiofs-cache-none-dax randread-libaio         413(MiB/s)
+
+virtiofs-cache-none     randread-libaio-multi   327(MiB/s)
+virtiofs-cache-none-dax randread-libaio-multi   1326(MiB/s)
+
+virtiofs-cache-none     seqwrite-psync          34(MiB/s)
+virtiofs-cache-none-dax seqwrite-psync          494(MiB/s)
+
+virtiofs-cache-none     seqwrite-psync-multi    223(MiB/s)
+virtiofs-cache-none-dax seqwrite-psync-multi    1680(MiB/s)
+
+virtiofs-cache-none     seqwrite-mmap           0(KiB/s)
+virtiofs-cache-none-dax seqwrite-mmap           1217(MiB/s)
+
+virtiofs-cache-none     seqwrite-mmap-multi     0(KiB/s)
+virtiofs-cache-none-dax seqwrite-mmap-multi     2359(MiB/s)
+
+virtiofs-cache-none     seqwrite-libaio         282(MiB/s)
+virtiofs-cache-none-dax seqwrite-libaio         348(MiB/s)
+
+virtiofs-cache-none     seqwrite-libaio-multi   320(MiB/s)
+virtiofs-cache-none-dax seqwrite-libaio-multi   1255(MiB/s)
+
+virtiofs-cache-none     randwrite-psync         32(MiB/s)
+virtiofs-cache-none-dax randwrite-psync         458(MiB/s)
+
+virtiofs-cache-none     randwrite-psync-multi   213(MiB/s)
+virtiofs-cache-none-dax randwrite-psync-multi   1343(MiB/s)
+
+virtiofs-cache-none     randwrite-mmap          0(KiB/s)
+virtiofs-cache-none-dax randwrite-mmap          663(MiB/s)
+
+virtiofs-cache-none     randwrite-mmap-multi    0(KiB/s)
+virtiofs-cache-none-dax randwrite-mmap-multi    1820(MiB/s)
+
+virtiofs-cache-none     randwrite-libaio        292(MiB/s)
+virtiofs-cache-none-dax randwrite-libaio        341(MiB/s)
+
+virtiofs-cache-none     randwrite-libaio-multi  322(MiB/s)
+virtiofs-cache-none-dax randwrite-libaio-multi  1094(MiB/s)
+
+Conclusion
+===========
+- virtio-fs with dax enabled is significantly faster and memory
+  effiecient as comapred to non-dax operation.
+
+Note:
+  Right now dax window is 64G and max fio file size is 32G as well (4
+  files of 8G each). That means everything fits into dax window and no
+  reclaim is needed. Dax window reclaim logic is slower and if file
+  size is bigger than dax window size, performance slows down.
+
+Thanks
+Vivek
+
+Sebastien Boeuf (3):
+  virtio: Add get_shm_region method
+  virtio: Implement get_shm_region for PCI transport
+  virtio: Implement get_shm_region for MMIO transport
+
+Stefan Hajnoczi (2):
+  virtio_fs, dax: Set up virtio_fs dax_device
+  fuse,dax: add DAX mmap support
+
+Vivek Goyal (15):
+  dax: Modify bdev_dax_pgoff() to handle NULL bdev
+  dax: Create a range version of dax_layout_busy_page()
+  virtiofs: Provide a helper function for virtqueue initialization
+  fuse: Get rid of no_mount_options
+  fuse,virtiofs: Add a mount option to enable dax
+  fuse,virtiofs: Keep a list of free dax memory ranges
+  fuse: implement FUSE_INIT map_alignment field
+  fuse: Introduce setupmapping/removemapping commands
+  fuse, dax: Implement dax read/write operations
+  fuse, dax: Take ->i_mmap_sem lock during dax page fault
+  fuse,virtiofs: Define dax address space operations
+  fuse,virtiofs: Maintain a list of busy elements
+  fuse: Release file in process context
+  fuse: Take inode lock for dax inode truncation
+  fuse,virtiofs: Add logic to free up a memory range
+
+ drivers/dax/super.c                |    3 +-
+ drivers/virtio/virtio_mmio.c       |   32 +
+ drivers/virtio/virtio_pci_modern.c |  107 +++
+ fs/dax.c                           |   66 +-
+ fs/fuse/dir.c                      |    2 +
+ fs/fuse/file.c                     | 1162 +++++++++++++++++++++++++++-
+ fs/fuse/fuse_i.h                   |  109 ++-
+ fs/fuse/inode.c                    |  148 +++-
+ fs/fuse/virtio_fs.c                |  250 +++++-
+ include/linux/dax.h                |    6 +
+ include/linux/virtio_config.h      |   17 +
+ include/uapi/linux/fuse.h          |   42 +-
+ include/uapi/linux/virtio_fs.h     |    3 +
+ include/uapi/linux/virtio_mmio.h   |   11 +
+ include/uapi/linux/virtio_pci.h    |   11 +-
+ 15 files changed, 1888 insertions(+), 81 deletions(-)
+
 -- 
-1.8.3.1
-
+2.20.1
 

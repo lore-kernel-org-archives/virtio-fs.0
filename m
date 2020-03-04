@@ -1,11 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed,  4 Mar 2020 11:58:32 -0500
-Message-Id: <20200304165845.3081-8-vgoyal@redhat.com>
+Date: Wed,  4 Mar 2020 11:58:35 -0500
+Message-Id: <20200304165845.3081-11-vgoyal@redhat.com>
 In-Reply-To: <20200304165845.3081-1-vgoyal@redhat.com>
 References: <20200304165845.3081-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 07/20] fuse: Get rid of no_mount_options
+Subject: [Virtio-fs] [PATCH 10/20] fuse,
+	virtiofs: Keep a list of free dax memory ranges
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,160 +18,215 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com, miklos@szeredi.hu
 Cc: mst@redhat.com, vgoyal@redhat.com
 
-This option was introduced so that for virtio_fs we don't show any mounts
-options fuse_show_options(). Because we don't offer any of these options
-to be controlled by mounter.
-
-Very soon we are planning to introduce option "dax" which mounter should
-be able to specify. And no_mount_options does not work anymore. What
-we need is a per mount option specific flag so that fileystem can
-specify which options to show.
-
-Add few such flags to control the behavior in more fine grained manner
-and get rid of no_mount_options.
+Divide the dax memory range into fixed size ranges (2MB for now) and put
+them in a list. This will track free ranges. Once an inode requires a
+free range, we will take one from here and put it in interval-tree
+of ranges assigned to inode.
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
 ---
- fs/fuse/fuse_i.h    | 14 ++++++++++----
- fs/fuse/inode.c     | 22 ++++++++++++++--------
- fs/fuse/virtio_fs.c |  1 -
- 3 files changed, 24 insertions(+), 13 deletions(-)
+ fs/fuse/fuse_i.h    | 22 ++++++++++++
+ fs/fuse/inode.c     | 88 ++++++++++++++++++++++++++++++++++++++++++++-
+ fs/fuse/virtio_fs.c |  2 ++
+ 3 files changed, 111 insertions(+), 1 deletion(-)
 
 diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index aa75e2305b75..2cebdf6dcfd8 100644
+index 1fe5065a2902..edd3136c11f7 100644
 --- a/fs/fuse/fuse_i.h
 +++ b/fs/fuse/fuse_i.h
-@@ -468,18 +468,21 @@ struct fuse_fs_context {
- 	int fd;
- 	unsigned int rootmode;
- 	kuid_t user_id;
-+	bool user_id_show;
- 	kgid_t group_id;
-+	bool group_id_show;
- 	bool is_bdev:1;
- 	bool fd_present:1;
- 	bool rootmode_present:1;
- 	bool user_id_present:1;
- 	bool group_id_present:1;
- 	bool default_permissions:1;
-+	bool default_permissions_show:1;
- 	bool allow_other:1;
-+	bool allow_other_show:1;
- 	bool destroy:1;
- 	bool no_control:1;
- 	bool no_force_umount:1;
--	bool no_mount_options:1;
- 	unsigned int max_read;
- 	unsigned int blksize;
- 	const char *subtype;
-@@ -509,9 +512,11 @@ struct fuse_conn {
+@@ -47,6 +47,10 @@
+ /** Number of dentries for each connection in the control filesystem */
+ #define FUSE_CTL_NUM_DENTRIES 5
  
- 	/** The user id for this mount */
- 	kuid_t user_id;
-+	bool user_id_show:1;
- 
- 	/** The group id for this mount */
- 	kgid_t group_id;
-+	bool group_id_show:1;
- 
- 	/** The pid namespace for this mount */
- 	struct pid_namespace *pid_ns;
-@@ -695,10 +700,14 @@ struct fuse_conn {
- 
- 	/** Check permissions based on the file mode or not? */
- 	unsigned default_permissions:1;
-+	bool default_permissions_show:1;
- 
- 	/** Allow other than the mounter user to access the filesystem ? */
- 	unsigned allow_other:1;
- 
-+	/** Show allow_other in mount options */
-+	bool allow_other_show:1;
++/* Default memory range size, 2MB */
++#define FUSE_DAX_MEM_RANGE_SZ	(2*1024*1024)
++#define FUSE_DAX_MEM_RANGE_PAGES	(FUSE_DAX_MEM_RANGE_SZ/PAGE_SIZE)
 +
- 	/** Does the filesystem support copy_file_range? */
- 	unsigned no_copy_file_range:1;
+ /** List of active connections */
+ extern struct list_head fuse_conn_list;
  
-@@ -714,9 +723,6 @@ struct fuse_conn {
- 	/** Do not allow MNT_FORCE umount */
- 	unsigned int no_force_umount:1;
+@@ -63,6 +67,18 @@ struct fuse_forget_link {
+ 	struct fuse_forget_link *next;
+ };
  
--	/* Do not show mount options */
--	unsigned int no_mount_options:1;
--
- 	/** The number of requests waiting for completion */
- 	atomic_t num_waiting;
++/** Translation information for file offsets to DAX window offsets */
++struct fuse_dax_mapping {
++	/* Will connect in fc->free_ranges to keep track of free memory */
++	struct list_head list;
++
++	/** Position in DAX window */
++	u64 window_offset;
++
++	/** Length of mapping, in bytes */
++	loff_t length;
++};
++
+ /** FUSE inode */
+ struct fuse_inode {
+ 	/** Inode data */
+@@ -765,6 +781,12 @@ struct fuse_conn {
  
+ 	/** DAX device, non-NULL if DAX is supported */
+ 	struct dax_device *dax_dev;
++
++	/*
++	 * DAX Window Free Ranges
++	 */
++	long nr_free_ranges;
++	struct list_head free_ranges;
+ };
+ 
+ static inline struct fuse_conn *get_fuse_conn_super(struct super_block *sb)
 diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index 95d712d44ca1..f160a3d47b63 100644
+index 84295fac4ff3..0ba092bf0b6d 100644
 --- a/fs/fuse/inode.c
 +++ b/fs/fuse/inode.c
-@@ -515,10 +515,12 @@ static int fuse_parse_param(struct fs_context *fc, struct fs_parameter *param)
+@@ -23,6 +23,8 @@
+ #include <linux/exportfs.h>
+ #include <linux/posix_acl.h>
+ #include <linux/pid_namespace.h>
++#include <linux/dax.h>
++#include <linux/pfn_t.h>
  
- 	case OPT_DEFAULT_PERMISSIONS:
- 		ctx->default_permissions = true;
-+		ctx->default_permissions_show = true;
- 		break;
+ MODULE_AUTHOR("Miklos Szeredi <miklos@szeredi.hu>");
+ MODULE_DESCRIPTION("Filesystem in Userspace");
+@@ -600,6 +602,76 @@ static void fuse_pqueue_init(struct fuse_pqueue *fpq)
+ 	fpq->connected = 1;
+ }
  
- 	case OPT_ALLOW_OTHER:
- 		ctx->allow_other = true;
-+		ctx->allow_other_show = true;
- 		break;
++static void fuse_free_dax_mem_ranges(struct list_head *mem_list)
++{
++	struct fuse_dax_mapping *range, *temp;
++
++	/* Free All allocated elements */
++	list_for_each_entry_safe(range, temp, mem_list, list) {
++		list_del(&range->list);
++		kfree(range);
++	}
++}
++
++#ifdef CONFIG_FS_DAX
++static int fuse_dax_mem_range_init(struct fuse_conn *fc,
++				   struct dax_device *dax_dev)
++{
++	long nr_pages, nr_ranges;
++	void *kaddr;
++	pfn_t pfn;
++	struct fuse_dax_mapping *range;
++	LIST_HEAD(mem_ranges);
++	phys_addr_t phys_addr;
++	int ret = 0, id;
++	size_t dax_size = -1;
++	unsigned long i;
++
++	id = dax_read_lock();
++	nr_pages = dax_direct_access(dax_dev, 0, PHYS_PFN(dax_size), &kaddr,
++					&pfn);
++	dax_read_unlock(id);
++	if (nr_pages < 0) {
++		pr_debug("dax_direct_access() returned %ld\n", nr_pages);
++		return nr_pages;
++	}
++
++	phys_addr = pfn_t_to_phys(pfn);
++	nr_ranges = nr_pages/FUSE_DAX_MEM_RANGE_PAGES;
++	printk("fuse_dax_mem_range_init(): dax mapped %ld pages. nr_ranges=%ld\n", nr_pages, nr_ranges);
++
++	for (i = 0; i < nr_ranges; i++) {
++		range = kzalloc(sizeof(struct fuse_dax_mapping), GFP_KERNEL);
++		if (!range) {
++			pr_debug("memory allocation for mem_range failed.\n");
++			ret = -ENOMEM;
++			goto out_err;
++		}
++		/* TODO: This offset only works if virtio-fs driver is not
++		 * having some memory hidden at the beginning. This needs
++		 * better handling
++		 */
++		range->window_offset = i * FUSE_DAX_MEM_RANGE_SZ;
++		range->length = FUSE_DAX_MEM_RANGE_SZ;
++		list_add_tail(&range->list, &mem_ranges);
++	}
++
++	list_replace_init(&mem_ranges, &fc->free_ranges);
++	fc->nr_free_ranges = nr_ranges;
++	return 0;
++out_err:
++	/* Free All allocated elements */
++	fuse_free_dax_mem_ranges(&mem_ranges);
++	return ret;
++}
++#else /* !CONFIG_FS_DAX */
++static inline int fuse_dax_mem_range_init(struct fuse_conn *fc,
++					  struct dax_device *dax_dev)
++{
++	return 0;
++}
++#endif /* CONFIG_FS_DAX */
++
+ void fuse_conn_init(struct fuse_conn *fc, struct user_namespace *user_ns,
+ 		    const struct fuse_iqueue_ops *fiq_ops, void *fiq_priv)
+ {
+@@ -627,6 +699,7 @@ void fuse_conn_init(struct fuse_conn *fc, struct user_namespace *user_ns,
+ 	fc->pid_ns = get_pid_ns(task_active_pid_ns(current));
+ 	fc->user_ns = get_user_ns(user_ns);
+ 	fc->max_pages = FUSE_DEFAULT_MAX_PAGES_PER_REQ;
++	INIT_LIST_HEAD(&fc->free_ranges);
+ }
+ EXPORT_SYMBOL_GPL(fuse_conn_init);
  
- 	case OPT_MAX_READ:
-@@ -553,14 +555,15 @@ static int fuse_show_options(struct seq_file *m, struct dentry *root)
- 	struct super_block *sb = root->d_sb;
- 	struct fuse_conn *fc = get_fuse_conn_super(sb);
+@@ -635,6 +708,8 @@ void fuse_conn_put(struct fuse_conn *fc)
+ 	if (refcount_dec_and_test(&fc->count)) {
+ 		struct fuse_iqueue *fiq = &fc->iq;
  
--	if (fc->no_mount_options)
--		return 0;
--
--	seq_printf(m, ",user_id=%u", from_kuid_munged(fc->user_ns, fc->user_id));
--	seq_printf(m, ",group_id=%u", from_kgid_munged(fc->user_ns, fc->group_id));
--	if (fc->default_permissions)
-+	if (fc->user_id_show)
-+		seq_printf(m, ",user_id=%u",
-+			   from_kuid_munged(fc->user_ns, fc->user_id));
-+	if (fc->group_id_show)
-+		seq_printf(m, ",group_id=%u",
-+			   from_kgid_munged(fc->user_ns, fc->group_id));
-+	if (fc->default_permissions && fc->default_permissions_show)
- 		seq_puts(m, ",default_permissions");
--	if (fc->allow_other)
-+	if (fc->allow_other && fc->allow_other_show)
- 		seq_puts(m, ",allow_other");
- 	if (fc->max_read != ~0)
- 		seq_printf(m, ",max_read=%u", fc->max_read);
-@@ -1171,14 +1174,17 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
- 	sb->s_flags |= SB_POSIXACL;
++		if (fc->dax_dev)
++			fuse_free_dax_mem_ranges(&fc->free_ranges);
+ 		if (fiq->ops->release)
+ 			fiq->ops->release(fiq);
+ 		put_pid_ns(fc->pid_ns);
+@@ -1160,9 +1235,17 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
+ 	if (sb->s_user_ns != &init_user_ns)
+ 		sb->s_xattr = fuse_no_acl_xattr_handlers;
  
- 	fc->default_permissions = ctx->default_permissions;
-+	fc->default_permissions_show = ctx->default_permissions_show;
- 	fc->allow_other = ctx->allow_other;
-+	fc->allow_other_show = ctx->allow_other_show;
- 	fc->user_id = ctx->user_id;
-+	fc->user_id_show = ctx->user_id_show;
- 	fc->group_id = ctx->group_id;
-+	fc->group_id_show = ctx->group_id_show;
- 	fc->max_read = max_t(unsigned, 4096, ctx->max_read);
- 	fc->destroy = ctx->destroy;
- 	fc->no_control = ctx->no_control;
- 	fc->no_force_umount = ctx->no_force_umount;
--	fc->no_mount_options = ctx->no_mount_options;
++	if (ctx->dax_dev) {
++		err = fuse_dax_mem_range_init(fc, ctx->dax_dev);
++		if (err) {
++			pr_debug("fuse_dax_mem_range_init() returned %d\n", err);
++			goto err_free_ranges;
++		}
++	}
++
+ 	fud = fuse_dev_alloc_install(fc);
+ 	if (!fud)
+-		goto err;
++		goto err_free_ranges;
  
- 	err = -ENOMEM;
- 	root = fuse_get_root_inode(sb, ctx->rootmode);
+ 	fc->dev = sb->s_dev;
+ 	fc->sb = sb;
+@@ -1218,6 +1301,9 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
+ 	dput(root_dentry);
+  err_dev_free:
+ 	fuse_dev_free(fud);
++ err_free_ranges:
++	if (ctx->dax_dev)
++		fuse_free_dax_mem_ranges(&fc->free_ranges);
+  err:
+ 	return err;
+ }
 diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index a16cc9195087..3f786a15b0d9 100644
+index b0574b208cd5..8423b674c81e 100644
 --- a/fs/fuse/virtio_fs.c
 +++ b/fs/fuse/virtio_fs.c
-@@ -1060,7 +1060,6 @@ static int virtio_fs_fill_super(struct super_block *sb)
- 		.destroy = true,
- 		.no_control = true,
- 		.no_force_umount = true,
--		.no_mount_options = true,
- 	};
+@@ -710,6 +710,8 @@ static long virtio_fs_direct_access(struct dax_device *dax_dev, pgoff_t pgoff,
+ 	phys_addr_t offset = PFN_PHYS(pgoff);
+ 	size_t max_nr_pages = fs->window_len/PAGE_SIZE - pgoff;
  
- 	mutex_lock(&virtio_fs_mutex);
++	pr_debug("virtio_fs_direct_access(): called. nr_pages=%ld max_nr_pages=%zu\n", nr_pages, max_nr_pages);
++
+ 	if (kaddr)
+ 		*kaddr = fs->window_kaddr + offset;
+ 	if (pfn)
 -- 
 2.20.1
 

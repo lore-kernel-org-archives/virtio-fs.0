@@ -1,9 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed,  4 Mar 2020 11:58:25 -0500
-Message-Id: <20200304165845.3081-1-vgoyal@redhat.com>
+Date: Wed,  4 Mar 2020 11:58:27 -0500
+Message-Id: <20200304165845.3081-3-vgoyal@redhat.com>
+In-Reply-To: <20200304165845.3081-1-vgoyal@redhat.com>
+References: <20200304165845.3081-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 00/20] virtiofs: Add DAX support
+Subject: [Virtio-fs] [PATCH 02/20] dax: Create a range version of
+	dax_layout_busy_page()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,209 +18,162 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com, miklos@szeredi.hu
 Cc: mst@redhat.com, vgoyal@redhat.com
 
-Hi,
+virtiofs device has a range of memory which is mapped into file inodes
+using dax. This memory is mapped in qemu on host and maps different
+sections of real file on host. Size of this memory is limited
+(determined by administrator) and depending on filesystem size, we will
+soon reach a situation where all the memory is in use and we need to
+reclaim some.
 
-This patch series adds DAX support to virtiofs filesystem. This allows
-bypassing guest page cache and allows mapping host page cache directly
-in guest address space.
+As part of reclaim process, we will need to make sure that there are
+no active references to pages (taken by get_user_pages()) on the memory
+range we are trying to reclaim. I am planning to use
+dax_layout_busy_page() for this. But in current form this is per inode
+and scans through all the pages of the inode.
 
-When a page of file is needed, guest sends a request to map that page
-(in host page cache) in qemu address space. Inside guest this is
-a physical memory range controlled by virtiofs device. And guest
-directly maps this physical address range using DAX and hence gets
-access to file data on host.
+We want to reclaim only a portion of memory (say 2MB page). So we want
+to make sure that only that 2MB range of pages do not have any
+references  (and don't want to unmap all the pages of inode).
 
-This can speed up things considerably in many situations. Also this
-can result in substantial memory savings as file data does not have
-to be copied in guest and it is directly accessed from host page
-cache.
+Hence, create a range version of this function named
+dax_layout_busy_page_range() which can be used to pass a range which
+needs to be unmapped.
 
-Most of the changes are limited to fuse/virtiofs. There are couple
-of changes needed in generic dax infrastructure and couple of changes
-in virtio to be able to access shared memory region.
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/dax.c            | 66 ++++++++++++++++++++++++++++++++-------------
+ include/linux/dax.h |  6 +++++
+ 2 files changed, 54 insertions(+), 18 deletions(-)
 
-These patches apply on top of 5.6-rc4 and are also available here.
-
-https://github.com/rhvgoyal/linux/commits/vivek-04-march-2020
-
-Any review or feedback is welcome.
-
-Performance
-===========
-I have basically run bunch of fio jobs to get a sense of speed of
-various operations. I wrote a simple wrapper script to run fio jobs
-3 times and take their average and report it. These scripts and fio
-jobs are available here.
-
-https://github.com/rhvgoyal/virtiofs-tests
-
-I set up a directory on ramfs on host and exported that directory inside
-guest using virtio-fs and ran tests inside guests. Ran tests with
-cache=none both with dax enabled and disabled. cache=none option
-enforces no caching happens in guest both for data and metadata.
-
-Test Setup
------------
-- A fedora 29 host with 376Gi RAM, 2 sockets (20 cores per socket, 2
-  threads per core)
-
-- Using ramfs on host as backing store. 4 fio files of 8G each.
-
-- Created a VM with 64 VCPUS and 64GB memory. An 64GB cache window (for dax
-  mmap).
-
-Test Results
-------------
-- Results in two configurations have been reported. 
-  virtio-fs (cache=none) and virtio-fs (cache=none + dax).
-
-  There are other caching modes as well but to me cache=none seemed most
-  interesting for now because it does not cache anything in guest
-  and provides strong coherence. Other modes which provide less strong
-  coherence and hence are faster are yet to be benchmarked.
-
-- Three fio ioengines psync, libaio and mmap have been used.
-
-- I/O Workload of randread, radwrite, seqread and seqwrite have been run.
-
-- Each file size is 8G. Block size 4K. iodepth=16 
-
-- "multi" means same operation was done with 4 jobs and each job is
-  operating on a file of size 8G. 
-
-- Some results are "0 (KiB/s)". That means that particular operation is
-  not supported in that configuration.
-
-NAME                    I/O Operation           BW(Read/Write)
-virtiofs-cache-none     seqread-psync           35(MiB/s)
-virtiofs-cache-none-dax seqread-psync           643(MiB/s)
-
-virtiofs-cache-none     seqread-psync-multi     219(MiB/s)
-virtiofs-cache-none-dax seqread-psync-multi     2132(MiB/s)
-
-virtiofs-cache-none     seqread-mmap            0(KiB/s)
-virtiofs-cache-none-dax seqread-mmap            741(MiB/s)
-
-virtiofs-cache-none     seqread-mmap-multi      0(KiB/s)
-virtiofs-cache-none-dax seqread-mmap-multi      2530(MiB/s)
-
-virtiofs-cache-none     seqread-libaio          293(MiB/s)
-virtiofs-cache-none-dax seqread-libaio          425(MiB/s)
-
-virtiofs-cache-none     seqread-libaio-multi    207(MiB/s)
-virtiofs-cache-none-dax seqread-libaio-multi    1543(MiB/s)
-
-virtiofs-cache-none     randread-psync          36(MiB/s)
-virtiofs-cache-none-dax randread-psync          572(MiB/s)
-
-virtiofs-cache-none     randread-psync-multi    211(MiB/s)
-virtiofs-cache-none-dax randread-psync-multi    1764(MiB/s)
-
-virtiofs-cache-none     randread-mmap           0(KiB/s)
-virtiofs-cache-none-dax randread-mmap           719(MiB/s)
-
-virtiofs-cache-none     randread-mmap-multi     0(KiB/s)
-virtiofs-cache-none-dax randread-mmap-multi     2005(MiB/s)
-
-virtiofs-cache-none     randread-libaio         300(MiB/s)
-virtiofs-cache-none-dax randread-libaio         413(MiB/s)
-
-virtiofs-cache-none     randread-libaio-multi   327(MiB/s)
-virtiofs-cache-none-dax randread-libaio-multi   1326(MiB/s)
-
-virtiofs-cache-none     seqwrite-psync          34(MiB/s)
-virtiofs-cache-none-dax seqwrite-psync          494(MiB/s)
-
-virtiofs-cache-none     seqwrite-psync-multi    223(MiB/s)
-virtiofs-cache-none-dax seqwrite-psync-multi    1680(MiB/s)
-
-virtiofs-cache-none     seqwrite-mmap           0(KiB/s)
-virtiofs-cache-none-dax seqwrite-mmap           1217(MiB/s)
-
-virtiofs-cache-none     seqwrite-mmap-multi     0(KiB/s)
-virtiofs-cache-none-dax seqwrite-mmap-multi     2359(MiB/s)
-
-virtiofs-cache-none     seqwrite-libaio         282(MiB/s)
-virtiofs-cache-none-dax seqwrite-libaio         348(MiB/s)
-
-virtiofs-cache-none     seqwrite-libaio-multi   320(MiB/s)
-virtiofs-cache-none-dax seqwrite-libaio-multi   1255(MiB/s)
-
-virtiofs-cache-none     randwrite-psync         32(MiB/s)
-virtiofs-cache-none-dax randwrite-psync         458(MiB/s)
-
-virtiofs-cache-none     randwrite-psync-multi   213(MiB/s)
-virtiofs-cache-none-dax randwrite-psync-multi   1343(MiB/s)
-
-virtiofs-cache-none     randwrite-mmap          0(KiB/s)
-virtiofs-cache-none-dax randwrite-mmap          663(MiB/s)
-
-virtiofs-cache-none     randwrite-mmap-multi    0(KiB/s)
-virtiofs-cache-none-dax randwrite-mmap-multi    1820(MiB/s)
-
-virtiofs-cache-none     randwrite-libaio        292(MiB/s)
-virtiofs-cache-none-dax randwrite-libaio        341(MiB/s)
-
-virtiofs-cache-none     randwrite-libaio-multi  322(MiB/s)
-virtiofs-cache-none-dax randwrite-libaio-multi  1094(MiB/s)
-
-Conclusion
-===========
-- virtio-fs with dax enabled is significantly faster and memory
-  effiecient as comapred to non-dax operation.
-
-Note:
-  Right now dax window is 64G and max fio file size is 32G as well (4
-  files of 8G each). That means everything fits into dax window and no
-  reclaim is needed. Dax window reclaim logic is slower and if file
-  size is bigger than dax window size, performance slows down.
-
-Thanks
-Vivek
-
-Sebastien Boeuf (3):
-  virtio: Add get_shm_region method
-  virtio: Implement get_shm_region for PCI transport
-  virtio: Implement get_shm_region for MMIO transport
-
-Stefan Hajnoczi (2):
-  virtio_fs, dax: Set up virtio_fs dax_device
-  fuse,dax: add DAX mmap support
-
-Vivek Goyal (15):
-  dax: Modify bdev_dax_pgoff() to handle NULL bdev
-  dax: Create a range version of dax_layout_busy_page()
-  virtiofs: Provide a helper function for virtqueue initialization
-  fuse: Get rid of no_mount_options
-  fuse,virtiofs: Add a mount option to enable dax
-  fuse,virtiofs: Keep a list of free dax memory ranges
-  fuse: implement FUSE_INIT map_alignment field
-  fuse: Introduce setupmapping/removemapping commands
-  fuse, dax: Implement dax read/write operations
-  fuse, dax: Take ->i_mmap_sem lock during dax page fault
-  fuse,virtiofs: Define dax address space operations
-  fuse,virtiofs: Maintain a list of busy elements
-  fuse: Release file in process context
-  fuse: Take inode lock for dax inode truncation
-  fuse,virtiofs: Add logic to free up a memory range
-
- drivers/dax/super.c                |    3 +-
- drivers/virtio/virtio_mmio.c       |   32 +
- drivers/virtio/virtio_pci_modern.c |  107 +++
- fs/dax.c                           |   66 +-
- fs/fuse/dir.c                      |    2 +
- fs/fuse/file.c                     | 1162 +++++++++++++++++++++++++++-
- fs/fuse/fuse_i.h                   |  109 ++-
- fs/fuse/inode.c                    |  148 +++-
- fs/fuse/virtio_fs.c                |  250 +++++-
- include/linux/dax.h                |    6 +
- include/linux/virtio_config.h      |   17 +
- include/uapi/linux/fuse.h          |   42 +-
- include/uapi/linux/virtio_fs.h     |    3 +
- include/uapi/linux/virtio_mmio.h   |   11 +
- include/uapi/linux/virtio_pci.h    |   11 +-
- 15 files changed, 1888 insertions(+), 81 deletions(-)
-
+diff --git a/fs/dax.c b/fs/dax.c
+index 35da144375a0..fde92bb5da69 100644
+--- a/fs/dax.c
++++ b/fs/dax.c
+@@ -558,27 +558,20 @@ static void *grab_mapping_entry(struct xa_state *xas,
+ 	return xa_mk_internal(VM_FAULT_FALLBACK);
+ }
+ 
+-/**
+- * dax_layout_busy_page - find first pinned page in @mapping
+- * @mapping: address space to scan for a page with ref count > 1
+- *
+- * DAX requires ZONE_DEVICE mapped pages. These pages are never
+- * 'onlined' to the page allocator so they are considered idle when
+- * page->count == 1. A filesystem uses this interface to determine if
+- * any page in the mapping is busy, i.e. for DMA, or other
+- * get_user_pages() usages.
+- *
+- * It is expected that the filesystem is holding locks to block the
+- * establishment of new mappings in this address_space. I.e. it expects
+- * to be able to run unmap_mapping_range() and subsequently not race
+- * mapping_mapped() becoming true.
++/*
++ * Partial pages are included. If end is 0, pages in the range from start
++ * to end of the file are inluded.
+  */
+-struct page *dax_layout_busy_page(struct address_space *mapping)
++struct page *dax_layout_busy_page_range(struct address_space *mapping,
++					loff_t start, loff_t end)
+ {
+-	XA_STATE(xas, &mapping->i_pages, 0);
+ 	void *entry;
+ 	unsigned int scanned = 0;
+ 	struct page *page = NULL;
++	pgoff_t start_idx = start >> PAGE_SHIFT;
++	pgoff_t end_idx = end >> PAGE_SHIFT;
++	XA_STATE(xas, &mapping->i_pages, start_idx);
++	loff_t len, lstart = round_down(start, PAGE_SIZE);
+ 
+ 	/*
+ 	 * In the 'limited' case get_user_pages() for dax is disabled.
+@@ -589,6 +582,22 @@ struct page *dax_layout_busy_page(struct address_space *mapping)
+ 	if (!dax_mapping(mapping) || !mapping_mapped(mapping))
+ 		return NULL;
+ 
++	/* If end == 0, all pages from start to till end of file */
++	if (!end) {
++		end_idx = ULONG_MAX;
++		len = 0;
++	} else {
++		/* length is being calculated from lstart and not start.
++		 * This is due to behavior of unmap_mapping_range(). If
++		 * start is say 4094 and end is on 4096 then we want to
++		 * unamp two pages, idx 0 and 1. But unmap_mapping_range()
++		 * will unmap only page at idx 0. If we calculate len
++		 * from the rounded down start, this problem should not
++		 * happen.
++		 */
++		len = end - lstart + 1;
++	}
++
+ 	/*
+ 	 * If we race get_user_pages_fast() here either we'll see the
+ 	 * elevated page count in the iteration and wait, or
+@@ -601,10 +610,10 @@ struct page *dax_layout_busy_page(struct address_space *mapping)
+ 	 * guaranteed to either see new references or prevent new
+ 	 * references from being established.
+ 	 */
+-	unmap_mapping_range(mapping, 0, 0, 0);
++	unmap_mapping_range(mapping, start, len, 0);
+ 
+ 	xas_lock_irq(&xas);
+-	xas_for_each(&xas, entry, ULONG_MAX) {
++	xas_for_each(&xas, entry, end_idx) {
+ 		if (WARN_ON_ONCE(!xa_is_value(entry)))
+ 			continue;
+ 		if (unlikely(dax_is_locked(entry)))
+@@ -625,6 +634,27 @@ struct page *dax_layout_busy_page(struct address_space *mapping)
+ 	xas_unlock_irq(&xas);
+ 	return page;
+ }
++EXPORT_SYMBOL_GPL(dax_layout_busy_page_range);
++
++/**
++ * dax_layout_busy_page - find first pinned page in @mapping
++ * @mapping: address space to scan for a page with ref count > 1
++ *
++ * DAX requires ZONE_DEVICE mapped pages. These pages are never
++ * 'onlined' to the page allocator so they are considered idle when
++ * page->count == 1. A filesystem uses this interface to determine if
++ * any page in the mapping is busy, i.e. for DMA, or other
++ * get_user_pages() usages.
++ *
++ * It is expected that the filesystem is holding locks to block the
++ * establishment of new mappings in this address_space. I.e. it expects
++ * to be able to run unmap_mapping_range() and subsequently not race
++ * mapping_mapped() becoming true.
++ */
++struct page *dax_layout_busy_page(struct address_space *mapping)
++{
++	return dax_layout_busy_page_range(mapping, 0, 0);
++}
+ EXPORT_SYMBOL_GPL(dax_layout_busy_page);
+ 
+ static int __dax_invalidate_entry(struct address_space *mapping,
+diff --git a/include/linux/dax.h b/include/linux/dax.h
+index 328c2dbb4409..4fd4f866a4d3 100644
+--- a/include/linux/dax.h
++++ b/include/linux/dax.h
+@@ -139,6 +139,7 @@ int dax_writeback_mapping_range(struct address_space *mapping,
+ 		struct dax_device *dax_dev, struct writeback_control *wbc);
+ 
+ struct page *dax_layout_busy_page(struct address_space *mapping);
++struct page *dax_layout_busy_page_range(struct address_space *mapping, loff_t start, loff_t end);
+ dax_entry_t dax_lock_page(struct page *page);
+ void dax_unlock_page(struct page *page, dax_entry_t cookie);
+ #else
+@@ -169,6 +170,11 @@ static inline struct page *dax_layout_busy_page(struct address_space *mapping)
+ 	return NULL;
+ }
+ 
++static inline struct page *dax_layout_busy_page_range(struct address_space *mapping, pgoff_t start, pgoff_t nr_pages)
++{
++	return NULL;
++}
++
+ static inline int dax_writeback_mapping_range(struct address_space *mapping,
+ 		struct dax_device *dax_dev, struct writeback_control *wbc)
+ {
 -- 
 2.20.1
 

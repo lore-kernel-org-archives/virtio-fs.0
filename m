@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed,  4 Mar 2020 11:58:34 -0500
-Message-Id: <20200304165845.3081-10-vgoyal@redhat.com>
+Date: Wed,  4 Mar 2020 11:58:33 -0500
+Message-Id: <20200304165845.3081-9-vgoyal@redhat.com>
 In-Reply-To: <20200304165845.3081-1-vgoyal@redhat.com>
 References: <20200304165845.3081-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 09/20] virtio_fs,
-	dax: Set up virtio_fs dax_device
+Subject: [Virtio-fs] [PATCH 08/20] fuse,
+	virtiofs: Add a mount option to enable dax
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,185 +18,204 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com, miklos@szeredi.hu
 Cc: mst@redhat.com, vgoyal@redhat.com
 
-From: Stefan Hajnoczi <stefanha@redhat.com>
+Add a mount option to allow using dax with virtio_fs.
 
-Setup a dax device.
-
-Use the shm capability to find the cache entry and map it.
-
-The DAX window is accessed by the fs/dax.c infrastructure and must have
-struct pages (at least on x86).  Use devm_memremap_pages() to map the
-DAX window PCI BAR and allocate struct page.
-
-Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
-Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
 ---
- fs/fuse/virtio_fs.c            | 115 +++++++++++++++++++++++++++++++++
- include/uapi/linux/virtio_fs.h |   3 +
- 2 files changed, 118 insertions(+)
+ fs/fuse/fuse_i.h    |  7 ++++
+ fs/fuse/inode.c     |  3 ++
+ fs/fuse/virtio_fs.c | 82 +++++++++++++++++++++++++++++++++++++--------
+ 3 files changed, 78 insertions(+), 14 deletions(-)
 
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 62cdd6817b5b..b0574b208cd5 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -5,6 +5,9 @@
-  */
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index 2cebdf6dcfd8..1fe5065a2902 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -483,10 +483,14 @@ struct fuse_fs_context {
+ 	bool destroy:1;
+ 	bool no_control:1;
+ 	bool no_force_umount:1;
++	bool dax:1;
+ 	unsigned int max_read;
+ 	unsigned int blksize;
+ 	const char *subtype;
  
- #include <linux/fs.h>
-+#include <linux/dax.h>
-+#include <linux/pci.h>
-+#include <linux/pfn_t.h>
- #include <linux/module.h>
- #include <linux/virtio.h>
- #include <linux/virtio_fs.h>
-@@ -50,6 +53,12 @@ struct virtio_fs {
- 	struct virtio_fs_vq *vqs;
- 	unsigned int nvqs;               /* number of virtqueues */
- 	unsigned int num_request_queues; /* number of request queues */
++	/* DAX device, may be NULL */
 +	struct dax_device *dax_dev;
 +
-+	/* DAX memory window where file contents are mapped */
-+	void *window_kaddr;
-+	phys_addr_t window_phys_addr;
-+	size_t window_len;
+ 	/* fuse_dev pointer to fill in, should contain NULL on entry */
+ 	void **fudptr;
+ };
+@@ -758,6 +762,9 @@ struct fuse_conn {
+ 
+ 	/** List of device instances belonging to this connection */
+ 	struct list_head devices;
++
++	/** DAX device, non-NULL if DAX is supported */
++	struct dax_device *dax_dev;
  };
  
- struct virtio_fs_forget_req {
-@@ -690,6 +699,108 @@ static void virtio_fs_cleanup_vqs(struct virtio_device *vdev,
- 	vdev->config->del_vqs(vdev);
+ static inline struct fuse_conn *get_fuse_conn_super(struct super_block *sb)
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index f160a3d47b63..84295fac4ff3 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -569,6 +569,8 @@ static int fuse_show_options(struct seq_file *m, struct dentry *root)
+ 		seq_printf(m, ",max_read=%u", fc->max_read);
+ 	if (sb->s_bdev && sb->s_blocksize != FUSE_DEFAULT_BLKSIZE)
+ 		seq_printf(m, ",blksize=%lu", sb->s_blocksize);
++	if (fc->dax_dev)
++		seq_printf(m, ",dax");
+ 	return 0;
  }
  
-+/* Map a window offset to a page frame number.  The window offset will have
-+ * been produced by .iomap_begin(), which maps a file offset to a window
-+ * offset.
-+ */
-+static long virtio_fs_direct_access(struct dax_device *dax_dev, pgoff_t pgoff,
-+				    long nr_pages, void **kaddr, pfn_t *pfn)
-+{
-+	struct virtio_fs *fs = dax_get_private(dax_dev);
-+	phys_addr_t offset = PFN_PHYS(pgoff);
-+	size_t max_nr_pages = fs->window_len/PAGE_SIZE - pgoff;
-+
-+	if (kaddr)
-+		*kaddr = fs->window_kaddr + offset;
-+	if (pfn)
-+		*pfn = phys_to_pfn_t(fs->window_phys_addr + offset,
-+					PFN_DEV | PFN_MAP);
-+	return nr_pages > max_nr_pages ? max_nr_pages : nr_pages;
-+}
-+
-+static size_t virtio_fs_copy_from_iter(struct dax_device *dax_dev,
-+				       pgoff_t pgoff, void *addr,
-+				       size_t bytes, struct iov_iter *i)
-+{
-+	return copy_from_iter(addr, bytes, i);
-+}
-+
-+static size_t virtio_fs_copy_to_iter(struct dax_device *dax_dev,
-+				       pgoff_t pgoff, void *addr,
-+				       size_t bytes, struct iov_iter *i)
-+{
-+	return copy_to_iter(addr, bytes, i);
-+}
-+
-+static const struct dax_operations virtio_fs_dax_ops = {
-+	.direct_access = virtio_fs_direct_access,
-+	.copy_from_iter = virtio_fs_copy_from_iter,
-+	.copy_to_iter = virtio_fs_copy_to_iter,
+@@ -1185,6 +1187,7 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
+ 	fc->destroy = ctx->destroy;
+ 	fc->no_control = ctx->no_control;
+ 	fc->no_force_umount = ctx->no_force_umount;
++	fc->dax_dev = ctx->dax_dev;
+ 
+ 	err = -ENOMEM;
+ 	root = fuse_get_root_inode(sb, ctx->rootmode);
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index 3f786a15b0d9..62cdd6817b5b 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -10,6 +10,7 @@
+ #include <linux/virtio_fs.h>
+ #include <linux/delay.h>
+ #include <linux/fs_context.h>
++#include <linux/fs_parser.h>
+ #include <linux/highmem.h>
+ #include "fuse_i.h"
+ 
+@@ -65,6 +66,45 @@ struct virtio_fs_forget {
+ static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
+ 				 struct fuse_req *req, bool in_flight);
+ 
++enum {
++	OPT_DAX,
 +};
 +
-+static void virtio_fs_cleanup_dax(void *data)
++static const struct fs_parameter_spec virtio_fs_parameters[] = {
++	fsparam_flag	("dax",		OPT_DAX),
++	{}
++};
++
++static int virtio_fs_parse_param(struct fs_context *fc,
++				 struct fs_parameter *param)
 +{
-+	struct virtio_fs *fs = data;
++	struct fs_parse_result result;
++	struct fuse_fs_context *ctx = fc->fs_private;
++	int opt;
 +
-+	kill_dax(fs->dax_dev);
-+	put_dax(fs->dax_dev);
-+}
++	opt = fs_parse(fc, virtio_fs_parameters, param, &result);
++	if (opt < 0)
++		return opt;
 +
-+static int virtio_fs_setup_dax(struct virtio_device *vdev, struct virtio_fs *fs)
-+{
-+	struct virtio_shm_region cache_reg;
-+	struct dev_pagemap *pgmap;
-+	bool have_cache;
-+
-+	if (!IS_ENABLED(CONFIG_DAX_DRIVER))
-+		return 0;
-+
-+	/* Get cache region */
-+	have_cache = virtio_get_shm_region(vdev, &cache_reg,
-+					   (u8)VIRTIO_FS_SHMCAP_ID_CACHE);
-+	if (!have_cache) {
-+		dev_notice(&vdev->dev, "%s: No cache capability\n", __func__);
-+		return 0;
-+	} else {
-+		dev_notice(&vdev->dev, "Cache len: 0x%llx @ 0x%llx\n",
-+			   cache_reg.len, cache_reg.addr);
++	switch(opt) {
++	case OPT_DAX:
++		ctx->dax = 1;
++		break;
++	default:
++		return -EINVAL;
 +	}
 +
-+	pgmap = devm_kzalloc(&vdev->dev, sizeof(*pgmap), GFP_KERNEL);
-+	if (!pgmap)
-+		return -ENOMEM;
-+
-+	pgmap->type = MEMORY_DEVICE_FS_DAX;
-+
-+	/* Ideally we would directly use the PCI BAR resource but
-+	 * devm_memremap_pages() wants its own copy in pgmap.  So
-+	 * initialize a struct resource from scratch (only the start
-+	 * and end fields will be used).
-+	 */
-+	pgmap->res = (struct resource){
-+		.name = "virtio-fs dax window",
-+		.start = (phys_addr_t) cache_reg.addr,
-+		.end = (phys_addr_t) cache_reg.addr + cache_reg.len - 1,
-+	};
-+
-+	fs->window_kaddr = devm_memremap_pages(&vdev->dev, pgmap);
-+	if (IS_ERR(fs->window_kaddr))
-+		return PTR_ERR(fs->window_kaddr);
-+
-+	fs->window_phys_addr = (phys_addr_t) cache_reg.addr;
-+	fs->window_len = (phys_addr_t) cache_reg.len;
-+
-+	dev_dbg(&vdev->dev, "%s: window kaddr 0x%px phys_addr 0x%llx"
-+		" len 0x%llx\n", __func__, fs->window_kaddr, cache_reg.addr,
-+		cache_reg.len);
-+
-+	fs->dax_dev = alloc_dax(fs, NULL, &virtio_fs_dax_ops, 0);
-+	if (!fs->dax_dev)
-+		return -ENOMEM;
-+
-+	return devm_add_action_or_reset(&vdev->dev, virtio_fs_cleanup_dax, fs);
++	return 0;
 +}
 +
- static int virtio_fs_probe(struct virtio_device *vdev)
++static void virtio_fs_free_fc(struct fs_context *fc)
++{
++	struct fuse_fs_context *ctx = fc->fs_private;
++
++	if (ctx)
++		kfree(ctx);
++}
++
+ static inline struct virtio_fs_vq *vq_to_fsvq(struct virtqueue *vq)
  {
- 	struct virtio_fs *fs;
-@@ -711,6 +822,10 @@ static int virtio_fs_probe(struct virtio_device *vdev)
+ 	struct virtio_fs *fs = vq->vdev->priv;
+@@ -1045,23 +1085,27 @@ static const struct fuse_iqueue_ops virtio_fs_fiq_ops = {
+ 	.release			= virtio_fs_fiq_release,
+ };
  
- 	/* TODO vq affinity */
- 
-+	ret = virtio_fs_setup_dax(vdev, fs);
-+	if (ret < 0)
-+		goto out_vqs;
+-static int virtio_fs_fill_super(struct super_block *sb)
++static inline void virtio_fs_ctx_set_defaults(struct fuse_fs_context *ctx)
++{
++	ctx->rootmode = S_IFDIR;
++	ctx->default_permissions = 1;
++	ctx->allow_other = 1;
++	ctx->max_read = UINT_MAX;
++	ctx->blksize = 512;
++	ctx->destroy = true;
++	ctx->no_control = true;
++	ctx->no_force_umount = true;
++}
 +
- 	/* Bring the device online in case the filesystem is mounted and
- 	 * requests need to be sent before we return.
- 	 */
-diff --git a/include/uapi/linux/virtio_fs.h b/include/uapi/linux/virtio_fs.h
-index b02eb2ac3d99..2f64abce781f 100644
---- a/include/uapi/linux/virtio_fs.h
-+++ b/include/uapi/linux/virtio_fs.h
-@@ -16,4 +16,7 @@ struct virtio_fs_config {
- 	__u32 num_request_queues;
- } __attribute__((packed));
++static int virtio_fs_fill_super(struct super_block *sb, struct fs_context *fsc)
+ {
+ 	struct fuse_conn *fc = get_fuse_conn_super(sb);
+ 	struct virtio_fs *fs = fc->iq.priv;
++	struct fuse_fs_context *ctx = fsc->fs_private;
+ 	unsigned int i;
+ 	int err;
+-	struct fuse_fs_context ctx = {
+-		.rootmode = S_IFDIR,
+-		.default_permissions = 1,
+-		.allow_other = 1,
+-		.max_read = UINT_MAX,
+-		.blksize = 512,
+-		.destroy = true,
+-		.no_control = true,
+-		.no_force_umount = true,
+-	};
  
-+/* For the id field in virtio_pci_shm_cap */
-+#define VIRTIO_FS_SHMCAP_ID_CACHE 0
++	virtio_fs_ctx_set_defaults(ctx);
+ 	mutex_lock(&virtio_fs_mutex);
+ 
+ 	/* After holding mutex, make sure virtiofs device is still there.
+@@ -1084,8 +1128,10 @@ static int virtio_fs_fill_super(struct super_block *sb)
+ 			goto err_free_fuse_devs;
+ 	}
+ 
+-	ctx.fudptr = (void **)&fs->vqs[VQ_REQUEST].fud;
+-	err = fuse_fill_super_common(sb, &ctx);
++	ctx->fudptr = (void **)&fs->vqs[VQ_REQUEST].fud;
++	if (ctx->dax)
++		ctx->dax_dev = fs->dax_dev;
++	err = fuse_fill_super_common(sb, ctx);
+ 	if (err < 0)
+ 		goto err_free_fuse_devs;
+ 
+@@ -1200,7 +1246,7 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
+ 		return PTR_ERR(sb);
+ 
+ 	if (!sb->s_root) {
+-		err = virtio_fs_fill_super(sb);
++		err = virtio_fs_fill_super(sb, fsc);
+ 		if (err) {
+ 			deactivate_locked_super(sb);
+ 			return err;
+@@ -1215,11 +1261,19 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
+ }
+ 
+ static const struct fs_context_operations virtio_fs_context_ops = {
++	.free		= virtio_fs_free_fc,
++	.parse_param	= virtio_fs_parse_param,
+ 	.get_tree	= virtio_fs_get_tree,
+ };
+ 
+ static int virtio_fs_init_fs_context(struct fs_context *fsc)
+ {
++	struct fuse_fs_context *ctx;
 +
- #endif /* _UAPI_LINUX_VIRTIO_FS_H */
++	ctx = kzalloc(sizeof(struct fuse_fs_context), GFP_KERNEL);
++	if (!ctx)
++		return -ENOMEM;
++	fsc->fs_private = ctx;
+ 	fsc->ops = &virtio_fs_context_ops;
+ 	return 0;
+ }
 -- 
 2.20.1
 

@@ -1,10 +1,21 @@
-From: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
-Date: Tue, 28 Jan 2020 19:18:17 +0900
-Message-ID: <20200128101819.21766-1-misono.tomohiro@jp.fujitsu.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=REgvRIGaQFX0rJ2F2E0SSglQVamoeuGWdGmoF/N5lus=;
+	b=HJVoZ3BVHYzJMf4JMkMnAD/QpaYgATC2WqGx7eeKdOmuRZictZ/zGUEUJt4b1gMiXu
+	0hawPVlcNtzk8ul9yZ6a3Y6I2WQaEeTlcyn5Z3vQTvShCy89CqDr1vcYG5JRvKrTEs+s
+	nGCJPvFnL9RJmti4Z6r3S8VHzjAQ5mxioY1DQ=
 MIME-Version: 1.0
-Content-Type: text/plain; charset=WINDOWS-1252
+References: <1583270111-76859-1-git-send-email-bo.liu@linux.alibaba.com>
+	<CAJfpegtFWqEAV-Jb_KoHihJ5-UpU=JkdxEg_stz6JM5OP_LXMQ@mail.gmail.com>
+	<20200310184640.5djxclzt6gqkq4v3@rsjd01523.et2sqa>
+In-Reply-To: <20200310184640.5djxclzt6gqkq4v3@rsjd01523.et2sqa>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Tue, 10 Mar 2020 20:08:49 +0100
+Message-ID: <CAJfpegtUkfwZXZ977HeC7pJ+2rFVwyr0pk-ru4J7z1-TVafcSQ@mail.gmail.com>
+Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 0/2] virtiofsd: Fix xattr and ACL
+Subject: Re: [Virtio-fs] [PATCH] fuse: make written data persistent after
+	writing
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,51 +24,31 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
-Cc: vgoyal@redhat.com
+To: Liu Bo <bo.liu@linux.alibaba.com>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com
 
-Hi,
+On Tue, Mar 10, 2020 at 7:46 PM Liu Bo <bo.liu@linux.alibaba.com> wrote:
+>
+> On Tue, Mar 10, 2020 at 11:14:17AM +0100, Miklos Szeredi wrote:
+> > On Tue, Mar 3, 2020 at 10:15 PM Liu Bo <bo.liu@linux.alibaba.com> wrote:
+> > >
+> > > If this is a DSYNC write, make sure we push it to stable storage now
+> > > that we've written data.
+> >
+> > If this is direct I/O then why do we need an fysnc() call?
+> >
+> > The only thing needed should be correct setting O_DSYNC in the flags
+> > field of the WRITE request, and it appears to me that that is already
+> > being done.
+>
+> Given direct IO itself doesn't guarantee FUA or FLUSH, I think we
+> still need such a fsync() call to make sure a FUA/FLUSH is sent after
+> direct IO.
 
-This is a second version of xattr fix for virtiofsd.
-I included ACL fix (which introduces new option posix_acl) in this version
-too as ACL mostly depends on xattr.
-
-I run xfstests with XFS backend using "-o xattr -o posix_acl" option and
-only new failure is generic/375 which checks if sgid bit is cleared after
-setfacl. I'll try to investigate it.
-
-change in v1 -> v2
- - rebased to current dev branch
-
- - Always chdir for xattr (1st patch)
-   In v1, I keep current implementation for regular file/dir since it
-   show better performance in my environment. But I notice opening file
-   for xattr causes seek sanity test fails (xfstest generic/285, 436).
-
-   I'm not sure what is the fundamental problem here but I believe
-   performance can be improved by introducing some caching mechanism
-   in general. So I change the code to always fchdir to avoid the
-   problem for now. This results in simpler code too.
-
- - Add ACL fix (2nd patch)
-   ACL mostly works if xattr option is enabled.
-   To support default ACL behavior, add new option posix_acl which
-   handles umasking in virtiofsd instead of guest kernel.
+What I mean is that the server itself can call fsync(2) from the WRITE
+request if it finds that fi->flags contains O_DSYNC.
 
 Thanks,
-Misono
-
-Misono Tomohiro (2):
-  virtiofsd: Fix xattr operations
-  virtiofsd: Add support of posix_acl
-
- tools/virtiofsd/fuse_virtio.c    |  13 +++
- tools/virtiofsd/helper.c         |   3 +
- tools/virtiofsd/passthrough_ll.c | 136 +++++++++++++++++++++----------
- tools/virtiofsd/seccomp.c        |  11 ++-
- 4 files changed, 115 insertions(+), 48 deletions(-)
-
--- 
-2.21.1
+Miklos
 
 

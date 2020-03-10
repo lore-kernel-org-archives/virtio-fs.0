@@ -1,19 +1,14 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=676hlAi9nQvJqPNZ6R7D8KQCs7ZMaZyVMWv6FGrNSog=;
-	b=BlCyZg3qAzKRX5Es9ctA1azKKf+fCW18+Z3+RK9WV/bkETeslBQeWcDJHakZv3N75m
-	A6xAk+tgOsrscdsv7V5kr5AAIdlxfsdJAjtkbuQYXis/pP7Ia8QDfP0Vckn4/arnS5uG
-	m2flT5Fwl10Vbx1mKDKvXEHME5GPc47vE9KVI=
+Date: Tue, 10 Mar 2020 10:53:14 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20200310105314.GH140737@stefanha-x1.localdomain>
+References: <20200304165845.3081-1-vgoyal@redhat.com>
+	<20200304165845.3081-4-vgoyal@redhat.com>
 MIME-Version: 1.0
-References: <1583270111-76859-1-git-send-email-bo.liu@linux.alibaba.com>
-In-Reply-To: <1583270111-76859-1-git-send-email-bo.liu@linux.alibaba.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Tue, 10 Mar 2020 11:14:17 +0100
-Message-ID: <CAJfpegtFWqEAV-Jb_KoHihJ5-UpU=JkdxEg_stz6JM5OP_LXMQ@mail.gmail.com>
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH] fuse: make written data persistent after
-	writing
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="poemUeGtc2GQvHuH"
+Content-Disposition: inline
+In-Reply-To: <20200304165845.3081-4-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 03/20] virtio: Add get_shm_region method
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,21 +17,45 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Liu Bo <bo.liu@linux.alibaba.com>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: miklos@szeredi.hu, linux-nvdimm@lists.01.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, mst@redhat.com, linux-fsdevel@vger.kernel.org
 
-On Tue, Mar 3, 2020 at 10:15 PM Liu Bo <bo.liu@linux.alibaba.com> wrote:
->
-> If this is a DSYNC write, make sure we push it to stable storage now
-> that we've written data.
 
-If this is direct I/O then why do we need an fysnc() call?
+--poemUeGtc2GQvHuH
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-The only thing needed should be correct setting O_DSYNC in the flags
-field of the WRITE request, and it appears to me that that is already
-being done.
+On Wed, Mar 04, 2020 at 11:58:28AM -0500, Vivek Goyal wrote:
+> From: Sebastien Boeuf <sebastien.boeuf@intel.com>
+>=20
+> Virtio defines 'shared memory regions' that provide a continuously
+> shared region between the host and guest.
+>=20
+> Provide a method to find a particular region on a device.
+>=20
+> Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
+> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> ---
+>  include/linux/virtio_config.h | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
 
-Thanks,
-Miklos
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
+--poemUeGtc2GQvHuH
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl5ncZoACgkQnKSrs4Gr
+c8jg6gf/SZPcTN7LLKRqnGxHpVb154voV9YMHZaHBKN3vnrXZ/Ea+UHdkyY5QADv
+1HY5kbzIGy9+ACo9dYF7RX+TuinFOlr+r5jN3n7IucAg0tpW4TgOk6zpgA78e9lm
+mO+nsBaEiHuhUuon5GUa93qEog7TEWFWJdvcPvVzMqZ2Lgn6GWHiREjWIjET8IUW
+toe4/8fig7Co7AvRXossbQVGQy6JO0b77Fe1KkrhIGnFm1CCa40cgb9SQWqgZgx+
+H8MqAl8thKLsKsusSCvvypkZnO4WI7I7bfQ8y91OFS6eH+TyOjWeCnE92hTIXNxs
+ADjNRLTsQ8amVAZxTD9jyKsF+tsOFA==
+=Eh/9
+-----END PGP SIGNATURE-----
+
+--poemUeGtc2GQvHuH--
 

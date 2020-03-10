@@ -1,20 +1,15 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=a3QS0e8RcKFN7/huSeBCCDwuVM9JqD+PwQz/25LYZ7s=;
-	b=OhbAghdNUJbciPVHuH7moOlqqCFrFRE9cU5y6G8bZaazds/cVCLgdwVJGN8cktdJeV
-	PcCU4iK+sDFS7sQ0uFJKeBvYtAZY/fdaWTYPriu+UWlAjLMThNuq340tP6KkBerdfuKh
-	y3T0QJitw2eIkqR+syI0QC6SM1+A3omTiS8nU=
-MIME-Version: 1.0
+Date: Tue, 10 Mar 2020 16:29:46 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200310202946.GE38440@redhat.com>
 References: <20200304165845.3081-1-vgoyal@redhat.com>
-	<20200304165845.3081-13-vgoyal@redhat.com>
-In-Reply-To: <20200304165845.3081-13-vgoyal@redhat.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Tue, 10 Mar 2020 20:49:49 +0100
-Message-ID: <CAJfpeguY8gDYVp_q3-W6JNA24zCry+SfWmEW2zuHLQLhmyUB3Q@mail.gmail.com>
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 12/20] fuse: Introduce
-	setupmapping/removemapping commands
+	<20200304165845.3081-3-vgoyal@redhat.com>
+	<20200310151906.GA670549@iweiny-DESK2.sc.intel.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20200310151906.GA670549@iweiny-DESK2.sc.intel.com>
+Subject: Re: [Virtio-fs] [PATCH 02/20] dax: Create a range version of
+ dax_layout_busy_page()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,53 +18,49 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: linux-nvdimm@lists.01.org, "Michael S. Tsirkin" <mst@redhat.com>, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
+To: Ira Weiny <ira.weiny@intel.com>
+Cc: miklos@szeredi.hu, linux-nvdimm@lists.01.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, mst@redhat.com, linux-fsdevel@vger.kernel.org
 
-On Wed, Mar 4, 2020 at 5:59 PM Vivek Goyal <vgoyal@redhat.com> wrote:
->
-> Introduce two new fuse commands to setup/remove memory mappings. This
-> will be used to setup/tear down file mapping in dax window.
->
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
-> ---
->  include/uapi/linux/fuse.h | 37 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
->
-> diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-> index 5b85819e045f..62633555d547 100644
-> --- a/include/uapi/linux/fuse.h
-> +++ b/include/uapi/linux/fuse.h
-> @@ -894,4 +894,41 @@ struct fuse_copy_file_range_in {
->         uint64_t        flags;
->  };
->
-> +#define FUSE_SETUPMAPPING_ENTRIES 8
-> +#define FUSE_SETUPMAPPING_FLAG_WRITE (1ull << 0)
-> +struct fuse_setupmapping_in {
-> +       /* An already open handle */
-> +       uint64_t        fh;
-> +       /* Offset into the file to start the mapping */
-> +       uint64_t        foffset;
-> +       /* Length of mapping required */
-> +       uint64_t        len;
-> +       /* Flags, FUSE_SETUPMAPPING_FLAG_* */
-> +       uint64_t        flags;
-> +       /* Offset in Memory Window */
-> +       uint64_t        moffset;
-> +};
-> +
-> +struct fuse_setupmapping_out {
-> +       /* Offsets into the cache of mappings */
-> +       uint64_t        coffset[FUSE_SETUPMAPPING_ENTRIES];
-> +        /* Lengths of each mapping */
-> +        uint64_t       len[FUSE_SETUPMAPPING_ENTRIES];
-> +};
+On Tue, Mar 10, 2020 at 08:19:07AM -0700, Ira Weiny wrote:
+> On Wed, Mar 04, 2020 at 11:58:27AM -0500, Vivek Goyal wrote:
+> >  
+> > +	/* If end == 0, all pages from start to till end of file */
+> > +	if (!end) {
+> > +		end_idx = ULONG_MAX;
+> > +		len = 0;
+> 
+> I find this a bit odd to specify end == 0 for ULONG_MAX...
+> 
+> >  }
+> > +EXPORT_SYMBOL_GPL(dax_layout_busy_page_range);
+> > +
+> > +/**
+> > + * dax_layout_busy_page - find first pinned page in @mapping
+> > + * @mapping: address space to scan for a page with ref count > 1
+> > + *
+> > + * DAX requires ZONE_DEVICE mapped pages. These pages are never
+> > + * 'onlined' to the page allocator so they are considered idle when
+> > + * page->count == 1. A filesystem uses this interface to determine if
+> > + * any page in the mapping is busy, i.e. for DMA, or other
+> > + * get_user_pages() usages.
+> > + *
+> > + * It is expected that the filesystem is holding locks to block the
+> > + * establishment of new mappings in this address_space. I.e. it expects
+> > + * to be able to run unmap_mapping_range() and subsequently not race
+> > + * mapping_mapped() becoming true.
+> > + */
+> > +struct page *dax_layout_busy_page(struct address_space *mapping)
+> > +{
+> > +	return dax_layout_busy_page_range(mapping, 0, 0);
+> 
+> ... other functions I have seen specify ULONG_MAX here.  Which IMO makes this
+> call site more clear.
 
-fuse_setupmapping_out together with FUSE_SETUPMAPPING_ENTRIES seem to be unused.
+I think I looked at unmap_mapping_range() where holelen=0 implies till the
+end of file and followed same pattern.
 
-Thanks,
-Miklos
+But I agree that LLONG_MAX (end is of type loff_t) is probably more
+intuitive. I will change it.
 
+Vivek
 

@@ -1,19 +1,20 @@
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
 	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=OYU1wxb/ge5DirIWwK28AnywpJQY3e/U9vYLjiccLeo=;
-	b=VUMeVtRyDXOmmJAxS6+A2yYelERcpsMobnU+K+HXqAre31LWH5Ybg9m1IevwykOAC8
-	LuhKNNqsEpPoC+7agcvG1rpEStM2V2YpmRpy+BjS+BXwOrIaMeNotiWCXzqWdLczA50g
-	BSV6AlSgpI8eO6i/dsioSkintiC6wBXLVK/So=
+	:cc; bh=yHUlshbt0krVyNx6H5AQrYmBp/rsTRhM/TkVqLTK1cA=;
+	b=DWyZY+fN2f5GWPycqc6nfqGuuLyjg3vxp56EkljIp4CFmK4rlXVcYb7WGIIrBmtWz9
+	NR+EjtBnZDRvDuMV/aRpSTLTMaQIfWG4nIPbzPJwAM0W39llvBvEuEw3xVXPour1P6cG
+	OnrgRxf5sAH77uw+c4f2x0E2WfazdfWrmdTjM=
 MIME-Version: 1.0
 References: <20200304165845.3081-1-vgoyal@redhat.com>
-	<20200304165845.3081-8-vgoyal@redhat.com>
-In-Reply-To: <20200304165845.3081-8-vgoyal@redhat.com>
+	<20200304165845.3081-9-vgoyal@redhat.com>
+In-Reply-To: <20200304165845.3081-9-vgoyal@redhat.com>
 From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Tue, 10 Mar 2020 15:12:51 +0100
-Message-ID: <CAJfpeguxR2mR53BHEaSQUq2dN6mUVQHMVCoECrCX1F6x38M-0A@mail.gmail.com>
+Date: Tue, 10 Mar 2020 15:16:53 +0100
+Message-ID: <CAJfpegsY1LBe85-Dx49LwM9TOrHE0aQq1CAtZQdYr4pYn5tBbg@mail.gmail.com>
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 07/20] fuse: Get rid of no_mount_options
+Subject: Re: [Virtio-fs] [PATCH 08/20] fuse,
+	virtiofs: Add a mount option to enable dax
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,17 +28,7 @@ Cc: linux-nvdimm@lists.01.org, "Michael S. Tsirkin" <mst@redhat.com>, linux-kern
 
 On Wed, Mar 4, 2020 at 5:59 PM Vivek Goyal <vgoyal@redhat.com> wrote:
 >
-> This option was introduced so that for virtio_fs we don't show any mounts
-> options fuse_show_options(). Because we don't offer any of these options
-> to be controlled by mounter.
->
-> Very soon we are planning to introduce option "dax" which mounter should
-> be able to specify. And no_mount_options does not work anymore. What
-> we need is a per mount option specific flag so that fileystem can
-> specify which options to show.
->
-> Add few such flags to control the behavior in more fine grained manner
-> and get rid of no_mount_options.
+> Add a mount option to allow using dax with virtio_fs.
 >
 > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 

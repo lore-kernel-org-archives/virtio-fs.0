@@ -1,15 +1,17 @@
-Date: Tue, 10 Mar 2020 16:33:21 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200310203321.GF38440@redhat.com>
+Date: Tue, 10 Mar 2020 17:27:09 -0400
+From: "Michael S. Tsirkin" <mst@redhat.com>
+Message-ID: <20200310172603-mutt-send-email-mst@kernel.org>
 References: <20200304165845.3081-1-vgoyal@redhat.com>
-	<20200304165845.3081-13-vgoyal@redhat.com>
-	<CAJfpeguY8gDYVp_q3-W6JNA24zCry+SfWmEW2zuHLQLhmyUB3Q@mail.gmail.com>
+	<20200304165845.3081-5-vgoyal@redhat.com>
+	<20200310071043-mutt-send-email-mst@kernel.org>
+	<20200310184720.GD38440@redhat.com>
 MIME-Version: 1.0
+In-Reply-To: <20200310184720.GD38440@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <CAJfpeguY8gDYVp_q3-W6JNA24zCry+SfWmEW2zuHLQLhmyUB3Q@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH 12/20] fuse: Introduce
-	setupmapping/removemapping commands
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH 04/20] virtio: Implement get_shm_region for
+	PCI transport
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,54 +20,62 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: linux-nvdimm@lists.01.org, "Michael S. Tsirkin" <mst@redhat.com>, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: kbuild test robot <lkp@intel.com>, miklos@szeredi.hu, linux-nvdimm@lists.01.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
 
-On Tue, Mar 10, 2020 at 08:49:49PM +0100, Miklos Szeredi wrote:
-> On Wed, Mar 4, 2020 at 5:59 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> >
-> > Introduce two new fuse commands to setup/remove memory mappings. This
-> > will be used to setup/tear down file mapping in dax window.
-> >
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
-> > ---
-> >  include/uapi/linux/fuse.h | 37 +++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 37 insertions(+)
-> >
-> > diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-> > index 5b85819e045f..62633555d547 100644
-> > --- a/include/uapi/linux/fuse.h
-> > +++ b/include/uapi/linux/fuse.h
-> > @@ -894,4 +894,41 @@ struct fuse_copy_file_range_in {
-> >         uint64_t        flags;
-> >  };
-> >
-> > +#define FUSE_SETUPMAPPING_ENTRIES 8
-> > +#define FUSE_SETUPMAPPING_FLAG_WRITE (1ull << 0)
-> > +struct fuse_setupmapping_in {
-> > +       /* An already open handle */
-> > +       uint64_t        fh;
-> > +       /* Offset into the file to start the mapping */
-> > +       uint64_t        foffset;
-> > +       /* Length of mapping required */
-> > +       uint64_t        len;
-> > +       /* Flags, FUSE_SETUPMAPPING_FLAG_* */
-> > +       uint64_t        flags;
-> > +       /* Offset in Memory Window */
-> > +       uint64_t        moffset;
-> > +};
-> > +
-> > +struct fuse_setupmapping_out {
-> > +       /* Offsets into the cache of mappings */
-> > +       uint64_t        coffset[FUSE_SETUPMAPPING_ENTRIES];
-> > +        /* Lengths of each mapping */
-> > +        uint64_t       len[FUSE_SETUPMAPPING_ENTRIES];
-> > +};
+On Tue, Mar 10, 2020 at 02:47:20PM -0400, Vivek Goyal wrote:
+> On Tue, Mar 10, 2020 at 07:12:25AM -0400, Michael S. Tsirkin wrote:
+> [..]
+> > > +static bool vp_get_shm_region(struct virtio_device *vdev,
+> > > +			      struct virtio_shm_region *region, u8 id)
+> > > +{
+> > > +	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
+> > > +	struct pci_dev *pci_dev = vp_dev->pci_dev;
+> > > +	u8 bar;
+> > > +	u64 offset, len;
+> > > +	phys_addr_t phys_addr;
+> > > +	size_t bar_len;
+> > > +	int ret;
+> > > +
+> > > +	if (!virtio_pci_find_shm_cap(pci_dev, id, &bar, &offset, &len)) {
+> > > +		return false;
+> > > +	}
+> > > +
+> > > +	ret = pci_request_region(pci_dev, bar, "virtio-pci-shm");
+> > > +	if (ret < 0) {
+> > > +		dev_err(&pci_dev->dev, "%s: failed to request BAR\n",
+> > > +			__func__);
+> > > +		return false;
+> > > +	}
+> > > +
+> > > +	phys_addr = pci_resource_start(pci_dev, bar);
+> > > +	bar_len = pci_resource_len(pci_dev, bar);
+> > > +
+> > > +        if (offset + len > bar_len) {
+> > > +                dev_err(&pci_dev->dev,
+> > > +                        "%s: bar shorter than cap offset+len\n",
+> > > +                        __func__);
+> > > +                return false;
+> > > +        }
+> > > +
+> > 
+> > Something wrong with indentation here.
 > 
-> fuse_setupmapping_out together with FUSE_SETUPMAPPING_ENTRIES seem to be unused.
+> Will fix all indentation related issues in this patch.
+> 
+> > Also as long as you are validating things, it's worth checking
+> > offset + len does not overflow.
+> 
+> Something like addition of following lines?
+> 
+> +       if ((offset + len) < offset) {
+> +               dev_err(&pci_dev->dev, "%s: cap offset+len overflow detected\n",
+> +                       __func__);
+> +               return false;
+> +       }
+> 
+> Vivek
 
-This looks like leftover from the old code. I will get rid of it. Thanks.
+That should do it.
 
-Vivek
 

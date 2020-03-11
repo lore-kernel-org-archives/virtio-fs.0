@@ -1,17 +1,23 @@
-Date: Wed, 11 Mar 2020 15:29:39 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200311192939.GD83257@redhat.com>
-References: <20200304165845.3081-1-vgoyal@redhat.com>
-	<20200304165845.3081-5-vgoyal@redhat.com>
-	<20200310110437.GI140737@stefanha-x1.localdomain>
-	<20200310181936.GC38440@redhat.com>
-	<20200311173405.GI281087@stefanha-x1.localdomain>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=2mXGK5i6t3MsASMxT0lG83kEdxLaxyp7/VkTyiOzfWA=;
+	b=Ytxtuf3QQxZWXFhnUaNGSp6HRtTjU2rvi2VTtDUKIWrIxcTF08sJcrGYYDSZ0cjYVi
+	NC7Jr18qi45Tn2TxgwNtbFQJyxoGPpldN77YOO65Z1kc2htI75AljVGHwZtqXl4WFh09
+	II9VBsbHtPSWuTzSj8DU2x+vAkcTNO12e6wd0JHiEtKO2fSJv+IyvIKGAf31Vwlh/6le
+	fGg/uJ53yaXQU8x+y+MF9ACDtFn+SNGFV7s3uD000Qka0NXvCcWm88thMuialB2aMbeW
+	LTTNeVSpoAVa+tcRkDxn2Zcdp7Mw05sgFo6hkmJTrwxWy7LCnul4OZtHXyEwSBI41s5K
+	c7lw==
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200311173405.GI281087@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH 04/20] virtio: Implement get_shm_region for
-	PCI transport
+References: <20200304165845.3081-1-vgoyal@redhat.com>
+	<CAOQ4uxi_Xrf+iyP6KVugFgLOfzUvscMr0de0KxQo+jHNBCA9oA@mail.gmail.com>
+	<20200311184830.GC83257@redhat.com>
+In-Reply-To: <20200311184830.GC83257@redhat.com>
+From: Amir Goldstein <amir73il@gmail.com>
+Date: Wed, 11 Mar 2020 21:32:17 +0200
+Message-ID: <CAOQ4uxjja3cReO28qOd-YGmhU-_KrLxOCaBeqZYydxPAte9_pg@mail.gmail.com>
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH 00/20] virtiofs: Add DAX support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,164 +26,64 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: kbuild test robot <lkp@intel.com>, miklos@szeredi.hu, linux-nvdimm@lists.01.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, mst@redhat.com, linux-fsdevel@vger.kernel.org
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, linux-nvdimm <linux-nvdimm@lists.01.org>, linux-kernel <linux-kernel@vger.kernel.org>, virtio-fs@redhat.com, mst@redhat.com, linux-fsdevel <linux-fsdevel@vger.kernel.org>
 
-On Wed, Mar 11, 2020 at 05:34:05PM +0000, Stefan Hajnoczi wrote:
-> On Tue, Mar 10, 2020 at 02:19:36PM -0400, Vivek Goyal wrote:
-> > On Tue, Mar 10, 2020 at 11:04:37AM +0000, Stefan Hajnoczi wrote:
-> > > On Wed, Mar 04, 2020 at 11:58:29AM -0500, Vivek Goyal wrote:
-> > > > diff --git a/drivers/virtio/virtio_pci_modern.c b/drivers/virtio/virtio_pci_modern.c
-> > > > index 7abcc50838b8..52f179411015 100644
-> > > > --- a/drivers/virtio/virtio_pci_modern.c
-> > > > +++ b/drivers/virtio/virtio_pci_modern.c
-> > > > @@ -443,6 +443,111 @@ static void del_vq(struct virtio_pci_vq_info *info)
-> > > >  	vring_del_virtqueue(vq);
-> > > >  }
-> > > >  
-> > > > +static int virtio_pci_find_shm_cap(struct pci_dev *dev,
-> > > > +                                   u8 required_id,
-> > > > +                                   u8 *bar, u64 *offset, u64 *len)
-> > > > +{
-> > > > +	int pos;
-> > > > +
-> > > > +        for (pos = pci_find_capability(dev, PCI_CAP_ID_VNDR);
-> > > 
-> > > Please fix the mixed tabs vs space indentation in this patch.
-> > 
-> > Will do. There are plenty of these in this patch.
-> > 
-> > > 
-> > > > +static bool vp_get_shm_region(struct virtio_device *vdev,
-> > > > +			      struct virtio_shm_region *region, u8 id)
-> > > > +{
-> > > > +	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
-> > > > +	struct pci_dev *pci_dev = vp_dev->pci_dev;
-> > > > +	u8 bar;
-> > > > +	u64 offset, len;
-> > > > +	phys_addr_t phys_addr;
-> > > > +	size_t bar_len;
-> > > > +	int ret;
-> > > > +
-> > > > +	if (!virtio_pci_find_shm_cap(pci_dev, id, &bar, &offset, &len)) {
-> > > > +		return false;
-> > > > +	}
-> > > > +
-> > > > +	ret = pci_request_region(pci_dev, bar, "virtio-pci-shm");
-> > > > +	if (ret < 0) {
-> > > > +		dev_err(&pci_dev->dev, "%s: failed to request BAR\n",
-> > > > +			__func__);
-> > > > +		return false;
-> > > > +	}
-> > > > +
-> > > > +	phys_addr = pci_resource_start(pci_dev, bar);
-> > > > +	bar_len = pci_resource_len(pci_dev, bar);
-> > > > +
-> > > > +        if (offset + len > bar_len) {
-> > > > +                dev_err(&pci_dev->dev,
-> > > > +                        "%s: bar shorter than cap offset+len\n",
-> > > > +                        __func__);
-> > > > +                return false;
-> > > > +        }
-> > > > +
-> > > > +	region->len = len;
-> > > > +	region->addr = (u64) phys_addr + offset;
-> > > > +
-> > > > +	return true;
-> > > > +}
-> > > 
-> > > Missing pci_release_region()?
-> > 
-> > Good catch. We don't have a mechanism to call pci_relese_region() and 
-> > virtio-mmio device's ->get_shm_region() implementation does not even
-> > seem to reserve the resources.
-> > 
-> > So how about we leave this resource reservation to the caller.
-> > ->get_shm_region() just returns the addr/len pair of requested resource.
-> > 
-> > Something like this patch.
-> > 
-> > ---
-> >  drivers/virtio/virtio_pci_modern.c |    8 --------
-> >  fs/fuse/virtio_fs.c                |   13 ++++++++++---
-> >  2 files changed, 10 insertions(+), 11 deletions(-)
-> > 
-> > Index: redhat-linux/fs/fuse/virtio_fs.c
-> > ===================================================================
-> > --- redhat-linux.orig/fs/fuse/virtio_fs.c	2020-03-10 09:13:34.624565666 -0400
-> > +++ redhat-linux/fs/fuse/virtio_fs.c	2020-03-10 14:11:10.970284651 -0400
-> > @@ -763,11 +763,18 @@ static int virtio_fs_setup_dax(struct vi
-> >  	if (!have_cache) {
-> >  		dev_notice(&vdev->dev, "%s: No cache capability\n", __func__);
-> >  		return 0;
-> > -	} else {
-> > -		dev_notice(&vdev->dev, "Cache len: 0x%llx @ 0x%llx\n",
-> > -			   cache_reg.len, cache_reg.addr);
-> >  	}
-> >  
-> > +	if (!devm_request_mem_region(&vdev->dev, cache_reg.addr, cache_reg.len,
-> > +				     dev_name(&vdev->dev))) {
-> > +		dev_warn(&vdev->dev, "could not reserve region addr=0x%llx"
-> > +			 " len=0x%llx\n", cache_reg.addr, cache_reg.len);
-> > +		return -EBUSY;
-> > +        }
-> > +
-> > +	dev_notice(&vdev->dev, "Cache len: 0x%llx @ 0x%llx\n", cache_reg.len,
-> > +		   cache_reg.addr);
-> > +
-> >  	pgmap = devm_kzalloc(&vdev->dev, sizeof(*pgmap), GFP_KERNEL);
-> >  	if (!pgmap)
-> >  		return -ENOMEM;
-> > Index: redhat-linux/drivers/virtio/virtio_pci_modern.c
-> > ===================================================================
-> > --- redhat-linux.orig/drivers/virtio/virtio_pci_modern.c	2020-03-10 08:51:36.886565666 -0400
-> > +++ redhat-linux/drivers/virtio/virtio_pci_modern.c	2020-03-10 13:43:15.168753543 -0400
-> > @@ -511,19 +511,11 @@ static bool vp_get_shm_region(struct vir
-> >  	u64 offset, len;
-> >  	phys_addr_t phys_addr;
-> >  	size_t bar_len;
-> > -	int ret;
-> >  
-> >  	if (!virtio_pci_find_shm_cap(pci_dev, id, &bar, &offset, &len)) {
-> >  		return false;
-> >  	}
-> >  
-> > -	ret = pci_request_region(pci_dev, bar, "virtio-pci-shm");
-> > -	if (ret < 0) {
-> > -		dev_err(&pci_dev->dev, "%s: failed to request BAR\n",
-> > -			__func__);
-> > -		return false;
-> > -	}
-> > -
-> >  	phys_addr = pci_resource_start(pci_dev, bar);
-> >  	bar_len = pci_resource_len(pci_dev, bar);
-> 
-> Do pci_resource_start()/pci_resource_len() work on a BAR where
-> pci_request_region() hasn't been called yet?  (I haven't checked the
-> code, sorry...)
+On Wed, Mar 11, 2020 at 8:48 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> On Wed, Mar 11, 2020 at 07:22:51AM +0200, Amir Goldstein wrote:
+> > On Wed, Mar 4, 2020 at 7:01 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> > >
+> > > Hi,
+> > >
+> > > This patch series adds DAX support to virtiofs filesystem. This allows
+> > > bypassing guest page cache and allows mapping host page cache directly
+> > > in guest address space.
+> > >
+> > > When a page of file is needed, guest sends a request to map that page
+> > > (in host page cache) in qemu address space. Inside guest this is
+> > > a physical memory range controlled by virtiofs device. And guest
+> > > directly maps this physical address range using DAX and hence gets
+> > > access to file data on host.
+> > >
+> > > This can speed up things considerably in many situations. Also this
+> > > can result in substantial memory savings as file data does not have
+> > > to be copied in guest and it is directly accessed from host page
+> > > cache.
+> > >
+> > > Most of the changes are limited to fuse/virtiofs. There are couple
+> > > of changes needed in generic dax infrastructure and couple of changes
+> > > in virtio to be able to access shared memory region.
+> > >
+> > > These patches apply on top of 5.6-rc4 and are also available here.
+> > >
+> > > https://github.com/rhvgoyal/linux/commits/vivek-04-march-2020
+> > >
+> > > Any review or feedback is welcome.
+> > >
+> > [...]
+> > >  drivers/dax/super.c                |    3 +-
+> > >  drivers/virtio/virtio_mmio.c       |   32 +
+> > >  drivers/virtio/virtio_pci_modern.c |  107 +++
+> > >  fs/dax.c                           |   66 +-
+> > >  fs/fuse/dir.c                      |    2 +
+> > >  fs/fuse/file.c                     | 1162 +++++++++++++++++++++++++++-
+> >
+> > That's a big addition to already big file.c.
+> > Maybe split dax specific code to dax.c?
+> > Can be a post series cleanup too.
+>
+> How about fs/fuse/iomap.c instead. This will have all the iomap related logic
+> as well as all the dax range allocation/free logic which is required
+> by iomap logic. That moves about 900 lines of code from file.c to iomap.c
+>
 
-It should. Infact, pci_request_region() itself is calling
-pci_resource_start() and pci_resource_len().
+Fine by me. I didn't take time to study the code in file.c
+I just noticed is has grown a lot bigger and wasn't sure that
+it made sense. Up to you. Only if you think the result would be nicer
+to maintain.
 
-> 
-> Assuming yes, then my next question is whether devm_request_mem_region()
-> works in both the VIRTIO PCI and MMIO cases?
+Thanks,
+Amir.
 
-It should work on MMIO case as well. This basically works on /proc/iomem
-resource tree to reserve resources. So as long as MMIO memory range
-has been registered by driver in /proc/iomem, it will work.
-
-> 
-> If yes, then this looks like a solution, though the need for
-> devm_request_mem_region() should be explained in the vp_get_shm_region()
-> doc comments so that callers remember to make that call.  Or maybe it
-> can be included in vp_get_shm_region().
-
-How about adding a line in include/linux/virtio_config.h right below the
-@get_shm_region descrition which says.
-
-"This does not reserve the resources and caller is expected to call
- devm_request_mem_region() or similar to reserve resources."
-
-Vivek
 

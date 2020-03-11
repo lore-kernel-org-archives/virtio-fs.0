@@ -1,17 +1,18 @@
-Date: Tue, 10 Mar 2020 17:27:09 -0400
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20200310172603-mutt-send-email-mst@kernel.org>
-References: <20200304165845.3081-1-vgoyal@redhat.com>
-	<20200304165845.3081-5-vgoyal@redhat.com>
-	<20200310071043-mutt-send-email-mst@kernel.org>
-	<20200310184720.GD38440@redhat.com>
+Date: Wed, 11 Mar 2020 12:58:19 +0800
+From: Liu Bo <bo.liu@linux.alibaba.com>
+Message-ID: <20200311045812.3p57mi23huazlvsx@rsjd01523.et2sqa>
+References: <1583270111-76859-1-git-send-email-bo.liu@linux.alibaba.com>
+	<CAJfpegtFWqEAV-Jb_KoHihJ5-UpU=JkdxEg_stz6JM5OP_LXMQ@mail.gmail.com>
+	<20200310184640.5djxclzt6gqkq4v3@rsjd01523.et2sqa>
+	<CAJfpegtUkfwZXZ977HeC7pJ+2rFVwyr0pk-ru4J7z1-TVafcSQ@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <20200310184720.GD38440@redhat.com>
-Content-Type: text/plain; charset=us-ascii
+In-Reply-To: <CAJfpegtUkfwZXZ977HeC7pJ+2rFVwyr0pk-ru4J7z1-TVafcSQ@mail.gmail.com>
+Content-Type: text/plain; charset=WINDOWS-1252
 Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 04/20] virtio: Implement get_shm_region for
-	PCI transport
+Subject: Re: [Virtio-fs] [PATCH] fuse: make written data persistent after
+	writing
+Reply-To: bo.liu@linux.alibaba.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,62 +21,35 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: kbuild test robot <lkp@intel.com>, miklos@szeredi.hu, linux-nvdimm@lists.01.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com
 
-On Tue, Mar 10, 2020 at 02:47:20PM -0400, Vivek Goyal wrote:
-> On Tue, Mar 10, 2020 at 07:12:25AM -0400, Michael S. Tsirkin wrote:
-> [..]
-> > > +static bool vp_get_shm_region(struct virtio_device *vdev,
-> > > +			      struct virtio_shm_region *region, u8 id)
-> > > +{
-> > > +	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
-> > > +	struct pci_dev *pci_dev = vp_dev->pci_dev;
-> > > +	u8 bar;
-> > > +	u64 offset, len;
-> > > +	phys_addr_t phys_addr;
-> > > +	size_t bar_len;
-> > > +	int ret;
-> > > +
-> > > +	if (!virtio_pci_find_shm_cap(pci_dev, id, &bar, &offset, &len)) {
-> > > +		return false;
-> > > +	}
-> > > +
-> > > +	ret = pci_request_region(pci_dev, bar, "virtio-pci-shm");
-> > > +	if (ret < 0) {
-> > > +		dev_err(&pci_dev->dev, "%s: failed to request BAR\n",
-> > > +			__func__);
-> > > +		return false;
-> > > +	}
-> > > +
-> > > +	phys_addr = pci_resource_start(pci_dev, bar);
-> > > +	bar_len = pci_resource_len(pci_dev, bar);
-> > > +
-> > > +        if (offset + len > bar_len) {
-> > > +                dev_err(&pci_dev->dev,
-> > > +                        "%s: bar shorter than cap offset+len\n",
-> > > +                        __func__);
-> > > +                return false;
-> > > +        }
-> > > +
-> > 
-> > Something wrong with indentation here.
+On Tue, Mar 10, 2020 at 08:08:49PM +0100, Miklos Szeredi wrote:
+> On Tue, Mar 10, 2020 at 7:46 PM Liu Bo <bo.liu@linux.alibaba.com> wrote:
+> >
+> > On Tue, Mar 10, 2020 at 11:14:17AM +0100, Miklos Szeredi wrote:
+> > > On Tue, Mar 3, 2020 at 10:15 PM Liu Bo <bo.liu@linux.alibaba.com> wrote:
+> > > >
+> > > > If this is a DSYNC write, make sure we push it to stable storage now
+> > > > that we've written data.
+> > >
+> > > If this is direct I/O then why do we need an fysnc() call?
+> > >
+> > > The only thing needed should be correct setting O_DSYNC in the flags
+> > > field of the WRITE request, and it appears to me that that is already
+> > > being done.
+> >
+> > Given direct IO itself doesn't guarantee FUA or FLUSH, I think we
+> > still need such a fsync() call to make sure a FUA/FLUSH is sent after
+> > direct IO.
 > 
-> Will fix all indentation related issues in this patch.
-> 
-> > Also as long as you are validating things, it's worth checking
-> > offset + len does not overflow.
-> 
-> Something like addition of following lines?
-> 
-> +       if ((offset + len) < offset) {
-> +               dev_err(&pci_dev->dev, "%s: cap offset+len overflow detected\n",
-> +                       __func__);
-> +               return false;
-> +       }
-> 
-> Vivek
+> What I mean is that the server itself can call fsync(2) from the WRITE
+> request if it finds that fi->flags contains O_DSYNC.
 
-That should do it.
+Right, I missed that with no_open FUSE_DIRECT_IO is not possible,
+thanks for clarifying it.
+
+thanks,
+-liubo
 
 

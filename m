@@ -1,12 +1,21 @@
-From: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
-Date: Tue, 28 Jan 2020 19:18:19 +0900
-Message-ID: <20200128101819.21766-3-misono.tomohiro@jp.fujitsu.com>
-In-Reply-To: <20200128101819.21766-1-misono.tomohiro@jp.fujitsu.com>
-References: <20200128101819.21766-1-misono.tomohiro@jp.fujitsu.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=vhWEqnexHgncpvxDS2l8sBNTUU1im25PrBPC7w+tOLk=;
+	b=FQioROWeCZRT5RbT70b6aS3L4z5A8Xh9+TkXcRo1x7CAqq0IA0ua0MEGE5Uykqe0FL
+	s7mGcH8etLLtylbbbK6FSbTb6IJjRhs43A8ysMHl6swkDiSbevywH8PsYFGAc5tuTu4F
+	hx5OcZDYIvjseSVuRKJfka41SHIGYvXKH88DsabLaszJEEo8W3EyzPcO//PwBEE3M3gH
+	e8lIZX3B3ofO7IvWP08ivloJcQzyEW6krILi2rllnwhYD/9lqaIRca+M2m313QFn0KyF
+	ArCoRx8xQTINJyLzKbBhKUuuPeE0059amPOESX5qE3B8OeqEICFbnYjaivOd08jIc7RP
+	nwqA==
 MIME-Version: 1.0
-Content-Type: text/plain; charset=WINDOWS-1252
+References: <20200304165845.3081-1-vgoyal@redhat.com>
+In-Reply-To: <20200304165845.3081-1-vgoyal@redhat.com>
+From: Amir Goldstein <amir73il@gmail.com>
+Date: Wed, 11 Mar 2020 07:22:51 +0200
+Message-ID: <CAOQ4uxi_Xrf+iyP6KVugFgLOfzUvscMr0de0KxQo+jHNBCA9oA@mail.gmail.com>
+Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 2/2] virtiofsd: Add support of posix_acl
+Subject: Re: [Virtio-fs] [PATCH 00/20] virtiofs: Add DAX support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,176 +24,51 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
-Cc: vgoyal@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, linux-nvdimm <linux-nvdimm@lists.01.org>, linux-kernel <linux-kernel@vger.kernel.org>, virtio-fs@redhat.com, mst@redhat.com, linux-fsdevel <linux-fsdevel@vger.kernel.org>
 
-This commit adds support of posix_acl which is enabled by 'posix_acl'
-option (default: disabled).
+On Wed, Mar 4, 2020 at 7:01 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> Hi,
+>
+> This patch series adds DAX support to virtiofs filesystem. This allows
+> bypassing guest page cache and allows mapping host page cache directly
+> in guest address space.
+>
+> When a page of file is needed, guest sends a request to map that page
+> (in host page cache) in qemu address space. Inside guest this is
+> a physical memory range controlled by virtiofs device. And guest
+> directly maps this physical address range using DAX and hence gets
+> access to file data on host.
+>
+> This can speed up things considerably in many situations. Also this
+> can result in substantial memory savings as file data does not have
+> to be copied in guest and it is directly accessed from host page
+> cache.
+>
+> Most of the changes are limited to fuse/virtiofs. There are couple
+> of changes needed in generic dax infrastructure and couple of changes
+> in virtio to be able to access shared memory region.
+>
+> These patches apply on top of 5.6-rc4 and are also available here.
+>
+> https://github.com/rhvgoyal/linux/commits/vivek-04-march-2020
+>
+> Any review or feedback is welcome.
+>
+[...]
+>  drivers/dax/super.c                |    3 +-
+>  drivers/virtio/virtio_mmio.c       |   32 +
+>  drivers/virtio/virtio_pci_modern.c |  107 +++
+>  fs/dax.c                           |   66 +-
+>  fs/fuse/dir.c                      |    2 +
+>  fs/fuse/file.c                     | 1162 +++++++++++++++++++++++++++-
 
-If posix_acl is enabled, virtiofsd handles umask handling otherwise done
-in guest kenrel in order to treat default ACL correctly.
+That's a big addition to already big file.c.
+Maybe split dax specific code to dax.c?
+Can be a post series cleanup too.
 
-With this, ACL-related xfstest generic/{099,237,319,444} passes on XFS
-backend.
-
-Implementation:
-  virtiofsd adds FUSE_CAP_POSIX_ACL/FUSE_CAP_DONT_MASK to INIT replay if
- posix_acl is enabled. This results in skipping umask handling in guest
- kernel. In turn, virtiofsd sets umask before creating files by using
- umask value included in fuse_request and restore umask after that.
- Note that calling umask() is ok since now each worker thread has called
- unshare(CLONE_FS) when starting up.
-
-Signed-off-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
----
- tools/virtiofsd/helper.c         |  3 +++
- tools/virtiofsd/passthrough_ll.c | 36 ++++++++++++++++++++++++++------
- tools/virtiofsd/seccomp.c        |  1 +
- 3 files changed, 34 insertions(+), 6 deletions(-)
-
-diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
-index 0801cf752c..97968a9385 100644
---- a/tools/virtiofsd/helper.c
-+++ b/tools/virtiofsd/helper.c
-@@ -171,6 +171,9 @@ void fuse_cmdline_help(void)
-            "                               default: no_writeback\n"
-            "    -o xattr|no_xattr          enable/disable xattr\n"
-            "                               default: no_xattr\n"
-+           "    -o posix_acl|no_posxi_acl  enable/disable posix_acl\n"
-+           "                               enabling this also enables xattr\n"
-+           "                               default: no_posix_acl\n"
-            );
- }
- 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 6bcc33e0eb..e1bb261b51 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -152,6 +152,7 @@ struct lo_data {
-     int flock;
-     int posix_lock;
-     int xattr;
-+    int posix_acl;
-     char *source;
-     double timeout;
-     int cache;
-@@ -182,6 +183,8 @@ static const struct fuse_opt lo_opts[] = {
-     { "no_posix_lock", offsetof(struct lo_data, posix_lock), 0 },
-     { "xattr", offsetof(struct lo_data, xattr), 1 },
-     { "no_xattr", offsetof(struct lo_data, xattr), 0 },
-+    { "posix_acl", offsetof(struct lo_data, posix_acl), 1 },
-+    { "no_posix_acl", offsetof(struct lo_data, posix_acl), 0 },
-     { "timeout=%lf", offsetof(struct lo_data, timeout), 0 },
-     { "timeout=", offsetof(struct lo_data, timeout_set), 1 },
-     { "cache=none", offsetof(struct lo_data, cache), CACHE_NONE },
-@@ -587,6 +590,17 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
-         fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling readdirplus\n");
-         conn->want &= ~FUSE_CAP_READDIRPLUS;
-     }
-+
-+    if (conn->capable & FUSE_CAP_POSIX_ACL) {
-+        if (lo->posix_acl) {
-+            if (!lo->xattr)  {
-+                fuse_log(FUSE_LOG_DEBUG, "lo_init: enabling xattr for ACL\n");
-+                lo->xattr = 1;
-+            }
-+            fuse_log(FUSE_LOG_DEBUG, "lo_init: enabling ACL\n");
-+            conn->want |= (FUSE_CAP_POSIX_ACL | FUSE_CAP_DONT_MASK);
-+        }
-+    }
- }
- 
- static int64_t *version_ptr(struct lo_data *lo, struct lo_inode *inode)
-@@ -1137,9 +1151,11 @@ static void lo_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
- /*
-  * Change to uid/gid of caller so that file is created with
-  * ownership of caller.
-+ * Also update umask if posix_acl is enabled.
-  * TODO: What about selinux context?
-  */
--static int lo_change_cred(fuse_req_t req, struct lo_cred *old)
-+static int lo_change_cred_and_umask(fuse_req_t req, struct lo_cred *old,
-+                                    struct lo_data *lo)
- {
-     int res;
- 
-@@ -1159,11 +1175,15 @@ static int lo_change_cred(fuse_req_t req, struct lo_cred *old)
-         return errno_save;
-     }
- 
-+    if (lo->posix_acl) {
-+        umask(req->ctx.umask);
-+    }
-+
-     return 0;
- }
- 
- /* Regain Privileges */
--static void lo_restore_cred(struct lo_cred *old)
-+static void lo_restore_cred_and_umask(struct lo_cred *old, struct lo_data *lo)
- {
-     int res;
- 
-@@ -1178,6 +1198,10 @@ static void lo_restore_cred(struct lo_cred *old)
-         fuse_log(FUSE_LOG_ERR, "setegid(%u): %m\n", old->egid);
-         exit(1);
-     }
-+
-+    if (lo->posix_acl) {
-+        umask(0);
-+    }
- }
- 
- static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
-@@ -1204,7 +1228,7 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
- 
-     saverr = ENOMEM;
- 
--    saverr = lo_change_cred(req, &old);
-+    saverr = lo_change_cred_and_umask(req, &old, lo);
-     if (saverr) {
-         goto out;
-     }
-@@ -1213,7 +1237,7 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
- 
-     saverr = errno;
- 
--    lo_restore_cred(&old);
-+    lo_restore_cred_and_umask(&old, lo);
- 
-     if (res == -1) {
-         goto out;
-@@ -1898,7 +1922,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
-         return;
-     }
- 
--    err = lo_change_cred(req, &old);
-+    err = lo_change_cred_and_umask(req, &old, lo);
-     if (err) {
-         goto out;
-     }
-@@ -1908,7 +1932,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
-     fd = openat(parent_inode->fd, name, (fi->flags | O_CREAT) & ~O_NOFOLLOW,
-                 mode);
-     err = fd == -1 ? errno : 0;
--    lo_restore_cred(&old);
-+    lo_restore_cred_and_umask(&old, lo);
- 
-     if (!err) {
-         ssize_t fh;
-diff --git a/tools/virtiofsd/seccomp.c b/tools/virtiofsd/seccomp.c
-index 9ee99e4725..1b6f579452 100644
---- a/tools/virtiofsd/seccomp.c
-+++ b/tools/virtiofsd/seccomp.c
-@@ -102,6 +102,7 @@ static const int syscall_whitelist[] = {
-     SCMP_SYS(symlinkat),
-     SCMP_SYS(time), /* Rarely needed, except on static builds */
-     SCMP_SYS(tgkill),
-+    SCMP_SYS(umask),
-     SCMP_SYS(unlinkat),
-     SCMP_SYS(unshare),
-     SCMP_SYS(utimensat),
--- 
-2.21.1
+Thanks,
+Amir.
 
 

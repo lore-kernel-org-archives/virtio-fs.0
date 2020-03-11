@@ -1,12 +1,25 @@
-Date: Thu, 30 Jan 2020 09:13:50 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200130141350.GA21264@redhat.com>
-References: <20200128101819.21766-1-misono.tomohiro@jp.fujitsu.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=zDINA0vZuHEOMHgRG8O8q8Cv6r3DuQRO69eZhFF5eEI=;
+	b=LPUXGEF5amYOBlrop1rcjSx8ZchMVTTL0Q8j/pP8BHayJceQuBOOq8WUjqMDAPx895
+	9IIyKqEalpT/MkO9z+NdQ49IQUNX1zj6RNQIdOLxH8Ewy+cMoKO32n73pUaLUprt9QaW
+	PJp5aNh7zDbiZn+7g0tDB0pJIQuBIRNfXjjoA=
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200128101819.21766-1-misono.tomohiro@jp.fujitsu.com>
-Subject: Re: [Virtio-fs] [PATCH v2 0/2] virtiofsd: Fix xattr and ACL
+References: <20200304165845.3081-1-vgoyal@redhat.com>
+	<20200304165845.3081-13-vgoyal@redhat.com>
+	<CAJfpeguY8gDYVp_q3-W6JNA24zCry+SfWmEW2zuHLQLhmyUB3Q@mail.gmail.com>
+	<20200310203321.GF38440@redhat.com>
+	<CAOQ4uxh2WdLdbcMp+qvQCX2hiBx+hLO1z5wkZtc-7GCuDdsthw@mail.gmail.com>
+	<CAJfpeguwqEsPLtph73AG7bhm1Dp4ahyJtyW=Ud7L-OFwyEmwWg@mail.gmail.com>
+	<20200311144124.GB83257@redhat.com>
+In-Reply-To: <20200311144124.GB83257@redhat.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Wed, 11 Mar 2020 16:12:15 +0100
+Message-ID: <CAJfpegvTo=FX5y+8R3hdkv6mOTAUQgg9qmzvL5oStddFW0OBgg@mail.gmail.com>
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH 12/20] fuse: Introduce
+	setupmapping/removemapping commands
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,72 +28,112 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
-Cc: virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: linux-nvdimm <linux-nvdimm@lists.01.org>, Amir Goldstein <amir73il@gmail.com>, linux-kernel <linux-kernel@vger.kernel.org>, virtio-fs@redhat.com, "Michael S. Tsirkin" <mst@redhat.com>, linux-fsdevel <linux-fsdevel@vger.kernel.org>
 
-On Tue, Jan 28, 2020 at 07:18:17PM +0900, Misono Tomohiro wrote:
-> Hi,
-> 
-> This is a second version of xattr fix for virtiofsd.
-> I included ACL fix (which introduces new option posix_acl) in this version
-> too as ACL mostly depends on xattr.
-> 
-> I run xfstests with XFS backend using "-o xattr -o posix_acl" option and
-> only new failure is generic/375 which checks if sgid bit is cleared after
-> setfacl. I'll try to investigate it.
-> 
-> change in v1 -> v2
->  - rebased to current dev branch
-> 
->  - Always chdir for xattr (1st patch)
->    In v1, I keep current implementation for regular file/dir since it
->    show better performance in my environment. But I notice opening file
->    for xattr causes seek sanity test fails (xfstest generic/285, 436).
-> 
->    I'm not sure what is the fundamental problem here but I believe
->    performance can be improved by introducing some caching mechanism
->    in general.
+On Wed, Mar 11, 2020 at 3:41 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> On Wed, Mar 11, 2020 at 03:19:18PM +0100, Miklos Szeredi wrote:
+> > On Wed, Mar 11, 2020 at 8:03 AM Amir Goldstein <amir73il@gmail.com> wrote:
+> > >
+> > > On Tue, Mar 10, 2020 at 10:34 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> > > >
+> > > > On Tue, Mar 10, 2020 at 08:49:49PM +0100, Miklos Szeredi wrote:
+> > > > > On Wed, Mar 4, 2020 at 5:59 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> > > > > >
+> > > > > > Introduce two new fuse commands to setup/remove memory mappings. This
+> > > > > > will be used to setup/tear down file mapping in dax window.
+> > > > > >
+> > > > > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > > > > > Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
+> > > > > > ---
+> > > > > >  include/uapi/linux/fuse.h | 37 +++++++++++++++++++++++++++++++++++++
+> > > > > >  1 file changed, 37 insertions(+)
+> > > > > >
+> > > > > > diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
+> > > > > > index 5b85819e045f..62633555d547 100644
+> > > > > > --- a/include/uapi/linux/fuse.h
+> > > > > > +++ b/include/uapi/linux/fuse.h
+> > > > > > @@ -894,4 +894,41 @@ struct fuse_copy_file_range_in {
+> > > > > >         uint64_t        flags;
+> > > > > >  };
+> > > > > >
+> > > > > > +#define FUSE_SETUPMAPPING_ENTRIES 8
+> > > > > > +#define FUSE_SETUPMAPPING_FLAG_WRITE (1ull << 0)
+> > > > > > +struct fuse_setupmapping_in {
+> > > > > > +       /* An already open handle */
+> > > > > > +       uint64_t        fh;
+> > > > > > +       /* Offset into the file to start the mapping */
+> > > > > > +       uint64_t        foffset;
+> > > > > > +       /* Length of mapping required */
+> > > > > > +       uint64_t        len;
+> > > > > > +       /* Flags, FUSE_SETUPMAPPING_FLAG_* */
+> > > > > > +       uint64_t        flags;
+> > > > > > +       /* Offset in Memory Window */
+> > > > > > +       uint64_t        moffset;
+> > > > > > +};
+> > > > > > +
+> > > > > > +struct fuse_setupmapping_out {
+> > > > > > +       /* Offsets into the cache of mappings */
+> > > > > > +       uint64_t        coffset[FUSE_SETUPMAPPING_ENTRIES];
+> > > > > > +        /* Lengths of each mapping */
+> > > > > > +        uint64_t       len[FUSE_SETUPMAPPING_ENTRIES];
+> > > > > > +};
+> > > > >
+> > > > > fuse_setupmapping_out together with FUSE_SETUPMAPPING_ENTRIES seem to be unused.
+> > > >
+> > > > This looks like leftover from the old code. I will get rid of it. Thanks.
+> > > >
+> > >
+> > > Hmm. I wonder if we should keep some out args for future extensions.
+> > > Maybe return the mapped size even though it is all or nothing at this
+> > > point?
+> > >
+> > > I have interest in a similar FUSE mapping functionality that was prototyped
+> > > by Miklos and published here:
+> > > https://lore.kernel.org/linux-fsdevel/CAJfpegtjEoE7H8tayLaQHG9fRSBiVuaspnmPr2oQiOZXVB1+7g@mail.gmail.com/
+> > >
+> > > In this prototype, a FUSE_MAP command is used by the server to map a
+> > > range of file to the kernel for io. The command in args are quite similar to
+> > > those in fuse_setupmapping_in, but since the server is on the same host,
+> > > the mapping response is {mapfd, offset, size}.
+> >
+> > Right.  So the difference is in which entity allocates the mapping.
+> > IOW whether the {fd, offset, size} is input or output in the protocol.
+> >
+> > I don't remember the reasons for going with the mapping being
+> > allocated by the client, not the other way round.   Vivek?
+>
+> I think one of the main reasons is memory reclaim. Once all ranges in
+> a cache range are allocated, we need to free a memory range which can be
+> reused. And client has all the logic to free up that range so that it can
+> be remapped and reused for a different file/offset. Server will not know
+> any of this. So I will think that for virtiofs, server might not be
+> able to decide where to map a section of file and it has to be told
+> explicitly by the client.
 
-Hi Misono,
+Okay.
 
-How much is performance degradation due to fchdir(). If it is significant,
-then I will be inclined to keep original code for dir/file till some
-other mechanism is introduced to offset the perofrmance loss.
+> >
+> > If the allocation were to be by the server, we could share the request
+> > type and possibly some code between the two, although the I/O
+> > mechanism would still be different.
+> >
+>
+> So input parameters of both FUSE_SETUPMAPPING and FUSE_MAP seem
+> similar (except the moffset field).  Given output of FUSE_MAP reqeust
+> is very different, I would think it will be easier to have it as a
+> separate command.
+>
+> Or can it be some sort of optional output args which can differentiate
+> between two types of requests.
+>
+> /me personally finds it simpler to have separate command instead of
+> overloading FUSE_SETUPMAPPING. But its your call. :-)
 
-> So I change the code to always fchdir to avoid the
->    problem for now. This results in simpler code too.
-> 
->  - Add ACL fix (2nd patch)
->    ACL mostly works if xattr option is enabled.
->    To support default ACL behavior, add new option posix_acl which
->    handles umasking in virtiofsd instead of guest kernel.
+I too prefer a separate request type.
 
-Ideally I would preferred ACL changes in a separapte patch series. We had
-been discussing xattr related changes and it will be easier to test and
-review xattr changes and then followed by ACL changes. Anyway, now you
-have already posted these changes in smae patch series, I will review it.
+Thanks,
+Miklos
 
-But if you happen to post another patch series, then lets separate out
-xattr changes and ACL changes in separate patch series.
-
-Thanks
-Vivek
-
-> 
-> Thanks,
-> Misono
-> 
-> Misono Tomohiro (2):
->   virtiofsd: Fix xattr operations
->   virtiofsd: Add support of posix_acl
-> 
->  tools/virtiofsd/fuse_virtio.c    |  13 +++
->  tools/virtiofsd/helper.c         |   3 +
->  tools/virtiofsd/passthrough_ll.c | 136 +++++++++++++++++++++----------
->  tools/virtiofsd/seccomp.c        |  11 ++-
->  4 files changed, 115 insertions(+), 48 deletions(-)
-> 
-> -- 
-> 2.21.1
-> 
 

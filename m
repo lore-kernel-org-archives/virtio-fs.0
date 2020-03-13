@@ -1,13 +1,22 @@
-Date: Thu, 30 Jan 2020 09:58:55 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200130145855.GA26448@redhat.com>
-References: <20200128101819.21766-1-misono.tomohiro@jp.fujitsu.com>
-	<20200128101819.21766-2-misono.tomohiro@jp.fujitsu.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=wyFbd+XTU4jmr46S/cr+5oxuJ4yyBlKA+WZPNk944HQ=;
+	b=jbLOV/wKEBCP+egAIPuAmGI01EGi9iRz1D+M4W1UTJ1zDP7EGuZ06aIyWN1ZP2PqaS
+	jt1Y6IaJZOgv5eR99mE1xIvQrt2lJqt2PMidGpfnF4LDdvdkrrGqK/CQ12baoYeXoNdR
+	bMkkgu83JFDRZECx6628ZmgAPYa4D+C7IpQ4M=
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200128101819.21766-2-misono.tomohiro@jp.fujitsu.com>
-Subject: Re: [Virtio-fs] [PATCH v2 1/2] virtiofsd: Fix xattr operations
+References: <20200304165845.3081-1-vgoyal@redhat.com>
+	<20200304165845.3081-14-vgoyal@redhat.com>
+	<CAJfpegtpgE+vnN0hvEVMDyNkYZ0h3_kNgxWCQUb2iuBdy8kEsw@mail.gmail.com>
+	<20200312160208.GB114720@redhat.com>
+In-Reply-To: <20200312160208.GB114720@redhat.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Fri, 13 Mar 2020 11:18:15 +0100
+Message-ID: <CAJfpegtuCCRfKfctUyQBimAOpnOTvW5zodLAy307Mr_1h0+e7g@mail.gmail.com>
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH 13/20] fuse,
+	dax: Implement dax read/write operations
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,110 +25,144 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
-Cc: virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: linux-nvdimm <linux-nvdimm@lists.01.org>, "Michael S. Tsirkin" <mst@redhat.com>, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
 
-On Tue, Jan 28, 2020 at 07:18:18PM +0900, Misono Tomohiro wrote:
-> Current virtiofsd has problems about xattr operations and
-> they does not work properly for directory/symlink/special file.
-> 
-> The fundamental cause is that virtiofsd uses openat() + f...xattr()
-> systemcalls for xattr operation but we should not open symlink/special
-> file in the daemon. Therefore the function is restricted.
-> 
-> Fix this problem by:
->  1. during setup of each thread, call unshare(CLONE_FS) so that chdir
->     would not affect other threads
->  2. in xattr operations (i.e. lo_getxattr), use
->     fchdir(proc_loot_fd) + ...xattr() + fchdir(root.fd)
->     instead of openat() + f...xattr() to avoid open files
-> 
-> With this patch, xfstests generic/062 passes on virtiofs.
-> This fix is suggested by Miklos Szeredi and Stefan Hajnoczi.
-> 
-> Signed-off-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
-> ---
->  tools/virtiofsd/fuse_virtio.c    |  13 ++++
->  tools/virtiofsd/passthrough_ll.c | 100 +++++++++++++++++++------------
->  tools/virtiofsd/seccomp.c        |  10 ++--
->  3 files changed, 81 insertions(+), 42 deletions(-)
-> 
-> diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-> index 1aac6b8687..ad03a7dcc0 100644
-> --- a/tools/virtiofsd/fuse_virtio.c
-> +++ b/tools/virtiofsd/fuse_virtio.c
-> @@ -463,6 +463,8 @@ err:
->      return ret;
->  }
->  
-> +static __thread bool clone_fs_called;
-> +
->  /* Process one FVRequest in a thread pool */
->  static void fv_queue_worker(gpointer data, gpointer user_data)
->  {
-> @@ -478,6 +480,17 @@ static void fv_queue_worker(gpointer data, gpointer user_data)
->  
->      assert(se->bufsize > sizeof(struct fuse_in_header));
->  
-> +    if (!clone_fs_called) {
-> +        int ret;
-> +
-> +        /* unshare FS for xattr operation */
-> +        ret = unshare(CLONE_FS);
-> +        /* should not fail */
-> +        assert(ret == 0);
-> +
-> +        clone_fs_called = true;
-> +    }
-> +
->      /*
->       * An element contains one request and the space to send our response
->       * They're spread over multiple descriptors in a scatter/gather set
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index f0093ab84e..6bcc33e0eb 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2362,6 +2362,7 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
->      ssize_t ret;
->      int saverr;
->      int fd = -1;
-> +    bool dir_changed = false;
->  
->      inode = lo_inode(req, ino);
->      if (!inode) {
-> @@ -2377,17 +2378,14 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
->      fuse_log(FUSE_LOG_DEBUG, "lo_getxattr(ino=%" PRIu64 ", name=%s size=%zd)\n",
->               ino, name, size);
->  
-> -    if (inode->is_symlink) {
-> -        /* Sorry, no race free way to getxattr on symlink. */
-> -        saverr = EPERM;
-> -        goto out;
-> -    }
-> -
->      sprintf(procname, "%i", inode->fd);
-> -    fd = openat(lo->proc_self_fd, procname, O_RDONLY);
-> -    if (fd < 0) {
-> +    ret = fchdir(lo->proc_self_fd);
-> +    if (ret < 0) {
-> +        /* should not happen */
-> +        fuse_log(FUSE_LOG_ERR, "lo_getxattr: fail fchdir to proc_self_fd\n");
->          goto out_err;
->      }
-> +    dir_changed = true;
->  
->      if (size) {
->          value = malloc(size);
+On Thu, Mar 12, 2020 at 5:02 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> On Thu, Mar 12, 2020 at 10:43:10AM +0100, Miklos Szeredi wrote:
+> > On Wed, Mar 4, 2020 at 5:59 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> > >
+> > > This patch implements basic DAX support. mmap() is not implemented
+> > > yet and will come in later patches. This patch looks into implemeting
+> > > read/write.
+> > >
+> > > We make use of interval tree to keep track of per inode dax mappings.
+> > >
+> > > Do not use dax for file extending writes, instead just send WRITE message
+> > > to daemon (like we do for direct I/O path). This will keep write and
+> > > i_size change atomic w.r.t crash.
+> > >
+> > > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> > > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > > Signed-off-by: Miklos Szeredi <mszeredi@redhat.com>
+> > > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+> > > Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
+> > > ---
+> > >  fs/fuse/file.c            | 597 +++++++++++++++++++++++++++++++++++++-
+> > >  fs/fuse/fuse_i.h          |  23 ++
+> > >  fs/fuse/inode.c           |   6 +
+> > >  include/uapi/linux/fuse.h |   1 +
+> > >  4 files changed, 621 insertions(+), 6 deletions(-)
+> > >
+> > > diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+> > > index 9d67b830fb7a..9effdd3dc6d6 100644
+> > > --- a/fs/fuse/file.c
+> > > +++ b/fs/fuse/file.c
+> > > @@ -18,6 +18,12 @@
+> > >  #include <linux/swap.h>
+> > >  #include <linux/falloc.h>
+> > >  #include <linux/uio.h>
+> > > +#include <linux/dax.h>
+> > > +#include <linux/iomap.h>
+> > > +#include <linux/interval_tree_generic.h>
+> > > +
+> > > +INTERVAL_TREE_DEFINE(struct fuse_dax_mapping, rb, __u64, __subtree_last,
+> > > +                     START, LAST, static inline, fuse_dax_interval_tree);
+> >
+> > Are you using this because of byte ranges (u64)?   Does it not make
+> > more sense to use page offsets, which are unsigned long and so fit
+> > nicely into the generic interval tree?
+>
+> I think I should be able to use generic interval tree. I will switch
+> to that.
+>
+> [..]
+> > > +/* offset passed in should be aligned to FUSE_DAX_MEM_RANGE_SZ */
+> > > +static int fuse_setup_one_mapping(struct inode *inode, loff_t offset,
+> > > +                                 struct fuse_dax_mapping *dmap, bool writable,
+> > > +                                 bool upgrade)
+> > > +{
+> > > +       struct fuse_conn *fc = get_fuse_conn(inode);
+> > > +       struct fuse_inode *fi = get_fuse_inode(inode);
+> > > +       struct fuse_setupmapping_in inarg;
+> > > +       FUSE_ARGS(args);
+> > > +       ssize_t err;
+> > > +
+> > > +       WARN_ON(offset % FUSE_DAX_MEM_RANGE_SZ);
+> > > +       WARN_ON(fc->nr_free_ranges < 0);
+> > > +
+> > > +       /* Ask fuse daemon to setup mapping */
+> > > +       memset(&inarg, 0, sizeof(inarg));
+> > > +       inarg.foffset = offset;
+> > > +       inarg.fh = -1;
+> > > +       inarg.moffset = dmap->window_offset;
+> > > +       inarg.len = FUSE_DAX_MEM_RANGE_SZ;
+> > > +       inarg.flags |= FUSE_SETUPMAPPING_FLAG_READ;
+> > > +       if (writable)
+> > > +               inarg.flags |= FUSE_SETUPMAPPING_FLAG_WRITE;
+> > > +       args.opcode = FUSE_SETUPMAPPING;
+> > > +       args.nodeid = fi->nodeid;
+> > > +       args.in_numargs = 1;
+> > > +       args.in_args[0].size = sizeof(inarg);
+> > > +       args.in_args[0].value = &inarg;
+> >
+> > args.force = true?
+>
+> I can do that but I am not sure what exactly does args.force do and
+> why do we need it in this case.
 
-I am wondering, is it better to allocate memory first (if need be) and
-then do fchdir(). If memory allocation fails, we can return error right
-away without having to do fchdir() twice.
+Hm, it prevents interrupts.  Looking closely, however it will only
+prevent SIGKILL from immediately interrupting the request, otherwise
+it will send an INTERRUPT request and the filesystem can ignore that.
+Might make sense to have a args.nonint flag to prevent the sending of
+INTERRUPT...
 
-Also do we need dir_changed variable? I think if we organize labels
-properly, we should be able to get rid of this dir_changed variable.
+> First thing it does is that request is allocated with flag __GFP_NOFAIL.
+> Second thing it does is that caller is forced to wait for request
+> completion and its not an interruptible sleep.
+>
+> I am wondering what makes FUSE_SETUPMAPING/FUSE_REMOVEMAPPING requests
+> special that we need to set force flag.
 
-Same comments apply to lo_listxattr() as well.
+Maybe not for SETUPMAPPING (I was confused by the error log).
 
-Thanks
-Vivek
+However if REMOVEMAPPING fails for some reason, than that dax mapping
+will be leaked for the lifetime of the filesystem.   Or am I
+misunderstanding it?
+
+> > > +       ret = fuse_setup_one_mapping(inode,
+> > > +                                    ALIGN_DOWN(pos, FUSE_DAX_MEM_RANGE_SZ),
+> > > +                                    dmap, true, true);
+> > > +       if (ret < 0) {
+> > > +               printk("fuse_setup_one_mapping() failed. err=%d pos=0x%llx\n",
+> > > +                      ret, pos);
+> >
+> > Again.
+>
+> Will remove. How about converting some of them to pr_debug() instead? It
+> can help with debugging if something is not working.
+
+Okay, and please move it to fuse_setup_one_mapping() where there's
+already a pr_debug() for the success case.
+
+ > > +
+> > > +       /* Do not use dax for file extending writes as its an mmap and
+> > > +        * trying to write beyong end of existing page will generate
+> > > +        * SIGBUS.
+> >
+> > Ah, here it is.  So what happens in case of a race?  Does that
+> > currently crash KVM?
+>
+> In case of race, yes, KVM hangs. So no shared directory operation yet
+> till we have designed proper error handling in kvm path.
+
+I think before this is merged we have to fix the KVM crash; that's not
+acceptable even if we explicitly say that shared directory is not
+supported for the time being.
+
+Thanks,
+Miklos
+
 

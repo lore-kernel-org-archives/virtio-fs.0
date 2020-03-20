@@ -1,10 +1,10 @@
 From: Liu Bo <bo.liu@linux.alibaba.com>
-Date: Fri, 20 Mar 2020 07:54:49 +0800
-Message-Id: <1584662089-26468-1-git-send-email-bo.liu@linux.alibaba.com>
+Date: Sat, 21 Mar 2020 02:34:13 +0800
+Message-Id: <1584729254-123546-1-git-send-email-bo.liu@linux.alibaba.com>
 Content-Type: text/plain; charset=WINDOWS-1252
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH] virtiofsd: print more verbose information when
-	bailing out
+Subject: [Virtio-fs] [PATCH v2 1/2] virtiofsd: print more verbose
+	information when bailing out
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,23 +20,24 @@ and flags.
 
 Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
 ---
- contrib/virtiofsd/fuse_lowlevel.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ tools/virtiofsd/fuse_lowlevel.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/contrib/virtiofsd/fuse_lowlevel.c b/contrib/virtiofsd/fuse_lowlevel.c
-index f7eb12c..7375bae 100644
---- a/contrib/virtiofsd/fuse_lowlevel.c
-+++ b/contrib/virtiofsd/fuse_lowlevel.c
-@@ -1226,7 +1226,8 @@ static void do_write_buf(fuse_req_t req, fuse_ino_t nodeid,
-         }
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index a34a611..ca2056f 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -1224,8 +1224,8 @@ static void do_write_buf(fuse_req_t req, fuse_ino_t nodeid,
+     }
  
- 	if (fuse_buf_size(pbufv) != arg->size) {
--		fuse_err("fuse: do_write_buf: buffer size doesn't match arg->size\n");
-+		fuse_err("fuse: do_write_buf: buffer size %lu doesn't match arg->size %u offset %lu flags %u\n",
-+			 fuse_buf_size(pbufv), arg->size, arg->offset, arg->write_flags);
- 		fuse_reply_err(req, EIO);
- 		return;
- 	}
+     if (fuse_buf_size(pbufv) != arg->size) {
+-        fuse_log(FUSE_LOG_ERR,
+-                 "fuse: do_write_buf: buffer size doesn't match arg->size\n");
++        fuse_log(FUSE_LOG_ERR, "fuse: do_write_buf: buffer size %lu doesn't match arg->size %u offset %lu flags %u\n",
++                 fuse_buf_size(pbufv), arg->size, arg->offset, arg->write_flags);
+         fuse_reply_err(req, EIO);
+         return;
+     }
 -- 
 1.8.3.1
 

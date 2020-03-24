@@ -1,15 +1,16 @@
-Date: Tue, 24 Mar 2020 19:52:30 +0000
+Date: Tue, 24 Mar 2020 20:09:40 +0000
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200324195230.GH2645@work-vm>
-References: <cb5bc383-a669-ebaa-3919-a5f860e10a52@redhat.com>
-	<20200323184309.GE3017@work-vm>
-	<1c152d0a-cd7c-9474-708b-fa825e97cd4a@redhat.com>
+Message-ID: <20200324200940.GI2645@work-vm>
+References: <1584729254-123546-1-git-send-email-bo.liu@linux.alibaba.com>
+	<1584729254-123546-2-git-send-email-bo.liu@linux.alibaba.com>
+	<20200320201615.GI3464@work-vm>
+	<20200320223252.snlelgr2ps5syfnh@rsjd01523.et2sqa>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <1c152d0a-cd7c-9474-708b-fa825e97cd4a@redhat.com>
-Subject: Re: [Virtio-fs] xfstest generic/503 hangs
+In-Reply-To: <20200320223252.snlelgr2ps5syfnh@rsjd01523.et2sqa>
+Subject: Re: [Virtio-fs] [PATCH v2 2/2] virtiofsd: fix mmap write under
+ nondax mode
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,64 +19,102 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: Liu Bo <bo.liu@linux.alibaba.com>
+Cc: virtio-fs@redhat.com
 
-* Max Reitz (mreitz@redhat.com) wrote:
-> On 23.03.20 19:43, Dr. David Alan Gilbert wrote:
-> > * Max Reitz (mreitz@redhat.com) wrote:
-> >> Hi,
-> >>
-> >> I have this bug report here:
-> >> https://bugzilla.redhat.com/show_bug.cgi?id=1813885
-> >>
-> >> And I’m afraid I’m not really making progress on debugging it, so I was
-> >> wondering whether any of you might have some insights.
-> >>
-> >> The problem is that the generic/503 xfstest hangs on virtio-fs.  Now, I
-> >> don’t know how the reporter got that test to run in the first place,
-> >> because for me, it requires fcollapse and fzero, which as far as I can
-> >> tell are currently not supported for virtio-fs.
-> >>
-> >> So I first had to disable those requirements, and then let the helper
-> >> program (src/t_mmap_collision.c) not test those operations.
-> >>
-> >> Then, the test hangs.  What I could find out so far is that the hang
-> >> occurs in src/t_mmap_collision.c’s truncate_down_fn() (run through
-> >> run_test(&truncate_down_fn), namely in one of the pread()s.  I can also
-> >> see that some of the pread()s before fail with EFAULT.
-> >>
-> >> A bit more context: t_mmap_collision.c opens a test file twice (I think
-> >> the idea is that you open it once on an FS with DAX, and once without,
-> >> but AFAIU it should work either way).  For the relevant test, it mmap()s
-> >> the DAX FD, truncates it, then fallocates it to increase the size again.
-> >>  Then it reads from the non-DAX FD.
+* Liu Bo (bo.liu@linux.alibaba.com) wrote:
+> On Fri, Mar 20, 2020 at 08:16:15PM +0000, Dr. David Alan Gilbert wrote:
+> > * Liu Bo (bo.liu@linux.alibaba.com) wrote:
+> > > When a file size is not aligned to PAGE_SIZE, a mmap write on it may
+> > > encounter -EIO (can be observed from virtiofsd's log) due to the difference
+> > > between the buf size and the size recorded in struct fuse_write_in.  The
+> > > difference comes from the fact that for mmap, writeback IO is used and
+> > > guest kernel sets fuse_write_in's size to inode size if EOF, while the buf
+> > > len still remains PAGE_SIZE aligned.
+> > > 
+> > > This handles the above special mmap case by truncating the last buf'size.
 > > 
-> > Can you just confirm where the DAX is happening here?  As I read that bz
-> > entry it's using the qemu which doesn't have DAX code yet.
+> > Thanks,
+> > 
+> > > Fixes: Commit 469f9d2f ("virtiofsd: Plumb fuse_bufvec through do_write_buf")
+> > > Reported-by: Yiqun Leng <yqleng@linux.alibaba.com>
+> > > Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
+> > > ---
+> > >  tools/virtiofsd/fuse_lowlevel.c | 17 +++++++++++++++++
+> > >  1 file changed, 17 insertions(+)
+> > > 
+> > > diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+> > > index ca2056f..4f8bfb6 100644
+> > > --- a/tools/virtiofsd/fuse_lowlevel.c
+> > > +++ b/tools/virtiofsd/fuse_lowlevel.c
+> > > @@ -1221,6 +1221,23 @@ static void do_write_buf(fuse_req_t req, fuse_ino_t nodeid,
+> > >           * and the data in the rest, we need to skip that first element
+> > >           */
+> > >          ibufv->buf[0].size = 0;
+> > > +
+> > > +        /*
+> > > +         * In case of mmap, fuse_buf_size(pbufv) may need to truncate if
+> > > +         * arg->size has been cropped by inode size inside guest.  The
+> > > +         * diff can only be (0, PAGE_SIZE) because inode size must be
+> > > +         * overlapped with the last buf.
+> > > +         */
+> > > +        if (arg->write_flags & FUSE_WRITE_CACHE) {
+> > 
+> > Does this need to only do it in the WRITE_CACHE case - or should we just
+> > always truncate the write to arg->size?
+> > Or is this just simpler?
 > 
-> I actually don’t know whether it really uses DAX.  When I say “DAX” here
-> (and “dax_fd”), I mean it in the spirit of the test, which tries to open
-> a file once with DAX and once without.  But it isn’t like it verifies
-> that the first instance actually uses DAX.
+> For non-mmap IO, AFAICS, it's all synchronous IO (not using
+> writepages) where the data part's length should be equal to arg->size
+> here.  So I think it's no harm to do it for both.
+
+OK, good that would simplify it.
+
+> > 
+> > > +                size_t total = fuse_buf_size(pbufv);
+> > > +                int last = ibufv->count - 1;
+> > > +
+> > > +                if (total > arg->size) {
+> > > +                        size_t diff = total - arg->size;
+> > > +                        if (diff < ibufv->buf[last].size)
+> > > +                                ibufv->buf[last].size -= diff;
+> > 
+> > I think that needs to modify pbufv->buf[last].size not ibufv
+> > because the two are only the same in some cases (although it's possible
+> > in this case the guest we try at the moment always falls in this side).
+> >
 > 
-> So I think it rather likely that it doesn’t use DAX, and just two FDs
-> for a single file concurrently.
+> OK.
+> 
+> > We should also do something in the else case - probably fail?
+> >
+> 
+> If it fails, it then gets to the following check and report -EIO.
 
-OK, I don't think DAX is really involved.
+Yes, but that error doesn't tell us why; so we'll see that error and not
+realise that it was because we failed to do this truncation.
 
-Does Liu Bo's: 
-https://www.redhat.com/archives/virtio-fs/2020-March/msg00074.html
+> > > +                }
+> > > +        }
+> > >      }
+> > >  
+> > >      if (fuse_buf_size(pbufv) != arg->size) {
+> > 
+> > If we now know that pbufv is now always shrung to size,
+> > then we only now need to check for the case where pbufv is too small.
+> >
+> 
+> From my understanding about both mmap IO and nonmmap IO, I think it's
+> arg->size that is always <= pbufv size.
 
-help?
+It should do, but this is a sanity check - remember we don't trust the
+guest.
 
 Dave
 
-> Max
+> thanks,
+> -liubo
 > 
-
-
-
 --
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

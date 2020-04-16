@@ -1,15 +1,19 @@
-References: <20200416164907.244868-1-stefanha@redhat.com>
-	<20200416164907.244868-3-stefanha@redhat.com>
-From: =?UTF-8?Q?Philippe_Mathieu-Daud=c3=a9?= <philmd@redhat.com>
-Message-ID: <989583c7-f7a0-544f-420d-43eb197098cb@redhat.com>
-Date: Thu, 16 Apr 2020 19:50:53 +0200
+Date: Thu, 16 Apr 2020 15:05:07 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200416190507.GC276932@redhat.com>
+References: <20200304165845.3081-1-vgoyal@redhat.com>
+	<20200304165845.3081-21-vgoyal@redhat.com>
+	<20200326000904.GA34937@rsjd01523.et2sqa>
+	<20200327140114.GB32717@redhat.com>
+	<20200327220606.GA119028@rsjd01523.et2sqa>
+	<20200414193045.GB210453@redhat.com>
+	<20200415172229.GA121484@rsjd01523.et2sqa>
 MIME-Version: 1.0
-In-Reply-To: <20200416164907.244868-3-stefanha@redhat.com>
-Content-Language: en-US
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 2/2] virtiofsd: drop all capabilities in the
- wait parent process
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20200415172229.GA121484@rsjd01523.et2sqa>
+Subject: Re: [Virtio-fs] [PATCH 20/20] fuse,
+	virtiofs: Add logic to free up a memory range
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,54 +22,90 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>, qemu-devel@nongnu.org
-Cc: virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
+To: Liu Bo <bo.liu@linux.alibaba.com>
+Cc: miklos@szeredi.hu, linux-nvdimm@lists.01.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, mst@redhat.com, linux-fsdevel@vger.kernel.org
 
-On 4/16/20 6:49 PM, Stefan Hajnoczi wrote:
-> All this process does is wait for its child.  No capabilities are
-> needed.
+On Thu, Apr 16, 2020 at 01:22:29AM +0800, Liu Bo wrote:
+> On Tue, Apr 14, 2020 at 03:30:45PM -0400, Vivek Goyal wrote:
+> > On Sat, Mar 28, 2020 at 06:06:06AM +0800, Liu Bo wrote:
+> > > On Fri, Mar 27, 2020 at 10:01:14AM -0400, Vivek Goyal wrote:
+> > > > On Thu, Mar 26, 2020 at 08:09:05AM +0800, Liu Bo wrote:
+> > > > 
+> > > > [..]
+> > > > > > +/*
+> > > > > > + * Find first mapping in the tree and free it and return it. Do not add
+> > > > > > + * it back to free pool. If fault == true, this function should be called
+> > > > > > + * with fi->i_mmap_sem held.
+> > > > > > + */
+> > > > > > +static struct fuse_dax_mapping *inode_reclaim_one_dmap(struct fuse_conn *fc,
+> > > > > > +							 struct inode *inode,
+> > > > > > +							 bool fault)
+> > > > > > +{
+> > > > > > +	struct fuse_inode *fi = get_fuse_inode(inode);
+> > > > > > +	struct fuse_dax_mapping *dmap;
+> > > > > > +	int ret;
+> > > > > > +
+> > > > > > +	if (!fault)
+> > > > > > +		down_write(&fi->i_mmap_sem);
+> > > > > > +
+> > > > > > +	/*
+> > > > > > +	 * Make sure there are no references to inode pages using
+> > > > > > +	 * get_user_pages()
+> > > > > > +	 */
+> > > > > > +	ret = fuse_break_dax_layouts(inode, 0, 0);
+> > > > > 
+> > > > > Hi Vivek,
+> > > > > 
+> > > > > This patch is enabling inline reclaim for fault path, but fault path
+> > > > > has already holds a locked exceptional entry which I believe the above
+> > > > > fuse_break_dax_layouts() needs to wait for, can you please elaborate
+> > > > > on how this can be avoided?
+> > > > > 
+> > > > 
+> > > > Hi Liubo,
+> > > > 
+> > > > Can you please point to the exact lock you are referring to. I will
+> > > > check it out. Once we got rid of needing to take inode lock in
+> > > > reclaim path, that opended the door to do inline reclaim in fault
+> > > > path as well. But I was not aware of this exceptional entry lock.
+> > > 
+> > > Hi Vivek,
+> > > 
+> > > dax_iomap_{pte,pmd}_fault has called grab_mapping_entry to get a
+> > > locked entry, when this fault gets into inline reclaim, would
+> > > fuse_break_dax_layouts wait for the locked exceptional entry which is
+> > > locked in dax_iomap_{pte,pmd}_fault?
+> > 
+> > Hi Liu Bo,
+> > 
+> > This is a good point. Indeed it can deadlock the way code is written
+> > currently.
+> >
 > 
-> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-> ---
->   tools/virtiofsd/passthrough_ll.c | 13 +++++++++++++
->   1 file changed, 13 insertions(+)
+> It's 100% reproducible on 4.19, but not on 5.x which has xarray for
+> dax_layout_busy_page.
 > 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index af97ba1c41..0c3f33b074 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2530,6 +2530,17 @@ static void print_capabilities(void)
->       printf("}\n");
->   }
->   
-> +/*
-> + * Drop all Linux capabilities because the wait parent process only needs to
-> + * sit in waitpid(2) and terminate.
-> + */
-> +static void setup_wait_parent_capabilities(void)
-> +{
-> +    capng_setpid(syscall(SYS_gettid));
+> It was weird that on 5.x kernel the deadlock is gone, it turned out
+> that xarray search in dax_layout_busy_page simply skips the empty
+> locked exceptional entry, I didn't get deeper to find out whether it's
+> reasonable, but with that 5.x doesn't run to deadlock.
 
-Maybe worth a /* Drop all capabilities */ comment here.
+I found more problems with enabling inline reclaim in fault path. I
+am holding fi->i_mmap_sem, shared and fuse_break_dax_layouts() can
+drop fi->i_mmap_sem if page is busy. I don't think we can drop and
+reacquire fi->i_mmap_sem while in fault path.
 
-Reviewed-by: Philippe Mathieu-Daudé <philmd@redhat.com>
+Also fuse_break_dax_layouts() does not know if we are holding it
+shared or exclusive.
 
-> +    capng_clear(CAPNG_SELECT_BOTH);
-> +    capng_apply(CAPNG_SELECT_BOTH);
-> +}
-> +
->   /*
->    * Move to a new mount, net, and pid namespaces to isolate this process.
->    */
-> @@ -2561,6 +2572,8 @@ static void setup_namespaces(struct lo_data *lo, struct fuse_session *se)
->           pid_t waited;
->           int wstatus;
->   
-> +        setup_wait_parent_capabilities();
-> +
->           /* The parent waits for the child */
->           do {
->               waited = waitpid(child, &wstatus, 0);
-> 
+So I will probably have to go back to disable inline reclaim in
+fault path. If memory range is not available go back up in
+fuse_dax_fault(), drop fi->i_mmap_sem lock and wait on wait queue for
+a range to become free and retry.
 
+I can retain the changes I did to break layout for a 2MB range only
+and not the whole file. I think that's a good optimization to retain
+anyway.
+
+Vivek
 

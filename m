@@ -1,6 +1,6 @@
-Date: Tue, 21 Apr 2020 15:31:53 -0400
+Date: Tue, 21 Apr 2020 17:04:21 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200421193153.GD28740@redhat.com>
+Message-ID: <20200421210421.GE28740@redhat.com>
 References: <20200421184107.GC28740@redhat.com>
 	<CAJfpeguGqLxA14unqNx-nExCWKs1Tv_0MwqGohHnuW-ugcjDyQ@mail.gmail.com>
 MIME-Version: 1.0
@@ -61,7 +61,17 @@ On Tue, Apr 21, 2020 at 08:59:24PM +0200, Miklos Szeredi wrote:
 > fs.   Clearing ATTR_OPEN seems obviously safe, so as a quick fix I'd
 > rather go with that for now.
 
-Ok, I will send another patch which clears ATTR_OPEN in ovl_setattr().
+Found another interesting problem while I cleared ATTR_OPEN. VFS also
+sets ATTR_FILE and attr->ia_file has ovl file pointer. ovl_setattr() does not
+look at this attribute and passes it to underlying layer as it is. Fuse
+thinks it got a valid file object and passes file handle to server and
+server complains -EBADF.
+
+ext4/xfs don't seem to look at ATTR_FILE, so it did not create problems
+so far. 
+
+For now, I will simply reset ATTR_FILE, indicating to lower layers
+don't use attr->ia_file.
 
 Thanks
 Vivek

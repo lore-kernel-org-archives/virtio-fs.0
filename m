@@ -1,22 +1,11 @@
-Date: Sat, 18 Apr 2020 02:05:13 +0800
-From: Liu Bo <bo.liu@linux.alibaba.com>
-Message-ID: <20200417180513.GA67026@rsjd01523.et2sqa>
-References: <20200304165845.3081-1-vgoyal@redhat.com>
-	<20200304165845.3081-21-vgoyal@redhat.com>
-	<20200326000904.GA34937@rsjd01523.et2sqa>
-	<20200327140114.GB32717@redhat.com>
-	<20200327220606.GA119028@rsjd01523.et2sqa>
-	<20200414193045.GB210453@redhat.com>
-	<20200415172229.GA121484@rsjd01523.et2sqa>
-	<20200416190507.GC276932@redhat.com>
+Date: Tue, 21 Apr 2020 14:41:07 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200421184107.GC28740@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20200416190507.GC276932@redhat.com>
-Content-Type: text/plain; charset=WINDOWS-1252
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 20/20] fuse,
-	virtiofs: Add logic to free up a memory range
-Reply-To: bo.liu@linux.alibaba.com
+Subject: [Virtio-fs] [PATCH] overlayfs: Pass O_TRUNC flag to underlying
+	filesystem
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,100 +14,79 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: miklos@szeredi.hu, linux-nvdimm@lists.01.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, mst@redhat.com, linux-fsdevel@vger.kernel.org
+To: linux-unionfs@vger.kernel.org, Miklos Szeredi <miklos@szeredi.hu>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, Amir Goldstein <amir73il@gmail.com>
 
-On Thu, Apr 16, 2020 at 03:05:07PM -0400, Vivek Goyal wrote:
-> On Thu, Apr 16, 2020 at 01:22:29AM +0800, Liu Bo wrote:
-> > On Tue, Apr 14, 2020 at 03:30:45PM -0400, Vivek Goyal wrote:
-> > > On Sat, Mar 28, 2020 at 06:06:06AM +0800, Liu Bo wrote:
-> > > > On Fri, Mar 27, 2020 at 10:01:14AM -0400, Vivek Goyal wrote:
-> > > > > On Thu, Mar 26, 2020 at 08:09:05AM +0800, Liu Bo wrote:
-> > > > > 
-> > > > > [..]
-> > > > > > > +/*
-> > > > > > > + * Find first mapping in the tree and free it and return it. Do not add
-> > > > > > > + * it back to free pool. If fault == true, this function should be called
-> > > > > > > + * with fi->i_mmap_sem held.
-> > > > > > > + */
-> > > > > > > +static struct fuse_dax_mapping *inode_reclaim_one_dmap(struct fuse_conn *fc,
-> > > > > > > +							 struct inode *inode,
-> > > > > > > +							 bool fault)
-> > > > > > > +{
-> > > > > > > +	struct fuse_inode *fi = get_fuse_inode(inode);
-> > > > > > > +	struct fuse_dax_mapping *dmap;
-> > > > > > > +	int ret;
-> > > > > > > +
-> > > > > > > +	if (!fault)
-> > > > > > > +		down_write(&fi->i_mmap_sem);
-> > > > > > > +
-> > > > > > > +	/*
-> > > > > > > +	 * Make sure there are no references to inode pages using
-> > > > > > > +	 * get_user_pages()
-> > > > > > > +	 */
-> > > > > > > +	ret = fuse_break_dax_layouts(inode, 0, 0);
-> > > > > > 
-> > > > > > Hi Vivek,
-> > > > > > 
-> > > > > > This patch is enabling inline reclaim for fault path, but fault path
-> > > > > > has already holds a locked exceptional entry which I believe the above
-> > > > > > fuse_break_dax_layouts() needs to wait for, can you please elaborate
-> > > > > > on how this can be avoided?
-> > > > > > 
-> > > > > 
-> > > > > Hi Liubo,
-> > > > > 
-> > > > > Can you please point to the exact lock you are referring to. I will
-> > > > > check it out. Once we got rid of needing to take inode lock in
-> > > > > reclaim path, that opended the door to do inline reclaim in fault
-> > > > > path as well. But I was not aware of this exceptional entry lock.
-> > > > 
-> > > > Hi Vivek,
-> > > > 
-> > > > dax_iomap_{pte,pmd}_fault has called grab_mapping_entry to get a
-> > > > locked entry, when this fault gets into inline reclaim, would
-> > > > fuse_break_dax_layouts wait for the locked exceptional entry which is
-> > > > locked in dax_iomap_{pte,pmd}_fault?
-> > > 
-> > > Hi Liu Bo,
-> > > 
-> > > This is a good point. Indeed it can deadlock the way code is written
-> > > currently.
-> > >
-> > 
-> > It's 100% reproducible on 4.19, but not on 5.x which has xarray for
-> > dax_layout_busy_page.
-> > 
-> > It was weird that on 5.x kernel the deadlock is gone, it turned out
-> > that xarray search in dax_layout_busy_page simply skips the empty
-> > locked exceptional entry, I didn't get deeper to find out whether it's
-> > reasonable, but with that 5.x doesn't run to deadlock.
-> 
-> I found more problems with enabling inline reclaim in fault path. I
-> am holding fi->i_mmap_sem, shared and fuse_break_dax_layouts() can
-> drop fi->i_mmap_sem if page is busy. I don't think we can drop and
-> reacquire fi->i_mmap_sem while in fault path.
->
+As of now during open(), we don't pass bunch of flags to underlying
+filesystem. O_TRUNC is one of these. Normally this is not a problem as VFS
+calls ->setattr() with zero size and underlying filesystem sets file size
+to 0.
 
-Good point, yes, dropping & reacquiring lock might bring more trouble
-w.r.t race on the i_mmap_sem.
+But when overlayfs is running on top of virtiofs, it has an optimization
+where it does not send setattr request to server if dectects that
+truncation is part of open(O_TRUNC). It assumes that server already zeroed
+file size as part of open(O_TRUNC).
 
-> Also fuse_break_dax_layouts() does not know if we are holding it
-> shared or exclusive.
-> 
-> So I will probably have to go back to disable inline reclaim in
-> fault path. If memory range is not available go back up in
-> fuse_dax_fault(), drop fi->i_mmap_sem lock and wait on wait queue for
-> a range to become free and retry.
-> 
-> I can retain the changes I did to break layout for a 2MB range only
-> and not the whole file. I think that's a good optimization to retain
-> anyway.
->
+fuse_do_setattr() {
+	if (attr->ia_valid & ATTR_OPEN) {
+		/*
+		 * No need to send request to userspace, since actual
+		 * truncation has already been done by OPEN.  But still
+		 * need to truncate page cache.
+		 */
+	}
+}
 
-That part does look reasonable to me.
+IOW, fuse expects O_TRUNC to be passed to it as part of open flags.
 
-thanks,
-liubo
+But currently overlayfs does not pass O_TRUNC to underlying filesystem
+hence fuse/virtiofs breaks. Setup overlayfs on top of virtiofs and
+following does not zero the file size of a file is either upper only
+or has already been copied up.
 
+fd = open(foo.txt, O_TRUNC | O_WRONLY);
+
+Fix it by passing O_TRUNC to underlying filesystem.
+
+I found this problem while running unionmount-testsuite. It fails.
+
+***
+*** ./run --ov --samefs --ts=0 open-trunc
+***
+TEST open-trunc.py:10: Open O_TRUNC|O_RDONLY
+ ./run --open-file /mnt/virtiofs/mnt/a/foo100 -r -t -R 
+ ./run --open-file /mnt/virtiofs/mnt/a/foo100 -r -t -R 
+TEST open-trunc.py:18: Open O_TRUNC|O_WRONLY
+ ./run --open-file /mnt/virtiofs/mnt/a/foo101 -w -t -W q
+ ./run --open-file /mnt/virtiofs/mnt/a/foo101 -r -R q
+ ./run --open-file /mnt/virtiofs/mnt/a/foo101 -w -t -W p
+ ./run --open-file /mnt/virtiofs/mnt/a/foo101 -r -R p
+TEST open-trunc.py:28: Open O_TRUNC|O_APPEND|O_WRONLY
+ ./run --open-file /mnt/virtiofs/mnt/a/foo102 -a -t -W q
+ ./run --open-file /mnt/virtiofs/mnt/a/foo102 -r -R q
+ ./run --open-file /mnt/virtiofs/mnt/a/foo102 -a -t -W p
+ ./run --open-file /mnt/virtiofs/mnt/a/foo102 -r -R p
+/mnt/virtiofs/mnt/a/foo102: File size wrong (got 2, want 1)
+
+After this patch, unionmount-testsuite passes with overlayfs on top of
+virtiofs.
+ 
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/overlayfs/file.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+Index: redhat-linux/fs/overlayfs/file.c
+===================================================================
+--- redhat-linux.orig/fs/overlayfs/file.c	2020-04-21 13:33:40.777125594 -0400
++++ redhat-linux/fs/overlayfs/file.c	2020-04-21 13:53:30.317125594 -0400
+@@ -134,7 +134,7 @@ static int ovl_open(struct inode *inode,
+ 		return err;
+ 
+ 	/* No longer need these flags, so don't pass them on to underlying fs */
+-	file->f_flags &= ~(O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC);
++	file->f_flags &= ~(O_CREAT | O_EXCL | O_NOCTTY);
+ 
+ 	realfile = ovl_open_realfile(file, ovl_inode_realdata(inode));
+ 	if (IS_ERR(realfile))
 

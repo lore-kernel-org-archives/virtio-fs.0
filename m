@@ -1,21 +1,12 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=qezUXX+PDmcxlnrQlsWEmrbjJla8YcRWeItkkwAcwoo=;
-	b=j9I9U46bH+5xzQSttd9Yte6HlwYULiU912w6TNxyldx3/TlVf9/kA53QbsYvGG3CzW
-	7e+0CL1Eu0upU5l8nDmZLBpf4q4nJJBP1Xj+JiD8xAFOJvZV/VBHSZZpeCQ0PGkKQHQB
-	NCNOPn6iJD3TnaQg2hEEnZoQKhPPu9lR+Po2c=
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Wed, 22 Apr 2020 09:08:49 -0400
+Message-Id: <20200422130850.59900-2-vgoyal@redhat.com>
+In-Reply-To: <20200422130850.59900-1-vgoyal@redhat.com>
+References: <20200422130850.59900-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-References: <20200421184107.GC28740@redhat.com>
-	<CAJfpeguGqLxA14unqNx-nExCWKs1Tv_0MwqGohHnuW-ugcjDyQ@mail.gmail.com>
-	<20200421210421.GE28740@redhat.com>
-In-Reply-To: <20200421210421.GE28740@redhat.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Wed, 22 Apr 2020 10:31:29 +0200
-Message-ID: <CAJfpegvsBLvodbmO+o6aLe6h3LvVCheKxE8KO4xXeQuwuEMrgw@mail.gmail.com>
-Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH] overlayfs: Pass O_TRUNC flag to underlying
-	filesystem
+Subject: [Virtio-fs] [PATCH 1/2] overlayfs: ovl_setattr() should clear
+	ATTR_FILE from attr->ia_valid
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,70 +15,42 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Amir Goldstein <amir73il@gmail.com>, overlayfs <linux-unionfs@vger.kernel.org>
+To: linux-unionfs@vger.kernel.org, miklos@szeredi.hu
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
-On Tue, Apr 21, 2020 at 11:04 PM Vivek Goyal <vgoyal@redhat.com> wrote:
->
-> On Tue, Apr 21, 2020 at 08:59:24PM +0200, Miklos Szeredi wrote:
-> > On Tue, Apr 21, 2020 at 8:41 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> > >
-> > > As of now during open(), we don't pass bunch of flags to underlying
-> > > filesystem. O_TRUNC is one of these. Normally this is not a problem as VFS
-> > > calls ->setattr() with zero size and underlying filesystem sets file size
-> > > to 0.
-> > >
-> > > But when overlayfs is running on top of virtiofs, it has an optimization
-> > > where it does not send setattr request to server if dectects that
-> > > truncation is part of open(O_TRUNC). It assumes that server already zeroed
-> > > file size as part of open(O_TRUNC).
-> > >
-> > > fuse_do_setattr() {
-> > >         if (attr->ia_valid & ATTR_OPEN) {
-> > >                 /*
-> > >                  * No need to send request to userspace, since actual
-> > >                  * truncation has already been done by OPEN.  But still
-> > >                  * need to truncate page cache.
-> > >                  */
-> > >         }
-> > > }
-> > >
-> > > IOW, fuse expects O_TRUNC to be passed to it as part of open flags.
-> > >
-> > > But currently overlayfs does not pass O_TRUNC to underlying filesystem
-> > > hence fuse/virtiofs breaks. Setup overlayfs on top of virtiofs and
-> > > following does not zero the file size of a file is either upper only
-> > > or has already been copied up.
-> > >
-> > > fd = open(foo.txt, O_TRUNC | O_WRONLY);
-> > >
-> > > Fix it by passing O_TRUNC to underlying filesystem.
-> >
-> >
-> > Or clear ATTR_OPEN in ovl_setattr()
-> >
-> > Need to think about side effects of passing O_TRUNC down to underlying
-> > fs.   Clearing ATTR_OPEN seems obviously safe, so as a quick fix I'd
-> > rather go with that for now.
->
-> Found another interesting problem while I cleared ATTR_OPEN. VFS also
-> sets ATTR_FILE and attr->ia_file has ovl file pointer. ovl_setattr() does not
-> look at this attribute and passes it to underlying layer as it is. Fuse
-> thinks it got a valid file object and passes file handle to server and
-> server complains -EBADF.
->
-> ext4/xfs don't seem to look at ATTR_FILE, so it did not create problems
-> so far.
->
-> For now, I will simply reset ATTR_FILE, indicating to lower layers
-> don't use attr->ia_file.
+ovl_setattr() can be passed an attr which has ATTR_FILE set and
+attr->ia_file is a file pointer to overlay file. This is done
+in open(O_TRUNC) path.
 
-Right.
+We should either replace with attr->ia_file with underlying file object
+or clear ATTR_FILE so that underlying filesystem does not end up using
+overlayfs file object pointer.
 
-The solution to that would be to replace attr->ia_file with the real
-file, but that can wait until we see any use case for that.
+There are no good use cases yet so for now clear ATTR_FILE. fuse seems
+to be one user which can use this. But it can work even without this.
+So it is not mandatory to pass ATTR_FILE to fuse.
 
-Thanks,
-Miklos
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/overlayfs/inode.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
+diff --git a/fs/overlayfs/inode.c b/fs/overlayfs/inode.c
+index b0d42ece4d7c..8d147bc70f0b 100644
+--- a/fs/overlayfs/inode.c
++++ b/fs/overlayfs/inode.c
+@@ -58,6 +58,11 @@ int ovl_setattr(struct dentry *dentry, struct iattr *attr)
+ 		if (attr->ia_valid & (ATTR_KILL_SUID|ATTR_KILL_SGID))
+ 			attr->ia_valid &= ~ATTR_MODE;
+ 
++		/* We might have to translate ovl file into underlying file
++		 * object once some use cases are there. For now, simply
++		 * don't let underlying filesystem rely on attr->ia_file */
++		attr->ia_valid &= ~ATTR_FILE;
++
+ 		inode_lock(upperdentry->d_inode);
+ 		old_cred = ovl_override_creds(dentry->d_sb);
+ 		err = notify_change(upperdentry, attr, NULL);
+-- 
+2.25.3
 

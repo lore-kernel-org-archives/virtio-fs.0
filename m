@@ -1,16 +1,12 @@
-Date: Mon, 3 Feb 2020 19:36:09 +0100
-From: =?iso-8859-1?B?SuFu?= Tomko <jtomko@redhat.com>
-Message-ID: <20200203183609.GX18565@lpt>
-References: <cover.1580403751.git.jtomko@redhat.com>
-	<484b10cf2a837ba7bc13400321978aa2076f0967.1580403751.git.jtomko@redhat.com>
-	<20200203164351.GV1922177@redhat.com>
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Wed, 22 Apr 2020 09:08:50 -0400
+Message-Id: <20200422130850.59900-3-vgoyal@redhat.com>
+In-Reply-To: <20200422130850.59900-1-vgoyal@redhat.com>
+References: <20200422130850.59900-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="7WMexqIhC8AwFtpM"
-Content-Disposition: inline
-In-Reply-To: <20200203164351.GV1922177@redhat.com>
-Subject: Re: [Virtio-fs] [libvirt PATCHv3 10/12] qemu: add code for handling
-	virtiofsd
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 2/2] overlayfs: ovl_setattr() should clear
+	ATTR_OPEN
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,152 +15,74 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>
-Cc: libvir-list@redhat.com, virtio-fs@redhat.com
+To: linux-unionfs@vger.kernel.org, miklos@szeredi.hu
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
+As of now during open(), we don't pass bunch of flags to underlying
+filesystem. O_TRUNC is one of these. Normally this is not a problem as VFS
+calls ->setattr() with zero size and underlying filesystem sets file size
+to 0.
 
---7WMexqIhC8AwFtpM
-Content-Type: text/plain; charset=iso-8859-1; format=flowed
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+But when overlayfs is running on top of virtiofs, it has an optimization
+where it does not send setattr request to server if dectects that
+truncation is part of open(O_TRUNC). It assumes that server already zeroed
+file size as part of open(O_TRUNC).
 
-[adding virtiofs list]
+fuse_do_setattr() {
+        if (attr->ia_valid & ATTR_OPEN) {
+                /*
+                 * No need to send request to userspace, since actual
+                 * truncation has already been done by OPEN.  But still
+                 * need to truncate page cache.
+                 */
+        }
+}
 
-On Mon, Feb 03, 2020 at 04:43:51PM +0000, Daniel P. Berrang=E9 wrote:
->On Thu, Jan 30, 2020 at 06:06:26PM +0100, J=E1n Tomko wrote:
->> Start virtiofsd for each <filesystem> device using it.
->>
->> Pre-create the socket for communication with QEMU and pass it
->> to virtiofsd.
->>
->> Note that virtiofsd needs to run as root.
->
->So we're not able to use  virtiofsd with the session libvirtd
->which runs completely unprivileged ?
->
+IOW, fuse expects O_TRUNC to be passed to it as part of open flags.
 
-Not with the version of virtiofsd currently merged in the QEMU tree.
+But currently overlayfs does not pass O_TRUNC to underlying filesystem
+hence fuse/virtiofs breaks. Setup overlayfs on top of virtiofs and
+following does not zero the file size of a file is either upper only
+or has already been copied up.
 
->I can understand the need to run as root if we want to support
->chown() of files, or DAC_OVERRIDE, but I'm surprised it isn't
->possible to run virtiofsd unprivileged & simply have a reduced
->featureset where it can only create files as that one user.
->
+fd = open(foo.txt, O_TRUNC | O_WRONLY);
 
-Apart from the possibly missing features (I don't know how well
-virtiofsd internals are ready for those), current version of the
-daemon sets up namespaces and the seccomp sandbox.
+There are two ways to fix this. Either pass O_TRUNC to underlying filesystem
+or clear ATTR_OPEN from attr->ia_valid so that fuse ends up sending a
+SETATTR request to server. Miklos is concerned that O_TRUNC might have
+side affects so it is better to clear ATTR_OPEN for now. Hence this patch
+clears ATTR_OPEN from attr->ia_valid.
 
->
->> +int
->> +qemuVirtioFSStart(virLogManagerPtr logManager,
->> +                  virQEMUDriverPtr driver,
->> +                  virDomainObjPtr vm,
->> +                  virDomainFSDefPtr fs)
->> +{
->> +    g_autoptr(virQEMUDriverConfig) cfg =3D virQEMUDriverGetConfig(drive=
-r);
->> +    g_autoptr(virCommand) cmd =3D NULL;
->> +    g_autofree char *socket_path =3D NULL;
->> +    g_autofree char *pidfile =3D NULL;
->> +    g_autofree char *logpath =3D NULL;
->> +    pid_t pid =3D (pid_t) -1;
->> +    VIR_AUTOCLOSE fd =3D -1;
->> +    VIR_AUTOCLOSE logfd =3D -1;
->> +    int ret =3D -1;
->> +    int rc;
->
->> +
->> +    if (!(pidfile =3D qemuVirtioFSCreatePidFilename(cfg, vm->def, fs->i=
-nfo.alias)))
->> +        goto cleanup;
->> +
->> +    if (!(socket_path =3D qemuVirtioFSCreateSocketFilename(vm, fs->info=
-=2Ealias)))
->> +        goto cleanup;
->> +
->> +    if ((fd =3D qemuVirtioFSOpenChardev(driver, vm, socket_path)) < 0)
->> +        goto cleanup;
->> +
->> +    logpath =3D qemuVirtioFSCreateLogFilename(cfg, vm->def, fs->info.al=
-ias);
->> +
->> +    if (cfg->stdioLogD) {
->> +        if ((logfd =3D virLogManagerDomainOpenLogFile(logManager,
->> +                                                    "qemu",
->> +                                                    vm->def->uuid,
->> +                                                    vm->def->name,
->> +                                                    logpath,
->> +                                                    0,
->> +                                                    NULL, NULL)) < 0)
->> +            goto cleanup;
->> +    } else {
->> +        if ((logfd =3D open(logpath, O_WRONLY | O_CREAT | O_APPEND, S_I=
-RUSR | S_IWUSR)) < 0) {
->> +            virReportSystemError(errno, _("failed to create logfile %s"=
-),
->> +                                 logpath);
->> +            goto cleanup;
->> +        }
->> +        if (virSetCloseExec(logfd) < 0) {
->> +            virReportSystemError(errno, _("failed to set close-on-exec =
-flag on %s"),
->> +                                 logpath);
->> +            goto error;
->> +        }
->> +    }
->> +
->> +    if (!(cmd =3D qemuVirtioFSBuildCommandLine(cfg, fs, &fd)))
->> +        goto cleanup;
->> +
->> +    virCommandSetPidFile(cmd, pidfile);
->> +    virCommandSetOutputFD(cmd, &logfd);
->> +    virCommandSetErrorFD(cmd, &logfd);
->> +    virCommandNonblockingFDs(cmd);
->> +    virCommandDaemonize(cmd);
->
->We're not mandating "root" here, it is just inheriting the user that
->libvirtd runs as. So IIUC ,this will run virtofsd as non-root when
->used with session libvirtd, unless there's a check somewhere else
->that prevents this scenario ?
+I found this problem while running unionmount-testsuite. With this patch,
+unionmount-testsuite passes with overlayfs on top of virtiofs.
 
-I'll add a check.
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/overlayfs/inode.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
->
->I'm also wondering about cgroups placement in this method, and
->any use of SELinux
->
-
-Placing it into a cgroup should be easy, AFAIK it does not need to
-access any devices.
-
-As for SELinux, I don't think there's anything to be done other than
-updating the selinux-policy. Recursively relabeling the whole directory
-feels intrusive.
-
-Jano
-
->> +
->> +    if (qemuExtDeviceLogCommand(driver, vm, cmd, "virtiofsd") < 0)
->> +        goto cleanup;
->> +
->> +    rc =3D virCommandRun(cmd, NULL);
->> +    logfd =3D -1;
-
---7WMexqIhC8AwFtpM
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEQeJGMrnL0ADuclbP+YPwO/Mat50FAl44aBQACgkQ+YPwO/Ma
-t52Vgwf9FXE+72S0zj80p9USmzsYoe5/VxD08Fz8ItDOjrLX+76SRIaTV4ZFtCbs
-4ImvHNoGm68frUnxv5zQZFBjOplyH8YyRV46zK1Bf6WndmlqEF35pfTQYLmgcLQV
-T6rD2avAefl5sjc0kHUDp+OjdwNmF20D9CK/HclL3QuEm8fx7G9DrU3j4Yl+N/ia
-W0U6tfxDahFOmFNNfB8Ue8jEPbwILW4lYZiSyIT8NiR94m/P+OJeGOe3cBAopdXK
-Q2lX4/DvLJwOWkof07gXDnV+jV/uIaU9OjJdzwYMNxT0dBJwXuIvk6YbEU3C4DPo
-Q7Cm14mxTX4KRF4R47AmNobzkuH33g==
-=W7+k
------END PGP SIGNATURE-----
-
---7WMexqIhC8AwFtpM--
+diff --git a/fs/overlayfs/inode.c b/fs/overlayfs/inode.c
+index 8d147bc70f0b..08ae88b72d9a 100644
+--- a/fs/overlayfs/inode.c
++++ b/fs/overlayfs/inode.c
+@@ -37,6 +37,17 @@ int ovl_setattr(struct dentry *dentry, struct iattr *attr)
+ 
+ 		/* Truncate should trigger data copy up as well */
+ 		full_copy_up = true;
++
++		/* If open(O_TRUNC) is done, VFS calls ->setattr with
++		 * ATTR_OPEN set. Overlayfs does not pass O_TRUNC flag
++		 * to underlying filesystem during open. Do not pass
++		 * ATTR_OPEN. This disables optimization in fuse which
++		 * assumes open(O_TRUNC) already set file size to 0. But
++		 * we never passed O_TRUNC to fuse. So by clearing ATTR_OPEN,
++		 * fuse will be forced to set ->setattr() request to
++		 * server.
++		 */
++		attr->ia_valid &= ~ATTR_OPEN;
+ 	}
+ 
+ 	if (!full_copy_up)
+-- 
+2.25.3
 

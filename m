@@ -1,10 +1,18 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 22 Apr 2020 09:08:48 -0400
-Message-Id: <20200422130850.59900-1-vgoyal@redhat.com>
+Date: Fri, 24 Apr 2020 10:15:00 +0800
+From: Eryu Guan <eguan@linux.alibaba.com>
+Message-ID: <20200424021500.GT47669@e18g06458.et15sqa>
+References: <5D4D0D06.1090602@huawei.com>
+	<20190821153802.GB9095@stefanha-x1.localdomain>
+	<5D633104.6030000@huawei.com>
+	<20190827144258.GF6901@stefanha-x1.localdomain>
+	<5D66279D.5000507@huawei.com>
 MIME-Version: 1.0
+In-Reply-To: <5D66279D.5000507@huawei.com>
+Content-Type: text/plain; charset=WINDOWS-1252
+Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 0/2] overlayfs: Fix overlayfs on virtiofs
-	open(O_TRUNC) issue
+Subject: Re: [Virtio-fs] [PATCH][RFC] Support multiqueue mode by setting cpu
+ affinity
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,28 +21,41 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-unionfs@vger.kernel.org, miklos@szeredi.hu
-Cc: virtio-fs@redhat.com, vgoyal@redhat.com
+To: piaojun <piaojun@huawei.com>
+Cc: virtio-fs@redhat.com
 
-Hi Miklos,
+Hi Jun,
 
-Here are couple of fixes solving open(O_TRUNC) issue while overlayfs
-is layered on top of virtiofs.
+On Wed, Aug 28, 2019 at 03:05:01PM +0800, piaojun wrote:
+> 
+> 
+> On 2019/8/27 22:42, Stefan Hajnoczi wrote:
+> > On Mon, Aug 26, 2019 at 09:08:20AM +0800, piaojun wrote:
+> >> On 2019/8/21 23:38, Stefan Hajnoczi wrote:
+> >>> On Fri, Aug 09, 2019 at 02:04:54PM +0800, piaojun wrote:
+> >>>> Set cpu affinity for each queue in multiqueue mode to improve the iops
+> >>>> performance.
 
-These are also available here.
+[snip]
 
-https://github.com/rhvgoyal/linux/commits/ovl-setattr-fix
+> > 
+> > Doing the setup before entering the sandbox sounds like a good idea.
+> > That way the sandbox does not need to whitelist the required syscalls.
+> > 
+> > Will you add an option similar to:
+> > 
+> >   --request-queues N
+> >   --request-queue-cpu-affinity N=CPU_A[,CPU_B][-CPU_C]
+> > 
+> > ?
+> 
+> I'm writing the multi-queue code for virtiofsd according to your
+> suggestion, but the final shape may look a bit different.
 
-Thanks
-Vivek
+Just curious, what's the status of this multi-queue support? I'd like to
+try it out :)
 
-Vivek Goyal (2):
-  overlayfs: ovl_setattr() should clear ATTR_FILE from attr->ia_valid
-  overlayfs: ovl_setattr() should clear ATTR_OPEN
+Thanks,
+Eryu
 
- fs/overlayfs/inode.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
--- 
-2.25.3
 

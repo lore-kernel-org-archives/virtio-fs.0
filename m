@@ -1,18 +1,17 @@
-Date: Fri, 24 Apr 2020 10:15:00 +0800
-From: Eryu Guan <eguan@linux.alibaba.com>
-Message-ID: <20200424021500.GT47669@e18g06458.et15sqa>
-References: <5D4D0D06.1090602@huawei.com>
-	<20190821153802.GB9095@stefanha-x1.localdomain>
-	<5D633104.6030000@huawei.com>
-	<20190827144258.GF6901@stefanha-x1.localdomain>
-	<5D66279D.5000507@huawei.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+	h=from:to:cc:subject:date:message-id:mime-version
+	:content-transfer-encoding;
+	bh=gfc0cFO2L1HUkwddTCsuj4a1zB9/jwWzyBDO+mCQarU=;
+	b=BLtx0N5LC85qAEv11FxLkhD7+543mklwOA7DxGaz3qkPFpdnaz1m7zbbl3uVeEGQ0D
+	ORDeFnGX68cXXK4ozkw24hStQgus/kwSbJcFYz8wTJwea9ogyQ9HGMSFUCy9lU0AgVZC
+	D2/IIWNRLKY2JTEZ7YgoDEeOi2H30WOoVG8Ds=
+From: Chirantan Ekbote <chirantan@chromium.org>
+Date: Fri, 24 Apr 2020 15:25:39 +0900
+Message-Id: <20200424062540.23679-1-chirantan@chromium.org>
 MIME-Version: 1.0
-In-Reply-To: <5D66279D.5000507@huawei.com>
-Content-Type: text/plain; charset=WINDOWS-1252
-Content-Disposition: inline
+Content-Type: text/plain; charset=US-ASCII
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH][RFC] Support multiqueue mode by setting cpu
- affinity
+Subject: [Virtio-fs] [PATCH 1/2] fuse: virtiofs: Fix nullptr dereference
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,41 +20,42 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: piaojun <piaojun@huawei.com>
-Cc: virtio-fs@redhat.com
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: Suleiman Souhlal <suleiman@chromium.org>, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Dylan Reid <dgreid@chromium.org>, Vivek Goyal <vgoyal@redhat.com>
 
-Hi Jun,
+virtiofs device implementations are allowed to provide more than one
+request queue.  In this case `fsvq->fud` would not be initialized,
+leading to a nullptr dereference later during driver initialization.
 
-On Wed, Aug 28, 2019 at 03:05:01PM +0800, piaojun wrote:
-> 
-> 
-> On 2019/8/27 22:42, Stefan Hajnoczi wrote:
-> > On Mon, Aug 26, 2019 at 09:08:20AM +0800, piaojun wrote:
-> >> On 2019/8/21 23:38, Stefan Hajnoczi wrote:
-> >>> On Fri, Aug 09, 2019 at 02:04:54PM +0800, piaojun wrote:
-> >>>> Set cpu affinity for each queue in multiqueue mode to improve the iops
-> >>>> performance.
+Make sure that `fsvq->fud` is initialized for all request queues even if
+the driver doesn't use them.
 
-[snip]
+Signed-off-by: Chirantan Ekbote <chirantan@chromium.org>
+---
+ fs/fuse/virtio_fs.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-> > 
-> > Doing the setup before entering the sandbox sounds like a good idea.
-> > That way the sandbox does not need to whitelist the required syscalls.
-> > 
-> > Will you add an option similar to:
-> > 
-> >   --request-queues N
-> >   --request-queue-cpu-affinity N=CPU_A[,CPU_B][-CPU_C]
-> > 
-> > ?
-> 
-> I'm writing the multi-queue code for virtiofsd according to your
-> suggestion, but the final shape may look a bit different.
-
-Just curious, what's the status of this multi-queue support? I'd like to
-try it out :)
-
-Thanks,
-Eryu
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index bade747689033..d3c38222a7e4e 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -1066,10 +1066,13 @@ static int virtio_fs_fill_super(struct super_block *sb)
+ 	}
+ 
+ 	err = -ENOMEM;
+-	/* Allocate fuse_dev for hiprio and notification queues */
+-	for (i = 0; i < VQ_REQUEST; i++) {
++	/* Allocate fuse_dev for all queues except the first request queue. */
++	for (i = 0; i < fs->nvqs; i++) {
+ 		struct virtio_fs_vq *fsvq = &fs->vqs[i];
+ 
++		if (i == VQ_REQUEST)
++			continue;
++
+ 		fsvq->fud = fuse_dev_alloc();
+ 		if (!fsvq->fud)
+ 			goto err_free_fuse_devs;
+-- 
+2.26.2.303.gf8c07b1a785-goog
 
 

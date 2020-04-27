@@ -1,12 +1,12 @@
-Date: Tue, 9 Jun 2020 08:31:55 -0400
+Date: Mon, 27 Apr 2020 14:03:54 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200609123155.GB211764@redhat.com>
-References: <20200608093111.14942-1-mreitz@redhat.com>
+Message-ID: <20200427180354.GD146096@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20200608093111.14942-1-mreitz@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Whitelist fchmod
+Subject: [Virtio-fs] [PATCH] fuse,
+ virtiofs: Do not alloc/install fuse device in
+ fuse_fill_super_common()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,74 +15,141 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, qemu-stable@nongnu.org
+To: linux-fsdevel@vger.kernel.org, Miklos Szeredi <miklos@szeredi.hu>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-On Mon, Jun 08, 2020 at 11:31:11AM +0200, Max Reitz wrote:
-> lo_setattr() invokes fchmod() in a rarely used code path, so it should
-> be whitelisted or virtiofsd will crash with EBADSYS.
-> 
-> Said code path can be triggered for example as follows:
-> 
-> On the host, in the shared directory, create a file with the sticky bit
-> set and a security.capability xattr:
-> (1) # touch foo
-> (2) # chmod u+s foo
-> (3) # setcap '' foo
-> 
-> Then in the guest let some process truncate that file after it has
-> dropped all of its capabilities (at least CAP_FSETID):
-> 
-> int main(int argc, char *argv[])
-> {
->     capng_setpid(getpid());
->     capng_clear(CAPNG_SELECT_BOTH);
->     capng_updatev(CAPNG_ADD, CAPNG_PERMITTED | CAPNG_EFFECTIVE, 0);
->     capng_apply(CAPNG_SELECT_BOTH);
-> 
->     ftruncate(open(argv[1], O_RDWR), 0);
-> }
-> 
-> This will cause the guest kernel to drop the sticky bit (i.e. perform a
-> mode change) as part of the truncate (where FATTR_FH is set), and that
-> will cause virtiofsd to invoke fchmod() instead of fchmodat().
-> 
-> (A similar configuration exists further below with futimens() vs.
-> utimensat(), but the former is not a syscall but just a wrapper for the
-> latter, so no further whitelisting is required.)
-> 
-> Buglink: https://bugzilla.redhat.com/show_bug.cgi?id=1842667
-> Reported-by: Qian Cai <caiqian@redhat.com>
-> Cc: qemu-stable@nongnu.org
-> Signed-off-by: Max Reitz <mreitz@redhat.com>
+As of now fuse_fill_super_common() allocates and installs one fuse device.
+Filesystems like virtiofs can have more than one filesystem queues and
+can have one fuse device per queue. Given, fuse_fill_super_common() only
+handles one device, virtiofs allocates and installes fuse devices for
+all queues except one.
 
-Nice catch. 
+This makes logic little twisted and hard to understand. It probably
+is better to not do any device allocation/installation in
+fuse_fill_super_common() and let caller take care of it instead.
 
-Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/fuse_i.h    |  3 ---
+ fs/fuse/inode.c     | 19 ++++++++++++-------
+ fs/fuse/virtio_fs.c |  9 +--------
+ 3 files changed, 13 insertions(+), 18 deletions(-)
 
-Vivek
-
-> ---
->  tools/virtiofsd/seccomp.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/tools/virtiofsd/seccomp.c b/tools/virtiofsd/seccomp.c
-> index bd9e7b083c..3b1522acdd 100644
-> --- a/tools/virtiofsd/seccomp.c
-> +++ b/tools/virtiofsd/seccomp.c
-> @@ -42,6 +42,7 @@ static const int syscall_whitelist[] = {
->      SCMP_SYS(exit_group),
->      SCMP_SYS(fallocate),
->      SCMP_SYS(fchdir),
-> +    SCMP_SYS(fchmod),
->      SCMP_SYS(fchmodat),
->      SCMP_SYS(fchownat),
->      SCMP_SYS(fcntl),
-> -- 
-> 2.26.2
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index ca344bf71404..df0a62f963a8 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -485,9 +485,6 @@ struct fuse_fs_context {
+ 	unsigned int max_read;
+ 	unsigned int blksize;
+ 	const char *subtype;
+-
+-	/* fuse_dev pointer to fill in, should contain NULL on entry */
+-	void **fudptr;
+ };
+ 
+ /**
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index 95d712d44ca1..135e8e9a80d8 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -1191,16 +1191,12 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
+ 
+ 	mutex_lock(&fuse_mutex);
+ 	err = -EINVAL;
+-	if (*ctx->fudptr)
+-		goto err_unlock;
+-
+ 	err = fuse_ctl_add_conn(fc);
+ 	if (err)
+ 		goto err_unlock;
+ 
+ 	list_add_tail(&fc->entry, &fuse_conn_list);
+ 	sb->s_root = root_dentry;
+-	*ctx->fudptr = fud;
+ 	mutex_unlock(&fuse_mutex);
+ 	return 0;
+ 
+@@ -1220,6 +1216,7 @@ static int fuse_fill_super(struct super_block *sb, struct fs_context *fsc)
+ 	struct file *file;
+ 	int err;
+ 	struct fuse_conn *fc;
++	struct fuse_dev *fud;
+ 
+ 	err = -EINVAL;
+ 	file = fget(ctx->fd);
+@@ -1233,13 +1230,16 @@ static int fuse_fill_super(struct super_block *sb, struct fs_context *fsc)
+ 	if ((file->f_op != &fuse_dev_operations) ||
+ 	    (file->f_cred->user_ns != sb->s_user_ns))
+ 		goto err_fput;
+-	ctx->fudptr = &file->private_data;
+ 
+-	fc = kmalloc(sizeof(*fc), GFP_KERNEL);
+ 	err = -ENOMEM;
+-	if (!fc)
++	fud = fuse_dev_alloc();
++	if (!fud)
+ 		goto err_fput;
+ 
++	fc = kmalloc(sizeof(*fc), GFP_KERNEL);
++	if (!fc)
++		goto err_free_dev;
++
+ 	fuse_conn_init(fc, sb->s_user_ns, &fuse_dev_fiq_ops, NULL);
+ 	fc->release = fuse_free_conn;
+ 	sb->s_fs_info = fc;
+@@ -1247,6 +1247,9 @@ static int fuse_fill_super(struct super_block *sb, struct fs_context *fsc)
+ 	err = fuse_fill_super_common(sb, ctx);
+ 	if (err)
+ 		goto err_put_conn;
++
++	fuse_dev_install(fud, fc);
++	file->private_data = fud;
+ 	/*
+ 	 * atomic_dec_and_test() in fput() provides the necessary
+ 	 * memory barrier for file->private_data to be visible on all
+@@ -1259,6 +1262,8 @@ static int fuse_fill_super(struct super_block *sb, struct fs_context *fsc)
+  err_put_conn:
+ 	fuse_conn_put(fc);
+ 	sb->s_fs_info = NULL;
++ err_free_dev:
++	fuse_dev_free(fud);
+  err_fput:
+ 	fput(file);
+  err:
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index bade74768903..87a7bc0f193c 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -1066,8 +1066,7 @@ static int virtio_fs_fill_super(struct super_block *sb)
+ 	}
+ 
+ 	err = -ENOMEM;
+-	/* Allocate fuse_dev for hiprio and notification queues */
+-	for (i = 0; i < VQ_REQUEST; i++) {
++	for (i = 0; i < fs->nvqs; i++) {
+ 		struct virtio_fs_vq *fsvq = &fs->vqs[i];
+ 
+ 		fsvq->fud = fuse_dev_alloc();
+@@ -1075,18 +1074,12 @@ static int virtio_fs_fill_super(struct super_block *sb)
+ 			goto err_free_fuse_devs;
+ 	}
+ 
+-	ctx.fudptr = (void **)&fs->vqs[VQ_REQUEST].fud;
+ 	err = fuse_fill_super_common(sb, &ctx);
+ 	if (err < 0)
+ 		goto err_free_fuse_devs;
+ 
+-	fc = fs->vqs[VQ_REQUEST].fud->fc;
+-
+ 	for (i = 0; i < fs->nvqs; i++) {
+ 		struct virtio_fs_vq *fsvq = &fs->vqs[i];
+-
+-		if (i == VQ_REQUEST)
+-			continue; /* already initialized */
+ 		fuse_dev_install(fsvq->fud, fc);
+ 	}
+ 
+-- 
+2.25.4
 

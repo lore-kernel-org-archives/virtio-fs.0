@@ -1,14 +1,14 @@
-References: <20200506153258.238687-1-mreitz@redhat.com>
-	<20200507205349.GD47645@redhat.com>
-From: Max Reitz <mreitz@redhat.com>
-Message-ID: <ca1e4ae3-44c8-3ffc-92e9-023f9a4bb9a0@redhat.com>
-Date: Fri, 8 May 2020 09:31:47 +0200
+Date: Tue, 28 Apr 2020 15:51:43 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20200428145143.GB107541@stefanha-x1.localdomain>
+References: <20200424133516.73077-1-mreitz@redhat.com>
+	<20200427175902.GM2923@work-vm>
 MIME-Version: 1.0
-In-Reply-To: <20200507205349.GD47645@redhat.com>
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature";
-	boundary="K1Eoi9Ye5ZgvkhedjFiVftDOJkCyzaUcS"
-Subject: Re: [Virtio-fs] [RFC] Duplicate submounts in the guest
+	protocol="application/pgp-signature"; boundary="kORqDWCi7qDJ0mEj"
+Content-Disposition: inline
+In-Reply-To: <20200427175902.GM2923@work-vm>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Show submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,90 +17,81 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Max Reitz <mreitz@redhat.com>
 
-This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
---K1Eoi9Ye5ZgvkhedjFiVftDOJkCyzaUcS
-Content-Type: multipart/mixed; boundary="vcYNKDlFQQTQ6D6Tvf6myaZq5DnS4365Y"
 
---vcYNKDlFQQTQ6D6Tvf6myaZq5DnS4365Y
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
+--kORqDWCi7qDJ0mEj
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On 07.05.20 22:53, Vivek Goyal wrote:
-> On Wed, May 06, 2020 at 05:32:58PM +0200, Max Reitz wrote:
->> Hi,
->>
->> This RFC consists of two patch series, one for virtiofsd (i.e., to be
->> applied to the qemu repo), and one for Linux.
->>
->> The problem it wants to solve is that virtiofsd just passes through th=
-e
->> stat.st_ino value from the host to the guest, without taking stat.st_d=
-ev
->> into account.  Therefore, it is generally impossible to uniquely
->> identify nodes in the guest by their st_dev/st_ino combinations.
->>
->> One way to fix this would be to derive some algorithm to derive a uniq=
-ue
->> st_ino value from the st_dev/st_ino combination on the host, but this =
-is
->> not always possible.
->>
->> So what this series does it basically passing through st_dev alongside=
-
->> st_ino: We can let the guest create auto-mounted submounts for every
->> host mount point, so that they get their own dedicated st_dev.  This i=
-s
->> similar to what NFS does with the crossmnt option.
->>
->> Announcing submounts to the guest (the FUSE client) is done by the FUS=
-E
->> server (virtiofsd) of setting st_rdev to a non-zero value (e.g. st_dev=
-)
->> for every mount point.
->>
->> In this version here, duplicate mounts on the host (same st_dev) will
->> not necessarily have the same st_dev in the guest.  That would be more=
-
->> complicated to implement, and there is probably no real need to.
+On Mon, Apr 27, 2020 at 06:59:02PM +0100, Dr. David Alan Gilbert wrote:
+> * Max Reitz (mreitz@redhat.com) wrote:
+> > Currently, setup_mounts() bind-mounts the shared directory without
+> > MS_REC.  This makes all submounts disappear.
+> >=20
+> > Pass MS_REC so that the guest can see submounts again.
 >=20
-> Hi Max,
+> Thanks!
 >=20
-> What's duplicate mount. Is it two bind bounts created from same
-> filesystem.
+> > Fixes: 3ca8a2b1c83eb185c232a4e87abbb65495263756
+>=20
+> Should this actually be 5baa3b8e95064c2434bd9e2f312edd5e9ae275dc ?
+>=20
+> > Signed-off-by: Max Reitz <mreitz@redhat.com>
+> > ---
+> >  tools/virtiofsd/passthrough_ll.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >=20
+> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthr=
+ough_ll.c
+> > index 4c35c95b25..9d7f863e66 100644
+> > --- a/tools/virtiofsd/passthrough_ll.c
+> > +++ b/tools/virtiofsd/passthrough_ll.c
+> > @@ -2643,7 +2643,7 @@ static void setup_mounts(const char *source)
+> >      int oldroot;
+> >      int newroot;
+> > =20
+> > -    if (mount(source, source, NULL, MS_BIND, NULL) < 0) {
+> > +    if (mount(source, source, NULL, MS_BIND | MS_REC, NULL) < 0) {
+> >          fuse_log(FUSE_LOG_ERR, "mount(%s, %s, MS_BIND): %m\n", source,=
+ source);
+> >          exit(1);
+> >      }
+>=20
+> Do we want MS_SLAVE to pick up future mounts that might happenf rom the
+> host?
 
-For example; or the same filesystem from the same device twice
-(mount /dev/loop0 a; mount /dev/loop0 b).
+There are two separate concepts:
 
-> So two bind mounts which have same st_dev on host, will appear to come
-> from two different devices in guest (different st_dev), right?
+1. Mount namespaces.  The virtiofsd process is sandboxed and lives in
+   its own mount namespace.  Therefore it does not share the mounts that
+   the rest of the host system sees.
 
-Yes.
+2. Propagation type.  This is related to bind mounts so that mount
+   operations that happen in one bind-mounted location can also appear
+   in other bind-mounted locations.
 
-Max
+Since virtiofsd is in a separate mount namespace, does the propagation
+type even have any effect?
 
+Stefan
 
---vcYNKDlFQQTQ6D6Tvf6myaZq5DnS4365Y--
-
---K1Eoi9Ye5ZgvkhedjFiVftDOJkCyzaUcS
+--kORqDWCi7qDJ0mEj
 Content-Type: application/pgp-signature; name="signature.asc"
-Content-Description: OpenPGP digital signature
-Content-Disposition: attachment; filename="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEkb62CjDbPohX0Rgp9AfbAGHVz0AFAl61CuMACgkQ9AfbAGHV
-z0DAyAf/bOPvJ82dPn/EcVAoFI+Ax6fkoLclZwI1aDNT2LuC18wmXYTRYW+iMBeY
-z6VHnn5FFEjLQpr9jtgyua5Ugtq1/PpgdWGZbEcEeld/V7y0FZqZDb4AI2g0hKBq
-O08f4eRYa9vZ5y4CivtWdAGzEcnq4IzcaIzccfiTRm8XHmlypYGM6aIermWz3y4L
-otioZ0YQhRG7xLAbyRYrn81Lw0Lb5B/uJW5N7kzL2o6dPH/EDLNyIYGktPREN6S4
-9PGXDXL17aW6Jd1r8dFuScmU+I4YKWK3ixHIE/JzXhmG37a9Ge6Gq3J9V0ClIVWq
-PFlktzebAIlT+6kQXrCjHsoYgeclmw==
-=9Jqu
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl6oQv8ACgkQnKSrs4Gr
+c8hp/Af+L4ecOtUnrwQ5w8BALWGRS8+H4FBMpp9yQLC9GAnJ9ALCfXZ7eaA0E2Us
+mPXWs6Tj8FROnIDlqxj3JxEEiSRnb3CG/HYPJE41y0EQYhkY+/ECKpdBlrmANqX/
+J+I+dmQO4Ni/PqTu7wfvPSXkCJxUG4IS1vpvBNzjwcoDgDN5oDqW/jcnJc0oqGXi
+BLfvoJw6hcuxDO78R9dfyXDRQe4KfdDsaPIwqZUhpy2IEBTR5++c6IeuhzmW9bvv
+0cL4dL5y7jTv9/ZQmq02x8us89B/rcEGGdgmB2uN1J0xGSV1RhQK3gL1ABVMOIgh
+1aHzkg47gj+f10K1jNEiT/nMm45/gQ==
+=5joq
 -----END PGP SIGNATURE-----
 
---K1Eoi9Ye5ZgvkhedjFiVftDOJkCyzaUcS--
+--kORqDWCi7qDJ0mEj--
 

@@ -1,15 +1,15 @@
-Date: Fri, 1 May 2020 16:22:58 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20200501152258.GB221440@stefanha-x1.localdomain>
-References: <20200430171814.GA275398@redhat.com>
+Date: Tue, 28 Apr 2020 10:59:35 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20200428095935.GA2794@work-vm>
+References: <20200424133516.73077-1-mreitz@redhat.com>
+	<20200427175902.GM2923@work-vm>
+	<8aa9aea2-cc5d-f9b5-5cdb-b5e596ef89aa@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="H+4ONPRPur6+Ovig"
+Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
-In-Reply-To: <20200430171814.GA275398@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH][v2] fuse,
- virtiofs: Do not alloc/install fuse device in
- fuse_fill_super_common()
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <8aa9aea2-cc5d-f9b5-5cdb-b5e596ef89aa@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Show submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,51 +18,89 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>, miklos@szeredi.hu
+To: Max Reitz <mreitz@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+
+* Max Reitz (mreitz@redhat.com) wrote:
+> On 27.04.20 19:59, Dr. David Alan Gilbert wrote:
+> > * Max Reitz (mreitz@redhat.com) wrote:
+> >> Currently, setup_mounts() bind-mounts the shared directory without
+> >> MS_REC.  This makes all submounts disappear.
+> >>
+> >> Pass MS_REC so that the guest can see submounts again.
+> > 
+> > Thanks!
+> > 
+> >> Fixes: 3ca8a2b1c83eb185c232a4e87abbb65495263756
+> > 
+> > Should this actually be 5baa3b8e95064c2434bd9e2f312edd5e9ae275dc ?
+> 
+> Well, I bisected it and landed at 3ca8a2b1.  So while the problematic
+> line may have been introduced by 5baa3b8e, it wasn’t used until 3ca8a2b1.
+
+OK, I'd rather stick with the Fixes: for the patch that was actually
+wrong.
+
+> >> Signed-off-by: Max Reitz <mreitz@redhat.com>
+> >> ---
+> >>  tools/virtiofsd/passthrough_ll.c | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> >> index 4c35c95b25..9d7f863e66 100644
+> >> --- a/tools/virtiofsd/passthrough_ll.c
+> >> +++ b/tools/virtiofsd/passthrough_ll.c
+> >> @@ -2643,7 +2643,7 @@ static void setup_mounts(const char *source)
+> >>      int oldroot;
+> >>      int newroot;
+> >>  
+> >> -    if (mount(source, source, NULL, MS_BIND, NULL) < 0) {
+> >> +    if (mount(source, source, NULL, MS_BIND | MS_REC, NULL) < 0) {
+> >>          fuse_log(FUSE_LOG_ERR, "mount(%s, %s, MS_BIND): %m\n", source, source);
+> >>          exit(1);
+> >>      }
+> > 
+> > Do we want MS_SLAVE to pick up future mounts that might happenf rom the
+> > host?
+> 
+> Hm.  So first it looks to me from the man page like one shouldn’t give
+> MS_SLAVE on the first mount() call but kind of only use it for remounts
+> (in the list at the start, “Create a bind mount” is separate from
+> “Change the propagation type of an existing mount”, and the man page
+> later says “The only other flags that can be specified while changing
+> the propagation type are MS_REC (described below) and MS_SILENT (which
+> is ignored).”).
+> 
+> Second, even if I do change the propagation type to MS_SLAVE in a second
+> call, mounts done after qemu has been started don’t show up in the guest
+> (for me).
+> 
+> So while it sounds correct, I can’t see it having an effect, actually.
+
+That's unfortunate; but I guess we can debug that separately
+
+> > What's the interaction between this and the MS_REC|MS_SLAVE that we have
+> > a few lines above for / ?
+> 
+> Good question.  It would seem to me that there isn’t any.  That previous
+> mount call just sets MS_REC | MS_SLAVE for the whole mount namespace,
+> and then we do a new mount here (by default from / to /) that needs its
+> own flags.
+> 
+> (More interesting is perhaps why we have that other mount() call below,
+> which again sets MS_REC | MS_SLAVE for the old (not-yet-bind-mounted) /.
+>  I can’t imagine that to have any effect.)
+
+Is that just trying to be careful before the umount2 so it doesn't try
+to unmount something useful?
+
+Dave
+
+> Max
+> 
 
 
---H+4ONPRPur6+Ovig
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
 
-On Thu, Apr 30, 2020 at 01:18:14PM -0400, Vivek Goyal wrote:
-> As of now fuse_fill_super_common() allocates and installs one fuse device.
-> Filesystems like virtiofs can have more than one filesystem queues and
-> can have one fuse device per queue. Give, fuse_fill_super_common() only
-> handles one device, virtiofs allocates and installes fuse devices for
-> all queues except one.
->=20
-> This makes logic little twisted and hard to understand. It probably
-> is better to not do any device allocation/installation in
-> fuse_fill_super_common() and let caller take care of it instead.
->=20
-> v2: Removed fuse_dev_alloc_install() call from fuse_fill_super_common().
->=20
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  fs/fuse/fuse_i.h    |  3 ---
->  fs/fuse/inode.c     | 30 ++++++++++++++----------------
->  fs/fuse/virtio_fs.c |  9 +--------
->  3 files changed, 15 insertions(+), 27 deletions(-)
-
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-
---H+4ONPRPur6+Ovig
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl6sPtIACgkQnKSrs4Gr
-c8hliQgAot+qe3sDadrMM/5bgjSPMJ98MqyVdtboP5q7pS53Uw52QJyEZpWm4o2/
-G3ACgq4R5RXhWfD4MZjHDRM2Co3RlINGaGCT6VqEdozxdZ+iNjkSvo62mdVjNRjC
-T7xqJYZlm7rDOqXqV3KG3jAEUmnPVikG4wsm+nJAlpUhH52ygQdhRWT8H0/tlSgV
-RE2Y8PZaafSHvJf8SnCNz4SQskUj77kSHjN4JpmS0iKRyQCyVlz64ZJ3VW92HJWM
-P13604JeZ95E0g0L4fRSSnw5ZsA1QuCrVpsKto+GgLEiqTmH5wuLiTMNKg8XdL/F
-qEQAGGrtIgt/27/FLmF4uYQkDFAEJA==
-=3pgI
------END PGP SIGNATURE-----
-
---H+4ONPRPur6+Ovig--
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

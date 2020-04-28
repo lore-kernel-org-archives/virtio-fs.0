@@ -1,23 +1,17 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=H8Cu6HxLa77jfVaZq3CgdIap4XuJaTdN0YbC0ZBDI6M=;
-	b=HHTWe/aw3WAO0yhwglTuWvnXtft80GNiSghWxIrZ8pm3zAl6YWCPBliDTGEgkmScPn
-	GRXl7egcPPz7vscL5sn1MgH+ZlgS20+7153v5mN3c8Sv5/SOt/jdmqkdfKiaabkOmQmY
-	JkkTTl0/M/DXPC/fmTCboG4vGxTAISZ/GlWe0=
+Date: Tue, 28 Apr 2020 11:19:45 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20200428101945.GB2794@work-vm>
+References: <20200424133516.73077-1-mreitz@redhat.com>
+	<20200427175902.GM2923@work-vm>
+	<8aa9aea2-cc5d-f9b5-5cdb-b5e596ef89aa@redhat.com>
+	<20200428095935.GA2794@work-vm>
+	<537eb3fe-d930-1d8e-1597-1b73831d0623@redhat.com>
 MIME-Version: 1.0
-References: <20200424062540.23679-1-chirantan@chromium.org>
-	<20200424062540.23679-2-chirantan@chromium.org>
-	<20200427151934.GB1042399@stefanha-x1.localdomain>
-	<CAJFHJrr2DAgQC9ZWx78OudX1x6A57_vpLf4rJu80ceR6bnpbaQ@mail.gmail.com>
-	<20200501154752.GA222606@stefanha-x1.localdomain>
-In-Reply-To: <20200501154752.GA222606@stefanha-x1.localdomain>
-From: Chirantan Ekbote <chirantan@chromium.org>
-Date: Thu, 7 May 2020 17:10:15 +0900
-Message-ID: <CAJFHJrpdbVKWyGuJJCBATVaYZsPLeg6JzpZmGFDsUcF_a4gcMA@mail.gmail.com>
-Content-Type: text/plain; charset=UTF-8
+Content-Type: text/plain; charset="utf-8"
+Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 2/2] fuse: virtiofs: Add basic multiqueue
-	support
+In-Reply-To: <537eb3fe-d930-1d8e-1597-1b73831d0623@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Show submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -26,46 +20,100 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: Miklos Szeredi <miklos@szeredi.hu>, Suleiman Souhlal <suleiman@chromium.org>, virtio-fs-list <virtio-fs@redhat.com>, Linux FS Devel <linux-fsdevel@vger.kernel.org>, Dylan Reid <dgreid@chromium.org>, Vivek Goyal <vgoyal@redhat.com>
+To: Max Reitz <mreitz@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Sat, May 2, 2020 at 12:48 AM Stefan Hajnoczi <stefanha@redhat.com> wrote:
->
-> On Fri, May 01, 2020 at 04:14:38PM +0900, Chirantan Ekbote wrote:
-> > On Tue, Apr 28, 2020 at 12:20 AM Stefan Hajnoczi <stefanha@redhat.com> wrote:
-> > > Instead of modifying the guest driver, please implement request
-> > > parallelism in your device implementation.
-> >
-> > Yes, we have tried this already [1][2].  As I mentioned above, having
-> > additional threads in the server actually made performance worse.  My
-> > theory is that when the device only has 2 cpus, having additional
-> > threads on the host that need cpu time ends up taking time away from
-> > the guest vcpu.  We're now looking at switching to io_uring so that we
-> > can submit multiple requests from a single thread.
->
-> The host has 2 CPUs?  How many vCPUs does the guest have?  What is the
-> physical storage device?  What is the host file system?
+* Max Reitz (mreitz@redhat.com) wrote:
+> On 28.04.20 11:59, Dr. David Alan Gilbert wrote:
+> > * Max Reitz (mreitz@redhat.com) wrote:
+> >> On 27.04.20 19:59, Dr. David Alan Gilbert wrote:
+> >>> * Max Reitz (mreitz@redhat.com) wrote:
+> >>>> Currently, setup_mounts() bind-mounts the shared directory without
+> >>>> MS_REC.  This makes all submounts disappear.
+> >>>>
+> >>>> Pass MS_REC so that the guest can see submounts again.
+> >>>
+> >>> Thanks!
+> >>>
+> >>>> Fixes: 3ca8a2b1c83eb185c232a4e87abbb65495263756
+> >>>
+> >>> Should this actually be 5baa3b8e95064c2434bd9e2f312edd5e9ae275dc ?
+> >>
+> >> Well, I bisected it and landed at 3ca8a2b1.  So while the problematic
+> >> line may have been introduced by 5baa3b8e, it wasn’t used until 3ca8a2b1.
+> > 
+> > OK, I'd rather stick with the Fixes: for the patch that was actually
+> > wrong.
+> 
+> Why not both? :)
+> 
+> >>>> Signed-off-by: Max Reitz <mreitz@redhat.com>
+> >>>> ---
+> >>>>  tools/virtiofsd/passthrough_ll.c | 2 +-
+> >>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>>
+> >>>> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> >>>> index 4c35c95b25..9d7f863e66 100644
+> >>>> --- a/tools/virtiofsd/passthrough_ll.c
+> >>>> +++ b/tools/virtiofsd/passthrough_ll.c
+> >>>> @@ -2643,7 +2643,7 @@ static void setup_mounts(const char *source)
+> >>>>      int oldroot;
+> >>>>      int newroot;
+> >>>>  
+> >>>> -    if (mount(source, source, NULL, MS_BIND, NULL) < 0) {
+> >>>> +    if (mount(source, source, NULL, MS_BIND | MS_REC, NULL) < 0) {
+> >>>>          fuse_log(FUSE_LOG_ERR, "mount(%s, %s, MS_BIND): %m\n", source, source);
+> >>>>          exit(1);
+> >>>>      }
+> >>>
+> >>> Do we want MS_SLAVE to pick up future mounts that might happenf rom the
+> >>> host?
+> >>
+> >> Hm.  So first it looks to me from the man page like one shouldn’t give
+> >> MS_SLAVE on the first mount() call but kind of only use it for remounts
+> >> (in the list at the start, “Create a bind mount” is separate from
+> >> “Change the propagation type of an existing mount”, and the man page
+> >> later says “The only other flags that can be specified while changing
+> >> the propagation type are MS_REC (described below) and MS_SILENT (which
+> >> is ignored).”).
+> >>
+> >> Second, even if I do change the propagation type to MS_SLAVE in a second
+> >> call, mounts done after qemu has been started don’t show up in the guest
+> >> (for me).
+> >>
+> >> So while it sounds correct, I can’t see it having an effect, actually.
+> > 
+> > That's unfortunate; but I guess we can debug that separately
+> > 
+> >>> What's the interaction between this and the MS_REC|MS_SLAVE that we have
+> >>> a few lines above for / ?
+> >>
+> >> Good question.  It would seem to me that there isn’t any.  That previous
+> >> mount call just sets MS_REC | MS_SLAVE for the whole mount namespace,
+> >> and then we do a new mount here (by default from / to /) that needs its
+> >> own flags.
+> >>
+> >> (More interesting is perhaps why we have that other mount() call below,
+> >> which again sets MS_REC | MS_SLAVE for the old (not-yet-bind-mounted) /.
+> >>  I can’t imagine that to have any effect.)
+> > 
+> > Is that just trying to be careful before the umount2 so it doesn't try
+> > to unmount something useful?
+> 
+> Perhaps, but still, it shouldn’t matter.  I rather suspect that
+> setup_namespaces() and setup_mounts() were developed (or taken from
+> elsewhere) independently, so they both have to work independently, and
+> thus they do overlapping stuff.
 
-The host has 2 cpus.  The guest has 1 vcpu.  The physical storage
-device is an internal ssd.  The file system is ext4 with directory
-encryption.
+Yep, agreed.
+
+Dave
+
+> Max
+> 
 
 
->
-> io_uring's vocabulary is expanding.  It can now do openat2(2), close(2),
-> statx(2), but not mkdir(2), unlink(2), rename(2), etc.
->
-> I guess there are two options:
-> 1. Fall back to threads for FUSE operations that cannot yet be done via
->    io_uring.
-> 2. Process FUSE operations that cannot be done via io_uring
->    synchronously.
->
 
-I'm hoping that using io_uring for just the reads and writes should
-give us a big enough improvement that we can do the rest of the
-operations synchronously.
-
-Chirantan
-
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

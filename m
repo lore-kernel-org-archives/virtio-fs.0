@@ -1,12 +1,14 @@
-Date: Wed, 29 Apr 2020 10:36:00 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200429143600.GE231284@redhat.com>
-References: <20200429124733.22488-1-mszeredi@redhat.com>
+References: <20200424133516.73077-1-mreitz@redhat.com>
+	<20200427175902.GM2923@work-vm>
+From: Max Reitz <mreitz@redhat.com>
+Message-ID: <8aa9aea2-cc5d-f9b5-5cdb-b5e596ef89aa@redhat.com>
+Date: Tue, 28 Apr 2020 08:06:30 +0200
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200429124733.22488-1-mszeredi@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: jail lo->proc_self_fd
+In-Reply-To: <20200427175902.GM2923@work-vm>
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature";
+	boundary="zOPKgSvGA9aD5ncr3lfdc5QsGlK365KXv"
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Show submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,91 +17,115 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <mszeredi@redhat.com>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Wed, Apr 29, 2020 at 02:47:33PM +0200, Miklos Szeredi wrote:
-> While it's not possible to escape the proc filesystem through
-> lo->proc_self_fd, it is possible to escape to the root of the proc
-> filesystem itself through "../..".
+This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
+--zOPKgSvGA9aD5ncr3lfdc5QsGlK365KXv
+Content-Type: multipart/mixed; boundary="jx7TNYgfYlBaxII1dZA4uAvXh65J08ksL"
 
-Hi Miklos,
+--jx7TNYgfYlBaxII1dZA4uAvXh65J08ksL
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: quoted-printable
 
-So this attack will work with some form of *at(lo->proc_self_fd, "../..")
-call?
+On 27.04.20 19:59, Dr. David Alan Gilbert wrote:
+> * Max Reitz (mreitz@redhat.com) wrote:
+>> Currently, setup_mounts() bind-mounts the shared directory without
+>> MS_REC.  This makes all submounts disappear.
+>>
+>> Pass MS_REC so that the guest can see submounts again.
+>=20
+> Thanks!
+>=20
+>> Fixes: 3ca8a2b1c83eb185c232a4e87abbb65495263756
+>=20
+> Should this actually be 5baa3b8e95064c2434bd9e2f312edd5e9ae275dc ?
 
-> 
-> Use a temporary mount for opening lo->proc_self_fd, that has it's root at
-> /proc/self/fd/, preventing access to the ancestor directories.
+Well, I bisected it and landed at 3ca8a2b1.  So while the problematic
+line may have been introduced by 5baa3b8e, it wasn=E2=80=99t used until 3=
+ca8a2b1.
 
-Does this mean that now similar attack can happen using "../.." on tmpdir
-fd instead and be able to look at peers of tmpdir. Or it is blocked
-due to mount point or something else. 
+>> Signed-off-by: Max Reitz <mreitz@redhat.com>
+>> ---
+>>  tools/virtiofsd/passthrough_ll.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passth=
+rough_ll.c
+>> index 4c35c95b25..9d7f863e66 100644
+>> --- a/tools/virtiofsd/passthrough_ll.c
+>> +++ b/tools/virtiofsd/passthrough_ll.c
+>> @@ -2643,7 +2643,7 @@ static void setup_mounts(const char *source)
+>>      int oldroot;
+>>      int newroot;
+>> =20
+>> -    if (mount(source, source, NULL, MS_BIND, NULL) < 0) {
+>> +    if (mount(source, source, NULL, MS_BIND | MS_REC, NULL) < 0) {
+>>          fuse_log(FUSE_LOG_ERR, "mount(%s, %s, MS_BIND): %m\n", source=
+, source);
+>>          exit(1);
+>>      }
+>=20
+> Do we want MS_SLAVE to pick up future mounts that might happenf rom the=
 
-Thanks
-Vivek
+> host?
 
-> 
-> Signed-off-by: Miklos Szeredi <mszeredi@redhat.com>
-> ---
->  tools/virtiofsd/passthrough_ll.c | 27 +++++++++++++++++++++++++--
->  1 file changed, 25 insertions(+), 2 deletions(-)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 4c35c95b256c..bc9c44c760f4 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2536,6 +2536,8 @@ static void print_capabilities(void)
->  static void setup_namespaces(struct lo_data *lo, struct fuse_session *se)
->  {
->      pid_t child;
-> +    char template[] = "virtiofsd-XXXXXX";
-> +    char *tmpdir;
->  
->      /*
->       * Create a new pid namespace for *child* processes.  We'll have to
-> @@ -2597,12 +2599,33 @@ static void setup_namespaces(struct lo_data *lo, struct fuse_session *se)
->          exit(1);
->      }
->  
-> +    tmpdir = mkdtemp(template);
-> +    if (!tmpdir) {
-> +        fuse_log(FUSE_LOG_ERR, "tmpdir(%s): %m\n", template);
-> +        exit(1);
-> +    }
-> +
-> +    if (mount("/proc/self/fd", tmpdir, NULL, MS_BIND, NULL) < 0) {
-> +        fuse_log(FUSE_LOG_ERR, "mount(/proc/self/fd, %s, MS_BIND): %m\n",
-> +                 tmpdir);
-> +        exit(1);
-> +    }
-> +
->      /* Now we can get our /proc/self/fd directory file descriptor */
-> -    lo->proc_self_fd = open("/proc/self/fd", O_PATH);
-> +    lo->proc_self_fd = open(tmpdir, O_PATH);
->      if (lo->proc_self_fd == -1) {
-> -        fuse_log(FUSE_LOG_ERR, "open(/proc/self/fd, O_PATH): %m\n");
-> +        fuse_log(FUSE_LOG_ERR, "open(%s, O_PATH): %m\n", tmpdir);
->          exit(1);
->      }
-> +
-> +    if (umount2(tmpdir, MNT_DETACH) < 0) {
-> +        fuse_log(FUSE_LOG_ERR, "umount2(%s, MNT_DETACH): %m\n", tmpdir);
-> +        exit(1);
-> +    }
-> +
-> +    if (rmdir(tmpdir) < 0) {
-> +        fuse_log(FUSE_LOG_ERR, "rmdir(%s): %m\n", tmpdir);
-> +    }
->  }
->  
->  /*
-> -- 
-> 2.21.1
-> 
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
+Hm.  So first it looks to me from the man page like one shouldn=E2=80=99t=
+ give
+MS_SLAVE on the first mount() call but kind of only use it for remounts
+(in the list at the start, =E2=80=9CCreate a bind mount=E2=80=9D is separ=
+ate from
+=E2=80=9CChange the propagation type of an existing mount=E2=80=9D, and t=
+he man page
+later says =E2=80=9CThe only other flags that can be specified while chan=
+ging
+the propagation type are MS_REC (described below) and MS_SILENT (which
+is ignored).=E2=80=9D).
+
+Second, even if I do change the propagation type to MS_SLAVE in a second
+call, mounts done after qemu has been started don=E2=80=99t show up in th=
+e guest
+(for me).
+
+So while it sounds correct, I can=E2=80=99t see it having an effect, actu=
+ally.
+
+> What's the interaction between this and the MS_REC|MS_SLAVE that we hav=
+e
+> a few lines above for / ?
+
+Good question.  It would seem to me that there isn=E2=80=99t any.  That p=
+revious
+mount call just sets MS_REC | MS_SLAVE for the whole mount namespace,
+and then we do a new mount here (by default from / to /) that needs its
+own flags.
+
+(More interesting is perhaps why we have that other mount() call below,
+which again sets MS_REC | MS_SLAVE for the old (not-yet-bind-mounted) /.
+ I can=E2=80=99t imagine that to have any effect.)
+
+Max
+
+
+--jx7TNYgfYlBaxII1dZA4uAvXh65J08ksL--
+
+--zOPKgSvGA9aD5ncr3lfdc5QsGlK365KXv
+Content-Type: application/pgp-signature; name="signature.asc"
+Content-Description: OpenPGP digital signature
+Content-Disposition: attachment; filename="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEkb62CjDbPohX0Rgp9AfbAGHVz0AFAl6nx+YACgkQ9AfbAGHV
+z0BVWwf+O8Uh7ZUmSnV29FWnmLRugDDUamw5nwW1PD7NS/gyI4eZhFgmqqweFeDY
+pDo1/O1QZgWQix94UR4oSz1YWkKs5RTnT7oK6TTVXCoXzv7E+KSxipbeZWYmAXGE
+pPLHBJA6f7iozo4NjPMce4+EPAIEC/gl8DOhw6rzFJuioyghYBYE7F7ZfhkxGpJY
+q+gs20BDRymK0BzYt5TuZQ5q0LzQvVbBsgtnJ6dFUEPCB0FrCC3hDVmTnLPm5Pdm
+aitOlNptlgyj+TTA2Msz3w7QIK2VGO0x3/EMlS7kkNV1vm8Nkq065/PT2/k0ur6R
+coGxfV2GruNEVjsf59vEMzLrRmnMaQ==
+=Mzh7
+-----END PGP SIGNATURE-----
+
+--zOPKgSvGA9aD5ncr3lfdc5QsGlK365KXv--
 

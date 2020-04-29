@@ -1,19 +1,10 @@
-Date: Wed, 29 Apr 2020 08:41:29 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200429124129.GB231284@redhat.com>
-References: <20200424133516.73077-1-mreitz@redhat.com>
-	<20200427175902.GM2923@work-vm>
-	<20200428145143.GB107541@stefanha-x1.localdomain>
-	<CAOssrKcoXBAxE=Ld5ZY79G=Dy=qBh3HdSxxC+nMGJOX52rUxxg@mail.gmail.com>
-	<20200428191523.GU2794@work-vm>
-	<CAOssrKcsVvMok6i+vAm1KJaq07Ep9JLcMiB1nWhsNU2n1m-Fmw@mail.gmail.com>
-	<CAOssrKcZr4QXV1qLO7wmvdutkPKm59nSquPisEApBCWGx-c-uA@mail.gmail.com>
-	<20200429123424.GA231284@redhat.com>
+From: Miklos Szeredi <mszeredi@redhat.com>
+Date: Wed, 29 Apr 2020 14:47:33 +0200
+Message-Id: <20200429124733.22488-1-mszeredi@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200429123424.GA231284@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Show submounts
+Content-Type: text/plain; charset=US-ASCII
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH] virtiofsd: jail lo->proc_self_fd
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,63 +13,71 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <mszeredi@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Max Reitz <mreitz@redhat.com>, qemu-devel@nongnu.org
+To: qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com
 
-On Wed, Apr 29, 2020 at 08:34:24AM -0400, Vivek Goyal wrote:
-> On Wed, Apr 29, 2020 at 11:26:49AM +0200, Miklos Szeredi wrote:
-> > On Wed, Apr 29, 2020 at 9:59 AM Miklos Szeredi <mszeredi@redhat.com> wrote:
-> > >
-> > > On Tue, Apr 28, 2020 at 9:15 PM Dr. David Alan Gilbert
-> > > <dgilbert@redhat.com> wrote:
-> > >
-> > > > So our current sequence is:
-> > > >
-> > > >    (new namespace)
-> > > >  1)    if (mount(NULL, "/", NULL, MS_REC | MS_SLAVE, NULL) < 0) {
-> > > >  2)   if (mount("proc", "/proc", "proc",
-> > > >            ....
-> > > >  3)   if (mount(source, source, NULL, MS_BIND | MS_REC, NULL) < 0) {
-> > > >  4)  (chdir newroot, pivot, chdir oldroot)
-> > > >  5)   if (mount("", ".", "", MS_SLAVE | MS_REC, NULL) < 0) {
-> > > >  6)   if (umount2(".", MNT_DETACH) < 0) {
-> > > >
-> > > > So are you saying we need a:
-> > > >        if (mount(NULL, "/", NULL, MS_REC | MS_SHARED, NULL) < 0) {
-> > > >
-> > > >   and can this go straight after (1) ?
-> > >
-> > > Or right before (3).   Important thing is that that new mount will
-> > > only receive propagation if the type of the mount at source (before
-> > > (3) is performed) is shared.
-> > 
-> > And seems I was wrong.  Bind mounting clones the slave property, hence
-> > no need to set MS_SHARED.  I.e. if the source was a slave, the bind
-> > mount will be a slave to the same master as well; the two slaves won't
-> > receive propagation between each other, but both will receive
-> > propagation from the master.
-> 
-> Agreed. I was playing with it yesterday and noticed the same thing. Wanted
-> to test more before I said anything
-> 
-> Anyway, I did following.
-> 
-> $ mkdir /tmp/a /tmp/a/c /tmp/b
-> $ mount --bind /tmp/a /tmp/a
-> 
-> $ findmnt -o +PROPAGATION /tmp/a
-> TARGET SOURCE    FSTYPE OPTIONS                  PROPAGATION
-> /tmp/a tmpfs[/a] tmpfs  rw,nosuid,nodev,seclabel shared
+While it's not possible to escape the proc filesystem through
+lo->proc_self_fd, it is possible to escape to the root of the proc
+filesystem itself through "../..".
 
-A note, this is "shared" by default becase parent mount ("/") is "shared"
-by default due to systemd settings. Some distributions make "/" private
-instead and in that case, new mount namespace will not be "slave" and
-will not receive propagation events.
+Use a temporary mount for opening lo->proc_self_fd, that has it's root at
+/proc/self/fd/, preventing access to the ancestor directories.
 
-In that case we will have to document to bind mount source directory
-with "shared" propagation so that mounts done later on host can 
-propagate into virtiofsd namespace.
+Signed-off-by: Miklos Szeredi <mszeredi@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c | 27 +++++++++++++++++++++++++--
+ 1 file changed, 25 insertions(+), 2 deletions(-)
 
-Thanks
-Vivek
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 4c35c95b256c..bc9c44c760f4 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -2536,6 +2536,8 @@ static void print_capabilities(void)
+ static void setup_namespaces(struct lo_data *lo, struct fuse_session *se)
+ {
+     pid_t child;
++    char template[] = "virtiofsd-XXXXXX";
++    char *tmpdir;
+ 
+     /*
+      * Create a new pid namespace for *child* processes.  We'll have to
+@@ -2597,12 +2599,33 @@ static void setup_namespaces(struct lo_data *lo, struct fuse_session *se)
+         exit(1);
+     }
+ 
++    tmpdir = mkdtemp(template);
++    if (!tmpdir) {
++        fuse_log(FUSE_LOG_ERR, "tmpdir(%s): %m\n", template);
++        exit(1);
++    }
++
++    if (mount("/proc/self/fd", tmpdir, NULL, MS_BIND, NULL) < 0) {
++        fuse_log(FUSE_LOG_ERR, "mount(/proc/self/fd, %s, MS_BIND): %m\n",
++                 tmpdir);
++        exit(1);
++    }
++
+     /* Now we can get our /proc/self/fd directory file descriptor */
+-    lo->proc_self_fd = open("/proc/self/fd", O_PATH);
++    lo->proc_self_fd = open(tmpdir, O_PATH);
+     if (lo->proc_self_fd == -1) {
+-        fuse_log(FUSE_LOG_ERR, "open(/proc/self/fd, O_PATH): %m\n");
++        fuse_log(FUSE_LOG_ERR, "open(%s, O_PATH): %m\n", tmpdir);
+         exit(1);
+     }
++
++    if (umount2(tmpdir, MNT_DETACH) < 0) {
++        fuse_log(FUSE_LOG_ERR, "umount2(%s, MNT_DETACH): %m\n", tmpdir);
++        exit(1);
++    }
++
++    if (rmdir(tmpdir) < 0) {
++        fuse_log(FUSE_LOG_ERR, "rmdir(%s): %m\n", tmpdir);
++    }
+ }
+ 
+ /*
+-- 
+2.21.1
+
 

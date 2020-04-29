@@ -1,17 +1,17 @@
-Date: Fri, 19 Jun 2020 12:12:44 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200619111244.GE2690@work-vm>
-References: <20200416164907.244868-1-stefanha@redhat.com>
-	<20200618190816.GD3814@redhat.com> <20200618191655.GI2769@work-vm>
-	<20200618192717.GE3814@redhat.com>
-	<CAJFHJrrJzPLatNvw2xC3WYLbzCW0+DB+4UczQHGPBF9p+WGYQA@mail.gmail.com>
-	<20200619083953.GB2690@work-vm>
-	<CAJFHJrpRGJ=myQzJtxjgQhHdbyhGXhz_N24=xJTKM4JqhhZG2g@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <CAJFHJrpRGJ=myQzJtxjgQhHdbyhGXhz_N24=xJTKM4JqhhZG2g@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
+References: <20200424133516.73077-1-mreitz@redhat.com>
+	<20200427175902.GM2923@work-vm>
+	<20200428145143.GB107541@stefanha-x1.localdomain>
+	<CAOssrKcoXBAxE=Ld5ZY79G=Dy=qBh3HdSxxC+nMGJOX52rUxxg@mail.gmail.com>
+	<20200428191523.GU2794@work-vm>
+	<0da9422f-6399-6ef0-1042-4b2b90d49ed8@redhat.com>
+In-Reply-To: <0da9422f-6399-6ef0-1042-4b2b90d49ed8@redhat.com>
+From: Miklos Szeredi <mszeredi@redhat.com>
+Date: Wed, 29 Apr 2020 10:52:46 +0200
+Message-ID: <CAOssrKfA_7cAio6i4Zy5hM-6VwBXphja6ps4s_NKrLsoF1yC+Q@mail.gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Show submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,66 +20,35 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Chirantan Ekbote <chirantan@chromium.org>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>
+To: Max Reitz <mreitz@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
 
-* Chirantan Ekbote (chirantan@chromium.org) wrote:
-> On Fri, Jun 19, 2020 at 5:40 PM Dr. David Alan Gilbert
-> <dgilbert@redhat.com> wrote:
+On Wed, Apr 29, 2020 at 10:31 AM Max Reitz <mreitz@redhat.com> wrote:
+>
+> On 28.04.20 21:15, Dr. David Alan Gilbert wrote:
+
+> > So are you saying we need a:
+> >        if (mount(NULL, "/", NULL, MS_REC | MS_SHARED, NULL) < 0) {
 > >
-> > * Chirantan Ekbote (chirantan@chromium.org) wrote:
-> >
-> > > We ended up working around it by prefixing "user.virtiofs." to the
-> > > xattr name[2], which has its own problems but there was pretty much no
-> > > chance that we would be able to give the fs device CAP_SYS_ADMIN in
-> > > the init namespace.
-> >
-> >
-> > What problems did you hit with that?  We should standardise the renaming
-> > so we make an on-disc format that's compatible.
-> >
-> 
-> I guess what I meant by problems is that it made what was previously a
-> simple and straightforward implementation into something more complex
-> and added some limitations.
+> >   and can this go straight after (1) ?
+>
+> Isn’t MS_SHARED and MS_SLAVE mutually exclusive, that is, both are just
+> different propagation types?  So shouldn’t putting this after (1) be
+> effectively the same as replacing (1)?
 
-Yeh.
+No, think of it more like a set of groups (mounts in a group have the
+same "shared:$ID" tag in /proc/self/mountinfo) and these groups being
+arranged into a tree, where child groups get propagation from the
+parent group (mounts have a "master:$PARENT_ID" tag), but not the
+other way round.
 
->  For example, we now need to parse the
-> result of the listxattr system call and strip out the prefix from any
-> name in the list.  It also means that we cannot allow the guest to
-> directly set or remove any "user.virtiofs." xattr as this would allow
-> an unprivileged process in the vm to modify an xattr that it wouldn't
-> otherwise be allowed to modify.  On top of being a somewhat arbitrary
-> restriction this also means that you can't have stacked virtiofs
-> instances as the lower instance would reject attempts by the upper one
-> to set those xattrs.  These limitations aren't really a problem for us
-> but I can see how they might be a problem for others.
+So if a mount is part of a shared group and this group is also the
+child of another shared group, then it will have both a "shared:$ID"
+and a "master:$PARENT_ID" tag in /proc/self/mountinfo.
 
-Isn't this a classic escaping problem?
-Would it work if you prepended  'user.virtiofs.' onto any xattr
-that started with 'trusted' or 'user.virtiofs.' ?
+For the gory details see Documentation/filesystems/sharedsubtree.txt
 
-> The change was also merged just yesterday so there may be other
-> problems with it that haven't surfaced yet.
-> 
-> I didn't mention it before because I figured this was something that
-> we brought upon ourselves as chrome os is a bit extreme about
-> sandboxing. 
+Thanks,
+Miklos
 
-I think we're trying to be as extreme in virtiofsd, but it is causing us
-similar problems.
-
-> If we can come up with a standardized way to handle this
-> I think we'll gladly switch the chrome os implementation to use it.
-
-Great!
-
-Dave
-
-> 
-> Chirantan
-> 
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

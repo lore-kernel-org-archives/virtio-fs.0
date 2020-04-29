@@ -1,12 +1,17 @@
-Date: Mon, 27 Apr 2020 13:58:14 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200427175814.GC146096@redhat.com>
-References: <20200424062540.23679-1-chirantan@chromium.org>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200424062540.23679-1-chirantan@chromium.org>
-Subject: Re: [Virtio-fs] [PATCH 1/2] fuse: virtiofs: Fix nullptr dereference
+References: <20200424133516.73077-1-mreitz@redhat.com>
+	<20200427175902.GM2923@work-vm>
+	<20200428145143.GB107541@stefanha-x1.localdomain>
+	<CAOssrKcoXBAxE=Ld5ZY79G=Dy=qBh3HdSxxC+nMGJOX52rUxxg@mail.gmail.com>
+	<20200428191523.GU2794@work-vm>
+	<CAOssrKcsVvMok6i+vAm1KJaq07Ep9JLcMiB1nWhsNU2n1m-Fmw@mail.gmail.com>
+In-Reply-To: <CAOssrKcsVvMok6i+vAm1KJaq07Ep9JLcMiB1nWhsNU2n1m-Fmw@mail.gmail.com>
+From: Miklos Szeredi <mszeredi@redhat.com>
+Date: Wed, 29 Apr 2020 11:26:49 +0200
+Message-ID: <CAOssrKcZr4QXV1qLO7wmvdutkPKm59nSquPisEApBCWGx-c-uA@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Show submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,52 +20,47 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Chirantan Ekbote <chirantan@chromium.org>
-Cc: Miklos Szeredi <miklos@szeredi.hu>, Suleiman Souhlal <suleiman@chromium.org>, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Dylan Reid <dgreid@chromium.org>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org, Max Reitz <mreitz@redhat.com>
 
-On Fri, Apr 24, 2020 at 03:25:39PM +0900, Chirantan Ekbote wrote:
-> virtiofs device implementations are allowed to provide more than one
-> request queue.  In this case `fsvq->fud` would not be initialized,
-> leading to a nullptr dereference later during driver initialization.
-> 
-> Make sure that `fsvq->fud` is initialized for all request queues even if
-> the driver doesn't use them.
-> 
-> Signed-off-by: Chirantan Ekbote <chirantan@chromium.org>
-> ---
->  fs/fuse/virtio_fs.c | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-> index bade747689033..d3c38222a7e4e 100644
-> --- a/fs/fuse/virtio_fs.c
-> +++ b/fs/fuse/virtio_fs.c
-> @@ -1066,10 +1066,13 @@ static int virtio_fs_fill_super(struct super_block *sb)
->  	}
->  
->  	err = -ENOMEM;
-> -	/* Allocate fuse_dev for hiprio and notification queues */
-> -	for (i = 0; i < VQ_REQUEST; i++) {
-> +	/* Allocate fuse_dev for all queues except the first request queue. */
-> +	for (i = 0; i < fs->nvqs; i++) {
->  		struct virtio_fs_vq *fsvq = &fs->vqs[i];
->  
-> +		if (i == VQ_REQUEST)
-> +			continue;
-> +
+On Wed, Apr 29, 2020 at 9:59 AM Miklos Szeredi <mszeredi@redhat.com> wrote:
+>
+> On Tue, Apr 28, 2020 at 9:15 PM Dr. David Alan Gilbert
+> <dgilbert@redhat.com> wrote:
+>
+> > So our current sequence is:
+> >
+> >    (new namespace)
+> >  1)    if (mount(NULL, "/", NULL, MS_REC | MS_SLAVE, NULL) < 0) {
+> >  2)   if (mount("proc", "/proc", "proc",
+> >            ....
+> >  3)   if (mount(source, source, NULL, MS_BIND | MS_REC, NULL) < 0) {
+> >  4)  (chdir newroot, pivot, chdir oldroot)
+> >  5)   if (mount("", ".", "", MS_SLAVE | MS_REC, NULL) < 0) {
+> >  6)   if (umount2(".", MNT_DETACH) < 0) {
+> >
+> > So are you saying we need a:
+> >        if (mount(NULL, "/", NULL, MS_REC | MS_SHARED, NULL) < 0) {
+> >
+> >   and can this go straight after (1) ?
+>
+> Or right before (3).   Important thing is that that new mount will
+> only receive propagation if the type of the mount at source (before
+> (3) is performed) is shared.
 
-These special conditions of initializing fuse device for one queue
-fusing fill_super_common() and rest of the queues outside of it, are
-bothering me. I am proposing a separate patch where all fuse device
-initialization/cleanup is done by the caller. It makes code look
-cleaner and easier to understand.
+And seems I was wrong.  Bind mounting clones the slave property, hence
+no need to set MS_SHARED.  I.e. if the source was a slave, the bind
+mount will be a slave to the same master as well; the two slaves won't
+receive propagation between each other, but both will receive
+propagation from the master.
 
-Vivek
+The only reason to set MS_SHARED would be if the bind mount wanted to
+receive propagation from within the cloned namespace.   Which is not
+the case.
 
->  		fsvq->fud = fuse_dev_alloc();
->  		if (!fsvq->fud)
->  			goto err_free_fuse_devs;
-> -- 
-> 2.26.2.303.gf8c07b1a785-goog
-> 
+Didn't I tell ya it was complicated ;)
+
+Thanks,
+Miklos
+
 

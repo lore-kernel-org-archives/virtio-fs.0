@@ -1,21 +1,12 @@
-Date: Thu, 30 Apr 2020 11:41:05 -0400
+Date: Thu, 30 Apr 2020 13:18:14 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200430154105.GE260081@redhat.com>
-References: <20200424133516.73077-1-mreitz@redhat.com>
-	<20200427175902.GM2923@work-vm> <20200429145720.GA2835@work-vm>
-	<8c73f374-fcc8-1684-b581-84a9ab501aa9@redhat.com>
-	<20200430085812.GC2874@work-vm>
-	<20200430135639.GA260081@redhat.com>
-	<20200430142013.GI2874@work-vm>
-	<20200430143425.GD2184629@redhat.com>
-	<20200430144116.GD260081@redhat.com>
-	<20200430144704.GG2184629@redhat.com>
+Message-ID: <20200430171814.GA275398@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <20200430144704.GG2184629@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Show submounts
+Subject: [Virtio-fs] [PATCH][v2] fuse,
+ virtiofs: Do not alloc/install fuse device in
+ fuse_fill_super_common()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,135 +15,183 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>
-Cc: virtio-fs@redhat.com, Max Reitz <mreitz@redhat.com>, qemu-devel@nongnu.org
+To: linux-fsdevel@vger.kernel.org, miklos@szeredi.hu
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-On Thu, Apr 30, 2020 at 03:47:04PM +0100, Daniel P. Berrangé wrote:
-> On Thu, Apr 30, 2020 at 10:41:16AM -0400, Vivek Goyal wrote:
-> > On Thu, Apr 30, 2020 at 03:34:25PM +0100, Daniel P. Berrangé wrote:
-> > > On Thu, Apr 30, 2020 at 03:20:13PM +0100, Dr. David Alan Gilbert wrote:
-> > > > * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > > > > On Thu, Apr 30, 2020 at 09:58:12AM +0100, Dr. David Alan Gilbert wrote:
-> > > > > [..]
-> > > > > > > > Even without this patch, the SLAVE stuff worked so if you start the
-> > > > > > > > daemon and *then* mount under the shared directory, the guest sees it
-> > > > > > > > with or without this patch.
-> > > > > > > 
-> > > > > > > Hm, I don’t.  Do you really?
-> > > > > > 
-> > > > > > Yes! With your patch reverted:
-> > > > > > 
-> > > > > > Start virtiofsd, mount in the guest:
-> > > > > > 
-> > > > > > host:
-> > > > > > # ./virtiofsd --socket-path=/tmp/vhostqemu -o source=/home/dgilbert/virtio-fs/fs  -o log_level=warn -o no_writeback
-> > > > > > 
-> > > > > > guest:
-> > > > > > # mount -t virtiofs myfs /sysroot
-> > > > > > 
-> > > > > > host:
-> > > > > > # findmnt -o +PROPAGATION -N 6100
-> > > > > > TARGET SOURCE                                                              FSTYPE OPTIONS                                                      PROPAGATION
-> > > > > > /      /dev/mapper/fedora_dgilbert--t580-root[/home/dgilbert/virtio-fs/fs] xfs    rw,relatime,seclabel,attr2,inode64,logbufs=8,logbsize=32k,no private,slave
-> > > > > > # mount -t tmpfs /dev/null /home/dgilbert/virtio-fs/fs/tmp
-> > > > > > # findmnt -o +PROPAGATION -N 6100
-> > > > > > TARGET SOURCE                                                              FSTYPE OPTIONS                                                      PROPAGATION
-> > > > > > /      /dev/mapper/fedora_dgilbert--t580-root[/home/dgilbert/virtio-fs/fs] xfs    rw,relatime,seclabel,attr2,inode64,logbufs=8,logbsize=32k,no private,slave
-> > > > > > └─/tmp /dev/null                                                           tmpfs  rw,relatime,seclabel                                         private,slave
-> > > > > 
-> > > > > Why is it showing a mount point at "/tmp". If mount point propagated, then
-> > > > > inside guest we should see a mount point at /sysroot/tmp?
-> > > > 
-> > > > That findmnt is on the host.
-> > > > 
-> > > > > So there are two things.
-> > > > > 
-> > > > > A. Propagation of mount from host to virtiofsd.
-> > > > > B. Visibility of that mount inside guest over fuse protocol (submount
-> > > > >   functionality).
-> > > > > 
-> > > > > I think A works for me without any patches. But don't think B is working
-> > > > > for me. I don't see the submount inside guest. 
-> > > > > 
-> > > > > > # touch /home/dgilbert/virtio-fs/fs/tmp/hello
-> > > > > > 
-> > > > > > guest:
-> > > > > > # ls -l /sysroot/tmp
-> > > > > > total 0
-> > > > > > -rw-r--r-- 1 root root 0 Apr 30 08:50 hello
-> > > > > 
-> > > > > Do a "findmnt /sysroot/tmp" inside guest and see what do you see.
-> > > > > 
-> > > > > You will be able to see "hello" as long as virtiofsd sees the new
-> > > > > mount point, I think. And guest does not have to see that mount point
-> > > > > for this simple test to work.
-> > > > 
-> > > > Right, the guest just sees:
-> > > > 
-> > > > `-/sysroot                            myfs       virtiof rw,relatime
-> > > 
-> > > That is a good thing surely ? If I'm exporting "/sysroot" from the host,
-> > > I want the content in "/sysroot/some/sub/mount" to be visible to the
-> > > guest, but I don't want the guest to see "/sysroot/some/sub/mount"
-> > > as an actual mount point. That would be leaking information about the
-> > > host storage setup into the guest. The host admin should be free to
-> > > re-arrange submounts in the host OS, to bring more storage space online,
-> > > and have this be transparent to the guest OS.
-> > 
-> > If we don't see mount inside guest, we run into the possibility of inode
-> > number collision. On host two files in shared dir can have same inode
-> > number (if they are on two different filesystem with different device
-> > numbers). But inside guest, we will show device number of virtiofs,
-> > and it will look as if two files in this filesystem have same inode
-> > number, breaking some workloads.
-> > 
-> > By propagating mounts (submounts), we can assign a unique device number
-> > to these submounts and hence <dev,inode> number pair will become unique.
-> 
-> Ah, yes, that's true.  In 9pfs there was recent changes precisely
-> because of this clash possibility:
-> 
-> commit 1a6ed33cc56997479bbe5b48337ff8da44585bd4
-> Author: Antonios Motakis <antonios.motakis@huawei.com>
-> Date:   Thu Oct 10 11:36:05 2019 +0200
-> 
->     9p: Added virtfs option 'multidevs=remap|forbid|warn'
->     
->     'warn' (default): Only log an error message (once) on host if more than one
->     device is shared by same export, except of that just ignore this config
->     error though. This is the default behaviour for not breaking existing
->     installations implying that they really know what they are doing.
->     
->     'forbid': Like 'warn', but except of just logging an error this
->     also denies access of guest to additional devices.
->     
->     'remap': Allows to share more than one device per export by remapping
->     inodes from host to guest appropriately. To support multiple devices on the
->     9p share, and avoid qid path collisions we take the device id as input to
->     generate a unique QID path. The lowest 48 bits of the path will be set
->     equal to the file inode, and the top bits will be uniquely assigned based
->     on the top 16 bits of the inode and the device id.
-> 
-> 
-> Perhaps we should try to support the same options in virtio-fs. At least
-> the "forbid" and "remap" options make sense I think. "warn" was only
-> really there for backcompat.  If we can expose it to the guest, then a
-> further "expose" option would be viable.
+As of now fuse_fill_super_common() allocates and installs one fuse device.
+Filesystems like virtiofs can have more than one filesystem queues and
+can have one fuse device per queue. Give, fuse_fill_super_common() only
+handles one device, virtiofs allocates and installes fuse devices for
+all queues except one.
 
-Providing options in virtiofsd daemon so that use can tweak these settings
-makes sense.
+This makes logic little twisted and hard to understand. It probably
+is better to not do any device allocation/installation in
+fuse_fill_super_common() and let caller take care of it instead.
 
-Given we are already allowing accessing multiple device inside guest, we
-also probably need a mode to continue to allow that so that not to break
-existing setups.
+v2: Removed fuse_dev_alloc_install() call from fuse_fill_super_common().
 
-"forbid", "remap" make sense. And I like the option "expose" too.
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/fuse_i.h    |  3 ---
+ fs/fuse/inode.c     | 30 ++++++++++++++----------------
+ fs/fuse/virtio_fs.c |  9 +--------
+ 3 files changed, 15 insertions(+), 27 deletions(-)
 
-"remap" will require little thought that how do we do that. We briefly
-discussed encoding device number in higher inode bits and Miklos was
-not too keen on it. What if filesystem is using all 64bits of inode. We
-also need to do encoding in such a way so that inode number is persistent.
-
-Thanks
-Vivek
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index ca344bf71404..df0a62f963a8 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -485,9 +485,6 @@ struct fuse_fs_context {
+ 	unsigned int max_read;
+ 	unsigned int blksize;
+ 	const char *subtype;
+-
+-	/* fuse_dev pointer to fill in, should contain NULL on entry */
+-	void **fudptr;
+ };
+ 
+ /**
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index 95d712d44ca1..6b38e0391c96 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -1113,7 +1113,6 @@ EXPORT_SYMBOL_GPL(fuse_dev_free);
+ 
+ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
+ {
+-	struct fuse_dev *fud;
+ 	struct fuse_conn *fc = get_fuse_conn_super(sb);
+ 	struct inode *root;
+ 	struct dentry *root_dentry;
+@@ -1155,15 +1154,11 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
+ 	if (sb->s_user_ns != &init_user_ns)
+ 		sb->s_xattr = fuse_no_acl_xattr_handlers;
+ 
+-	fud = fuse_dev_alloc_install(fc);
+-	if (!fud)
+-		goto err;
+-
+ 	fc->dev = sb->s_dev;
+ 	fc->sb = sb;
+ 	err = fuse_bdi_init(fc, sb);
+ 	if (err)
+-		goto err_dev_free;
++		goto err;
+ 
+ 	/* Handle umasking inside the fuse code */
+ 	if (sb->s_flags & SB_POSIXACL)
+@@ -1185,30 +1180,24 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
+ 	sb->s_d_op = &fuse_root_dentry_operations;
+ 	root_dentry = d_make_root(root);
+ 	if (!root_dentry)
+-		goto err_dev_free;
++		goto err;
+ 	/* Root dentry doesn't have .d_revalidate */
+ 	sb->s_d_op = &fuse_dentry_operations;
+ 
+ 	mutex_lock(&fuse_mutex);
+ 	err = -EINVAL;
+-	if (*ctx->fudptr)
+-		goto err_unlock;
+-
+ 	err = fuse_ctl_add_conn(fc);
+ 	if (err)
+ 		goto err_unlock;
+ 
+ 	list_add_tail(&fc->entry, &fuse_conn_list);
+ 	sb->s_root = root_dentry;
+-	*ctx->fudptr = fud;
+ 	mutex_unlock(&fuse_mutex);
+ 	return 0;
+ 
+  err_unlock:
+ 	mutex_unlock(&fuse_mutex);
+ 	dput(root_dentry);
+- err_dev_free:
+-	fuse_dev_free(fud);
+  err:
+ 	return err;
+ }
+@@ -1220,6 +1209,7 @@ static int fuse_fill_super(struct super_block *sb, struct fs_context *fsc)
+ 	struct file *file;
+ 	int err;
+ 	struct fuse_conn *fc;
++	struct fuse_dev *fud;
+ 
+ 	err = -EINVAL;
+ 	file = fget(ctx->fd);
+@@ -1233,13 +1223,16 @@ static int fuse_fill_super(struct super_block *sb, struct fs_context *fsc)
+ 	if ((file->f_op != &fuse_dev_operations) ||
+ 	    (file->f_cred->user_ns != sb->s_user_ns))
+ 		goto err_fput;
+-	ctx->fudptr = &file->private_data;
+ 
+-	fc = kmalloc(sizeof(*fc), GFP_KERNEL);
+ 	err = -ENOMEM;
+-	if (!fc)
++	fud = fuse_dev_alloc();
++	if (!fud)
+ 		goto err_fput;
+ 
++	fc = kmalloc(sizeof(*fc), GFP_KERNEL);
++	if (!fc)
++		goto err_free_dev;
++
+ 	fuse_conn_init(fc, sb->s_user_ns, &fuse_dev_fiq_ops, NULL);
+ 	fc->release = fuse_free_conn;
+ 	sb->s_fs_info = fc;
+@@ -1247,6 +1240,9 @@ static int fuse_fill_super(struct super_block *sb, struct fs_context *fsc)
+ 	err = fuse_fill_super_common(sb, ctx);
+ 	if (err)
+ 		goto err_put_conn;
++
++	fuse_dev_install(fud, fc);
++	file->private_data = fud;
+ 	/*
+ 	 * atomic_dec_and_test() in fput() provides the necessary
+ 	 * memory barrier for file->private_data to be visible on all
+@@ -1259,6 +1255,8 @@ static int fuse_fill_super(struct super_block *sb, struct fs_context *fsc)
+  err_put_conn:
+ 	fuse_conn_put(fc);
+ 	sb->s_fs_info = NULL;
++ err_free_dev:
++	fuse_dev_free(fud);
+  err_fput:
+ 	fput(file);
+  err:
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index bade74768903..87a7bc0f193c 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -1066,8 +1066,7 @@ static int virtio_fs_fill_super(struct super_block *sb)
+ 	}
+ 
+ 	err = -ENOMEM;
+-	/* Allocate fuse_dev for hiprio and notification queues */
+-	for (i = 0; i < VQ_REQUEST; i++) {
++	for (i = 0; i < fs->nvqs; i++) {
+ 		struct virtio_fs_vq *fsvq = &fs->vqs[i];
+ 
+ 		fsvq->fud = fuse_dev_alloc();
+@@ -1075,18 +1074,12 @@ static int virtio_fs_fill_super(struct super_block *sb)
+ 			goto err_free_fuse_devs;
+ 	}
+ 
+-	ctx.fudptr = (void **)&fs->vqs[VQ_REQUEST].fud;
+ 	err = fuse_fill_super_common(sb, &ctx);
+ 	if (err < 0)
+ 		goto err_free_fuse_devs;
+ 
+-	fc = fs->vqs[VQ_REQUEST].fud->fc;
+-
+ 	for (i = 0; i < fs->nvqs; i++) {
+ 		struct virtio_fs_vq *fsvq = &fs->vqs[i];
+-
+-		if (i == VQ_REQUEST)
+-			continue; /* already initialized */
+ 		fuse_dev_install(fsvq->fud, fc);
+ 	}
+ 
+-- 
+2.25.4
 

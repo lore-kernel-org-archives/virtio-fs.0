@@ -1,12 +1,15 @@
+Date: Fri, 1 May 2020 16:22:58 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Fri,  1 May 2020 15:06:44 +0100
-Message-Id: <20200501140644.220940-3-stefanha@redhat.com>
-In-Reply-To: <20200501140644.220940-1-stefanha@redhat.com>
-References: <20200501140644.220940-1-stefanha@redhat.com>
+Message-ID: <20200501152258.GB221440@stefanha-x1.localdomain>
+References: <20200430171814.GA275398@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: base64
-Subject: [Virtio-fs] [PATCH v2 2/2] virtiofsd: stay below fs.file-max sysctl
-	value (CVE-2020-10717)
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="H+4ONPRPur6+Ovig"
+Content-Disposition: inline
+In-Reply-To: <20200430171814.GA275398@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH][v2] fuse,
+ virtiofs: Do not alloc/install fuse device in
+ fuse_fill_super_common()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,56 +18,51 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: virtio-fs@redhat.com, Yuval Avrahami <yavrahami@paloaltonetworks.com>, pjp@redhat.com, vgoyal@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>, miklos@szeredi.hu
 
-VGhlIHN5c3RlbS13aWRlIGZzLmZpbGUtbWF4IHN5c2N0bCB2YWx1ZSBkZXRlcm1pbmVzIGhvdyBt
-YW55IGZpbGVzIGNhbgpiZSBvcGVuLiAgSXQgZGVmYXVsdHMgdG8gYSB2YWx1ZSBjYWxjdWxhdGVk
-IGJhc2VkIG9uIHRoZSBtYWNoaW5lJ3MgUkFNCnNpemUuICBQcmV2aW91c2x5IHZpcnRpb2ZzZCB3
-b3VsZCB0cnkgdG8gc2V0IFJMSU1JVF9OT0ZJTEUgdG8gMSwwMDAsMDAwCmFuZCB0aGlzIGFsbG93
-ZWQgdGhlIEZVU0UgY2xpZW50IHRvIGV4aGF1c3QgdGhlIG51bWJlciBvZiBvcGVuIGZpbGVzCnN5
-c3RlbS13aWRlIG9uIExpbnV4IGhvc3RzIHdpdGggbGVzcyB0aGFuIDEwIEdCIG9mIFJBTSEKClRh
-a2UgZnMuZmlsZS1tYXggaW50byBhY2NvdW50IHdoZW4gY2hvb3NpbmcgdGhlIGRlZmF1bHQgUkxJ
-TUlUX05PRklMRQp2YWx1ZS4KCkZpeGVzOiBDVkUtMjAyMC0xMDcxNwpSZXBvcnRlZC1ieTogWXV2
-YWwgQXZyYWhhbWkgPHlhdnJhaGFtaUBwYWxvYWx0b25ldHdvcmtzLmNvbT4KU2lnbmVkLW9mZi1i
-eTogU3RlZmFuIEhham5vY3ppIDxzdGVmYW5oYUByZWRoYXQuY29tPgpSZXZpZXdlZC1ieTogRHIu
-IERhdmlkIEFsYW4gR2lsYmVydCA8ZGdpbGJlcnRAcmVkaGF0LmNvbT4KLS0tCiB0b29scy92aXJ0
-aW9mc2QvaGVscGVyLmMgfCAyNiArKysrKysrKysrKysrKysrKysrKysrKysrLQogMSBmaWxlIGNo
-YW5nZWQsIDI1IGluc2VydGlvbnMoKyksIDEgZGVsZXRpb24oLSkKCmRpZmYgLS1naXQgYS90b29s
-cy92aXJ0aW9mc2QvaGVscGVyLmMgYi90b29scy92aXJ0aW9mc2QvaGVscGVyLmMKaW5kZXggZGM1
-OWYzOGFmMC4uMDBhMWVmNjY2YSAxMDA2NDQKLS0tIGEvdG9vbHMvdmlydGlvZnNkL2hlbHBlci5j
-CisrKyBiL3Rvb2xzL3ZpcnRpb2ZzZC9oZWxwZXIuYwpAQCAtMTc2LDcgKzE3Niw4IEBAIHZvaWQg
-ZnVzZV9jbWRsaW5lX2hlbHAodm9pZCkKICAgICAgICAgICAgIiAgICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgICBkZWZhdWx0OiBub194YXR0clxuIgogICAgICAgICAgICAiICAgIC0tcmxpbWl0
-LW5vZmlsZT08bnVtPiAgICAgIHNldCBtYXhpbXVtIG51bWJlciBvZiBmaWxlIGRlc2NyaXB0b3Jz
-XG4iCiAgICAgICAgICAgICIgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgKDAgbGVhdmVz
-IHJsaW1pdCB1bmNoYW5nZWQpXG4iCi0gICAgICAgICAgICIgICAgICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgZGVmYXVsdDogMSwwMDAsMDAwIGlmIHRoZSBjdXJyZW50IHJsaW1pdCBpcyBsb3dl
-clxuIgorICAgICAgICAgICAiICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGRlZmF1bHQ6
-IG1pbigxMDAwMDAwLCBmcy5maWxlLW1heCAtIDE2Mzg0KVxuIgorICAgICAgICAgICAiICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGlmIHRoZSBjdXJyZW50IHJsaW1pdCBp
-cyBsb3dlclxuIgogICAgICAgICAgICApOwogfQogCkBAIC0xOTksOSArMjAwLDMyIEBAIHN0YXRp
-YyBpbnQgZnVzZV9oZWxwZXJfb3B0X3Byb2Modm9pZCAqZGF0YSwgY29uc3QgY2hhciAqYXJnLCBp
-bnQga2V5LAogCiBzdGF0aWMgdW5zaWduZWQgbG9uZyBnZXRfZGVmYXVsdF9ybGltaXRfbm9maWxl
-KHZvaWQpCiB7CisgICAgZ19hdXRvZnJlZSBnY2hhciAqZmlsZV9tYXhfc3RyID0gTlVMTDsKKyAg
-ICBjb25zdCBybGltX3QgcmVzZXJ2ZWRfZmRzID0gMTYzODQ7IC8qIGxlYXZlIGF0IGxlYXN0IHRo
-aXMgbWFueSBmZHMgZnJlZSAqLwogICAgIHJsaW1fdCBtYXhfZmRzID0gMTAwMDAwMDsgLyogb3Vy
-IGRlZmF1bHQgUkxJTUlUX05PRklMRSB0YXJnZXQgKi8KKyAgICBybGltX3QgZmlsZV9tYXg7CiAg
-ICAgc3RydWN0IHJsaW1pdCBybGltOwogCisgICAgLyoKKyAgICAgKiBSZWR1Y2UgbWF4X2ZkcyBi
-ZWxvdyB0aGUgc3lzdGVtLXdpZGUgbWF4aW11bSwgaWYgbmVjZXNzYXJ5LiAgVGhpcworICAgICAq
-IGVuc3VyZXMgdGhlcmUgYXJlIGZkcyBhdmFpbGFibGUgZm9yIG90aGVyIHByb2Nlc3NlcyBzbyB3
-ZSBkb24ndAorICAgICAqIGNhdXNlIHJlc291cmNlIGV4aGF1c3Rpb24uCisgICAgICovCisgICAg
-aWYgKCFnX2ZpbGVfZ2V0X2NvbnRlbnRzKCIvcHJvYy9zeXMvZnMvZmlsZS1tYXgiLCAmZmlsZV9t
-YXhfc3RyLAorICAgICAgICAgICAgICAgICAgICAgICAgICAgICBOVUxMLCBOVUxMKSkgeworICAg
-ICAgICBmdXNlX2xvZyhGVVNFX0xPR19FUlIsICJjYW4ndCByZWFkIC9wcm9jL3N5cy9mcy9maWxl
-LW1heFxuIik7CisgICAgICAgIGV4aXQoMSk7CisgICAgfQorICAgIGZpbGVfbWF4ID0gZ19hc2Np
-aV9zdHJ0b3VsbChmaWxlX21heF9zdHIsIE5VTEwsIDEwKTsKKyAgICBpZiAoZmlsZV9tYXggPCAy
-ICogcmVzZXJ2ZWRfZmRzKSB7CisgICAgICAgIGZ1c2VfbG9nKEZVU0VfTE9HX0VSUiwKKyAgICAg
-ICAgICAgICAgICAgIlRoZSBmcy5maWxlLW1heCBzeXNjdGwgaXMgdG9vIGxvdyAoJWx1KSB0byBh
-bGxvdyBhICIKKyAgICAgICAgICAgICAgICAgInJlYXNvbmFibGUgbnVtYmVyIG9mIG9wZW4gZmls
-ZXMuXG4iLAorICAgICAgICAgICAgICAgICAodW5zaWduZWQgbG9uZylmaWxlX21heCk7CisgICAg
-ICAgIGV4aXQoMSk7CisgICAgfQorICAgIG1heF9mZHMgPSBNSU4oZmlsZV9tYXggLSByZXNlcnZl
-ZF9mZHMsIG1heF9mZHMpOworCiAgICAgaWYgKGdldHJsaW1pdChSTElNSVRfTk9GSUxFLCAmcmxp
-bSkgPCAwKSB7CiAgICAgICAgIGZ1c2VfbG9nKEZVU0VfTE9HX0VSUiwgImdldHJsaW1pdChSTElN
-SVRfTk9GSUxFKTogJW1cbiIpOwogICAgICAgICBleGl0KDEpOwotLSAKMi4yNS4zCgo=
+
+--H+4ONPRPur6+Ovig
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Thu, Apr 30, 2020 at 01:18:14PM -0400, Vivek Goyal wrote:
+> As of now fuse_fill_super_common() allocates and installs one fuse device.
+> Filesystems like virtiofs can have more than one filesystem queues and
+> can have one fuse device per queue. Give, fuse_fill_super_common() only
+> handles one device, virtiofs allocates and installes fuse devices for
+> all queues except one.
+>=20
+> This makes logic little twisted and hard to understand. It probably
+> is better to not do any device allocation/installation in
+> fuse_fill_super_common() and let caller take care of it instead.
+>=20
+> v2: Removed fuse_dev_alloc_install() call from fuse_fill_super_common().
+>=20
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  fs/fuse/fuse_i.h    |  3 ---
+>  fs/fuse/inode.c     | 30 ++++++++++++++----------------
+>  fs/fuse/virtio_fs.c |  9 +--------
+>  3 files changed, 15 insertions(+), 27 deletions(-)
+
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+
+--H+4ONPRPur6+Ovig
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl6sPtIACgkQnKSrs4Gr
+c8hliQgAot+qe3sDadrMM/5bgjSPMJ98MqyVdtboP5q7pS53Uw52QJyEZpWm4o2/
+G3ACgq4R5RXhWfD4MZjHDRM2Co3RlINGaGCT6VqEdozxdZ+iNjkSvo62mdVjNRjC
+T7xqJYZlm7rDOqXqV3KG3jAEUmnPVikG4wsm+nJAlpUhH52ygQdhRWT8H0/tlSgV
+RE2Y8PZaafSHvJf8SnCNz4SQskUj77kSHjN4JpmS0iKRyQCyVlz64ZJ3VW92HJWM
+P13604JeZ95E0g0L4fRSSnw5ZsA1QuCrVpsKto+GgLEiqTmH5wuLiTMNKg8XdL/F
+qEQAGGrtIgt/27/FLmF4uYQkDFAEJA==
+=3pgI
+-----END PGP SIGNATURE-----
+
+--H+4ONPRPur6+Ovig--
 

@@ -1,13 +1,12 @@
-Date: Fri, 1 May 2020 18:42:33 +0100
+Date: Fri, 1 May 2020 18:47:21 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200501174233.GA38251@work-vm>
-References: <20200501140644.220940-1-stefanha@redhat.com>
+Message-ID: <20200501174721.GB38251@work-vm>
+References: <20200429124733.22488-1-mszeredi@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20200501140644.220940-1-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v2 0/2] virtiofsd: stay under fs.file-max
- sysctl limit (CVE-2020-10717)
+In-Reply-To: <20200429124733.22488-1-mszeredi@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: jail lo->proc_self_fd
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,34 +15,77 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com, pjp@redhat.com
+To: Miklos Szeredi <mszeredi@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> This patch series introduces the --rlimit-nofile=NUM option for setting the
-> number of open files on the virtiofsd process.  This gives users and management
-> tools more control over resource limits.
+* Miklos Szeredi (mszeredi@redhat.com) wrote:
+> While it's not possible to escape the proc filesystem through
+> lo->proc_self_fd, it is possible to escape to the root of the proc
+> filesystem itself through "../..".
 > 
-> Previously it was possible for FUSE clients on machines with less than ~10 GB
-> of RAM to exhaust the system-wide open file limit.  This is a denial of service
-> attack against other processes running on the host.
+> Use a temporary mount for opening lo->proc_self_fd, that has it's root at
+> /proc/self/fd/, preventing access to the ancestor directories.
 > 
-> This patch series updates the default RLIMIT_NOFILE calculation to take the
-> fs.file-max sysctl value into account.  This solves the fs.file-max DoS.
+> Signed-off-by: Miklos Szeredi <mszeredi@redhat.com>
 
-Queued.
+Queued
 
-> Stefan Hajnoczi (2):
->   virtiofsd: add --rlimit-nofile=NUM option
->   virtiofsd: stay below fs.file-max sysctl value (CVE-2020-10717)
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 27 +++++++++++++++++++++++++--
+>  1 file changed, 25 insertions(+), 2 deletions(-)
 > 
->  tools/virtiofsd/fuse_lowlevel.h  |  1 +
->  tools/virtiofsd/helper.c         | 47 ++++++++++++++++++++++++++++++++
->  tools/virtiofsd/passthrough_ll.c | 22 ++++++---------
->  3 files changed, 56 insertions(+), 14 deletions(-)
-> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 4c35c95b256c..bc9c44c760f4 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -2536,6 +2536,8 @@ static void print_capabilities(void)
+>  static void setup_namespaces(struct lo_data *lo, struct fuse_session *se)
+>  {
+>      pid_t child;
+> +    char template[] = "virtiofsd-XXXXXX";
+> +    char *tmpdir;
+>  
+>      /*
+>       * Create a new pid namespace for *child* processes.  We'll have to
+> @@ -2597,12 +2599,33 @@ static void setup_namespaces(struct lo_data *lo, struct fuse_session *se)
+>          exit(1);
+>      }
+>  
+> +    tmpdir = mkdtemp(template);
+> +    if (!tmpdir) {
+> +        fuse_log(FUSE_LOG_ERR, "tmpdir(%s): %m\n", template);
+> +        exit(1);
+> +    }
+> +
+> +    if (mount("/proc/self/fd", tmpdir, NULL, MS_BIND, NULL) < 0) {
+> +        fuse_log(FUSE_LOG_ERR, "mount(/proc/self/fd, %s, MS_BIND): %m\n",
+> +                 tmpdir);
+> +        exit(1);
+> +    }
+> +
+>      /* Now we can get our /proc/self/fd directory file descriptor */
+> -    lo->proc_self_fd = open("/proc/self/fd", O_PATH);
+> +    lo->proc_self_fd = open(tmpdir, O_PATH);
+>      if (lo->proc_self_fd == -1) {
+> -        fuse_log(FUSE_LOG_ERR, "open(/proc/self/fd, O_PATH): %m\n");
+> +        fuse_log(FUSE_LOG_ERR, "open(%s, O_PATH): %m\n", tmpdir);
+>          exit(1);
+>      }
+> +
+> +    if (umount2(tmpdir, MNT_DETACH) < 0) {
+> +        fuse_log(FUSE_LOG_ERR, "umount2(%s, MNT_DETACH): %m\n", tmpdir);
+> +        exit(1);
+> +    }
+> +
+> +    if (rmdir(tmpdir) < 0) {
+> +        fuse_log(FUSE_LOG_ERR, "rmdir(%s): %m\n", tmpdir);
+> +    }
+>  }
+>  
+>  /*
 > -- 
-> 2.25.3
+> 2.21.1
+> 
 > 
 --
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK

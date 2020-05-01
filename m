@@ -1,12 +1,21 @@
-Date: Thu, 30 Apr 2020 13:18:14 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200430171814.GA275398@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=MV/Q7EwkQ764+aYA9y8KigZ49kNY6VR5runzo9HRXAI=;
+	b=YEsJ68kG67HFUSEVoa4ShQkuTQXVsgWgNJnujwjFmqlO4tae8gECHz+YXcWwCiDBC+
+	YLqHC3qQXaRzDO7F3ICHjwSHE14kYBfZ1yL4lBRLcTwFpx4R/vsXaPPcE8w0a9/dcrYN
+	PETEIzETn8rgkDpHd4NyRr3SEAw3Hm8bv7aNw=
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: [Virtio-fs] [PATCH][v2] fuse,
- virtiofs: Do not alloc/install fuse device in
- fuse_fill_super_common()
+References: <20200424062540.23679-1-chirantan@chromium.org>
+	<20200424062540.23679-2-chirantan@chromium.org>
+	<20200427151934.GB1042399@stefanha-x1.localdomain>
+In-Reply-To: <20200427151934.GB1042399@stefanha-x1.localdomain>
+From: Chirantan Ekbote <chirantan@chromium.org>
+Date: Fri, 1 May 2020 16:14:38 +0900
+Message-ID: <CAJFHJrr2DAgQC9ZWx78OudX1x6A57_vpLf4rJu80ceR6bnpbaQ@mail.gmail.com>
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH 2/2] fuse: virtiofs: Add basic multiqueue
+	support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,183 +24,81 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, miklos@szeredi.hu
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, Suleiman Souhlal <suleiman@chromium.org>, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Dylan Reid <dgreid@chromium.org>, Vivek Goyal <vgoyal@redhat.com>
 
-As of now fuse_fill_super_common() allocates and installs one fuse device.
-Filesystems like virtiofs can have more than one filesystem queues and
-can have one fuse device per queue. Give, fuse_fill_super_common() only
-handles one device, virtiofs allocates and installes fuse devices for
-all queues except one.
+Hi Stefan,
 
-This makes logic little twisted and hard to understand. It probably
-is better to not do any device allocation/installation in
-fuse_fill_super_common() and let caller take care of it instead.
+On Tue, Apr 28, 2020 at 12:20 AM Stefan Hajnoczi <stefanha@redhat.com> wrote:
+>
+> On Fri, Apr 24, 2020 at 03:25:40PM +0900, Chirantan Ekbote wrote:
+> > Use simple round-robin scheduling based on the `unique` field of the
+> > fuse request to spread requests across multiple queues, if supported by
+> > the device.
+>
+> Multiqueue is not intended to be used this way and this patch will
+> reduce performance*.  I don't think it should be merged.
+>
+> * I know it increases performance for you :) but hear me out:
+>
 
-v2: Removed fuse_dev_alloc_install() call from fuse_fill_super_common().
+It actually doesn't increase performance for me :-(.  It did increase
+performance when I tested it on my 96-core workstation but on our
+actual target devices, which only have 2 cores, using multiqueue or
+having additional threads in the server actually made performance
+worse.
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/fuse_i.h    |  3 ---
- fs/fuse/inode.c     | 30 ++++++++++++++----------------
- fs/fuse/virtio_fs.c |  9 +--------
- 3 files changed, 15 insertions(+), 27 deletions(-)
+> The purpose of multiqueue is for SMP scalability.  It allows queues to
+> be processed with CPU/NUMA affinity to the vCPU that submitted the
+> request (i.e. the virtqueue processing thread runs on a sibling physical
+> CPU core).  Each queue has its own MSI-X interrupt so that completion
+> interrupts can be processed on the same vCPU that submitted the request.
+>
+> Spreading requests across queues defeats all this.  Virtqueue processing
+> threads that are located in the wrong place will now process the
+> requests.  Completion interrupts will wake up a vCPU that did not submit
+> the request and IPIs are necessary to notify the vCPU that originally
+> submitted the request.
+>
 
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index ca344bf71404..df0a62f963a8 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -485,9 +485,6 @@ struct fuse_fs_context {
- 	unsigned int max_read;
- 	unsigned int blksize;
- 	const char *subtype;
--
--	/* fuse_dev pointer to fill in, should contain NULL on entry */
--	void **fudptr;
- };
- 
- /**
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index 95d712d44ca1..6b38e0391c96 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -1113,7 +1113,6 @@ EXPORT_SYMBOL_GPL(fuse_dev_free);
- 
- int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
- {
--	struct fuse_dev *fud;
- 	struct fuse_conn *fc = get_fuse_conn_super(sb);
- 	struct inode *root;
- 	struct dentry *root_dentry;
-@@ -1155,15 +1154,11 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
- 	if (sb->s_user_ns != &init_user_ns)
- 		sb->s_xattr = fuse_no_acl_xattr_handlers;
- 
--	fud = fuse_dev_alloc_install(fc);
--	if (!fud)
--		goto err;
--
- 	fc->dev = sb->s_dev;
- 	fc->sb = sb;
- 	err = fuse_bdi_init(fc, sb);
- 	if (err)
--		goto err_dev_free;
-+		goto err;
- 
- 	/* Handle umasking inside the fuse code */
- 	if (sb->s_flags & SB_POSIXACL)
-@@ -1185,30 +1180,24 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
- 	sb->s_d_op = &fuse_root_dentry_operations;
- 	root_dentry = d_make_root(root);
- 	if (!root_dentry)
--		goto err_dev_free;
-+		goto err;
- 	/* Root dentry doesn't have .d_revalidate */
- 	sb->s_d_op = &fuse_dentry_operations;
- 
- 	mutex_lock(&fuse_mutex);
- 	err = -EINVAL;
--	if (*ctx->fudptr)
--		goto err_unlock;
--
- 	err = fuse_ctl_add_conn(fc);
- 	if (err)
- 		goto err_unlock;
- 
- 	list_add_tail(&fc->entry, &fuse_conn_list);
- 	sb->s_root = root_dentry;
--	*ctx->fudptr = fud;
- 	mutex_unlock(&fuse_mutex);
- 	return 0;
- 
-  err_unlock:
- 	mutex_unlock(&fuse_mutex);
- 	dput(root_dentry);
-- err_dev_free:
--	fuse_dev_free(fud);
-  err:
- 	return err;
- }
-@@ -1220,6 +1209,7 @@ static int fuse_fill_super(struct super_block *sb, struct fs_context *fsc)
- 	struct file *file;
- 	int err;
- 	struct fuse_conn *fc;
-+	struct fuse_dev *fud;
- 
- 	err = -EINVAL;
- 	file = fget(ctx->fd);
-@@ -1233,13 +1223,16 @@ static int fuse_fill_super(struct super_block *sb, struct fs_context *fsc)
- 	if ((file->f_op != &fuse_dev_operations) ||
- 	    (file->f_cred->user_ns != sb->s_user_ns))
- 		goto err_fput;
--	ctx->fudptr = &file->private_data;
- 
--	fc = kmalloc(sizeof(*fc), GFP_KERNEL);
- 	err = -ENOMEM;
--	if (!fc)
-+	fud = fuse_dev_alloc();
-+	if (!fud)
- 		goto err_fput;
- 
-+	fc = kmalloc(sizeof(*fc), GFP_KERNEL);
-+	if (!fc)
-+		goto err_free_dev;
-+
- 	fuse_conn_init(fc, sb->s_user_ns, &fuse_dev_fiq_ops, NULL);
- 	fc->release = fuse_free_conn;
- 	sb->s_fs_info = fc;
-@@ -1247,6 +1240,9 @@ static int fuse_fill_super(struct super_block *sb, struct fs_context *fsc)
- 	err = fuse_fill_super_common(sb, ctx);
- 	if (err)
- 		goto err_put_conn;
-+
-+	fuse_dev_install(fud, fc);
-+	file->private_data = fud;
- 	/*
- 	 * atomic_dec_and_test() in fput() provides the necessary
- 	 * memory barrier for file->private_data to be visible on all
-@@ -1259,6 +1255,8 @@ static int fuse_fill_super(struct super_block *sb, struct fs_context *fsc)
-  err_put_conn:
- 	fuse_conn_put(fc);
- 	sb->s_fs_info = NULL;
-+ err_free_dev:
-+	fuse_dev_free(fud);
-  err_fput:
- 	fput(file);
-  err:
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index bade74768903..87a7bc0f193c 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -1066,8 +1066,7 @@ static int virtio_fs_fill_super(struct super_block *sb)
- 	}
- 
- 	err = -ENOMEM;
--	/* Allocate fuse_dev for hiprio and notification queues */
--	for (i = 0; i < VQ_REQUEST; i++) {
-+	for (i = 0; i < fs->nvqs; i++) {
- 		struct virtio_fs_vq *fsvq = &fs->vqs[i];
- 
- 		fsvq->fud = fuse_dev_alloc();
-@@ -1075,18 +1074,12 @@ static int virtio_fs_fill_super(struct super_block *sb)
- 			goto err_free_fuse_devs;
- 	}
- 
--	ctx.fudptr = (void **)&fs->vqs[VQ_REQUEST].fud;
- 	err = fuse_fill_super_common(sb, &ctx);
- 	if (err < 0)
- 		goto err_free_fuse_devs;
- 
--	fc = fs->vqs[VQ_REQUEST].fud->fc;
--
- 	for (i = 0; i < fs->nvqs; i++) {
- 		struct virtio_fs_vq *fsvq = &fs->vqs[i];
--
--		if (i == VQ_REQUEST)
--			continue; /* already initialized */
- 		fuse_dev_install(fsvq->fud, fc);
- 	}
- 
--- 
-2.25.4
+Thanks for the explanation.  I wasn't aware of this aspect of using
+multiple queues but it makes sense now why we wouldn't want to spread
+the requests across different queues.
+
+> Even if you don't care about SMP performance, using multiqueue as a
+> workaround for missing request parallelism still won't yield the best
+> results.  The guest should be able to submit up to the maximum queue
+> depth of the physical storage device.  Many Linux block drivers have max
+> queue depths of 64.  This would require 64 virtqueues (plus the queue
+> selection algorithm would have to utilize each one) and shows how
+> wasteful this approach is.
+>
+
+I understand this but in practice unlike the virtio-blk workload,
+which is nothing but reads and writes to a single file, the virtio-fs
+workload tends to mix a bunch of metadata operations with data
+transfers.  The metadata operations should be mostly handled out of
+the host's file cache so it's unlikely virtio-fs would really be able
+to fully utilize the underlying storage short of reading or writing a
+really huge file.
+
+> Instead of modifying the guest driver, please implement request
+> parallelism in your device implementation.
+
+Yes, we have tried this already [1][2].  As I mentioned above, having
+additional threads in the server actually made performance worse.  My
+theory is that when the device only has 2 cpus, having additional
+threads on the host that need cpu time ends up taking time away from
+the guest vcpu.  We're now looking at switching to io_uring so that we
+can submit multiple requests from a single thread.
+
+The multiqueue change was small and I wasn't aware of the SMP
+implications, which is why I sent this patch.
+
+Thanks,
+Chirantan
+
+[1] https://chromium-review.googlesource.com/c/chromiumos/platform/crosvm/+/2103602
+[2] https://chromium-review.googlesource.com/c/chromiumos/platform/crosvm/+/2103603
+
 

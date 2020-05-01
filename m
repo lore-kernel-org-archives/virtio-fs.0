@@ -1,12 +1,12 @@
-Date: Fri, 1 May 2020 18:53:26 +0100
+Date: Fri, 1 May 2020 19:28:57 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200501175326.GC38251@work-vm>
-References: <20200424133516.73077-1-mreitz@redhat.com>
+Message-ID: <20200501182857.GD38251@work-vm>
+References: <20200416164907.244868-1-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20200424133516.73077-1-mreitz@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Show submounts
+In-Reply-To: <20200416164907.244868-1-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,40 +15,26 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
 
-* Max Reitz (mreitz@redhat.com) wrote:
-> Currently, setup_mounts() bind-mounts the shared directory without
-> MS_REC.  This makes all submounts disappear.
-> 
-> Pass MS_REC so that the guest can see submounts again.
-> 
-> Fixes: 3ca8a2b1c83eb185c232a4e87abbb65495263756
-> Signed-off-by: Max Reitz <mreitz@redhat.com>
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> virtiofsd doesn't need of all Linux capabilities(7) available to root.  Keep a
+> whitelisted set of capabilities that we require.  This improves security in
+> case virtiofsd is compromised by making it hard for an attacker to gain further
+> access to the system.
 
 Queued.
 
-> ---
->  tools/virtiofsd/passthrough_ll.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Stefan Hajnoczi (2):
+>   virtiofsd: only retain file system capabilities
+>   virtiofsd: drop all capabilities in the wait parent process
 > 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 4c35c95b25..9d7f863e66 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2643,7 +2643,7 @@ static void setup_mounts(const char *source)
->      int oldroot;
->      int newroot;
->  
-> -    if (mount(source, source, NULL, MS_BIND, NULL) < 0) {
-> +    if (mount(source, source, NULL, MS_BIND | MS_REC, NULL) < 0) {
->          fuse_log(FUSE_LOG_ERR, "mount(%s, %s, MS_BIND): %m\n", source, source);
->          exit(1);
->      }
+>  tools/virtiofsd/passthrough_ll.c | 51 ++++++++++++++++++++++++++++++++
+>  1 file changed, 51 insertions(+)
+> 
 > -- 
-> 2.25.3
-> 
+> 2.25.1
 > 
 --
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK

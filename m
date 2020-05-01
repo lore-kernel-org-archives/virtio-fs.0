@@ -1,21 +1,18 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
 	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=MV/Q7EwkQ764+aYA9y8KigZ49kNY6VR5runzo9HRXAI=;
-	b=YEsJ68kG67HFUSEVoa4ShQkuTQXVsgWgNJnujwjFmqlO4tae8gECHz+YXcWwCiDBC+
-	YLqHC3qQXaRzDO7F3ICHjwSHE14kYBfZ1yL4lBRLcTwFpx4R/vsXaPPcE8w0a9/dcrYN
-	PETEIzETn8rgkDpHd4NyRr3SEAw3Hm8bv7aNw=
+	:cc; bh=JBA3kWcV1EmEL7fNmuvvfUm9MgrKtq0ZwPzgOB7jxY0=;
+	b=HWYJKgbn6Yzr2UMYpS/j+sOBW/wz7i6JHJhql1zCyxplMmvrDqqtazn85w9QlQuog8
+	pFS4cnMQM4Rz8eCEIJ32ylWpAzojc+G8FnlfjB92YMFgM2sGqGPJriIrUPqYIcbu6jqU
+	N4jO0T+MGT4F4gXwWiQwczONmyi0W1rscLr+Y=
 MIME-Version: 1.0
-References: <20200424062540.23679-1-chirantan@chromium.org>
-	<20200424062540.23679-2-chirantan@chromium.org>
-	<20200427151934.GB1042399@stefanha-x1.localdomain>
-In-Reply-To: <20200427151934.GB1042399@stefanha-x1.localdomain>
-From: Chirantan Ekbote <chirantan@chromium.org>
-Date: Fri, 1 May 2020 16:14:38 +0900
-Message-ID: <CAJFHJrr2DAgQC9ZWx78OudX1x6A57_vpLf4rJu80ceR6bnpbaQ@mail.gmail.com>
+References: <CAJFHJroyC8SAFJZuQxcwHqph5EQRg=MqFdvfnwbK35Cv-A-neA@mail.gmail.com>
+In-Reply-To: <CAJFHJroyC8SAFJZuQxcwHqph5EQRg=MqFdvfnwbK35Cv-A-neA@mail.gmail.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Fri, 1 May 2020 09:53:19 +0200
+Message-ID: <CAJfpegtWEMd_bCeULG13PACqPq5G5HbwKjMOnCoXyFQViXE0yQ@mail.gmail.com>
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 2/2] fuse: virtiofs: Add basic multiqueue
-	support
+Subject: Re: [Virtio-fs] fuse doesn't use security_inode_init_security?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,81 +21,47 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: Miklos Szeredi <miklos@szeredi.hu>, Suleiman Souhlal <suleiman@chromium.org>, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Dylan Reid <dgreid@chromium.org>, Vivek Goyal <vgoyal@redhat.com>
+To: Chirantan Ekbote <chirantan@chromium.org>
+Cc: linux-fsdevel@vger.kernel.org, fuse-devel <fuse-devel@lists.sourceforge.net>, LSM <linux-security-module@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
-Hi Stefan,
-
-On Tue, Apr 28, 2020 at 12:20 AM Stefan Hajnoczi <stefanha@redhat.com> wrote:
+On Fri, May 1, 2020 at 8:55 AM Chirantan Ekbote <chirantan@chromium.org> wrote:
 >
-> On Fri, Apr 24, 2020 at 03:25:40PM +0900, Chirantan Ekbote wrote:
-> > Use simple round-robin scheduling based on the `unique` field of the
-> > fuse request to spread requests across multiple queues, if supported by
-> > the device.
+> Hello,
 >
-> Multiqueue is not intended to be used this way and this patch will
-> reduce performance*.  I don't think it should be merged.
+> I noticed that the fuse module doesn't currently call
+> security_inode_init_security and I was wondering if there is a
+> specific reason for that.  I found a patch from 2013[1] that would
+> change fuse so that it would call that function but it doesn't appear
+> that the patch was merged.
 >
-> * I know it increases performance for you :) but hear me out:
+> For background: I currently have a virtio-fs server with a guest VM
+> that wants to use selinux.  I was able to enable selinux support
+> without much issue by adding
 >
-
-It actually doesn't increase performance for me :-(.  It did increase
-performance when I tested it on my 96-core workstation but on our
-actual target devices, which only have 2 cores, using multiqueue or
-having additional threads in the server actually made performance
-worse.
-
-> The purpose of multiqueue is for SMP scalability.  It allows queues to
-> be processed with CPU/NUMA affinity to the vCPU that submitted the
-> request (i.e. the virtqueue processing thread runs on a sibling physical
-> CPU core).  Each queue has its own MSI-X interrupt so that completion
-> interrupts can be processed on the same vCPU that submitted the request.
+>     fs_use_xattr virtiofs u:object_r:labeledfs:s0;
 >
-> Spreading requests across queues defeats all this.  Virtqueue processing
-> threads that are located in the wrong place will now process the
-> requests.  Completion interrupts will wake up a vCPU that did not submit
-> the request and IPIs are necessary to notify the vCPU that originally
-> submitted the request.
+> to the selinux policy in the guest.  This works for the most part
+> except that `setfscreatecon` doesn't appear to work.  From what I can
+> tell, this ends up writing to `/proc/[pid]/attr/fscreate` and the
+> attributes actually get set via the `inode_init_security` lsm hook in
+> selinux.  However, since fuse doesn't call
+> `security_inode_init_security` the hook never runs so the
+> file/directory doesn't have the right attributes.
 >
+> Is it safe to just call `security_inode_init_security` whenever fuse
+> creates a new inode?  How does this affect non-virtiofs fuse servers?
 
-Thanks for the explanation.  I wasn't aware of this aspect of using
-multiple queues but it makes sense now why we wouldn't want to spread
-the requests across different queues.
+Not sure,  Adding more Cc's.
 
-> Even if you don't care about SMP performance, using multiqueue as a
-> workaround for missing request parallelism still won't yield the best
-> results.  The guest should be able to submit up to the maximum queue
-> depth of the physical storage device.  Many Linux block drivers have max
-> queue depths of 64.  This would require 64 virtqueues (plus the queue
-> selection algorithm would have to utilize each one) and shows how
-> wasteful this approach is.
->
+I know there's a deadlock scenario with getxattr called on root inode
+before mount returns, which causes a deadlock unless mount is run in
+the background.  Current libfuse doesn't handle this, but I think some
+fuse fs work around this by not using libfuse, or at least have some
+special setup code (glusterfs? ceph-fuse? not sure...).  I also don't
+know whether the ->inode_init_security hook is related to this or not.
 
-I understand this but in practice unlike the virtio-blk workload,
-which is nothing but reads and writes to a single file, the virtio-fs
-workload tends to mix a bunch of metadata operations with data
-transfers.  The metadata operations should be mostly handled out of
-the host's file cache so it's unlikely virtio-fs would really be able
-to fully utilize the underlying storage short of reading or writing a
-really huge file.
-
-> Instead of modifying the guest driver, please implement request
-> parallelism in your device implementation.
-
-Yes, we have tried this already [1][2].  As I mentioned above, having
-additional threads in the server actually made performance worse.  My
-theory is that when the device only has 2 cpus, having additional
-threads on the host that need cpu time ends up taking time away from
-the guest vcpu.  We're now looking at switching to io_uring so that we
-can submit multiple requests from a single thread.
-
-The multiqueue change was small and I wasn't aware of the SMP
-implications, which is why I sent this patch.
 
 Thanks,
-Chirantan
-
-[1] https://chromium-review.googlesource.com/c/chromiumos/platform/crosvm/+/2103602
-[2] https://chromium-review.googlesource.com/c/chromiumos/platform/crosvm/+/2103603
+Miklos
 
 

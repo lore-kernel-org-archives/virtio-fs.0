@@ -1,16 +1,11 @@
-References: <20200424133516.73077-1-mreitz@redhat.com>
-	<20200427175902.GM2923@work-vm>
-	<8aa9aea2-cc5d-f9b5-5cdb-b5e596ef89aa@redhat.com>
-	<20200428095935.GA2794@work-vm>
 From: Max Reitz <mreitz@redhat.com>
-Message-ID: <537eb3fe-d930-1d8e-1597-1b73831d0623@redhat.com>
-Date: Tue, 28 Apr 2020 12:13:14 +0200
+Date: Wed,  6 May 2020 17:36:33 +0200
+Message-Id: <20200506153637.240191-1-mreitz@redhat.com>
+In-Reply-To: <20200506153529.239939-1-mreitz@redhat.com>
+References: <20200506153529.239939-1-mreitz@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20200428095935.GA2794@work-vm>
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature";
-	boundary="ZSsyBjZKdka6iJkrHCtJc6NPPhvKrYh2D"
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Show submounts
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [RFC 1/5] fuse: Store fuse_conn in fuse_req
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,138 +14,94 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: virtio-fs@redhat.com
+Cc: Max Reitz <mreitz@redhat.com>
 
-This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
---ZSsyBjZKdka6iJkrHCtJc6NPPhvKrYh2D
-Content-Type: multipart/mixed; boundary="sGOz0g6p87dklTrbhaM7lkcYZN6yEs9fj"
+Every fuse_req belongs to a fuse_conn.  Right now, we always know which
+fuse_conn that is based on the respective device, but we want to allow
+multiple (sub)mounts per single connection, and then the corresponding
+filesystem is not going to be so trivial to obtain.
 
---sGOz0g6p87dklTrbhaM7lkcYZN6yEs9fj
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
-Content-Transfer-Encoding: quoted-printable
+Storing a pointer to the associated fuse_conn in every fuse_req will
+allow us to trivially find any request's superblock (and thus
+filesystem) even then.
 
-On 28.04.20 11:59, Dr. David Alan Gilbert wrote:
-> * Max Reitz (mreitz@redhat.com) wrote:
->> On 27.04.20 19:59, Dr. David Alan Gilbert wrote:
->>> * Max Reitz (mreitz@redhat.com) wrote:
->>>> Currently, setup_mounts() bind-mounts the shared directory without
->>>> MS_REC.  This makes all submounts disappear.
->>>>
->>>> Pass MS_REC so that the guest can see submounts again.
->>>
->>> Thanks!
->>>
->>>> Fixes: 3ca8a2b1c83eb185c232a4e87abbb65495263756
->>>
->>> Should this actually be 5baa3b8e95064c2434bd9e2f312edd5e9ae275dc ?
->>
->> Well, I bisected it and landed at 3ca8a2b1.  So while the problematic
->> line may have been introduced by 5baa3b8e, it wasn=E2=80=99t used unti=
-l 3ca8a2b1.
->=20
-> OK, I'd rather stick with the Fixes: for the patch that was actually
-> wrong.
+Signed-off-by: Max Reitz <mreitz@redhat.com>
+---
+ fs/fuse/fuse_i.h |  3 +++
+ fs/fuse/dev.c    | 13 +++++++------
+ 2 files changed, 10 insertions(+), 6 deletions(-)
 
-Why not both? :)
-
->>>> Signed-off-by: Max Reitz <mreitz@redhat.com>
->>>> ---
->>>>  tools/virtiofsd/passthrough_ll.c | 2 +-
->>>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/pass=
-through_ll.c
->>>> index 4c35c95b25..9d7f863e66 100644
->>>> --- a/tools/virtiofsd/passthrough_ll.c
->>>> +++ b/tools/virtiofsd/passthrough_ll.c
->>>> @@ -2643,7 +2643,7 @@ static void setup_mounts(const char *source)
->>>>      int oldroot;
->>>>      int newroot;
->>>> =20
->>>> -    if (mount(source, source, NULL, MS_BIND, NULL) < 0) {
->>>> +    if (mount(source, source, NULL, MS_BIND | MS_REC, NULL) < 0) {
->>>>          fuse_log(FUSE_LOG_ERR, "mount(%s, %s, MS_BIND): %m\n", sour=
-ce, source);
->>>>          exit(1);
->>>>      }
->>>
->>> Do we want MS_SLAVE to pick up future mounts that might happenf rom t=
-he
->>> host?
->>
->> Hm.  So first it looks to me from the man page like one shouldn=E2=80=99=
-t give
->> MS_SLAVE on the first mount() call but kind of only use it for remount=
-s
->> (in the list at the start, =E2=80=9CCreate a bind mount=E2=80=9D is se=
-parate from
->> =E2=80=9CChange the propagation type of an existing mount=E2=80=9D, an=
-d the man page
->> later says =E2=80=9CThe only other flags that can be specified while c=
-hanging
->> the propagation type are MS_REC (described below) and MS_SILENT (which=
-
->> is ignored).=E2=80=9D).
->>
->> Second, even if I do change the propagation type to MS_SLAVE in a seco=
-nd
->> call, mounts done after qemu has been started don=E2=80=99t show up in=
- the guest
->> (for me).
->>
->> So while it sounds correct, I can=E2=80=99t see it having an effect, a=
-ctually.
->=20
-> That's unfortunate; but I guess we can debug that separately
->=20
->>> What's the interaction between this and the MS_REC|MS_SLAVE that we h=
-ave
->>> a few lines above for / ?
->>
->> Good question.  It would seem to me that there isn=E2=80=99t any.  Tha=
-t previous
->> mount call just sets MS_REC | MS_SLAVE for the whole mount namespace,
->> and then we do a new mount here (by default from / to /) that needs it=
-s
->> own flags.
->>
->> (More interesting is perhaps why we have that other mount() call below=
-,
->> which again sets MS_REC | MS_SLAVE for the old (not-yet-bind-mounted) =
-/.
->>  I can=E2=80=99t imagine that to have any effect.)
->=20
-> Is that just trying to be careful before the umount2 so it doesn't try
-> to unmount something useful?
-
-Perhaps, but still, it shouldn=E2=80=99t matter.  I rather suspect that
-setup_namespaces() and setup_mounts() were developed (or taken from
-elsewhere) independently, so they both have to work independently, and
-thus they do overlapping stuff.
-
-Max
-
-
---sGOz0g6p87dklTrbhaM7lkcYZN6yEs9fj--
-
---ZSsyBjZKdka6iJkrHCtJc6NPPhvKrYh2D
-Content-Type: application/pgp-signature; name="signature.asc"
-Content-Description: OpenPGP digital signature
-Content-Disposition: attachment; filename="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEkb62CjDbPohX0Rgp9AfbAGHVz0AFAl6oAboACgkQ9AfbAGHV
-z0CVhAf+IuToXHK0o9w6hHjFtn1Lhg+/OO+5TZYh1wZIHI7gKBHmgW6dvJ05ya6o
-d+NpukoaT/KY5E7n/T/Z/OfBdsYGHbJAEF/HSWLgA7wg2ydPc7+lxO6ETzdwUlDq
-wL4W9cyZYcjQ7DlhPlBX5yxbclPhhih2ZqXgm3yIk6qiGmLhw7+8IG9Gt5LNr5xR
-7AvA0h4hXpTdggb6UzFJW1zaAz7VF1rqWYB0jOKqPO/EkP35rc7FDvrdvkcwmnrH
-CqkZbaApc98HavdMO5oNk3ZbqrwTl2BKUjPT4yWxUY1ifHCx8Fz7wWt+a7x8b8TO
-ykAU8yhFzhetHgadA3t0qcrqXyvlxg==
-=qz4M
------END PGP SIGNATURE-----
-
---ZSsyBjZKdka6iJkrHCtJc6NPPhvKrYh2D--
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index ca344bf71404..f857b371f5a9 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -359,6 +359,9 @@ struct fuse_req {
+ 	/** virtio-fs's physically contiguous buffer for in and out args */
+ 	void *argbuf;
+ #endif
++
++	/** fuse_conn this request belongs to */
++	struct fuse_conn *fc;
+ };
+ 
+ struct fuse_iqueue;
+diff --git a/fs/fuse/dev.c b/fs/fuse/dev.c
+index 97eec7522bf2..f4e8ca9e8ef4 100644
+--- a/fs/fuse/dev.c
++++ b/fs/fuse/dev.c
+@@ -40,20 +40,21 @@ static struct fuse_dev *fuse_get_dev(struct file *file)
+ 	return READ_ONCE(file->private_data);
+ }
+ 
+-static void fuse_request_init(struct fuse_req *req)
++static void fuse_request_init(struct fuse_conn *fc, struct fuse_req *req)
+ {
+ 	INIT_LIST_HEAD(&req->list);
+ 	INIT_LIST_HEAD(&req->intr_entry);
+ 	init_waitqueue_head(&req->waitq);
+ 	refcount_set(&req->count, 1);
+ 	__set_bit(FR_PENDING, &req->flags);
++	req->fc = fc;
+ }
+ 
+-static struct fuse_req *fuse_request_alloc(gfp_t flags)
++static struct fuse_req *fuse_request_alloc(struct fuse_conn *fc, gfp_t flags)
+ {
+ 	struct fuse_req *req = kmem_cache_zalloc(fuse_req_cachep, flags);
+ 	if (req)
+-		fuse_request_init(req);
++		fuse_request_init(fc, req);
+ 
+ 	return req;
+ }
+@@ -125,7 +126,7 @@ static struct fuse_req *fuse_get_req(struct fuse_conn *fc, bool for_background)
+ 	if (fc->conn_error)
+ 		goto out;
+ 
+-	req = fuse_request_alloc(GFP_KERNEL);
++	req = fuse_request_alloc(fc, GFP_KERNEL);
+ 	err = -ENOMEM;
+ 	if (!req) {
+ 		if (for_background)
+@@ -480,7 +481,7 @@ ssize_t fuse_simple_request(struct fuse_conn *fc, struct fuse_args *args)
+ 
+ 	if (args->force) {
+ 		atomic_inc(&fc->num_waiting);
+-		req = fuse_request_alloc(GFP_KERNEL | __GFP_NOFAIL);
++		req = fuse_request_alloc(fc, GFP_KERNEL | __GFP_NOFAIL);
+ 
+ 		if (!args->nocreds)
+ 			fuse_force_creds(fc, req);
+@@ -547,7 +548,7 @@ int fuse_simple_background(struct fuse_conn *fc, struct fuse_args *args,
+ 
+ 	if (args->force) {
+ 		WARN_ON(!args->nocreds);
+-		req = fuse_request_alloc(gfp_flags);
++		req = fuse_request_alloc(fc, gfp_flags);
+ 		if (!req)
+ 			return -ENOMEM;
+ 		__set_bit(FR_BACKGROUND, &req->flags);
+-- 
+2.26.2
 

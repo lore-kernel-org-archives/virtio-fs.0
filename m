@@ -1,10 +1,9 @@
-From: Eryu Guan <eguan@linux.alibaba.com>
-Date: Wed,  6 May 2020 23:20:44 +0800
-Message-Id: <1588778444-28375-1-git-send-email-eguan@linux.alibaba.com>
-Content-Type: text/plain; charset=WINDOWS-1252
+From: Max Reitz <mreitz@redhat.com>
+Date: Wed,  6 May 2020 17:32:58 +0200
+Message-Id: <20200506153258.238687-1-mreitz@redhat.com>
+MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH RFC] fuse: invalidate inode attr in writeback
-	cache mode
+Subject: [Virtio-fs] [RFC] Duplicate submounts in the guest
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,48 +12,42 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org
-Cc: virtio-fs@redhat.com, miklos@szeredi.hu
+To: virtio-fs@redhat.com
+Cc: Max Reitz <mreitz@redhat.com>
 
-Under writeback mode, inode->i_blocks is not updated, making utils like
-du read st.blocks as 0.
+Hi,
 
-For example, when using virtiofs (cache=always & nondax mode) with
-writeback_cache enabled, writing a new file and check its disk usage
-with du, du reports 0 usage.
+This RFC consists of two patch series, one for virtiofsd (i.e., to be
+applied to the qemu repo), and one for Linux.
 
-  # uname -r
-  5.6.0-rc6+
-  # mount -t virtiofs virtiofs /mnt/virtiofs
-  # rm -f /mnt/virtiofs/testfile
+The problem it wants to solve is that virtiofsd just passes through the
+stat.st_ino value from the host to the guest, without taking stat.st_dev
+into account.  Therefore, it is generally impossible to uniquely
+identify nodes in the guest by their st_dev/st_ino combinations.
 
-  # create new file and do extend write
-  # xfs_io -fc "pwrite 0 4k" /mnt/virtiofs/testfile
-  wrote 4096/4096 bytes at offset 0
-  4 KiB, 1 ops; 0.0001 sec (28.103 MiB/sec and 7194.2446 ops/sec)
-  # stat -c %s,%b /mnt/virtiofs/testfile
-  4096,0	  <==== i_size is correct, but block usage is 0
+One way to fix this would be to derive some algorithm to derive a unique
+st_ino value from the st_dev/st_ino combination on the host, but this is
+not always possible.
 
-Fix it by invalidating attr in fuse_write_end(), like other write paths.
+So what this series does it basically passing through st_dev alongside
+st_ino: We can let the guest create auto-mounted submounts for every
+host mount point, so that they get their own dedicated st_dev.  This is
+similar to what NFS does with the crossmnt option.
 
-Signed-off-by: Eryu Guan <eguan@linux.alibaba.com>
----
- fs/fuse/file.c | 1 +
- 1 file changed, 1 insertion(+)
+Announcing submounts to the guest (the FUSE client) is done by the FUSE
+server (virtiofsd) of setting st_rdev to a non-zero value (e.g. st_dev)
+for every mount point.
 
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index 9d67b830fb7a..3c875104ca11 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -2228,6 +2228,7 @@ static int fuse_write_end(struct file *file, struct address_space *mapping,
- 	}
- 
- 	fuse_write_update_size(inode, pos + copied);
-+	fuse_invalidate_attr(inode);
- 	set_page_dirty(page);
- 
- unlock:
+In this version here, duplicate mounts on the host (same st_dev) will
+not necessarily have the same st_dev in the guest.  That would be more
+complicated to implement, and there is probably no real need to.
+
+Furthermore, note that virtiofsd identifies files based on
+st_dev/st_ino, so if you do have duplicate mounts on the guest, it is
+very much possible that you will run into problems when trying to pass
+them through to the guest (because virtiofsd may treat them as one and
+the same tree).
+
 -- 
-1.8.3.1
-
+2.26.2
 

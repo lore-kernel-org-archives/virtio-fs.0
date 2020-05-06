@@ -1,9 +1,11 @@
 From: Max Reitz <mreitz@redhat.com>
-Date: Wed,  6 May 2020 17:32:58 +0200
-Message-Id: <20200506153258.238687-1-mreitz@redhat.com>
+Date: Wed,  6 May 2020 17:35:29 +0200
+Message-Id: <20200506153529.239939-1-mreitz@redhat.com>
+In-Reply-To: <20200506153258.238687-1-mreitz@redhat.com>
+References: <20200506153258.238687-1-mreitz@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [RFC] Duplicate submounts in the guest
+Subject: [Virtio-fs] [RFC 0/5] fuse: Auto-mounted submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,36 +19,37 @@ Cc: Max Reitz <mreitz@redhat.com>
 
 Hi,
 
-This RFC consists of two patch series, one for virtiofsd (i.e., to be
-applied to the qemu repo), and one for Linux.
+As explained in the common cover letter
+(<20200506153258.238687-1-mreitz@redhat.com>),
+we want the Linux FUSE driver to be able to create auto-mounted
+submounts for every submount on the host.
 
-The problem it wants to solve is that virtiofsd just passes through the
-stat.st_ino value from the host to the guest, without taking stat.st_dev
-into account.  Therefore, it is generally impossible to uniquely
-identify nodes in the guest by their st_dev/st_ino combinations.
+To do so, we need to allow multiple super blocks per fuse_conn, which is
+done by splitting an SB-specific fuse_mount structure off of fuse_conn,
+so there can be multiple fuse_mounts per fuse_conn.
 
-One way to fix this would be to derive some algorithm to derive a unique
-st_ino value from the st_dev/st_ino combination on the host, but this is
-not always possible.
+We can then create new super blocks (with anonymous block devices
+backing them) for every submount point, letting them point to a shared
+fuse_conn structure.
 
-So what this series does it basically passing through st_dev alongside
-st_ino: We can let the guest create auto-mounted submounts for every
-host mount point, so that they get their own dedicated st_dev.  This is
-similar to what NFS does with the crossmnt option.
 
-Announcing submounts to the guest (the FUSE client) is done by the FUSE
-server (virtiofsd) of setting st_rdev to a non-zero value (e.g. st_dev)
-for every mount point.
+Max Reitz (5):
+  fuse: Store fuse_conn in fuse_req
+  fuse: Drop fuse_conn parameter where possible
+  fuse: Split fuse_mount off of fuse_conn
+  fuse: Allow fuse_fill_super_common() for submounts
+  fuse: Implement crossmounts
 
-In this version here, duplicate mounts on the host (same st_dev) will
-not necessarily have the same st_dev in the guest.  That would be more
-complicated to implement, and there is probably no real need to.
-
-Furthermore, note that virtiofsd identifies files based on
-st_dev/st_ino, so if you do have duplicate mounts on the guest, it is
-very much possible that you will run into problems when trying to pass
-them through to the guest (because virtiofsd may treat them as one and
-the same tree).
+ fs/fuse/fuse_i.h    | 131 ++++++++++++++++++--------
+ fs/fuse/control.c   | 194 +++++++++++++++++++-------------------
+ fs/fuse/dev.c       | 215 ++++++++++++++++++++++++------------------
+ fs/fuse/dir.c       | 191 +++++++++++++++++++++++++++-----------
+ fs/fuse/file.c      | 212 +++++++++++++++++++++---------------------
+ fs/fuse/inode.c     | 221 ++++++++++++++++++++++++++++++--------------
+ fs/fuse/readdir.c   |  10 +-
+ fs/fuse/virtio_fs.c |  40 +++++---
+ fs/fuse/xattr.c     |  34 +++----
+ 9 files changed, 766 insertions(+), 482 deletions(-)
 
 -- 
 2.26.2

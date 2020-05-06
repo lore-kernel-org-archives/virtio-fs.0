@@ -1,12 +1,11 @@
 From: Max Reitz <mreitz@redhat.com>
-Date: Wed,  6 May 2020 17:36:36 +0200
-Message-Id: <20200506153637.240191-4-mreitz@redhat.com>
+Date: Wed,  6 May 2020 17:36:37 +0200
+Message-Id: <20200506153637.240191-5-mreitz@redhat.com>
 In-Reply-To: <20200506153529.239939-1-mreitz@redhat.com>
 References: <20200506153529.239939-1-mreitz@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [RFC 4/5] fuse: Allow fuse_fill_super_common() for
-	submounts
+Subject: [Virtio-fs] [RFC 5/5] fuse: Implement crossmounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,219 +17,189 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: virtio-fs@redhat.com
 Cc: Max Reitz <mreitz@redhat.com>
 
-Submounts have their own superblock, which needs to be initialized.
-However, they do not have a fuse_fs_context associated with them, and
-the root node's attributes should be taken from the mountpoint's node.
+With this commit, FUSE servers can indicate crossmount points by putting
+the mounted filesystem's st_dev into st_rdev (which is otherwise unused
+for directories).  The inode will then be marked as S_AUTOMOUNT, and the
+.d_automount implementation creates a new submount at that location, so
+that the submount gets a distinct st_dev value.
 
-Extend fuse_fill_super_common() to work for submounts by making the @ctx
-parameter optional, and by adding a @submount_finode parameter.
+Note that all submounts get a distinct superblock and a distinct st_dev
+value, so for virtio-fs, even if the same filesystem is mounted more
+than once on the host, none of its mount points will have the same
+st_dev.  We need distinct superblocks because the superblock points to
+the root node, but the different host mounts may show different trees
+(e.g. due to submounts in some of them, but not in others).
+
+We could keep a mapping of "server-reported st_rdev" to "anonymous
+st_dev" (as returned by get_anon_bdev()), and thus use the same st_dev
+for multiple superblocks, but that probably has pitfalls that are not
+worth risking for something that most likely nobody needs.
+
+Right now, this behavior is only enabled when fuse_conn.auto_submounts
+is set, which is the case only for virtio-fs.
 
 Signed-off-by: Max Reitz <mreitz@redhat.com>
 ---
- fs/fuse/fuse_i.h    | 10 +++--
- fs/fuse/inode.c     | 89 +++++++++++++++++++++++++++++++++------------
- fs/fuse/virtio_fs.c |  2 +-
- 3 files changed, 74 insertions(+), 27 deletions(-)
+ fs/fuse/fuse_i.h    |  3 ++
+ fs/fuse/dir.c       | 85 +++++++++++++++++++++++++++++++++++++++++++++
+ fs/fuse/inode.c     |  6 ++--
+ fs/fuse/virtio_fs.c |  1 +
+ 4 files changed, 93 insertions(+), 2 deletions(-)
 
 diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 3b2b47e2e966..d8528aa97386 100644
+index d8528aa97386..af73d60253d8 100644
 --- a/fs/fuse/fuse_i.h
 +++ b/fs/fuse/fuse_i.h
-@@ -1015,11 +1015,15 @@ void fuse_dev_free(struct fuse_dev *fud);
- void fuse_send_init(struct fuse_mount *fm);
+@@ -723,6 +723,9 @@ struct fuse_conn {
+ 	/* Do not show mount options */
+ 	unsigned int no_mount_options:1;
  
- /**
-- * Fill in superblock and initialize fuse connection
-+ * Fill in superblock and initialize fuse connection for root mounts.
-  * @sb: partially-initialized superblock to fill in
-- * @ctx: mount context
-+ * @ctx: mount context (for root mounts)
-+ * @submount_finode: For submounts: The fuse_inode of the parent
-+ *                   filesystem where this submount is mounted
-+ *		     (NULL for root mounts)
-  */
--int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx);
-+int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx,
-+			   struct fuse_inode *submount_finode);
++	/* Auto-mount submounts announced by the server */
++	unsigned int auto_submounts:1;
++
+ 	/** The number of requests waiting for completion */
+ 	atomic_t num_waiting;
  
- /**
-  * Disassociate fuse connection from superblock and kill the superblock
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index 596504321cc7..ff30d30b3faf 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -1140,9 +1140,32 @@ void fuse_dev_free(struct fuse_dev *fud)
+diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
+index fb0e9204060c..882fc76834b2 100644
+--- a/fs/fuse/dir.c
++++ b/fs/fuse/dir.c
+@@ -10,6 +10,7 @@
+ 
+ #include <linux/pagemap.h>
+ #include <linux/file.h>
++#include <linux/fs_context.h>
+ #include <linux/sched.h>
+ #include <linux/namei.h>
+ #include <linux/slab.h>
+@@ -299,6 +300,89 @@ static int fuse_dentry_delete(const struct dentry *dentry)
+ 	return time_before64(fuse_dentry_time(dentry), get_jiffies_64());
  }
- EXPORT_SYMBOL_GPL(fuse_dev_free);
  
--int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
--{
--	struct fuse_dev *fud;
-+static void fuse_fill_attr_from_inode(struct fuse_attr *attr,
-+				      const struct fuse_inode *fi)
++static int fuse_submount_set_super(struct super_block *sb,
++				   struct fs_context *fsc)
 +{
-+	*attr = (struct fuse_attr){
-+		.ino		= fi->inode.i_ino,
-+		.size		= fi->inode.i_size,
-+		.blocks		= fi->inode.i_blocks,
-+		.atime		= fi->inode.i_atime.tv_sec,
-+		.mtime		= fi->inode.i_mtime.tv_sec,
-+		.ctime		= fi->inode.i_ctime.tv_sec,
-+		.atimensec	= fi->inode.i_atime.tv_nsec,
-+		.mtimensec	= fi->inode.i_mtime.tv_nsec,
-+		.ctimensec	= fi->inode.i_ctime.tv_nsec,
-+		.mode		= fi->inode.i_mode,
-+		.nlink		= fi->inode.i_nlink,
-+		.uid		= fi->inode.i_uid.val,
-+		.gid		= fi->inode.i_gid.val,
-+		.rdev		= fi->inode.i_rdev,
-+		.blksize	= 1u << fi->inode.i_blkbits,
-+	};
++	int err;
++
++	err = get_anon_bdev(&sb->s_dev);
++	if (!err)
++		fuse_mount_get(fsc->s_fs_info);
++
++	return err;
 +}
 +
-+int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx,
-+			   struct fuse_inode *submount_finode)
++/*
++ * Create a fuse_mount object with a new superblock (with path->dentry
++ * as the root), and return that mount so it can be auto-mounted on
++ * @path.
++ */
++static struct vfsmount *fuse_dentry_automount(struct path *path)
 +{
-+	struct fuse_dev *fud = NULL;
- 	struct fuse_mount *fm = get_fuse_mount_super(sb);
- 	struct fuse_conn *fc = fm->fc;
- 	struct inode *root;
-@@ -1150,12 +1173,16 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
- 	int err;
- 
- 	err = -EINVAL;
-+	/* One must be NULL, the other must be non-NULL */
-+	if (!ctx == !submount_finode)
-+		goto err;
++	struct fs_context *fsc;
++	struct fuse_mount *parent_fm = get_fuse_mount_super(path->mnt->mnt_sb);
++	struct fuse_conn *fc = parent_fm->fc;
++	struct fuse_mount *fm;
++	struct vfsmount *mnt;
++	struct fuse_inode *mp_finode = get_fuse_inode(d_inode(path->dentry));
++	struct super_block *sb;
++	int err;
 +
- 	if (sb->s_flags & SB_MANDLOCK)
- 		goto err;
- 
- 	sb->s_flags &= ~(SB_NOSEC | SB_I_VERSION);
- 
--	if (ctx->is_bdev) {
-+	if (ctx && ctx->is_bdev) {
- #ifdef CONFIG_BLOCK
- 		err = -EINVAL;
- 		if (!sb_set_blocksize(sb, ctx->blksize))
-@@ -1166,8 +1193,12 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
- 		sb->s_blocksize_bits = PAGE_SHIFT;
- 	}
- 
--	sb->s_subtype = ctx->subtype;
--	ctx->subtype = NULL;
-+	if (ctx) {
-+		sb->s_subtype = ctx->subtype;
-+		ctx->subtype = NULL;
-+	} else
-+		sb->s_subtype = NULL;
++	fsc = fs_context_for_submount(path->mnt->mnt_sb->s_type, path->dentry);
++	if (IS_ERR(fsc)) {
++		err = PTR_ERR(fsc);
++		goto out;
++	}
 +
- 	sb->s_magic = FUSE_SUPER_MAGIC;
- 	sb->s_op = &fuse_super_operations;
- 	sb->s_xattr = fuse_xattr_handlers;
-@@ -1185,9 +1216,11 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
- 	if (sb->s_user_ns != &init_user_ns)
- 		sb->s_xattr = fuse_no_acl_xattr_handlers;
- 
--	fud = fuse_dev_alloc_install(fc);
--	if (!fud)
--		goto err;
-+	if (ctx) {
-+		fud = fuse_dev_alloc_install(fc);
-+		if (!fud)
-+			goto err;
++	err = -ENOMEM;
++	fm = kzalloc(sizeof(struct fuse_mount), GFP_KERNEL);
++	if (!fm)
++		goto out_put_fsc;
++
++	/* Create new fuse_mount for the existing fuse_conn */
++	fuse_mount_init(fm, fc);
++
++	/* Get (new) superblock for this new fuse_mount */
++	fsc->s_fs_info = fm;
++	sb = sget_fc(fsc, NULL, fuse_submount_set_super);
++	fuse_mount_put(fm);
++	if (IS_ERR(sb)) {
++		err = PTR_ERR(sb);
++		goto out_put_fsc;
 +	}
- 
- 	fm->dev = sb->s_dev;
- 	fm->sb = sb;
-@@ -1200,18 +1233,26 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
- 		fc->dont_mask = 1;
- 	sb->s_flags |= SB_POSIXACL;
- 
--	fc->default_permissions = ctx->default_permissions;
--	fc->allow_other = ctx->allow_other;
--	fc->user_id = ctx->user_id;
--	fc->group_id = ctx->group_id;
--	fc->max_read = max_t(unsigned, 4096, ctx->max_read);
--	fc->destroy = ctx->destroy;
--	fc->no_control = ctx->no_control;
--	fc->no_force_umount = ctx->no_force_umount;
--	fc->no_mount_options = ctx->no_mount_options;
-+	if (ctx) {
-+		fc->default_permissions = ctx->default_permissions;
-+		fc->allow_other = ctx->allow_other;
-+		fc->user_id = ctx->user_id;
-+		fc->group_id = ctx->group_id;
-+		fc->max_read = max_t(unsigned, 4096, ctx->max_read);
-+		fc->destroy = ctx->destroy;
-+		fc->no_control = ctx->no_control;
-+		fc->no_force_umount = ctx->no_force_umount;
-+		fc->no_mount_options = ctx->no_mount_options;
++
++	/* Initialize superblock, making @mp_finode its root */
++	err = fuse_fill_super_common(sb, NULL, mp_finode);
++	if (err)
++		goto out_put_sb;
++
++	sb->s_flags |= SB_ACTIVE;
++	fsc->root = dget(sb->s_root);
++	/* We are done configuring the superblock, so unlock it */
++	up_write(&sb->s_umount);
++
++	/* Create the submount */
++	mnt = vfs_create_mount(fsc);
++	if (IS_ERR(mnt)) {
++		err = PTR_ERR(mnt);
++		goto out_put_fsc;
 +	}
++
++	mntget(mnt);
++
++	put_fs_context(fsc);
++	return mnt;
++
++out_put_sb:
++	/* Only jump here when fsc->root is NULL and sb is still locked
++	 * (otherwise put_fs_context() will put the superblock) */
++	deactivate_locked_super(sb);
++out_put_fsc:
++	put_fs_context(fsc);
++out:
++	return ERR_PTR(err);
++}
++
+ const struct dentry_operations fuse_dentry_operations = {
+ 	.d_revalidate	= fuse_dentry_revalidate,
+ 	.d_delete	= fuse_dentry_delete,
+@@ -306,6 +390,7 @@ const struct dentry_operations fuse_dentry_operations = {
+ 	.d_init		= fuse_dentry_init,
+ 	.d_release	= fuse_dentry_release,
+ #endif
++	.d_automount	= fuse_dentry_automount,
+ };
  
- 	err = -ENOMEM;
--	root = fuse_get_root_inode(sb, ctx->rootmode);
-+	if (ctx) {
-+		root = fuse_get_root_inode(sb, ctx->rootmode);
-+	} else {
-+		struct fuse_attr root_attr;
-+		fuse_fill_attr_from_inode(&root_attr, submount_finode);
-+		root = fuse_iget(sb, submount_finode->nodeid, 0, &root_attr, 0, 0);
-+	}
- 	sb->s_d_op = &fuse_root_dentry_operations;
- 	root_dentry = d_make_root(root);
- 	if (!root_dentry)
-@@ -1221,7 +1262,7 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
- 
- 	mutex_lock(&fuse_mutex);
- 	err = -EINVAL;
--	if (*ctx->fudptr)
-+	if (ctx && *ctx->fudptr)
- 		goto err_unlock;
- 
- 	err = fuse_ctl_add_conn(fm);
-@@ -1230,7 +1271,8 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
- 
- 	list_add_tail(&fm->entry, &fuse_mount_list);
- 	sb->s_root = root_dentry;
--	*ctx->fudptr = fud;
-+	if (ctx)
-+		*ctx->fudptr = fud;
- 	mutex_unlock(&fuse_mutex);
- 	return 0;
- 
-@@ -1238,7 +1280,8 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
- 	mutex_unlock(&fuse_mutex);
- 	dput(root_dentry);
-  err_dev_free:
--	fuse_dev_free(fud);
-+	if (fud)
-+		fuse_dev_free(fud);
-  err:
- 	return err;
- }
-@@ -1284,7 +1327,7 @@ static int fuse_fill_super(struct super_block *sb, struct fs_context *fsc)
- 	fuse_conn_put(fc);
- 	sb->s_fs_info = fm;
- 
--	err = fuse_fill_super_common(sb, ctx);
-+	err = fuse_fill_super_common(sb, ctx, NULL);
- 	if (err)
- 		goto err_put_conn;
- 	/*
+ const struct dentry_operations fuse_root_dentry_operations = {
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index ff30d30b3faf..77a386cad12f 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -253,9 +253,11 @@ static void fuse_init_inode(struct inode *inode, struct fuse_attr *attr)
+ 	if (S_ISREG(inode->i_mode)) {
+ 		fuse_init_common(inode);
+ 		fuse_init_file_inode(inode);
+-	} else if (S_ISDIR(inode->i_mode))
++	} else if (S_ISDIR(inode->i_mode)) {
+ 		fuse_init_dir(inode);
+-	else if (S_ISLNK(inode->i_mode))
++		if (attr->rdev && get_fuse_conn(inode)->auto_submounts)
++			inode->i_flags |= S_AUTOMOUNT;
++	} else if (S_ISLNK(inode->i_mode))
+ 		fuse_init_symlink(inode);
+ 	else if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode) ||
+ 		 S_ISFIFO(inode->i_mode) || S_ISSOCK(inode->i_mode)) {
 diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 492ddd34ecd9..38100f096421 100644
+index 38100f096421..53dae0ee5ab1 100644
 --- a/fs/fuse/virtio_fs.c
 +++ b/fs/fuse/virtio_fs.c
-@@ -1075,7 +1075,7 @@ static int virtio_fs_fill_super(struct super_block *sb)
- 	}
+@@ -1193,6 +1193,7 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
+ 		       fs);
+ 	fc->release = fuse_free_conn;
+ 	fc->delete_stale = true;
++	fc->auto_submounts = true;
  
- 	ctx.fudptr = (void **)&fs->vqs[VQ_REQUEST].fud;
--	err = fuse_fill_super_common(sb, &ctx);
-+	err = fuse_fill_super_common(sb, &ctx, NULL);
- 	if (err < 0)
- 		goto err_free_fuse_devs;
- 
+ 	fuse_mount_init(fm, fc);
+ 	fuse_conn_put(fc);
 -- 
 2.26.2
 

@@ -1,13 +1,14 @@
+References: <20200506153258.238687-1-mreitz@redhat.com>
+	<20200506155212.GN2743@work-vm>
+From: Max Reitz <mreitz@redhat.com>
+Message-ID: <64d463d9-310c-3738-c80e-14c446add130@redhat.com>
+Date: Thu, 7 May 2020 12:50:23 +0200
 MIME-Version: 1.0
-References: <20200506153529.239939-1-mreitz@redhat.com>
-	<20200506153637.240191-3-mreitz@redhat.com>
-In-Reply-To: <20200506153637.240191-3-mreitz@redhat.com>
-From: Miklos Szeredi <mszeredi@redhat.com>
-Date: Thu, 7 May 2020 11:56:07 +0200
-Message-ID: <CAOssrKerr_KvfuXqTNjJ4936SXiN3AZ6rZ6oo8Mv+9bvDrFAWQ@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [RFC 3/5] fuse: Split fuse_mount off of fuse_conn
+In-Reply-To: <20200506155212.GN2743@work-vm>
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature";
+	boundary="B8O9n2RaGMQtSnjnfXe7RQcwz6LAKpMvk"
+Subject: Re: [Virtio-fs] [RFC] Duplicate submounts in the guest
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,36 +17,72 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Max Reitz <xanclic@xanclic.moe>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com
 
-On Wed, May 6, 2020 at 5:37 PM Max Reitz <mreitz@redhat.com> wrote:
->
-> From: Max Reitz <xanclic@xanclic.moe>
->
-> We want to allow submounts for the same fuse_conn, but with different
-> superblocks so that each of the submounts has its own device ID.  To do
-> so, we need to split all mount-specific information off of fuse_conn
-> into a new fuse_mount structure, so that multiple mounts can share a
-> single fuse_conn.
+This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
+--B8O9n2RaGMQtSnjnfXe7RQcwz6LAKpMvk
+Content-Type: multipart/mixed; boundary="VtrdiTyMv9boViL6nfLRdrRvAVdqjnCjq"
 
-I have the following high level comments:
+--VtrdiTyMv9boViL6nfLRdrRvAVdqjnCjq
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: quoted-printable
 
-Control filesystem: each fuse_mount gets a new entry, but they are all
-aliases.   I think we should just stick with just one entry for the
-connection (and perhaps a symlink for each additional mount, but this
-is of secondary importance).
+On 06.05.20 17:52, Dr. David Alan Gilbert wrote:
+> * Max Reitz (mreitz@redhat.com) wrote:
+>> Hi,
+>>
+>> This RFC consists of two patch series, one for virtiofsd (i.e., to be
+>> applied to the qemu repo), and one for Linux.
+>>
+>> The problem it wants to solve is that virtiofsd just passes through th=
+e
+>> stat.st_ino value from the host to the guest, without taking stat.st_d=
+ev
+>> into account.  Therefore, it is generally impossible to uniquely
+>> identify nodes in the guest by their st_dev/st_ino combinations.
+>>
+>> One way to fix this would be to derive some algorithm to derive a uniq=
+ue
+>> st_ino value from the st_dev/st_ino combination on the host, but this =
+is
+>> not always possible.
+>>
+>> So what this series does it basically passing through st_dev alongside=
 
-BDI:  we need to call set_bdi_congested/clear_bdi_congested for *all*
-mounts of a connection.  Might make sense to look into getting rid of
-bdi congestion handling completely, but this is not something I have a
-good insight into right now.
+>> st_ino: We can let the guest create auto-mounted submounts for every
+>> host mount point, so that they get their own dedicated st_dev.  This i=
+s
+>> similar to what NFS does with the crossmnt option.
+>=20
+> Nice;  this should probably get cc'd to fuse-devel and/or put as a pull=
 
-Notification: please create a fuse_ilookup() that takes fc and returns
-(sb, inode) pair and call this instead ilookup5().   This way the loop
-is moved to the place where it's actually necessary.
+> into their github to see what they have to say.
 
-Thanks,
-Miklos
+Sure, I just thought maybe I should gather some opinions here first. :)
 
+Max
+
+
+--VtrdiTyMv9boViL6nfLRdrRvAVdqjnCjq--
+
+--B8O9n2RaGMQtSnjnfXe7RQcwz6LAKpMvk
+Content-Type: application/pgp-signature; name="signature.asc"
+Content-Description: OpenPGP digital signature
+Content-Disposition: attachment; filename="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEkb62CjDbPohX0Rgp9AfbAGHVz0AFAl6z5+8ACgkQ9AfbAGHV
+z0DFEgf/bP32iD7NhqOCbKVnhZKrRNrhSRqbuufNxeRQ4oIIUf5ruRVnVdYlCrsd
+bHToGJIkfAo7lC06uYpepWLQJbWQBU/VqtFD0DV21NywViG45X5s0/4PEe1x5+b1
+bXpca2bmYlpdO2J9tEHVlxDUIgG1VrMlCDh+Sua4BixUyMh173T/4g0wGKRkVR7/
++omSmhmCWYzWSygI9s+LYbTTE9kG1v0XRbBzX3Mk5eRxeZJCFFHJkz2ggdwr6hLo
+X7+CciTjn7Nt/f4rQ5WGeNypiv/ulhXCRn5NHt4YhB3iE632EvhWu0puKknf1cET
+/6YkzLi/29Nde7ia8t/t39n5bOkl4w==
+=hjY6
+-----END PGP SIGNATURE-----
+
+--B8O9n2RaGMQtSnjnfXe7RQcwz6LAKpMvk--
 

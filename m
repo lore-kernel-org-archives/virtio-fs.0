@@ -1,14 +1,18 @@
-Date: Tue, 28 Apr 2020 12:48:15 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200428114815.GC2794@work-vm>
-References: <20200416164907.244868-1-stefanha@redhat.com>
-	<20200416164907.244868-2-stefanha@redhat.com>
+References: <20200506153832.240812-1-mreitz@redhat.com>
+	<20200506154010.241055-2-mreitz@redhat.com>
+	<20200506160411.GO2743@work-vm>
+	<52f6dc62-496e-2337-72dc-a9b762732848@redhat.com>
+	<CAOssrKfcZH3Bu1g2U4XbGn_b5LenLoHQOO=WWqT71J4sMVTv3w@mail.gmail.com>
+From: Max Reitz <mreitz@redhat.com>
+Message-ID: <9a601294-a470-3df9-fd8f-0eb1ed5847b6@redhat.com>
+Date: Thu, 7 May 2020 14:18:28 +0200
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200416164907.244868-2-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 1/2] virtiofsd: only retain file system
-	capabilities
+In-Reply-To: <CAOssrKfcZH3Bu1g2U4XbGn_b5LenLoHQOO=WWqT71J4sMVTv3w@mail.gmail.com>
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature";
+	boundary="YQOLImz1TGeOXKPr3wUOE4KarRWHtfnoT"
+Subject: Re: [Virtio-fs] [RFC 2/2] virtiofsd: Set st_rdev for sub-mount
+	points
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,111 +21,88 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
+To: Miklos Szeredi <mszeredi@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> virtiofsd runs as root but only needs a subset of root's Linux
-> capabilities(7).  As a file server its purpose is to create and access
-> files on behalf of a client.  It needs to be able to access files with
-> arbitrary uid/gid owners.  It also needs to be create device nodes.
-> 
-> Introduce a Linux capabilities(7) whitelist and drop all capabilities
-> that we don't need, making the virtiofsd process less powerful than a
-> regular uid root process.
-> 
->   # cat /proc/PID/status
->   ...
->           Before           After
->   CapInh: 0000000000000000 0000000000000000
->   CapPrm: 0000003fffffffff 00000000880000df
->   CapEff: 0000003fffffffff 00000000880000df
->   CapBnd: 0000003fffffffff 0000000000000000
->   CapAmb: 0000000000000000 0000000000000000
-> 
-> Note that file capabilities cannot be used to achieve the same effect on
-> the virtiofsd executable because mount is used during sandbox setup.
-> Therefore we drop capabilities programmatically at the right point
-> during startup.
-> 
-> This patch only affects the sandboxed child process.  The parent process
-> that sits in waitpid(2) still has full root capabilities and will be
-> addressed in the next patch.
-> 
-> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
+--YQOLImz1TGeOXKPr3wUOE4KarRWHtfnoT
+Content-Type: multipart/mixed; boundary="WKHYTWiagtvpPLPPMo0i3pZ4gGkY4MSuw"
 
-Looks reasonable to me; I can't see any capabilities in the manpage that
-you're missing that make sense.
-They also look old enough not to be a problem with reasonably old
-systems.
+--WKHYTWiagtvpPLPPMo0i3pZ4gGkY4MSuw
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: quoted-printable
+
+On 07.05.20 13:43, Miklos Szeredi wrote:
+> On Thu, May 7, 2020 at 12:56 PM Max Reitz <mreitz@redhat.com> wrote:
+>>
+>> On 06.05.20 18:04, Dr. David Alan Gilbert wrote:
+>>> * Max Reitz (mreitz@redhat.com) wrote:
+>>>> Whenever we encounter a directory with an st_dev that differs from t=
+hat
+>>>> of its parent, we set st_rdev accordingly so the guest can create a
+>>>> submount for it.
+>>>>
+>>>> Make this behavior optional, so submounts are only announced to the
+>>>> guest with the announce_submounts option.  Some users may prefer the=
+
+>>>> current behavior, so that the guest learns nothing about the host mo=
+unt
+>>>> structure.
+>>>>
+>>>> Signed-off-by: Max Reitz <mreitz@redhat.com>
+>>>
+>>> Does this need to be wired to a flag in the INIT message (like say
+>>> FUSE_ASYNC_READ) to indicate that the kernel/daemon supports this, or=
+ is
+>>> it really safe just to start sending the changed rdev?
+>>
+>> I supposed it to be safe, given that rdev is never used for anything b=
+ut
+>> device files, so basically it was just a reserved field for directorie=
+s.
+>=20
+> You assume only directories can be mounted, but that's not so.  A
+> device can also be the source or destination of a bind mount.
+
+Well, I mostly thought this case wouldn=E2=80=99t be too important.  But =
+I
+suppose it doesn=E2=80=99t make sense to decide now that it=E2=80=99s nev=
+er going to be
+important.
+
+> We need to extend fuse_entry_out with a flags field.  We could
+> possibly reuse the upper bits of entry_valid (i.e. timeouts above say
+> INT_MAX seconds could be taken as  "infinity").  Unfortunately that's
+> not as easy as splitting it into two fields due to endianness :(
+
+For the time being, a single bit would be sufficient to signify whether
+there should be a submount at all.  We could add a field with a submount
+ID (i.e., st_dev from the host) in the future when we decide we
+want/need to ensure that two inodes with the same st_dev on the host
+also have the same st_dev in the guest.
+
+Max
 
 
+--WKHYTWiagtvpPLPPMo0i3pZ4gGkY4MSuw--
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+--YQOLImz1TGeOXKPr3wUOE4KarRWHtfnoT
+Content-Type: application/pgp-signature; name="signature.asc"
+Content-Description: OpenPGP digital signature
+Content-Disposition: attachment; filename="signature.asc"
 
-> ---
->  tools/virtiofsd/passthrough_ll.c | 38 ++++++++++++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 4c35c95b25..af97ba1c41 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2695,6 +2695,43 @@ static void setup_mounts(const char *source)
->      close(oldroot);
->  }
->  
-> +/*
-> + * Only keep whitelisted capabilities that are needed for file system operation
-> + */
-> +static void setup_capabilities(void)
-> +{
-> +    pthread_mutex_lock(&cap.mutex);
-> +    capng_restore_state(&cap.saved);
-> +
-> +    /*
-> +     * Whitelist file system-related capabilities that are needed for a file
-> +     * server to act like root.  Drop everything else like networking and
-> +     * sysadmin capabilities.
-> +     *
-> +     * Exclusions:
-> +     * 1. CAP_LINUX_IMMUTABLE is not included because it's only used via ioctl
-> +     *    and we don't support that.
-> +     * 2. CAP_MAC_OVERRIDE is not included because it only seems to be
-> +     *    used by the Smack LSM.  Omit it until there is demand for it.
-> +     */
-> +    capng_setpid(syscall(SYS_gettid));
-> +    capng_clear(CAPNG_SELECT_BOTH);
-> +    capng_updatev(CAPNG_ADD, CAPNG_PERMITTED | CAPNG_EFFECTIVE,
-> +            CAP_CHOWN,
-> +            CAP_DAC_OVERRIDE,
-> +            CAP_DAC_READ_SEARCH,
-> +            CAP_FOWNER,
-> +            CAP_FSETID,
-> +            CAP_SETGID,
-> +            CAP_SETUID,
-> +            CAP_MKNOD,
-> +            CAP_SETFCAP);
-> +    capng_apply(CAPNG_SELECT_BOTH);
-> +
-> +    cap.saved = capng_save_state();
-> +    pthread_mutex_unlock(&cap.mutex);
-> +}
-> +
->  /*
->   * Lock down this process to prevent access to other processes or files outside
->   * source directory.  This reduces the impact of arbitrary code execution bugs.
-> @@ -2705,6 +2742,7 @@ static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
->      setup_namespaces(lo, se);
->      setup_mounts(lo->source);
->      setup_seccomp(enable_syslog);
-> +    setup_capabilities();
->  }
->  
->  /* Raise the maximum number of open file descriptors */
-> -- 
-> 2.25.1
-> 
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEkb62CjDbPohX0Rgp9AfbAGHVz0AFAl6z/JQACgkQ9AfbAGHV
+z0C9ywf/dWTDWet4DynAtAtA5/vtTJoTiiwVtQS5n9UX+q9uik9UuXckvRACm5HW
+9xIhnxrvOwdZuuZOv08obtwbzxTiVsNrczmb67q4DtWbHZfX6wb5NgG5BKOXInW8
+ZtLRBn1eK3vcMGqmz+H6HxkTR8eblp/0ViUf7khkIRmkoGMXZwJ42IW9ZEFVMoW3
+V6ZRVoKx5ayfKt4e2o2AryJs45Oo+RiFAXPkLCmA7Pupsa2OtNf1NzJ8LPnBa4+F
+F0T+VhQ6Nlq+rqNhW9UKE1wFwO9RhJAYjYUEWHgSSV/7BeIJyfA3CSehev/RtW/W
+UkZigjMOpBLfTcoWElyBBGi/IiUE/w==
+=pjlB
+-----END PGP SIGNATURE-----
+
+--YQOLImz1TGeOXKPr3wUOE4KarRWHtfnoT--
 

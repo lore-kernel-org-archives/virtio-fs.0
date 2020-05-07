@@ -1,19 +1,24 @@
-Date: Thu, 7 May 2020 14:06:32 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200507130632.GE2699@work-vm>
-References: <20200506153832.240812-1-mreitz@redhat.com>
-	<20200506154010.241055-2-mreitz@redhat.com>
-	<20200506160411.GO2743@work-vm>
-	<52f6dc62-496e-2337-72dc-a9b762732848@redhat.com>
-	<CAOssrKfcZH3Bu1g2U4XbGn_b5LenLoHQOO=WWqT71J4sMVTv3w@mail.gmail.com>
-	<9a601294-a470-3df9-fd8f-0eb1ed5847b6@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=JrKE0/k9TqvO63dFVD5bdAgHBAm+WjFMdax9qWxHqKs=;
+	b=CojCw9Fmh9zgr/0dIGJBy9xx9eWODCnoJMmbcD0f752ky4fgbcwRw7B9uOCFzQRteP
+	O2rqfKu0O73IQxAsBUNVFV+5qRjL6w/6Z4E8M+CWtfRdEF7SgdIqv4cWr9QErt9oJsy+
+	jvcNmhVrwy0jEDEA3z16tYXv1cKUu6B1tKL4lcF7T0uf19RthMQchvysM2Rzbg7XHXcV
+	2jm8Gvduu8R9jNUnn67MjsyYV+hbQ+JgW5mOitej7bNy4O84oi5OzqlpW06UvPp+9zVR
+	4aqsRg4qS05H8m0uUCO2eyQ4D/jDNHlDyZXtevyZcNDz1VIyS5MwcO9ADjmuvS064y2b
+	8+Ug==
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Disposition: inline
+References: <CAJFHJroyC8SAFJZuQxcwHqph5EQRg=MqFdvfnwbK35Cv-A-neA@mail.gmail.com>
+	<CAJfpegtWEMd_bCeULG13PACqPq5G5HbwKjMOnCoXyFQViXE0yQ@mail.gmail.com>
+	<CAEjxPJ56JXRr0MWxtekBhfNS7i8hFex2oiwqGYrh=m1cH9X4kg@mail.gmail.com>
+	<CAJFHJrppbb1cUTq9w7G7E2RrV5CbYx54dAfk62tiZYCewcwXhg@mail.gmail.com>
+In-Reply-To: <CAJFHJrppbb1cUTq9w7G7E2RrV5CbYx54dAfk62tiZYCewcwXhg@mail.gmail.com>
+From: Stephen Smalley <stephen.smalley.work@gmail.com>
+Date: Thu, 7 May 2020 09:06:43 -0400
+Message-ID: <CAEjxPJ6LZowJJ1uQXa+NTSMA=y2AWatNKvtp3iDcH7kL4D-qcw@mail.gmail.com>
+Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
-In-Reply-To: <9a601294-a470-3df9-fd8f-0eb1ed5847b6@redhat.com>
-Subject: Re: [Virtio-fs] [RFC 2/2] virtiofsd: Set st_rdev for sub-mount
-	points
+Subject: Re: [Virtio-fs] fuse doesn't use security_inode_init_security?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,61 +27,77 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: Chirantan Ekbote <chirantan@chromium.org>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, fuse-devel <fuse-devel@lists.sourceforge.net>, virtio-fs-list <virtio-fs@redhat.com>, SElinux list <selinux@vger.kernel.org>, LSM <linux-security-module@vger.kernel.org>, Linux FS Devel <linux-fsdevel@vger.kernel.org>, Vivek Goyal <vgoyal@redhat.com>
 
-* Max Reitz (mreitz@redhat.com) wrote:
-> On 07.05.20 13:43, Miklos Szeredi wrote:
-> > On Thu, May 7, 2020 at 12:56 PM Max Reitz <mreitz@redhat.com> wrote:
-> >>
-> >> On 06.05.20 18:04, Dr. David Alan Gilbert wrote:
-> >>> * Max Reitz (mreitz@redhat.com) wrote:
-> >>>> Whenever we encounter a directory with an st_dev that differs from that
-> >>>> of its parent, we set st_rdev accordingly so the guest can create a
-> >>>> submount for it.
-> >>>>
-> >>>> Make this behavior optional, so submounts are only announced to the
-> >>>> guest with the announce_submounts option.  Some users may prefer the
-> >>>> current behavior, so that the guest learns nothing about the host mount
-> >>>> structure.
-> >>>>
-> >>>> Signed-off-by: Max Reitz <mreitz@redhat.com>
-> >>>
-> >>> Does this need to be wired to a flag in the INIT message (like say
-> >>> FUSE_ASYNC_READ) to indicate that the kernel/daemon supports this, or is
-> >>> it really safe just to start sending the changed rdev?
-> >>
-> >> I supposed it to be safe, given that rdev is never used for anything but
-> >> device files, so basically it was just a reserved field for directories.
-> > 
-> > You assume only directories can be mounted, but that's not so.  A
-> > device can also be the source or destination of a bind mount.
-> 
-> Well, I mostly thought this case wouldn’t be too important.  But I
-> suppose it doesn’t make sense to decide now that it’s never going to be
-> important.
+On Thu, May 7, 2020 at 3:53 AM Chirantan Ekbote <chirantan@chromium.org> wrote:
+> On Sat, May 2, 2020 at 3:32 AM Stephen Smalley
+> <stephen.smalley.work@gmail.com> wrote:
+> >
+> >
+> > (cc selinux list)
+> >
+> > security_inode_init_security() calls the initxattrs callback to
+> > actually set each xattr in the backing store (if any), so unless you
+> > have a way to pass that to the daemon along with the create request
+> > the attribute won't be persisted with the file.  Setting the xattrs is
+> > supposed to be atomic with the file creation, not a separate
+> > setxattr() operation after creating the file, similar to ACL
+> > inheritance on new files.
+> >
+>
+> But it's not truly atomic, is it?  The underlying file system creates
+> the inode and then the inode_init_security selinux hook actually sets
+> the attributes.  What would happen if the computer lost power after
+> the file system driver created the inode but before the selinux hook
+> set the attributes?
 
-It's quite common in kata to bind mount individual /etc files - I'm not
-clear if that's this particular case.
+IIUC, in the case of ext4 and xfs at least, the setting of the
+security.selinux xattr is performed in the same transaction as the
+file create, so a crash will either yield a file that has its xattr
+set or no file at all.  This is also true of POSIX ACLs.  Labeled NFS
+(NFSv4.2) likewise is supposed to send the MAC label with the file
+create request and either create it with that label or not create it
+at all.  Note that nfs however uses security_dentry_init_security() to
+get the MAC label since it doesn't yet have an inode and MAC labels
+are a first class abstraction in NFS not merely xattrs.
 
-Dave
+> > - deadlock during mount with userspace waiting for mount(2) to complete
+> > and the kernel blocked on requesting the security.selinux xattr of the
+> > root directory as part of superblock setup during mount
+>
+> I haven't personally run into this.  It Just Works, except for the
+> fscreate issue.
 
-> > We need to extend fuse_entry_out with a flags field.  We could
-> > possibly reuse the upper bits of entry_valid (i.e. timeouts above say
-> > INT_MAX seconds could be taken as  "infinity").  Unfortunately that's
-> > not as easy as splitting it into two fields due to endianness :(
-> 
-> For the time being, a single bit would be sufficient to signify whether
-> there should be a submount at all.  We could add a field with a submount
-> ID (i.e., st_dev from the host) in the future when we decide we
-> want/need to ensure that two inodes with the same st_dev on the host
-> also have the same st_dev in the guest.
-> 
-> Max
-> 
+Yes, this can be worked around in your fuse daemon if it supports
+handling getxattr during mount (e.g. multi-threaded, other threads can
+service the getxattr request while the mount(2) is still in progress).
+But not supported by stock fuse userspace IIUC.
 
+> I guess what I'm trying to understand is: what are the issues with
+> having the fuse driver call the inode_init_security hooks?  Even if
+> it's not something that can be turned on by default in mainline, I'd
+> like to evaluate whether we can turn it on locally in our restricted
+> environment.
+>
+> One issue is the lack of atomicity guarantees.  This is likely a
+> deal-breaker for general fuse usage.  However, I don't think it's an
+> issue for our restricted use of virtiofs because the attributes will
+> be set "atomically" from the guest userspace's perspective.  It won't
+> be atomic on the host side, but host processes don't have access to
+> those directories anyway.
+>
+> Are there any other issues?
 
+I don't have a problem with fuse calling the hook (either
+security_inode_init_security or security_dentry_init_security).  It is
+just a question of what it will do with the result (i.e. what its
+initxattr callback will do for the former or what it will do with the
+returned label in the latter). Optimally it will take the label
+information and bundle it up along with the create request to the
+daemon, which can then handle it as a single transaction.  Failing
+that, it needs to support setting the label in some manner during file
+creation that at least provides atomicity with respect to the user of
+the filesystem (the guest in your case).
 
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

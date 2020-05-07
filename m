@@ -1,14 +1,20 @@
-Date: Wed, 6 May 2020 17:04:11 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200506160411.GO2743@work-vm>
-References: <20200506153832.240812-1-mreitz@redhat.com>
-	<20200506154010.241055-2-mreitz@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=jgTNxE5V/BIoY+I2iej30rSKy2BONiHOg6xHs9/0haE=;
+	b=VCVIOMQ+K00QYE9ISlJoTypjvzNFrWABj7QekDFf12RqWKRjdx7Kpz16H7FyREAFNC
+	WtxTlKuz1PgB8QOnv6dh+GARbk9hYdmybcuDpYgds7N1S4nwdjMiFtwQw4lGDeFKQuTr
+	R8Vj8AHdkJOsV8b3umhNzNYuiFP6vSD+y5KWc=
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200506154010.241055-2-mreitz@redhat.com>
-Subject: Re: [Virtio-fs] [RFC 2/2] virtiofsd: Set st_rdev for sub-mount
-	points
+References: <CAJFHJroyC8SAFJZuQxcwHqph5EQRg=MqFdvfnwbK35Cv-A-neA@mail.gmail.com>
+	<CAJfpegtWEMd_bCeULG13PACqPq5G5HbwKjMOnCoXyFQViXE0yQ@mail.gmail.com>
+	<CAEjxPJ56JXRr0MWxtekBhfNS7i8hFex2oiwqGYrh=m1cH9X4kg@mail.gmail.com>
+In-Reply-To: <CAEjxPJ56JXRr0MWxtekBhfNS7i8hFex2oiwqGYrh=m1cH9X4kg@mail.gmail.com>
+From: Chirantan Ekbote <chirantan@chromium.org>
+Date: Thu, 7 May 2020 16:53:13 +0900
+Message-ID: <CAJFHJrppbb1cUTq9w7G7E2RrV5CbYx54dAfk62tiZYCewcwXhg@mail.gmail.com>
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] fuse doesn't use security_inode_init_security?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,171 +23,107 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs@redhat.com
+To: Stephen Smalley <stephen.smalley.work@gmail.com>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, fuse-devel <fuse-devel@lists.sourceforge.net>, virtio-fs-list <virtio-fs@redhat.com>, SElinux list <selinux@vger.kernel.org>, LSM <linux-security-module@vger.kernel.org>, Linux FS Devel <linux-fsdevel@vger.kernel.org>, Vivek Goyal <vgoyal@redhat.com>
 
-* Max Reitz (mreitz@redhat.com) wrote:
-> Whenever we encounter a directory with an st_dev that differs from that
-> of its parent, we set st_rdev accordingly so the guest can create a
-> submount for it.
-> 
-> Make this behavior optional, so submounts are only announced to the
-> guest with the announce_submounts option.  Some users may prefer the
-> current behavior, so that the guest learns nothing about the host mount
-> structure.
-> 
-> Signed-off-by: Max Reitz <mreitz@redhat.com>
+On Sat, May 2, 2020 at 12:46 AM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> I am wondering how would fuse initialize the security context of newly
+> created file. One way seems to be that it passes that information
+> as part of FUSE_CREATE/FUSE_MKNOD calls to server and server sets
+> its "fscreate" accordingly and then creates new file. This is similar
+> to virtiofsd changing its effective uid/gid to the fuse client so that
+> file is created with caller's uid/gid. Seems to be selinux context for
+> file creation probably should be handled similiarly.
+>
 
-Does this need to be wired to a flag in the INIT message (like say
-FUSE_ASYNC_READ) to indicate that the kernel/daemon supports this, or is
-it really safe just to start sending the changed rdev?
+How would the fuse driver get the correct context without going
+through security_inode_init_security?
 
-Dave
+> Other method could be to first create new file and then new fuse
+> commands to do setxattrs. But that will be racy as file will have
+> some default label for sometime between creation and setxattr.
+>
+> Having said that, I have a question. How do you reconcile host selinux
+> policy and guest selinux labels. I am assuming host selinux policy
+> will have to know about guest labels so that it allows virtiofsd do
+> set those labels? Dan, you might have more thoughts on this.
+>
 
-> ---
->  tools/virtiofsd/passthrough_ll.c | 59 +++++++++++++++++++++++++++-----
->  1 file changed, 50 insertions(+), 9 deletions(-)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 6cf471d31a..abf9d33493 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -159,6 +159,7 @@ struct lo_data {
->      int timeout_set;
->      int readdirplus_set;
->      int readdirplus_clear;
-> +    int announce_submounts;
->      struct lo_inode root;
->      GHashTable *inodes; /* protected by lo->mutex */
->      struct lo_map ino_map; /* protected by lo->mutex */
-> @@ -187,6 +188,7 @@ static const struct fuse_opt lo_opts[] = {
->      { "norace", offsetof(struct lo_data, norace), 1 },
->      { "readdirplus", offsetof(struct lo_data, readdirplus_set), 1 },
->      { "no_readdirplus", offsetof(struct lo_data, readdirplus_clear), 1 },
-> +    { "announce_submounts", offsetof(struct lo_data, announce_submounts), 1 },
->      FUSE_OPT_END
->  };
->  static bool use_syslog = false;
-> @@ -582,17 +584,42 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
->      }
->  }
->  
-> +/**
-> + * Call fstatat() and set st_rdev whenever a directory's st_dev
-> + * differs from the rparent's st_dev (@parent_dev).  This will
-> + * announce submounts to the FUSE client (unless @announce_submounts
-> + * is false).
-> + */
-> +static int do_fstatat(int dirfd, const char *pathname, struct stat *statbuf,
-> +                      int flags, dev_t parent_dev, bool announce_submounts)
-> +{
-> +    int res = fstatat(dirfd, pathname, statbuf, flags);
-> +    if (res == -1) {
-> +        return res;
-> +    }
-> +
-> +    if (statbuf->st_dev != parent_dev && S_ISDIR(statbuf->st_mode) &&
-> +        announce_submounts)
-> +    {
-> +        statbuf->st_rdev = statbuf->st_dev;
-> +    }
-> +
-> +    return 0;
-> +}
-> +
->  static void lo_getattr(fuse_req_t req, fuse_ino_t ino,
->                         struct fuse_file_info *fi)
->  {
->      int res;
->      struct stat buf;
->      struct lo_data *lo = lo_data(req);
-> +    struct lo_inode *inode = lo_inode(req, ino);
->  
->      (void)fi;
->  
-> -    res =
-> -        fstatat(lo_fd(req, ino), "", &buf, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
-> +    res = do_fstatat(inode->fd, "", &buf, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW,
-> +                     inode->parent_dev, lo->announce_submounts);
-> +    lo_inode_put(lo, &inode);
->      if (res == -1) {
->          return (void)fuse_reply_err(req, errno);
->      }
-> @@ -645,7 +672,9 @@ retry:
->          pthread_mutex_unlock(&lo->mutex);
->      } else {
->          *last = '\0';
-> -        res = fstatat(AT_FDCWD, last == path ? "/" : path, &stat, 0);
-> +        /* Pass parent_dev=0 because st_rdev will be ignored anyway */
-> +        res = do_fstatat(AT_FDCWD, last == path ? "/" : path, &stat, 0, 0,
-> +                         lo->announce_submounts);
->          if (res == -1) {
->              if (!retries) {
->                  fuse_log(FUSE_LOG_WARNING,
-> @@ -663,7 +692,8 @@ retry:
->          }
->      }
->      last++;
-> -    res = fstatat(p->fd, last, &stat, AT_SYMLINK_NOFOLLOW);
-> +    res = do_fstatat(p->fd, last, &stat, AT_SYMLINK_NOFOLLOW, p->key.dev,
-> +                     lo->announce_submounts);
->      if (res == -1) {
->          if (!retries) {
->              fuse_log(FUSE_LOG_WARNING,
-> @@ -925,7 +955,8 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
->          goto out_err;
->      }
->  
-> -    res = fstatat(newfd, "", &e->attr, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
-> +    res = do_fstatat(newfd, "", &e->attr, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW,
-> +                     dir->key.dev, lo->announce_submounts);
->      if (res == -1) {
->          goto out_err;
->      }
-> @@ -1207,7 +1238,9 @@ static void lo_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t parent,
->          goto out_err;
->      }
->  
-> -    res = fstatat(inode->fd, "", &e.attr, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
-> +    res = do_fstatat(inode->fd, "", &e.attr,
-> +                     AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW,
-> +                     parent_inode->key.dev, lo->announce_submounts);
->      if (res == -1) {
->          goto out_err;
->      }
-> @@ -1246,14 +1279,22 @@ static struct lo_inode *lookup_name(fuse_req_t req, fuse_ino_t parent,
->  {
->      int res;
->      struct stat attr;
-> +    struct lo_data *lo = lo_data(req);
-> +    struct lo_inode *dir = lo_inode(req, parent);
->  
-> -    res = fstatat(lo_fd(req, parent), name, &attr,
-> -                  AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
-> +    if (!dir) {
-> +        return NULL;
-> +    }
-> +
-> +    res = do_fstatat(dir->fd, name, &attr,
-> +                     AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW, dir->key.dev,
-> +                     lo->announce_submounts);
-> +    lo_inode_put(lo, &dir);
->      if (res == -1) {
->          return NULL;
->      }
->  
-> -    return lo_find(lo_data(req), &attr);
-> +    return lo_find(lo, &attr);
->  }
->  
->  static void lo_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name)
-> -- 
-> 2.26.2
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+My understanding is that we currently merge the guest and host
+policies so that all types in the guest are available on the host.
+The host itself uses selinux in permissive mode.  The top-level
+directory is also owned exclusively by the guest and host processes
+don't have access to it.
+
+
+On Sat, May 2, 2020 at 3:32 AM Stephen Smalley
+<stephen.smalley.work@gmail.com> wrote:
+>
+>
+> (cc selinux list)
+>
+> security_inode_init_security() calls the initxattrs callback to
+> actually set each xattr in the backing store (if any), so unless you
+> have a way to pass that to the daemon along with the create request
+> the attribute won't be persisted with the file.  Setting the xattrs is
+> supposed to be atomic with the file creation, not a separate
+> setxattr() operation after creating the file, similar to ACL
+> inheritance on new files.
+>
+
+But it's not truly atomic, is it?  The underlying file system creates
+the inode and then the inode_init_security selinux hook actually sets
+the attributes.  What would happen if the computer lost power after
+the file system driver created the inode but before the selinux hook
+set the attributes?
+
+> Also possibly related
+> https://lore.kernel.org/selinux/6df9b58c-fe9b-28f3-c151-f77aa6dd67e7@tycho.nsa.gov/.
+
+Interesting.  Let me pull out the relevant bits and respond inline.
+
+> - deadlock during mount with userspace waiting for mount(2) to complete
+> and the kernel blocked on requesting the security.selinux xattr of the
+> root directory as part of superblock setup during mount
+
+I haven't personally run into this.  It Just Works, except for the
+fscreate issue.
+
+> - there was an attempt to introduce distinctions based on filesystem
+> "subtype" so that whitelisted fuse filesystems could have xattr support
+> enabled when it was known that their userspace would handle mount(2)
+> safely [3] but this was apparently always broken and later reverted [4].
+
+I think we kind of side-stepped this issue.  The fstype for virtiofs
+is "virtiofs" instead of something like "fuse.virtiofs" so there is no
+subtype handling required.
+
+> - there is the issue of trusting the fuse filesystem for its labeling
+> information and for domain/context transitions
+
+This is definitely an issue for regular fuse file systems.  However,
+the virtiofs device has read/write access to all the VM's memory so
+there isn't much the VM can do if it doesn't trust the device.
+
+
+
+I guess what I'm trying to understand is: what are the issues with
+having the fuse driver call the inode_init_security hooks?  Even if
+it's not something that can be turned on by default in mainline, I'd
+like to evaluate whether we can turn it on locally in our restricted
+environment.
+
+One issue is the lack of atomicity guarantees.  This is likely a
+deal-breaker for general fuse usage.  However, I don't think it's an
+issue for our restricted use of virtiofs because the attributes will
+be set "atomically" from the guest userspace's perspective.  It won't
+be atomic on the host side, but host processes don't have access to
+those directories anyway.
+
+Are there any other issues?
+
+Thank you,
+Chirantan
+
 

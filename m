@@ -1,15 +1,16 @@
 MIME-Version: 1.0
-References: <20200506153529.239939-1-mreitz@redhat.com>
-	<20200506153637.240191-3-mreitz@redhat.com>
-	<CAOssrKerr_KvfuXqTNjJ4936SXiN3AZ6rZ6oo8Mv+9bvDrFAWQ@mail.gmail.com>
-	<879d4262-fde1-eedb-a114-2a0b8a185125@redhat.com>
-In-Reply-To: <879d4262-fde1-eedb-a114-2a0b8a185125@redhat.com>
+References: <20200506153832.240812-1-mreitz@redhat.com>
+	<20200506154010.241055-2-mreitz@redhat.com>
+	<20200506160411.GO2743@work-vm>
+	<52f6dc62-496e-2337-72dc-a9b762732848@redhat.com>
+In-Reply-To: <52f6dc62-496e-2337-72dc-a9b762732848@redhat.com>
 From: Miklos Szeredi <mszeredi@redhat.com>
-Date: Thu, 7 May 2020 13:24:23 +0200
-Message-ID: <CAOssrKd99kBf9ccc4xk_ZktO+Sc_+WvP0=wvVOXV7+Jgp8sTZA@mail.gmail.com>
-Content-Type: text/plain; charset="utf-8"
+Date: Thu, 7 May 2020 13:43:56 +0200
+Message-ID: <CAOssrKfcZH3Bu1g2U4XbGn_b5LenLoHQOO=WWqT71J4sMVTv3w@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [RFC 3/5] fuse: Split fuse_mount off of fuse_conn
+Subject: Re: [Virtio-fs] [RFC 2/2] virtiofsd: Set st_rdev for sub-mount
+	points
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,70 +20,37 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Max Reitz <xanclic@xanclic.moe>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-On Thu, May 7, 2020 at 1:16 PM Max Reitz <mreitz@redhat.com> wrote:
+On Thu, May 7, 2020 at 12:56 PM Max Reitz <mreitz@redhat.com> wrote:
 >
-> On 07.05.20 11:56, Miklos Szeredi wrote:
-> > On Wed, May 6, 2020 at 5:37 PM Max Reitz <mreitz@redhat.com> wrote:
+> On 06.05.20 18:04, Dr. David Alan Gilbert wrote:
+> > * Max Reitz (mreitz@redhat.com) wrote:
+> >> Whenever we encounter a directory with an st_dev that differs from that
+> >> of its parent, we set st_rdev accordingly so the guest can create a
+> >> submount for it.
 > >>
-> >> From: Max Reitz <xanclic@xanclic.moe>
->
-> Oops.
->
-> >> We want to allow submounts for the same fuse_conn, but with different
-> >> superblocks so that each of the submounts has its own device ID.  To do
-> >> so, we need to split all mount-specific information off of fuse_conn
-> >> into a new fuse_mount structure, so that multiple mounts can share a
-> >> single fuse_conn.
+> >> Make this behavior optional, so submounts are only announced to the
+> >> guest with the announce_submounts option.  Some users may prefer the
+> >> current behavior, so that the guest learns nothing about the host mount
+> >> structure.
+> >>
+> >> Signed-off-by: Max Reitz <mreitz@redhat.com>
 > >
-> > I have the following high level comments:
-> >
-> > Control filesystem: each fuse_mount gets a new entry, but they are all
-> > aliases.   I think we should just stick with just one entry for the
-> > connection (and perhaps a symlink for each additional mount, but this
-> > is of secondary importance).
+> > Does this need to be wired to a flag in the INIT message (like say
+> > FUSE_ASYNC_READ) to indicate that the kernel/daemon supports this, or is
+> > it really safe just to start sending the changed rdev?
 >
-> I have to admit that I didn’t spend much thought on any of this, but
-> just went with what worked.  Since one of the functions in control.c
-> require the super block, I went with fuse_mount.
->
-> I suppose for fuse_ctl_add_conn() (for @name), we can simply use the
-> first fuse_mount’s device ID.
+> I supposed it to be safe, given that rdev is never used for anything but
+> device files, so basically it was just a reserved field for directories.
 
-Yes.
+You assume only directories can be mounted, but that's not so.  A
+device can also be the source or destination of a bind mount.
 
->
-> > BDI:  we need to call set_bdi_congested/clear_bdi_congested for *all*
-> > mounts of a connection.
->
-> OK, then one entry per fuse_conn will work.
->
-> But do we need to do the same in fuse_request_end() and
-> fuse_request_queue_background()?
-
-Definitely.  Otherwise one bdi could have its congestion state set,
-and the other one cleared.  Not good.
-
-Even better:  share the bdi between submounts.  This would make a lot
-more sense and remove the need for loops.
-
->
-> >                          Might make sense to look into getting rid of
-> > bdi congestion handling completely, but this is not something I have a
-> > good insight into right now.
-> >
-> > Notification: please create a fuse_ilookup() that takes fc and returns
-> > (sb, inode) pair and call this instead ilookup5().   This way the loop
-> > is moved to the place where it's actually necessary.
->
-> Hm, sounds a bit cumbersome for the fuse_notify_* functions that don’t
-> directly call ilookup5().  But they always have a callee that does, so I
-> suppose I’ll just have to move that up to the caller.  That should work
-> then.
-
-I'd rather say: move the fc down to the callee.  The kill_sb mutex can
-remain in fuse_conn, so callers shouldn't need an sb.
+We need to extend fuse_entry_out with a flags field.  We could
+possibly reuse the upper bits of entry_valid (i.e. timeouts above say
+INT_MAX seconds could be taken as  "infinity").  Unfortunately that's
+not as easy as splitting it into two fields due to endianness :(
 
 Thanks,
 Miklos

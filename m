@@ -1,19 +1,20 @@
 MIME-Version: 1.0
-References: <20200506153529.239939-1-mreitz@redhat.com>
-	<20200506153637.240191-3-mreitz@redhat.com>
-	<CAOssrKerr_KvfuXqTNjJ4936SXiN3AZ6rZ6oo8Mv+9bvDrFAWQ@mail.gmail.com>
-	<879d4262-fde1-eedb-a114-2a0b8a185125@redhat.com>
-	<CAOssrKd99kBf9ccc4xk_ZktO+Sc_+WvP0=wvVOXV7+Jgp8sTZA@mail.gmail.com>
-	<5396dbd9-0d6c-556d-d015-cbc034d6471e@redhat.com>
-	<CAOssrKfX1ocpXH_rnaAYMJS50L3kKTr1yGvY6=iqvn9TcwdhWg@mail.gmail.com>
-	<1b5ef937-34ee-3df1-ed78-0b14f4d28f9e@redhat.com>
-In-Reply-To: <1b5ef937-34ee-3df1-ed78-0b14f4d28f9e@redhat.com>
+References: <20200506153832.240812-1-mreitz@redhat.com>
+	<20200506154010.241055-2-mreitz@redhat.com>
+	<20200506160411.GO2743@work-vm>
+	<52f6dc62-496e-2337-72dc-a9b762732848@redhat.com>
+	<CAOssrKfcZH3Bu1g2U4XbGn_b5LenLoHQOO=WWqT71J4sMVTv3w@mail.gmail.com>
+	<9a601294-a470-3df9-fd8f-0eb1ed5847b6@redhat.com>
+	<CAOssrKcgQ7cFpG6Jh7B25bVNp419coHvFjCiGt4KiZ=oHsYhJw@mail.gmail.com>
+	<4518b2a2-705b-9c13-1384-560e670f941f@redhat.com>
+In-Reply-To: <4518b2a2-705b-9c13-1384-560e670f941f@redhat.com>
 From: Miklos Szeredi <mszeredi@redhat.com>
-Date: Thu, 7 May 2020 17:19:11 +0200
-Message-ID: <CAOssrKfdwG1ywAFnBzf1kVMrHjjhmRX5Nvk9ekyUf9pgw2yU1Q@mail.gmail.com>
-Content-Type: text/plain; charset="utf-8"
+Date: Thu, 7 May 2020 17:23:52 +0200
+Message-ID: <CAOssrKdNBrnOFV2qh-8OR8sGatbt-vzUm9UDwUiThuYPdA+q7w@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [RFC 3/5] fuse: Split fuse_mount off of fuse_conn
+Subject: Re: [Virtio-fs] [RFC 2/2] virtiofsd: Set st_rdev for sub-mount
+	points
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,37 +24,21 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Max Reitz <xanclic@xanclic.moe>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-On Thu, May 7, 2020 at 5:05 PM Max Reitz <mreitz@redhat.com> wrote:
+On Thu, May 7, 2020 at 5:15 PM Max Reitz <mreitz@redhat.com> wrote:
 >
-> On 07.05.20 16:05, Miklos Szeredi wrote:
-> > On Thu, May 7, 2020 at 2:08 PM Max Reitz <mreitz@redhat.com> wrote:
-> >>
-> >> On 07.05.20 13:24, Miklos Szeredi wrote:
-> >
-> >>> Even better:  share the bdi between submounts.  This would make a lot
-> >>> more sense and remove the need for loops.
-> >>
-> >> Hm, isn’t bdi related to the (anonymous) block device “serving” the
-> >> super block, and thus the st_dev value?  (Which is necessarily different
-> >> for all fuse_mounts)
-> >
-> > BDI is normally an object bound to a block device, but a block device
-> > can have multiple partitions, each having different st_dev values.  So
-> > yes, a bdi *can* be shared by multiple super blocks, and this very
-> > much makes sense in the case of fuse submounts sharing a connection.
+> On 07.05.20 16:29, Miklos Szeredi wrote:
+
+> > Hmm, do we need a separate bit, then?  Couldn't the kernel decide
+> > based on st_dev whether a new submount is needed?  I.e. return root
+> > st_dev in INIT reply, store it in root fuse_mount and lookups compare
+> > attr.dev to fm->st_dev.
 >
-> OK.  Seems like all I’d need to do is let fuse_bdi_init() clone
-> (bdi_get()) the existing BDI for submounts.  However, the BDI’s name (in
-> sysfs) is going to be based on the root mount’s st_dev.  Is that a problem?
+> That was the idea, but there is no fuse_attr.dev, which is why I
+> (ab)used fuse_attr.rdev instead.
 
-I don't think that's a problem.
-
-> (Sorry if I’m asking questions whose answer seem obvious to you, but I’m
-> afraid I’m rather new to everything, and it all still overwhelms me a bit.)
-
-Don't be sorry :)
+Ah, right.
 
 Thanks,
 Miklos

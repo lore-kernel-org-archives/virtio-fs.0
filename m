@@ -1,14 +1,13 @@
-Date: Tue, 12 May 2020 10:06:51 +0800
 From: Eryu Guan <eguan@linux.alibaba.com>
-Message-ID: <20200512020651.GX47669@e18g06458.et15sqa>
+Date: Tue, 12 May 2020 10:29:04 +0800
+Message-Id: <20200512022904.75689-1-eguan@linux.alibaba.com>
+In-Reply-To: <1588778444-28375-1-git-send-email-eguan@linux.alibaba.com>
 References: <1588778444-28375-1-git-send-email-eguan@linux.alibaba.com>
-	<CAJfpegsivYq68FjSxAGnszcPJBrJrYG5Gojsc8T+PKup0Cm8fw@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <CAJfpegsivYq68FjSxAGnszcPJBrJrYG5Gojsc8T+PKup0Cm8fw@mail.gmail.com>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH RFC] fuse: invalidate inode attr in
-	writeback cache mode
+Content-Type: text/plain; charset=US-ASCII
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2] fuse: invalidate inode attr in writeback
+	cache mode
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,48 +16,71 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>
+To: linux-fsdevel@vger.kernel.org
+Cc: virtio-fs@redhat.com, miklos@szeredi.hu
 
-On Mon, May 11, 2020 at 03:06:08PM +0200, Miklos Szeredi wrote:
-> On Wed, May 6, 2020 at 5:21 PM Eryu Guan <eguan@linux.alibaba.com> wrote:
-> >
-> > Under writeback mode, inode->i_blocks is not updated, making utils like
-> > du read st.blocks as 0.
-> >
-> > For example, when using virtiofs (cache=always & nondax mode) with
-> > writeback_cache enabled, writing a new file and check its disk usage
-> > with du, du reports 0 usage.
-> 
-> Hmm... invalidating the attribute might also yield the wrong result as
-> the server may not have received the WRITE request that modifies the
-> underlying file.
+Under writeback mode, inode->i_blocks is not updated, making utils du
+read st.blocks as 0.
 
-That's true, I open-write a file then sleep without closing it, and
-check file's st_blocks in another terminal, the usage is 0, and remains
-0 even after the file is closed, because the wrong attr is cached.
+For example, when using virtiofs (cache=always & nondax mode) with
+writeback_cache enabled, writing a new file and check its disk usage
+with du, du reports 0 usage.
 
-> 
-> Invalidating attributes at the end of fuse_flush() definitely makes
-> sense, though.
+  # uname -r
+  5.6.0-rc6+
+  # mount -t virtiofs virtiofs /mnt/virtiofs
+  # rm -f /mnt/virtiofs/testfile
 
-du also reports 0 if I didn't close the file, but I got correct
-st_blocks when it's closed.
+  # create new file and do extend write
+  # xfs_io -fc "pwrite 0 4k" /mnt/virtiofs/testfile
+  wrote 4096/4096 bytes at offset 0
+  4 KiB, 1 ops; 0.0001 sec (28.103 MiB/sec and 7194.2446 ops/sec)
+  # du -k /mnt/virtiofs/testfile
+  0               <==== disk usage is 0
+  # stat -c %s,%b /mnt/virtiofs/testfile
+  4096,0          <==== i_size is correct, but st_blocks is 0
 
-> 
-> If we wanted 100% correct behavior, we'd need to flush WRITE requests
-> before each GETATTR request.  That might be a performance bottleneck,
-> though.
-> 
-> So first I'd just try doing the invalidation from fuse_flush().
+Fix it by invalidating attr in fuse_flush(), so we get up-to-date attr
+from server on next getattr.
 
-Sure, will send v2 soon.
+Signed-off-by: Eryu Guan <eguan@linux.alibaba.com>
+---
+v2:
+- do fuse_invalidate_attr() in fuse_flush() as Miklos suggested
 
-> 
-> Thanks,
-> Miklos
+ fs/fuse/file.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-Thanks for the review!
-
-Eryu
+diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+index 9d67b830fb7a..4bb399caec01 100644
+--- a/fs/fuse/file.c
++++ b/fs/fuse/file.c
+@@ -445,8 +445,9 @@ static int fuse_flush(struct file *file, fl_owner_t id)
+ 	if (is_bad_inode(inode))
+ 		return -EIO;
+ 
++	err = 0;
+ 	if (fc->no_flush)
+-		return 0;
++		goto inval_attr_out;
+ 
+ 	err = write_inode_now(inode, 1);
+ 	if (err)
+@@ -475,6 +476,14 @@ static int fuse_flush(struct file *file, fl_owner_t id)
+ 		fc->no_flush = 1;
+ 		err = 0;
+ 	}
++
++inval_attr_out:
++	/*
++	 * In memory i_blocks is not maintained by fuse, if writeback cache is
++	 * enabled, i_blocks from cached attr may not be accurate.
++	 */
++	if (!err && fc->writeback_cache)
++		fuse_invalidate_attr(inode);
+ 	return err;
+ }
+ 
+-- 
+2.26.1.107.gefe3874
 

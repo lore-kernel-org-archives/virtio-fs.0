@@ -1,12 +1,12 @@
+Date: Fri, 15 May 2020 08:52:05 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200515125205.GA235744@redhat.com>
+References: <VI1PR03MB438360F20BFF32EC2AE5ACCEA6BF0@VI1PR03MB4383.eurprd03.prod.outlook.com>
 MIME-Version: 1.0
-References: <20200514140736.20561-1-mszeredi@redhat.com>
-	<20200515034309.GA49087@rsjd01523.et2sqa>
-In-Reply-To: <20200515034309.GA49087@rsjd01523.et2sqa>
-From: Miklos Szeredi <mszeredi@redhat.com>
-Date: Fri, 15 May 2020 06:42:00 +0200
-Message-ID: <CAOssrKeLqOtsRXVwHBncyaWEW2ZP3T-rL+O7C3j8=Jp3DKpGXg@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: remove symlink fallbacks
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <VI1PR03MB438360F20BFF32EC2AE5ACCEA6BF0@VI1PR03MB4383.eurprd03.prod.outlook.com>
+Subject: Re: [Virtio-fs] [PATCH] Fix file descriptor passed for setupmapping
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,29 +15,45 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Liu Bo <bo.liu@linux.alibaba.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
+To: Fotis Xenakis <foxen@windowslive.com>
+Cc: virtio-fs@redhat.com
 
-On Fri, May 15, 2020 at 5:43 AM Liu Bo <bo.liu@linux.alibaba.com> wrote:
->
-> On Thu, May 14, 2020 at 04:07:36PM +0200, Miklos Szeredi wrote:
-> > Path lookup in the kernel has special rules for looking up magic symlinks
-> > under /proc.  If a filesystem operation is instructed to follow symlinks
-> > (e.g. via AT_SYMLINK_FOLLOW or lack of AT_SYMLINK_NOFOLLOW), and the final
-> > component is such a proc symlink, then the target of the magic symlink is
-> > used for the operation, even if the target itself is a symlink.  I.e. path
-> > lookup is always terminated after following a final magic symlink.
-> >
->
-> Hi Miklos,
->
-> Are these mentioned special rules supported by a recent kernel version
-> or are they there from day one linux?
+On Wed, May 13, 2020 at 07:33:56PM +0300, Fotis Xenakis wrote:
+> Currently, during FUSE_SETUPMAPPING, virtiofsd passes the wrong file
+> descriptor for the file to mmap() to QEMU (specifically, it passes the
+> file handle as requested from the guest).
+> 
+> This fixes it, using lo_fi_fd() to map the file handle to the right file
+> descriptor on the host.
+> 
+> Signed-off-by: Fotis Xenakis <foxen@windowslive.com>
 
-Hi Liubo,
+Acked-by: Vivek Goyal <vgoyal@redhat.com>
 
-AFAICS, these rules have been there from day one.
-
-Thanks,
-Miklos
+Vivek
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index e09d557d74..44bb24eb5e 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -2709,7 +2709,7 @@ static void lo_setupmapping(fuse_req_t req, fuse_ino_t ino, uint64_t foffset,
+>      msg.flags[0] = vhu_flags;
+>  
+>      if (fi) {
+> -        fd = fi->fh;
+> +        fd = lo_fi_fd(req, fi);
+>      } else {
+>          res = asprintf(&buf, "%i", lo_fd(req, ino));
+>          if (res == -1) {
+> -- 
+> 2.26.2
+> 
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 

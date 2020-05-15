@@ -1,12 +1,14 @@
-Date: Fri, 15 May 2020 10:10:57 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200515141057.GB235744@redhat.com>
-References: <20200514140736.20561-1-mszeredi@redhat.com>
+From: Fotis Xenakis <foxen@windowslive.com>
+Date: Fri, 15 May 2020 16:50:31 +0000
+Message-ID: <VI1PR03MB4383EAFC7403141AB2278802A6BD0@VI1PR03MB4383.eurprd03.prod.outlook.com>
+References: <VI1PR03MB438360F20BFF32EC2AE5ACCEA6BF0@VI1PR03MB4383.eurprd03.prod.outlook.com>,
+	<20200515034814.GB49087@rsjd01523.et2sqa>
+In-Reply-To: <20200515034814.GB49087@rsjd01523.et2sqa>
+Content-Language: en-US
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200514140736.20561-1-mszeredi@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: remove symlink fallbacks
+Content-Type: multipart/alternative;
+	boundary="_000_VI1PR03MB4383EAFC7403141AB2278802A6BD0VI1PR03MB4383eurp_"
+Subject: Re: [Virtio-fs] [PATCH] Fix file descriptor passed for setupmapping
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,272 +17,174 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <mszeredi@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: "bo.liu@linux.alibaba.com" <bo.liu@linux.alibaba.com>
+Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
-On Thu, May 14, 2020 at 04:07:36PM +0200, Miklos Szeredi wrote:
-> Path lookup in the kernel has special rules for looking up magic symlinks
-> under /proc.  If a filesystem operation is instructed to follow symlinks
-> (e.g. via AT_SYMLINK_FOLLOW or lack of AT_SYMLINK_NOFOLLOW), and the final
-> component is such a proc symlink, then the target of the magic symlink is
-> used for the operation, even if the target itself is a symlink.  I.e. path
-> lookup is always terminated after following a final magic symlink.
-> 
-> I was erronously assuming that in the above case the target symlink would
-> also be followed, and so workarounds were added for a couple of operations
-> to handle the symlink case.  Since the symlink can be handled simply by
-> following the proc symlink, these workardouds are not needed.
-> 
-> Also remove the "norace" option, which disabled the workarounds.
-> 
-> Commit bdfd66788349 ("virtiofsd: Fix xattr operations") already dealt with
-> the same issue for xattr operations.
-> 
-> Signed-off-by: Miklos Szeredi <mszeredi@redhat.com>
+--_000_VI1PR03MB4383EAFC7403141AB2278802A6BD0VI1PR03MB4383eurp_
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 
-Good to have this cleanup.
+From: Liu Bo <bo.liu@linux.alibaba.com>
+Sent: Friday, May 15, 2020 06:48
+To: Fotis Xenakis <foxen@windowslive.com>
+Cc: virtio-fs@redhat.com <virtio-fs@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] Fix file descriptor passed for setupmappin=
+g
 
-Acked-by: Vivek Goyal <vgoyal@redhat.com>
+On Wed, May 13, 2020 at 07:33:56PM +0300, Fotis Xenakis wrote:
+> Currently, during FUSE_SETUPMAPPING, virtiofsd passes the wrong file
+> descriptor for the file to mmap() to QEMU (specifically, it passes the
+> file handle as requested from the guest).
+>
+> This fixes it, using lo_fi_fd() to map the file handle to the right file
+> descriptor on the host.
+>
 
-Vivek
+Looks good, guest has been setting fi as NULL though.
+As far as I can see, this function is only called from [1], which passes fi=
+ as NULL only when the file handle passed from the guest is (uint64_t)-1. I=
+n my testing this was never the case though.
 
+Reference:
+[1] https://gitlab.com/virtio-fs/qemu/-/blob/21336c0f3d05a97f5c409bbc894c19=
+d87259655c/tools/virtiofsd/fuse_lowlevel.c#L1930
+Reviewed-by: Liu Bo <bo.liu@linux.alibaba.com>
+
+
+> Signed-off-by: Fotis Xenakis <foxen@windowslive.com>
 > ---
->  tools/virtiofsd/passthrough_ll.c | 175 ++-----------------------------
->  1 file changed, 6 insertions(+), 169 deletions(-)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 3ba1d9098460..2ce7c96085bf 100644
+>  tools/virtiofsd/passthrough_ll.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrou=
+gh_ll.c
+> index e09d557d74..44bb24eb5e 100644
 > --- a/tools/virtiofsd/passthrough_ll.c
 > +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -140,7 +140,6 @@ enum {
->  struct lo_data {
->      pthread_mutex_t mutex;
->      int debug;
-> -    int norace;
->      int writeback;
->      int flock;
->      int posix_lock;
-> @@ -176,7 +175,6 @@ static const struct fuse_opt lo_opts[] = {
->      { "cache=none", offsetof(struct lo_data, cache), CACHE_NONE },
->      { "cache=auto", offsetof(struct lo_data, cache), CACHE_AUTO },
->      { "cache=always", offsetof(struct lo_data, cache), CACHE_ALWAYS },
-> -    { "norace", offsetof(struct lo_data, norace), 1 },
->      { "readdirplus", offsetof(struct lo_data, readdirplus_set), 1 },
->      { "no_readdirplus", offsetof(struct lo_data, readdirplus_clear), 1 },
->      FUSE_OPT_END
-> @@ -592,136 +590,6 @@ static void lo_getattr(fuse_req_t req, fuse_ino_t ino,
->      fuse_reply_attr(req, &buf, lo->timeout);
->  }
->  
-> -/*
-> - * Increments parent->nlookup and caller must release refcount using
-> - * lo_inode_put(&parent).
-> - */
-> -static int lo_parent_and_name(struct lo_data *lo, struct lo_inode *inode,
-> -                              char path[PATH_MAX], struct lo_inode **parent)
-> -{
-> -    char procname[64];
-> -    char *last;
-> -    struct stat stat;
-> -    struct lo_inode *p;
-> -    int retries = 2;
-> -    int res;
-> -
-> -retry:
-> -    sprintf(procname, "%i", inode->fd);
-> -
-> -    res = readlinkat(lo->proc_self_fd, procname, path, PATH_MAX);
-> -    if (res < 0) {
-> -        fuse_log(FUSE_LOG_WARNING, "%s: readlink failed: %m\n", __func__);
-> -        goto fail_noretry;
-> -    }
-> -
-> -    if (res >= PATH_MAX) {
-> -        fuse_log(FUSE_LOG_WARNING, "%s: readlink overflowed\n", __func__);
-> -        goto fail_noretry;
-> -    }
-> -    path[res] = '\0';
-> -
-> -    last = strrchr(path, '/');
-> -    if (last == NULL) {
-> -        /* Shouldn't happen */
-> -        fuse_log(
-> -            FUSE_LOG_WARNING,
-> -            "%s: INTERNAL ERROR: bad path read from proc\n", __func__);
-> -        goto fail_noretry;
-> -    }
-> -    if (last == path) {
-> -        p = &lo->root;
-> -        pthread_mutex_lock(&lo->mutex);
-> -        p->nlookup++;
-> -        g_atomic_int_inc(&p->refcount);
-> -        pthread_mutex_unlock(&lo->mutex);
-> -    } else {
-> -        *last = '\0';
-> -        res = fstatat(AT_FDCWD, last == path ? "/" : path, &stat, 0);
-> -        if (res == -1) {
-> -            if (!retries) {
-> -                fuse_log(FUSE_LOG_WARNING,
-> -                         "%s: failed to stat parent: %m\n", __func__);
-> -            }
-> -            goto fail;
-> -        }
-> -        p = lo_find(lo, &stat);
-> -        if (p == NULL) {
-> -            if (!retries) {
-> -                fuse_log(FUSE_LOG_WARNING,
-> -                         "%s: failed to find parent\n", __func__);
-> -            }
-> -            goto fail;
-> -        }
-> -    }
-> -    last++;
-> -    res = fstatat(p->fd, last, &stat, AT_SYMLINK_NOFOLLOW);
-> -    if (res == -1) {
-> -        if (!retries) {
-> -            fuse_log(FUSE_LOG_WARNING,
-> -                     "%s: failed to stat last\n", __func__);
-> -        }
-> -        goto fail_unref;
-> -    }
-> -    if (stat.st_dev != inode->key.dev || stat.st_ino != inode->key.ino) {
-> -        if (!retries) {
-> -            fuse_log(FUSE_LOG_WARNING,
-> -                     "%s: failed to match last\n", __func__);
-> -        }
-> -        goto fail_unref;
-> -    }
-> -    *parent = p;
-> -    memmove(path, last, strlen(last) + 1);
-> -
-> -    return 0;
-> -
-> -fail_unref:
-> -    unref_inode_lolocked(lo, p, 1);
-> -    lo_inode_put(lo, &p);
-> -fail:
-> -    if (retries) {
-> -        retries--;
-> -        goto retry;
-> -    }
-> -fail_noretry:
-> -    errno = EIO;
-> -    return -1;
-> -}
-> -
-> -static int utimensat_empty(struct lo_data *lo, struct lo_inode *inode,
-> -                           const struct timespec *tv)
-> -{
-> -    int res;
-> -    struct lo_inode *parent;
-> -    char path[PATH_MAX];
-> -
-> -    if (S_ISLNK(inode->filetype)) {
-> -        res = utimensat(inode->fd, "", tv, AT_EMPTY_PATH);
-> -        if (res == -1 && errno == EINVAL) {
-> -            /* Sorry, no race free way to set times on symlink. */
-> -            if (lo->norace) {
-> -                errno = EPERM;
-> -            } else {
-> -                goto fallback;
-> -            }
-> -        }
-> -        return res;
-> -    }
-> -    sprintf(path, "%i", inode->fd);
-> -
-> -    return utimensat(lo->proc_self_fd, path, tv, 0);
-> -
-> -fallback:
-> -    res = lo_parent_and_name(lo, inode, path, &parent);
-> -    if (res != -1) {
-> -        res = utimensat(parent->fd, path, tv, AT_SYMLINK_NOFOLLOW);
-> -        unref_inode_lolocked(lo, parent, 1);
-> -        lo_inode_put(lo, &parent);
-> -    }
-> -
-> -    return res;
-> -}
-> -
->  static int lo_fi_fd(fuse_req_t req, struct fuse_file_info *fi)
->  {
->      struct lo_data *lo = lo_data(req);
-> @@ -828,7 +696,8 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
->          if (fi) {
->              res = futimens(fd, tv);
->          } else {
-> -            res = utimensat_empty(lo, inode, tv);
-> +            sprintf(procname, "%i", inode->fd);
-> +            res = utimensat(lo->proc_self_fd, procname, tv, 0);
->          }
->          if (res == -1) {
->              goto out_err;
-> @@ -1129,41 +998,6 @@ static void lo_symlink(fuse_req_t req, const char *link, fuse_ino_t parent,
->      lo_mknod_symlink(req, parent, name, S_IFLNK, 0, link);
->  }
->  
-> -static int linkat_empty_nofollow(struct lo_data *lo, struct lo_inode *inode,
-> -                                 int dfd, const char *name)
-> -{
-> -    int res;
-> -    struct lo_inode *parent;
-> -    char path[PATH_MAX];
-> -
-> -    if (S_ISLNK(inode->filetype)) {
-> -        res = linkat(inode->fd, "", dfd, name, AT_EMPTY_PATH);
-> -        if (res == -1 && (errno == ENOENT || errno == EINVAL)) {
-> -            /* Sorry, no race free way to hard-link a symlink. */
-> -            if (lo->norace) {
-> -                errno = EPERM;
-> -            } else {
-> -                goto fallback;
-> -            }
-> -        }
-> -        return res;
-> -    }
-> -
-> -    sprintf(path, "%i", inode->fd);
-> -
-> -    return linkat(lo->proc_self_fd, path, dfd, name, AT_SYMLINK_FOLLOW);
-> -
-> -fallback:
-> -    res = lo_parent_and_name(lo, inode, path, &parent);
-> -    if (res != -1) {
-> -        res = linkat(parent->fd, path, dfd, name, 0);
-> -        unref_inode_lolocked(lo, parent, 1);
-> -        lo_inode_put(lo, &parent);
-> -    }
-> -
-> -    return res;
-> -}
-> -
->  static void lo_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t parent,
->                      const char *name)
->  {
-> @@ -1172,6 +1006,7 @@ static void lo_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t parent,
->      struct lo_inode *parent_inode;
->      struct lo_inode *inode;
->      struct fuse_entry_param e;
-> +    char procname[64];
->      int saverr;
->  
->      if (!is_safe_path_component(name)) {
-> @@ -1190,7 +1025,9 @@ static void lo_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t parent,
->      e.attr_timeout = lo->timeout;
->      e.entry_timeout = lo->timeout;
->  
-> -    res = linkat_empty_nofollow(lo, inode, parent_inode->fd, name);
-> +    sprintf(procname, "%i", inode->fd);
-> +    res = linkat(lo->proc_self_fd, procname, parent_inode->fd, name,
-> +                 AT_SYMLINK_FOLLOW);
->      if (res == -1) {
->          goto out_err;
->      }
-> -- 
-> 2.21.1
-> 
+> @@ -2709,7 +2709,7 @@ static void lo_setupmapping(fuse_req_t req, fuse_in=
+o_t ino, uint64_t foffset,
+>      msg.flags[0] =3D vhu_flags;
+>
+>      if (fi) {
+> -        fd =3D fi->fh;
+> +        fd =3D lo_fi_fd(req, fi);
+>      } else {
+>          res =3D asprintf(&buf, "%i", lo_fd(req, ino));
+>          if (res =3D=3D -1) {
+> --
+> 2.26.2
+>
+>
 > _______________________________________________
 > Virtio-fs mailing list
 > Virtio-fs@redhat.com
 > https://www.redhat.com/mailman/listinfo/virtio-fs
+
+--_000_VI1PR03MB4383EAFC7403141AB2278802A6BD0VI1PR03MB4383eurp_
+Content-Type: text/html; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
+
+<html>
+<head>
+<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Diso-8859-=
+1">
+<style type=3D"text/css" style=3D"display:none;"> P {margin-top:0;margin-bo=
+ttom:0;} </style>
+</head>
+<body dir=3D"ltr">
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0);">
+</div>
+<blockquote style=3D"border-left: 3px solid rgb(200, 200, 200); border-top-=
+color: rgb(200, 200, 200); border-right-color: rgb(200, 200, 200); border-b=
+ottom-color: rgb(200, 200, 200); padding-left: 1ex; margin-left: 0.8ex; col=
+or: rgb(102, 102, 102);">
+<div id=3D"divRplyFwdMsg" dir=3D"ltr"><font face=3D"Calibri, sans-serif" co=
+lor=3D"#000000" style=3D"font-size:11pt"><b>From:</b> Liu Bo &lt;bo.liu@lin=
+ux.alibaba.com&gt;<br>
+<b>Sent:</b> Friday, May 15, 2020 06:48<br>
+<b>To:</b> Fotis Xenakis &lt;foxen@windowslive.com&gt;<br>
+<b>Cc:</b> virtio-fs@redhat.com &lt;virtio-fs@redhat.com&gt;<br>
+<b>Subject:</b> Re: [Virtio-fs] [PATCH] Fix file descriptor passed for setu=
+pmapping</font>
+<div>&nbsp;</div>
+</div>
+<div class=3D"BodyFragment"><font size=3D"2"><span style=3D"font-size:11pt"=
+>
+<div class=3D"PlainText">On Wed, May 13, 2020 at 07:33:56PM &#43;0300, Foti=
+s Xenakis wrote:<br>
+&gt; Currently, during FUSE_SETUPMAPPING, virtiofsd passes the wrong file<b=
+r>
+&gt; descriptor for the file to mmap() to QEMU (specifically, it passes the=
+<br>
+&gt; file handle as requested from the guest).<br>
+&gt; <br>
+&gt; This fixes it, using lo_fi_fd() to map the file handle to the right fi=
+le<br>
+&gt; descriptor on the host.<br>
+&gt;<br>
+<br>
+Looks good, guest has been setting fi as NULL though.<br>
+</div>
+</span></font></div>
+</blockquote>
+<div class=3D"BodyFragment"><font size=3D"2"><span style=3D"font-size:11pt"=
+>
+<div class=3D"PlainText">As far as I can see, this function is only called =
+from [1], which passes fi as NULL only when the file handle passed from the=
+ guest is (uint64_t)-1. In my testing this was never the case though.</div>
+<div class=3D"PlainText"><br>
+</div>
+<div class=3D"PlainText">Reference:</div>
+<div class=3D"PlainText">[1]&nbsp;<a href=3D"https://gitlab.com/virtio-fs/q=
+emu/-/blob/21336c0f3d05a97f5c409bbc894c19d87259655c/tools/virtiofsd/fuse_lo=
+wlevel.c#L1930" id=3D"LPNoLP164453">https://gitlab.com/virtio-fs/qemu/-/blo=
+b/21336c0f3d05a97f5c409bbc894c19d87259655c/tools/virtiofsd/fuse_lowlevel.c#=
+L1930</a><br>
+<blockquote style=3D"border-left: 3px solid rgb(200, 200, 200); border-top-=
+color: rgb(200, 200, 200); border-right-color: rgb(200, 200, 200); border-b=
+ottom-color: rgb(200, 200, 200); padding-left: 1ex; margin-left: 0.8ex; col=
+or: rgb(102, 102, 102);">
+Reviewed-by: Liu Bo &lt;bo.liu@linux.alibaba.com&gt;<br>
+<br>
+<br>
+&gt; Signed-off-by: Fotis Xenakis &lt;foxen@windowslive.com&gt;<br>
+&gt; ---<br>
+&gt;&nbsp; tools/virtiofsd/passthrough_ll.c | 2 &#43;-<br>
+&gt;&nbsp; 1 file changed, 1 insertion(&#43;), 1 deletion(-)<br>
+&gt; <br>
+&gt; diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passth=
+rough_ll.c<br>
+&gt; index e09d557d74..44bb24eb5e 100644<br>
+&gt; --- a/tools/virtiofsd/passthrough_ll.c<br>
+&gt; &#43;&#43;&#43; b/tools/virtiofsd/passthrough_ll.c<br>
+&gt; @@ -2709,7 &#43;2709,7 @@ static void lo_setupmapping(fuse_req_t req, =
+fuse_ino_t ino, uint64_t foffset,<br>
+&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; msg.flags[0] =3D vhu_flags;<br>
+&gt;&nbsp; <br>
+&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (fi) {<br>
+&gt; -&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; fd =3D fi-&gt;fh;<br>
+&gt; &#43;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; fd =3D lo_fi_fd(req, f=
+i);<br>
+&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; } else {<br>
+&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; res =3D asprintf=
+(&amp;buf, &quot;%i&quot;, lo_fd(req, ino));<br>
+&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (res =3D=3D -=
+1) {<br>
+&gt; -- <br>
+&gt; 2.26.2<br>
+&gt; <br>
+&gt; <br>
+&gt; _______________________________________________<br>
+&gt; Virtio-fs mailing list<br>
+&gt; Virtio-fs@redhat.com<br>
+&gt; <a href=3D"https://www.redhat.com/mailman/listinfo/virtio-fs">https://=
+www.redhat.com/mailman/listinfo/virtio-fs</a><br>
+</blockquote>
+</div>
+</span></font></div>
+</body>
+</html>
+
+--_000_VI1PR03MB4383EAFC7403141AB2278802A6BD0VI1PR03MB4383eurp_--
 

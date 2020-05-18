@@ -1,12 +1,21 @@
-Date: Mon, 18 May 2020 11:45:26 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200518104526.GC2786@work-vm>
-References: <VI1PR03MB438360F20BFF32EC2AE5ACCEA6BF0@VI1PR03MB4383.eurprd03.prod.outlook.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=1RDSyGRpw2VRf31bxawCo734Y2yQmHYTppNEBtUFy1U=;
+	b=O5Xa9XcVP4RwdKpVI1k4ps0IER5omUHFawIxpk5Ybxlk9fTdR2HkLbmmgySRZZleUZ
+	Y4uhpBdv1uADkBZpmeQcC2FNKVG8Bs4de8RCzkQUybqChWSsbGpB4c3xL/xOX2aV7kv3
+	DizqHRexmJk5lBp10WaPkb9GltwF2YLEfzTYo=
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <VI1PR03MB438360F20BFF32EC2AE5ACCEA6BF0@VI1PR03MB4383.eurprd03.prod.outlook.com>
-Subject: Re: [Virtio-fs] [PATCH] Fix file descriptor passed for setupmapping
+References: <20200430171814.GA275398@redhat.com>
+	<CAJfpegt9XraNpzBK+qOo2y-Lox3HZ7FBouSV6ioh+uQHCtqsbg@mail.gmail.com>
+	<20200504183315.GF9022@redhat.com>
+In-Reply-To: <20200504183315.GF9022@redhat.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Mon, 18 May 2020 14:15:21 +0200
+Message-ID: <CAJfpegtoNV9HzFu1WE_hPZ_uxXH7iDb1Yfbzv3FBzXku3yQ7Gw@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PATCH][v2] fuse,
+	virtiofs: Do not alloc/install fuse device in
+	fuse_fill_super_common()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,53 +24,33 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Fotis Xenakis <foxen@windowslive.com>
-Cc: virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>
 
-* Fotis Xenakis (foxen@windowslive.com) wrote:
-> Currently, during FUSE_SETUPMAPPING, virtiofsd passes the wrong file
-> descriptor for the file to mmap() to QEMU (specifically, it passes the
-> file handle as requested from the guest).
-> 
-> This fixes it, using lo_fi_fd() to map the file handle to the right file
-> descriptor on the host.
-> 
-> Signed-off-by: Fotis Xenakis <foxen@windowslive.com>
+On Mon, May 4, 2020 at 8:33 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
 
-Thanks!  I've merged this into:
-  'DAX: virtiofsd: Make setupmapping work only with inode'
+> Subject: virtiofs: Do not use fuse_fill_super_common() for fuse device installation
+>
+> fuse_fill_super_common() allocates and installs one fuse_device. Hence
+> virtiofs allocates and install all fuse devices by itself except one.
+>
+> This makes logic little twisted. There does not seem to be any real need
+> that why virtiofs can't allocate and install all fuse devices itself.
+>
+> So opt out of fuse device allocation and installation while calling
+> fuse_fill_super_common().
+>
+> Regular fuse still wants fuse_fill_super_common() to install fuse_device.
+> It needs to prevent against races where two mounters are trying to mount
+> fuse using same fd. In that case one will succeed while other will get
+> -EINVAL.
+>
+> virtiofs does not have this issue because sget_fc() resolves the race
+> w.r.t multiple mounters and only one instance of virtio_fs_fill_super()
+> should be in progress for same filesystem.
 
-This was a fixup/merging problem - the fd indirection/hiding was done
-after the setupmapping; but then the fd indirection got merged first and
-the setupmapping put back on top.
+Thanks, applied.
 
-Dave
-
-> ---
->  tools/virtiofsd/passthrough_ll.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index e09d557d74..44bb24eb5e 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2709,7 +2709,7 @@ static void lo_setupmapping(fuse_req_t req, fuse_ino_t ino, uint64_t foffset,
->      msg.flags[0] = vhu_flags;
->  
->      if (fi) {
-> -        fd = fi->fh;
-> +        fd = lo_fi_fd(req, fi);
->      } else {
->          res = asprintf(&buf, "%i", lo_fd(req, ino));
->          if (res == -1) {
-> -- 
-> 2.26.2
-> 
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+Miklos
 

@@ -1,13 +1,18 @@
-Date: Fri, 29 May 2020 20:15:38 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200529191538.GS2856@work-vm>
-References: <20200514140736.20561-1-mszeredi@redhat.com>
-	<20200515141057.GB235744@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+	h=from:to:cc:subject:date:message-id:mime-version
+	:content-transfer-encoding;
+	bh=VZbRNVKPx+MHKWsMTYMesIpjX+Sn7oV5qyS4D4WEG+g=;
+	b=T3H8ZzUMlEEGiHCobSPBhWBNsVuoDLuetUpkdZ7+NJAcKeqDolb2sALrbCdxWeXSqj
+	EBkY0uGHePg7Iha96qlwvd/T/VhTnRaWmIqtai8TMhT1NJp9y8zcKFU7BUr/D41kmdRk
+	uh8EYkPnLFX+9jkKh6YPg8I+zPi69MmrWiglM=
+From: Chirantan Ekbote <chirantan@chromium.org>
+Date: Mon,  1 Jun 2020 14:32:14 +0900
+Message-Id: <20200601053214.201723-1-chirantan@chromium.org>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200515141057.GB235744@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: remove symlink fallbacks
+Content-Type: text/plain; charset=US-ASCII
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH] RFC: fuse: virtiofs: Call security hooks on new
+	inodes
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,282 +21,212 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: Suleiman Souhlal <suleiman@chromium.org>, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Dylan Reid <dgreid@chromium.org>, Vivek Goyal <vgoyal@redhat.com>
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> On Thu, May 14, 2020 at 04:07:36PM +0200, Miklos Szeredi wrote:
-> > Path lookup in the kernel has special rules for looking up magic symlinks
-> > under /proc.  If a filesystem operation is instructed to follow symlinks
-> > (e.g. via AT_SYMLINK_FOLLOW or lack of AT_SYMLINK_NOFOLLOW), and the final
-> > component is such a proc symlink, then the target of the magic symlink is
-> > used for the operation, even if the target itself is a symlink.  I.e. path
-> > lookup is always terminated after following a final magic symlink.
-> > 
-> > I was erronously assuming that in the above case the target symlink would
-> > also be followed, and so workarounds were added for a couple of operations
-> > to handle the symlink case.  Since the symlink can be handled simply by
-> > following the proc symlink, these workardouds are not needed.
-> > 
-> > Also remove the "norace" option, which disabled the workarounds.
-> > 
-> > Commit bdfd66788349 ("virtiofsd: Fix xattr operations") already dealt with
-> > the same issue for xattr operations.
-> > 
-> > Signed-off-by: Miklos Szeredi <mszeredi@redhat.com>
-> 
-> Good to have this cleanup.
-> 
-> Acked-by: Vivek Goyal <vgoyal@redhat.com>
+Add a new `init_security` field to `fuse_conn` that controls whether we
+initialize security when a new inode is created.  Set this to true for
+virtiofs but false for regular fuse file systems.
 
-Queued.
+Calling security hooks is needed for `setfscreatecon` to work since it
+is applied as part of the selinux security hook.
 
-> Vivek
-> 
-> > ---
-> >  tools/virtiofsd/passthrough_ll.c | 175 ++-----------------------------
-> >  1 file changed, 6 insertions(+), 169 deletions(-)
-> > 
-> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> > index 3ba1d9098460..2ce7c96085bf 100644
-> > --- a/tools/virtiofsd/passthrough_ll.c
-> > +++ b/tools/virtiofsd/passthrough_ll.c
-> > @@ -140,7 +140,6 @@ enum {
-> >  struct lo_data {
-> >      pthread_mutex_t mutex;
-> >      int debug;
-> > -    int norace;
-> >      int writeback;
-> >      int flock;
-> >      int posix_lock;
-> > @@ -176,7 +175,6 @@ static const struct fuse_opt lo_opts[] = {
-> >      { "cache=none", offsetof(struct lo_data, cache), CACHE_NONE },
-> >      { "cache=auto", offsetof(struct lo_data, cache), CACHE_AUTO },
-> >      { "cache=always", offsetof(struct lo_data, cache), CACHE_ALWAYS },
-> > -    { "norace", offsetof(struct lo_data, norace), 1 },
-> >      { "readdirplus", offsetof(struct lo_data, readdirplus_set), 1 },
-> >      { "no_readdirplus", offsetof(struct lo_data, readdirplus_clear), 1 },
-> >      FUSE_OPT_END
-> > @@ -592,136 +590,6 @@ static void lo_getattr(fuse_req_t req, fuse_ino_t ino,
-> >      fuse_reply_attr(req, &buf, lo->timeout);
-> >  }
-> >  
-> > -/*
-> > - * Increments parent->nlookup and caller must release refcount using
-> > - * lo_inode_put(&parent).
-> > - */
-> > -static int lo_parent_and_name(struct lo_data *lo, struct lo_inode *inode,
-> > -                              char path[PATH_MAX], struct lo_inode **parent)
-> > -{
-> > -    char procname[64];
-> > -    char *last;
-> > -    struct stat stat;
-> > -    struct lo_inode *p;
-> > -    int retries = 2;
-> > -    int res;
-> > -
-> > -retry:
-> > -    sprintf(procname, "%i", inode->fd);
-> > -
-> > -    res = readlinkat(lo->proc_self_fd, procname, path, PATH_MAX);
-> > -    if (res < 0) {
-> > -        fuse_log(FUSE_LOG_WARNING, "%s: readlink failed: %m\n", __func__);
-> > -        goto fail_noretry;
-> > -    }
-> > -
-> > -    if (res >= PATH_MAX) {
-> > -        fuse_log(FUSE_LOG_WARNING, "%s: readlink overflowed\n", __func__);
-> > -        goto fail_noretry;
-> > -    }
-> > -    path[res] = '\0';
-> > -
-> > -    last = strrchr(path, '/');
-> > -    if (last == NULL) {
-> > -        /* Shouldn't happen */
-> > -        fuse_log(
-> > -            FUSE_LOG_WARNING,
-> > -            "%s: INTERNAL ERROR: bad path read from proc\n", __func__);
-> > -        goto fail_noretry;
-> > -    }
-> > -    if (last == path) {
-> > -        p = &lo->root;
-> > -        pthread_mutex_lock(&lo->mutex);
-> > -        p->nlookup++;
-> > -        g_atomic_int_inc(&p->refcount);
-> > -        pthread_mutex_unlock(&lo->mutex);
-> > -    } else {
-> > -        *last = '\0';
-> > -        res = fstatat(AT_FDCWD, last == path ? "/" : path, &stat, 0);
-> > -        if (res == -1) {
-> > -            if (!retries) {
-> > -                fuse_log(FUSE_LOG_WARNING,
-> > -                         "%s: failed to stat parent: %m\n", __func__);
-> > -            }
-> > -            goto fail;
-> > -        }
-> > -        p = lo_find(lo, &stat);
-> > -        if (p == NULL) {
-> > -            if (!retries) {
-> > -                fuse_log(FUSE_LOG_WARNING,
-> > -                         "%s: failed to find parent\n", __func__);
-> > -            }
-> > -            goto fail;
-> > -        }
-> > -    }
-> > -    last++;
-> > -    res = fstatat(p->fd, last, &stat, AT_SYMLINK_NOFOLLOW);
-> > -    if (res == -1) {
-> > -        if (!retries) {
-> > -            fuse_log(FUSE_LOG_WARNING,
-> > -                     "%s: failed to stat last\n", __func__);
-> > -        }
-> > -        goto fail_unref;
-> > -    }
-> > -    if (stat.st_dev != inode->key.dev || stat.st_ino != inode->key.ino) {
-> > -        if (!retries) {
-> > -            fuse_log(FUSE_LOG_WARNING,
-> > -                     "%s: failed to match last\n", __func__);
-> > -        }
-> > -        goto fail_unref;
-> > -    }
-> > -    *parent = p;
-> > -    memmove(path, last, strlen(last) + 1);
-> > -
-> > -    return 0;
-> > -
-> > -fail_unref:
-> > -    unref_inode_lolocked(lo, p, 1);
-> > -    lo_inode_put(lo, &p);
-> > -fail:
-> > -    if (retries) {
-> > -        retries--;
-> > -        goto retry;
-> > -    }
-> > -fail_noretry:
-> > -    errno = EIO;
-> > -    return -1;
-> > -}
-> > -
-> > -static int utimensat_empty(struct lo_data *lo, struct lo_inode *inode,
-> > -                           const struct timespec *tv)
-> > -{
-> > -    int res;
-> > -    struct lo_inode *parent;
-> > -    char path[PATH_MAX];
-> > -
-> > -    if (S_ISLNK(inode->filetype)) {
-> > -        res = utimensat(inode->fd, "", tv, AT_EMPTY_PATH);
-> > -        if (res == -1 && errno == EINVAL) {
-> > -            /* Sorry, no race free way to set times on symlink. */
-> > -            if (lo->norace) {
-> > -                errno = EPERM;
-> > -            } else {
-> > -                goto fallback;
-> > -            }
-> > -        }
-> > -        return res;
-> > -    }
-> > -    sprintf(path, "%i", inode->fd);
-> > -
-> > -    return utimensat(lo->proc_self_fd, path, tv, 0);
-> > -
-> > -fallback:
-> > -    res = lo_parent_and_name(lo, inode, path, &parent);
-> > -    if (res != -1) {
-> > -        res = utimensat(parent->fd, path, tv, AT_SYMLINK_NOFOLLOW);
-> > -        unref_inode_lolocked(lo, parent, 1);
-> > -        lo_inode_put(lo, &parent);
-> > -    }
-> > -
-> > -    return res;
-> > -}
-> > -
-> >  static int lo_fi_fd(fuse_req_t req, struct fuse_file_info *fi)
-> >  {
-> >      struct lo_data *lo = lo_data(req);
-> > @@ -828,7 +696,8 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
-> >          if (fi) {
-> >              res = futimens(fd, tv);
-> >          } else {
-> > -            res = utimensat_empty(lo, inode, tv);
-> > +            sprintf(procname, "%i", inode->fd);
-> > +            res = utimensat(lo->proc_self_fd, procname, tv, 0);
-> >          }
-> >          if (res == -1) {
-> >              goto out_err;
-> > @@ -1129,41 +998,6 @@ static void lo_symlink(fuse_req_t req, const char *link, fuse_ino_t parent,
-> >      lo_mknod_symlink(req, parent, name, S_IFLNK, 0, link);
-> >  }
-> >  
-> > -static int linkat_empty_nofollow(struct lo_data *lo, struct lo_inode *inode,
-> > -                                 int dfd, const char *name)
-> > -{
-> > -    int res;
-> > -    struct lo_inode *parent;
-> > -    char path[PATH_MAX];
-> > -
-> > -    if (S_ISLNK(inode->filetype)) {
-> > -        res = linkat(inode->fd, "", dfd, name, AT_EMPTY_PATH);
-> > -        if (res == -1 && (errno == ENOENT || errno == EINVAL)) {
-> > -            /* Sorry, no race free way to hard-link a symlink. */
-> > -            if (lo->norace) {
-> > -                errno = EPERM;
-> > -            } else {
-> > -                goto fallback;
-> > -            }
-> > -        }
-> > -        return res;
-> > -    }
-> > -
-> > -    sprintf(path, "%i", inode->fd);
-> > -
-> > -    return linkat(lo->proc_self_fd, path, dfd, name, AT_SYMLINK_FOLLOW);
-> > -
-> > -fallback:
-> > -    res = lo_parent_and_name(lo, inode, path, &parent);
-> > -    if (res != -1) {
-> > -        res = linkat(parent->fd, path, dfd, name, 0);
-> > -        unref_inode_lolocked(lo, parent, 1);
-> > -        lo_inode_put(lo, &parent);
-> > -    }
-> > -
-> > -    return res;
-> > -}
-> > -
-> >  static void lo_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t parent,
-> >                      const char *name)
-> >  {
-> > @@ -1172,6 +1006,7 @@ static void lo_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t parent,
-> >      struct lo_inode *parent_inode;
-> >      struct lo_inode *inode;
-> >      struct fuse_entry_param e;
-> > +    char procname[64];
-> >      int saverr;
-> >  
-> >      if (!is_safe_path_component(name)) {
-> > @@ -1190,7 +1025,9 @@ static void lo_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t parent,
-> >      e.attr_timeout = lo->timeout;
-> >      e.entry_timeout = lo->timeout;
-> >  
-> > -    res = linkat_empty_nofollow(lo, inode, parent_inode->fd, name);
-> > +    sprintf(procname, "%i", inode->fd);
-> > +    res = linkat(lo->proc_self_fd, procname, parent_inode->fd, name,
-> > +                 AT_SYMLINK_FOLLOW);
-> >      if (res == -1) {
-> >          goto out_err;
-> >      }
-> > -- 
-> > 2.21.1
-> > 
-> > _______________________________________________
-> > Virtio-fs mailing list
-> > Virtio-fs@redhat.com
-> > https://www.redhat.com/mailman/listinfo/virtio-fs
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+Signed-off-by: Chirantan Ekbote <chirantan@chromium.org>
+---
+ fs/fuse/dir.c       | 74 ++++++++++++++++++++++++++++++++++++++++++---
+ fs/fuse/fuse_i.h    |  4 +++
+ fs/fuse/inode.c     |  1 +
+ fs/fuse/virtio_fs.c |  1 +
+ 4 files changed, 75 insertions(+), 5 deletions(-)
+
+diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
+index de1e2fde60bd4..b18c92a8a4c11 100644
+--- a/fs/fuse/dir.c
++++ b/fs/fuse/dir.c
+@@ -16,6 +16,9 @@
+ #include <linux/xattr.h>
+ #include <linux/iversion.h>
+ #include <linux/posix_acl.h>
++#include <linux/security.h>
++#include <linux/types.h>
++#include <linux/kernel.h>
+ 
+ static void fuse_advise_use_readdirplus(struct inode *dir)
+ {
+@@ -135,6 +138,50 @@ static void fuse_dir_changed(struct inode *dir)
+ 	inode_maybe_inc_iversion(dir, false);
+ }
+ 
++static int fuse_initxattrs(struct inode *inode, const struct xattr *xattrs,
++			   void *fs_info)
++{
++	const struct xattr *xattr;
++	int err = 0;
++	int len;
++	char *name;
++
++	for (xattr = xattrs; xattr->name != NULL; ++xattr) {
++		len = XATTR_SECURITY_PREFIX_LEN + strlen(xattr->name) + 1;
++		name = kmalloc(len, GFP_KERNEL);
++		if (!name) {
++			err = -ENOMEM;
++			break;
++		}
++
++		scnprintf(name, len, XATTR_SECURITY_PREFIX "%s", xattr->name);
++		err = fuse_setxattr(inode, name, xattr->value, xattr->value_len,
++				    0);
++		kfree(name);
++		if (err < 0)
++			break;
++	}
++
++	return err;
++}
++
++/*
++ * Initialize security on newly created inodes if supported by the filesystem.
++ */
++static int fuse_init_security(struct inode *inode, struct inode *dir,
++			      const struct qstr *qstr)
++{
++	struct fuse_conn *conn = get_fuse_conn(dir);
++	int err = 0;
++
++	if (conn->init_security) {
++		err = security_inode_init_security(inode, dir, qstr,
++						   fuse_initxattrs, NULL);
++	}
++
++	return err;
++}
++
+ /**
+  * Mark the attributes as stale due to an atime change.  Avoid the invalidate if
+  * atime is not used.
+@@ -498,7 +545,17 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
+ 		err = -ENOMEM;
+ 		goto out_err;
+ 	}
++
++	err = fuse_init_security(inode, dir, &entry->d_name);
++	if (err) {
++		flags &= ~(O_CREAT | O_EXCL | O_TRUNC);
++		fi = get_fuse_inode(inode);
++		fuse_sync_release(fi, ff, flags);
++		fuse_queue_forget(fc, forget, outentry.nodeid, 1);
++		goto out_err;
++	}
+ 	kfree(forget);
++
+ 	d_instantiate(entry, inode);
+ 	fuse_change_entry_timeout(entry, &outentry);
+ 	fuse_dir_changed(dir);
+@@ -569,7 +626,7 @@ static int fuse_atomic_open(struct inode *dir, struct dentry *entry,
+  */
+ static int create_new_entry(struct fuse_conn *fc, struct fuse_args *args,
+ 			    struct inode *dir, struct dentry *entry,
+-			    umode_t mode)
++			    umode_t mode, bool init_security)
+ {
+ 	struct fuse_entry_out outarg;
+ 	struct inode *inode;
+@@ -603,6 +660,13 @@ static int create_new_entry(struct fuse_conn *fc, struct fuse_args *args,
+ 		fuse_queue_forget(fc, forget, outarg.nodeid, 1);
+ 		return -ENOMEM;
+ 	}
++	if (init_security) {
++		err = fuse_init_security(inode, dir, &entry->d_name);
++		if (err) {
++			fuse_queue_forget(fc, forget, outarg.nodeid, 1);
++			return err;
++		}
++	}
+ 	kfree(forget);
+ 
+ 	d_drop(entry);
+@@ -644,7 +708,7 @@ static int fuse_mknod(struct inode *dir, struct dentry *entry, umode_t mode,
+ 	args.in_args[0].value = &inarg;
+ 	args.in_args[1].size = entry->d_name.len + 1;
+ 	args.in_args[1].value = entry->d_name.name;
+-	return create_new_entry(fc, &args, dir, entry, mode);
++	return create_new_entry(fc, &args, dir, entry, mode, true);
+ }
+ 
+ static int fuse_create(struct inode *dir, struct dentry *entry, umode_t mode,
+@@ -671,7 +735,7 @@ static int fuse_mkdir(struct inode *dir, struct dentry *entry, umode_t mode)
+ 	args.in_args[0].value = &inarg;
+ 	args.in_args[1].size = entry->d_name.len + 1;
+ 	args.in_args[1].value = entry->d_name.name;
+-	return create_new_entry(fc, &args, dir, entry, S_IFDIR);
++	return create_new_entry(fc, &args, dir, entry, S_IFDIR, true);
+ }
+ 
+ static int fuse_symlink(struct inode *dir, struct dentry *entry,
+@@ -687,7 +751,7 @@ static int fuse_symlink(struct inode *dir, struct dentry *entry,
+ 	args.in_args[0].value = entry->d_name.name;
+ 	args.in_args[1].size = len;
+ 	args.in_args[1].value = link;
+-	return create_new_entry(fc, &args, dir, entry, S_IFLNK);
++	return create_new_entry(fc, &args, dir, entry, S_IFLNK, true);
+ }
+ 
+ void fuse_update_ctime(struct inode *inode)
+@@ -858,7 +922,7 @@ static int fuse_link(struct dentry *entry, struct inode *newdir,
+ 	args.in_args[0].value = &inarg;
+ 	args.in_args[1].size = newent->d_name.len + 1;
+ 	args.in_args[1].value = newent->d_name.name;
+-	err = create_new_entry(fc, &args, newdir, newent, inode->i_mode);
++	err = create_new_entry(fc, &args, newdir, newent, inode->i_mode, false);
+ 	/* Contrary to "normal" filesystems it can happen that link
+ 	   makes two "logical" inodes point to the same "physical"
+ 	   inode.  We invalidate the attributes of the old one, so it
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index ca344bf714045..ed871742db584 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -482,6 +482,7 @@ struct fuse_fs_context {
+ 	bool no_control:1;
+ 	bool no_force_umount:1;
+ 	bool no_mount_options:1;
++	bool init_security:1;
+ 	unsigned int max_read;
+ 	unsigned int blksize;
+ 	const char *subtype;
+@@ -719,6 +720,9 @@ struct fuse_conn {
+ 	/* Do not show mount options */
+ 	unsigned int no_mount_options:1;
+ 
++	/* Initialize security xattrs when creating a new inode */
++	unsigned int init_security : 1;
++
+ 	/** The number of requests waiting for completion */
+ 	atomic_t num_waiting;
+ 
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index 95d712d44ca13..ab47e73566864 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -1179,6 +1179,7 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
+ 	fc->no_control = ctx->no_control;
+ 	fc->no_force_umount = ctx->no_force_umount;
+ 	fc->no_mount_options = ctx->no_mount_options;
++	fc->init_security = ctx->init_security;
+ 
+ 	err = -ENOMEM;
+ 	root = fuse_get_root_inode(sb, ctx->rootmode);
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index bade747689033..ee22e9a8309df 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -1051,6 +1051,7 @@ static int virtio_fs_fill_super(struct super_block *sb)
+ 		.no_control = true,
+ 		.no_force_umount = true,
+ 		.no_mount_options = true,
++		.init_security = true,
+ 	};
+ 
+ 	mutex_lock(&virtio_fs_mutex);
+-- 
+2.27.0.rc0.183.gde8f92d652-goog
 

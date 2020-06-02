@@ -1,18 +1,19 @@
-Date: Mon, 1 Jun 2020 16:55:05 +0100
+Date: Tue, 2 Jun 2020 10:29:16 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20200601155505.GA581007@stefanha-x1.localdomain>
-References: <20191025100152.6638-1-stefanha@redhat.com>
-	<20191025100152.6638-2-stefanha@redhat.com>
-	<20191026174745-mutt-send-email-mst@kernel.org>
-	<20191027123623.GO4472@stefanha-x1.localdomain>
-	<87zh9n6pwj.fsf@linaro.org>
+Message-ID: <20200602092916.GC9852@stefanha-x1.localdomain>
+References: <20200424062540.23679-1-chirantan@chromium.org>
+	<20200424062540.23679-2-chirantan@chromium.org>
+	<20200427151934.GB1042399@stefanha-x1.localdomain>
+	<CAJFHJrr2DAgQC9ZWx78OudX1x6A57_vpLf4rJu80ceR6bnpbaQ@mail.gmail.com>
+	<20200501154752.GA222606@stefanha-x1.localdomain>
+	<CAJFHJrpdbVKWyGuJJCBATVaYZsPLeg6JzpZmGFDsUcF_a4gcMA@mail.gmail.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="7JfCtLOvnd9MIVvH"
+	protocol="application/pgp-signature"; boundary="jy6Sn24JjFx/iggw"
 Content-Disposition: inline
-In-Reply-To: <87zh9n6pwj.fsf@linaro.org>
-Subject: Re: [Virtio-fs] [RFC 1/3] WIP virtiofsd: import Linux <fuse.h>
-	header file
+In-Reply-To: <CAJFHJrpdbVKWyGuJJCBATVaYZsPLeg6JzpZmGFDsUcF_a4gcMA@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 2/2] fuse: virtiofs: Add basic multiqueue
+	support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,58 +22,53 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Alex =?iso-8859-1?Q?Benn=E9e?= <alex.bennee@linaro.org>
-Cc: Laurent Vivier <lvivier@redhat.com>, Thomas Huth <thuth@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Cornelia Huck <cohuck@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, Paolo Bonzini <pbonzini@redhat.com>, vgoyal@redhat.com
+To: Chirantan Ekbote <chirantan@chromium.org>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, Suleiman Souhlal <suleiman@chromium.org>, virtio-fs-list <virtio-fs@redhat.com>, Linux FS Devel <linux-fsdevel@vger.kernel.org>, Dylan Reid <dgreid@chromium.org>, Vivek Goyal <vgoyal@redhat.com>
 
 
---7JfCtLOvnd9MIVvH
-Content-Type: text/plain; charset=iso-8859-1
+--jy6Sn24JjFx/iggw
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Mon, Jun 01, 2020 at 11:28:44AM +0100, Alex Benn=E9e wrote:
->=20
-> Stefan Hajnoczi <stefanha@redhat.com> writes:
->=20
-> > On Sat, Oct 26, 2019 at 05:49:11PM -0400, Michael S. Tsirkin wrote:
-> >> On Fri, Oct 25, 2019 at 12:01:50PM +0200, Stefan Hajnoczi wrote:
-> >> > tests/vhost-user-fs-test.c needs fuse.h.  The private copy that
-> >> > virtiofsd has can be replaced with a properly imported file using
-> >> > update-linux-headers.sh.
-> >> >=20
-> >> > TODO rerun update-linux-headers.sh with upstream kernel tree!
-> >> >=20
-> >> > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-> >>=20
-> >> OK I would just add this with the virtiofsd patchset.
+On Thu, May 07, 2020 at 05:10:15PM +0900, Chirantan Ekbote wrote:
+> On Sat, May 2, 2020 at 12:48 AM Stefan Hajnoczi <stefanha@redhat.com> wro=
+te:
+> > On Fri, May 01, 2020 at 04:14:38PM +0900, Chirantan Ekbote wrote:
+> > > On Tue, Apr 28, 2020 at 12:20 AM Stefan Hajnoczi <stefanha@redhat.com=
+> wrote:
+> > io_uring's vocabulary is expanding.  It can now do openat2(2), close(2),
+> > statx(2), but not mkdir(2), unlink(2), rename(2), etc.
 > >
-> > Yes, I'll talk to David.
+> > I guess there are two options:
+> > 1. Fall back to threads for FUSE operations that cannot yet be done via
+> >    io_uring.
+> > 2. Process FUSE operations that cannot be done via io_uring
+> >    synchronously.
+> >
 >=20
-> Catching up after the fact I see this didn't get merged. Was there a
-> reason?
+> I'm hoping that using io_uring for just the reads and writes should
+> give us a big enough improvement that we can do the rest of the
+> operations synchronously.
 
-This patch series is stalled because I have been busy with other tasks.
-
-The standard-headers fuse.h header will be needed when something outside
-virtiofsd uses FUSE definitions for virtio-fs. At the moment nothing
-does so there is no need to merge this patch yet.
+Sounds like a good idea.
 
 Stefan
 
---7JfCtLOvnd9MIVvH
+--jy6Sn24JjFx/iggw
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl7VJNgACgkQnKSrs4Gr
-c8jDWAf9GfRw0GKIvlbbLhOpjwgs9gY4vpGKmEfTmuiXoJcDzDEchSpA7PNH6sKc
-PKY462eeO8VqxfTf23k75SaGdnbzljN1fHnb4kFi6hZKmaQPggrTGTmrYtP2zqnT
-xwfhbZ1A9Q2DGZRLXt54i22UZhmpFY03scirsXmU2pj3e4ZFD+h5nMdITljZv8UP
-SKIvStf8HpOFBWTwY2D/ifBxOWCwvD7dFSfMhs4V7/LpIb0svFhM+57o7O2Q/a7J
-6QKTuEsAhRNFxc90L8BBa4d9n0OUFF+Wb72AbU5mewAh8ckofSM+9dUL4W/sp/y4
-MRdZHst4/7bJfIdgH+G3n5xvjy/mRg==
-=CWEx
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl7WG+wACgkQnKSrs4Gr
+c8itMggArze0SlGMV0FObjiOGh2x91wC4w83cdukHjDRXnx8LUROTBFIWVUDTxYz
+YRq46Fr1LAx38jacfEQVrTbBVDgK5FQzobPKrJycw4X2z5b3OvfH3iO+Xx9KcL4M
+4MXBvL+Z4EBpXQmdWeR25jAztg75rqapof0x4o+ZESbu7h4oItjYjmBHszbx+t+s
+63anVjgk/0zoi66ifHzupCJSuxfAVuyFMUU6zNQBWPtWPzhjE87rPH/ZKDtQAylB
+H5UxNF5nidSN7qTPm9sFxEa7SPuXUw+tdfKXZZVN3PbOBITQSgE7NHdAjEpDzgRs
+MOS5GYYlk740tAAMpTFDFydpJuGQdQ==
+=FKk/
 -----END PGP SIGNATURE-----
 
---7JfCtLOvnd9MIVvH--
+--jy6Sn24JjFx/iggw--
 

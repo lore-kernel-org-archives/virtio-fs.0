@@ -1,9 +1,14 @@
-From: Max Reitz <mreitz@redhat.com>
-Date: Mon,  8 Jun 2020 11:31:11 +0200
-Message-Id: <20200608093111.14942-1-mreitz@redhat.com>
+Date: Mon, 8 Jun 2020 09:35:06 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200608133506.GB170885@redhat.com>
+References: <CALfysxrU1WNcWhzRUXboMSjZLsOz_J=BC1y_heye8juk+L-fSA@mail.gmail.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH] virtiofsd: Whitelist fchmod
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+In-Reply-To: <CALfysxrU1WNcWhzRUXboMSjZLsOz_J=BC1y_heye8juk+L-fSA@mail.gmail.com>
+Subject: Re: [Virtio-fs] How to setup virtiofs for file sharing between host
+ and VM
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -12,61 +17,79 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: virtio-fs@redhat.com, qemu-stable@nongnu.org, Max Reitz <mreitz@redhat.com>
+To: Boris Ebwanga <bbebwanga@gmail.com>
+Cc: virtio-fs@redhat.com
 
-lo_setattr() invokes fchmod() in a rarely used code path, so it should
-be whitelisted or virtiofsd will crash with EBADSYS.
+On Fri, Jun 05, 2020 at 11:50:06AM +0100, Boris Ebwanga wrote:
+> Hello everyone.
+>=20
+> It's been a while now, I am trying to use virtio-fs. Everything I do end =
+up
+> with an error.
+>=20
+> First I was on fedora 31 and I tried to run manually qemu with virtio-fs
+> https://virtio-fs.gitlab.io/howto-qemu.html. But I was not able to "make
+> virtiofsd".
+>=20
+> Then, I upgraded to fedora 32 which has virtiofsd at /usr/libexec. I
+> followed the steps describe at
+> https://libvirt.org/kbase/virtiofs.html
+> I could not modify the XML domain of my VM. The error message is "*unsupp=
+orted
+> configuration: unknown fs virtiofs =BB driver type".*
 
-Said code path can be triggered for example as follows:
+Hi Boris,
 
-On the host, in the shared directory, create a file with the sticky bit
-set and a security.capability xattr:
-(1) # touch foo
-(2) # chmod u+s foo
-(3) # setcap '' foo
+Ccing Jan Tomko. He might have toughts on this.
 
-Then in the guest let some process truncate that file after it has
-dropped all of its capabilities (at least CAP_FSETID):
 
-int main(int argc, char *argv[])
-{
-    capng_setpid(getpid());
-    capng_clear(CAPNG_SELECT_BOTH);
-    capng_updatev(CAPNG_ADD, CAPNG_PERMITTED | CAPNG_EFFECTIVE, 0);
-    capng_apply(CAPNG_SELECT_BOTH);
+>=20
+> I wrote to Stefan Hajnoczi <stefanha@redhat.com> describing this problem.
+> He answers with the following:
+>=20
+> Hi Boris,
+> > You can pass command-line options to the guest like this:
+> >
+> >   <domain type=3D'kvm' xmlns:qemu=3D'
+> > http://libvirt.org/schemas/domain/qemu/1.0'>
+> >     ...
+> >     <qemu:commandline>
+> >       <qemu:arg value=3D'-chardev'/>
+> >       <qemu:arg value=3D'socket,id=3Dchar0,path=3D/tmp/vhost-fs.sock'/>
+> >       <qemu:arg value=3D'-device'/>
+> >       <qemu:arg
+> > value=3D'vhost-user-fs-pci,chardev=3Dvirtio-fs-chardev,tag=3Dmyfs'/>
+> >     </qemu:commandline>
+> >   </domain>
+> >
+> > Note that the xmlns in the <domain> tag is required.
+> >
+> > If you pass these options manually then you need to launch virtiofsd
+> > yourself before launching the guest:
+> >
+> >   # /usr/libexec/virtiofsd --socket-path=3D/tmp/vhost-fs.sock -o
+> > source=3D/path/to/share/dir -o no_posix_lock -o xattr
+> >
+> > Hope this helps! Please email virtio-fs@redhat.com if you have any more
+> > questions, it's the virtio-fs mailing list and others will be able to
+> > participate in the discussion.
+> >
+>=20
+> I am still getting the same error after applying the change above.
+>=20
+> Can anyone help me with this ? Thank you in advance for your help.
 
-    ftruncate(open(argv[1], O_RDWR), 0);
-}
+Can you attach your domain xml file here.
 
-This will cause the guest kernel to drop the sticky bit (i.e. perform a
-mode change) as part of the truncate (where FATTR_FH is set), and that
-will cause virtiofsd to invoke fchmod() instead of fchmodat().
+I think you also will need to add following in <qemu:commandline> section.
 
-(A similar configuration exists further below with futimens() vs.
-utimensat(), but the former is not a syscall but just a wrapper for the
-latter, so no further whitelisting is required.)
 
-Buglink: https://bugzilla.redhat.com/show_bug.cgi?id=1842667
-Reported-by: Qian Cai <caiqian@redhat.com>
-Cc: qemu-stable@nongnu.org
-Signed-off-by: Max Reitz <mreitz@redhat.com>
----
- tools/virtiofsd/seccomp.c | 1 +
- 1 file changed, 1 insertion(+)
+    <qemu:arg value=3D'-object'/>
+    <qemu:arg value=3D'memory-backend-file,id=3Dmem,size=3D8G,mem-path=3D/d=
+ev/shm,share=3Don'/>
+    <qemu:arg value=3D'-numa'/>
+    <qemu:arg value=3D'node,memdev=3Dmem'/>
 
-diff --git a/tools/virtiofsd/seccomp.c b/tools/virtiofsd/seccomp.c
-index bd9e7b083c..3b1522acdd 100644
---- a/tools/virtiofsd/seccomp.c
-+++ b/tools/virtiofsd/seccomp.c
-@@ -42,6 +42,7 @@ static const int syscall_whitelist[] = {
-     SCMP_SYS(exit_group),
-     SCMP_SYS(fallocate),
-     SCMP_SYS(fchdir),
-+    SCMP_SYS(fchmod),
-     SCMP_SYS(fchmodat),
-     SCMP_SYS(fchownat),
-     SCMP_SYS(fcntl),
--- 
-2.26.2
+Thanks
+Vivek
 

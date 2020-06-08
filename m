@@ -1,15 +1,12 @@
-Date: Mon, 8 Jun 2020 15:54:50 +0200
-From: =?iso-8859-1?B?SuFu?= Tomko <jtomko@redhat.com>
-Message-ID: <20200608135450.GA1774718@lpt>
-References: <CALfysxrU1WNcWhzRUXboMSjZLsOz_J=BC1y_heye8juk+L-fSA@mail.gmail.com>
-	<20200608133506.GB170885@redhat.com>
+Date: Mon, 8 Jun 2020 16:57:46 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20200608155746.GC2845@work-vm>
+References: <20200608093111.14942-1-mreitz@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="u3/rZRmxL6MmkK24"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20200608133506.GB170885@redhat.com>
-Subject: Re: [Virtio-fs] How to setup virtiofs for file sharing between host
- and VM
+In-Reply-To: <20200608093111.14942-1-mreitz@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Whitelist fchmod
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,121 +15,71 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, Boris Ebwanga <bbebwanga@gmail.com>
+To: Max Reitz <mreitz@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, qemu-stable@nongnu.org
+
+* Max Reitz (mreitz@redhat.com) wrote:
+> lo_setattr() invokes fchmod() in a rarely used code path, so it should
+> be whitelisted or virtiofsd will crash with EBADSYS.
+> 
+> Said code path can be triggered for example as follows:
+> 
+> On the host, in the shared directory, create a file with the sticky bit
+> set and a security.capability xattr:
+> (1) # touch foo
+> (2) # chmod u+s foo
+> (3) # setcap '' foo
+> 
+> Then in the guest let some process truncate that file after it has
+> dropped all of its capabilities (at least CAP_FSETID):
+> 
+> int main(int argc, char *argv[])
+> {
+>     capng_setpid(getpid());
+>     capng_clear(CAPNG_SELECT_BOTH);
+>     capng_updatev(CAPNG_ADD, CAPNG_PERMITTED | CAPNG_EFFECTIVE, 0);
+>     capng_apply(CAPNG_SELECT_BOTH);
+> 
+>     ftruncate(open(argv[1], O_RDWR), 0);
+> }
+> 
+> This will cause the guest kernel to drop the sticky bit (i.e. perform a
+> mode change) as part of the truncate (where FATTR_FH is set), and that
+> will cause virtiofsd to invoke fchmod() instead of fchmodat().
+> 
+> (A similar configuration exists further below with futimens() vs.
+> utimensat(), but the former is not a syscall but just a wrapper for the
+> latter, so no further whitelisting is required.)
+> 
+> Buglink: https://bugzilla.redhat.com/show_bug.cgi?id=1842667
+> Reported-by: Qian Cai <caiqian@redhat.com>
+> Cc: qemu-stable@nongnu.org
+> Signed-off-by: Max Reitz <mreitz@redhat.com>
+
+Nicely found!
 
 
---u3/rZRmxL6MmkK24
-Content-Type: text/plain; charset=iso-8859-1; format=flowed
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 
-On a Monday in 2020, Vivek Goyal wrote:
->On Fri, Jun 05, 2020 at 11:50:06AM +0100, Boris Ebwanga wrote:
->> Hello everyone.
->>
->> It's been a while now, I am trying to use virtio-fs. Everything I do end=
- up
->> with an error.
->>
->> First I was on fedora 31 and I tried to run manually qemu with virtio-fs
->> https://virtio-fs.gitlab.io/howto-qemu.html. But I was not able to "make
->> virtiofsd".
->>
->> Then, I upgraded to fedora 32 which has virtiofsd at /usr/libexec. I
->> followed the steps describe at
->> https://libvirt.org/kbase/virtiofs.html
->> I could not modify the XML domain of my VM. The error message is "*unsup=
-ported
->> configuration: unknown fs virtiofs =BB driver type".*
-
-That is correct.
-
-libvirt learned about the 'virtiofs' driver type in v6.2.0, Fedora 32
-has 6.1.0:
-https://apps.fedoraproject.org/packages/libvirt/
-
-You can try enabling the experimental virt-preview repo to get more
-recent builds of libvirt, QEMU and other virt packages:
-https://fedoraproject.org/wiki/Virtualization_Preview_Repository
-
->
->Hi Boris,
->
->Ccing Jan Tomko. He might have toughts on this.
->
->
->>
->> I wrote to Stefan Hajnoczi <stefanha@redhat.com> describing this problem.
->> He answers with the following:
->>
->> Hi Boris,
->> > You can pass command-line options to the guest like this:
->> >
->> >   <domain type=3D'kvm' xmlns:qemu=3D'
->> > http://libvirt.org/schemas/domain/qemu/1.0'>
->> >     ...
->> >     <qemu:commandline>
->> >       <qemu:arg value=3D'-chardev'/>
->> >       <qemu:arg value=3D'socket,id=3Dchar0,path=3D/tmp/vhost-fs.sock'/>
->> >       <qemu:arg value=3D'-device'/>
->> >       <qemu:arg
->> > value=3D'vhost-user-fs-pci,chardev=3Dvirtio-fs-chardev,tag=3Dmyfs'/>
->> >     </qemu:commandline>
->> >   </domain>
->> >
->> > Note that the xmlns in the <domain> tag is required.
->> >
->> > If you pass these options manually then you need to launch virtiofsd
->> > yourself before launching the guest:
->> >
->> >   # /usr/libexec/virtiofsd --socket-path=3D/tmp/vhost-fs.sock -o
->> > source=3D/path/to/share/dir -o no_posix_lock -o xattr
->> >
->> > Hope this helps! Please email virtio-fs@redhat.com if you have any more
->> > questions, it's the virtio-fs mailing list and others will be able to
->> > participate in the discussion.
->> >
->>
->> I am still getting the same error after applying the change above.
->>
->> Can anyone help me with this ? Thank you in advance for your help.
->
->Can you attach your domain xml file here.
->
->I think you also will need to add following in <qemu:commandline> section.
->
->
->    <qemu:arg value=3D'-object'/>
->    <qemu:arg value=3D'memory-backend-file,id=3Dmem,size=3D8G,mem-path=3D/=
-dev/shm,share=3Don'/>
->    <qemu:arg value=3D'-numa'/>
->    <qemu:arg value=3D'node,memdev=3Dmem'/>
->
-
-Even with libvirt 6.1.0 that does not know virtiofs yet, the shared
-memory can be specified as described on https://libvirt.org/kbase/virtiofs.=
-html
-
-Jano
-
->Thanks
->Vivek
-
---u3/rZRmxL6MmkK24
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEQeJGMrnL0ADuclbP+YPwO/Mat50FAl7eQyYACgkQ+YPwO/Ma
-t52egggAgpqiJsdYOAv62DciW6qX89LXwZzB5g0gbiudReG8vUI2RRw7UljKgWbz
-QOC+fCWyjKoQPfNm6LXdGZaMeZiTcRuzO5i9DxhI/vu0LsAZlsklmMr//zZpGXr/
-339kQC4mHiB/Oi49XzJwG7SvQNioeA4aaj+k7TTi4RykdUGsvZfrgeL6e69ly4m/
-ecGnrTg2ri4kmbdoXQnqoXAkOOxIb/x8wLSiXSmAlewDC22V+NsqXTFDUmntiWdn
-h3Scbef/IvnhKQjgC4DKE05YaJVh0Ul5ALfc+IN2J131x4AYJX5ow8/wh34bVMll
-C9yyNnYidrEs/hAE9bsX2y227N28UQ==
-=5WSV
------END PGP SIGNATURE-----
-
---u3/rZRmxL6MmkK24--
+> ---
+>  tools/virtiofsd/seccomp.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/tools/virtiofsd/seccomp.c b/tools/virtiofsd/seccomp.c
+> index bd9e7b083c..3b1522acdd 100644
+> --- a/tools/virtiofsd/seccomp.c
+> +++ b/tools/virtiofsd/seccomp.c
+> @@ -42,6 +42,7 @@ static const int syscall_whitelist[] = {
+>      SCMP_SYS(exit_group),
+>      SCMP_SYS(fallocate),
+>      SCMP_SYS(fchdir),
+> +    SCMP_SYS(fchmod),
+>      SCMP_SYS(fchmodat),
+>      SCMP_SYS(fchownat),
+>      SCMP_SYS(fcntl),
+> -- 
+> 2.26.2
+> 
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

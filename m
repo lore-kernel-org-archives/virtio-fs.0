@@ -1,6 +1,6 @@
-Date: Mon, 8 Jun 2020 16:57:46 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200608155746.GC2845@work-vm>
+Date: Tue, 9 Jun 2020 08:31:55 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200609123155.GB211764@redhat.com>
 References: <20200608093111.14942-1-mreitz@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
@@ -18,7 +18,7 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: Max Reitz <mreitz@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, qemu-stable@nongnu.org
 
-* Max Reitz (mreitz@redhat.com) wrote:
+On Mon, Jun 08, 2020 at 11:31:11AM +0200, Max Reitz wrote:
 > lo_setattr() invokes fchmod() in a rarely used code path, so it should
 > be whitelisted or virtiofsd will crash with EBADSYS.
 > 
@@ -56,10 +56,11 @@ Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, qemu-stable@nongnu.org
 > Cc: qemu-stable@nongnu.org
 > Signed-off-by: Max Reitz <mreitz@redhat.com>
 
-Nicely found!
+Nice catch. 
 
+Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Vivek
 
 > ---
 >  tools/virtiofsd/seccomp.c | 1 +
@@ -80,6 +81,8 @@ Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 > -- 
 > 2.26.2
 > 
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 

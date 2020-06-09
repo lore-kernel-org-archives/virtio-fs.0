@@ -1,12 +1,14 @@
-Date: Mon, 27 Apr 2020 14:03:54 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200427180354.GD146096@redhat.com>
+Date: Tue, 9 Jun 2020 13:50:40 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20200609125040.GG92564@stefanha-x1.localdomain>
+References: <CALfysxrU1WNcWhzRUXboMSjZLsOz_J=BC1y_heye8juk+L-fSA@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="f5QefDQHtn8hx44O"
 Content-Disposition: inline
-Subject: [Virtio-fs] [PATCH] fuse,
- virtiofs: Do not alloc/install fuse device in
- fuse_fill_super_common()
+In-Reply-To: <CALfysxrU1WNcWhzRUXboMSjZLsOz_J=BC1y_heye8juk+L-fSA@mail.gmail.com>
+Subject: Re: [Virtio-fs] How to setup virtiofs for file sharing between host
+ and VM
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,141 +17,92 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, Miklos Szeredi <miklos@szeredi.hu>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: Boris Ebwanga <bbebwanga@gmail.com>
+Cc: virtio-fs@redhat.com
 
-As of now fuse_fill_super_common() allocates and installs one fuse device.
-Filesystems like virtiofs can have more than one filesystem queues and
-can have one fuse device per queue. Given, fuse_fill_super_common() only
-handles one device, virtiofs allocates and installes fuse devices for
-all queues except one.
 
-This makes logic little twisted and hard to understand. It probably
-is better to not do any device allocation/installation in
-fuse_fill_super_common() and let caller take care of it instead.
+--f5QefDQHtn8hx44O
+Content-Type: text/plain; charset=iso-8859-1
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/fuse_i.h    |  3 ---
- fs/fuse/inode.c     | 19 ++++++++++++-------
- fs/fuse/virtio_fs.c |  9 +--------
- 3 files changed, 13 insertions(+), 18 deletions(-)
+On Fri, Jun 05, 2020 at 11:50:06AM +0100, Boris Ebwanga wrote:
+> Hello everyone.
+>=20
+> It's been a while now, I am trying to use virtio-fs. Everything I do end =
+up
+> with an error.
+>=20
+> First I was on fedora 31 and I tried to run manually qemu with virtio-fs
+> https://virtio-fs.gitlab.io/howto-qemu.html. But I was not able to "make
+> virtiofsd".
+>=20
+> Then, I upgraded to fedora 32 which has virtiofsd at /usr/libexec. I
+> followed the steps describe at
+> https://libvirt.org/kbase/virtiofs.html
+> I could not modify the XML domain of my VM. The error message is "*unsupp=
+orted
+> configuration: unknown fs virtiofs =BB driver type".*
+>=20
+> I wrote to Stefan Hajnoczi <stefanha@redhat.com> describing this problem.
+> He answers with the following:
+>=20
+> Hi Boris,
+> > You can pass command-line options to the guest like this:
+> >
+> >   <domain type=3D'kvm' xmlns:qemu=3D'
+> > http://libvirt.org/schemas/domain/qemu/1.0'>
+> >     ...
+> >     <qemu:commandline>
+> >       <qemu:arg value=3D'-chardev'/>
+> >       <qemu:arg value=3D'socket,id=3Dchar0,path=3D/tmp/vhost-fs.sock'/>
+> >       <qemu:arg value=3D'-device'/>
+> >       <qemu:arg
+> > value=3D'vhost-user-fs-pci,chardev=3Dvirtio-fs-chardev,tag=3Dmyfs'/>
+> >     </qemu:commandline>
+> >   </domain>
+> >
+> > Note that the xmlns in the <domain> tag is required.
+> >
+> > If you pass these options manually then you need to launch virtiofsd
+> > yourself before launching the guest:
+> >
+> >   # /usr/libexec/virtiofsd --socket-path=3D/tmp/vhost-fs.sock -o
+> > source=3D/path/to/share/dir -o no_posix_lock -o xattr
+> >
+> > Hope this helps! Please email virtio-fs@redhat.com if you have any more
+> > questions, it's the virtio-fs mailing list and others will be able to
+> > participate in the discussion.
+> >
+>=20
+> I am still getting the same error after applying the change above.
+>=20
+> Can anyone help me with this ? Thank you in advance for your help.
 
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index ca344bf71404..df0a62f963a8 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -485,9 +485,6 @@ struct fuse_fs_context {
- 	unsigned int max_read;
- 	unsigned int blksize;
- 	const char *subtype;
--
--	/* fuse_dev pointer to fill in, should contain NULL on entry */
--	void **fudptr;
- };
- 
- /**
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index 95d712d44ca1..135e8e9a80d8 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -1191,16 +1191,12 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
- 
- 	mutex_lock(&fuse_mutex);
- 	err = -EINVAL;
--	if (*ctx->fudptr)
--		goto err_unlock;
--
- 	err = fuse_ctl_add_conn(fc);
- 	if (err)
- 		goto err_unlock;
- 
- 	list_add_tail(&fc->entry, &fuse_conn_list);
- 	sb->s_root = root_dentry;
--	*ctx->fudptr = fud;
- 	mutex_unlock(&fuse_mutex);
- 	return 0;
- 
-@@ -1220,6 +1216,7 @@ static int fuse_fill_super(struct super_block *sb, struct fs_context *fsc)
- 	struct file *file;
- 	int err;
- 	struct fuse_conn *fc;
-+	struct fuse_dev *fud;
- 
- 	err = -EINVAL;
- 	file = fget(ctx->fd);
-@@ -1233,13 +1230,16 @@ static int fuse_fill_super(struct super_block *sb, struct fs_context *fsc)
- 	if ((file->f_op != &fuse_dev_operations) ||
- 	    (file->f_cred->user_ns != sb->s_user_ns))
- 		goto err_fput;
--	ctx->fudptr = &file->private_data;
- 
--	fc = kmalloc(sizeof(*fc), GFP_KERNEL);
- 	err = -ENOMEM;
--	if (!fc)
-+	fud = fuse_dev_alloc();
-+	if (!fud)
- 		goto err_fput;
- 
-+	fc = kmalloc(sizeof(*fc), GFP_KERNEL);
-+	if (!fc)
-+		goto err_free_dev;
-+
- 	fuse_conn_init(fc, sb->s_user_ns, &fuse_dev_fiq_ops, NULL);
- 	fc->release = fuse_free_conn;
- 	sb->s_fs_info = fc;
-@@ -1247,6 +1247,9 @@ static int fuse_fill_super(struct super_block *sb, struct fs_context *fsc)
- 	err = fuse_fill_super_common(sb, ctx);
- 	if (err)
- 		goto err_put_conn;
-+
-+	fuse_dev_install(fud, fc);
-+	file->private_data = fud;
- 	/*
- 	 * atomic_dec_and_test() in fput() provides the necessary
- 	 * memory barrier for file->private_data to be visible on all
-@@ -1259,6 +1262,8 @@ static int fuse_fill_super(struct super_block *sb, struct fs_context *fsc)
-  err_put_conn:
- 	fuse_conn_put(fc);
- 	sb->s_fs_info = NULL;
-+ err_free_dev:
-+	fuse_dev_free(fud);
-  err_fput:
- 	fput(file);
-  err:
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index bade74768903..87a7bc0f193c 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -1066,8 +1066,7 @@ static int virtio_fs_fill_super(struct super_block *sb)
- 	}
- 
- 	err = -ENOMEM;
--	/* Allocate fuse_dev for hiprio and notification queues */
--	for (i = 0; i < VQ_REQUEST; i++) {
-+	for (i = 0; i < fs->nvqs; i++) {
- 		struct virtio_fs_vq *fsvq = &fs->vqs[i];
- 
- 		fsvq->fud = fuse_dev_alloc();
-@@ -1075,18 +1074,12 @@ static int virtio_fs_fill_super(struct super_block *sb)
- 			goto err_free_fuse_devs;
- 	}
- 
--	ctx.fudptr = (void **)&fs->vqs[VQ_REQUEST].fud;
- 	err = fuse_fill_super_common(sb, &ctx);
- 	if (err < 0)
- 		goto err_free_fuse_devs;
- 
--	fc = fs->vqs[VQ_REQUEST].fud->fc;
--
- 	for (i = 0; i < fs->nvqs; i++) {
- 		struct virtio_fs_vq *fsvq = &fs->vqs[i];
--
--		if (i == VQ_REQUEST)
--			continue; /* already initialized */
- 		fuse_dev_install(fsvq->fud, fc);
- 	}
- 
--- 
-2.25.4
+Hi Boris,
+The "unknown fs virtiofs" error shouldn't happen if you the
+<qemu:commandline> syntax. Could it be that there is still a <filesystem
+type=3D'mount' accessmode=3D'passthrough'> XML tag from a previous attempt?
+
+Please post the full domain XML (virsh dumpxml <domain>) so we can
+suggest how to fix it.
+
+Stefan
+
+--f5QefDQHtn8hx44O
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl7fhaAACgkQnKSrs4Gr
+c8gE/wf+JSxi7L/zKyZxnu7KxO8JpodQYqu97zc+UBuFeTYDprjPKsuWDKdd2q5D
+upjrYX5xkLb1aJI3vddYexdff0ph+ORGrjkF/NCo+M69fJax1UanIj4HeMeWVBcn
+7pr9s56PjNRwmydcYK8TohlJG+ZnCQ0AVfp5FTUrWRY4TK1gDJ6Aiu8XsNX+6WZT
+9z/HP7w5LCSHRwmdAEt5gi0pmsAGGl2G4N7+wsT+PcwTVSH3+SNZv3MSjrExNBNf
+Lgmh1XcACrsPOIv1bxC123WZRW0F5ESFeJLfo1Pc5nn7ag2zxhlMzKWZ28hSVarY
+orjIvJTaxIuHXdkJj3BXSBgGy7CHNg==
+=mlEG
+-----END PGP SIGNATURE-----
+
+--f5QefDQHtn8hx44O--
 

@@ -1,19 +1,22 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
-	h=from:to:cc:subject:date:message-id:in-reply-to:references
-	:mime-version:content-transfer-encoding;
-	bh=g5zkZKTN+9Pwa1H+ZwZQErrRQBCq/NTm9XsGCeUK92c=;
-	b=jl4GQo4LJUzYtck/CItWh5pjD/Q8fdg5mLlk/SEXkptLcklSB5+bg/6iY1ni/gAhby
-	mKWOPYJPzRywdX4LCpytW/FJdymee+9fzLlYa0gqNAbgv+VZ5jYNf4RH/Y4cJ266+vGS
-	VLIHu957ODkcWPXz6hmcHbDr8uzJlDVElFQjk=
-From: Chirantan Ekbote <chirantan@chromium.org>
-Date: Wed, 10 Jun 2020 18:27:44 +0900
-Message-Id: <20200610092744.140038-1-chirantan@chromium.org>
-In-Reply-To: <20200601053214.201723-1-chirantan@chromium.org>
-References: <20200601053214.201723-1-chirantan@chromium.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=+uNrF5ROsVGyfgjVQg6D0M6p6VKL0g3W1Rldcy14BRs=;
+	b=jbBzbzwsMrTc4C1EXvpESjLYRmVGYmoY/jKnWbOb9We5mM2WaXj4Aw+lBGKldvokXU
+	PFQEYX07mms8CW9mXGmCC2ztjUWpLnr7YrHlET4kcM9OpmQAO2clkcvq6DXLf2SkRQEs
+	jL5WiTmbnyZT7hJOV0Ec9zBEO5hm82+SukKpU4IhDvyj7HRuJWgdk5ad2Whod7zOf5lS
+	OIVCvpgHlwVeggUvCj8XYCAzi/zl3JwT3cYWsCx5pBHfPqqZ++nVBrRPe8I1HW86+bzP
+	IHrrAdjasbcyGL5DeKU5dBnfZ2RykAcdHr1ntUJ9Fb8hf4UmpXKR9Thu5EFA1K+zJzl9
+	qrOA==
 MIME-Version: 1.0
-Content-Type: text/plain; charset=US-ASCII
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2] RFC: fuse: Call security hooks on new inodes
+References: <CALfysxrU1WNcWhzRUXboMSjZLsOz_J=BC1y_heye8juk+L-fSA@mail.gmail.com>
+	<20200609125040.GG92564@stefanha-x1.localdomain>
+In-Reply-To: <20200609125040.GG92564@stefanha-x1.localdomain>
+From: Boris Ebwanga <bbebwanga@gmail.com>
+Date: Thu, 11 Jun 2020 18:04:58 +0100
+Message-ID: <CALfysxpKT0C1Eu8whTr-i4YdUp93sNBPSdriH-L68Qx03HE_jQ@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="000000000000918c1905a7d1f69e"
+Subject: Re: [Virtio-fs] How to setup virtiofs for file sharing between host
+ and VM
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,288 +25,203 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: Suleiman Souhlal <suleiman@chromium.org>, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Dylan Reid <dgreid@chromium.org>, Vivek Goyal <vgoyal@redhat.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com
 
-Add a new `init_security` field to `fuse_conn` that controls whether we
-initialize security when a new inode is created.  Also add a
-`FUSE_SECURITY_CTX` flag that can be set in the `flags` field of the
-`fuse_init_out` struct that controls when the `init_security` field is
-set.
+--000000000000918c1905a7d1f69e
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-When set to true, get the security context for a newly created inode via
-`security_dentry_init_security` and append it to the create, mkdir,
-mknod, and symlink requests.  The server should use this context by
-writing it to `/proc/thread-self/attr/fscreate` before creating the
-requested inode.
+Hello!
+I was able to modify the XML domain without errors.
 
-Calling security hooks is needed for `setfscreatecon` to work since it
-is applied as part of the selinux security hook.
+Now, the guest failed to start. It shows this error message:
+erreur :internal error: process exited while connecting to monitor:
+2020-06-11T16:53:58.809703Z qemu-system-x86_64: -chardev
+socket,id=3Dchar0,path=3D/home/deharteloos/tmp/vhost-fs.sock: Failed to con=
+nect
+socket /home/deharteloos/tmp/vhost-fs.sock: Permission denied
 
-Signed-off-by: Chirantan Ekbote <chirantan@chromium.org>
----
-Changes in v2:
-  * Added the FUSE_SECURITY_CTX flag for init_out responses.
-  * Switched to security_dentry_init_security.
-  * Send security context with create, mknod, mkdir, and symlink
-    requests instead of applying it after creation.
+I don't know how to solve this problem.
 
- fs/fuse/dir.c             | 99 +++++++++++++++++++++++++++++++++++++--
- fs/fuse/fuse_i.h          |  3 ++
- fs/fuse/inode.c           |  5 +-
- include/uapi/linux/fuse.h |  8 +++-
- 4 files changed, 110 insertions(+), 5 deletions(-)
 
-diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
-index ee190119f45cc..86bc073bb4f0a 100644
---- a/fs/fuse/dir.c
-+++ b/fs/fuse/dir.c
-@@ -16,6 +16,9 @@
- #include <linux/xattr.h>
- #include <linux/iversion.h>
- #include <linux/posix_acl.h>
-+#include <linux/security.h>
-+#include <linux/types.h>
-+#include <linux/kernel.h>
- 
- static void fuse_advise_use_readdirplus(struct inode *dir)
- {
-@@ -442,6 +445,8 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
- 	struct fuse_entry_out outentry;
- 	struct fuse_inode *fi;
- 	struct fuse_file *ff;
-+	void *security_ctx = NULL;
-+	u32 security_ctxlen = 0;
- 
- 	/* Userspace expects S_IFREG in create mode */
- 	BUG_ON((mode & S_IFMT) != S_IFREG);
-@@ -477,6 +482,21 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
- 	args.out_args[0].value = &outentry;
- 	args.out_args[1].size = sizeof(outopen);
- 	args.out_args[1].value = &outopen;
-+
-+	if (fc->init_security) {
-+		err = security_dentry_init_security(entry, mode, &entry->d_name,
-+						    &security_ctx,
-+						    &security_ctxlen);
-+		if (err)
-+			goto out_put_forget_req;
-+
-+		if (security_ctxlen > 0) {
-+			args.in_numargs = 3;
-+			args.in_args[2].size = security_ctxlen;
-+			args.in_args[2].value = security_ctx;
-+		}
-+	}
-+
- 	err = fuse_simple_request(fc, &args);
- 	if (err)
- 		goto out_free_ff;
-@@ -513,6 +533,8 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
- 	return err;
- 
- out_free_ff:
-+	if (security_ctxlen > 0)
-+		kfree(security_ctx);
- 	fuse_file_free(ff);
- out_put_forget_req:
- 	kfree(forget);
-@@ -629,6 +651,9 @@ static int fuse_mknod(struct inode *dir, struct dentry *entry, umode_t mode,
- {
- 	struct fuse_mknod_in inarg;
- 	struct fuse_conn *fc = get_fuse_conn(dir);
-+	void *security_ctx = NULL;
-+	u32 security_ctxlen = 0;
-+	int ret;
- 	FUSE_ARGS(args);
- 
- 	if (!fc->dont_mask)
-@@ -644,7 +669,27 @@ static int fuse_mknod(struct inode *dir, struct dentry *entry, umode_t mode,
- 	args.in_args[0].value = &inarg;
- 	args.in_args[1].size = entry->d_name.len + 1;
- 	args.in_args[1].value = entry->d_name.name;
--	return create_new_entry(fc, &args, dir, entry, mode);
-+
-+	if (fc->init_security) {
-+		ret = security_dentry_init_security(entry, mode, &entry->d_name,
-+						    &security_ctx,
-+						    &security_ctxlen);
-+		if (ret)
-+			goto out;
-+
-+		if (security_ctxlen > 0) {
-+			args.in_numargs = 3;
-+			args.in_args[2].size = security_ctxlen;
-+			args.in_args[2].value = security_ctx;
-+		}
-+	}
-+
-+	ret = create_new_entry(fc, &args, dir, entry, mode);
-+
-+	if (security_ctxlen > 0)
-+		kfree(security_ctx);
-+out:
-+	return ret;
- }
- 
- static int fuse_create(struct inode *dir, struct dentry *entry, umode_t mode,
-@@ -657,6 +702,9 @@ static int fuse_mkdir(struct inode *dir, struct dentry *entry, umode_t mode)
- {
- 	struct fuse_mkdir_in inarg;
- 	struct fuse_conn *fc = get_fuse_conn(dir);
-+	void *security_ctx = NULL;
-+	u32 security_ctxlen = 0;
-+	int ret;
- 	FUSE_ARGS(args);
- 
- 	if (!fc->dont_mask)
-@@ -671,7 +719,28 @@ static int fuse_mkdir(struct inode *dir, struct dentry *entry, umode_t mode)
- 	args.in_args[0].value = &inarg;
- 	args.in_args[1].size = entry->d_name.len + 1;
- 	args.in_args[1].value = entry->d_name.name;
--	return create_new_entry(fc, &args, dir, entry, S_IFDIR);
-+
-+	if (fc->init_security) {
-+		ret = security_dentry_init_security(entry, S_IFDIR,
-+						    &entry->d_name,
-+						    &security_ctx,
-+						    &security_ctxlen);
-+		if (ret)
-+			goto out;
-+
-+		if (security_ctxlen > 0) {
-+			args.in_numargs = 3;
-+			args.in_args[2].size = security_ctxlen;
-+			args.in_args[2].value = security_ctx;
-+		}
-+	}
-+
-+	ret = create_new_entry(fc, &args, dir, entry, S_IFDIR);
-+
-+	if (security_ctxlen > 0)
-+		kfree(security_ctx);
-+out:
-+	return ret;
- }
- 
- static int fuse_symlink(struct inode *dir, struct dentry *entry,
-@@ -679,6 +748,9 @@ static int fuse_symlink(struct inode *dir, struct dentry *entry,
- {
- 	struct fuse_conn *fc = get_fuse_conn(dir);
- 	unsigned len = strlen(link) + 1;
-+	void *security_ctx = NULL;
-+	u32 security_ctxlen = 0;
-+	int ret;
- 	FUSE_ARGS(args);
- 
- 	args.opcode = FUSE_SYMLINK;
-@@ -687,7 +759,28 @@ static int fuse_symlink(struct inode *dir, struct dentry *entry,
- 	args.in_args[0].value = entry->d_name.name;
- 	args.in_args[1].size = len;
- 	args.in_args[1].value = link;
--	return create_new_entry(fc, &args, dir, entry, S_IFLNK);
-+
-+	if (fc->init_security) {
-+		ret = security_dentry_init_security(entry, S_IFLNK,
-+						    &entry->d_name,
-+						    &security_ctx,
-+						    &security_ctxlen);
-+		if (ret)
-+			goto out;
-+
-+		if (security_ctxlen > 0) {
-+			args.in_numargs = 3;
-+			args.in_args[2].size = security_ctxlen;
-+			args.in_args[2].value = security_ctx;
-+		}
-+	}
-+
-+	ret = create_new_entry(fc, &args, dir, entry, S_IFLNK);
-+
-+	if (security_ctxlen > 0)
-+		kfree(security_ctx);
-+out:
-+	return ret;
- }
- 
- void fuse_update_ctime(struct inode *inode)
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index ca344bf714045..5ea9212b0a71c 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -719,6 +719,9 @@ struct fuse_conn {
- 	/* Do not show mount options */
- 	unsigned int no_mount_options:1;
- 
-+	/* Initialize security xattrs when creating a new inode */
-+	unsigned int init_security : 1;
-+
- 	/** The number of requests waiting for completion */
- 	atomic_t num_waiting;
- 
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index 16aec32f7f3d7..1a311771c5555 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -951,6 +951,8 @@ static void process_init_reply(struct fuse_conn *fc, struct fuse_args *args,
- 					min_t(unsigned int, FUSE_MAX_MAX_PAGES,
- 					max_t(unsigned int, arg->max_pages, 1));
- 			}
-+			if (arg->flags & FUSE_SECURITY_CTX)
-+				fc->init_security = 1;
- 		} else {
- 			ra_pages = fc->max_read / PAGE_SIZE;
- 			fc->no_lock = 1;
-@@ -988,7 +990,8 @@ void fuse_send_init(struct fuse_conn *fc)
- 		FUSE_WRITEBACK_CACHE | FUSE_NO_OPEN_SUPPORT |
- 		FUSE_PARALLEL_DIROPS | FUSE_HANDLE_KILLPRIV | FUSE_POSIX_ACL |
- 		FUSE_ABORT_ERROR | FUSE_MAX_PAGES | FUSE_CACHE_SYMLINKS |
--		FUSE_NO_OPENDIR_SUPPORT | FUSE_EXPLICIT_INVAL_DATA;
-+		FUSE_NO_OPENDIR_SUPPORT | FUSE_EXPLICIT_INVAL_DATA |
-+		FUSE_SECURITY_CTX;
- 	ia->args.opcode = FUSE_INIT;
- 	ia->args.in_numargs = 1;
- 	ia->args.in_args[0].size = sizeof(ia->in);
-diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-index 373cada898159..00919c214149d 100644
---- a/include/uapi/linux/fuse.h
-+++ b/include/uapi/linux/fuse.h
-@@ -172,6 +172,10 @@
-  *  - add FUSE_WRITE_KILL_PRIV flag
-  *  - add FUSE_SETUPMAPPING and FUSE_REMOVEMAPPING
-  *  - add map_alignment to fuse_init_out, add FUSE_MAP_ALIGNMENT flag
-+ *
-+ *  7.32
-+ *  - add FUSE_SECURITY_CTX flag for fuse_init_out
-+ *  - add security context to create, mkdir, and mknod requests
-  */
- 
- #ifndef _LINUX_FUSE_H
-@@ -207,7 +211,7 @@
- #define FUSE_KERNEL_VERSION 7
- 
- /** Minor version number of this interface */
--#define FUSE_KERNEL_MINOR_VERSION 31
-+#define FUSE_KERNEL_MINOR_VERSION 32
- 
- /** The node ID of the root inode */
- #define FUSE_ROOT_ID 1
-@@ -314,6 +318,7 @@ struct fuse_file_lock {
-  * FUSE_NO_OPENDIR_SUPPORT: kernel supports zero-message opendir
-  * FUSE_EXPLICIT_INVAL_DATA: only invalidate cached pages on explicit request
-  * FUSE_MAP_ALIGNMENT: map_alignment field is valid
-+ * FUSE_SECURITY_CTX: add security context to create, mkdir, symlink, and mknod
-  */
- #define FUSE_ASYNC_READ		(1 << 0)
- #define FUSE_POSIX_LOCKS	(1 << 1)
-@@ -342,6 +347,7 @@ struct fuse_file_lock {
- #define FUSE_NO_OPENDIR_SUPPORT (1 << 24)
- #define FUSE_EXPLICIT_INVAL_DATA (1 << 25)
- #define FUSE_MAP_ALIGNMENT	(1 << 26)
-+#define FUSE_SECURITY_CTX	(1 << 27)
- 
- /**
-  * CUSE INIT request/reply flags
--- 
-2.27.0.278.ge193c7cf3a9-goog
+Le mar. 9 juin 2020 =C3=A0 13:50, Stefan Hajnoczi <stefanha@redhat.com> a =
+=C3=A9crit :
+
+> On Fri, Jun 05, 2020 at 11:50:06AM +0100, Boris Ebwanga wrote:
+> > Hello everyone.
+> >
+> > It's been a while now, I am trying to use virtio-fs. Everything I do en=
+d
+> up
+> > with an error.
+> >
+> > First I was on fedora 31 and I tried to run manually qemu with virtio-f=
+s
+> > https://virtio-fs.gitlab.io/howto-qemu.html. But I was not able to "mak=
+e
+> > virtiofsd".
+> >
+> > Then, I upgraded to fedora 32 which has virtiofsd at /usr/libexec. I
+> > followed the steps describe at
+> > https://libvirt.org/kbase/virtiofs.html
+> > I could not modify the XML domain of my VM. The error message is
+> "*unsupported
+> > configuration: unknown fs virtiofs =C2=BB driver type".*
+> >
+> > I wrote to Stefan Hajnoczi <stefanha@redhat.com> describing this
+> problem.
+> > He answers with the following:
+> >
+> > Hi Boris,
+> > > You can pass command-line options to the guest like this:
+> > >
+> > >   <domain type=3D'kvm' xmlns:qemu=3D'
+> > > http://libvirt.org/schemas/domain/qemu/1.0'>
+> > >     ...
+> > >     <qemu:commandline>
+> > >       <qemu:arg value=3D'-chardev'/>
+> > >       <qemu:arg value=3D'socket,id=3Dchar0,path=3D/tmp/vhost-fs.sock'=
+/>
+> > >       <qemu:arg value=3D'-device'/>
+> > >       <qemu:arg
+> > > value=3D'vhost-user-fs-pci,chardev=3Dvirtio-fs-chardev,tag=3Dmyfs'/>
+> > >     </qemu:commandline>
+> > >   </domain>
+> > >
+> > > Note that the xmlns in the <domain> tag is required.
+> > >
+> > > If you pass these options manually then you need to launch virtiofsd
+> > > yourself before launching the guest:
+> > >
+> > >   # /usr/libexec/virtiofsd --socket-path=3D/tmp/vhost-fs.sock -o
+> > > source=3D/path/to/share/dir -o no_posix_lock -o xattr
+> > >
+> > > Hope this helps! Please email virtio-fs@redhat.com if you have any
+> more
+> > > questions, it's the virtio-fs mailing list and others will be able to
+> > > participate in the discussion.
+> > >
+> >
+> > I am still getting the same error after applying the change above.
+> >
+> > Can anyone help me with this ? Thank you in advance for your help.
+>
+> Hi Boris,
+> The "unknown fs virtiofs" error shouldn't happen if you the
+> <qemu:commandline> syntax. Could it be that there is still a <filesystem
+> type=3D'mount' accessmode=3D'passthrough'> XML tag from a previous attemp=
+t?
+>
+> Please post the full domain XML (virsh dumpxml <domain>) so we can
+> suggest how to fix it.
+>
+> Stefan
+>
+
+--000000000000918c1905a7d1f69e
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><div dir=3D"ltr"><div><br></div>Hello!<div>I was able to m=
+odify the XML domain without errors.</div><div><br></div><div>Now, the gues=
+t failed to start. It shows this error message:</div><div><font face=3D"mon=
+ospace">erreur=C2=A0:internal error: process exited while connecting to mon=
+itor: 2020-06-11T16:53:58.809703Z qemu-system-x86_64: -chardev socket,id=3D=
+char0,path=3D/home/deharteloos/tmp/vhost-fs.sock: Failed to connect socket =
+/home/deharteloos/tmp/vhost-fs.sock: Permission denied</font><br><br>I don&=
+#39;t know how to solve this problem.</div><br></div><br><div class=3D"gmai=
+l_quote"><div dir=3D"ltr" class=3D"gmail_attr">Le=C2=A0mar. 9 juin 2020 =C3=
+=A0=C2=A013:50, Stefan Hajnoczi &lt;<a href=3D"mailto:stefanha@redhat.com">=
+stefanha@redhat.com</a>&gt; a =C3=A9crit=C2=A0:<br></div><blockquote class=
+=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rg=
+b(204,204,204);padding-left:1ex">On Fri, Jun 05, 2020 at 11:50:06AM +0100, =
+Boris Ebwanga wrote:<br>
+&gt; Hello everyone.<br>
+&gt; <br>
+&gt; It&#39;s been a while now, I am trying to use virtio-fs. Everything I =
+do end up<br>
+&gt; with an error.<br>
+&gt; <br>
+&gt; First I was on fedora 31 and I tried to run manually qemu with virtio-=
+fs<br>
+&gt; <a href=3D"https://virtio-fs.gitlab.io/howto-qemu.html" rel=3D"norefer=
+rer" target=3D"_blank">https://virtio-fs.gitlab.io/howto-qemu.html</a>. But=
+ I was not able to &quot;make<br>
+&gt; virtiofsd&quot;.<br>
+&gt; <br>
+&gt; Then, I upgraded to fedora 32 which has virtiofsd at /usr/libexec. I<b=
+r>
+&gt; followed the steps describe at<br>
+&gt; <a href=3D"https://libvirt.org/kbase/virtiofs.html" rel=3D"noreferrer"=
+ target=3D"_blank">https://libvirt.org/kbase/virtiofs.html</a><br>
+&gt; I could not modify the XML domain of my VM. The error message is &quot=
+;*unsupported<br>
+&gt; configuration: unknown fs virtiofs =C2=BB driver type&quot;.*<br>
+&gt; <br>
+&gt; I wrote to Stefan Hajnoczi &lt;<a href=3D"mailto:stefanha@redhat.com" =
+target=3D"_blank">stefanha@redhat.com</a>&gt; describing this problem.<br>
+&gt; He answers with the following:<br>
+&gt; <br>
+&gt; Hi Boris,<br>
+&gt; &gt; You can pass command-line options to the guest like this:<br>
+&gt; &gt;<br>
+&gt; &gt;=C2=A0 =C2=A0&lt;domain type=3D&#39;kvm&#39; xmlns:qemu=3D&#39;<br=
+>
+&gt; &gt; <a href=3D"http://libvirt.org/schemas/domain/qemu/1.0" rel=3D"nor=
+eferrer" target=3D"_blank">http://libvirt.org/schemas/domain/qemu/1.0</a>&#=
+39;&gt;<br>
+&gt; &gt;=C2=A0 =C2=A0 =C2=A0...<br>
+&gt; &gt;=C2=A0 =C2=A0 =C2=A0&lt;qemu:commandline&gt;<br>
+&gt; &gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0&lt;qemu:arg value=3D&#39;-chardev&#39;=
+/&gt;<br>
+&gt; &gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0&lt;qemu:arg value=3D&#39;socket,id=3Dc=
+har0,path=3D/tmp/vhost-fs.sock&#39;/&gt;<br>
+&gt; &gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0&lt;qemu:arg value=3D&#39;-device&#39;/=
+&gt;<br>
+&gt; &gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0&lt;qemu:arg<br>
+&gt; &gt; value=3D&#39;vhost-user-fs-pci,chardev=3Dvirtio-fs-chardev,tag=3D=
+myfs&#39;/&gt;<br>
+&gt; &gt;=C2=A0 =C2=A0 =C2=A0&lt;/qemu:commandline&gt;<br>
+&gt; &gt;=C2=A0 =C2=A0&lt;/domain&gt;<br>
+&gt; &gt;<br>
+&gt; &gt; Note that the xmlns in the &lt;domain&gt; tag is required.<br>
+&gt; &gt;<br>
+&gt; &gt; If you pass these options manually then you need to launch virtio=
+fsd<br>
+&gt; &gt; yourself before launching the guest:<br>
+&gt; &gt;<br>
+&gt; &gt;=C2=A0 =C2=A0# /usr/libexec/virtiofsd --socket-path=3D/tmp/vhost-f=
+s.sock -o<br>
+&gt; &gt; source=3D/path/to/share/dir -o no_posix_lock -o xattr<br>
+&gt; &gt;<br>
+&gt; &gt; Hope this helps! Please email <a href=3D"mailto:virtio-fs@redhat.=
+com" target=3D"_blank">virtio-fs@redhat.com</a> if you have any more<br>
+&gt; &gt; questions, it&#39;s the virtio-fs mailing list and others will be=
+ able to<br>
+&gt; &gt; participate in the discussion.<br>
+&gt; &gt;<br>
+&gt; <br>
+&gt; I am still getting the same error after applying the change above.<br>
+&gt; <br>
+&gt; Can anyone help me with this ? Thank you in advance for your help.<br>
+<br>
+Hi Boris,<br>
+The &quot;unknown fs virtiofs&quot; error shouldn&#39;t happen if you the<b=
+r>
+&lt;qemu:commandline&gt; syntax. Could it be that there is still a &lt;file=
+system<br>
+type=3D&#39;mount&#39; accessmode=3D&#39;passthrough&#39;&gt; XML tag from =
+a previous attempt?<br>
+<br>
+Please post the full domain XML (virsh dumpxml &lt;domain&gt;) so we can<br=
+>
+suggest how to fix it.<br>
+<br>
+Stefan<br>
+</blockquote></div><img width=3D"0" height=3D"0" class=3D"mailtrack-img" al=
+t=3D"" style=3D"display:flex" src=3D"https://mailtrack.io/trace/mail/6d524e=
+43bb3d4f47c4650b9e52e9c7688b24e5b2.png?u=3D4017047"></div>
+
+--000000000000918c1905a7d1f69e--
 

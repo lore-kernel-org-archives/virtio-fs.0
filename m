@@ -1,16 +1,16 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yandex.com; s=mail;
-	t=1591916543; bh=vnOGJzuIj7hlpvQ+R+pny/pxbegxtIlQBePLVf74HcY=;
-	h=Message-Id:Date:Subject:To:From;
-	b=WR12WepN3UCyL9AY3qA0swq5phzDEyzcZCambKYBjEHw/je7OChmv8lz21b3Hx52/
-	X5O6A/Cngr8xXSXu2W1GIak8alI1xpuA4qu7Ctgcfhr9Ch31H5PyuoXVH8GjD2cFqt
-	cGFI+/tR/d3Ut9NndTuJmK7PtGbOecO/wRcpCXHY=
-From: Aa Aa <jimbothom@yandex.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=intel.onmicrosoft.com; 
+	s=selector2-intel-onmicrosoft-com;
+	h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+	bh=tiaAsShn1LX2Dl/up+zI+gRQu7Dz8KMBBT2djd9LlTA=;
+	b=yGQO76zwDd5Zv48IAp3gCFbR8s+cTrjXdNhHsPf3QgjkJDNPZg5svT/e+vXIx4OFmq8PHEHrUC/VVU3rc6z4b+OmMrKUlSjHwdzHtCSCI6tr6JSvbyWyrEoALJsFNDQgCHcz8ChuX4MYjojsIfO6umW8Aps/DZtx6CT32QpCYdM=
+From: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
+Date: Fri, 12 Jun 2020 09:00:50 +0000
+Message-ID: <SN6PR11MB2943070029C7CA4BACE7438AEA810@SN6PR11MB2943.namprd11.prod.outlook.com>
+Content-Language: en-US
 MIME-Version: 1.0
-Date: Fri, 12 Jun 2020 09:02:23 +1000
-Message-Id: <1099751591915615@mail.yandex.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] How is the daemon meant to be started?
+Content-Type: multipart/alternative;
+	boundary="_000_SN6PR11MB2943070029C7CA4BACE7438AEA810SN6PR11MB2943namp_"
+Subject: [Virtio-fs] Kernel patches on latest linux kernel
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,20 +19,82 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+Cc: "vgoyal@redhat.com" <vgoyal@redhat.com>
 
-Hi
+--_000_SN6PR11MB2943070029C7CA4BACE7438AEA810SN6PR11MB2943namp_
+Content-Type: text/plain; charset="iso-8859-1"
+MIME-Version: 1.0
+Content-Transfer-Encoding: quoted-printable
 
-I have a few questions about using virtiofsd. I currently have multiple vms share the same mountpoint for their rootfs using 9p, in read only (9p had a permissions issue but that was overcome). I can start qemu for each of them as non root with say only allowing access to /dev/kvm and even have some of the VM running with a different user name.
+Hi folks,
 
-If I wish to change to using virtiofsd, I can just change the init to:
-  mount -t virtiofs -onoatime,nodiratime,noauto,ro rootfs /new  | mount -t 9p -onoatime,nodiratime,noauto,ro,trans=virtio,cache=loose root /new
-and the qemu command line from using 9p to using a vhost-user-fs-pci device.
+Just wondering when the kernel patch series will be rebased on top of lates=
+t kernel?
 
-The problem is how do I start virtiofsd. The daemon needs root permissions from what I can tell, to start. Thereafter, it listens on the socket and only accepts a single connection on the socket. In my case, I have a single mount point that I wish to use multiple times. You cannot listen on the socket multiple times, so I cannot say that /mnt/root socket will be exported as /run/virtiofsd/mounts/mnt-root.socket by something that has been started by root independently of qemu, but rather it would appear that I need to be root and create a socket for each qemu task then drop permissions. Is this correct or is there another way to achieve this.
+Thanks,
+Sebastien
+---------------------------------------------------------------------
+Intel Corporation SAS (French simplified joint stock company)
+Registered headquarters: "Les Montalets"- 2, rue de Paris,=20
+92196 Meudon Cedex, France
+Registration Number:  302 456 199 R.C.S. NANTERRE
+Capital: 4,572,000 Euros
 
-Cheers
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
 
-JT
+--_000_SN6PR11MB2943070029C7CA4BACE7438AEA810SN6PR11MB2943namp_
+Content-Type: text/html; charset="iso-8859-1"
+MIME-Version: 1.0
+Content-Transfer-Encoding: quoted-printable
 
+<html>
+<head>
+<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Diso-8859-=
+1">
+<style type=3D"text/css" style=3D"display:none;"> P {margin-top:0;margin-bo=
+ttom:0;} </style>
+</head>
+<body dir=3D"ltr">
+<div style=3D"font-family: Calibri, Arial, Helvetica, sans-serif; font-size=
+: 12pt; color: rgb(0, 0, 0);">
+Hi folks,</div>
+<div style=3D"font-family: Calibri, Arial, Helvetica, sans-serif; font-size=
+: 12pt; color: rgb(0, 0, 0);">
+<br>
+</div>
+<div style=3D"font-family: Calibri, Arial, Helvetica, sans-serif; font-size=
+: 12pt; color: rgb(0, 0, 0);">
+Just wondering when the kernel patch series will be rebased on top of lates=
+t kernel?</div>
+<div style=3D"font-family: Calibri, Arial, Helvetica, sans-serif; font-size=
+: 12pt; color: rgb(0, 0, 0);">
+<br>
+</div>
+<div style=3D"font-family: Calibri, Arial, Helvetica, sans-serif; font-size=
+: 12pt; color: rgb(0, 0, 0);">
+Thanks,</div>
+<div style=3D"font-family: Calibri, Arial, Helvetica, sans-serif; font-size=
+: 12pt; color: rgb(0, 0, 0);">
+Sebastien<br>
+</div>
+<p>---------------------------------------------------------------------<br=
+>
+Intel Corporation SAS (French simplified joint stock company)<br>
+Registered headquarters: "Les Montalets"- 2, rue de Paris, <br>
+92196 Meudon Cedex, France<br>
+Registration Number:&nbsp; 302 456 199 R.C.S. NANTERRE<br>
+Capital: 4,572,000 Euros</p>
+
+<p>This e-mail and any attachments may contain confidential material for<br=
+>
+the sole use of the intended recipient(s). Any review or distribution<br>
+by others is strictly prohibited. If you are not the intended<br>
+recipient, please contact the sender and delete all copies.</p></body>
+</html>
+
+--_000_SN6PR11MB2943070029C7CA4BACE7438AEA810SN6PR11MB2943namp_--
 

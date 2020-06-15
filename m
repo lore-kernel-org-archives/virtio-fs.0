@@ -1,13 +1,15 @@
-Date: Mon, 15 Jun 2020 10:54:06 +0100
+Date: Mon, 15 Jun 2020 10:55:50 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200615095406.GD2883@work-vm>
-References: <1099751591915615@mail.yandex.com>
+Message-ID: <20200615095550.GE2883@work-vm>
+References: <CALjEBWTnYLtVfJV_KnEv6oqdcWhU-dzoR_pB+C84u798oAw1Vw@mail.gmail.com>
+	<20200611191154.GI2968@work-vm>
+	<CALjEBWRR24OnJ9dUFFDWaungNONQLZM0J2dzUg-gOepTKAxttw@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
+Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <1099751591915615@mail.yandex.com>
-Subject: Re: [Virtio-fs] How is the daemon meant to be started?
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <CALjEBWRR24OnJ9dUFFDWaungNONQLZM0J2dzUg-gOepTKAxttw@mail.gmail.com>
+Subject: Re: [Virtio-fs] Getting help setting up virtiofs guest
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,54 +18,97 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Aa Aa <jimbothom@yandex.com>
+To: David Lomas <dl3@pale-eds.co.uk>
 Cc: virtio-fs@redhat.com
 
-* Aa Aa (jimbothom@yandex.com) wrote:
-> Hi
->=20
-> I have a few questions about using virtiofsd. I currently have multiple v=
-ms share the same mountpoint for their rootfs using 9p, in read only (9p ha=
-d a permissions issue but that was overcome). I can start qemu for each of =
-them as non root with say only allowing access to /dev/kvm and even have so=
-me of the VM running with a different user name.
->=20
-> If I wish to change to using virtiofsd, I can just change the init to:
-> =A0 mount -t virtiofs -onoatime,nodiratime,noauto,ro rootfs /new=A0 | mou=
-nt -t 9p -onoatime,nodiratime,noauto,ro,trans=3Dvirtio,cache=3Dloose root /=
-new
-> and the qemu command line from using 9p to using a vhost-user-fs-pci devi=
-ce.
->=20
-> The problem is how do I start virtiofsd. The daemon needs root
-> permissions from what I can tell, to start. Thereafter, it listens on the
-> socket and only accepts a single connection on the socket. In my case,
-> I have a single mount point that I wish to use multiple times. You cannot
-> listen on the socket multiple times, so I cannot say that /mnt/root socket
-> will be exported as /run/virtiofsd/mounts/mnt-root.socket by something
-> that has been started by root independently of qemu, but rather it would
-> appear that I need to be root=20
+* David Lomas (dl3@pale-eds.co.uk) wrote:
+> Just to say thanks to Dave (all the best people are called Dave) for the
+> pointer to use kernel 5.7. That just worked on the guest, and I can now see
+> the host filesystem.
+> 
+> Perhaps this page <https://virtio-fs.gitlab.io/howto-qemu.html> should just
+> link to the mainline kernel rather than the virtio-fs one?
 
-Correct, at the moment you do need to be root; there were some
-suggestions for relaxing that but they haven't been sorted out yet.
-
-> and create a socket for each qemu task then
-> drop permissions. Is this correct or is there another way to achieve this.
-
-Yes, you need one daemon instance per mount/VM.
+Oops yes! We need to update to say you can either use upstream, or use
+the virtio-fs-dev branch of that git.
 
 Dave
 
->=20
-> Cheers
->=20
-> JT
->=20
->=20
+> 
+> 
+> On Thu, Jun 11, 2020 at 8:11 PM Dr. David Alan Gilbert <dgilbert@redhat.com>
+> wrote:
+> 
+> > * David Lomas (dl3@pale-eds.co.uk) wrote:
+> > > Apologies if this isn't the correct place for this kind or request.
+> >
+> > It's the right place to ask.
+> >
+> > > I've been following these instructions to set up host and guest:
+> > > https://virtio-fs.gitlab.io/howto-qemu.html and
+> > > https://libvirt.org/kbase/virtiofs.html
+> > >
+> > > On the host, I've built the latest version of libvirt (6.4.0) and qemu
+> > > (5.0.0), and added sections to the domain definition. All appears well
+> > (no
+> > > errors at least). This is the relevant section:
+> > >
+> > >     <filesystem type='mount' accessmode='passthrough'>
+> > >       <driver type='virtiofs'/>
+> > >       <binary path='/usr/libexec/virtiofsd'/>
+> > >       <source dir='/fast_data/test'/>
+> > >       <target dir='test'/>
+> > >       <address type='pci' domain='0x0000' bus='0x00' slot='0x06'
+> > > function='0x0'/>
+> > >     </filesystem>
+> >
+> > I think that's OK.
+> >
+> > > On the guest, I've build the kernel (4.19.28), booted it, and confirmed
+> > > virtio_fs.ko is a built-in module.
+> >
+> > Where did you get that kernel?  It sounds rather old;  the main part of
+> > virtiofs is now in the upstream kernel; so if your distro has a recent
+> > 5.x kernel, you can just use it.
+> >
+> > > But on running mount -t virtio_fs test /mnt/test/ I get the following
+> > error:
+> > >
+> > > mount: /mnt/test: wrong fs type, bad option, bad superblock on
+> > qube-server,
+> > > missing codepage or helper program, or other error.
+> > >
+> > > Note both those web pages above suggest using mount -t virtiofs, but that
+> > > gives unknown filesystem type 'virtiofs'
+> >
+> > It changed in the newer kernels to the 'virtiofs'.
+> >
+> > > I'm at a loss to find more detailed information on how to configure
+> > > this—are there other resources online, or can anyone suggest what to try
+> > > next?
+> >
+> > I suspect you're suffering from the older kernel here.  Try a nice
+> > shiny new one.
+> >
+> > Dave
+> >
+> > > Thanks!
+> >
+> > > _______________________________________________
+> > > Virtio-fs mailing list
+> > > Virtio-fs@redhat.com
+> > > https://www.redhat.com/mailman/listinfo/virtio-fs
+> >
+> > --
+> > Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> >
+> >
+
 > _______________________________________________
 > Virtio-fs mailing list
 > Virtio-fs@redhat.com
 > https://www.redhat.com/mailman/listinfo/virtio-fs
+
 --
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

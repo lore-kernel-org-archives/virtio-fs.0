@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue, 16 Jun 2020 17:48:47 -0400
-Message-Id: <20200616214847.24482-4-vgoyal@redhat.com>
+Date: Tue, 16 Jun 2020 17:48:45 -0400
+Message-Id: <20200616214847.24482-2-vgoyal@redhat.com>
 In-Reply-To: <20200616214847.24482-1-vgoyal@redhat.com>
 References: <20200616214847.24482-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 3/3] kvm,
-	async_pf: Use FOLL_WRITE only for write faults
+Subject: [Virtio-fs] [PATCH 1/3] kvm,
+	x86: Force sync fault if previous attempts failed
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,123 +18,171 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: kvm@vger.kernel.org, linux-kernel@vger.kernel.org
 Cc: wanpengli@tencent.com, miklos@szeredi.hu, sean.j.christopherson@intel.com, virtio-fs@redhat.com, pbonzini@redhat.com, vkuznets@redhat.com, vgoyal@redhat.com
 
-async_pf_execute() calls get_user_pages_remote() and uses FOLL_WRITE
-always. It does not matter whether fault happened due to read/write.
+Page fault error handling behavior in kvm seems little inconsistent when
+page fault reports error. If we are doing fault synchronously
+then we capture error (-EFAULT) returned by __gfn_to_pfn_memslot() and
+exit to user space and qemu reports error, "error: kvm run failed Bad address".
 
-This creates issues if vma is mapped for reading and does not have
-VM_WRITE set and check_vma_flags() fails in __get_user_pages() and
-get_user_pages_remote() returns -EFAULT.
+But if we are doing async page fault, then async_pf_execute() will simply
+ignore the error reported by get_user_pages_remote(). It is assumed that
+page fault was successful and either a page ready event is injected in
+guest or guest is brought out of artificial halt state and run again.
+In both the cases when guest retries the instruction, it takes exit
+again as page fault was not successful in previous attempt. And then
+this infinite loop continues forever.
 
-So far this was not an issue, as we don't care about return code
-from get_user_pages_remote(). But soon we want to look at this error
-code and if file got truncated and page can't be faulted in, we want
-to inject error in guest and let guest take appropriate action (Either
-send SIGBUS to guest process or do exception table handling or possibly
-die).
+This patch tries to make this behavior consistent. That is instead of
+getting into infinite loop of retrying page fault, exit to user space
+and stop VM if page fault error happens. This can be improved by
+injecting errors in guest when it is allowed. Later patches can
+inject error when a process in guest triggered page fault and
+in that case guest process will receive SIGBUS. Currently we don't
+have a way to inject errors when guest is in kernel mode. Once we
+have race free method to do so, we should be able to inject errors
+and guest can do fixup_exception() if caller set it up so (virtio-fs).
 
-Hence, we don't want to get -EFAULT erroneously. Pass FOLL_WRITE only
-if it is write fault.
+When async pf encounters error then save that pfn and when next time
+guest retries, do a sync fault instead of async fault. So that if error
+is encountered, we exit to qemu and avoid infinite loop.
+
+As of now only one error pfn is stored and that means it could be
+overwritten before next a retry from guest happens. But this is
+just a hint and if we miss it, some other time we will catch it.
+If this becomes an issue, we could maintain an array of error
+gfn later to help ease the issue.
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- arch/x86/kvm/mmu/mmu.c   | 7 ++++---
- include/linux/kvm_host.h | 4 +++-
- virt/kvm/async_pf.c      | 9 +++++++--
- 3 files changed, 14 insertions(+), 6 deletions(-)
+ arch/x86/include/asm/kvm_host.h |  1 +
+ arch/x86/kvm/mmu.h              |  2 +-
+ arch/x86/kvm/mmu/mmu.c          |  2 +-
+ arch/x86/kvm/x86.c              | 19 +++++++++++++++++--
+ include/linux/kvm_host.h        |  1 +
+ virt/kvm/async_pf.c             |  8 ++++++--
+ 6 files changed, 27 insertions(+), 6 deletions(-)
 
+diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
+index 938497a6ebd7..348a73106556 100644
+--- a/arch/x86/include/asm/kvm_host.h
++++ b/arch/x86/include/asm/kvm_host.h
+@@ -778,6 +778,7 @@ struct kvm_vcpu_arch {
+ 		unsigned long nested_apf_token;
+ 		bool delivery_as_pf_vmexit;
+ 		bool pageready_pending;
++		gfn_t error_gfn;
+ 	} apf;
+ 
+ 	/* OSVW MSRs (AMD only) */
+diff --git a/arch/x86/kvm/mmu.h b/arch/x86/kvm/mmu.h
+index 0ad06bfe2c2c..6fa085ff07a3 100644
+--- a/arch/x86/kvm/mmu.h
++++ b/arch/x86/kvm/mmu.h
+@@ -60,7 +60,7 @@ void kvm_init_mmu(struct kvm_vcpu *vcpu, bool reset_roots);
+ void kvm_init_shadow_mmu(struct kvm_vcpu *vcpu, u32 cr0, u32 cr4, u32 efer);
+ void kvm_init_shadow_ept_mmu(struct kvm_vcpu *vcpu, bool execonly,
+ 			     bool accessed_dirty, gpa_t new_eptp);
+-bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu);
++bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu, gfn_t gfn);
+ int kvm_handle_page_fault(struct kvm_vcpu *vcpu, u64 error_code,
+ 				u64 fault_address, char *insn, int insn_len);
+ 
 diff --git a/arch/x86/kvm/mmu/mmu.c b/arch/x86/kvm/mmu/mmu.c
-index 634182bb07c7..15969c4c8925 100644
+index 15984dfde427..e207900ab303 100644
 --- a/arch/x86/kvm/mmu/mmu.c
 +++ b/arch/x86/kvm/mmu/mmu.c
-@@ -4046,7 +4046,7 @@ static void shadow_page_table_clear_flood(struct kvm_vcpu *vcpu, gva_t addr)
- }
+@@ -4078,7 +4078,7 @@ static bool try_async_pf(struct kvm_vcpu *vcpu, bool prefault, gfn_t gfn,
+ 	if (!async)
+ 		return false; /* *pfn has correct page already */
  
- static int kvm_arch_setup_async_pf(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa,
--				   gfn_t gfn)
-+				   gfn_t gfn, bool write)
- {
- 	struct kvm_arch_async_pf arch;
- 
-@@ -4056,7 +4056,8 @@ static int kvm_arch_setup_async_pf(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa,
- 	arch.cr3 = vcpu->arch.mmu->get_guest_pgd(vcpu);
- 
- 	return kvm_setup_async_pf(vcpu, cr2_or_gpa,
--				  kvm_vcpu_gfn_to_hva(vcpu, gfn), &arch);
-+				  kvm_vcpu_gfn_to_hva(vcpu, gfn), &arch,
-+				  write);
- }
- 
- static bool try_async_pf(struct kvm_vcpu *vcpu, bool prefault, gfn_t gfn,
-@@ -4084,7 +4085,7 @@ static bool try_async_pf(struct kvm_vcpu *vcpu, bool prefault, gfn_t gfn,
+-	if (!prefault && kvm_can_do_async_pf(vcpu)) {
++	if (!prefault && kvm_can_do_async_pf(vcpu, cr2_or_gpa >> PAGE_SHIFT)) {
+ 		trace_kvm_try_async_get_page(cr2_or_gpa, gfn);
+ 		if (kvm_find_async_pf_gfn(vcpu, gfn)) {
  			trace_kvm_async_pf_doublefault(cr2_or_gpa, gfn);
- 			kvm_make_request(KVM_REQ_APF_HALT, vcpu);
- 			return true;
--		} else if (kvm_arch_setup_async_pf(vcpu, cr2_or_gpa, gfn))
-+		} else if (kvm_arch_setup_async_pf(vcpu, cr2_or_gpa, gfn, write))
- 			return true;
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index 697d1b273a2f..4c5205434b9c 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -10513,7 +10513,7 @@ static bool kvm_can_deliver_async_pf(struct kvm_vcpu *vcpu)
+ 	return true;
+ }
+ 
+-bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu)
++bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu, gfn_t gfn)
+ {
+ 	if (unlikely(!lapic_in_kernel(vcpu) ||
+ 		     kvm_event_needs_reinjection(vcpu) ||
+@@ -10527,7 +10527,13 @@ bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu)
+ 	 * If interrupts are off we cannot even use an artificial
+ 	 * halt state.
+ 	 */
+-	return kvm_arch_interrupt_allowed(vcpu);
++	if (!kvm_arch_interrupt_allowed(vcpu))
++		return false;
++
++	if (vcpu->arch.apf.error_gfn == gfn)
++		return false;
++
++	return true;
+ }
+ 
+ bool kvm_arch_async_page_not_present(struct kvm_vcpu *vcpu,
+@@ -10583,6 +10589,15 @@ void kvm_arch_async_page_present(struct kvm_vcpu *vcpu,
+ 		kvm_apic_set_irq(vcpu, &irq, NULL);
  	}
  
++	if (work->error_code) {
++		/*
++		 * Page fault failed and we don't have a way to report
++		 * errors back to guest yet. So save this pfn and force
++		 * sync page fault next time.
++		 */
++		vcpu->arch.apf.error_gfn = work->cr2_or_gpa >> PAGE_SHIFT;
++	}
++
+ 	vcpu->arch.apf.halted = false;
+ 	vcpu->arch.mp_state = KVM_MP_STATE_RUNNABLE;
+ }
 diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index b8558334b184..a7c3999a7374 100644
+index 216cdb6581e2..b8558334b184 100644
 --- a/include/linux/kvm_host.h
 +++ b/include/linux/kvm_host.h
-@@ -208,12 +208,14 @@ struct kvm_async_pf {
+@@ -207,6 +207,7 @@ struct kvm_async_pf {
+ 	struct kvm_arch_async_pf arch;
  	bool   wakeup_all;
  	bool notpresent_injected;
- 	int error_code;
-+	bool write;
++	int error_code;
  };
  
  void kvm_clear_async_pf_completion_queue(struct kvm_vcpu *vcpu);
- void kvm_check_async_pf_completion(struct kvm_vcpu *vcpu);
- int kvm_setup_async_pf(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa,
--		       unsigned long hva, struct kvm_arch_async_pf *arch);
-+		       unsigned long hva, struct kvm_arch_async_pf *arch,
-+		       bool write);
- int kvm_async_pf_wakeup_all(struct kvm_vcpu *vcpu);
- #endif
- 
 diff --git a/virt/kvm/async_pf.c b/virt/kvm/async_pf.c
-index 6b30374a4de1..1d2dc267f9b8 100644
+index a36828fbf40a..6b30374a4de1 100644
 --- a/virt/kvm/async_pf.c
 +++ b/virt/kvm/async_pf.c
-@@ -53,6 +53,7 @@ static void async_pf_execute(struct work_struct *work)
+@@ -52,6 +52,7 @@ static void async_pf_execute(struct work_struct *work)
+ 	gpa_t cr2_or_gpa = apf->cr2_or_gpa;
  	int locked = 1;
  	bool first;
- 	long ret;
-+	unsigned int gup_flags = 0;
++	long ret;
  
  	might_sleep();
  
-@@ -61,8 +62,10 @@ static void async_pf_execute(struct work_struct *work)
- 	 * mm and might be done in another context, so we must
+@@ -61,11 +62,14 @@ static void async_pf_execute(struct work_struct *work)
  	 * access remotely.
  	 */
-+	if (apf->write)
-+		gup_flags = FOLL_WRITE;
  	down_read(&mm->mmap_sem);
--	ret = get_user_pages_remote(NULL, mm, addr, 1, FOLL_WRITE, NULL, NULL,
-+	ret = get_user_pages_remote(NULL, mm, addr, 1, gup_flags, NULL, NULL,
- 				    &locked);
+-	get_user_pages_remote(NULL, mm, addr, 1, FOLL_WRITE, NULL, NULL,
+-			&locked);
++	ret = get_user_pages_remote(NULL, mm, addr, 1, FOLL_WRITE, NULL, NULL,
++				    &locked);
  	if (locked)
  		up_read(&mm->mmap_sem);
-@@ -161,7 +164,8 @@ void kvm_check_async_pf_completion(struct kvm_vcpu *vcpu)
- }
  
- int kvm_setup_async_pf(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa,
--		       unsigned long hva, struct kvm_arch_async_pf *arch)
-+		       unsigned long hva, struct kvm_arch_async_pf *arch,
-+		       bool write)
- {
- 	struct kvm_async_pf *work;
- 
-@@ -186,6 +190,7 @@ int kvm_setup_async_pf(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa,
- 	work->addr = hva;
- 	work->arch = *arch;
- 	work->mm = current->mm;
-+	work->write = write;
- 	mmget(work->mm);
- 	kvm_get_kvm(work->vcpu->kvm);
++	if (ret < 0)
++		apf->error_code = ret;
++
+ 	if (IS_ENABLED(CONFIG_KVM_ASYNC_PF_SYNC))
+ 		kvm_arch_async_page_present(vcpu, apf);
  
 -- 
 2.25.4

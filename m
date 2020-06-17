@@ -1,13 +1,14 @@
-Date: Wed, 17 Jun 2020 16:33:07 -0400
+Date: Wed, 17 Jun 2020 17:51:52 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200617203307.GE26770@redhat.com>
+Message-ID: <20200617215152.GF26770@redhat.com>
 References: <20200616214847.24482-1-vgoyal@redhat.com>
 	<20200616214847.24482-3-vgoyal@redhat.com>
 	<87lfklhm58.fsf@vitty.brq.redhat.com>
+	<20200617183224.GK26818@linux.intel.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <87lfklhm58.fsf@vitty.brq.redhat.com>
+In-Reply-To: <20200617183224.GK26818@linux.intel.com>
 Subject: Re: [Virtio-fs] [PATCH 2/3] kvm: Add capability to be able to
  report async pf error to guest
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -18,453 +19,161 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vitaly Kuznetsov <vkuznets@redhat.com>
-Cc: wanpengli@tencent.com, kvm@vger.kernel.org, miklos@szeredi.hu, sean.j.christopherson@intel.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, pbonzini@redhat.com
+To: Sean Christopherson <sean.j.christopherson@intel.com>
+Cc: wanpengli@tencent.com, kvm@vger.kernel.org, miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, pbonzini@redhat.com, Vitaly Kuznetsov <vkuznets@redhat.com>
 
-On Wed, Jun 17, 2020 at 03:12:03PM +0200, Vitaly Kuznetsov wrote:
-> Vivek Goyal <vgoyal@redhat.com> writes:
+On Wed, Jun 17, 2020 at 11:32:24AM -0700, Sean Christopherson wrote:
+> On Wed, Jun 17, 2020 at 03:12:03PM +0200, Vitaly Kuznetsov wrote:
+> > Vivek Goyal <vgoyal@redhat.com> writes:
+> > 
+> > > As of now asynchronous page fault mecahanism assumes host will always be
+> > > successful in resolving page fault. So there are only two states, that
+> > > is page is not present and page is ready.
+> > >
+> > > If a page is backed by a file and that file has been truncated (as
+> > > can be the case with virtio-fs), then page fault handler on host returns
+> > > -EFAULT.
+> > >
+> > > As of now async page fault logic does not look at error code (-EFAULT)
+> > > returned by get_user_pages_remote() and returns PAGE_READY to guest.
+> > > Guest tries to access page and page fault happnes again. And this
+> > > gets kvm into an infinite loop. (Killing host process gets kvm out of
+> > > this loop though).
 > 
-> > As of now asynchronous page fault mecahanism assumes host will always be
-> > successful in resolving page fault. So there are only two states, that
-> > is page is not present and page is ready.
-> >
-> > If a page is backed by a file and that file has been truncated (as
-> > can be the case with virtio-fs), then page fault handler on host returns
-> > -EFAULT.
-> >
-> > As of now async page fault logic does not look at error code (-EFAULT)
-> > returned by get_user_pages_remote() and returns PAGE_READY to guest.
-> > Guest tries to access page and page fault happnes again. And this
-> > gets kvm into an infinite loop. (Killing host process gets kvm out of
-> > this loop though).
-> >
-> > This patch adds another state to async page fault logic which allows
-> > host to return error to guest. Once guest knows that async page fault
-> > can't be resolved, it can send SIGBUS to host process (if user space
-> > was accessing the page in question).
-> >
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > ---
-> >  Documentation/virt/kvm/cpuid.rst     |  4 +++
-> >  Documentation/virt/kvm/msr.rst       | 10 +++++---
-> >  arch/x86/include/asm/kvm_host.h      |  3 +++
-> >  arch/x86/include/asm/kvm_para.h      |  8 +++---
-> >  arch/x86/include/uapi/asm/kvm_para.h | 10 ++++++--
-> >  arch/x86/kernel/kvm.c                | 34 ++++++++++++++++++++-----
-> >  arch/x86/kvm/cpuid.c                 |  3 ++-
-> >  arch/x86/kvm/mmu/mmu.c               |  2 +-
-> >  arch/x86/kvm/x86.c                   | 38 ++++++++++++++++++++--------
-> >  9 files changed, 83 insertions(+), 29 deletions(-)
-> >
-> > diff --git a/Documentation/virt/kvm/cpuid.rst b/Documentation/virt/kvm/cpuid.rst
-> > index a7dff9186bed..a4497f3a6e7f 100644
-> > --- a/Documentation/virt/kvm/cpuid.rst
-> > +++ b/Documentation/virt/kvm/cpuid.rst
-> > @@ -92,6 +92,10 @@ KVM_FEATURE_ASYNC_PF_INT          14          guest checks this feature bit
-> >                                                async pf acknowledgment msr
-> >                                                0x4b564d07.
-> >  
-> > +KVM_FEATURE_ASYNC_PF_ERROR        15          paravirtualized async PF error
-> > +                                              can be enabled by setting bit 4
-> > +                                              when writing to msr 0x4b564d02
-> > +
-> >  KVM_FEATURE_CLOCSOURCE_STABLE_BIT 24          host will warn if no guest-side
-> >                                                per-cpu warps are expeced in
-> >                                                kvmclock
-> > diff --git a/Documentation/virt/kvm/msr.rst b/Documentation/virt/kvm/msr.rst
-> > index e37a14c323d2..513eb8e0b0eb 100644
-> > --- a/Documentation/virt/kvm/msr.rst
-> > +++ b/Documentation/virt/kvm/msr.rst
-> > @@ -202,19 +202,21 @@ data:
-> >  
-> >  		/* Used for 'page ready' events delivered via interrupt notification */
-> >  		__u32 token;
-> > -
-> > -		__u8 pad[56];
-> > +                __u32 ready_flags;
-> > +		__u8 pad[52];
-> >  		__u32 enabled;
-> >  	  };
-> >  
-> > -	Bits 5-4 of the MSR are reserved and should be zero. Bit 0 is set to 1
-> > +	Bits 5 of the MSR is reserved and should be zero. Bit 0 is set to 1
-> >  	when asynchronous page faults are enabled on the vcpu, 0 when disabled.
-> >  	Bit 1 is 1 if asynchronous page faults can be injected when vcpu is in
-> >  	cpl == 0. Bit 2 is 1 if asynchronous page faults are delivered to L1 as
-> >  	#PF vmexits.  Bit 2 can be set only if KVM_FEATURE_ASYNC_PF_VMEXIT is
-> >  	present in CPUID. Bit 3 enables interrupt based delivery of 'page ready'
-> >  	events. Bit 3 can only be set if KVM_FEATURE_ASYNC_PF_INT is present in
-> > -	CPUID.
-> > +	CPUID. Bit 4 enables reporting of page fault errors if hypervisor
-> > +        encounters errors while faulting in page. Bit 4 can only be set if
-> > +        KVM_FEATURE_ASYNC_PF_ERROR is present in CPUID.
-> 
-> Would it actually make sense to deliver the exact error from
-> get_user_pages() and not a binary failure/no-failure? Is the guest
-> interested in how exactly we failed?
+> Isn't this already fixed by patch 1/3 "kvm,x86: Force sync fault if previous
+> attempts failed"?  If it isn't, it should be, i.e. we should fix KVM before
+> adding what are effectively optimizations on top.
 
-I was thinking about it but could not find a use case. I am not sure
-what will guest do with this error code.
+Yes you are right. It is now fixed by patch 1. I wrote changelog first
+and later I changed the order of patches and forgot to fix the changelog.
 
-If error happened in user space because mmap() tried to access portion
-of file which got truncated on host then we probably should treat
-it same way as if a process on host gets SIGBUS. I think they get
-si_code as BUS_ADRERR and also the faulting address. This patch as
-of now does not send faulting gva because I am not sure how to get
-that. In the past I had proposed a patch where I was sending gva
-also as part of error.
+So yes, with previous patch we will not exit to qemu with -EFAULT or
+any other error code.
 
-https://lore.kernel.org/kvm/20200331194011.24834-3-vgoyal@redhat.com/
+This patch improves upon it and when possible injects error into guest
+so that guest can handle it.
 
-I am not sure if that's the right way to get to GVA. Is it true
-that following will give me guest virtual address. It seemed to
-work for me in the past.
+> And, it's not clear that
+> the optimizations are necessary, e.g. I assume the virtio-fs truncation
+> scenario is relatively uncommon, i.e. not performance sensitive?
 
-+	if (exit_qualification | EPT_VIOLATION_GLA_VALID) {
-+		gva = vmcs_readl(GUEST_LINEAR_ADDRESS);
-+	}
+As of now this scenario is less common but with virtio-fs this truncation
+can become more common. A file can be truncated on host or by another
+guest. Its a full filesystem. And most of the time filesystem will
+try to cope with it but invariably there will be some cases where
+user space/kernel space will try to load/store to a page which got
+truncated.  And in that case, guest can do error handling much 
+better as long as we can inject error back into guest.
 
-If error happened in kernel, we will just simply call fixup_exception()
-or panic().
+For process, we can send SIGBUS and for kernel access, a special
+version of memcpy_mcsafe() equivalent will be used which simply
+return -EIO to user space. 
 
-So while sending error back might not hurt, I don't have a good use
-case in mind yet. So I thought of leaving it as a future item when
-somebody cares about it.
+So these optimizations make sense to me because guest can continue
+to work instead of dying when error occurs.
 
 > 
-> >  
-> >  	'Page not present' events are currently always delivered as synthetic
-> >  	#PF exception. During delivery of these events APF CR2 register contains
-> > diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
-> > index 348a73106556..ff8dbc604dbe 100644
-> > --- a/arch/x86/include/asm/kvm_host.h
-> > +++ b/arch/x86/include/asm/kvm_host.h
-> > @@ -779,6 +779,7 @@ struct kvm_vcpu_arch {
-> >  		bool delivery_as_pf_vmexit;
-> >  		bool pageready_pending;
-> >  		gfn_t error_gfn;
-> > +		bool send_pf_error;
-> >  	} apf;
-> >  
-> >  	/* OSVW MSRs (AMD only) */
-> > @@ -1680,6 +1681,8 @@ void kvm_arch_async_page_ready(struct kvm_vcpu *vcpu,
-> >  			       struct kvm_async_pf *work);
-> >  void kvm_arch_async_page_present_queued(struct kvm_vcpu *vcpu);
-> >  bool kvm_arch_can_dequeue_async_page_present(struct kvm_vcpu *vcpu);
-> > +void kvm_arch_async_page_fault_error(struct kvm_vcpu *vcpu,
-> > +				     struct kvm_async_pf *work);
-> >  extern bool kvm_find_async_pf_gfn(struct kvm_vcpu *vcpu, gfn_t gfn);
-> >  
-> >  int kvm_skip_emulated_instruction(struct kvm_vcpu *vcpu);
-> > diff --git a/arch/x86/include/asm/kvm_para.h b/arch/x86/include/asm/kvm_para.h
-> > index bbc43e5411d9..6c738e91ca2c 100644
-> > --- a/arch/x86/include/asm/kvm_para.h
-> > +++ b/arch/x86/include/asm/kvm_para.h
-> > @@ -89,8 +89,8 @@ static inline long kvm_hypercall4(unsigned int nr, unsigned long p1,
-> >  bool kvm_para_available(void);
-> >  unsigned int kvm_arch_para_features(void);
-> >  unsigned int kvm_arch_para_hints(void);
-> > -void kvm_async_pf_task_wait_schedule(u32 token);
-> > -void kvm_async_pf_task_wake(u32 token);
-> > +void kvm_async_pf_task_wait_schedule(u32 token, bool user_mode);
-> > +void kvm_async_pf_task_wake(u32 token, bool is_err);
-> >  u32 kvm_read_and_reset_apf_flags(void);
-> >  void kvm_disable_steal_time(void);
-> >  bool __kvm_handle_async_pf(struct pt_regs *regs, u32 token);
-> > @@ -120,8 +120,8 @@ static inline void kvm_spinlock_init(void)
-> >  #endif /* CONFIG_PARAVIRT_SPINLOCKS */
-> >  
-> >  #else /* CONFIG_KVM_GUEST */
-> > -#define kvm_async_pf_task_wait_schedule(T) do {} while(0)
-> > -#define kvm_async_pf_task_wake(T) do {} while(0)
-> > +#define kvm_async_pf_task_wait_schedule(T, U) do {} while(0)
-> > +#define kvm_async_pf_task_wake(T, I) do {} while(0)
-> >  
-> >  static inline bool kvm_para_available(void)
-> >  {
-> > diff --git a/arch/x86/include/uapi/asm/kvm_para.h b/arch/x86/include/uapi/asm/kvm_para.h
-> > index 812e9b4c1114..b43fd2ddc949 100644
-> > --- a/arch/x86/include/uapi/asm/kvm_para.h
-> > +++ b/arch/x86/include/uapi/asm/kvm_para.h
-> > @@ -32,6 +32,7 @@
-> >  #define KVM_FEATURE_POLL_CONTROL	12
-> >  #define KVM_FEATURE_PV_SCHED_YIELD	13
-> >  #define KVM_FEATURE_ASYNC_PF_INT	14
-> > +#define KVM_FEATURE_ASYNC_PF_ERROR	15
-> >  
-> >  #define KVM_HINTS_REALTIME      0
-> >  
-> > @@ -85,6 +86,7 @@ struct kvm_clock_pairing {
-> >  #define KVM_ASYNC_PF_SEND_ALWAYS		(1 << 1)
-> >  #define KVM_ASYNC_PF_DELIVERY_AS_PF_VMEXIT	(1 << 2)
-> >  #define KVM_ASYNC_PF_DELIVERY_AS_INT		(1 << 3)
-> > +#define KVM_ASYNC_PF_SEND_ERROR			(1 << 4)
-> >  
-> >  /* MSR_KVM_ASYNC_PF_INT */
-> >  #define KVM_ASYNC_PF_VEC_MASK			GENMASK(7, 0)
-> > @@ -119,14 +121,18 @@ struct kvm_mmu_op_release_pt {
-> >  #define KVM_PV_REASON_PAGE_NOT_PRESENT 1
-> >  #define KVM_PV_REASON_PAGE_READY 2
-> >  
-> > +
-> > +/* Bit flags for ready_flags field */
-> > +#define KVM_PV_REASON_PAGE_ERROR 1
-> > +
-> >  struct kvm_vcpu_pv_apf_data {
-> >  	/* Used for 'page not present' events delivered via #PF */
-> >  	__u32 flags;
-> >  
-> >  	/* Used for 'page ready' events delivered via interrupt notification */
-> >  	__u32 token;
-> > -
-> > -	__u8 pad[56];
-> > +	__u32 ready_flags;
-> > +	__u8 pad[52];
-> >  	__u32 enabled;
-> >  };
-> >  
-> > diff --git a/arch/x86/kernel/kvm.c b/arch/x86/kernel/kvm.c
-> > index ff95429d206b..2ee9c9d971ae 100644
-> > --- a/arch/x86/kernel/kvm.c
-> > +++ b/arch/x86/kernel/kvm.c
-> > @@ -75,6 +75,7 @@ struct kvm_task_sleep_node {
-> >  	struct swait_queue_head wq;
-> >  	u32 token;
-> >  	int cpu;
-> > +	bool is_err;
-> >  };
-> >  
-> >  static struct kvm_task_sleep_head {
-> > @@ -97,7 +98,14 @@ static struct kvm_task_sleep_node *_find_apf_task(struct kvm_task_sleep_head *b,
-> >  	return NULL;
-> >  }
-> >  
-> > -static bool kvm_async_pf_queue_task(u32 token, struct kvm_task_sleep_node *n)
-> > +static void handle_async_pf_error(bool user_mode)
-> > +{
-> > +	if (user_mode)
-> > +		send_sig_info(SIGBUS, SEND_SIG_PRIV, current);
-> > +}
-> > +
-> > +static bool kvm_async_pf_queue_task(u32 token, struct kvm_task_sleep_node *n,
-> > +				    bool user_mode)
-> >  {
-> >  	u32 key = hash_32(token, KVM_TASK_SLEEP_HASHBITS);
-> >  	struct kvm_task_sleep_head *b = &async_pf_sleepers[key];
-> > @@ -107,6 +115,8 @@ static bool kvm_async_pf_queue_task(u32 token, struct kvm_task_sleep_node *n)
-> >  	e = _find_apf_task(b, token);
-> >  	if (e) {
-> >  		/* dummy entry exist -> wake up was delivered ahead of PF */
-> > +		if (e->is_err)
-> > +			handle_async_pf_error(user_mode);
-> >  		hlist_del(&e->link);
-> >  		raw_spin_unlock(&b->lock);
-> >  		kfree(e);
-> > @@ -128,14 +138,14 @@ static bool kvm_async_pf_queue_task(u32 token, struct kvm_task_sleep_node *n)
-> >   * Invoked from the async pagefault handling code or from the VM exit page
-> >   * fault handler. In both cases RCU is watching.
-> >   */
-> > -void kvm_async_pf_task_wait_schedule(u32 token)
-> > +void kvm_async_pf_task_wait_schedule(u32 token, bool user_mode)
-> >  {
-> >  	struct kvm_task_sleep_node n;
-> >  	DECLARE_SWAITQUEUE(wait);
-> >  
-> >  	lockdep_assert_irqs_disabled();
-> >  
-> > -	if (!kvm_async_pf_queue_task(token, &n))
-> > +	if (!kvm_async_pf_queue_task(token, &n, user_mode))
-> >  		return;
-> >  
-> >  	for (;;) {
-> > @@ -148,6 +158,8 @@ void kvm_async_pf_task_wait_schedule(u32 token)
-> >  		local_irq_disable();
-> >  	}
-> >  	finish_swait(&n.wq, &wait);
-> > +	if (n.is_err)
-> > +		handle_async_pf_error(user_mode);
-> >  }
-> >  EXPORT_SYMBOL_GPL(kvm_async_pf_task_wait_schedule);
-> >  
-> > @@ -177,7 +189,7 @@ static void apf_task_wake_all(void)
-> >  	}
-> >  }
-> >  
-> > -void kvm_async_pf_task_wake(u32 token)
-> > +void kvm_async_pf_task_wake(u32 token, bool is_err)
-> >  {
-> >  	u32 key = hash_32(token, KVM_TASK_SLEEP_HASHBITS);
-> >  	struct kvm_task_sleep_head *b = &async_pf_sleepers[key];
-> > @@ -208,9 +220,11 @@ void kvm_async_pf_task_wake(u32 token)
-> >  		}
-> >  		n->token = token;
-> >  		n->cpu = smp_processor_id();
-> > +		n->is_err = is_err;
-> >  		init_swait_queue_head(&n->wq);
-> >  		hlist_add_head(&n->link, &b->list);
-> >  	} else {
-> > +		n->is_err = is_err;
-> >  		apf_task_wake_one(n);
-> >  	}
-> >  	raw_spin_unlock(&b->lock);
-> > @@ -256,14 +270,15 @@ bool __kvm_handle_async_pf(struct pt_regs *regs, u32 token)
-> >  		panic("Host injected async #PF in kernel mode\n");
-> >  
-> >  	/* Page is swapped out by the host. */
-> > -	kvm_async_pf_task_wait_schedule(token);
-> > +	kvm_async_pf_task_wait_schedule(token, user_mode(regs));
-> >  	return true;
-> >  }
-> >  NOKPROBE_SYMBOL(__kvm_handle_async_pf);
-> >  
-> >  __visible void __irq_entry kvm_async_pf_intr(struct pt_regs *regs)
-> >  {
-> > -	u32 token;
-> > +	u32 token, ready_flags;
-> > +	bool is_err;
-> >  
-> >  	entering_ack_irq();
-> >  
-> > @@ -271,7 +286,9 @@ __visible void __irq_entry kvm_async_pf_intr(struct pt_regs *regs)
-> >  
-> >  	if (__this_cpu_read(apf_reason.enabled)) {
-> >  		token = __this_cpu_read(apf_reason.token);
-> > -		kvm_async_pf_task_wake(token);
-> > +		ready_flags = __this_cpu_read(apf_reason.ready_flags);
-> > +		is_err = ready_flags & KVM_PV_REASON_PAGE_ERROR;
-> > +		kvm_async_pf_task_wake(token, is_err);
-> >  		__this_cpu_write(apf_reason.token, 0);
-> >  		wrmsrl(MSR_KVM_ASYNC_PF_ACK, 1);
-> >  	}
-> > @@ -335,6 +352,9 @@ static void kvm_guest_cpu_init(void)
-> >  
-> >  		wrmsrl(MSR_KVM_ASYNC_PF_INT, KVM_ASYNC_PF_VECTOR);
-> >  
-> > +		if (kvm_para_has_feature(KVM_FEATURE_ASYNC_PF_ERROR))
-> > +			pa |= KVM_ASYNC_PF_SEND_ERROR;
-> > +
-> >  		wrmsrl(MSR_KVM_ASYNC_PF_EN, pa);
-> >  		__this_cpu_write(apf_reason.enabled, 1);
-> >  		pr_info("KVM setup async PF for cpu %d\n", smp_processor_id());
-> > diff --git a/arch/x86/kvm/cpuid.c b/arch/x86/kvm/cpuid.c
-> > index 253b8e875ccd..f811f36e0c24 100644
-> > --- a/arch/x86/kvm/cpuid.c
-> > +++ b/arch/x86/kvm/cpuid.c
-> > @@ -712,7 +712,8 @@ static inline int __do_cpuid_func(struct kvm_cpuid_array *array, u32 function)
-> >  			     (1 << KVM_FEATURE_PV_SEND_IPI) |
-> >  			     (1 << KVM_FEATURE_POLL_CONTROL) |
-> >  			     (1 << KVM_FEATURE_PV_SCHED_YIELD) |
-> > -			     (1 << KVM_FEATURE_ASYNC_PF_INT);
-> > +			     (1 << KVM_FEATURE_ASYNC_PF_INT) |
-> > +			     (1 << KVM_FEATURE_ASYNC_PF_ERROR);
-> >  
-> >  		if (sched_info_on())
-> >  			entry->eax |= (1 << KVM_FEATURE_STEAL_TIME);
-> > diff --git a/arch/x86/kvm/mmu/mmu.c b/arch/x86/kvm/mmu/mmu.c
-> > index e207900ab303..634182bb07c7 100644
-> > --- a/arch/x86/kvm/mmu/mmu.c
-> > +++ b/arch/x86/kvm/mmu/mmu.c
-> > @@ -4175,7 +4175,7 @@ int kvm_handle_page_fault(struct kvm_vcpu *vcpu, u64 error_code,
-> >  	} else if (flags & KVM_PV_REASON_PAGE_NOT_PRESENT) {
-> >  		vcpu->arch.apf.host_apf_flags = 0;
-> >  		local_irq_disable();
-> > -		kvm_async_pf_task_wait_schedule(fault_address);
-> > +		kvm_async_pf_task_wait_schedule(fault_address, 0);
-> >  		local_irq_enable();
-> >  	} else {
-> >  		WARN_ONCE(1, "Unexpected host async PF flags: %x\n", flags);
-> > diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
-> > index 4c5205434b9c..c3b2097f2eaa 100644
-> > --- a/arch/x86/kvm/x86.c
-> > +++ b/arch/x86/kvm/x86.c
-> > @@ -2690,8 +2690,8 @@ static int kvm_pv_enable_async_pf(struct kvm_vcpu *vcpu, u64 data)
-> >  {
-> >  	gpa_t gpa = data & ~0x3f;
-> >  
-> > -	/* Bits 4:5 are reserved, Should be zero */
-> > -	if (data & 0x30)
-> > +	/* Bits 5 is reserved, Should be zero */
-> > +	if (data & 0x20)
-> >  		return 1;
-> >  
-> >  	vcpu->arch.apf.msr_en_val = data;
-> > @@ -2703,11 +2703,12 @@ static int kvm_pv_enable_async_pf(struct kvm_vcpu *vcpu, u64 data)
-> >  	}
-> >  
-> >  	if (kvm_gfn_to_hva_cache_init(vcpu->kvm, &vcpu->arch.apf.data, gpa,
-> > -					sizeof(u64)))
-> > +					sizeof(u64) + sizeof(u32)))
-> >  		return 1;
-> >  
-> >  	vcpu->arch.apf.send_user_only = !(data & KVM_ASYNC_PF_SEND_ALWAYS);
-> >  	vcpu->arch.apf.delivery_as_pf_vmexit = data & KVM_ASYNC_PF_DELIVERY_AS_PF_VMEXIT;
-> > +	vcpu->arch.apf.send_pf_error = data & KVM_ASYNC_PF_SEND_ERROR;
-> >  
-> >  	kvm_async_pf_wakeup_all(vcpu);
-> >  
-> > @@ -10481,12 +10482,25 @@ static inline int apf_put_user_notpresent(struct kvm_vcpu *vcpu)
-> >  				      sizeof(reason));
-> >  }
-> >  
-> > -static inline int apf_put_user_ready(struct kvm_vcpu *vcpu, u32 token)
-> > +static inline int apf_put_user_ready(struct kvm_vcpu *vcpu, u32 token,
-> > +				     bool is_err)
-> >  {
-> >  	unsigned int offset = offsetof(struct kvm_vcpu_pv_apf_data, token);
-> > +	int ret;
-> > +	u32 ready_flags = 0;
-> > +
-> > +	if (is_err && vcpu->arch.apf.send_pf_error)
-> > +		ready_flags = KVM_PV_REASON_PAGE_ERROR;
-> > +
-> > +	ret = kvm_write_guest_offset_cached(vcpu->kvm, &vcpu->arch.apf.data,
-> > +					    &token, offset, sizeof(token));
-> > +	if (ret < 0)
-> > +		return ret;
-> >  
-> > +	offset = offsetof(struct kvm_vcpu_pv_apf_data, ready_flags);
-> >  	return kvm_write_guest_offset_cached(vcpu->kvm, &vcpu->arch.apf.data,
-> > -					     &token, offset, sizeof(token));
-> > +					    &ready_flags, offset,
-> > +					    sizeof(ready_flags));
-> >  }
-> >  
-> >  static inline bool apf_pageready_slot_free(struct kvm_vcpu *vcpu)
-> > @@ -10571,6 +10585,8 @@ bool kvm_arch_async_page_not_present(struct kvm_vcpu *vcpu,
-> >  void kvm_arch_async_page_present(struct kvm_vcpu *vcpu,
-> >  				 struct kvm_async_pf *work)
-> >  {
-> > +	bool present_injected = false;
-> > +
-> >  	struct kvm_lapic_irq irq = {
-> >  		.delivery_mode = APIC_DM_FIXED,
-> >  		.vector = vcpu->arch.apf.vec
-> > @@ -10584,16 +10600,18 @@ void kvm_arch_async_page_present(struct kvm_vcpu *vcpu,
-> >  
-> >  	if ((work->wakeup_all || work->notpresent_injected) &&
-> >  	    kvm_pv_async_pf_enabled(vcpu) &&
-> > -	    !apf_put_user_ready(vcpu, work->arch.token)) {
-> > +	    !apf_put_user_ready(vcpu, work->arch.token, work->error_code)) {
-> >  		vcpu->arch.apf.pageready_pending = true;
-> >  		kvm_apic_set_irq(vcpu, &irq, NULL);
-> > +		present_injected = true;
-> >  	}
-> >  
-> > -	if (work->error_code) {
-> > +	if (work->error_code &&
-> > +	    (!present_injected || !vcpu->arch.apf.send_pf_error)) {
-> >  		/*
-> > -		 * Page fault failed and we don't have a way to report
-> > -		 * errors back to guest yet. So save this pfn and force
-> > -		 * sync page fault next time.
-> > +		 * Page fault failed. If we did not report error back
-> > +		 * to guest, save this pfn and force sync page fault next
-> > +		 * time.
-> >  		 */
-> >  		vcpu->arch.apf.error_gfn = work->cr2_or_gpa >> PAGE_SHIFT;
-> >  	}
+> > >
+> > > This patch adds another state to async page fault logic which allows
+> > > host to return error to guest. Once guest knows that async page fault
+> > > can't be resolved, it can send SIGBUS to host process (if user space
 > 
-> -- 
-> Vitaly
+> I assume this is supposed to be "it can send SIGBUS to guest process"?
+> Otherwise none of this makes sense (to me).
+
+Yes, I meant SIGBUS to guest process (and not host process). Its a typo.
+
 > 
+> > > was accessing the page in question).
+> 
+> Allowing the guest to opt-in to intercepting host page allocation failures
+> feels wrong, and fragile.  KVM can't possibly know whether an allocation
+> failure is something that should be forwarded to the guest, as KVM doesn't
+> know the physical backing for any given hva/gfn, e.g. the error could be
+> due to a physical device failure or a configuration issue.  Relying on the
+> async #PF mechanism to prevent allocation failures from crashing the guest
+> is fragile because there is no guarantee that a #PF can be async.
+> 
+
+Actually it is it does not necessarily have to be async #PF. What we
+are missing right now, is a synchronous method to report errors back.
+And once that is available (#VE), then we can use that instead. So
+if KVM decides to do synchrous fault, we can inject error using #VE
+otherwise use interrupt based APF READY.
+
+IOW, we are not necessarily relying on #PF being async. For now if
+page fault is sync and error happens, we will exit to qemu and
+VM will freeze/die.
+
+> IMO, the virtio-fs truncation use case should first be addressed in a way
+> that requires explicit userspace intervention, e.g. by enhancing
+> kvm_handle_bad_page() to provide the necessary information to userspace so
+> that userspace can reflect select errors into the guest.
+
+Which errors do you want to filter out. And this does not take away
+filtering capability. When we figure out what needs to be filtered
+out, we can do something like kvm_send_hwpoison_signal() to signal
+to user space and not exit to user space with error.
+
+Havind said that, I see that currently the way code is written, we
+capture the error and will inject it in guest if guest opted for
+it.
+
+kvm_check_async_pf_completion() {
+	kvm_arch_async_page_ready();
+	kvm_arch_async_page_present();
+}
+
+I really don't understand what's the significance of
+kvm_arch_async_page_ready(). Why does it go all they way into
+try_async_pf() and why does it set prefault=1.
+
+Anway, so we executed async page fault which did get_user_pages_remote()
+and populated page tables. Now we check for completion can call
+kvm_arch_async_page_ready() which will call into direct_page_fault()
+and try_async_pf() and handle_abnormal_pfn(). I think we could
+capture the error from kvm_arch_async_page_ready() also. That way
+handle_abnormal_pfn() will be able to filter it out and do out
+of band action (like poisoned pages) and page_present() will not
+inject error in guest.
+
+> The reflection
+> could piggyback whatever vector is used by async page faults (#PF or #VE),
+> but would not be an async page fault per se.  If an async #PF happens to
+> encounter an allocation failure, it would naturally fall back to the
+> synchronous path (provided by patch 1/3) and the synchronous path would
+> automagically handle the error as above.
+
+We could do that as well. So you are suggesting that instead of reporting
+error in async PF PAGE_READY event. Instead send PAGE_READY and upon retry
+path force sync page fault and then report error using new race free
+vector (#VE). 
+
+We don't have that vector yet though and given the conversation it might
+not be simple to implement that. 
+
+I had played with using MCE also to inject errors as Andy had suggested
+but this error can happen on store path too and MCEs are not generated
+on store path. So this is not suitable either.
+
+> 
+> In other words, I think the guest should be able to enable "error handling"
+> support without first enabling async #PF.  From a functional perspective it
+> probably won't change a whole lot, but it would hopefully force us to
+> concoct an overall "paravirt page fault" design as opposed to simply async
+> #PF v2.
+
+I am not sure how independent these two can be. Even if there was
+a separate way to enable error handling, one will have to opt in
+in async pf V2 to report errors because shared data between host
+and guest will change accordingly. So we probably will end up
+electing for error reporting at two places. One a generic method
+and then also at async PF level.
+
+Or maybe we we can choose to never report errors using async PF
+protocol. Always choose suboptimal implementation of retrying
+the fault and inject errors *always* using that new vector( #VE).
+
+Thanks
+Vivek
 

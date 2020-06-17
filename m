@@ -1,19 +1,15 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=intel.onmicrosoft.com; 
-	s=selector2-intel-onmicrosoft-com;
-	h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
-	bh=4jtubgByHkA1i/jssBuAwrbSpxVE2vivwulG2dgmnyc=;
-	b=jaBkUmQMduFXqGH8M8npheh2AyZvLuvub3St4fRooz9vFrDaYZxHJJFyJMCPNrNgVJNEfoQZgJPuor1KsIzN4Ld0QjBdFICTGVfKZaEZFyU4hGIAjLq1V6GygdvunnIanxElF641ioc8/EkqLydCB6ZDhrIkRBoWoDsSju/Irtw=
-From: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
-Date: Wed, 17 Jun 2020 13:58:54 +0000
-Message-ID: <SN6PR11MB2943CDD11BE8CB3F5E73794DEA9A0@SN6PR11MB2943.namprd11.prod.outlook.com>
-References: <SN6PR11MB2943070029C7CA4BACE7438AEA810@SN6PR11MB2943.namprd11.prod.outlook.com>,
-	<20200617135229.GB26770@redhat.com>
-In-Reply-To: <20200617135229.GB26770@redhat.com>
-Content-Language: en-US
+Date: Wed, 17 Jun 2020 11:32:24 -0700
+From: Sean Christopherson <sean.j.christopherson@intel.com>
+Message-ID: <20200617183224.GK26818@linux.intel.com>
+References: <20200616214847.24482-1-vgoyal@redhat.com>
+	<20200616214847.24482-3-vgoyal@redhat.com>
+	<87lfklhm58.fsf@vitty.brq.redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/alternative;
-	boundary="_000_SN6PR11MB2943CDD11BE8CB3F5E73794DEA9A0SN6PR11MB2943namp_"
-Subject: Re: [Virtio-fs] Kernel patches on latest linux kernel
+In-Reply-To: <87lfklhm58.fsf@vitty.brq.redhat.com>
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: Re: [Virtio-fs] [PATCH 2/3] kvm: Add capability to be able to
+ report async pf error to guest
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,80 +18,63 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+To: Vitaly Kuznetsov <vkuznets@redhat.com>
+Cc: wanpengli@tencent.com, kvm@vger.kernel.org, miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, pbonzini@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
---_000_SN6PR11MB2943CDD11BE8CB3F5E73794DEA9A0SN6PR11MB2943namp_
-Content-Type: text/plain; charset="utf-8"
-MIME-Version: 1.0
-Content-Transfer-Encoding: base64
+On Wed, Jun 17, 2020 at 03:12:03PM +0200, Vitaly Kuznetsov wrote:
+> Vivek Goyal <vgoyal@redhat.com> writes:
+> 
+> > As of now asynchronous page fault mecahanism assumes host will always be
+> > successful in resolving page fault. So there are only two states, that
+> > is page is not present and page is ready.
+> >
+> > If a page is backed by a file and that file has been truncated (as
+> > can be the case with virtio-fs), then page fault handler on host returns
+> > -EFAULT.
+> >
+> > As of now async page fault logic does not look at error code (-EFAULT)
+> > returned by get_user_pages_remote() and returns PAGE_READY to guest.
+> > Guest tries to access page and page fault happnes again. And this
+> > gets kvm into an infinite loop. (Killing host process gets kvm out of
+> > this loop though).
 
-U291bmRzIGdvb2QsIHRoYW5rIHlvdSBWaXZlayBmb3IgdGhlIGhlYWRzIHVwIPCfmYINCg0KU2Vi
-YXN0aWVuDQpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXw0KRnJvbTogVml2ZWsgR295
-YWwgPHZnb3lhbEByZWRoYXQuY29tPg0KU2VudDogV2VkbmVzZGF5LCBKdW5lIDE3LCAyMDIwIDM6
-NTIgUE0NClRvOiBCb2V1ZiwgU2ViYXN0aWVuIDxzZWJhc3RpZW4uYm9ldWZAaW50ZWwuY29tPg0K
-Q2M6IHZpcnRpby1mc0ByZWRoYXQuY29tIDx2aXJ0aW8tZnNAcmVkaGF0LmNvbT4NClN1YmplY3Q6
-IFJlOiBLZXJuZWwgcGF0Y2hlcyBvbiBsYXRlc3QgbGludXgga2VybmVsDQoNCk9uIEZyaSwgSnVu
-IDEyLCAyMDIwIGF0IDA5OjAwOjUwQU0gKzAwMDAsIEJvZXVmLCBTZWJhc3RpZW4gd3JvdGU6DQo+
-IEhpIGZvbGtzLA0KPg0KPiBKdXN0IHdvbmRlcmluZyB3aGVuIHRoZSBrZXJuZWwgcGF0Y2ggc2Vy
-aWVzIHdpbGwgYmUgcmViYXNlZCBvbiB0b3Agb2YgbGF0ZXN0IGtlcm5lbD8NCg0KSGkgU2ViYXN0
-aWVuLA0KDQpJIHdpbGwgdHJ5IHRvIHRha2UgY2FyZSBvZiB0aGlzIHdlZWsgb3IgbmV4dCB3ZWVr
-IGFuZCByZWJhc2UgdGhlIHBhdGNoZXMNCm9uIHRvcCBvZiA1LjgtcmMxDQoNClRoYW5rcw0KVml2
-ZWsNCg0KLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
-LS0tLS0tLS0tLS0tLS0tLS0tCkludGVsIENvcnBvcmF0aW9uIFNBUyAoRnJlbmNoIHNpbXBsaWZp
-ZWQgam9pbnQgc3RvY2sgY29tcGFueSkKUmVnaXN0ZXJlZCBoZWFkcXVhcnRlcnM6ICJMZXMgTW9u
-dGFsZXRzIi0gMiwgcnVlIGRlIFBhcmlzLCAKOTIxOTYgTWV1ZG9uIENlZGV4LCBGcmFuY2UKUmVn
-aXN0cmF0aW9uIE51bWJlcjogIDMwMiA0NTYgMTk5IFIuQy5TLiBOQU5URVJSRQpDYXBpdGFsOiA0
-LDU3MiwwMDAgRXVyb3MKClRoaXMgZS1tYWlsIGFuZCBhbnkgYXR0YWNobWVudHMgbWF5IGNvbnRh
-aW4gY29uZmlkZW50aWFsIG1hdGVyaWFsIGZvcgp0aGUgc29sZSB1c2Ugb2YgdGhlIGludGVuZGVk
-IHJlY2lwaWVudChzKS4gQW55IHJldmlldyBvciBkaXN0cmlidXRpb24KYnkgb3RoZXJzIGlzIHN0
-cmljdGx5IHByb2hpYml0ZWQuIElmIHlvdSBhcmUgbm90IHRoZSBpbnRlbmRlZApyZWNpcGllbnQs
-IHBsZWFzZSBjb250YWN0IHRoZSBzZW5kZXIgYW5kIGRlbGV0ZSBhbGwgY29waWVzLgo=
---_000_SN6PR11MB2943CDD11BE8CB3F5E73794DEA9A0SN6PR11MB2943namp_
-Content-Type: text/html; charset="utf-8"
-MIME-Version: 1.0
-Content-Transfer-Encoding: base64
+Isn't this already fixed by patch 1/3 "kvm,x86: Force sync fault if previous
+attempts failed"?  If it isn't, it should be, i.e. we should fix KVM before
+adding what are effectively optimizations on top.   And, it's not clear that
+the optimizations are necessary, e.g. I assume the virtio-fs truncation
+scenario is relatively uncommon, i.e. not performance sensitive?
 
-PGh0bWw+DQo8aGVhZD4NCjxtZXRhIGh0dHAtZXF1aXY9IkNvbnRlbnQtVHlwZSIgY29udGVudD0i
-dGV4dC9odG1sOyBjaGFyc2V0PXV0Zi04Ij4NCjxzdHlsZSB0eXBlPSJ0ZXh0L2NzcyIgc3R5bGU9
-ImRpc3BsYXk6bm9uZTsiPiBQIHttYXJnaW4tdG9wOjA7bWFyZ2luLWJvdHRvbTowO30gPC9zdHls
-ZT4NCjwvaGVhZD4NCjxib2R5IGRpcj0ibHRyIj4NCjxkaXYgc3R5bGU9ImZvbnQtZmFtaWx5OiBD
-YWxpYnJpLCBBcmlhbCwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDEycHQ7IGNv
-bG9yOiByZ2IoMCwgMCwgMCk7Ij4NClNvdW5kcyBnb29kLCB0aGFuayB5b3UgVml2ZWsgZm9yIHRo
-ZSBoZWFkcyB1cCA8c3BhbiBpZD0i8J+ZgiI+8J+Zgjwvc3Bhbj48YnI+DQo8L2Rpdj4NCjxkaXYg
-c3R5bGU9ImZvbnQtZmFtaWx5OiBDYWxpYnJpLCBBcmlhbCwgSGVsdmV0aWNhLCBzYW5zLXNlcmlm
-OyBmb250LXNpemU6IDEycHQ7IGNvbG9yOiByZ2IoMCwgMCwgMCk7Ij4NCjxicj4NCjwvZGl2Pg0K
-PGRpdiBzdHlsZT0iZm9udC1mYW1pbHk6IENhbGlicmksIEFyaWFsLCBIZWx2ZXRpY2EsIHNhbnMt
-c2VyaWY7IGZvbnQtc2l6ZTogMTJwdDsgY29sb3I6IHJnYigwLCAwLCAwKTsiPg0KU2ViYXN0aWVu
-PGJyPg0KPC9kaXY+DQo8ZGl2IGlkPSJhcHBlbmRvbnNlbmQiPjwvZGl2Pg0KPGhyIHN0eWxlPSJk
-aXNwbGF5OmlubGluZS1ibG9jazt3aWR0aDo5OCUiIHRhYmluZGV4PSItMSI+DQo8ZGl2IGlkPSJk
-aXZScGx5RndkTXNnIiBkaXI9Imx0ciI+PGZvbnQgZmFjZT0iQ2FsaWJyaSwgc2Fucy1zZXJpZiIg
-c3R5bGU9ImZvbnQtc2l6ZToxMXB0IiBjb2xvcj0iIzAwMDAwMCI+PGI+RnJvbTo8L2I+IFZpdmVr
-IEdveWFsICZsdDt2Z295YWxAcmVkaGF0LmNvbSZndDs8YnI+DQo8Yj5TZW50OjwvYj4gV2VkbmVz
-ZGF5LCBKdW5lIDE3LCAyMDIwIDM6NTIgUE08YnI+DQo8Yj5Ubzo8L2I+IEJvZXVmLCBTZWJhc3Rp
-ZW4gJmx0O3NlYmFzdGllbi5ib2V1ZkBpbnRlbC5jb20mZ3Q7PGJyPg0KPGI+Q2M6PC9iPiB2aXJ0
-aW8tZnNAcmVkaGF0LmNvbSAmbHQ7dmlydGlvLWZzQHJlZGhhdC5jb20mZ3Q7PGJyPg0KPGI+U3Vi
-amVjdDo8L2I+IFJlOiBLZXJuZWwgcGF0Y2hlcyBvbiBsYXRlc3QgbGludXgga2VybmVsPC9mb250
-Pg0KPGRpdj4mbmJzcDs8L2Rpdj4NCjwvZGl2Pg0KPGRpdiBjbGFzcz0iQm9keUZyYWdtZW50Ij48
-Zm9udCBzaXplPSIyIj48c3BhbiBzdHlsZT0iZm9udC1zaXplOjExcHQ7Ij4NCjxkaXYgY2xhc3M9
-IlBsYWluVGV4dCI+T24gRnJpLCBKdW4gMTIsIDIwMjAgYXQgMDk6MDA6NTBBTSAmIzQzOzAwMDAs
-IEJvZXVmLCBTZWJhc3RpZW4gd3JvdGU6PGJyPg0KJmd0OyBIaSBmb2xrcyw8YnI+DQomZ3Q7IDxi
-cj4NCiZndDsgSnVzdCB3b25kZXJpbmcgd2hlbiB0aGUga2VybmVsIHBhdGNoIHNlcmllcyB3aWxs
-IGJlIHJlYmFzZWQgb24gdG9wIG9mIGxhdGVzdCBrZXJuZWw/PGJyPg0KPGJyPg0KSGkgU2ViYXN0
-aWVuLDxicj4NCjxicj4NCkkgd2lsbCB0cnkgdG8gdGFrZSBjYXJlIG9mIHRoaXMgd2VlayBvciBu
-ZXh0IHdlZWsgYW5kIHJlYmFzZSB0aGUgcGF0Y2hlczxicj4NCm9uIHRvcCBvZiA1LjgtcmMxPGJy
-Pg0KPGJyPg0KVGhhbmtzPGJyPg0KVml2ZWs8YnI+DQo8YnI+DQo8L2Rpdj4NCjwvc3Bhbj48L2Zv
-bnQ+PC9kaXY+DQo8cD4tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
-LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS08YnI+CkludGVsIENvcnBvcmF0aW9uIFNBUyAoRnJl
-bmNoIHNpbXBsaWZpZWQgam9pbnQgc3RvY2sgY29tcGFueSk8YnI+ClJlZ2lzdGVyZWQgaGVhZHF1
-YXJ0ZXJzOiAiTGVzIE1vbnRhbGV0cyItIDIsIHJ1ZSBkZSBQYXJpcywgPGJyPgo5MjE5NiBNZXVk
-b24gQ2VkZXgsIEZyYW5jZTxicj4KUmVnaXN0cmF0aW9uIE51bWJlcjombmJzcDsgMzAyIDQ1NiAx
-OTkgUi5DLlMuIE5BTlRFUlJFPGJyPgpDYXBpdGFsOiA0LDU3MiwwMDAgRXVyb3M8L3A+Cgo8cD5U
-aGlzIGUtbWFpbCBhbmQgYW55IGF0dGFjaG1lbnRzIG1heSBjb250YWluIGNvbmZpZGVudGlhbCBt
-YXRlcmlhbCBmb3I8YnI+CnRoZSBzb2xlIHVzZSBvZiB0aGUgaW50ZW5kZWQgcmVjaXBpZW50KHMp
-LiBBbnkgcmV2aWV3IG9yIGRpc3RyaWJ1dGlvbjxicj4KYnkgb3RoZXJzIGlzIHN0cmljdGx5IHBy
-b2hpYml0ZWQuIElmIHlvdSBhcmUgbm90IHRoZSBpbnRlbmRlZDxicj4KcmVjaXBpZW50LCBwbGVh
-c2UgY29udGFjdCB0aGUgc2VuZGVyIGFuZCBkZWxldGUgYWxsIGNvcGllcy48L3A+PC9ib2R5Pg0K
-PC9odG1sPg0K
---_000_SN6PR11MB2943CDD11BE8CB3F5E73794DEA9A0SN6PR11MB2943namp_--
+> >
+> > This patch adds another state to async page fault logic which allows
+> > host to return error to guest. Once guest knows that async page fault
+> > can't be resolved, it can send SIGBUS to host process (if user space
+
+I assume this is supposed to be "it can send SIGBUS to guest process"?
+Otherwise none of this makes sense (to me).
+
+> > was accessing the page in question).
+
+Allowing the guest to opt-in to intercepting host page allocation failures
+feels wrong, and fragile.  KVM can't possibly know whether an allocation
+failure is something that should be forwarded to the guest, as KVM doesn't
+know the physical backing for any given hva/gfn, e.g. the error could be
+due to a physical device failure or a configuration issue.  Relying on the
+async #PF mechanism to prevent allocation failures from crashing the guest
+is fragile because there is no guarantee that a #PF can be async.
+
+IMO, the virtio-fs truncation use case should first be addressed in a way
+that requires explicit userspace intervention, e.g. by enhancing
+kvm_handle_bad_page() to provide the necessary information to userspace so
+that userspace can reflect select errors into the guest.  The reflection
+could piggyback whatever vector is used by async page faults (#PF or #VE),
+but would not be an async page fault per se.  If an async #PF happens to
+encounter an allocation failure, it would naturally fall back to the
+synchronous path (provided by patch 1/3) and the synchronous path would
+automagically handle the error as above.
+
+In other words, I think the guest should be able to enable "error handling"
+support without first enabling async #PF.  From a functional perspective it
+probably won't change a whole lot, but it would hopefully force us to
+concoct an overall "paravirt page fault" design as opposed to simply async
+#PF v2.
 

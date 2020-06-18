@@ -1,10 +1,10 @@
-Date: Thu, 18 Jun 2020 16:09:02 -0400
+Date: Thu, 18 Jun 2020 17:46:46 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200618200902.GA25727@redhat.com>
+Message-ID: <20200618214646.GG3814@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: [Virtio-fs] podman + virtiofs + SElinux issues
+Subject: [Virtio-fs] How to test virtiofs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,37 +13,24 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs-list <virtio-fs@redhat.com>, Daniel J Walsh <dwalsh@redhat.com>
-Cc: Giuseppe Scrivano <gscrivan@redhat.com>
+To: virtio-fs-list <virtio-fs@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Hi Dan,
+Hi All,
 
-I tried to run podman with virtiofs and ran into SELinux issues.
+I recently noticed a regression with overlayfs on top virtiofs. I thought
+that it will be good to put together a small text file which explains
+how to test virtiofs to ensure its sanity. We can run these tests before
+merging pathces in virtiofsd or in kernel.
 
-# mount -t virtiofs myfs /mnt/virtiofs/
-# mount --bind /mnt/virtiofs/containers /var/lib/containers/
-# podman run -ti fedora bash
+https://github.com/rhvgoyal/misc/blob/master/virtiofs-tests/virtio-fs-testing-requirement.txt
 
-# podman run -ti fedora bash
-Trying to pull registry.fedoraproject.org/fedora...
-Getting image source signatures
-Copying blob 1657ffead824 done
-Copying config eb7134a03c done
-Writing manifest to image destination
-Storing signatures
-bash: error while loading shared libraries: /lib64/libc.so.6: cannot apply additional memory protection after relocation: Permission denied
+For now this document is in my personal repo. I can move it somewhere
+else if need be.
 
-I see following in audit.logs
+This is still work in progress and I will update it once I have got
+more testing configurations working.
 
-type=AVC msg=audit(1592510365.898:387): avc:  denied  { read } for  pid=5770 comm="bash" path="/usr/lib64/libc-2.31.so" dev="virtiofs" ino=2757637 scontext=system_u:system_r:container_t:s0:c211,c761 tcontext=system_u:object_r:unlabeled_t:s0 tclass=file permissive=0
-
-We had discussed that we will need to disable SELinux in guest so that
-host policy continues to work. Right now I don't think guest SELinux
-labels are stored on host.
-
-Can I do a context mount of virtiofs to fake the labels which are
-compatible with system_u:system_r:container_t:s0:c211,c761. So that
-I don't have to disable selinux for whole container.
+Any comment or feedback is welcome.
 
 Thanks
 Vivek

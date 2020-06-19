@@ -1,16 +1,16 @@
-Date: Thu, 23 Jul 2020 18:55:38 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200723175538.GW2621@work-vm>
-References: <20200722130206.224898-1-stefanha@redhat.com>
-	<20200722130206.224898-3-stefanha@redhat.com>
-	<20200722190318.GM2660@work-vm>
-	<20200723123229.GK186372@stefanha-x1.localdomain>
+Date: Fri, 19 Jun 2020 15:12:54 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200619191254.GH3154@redhat.com>
+References: <20200416164907.244868-1-stefanha@redhat.com>
+	<20200618190816.GD3814@redhat.com> <20200618191655.GI2769@work-vm>
+	<20200618192717.GE3814@redhat.com> <20200619082746.GA2690@work-vm>
+	<20200619113914.GI700896@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
-In-Reply-To: <20200723123229.GK186372@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH for-5.1 2/3] virtiofsd: add
- container-friendly -o chroot sandboxing option
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <20200619113914.GI700896@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,42 +19,65 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, rmohr@redhat.com, qemu-devel@nongnu.org, vromanso@redhat.com
+To: Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>
+Cc: virtio-fs@redhat.com, Miklos Szeredi <miklos@szeredi.hu>, qemu-devel@nongnu.org
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> On Wed, Jul 22, 2020 at 08:03:18PM +0100, Dr. David Alan Gilbert wrote:
-> > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> > > +    /*
-> > > +     * Make the shared directory the file system root so that FUSE_OPEN
-> > > +     * (lo_open()) cannot escape the shared directory by opening a symlink.
-> > > +     *
-> > > +     * It's still possible to escape the chroot via lo->proc_self_fd but that
-> > > +     * requires gaining control of the process first.
-> > > +     */
-> > > +    if (chroot(lo->source) != 0) {
-> > > +        fuse_log(FUSE_LOG_ERR, "chroot(\"%s\"): %m\n", lo->source);
-> > > +        exit(1);
-> > > +    }
-> > 
-> > I'm seeing suggestions that you should drop CAP_SYS_CHROOT after
-> > chroot'ing to stop an old escape (where you create another jail inside
-> > the jail and the kernel then lets you walk outside of the old one).
+On Fri, Jun 19, 2020 at 12:39:14PM +0100, Daniel P. Berrangé wrote:
+[..]
+> The CAP_SYS_ADMIN requirement for 'trusted.' xattrs is simply a useful
+> mechanism for applications to control access. The host kernel doesn'
+> tuse this namespace itself. Linux has four namespaces for xattrs:
 > 
-> That's already the case:
+>  -  user - for userspace apps. accessible based on read/write permissions
+>  -  trusted - for userspace apps. accessible by CAP_SYS_ADMIN processes only
+>  -  system - for kernel only. used by ACLs
+>  -  security - for kernel only. used by SELinux
 > 
-> 1. setup_seccomp() blocks further chroot(2) calls.
-> 2. setup_capabilities() drops CAP_SYS_CHROOT.
+> The use case for "trusted" xattrs is thus where a privileged management
+> application or service wants to store metadata against the file, but
+> also needs to grant an unprivileged process access to write to this file
+> while not allowing that unprivileged process the ability to change the
+> metadata. This is mentioned in the man page:
+> 
+> [man xattr(7)]
+>    Trusted extended attributes
+>        Trusted  extended attributes are visible and accessible only to pro‐
+>        cesses that have the CAP_SYS_ADMIN capability.  Attributes  in  this
+>        class  are used to implement mechanisms in user space (i.e., outside
+>        the kernel) which keep information in extended attributes  to  which
+>        ordinary processes should not have access.
+> 
+>    User extended attributes
+>        User  extended  attributes  may be assigned to files and directories
+>        for storing arbitrary additional information such as the mime  type,
+>        character  set  or  encoding  of a file.  The access permissions for
+>        user attributes are defined by the file permission bits:  read  per‐
+>        mission is required to retrieve the attribute value, and writer per‐
+>        mission is required to change it.
+> [/man]
+> 
+> Libvirtd uses the "trusted." xattr namespace to record information against
+> disk images for QEMU, because we need to grant QEMU access to read/write
+> the disk iamges, but don't want QEMU to be able to alter our xattrs.
+> 
+> It is unfortunate that this namespace is tied to the CAP_SYS_ADMIN cap.
+> It really ought to have had its own dedicated capability :-( Such is
+> life with anything that uses CAP_SYS_ADMIN...
+> 
+> With this in mind we really should have both trusted. & user. xattrs
+> allowed to the guest by default.
+> 
+> Conversely, we'll need to block usage of the security. and system.
+> namespaces.
 
-Ah yes; could you add a comment if you respin; it's not obvious that
-the capability to chroot allows you to break out of an existing chroot
-you're in.
+I am wondering can we block usage of "system" and "security"?  What
+about guest setting acls over virtiofs files. These will have to
+go through and that means we need to allow system xattrs.
 
-Dave
+Similarly setting file capabilities inside should trigger
+setxattr(security.capability) and that means we need to allow security
+xattr as well.
 
-> Stefan
-
-
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+Thanks
+Vivek
 

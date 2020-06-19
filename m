@@ -1,12 +1,16 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Mon, 29 Jun 2020 12:54:20 +0100
-Message-Id: <20200629115420.98443-4-dgilbert@redhat.com>
-In-Reply-To: <20200629115420.98443-1-dgilbert@redhat.com>
-References: <20200629115420.98443-1-dgilbert@redhat.com>
+Date: Fri, 19 Jun 2020 17:16:48 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20200619161648.GJ2690@work-vm>
+References: <20200416164907.244868-1-stefanha@redhat.com>
+	<20200618190816.GD3814@redhat.com> <20200618191655.GI2769@work-vm>
+	<20200618192717.GE3814@redhat.com> <20200619082746.GA2690@work-vm>
+	<20200619160923.GD3154@redhat.com>
 MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 3/3] virtiofsd: Allow addition or removal of
-	capabilities
+In-Reply-To: <20200619160923.GD3154@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,157 +19,154 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com, stefanha@redhat.com, vgoyal@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Miklos Szeredi <miklos@szeredi.hu>
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> On Fri, Jun 19, 2020 at 09:27:46AM +0100, Dr. David Alan Gilbert wrote:
+> > * Vivek Goyal (vgoyal@redhat.com) wrote:
+> > > On Thu, Jun 18, 2020 at 08:16:55PM +0100, Dr. David Alan Gilbert wrote:
+> > > > * Vivek Goyal (vgoyal@redhat.com) wrote:
+> > > > > On Thu, Apr 16, 2020 at 05:49:05PM +0100, Stefan Hajnoczi wrote:
+> > > > > > virtiofsd doesn't need of all Linux capabilities(7) available to root.  Keep a
+> > > > > > whitelisted set of capabilities that we require.  This improves security in
+> > > > > > case virtiofsd is compromised by making it hard for an attacker to gain further
+> > > > > > access to the system.
+> > > > > 
+> > > > > Hi Stefan,
+> > > > > 
+> > > > > I just noticed that this patch set breaks overlayfs on top of virtiofs.
+> > > > > 
+> > > > > overlayfs sets "trusted.overlay.*" and xattrs in trusted domain
+> > > > > need CAP_SYS_ADMIN.
+> > > > > 
+> > > > > man xattr says.
+> > > > > 
+> > > > >    Trusted extended attributes
+> > > > >        Trusted  extended  attributes  are  visible and accessible only to pro‐
+> > > > >        cesses that have the  CAP_SYS_ADMIN  capability.   Attributes  in  this
+> > > > >        class are used to implement mechanisms in user space (i.e., outside the
+> > > > >        kernel) which keep information in extended attributes to which ordinary
+> > > > >        processes should not have access.
+> > > > > 
+> > > > > There is a chance that overlay moves away from trusted xattr in future.
+> > > > > But for now we need to make it work. This is an important use case for
+> > > > > kata docker in docker build.
+> > > > > 
+> > > > > May be we can add an option to virtiofsd say "--add-cap <capability>" and
+> > > > > ask user to pass in "--add-cap cap_sys_admin" if they need to run daemon
+> > > > > with this capaibility.
+> > > > 
+> > > > I'll admit I don't like the idea of giving it cap_sys_admin.
+> > > > Can you explain:
+> > > >   a) What overlayfs uses trusted for?
+> > > 
+> > > overlayfs stores bunch of metadata and uses "trusted" xattrs for it.
+> > 
+> > Tell me more about this metadata.
+> > Taking a juicy looking one, what does OVL_XATTR_REDIRECT do?
+> 
+> It contains path information which is used for lookup into lower layer.
+> 
+> > Or what happens if I was to write random numbers into OVL_XATTR_NLINK?
+> 
+> Overlay is storing its metadata in trusted.* xattrs. If a user modifies
+> metadata, then various kind of bad things can happen. I think one can
+> do some kind of checks on metadata to make sure it does not crash
+> atleast.
+> 
+> And that's true for any filesystem. Isn't. If user manages to modify
+> metadata outside of filesystem, then lot of bad things can happen. I
+> thought that's the reason that people are not comfortable with the
+> idea of allowing mounting filesystem from inside user namespace because
+> it makes it easy to mount a hand crafted filesystem.
+> 
+> Anyway, I think overlayfs is just one use case of trusted xattr. Even
+> if overlayfs moves away from trusted xattr, what about other users.
+> We need to have a story around how will we support trusted xattrs
+> safely.
+> 
+> 
+> > 
+> > > >   b) If something nasty was to write junk into the trusted attributes,
+> > > >     what would happen?
+> > > 
+> > > This directory is owned by guest. So it should be able to write
+> > > anything it wants, as long as process in guest has CAP_SYS_ADMIN, right?
+> > 
+> > Well, we shouldn't be able to break/crash/escape into the host; how
+> > much does overlayfs validate trusted.* it uses?
+> 
+> I thought qemu and kvm are the one who should ensure we should not be
+> able to break out of sandbox. Kernel implementation could be as 
+> buggy as it wanted to be. We are working with this security model
+> that kernel is completely untrusted.
 
-Allow capabilities to be added or removed from the allowed set for the
-daemon; e.g.
+But with virtiofs we allow the guest to do a lot of filesystem
+operations on the host.  It's the virtiofsd that has to ensure that
+these are safe and contained within the fs it's exposed; the qemu/kvm
+can't protect us from that.
 
-default:
-CapPrm: 00000000880000df
-CapEff: 00000000880000df
+That's why we sandbox the virtiofsd like we do - if we allow a
+priviliged guest to perform calls to an unconstrained virtiofsd it would
+be able to escape.  That's what I want to check.
 
--o modcaps=+sys_admin
+Dave
 
-CapPrm: 00000000882000df
-CapEff: 00000000882000df
-
--o modcaps=+sys_admin:-chown
-
-CapPrm: 00000000882000de
-CapEff: 00000000882000de
-
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
----
- docs/tools/virtiofsd.rst         |  5 +++
- tools/virtiofsd/helper.c         |  2 ++
- tools/virtiofsd/passthrough_ll.c | 53 ++++++++++++++++++++++++++++++--
- 3 files changed, 58 insertions(+), 2 deletions(-)
-
-diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-index 378594c422..824e713491 100644
---- a/docs/tools/virtiofsd.rst
-+++ b/docs/tools/virtiofsd.rst
-@@ -54,6 +54,11 @@ Options
-   * flock|no_flock -
-     Enable/disable flock.  The default is ``no_flock``.
- 
-+  * modcaps=CAPLIST
-+    Modify the list of capabilities allowed; CAPLIST is a colon separated
-+    list of capabilities, each preceded by either + or -, e.g.
-+    ''+sys_admin:-chown''.
-+
-   * log_level=LEVEL -
-     Print only log messages matching LEVEL or more severe.  LEVEL is one of
-     ``err``, ``warn``, ``info``, or ``debug``.  The default is ``info``.
-diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
-index 00a1ef666a..3105b6c23a 100644
---- a/tools/virtiofsd/helper.c
-+++ b/tools/virtiofsd/helper.c
-@@ -174,6 +174,8 @@ void fuse_cmdline_help(void)
-            "                               default: no_writeback\n"
-            "    -o xattr|no_xattr          enable/disable xattr\n"
-            "                               default: no_xattr\n"
-+           "    -o modcaps=CAPLIST         Modify the list of capabilities\n"
-+           "                               e.g. -o modcaps=+sys_admin:-chown\n"
-            "    --rlimit-nofile=<num>      set maximum number of file descriptors\n"
-            "                               (0 leaves rlimit unchanged)\n"
-            "                               default: min(1000000, fs.file-max - 16384)\n"
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 99d562046a..94e0de2d2b 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -145,6 +145,7 @@ struct lo_data {
-     int posix_lock;
-     int xattr;
-     char *source;
-+    char *modcaps;
-     double timeout;
-     int cache;
-     int timeout_set;
-@@ -170,6 +171,7 @@ static const struct fuse_opt lo_opts[] = {
-     { "no_posix_lock", offsetof(struct lo_data, posix_lock), 0 },
-     { "xattr", offsetof(struct lo_data, xattr), 1 },
-     { "no_xattr", offsetof(struct lo_data, xattr), 0 },
-+    { "modcaps=%s", offsetof(struct lo_data, modcaps), 0 },
-     { "timeout=%lf", offsetof(struct lo_data, timeout), 0 },
-     { "timeout=", offsetof(struct lo_data, timeout_set), 1 },
-     { "cache=none", offsetof(struct lo_data, cache), CACHE_NONE },
-@@ -2570,9 +2572,11 @@ static void setup_mounts(const char *source)
- 
- /*
-  * Only keep whitelisted capabilities that are needed for file system operation
-+ * The (possibly NULL) modcaps_in string passed in is free'd before exit.
-  */
--static void setup_capabilities(void)
-+static void setup_capabilities(char *modcaps_in)
- {
-+    char *modcaps = modcaps_in;
-     pthread_mutex_lock(&cap.mutex);
-     capng_restore_state(&cap.saved);
- 
-@@ -2604,6 +2608,51 @@ static void setup_capabilities(void)
-         exit(1);
-     }
- 
-+    /*
-+     * The modcaps option is a colon separated list of caps,
-+     * each preceded by either + or -.
-+     */
-+    while (modcaps) {
-+        capng_act_t action;
-+        int cap;
-+
-+        char *next = strchr(modcaps, ':');
-+        if (next) {
-+            *next = '\0';
-+            next++;
-+        }
-+
-+        switch (modcaps[0]) {
-+        case '+':
-+            action = CAPNG_ADD;
-+            break;
-+
-+        case '-':
-+            action = CAPNG_DROP;
-+            break;
-+
-+        default:
-+            fuse_log(FUSE_LOG_ERR,
-+                     "%s: Expecting '+'/'-' in modcaps but found '%c'\n",
-+                     __func__, modcaps[0]);
-+            exit(1);
-+        }
-+        cap = capng_name_to_capability(modcaps + 1);
-+        if (cap < 0) {
-+            fuse_log(FUSE_LOG_ERR, "%s: Unknown capability '%s'\n", __func__,
-+                     modcaps);
-+            exit(1);
-+        }
-+        if (capng_update(action, CAPNG_PERMITTED | CAPNG_EFFECTIVE, cap)) {
-+            fuse_log(FUSE_LOG_ERR, "%s: capng_update failed for '%s'\n",
-+                     __func__, modcaps);
-+            exit(1);
-+        }
-+
-+        modcaps = next;
-+    }
-+    g_free(modcaps_in);
-+
-     if (capng_apply(CAPNG_SELECT_BOTH)) {
-         fuse_log(FUSE_LOG_ERR, "%s: capng_apply failed\n", __func__);
-         exit(1);
-@@ -2627,7 +2676,7 @@ static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
-     setup_namespaces(lo, se);
-     setup_mounts(lo->source);
-     setup_seccomp(enable_syslog);
--    setup_capabilities();
-+    setup_capabilities(g_strdup(lo->modcaps));
- }
- 
- /* Set the maximum number of open file descriptors */
--- 
-2.26.2
+> > 
+> > > >   c) I see overlayfs has a fallback check if xattr isn't supported at
+> > > > all - what is the consequence?
+> > > 
+> > > It falls back to I think read only mode. 
+> > 
+> > It looks like the fallback is more subtle to me:
+> >         /*
+> >          * Check if upper/work fs supports trusted.overlay.* xattr
+> >          */
+> >         err = ovl_do_setxattr(ofs->workdir, OVL_XATTR_OPAQUE, "0", 1, 0);
+> >         if (err) {
+> >                 ofs->noxattr = true;
+> >                 ofs->config.index = false;
+> >                 ofs->config.metacopy = false;
+> >                 pr_warn("upper fs does not support xattr, falling back to index=off and metacopy=off.\n");
+> > 
+> > but I don't know what index and metacopy are.
+> 
+> They enable certain features in overlayfs. In fact, we fall back to
+> lesser capability on if we are running on ext4/xfs. For virtiofs, 
+> we deny the mount completely.
+> 
+>         /*
+>          * We allowed sub-optimal upper fs configuration and don't want to break
+>          * users over kernel upgrade, but we never allowed remote upper fs, so
+>          * we can enforce strict requirements for remote upper fs.
+>          */
+>         if (ovl_dentry_remote(ofs->workdir) &&
+>             (!d_type || !rename_whiteout || ofs->noxattr)) {
+>                 pr_err("upper fs missing required features.\n");
+>                 err = -EINVAL;
+>                 goto out;
+>         }
+> 
+> > 
+> > > For a moment forget about overlayfs. Say a user process in guest with
+> > > CAP_SYS_ADMIN is writing trusted.foo. Should that succeed? Is a
+> > > passthrough filesystem, so it should go through. But currently it
+> > > wont.
+> > 
+> > As long as any effects of what it writes are contained to the area of
+> > the filesystem exposed to the guest, yes - however it worries me what
+> > the consequences of broken trusted metadata is.  If it's delicate enough
+> > that it's guarded by CAP_SYS_ADMIN someone must have worried about it.
+> 
+> Agreed that we need to look into whether having CAP_SYS_ADMIN allow
+> virtiofsd to break out of jail. 
+> 
+> May be we need to provide that remapping trusted xattr feature so
+> that we don't have to have CAP_SYS_ADMIN in init_user_ns and can
+> provide this emulation even when running in user namespace.
+> 
+> Vivek
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

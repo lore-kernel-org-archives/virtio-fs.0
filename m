@@ -1,15 +1,15 @@
-Date: Mon, 27 Jul 2020 14:40:53 -0400
+Date: Fri, 19 Jun 2020 15:15:40 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200727184053.GB39559@redhat.com>
-References: <20200720211359.GF502563@redhat.com>
-	<20200727135603.GA39559@redhat.com>
-	<87ft9dlz2b.fsf@vitty.brq.redhat.com>
+Message-ID: <20200619191540.GI3154@redhat.com>
+References: <20200416164907.244868-1-stefanha@redhat.com>
+	<20200618190816.GD3814@redhat.com> <20200618191655.GI2769@work-vm>
+	<20200618192717.GE3814@redhat.com>
+	<CAJFHJrrJzPLatNvw2xC3WYLbzCW0+DB+4UczQHGPBF9p+WGYQA@mail.gmail.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <87ft9dlz2b.fsf@vitty.brq.redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v4] kvm,
-	x86: Exit to user space in case page fault error
+In-Reply-To: <CAJFHJrrJzPLatNvw2xC3WYLbzCW0+DB+4UczQHGPBF9p+WGYQA@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,31 +18,47 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vitaly Kuznetsov <vkuznets@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, pbonzini@redhat.com, sean.j.christopherson@intel.com, linux-kernel@vger.kernel.org, kvm@vger.kernel.org
+To: Chirantan Ekbote <chirantan@chromium.org>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, qemu-devel@nongnu.org
 
-On Mon, Jul 27, 2020 at 06:09:32PM +0200, Vitaly Kuznetsov wrote:
-> Vivek Goyal <vgoyal@redhat.com> writes:
-> 
-> > On Mon, Jul 20, 2020 at 05:13:59PM -0400, Vivek Goyal wrote:
-> >> Page fault error handling behavior in kvm seems little inconsistent when
-> >> page fault reports error. If we are doing fault synchronously
-> >> then we capture error (-EFAULT) returned by __gfn_to_pfn_memslot() and
-> >> exit to user space and qemu reports error, "error: kvm run failed Bad address".
+On Fri, Jun 19, 2020 at 01:46:20PM +0900, Chirantan Ekbote wrote:
+> On Fri, Jun 19, 2020 at 4:27 AM Vivek Goyal <vgoyal@redhat.com> wrote:
 > >
-> > Hi Vitaly,
-> >
-> > A gentle reminder. How does this patch look now?
-> >
+> > On Thu, Jun 18, 2020 at 08:16:55PM +0100, Dr. David Alan Gilbert wrote:
+> > > * Vivek Goyal (vgoyal@redhat.com) wrote:
+> > > > On Thu, Apr 16, 2020 at 05:49:05PM +0100, Stefan Hajnoczi wrote:
+> > > > > virtiofsd doesn't need of all Linux capabilities(7) available to root.  Keep a
+> > > > > whitelisted set of capabilities that we require.  This improves security in
+> > > > > case virtiofsd is compromised by making it hard for an attacker to gain further
+> > > > > access to the system.
+> > > >
+> > > > Hi Stefan,
+> > > >
+> > > > I just noticed that this patch set breaks overlayfs on top of virtiofs.
+> > > >
+> > > > overlayfs sets "trusted.overlay.*" and xattrs in trusted domain
+> > > > need CAP_SYS_ADMIN.
+> > > >
 > 
-> Sorry, I even reviewd it but never replied. It looks good to me!
+> Not just that but it needs CAP_SYS_ADMIN in the init namespace[1].  We
+> have the same problem.  Our virtiofs process has CAP_SYS_ADMIN in a
+> user namespace and it cannot set any trusted or security xattrs.  The
+> security xattrs check is at least namespace aware so you only need
+> CAP_SYS_ADMIN in the namespace that mounted the fs but that doesn't
+> help us much.
 > 
-> Reviewed-by: Vitaly Kuznetsov <vkuznets@redhat.com>
+> We ended up working around it by prefixing "user.virtiofs." to the
+> xattr name[2], which has its own problems but there was pretty much no
+> chance that we would be able to give the fs device CAP_SYS_ADMIN in
+> the init namespace.
 
-Thanks Vitaly.
+Chirantan, 
 
-Paolo, what do you think about this patch. Do you have concerns with
-this. Can this be merged.
+So you ended up renaming all "trusted", "security" and "system" xattrs?
+Only "user" xattrs are complete passthrough?
+
+IOW, security.selinux will be renamed to user.virtiofs.security.selinux
+on host?
 
 Thanks
 Vivek

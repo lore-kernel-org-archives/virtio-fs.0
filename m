@@ -1,15 +1,15 @@
-Date: Thu, 6 Aug 2020 13:46:45 -0400
+Date: Fri, 19 Jun 2020 12:09:23 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200806174645.GG367847@redhat.com>
-References: <20200727161841.GA54539@redhat.com>
-	<OSBPR01MB4582AB9CD2DB32A48A8BB13FE5480@OSBPR01MB4582.jpnprd01.prod.outlook.com>
-	<20200806174129.GK2711@work-vm>
+Message-ID: <20200619160923.GD3154@redhat.com>
+References: <20200416164907.244868-1-stefanha@redhat.com>
+	<20200618190816.GD3814@redhat.com> <20200618191655.GI2769@work-vm>
+	<20200618192717.GE3814@redhat.com> <20200619082746.GA2690@work-vm>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
-In-Reply-To: <20200806174129.GK2711@work-vm>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Disable remote posix locks by
- default
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <20200619082746.GA2690@work-vm>
+Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,36 +19,139 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>, virtio-fs-list <virtio-fs@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Miklos Szeredi <miklos@szeredi.hu>
 
-On Thu, Aug 06, 2020 at 06:41:29PM +0100, Dr. David Alan Gilbert wrote:
-> * misono.tomohiro@fujitsu.com (misono.tomohiro@fujitsu.com) wrote:
-> > > Right now we enable remote posix locks by default. That means when guest does a posix lock it sends request to server
-> > > (virtiofsd). But currently we only support non-blocking posix lock and return -EOPNOTSUPP for blocking version.
+On Fri, Jun 19, 2020 at 09:27:46AM +0100, Dr. David Alan Gilbert wrote:
+> * Vivek Goyal (vgoyal@redhat.com) wrote:
+> > On Thu, Jun 18, 2020 at 08:16:55PM +0100, Dr. David Alan Gilbert wrote:
+> > > * Vivek Goyal (vgoyal@redhat.com) wrote:
+> > > > On Thu, Apr 16, 2020 at 05:49:05PM +0100, Stefan Hajnoczi wrote:
+> > > > > virtiofsd doesn't need of all Linux capabilities(7) available to root.  Keep a
+> > > > > whitelisted set of capabilities that we require.  This improves security in
+> > > > > case virtiofsd is compromised by making it hard for an attacker to gain further
+> > > > > access to the system.
+> > > > 
+> > > > Hi Stefan,
+> > > > 
+> > > > I just noticed that this patch set breaks overlayfs on top of virtiofs.
+> > > > 
+> > > > overlayfs sets "trusted.overlay.*" and xattrs in trusted domain
+> > > > need CAP_SYS_ADMIN.
+> > > > 
+> > > > man xattr says.
+> > > > 
+> > > >    Trusted extended attributes
+> > > >        Trusted  extended  attributes  are  visible and accessible only to pro‐
+> > > >        cesses that have the  CAP_SYS_ADMIN  capability.   Attributes  in  this
+> > > >        class are used to implement mechanisms in user space (i.e., outside the
+> > > >        kernel) which keep information in extended attributes to which ordinary
+> > > >        processes should not have access.
+> > > > 
+> > > > There is a chance that overlay moves away from trusted xattr in future.
+> > > > But for now we need to make it work. This is an important use case for
+> > > > kata docker in docker build.
+> > > > 
+> > > > May be we can add an option to virtiofsd say "--add-cap <capability>" and
+> > > > ask user to pass in "--add-cap cap_sys_admin" if they need to run daemon
+> > > > with this capaibility.
 > > > 
-> > > This means that existing applications which are doing blocking posix locks get -EOPNOTSUPP and fail. To avoid this,
-> > > people have been running virtiosd with option "-o no_posix_lock". For new users it is still a surprise and trial and error
-> > > takes them to this option.
-> > > 
-> > > Given posix lock implementation is not complete in virtiofsd, disable it by default. This means that posix locks will work
-> > > with-in applications in a guest but not across guests. Anyway we don't support sharing filesystem among different guests
-> > > yet in virtiofs so this should not lead to any kind of surprise or regression and will make life little easier for virtiofs users.
-> > > 
-> > > Reported-by: Aa Aa <jimbothom@yandex.com>
-> > > Suggested-by: Miklos Szeredi <mszeredi@redhat.com>
-> > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > > ---
-> > >  tools/virtiofsd/passthrough_ll.c | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > I'll admit I don't like the idea of giving it cap_sys_admin.
+> > > Can you explain:
+> > >   a) What overlayfs uses trusted for?
 > > 
-> > We should update docs/tools/virtiofsd.rst as well. Given that:
-> >  Reviewed-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+> > overlayfs stores bunch of metadata and uses "trusted" xattrs for it.
 > 
-> Fixed up the doc.
+> Tell me more about this metadata.
+> Taking a juicy looking one, what does OVL_XATTR_REDIRECT do?
 
-Aha.. Looks like we were looking at this at the same time.
+It contains path information which is used for lookup into lower layer.
 
-Thanks for taking care of this Dave.
+> Or what happens if I was to write random numbers into OVL_XATTR_NLINK?
+
+Overlay is storing its metadata in trusted.* xattrs. If a user modifies
+metadata, then various kind of bad things can happen. I think one can
+do some kind of checks on metadata to make sure it does not crash
+atleast.
+
+And that's true for any filesystem. Isn't. If user manages to modify
+metadata outside of filesystem, then lot of bad things can happen. I
+thought that's the reason that people are not comfortable with the
+idea of allowing mounting filesystem from inside user namespace because
+it makes it easy to mount a hand crafted filesystem.
+
+Anyway, I think overlayfs is just one use case of trusted xattr. Even
+if overlayfs moves away from trusted xattr, what about other users.
+We need to have a story around how will we support trusted xattrs
+safely.
+
+
+> 
+> > >   b) If something nasty was to write junk into the trusted attributes,
+> > >     what would happen?
+> > 
+> > This directory is owned by guest. So it should be able to write
+> > anything it wants, as long as process in guest has CAP_SYS_ADMIN, right?
+> 
+> Well, we shouldn't be able to break/crash/escape into the host; how
+> much does overlayfs validate trusted.* it uses?
+
+I thought qemu and kvm are the one who should ensure we should not be
+able to break out of sandbox. Kernel implementation could be as 
+buggy as it wanted to be. We are working with this security model
+that kernel is completely untrusted.
+
+> 
+> > >   c) I see overlayfs has a fallback check if xattr isn't supported at
+> > > all - what is the consequence?
+> > 
+> > It falls back to I think read only mode. 
+> 
+> It looks like the fallback is more subtle to me:
+>         /*
+>          * Check if upper/work fs supports trusted.overlay.* xattr
+>          */
+>         err = ovl_do_setxattr(ofs->workdir, OVL_XATTR_OPAQUE, "0", 1, 0);
+>         if (err) {
+>                 ofs->noxattr = true;
+>                 ofs->config.index = false;
+>                 ofs->config.metacopy = false;
+>                 pr_warn("upper fs does not support xattr, falling back to index=off and metacopy=off.\n");
+> 
+> but I don't know what index and metacopy are.
+
+They enable certain features in overlayfs. In fact, we fall back to
+lesser capability on if we are running on ext4/xfs. For virtiofs, 
+we deny the mount completely.
+
+        /*
+         * We allowed sub-optimal upper fs configuration and don't want to break
+         * users over kernel upgrade, but we never allowed remote upper fs, so
+         * we can enforce strict requirements for remote upper fs.
+         */
+        if (ovl_dentry_remote(ofs->workdir) &&
+            (!d_type || !rename_whiteout || ofs->noxattr)) {
+                pr_err("upper fs missing required features.\n");
+                err = -EINVAL;
+                goto out;
+        }
+
+> 
+> > For a moment forget about overlayfs. Say a user process in guest with
+> > CAP_SYS_ADMIN is writing trusted.foo. Should that succeed? Is a
+> > passthrough filesystem, so it should go through. But currently it
+> > wont.
+> 
+> As long as any effects of what it writes are contained to the area of
+> the filesystem exposed to the guest, yes - however it worries me what
+> the consequences of broken trusted metadata is.  If it's delicate enough
+> that it's guarded by CAP_SYS_ADMIN someone must have worried about it.
+
+Agreed that we need to look into whether having CAP_SYS_ADMIN allow
+virtiofsd to break out of jail. 
+
+May be we need to provide that remapping trusted xattr feature so
+that we don't have to have CAP_SYS_ADMIN in init_user_ns and can
+provide this emulation even when running in user namespace.
 
 Vivek
 

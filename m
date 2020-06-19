@@ -1,6 +1,6 @@
-Date: Fri, 19 Jun 2020 10:25:08 -0400
+Date: Fri, 19 Jun 2020 10:29:11 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200619142508.GB3154@redhat.com>
+Message-ID: <20200619142911.GC3154@redhat.com>
 References: <20200416164907.244868-1-stefanha@redhat.com>
 	<20200618190816.GD3814@redhat.com>
 	<CAJfpegsfqADmK6foDyuQQnvMDh_jE0rNUCBRuxPchSSirrb04Q@mail.gmail.com>
@@ -36,12 +36,8 @@ On Fri, Jun 19, 2020 at 04:16:30PM +0200, Miklos Szeredi wrote:
 > How so?  Virtiofs isn't mounting overlayfs, is it?  Only the mounter
 > requires CAP_SYS_ADMIN, not the accessor.
 
-virtiofsd needs CAP_SYS_ADMIN, otherwise fsetxattr(trusted.overlay.opaque)
-fails in lo_setxattr().
-
-This is triggered when we mount overlayfs on top of virtiofs and overlayfs
-tries to set OVL_XATTR_OPAQUE on upper to check if trusted xattrs are
-supported or not.
+Are you thinking of virtiofs on top of overlayfs? I was referring to
+mounting overlayfs on top of virtiofs inside VM.
 
 Thanks
 Vivek

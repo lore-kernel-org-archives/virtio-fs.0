@@ -1,20 +1,15 @@
-Date: Tue, 30 Jun 2020 11:25:29 -0400
+Date: Fri, 19 Jun 2020 13:11:21 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200630152529.GC322149@redhat.com>
-References: <20200625214701.GA180786@redhat.com>
-	<87lfkach6o.fsf@vitty.brq.redhat.com>
-	<20200626150303.GC195150@redhat.com>
-	<874kqtd212.fsf@vitty.brq.redhat.com>
-	<20200629220353.GC269627@redhat.com>
-	<87sgecbs9w.fsf@vitty.brq.redhat.com>
-	<20200630145303.GB322149@redhat.com>
-	<87mu4kbn7x.fsf@vitty.brq.redhat.com>
+Message-ID: <20200619171121.GE3154@redhat.com>
+References: <20200416164907.244868-1-stefanha@redhat.com>
+	<20200618190816.GD3814@redhat.com> <20200618191655.GI2769@work-vm>
+	<20200618192717.GE3814@redhat.com> <20200619082746.GA2690@work-vm>
+	<20200619160923.GD3154@redhat.com> <20200619161648.GJ2690@work-vm>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <87mu4kbn7x.fsf@vitty.brq.redhat.com>
-Subject: Re: [Virtio-fs] [RFC PATCH] kvm,
- x86: Exit to user space in case of page fault error
+In-Reply-To: <20200619161648.GJ2690@work-vm>
+Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,85 +18,44 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vitaly Kuznetsov <vkuznets@redhat.com>
-Cc: virtio-fs@redhat.com, pbonzini@redhat.com, sean.j.christopherson@intel.com, kvm@vger.kernel.org, linux-kernel@vger.kernel.org
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Miklos Szeredi <miklos@szeredi.hu>
 
-On Tue, Jun 30, 2020 at 05:13:54PM +0200, Vitaly Kuznetsov wrote:
-> Vivek Goyal <vgoyal@redhat.com> writes:
-> 
-> > On Tue, Jun 30, 2020 at 03:24:43PM +0200, Vitaly Kuznetsov wrote:
-> 
-> >> 
-> >> It's probably me who's missing something important here :-) but I think
-> >> you describe how it *should* work as I'm not seeing how we can leave the
-> >> loop in kvm_async_pf_task_wait_schedule() other than by 
-> >> "if (hlist_unhashed(&n.link)) break;" and this only happens when APF
-> >> completes.
-> >
-> > We don't leave loop in kvm_async_pf_task_wait_schedule(). It will happen
-> > before you return to user space.
-> >
-> > I have not looked too closely but I think following code path might be taken
-> > after aync PF has completed.
-> >
-> > __kvm_handle_async_pf()
-> >   idtentry_exit_cond_rcu()
-> >     prepare_exit_to_usermode()
-> >       __prepare_exit_to_usermode()
-> >         exit_to_usermode_loop()
-> > 	  do_signal()
-> >
-> > So once you have been woken up (because APF completed),
-> 
-> Ah, OK so we still need to complete APF and we can't kill the process
-> before this happens, that's what I was missing.
-> 
-> >  you will
-> > return to user space and before that you will check if there are
-> > pending signals and handle that signal first before user space
-> > gets a chance to run again and retry faulting instruction.
-> 
-> ...
-> 
-> >
-> >> 
-> >> When guest receives the 'page ready' event with an error it (like for
-> >> every other 'page ready' event) tries to wake up the corresponding
-> >> process but if the process is dead already it can do in-kernel probing
-> >> of the GFN, this way we guarantee that the error is always injected. I'm
-> >> not sure if it is needed though but in case it is, this can be a
-> >> solution. We can add a new feature bit and only deliver errors when the
-> >> guest indicates that it knows what to do with them.
-> >
-> > - Process will be delivered singal after async PF completion and during
-> >   returning to user space. You have lost control by then.
-> >
-> 
-> So actually there's no way for kernel to know if the userspace process
-> managed to re-try the instruction and get the error injected or if it
-> was killed prior to that.
+On Fri, Jun 19, 2020 at 05:16:48PM +0100, Dr. David Alan Gilbert wrote:
 
-Yes. 
+[..]
+> > > > >   b) If something nasty was to write junk into the trusted attributes,
+> > > > >     what would happen?
+> > > > 
+> > > > This directory is owned by guest. So it should be able to write
+> > > > anything it wants, as long as process in guest has CAP_SYS_ADMIN, right?
+> > > 
+> > > Well, we shouldn't be able to break/crash/escape into the host; how
+> > > much does overlayfs validate trusted.* it uses?
+> > 
+> > I thought qemu and kvm are the one who should ensure we should not be
+> > able to break out of sandbox. Kernel implementation could be as 
+> > buggy as it wanted to be. We are working with this security model
+> > that kernel is completely untrusted.
+> 
+> But with virtiofs we allow the guest to do a lot of filesystem
+> operations on the host.  It's the virtiofsd that has to ensure that
+> these are safe and contained within the fs it's exposed; the qemu/kvm
+> can't protect us from that.
+
+Fair enough. I should have added virtiofsd to list. Its an attack
+vector and is of concern.
 
 > 
-> > - If you retry in kernel, we will change the context completely that
-> >   who was trying to access the gfn in question. We want to retain
-> >   the real context and retain information who was trying to access
-> >   gfn in question.
-> 
-> (Just so I understand the idea better) does the guest context matter to
-> the host? Or, more specifically, are we going to do anything besides
-> get_user_pages() which will actually analyze who triggered the access
-> *in the guest*?
+> That's why we sandbox the virtiofsd like we do - if we allow a
+> priviliged guest to perform calls to an unconstrained virtiofsd it would
+> be able to escape.  That's what I want to check.
 
-When we exit to user space, qemu prints bunch of register state. I am
-wondering what does that state represent. Does some of that traces
-back to the process which was trying to access that hva? I don't
-know.
-
-I think keeping a cache of error gfns might not be too bad from
-implemetation point of view. I will give it a try and see how
-bad does it look.
+Sure. So does giving CAP_SYS_ADMIN to virtiofsd allow daemon to escape
+the jail. If it does we need to implement what crossvm folks did,
+remapping of trusted xattr. That will also allow us to run inside
+user namespace and still be able to support trusted xattr emulation
+for guest.
 
 Vivek
 

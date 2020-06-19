@@ -1,19 +1,16 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
-	h=from:to:cc:subject:date:message-id:in-reply-to:references
-	:mime-version:content-transfer-encoding;
-	bh=Fhc+RGhQKPjaGb3t2j/Ouyv4Kl3zy1Pm1n0Ml4d0G1I=;
-	b=EQdLtqIQ++mKv92vV8ab16Fz3TjOrfmxwCgb76ZMPlnmDD2qzBTicxvkq7bSf2j1Yx
-	EktyrbyrJ39aeqFkAUYDCMyiMRrOnHN8Tk7p0GW2VddUmp6bI2w6/VeYhxXpbAisPgui
-	HaTzAXtKx1OBZeJjIeyNS6P3u5jzexAyfm94k=
-From: Chirantan Ekbote <chirantan@chromium.org>
-Date: Mon, 13 Jul 2020 18:09:20 +0900
-Message-Id: <20200713090921.312962-1-chirantan@chromium.org>
-In-Reply-To: <20200610092744.140038-1-chirantan@chromium.org>
-References: <20200610092744.140038-1-chirantan@chromium.org>
+Date: Fri, 19 Jun 2020 11:57:37 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200619155737.GA12225@redhat.com>
+References: <20200416164907.244868-1-stefanha@redhat.com>
+	<20200618190816.GD3814@redhat.com>
+	<CAJfpegsfqADmK6foDyuQQnvMDh_jE0rNUCBRuxPchSSirrb04Q@mail.gmail.com>
+	<20200619142508.GB3154@redhat.com>
+	<CAJfpeguhS3w-AZTpyzO2QqcX_7F1qDm__5C8r3pBnCgPoxTKmQ@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=US-ASCII
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCHv3 1/2] uapi: fuse: Add FUSE_SECURITY_CTX
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAJfpeguhS3w-AZTpyzO2QqcX_7F1qDm__5C8r3pBnCgPoxTKmQ@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,63 +20,56 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: fuse-devel@lists.sourceforge.net, Suleiman Souhlal <suleiman@chromium.org>, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Dylan Reid <dgreid@chromium.org>, Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
 
-Add the FUSE_SECURITY_CTX flag for the `flags` field of the
-fuse_init_out struct.  When this flag is set the kernel will append the
-security context for a newly created inode to the request (create,
-mkdir, mknod, and symlink).  The server is responsible for ensuring that
-the inode appears atomically with the requested security context.
+On Fri, Jun 19, 2020 at 05:26:37PM +0200, Miklos Szeredi wrote:
+> On Fri, Jun 19, 2020 at 4:25 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> >
+> > On Fri, Jun 19, 2020 at 04:16:30PM +0200, Miklos Szeredi wrote:
+> > > On Thu, Jun 18, 2020 at 9:08 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> > > >
+> > > > On Thu, Apr 16, 2020 at 05:49:05PM +0100, Stefan Hajnoczi wrote:
+> > > > > virtiofsd doesn't need of all Linux capabilities(7) available to root.  Keep a
+> > > > > whitelisted set of capabilities that we require.  This improves security in
+> > > > > case virtiofsd is compromised by making it hard for an attacker to gain further
+> > > > > access to the system.
+> > > >
+> > > > Hi Stefan,
+> > > >
+> > > > I just noticed that this patch set breaks overlayfs on top of virtiofs.
+> > >
+> > > How so?  Virtiofs isn't mounting overlayfs, is it?  Only the mounter
+> > > requires CAP_SYS_ADMIN, not the accessor.
+> >
+> > virtiofsd needs CAP_SYS_ADMIN, otherwise fsetxattr(trusted.overlay.opaque)
+> > fails in lo_setxattr().
+> >
+> > This is triggered when we mount overlayfs on top of virtiofs and overlayfs
+> > tries to set OVL_XATTR_OPAQUE on upper to check if trusted xattrs are
+> > supported or not.
+> 
+> Ah, right.
+> 
+> Plan is to use "user.*" xattr for unprivileged overlay.  This would be
+> a good way to eliminate this attack surface in the overlay on virtiofs
+> case as well.
 
-For example, if the server is backed by a "real" linux file system then
-it can write the security context value to
-/proc/thread-self/attr/fscreate before making the syscall to create the
-inode.
+So unpriviliged overlay is one which is mounted from inside a user
+namespace. But in this case we might be mounting it from init_user_ns
+of guest. So from overlayfs perspective this will still be treated
+as priviliged overlay instance and it will use trusted xattrs, IIUC?
 
----
- include/uapi/linux/fuse.h | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+Thanks
+Vivek
 
-diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-index 373cada898159..e2099b45fd44b 100644
---- a/include/uapi/linux/fuse.h
-+++ b/include/uapi/linux/fuse.h
-@@ -172,6 +172,10 @@
-  *  - add FUSE_WRITE_KILL_PRIV flag
-  *  - add FUSE_SETUPMAPPING and FUSE_REMOVEMAPPING
-  *  - add map_alignment to fuse_init_out, add FUSE_MAP_ALIGNMENT flag
-+ *
-+ *  7.32
-+ *  - add FUSE_SECURITY_CTX flag for fuse_init_out
-+ *  - add security context to create, mkdir, symlink, and mknod requests
-  */
- 
- #ifndef _LINUX_FUSE_H
-@@ -207,7 +211,7 @@
- #define FUSE_KERNEL_VERSION 7
- 
- /** Minor version number of this interface */
--#define FUSE_KERNEL_MINOR_VERSION 31
-+#define FUSE_KERNEL_MINOR_VERSION 32
- 
- /** The node ID of the root inode */
- #define FUSE_ROOT_ID 1
-@@ -314,6 +318,7 @@ struct fuse_file_lock {
-  * FUSE_NO_OPENDIR_SUPPORT: kernel supports zero-message opendir
-  * FUSE_EXPLICIT_INVAL_DATA: only invalidate cached pages on explicit request
-  * FUSE_MAP_ALIGNMENT: map_alignment field is valid
-+ * FUSE_SECURITY_CTX: add security context to create, mkdir, symlink, and mknod
-  */
- #define FUSE_ASYNC_READ		(1 << 0)
- #define FUSE_POSIX_LOCKS	(1 << 1)
-@@ -342,6 +347,7 @@ struct fuse_file_lock {
- #define FUSE_NO_OPENDIR_SUPPORT (1 << 24)
- #define FUSE_EXPLICIT_INVAL_DATA (1 << 25)
- #define FUSE_MAP_ALIGNMENT	(1 << 26)
-+#define FUSE_SECURITY_CTX	(1 << 27)
- 
- /**
-  * CUSE INIT request/reply flags
--- 
-2.27.0.383.g050319c2ae-goog
+> 
+> Other ways to minimize risk is to separate operations requiring
+> CAP_SYS_ADMIN into a separate process, preferably a separate
+> executable, that communicates with virtiofsd using a pipe and contains
+> the minimum amount of code.
+
+> 
+> Thanks,
+> Miklos
+> 
 

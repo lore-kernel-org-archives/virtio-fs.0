@@ -1,16 +1,20 @@
-Date: Fri, 19 Jun 2020 16:25:43 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20200619152543.GF2424182@stefanha-x1.localdomain>
-References: <CALfysxrU1WNcWhzRUXboMSjZLsOz_J=BC1y_heye8juk+L-fSA@mail.gmail.com>
-	<20200609125040.GG92564@stefanha-x1.localdomain>
-	<CALfysxpKT0C1Eu8whTr-i4YdUp93sNBPSdriH-L68Qx03HE_jQ@mail.gmail.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=ezYfCp7rMSCdCycRYPJgIax1dV1358jvQsgEOQjDekY=;
+	b=K8Gc9jhGS0MVQy9vMkRFmG4D4kxf0IcAe5Irm674JuBHGP4yU8ENNr3a/vWVgAwVgA
+	t2MiZSTLBSfSy4LqcF3uJz4RmURBBSJFyeFx6POunrbqZteh4w5kvFrQRcIqejK0PRr2
+	PAnxLnVgyyEOIqxnSHMKoJfic4mH2l098ARPo=
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="Zs/RYxT/hKAHzkfQ"
-Content-Disposition: inline
-In-Reply-To: <CALfysxpKT0C1Eu8whTr-i4YdUp93sNBPSdriH-L68Qx03HE_jQ@mail.gmail.com>
-Subject: Re: [Virtio-fs] How to setup virtiofs for file sharing between host
- and VM
+References: <20200416164907.244868-1-stefanha@redhat.com>
+	<20200618190816.GD3814@redhat.com>
+	<CAJfpegsfqADmK6foDyuQQnvMDh_jE0rNUCBRuxPchSSirrb04Q@mail.gmail.com>
+	<20200619142508.GB3154@redhat.com>
+In-Reply-To: <20200619142508.GB3154@redhat.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Fri, 19 Jun 2020 17:26:37 +0200
+Message-ID: <CAJfpeguhS3w-AZTpyzO2QqcX_7F1qDm__5C8r3pBnCgPoxTKmQ@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,55 +23,45 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Boris Ebwanga <bbebwanga@gmail.com>
-Cc: virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
 
+On Fri, Jun 19, 2020 at 4:25 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> On Fri, Jun 19, 2020 at 04:16:30PM +0200, Miklos Szeredi wrote:
+> > On Thu, Jun 18, 2020 at 9:08 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> > >
+> > > On Thu, Apr 16, 2020 at 05:49:05PM +0100, Stefan Hajnoczi wrote:
+> > > > virtiofsd doesn't need of all Linux capabilities(7) available to root.  Keep a
+> > > > whitelisted set of capabilities that we require.  This improves security in
+> > > > case virtiofsd is compromised by making it hard for an attacker to gain further
+> > > > access to the system.
+> > >
+> > > Hi Stefan,
+> > >
+> > > I just noticed that this patch set breaks overlayfs on top of virtiofs.
+> >
+> > How so?  Virtiofs isn't mounting overlayfs, is it?  Only the mounter
+> > requires CAP_SYS_ADMIN, not the accessor.
+>
+> virtiofsd needs CAP_SYS_ADMIN, otherwise fsetxattr(trusted.overlay.opaque)
+> fails in lo_setxattr().
+>
+> This is triggered when we mount overlayfs on top of virtiofs and overlayfs
+> tries to set OVL_XATTR_OPAQUE on upper to check if trusted xattrs are
+> supported or not.
 
---Zs/RYxT/hKAHzkfQ
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Ah, right.
 
-On Thu, Jun 11, 2020 at 06:04:58PM +0100, Boris Ebwanga wrote:
-> Hello!
-> I was able to modify the XML domain without errors.
->=20
-> Now, the guest failed to start. It shows this error message:
-> erreur :internal error: process exited while connecting to monitor:
-> 2020-06-11T16:53:58.809703Z qemu-system-x86_64: -chardev
-> socket,id=3Dchar0,path=3D/home/deharteloos/tmp/vhost-fs.sock: Failed to c=
-onnect
-> socket /home/deharteloos/tmp/vhost-fs.sock: Permission denied
->=20
-> I don't know how to solve this problem.
+Plan is to use "user.*" xattr for unprivileged overlay.  This would be
+a good way to eliminate this attack surface in the overlay on virtiofs
+case as well.
 
-Have you checked the UNIX permissions for all components in the
-/home/deharteloos/tmp/vhost-fs.sock path? It should work if directories
-have execute permission and the UNIX domain socket has read permission
-for "other users" (the chmod syntax for that is o+x on directories and
-o+r on the socket).
+Other ways to minimize risk is to separate operations requiring
+CAP_SYS_ADMIN into a separate process, preferably a separate
+executable, that communicates with virtiofsd using a pipe and contains
+the minimum amount of code.
 
-It may also help to temporarily disable SELinux.
-
-Libvirt sets all this up securely and automatically, so if you get a
-chance to use libvirt 6.2 then you won't need to worry about it.
-
-Stefan
-
---Zs/RYxT/hKAHzkfQ
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl7s2PcACgkQnKSrs4Gr
-c8h/ywf/f3+Cg7oOvXwOowZi3X/hQGNZET0+Rpx17x7E0ORJi4KmpFqiD9mFuRHe
-MjFLj05rmHRKkO1neDXoiaimN7SdHsSLYFtJopz2dvSbNjhLTtBzesGiOFdrFbYN
-cIMMbAObmuYFNih0NDvq8ZIjNq2Z/rjVbJPht6Fbsz9UPa/LJnIeL3d1MWJY1rxs
-l2KfOiAgf/9GgMywJPx1e79Q5QFeFm0VUwxe5dUqFAWQxyY/rXbSikyRSmcxAQOD
-l1QNcZjhQtIigCAcswqnUpIZoj/bc9O6DGIRXQft0xBhCZ1mmUQkabUHh7IYXynr
-v/xgsN7VxJiNyfNJ7piqref++YTccg==
-=KiXX
------END PGP SIGNATURE-----
-
---Zs/RYxT/hKAHzkfQ--
+Thanks,
+Miklos
 

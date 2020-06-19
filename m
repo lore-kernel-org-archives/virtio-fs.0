@@ -1,17 +1,16 @@
+Date: Fri, 19 Jun 2020 12:39:14 +0100
+From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+Message-ID: <20200619113914.GI700896@redhat.com>
+References: <20200416164907.244868-1-stefanha@redhat.com>
+	<20200618190816.GD3814@redhat.com> <20200618191655.GI2769@work-vm>
+	<20200618192717.GE3814@redhat.com> <20200619082746.GA2690@work-vm>
 MIME-Version: 1.0
-References: <20200424133516.73077-1-mreitz@redhat.com>
-	<20200427175902.GM2923@work-vm>
-	<20200428145143.GB107541@stefanha-x1.localdomain>
-	<CAOssrKcoXBAxE=Ld5ZY79G=Dy=qBh3HdSxxC+nMGJOX52rUxxg@mail.gmail.com>
-	<20200428191523.GU2794@work-vm>
-	<0da9422f-6399-6ef0-1042-4b2b90d49ed8@redhat.com>
-In-Reply-To: <0da9422f-6399-6ef0-1042-4b2b90d49ed8@redhat.com>
-From: Miklos Szeredi <mszeredi@redhat.com>
-Date: Wed, 29 Apr 2020 10:52:46 +0200
-Message-ID: <CAOssrKfA_7cAio6i4Zy5hM-6VwBXphja6ps4s_NKrLsoF1yC+Q@mail.gmail.com>
 Content-Type: text/plain; charset="utf-8"
+Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Show submounts
+In-Reply-To: <20200619082746.GA2690@work-vm>
+Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
+Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,35 +19,144 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>
 
-On Wed, Apr 29, 2020 at 10:31 AM Max Reitz <mreitz@redhat.com> wrote:
->
-> On 28.04.20 21:15, Dr. David Alan Gilbert wrote:
+On Fri, Jun 19, 2020 at 09:27:46AM +0100, Dr. David Alan Gilbert wrote:
+> * Vivek Goyal (vgoyal@redhat.com) wrote:
+> > On Thu, Jun 18, 2020 at 08:16:55PM +0100, Dr. David Alan Gilbert wrote:
+> > > * Vivek Goyal (vgoyal@redhat.com) wrote:
+> > > > On Thu, Apr 16, 2020 at 05:49:05PM +0100, Stefan Hajnoczi wrote:
+> > > > > virtiofsd doesn't need of all Linux capabilities(7) available to root.  Keep a
+> > > > > whitelisted set of capabilities that we require.  This improves security in
+> > > > > case virtiofsd is compromised by making it hard for an attacker to gain further
+> > > > > access to the system.
+> > > > 
+> > > > Hi Stefan,
+> > > > 
+> > > > I just noticed that this patch set breaks overlayfs on top of virtiofs.
+> > > > 
+> > > > overlayfs sets "trusted.overlay.*" and xattrs in trusted domain
+> > > > need CAP_SYS_ADMIN.
+> > > > 
+> > > > man xattr says.
+> > > > 
+> > > >    Trusted extended attributes
+> > > >        Trusted  extended  attributes  are  visible and accessible only to pro‐
+> > > >        cesses that have the  CAP_SYS_ADMIN  capability.   Attributes  in  this
+> > > >        class are used to implement mechanisms in user space (i.e., outside the
+> > > >        kernel) which keep information in extended attributes to which ordinary
+> > > >        processes should not have access.
+> > > > 
+> > > > There is a chance that overlay moves away from trusted xattr in future.
+> > > > But for now we need to make it work. This is an important use case for
+> > > > kata docker in docker build.
+> > > > 
+> > > > May be we can add an option to virtiofsd say "--add-cap <capability>" and
+> > > > ask user to pass in "--add-cap cap_sys_admin" if they need to run daemon
+> > > > with this capaibility.
+> > > 
+> > > I'll admit I don't like the idea of giving it cap_sys_admin.
+> > > Can you explain:
+> > >   a) What overlayfs uses trusted for?
+> > 
+> > overlayfs stores bunch of metadata and uses "trusted" xattrs for it.
+> 
+> Tell me more about this metadata.
+> Taking a juicy looking one, what does OVL_XATTR_REDIRECT do?
+> Or what happens if I was to write random numbers into OVL_XATTR_NLINK?
+> 
+> > >   b) If something nasty was to write junk into the trusted attributes,
+> > >     what would happen?
+> > 
+> > This directory is owned by guest. So it should be able to write
+> > anything it wants, as long as process in guest has CAP_SYS_ADMIN, right?
+> 
+> Well, we shouldn't be able to break/crash/escape into the host; how
+> much does overlayfs validate trusted.* it uses?
+> 
+> > >   c) I see overlayfs has a fallback check if xattr isn't supported at
+> > > all - what is the consequence?
+> > 
+> > It falls back to I think read only mode. 
+> 
+> It looks like the fallback is more subtle to me:
+>         /*
+>          * Check if upper/work fs supports trusted.overlay.* xattr
+>          */
+>         err = ovl_do_setxattr(ofs->workdir, OVL_XATTR_OPAQUE, "0", 1, 0);
+>         if (err) {
+>                 ofs->noxattr = true;
+>                 ofs->config.index = false;
+>                 ofs->config.metacopy = false;
+>                 pr_warn("upper fs does not support xattr, falling back to index=off and metacopy=off.\n");
+> 
+> but I don't know what index and metacopy are.
+> 
+> > For a moment forget about overlayfs. Say a user process in guest with
+> > CAP_SYS_ADMIN is writing trusted.foo. Should that succeed? Is a
+> > passthrough filesystem, so it should go through. But currently it
+> > wont.
+> 
+> As long as any effects of what it writes are contained to the area of
+> the filesystem exposed to the guest, yes - however it worries me what
+> the consequences of broken trusted metadata is.  If it's delicate enough
+> that it's guarded by CAP_SYS_ADMIN someone must have worried about it.
 
-> > So are you saying we need a:
-> >        if (mount(NULL, "/", NULL, MS_REC | MS_SHARED, NULL) < 0) {
-> >
-> >   and can this go straight after (1) ?
->
-> Isn’t MS_SHARED and MS_SLAVE mutually exclusive, that is, both are just
-> different propagation types?  So shouldn’t putting this after (1) be
-> effectively the same as replacing (1)?
+The CAP_SYS_ADMIN requirement for 'trusted.' xattrs is simply a useful
+mechanism for applications to control access. The host kernel doesn'
+tuse this namespace itself. Linux has four namespaces for xattrs:
 
-No, think of it more like a set of groups (mounts in a group have the
-same "shared:$ID" tag in /proc/self/mountinfo) and these groups being
-arranged into a tree, where child groups get propagation from the
-parent group (mounts have a "master:$PARENT_ID" tag), but not the
-other way round.
+ -  user - for userspace apps. accessible based on read/write permissions
+ -  trusted - for userspace apps. accessible by CAP_SYS_ADMIN processes only
+ -  system - for kernel only. used by ACLs
+ -  security - for kernel only. used by SELinux
 
-So if a mount is part of a shared group and this group is also the
-child of another shared group, then it will have both a "shared:$ID"
-and a "master:$PARENT_ID" tag in /proc/self/mountinfo.
+The use case for "trusted" xattrs is thus where a privileged management
+application or service wants to store metadata against the file, but
+also needs to grant an unprivileged process access to write to this file
+while not allowing that unprivileged process the ability to change the
+metadata. This is mentioned in the man page:
 
-For the gory details see Documentation/filesystems/sharedsubtree.txt
+[man xattr(7)]
+   Trusted extended attributes
+       Trusted  extended attributes are visible and accessible only to pro‐
+       cesses that have the CAP_SYS_ADMIN capability.  Attributes  in  this
+       class  are used to implement mechanisms in user space (i.e., outside
+       the kernel) which keep information in extended attributes  to  which
+       ordinary processes should not have access.
 
-Thanks,
-Miklos
+   User extended attributes
+       User  extended  attributes  may be assigned to files and directories
+       for storing arbitrary additional information such as the mime  type,
+       character  set  or  encoding  of a file.  The access permissions for
+       user attributes are defined by the file permission bits:  read  per‐
+       mission is required to retrieve the attribute value, and writer per‐
+       mission is required to change it.
+[/man]
 
+Libvirtd uses the "trusted." xattr namespace to record information against
+disk images for QEMU, because we need to grant QEMU access to read/write
+the disk iamges, but don't want QEMU to be able to alter our xattrs.
+
+It is unfortunate that this namespace is tied to the CAP_SYS_ADMIN cap.
+It really ought to have had its own dedicated capability :-( Such is
+life with anything that uses CAP_SYS_ADMIN...
+
+With this in mind we really should have both trusted. & user. xattrs
+allowed to the guest by default.
+
+Conversely, we'll need to block usage of the security. and system.
+namespaces.
+
+Unfortuntely this implies allowing CAP_SYS_ADMIN by default. We could
+have a "--trusted-xattrs=on|off" flag to allow people to run in a more
+locked down state if they knowingly want to block trusted xattrs.
+
+Regards,
+Daniel
+-- 
+|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
+|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
+|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
 

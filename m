@@ -1,14 +1,11 @@
-Date: Fri, 7 Aug 2020 16:36:28 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200807153628.GG2780@work-vm>
-References: <20200727190223.422280-1-stefanha@redhat.com>
-	<20200727190223.422280-3-stefanha@redhat.com>
+Date: Thu, 25 Jun 2020 17:47:01 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200625214701.GA180786@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20200727190223.422280-3-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v2 2/3] virtiofsd: add container-friendly -o
- sandbox=chroot option
+Subject: [Virtio-fs] [RFC PATCH] kvm,
+	x86: Exit to user space in case of page fault error
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,216 +14,135 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: vromanso@redhat.com, qemu-devel@nongnu.org, rmohr@redhat.com, virtio-fs@redhat.com, mpatel@redhat.com, vgoyal@redhat.com
+To: kvm@vger.kernel.org, linux-kernel@vger.kernel.org
+Cc: virtio-fs@redhat.com, pbonzini@redhat.com, vkuznets@redhat.com, sean.j.christopherson@intel.com
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> virtiofsd cannot run in a container because CAP_SYS_ADMIN is required to
-> create namespaces.
-> 
-> Introduce a weaker sandbox mode that is sufficient in container
-> environments because the container runtime already sets up namespaces.
-> Use chroot to restrict path traversal to the shared directory.
-> 
-> virtiofsd loses the following:
-> 
-> 1. Mount namespace. The process chroots to the shared directory but
->    leaves the mounts in place. Seccomp rejects mount(2)/umount(2)
->    syscalls.
-> 
-> 2. Pid namespace. This should be fine because virtiofsd is the only
->    process running in the container.
-> 
-> 3. Network namespace. This should be fine because seccomp already
->    rejects the connect(2) syscall, but an additional layer of security
->    is lost. Container runtime-specific network security policies can be
->    used drop network traffic (except for the vhost-user UNIX domain
->    socket).
-> 
-> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+Page fault error handling behavior in kvm seems little inconsistent when
+page fault reports error. If we are doing fault synchronously
+then we capture error (-EFAULT) returned by __gfn_to_pfn_memslot() and
+exit to user space and qemu reports error, "error: kvm run failed Bad address".
 
-Is there anyone with a bit more FS semantics expertise who could check
-this;  I already surprised myself a few times reading about chroot
-escapes, so I'd appreciate a 2nd pair of eyes.
+But if we are doing async page fault, then async_pf_execute() will simply
+ignore the error reported by get_user_pages_remote() or
+by kvm_mmu_do_page_fault(). It is assumed that page fault was successful
+and either a page ready event is injected in guest or guest is brought
+out of artificial halt state and run again. In both the cases when guest
+retries the instruction, it takes exit again as page fault was not
+successful in previous attempt. And then this infinite loop continues
+forever.
 
-Dave
+Trying fault in a loop will make sense if error is temporary and will
+be resolved on retry. But I don't see any intention in the code to
+determine if error is temporary or not.  Whether to do fault synchronously
+or asynchronously, depends on so many variables but none of the varibales
+is whether error is temporary or not. (kvm_can_do_async_pf()).
 
-> ---
->  tools/virtiofsd/helper.c         |  8 +++++
->  tools/virtiofsd/passthrough_ll.c | 57 ++++++++++++++++++++++++++++++--
->  docs/tools/virtiofsd.rst         | 32 ++++++++++++++----
->  3 files changed, 88 insertions(+), 9 deletions(-)
-> 
-> diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
-> index 3105b6c23a..91dcb23664 100644
-> --- a/tools/virtiofsd/helper.c
-> +++ b/tools/virtiofsd/helper.c
-> @@ -168,6 +168,14 @@ void fuse_cmdline_help(void)
->             "                               enable/disable readirplus\n"
->             "                               default: readdirplus except with "
->             "cache=none\n"
-> +           "    -o sandbox=namespace|chroot\n"
-> +           "                               sandboxing mode:\n"
-> +           "                               - namespace: mount, pid, and net\n"
-> +           "                                 namespaces with pivot_root(2)\n"
-> +           "                                 into shared directory\n"
-> +           "                               - chroot: chroot(2) into shared\n"
-> +           "                                 directory (use in containers)\n"
-> +           "                               default: namespace\n"
->             "    -o timeout=<number>        I/O timeout (seconds)\n"
->             "                               default: depends on cache= option.\n"
->             "    -o writeback|no_writeback  enable/disable writeback cache\n"
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 50a164a599..a7894c3e7c 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -137,8 +137,14 @@ enum {
->      CACHE_ALWAYS,
->  };
->  
-> +enum {
-> +    SANDBOX_NAMESPACE,
-> +    SANDBOX_CHROOT,
-> +};
-> +
->  struct lo_data {
->      pthread_mutex_t mutex;
-> +    int sandbox;
->      int debug;
->      int writeback;
->      int flock;
-> @@ -162,6 +168,12 @@ struct lo_data {
->  };
->  
->  static const struct fuse_opt lo_opts[] = {
-> +    { "sandbox=namespace",
-> +      offsetof(struct lo_data, sandbox),
-> +      SANDBOX_NAMESPACE },
-> +    { "sandbox=chroot",
-> +      offsetof(struct lo_data, sandbox),
-> +      SANDBOX_CHROOT },
->      { "writeback", offsetof(struct lo_data, writeback), 1 },
->      { "no_writeback", offsetof(struct lo_data, writeback), 0 },
->      { "source=%s", offsetof(struct lo_data, source), 0 },
-> @@ -2665,6 +2677,41 @@ static void setup_capabilities(char *modcaps_in)
->      pthread_mutex_unlock(&cap.mutex);
->  }
->  
-> +/*
-> + * Use chroot as a weaker sandbox for environments where the process is
-> + * launched without CAP_SYS_ADMIN.
-> + */
-> +static void setup_chroot(struct lo_data *lo)
-> +{
-> +    lo->proc_self_fd = open("/proc/self/fd", O_PATH);
-> +    if (lo->proc_self_fd == -1) {
-> +        fuse_log(FUSE_LOG_ERR, "open(\"/proc/self/fd\", O_PATH): %m\n");
-> +        exit(1);
-> +    }
-> +
-> +    /*
-> +     * Make the shared directory the file system root so that FUSE_OPEN
-> +     * (lo_open()) cannot escape the shared directory by opening a symlink.
-> +     *
-> +     * The chroot(2) syscall is later disabled by seccomp and the
-> +     * CAP_SYS_CHROOT capability is dropped so that tampering with the chroot
-> +     * is not possible.
-> +     *
-> +     * However, it's still possible to escape the chroot via lo->proc_self_fd
-> +     * but that requires first gaining control of the process.
-> +     */
-> +    if (chroot(lo->source) != 0) {
-> +        fuse_log(FUSE_LOG_ERR, "chroot(\"%s\"): %m\n", lo->source);
-> +        exit(1);
-> +    }
-> +
-> +    /* Move into the chroot */
-> +    if (chdir("/") != 0) {
-> +        fuse_log(FUSE_LOG_ERR, "chdir(\"/\"): %m\n");
-> +        exit(1);
-> +    }
-> +}
-> +
->  /*
->   * Lock down this process to prevent access to other processes or files outside
->   * source directory.  This reduces the impact of arbitrary code execution bugs.
-> @@ -2672,8 +2719,13 @@ static void setup_capabilities(char *modcaps_in)
->  static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
->                            bool enable_syslog)
->  {
-> -    setup_namespaces(lo, se);
-> -    setup_mounts(lo->source);
-> +    if (lo->sandbox == SANDBOX_NAMESPACE) {
-> +        setup_namespaces(lo, se);
-> +        setup_mounts(lo->source);
-> +    } else {
-> +        setup_chroot(lo);
-> +    }
-> +
->      setup_seccomp(enable_syslog);
->      setup_capabilities(g_strdup(lo->modcaps));
->  }
-> @@ -2820,6 +2872,7 @@ int main(int argc, char *argv[])
->      struct fuse_session *se;
->      struct fuse_cmdline_opts opts;
->      struct lo_data lo = {
-> +        .sandbox = SANDBOX_NAMESPACE,
->          .debug = 0,
->          .writeback = 0,
->          .posix_lock = 1,
-> diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-> index 824e713491..40629f95ae 100644
-> --- a/docs/tools/virtiofsd.rst
-> +++ b/docs/tools/virtiofsd.rst
-> @@ -17,13 +17,24 @@ This program is designed to work with QEMU's ``--device vhost-user-fs-pci``
->  but should work with any virtual machine monitor (VMM) that supports
->  vhost-user.  See the Examples section below.
->  
-> -This program must be run as the root user.  Upon startup the program will
-> -switch into a new file system namespace with the shared directory tree as its
-> -root.  This prevents "file system escapes" due to symlinks and other file
-> -system objects that might lead to files outside the shared directory.  The
-> -program also sandboxes itself using seccomp(2) to prevent ptrace(2) and other
-> -vectors that could allow an attacker to compromise the system after gaining
-> -control of the virtiofsd process.
-> +This program must be run as the root user.  The program drops privileges where
-> +possible during startup although it must be able to create and access files
-> +with any uid/gid:
-> +
-> +* The ability to invoke syscalls is limited using seccomp(2).
-> +* Linux capabilities(7) are dropped.
-> +
-> +In "namespace" sandbox mode the program switches into a new file system
-> +namespace and invokes pivot_root(2) to make the shared directory tree its root.
-> +A new pid and net namespace is also created to isolate the process.
-> +
-> +In "chroot" sandbox mode the program invokes chroot(2) to make the shared
-> +directory tree its root. This mode is intended for container environments where
-> +the container runtime has already set up the namespaces and the program does
-> +not have permission to create namespaces itself.
-> +
-> +Both sandbox modes prevent "file system escapes" due to symlinks and other file
-> +system objects that might lead to files outside the shared directory.
->  
->  Options
->  -------
-> @@ -72,6 +83,13 @@ Options
->    * readdirplus|no_readdirplus -
->      Enable/disable readdirplus.  The default is ``readdirplus``.
->  
-> +  * sandbox=namespace|chroot -
-> +    Sandbox mode:
-> +    - namespace: Create mount, pid, and net namespaces and pivot_root(2) into
-> +    the shared directory.
-> +    - chroot: chroot(2) into shared directory (use in containers).
-> +    The default is "namespace".
-> +
->    * source=PATH -
->      Share host directory tree located at PATH.  This option is required.
->  
-> -- 
-> 2.26.2
-> 
+And that makes it very inconsistent or unpredictable to figure out whether
+kvm will exit to qemu with error or it will just retry and go into an
+infinite loop.
+
+This patch tries to make this behavior consistent. That is instead of
+getting into infinite loop of retrying page fault, exit to user space
+and stop VM if page fault error happens.
+
+In future this can be improved by injecting errors into guest. As of
+now we don't have any race free method to inject errors in guest.
+
+When page fault error happens in async path save that pfn and when next
+time guest retries, do a sync fault instead of async fault. So that if error
+is encountered, we exit to qemu and avoid infinite loop.
+
+As of now only one error pfn is stored and that means it could be
+overwritten before next a retry from guest happens. But this is
+just a hint and if we miss it, some other time we will catch it.
+If this becomes an issue, we could maintain an array of error
+gfn later to help ease the issue.
+
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ arch/x86/include/asm/kvm_host.h |  1 +
+ arch/x86/kvm/mmu.h              |  2 +-
+ arch/x86/kvm/mmu/mmu.c          |  2 +-
+ arch/x86/kvm/x86.c              | 14 +++++++++++---
+ 4 files changed, 14 insertions(+), 5 deletions(-)
+
+diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
+index be5363b21540..3c0677b9d3d5 100644
+--- a/arch/x86/include/asm/kvm_host.h
++++ b/arch/x86/include/asm/kvm_host.h
+@@ -778,6 +778,7 @@ struct kvm_vcpu_arch {
+ 		unsigned long nested_apf_token;
+ 		bool delivery_as_pf_vmexit;
+ 		bool pageready_pending;
++		gfn_t error_gfn;
+ 	} apf;
+ 
+ 	/* OSVW MSRs (AMD only) */
+diff --git a/arch/x86/kvm/mmu.h b/arch/x86/kvm/mmu.h
+index 444bb9c54548..d0a2a12c7bb6 100644
+--- a/arch/x86/kvm/mmu.h
++++ b/arch/x86/kvm/mmu.h
+@@ -60,7 +60,7 @@ void kvm_init_mmu(struct kvm_vcpu *vcpu, bool reset_roots);
+ void kvm_init_shadow_mmu(struct kvm_vcpu *vcpu, u32 cr0, u32 cr4, u32 efer);
+ void kvm_init_shadow_ept_mmu(struct kvm_vcpu *vcpu, bool execonly,
+ 			     bool accessed_dirty, gpa_t new_eptp);
+-bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu);
++bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu, gfn_t gfn);
+ int kvm_handle_page_fault(struct kvm_vcpu *vcpu, u64 error_code,
+ 				u64 fault_address, char *insn, int insn_len);
+ 
+diff --git a/arch/x86/kvm/mmu/mmu.c b/arch/x86/kvm/mmu/mmu.c
+index 76817d13c86e..a882a6a9f7a7 100644
+--- a/arch/x86/kvm/mmu/mmu.c
++++ b/arch/x86/kvm/mmu/mmu.c
+@@ -4078,7 +4078,7 @@ static bool try_async_pf(struct kvm_vcpu *vcpu, bool prefault, gfn_t gfn,
+ 	if (!async)
+ 		return false; /* *pfn has correct page already */
+ 
+-	if (!prefault && kvm_can_do_async_pf(vcpu)) {
++	if (!prefault && kvm_can_do_async_pf(vcpu, cr2_or_gpa >> PAGE_SHIFT)) {
+ 		trace_kvm_try_async_get_page(cr2_or_gpa, gfn);
+ 		if (kvm_find_async_pf_gfn(vcpu, gfn)) {
+ 			trace_kvm_async_pf_doublefault(cr2_or_gpa, gfn);
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index 3b92db412335..a6af7e9831b9 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -10380,7 +10380,9 @@ void kvm_arch_async_page_ready(struct kvm_vcpu *vcpu, struct kvm_async_pf *work)
+ 	      work->arch.cr3 != vcpu->arch.mmu->get_guest_pgd(vcpu))
+ 		return;
+ 
+-	kvm_mmu_do_page_fault(vcpu, work->cr2_or_gpa, 0, true);
++	r = kvm_mmu_do_page_fault(vcpu, work->cr2_or_gpa, 0, true);
++	if (r < 0)
++		vcpu->arch.apf.error_gfn = work->cr2_or_gpa >> PAGE_SHIFT;
+ }
+ 
+ static inline u32 kvm_async_pf_hash_fn(gfn_t gfn)
+@@ -10490,7 +10492,7 @@ static bool kvm_can_deliver_async_pf(struct kvm_vcpu *vcpu)
+ 	return true;
+ }
+ 
+-bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu)
++bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu, gfn_t gfn)
+ {
+ 	if (unlikely(!lapic_in_kernel(vcpu) ||
+ 		     kvm_event_needs_reinjection(vcpu) ||
+@@ -10504,7 +10506,13 @@ bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu)
+ 	 * If interrupts are off we cannot even use an artificial
+ 	 * halt state.
+ 	 */
+-	return kvm_arch_interrupt_allowed(vcpu);
++	if (!kvm_arch_interrupt_allowed(vcpu))
++		return false;
++
++	if (vcpu->arch.apf.error_gfn == gfn)
++		return false;
++
++	return true;
+ }
+ 
+ bool kvm_arch_async_page_not_present(struct kvm_vcpu *vcpu,
 -- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+2.25.4
 

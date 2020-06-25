@@ -1,15 +1,12 @@
-Date: Wed, 5 Aug 2020 13:47:49 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20200805124749.GH361702@stefanha-x1.localdomain>
-References: <20200803191511.45261-1-dgilbert@redhat.com>
-	<20200803191511.45261-2-dgilbert@redhat.com>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Thu, 25 Jun 2020 17:29:29 +0100
+Message-Id: <20200625162929.46672-4-dgilbert@redhat.com>
+In-Reply-To: <20200625162929.46672-1-dgilbert@redhat.com>
+References: <20200625162929.46672-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="Uu2n37VG4rOBDVuR"
-Content-Disposition: inline
-In-Reply-To: <20200803191511.45261-2-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 1/3] tools/virtiofsd: xattr name mappings:
-	Add option
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 3/3] virtiofsd: Allow addition or removal of
+	capabilities
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,130 +15,152 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com, stefanha@redhat.com, vgoyal@redhat.com
 
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
---Uu2n37VG4rOBDVuR
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Allow capabilities to be added or removed from the allowed set for the
+daemon; e.g.
 
-On Mon, Aug 03, 2020 at 08:15:09PM +0100, Dr. David Alan Gilbert (git) wrot=
-e:
-> diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-> index 824e713491..82b6f6d90a 100644
-> --- a/docs/tools/virtiofsd.rst
-> +++ b/docs/tools/virtiofsd.rst
-> @@ -107,6 +107,51 @@ Options
->    performance.  ``auto`` acts similar to NFS with a 1 second metadata ca=
-che
->    timeout.  ``always`` sets a long cache lifetime at the expense of cohe=
-rency.
-> =20
-> +xattr-mapping
-> +-------------
-> +
-> +By default the name of xattr's used by the client are passe through to t=
-he host
-> +file system.  This can be a problem where either those xattr names are u=
-sed
-> +by something on the host (e.g. selinux guest/host confusion) or if the
-> +virtiofsd is running in a container with restricted priviliges where it =
-cannot
-> +access some attributes.
-> +
-> +A mapping of xattr names can be made using -o xattrmap=3Dmapping where t=
-he ``mapping``
-> +string consists of a series of rules.
-> +
-> +Each rule starts and ends with a ':'.  The mapping stops on a matching
-> +rule.  White space may be added before and after each rule.
-> +
-> +:scope:type:key:prepend:
-> +
-> +scope=3D 'c' - match 'key' against a xattr name from the client
-> +            for setxattr/getxattr/removexattr
-> +       'h' - match 'prepend' against a xattr name from the host
-> +            for listxattr
-> +       both letters can be included to match both cases.
-> +
-> +type is one of:
-> +       'p' Prefixing: If 'key' matches the client then the 'prepend'
-> +           is added before the name is passed to the host.
-> +           For a host case, the prepend is tested and stripped
-> +           if matching.
-> +
-> +       'o' OK: The attribute name is OK and passed through to
-> +           the host unchanged.
-> +
-> +       'b' Bad: If a client tries to use this name it's
-> +           denied using EPERM; when the host passes an attribute
-> +           name matching it's hidden.
-> +
-> +key is a string tested as a prefix on an attribute name originating
-> +       on the client.  It maybe empty in which case a 'c' rule
-> +       will always match on client names.
-> +
-> +prepend is a string tested as a prefix on an attribute name originiating
-> +       on the host, and used as a new prefix by 'p'.  It maybe empty
-> +       in which case a 'h' rule will always match on host names.
+default:
+CapPrm: 00000000880000df
+CapEff: 00000000880000df
 
-This syntax and the documentation is hard to understand. Defining
-concrete commands instead of a single super-command would make it more
-straightforward.
+-o modcaps=+sys_admin
 
-Here is the functionality I've been able to extract from the
-documentation:
+CapPrm: 00000000882000df
+CapEff: 00000000882000df
 
-1. Rewrite client xattrs
+-o modcaps=+sys_admin:-chown
 
-   rewrite OLD NEW -> s/^OLD/NEW/
+CapPrm: 00000000882000de
+CapEff: 00000000882000de
 
-2. Allow client xattrs
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+---
+ docs/tools/virtiofsd.rst         |  5 ++++
+ tools/virtiofsd/helper.c         |  2 ++
+ tools/virtiofsd/passthrough_ll.c | 50 ++++++++++++++++++++++++++++++--
+ 3 files changed, 55 insertions(+), 2 deletions(-)
 
-   allow PREFIX -> allow if matching
-
-3. Deny client xattrs
-
-   deny PREFIX -> EPERM if matching
-
-4. Unprefix server xattrs
-
-   unprefix PREFIX -> s/^PREFIX//
-
-5. Hide server xattrs
-
-   hide PREFIX -> skip if matching
-
-Did I miss any functionality?
-
-I suggest using "client" and "server" terminology instead of "client"
-and "host".
-
-Prefix syntax: xattr names are matched by prefix. The empty string
-matches all xattr names. How is ':' escaped?
-
-It is unclear whether 'o' terminates processing immediately. Will later
-'p' rules still execute?
-
-It is unclear whether 'o'/'b' match the original client name or the
-rewritten name after a 'p' command.
-
---Uu2n37VG4rOBDVuR
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl8qqnUACgkQnKSrs4Gr
-c8g8rgf/f1wYLasnqqi1EWMrYj1WL9+0vvyGPEteDMK46Gclq8K+e7AsoLOaq5hf
-DQOdFyC/IwkiBfFD1dVBXnRKeUN47rtRCgOK0czLtcBCR8LREvwTpKBKRX+8Lcpz
-UAtP+x2/Aik5+cwOzdFC0lilY191gMrB4xP8M6vfEnynOTRkWsP9QY9ccej3IFJY
-J8EfGBFQeXrLYYPtKZOkE+sPp2lfi/dK9kWV2/MfUhd2l/naLOah3Z3R+2HaveAO
-RR5BeLNAOb1r+0oDntgmfsjfSImWn75ZCxlvkUQbT+ZeMCcHkxLkR4yc3c21ZYJB
-kMnJ5DNLdXV0bJ8lIiJMtf3M41N80Q==
-=qN12
------END PGP SIGNATURE-----
-
---Uu2n37VG4rOBDVuR--
+diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
+index 378594c422..824e713491 100644
+--- a/docs/tools/virtiofsd.rst
++++ b/docs/tools/virtiofsd.rst
+@@ -54,6 +54,11 @@ Options
+   * flock|no_flock -
+     Enable/disable flock.  The default is ``no_flock``.
+ 
++  * modcaps=CAPLIST
++    Modify the list of capabilities allowed; CAPLIST is a colon separated
++    list of capabilities, each preceded by either + or -, e.g.
++    ''+sys_admin:-chown''.
++
+   * log_level=LEVEL -
+     Print only log messages matching LEVEL or more severe.  LEVEL is one of
+     ``err``, ``warn``, ``info``, or ``debug``.  The default is ``info``.
+diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
+index 00a1ef666a..3105b6c23a 100644
+--- a/tools/virtiofsd/helper.c
++++ b/tools/virtiofsd/helper.c
+@@ -174,6 +174,8 @@ void fuse_cmdline_help(void)
+            "                               default: no_writeback\n"
+            "    -o xattr|no_xattr          enable/disable xattr\n"
+            "                               default: no_xattr\n"
++           "    -o modcaps=CAPLIST         Modify the list of capabilities\n"
++           "                               e.g. -o modcaps=+sys_admin:-chown\n"
+            "    --rlimit-nofile=<num>      set maximum number of file descriptors\n"
+            "                               (0 leaves rlimit unchanged)\n"
+            "                               default: min(1000000, fs.file-max - 16384)\n"
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 99d562046a..9d2cbc70ca 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -145,6 +145,7 @@ struct lo_data {
+     int posix_lock;
+     int xattr;
+     char *source;
++    char *modcaps;
+     double timeout;
+     int cache;
+     int timeout_set;
+@@ -170,6 +171,7 @@ static const struct fuse_opt lo_opts[] = {
+     { "no_posix_lock", offsetof(struct lo_data, posix_lock), 0 },
+     { "xattr", offsetof(struct lo_data, xattr), 1 },
+     { "no_xattr", offsetof(struct lo_data, xattr), 0 },
++    { "modcaps=%s", offsetof(struct lo_data, modcaps), 0 },
+     { "timeout=%lf", offsetof(struct lo_data, timeout), 0 },
+     { "timeout=", offsetof(struct lo_data, timeout_set), 1 },
+     { "cache=none", offsetof(struct lo_data, cache), CACHE_NONE },
+@@ -2571,7 +2573,7 @@ static void setup_mounts(const char *source)
+ /*
+  * Only keep whitelisted capabilities that are needed for file system operation
+  */
+-static void setup_capabilities(void)
++static void setup_capabilities(struct lo_data *lo)
+ {
+     pthread_mutex_lock(&cap.mutex);
+     capng_restore_state(&cap.saved);
+@@ -2604,6 +2606,50 @@ static void setup_capabilities(void)
+         exit(1);
+     }
+ 
++    /*
++     * The modcaps option is a colon separated list of caps,
++     * each preceded by either + or -.
++     */
++    while (lo->modcaps) {
++        capng_act_t action;
++        int cap;
++
++        char *next = strchr(lo->modcaps, ':');
++        if (next) {
++            *next = '\0';
++            next++;
++        }
++
++        switch (lo->modcaps[0]) {
++        case '+':
++            action = CAPNG_ADD;
++            break;
++
++        case '-':
++            action = CAPNG_DROP;
++            break;
++
++        default:
++            fuse_log(FUSE_LOG_ERR,
++                     "%s: Expecting '+'/'-' in modcaps but found '%c'\n",
++                     __func__, lo->modcaps[0]);
++            exit(1);
++        }
++        cap = capng_name_to_capability(lo->modcaps + 1);
++        if (cap < 0) {
++            fuse_log(FUSE_LOG_ERR, "%s: Unknown capability '%s'\n", __func__,
++                     lo->modcaps);
++            exit(1);
++        }
++        if (capng_update(action, CAPNG_PERMITTED | CAPNG_EFFECTIVE, cap)) {
++            fuse_log(FUSE_LOG_ERR, "%s: capng_update failed for '%s'\n",
++                     __func__, lo->modcaps);
++            exit(1);
++        }
++
++        lo->modcaps = next;
++    }
++
+     if (capng_apply(CAPNG_SELECT_BOTH)) {
+         fuse_log(FUSE_LOG_ERR, "%s: capng_apply failed\n", __func__);
+         exit(1);
+@@ -2627,7 +2673,7 @@ static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
+     setup_namespaces(lo, se);
+     setup_mounts(lo->source);
+     setup_seccomp(enable_syslog);
+-    setup_capabilities();
++    setup_capabilities(lo);
+ }
+ 
+ /* Set the maximum number of open file descriptors */
+-- 
+2.26.2
 

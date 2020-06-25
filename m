@@ -1,12 +1,17 @@
+Date: Thu, 25 Jun 2020 08:55:08 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 29 Jul 2020 18:14:07 -0400
-Message-Id: <20200729221410.147556-3-vgoyal@redhat.com>
-In-Reply-To: <20200729221410.147556-1-vgoyal@redhat.com>
-References: <20200729221410.147556-1-vgoyal@redhat.com>
+Message-ID: <20200625125508.GB149340@redhat.com>
+References: <20200416164907.244868-1-stefanha@redhat.com>
+	<20200618190816.GD3814@redhat.com> <20200618191655.GI2769@work-vm>
+	<20200618192717.GE3814@redhat.com>
+	<CAJFHJrrJzPLatNvw2xC3WYLbzCW0+DB+4UczQHGPBF9p+WGYQA@mail.gmail.com>
+	<20200619191540.GI3154@redhat.com>
+	<CAJFHJroGNbfO-tXqrod_snCHcnN4NKjX8t9LTeroyiNEwjtVcQ@mail.gmail.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 2/5] virtiofsd: create lock/pid file in per user
-	cache dir
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAJFHJroGNbfO-tXqrod_snCHcnN4NKjX8t9LTeroyiNEwjtVcQ@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,78 +20,36 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: berrange@redhat.com, vromanso@redhat.com, virtio-fs@redhat.com, vgoyal@redhat.com
+To: Chirantan Ekbote <chirantan@chromium.org>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, qemu-devel@nongnu.org
 
-Right now we create lock/pid file in /usr/local/var/... and unprivliged
-user does not have access to create files there.
+On Thu, Jun 25, 2020 at 12:19:39PM +0900, Chirantan Ekbote wrote:
+[..]
+> > Chirantan,
+> >
+> > So you ended up renaming all "trusted", "security" and "system" xattrs?
+> > Only "user" xattrs are complete passthrough?
+> >
+> 
+> No, we only rename "security" xattrs (except for selinux).
+> 
+> >
+> > IOW, security.selinux will be renamed to user.virtiofs.security.selinux
+> > on host?
+> >
+> 
+> We don't relabel security.selinux because it only requires CAP_FOWNER
+> in the process's user namespace and it also does its own MAC-based
+> checks.  Also we have some tools that label files beforehand so it
+> seemed easier to leave them unchanged.
 
-So create this file in per user cache dir as queried as specified
-by environment variable XDG_RUNTIME_DIR.
+If we rename selinux xattr also, then we can support selinux both in
+guest and host and they both can have their own independent policies.
 
-Note: "su $USER" does not update XDG_RUNTIME_DIR and it still points to
-root user's director. So for now I create a directory /tmp/$UID to save
-lock/pid file. Dan pointed out that it can be a problem if a malicious
-app already has /tmp/$UID created. So we probably need to get rid of this.
+Otherwise we either have to disable selinux on host (if we want to
+support it in guest) or somehow guest and how policies will have
+to know about each other and be able to work together (which will
+be hard for a generic use case).
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- tools/virtiofsd/fuse_virtio.c | 40 ++++++++++++++++++++++++++++++-----
- 1 file changed, 35 insertions(+), 5 deletions(-)
-
-diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-index 6b21a93841..f763a70ba5 100644
---- a/tools/virtiofsd/fuse_virtio.c
-+++ b/tools/virtiofsd/fuse_virtio.c
-@@ -972,13 +972,43 @@ static bool fv_socket_lock(struct fuse_session *se)
-     g_autofree gchar *pidfile = NULL;
-     g_autofree gchar *dir = NULL;
-     Error *local_err = NULL;
-+    gboolean unprivileged = false;
- 
--    dir = qemu_get_local_state_pathname("run/virtiofsd");
-+    if (geteuid() != 0)
-+        unprivileged = true;
- 
--    if (g_mkdir_with_parents(dir, S_IRWXU) < 0) {
--        fuse_log(FUSE_LOG_ERR, "%s: Failed to create directory %s: %s",
--                 __func__, dir, strerror(errno));
--        return false;
-+    /*
-+     * Unpriviliged users don't have access to /usr/local/var. Hence
-+     * store lock/pid file in per user directory. Use environment
-+     * variable XDG_RUNTIME_DIR.
-+     * If one logs into the system as root and then does "su" then
-+     * XDG_RUNTIME_DIR still points to root user directory. In that
-+     * case create a directory for user in /tmp/$UID
-+     */
-+    if (unprivileged) {
-+        gchar *user_dir = NULL;
-+        gboolean create_dir = false;
-+        user_dir = g_strdup(g_get_user_runtime_dir());
-+        if (!user_dir || g_str_has_suffix(user_dir, "/0")) {
-+            user_dir = g_strdup_printf("/tmp/%d", geteuid());
-+            create_dir = true;
-+        }
-+
-+        if (create_dir && g_mkdir_with_parents(user_dir, S_IRWXU) < 0) {
-+            fuse_log(FUSE_LOG_ERR, "%s: Failed to create directory %s: %s",
-+                     __func__, user_dir, strerror(errno));
-+            g_free(user_dir);
-+            return false;
-+        }
-+        dir = g_strdup(user_dir);
-+        g_free(user_dir);
-+    } else {
-+        dir = qemu_get_local_state_pathname("run/virtiofsd");
-+        if (g_mkdir_with_parents(dir, S_IRWXU) < 0) {
-+            fuse_log(FUSE_LOG_ERR, "%s: Failed to create directory %s: %s",
-+                     __func__, dir, strerror(errno));
-+            return false;
-+        }
-     }
- 
-     sk_name = g_strdup(se->vu_socket_path);
--- 
-2.25.4
+Vivek
 

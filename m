@@ -1,12 +1,11 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Mon,  3 Aug 2020 20:15:10 +0100
-Message-Id: <20200803191511.45261-3-dgilbert@redhat.com>
-In-Reply-To: <20200803191511.45261-1-dgilbert@redhat.com>
-References: <20200803191511.45261-1-dgilbert@redhat.com>
+Date: Thu, 25 Jun 2020 17:29:28 +0100
+Message-Id: <20200625162929.46672-3-dgilbert@redhat.com>
+In-Reply-To: <20200625162929.46672-1-dgilbert@redhat.com>
+References: <20200625162929.46672-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 2/3] tools/virtiofsd: xattr name mappings: Map
-	client xattr names
+Subject: [Virtio-fs] [PATCH 2/3] virtiofsd: Check capability calls
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,195 +14,52 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, virtio-fs@redhat.com
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com, stefanha@redhat.com, vgoyal@redhat.com
 
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Map xattr names originating at the client; from get/set/remove xattr.
+Check the capability calls worked.
 
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 101 ++++++++++++++++++++++++++++++-
- 1 file changed, 99 insertions(+), 2 deletions(-)
+ tools/virtiofsd/passthrough_ll.c | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
 
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 5506d84132..68d2407a37 100644
+index e373e3b36e..99d562046a 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -2152,20 +2152,82 @@ static XattrMapEntry *parse_xattrmap(const char *map)
-     return res;
- }
- 
-+
-+/*
-+ * For use with getxattr/setxattr/removexattr, where the client
-+ * gives us a name and we may need to choose a different one.
-+ * Allocates a buffer for the result placing it in *out_name.
-+ *   If there's no change then *out_name is not set.
-+ * Returns 0 on success
-+ * Can return -EPERM to indicate we block a given attribute
-+ *   (in which case out_name is not allocated)
-+ * Can return -ENOMEM to indicate out_name couldn't be allocated.
-+ */
-+static int xattr_map_client(const char *client_name, char **out_name)
-+{
-+    const XattrMapEntry *cur_entry;
-+
-+    for (cur_entry = xattr_map_list; ; cur_entry++) {
-+        if ((cur_entry->flags & XATTR_MAP_FLAG_CLIENT) &&
-+            (!strncmp(cur_entry->key,
-+                      client_name,
-+                      strlen(cur_entry->key)))) {
-+            if (cur_entry->flags & XATTR_MAP_FLAG_END_BAD) {
-+                return -EPERM;
-+            }
-+            if (cur_entry->flags & XATTR_MAP_FLAG_END_OK) {
-+                /* Unmodified name */
-+                return 0;
-+            }
-+            if (cur_entry->flags & XATTR_MAP_FLAG_PREFIX) {
-+                *out_name = g_try_malloc(strlen(client_name) +
-+                                         strlen(cur_entry->prepend) + 1);
-+                if (!*out_name) {
-+                    return -ENOMEM;
-+                }
-+                sprintf(*out_name, "%s%s", cur_entry->prepend, client_name);
-+                return 0;
-+            }
-+        }
+@@ -2589,7 +2589,7 @@ static void setup_capabilities(void)
+      */
+     capng_setpid(syscall(SYS_gettid));
+     capng_clear(CAPNG_SELECT_BOTH);
+-    capng_updatev(CAPNG_ADD, CAPNG_PERMITTED | CAPNG_EFFECTIVE,
++    if (capng_updatev(CAPNG_ADD, CAPNG_PERMITTED | CAPNG_EFFECTIVE,
+             CAP_CHOWN,
+             CAP_DAC_OVERRIDE,
+             CAP_DAC_READ_SEARCH,
+@@ -2599,11 +2599,21 @@ static void setup_capabilities(void)
+             CAP_SETUID,
+             CAP_MKNOD,
+             CAP_SETFCAP,
+-            -1);
++            -1)) {
++        fuse_log(FUSE_LOG_ERR, "%s: capng_updatev failed\n", __func__);
++        exit(1);
 +    }
-+
-+    /* Shouldn't get here - rules should have an END_* */
-+    abort();
-+}
-+
- static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
-                         size_t size)
- {
-     struct lo_data *lo = lo_data(req);
-     char *value = NULL;
-     char procname[64];
-+    const char *name;
-+    char *mapped_name;
-     struct lo_inode *inode;
-     ssize_t ret;
-     int saverr;
-     int fd = -1;
  
-+    mapped_name = NULL;
-+    name = in_name;
-+    if (lo->xattrmap) {
-+        ret = xattr_map_client(in_name, &mapped_name);
-+        if (ret < 0) {
-+            if (ret == -EPERM) {
-+                ret = -ENODATA;
-+            }
-+            fuse_reply_err(req, -ret);
-+            return;
-+        }
-+        if (mapped_name) {
-+            name = mapped_name;
-+        }
+-    capng_apply(CAPNG_SELECT_BOTH);
++    if (capng_apply(CAPNG_SELECT_BOTH)) {
++        fuse_log(FUSE_LOG_ERR, "%s: capng_apply failed\n", __func__);
++        exit(1);
 +    }
-+
-     inode = lo_inode(req, ino);
-     if (!inode) {
-         fuse_reply_err(req, EBADF);
-+        g_free(mapped_name);
-         return;
-     }
  
-@@ -2230,6 +2292,7 @@ out_err:
-     saverr = errno;
- out:
-     fuse_reply_err(req, saverr);
-+    g_free(mapped_name);
-     goto out_free;
- }
- 
-@@ -2307,19 +2370,35 @@ out:
-     goto out_free;
- }
- 
--static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
-+static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
-                         const char *value, size_t size, int flags)
- {
-     char procname[64];
-+    const char *name;
-+    char *mapped_name;
-     struct lo_data *lo = lo_data(req);
-     struct lo_inode *inode;
-     ssize_t ret;
-     int saverr;
-     int fd = -1;
- 
-+    mapped_name = NULL;
-+    name = in_name;
-+    if (lo->xattrmap) {
-+        ret = xattr_map_client(in_name, &mapped_name);
-+        if (ret < 0) {
-+            fuse_reply_err(req, -ret);
-+            return;
-+        }
-+        if (mapped_name) {
-+            name = mapped_name;
-+        }
+     cap.saved = capng_save_state();
++    if (!cap.saved) {
++        fuse_log(FUSE_LOG_ERR, "%s: capng_save_state failed\n", __func__);
++        exit(1);
 +    }
-+
-     inode = lo_inode(req, ino);
-     if (!inode) {
-         fuse_reply_err(req, EBADF);
-+        g_free(mapped_name);
-         return;
-     }
- 
-@@ -2354,21 +2433,38 @@ out:
-     }
- 
-     lo_inode_put(lo, &inode);
-+    g_free(mapped_name);
-     fuse_reply_err(req, saverr);
- }
- 
--static void lo_removexattr(fuse_req_t req, fuse_ino_t ino, const char *name)
-+static void lo_removexattr(fuse_req_t req, fuse_ino_t ino, const char *in_name)
- {
-     char procname[64];
-+    const char *name;
-+    char *mapped_name;
-     struct lo_data *lo = lo_data(req);
-     struct lo_inode *inode;
-     ssize_t ret;
-     int saverr;
-     int fd = -1;
- 
-+    mapped_name = NULL;
-+    name = in_name;
-+    if (lo->xattrmap) {
-+        ret = xattr_map_client(in_name, &mapped_name);
-+        if (ret < 0) {
-+            fuse_reply_err(req, -ret);
-+            return;
-+        }
-+        if (mapped_name) {
-+            name = mapped_name;
-+        }
-+    }
-+
-     inode = lo_inode(req, ino);
-     if (!inode) {
-         fuse_reply_err(req, EBADF);
-+        g_free(mapped_name);
-         return;
-     }
- 
-@@ -2403,6 +2499,7 @@ out:
-     }
- 
-     lo_inode_put(lo, &inode);
-+    g_free(mapped_name);
-     fuse_reply_err(req, saverr);
+     pthread_mutex_unlock(&cap.mutex);
  }
  
 -- 

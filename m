@@ -1,20 +1,12 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=ezYfCp7rMSCdCycRYPJgIax1dV1358jvQsgEOQjDekY=;
-	b=K8Gc9jhGS0MVQy9vMkRFmG4D4kxf0IcAe5Irm674JuBHGP4yU8ENNr3a/vWVgAwVgA
-	t2MiZSTLBSfSy4LqcF3uJz4RmURBBSJFyeFx6POunrbqZteh4w5kvFrQRcIqejK0PRr2
-	PAnxLnVgyyEOIqxnSHMKoJfic4mH2l098ARPo=
+From: Vitaly Kuznetsov <vkuznets@redhat.com>
+In-Reply-To: <20200625214701.GA180786@redhat.com>
+References: <20200625214701.GA180786@redhat.com>
+Date: Fri, 26 Jun 2020 11:25:19 +0200
+Message-ID: <87lfkach6o.fsf@vitty.brq.redhat.com>
 MIME-Version: 1.0
-References: <20200416164907.244868-1-stefanha@redhat.com>
-	<20200618190816.GD3814@redhat.com>
-	<CAJfpegsfqADmK6foDyuQQnvMDh_jE0rNUCBRuxPchSSirrb04Q@mail.gmail.com>
-	<20200619142508.GB3154@redhat.com>
-In-Reply-To: <20200619142508.GB3154@redhat.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Fri, 19 Jun 2020 17:26:37 +0200
-Message-ID: <CAJfpeguhS3w-AZTpyzO2QqcX_7F1qDm__5C8r3pBnCgPoxTKmQ@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
+Content-Type: text/plain
+Subject: Re: [Virtio-fs] [RFC PATCH] kvm,
+	x86: Exit to user space in case of page fault error
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,45 +15,213 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
+To: Vivek Goyal <vgoyal@redhat.com>, kvm@vger.kernel.org
+Cc: virtio-fs@redhat.com, pbonzini@redhat.com, linux-kernel@vger.kernel.org, sean.j.christopherson@intel.com
 
-On Fri, Jun 19, 2020 at 4:25 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+Vivek Goyal <vgoyal@redhat.com> writes:
+
+> Page fault error handling behavior in kvm seems little inconsistent when
+> page fault reports error. If we are doing fault synchronously
+> then we capture error (-EFAULT) returned by __gfn_to_pfn_memslot() and
+> exit to user space and qemu reports error, "error: kvm run failed Bad address".
 >
-> On Fri, Jun 19, 2020 at 04:16:30PM +0200, Miklos Szeredi wrote:
-> > On Thu, Jun 18, 2020 at 9:08 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> > >
-> > > On Thu, Apr 16, 2020 at 05:49:05PM +0100, Stefan Hajnoczi wrote:
-> > > > virtiofsd doesn't need of all Linux capabilities(7) available to root.  Keep a
-> > > > whitelisted set of capabilities that we require.  This improves security in
-> > > > case virtiofsd is compromised by making it hard for an attacker to gain further
-> > > > access to the system.
-> > >
-> > > Hi Stefan,
-> > >
-> > > I just noticed that this patch set breaks overlayfs on top of virtiofs.
-> >
-> > How so?  Virtiofs isn't mounting overlayfs, is it?  Only the mounter
-> > requires CAP_SYS_ADMIN, not the accessor.
+> But if we are doing async page fault, then async_pf_execute() will simply
+> ignore the error reported by get_user_pages_remote() or
+> by kvm_mmu_do_page_fault(). It is assumed that page fault was successful
+> and either a page ready event is injected in guest or guest is brought
+> out of artificial halt state and run again. In both the cases when guest
+> retries the instruction, it takes exit again as page fault was not
+> successful in previous attempt. And then this infinite loop continues
+> forever.
 >
-> virtiofsd needs CAP_SYS_ADMIN, otherwise fsetxattr(trusted.overlay.opaque)
-> fails in lo_setxattr().
+> Trying fault in a loop will make sense if error is temporary and will
+> be resolved on retry. But I don't see any intention in the code to
+> determine if error is temporary or not.  Whether to do fault synchronously
+> or asynchronously, depends on so many variables but none of the varibales
+> is whether error is temporary or not. (kvm_can_do_async_pf()).
 >
-> This is triggered when we mount overlayfs on top of virtiofs and overlayfs
-> tries to set OVL_XATTR_OPAQUE on upper to check if trusted xattrs are
-> supported or not.
+> And that makes it very inconsistent or unpredictable to figure out whether
+> kvm will exit to qemu with error or it will just retry and go into an
+> infinite loop.
+>
+> This patch tries to make this behavior consistent. That is instead of
+> getting into infinite loop of retrying page fault, exit to user space
+> and stop VM if page fault error happens.
+>
+> In future this can be improved by injecting errors into guest. As of
+> now we don't have any race free method to inject errors in guest.
+>
+> When page fault error happens in async path save that pfn and when next
+> time guest retries, do a sync fault instead of async fault. So that if error
+> is encountered, we exit to qemu and avoid infinite loop.
+>
+> As of now only one error pfn is stored and that means it could be
+> overwritten before next a retry from guest happens. But this is
+> just a hint and if we miss it, some other time we will catch it.
+> If this becomes an issue, we could maintain an array of error
+> gfn later to help ease the issue.
+>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  arch/x86/include/asm/kvm_host.h |  1 +
+>  arch/x86/kvm/mmu.h              |  2 +-
+>  arch/x86/kvm/mmu/mmu.c          |  2 +-
+>  arch/x86/kvm/x86.c              | 14 +++++++++++---
+>  4 files changed, 14 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
+> index be5363b21540..3c0677b9d3d5 100644
+> --- a/arch/x86/include/asm/kvm_host.h
+> +++ b/arch/x86/include/asm/kvm_host.h
+> @@ -778,6 +778,7 @@ struct kvm_vcpu_arch {
+>  		unsigned long nested_apf_token;
+>  		bool delivery_as_pf_vmexit;
+>  		bool pageready_pending;
+> +		gfn_t error_gfn;
+>  	} apf;
+>  
+>  	/* OSVW MSRs (AMD only) */
+> diff --git a/arch/x86/kvm/mmu.h b/arch/x86/kvm/mmu.h
+> index 444bb9c54548..d0a2a12c7bb6 100644
+> --- a/arch/x86/kvm/mmu.h
+> +++ b/arch/x86/kvm/mmu.h
+> @@ -60,7 +60,7 @@ void kvm_init_mmu(struct kvm_vcpu *vcpu, bool reset_roots);
+>  void kvm_init_shadow_mmu(struct kvm_vcpu *vcpu, u32 cr0, u32 cr4, u32 efer);
+>  void kvm_init_shadow_ept_mmu(struct kvm_vcpu *vcpu, bool execonly,
+>  			     bool accessed_dirty, gpa_t new_eptp);
+> -bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu);
+> +bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu, gfn_t gfn);
+>  int kvm_handle_page_fault(struct kvm_vcpu *vcpu, u64 error_code,
+>  				u64 fault_address, char *insn, int insn_len);
+>  
+> diff --git a/arch/x86/kvm/mmu/mmu.c b/arch/x86/kvm/mmu/mmu.c
+> index 76817d13c86e..a882a6a9f7a7 100644
+> --- a/arch/x86/kvm/mmu/mmu.c
+> +++ b/arch/x86/kvm/mmu/mmu.c
+> @@ -4078,7 +4078,7 @@ static bool try_async_pf(struct kvm_vcpu *vcpu, bool prefault, gfn_t gfn,
+>  	if (!async)
+>  		return false; /* *pfn has correct page already */
+>  
+> -	if (!prefault && kvm_can_do_async_pf(vcpu)) {
+> +	if (!prefault && kvm_can_do_async_pf(vcpu, cr2_or_gpa >> PAGE_SHIFT)) {
 
-Ah, right.
+gpa_to_gfn(cr2_or_gpa) ?
 
-Plan is to use "user.*" xattr for unprivileged overlay.  This would be
-a good way to eliminate this attack surface in the overlay on virtiofs
-case as well.
+>  		trace_kvm_try_async_get_page(cr2_or_gpa, gfn);
+>  		if (kvm_find_async_pf_gfn(vcpu, gfn)) {
+>  			trace_kvm_async_pf_doublefault(cr2_or_gpa, gfn);
+> diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+> index 3b92db412335..a6af7e9831b9 100644
+> --- a/arch/x86/kvm/x86.c
+> +++ b/arch/x86/kvm/x86.c
+> @@ -10380,7 +10380,9 @@ void kvm_arch_async_page_ready(struct kvm_vcpu *vcpu, struct kvm_async_pf *work)
+>  	      work->arch.cr3 != vcpu->arch.mmu->get_guest_pgd(vcpu))
+>  		return;
+>  
+> -	kvm_mmu_do_page_fault(vcpu, work->cr2_or_gpa, 0, true);
+> +	r = kvm_mmu_do_page_fault(vcpu, work->cr2_or_gpa, 0, true);
+> +	if (r < 0)
+> +		vcpu->arch.apf.error_gfn = work->cr2_or_gpa >> PAGE_SHIFT;
+>  }
+>  
+>  static inline u32 kvm_async_pf_hash_fn(gfn_t gfn)
+> @@ -10490,7 +10492,7 @@ static bool kvm_can_deliver_async_pf(struct kvm_vcpu *vcpu)
+>  	return true;
+>  }
+>  
+> -bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu)
+> +bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu, gfn_t gfn)
+>  {
+>  	if (unlikely(!lapic_in_kernel(vcpu) ||
+>  		     kvm_event_needs_reinjection(vcpu) ||
+> @@ -10504,7 +10506,13 @@ bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu)
+>  	 * If interrupts are off we cannot even use an artificial
+>  	 * halt state.
+>  	 */
+> -	return kvm_arch_interrupt_allowed(vcpu);
+> +	if (!kvm_arch_interrupt_allowed(vcpu))
+> +		return false;
+> +
+> +	if (vcpu->arch.apf.error_gfn == gfn)
+> +		return false;
+> +
+> +	return true;
+>  }
+>  
+>  bool kvm_arch_async_page_not_present(struct kvm_vcpu *vcpu,
 
-Other ways to minimize risk is to separate operations requiring
-CAP_SYS_ADMIN into a separate process, preferably a separate
-executable, that communicates with virtiofsd using a pipe and contains
-the minimum amount of code.
+I'm a little bit afraid that a single error_gfn may not give us
+deterministric behavior. E.g. when we have a lot of faulting processes
+it may take many iterations to hit 'error_gfn == gfn' because we'll
+always be overwriting 'error_gfn' with new values and waking up some
+(random) process.
 
-Thanks,
-Miklos
+What if we just temporary disable the whole APF mechanism? That would
+ensure we're making forward progress. Something like (completely
+untested):
+
+diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
+index f8998e97457f..945b3d5a2796 100644
+--- a/arch/x86/include/asm/kvm_host.h
++++ b/arch/x86/include/asm/kvm_host.h
+@@ -778,6 +778,7 @@ struct kvm_vcpu_arch {
+ 		unsigned long nested_apf_token;
+ 		bool delivery_as_pf_vmexit;
+ 		bool pageready_pending;
++		bool error_pending;
+ 	} apf;
+ 
+ 	/* OSVW MSRs (AMD only) */
+diff --git a/arch/x86/kvm/mmu/mmu.c b/arch/x86/kvm/mmu/mmu.c
+index fdd05c233308..e5f04ae97e91 100644
+--- a/arch/x86/kvm/mmu/mmu.c
++++ b/arch/x86/kvm/mmu/mmu.c
+@@ -4124,8 +4124,18 @@ static int direct_page_fault(struct kvm_vcpu *vcpu, gpa_t gpa, u32 error_code,
+ 	if (try_async_pf(vcpu, prefault, gfn, gpa, &pfn, write, &map_writable))
+ 		return RET_PF_RETRY;
+ 
+-	if (handle_abnormal_pfn(vcpu, is_tdp ? 0 : gpa, gfn, pfn, ACC_ALL, &r))
++	if (handle_abnormal_pfn(vcpu, is_tdp ? 0 : gpa, gfn, pfn, ACC_ALL, &r)) {
++		/*
++		 * In case APF mechanism was previously disabled due to an error
++		 * we are ready to re-enable it here as we're about to inject an
++		 * error to userspace. There is no guarantee we are handling the
++		 * same GFN which failed in APF here but at least we are making
++		 * forward progress.
++		 */
++
++		vcpu->arch.apf.error_pending = false;
+ 		return r;
++	}
+ 
+ 	r = RET_PF_RETRY;
+ 	spin_lock(&vcpu->kvm->mmu_lock);
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index 00c88c2f34e4..4607cf4d5117 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -10379,7 +10379,9 @@ void kvm_arch_async_page_ready(struct kvm_vcpu *vcpu, struct kvm_async_pf *work)
+ 	      work->arch.cr3 != vcpu->arch.mmu->get_guest_pgd(vcpu))
+ 		return;
+ 
+-	kvm_mmu_do_page_fault(vcpu, work->cr2_or_gpa, 0, true);
++	r = kvm_mmu_do_page_fault(vcpu, work->cr2_or_gpa, 0, true);
++	if (r < 0)
++		vcpu->arch.apf.error_pending = true;
+ }
+ 
+ static inline u32 kvm_async_pf_hash_fn(gfn_t gfn)
+@@ -10499,6 +10501,9 @@ bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu)
+ 	if (kvm_hlt_in_guest(vcpu->kvm) && !kvm_can_deliver_async_pf(vcpu))
+ 		return false;
+ 
++	if (unlikely(vcpu->arch.apf.error_pending))
++		return false;
++
+ 	/*
+ 	 * If interrupts are off we cannot even use an artificial
+ 	 * halt state.
+
+-- 
+Vitaly
 

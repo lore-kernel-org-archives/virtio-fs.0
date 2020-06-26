@@ -1,14 +1,14 @@
-Date: Fri, 26 Jun 2020 11:31:22 +0100
+Date: Fri, 26 Jun 2020 11:31:26 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20200626103122.GF281902@stefanha-x1.localdomain>
+Message-ID: <20200626103126.GG281902@stefanha-x1.localdomain>
 References: <20200625162929.46672-1-dgilbert@redhat.com>
-	<20200625162929.46672-2-dgilbert@redhat.com>
+	<20200625162929.46672-3-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="dgjlcl3Tl+kb3YDk"
+	protocol="application/pgp-signature"; boundary="9Iq5ULCa7nGtWwZS"
 Content-Disposition: inline
-In-Reply-To: <20200625162929.46672-2-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 1/3] virtiofsd: Terminate capability list
+In-Reply-To: <20200625162929.46672-3-dgilbert@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 2/3] virtiofsd: Check capability calls
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,45 +21,38 @@ To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
 
 
---dgjlcl3Tl+kb3YDk
+--9Iq5ULCa7nGtWwZS
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Thu, Jun 25, 2020 at 05:29:27PM +0100, Dr. David Alan Gilbert (git) wrot=
+On Thu, Jun 25, 2020 at 05:29:28PM +0100, Dr. David Alan Gilbert (git) wrot=
 e:
 > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 >=20
-> capng_updatev is a varargs function that needs a -1 to terminate it,
-> but it was missing.
+> Check the capability calls worked.
 >=20
-> In practice what seems to have been happening is that it's added the
-> capabilities we asked for, then runs into junk on the stack, so if
-> we're unlucky it might be adding some more, but in reality it's
-> failing - but after adding the capabilities we asked for.
->=20
-> Fixes: a59feb483b8 ("virtiofsd: only retain file system capabilities")
 > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 > ---
->  tools/virtiofsd/passthrough_ll.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+>  tools/virtiofsd/passthrough_ll.c | 16 +++++++++++++---
+>  1 file changed, 13 insertions(+), 3 deletions(-)
 
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
---dgjlcl3Tl+kb3YDk
+--9Iq5ULCa7nGtWwZS
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl71znoACgkQnKSrs4Gr
-c8hFwgf+KpmNHkGjRfZRdBpqgYqmm6P8GwGbZQHUIRJWvgwrKVZy1QG68IYMD34P
-o8/LC4nbhjNFD+zHNdiPDZlSY3x32OgmifFJN5wvcJZdL4+UMoqULFusgv2ORZ8j
-76qnUsJpFX/VZu3tM8l5S/ABByMvJc0fVRIRwMME3u5M9F3us7vjgBzSTGS3I0b9
-hEIO7VTSgaxfxX7dlzli7iNhVxKH9wpIcP3jzT4IpxHnABay8XpG8KJPHmZ8Epy6
-pfhKkkXHiHe8ijVH6haSMy43QYqWAAp1p5/WtklfttXqbAxXvIdeWXMckCBgoZ14
-VkRbGmuJpZS7/yM1hDtmoQZpv+woLg==
-=U6FJ
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl71zn0ACgkQnKSrs4Gr
+c8gJUAf/YNnk6vd+VlAKy6G4vPvZhq3Yxtcf+DIWtTDBSF1GI7Qm8BxcFTTijPha
+HA9u6NSLmuyjbFDKOM7we9ICGqK3DxdzlRjzWbvjqJ0mdUH1DpQKN6Z2o8nlTml6
+t0NwU7X+b2aPi6tJPgQkMoOptUv9cm8ITdyh+LJkA8eELrMV78tWW7dCoLPEJqeI
+eXq0lSEb04Lc3WraQuNxzhMeWGc4RQa4TheA4WxiOZGZBX5GFqAvU43/1fmWalug
+Mt2Y04Se/5Kf4UcVsNGu4Bh5z0BlC5cvJs+A8yKkQDf9EROebQiyLI59Cb0allSQ
+Ce3rTFDZgQp4lLlnvAMEzW+PlK3OSA==
+=/fPw
 -----END PGP SIGNATURE-----
 
---dgjlcl3Tl+kb3YDk--
+--9Iq5ULCa7nGtWwZS--
 

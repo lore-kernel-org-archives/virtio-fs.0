@@ -1,14 +1,15 @@
-Date: Fri, 26 Jun 2020 11:03:03 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200626150303.GC195150@redhat.com>
-References: <20200625214701.GA180786@redhat.com>
-	<87lfkach6o.fsf@vitty.brq.redhat.com>
+Date: Fri, 26 Jun 2020 19:42:52 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20200626184252.GS3087@work-vm>
+References: <20200625162929.46672-1-dgilbert@redhat.com>
+	<20200625162929.46672-4-dgilbert@redhat.com>
+	<20200626103117.GE281902@stefanha-x1.localdomain>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <87lfkach6o.fsf@vitty.brq.redhat.com>
-Subject: Re: [Virtio-fs] [RFC PATCH] kvm,
- x86: Exit to user space in case of page fault error
+In-Reply-To: <20200626103117.GE281902@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH 3/3] virtiofsd: Allow addition or removal of
+	capabilities
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,147 +18,65 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vitaly Kuznetsov <vkuznets@redhat.com>
-Cc: virtio-fs@redhat.com, pbonzini@redhat.com, sean.j.christopherson@intel.com, kvm@vger.kernel.org, linux-kernel@vger.kernel.org
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
 
-On Fri, Jun 26, 2020 at 11:25:19AM +0200, Vitaly Kuznetsov wrote:
-
-[..]
-> > diff --git a/arch/x86/kvm/mmu/mmu.c b/arch/x86/kvm/mmu/mmu.c
-> > index 76817d13c86e..a882a6a9f7a7 100644
-> > --- a/arch/x86/kvm/mmu/mmu.c
-> > +++ b/arch/x86/kvm/mmu/mmu.c
-> > @@ -4078,7 +4078,7 @@ static bool try_async_pf(struct kvm_vcpu *vcpu, bool prefault, gfn_t gfn,
-> >  	if (!async)
-> >  		return false; /* *pfn has correct page already */
-> >  
-> > -	if (!prefault && kvm_can_do_async_pf(vcpu)) {
-> > +	if (!prefault && kvm_can_do_async_pf(vcpu, cr2_or_gpa >> PAGE_SHIFT)) {
-> 
-> gpa_to_gfn(cr2_or_gpa) ?
-
-Will do.
-
-[..]
-> > -bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu)
-> > +bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu, gfn_t gfn)
-> >  {
-> >  	if (unlikely(!lapic_in_kernel(vcpu) ||
-> >  		     kvm_event_needs_reinjection(vcpu) ||
-> > @@ -10504,7 +10506,13 @@ bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu)
-> >  	 * If interrupts are off we cannot even use an artificial
-> >  	 * halt state.
-> >  	 */
-> > -	return kvm_arch_interrupt_allowed(vcpu);
-> > +	if (!kvm_arch_interrupt_allowed(vcpu))
-> > +		return false;
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> On Thu, Jun 25, 2020 at 05:29:29PM +0100, Dr. David Alan Gilbert (git) wrote:
+> > +    /*
+> > +     * The modcaps option is a colon separated list of caps,
+> > +     * each preceded by either + or -.
+> > +     */
+> > +    while (lo->modcaps) {
+> > +        capng_act_t action;
+> > +        int cap;
 > > +
-> > +	if (vcpu->arch.apf.error_gfn == gfn)
-> > +		return false;
+> > +        char *next = strchr(lo->modcaps, ':');
+> > +        if (next) {
+> > +            *next = '\0';
+> > +            next++;
+> > +        }
 > > +
-> > +	return true;
-> >  }
-> >  
-> >  bool kvm_arch_async_page_not_present(struct kvm_vcpu *vcpu,
+> > +        switch (lo->modcaps[0]) {
+> > +        case '+':
+> > +            action = CAPNG_ADD;
+> > +            break;
+> > +
+> > +        case '-':
+> > +            action = CAPNG_DROP;
+> > +            break;
+> > +
+> > +        default:
+> > +            fuse_log(FUSE_LOG_ERR,
+> > +                     "%s: Expecting '+'/'-' in modcaps but found '%c'\n",
+> > +                     __func__, lo->modcaps[0]);
+> > +            exit(1);
+> > +        }
+> > +        cap = capng_name_to_capability(lo->modcaps + 1);
+> > +        if (cap < 0) {
+> > +            fuse_log(FUSE_LOG_ERR, "%s: Unknown capability '%s'\n", __func__,
+> > +                     lo->modcaps);
+> > +            exit(1);
+> > +        }
+> > +        if (capng_update(action, CAPNG_PERMITTED | CAPNG_EFFECTIVE, cap)) {
+> > +            fuse_log(FUSE_LOG_ERR, "%s: capng_update failed for '%s'\n",
+> > +                     __func__, lo->modcaps);
+> > +            exit(1);
+> > +        }
+> > +
+> > +        lo->modcaps = next;
 > 
-> I'm a little bit afraid that a single error_gfn may not give us
-> deterministric behavior. E.g. when we have a lot of faulting processes
-> it may take many iterations to hit 'error_gfn == gfn' because we'll
-> always be overwriting 'error_gfn' with new values and waking up some
-> (random) process.
-> 
-> What if we just temporary disable the whole APF mechanism? That would
-> ensure we're making forward progress. Something like (completely
-> untested):
-> 
-> diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
-> index f8998e97457f..945b3d5a2796 100644
-> --- a/arch/x86/include/asm/kvm_host.h
-> +++ b/arch/x86/include/asm/kvm_host.h
-> @@ -778,6 +778,7 @@ struct kvm_vcpu_arch {
->  		unsigned long nested_apf_token;
->  		bool delivery_as_pf_vmexit;
->  		bool pageready_pending;
-> +		bool error_pending;
->  	} apf;
->  
->  	/* OSVW MSRs (AMD only) */
-> diff --git a/arch/x86/kvm/mmu/mmu.c b/arch/x86/kvm/mmu/mmu.c
-> index fdd05c233308..e5f04ae97e91 100644
-> --- a/arch/x86/kvm/mmu/mmu.c
-> +++ b/arch/x86/kvm/mmu/mmu.c
-> @@ -4124,8 +4124,18 @@ static int direct_page_fault(struct kvm_vcpu *vcpu, gpa_t gpa, u32 error_code,
->  	if (try_async_pf(vcpu, prefault, gfn, gpa, &pfn, write, &map_writable))
->  		return RET_PF_RETRY;
->  
-> -	if (handle_abnormal_pfn(vcpu, is_tdp ? 0 : gpa, gfn, pfn, ACC_ALL, &r))
-> +	if (handle_abnormal_pfn(vcpu, is_tdp ? 0 : gpa, gfn, pfn, ACC_ALL, &r)) {
-> +		/*
-> +		 * In case APF mechanism was previously disabled due to an error
-> +		 * we are ready to re-enable it here as we're about to inject an
-> +		 * error to userspace. There is no guarantee we are handling the
-> +		 * same GFN which failed in APF here but at least we are making
-> +		 * forward progress.
-> +		 */
-> +
-> +		vcpu->arch.apf.error_pending = false;
+> How about passing char *modcaps into this function so that lo->modcaps
+> isn't modified by the parsing loop? That seems a bit cleaner and if we
+> ever decide to free lo->modcaps it will work as expected.
 
-I like this idea. It is simple. But I have a concern with it though.
+Yep, can do.
 
-- Can it happen that we never retry faulting in error pfn.  Say a process
-  accessed a pfn, we set error_pending, and then process got killed due
-  to pending signal. Now process will not retry error pfn. And
-  error_pending will remain set and we completely disabled APF
-  mechanism till next error happens (if it happens).
+Dave
 
-In another idea, we could think of maintaining another hash of error
-gfns. Similar to "vcpu->arch.apf.gfns[]". Say "vgpu->arch.apf.error_gfns[]"
+> Stefan
 
-- When error happens on a gfn, add it to hash. If slot is busy, overwrite
-  it.
 
-- When kvm_can_do_async_pf(gfn) is called, check if this gfn is present
-  in error_gfn, if yes, clear it and force sync fault.
-
-This is more complicated but should take care of your concerns. Also 
-even if process never retries that gfn, we are fine. At max that
-gfn will remain error_gfn array but will not disable APF completely.
-
-Thanks
-Vivek
-
->  		return r;
-> +	}
->  
->  	r = RET_PF_RETRY;
->  	spin_lock(&vcpu->kvm->mmu_lock);
-> diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
-> index 00c88c2f34e4..4607cf4d5117 100644
-> --- a/arch/x86/kvm/x86.c
-> +++ b/arch/x86/kvm/x86.c
-> @@ -10379,7 +10379,9 @@ void kvm_arch_async_page_ready(struct kvm_vcpu *vcpu, struct kvm_async_pf *work)
->  	      work->arch.cr3 != vcpu->arch.mmu->get_guest_pgd(vcpu))
->  		return;
->  
-> -	kvm_mmu_do_page_fault(vcpu, work->cr2_or_gpa, 0, true);
-> +	r = kvm_mmu_do_page_fault(vcpu, work->cr2_or_gpa, 0, true);
-> +	if (r < 0)
-> +		vcpu->arch.apf.error_pending = true;
->  }
->  
->  static inline u32 kvm_async_pf_hash_fn(gfn_t gfn)
-> @@ -10499,6 +10501,9 @@ bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu)
->  	if (kvm_hlt_in_guest(vcpu->kvm) && !kvm_can_deliver_async_pf(vcpu))
->  		return false;
->  
-> +	if (unlikely(vcpu->arch.apf.error_pending))
-> +		return false;
-> +
->  	/*
->  	 * If interrupts are off we cannot even use an artificial
->  	 * halt state.
-> 
-> -- 
-> Vitaly
-> 
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

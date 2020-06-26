@@ -1,17 +1,14 @@
-Date: Fri, 26 Jun 2020 12:26:02 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200626112602.GG3087@work-vm>
-References: <20200416164907.244868-1-stefanha@redhat.com>
-	<20200618190816.GD3814@redhat.com> <20200618191655.GI2769@work-vm>
-	<20200618192717.GE3814@redhat.com> <20200619082746.GA2690@work-vm>
-	<20200619113914.GI700896@redhat.com>
-	<20200619191254.GH3154@redhat.com>
+Date: Fri, 26 Jun 2020 11:03:03 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200626150303.GC195150@redhat.com>
+References: <20200625214701.GA180786@redhat.com>
+	<87lfkach6o.fsf@vitty.brq.redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <20200619191254.GH3154@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
+In-Reply-To: <87lfkach6o.fsf@vitty.brq.redhat.com>
+Subject: Re: [Virtio-fs] [RFC PATCH] kvm,
+ x86: Exit to user space in case of page fault error
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,80 +17,147 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>, qemu-devel@nongnu.org, Miklos Szeredi <miklos@szeredi.hu>
+To: Vitaly Kuznetsov <vkuznets@redhat.com>
+Cc: virtio-fs@redhat.com, pbonzini@redhat.com, sean.j.christopherson@intel.com, kvm@vger.kernel.org, linux-kernel@vger.kernel.org
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> On Fri, Jun 19, 2020 at 12:39:14PM +0100, Daniel P. Berrangé wrote:
-> [..]
-> > The CAP_SYS_ADMIN requirement for 'trusted.' xattrs is simply a useful
-> > mechanism for applications to control access. The host kernel doesn'
-> > tuse this namespace itself. Linux has four namespaces for xattrs:
-> > 
-> >  -  user - for userspace apps. accessible based on read/write permissions
-> >  -  trusted - for userspace apps. accessible by CAP_SYS_ADMIN processes only
-> >  -  system - for kernel only. used by ACLs
-> >  -  security - for kernel only. used by SELinux
-> > 
-> > The use case for "trusted" xattrs is thus where a privileged management
-> > application or service wants to store metadata against the file, but
-> > also needs to grant an unprivileged process access to write to this file
-> > while not allowing that unprivileged process the ability to change the
-> > metadata. This is mentioned in the man page:
-> > 
-> > [man xattr(7)]
-> >    Trusted extended attributes
-> >        Trusted  extended attributes are visible and accessible only to pro‐
-> >        cesses that have the CAP_SYS_ADMIN capability.  Attributes  in  this
-> >        class  are used to implement mechanisms in user space (i.e., outside
-> >        the kernel) which keep information in extended attributes  to  which
-> >        ordinary processes should not have access.
-> > 
-> >    User extended attributes
-> >        User  extended  attributes  may be assigned to files and directories
-> >        for storing arbitrary additional information such as the mime  type,
-> >        character  set  or  encoding  of a file.  The access permissions for
-> >        user attributes are defined by the file permission bits:  read  per‐
-> >        mission is required to retrieve the attribute value, and writer per‐
-> >        mission is required to change it.
-> > [/man]
-> > 
-> > Libvirtd uses the "trusted." xattr namespace to record information against
-> > disk images for QEMU, because we need to grant QEMU access to read/write
-> > the disk iamges, but don't want QEMU to be able to alter our xattrs.
-> > 
-> > It is unfortunate that this namespace is tied to the CAP_SYS_ADMIN cap.
-> > It really ought to have had its own dedicated capability :-( Such is
-> > life with anything that uses CAP_SYS_ADMIN...
-> > 
-> > With this in mind we really should have both trusted. & user. xattrs
-> > allowed to the guest by default.
-> > 
-> > Conversely, we'll need to block usage of the security. and system.
-> > namespaces.
+On Fri, Jun 26, 2020 at 11:25:19AM +0200, Vitaly Kuznetsov wrote:
+
+[..]
+> > diff --git a/arch/x86/kvm/mmu/mmu.c b/arch/x86/kvm/mmu/mmu.c
+> > index 76817d13c86e..a882a6a9f7a7 100644
+> > --- a/arch/x86/kvm/mmu/mmu.c
+> > +++ b/arch/x86/kvm/mmu/mmu.c
+> > @@ -4078,7 +4078,7 @@ static bool try_async_pf(struct kvm_vcpu *vcpu, bool prefault, gfn_t gfn,
+> >  	if (!async)
+> >  		return false; /* *pfn has correct page already */
+> >  
+> > -	if (!prefault && kvm_can_do_async_pf(vcpu)) {
+> > +	if (!prefault && kvm_can_do_async_pf(vcpu, cr2_or_gpa >> PAGE_SHIFT)) {
 > 
-> I am wondering can we block usage of "system" and "security"?  What
-> about guest setting acls over virtiofs files. These will have to
-> go through and that means we need to allow system xattrs.
+> gpa_to_gfn(cr2_or_gpa) ?
+
+Will do.
+
+[..]
+> > -bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu)
+> > +bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu, gfn_t gfn)
+> >  {
+> >  	if (unlikely(!lapic_in_kernel(vcpu) ||
+> >  		     kvm_event_needs_reinjection(vcpu) ||
+> > @@ -10504,7 +10506,13 @@ bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu)
+> >  	 * If interrupts are off we cannot even use an artificial
+> >  	 * halt state.
+> >  	 */
+> > -	return kvm_arch_interrupt_allowed(vcpu);
+> > +	if (!kvm_arch_interrupt_allowed(vcpu))
+> > +		return false;
+> > +
+> > +	if (vcpu->arch.apf.error_gfn == gfn)
+> > +		return false;
+> > +
+> > +	return true;
+> >  }
+> >  
+> >  bool kvm_arch_async_page_not_present(struct kvm_vcpu *vcpu,
 > 
-> Similarly setting file capabilities inside should trigger
-> setxattr(security.capability) and that means we need to allow security
-> xattr as well.
+> I'm a little bit afraid that a single error_gfn may not give us
+> deterministric behavior. E.g. when we have a lot of faulting processes
+> it may take many iterations to hit 'error_gfn == gfn' because we'll
+> always be overwriting 'error_gfn' with new values and waking up some
+> (random) process.
+> 
+> What if we just temporary disable the whole APF mechanism? That would
+> ensure we're making forward progress. Something like (completely
+> untested):
+> 
+> diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
+> index f8998e97457f..945b3d5a2796 100644
+> --- a/arch/x86/include/asm/kvm_host.h
+> +++ b/arch/x86/include/asm/kvm_host.h
+> @@ -778,6 +778,7 @@ struct kvm_vcpu_arch {
+>  		unsigned long nested_apf_token;
+>  		bool delivery_as_pf_vmexit;
+>  		bool pageready_pending;
+> +		bool error_pending;
+>  	} apf;
+>  
+>  	/* OSVW MSRs (AMD only) */
+> diff --git a/arch/x86/kvm/mmu/mmu.c b/arch/x86/kvm/mmu/mmu.c
+> index fdd05c233308..e5f04ae97e91 100644
+> --- a/arch/x86/kvm/mmu/mmu.c
+> +++ b/arch/x86/kvm/mmu/mmu.c
+> @@ -4124,8 +4124,18 @@ static int direct_page_fault(struct kvm_vcpu *vcpu, gpa_t gpa, u32 error_code,
+>  	if (try_async_pf(vcpu, prefault, gfn, gpa, &pfn, write, &map_writable))
+>  		return RET_PF_RETRY;
+>  
+> -	if (handle_abnormal_pfn(vcpu, is_tdp ? 0 : gpa, gfn, pfn, ACC_ALL, &r))
+> +	if (handle_abnormal_pfn(vcpu, is_tdp ? 0 : gpa, gfn, pfn, ACC_ALL, &r)) {
+> +		/*
+> +		 * In case APF mechanism was previously disabled due to an error
+> +		 * we are ready to re-enable it here as we're about to inject an
+> +		 * error to userspace. There is no guarantee we are handling the
+> +		 * same GFN which failed in APF here but at least we are making
+> +		 * forward progress.
+> +		 */
+> +
+> +		vcpu->arch.apf.error_pending = false;
 
-Yep, we see that when people install Fedora packages, when rpm
-unpackgs /usr/bin/newgidmap which has:
+I like this idea. It is simple. But I have a concern with it though.
 
-$ getfattr -d '--match=.*' /usr/bin/newgidmap 
-getfattr: Removing leading '/' from absolute path names
-# file: usr/bin/newgidmap
-security.capability=0sAQAAAkAAAAAAAAAAAAAAAAAAAAA=
-security.selinux="system_u:object_r:bin_t:s0"
+- Can it happen that we never retry faulting in error pfn.  Say a process
+  accessed a pfn, we set error_pending, and then process got killed due
+  to pending signal. Now process will not retry error pfn. And
+  error_pending will remain set and we completely disabled APF
+  mechanism till next error happens (if it happens).
 
+In another idea, we could think of maintaining another hash of error
+gfns. Similar to "vcpu->arch.apf.gfns[]". Say "vgpu->arch.apf.error_gfns[]"
 
-Dave
+- When error happens on a gfn, add it to hash. If slot is busy, overwrite
+  it.
 
-> Thanks
-> Vivek
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+- When kvm_can_do_async_pf(gfn) is called, check if this gfn is present
+  in error_gfn, if yes, clear it and force sync fault.
+
+This is more complicated but should take care of your concerns. Also 
+even if process never retries that gfn, we are fine. At max that
+gfn will remain error_gfn array but will not disable APF completely.
+
+Thanks
+Vivek
+
+>  		return r;
+> +	}
+>  
+>  	r = RET_PF_RETRY;
+>  	spin_lock(&vcpu->kvm->mmu_lock);
+> diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+> index 00c88c2f34e4..4607cf4d5117 100644
+> --- a/arch/x86/kvm/x86.c
+> +++ b/arch/x86/kvm/x86.c
+> @@ -10379,7 +10379,9 @@ void kvm_arch_async_page_ready(struct kvm_vcpu *vcpu, struct kvm_async_pf *work)
+>  	      work->arch.cr3 != vcpu->arch.mmu->get_guest_pgd(vcpu))
+>  		return;
+>  
+> -	kvm_mmu_do_page_fault(vcpu, work->cr2_or_gpa, 0, true);
+> +	r = kvm_mmu_do_page_fault(vcpu, work->cr2_or_gpa, 0, true);
+> +	if (r < 0)
+> +		vcpu->arch.apf.error_pending = true;
+>  }
+>  
+>  static inline u32 kvm_async_pf_hash_fn(gfn_t gfn)
+> @@ -10499,6 +10501,9 @@ bool kvm_can_do_async_pf(struct kvm_vcpu *vcpu)
+>  	if (kvm_hlt_in_guest(vcpu->kvm) && !kvm_can_deliver_async_pf(vcpu))
+>  		return false;
+>  
+> +	if (unlikely(vcpu->arch.apf.error_pending))
+> +		return false;
+> +
+>  	/*
+>  	 * If interrupts are off we cannot even use an artificial
+>  	 * halt state.
+> 
+> -- 
+> Vitaly
+> 
 

@@ -1,15 +1,9 @@
-Date: Fri, 26 Jun 2020 19:42:52 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200626184252.GS3087@work-vm>
-References: <20200625162929.46672-1-dgilbert@redhat.com>
-	<20200625162929.46672-4-dgilbert@redhat.com>
-	<20200626103117.GE281902@stefanha-x1.localdomain>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Mon, 29 Jun 2020 12:54:17 +0100
+Message-Id: <20200629115420.98443-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200626103117.GE281902@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH 3/3] virtiofsd: Allow addition or removal of
-	capabilities
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2 0/3] virtiofsd capability changes and addition
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,65 +12,33 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com, stefanha@redhat.com, vgoyal@redhat.com
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> On Thu, Jun 25, 2020 at 05:29:29PM +0100, Dr. David Alan Gilbert (git) wrote:
-> > +    /*
-> > +     * The modcaps option is a colon separated list of caps,
-> > +     * each preceded by either + or -.
-> > +     */
-> > +    while (lo->modcaps) {
-> > +        capng_act_t action;
-> > +        int cap;
-> > +
-> > +        char *next = strchr(lo->modcaps, ':');
-> > +        if (next) {
-> > +            *next = '\0';
-> > +            next++;
-> > +        }
-> > +
-> > +        switch (lo->modcaps[0]) {
-> > +        case '+':
-> > +            action = CAPNG_ADD;
-> > +            break;
-> > +
-> > +        case '-':
-> > +            action = CAPNG_DROP;
-> > +            break;
-> > +
-> > +        default:
-> > +            fuse_log(FUSE_LOG_ERR,
-> > +                     "%s: Expecting '+'/'-' in modcaps but found '%c'\n",
-> > +                     __func__, lo->modcaps[0]);
-> > +            exit(1);
-> > +        }
-> > +        cap = capng_name_to_capability(lo->modcaps + 1);
-> > +        if (cap < 0) {
-> > +            fuse_log(FUSE_LOG_ERR, "%s: Unknown capability '%s'\n", __func__,
-> > +                     lo->modcaps);
-> > +            exit(1);
-> > +        }
-> > +        if (capng_update(action, CAPNG_PERMITTED | CAPNG_EFFECTIVE, cap)) {
-> > +            fuse_log(FUSE_LOG_ERR, "%s: capng_update failed for '%s'\n",
-> > +                     __func__, lo->modcaps);
-> > +            exit(1);
-> > +        }
-> > +
-> > +        lo->modcaps = next;
-> 
-> How about passing char *modcaps into this function so that lo->modcaps
-> isn't modified by the parsing loop? That seems a bit cleaner and if we
-> ever decide to free lo->modcaps it will work as expected.
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Yep, can do.
+Hi,
+  This is a set of changes relating to the capability restirctions
+introduced in virtiofsd back in a59feb483b8.
+ 
+The first one is a potentially important fix; the missing terminator
+could mean extra capabilities are added based on junk on the stack;
+although that's not been seen in practice.
+ 
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 
-Dave
+v2
+  Pass a copy of the parameter list into setup_capabilities
 
-> Stefan
+Dr. David Alan Gilbert (3):
+  virtiofsd: Terminate capability list
+  virtiofsd: Check capability calls
+  virtiofsd: Allow addition or removal of capabilities
 
+ docs/tools/virtiofsd.rst         |  5 +++
+ tools/virtiofsd/helper.c         |  2 +
+ tools/virtiofsd/passthrough_ll.c | 71 +++++++++++++++++++++++++++++---
+ 3 files changed, 73 insertions(+), 5 deletions(-)
 
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+-- 
+2.26.2
 

@@ -1,15 +1,20 @@
-Date: Fri, 19 Jun 2020 13:11:21 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200619171121.GE3154@redhat.com>
-References: <20200416164907.244868-1-stefanha@redhat.com>
-	<20200618190816.GD3814@redhat.com> <20200618191655.GI2769@work-vm>
-	<20200618192717.GE3814@redhat.com> <20200619082746.GA2690@work-vm>
-	<20200619160923.GD3154@redhat.com> <20200619161648.GJ2690@work-vm>
+From: Vitaly Kuznetsov <vkuznets@redhat.com>
+In-Reply-To: <20200630152529.GC322149@redhat.com>
+References: <20200625214701.GA180786@redhat.com>
+	<87lfkach6o.fsf@vitty.brq.redhat.com>
+	<20200626150303.GC195150@redhat.com>
+	<874kqtd212.fsf@vitty.brq.redhat.com>
+	<20200629220353.GC269627@redhat.com>
+	<87sgecbs9w.fsf@vitty.brq.redhat.com>
+	<20200630145303.GB322149@redhat.com>
+	<87mu4kbn7x.fsf@vitty.brq.redhat.com>
+	<20200630152529.GC322149@redhat.com>
+Date: Tue, 30 Jun 2020 17:43:54 +0200
+Message-ID: <87k0zobltx.fsf@vitty.brq.redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200619161648.GJ2690@work-vm>
-Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
+Content-Type: text/plain
+Subject: Re: [Virtio-fs] [RFC PATCH] kvm,
+	x86: Exit to user space in case of page fault error
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,44 +23,45 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Miklos Szeredi <miklos@szeredi.hu>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, pbonzini@redhat.com, sean.j.christopherson@intel.com, kvm@vger.kernel.org, linux-kernel@vger.kernel.org
 
-On Fri, Jun 19, 2020 at 05:16:48PM +0100, Dr. David Alan Gilbert wrote:
+Vivek Goyal <vgoyal@redhat.com> writes:
 
-[..]
-> > > > >   b) If something nasty was to write junk into the trusted attributes,
-> > > > >     what would happen?
-> > > > 
-> > > > This directory is owned by guest. So it should be able to write
-> > > > anything it wants, as long as process in guest has CAP_SYS_ADMIN, right?
-> > > 
-> > > Well, we shouldn't be able to break/crash/escape into the host; how
-> > > much does overlayfs validate trusted.* it uses?
-> > 
-> > I thought qemu and kvm are the one who should ensure we should not be
-> > able to break out of sandbox. Kernel implementation could be as 
-> > buggy as it wanted to be. We are working with this security model
-> > that kernel is completely untrusted.
-> 
-> But with virtiofs we allow the guest to do a lot of filesystem
-> operations on the host.  It's the virtiofsd that has to ensure that
-> these are safe and contained within the fs it's exposed; the qemu/kvm
-> can't protect us from that.
+> On Tue, Jun 30, 2020 at 05:13:54PM +0200, Vitaly Kuznetsov wrote:
+>> 
+>> > - If you retry in kernel, we will change the context completely that
+>> >   who was trying to access the gfn in question. We want to retain
+>> >   the real context and retain information who was trying to access
+>> >   gfn in question.
+>> 
+>> (Just so I understand the idea better) does the guest context matter to
+>> the host? Or, more specifically, are we going to do anything besides
+>> get_user_pages() which will actually analyze who triggered the access
+>> *in the guest*?
+>
+> When we exit to user space, qemu prints bunch of register state. I am
+> wondering what does that state represent. Does some of that traces
+> back to the process which was trying to access that hva? I don't
+> know.
 
-Fair enough. I should have added virtiofsd to list. Its an attack
-vector and is of concern.
+We can get the full CPU state when the fault happens if we need to but
+generally we are not analyzing it. I can imagine looking at CPL, for
+example, but trying to distinguish guest's 'process A' from 'process B'
+may not be simple.
 
-> 
-> That's why we sandbox the virtiofsd like we do - if we allow a
-> priviliged guest to perform calls to an unconstrained virtiofsd it would
-> be able to escape.  That's what I want to check.
+>
+> I think keeping a cache of error gfns might not be too bad from
+> implemetation point of view. I will give it a try and see how
+> bad does it look.
 
-Sure. So does giving CAP_SYS_ADMIN to virtiofsd allow daemon to escape
-the jail. If it does we need to implement what crossvm folks did,
-remapping of trusted xattr. That will also allow us to run inside
-user namespace and still be able to support trusted xattr emulation
-for guest.
+Right; I'm only worried about the fact that every cache (or hash) has a
+limited size and under certain curcumstances we may overflow it. When an
+overflow happens, we will follow the APF path again and this can go over
+and over. Maybe we can punch a hole in EPT/NPT making the PFN reserved/
+not-present so when the guest tries to access it again we trap the
+access in KVM and, if the error persists, don't follow the APF path?
 
-Vivek
+-- 
+Vitaly
 

@@ -1,22 +1,9 @@
-From: Vitaly Kuznetsov <vkuznets@redhat.com>
-In-Reply-To: <20200630182542.GA328891@redhat.com>
-References: <20200625214701.GA180786@redhat.com>
-	<87lfkach6o.fsf@vitty.brq.redhat.com>
-	<20200626150303.GC195150@redhat.com>
-	<874kqtd212.fsf@vitty.brq.redhat.com>
-	<20200629220353.GC269627@redhat.com>
-	<87sgecbs9w.fsf@vitty.brq.redhat.com>
-	<20200630145303.GB322149@redhat.com>
-	<87mu4kbn7x.fsf@vitty.brq.redhat.com>
-	<20200630152529.GC322149@redhat.com>
-	<87k0zobltx.fsf@vitty.brq.redhat.com>
-	<20200630182542.GA328891@redhat.com>
-Date: Wed, 01 Jul 2020 10:06:51 +0200
-Message-ID: <87blkzbqw4.fsf@vitty.brq.redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain
-Subject: Re: [Virtio-fs] [RFC PATCH] kvm,
-	x86: Exit to user space in case of page fault error
+From: David Lomas <dl3@pale-eds.co.uk>
+Date: Thu, 2 Jul 2020 16:20:15 +0100
+Message-ID: <CALjEBWSmL_1s8n4WEMQS9_6At2B24sXysEkiWiUA867hcLbD5g@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="000000000000259adc05a976f4e4"
+Subject: [Virtio-fs] Mount error
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,77 +12,83 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, pbonzini@redhat.com, sean.j.christopherson@intel.com, kvm@vger.kernel.org, linux-kernel@vger.kernel.org
+To: virtio-fs@redhat.com
 
-Vivek Goyal <vgoyal@redhat.com> writes:
+--000000000000259adc05a976f4e4
+Content-Type: text/plain; charset="UTF-8"
 
-> On Tue, Jun 30, 2020 at 05:43:54PM +0200, Vitaly Kuznetsov wrote:
->> Vivek Goyal <vgoyal@redhat.com> writes:
->> 
->> > On Tue, Jun 30, 2020 at 05:13:54PM +0200, Vitaly Kuznetsov wrote:
->> >> 
->> >> > - If you retry in kernel, we will change the context completely that
->> >> >   who was trying to access the gfn in question. We want to retain
->> >> >   the real context and retain information who was trying to access
->> >> >   gfn in question.
->> >> 
->> >> (Just so I understand the idea better) does the guest context matter to
->> >> the host? Or, more specifically, are we going to do anything besides
->> >> get_user_pages() which will actually analyze who triggered the access
->> >> *in the guest*?
->> >
->> > When we exit to user space, qemu prints bunch of register state. I am
->> > wondering what does that state represent. Does some of that traces
->> > back to the process which was trying to access that hva? I don't
->> > know.
->> 
->> We can get the full CPU state when the fault happens if we need to but
->> generally we are not analyzing it. I can imagine looking at CPL, for
->> example, but trying to distinguish guest's 'process A' from 'process B'
->> may not be simple.
->> 
->> >
->> > I think keeping a cache of error gfns might not be too bad from
->> > implemetation point of view. I will give it a try and see how
->> > bad does it look.
->> 
->> Right; I'm only worried about the fact that every cache (or hash) has a
->> limited size and under certain curcumstances we may overflow it. When an
->> overflow happens, we will follow the APF path again and this can go over
->> and over.
->
-> Sure. But what are the chances of that happening. Say our cache size is
-> 64. That means we need atleast 128 processes to do co-ordinated faults
-> (all in error zone) to skip the cache completely all the time. We
-> have to hit cache only once. Chances of missing the error gnf
-> cache completely for a very long time are very slim. And if we miss
-> it few times, now harm done. We will just spin few times and then
-> exit to qemu.
->
-> IOW, chances of spinning infinitely are not zero. But they look so
-> small that in practice I am not worried about it.
->
->> Maybe we can punch a hole in EPT/NPT making the PFN reserved/
->> not-present so when the guest tries to access it again we trap the
->> access in KVM and, if the error persists, don't follow the APF path?
->
-> Cache solution seems simpler than this. Trying to maintain any state
-> in page tables will be invariably more complex (Especially given
-> many flavors of paging).
->
-> I can start looking in this direction if you really think that its worth
-> implementing  page table based solution for this problem. I feel that
-> we implement something simpler for now and if there are easy ways
-> to skip error gns, then replace it with something page table based
-> solution (This will only require hypervisor change and no guest
-> changes).
+I've compiled and installed kernel 5.7, and have virtiofs mostly working,
+but I'm still being caught by something which leads to an error. I've
+defined the filesystem on the host like this:
 
-I think we're fine with an interim cache/hash solution as long as
-chances of getting into an infinite loop accidentaially are very slim
-and we don't have any specific latency requirements. Feel free to forget
-about PT suggestion for now, we can certainly make it 'step 2' (IMO).
+<filesystem type='mount' accessmode='passthrough'>
+  <driver type='virtiofs'/>
+  <binary path='/usr/libexec/virtiofsd'/>
+  <source dir='/data/hosts/VMHOSTNAME/users'/>
+  <target dir='users'/>
+  <address type='pci' domain='0x0000' bus='0x00' slot='0x09'
+function='0x0'/>
+</filesystem>
 
--- 
-Vitaly
+and on the host I've put this in /etc/fstab:
+
+users           /appdata/users            virtiofs
+
+On boot, the /appdata/users folder is correctly mounted, but if I ever try
+to manually unmount / remount, or if I boot up without an entry in
+/etc/fstab and try to mount manually with something like:
+
+# mount -t virtiofs users /appdata/users
+
+I get this rather opaque error:
+
+mount: /appdata/users : wrong fs type, bad option, bad superblock on /
+appdata/users, missing codepage or helper program, or other error.
+
+Are there more options I should be specifying which for some reason aren't
+needed on boot?
+
+--000000000000259adc05a976f4e4
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><div>I&#39;ve compiled and installed kernel 5.7, and have =
+virtiofs mostly working, but I&#39;m still being caught by something which =
+leads to an error. I&#39;ve defined the filesystem on the host like this:</=
+div><div><br></div><div><span style=3D"font-family:monospace">&lt;filesyste=
+m type=3D&#39;mount&#39; accessmode=3D&#39;passthrough&#39;&gt;<br>=C2=A0 &=
+lt;driver type=3D&#39;virtiofs&#39;/&gt;<br>=C2=A0 &lt;binary path=3D&#39;/=
+usr/libexec/virtiofsd&#39;/&gt;<br>=C2=A0 &lt;source dir=3D&#39;/data/hosts=
+/VMHOSTNAME/users&#39;/&gt;<br>=C2=A0 &lt;target dir=3D&#39;users&#39;/&gt;=
+<br>=C2=A0 &lt;address type=3D&#39;pci&#39; domain=3D&#39;0x0000&#39; bus=
+=3D&#39;0x00&#39; slot=3D&#39;0x09&#39; function=3D&#39;0x0&#39;/&gt;<br>&l=
+t;/filesystem&gt;</span></div><div><br></div><div>and on the host I&#39;ve =
+put this in /etc/fstab:</div><div><br></div><div><span style=3D"font-family=
+:monospace">users =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 /appdata/users =C2=A0 =
+=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0virtiofs</span></div><div><span style=3D"=
+font-family:monospace"><br></span></div><div><span style=3D"font-family:mon=
+ospace"><font face=3D"arial,sans-serif">On boot, the /appdata/users folder =
+is correctly mounted, but if I ever try to manually unmount / remount, or i=
+f I boot up without an entry in /etc/fstab and try to mount manually with s=
+omething like:</font></span></div><div><span style=3D"font-family:monospace=
+"><font face=3D"arial,sans-serif"><br></font></span></div><div><span style=
+=3D"font-family:monospace"># mount -t virtiofs users /appdata/users</span><=
+/div><div><span style=3D"font-family:monospace"><font face=3D"arial,sans-se=
+rif"><br></font></span></div><div><span style=3D"font-family:monospace"><fo=
+nt face=3D"arial,sans-serif">I get this rather opaque error:</font></span><=
+/div><div><span style=3D"font-family:monospace"><font face=3D"arial,sans-se=
+rif"><br></font></span></div><div><span style=3D"font-family:monospace"><fo=
+nt face=3D"arial,sans-serif"><span style=3D"font-family:monospace">mount: /=
+appdata/users
+
+: wrong fs type, bad option, bad superblock on /
+appdata/users, missing codepage or helper program, or other error.</span></=
+font></span></div><div><span style=3D"font-family:monospace"><font face=3D"=
+arial,sans-serif"><span style=3D"font-family:monospace"><br></span></font><=
+/span></div><div><span style=3D"font-family:monospace"><font face=3D"arial,=
+sans-serif"><span style=3D"font-family:monospace"><font face=3D"arial,sans-=
+serif">Are there more options I should be specifying which for some reason =
+aren&#39;t needed on boot?</font><br></span></font></span></div></div>
+
+--000000000000259adc05a976f4e4--
 

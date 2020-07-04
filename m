@@ -1,16 +1,22 @@
-Date: Fri, 19 Jun 2020 18:16:31 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200619171631.GK2690@work-vm>
-References: <20200416164907.244868-1-stefanha@redhat.com>
-	<20200618190816.GD3814@redhat.com> <20200618191655.GI2769@work-vm>
-	<20200618192717.GE3814@redhat.com> <20200619082746.GA2690@work-vm>
-	<20200619160923.GD3154@redhat.com> <20200619161648.GJ2690@work-vm>
-	<20200619171121.GE3154@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=date:from:to:cc:subject:message-id:references:mime-version
+	:content-disposition:in-reply-to;
+	bh=YG0L3wKn++d3omIZATisPGrSaErh2+D0JznHzkSGAbs=;
+	b=gPw20euKQEntdSSq980HfBz/7xR14S15dAZcXCRYDXhJ1D/+/0Zy7pE28+Pv4iaqc4
+	t42xvHAx0HIElKjhfQbqbnflTKl8WICRYI59EkruKVkcXR5rkiusjX+RNcwz8MIp1XTv
+	2GyQ4zmEmRfPEwQPOrrEABaK6tzMZkgK4ClOdyO67fiUwWgejggpAtQX6fumRhdKmmEs
+	YMva1EbCficPcenU6hDkiLAng2YQKmfkamEQAbcDXvda1vkub3KoWtOgilHGHiYW1weU
+	Z7ZX9cEwF4ezXJTZZ3KB0LQeXjJBFEXbD/thL67N+ApJNfJ+w+2z16JGCXvkkI9LWn+O
+	zGfg==
+Date: Sat, 4 Jul 2020 14:46:25 -0400
+From: Masayoshi Mizuma <msys.mizuma@gmail.com>
+Message-ID: <20200704184625.4tivbyaiwnfzdz5z@gabell>
+References: <CALjEBWSmL_1s8n4WEMQS9_6At2B24sXysEkiWiUA867hcLbD5g@mail.gmail.com>
 MIME-Version: 1.0
+In-Reply-To: <CALjEBWSmL_1s8n4WEMQS9_6At2B24sXysEkiWiUA867hcLbD5g@mail.gmail.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20200619171121.GE3154@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
+Subject: Re: [Virtio-fs] Mount error
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,63 +25,63 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Miklos Szeredi <miklos@szeredi.hu>
+To: David Lomas <dl3@pale-eds.co.uk>
+Cc: virtio-fs@redhat.com
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> On Fri, Jun 19, 2020 at 05:16:48PM +0100, Dr. David Alan Gilbert wrote:
+On Thu, Jul 02, 2020 at 04:20:15PM +0100, David Lomas wrote:
+> I've compiled and installed kernel 5.7, and have virtiofs mostly working,
+> but I'm still being caught by something which leads to an error. I've
+> defined the filesystem on the host like this:
 > 
-> [..]
-> > > > > >   b) If something nasty was to write junk into the trusted attributes,
-> > > > > >     what would happen?
-> > > > > 
-> > > > > This directory is owned by guest. So it should be able to write
-> > > > > anything it wants, as long as process in guest has CAP_SYS_ADMIN, right?
-> > > > 
-> > > > Well, we shouldn't be able to break/crash/escape into the host; how
-> > > > much does overlayfs validate trusted.* it uses?
-> > > 
-> > > I thought qemu and kvm are the one who should ensure we should not be
-> > > able to break out of sandbox. Kernel implementation could be as 
-> > > buggy as it wanted to be. We are working with this security model
-> > > that kernel is completely untrusted.
-> > 
-> > But with virtiofs we allow the guest to do a lot of filesystem
-> > operations on the host.  It's the virtiofsd that has to ensure that
-> > these are safe and contained within the fs it's exposed; the qemu/kvm
-> > can't protect us from that.
+> <filesystem type='mount' accessmode='passthrough'>
+>   <driver type='virtiofs'/>
+>   <binary path='/usr/libexec/virtiofsd'/>
+>   <source dir='/data/hosts/VMHOSTNAME/users'/>
+>   <target dir='users'/>
+>   <address type='pci' domain='0x0000' bus='0x00' slot='0x09'
+> function='0x0'/>
+> </filesystem>
 > 
-> Fair enough. I should have added virtiofsd to list. Its an attack
-> vector and is of concern.
+> and on the host I've put this in /etc/fstab:
 > 
-> > 
-> > That's why we sandbox the virtiofsd like we do - if we allow a
-> > priviliged guest to perform calls to an unconstrained virtiofsd it would
-> > be able to escape.  That's what I want to check.
+> users           /appdata/users            virtiofs
 > 
-> Sure. So does giving CAP_SYS_ADMIN to virtiofsd allow daemon to escape
-> the jail.
-
-So that's *my* question - what bad things can someone do by setting
-attributes (trusted/system/security) - it's fine if they break they
-screwup the security inside the container, because they'd need to be
-CAP_SYS_ADMIN inside the container to do it - as long as they can't
-break the host.  So what happens if someone starts doing bad things to
-trusted.* attributes on an overlayfs - no other fs uses them as far as I
-know.
-
-> If it does we need to implement what crossvm folks did,
-> remapping of trusted xattr. That will also allow us to run inside
-> user namespace and still be able to support trusted xattr emulation
-> for guest.
-
-I think we need to do that anyway, it's just going to take a while to
-figure out.
-
-Dave
-
+> On boot, the /appdata/users folder is correctly mounted, but if I ever try
+> to manually unmount / remount, or if I boot up without an entry in
+> /etc/fstab and try to mount manually with something like:
 > 
-> Vivek
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> # mount -t virtiofs users /appdata/users
+> 
+> I get this rather opaque error:
+> 
+> mount: /appdata/users : wrong fs type, bad option, bad superblock on /
+> appdata/users, missing codepage or helper program, or other error.
+> 
+> Are there more options I should be specifying which for some reason aren't
+> needed on boot?
+
+Hi David,
+
+If 'users' directory is in the current directory, the mount command will fail.
+
+  # ls
+  users
+  # mount -t virtiofs --source users /mnt/users
+  mount: /mnt/users: wrong fs type, bad option, bad superblock on /mnt/users, missing codepage or helper program, or other error.
+  #
+
+That's because the mount command handles the full path of 'users' as the
+first argument for mount() system call like as:
+
+  # strace -emount mount -t virtiofs users /mnt/users
+  mount("/mnt/users", "/mnt/users", "virtiofs", MS_MGC_VAL, NULL) = -1 EINVAL (Invalid argument)
+  mount: /mnt/users: wrong fs type, bad option, bad superblock on /mnt/users, missing codepage or helper program, or other error.
+  +++ exited with 32 +++
+  # 
+
+I'm not sure mount command has an option to avoid that, but probably
+you can avoid the failure to change current directory.
+
+Thanks,
+Masa
 

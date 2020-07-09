@@ -1,11 +1,11 @@
-Date: Tue, 7 Jul 2020 16:13:52 -0400
+Date: Thu, 9 Jul 2020 08:54:42 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200707201352.GA88802@redhat.com>
+Message-ID: <20200709125442.GA150543@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: [Virtio-fs] [RFC PATCH v2] kvm,
- x86: Exit to user space in case of page fault error
+Subject: [Virtio-fs] [PATCH v3] kvm,
+	x86: Exit to user space in case of page fault error
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -58,8 +58,10 @@ miss an error gfn (as it got overwritten by a new error gfn). But
 its just a hint and sooner or later some error pfn will match
 and we will force sync fault and exit to user space.
 
-Change from v1:
+Change from v2:
+- Fixed a warning by converting kvm_find_error_gfn() static.
 
+Change from v1:
 - Maintain a cache of error gfns, instead of single gfn. (Vitaly)
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
@@ -117,7 +119,7 @@ index 6d6a0ae7800c..a0e6283e872d 100644
  		if (kvm_find_async_pf_gfn(vcpu, gfn)) {
  			trace_kvm_async_pf_doublefault(cr2_or_gpa, gfn);
 diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
-index 88c593f83b28..9c18b919affd 100644
+index 88c593f83b28..c4d4dab3ccde 100644
 --- a/arch/x86/kvm/x86.c
 +++ b/arch/x86/kvm/x86.c
 @@ -263,6 +263,13 @@ static inline void kvm_async_pf_hash_reset(struct kvm_vcpu *vcpu)
@@ -182,7 +184,7 @@ index 88c593f83b28..9c18b919affd 100644
 +	vcpu->arch.apf.error_gfns[key] = ~0;
 +}
 +
-+bool kvm_find_error_gfn(struct kvm_vcpu *vcpu, gfn_t gfn)
++static bool kvm_find_error_gfn(struct kvm_vcpu *vcpu, gfn_t gfn)
 +{
 +	u32 key = kvm_error_gfn_hash_fn(gfn);
 +

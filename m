@@ -1,10 +1,11 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Fri, 19 Jun 2020 18:18:09 +0100
-Message-Id: <20200619171809.30984-1-dgilbert@redhat.com>
+Date: Thu, 16 Jul 2020 10:40:32 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200716144032.GC422759@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH] virtiofsd: Allow capability restriction to be
-	turned off
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: [Virtio-fs] [PATCH] virtiofs: Enable SB_NOSEC flag to improve small
+ write performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,97 +14,114 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com, stefanha@redhat.com, vgoyal@redhat.com
+To: Miklos Szeredi <miklos@szeredi.hu>, linux-fsdevel@vger.kernel.org
+Cc: virtio-fs-list <virtio-fs@redhat.com>, ganesh.mahalingam@intel.com
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Ganesh Mahalingam reported that virtiofs is slow with small direct random
+writes when virtiofsd is run with cache=always.
 
-Commit a59feb483b8fae24d043 dropped most capabilities at startup,
-since in most cases virtiofsd doesn't need them.  Unfortunately we found
-a case that needs CAP_SYS_ADMIN - setting trusted extended attributes.
-It's rare to need it, and the clean fix for it is going to be more
-complicated, but as a way for existing users to continue, allow the
-capability restriction to be turned off by adding
+https://github.com/kata-containers/runtime/issues/2815
 
-  -o no_restrictcaps
+Little debugging showed that that file_remove_privs() is called in cached
+write path on every write. And everytime it calls
+security_inode_need_killpriv() which results in call to
+__vfs_getxattr(XATTR_NAME_CAPS). And this goes to file server to fetch
+xattr. This extra round trip for every write slows down writes a lot.
 
-We still drop the capabilities by default since this seems much safer;
-even if we don't have an explicit problem to fix.
+Normally to avoid paying this penalty on every write, vfs has the
+notion of caching this information in inode (S_NOSEC). So vfs
+sets S_NOSEC, if filesystem opted for it using super block flag
+SB_NOSEC. And S_NOSEC is cleared when setuid/setgid bit is set or
+when security xattr is set on inode so that next time a write
+happens, we check inode again for clearing setuid/setgid bits as well
+clear any security.capability xattr.
 
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+This seems to work well for local file systems but for remote file
+systems it is possible that VFS does not have full picture and a
+different client sets setuid/setgid bit or security.capability xattr
+on file and that means VFS information about S_NOSEC on another client
+will be stale. So for remote filesystems SB_NOSEC was disabled by
+default.
+
+commit 9e1f1de02c2275d7172e18dc4e7c2065777611bf
+Author: Al Viro <viro@zeniv.linux.org.uk>
+Date:   Fri Jun 3 18:24:58 2011 -0400
+
+    more conservative S_NOSEC handling
+
+That commit mentioned that these filesystems can still make use of
+SB_NOSEC as long as they clear S_NOSEC when they are refreshing inode
+attriutes from server.
+
+So this patch tries to enable SB_NOSEC on fuse (regular fuse as well
+as virtiofs). And clear SB_NOSEC when we are refreshing inode attributes.
+
+We need to clear SB_NOSEC either when inode has setuid/setgid bit set
+or security.capability xattr has been set. We have the first piece of
+information available in FUSE_GETATTR response. But we don't know if
+security.capability has been set on file or not. Question is, do we
+really need to know about security.capability. file_remove_privs()
+always removes security.capability if a file is being written to. That
+means when server writes to file, security.capability should be removed
+without guest having to tell anything to it.
+
+That means we don't have to worry about knowing if security.capability
+was set or not as long as writes by client don't get cached and go to
+server always. And server write should clear security.capability. Hence,
+I clear SB_NOSEC when writeback cache is enabled.
+
+This change improves random write performance very significantly. I
+am running virtiofsd with cache=auto and following fio command.
+
+fio --ioengine=libaio --direct=1  --name=test --filename=/mnt/virtiofs/random_read_write.fio --bs=4k --iodepth=64 --size=4G --readwrite=randwrite
+
+Before this patch I get around 40MB/s and after the patch I get around
+300MB/s bandwidth. So improvement is very significant.
+
+Note: We probably could do this change for regular fuse filesystems
+      as well. But I don't know all the possible configurations supported
+      so I am limiting it to virtiofs.
+
+Reported-by: "Mahalingam, Ganesh" <ganesh.mahalingam@intel.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- docs/tools/virtiofsd.rst         | 3 +++
- tools/virtiofsd/helper.c         | 3 +++
- tools/virtiofsd/passthrough_ll.c | 8 +++++++-
- 3 files changed, 13 insertions(+), 1 deletion(-)
+ fs/fuse/inode.c     | 7 +++++++
+ fs/fuse/virtio_fs.c | 4 ++++
+ 2 files changed, 11 insertions(+)
 
-diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-index 378594c422..8819d7d19e 100644
---- a/docs/tools/virtiofsd.rst
-+++ b/docs/tools/virtiofsd.rst
-@@ -81,6 +81,9 @@ Options
-     Enable/disable extended attributes (xattr) on files and directories.  The
-     default is ``no_xattr``.
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index 5b4aebf5821f..5e74c818b2aa 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -185,6 +185,13 @@ void fuse_change_attributes_common(struct inode *inode, struct fuse_attr *attr,
+ 		inode->i_mode &= ~S_ISVTX;
  
-+  * restrictcaps|no_restrictcaps\n"
-+    Restrict capabilities at startup.  The default is ``restrictcaps``.
+ 	fi->orig_ino = attr->ino;
 +
- .. option:: --socket-path=PATH
- 
-   Listen on vhost-user UNIX domain socket at PATH.
-diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
-index 00a1ef666a..51ed9fbed0 100644
---- a/tools/virtiofsd/helper.c
-+++ b/tools/virtiofsd/helper.c
-@@ -174,6 +174,9 @@ void fuse_cmdline_help(void)
-            "                               default: no_writeback\n"
-            "    -o xattr|no_xattr          enable/disable xattr\n"
-            "                               default: no_xattr\n"
-+           "    -o restrictcaps|no_restrictcaps\n"
-+           "                               restrict capabilities at startup\n"
-+           "                               default: restrictcaps\n"
-            "    --rlimit-nofile=<num>      set maximum number of file descriptors\n"
-            "                               (0 leaves rlimit unchanged)\n"
-            "                               default: min(1000000, fs.file-max - 16384)\n"
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 2ce7c96085..8dee657b19 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -144,6 +144,7 @@ struct lo_data {
-     int flock;
-     int posix_lock;
-     int xattr;
-+    int restrictcaps;
-     char *source;
-     double timeout;
-     int cache;
-@@ -170,6 +171,8 @@ static const struct fuse_opt lo_opts[] = {
-     { "no_posix_lock", offsetof(struct lo_data, posix_lock), 0 },
-     { "xattr", offsetof(struct lo_data, xattr), 1 },
-     { "no_xattr", offsetof(struct lo_data, xattr), 0 },
-+    { "restrictcaps", offsetof(struct lo_data, restrictcaps), 1 },
-+    { "no_restrictcaps", offsetof(struct lo_data, restrictcaps), 0 },
-     { "timeout=%lf", offsetof(struct lo_data, timeout), 0 },
-     { "timeout=", offsetof(struct lo_data, timeout_set), 1 },
-     { "cache=none", offsetof(struct lo_data, cache), CACHE_NONE },
-@@ -2615,7 +2618,9 @@ static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
-     setup_namespaces(lo, se);
-     setup_mounts(lo->source);
-     setup_seccomp(enable_syslog);
--    setup_capabilities();
-+    if (lo->restrictcaps) {
-+        setup_capabilities();
-+    }
++	/*
++	 * File server see setuid/setgid bit set. Maybe another client did
++	 * it. Reset S_NOSEC.
++	 */
++	if (IS_NOSEC(inode) && is_sxid(inode->i_mode))
++		inode->i_flags &= ~S_NOSEC;
  }
  
- /* Set the maximum number of open file descriptors */
-@@ -2764,6 +2769,7 @@ int main(int argc, char *argv[])
-         .writeback = 0,
-         .posix_lock = 1,
-         .proc_self_fd = -1,
-+        .restrictcaps = 1,
-     };
-     struct lo_map_elem *root_elem;
-     int ret = -1;
+ void fuse_change_attributes(struct inode *inode, struct fuse_attr *attr,
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index 4c4ef5d69298..e89628163ec4 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -1126,6 +1126,10 @@ static int virtio_fs_fill_super(struct super_block *sb)
+ 	/* Previous unmount will stop all queues. Start these again */
+ 	virtio_fs_start_all_queues(fs);
+ 	fuse_send_init(fc);
++
++	if (!fc->writeback_cache)
++		sb->s_flags |= SB_NOSEC;
++
+ 	mutex_unlock(&virtio_fs_mutex);
+ 	return 0;
+ 
 -- 
-2.26.2
+2.25.4
 

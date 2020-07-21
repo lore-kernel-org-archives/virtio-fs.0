@@ -1,18 +1,17 @@
-Date: Fri, 19 Jun 2020 13:41:26 -0400
+Date: Tue, 21 Jul 2020 11:16:55 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200619174126.GF3154@redhat.com>
-References: <20200416164907.244868-1-stefanha@redhat.com>
-	<20200618190816.GD3814@redhat.com> <20200618191655.GI2769@work-vm>
-	<20200618192717.GE3814@redhat.com> <20200619082746.GA2690@work-vm>
-	<20200619113914.GI700896@redhat.com>
-	<20200619114957.GG2690@work-vm>
-	<20200619120547.GJ700896@redhat.com>
+Message-ID: <20200721151655.GB551452@redhat.com>
+References: <20200716144032.GC422759@redhat.com>
+	<20200716181828.GE422759@redhat.com>
+	<CAJfpegt-v6sjm2WyjXMWkObqLdL6TSAi=rjra4KK5sNy6hhhmA@mail.gmail.com>
+	<20200720154112.GC502563@redhat.com>
+	<CAJfpegtked-aUq0zbTQjmspG04LG3ar-j_BRsb88kR+cnHNO_w@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <20200619120547.GJ700896@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
+In-Reply-To: <CAJfpegtked-aUq0zbTQjmspG04LG3ar-j_BRsb88kR+cnHNO_w@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofs: Enable SB_NOSEC flag to improve
+ small write performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,196 +20,89 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>
-Cc: virtio-fs@redhat.com, Miklos Szeredi <miklos@szeredi.hu>, qemu-devel@nongnu.org
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>, ganesh.mahalingam@intel.com
 
-On Fri, Jun 19, 2020 at 01:05:47PM +0100, Daniel P. Berrangé wrote:
-> On Fri, Jun 19, 2020 at 12:49:57PM +0100, Dr. David Alan Gilbert wrote:
-> > * Daniel P. Berrangé (berrange@redhat.com) wrote:
-> > > On Fri, Jun 19, 2020 at 09:27:46AM +0100, Dr. David Alan Gilbert wrote:
-> > > > * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > > > > On Thu, Jun 18, 2020 at 08:16:55PM +0100, Dr. David Alan Gilbert wrote:
-> > > > > > * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > > > > > > On Thu, Apr 16, 2020 at 05:49:05PM +0100, Stefan Hajnoczi wrote:
-> > > > > > > > virtiofsd doesn't need of all Linux capabilities(7) available to root.  Keep a
-> > > > > > > > whitelisted set of capabilities that we require.  This improves security in
-> > > > > > > > case virtiofsd is compromised by making it hard for an attacker to gain further
-> > > > > > > > access to the system.
-> > > > > > > 
-> > > > > > > Hi Stefan,
-> > > > > > > 
-> > > > > > > I just noticed that this patch set breaks overlayfs on top of virtiofs.
-> > > > > > > 
-> > > > > > > overlayfs sets "trusted.overlay.*" and xattrs in trusted domain
-> > > > > > > need CAP_SYS_ADMIN.
-> > > > > > > 
-> > > > > > > man xattr says.
-> > > > > > > 
-> > > > > > >    Trusted extended attributes
-> > > > > > >        Trusted  extended  attributes  are  visible and accessible only to pro‐
-> > > > > > >        cesses that have the  CAP_SYS_ADMIN  capability.   Attributes  in  this
-> > > > > > >        class are used to implement mechanisms in user space (i.e., outside the
-> > > > > > >        kernel) which keep information in extended attributes to which ordinary
-> > > > > > >        processes should not have access.
-> > > > > > > 
-> > > > > > > There is a chance that overlay moves away from trusted xattr in future.
-> > > > > > > But for now we need to make it work. This is an important use case for
-> > > > > > > kata docker in docker build.
-> > > > > > > 
-> > > > > > > May be we can add an option to virtiofsd say "--add-cap <capability>" and
-> > > > > > > ask user to pass in "--add-cap cap_sys_admin" if they need to run daemon
-> > > > > > > with this capaibility.
-> > > > > > 
-> > > > > > I'll admit I don't like the idea of giving it cap_sys_admin.
-> > > > > > Can you explain:
-> > > > > >   a) What overlayfs uses trusted for?
-> > > > > 
-> > > > > overlayfs stores bunch of metadata and uses "trusted" xattrs for it.
-> > > > 
-> > > > Tell me more about this metadata.
-> > > > Taking a juicy looking one, what does OVL_XATTR_REDIRECT do?
-> > > > Or what happens if I was to write random numbers into OVL_XATTR_NLINK?
-> > > > 
-> > > > > >   b) If something nasty was to write junk into the trusted attributes,
-> > > > > >     what would happen?
-> > > > > 
-> > > > > This directory is owned by guest. So it should be able to write
-> > > > > anything it wants, as long as process in guest has CAP_SYS_ADMIN, right?
-> > > > 
-> > > > Well, we shouldn't be able to break/crash/escape into the host; how
-> > > > much does overlayfs validate trusted.* it uses?
-> > > > 
-> > > > > >   c) I see overlayfs has a fallback check if xattr isn't supported at
-> > > > > > all - what is the consequence?
-> > > > > 
-> > > > > It falls back to I think read only mode. 
-> > > > 
-> > > > It looks like the fallback is more subtle to me:
-> > > >         /*
-> > > >          * Check if upper/work fs supports trusted.overlay.* xattr
-> > > >          */
-> > > >         err = ovl_do_setxattr(ofs->workdir, OVL_XATTR_OPAQUE, "0", 1, 0);
-> > > >         if (err) {
-> > > >                 ofs->noxattr = true;
-> > > >                 ofs->config.index = false;
-> > > >                 ofs->config.metacopy = false;
-> > > >                 pr_warn("upper fs does not support xattr, falling back to index=off and metacopy=off.\n");
-> > > > 
-> > > > but I don't know what index and metacopy are.
-> > > > 
-> > > > > For a moment forget about overlayfs. Say a user process in guest with
-> > > > > CAP_SYS_ADMIN is writing trusted.foo. Should that succeed? Is a
-> > > > > passthrough filesystem, so it should go through. But currently it
-> > > > > wont.
-> > > > 
-> > > > As long as any effects of what it writes are contained to the area of
-> > > > the filesystem exposed to the guest, yes - however it worries me what
-> > > > the consequences of broken trusted metadata is.  If it's delicate enough
-> > > > that it's guarded by CAP_SYS_ADMIN someone must have worried about it.
-> > > 
-> > > The CAP_SYS_ADMIN requirement for 'trusted.' xattrs is simply a useful
-> > > mechanism for applications to control access. The host kernel doesn'
-> > > tuse this namespace itself. Linux has four namespaces for xattrs:
-> > > 
-> > >  -  user - for userspace apps. accessible based on read/write permissions
-> > >  -  trusted - for userspace apps. accessible by CAP_SYS_ADMIN processes only
-> > >  -  system - for kernel only. used by ACLs
-> > >  -  security - for kernel only. used by SELinux
-> > > 
-> > > The use case for "trusted" xattrs is thus where a privileged management
-> > > application or service wants to store metadata against the file, but
-> > > also needs to grant an unprivileged process access to write to this file
-> > > while not allowing that unprivileged process the ability to change the
-> > > metadata. This is mentioned in the man page:
-> > > 
-> > > [man xattr(7)]
-> > >    Trusted extended attributes
-> > >        Trusted  extended attributes are visible and accessible only to pro‐
-> > >        cesses that have the CAP_SYS_ADMIN capability.  Attributes  in  this
-> > >        class  are used to implement mechanisms in user space (i.e., outside
-> > >        the kernel) which keep information in extended attributes  to  which
-> > >        ordinary processes should not have access.
-> > 
-> > overlayfs inside the kernel is using trusted though which is the case
-> > Vivek ran into.
+On Tue, Jul 21, 2020 at 02:33:41PM +0200, Miklos Szeredi wrote:
+> On Mon, Jul 20, 2020 at 5:41 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> >
+> > On Fri, Jul 17, 2020 at 10:53:07AM +0200, Miklos Szeredi wrote:
 > 
-> IIUC, this is need on the lower-layer FS. If you're running overlayfs on the
-> host, then virtiofsd is exposing the upper layer FS, so guest use of "trusted."
-> on the upper layer won't clash with overlayfs in the host.
+> > I see in VFS that chown() always kills suid/sgid. While truncate() and
+> > write(), will suid/sgid only if caller does not have CAP_FSETID.
+> >
+> > How does this work with FUSE_HANDLE_KILLPRIV. IIUC, file server does not
+> > know if caller has CAP_FSETID or not. That means file server will be
+> > forced to kill suid/sgid on every write and truncate. And that will fail
+> > some of the tests.
+> >
+> > For WRITE requests now we do have the notion of setting
+> > FUSE_WRITE_KILL_PRIV flag to tell server explicitly to kill suid/sgid.
+> > Probably we could use that in cached write path as well to figure out
+> > whether to kill suid/sgid or not. But truncate() will still continue
+> > to be an issue.
 > 
-> If you're running overlayfs in the guest, then virtiofs is the lower layer
-> so needs to support the "trusted." on the FS its exposing. Again this should
-> not clash with anything on the host.
+> Yes, not doing the same for truncate seems to be an oversight.
+> Unfortunate, since we'll need another INIT flag to enable selective
+> clearing of suid/sgid on truncate.
 > 
-> > >    User extended attributes
-> > >        User  extended  attributes  may be assigned to files and directories
-> > >        for storing arbitrary additional information such as the mime  type,
-> > >        character  set  or  encoding  of a file.  The access permissions for
-> > >        user attributes are defined by the file permission bits:  read  per‐
-> > >        mission is required to retrieve the attribute value, and writer per‐
-> > >        mission is required to change it.
-> > > [/man]
-> > > 
-> > > Libvirtd uses the "trusted." xattr namespace to record information against
-> > > disk images for QEMU, because we need to grant QEMU access to read/write
-> > > the disk iamges, but don't want QEMU to be able to alter our xattrs.
-> > > 
-> > > It is unfortunate that this namespace is tied to the CAP_SYS_ADMIN cap.
-> > > It really ought to have had its own dedicated capability :-( Such is
-> > > life with anything that uses CAP_SYS_ADMIN...
-> > > 
-> > > With this in mind we really should have both trusted. & user. xattrs
-> > > allowed to the guest by default.
-> > > 
-> > > Conversely, we'll need to block usage of the security. and system.
-> > > namespaces.
-> > > 
-> > > Unfortuntely this implies allowing CAP_SYS_ADMIN by default. We could
-> > > have a "--trusted-xattrs=on|off" flag to allow people to run in a more
-> > > locked down state if they knowingly want to block trusted xattrs.
-> > 
-> > Does the trick described by Chirantan work for you, where the clients
-> > 'trusted' view is different from the host?
+> >
+> > >
+> > > Even writeback_cache could be handled by this addition, since we call
+> > > fuse_update_attributes() before generic_file_write_iter() :
+> > >
+> > > --- a/fs/fuse/dir.c
+> > > +++ b/fs/fuse/dir.c
+> > > @@ -985,6 +985,7 @@ static int fuse_update_get_attr(struct inode
+> > > *inode, struct file *file,
+> > >
+> > >         if (sync) {
+> > >                 forget_all_cached_acls(inode);
+> > > +               inode->i_flags &= ~S_NOSEC;
+> >
+> > Ok, So I was clearing S_NOSEC only if server reports that file has
+> > suid/sgid bit set. This change will clear S_NOSEC whenever we fetch
+> > attrs from host and will force getxattr() when we call file_remove_privs()
+> > and will increase overhead for non cache writeback mode. We probably
+> > could keep both. For cache writeback mode, clear it undonditionally
+> > otherwise not.
 > 
-> That works as long as you don't require any interoperability with
-> processes that have setup the exposed file tree on the host, or
-> might need to concurrently access it.
+> We clear S_NOSEC because the attribute timeout has expired.  This
+> means we need to refresh all metadata, including cached xattr (which
+> is what S_NOSEC effectively is).
 > 
-> This probably suggests a need various modes of exposing xattrs
+> > What I don't understand is though that how this change will clear
+> > suid/sgid on host in cache=writeback mode. I see fuse_setattr()
+> > will not set ATTR_MODE and clear S_ISUID and S_ISGID if
+> > fc->handle_killpriv is set. So when server receives setattr request
+> > (if it does), then how will it know it is supposed to kill suid/sgid
+> > bit. (its not chown, truncate and its not write).
 > 
->  - "passthrough"  - run CAP_SYS_ADMIN and pass directly
->  - "mapped"       - no capabilities, rewrite everything into user. namespace
->  - "disable"      - don't allow xattr
+> Depends.  If the attribute timeout is infinity, then that means the
+> cache is always up to date.  In that case we only need to clear
+> suid/sgid if set in i_mode.  Similarly, the security.capability will
+> only be cleared if it was set in the first place (which would clear
+> S_NOSEC).
 > 
+> If the timeout is finite, then that means we need to check if the
+> metadata changed after a timeout.  That's the purpose of the
+> fuse_update_attributes() call before generic_file_write_iter().
+> 
+> Does that make it clear?
 
-We already do "passthrough" (this is our default) and "disable" (-o no_xattr).
-We probably need to implement this "mapped" mode and that will allow us
-to run without CAP_SYS_ADMIN in init_user_ns.
+I understood it partly but one thing is still bothering me. What
+happens when cache writeback is set as well as fc->handle_killpriv=1.
 
-> As mentioned in the other thread though, CAP_SYS_ADMIN needs to be present
-> in the initial namespace, so to support "passthrough" we'd have to NOT
-> use user namespace too. Something to be aware of when we accept the
-> user namespace patches.
+When handle_killpriv is set, how suid/sgid will be cleared by
+server. Given cache=writeback, write probably got cached in
+guest and server probably will not not see a WRITE immideately.
+(I am assuming we are relying on a WRITE to clear setuid/setgid when
+ handle_killpriv is set). And that means server will not clear
+ setuid/setgid till inode is written back at some point of time
+ later.
 
-> 
-> Such "mapping" of attributes could also be used if virtiofs was running
-> as an unprivileged user account, to expose a full range of file owner,
-> group and permissions to the guest, while having everything be owned
-> by the normal user on the host.   QEMU's current 9p filesystem has
-> this kind of mapping support for owner/permissions, so guest view can
-> be distinct from the host view.
-
-If we figure out a way to run in a user namespace, then we don't
-necessarily require this mapping functionality, right? User namespace will
-automatically provide that mapping. We can just run as root of that user
-namespace.
-
-When 9p wrote this remapping method, we probably did not have user
-namespace as popular as they are now. So we probably should implement
-remapping of trusted xattr and then run in a user namesapce.
-
-And complete passthrough mode will have to run in init user namespace
-and this will be least securre mode (from host security point of view).
+IOW, cache=writeback and fc->handle_killpriv don't seem to go
+together (atleast given the current code).
 
 Thanks
 Vivek

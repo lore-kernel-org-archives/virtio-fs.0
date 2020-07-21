@@ -1,6 +1,10 @@
-Date: Tue, 21 Jul 2020 14:16:30 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200721181630.GD551452@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=T2aZrKVuHDqzp/6/afoPT5Qs7CpE30a6L99Z/Un6I84=;
+	b=ayTKHcDSCpiaNGmYVNtgwj9ueSrIFcBwXg0ubOzfyGztVsEhB6PhS2XNOblKELmtzI
+	WINWFpIxZbgE1Xm55V4YcuekUNWPuvcwsb6i1Dg2ZWopqukflpWGRwjs9HJZ1V53EUB6
+	BsldDfIXHzbgnMd4lj9ZbA5WYvJVLryzGNa8M=
+MIME-Version: 1.0
 References: <20200716144032.GC422759@redhat.com>
 	<20200716181828.GE422759@redhat.com>
 	<CAJfpegt-v6sjm2WyjXMWkObqLdL6TSAi=rjra4KK5sNy6hhhmA@mail.gmail.com>
@@ -9,12 +13,13 @@ References: <20200716144032.GC422759@redhat.com>
 	<20200721151655.GB551452@redhat.com>
 	<CAJfpegtiSNVhnH_FF8qyd2+NO8EJyXoJhPzRVsus8qm4d6UABQ@mail.gmail.com>
 	<20200721155503.GC551452@redhat.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
 In-Reply-To: <20200721155503.GC551452@redhat.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Tue, 21 Jul 2020 21:53:21 +0200
+Message-ID: <CAJfpegsUsZ1DLW6rzR4PQ=M2MxCY1r87eu2rP0Nac4Li_VEm7Q@mail.gmail.com>
+Content-Type: multipart/mixed; boundary="00000000000061eee205aaf8fa6b"
 Subject: Re: [Virtio-fs] [PATCH] virtiofs: Enable SB_NOSEC flag to improve
- small write performance
+	small write performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,10 +28,14 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
+To: Vivek Goyal <vgoyal@redhat.com>
 Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>, ganesh.mahalingam@intel.com
 
-On Tue, Jul 21, 2020 at 11:55:03AM -0400, Vivek Goyal wrote:
+--00000000000061eee205aaf8fa6b
+Content-Type: text/plain; charset="UTF-8"
+
+On Tue, Jul 21, 2020 at 5:55 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
 > On Tue, Jul 21, 2020 at 05:44:14PM +0200, Miklos Szeredi wrote:
 > > On Tue, Jul 21, 2020 at 5:17 PM Vivek Goyal <vgoyal@redhat.com> wrote:
 > > >
@@ -110,7 +119,7 @@ On Tue, Jul 21, 2020 at 11:55:03AM -0400, Vivek Goyal wrote:
 > > >
 > > > IOW, cache=writeback and fc->handle_killpriv don't seem to go
 > > > together (atleast given the current code).
-> > 
+> >
 > > fuse_cache_write_iter()
 > >   -> fuse_update_attributes()   * this will refresh i_mode
 > >   -> generic_file_write_iter()
@@ -119,9 +128,9 @@ On Tue, Jul 21, 2020 at 11:55:03AM -0400, Vivek Goyal wrote:
 > >               ->__remove_privs()
 > >                   -> notify_change()
 > >                      -> fuse_setattr()   * this will clear suid/sgit bits
-> 
+>
 > And fuse_setattr() has following.
-> 
+>
 >                 if (!fc->handle_killpriv) {
 >                         /*
 >                          * ia_mode calculation may have used stale i_mode.
@@ -130,7 +139,7 @@ On Tue, Jul 21, 2020 at 11:55:03AM -0400, Vivek Goyal wrote:
 >                         ret = fuse_do_getattr(inode, NULL, file);
 >                         if (ret)
 >                                 return ret;
-> 
+>
 >                         attr->ia_mode = inode->i_mode;
 >                         if (inode->i_mode & S_ISUID) {
 >                                 attr->ia_valid |= ATTR_MODE;
@@ -144,34 +153,43 @@ On Tue, Jul 21, 2020 at 11:55:03AM -0400, Vivek Goyal wrote:
 >         }
 >         if (!attr->ia_valid)
 >                 return 0;
-> 
+>
 > So if fc->handle_killpriv is set, we might not even send setattr
 > request if attr->ia_valid turns out to be zero.
-> 
-> I did a quick instrumentation and noticed that we are sending
-> setattr with attr->ia_valid=0x200 (ATTR_FORCE) set. And file
-> server is not required to kill suid/sgid in this case?
 
-Did little more instrumentation of fuse and virtiofsd. Modified 
-virtiofsd to enable FUSE_HANDLE_KILLPRIV and ran virtiofsd with
--o writeback.
+Ah, right you are.  The writeback_cache case is indeed special.
 
-On client created a file /mnt/virtiofs/foo.txt and set setuid bit.
-Write a program to write a single charater to the file and
-dropped CAP_FSETID before executing the program and noticed messages
-coming on virtiofsd. 
+The way that can be properly solved, I think, is to check if any
+security bits need to be removed before calling into
+generic_file_write_iter() and if yes, fall back to unbuffered write.
 
-I see no WRITE came and lo_setattr() was called with valid=0x0. And
-that means it will not change any of the attrs and simply get
-current attrs and return to client.
+Something like the attached?
 
-A WRITE comes later either when file is close (fuse_flush()) or
-a writeback is triggred. So if file server clears setuid/setgid
-bit always on WRITE, then setuid/setgid bit will ultimately
-be cleared but much later when guest page is written back.
+Thanks,
+Miklos
 
-Hopefully I am not missing something very basic.
+--00000000000061eee205aaf8fa6b
+Content-Type: text/x-patch; charset="US-ASCII"; name="t.patch"
+Content-Disposition: attachment; filename="t.patch"
+Content-Transfer-Encoding: base64
+Content-ID: <f_kcwcufj30>
+X-Attachment-Id: f_kcwcufj30
 
-Thanks
-Vivek
+ZGlmZiAtLWdpdCBhL2ZzL2Z1c2UvZmlsZS5jIGIvZnMvZnVzZS9maWxlLmMKaW5kZXggODNkOTE3
+ZjdlNTQyLi5mNjdjNmY0NmRhZTkgMTAwNjQ0Ci0tLSBhL2ZzL2Z1c2UvZmlsZS5jCisrKyBiL2Zz
+L2Z1c2UvZmlsZS5jCkBAIC0xMjQ1LDE2ICsxMjQ1LDIxIEBAIHN0YXRpYyBzc2l6ZV90IGZ1c2Vf
+Y2FjaGVfd3JpdGVfaXRlcihzdHJ1Y3Qga2lvY2IgKmlvY2IsIHN0cnVjdCBpb3ZfaXRlciAqZnJv
+bSkKIAlzc2l6ZV90IHdyaXR0ZW4gPSAwOwogCXNzaXplX3Qgd3JpdHRlbl9idWZmZXJlZCA9IDA7
+CiAJc3RydWN0IGlub2RlICppbm9kZSA9IG1hcHBpbmctPmhvc3Q7CisJc3RydWN0IGZ1c2VfY29u
+biAqZmMgPSBnZXRfZnVzZV9jb25uKGlub2RlKTsKIAlzc2l6ZV90IGVycjsKIAlsb2ZmX3QgZW5k
+Ynl0ZSA9IDA7CiAKLQlpZiAoZ2V0X2Z1c2VfY29ubihpbm9kZSktPndyaXRlYmFja19jYWNoZSkg
+eworCWlmIChmYy0+d3JpdGViYWNrX2NhY2hlKSB7CiAJCS8qIFVwZGF0ZSBzaXplIChFT0Ygb3B0
+aW1pemF0aW9uKSBhbmQgbW9kZSAoU1VJRCBjbGVhcmluZykgKi8KIAkJZXJyID0gZnVzZV91cGRh
+dGVfYXR0cmlidXRlcyhtYXBwaW5nLT5ob3N0LCBmaWxlKTsKIAkJaWYgKGVycikKIAkJCXJldHVy
+biBlcnI7CiAKLQkJcmV0dXJuIGdlbmVyaWNfZmlsZV93cml0ZV9pdGVyKGlvY2IsIGZyb20pOwor
+CQlpZiAoIWZjLT5oYW5kbGVfa2lsbHByaXYgfHwKKwkJICAgICFzaG91bGRfcmVtb3ZlX3N1aWQo
+ZmlsZS0+Zl9wYXRoLmRlbnRyeSkpCisJCQlyZXR1cm4gZ2VuZXJpY19maWxlX3dyaXRlX2l0ZXIo
+aW9jYiwgZnJvbSk7CisKKwkJLyogRmFsbCBiYWNrIHRvIHVuYnVmZmVyZWQgd3JpdGUgdG8gcmVt
+b3ZlIFNVSUQvU0dJRCBiaXRzICovCiAJfQogCiAJaW5vZGVfbG9jayhpbm9kZSk7Cg==
+--00000000000061eee205aaf8fa6b--
 

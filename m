@@ -1,14 +1,14 @@
-Date: Wed, 22 Jul 2020 17:58:11 +0100
+Date: Wed, 22 Jul 2020 18:03:28 +0100
 From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
-Message-ID: <20200722165811.GT2324845@redhat.com>
+Message-ID: <20200722170328.GU2324845@redhat.com>
 References: <20200722130206.224898-1-stefanha@redhat.com>
-	<20200722130206.224898-3-stefanha@redhat.com>
+	<20200722130206.224898-4-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=utf-8
 Content-Disposition: inline
-In-Reply-To: <20200722130206.224898-3-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH for-5.1 2/3] virtiofsd: add
- container-friendly -o chroot sandboxing option
+In-Reply-To: <20200722130206.224898-4-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH for-5.1 3/3] virtiofsd: probe
+ unshare(CLONE_FS) and print an error
 Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
@@ -19,64 +19,63 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, vromanso@redhat.com, qemu-devel@nongnu.org, rmohr@redhat.com
+Cc: vromanso@redhat.com, qemu-devel@nongnu.org, virtio-fs@redhat.com, rmohr@redhat.com
 
-On Wed, Jul 22, 2020 at 02:02:05PM +0100, Stefan Hajnoczi wrote:
-> virtiofsd cannot run in an unprivileged container because CAP_SYS_ADMIN
-> is required to create namespaces.
+On Wed, Jul 22, 2020 at 02:02:06PM +0100, Stefan Hajnoczi wrote:
+> An assertion failure is raised during request processing if
+> unshare(CLONE_FS) fails. Implement a probe at startup so the problem can
+> be detected right away.
 > 
-> Introduce a weaker sandbox that is sufficient in container environments
-> because the container runtime already sets up namespaces. Use chroot to
-> restrict path traversal to the shared directory.
+> Unfortunately Docker/Moby does not include unshare in the seccomp.json
+> list unless CAP_SYS_ADMIN is given. Other seccomp.json lists always
+> include unshare (e.g. podman is unaffected):
+> https://raw.githubusercontent.com/seccomp/containers-golang/master/seccomp.json
 > 
-> virtiofsd loses the following:
+> Use "docker run --security-opt seccomp=path/to/seccomp.json ..." if the
+> default seccomp.json is missing unshare.
 > 
-> 1. Mount namespace. The process chroots to the shared directory but
->    leaves the mounts in place. Seccomp rejects mount(2)/umount(2)
->    syscalls.
-> 
-> 2. Pid namespace. This should be fine because virtiofsd is the only
->    process running in the container.
-> 
-> 3. Network namespace. This should be fine because seccomp already
->    rejects the connect(2) syscall, but an additional layer of security
->    is lost. Container runtime-specific network security policies can be
->    used drop network traffic (except for the vhost-user UNIX domain
->    socket).
-
-IIUC this relies on the fact that the container will still have 
-CAP_SYS_CHROOT IOW, we still don't have a solution for running
-virtiofsd as an unprivileged user.
-
-Bearing in mind possibly need for future improvements to handle
-unprivileged users....
-
+> Cc: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
 > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 > ---
->  tools/virtiofsd/helper.c         |  3 +++
->  tools/virtiofsd/passthrough_ll.c | 44 ++++++++++++++++++++++++++++++--
->  2 files changed, 45 insertions(+), 2 deletions(-)
+>  tools/virtiofsd/fuse_virtio.c | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
 > 
-> diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
-> index 3105b6c23a..7421c9ca1a 100644
-> --- a/tools/virtiofsd/helper.c
-> +++ b/tools/virtiofsd/helper.c
-> @@ -151,6 +151,9 @@ void fuse_cmdline_help(void)
->             "    -o cache=<mode>            cache mode. could be one of \"auto, "
->             "always, none\"\n"
->             "                               default: auto\n"
-> +           "    -o chroot|no_chroot        use container-friendly chroot instead\n"
-> +           "                               of stronger mount namespace sandbox\n"
-> +           "                               default: false\n"
+> diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+> index 3b6d16a041..ebeb352514 100644
+> --- a/tools/virtiofsd/fuse_virtio.c
+> +++ b/tools/virtiofsd/fuse_virtio.c
+> @@ -949,6 +949,19 @@ int virtio_session_mount(struct fuse_session *se)
+>  {
+>      int ret;
+>  
+> +    /*
+> +     * Test that unshare(CLONE_FS) works. fv_queue_worker() will need it. It's
+> +     * an unprivileged system call but some Docker/Moby versions are known to
+> +     * reject it via seccomp when CAP_SYS_ADMIN is not given.
+> +     */
+> +    ret = unshare(CLONE_FS);
+> +    if (ret == -1 && errno == EPERM) {
+> +        fuse_log(FUSE_LOG_ERR, "unshare(CLONE_FS) failed with EPERM. If "
+> +                "running in a container please check that the container "
+> +                "runtime seccomp policy allows unshare.\n");
+> +        return -1;
+> +    }
+> +
 
-A simple boolean like this feels like it lacks future-proofing.
+This describes the unshare() call as a "probe" and a "test", but that's
+misleading IMHO. A "probe" / "test" implies that after it has completed,
+there's no lingering side-effect, which isn't the case here.
 
-Should we have an option that takes an enumerated arg string:
+This is actively changing the process' namespace environment in the
+success case, and not putting it back how it was originally.
 
-   -o sandbox=[namespace|chroot|....]
+May be this is in fact OK, but if so I think the commit message and
+comment should explain/justify what its fine to have this lingering
+side-effect.
 
-so we can add more options later with the same syntax.
-
+If we want to avoid the side-effect then we need to fork() and run
+unshare() in the child, and use a check of exit status of the child
+to determine the result.
 
 Regards,
 Daniel

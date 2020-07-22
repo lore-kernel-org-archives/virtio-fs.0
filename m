@@ -1,15 +1,14 @@
-Date: Wed, 22 Jul 2020 18:03:28 +0100
-From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
-Message-ID: <20200722170328.GU2324845@redhat.com>
+Date: Wed, 22 Jul 2020 18:58:20 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20200722175820.GL2660@work-vm>
 References: <20200722130206.224898-1-stefanha@redhat.com>
-	<20200722130206.224898-4-stefanha@redhat.com>
+	<20200722130206.224898-3-stefanha@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=utf-8
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20200722130206.224898-4-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH for-5.1 3/3] virtiofsd: probe
- unshare(CLONE_FS) and print an error
-Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+In-Reply-To: <20200722130206.224898-3-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH for-5.1 2/3] virtiofsd: add
+ container-friendly -o chroot sandboxing option
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,68 +18,156 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: vromanso@redhat.com, qemu-devel@nongnu.org, virtio-fs@redhat.com, rmohr@redhat.com
+Cc: virtio-fs@redhat.com, rmohr@redhat.com, qemu-devel@nongnu.org, vromanso@redhat.com
 
-On Wed, Jul 22, 2020 at 02:02:06PM +0100, Stefan Hajnoczi wrote:
-> An assertion failure is raised during request processing if
-> unshare(CLONE_FS) fails. Implement a probe at startup so the problem can
-> be detected right away.
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> virtiofsd cannot run in an unprivileged container because CAP_SYS_ADMIN
+> is required to create namespaces.
 > 
-> Unfortunately Docker/Moby does not include unshare in the seccomp.json
-> list unless CAP_SYS_ADMIN is given. Other seccomp.json lists always
-> include unshare (e.g. podman is unaffected):
-> https://raw.githubusercontent.com/seccomp/containers-golang/master/seccomp.json
+> Introduce a weaker sandbox that is sufficient in container environments
+> because the container runtime already sets up namespaces. Use chroot to
+> restrict path traversal to the shared directory.
 > 
-> Use "docker run --security-opt seccomp=path/to/seccomp.json ..." if the
-> default seccomp.json is missing unshare.
+> virtiofsd loses the following:
 > 
-> Cc: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+> 1. Mount namespace. The process chroots to the shared directory but
+>    leaves the mounts in place. Seccomp rejects mount(2)/umount(2)
+>    syscalls.
+
+OK, I'm guessing the behaviour of what happens if the host adds another
+mount afterwards might be different?
+
+> 2. Pid namespace. This should be fine because virtiofsd is the only
+>    process running in the container.
+
+Is it ? Isn't the qemu and any other vhost-user processes also in the
+same container?
+
+> 3. Network namespace. This should be fine because seccomp already
+>    rejects the connect(2) syscall, but an additional layer of security
+>    is lost. Container runtime-specific network security policies can be
+>    used drop network traffic (except for the vhost-user UNIX domain
+>    socket).
+
+Should this be tied to the same flag - this feels different from the
+chroot specific problem.
+
 > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 > ---
->  tools/virtiofsd/fuse_virtio.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
+>  tools/virtiofsd/helper.c         |  3 +++
+>  tools/virtiofsd/passthrough_ll.c | 44 ++++++++++++++++++++++++++++++--
+>  2 files changed, 45 insertions(+), 2 deletions(-)
 > 
-> diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-> index 3b6d16a041..ebeb352514 100644
-> --- a/tools/virtiofsd/fuse_virtio.c
-> +++ b/tools/virtiofsd/fuse_virtio.c
-> @@ -949,6 +949,19 @@ int virtio_session_mount(struct fuse_session *se)
->  {
->      int ret;
+> diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
+> index 3105b6c23a..7421c9ca1a 100644
+> --- a/tools/virtiofsd/helper.c
+> +++ b/tools/virtiofsd/helper.c
+> @@ -151,6 +151,9 @@ void fuse_cmdline_help(void)
+>             "    -o cache=<mode>            cache mode. could be one of \"auto, "
+>             "always, none\"\n"
+>             "                               default: auto\n"
+> +           "    -o chroot|no_chroot        use container-friendly chroot instead\n"
+> +           "                               of stronger mount namespace sandbox\n"
+> +           "                               default: false\n"
+
+I agree with Dan that something more enum like feels right
+
+>             "    -o flock|no_flock          enable/disable flock\n"
+>             "                               default: no_flock\n"
+>             "    -o log_level=<level>       log level, default to \"info\"\n"
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 50a164a599..990c0a8a70 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -139,6 +139,7 @@ enum {
 >  
-> +    /*
-> +     * Test that unshare(CLONE_FS) works. fv_queue_worker() will need it. It's
-> +     * an unprivileged system call but some Docker/Moby versions are known to
-> +     * reject it via seccomp when CAP_SYS_ADMIN is not given.
-> +     */
-> +    ret = unshare(CLONE_FS);
-> +    if (ret == -1 && errno == EPERM) {
-> +        fuse_log(FUSE_LOG_ERR, "unshare(CLONE_FS) failed with EPERM. If "
-> +                "running in a container please check that the container "
-> +                "runtime seccomp policy allows unshare.\n");
-> +        return -1;
+>  struct lo_data {
+>      pthread_mutex_t mutex;
+> +    int chroot; /* 1 - use chroot, 0 - use mount namespace */
+>      int debug;
+>      int writeback;
+>      int flock;
+> @@ -162,6 +163,8 @@ struct lo_data {
+>  };
+>  
+>  static const struct fuse_opt lo_opts[] = {
+> +    { "chroot", offsetof(struct lo_data, chroot), 1 },
+> +    { "no_chroot", offsetof(struct lo_data, chroot), 0 },
+>      { "writeback", offsetof(struct lo_data, writeback), 1 },
+>      { "no_writeback", offsetof(struct lo_data, writeback), 0 },
+>      { "source=%s", offsetof(struct lo_data, source), 0 },
+> @@ -2665,6 +2668,37 @@ static void setup_capabilities(char *modcaps_in)
+>      pthread_mutex_unlock(&cap.mutex);
+>  }
+>  
+> +/*
+> + * Use chroot as a weaker sandbox for environment where the process is launched
+> + * without CAP_SYS_ADMIN.
+> + */
+> +static void setup_chroot(struct lo_data *lo)
+> +{
+> +    lo->proc_self_fd = open("/proc/self/fd", O_PATH);
+> +    if (lo->proc_self_fd == -1) {
+> +        fuse_log(FUSE_LOG_ERR, "open(\"/proc/self/fd\", O_PATH): %m\n");
+> +        exit(1);
 > +    }
 > +
+> +    /*
+> +     * Make the shared directory the file system root so that FUSE_OPEN
+> +     * (lo_open()) cannot escape the shared directory by opening a symlink.
+> +     *
+> +     * It's still possible to escape the chroot via lo->proc_self_fd but that
+> +     * requires gaining control of the process first.
+> +     */
+> +    if (chroot(lo->source) != 0) {
+> +        fuse_log(FUSE_LOG_ERR, "chroot(\"%s\"): %m\n", lo->source);
+> +        exit(1);
+> +    }
+> +
+> +    /* Move into the chroot */
+> +    if (chdir("/") != 0) {
+> +        fuse_log(FUSE_LOG_ERR, "chdir(\"/\"): %m\n");
+> +        exit(1);
+> +    }
+> +}
+> +
 
-This describes the unshare() call as a "probe" and a "test", but that's
-misleading IMHO. A "probe" / "test" implies that after it has completed,
-there's no lingering side-effect, which isn't the case here.
+This looks OK to me, but I would prefer a check from someone who has the
+experience of why the mount based sandboxing is so much more common than
+old chroot.
 
-This is actively changing the process' namespace environment in the
-success case, and not putting it back how it was originally.
+Dave
 
-May be this is in fact OK, but if so I think the commit message and
-comment should explain/justify what its fine to have this lingering
-side-effect.
-
-If we want to avoid the side-effect then we need to fork() and run
-unshare() in the child, and use a check of exit status of the child
-to determine the result.
-
-Regards,
-Daniel
--- 
-|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
-|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
-|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
+>  /*
+>   * Lock down this process to prevent access to other processes or files outside
+>   * source directory.  This reduces the impact of arbitrary code execution bugs.
+> @@ -2672,8 +2706,13 @@ static void setup_capabilities(char *modcaps_in)
+>  static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
+>                            bool enable_syslog)
+>  {
+> -    setup_namespaces(lo, se);
+> -    setup_mounts(lo->source);
+> +    if (lo->chroot) {
+> +        setup_chroot(lo);
+> +    } else {
+> +        setup_namespaces(lo, se);
+> +        setup_mounts(lo->source);
+> +    }
+> +
+>      setup_seccomp(enable_syslog);
+>      setup_capabilities(g_strdup(lo->modcaps));
+>  }
+> @@ -2820,6 +2859,7 @@ int main(int argc, char *argv[])
+>      struct fuse_session *se;
+>      struct fuse_cmdline_opts opts;
+>      struct lo_data lo = {
+> +        .chroot = 0,
+>          .debug = 0,
+>          .writeback = 0,
+>          .posix_lock = 1,
+> -- 
+> 2.26.2
+> 
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

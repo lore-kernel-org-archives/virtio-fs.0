@@ -1,12 +1,14 @@
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Wed, 22 Jul 2020 14:02:06 +0100
-Message-Id: <20200722130206.224898-4-stefanha@redhat.com>
-In-Reply-To: <20200722130206.224898-1-stefanha@redhat.com>
+Date: Wed, 22 Jul 2020 17:51:25 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20200722165125.GJ2660@work-vm>
 References: <20200722130206.224898-1-stefanha@redhat.com>
+	<20200722130206.224898-2-stefanha@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: base64
-Subject: [Virtio-fs] [PATCH for-5.1 3/3] virtiofsd: probe unshare(CLONE_FS)
-	and print an error
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20200722130206.224898-2-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH for-5.1 1/3] virtiofsd: drop
+	CAP_DAC_READ_SEARCH
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,36 +17,48 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: vromanso@redhat.com, virtio-fs@redhat.com, rmohr@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, rmohr@redhat.com, qemu-devel@nongnu.org, vromanso@redhat.com
 
-QW4gYXNzZXJ0aW9uIGZhaWx1cmUgaXMgcmFpc2VkIGR1cmluZyByZXF1ZXN0IHByb2Nlc3Npbmcg
-aWYKdW5zaGFyZShDTE9ORV9GUykgZmFpbHMuIEltcGxlbWVudCBhIHByb2JlIGF0IHN0YXJ0dXAg
-c28gdGhlIHByb2JsZW0gY2FuCmJlIGRldGVjdGVkIHJpZ2h0IGF3YXkuCgpVbmZvcnR1bmF0ZWx5
-IERvY2tlci9Nb2J5IGRvZXMgbm90IGluY2x1ZGUgdW5zaGFyZSBpbiB0aGUgc2VjY29tcC5qc29u
-Cmxpc3QgdW5sZXNzIENBUF9TWVNfQURNSU4gaXMgZ2l2ZW4uIE90aGVyIHNlY2NvbXAuanNvbiBs
-aXN0cyBhbHdheXMKaW5jbHVkZSB1bnNoYXJlIChlLmcuIHBvZG1hbiBpcyB1bmFmZmVjdGVkKToK
-aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3NlY2NvbXAvY29udGFpbmVycy1nb2xh
-bmcvbWFzdGVyL3NlY2NvbXAuanNvbgoKVXNlICJkb2NrZXIgcnVuIC0tc2VjdXJpdHktb3B0IHNl
-Y2NvbXA9cGF0aC90by9zZWNjb21wLmpzb24gLi4uIiBpZiB0aGUKZGVmYXVsdCBzZWNjb21wLmpz
-b24gaXMgbWlzc2luZyB1bnNoYXJlLgoKQ2M6IE1pc29ubyBUb21vaGlybyA8bWlzb25vLnRvbW9o
-aXJvQGpwLmZ1aml0c3UuY29tPgpTaWduZWQtb2ZmLWJ5OiBTdGVmYW4gSGFqbm9jemkgPHN0ZWZh
-bmhhQHJlZGhhdC5jb20+Ci0tLQogdG9vbHMvdmlydGlvZnNkL2Z1c2VfdmlydGlvLmMgfCAxMyAr
-KysrKysrKysrKysrCiAxIGZpbGUgY2hhbmdlZCwgMTMgaW5zZXJ0aW9ucygrKQoKZGlmZiAtLWdp
-dCBhL3Rvb2xzL3ZpcnRpb2ZzZC9mdXNlX3ZpcnRpby5jIGIvdG9vbHMvdmlydGlvZnNkL2Z1c2Vf
-dmlydGlvLmMKaW5kZXggM2I2ZDE2YTA0MS4uZWJlYjM1MjUxNCAxMDA2NDQKLS0tIGEvdG9vbHMv
-dmlydGlvZnNkL2Z1c2VfdmlydGlvLmMKKysrIGIvdG9vbHMvdmlydGlvZnNkL2Z1c2VfdmlydGlv
-LmMKQEAgLTk0OSw2ICs5NDksMTkgQEAgaW50IHZpcnRpb19zZXNzaW9uX21vdW50KHN0cnVjdCBm
-dXNlX3Nlc3Npb24gKnNlKQogewogICAgIGludCByZXQ7CiAKKyAgICAvKgorICAgICAqIFRlc3Qg
-dGhhdCB1bnNoYXJlKENMT05FX0ZTKSB3b3Jrcy4gZnZfcXVldWVfd29ya2VyKCkgd2lsbCBuZWVk
-IGl0LiBJdCdzCisgICAgICogYW4gdW5wcml2aWxlZ2VkIHN5c3RlbSBjYWxsIGJ1dCBzb21lIERv
-Y2tlci9Nb2J5IHZlcnNpb25zIGFyZSBrbm93biB0bworICAgICAqIHJlamVjdCBpdCB2aWEgc2Vj
-Y29tcCB3aGVuIENBUF9TWVNfQURNSU4gaXMgbm90IGdpdmVuLgorICAgICAqLworICAgIHJldCA9
-IHVuc2hhcmUoQ0xPTkVfRlMpOworICAgIGlmIChyZXQgPT0gLTEgJiYgZXJybm8gPT0gRVBFUk0p
-IHsKKyAgICAgICAgZnVzZV9sb2coRlVTRV9MT0dfRVJSLCAidW5zaGFyZShDTE9ORV9GUykgZmFp
-bGVkIHdpdGggRVBFUk0uIElmICIKKyAgICAgICAgICAgICAgICAicnVubmluZyBpbiBhIGNvbnRh
-aW5lciBwbGVhc2UgY2hlY2sgdGhhdCB0aGUgY29udGFpbmVyICIKKyAgICAgICAgICAgICAgICAi
-cnVudGltZSBzZWNjb21wIHBvbGljeSBhbGxvd3MgdW5zaGFyZS5cbiIpOworICAgICAgICByZXR1
-cm4gLTE7CisgICAgfQorCiAgICAgcmV0ID0gZnZfY3JlYXRlX2xpc3Rlbl9zb2NrZXQoc2UpOwog
-ICAgIGlmIChyZXQgPCAwKSB7CiAgICAgICAgIHJldHVybiByZXQ7Ci0tIAoyLjI2LjIKCg==
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> virtiofsd does not need CAP_DAC_READ_SEARCH because it already has
+> the more powerful CAP_DAC_OVERRIDE. Drop it from the list of
+> capabilities.
+> 
+> This is important because container runtimes may not include
+> CAP_DAC_READ_SEARCH by default. This patch allows virtiofsd to reduce
+> its capabilities when running inside a Docker container.
+> 
+> Note that CAP_DAC_READ_SEARCH may be necessary again in the future if
+> virtiofsd starts using open_by_handle_at(2).
+> 
+> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+
+Yeh that seems to make sense, and is probably worth having irrespective
+of the rest of the series.
+
+
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 94e0de2d2b..50a164a599 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -2596,7 +2596,6 @@ static void setup_capabilities(char *modcaps_in)
+>      if (capng_updatev(CAPNG_ADD, CAPNG_PERMITTED | CAPNG_EFFECTIVE,
+>              CAP_CHOWN,
+>              CAP_DAC_OVERRIDE,
+> -            CAP_DAC_READ_SEARCH,
+>              CAP_FOWNER,
+>              CAP_FSETID,
+>              CAP_SETGID,
+> -- 
+> 2.26.2
+> 
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

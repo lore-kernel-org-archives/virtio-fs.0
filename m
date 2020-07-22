@@ -1,13 +1,11 @@
-Date: Fri, 19 Jun 2020 13:46:14 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200619174614.GG3154@redhat.com>
-References: <20200619171809.30984-1-dgilbert@redhat.com>
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Date: Wed, 22 Jul 2020 14:02:04 +0100
+Message-Id: <20200722130206.224898-2-stefanha@redhat.com>
+In-Reply-To: <20200722130206.224898-1-stefanha@redhat.com>
+References: <20200722130206.224898-1-stefanha@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200619171809.30984-1-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Allow capability restriction to
-	be turned off
+Content-Transfer-Encoding: base64
+Subject: [Virtio-fs] [PATCH for-5.1 1/3] virtiofsd: drop CAP_DAC_READ_SEARCH
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,113 +14,27 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, rmohr@redhat.com, vromanso@redhat.com
 
-On Fri, Jun 19, 2020 at 06:18:09PM +0100, Dr. David Alan Gilbert (git) wrote:
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-> 
-> Commit a59feb483b8fae24d043 dropped most capabilities at startup,
-> since in most cases virtiofsd doesn't need them.  Unfortunately we found
-> a case that needs CAP_SYS_ADMIN - setting trusted extended attributes.
-> It's rare to need it, and the clean fix for it is going to be more
-> complicated, but as a way for existing users to continue, allow the
-> capability restriction to be turned off by adding
-> 
->   -o no_restrictcaps
-> 
-> We still drop the capabilities by default since this seems much safer;
-> even if we don't have an explicit problem to fix.
-> 
-
-Hi David,
-
-In one of the emails, Daniel suggested option "--trusted-xattrs=on|off". 
-How about we use that and if that option is specified, we automatically
-give CAP_SYS_ADMIN as well. Something to consider.
-
-This probably could be extended later to "--trusted-xattrs=on|off|remapped"
-when we have the capability to remap. And in case of "off/remap" we can take
-away CAP_SYS_ADMIN. 
-
-Vivek
-
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> ---
->  docs/tools/virtiofsd.rst         | 3 +++
->  tools/virtiofsd/helper.c         | 3 +++
->  tools/virtiofsd/passthrough_ll.c | 8 +++++++-
->  3 files changed, 13 insertions(+), 1 deletion(-)
-> 
-> diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-> index 378594c422..8819d7d19e 100644
-> --- a/docs/tools/virtiofsd.rst
-> +++ b/docs/tools/virtiofsd.rst
-> @@ -81,6 +81,9 @@ Options
->      Enable/disable extended attributes (xattr) on files and directories.  The
->      default is ``no_xattr``.
->  
-> +  * restrictcaps|no_restrictcaps\n"
-> +    Restrict capabilities at startup.  The default is ``restrictcaps``.
-> +
->  .. option:: --socket-path=PATH
->  
->    Listen on vhost-user UNIX domain socket at PATH.
-> diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
-> index 00a1ef666a..51ed9fbed0 100644
-> --- a/tools/virtiofsd/helper.c
-> +++ b/tools/virtiofsd/helper.c
-> @@ -174,6 +174,9 @@ void fuse_cmdline_help(void)
->             "                               default: no_writeback\n"
->             "    -o xattr|no_xattr          enable/disable xattr\n"
->             "                               default: no_xattr\n"
-> +           "    -o restrictcaps|no_restrictcaps\n"
-> +           "                               restrict capabilities at startup\n"
-> +           "                               default: restrictcaps\n"
->             "    --rlimit-nofile=<num>      set maximum number of file descriptors\n"
->             "                               (0 leaves rlimit unchanged)\n"
->             "                               default: min(1000000, fs.file-max - 16384)\n"
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 2ce7c96085..8dee657b19 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -144,6 +144,7 @@ struct lo_data {
->      int flock;
->      int posix_lock;
->      int xattr;
-> +    int restrictcaps;
->      char *source;
->      double timeout;
->      int cache;
-> @@ -170,6 +171,8 @@ static const struct fuse_opt lo_opts[] = {
->      { "no_posix_lock", offsetof(struct lo_data, posix_lock), 0 },
->      { "xattr", offsetof(struct lo_data, xattr), 1 },
->      { "no_xattr", offsetof(struct lo_data, xattr), 0 },
-> +    { "restrictcaps", offsetof(struct lo_data, restrictcaps), 1 },
-> +    { "no_restrictcaps", offsetof(struct lo_data, restrictcaps), 0 },
->      { "timeout=%lf", offsetof(struct lo_data, timeout), 0 },
->      { "timeout=", offsetof(struct lo_data, timeout_set), 1 },
->      { "cache=none", offsetof(struct lo_data, cache), CACHE_NONE },
-> @@ -2615,7 +2618,9 @@ static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
->      setup_namespaces(lo, se);
->      setup_mounts(lo->source);
->      setup_seccomp(enable_syslog);
-> -    setup_capabilities();
-> +    if (lo->restrictcaps) {
-> +        setup_capabilities();
-> +    }
->  }
->  
->  /* Set the maximum number of open file descriptors */
-> @@ -2764,6 +2769,7 @@ int main(int argc, char *argv[])
->          .writeback = 0,
->          .posix_lock = 1,
->          .proc_self_fd = -1,
-> +        .restrictcaps = 1,
->      };
->      struct lo_map_elem *root_elem;
->      int ret = -1;
-> -- 
-> 2.26.2
-> 
+dmlydGlvZnNkIGRvZXMgbm90IG5lZWQgQ0FQX0RBQ19SRUFEX1NFQVJDSCBiZWNhdXNlIGl0IGFs
+cmVhZHkgaGFzCnRoZSBtb3JlIHBvd2VyZnVsIENBUF9EQUNfT1ZFUlJJREUuIERyb3AgaXQgZnJv
+bSB0aGUgbGlzdCBvZgpjYXBhYmlsaXRpZXMuCgpUaGlzIGlzIGltcG9ydGFudCBiZWNhdXNlIGNv
+bnRhaW5lciBydW50aW1lcyBtYXkgbm90IGluY2x1ZGUKQ0FQX0RBQ19SRUFEX1NFQVJDSCBieSBk
+ZWZhdWx0LiBUaGlzIHBhdGNoIGFsbG93cyB2aXJ0aW9mc2QgdG8gcmVkdWNlCml0cyBjYXBhYmls
+aXRpZXMgd2hlbiBydW5uaW5nIGluc2lkZSBhIERvY2tlciBjb250YWluZXIuCgpOb3RlIHRoYXQg
+Q0FQX0RBQ19SRUFEX1NFQVJDSCBtYXkgYmUgbmVjZXNzYXJ5IGFnYWluIGluIHRoZSBmdXR1cmUg
+aWYKdmlydGlvZnNkIHN0YXJ0cyB1c2luZyBvcGVuX2J5X2hhbmRsZV9hdCgyKS4KClNpZ25lZC1v
+ZmYtYnk6IFN0ZWZhbiBIYWpub2N6aSA8c3RlZmFuaGFAcmVkaGF0LmNvbT4KLS0tCiB0b29scy92
+aXJ0aW9mc2QvcGFzc3Rocm91Z2hfbGwuYyB8IDEgLQogMSBmaWxlIGNoYW5nZWQsIDEgZGVsZXRp
+b24oLSkKCmRpZmYgLS1naXQgYS90b29scy92aXJ0aW9mc2QvcGFzc3Rocm91Z2hfbGwuYyBiL3Rv
+b2xzL3ZpcnRpb2ZzZC9wYXNzdGhyb3VnaF9sbC5jCmluZGV4IDk0ZTBkZTJkMmIuLjUwYTE2NGE1
+OTkgMTAwNjQ0Ci0tLSBhL3Rvb2xzL3ZpcnRpb2ZzZC9wYXNzdGhyb3VnaF9sbC5jCisrKyBiL3Rv
+b2xzL3ZpcnRpb2ZzZC9wYXNzdGhyb3VnaF9sbC5jCkBAIC0yNTk2LDcgKzI1OTYsNiBAQCBzdGF0
+aWMgdm9pZCBzZXR1cF9jYXBhYmlsaXRpZXMoY2hhciAqbW9kY2Fwc19pbikKICAgICBpZiAoY2Fw
+bmdfdXBkYXRldihDQVBOR19BREQsIENBUE5HX1BFUk1JVFRFRCB8IENBUE5HX0VGRkVDVElWRSwK
+ICAgICAgICAgICAgIENBUF9DSE9XTiwKICAgICAgICAgICAgIENBUF9EQUNfT1ZFUlJJREUsCi0g
+ICAgICAgICAgICBDQVBfREFDX1JFQURfU0VBUkNILAogICAgICAgICAgICAgQ0FQX0ZPV05FUiwK
+ICAgICAgICAgICAgIENBUF9GU0VUSUQsCiAgICAgICAgICAgICBDQVBfU0VUR0lELAotLSAKMi4y
+Ni4yCgo=
 

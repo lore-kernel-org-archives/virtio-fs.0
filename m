@@ -1,6 +1,6 @@
-Date: Wed, 22 Jul 2020 18:58:20 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200722175820.GL2660@work-vm>
+Date: Wed, 22 Jul 2020 14:17:10 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200722181710.GA598987@redhat.com>
 References: <20200722130206.224898-1-stefanha@redhat.com>
 	<20200722130206.224898-3-stefanha@redhat.com>
 MIME-Version: 1.0
@@ -18,9 +18,9 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, rmohr@redhat.com, qemu-devel@nongnu.org, vromanso@redhat.com
+Cc: virtio-fs@redhat.com, vromanso@redhat.com, qemu-devel@nongnu.org, rmohr@redhat.com
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+On Wed, Jul 22, 2020 at 02:02:05PM +0100, Stefan Hajnoczi wrote:
 > virtiofsd cannot run in an unprivileged container because CAP_SYS_ADMIN
 > is required to create namespaces.
 > 
@@ -33,25 +33,16 @@ Cc: virtio-fs@redhat.com, rmohr@redhat.com, qemu-devel@nongnu.org, vromanso@redh
 > 1. Mount namespace. The process chroots to the shared directory but
 >    leaves the mounts in place. Seccomp rejects mount(2)/umount(2)
 >    syscalls.
-
-OK, I'm guessing the behaviour of what happens if the host adds another
-mount afterwards might be different?
-
+> 
 > 2. Pid namespace. This should be fine because virtiofsd is the only
 >    process running in the container.
-
-Is it ? Isn't the qemu and any other vhost-user processes also in the
-same container?
-
+> 
 > 3. Network namespace. This should be fine because seccomp already
 >    rejects the connect(2) syscall, but an additional layer of security
 >    is lost. Container runtime-specific network security policies can be
 >    used drop network traffic (except for the vhost-user UNIX domain
 >    socket).
-
-Should this be tied to the same flag - this feels different from the
-chroot specific problem.
-
+> 
 > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 > ---
 >  tools/virtiofsd/helper.c         |  3 +++
@@ -70,7 +61,14 @@ chroot specific problem.
 > +           "                               of stronger mount namespace sandbox\n"
 > +           "                               default: false\n"
 
-I agree with Dan that something more enum like feels right
+This option name disabling namespace setup is little confusing to me.
+
+Will it make sense to provide another option to disable/enable
+namespaces. "-o no-namespaces" and that disables setting up
+namespaces.
+
+Thanks
+Vivek
 
 >             "    -o flock|no_flock          enable/disable flock\n"
 >             "                               default: no_flock\n"
@@ -131,13 +129,6 @@ I agree with Dan that something more enum like feels right
 > +    }
 > +}
 > +
-
-This looks OK to me, but I would prefer a check from someone who has the
-experience of why the mount based sandboxing is so much more common than
-old chroot.
-
-Dave
-
 >  /*
 >   * Lock down this process to prevent access to other processes or files outside
 >   * source directory.  This reduces the impact of arbitrary code execution bugs.
@@ -168,6 +159,8 @@ Dave
 > -- 
 > 2.26.2
 > 
---
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 

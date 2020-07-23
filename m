@@ -1,18 +1,16 @@
-Date: Thu, 23 Jul 2020 13:50:35 +0100
-From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
-Message-ID: <20200723125035.GH2615312@redhat.com>
+Date: Thu, 23 Jul 2020 09:47:33 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200723134733.GA5885@redhat.com>
 References: <20200722130206.224898-1-stefanha@redhat.com>
-	<20200722130206.224898-4-stefanha@redhat.com>
-	<20200722170328.GU2324845@redhat.com>
-	<20200723124611.GL186372@stefanha-x1.localdomain>
+	<20200722130206.224898-3-stefanha@redhat.com>
+	<20200722175820.GL2660@work-vm>
+	<20200723122850.GI186372@stefanha-x1.localdomain>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <20200723124611.GL186372@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH for-5.1 3/3] virtiofsd: probe
- unshare(CLONE_FS) and print an error
-Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+In-Reply-To: <20200723122850.GI186372@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH for-5.1 2/3] virtiofsd: add
+ container-friendly -o chroot sandboxing option
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,78 +20,38 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: vromanso@redhat.com, qemu-devel@nongnu.org, virtio-fs@redhat.com, rmohr@redhat.com
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vromanso@redhat.com, rmohr@redhat.com
 
-On Thu, Jul 23, 2020 at 01:46:11PM +0100, Stefan Hajnoczi wrote:
-> On Wed, Jul 22, 2020 at 06:03:28PM +0100, Daniel P. Berrangé wrote:
-> > On Wed, Jul 22, 2020 at 02:02:06PM +0100, Stefan Hajnoczi wrote:
-> > > An assertion failure is raised during request processing if
-> > > unshare(CLONE_FS) fails. Implement a probe at startup so the problem can
-> > > be detected right away.
+On Thu, Jul 23, 2020 at 01:28:50PM +0100, Stefan Hajnoczi wrote:
+> On Wed, Jul 22, 2020 at 06:58:20PM +0100, Dr. David Alan Gilbert wrote:
+> > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > > virtiofsd cannot run in an unprivileged container because CAP_SYS_ADMIN
+> > > is required to create namespaces.
 > > > 
-> > > Unfortunately Docker/Moby does not include unshare in the seccomp.json
-> > > list unless CAP_SYS_ADMIN is given. Other seccomp.json lists always
-> > > include unshare (e.g. podman is unaffected):
-> > > https://raw.githubusercontent.com/seccomp/containers-golang/master/seccomp.json
+> > > Introduce a weaker sandbox that is sufficient in container environments
+> > > because the container runtime already sets up namespaces. Use chroot to
+> > > restrict path traversal to the shared directory.
 > > > 
-> > > Use "docker run --security-opt seccomp=path/to/seccomp.json ..." if the
-> > > default seccomp.json is missing unshare.
+> > > virtiofsd loses the following:
 > > > 
-> > > Cc: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
-> > > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-> > > ---
-> > >  tools/virtiofsd/fuse_virtio.c | 13 +++++++++++++
-> > >  1 file changed, 13 insertions(+)
-> > > 
-> > > diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-> > > index 3b6d16a041..ebeb352514 100644
-> > > --- a/tools/virtiofsd/fuse_virtio.c
-> > > +++ b/tools/virtiofsd/fuse_virtio.c
-> > > @@ -949,6 +949,19 @@ int virtio_session_mount(struct fuse_session *se)
-> > >  {
-> > >      int ret;
-> > >  
-> > > +    /*
-> > > +     * Test that unshare(CLONE_FS) works. fv_queue_worker() will need it. It's
-> > > +     * an unprivileged system call but some Docker/Moby versions are known to
-> > > +     * reject it via seccomp when CAP_SYS_ADMIN is not given.
-> > > +     */
-> > > +    ret = unshare(CLONE_FS);
-> > > +    if (ret == -1 && errno == EPERM) {
-> > > +        fuse_log(FUSE_LOG_ERR, "unshare(CLONE_FS) failed with EPERM. If "
-> > > +                "running in a container please check that the container "
-> > > +                "runtime seccomp policy allows unshare.\n");
-> > > +        return -1;
-> > > +    }
-> > > +
+> > > 1. Mount namespace. The process chroots to the shared directory but
+> > >    leaves the mounts in place. Seccomp rejects mount(2)/umount(2)
+> > >    syscalls.
 > > 
-> > This describes the unshare() call as a "probe" and a "test", but that's
-> > misleading IMHO. A "probe" / "test" implies that after it has completed,
-> > there's no lingering side-effect, which isn't the case here.
-> > 
-> > This is actively changing the process' namespace environment in the
-> > success case, and not putting it back how it was originally.
-> > 
-> > May be this is in fact OK, but if so I think the commit message and
-> > comment should explain/justify what its fine to have this lingering
-> > side-effect.
-> > 
-> > If we want to avoid the side-effect then we need to fork() and run
-> > unshare() in the child, and use a check of exit status of the child
-> > to determine the result.
+> > OK, I'm guessing the behaviour of what happens if the host adds another
+> > mount afterwards might be different?
 > 
-> Thanks for pointing this out. I'll add a comment explaining that
-> virtiofsd is single-threaded at this point. No other threads share the
-> file system attributes so the call has no observable side-effects.
+> Running inside a container with -o chroot:
+>  - The container has its own mount namespace and it is therefore not
+>    affected, modulo shared subtrees (see mount(8)).
 
-Also, if we do an unshare() here, do we still need the unshare() later
-on in the code ?
+How does virtiofsd inside container gets the directory it wants to
+export to guest? I am assuming that its probably a volume mount
+inside container. If yes, volume mounts can set propagation
+properties say "slave" and that means mounts done later will
+propagate inside container in that volume (and hopefully be
+visible inside guest once submount patches are upstream).
 
-
-Regards,
-Daniel
--- 
-|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
-|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
-|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
+Thanks
+Vivek
 

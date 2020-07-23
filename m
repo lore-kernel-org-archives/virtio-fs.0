@@ -1,19 +1,18 @@
-Date: Thu, 23 Jul 2020 16:19:29 +0100
+Date: Thu, 23 Jul 2020 16:36:47 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20200723151929.GA300121@stefanha-x1.localdomain>
+Message-ID: <20200723153647.GB300121@stefanha-x1.localdomain>
 References: <20200722130206.224898-1-stefanha@redhat.com>
-	<20200722130206.224898-4-stefanha@redhat.com>
-	<20200722170328.GU2324845@redhat.com>
-	<20200723124611.GL186372@stefanha-x1.localdomain>
-	<20200723125035.GH2615312@redhat.com>
-	<20200723135603.GB5885@redhat.com>
+	<20200722130206.224898-3-stefanha@redhat.com>
+	<20200722175820.GL2660@work-vm>
+	<20200723122850.GI186372@stefanha-x1.localdomain>
+	<20200723134733.GA5885@redhat.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="azLHFNyN32YCQGCU"
+	protocol="application/pgp-signature"; boundary="QTprm0S8XgL7H0Dt"
 Content-Disposition: inline
-In-Reply-To: <20200723135603.GB5885@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH for-5.1 3/3] virtiofsd: probe
- unshare(CLONE_FS) and print an error
+In-Reply-To: <20200723134733.GA5885@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH for-5.1 2/3] virtiofsd: add
+ container-friendly -o chroot sandboxing option
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,118 +22,89 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, rmohr@redhat.com, Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>, qemu-devel@nongnu.org, vromanso@redhat.com
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vromanso@redhat.com, rmohr@redhat.com
 
 
---azLHFNyN32YCQGCU
-Content-Type: text/plain; charset=iso-8859-1
+--QTprm0S8XgL7H0Dt
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Thu, Jul 23, 2020 at 09:56:03AM -0400, Vivek Goyal wrote:
-> On Thu, Jul 23, 2020 at 01:50:35PM +0100, Daniel P. Berrang=E9 wrote:
-> > On Thu, Jul 23, 2020 at 01:46:11PM +0100, Stefan Hajnoczi wrote:
-> > > On Wed, Jul 22, 2020 at 06:03:28PM +0100, Daniel P. Berrang=E9 wrote:
-> > > > On Wed, Jul 22, 2020 at 02:02:06PM +0100, Stefan Hajnoczi wrote:
-> > > > > An assertion failure is raised during request processing if
-> > > > > unshare(CLONE_FS) fails. Implement a probe at startup so the prob=
-lem can
-> > > > > be detected right away.
-> > > > >=20
-> > > > > Unfortunately Docker/Moby does not include unshare in the seccomp=
-=2Ejson
-> > > > > list unless CAP_SYS_ADMIN is given. Other seccomp.json lists alwa=
-ys
-> > > > > include unshare (e.g. podman is unaffected):
-> > > > > https://raw.githubusercontent.com/seccomp/containers-golang/maste=
-r/seccomp.json
-> > > > >=20
-> > > > > Use "docker run --security-opt seccomp=3Dpath/to/seccomp.json ...=
-" if the
-> > > > > default seccomp.json is missing unshare.
-> > > > >=20
-> > > > > Cc: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
-> > > > > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-> > > > > ---
-> > > > >  tools/virtiofsd/fuse_virtio.c | 13 +++++++++++++
-> > > > >  1 file changed, 13 insertions(+)
-> > > > >=20
-> > > > > diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse=
-_virtio.c
-> > > > > index 3b6d16a041..ebeb352514 100644
-> > > > > --- a/tools/virtiofsd/fuse_virtio.c
-> > > > > +++ b/tools/virtiofsd/fuse_virtio.c
-> > > > > @@ -949,6 +949,19 @@ int virtio_session_mount(struct fuse_session=
- *se)
-> > > > >  {
-> > > > >      int ret;
-> > > > > =20
-> > > > > +    /*
-> > > > > +     * Test that unshare(CLONE_FS) works. fv_queue_worker() will=
- need it. It's
-> > > > > +     * an unprivileged system call but some Docker/Moby versions=
- are known to
-> > > > > +     * reject it via seccomp when CAP_SYS_ADMIN is not given.
-> > > > > +     */
-> > > > > +    ret =3D unshare(CLONE_FS);
-> > > > > +    if (ret =3D=3D -1 && errno =3D=3D EPERM) {
-> > > > > +        fuse_log(FUSE_LOG_ERR, "unshare(CLONE_FS) failed with EP=
-ERM. If "
-> > > > > +                "running in a container please check that the co=
-ntainer "
-> > > > > +                "runtime seccomp policy allows unshare.\n");
-> > > > > +        return -1;
-> > > > > +    }
-> > > > > +
+On Thu, Jul 23, 2020 at 09:47:33AM -0400, Vivek Goyal wrote:
+> On Thu, Jul 23, 2020 at 01:28:50PM +0100, Stefan Hajnoczi wrote:
+> > On Wed, Jul 22, 2020 at 06:58:20PM +0100, Dr. David Alan Gilbert wrote:
+> > > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > > > virtiofsd cannot run in an unprivileged container because CAP_SYS_A=
+DMIN
+> > > > is required to create namespaces.
 > > > >=20
-> > > > This describes the unshare() call as a "probe" and a "test", but th=
-at's
-> > > > misleading IMHO. A "probe" / "test" implies that after it has compl=
-eted,
-> > > > there's no lingering side-effect, which isn't the case here.
+> > > > Introduce a weaker sandbox that is sufficient in container environm=
+ents
+> > > > because the container runtime already sets up namespaces. Use chroo=
+t to
+> > > > restrict path traversal to the shared directory.
 > > > >=20
-> > > > This is actively changing the process' namespace environment in the
-> > > > success case, and not putting it back how it was originally.
+> > > > virtiofsd loses the following:
 > > > >=20
-> > > > May be this is in fact OK, but if so I think the commit message and
-> > > > comment should explain/justify what its fine to have this lingering
-> > > > side-effect.
-> > > >=20
-> > > > If we want to avoid the side-effect then we need to fork() and run
-> > > > unshare() in the child, and use a check of exit status of the child
-> > > > to determine the result.
+> > > > 1. Mount namespace. The process chroots to the shared directory but
+> > > >    leaves the mounts in place. Seccomp rejects mount(2)/umount(2)
+> > > >    syscalls.
 > > >=20
-> > > Thanks for pointing this out. I'll add a comment explaining that
-> > > virtiofsd is single-threaded at this point. No other threads share the
-> > > file system attributes so the call has no observable side-effects.
+> > > OK, I'm guessing the behaviour of what happens if the host adds anoth=
+er
+> > > mount afterwards might be different?
 > >=20
-> > Also, if we do an unshare() here, do we still need the unshare() later
-> > on in the code ?
+> > Running inside a container with -o chroot:
+> >  - The container has its own mount namespace and it is therefore not
+> >    affected, modulo shared subtrees (see mount(8)).
 >=20
-> I think so. That unshare() later is to isolate one thread from other.
+> How does virtiofsd inside container gets the directory it wants to
+> export to guest? I am assuming that its probably a volume mount
+> inside container. If yes, volume mounts can set propagation
+> properties say "slave" and that means mounts done later will
+> propagate inside container in that volume (and hopefully be
+> visible inside guest once submount patches are upstream).
 
-Yes. Each thread that calls unshare(CLONE_FS) gets its own current
-working directory and other file system attributes.
+Yes, the shared directory is a volume mount and propagation works as
+expected:
 
-The purpose of the call is to allow worker threads to change current
-working directory without affecting each other.
+  $ docker run -v path/to/shared-dir:/shared-dir:slave \
+	       -v /tmp/socket-dir:/var/run \
+	       virtiofsd
+
+When I mount things in path/to/shared-dir on the host they appear in
+/shared-dir inside the guest. When I omit the "slave" option (the
+default is "private") then the mount does not propagate.
+
+The following Dockerfile was used:
+
+  $ cp ~/src/qemu/virtiofsd . # copy the executable
+  $ cat >Dockerfile
+  FROM fedora:32
+  COPY --chown=3D0:0 virtiofsd /usr/bin/virtiofsd
+  RUN dnf update -qy && dnf install -qy libseccomp liburing zlib glib2 nett=
+le gnutls libcap-ng
+  VOLUME ["/shared-dir", "/var/run"]
+  CMD ["/usr/bin/virtiofsd", "--socket-path=3D/var/run/virtiofsd.sock", "-o=
+", "source=3D/shared-dir", "-o", "cache=3Dauto", "-o", "no_posix_lock", "-o=
+", "xattr", "-o", "chroot"]
 
 Stefan
 
---azLHFNyN32YCQGCU
+--QTprm0S8XgL7H0Dt
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl8ZqoEACgkQnKSrs4Gr
-c8gWGwf+JXFC/fVRr0GYRmrh2uGeGA4U1u2SxYwL9sZysPsGWbqQ1tw6+mu8fzNv
-stSqtgMA+7FZJERxdL551DWiEloK1mSKpp8pb5RVBxEW6HZrVwsKAw3F89bkJrhk
-tiCxlkTvlhd+D3eIoO4/lYoYHj5HRP0hO67yB7LGicSqpfED/3AbTGJSYBgIb7Mu
-7lgKFy1cyA1p7TrLtbpFOixoUS4kTRlmETa5mUuRU9SqHjvNKlQugJMrMNcNiDrK
-lXpy1tv/gmpRShFFlW5LoePDV/z9UEj4L8QHauuxy+yFF2Rf8WyGqzL0OCN9YuWi
-2Nrzj7F7AgF5m/Qd1T2/PhBi5yTyrw==
-=IHJ0
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl8Zro8ACgkQnKSrs4Gr
+c8iWkggAtGpbfo1cQOxcG92FgjYSVkpMbpQGp+Mlmr1zpPbb/3jfk9KnX8ONeV5M
+YqCPm0tkPdX0Ufjkzano+Q3X1udYRCk3AShn7CfwhrkcWixQzzdk0QzO24pJDOjX
+tL1msD+tMuljJf4X6lqAxFnTVWegUPcGGtRH4kk+ebNoPwccWdO6f1P9y50Q5ChB
+POu4IFzY92ykUhJSB1EkyUKiQiqa467jU8twOkhaHjcw2ydGAs4Q6LAWSCgB0z+S
+QWgBhS/4VcMxipfOQC3kj1Zlhlax6Jp8QnokO95MHyIATVk0FS93K8o/g6CkbzNb
+TMoVWMMIHn1F4oMmVvpoF6JvWO0CfQ==
+=paOA
 -----END PGP SIGNATURE-----
 
---azLHFNyN32YCQGCU--
+--QTprm0S8XgL7H0Dt--
 

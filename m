@@ -1,18 +1,11 @@
-Date: Fri, 24 Jul 2020 13:22:52 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20200724122252.GA333683@stefanha-x1.localdomain>
-References: <20200722130206.224898-1-stefanha@redhat.com>
-	<20200722130206.224898-3-stefanha@redhat.com>
-	<20200722190318.GM2660@work-vm>
-	<20200723123229.GK186372@stefanha-x1.localdomain>
-	<20200723175538.GW2621@work-vm>
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Fri, 24 Jul 2020 14:38:10 -0400
+Message-Id: <20200724183812.19573-4-vgoyal@redhat.com>
+In-Reply-To: <20200724183812.19573-1-vgoyal@redhat.com>
+References: <20200724183812.19573-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="OXfL5xGRrasGEqWY"
-Content-Disposition: inline
-In-Reply-To: <20200723175538.GW2621@work-vm>
-Subject: Re: [Virtio-fs] [PATCH for-5.1 2/3] virtiofsd: add
- container-friendly -o chroot sandboxing option
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 3/5] fuse: Add a flag FUSE_SETATTR_KILL_PRIV
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,65 +14,111 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, rmohr@redhat.com, qemu-devel@nongnu.org, vromanso@redhat.com
+To: linux-fsdevel@vger.kernel.org, miklos@szeredi.hu
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
+With handle_killpriv_v2, server needs to kill suid/sgid on truncate (setattr)
+but it does not know if caller has CAP_FSETID or not. So like write, send
+killpriv information in fuse_setattr_in and add a flag FUSE_SETATTR_KILL_PRIV.
 
---OXfL5xGRrasGEqWY
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/dir.c             | 11 ++++++++---
+ include/uapi/linux/fuse.h | 11 ++++++++++-
+ 2 files changed, 18 insertions(+), 4 deletions(-)
 
-On Thu, Jul 23, 2020 at 06:55:38PM +0100, Dr. David Alan Gilbert wrote:
-> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> > On Wed, Jul 22, 2020 at 08:03:18PM +0100, Dr. David Alan Gilbert wrote:
-> > > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> > > > +    /*
-> > > > +     * Make the shared directory the file system root so that FUSE=
-_OPEN
-> > > > +     * (lo_open()) cannot escape the shared directory by opening a=
- symlink.
-> > > > +     *
-> > > > +     * It's still possible to escape the chroot via lo->proc_self_=
-fd but that
-> > > > +     * requires gaining control of the process first.
-> > > > +     */
-> > > > +    if (chroot(lo->source) !=3D 0) {
-> > > > +        fuse_log(FUSE_LOG_ERR, "chroot(\"%s\"): %m\n", lo->source);
-> > > > +        exit(1);
-> > > > +    }
-> > >=20
-> > > I'm seeing suggestions that you should drop CAP_SYS_CHROOT after
-> > > chroot'ing to stop an old escape (where you create another jail inside
-> > > the jail and the kernel then lets you walk outside of the old one).
-> >=20
-> > That's already the case:
-> >=20
-> > 1. setup_seccomp() blocks further chroot(2) calls.
-> > 2. setup_capabilities() drops CAP_SYS_CHROOT.
->=20
-> Ah yes; could you add a comment if you respin; it's not obvious that
-> the capability to chroot allows you to break out of an existing chroot
-> you're in.
-
-Sure.
-
-Stefan
-
---OXfL5xGRrasGEqWY
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl8a0pwACgkQnKSrs4Gr
-c8gtjAf+N3a6aSnhKxco1M3LCLZ/NcE9w+b0cAGpoxUawTBFfxYCHoT569DSsB5M
-qBhQsAw6JWm6FvmnsSlrND2m6bIvARP5k3OOZzwyv7jrfCkoWG/q53ULaWCtYsOr
-NFrGoqrDKicuwZa8YwJOERT+yJv/wIpWPJ585UIU8F5NtQ4LirYz2W71YfxkU519
-czYfiAoY42QJSmrCjEi18SJCfD6gS7cbY5yOKAWq2y5zK8mGJe2j91WXa4N/DssH
-79C2XlmEWpAvQUbXBsO5oYpuxNzRgWBiNruP5PkltPtOtIHOV0nbTnbOvR8aHj9N
-vNUXY8FWOmZTE4VXa2zvuOCphT6gWg==
-=3N0O
------END PGP SIGNATURE-----
-
---OXfL5xGRrasGEqWY--
+diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
+index 26f028bc760b..82747ca4c5c8 100644
+--- a/fs/fuse/dir.c
++++ b/fs/fuse/dir.c
+@@ -1437,13 +1437,15 @@ void fuse_release_nowrite(struct inode *inode)
+ static void fuse_setattr_fill(struct fuse_conn *fc, struct fuse_args *args,
+ 			      struct inode *inode,
+ 			      struct fuse_setattr_in *inarg_p,
+-			      struct fuse_attr_out *outarg_p)
++			      struct fuse_attr_out *outarg_p,
++			      uint32_t setattr_flags)
+ {
+ 	args->opcode = FUSE_SETATTR;
+ 	args->nodeid = get_node_id(inode);
+ 	args->in_numargs = 1;
+ 	args->in_args[0].size = sizeof(*inarg_p);
+ 	args->in_args[0].value = inarg_p;
++	inarg_p->setattr_flags = setattr_flags;
+ 	args->out_numargs = 1;
+ 	args->out_args[0].size = sizeof(*outarg_p);
+ 	args->out_args[0].value = outarg_p;
+@@ -1474,7 +1476,7 @@ int fuse_flush_times(struct inode *inode, struct fuse_file *ff)
+ 		inarg.valid |= FATTR_FH;
+ 		inarg.fh = ff->fh;
+ 	}
+-	fuse_setattr_fill(fc, &args, inode, &inarg, &outarg);
++	fuse_setattr_fill(fc, &args, inode, &inarg, &outarg, 0);
+ 
+ 	return fuse_simple_request(fc, &args);
+ }
+@@ -1501,6 +1503,7 @@ int fuse_do_setattr(struct dentry *dentry, struct iattr *attr,
+ 	loff_t oldsize;
+ 	int err;
+ 	bool trust_local_cmtime = is_wb && S_ISREG(inode->i_mode);
++	uint32_t setattr_flags = 0;
+ 
+ 	if (!fc->default_permissions)
+ 		attr->ia_valid |= ATTR_FORCE;
+@@ -1529,6 +1532,8 @@ int fuse_do_setattr(struct dentry *dentry, struct iattr *attr,
+ 	if (attr->ia_valid & ATTR_SIZE) {
+ 		if (WARN_ON(!S_ISREG(inode->i_mode)))
+ 			return -EIO;
++		if (fc->handle_killpriv_v2 && !capable(CAP_FSETID))
++			setattr_flags |= FUSE_SETATTR_KILL_PRIV;
+ 		is_truncate = true;
+ 	}
+ 
+@@ -1565,7 +1570,7 @@ int fuse_do_setattr(struct dentry *dentry, struct iattr *attr,
+ 		inarg.valid |= FATTR_LOCKOWNER;
+ 		inarg.lock_owner = fuse_lock_owner_id(fc, current->files);
+ 	}
+-	fuse_setattr_fill(fc, &args, inode, &inarg, &outarg);
++	fuse_setattr_fill(fc, &args, inode, &inarg, &outarg, setattr_flags);
+ 	err = fuse_simple_request(fc, &args);
+ 	if (err) {
+ 		if (err == -EINTR)
+diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
+index 960ba8af5cf4..4b275653ac2e 100644
+--- a/include/uapi/linux/fuse.h
++++ b/include/uapi/linux/fuse.h
+@@ -173,6 +173,7 @@
+  *  - add FUSE_SETUPMAPPING and FUSE_REMOVEMAPPING
+  *  - add map_alignment to fuse_init_out, add FUSE_MAP_ALIGNMENT flag
+  *  - add FUSE_HANDLE_KILLPRIV_V2
++ *  - add FUSE_SETATTR_KILL_PRIV
+  */
+ 
+ #ifndef _LINUX_FUSE_H
+@@ -368,6 +369,14 @@ struct fuse_file_lock {
+  */
+ #define FUSE_GETATTR_FH		(1 << 0)
+ 
++/**
++ * Setattr flags
++ * FUSE_SETATTR_KILL_PRIV: kill suid and sgid bits. sgid should be killed
++ * only if group execute bit (S_IXGRP) is set. Meant to be used together
++ * with FUSE_HANDLE_KILLPRIV_V2.
++ */
++#define FUSE_SETATTR_KILL_PRIV	(1 << 0)
++
+ /**
+  * Lock flags
+  */
+@@ -566,7 +575,7 @@ struct fuse_link_in {
+ 
+ struct fuse_setattr_in {
+ 	uint32_t	valid;
+-	uint32_t	padding;
++	uint32_t	setattr_flags;
+ 	uint64_t	fh;
+ 	uint64_t	size;
+ 	uint64_t	lock_owner;
+-- 
+2.25.4
 

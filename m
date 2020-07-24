@@ -1,10 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri, 24 Jul 2020 14:38:07 -0400
-Message-Id: <20200724183812.19573-1-vgoyal@redhat.com>
+Date: Fri, 24 Jul 2020 14:38:12 -0400
+Message-Id: <20200724183812.19573-6-vgoyal@redhat.com>
+In-Reply-To: <20200724183812.19573-1-vgoyal@redhat.com>
+References: <20200724183812.19573-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [RFC PATCH 0/5] fuse: Implement FUSE_HANDLE_KILLPRIV_V2
-	and enable SB_NOSEC
+Subject: [Virtio-fs] [PATCH 5/5] virtiofs: Support SB_NOSEC flag to improve
+	direct write performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,119 +18,118 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, miklos@szeredi.hu
 Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
-Hi Miklos,
+Ganesh Mahalingam reported that virtiofs is slow with small direct random
+writes when virtiofsd is run with cache=always.
 
-Here is the updated RFC patch for implementing FUSE_HANDLE_KILLPRIV_V2
-and enabling SB_NOSEC. Previous discussion was here.
+https://github.com/kata-containers/runtime/issues/2815
 
-https://lore.kernel.org/linux-fsdevel/20200716144032.GC422759@redhat.com/
+Little debugging showed that that file_remove_privs() is called in cached
+write path on every write. And everytime it calls
+security_inode_need_killpriv() which results in call to
+__vfs_getxattr(XATTR_NAME_CAPS). And this goes to file server to fetch
+xattr. This extra round trip for every write slows down writes a lot.
 
-Based on previous discussion, you preferred that enabling SB_NOSEC
-should dependent on FUSE_HANDLE_KILLPRIV. We also agreed that
-implementing FUSE_HANDLE_KILLPRIV_V2 probably is a good idea because
-current version clears suid/sgid even if caller has CAP_FSETID in
-certain cases.
+Normally to avoid paying this penalty on every write, vfs has the
+notion of caching this information in inode (S_NOSEC). So vfs
+sets S_NOSEC, if filesystem opted for it using super block flag
+SB_NOSEC. And S_NOSEC is cleared when setuid/setgid bit is set or
+when security xattr is set on inode so that next time a write
+happens, we check inode again for clearing setuid/setgid bits as well
+clear any security.capability xattr.
 
-So I decided to give it a try and here are the RFC patches. This is only
-compile and boot tested. Before I spend more time, I want to make sure
-I am heading in right direction.
+This seems to work well for local file systems but for remote file
+systems it is possible that VFS does not have full picture and a
+different client sets setuid/setgid bit or security.capability xattr
+on file and that means VFS information about S_NOSEC on another client
+will be stale. So for remote filesystems SB_NOSEC was disabled by
+default.
 
-I have done some virtiofsd changes as well to enable handle_killpriv_v2
-and proof of concept patch is here.
+commit 9e1f1de02c2275d7172e18dc4e7c2065777611bf
+Author: Al Viro <viro@zeniv.linux.org.uk>
+Date:   Fri Jun 3 18:24:58 2011 -0400
 
-https://github.com/rhvgoyal/qemu/commit/5c8b40dd94e094942df3fd2796b1ee468f9d3df3
+    more conservative S_NOSEC handling
 
-TODO: I want to set set SB_NOSEC flag after I get a response from file
-      server. But we send init request asynchronously. That means
-      by the time fill_super finishes, we might not get resoponse
-      from server and that means we might not enable SB_NOSEC.
+That commit mentioned that these filesystems can still make use of
+SB_NOSEC as long as they clear S_NOSEC when they are refreshing inode
+attriutes from server.
 
-Before I improve these patches, I have my doubts that enabling
-SB_NOSEC should be dependent on FUSE_HANDLE_KILLPRIV_V2. And here
-is my rationale.
+So this patch tries to enable SB_NOSEC on fuse (regular fuse as well
+as virtiofs). And clear SB_NOSEC when we are refreshing inode attributes.
 
-If server clears suid/sgid/caps on chown/trunc/write always, then
-it probably just provides little better coherency in certain cases
-where client B might have modified file metadata and client A does
-not know about it.
+We need to clear SB_NOSEC either when inode has setuid/setgid bit set
+or security.capability xattr has been set. We have the first piece of
+information available in FUSE_GETATTR response. But we don't know if
+security.capability has been set on file or not. Question is, do we
+really need to know about security.capability. file_remove_privs()
+always removes security.capability if a file is being written to. That
+means when server writes to file, security.capability should be removed
+without guest having to tell anything to it.
 
-So those who have even stricter coherency requirement can enable
-FUSE_HANDLE_KILLPRIV_V2. But I am not sure why it should be a
-pre-requisite for SB_NOSEC.
+That means we don't have to worry about knowing if security.capability
+was set or not as long as writes by client don't get cached and go to
+server always. And server write should clear security.capability. Hence,
+I clear SB_NOSEC when writeback cache is enabled.
 
-Even now, clearing of suid/sgid happens based on cached state of
-inode->mode. So even with SB_NOSEC disabled, it is very much possible
-that client B sets suid/sgid and client A write will not clear it.
+This change improves random write performance very significantly. I
+am running virtiofsd with cache=auto and following fio command.
 
-Only exception seems to be security.capability. Because we don't
-cache this xattr, currently we always check with file server if
-this xattr is set. If it is, we clear it. So while suid/sgid
-clearing is dedendent on cached attributes in client, clearing
-of caps is not. I feel this is probably more by accident and
-not design.
+fio --ioengine=libaio --direct=1  --name=test --filename=/mnt/virtiofs/random_read_write.fio --bs=4k --iodepth=64 --size=4G --readwrite=randwrite
 
-To me, I can think of following two models.
+Before this patch I get around 40MB/s and after the patch I get around
+300MB/s bandwidth. So improvement is very significant.
 
-- weak coherency
+Reported-by: "Mahalingam, Ganesh" <ganesh.mahalingam@intel.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/inode.c     | 12 ++++++++++++
+ fs/fuse/virtio_fs.c |  3 +++
+ 2 files changed, 15 insertions(+)
 
-  Clearing of suid/sgid/caps is driven by cached attributes in client.
-  If attributes are stale, then suid/sgid/caps might not be cleared.
-  This is the current default (except the case of caps).
-
-- strong coherency
-
-  File server takes care of clearing suid/sgid/caps so that even if
-  client cache is old/stale, server will still be able to clear it.
-  This is what FUSE_HANDLE_KILLPRIV_V2 can achieve based on the
-  use case.
-
-IOW, FUSE_HANDLE_KILLPRIV_V2 will help choose between weak/strong
-coherency model when it comes to clearing suid/sgid/caps. But
-notion of SB_NOSEC seems to be orthogonal to FUSE_HANDLE_KILLPRIV_V2
-and SB_NOSEC should work both with and without FUSE_HANDLE_KILLPRIV_V2.
-
-FUSE_HANDLE_KILLPRIV_V2 has its own issues. Right now enabling it does
-not disable client driven clearing of suid/sgid/caps
-(file_remove_privs() and other chown/trucnation paths).
-
-If we actively work on supressing file_remove_privs/setattr when
-FUSE_HANDLE_KILLPRIV_V2 is set, then we have the issue of client
-attributes going stale (suid/sgid), as server might clear suid/sgid
-upon write but client will have no idea. May be we can keep track
-of completion of writes and clear suid/sgid in local cache or
-invalidate attrs etc. Something to think about.
-  
-In short, I feel more inclined that SB_NOSEC should not be dependent
-on FUSE_HANDLE_KILLPRIV_V2. It should be a separate feature which
-works both with and without and user chooses FUSE_HANDLE_KILLPRIV_V2
-if they want stronger coherency.
-
-If you are concerned about regression w.r.t clear of caps, then we
-can think of enabling SB_NOSEC conditionally. Say user chooses it
-as mount option. But given caps is just an outlier and currently
-we clear suid/sgid based on cache (and not based on state on server),
-I feel it might not be a huge issue.
-
-What do you think?
-
-Thanks
-Vivek
-
-Vivek Goyal (5):
-  fuse: Introduce the notion of FUSE_HANDLE_KILLPRIV_V2
-  fuse: Set FUSE_WRITE_KILL_PRIV in cached write path
-  fuse: Add a flag FUSE_SETATTR_KILL_PRIV
-  fuse: For sending setattr in case of open(O_TRUNC)
-  virtiofs: Support SB_NOSEC flag to improve direct write performance
-
- fs/fuse/dir.c             | 13 +++++++++----
- fs/fuse/file.c            |  2 ++
- fs/fuse/fuse_i.h          |  6 ++++++
- fs/fuse/inode.c           | 17 ++++++++++++++++-
- fs/fuse/virtio_fs.c       |  3 +++
- include/uapi/linux/fuse.h | 18 +++++++++++++++++-
- 6 files changed, 53 insertions(+), 6 deletions(-)
-
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index 113ba149e08d..412ab08607ca 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -187,6 +187,16 @@ void fuse_change_attributes_common(struct inode *inode, struct fuse_attr *attr,
+ 		inode->i_mode &= ~S_ISVTX;
+ 
+ 	fi->orig_ino = attr->ino;
++
++	/*
++	 * We are refreshing inode data and it is possible that another
++	 * client set suid/sgid or security.capability xattr. So clear
++	 * S_NOSEC. Ideally, we could have cleared it only if suid/sgid
++	 * was set or if security.capability xattr was set. But we don't
++	 * know if security.capability has been set or not. So clear it
++	 * anyway. Its less efficient but should is safe.
++	 */
++	inode->i_flags &= ~S_NOSEC;
+ }
+ 
+ void fuse_change_attributes(struct inode *inode, struct fuse_attr *attr,
+@@ -1281,6 +1291,8 @@ static int fuse_fill_super(struct super_block *sb, struct fs_context *fsc)
+ 	 */
+ 	fput(file);
+ 	fuse_send_init(get_fuse_conn_super(sb));
++	if (fc->handle_killpriv_v2)
++		sb->s_flags |= SB_NOSEC;
+ 	return 0;
+ 
+  err_put_conn:
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index 4c4ef5d69298..be05e4995e60 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -1126,6 +1126,9 @@ static int virtio_fs_fill_super(struct super_block *sb)
+ 	/* Previous unmount will stop all queues. Start these again */
+ 	virtio_fs_start_all_queues(fs);
+ 	fuse_send_init(fc);
++
++	if (fc->handle_killpriv_v2)
++		sb->s_flags |= SB_NOSEC;
+ 	mutex_unlock(&virtio_fs_mutex);
+ 	return 0;
+ 
 -- 
 2.25.4
 

@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri, 24 Jul 2020 14:38:11 -0400
-Message-Id: <20200724183812.19573-5-vgoyal@redhat.com>
+Date: Fri, 24 Jul 2020 14:38:09 -0400
+Message-Id: <20200724183812.19573-3-vgoyal@redhat.com>
 In-Reply-To: <20200724183812.19573-1-vgoyal@redhat.com>
 References: <20200724183812.19573-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 4/5] fuse: For sending setattr in case of
-	open(O_TRUNC)
+Subject: [Virtio-fs] [PATCH 2/5] fuse: Set FUSE_WRITE_KILL_PRIV in cached
+	write path
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,30 +18,32 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, miklos@szeredi.hu
 Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
-open(O_TRUNC) will not kill suid/sgid on server and fuse_open_in does not
-have information if caller has CAP_FSETID or not.
+If caller does not have CAP_FSETID, we set FUSE_WRITE_KILL_PRIV in direct
+I/O path but not in cached write path. Set it there as well so that server
+can clear suid/sgid/caps as needed.
 
-So force sending setattr() which is called after open(O_TRUNC) so that
-server clears setuid/setgid.
+Set it only if fc->handle_killpriv_v2 is set. Otherwise client is responsible
+for kill suid/sgid. We do it direct I/O path anyway because we do't call
+file_remove_privs() there (with cache=none option).
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- fs/fuse/dir.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ fs/fuse/file.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
-index 82747ca4c5c8..0572779abbbe 100644
---- a/fs/fuse/dir.c
-+++ b/fs/fuse/dir.c
-@@ -1516,7 +1516,7 @@ int fuse_do_setattr(struct dentry *dentry, struct iattr *attr,
- 		/* This is coming from open(..., ... | O_TRUNC); */
- 		WARN_ON(!(attr->ia_valid & ATTR_SIZE));
- 		WARN_ON(attr->ia_size != 0);
--		if (fc->atomic_o_trunc) {
-+		if (fc->atomic_o_trunc && !fc->handle_killpriv_v2) {
- 			/*
- 			 * No need to send request to userspace, since actual
- 			 * truncation has already been done by OPEN.  But still
+diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+index 83d917f7e542..57899afc7cba 100644
+--- a/fs/fuse/file.c
++++ b/fs/fuse/file.c
+@@ -1083,6 +1083,8 @@ static ssize_t fuse_send_write_pages(struct fuse_io_args *ia,
+ 
+ 	fuse_write_args_fill(ia, ff, pos, count);
+ 	ia->write.in.flags = fuse_write_flags(iocb);
++	if (fc->handle_killpriv_v2 && !capable(CAP_FSETID))
++		ia->write.in.write_flags |= FUSE_WRITE_KILL_PRIV;
+ 
+ 	err = fuse_simple_request(fc, &ap->args);
+ 	if (!err && ia->write.out.size > count)
 -- 
 2.25.4
 

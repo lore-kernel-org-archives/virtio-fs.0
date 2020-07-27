@@ -1,15 +1,11 @@
-Date: Fri, 19 Jun 2020 15:15:40 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200619191540.GI3154@redhat.com>
-References: <20200416164907.244868-1-stefanha@redhat.com>
-	<20200618190816.GD3814@redhat.com> <20200618191655.GI2769@work-vm>
-	<20200618192717.GE3814@redhat.com>
-	<CAJFHJrrJzPLatNvw2xC3WYLbzCW0+DB+4UczQHGPBF9p+WGYQA@mail.gmail.com>
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Date: Mon, 27 Jul 2020 20:02:20 +0100
+Message-Id: <20200727190223.422280-1-stefanha@redhat.com>
+Content-Type: text/plain; charset="utf-8"
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <CAJFHJrrJzPLatNvw2xC3WYLbzCW0+DB+4UczQHGPBF9p+WGYQA@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2 0/3] virtiofsd: allow virtiofsd to run in a
+	container
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,48 +14,52 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Chirantan Ekbote <chirantan@chromium.org>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, qemu-devel@nongnu.org
+To: qemu-devel@nongnu.org
+Cc: vromanso@redhat.com, rmohr@redhat.com, virtio-fs@redhat.com, mpatel@redhat.com, vgoyal@redhat.com
 
-On Fri, Jun 19, 2020 at 01:46:20PM +0900, Chirantan Ekbote wrote:
-> On Fri, Jun 19, 2020 at 4:27 AM Vivek Goyal <vgoyal@redhat.com> wrote:
-> >
-> > On Thu, Jun 18, 2020 at 08:16:55PM +0100, Dr. David Alan Gilbert wrote:
-> > > * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > > > On Thu, Apr 16, 2020 at 05:49:05PM +0100, Stefan Hajnoczi wrote:
-> > > > > virtiofsd doesn't need of all Linux capabilities(7) available to root.  Keep a
-> > > > > whitelisted set of capabilities that we require.  This improves security in
-> > > > > case virtiofsd is compromised by making it hard for an attacker to gain further
-> > > > > access to the system.
-> > > >
-> > > > Hi Stefan,
-> > > >
-> > > > I just noticed that this patch set breaks overlayfs on top of virtiofs.
-> > > >
-> > > > overlayfs sets "trusted.overlay.*" and xattrs in trusted domain
-> > > > need CAP_SYS_ADMIN.
-> > > >
-> 
-> Not just that but it needs CAP_SYS_ADMIN in the init namespace[1].  We
-> have the same problem.  Our virtiofs process has CAP_SYS_ADMIN in a
-> user namespace and it cannot set any trusted or security xattrs.  The
-> security xattrs check is at least namespace aware so you only need
-> CAP_SYS_ADMIN in the namespace that mounted the fs but that doesn't
-> help us much.
-> 
-> We ended up working around it by prefixing "user.virtiofs." to the
-> xattr name[2], which has its own problems but there was pretty much no
-> chance that we would be able to give the fs device CAP_SYS_ADMIN in
-> the init namespace.
+v2:
+ * Update virtiofsd.rst documentation on sandboxing modes
+ * Change syntax to -o sandbox=namespace|chroot
+ * Add comment explaining that unshare(CLONE_FS) has no visible side-effect
+   while single-threaded
+ * xfstests and pjdfstest pass. Did not run tests on overlayfs because required
+   xattrs do not work without CAP_SYS_ADMIN.
 
-Chirantan, 
+Mrunal and Dan: This patch series adds a sandboxing mode where virtiofsd relies
+on the container runtime for isolation. It only does
+chroot("path/to/shared-dir"), seccomp, and drops Linux capabilities. Previously
+it created a new mount, pid, and net namespace but cannot do this without
+CAP_SYS_ADMIN when run inside a container. pivot_root("path/to/shared-dir") has
+been replaced with chroot("path/to/shared-dir"), again because CAP_SYS_ADMIN is
+unavailable. The point of the chroot() is to prevent escapes from the shared
+directory during path traversal. Does this ring any alarm bells or does it
+sound sane?
 
-So you ended up renaming all "trusted", "security" and "system" xattrs?
-Only "user" xattrs are complete passthrough?
+Container runtimes handle namespace setup and remove privileges needed by
+virtiofsd to perform sandboxing. Luckily the container environment already
+provides most of the sandbox that virtiofsd needs for security.
 
-IOW, security.selinux will be renamed to user.virtiofs.security.selinux
-on host?
+Introduce a new "virtiofsd -o sandbox=chroot" option that uses chroot(2)
+instead of namespaces. This option allows virtiofsd to work inside a container.
 
-Thanks
-Vivek
+Please see the individual patches for details on the changes and security
+implications.
+
+Given that people are starting to attempt running virtiofsd in containers I
+think this should go into QEMU 5.1.
+
+Stefan Hajnoczi (3):
+  virtiofsd: drop CAP_DAC_READ_SEARCH
+  virtiofsd: add container-friendly -o sandbox=chroot option
+  virtiofsd: probe unshare(CLONE_FS) and print an error
+
+ tools/virtiofsd/fuse_virtio.c    | 16 +++++++++
+ tools/virtiofsd/helper.c         |  8 +++++
+ tools/virtiofsd/passthrough_ll.c | 58 ++++++++++++++++++++++++++++++--
+ docs/tools/virtiofsd.rst         | 32 ++++++++++++++----
+ 4 files changed, 104 insertions(+), 10 deletions(-)
+
+-- 
+2.26.2
+
 

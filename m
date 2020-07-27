@@ -1,11 +1,11 @@
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Mon, 27 Jul 2020 20:02:20 +0100
-Message-Id: <20200727190223.422280-1-stefanha@redhat.com>
-Content-Type: text/plain; charset="utf-8"
+Date: Mon, 27 Jul 2020 20:02:21 +0100
+Message-Id: <20200727190223.422280-2-stefanha@redhat.com>
+In-Reply-To: <20200727190223.422280-1-stefanha@redhat.com>
+References: <20200727190223.422280-1-stefanha@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 0/3] virtiofsd: allow virtiofsd to run in a
-	container
+Content-Transfer-Encoding: base64
+Subject: [Virtio-fs] [PATCH v2 1/3] virtiofsd: drop CAP_DAC_READ_SEARCH
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,49 +17,25 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org
 Cc: vromanso@redhat.com, rmohr@redhat.com, virtio-fs@redhat.com, mpatel@redhat.com, vgoyal@redhat.com
 
-v2:
- * Update virtiofsd.rst documentation on sandboxing modes
- * Change syntax to -o sandbox=namespace|chroot
- * Add comment explaining that unshare(CLONE_FS) has no visible side-effect
-   while single-threaded
- * xfstests and pjdfstest pass. Did not run tests on overlayfs because required
-   xattrs do not work without CAP_SYS_ADMIN.
-
-Mrunal and Dan: This patch series adds a sandboxing mode where virtiofsd relies
-on the container runtime for isolation. It only does
-chroot("path/to/shared-dir"), seccomp, and drops Linux capabilities. Previously
-it created a new mount, pid, and net namespace but cannot do this without
-CAP_SYS_ADMIN when run inside a container. pivot_root("path/to/shared-dir") has
-been replaced with chroot("path/to/shared-dir"), again because CAP_SYS_ADMIN is
-unavailable. The point of the chroot() is to prevent escapes from the shared
-directory during path traversal. Does this ring any alarm bells or does it
-sound sane?
-
-Container runtimes handle namespace setup and remove privileges needed by
-virtiofsd to perform sandboxing. Luckily the container environment already
-provides most of the sandbox that virtiofsd needs for security.
-
-Introduce a new "virtiofsd -o sandbox=chroot" option that uses chroot(2)
-instead of namespaces. This option allows virtiofsd to work inside a container.
-
-Please see the individual patches for details on the changes and security
-implications.
-
-Given that people are starting to attempt running virtiofsd in containers I
-think this should go into QEMU 5.1.
-
-Stefan Hajnoczi (3):
-  virtiofsd: drop CAP_DAC_READ_SEARCH
-  virtiofsd: add container-friendly -o sandbox=chroot option
-  virtiofsd: probe unshare(CLONE_FS) and print an error
-
- tools/virtiofsd/fuse_virtio.c    | 16 +++++++++
- tools/virtiofsd/helper.c         |  8 +++++
- tools/virtiofsd/passthrough_ll.c | 58 ++++++++++++++++++++++++++++++--
- docs/tools/virtiofsd.rst         | 32 ++++++++++++++----
- 4 files changed, 104 insertions(+), 10 deletions(-)
-
--- 
-2.26.2
-
+dmlydGlvZnNkIGRvZXMgbm90IG5lZWQgQ0FQX0RBQ19SRUFEX1NFQVJDSCBiZWNhdXNlIGl0IGFs
+cmVhZHkgaGFzCnRoZSBtb3JlIHBvd2VyZnVsIENBUF9EQUNfT1ZFUlJJREUuIERyb3AgaXQgZnJv
+bSB0aGUgbGlzdCBvZgpjYXBhYmlsaXRpZXMuCgpUaGlzIGlzIGltcG9ydGFudCBiZWNhdXNlIGNv
+bnRhaW5lciBydW50aW1lcyBtYXkgbm90IGluY2x1ZGUKQ0FQX0RBQ19SRUFEX1NFQVJDSCBieSBk
+ZWZhdWx0LiBUaGlzIHBhdGNoIGFsbG93cyB2aXJ0aW9mc2QgdG8gcmVkdWNlCml0cyBjYXBhYmls
+aXRpZXMgd2hlbiBydW5uaW5nIGluc2lkZSBhIERvY2tlciBjb250YWluZXIuCgpOb3RlIHRoYXQg
+Q0FQX0RBQ19SRUFEX1NFQVJDSCBtYXkgYmUgbmVjZXNzYXJ5IGFnYWluIGluIHRoZSBmdXR1cmUg
+aWYKdmlydGlvZnNkIHN0YXJ0cyB1c2luZyBvcGVuX2J5X2hhbmRsZV9hdCgyKS4KClNpZ25lZC1v
+ZmYtYnk6IFN0ZWZhbiBIYWpub2N6aSA8c3RlZmFuaGFAcmVkaGF0LmNvbT4KUmV2aWV3ZWQtYnk6
+IERyLiBEYXZpZCBBbGFuIEdpbGJlcnQgPGRnaWxiZXJ0QHJlZGhhdC5jb20+Ci0tLQogdG9vbHMv
+dmlydGlvZnNkL3Bhc3N0aHJvdWdoX2xsLmMgfCAxIC0KIDEgZmlsZSBjaGFuZ2VkLCAxIGRlbGV0
+aW9uKC0pCgpkaWZmIC0tZ2l0IGEvdG9vbHMvdmlydGlvZnNkL3Bhc3N0aHJvdWdoX2xsLmMgYi90
+b29scy92aXJ0aW9mc2QvcGFzc3Rocm91Z2hfbGwuYwppbmRleCA5NGUwZGUyZDJiLi41MGExNjRh
+NTk5IDEwMDY0NAotLS0gYS90b29scy92aXJ0aW9mc2QvcGFzc3Rocm91Z2hfbGwuYworKysgYi90
+b29scy92aXJ0aW9mc2QvcGFzc3Rocm91Z2hfbGwuYwpAQCAtMjU5Niw3ICsyNTk2LDYgQEAgc3Rh
+dGljIHZvaWQgc2V0dXBfY2FwYWJpbGl0aWVzKGNoYXIgKm1vZGNhcHNfaW4pCiAgICAgaWYgKGNh
+cG5nX3VwZGF0ZXYoQ0FQTkdfQURELCBDQVBOR19QRVJNSVRURUQgfCBDQVBOR19FRkZFQ1RJVkUs
+CiAgICAgICAgICAgICBDQVBfQ0hPV04sCiAgICAgICAgICAgICBDQVBfREFDX09WRVJSSURFLAot
+ICAgICAgICAgICAgQ0FQX0RBQ19SRUFEX1NFQVJDSCwKICAgICAgICAgICAgIENBUF9GT1dORVIs
+CiAgICAgICAgICAgICBDQVBfRlNFVElELAogICAgICAgICAgICAgQ0FQX1NFVEdJRCwKLS0gCjIu
+MjYuMgoK
 

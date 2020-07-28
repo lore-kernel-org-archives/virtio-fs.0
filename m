@@ -1,21 +1,19 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=P/0wT5AVlfJU51+aOXmXuOFRQiK5GOEuvWtw0JpdSQw=;
-	b=HLzehYXPr5Tyja0osk+SAA7sNvb+Fab+4kapFvH+KvWSEWJ5IGg6C32MSsPtS4lK1Z
-	uGqttIPjgSVUZvOkrpuSB32efRB83q1Z5Dew/wxxREWuwJ+lauvG4LmgB3eZKk6MsdUw
-	bEL4IU0r1uDnDHLT+SJmA0E/Fp3mMUuAEAaLM=
+References: <20200727190223.422280-1-stefanha@redhat.com>
+	<20200727190223.422280-4-stefanha@redhat.com>
+	<OSBPR01MB45826073E5A54CF869E56721E5730@OSBPR01MB4582.jpnprd01.prod.outlook.com>
+	<CALDPj7syG0KPhtZEma5n403=YFZ2ptcD4MtP=GdrY9n1eUs5Eg@mail.gmail.com>
+	<20200728131250.GB78409@redhat.com>
+From: Daniel Walsh <dwalsh@redhat.com>
+Message-ID: <e982e87a-d5a8-264d-f591-0f1523464c97@redhat.com>
+Date: Tue, 28 Jul 2020 15:12:54 -0400
 MIME-Version: 1.0
-References: <20200416164907.244868-1-stefanha@redhat.com>
-	<20200618190816.GD3814@redhat.com>
-	<20200618191655.GI2769@work-vm> <20200618192717.GE3814@redhat.com>
-	<CAJFHJrrJzPLatNvw2xC3WYLbzCW0+DB+4UczQHGPBF9p+WGYQA@mail.gmail.com>
-	<20200619191540.GI3154@redhat.com>
-In-Reply-To: <20200619191540.GI3154@redhat.com>
-From: Chirantan Ekbote <chirantan@chromium.org>
-Date: Thu, 25 Jun 2020 12:19:39 +0900
-Message-ID: <CAJFHJroGNbfO-tXqrod_snCHcnN4NKjX8t9LTeroyiNEwjtVcQ@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
+In-Reply-To: <20200728131250.GB78409@redhat.com>
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+Content-Language: en-US
+Subject: Re: [Virtio-fs] [PATCH v2 3/3] virtiofsd: probe unshare(CLONE_FS)
+ and print an error
+Reply-To: dwalsh@redhat.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,59 +22,118 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, qemu-devel@nongnu.org
+To: Vivek Goyal <vgoyal@redhat.com>, Roman Mohr <rmohr@redhat.com>
+Cc: "vromanso@redhat.com" <vromanso@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>, "mpatel@redhat.com" <mpatel@redhat.com>
 
-On Sat, Jun 20, 2020 at 4:15 AM Vivek Goyal <vgoyal@redhat.com> wrote:
+On 7/28/20 09:12, Vivek Goyal wrote:
+> On Tue, Jul 28, 2020 at 12:00:20PM +0200, Roman Mohr wrote:
+>> On Tue, Jul 28, 2020 at 3:07 AM misono.tomohiro@fujitsu.com <
+>> misono.tomohiro@fujitsu.com> wrote:
+>>
+>>>> Subject: [PATCH v2 3/3] virtiofsd: probe unshare(CLONE_FS) and print an
+>>> error
+>>>> An assertion failure is raised during request processing if
+>>>> unshare(CLONE_FS) fails. Implement a probe at startup so the problem can
+>>>> be detected right away.
+>>>>
+>>>> Unfortunately Docker/Moby does not include unshare in the seccomp.json
+>>>> list unless CAP_SYS_ADMIN is given. Other seccomp.json lists always
+>>>> include unshare (e.g. podman is unaffected):
+>>>>
+>>> https://raw.githubusercontent.com/seccomp/containers-golang/master/seccomp.json
+>>>> Use "docker run --security-opt seccomp=path/to/seccomp.json ..." if the
+>>>> default seccomp.json is missing unshare.
+>>> Hi, sorry for a bit late.
+>>>
+>>> unshare() was added to fix xattr problem:
+>>>
+>>> https://github.com/qemu/qemu/commit/bdfd66788349acc43cd3f1298718ad491663cfcc#
+>>> In theory we don't need to call unshare if xattr is disabled, but it is
+>>> hard to get to know
+>>> if xattr is enabled or disabled in fv_queue_worker(), right?
+>>>
+>>>
+>> In kubevirt we want to run virtiofsd in containers. We would already not
+>> have xattr support for e.g. overlayfs in the VM after this patch series (an
+>> acceptable con at least for us right now).
+>> If we can get rid of the unshare (and potentially of needing root) that
+>> would be great. We always assume that everything which we run in containers
+>> should work for cri-o and docker.
+> But cri-o and docker containers run as root, isn't it? (or atleast have
+> the capability to run as root). Havind said that, it will be nice to be able
+> to run virtiofsd without root. 
 >
-> On Fri, Jun 19, 2020 at 01:46:20PM +0900, Chirantan Ekbote wrote:
-> > On Fri, Jun 19, 2020 at 4:27 AM Vivek Goyal <vgoyal@redhat.com> wrote:
-> > >
-> > > On Thu, Jun 18, 2020 at 08:16:55PM +0100, Dr. David Alan Gilbert wrote:
-> > > > * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > > > > On Thu, Apr 16, 2020 at 05:49:05PM +0100, Stefan Hajnoczi wrote:
-> > > > > > virtiofsd doesn't need of all Linux capabilities(7) available to root.  Keep a
-> > > > > > whitelisted set of capabilities that we require.  This improves security in
-> > > > > > case virtiofsd is compromised by making it hard for an attacker to gain further
-> > > > > > access to the system.
-> > > > >
-> > > > > Hi Stefan,
-> > > > >
-> > > > > I just noticed that this patch set breaks overlayfs on top of virtiofs.
-> > > > >
-> > > > > overlayfs sets "trusted.overlay.*" and xattrs in trusted domain
-> > > > > need CAP_SYS_ADMIN.
-> > > > >
-> >
-> > Not just that but it needs CAP_SYS_ADMIN in the init namespace[1].  We
-> > have the same problem.  Our virtiofs process has CAP_SYS_ADMIN in a
-> > user namespace and it cannot set any trusted or security xattrs.  The
-> > security xattrs check is at least namespace aware so you only need
-> > CAP_SYS_ADMIN in the namespace that mounted the fs but that doesn't
-> > help us much.
-> >
-> > We ended up working around it by prefixing "user.virtiofs." to the
-> > xattr name[2], which has its own problems but there was pretty much no
-> > chance that we would be able to give the fs device CAP_SYS_ADMIN in
-> > the init namespace.
+> There are few hurdles though.
 >
-> Chirantan,
+> - For file creation, we switch uid/gid (seteuid/setegid) and that seems
+>   to require root. If we were to run unpriviliged, probably all files
+>   on host will have to be owned by unpriviliged user and guest visible
+>   uid/gid will have to be stored in xattrs. I think virtfs supports
+>   something similar.
 >
-> So you ended up renaming all "trusted", "security" and "system" xattrs?
-> Only "user" xattrs are complete passthrough?
+> I am sure there are other restrictions but this probably is the biggest
+> one to overcome.
 >
-
-No, we only rename "security" xattrs (except for selinux).
-
+>  > 
+You should be able to run it within a user namespace with Namespaces
+capabilities.
+>> "Just" pointing docker to a different seccomp.json file is something which
+>> k8s users/admin in many cases can't do.
+> Or may be issue is that standard seccomp.json does not allow unshare()
+> and hence you are forced to use a non-standar seccomp.json.
 >
-> IOW, security.selinux will be renamed to user.virtiofs.security.selinux
-> on host?
+> Vivek
 >
-
-We don't relabel security.selinux because it only requires CAP_FOWNER
-in the process's user namespace and it also does its own MAC-based
-checks.  Also we have some tools that label files beforehand so it
-seemed easier to leave them unchanged.
-
-Chirantan
+>> Best Regards,
+>> Roman
+>>
+>>
+>>> So, it looks good to me.
+>>> Reviewed-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+>>>
+>>> Regards,
+>>> Misono
+>>>
+>>>> Cc: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+>>>> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+>>>> ---
+>>>>  tools/virtiofsd/fuse_virtio.c | 16 ++++++++++++++++
+>>>>  1 file changed, 16 insertions(+)
+>>>>
+>>>> diff --git a/tools/virtiofsd/fuse_virtio.c
+>>> b/tools/virtiofsd/fuse_virtio.c
+>>>> index 3b6d16a041..9e5537506c 100644
+>>>> --- a/tools/virtiofsd/fuse_virtio.c
+>>>> +++ b/tools/virtiofsd/fuse_virtio.c
+>>>> @@ -949,6 +949,22 @@ int virtio_session_mount(struct fuse_session *se)
+>>>>  {
+>>>>      int ret;
+>>>>
+>>>> +    /*
+>>>> +     * Test that unshare(CLONE_FS) works. fv_queue_worker() will need
+>>> it. It's
+>>>> +     * an unprivileged system call but some Docker/Moby versions are
+>>> known to
+>>>> +     * reject it via seccomp when CAP_SYS_ADMIN is not given.
+>>>> +     *
+>>>> +     * Note that the program is single-threaded here so this syscall
+>>> has no
+>>>> +     * visible effect and is safe to make.
+>>>> +     */
+>>>> +    ret = unshare(CLONE_FS);
+>>>> +    if (ret == -1 && errno == EPERM) {
+>>>> +        fuse_log(FUSE_LOG_ERR, "unshare(CLONE_FS) failed with EPERM. If
+>>> "
+>>>> +                "running in a container please check that the container
+>>> "
+>>>> +                "runtime seccomp policy allows unshare.\n");
+>>>> +        return -1;
+>>>> +    }
+>>>> +
+>>>>      ret = fv_create_listen_socket(se);
+>>>>      if (ret < 0) {
+>>>>          return ret;
+>>>> --
+>>>> 2.26.2
+>>>
 

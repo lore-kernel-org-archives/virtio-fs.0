@@ -1,12 +1,10 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 29 Jul 2020 18:14:09 -0400
-Message-Id: <20200729221410.147556-5-vgoyal@redhat.com>
-In-Reply-To: <20200729221410.147556-1-vgoyal@redhat.com>
-References: <20200729221410.147556-1-vgoyal@redhat.com>
+Date: Wed, 29 Jul 2020 18:14:05 -0400
+Message-Id: <20200729221410.147556-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 4/5] virtiofsd: Open lo->source while setting up
-	root in sandbox=NONE mode
+Subject: [Virtio-fs] [RFC PATCH 0/5] virtiofsd: Add notion of unprivileged
+	mode
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,30 +16,41 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org
 Cc: berrange@redhat.com, vromanso@redhat.com, virtio-fs@redhat.com, vgoyal@redhat.com
 
-In sandbox=NONE mode, lo->source points to the directory which is being
-exported. We have not done any chroot()/pivot_root(). So open lo->source.
+Hi,
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- tools/virtiofsd/passthrough_ll.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Daniel Berrange mentioned that having a unpriviliged mode in virtiofsd 
+might be useful for certain use cases. Hence I decided to give it
+a try.
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 76ef891105..a6fa816b6c 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -3209,7 +3209,10 @@ static void setup_root(struct lo_data *lo, struct lo_inode *root)
-     int fd, res;
-     struct stat stat;
- 
--    fd = open("/", O_PATH);
-+    if (lo->sandbox == SANDBOX_NONE)
-+        fd = open(lo->source, O_PATH);
-+    else
-+        fd = open("/", O_PATH);
-     if (fd == -1) {
-         fuse_log(FUSE_LOG_ERR, "open(%s, O_PATH): %m\n", lo->source);
-         exit(1);
+This is RFC patch series to allow running virtiofsd as unpriviliged
+user. This is still work in progress. I am posting it to get
+some early feedback.
+
+These patches are dependent on Stefan's patch series for sandbox=chroot.
+
+https://www.redhat.com/archives/virtio-fs/2020-July/msg00078.html
+
+I can now run virtiofsd as user "test" and also export a directory
+into a VM running as user test.
+
+This is ideally for the cases where user "test" inside VM will operate
+on this virtiofs mount point. Any filesystem operations which can't
+be done with the creds of "test" user on host, will fail.
+
+Thanks
+Vivek
+
+Vivek Goyal (5):
+  virtiofsd: Add notion of unprivileged mode
+  virtiofsd: create lock/pid file in per user cache dir
+  virtiofsd: open /proc/self/fd/ in sandbox=NONE mode
+  virtiofsd: Open lo->source while setting up root in sandbox=NONE mode
+  virtiofsd: Skip setup_capabilities() in sandbox=NONE mode
+
+ tools/virtiofsd/fuse_virtio.c    | 40 ++++++++++++++++++++++++++++----
+ tools/virtiofsd/passthrough_ll.c | 29 ++++++++++++++++++++---
+ 2 files changed, 61 insertions(+), 8 deletions(-)
+
 -- 
 2.25.4
 

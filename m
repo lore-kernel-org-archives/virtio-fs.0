@@ -1,17 +1,12 @@
-Date: Thu, 25 Jun 2020 08:55:08 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200625125508.GB149340@redhat.com>
-References: <20200416164907.244868-1-stefanha@redhat.com>
-	<20200618190816.GD3814@redhat.com> <20200618191655.GI2769@work-vm>
-	<20200618192717.GE3814@redhat.com>
-	<CAJFHJrrJzPLatNvw2xC3WYLbzCW0+DB+4UczQHGPBF9p+WGYQA@mail.gmail.com>
-	<20200619191540.GI3154@redhat.com>
-	<CAJFHJroGNbfO-tXqrod_snCHcnN4NKjX8t9LTeroyiNEwjtVcQ@mail.gmail.com>
+Date: Wed, 29 Jul 2020 18:14:08 -0400
+Message-Id: <20200729221410.147556-4-vgoyal@redhat.com>
+In-Reply-To: <20200729221410.147556-1-vgoyal@redhat.com>
+References: <20200729221410.147556-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <CAJFHJroGNbfO-tXqrod_snCHcnN4NKjX8t9LTeroyiNEwjtVcQ@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 3/5] virtiofsd: open /proc/self/fd/ in
+	sandbox=NONE mode
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,36 +15,48 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Chirantan Ekbote <chirantan@chromium.org>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, qemu-devel@nongnu.org
+To: qemu-devel@nongnu.org
+Cc: berrange@redhat.com, vromanso@redhat.com, virtio-fs@redhat.com, vgoyal@redhat.com
 
-On Thu, Jun 25, 2020 at 12:19:39PM +0900, Chirantan Ekbote wrote:
-[..]
-> > Chirantan,
-> >
-> > So you ended up renaming all "trusted", "security" and "system" xattrs?
-> > Only "user" xattrs are complete passthrough?
-> >
-> 
-> No, we only rename "security" xattrs (except for selinux).
-> 
-> >
-> > IOW, security.selinux will be renamed to user.virtiofs.security.selinux
-> > on host?
-> >
-> 
-> We don't relabel security.selinux because it only requires CAP_FOWNER
-> in the process's user namespace and it also does its own MAC-based
-> checks.  Also we have some tools that label files beforehand so it
-> seemed easier to leave them unchanged.
+We need /proc/self/fd descriptor even in sandbox=NONE mode.
 
-If we rename selinux xattr also, then we can support selinux both in
-guest and host and they both can have their own independent policies.
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-Otherwise we either have to disable selinux on host (if we want to
-support it in guest) or somehow guest and how policies will have
-to know about each other and be able to work together (which will
-be hard for a generic use case).
-
-Vivek
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index cd91c4a831..76ef891105 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -2969,6 +2969,15 @@ static void setup_capabilities(char *modcaps_in)
+     pthread_mutex_unlock(&cap.mutex);
+ }
+ 
++static void setup_none(struct lo_data *lo)
++{
++    lo->proc_self_fd = open("/proc/self/fd", O_PATH);
++    if (lo->proc_self_fd == -1) {
++        fuse_log(FUSE_LOG_ERR, "open(\"/proc/self/fd\", O_PATH): %m\n");
++        exit(1);
++    }
++}
++
+ /*
+  * Use chroot as a weaker sandbox for environments where the process is
+  * launched without CAP_SYS_ADMIN.
+@@ -3014,8 +3023,10 @@ static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
+     if (lo->sandbox == SANDBOX_NAMESPACE) {
+         setup_namespaces(lo, se);
+         setup_mounts(lo->source);
+-    } else {
++    } else if (lo->sandbox == SANDBOX_CHROOT) {
+         setup_chroot(lo);
++    } else {
++        setup_none(lo);
+     }
+ 
+     setup_seccomp(enable_syslog);
+-- 
+2.25.4
 

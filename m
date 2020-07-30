@@ -1,10 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Thu, 30 Jul 2020 15:47:31 -0400
-Message-Id: <20200730194736.173994-1-vgoyal@redhat.com>
+Date: Thu, 30 Jul 2020 15:47:33 -0400
+Message-Id: <20200730194736.173994-3-vgoyal@redhat.com>
+In-Reply-To: <20200730194736.173994-1-vgoyal@redhat.com>
+References: <20200730194736.173994-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 0/5] virtiofsd: Add a unprivileged
-	passthrough mode
+Subject: [Virtio-fs] [PATCH v2 2/5] virtiofsd: create lock/pid file in per
+	user cache dir
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,37 +18,44 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org
 Cc: berrange@redhat.com, vromanso@redhat.com, virtio-fs@redhat.com, vgoyal@redhat.com
 
-Hi,
+Right now we create lock/pid file in /usr/local/var/... and unprivliged
+user does not have access to create files there.
 
-This is V2 of patches. Only change since last version is handling of
-lock/pid file creation as per the comments from Daniel Berrange.
+Hence, in unprivileged mode, create this file in per user cache dir
+as specified by environment variable XDG_RUNTIME_DIR.
 
-I can't think of any more changes needed. As a unpriviliged user
-inside VM I can do simple operations like create/remove/read/write
-files.
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ tools/virtiofsd/fuse_virtio.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-For more testing, I probably need a testsuite which runs as unpriviliged
-user. pjdfstests needs to run as root and this does not work in this
-setup as creation of files as root fails. (On host, daemon tries to
-switch to root uid and that fails).
-
-So as of now, I think these are the minimum changes needed to support
-unprivileged passthrough mode of virtiofsd.
-
-Thanks
-Vivek
-
-Vivek Goyal (5):
-  virtiofsd: Add notion of unprivileged mode
-  virtiofsd: create lock/pid file in per user cache dir
-  virtiofsd: open /proc/self/fd/ in sandbox=NONE mode
-  virtiofsd: Open lo->source while setting up root in sandbox=NONE mode
-  virtiofsd: Skip setup_capabilities() in sandbox=NONE mode
-
- tools/virtiofsd/fuse_virtio.c    | 15 ++++++++++++++-
- tools/virtiofsd/passthrough_ll.c | 29 ++++++++++++++++++++++++++---
- 2 files changed, 40 insertions(+), 4 deletions(-)
-
+diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+index 6b21a93841..1551a94757 100644
+--- a/tools/virtiofsd/fuse_virtio.c
++++ b/tools/virtiofsd/fuse_virtio.c
+@@ -972,8 +972,21 @@ static bool fv_socket_lock(struct fuse_session *se)
+     g_autofree gchar *pidfile = NULL;
+     g_autofree gchar *dir = NULL;
+     Error *local_err = NULL;
++    gboolean unprivileged = false;
+ 
+-    dir = qemu_get_local_state_pathname("run/virtiofsd");
++    if (geteuid() != 0)
++        unprivileged = true;
++
++    /*
++     * Unpriviliged users don't have access to /usr/local/var. Hence
++     * store lock/pid file in per user cache directory. Use environment
++     * variable XDG_RUNTIME_DIR.
++     */
++    if (unprivileged) {
++        dir = g_strdup_printf("%s/virtiofsd", g_get_user_runtime_dir());
++    } else {
++        dir = qemu_get_local_state_pathname("run/virtiofsd");
++    }
+ 
+     if (g_mkdir_with_parents(dir, S_IRWXU) < 0) {
+         fuse_log(FUSE_LOG_ERR, "%s: Failed to create directory %s: %s",
 -- 
 2.25.4
 

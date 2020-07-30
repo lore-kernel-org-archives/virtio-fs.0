@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Thu, 30 Jul 2020 15:47:35 -0400
-Message-Id: <20200730194736.173994-5-vgoyal@redhat.com>
+Date: Thu, 30 Jul 2020 15:47:36 -0400
+Message-Id: <20200730194736.173994-6-vgoyal@redhat.com>
 In-Reply-To: <20200730194736.173994-1-vgoyal@redhat.com>
 References: <20200730194736.173994-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 4/5] virtiofsd: Open lo->source while setting
-	up root in sandbox=NONE mode
+Subject: [Virtio-fs] [PATCH v2 5/5] virtiofsd: Skip setup_capabilities() in
+	sandbox=NONE mode
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,30 +18,31 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org
 Cc: berrange@redhat.com, vromanso@redhat.com, virtio-fs@redhat.com, vgoyal@redhat.com
 
-In sandbox=NONE mode, lo->source points to the directory which is being
-exported. We have not done any chroot()/pivot_root(). So open lo->source.
+setup_capabilites() tries to give some of the required capabilities
+to act as a full fledged file server in priviliged mode. In unpriviliged
+mode we can't get those capabilities and setup_capabilities() will fail.
+
+So don't setup capabilities when sandbox=NONE.
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ tools/virtiofsd/passthrough_ll.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 76ef891105..a6fa816b6c 100644
+index a6fa816b6c..1a0b24cbf2 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -3209,7 +3209,10 @@ static void setup_root(struct lo_data *lo, struct lo_inode *root)
-     int fd, res;
-     struct stat stat;
+@@ -3030,7 +3030,8 @@ static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
+     }
  
--    fd = open("/", O_PATH);
-+    if (lo->sandbox == SANDBOX_NONE)
-+        fd = open(lo->source, O_PATH);
-+    else
-+        fd = open("/", O_PATH);
-     if (fd == -1) {
-         fuse_log(FUSE_LOG_ERR, "open(%s, O_PATH): %m\n", lo->source);
-         exit(1);
+     setup_seccomp(enable_syslog);
+-    setup_capabilities(g_strdup(lo->modcaps));
++    if (lo->sandbox != SANDBOX_NONE)
++       setup_capabilities(g_strdup(lo->modcaps));
+ }
+ 
+ /* Set the maximum number of open file descriptors */
 -- 
 2.25.4
 

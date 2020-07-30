@@ -1,9 +1,12 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Thu, 25 Jun 2020 17:29:26 +0100
-Message-Id: <20200625162929.46672-1-dgilbert@redhat.com>
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Thu, 30 Jul 2020 15:47:32 -0400
+Message-Id: <20200730194736.173994-2-vgoyal@redhat.com>
+In-Reply-To: <20200730194736.173994-1-vgoyal@redhat.com>
+References: <20200730194736.173994-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 0/3] virtiofsd capability changes and addition
+Subject: [Virtio-fs] [PATCH v2 1/5] virtiofsd: Add notion of unprivileged
+	mode
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -12,32 +15,50 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com, stefanha@redhat.com, vgoyal@redhat.com
+To: qemu-devel@nongnu.org
+Cc: berrange@redhat.com, vromanso@redhat.com, virtio-fs@redhat.com, vgoyal@redhat.com
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+At startup if we are running as non-root user, then internally set
+unpriviliged mode set. Also add a notion of sandbox NONE and set
+that internally in unprivileged mode. setting up namespaces and
+chroot() fails in unpriviliged mode.
 
-Hi,
-  This is a set of changes relating to the capability restirctions
-introduced in virtiofsd back in a59feb483b8.
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-The first one is a potentially important fix; the missing terminator
-could mean extra capabilities are added based on junk on the stack;
-although that's not been seen in practice.
-
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-
-
-
-Dr. David Alan Gilbert (3):
-  virtiofsd: Terminate capability list
-  virtiofsd: Check capability calls
-  virtiofsd: Allow addition or removal of capabilities
-
- docs/tools/virtiofsd.rst         |  5 +++
- tools/virtiofsd/helper.c         |  2 +
- tools/virtiofsd/passthrough_ll.c | 68 +++++++++++++++++++++++++++++---
- 3 files changed, 70 insertions(+), 5 deletions(-)
-
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index e2fbc614fd..cd91c4a831 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -147,11 +147,13 @@ enum {
+ enum {
+     SANDBOX_NAMESPACE,
+     SANDBOX_CHROOT,
++    SANDBOX_NONE,
+ };
+ 
+ struct lo_data {
+     pthread_mutex_t mutex;
+     int sandbox;
++    bool unprivileged;
+     int debug;
+     int writeback;
+     int flock;
+@@ -3288,6 +3290,12 @@ int main(int argc, char *argv[])
+     lo_map_init(&lo.dirp_map);
+     lo_map_init(&lo.fd_map);
+ 
++    if (geteuid() != 0) {
++       lo.unprivileged = true;
++       lo.sandbox = SANDBOX_NONE;
++       fuse_log(FUSE_LOG_DEBUG, "Running in unprivileged passthrough mode.\n");
++    }
++
+     if (fuse_parse_cmdline(&args, &opts) != 0) {
+         goto err_out1;
+     }
 -- 
-2.26.2
+2.25.4
 

@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Mon,  3 Aug 2020 20:15:09 +0100
-Message-Id: <20200803191511.45261-2-dgilbert@redhat.com>
+Date: Mon,  3 Aug 2020 20:15:10 +0100
+Message-Id: <20200803191511.45261-3-dgilbert@redhat.com>
 In-Reply-To: <20200803191511.45261-1-dgilbert@redhat.com>
 References: <20200803191511.45261-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 1/3] tools/virtiofsd: xattr name mappings: Add
-	option
+Subject: [Virtio-fs] [PATCH 2/3] tools/virtiofsd: xattr name mappings: Map
+	client xattr names
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,276 +19,193 @@ To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, virtio-fs@red
 
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Add an option to define mappings of xattr names so that
-the client and host filesystems see different views.
-This can be used to have different SELinux mappings as
-seen by the guest, to run the virtiofsd with less privileges
-(e.g. in a case where it can't set trusted/system/security
-xattrs but you want the guest to be able to), or to isolate
-multiple users of the same name; e.g. trusted attributes
-used by stacking overlayfs.
-
-A mapping engine is used wit 3 simple rules; the rules can
-be combined to allow most useful mapping scenarios.
-The ruleset is defined by -o xattrmap='rules...'.
-
-This patch doesn't use the rule maps yet.
+Map xattr names originating at the client; from get/set/remove xattr.
 
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 ---
- docs/tools/virtiofsd.rst         |  46 +++++++++
- tools/virtiofsd/passthrough_ll.c | 156 ++++++++++++++++++++++++++++++-
- 2 files changed, 201 insertions(+), 1 deletion(-)
+ tools/virtiofsd/passthrough_ll.c | 101 ++++++++++++++++++++++++++++++-
+ 1 file changed, 99 insertions(+), 2 deletions(-)
 
-diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-index 824e713491..82b6f6d90a 100644
---- a/docs/tools/virtiofsd.rst
-+++ b/docs/tools/virtiofsd.rst
-@@ -107,6 +107,51 @@ Options
-   performance.  ``auto`` acts similar to NFS with a 1 second metadata cache
-   timeout.  ``always`` sets a long cache lifetime at the expense of coherency.
- 
-+xattr-mapping
-+-------------
-+
-+By default the name of xattr's used by the client are passe through to the host
-+file system.  This can be a problem where either those xattr names are used
-+by something on the host (e.g. selinux guest/host confusion) or if the
-+virtiofsd is running in a container with restricted priviliges where it cannot
-+access some attributes.
-+
-+A mapping of xattr names can be made using -o xattrmap=mapping where the ``mapping``
-+string consists of a series of rules.
-+
-+Each rule starts and ends with a ':'.  The mapping stops on a matching
-+rule.  White space may be added before and after each rule.
-+
-+:scope:type:key:prepend:
-+
-+scope= 'c' - match 'key' against a xattr name from the client
-+            for setxattr/getxattr/removexattr
-+       'h' - match 'prepend' against a xattr name from the host
-+            for listxattr
-+       both letters can be included to match both cases.
-+
-+type is one of:
-+       'p' Prefixing: If 'key' matches the client then the 'prepend'
-+           is added before the name is passed to the host.
-+           For a host case, the prepend is tested and stripped
-+           if matching.
-+
-+       'o' OK: The attribute name is OK and passed through to
-+           the host unchanged.
-+
-+       'b' Bad: If a client tries to use this name it's
-+           denied using EPERM; when the host passes an attribute
-+           name matching it's hidden.
-+
-+key is a string tested as a prefix on an attribute name originating
-+       on the client.  It maybe empty in which case a 'c' rule
-+       will always match on client names.
-+
-+prepend is a string tested as a prefix on an attribute name originiating
-+       on the host, and used as a new prefix by 'p'.  It maybe empty
-+       in which case a 'h' rule will always match on host names.
-+
-+
- Examples
- --------
- 
-@@ -123,3 +168,4 @@ Export ``/var/lib/fs/vm001/`` on vhost-user UNIX domain socket
-       -numa node,memdev=mem \
-       ...
-   guest# mount -t virtiofs myfs /mnt
-+
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 94e0de2d2b..5506d84132 100644
+index 5506d84132..68d2407a37 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -144,6 +144,7 @@ struct lo_data {
-     int flock;
-     int posix_lock;
-     int xattr;
-+    char *xattrmap;
-     char *source;
-     char *modcaps;
-     double timeout;
-@@ -171,6 +172,7 @@ static const struct fuse_opt lo_opts[] = {
-     { "no_posix_lock", offsetof(struct lo_data, posix_lock), 0 },
-     { "xattr", offsetof(struct lo_data, xattr), 1 },
-     { "no_xattr", offsetof(struct lo_data, xattr), 0 },
-+    { "xattrmap=%s", offsetof(struct lo_data, xattrmap), 0 },
-     { "modcaps=%s", offsetof(struct lo_data, modcaps), 0 },
-     { "timeout=%lf", offsetof(struct lo_data, timeout), 0 },
-     { "timeout=", offsetof(struct lo_data, timeout_set), 1 },
-@@ -2003,7 +2005,154 @@ static void lo_flock(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
-     fuse_reply_err(req, res == -1 ? errno : 0);
+@@ -2152,20 +2152,82 @@ static XattrMapEntry *parse_xattrmap(const char *map)
+     return res;
  }
  
--static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
-+typedef struct xattr_map_entry {
-+    const char *key;
-+    const char *prepend;
-+    unsigned int flags;
-+} XattrMapEntry;
 +
 +/*
-+ * Exit; process attribute unmodified if matched.
-+ * An empty key applies to all.
++ * For use with getxattr/setxattr/removexattr, where the client
++ * gives us a name and we may need to choose a different one.
++ * Allocates a buffer for the result placing it in *out_name.
++ *   If there's no change then *out_name is not set.
++ * Returns 0 on success
++ * Can return -EPERM to indicate we block a given attribute
++ *   (in which case out_name is not allocated)
++ * Can return -ENOMEM to indicate out_name couldn't be allocated.
 + */
-+#define XATTR_MAP_FLAG_END_OK  (1 <<  0)
-+/*
-+ * The attribute is unwanted;
-+ * EPERM on write hidden on read.
-+ */
-+#define XATTR_MAP_FLAG_END_BAD (1 <<  1)
-+/*
-+ * For attr that start with 'key' prepend 'prepend'
-+ * 'key' maybe empty to prepend for all attrs
-+ * key is defined from set/remove point of view.
-+ * Automatically reversed on read
-+ */
-+#define XATTR_MAP_FLAG_PREFIX  (1 <<  2)
-+/* Apply rule to get/set/remove */
-+#define XATTR_MAP_FLAG_CLIENT  (1 << 16)
-+/* Apply rule to list */
-+#define XATTR_MAP_FLAG_HOST    (1 << 17)
-+/* Apply rule to all */
-+#define XATTR_MAP_FLAG_ALL   (XATTR_MAP_FLAG_HOST | XATTR_MAP_FLAG_CLIENT)
-+
-+static XattrMapEntry *xattr_map_list;
-+
-+static XattrMapEntry *parse_xattrmap(const char *map)
++static int xattr_map_client(const char *client_name, char **out_name)
 +{
-+    XattrMapEntry *res = NULL;
-+    size_t nentries = 0;
-+    const char *tmp;
++    const XattrMapEntry *cur_entry;
 +
-+    while (*map) {
-+        /* Find the : at the start of a rule */
-+        if (isspace(*map)) {
-+            map++;
-+            continue;
-+        }
-+        if (*map != ':') {
-+            fuse_log(FUSE_LOG_ERR,
-+                     "%s: Expecting : or space, found '%c'"
-+                     " at start of rule %zu\n",
-+                     __func__, *map, nentries + 1);
-+            exit(1);
-+        }
-+        /* Skip the :, now at the start of the 'scope' */
-+        map++;
-+
-+        /* Allocate some space for the rule */
-+        res = g_realloc_n(res, ++nentries, sizeof(XattrMapEntry));
-+        res[nentries - 1].flags = 0;
-+
-+        /* Scope is one or both of 'c' or 'h' */
-+        do {
-+            switch (*map) {
-+            case 'c':
-+                res[nentries - 1].flags |= XATTR_MAP_FLAG_CLIENT;
-+                map++;
-+                break;
-+            case 'h':
-+                res[nentries - 1].flags |= XATTR_MAP_FLAG_HOST;
-+                map++;
-+                break;
-+            case ':':
-+                break;
-+            default:
-+                fuse_log(FUSE_LOG_ERR,
-+                         "%s: Expecting 'c', 'h', or ':', found '%c' in scope"
-+                         " section of rule %zu\n",
-+                         __func__, *map, nentries);
-+                exit(1);
++    for (cur_entry = xattr_map_list; ; cur_entry++) {
++        if ((cur_entry->flags & XATTR_MAP_FLAG_CLIENT) &&
++            (!strncmp(cur_entry->key,
++                      client_name,
++                      strlen(cur_entry->key)))) {
++            if (cur_entry->flags & XATTR_MAP_FLAG_END_BAD) {
++                return -EPERM;
 +            }
-+        } while (*map != ':');
-+
-+        /* Start of 'type' */
-+        switch (*++map) {
-+        case 'p':
-+            res[nentries - 1].flags |= XATTR_MAP_FLAG_PREFIX;
-+            map++;
-+            break;
-+        case 'o':
-+            res[nentries - 1].flags |= XATTR_MAP_FLAG_END_OK;
-+            map++;
-+            break;
-+        case 'b':
-+            res[nentries - 1].flags |= XATTR_MAP_FLAG_END_BAD;
-+            map++;
-+            break;
-+        default:
-+            fuse_log(FUSE_LOG_ERR,
-+                     "%s: Expecting 'p', 'o', or 'b', found '%c' in type"
-+                     " section of rule %zu\n",
-+                     __func__, *map, nentries);
-+            exit(1);
++            if (cur_entry->flags & XATTR_MAP_FLAG_END_OK) {
++                /* Unmodified name */
++                return 0;
++            }
++            if (cur_entry->flags & XATTR_MAP_FLAG_PREFIX) {
++                *out_name = g_try_malloc(strlen(client_name) +
++                                         strlen(cur_entry->prepend) + 1);
++                if (!*out_name) {
++                    return -ENOMEM;
++                }
++                sprintf(*out_name, "%s%s", cur_entry->prepend, client_name);
++                return 0;
++            }
 +        }
-+
-+        if (*map++ != ':') {
-+            fuse_log(FUSE_LOG_ERR,
-+                     "%s: Missing ':' at end of type field of rule %zu\n",
-+                     __func__, *map, nentries);
-+            exit(1);
-+        }
-+
-+        /* At start of 'key' field */
-+        tmp = strchr(map, ':');
-+        if (!tmp) {
-+            fuse_log(FUSE_LOG_ERR,
-+                     "%s: Missing ':' at end of key field of rule %zu",
-+                     __func__, *map, nentries);
-+            exit(1);
-+        }
-+        res[nentries - 1].key = g_strndup(map, tmp - map);
-+        map = tmp + 1;
-+
-+        /* At start of 'prepend' field */
-+        tmp = strchr(map, ':');
-+        if (!tmp) {
-+            fuse_log(FUSE_LOG_ERR,
-+                     "%s: Missing ':' at end of prepend field of rule %zu",
-+                     __func__, *map, nentries);
-+            exit(1);
-+        }
-+        res[nentries - 1].prepend = g_strndup(map, tmp - map);
-+        map = tmp + 1;
-+        /* End of rule - go around again for another rule */
 +    }
 +
-+    if (!nentries) {
-+        fuse_log(FUSE_LOG_ERR, "Empty xattr map\n");
-+        exit(1);
-+    }
-+
-+    /* Add a terminaotr to error in cases the user hasn't specified */
-+    res = g_realloc_n(res, ++nentries, sizeof(XattrMapEntry));
-+    res[nentries - 1].flags = XATTR_MAP_FLAG_ALL | XATTR_MAP_FLAG_END_BAD;
-+    res[nentries - 1].key = g_strdup("");
-+    res[nentries - 1].prepend = g_strdup("");
-+
-+    return res;
++    /* Shouldn't get here - rules should have an END_* */
++    abort();
 +}
 +
-+static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
                          size_t size)
  {
      struct lo_data *lo = lo_data(req);
-@@ -2909,6 +3058,11 @@ int main(int argc, char *argv[])
-     } else {
-         lo.source = strdup("/");
-     }
-+
-+    if (lo.xattrmap) {
-+        xattr_map_list = parse_xattrmap(lo.xattrmap);
+     char *value = NULL;
+     char procname[64];
++    const char *name;
++    char *mapped_name;
+     struct lo_inode *inode;
+     ssize_t ret;
+     int saverr;
+     int fd = -1;
+ 
++    mapped_name = NULL;
++    name = in_name;
++    if (lo->xattrmap) {
++        ret = xattr_map_client(in_name, &mapped_name);
++        if (ret < 0) {
++            if (ret == -EPERM) {
++                ret = -ENODATA;
++            }
++            fuse_reply_err(req, -ret);
++            return;
++        }
++        if (mapped_name) {
++            name = mapped_name;
++        }
 +    }
 +
-     if (!lo.timeout_set) {
-         switch (lo.cache) {
-         case CACHE_NONE:
+     inode = lo_inode(req, ino);
+     if (!inode) {
+         fuse_reply_err(req, EBADF);
++        g_free(mapped_name);
+         return;
+     }
+ 
+@@ -2230,6 +2292,7 @@ out_err:
+     saverr = errno;
+ out:
+     fuse_reply_err(req, saverr);
++    g_free(mapped_name);
+     goto out_free;
+ }
+ 
+@@ -2307,19 +2370,35 @@ out:
+     goto out_free;
+ }
+ 
+-static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
++static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+                         const char *value, size_t size, int flags)
+ {
+     char procname[64];
++    const char *name;
++    char *mapped_name;
+     struct lo_data *lo = lo_data(req);
+     struct lo_inode *inode;
+     ssize_t ret;
+     int saverr;
+     int fd = -1;
+ 
++    mapped_name = NULL;
++    name = in_name;
++    if (lo->xattrmap) {
++        ret = xattr_map_client(in_name, &mapped_name);
++        if (ret < 0) {
++            fuse_reply_err(req, -ret);
++            return;
++        }
++        if (mapped_name) {
++            name = mapped_name;
++        }
++    }
++
+     inode = lo_inode(req, ino);
+     if (!inode) {
+         fuse_reply_err(req, EBADF);
++        g_free(mapped_name);
+         return;
+     }
+ 
+@@ -2354,21 +2433,38 @@ out:
+     }
+ 
+     lo_inode_put(lo, &inode);
++    g_free(mapped_name);
+     fuse_reply_err(req, saverr);
+ }
+ 
+-static void lo_removexattr(fuse_req_t req, fuse_ino_t ino, const char *name)
++static void lo_removexattr(fuse_req_t req, fuse_ino_t ino, const char *in_name)
+ {
+     char procname[64];
++    const char *name;
++    char *mapped_name;
+     struct lo_data *lo = lo_data(req);
+     struct lo_inode *inode;
+     ssize_t ret;
+     int saverr;
+     int fd = -1;
+ 
++    mapped_name = NULL;
++    name = in_name;
++    if (lo->xattrmap) {
++        ret = xattr_map_client(in_name, &mapped_name);
++        if (ret < 0) {
++            fuse_reply_err(req, -ret);
++            return;
++        }
++        if (mapped_name) {
++            name = mapped_name;
++        }
++    }
++
+     inode = lo_inode(req, ino);
+     if (!inode) {
+         fuse_reply_err(req, EBADF);
++        g_free(mapped_name);
+         return;
+     }
+ 
+@@ -2403,6 +2499,7 @@ out:
+     }
+ 
+     lo_inode_put(lo, &inode);
++    g_free(mapped_name);
+     fuse_reply_err(req, saverr);
+ }
+ 
 -- 
 2.26.2
 

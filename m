@@ -1,11 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Thu, 25 Jun 2020 17:29:28 +0100
-Message-Id: <20200625162929.46672-3-dgilbert@redhat.com>
-In-Reply-To: <20200625162929.46672-1-dgilbert@redhat.com>
-References: <20200625162929.46672-1-dgilbert@redhat.com>
+Date: Mon,  3 Aug 2020 20:15:11 +0100
+Message-Id: <20200803191511.45261-4-dgilbert@redhat.com>
+In-Reply-To: <20200803191511.45261-1-dgilbert@redhat.com>
+References: <20200803191511.45261-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 2/3] virtiofsd: Check capability calls
+Subject: [Virtio-fs] [PATCH 3/3] tools/virtiofsd: xattr name mappings: Map
+	host xattr names
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,54 +15,125 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com, stefanha@redhat.com, vgoyal@redhat.com
+To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, virtio-fs@redhat.com
 
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Check the capability calls worked.
+Map xattr names coming from the host, i.e. listxattr.
 
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+ tools/virtiofsd/passthrough_ll.c | 88 ++++++++++++++++++++++++++++++++
+ 1 file changed, 88 insertions(+)
 
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index e373e3b36e..99d562046a 100644
+index 68d2407a37..3af4cfb0e3 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -2589,7 +2589,7 @@ static void setup_capabilities(void)
-      */
-     capng_setpid(syscall(SYS_gettid));
-     capng_clear(CAPNG_SELECT_BOTH);
--    capng_updatev(CAPNG_ADD, CAPNG_PERMITTED | CAPNG_EFFECTIVE,
-+    if (capng_updatev(CAPNG_ADD, CAPNG_PERMITTED | CAPNG_EFFECTIVE,
-             CAP_CHOWN,
-             CAP_DAC_OVERRIDE,
-             CAP_DAC_READ_SEARCH,
-@@ -2599,11 +2599,21 @@ static void setup_capabilities(void)
-             CAP_SETUID,
-             CAP_MKNOD,
-             CAP_SETFCAP,
--            -1);
-+            -1)) {
-+        fuse_log(FUSE_LOG_ERR, "%s: capng_updatev failed\n", __func__);
-+        exit(1);
-+    }
- 
--    capng_apply(CAPNG_SELECT_BOTH);
-+    if (capng_apply(CAPNG_SELECT_BOTH)) {
-+        fuse_log(FUSE_LOG_ERR, "%s: capng_apply failed\n", __func__);
-+        exit(1);
-+    }
- 
-     cap.saved = capng_save_state();
-+    if (!cap.saved) {
-+        fuse_log(FUSE_LOG_ERR, "%s: capng_save_state failed\n", __func__);
-+        exit(1);
-+    }
-     pthread_mutex_unlock(&cap.mutex);
+@@ -2195,6 +2195,42 @@ static int xattr_map_client(const char *client_name, char **out_name)
+     abort();
  }
  
++/*
++ * For use with listxattr where the host fs gives us a name and we may need
++ * to sanitize this for the client.
++ * Returns a pointer to the result in *out_name
++ *   This is always the original string or the current string with some prefix
++ *   removed; no reallocation is done.
++ * Returns 0 on success
++ * Can return -ENODATA to indicate the name should be dropped from the list.
++ */
++static int xattr_map_host(const char *host_name, const char **out_name)
++{
++    const XattrMapEntry *cur_entry;
++    for (cur_entry = xattr_map_list; ; cur_entry++) {
++        if ((cur_entry->flags & XATTR_MAP_FLAG_HOST) &&
++            (!strncmp(cur_entry->prepend,
++                      host_name,
++                      strlen(cur_entry->prepend)))) {
++            if (cur_entry->flags & XATTR_MAP_FLAG_END_BAD) {
++                return -ENODATA;
++            }
++            if (cur_entry->flags & XATTR_MAP_FLAG_END_OK) {
++                *out_name = host_name;
++                return 0;
++            }
++            if (cur_entry->flags & XATTR_MAP_FLAG_PREFIX) {
++                /* Remove prefix */
++                *out_name = host_name + strlen(cur_entry->prepend);
++                return 0;
++            }
++        }
++    }
++
++    /* Shouldn't get here - rules should have an END_* */
++    abort();
++}
++
+ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+                         size_t size)
+ {
+@@ -2349,8 +2385,60 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
+         if (ret == 0) {
+             goto out;
+         }
++
++        if (lo->xattrmap) {
++            /*
++             * Map the names back, some attributes might be dropped,
++             * some shortened, but not increased, so we shouldn't
++             * run out of room.
++             */
++            size_t out_index, in_index;
++            out_index = 0;
++            in_index = 0;
++            while (in_index < ret) {
++                const char *map_out;
++                char *in_ptr = value + in_index;
++                /* Length of current attribute name */
++                size_t in_len = strlen(value + in_index) + 1;
++
++                int mapret = xattr_map_host(in_ptr, &map_out);
++                if (mapret != -ENODATA && mapret != 0) {
++                    /* Shouldn't happen */
++                    saverr = -mapret;
++                    goto out;
++                }
++                if (mapret == 0) {
++                    /* Either unchanged, or truncated */
++                    size_t out_len;
++                    if (map_out != in_ptr) {
++                        /* +1 copies the NIL */
++                        out_len = strlen(map_out) + 1;
++                    } else {
++                        /* No change */
++                        out_len = in_len;
++                    }
++                    /*
++                     * Move result along, may still be needed for an unchanged
++                     * entry if a previous entry was changed.
++                     */
++                    memmove(value + out_index, map_out, out_len);
++
++                    out_index += out_len;
++                }
++                in_index += in_len;
++            }
++            ret = out_index;
++            if (ret == 0) {
++                goto out;
++            }
++        }
+         fuse_reply_buf(req, value, ret);
+     } else {
++        /*
++         * xattrmap only ever shortens the result,
++         * so we don't need to do anything clever with the
++         * allocation length here.
++         */
+         fuse_reply_xattr(req, ret);
+     }
+ out_free:
 -- 
 2.26.2
 

@@ -1,12 +1,23 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Mon,  3 Aug 2020 20:15:11 +0100
-Message-Id: <20200803191511.45261-4-dgilbert@redhat.com>
-In-Reply-To: <20200803191511.45261-1-dgilbert@redhat.com>
-References: <20200803191511.45261-1-dgilbert@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc:content-transfer-encoding;
+	bh=N016jYxqycH4EFoWdJ7RPWxS/v26Q+yXklavvpLDJq0=;
+	b=ne7cdE0l/HKRKiFt2ioDKcW67a/Xirn9lnkcmn22u/JpKu989fXfXaeESoZaSa0lzd
+	uyzWeyfs8URQfr1Qf4zdCILyxp/3NZIurkqULsJPQdzPnC9HMFrx8SW2yPpIYZFGAtfa
+	gSagX8J6KUiDTSqRO0/SxxRCjmJ9WULN6DQTAI4NTwFNbXqIgSl7Ph6rEeAd7/LB8/iX
+	eo/6Xauh+wNrZSsJVxLIcdkO3oYuhp2vc56fisfU+HSjZ4ZgrcMnfVKBlQf0i+F3PSO0
+	CKdjgtj86NRYaIA6dD7gntnNC2O4fFEd7+iafN40nSp0uIAKioZWh5t5ZxQMkUukNo+6
+	XQEg==
 MIME-Version: 1.0
+References: <CAFKS8hWbckrE_cyJCf0pgFresD-JQk66wo-6uJA=Gu2MhReHVw@mail.gmail.com>
+	<20200728134936.GA21660@stefanha-x1.localdomain>
+In-Reply-To: <20200728134936.GA21660@stefanha-x1.localdomain>
+From: Derek Su <jwsu1986@gmail.com>
+Date: Tue, 4 Aug 2020 15:37:26 +0800
+Message-ID: <CAFKS8hVwajyBFrVSURs1bS0F+ig8PSUAi1+YPUpe6=KYH8TjmA@mail.gmail.com>
+Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 3/3] tools/virtiofsd: xattr name mappings: Map
-	host xattr names
+Subject: Re: [Virtio-fs] virtio-fs performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,125 +26,134 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, virtio-fs@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, qemu-discuss@nongnu.org
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Hello,
 
-Map xattr names coming from the host, i.e. listxattr.
+Set the cache=none in virtiofsd and direct=1 in fio,
+here are the results and kvm-exit count in 5 seconds.
 
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
----
- tools/virtiofsd/passthrough_ll.c | 88 ++++++++++++++++++++++++++++++++
- 1 file changed, 88 insertions(+)
+--thread-pool-size=64 (default)
+    seq read: 307 MB/s (kvm-exit count=1076463)
+    seq write: 430 MB/s (kvm-exit count=1302493)
+    rand 4KB read: 65.2k IOPS (kvm-exit count=1322899)
+    rand 4KB write: 97.2k IOPS (kvm-exit count=1568618)
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 68d2407a37..3af4cfb0e3 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -2195,6 +2195,42 @@ static int xattr_map_client(const char *client_name, char **out_name)
-     abort();
- }
- 
-+/*
-+ * For use with listxattr where the host fs gives us a name and we may need
-+ * to sanitize this for the client.
-+ * Returns a pointer to the result in *out_name
-+ *   This is always the original string or the current string with some prefix
-+ *   removed; no reallocation is done.
-+ * Returns 0 on success
-+ * Can return -ENODATA to indicate the name should be dropped from the list.
-+ */
-+static int xattr_map_host(const char *host_name, const char **out_name)
-+{
-+    const XattrMapEntry *cur_entry;
-+    for (cur_entry = xattr_map_list; ; cur_entry++) {
-+        if ((cur_entry->flags & XATTR_MAP_FLAG_HOST) &&
-+            (!strncmp(cur_entry->prepend,
-+                      host_name,
-+                      strlen(cur_entry->prepend)))) {
-+            if (cur_entry->flags & XATTR_MAP_FLAG_END_BAD) {
-+                return -ENODATA;
-+            }
-+            if (cur_entry->flags & XATTR_MAP_FLAG_END_OK) {
-+                *out_name = host_name;
-+                return 0;
-+            }
-+            if (cur_entry->flags & XATTR_MAP_FLAG_PREFIX) {
-+                /* Remove prefix */
-+                *out_name = host_name + strlen(cur_entry->prepend);
-+                return 0;
-+            }
-+        }
-+    }
-+
-+    /* Shouldn't get here - rules should have an END_* */
-+    abort();
-+}
-+
- static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
-                         size_t size)
- {
-@@ -2349,8 +2385,60 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
-         if (ret == 0) {
-             goto out;
-         }
-+
-+        if (lo->xattrmap) {
-+            /*
-+             * Map the names back, some attributes might be dropped,
-+             * some shortened, but not increased, so we shouldn't
-+             * run out of room.
-+             */
-+            size_t out_index, in_index;
-+            out_index = 0;
-+            in_index = 0;
-+            while (in_index < ret) {
-+                const char *map_out;
-+                char *in_ptr = value + in_index;
-+                /* Length of current attribute name */
-+                size_t in_len = strlen(value + in_index) + 1;
-+
-+                int mapret = xattr_map_host(in_ptr, &map_out);
-+                if (mapret != -ENODATA && mapret != 0) {
-+                    /* Shouldn't happen */
-+                    saverr = -mapret;
-+                    goto out;
-+                }
-+                if (mapret == 0) {
-+                    /* Either unchanged, or truncated */
-+                    size_t out_len;
-+                    if (map_out != in_ptr) {
-+                        /* +1 copies the NIL */
-+                        out_len = strlen(map_out) + 1;
-+                    } else {
-+                        /* No change */
-+                        out_len = in_len;
-+                    }
-+                    /*
-+                     * Move result along, may still be needed for an unchanged
-+                     * entry if a previous entry was changed.
-+                     */
-+                    memmove(value + out_index, map_out, out_len);
-+
-+                    out_index += out_len;
-+                }
-+                in_index += in_len;
-+            }
-+            ret = out_index;
-+            if (ret == 0) {
-+                goto out;
-+            }
-+        }
-         fuse_reply_buf(req, value, ret);
-     } else {
-+        /*
-+         * xattrmap only ever shortens the result,
-+         * so we don't need to do anything clever with the
-+         * allocation length here.
-+         */
-         fuse_reply_xattr(req, ret);
-     }
- out_free:
--- 
-2.26.2
+--thread-pool-size=1
+    seq read: 303 MB/s (kvm-exit count=1034614)
+    seq write: 358 MB/s. (kvm-exit count=1537735)
+    rand 4KB read: 7995 IOPS (kvm-exit count=438348)
+    rand 4KB write: 97.7k IOPS (kvm-exit count=1907585)
+
+The thread-pool-size=64 improves the rand 4KB read performance largely,
+but doesn't increases the kvm-exit count too much.
+
+In addition, the fio avg. clat of rand 4K write are 960us for
+thread-pool-size=64 and 7700us for thread-pool-size=1.
+
+Regards,
+Derek
+
+Stefan Hajnoczi <stefanha@redhat.com> 於 2020年7月28日 週二 下午9:49寫道：
+>
+> > I'm trying and testing the virtio-fs feature in QEMU v5.0.0.
+> > My host and guest OS are both ubuntu 18.04 with kernel 5.4, and the
+> > underlying storage is one single SSD.
+> >
+> > The configuations are:
+> > (1) virtiofsd
+> > ./virtiofsd -o
+> > source=/mnt/ssd/virtiofs,cache=auto,flock,posix_lock,writeback,xattr
+> > --thread-pool-size=1 --socket-path=/tmp/vhostqemu
+> >
+> > (2) qemu
+> > qemu-system-x86_64 \
+> > -enable-kvm \
+> > -name ubuntu \
+> > -cpu Westmere \
+> > -m 4096 \
+> > -global kvm-apic.vapic=false \
+> > -netdev tap,id=hn0,vhost=off,br=br0,helper=/usr/local/libexec/qemu-bridge-helper
+> > \
+> > -device e1000,id=e0,netdev=hn0 \
+> > -blockdev '{"node-name": "disk0", "driver": "qcow2",
+> > "refcount-cache-size": 1638400, "l2-cache-size": 6553600, "file": {
+> > "driver": "file", "filename": "'${imagefolder}\/ubuntu.qcow2'"}}' \
+> > -device virtio-blk,drive=disk0,id=disk0 \
+> > -chardev socket,id=ch0,path=/tmp/vhostqemu \
+> > -device vhost-user-fs-pci,chardev=ch0,tag=myfs \
+> > -object memory-backend-memfd,id=mem,size=4G,share=on \
+> > -numa node,memdev=mem \
+> > -qmp stdio \
+> > -vnc :0
+> >
+> > (3) guest
+> > mount -t virtiofs myfs /mnt/virtiofs
+> >
+> > I tried to change virtiofsd's --thread-pool-size value and test the
+> > storage performance by fio.
+> > Before each read/write/randread/randwrite test, the pagecaches of
+> > guest and host are dropped.
+> >
+> > ```
+> > RW="read" # or write/randread/randwrite
+> > fio --name=test --rw=$RW --bs=4k --numjobs=1 --ioengine=libaio
+> > --runtime=60 --direct=0 --iodepth=64 --size=10g
+> > --filename=/mnt/virtiofs/testfile
+> > done
+> > ```
+> >
+> > --thread-pool-size=64 (default)
+> >     seq read: 305 MB/s
+> >     seq write: 118 MB/s
+> >     rand 4KB read: 2222 IOPS
+> >     rand 4KB write: 21100 IOPS
+> >
+> > --thread-pool-size=1
+> >     seq read: 387 MB/s
+> >     seq write: 160 MB/s
+> >     rand 4KB read: 2622 IOPS
+> >     rand 4KB write: 30400 IOPS
+> >
+> > The results show the performance using default-pool-size (64) is
+> > poorer than using single thread.
+> > Is it due to the lock contention of the multiple threads?
+> > When can virtio-fs get better performance using multiple threads?
+> >
+> >
+> > I also tested the performance that guest accesses host's files via
+> > NFSv4/CIFS network filesystem.
+> > The "seq read" and "randread" performance of virtio-fs are also worse
+> > than the NFSv4 and CIFS.
+> >
+> > NFSv4:
+> >   seq write: 244 MB/s
+> >   rand 4K read: 4086 IOPS
+> >
+> > I cannot figure out why the perf of NFSv4/CIFS with the network stack
+> > is better than virtio-fs.
+> > Is it expected? Or, do I have an incorrect configuration?
+>
+> No, I remember benchmarking the thread pool and did not see such a big
+> difference.
+>
+> Please use direct=1 so that each I/O results in a virtio-fs request.
+> Otherwise the I/O pattern is not directly controlled by the benchmark
+> but by the page cache (readahead, etc).
+>
+> Using numactl(8) or taskset(1) to launch virtiofsd allows you to control
+> NUMA and CPU scheduling properties. For example, you could force all 64
+> threads to run on the same host CPU using taskset to see if that helps
+> this I/O bound workload.
+>
+> fio can collect detailed statistics on queue depths and a latency
+> histogram. It would be interesting to compare the --thread-pool-size=64
+> and --thread-pool-size=1 numbers.
+>
+> Comparing the "perf record -e kvm:kvm_exit" counts between the two might
+> also be interesting.
+>
+> Stefan
+
 

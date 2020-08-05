@@ -1,17 +1,15 @@
-Date: Tue, 4 Aug 2020 11:36:03 +0100
+Date: Wed, 5 Aug 2020 12:52:29 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20200804103603.GC1284284@stefanha-x1.localdomain>
-References: <20200730194736.173994-1-vgoyal@redhat.com>
-	<20200730194736.173994-5-vgoyal@redhat.com>
-	<20200803095459.GD244853@stefanha-x1.localdomain>
-	<20200803135715.GA233053@redhat.com>
+Message-ID: <20200805115229.GF361702@stefanha-x1.localdomain>
+References: <CAFKS8hWbckrE_cyJCf0pgFresD-JQk66wo-6uJA=Gu2MhReHVw@mail.gmail.com>
+	<20200728134936.GA21660@stefanha-x1.localdomain>
+	<CAFKS8hVwajyBFrVSURs1bS0F+ig8PSUAi1+YPUpe6=KYH8TjmA@mail.gmail.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="vEao7xgI/oilGqZ+"
+	protocol="application/pgp-signature"; boundary="SnV5plBeK2Ge1I9g"
 Content-Disposition: inline
-In-Reply-To: <20200803135715.GA233053@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v2 4/5] virtiofsd: Open lo->source while
- setting up root in sandbox=NONE mode
+In-Reply-To: <CAFKS8hVwajyBFrVSURs1bS0F+ig8PSUAi1+YPUpe6=KYH8TjmA@mail.gmail.com>
+Subject: Re: [Virtio-fs] virtio-fs performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,120 +18,74 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: berrange@redhat.com, vromanso@redhat.com, qemu-devel@nongnu.org, virtio-fs@redhat.com
+To: Derek Su <jwsu1986@gmail.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, qemu-discuss@nongnu.org
 
 
---vEao7xgI/oilGqZ+
+--SnV5plBeK2Ge1I9g
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Mon, Aug 03, 2020 at 09:57:15AM -0400, Vivek Goyal wrote:
-> On Mon, Aug 03, 2020 at 10:54:59AM +0100, Stefan Hajnoczi wrote:
-> > On Thu, Jul 30, 2020 at 03:47:35PM -0400, Vivek Goyal wrote:
-> > > In sandbox=3DNONE mode, lo->source points to the directory which is b=
-eing
-> > > exported. We have not done any chroot()/pivot_root(). So open lo->sou=
-rce.
-> > >=20
-> > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > > ---
-> > >  tools/virtiofsd/passthrough_ll.c | 5 ++++-
-> > >  1 file changed, 4 insertions(+), 1 deletion(-)
-> > >=20
-> > > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passt=
-hrough_ll.c
-> > > index 76ef891105..a6fa816b6c 100644
-> > > --- a/tools/virtiofsd/passthrough_ll.c
-> > > +++ b/tools/virtiofsd/passthrough_ll.c
-> > > @@ -3209,7 +3209,10 @@ static void setup_root(struct lo_data *lo, str=
-uct lo_inode *root)
-> > >      int fd, res;
-> > >      struct stat stat;
-> > > =20
-> > > -    fd =3D open("/", O_PATH);
-> > > +    if (lo->sandbox =3D=3D SANDBOX_NONE)
-> > > +        fd =3D open(lo->source, O_PATH);
-> > > +    else
-> > > +        fd =3D open("/", O_PATH);
-> >=20
-> > Up until now virtiofsd has been able to assume that path traversal has
-> > the shared directory as "/".
-> >=20
-> > Now this is no longer true and it is necessary to audit all syscalls
-> > that take path arguments. They must ensure that:
-> > 1. Path components are safe (no ".." or "/" allowed)
-> > 2. Symlinks are not followed.
+On Tue, Aug 04, 2020 at 03:37:26PM +0800, Derek Su wrote:
+> Set the cache=3Dnone in virtiofsd and direct=3D1 in fio,
+> here are the results and kvm-exit count in 5 seconds.
 >=20
-> This code does not change the path client is passing in and we are
-> already doing the checks on passed in paths/names. So existing checks
-> should work even for this case, isn't it?
+> --thread-pool-size=3D64 (default)
+>     seq read: 307 MB/s (kvm-exit count=3D1076463)
+>     seq write: 430 MB/s (kvm-exit count=3D1302493)
+>     rand 4KB read: 65.2k IOPS (kvm-exit count=3D1322899)
+>     rand 4KB write: 97.2k IOPS (kvm-exit count=3D1568618)
 >=20
-> lo_lookup() {
->     if (strchr(name, '/')) {
->         fuse_reply_err(req, EINVAL);
->         return;
->     }
-> }
+> --thread-pool-size=3D1
+>     seq read: 303 MB/s (kvm-exit count=3D1034614)
+>     seq write: 358 MB/s. (kvm-exit count=3D1537735)
+>     rand 4KB read: 7995 IOPS (kvm-exit count=3D438348)
+>     rand 4KB write: 97.7k IOPS (kvm-exit count=3D1907585)
 >=20
-> lo_do_lookup() {
->     /* Do not allow escaping root directory */
->     if (dir =3D=3D &lo->root && strcmp(name, "..") =3D=3D 0) {
->         name =3D ".";
->     }
-> }
-
-Yes, hopefully paths are already checked and syscalls do not follow
-symlinks. However, we wouldn't have noticed if either of those were
-missing since the pivot_root(2) ensured that path traversal stays within
-the shared directory.
-
-Now that a layer of protection has been removed it's necessary to check
-again whether everything is really alright.
-
+> The thread-pool-size=3D64 improves the rand 4KB read performance largely,
+> but doesn't increases the kvm-exit count too much.
 >=20
-> >=20
-> > Did you audit all syscalls made by passthrough_ll.c?
-> >=20
-> > virtiofsd still needs to restrict the client to the shared directory for
-> > two reasons:
-> > 1. The guest may not be trusted. An unprivileged sandbox=3Dnone mount c=
-an
-> >    be used with a malicious guest.
-> > 2. If accidental escapes are possible then the guest could accidentally
-> >    corrupt or delete files outside the shared directory.
->=20
-> Even if escape is possible, its no different than a malicious user
-> application running. Given sandbox=3Dnone can be used in case of
-> unpriviliged mode, that means user app can only affect files owned by
-> that user.
+> In addition, the fio avg. clat of rand 4K write are 960us for
+> thread-pool-size=3D64 and 7700us for thread-pool-size=3D1.
 
-Users may run untrusted guests. Those guests should not gain access to
-the user's files outside the shared directory.
+These numbers make sense to me. The thread pool is generally faster.
 
-> If doing chroot/pivot_root is must, then we need additional capabilities.
+Note that virtiofsd opens files without O_DIRECT, even if with the
+cache=3Dnone option. This explains why rand 4KB write reaches 97.7K but
+rand 4KB read only does 7885 IOPS (random reads result in page cache
+misses on the host).
 
-I think it's not a must, but just an extra layer of security. What I
-don't know 100% is whether virtiofsd accidentally relies on that extra
-layer of security today since it never ran without it :).
+I don't have a good explanation of why the thread pool was slower with
+direct=3D0 though :(. One way to investigate that is by checking whether
+the I/O pattern submitted by the guest is comparable between
+--thread-pool-size=3D64 and --thread-pool-size=3D1. You could try to observe
+this by tracing virtiofsd preadv()/pwritev() system calls.
+
+If you find that --thread-pool-size=3D64 made more I/O requests and with
+smaller block sizes, then it's probably a timing issue where the guest
+page cache responds differently because the virtiofsd thread pool
+completes requests at a different rate. Maybe it affects how the guest
+page cache is populated and a slower virtiofsd leads to more efficient
+page cache activity in the guest (-> fewer and bigger FUSE read/write
+requests)?
 
 Stefan
 
---vEao7xgI/oilGqZ+
+--SnV5plBeK2Ge1I9g
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl8pOhMACgkQnKSrs4Gr
-c8guwAf/VzWCrF8gU2TyirNenM6hAUUNehn9r0oFneTOWyiN+lGMUgznl1dZSLjE
-7xOa968yo88CpK9ukzZTsa6qV28SWatInBGTa4jere1ju4gX9hvUpj8w+h9/Y0gq
-gBlymLvn8ABGd4AcjCNsZPoNLsERJ35UUkMNyxPiLAiAEx93ujJvtkA1dq15DAUj
-dZUEYyS0A1szZMH5HkDFOifcSQJjQ2LY3sqbBVYw8WhyYoCKVPS+v97LVzitXmCS
-NksNIE5EDrSgmxfa43wZ57pCqtlZi2qsBrd+Gm35i4wzFU0pFEc6kcQpYXDJMOiO
-b0qSr3S/KkcM478tnHbEMory1P3lMg==
-=bD9h
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl8qnX0ACgkQnKSrs4Gr
+c8hVrAf9FfJqBahHMhq7wxLOV5zfxam1rcnDhEpaDL68RpdXZ9jXO4RPOB7+nP3T
+a3dhz/0sz7V4ribDPUgU/iTXg6Zn4j9MNwV/dN8rfVRy/J0DPqqViI7yXOu6ICz2
+vzhKtoRHSksAjWjqgYI+DKBGGKXjdMjoq1VqyOucVA18qgVJTBquKr0e6YdoZ5SX
++JtteOmyOcp2AXUIyBswTqWfBthlDonnTl53oKWyGydV4NxWVB7jdaL0F1K5/XYU
+TfMBT1udLN1ceudRRLbqA34pjpJ0cz+McLoM9AkSKUihaKEaIg8YA4cjFTXwhg69
+VSFCHrpjJx7ctOroURO1s5adWLQxng==
+=gfxr
 -----END PGP SIGNATURE-----
 
---vEao7xgI/oilGqZ+--
+--SnV5plBeK2Ge1I9g--
 

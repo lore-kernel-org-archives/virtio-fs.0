@@ -1,19 +1,10 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-	d=fujitsu.onmicrosoft.com; s=selector2-fujitsu-onmicrosoft-com;
-	h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
-	bh=4bniU8zPH+52MQmMc/EX4E81xCFPz4/8Bdos46VqOmc=;
-	b=GLtvG6ce/RATRHdUe9cZRwvmohnMPQBIhT+JFK8cgyC4rbLFOQVY4Dh15A+lvu7cB0zYFdZ3HxHVKSOTtuEjSvVZU4uAEymRT4Eeg+PUyycVdYBHldk6HcJya6tVyRU/CTPQqEJV4dJSbMq6tCdMA6VcjQCCJY0ca+y7SZwF0l8=
-From: "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>
-Date: Thu, 6 Aug 2020 08:20:39 +0000
-Message-ID: <OSBPR01MB4582AB9CD2DB32A48A8BB13FE5480@OSBPR01MB4582.jpnprd01.prod.outlook.com>
-References: <20200727161841.GA54539@redhat.com>
-In-Reply-To: <20200727161841.GA54539@redhat.com>
-Content-Language: ja-JP
+From: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+Date: Thu, 6 Aug 2020 20:11:29 +0900
+Message-ID: <20200806111129.22055-1-misono.tomohiro@jp.fujitsu.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-2022-jp"
+Content-Type: text/plain
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Disable remote posix locks by
- default
+Subject: [Virtio-fs] [PATCH] virtiofsd: Cleanup norace option description
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,28 +13,45 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: 'Vivek Goyal' <vgoyal@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: virtio-fs@redhat.com
+Cc: qemu-devel@nongnu.org
 
-> Right now we enable remote posix locks by default. That means when guest does a posix lock it sends request to server
-> (virtiofsd). But currently we only support non-blocking posix lock and return -EOPNOTSUPP for blocking version.
-> 
-> This means that existing applications which are doing blocking posix locks get -EOPNOTSUPP and fail. To avoid this,
-> people have been running virtiosd with option "-o no_posix_lock". For new users it is still a surprise and trial and error
-> takes them to this option.
-> 
-> Given posix lock implementation is not complete in virtiofsd, disable it by default. This means that posix locks will work
-> with-in applications in a guest but not across guests. Anyway we don't support sharing filesystem among different guests
-> yet in virtiofs so this should not lead to any kind of surprise or regression and will make life little easier for virtiofs users.
-> 
-> Reported-by: Aa Aa <jimbothom@yandex.com>
-> Suggested-by: Miklos Szeredi <mszeredi@redhat.com>
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  tools/virtiofsd/passthrough_ll.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Cleanup norace option as the feature was removed by below commit:
 
-We should update docs/tools/virtiofsd.rst as well. Given that:
- Reviewed-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+Fixes: 93bb3d8d4cda("virtiofsd: remove symlink fallbacks")
+Signed-off-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+---
+ docs/tools/virtiofsd.rst | 3 ---
+ tools/virtiofsd/helper.c | 2 --
+ 2 files changed, 5 deletions(-)
 
+diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
+index 824e713491..58666a4495 100644
+--- a/docs/tools/virtiofsd.rst
++++ b/docs/tools/virtiofsd.rst
+@@ -63,9 +63,6 @@ Options
+     Print only log messages matching LEVEL or more severe.  LEVEL is one of
+     ``err``, ``warn``, ``info``, or ``debug``.  The default is ``info``.
+ 
+-  * norace -
+-    Disable racy fallback.  The default is false.
+-
+   * posix_lock|no_posix_lock -
+     Enable/disable remote POSIX locks.  The default is ``posix_lock``.
+ 
+diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
+index 2e4cdb4f49..4ded1d588a 100644
+--- a/tools/virtiofsd/helper.c
++++ b/tools/virtiofsd/helper.c
+@@ -159,8 +159,6 @@ void fuse_cmdline_help(void)
+            "    -o max_idle_threads        the maximum number of idle worker "
+            "threads\n"
+            "                               allowed (default: 10)\n"
+-           "    -o norace                  disable racy fallback\n"
+-           "                               default: false\n"
+            "    -o posix_lock|no_posix_lock\n"
+            "                               enable/disable remote posix lock\n"
+            "                               default: posix_lock\n"
+-- 
+2.21.3
 

@@ -1,12 +1,19 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Thu, 25 Jun 2020 17:29:29 +0100
-Message-Id: <20200625162929.46672-4-dgilbert@redhat.com>
-In-Reply-To: <20200625162929.46672-1-dgilbert@redhat.com>
-References: <20200625162929.46672-1-dgilbert@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+	d=fujitsu.onmicrosoft.com; s=selector2-fujitsu-onmicrosoft-com;
+	h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+	bh=4bniU8zPH+52MQmMc/EX4E81xCFPz4/8Bdos46VqOmc=;
+	b=GLtvG6ce/RATRHdUe9cZRwvmohnMPQBIhT+JFK8cgyC4rbLFOQVY4Dh15A+lvu7cB0zYFdZ3HxHVKSOTtuEjSvVZU4uAEymRT4Eeg+PUyycVdYBHldk6HcJya6tVyRU/CTPQqEJV4dJSbMq6tCdMA6VcjQCCJY0ca+y7SZwF0l8=
+From: "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>
+Date: Thu, 6 Aug 2020 08:20:39 +0000
+Message-ID: <OSBPR01MB4582AB9CD2DB32A48A8BB13FE5480@OSBPR01MB4582.jpnprd01.prod.outlook.com>
+References: <20200727161841.GA54539@redhat.com>
+In-Reply-To: <20200727161841.GA54539@redhat.com>
+Content-Language: ja-JP
 MIME-Version: 1.0
+Content-Type: text/plain; charset="iso-2022-jp"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 3/3] virtiofsd: Allow addition or removal of
-	capabilities
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Disable remote posix locks by
+ default
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,152 +22,28 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com, stefanha@redhat.com, vgoyal@redhat.com
+To: 'Vivek Goyal' <vgoyal@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+> Right now we enable remote posix locks by default. That means when guest does a posix lock it sends request to server
+> (virtiofsd). But currently we only support non-blocking posix lock and return -EOPNOTSUPP for blocking version.
+> 
+> This means that existing applications which are doing blocking posix locks get -EOPNOTSUPP and fail. To avoid this,
+> people have been running virtiosd with option "-o no_posix_lock". For new users it is still a surprise and trial and error
+> takes them to this option.
+> 
+> Given posix lock implementation is not complete in virtiofsd, disable it by default. This means that posix locks will work
+> with-in applications in a guest but not across guests. Anyway we don't support sharing filesystem among different guests
+> yet in virtiofs so this should not lead to any kind of surprise or regression and will make life little easier for virtiofs users.
+> 
+> Reported-by: Aa Aa <jimbothom@yandex.com>
+> Suggested-by: Miklos Szeredi <mszeredi@redhat.com>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Allow capabilities to be added or removed from the allowed set for the
-daemon; e.g.
+We should update docs/tools/virtiofsd.rst as well. Given that:
+ Reviewed-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
 
-default:
-CapPrm: 00000000880000df
-CapEff: 00000000880000df
-
--o modcaps=+sys_admin
-
-CapPrm: 00000000882000df
-CapEff: 00000000882000df
-
--o modcaps=+sys_admin:-chown
-
-CapPrm: 00000000882000de
-CapEff: 00000000882000de
-
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
----
- docs/tools/virtiofsd.rst         |  5 ++++
- tools/virtiofsd/helper.c         |  2 ++
- tools/virtiofsd/passthrough_ll.c | 50 ++++++++++++++++++++++++++++++--
- 3 files changed, 55 insertions(+), 2 deletions(-)
-
-diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-index 378594c422..824e713491 100644
---- a/docs/tools/virtiofsd.rst
-+++ b/docs/tools/virtiofsd.rst
-@@ -54,6 +54,11 @@ Options
-   * flock|no_flock -
-     Enable/disable flock.  The default is ``no_flock``.
- 
-+  * modcaps=CAPLIST
-+    Modify the list of capabilities allowed; CAPLIST is a colon separated
-+    list of capabilities, each preceded by either + or -, e.g.
-+    ''+sys_admin:-chown''.
-+
-   * log_level=LEVEL -
-     Print only log messages matching LEVEL or more severe.  LEVEL is one of
-     ``err``, ``warn``, ``info``, or ``debug``.  The default is ``info``.
-diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
-index 00a1ef666a..3105b6c23a 100644
---- a/tools/virtiofsd/helper.c
-+++ b/tools/virtiofsd/helper.c
-@@ -174,6 +174,8 @@ void fuse_cmdline_help(void)
-            "                               default: no_writeback\n"
-            "    -o xattr|no_xattr          enable/disable xattr\n"
-            "                               default: no_xattr\n"
-+           "    -o modcaps=CAPLIST         Modify the list of capabilities\n"
-+           "                               e.g. -o modcaps=+sys_admin:-chown\n"
-            "    --rlimit-nofile=<num>      set maximum number of file descriptors\n"
-            "                               (0 leaves rlimit unchanged)\n"
-            "                               default: min(1000000, fs.file-max - 16384)\n"
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 99d562046a..9d2cbc70ca 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -145,6 +145,7 @@ struct lo_data {
-     int posix_lock;
-     int xattr;
-     char *source;
-+    char *modcaps;
-     double timeout;
-     int cache;
-     int timeout_set;
-@@ -170,6 +171,7 @@ static const struct fuse_opt lo_opts[] = {
-     { "no_posix_lock", offsetof(struct lo_data, posix_lock), 0 },
-     { "xattr", offsetof(struct lo_data, xattr), 1 },
-     { "no_xattr", offsetof(struct lo_data, xattr), 0 },
-+    { "modcaps=%s", offsetof(struct lo_data, modcaps), 0 },
-     { "timeout=%lf", offsetof(struct lo_data, timeout), 0 },
-     { "timeout=", offsetof(struct lo_data, timeout_set), 1 },
-     { "cache=none", offsetof(struct lo_data, cache), CACHE_NONE },
-@@ -2571,7 +2573,7 @@ static void setup_mounts(const char *source)
- /*
-  * Only keep whitelisted capabilities that are needed for file system operation
-  */
--static void setup_capabilities(void)
-+static void setup_capabilities(struct lo_data *lo)
- {
-     pthread_mutex_lock(&cap.mutex);
-     capng_restore_state(&cap.saved);
-@@ -2604,6 +2606,50 @@ static void setup_capabilities(void)
-         exit(1);
-     }
- 
-+    /*
-+     * The modcaps option is a colon separated list of caps,
-+     * each preceded by either + or -.
-+     */
-+    while (lo->modcaps) {
-+        capng_act_t action;
-+        int cap;
-+
-+        char *next = strchr(lo->modcaps, ':');
-+        if (next) {
-+            *next = '\0';
-+            next++;
-+        }
-+
-+        switch (lo->modcaps[0]) {
-+        case '+':
-+            action = CAPNG_ADD;
-+            break;
-+
-+        case '-':
-+            action = CAPNG_DROP;
-+            break;
-+
-+        default:
-+            fuse_log(FUSE_LOG_ERR,
-+                     "%s: Expecting '+'/'-' in modcaps but found '%c'\n",
-+                     __func__, lo->modcaps[0]);
-+            exit(1);
-+        }
-+        cap = capng_name_to_capability(lo->modcaps + 1);
-+        if (cap < 0) {
-+            fuse_log(FUSE_LOG_ERR, "%s: Unknown capability '%s'\n", __func__,
-+                     lo->modcaps);
-+            exit(1);
-+        }
-+        if (capng_update(action, CAPNG_PERMITTED | CAPNG_EFFECTIVE, cap)) {
-+            fuse_log(FUSE_LOG_ERR, "%s: capng_update failed for '%s'\n",
-+                     __func__, lo->modcaps);
-+            exit(1);
-+        }
-+
-+        lo->modcaps = next;
-+    }
-+
-     if (capng_apply(CAPNG_SELECT_BOTH)) {
-         fuse_log(FUSE_LOG_ERR, "%s: capng_apply failed\n", __func__);
-         exit(1);
-@@ -2627,7 +2673,7 @@ static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
-     setup_namespaces(lo, se);
-     setup_mounts(lo->source);
-     setup_seccomp(enable_syslog);
--    setup_capabilities();
-+    setup_capabilities(lo);
- }
- 
- /* Set the maximum number of open file descriptors */
--- 
-2.26.2
 

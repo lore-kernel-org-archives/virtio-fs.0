@@ -1,15 +1,16 @@
-Date: Fri, 19 Jun 2020 12:09:23 -0400
+Date: Thu, 6 Aug 2020 16:07:29 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200619160923.GD3154@redhat.com>
-References: <20200416164907.244868-1-stefanha@redhat.com>
-	<20200618190816.GD3814@redhat.com> <20200618191655.GI2769@work-vm>
-	<20200618192717.GE3814@redhat.com> <20200619082746.GA2690@work-vm>
+Message-ID: <20200806200729.GH367847@redhat.com>
+References: <CAFKS8hWbckrE_cyJCf0pgFresD-JQk66wo-6uJA=Gu2MhReHVw@mail.gmail.com>
+	<20200728134936.GA21660@stefanha-x1.localdomain>
+	<20200728152719.GD78409@redhat.com>
+	<CAFKS8hUPdx=eHpvYqB3T__ZBWyztfNPGSBtiBDiqMotA8Cca9Q@mail.gmail.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-In-Reply-To: <20200619082746.GA2690@work-vm>
-Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: drop Linux capabilities(7)
+In-Reply-To: <CAFKS8hUPdx=eHpvYqB3T__ZBWyztfNPGSBtiBDiqMotA8Cca9Q@mail.gmail.com>
+Subject: Re: [Virtio-fs] virtio-fs performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,140 +19,134 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Miklos Szeredi <miklos@szeredi.hu>
+To: Derek Su <jwsu1986@gmail.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, qemu-discuss@nongnu.org
 
-On Fri, Jun 19, 2020 at 09:27:46AM +0100, Dr. David Alan Gilbert wrote:
-> * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > On Thu, Jun 18, 2020 at 08:16:55PM +0100, Dr. David Alan Gilbert wrote:
-> > > * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > > > On Thu, Apr 16, 2020 at 05:49:05PM +0100, Stefan Hajnoczi wrote:
-> > > > > virtiofsd doesn't need of all Linux capabilities(7) available to root.  Keep a
-> > > > > whitelisted set of capabilities that we require.  This improves security in
-> > > > > case virtiofsd is compromised by making it hard for an attacker to gain further
-> > > > > access to the system.
-> > > > 
-> > > > Hi Stefan,
-> > > > 
-> > > > I just noticed that this patch set breaks overlayfs on top of virtiofs.
-> > > > 
-> > > > overlayfs sets "trusted.overlay.*" and xattrs in trusted domain
-> > > > need CAP_SYS_ADMIN.
-> > > > 
-> > > > man xattr says.
-> > > > 
-> > > >    Trusted extended attributes
-> > > >        Trusted  extended  attributes  are  visible and accessible only to pro‐
-> > > >        cesses that have the  CAP_SYS_ADMIN  capability.   Attributes  in  this
-> > > >        class are used to implement mechanisms in user space (i.e., outside the
-> > > >        kernel) which keep information in extended attributes to which ordinary
-> > > >        processes should not have access.
-> > > > 
-> > > > There is a chance that overlay moves away from trusted xattr in future.
-> > > > But for now we need to make it work. This is an important use case for
-> > > > kata docker in docker build.
-> > > > 
-> > > > May be we can add an option to virtiofsd say "--add-cap <capability>" and
-> > > > ask user to pass in "--add-cap cap_sys_admin" if they need to run daemon
-> > > > with this capaibility.
-> > > 
-> > > I'll admit I don't like the idea of giving it cap_sys_admin.
-> > > Can you explain:
-> > >   a) What overlayfs uses trusted for?
-> > 
-> > overlayfs stores bunch of metadata and uses "trusted" xattrs for it.
+On Tue, Aug 04, 2020 at 03:51:50PM +0800, Derek Su wrote:
+> Vivek Goyal <vgoyal@redhat.com> 於 2020年7月28日 週二 下午11:27寫道：
+> >
+> > On Tue, Jul 28, 2020 at 02:49:36PM +0100, Stefan Hajnoczi wrote:
+> > > > I'm trying and testing the virtio-fs feature in QEMU v5.0.0.
+> > > > My host and guest OS are both ubuntu 18.04 with kernel 5.4, and the
+> > > > underlying storage is one single SSD.
+> > > >
+> > > > The configuations are:
+> > > > (1) virtiofsd
+> > > > ./virtiofsd -o
+> > > > source=/mnt/ssd/virtiofs,cache=auto,flock,posix_lock,writeback,xattr
+> > > > --thread-pool-size=1 --socket-path=/tmp/vhostqemu
+> > > >
+> > > > (2) qemu
+> > > > qemu-system-x86_64 \
+> > > > -enable-kvm \
+> > > > -name ubuntu \
+> > > > -cpu Westmere \
+> > > > -m 4096 \
+> > > > -global kvm-apic.vapic=false \
+> > > > -netdev tap,id=hn0,vhost=off,br=br0,helper=/usr/local/libexec/qemu-bridge-helper
+> > > > \
+> > > > -device e1000,id=e0,netdev=hn0 \
+> > > > -blockdev '{"node-name": "disk0", "driver": "qcow2",
+> > > > "refcount-cache-size": 1638400, "l2-cache-size": 6553600, "file": {
+> > > > "driver": "file", "filename": "'${imagefolder}\/ubuntu.qcow2'"}}' \
+> > > > -device virtio-blk,drive=disk0,id=disk0 \
+> > > > -chardev socket,id=ch0,path=/tmp/vhostqemu \
+> > > > -device vhost-user-fs-pci,chardev=ch0,tag=myfs \
+> > > > -object memory-backend-memfd,id=mem,size=4G,share=on \
+> > > > -numa node,memdev=mem \
+> > > > -qmp stdio \
+> > > > -vnc :0
+> > > >
+> > > > (3) guest
+> > > > mount -t virtiofs myfs /mnt/virtiofs
+> > > >
+> > > > I tried to change virtiofsd's --thread-pool-size value and test the
+> > > > storage performance by fio.
+> > > > Before each read/write/randread/randwrite test, the pagecaches of
+> > > > guest and host are dropped.
+> > > >
+> > > > ```
+> > > > RW="read" # or write/randread/randwrite
+> > > > fio --name=test --rw=$RW --bs=4k --numjobs=1 --ioengine=libaio
+> > > > --runtime=60 --direct=0 --iodepth=64 --size=10g
+> > > > --filename=/mnt/virtiofs/testfile
+> > > > done
+> >
+> > Couple of things.
+> >
+> > - Can you try cache=none option in virtiofsd. That will bypass page
+> >   cache in guest. It also gets rid of latencies related to
+> >   file_remove_privs() as of now.
+> >
+> > - Also with direct=0, are we really driving iodepth of 64? With direct=0
+> >   it is cached I/O. Is it still asynchronous at this point of time of
+> >   we have fallen back to synchronous I/O and driving queue depth of
+> >   1.
 > 
-> Tell me more about this metadata.
-> Taking a juicy looking one, what does OVL_XATTR_REDIRECT do?
-
-It contains path information which is used for lookup into lower layer.
-
-> Or what happens if I was to write random numbers into OVL_XATTR_NLINK?
-
-Overlay is storing its metadata in trusted.* xattrs. If a user modifies
-metadata, then various kind of bad things can happen. I think one can
-do some kind of checks on metadata to make sure it does not crash
-atleast.
-
-And that's true for any filesystem. Isn't. If user manages to modify
-metadata outside of filesystem, then lot of bad things can happen. I
-thought that's the reason that people are not comfortable with the
-idea of allowing mounting filesystem from inside user namespace because
-it makes it easy to mount a hand crafted filesystem.
-
-Anyway, I think overlayfs is just one use case of trusted xattr. Even
-if overlayfs moves away from trusted xattr, what about other users.
-We need to have a story around how will we support trusted xattrs
-safely.
-
-
+> Hi, Vivek
 > 
-> > >   b) If something nasty was to write junk into the trusted attributes,
-> > >     what would happen?
-> > 
-> > This directory is owned by guest. So it should be able to write
-> > anything it wants, as long as process in guest has CAP_SYS_ADMIN, right?
-> 
-> Well, we shouldn't be able to break/crash/escape into the host; how
-> much does overlayfs validate trusted.* it uses?
+> I did not see any difference in queue depth with direct={0|1} in my fio test.
+> Are there more clues to dig into this issue?
 
-I thought qemu and kvm are the one who should ensure we should not be
-able to break out of sandbox. Kernel implementation could be as 
-buggy as it wanted to be. We are working with this security model
-that kernel is completely untrusted.
+I tried it just again. fio seems to say queue depth 64 in both the cases
+but I am not sure if this is correct. Reason being that I get much
+better performance with direct=1. Also fio man page says.
 
-> 
-> > >   c) I see overlayfs has a fallback check if xattr isn't supported at
-> > > all - what is the consequence?
-> > 
-> > It falls back to I think read only mode. 
-> 
-> It looks like the fallback is more subtle to me:
->         /*
->          * Check if upper/work fs supports trusted.overlay.* xattr
->          */
->         err = ovl_do_setxattr(ofs->workdir, OVL_XATTR_OPAQUE, "0", 1, 0);
->         if (err) {
->                 ofs->noxattr = true;
->                 ofs->config.index = false;
->                 ofs->config.metacopy = false;
->                 pr_warn("upper fs does not support xattr, falling back to index=off and metacopy=off.\n");
-> 
-> but I don't know what index and metacopy are.
+ libaio Linux native asynchronous I/O. Note that Linux may
+        only support queued behavior with non-buffered I/O
+        (set  `direct=1'  or  `buffered=0').   This engine
+        defines engine specific options.
 
-They enable certain features in overlayfs. In fact, we fall back to
-lesser capability on if we are running on ext4/xfs. For virtiofs, 
-we deny the mount completely.
+Are you see difference in effective bandwidth/iops when you run with
+direct=0/1. I see it. 
 
-        /*
-         * We allowed sub-optimal upper fs configuration and don't want to break
-         * users over kernel upgrade, but we never allowed remote upper fs, so
-         * we can enforce strict requirements for remote upper fs.
-         */
-        if (ovl_dentry_remote(ofs->workdir) &&
-            (!d_type || !rename_whiteout || ofs->noxattr)) {
-                pr_err("upper fs missing required features.\n");
-                err = -EINVAL;
-                goto out;
-        }
+Anyway, in an attempt to narrow down the issues, I ran virtiofsd 
+with cache=none and did not enable xattr. (As of now xattr case
+needs to be optimized with SB_NOSEC).
 
-> 
-> > For a moment forget about overlayfs. Say a user process in guest with
-> > CAP_SYS_ADMIN is writing trusted.foo. Should that succeed? Is a
-> > passthrough filesystem, so it should go through. But currently it
-> > wont.
-> 
-> As long as any effects of what it writes are contained to the area of
-> the filesystem exposed to the guest, yes - however it worries me what
-> the consequences of broken trusted metadata is.  If it's delicate enough
-> that it's guarded by CAP_SYS_ADMIN someone must have worried about it.
+I ran virtiofsd as follows.
 
-Agreed that we need to look into whether having CAP_SYS_ADMIN allow
-virtiofsd to break out of jail. 
+./virtiofsd --socket-path=/tmp/vhostqemu2 -o source=/mnt/sdb/virtiofs-source2/ -o no_posix_lock -o modcaps=+sys_admin -o log_level=info -o cache=none --daemonize
 
-May be we need to provide that remapping trusted xattr feature so
-that we don't have to have CAP_SYS_ADMIN in init_user_ns and can
-provide this emulation even when running in user namespace.
+And then ran following fio commands with direct=0 and direct=1.
 
+fio --name=test --rw=randwrite --bs=4K --numjobs=1 --ioengine=libaio --runtime=30 --direct=0 --iodepth=64 --filename=fio-file1
+
+direct=0
+--------
+write: IOPS=8712, BW=34.0MiB/s (35.7MB/s)(1021MiB/30001msec)
+
+direct=1
+--------
+write: IOPS=84.4k, BW=330MiB/s (346MB/s)(4096MiB/12428msec)
+
+So I see almost 10 fold jump in throughput with direct=1. So I believe
+direct=0 is not driving the queue depth.
+
+You raised interesting issue of --thread-pool-size=1 vs 64 and I decided
+to give it a try. I ran same tests as above with thread pool size 1
+and following are results.
+
+with direct=0
+-------------
+write: IOPS=14.7k, BW=57.4MiB/s (60.2MB/s)(1721MiB/30001msec)
+
+with direct=1
+-------------
+write: IOPS=71.7k, BW=280MiB/s (294MB/s)(4096MiB/14622msec);
+
+So with we are driving queue depth 1 (direct=0), looks like
+--thread-pool-size 1 is helping. I see higher IOPS. But when we are
+driving queue depth of 64, then --thread-pool-size=1 seems to hurt.
+
+Now question is, why thread pool size 64 by default hurts so much
+for the case of queue depth 1.
+
+You raised anohter issue of it being slower than NFSv4/CIFS. I think
+you can run virtiofsd with cache=none and without enabling xattr
+and post results here so that we have some idea how much better
+NFSv4/CIFS is.
+
+Thanks
 Vivek
 

@@ -1,24 +1,12 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
-	h=subject:to:cc:references:from:autocrypt:message-id:date:user-agent
-	:mime-version:in-reply-to:content-transfer-encoding:content-language;
-	bh=8UjLDVxuRdTxa+CZhgvCb62UfDHpnO31awh1SfpMwAY=;
-	b=sDqWpTdyaQL4f+ta445Nr/5xOzeQfQN26xQmV8G9ZaRgU9T3y9pla84T3pn5/kwJnd
-	5Hq+OgQ71zL1GckJ0SJOR/xHRTV9ByBSLe+BvQlG8xgcjoCzD4b7RkmYzqmmzaMpo1e0
-	OlSctSg0Ax8JW7Dhd8KjewRWx9YAbqTb1JB9n0y2xM9N0ZeciNqcFf9+asg0FpfmXAb0
-	NTOD9p3ELtzlH1IIjXsLOHr6Zr7ino9aZw/w5V0j3Giv6kj6drSDSbk3+kBJIrlEx909
-	SqJ4Rnw87S1L1i4EfoeFnOjsZ4ayn6QX50GpK8ZaZtS/pdV/NlnQtMUQAg3MoZUxv1Qz
-	+wtQ==
-References: <a14cfa52-f1bc-b31e-5f85-ab207c1689a0@gmail.com>
-	<20200918185548.GS2816@work-vm>
-From: "Harry G. Coin" <hgcoin@gmail.com>
-Message-ID: <1b3d3efe-b3b8-1711-4993-956e88da9b7d@gmail.com>
-Date: Fri, 18 Sep 2020 14:06:11 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Fri,  7 Aug 2020 15:55:12 -0400
+Message-Id: <20200807195526.426056-7-vgoyal@redhat.com>
+In-Reply-To: <20200807195526.426056-1-vgoyal@redhat.com>
+References: <20200807195526.426056-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20200918185548.GS2816@work-vm>
-Content-Type: text/plain; charset="utf-8"
-Content-Language: en-US
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] Can libvirt parse virtiofsd -o writeback?
+Subject: [Virtio-fs] [PATCH v2 06/20] virtiofs: Provide a helper function
+	for virtqueue initialization
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,77 +15,110 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
+Cc: vgoyal@redhat.com, miklos@szeredi.hu
 
+This reduces code duplication and make it little easier to read code.
 
-On 9/18/20 1:55 PM, Dr. David Alan Gilbert wrote:
-> * Harry G. Coin (hgcoin@gmail.com) wrote:
->> Is there any libvirt xml parser rev that knows about how to set
->> virtiofsd -o writeback?
-> I don't think so ; the docs say:
-> https://libvirt.org/formatdomain.html#filesystems
-> says:
->
->  binary
->
->     The optional binary element can tune the options for virtiofsd. All
->     of the following attributes and elements are optional. The attribute
->     path can be used to override the path to the daemon. Attribute xattr
->     enables the use of filesystem extended attributes. Caching can be
->     tuned via the cache element, possible mode values being none and
->     always. Locking can be controlled via the lock element - attributes
->     posix and flock both accepting values on or off. ( Since 6.2.0 )
->
->
-> Hmm, I've never tried the -o writeback; have you found it beneficial?
->
-> Dave
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/virtio_fs.c | 50 +++++++++++++++++++++++++++------------------
+ 1 file changed, 30 insertions(+), 20 deletions(-)
 
-Jury is still out.  Writeback without dax (which is unavailable outside
-the high-interest bubble) subjectively seems to help a bit.  I have
-managed to get a kernel boot going with generic environments, calls for
-some hacking of initramfs, and most of the instructions about kernel
-command line content is wrong on the info page.
-
-Here's how folks can try writeback without having to cook up a dev
-environment:
-
-The paths below are for debian/ubuntu style distos, the rhel/centos
-paths differ a bit.   I don't have the SELinux equivalent to the
-apparmor glue.
-
-Libvirt xml:
-
-...
-
-<filesystem type="mount" accessmode="passthrough">
-  <driver type="virtiofs" queue="1024"/>
-  <binary path="/usr/local/sbin/custom_virtiofsd" xattr="on">
-    <lock posix="off" flock="on"/>
-  </binary>
-
-cat >  /usr/local/sbin/custom_virtiofsd
-#!/bin/bash
-#Provide a way to add arguments libvirt doesn't know about.
-set -o allexport
-/usr/lib/qemu/virtiofsd $@ -o writeback
-
-and
-
-cat > /etc/apparmor.d/local/usr.sbin.libvirtd
-/usr/local/sbin/custom_virtiofsd rux,
-
-
->
->> Thanks
->>
->> Harry Coin
->>
->>
->> _______________________________________________
->> Virtio-fs mailing list
->> Virtio-fs@redhat.com
->> https://www.redhat.com/mailman/listinfo/virtio-fs
-
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index 4c4ef5d69298..e615edfbd09c 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -24,6 +24,8 @@ enum {
+ 	VQ_REQUEST
+ };
+ 
++#define VQ_NAME_LEN	24
++
+ /* Per-virtqueue state */
+ struct virtio_fs_vq {
+ 	spinlock_t lock;
+@@ -36,7 +38,7 @@ struct virtio_fs_vq {
+ 	bool connected;
+ 	long in_flight;
+ 	struct completion in_flight_zero; /* No inflight requests */
+-	char name[24];
++	char name[VQ_NAME_LEN];
+ } ____cacheline_aligned_in_smp;
+ 
+ /* A virtio-fs device instance */
+@@ -596,6 +598,26 @@ static void virtio_fs_vq_done(struct virtqueue *vq)
+ 	schedule_work(&fsvq->done_work);
+ }
+ 
++static void virtio_fs_init_vq(struct virtio_fs_vq *fsvq, char *name,
++			      int vq_type)
++{
++	strncpy(fsvq->name, name, VQ_NAME_LEN);
++	spin_lock_init(&fsvq->lock);
++	INIT_LIST_HEAD(&fsvq->queued_reqs);
++	INIT_LIST_HEAD(&fsvq->end_reqs);
++	init_completion(&fsvq->in_flight_zero);
++
++	if (vq_type == VQ_REQUEST) {
++		INIT_WORK(&fsvq->done_work, virtio_fs_requests_done_work);
++		INIT_DELAYED_WORK(&fsvq->dispatch_work,
++				  virtio_fs_request_dispatch_work);
++	} else {
++		INIT_WORK(&fsvq->done_work, virtio_fs_hiprio_done_work);
++		INIT_DELAYED_WORK(&fsvq->dispatch_work,
++				  virtio_fs_hiprio_dispatch_work);
++	}
++}
++
+ /* Initialize virtqueues */
+ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 			       struct virtio_fs *fs)
+@@ -611,7 +633,7 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 	if (fs->num_request_queues == 0)
+ 		return -EINVAL;
+ 
+-	fs->nvqs = 1 + fs->num_request_queues;
++	fs->nvqs = VQ_REQUEST + fs->num_request_queues;
+ 	fs->vqs = kcalloc(fs->nvqs, sizeof(fs->vqs[VQ_HIPRIO]), GFP_KERNEL);
+ 	if (!fs->vqs)
+ 		return -ENOMEM;
+@@ -625,29 +647,17 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 		goto out;
+ 	}
+ 
++	/* Initialize the hiprio/forget request virtqueue */
+ 	callbacks[VQ_HIPRIO] = virtio_fs_vq_done;
+-	snprintf(fs->vqs[VQ_HIPRIO].name, sizeof(fs->vqs[VQ_HIPRIO].name),
+-			"hiprio");
++	virtio_fs_init_vq(&fs->vqs[VQ_HIPRIO], "hiprio", VQ_HIPRIO);
+ 	names[VQ_HIPRIO] = fs->vqs[VQ_HIPRIO].name;
+-	INIT_WORK(&fs->vqs[VQ_HIPRIO].done_work, virtio_fs_hiprio_done_work);
+-	INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].queued_reqs);
+-	INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].end_reqs);
+-	INIT_DELAYED_WORK(&fs->vqs[VQ_HIPRIO].dispatch_work,
+-			virtio_fs_hiprio_dispatch_work);
+-	init_completion(&fs->vqs[VQ_HIPRIO].in_flight_zero);
+-	spin_lock_init(&fs->vqs[VQ_HIPRIO].lock);
+ 
+ 	/* Initialize the requests virtqueues */
+ 	for (i = VQ_REQUEST; i < fs->nvqs; i++) {
+-		spin_lock_init(&fs->vqs[i].lock);
+-		INIT_WORK(&fs->vqs[i].done_work, virtio_fs_requests_done_work);
+-		INIT_DELAYED_WORK(&fs->vqs[i].dispatch_work,
+-				  virtio_fs_request_dispatch_work);
+-		INIT_LIST_HEAD(&fs->vqs[i].queued_reqs);
+-		INIT_LIST_HEAD(&fs->vqs[i].end_reqs);
+-		init_completion(&fs->vqs[i].in_flight_zero);
+-		snprintf(fs->vqs[i].name, sizeof(fs->vqs[i].name),
+-			 "requests.%u", i - VQ_REQUEST);
++		char vq_name[VQ_NAME_LEN];
++
++		snprintf(vq_name, VQ_NAME_LEN, "requests.%u", i - VQ_REQUEST);
++		virtio_fs_init_vq(&fs->vqs[i], vq_name, VQ_REQUEST);
+ 		callbacks[i] = virtio_fs_vq_done;
+ 		names[i] = fs->vqs[i].name;
+ 	}
+-- 
+2.25.4
 

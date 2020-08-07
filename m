@@ -1,14 +1,11 @@
-Date: Mon, 21 Sep 2020 09:39:44 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200921133944.GB13362@redhat.com>
-References: <20200918213436.GA3520@redhat.com>
-	<20200921083923.GA71121@stefanha-x1.localdomain>
+Date: Fri,  7 Aug 2020 15:55:20 -0400
+Message-Id: <20200807195526.426056-15-vgoyal@redhat.com>
+In-Reply-To: <20200807195526.426056-1-vgoyal@redhat.com>
+References: <20200807195526.426056-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200921083923.GA71121@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] tools/virtiofs: Multi threading seems to hurt
-	performance
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2 14/20] fuse,dax: add DAX mmap support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,65 +14,111 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
+Cc: vgoyal@redhat.com, miklos@szeredi.hu
 
-On Mon, Sep 21, 2020 at 09:39:23AM +0100, Stefan Hajnoczi wrote:
-> On Fri, Sep 18, 2020 at 05:34:36PM -0400, Vivek Goyal wrote:
-> > And here are the comparision results. To me it seems that by default
-> > we should switch to 1 thread (Till we can figure out how to make
-> > multi thread performance better even when single process is doing
-> > I/O in client).
-> 
-> Let's understand the reason before making changes.
-> 
-> Questions:
->  * Is "1-thread" --thread-pool-size=1?
+From: Stefan Hajnoczi <stefanha@redhat.com>
 
-Yes.
+Add DAX mmap() support.
 
->  * Was DAX enabled?
+Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ fs/fuse/file.c | 62 +++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 61 insertions(+), 1 deletion(-)
 
-No.
-
->  * How does cache=none perform?
-
-I just ran random read workload with cache=none.
-
-cache-none              randread-psync          45(MiB/s)       11k             
-cache-none-1-thread     randread-psync          63(MiB/s)       15k
-
-With 1 thread it offers more IOPS.
-
->  * Does commenting out vu_queue_get_avail_bytes() + fuse_log("%s:
->    Queue %d gave evalue: %zx available: in: %u out: %u\n") in
->    fv_queue_thread help?
-
-Will try that.
-
->  * How do the kvm_stat vmexit counters compare?
-
-This should be same, isn't it. Changing number of threads serving should
-not change number of vmexits?
-
->  * How does host mpstat -P ALL compare?
-
-Never used mpstat. Will try running it and see if I can get something
-meaningful.
-
->  * How does host perf record -a compare?
-
-Will try it. I feel this might be too big and too verbose to get
-something meaningful.
-
->  * Does the Rust virtiofsd show the same pattern (it doesn't use glib
->    thread pools)?
-
-No idea. Never tried rust implementation of virtiofsd.
-
-But I suepct it has to do with thread pool implementation and possibly
-extra cacheline bouncing.
-
-Thanks
-Vivek
+diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+index 194fe3e404a7..be7d90eb5b41 100644
+--- a/fs/fuse/file.c
++++ b/fs/fuse/file.c
+@@ -2841,10 +2841,15 @@ static const struct vm_operations_struct fuse_file_vm_ops = {
+ 	.page_mkwrite	= fuse_page_mkwrite,
+ };
+ 
++static int fuse_dax_mmap(struct file *file, struct vm_area_struct *vma);
+ static int fuse_file_mmap(struct file *file, struct vm_area_struct *vma)
+ {
+ 	struct fuse_file *ff = file->private_data;
+ 
++	/* DAX mmap is superior to direct_io mmap */
++	if (IS_DAX(file_inode(file)))
++		return fuse_dax_mmap(file, vma);
++
+ 	if (ff->open_flags & FOPEN_DIRECT_IO) {
+ 		/* Can't provide the coherency needed for MAP_SHARED */
+ 		if (vma->vm_flags & VM_MAYSHARE)
+@@ -2863,9 +2868,63 @@ static int fuse_file_mmap(struct file *file, struct vm_area_struct *vma)
+ 	return 0;
+ }
+ 
++static vm_fault_t __fuse_dax_fault(struct vm_fault *vmf,
++				   enum page_entry_size pe_size, bool write)
++{
++	vm_fault_t ret;
++	struct inode *inode = file_inode(vmf->vma->vm_file);
++	struct super_block *sb = inode->i_sb;
++	pfn_t pfn;
++
++	if (write)
++		sb_start_pagefault(sb);
++
++	ret = dax_iomap_fault(vmf, pe_size, &pfn, NULL, &fuse_iomap_ops);
++
++	if (ret & VM_FAULT_NEEDDSYNC)
++		ret = dax_finish_sync_fault(vmf, pe_size, pfn);
++
++	if (write)
++		sb_end_pagefault(sb);
++
++	return ret;
++}
++
++static vm_fault_t fuse_dax_fault(struct vm_fault *vmf)
++{
++	return __fuse_dax_fault(vmf, PE_SIZE_PTE,
++				vmf->flags & FAULT_FLAG_WRITE);
++}
++
++static vm_fault_t fuse_dax_huge_fault(struct vm_fault *vmf,
++			       enum page_entry_size pe_size)
++{
++	return __fuse_dax_fault(vmf, pe_size, vmf->flags & FAULT_FLAG_WRITE);
++}
++
++static vm_fault_t fuse_dax_page_mkwrite(struct vm_fault *vmf)
++{
++	return __fuse_dax_fault(vmf, PE_SIZE_PTE, true);
++}
++
++static vm_fault_t fuse_dax_pfn_mkwrite(struct vm_fault *vmf)
++{
++	return __fuse_dax_fault(vmf, PE_SIZE_PTE, true);
++}
++
++static const struct vm_operations_struct fuse_dax_vm_ops = {
++	.fault		= fuse_dax_fault,
++	.huge_fault	= fuse_dax_huge_fault,
++	.page_mkwrite	= fuse_dax_page_mkwrite,
++	.pfn_mkwrite	= fuse_dax_pfn_mkwrite,
++};
++
+ static int fuse_dax_mmap(struct file *file, struct vm_area_struct *vma)
+ {
+-	return -EINVAL; /* TODO */
++	file_accessed(file);
++	vma->vm_ops = &fuse_dax_vm_ops;
++	vma->vm_flags |= VM_MIXEDMAP | VM_HUGEPAGE;
++	return 0;
+ }
+ 
+ static int convert_fuse_file_lock(struct fuse_conn *fc,
+@@ -3938,6 +3997,7 @@ static const struct file_operations fuse_file_operations = {
+ 	.release	= fuse_release,
+ 	.fsync		= fuse_fsync,
+ 	.lock		= fuse_file_lock,
++	.get_unmapped_area = thp_get_unmapped_area,
+ 	.flock		= fuse_file_flock,
+ 	.splice_read	= generic_file_splice_read,
+ 	.splice_write	= iter_file_splice_write,
+-- 
+2.25.4
 

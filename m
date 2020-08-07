@@ -1,11 +1,9 @@
-From: Max Reitz <mreitz@redhat.com>
-Date: Wed,  9 Sep 2020 20:40:24 +0200
-Message-Id: <20200909184028.262297-5-mreitz@redhat.com>
-In-Reply-To: <20200909184028.262297-1-mreitz@redhat.com>
-References: <20200909184028.262297-1-mreitz@redhat.com>
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Fri,  7 Aug 2020 15:55:06 -0400
+Message-Id: <20200807195526.426056-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 4/8] virtiofsd: Add fuse_reply_attr_with_flags()
+Subject: [Virtio-fs] [PATCH v2 00/20] virtiofs: Add DAX support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,81 +12,117 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: virtio-fs@redhat.com, Max Reitz <mreitz@redhat.com>
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
+Cc: vgoyal@redhat.com, miklos@szeredi.hu
 
-The plain fuse_reply_attr() function does not allow setting
-fuse_attr.flags, so add this new function that does.
+Hi All,
 
-Make fuse_reply_attr() a wrapper around it.
+This is V2 of the patches. I had posted V1 here.
 
-Signed-off-by: Max Reitz <mreitz@redhat.com>
----
- tools/virtiofsd/fuse_lowlevel.h | 15 +++++++++++++++
- tools/virtiofsd/fuse_lowlevel.c | 14 ++++++++++++--
- 2 files changed, 27 insertions(+), 2 deletions(-)
+https://lore.kernel.org/linux-fsdevel/20200304165845.3081-1-vgoyal@redhat.com/
 
-diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
-index 9c06240f9e..1ff6ba1e4f 100644
---- a/tools/virtiofsd/fuse_lowlevel.h
-+++ b/tools/virtiofsd/fuse_lowlevel.h
-@@ -1313,6 +1313,21 @@ int fuse_reply_create(fuse_req_t req, const struct fuse_entry_param *e,
- int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
-                     double attr_timeout);
+I have taken care of most of the comments from V1.
+
+Amir had suggested that some of the code can be moved to a new file, may
+be post series. I have left that item for the post series cleanup.
+
+Miklos was concerned about KVM error handling when a mapped file on
+host gets truncated and guest tries to access it. As of now guest
+can spin in infinite loop. I have tried to address that with KVM
+developers and there is no easy race free way to inject synchronous
+exception which can indicate error in guest. For now, I have proposed
+that atleast guest can exit to qemu with error when such scenario
+happen and proposed a patch which has got two acks. But it has not
+been merged yet.
+
+https://lore.kernel.org/kvm/20200720211359.GF502563@redhat.com/
+
+We don't support modifications in virtiofs files from host or
+from other guests. And even if somebody modifies it, qemu will
+exit gracefully without bringing down host. So I think this
+probably is good enough for now to make progress on virtiofs DAX
+patches.
+
+Fixing kvm to inject errors is not easy and is a complicated design.
+We will need to make sure that happens before we support DAX in
+shared mode in virtiofs. But blocking behind this is proabably not
+a good idea because DAX can be very useful in non-shared mode in
+kata containers.
+
+Performance numbers are more or less same as in V1 post. So I am
+not providing any numbers again. In general, DAX can provide a good
+performance boost and memory savings.
+
+Any thoughts or feedback is welcome.
+
+Description from previous post
+------------------------------
+
+This patch series adds DAX support to virtiofs filesystem. This allows
+bypassing guest page cache and allows mapping host page cache directly
+in guest address space.
+
+When a page of file is needed, guest sends a request to map that page
+(in host page cache) in qemu address space. Inside guest this is
+a physical memory range controlled by virtiofs device. And guest
+directly maps this physical address range using DAX and hence gets
+access to file data on host.
+
+This can speed up things considerably in many situations. Also this
+can result in substantial memory savings as file data does not have
+to be copied in guest and it is directly accessed from host page
+cache.
+
+Most of the changes are limited to fuse/virtiofs. There are couple
+of changes needed in generic dax infrastructure and couple of changes
+in virtio to be able to access shared memory region.
  
-+/**
-+ * Reply with attributes and set fuse_attr.flags
-+ *
-+ * Possible requests:
-+ *   getattr, setattr
-+ *
-+ * @param req request handle
-+ * @param attr the attributes
-+ * @param attr_timeout validity timeout (in seconds) for the attributes
-+ * @param attr_flags flags to put into fuse_attr.flags
-+ * @return zero for success, -errno for failure to send reply
-+ */
-+int fuse_reply_attr_with_flags(fuse_req_t req, const struct stat *attr,
-+                               double attr_timeout, uint32_t attr_flags);
-+
- /**
-  * Reply with the contents of a symbolic link
-  *
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index 3ca49456c3..70efd3feaf 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -426,8 +426,8 @@ int fuse_reply_create(fuse_req_t req, const struct fuse_entry_param *e,
-     return send_reply_ok(req, buf, entrysize + sizeof(struct fuse_open_out));
- }
- 
--int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
--                    double attr_timeout)
-+int fuse_reply_attr_with_flags(fuse_req_t req, const struct stat *attr,
-+                               double attr_timeout, uint32_t attr_flags)
- {
-     struct fuse_attr_out arg;
-     size_t size = sizeof(arg);
-@@ -437,9 +437,19 @@ int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
-     arg.attr_valid_nsec = calc_timeout_nsec(attr_timeout);
-     convert_stat(attr, &arg.attr);
- 
-+    if (req->se->conn.capable & FUSE_CAP_ATTR_FLAGS) {
-+        arg.attr.flags = attr_flags;
-+    }
-+
-     return send_reply_ok(req, &arg, size);
- }
- 
-+int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
-+                    double attr_timeout)
-+{
-+    return fuse_reply_attr_with_flags(req, attr, attr_timeout, 0);
-+}
-+
- int fuse_reply_readlink(fuse_req_t req, const char *linkname)
- {
-     return send_reply_ok(req, linkname, strlen(linkname));
+Thanks
+Vivek
+
+Sebastien Boeuf (3):
+  virtio: Add get_shm_region method
+  virtio: Implement get_shm_region for PCI transport
+  virtio: Implement get_shm_region for MMIO transport
+
+Stefan Hajnoczi (2):
+  virtio_fs, dax: Set up virtio_fs dax_device
+  fuse,dax: add DAX mmap support
+
+Vivek Goyal (15):
+  dax: Modify bdev_dax_pgoff() to handle NULL bdev
+  dax: Create a range version of dax_layout_busy_page()
+  virtiofs: Provide a helper function for virtqueue initialization
+  fuse: Get rid of no_mount_options
+  fuse,virtiofs: Add a mount option to enable dax
+  fuse,virtiofs: Keep a list of free dax memory ranges
+  fuse: implement FUSE_INIT map_alignment field
+  fuse: Introduce setupmapping/removemapping commands
+  fuse, dax: Implement dax read/write operations
+  fuse, dax: Take ->i_mmap_sem lock during dax page fault
+  fuse,virtiofs: Define dax address space operations
+  fuse,virtiofs: Maintain a list of busy elements
+  fuse: Release file in process context
+  fuse: Take inode lock for dax inode truncation
+  fuse,virtiofs: Add logic to free up a memory range
+
+ drivers/dax/super.c                |    3 +-
+ drivers/virtio/virtio_mmio.c       |   32 +
+ drivers/virtio/virtio_pci_modern.c |   96 +++
+ fs/dax.c                           |   66 +-
+ fs/fuse/dir.c                      |    2 +
+ fs/fuse/file.c                     | 1189 +++++++++++++++++++++++++++-
+ fs/fuse/fuse_i.h                   |  112 ++-
+ fs/fuse/inode.c                    |  147 +++-
+ fs/fuse/virtio_fs.c                |  279 ++++++-
+ include/linux/dax.h                |    6 +
+ include/linux/virtio_config.h      |   17 +
+ include/uapi/linux/fuse.h          |   34 +-
+ include/uapi/linux/virtio_fs.h     |    3 +
+ include/uapi/linux/virtio_mmio.h   |   11 +
+ include/uapi/linux/virtio_pci.h    |   11 +-
+ 15 files changed, 1927 insertions(+), 81 deletions(-)
+
 -- 
-2.26.2
+2.25.4
 

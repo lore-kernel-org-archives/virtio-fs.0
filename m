@@ -1,12 +1,15 @@
-Date: Fri, 7 Aug 2020 10:55:14 +0100
+Date: Fri, 7 Aug 2020 16:29:49 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200807095514.GD2779@work-vm>
-References: <20200806111129.22055-1-misono.tomohiro@jp.fujitsu.com>
+Message-ID: <20200807152949.GF2780@work-vm>
+References: <20200727190223.422280-1-stefanha@redhat.com>
+	<20200727190223.422280-4-stefanha@redhat.com>
+	<OSBPR01MB45826073E5A54CF869E56721E5730@OSBPR01MB4582.jpnprd01.prod.outlook.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20200806111129.22055-1-misono.tomohiro@jp.fujitsu.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Cleanup norace option description
+In-Reply-To: <OSBPR01MB45826073E5A54CF869E56721E5730@OSBPR01MB4582.jpnprd01.prod.outlook.com>
+Subject: Re: [Virtio-fs] [PATCH v2 3/3] virtiofsd: probe unshare(CLONE_FS)
+ and print an error
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,62 +18,79 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>
+Cc: "vromanso@redhat.com" <vromanso@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, "rmohr@redhat.com" <rmohr@redhat.com>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "mpatel@redhat.com" <mpatel@redhat.com>, "vgoyal@redhat.com" <vgoyal@redhat.com>
 
-* Misono Tomohiro (misono.tomohiro@jp.fujitsu.com) wrote:
-> Cleanup norace option as the feature was removed by below commit:
+* misono.tomohiro@fujitsu.com (misono.tomohiro@fujitsu.com) wrote:
+> > Subject: [PATCH v2 3/3] virtiofsd: probe unshare(CLONE_FS) and print an error
+> > 
+> > An assertion failure is raised during request processing if
+> > unshare(CLONE_FS) fails. Implement a probe at startup so the problem can
+> > be detected right away.
+> > 
+> > Unfortunately Docker/Moby does not include unshare in the seccomp.json
+> > list unless CAP_SYS_ADMIN is given. Other seccomp.json lists always
+> > include unshare (e.g. podman is unaffected):
+> > https://raw.githubusercontent.com/seccomp/containers-golang/master/seccomp.json
+> > 
+> > Use "docker run --security-opt seccomp=path/to/seccomp.json ..." if the
+> > default seccomp.json is missing unshare.
 > 
-> Fixes: 93bb3d8d4cda("virtiofsd: remove symlink fallbacks")
-> Signed-off-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+> Hi, sorry for a bit late.
+> 
+> unshare() was added to fix xattr problem: 
+>   https://github.com/qemu/qemu/commit/bdfd66788349acc43cd3f1298718ad491663cfcc#
+> In theory we don't need to call unshare if xattr is disabled, but it is hard to get to know
+> if xattr is enabled or disabled in fv_queue_worker(), right?
+> 
+> So, it looks good to me.
+> Reviewed-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
 
-Sergio Lopez posted an identical post a few weeks back, but only to
-qemu-devel.
-I'll merge it into my dev world.
-
-Thanks.
+OK, I think it might also be OK to just fail the xattr operation on a
+non-file/directory in this case.
 
 Dave
 
-> ---
->  docs/tools/virtiofsd.rst | 3 ---
->  tools/virtiofsd/helper.c | 2 --
->  2 files changed, 5 deletions(-)
+> Regards,
+> Misono
 > 
-> diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-> index 824e713491..58666a4495 100644
-> --- a/docs/tools/virtiofsd.rst
-> +++ b/docs/tools/virtiofsd.rst
-> @@ -63,9 +63,6 @@ Options
->      Print only log messages matching LEVEL or more severe.  LEVEL is one of
->      ``err``, ``warn``, ``info``, or ``debug``.  The default is ``info``.
->  
-> -  * norace -
-> -    Disable racy fallback.  The default is false.
-> -
->    * posix_lock|no_posix_lock -
->      Enable/disable remote POSIX locks.  The default is ``posix_lock``.
->  
-> diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
-> index 2e4cdb4f49..4ded1d588a 100644
-> --- a/tools/virtiofsd/helper.c
-> +++ b/tools/virtiofsd/helper.c
-> @@ -159,8 +159,6 @@ void fuse_cmdline_help(void)
->             "    -o max_idle_threads        the maximum number of idle worker "
->             "threads\n"
->             "                               allowed (default: 10)\n"
-> -           "    -o norace                  disable racy fallback\n"
-> -           "                               default: false\n"
->             "    -o posix_lock|no_posix_lock\n"
->             "                               enable/disable remote posix lock\n"
->             "                               default: posix_lock\n"
-> -- 
-> 2.21.3
+> > 
+> > Cc: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+> > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> > ---
+> >  tools/virtiofsd/fuse_virtio.c | 16 ++++++++++++++++
+> >  1 file changed, 16 insertions(+)
+> > 
+> > diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+> > index 3b6d16a041..9e5537506c 100644
+> > --- a/tools/virtiofsd/fuse_virtio.c
+> > +++ b/tools/virtiofsd/fuse_virtio.c
+> > @@ -949,6 +949,22 @@ int virtio_session_mount(struct fuse_session *se)
+> >  {
+> >      int ret;
+> > 
+> > +    /*
+> > +     * Test that unshare(CLONE_FS) works. fv_queue_worker() will need it. It's
+> > +     * an unprivileged system call but some Docker/Moby versions are known to
+> > +     * reject it via seccomp when CAP_SYS_ADMIN is not given.
+> > +     *
+> > +     * Note that the program is single-threaded here so this syscall has no
+> > +     * visible effect and is safe to make.
+> > +     */
+> > +    ret = unshare(CLONE_FS);
+> > +    if (ret == -1 && errno == EPERM) {
+> > +        fuse_log(FUSE_LOG_ERR, "unshare(CLONE_FS) failed with EPERM. If "
+> > +                "running in a container please check that the container "
+> > +                "runtime seccomp policy allows unshare.\n");
+> > +        return -1;
+> > +    }
+> > +
+> >      ret = fv_create_listen_socket(se);
+> >      if (ret < 0) {
+> >          return ret;
+> > --
+> > 2.26.2
 > 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
 -- 
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

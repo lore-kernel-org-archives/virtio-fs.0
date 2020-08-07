@@ -1,17 +1,14 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=43SZmp+vV8Sn7GE9PjnhjxxvuNGsA7FckBZzSlZ2a3A=;
-	b=TfaRUWxgqzFbKktIb4Hqt920WExOCG8A/B8G6G3gHeQdfzhyhPlBj3W4n4wmXPXo1h
-	H3SXSQKn6gjCRj/BO/qLLXhzfMro01CW6pGmfkXR1hG/J0BdHRaNCAoaEamtlVc5Ix0p
-	j6FQdh1QoUTYwtEnyVXcm96qmYLTqaCg0ZJ2U=
+Date: Fri, 7 Aug 2020 18:58:39 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20200807175839.GK2780@work-vm>
+References: <20200730194736.173994-1-vgoyal@redhat.com>
+	<20200730194736.173994-6-vgoyal@redhat.com>
 MIME-Version: 1.0
-References: <20200807195526.426056-1-vgoyal@redhat.com>
-In-Reply-To: <20200807195526.426056-1-vgoyal@redhat.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Mon, 10 Aug 2020 09:29:47 +0200
-Message-ID: <CAJfpegtboe-XssmqrcvsJm1R0FBP8fYFrTMv5cuBhfmebiGfQw@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH v2 00/20] virtiofs: Add DAX support
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20200730194736.173994-6-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v2 5/5] virtiofsd: Skip setup_capabilities()
+ in sandbox=NONE mode
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,19 +18,43 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>, linux-kernel@vger.kernel.org
+Cc: berrange@redhat.com, vromanso@redhat.com, qemu-devel@nongnu.org, virtio-fs@redhat.com
 
-On Fri, Aug 7, 2020 at 9:55 PM Vivek Goyal <vgoyal@redhat.com> wrote:
->
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> setup_capabilites() tries to give some of the required capabilities
+> to act as a full fledged file server in priviliged mode. In unpriviliged
+> mode we can't get those capabilities and setup_capabilities() will fail.
+> 
+> So don't setup capabilities when sandbox=NONE.
+> 
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index a6fa816b6c..1a0b24cbf2 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -3030,7 +3030,8 @@ static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
+>      }
+>  
+>      setup_seccomp(enable_syslog);
+> -    setup_capabilities(g_strdup(lo->modcaps));
+> +    if (lo->sandbox != SANDBOX_NONE)
+> +       setup_capabilities(g_strdup(lo->modcaps));
+>  }
 
-> Most of the changes are limited to fuse/virtiofs. There are couple
-> of changes needed in generic dax infrastructure and couple of changes
-> in virtio to be able to access shared memory region.
+I'd rather keep capabilities and sandboxing separate.
+Since I already added modcaps=  how about just letting that
+take a varient as  '-o modcaps=keep'
 
-So what's the plan for merging the different subsystems?  I can take
-all that into the fuse tree, but would need ACKs from the respective
-maintainers.
+Dave
 
-Thanks,
-Miklos
+>  /* Set the maximum number of open file descriptors */
+> -- 
+> 2.25.4
+> 
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

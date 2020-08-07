@@ -1,11 +1,12 @@
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Fri,  7 Aug 2020 15:55:23 -0400
+Message-Id: <20200807195526.426056-18-vgoyal@redhat.com>
+In-Reply-To: <20200807195526.426056-1-vgoyal@redhat.com>
+References: <20200807195526.426056-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-References: <20200825155140.GA16427@stefanha-x1.localdomain>
-In-Reply-To: <20200825155140.GA16427@stefanha-x1.localdomain>
-From: Gal Hammer <ghammer@redhat.com>
-Date: Wed, 2 Sep 2020 11:09:47 +0300
-Message-ID: <CAA2ifQz5ffEGx6a+gN_S38ZiMkpcUaZwNiZBLtwsE2kmKiqjeA@mail.gmail.com>
-Content-Type: multipart/alternative; boundary="0000000000005d009d05ae50297e"
-Subject: Re: [Virtio-fs] Windows drivers in Fedora virtio-win ISO
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2 17/20] fuse,
+	virtiofs: Maintain a list of busy elements
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,105 +15,120 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, o.popov@livelace.ru
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
+Cc: vgoyal@redhat.com, miklos@szeredi.hu
 
---0000000000005d009d05ae50297e
-Content-Type: text/plain; charset="UTF-8"
+This list will be used selecting fuse_dax_mapping to free when number of
+free mappings drops below a threshold.
 
-On Tue, 25 Aug 2020 at 18:51, Stefan Hajnoczi <stefanha@redhat.com> wrote:
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/file.c   | 22 ++++++++++++++++++++++
+ fs/fuse/fuse_i.h |  7 +++++++
+ fs/fuse/inode.c  |  4 ++++
+ 3 files changed, 33 insertions(+)
 
-> Hi Gal,
-> On #virtio-fs freenode IRC it was just mentioned that the Fedora
-> virtio-win "latest" ISO now includes virtio-fs drivers:
->
-> 15:48 < livelace> It looks like virtio-win contains some virtiofs stuff
-> 15:49 < livelace> 07/15/2020  06:22 PM            55,496 viofs.sys
->
->
-We did a quiet launch.
-
-
-> This is great news! We've had questions about the status of Windows
-> support recently and this will help many users.
->
-> Can you provide a HowTo for the virtio-fs website
-> (https://virtio-fs.gitlab.io/) so there are instructions on installing
-> and using the driver?
->
->
-I can write a few lines on how to manually install it. Unless there is an
-installer that I'm not familiar with.
-
-
-> If you don't have time to write an HTML HowTo (the website git repo is
-> here: https://gitlab.com/virtio-fs/virtio-fs.gitlab.io) I can format it
-> for you. Just an email reply would be great.
->
-
-You probably will need to format it anyway ;-).
-
-
-> Thanks,
-> Stefan
->
-
-   Gal.
-
---0000000000005d009d05ae50297e
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr"><div dir=3D"ltr"><div class=3D"gmail_default" style=3D"fon=
-t-family:verdana,sans-serif"><br></div></div><div>On Tue, 25 Aug 2020 at 18=
-:51, Stefan Hajnoczi &lt;<a href=3D"mailto:stefanha@redhat.com">stefanha@re=
-dhat.com</a>&gt; wrote:<br></div><div class=3D"gmail_quote"><blockquote cla=
-ss=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-left-width:1px;=
-border-left-style:solid;border-left-color:rgb(204,204,204);padding-left:1ex=
-">Hi Gal,<br>
-On #virtio-fs freenode IRC it was just mentioned that the Fedora<br>
-virtio-win &quot;latest&quot; ISO now includes virtio-fs drivers:<br>
-<br>
-15:48 &lt; livelace&gt; It looks like virtio-win contains some virtiofs stu=
-ff<br>
-15:49 &lt; livelace&gt; 07/15/2020=C2=A0 06:22 PM=C2=A0 =C2=A0 =C2=A0 =C2=
-=A0 =C2=A0 =C2=A0 55,496 viofs.sys<br>
-<br>
-</blockquote><div><br></div><div><div class=3D"gmail_default" style=3D"font=
--family:verdana,sans-serif">We did=C2=A0a quiet launch.</div></div><div>=C2=
-=A0</div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8e=
-x;border-left-width:1px;border-left-style:solid;border-left-color:rgb(204,2=
-04,204);padding-left:1ex">This is great news! We&#39;ve had questions about=
- the status of Windows<br>
-support recently and this will help many users.<br>
-<br>
-Can you provide a HowTo for the virtio-fs website<br>
-(<a href=3D"https://virtio-fs.gitlab.io/" rel=3D"noreferrer" target=3D"_bla=
-nk">https://virtio-fs.gitlab.io/</a>) so there are instructions on installi=
-ng<br>
-and using the driver?<br>
-<br></blockquote><div><br></div><div><div class=3D"gmail_default" style=3D"=
-font-family:verdana,sans-serif">I can write a few lines on how to manually =
-install it. Unless there is an installer that I&#39;m not=C2=A0familiar wit=
-h.</div></div><div>=C2=A0</div><blockquote class=3D"gmail_quote" style=3D"m=
-argin:0px 0px 0px 0.8ex;border-left-width:1px;border-left-style:solid;borde=
-r-left-color:rgb(204,204,204);padding-left:1ex">
-If you don&#39;t have time to write an HTML HowTo (the website git repo is<=
-br>
-here: <a href=3D"https://gitlab.com/virtio-fs/virtio-fs.gitlab.io" rel=3D"n=
-oreferrer" target=3D"_blank">https://gitlab.com/virtio-fs/virtio-fs.gitlab.=
-io</a>) I can format it<br>
-for you. Just an email reply would be great.<br></blockquote><div><br></div=
-><div><div class=3D"gmail_default" style=3D"font-family:verdana,sans-serif"=
->You probably=C2=A0will need to format it anyway ;-).</div></div><div><br><=
-/div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;bo=
-rder-left-width:1px;border-left-style:solid;border-left-color:rgb(204,204,2=
-04);padding-left:1ex">
-<br>
-Thanks,<br>
-Stefan<br></blockquote><div><br></div><div class=3D"gmail_default" style=3D=
-"font-family:verdana,sans-serif"> =C2=A0 =C2=A0Gal.</div><div class=3D"gmai=
-l_default" style=3D"font-family:verdana,sans-serif"></div></div></div>
-
---0000000000005d009d05ae50297e--
+diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+index 54708cb24da0..ecd2a42f6e30 100644
+--- a/fs/fuse/file.c
++++ b/fs/fuse/file.c
+@@ -213,6 +213,23 @@ static struct fuse_dax_mapping *alloc_dax_mapping(struct fuse_conn *fc)
+ 	return dmap;
+ }
+ 
++/* This assumes fc->lock is held */
++static void __dmap_remove_busy_list(struct fuse_conn *fc,
++				    struct fuse_dax_mapping *dmap)
++{
++	list_del_init(&dmap->busy_list);
++	WARN_ON(fc->nr_busy_ranges == 0);
++	fc->nr_busy_ranges--;
++}
++
++static void dmap_remove_busy_list(struct fuse_conn *fc,
++				  struct fuse_dax_mapping *dmap)
++{
++	spin_lock(&fc->lock);
++	__dmap_remove_busy_list(fc, dmap);
++	spin_unlock(&fc->lock);
++}
++
+ /* This assumes fc->lock is held */
+ static void __dmap_add_to_free_pool(struct fuse_conn *fc,
+ 				struct fuse_dax_mapping *dmap)
+@@ -266,6 +283,10 @@ static int fuse_setup_one_mapping(struct inode *inode, unsigned long start_idx,
+ 		/* Protected by fi->i_dmap_sem */
+ 		interval_tree_insert(&dmap->itn, &fi->dmap_tree);
+ 		fi->nr_dmaps++;
++		spin_lock(&fc->lock);
++		list_add_tail(&dmap->busy_list, &fc->busy_ranges);
++		fc->nr_busy_ranges++;
++		spin_unlock(&fc->lock);
+ 	}
+ 	return 0;
+ }
+@@ -335,6 +356,7 @@ static void dmap_reinit_add_to_free_pool(struct fuse_conn *fc,
+ 	pr_debug("fuse: freeing memory range start_idx=0x%lx end_idx=0x%lx "
+ 		 "window_offset=0x%llx length=0x%llx\n", dmap->itn.start,
+ 		 dmap->itn.last, dmap->window_offset, dmap->length);
++	__dmap_remove_busy_list(fc, dmap);
+ 	dmap->itn.start = dmap->itn.last = 0;
+ 	__dmap_add_to_free_pool(fc, dmap);
+ }
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index 1ddf526330a5..f84ec9c661ab 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -80,6 +80,9 @@ struct fuse_dax_mapping {
+ 	/* For interval tree in file/inode */
+ 	struct interval_tree_node itn;
+ 
++	/* Will connect in fc->busy_ranges to keep track busy memory */
++	struct list_head busy_list;
++
+ 	/** Position in DAX window */
+ 	u64 window_offset;
+ 
+@@ -812,6 +815,10 @@ struct fuse_conn {
+ 	/** DAX device, non-NULL if DAX is supported */
+ 	struct dax_device *dax_dev;
+ 
++	/* List of memory ranges which are busy */
++	unsigned long nr_busy_ranges;
++	struct list_head busy_ranges;
++
+ 	/*
+ 	 * DAX Window Free Ranges
+ 	 */
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index 4bd965d0ecf6..cfc04c5eda73 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -636,6 +636,8 @@ static void fuse_free_dax_mem_ranges(struct list_head *mem_list)
+ 	/* Free All allocated elements */
+ 	list_for_each_entry_safe(range, temp, mem_list, list) {
+ 		list_del(&range->list);
++		if (!list_empty(&range->busy_list))
++			list_del(&range->busy_list);
+ 		kfree(range);
+ 	}
+ }
+@@ -680,6 +682,7 @@ static int fuse_dax_mem_range_init(struct fuse_conn *fc,
+ 		 */
+ 		range->window_offset = i * FUSE_DAX_SZ;
+ 		range->length = FUSE_DAX_SZ;
++		INIT_LIST_HEAD(&range->busy_list);
+ 		list_add_tail(&range->list, &mem_ranges);
+ 	}
+ 
+@@ -727,6 +730,7 @@ void fuse_conn_init(struct fuse_conn *fc, struct user_namespace *user_ns,
+ 	fc->user_ns = get_user_ns(user_ns);
+ 	fc->max_pages = FUSE_DEFAULT_MAX_PAGES_PER_REQ;
+ 	INIT_LIST_HEAD(&fc->free_ranges);
++	INIT_LIST_HEAD(&fc->busy_ranges);
+ }
+ EXPORT_SYMBOL_GPL(fuse_conn_init);
+ 
+-- 
+2.25.4
 

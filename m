@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri,  7 Aug 2020 15:55:18 -0400
-Message-Id: <20200807195526.426056-13-vgoyal@redhat.com>
+Date: Fri,  7 Aug 2020 15:55:14 -0400
+Message-Id: <20200807195526.426056-9-vgoyal@redhat.com>
 In-Reply-To: <20200807195526.426056-1-vgoyal@redhat.com>
 References: <20200807195526.426056-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 12/20] fuse: Introduce
-	setupmapping/removemapping commands
+Subject: [Virtio-fs] [PATCH v2 08/20] fuse,
+	virtiofs: Add a mount option to enable dax
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,53 +18,204 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
 Cc: vgoyal@redhat.com, miklos@szeredi.hu
 
-Introduce two new fuse commands to setup/remove memory mappings. This
-will be used to setup/tear down file mapping in dax window.
+Add a mount option to allow using dax with virtio_fs.
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
 ---
- include/uapi/linux/fuse.h | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ fs/fuse/fuse_i.h    |  7 ++++
+ fs/fuse/inode.c     |  3 ++
+ fs/fuse/virtio_fs.c | 82 +++++++++++++++++++++++++++++++++++++--------
+ 3 files changed, 78 insertions(+), 14 deletions(-)
 
-diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-index 5b85819e045f..4c386116978a 100644
---- a/include/uapi/linux/fuse.h
-+++ b/include/uapi/linux/fuse.h
-@@ -894,4 +894,33 @@ struct fuse_copy_file_range_in {
- 	uint64_t	flags;
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index cf5e675100ec..04fdd7c41bd1 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -486,10 +486,14 @@ struct fuse_fs_context {
+ 	bool destroy:1;
+ 	bool no_control:1;
+ 	bool no_force_umount:1;
++	bool dax:1;
+ 	unsigned int max_read;
+ 	unsigned int blksize;
+ 	const char *subtype;
+ 
++	/* DAX device, may be NULL */
++	struct dax_device *dax_dev;
++
+ 	/* fuse_dev pointer to fill in, should contain NULL on entry */
+ 	void **fudptr;
+ };
+@@ -761,6 +765,9 @@ struct fuse_conn {
+ 
+ 	/** List of device instances belonging to this connection */
+ 	struct list_head devices;
++
++	/** DAX device, non-NULL if DAX is supported */
++	struct dax_device *dax_dev;
  };
  
-+#define FUSE_SETUPMAPPING_FLAG_WRITE (1ull << 0)
-+struct fuse_setupmapping_in {
-+	/* An already open handle */
-+	uint64_t	fh;
-+	/* Offset into the file to start the mapping */
-+	uint64_t	foffset;
-+	/* Length of mapping required */
-+	uint64_t	len;
-+	/* Flags, FUSE_SETUPMAPPING_FLAG_* */
-+	uint64_t	flags;
-+	/* Offset in Memory Window */
-+	uint64_t	moffset;
+ static inline struct fuse_conn *get_fuse_conn_super(struct super_block *sb)
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index 2ac5713c4c32..beac337ccc10 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -589,6 +589,8 @@ static int fuse_show_options(struct seq_file *m, struct dentry *root)
+ 		seq_printf(m, ",max_read=%u", fc->max_read);
+ 	if (sb->s_bdev && sb->s_blocksize != FUSE_DEFAULT_BLKSIZE)
+ 		seq_printf(m, ",blksize=%lu", sb->s_blocksize);
++	if (fc->dax_dev)
++		seq_printf(m, ",dax");
+ 	return 0;
+ }
+ 
+@@ -1207,6 +1209,7 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
+ 	fc->destroy = ctx->destroy;
+ 	fc->no_control = ctx->no_control;
+ 	fc->no_force_umount = ctx->no_force_umount;
++	fc->dax_dev = ctx->dax_dev;
+ 
+ 	err = -ENOMEM;
+ 	root = fuse_get_root_inode(sb, ctx->rootmode);
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index afddae8ee2ec..add31794ca1a 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -10,6 +10,7 @@
+ #include <linux/virtio_fs.h>
+ #include <linux/delay.h>
+ #include <linux/fs_context.h>
++#include <linux/fs_parser.h>
+ #include <linux/highmem.h>
+ #include "fuse_i.h"
+ 
+@@ -71,6 +72,45 @@ struct virtio_fs_req_work {
+ static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
+ 				 struct fuse_req *req, bool in_flight);
+ 
++enum {
++	OPT_DAX,
 +};
 +
-+struct fuse_removemapping_in {
-+	/* number of fuse_removemapping_one follows */
-+	uint32_t        count;
++static const struct fs_parameter_spec virtio_fs_parameters[] = {
++	fsparam_flag	("dax",		OPT_DAX),
++	{}
 +};
 +
-+struct fuse_removemapping_one {
-+	/* Offset into the dax window start the unmapping */
-+	uint64_t        moffset;
-+        /* Length of mapping required */
-+        uint64_t	len;
-+};
++static int virtio_fs_parse_param(struct fs_context *fc,
++				 struct fs_parameter *param)
++{
++	struct fs_parse_result result;
++	struct fuse_fs_context *ctx = fc->fs_private;
++	int opt;
 +
-+#define FUSE_REMOVEMAPPING_MAX_ENTRY   \
-+		(PAGE_SIZE / sizeof(struct fuse_removemapping_one))
++	opt = fs_parse(fc, virtio_fs_parameters, param, &result);
++	if (opt < 0)
++		return opt;
 +
- #endif /* _LINUX_FUSE_H */
++	switch(opt) {
++	case OPT_DAX:
++		ctx->dax = 1;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static void virtio_fs_free_fc(struct fs_context *fc)
++{
++	struct fuse_fs_context *ctx = fc->fs_private;
++
++	if (ctx)
++		kfree(ctx);
++}
++
+ static inline struct virtio_fs_vq *vq_to_fsvq(struct virtqueue *vq)
+ {
+ 	struct virtio_fs *fs = vq->vdev->priv;
+@@ -1081,23 +1121,27 @@ static const struct fuse_iqueue_ops virtio_fs_fiq_ops = {
+ 	.release			= virtio_fs_fiq_release,
+ };
+ 
+-static int virtio_fs_fill_super(struct super_block *sb)
++static inline void virtio_fs_ctx_set_defaults(struct fuse_fs_context *ctx)
++{
++	ctx->rootmode = S_IFDIR;
++	ctx->default_permissions = 1;
++	ctx->allow_other = 1;
++	ctx->max_read = UINT_MAX;
++	ctx->blksize = 512;
++	ctx->destroy = true;
++	ctx->no_control = true;
++	ctx->no_force_umount = true;
++}
++
++static int virtio_fs_fill_super(struct super_block *sb, struct fs_context *fsc)
+ {
+ 	struct fuse_conn *fc = get_fuse_conn_super(sb);
+ 	struct virtio_fs *fs = fc->iq.priv;
++	struct fuse_fs_context *ctx = fsc->fs_private;
+ 	unsigned int i;
+ 	int err;
+-	struct fuse_fs_context ctx = {
+-		.rootmode = S_IFDIR,
+-		.default_permissions = 1,
+-		.allow_other = 1,
+-		.max_read = UINT_MAX,
+-		.blksize = 512,
+-		.destroy = true,
+-		.no_control = true,
+-		.no_force_umount = true,
+-	};
+ 
++	virtio_fs_ctx_set_defaults(ctx);
+ 	mutex_lock(&virtio_fs_mutex);
+ 
+ 	/* After holding mutex, make sure virtiofs device is still there.
+@@ -1121,8 +1165,10 @@ static int virtio_fs_fill_super(struct super_block *sb)
+ 	}
+ 
+ 	/* virtiofs allocates and installs its own fuse devices */
+-	ctx.fudptr = NULL;
+-	err = fuse_fill_super_common(sb, &ctx);
++	ctx->fudptr = NULL;
++	if (ctx->dax)
++		ctx->dax_dev = fs->dax_dev;
++	err = fuse_fill_super_common(sb, ctx);
+ 	if (err < 0)
+ 		goto err_free_fuse_devs;
+ 
+@@ -1233,7 +1279,7 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
+ 		return PTR_ERR(sb);
+ 
+ 	if (!sb->s_root) {
+-		err = virtio_fs_fill_super(sb);
++		err = virtio_fs_fill_super(sb, fsc);
+ 		if (err) {
+ 			deactivate_locked_super(sb);
+ 			return err;
+@@ -1248,11 +1294,19 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
+ }
+ 
+ static const struct fs_context_operations virtio_fs_context_ops = {
++	.free		= virtio_fs_free_fc,
++	.parse_param	= virtio_fs_parse_param,
+ 	.get_tree	= virtio_fs_get_tree,
+ };
+ 
+ static int virtio_fs_init_fs_context(struct fs_context *fsc)
+ {
++	struct fuse_fs_context *ctx;
++
++	ctx = kzalloc(sizeof(struct fuse_fs_context), GFP_KERNEL);
++	if (!ctx)
++		return -ENOMEM;
++	fsc->fs_private = ctx;
+ 	fsc->ops = &virtio_fs_context_ops;
+ 	return 0;
+ }
 -- 
 2.25.4
 

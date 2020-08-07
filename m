@@ -1,20 +1,12 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=WxNG5RN2hoFSDN98UXNrt2eLopXcYkRuq6vbl8JTP4I=;
-	b=jeOCjcqHWRuh7dVt6kyPIOd+XHEy3VxDLMtocFh13ZMnJ5/zRfWLBYn1bfd4wscvh6
-	DO4SHEFwO8hrR4zZ1DAKLrjPVhRKtxp8EtTLsorHk7u+/8kLY25txny1BprFIBHMwB5D
-	y0KmUJDK+krmyTuS3jaKwkZyWpXZk0Zq05QeY=
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Fri,  7 Aug 2020 15:55:07 -0400
+Message-Id: <20200807195526.426056-2-vgoyal@redhat.com>
+In-Reply-To: <20200807195526.426056-1-vgoyal@redhat.com>
+References: <20200807195526.426056-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-References: <20200724183812.19573-1-vgoyal@redhat.com>
-	<CAJfpeguzG3tfjHkToikA+v4Pu7iEa7Y=RxaO+SnycZHxFHRLGg@mail.gmail.com>
-	<20200821200232.GA905782@redhat.com>
-In-Reply-To: <20200821200232.GA905782@redhat.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Mon, 24 Aug 2020 10:43:04 +0200
-Message-ID: <CAJfpegsMu+_bjg4iEBCr-pG4jsVg7DKs+aH+jNwicoMpWsM-tw@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [RFC PATCH 0/5] fuse: Implement
- FUSE_HANDLE_KILLPRIV_V2 and enable SB_NOSEC
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2 01/20] dax: Modify bdev_dax_pgoff() to handle
+	NULL bdev
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,24 +15,57 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
+Cc: miklos@szeredi.hu, linux-nvdimm@lists.01.org, Christoph Hellwig <hch@infradead.org>, Dan Williams <dan.j.williams@intel.com>, vgoyal@redhat.com
 
-On Fri, Aug 21, 2020 at 10:02 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+virtiofs does not have a block device but it has dax device.
+Modify bdev_dax_pgoff() to be able to handle that.
 
-> So how about, we instead implement a flag which tells fuse that
-> file server is implementing a local filesystem and it does not
-> expect anything to changed outside fuse. This will make sure
-> distributed filesystems like gluster don't regress because
-> of this change and a class of local filesystems can gain from
-> this. Once we support sharing mode in virtiofs, then we will
-> need to revisit it again and do it right for distributed
-> filesystems (depending on their invalidation mechanism).
+If there is no bdev, that means dax offset is 0. (It can't be a partition
+block device starting at an offset in dax device).
 
-Okay, sounds good.
+This is little hackish. There have been discussions about getting rid
+of dax not supporting partitions.
 
-This flag can be set on "cache=always" in virtiofsd.
+https://lore.kernel.org/linux-fsdevel/20200107125159.GA15745@infradead.org/
 
-Thanks,
-Miklos
+IMHO, this path can easily break exisitng users. For example
+ioctl(BLKPG_ADD_PARTITION) will start breaking on block devices
+supporting DAX. Also, I personally find it very useful to be able to
+partition dax devices and still be able to use DAX.
+
+Alternatively, I tried to store offset into dax device information in iomap
+interface, but that got NACKed.
+
+https://lore.kernel.org/linux-fsdevel/20200217133117.GB20444@infradead.org/
+
+I can't think of a good path to solve this issue properly. So to make
+progress, it seems this patch is least bad option for now and I hope
+we can take it.
+
+Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Cc: Christoph Hellwig <hch@infradead.org>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: linux-nvdimm@lists.01.org
+---
+ drivers/dax/super.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/dax/super.c b/drivers/dax/super.c
+index 8e32345be0f7..c4bec437e88b 100644
+--- a/drivers/dax/super.c
++++ b/drivers/dax/super.c
+@@ -46,7 +46,8 @@ EXPORT_SYMBOL_GPL(dax_read_unlock);
+ int bdev_dax_pgoff(struct block_device *bdev, sector_t sector, size_t size,
+ 		pgoff_t *pgoff)
+ {
+-	phys_addr_t phys_off = (get_start_sect(bdev) + sector) * 512;
++	sector_t start_sect = bdev ? get_start_sect(bdev) : 0;
++	phys_addr_t phys_off = (start_sect + sector) * 512;
+ 
+ 	if (pgoff)
+ 		*pgoff = PHYS_PFN(phys_off);
+-- 
+2.25.4
 

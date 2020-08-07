@@ -1,15 +1,14 @@
-Date: Fri, 7 Aug 2020 16:29:49 +0100
+Date: Fri, 7 Aug 2020 16:36:28 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200807152949.GF2780@work-vm>
+Message-ID: <20200807153628.GG2780@work-vm>
 References: <20200727190223.422280-1-stefanha@redhat.com>
-	<20200727190223.422280-4-stefanha@redhat.com>
-	<OSBPR01MB45826073E5A54CF869E56721E5730@OSBPR01MB4582.jpnprd01.prod.outlook.com>
+	<20200727190223.422280-3-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <OSBPR01MB45826073E5A54CF869E56721E5730@OSBPR01MB4582.jpnprd01.prod.outlook.com>
-Subject: Re: [Virtio-fs] [PATCH v2 3/3] virtiofsd: probe unshare(CLONE_FS)
- and print an error
+In-Reply-To: <20200727190223.422280-3-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v2 2/3] virtiofsd: add container-friendly -o
+ sandbox=chroot option
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,78 +17,215 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>
-Cc: "vromanso@redhat.com" <vromanso@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, "rmohr@redhat.com" <rmohr@redhat.com>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "mpatel@redhat.com" <mpatel@redhat.com>, "vgoyal@redhat.com" <vgoyal@redhat.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: vromanso@redhat.com, qemu-devel@nongnu.org, rmohr@redhat.com, virtio-fs@redhat.com, mpatel@redhat.com, vgoyal@redhat.com
 
-* misono.tomohiro@fujitsu.com (misono.tomohiro@fujitsu.com) wrote:
-> > Subject: [PATCH v2 3/3] virtiofsd: probe unshare(CLONE_FS) and print an error
-> > 
-> > An assertion failure is raised during request processing if
-> > unshare(CLONE_FS) fails. Implement a probe at startup so the problem can
-> > be detected right away.
-> > 
-> > Unfortunately Docker/Moby does not include unshare in the seccomp.json
-> > list unless CAP_SYS_ADMIN is given. Other seccomp.json lists always
-> > include unshare (e.g. podman is unaffected):
-> > https://raw.githubusercontent.com/seccomp/containers-golang/master/seccomp.json
-> > 
-> > Use "docker run --security-opt seccomp=path/to/seccomp.json ..." if the
-> > default seccomp.json is missing unshare.
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> virtiofsd cannot run in a container because CAP_SYS_ADMIN is required to
+> create namespaces.
 > 
-> Hi, sorry for a bit late.
+> Introduce a weaker sandbox mode that is sufficient in container
+> environments because the container runtime already sets up namespaces.
+> Use chroot to restrict path traversal to the shared directory.
 > 
-> unshare() was added to fix xattr problem: 
->   https://github.com/qemu/qemu/commit/bdfd66788349acc43cd3f1298718ad491663cfcc#
-> In theory we don't need to call unshare if xattr is disabled, but it is hard to get to know
-> if xattr is enabled or disabled in fv_queue_worker(), right?
+> virtiofsd loses the following:
 > 
-> So, it looks good to me.
-> Reviewed-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+> 1. Mount namespace. The process chroots to the shared directory but
+>    leaves the mounts in place. Seccomp rejects mount(2)/umount(2)
+>    syscalls.
+> 
+> 2. Pid namespace. This should be fine because virtiofsd is the only
+>    process running in the container.
+> 
+> 3. Network namespace. This should be fine because seccomp already
+>    rejects the connect(2) syscall, but an additional layer of security
+>    is lost. Container runtime-specific network security policies can be
+>    used drop network traffic (except for the vhost-user UNIX domain
+>    socket).
+> 
+> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 
-OK, I think it might also be OK to just fail the xattr operation on a
-non-file/directory in this case.
+Is there anyone with a bit more FS semantics expertise who could check
+this;  I already surprised myself a few times reading about chroot
+escapes, so I'd appreciate a 2nd pair of eyes.
 
 Dave
 
-> Regards,
-> Misono
+> ---
+>  tools/virtiofsd/helper.c         |  8 +++++
+>  tools/virtiofsd/passthrough_ll.c | 57 ++++++++++++++++++++++++++++++--
+>  docs/tools/virtiofsd.rst         | 32 ++++++++++++++----
+>  3 files changed, 88 insertions(+), 9 deletions(-)
 > 
-> > 
-> > Cc: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
-> > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-> > ---
-> >  tools/virtiofsd/fuse_virtio.c | 16 ++++++++++++++++
-> >  1 file changed, 16 insertions(+)
-> > 
-> > diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-> > index 3b6d16a041..9e5537506c 100644
-> > --- a/tools/virtiofsd/fuse_virtio.c
-> > +++ b/tools/virtiofsd/fuse_virtio.c
-> > @@ -949,6 +949,22 @@ int virtio_session_mount(struct fuse_session *se)
-> >  {
-> >      int ret;
-> > 
-> > +    /*
-> > +     * Test that unshare(CLONE_FS) works. fv_queue_worker() will need it. It's
-> > +     * an unprivileged system call but some Docker/Moby versions are known to
-> > +     * reject it via seccomp when CAP_SYS_ADMIN is not given.
-> > +     *
-> > +     * Note that the program is single-threaded here so this syscall has no
-> > +     * visible effect and is safe to make.
-> > +     */
-> > +    ret = unshare(CLONE_FS);
-> > +    if (ret == -1 && errno == EPERM) {
-> > +        fuse_log(FUSE_LOG_ERR, "unshare(CLONE_FS) failed with EPERM. If "
-> > +                "running in a container please check that the container "
-> > +                "runtime seccomp policy allows unshare.\n");
-> > +        return -1;
-> > +    }
-> > +
-> >      ret = fv_create_listen_socket(se);
-> >      if (ret < 0) {
-> >          return ret;
-> > --
-> > 2.26.2
+> diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
+> index 3105b6c23a..91dcb23664 100644
+> --- a/tools/virtiofsd/helper.c
+> +++ b/tools/virtiofsd/helper.c
+> @@ -168,6 +168,14 @@ void fuse_cmdline_help(void)
+>             "                               enable/disable readirplus\n"
+>             "                               default: readdirplus except with "
+>             "cache=none\n"
+> +           "    -o sandbox=namespace|chroot\n"
+> +           "                               sandboxing mode:\n"
+> +           "                               - namespace: mount, pid, and net\n"
+> +           "                                 namespaces with pivot_root(2)\n"
+> +           "                                 into shared directory\n"
+> +           "                               - chroot: chroot(2) into shared\n"
+> +           "                                 directory (use in containers)\n"
+> +           "                               default: namespace\n"
+>             "    -o timeout=<number>        I/O timeout (seconds)\n"
+>             "                               default: depends on cache= option.\n"
+>             "    -o writeback|no_writeback  enable/disable writeback cache\n"
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 50a164a599..a7894c3e7c 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -137,8 +137,14 @@ enum {
+>      CACHE_ALWAYS,
+>  };
+>  
+> +enum {
+> +    SANDBOX_NAMESPACE,
+> +    SANDBOX_CHROOT,
+> +};
+> +
+>  struct lo_data {
+>      pthread_mutex_t mutex;
+> +    int sandbox;
+>      int debug;
+>      int writeback;
+>      int flock;
+> @@ -162,6 +168,12 @@ struct lo_data {
+>  };
+>  
+>  static const struct fuse_opt lo_opts[] = {
+> +    { "sandbox=namespace",
+> +      offsetof(struct lo_data, sandbox),
+> +      SANDBOX_NAMESPACE },
+> +    { "sandbox=chroot",
+> +      offsetof(struct lo_data, sandbox),
+> +      SANDBOX_CHROOT },
+>      { "writeback", offsetof(struct lo_data, writeback), 1 },
+>      { "no_writeback", offsetof(struct lo_data, writeback), 0 },
+>      { "source=%s", offsetof(struct lo_data, source), 0 },
+> @@ -2665,6 +2677,41 @@ static void setup_capabilities(char *modcaps_in)
+>      pthread_mutex_unlock(&cap.mutex);
+>  }
+>  
+> +/*
+> + * Use chroot as a weaker sandbox for environments where the process is
+> + * launched without CAP_SYS_ADMIN.
+> + */
+> +static void setup_chroot(struct lo_data *lo)
+> +{
+> +    lo->proc_self_fd = open("/proc/self/fd", O_PATH);
+> +    if (lo->proc_self_fd == -1) {
+> +        fuse_log(FUSE_LOG_ERR, "open(\"/proc/self/fd\", O_PATH): %m\n");
+> +        exit(1);
+> +    }
+> +
+> +    /*
+> +     * Make the shared directory the file system root so that FUSE_OPEN
+> +     * (lo_open()) cannot escape the shared directory by opening a symlink.
+> +     *
+> +     * The chroot(2) syscall is later disabled by seccomp and the
+> +     * CAP_SYS_CHROOT capability is dropped so that tampering with the chroot
+> +     * is not possible.
+> +     *
+> +     * However, it's still possible to escape the chroot via lo->proc_self_fd
+> +     * but that requires first gaining control of the process.
+> +     */
+> +    if (chroot(lo->source) != 0) {
+> +        fuse_log(FUSE_LOG_ERR, "chroot(\"%s\"): %m\n", lo->source);
+> +        exit(1);
+> +    }
+> +
+> +    /* Move into the chroot */
+> +    if (chdir("/") != 0) {
+> +        fuse_log(FUSE_LOG_ERR, "chdir(\"/\"): %m\n");
+> +        exit(1);
+> +    }
+> +}
+> +
+>  /*
+>   * Lock down this process to prevent access to other processes or files outside
+>   * source directory.  This reduces the impact of arbitrary code execution bugs.
+> @@ -2672,8 +2719,13 @@ static void setup_capabilities(char *modcaps_in)
+>  static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
+>                            bool enable_syslog)
+>  {
+> -    setup_namespaces(lo, se);
+> -    setup_mounts(lo->source);
+> +    if (lo->sandbox == SANDBOX_NAMESPACE) {
+> +        setup_namespaces(lo, se);
+> +        setup_mounts(lo->source);
+> +    } else {
+> +        setup_chroot(lo);
+> +    }
+> +
+>      setup_seccomp(enable_syslog);
+>      setup_capabilities(g_strdup(lo->modcaps));
+>  }
+> @@ -2820,6 +2872,7 @@ int main(int argc, char *argv[])
+>      struct fuse_session *se;
+>      struct fuse_cmdline_opts opts;
+>      struct lo_data lo = {
+> +        .sandbox = SANDBOX_NAMESPACE,
+>          .debug = 0,
+>          .writeback = 0,
+>          .posix_lock = 1,
+> diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
+> index 824e713491..40629f95ae 100644
+> --- a/docs/tools/virtiofsd.rst
+> +++ b/docs/tools/virtiofsd.rst
+> @@ -17,13 +17,24 @@ This program is designed to work with QEMU's ``--device vhost-user-fs-pci``
+>  but should work with any virtual machine monitor (VMM) that supports
+>  vhost-user.  See the Examples section below.
+>  
+> -This program must be run as the root user.  Upon startup the program will
+> -switch into a new file system namespace with the shared directory tree as its
+> -root.  This prevents "file system escapes" due to symlinks and other file
+> -system objects that might lead to files outside the shared directory.  The
+> -program also sandboxes itself using seccomp(2) to prevent ptrace(2) and other
+> -vectors that could allow an attacker to compromise the system after gaining
+> -control of the virtiofsd process.
+> +This program must be run as the root user.  The program drops privileges where
+> +possible during startup although it must be able to create and access files
+> +with any uid/gid:
+> +
+> +* The ability to invoke syscalls is limited using seccomp(2).
+> +* Linux capabilities(7) are dropped.
+> +
+> +In "namespace" sandbox mode the program switches into a new file system
+> +namespace and invokes pivot_root(2) to make the shared directory tree its root.
+> +A new pid and net namespace is also created to isolate the process.
+> +
+> +In "chroot" sandbox mode the program invokes chroot(2) to make the shared
+> +directory tree its root. This mode is intended for container environments where
+> +the container runtime has already set up the namespaces and the program does
+> +not have permission to create namespaces itself.
+> +
+> +Both sandbox modes prevent "file system escapes" due to symlinks and other file
+> +system objects that might lead to files outside the shared directory.
+>  
+>  Options
+>  -------
+> @@ -72,6 +83,13 @@ Options
+>    * readdirplus|no_readdirplus -
+>      Enable/disable readdirplus.  The default is ``readdirplus``.
+>  
+> +  * sandbox=namespace|chroot -
+> +    Sandbox mode:
+> +    - namespace: Create mount, pid, and net namespaces and pivot_root(2) into
+> +    the shared directory.
+> +    - chroot: chroot(2) into shared directory (use in containers).
+> +    The default is "namespace".
+> +
+>    * source=PATH -
+>      Share host directory tree located at PATH.  This option is required.
+>  
+> -- 
+> 2.26.2
 > 
 -- 
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK

@@ -1,21 +1,14 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=8FB9qBlcnnV7tNXkgg0cfLMfuoyQM+za2trKIURDDTQ=;
-	b=qiqKtTbV0zFdDhubSofXDpDaKx/M0v422ibki3fNwhZrFXYn9o4oq0vUEgj4rmCF8p
-	D2pJKhwNSNR6f8sEyRE5zP9N71FfdAUWNtUtM1+gkdiBblXKV2hE4j7UwqHB/A7OWvJ6
-	cCmLzgqcmCG6zy9LOIktVigjXCrGRh8eUBpxw=
-MIME-Version: 1.0
+Date: Tue, 11 Aug 2020 08:22:38 +1000
+From: Dave Chinner <david@fromorbit.com>
+Message-ID: <20200810222238.GD2079@dread.disaster.area>
 References: <20200807195526.426056-1-vgoyal@redhat.com>
-	<20200807195526.426056-19-vgoyal@redhat.com>
-	<CAJfpegs1CtPMaVmbDc__N0Fc3FkNEe=vQOkrr8RKiiS6NqTyHA@mail.gmail.com>
-	<20200810193717.GF455528@redhat.com>
-In-Reply-To: <20200810193717.GF455528@redhat.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Mon, 10 Aug 2020 21:39:46 +0200
-Message-ID: <CAJfpegsARKo+az+4Q98ecH3RMQinFT=QeMdte2=aZdvbz2WY1w@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH v2 18/20] fuse: Release file in process
-	context
+	<20200807195526.426056-16-vgoyal@redhat.com>
+MIME-Version: 1.0
+In-Reply-To: <20200807195526.426056-16-vgoyal@redhat.com>
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: Re: [Virtio-fs] [PATCH v2 15/20] fuse,
+ dax: Take ->i_mmap_sem lock during dax page fault
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,56 +18,116 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>, linux-kernel@vger.kernel.org
+Cc: miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
 
-On Mon, Aug 10, 2020 at 9:37 PM Vivek Goyal <vgoyal@redhat.com> wrote:
->
-> On Mon, Aug 10, 2020 at 10:29:13AM +0200, Miklos Szeredi wrote:
-> > On Fri, Aug 7, 2020 at 9:55 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> > >
-> > > fuse_file_put(sync) can be called with sync=true/false. If sync=true,
-> > > it waits for release request response and then calls iput() in the
-> > > caller's context. If sync=false, it does not wait for release request
-> > > response, frees the fuse_file struct immediately and req->end function
-> > > does the iput().
-> > >
-> > > iput() can be a problem with DAX if called in req->end context. If this
-> > > is last reference to inode (VFS has let go its reference already), then
-> > > iput() will clean DAX mappings as well and send REMOVEMAPPING requests
-> > > and wait for completion. (All the the worker thread context which is
-> > > processing fuse replies from daemon on the host).
-> > >
-> > > That means it blocks worker thread and it stops processing further
-> > > replies and system deadlocks.
-> >
-> > Is this reasoning specific to DAX?  Seems to me this is a virtio-fs
-> > specific issue.
->
-> Hi Miklos,
->
-> I am looking at this patch closely and maybe we don't need it, given
-> current code.
->
-> Reason being that looks like for virtiofs now we set ctx->destroy=true
-> and that sets fc->destroy. And if that's set, we don't schedule async req
-> in fuse_release_common();
->
-> fuse_release_common() {
->   fuse_file_put(ff, ff->fc->destroy, isdir);
-> }
->
-> And if we don't schedule async file put, we don't run the risk of
-> blocking worker thread in evict_inode() with DAX enabled.
->
-> I ran blogbench multiple times with this patch reverted and I can't
-> reproduce the deadlock.
->
-> So we can drop this patch for now. If need be I will fix it as
-> post merge patch.
+On Fri, Aug 07, 2020 at 03:55:21PM -0400, Vivek Goyal wrote:
+> We need some kind of locking mechanism here. Normal file systems like
+> ext4 and xfs seems to take their own semaphore to protect agains
+> truncate while fault is going on.
+> 
+> We have additional requirement to protect against fuse dax memory range
+> reclaim. When a range has been selected for reclaim, we need to make sure
+> no other read/write/fault can try to access that memory range while
+> reclaim is in progress. Once reclaim is complete, lock will be released
+> and read/write/fault will trigger allocation of fresh dax range.
+> 
+> Taking inode_lock() is not an option in fault path as lockdep complains
+> about circular dependencies. So define a new fuse_inode->i_mmap_sem.
 
-Okay.  Yeah, I was thinking along the lines of no-async-release-ever
-for virtiofs, but apparently that's already done.
+That's precisely why filesystems like ext4 and XFS define their own
+rwsem.
 
-Thanks,
-Miklos
+Note that this isn't a DAX requirement - the page fault
+serialisation is actually a requirement of hole punching...
+
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  fs/fuse/dir.c    |  2 ++
+>  fs/fuse/file.c   | 15 ++++++++++++---
+>  fs/fuse/fuse_i.h |  7 +++++++
+>  fs/fuse/inode.c  |  1 +
+>  4 files changed, 22 insertions(+), 3 deletions(-)
+> 
+> diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
+> index 26f028bc760b..f40766c0693b 100644
+> --- a/fs/fuse/dir.c
+> +++ b/fs/fuse/dir.c
+> @@ -1609,8 +1609,10 @@ int fuse_do_setattr(struct dentry *dentry, struct iattr *attr,
+>  	 */
+>  	if ((is_truncate || !is_wb) &&
+>  	    S_ISREG(inode->i_mode) && oldsize != outarg.attr.size) {
+> +		down_write(&fi->i_mmap_sem);
+>  		truncate_pagecache(inode, outarg.attr.size);
+>  		invalidate_inode_pages2(inode->i_mapping);
+> +		up_write(&fi->i_mmap_sem);
+>  	}
+>  
+>  	clear_bit(FUSE_I_SIZE_UNSTABLE, &fi->state);
+> diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+> index be7d90eb5b41..00ad27216cc3 100644
+> --- a/fs/fuse/file.c
+> +++ b/fs/fuse/file.c
+> @@ -2878,11 +2878,18 @@ static vm_fault_t __fuse_dax_fault(struct vm_fault *vmf,
+>  
+>  	if (write)
+>  		sb_start_pagefault(sb);
+> -
+> +	/*
+> +	 * We need to serialize against not only truncate but also against
+> +	 * fuse dax memory range reclaim. While a range is being reclaimed,
+> +	 * we do not want any read/write/mmap to make progress and try
+> +	 * to populate page cache or access memory we are trying to free.
+> +	 */
+> +	down_read(&get_fuse_inode(inode)->i_mmap_sem);
+>  	ret = dax_iomap_fault(vmf, pe_size, &pfn, NULL, &fuse_iomap_ops);
+>  
+>  	if (ret & VM_FAULT_NEEDDSYNC)
+>  		ret = dax_finish_sync_fault(vmf, pe_size, pfn);
+> +	up_read(&get_fuse_inode(inode)->i_mmap_sem);
+>  
+>  	if (write)
+>  		sb_end_pagefault(sb);
+> @@ -3849,9 +3856,11 @@ static long fuse_file_fallocate(struct file *file, int mode, loff_t offset,
+>  			file_update_time(file);
+>  	}
+>  
+> -	if (mode & FALLOC_FL_PUNCH_HOLE)
+> +	if (mode & FALLOC_FL_PUNCH_HOLE) {
+> +		down_write(&fi->i_mmap_sem);
+>  		truncate_pagecache_range(inode, offset, offset + length - 1);
+> -
+> +		up_write(&fi->i_mmap_sem);
+> +	}
+>  	fuse_invalidate_attr(inode);
+
+
+I'm not sure this is sufficient. You have to lock page faults out
+for the entire time the hole punch is being performed, not just while
+the mapping is being invalidated.
+
+That is, once you've taken the inode lock and written back the dirty
+data over the range being punched, you can then take a page fault
+and dirty the page again. Then after you punch the hole out,
+you have a dirty page with non-zero data in it, and that can get
+written out before the page cache is truncated.
+
+IOWs, to do a hole punch safely, you have to both lock the inode
+and lock out page faults *before* you write back dirty data. Then
+you can invalidate the page cache so you know there is no cached
+data over the range about to be punched. Once the punch is done,
+then you can drop all locks....
+
+The same goes for any other operation that manipulates extents
+directly (other fallocate ops, truncate, etc).
+
+/me also wonders if there can be racing AIO+DIO in progress over the
+range that is being punched and whether fuse needs to call
+inode_dio_wait() before punching holes, running truncates, etc...
+
+Cheers,
+
+Dave.
+-- 
+Dave Chinner
+david@fromorbit.com
 

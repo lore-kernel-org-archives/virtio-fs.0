@@ -1,12 +1,13 @@
-Date: Mon, 10 Aug 2020 09:47:15 -0400
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20200810094548-mutt-send-email-mst@kernel.org>
+Date: Mon, 10 Aug 2020 09:54:32 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200810135432.GA459233@redhat.com>
 References: <20200807195526.426056-1-vgoyal@redhat.com>
 	<20200807195526.426056-4-vgoyal@redhat.com>
+	<20200810094548-mutt-send-email-mst@kernel.org>
 MIME-Version: 1.0
-In-Reply-To: <20200807195526.426056-4-vgoyal@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
+In-Reply-To: <20200810094548-mutt-send-email-mst@kernel.org>
 Subject: Re: [Virtio-fs] [PATCH v2 03/20] virtio: Add get_shm_region method
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
@@ -16,82 +17,95 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
+To: "Michael S. Tsirkin" <mst@redhat.com>
 Cc: kvm@vger.kernel.org, miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
 
-On Fri, Aug 07, 2020 at 03:55:09PM -0400, Vivek Goyal wrote:
-> From: Sebastien Boeuf <sebastien.boeuf@intel.com>
+On Mon, Aug 10, 2020 at 09:47:15AM -0400, Michael S. Tsirkin wrote:
+> On Fri, Aug 07, 2020 at 03:55:09PM -0400, Vivek Goyal wrote:
+> > From: Sebastien Boeuf <sebastien.boeuf@intel.com>
+> > 
+> > Virtio defines 'shared memory regions' that provide a continuously
+> > shared region between the host and guest.
+> > 
+> > Provide a method to find a particular region on a device.
+> > 
+> > Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
+> > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> > Cc: kvm@vger.kernel.org
+> > Cc: "Michael S. Tsirkin" <mst@redhat.com>
 > 
-> Virtio defines 'shared memory regions' that provide a continuously
-> shared region between the host and guest.
+> I'm not sure why doesn't b4 pick up reset of this
+> patchset. where can I find it?
+
+What is b4? I think I might not have copied to right list. I cced
+kvm, but probably I should sent it to virtualization@lists.linux-foundation.org
+instead?
+
 > 
-> Provide a method to find a particular region on a device.
 > 
-> Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> Cc: kvm@vger.kernel.org
-> Cc: "Michael S. Tsirkin" <mst@redhat.com>
+> IIUC all this is 5.10 material, right?
 
-I'm not sure why doesn't b4 pick up reset of this
-patchset. where can I find it?
+I think so. It probably is too late for 5.9.
 
+Thanks
+Vivek
 
-IIUC all this is 5.10 material, right?
-
-
-> ---
->  include/linux/virtio_config.h | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
 > 
-> diff --git a/include/linux/virtio_config.h b/include/linux/virtio_config.h
-> index bb4cc4910750..c859f000a751 100644
-> --- a/include/linux/virtio_config.h
-> +++ b/include/linux/virtio_config.h
-> @@ -10,6 +10,11 @@
->  
->  struct irq_affinity;
->  
-> +struct virtio_shm_region {
-> +       u64 addr;
-> +       u64 len;
-> +};
-> +
->  /**
->   * virtio_config_ops - operations for configuring a virtio device
->   * Note: Do not assume that a transport implements all of the operations
-> @@ -65,6 +70,7 @@ struct irq_affinity;
->   *      the caller can then copy.
->   * @set_vq_affinity: set the affinity for a virtqueue (optional).
->   * @get_vq_affinity: get the affinity for a virtqueue (optional).
-> + * @get_shm_region: get a shared memory region based on the index.
->   */
->  typedef void vq_callback_t(struct virtqueue *);
->  struct virtio_config_ops {
-> @@ -88,6 +94,8 @@ struct virtio_config_ops {
->  			       const struct cpumask *cpu_mask);
->  	const struct cpumask *(*get_vq_affinity)(struct virtio_device *vdev,
->  			int index);
-> +	bool (*get_shm_region)(struct virtio_device *vdev,
-> +			       struct virtio_shm_region *region, u8 id);
->  };
->  
->  /* If driver didn't advertise the feature, it will never appear. */
-> @@ -250,6 +258,15 @@ int virtqueue_set_affinity(struct virtqueue *vq, const struct cpumask *cpu_mask)
->  	return 0;
->  }
->  
-> +static inline
-> +bool virtio_get_shm_region(struct virtio_device *vdev,
-> +                         struct virtio_shm_region *region, u8 id)
-> +{
-> +	if (!vdev->config->get_shm_region)
-> +		return false;
-> +	return vdev->config->get_shm_region(vdev, region, id);
-> +}
-> +
->  static inline bool virtio_is_little_endian(struct virtio_device *vdev)
->  {
->  	return virtio_has_feature(vdev, VIRTIO_F_VERSION_1) ||
-> -- 
-> 2.25.4
+> 
+> > ---
+> >  include/linux/virtio_config.h | 17 +++++++++++++++++
+> >  1 file changed, 17 insertions(+)
+> > 
+> > diff --git a/include/linux/virtio_config.h b/include/linux/virtio_config.h
+> > index bb4cc4910750..c859f000a751 100644
+> > --- a/include/linux/virtio_config.h
+> > +++ b/include/linux/virtio_config.h
+> > @@ -10,6 +10,11 @@
+> >  
+> >  struct irq_affinity;
+> >  
+> > +struct virtio_shm_region {
+> > +       u64 addr;
+> > +       u64 len;
+> > +};
+> > +
+> >  /**
+> >   * virtio_config_ops - operations for configuring a virtio device
+> >   * Note: Do not assume that a transport implements all of the operations
+> > @@ -65,6 +70,7 @@ struct irq_affinity;
+> >   *      the caller can then copy.
+> >   * @set_vq_affinity: set the affinity for a virtqueue (optional).
+> >   * @get_vq_affinity: get the affinity for a virtqueue (optional).
+> > + * @get_shm_region: get a shared memory region based on the index.
+> >   */
+> >  typedef void vq_callback_t(struct virtqueue *);
+> >  struct virtio_config_ops {
+> > @@ -88,6 +94,8 @@ struct virtio_config_ops {
+> >  			       const struct cpumask *cpu_mask);
+> >  	const struct cpumask *(*get_vq_affinity)(struct virtio_device *vdev,
+> >  			int index);
+> > +	bool (*get_shm_region)(struct virtio_device *vdev,
+> > +			       struct virtio_shm_region *region, u8 id);
+> >  };
+> >  
+> >  /* If driver didn't advertise the feature, it will never appear. */
+> > @@ -250,6 +258,15 @@ int virtqueue_set_affinity(struct virtqueue *vq, const struct cpumask *cpu_mask)
+> >  	return 0;
+> >  }
+> >  
+> > +static inline
+> > +bool virtio_get_shm_region(struct virtio_device *vdev,
+> > +                         struct virtio_shm_region *region, u8 id)
+> > +{
+> > +	if (!vdev->config->get_shm_region)
+> > +		return false;
+> > +	return vdev->config->get_shm_region(vdev, region, id);
+> > +}
+> > +
+> >  static inline bool virtio_is_little_endian(struct virtio_device *vdev)
+> >  {
+> >  	return virtio_has_feature(vdev, VIRTIO_F_VERSION_1) ||
+> > -- 
+> > 2.25.4
+> 
 

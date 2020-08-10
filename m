@@ -1,13 +1,14 @@
-Date: Mon, 10 Aug 2020 10:02:30 -0400
+Date: Mon, 10 Aug 2020 10:03:17 -0400
 From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20200810100208-mutt-send-email-mst@kernel.org>
+Message-ID: <20200810100240-mutt-send-email-mst@kernel.org>
 References: <20200807195526.426056-1-vgoyal@redhat.com>
-	<20200807195526.426056-4-vgoyal@redhat.com>
+	<20200807195526.426056-6-vgoyal@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20200807195526.426056-4-vgoyal@redhat.com>
+In-Reply-To: <20200807195526.426056-6-vgoyal@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH v2 03/20] virtio: Add get_shm_region method
+Subject: Re: [Virtio-fs] [PATCH v2 05/20] virtio: Implement get_shm_region
+ for MMIO transport
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,74 +20,101 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: Vivek Goyal <vgoyal@redhat.com>
 Cc: kvm@vger.kernel.org, miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
 
-On Fri, Aug 07, 2020 at 03:55:09PM -0400, Vivek Goyal wrote:
+On Fri, Aug 07, 2020 at 03:55:11PM -0400, Vivek Goyal wrote:
 > From: Sebastien Boeuf <sebastien.boeuf@intel.com>
 > 
-> Virtio defines 'shared memory regions' that provide a continuously
-> shared region between the host and guest.
-> 
-> Provide a method to find a particular region on a device.
+> On MMIO a new set of registers is defined for finding SHM
+> regions.  Add their definitions and use them to find the region.
 > 
 > Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 > Cc: kvm@vger.kernel.org
 > Cc: "Michael S. Tsirkin" <mst@redhat.com>
+
 
 Acked-by: Michael S. Tsirkin <mst@redhat.com>
 
 > ---
->  include/linux/virtio_config.h | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
+>  drivers/virtio/virtio_mmio.c     | 32 ++++++++++++++++++++++++++++++++
+>  include/uapi/linux/virtio_mmio.h | 11 +++++++++++
+>  2 files changed, 43 insertions(+)
 > 
-> diff --git a/include/linux/virtio_config.h b/include/linux/virtio_config.h
-> index bb4cc4910750..c859f000a751 100644
-> --- a/include/linux/virtio_config.h
-> +++ b/include/linux/virtio_config.h
-> @@ -10,6 +10,11 @@
->  
->  struct irq_affinity;
->  
-> +struct virtio_shm_region {
-> +       u64 addr;
-> +       u64 len;
-> +};
-> +
->  /**
->   * virtio_config_ops - operations for configuring a virtio device
->   * Note: Do not assume that a transport implements all of the operations
-> @@ -65,6 +70,7 @@ struct irq_affinity;
->   *      the caller can then copy.
->   * @set_vq_affinity: set the affinity for a virtqueue (optional).
->   * @get_vq_affinity: get the affinity for a virtqueue (optional).
-> + * @get_shm_region: get a shared memory region based on the index.
->   */
->  typedef void vq_callback_t(struct virtqueue *);
->  struct virtio_config_ops {
-> @@ -88,6 +94,8 @@ struct virtio_config_ops {
->  			       const struct cpumask *cpu_mask);
->  	const struct cpumask *(*get_vq_affinity)(struct virtio_device *vdev,
->  			int index);
-> +	bool (*get_shm_region)(struct virtio_device *vdev,
-> +			       struct virtio_shm_region *region, u8 id);
->  };
->  
->  /* If driver didn't advertise the feature, it will never appear. */
-> @@ -250,6 +258,15 @@ int virtqueue_set_affinity(struct virtqueue *vq, const struct cpumask *cpu_mask)
->  	return 0;
+> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
+> index 627ac0487494..2697c492cf78 100644
+> --- a/drivers/virtio/virtio_mmio.c
+> +++ b/drivers/virtio/virtio_mmio.c
+> @@ -498,6 +498,37 @@ static const char *vm_bus_name(struct virtio_device *vdev)
+>  	return vm_dev->pdev->name;
 >  }
 >  
-> +static inline
-> +bool virtio_get_shm_region(struct virtio_device *vdev,
-> +                         struct virtio_shm_region *region, u8 id)
+> +static bool vm_get_shm_region(struct virtio_device *vdev,
+> +			      struct virtio_shm_region *region, u8 id)
 > +{
-> +	if (!vdev->config->get_shm_region)
+> +	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
+> +	u64 len, addr;
+> +
+> +	/* Select the region we're interested in */
+> +	writel(id, vm_dev->base + VIRTIO_MMIO_SHM_SEL);
+> +
+> +	/* Read the region size */
+> +	len = (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_LEN_LOW);
+> +	len |= (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_LEN_HIGH) << 32;
+> +
+> +	region->len = len;
+> +
+> +	/* Check if region length is -1. If that's the case, the shared memory
+> +	 * region does not exist and there is no need to proceed further.
+> +	 */
+> +	if (len == ~(u64)0) {
 > +		return false;
-> +	return vdev->config->get_shm_region(vdev, region, id);
+> +	}
+> +
+
+It might make sense to validate that addr/len do not overlap.
+Will be useful for PCI too.
+Can be a patch on top.
+
+> +	/* Read the region base address */
+> +	addr = (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_BASE_LOW);
+> +	addr |= (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_BASE_HIGH) << 32;
+> +
+> +	region->addr = addr;
+> +
+> +	return true;
 > +}
 > +
->  static inline bool virtio_is_little_endian(struct virtio_device *vdev)
->  {
->  	return virtio_has_feature(vdev, VIRTIO_F_VERSION_1) ||
+>  static const struct virtio_config_ops virtio_mmio_config_ops = {
+>  	.get		= vm_get,
+>  	.set		= vm_set,
+> @@ -510,6 +541,7 @@ static const struct virtio_config_ops virtio_mmio_config_ops = {
+>  	.get_features	= vm_get_features,
+>  	.finalize_features = vm_finalize_features,
+>  	.bus_name	= vm_bus_name,
+> +	.get_shm_region = vm_get_shm_region,
+>  };
+>  
+>  
+> diff --git a/include/uapi/linux/virtio_mmio.h b/include/uapi/linux/virtio_mmio.h
+> index c4b09689ab64..0650f91bea6c 100644
+> --- a/include/uapi/linux/virtio_mmio.h
+> +++ b/include/uapi/linux/virtio_mmio.h
+> @@ -122,6 +122,17 @@
+>  #define VIRTIO_MMIO_QUEUE_USED_LOW	0x0a0
+>  #define VIRTIO_MMIO_QUEUE_USED_HIGH	0x0a4
+>  
+> +/* Shared memory region id */
+> +#define VIRTIO_MMIO_SHM_SEL             0x0ac
+> +
+> +/* Shared memory region length, 64 bits in two halves */
+> +#define VIRTIO_MMIO_SHM_LEN_LOW         0x0b0
+> +#define VIRTIO_MMIO_SHM_LEN_HIGH        0x0b4
+> +
+> +/* Shared memory region base address, 64 bits in two halves */
+> +#define VIRTIO_MMIO_SHM_BASE_LOW        0x0b8
+> +#define VIRTIO_MMIO_SHM_BASE_HIGH       0x0bc
+> +
+>  /* Configuration atomicity value */
+>  #define VIRTIO_MMIO_CONFIG_GENERATION	0x0fc
+>  
 > -- 
 > 2.25.4
 > 

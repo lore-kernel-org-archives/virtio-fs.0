@@ -1,13 +1,13 @@
-Date: Mon, 10 Aug 2020 09:08:09 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200810130809.GA455528@redhat.com>
+Date: Mon, 10 Aug 2020 09:47:15 -0400
+From: "Michael S. Tsirkin" <mst@redhat.com>
+Message-ID: <20200810094548-mutt-send-email-mst@kernel.org>
 References: <20200807195526.426056-1-vgoyal@redhat.com>
-	<CAJfpegtboe-XssmqrcvsJm1R0FBP8fYFrTMv5cuBhfmebiGfQw@mail.gmail.com>
+	<20200807195526.426056-4-vgoyal@redhat.com>
 MIME-Version: 1.0
+In-Reply-To: <20200807195526.426056-4-vgoyal@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <CAJfpegtboe-XssmqrcvsJm1R0FBP8fYFrTMv5cuBhfmebiGfQw@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH v2 00/20] virtiofs: Add DAX support
+Subject: Re: [Virtio-fs] [PATCH v2 03/20] virtio: Add get_shm_region method
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,28 +16,82 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>, Dan Williams <dan.j.williams@intel.com>, "Michael S. Tsirkin" <mst@redhat.com>
-Cc: linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs-list <virtio-fs@redhat.com>, linux-fsdevel@vger.kernel.org
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: kvm@vger.kernel.org, miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
 
-On Mon, Aug 10, 2020 at 09:29:47AM +0200, Miklos Szeredi wrote:
-> On Fri, Aug 7, 2020 at 9:55 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> >
+On Fri, Aug 07, 2020 at 03:55:09PM -0400, Vivek Goyal wrote:
+> From: Sebastien Boeuf <sebastien.boeuf@intel.com>
 > 
-> > Most of the changes are limited to fuse/virtiofs. There are couple
-> > of changes needed in generic dax infrastructure and couple of changes
-> > in virtio to be able to access shared memory region.
+> Virtio defines 'shared memory regions' that provide a continuously
+> shared region between the host and guest.
 > 
-> So what's the plan for merging the different subsystems?  I can take
-> all that into the fuse tree, but would need ACKs from the respective
-> maintainers.
+> Provide a method to find a particular region on a device.
+> 
+> Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
+> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> Cc: kvm@vger.kernel.org
+> Cc: "Michael S. Tsirkin" <mst@redhat.com>
 
-I am assuming for DAX patches we need ACK from Dan Williams and for
-virtio patches we need ack from Michael S. Tsirkin.
+I'm not sure why doesn't b4 pick up reset of this
+patchset. where can I find it?
 
-Dan, Michael, can you please review the dax and virtio patches
-respectively and if there are no concerns, please provide ACK. Or
-suggest an alternative way of how these patches can be merged.
 
-Thanks
-Vivek
+IIUC all this is 5.10 material, right?
+
+
+> ---
+>  include/linux/virtio_config.h | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/include/linux/virtio_config.h b/include/linux/virtio_config.h
+> index bb4cc4910750..c859f000a751 100644
+> --- a/include/linux/virtio_config.h
+> +++ b/include/linux/virtio_config.h
+> @@ -10,6 +10,11 @@
+>  
+>  struct irq_affinity;
+>  
+> +struct virtio_shm_region {
+> +       u64 addr;
+> +       u64 len;
+> +};
+> +
+>  /**
+>   * virtio_config_ops - operations for configuring a virtio device
+>   * Note: Do not assume that a transport implements all of the operations
+> @@ -65,6 +70,7 @@ struct irq_affinity;
+>   *      the caller can then copy.
+>   * @set_vq_affinity: set the affinity for a virtqueue (optional).
+>   * @get_vq_affinity: get the affinity for a virtqueue (optional).
+> + * @get_shm_region: get a shared memory region based on the index.
+>   */
+>  typedef void vq_callback_t(struct virtqueue *);
+>  struct virtio_config_ops {
+> @@ -88,6 +94,8 @@ struct virtio_config_ops {
+>  			       const struct cpumask *cpu_mask);
+>  	const struct cpumask *(*get_vq_affinity)(struct virtio_device *vdev,
+>  			int index);
+> +	bool (*get_shm_region)(struct virtio_device *vdev,
+> +			       struct virtio_shm_region *region, u8 id);
+>  };
+>  
+>  /* If driver didn't advertise the feature, it will never appear. */
+> @@ -250,6 +258,15 @@ int virtqueue_set_affinity(struct virtqueue *vq, const struct cpumask *cpu_mask)
+>  	return 0;
+>  }
+>  
+> +static inline
+> +bool virtio_get_shm_region(struct virtio_device *vdev,
+> +                         struct virtio_shm_region *region, u8 id)
+> +{
+> +	if (!vdev->config->get_shm_region)
+> +		return false;
+> +	return vdev->config->get_shm_region(vdev, region, id);
+> +}
+> +
+>  static inline bool virtio_is_little_endian(struct virtio_device *vdev)
+>  {
+>  	return virtio_has_feature(vdev, VIRTIO_F_VERSION_1) ||
+> -- 
+> 2.25.4
 

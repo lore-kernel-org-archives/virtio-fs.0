@@ -1,14 +1,19 @@
-Date: Fri, 7 Aug 2020 18:58:39 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200807175839.GK2780@work-vm>
-References: <20200730194736.173994-1-vgoyal@redhat.com>
-	<20200730194736.173994-6-vgoyal@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=CquD0s9C4x3ETpaALuSLXwVqkmCKd258dwzlSXP4DNs=;
+	b=S2DnfquUHkVrQ3lZVZC1emkh4OCaAvpJvC5YFe8+WX6NKsOIK7gbvBx/6LZgrhozk7
+	CFbSDsCdO1bYMfX6mAIinY2M5dta1plFEJhbQJA6IDjdZX4QYOF8Qga7R0zegK/Swnxn
+	GUzWkJocv9oeIfkHDemI3ud7ojPTlett6S974=
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200730194736.173994-6-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v2 5/5] virtiofsd: Skip setup_capabilities()
- in sandbox=NONE mode
+References: <20200807195526.426056-1-vgoyal@redhat.com>
+	<20200807195526.426056-19-vgoyal@redhat.com>
+In-Reply-To: <20200807195526.426056-19-vgoyal@redhat.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Mon, 10 Aug 2020 10:29:13 +0200
+Message-ID: <CAJfpegs1CtPMaVmbDc__N0Fc3FkNEe=vQOkrr8RKiiS6NqTyHA@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PATCH v2 18/20] fuse: Release file in process
+	context
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,43 +23,28 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: berrange@redhat.com, vromanso@redhat.com, qemu-devel@nongnu.org, virtio-fs@redhat.com
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>, linux-kernel@vger.kernel.org
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> setup_capabilites() tries to give some of the required capabilities
-> to act as a full fledged file server in priviliged mode. In unpriviliged
-> mode we can't get those capabilities and setup_capabilities() will fail.
-> 
-> So don't setup capabilities when sandbox=NONE.
-> 
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  tools/virtiofsd/passthrough_ll.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index a6fa816b6c..1a0b24cbf2 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -3030,7 +3030,8 @@ static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
->      }
->  
->      setup_seccomp(enable_syslog);
-> -    setup_capabilities(g_strdup(lo->modcaps));
-> +    if (lo->sandbox != SANDBOX_NONE)
-> +       setup_capabilities(g_strdup(lo->modcaps));
->  }
+On Fri, Aug 7, 2020 at 9:55 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> fuse_file_put(sync) can be called with sync=true/false. If sync=true,
+> it waits for release request response and then calls iput() in the
+> caller's context. If sync=false, it does not wait for release request
+> response, frees the fuse_file struct immediately and req->end function
+> does the iput().
+>
+> iput() can be a problem with DAX if called in req->end context. If this
+> is last reference to inode (VFS has let go its reference already), then
+> iput() will clean DAX mappings as well and send REMOVEMAPPING requests
+> and wait for completion. (All the the worker thread context which is
+> processing fuse replies from daemon on the host).
+>
+> That means it blocks worker thread and it stops processing further
+> replies and system deadlocks.
 
-I'd rather keep capabilities and sandboxing separate.
-Since I already added modcaps=  how about just letting that
-take a varient as  '-o modcaps=keep'
+Is this reasoning specific to DAX?  Seems to me this is a virtio-fs
+specific issue.
 
-Dave
-
->  /* Set the maximum number of open file descriptors */
-> -- 
-> 2.25.4
-> 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+Thanks,
+Miklos
 

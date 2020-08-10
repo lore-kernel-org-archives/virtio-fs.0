@@ -1,15 +1,15 @@
-Date: Mon, 10 Aug 2020 10:50:19 -0400
+Date: Mon, 10 Aug 2020 11:48:30 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200810145019.GB455528@redhat.com>
+Message-ID: <20200810154830.GC455528@redhat.com>
 References: <20200807195526.426056-1-vgoyal@redhat.com>
-	<20200807195526.426056-5-vgoyal@redhat.com>
-	<20200810100327-mutt-send-email-mst@kernel.org>
+	<20200807195526.426056-19-vgoyal@redhat.com>
+	<CAJfpegs1CtPMaVmbDc__N0Fc3FkNEe=vQOkrr8RKiiS6NqTyHA@mail.gmail.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20200810100327-mutt-send-email-mst@kernel.org>
-Subject: Re: [Virtio-fs] [PATCH v2 04/20] virtio: Implement get_shm_region
- for PCI transport
+In-Reply-To: <CAJfpegs1CtPMaVmbDc__N0Fc3FkNEe=vQOkrr8RKiiS6NqTyHA@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH v2 18/20] fuse: Release file in process
+	context
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,60 +18,41 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Michael S. Tsirkin" <mst@redhat.com>
-Cc: kbuild test robot <lkp@intel.com>, kvm@vger.kernel.org, miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>, linux-kernel@vger.kernel.org
 
-On Mon, Aug 10, 2020 at 10:05:17AM -0400, Michael S. Tsirkin wrote:
-> On Fri, Aug 07, 2020 at 03:55:10PM -0400, Vivek Goyal wrote:
-> > From: Sebastien Boeuf <sebastien.boeuf@intel.com>
-> > 
-> > On PCI the shm regions are found using capability entries;
-> > find a region by searching for the capability.
-> > 
-> > Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
-> > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> > Signed-off-by: kbuild test robot <lkp@intel.com>
-> > Cc: kvm@vger.kernel.org
-> > Cc: "Michael S. Tsirkin" <mst@redhat.com>
+On Mon, Aug 10, 2020 at 10:29:13AM +0200, Miklos Szeredi wrote:
+> On Fri, Aug 7, 2020 at 9:55 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> >
+> > fuse_file_put(sync) can be called with sync=true/false. If sync=true,
+> > it waits for release request response and then calls iput() in the
+> > caller's context. If sync=false, it does not wait for release request
+> > response, frees the fuse_file struct immediately and req->end function
+> > does the iput().
+> >
+> > iput() can be a problem with DAX if called in req->end context. If this
+> > is last reference to inode (VFS has let go its reference already), then
+> > iput() will clean DAX mappings as well and send REMOVEMAPPING requests
+> > and wait for completion. (All the the worker thread context which is
+> > processing fuse replies from daemon on the host).
+> >
+> > That means it blocks worker thread and it stops processing further
+> > replies and system deadlocks.
 > 
-> Acked-by: Michael S. Tsirkin <mst@redhat.com>
-> 
+> Is this reasoning specific to DAX?  Seems to me this is a virtio-fs
+> specific issue.
 
-[..]
-> > +static bool vp_get_shm_region(struct virtio_device *vdev,
-> > +			      struct virtio_shm_region *region, u8 id)
-> > +{
-> > +	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
-> > +	struct pci_dev *pci_dev = vp_dev->pci_dev;
-> > +	u8 bar;
-> > +	u64 offset, len;
-> > +	phys_addr_t phys_addr;
-> > +	size_t bar_len;
-> > +
-> > +	if (!virtio_pci_find_shm_cap(pci_dev, id, &bar, &offset, &len)) {
-> > +		return false;
-> > +	}
-> > +
-> > +	phys_addr = pci_resource_start(pci_dev, bar);
-> > +	bar_len = pci_resource_len(pci_dev, bar);
-> > +
-> > +	if ((offset + len) < offset) {
-> > +		dev_err(&pci_dev->dev, "%s: cap offset+len overflow detected\n",
-> > +			__func__);
-> > +		return false;
-> > +	}
-> > +
-> > +	if (offset + len > bar_len) {
-> > +		dev_err(&pci_dev->dev, "%s: bar shorter than cap offset+len\n",
-> > +			__func__);
-> > +		return false;
-> > +	}
-> 
-> Maybe move this to a common header so the checks can be reused by
-> other transports? Can be a patch on top.
+I would think it is virtio-fs + DAX issues. virtio-fs without DAX does
+not have this problem.
 
-Will do as patch on top once these patches get merged. 
+If making this conditional on DAX an issue, I am wondering, can
+we now set args->may_block instead. Now virtiofs will do completion
+in a separate worker thread if ->may_block is set. That means, 
+worker will block till REMOVEMAPPING completes and then be woken
+up.
 
-Thanks
+Do let me know if you like setting args->may_block approach better.
+I can give that a try.
+
 Vivek
 

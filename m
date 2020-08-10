@@ -1,6 +1,6 @@
-Date: Mon, 10 Aug 2020 11:48:30 -0400
+Date: Mon, 10 Aug 2020 15:37:17 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200810154830.GC455528@redhat.com>
+Message-ID: <20200810193717.GF455528@redhat.com>
 References: <20200807195526.426056-1-vgoyal@redhat.com>
 	<20200807195526.426056-19-vgoyal@redhat.com>
 	<CAJfpegs1CtPMaVmbDc__N0Fc3FkNEe=vQOkrr8RKiiS6NqTyHA@mail.gmail.com>
@@ -42,17 +42,28 @@ On Mon, Aug 10, 2020 at 10:29:13AM +0200, Miklos Szeredi wrote:
 > Is this reasoning specific to DAX?  Seems to me this is a virtio-fs
 > specific issue.
 
-I would think it is virtio-fs + DAX issues. virtio-fs without DAX does
-not have this problem.
+Hi Miklos,
 
-If making this conditional on DAX an issue, I am wondering, can
-we now set args->may_block instead. Now virtiofs will do completion
-in a separate worker thread if ->may_block is set. That means, 
-worker will block till REMOVEMAPPING completes and then be woken
-up.
+I am looking at this patch closely and maybe we don't need it, given
+current code.
 
-Do let me know if you like setting args->may_block approach better.
-I can give that a try.
+Reason being that looks like for virtiofs now we set ctx->destroy=true
+and that sets fc->destroy. And if that's set, we don't schedule async req
+in fuse_release_common();
 
+fuse_release_common() {
+  fuse_file_put(ff, ff->fc->destroy, isdir);
+}
+
+And if we don't schedule async file put, we don't run the risk of
+blocking worker thread in evict_inode() with DAX enabled.
+
+I ran blogbench multiple times with this patch reverted and I can't
+reproduce the deadlock.
+
+So we can drop this patch for now. If need be I will fix it as
+post merge patch.
+
+Thanks
 Vivek
 

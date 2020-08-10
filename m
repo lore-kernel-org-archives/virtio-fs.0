@@ -1,19 +1,13 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=CquD0s9C4x3ETpaALuSLXwVqkmCKd258dwzlSXP4DNs=;
-	b=S2DnfquUHkVrQ3lZVZC1emkh4OCaAvpJvC5YFe8+WX6NKsOIK7gbvBx/6LZgrhozk7
-	CFbSDsCdO1bYMfX6mAIinY2M5dta1plFEJhbQJA6IDjdZX4QYOF8Qga7R0zegK/Swnxn
-	GUzWkJocv9oeIfkHDemI3ud7ojPTlett6S974=
-MIME-Version: 1.0
+Date: Mon, 10 Aug 2020 09:08:09 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200810130809.GA455528@redhat.com>
 References: <20200807195526.426056-1-vgoyal@redhat.com>
-	<20200807195526.426056-19-vgoyal@redhat.com>
-In-Reply-To: <20200807195526.426056-19-vgoyal@redhat.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Mon, 10 Aug 2020 10:29:13 +0200
-Message-ID: <CAJfpegs1CtPMaVmbDc__N0Fc3FkNEe=vQOkrr8RKiiS6NqTyHA@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH v2 18/20] fuse: Release file in process
-	context
+	<CAJfpegtboe-XssmqrcvsJm1R0FBP8fYFrTMv5cuBhfmebiGfQw@mail.gmail.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAJfpegtboe-XssmqrcvsJm1R0FBP8fYFrTMv5cuBhfmebiGfQw@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH v2 00/20] virtiofs: Add DAX support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,29 +16,28 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>, linux-kernel@vger.kernel.org
+To: Miklos Szeredi <miklos@szeredi.hu>, Dan Williams <dan.j.williams@intel.com>, "Michael S. Tsirkin" <mst@redhat.com>
+Cc: linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs-list <virtio-fs@redhat.com>, linux-fsdevel@vger.kernel.org
 
-On Fri, Aug 7, 2020 at 9:55 PM Vivek Goyal <vgoyal@redhat.com> wrote:
->
-> fuse_file_put(sync) can be called with sync=true/false. If sync=true,
-> it waits for release request response and then calls iput() in the
-> caller's context. If sync=false, it does not wait for release request
-> response, frees the fuse_file struct immediately and req->end function
-> does the iput().
->
-> iput() can be a problem with DAX if called in req->end context. If this
-> is last reference to inode (VFS has let go its reference already), then
-> iput() will clean DAX mappings as well and send REMOVEMAPPING requests
-> and wait for completion. (All the the worker thread context which is
-> processing fuse replies from daemon on the host).
->
-> That means it blocks worker thread and it stops processing further
-> replies and system deadlocks.
+On Mon, Aug 10, 2020 at 09:29:47AM +0200, Miklos Szeredi wrote:
+> On Fri, Aug 7, 2020 at 9:55 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> >
+> 
+> > Most of the changes are limited to fuse/virtiofs. There are couple
+> > of changes needed in generic dax infrastructure and couple of changes
+> > in virtio to be able to access shared memory region.
+> 
+> So what's the plan for merging the different subsystems?  I can take
+> all that into the fuse tree, but would need ACKs from the respective
+> maintainers.
 
-Is this reasoning specific to DAX?  Seems to me this is a virtio-fs
-specific issue.
+I am assuming for DAX patches we need ACK from Dan Williams and for
+virtio patches we need ack from Michael S. Tsirkin.
 
-Thanks,
-Miklos
+Dan, Michael, can you please review the dax and virtio patches
+respectively and if there are no concerns, please provide ACK. Or
+suggest an alternative way of how these patches can be merged.
+
+Thanks
+Vivek
 

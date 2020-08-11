@@ -1,12 +1,15 @@
+Date: Tue, 11 Aug 2020 13:55:30 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri,  7 Aug 2020 15:55:17 -0400
-Message-Id: <20200807195526.426056-12-vgoyal@redhat.com>
-In-Reply-To: <20200807195526.426056-1-vgoyal@redhat.com>
+Message-ID: <20200811175530.GB497326@redhat.com>
 References: <20200807195526.426056-1-vgoyal@redhat.com>
+	<20200807195526.426056-16-vgoyal@redhat.com>
+	<20200810222238.GD2079@dread.disaster.area>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 11/20] fuse: implement FUSE_INIT
-	map_alignment field
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20200810222238.GD2079@dread.disaster.area>
+Subject: Re: [Virtio-fs] [PATCH v2 15/20] fuse,
+ dax: Take ->i_mmap_sem lock during dax page fault
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,114 +18,142 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
-Cc: vgoyal@redhat.com, miklos@szeredi.hu
+To: Dave Chinner <david@fromorbit.com>
+Cc: miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
 
-The device communicates FUSE_SETUPMAPPING/FUSE_REMOVMAPPING alignment
-constraints via the FUST_INIT map_alignment field.  Parse this field and
-ensure our DAX mappings meet the alignment constraints.
+On Tue, Aug 11, 2020 at 08:22:38AM +1000, Dave Chinner wrote:
+> On Fri, Aug 07, 2020 at 03:55:21PM -0400, Vivek Goyal wrote:
+> > We need some kind of locking mechanism here. Normal file systems like
+> > ext4 and xfs seems to take their own semaphore to protect agains
+> > truncate while fault is going on.
+> > 
+> > We have additional requirement to protect against fuse dax memory range
+> > reclaim. When a range has been selected for reclaim, we need to make sure
+> > no other read/write/fault can try to access that memory range while
+> > reclaim is in progress. Once reclaim is complete, lock will be released
+> > and read/write/fault will trigger allocation of fresh dax range.
+> > 
+> > Taking inode_lock() is not an option in fault path as lockdep complains
+> > about circular dependencies. So define a new fuse_inode->i_mmap_sem.
+> 
+> That's precisely why filesystems like ext4 and XFS define their own
+> rwsem.
+> 
+> Note that this isn't a DAX requirement - the page fault
+> serialisation is actually a requirement of hole punching...
 
-We don't actually align anything differently since our mappings are
-already 2MB aligned.  Just check the value when the connection is
-established.  If it becomes necessary to honor arbitrary alignments in
-the future we'll have to adjust how mappings are sized.
+Hi Dave,
 
-The upshot of this commit is that we can be confident that mappings will
-work even when emulating x86 on Power and similar combinations where the
-host page sizes are different.
+I noticed that fuse code currently does not seem to have a rwsem which
+can provide mutual exclusion between truncation/hole_punch path
+and page fault path. I am wondering does that mean there are issues
+with existing code or something else makes it unnecessary to provide
+this mutual exlusion.
 
-Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/fuse_i.h          |  5 ++++-
- fs/fuse/inode.c           | 19 +++++++++++++++++--
- include/uapi/linux/fuse.h |  4 +++-
- 3 files changed, 24 insertions(+), 4 deletions(-)
+> 
+> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > ---
+> >  fs/fuse/dir.c    |  2 ++
+> >  fs/fuse/file.c   | 15 ++++++++++++---
+> >  fs/fuse/fuse_i.h |  7 +++++++
+> >  fs/fuse/inode.c  |  1 +
+> >  4 files changed, 22 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
+> > index 26f028bc760b..f40766c0693b 100644
+> > --- a/fs/fuse/dir.c
+> > +++ b/fs/fuse/dir.c
+> > @@ -1609,8 +1609,10 @@ int fuse_do_setattr(struct dentry *dentry, struct iattr *attr,
+> >  	 */
+> >  	if ((is_truncate || !is_wb) &&
+> >  	    S_ISREG(inode->i_mode) && oldsize != outarg.attr.size) {
+> > +		down_write(&fi->i_mmap_sem);
+> >  		truncate_pagecache(inode, outarg.attr.size);
+> >  		invalidate_inode_pages2(inode->i_mapping);
+> > +		up_write(&fi->i_mmap_sem);
+> >  	}
+> >  
+> >  	clear_bit(FUSE_I_SIZE_UNSTABLE, &fi->state);
+> > diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+> > index be7d90eb5b41..00ad27216cc3 100644
+> > --- a/fs/fuse/file.c
+> > +++ b/fs/fuse/file.c
+> > @@ -2878,11 +2878,18 @@ static vm_fault_t __fuse_dax_fault(struct vm_fault *vmf,
+> >  
+> >  	if (write)
+> >  		sb_start_pagefault(sb);
+> > -
+> > +	/*
+> > +	 * We need to serialize against not only truncate but also against
+> > +	 * fuse dax memory range reclaim. While a range is being reclaimed,
+> > +	 * we do not want any read/write/mmap to make progress and try
+> > +	 * to populate page cache or access memory we are trying to free.
+> > +	 */
+> > +	down_read(&get_fuse_inode(inode)->i_mmap_sem);
+> >  	ret = dax_iomap_fault(vmf, pe_size, &pfn, NULL, &fuse_iomap_ops);
+> >  
+> >  	if (ret & VM_FAULT_NEEDDSYNC)
+> >  		ret = dax_finish_sync_fault(vmf, pe_size, pfn);
+> > +	up_read(&get_fuse_inode(inode)->i_mmap_sem);
+> >  
+> >  	if (write)
+> >  		sb_end_pagefault(sb);
+> > @@ -3849,9 +3856,11 @@ static long fuse_file_fallocate(struct file *file, int mode, loff_t offset,
+> >  			file_update_time(file);
+> >  	}
+> >  
+> > -	if (mode & FALLOC_FL_PUNCH_HOLE)
+> > +	if (mode & FALLOC_FL_PUNCH_HOLE) {
+> > +		down_write(&fi->i_mmap_sem);
+> >  		truncate_pagecache_range(inode, offset, offset + length - 1);
+> > -
+> > +		up_write(&fi->i_mmap_sem);
+> > +	}
+> >  	fuse_invalidate_attr(inode);
+> 
+> 
+> I'm not sure this is sufficient. You have to lock page faults out
+> for the entire time the hole punch is being performed, not just while
+> the mapping is being invalidated.
+> 
+> That is, once you've taken the inode lock and written back the dirty
+> data over the range being punched, you can then take a page fault
+> and dirty the page again. Then after you punch the hole out,
+> you have a dirty page with non-zero data in it, and that can get
+> written out before the page cache is truncated.
 
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 478c940b05b4..4a46e35222c7 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -47,7 +47,10 @@
- /** Number of dentries for each connection in the control filesystem */
- #define FUSE_CTL_NUM_DENTRIES 5
- 
--/* Default memory range size, 2MB */
-+/*
-+ * Default memory range size.  A power of 2 so it agrees with common FUSE_INIT
-+ * map_alignment values 4KB and 64KB.
-+ */
- #define FUSE_DAX_SZ	(2*1024*1024)
- #define FUSE_DAX_SHIFT	(21)
- #define FUSE_DAX_PAGES	(FUSE_DAX_SZ/PAGE_SIZE)
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index b82eb61d63cc..9b690456de30 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -980,9 +980,10 @@ static void process_init_reply(struct fuse_conn *fc, struct fuse_args *args,
- {
- 	struct fuse_init_args *ia = container_of(args, typeof(*ia), args);
- 	struct fuse_init_out *arg = &ia->out;
-+	bool ok = true;
- 
- 	if (error || arg->major != FUSE_KERNEL_VERSION)
--		fc->conn_error = 1;
-+		ok = false;
- 	else {
- 		unsigned long ra_pages;
- 
-@@ -1045,6 +1046,14 @@ static void process_init_reply(struct fuse_conn *fc, struct fuse_args *args,
- 					min_t(unsigned int, FUSE_MAX_MAX_PAGES,
- 					max_t(unsigned int, arg->max_pages, 1));
- 			}
-+			if ((arg->flags & FUSE_MAP_ALIGNMENT) &&
-+			    (FUSE_DAX_SZ % (1ul << arg->map_alignment))) {
-+				printk(KERN_ERR "FUSE: map_alignment %u"
-+				       " incompatible with dax mem range size"
-+				       " %u\n", arg->map_alignment,
-+				       FUSE_DAX_SZ);
-+				ok = false;
-+			}
- 		} else {
- 			ra_pages = fc->max_read / PAGE_SIZE;
- 			fc->no_lock = 1;
-@@ -1060,6 +1069,11 @@ static void process_init_reply(struct fuse_conn *fc, struct fuse_args *args,
- 	}
- 	kfree(ia);
- 
-+	if (!ok) {
-+		fc->conn_init = 0;
-+		fc->conn_error = 1;
-+	}
-+
- 	fuse_set_initialized(fc);
- 	wake_up_all(&fc->blocked_waitq);
- }
-@@ -1082,7 +1096,8 @@ void fuse_send_init(struct fuse_conn *fc)
- 		FUSE_WRITEBACK_CACHE | FUSE_NO_OPEN_SUPPORT |
- 		FUSE_PARALLEL_DIROPS | FUSE_HANDLE_KILLPRIV | FUSE_POSIX_ACL |
- 		FUSE_ABORT_ERROR | FUSE_MAX_PAGES | FUSE_CACHE_SYMLINKS |
--		FUSE_NO_OPENDIR_SUPPORT | FUSE_EXPLICIT_INVAL_DATA;
-+		FUSE_NO_OPENDIR_SUPPORT | FUSE_EXPLICIT_INVAL_DATA |
-+		FUSE_MAP_ALIGNMENT;
- 	ia->args.opcode = FUSE_INIT;
- 	ia->args.in_numargs = 1;
- 	ia->args.in_args[0].size = sizeof(ia->in);
-diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-index 373cada89815..5b85819e045f 100644
---- a/include/uapi/linux/fuse.h
-+++ b/include/uapi/linux/fuse.h
-@@ -313,7 +313,9 @@ struct fuse_file_lock {
-  * FUSE_CACHE_SYMLINKS: cache READLINK responses
-  * FUSE_NO_OPENDIR_SUPPORT: kernel supports zero-message opendir
-  * FUSE_EXPLICIT_INVAL_DATA: only invalidate cached pages on explicit request
-- * FUSE_MAP_ALIGNMENT: map_alignment field is valid
-+ * FUSE_MAP_ALIGNMENT: init_out.map_alignment contains log2(byte alignment) for
-+ *		       foffset and moffset fields in struct
-+ *		       fuse_setupmapping_out and fuse_removemapping_one.
-  */
- #define FUSE_ASYNC_READ		(1 << 0)
- #define FUSE_POSIX_LOCKS	(1 << 1)
--- 
-2.25.4
+Just for my better udnerstanding of the issue, I am wondering what
+problem will it lead to. If one process is doing punch_hole and
+other is writing in the range being punched, end result could be
+anything. Either we will read zeroes from punched_hole pages or
+we will read the data written by process writing to mmaped page, depending
+on in what order it got executed. 
+
+If that's the case, then holding fi->i_mmap_sem for the whole duration
+might not matter. What am I missing?
+
+Thanks
+Vivek
+
+> 
+> IOWs, to do a hole punch safely, you have to both lock the inode
+> and lock out page faults *before* you write back dirty data. Then
+> you can invalidate the page cache so you know there is no cached
+> data over the range about to be punched. Once the punch is done,
+> then you can drop all locks....
+> 
+> The same goes for any other operation that manipulates extents
+> directly (other fallocate ops, truncate, etc).
+> 
+> /me also wonders if there can be racing AIO+DIO in progress over the
+> range that is being punched and whether fuse needs to call
+> inode_dio_wait() before punching holes, running truncates, etc...
+> 
+> Cheers,
+> 
+> Dave.
+> -- 
+> Dave Chinner
+> david@fromorbit.com
+> 
 

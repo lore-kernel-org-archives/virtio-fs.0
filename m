@@ -1,15 +1,17 @@
-Date: Wed, 12 Aug 2020 17:43:09 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200812164309.GN2810@work-vm>
-References: <20200803191511.45261-1-dgilbert@redhat.com>
-	<20200803191511.45261-2-dgilbert@redhat.com>
-	<20200805124749.GH361702@stefanha-x1.localdomain>
+Date: Wed, 12 Aug 2020 17:10:12 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200812211012.GA540706@redhat.com>
+References: <20200807195526.426056-1-vgoyal@redhat.com>
+	<20200807195526.426056-16-vgoyal@redhat.com>
+	<20200810222238.GD2079@dread.disaster.area>
+	<20200811175530.GB497326@redhat.com>
+	<20200812012345.GG2079@dread.disaster.area>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20200805124749.GH361702@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH 1/3] tools/virtiofsd: xattr name mappings:
-	Add option
+In-Reply-To: <20200812012345.GG2079@dread.disaster.area>
+Subject: Re: [Virtio-fs] [PATCH v2 15/20] fuse,
+ dax: Take ->i_mmap_sem lock during dax page fault
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,146 +20,228 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
+To: Dave Chinner <david@fromorbit.com>
+Cc: miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> On Mon, Aug 03, 2020 at 08:15:09PM +0100, Dr. David Alan Gilbert (git) wrote:
-> > diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-> > index 824e713491..82b6f6d90a 100644
-> > --- a/docs/tools/virtiofsd.rst
-> > +++ b/docs/tools/virtiofsd.rst
-> > @@ -107,6 +107,51 @@ Options
-> >    performance.  ``auto`` acts similar to NFS with a 1 second metadata cache
-> >    timeout.  ``always`` sets a long cache lifetime at the expense of coherency.
-> >  
-> > +xattr-mapping
-> > +-------------
-> > +
-> > +By default the name of xattr's used by the client are passe through to the host
-> > +file system.  This can be a problem where either those xattr names are used
-> > +by something on the host (e.g. selinux guest/host confusion) or if the
-> > +virtiofsd is running in a container with restricted priviliges where it cannot
-> > +access some attributes.
-> > +
-> > +A mapping of xattr names can be made using -o xattrmap=mapping where the ``mapping``
-> > +string consists of a series of rules.
-> > +
-> > +Each rule starts and ends with a ':'.  The mapping stops on a matching
-> > +rule.  White space may be added before and after each rule.
-> > +
-> > +:scope:type:key:prepend:
-> > +
-> > +scope= 'c' - match 'key' against a xattr name from the client
-> > +            for setxattr/getxattr/removexattr
-> > +       'h' - match 'prepend' against a xattr name from the host
-> > +            for listxattr
-> > +       both letters can be included to match both cases.
-> > +
-> > +type is one of:
-> > +       'p' Prefixing: If 'key' matches the client then the 'prepend'
-> > +           is added before the name is passed to the host.
-> > +           For a host case, the prepend is tested and stripped
-> > +           if matching.
-> > +
-> > +       'o' OK: The attribute name is OK and passed through to
-> > +           the host unchanged.
-> > +
-> > +       'b' Bad: If a client tries to use this name it's
-> > +           denied using EPERM; when the host passes an attribute
-> > +           name matching it's hidden.
-> > +
-> > +key is a string tested as a prefix on an attribute name originating
-> > +       on the client.  It maybe empty in which case a 'c' rule
-> > +       will always match on client names.
-> > +
-> > +prepend is a string tested as a prefix on an attribute name originiating
-> > +       on the host, and used as a new prefix by 'p'.  It maybe empty
-> > +       in which case a 'h' rule will always match on host names.
+On Wed, Aug 12, 2020 at 11:23:45AM +1000, Dave Chinner wrote:
+> On Tue, Aug 11, 2020 at 01:55:30PM -0400, Vivek Goyal wrote:
+> > On Tue, Aug 11, 2020 at 08:22:38AM +1000, Dave Chinner wrote:
+> > > On Fri, Aug 07, 2020 at 03:55:21PM -0400, Vivek Goyal wrote:
+> > > > We need some kind of locking mechanism here. Normal file systems like
+> > > > ext4 and xfs seems to take their own semaphore to protect agains
+> > > > truncate while fault is going on.
+> > > > 
+> > > > We have additional requirement to protect against fuse dax memory range
+> > > > reclaim. When a range has been selected for reclaim, we need to make sure
+> > > > no other read/write/fault can try to access that memory range while
+> > > > reclaim is in progress. Once reclaim is complete, lock will be released
+> > > > and read/write/fault will trigger allocation of fresh dax range.
+> > > > 
+> > > > Taking inode_lock() is not an option in fault path as lockdep complains
+> > > > about circular dependencies. So define a new fuse_inode->i_mmap_sem.
+> > > 
+> > > That's precisely why filesystems like ext4 and XFS define their own
+> > > rwsem.
+> > > 
+> > > Note that this isn't a DAX requirement - the page fault
+> > > serialisation is actually a requirement of hole punching...
+> > 
+> > Hi Dave,
+> > 
+> > I noticed that fuse code currently does not seem to have a rwsem which
+> > can provide mutual exclusion between truncation/hole_punch path
+> > and page fault path. I am wondering does that mean there are issues
+> > with existing code or something else makes it unnecessary to provide
+> > this mutual exlusion.
 > 
-> This syntax and the documentation is hard to understand. Defining
-> concrete commands instead of a single super-command would make it more
-> straightforward.
+> I don't know enough about the fuse implementation to say. What I'm
+> saying is that nothing in the core mm/ or VFS serilises page cache
+> access to the data against direct filesystem manipulations of the
+> underlying filesystem structures.
 
-Yeh I realised it was getting a bit arcane.
+Hi Dave,
 
-> Here is the functionality I've been able to extract from the
-> documentation:
+Got it. I was checking nfs and they also seem to be calling filemap_fault
+and not taking any locks to block faults. fallocate() (nfs42_fallocate)
+seems to block read/write/aio/dio but does not seem to do anything
+about blocking faults. I am wondering if remote filesystem are
+little different in this aspect. Especially fuse does not maintain
+any filesystem block/extent data. It is file server which is doing
+all that.
+
 > 
-> 1. Rewrite client xattrs
+> i.e. nothing in the VFS or page fault IO path prevents this race
+> condition:
 > 
->    rewrite OLD NEW -> s/^OLD/NEW/
-
-It's not actually that flexible; it can only prepend a prefix;
-conditionally on a given prefix, i.e.
-
-   s/^OLD/NEWOLD/
-
-it can't do a generic rewrite.  It's precisely the inverse of (4).
-
-> 2. Allow client xattrs
+> P0				P1
+> fallocate
+> page cache invalidation
+> 				page fault
+> 				read data
+> punch out data extents
+> 				<data exposed to userspace is stale>
+> 				<data exposed to userspace has no
+> 				backing store allocated>
 > 
->    allow PREFIX -> allow if matching
 > 
-> 3. Deny client xattrs
+> That's where the ext4 and XFS internal rwsem come into play:
 > 
->    deny PREFIX -> EPERM if matching
+> fallocate
+> down_write(mmaplock)
+> page cache invalidation
+> 				page fault
+> 				down_read(mmaplock)
+> 				<blocks>
+> punch out data
+> up_write(mmaplock)
+> 				<unblocks>
+> 				<sees hole>
+> 				<allocates zeroed pages in page cache>
 > 
-> 4. Unprefix server xattrs
+> And there's not stale data exposure to userspace.
+
+Got it. I noticed that both fuse/nfs seem to have reversed the
+order of operation. They call server to punch out data first
+and then truncate page cache. And that should mean that even
+if mmap reader will not see stale data after fallocate(punch_hole)
+has finished.
+
 > 
->    unprefix PREFIX -> s/^PREFIX//
+> It's the same reason that we use the i_rwsem to prevent concurrent
+> IO while a truncate or hole punch is in progress. The IO could map
+> the extent, then block in the IO path, while the filesytsem
+> re-allocates and writes new data or metadata to those blocks. That's
+> another potential non-owner data exposure problem.
 > 
-> 5. Hide server xattrs
+> And if you don't drain AIO+DIO before truncate/hole punch, the
+> i_rwsem does not protect you against concurrent IO as that gets
+> dropped after the AIO is submitted and returns EIOCBQUEUED to the
+> AIO layer. Hence there's IO in flight that isn't tracked by the
+> i_rwsem or the MMAPLOCK, and if you punch out the blocks and
+> reallocate them while the IO is in flight....
 > 
->    hide PREFIX -> skip if matching
+> > > > @@ -3849,9 +3856,11 @@ static long fuse_file_fallocate(struct file *file, int mode, loff_t offset,
+> > > >  			file_update_time(file);
+> > > >  	}
+> > > >  
+> > > > -	if (mode & FALLOC_FL_PUNCH_HOLE)
+> > > > +	if (mode & FALLOC_FL_PUNCH_HOLE) {
+> > > > +		down_write(&fi->i_mmap_sem);
+> > > >  		truncate_pagecache_range(inode, offset, offset + length - 1);
+> > > > -
+> > > > +		up_write(&fi->i_mmap_sem);
+> > > > +	}
+> > > >  	fuse_invalidate_attr(inode);
+> > > 
+> > > 
+> > > I'm not sure this is sufficient. You have to lock page faults out
+> > > for the entire time the hole punch is being performed, not just while
+> > > the mapping is being invalidated.
+> > > 
+> > > That is, once you've taken the inode lock and written back the dirty
+> > > data over the range being punched, you can then take a page fault
+> > > and dirty the page again. Then after you punch the hole out,
+> > > you have a dirty page with non-zero data in it, and that can get
+> > > written out before the page cache is truncated.
+> > 
+> > Just for my better udnerstanding of the issue, I am wondering what
+> > problem will it lead to.
+> > If one process is doing punch_hole and other is writing in the
+> > range being punched, end result could be anything. Either we will
+> > read zeroes from punched_hole pages or we will read the data
+> > written by process writing to mmaped page, depending on in what
+> > order it got executed. 
+> >
+> > If that's the case, then holding fi->i_mmap_sem for the whole
+> > duration might not matter. What am I missing?
 > 
-> Did I miss any functionality?
+> That it is safe to invalidate the page cache after the hole has been
+> punched.
 
-It can explicitly allow server xattrs.
+That's precisely both fuse and nfs seem to be doing. truncate page
+cache after server has hole punched the file. (nfs42_proc_deallocate()
+and fuse_file_fallocate()). I don't understand the nfs code, but
+that seems to be the case from a quick look.
 
-What we have is 
-(client, server, all) x ([un-]prefix , good, bad)
+> 
+> There is nothing stopping, say, memory reclaim from reclaiming pages
+> over the range while the hole is being punched, then having the
+> application refault them while the backing store is being freed.
+> While the page fault read IO is in progress, there's nothing
+> stopping the filesystem from freeing those blocks, nor reallocating
+> them and writing something else to them (e.g. metadata). So they
+> could read someone elses data.
+> 
+> Even worse: the page fault is a write fault, it lands in a hole, has
+> space allocated, the page cache is zeroed, page marked dirty, and
+> then the hole punch calls truncate_pagecache_range() which tosses
+> away the zeroed page and the data the userspace application wrote
+> to the page.
 
-> I suggest using "client" and "server" terminology instead of "client"
-> and "host".
+But isn't that supposed to happen. If fallocate(hole_punch) and mmaped
+write are happening at the same time, then there is no guarantee
+in what order they will execute. App might read back data it wrote
+or might read back zeros depdening on order it was executed. (Even
+with proper locking).
 
-OK; so the 'server' being the one with the underlying fs from which a
-capability is read.
+> 
+> The application then refaults the page, reading stale data off
+> disk instead of seeing what it had already written to the page....
+> 
+> And unlike truncated pages, the mm/ code cannot reliably detect
+> invalidation races on lockless lookup of pages that are within EOF.
+> They rely on truncate changing the file size before page
+> invalidation to detect races as page->index then points beyond EOF.
+> Hole punching does not change inode size, so the page cache lookups
+> cannot tell the difference between a new page that just needs IO to
+> initialise the data and a page that has just been invalidated....
+> 
+> IOWs, there are many ways things can go wrong with hole punch, and
+> the only way to avoid them all is to do invalidate and lock out the
+> page cache before starting the fallocate operation. i.e.:
+> 
+> 	1. lock up the entire IO path (vfs and page fault)
+> 	2. drain the AIO+DIO path
+> 	3. write back dirty pages
+> 	4. invalidate the page cache
 
-> Prefix syntax: xattr names are matched by prefix. The empty string
-> matches all xattr names. How is ':' escaped?
+I see that this is definitely safe. Stop all read/write/faults/aio/dio
+before proceeding with punching hole and invalidating page cache.
 
-I didn't bother adding any escaping code; do you think we need to
-bother? I've not seen any use of an xattr pattern that uses a :  - if
-I was going to suggest an easiest thing I think I'd do it like 'sed'
-in making the first character be the matching character rather than
-explicitly :.
+I think for my purpose, I need to take fi->i_mmap_sem in memory
+range freeing path and need to exactly do all the above to make
+sure that no I/O, fault or AIO/DIO is going on before I take
+away the memory range I have allocated for that inode offset. This
+is I think very similar to assigning blocks/extents and taking
+these away. In that code path I am already taking care of
+taking inode lock as well as i_mmap_sem. But I have not taken
+care of AIO/DIO stuff. I will introduce that too.
 
-> It is unclear whether 'o' terminates processing immediately. Will later
-> 'p' rules still execute?
+For the time being I will handle this fallocate/ftruncate possible
+races in a separate patch series. To me it makes sense to do what
+ext4/xfs are doing. But there might be more to it when it comes
+to remote filesystems... 
 
-The point of 'o' and 'b' is to terminate immediately; the idea is to be
-able to do something like:
+Miklos, WDYT. Shall I modify fuse fallocate/ftruncate code to 
+block all faults/AIO/DIO as well before we get down to the
+task of writing back pages, truncating page cache and punching
+hole.
 
-    'trusted.chocolate' -> OK
-    'trusted.cheese' -> BAD
-    'trusted' -> prefix by user.virtiofs
+> 
+> Because this is the only way we can guarantee that nothing can access
+> the filesystem's backing store for the range we are about to
+> directly manipulate the data in while we perform an "offloaded" data
+> transformation on that range...
+> 
+> This isn't just hole punch - the same problems exist with
+> FALLOC_FL_ZERO_RANGE and FALLOC_FL_{INSERT,COLLAPSE}_RANGE because
+> they change data with extent manipulations and/or hardware offloads
+> that provide no guarantees of specific data state or integrity until
+> they complete....
 
-so that the trusted.something is accepted and stops processing, and then
-any other trusted's get prefixed.
+Ok. As of now fuse seems to have blocked all extra fallocate operations
+like ZERO_RANGE, INSERT, COLLAPSE.
 
-> It is unclear whether 'o'/'b' match the original client name or the
-> rewritten name after a 'p' command.
-
-Any match terminates; so a 'p' prefixes and that's it - no other command
-is processed.
-
-I'll rework so that:
-  a) I replace any single letters by an explicit name
-  b) I use 'server' instead of host'
-
-Dave
-
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+Thanks
+Vivek
 

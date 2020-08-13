@@ -1,15 +1,16 @@
-Date: Wed, 12 Aug 2020 17:10:12 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200812211012.GA540706@redhat.com>
+Date: Thu, 13 Aug 2020 15:12:38 +1000
+From: Dave Chinner <david@fromorbit.com>
+Message-ID: <20200813051238.GA3339@dread.disaster.area>
 References: <20200807195526.426056-1-vgoyal@redhat.com>
 	<20200807195526.426056-16-vgoyal@redhat.com>
 	<20200810222238.GD2079@dread.disaster.area>
 	<20200811175530.GB497326@redhat.com>
 	<20200812012345.GG2079@dread.disaster.area>
+	<20200812211012.GA540706@redhat.com>
 MIME-Version: 1.0
+In-Reply-To: <20200812211012.GA540706@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20200812012345.GG2079@dread.disaster.area>
 Subject: Re: [Virtio-fs] [PATCH v2 15/20] fuse,
  dax: Take ->i_mmap_sem lock during dax page fault
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -20,228 +21,243 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Dave Chinner <david@fromorbit.com>
+To: Vivek Goyal <vgoyal@redhat.com>
 Cc: miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
 
-On Wed, Aug 12, 2020 at 11:23:45AM +1000, Dave Chinner wrote:
-> On Tue, Aug 11, 2020 at 01:55:30PM -0400, Vivek Goyal wrote:
-> > On Tue, Aug 11, 2020 at 08:22:38AM +1000, Dave Chinner wrote:
-> > > On Fri, Aug 07, 2020 at 03:55:21PM -0400, Vivek Goyal wrote:
-> > > > We need some kind of locking mechanism here. Normal file systems like
-> > > > ext4 and xfs seems to take their own semaphore to protect agains
-> > > > truncate while fault is going on.
+On Wed, Aug 12, 2020 at 05:10:12PM -0400, Vivek Goyal wrote:
+> On Wed, Aug 12, 2020 at 11:23:45AM +1000, Dave Chinner wrote:
+> > On Tue, Aug 11, 2020 at 01:55:30PM -0400, Vivek Goyal wrote:
+> > > On Tue, Aug 11, 2020 at 08:22:38AM +1000, Dave Chinner wrote:
+> > > > On Fri, Aug 07, 2020 at 03:55:21PM -0400, Vivek Goyal wrote:
+> > > > > We need some kind of locking mechanism here. Normal file systems like
+> > > > > ext4 and xfs seems to take their own semaphore to protect agains
+> > > > > truncate while fault is going on.
+> > > > > 
+> > > > > We have additional requirement to protect against fuse dax memory range
+> > > > > reclaim. When a range has been selected for reclaim, we need to make sure
+> > > > > no other read/write/fault can try to access that memory range while
+> > > > > reclaim is in progress. Once reclaim is complete, lock will be released
+> > > > > and read/write/fault will trigger allocation of fresh dax range.
+> > > > > 
+> > > > > Taking inode_lock() is not an option in fault path as lockdep complains
+> > > > > about circular dependencies. So define a new fuse_inode->i_mmap_sem.
 > > > > 
-> > > > We have additional requirement to protect against fuse dax memory range
-> > > > reclaim. When a range has been selected for reclaim, we need to make sure
-> > > > no other read/write/fault can try to access that memory range while
-> > > > reclaim is in progress. Once reclaim is complete, lock will be released
-> > > > and read/write/fault will trigger allocation of fresh dax range.
+> > > > That's precisely why filesystems like ext4 and XFS define their own
+> > > > rwsem.
 > > > > 
-> > > > Taking inode_lock() is not an option in fault path as lockdep complains
-> > > > about circular dependencies. So define a new fuse_inode->i_mmap_sem.
+> > > > Note that this isn't a DAX requirement - the page fault
+> > > > serialisation is actually a requirement of hole punching...
 > > > 
-> > > That's precisely why filesystems like ext4 and XFS define their own
-> > > rwsem.
+> > > Hi Dave,
 > > > 
-> > > Note that this isn't a DAX requirement - the page fault
-> > > serialisation is actually a requirement of hole punching...
+> > > I noticed that fuse code currently does not seem to have a rwsem which
+> > > can provide mutual exclusion between truncation/hole_punch path
+> > > and page fault path. I am wondering does that mean there are issues
+> > > with existing code or something else makes it unnecessary to provide
+> > > this mutual exlusion.
 > > 
-> > Hi Dave,
+> > I don't know enough about the fuse implementation to say. What I'm
+> > saying is that nothing in the core mm/ or VFS serilises page cache
+> > access to the data against direct filesystem manipulations of the
+> > underlying filesystem structures.
+> 
+> Hi Dave,
+> 
+> Got it. I was checking nfs and they also seem to be calling filemap_fault
+> and not taking any locks to block faults. fallocate() (nfs42_fallocate)
+> seems to block read/write/aio/dio but does not seem to do anything
+> about blocking faults. I am wondering if remote filesystem are
+> little different in this aspect. Especially fuse does not maintain
+> any filesystem block/extent data. It is file server which is doing
+> all that.
+
+I suspect they have all the same problems, and worse, the behaviour
+will largely be dependent on the server side behaviour that is out
+of the user's control.
+
+Essentially, nobody except us XFS folks seem to regard hole punching
+corrupting data or exposing stale data as being a problem that needs
+to be avoided or fixed. The only reason ext4 has the i_mmap_sem is
+because ext4 wanted to support DAX, and us XFS developers said "DAX
+absolutely requires that the filesystem can lock out physical access
+to the storage" and so they had no choice in the matter.
+
+Other than that, nobody really seems to understand or care about all
+these nasty little mmap() corner cases that we've seen corrupt user
+data or expose stale data to users over many years.....
+
+> > i.e. nothing in the VFS or page fault IO path prevents this race
+> > condition:
 > > 
-> > I noticed that fuse code currently does not seem to have a rwsem which
-> > can provide mutual exclusion between truncation/hole_punch path
-> > and page fault path. I am wondering does that mean there are issues
-> > with existing code or something else makes it unnecessary to provide
-> > this mutual exlusion.
-> 
-> I don't know enough about the fuse implementation to say. What I'm
-> saying is that nothing in the core mm/ or VFS serilises page cache
-> access to the data against direct filesystem manipulations of the
-> underlying filesystem structures.
-
-Hi Dave,
-
-Got it. I was checking nfs and they also seem to be calling filemap_fault
-and not taking any locks to block faults. fallocate() (nfs42_fallocate)
-seems to block read/write/aio/dio but does not seem to do anything
-about blocking faults. I am wondering if remote filesystem are
-little different in this aspect. Especially fuse does not maintain
-any filesystem block/extent data. It is file server which is doing
-all that.
-
-> 
-> i.e. nothing in the VFS or page fault IO path prevents this race
-> condition:
-> 
-> P0				P1
-> fallocate
-> page cache invalidation
-> 				page fault
-> 				read data
-> punch out data extents
-> 				<data exposed to userspace is stale>
-> 				<data exposed to userspace has no
-> 				backing store allocated>
-> 
-> 
-> That's where the ext4 and XFS internal rwsem come into play:
-> 
-> fallocate
-> down_write(mmaplock)
-> page cache invalidation
-> 				page fault
-> 				down_read(mmaplock)
-> 				<blocks>
-> punch out data
-> up_write(mmaplock)
-> 				<unblocks>
-> 				<sees hole>
-> 				<allocates zeroed pages in page cache>
-> 
-> And there's not stale data exposure to userspace.
-
-Got it. I noticed that both fuse/nfs seem to have reversed the
-order of operation. They call server to punch out data first
-and then truncate page cache. And that should mean that even
-if mmap reader will not see stale data after fallocate(punch_hole)
-has finished.
-
-> 
-> It's the same reason that we use the i_rwsem to prevent concurrent
-> IO while a truncate or hole punch is in progress. The IO could map
-> the extent, then block in the IO path, while the filesytsem
-> re-allocates and writes new data or metadata to those blocks. That's
-> another potential non-owner data exposure problem.
-> 
-> And if you don't drain AIO+DIO before truncate/hole punch, the
-> i_rwsem does not protect you against concurrent IO as that gets
-> dropped after the AIO is submitted and returns EIOCBQUEUED to the
-> AIO layer. Hence there's IO in flight that isn't tracked by the
-> i_rwsem or the MMAPLOCK, and if you punch out the blocks and
-> reallocate them while the IO is in flight....
-> 
-> > > > @@ -3849,9 +3856,11 @@ static long fuse_file_fallocate(struct file *file, int mode, loff_t offset,
-> > > >  			file_update_time(file);
-> > > >  	}
-> > > >  
-> > > > -	if (mode & FALLOC_FL_PUNCH_HOLE)
-> > > > +	if (mode & FALLOC_FL_PUNCH_HOLE) {
-> > > > +		down_write(&fi->i_mmap_sem);
-> > > >  		truncate_pagecache_range(inode, offset, offset + length - 1);
-> > > > -
-> > > > +		up_write(&fi->i_mmap_sem);
-> > > > +	}
-> > > >  	fuse_invalidate_attr(inode);
-> > > 
-> > > 
-> > > I'm not sure this is sufficient. You have to lock page faults out
-> > > for the entire time the hole punch is being performed, not just while
-> > > the mapping is being invalidated.
-> > > 
-> > > That is, once you've taken the inode lock and written back the dirty
-> > > data over the range being punched, you can then take a page fault
-> > > and dirty the page again. Then after you punch the hole out,
-> > > you have a dirty page with non-zero data in it, and that can get
-> > > written out before the page cache is truncated.
+> > P0				P1
+> > fallocate
+> > page cache invalidation
+> > 				page fault
+> > 				read data
+> > punch out data extents
+> > 				<data exposed to userspace is stale>
+> > 				<data exposed to userspace has no
+> > 				backing store allocated>
 > > 
-> > Just for my better udnerstanding of the issue, I am wondering what
-> > problem will it lead to.
-> > If one process is doing punch_hole and other is writing in the
-> > range being punched, end result could be anything. Either we will
-> > read zeroes from punched_hole pages or we will read the data
-> > written by process writing to mmaped page, depending on in what
-> > order it got executed. 
-> >
-> > If that's the case, then holding fi->i_mmap_sem for the whole
-> > duration might not matter. What am I missing?
+> > 
+> > That's where the ext4 and XFS internal rwsem come into play:
+> > 
+> > fallocate
+> > down_write(mmaplock)
+> > page cache invalidation
+> > 				page fault
+> > 				down_read(mmaplock)
+> > 				<blocks>
+> > punch out data
+> > up_write(mmaplock)
+> > 				<unblocks>
+> > 				<sees hole>
+> > 				<allocates zeroed pages in page cache>
+> > 
+> > And there's not stale data exposure to userspace.
 > 
-> That it is safe to invalidate the page cache after the hole has been
-> punched.
+> Got it. I noticed that both fuse/nfs seem to have reversed the
+> order of operation. They call server to punch out data first
+> and then truncate page cache. And that should mean that even
+> if mmap reader will not see stale data after fallocate(punch_hole)
+> has finished.
 
-That's precisely both fuse and nfs seem to be doing. truncate page
-cache after server has hole punched the file. (nfs42_proc_deallocate()
-and fuse_file_fallocate()). I don't understand the nfs code, but
-that seems to be the case from a quick look.
+Yes, but that doesn't prevent page fault races from occuring, it
+just changes the nature of them.. Such as.....
 
+> > There is nothing stopping, say, memory reclaim from reclaiming pages
+> > over the range while the hole is being punched, then having the
+> > application refault them while the backing store is being freed.
+> > While the page fault read IO is in progress, there's nothing
+> > stopping the filesystem from freeing those blocks, nor reallocating
+> > them and writing something else to them (e.g. metadata). So they
+> > could read someone elses data.
+> > 
+> > Even worse: the page fault is a write fault, it lands in a hole, has
+> > space allocated, the page cache is zeroed, page marked dirty, and
+> > then the hole punch calls truncate_pagecache_range() which tosses
+> > away the zeroed page and the data the userspace application wrote
+> > to the page.
 > 
-> There is nothing stopping, say, memory reclaim from reclaiming pages
-> over the range while the hole is being punched, then having the
-> application refault them while the backing store is being freed.
-> While the page fault read IO is in progress, there's nothing
-> stopping the filesystem from freeing those blocks, nor reallocating
-> them and writing something else to them (e.g. metadata). So they
-> could read someone elses data.
+> But isn't that supposed to happen.
+
+Right, it isn;'t supposed to happen, but it can happen if
+page_mkwrite doesn't serialise against fallocate(). i.e. without a
+i_mmap_sem, nothing in the mm page fault paths serialise the page
+fault against the filesystem fallocate operation in progress.
+
+Indeed, looking at fuse_page_mkwrite(), it just locks the page,
+checks the page->mapping hasn't changed (that's one of those
+"doesn't work for hole punching page invalidation" checks that I
+mentioned!) and then it waits for page writeback to complete. IOWs,
+fuse will allow a clean page in cache to be dirtied without the
+filesystem actually locking anything or doing any sort of internal
+serialisation operation.
+
+IOWs, there is nothing stopping an application on fuse from hitting
+this data corruption when a concurrent hole punch is run:
+
+ P0				P1
+ <read() loop to find zeros>
+ fallocate
+ write back dirty data
+ punch out data extents
+ .....
+ 				<app reads data via mmap>
+				  read fault, clean page in cache!
+ 				<app writes data via mmap>
+ 				  write page fault
+				  page_mkwrite
+				    <page is locked just fine>
+				  page is dirtied.
+				<app writes new data to page>
+ .....
+ page cache invalidation
+   <app's dirty page thrown away>
+				.....
+				<app reads data via mmap>
+				  read page fault
+				    <maps punched hole, returns zeros>
+				app detects data corruption
+
+That can happen quite easily - just go put a "sparsify" script into
+cron so that runs of zeroes in files are converted into holes to
+free up disk space every night....
+
+> If fallocate(hole_punch) and mmaped
+> write are happening at the same time, then there is no guarantee
+> in what order they will execute.
+
+It's not "order of exceution" that is the problem here - it's
+guaranteeing *atomic execution* that is the problem. See the example
+above - by not locking out page faults, fallocate() does not execute
+atomically w.r.t. to mmap() access to the file, and hence we end up
+losing changes the to data made via mmap.
+
+That's precisely what the i_mmap_sem fixes. It *guarantees* the
+ordering of the fallocate() operation and the page fault based
+access to the underlying data by ensuring that the *operations
+execute atomically* with respect to each other. And, by definition,
+that atomicity of execution removes all the races that can lead to
+data loss, corruption and/or stale data exposure....
+
+> App might read back data it wrote
+> or might read back zeros depdening on order it was executed. (Even
+> with proper locking).
+
+That behaviour is what "proper locking" provides. If you don't
+have an i_mmap_sem to guarantee serialisation of page faults against
+fallocate (i.e. "unproper locking"), then you also can get stale
+data, the wrong data, data loss, access-after-free, overwrite of
+metadata or other people's data, etc.
+
+> > The application then refaults the page, reading stale data off
+> > disk instead of seeing what it had already written to the page....
+> > 
+> > And unlike truncated pages, the mm/ code cannot reliably detect
+> > invalidation races on lockless lookup of pages that are within EOF.
+> > They rely on truncate changing the file size before page
+> > invalidation to detect races as page->index then points beyond EOF.
+> > Hole punching does not change inode size, so the page cache lookups
+> > cannot tell the difference between a new page that just needs IO to
+> > initialise the data and a page that has just been invalidated....
+> > 
+> > IOWs, there are many ways things can go wrong with hole punch, and
+> > the only way to avoid them all is to do invalidate and lock out the
+> > page cache before starting the fallocate operation. i.e.:
+> > 
+> > 	1. lock up the entire IO path (vfs and page fault)
+> > 	2. drain the AIO+DIO path
+> > 	3. write back dirty pages
+> > 	4. invalidate the page cache
 > 
-> Even worse: the page fault is a write fault, it lands in a hole, has
-> space allocated, the page cache is zeroed, page marked dirty, and
-> then the hole punch calls truncate_pagecache_range() which tosses
-> away the zeroed page and the data the userspace application wrote
-> to the page.
-
-But isn't that supposed to happen. If fallocate(hole_punch) and mmaped
-write are happening at the same time, then there is no guarantee
-in what order they will execute. App might read back data it wrote
-or might read back zeros depdening on order it was executed. (Even
-with proper locking).
-
+> I see that this is definitely safe. Stop all read/write/faults/aio/dio
+> before proceeding with punching hole and invalidating page cache.
 > 
-> The application then refaults the page, reading stale data off
-> disk instead of seeing what it had already written to the page....
+> I think for my purpose, I need to take fi->i_mmap_sem in memory
+> range freeing path and need to exactly do all the above to make
+> sure that no I/O, fault or AIO/DIO is going on before I take
+> away the memory range I have allocated for that inode offset. This
+> is I think very similar to assigning blocks/extents and taking
+> these away. In that code path I am already taking care of
+> taking inode lock as well as i_mmap_sem. But I have not taken
+> care of AIO/DIO stuff. I will introduce that too.
 > 
-> And unlike truncated pages, the mm/ code cannot reliably detect
-> invalidation races on lockless lookup of pages that are within EOF.
-> They rely on truncate changing the file size before page
-> invalidation to detect races as page->index then points beyond EOF.
-> Hole punching does not change inode size, so the page cache lookups
-> cannot tell the difference between a new page that just needs IO to
-> initialise the data and a page that has just been invalidated....
-> 
-> IOWs, there are many ways things can go wrong with hole punch, and
-> the only way to avoid them all is to do invalidate and lock out the
-> page cache before starting the fallocate operation. i.e.:
-> 
-> 	1. lock up the entire IO path (vfs and page fault)
-> 	2. drain the AIO+DIO path
-> 	3. write back dirty pages
-> 	4. invalidate the page cache
+> For the time being I will handle this fallocate/ftruncate possible
+> races in a separate patch series. To me it makes sense to do what
+> ext4/xfs are doing. But there might be more to it when it comes
+> to remote filesystems... 
 
-I see that this is definitely safe. Stop all read/write/faults/aio/dio
-before proceeding with punching hole and invalidating page cache.
+Remote filesystems introduce a whole new range of data coherency
+problems that are outside the scope of mmap() vs fallocate()
+serialisation. That is, page fault vs fallocate serialisation is a
+local client serialisation condition, not a remote filesystem
+data coherency issue...
 
-I think for my purpose, I need to take fi->i_mmap_sem in memory
-range freeing path and need to exactly do all the above to make
-sure that no I/O, fault or AIO/DIO is going on before I take
-away the memory range I have allocated for that inode offset. This
-is I think very similar to assigning blocks/extents and taking
-these away. In that code path I am already taking care of
-taking inode lock as well as i_mmap_sem. But I have not taken
-care of AIO/DIO stuff. I will introduce that too.
+Cheers,
 
-For the time being I will handle this fallocate/ftruncate possible
-races in a separate patch series. To me it makes sense to do what
-ext4/xfs are doing. But there might be more to it when it comes
-to remote filesystems... 
-
-Miklos, WDYT. Shall I modify fuse fallocate/ftruncate code to 
-block all faults/AIO/DIO as well before we get down to the
-task of writing back pages, truncating page cache and punching
-hole.
-
-> 
-> Because this is the only way we can guarantee that nothing can access
-> the filesystem's backing store for the range we are about to
-> directly manipulate the data in while we perform an "offloaded" data
-> transformation on that range...
-> 
-> This isn't just hole punch - the same problems exist with
-> FALLOC_FL_ZERO_RANGE and FALLOC_FL_{INSERT,COLLAPSE}_RANGE because
-> they change data with extent manipulations and/or hardware offloads
-> that provide no guarantees of specific data state or integrity until
-> they complete....
-
-Ok. As of now fuse seems to have blocked all extra fallocate operations
-like ZERO_RANGE, INSERT, COLLAPSE.
-
-Thanks
-Vivek
+Dave.
+-- 
+Dave Chinner
+david@fromorbit.com
 

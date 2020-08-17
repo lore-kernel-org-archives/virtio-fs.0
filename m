@@ -1,19 +1,14 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yahoo.com; s=s2048;
-	t=1597419889; bh=ljMTuwKrqWkkWYdOmTtthmbN/XW+/rs+OF/GwBjGrBw=;
-	h=Subject:To:Cc:References:From:Date:In-Reply-To:From:Subject;
-	b=ErpnedFsPZRbMGEsJw200Lp0vuzgd1/boPU1Rv+jwRb2wxSEC8ikJ5OThfSO10tR/S32c9QJbLg4y940/5xeUebxB474e6BA42w0CYFVFbLTqZ3B+N26Hn7JF3eBjpz5TQXH9q3ySFFQ+syK+1k6kv2VJ4ziJ9UnI8xT1SdkJ0GTMj2MZyLNZFjwxhyEuHF2aajeKHL3q11/W5fyaJcQSbKnABo+2Kekb8C2Ir1ADdSby+T5LBzfT32HezLFRgQl68O+2NvzAZIT6e9FLBmKDXyh8JCjMMEMARgAyOxs80LnGBWRELnEzpWhIzUIuccCbWeIBCRtJ2VYJkhtHlZ2qw==
-References: <20200722090758.3221812-1-chirantan@chromium.org>
-	<CAJFHJrr+B=xszNvdkmksG5ULPy_nKpn4_MS9_Pnq6ySkkb5y6g@mail.gmail.com>
-From: Casey Schaufler <casey@schaufler-ca.com>
-Message-ID: <1dfa1ae5-bb5a-67ea-f38a-b9d9a545dd0a@schaufler-ca.com>
-Date: Fri, 14 Aug 2020 08:44:47 -0700
+Date: Mon, 17 Aug 2020 18:57:31 +0200
+From: Jan Kara <jack@suse.cz>
+Message-ID: <20200817165731.GB22500@quack2.suse.cz>
+References: <20200807195526.426056-1-vgoyal@redhat.com>
+	<20200807195526.426056-2-vgoyal@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <CAJFHJrr+B=xszNvdkmksG5ULPy_nKpn4_MS9_Pnq6ySkkb5y6g@mail.gmail.com>
-Content-Language: en-US
-Content-Type: text/plain; charset=utf-8
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [RESEND] [PATCHv4 1/2] uapi: fuse: Add
-	FUSE_SECURITY_CTX
+In-Reply-To: <20200807195526.426056-2-vgoyal@redhat.com>
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: Re: [Virtio-fs] [PATCH v2 01/20] dax: Modify bdev_dax_pgoff() to
+	handle NULL bdev
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,30 +17,69 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Chirantan Ekbote <chirantan@chromium.org>, Miklos Szeredi <miklos@szeredi.hu>, Stephen Smalley <stephen.smalley.work@gmail.com>
-Cc: fuse-devel <fuse-devel@lists.sourceforge.net>, Casey Schaufler <casey@schaufler-ca.com>, Suleiman Souhlal <suleiman@chromium.org>, virtio-fs-list <virtio-fs@redhat.com>, SElinux list <selinux@vger.kernel.org>, Linux FS Devel <linux-fsdevel@vger.kernel.org>, Dylan Reid <dgreid@chromium.org>, Vivek Goyal <vgoyal@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: Christoph Hellwig <hch@infradead.org>, miklos@szeredi.hu, linux-nvdimm@lists.01.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Dan Williams <dan.j.williams@intel.com>
 
-On 8/13/2020 10:20 PM, Chirantan Ekbote wrote:
-> On Wed, Jul 22, 2020 at 6:09 PM Chirantan Ekbote <chirantan@chromium.org> wrote:
->> Add the FUSE_SECURITY_CTX flag for the `flags` field of the
->> fuse_init_out struct.  When this flag is set the kernel will append the
->> security context for a newly created inode to the request (create,
->> mkdir, mknod, and symlink).  The server is responsible for ensuring that
->> the inode appears atomically with the requested security context.
->>
->> For example, if the server is backed by a "real" linux file system then
->> it can write the security context value to
->> /proc/thread-self/attr/fscreate before making the syscall to create the
->> inode.
->>
-> Friendly ping. Will this (and the next patch in the series) be merged into 5.9?
+On Fri 07-08-20 15:55:07, Vivek Goyal wrote:
+> virtiofs does not have a block device but it has dax device.
+> Modify bdev_dax_pgoff() to be able to handle that.
+> 
+> If there is no bdev, that means dax offset is 0. (It can't be a partition
+> block device starting at an offset in dax device).
+> 
+> This is little hackish. There have been discussions about getting rid
+> of dax not supporting partitions.
+> 
+> https://lore.kernel.org/linux-fsdevel/20200107125159.GA15745@infradead.org/
+> 
+> IMHO, this path can easily break exisitng users. For example
+> ioctl(BLKPG_ADD_PARTITION) will start breaking on block devices
+> supporting DAX. Also, I personally find it very useful to be able to
+> partition dax devices and still be able to use DAX.
+> 
+> Alternatively, I tried to store offset into dax device information in iomap
+> interface, but that got NACKed.
+> 
+> https://lore.kernel.org/linux-fsdevel/20200217133117.GB20444@infradead.org/
+> 
+> I can't think of a good path to solve this issue properly. So to make
+> progress, it seems this patch is least bad option for now and I hope
+> we can take it.
+> 
+> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> Cc: Christoph Hellwig <hch@infradead.org>
+> Cc: Dan Williams <dan.j.williams@intel.com>
+> Cc: linux-nvdimm@lists.01.org
 
-This really needed to go to the LSM List <linux-security-module@vger.kernel.org>.
+This patch looks OK to me. You can add:
 
+Reviewed-by: Jan Kara <jack@suse.cz>
 
->
-> Chirantan
->
->
-> Chirantan
+								Honza
+
+> ---
+>  drivers/dax/super.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/dax/super.c b/drivers/dax/super.c
+> index 8e32345be0f7..c4bec437e88b 100644
+> --- a/drivers/dax/super.c
+> +++ b/drivers/dax/super.c
+> @@ -46,7 +46,8 @@ EXPORT_SYMBOL_GPL(dax_read_unlock);
+>  int bdev_dax_pgoff(struct block_device *bdev, sector_t sector, size_t size,
+>  		pgoff_t *pgoff)
+>  {
+> -	phys_addr_t phys_off = (get_start_sect(bdev) + sector) * 512;
+> +	sector_t start_sect = bdev ? get_start_sect(bdev) : 0;
+> +	phys_addr_t phys_off = (start_sect + sector) * 512;
+>  
+>  	if (pgoff)
+>  		*pgoff = PHYS_PFN(phys_off);
+> -- 
+> 2.25.4
+> 
+-- 
+Jan Kara <jack@suse.com>
+SUSE Labs, CR
 

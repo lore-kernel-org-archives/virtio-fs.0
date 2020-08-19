@@ -1,9 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 19 Aug 2020 18:19:38 -0400
-Message-Id: <20200819221956.845195-1-vgoyal@redhat.com>
+Date: Wed, 19 Aug 2020 18:19:43 -0400
+Message-Id: <20200819221956.845195-6-vgoyal@redhat.com>
+In-Reply-To: <20200819221956.845195-1-vgoyal@redhat.com>
+References: <20200819221956.845195-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 00/18] virtiofs: Add DAX support
+Subject: [Virtio-fs] [PATCH v3 05/18] virtio: Implement get_shm_region for
+	MMIO transport
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,106 +16,93 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com
-Cc: Jan Kara <jack@suse.cz>, miklos@szeredi.hu, Vishal L Verma <vishal.l.verma@intel.com>, "Michael S. Tsirkin" <mst@redhat.com>, Dave Chinner <david@fromorbit.com>, Christoph Hellwig <hch@infradead.org>, dan.j.williams@intel.com, Ira Weiny <ira.weiny@intel.com>, vgoyal@redhat.com
+Cc: kvm@vger.kernel.org, miklos@szeredi.hu, "Michael S. Tsirkin" <mst@redhat.com>, virtualization@lists.linux-foundation.org, dan.j.williams@intel.com, vgoyal@redhat.com
 
-Hi All,
+From: Sebastien Boeuf <sebastien.boeuf@intel.com>
 
-This is V3 of patches. I had posted version v2 version here.
+On MMIO a new set of registers is defined for finding SHM
+regions.  Add their definitions and use them to find the region.
 
-https://lore.kernel.org/linux-fsdevel/20200807195526.426056-1-vgoyal@redhat.com/
-
-I have taken care of comments from V2. Changes from V2 are.
-
-- Rebased patches on top of 5.9-rc1
-
-- Renamed couple of functions to get rid of iomap prefix. (Dave Chinner)
-
-- Modified truncate/punch_hole paths to serialize with dax fault
-  path. For now did this only for dax paths. May be non-dax path
-  can benefit from this too. But that is an option for a different
-  day. (Dave Chinner).
-
-- Took care of comments by Jan Kara in dax_layout_busy_page_range()
-  implementation patch.
-
-- Dropped one of the patches which forced sync release in
-  fuse_file_put() path for DAX files. It was redundant now as virtiofs
-  already sets fs_context->destroy which forces sync release. (Miklos)
-
-- Took care of some of the errors flagged by checkpatch.pl.
-
-Description from previous post
-------------------------------
-
-This patch series adds DAX support to virtiofs filesystem. This allows
-bypassing guest page cache and allows mapping host page cache directly
-in guest address space.
-
-When a page of file is needed, guest sends a request to map that page
-(in host page cache) in qemu address space. Inside guest this is
-a physical memory range controlled by virtiofs device. And guest
-directly maps this physical address range using DAX and hence gets
-access to file data on host.
-
-This can speed up things considerably in many situations. Also this
-can result in substantial memory savings as file data does not have
-to be copied in guest and it is directly accessed from host page
-cache.
-
-Most of the changes are limited to fuse/virtiofs. There are couple
-of changes needed in generic dax infrastructure and couple of changes
-in virtio to be able to access shared memory region.
-
-Thanks
-Vivek
-
-Sebastien Boeuf (3):
-  virtio: Add get_shm_region method
-  virtio: Implement get_shm_region for PCI transport
-  virtio: Implement get_shm_region for MMIO transport
-
-Stefan Hajnoczi (2):
-  virtio_fs, dax: Set up virtio_fs dax_device
-  fuse,dax: add DAX mmap support
-
-Vivek Goyal (13):
-  dax: Modify bdev_dax_pgoff() to handle NULL bdev
-  dax: Create a range version of dax_layout_busy_page()
-  virtiofs: Provide a helper function for virtqueue initialization
-  fuse: Get rid of no_mount_options
-  fuse,virtiofs: Add a mount option to enable dax
-  fuse,virtiofs: Keep a list of free dax memory ranges
-  fuse: implement FUSE_INIT map_alignment field
-  fuse: Introduce setupmapping/removemapping commands
-  fuse, dax: Implement dax read/write operations
-  fuse,virtiofs: Define dax address space operations
-  fuse, dax: Serialize truncate/punch_hole and dax fault path
-  fuse,virtiofs: Maintain a list of busy elements
-  fuse,virtiofs: Add logic to free up a memory range
-
- drivers/dax/super.c                |    3 +-
- drivers/virtio/virtio_mmio.c       |   31 +
- drivers/virtio/virtio_pci_modern.c |   95 +++
- fs/dax.c                           |   29 +-
- fs/fuse/dir.c                      |   32 +-
- fs/fuse/file.c                     | 1198 +++++++++++++++++++++++++++-
- fs/fuse/fuse_i.h                   |  114 ++-
- fs/fuse/inode.c                    |  146 +++-
- fs/fuse/virtio_fs.c                |  279 ++++++-
- include/linux/dax.h                |    6 +
- include/linux/virtio_config.h      |   17 +
- include/uapi/linux/fuse.h          |   34 +-
- include/uapi/linux/virtio_fs.h     |    3 +
- include/uapi/linux/virtio_mmio.h   |   11 +
- include/uapi/linux/virtio_pci.h    |   11 +-
- 15 files changed, 1933 insertions(+), 76 deletions(-)
-
-Cc: Jan Kara <jack@suse.cz>
-Cc: Dave Chinner <david@fromorbit.com>
-Cc: Christoph Hellwig <hch@infradead.org>
-Cc: Ira Weiny <ira.weiny@intel.com>
+Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
+Cc: kvm@vger.kernel.org
+Cc: virtualization@lists.linux-foundation.org
 Cc: "Michael S. Tsirkin" <mst@redhat.com>
-Cc: Vishal L Verma <vishal.l.verma@intel.com>
+---
+ drivers/virtio/virtio_mmio.c     | 31 +++++++++++++++++++++++++++++++
+ include/uapi/linux/virtio_mmio.h | 11 +++++++++++
+ 2 files changed, 42 insertions(+)
+
+diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
+index 627ac0487494..238383ff1064 100644
+--- a/drivers/virtio/virtio_mmio.c
++++ b/drivers/virtio/virtio_mmio.c
+@@ -498,6 +498,36 @@ static const char *vm_bus_name(struct virtio_device *vdev)
+ 	return vm_dev->pdev->name;
+ }
+ 
++static bool vm_get_shm_region(struct virtio_device *vdev,
++			      struct virtio_shm_region *region, u8 id)
++{
++	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
++	u64 len, addr;
++
++	/* Select the region we're interested in */
++	writel(id, vm_dev->base + VIRTIO_MMIO_SHM_SEL);
++
++	/* Read the region size */
++	len = (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_LEN_LOW);
++	len |= (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_LEN_HIGH) << 32;
++
++	region->len = len;
++
++	/* Check if region length is -1. If that's the case, the shared memory
++	 * region does not exist and there is no need to proceed further.
++	 */
++	if (len == ~(u64)0)
++		return false;
++
++	/* Read the region base address */
++	addr = (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_BASE_LOW);
++	addr |= (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_BASE_HIGH) << 32;
++
++	region->addr = addr;
++
++	return true;
++}
++
+ static const struct virtio_config_ops virtio_mmio_config_ops = {
+ 	.get		= vm_get,
+ 	.set		= vm_set,
+@@ -510,6 +540,7 @@ static const struct virtio_config_ops virtio_mmio_config_ops = {
+ 	.get_features	= vm_get_features,
+ 	.finalize_features = vm_finalize_features,
+ 	.bus_name	= vm_bus_name,
++	.get_shm_region = vm_get_shm_region,
+ };
+ 
+ 
+diff --git a/include/uapi/linux/virtio_mmio.h b/include/uapi/linux/virtio_mmio.h
+index c4b09689ab64..0650f91bea6c 100644
+--- a/include/uapi/linux/virtio_mmio.h
++++ b/include/uapi/linux/virtio_mmio.h
+@@ -122,6 +122,17 @@
+ #define VIRTIO_MMIO_QUEUE_USED_LOW	0x0a0
+ #define VIRTIO_MMIO_QUEUE_USED_HIGH	0x0a4
+ 
++/* Shared memory region id */
++#define VIRTIO_MMIO_SHM_SEL             0x0ac
++
++/* Shared memory region length, 64 bits in two halves */
++#define VIRTIO_MMIO_SHM_LEN_LOW         0x0b0
++#define VIRTIO_MMIO_SHM_LEN_HIGH        0x0b4
++
++/* Shared memory region base address, 64 bits in two halves */
++#define VIRTIO_MMIO_SHM_BASE_LOW        0x0b8
++#define VIRTIO_MMIO_SHM_BASE_HIGH       0x0bc
++
+ /* Configuration atomicity value */
+ #define VIRTIO_MMIO_CONFIG_GENERATION	0x0fc
+ 
 -- 
 2.25.4
 

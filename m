@@ -1,17 +1,11 @@
-Date: Mon, 17 Aug 2020 16:29:05 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200817202905.GA659987@redhat.com>
-References: <20200807195526.426056-1-vgoyal@redhat.com>
-	<20200807195526.426056-5-vgoyal@redhat.com>
-	<20200810100327-mutt-send-email-mst@kernel.org>
-	<20200810145019.GB455528@redhat.com>
-	<CAAfnVBk+Hmcm2ftd3wOK-P2NyYQ7z4Wrf1JKhLJaNkCZBLoo6g@mail.gmail.com>
+Date: Wed, 19 Aug 2020 18:19:41 -0400
+Message-Id: <20200819221956.845195-4-vgoyal@redhat.com>
+In-Reply-To: <20200819221956.845195-1-vgoyal@redhat.com>
+References: <20200819221956.845195-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <CAAfnVBk+Hmcm2ftd3wOK-P2NyYQ7z4Wrf1JKhLJaNkCZBLoo6g@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH v2 04/20] virtio: Implement get_shm_region
- for PCI transport
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v3 03/18] virtio: Add get_shm_region method
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,72 +14,75 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Gurchetan Singh <gurchetansingh@google.com>
-Cc: kbuild test robot <lkp@intel.com>, kvm@vger.kernel.org, miklos@szeredi.hu, "Michael S. Tsirkin" <mst@redhat.com>, open list <linux-kernel@vger.kernel.org>, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com
+Cc: kvm@vger.kernel.org, miklos@szeredi.hu, "Michael S . Tsirkin" <mst@redhat.com>, virtualization@lists.linux-foundation.org, dan.j.williams@intel.com, vgoyal@redhat.com
 
-On Thu, Aug 13, 2020 at 07:51:56PM -0700, Gurchetan Singh wrote:
-> On Mon, Aug 10, 2020 at 7:50 AM Vivek Goyal <vgoyal@redhat.com> wrote:
-> 
-> > On Mon, Aug 10, 2020 at 10:05:17AM -0400, Michael S. Tsirkin wrote:
-> > > On Fri, Aug 07, 2020 at 03:55:10PM -0400, Vivek Goyal wrote:
-> > > > From: Sebastien Boeuf <sebastien.boeuf@intel.com>
-> > > >
-> > > > On PCI the shm regions are found using capability entries;
-> > > > find a region by searching for the capability.
-> > > >
-> > > > Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
-> > > > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> > > > Signed-off-by: kbuild test robot <lkp@intel.com>
-> > > > Cc: kvm@vger.kernel.org
-> > > > Cc: "Michael S. Tsirkin" <mst@redhat.com>
-> > >
-> > > Acked-by: Michael S. Tsirkin <mst@redhat.com>
-> > >
-> >
-> > [..]
-> > > > +static bool vp_get_shm_region(struct virtio_device *vdev,
-> > > > +                         struct virtio_shm_region *region, u8 id)
-> > > > +{
-> > > > +   struct virtio_pci_device *vp_dev = to_vp_device(vdev);
-> > > > +   struct pci_dev *pci_dev = vp_dev->pci_dev;
-> > > > +   u8 bar;
-> > > > +   u64 offset, len;
-> > > > +   phys_addr_t phys_addr;
-> > > > +   size_t bar_len;
-> > > > +
-> > > > +   if (!virtio_pci_find_shm_cap(pci_dev, id, &bar, &offset, &len)) {
-> > > > +           return false;
-> > > > +   }
-> > > > +
-> > > > +   phys_addr = pci_resource_start(pci_dev, bar);
-> > > > +   bar_len = pci_resource_len(pci_dev, bar);
-> > > > +
-> > > > +   if ((offset + len) < offset) {
-> > > > +           dev_err(&pci_dev->dev, "%s: cap offset+len overflow
-> > detected\n",
-> > > > +                   __func__);
-> > > > +           return false;
-> > > > +   }
-> > > > +
-> > > > +   if (offset + len > bar_len) {
-> > > > +           dev_err(&pci_dev->dev, "%s: bar shorter than cap
-> > offset+len\n",
-> > > > +                   __func__);
-> > > > +           return false;
-> > > > +   }
-> > >
-> > > Maybe move this to a common header so the checks can be reused by
-> > > other transports? Can be a patch on top.
-> >
-> > Will do as patch on top once these patches get merged.
-> >
-> 
-> There's also some minor checkpatch complaints.  I fixed them with the
-> series I sent out with virtio-gpu.
+From: Sebastien Boeuf <sebastien.boeuf@intel.com>
 
-Thanks Gurchetan. I will post the patch with V3 posting anyway. We both
-need these patches. So whatever gets merged in the tree first, other
-person can use it.
+Virtio defines 'shared memory regions' that provide a continuously
+shared region between the host and guest.
 
-Vivek
+Provide a method to find a particular region on a device.
+
+Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Acked-by: Michael S. Tsirkin <mst@redhat.com>
+Cc: kvm@vger.kernel.org
+Cc: virtualization@lists.linux-foundation.org
+Cc: "Michael S. Tsirkin" <mst@redhat.com>
+---
+ include/linux/virtio_config.h | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/include/linux/virtio_config.h b/include/linux/virtio_config.h
+index 8fe857e27ef3..4b8e38c5c4d8 100644
+--- a/include/linux/virtio_config.h
++++ b/include/linux/virtio_config.h
+@@ -11,6 +11,11 @@
+ 
+ struct irq_affinity;
+ 
++struct virtio_shm_region {
++	u64 addr;
++	u64 len;
++};
++
+ /**
+  * virtio_config_ops - operations for configuring a virtio device
+  * Note: Do not assume that a transport implements all of the operations
+@@ -66,6 +71,7 @@ struct irq_affinity;
+  *      the caller can then copy.
+  * @set_vq_affinity: set the affinity for a virtqueue (optional).
+  * @get_vq_affinity: get the affinity for a virtqueue (optional).
++ * @get_shm_region: get a shared memory region based on the index.
+  */
+ typedef void vq_callback_t(struct virtqueue *);
+ struct virtio_config_ops {
+@@ -89,6 +95,8 @@ struct virtio_config_ops {
+ 			       const struct cpumask *cpu_mask);
+ 	const struct cpumask *(*get_vq_affinity)(struct virtio_device *vdev,
+ 			int index);
++	bool (*get_shm_region)(struct virtio_device *vdev,
++			       struct virtio_shm_region *region, u8 id);
+ };
+ 
+ /* If driver didn't advertise the feature, it will never appear. */
+@@ -251,6 +259,15 @@ int virtqueue_set_affinity(struct virtqueue *vq, const struct cpumask *cpu_mask)
+ 	return 0;
+ }
+ 
++static inline
++bool virtio_get_shm_region(struct virtio_device *vdev,
++			   struct virtio_shm_region *region, u8 id)
++{
++	if (!vdev->config->get_shm_region)
++		return false;
++	return vdev->config->get_shm_region(vdev, region, id);
++}
++
+ static inline bool virtio_is_little_endian(struct virtio_device *vdev)
+ {
+ 	return virtio_has_feature(vdev, VIRTIO_F_VERSION_1) ||
+-- 
+2.25.4
 

@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 19 Aug 2020 18:19:50 -0400
-Message-Id: <20200819221956.845195-13-vgoyal@redhat.com>
+Date: Wed, 19 Aug 2020 18:19:44 -0400
+Message-Id: <20200819221956.845195-7-vgoyal@redhat.com>
 In-Reply-To: <20200819221956.845195-1-vgoyal@redhat.com>
 References: <20200819221956.845195-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 12/18] fuse: Introduce
-	setupmapping/removemapping commands
+Subject: [Virtio-fs] [PATCH v3 06/18] virtiofs: Provide a helper function
+	for virtqueue initialization
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,55 +16,109 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com
-Cc: miklos@szeredi.hu, dan.j.williams@intel.com, vgoyal@redhat.com
+Cc: dan.j.williams@intel.com, vgoyal@redhat.com, miklos@szeredi.hu
 
-Introduce two new fuse commands to setup/remove memory mappings. This
-will be used to setup/tear down file mapping in dax window.
+This reduces code duplication and make it little easier to read code.
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
 ---
- include/uapi/linux/fuse.h | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ fs/fuse/virtio_fs.c | 50 +++++++++++++++++++++++++++------------------
+ 1 file changed, 30 insertions(+), 20 deletions(-)
 
-diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-index 5b85819e045f..60a7bfc787ce 100644
---- a/include/uapi/linux/fuse.h
-+++ b/include/uapi/linux/fuse.h
-@@ -894,4 +894,33 @@ struct fuse_copy_file_range_in {
- 	uint64_t	flags;
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index 104f35de5270..ed8da4825b70 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -24,6 +24,8 @@ enum {
+ 	VQ_REQUEST
  };
  
-+#define FUSE_SETUPMAPPING_FLAG_WRITE (1ull << 0)
-+struct fuse_setupmapping_in {
-+	/* An already open handle */
-+	uint64_t	fh;
-+	/* Offset into the file to start the mapping */
-+	uint64_t	foffset;
-+	/* Length of mapping required */
-+	uint64_t	len;
-+	/* Flags, FUSE_SETUPMAPPING_FLAG_* */
-+	uint64_t	flags;
-+	/* Offset in Memory Window */
-+	uint64_t	moffset;
-+};
++#define VQ_NAME_LEN	24
 +
-+struct fuse_removemapping_in {
-+	/* number of fuse_removemapping_one follows */
-+	uint32_t        count;
-+};
+ /* Per-virtqueue state */
+ struct virtio_fs_vq {
+ 	spinlock_t lock;
+@@ -36,7 +38,7 @@ struct virtio_fs_vq {
+ 	bool connected;
+ 	long in_flight;
+ 	struct completion in_flight_zero; /* No inflight requests */
+-	char name[24];
++	char name[VQ_NAME_LEN];
+ } ____cacheline_aligned_in_smp;
+ 
+ /* A virtio-fs device instance */
+@@ -596,6 +598,26 @@ static void virtio_fs_vq_done(struct virtqueue *vq)
+ 	schedule_work(&fsvq->done_work);
+ }
+ 
++static void virtio_fs_init_vq(struct virtio_fs_vq *fsvq, char *name,
++			      int vq_type)
++{
++	strncpy(fsvq->name, name, VQ_NAME_LEN);
++	spin_lock_init(&fsvq->lock);
++	INIT_LIST_HEAD(&fsvq->queued_reqs);
++	INIT_LIST_HEAD(&fsvq->end_reqs);
++	init_completion(&fsvq->in_flight_zero);
 +
-+struct fuse_removemapping_one {
-+	/* Offset into the dax window start the unmapping */
-+	uint64_t        moffset;
-+	/* Length of mapping required */
-+	uint64_t	len;
-+};
++	if (vq_type == VQ_REQUEST) {
++		INIT_WORK(&fsvq->done_work, virtio_fs_requests_done_work);
++		INIT_DELAYED_WORK(&fsvq->dispatch_work,
++				  virtio_fs_request_dispatch_work);
++	} else {
++		INIT_WORK(&fsvq->done_work, virtio_fs_hiprio_done_work);
++		INIT_DELAYED_WORK(&fsvq->dispatch_work,
++				  virtio_fs_hiprio_dispatch_work);
++	}
++}
 +
-+#define FUSE_REMOVEMAPPING_MAX_ENTRY   \
-+		(PAGE_SIZE / sizeof(struct fuse_removemapping_one))
+ /* Initialize virtqueues */
+ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 			       struct virtio_fs *fs)
+@@ -611,7 +633,7 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 	if (fs->num_request_queues == 0)
+ 		return -EINVAL;
+ 
+-	fs->nvqs = 1 + fs->num_request_queues;
++	fs->nvqs = VQ_REQUEST + fs->num_request_queues;
+ 	fs->vqs = kcalloc(fs->nvqs, sizeof(fs->vqs[VQ_HIPRIO]), GFP_KERNEL);
+ 	if (!fs->vqs)
+ 		return -ENOMEM;
+@@ -625,29 +647,17 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 		goto out;
+ 	}
+ 
++	/* Initialize the hiprio/forget request virtqueue */
+ 	callbacks[VQ_HIPRIO] = virtio_fs_vq_done;
+-	snprintf(fs->vqs[VQ_HIPRIO].name, sizeof(fs->vqs[VQ_HIPRIO].name),
+-			"hiprio");
++	virtio_fs_init_vq(&fs->vqs[VQ_HIPRIO], "hiprio", VQ_HIPRIO);
+ 	names[VQ_HIPRIO] = fs->vqs[VQ_HIPRIO].name;
+-	INIT_WORK(&fs->vqs[VQ_HIPRIO].done_work, virtio_fs_hiprio_done_work);
+-	INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].queued_reqs);
+-	INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].end_reqs);
+-	INIT_DELAYED_WORK(&fs->vqs[VQ_HIPRIO].dispatch_work,
+-			virtio_fs_hiprio_dispatch_work);
+-	init_completion(&fs->vqs[VQ_HIPRIO].in_flight_zero);
+-	spin_lock_init(&fs->vqs[VQ_HIPRIO].lock);
+ 
+ 	/* Initialize the requests virtqueues */
+ 	for (i = VQ_REQUEST; i < fs->nvqs; i++) {
+-		spin_lock_init(&fs->vqs[i].lock);
+-		INIT_WORK(&fs->vqs[i].done_work, virtio_fs_requests_done_work);
+-		INIT_DELAYED_WORK(&fs->vqs[i].dispatch_work,
+-				  virtio_fs_request_dispatch_work);
+-		INIT_LIST_HEAD(&fs->vqs[i].queued_reqs);
+-		INIT_LIST_HEAD(&fs->vqs[i].end_reqs);
+-		init_completion(&fs->vqs[i].in_flight_zero);
+-		snprintf(fs->vqs[i].name, sizeof(fs->vqs[i].name),
+-			 "requests.%u", i - VQ_REQUEST);
++		char vq_name[VQ_NAME_LEN];
 +
- #endif /* _LINUX_FUSE_H */
++		snprintf(vq_name, VQ_NAME_LEN, "requests.%u", i - VQ_REQUEST);
++		virtio_fs_init_vq(&fs->vqs[i], vq_name, VQ_REQUEST);
+ 		callbacks[i] = virtio_fs_vq_done;
+ 		names[i] = fs->vqs[i].name;
+ 	}
 -- 
 2.25.4
 

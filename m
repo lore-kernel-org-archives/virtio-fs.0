@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 19 Aug 2020 18:19:43 -0400
-Message-Id: <20200819221956.845195-6-vgoyal@redhat.com>
+Date: Wed, 19 Aug 2020 18:19:47 -0400
+Message-Id: <20200819221956.845195-10-vgoyal@redhat.com>
 In-Reply-To: <20200819221956.845195-1-vgoyal@redhat.com>
 References: <20200819221956.845195-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 05/18] virtio: Implement get_shm_region for
-	MMIO transport
+Subject: [Virtio-fs] [PATCH v3 09/18] fuse,
+	virtiofs: Add a mount option to enable dax
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,93 +16,206 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com
-Cc: kvm@vger.kernel.org, miklos@szeredi.hu, "Michael S. Tsirkin" <mst@redhat.com>, virtualization@lists.linux-foundation.org, dan.j.williams@intel.com, vgoyal@redhat.com
+Cc: dan.j.williams@intel.com, vgoyal@redhat.com, miklos@szeredi.hu
 
-From: Sebastien Boeuf <sebastien.boeuf@intel.com>
+Add a mount option to allow using dax with virtio_fs.
 
-On MMIO a new set of registers is defined for finding SHM
-regions.  Add their definitions and use them to find the region.
-
-Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
-Cc: kvm@vger.kernel.org
-Cc: virtualization@lists.linux-foundation.org
-Cc: "Michael S. Tsirkin" <mst@redhat.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- drivers/virtio/virtio_mmio.c     | 31 +++++++++++++++++++++++++++++++
- include/uapi/linux/virtio_mmio.h | 11 +++++++++++
- 2 files changed, 42 insertions(+)
+ fs/fuse/fuse_i.h    |  7 ++++
+ fs/fuse/inode.c     |  3 ++
+ fs/fuse/virtio_fs.c | 82 +++++++++++++++++++++++++++++++++++++--------
+ 3 files changed, 78 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
-index 627ac0487494..238383ff1064 100644
---- a/drivers/virtio/virtio_mmio.c
-+++ b/drivers/virtio/virtio_mmio.c
-@@ -498,6 +498,36 @@ static const char *vm_bus_name(struct virtio_device *vdev)
- 	return vm_dev->pdev->name;
- }
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index cf5e675100ec..04fdd7c41bd1 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -486,10 +486,14 @@ struct fuse_fs_context {
+ 	bool destroy:1;
+ 	bool no_control:1;
+ 	bool no_force_umount:1;
++	bool dax:1;
+ 	unsigned int max_read;
+ 	unsigned int blksize;
+ 	const char *subtype;
  
-+static bool vm_get_shm_region(struct virtio_device *vdev,
-+			      struct virtio_shm_region *region, u8 id)
-+{
-+	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
-+	u64 len, addr;
++	/* DAX device, may be NULL */
++	struct dax_device *dax_dev;
 +
-+	/* Select the region we're interested in */
-+	writel(id, vm_dev->base + VIRTIO_MMIO_SHM_SEL);
+ 	/* fuse_dev pointer to fill in, should contain NULL on entry */
+ 	void **fudptr;
+ };
+@@ -761,6 +765,9 @@ struct fuse_conn {
+ 
+ 	/** List of device instances belonging to this connection */
+ 	struct list_head devices;
 +
-+	/* Read the region size */
-+	len = (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_LEN_LOW);
-+	len |= (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_LEN_HIGH) << 32;
-+
-+	region->len = len;
-+
-+	/* Check if region length is -1. If that's the case, the shared memory
-+	 * region does not exist and there is no need to proceed further.
-+	 */
-+	if (len == ~(u64)0)
-+		return false;
-+
-+	/* Read the region base address */
-+	addr = (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_BASE_LOW);
-+	addr |= (u64) readl(vm_dev->base + VIRTIO_MMIO_SHM_BASE_HIGH) << 32;
-+
-+	region->addr = addr;
-+
-+	return true;
-+}
-+
- static const struct virtio_config_ops virtio_mmio_config_ops = {
- 	.get		= vm_get,
- 	.set		= vm_set,
-@@ -510,6 +540,7 @@ static const struct virtio_config_ops virtio_mmio_config_ops = {
- 	.get_features	= vm_get_features,
- 	.finalize_features = vm_finalize_features,
- 	.bus_name	= vm_bus_name,
-+	.get_shm_region = vm_get_shm_region,
++	/** DAX device, non-NULL if DAX is supported */
++	struct dax_device *dax_dev;
  };
  
+ static inline struct fuse_conn *get_fuse_conn_super(struct super_block *sb)
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index 2ac5713c4c32..beac337ccc10 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -589,6 +589,8 @@ static int fuse_show_options(struct seq_file *m, struct dentry *root)
+ 		seq_printf(m, ",max_read=%u", fc->max_read);
+ 	if (sb->s_bdev && sb->s_blocksize != FUSE_DEFAULT_BLKSIZE)
+ 		seq_printf(m, ",blksize=%lu", sb->s_blocksize);
++	if (fc->dax_dev)
++		seq_printf(m, ",dax");
+ 	return 0;
+ }
  
-diff --git a/include/uapi/linux/virtio_mmio.h b/include/uapi/linux/virtio_mmio.h
-index c4b09689ab64..0650f91bea6c 100644
---- a/include/uapi/linux/virtio_mmio.h
-+++ b/include/uapi/linux/virtio_mmio.h
-@@ -122,6 +122,17 @@
- #define VIRTIO_MMIO_QUEUE_USED_LOW	0x0a0
- #define VIRTIO_MMIO_QUEUE_USED_HIGH	0x0a4
+@@ -1207,6 +1209,7 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
+ 	fc->destroy = ctx->destroy;
+ 	fc->no_control = ctx->no_control;
+ 	fc->no_force_umount = ctx->no_force_umount;
++	fc->dax_dev = ctx->dax_dev;
  
-+/* Shared memory region id */
-+#define VIRTIO_MMIO_SHM_SEL             0x0ac
-+
-+/* Shared memory region length, 64 bits in two halves */
-+#define VIRTIO_MMIO_SHM_LEN_LOW         0x0b0
-+#define VIRTIO_MMIO_SHM_LEN_HIGH        0x0b4
-+
-+/* Shared memory region base address, 64 bits in two halves */
-+#define VIRTIO_MMIO_SHM_BASE_LOW        0x0b8
-+#define VIRTIO_MMIO_SHM_BASE_HIGH       0x0bc
-+
- /* Configuration atomicity value */
- #define VIRTIO_MMIO_CONFIG_GENERATION	0x0fc
+ 	err = -ENOMEM;
+ 	root = fuse_get_root_inode(sb, ctx->rootmode);
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index 0fd3b5cecc5f..741cad4abad8 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -13,6 +13,7 @@
+ #include <linux/virtio_fs.h>
+ #include <linux/delay.h>
+ #include <linux/fs_context.h>
++#include <linux/fs_parser.h>
+ #include <linux/highmem.h>
+ #include <linux/uio.h>
+ #include "fuse_i.h"
+@@ -81,6 +82,45 @@ struct virtio_fs_req_work {
+ static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
+ 				 struct fuse_req *req, bool in_flight);
  
++enum {
++	OPT_DAX,
++};
++
++static const struct fs_parameter_spec virtio_fs_parameters[] = {
++	fsparam_flag	("dax",		OPT_DAX),
++	{}
++};
++
++static int virtio_fs_parse_param(struct fs_context *fc,
++				 struct fs_parameter *param)
++{
++	struct fs_parse_result result;
++	struct fuse_fs_context *ctx = fc->fs_private;
++	int opt;
++
++	opt = fs_parse(fc, virtio_fs_parameters, param, &result);
++	if (opt < 0)
++		return opt;
++
++	switch (opt) {
++	case OPT_DAX:
++		ctx->dax = 1;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static void virtio_fs_free_fc(struct fs_context *fc)
++{
++	struct fuse_fs_context *ctx = fc->fs_private;
++
++	if (ctx)
++		kfree(ctx);
++}
++
+ static inline struct virtio_fs_vq *vq_to_fsvq(struct virtqueue *vq)
+ {
+ 	struct virtio_fs *fs = vq->vdev->priv;
+@@ -1220,23 +1260,27 @@ static const struct fuse_iqueue_ops virtio_fs_fiq_ops = {
+ 	.release			= virtio_fs_fiq_release,
+ };
+ 
+-static int virtio_fs_fill_super(struct super_block *sb)
++static inline void virtio_fs_ctx_set_defaults(struct fuse_fs_context *ctx)
++{
++	ctx->rootmode = S_IFDIR;
++	ctx->default_permissions = 1;
++	ctx->allow_other = 1;
++	ctx->max_read = UINT_MAX;
++	ctx->blksize = 512;
++	ctx->destroy = true;
++	ctx->no_control = true;
++	ctx->no_force_umount = true;
++}
++
++static int virtio_fs_fill_super(struct super_block *sb, struct fs_context *fsc)
+ {
+ 	struct fuse_conn *fc = get_fuse_conn_super(sb);
+ 	struct virtio_fs *fs = fc->iq.priv;
++	struct fuse_fs_context *ctx = fsc->fs_private;
+ 	unsigned int i;
+ 	int err;
+-	struct fuse_fs_context ctx = {
+-		.rootmode = S_IFDIR,
+-		.default_permissions = 1,
+-		.allow_other = 1,
+-		.max_read = UINT_MAX,
+-		.blksize = 512,
+-		.destroy = true,
+-		.no_control = true,
+-		.no_force_umount = true,
+-	};
+ 
++	virtio_fs_ctx_set_defaults(ctx);
+ 	mutex_lock(&virtio_fs_mutex);
+ 
+ 	/* After holding mutex, make sure virtiofs device is still there.
+@@ -1260,8 +1304,10 @@ static int virtio_fs_fill_super(struct super_block *sb)
+ 	}
+ 
+ 	/* virtiofs allocates and installs its own fuse devices */
+-	ctx.fudptr = NULL;
+-	err = fuse_fill_super_common(sb, &ctx);
++	ctx->fudptr = NULL;
++	if (ctx->dax)
++		ctx->dax_dev = fs->dax_dev;
++	err = fuse_fill_super_common(sb, ctx);
+ 	if (err < 0)
+ 		goto err_free_fuse_devs;
+ 
+@@ -1372,7 +1418,7 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
+ 		return PTR_ERR(sb);
+ 
+ 	if (!sb->s_root) {
+-		err = virtio_fs_fill_super(sb);
++		err = virtio_fs_fill_super(sb, fsc);
+ 		if (err) {
+ 			deactivate_locked_super(sb);
+ 			return err;
+@@ -1387,11 +1433,19 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
+ }
+ 
+ static const struct fs_context_operations virtio_fs_context_ops = {
++	.free		= virtio_fs_free_fc,
++	.parse_param	= virtio_fs_parse_param,
+ 	.get_tree	= virtio_fs_get_tree,
+ };
+ 
+ static int virtio_fs_init_fs_context(struct fs_context *fsc)
+ {
++	struct fuse_fs_context *ctx;
++
++	ctx = kzalloc(sizeof(struct fuse_fs_context), GFP_KERNEL);
++	if (!ctx)
++		return -ENOMEM;
++	fsc->fs_private = ctx;
+ 	fsc->ops = &virtio_fs_context_ops;
+ 	return 0;
+ }
 -- 
 2.25.4
 

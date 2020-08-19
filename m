@@ -1,11 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 19 Aug 2020 18:19:52 -0400
-Message-Id: <20200819221956.845195-15-vgoyal@redhat.com>
+Date: Wed, 19 Aug 2020 18:19:50 -0400
+Message-Id: <20200819221956.845195-13-vgoyal@redhat.com>
 In-Reply-To: <20200819221956.845195-1-vgoyal@redhat.com>
 References: <20200819221956.845195-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 14/18] fuse,dax: add DAX mmap support
+Subject: [Virtio-fs] [PATCH v3 12/18] fuse: Introduce
+	setupmapping/removemapping commands
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,110 +16,55 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com
-Cc: dan.j.williams@intel.com, vgoyal@redhat.com, miklos@szeredi.hu
+Cc: miklos@szeredi.hu, dan.j.williams@intel.com, vgoyal@redhat.com
 
-From: Stefan Hajnoczi <stefanha@redhat.com>
+Introduce two new fuse commands to setup/remove memory mappings. This
+will be used to setup/tear down file mapping in dax window.
 
-Add DAX mmap() support.
-
-Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
 ---
- fs/fuse/file.c | 62 +++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 61 insertions(+), 1 deletion(-)
+ include/uapi/linux/fuse.h | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index 99457d0b14b9..f1ad8b95b546 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -2841,10 +2841,15 @@ static const struct vm_operations_struct fuse_file_vm_ops = {
- 	.page_mkwrite	= fuse_page_mkwrite,
+diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
+index 5b85819e045f..60a7bfc787ce 100644
+--- a/include/uapi/linux/fuse.h
++++ b/include/uapi/linux/fuse.h
+@@ -894,4 +894,33 @@ struct fuse_copy_file_range_in {
+ 	uint64_t	flags;
  };
  
-+static int fuse_dax_mmap(struct file *file, struct vm_area_struct *vma);
- static int fuse_file_mmap(struct file *file, struct vm_area_struct *vma)
- {
- 	struct fuse_file *ff = file->private_data;
- 
-+	/* DAX mmap is superior to direct_io mmap */
-+	if (IS_DAX(file_inode(file)))
-+		return fuse_dax_mmap(file, vma);
-+
- 	if (ff->open_flags & FOPEN_DIRECT_IO) {
- 		/* Can't provide the coherency needed for MAP_SHARED */
- 		if (vma->vm_flags & VM_MAYSHARE)
-@@ -2863,9 +2868,63 @@ static int fuse_file_mmap(struct file *file, struct vm_area_struct *vma)
- 	return 0;
- }
- 
-+static vm_fault_t __fuse_dax_fault(struct vm_fault *vmf,
-+				   enum page_entry_size pe_size, bool write)
-+{
-+	vm_fault_t ret;
-+	struct inode *inode = file_inode(vmf->vma->vm_file);
-+	struct super_block *sb = inode->i_sb;
-+	pfn_t pfn;
-+
-+	if (write)
-+		sb_start_pagefault(sb);
-+
-+	ret = dax_iomap_fault(vmf, pe_size, &pfn, NULL, &fuse_iomap_ops);
-+
-+	if (ret & VM_FAULT_NEEDDSYNC)
-+		ret = dax_finish_sync_fault(vmf, pe_size, pfn);
-+
-+	if (write)
-+		sb_end_pagefault(sb);
-+
-+	return ret;
-+}
-+
-+static vm_fault_t fuse_dax_fault(struct vm_fault *vmf)
-+{
-+	return __fuse_dax_fault(vmf, PE_SIZE_PTE,
-+				vmf->flags & FAULT_FLAG_WRITE);
-+}
-+
-+static vm_fault_t fuse_dax_huge_fault(struct vm_fault *vmf,
-+			       enum page_entry_size pe_size)
-+{
-+	return __fuse_dax_fault(vmf, pe_size, vmf->flags & FAULT_FLAG_WRITE);
-+}
-+
-+static vm_fault_t fuse_dax_page_mkwrite(struct vm_fault *vmf)
-+{
-+	return __fuse_dax_fault(vmf, PE_SIZE_PTE, true);
-+}
-+
-+static vm_fault_t fuse_dax_pfn_mkwrite(struct vm_fault *vmf)
-+{
-+	return __fuse_dax_fault(vmf, PE_SIZE_PTE, true);
-+}
-+
-+static const struct vm_operations_struct fuse_dax_vm_ops = {
-+	.fault		= fuse_dax_fault,
-+	.huge_fault	= fuse_dax_huge_fault,
-+	.page_mkwrite	= fuse_dax_page_mkwrite,
-+	.pfn_mkwrite	= fuse_dax_pfn_mkwrite,
++#define FUSE_SETUPMAPPING_FLAG_WRITE (1ull << 0)
++struct fuse_setupmapping_in {
++	/* An already open handle */
++	uint64_t	fh;
++	/* Offset into the file to start the mapping */
++	uint64_t	foffset;
++	/* Length of mapping required */
++	uint64_t	len;
++	/* Flags, FUSE_SETUPMAPPING_FLAG_* */
++	uint64_t	flags;
++	/* Offset in Memory Window */
++	uint64_t	moffset;
 +};
 +
- static int fuse_dax_mmap(struct file *file, struct vm_area_struct *vma)
- {
--	return -EINVAL; /* TODO */
-+	file_accessed(file);
-+	vma->vm_ops = &fuse_dax_vm_ops;
-+	vma->vm_flags |= VM_MIXEDMAP | VM_HUGEPAGE;
-+	return 0;
- }
- 
- static int convert_fuse_file_lock(struct fuse_conn *fc,
-@@ -3938,6 +3997,7 @@ static const struct file_operations fuse_file_operations = {
- 	.release	= fuse_release,
- 	.fsync		= fuse_fsync,
- 	.lock		= fuse_file_lock,
-+	.get_unmapped_area = thp_get_unmapped_area,
- 	.flock		= fuse_file_flock,
- 	.splice_read	= generic_file_splice_read,
- 	.splice_write	= iter_file_splice_write,
++struct fuse_removemapping_in {
++	/* number of fuse_removemapping_one follows */
++	uint32_t        count;
++};
++
++struct fuse_removemapping_one {
++	/* Offset into the dax window start the unmapping */
++	uint64_t        moffset;
++	/* Length of mapping required */
++	uint64_t	len;
++};
++
++#define FUSE_REMOVEMAPPING_MAX_ENTRY   \
++		(PAGE_SIZE / sizeof(struct fuse_removemapping_one))
++
+ #endif /* _LINUX_FUSE_H */
 -- 
 2.25.4
 

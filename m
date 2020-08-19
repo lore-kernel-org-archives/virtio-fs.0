@@ -1,12 +1,11 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri,  7 Aug 2020 15:55:15 -0400
-Message-Id: <20200807195526.426056-10-vgoyal@redhat.com>
-In-Reply-To: <20200807195526.426056-1-vgoyal@redhat.com>
-References: <20200807195526.426056-1-vgoyal@redhat.com>
+Date: Wed, 19 Aug 2020 18:19:45 -0400
+Message-Id: <20200819221956.845195-8-vgoyal@redhat.com>
+In-Reply-To: <20200819221956.845195-1-vgoyal@redhat.com>
+References: <20200819221956.845195-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 09/20] virtio_fs,
-	dax: Set up virtio_fs dax_device
+Subject: [Virtio-fs] [PATCH v3 07/18] fuse: Get rid of no_mount_options
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,219 +14,163 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
-Cc: miklos@szeredi.hu, vgoyal@redhat.com
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com
+Cc: dan.j.williams@intel.com, vgoyal@redhat.com, miklos@szeredi.hu
 
-From: Stefan Hajnoczi <stefanha@redhat.com>
+This option was introduced so that for virtio_fs we don't show any mounts
+options fuse_show_options(). Because we don't offer any of these options
+to be controlled by mounter.
 
-Setup a dax device.
+Very soon we are planning to introduce option "dax" which mounter should
+be able to specify. And no_mount_options does not work anymore. What
+we need is a per mount option specific flag so that filesystem can
+specify which options to show.
 
-Use the shm capability to find the cache entry and map it.
+Add few such flags to control the behavior in more fine grained manner
+and get rid of no_mount_options.
 
-The DAX window is accessed by the fs/dax.c infrastructure and must have
-struct pages (at least on x86).  Use devm_memremap_pages() to map the
-DAX window PCI BAR and allocate struct page.
-
-Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
-Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
 ---
- fs/fuse/virtio_fs.c            | 139 +++++++++++++++++++++++++++++++++
- include/uapi/linux/virtio_fs.h |   3 +
- 2 files changed, 142 insertions(+)
+ fs/fuse/fuse_i.h    | 14 ++++++++++----
+ fs/fuse/inode.c     | 22 ++++++++++++++--------
+ fs/fuse/virtio_fs.c |  1 -
+ 3 files changed, 24 insertions(+), 13 deletions(-)
 
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index 740a8a7d7ae6..cf5e675100ec 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -471,18 +471,21 @@ struct fuse_fs_context {
+ 	int fd;
+ 	unsigned int rootmode;
+ 	kuid_t user_id;
++	bool user_id_show;
+ 	kgid_t group_id;
++	bool group_id_show;
+ 	bool is_bdev:1;
+ 	bool fd_present:1;
+ 	bool rootmode_present:1;
+ 	bool user_id_present:1;
+ 	bool group_id_present:1;
+ 	bool default_permissions:1;
++	bool default_permissions_show:1;
+ 	bool allow_other:1;
++	bool allow_other_show:1;
+ 	bool destroy:1;
+ 	bool no_control:1;
+ 	bool no_force_umount:1;
+-	bool no_mount_options:1;
+ 	unsigned int max_read;
+ 	unsigned int blksize;
+ 	const char *subtype;
+@@ -512,9 +515,11 @@ struct fuse_conn {
+ 
+ 	/** The user id for this mount */
+ 	kuid_t user_id;
++	bool user_id_show:1;
+ 
+ 	/** The group id for this mount */
+ 	kgid_t group_id;
++	bool group_id_show:1;
+ 
+ 	/** The pid namespace for this mount */
+ 	struct pid_namespace *pid_ns;
+@@ -698,10 +703,14 @@ struct fuse_conn {
+ 
+ 	/** Check permissions based on the file mode or not? */
+ 	unsigned default_permissions:1;
++	bool default_permissions_show:1;
+ 
+ 	/** Allow other than the mounter user to access the filesystem ? */
+ 	unsigned allow_other:1;
+ 
++	/** Show allow_other in mount options */
++	bool allow_other_show:1;
++
+ 	/** Does the filesystem support copy_file_range? */
+ 	unsigned no_copy_file_range:1;
+ 
+@@ -717,9 +726,6 @@ struct fuse_conn {
+ 	/** Do not allow MNT_FORCE umount */
+ 	unsigned int no_force_umount:1;
+ 
+-	/* Do not show mount options */
+-	unsigned int no_mount_options:1;
+-
+ 	/** The number of requests waiting for completion */
+ 	atomic_t num_waiting;
+ 
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index bba747520e9b..2ac5713c4c32 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -535,10 +535,12 @@ static int fuse_parse_param(struct fs_context *fc, struct fs_parameter *param)
+ 
+ 	case OPT_DEFAULT_PERMISSIONS:
+ 		ctx->default_permissions = true;
++		ctx->default_permissions_show = true;
+ 		break;
+ 
+ 	case OPT_ALLOW_OTHER:
+ 		ctx->allow_other = true;
++		ctx->allow_other_show = true;
+ 		break;
+ 
+ 	case OPT_MAX_READ:
+@@ -573,14 +575,15 @@ static int fuse_show_options(struct seq_file *m, struct dentry *root)
+ 	struct super_block *sb = root->d_sb;
+ 	struct fuse_conn *fc = get_fuse_conn_super(sb);
+ 
+-	if (fc->no_mount_options)
+-		return 0;
+-
+-	seq_printf(m, ",user_id=%u", from_kuid_munged(fc->user_ns, fc->user_id));
+-	seq_printf(m, ",group_id=%u", from_kgid_munged(fc->user_ns, fc->group_id));
+-	if (fc->default_permissions)
++	if (fc->user_id_show)
++		seq_printf(m, ",user_id=%u",
++			   from_kuid_munged(fc->user_ns, fc->user_id));
++	if (fc->group_id_show)
++		seq_printf(m, ",group_id=%u",
++			   from_kgid_munged(fc->user_ns, fc->group_id));
++	if (fc->default_permissions && fc->default_permissions_show)
+ 		seq_puts(m, ",default_permissions");
+-	if (fc->allow_other)
++	if (fc->allow_other && fc->allow_other_show)
+ 		seq_puts(m, ",allow_other");
+ 	if (fc->max_read != ~0)
+ 		seq_printf(m, ",max_read=%u", fc->max_read);
+@@ -1193,14 +1196,17 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
+ 	sb->s_flags |= SB_POSIXACL;
+ 
+ 	fc->default_permissions = ctx->default_permissions;
++	fc->default_permissions_show = ctx->default_permissions_show;
+ 	fc->allow_other = ctx->allow_other;
++	fc->allow_other_show = ctx->allow_other_show;
+ 	fc->user_id = ctx->user_id;
++	fc->user_id_show = ctx->user_id_show;
+ 	fc->group_id = ctx->group_id;
++	fc->group_id_show = ctx->group_id_show;
+ 	fc->max_read = max_t(unsigned, 4096, ctx->max_read);
+ 	fc->destroy = ctx->destroy;
+ 	fc->no_control = ctx->no_control;
+ 	fc->no_force_umount = ctx->no_force_umount;
+-	fc->no_mount_options = ctx->no_mount_options;
+ 
+ 	err = -ENOMEM;
+ 	root = fuse_get_root_inode(sb, ctx->rootmode);
 diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index add31794ca1a..e54696f778a7 100644
+index ed8da4825b70..47ecdc15f25d 100644
 --- a/fs/fuse/virtio_fs.c
 +++ b/fs/fuse/virtio_fs.c
-@@ -5,6 +5,9 @@
-  */
+@@ -1096,7 +1096,6 @@ static int virtio_fs_fill_super(struct super_block *sb)
+ 		.destroy = true,
+ 		.no_control = true,
+ 		.no_force_umount = true,
+-		.no_mount_options = true,
+ 	};
  
- #include <linux/fs.h>
-+#include <linux/dax.h>
-+#include <linux/pci.h>
-+#include <linux/pfn_t.h>
- #include <linux/module.h>
- #include <linux/virtio.h>
- #include <linux/virtio_fs.h>
-@@ -12,6 +15,7 @@
- #include <linux/fs_context.h>
- #include <linux/fs_parser.h>
- #include <linux/highmem.h>
-+#include <linux/uio.h>
- #include "fuse_i.h"
- 
- /* List of virtio-fs device instances and a lock for the list. Also provides
-@@ -50,6 +54,12 @@ struct virtio_fs {
- 	struct virtio_fs_vq *vqs;
- 	unsigned int nvqs;               /* number of virtqueues */
- 	unsigned int num_request_queues; /* number of request queues */
-+	struct dax_device *dax_dev;
-+
-+	/* DAX memory window where file contents are mapped */
-+	void *window_kaddr;
-+	phys_addr_t window_phys_addr;
-+	size_t window_len;
- };
- 
- struct virtio_fs_forget_req {
-@@ -726,6 +736,131 @@ static void virtio_fs_cleanup_vqs(struct virtio_device *vdev,
- 	vdev->config->del_vqs(vdev);
- }
- 
-+/* Map a window offset to a page frame number.  The window offset will have
-+ * been produced by .iomap_begin(), which maps a file offset to a window
-+ * offset.
-+ */
-+static long virtio_fs_direct_access(struct dax_device *dax_dev, pgoff_t pgoff,
-+				    long nr_pages, void **kaddr, pfn_t *pfn)
-+{
-+	struct virtio_fs *fs = dax_get_private(dax_dev);
-+	phys_addr_t offset = PFN_PHYS(pgoff);
-+	size_t max_nr_pages = fs->window_len/PAGE_SIZE - pgoff;
-+
-+	if (kaddr)
-+		*kaddr = fs->window_kaddr + offset;
-+	if (pfn)
-+		*pfn = phys_to_pfn_t(fs->window_phys_addr + offset,
-+					PFN_DEV | PFN_MAP);
-+	return nr_pages > max_nr_pages ? max_nr_pages : nr_pages;
-+}
-+
-+static size_t virtio_fs_copy_from_iter(struct dax_device *dax_dev,
-+				       pgoff_t pgoff, void *addr,
-+				       size_t bytes, struct iov_iter *i)
-+{
-+	return copy_from_iter(addr, bytes, i);
-+}
-+
-+static size_t virtio_fs_copy_to_iter(struct dax_device *dax_dev,
-+				       pgoff_t pgoff, void *addr,
-+				       size_t bytes, struct iov_iter *i)
-+{
-+	return copy_to_iter(addr, bytes, i);
-+}
-+
-+static int virtio_fs_zero_page_range(struct dax_device *dax_dev,
-+				     pgoff_t pgoff, size_t nr_pages)
-+{
-+	long rc;
-+	void *kaddr;
-+
-+	rc = dax_direct_access(dax_dev, pgoff, nr_pages, &kaddr, NULL);
-+	if (rc < 0)
-+		return rc;
-+	memset(kaddr, 0, nr_pages << PAGE_SHIFT);
-+	dax_flush(dax_dev, kaddr, nr_pages << PAGE_SHIFT);
-+	return 0;
-+}
-+
-+static const struct dax_operations virtio_fs_dax_ops = {
-+	.direct_access = virtio_fs_direct_access,
-+	.copy_from_iter = virtio_fs_copy_from_iter,
-+	.copy_to_iter = virtio_fs_copy_to_iter,
-+	.zero_page_range = virtio_fs_zero_page_range,
-+};
-+
-+static void virtio_fs_cleanup_dax(void *data)
-+{
-+	struct dax_device *dax_dev = data;
-+
-+	kill_dax(dax_dev);
-+	put_dax(dax_dev);
-+}
-+
-+static int virtio_fs_setup_dax(struct virtio_device *vdev, struct virtio_fs *fs)
-+{
-+	struct virtio_shm_region cache_reg;
-+	struct dev_pagemap *pgmap;
-+	bool have_cache;
-+
-+	if (!IS_ENABLED(CONFIG_DAX_DRIVER))
-+		return 0;
-+
-+	/* Get cache region */
-+	have_cache = virtio_get_shm_region(vdev, &cache_reg,
-+					   (u8)VIRTIO_FS_SHMCAP_ID_CACHE);
-+	if (!have_cache) {
-+		dev_notice(&vdev->dev, "%s: No cache capability\n", __func__);
-+		return 0;
-+	}
-+
-+	if (!devm_request_mem_region(&vdev->dev, cache_reg.addr, cache_reg.len,
-+				     dev_name(&vdev->dev))) {
-+		dev_warn(&vdev->dev, "could not reserve region addr=0x%llx"
-+			 " len=0x%llx\n", cache_reg.addr, cache_reg.len);
-+		return -EBUSY;
-+	}
-+
-+	dev_notice(&vdev->dev, "Cache len: 0x%llx @ 0x%llx\n", cache_reg.len,
-+		   cache_reg.addr);
-+
-+	pgmap = devm_kzalloc(&vdev->dev, sizeof(*pgmap), GFP_KERNEL);
-+	if (!pgmap)
-+		return -ENOMEM;
-+
-+	pgmap->type = MEMORY_DEVICE_FS_DAX;
-+
-+	/* Ideally we would directly use the PCI BAR resource but
-+	 * devm_memremap_pages() wants its own copy in pgmap.  So
-+	 * initialize a struct resource from scratch (only the start
-+	 * and end fields will be used).
-+	 */
-+	pgmap->res = (struct resource){
-+		.name = "virtio-fs dax window",
-+		.start = (phys_addr_t) cache_reg.addr,
-+		.end = (phys_addr_t) cache_reg.addr + cache_reg.len - 1,
-+	};
-+
-+	fs->window_kaddr = devm_memremap_pages(&vdev->dev, pgmap);
-+	if (IS_ERR(fs->window_kaddr))
-+		return PTR_ERR(fs->window_kaddr);
-+
-+	fs->window_phys_addr = (phys_addr_t) cache_reg.addr;
-+	fs->window_len = (phys_addr_t) cache_reg.len;
-+
-+	dev_dbg(&vdev->dev, "%s: window kaddr 0x%px phys_addr 0x%llx"
-+		" len 0x%llx\n", __func__, fs->window_kaddr, cache_reg.addr,
-+		cache_reg.len);
-+
-+	fs->dax_dev = alloc_dax(fs, NULL, &virtio_fs_dax_ops, 0);
-+	if (IS_ERR(fs->dax_dev))
-+		return PTR_ERR(fs->dax_dev);
-+
-+	return devm_add_action_or_reset(&vdev->dev, virtio_fs_cleanup_dax,
-+					fs->dax_dev);
-+}
-+
- static int virtio_fs_probe(struct virtio_device *vdev)
- {
- 	struct virtio_fs *fs;
-@@ -747,6 +882,10 @@ static int virtio_fs_probe(struct virtio_device *vdev)
- 
- 	/* TODO vq affinity */
- 
-+	ret = virtio_fs_setup_dax(vdev, fs);
-+	if (ret < 0)
-+		goto out_vqs;
-+
- 	/* Bring the device online in case the filesystem is mounted and
- 	 * requests need to be sent before we return.
- 	 */
-diff --git a/include/uapi/linux/virtio_fs.h b/include/uapi/linux/virtio_fs.h
-index b02eb2ac3d99..2f64abce781f 100644
---- a/include/uapi/linux/virtio_fs.h
-+++ b/include/uapi/linux/virtio_fs.h
-@@ -16,4 +16,7 @@ struct virtio_fs_config {
- 	__u32 num_request_queues;
- } __attribute__((packed));
- 
-+/* For the id field in virtio_pci_shm_cap */
-+#define VIRTIO_FS_SHMCAP_ID_CACHE 0
-+
- #endif /* _UAPI_LINUX_VIRTIO_FS_H */
+ 	mutex_lock(&virtio_fs_mutex);
 -- 
 2.25.4
 

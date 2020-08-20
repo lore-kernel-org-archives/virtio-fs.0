@@ -1,12 +1,14 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 19 Aug 2020 18:19:48 -0400
-Message-Id: <20200819221956.845195-11-vgoyal@redhat.com>
-In-Reply-To: <20200819221956.845195-1-vgoyal@redhat.com>
+Date: Thu, 20 Aug 2020 14:58:55 +0200
+From: Jan Kara <jack@suse.cz>
+Message-ID: <20200820125855.GL1902@quack2.suse.cz>
 References: <20200819221956.845195-1-vgoyal@redhat.com>
+	<20200819221956.845195-3-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 10/18] fuse,
-	virtiofs: Keep a list of free dax memory ranges
+In-Reply-To: <20200819221956.845195-3-vgoyal@redhat.com>
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: Re: [Virtio-fs] [PATCH v3 02/18] dax: Create a range version of
+ dax_layout_busy_page()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,221 +17,160 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com
-Cc: miklos@szeredi.hu, dan.j.williams@intel.com, vgoyal@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: Jan Kara <jack@suse.cz>, miklos@szeredi.hu, Vishal L Verma <vishal.l.verma@intel.com>, linux-nvdimm@lists.01.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, dan.j.williams@intel.com, "Weiny, Ira" <ira.weiny@intel.com>
 
-Divide the dax memory range into fixed size ranges (2MB for now) and put
-them in a list. This will track free ranges. Once an inode requires a
-free range, we will take one from here and put it in interval-tree
-of ranges assigned to inode.
+On Wed 19-08-20 18:19:40, Vivek Goyal wrote:
+> virtiofs device has a range of memory which is mapped into file inodes
+> using dax. This memory is mapped in qemu on host and maps different
+> sections of real file on host. Size of this memory is limited
+> (determined by administrator) and depending on filesystem size, we will
+> soon reach a situation where all the memory is in use and we need to
+> reclaim some.
+> 
+> As part of reclaim process, we will need to make sure that there are
+> no active references to pages (taken by get_user_pages()) on the memory
+> range we are trying to reclaim. I am planning to use
+> dax_layout_busy_page() for this. But in current form this is per inode
+> and scans through all the pages of the inode.
+> 
+> We want to reclaim only a portion of memory (say 2MB page). So we want
+> to make sure that only that 2MB range of pages do not have any
+> references  (and don't want to unmap all the pages of inode).
+> 
+> Hence, create a range version of this function named
+> dax_layout_busy_page_range() which can be used to pass a range which
+> needs to be unmapped.
+> 
+> Cc: Dan Williams <dan.j.williams@intel.com>
+> Cc: linux-nvdimm@lists.01.org
+> Cc: Jan Kara <jack@suse.cz>
+> Cc: Vishal L Verma <vishal.l.verma@intel.com>
+> Cc: "Weiny, Ira" <ira.weiny@intel.com>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  fs/dax.c            | 29 +++++++++++++++++++++++------
+>  include/linux/dax.h |  6 ++++++
+>  2 files changed, 29 insertions(+), 6 deletions(-)
+> 
+> diff --git a/fs/dax.c b/fs/dax.c
+> index 95341af1a966..ddd705251d9f 100644
+> --- a/fs/dax.c
+> +++ b/fs/dax.c
+> @@ -559,7 +559,7 @@ static void *grab_mapping_entry(struct xa_state *xas,
+>  }
+>  
+>  /**
+> - * dax_layout_busy_page - find first pinned page in @mapping
+> + * dax_layout_busy_page_range - find first pinned page in @mapping
+>   * @mapping: address space to scan for a page with ref count > 1
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
----
- fs/fuse/fuse_i.h    | 23 ++++++++++++
- fs/fuse/inode.c     | 88 ++++++++++++++++++++++++++++++++++++++++++++-
- fs/fuse/virtio_fs.c |  2 ++
- 3 files changed, 112 insertions(+), 1 deletion(-)
+Please document additional function arguments in the kernel-doc comment.
 
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 04fdd7c41bd1..478c940b05b4 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -47,6 +47,11 @@
- /** Number of dentries for each connection in the control filesystem */
- #define FUSE_CTL_NUM_DENTRIES 5
- 
-+/* Default memory range size, 2MB */
-+#define FUSE_DAX_SZ	(2*1024*1024)
-+#define FUSE_DAX_SHIFT	(21)
-+#define FUSE_DAX_PAGES	(FUSE_DAX_SZ/PAGE_SIZE)
-+
- /** List of active connections */
- extern struct list_head fuse_conn_list;
- 
-@@ -63,6 +68,18 @@ struct fuse_forget_link {
- 	struct fuse_forget_link *next;
- };
- 
-+/** Translation information for file offsets to DAX window offsets */
-+struct fuse_dax_mapping {
-+	/* Will connect in fc->free_ranges to keep track of free memory */
-+	struct list_head list;
-+
-+	/** Position in DAX window */
-+	u64 window_offset;
-+
-+	/** Length of mapping, in bytes */
-+	loff_t length;
-+};
-+
- /** FUSE inode */
- struct fuse_inode {
- 	/** Inode data */
-@@ -768,6 +785,12 @@ struct fuse_conn {
- 
- 	/** DAX device, non-NULL if DAX is supported */
- 	struct dax_device *dax_dev;
-+
-+	/*
-+	 * DAX Window Free Ranges
-+	 */
-+	long nr_free_ranges;
-+	struct list_head free_ranges;
- };
- 
- static inline struct fuse_conn *get_fuse_conn_super(struct super_block *sb)
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index beac337ccc10..b82eb61d63cc 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -23,6 +23,8 @@
- #include <linux/exportfs.h>
- #include <linux/posix_acl.h>
- #include <linux/pid_namespace.h>
-+#include <linux/dax.h>
-+#include <linux/pfn_t.h>
- 
- MODULE_AUTHOR("Miklos Szeredi <miklos@szeredi.hu>");
- MODULE_DESCRIPTION("Filesystem in Userspace");
-@@ -620,6 +622,76 @@ static void fuse_pqueue_init(struct fuse_pqueue *fpq)
- 	fpq->connected = 1;
- }
- 
-+static void fuse_free_dax_mem_ranges(struct list_head *mem_list)
-+{
-+	struct fuse_dax_mapping *range, *temp;
-+
-+	/* Free All allocated elements */
-+	list_for_each_entry_safe(range, temp, mem_list, list) {
-+		list_del(&range->list);
-+		kfree(range);
-+	}
-+}
-+
-+#ifdef CONFIG_FS_DAX
-+static int fuse_dax_mem_range_init(struct fuse_conn *fc,
-+				   struct dax_device *dax_dev)
-+{
-+	long nr_pages, nr_ranges;
-+	void *kaddr;
-+	pfn_t pfn;
-+	struct fuse_dax_mapping *range;
-+	LIST_HEAD(mem_ranges);
-+	phys_addr_t phys_addr;
-+	int ret = 0, id;
-+	size_t dax_size = -1;
-+	unsigned long i;
-+
-+	id = dax_read_lock();
-+	nr_pages = dax_direct_access(dax_dev, 0, PHYS_PFN(dax_size), &kaddr,
-+					&pfn);
-+	dax_read_unlock(id);
-+	if (nr_pages < 0) {
-+		pr_debug("dax_direct_access() returned %ld\n", nr_pages);
-+		return nr_pages;
-+	}
-+
-+	phys_addr = pfn_t_to_phys(pfn);
-+	nr_ranges = nr_pages/FUSE_DAX_PAGES;
-+	printk("fuse_dax_mem_range_init(): dax mapped %ld pages. nr_ranges=%ld\n", nr_pages, nr_ranges);
-+
-+	for (i = 0; i < nr_ranges; i++) {
-+		range = kzalloc(sizeof(struct fuse_dax_mapping), GFP_KERNEL);
-+		if (!range) {
-+			pr_debug("memory allocation for mem_range failed.\n");
-+			ret = -ENOMEM;
-+			goto out_err;
-+		}
-+		/* TODO: This offset only works if virtio-fs driver is not
-+		 * having some memory hidden at the beginning. This needs
-+		 * better handling
-+		 */
-+		range->window_offset = i * FUSE_DAX_SZ;
-+		range->length = FUSE_DAX_SZ;
-+		list_add_tail(&range->list, &mem_ranges);
-+	}
-+
-+	list_replace_init(&mem_ranges, &fc->free_ranges);
-+	fc->nr_free_ranges = nr_ranges;
-+	return 0;
-+out_err:
-+	/* Free All allocated elements */
-+	fuse_free_dax_mem_ranges(&mem_ranges);
-+	return ret;
-+}
-+#else /* !CONFIG_FS_DAX */
-+static inline int fuse_dax_mem_range_init(struct fuse_conn *fc,
-+					  struct dax_device *dax_dev)
-+{
-+	return 0;
-+}
-+#endif /* CONFIG_FS_DAX */
-+
- void fuse_conn_init(struct fuse_conn *fc, struct user_namespace *user_ns,
- 		    const struct fuse_iqueue_ops *fiq_ops, void *fiq_priv)
- {
-@@ -647,6 +719,7 @@ void fuse_conn_init(struct fuse_conn *fc, struct user_namespace *user_ns,
- 	fc->pid_ns = get_pid_ns(task_active_pid_ns(current));
- 	fc->user_ns = get_user_ns(user_ns);
- 	fc->max_pages = FUSE_DEFAULT_MAX_PAGES_PER_REQ;
-+	INIT_LIST_HEAD(&fc->free_ranges);
- }
- EXPORT_SYMBOL_GPL(fuse_conn_init);
- 
-@@ -655,6 +728,8 @@ void fuse_conn_put(struct fuse_conn *fc)
- 	if (refcount_dec_and_test(&fc->count)) {
- 		struct fuse_iqueue *fiq = &fc->iq;
- 
-+		if (fc->dax_dev)
-+			fuse_free_dax_mem_ranges(&fc->free_ranges);
- 		if (fiq->ops->release)
- 			fiq->ops->release(fiq);
- 		put_pid_ns(fc->pid_ns);
-@@ -1179,11 +1254,19 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
- 	if (sb->s_user_ns != &init_user_ns)
- 		sb->s_xattr = fuse_no_acl_xattr_handlers;
- 
-+	if (ctx->dax_dev) {
-+		err = fuse_dax_mem_range_init(fc, ctx->dax_dev);
-+		if (err) {
-+			pr_debug("fuse_dax_mem_range_init() returned %d\n", err);
-+			goto err_free_ranges;
-+		}
-+	}
-+
- 	if (ctx->fudptr) {
- 		err = -ENOMEM;
- 		fud = fuse_dev_alloc_install(fc);
- 		if (!fud)
--			goto err;
-+			goto err_free_ranges;
- 	}
- 
- 	fc->dev = sb->s_dev;
-@@ -1242,6 +1325,9 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
-  err_dev_free:
- 	if (fud)
- 		fuse_dev_free(fud);
-+ err_free_ranges:
-+	if (ctx->dax_dev)
-+		fuse_free_dax_mem_ranges(&fc->free_ranges);
-  err:
- 	return err;
- }
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 741cad4abad8..fb31c9dbc0b8 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -747,6 +747,8 @@ static long virtio_fs_direct_access(struct dax_device *dax_dev, pgoff_t pgoff,
- 	phys_addr_t offset = PFN_PHYS(pgoff);
- 	size_t max_nr_pages = fs->window_len/PAGE_SIZE - pgoff;
- 
-+	pr_debug("virtio_fs_direct_access(): called. nr_pages=%ld max_nr_pages=%zu\n", nr_pages, max_nr_pages);
-+
- 	if (kaddr)
- 		*kaddr = fs->window_kaddr + offset;
- 	if (pfn)
+Otherwise the patch looks good so feel free to add:
+
+Reviewed-by: Jan Kara <jack@suse.cz>
+
+after fixing this nit.
+
+								Honza
+
+>   *
+>   * DAX requires ZONE_DEVICE mapped pages. These pages are never
+> @@ -572,13 +572,19 @@ static void *grab_mapping_entry(struct xa_state *xas,
+>   * establishment of new mappings in this address_space. I.e. it expects
+>   * to be able to run unmap_mapping_range() and subsequently not race
+>   * mapping_mapped() becoming true.
+> + *
+> + * Partial pages are included. If 'end' is LLONG_MAX, pages in the range
+> + * from 'start' to end of the file are inluded.
+>   */
+> -struct page *dax_layout_busy_page(struct address_space *mapping)
+> +struct page *dax_layout_busy_page_range(struct address_space *mapping,
+> +					loff_t start, loff_t end)
+>  {
+> -	XA_STATE(xas, &mapping->i_pages, 0);
+>  	void *entry;
+>  	unsigned int scanned = 0;
+>  	struct page *page = NULL;
+> +	pgoff_t start_idx = start >> PAGE_SHIFT;
+> +	pgoff_t end_idx;
+> +	XA_STATE(xas, &mapping->i_pages, start_idx);
+>  
+>  	/*
+>  	 * In the 'limited' case get_user_pages() for dax is disabled.
+> @@ -589,6 +595,11 @@ struct page *dax_layout_busy_page(struct address_space *mapping)
+>  	if (!dax_mapping(mapping) || !mapping_mapped(mapping))
+>  		return NULL;
+>  
+> +	/* If end == LLONG_MAX, all pages from start to till end of file */
+> +	if (end == LLONG_MAX)
+> +		end_idx = ULONG_MAX;
+> +	else
+> +		end_idx = end >> PAGE_SHIFT;
+>  	/*
+>  	 * If we race get_user_pages_fast() here either we'll see the
+>  	 * elevated page count in the iteration and wait, or
+> @@ -596,15 +607,15 @@ struct page *dax_layout_busy_page(struct address_space *mapping)
+>  	 * against is no longer mapped in the page tables and bail to the
+>  	 * get_user_pages() slow path.  The slow path is protected by
+>  	 * pte_lock() and pmd_lock(). New references are not taken without
+> -	 * holding those locks, and unmap_mapping_range() will not zero the
+> +	 * holding those locks, and unmap_mapping_pages() will not zero the
+>  	 * pte or pmd without holding the respective lock, so we are
+>  	 * guaranteed to either see new references or prevent new
+>  	 * references from being established.
+>  	 */
+> -	unmap_mapping_range(mapping, 0, 0, 0);
+> +	unmap_mapping_pages(mapping, start_idx, end_idx - start_idx + 1, 0);
+>  
+>  	xas_lock_irq(&xas);
+> -	xas_for_each(&xas, entry, ULONG_MAX) {
+> +	xas_for_each(&xas, entry, end_idx) {
+>  		if (WARN_ON_ONCE(!xa_is_value(entry)))
+>  			continue;
+>  		if (unlikely(dax_is_locked(entry)))
+> @@ -625,6 +636,12 @@ struct page *dax_layout_busy_page(struct address_space *mapping)
+>  	xas_unlock_irq(&xas);
+>  	return page;
+>  }
+> +EXPORT_SYMBOL_GPL(dax_layout_busy_page_range);
+> +
+> +struct page *dax_layout_busy_page(struct address_space *mapping)
+> +{
+> +	return dax_layout_busy_page_range(mapping, 0, LLONG_MAX);
+> +}
+>  EXPORT_SYMBOL_GPL(dax_layout_busy_page);
+>  
+>  static int __dax_invalidate_entry(struct address_space *mapping,
+> diff --git a/include/linux/dax.h b/include/linux/dax.h
+> index 6904d4e0b2e0..9016929db4c6 100644
+> --- a/include/linux/dax.h
+> +++ b/include/linux/dax.h
+> @@ -141,6 +141,7 @@ int dax_writeback_mapping_range(struct address_space *mapping,
+>  		struct dax_device *dax_dev, struct writeback_control *wbc);
+>  
+>  struct page *dax_layout_busy_page(struct address_space *mapping);
+> +struct page *dax_layout_busy_page_range(struct address_space *mapping, loff_t start, loff_t end);
+>  dax_entry_t dax_lock_page(struct page *page);
+>  void dax_unlock_page(struct page *page, dax_entry_t cookie);
+>  #else
+> @@ -171,6 +172,11 @@ static inline struct page *dax_layout_busy_page(struct address_space *mapping)
+>  	return NULL;
+>  }
+>  
+> +static inline struct page *dax_layout_busy_page_range(struct address_space *mapping, pgoff_t start, pgoff_t nr_pages)
+> +{
+> +	return NULL;
+> +}
+> +
+>  static inline int dax_writeback_mapping_range(struct address_space *mapping,
+>  		struct dax_device *dax_dev, struct writeback_control *wbc)
+>  {
+> -- 
+> 2.25.4
+> 
 -- 
-2.25.4
+Jan Kara <jack@suse.com>
+SUSE Labs, CR
 

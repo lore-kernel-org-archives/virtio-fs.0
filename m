@@ -1,12 +1,11 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri,  7 Aug 2020 15:55:07 -0400
-Message-Id: <20200807195526.426056-2-vgoyal@redhat.com>
-In-Reply-To: <20200807195526.426056-1-vgoyal@redhat.com>
-References: <20200807195526.426056-1-vgoyal@redhat.com>
+Date: Tue, 25 Aug 2020 16:51:40 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20200825155140.GA16427@stefanha-x1.localdomain>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 01/20] dax: Modify bdev_dax_pgoff() to handle
-	NULL bdev
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="Dxnq1zWXvFF0Q93v"
+Content-Disposition: inline
+Subject: [Virtio-fs] Windows drivers in Fedora virtio-win ISO
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,57 +14,49 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
-Cc: miklos@szeredi.hu, linux-nvdimm@lists.01.org, Christoph Hellwig <hch@infradead.org>, Dan Williams <dan.j.williams@intel.com>, vgoyal@redhat.com
+To: ghammer@redhat.com
+Cc: virtio-fs@redhat.com, o.popov@livelace.ru
 
-virtiofs does not have a block device but it has dax device.
-Modify bdev_dax_pgoff() to be able to handle that.
 
-If there is no bdev, that means dax offset is 0. (It can't be a partition
-block device starting at an offset in dax device).
+--Dxnq1zWXvFF0Q93v
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
 
-This is little hackish. There have been discussions about getting rid
-of dax not supporting partitions.
+Hi Gal,
+On #virtio-fs freenode IRC it was just mentioned that the Fedora
+virtio-win "latest" ISO now includes virtio-fs drivers:
 
-https://lore.kernel.org/linux-fsdevel/20200107125159.GA15745@infradead.org/
+15:48 < livelace> It looks like virtio-win contains some virtiofs stuff
+15:49 < livelace> 07/15/2020  06:22 PM            55,496 viofs.sys
 
-IMHO, this path can easily break exisitng users. For example
-ioctl(BLKPG_ADD_PARTITION) will start breaking on block devices
-supporting DAX. Also, I personally find it very useful to be able to
-partition dax devices and still be able to use DAX.
+This is great news! We've had questions about the status of Windows
+support recently and this will help many users.
 
-Alternatively, I tried to store offset into dax device information in iomap
-interface, but that got NACKed.
+Can you provide a HowTo for the virtio-fs website
+(https://virtio-fs.gitlab.io/) so there are instructions on installing
+and using the driver?
 
-https://lore.kernel.org/linux-fsdevel/20200217133117.GB20444@infradead.org/
+If you don't have time to write an HTML HowTo (the website git repo is
+here: https://gitlab.com/virtio-fs/virtio-fs.gitlab.io) I can format it
+for you. Just an email reply would be great.
 
-I can't think of a good path to solve this issue properly. So to make
-progress, it seems this patch is least bad option for now and I hope
-we can take it.
+Thanks,
+Stefan
 
-Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-Cc: Christoph Hellwig <hch@infradead.org>
-Cc: Dan Williams <dan.j.williams@intel.com>
-Cc: linux-nvdimm@lists.01.org
----
- drivers/dax/super.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+--Dxnq1zWXvFF0Q93v
+Content-Type: application/pgp-signature; name="signature.asc"
 
-diff --git a/drivers/dax/super.c b/drivers/dax/super.c
-index 8e32345be0f7..c4bec437e88b 100644
---- a/drivers/dax/super.c
-+++ b/drivers/dax/super.c
-@@ -46,7 +46,8 @@ EXPORT_SYMBOL_GPL(dax_read_unlock);
- int bdev_dax_pgoff(struct block_device *bdev, sector_t sector, size_t size,
- 		pgoff_t *pgoff)
- {
--	phys_addr_t phys_off = (get_start_sect(bdev) + sector) * 512;
-+	sector_t start_sect = bdev ? get_start_sect(bdev) : 0;
-+	phys_addr_t phys_off = (start_sect + sector) * 512;
- 
- 	if (pgoff)
- 		*pgoff = PHYS_PFN(phys_off);
--- 
-2.25.4
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl9FM4wACgkQnKSrs4Gr
+c8hKmgf+OM/SOIxDmOirU1cP53UaZQ3RMgJjW6s4V5LFf7Y/zLkZcmffHjYMysWt
+YwwWkTm1DYOIcToEewbbuNqIO3LKneJLDem1Xddn130BQ55sGpy5hH24bnG/VC27
+BypAxkwrT6fWaqiIfaz7Yacn/YXnMHfrjLsJSVvQfjX+xaU2h2anc76kf2rwUJJU
+8oRApme1b9fFTo/pI97fSVom7OD2LjWw08u5r3dLed6clsIsi7z9B6omuTLOQMZZ
+2XceJgNkfp3Sf8t89ZrgMBvVI3EqsdP3TR+Ynemn5m1iKyZO/XSxP8w+MNLaspCh
+hF40cyaPaFO3b/pTWwgjHPvBOGvd4Q==
+=3fwM
+-----END PGP SIGNATURE-----
+
+--Dxnq1zWXvFF0Q93v--
 

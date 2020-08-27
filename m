@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Thu, 27 Aug 2020 16:36:56 +0100
-Message-Id: <20200827153657.111098-6-dgilbert@redhat.com>
+Date: Thu, 27 Aug 2020 16:36:57 +0100
+Message-Id: <20200827153657.111098-7-dgilbert@redhat.com>
 In-Reply-To: <20200827153657.111098-1-dgilbert@redhat.com>
 References: <20200827153657.111098-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 5/6] tools/virtiofsd: xattr name mappings:
-	Map server xattr names
+Subject: [Virtio-fs] [PATCH v2 6/6] tools/virtiofsd: xattr name mapping
+	examples
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,122 +19,73 @@ To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, virtio-fs@red
 
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Map xattr names coming from the server, i.e. the host filesystem;
-currently this is only from listxattr.
+Add a few examples of xattrmaps to the documentation.
 
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 88 ++++++++++++++++++++++++++++++++
- 1 file changed, 88 insertions(+)
+ docs/tools/virtiofsd.rst | 49 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 9b9c8f3ab1..7cd99186f7 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -2188,6 +2188,42 @@ static int xattr_map_client(const char *client_name, char **out_name)
-     abort();
- }
+diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
+index 2efa16d3c5..a138549862 100644
+--- a/docs/tools/virtiofsd.rst
++++ b/docs/tools/virtiofsd.rst
+@@ -161,6 +161,55 @@ in which case a 'server' rule will always match on all names from
+ the server.
  
-+/*
-+ * For use with listxattr where the server fs gives us a name and we may need
-+ * to sanitize this for the client.
-+ * Returns a pointer to the result in *out_name
-+ *   This is always the original string or the current string with some prefix
-+ *   removed; no reallocation is done.
-+ * Returns 0 on success
-+ * Can return -ENODATA to indicate the name should be dropped from the list.
-+ */
-+static int xattr_map_server(const char *server_name, const char **out_name)
-+{
-+    const XattrMapEntry *cur_entry;
-+    for (cur_entry = xattr_map_list; ; cur_entry++) {
-+        if ((cur_entry->flags & XATTR_MAP_FLAG_SERVER) &&
-+            (!strncmp(cur_entry->prepend,
-+                      server_name,
-+                      strlen(cur_entry->prepend)))) {
-+            if (cur_entry->flags & XATTR_MAP_FLAG_END_BAD) {
-+                return -ENODATA;
-+            }
-+            if (cur_entry->flags & XATTR_MAP_FLAG_END_OK) {
-+                *out_name = server_name;
-+                return 0;
-+            }
-+            if (cur_entry->flags & XATTR_MAP_FLAG_PREFIX) {
-+                /* Remove prefix */
-+                *out_name = server_name + strlen(cur_entry->prepend);
-+                return 0;
-+            }
-+        }
-+    }
+ 
++xattr-mapping Examples
++----------------------
 +
-+    /* Shouldn't get here - rules should have an END_* */
-+    abort();
-+}
++1) Prefix all attributes with 'user.virtiofs.'
 +
- static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
-                         size_t size)
- {
-@@ -2342,8 +2378,60 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
-         if (ret == 0) {
-             goto out;
-         }
++::
 +
-+        if (lo->xattrmap) {
-+            /*
-+             * Map the names back, some attributes might be dropped,
-+             * some shortened, but not increased, so we shouldn't
-+             * run out of room.
-+             */
-+            size_t out_index, in_index;
-+            out_index = 0;
-+            in_index = 0;
-+            while (in_index < ret) {
-+                const char *map_out;
-+                char *in_ptr = value + in_index;
-+                /* Length of current attribute name */
-+                size_t in_len = strlen(value + in_index) + 1;
++-o xattrmap=":all:prefix::user.virtiofs.::all:bad:::"
 +
-+                int mapret = xattr_map_server(in_ptr, &map_out);
-+                if (mapret != -ENODATA && mapret != 0) {
-+                    /* Shouldn't happen */
-+                    saverr = -mapret;
-+                    goto out;
-+                }
-+                if (mapret == 0) {
-+                    /* Either unchanged, or truncated */
-+                    size_t out_len;
-+                    if (map_out != in_ptr) {
-+                        /* +1 copies the NIL */
-+                        out_len = strlen(map_out) + 1;
-+                    } else {
-+                        /* No change */
-+                        out_len = in_len;
-+                    }
-+                    /*
-+                     * Move result along, may still be needed for an unchanged
-+                     * entry if a previous entry was changed.
-+                     */
-+                    memmove(value + out_index, map_out, out_len);
 +
-+                    out_index += out_len;
-+                }
-+                in_index += in_len;
-+            }
-+            ret = out_index;
-+            if (ret == 0) {
-+                goto out;
-+            }
-+        }
-         fuse_reply_buf(req, value, ret);
-     } else {
-+        /*
-+         * xattrmap only ever shortens the result,
-+         * so we don't need to do anything clever with the
-+         * allocation length here.
-+         */
-         fuse_reply_xattr(req, ret);
-     }
- out_free:
++This uses two rules, using : as the field separator;
++the first rule prefixes and strips 'user.virtiofs.',
++the second rule hides any non-prefixed attributes that
++the host set.
++
++2) Prefix 'trusted.' attributes, allow others through
++
++::
++
++   "/all/prefix/trusted./user.virtiofs./
++    /server/bad//trusted./
++    /client/bad/user.virtiofs.trusted.//
++    /all/ok///"
++
++
++Here there are four rules, using / as the field
++separator, and also demonstrating that new lines can
++be included between rules.
++The first rule is the prefixing of 'trusted.'.
++The second rule hides unprefixed 'trusted.' attributes
++on the host.
++The third rule stops a guest from explicitily setting
++the 'user.viritofs.trusted.' path directly.
++Finally, the fourth rule lets all remaining attributes
++through.
++
++3) Hide 'security.' attributes, and allow everything else
++
++::
++
++    "/all/bad/security./security./
++     /all/ok///'
++
++The first rule combines what could be separate client and server
++rules into a single 'all' rule, matching 'security.' in either
++client arguments or lists returned from the host.  This stops
++the client seeing any 'security.' attributes on the server and
++stops it setting  any.
++
+ Examples
+ --------
+ 
 -- 
 2.26.2
 

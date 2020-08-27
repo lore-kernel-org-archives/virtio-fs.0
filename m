@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Thu, 27 Aug 2020 16:36:55 +0100
-Message-Id: <20200827153657.111098-5-dgilbert@redhat.com>
+Date: Thu, 27 Aug 2020 16:36:56 +0100
+Message-Id: <20200827153657.111098-6-dgilbert@redhat.com>
 In-Reply-To: <20200827153657.111098-1-dgilbert@redhat.com>
 References: <20200827153657.111098-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 4/6] tools/virtiofsd: xattr name mappings:
-	Map client xattr names
+Subject: [Virtio-fs] [PATCH v2 5/6] tools/virtiofsd: xattr name mappings:
+	Map server xattr names
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,55 +19,49 @@ To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, virtio-fs@red
 
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Map xattr names originating at the client; from get/set/remove xattr.
+Map xattr names coming from the server, i.e. the host filesystem;
+currently this is only from listxattr.
 
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 102 ++++++++++++++++++++++++++++++-
- 1 file changed, 99 insertions(+), 3 deletions(-)
+ tools/virtiofsd/passthrough_ll.c | 88 ++++++++++++++++++++++++++++++++
+ 1 file changed, 88 insertions(+)
 
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 00e96a10cd..9b9c8f3ab1 100644
+index 9b9c8f3ab1..7cd99186f7 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -2146,20 +2146,81 @@ static XattrMapEntry *parse_xattrmap(const char *map)
-     return res;
+@@ -2188,6 +2188,42 @@ static int xattr_map_client(const char *client_name, char **out_name)
+     abort();
  }
  
--static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 +/*
-+ * For use with getxattr/setxattr/removexattr, where the client
-+ * gives us a name and we may need to choose a different one.
-+ * Allocates a buffer for the result placing it in *out_name.
-+ *   If there's no change then *out_name is not set.
++ * For use with listxattr where the server fs gives us a name and we may need
++ * to sanitize this for the client.
++ * Returns a pointer to the result in *out_name
++ *   This is always the original string or the current string with some prefix
++ *   removed; no reallocation is done.
 + * Returns 0 on success
-+ * Can return -EPERM to indicate we block a given attribute
-+ *   (in which case out_name is not allocated)
-+ * Can return -ENOMEM to indicate out_name couldn't be allocated.
++ * Can return -ENODATA to indicate the name should be dropped from the list.
 + */
-+static int xattr_map_client(const char *client_name, char **out_name)
++static int xattr_map_server(const char *server_name, const char **out_name)
 +{
 +    const XattrMapEntry *cur_entry;
-+
 +    for (cur_entry = xattr_map_list; ; cur_entry++) {
-+        if ((cur_entry->flags & XATTR_MAP_FLAG_CLIENT) &&
-+            (!strncmp(cur_entry->key,
-+                      client_name,
-+                      strlen(cur_entry->key)))) {
++        if ((cur_entry->flags & XATTR_MAP_FLAG_SERVER) &&
++            (!strncmp(cur_entry->prepend,
++                      server_name,
++                      strlen(cur_entry->prepend)))) {
 +            if (cur_entry->flags & XATTR_MAP_FLAG_END_BAD) {
-+                return -EPERM;
++                return -ENODATA;
 +            }
 +            if (cur_entry->flags & XATTR_MAP_FLAG_END_OK) {
-+                /* Unmodified name */
++                *out_name = server_name;
 +                return 0;
 +            }
 +            if (cur_entry->flags & XATTR_MAP_FLAG_PREFIX) {
-+                *out_name = g_try_malloc(strlen(client_name) +
-+                                         strlen(cur_entry->prepend) + 1);
-+                if (!*out_name) {
-+                    return -ENOMEM;
-+                }
-+                sprintf(*out_name, "%s%s", cur_entry->prepend, client_name);
++                /* Remove prefix */
++                *out_name = server_name + strlen(cur_entry->prepend);
 +                return 0;
 +            }
 +        }
@@ -77,135 +71,70 @@ index 00e96a10cd..9b9c8f3ab1 100644
 +    abort();
 +}
 +
-+static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
                          size_t size)
  {
-     struct lo_data *lo = lo_data(req);
-     char *value = NULL;
-     char procname[64];
-+    const char *name;
-+    char *mapped_name;
-     struct lo_inode *inode;
-     ssize_t ret;
-     int saverr;
-     int fd = -1;
- 
-+    mapped_name = NULL;
-+    name = in_name;
-+    if (lo->xattrmap) {
-+        ret = xattr_map_client(in_name, &mapped_name);
-+        if (ret < 0) {
-+            if (ret == -EPERM) {
-+                ret = -ENODATA;
+@@ -2342,8 +2378,60 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
+         if (ret == 0) {
+             goto out;
+         }
++
++        if (lo->xattrmap) {
++            /*
++             * Map the names back, some attributes might be dropped,
++             * some shortened, but not increased, so we shouldn't
++             * run out of room.
++             */
++            size_t out_index, in_index;
++            out_index = 0;
++            in_index = 0;
++            while (in_index < ret) {
++                const char *map_out;
++                char *in_ptr = value + in_index;
++                /* Length of current attribute name */
++                size_t in_len = strlen(value + in_index) + 1;
++
++                int mapret = xattr_map_server(in_ptr, &map_out);
++                if (mapret != -ENODATA && mapret != 0) {
++                    /* Shouldn't happen */
++                    saverr = -mapret;
++                    goto out;
++                }
++                if (mapret == 0) {
++                    /* Either unchanged, or truncated */
++                    size_t out_len;
++                    if (map_out != in_ptr) {
++                        /* +1 copies the NIL */
++                        out_len = strlen(map_out) + 1;
++                    } else {
++                        /* No change */
++                        out_len = in_len;
++                    }
++                    /*
++                     * Move result along, may still be needed for an unchanged
++                     * entry if a previous entry was changed.
++                     */
++                    memmove(value + out_index, map_out, out_len);
++
++                    out_index += out_len;
++                }
++                in_index += in_len;
 +            }
-+            fuse_reply_err(req, -ret);
-+            return;
++            ret = out_index;
++            if (ret == 0) {
++                goto out;
++            }
 +        }
-+        if (mapped_name) {
-+            name = mapped_name;
-+        }
-+    }
-+
-     inode = lo_inode(req, ino);
-     if (!inode) {
-         fuse_reply_err(req, EBADF);
-+        g_free(mapped_name);
-         return;
+         fuse_reply_buf(req, value, ret);
+     } else {
++        /*
++         * xattrmap only ever shortens the result,
++         * so we don't need to do anything clever with the
++         * allocation length here.
++         */
+         fuse_reply_xattr(req, ret);
      }
- 
-@@ -2224,6 +2285,7 @@ out_err:
-     saverr = errno;
- out:
-     fuse_reply_err(req, saverr);
-+    g_free(mapped_name);
-     goto out_free;
- }
- 
-@@ -2301,19 +2363,35 @@ out:
-     goto out_free;
- }
- 
--static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
-+static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
-                         const char *value, size_t size, int flags)
- {
-     char procname[64];
-+    const char *name;
-+    char *mapped_name;
-     struct lo_data *lo = lo_data(req);
-     struct lo_inode *inode;
-     ssize_t ret;
-     int saverr;
-     int fd = -1;
- 
-+    mapped_name = NULL;
-+    name = in_name;
-+    if (lo->xattrmap) {
-+        ret = xattr_map_client(in_name, &mapped_name);
-+        if (ret < 0) {
-+            fuse_reply_err(req, -ret);
-+            return;
-+        }
-+        if (mapped_name) {
-+            name = mapped_name;
-+        }
-+    }
-+
-     inode = lo_inode(req, ino);
-     if (!inode) {
-         fuse_reply_err(req, EBADF);
-+        g_free(mapped_name);
-         return;
-     }
- 
-@@ -2348,21 +2426,38 @@ out:
-     }
- 
-     lo_inode_put(lo, &inode);
-+    g_free(mapped_name);
-     fuse_reply_err(req, saverr);
- }
- 
--static void lo_removexattr(fuse_req_t req, fuse_ino_t ino, const char *name)
-+static void lo_removexattr(fuse_req_t req, fuse_ino_t ino, const char *in_name)
- {
-     char procname[64];
-+    const char *name;
-+    char *mapped_name;
-     struct lo_data *lo = lo_data(req);
-     struct lo_inode *inode;
-     ssize_t ret;
-     int saverr;
-     int fd = -1;
- 
-+    mapped_name = NULL;
-+    name = in_name;
-+    if (lo->xattrmap) {
-+        ret = xattr_map_client(in_name, &mapped_name);
-+        if (ret < 0) {
-+            fuse_reply_err(req, -ret);
-+            return;
-+        }
-+        if (mapped_name) {
-+            name = mapped_name;
-+        }
-+    }
-+
-     inode = lo_inode(req, ino);
-     if (!inode) {
-         fuse_reply_err(req, EBADF);
-+        g_free(mapped_name);
-         return;
-     }
- 
-@@ -2397,6 +2492,7 @@ out:
-     }
- 
-     lo_inode_put(lo, &inode);
-+    g_free(mapped_name);
-     fuse_reply_err(req, saverr);
- }
- 
+ out_free:
 -- 
 2.26.2
 

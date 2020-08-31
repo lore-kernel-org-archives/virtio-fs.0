@@ -1,12 +1,9 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri,  7 Aug 2020 15:55:21 -0400
-Message-Id: <20200807195526.426056-16-vgoyal@redhat.com>
-In-Reply-To: <20200807195526.426056-1-vgoyal@redhat.com>
-References: <20200807195526.426056-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 15/20] fuse,
-	dax: Take ->i_mmap_sem lock during dax page fault
+From: David Lomas <dl3@pale-eds.co.uk>
+Date: Mon, 31 Aug 2020 12:06:16 +0100
+Message-ID: <CALjEBWSn6q3G+60qZq9cPR4V84daDryrdXRH8ovCeHqSJC1H0w@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="0000000000005f725d05ae2a66ed"
+Subject: [Virtio-fs] Can't start guest after rebuilding qemu / libvirt
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,113 +12,84 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
-Cc: vgoyal@redhat.com, miklos@szeredi.hu
+To: virtio-fs@redhat.com
 
-We need some kind of locking mechanism here. Normal file systems like
-ext4 and xfs seems to take their own semaphore to protect agains
-truncate while fault is going on.
+--0000000000005f725d05ae2a66ed
+Content-Type: text/plain; charset="UTF-8"
 
-We have additional requirement to protect against fuse dax memory range
-reclaim. When a range has been selected for reclaim, we need to make sure
-no other read/write/fault can try to access that memory range while
-reclaim is in progress. Once reclaim is complete, lock will be released
-and read/write/fault will trigger allocation of fresh dax range.
+I had to rebuild some parts of a host, so decided to recompile / reinstall
+libvirt & qemu (as I had done before), but using the latest 'stable'
+versions. The host is Ubuntu 18.04, and I downloaded libvirt 6.6.0 and qemu
+5.1.0, configured them to install in /usr (rather than /usr/local, as I was
+having some other issues when they weren't installed in the usual location)
+and built both.
 
-Taking inode_lock() is not an option in fault path as lockdep complains
-about circular dependencies. So define a new fuse_inode->i_mmap_sem.
+Apart from some wrinkles with apparmor (just set it to 'complain' for now,
+until I can figure that out), I've hit this error as soon as I try to add a
+virtiofs disk to a guest:
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/dir.c    |  2 ++
- fs/fuse/file.c   | 15 ++++++++++++---
- fs/fuse/fuse_i.h |  7 +++++++
- fs/fuse/inode.c  |  1 +
- 4 files changed, 22 insertions(+), 3 deletions(-)
+libvirtd[22847]: Unable to read from monitor: Connection reset by peer
+libvirtd[22847]: internal error: qemu unexpectedly closed the monitor:
+2020-08-31T10:29:23.161478Z qemu-system-x86_64: -device
+vhost-user-fs-pci,chardev=chr-vu-fs0,tag=realms,bus=pci.0,addr=0x6: Failed
+to read msg header. Read 0 instead of 12. Original request
+1301467040.#0122020-08-31T10:29:23.161560Z qemu-system-x86_64: -device
+vhost-user-fs-pci,chardev=chr-vu-fs0,tag=realms,bus=pci.0,addr=0x6:
+vhost_dev_init failed: Operation not permitted
 
-diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
-index 26f028bc760b..f40766c0693b 100644
---- a/fs/fuse/dir.c
-+++ b/fs/fuse/dir.c
-@@ -1609,8 +1609,10 @@ int fuse_do_setattr(struct dentry *dentry, struct iattr *attr,
- 	 */
- 	if ((is_truncate || !is_wb) &&
- 	    S_ISREG(inode->i_mode) && oldsize != outarg.attr.size) {
-+		down_write(&fi->i_mmap_sem);
- 		truncate_pagecache(inode, outarg.attr.size);
- 		invalidate_inode_pages2(inode->i_mapping);
-+		up_write(&fi->i_mmap_sem);
- 	}
- 
- 	clear_bit(FUSE_I_SIZE_UNSTABLE, &fi->state);
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index be7d90eb5b41..00ad27216cc3 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -2878,11 +2878,18 @@ static vm_fault_t __fuse_dax_fault(struct vm_fault *vmf,
- 
- 	if (write)
- 		sb_start_pagefault(sb);
--
-+	/*
-+	 * We need to serialize against not only truncate but also against
-+	 * fuse dax memory range reclaim. While a range is being reclaimed,
-+	 * we do not want any read/write/mmap to make progress and try
-+	 * to populate page cache or access memory we are trying to free.
-+	 */
-+	down_read(&get_fuse_inode(inode)->i_mmap_sem);
- 	ret = dax_iomap_fault(vmf, pe_size, &pfn, NULL, &fuse_iomap_ops);
- 
- 	if (ret & VM_FAULT_NEEDDSYNC)
- 		ret = dax_finish_sync_fault(vmf, pe_size, pfn);
-+	up_read(&get_fuse_inode(inode)->i_mmap_sem);
- 
- 	if (write)
- 		sb_end_pagefault(sb);
-@@ -3849,9 +3856,11 @@ static long fuse_file_fallocate(struct file *file, int mode, loff_t offset,
- 			file_update_time(file);
- 	}
- 
--	if (mode & FALLOC_FL_PUNCH_HOLE)
-+	if (mode & FALLOC_FL_PUNCH_HOLE) {
-+		down_write(&fi->i_mmap_sem);
- 		truncate_pagecache_range(inode, offset, offset + length - 1);
--
-+		up_write(&fi->i_mmap_sem);
-+	}
- 	fuse_invalidate_attr(inode);
- 
- out:
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 22fb01ba55fb..1ddf526330a5 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -181,6 +181,13 @@ struct fuse_inode {
- 	 */
- 	struct rw_semaphore i_dmap_sem;
- 
-+	/**
-+	 * Can't take inode lock in fault path (leads to circular dependency).
-+	 * So take this in fuse dax fault path to make sure truncate and
-+	 * punch hole etc. can't make progress in parallel.
-+	 */
-+	struct rw_semaphore i_mmap_sem;
-+
- 	/** Sorted rb tree of struct fuse_dax_mapping elements */
- 	struct rb_root_cached dmap_tree;
- 	unsigned long nr_dmaps;
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index 41edc377a3df..4bd965d0ecf6 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -88,6 +88,7 @@ static struct inode *fuse_alloc_inode(struct super_block *sb)
- 	fi->state = 0;
- 	fi->nr_dmaps = 0;
- 	mutex_init(&fi->mutex);
-+	init_rwsem(&fi->i_mmap_sem);
- 	init_rwsem(&fi->i_dmap_sem);
- 	spin_lock_init(&fi->lock);
- 	fi->forget = fuse_alloc_forget();
--- 
-2.25.4
+Googling for 'vhost_dev_init failed: Operation not permitted' led to a
+couple of errors regarding kata containers, and a mention of needing to run
+virtiofsd with elevated privileges. I don't have SELinuex enforcing, and
+vhost-vsock looks like this:
+
+# ls -lZ /dev/vhost-vsock
+crw------- 1 root root ? 10, 241 Aug 27 14:37 /dev/vhost-vsock
+
+and virtiofsd:
+
+# ls -l /usr/libexec/virtiofsd
+-rwxr-xr-x 1 root root 358032 Aug 27 15:52 /usr/libexec/virtiofsd
+# /usr/libexec/virtiofsd --version
+using FUSE kernel interface version 7.31
+
+Any ideas how to progress?
+
+Tx
+
+--0000000000005f725d05ae2a66ed
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><div>I had to rebuild some parts of a host, so decided to =
+recompile / reinstall libvirt &amp; qemu (as I had done before), but using =
+the latest &#39;stable&#39; versions. The host is Ubuntu 18.04, and I downl=
+oaded libvirt 6.6.0 and qemu 5.1.0, configured them to install in /usr (rat=
+her than /usr/local, as I was having some other issues when they weren&#39;=
+t installed in the usual location) and built both.</div><div><br></div><div=
+>Apart from some wrinkles with apparmor (just set it to &#39;complain&#39; =
+for now, until I can figure that out), I&#39;ve hit this error as soon as I=
+ try to add a virtiofs disk to a guest:</div><div><span style=3D"font-famil=
+y:monospace"><br></span></div><div><span style=3D"font-family:monospace">li=
+bvirtd[22847]: Unable to read from monitor: Connection reset by peer<br>lib=
+virtd[22847]: internal error: qemu unexpectedly closed the monitor: 2020-08=
+-31T10:29:23.161478Z qemu-system-x86_64: -device vhost-user-fs-pci,chardev=
+=3Dchr-vu-fs0,tag=3Drealms,bus=3Dpci.0,addr=3D0x6: Failed to read msg heade=
+r. Read 0 instead of 12. Original request 1301467040.#0122020-08-31T10:29:2=
+3.161560Z qemu-system-x86_64: -device vhost-user-fs-pci,chardev=3Dchr-vu-fs=
+0,tag=3Drealms,bus=3Dpci.0,addr=3D0x6: vhost_dev_init failed: Operation not=
+ permitted</span></div><div><br></div><div>Googling for &#39;<span style=3D=
+"font-family:monospace">vhost_dev_init failed: Operation not permitted</spa=
+n>&#39; led to a couple of errors regarding kata containers, and a mention =
+of needing to run virtiofsd with elevated privileges. I don&#39;t have SELi=
+nuex enforcing, and vhost-vsock looks like this:</div><div><br></div><div><=
+span style=3D"font-family:monospace"># ls -lZ /dev/vhost-vsock<br>crw------=
+- 1 root root ? 10, 241 Aug 27 14:37 /dev/vhost-vsock</span></div><div><br>=
+</div><div>and virtiofsd:</div><div><br></div><div><span style=3D"font-fami=
+ly:monospace"># ls -l /usr/libexec/virtiofsd<br>-rwxr-xr-x 1 root root 3580=
+32 Aug 27 15:52 /usr/libexec/virtiofsd<br># /usr/libexec/virtiofsd --versio=
+n<br>using FUSE kernel interface version 7.31</span><br></div><div><br></di=
+v><div>Any ideas how to progress?</div><div><br></div><div>Tx<br></div></di=
+v>
+
+--0000000000005f725d05ae2a66ed--
 

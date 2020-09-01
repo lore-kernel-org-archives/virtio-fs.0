@@ -1,12 +1,11 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue,  1 Sep 2020 10:26:33 -0400
-Message-Id: <20200901142634.1227109-2-vgoyal@redhat.com>
+Date: Tue,  1 Sep 2020 10:26:34 -0400
+Message-Id: <20200901142634.1227109-3-vgoyal@redhat.com>
 In-Reply-To: <20200901142634.1227109-1-vgoyal@redhat.com>
 References: <20200901142634.1227109-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 1/2] fuse,
-	dax: Use correct config option CONFIG_FUSE_DAX
+Subject: [Virtio-fs] [PATCH 2/2] fuse, dax: Save dax device in fuse_conn_dax
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,25 +17,26 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, miklos@szeredi.hu
 Cc: vgoyal@redhat.com
 
-Correct config option to use is CONFIG_FUSE_DAX and not CONFIG_VIRTIO_FS_DAX.
+This is needed later in fuse_iomap_begin to fill iomap->dax_dev. Otherwise
+dax generic code (dax_iomap_rw()) returns -EOPNOTSUPP.
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- fs/fuse/file.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ fs/fuse/dax.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index 7b53ae43860c..380577159c6e 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -3480,6 +3480,6 @@ void fuse_init_file_inode(struct inode *inode)
- 	init_waitqueue_head(&fi->page_waitq);
- 	fi->writepages = RB_ROOT;
+diff --git a/fs/fuse/dax.c b/fs/fuse/dax.c
+index c7099eec17b4..aa89173234c1 100644
+--- a/fs/fuse/dax.c
++++ b/fs/fuse/dax.c
+@@ -1296,6 +1296,7 @@ int fuse_dax_conn_alloc(struct fuse_conn *fc, struct dax_device *dax_dev)
  
--	if (IS_ENABLED(CONFIG_VIRTIO_FS_DAX))
-+	if (IS_ENABLED(CONFIG_FUSE_DAX))
- 		fuse_dax_inode_init(inode);
- }
+ 	fcd->nr_free_ranges = nr_ranges;
+ 	fcd->nr_ranges = nr_ranges;
++	fcd->dev = dax_dev;
+ 
+ 	fc->dax = fcd;
+ 	return 0;
 -- 
 2.25.4
 

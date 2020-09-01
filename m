@@ -1,10 +1,13 @@
+Date: Tue, 1 Sep 2020 16:46:37 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue,  1 Sep 2020 16:40:43 -0400
-Message-Id: <20200901204045.1250822-1-vgoyal@redhat.com>
+Message-ID: <20200901204637.GA1232696@redhat.com>
+References: <20200901204045.1250822-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [RFC PATCH 0/2] fuse: Enable SB_NOSEC if filesystem is
-	not shared
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20200901204045.1250822-1-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [RFC PATCH 0/2] fuse: Enable SB_NOSEC if filesystem
+	is not shared
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,61 +17,110 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, miklos@szeredi.hu
-Cc: vgoyal@redhat.com
 
-Hi,
+On Tue, Sep 01, 2020 at 04:40:43PM -0400, Vivek Goyal wrote:
+> Hi,
+> 
+> I want to enable SB_NOSEC in fuse in some form so that performance of
+> small random writes can be improved. As of now, we call file_remove_privs(),
+> which results in fuse always sending getxattr(security.capability) to
+> server to figure out if security.capability has been set on file or not.
+> If it has been set, it needs to be cleared. This slows down small
+> random writes tremendously.
+> 
+> I posted couple of proposals in the past here.
+> 
+> Proposal 1:
+> 
+> https://lore.kernel.org/linux-fsdevel/20200716144032.GC422759@redhat.com/
+> 
+> Proposal 2:
+> 
+> https://lore.kernel.org/linux-fsdevel/20200724183812.19573-1-vgoyal@redhat.com/
+> 
+> This is 3rd proposal now. One of the roadblocks in enabling SB_NOSEC
+> is shared filesystem. It is possible that another client modified the
+> file data and this client does not know about it. So we might regress
+> if we don't fetch security.capability always.
+> 
+> So looks like this needs to be handled different for shared filesystems
+> and non-shared filesystems. non-shared filesystems will be more like
+> local filesystems where fuse does not expect file data/metadata to
+> change outside the fuse. And we should be able to enable SB_NOSEC
+> optimization. This is what this proposal does.
+> 
+> It does not handle the case of shared filesystems. I believe solution
+> to that will depend on filesystem based on what's the cache coherency
+> guarantees filesystem provides and what's the cache invalidation 
+> mechanism it uses.
+> 
+> For now, all filesystems which are not shared can benefit from this
+> optimization. I am interested in virtiofs which is not shared in
+> many of the cases. In fact we don't even support shared mode yet. 
 
-I want to enable SB_NOSEC in fuse in some form so that performance of
-small random writes can be improved. As of now, we call file_remove_privs(),
-which results in fuse always sending getxattr(security.capability) to
-server to figure out if security.capability has been set on file or not.
-If it has been set, it needs to be cleared. This slows down small
-random writes tremendously.
+Here is the corresponding qemu virtiofsd patch which can enable this
+feature.
 
-I posted couple of proposals in the past here.
 
-Proposal 1:
+Subject: virtiofsd: Enable FUSE_NONSHARED_FS by default
 
-https://lore.kernel.org/linux-fsdevel/20200716144032.GC422759@redhat.com/
+Set FUSE_NONSHARED_FS flag by default as we don't support sharing of
+virtiofs filesystem yet. Once that is supported, it should not be set
+for shared mode.
 
-Proposal 2:
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ include/standard-headers/linux/fuse.h |    4 ++++
+ tools/virtiofsd/fuse_lowlevel.c       |    9 +++++++++
+ 2 files changed, 13 insertions(+)
 
-https://lore.kernel.org/linux-fsdevel/20200724183812.19573-1-vgoyal@redhat.com/
-
-This is 3rd proposal now. One of the roadblocks in enabling SB_NOSEC
-is shared filesystem. It is possible that another client modified the
-file data and this client does not know about it. So we might regress
-if we don't fetch security.capability always.
-
-So looks like this needs to be handled different for shared filesystems
-and non-shared filesystems. non-shared filesystems will be more like
-local filesystems where fuse does not expect file data/metadata to
-change outside the fuse. And we should be able to enable SB_NOSEC
-optimization. This is what this proposal does.
-
-It does not handle the case of shared filesystems. I believe solution
-to that will depend on filesystem based on what's the cache coherency
-guarantees filesystem provides and what's the cache invalidation 
-mechanism it uses.
-
-For now, all filesystems which are not shared can benefit from this
-optimization. I am interested in virtiofs which is not shared in
-many of the cases. In fact we don't even support shared mode yet. 
-
-Any comments or feedback is welcome.
-
-Thanks
-Vivek
-
-Vivek Goyal (2):
-  fuse: Add a flag FUSE_NONSHARED_FS
-  fuse: Enable SB_NOSEC if filesystem is not shared
-
- fs/fuse/fuse_i.h          |  3 +++
- fs/fuse/inode.c           | 12 +++++++++++-
- include/uapi/linux/fuse.h |  4 ++++
- 3 files changed, 18 insertions(+), 1 deletion(-)
-
--- 
-2.25.4
+Index: qemu/include/standard-headers/linux/fuse.h
+===================================================================
+--- qemu.orig/include/standard-headers/linux/fuse.h	2020-09-01 15:22:31.449707002 -0400
++++ qemu/include/standard-headers/linux/fuse.h	2020-09-01 15:23:18.776668542 -0400
+@@ -172,6 +172,8 @@
+  *  - add FUSE_WRITE_KILL_PRIV flag
+  *  - add FUSE_SETUPMAPPING and FUSE_REMOVEMAPPING
+  *  - add map_alignment to fuse_init_out, add FUSE_MAP_ALIGNMENT flag
++ *  7.32
++ *  - add FUSE_NONSHARED_FS flag
+  */
+ 
+ #ifndef _LINUX_FUSE_H
+@@ -310,6 +312,7 @@ struct fuse_file_lock {
+  * FUSE_NO_OPENDIR_SUPPORT: kernel supports zero-message opendir
+  * FUSE_EXPLICIT_INVAL_DATA: only invalidate cached pages on explicit request
+  * FUSE_MAP_ALIGNMENT: map_alignment field is valid
++ * FUSE_NONSHARED_FS: Filesystem is not shared.
+  */
+ #define FUSE_ASYNC_READ		(1 << 0)
+ #define FUSE_POSIX_LOCKS	(1 << 1)
+@@ -338,6 +341,7 @@ struct fuse_file_lock {
+ #define FUSE_NO_OPENDIR_SUPPORT (1 << 24)
+ #define FUSE_EXPLICIT_INVAL_DATA (1 << 25)
+ #define FUSE_MAP_ALIGNMENT	(1 << 26)
++#define FUSE_NONSHARED_FS	(1 << 27)
+ 
+ /**
+  * CUSE INIT request/reply flags
+Index: qemu/tools/virtiofsd/fuse_lowlevel.c
+===================================================================
+--- qemu.orig/tools/virtiofsd/fuse_lowlevel.c	2020-09-01 15:22:31.449707002 -0400
++++ qemu/tools/virtiofsd/fuse_lowlevel.c	2020-09-01 15:23:18.777668583 -0400
+@@ -2218,6 +2218,15 @@ static void do_init(fuse_req_t req, fuse
+         outarg.map_alignment = ffsl(sysconf(_SC_PAGE_SIZE)) - 1;
+     }
+ 
++    if (arg->flags & FUSE_NONSHARED_FS) {
++        /*
++         * By default virtiofs is not shared. Once we support sharing,
++         * this will be have to a conditional and driven by user's
++         * selection.
++         */
++         outarg.flags |= FUSE_NONSHARED_FS;
++    }
++
+     fuse_log(FUSE_LOG_DEBUG, "   INIT: %u.%u\n", outarg.major, outarg.minor);
+     fuse_log(FUSE_LOG_DEBUG, "   flags=0x%08x\n", outarg.flags);
+     fuse_log(FUSE_LOG_DEBUG, "   max_readahead=0x%08x\n", outarg.max_readahead);
 

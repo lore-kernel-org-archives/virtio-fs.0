@@ -1,12 +1,14 @@
+Date: Wed, 2 Sep 2020 14:08:04 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri,  7 Aug 2020 15:55:23 -0400
-Message-Id: <20200807195526.426056-18-vgoyal@redhat.com>
-In-Reply-To: <20200807195526.426056-1-vgoyal@redhat.com>
-References: <20200807195526.426056-1-vgoyal@redhat.com>
+Message-ID: <20200902180804.GB1263242@redhat.com>
+References: <20200901204045.1250822-1-vgoyal@redhat.com>
+	<20200901204045.1250822-2-vgoyal@redhat.com>
+	<CAJfpegtUMJqUDhFTePpFP=oQ=XGFj2tfvx+unV94sN3fFZbZHg@mail.gmail.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 17/20] fuse,
-	virtiofs: Maintain a list of busy elements
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAJfpegtUMJqUDhFTePpFP=oQ=XGFj2tfvx+unV94sN3fFZbZHg@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 1/2] fuse: Add a flag FUSE_NONSHARED_FS
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,120 +17,89 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
-Cc: vgoyal@redhat.com, miklos@szeredi.hu
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>
 
-This list will be used selecting fuse_dax_mapping to free when number of
-free mappings drops below a threshold.
+On Wed, Sep 02, 2020 at 08:57:07AM +0200, Miklos Szeredi wrote:
+> On Tue, Sep 1, 2020 at 10:41 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> >
+> > FUSE_NONSHARED_FS will signify that filesystem is not shared. That is
+> > all fuse modifications are going thourgh this single fuse connection. It
+> > should not happen that file's data/metadata changed without the knowledge
+> > of fuse. Automatic file time stamp changes will probably be an exception
+> > to this rule.
+> >
+> > If filesystem is shared between different clients, then this flag should
+> > not be set.
+> 
+> I'm thinking maybe this flag should force some other parameters as well:
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/file.c   | 22 ++++++++++++++++++++++
- fs/fuse/fuse_i.h |  7 +++++++
- fs/fuse/inode.c  |  4 ++++
- 3 files changed, 33 insertions(+)
+So you are thinking of fuse enforcing these parameters automatically
+without server asking for it. IOW, override what server says about
+following parameters and fuse sets their values if
+FUSE_NONSHARED_FS is set?
 
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index 54708cb24da0..ecd2a42f6e30 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -213,6 +213,23 @@ static struct fuse_dax_mapping *alloc_dax_mapping(struct fuse_conn *fc)
- 	return dmap;
- }
- 
-+/* This assumes fc->lock is held */
-+static void __dmap_remove_busy_list(struct fuse_conn *fc,
-+				    struct fuse_dax_mapping *dmap)
-+{
-+	list_del_init(&dmap->busy_list);
-+	WARN_ON(fc->nr_busy_ranges == 0);
-+	fc->nr_busy_ranges--;
-+}
-+
-+static void dmap_remove_busy_list(struct fuse_conn *fc,
-+				  struct fuse_dax_mapping *dmap)
-+{
-+	spin_lock(&fc->lock);
-+	__dmap_remove_busy_list(fc, dmap);
-+	spin_unlock(&fc->lock);
-+}
-+
- /* This assumes fc->lock is held */
- static void __dmap_add_to_free_pool(struct fuse_conn *fc,
- 				struct fuse_dax_mapping *dmap)
-@@ -266,6 +283,10 @@ static int fuse_setup_one_mapping(struct inode *inode, unsigned long start_idx,
- 		/* Protected by fi->i_dmap_sem */
- 		interval_tree_insert(&dmap->itn, &fi->dmap_tree);
- 		fi->nr_dmaps++;
-+		spin_lock(&fc->lock);
-+		list_add_tail(&dmap->busy_list, &fc->busy_ranges);
-+		fc->nr_busy_ranges++;
-+		spin_unlock(&fc->lock);
- 	}
- 	return 0;
- }
-@@ -335,6 +356,7 @@ static void dmap_reinit_add_to_free_pool(struct fuse_conn *fc,
- 	pr_debug("fuse: freeing memory range start_idx=0x%lx end_idx=0x%lx "
- 		 "window_offset=0x%llx length=0x%llx\n", dmap->itn.start,
- 		 dmap->itn.last, dmap->window_offset, dmap->length);
-+	__dmap_remove_busy_list(fc, dmap);
- 	dmap->itn.start = dmap->itn.last = 0;
- 	__dmap_add_to_free_pool(fc, dmap);
- }
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 1ddf526330a5..f84ec9c661ab 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -80,6 +80,9 @@ struct fuse_dax_mapping {
- 	/* For interval tree in file/inode */
- 	struct interval_tree_node itn;
- 
-+	/* Will connect in fc->busy_ranges to keep track busy memory */
-+	struct list_head busy_list;
-+
- 	/** Position in DAX window */
- 	u64 window_offset;
- 
-@@ -812,6 +815,10 @@ struct fuse_conn {
- 	/** DAX device, non-NULL if DAX is supported */
- 	struct dax_device *dax_dev;
- 
-+	/* List of memory ranges which are busy */
-+	unsigned long nr_busy_ranges;
-+	struct list_head busy_ranges;
-+
- 	/*
- 	 * DAX Window Free Ranges
- 	 */
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index 4bd965d0ecf6..cfc04c5eda73 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -636,6 +636,8 @@ static void fuse_free_dax_mem_ranges(struct list_head *mem_list)
- 	/* Free All allocated elements */
- 	list_for_each_entry_safe(range, temp, mem_list, list) {
- 		list_del(&range->list);
-+		if (!list_empty(&range->busy_list))
-+			list_del(&range->busy_list);
- 		kfree(range);
- 	}
- }
-@@ -680,6 +682,7 @@ static int fuse_dax_mem_range_init(struct fuse_conn *fc,
- 		 */
- 		range->window_offset = i * FUSE_DAX_SZ;
- 		range->length = FUSE_DAX_SZ;
-+		INIT_LIST_HEAD(&range->busy_list);
- 		list_add_tail(&range->list, &mem_ranges);
- 	}
- 
-@@ -727,6 +730,7 @@ void fuse_conn_init(struct fuse_conn *fc, struct user_namespace *user_ns,
- 	fc->user_ns = get_user_ns(user_ns);
- 	fc->max_pages = FUSE_DEFAULT_MAX_PAGES_PER_REQ;
- 	INIT_LIST_HEAD(&fc->free_ranges);
-+	INIT_LIST_HEAD(&fc->busy_ranges);
- }
- EXPORT_SYMBOL_GPL(fuse_conn_init);
- 
--- 
-2.25.4
+Or should we recommend these for FUSE_NONSHARED_FS and let file server
+specify all this.
+
+> 
+> ^FUSE_POSIX_LOCK
+
+No remote posix locks. Makes sense. If filesystem is not shared then
+there is no need of remote posix locks.
+
+> ^FUSE_FLOCK_LOCKS
+
+No remote BSD style file locks. If filesystem is not shared, then
+local locks should work just fine.
+
+> ^FUSE_AUTO_INVAL_DATA
+
+This controls if page cache data should be invalidated upon mtime
+change. For non shared fs, mtime should not change outside fuse, 
+so makes sense to enforce ^FUSE_AUTO_INVAL_DATA.
+
+> FUSE_EXPLICIT_INVAL_DATA
+
+This tells fuse to not invalidate page cache and not truncate page cache
+if attr->size or mtime change is detected. For non-shared fs we don't
+expect attr->size or mtime to change, so it does not harm to enfroce
+this.
+
+> FUSE_CACHE_SYMLINKS
+
+This caches readlink responses. Makes sense to enable it for
+non shared fs. 
+
+> attr_valid=inf
+> entry_valid=inf
+
+dentry and attr timeout being infinite should be good for performance
+if filesystem is not shared.
+
+> FOPEN_KEEP_CACHE
+
+If this is not set, by default fuse invalidates page cache on open. Makes
+sense to not flush page cache on open with FUSE_NONSHARED_FS.
+
+> FOPEN_CACHE_DIR
+
+Caching directory contents for FUSE_NONSHARED_FS makes sense too.
+
+> 
+> This would make sure that it's really only used in the non-shared case.
+
+I am little afraid of enforcing this in fuse core because tomorrow
+somebody will say hey I need hybrid mode where FUSE_NONSHARED_FS is
+set but for some reason I want attrs to expire after some time. I 
+don't have a good use case in my mind though.
+
+If I were to choose, I will probably document it and suggest that
+file servers sets all the above for the case of FUSE_NONSHARED_FS.
+
+But I am also open to enforcing this in fuse core if you prefer
+that option.
+
+Thanks
+Vivek
 

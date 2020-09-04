@@ -1,13 +1,18 @@
-Date: Wed, 2 Sep 2020 15:14:17 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200902191417.GC1263242@redhat.com>
-References: <20200901204045.1250822-1-vgoyal@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=MXzRjhwn8e2J5zYTCR4K+ZTW1our2Q6VsUPgVktuBLs=;
+	b=LdTO8+I8XHmU+YCHchiFOBlCOwF2mhR5dAZx74JAbUsVoRU33CWaY86v/bbMDVm7wP
+	oYKi0OpxacAUC3LC5vNhWGHA87ywut6e9wR3KE1bYg6VrM/LVLbCgXWuQc77HjQQITD7
+	g2yIZPsT16veeMHQ81rSKzD82ttwqwbK+LSB4=
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200901204045.1250822-1-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [RFC PATCH 0/2] fuse: Enable SB_NOSEC if filesystem
-	is not shared
+References: <20200901142634.1227109-1-vgoyal@redhat.com>
+In-Reply-To: <20200901142634.1227109-1-vgoyal@redhat.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Fri, 4 Sep 2020 11:45:53 +0200
+Message-ID: <CAJfpegtBA6XSbb+futZGt=NY-VjnN_GWFmnNfGjLfgnZ1ynM0w@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PATCH 0/2] fuse,
+	dax: Couple of fixes for fuse dax support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,82 +21,46 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, miklos@szeredi.hu
-Cc: eric.ernst@intel.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>
 
-On Tue, Sep 01, 2020 at 04:40:43PM -0400, Vivek Goyal wrote:
-> Hi,
-> 
-> I want to enable SB_NOSEC in fuse in some form so that performance of
-> small random writes can be improved. As of now, we call file_remove_privs(),
-> which results in fuse always sending getxattr(security.capability) to
-> server to figure out if security.capability has been set on file or not.
-> If it has been set, it needs to be cleared. This slows down small
-> random writes tremendously.
-> 
-> I posted couple of proposals in the past here.
-> 
-> Proposal 1:
-> 
-> https://lore.kernel.org/linux-fsdevel/20200716144032.GC422759@redhat.com/
-> 
-> Proposal 2:
-> 
-> https://lore.kernel.org/linux-fsdevel/20200724183812.19573-1-vgoyal@redhat.com/
-> 
-> This is 3rd proposal now. One of the roadblocks in enabling SB_NOSEC
-> is shared filesystem. It is possible that another client modified the
-> file data and this client does not know about it. So we might regress
-> if we don't fetch security.capability always.
-> 
-> So looks like this needs to be handled different for shared filesystems
-> and non-shared filesystems. non-shared filesystems will be more like
-> local filesystems where fuse does not expect file data/metadata to
-> change outside the fuse. And we should be able to enable SB_NOSEC
-> optimization. This is what this proposal does.
-> 
-> It does not handle the case of shared filesystems. I believe solution
-> to that will depend on filesystem based on what's the cache coherency
-> guarantees filesystem provides and what's the cache invalidation 
-> mechanism it uses.
-> 
-> For now, all filesystems which are not shared can benefit from this
-> optimization. I am interested in virtiofs which is not shared in
-> many of the cases. In fact we don't even support shared mode yet. 
+On Tue, Sep 1, 2020 at 4:26 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> Hi Miklos,
+>
+> I am testing fuse dax branch now. To begin with here are couple of
+> simple fixes to make sure I/O is going through dax path.
+>
+> Either you can roll these fixes into existing patches or apply on
+> top.
+>
+> I ran blogbench workload and some fio mmap jobs and these seem to be
+> running fine after these fixes.
 
-Well, I was hoping that virtiofs and kata containers can directly
-benefit from this mode for root filesystem image. But Eric Ernst
-says that kata containers keep bunch of things in a single directory
-being exported to guest. And while rootfs image is not expected to
-be updated later, it is possile kubernetes updates other parts
-later.
+Thanks for testing and fixing.
 
-And that most likely means kata will not use virtiofs non-shared
-mode. 
+Pushed a rerolled series to #for-next.   Would be good if you cour retest.
 
-I guess I need to keep this idea on hold for now because I will not
-have any immediate users. And go back to drawing board and figure out
-how to not query security.capability on every WRITE.
+There's one checkpatch warning I'm unsure about:
 
-Thanks
-Vivek
+| WARNING: Using vsprintf specifier '%px' potentially exposes the
+kernel memory layout, if you don't really need the address please
+consider using '%p'.
+| #173: FILE: fs/fuse/virtio_fs.c:812:
+| +    dev_dbg(&vdev->dev, "%s: window kaddr 0x%px phys_addr 0x%llx
+len 0x%llx\n",
+| +        __func__, fs->window_kaddr, cache_reg.addr, cache_reg.len);
+|
+| total: 0 errors, 1 warnings, 175 lines checked
+|
+| NOTE: For some of the reported defects, checkpatch may be able to
+|       mechanically convert to the typical style using --fix or --fix-inplace.
+|
+| patches/virtio_fs-dax-set-up-virtio_fs-dax_device.patch has style
+problems, please review.
 
-> 
-> Any comments or feedback is welcome.
-> 
-> Thanks
-> Vivek
-> 
-> Vivek Goyal (2):
->   fuse: Add a flag FUSE_NONSHARED_FS
->   fuse: Enable SB_NOSEC if filesystem is not shared
-> 
->  fs/fuse/fuse_i.h          |  3 +++
->  fs/fuse/inode.c           | 12 +++++++++++-
->  include/uapi/linux/fuse.h |  4 ++++
->  3 files changed, 18 insertions(+), 1 deletion(-)
-> 
-> -- 
-> 2.25.4
-> 
+Do you think that the kernel address in the debug output is necessary?
+
+Thanks,
+Miklos
 

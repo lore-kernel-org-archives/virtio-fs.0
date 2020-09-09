@@ -1,9 +1,11 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri,  7 Aug 2020 15:55:06 -0400
-Message-Id: <20200807195526.426056-1-vgoyal@redhat.com>
+From: Max Reitz <mreitz@redhat.com>
+Date: Wed,  9 Sep 2020 20:40:25 +0200
+Message-Id: <20200909184028.262297-6-mreitz@redhat.com>
+In-Reply-To: <20200909184028.262297-1-mreitz@redhat.com>
+References: <20200909184028.262297-1-mreitz@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 00/20] virtiofs: Add DAX support
+Subject: [Virtio-fs] [PATCH 5/8] virtiofsd: Store every lo_inode's parent_dev
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -12,117 +14,69 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
-Cc: vgoyal@redhat.com, miklos@szeredi.hu
+To: qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, Max Reitz <mreitz@redhat.com>
 
-Hi All,
+We want to detect mount points in the shared tree.  We report them to
+the guest by setting the FUSE_ATTR_SUBMOUNT flag in fuse_attr.flags, but
+because the FUSE client will create a submount for every directory that
+has this flag set, we must do this only for the actual mount points.
 
-This is V2 of the patches. I had posted V1 here.
+We can detect mount points by comparing a directory's st_dev with its
+parent's st_dev.  To be able to do so, we need to store the parent's
+st_dev in the lo_inode object.
 
-https://lore.kernel.org/linux-fsdevel/20200304165845.3081-1-vgoyal@redhat.com/
+Note that mount points need not necessarily be directories; a single
+file can be a mount point as well.  However, for the sake of simplicity
+let us ignore any non-directory mount points for now.
 
-I have taken care of most of the comments from V1.
+Signed-off-by: Max Reitz <mreitz@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-Amir had suggested that some of the code can be moved to a new file, may
-be post series. I have left that item for the post series cleanup.
-
-Miklos was concerned about KVM error handling when a mapped file on
-host gets truncated and guest tries to access it. As of now guest
-can spin in infinite loop. I have tried to address that with KVM
-developers and there is no easy race free way to inject synchronous
-exception which can indicate error in guest. For now, I have proposed
-that atleast guest can exit to qemu with error when such scenario
-happen and proposed a patch which has got two acks. But it has not
-been merged yet.
-
-https://lore.kernel.org/kvm/20200720211359.GF502563@redhat.com/
-
-We don't support modifications in virtiofs files from host or
-from other guests. And even if somebody modifies it, qemu will
-exit gracefully without bringing down host. So I think this
-probably is good enough for now to make progress on virtiofs DAX
-patches.
-
-Fixing kvm to inject errors is not easy and is a complicated design.
-We will need to make sure that happens before we support DAX in
-shared mode in virtiofs. But blocking behind this is proabably not
-a good idea because DAX can be very useful in non-shared mode in
-kata containers.
-
-Performance numbers are more or less same as in V1 post. So I am
-not providing any numbers again. In general, DAX can provide a good
-performance boost and memory savings.
-
-Any thoughts or feedback is welcome.
-
-Description from previous post
-------------------------------
-
-This patch series adds DAX support to virtiofs filesystem. This allows
-bypassing guest page cache and allows mapping host page cache directly
-in guest address space.
-
-When a page of file is needed, guest sends a request to map that page
-(in host page cache) in qemu address space. Inside guest this is
-a physical memory range controlled by virtiofs device. And guest
-directly maps this physical address range using DAX and hence gets
-access to file data on host.
-
-This can speed up things considerably in many situations. Also this
-can result in substantial memory savings as file data does not have
-to be copied in guest and it is directly accessed from host page
-cache.
-
-Most of the changes are limited to fuse/virtiofs. There are couple
-of changes needed in generic dax infrastructure and couple of changes
-in virtio to be able to access shared memory region.
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 784330e0e4..2c48c03b4c 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -124,6 +124,14 @@ struct lo_inode {
+     GHashTable *posix_locks; /* protected by lo_inode->plock_mutex */
  
-Thanks
-Vivek
-
-Sebastien Boeuf (3):
-  virtio: Add get_shm_region method
-  virtio: Implement get_shm_region for PCI transport
-  virtio: Implement get_shm_region for MMIO transport
-
-Stefan Hajnoczi (2):
-  virtio_fs, dax: Set up virtio_fs dax_device
-  fuse,dax: add DAX mmap support
-
-Vivek Goyal (15):
-  dax: Modify bdev_dax_pgoff() to handle NULL bdev
-  dax: Create a range version of dax_layout_busy_page()
-  virtiofs: Provide a helper function for virtqueue initialization
-  fuse: Get rid of no_mount_options
-  fuse,virtiofs: Add a mount option to enable dax
-  fuse,virtiofs: Keep a list of free dax memory ranges
-  fuse: implement FUSE_INIT map_alignment field
-  fuse: Introduce setupmapping/removemapping commands
-  fuse, dax: Implement dax read/write operations
-  fuse, dax: Take ->i_mmap_sem lock during dax page fault
-  fuse,virtiofs: Define dax address space operations
-  fuse,virtiofs: Maintain a list of busy elements
-  fuse: Release file in process context
-  fuse: Take inode lock for dax inode truncation
-  fuse,virtiofs: Add logic to free up a memory range
-
- drivers/dax/super.c                |    3 +-
- drivers/virtio/virtio_mmio.c       |   32 +
- drivers/virtio/virtio_pci_modern.c |   96 +++
- fs/dax.c                           |   66 +-
- fs/fuse/dir.c                      |    2 +
- fs/fuse/file.c                     | 1189 +++++++++++++++++++++++++++-
- fs/fuse/fuse_i.h                   |  112 ++-
- fs/fuse/inode.c                    |  147 +++-
- fs/fuse/virtio_fs.c                |  279 ++++++-
- include/linux/dax.h                |    6 +
- include/linux/virtio_config.h      |   17 +
- include/uapi/linux/fuse.h          |   34 +-
- include/uapi/linux/virtio_fs.h     |    3 +
- include/uapi/linux/virtio_mmio.h   |   11 +
- include/uapi/linux/virtio_pci.h    |   11 +-
- 15 files changed, 1927 insertions(+), 81 deletions(-)
-
+     mode_t filetype;
++
++    /*
++     * So we can detect crossmount roots
++     * (As such, this only needs to be valid for directories.  Note
++     * that files can have multiple parents due to hard links, and so
++     * their parent_dev may fluctuate.)
++     */
++    dev_t parent_dev;
+ };
+ 
+ struct lo_cred {
+@@ -821,6 +829,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+         g_hash_table_insert(lo->inodes, &inode->key, inode);
+         pthread_mutex_unlock(&lo->mutex);
+     }
++    inode->parent_dev = dir->key.dev;
+     e->ino = inode->fuse_ino;
+     lo_inode_put(lo, &inode);
+     lo_inode_put(lo, &dir);
+@@ -1047,6 +1056,14 @@ static void lo_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t parent,
+     fuse_log(FUSE_LOG_DEBUG, "  %lli/%s -> %lli\n", (unsigned long long)parent,
+              name, (unsigned long long)e.ino);
+ 
++    /*
++     * No need to update inode->parent_dev, because
++     * (1) We cannot, the inode now has more than one parent,
++     * (2) Directories cannot have more than one parent, so link()
++     *     does not work for them; but parent_dev only needs to be
++     *     valid for directories.
++     */
++
+     fuse_reply_entry(req, &e);
+     lo_inode_put(lo, &parent_inode);
+     lo_inode_put(lo, &inode);
 -- 
-2.25.4
+2.26.2
 

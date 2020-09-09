@@ -1,11 +1,11 @@
 From: Max Reitz <mreitz@redhat.com>
-Date: Wed,  9 Sep 2020 20:40:21 +0200
-Message-Id: <20200909184028.262297-2-mreitz@redhat.com>
+Date: Wed,  9 Sep 2020 20:40:22 +0200
+Message-Id: <20200909184028.262297-3-mreitz@redhat.com>
 In-Reply-To: <20200909184028.262297-1-mreitz@redhat.com>
 References: <20200909184028.262297-1-mreitz@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 1/8] linux/fuse.h: Pull in from Linux
+Subject: [Virtio-fs] [PATCH 2/8] virtiofsd: Announce FUSE_ATTR_FLAGS
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,60 +17,67 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org
 Cc: virtio-fs@redhat.com, Max Reitz <mreitz@redhat.com>
 
-Update the linux/fuse.h standard header from the kernel development tree
-that implements FUSE submounts.
-
-This adds the fuse_attr.flags field, the FUSE_ATTR_FLAGS INIT flag, and
-the FUSE_ATTR_SUBMOUNT flag for fuse_attr.flags.
+The fuse_attr.flags field is currently just initialized to 0, which is
+valid.  Thus, there is no reason not to always announce FUSE_ATTR_FLAGS
+(when the kernel supports it).
 
 Signed-off-by: Max Reitz <mreitz@redhat.com>
 ---
- include/standard-headers/linux/fuse.h | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ tools/virtiofsd/fuse_common.h   | 8 ++++++++
+ tools/virtiofsd/fuse_lowlevel.c | 7 +++++++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/include/standard-headers/linux/fuse.h b/include/standard-headers/linux/fuse.h
-index f4df0a40f6..7dd7a3b992 100644
---- a/include/standard-headers/linux/fuse.h
-+++ b/include/standard-headers/linux/fuse.h
-@@ -227,7 +227,7 @@ struct fuse_attr {
- 	uint32_t	gid;
- 	uint32_t	rdev;
- 	uint32_t	blksize;
--	uint32_t	padding;
-+	uint32_t	flags;
- };
- 
- struct fuse_kstatfs {
-@@ -310,6 +310,7 @@ struct fuse_file_lock {
-  * FUSE_NO_OPENDIR_SUPPORT: kernel supports zero-message opendir
-  * FUSE_EXPLICIT_INVAL_DATA: only invalidate cached pages on explicit request
-  * FUSE_MAP_ALIGNMENT: map_alignment field is valid
-+ * FUSE_ATTR_FLAGS: fuse_attr.flags is present and valid
+diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
+index 686c42c0a5..870544fe13 100644
+--- a/tools/virtiofsd/fuse_common.h
++++ b/tools/virtiofsd/fuse_common.h
+@@ -352,6 +352,14 @@ struct fuse_file_info {
   */
- #define FUSE_ASYNC_READ		(1 << 0)
- #define FUSE_POSIX_LOCKS	(1 << 1)
-@@ -338,6 +339,7 @@ struct fuse_file_lock {
- #define FUSE_NO_OPENDIR_SUPPORT (1 << 24)
- #define FUSE_EXPLICIT_INVAL_DATA (1 << 25)
- #define FUSE_MAP_ALIGNMENT	(1 << 26)
-+#define FUSE_ATTR_FLAGS		(1 << 27)
- 
- /**
-  * CUSE INIT request/reply flags
-@@ -413,6 +415,13 @@ struct fuse_file_lock {
-  */
- #define FUSE_FSYNC_FDATASYNC	(1 << 0)
+ #define FUSE_CAP_NO_OPENDIR_SUPPORT (1 << 24)
  
 +/**
-+ * fuse_attr flags
++ * Indicates that the client will provide fuse_attr.flags, and the kernel will
++ * interpret it.
 + *
-+ * FUSE_ATTR_SUBMOUNT: File/directory is a submount point
++ * This feature is enabled by default when supported by the kernel.
 + */
-+#define FUSE_ATTR_SUBMOUNT      (1 << 0)
++#define FUSE_CAP_ATTR_FLAGS (1 << 27)
 +
- enum fuse_opcode {
- 	FUSE_LOOKUP		= 1,
- 	FUSE_FORGET		= 2,  /* no reply */
+ /**
+  * Ioctl flags
+  *
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index 2dd36ec03b..e9e2652d33 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -1988,6 +1988,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+             bufsize = max_bufsize;
+         }
+     }
++    if (arg->flags & FUSE_ATTR_FLAGS) {
++        se->conn.capable |= FUSE_CAP_ATTR_FLAGS;
++    }
+ #ifdef HAVE_SPLICE
+ #ifdef HAVE_VMSPLICE
+     se->conn.capable |= FUSE_CAP_SPLICE_WRITE | FUSE_CAP_SPLICE_MOVE;
+@@ -2014,6 +2017,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+     LL_SET_DEFAULT(1, FUSE_CAP_ASYNC_DIO);
+     LL_SET_DEFAULT(1, FUSE_CAP_IOCTL_DIR);
+     LL_SET_DEFAULT(1, FUSE_CAP_ATOMIC_O_TRUNC);
++    LL_SET_DEFAULT(1, FUSE_CAP_ATTR_FLAGS);
+     LL_SET_DEFAULT(se->op.write_buf, FUSE_CAP_SPLICE_READ);
+     LL_SET_DEFAULT(se->op.getlk && se->op.setlk, FUSE_CAP_POSIX_LOCKS);
+     LL_SET_DEFAULT(se->op.flock, FUSE_CAP_FLOCK_LOCKS);
+@@ -2103,6 +2107,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+     if (se->conn.want & FUSE_CAP_POSIX_ACL) {
+         outarg.flags |= FUSE_POSIX_ACL;
+     }
++    if (se->conn.want & FUSE_CAP_ATTR_FLAGS) {
++        outarg.flags |= FUSE_ATTR_FLAGS;
++    }
+     outarg.max_readahead = se->conn.max_readahead;
+     outarg.max_write = se->conn.max_write;
+     if (se->conn.max_background >= (1 << 16)) {
 -- 
 2.26.2
 

@@ -1,14 +1,14 @@
-Date: Fri, 4 Sep 2020 09:05:02 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200904130502.GA55989@redhat.com>
-References: <20200901142634.1227109-1-vgoyal@redhat.com>
-	<CAJfpegtBA6XSbb+futZGt=NY-VjnN_GWFmnNfGjLfgnZ1ynM0w@mail.gmail.com>
+Date: Wed, 9 Sep 2020 13:16:49 +0200
+From: =?iso-8859-1?B?SuFu?= Tomko <jtomko@redhat.com>
+Message-ID: <20200909111649.GC1377607@lpt>
+References: <20200827153657.111098-1-dgilbert@redhat.com>
+	<20200827153657.111098-2-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="V88s5gaDVPzZ0KCq"
 Content-Disposition: inline
-In-Reply-To: <CAJfpegtBA6XSbb+futZGt=NY-VjnN_GWFmnNfGjLfgnZ1ynM0w@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH 0/2] fuse,
-	dax: Couple of fixes for fuse dax support
+In-Reply-To: <20200827153657.111098-2-dgilbert@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v2 1/6] virtiofsd: Silence gcc warning
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,61 +17,46 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>
+To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
 
-On Fri, Sep 04, 2020 at 11:45:53AM +0200, Miklos Szeredi wrote:
-> On Tue, Sep 1, 2020 at 4:26 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> >
-> > Hi Miklos,
-> >
-> > I am testing fuse dax branch now. To begin with here are couple of
-> > simple fixes to make sure I/O is going through dax path.
-> >
-> > Either you can roll these fixes into existing patches or apply on
-> > top.
-> >
-> > I ran blogbench workload and some fio mmap jobs and these seem to be
-> > running fine after these fixes.
-> 
-> Thanks for testing and fixing.
-> 
-> Pushed a rerolled series to #for-next.   Would be good if you cour retest.
 
-Thanks. Will test again next week.
+--V88s5gaDVPzZ0KCq
+Content-Type: text/plain; charset=iso-8859-1; format=flowed
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-> 
-> There's one checkpatch warning I'm unsure about:
-> 
-> | WARNING: Using vsprintf specifier '%px' potentially exposes the
-> kernel memory layout, if you don't really need the address please
-> consider using '%p'.
-> | #173: FILE: fs/fuse/virtio_fs.c:812:
-> | +    dev_dbg(&vdev->dev, "%s: window kaddr 0x%px phys_addr 0x%llx
-> len 0x%llx\n",
-> | +        __func__, fs->window_kaddr, cache_reg.addr, cache_reg.len);
-> |
-> | total: 0 errors, 1 warnings, 175 lines checked
-> |
-> | NOTE: For some of the reported defects, checkpatch may be able to
-> |       mechanically convert to the typical style using --fix or --fix-inplace.
-> |
-> | patches/virtio_fs-dax-set-up-virtio_fs-dax_device.patch has style
-> problems, please review.
-> 
-> Do you think that the kernel address in the debug output is necessary?
+On a Thursday in 2020, Dr. David Alan Gilbert (git) wrote:
+>From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+>
+>Gcc worries fd might be used unset, in reality it's always set if
+>fi is set, and only used if fi is set so it's safe.  Initialise it to -1
+>just to keep gcc happy for now.
+>
+>Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+>---
+> tools/virtiofsd/passthrough_ll.c | 2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
+>
 
-It is more of a nice to have thing. Was more useful in initial
-development. Now things have stablized, so I don't use it that much
-anymore.
+Reviewed-by: J=E1n Tomko <jtomko@redhat.com>
 
-So I am fine converting %px to %p. I am not sure though how people
-practically make use of %p output for debugging. IIUC, that's a
-hash of actual value.
+Jano
 
-This debug output atleast tells us that a certain virtio device
-provided a cache window and driver mapped it.
+--V88s5gaDVPzZ0KCq
+Content-Type: application/pgp-signature; name="signature.asc"
 
-Thanks
-Vivek
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEE7DTm0WabvfIr7YZ4Ak1z5KIMl5QFAl9YuZ0ACgkQAk1z5KIM
+l5S4MAf/dm2VM2eVZnN8FydhcFUE4anDIpf1cAcLpFXmSBcFXae4OEZAP6miQxlf
+q0an22nLJKcMsOJhajx0BEZ3lKlydSVr2Nj7YA2eAQ1psf7zZVdb9nBJuNh7lyBV
+ZqKmfPCZdDZDwfJplon7cclU/o0tf1yhOwZ4HmBlf3gaU3tren9p4PB4jrkla/gI
+zTi1n8C5kVjrY710ThEMzgN4cmESJ1sEr9jY9ywuRcTsNXjV61HDCqkTW6WlPn0Q
+nEeAixVk9kk0d15xWQx0xRJ2Y+zgdVWEn/wtQ8lJmCAnTvDNGm+SOYZDrcfM/0mz
+VSUVd7RxUExwsfeToX8qs/RgOYnYDg==
+=xftR
+-----END PGP SIGNATURE-----
+
+--V88s5gaDVPzZ0KCq--
 

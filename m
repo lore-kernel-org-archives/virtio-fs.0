@@ -1,15 +1,10 @@
-Date: Wed, 9 Sep 2020 13:35:53 +0200
-From: =?iso-8859-1?B?SuFu?= Tomko <jtomko@redhat.com>
-Message-ID: <20200909113553.GE1377607@lpt>
-References: <20200827153657.111098-1-dgilbert@redhat.com>
-	<20200827153657.111098-7-dgilbert@redhat.com>
+From: Max Reitz <mreitz@redhat.com>
+Date: Wed,  9 Sep 2020 20:40:20 +0200
+Message-Id: <20200909184028.262297-1-mreitz@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="jKBxcB1XkHIR0Eqt"
-Content-Disposition: inline
-In-Reply-To: <20200827153657.111098-7-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v2 6/6] tools/virtiofsd: xattr name mapping
-	examples
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 0/8] virtiofsd: Announce submounts to the guest
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,106 +13,140 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
+To: qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, Max Reitz <mreitz@redhat.com>
+
+RFC: https://www.redhat.com/archives/virtio-fs/2020-May/msg00024.html
+
+Branch: https://github.com/XanClic/qemu.git virtiofs-submounts-v2
+Branch: https://git.xanclic.moe/XanClic/qemu.git virtiofs-submounts-v2
 
 
---jKBxcB1XkHIR0Eqt
-Content-Type: text/plain; charset=iso-8859-1; format=flowed
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+(Note that there is an accompanying Linux (kernel) series
+“fuse: Mirror virtio-fs submounts”.)
 
-On a Thursday in 2020, Dr. David Alan Gilbert (git) wrote:
->From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
->
->Add a few examples of xattrmaps to the documentation.
->
->Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
->---
-> docs/tools/virtiofsd.rst | 49 ++++++++++++++++++++++++++++++++++++++++
-> 1 file changed, 49 insertions(+)
->
->diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
->index 2efa16d3c5..a138549862 100644
->--- a/docs/tools/virtiofsd.rst
->+++ b/docs/tools/virtiofsd.rst
->@@ -161,6 +161,55 @@ in which case a 'server' rule will always match on al=
-l names from
-> the server.
->
->
->+xattr-mapping Examples
->+----------------------
->+
->+1) Prefix all attributes with 'user.virtiofs.'
->+
->+::
->+
->+-o xattrmap=3D":all:prefix::user.virtiofs.::all:bad:::"
->+
->+
->+This uses two rules, using : as the field separator;
->+the first rule prefixes and strips 'user.virtiofs.',
->+the second rule hides any non-prefixed attributes that
->+the host set.
->+
->+2) Prefix 'trusted.' attributes, allow others through
->+
->+::
->+
->+   "/all/prefix/trusted./user.virtiofs./
->+    /server/bad//trusted./
->+    /client/bad/user.virtiofs.trusted.//
->+    /all/ok///"
->+
->+
->+Here there are four rules, using / as the field
->+separator, and also demonstrating that new lines can
->+be included between rules.
->+The first rule is the prefixing of 'trusted.'.
->+The second rule hides unprefixed 'trusted.' attributes
->+on the host.
->+The third rule stops a guest from explicitily setting
 
-explicitly
+Hi,
 
->+the 'user.viritofs.trusted.' path directly.
->+Finally, the fourth rule lets all remaining attributes
->+through.
->+
->+3) Hide 'security.' attributes, and allow everything else
->+
->+::
->+
->+    "/all/bad/security./security./
->+     /all/ok///'
->+
->+The first rule combines what could be separate client and server
->+rules into a single 'all' rule, matching 'security.' in either
->+client arguments or lists returned from the host.  This stops
->+the client seeing any 'security.' attributes on the server and
->+stops it setting  any.
+We want to (be able to) announce the host mount structure of the shared
+directory to the guest so it can replicate that structure.  This ensures
+that whenever the combination of st_dev and st_ino is unique on the
+host, it will be unique in the guest as well.
 
-extra space.
+This feature is optional and needs to be enabled explicitly, so that the
+mount structure isn’t leaked to the guest if the user doesn’t want it to
+be.
 
-Reviewed-by: J=E1n Tomko <jtomko@redhat.com>
+The last patch in this series adds a test script.  For it to pass, you
+need to compile a kernel with the accompanying “fuse: Mirror virtio-fs
+submounts” patch series, and provide it to the test (as described in the
+test patch).
 
-Jano
 
---jKBxcB1XkHIR0Eqt
-Content-Type: application/pgp-signature; name="signature.asc"
+Known caveats:
+- stat(2) doesn’t trigger auto-mounting.  Therefore, issuing a stat() on
+  a sub-mountpoint before it’s been auto-mounted will show its parent’s
+  st_dev together with the st_ino it has in the sub-mounted filesystem.
 
------BEGIN PGP SIGNATURE-----
+  For example, imagine you want to share a whole filesystem with the
+  guest, which on the host first looks like this:
 
-iQEzBAEBCAAdFiEE7DTm0WabvfIr7YZ4Ak1z5KIMl5QFAl9YvhQACgkQAk1z5KIM
-l5QUKwf/ZBaLC62OyOmi7Ngv4ZNoHuNaNrtyfzD1D2nZCk+UG476FQQovF9zvol6
-AYQhfWSdai8I5fJnCSGSt4XrbBxx5Y03zCWb7v6Dg+KoUHpOq+FANhSWKWJqbVz0
-xqelEzZFXX28TBgXCOwCJ490F4oWnarlVc/Z4hxTYgnPlGKs4L3oM51WZpLw6Ocs
-u+a2E/+GH0+zLJAVqNyvpF7hVNzW2r7bH9uk1DshV6cNc2qnLmYwgsgMDiAcUyGi
-M4IH+15pgLZ5KgzGkAAHHLcbFfWT/YcOp0OQHSCoBs7llyKNxfoOe1GE3gpY4ZSa
-IgzD+RvwjuxbDGKY3/f5nouQIpVySw==
-=LUKL
------END PGP SIGNATURE-----
+    root/           (st_dev=64, st_ino=128)
+      sub_fs/       (st_dev=64, st_ino=234)
 
---jKBxcB1XkHIR0Eqt--
+  And then you mount another filesystem under sub_fs, so it looks like
+  this:
+
+    root/           (st_dev=64, st_ino=128)
+      sub_fs/       (st_dev=96, st_ino=128)
+        ...
+
+  As you can see, sub_fs becomes a mount point, so its st_dev and st_ino
+  change from what they were on root’s filesystem to what they are in
+  the sub-filesystem.  In fact, root and sub_fs now have the same
+  st_ino, which is not unlikely given that both are root nodes in their
+  respective filesystems.
+
+  Now, this filesystem is shared with the guest through virtiofsd.
+  There is no way for virtiofsd to uncover sub_fs’s original st_ino
+  value of 234, so it will always provide st_ino=128 to the guest.
+  However, virtiofsd does notice that sub_fs is a mount point and
+  announces this fact to the guest.
+
+  We want this to result in something like the following tree in the
+  guest:
+
+    root/           (st_dev=32, st_ino=128)
+      sub_fs/       (st_dev=33, st_ino=128)
+        ...
+
+  That is, sub_fs should be a different filesystem that’s auto-mounted.
+  However, as stated above, stat(2) doesn’t trigger auto-mounting, so
+  before it happens, the following structure will be visible:
+
+    root/           (st_dev=32, st_ino=128)
+      sub_fs/       (st_dev=32, st_ino=128)
+
+  That is, sub_fs and root will have the same st_dev/st_ino combination.
+
+  This can easily be seen by executing find(1) on root in the guest,
+  which will subsequently complain about an alleged filesystem loop.
+
+  To properly fix this problem, we probably would have to be able to
+  uncover sub_fs’s original st_ino value (i.e. 234) and let the guest
+  use that until the auto-mount happens.  However, there is no way to
+  get that value (from userspace at least).
+
+  Note that NFS with crossmnt has the exact same issue.
+
+
+- You can unmount auto-mounted submounts in the guest, but then you
+  still cannot unmount them on the host.  The guest still holds a
+  reference to the submount’s root directory, because that’s just a
+  normal entry in its parent directory (on the submount’s parent
+  filesystem).
+
+  This is kind of related to the issue noted above: When the submount is
+  unmounted, the guest shouldn’t have a reference to sub_fs as the
+  submount’s root directory (host’s st_dev=96, st_ino=128), but to it as
+  a normal entry in its parent filesystem (st_dev=64, st_ino=234).
+
+  (When you have multiple nesting levels, you can unmount inner mounts
+  when the outer ones have been unmounted in the guest.  For example,
+  say you have a structure A/B/C/D, where each is a mount point, then
+  unmounting D, C, and B in the guest will allow the host to unmount D
+  and C.)
+
+
+Max Reitz (8):
+  linux/fuse.h: Pull in from Linux
+  virtiofsd: Announce FUSE_ATTR_FLAGS
+  virtiofsd: Add attr_flags to fuse_entry_param
+  virtiofsd: Add fuse_reply_attr_with_flags()
+  virtiofsd: Store every lo_inode's parent_dev
+  virtiofsd: Announce sub-mount points
+  tests/acceptance/boot_linux: Accept SSH pubkey
+  tests/acceptance: Add virtiofs_submounts.py
+
+ include/standard-headers/linux/fuse.h         |  11 +-
+ tools/virtiofsd/fuse_common.h                 |   8 +
+ tools/virtiofsd/fuse_lowlevel.h               |  20 ++
+ tools/virtiofsd/fuse_lowlevel.c               |  34 ++-
+ tools/virtiofsd/helper.c                      |   1 +
+ tools/virtiofsd/passthrough_ll.c              |  84 ++++-
+ tests/acceptance/boot_linux.py                |  13 +-
+ tests/acceptance/virtiofs_submounts.py        | 289 ++++++++++++++++++
+ .../virtiofs_submounts.py.data/cleanup.sh     |  46 +++
+ .../guest-cleanup.sh                          |  30 ++
+ .../virtiofs_submounts.py.data/guest.sh       | 138 +++++++++
+ .../virtiofs_submounts.py.data/host.sh        | 127 ++++++++
+ 12 files changed, 780 insertions(+), 21 deletions(-)
+ create mode 100644 tests/acceptance/virtiofs_submounts.py
+ create mode 100644 tests/acceptance/virtiofs_submounts.py.data/cleanup.sh
+ create mode 100644 tests/acceptance/virtiofs_submounts.py.data/guest-cleanup.sh
+ create mode 100644 tests/acceptance/virtiofs_submounts.py.data/guest.sh
+ create mode 100644 tests/acceptance/virtiofs_submounts.py.data/host.sh
+
+-- 
+2.26.2
 

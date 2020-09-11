@@ -1,14 +1,15 @@
-Date: Fri, 11 Sep 2020 11:26:42 +0100
+Date: Fri, 11 Sep 2020 11:28:14 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20200911102642.GG94280@stefanha-x1.localdomain>
+Message-ID: <20200911102814.GH94280@stefanha-x1.localdomain>
 References: <20200909184603.263700-1-mreitz@redhat.com>
-	<20200909184603.263700-6-mreitz@redhat.com>
+	<20200909184603.263700-7-mreitz@redhat.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="/Zw+/jwnNHcBRYYu"
+	protocol="application/pgp-signature"; boundary="BXr400anF0jyguTS"
 Content-Disposition: inline
-In-Reply-To: <20200909184603.263700-6-mreitz@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 5/9] fuse: Store fuse_conn in fuse_req
+In-Reply-To: <20200909184603.263700-7-mreitz@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 6/9] fuse: Drop fuse_conn parameter where
+	possible
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,43 +22,39 @@ To: Max Reitz <mreitz@redhat.com>
 Cc: virtio-fs@redhat.com, fuse-devel@lists.sourceforge.net
 
 
---/Zw+/jwnNHcBRYYu
+--BXr400anF0jyguTS
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Wed, Sep 09, 2020 at 08:45:59PM +0200, Max Reitz wrote:
-> Every fuse_req belongs to a fuse_conn.  Right now, we always know which
-> fuse_conn that is based on the respective device, but we want to allow
-> multiple (sub)mounts per single connection, and then the corresponding
-> filesystem is not going to be so trivial to obtain.
->=20
-> Storing a pointer to the associated fuse_conn in every fuse_req will
-> allow us to trivially find any request's superblock (and thus
-> filesystem) even then.
+On Wed, Sep 09, 2020 at 08:46:00PM +0200, Max Reitz wrote:
+> With the last commit, all functions that handle some existing fuse_req
+> no longer need to be given the associated fuse_conn, because they can
+> get it from the fuse_req object.
 >=20
 > Signed-off-by: Max Reitz <mreitz@redhat.com>
 > ---
->  fs/fuse/fuse_i.h |  3 +++
->  fs/fuse/dev.c    | 13 +++++++------
->  2 files changed, 10 insertions(+), 6 deletions(-)
+>  fs/fuse/fuse_i.h    |  2 +-
+>  fs/fuse/dev.c       | 70 +++++++++++++++++++++++++--------------------
+>  fs/fuse/virtio_fs.c |  8 ++----
+>  3 files changed, 43 insertions(+), 37 deletions(-)
 
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
---/Zw+/jwnNHcBRYYu
+--BXr400anF0jyguTS
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl9bUOIACgkQnKSrs4Gr
-c8gMgAf9Ez0h55iwBjD75JZ445t3LamcdB84L+imY8zqRSkbssECl/LC+CQ+UFCL
-To8ZV4PjkcdUGlK0LfOcXQCjp1J1Mrfkkv6nVo5z2PZ/LW1eKr203dh0pvr3N0Uu
-ynbdl5tLN9YPTBTQ52MjTSXvzHJ1Vxn7CScvfiOwZcPHuTxuP/0sSXd1DKsblyLa
-2hQljmPkt3g8ePrXTC+MdPQG0WWjOGOWC+pq86Qu9jXAd7pHAC4uKbcB+5M8YeOB
-yWlED7HoxqASdQ5Arinudd2C3e2ui/cnaBDQEG3bEEeAKw6FclLV6K6uTxo4AByV
-DKIm2DIT97zYWjmAU/DUrf1RsWXevg==
-=9qCN
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl9bUT4ACgkQnKSrs4Gr
+c8jzcQf/SY2AhnFNwrtV8nji70703wHgzjWZ9b1tgyT3AR7CDy2WZwgOFHp5P0tD
+D3TQxwP8pQv6CywYQ/j5z+B0GxNzjpii4vr+5zASi8s7Y/opox1JTjDb5gpYMpRY
+2SJm7ak+r3eNCpGXqxvgqca3ikinq+xjNvJYK14f/aXCT4WGoKEFj3+Y5WVcIQCP
+MMJz5RePqbNPCbX0FI76bCJyHIAnk87v9EcL8+HiYRpsVUavXtpH+9REqPvPtEsz
+N1SzHkzCH1oMb5d8vgeYt7sz+/lY/UAm5jyCcf8LK+7SnmIEb1w3X9cg0PRzGdgL
+QMwB/0woGbmuzPFJJp0cnwSobwPszg==
+=vZAc
 -----END PGP SIGNATURE-----
 
---/Zw+/jwnNHcBRYYu--
+--BXr400anF0jyguTS--
 

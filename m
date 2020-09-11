@@ -1,11 +1,14 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri,  7 Aug 2020 15:55:09 -0400
-Message-Id: <20200807195526.426056-4-vgoyal@redhat.com>
-In-Reply-To: <20200807195526.426056-1-vgoyal@redhat.com>
-References: <20200807195526.426056-1-vgoyal@redhat.com>
+Date: Fri, 11 Sep 2020 11:22:16 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20200911102216.GB94280@stefanha-x1.localdomain>
+References: <20200909184028.262297-1-mreitz@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 03/20] virtio: Add get_shm_region method
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="1LKvkjL3sHcu1TtY"
+Content-Disposition: inline
+In-Reply-To: <20200909184028.262297-1-mreitz@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 0/8] virtiofsd: Announce submounts to the
+	guest
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,73 +17,38 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
-Cc: kvm@vger.kernel.org, miklos@szeredi.hu, "Michael S. Tsirkin" <mst@redhat.com>, vgoyal@redhat.com
+To: Max Reitz <mreitz@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-From: Sebastien Boeuf <sebastien.boeuf@intel.com>
 
-Virtio defines 'shared memory regions' that provide a continuously
-shared region between the host and guest.
+--1LKvkjL3sHcu1TtY
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
 
-Provide a method to find a particular region on a device.
+On Wed, Sep 09, 2020 at 08:40:20PM +0200, Max Reitz wrote:
+> We want to (be able to) announce the host mount structure of the shared
+> directory to the guest so it can replicate that structure.  This ensures
+> that whenever the combination of st_dev and st_ino is unique on the
+> host, it will be unique in the guest as well.
 
-Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Cc: kvm@vger.kernel.org
-Cc: "Michael S. Tsirkin" <mst@redhat.com>
----
- include/linux/virtio_config.h | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Great, thank you for solving the long-standing inode collision problem!
 
-diff --git a/include/linux/virtio_config.h b/include/linux/virtio_config.h
-index bb4cc4910750..c859f000a751 100644
---- a/include/linux/virtio_config.h
-+++ b/include/linux/virtio_config.h
-@@ -10,6 +10,11 @@
- 
- struct irq_affinity;
- 
-+struct virtio_shm_region {
-+       u64 addr;
-+       u64 len;
-+};
-+
- /**
-  * virtio_config_ops - operations for configuring a virtio device
-  * Note: Do not assume that a transport implements all of the operations
-@@ -65,6 +70,7 @@ struct irq_affinity;
-  *      the caller can then copy.
-  * @set_vq_affinity: set the affinity for a virtqueue (optional).
-  * @get_vq_affinity: get the affinity for a virtqueue (optional).
-+ * @get_shm_region: get a shared memory region based on the index.
-  */
- typedef void vq_callback_t(struct virtqueue *);
- struct virtio_config_ops {
-@@ -88,6 +94,8 @@ struct virtio_config_ops {
- 			       const struct cpumask *cpu_mask);
- 	const struct cpumask *(*get_vq_affinity)(struct virtio_device *vdev,
- 			int index);
-+	bool (*get_shm_region)(struct virtio_device *vdev,
-+			       struct virtio_shm_region *region, u8 id);
- };
- 
- /* If driver didn't advertise the feature, it will never appear. */
-@@ -250,6 +258,15 @@ int virtqueue_set_affinity(struct virtqueue *vq, const struct cpumask *cpu_mask)
- 	return 0;
- }
- 
-+static inline
-+bool virtio_get_shm_region(struct virtio_device *vdev,
-+                         struct virtio_shm_region *region, u8 id)
-+{
-+	if (!vdev->config->get_shm_region)
-+		return false;
-+	return vdev->config->get_shm_region(vdev, region, id);
-+}
-+
- static inline bool virtio_is_little_endian(struct virtio_device *vdev)
- {
- 	return virtio_has_feature(vdev, VIRTIO_F_VERSION_1) ||
--- 
-2.25.4
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+
+--1LKvkjL3sHcu1TtY
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl9bT9gACgkQnKSrs4Gr
+c8hNGwgAg4Xh++jzhmM9iDbsA9LVl1TcM7KBkySTROkWPcU0j/PlOWTfwrJTkZkd
+4fkxoPOQnBoNUPEsAX06Y2UOQvCRWtRZu/m/JyrIIy/UNgffTta5FjCEgyZbOcFA
+qSeb1iihUSkU8AMneplFis4yosc/R849IgrXCICNjSh6HtE8GkXWyOi3qW0ZLbPF
+S4y9HZCBUW30kGDk80F2Y6lyvcVggyHJuHwOJWsD+tE5jGO0iFBpL7b9V7EpQJ3o
+raNBl4SxueutlbTCvG0/r9Qvy/hin+NKB4v5sclGy7laBsHMwYPIM5yTCg1zeY23
+s+I2eDcPpLSd6kaPjF7/Y2Imj2gm6w==
+=je+o
+-----END PGP SIGNATURE-----
+
+--1LKvkjL3sHcu1TtY--
 

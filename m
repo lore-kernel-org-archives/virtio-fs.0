@@ -1,13 +1,20 @@
-Date: Fri, 11 Sep 2020 11:39:24 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20200911103924.GJ94280@stefanha-x1.localdomain>
-References: <20200909184603.263700-1-mreitz@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=nI0HWLJgICoyePL8Ldl1+Q3Qdj/zpAln8rI/PCnTuA4=;
+	b=Ti/XdWmxCICqMHvH3DLBF2lbfN511qtnxha4Fj+jSb6HtefXHztH2OMmsrVSxQ+Vz1
+	iiIGmqlIbgmfSvkqT4IrGoJabOh0uD0OP7x/MrJv/DCub/GAOyg502J2xrSNBtKxCZdz
+	AeAj3o2fSrIKY9uvsP3qKzwU6hFvE2yDoVyGw=
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="GlnCQLZWzqLRJED8"
-Content-Disposition: inline
-In-Reply-To: <20200909184603.263700-1-mreitz@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 0/9] fuse: Mirror virtio-fs submounts
+References: <20200909184603.263700-1-mreitz@redhat.com>
+	<20200909184603.263700-3-mreitz@redhat.com>
+	<20200911102459.GC94280@stefanha-x1.localdomain>
+In-Reply-To: <20200911102459.GC94280@stefanha-x1.localdomain>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Fri, 11 Sep 2020 13:07:55 +0200
+Message-ID: <CAJfpegvxmx995QihR+=bOcyWy0pGmxFtAJhzvw7O2k9rq9r5zA@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [fuse-devel] [PATCH 2/9] fuse: Add
+	FUSE_ATTR_SUBMOUNT
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,39 +23,53 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs@redhat.com, fuse-devel@lists.sourceforge.net
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, fuse-devel <fuse-devel@lists.sourceforge.net>, Max Reitz <mreitz@redhat.com>
 
+On Fri, Sep 11, 2020 at 12:25 PM Stefan Hajnoczi <stefanha@redhat.com> wrote:
+>
+> On Wed, Sep 09, 2020 at 08:45:56PM +0200, Max Reitz wrote:
+> > This is a flag for fuse_attr.flags that indicates that the given entry
+> > resides on a different filesystem than the parent, and as such should
+> > have a different st_dev.
+> >
+> > Signed-off-by: Max Reitz <mreitz@redhat.com>
+> > ---
+> >  include/uapi/linux/fuse.h | 7 +++++++
+> >  1 file changed, 7 insertions(+)
+> >
+> > diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
+> > index de94c11cfc3b..c034cdf8f5f4 100644
+> > --- a/include/uapi/linux/fuse.h
+> > +++ b/include/uapi/linux/fuse.h
+> > @@ -417,6 +417,13 @@ struct fuse_file_lock {
+> >   */
+> >  #define FUSE_FSYNC_FDATASYNC (1 << 0)
+> >
+> > +/**
+> > + * fuse_attr flags
+> > + *
+> > + * FUSE_ATTR_SUBMOUNT: File/directory is a submount point
+> > + */
+> > +#define FUSE_ATTR_SUBMOUNT      (1 << 0)
+>
+> If you respin, please add a little more detail here. How should clients
 
---GlnCQLZWzqLRJED8
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
+I'm just reviewing/queuing this, so no need to respin.
 
-On Wed, Sep 09, 2020 at 08:45:54PM +0200, Max Reitz wrote:
-> When using virtio-fs, we want all nodes that have a unique st_dev/st_ino
-> combination on the host to have such a unique combination in the guest
-> as well.  To do so, we introduce a flags field to fuse_attr, where
-> virtiofsd can announce submounts.  All such entries are then translated
-> to auto-mounts by the FUSE driver in the guest.
+> act when this flag is detected (which FUSE messages should they send to
+> deal with submounts)?
 
-The easy parts look good. I'm leaving the hard parts to Miklos :).
+Actually, no new messages, since the reply containing
+FUSE_ATTR_SUBMOUNT already refers to the submount root.  I'll fix the
+description.
 
-Stefan
+And since there's no separate information for the actual mount point
+(userspace can't obtain it) AT_NO_AUTOMOUNT users become confused due
+to the dummy mountpoint becoming visible with all the wrong data.
+Maybe the fix is to force automount even with AT_NO_AUTOMOUNT.  Will
+look into that.
 
---GlnCQLZWzqLRJED8
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl9bU9wACgkQnKSrs4Gr
-c8jpqgf9HQ4mVa69Ipd1zXX0+U04dpW97IQxYnC9RSa/+utZJH+oedv1wJgVJ3EZ
-aezlQYddUWpRtI1gc1anm1WxTtCAYi9SqPrPrISuNWMZlTKLQgnJ68ZQI3ohJx3t
-dO1bbdaTUwSqSpXkYKoueKA8RzPsU2GDgH45BCxG8mk99pmYov8GgYuhC/06mI5I
-IAH8NR/2Ey5jkU/+VS1Rxz1Z+4m4uEBFjN/Sgb1jRJ9UJ4GZI4NsvzpF5epkexMS
-OfLZfZ3irT1tFdcfbtDIqRhM4PA5ZICdf8mkrOeRojI+YAXpbFV+2lVKfChDGjrb
-jyD+jdioZLZX7JSZkzppPeaN0HiHFA==
-=RoQp
------END PGP SIGNATURE-----
-
---GlnCQLZWzqLRJED8--
+Thanks,
+Miklos
 

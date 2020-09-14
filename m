@@ -1,17 +1,14 @@
-References: <20200909184603.263700-1-mreitz@redhat.com>
-	<20200909184603.263700-3-mreitz@redhat.com>
-	<20200911102459.GC94280@stefanha-x1.localdomain>
-	<CAJfpegvxmx995QihR+=bOcyWy0pGmxFtAJhzvw7O2k9rq9r5zA@mail.gmail.com>
-From: Max Reitz <mreitz@redhat.com>
-Message-ID: <a75efdcf-834c-8515-b3b7-87d4f63c888c@redhat.com>
-Date: Mon, 14 Sep 2020 14:29:31 +0200
+Date: Mon, 14 Sep 2020 15:59:36 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20200914145936.GA629589@stefanha-x1.localdomain>
+References: <20200825155140.GA16427@stefanha-x1.localdomain>
+	<CAA2ifQz5ffEGx6a+gN_S38ZiMkpcUaZwNiZBLtwsE2kmKiqjeA@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <CAJfpegvxmx995QihR+=bOcyWy0pGmxFtAJhzvw7O2k9rq9r5zA@mail.gmail.com>
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature";
-	boundary="N79ji15RcNiB4EY2z7LqOKqJpGd3RxSMn"
-Subject: Re: [Virtio-fs] [fuse-devel] [PATCH 2/9] fuse: Add
-	FUSE_ATTR_SUBMOUNT
+	protocol="application/pgp-signature"; boundary="+QahgC5+KEYLbs62"
+Content-Disposition: inline
+In-Reply-To: <CAA2ifQz5ffEGx6a+gN_S38ZiMkpcUaZwNiZBLtwsE2kmKiqjeA@mail.gmail.com>
+Subject: Re: [Virtio-fs] Windows drivers in Fedora virtio-win ISO
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,101 +17,58 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>, Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, fuse-devel <fuse-devel@lists.sourceforge.net>
+To: Gal Hammer <ghammer@redhat.com>
+Cc: virtio-fs@redhat.com, o.popov@livelace.ru
 
-This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
---N79ji15RcNiB4EY2z7LqOKqJpGd3RxSMn
-Content-Type: multipart/mixed; boundary="PIo2RTn57LGhQsSXCv2DZVkWHsgR7WArY"
 
---PIo2RTn57LGhQsSXCv2DZVkWHsgR7WArY
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
+--+QahgC5+KEYLbs62
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On 11.09.20 13:07, Miklos Szeredi wrote:
-> On Fri, Sep 11, 2020 at 12:25 PM Stefan Hajnoczi <stefanha@redhat.com> =
-wrote:
->>
->> On Wed, Sep 09, 2020 at 08:45:56PM +0200, Max Reitz wrote:
->>> This is a flag for fuse_attr.flags that indicates that the given entr=
-y
->>> resides on a different filesystem than the parent, and as such should=
-
->>> have a different st_dev.
->>>
->>> Signed-off-by: Max Reitz <mreitz@redhat.com>
->>> ---
->>>  include/uapi/linux/fuse.h | 7 +++++++
->>>  1 file changed, 7 insertions(+)
->>>
->>> diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
->>> index de94c11cfc3b..c034cdf8f5f4 100644
->>> --- a/include/uapi/linux/fuse.h
->>> +++ b/include/uapi/linux/fuse.h
->>> @@ -417,6 +417,13 @@ struct fuse_file_lock {
->>>   */
->>>  #define FUSE_FSYNC_FDATASYNC (1 << 0)
->>>
->>> +/**
->>> + * fuse_attr flags
->>> + *
->>> + * FUSE_ATTR_SUBMOUNT: File/directory is a submount point
->>> + */
->>> +#define FUSE_ATTR_SUBMOUNT      (1 << 0)
->>
->> If you respin, please add a little more detail here. How should client=
-s
+On Wed, Sep 02, 2020 at 11:09:47AM +0300, Gal Hammer wrote:
+> On Tue, 25 Aug 2020 at 18:51, Stefan Hajnoczi <stefanha@redhat.com> wrote:
 >=20
-> I'm just reviewing/queuing this, so no need to respin.
+> > Hi Gal,
+> > On #virtio-fs freenode IRC it was just mentioned that the Fedora
+> > virtio-win "latest" ISO now includes virtio-fs drivers:
+> >
+> > 15:48 < livelace> It looks like virtio-win contains some virtiofs stuff
+> > 15:49 < livelace> 07/15/2020  06:22 PM            55,496 viofs.sys
+> >
+> >
+> We did a quiet launch.
 >=20
->> act when this flag is detected (which FUSE messages should they send t=
-o
->> deal with submounts)?
 >=20
-> Actually, no new messages, since the reply containing
-> FUSE_ATTR_SUBMOUNT already refers to the submount root.  I'll fix the
-> description.
+> > This is great news! We've had questions about the status of Windows
+> > support recently and this will help many users.
+> >
+> > Can you provide a HowTo for the virtio-fs website
+> > (https://virtio-fs.gitlab.io/) so there are instructions on installing
+> > and using the driver?
+> >
+> >
+> I can write a few lines on how to manually install it. Unless there is an
+> installer that I'm not familiar with.
 
-Perhaps it=E2=80=99s still useful to note how this flag is supposed to be=
+Thank you!
 
-handled; i.e. that it=E2=80=99s a hint to the kernel to create an auto-mo=
-unted
-submount.
+Stefan
 
-> And since there's no separate information for the actual mount point
-> (userspace can't obtain it) AT_NO_AUTOMOUNT users become confused due
-> to the dummy mountpoint becoming visible with all the wrong data.
-> Maybe the fix is to force automount even with AT_NO_AUTOMOUNT.  Will
-> look into that.
-
-If that=E2=80=99s possible...  Though Dave did mention that it seems inte=
-ntional
-that auto-mounts aren=E2=80=99t mounted on stat, so as not to overwhelm t=
-he
-system on a plain ls call.
-
-Max
-
-
---PIo2RTn57LGhQsSXCv2DZVkWHsgR7WArY--
-
---N79ji15RcNiB4EY2z7LqOKqJpGd3RxSMn
+--+QahgC5+KEYLbs62
 Content-Type: application/pgp-signature; name="signature.asc"
-Content-Description: OpenPGP digital signature
-Content-Disposition: attachment; filename="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEkb62CjDbPohX0Rgp9AfbAGHVz0AFAl9fYisACgkQ9AfbAGHV
-z0DqlAf/SSEyzztW4FpTMv/5sMqNBIoB6qOCpNJxYEyR/RuRriN6VwIyaAENEX8f
-fVCDYsF5DrDFGqGEWxlbvvVInp+50tCHAmLAZjo1eeebWYVpFANI9jMaWaF7jDCR
-nlBQFzTUGKBivehbma1cyuZH0Lp0iEZPN3elHhcsaaj3Ztr4cH+5urk68q+WbIiJ
-iHgK7GG08wYRdm5D/hQIlRyTixoA2v1Z2yxUaF2k9jG7iZ8bWDFDF4wg+dU2dBNl
-rA3VtVksv31uC9qp+dubqjriOgDpchMiNZ0AR57xpz0Rto8ykV+60sW/q0SRn8np
-WfUlnblFXV7CAuGOUyH3cm3Ok6XI8w==
-=CsY9
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl9fhVgACgkQnKSrs4Gr
+c8g+Rwf/UeBx0CfEdXhKMuFrcyQqPA2Cy5zqrDQ83oxb6BhKxnjhzoCY9tsVNBNt
+8CMJGkgEBsyRw7zzSyJO8XNvt7FmaEQJ0NGSQCMFyS9hmXKkToee2HDSUZQcABna
+bY//1wHZFA09zF4mdkCjP3lmcn9ZQukrPFACbQoKFwUCoktEnClJeoP2cxOJU9r1
+RfgP65HvoXRDdI//cCT0QuUTNX5pZ+pwZIzmLPVXW6WHwD9rji3JcyPO7Zu0HAf5
+rkRexEDygCRF0DMQBQNqMeINLQO/wCOCbTW2Lx+A9qWWngzTH7I6vEi/fJ0iXvWa
+d3Mqv2NTSfzD8ghHk27F1FXB80vIHQ==
+=xFz8
 -----END PGP SIGNATURE-----
 
---N79ji15RcNiB4EY2z7LqOKqJpGd3RxSMn--
+--+QahgC5+KEYLbs62--
 

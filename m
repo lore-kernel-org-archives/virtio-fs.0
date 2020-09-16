@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 16 Sep 2020 12:17:34 -0400
-Message-Id: <20200916161737.38028-4-vgoyal@redhat.com>
+Date: Wed, 16 Sep 2020 12:17:36 -0400
+Message-Id: <20200916161737.38028-6-vgoyal@redhat.com>
 In-Reply-To: <20200916161737.38028-1-vgoyal@redhat.com>
 References: <20200916161737.38028-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 3/6] fuse: setattr should set FATTR_KILL_PRIV
-	upon size change
+Subject: [Virtio-fs] [PATCH v2 5/6] fuse: Add a flag FUSE_OPEN_KILL_PRIV for
+	open() request
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,50 +18,74 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, miklos@szeredi.hu
 Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
-If fc->handle_killpriv_v2 is enabled, we expect file server to clear
-suid/sgid/security.capbility upon chown/truncate/write as appropriate.
+With FUSE_HANDLE_KILLPRIV_V2 support, server will need to kill
+suid/sgid/security.capability on open(O_TRUNC), if server supports
+FUSE_ATOMIC_O_TRUNC.
 
-Upon truncate (ATTR_SIZE), suid/sgid is cleared only if caller does
-not have CAP_FSETID. File server does not know whether caller has
-CAP_FSETID or not. Hence set FATTR_KILL_PRIV upon truncate to let
-file server know that caller does not have CAP_FSETID and it should
-kill suid/sgid as appropriate.
+But server needs to kill suid/sgid only if caller does not have
+CAP_FSETID. Given server does not have this information, client
+needs to send this info to server.
 
-We don't have to send this information for chown (ATTR_UID/ATTR_GID)
-as that always clears suid/sgid irrespective of capabilities of
-calling process.
+So add a flag FUSE_OPEN_KILL_PRIV to fuse_open_in request which tells
+server to kill suid/sgid(only if group execute is set).
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- fs/fuse/dir.c             | 2 ++
- include/uapi/linux/fuse.h | 1 +
- 2 files changed, 3 insertions(+)
+ fs/fuse/file.c            |  5 +++++
+ include/uapi/linux/fuse.h | 10 +++++++++-
+ 2 files changed, 14 insertions(+), 1 deletion(-)
 
-diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
-index c4a01290aec6..ecdb7895c156 100644
---- a/fs/fuse/dir.c
-+++ b/fs/fuse/dir.c
-@@ -1575,6 +1575,8 @@ int fuse_do_setattr(struct dentry *dentry, struct iattr *attr,
- 		/* For mandatory locking in truncate */
- 		inarg.valid |= FATTR_LOCKOWNER;
- 		inarg.lock_owner = fuse_lock_owner_id(fc, current->files);
-+		if (fc->handle_killpriv_v2 && !capable(CAP_FSETID))
-+			inarg.valid |= FATTR_KILL_PRIV;
- 	}
- 	fuse_setattr_fill(fc, &args, inode, &inarg, &outarg);
- 	err = fuse_simple_request(fc, &args);
+diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+index e40428f3d0f1..2853f55fd8f7 100644
+--- a/fs/fuse/file.c
++++ b/fs/fuse/file.c
+@@ -42,6 +42,11 @@ static int fuse_send_open(struct fuse_conn *fc, u64 nodeid, struct file *file,
+ 	inarg.flags = file->f_flags & ~(O_CREAT | O_EXCL | O_NOCTTY);
+ 	if (!fc->atomic_o_trunc)
+ 		inarg.flags &= ~O_TRUNC;
++
++	if (fc->handle_killpriv_v2 && (inarg.flags & O_TRUNC) &&
++	    !capable(CAP_FSETID))
++		inarg.open_flags |= FUSE_OPEN_KILL_PRIV;
++
+ 	args.opcode = opcode;
+ 	args.nodeid = nodeid;
+ 	args.in_numargs = 1;
 diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-index 3ae3f222a0ed..7b8da0a2de0d 100644
+index 7b8da0a2de0d..e20b3ee9d292 100644
 --- a/include/uapi/linux/fuse.h
 +++ b/include/uapi/linux/fuse.h
-@@ -269,6 +269,7 @@ struct fuse_file_lock {
- #define FATTR_MTIME_NOW	(1 << 8)
- #define FATTR_LOCKOWNER	(1 << 9)
- #define FATTR_CTIME	(1 << 10)
-+#define FATTR_KILL_PRIV	(1 << 14) /* Matches ATTR_KILL_PRIV */
+@@ -173,6 +173,7 @@
+  *  - add FUSE_SETUPMAPPING and FUSE_REMOVEMAPPING
+  *  - add map_alignment to fuse_init_out, add FUSE_MAP_ALIGNMENT flag
+  *  - add FUSE_HANDLE_KILLPRIV_V2
++ *  - add FUSE_OPEN_KILL_PRIV
+  */
  
- /**
-  * Flags returned by the OPEN request
+ #ifndef _LINUX_FUSE_H
+@@ -427,6 +428,13 @@ struct fuse_file_lock {
+  */
+ #define FUSE_FSYNC_FDATASYNC	(1 << 0)
+ 
++/**
++ * Open flags
++ * FUSE_OPEN_KILL_PRIV: Kill suid/sgid/security.capability. sgid is cleared
++ * 			only if file has group execute permission.
++ */
++#define FUSE_OPEN_KILL_PRIV	(1 << 0)
++
+ enum fuse_opcode {
+ 	FUSE_LOOKUP		= 1,
+ 	FUSE_FORGET		= 2,  /* no reply */
+@@ -588,7 +596,7 @@ struct fuse_setattr_in {
+ 
+ struct fuse_open_in {
+ 	uint32_t	flags;
+-	uint32_t	unused;
++	uint32_t	open_flags;
+ };
+ 
+ struct fuse_create_in {
 -- 
 2.25.4
 

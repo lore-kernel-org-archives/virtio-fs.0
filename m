@@ -1,12 +1,11 @@
+Date: Fri, 18 Sep 2020 17:34:36 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri,  7 Aug 2020 15:55:12 -0400
-Message-Id: <20200807195526.426056-7-vgoyal@redhat.com>
-In-Reply-To: <20200807195526.426056-1-vgoyal@redhat.com>
-References: <20200807195526.426056-1-vgoyal@redhat.com>
+Message-ID: <20200918213436.GA3520@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 06/20] virtiofs: Provide a helper function
-	for virtqueue initialization
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: [Virtio-fs] tools/virtiofs: Multi threading seems to hurt
+	performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,110 +14,113 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
-Cc: vgoyal@redhat.com, miklos@szeredi.hu
+To: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
 
-This reduces code duplication and make it little easier to read code.
+Hi All,
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/virtio_fs.c | 50 +++++++++++++++++++++++++++------------------
- 1 file changed, 30 insertions(+), 20 deletions(-)
+virtiofsd default thread pool size is 64. To me it feels that in most of
+the cases thread pool size 1 performs better than thread pool size 64.
 
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 4c4ef5d69298..e615edfbd09c 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -24,6 +24,8 @@ enum {
- 	VQ_REQUEST
- };
- 
-+#define VQ_NAME_LEN	24
-+
- /* Per-virtqueue state */
- struct virtio_fs_vq {
- 	spinlock_t lock;
-@@ -36,7 +38,7 @@ struct virtio_fs_vq {
- 	bool connected;
- 	long in_flight;
- 	struct completion in_flight_zero; /* No inflight requests */
--	char name[24];
-+	char name[VQ_NAME_LEN];
- } ____cacheline_aligned_in_smp;
- 
- /* A virtio-fs device instance */
-@@ -596,6 +598,26 @@ static void virtio_fs_vq_done(struct virtqueue *vq)
- 	schedule_work(&fsvq->done_work);
- }
- 
-+static void virtio_fs_init_vq(struct virtio_fs_vq *fsvq, char *name,
-+			      int vq_type)
-+{
-+	strncpy(fsvq->name, name, VQ_NAME_LEN);
-+	spin_lock_init(&fsvq->lock);
-+	INIT_LIST_HEAD(&fsvq->queued_reqs);
-+	INIT_LIST_HEAD(&fsvq->end_reqs);
-+	init_completion(&fsvq->in_flight_zero);
-+
-+	if (vq_type == VQ_REQUEST) {
-+		INIT_WORK(&fsvq->done_work, virtio_fs_requests_done_work);
-+		INIT_DELAYED_WORK(&fsvq->dispatch_work,
-+				  virtio_fs_request_dispatch_work);
-+	} else {
-+		INIT_WORK(&fsvq->done_work, virtio_fs_hiprio_done_work);
-+		INIT_DELAYED_WORK(&fsvq->dispatch_work,
-+				  virtio_fs_hiprio_dispatch_work);
-+	}
-+}
-+
- /* Initialize virtqueues */
- static int virtio_fs_setup_vqs(struct virtio_device *vdev,
- 			       struct virtio_fs *fs)
-@@ -611,7 +633,7 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
- 	if (fs->num_request_queues == 0)
- 		return -EINVAL;
- 
--	fs->nvqs = 1 + fs->num_request_queues;
-+	fs->nvqs = VQ_REQUEST + fs->num_request_queues;
- 	fs->vqs = kcalloc(fs->nvqs, sizeof(fs->vqs[VQ_HIPRIO]), GFP_KERNEL);
- 	if (!fs->vqs)
- 		return -ENOMEM;
-@@ -625,29 +647,17 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
- 		goto out;
- 	}
- 
-+	/* Initialize the hiprio/forget request virtqueue */
- 	callbacks[VQ_HIPRIO] = virtio_fs_vq_done;
--	snprintf(fs->vqs[VQ_HIPRIO].name, sizeof(fs->vqs[VQ_HIPRIO].name),
--			"hiprio");
-+	virtio_fs_init_vq(&fs->vqs[VQ_HIPRIO], "hiprio", VQ_HIPRIO);
- 	names[VQ_HIPRIO] = fs->vqs[VQ_HIPRIO].name;
--	INIT_WORK(&fs->vqs[VQ_HIPRIO].done_work, virtio_fs_hiprio_done_work);
--	INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].queued_reqs);
--	INIT_LIST_HEAD(&fs->vqs[VQ_HIPRIO].end_reqs);
--	INIT_DELAYED_WORK(&fs->vqs[VQ_HIPRIO].dispatch_work,
--			virtio_fs_hiprio_dispatch_work);
--	init_completion(&fs->vqs[VQ_HIPRIO].in_flight_zero);
--	spin_lock_init(&fs->vqs[VQ_HIPRIO].lock);
- 
- 	/* Initialize the requests virtqueues */
- 	for (i = VQ_REQUEST; i < fs->nvqs; i++) {
--		spin_lock_init(&fs->vqs[i].lock);
--		INIT_WORK(&fs->vqs[i].done_work, virtio_fs_requests_done_work);
--		INIT_DELAYED_WORK(&fs->vqs[i].dispatch_work,
--				  virtio_fs_request_dispatch_work);
--		INIT_LIST_HEAD(&fs->vqs[i].queued_reqs);
--		INIT_LIST_HEAD(&fs->vqs[i].end_reqs);
--		init_completion(&fs->vqs[i].in_flight_zero);
--		snprintf(fs->vqs[i].name, sizeof(fs->vqs[i].name),
--			 "requests.%u", i - VQ_REQUEST);
-+		char vq_name[VQ_NAME_LEN];
-+
-+		snprintf(vq_name, VQ_NAME_LEN, "requests.%u", i - VQ_REQUEST);
-+		virtio_fs_init_vq(&fs->vqs[i], vq_name, VQ_REQUEST);
- 		callbacks[i] = virtio_fs_vq_done;
- 		names[i] = fs->vqs[i].name;
- 	}
--- 
-2.25.4
+I ran virtiofs-tests.
+
+https://github.com/rhvgoyal/virtiofs-tests
+
+And here are the comparision results. To me it seems that by default
+we should switch to 1 thread (Till we can figure out how to make
+multi thread performance better even when single process is doing
+I/O in client).
+
+I am especially more interested in getting performance better for
+single process in client. If that suffers, then it is pretty bad.
+
+Especially look at randread, randwrite, seqwrite performance. seqread
+seems pretty good anyway.
+
+If I don't run who test suite and just ran randread-psync job,
+my throughput jumps from around 40MB/s to 60MB/s. That's a huge
+jump I would say.
+
+Thoughts?
+
+Thanks
+Vivek
+
+
+NAME                    WORKLOAD                Bandwidth       IOPS            
+cache-auto              seqread-psync           690(MiB/s)      172k            
+cache-auto-1-thread     seqread-psync           729(MiB/s)      182k            
+
+cache-auto              seqread-psync-multi     2578(MiB/s)     644k            
+cache-auto-1-thread     seqread-psync-multi     2597(MiB/s)     649k            
+
+cache-auto              seqread-mmap            660(MiB/s)      165k            
+cache-auto-1-thread     seqread-mmap            672(MiB/s)      168k            
+
+cache-auto              seqread-mmap-multi      2499(MiB/s)     624k            
+cache-auto-1-thread     seqread-mmap-multi      2618(MiB/s)     654k            
+
+cache-auto              seqread-libaio          286(MiB/s)      71k             
+cache-auto-1-thread     seqread-libaio          260(MiB/s)      65k             
+
+cache-auto              seqread-libaio-multi    1508(MiB/s)     377k            
+cache-auto-1-thread     seqread-libaio-multi    986(MiB/s)      246k            
+
+cache-auto              randread-psync          35(MiB/s)       9191            
+cache-auto-1-thread     randread-psync          55(MiB/s)       13k             
+
+cache-auto              randread-psync-multi    179(MiB/s)      44k             
+cache-auto-1-thread     randread-psync-multi    209(MiB/s)      52k             
+
+cache-auto              randread-mmap           32(MiB/s)       8273            
+cache-auto-1-thread     randread-mmap           50(MiB/s)       12k             
+
+cache-auto              randread-mmap-multi     161(MiB/s)      40k             
+cache-auto-1-thread     randread-mmap-multi     185(MiB/s)      46k             
+
+cache-auto              randread-libaio         268(MiB/s)      67k             
+cache-auto-1-thread     randread-libaio         254(MiB/s)      63k             
+
+cache-auto              randread-libaio-multi   256(MiB/s)      64k             
+cache-auto-1-thread     randread-libaio-multi   155(MiB/s)      38k             
+
+cache-auto              seqwrite-psync          23(MiB/s)       6026            
+cache-auto-1-thread     seqwrite-psync          30(MiB/s)       7925            
+
+cache-auto              seqwrite-psync-multi    100(MiB/s)      25k             
+cache-auto-1-thread     seqwrite-psync-multi    154(MiB/s)      38k             
+
+cache-auto              seqwrite-mmap           343(MiB/s)      85k             
+cache-auto-1-thread     seqwrite-mmap           355(MiB/s)      88k             
+
+cache-auto              seqwrite-mmap-multi     408(MiB/s)      102k            
+cache-auto-1-thread     seqwrite-mmap-multi     438(MiB/s)      109k            
+
+cache-auto              seqwrite-libaio         41(MiB/s)       10k             
+cache-auto-1-thread     seqwrite-libaio         65(MiB/s)       16k             
+
+cache-auto              seqwrite-libaio-multi   137(MiB/s)      34k             
+cache-auto-1-thread     seqwrite-libaio-multi   214(MiB/s)      53k             
+
+cache-auto              randwrite-psync         22(MiB/s)       5801            
+cache-auto-1-thread     randwrite-psync         30(MiB/s)       7927            
+
+cache-auto              randwrite-psync-multi   100(MiB/s)      25k             
+cache-auto-1-thread     randwrite-psync-multi   151(MiB/s)      37k             
+
+cache-auto              randwrite-mmap          31(MiB/s)       7984            
+cache-auto-1-thread     randwrite-mmap          55(MiB/s)       13k             
+
+cache-auto              randwrite-mmap-multi    124(MiB/s)      31k             
+cache-auto-1-thread     randwrite-mmap-multi    213(MiB/s)      53k             
+
+cache-auto              randwrite-libaio        40(MiB/s)       10k             
+cache-auto-1-thread     randwrite-libaio        64(MiB/s)       16k             
+
+cache-auto              randwrite-libaio-multi  139(MiB/s)      34k             
+cache-auto-1-thread     randwrite-libaio-multi  212(MiB/s)      53k             
+
+
+
+
+
 

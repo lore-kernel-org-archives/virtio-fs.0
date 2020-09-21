@@ -1,11 +1,15 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri,  7 Aug 2020 15:55:20 -0400
-Message-Id: <20200807195526.426056-15-vgoyal@redhat.com>
-In-Reply-To: <20200807195526.426056-1-vgoyal@redhat.com>
-References: <20200807195526.426056-1-vgoyal@redhat.com>
+References: <20200909184603.263700-1-mreitz@redhat.com>
+	<20200909184603.263700-8-mreitz@redhat.com>
+	<20200911103259.GI94280@stefanha-x1.localdomain>
+From: Max Reitz <mreitz@redhat.com>
+Message-ID: <48dff621-1085-0a16-55f9-b7351debf36e@redhat.com>
+Date: Mon, 21 Sep 2020 15:47:57 +0200
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 14/20] fuse,dax: add DAX mmap support
+In-Reply-To: <20200911103259.GI94280@stefanha-x1.localdomain>
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature";
+	boundary="Nj5B1LLACxIThNL9musrfFLCCRl9PJFJ1"
+Subject: Re: [Virtio-fs] [PATCH 7/9] fuse: Split fuse_mount off of fuse_conn
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,111 +18,93 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
-Cc: vgoyal@redhat.com, miklos@szeredi.hu
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, fuse-devel@lists.sourceforge.net
 
-From: Stefan Hajnoczi <stefanha@redhat.com>
+This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
+--Nj5B1LLACxIThNL9musrfFLCCRl9PJFJ1
+Content-Type: multipart/mixed; boundary="Zlu5UMfeG0n8b7pLW7syQ1reckBBqWb6o"
 
-Add DAX mmap() support.
+--Zlu5UMfeG0n8b7pLW7syQ1reckBBqWb6o
+Content-Type: text/plain; charset=windows-1252
+Content-Language: en-US
+Content-Transfer-Encoding: quoted-printable
 
-Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
----
- fs/fuse/file.c | 62 +++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 61 insertions(+), 1 deletion(-)
+On 11.09.20 12:32, Stefan Hajnoczi wrote:
+> On Wed, Sep 09, 2020 at 08:46:01PM +0200, Max Reitz wrote:
+>> @@ -176,13 +177,22 @@ static ssize_t fuse_conn_congestion_threshold_wr=
+ite(struct file *file,
+>> =20
+>>  	spin_lock(&fc->bg_lock);
+>>  	fc->congestion_threshold =3D val;
+>> -	if (fc->sb) {
+>> +
+>> +	/*
+>> +	 * Get any fuse_mount belonging to this fuse_conn; s_bdi is
+>> +	 * shared between all of them
+>> +	 */
+>> +	if (!list_empty(&fc->mounts))
+>> +		first_fm =3D list_first_entry(&fc->mounts, struct fuse_mount,
+>> +					    fc_entry);
+> ...
+>> @@ -263,14 +273,20 @@ static struct dentry *fuse_ctl_add_dentry(struct=
+ dentry *parent,
+>>  int fuse_ctl_add_conn(struct fuse_conn *fc)
+>>  {
+>>  	struct dentry *parent;
+>> +	struct fuse_mount *first_fm;
+>>  	char name[32];
+>> =20
+>>  	if (!fuse_control_sb)
+>>  		return 0;
+>> =20
+>> +	if (list_empty(&fc->mounts))
+>> +		return 0;
+>> +
+>> +	first_fm =3D list_first_entry(&fc->mounts, struct fuse_mount, fc_ent=
+ry);
+>> +	sprintf(name, "%u", first_fm->dev);
+>=20
+> How does locking work for struct fuse_mount? Are there any locking rule=
+s
+> that can be documented?
 
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index 194fe3e404a7..be7d90eb5b41 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -2841,10 +2841,15 @@ static const struct vm_operations_struct fuse_file_vm_ops = {
- 	.page_mkwrite	= fuse_page_mkwrite,
- };
- 
-+static int fuse_dax_mmap(struct file *file, struct vm_area_struct *vma);
- static int fuse_file_mmap(struct file *file, struct vm_area_struct *vma)
- {
- 	struct fuse_file *ff = file->private_data;
- 
-+	/* DAX mmap is superior to direct_io mmap */
-+	if (IS_DAX(file_inode(file)))
-+		return fuse_dax_mmap(file, vma);
-+
- 	if (ff->open_flags & FOPEN_DIRECT_IO) {
- 		/* Can't provide the coherency needed for MAP_SHARED */
- 		if (vma->vm_flags & VM_MAYSHARE)
-@@ -2863,9 +2868,63 @@ static int fuse_file_mmap(struct file *file, struct vm_area_struct *vma)
- 	return 0;
- }
- 
-+static vm_fault_t __fuse_dax_fault(struct vm_fault *vmf,
-+				   enum page_entry_size pe_size, bool write)
-+{
-+	vm_fault_t ret;
-+	struct inode *inode = file_inode(vmf->vma->vm_file);
-+	struct super_block *sb = inode->i_sb;
-+	pfn_t pfn;
-+
-+	if (write)
-+		sb_start_pagefault(sb);
-+
-+	ret = dax_iomap_fault(vmf, pe_size, &pfn, NULL, &fuse_iomap_ops);
-+
-+	if (ret & VM_FAULT_NEEDDSYNC)
-+		ret = dax_finish_sync_fault(vmf, pe_size, pfn);
-+
-+	if (write)
-+		sb_end_pagefault(sb);
-+
-+	return ret;
-+}
-+
-+static vm_fault_t fuse_dax_fault(struct vm_fault *vmf)
-+{
-+	return __fuse_dax_fault(vmf, PE_SIZE_PTE,
-+				vmf->flags & FAULT_FLAG_WRITE);
-+}
-+
-+static vm_fault_t fuse_dax_huge_fault(struct vm_fault *vmf,
-+			       enum page_entry_size pe_size)
-+{
-+	return __fuse_dax_fault(vmf, pe_size, vmf->flags & FAULT_FLAG_WRITE);
-+}
-+
-+static vm_fault_t fuse_dax_page_mkwrite(struct vm_fault *vmf)
-+{
-+	return __fuse_dax_fault(vmf, PE_SIZE_PTE, true);
-+}
-+
-+static vm_fault_t fuse_dax_pfn_mkwrite(struct vm_fault *vmf)
-+{
-+	return __fuse_dax_fault(vmf, PE_SIZE_PTE, true);
-+}
-+
-+static const struct vm_operations_struct fuse_dax_vm_ops = {
-+	.fault		= fuse_dax_fault,
-+	.huge_fault	= fuse_dax_huge_fault,
-+	.page_mkwrite	= fuse_dax_page_mkwrite,
-+	.pfn_mkwrite	= fuse_dax_pfn_mkwrite,
-+};
-+
- static int fuse_dax_mmap(struct file *file, struct vm_area_struct *vma)
- {
--	return -EINVAL; /* TODO */
-+	file_accessed(file);
-+	vma->vm_ops = &fuse_dax_vm_ops;
-+	vma->vm_flags |= VM_MIXEDMAP | VM_HUGEPAGE;
-+	return 0;
- }
- 
- static int convert_fuse_file_lock(struct fuse_conn *fc,
-@@ -3938,6 +3997,7 @@ static const struct file_operations fuse_file_operations = {
- 	.release	= fuse_release,
- 	.fsync		= fuse_fsync,
- 	.lock		= fuse_file_lock,
-+	.get_unmapped_area = thp_get_unmapped_area,
- 	.flock		= fuse_file_flock,
- 	.splice_read	= generic_file_splice_read,
- 	.splice_write	= iter_file_splice_write,
--- 
-2.25.4
+Hm.  I just hoped the largely mechanical conversion of fuse_conn to
+fuse_mount would ensure nothing breaks.
+
+There are locks protecting the superblock and fuse_conn as a whole
+(which basically includes the associated fuse_mounts).  I suspect we
+could get better (i.e., finer) granularity by giving each fuse_mount its
+own lock, and then releasing the fuse_conn lock while we switch over to
+the fuse_mount lock.
+
+That seems bug-prone, though, and probably doesn=92t even help performanc=
+e
+that much.  I mean, in the most common case, you won=92t have submounts,
+so each fuse_conn has exactly one fuse_mount, so having a separate lock
+for the latter won=92t help.
+
+Max
+
+
+--Zlu5UMfeG0n8b7pLW7syQ1reckBBqWb6o--
+
+--Nj5B1LLACxIThNL9musrfFLCCRl9PJFJ1
+Content-Type: application/pgp-signature; name="signature.asc"
+Content-Description: OpenPGP digital signature
+Content-Disposition: attachment; filename="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEkb62CjDbPohX0Rgp9AfbAGHVz0AFAl9orw0ACgkQ9AfbAGHV
+z0DUSAf+KjPtXrBVymfouu75IBjd8+lRI9ROD90fx8yQz+crMa84wP/A/zGxDg10
+slBHc2x6IAQYNybSPmwrdsvYeT3xUaa8GumqCbFCfvg1N6voZNM3Xyj3Kef2Rp24
+ZvnBGJFwXMEfMDfVp/JIxq1P+AIRuSAzJbR00OWjUqj5OmdzgszsXoQX3sk8d3f5
+PDSpWV/ZiCVysGfLnbqXZL2qaotOYjNL7wW7aXiXRoHN2CtYSHUBR5F4iFjANiYv
+H3gDI6MqULjauhezN1RqeApldE1dlBj+LxaWwoo3jZVgEPDD2ScFGFNearsmx+0Z
+x8fnrnAwkmbydvTOEL8xyOw8f8GwTQ==
+=c2EA
+-----END PGP SIGNATURE-----
+
+--Nj5B1LLACxIThNL9musrfFLCCRl9PJFJ1--
 

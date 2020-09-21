@@ -1,12 +1,11 @@
-Date: Mon, 21 Sep 2020 10:10:34 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200921091034.GC3221@work-vm>
-References: <20200916112250.760245-1-stefanha@redhat.com>
+From: Matthias Rettl <mrettl@redhat.com>
+Message-ID: <2683c66a-aea2-f9a6-e8b7-173865c2be1a@redhat.com>
+Date: Mon, 21 Sep 2020 12:20:00 +0200
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200916112250.760245-1-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: document cache=auto default
+Content-Type: multipart/alternative;
+	boundary="------------CAD6FA5999F42BD62DE82F59"
+Content-Language: de-DE
+Subject: [Virtio-fs] Signed virtio-fs driver for Windows?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,44 +14,113 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: virtio-fs@redhat.com
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> From: "Harry G. Coin" <hgcoin@gmail.com>
-> 
-> The virtiofsd --help output documents the cache=auto default value but
-> the man page does not. Fix this.
-> 
-> Signed-off-by: Harry G. Coin <hgcoin@gmail.com>
-> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+This is a multi-part message in MIME format.
+--------------CAD6FA5999F42BD62DE82F59
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Transfer-Encoding: 8bit
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Hi!
 
-Thanks, I'll add it to the next pull.
+One of my enterprise customers is asking if there is a digitally signed 
+virtio-fs driver for Windows 10 available?
 
-Dave
+Thank you in advance!
+kr,
+Matthias
 
 
-> ---
->  docs/tools/virtiofsd.rst | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-> index e33c81ed41..352a29ce3c 100644
-> --- a/docs/tools/virtiofsd.rst
-> +++ b/docs/tools/virtiofsd.rst
-> @@ -103,6 +103,7 @@ Options
->    forbids the FUSE client from caching to achieve best coherency at the cost of
->    performance.  ``auto`` acts similar to NFS with a 1 second metadata cache
->    timeout.  ``always`` sets a long cache lifetime at the expense of coherency.
-> +  The default is ``auto``.
->  
->  Examples
->  --------
-> -- 
-> 2.26.2
-> 
 -- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+Mit freundlichen Grüßen / Kind regards
+*Matthias Rettl*
+Account Solution Architect Austria
+
+Red Hat Austria GmbH
+http://www.redhat.com <http://www.redhat.com/>
+
+Cell: +43 676 6543170
+mailto: mrettl@redhat.com <mailto:mrettl@redhat.com>
+touch: LinkedIn <https://bit.ly/mrettllinkedin> | Xing 
+<https://bit.ly/mrettlxing> | VCard <https://bit.ly/matthiasrettl>
+
+
+
+--------------CAD6FA5999F42BD62DE82F59
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
+<html>
+  <head>
+
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  </head>
+  <body>
+    <div class="moz-signature">
+      <div dir="ltr" style="font-family: 'Trebuchet MS', sans-serif">Hi!<br>
+        <br>
+        One of my enterprise customers is asking if there is a digitally
+        signed virtio-fs driver for Windows 10 available?<br>
+        <br>
+        Thank you in advance!<br>
+        kr, <br>
+        Matthias<br>
+        <br clear="all">
+        <div><br>
+        </div>
+        -- <br>
+        <div dir="ltr" class="gmail_signature"
+          data-smartmail="gmail_signature">
+          <div dir="ltr">
+            <div>
+              <div dir="ltr">
+                <div dir="ltr">
+                  <div dir="ltr">
+                    <div><font size="1">Mit freundlichen Grüßen / Kind
+                        regards</font></div>
+                    <div dir="ltr"><span style="font-size:12.8px"><b>Matthias
+                          Rettl</b></span><br style="font-size:12.8px">
+                      <span style="font-size:12.8px">Account Solution
+                        Architect Austria</span><br
+                        style="font-size:12.8px">
+                      <div style="font-size:12.8px"><br>
+                      </div>
+                      <span style="font-size:12.8px">Red Hat Austria
+                        GmbH</span><br style="font-size:12.8px">
+                      <a href="http://www.redhat.com/"
+                        style="color:rgb(17,85,204);font-size:12.8px"
+                        target="_blank" moz-do-not-send="true">http://www.redhat.com</a><br
+                        style="font-size:12.8px">
+                      <div style="font-size:12.8px"><br>
+                      </div>
+                      Cell: <a value="+491727955020"
+                        style="color:rgb(17,85,204)"
+                        moz-do-not-send="true">+43 676 6543170</a><br>
+                      mailto: <a href="mailto:mrettl@redhat.com"
+                        style="color:rgb(17,85,204)" target="_blank"
+                        moz-do-not-send="true">mrettl@redhat.com</a><br>
+                      touch: <a href="https://bit.ly/mrettllinkedin"
+                        target="_blank" moz-do-not-send="true">LinkedIn</a>
+                      | <a href="https://bit.ly/mrettlxing"
+                        target="_blank" moz-do-not-send="true">Xing</a>
+                      | <a href="https://bit.ly/matthiasrettl"
+                        target="_blank" moz-do-not-send="true">VCard</a></div>
+                    <div dir="ltr"><br>
+                    </div>
+                    <div dir="ltr"><img
+src="https://marketing-outfit-prod-images.s3-us-west-2.amazonaws.com/f5445ae0c9ddafd5b2f1836854d7416a/Logo-RedHat-Email.png"
+                        moz-do-not-send="true"><br>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+
+--------------CAD6FA5999F42BD62DE82F59--
 

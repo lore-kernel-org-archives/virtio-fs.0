@@ -1,11 +1,15 @@
-From: Matthias Rettl <mrettl@redhat.com>
-Message-ID: <2683c66a-aea2-f9a6-e8b7-173865c2be1a@redhat.com>
-Date: Mon, 21 Sep 2020 12:20:00 +0200
+References: <20200909184603.263700-1-mreitz@redhat.com>
+	<CAJfpegt92oj88FbGxphce80AWtU51Qgm87KuZqYD9kfpSVq2tA@mail.gmail.com>
+From: Max Reitz <mreitz@redhat.com>
+Message-ID: <03022cbc-fe80-5ded-522e-ae9ef33703bd@redhat.com>
+Date: Mon, 21 Sep 2020 15:35:04 +0200
 MIME-Version: 1.0
-Content-Type: multipart/alternative;
-	boundary="------------CAD6FA5999F42BD62DE82F59"
-Content-Language: de-DE
-Subject: [Virtio-fs] Signed virtio-fs driver for Windows?
+In-Reply-To: <CAJfpegt92oj88FbGxphce80AWtU51Qgm87KuZqYD9kfpSVq2tA@mail.gmail.com>
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature";
+	boundary="aoq1jxa0jzF7mNWmZu5C7ynnyga1KFTNd"
+Subject: Re: [Virtio-fs] [fuse-devel] [PATCH 0/9] fuse: Mirror virtio-fs
+	submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,113 +18,120 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, fuse-devel <fuse-devel@lists.sourceforge.net>
 
-This is a multi-part message in MIME format.
---------------CAD6FA5999F42BD62DE82F59
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Transfer-Encoding: 8bit
+This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
+--aoq1jxa0jzF7mNWmZu5C7ynnyga1KFTNd
+Content-Type: multipart/mixed; boundary="Mh3fpPLCsNTzpWJzU7kokoIBprPo9ZLZD"
 
-Hi!
+--Mh3fpPLCsNTzpWJzU7kokoIBprPo9ZLZD
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: quoted-printable
 
-One of my enterprise customers is asking if there is a digitally signed 
-virtio-fs driver for Windows 10 available?
+On 18.09.20 17:25, Miklos Szeredi wrote:
+> Pushed an updated version to fuse.git#submounts.
+>=20
+> Also attached incremental patch (against rebase of
+> virtiofs-submounts-v2 on fuse.git#for-next).
+>=20
+> Changes:
+>=20
+>  1) rebased on top of DAX patches
+>  2) fixed CUSE
+>  3) added locking for fc->mounts list
+>  4) dissociate lifetime of fc from lifetime of root mount
+>  5) do not hash mountpoint inodes
+>  6) add FUSE_SUBMOUNTS init flag (replaces FUSE_ATTR_FLAGS but
+> slightly different usage)
+>  7) various cleanups
 
-Thank you in advance!
-kr,
-Matthias
+Wow.  Thanks!  I=E2=80=99ll take a closer look once I can.
+
+> Note, the effect of 5 can only be observed if the same directory is
+> bind mounted into multiple places:
+>=20
+> HOST:
+> cd /mnt
+> mkdir 1 2
+> mount --bind /dev/shm 1
+> mount --bind /dev/shm 2
+>=20
+> GUEST:
+> mount -t virtiofs mnt /mnt
+> cd /mnt/1
+> ls ../2
+> /bin/pwd
+>=20
+> If the mountpoint is hashed, then the "ls ../2" will basically result
+> in /mnt/1 inode being moved to /mnt/2, which is not what we want.  I
+> don't think there's any negative side effect of the mountpoint being
+> unhashed, but this is a bit subtle.
+>=20
+>=20
+> On the server side, keying on just st_ino/st_dev is a really crude way
+> of mapping out mounts.  Take this example:
+>=20
+> HOST:
+> cd /mnt
+> mkdir 1
+> mount --bind /dev/shm 1
+> cd 1
+> mkdir 2
+> mount --bind /mnt 2
+> ls /mnt/1/2/1
+>=20
+> GUEST:
+> mount -t virtiofs mnt /mnt
+> ls /mnt/1/2/1
+> 2
+> ls /mnt/1/2/1/2/1/2/1/
+> 2
+>=20
+> So what we really need is keying on mount ID as well.
+
+Yes, I=E2=80=99ve noticed this, too.  I just didn=E2=80=99t care to fix i=
+t here, because
+it=E2=80=99s a pre-existing issue (I believe), and it isn=E2=80=99t relat=
+ed to the
+submount-automount implementation =E2=80=93 it=E2=80=99s just a bug in vi=
+rtiofsd, basically.
+
+> Attaching an incremental patch to do that.  Needs v5.8 kernel on host
+> to actually make a difference, but commit fa2fcf4f1df1 ("statx: add
+> mount ID") is trivial to backport to any kernel that has statx.
+>=20
+> Please review and test.
+
+Will do.
+
+> If there are no major issues, this should be
+> good to go for v5.10.
+
+Great :)
+
+Max
 
 
--- 
-Mit freundlichen Grüßen / Kind regards
-*Matthias Rettl*
-Account Solution Architect Austria
+--Mh3fpPLCsNTzpWJzU7kokoIBprPo9ZLZD--
 
-Red Hat Austria GmbH
-http://www.redhat.com <http://www.redhat.com/>
+--aoq1jxa0jzF7mNWmZu5C7ynnyga1KFTNd
+Content-Type: application/pgp-signature; name="signature.asc"
+Content-Description: OpenPGP digital signature
+Content-Disposition: attachment; filename="signature.asc"
 
-Cell: +43 676 6543170
-mailto: mrettl@redhat.com <mailto:mrettl@redhat.com>
-touch: LinkedIn <https://bit.ly/mrettllinkedin> | Xing 
-<https://bit.ly/mrettlxing> | VCard <https://bit.ly/matthiasrettl>
+-----BEGIN PGP SIGNATURE-----
 
+iQEzBAEBCAAdFiEEkb62CjDbPohX0Rgp9AfbAGHVz0AFAl9orAgACgkQ9AfbAGHV
+z0CBkQf+J/8+pXR3d4t2al2hr/Wvk5aURfRDegUMn2OK1RNgdhnKAXJVLW6AFcSs
+6m5KvkGYD8qi1NBAdhX0fDfqUqen3FiFYD3C975J2fbVIhtxHPB3cJsKz3ucCgCQ
+JUZ4263OW0YcL8Wd+hszMbHZsqmcdwmEbTSql/mIHo/S3CQJ2+Gdcay/6inV+24Q
+GDtreo+GaaUPFh/2USAaIeGJljsL3nARFjlWAqqxis2ZmxCPSwVaRlt2x7ar2zoF
+/Obh7b9TK13dESLQfRtQuvrOqpup/QcsmT4EwzLOuO6uEDJHhalMP5Fx8AooI6Uw
+YI3TpZWByBKlTfBF2RYN1ATxJcfXdQ==
+=1yfX
+-----END PGP SIGNATURE-----
 
-
---------------CAD6FA5999F42BD62DE82F59
-Content-Type: text/html; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-
-<html>
-  <head>
-
-    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
-  </head>
-  <body>
-    <div class="moz-signature">
-      <div dir="ltr" style="font-family: 'Trebuchet MS', sans-serif">Hi!<br>
-        <br>
-        One of my enterprise customers is asking if there is a digitally
-        signed virtio-fs driver for Windows 10 available?<br>
-        <br>
-        Thank you in advance!<br>
-        kr, <br>
-        Matthias<br>
-        <br clear="all">
-        <div><br>
-        </div>
-        -- <br>
-        <div dir="ltr" class="gmail_signature"
-          data-smartmail="gmail_signature">
-          <div dir="ltr">
-            <div>
-              <div dir="ltr">
-                <div dir="ltr">
-                  <div dir="ltr">
-                    <div><font size="1">Mit freundlichen Grüßen / Kind
-                        regards</font></div>
-                    <div dir="ltr"><span style="font-size:12.8px"><b>Matthias
-                          Rettl</b></span><br style="font-size:12.8px">
-                      <span style="font-size:12.8px">Account Solution
-                        Architect Austria</span><br
-                        style="font-size:12.8px">
-                      <div style="font-size:12.8px"><br>
-                      </div>
-                      <span style="font-size:12.8px">Red Hat Austria
-                        GmbH</span><br style="font-size:12.8px">
-                      <a href="http://www.redhat.com/"
-                        style="color:rgb(17,85,204);font-size:12.8px"
-                        target="_blank" moz-do-not-send="true">http://www.redhat.com</a><br
-                        style="font-size:12.8px">
-                      <div style="font-size:12.8px"><br>
-                      </div>
-                      Cell: <a value="+491727955020"
-                        style="color:rgb(17,85,204)"
-                        moz-do-not-send="true">+43 676 6543170</a><br>
-                      mailto: <a href="mailto:mrettl@redhat.com"
-                        style="color:rgb(17,85,204)" target="_blank"
-                        moz-do-not-send="true">mrettl@redhat.com</a><br>
-                      touch: <a href="https://bit.ly/mrettllinkedin"
-                        target="_blank" moz-do-not-send="true">LinkedIn</a>
-                      | <a href="https://bit.ly/mrettlxing"
-                        target="_blank" moz-do-not-send="true">Xing</a>
-                      | <a href="https://bit.ly/matthiasrettl"
-                        target="_blank" moz-do-not-send="true">VCard</a></div>
-                    <div dir="ltr"><br>
-                    </div>
-                    <div dir="ltr"><img
-src="https://marketing-outfit-prod-images.s3-us-west-2.amazonaws.com/f5445ae0c9ddafd5b2f1836854d7416a/Logo-RedHat-Email.png"
-                        moz-do-not-send="true"><br>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </body>
-</html>
-
---------------CAD6FA5999F42BD62DE82F59--
+--aoq1jxa0jzF7mNWmZu5C7ynnyga1KFTNd--
 

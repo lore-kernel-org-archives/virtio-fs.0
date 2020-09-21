@@ -1,15 +1,15 @@
-References: <20200909184603.263700-1-mreitz@redhat.com>
-	<20200909184603.263700-8-mreitz@redhat.com>
-	<20200911103259.GI94280@stefanha-x1.localdomain>
-From: Max Reitz <mreitz@redhat.com>
-Message-ID: <48dff621-1085-0a16-55f9-b7351debf36e@redhat.com>
-Date: Mon, 21 Sep 2020 15:47:57 +0200
+Date: Mon, 21 Sep 2020 15:08:03 +0100
+From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+Message-ID: <20200921140803.GN1942072@redhat.com>
+References: <20200918213436.GA3520@redhat.com> <20200921085019.GB3221@work-vm>
+	<20200921133516.GA13362@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20200911103259.GI94280@stefanha-x1.localdomain>
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature";
-	boundary="Nj5B1LLACxIThNL9musrfFLCCRl9PJFJ1"
-Subject: Re: [Virtio-fs] [PATCH 7/9] fuse: Split fuse_mount off of fuse_conn
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+In-Reply-To: <20200921133516.GA13362@redhat.com>
+Subject: Re: [Virtio-fs] tools/virtiofs: Multi threading seems to hurt
+	performance
+Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,93 +18,57 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, fuse-devel@lists.sourceforge.net
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
 
-This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
---Nj5B1LLACxIThNL9musrfFLCCRl9PJFJ1
-Content-Type: multipart/mixed; boundary="Zlu5UMfeG0n8b7pLW7syQ1reckBBqWb6o"
+On Mon, Sep 21, 2020 at 09:35:16AM -0400, Vivek Goyal wrote:
+> On Mon, Sep 21, 2020 at 09:50:19AM +0100, Dr. David Alan Gilbert wrote:
+> > * Vivek Goyal (vgoyal@redhat.com) wrote:
+> > > Hi All,
+> > > 
+> > > virtiofsd default thread pool size is 64. To me it feels that in most of
+> > > the cases thread pool size 1 performs better than thread pool size 64.
+> > > 
+> > > I ran virtiofs-tests.
+> > > 
+> > > https://github.com/rhvgoyal/virtiofs-tests
+> > > 
+> > > And here are the comparision results. To me it seems that by default
+> > > we should switch to 1 thread (Till we can figure out how to make
+> > > multi thread performance better even when single process is doing
+> > > I/O in client).
+> > > 
+> > > I am especially more interested in getting performance better for
+> > > single process in client. If that suffers, then it is pretty bad.
+> > > 
+> > > Especially look at randread, randwrite, seqwrite performance. seqread
+> > > seems pretty good anyway.
+> > > 
+> > > If I don't run who test suite and just ran randread-psync job,
+> > > my throughput jumps from around 40MB/s to 60MB/s. That's a huge
+> > > jump I would say.
+> > > 
+> > > Thoughts?
+> > 
+> > What's your host setup; how many cores has the host got and how many did
+> > you give the guest?
+> 
+> Got 2 processors on host with 16 cores in each processor. With
+> hyperthreading enabled, it makes 32 logical cores on each processor and
+> that makes 64 logical cores on host.
+> 
+> I have given 32 to guest.
 
---Zlu5UMfeG0n8b7pLW7syQ1reckBBqWb6o
-Content-Type: text/plain; charset=windows-1252
-Content-Language: en-US
-Content-Transfer-Encoding: quoted-printable
+FWIW, I'd be inclined to disable hyperthreading in the BIOS for one
+test to validate whether it is impacting performance results seen.
+Hyperthreads are weak compared to a real CPU, and could result in
+misleading data even if you are limiting your guest to 1/2 the host
+logical CPUs.
 
-On 11.09.20 12:32, Stefan Hajnoczi wrote:
-> On Wed, Sep 09, 2020 at 08:46:01PM +0200, Max Reitz wrote:
->> @@ -176,13 +177,22 @@ static ssize_t fuse_conn_congestion_threshold_wr=
-ite(struct file *file,
->> =20
->>  	spin_lock(&fc->bg_lock);
->>  	fc->congestion_threshold =3D val;
->> -	if (fc->sb) {
->> +
->> +	/*
->> +	 * Get any fuse_mount belonging to this fuse_conn; s_bdi is
->> +	 * shared between all of them
->> +	 */
->> +	if (!list_empty(&fc->mounts))
->> +		first_fm =3D list_first_entry(&fc->mounts, struct fuse_mount,
->> +					    fc_entry);
-> ...
->> @@ -263,14 +273,20 @@ static struct dentry *fuse_ctl_add_dentry(struct=
- dentry *parent,
->>  int fuse_ctl_add_conn(struct fuse_conn *fc)
->>  {
->>  	struct dentry *parent;
->> +	struct fuse_mount *first_fm;
->>  	char name[32];
->> =20
->>  	if (!fuse_control_sb)
->>  		return 0;
->> =20
->> +	if (list_empty(&fc->mounts))
->> +		return 0;
->> +
->> +	first_fm =3D list_first_entry(&fc->mounts, struct fuse_mount, fc_ent=
-ry);
->> +	sprintf(name, "%u", first_fm->dev);
->=20
-> How does locking work for struct fuse_mount? Are there any locking rule=
-s
-> that can be documented?
-
-Hm.  I just hoped the largely mechanical conversion of fuse_conn to
-fuse_mount would ensure nothing breaks.
-
-There are locks protecting the superblock and fuse_conn as a whole
-(which basically includes the associated fuse_mounts).  I suspect we
-could get better (i.e., finer) granularity by giving each fuse_mount its
-own lock, and then releasing the fuse_conn lock while we switch over to
-the fuse_mount lock.
-
-That seems bug-prone, though, and probably doesn=92t even help performanc=
-e
-that much.  I mean, in the most common case, you won=92t have submounts,
-so each fuse_conn has exactly one fuse_mount, so having a separate lock
-for the latter won=92t help.
-
-Max
-
-
---Zlu5UMfeG0n8b7pLW7syQ1reckBBqWb6o--
-
---Nj5B1LLACxIThNL9musrfFLCCRl9PJFJ1
-Content-Type: application/pgp-signature; name="signature.asc"
-Content-Description: OpenPGP digital signature
-Content-Disposition: attachment; filename="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEkb62CjDbPohX0Rgp9AfbAGHVz0AFAl9orw0ACgkQ9AfbAGHV
-z0DUSAf+KjPtXrBVymfouu75IBjd8+lRI9ROD90fx8yQz+crMa84wP/A/zGxDg10
-slBHc2x6IAQYNybSPmwrdsvYeT3xUaa8GumqCbFCfvg1N6voZNM3Xyj3Kef2Rp24
-ZvnBGJFwXMEfMDfVp/JIxq1P+AIRuSAzJbR00OWjUqj5OmdzgszsXoQX3sk8d3f5
-PDSpWV/ZiCVysGfLnbqXZL2qaotOYjNL7wW7aXiXRoHN2CtYSHUBR5F4iFjANiYv
-H3gDI6MqULjauhezN1RqeApldE1dlBj+LxaWwoo3jZVgEPDD2ScFGFNearsmx+0Z
-x8fnrnAwkmbydvTOEL8xyOw8f8GwTQ==
-=c2EA
------END PGP SIGNATURE-----
-
---Nj5B1LLACxIThNL9musrfFLCCRl9PJFJ1--
+Regards,
+Daniel
+-- 
+|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
+|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
+|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
 

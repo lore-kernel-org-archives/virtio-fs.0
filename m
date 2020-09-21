@@ -1,15 +1,13 @@
-Date: Mon, 21 Sep 2020 15:08:03 +0100
-From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
-Message-ID: <20200921140803.GN1942072@redhat.com>
-References: <20200918213436.GA3520@redhat.com> <20200921085019.GB3221@work-vm>
-	<20200921133516.GA13362@redhat.com>
+Date: Mon, 21 Sep 2020 16:32:43 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20200921153243.GK3221@work-vm>
+References: <20200918213436.GA3520@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=utf-8
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20200921133516.GA13362@redhat.com>
+In-Reply-To: <20200918213436.GA3520@redhat.com>
 Subject: Re: [Virtio-fs] tools/virtiofs: Multi threading seems to hurt
 	performance
-Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,56 +17,78 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
+Cc: jose.carlos.venegas.munoz@intel.com, qemu-devel@nongnu.org, cdupontd@redhat.com, virtio-fs-list <virtio-fs@redhat.com>, archana.m.shinde@intel.com
 
-On Mon, Sep 21, 2020 at 09:35:16AM -0400, Vivek Goyal wrote:
-> On Mon, Sep 21, 2020 at 09:50:19AM +0100, Dr. David Alan Gilbert wrote:
-> > * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > > Hi All,
-> > > 
-> > > virtiofsd default thread pool size is 64. To me it feels that in most of
-> > > the cases thread pool size 1 performs better than thread pool size 64.
-> > > 
-> > > I ran virtiofs-tests.
-> > > 
-> > > https://github.com/rhvgoyal/virtiofs-tests
-> > > 
-> > > And here are the comparision results. To me it seems that by default
-> > > we should switch to 1 thread (Till we can figure out how to make
-> > > multi thread performance better even when single process is doing
-> > > I/O in client).
-> > > 
-> > > I am especially more interested in getting performance better for
-> > > single process in client. If that suffers, then it is pretty bad.
-> > > 
-> > > Especially look at randread, randwrite, seqwrite performance. seqread
-> > > seems pretty good anyway.
-> > > 
-> > > If I don't run who test suite and just ran randread-psync job,
-> > > my throughput jumps from around 40MB/s to 60MB/s. That's a huge
-> > > jump I would say.
-> > > 
-> > > Thoughts?
-> > 
-> > What's your host setup; how many cores has the host got and how many did
-> > you give the guest?
-> 
-> Got 2 processors on host with 16 cores in each processor. With
-> hyperthreading enabled, it makes 32 logical cores on each processor and
-> that makes 64 logical cores on host.
-> 
-> I have given 32 to guest.
+Hi,
+  I've been doing some of my own perf tests and I think I agree
+about the thread pool size;  my test is a kernel build
+and I've tried a bunch of different options.
 
-FWIW, I'd be inclined to disable hyperthreading in the BIOS for one
-test to validate whether it is impacting performance results seen.
-Hyperthreads are weak compared to a real CPU, and could result in
-misleading data even if you are limiting your guest to 1/2 the host
-logical CPUs.
+My config:
+  Host: 16 core AMD EPYC (32 thread), 128G RAM,
+     5.9.0-rc4 kernel, rhel 8.2ish userspace.
+  5.1.0 qemu/virtiofsd built from git.
+  Guest: Fedora 32 from cloud image with just enough extra installed for
+a kernel build.
 
-Regards,
-Daniel
+  git cloned and checkout v5.8 of Linux into /dev/shm/linux on the host
+fresh before each test.  Then log into the guest, make defconfig,
+time make -j 16 bzImage,  make clean; time make -j 16 bzImage 
+The numbers below are the 'real' time in the guest from the initial make
+(the subsequent makes dont vary much)
+
+Below are the detauls of what each of these means, but here are the
+numbers first
+
+virtiofsdefault        4m0.978s
+9pdefault              9m41.660s
+virtiofscache=none    10m29.700s
+9pmmappass             9m30.047s
+9pmbigmsize           12m4.208s
+9pmsecnone             9m21.363s
+virtiofscache=noneT1   7m17.494s
+virtiofsdefaultT1      3m43.326s
+
+So the winner there by far is the 'virtiofsdefaultT1' - that's
+the default virtiofs settings, but with --thread-pool-size=1 - so
+yes it gives a small benefit.
+But interestingly the cache=none virtiofs performance is pretty bad,
+but thread-pool-size=1 on that makes a BIG improvement.
+
+
+virtiofsdefault:
+  ./virtiofsd --socket-path=/tmp/vhostqemu -o source=/dev/shm/linux
+  ./x86_64-softmmu/qemu-system-x86_64 -M pc,memory-backend=mem,accel=kvm -smp 8 -cpu host -m 32G,maxmem=64G,slots=1 -object memory-backend-memfd,id=mem,size=32G,share=on -drive if=virtio,file=/home/images/f-32-kernel.qcow2 -nographic -chardev socket,id=char0,path=/tmp/vhostqemu -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=kernel
+  mount -t virtiofs kernel /mnt
+
+9pdefault
+  ./x86_64-softmmu/qemu-system-x86_64 -M pc,accel=kvm -smp 8 -cpu host -m 32G -drive if=virtio,file=/home/images/f-32-kernel.qcow2 -nographic -virtfs local,path=/dev/shm/linux,mount_tag=kernel,security_model=passthrough
+  mount -t 9p -o trans=virtio kernel /mnt -oversion=9p2000.L
+
+virtiofscache=none
+  ./virtiofsd --socket-path=/tmp/vhostqemu -o source=/dev/shm/linux -o cache=none
+  ./x86_64-softmmu/qemu-system-x86_64 -M pc,memory-backend=mem,accel=kvm -smp 8 -cpu host -m 32G,maxmem=64G,slots=1 -object memory-backend-memfd,id=mem,size=32G,share=on -drive if=virtio,file=/home/images/f-32-kernel.qcow2 -nographic -chardev socket,id=char0,path=/tmp/vhostqemu -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=kernel
+  mount -t virtiofs kernel /mnt
+
+9pmmappass
+  ./x86_64-softmmu/qemu-system-x86_64 -M pc,accel=kvm -smp 8 -cpu host -m 32G -drive if=virtio,file=/home/images/f-32-kernel.qcow2 -nographic -virtfs local,path=/dev/shm/linux,mount_tag=kernel,security_model=passthrough
+  mount -t 9p -o trans=virtio kernel /mnt -oversion=9p2000.L,cache=mmap
+
+9pmbigmsize
+   ./x86_64-softmmu/qemu-system-x86_64 -M pc,accel=kvm -smp 8 -cpu host -m 32G -drive if=virtio,file=/home/images/f-32-kernel.qcow2 -nographic -virtfs local,path=/dev/shm/linux,mount_tag=kernel,security_model=passthrough
+   mount -t 9p -o trans=virtio kernel /mnt -oversion=9p2000.L,cache=mmap,msize=1048576
+
+9pmsecnone
+   ./x86_64-softmmu/qemu-system-x86_64 -M pc,accel=kvm -smp 8 -cpu host -m 32G -drive if=virtio,file=/home/images/f-32-kernel.qcow2 -nographic -virtfs local,path=/dev/shm/linux,mount_tag=kernel,security_model=none
+   mount -t 9p -o trans=virtio kernel /mnt -oversion=9p2000.L
+
+virtiofscache=noneT1
+   ./virtiofsd --socket-path=/tmp/vhostqemu -o source=/dev/shm/linux -o cache=none --thread-pool-size=1
+   mount -t virtiofs kernel /mnt
+
+virtiofsdefaultT1
+   ./virtiofsd --socket-path=/tmp/vhostqemu -o source=/dev/shm/linux --thread-pool-size=1
+    ./x86_64-softmmu/qemu-system-x86_64 -M pc,memory-backend=mem,accel=kvm -smp 8 -cpu host -m 32G,maxmem=64G,slots=1 -object memory-backend-memfd,id=mem,size=32G,share=on -drive if=virtio,file=/home/images/f-32-kernel.qcow2 -nographic -chardev socket,id=char0,path=/tmp/vhostqemu -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=kernel
 -- 
-|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
-|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
-|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

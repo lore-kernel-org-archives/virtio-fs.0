@@ -1,10 +1,17 @@
-Date: Mon, 21 Sep 2020 17:32:16 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200921213216.GE13362@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=intel.onmicrosoft.com; 
+	s=selector2-intel-onmicrosoft-com;
+	h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+	bh=BfKfXqphLnqy80GF3r9Kua6OpPXHTVOs/s2IZVlkSnc=;
+	b=L3Y8GCE5tdqht7DeBI3aqbvLtVZxvwkjEDAYr7cUcmg1Q3n3ftaYr6daxbX4d5RIbVjT882OJFvD2PW6U9V0SSDUyeMIVwC0N+cd8/eorzoDQj/E8lObmmdqGLZRr2C0q+lspymr9vCwBVzg50Ivn+7hRR89wHpr95uwlEb6jng=
+From: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
+Date: Tue, 22 Sep 2020 09:10:27 +0000
+Message-ID: <bd4b7ab761dcb47f3b6ebf7fc065f5040a314056.camel@intel.com>
+Content-ID: <28942C222C371948992683CDC024F55F@namprd11.prod.outlook.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: [Virtio-fs] [PATCH] virtiofsd: Used glib "shared" thread pool
+Content-Type: text/plain; charset="utf-8"
+Content-Language: en-US
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] Branch with patches on top of Linux 5.9-rcX
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,41 +20,25 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
-Cc: Miklos Szeredi <miklos@szeredi.hu>
+To: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+Cc: "vgoyal@redhat.com" <vgoyal@redhat.com>
 
-glib offers thread pools and it seems to support "exclusive" and "shared"
-thread pools.
+Hi,
 
-https://developer.gnome.org/glib/stable/glib-Thread-Pools.html#g-thread-pool-new
+I was wondering if you had a branch ready with the virtio-fs patches
+rebased on top 5.9-rcX?
 
-Currently we use "exlusive" thread pools but its performance seems to be
-poor. I tried using "shared" thread pools and performance seems much
-better. I posted performance results here.
+Thanks,
+Sebastien
+---------------------------------------------------------------------
+Intel Corporation SAS (French simplified joint stock company)
+Registered headquarters: "Les Montalets"- 2, rue de Paris, 
+92196 Meudon Cedex, France
+Registration Number:  302 456 199 R.C.S. NANTERRE
+Capital: 4,572,000 Euros
 
-https://www.redhat.com/archives/virtio-fs/2020-September/msg00080.html
-
-So lets switch to shared thread pools. We can think of making it optional
-once somebody can show in what cases exclusive thread pools offer better
-results. For now, my simple performance tests across the board see
-better results with shared thread pools.
-
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- tools/virtiofsd/fuse_virtio.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-Index: qemu/tools/virtiofsd/fuse_virtio.c
-===================================================================
---- qemu.orig/tools/virtiofsd/fuse_virtio.c	2020-09-21 17:28:27.444438015 -0400
-+++ qemu/tools/virtiofsd/fuse_virtio.c	2020-09-21 17:28:30.584568910 -0400
-@@ -695,7 +695,7 @@ static void *fv_queue_thread(void *opaqu
-     struct fuse_session *se = qi->virtio_dev->se;
-     GThreadPool *pool;
- 
--    pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size, TRUE,
-+    pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size, FALSE,
-                              NULL);
-     if (!pool) {
-         fuse_log(FUSE_LOG_ERR, "%s: g_thread_pool_new failed\n", __func__);
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
 

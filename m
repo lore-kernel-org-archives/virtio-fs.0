@@ -1,11 +1,14 @@
+Date: Tue, 22 Sep 2020 13:29:57 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri,  7 Aug 2020 15:55:24 -0400
-Message-Id: <20200807195526.426056-19-vgoyal@redhat.com>
-In-Reply-To: <20200807195526.426056-1-vgoyal@redhat.com>
-References: <20200807195526.426056-1-vgoyal@redhat.com>
+Message-ID: <20200922172957.GB57620@redhat.com>
+References: <20200921213216.GE13362@redhat.com>
+	<CAJfpegujM0ygoBT5uPf4zBUDiphDTwgu97NfqaEgaa8HoSnuRw@mail.gmail.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 18/20] fuse: Release file in process context
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+In-Reply-To: <CAJfpegujM0ygoBT5uPf4zBUDiphDTwgu97NfqaEgaa8HoSnuRw@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Used glib "shared" thread pool
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,64 +17,65 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
-Cc: vgoyal@redhat.com, miklos@szeredi.hu
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
 
-fuse_file_put(sync) can be called with sync=true/false. If sync=true,
-it waits for release request response and then calls iput() in the
-caller's context. If sync=false, it does not wait for release request
-response, frees the fuse_file struct immediately and req->end function
-does the iput().
+On Tue, Sep 22, 2020 at 02:03:18PM +0200, Miklos Szeredi wrote:
+> On Mon, Sep 21, 2020 at 11:32 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+>=20
+> > glib offers thread pools and it seems to support "exclusive" and "share=
+d"
+> > thread pools.
+> >
+> >
+> > https://developer.gnome.org/glib/stable/glib-Thread-Pools.html#g-thread=
+-pool-new
+> >
+> > Currently we use "exlusive" thread pools but its performance seems to be
+> > poor. I tried using "shared" thread pools and performance seems much
+> > better. I posted performance results here.
+> >
+> > https://www.redhat.com/archives/virtio-fs/2020-September/msg00080.html
+> >
+> > So lets switch to shared thread pools. We can think of making it option=
+al
+> > once somebody can show in what cases exclusive thread pools offer better
+> > results. For now, my simple performance tests across the board see
+> > better results with shared thread pools.
+> >
+>=20
+> Needs this as well:
 
-iput() can be a problem with DAX if called in req->end context. If this
-is last reference to inode (VFS has let go its reference already), then
-iput() will clean DAX mappings as well and send REMOVEMAPPING requests
-and wait for completion. (All the the worker thread context which is
-processing fuse replies from daemon on the host).
+I was wondering why I did not face this issue. I think my glib is old
+(glib2, 2.58.3) from fedora 29 and this change about sched_getattr seems
+relatively recent.
 
-That means it blocks worker thread and it stops processing further
-replies and system deadlocks.
+commit 8aeca4fa647bfd0f35c4a86b1e6ca6e955519ca5
+Author: Sebastian Dr=F6ge <sebastian@centricular.com>
+Date:   Tue Dec 24 15:33:30 2019 +0200
 
-So for now, force sync release of file in case of DAX inodes.
+    GThreadPool - Don't inherit thread priorities when creating new threads
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/file.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+I think my glib2 does not have this change and probably that's why
+seccomp did not trigger.
 
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index ecd2a42f6e30..605976a586c2 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -527,6 +527,7 @@ void fuse_release_common(struct file *file, bool isdir)
- 	struct fuse_file *ff = file->private_data;
- 	struct fuse_release_args *ra = ff->release_args;
- 	int opcode = isdir ? FUSE_RELEASEDIR : FUSE_RELEASE;
-+	bool sync = false;
- 
- 	fuse_prepare_release(fi, ff, file->f_flags, opcode);
- 
-@@ -546,8 +547,19 @@ void fuse_release_common(struct file *file, bool isdir)
- 	 * Make the release synchronous if this is a fuseblk mount,
- 	 * synchronous RELEASE is allowed (and desirable) in this case
- 	 * because the server can be trusted not to screw up.
-+	 *
-+	 * For DAX, fuse server is trusted. So it should be fine to
-+	 * do a sync file put. Doing async file put is creating
-+	 * problems right now because when request finish, iput()
-+	 * can lead to freeing of inode. That means it tears down
-+	 * mappings backing DAX memory and sends REMOVEMAPPING message
-+	 * to server and blocks for completion. Currently, waiting
-+	 * in req->end context deadlocks the system as same worker thread
-+	 * can't process REMOVEMAPPING reply it is waiting for.
- 	 */
--	fuse_file_put(ff, ff->fc->destroy, isdir);
-+	if (IS_DAX(file_inode(file)) || ff->fc->destroy)
-+		sync = true;
-+	fuse_file_put(ff, sync, isdir);
- }
- 
- static int fuse_open(struct inode *inode, struct file *file)
--- 
-2.25.4
+Vivek
+
+>=20
+> --- qemu.orig/tools/virtiofsd/passthrough_seccomp.c 2020-09-16
+> 20:21:13.168686176 +0200
+> +++ qemu/tools/virtiofsd/passthrough_seccomp.c 2020-09-22
+> 14:01:38.499164501 +0200
+> @@ -94,6 +94,8 @@ static const int syscall_whitelist[] =3D {
+>      SCMP_SYS(rt_sigaction),
+>      SCMP_SYS(rt_sigprocmask),
+>      SCMP_SYS(rt_sigreturn),
+> +    SCMP_SYS(sched_getattr),
+> +    SCMP_SYS(sched_setattr),
+>      SCMP_SYS(sendmsg),
+>      SCMP_SYS(setresgid),
+>      SCMP_SYS(setresuid),
+>=20
+> Thanks,
+> Miklos
 

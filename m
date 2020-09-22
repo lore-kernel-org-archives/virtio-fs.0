@@ -1,14 +1,12 @@
-Date: Tue, 22 Sep 2020 13:47:33 -0400
+Date: Tue, 22 Sep 2020 14:16:35 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200922174733.GD57620@redhat.com>
-References: <20200918213436.GA3520@redhat.com> <20200921153243.GK3221@work-vm>
-	<20200922102531.GA2837@work-vm>
+Message-ID: <20200922181635.GE57620@redhat.com>
+References: <bd4b7ab761dcb47f3b6ebf7fc065f5040a314056.camel@intel.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20200922102531.GA2837@work-vm>
-Subject: Re: [Virtio-fs] tools/virtiofs: Multi threading seems to hurt
-	performance
+In-Reply-To: <bd4b7ab761dcb47f3b6ebf7fc065f5040a314056.camel@intel.com>
+Subject: Re: [Virtio-fs] Branch with patches on top of Linux 5.9-rcX
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,62 +15,43 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: jose.carlos.venegas.munoz@intel.com, qemu-devel@nongnu.org, cdupontd@redhat.com, virtio-fs-list <virtio-fs@redhat.com>, archana.m.shinde@intel.com
+To: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
+Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
-On Tue, Sep 22, 2020 at 11:25:31AM +0100, Dr. David Alan Gilbert wrote:
-> * Dr. David Alan Gilbert (dgilbert@redhat.com) wrote:
-> > Hi,
-> >   I've been doing some of my own perf tests and I think I agree
-> > about the thread pool size;  my test is a kernel build
-> > and I've tried a bunch of different options.
-> > 
-> > My config:
-> >   Host: 16 core AMD EPYC (32 thread), 128G RAM,
-> >      5.9.0-rc4 kernel, rhel 8.2ish userspace.
-> >   5.1.0 qemu/virtiofsd built from git.
-> >   Guest: Fedora 32 from cloud image with just enough extra installed for
-> > a kernel build.
-> > 
-> >   git cloned and checkout v5.8 of Linux into /dev/shm/linux on the host
-> > fresh before each test.  Then log into the guest, make defconfig,
-> > time make -j 16 bzImage,  make clean; time make -j 16 bzImage 
-> > The numbers below are the 'real' time in the guest from the initial make
-> > (the subsequent makes dont vary much)
-> > 
-> > Below are the detauls of what each of these means, but here are the
-> > numbers first
-> > 
-> > virtiofsdefault        4m0.978s
-> > 9pdefault              9m41.660s
-> > virtiofscache=none    10m29.700s
-> > 9pmmappass             9m30.047s
-> > 9pmbigmsize           12m4.208s
-> > 9pmsecnone             9m21.363s
-> > virtiofscache=noneT1   7m17.494s
-> > virtiofsdefaultT1      3m43.326s
-> > 
-> > So the winner there by far is the 'virtiofsdefaultT1' - that's
-> > the default virtiofs settings, but with --thread-pool-size=1 - so
-> > yes it gives a small benefit.
-> > But interestingly the cache=none virtiofs performance is pretty bad,
-> > but thread-pool-size=1 on that makes a BIG improvement.
+On Tue, Sep 22, 2020 at 09:10:27AM +0000, Boeuf, Sebastien wrote:
+> Hi,
 > 
-> Here are fio runs that Vivek asked me to run in my same environment
-> (there are some 0's in some of the mmap cases, and I've not investigated
-> why yet).
+> I was wondering if you had a branch ready with the virtio-fs patches
+> rebased on top 5.9-rcX?
+> 
 
-cache=none does not allow mmap in case of virtiofs. That's when you
-are seeing 0.
+Hi Sebastien,
 
->virtiofs is looking good here in I think all of the cases;
-> there's some division over which cinfig; cache=none
-> seems faster in some cases which surprises me.
+I am waiting for DAX patches to be merged in 5.10 and then you can
+pull from upstream directly.
 
-I know cache=none is faster in case of write workloads. It forces
-direct write where we don't call file_remove_privs(). While cache=auto
-goes through file_remove_privs() and that adds a GETXATTR request to
-every WRITE request.
+In the meantime, everything is in Miklos's tree and you should be able
+to pull from there as well.
+
+https://git.kernel.org/pub/scm/linux/kernel/git/mszeredi/fuse.git/log/?h=for-next
+
+Is there still a need for me to take patches from Miklos's tree and
+push on virtiof-fs-dev?
 
 Vivek
+
+
+> Thanks,
+> Sebastien
+> ---------------------------------------------------------------------
+> Intel Corporation SAS (French simplified joint stock company)
+> Registered headquarters: "Les Montalets"- 2, rue de Paris, 
+> 92196 Meudon Cedex, France
+> Registration Number:  302 456 199 R.C.S. NANTERRE
+> Capital: 4,572,000 Euros
+> 
+> This e-mail and any attachments may contain confidential material for
+> the sole use of the intended recipient(s). Any review or distribution
+> by others is strictly prohibited. If you are not the intended
+> recipient, please contact the sender and delete all copies.
 

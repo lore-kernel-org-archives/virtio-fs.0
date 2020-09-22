@@ -1,16 +1,14 @@
-Date: Tue, 22 Sep 2020 18:46:18 +0100
-From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
-Message-ID: <20200922174618.GV1989025@redhat.com>
-References: <20200921213216.GE13362@redhat.com>
-	<20200922125957.GN1989025@redhat.com>
-	<20200922174255.GC57620@redhat.com>
+Date: Tue, 22 Sep 2020 13:47:33 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200922174733.GD57620@redhat.com>
+References: <20200918213436.GA3520@redhat.com> <20200921153243.GK3221@work-vm>
+	<20200922102531.GA2837@work-vm>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <20200922174255.GC57620@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Used glib "shared" thread pool
-Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+In-Reply-To: <20200922102531.GA2837@work-vm>
+Subject: Re: [Virtio-fs] tools/virtiofs: Multi threading seems to hurt
+	performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,75 +17,62 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, qemu-devel@nongnu.org
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: jose.carlos.venegas.munoz@intel.com, qemu-devel@nongnu.org, cdupontd@redhat.com, virtio-fs-list <virtio-fs@redhat.com>, archana.m.shinde@intel.com
 
-On Tue, Sep 22, 2020 at 01:42:55PM -0400, Vivek Goyal wrote:
-> On Tue, Sep 22, 2020 at 01:59:57PM +0100, Daniel P. Berrangé wrote:
-> > On Mon, Sep 21, 2020 at 05:32:16PM -0400, Vivek Goyal wrote:
-> > > glib offers thread pools and it seems to support "exclusive" and "shared"
-> > > thread pools.
-> > > 
-> > > https://developer.gnome.org/glib/stable/glib-Thread-Pools.html#g-thread-pool-new
-> > > 
-> > > Currently we use "exlusive" thread pools but its performance seems to be
-> > > poor. I tried using "shared" thread pools and performance seems much
-> > > better. I posted performance results here.
-> > > 
-> > > https://www.redhat.com/archives/virtio-fs/2020-September/msg00080.html
-> > > 
-> > > So lets switch to shared thread pools. We can think of making it optional
-> > > once somebody can show in what cases exclusive thread pools offer better
-> > > results. For now, my simple performance tests across the board see
-> > > better results with shared thread pools.
+On Tue, Sep 22, 2020 at 11:25:31AM +0100, Dr. David Alan Gilbert wrote:
+> * Dr. David Alan Gilbert (dgilbert@redhat.com) wrote:
+> > Hi,
+> >   I've been doing some of my own perf tests and I think I agree
+> > about the thread pool size;  my test is a kernel build
+> > and I've tried a bunch of different options.
 > > 
-> > I'm really curious why  there's any perf difference between shared and
-> > exclusive thread pools in the GLib impl.
+> > My config:
+> >   Host: 16 core AMD EPYC (32 thread), 128G RAM,
+> >      5.9.0-rc4 kernel, rhel 8.2ish userspace.
+> >   5.1.0 qemu/virtiofsd built from git.
+> >   Guest: Fedora 32 from cloud image with just enough extra installed for
+> > a kernel build.
 > > 
-> > Looking at the code the main difference between the two is appears to
-> > be around the way threads are spawned, specifically around the scheduler
-> > attributes assigned.
+> >   git cloned and checkout v5.8 of Linux into /dev/shm/linux on the host
+> > fresh before each test.  Then log into the guest, make defconfig,
+> > time make -j 16 bzImage,  make clean; time make -j 16 bzImage 
+> > The numbers below are the 'real' time in the guest from the initial make
+> > (the subsequent makes dont vary much)
 > > 
-> > In the shared case, the threads in the pool will have their scheduler
-> > attributes copied from the very first thread that calls g_thread_pool_new.
+> > Below are the detauls of what each of these means, but here are the
+> > numbers first
 > > 
-> > In the exclusive case, the threads in the pool will inherit their
-> > scheduler attributes from the thread which pushs the job that
-> > causes the worker thread to be created.
+> > virtiofsdefault        4m0.978s
+> > 9pdefault              9m41.660s
+> > virtiofscache=none    10m29.700s
+> > 9pmmappass             9m30.047s
+> > 9pmbigmsize           12m4.208s
+> > 9pmsecnone             9m21.363s
+> > virtiofscache=noneT1   7m17.494s
+> > virtiofsdefaultT1      3m43.326s
 > > 
-> > By schedular attributes, I mean all the items in the 'struct schedattr'
-> > filled by sched_getattr()
-> > 
-> > IOW, if threads in virtiofsd have varying schedular attributes this
-> > could possibly explain the difference in performance you see between
-> > the two setups.
+> > So the winner there by far is the 'virtiofsdefaultT1' - that's
+> > the default virtiofs settings, but with --thread-pool-size=1 - so
+> > yes it gives a small benefit.
+> > But interestingly the cache=none virtiofs performance is pretty bad,
+> > but thread-pool-size=1 on that makes a BIG improvement.
 > 
-> Hi Daniel,
-> 
-> Few things.
-> 
-> - I think scheduler attributes are same for the thread creating
->   pool as well as for thread pushing the job for virtiofsd.
-> 
-> - My glib2 is old (2.58.3) and I think that did not have sched_getattr()
->   stuff.
-> 
-> - One difference I noticed is that in case of shared pool, it does not
->   create extra threads if client is doing one request at a time. While
->   exclusive pool seemed to push every request to a new thread in pool
->   in sort of round robin fashion. It feels keeping requests being served
->   from same thread helps in this particilar workload case.
+> Here are fio runs that Vivek asked me to run in my same environment
+> (there are some 0's in some of the mmap cases, and I've not investigated
+> why yet).
 
-Yeah, that does sound like a candidate for the cause. I wonder if that
-was intentional in the GLib design or just an accidental impl they didn't
-realize had performance implications. Might be worth filing a bug against
-GLib if someone has free time & motivation to figure out a standalone
-reproducer to demonstrate the performance difference in the GLib APIs.
+cache=none does not allow mmap in case of virtiofs. That's when you
+are seeing 0.
 
-Regards,
-Daniel
--- 
-|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
-|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
-|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
+>virtiofs is looking good here in I think all of the cases;
+> there's some division over which cinfig; cache=none
+> seems faster in some cases which surprises me.
+
+I know cache=none is faster in case of write workloads. It forces
+direct write where we don't call file_remove_privs(). While cache=auto
+goes through file_remove_privs() and that adds a GETXATTR request to
+every WRITE request.
+
+Vivek
 

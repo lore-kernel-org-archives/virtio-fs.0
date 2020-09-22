@@ -1,11 +1,12 @@
-Date: Tue, 22 Sep 2020 11:25:31 +0100
+Date: Tue, 22 Sep 2020 12:09:46 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20200922102531.GA2837@work-vm>
-References: <20200918213436.GA3520@redhat.com> <20200921153243.GK3221@work-vm>
+Message-ID: <20200922110946.GB2836@work-vm>
+References: <20200918213436.GA3520@redhat.com>
+	<20200921201641.GD13362@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20200921153243.GK3221@work-vm>
+In-Reply-To: <20200921201641.GD13362@redhat.com>
 Subject: Re: [Virtio-fs] tools/virtiofs: Multi threading seems to hurt
 	performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -17,307 +18,129 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: jose.carlos.venegas.munoz@intel.com, qemu-devel@nongnu.org, cdupontd@redhat.com, virtio-fs-list <virtio-fs@redhat.com>, archana.m.shinde@intel.com
+Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org, Miklos Szeredi <miklos@szeredi.hu>
 
-* Dr. David Alan Gilbert (dgilbert@redhat.com) wrote:
-> Hi,
->   I've been doing some of my own perf tests and I think I agree
-> about the thread pool size;  my test is a kernel build
-> and I've tried a bunch of different options.
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> On Fri, Sep 18, 2020 at 05:34:36PM -0400, Vivek Goyal wrote:
+> > Hi All,
+> > 
+> > virtiofsd default thread pool size is 64. To me it feels that in most of
+> > the cases thread pool size 1 performs better than thread pool size 64.
+> > 
+> > I ran virtiofs-tests.
+> > 
+> > https://github.com/rhvgoyal/virtiofs-tests
 > 
-> My config:
->   Host: 16 core AMD EPYC (32 thread), 128G RAM,
->      5.9.0-rc4 kernel, rhel 8.2ish userspace.
->   5.1.0 qemu/virtiofsd built from git.
->   Guest: Fedora 32 from cloud image with just enough extra installed for
-> a kernel build.
+> I spent more time debugging this. First thing I noticed is that we
+> are using "exclusive" glib thread pool.
 > 
->   git cloned and checkout v5.8 of Linux into /dev/shm/linux on the host
-> fresh before each test.  Then log into the guest, make defconfig,
-> time make -j 16 bzImage,  make clean; time make -j 16 bzImage 
-> The numbers below are the 'real' time in the guest from the initial make
-> (the subsequent makes dont vary much)
+> https://developer.gnome.org/glib/stable/glib-Thread-Pools.html#g-thread-pool-new
 > 
-> Below are the detauls of what each of these means, but here are the
-> numbers first
+> This seems to run pre-determined number of threads dedicated to that
+> thread pool. Little instrumentation of code revealed that every new
+> request gets assiged to new thread (despite the fact that previous
+> thread finished its job). So internally there might be some kind of
+> round robin policy to choose next thread for running the job.
 > 
-> virtiofsdefault        4m0.978s
-> 9pdefault              9m41.660s
-> virtiofscache=none    10m29.700s
-> 9pmmappass             9m30.047s
-> 9pmbigmsize           12m4.208s
-> 9pmsecnone             9m21.363s
-> virtiofscache=noneT1   7m17.494s
-> virtiofsdefaultT1      3m43.326s
+> I decided to switch to "shared" pool instead where it seemed to spin
+> up new threads only if there is enough work. Also threads can be shared
+> between pools.
 > 
-> So the winner there by far is the 'virtiofsdefaultT1' - that's
-> the default virtiofs settings, but with --thread-pool-size=1 - so
-> yes it gives a small benefit.
-> But interestingly the cache=none virtiofs performance is pretty bad,
-> but thread-pool-size=1 on that makes a BIG improvement.
+> And looks like testing results are way better with "shared" pools. So
+> may be we should switch to shared pool by default. (Till somebody shows
+> in what cases exclusive pools are better).
+> 
+> Second thought which came to mind was what's the impact of NUMA. What
+> if qemu and virtiofsd process/threads are running on separate NUMA
+> node. That should increase memory access latency and increased overhead.
+> So I used "numactl --cpubind=0" to bind both qemu and virtiofsd to node
+> 0. My machine seems to have two numa nodes. (Each node is having 32
+> logical processors). Keeping both qemu and virtiofsd on same node
+> improves throughput further.
+> 
+> So here are the results.
+> 
+> vtfs-none-epool --> cache=none, exclusive thread pool.
+> vtfs-none-spool --> cache=none, shared thread pool.
+> vtfs-none-spool-numa --> cache=none, shared thread pool, same numa node
 
-Here are fio runs that Vivek asked me to run in my same environment
-(there are some 0's in some of the mmap cases, and I've not investigated
-why yet). virtiofs is looking good here in I think all of the cases;
-there's some division over which cinfig; cache=none
-seems faster in some cases which surprises me.
+Do you have the numbers for:
+   epool
+   epool thread-pool-size=1
+   spool
+
+?
 
 Dave
 
-
-NAME                    WORKLOAD                Bandwidth       IOPS            
-9pbigmsize              seqread-psync           108(MiB/s)      27k             
-9pdefault               seqread-psync           105(MiB/s)      26k             
-9pmmappass              seqread-psync           107(MiB/s)      26k             
-9pmsecnone              seqread-psync           107(MiB/s)      26k             
-virtiofscachenoneT1     seqread-psync           135(MiB/s)      33k             
-virtiofscachenone       seqread-psync           115(MiB/s)      28k             
-virtiofsdefaultT1       seqread-psync           2465(MiB/s)     616k            
-virtiofsdefault         seqread-psync           2468(MiB/s)     617k            
-
-9pbigmsize              seqread-psync-multi     357(MiB/s)      89k             
-9pdefault               seqread-psync-multi     358(MiB/s)      89k             
-9pmmappass              seqread-psync-multi     347(MiB/s)      86k             
-9pmsecnone              seqread-psync-multi     364(MiB/s)      91k             
-virtiofscachenoneT1     seqread-psync-multi     479(MiB/s)      119k            
-virtiofscachenone       seqread-psync-multi     385(MiB/s)      96k             
-virtiofsdefaultT1       seqread-psync-multi     5916(MiB/s)     1479k           
-virtiofsdefault         seqread-psync-multi     8771(MiB/s)     2192k           
-
-9pbigmsize              seqread-mmap            111(MiB/s)      27k             
-9pdefault               seqread-mmap            101(MiB/s)      25k             
-9pmmappass              seqread-mmap            114(MiB/s)      28k             
-9pmsecnone              seqread-mmap            107(MiB/s)      26k             
-virtiofscachenoneT1     seqread-mmap            0(KiB/s)        0               
-virtiofscachenone       seqread-mmap            0(KiB/s)        0               
-virtiofsdefaultT1       seqread-mmap            2896(MiB/s)     724k            
-virtiofsdefault         seqread-mmap            2856(MiB/s)     714k            
-
-9pbigmsize              seqread-mmap-multi      364(MiB/s)      91k             
-9pdefault               seqread-mmap-multi      348(MiB/s)      87k             
-9pmmappass              seqread-mmap-multi      354(MiB/s)      88k             
-9pmsecnone              seqread-mmap-multi      340(MiB/s)      85k             
-virtiofscachenoneT1     seqread-mmap-multi      0(KiB/s)        0               
-virtiofscachenone       seqread-mmap-multi      0(KiB/s)        0               
-virtiofsdefaultT1       seqread-mmap-multi      6057(MiB/s)     1514k           
-virtiofsdefault         seqread-mmap-multi      9585(MiB/s)     2396k           
-
-9pbigmsize              seqread-libaio          109(MiB/s)      27k             
-9pdefault               seqread-libaio          103(MiB/s)      25k             
-9pmmappass              seqread-libaio          107(MiB/s)      26k             
-9pmsecnone              seqread-libaio          107(MiB/s)      26k             
-virtiofscachenoneT1     seqread-libaio          671(MiB/s)      167k            
-virtiofscachenone       seqread-libaio          538(MiB/s)      134k            
-virtiofsdefaultT1       seqread-libaio          187(MiB/s)      46k             
-virtiofsdefault         seqread-libaio          541(MiB/s)      135k            
-
-9pbigmsize              seqread-libaio-multi    354(MiB/s)      88k             
-9pdefault               seqread-libaio-multi    360(MiB/s)      90k             
-9pmmappass              seqread-libaio-multi    356(MiB/s)      89k             
-9pmsecnone              seqread-libaio-multi    344(MiB/s)      86k             
-virtiofscachenoneT1     seqread-libaio-multi    488(MiB/s)      122k            
-virtiofscachenone       seqread-libaio-multi    380(MiB/s)      95k             
-virtiofsdefaultT1       seqread-libaio-multi    5577(MiB/s)     1394k           
-virtiofsdefault         seqread-libaio-multi    5359(MiB/s)     1339k           
-
-9pbigmsize              randread-psync          106(MiB/s)      26k             
-9pdefault               randread-psync          106(MiB/s)      26k             
-9pmmappass              randread-psync          120(MiB/s)      30k             
-9pmsecnone              randread-psync          105(MiB/s)      26k             
-virtiofscachenoneT1     randread-psync          154(MiB/s)      38k             
-virtiofscachenone       randread-psync          134(MiB/s)      33k             
-virtiofsdefaultT1       randread-psync          129(MiB/s)      32k             
-virtiofsdefault         randread-psync          129(MiB/s)      32k             
-
-9pbigmsize              randread-psync-multi    349(MiB/s)      87k             
-9pdefault               randread-psync-multi    354(MiB/s)      88k             
-9pmmappass              randread-psync-multi    360(MiB/s)      90k             
-9pmsecnone              randread-psync-multi    352(MiB/s)      88k             
-virtiofscachenoneT1     randread-psync-multi    449(MiB/s)      112k            
-virtiofscachenone       randread-psync-multi    383(MiB/s)      95k             
-virtiofsdefaultT1       randread-psync-multi    435(MiB/s)      108k            
-virtiofsdefault         randread-psync-multi    368(MiB/s)      92k             
-
-9pbigmsize              randread-mmap           100(MiB/s)      25k             
-9pdefault               randread-mmap           89(MiB/s)       22k             
-9pmmappass              randread-mmap           87(MiB/s)       21k             
-9pmsecnone              randread-mmap           92(MiB/s)       23k             
-virtiofscachenoneT1     randread-mmap           0(KiB/s)        0               
-virtiofscachenone       randread-mmap           0(KiB/s)        0               
-virtiofsdefaultT1       randread-mmap           111(MiB/s)      27k             
-virtiofsdefault         randread-mmap           101(MiB/s)      25k             
-
-9pbigmsize              randread-mmap-multi     335(MiB/s)      83k             
-9pdefault               randread-mmap-multi     318(MiB/s)      79k             
-9pmmappass              randread-mmap-multi     335(MiB/s)      83k             
-9pmsecnone              randread-mmap-multi     323(MiB/s)      80k             
-virtiofscachenoneT1     randread-mmap-multi     0(KiB/s)        0               
-virtiofscachenone       randread-mmap-multi     0(KiB/s)        0               
-virtiofsdefaultT1       randread-mmap-multi     422(MiB/s)      105k            
-virtiofsdefault         randread-mmap-multi     345(MiB/s)      86k             
-
-9pbigmsize              randread-libaio         84(MiB/s)       21k             
-9pdefault               randread-libaio         89(MiB/s)       22k             
-9pmmappass              randread-libaio         87(MiB/s)       21k             
-9pmsecnone              randread-libaio         82(MiB/s)       20k             
-virtiofscachenoneT1     randread-libaio         641(MiB/s)      160k            
-virtiofscachenone       randread-libaio         527(MiB/s)      131k            
-virtiofsdefaultT1       randread-libaio         205(MiB/s)      51k             
-virtiofsdefault         randread-libaio         536(MiB/s)      134k            
-
-9pbigmsize              randread-libaio-multi   265(MiB/s)      66k             
-9pdefault               randread-libaio-multi   267(MiB/s)      66k             
-9pmmappass              randread-libaio-multi   266(MiB/s)      66k             
-9pmsecnone              randread-libaio-multi   269(MiB/s)      67k             
-virtiofscachenoneT1     randread-libaio-multi   615(MiB/s)      153k            
-virtiofscachenone       randread-libaio-multi   542(MiB/s)      135k            
-virtiofsdefaultT1       randread-libaio-multi   595(MiB/s)      148k            
-virtiofsdefault         randread-libaio-multi   552(MiB/s)      138k            
-
-9pbigmsize              seqwrite-psync          106(MiB/s)      26k             
-9pdefault               seqwrite-psync          106(MiB/s)      26k             
-9pmmappass              seqwrite-psync          107(MiB/s)      26k             
-9pmsecnone              seqwrite-psync          107(MiB/s)      26k             
-virtiofscachenoneT1     seqwrite-psync          136(MiB/s)      34k             
-virtiofscachenone       seqwrite-psync          112(MiB/s)      28k             
-virtiofsdefaultT1       seqwrite-psync          132(MiB/s)      33k             
-virtiofsdefault         seqwrite-psync          109(MiB/s)      27k             
-
-9pbigmsize              seqwrite-psync-multi    353(MiB/s)      88k             
-9pdefault               seqwrite-psync-multi    364(MiB/s)      91k             
-9pmmappass              seqwrite-psync-multi    345(MiB/s)      86k             
-9pmsecnone              seqwrite-psync-multi    350(MiB/s)      87k             
-virtiofscachenoneT1     seqwrite-psync-multi    470(MiB/s)      117k            
-virtiofscachenone       seqwrite-psync-multi    374(MiB/s)      93k             
-virtiofsdefaultT1       seqwrite-psync-multi    470(MiB/s)      117k            
-virtiofsdefault         seqwrite-psync-multi    373(MiB/s)      93k             
-
-9pbigmsize              seqwrite-mmap           195(MiB/s)      48k             
-9pdefault               seqwrite-mmap           0(KiB/s)        0               
-9pmmappass              seqwrite-mmap           196(MiB/s)      49k             
-9pmsecnone              seqwrite-mmap           0(KiB/s)        0               
-virtiofscachenoneT1     seqwrite-mmap           0(KiB/s)        0               
-virtiofscachenone       seqwrite-mmap           0(KiB/s)        0               
-virtiofsdefaultT1       seqwrite-mmap           603(MiB/s)      150k            
-virtiofsdefault         seqwrite-mmap           629(MiB/s)      157k            
-
-9pbigmsize              seqwrite-mmap-multi     247(MiB/s)      61k             
-9pdefault               seqwrite-mmap-multi     0(KiB/s)        0               
-9pmmappass              seqwrite-mmap-multi     246(MiB/s)      61k             
-9pmsecnone              seqwrite-mmap-multi     0(KiB/s)        0               
-virtiofscachenoneT1     seqwrite-mmap-multi     0(KiB/s)        0               
-virtiofscachenone       seqwrite-mmap-multi     0(KiB/s)        0               
-virtiofsdefaultT1       seqwrite-mmap-multi     1787(MiB/s)     446k            
-virtiofsdefault         seqwrite-mmap-multi     1692(MiB/s)     423k            
-
-9pbigmsize              seqwrite-libaio         107(MiB/s)      26k             
-9pdefault               seqwrite-libaio         107(MiB/s)      26k             
-9pmmappass              seqwrite-libaio         106(MiB/s)      26k             
-9pmsecnone              seqwrite-libaio         108(MiB/s)      27k             
-virtiofscachenoneT1     seqwrite-libaio         595(MiB/s)      148k            
-virtiofscachenone       seqwrite-libaio         524(MiB/s)      131k            
-virtiofsdefaultT1       seqwrite-libaio         575(MiB/s)      143k            
-virtiofsdefault         seqwrite-libaio         538(MiB/s)      134k            
-
-9pbigmsize              seqwrite-libaio-multi   355(MiB/s)      88k             
-9pdefault               seqwrite-libaio-multi   341(MiB/s)      85k             
-9pmmappass              seqwrite-libaio-multi   354(MiB/s)      88k             
-9pmsecnone              seqwrite-libaio-multi   350(MiB/s)      87k             
-virtiofscachenoneT1     seqwrite-libaio-multi   609(MiB/s)      152k            
-virtiofscachenone       seqwrite-libaio-multi   536(MiB/s)      134k            
-virtiofsdefaultT1       seqwrite-libaio-multi   609(MiB/s)      152k            
-virtiofsdefault         seqwrite-libaio-multi   538(MiB/s)      134k            
-
-9pbigmsize              randwrite-psync         104(MiB/s)      26k             
-9pdefault               randwrite-psync         106(MiB/s)      26k             
-9pmmappass              randwrite-psync         105(MiB/s)      26k             
-9pmsecnone              randwrite-psync         103(MiB/s)      25k             
-virtiofscachenoneT1     randwrite-psync         125(MiB/s)      31k             
-virtiofscachenone       randwrite-psync         110(MiB/s)      27k             
-virtiofsdefaultT1       randwrite-psync         129(MiB/s)      32k             
-virtiofsdefault         randwrite-psync         112(MiB/s)      28k             
-
-9pbigmsize              randwrite-psync-multi   355(MiB/s)      88k             
-9pdefault               randwrite-psync-multi   339(MiB/s)      84k             
-9pmmappass              randwrite-psync-multi   343(MiB/s)      85k             
-9pmsecnone              randwrite-psync-multi   344(MiB/s)      86k             
-virtiofscachenoneT1     randwrite-psync-multi   461(MiB/s)      115k            
-virtiofscachenone       randwrite-psync-multi   370(MiB/s)      92k             
-virtiofsdefaultT1       randwrite-psync-multi   449(MiB/s)      112k            
-virtiofsdefault         randwrite-psync-multi   364(MiB/s)      91k             
-
-9pbigmsize              randwrite-mmap          98(MiB/s)       24k             
-9pdefault               randwrite-mmap          0(KiB/s)        0               
-9pmmappass              randwrite-mmap          97(MiB/s)       24k             
-9pmsecnone              randwrite-mmap          0(KiB/s)        0               
-virtiofscachenoneT1     randwrite-mmap          0(KiB/s)        0               
-virtiofscachenone       randwrite-mmap          0(KiB/s)        0               
-virtiofsdefaultT1       randwrite-mmap          102(MiB/s)      25k             
-virtiofsdefault         randwrite-mmap          92(MiB/s)       23k             
-
-9pbigmsize              randwrite-mmap-multi    246(MiB/s)      61k             
-9pdefault               randwrite-mmap-multi    0(KiB/s)        0               
-9pmmappass              randwrite-mmap-multi    239(MiB/s)      59k             
-9pmsecnone              randwrite-mmap-multi    0(KiB/s)        0               
-virtiofscachenoneT1     randwrite-mmap-multi    0(KiB/s)        0               
-virtiofscachenone       randwrite-mmap-multi    0(KiB/s)        0               
-virtiofsdefaultT1       randwrite-mmap-multi    279(MiB/s)      69k             
-virtiofsdefault         randwrite-mmap-multi    225(MiB/s)      56k             
-
-9pbigmsize              randwrite-libaio        110(MiB/s)      27k             
-9pdefault               randwrite-libaio        111(MiB/s)      27k             
-9pmmappass              randwrite-libaio        103(MiB/s)      25k             
-9pmsecnone              randwrite-libaio        102(MiB/s)      25k             
-virtiofscachenoneT1     randwrite-libaio        601(MiB/s)      150k            
-virtiofscachenone       randwrite-libaio        525(MiB/s)      131k            
-virtiofsdefaultT1       randwrite-libaio        618(MiB/s)      154k            
-virtiofsdefault         randwrite-libaio        527(MiB/s)      131k            
-
-9pbigmsize              randwrite-libaio-multi  332(MiB/s)      83k             
-9pdefault               randwrite-libaio-multi  343(MiB/s)      85k             
-9pmmappass              randwrite-libaio-multi  350(MiB/s)      87k             
-9pmsecnone              randwrite-libaio-multi  334(MiB/s)      83k             
-virtiofscachenoneT1     randwrite-libaio-multi  611(MiB/s)      152k            
-virtiofscachenone       randwrite-libaio-multi  533(MiB/s)      133k            
-virtiofsdefaultT1       randwrite-libaio-multi  599(MiB/s)      149k            
-virtiofsdefault         randwrite-libaio-multi  531(MiB/s)      132k            
-
 > 
-> virtiofsdefault:
->   ./virtiofsd --socket-path=/tmp/vhostqemu -o source=/dev/shm/linux
->   ./x86_64-softmmu/qemu-system-x86_64 -M pc,memory-backend=mem,accel=kvm -smp 8 -cpu host -m 32G,maxmem=64G,slots=1 -object memory-backend-memfd,id=mem,size=32G,share=on -drive if=virtio,file=/home/images/f-32-kernel.qcow2 -nographic -chardev socket,id=char0,path=/tmp/vhostqemu -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=kernel
->   mount -t virtiofs kernel /mnt
+> NAME                    WORKLOAD                Bandwidth       IOPS            
+> vtfs-none-epool         seqread-psync           36(MiB/s)       9392            
+> vtfs-none-spool         seqread-psync           68(MiB/s)       17k             
+> vtfs-none-spool-numa    seqread-psync           73(MiB/s)       18k             
 > 
-> 9pdefault
->   ./x86_64-softmmu/qemu-system-x86_64 -M pc,accel=kvm -smp 8 -cpu host -m 32G -drive if=virtio,file=/home/images/f-32-kernel.qcow2 -nographic -virtfs local,path=/dev/shm/linux,mount_tag=kernel,security_model=passthrough
->   mount -t 9p -o trans=virtio kernel /mnt -oversion=9p2000.L
+> vtfs-none-epool         seqread-psync-multi     210(MiB/s)      52k             
+> vtfs-none-spool         seqread-psync-multi     260(MiB/s)      65k             
+> vtfs-none-spool-numa    seqread-psync-multi     309(MiB/s)      77k             
 > 
-> virtiofscache=none
->   ./virtiofsd --socket-path=/tmp/vhostqemu -o source=/dev/shm/linux -o cache=none
->   ./x86_64-softmmu/qemu-system-x86_64 -M pc,memory-backend=mem,accel=kvm -smp 8 -cpu host -m 32G,maxmem=64G,slots=1 -object memory-backend-memfd,id=mem,size=32G,share=on -drive if=virtio,file=/home/images/f-32-kernel.qcow2 -nographic -chardev socket,id=char0,path=/tmp/vhostqemu -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=kernel
->   mount -t virtiofs kernel /mnt
+> vtfs-none-epool         seqread-libaio          286(MiB/s)      71k             
+> vtfs-none-spool         seqread-libaio          328(MiB/s)      82k             
+> vtfs-none-spool-numa    seqread-libaio          332(MiB/s)      83k             
 > 
-> 9pmmappass
->   ./x86_64-softmmu/qemu-system-x86_64 -M pc,accel=kvm -smp 8 -cpu host -m 32G -drive if=virtio,file=/home/images/f-32-kernel.qcow2 -nographic -virtfs local,path=/dev/shm/linux,mount_tag=kernel,security_model=passthrough
->   mount -t 9p -o trans=virtio kernel /mnt -oversion=9p2000.L,cache=mmap
+> vtfs-none-epool         seqread-libaio-multi    201(MiB/s)      50k             
+> vtfs-none-spool         seqread-libaio-multi    254(MiB/s)      63k             
+> vtfs-none-spool-numa    seqread-libaio-multi    276(MiB/s)      69k             
 > 
-> 9pmbigmsize
->    ./x86_64-softmmu/qemu-system-x86_64 -M pc,accel=kvm -smp 8 -cpu host -m 32G -drive if=virtio,file=/home/images/f-32-kernel.qcow2 -nographic -virtfs local,path=/dev/shm/linux,mount_tag=kernel,security_model=passthrough
->    mount -t 9p -o trans=virtio kernel /mnt -oversion=9p2000.L,cache=mmap,msize=1048576
+> vtfs-none-epool         randread-psync          40(MiB/s)       10k             
+> vtfs-none-spool         randread-psync          64(MiB/s)       16k             
+> vtfs-none-spool-numa    randread-psync          72(MiB/s)       18k             
 > 
-> 9pmsecnone
->    ./x86_64-softmmu/qemu-system-x86_64 -M pc,accel=kvm -smp 8 -cpu host -m 32G -drive if=virtio,file=/home/images/f-32-kernel.qcow2 -nographic -virtfs local,path=/dev/shm/linux,mount_tag=kernel,security_model=none
->    mount -t 9p -o trans=virtio kernel /mnt -oversion=9p2000.L
+> vtfs-none-epool         randread-psync-multi    211(MiB/s)      52k             
+> vtfs-none-spool         randread-psync-multi    252(MiB/s)      63k             
+> vtfs-none-spool-numa    randread-psync-multi    297(MiB/s)      74k             
 > 
-> virtiofscache=noneT1
->    ./virtiofsd --socket-path=/tmp/vhostqemu -o source=/dev/shm/linux -o cache=none --thread-pool-size=1
->    mount -t virtiofs kernel /mnt
+> vtfs-none-epool         randread-libaio         313(MiB/s)      78k             
+> vtfs-none-spool         randread-libaio         320(MiB/s)      80k             
+> vtfs-none-spool-numa    randread-libaio         330(MiB/s)      82k             
 > 
-> virtiofsdefaultT1
->    ./virtiofsd --socket-path=/tmp/vhostqemu -o source=/dev/shm/linux --thread-pool-size=1
->     ./x86_64-softmmu/qemu-system-x86_64 -M pc,memory-backend=mem,accel=kvm -smp 8 -cpu host -m 32G,maxmem=64G,slots=1 -object memory-backend-memfd,id=mem,size=32G,share=on -drive if=virtio,file=/home/images/f-32-kernel.qcow2 -nographic -chardev socket,id=char0,path=/tmp/vhostqemu -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=kernel
-> -- 
-> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> vtfs-none-epool         randread-libaio-multi   257(MiB/s)      64k             
+> vtfs-none-spool         randread-libaio-multi   274(MiB/s)      68k             
+> vtfs-none-spool-numa    randread-libaio-multi   319(MiB/s)      79k             
+> 
+> vtfs-none-epool         seqwrite-psync          34(MiB/s)       8926            
+> vtfs-none-spool         seqwrite-psync          55(MiB/s)       13k             
+> vtfs-none-spool-numa    seqwrite-psync          66(MiB/s)       16k             
+> 
+> vtfs-none-epool         seqwrite-psync-multi    196(MiB/s)      49k             
+> vtfs-none-spool         seqwrite-psync-multi    225(MiB/s)      56k             
+> vtfs-none-spool-numa    seqwrite-psync-multi    270(MiB/s)      67k             
+> 
+> vtfs-none-epool         seqwrite-libaio         257(MiB/s)      64k             
+> vtfs-none-spool         seqwrite-libaio         304(MiB/s)      76k             
+> vtfs-none-spool-numa    seqwrite-libaio         267(MiB/s)      66k             
+> 
+> vtfs-none-epool         seqwrite-libaio-multi   312(MiB/s)      78k             
+> vtfs-none-spool         seqwrite-libaio-multi   366(MiB/s)      91k             
+> vtfs-none-spool-numa    seqwrite-libaio-multi   381(MiB/s)      95k             
+> 
+> vtfs-none-epool         randwrite-psync         38(MiB/s)       9745            
+> vtfs-none-spool         randwrite-psync         55(MiB/s)       13k             
+> vtfs-none-spool-numa    randwrite-psync         67(MiB/s)       16k             
+> 
+> vtfs-none-epool         randwrite-psync-multi   186(MiB/s)      46k             
+> vtfs-none-spool         randwrite-psync-multi   240(MiB/s)      60k             
+> vtfs-none-spool-numa    randwrite-psync-multi   271(MiB/s)      67k             
+> 
+> vtfs-none-epool         randwrite-libaio        224(MiB/s)      56k             
+> vtfs-none-spool         randwrite-libaio        296(MiB/s)      74k             
+> vtfs-none-spool-numa    randwrite-libaio        290(MiB/s)      72k             
+> 
+> vtfs-none-epool         randwrite-libaio-multi  300(MiB/s)      75k             
+> vtfs-none-spool         randwrite-libaio-multi  350(MiB/s)      87k             
+> vtfs-none-spool-numa    randwrite-libaio-multi  383(MiB/s)      95k             
+> 
+> Thanks
+> Vivek
 -- 
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

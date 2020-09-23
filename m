@@ -1,19 +1,13 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=tutwXlLRaCHmNunSZOUg3PFewrcSdlhQGYC1/N5DtJA=;
-	b=avwq57Ap2/fV3ZAutyiFwEZ07ArfkXhlgtYTLYmfqV/wgNzcOMyRJYa3Y3QXcZwsZD
-	Ow3RKKyFsBwNE4sa+z6K3fk+Rcki8+gUTV5Wql0HgoYLLjze6UcDyIkuYbyQMNCtardL
-	YN0XrDBY/2Kvt+it57hvDhGO74D6Lcwe3MP1M=
+Date: Wed, 23 Sep 2020 13:22:53 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20200923122253.GB51019@stefanha-x1.localdomain>
+References: <20200921213216.GE13362@redhat.com>
 MIME-Version: 1.0
-References: <20200929185015.GG220516@redhat.com>
-	<CAOQ4uxgMeWF_vitenBY6_N3Eu-ix92q8AO5ckDAF+SVxHTBXXw@mail.gmail.com>
-In-Reply-To: <CAOQ4uxgMeWF_vitenBY6_N3Eu-ix92q8AO5ckDAF+SVxHTBXXw@mail.gmail.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Wed, 30 Sep 2020 08:40:26 +0200
-Message-ID: <CAJfpegtH0TruLCnG_YJ8aUBHh7k5sqN_wVEegvDPJOoDcmwLSQ@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [RFC PATCH] fuse: update attributes on read() only
-	on timeout
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="/WwmFnJnmDyWGHa4"
+Content-Disposition: inline
+In-Reply-To: <20200921213216.GE13362@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Used glib "shared" thread pool
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,93 +16,74 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Amir Goldstein <amir73il@gmail.com>
-Cc: Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, Brian Foster <bfoster@redhat.com>, Zhi Zhang <zhang.david2011@gmail.com>, Vivek Goyal <vgoyal@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, qemu-devel@nongnu.org
 
-On Wed, Sep 30, 2020 at 6:36 AM Amir Goldstein <amir73il@gmail.com> wrote:
 
-> I wonder out loud if this change of behavior you proposed is a good opportunity
-> to introduce some of the verbs from SMB oplocks / NFS delegations into the
-> FUSE protocol in order to allow finer grained control over per-file
-> (and later also per-directory) caching behavior.
+--/WwmFnJnmDyWGHa4
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-That would be really nice.  Let me find a recent discussion on this...
-ah it was private.   Copying the thread below.  Thoughts?
+On Mon, Sep 21, 2020 at 05:32:16PM -0400, Vivek Goyal wrote:
+> glib offers thread pools and it seems to support "exclusive" and "shared"
+> thread pools.
+>=20
+> https://developer.gnome.org/glib/stable/glib-Thread-Pools.html#g-thread-p=
+ool-new
+>=20
+> Currently we use "exlusive" thread pools but its performance seems to be
+> poor. I tried using "shared" thread pools and performance seems much
+> better. I posted performance results here.
+>=20
+> https://www.redhat.com/archives/virtio-fs/2020-September/msg00080.html
+>=20
+> So lets switch to shared thread pools. We can think of making it optional
+> once somebody can show in what cases exclusive thread pools offer better
+> results. For now, my simple performance tests across the board see
+> better results with shared thread pools.
+>=20
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  tools/virtiofsd/fuse_virtio.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>=20
+> Index: qemu/tools/virtiofsd/fuse_virtio.c
+> =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+> --- qemu.orig/tools/virtiofsd/fuse_virtio.c	2020-09-21 17:28:27.444438015=
+ -0400
+> +++ qemu/tools/virtiofsd/fuse_virtio.c	2020-09-21 17:28:30.584568910 -0400
+> @@ -695,7 +695,7 @@ static void *fv_queue_thread(void *opaqu
+>      struct fuse_session *se =3D qi->virtio_dev->se;
+>      GThreadPool *pool;
+> =20
+> -    pool =3D g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size=
+, TRUE,
+> +    pool =3D g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size=
+, FALSE,
+>                               NULL);
+>      if (!pool) {
+>          fuse_log(FUSE_LOG_ERR, "%s: g_thread_pool_new failed\n", __func_=
+_);
 
-Thanks,
-Miklos
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
-On Tue, Aug 11, 2020 at 8:56 AM Miklos Szeredi <miklos@szeredi.hu> wrote:
->
-> On Wed, Aug 5, 2020 at 5:53 AM Zhi Zhang <zhang.david2011@gmail.com> wrote:
-> > On Tue, Aug 4, 2020 at 11:36 AM Zhi Zhang <zhang.david2011@gmail.com> wrote:
-> > > On Mon, Aug 3, 2020 at 6:37 PM Miklos Szeredi <miklos@szeredi.hu> wrote:
-> > > >
-> > > > On Thu, Jul 23, 2020 at 12:40 PM Zhi Zhang <zhang.david2011@gmail.com> wrote:
->
-> > > > > We are using distributed filesystem ceph-fuse and we enabled writeback
-> > > > > cache on fuse which improves the write performance, but the file's
-> > > > > size attribute can't be updated on another client even if the users on
-> > > > > this client only read this file.
-> > > > >
-> > > > > From my understanding, if the file is not opened in write mode and
-> > > > > already writes its buffered data to userspace filesystem like
-> > > > > ceph-fuse, then its state should be clean. The upper userspace and
-> > > > > remote server should be responsible for the data and consistency. So
-> > > > > at this moment fuse could trust the attributes from the server which
-> > > > > has the most authoritative information about this file.
-> > > > >
-> > > > > Please let me know your thoughts, then I can work on this patch. Thanks.
-> > > >
-> > > > Hi,
-> > > >
-> > > > Something like this makes sense, but I think we should be adding an
-> > > > explicit state (a lease to read/write the data) to the fuse inode.
-> > > >
-> > > > Opening for write would automatically acquire the WRITE lease,
-> > > > similarly opening for read would acquire the READ lease.  Then we need
-> > > > a new notification for revoking a lease (FUSE_NOTIFY_REVOKE).  And we
-> > > > need a new request for re-acquiring a lease (FUSE_REACQUIRE).
-> > > >
-> > > > Does that make sense?
-> > > >
-> > > > Would you mind discussing this on the linux-fsdevel mailing lists?
-> > > >
-> > > > Thanks,
-> > > > Miklos>
-> > Hi Miklos,
-> >
-> > Thanks for the comments. I thought about it but I still have a couple
-> > of questions about the lease.
-> >
-> > 1. After acquiring a WRITE lease, when should we release(revoke) it?
-> > Before I assumed the file would be clean once we wrote buffered data
-> > to the userspace file system. Now if we introduce the lease, should we
-> > release the WRITE lease once we write the buffered data or we need to
-> > wait for the revoking notification from userspace file system?
->
-> I think it's easier to wait for the notification, instead of trying to
-> guess.   When the file is closed (released) then the lease is also
-> implicitly released.
->
-> > 2. What is the purpose of READ lease?
-> > Once we hold the READ lease, we could trust cached attributes and data
-> > until revoking notification from userspace file system?
->
-> Yes.
->
-> > 3. What is the purpose of re-acquiring a lease and why do we need a new request?
-> > From my understanding, the lease mechanism is only known by kernel
-> > fuse, not for libfuse.
->
-> We don't necessarily need a new request, it could be implicit in the
-> first uncached write.
->
-> > To re-acquire a lease here is actually for READ
-> > lease by sending a sync getattr request.
->
-> Yes.
->
-> Thanks,
-> Miklos
+--/WwmFnJnmDyWGHa4
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl9rPh0ACgkQnKSrs4Gr
+c8h95ggAhwmJLoaBHHsErEpHJKkma6Mx70WHmYZCr+JoAogEvV0TjYfj83oOzRMZ
+IAeaS78kppwaYJf4nmbbU5VW0jz0U88wVFO43D6N8tt9sWNPD6u8Zr9hlWN1tkUz
+SIPiRfa4h+vSpZNdzEL8L/cnO3gdp3m+IyYnwz+fa+IAD3wgO6OOB4naLUzJEmLb
+RWYTL081LUCRuRABTZWTiemr1sLOBNCmIHkoRVszqbhfOFwKO7b3ygqLC7mg8+9n
+ajlN+XuMR8/rL+El1cct9m0ef6iimme3oj2lF/ihxCb4EdC77FsHdgFJFTANih6j
+MC5FfBdd+AC++n0IxrkIeQiEEAqe3w==
+=Ub6E
+-----END PGP SIGNATURE-----
+
+--/WwmFnJnmDyWGHa4--
 

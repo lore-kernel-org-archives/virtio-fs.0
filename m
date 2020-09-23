@@ -1,22 +1,14 @@
-Date: Mon, 5 Oct 2020 09:16:20 -0700
-From: Sean Christopherson <sean.j.christopherson@intel.com>
-Message-ID: <20201005161620.GC11938@linux.intel.com>
-References: <20200929043700.GL31514@linux.intel.com>
-	<20201001215508.GD3522@redhat.com>
-	<20201001223320.GI7474@linux.intel.com>
-	<20201002153854.GC3119@redhat.com>
-	<20201002183036.GB24460@linux.intel.com>
-	<20201002192734.GD3119@redhat.com>
-	<20201002194517.GD24460@linux.intel.com>
-	<20201002200214.GB10232@redhat.com>
-	<20201002211314.GE24460@linux.intel.com>
-	<20201005153318.GA4302@redhat.com>
+Date: Wed, 23 Sep 2020 08:59:49 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200923125949.GA88270@redhat.com>
+References: <20200918213436.GA3520@redhat.com>
+	<CAJFHJroSeg=Zk1VaHBzwurNTkziFzupiiVf_Y-2TDQ7nmdAERg@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <20201005153318.GA4302@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH v4] kvm,
-	x86: Exit to user space in case page fault error
+In-Reply-To: <CAJFHJroSeg=Zk1VaHBzwurNTkziFzupiiVf_Y-2TDQ7nmdAERg@mail.gmail.com>
+Subject: Re: [Virtio-fs] tools/virtiofs: Multi threading seems to hurt
+ performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,84 +17,38 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, pbonzini@redhat.com, vkuznets@redhat.com, linux-kernel@vger.kernel.org, kvm@vger.kernel.org
+To: Chirantan Ekbote <chirantan@chromium.org>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
 
-On Mon, Oct 05, 2020 at 11:33:18AM -0400, Vivek Goyal wrote:
-> On Fri, Oct 02, 2020 at 02:13:14PM -0700, Sean Christopherson wrote:
-> Now I have few questions.
+On Wed, Sep 23, 2020 at 09:50:59PM +0900, Chirantan Ekbote wrote:
+> On Sat, Sep 19, 2020 at 6:36 AM Vivek Goyal <vgoyal@redhat.com> wrote:
+> >
+> > Hi All,
+> >
+> > virtiofsd default thread pool size is 64. To me it feels that in most of
+> > the cases thread pool size 1 performs better than thread pool size 64.
+> >
+> > I ran virtiofs-tests.
+> >
+> > https://github.com/rhvgoyal/virtiofs-tests
+> >
+> > And here are the comparision results. To me it seems that by default
+> > we should switch to 1 thread (Till we can figure out how to make
+> > multi thread performance better even when single process is doing
+> > I/O in client).
+> >
 > 
-> - If we exit to user space asynchronously (using kvm request), what debug
->   information is in there which tells user which address is bad. I admit
->   that even above trace does not seem to be telling me directly which
->   address (HVA?) is bad.
-> 
->   But if I take a crash dump of guest, using above information I should
->   be able to get to GPA which is problematic. And looking at /proc/iomem
->   it should also tell which device this memory region is in.
-> 
->   Also using this crash dump one should be able to walk through virtiofs data
->   structures and figure out which file and what offset with-in file does
->   it belong to. Now one can look at filesystem on host and see file got
->   truncated and it will become obvious it can't be faulted in. And then
->   one can continue to debug that how did we arrive here.
-> 
-> But if we don't exit to user space synchronously, Only relevant
-> information we seem to have is -EFAULT. Apart from that, how does one
-> figure out what address is bad, or who tried to access it. Or which
-> file/offset does it belong to etc.
->
-> I agree that problem is not necessarily in guest code. But by exiting
-> synchronously, it gives enough information that one can use crash
-> dump to get to bottom of the issue. If we exit to user space
-> asynchronously, all this information will be lost and it might make
-> it very hard to figure out (if not impossible), what's going on.
+> FWIW, we've observed the same behavior in crosvm. Using a thread pool
+> for the virtiofs server consistently gave us worse performance than
+> using a single thread.
 
-If we want userspace to be able to do something useful, KVM should explicitly
-inform userspace about the error, userspace shouldn't simply assume that
--EFAULT means a HVA->PFN lookup failed.  Userspace also shouldn't have to
-query guest state to handle the error, as that won't work for protected guests
-guests like SEV-ES and TDX.
+Thanks for sharing this information Chirantan. Shared pool seems to
+perform better than exclusive pool. Single thread vs shared pool is
+sort of mixed result but it looks like one thread beats shared pool
+results in many of the tests.
 
-I can think of two options:
+May be we will have to swtich to single thread as default at some point
+of time if shared pool does not live up to the expectations.
 
-  1. Send a signal, a la kvm_send_hwpoison_signal().
-
-  2. Add a userspace exit reason along with a new entry in the run struct,
-     e.g. that provides the bad GPA, HVA, possibly permissions, etc...
-
-> > > > > > To fully handle the situation, the guest needs to remove the bad page from
-> > > > > > its memory pool.  Once the page is offlined, the guest kernel's error
-> > > > > > handling will kick in when a task accesses the bad page (or nothing ever
-> > > > > > touches the bad page again and everyone is happy).
-> > > > > 
-> > > > > This is not really a case of bad page as such. It is more of a page
-> > > > > gone missing/trucated. And no new user can map it. We just need to
-> > > > > worry about existing users who already have it mapped.
-> > > > 
-> > > > What do you mean by "no new user can map it"?  Are you talking about guest
-> > > > tasks or host tasks?  If guest tasks, how would the guest know the page is
-> > > > missing and thus prevent mapping the non-existent page?
-> > > 
-> > > If a new task wants mmap(), it will send a request to virtiofsd/qemu
-> > > on host. If file has been truncated, then mapping beyond file size
-> > > will fail and process will get error.  So they will not be able to
-> > > map a page which has been truncated.
-> > 
-> > Ah.  Is there anything that prevents the notification side of things from
-> > being handled purely within the virtiofs layer?  E.g. host notifies the guest
-> > that a file got truncated, virtiofs driver in the guest invokes a kernel API
-> > to remove the page(s).
-> 
-> virtiofsd notifications can help a bit but not in all cases. For example,
-> If file got truncated and guest kernel accesses it immidiately after that,
-> (before notification arrives), it will hang and notification will not
-> be able to do much.
-> 
-> So while notification might be nice to have, but we still will need some
-> sort of error reporting from kvm.
-
-And I'm in full agreement with that.  What I'm saying is that resolving the
-infinite loop is a _bug fix_ and is completely orthogonal to adding a new
-mechanism to handle the file truncation scenario.
+Vivek
 

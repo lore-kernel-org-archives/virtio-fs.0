@@ -1,13 +1,15 @@
-References: <20200827153657.111098-1-dgilbert@redhat.com>
-	<20200827153657.111098-6-dgilbert@redhat.com>
-From: Christophe de Dinechin <dinechin@redhat.com>
-In-reply-to: <20200827153657.111098-6-dgilbert@redhat.com>
-Date: Tue, 06 Oct 2020 18:03:38 +0200
-Message-ID: <lyft6rl4th.fsf@redhat.com>
+References: <20200909184603.263700-1-mreitz@redhat.com>
+	<CAJfpegt92oj88FbGxphce80AWtU51Qgm87KuZqYD9kfpSVq2tA@mail.gmail.com>
+From: Max Reitz <mreitz@redhat.com>
+Message-ID: <e640c06b-2918-5b90-e792-24e38e55e7e7@redhat.com>
+Date: Wed, 23 Sep 2020 17:20:28 +0200
 MIME-Version: 1.0
-Content-Type: text/plain
-Subject: Re: [Virtio-fs] [PATCH v2 5/6] tools/virtiofsd: xattr name
-	mappings: Map server xattr names
+In-Reply-To: <CAJfpegt92oj88FbGxphce80AWtU51Qgm87KuZqYD9kfpSVq2tA@mail.gmail.com>
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature";
+	boundary="h4aY4OHth12nA2N2yieMOG5oEiBnplTD9"
+Subject: Re: [Virtio-fs] [fuse-devel] [PATCH 0/9] fuse: Mirror virtio-fs
+	submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,154 +18,75 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, vgoyal@redhat.com, qemu-devel@nongnu.org
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, fuse-devel <fuse-devel@lists.sourceforge.net>
+
+This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
+--h4aY4OHth12nA2N2yieMOG5oEiBnplTD9
+Content-Type: multipart/mixed; boundary="wV07ROAVvwym7kwH9AFLSUYsgd8pNzX0O"
+
+--wV07ROAVvwym7kwH9AFLSUYsgd8pNzX0O
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: quoted-printable
+
+On 18.09.20 17:25, Miklos Szeredi wrote:
+> Pushed an updated version to fuse.git#submounts.
+>=20
+> Also attached incremental patch (against rebase of
+> virtiofs-submounts-v2 on fuse.git#for-next).
+>=20
+> Changes:
+>=20
+>  1) rebased on top of DAX patches
+>  2) fixed CUSE
+>  3) added locking for fc->mounts list
+>  4) dissociate lifetime of fc from lifetime of root mount
+>  5) do not hash mountpoint inodes
+>  6) add FUSE_SUBMOUNTS init flag (replaces FUSE_ATTR_FLAGS but
+> slightly different usage)
+>  7) various cleanups
+
+[...]
+
+> Please review and test.  If there are no major issues, this should be
+> good to go for v5.10.
+
+submounts-update.patch looks good to me.  Thanks again!
+(I have to admit I found it quite hard to review because it=E2=80=99s the=
+ 7
+changes noted above rolled into a single diff, so it took me quite a whil=
+e.)
+
+The only thing I noticed was that fuse_init_node() shouldn=E2=80=99t decl=
+are @fc
+any longer.  (I also don=E2=80=99t quite understand why in fuse_i.h some =
+/** are
+replaced by /*, but that isn=E2=80=99t really relevant.)
+
+(I=E2=80=99ll look at virtiofsd-use-mount-id.patch tomorrow.)
+
+Max
 
 
-On 2020-08-27 at 17:36 CEST, Dr. David Alan Gilbert (git) wrote...
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
->
-> Map xattr names coming from the server, i.e. the host filesystem;
-> currently this is only from listxattr.
->
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> ---
->  tools/virtiofsd/passthrough_ll.c | 88 ++++++++++++++++++++++++++++++++
->  1 file changed, 88 insertions(+)
->
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 9b9c8f3ab1..7cd99186f7 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2188,6 +2188,42 @@ static int xattr_map_client(const char *client_name, char **out_name)
->      abort();
->  }
->
-> +/*
-> + * For use with listxattr where the server fs gives us a name and we may need
-> + * to sanitize this for the client.
-> + * Returns a pointer to the result in *out_name
-> + *   This is always the original string or the current string with some prefix
-> + *   removed; no reallocation is done.
-> + * Returns 0 on success
-> + * Can return -ENODATA to indicate the name should be dropped from the list.
-> + */
-> +static int xattr_map_server(const char *server_name, const char **out_name)
+--wV07ROAVvwym7kwH9AFLSUYsgd8pNzX0O--
 
-> +{
-> +    const XattrMapEntry *cur_entry;
-> +    for (cur_entry = xattr_map_list; ; cur_entry++) {
-> +        if ((cur_entry->flags & XATTR_MAP_FLAG_SERVER) &&
-> +            (!strncmp(cur_entry->prepend,
-> +                      server_name,
-> +                      strlen(cur_entry->prepend)))) {
+--h4aY4OHth12nA2N2yieMOG5oEiBnplTD9
+Content-Type: application/pgp-signature; name="signature.asc"
+Content-Description: OpenPGP digital signature
+Content-Disposition: attachment; filename="signature.asc"
 
-Might be slightly clearer (and possibly faster) as
+-----BEGIN PGP SIGNATURE-----
 
-    strstart(cur_entry->prepend, server_name, &end)
+iQEzBAEBCAAdFiEEkb62CjDbPohX0Rgp9AfbAGHVz0AFAl9rZ7wACgkQ9AfbAGHV
+z0D5dwgAmDrrG/wbTixEPEVzsnbLvKipRM2ZRRRYIfJQdTMAu3HB8xqZUsKQoswt
+b9JsD+k8CUKx0SPzbiHTL4BqzLCa4sV1+HtESphVh2uK1ZZEQJvOJOjT2DYzaf+e
+Dujgv5P2rlimPPLrZmD8TrOR68jsUl54VzG7o4tOgHlE9zUHqlHV19TAR4CLCsrq
+5c04FEZWHM9AbgKh8DB4n2ljwJgK86GoDLzTVnYr4WSvZRWnVO692dbZpL+2JtPk
+myPrtiiyVm3I4M0I/yZ8LTDQC02kzs8boiFzrKOxBCVdB7EhJ5C93mu3og7FKI3+
+MoqejpijL0cYVBVAN9LwO7RsdUKmwg==
+=G5CA
+-----END PGP SIGNATURE-----
 
-> +            if (cur_entry->flags & XATTR_MAP_FLAG_END_BAD) {
-> +                return -ENODATA;
-> +            }
-> +            if (cur_entry->flags & XATTR_MAP_FLAG_END_OK) {
-> +                *out_name = server_name;
-> +                return 0;
-> +            }
-> +            if (cur_entry->flags & XATTR_MAP_FLAG_PREFIX) {
-> +                /* Remove prefix */
-> +                *out_name = server_name + strlen(cur_entry->prepend);
-
-With the above, that would be
-
-    *out_name = end;
-
-
-> +                return 0;
-> +            }
-> +        }
-> +    }
-> +
-> +    /* Shouldn't get here - rules should have an END_* */
-
-You probably want to point the finger back to parse_xattrmap() in the comment?
-
-> +    abort();
-
-> +}
-> +
->  static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
->                          size_t size)
->  {
-> @@ -2342,8 +2378,60 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
->          if (ret == 0) {
->              goto out;
->          }
-> +
-> +        if (lo->xattrmap) {
-
-If you put the "XattrMapEntry" pointer in lo, then you would probably test that.
-
-> +            /*
-> +             * Map the names back, some attributes might be dropped,
-> +             * some shortened, but not increased, so we shouldn't
-> +             * run out of room.
-> +             */
-> +            size_t out_index, in_index;
-> +            out_index = 0;
-> +            in_index = 0;
-> +            while (in_index < ret) {
-> +                const char *map_out;
-> +                char *in_ptr = value + in_index;
-> +                /* Length of current attribute name */
-> +                size_t in_len = strlen(value + in_index) + 1;
-> +
-> +                int mapret = xattr_map_server(in_ptr, &map_out);
-> +                if (mapret != -ENODATA && mapret != 0) {
-> +                    /* Shouldn't happen */
-> +                    saverr = -mapret;
-> +                    goto out;
-> +                }
-> +                if (mapret == 0) {
-> +                    /* Either unchanged, or truncated */
-> +                    size_t out_len;
-> +                    if (map_out != in_ptr) {
-> +                        /* +1 copies the NIL */
-> +                        out_len = strlen(map_out) + 1;
-> +                    } else {
-> +                        /* No change */
-> +                        out_len = in_len;
-> +                    }
-> +                    /*
-> +                     * Move result along, may still be needed for an unchanged
-> +                     * entry if a previous entry was changed.
-> +                     */
-> +                    memmove(value + out_index, map_out, out_len);
-> +
-> +                    out_index += out_len;
-> +                }
-> +                in_index += in_len;
-> +            }
-> +            ret = out_index;
-> +            if (ret == 0) {
-> +                goto out;
-> +            }
-> +        }
->          fuse_reply_buf(req, value, ret);
->      } else {
-> +        /*
-> +         * xattrmap only ever shortens the result,
-> +         * so we don't need to do anything clever with the
-> +         * allocation length here.
-> +         */
-
-I don't understand the comment above. We are in the !lo->xattrmap) case, no?
-
->          fuse_reply_xattr(req, ret);
->      }
->  out_free:
-
-
---
-Cheers,
-Christophe de Dinechin (IRC c3d)
+--h4aY4OHth12nA2N2yieMOG5oEiBnplTD9--
 

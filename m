@@ -1,14 +1,12 @@
-Date: Tue, 20 Oct 2020 10:40:41 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20201020144041.GC380917@redhat.com>
-References: <20201014180209.49299-1-dgilbert@redhat.com>
-	<20201014180209.49299-5-dgilbert@redhat.com>
+Date: Thu, 24 Sep 2020 10:29:35 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20200924092935.GC2792@work-vm>
+References: <20200921213216.GE13362@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20201014180209.49299-5-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 4/5] tools/virtiofsd: xattr name mapping
-	examples
+In-Reply-To: <20200921213216.GE13362@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Used glib "shared" thread pool
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,122 +15,50 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: dinechin@redhat.com, virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org, Miklos Szeredi <miklos@szeredi.hu>
 
-On Wed, Oct 14, 2020 at 07:02:08PM +0100, Dr. David Alan Gilbert (git) wrote:
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> glib offers thread pools and it seems to support "exclusive" and "shared"
+> thread pools.
 > 
-> Add a few examples of xattrmaps to the documentation.
+> https://developer.gnome.org/glib/stable/glib-Thread-Pools.html#g-thread-pool-new
 > 
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> Currently we use "exlusive" thread pools but its performance seems to be
+> poor. I tried using "shared" thread pools and performance seems much
+> better. I posted performance results here.
+> 
+> https://www.redhat.com/archives/virtio-fs/2020-September/msg00080.html
+> 
+> So lets switch to shared thread pools. We can think of making it optional
+> once somebody can show in what cases exclusive thread pools offer better
+> results. For now, my simple performance tests across the board see
+> better results with shared thread pools.
+> 
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+
+Queued (with Miklos's seccomp fix); although my gut feeling is we'll be
+coming back to this again to understand how the threading should work.
+
+Dave
+
 > ---
->  docs/tools/virtiofsd.rst | 50 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 50 insertions(+)
+>  tools/virtiofsd/fuse_virtio.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-> index a3a120da2f..5cb64612ed 100644
-> --- a/docs/tools/virtiofsd.rst
-> +++ b/docs/tools/virtiofsd.rst
-> @@ -163,6 +163,56 @@ in which case a 'server' rule will always match on all names from
->  the server.
+> Index: qemu/tools/virtiofsd/fuse_virtio.c
+> ===================================================================
+> --- qemu.orig/tools/virtiofsd/fuse_virtio.c	2020-09-21 17:28:27.444438015 -0400
+> +++ qemu/tools/virtiofsd/fuse_virtio.c	2020-09-21 17:28:30.584568910 -0400
+> @@ -695,7 +695,7 @@ static void *fv_queue_thread(void *opaqu
+>      struct fuse_session *se = qi->virtio_dev->se;
+>      GThreadPool *pool;
 >  
->  
-> +xattr-mapping Examples
-> +----------------------
-> +
-> +1) Prefix all attributes with 'user.virtiofs.'
-> +
-> +::
-> +
-> +-o xattrmap=":prefix:all::user.virtiofs.::bad:all:::"
-> +
-
-Staring at rule.
-
-":bad:all:::"
-
-and trying to map this to ":type:scope:key:prepend:"
-
-type==bad
-scope==all
-key==""
-prepend==""
-
-> +
-> +This uses two rules, using : as the field separator;
-> +the first rule prefixes and strips 'user.virtiofs.',
-> +the second rule hides any non-prefixed attributes that
-> +the host set.
-
-What is non-prefixed xattr in this context. If client sends
-"security.selinux", is prefixed or non-prefixed.
-
-Documentation in first patch said.
-
-+- 'bad' - If a client tries to use this name it's
-+  denied using EPERM; when the server passes an attribute
-+  name matching it's hidden.
-
-I am not sure which xattr name will be blocked if key=="" and prepend==""
-
-> +
-> +2) Prefix 'trusted.' attributes, allow others through
-> +
-> +::
-> +
-> +   "/prefix/all/trusted./user.virtiofs./
-> +    /bad/server//trusted./
-> +    /bad/client/user.virtiofs.//
-> +    /ok/all///"
-> +
-> +
-> +Here there are four rules, using / as the field
-> +separator, and also demonstrating that new lines can
-> +be included between rules.
-> +The first rule is the prefixing of 'trusted.' and
-> +stripping of 'user.virtiofs.'.
-
-So this is bidrectional rule, right. For setxattr(), "trusted."
-will be replaced with "user.virtiofs" and for listxattr(),
-server will replace user.virtiofs with trusted. ?
-
-> +The second rule hides unprefixed 'trusted.' attributes
-> +on the host.
-
-If host has "trusted.*", we are not hiding it and as per first
-rule we are converting it to "user.virtiofs.trusted.*", right?
-So why this second rule is needed.
-
-> +The third rule stops a guest from explicitly setting
-> +the 'user.viritofs.' path directly.
-> +Finally, the fourth rule lets all remaining attributes
-> +through.
-
-So If I don't specify third rule, and client does
-setxattr(user.virtiofs.*), it will simply be a passthrough?
-
-Thanks
-Vivek
-
-> +
-> +3) Hide 'security.' attributes, and allow everything else
-> +
-> +::
-> +
-> +    "/bad/all/security./security./
-> +     /ok/all///'
-> +
-> +The first rule combines what could be separate client and server
-> +rules into a single 'all' rule, matching 'security.' in either
-> +client arguments or lists returned from the host.  This stops
-> +the client seeing any 'security.' attributes on the server and
-> +stops it setting any.
-> +
->  Examples
->  --------
->  
-> -- 
-> 2.28.0
-> 
+> -    pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size, TRUE,
+> +    pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size, FALSE,
+>                               NULL);
+>      if (!pool) {
+>          fuse_log(FUSE_LOG_ERR, "%s: g_thread_pool_new failed\n", __func__);
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

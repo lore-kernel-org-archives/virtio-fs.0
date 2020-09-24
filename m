@@ -1,11 +1,15 @@
-From: Fotis Xenakis <foxen@windowslive.com>
-Date: Mon, 26 Oct 2020 09:20:36 +0000
-Message-ID: <AM0PR03MB6292811A0A897121E1165A11A6190@AM0PR03MB6292.eurprd03.prod.outlook.com>
+Date: Thu, 24 Sep 2020 18:10:23 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200924221023.GB132653@redhat.com>
+References: <20200918213436.GA3520@redhat.com> <20200921153243.GK3221@work-vm>
+	<20200922102531.GA2837@work-vm> <20200922174733.GD57620@redhat.com>
+	<46D726A6-72F3-40FE-9382-A189513F783D@intel.com>
 MIME-Version: 1.0
-Content-Language: en-US
-Content-Type: multipart/alternative;
-	boundary="_000_AM0PR03MB6292811A0A897121E1165A11A6190AM0PR03MB6292eurp_"
-Subject: [Virtio-fs] Architecture diagram license
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <46D726A6-72F3-40FE-9382-A189513F783D@intel.com>
+Subject: [Virtio-fs] virtiofs vs 9p performance(Re: tools/virtiofs: Multi
+ threading seems to hurt performance)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,82 +18,73 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs-list <virtio-fs@redhat.com>
+To: "Venegas Munoz, Jose Carlos" <jose.carlos.venegas.munoz@intel.com>
+Cc: "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, "cdupontd@redhat.com" <cdupontd@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, "Shinde,
+	Archana M" <archana.m.shinde@intel.com>
 
---_000_AM0PR03MB6292811A0A897121E1165A11A6190AM0PR03MB6292eurp_
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+On Thu, Sep 24, 2020 at 09:33:01PM +0000, Venegas Munoz, Jose Carlos wrote:
+> Hi Folks,
+> 
+> Sorry for the delay about how to reproduce `fio` data.
+> 
+> I have some code to automate testing for multiple kata configs and collect info like:
+> - Kata-env, kata configuration.toml, qemu command, virtiofsd command.
+> 
+> See: 
+> https://github.com/jcvenegas/mrunner/
+> 
+> 
+> Last time we agreed to narrow the cases and configs to compare virtiofs and 9pfs
+> 
+> The configs where the following:
+> 
+> - qemu + virtiofs(cache=auto, dax=0) a.ka. `kata-qemu-virtiofs` WITOUT xattr
+> - qemu + 9pfs a.k.a `kata-qemu`
+> 
+> Please take a look to the html and raw results I attach in this mail.
 
-Hello all,
+Hi Carlos,
 
-As a student completing his thesis, which involved adding virtio-fs DAX sup=
-port to OSv [1], it would be nice if I could include the architecture diagr=
-am [2] featured in the website.
-Yet, I see no licensing notice in the repo, so I guess it's copyrighted atm=
- (?). Could you clarify on this, or ideally license it to allow usage in th=
-is context?
+So you are running following test.
 
-Thank you,
-Fotis Xenakis
+fio --direct=1 --gtod_reduce=1 --name=test --filename=random_read_write.fio --bs=4k --iodepth=64 --size=4G --readwrite=randrw --rwmixread=75 --output=/output/fio.txt
 
-[1] https://github.com/cloudius-systems/osv
-[2] https://gitlab.com/virtio-fs/virtio-fs.gitlab.io/-/blob/master/architec=
-ture.svg
+And following are your results.
 
---_000_AM0PR03MB6292811A0A897121E1165A11A6190AM0PR03MB6292eurp_
-Content-Type: text/html; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+9p
+--
+READ: bw=211MiB/s (222MB/s), 211MiB/s-211MiB/s (222MB/s-222MB/s), io=3070MiB (3219MB), run=14532-14532msec
 
-<html>
-<head>
-<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Diso-8859-=
-1">
-<style type=3D"text/css" style=3D"display:none;"> P {margin-top:0;margin-bo=
-ttom:0;} </style>
-</head>
-<body dir=3D"ltr">
-<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
- color: rgb(0, 0, 0);">
-Hello all,</div>
-<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
- color: rgb(0, 0, 0);">
-<br>
-</div>
-<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
- color: rgb(0, 0, 0);">
-As a student completing his thesis, which involved adding virtio-fs DAX sup=
-port to OSv [1], it would be nice if I could include the architecture diagr=
-am [2] featured in the website.</div>
-<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
- color: rgb(0, 0, 0);">
-Yet, I see no licensing notice in the repo, so I guess it's copyrighted atm=
- (?). Could you clarify on this, or ideally license it to allow usage in th=
-is context?</div>
-<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
- color: rgb(0, 0, 0);">
-<br>
-</div>
-<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
- color: rgb(0, 0, 0);">
-Thank you,</div>
-<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
- color: rgb(0, 0, 0);">
-Fotis Xenakis</div>
-<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
- color: rgb(0, 0, 0);">
-<br>
-</div>
-<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
- color: rgb(0, 0, 0);">
-[1]&nbsp;<a href=3D"https://github.com/cloudius-systems/osv" id=3D"LPlnk946=
-612">https://github.com/cloudius-systems/osv</a></div>
-<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
- color: rgb(0, 0, 0);">
-[2]&nbsp;<a href=3D"https://gitlab.com/virtio-fs/virtio-fs.gitlab.io/-/blob=
-/master/architecture.svg" id=3D"LPlnk916667">https://gitlab.com/virtio-fs/v=
-irtio-fs.gitlab.io/-/blob/master/architecture.svg</a></div>
-</body>
-</html>
+WRITE: bw=70.6MiB/s (74.0MB/s), 70.6MiB/s-70.6MiB/s (74.0MB/s-74.0MB/s), io=1026MiB (1076MB), run=14532-14532msec
 
---_000_AM0PR03MB6292811A0A897121E1165A11A6190AM0PR03MB6292eurp_--
+virtiofs
+--------
+Run status group 0 (all jobs):
+   READ: bw=159MiB/s (167MB/s), 159MiB/s-159MiB/s (167MB/s-167MB/s), io=3070MiB (3219MB), run=19321-19321msec
+  WRITE: bw=53.1MiB/s (55.7MB/s), 53.1MiB/s-53.1MiB/s (55.7MB/s-55.7MB/s), io=1026MiB (1076MB), run=19321-19321msec
+
+So looks like you are getting better performance with 9p in this case.
+
+Can you apply "shared pool" patch to qemu for virtiofsd and re-run this
+test and see if you see any better results.
+
+In my testing, with cache=none, virtiofs performed better than 9p in 
+all the fio jobs I was running. For the case of cache=auto  for virtiofs
+(with xattr enabled), 9p performed better in certain write workloads. I
+have identified root cause of that problem and working on
+HANDLE_KILLPRIV_V2 patches to improve WRITE performance of virtiofs
+with cache=auto and xattr enabled.
+
+I will post my 9p and virtiofs comparison numbers next week. In the
+mean time will be great if you could apply following qemu patch, rebuild
+qemu and re-run above test.
+
+https://www.redhat.com/archives/virtio-fs/2020-September/msg00081.html
+
+Also what's the status of file cache on host in both the cases. Are
+you booting host fresh for these tests so that cache is cold on host
+or cache is warm?
+
+Thanks
+Vivek
 

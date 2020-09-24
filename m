@@ -1,25 +1,22 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
-	h=to:references:from:subject:message-id:date:user-agent:mime-version
-	:in-reply-to:content-transfer-encoding:content-language;
-	bh=NZ9jFMhZgyNB/uNJMB/ss75VZUSyirXEHwwlWjteg5M=;
-	b=EtI+PfgXepYMOPpyHZ2IdQk/GH6CBBwr77lvftQStN8hdMPoFixq+/MTVMGDEK8uHC
-	lVL9/ki9xSXdR5TKZZcjRglZomkx/RN1haASyV0EWSAQ+NJl08sVpGgls81ipm5jJrjF
-	3KThb0AYR1+nno3yZf7l2Tp5w+fNHVEP/h4mvjo32lWPWZPUXZEc/WS6+llX8mwE8w3b
-	lrnJmaCSKFtVbL6U38qljA3+sRmuFGSKF8X+Xay0Jk+ozgjqQXb0350q2B+n/4mg+SkM
-	jAfhgfWpviXoy4TWePo8WK2CkkXF25QDrn3+h6mTC/DZK4r71ohn8U9uff/jJ3KV0n1q
-	e/gw==
-References: <20201014180209.49299-1-dgilbert@redhat.com>
-	<20201014180209.49299-4-dgilbert@redhat.com>
-From: "Harry G. Coin" <hgcoin@gmail.com>
-Message-ID: <bd3c072f-dc6c-23a8-cd48-543bafa46363@gmail.com>
-Date: Thu, 15 Oct 2020 18:57:09 -0500
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=u88Nz3rBig4xGKGFNxDHE9sSRToky27GfnUF7UrAav0=;
+	b=L97D8fFtnQeKDLVRu9hkAR/8BpBDSzS6M0rNIZhFTqrVKCYltGQNSUzWKvYNTgmvXl
+	Jz12MC1X+MSDOESlQ+u7Om6WBZXhAD4yT0Ld9Rirzy2hSOCXK97V576x/2miNQbOX5uS
+	eyYTQYTv76zGTHL1QH8L12Pfzz4TQ8qnVxwuo=
 MIME-Version: 1.0
-In-Reply-To: <20201014180209.49299-4-dgilbert@redhat.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Language: en-US
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] Puzzle about rootflags,
-	restorecon "operation not supported"
+References: <20200909184603.263700-1-mreitz@redhat.com>
+	<CAJfpegt92oj88FbGxphce80AWtU51Qgm87KuZqYD9kfpSVq2tA@mail.gmail.com>
+	<e87d7603-100b-173a-07c6-3ef4c2400e94@redhat.com>
+	<CAJfpegt-BOG7Xz4Xyy4OEnK+2EPGQ61e4qk7WBKUVjQN4yAiSw@mail.gmail.com>
+	<5249b6e0-597a-ce62-0e44-ac3e2398842c@redhat.com>
+In-Reply-To: <5249b6e0-597a-ce62-0e44-ac3e2398842c@redhat.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Thu, 24 Sep 2020 10:13:42 +0200
+Message-ID: <CAJfpegsxPzBA_M+ZRoHM88+pojdk5=3q0fCNaFN8euTvMt0krA@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [fuse-devel] [PATCH 0/9] fuse: Mirror virtio-fs
+	submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -28,26 +25,23 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Max Reitz <mreitz@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, fuse-devel <fuse-devel@lists.sourceforge.net>
 
-The 'mainline generic' version of the latest kernel fails to parse
-'fuse' virtiofs options on root kernel boots.  Not only dax, but all the
-'fuse' usual ones as well.  (None of
-default_permissions,allow_other,user_id=0 etc are accepted).
+On Thu, Sep 24, 2020 at 10:10 AM Max Reitz <mreitz@redhat.com> wrote:
 
-Is that what you expected of the mainline kernel?  I learned of this
-when trying to understand this further problem:
+> > No, object creation never results in a mounted object.  If the newly
+> > created object is mounted on at a later time, the revalidate logic
+> > will take care of that.
+>
+> So lo_getattr() is not an issue either, because all mount operations
+> will be handled by the revalidate logic?
 
-SELinux's 'restorecon' and other attempts to change security attributes
-then fails with "operation not supported".
+Right.  Attribute revalidation is done by GETATTR and lookup
+revalidation is done by LOOKUP.  Setting the automount point in case
+of attribute revalidation would not make any difference, since no
+lookup is being performed at that point.
 
-I could only get sshd able to accept connections by changing SELinux to
-permissive.  The commands necessary to change the security attributes
-failed with the 'operation not supported' issue.
-
-Ideas?
-
-
-
-
+Thanks,
+Miklos
 

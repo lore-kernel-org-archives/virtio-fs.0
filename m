@@ -1,13 +1,25 @@
-Date: Mon, 26 Oct 2020 16:15:03 +0000
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20201026161503.GL52035@stefanha-x1.localdomain>
-References: <AM0PR03MB6292B7495BBCF452714B7C8CA6190@AM0PR03MB6292.eurprd03.prod.outlook.com>
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+	d=crudebyte.com; s=lizzy; h=Content-Type:Content-Transfer-Encoding:
+	MIME-Version:References:In-Reply-To:Message-ID:Date:Subject:Cc:To:From:
+	Content-ID:Content-Description;
+	bh=C1LAl7iFhSWxJo4O4+Fg+1J6QMFGsW7M6C6eJvk9vCY=;
+	b=cNrpcyH0NFjMrz4CcpXPepwflE
+	cABEw0CuVkczdQ4KKAiLuLaApRjK6H2iXpZDV57nFWniDUr2a2ltzigIX6S3E+7c4K5WtKJrAgO8z
+	qDj2OelLbyk21s0r20IvfMrukx1q1ep6LtU0mKlcd1pUqK2Cj8He66+yNzYFe7ZLpUI1s6c4Zzv5X
+	IxFH5mkv0k79MmH3PfJO67eZHFa2iiZyDQcE/M+qi3OitCYV61LvYPLolhFqF5yeoSm/ofhMNyt8j
+	VeFN1sVB1SvCoU+nXNMAcxaETUeb6z2qfRRmJu6v6Iw3B9nwht/pIbUV8OPFyeidAdyx8AqEqRxdw
+	aQtPraeA==
+From: Christian Schoenebeck <qemu_oss@crudebyte.com>
+Date: Fri, 25 Sep 2020 10:06:41 +0200
+Message-ID: <17216624.eqST2d0sUl@silver>
+In-Reply-To: <20200924221023.GB132653@redhat.com>
+References: <20200918213436.GA3520@redhat.com>
+	<46D726A6-72F3-40FE-9382-A189513F783D@intel.com>
+	<20200924221023.GB132653@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="1hKfHPzOXWu1rh0v"
-Content-Disposition: inline
-In-Reply-To: <AM0PR03MB6292B7495BBCF452714B7C8CA6190@AM0PR03MB6292.eurprd03.prod.outlook.com>
-Subject: Re: [Virtio-fs] Architecture diagram license
+Content-Transfer-Encoding: 7Bit
+Content-Type: text/plain; charset="us-ascii"
+Subject: Re: [Virtio-fs] virtiofs vs 9p performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,43 +28,28 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Fotis Xenakis <foxen@windowslive.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: qemu-devel@nongnu.org
+Cc: "Venegas Munoz, Jose Carlos" <jose.carlos.venegas.munoz@intel.com>, "cdupontd@redhat.com" <cdupontd@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, Greg Kurz <groug@kaod.org>, "Shinde,
+	Archana M" <archana.m.shinde@intel.com>, Vivek Goyal <vgoyal@redhat.com>
 
+On Freitag, 25. September 2020 00:10:23 CEST Vivek Goyal wrote:
+> In my testing, with cache=none, virtiofs performed better than 9p in
+> all the fio jobs I was running. For the case of cache=auto  for virtiofs
+> (with xattr enabled), 9p performed better in certain write workloads. I
+> have identified root cause of that problem and working on
+> HANDLE_KILLPRIV_V2 patches to improve WRITE performance of virtiofs
+> with cache=auto and xattr enabled.
 
---1hKfHPzOXWu1rh0v
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
+Please note, when it comes to performance aspects, you should set a reasonable 
+high value for 'msize' on 9p client side:
+https://wiki.qemu.org/Documentation/9psetup#msize
 
-On Mon, Oct 26, 2020 at 01:57:53PM +0000, Fotis Xenakis wrote:
-> That would work great actually, thank you very much for the prompt response!
+I'm also working on performance optimizations for 9p BTW. There is plenty of 
+headroom to put it mildly. For QEMU 5.2 I started by addressing readdir 
+requests:
+https://wiki.qemu.org/ChangeLog/5.2#9pfs
 
-Okay, in that case this is my written confirmation that you may use the
-https://creativecommons.org/licenses/by-sa/4.0/ license on the
-architecture.svg file.
+Best regards,
+Christian Schoenebeck
 
-I'll send a separate patch to explicitly apply the license to the entire
-virtio-fs website.
-
-By the way, how are you using virtio-fs in your thesis? It would be
-interesting to hear what you are working on.
-
-Stefan
-
---1hKfHPzOXWu1rh0v
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl+W9gcACgkQnKSrs4Gr
-c8jPdggAu7Oo76HPk8jUmn2bzCVP5JLbfQ6RLnmzMYCWQij35BSyq5549ip2Yfon
-InTU83TBA5b/UZjWziT/qk3Xje80fQs+o0FG4b728W2PgxwIv1+q2ITrpVz5u58a
-RHYu6eM/W/h5OiPIj/ggA+KE2i7I0rvkyY2uzKbRuwuJJ3Jh/tSBWzGxTfpmy/lq
-OI6V1n3TGFqNjCjSJSC0Er91h16VtOnuxdMFXhxkn6md1NSjKOD7dDVzOp3Twm00
-Qk1ZGfEILfniYBKjJS714kMHidDWW0xNhwMidCDLhJ4deUGT10x0QfmEa9AZArp6
-xrOuATdVPyl3FI+uyavJTuGCNpwpug==
-=3lGw
------END PGP SIGNATURE-----
-
---1hKfHPzOXWu1rh0v--
 

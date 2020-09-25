@@ -1,15 +1,14 @@
-Date: Fri, 25 Sep 2020 09:11:42 -0400
+Date: Fri, 25 Sep 2020 09:13:56 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200925131142.GC132653@redhat.com>
-References: <20200918213436.GA3520@redhat.com> <20200921153243.GK3221@work-vm>
-	<20200922102531.GA2837@work-vm> <20200922174733.GD57620@redhat.com>
-	<20200925121127.GI2873@work-vm>
+Message-ID: <20200925131356.GD132653@redhat.com>
+References: <20200918213436.GA3520@redhat.com>
+	<46D726A6-72F3-40FE-9382-A189513F783D@intel.com>
+	<20200924221023.GB132653@redhat.com> <17216624.eqST2d0sUl@silver>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20200925121127.GI2873@work-vm>
-Subject: Re: [Virtio-fs] tools/virtiofs: Multi threading seems to hurt
-	performance
+In-Reply-To: <17216624.eqST2d0sUl@silver>
+Subject: Re: [Virtio-fs] virtiofs vs 9p performance
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,87 +17,34 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: jose.carlos.venegas.munoz@intel.com, qemu-devel@nongnu.org, cdupontd@redhat.com, virtio-fs-list <virtio-fs@redhat.com>, archana.m.shinde@intel.com
+To: Christian Schoenebeck <qemu_oss@crudebyte.com>
+Cc: "Shinde, Archana M" <archana.m.shinde@intel.com>, "Venegas Munoz,
+	Jose Carlos" <jose.carlos.venegas.munoz@intel.com>, qemu-devel@nongnu.org, virtio-fs-list <virtio-fs@redhat.com>, Greg Kurz <groug@kaod.org>, "cdupontd@redhat.com" <cdupontd@redhat.com>
 
-On Fri, Sep 25, 2020 at 01:11:27PM +0100, Dr. David Alan Gilbert wrote:
-> * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > On Tue, Sep 22, 2020 at 11:25:31AM +0100, Dr. David Alan Gilbert wrote:
-> > > * Dr. David Alan Gilbert (dgilbert@redhat.com) wrote:
-> > > > Hi,
-> > > >   I've been doing some of my own perf tests and I think I agree
-> > > > about the thread pool size;  my test is a kernel build
-> > > > and I've tried a bunch of different options.
-> > > > 
-> > > > My config:
-> > > >   Host: 16 core AMD EPYC (32 thread), 128G RAM,
-> > > >      5.9.0-rc4 kernel, rhel 8.2ish userspace.
-> > > >   5.1.0 qemu/virtiofsd built from git.
-> > > >   Guest: Fedora 32 from cloud image with just enough extra installed for
-> > > > a kernel build.
-> > > > 
-> > > >   git cloned and checkout v5.8 of Linux into /dev/shm/linux on the host
-> > > > fresh before each test.  Then log into the guest, make defconfig,
-> > > > time make -j 16 bzImage,  make clean; time make -j 16 bzImage 
-> > > > The numbers below are the 'real' time in the guest from the initial make
-> > > > (the subsequent makes dont vary much)
-> > > > 
-> > > > Below are the detauls of what each of these means, but here are the
-> > > > numbers first
-> > > > 
-> > > > virtiofsdefault        4m0.978s
-> > > > 9pdefault              9m41.660s
-> > > > virtiofscache=none    10m29.700s
-> > > > 9pmmappass             9m30.047s
-> > > > 9pmbigmsize           12m4.208s
-> > > > 9pmsecnone             9m21.363s
-> > > > virtiofscache=noneT1   7m17.494s
-> > > > virtiofsdefaultT1      3m43.326s
-> > > > 
-> > > > So the winner there by far is the 'virtiofsdefaultT1' - that's
-> > > > the default virtiofs settings, but with --thread-pool-size=1 - so
-> > > > yes it gives a small benefit.
-> > > > But interestingly the cache=none virtiofs performance is pretty bad,
-> > > > but thread-pool-size=1 on that makes a BIG improvement.
-> > > 
-> > > Here are fio runs that Vivek asked me to run in my same environment
-> > > (there are some 0's in some of the mmap cases, and I've not investigated
-> > > why yet).
-> > 
-> > cache=none does not allow mmap in case of virtiofs. That's when you
-> > are seeing 0.
-> > 
-> > >virtiofs is looking good here in I think all of the cases;
-> > > there's some division over which cinfig; cache=none
-> > > seems faster in some cases which surprises me.
-> > 
-> > I know cache=none is faster in case of write workloads. It forces
-> > direct write where we don't call file_remove_privs(). While cache=auto
-> > goes through file_remove_privs() and that adds a GETXATTR request to
-> > every WRITE request.
+On Fri, Sep 25, 2020 at 10:06:41AM +0200, Christian Schoenebeck wrote:
+> On Freitag, 25. September 2020 00:10:23 CEST Vivek Goyal wrote:
+> > In my testing, with cache=none, virtiofs performed better than 9p in
+> > all the fio jobs I was running. For the case of cache=auto  for virtiofs
+> > (with xattr enabled), 9p performed better in certain write workloads. I
+> > have identified root cause of that problem and working on
+> > HANDLE_KILLPRIV_V2 patches to improve WRITE performance of virtiofs
+> > with cache=auto and xattr enabled.
 > 
-> Can you point me to how cache=auto causes the file_remove_privs?
+> Please note, when it comes to performance aspects, you should set a reasonable 
+> high value for 'msize' on 9p client side:
+> https://wiki.qemu.org/Documentation/9psetup#msize
 
-fs/fuse/file.c
+Interesting. I will try that. What does "msize" do? 
 
-fuse_cache_write_iter() {
-	err = file_remove_privs(file);
-}
+> 
+> I'm also working on performance optimizations for 9p BTW. There is plenty of 
+> headroom to put it mildly. For QEMU 5.2 I started by addressing readdir 
+> requests:
+> https://wiki.qemu.org/ChangeLog/5.2#9pfs
 
-Above path is taken when cache=auto/cache=always is used. If virtiofsd
-is running with noxattr, then it does not impose any cost. But if xattr
-are enabled, then every WRITE first results in a
-getxattr(security.capability) and that slows down WRITES tremendously.
+Nice. I guess this performance comparison between 9p and virtiofs is good.
+Both the projects can try to identify weak points and improve performance.
 
-When cache=none is used, we go through following path instead.
-
-fuse_direct_write_iter() and it does not have file_remove_privs(). We
-set a flag in WRITE request to tell server to kill
-suid/sgid/security.capability, instead.
-
-fuse_direct_io() {
-	ia->write.in.write_flags |= FUSE_WRITE_KILL_PRIV
-}
-
+Thanks
 Vivek
 

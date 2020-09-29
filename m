@@ -1,14 +1,12 @@
+Date: Tue, 29 Sep 2020 09:49:42 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200929134942.GC220516@redhat.com>
+References: <20200918213436.GA3520@redhat.com> <66718708.HdZnNlUTFG@silver>
+	<20200929130325.GA220516@redhat.com> <2302525.O3mciSdnpG@silver>
 MIME-Version: 1.0
-References: <20200918213436.GA3520@redhat.com> <20200921153243.GK3221@work-vm>
-	<20200922102531.GA2837@work-vm> <20200922174733.GD57620@redhat.com>
-	<46D726A6-72F3-40FE-9382-A189513F783D@intel.com>
-	<20200924221023.GB132653@redhat.com>
-	<20200925124139.GJ2873@work-vm> <20200929131753.GB220516@redhat.com>
-In-Reply-To: <20200929131753.GB220516@redhat.com>
-From: Miklos Szeredi <mszeredi@redhat.com>
-Date: Tue, 29 Sep 2020 15:49:04 +0200
-Message-ID: <CAOssrKcVNs=uiU2U1-ScowogFan8W=iw7kyTCnaz-vL8r9gLmw@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <2302525.O3mciSdnpG@silver>
 Subject: Re: [Virtio-fs] virtiofs vs 9p performance(Re: tools/virtiofs:
  Multi threading seems to hurt performance)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -19,20 +17,137 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, "Venegas Munoz,
-	Jose Carlos" <jose.carlos.venegas.munoz@intel.com>, "cdupontd@redhat.com" <cdupontd@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, "Shinde,
+To: Christian Schoenebeck <qemu_oss@crudebyte.com>
+Cc: "Venegas Munoz, Jose Carlos" <jose.carlos.venegas.munoz@intel.com>, qemu-devel@nongnu.org, "cdupontd@redhat.com" <cdupontd@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, "Shinde,
 	Archana M" <archana.m.shinde@intel.com>
 
-On Tue, Sep 29, 2020 at 3:18 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+On Tue, Sep 29, 2020 at 03:28:06PM +0200, Christian Schoenebeck wrote:
+> On Dienstag, 29. September 2020 15:03:25 CEST Vivek Goyal wrote:
+> > On Sun, Sep 27, 2020 at 02:14:43PM +0200, Christian Schoenebeck wrote:
+> > > On Freitag, 25. September 2020 20:51:47 CEST Dr. David Alan Gilbert wrote:
+> > > > * Christian Schoenebeck (qemu_oss@crudebyte.com) wrote:
+> > > > > On Freitag, 25. September 2020 15:05:38 CEST Dr. David Alan Gilbert 
+> wrote:
+> > > > > > > > 9p ( mount -t 9p -o trans=virtio kernel /mnt
+> > > > > > > > -oversion=9p2000.L,cache=mmap,msize=1048576 ) test: (g=0):
+> > > > > > > > rw=randrw,
+> > > > > > > 
+> > > > > > > Bottleneck ------------------------------^
+> > > > > > > 
+> > > > > > > By increasing 'msize' you would encounter better 9P I/O results.
+> > > > > > 
+> > > > > > OK, I thought that was bigger than the default;  what number should
+> > > > > > I
+> > > > > > use?
+> > > > > 
+> > > > > It depends on the underlying storage hardware. In other words: you
+> > > > > have to
+> > > > > try increasing the 'msize' value to a point where you no longer notice
+> > > > > a
+> > > > > negative performance impact (or almost). Which is fortunately quite
+> > > > > easy
+> > > > > to test on>
+> > > > > 
+> > > > > guest like:
+> > > > > 	dd if=/dev/zero of=test.dat bs=1G count=12
+> > > > > 	time cat test.dat > /dev/null
+> > > > > 
+> > > > > I would start with an absolute minimum msize of 10MB. I would
+> > > > > recommend
+> > > > > something around 100MB maybe for a mechanical hard drive. With a PCIe
+> > > > > flash
+> > > > > you probably would rather pick several hundred MB or even more.
+> > > > > 
+> > > > > That unpleasant 'msize' issue is a limitation of the 9p protocol:
+> > > > > client
+> > > > > (guest) must suggest the value of msize on connection to server
+> > > > > (host).
+> > > > > Server can only lower, but not raise it. And the client in turn
+> > > > > obviously
+> > > > > cannot see host's storage device(s), so client is unable to pick a
+> > > > > good
+> > > > > value by itself. So it's a suboptimal handshake issue right now.
+> > > > 
+> > > > It doesn't seem to be making a vast difference here:
+> > > > 
+> > > > 
+> > > > 
+> > > > 9p mount -t 9p -o trans=virtio kernel /mnt
+> > > > -oversion=9p2000.L,cache=mmap,msize=104857600
+> > > > 
+> > > > Run status group 0 (all jobs):
+> > > >    READ: bw=62.5MiB/s (65.6MB/s), 62.5MiB/s-62.5MiB/s
+> > > >    (65.6MB/s-65.6MB/s),
+> > > > 
+> > > > io=3070MiB (3219MB), run=49099-49099msec WRITE: bw=20.9MiB/s (21.9MB/s),
+> > > > 20.9MiB/s-20.9MiB/s (21.9MB/s-21.9MB/s), io=1026MiB (1076MB),
+> > > > run=49099-49099msec
+> > > > 
+> > > > 9p mount -t 9p -o trans=virtio kernel /mnt
+> > > > -oversion=9p2000.L,cache=mmap,msize=1048576000
+> > > > 
+> > > > Run status group 0 (all jobs):
+> > > >    READ: bw=65.2MiB/s (68.3MB/s), 65.2MiB/s-65.2MiB/s
+> > > >    (68.3MB/s-68.3MB/s),
+> > > > 
+> > > > io=3070MiB (3219MB), run=47104-47104msec WRITE: bw=21.8MiB/s (22.8MB/s),
+> > > > 21.8MiB/s-21.8MiB/s (22.8MB/s-22.8MB/s), io=1026MiB (1076MB),
+> > > > run=47104-47104msec
+> > > > 
+> > > > 
+> > > > Dave
+> > > 
+> > > Is that benchmark tool honoring 'iounit' to automatically run with max.
+> > > I/O
+> > > chunk sizes? What's that benchmark tool actually? And do you also see no
+> > > improvement with a simple
+> > > 
+> > > 	time cat largefile.dat > /dev/null
+> > 
+> > I am assuming that msize only helps with sequential I/O and not random
+> > I/O.
+> > 
+> > Dave is running random read and random write mix and probably that's why
+> > he is not seeing any improvement with msize increase.
+> > 
+> > If we run sequential workload (as "cat largefile.dat"), that should
+> > see an improvement with msize increase.
+> > 
+> > Thanks
+> > Vivek
+> 
+> Depends on what's randomized. If read chunk size is randomized, then yes, you 
+> would probably see less performance increase compared to a simple
+> 'cat foo.dat'.
 
-> - virtiofs cache=none mode is faster than cache=auto mode for this
->   workload.
+We are using "fio" for testing and read chunk size is not being
+randomized. chunk size (block size) is fixed at 4K size for these tests.
 
-Not sure why.  One cause could be that readahead is not perfect at
-detecting the random pattern.  Could we compare total I/O on the
-server vs. total I/O by fio?
+> 
+> If only the read position is randomized, but the read chunk size honors 
+> iounit, a.k.a. stat's st_blksize (i.e. reading with the most efficient block 
+> size advertised by 9P), then I would assume still seeing a performance 
+> increase.
 
-Thanks,
-Millos
+Yes, we are randomizing read position. But there is no notion of looking
+at st_blksize. Its fixed at 4K. (notice option --bs=4k in fio
+commandline).
+
+> Because seeking is a no/low cost factor in this case. The guest OS 
+> seeking does not transmit a 9p message. The offset is rather passed with any 
+> Tread message instead:
+> https://github.com/chaos/diod/blob/master/protocol.md
+> 
+> I mean, yes, random seeks reduce I/O performance in general of course, but in 
+> direct performance comparison, the difference in overhead of the 9p vs. 
+> virtiofs network controller layer is most probably the most relevant aspect if 
+> large I/O chunk sizes are used.
+> 
+
+Agreed that large I/O chunk size will help with the perfomance numbers.
+But idea is to intentonally use smaller I/O chunk size with some of
+the tests to measure how efficient communication path is.
+
+Thanks
+Vivek
 

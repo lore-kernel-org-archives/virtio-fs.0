@@ -1,29 +1,19 @@
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=crudebyte.com; s=kylie; h=Content-Type:Content-Transfer-Encoding:
-	MIME-Version:References:In-Reply-To:Message-ID:Date:Subject:Cc:To:From:
-	Content-ID:Content-Description;
-	bh=/6jbIRjUAtVZGGk6gEYrACTLQuHei87M+7UfjHxjsLs=;
-	b=nGUS9tRipgxyuo3hpvpRsY8ETE
-	3hFpqgb614l0CQZNokZh+gDGqtw+VH8g/VPhtZpvLDlBV5QT7knBTPMJsKiLVsvx2He4oXpz9aWyR
-	IgamL7pKWnzD89L0Z+8LQeTGWQNFw/w/aqpZCl0haVCss2uHNDMuujIViEAXMQhE7RFTlSEenmHKr
-	aRC6DIB6pSEkJ9Lylpf/gocxrX/yz7orjg/mgpXDYv0e3m9vMx5KGeLRYN7a1b5B6/Ln5EVEpJUwA
-	kpAg5uyqXnKch6qpHxmx1axAkHSNDiEzhQ1GuYr3w054LpDA1JLEN8g50j7jo9A+BFAY9+6xrJEAD
-	gRvKeqO3uvgWsIg14kv3/5dzXIlz0IKK5hZ3vZhYj0ZIUCtf4j+8Kw2FNvPlT8NkxyesNkSn1slb+
-	uhMyyzjgvvBnVgiepNPZ4jfipnThTzHUenB16p2mvxwLLjqtMbVMA57lyOrnbNyNvBdMzXMCIZcJ5
-	1oKOImZocRc4jVN0LGMXkKvpxNpuVhgKJwiKN74E/rcp+tu8CLxPCsb0tO52sT7qR0CnvnV9/5vj3
-	IsMNRoI1IZ/ycOw+CKs6d7zH5N1gspyDawemnIQBLiLaoo5kLGfxehtdx4EaA6t3XEHeQIXd0M3oi
-	mvkXPErL245YI/9aSCKHNvrQbQY/KO7oIXND+xvfc=
-From: Christian Schoenebeck <qemu_oss@crudebyte.com>
-Date: Tue, 29 Sep 2020 15:59:34 +0200
-Message-ID: <6044656.UxkCsAYsKb@silver>
-In-Reply-To: <20200929134942.GC220516@redhat.com>
-References: <20200918213436.GA3520@redhat.com> <2302525.O3mciSdnpG@silver>
-	<20200929134942.GC220516@redhat.com>
+Date: Tue, 29 Sep 2020 10:01:36 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20200929140136.GD220516@redhat.com>
+References: <20200918213436.GA3520@redhat.com> <20200921153243.GK3221@work-vm>
+	<20200922102531.GA2837@work-vm> <20200922174733.GD57620@redhat.com>
+	<46D726A6-72F3-40FE-9382-A189513F783D@intel.com>
+	<20200924221023.GB132653@redhat.com>
+	<20200925124139.GJ2873@work-vm>
+	<20200929131753.GB220516@redhat.com>
+	<CAOssrKcVNs=uiU2U1-ScowogFan8W=iw7kyTCnaz-vL8r9gLmw@mail.gmail.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 7Bit
-Content-Type: text/plain; charset="us-ascii"
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAOssrKcVNs=uiU2U1-ScowogFan8W=iw7kyTCnaz-vL8r9gLmw@mail.gmail.com>
 Subject: Re: [Virtio-fs] virtiofs vs 9p performance(Re: tools/virtiofs:
-	Multi threading seems to hurt performance)
+ Multi threading seems to hurt performance)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -32,35 +22,57 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: "Venegas Munoz, Jose Carlos" <jose.carlos.venegas.munoz@intel.com>, "cdupontd@redhat.com" <cdupontd@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, "Shinde,
-	Archana M" <archana.m.shinde@intel.com>, Vivek Goyal <vgoyal@redhat.com>
+To: Miklos Szeredi <mszeredi@redhat.com>
+Cc: "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, "Venegas Munoz,
+	Jose Carlos" <jose.carlos.venegas.munoz@intel.com>, "cdupontd@redhat.com" <cdupontd@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, "Shinde,
+	Archana M" <archana.m.shinde@intel.com>
 
-On Dienstag, 29. September 2020 15:49:42 CEST Vivek Goyal wrote:
-> > Depends on what's randomized. If read chunk size is randomized, then yes,
-> > you would probably see less performance increase compared to a simple
-> > 'cat foo.dat'.
+On Tue, Sep 29, 2020 at 03:49:04PM +0200, Miklos Szeredi wrote:
+> On Tue, Sep 29, 2020 at 3:18 PM Vivek Goyal <vgoyal@redhat.com> wrote:
 > 
-> We are using "fio" for testing and read chunk size is not being
-> randomized. chunk size (block size) is fixed at 4K size for these tests.
-
-Good to know, thanks!
-
-> > If only the read position is randomized, but the read chunk size honors
-> > iounit, a.k.a. stat's st_blksize (i.e. reading with the most efficient
-> > block size advertised by 9P), then I would assume still seeing a
-> > performance increase.
+> > - virtiofs cache=none mode is faster than cache=auto mode for this
+> >   workload.
 > 
-> Yes, we are randomizing read position. But there is no notion of looking
-> at st_blksize. Its fixed at 4K. (notice option --bs=4k in fio
-> commandline).
+> Not sure why.  One cause could be that readahead is not perfect at
+> detecting the random pattern.  Could we compare total I/O on the
+> server vs. total I/O by fio?
 
-Ah ok, then the results make sense.
+Hi Miklos,
 
-With these block sizes you will indeed suffer a performance issue with 9p, due 
-to several thread hops in Tread handling, which is due to be fixed.
+I will instrument virtiosd code to figure out total I/O.
 
-Best regards,
-Christian Schoenebeck
+One more potential issue I am staring at is refreshing the attrs on 
+READ if fc->auto_inval_data is set.
 
+fuse_cache_read_iter() {
+        /*
+         * In auto invalidate mode, always update attributes on read.
+         * Otherwise, only update if we attempt to read past EOF (to ensure
+         * i_size is up to date).
+         */
+        if (fc->auto_inval_data ||
+            (iocb->ki_pos + iov_iter_count(to) > i_size_read(inode))) {
+                int err;
+                err = fuse_update_attributes(inode, iocb->ki_filp);
+                if (err)
+                        return err;
+        }
+}
+
+Given this is a mixed READ/WRITE workload, every WRITE will invalidate
+attrs. And next READ will first do GETATTR() from server (and potentially
+invalidate page cache) before doing READ.
+
+This sounds suboptimal especially from the point of view of WRITEs
+done by this client itself. I mean if another client has modified
+the file, then doing GETATTR after a second makes sense. But there
+should be some optimization to make sure our own WRITEs don't end
+up doing GETATTR and invalidate page cache (because cache contents
+are still valid).
+
+I disabled ->auto_invalid_data and that seemed to result in 8-10%
+gain in performance for this workload.
+
+Thanks
+Vivek
 

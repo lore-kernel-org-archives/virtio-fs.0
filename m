@@ -1,19 +1,11 @@
-Date: Tue, 29 Sep 2020 11:28:12 -0400
+Date: Tue, 29 Sep 2020 14:50:15 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20200929152812.GF220516@redhat.com>
-References: <20200918213436.GA3520@redhat.com> <20200921153243.GK3221@work-vm>
-	<20200922102531.GA2837@work-vm> <20200922174733.GD57620@redhat.com>
-	<46D726A6-72F3-40FE-9382-A189513F783D@intel.com>
-	<20200924221023.GB132653@redhat.com>
-	<20200925124139.GJ2873@work-vm>
-	<20200929131753.GB220516@redhat.com>
-	<CAOssrKcVNs=uiU2U1-ScowogFan8W=iw7kyTCnaz-vL8r9gLmw@mail.gmail.com>
+Message-ID: <20200929185015.GG220516@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <CAOssrKcVNs=uiU2U1-ScowogFan8W=iw7kyTCnaz-vL8r9gLmw@mail.gmail.com>
-Subject: Re: [Virtio-fs] virtiofs vs 9p performance(Re: tools/virtiofs:
- Multi threading seems to hurt performance)
+Subject: [Virtio-fs] [RFC PATCH] fuse: update attributes on read() only on
+	timeout
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,31 +14,145 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <mszeredi@redhat.com>
-Cc: "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, "Venegas Munoz,
-	Jose Carlos" <jose.carlos.venegas.munoz@intel.com>, "cdupontd@redhat.com" <cdupontd@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, "Shinde,
-	Archana M" <archana.m.shinde@intel.com>
+To: Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>, Miklos Szeredi <miklos@szeredi.hu>, virtio-fs-list <virtio-fs@redhat.com>
+Cc: Brian Foster <bfoster@redhat.com>
 
-On Tue, Sep 29, 2020 at 03:49:04PM +0200, Miklos Szeredi wrote:
-> On Tue, Sep 29, 2020 at 3:18 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> 
-> > - virtiofs cache=none mode is faster than cache=auto mode for this
-> >   workload.
-> 
-> Not sure why.  One cause could be that readahead is not perfect at
-> detecting the random pattern.  Could we compare total I/O on the
-> server vs. total I/O by fio?
+Following commit added a flag to invalidate guest page cache automatically.
 
-Ran tests with auto_inval_data disabled and compared with other results.
+72d0d248ca823 fuse: add FUSE_AUTO_INVAL_DATA init flag
 
-vtfs-auto-ex-randrw     randrw-psync            27.8mb/9547kb   7136/2386
-vtfs-auto-sh-randrw     randrw-psync            43.3mb/14.4mb   10.8k/3709
-vtfs-auto-sh-noinval    randrw-psync            50.5mb/16.9mb   12.6k/4330
-vtfs-none-sh-randrw     randrw-psync            54.1mb/18.1mb   13.5k/4649
+Idea seemed to be that for network file systmes if client A modifies
+the file, then client B should be able to detect that mtime of file
+change and invalidate its own cache and fetch new data from server.
 
-With auto_inval_data disabled, this time I saw around 20% performance jump
-in READ and is now much closer to cache=none performance.
+There are few questions/issues with this method.
 
-Thanks
-Vivek
+How soon client B able to detect that file has changed. Should it
+first GETATTR from server for every READ and compare mtime. That
+will be much stronger cache coherency but very slow because every
+READ will first be preceeded by a GETATTR.
+
+Or should this be driven by inode timeout. That is if inode cached attrs
+(including mtime) have timed out, we fetch new mtime from server and
+invalidate cache based on that.
+
+Current logic calls fuse_update_attr() on every READ. But that method
+will result in GETATTR only if either attrs have timedout or if cached
+attrs have been invalidated.
+
+If client B is only doing READs (and not WRITEs), then attrs should be
+valid for inode timeout interval. And that means client B will detect
+mtime change only after timeout interval.
+
+But if client B is also doing WRITE, then once WRITE completes, we
+invalidate cached attrs. That means next READ will force GETATTR()
+and invalidate page cache. In this case client B will detect the
+change by client A much sooner but it can't differentiate between
+its own WRITEs and by another client WRITE. So every WRITE followed
+by READ will result in GETATTR, followed by page cache invalidation
+and performance suffers in mixed read/write workloads.
+
+I am assuming that intent of auto_inval_data is to detect changes
+by another client but it can take up to "inode timeout" seconds
+to detect that change. (And it does not guarantee an immidiate change
+detection).
+
+If above assumption is acceptable, then I am proposing this patch
+which will update attrs on READ only if attrs have timed out. This
+means every second we will do a GETATTR and invalidate page cache.
+
+This is also suboptimal because only if client B is writing, our
+cache is still valid but we will still invalidate it after 1 second.
+But we don't have a good mechanism to differentiate between our own
+changes and another client's changes. So this is probably second
+best method to reduce the extent of issue.
+
+I am running equivalent of following fio workload on virtiofs (cache=auto)
+and there I see a performance improvement of roughly 12%.
+
+fio --direct=1 --gtod_reduce=1 --name=test --filename=random_read_write.fio
++--bs=4k --iodepth=64 --size=4G --readwrite=randrw --rwmixread=75
++--output=/output/fio.txt
+
+NAME                    WORKLOAD                Bandwidth       IOPS
+vtfs-auto-sh		randrw-psync            43.3mb/14.4mb   10.8k/3709
+vtfs-auto-sh-invaltime  randrw-psync            48.9mb/16.3mb   12.2k/4197
+
+Signee-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/dir.c    |  6 ++++++
+ fs/fuse/file.c   | 21 +++++++++++++++------
+ fs/fuse/fuse_i.h |  1 +
+ 3 files changed, 22 insertions(+), 6 deletions(-)
+
+diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
+index 26f028bc760b..5c4eda0edd95 100644
+--- a/fs/fuse/dir.c
++++ b/fs/fuse/dir.c
+@@ -1002,6 +1002,12 @@ int fuse_update_attributes(struct inode *inode, struct file *file)
+ 				    STATX_BASIC_STATS & ~STATX_ATIME, 0);
+ }
+ 
++int fuse_update_attributes_timeout(struct inode *inode, struct file *file)
++{
++	/* Only refresh attrs if timeout has happened */
++	return fuse_update_get_attr(inode, file, NULL, 0, 0);
++}
++
+ int fuse_reverse_inval_entry(struct super_block *sb, u64 parent_nodeid,
+ 			     u64 child_nodeid, struct qstr *name)
+ {
+diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+index 6611ef3269a8..dea001f5f4e9 100644
+--- a/fs/fuse/file.c
++++ b/fs/fuse/file.c
+@@ -972,19 +972,28 @@ static ssize_t fuse_cache_read_iter(struct kiocb *iocb, struct iov_iter *to)
+ {
+ 	struct inode *inode = iocb->ki_filp->f_mapping->host;
+ 	struct fuse_conn *fc = get_fuse_conn(inode);
++	int err = 0;
+ 
+ 	/*
+-	 * In auto invalidate mode, always update attributes on read.
++	 * In auto invalidate mode, update attributes on read if previously
++	 * stored attributes timed out. This is primarily done to detect
++	 * writes by other clients and invalidate local cache. But we don't
++	 * have a way to differentiate between our own writes and writes
++	 * by other clients. So we end up updating attrs and invalidating
++	 * cache on our own write. Stick to the theme of detecting changes
++	 * after timeout. This is what happens already if we are not doing
++	 * writes but other client is doing.
++	 *
+ 	 * Otherwise, only update if we attempt to read past EOF (to ensure
+ 	 * i_size is up to date).
+ 	 */
+-	if (fc->auto_inval_data ||
+-	    (iocb->ki_pos + iov_iter_count(to) > i_size_read(inode))) {
+-		int err;
++	if (iocb->ki_pos + iov_iter_count(to) > i_size_read(inode)) {
+ 		err = fuse_update_attributes(inode, iocb->ki_filp);
+-		if (err)
+-			return err;
++	} else if (fc->auto_inval_data) {
++		err = fuse_update_attributes_timeout(inode, iocb->ki_filp);
+ 	}
++	if (err)
++		return err;
+ 
+ 	return generic_file_read_iter(iocb, to);
+ }
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index 740a8a7d7ae6..78f93129b60e 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -1004,6 +1004,7 @@ u64 fuse_lock_owner_id(struct fuse_conn *fc, fl_owner_t id);
+ void fuse_update_ctime(struct inode *inode);
+ 
+ int fuse_update_attributes(struct inode *inode, struct file *file);
++int fuse_update_attributes_timeout(struct inode *inode, struct file *file);
+ 
+ void fuse_flush_writepages(struct inode *inode);
+ 
+-- 
+2.25.4
 

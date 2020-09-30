@@ -1,14 +1,23 @@
-Date: Wed, 30 Sep 2020 10:03:40 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20200930090340.GB201070@stefanha-x1.localdomain>
-References: <20200929185015.GG220516@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=cuRMI2dEbW7qdVyqJr4Dp9XK546nDs8UHDfV++8fh6o=;
+	b=WdYfVz9XvAYja6V+uU/flmg7Tzv7KdXyhWt4mlGjsjZW71CHBTA8ggwk/LrKV3Uqum
+	YpybTHXhAsT/C0FWeRaFHGN23XEvuHeX3MQv8RL+b/D9vR7DN82aMn8dgtLzm46NNpmt
+	tTxL0uArHNkW3CFSxm7PPKBTx9yKAwcTzCC6NCu48iowbceXYrU+3WOMKKsEmoV0O4EH
+	T0GxaUz2KjsYZs6S8bselpH/VzKRZGHjJ0tlPmapjQb1hM4qUHAePmxtnjPLJFtqqN79
+	eRScaW5lBRep+xRYClOTz4HWPiPXG9dy40AcHizr1LaJGby86y4PB6Vef+of/pJPZ7RQ
+	6beA==
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="61jdw2sOBCFtR2d/"
-Content-Disposition: inline
-In-Reply-To: <20200929185015.GG220516@redhat.com>
+References: <20200929185015.GG220516@redhat.com>
+	<CAOQ4uxgMeWF_vitenBY6_N3Eu-ix92q8AO5ckDAF+SVxHTBXXw@mail.gmail.com>
+	<CAJfpegtH0TruLCnG_YJ8aUBHh7k5sqN_wVEegvDPJOoDcmwLSQ@mail.gmail.com>
+In-Reply-To: <CAJfpegtH0TruLCnG_YJ8aUBHh7k5sqN_wVEegvDPJOoDcmwLSQ@mail.gmail.com>
+From: Amir Goldstein <amir73il@gmail.com>
+Date: Wed, 30 Sep 2020 14:57:53 +0300
+Message-ID: <CAOQ4uxiity6zAW__Y+T=o+GHkzxo=fnVj+21Z8cRjdvFWbauRQ@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
 Subject: Re: [Virtio-fs] [RFC PATCH] fuse: update attributes on read() only
- on timeout
+	on timeout
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,104 +26,111 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, Brian Foster <bfoster@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, Brian Foster <bfoster@redhat.com>, Zhi Zhang <zhang.david2011@gmail.com>, Vivek Goyal <vgoyal@redhat.com>
 
+On Wed, Sep 30, 2020 at 9:40 AM Miklos Szeredi <miklos@szeredi.hu> wrote:
+>
+> On Wed, Sep 30, 2020 at 6:36 AM Amir Goldstein <amir73il@gmail.com> wrote:
+>
+> > I wonder out loud if this change of behavior you proposed is a good opportunity
+> > to introduce some of the verbs from SMB oplocks / NFS delegations into the
+> > FUSE protocol in order to allow finer grained control over per-file
+> > (and later also per-directory) caching behavior.
+>
+> That would be really nice.  Let me find a recent discussion on this...
+> ah it was private.   Copying the thread below.  Thoughts?
+>
+> Thanks,
+> Miklos
+>
+> On Tue, Aug 11, 2020 at 8:56 AM Miklos Szeredi <miklos@szeredi.hu> wrote:
+> >
+> > On Wed, Aug 5, 2020 at 5:53 AM Zhi Zhang <zhang.david2011@gmail.com> wrote:
+> > > On Tue, Aug 4, 2020 at 11:36 AM Zhi Zhang <zhang.david2011@gmail.com> wrote:
+> > > > On Mon, Aug 3, 2020 at 6:37 PM Miklos Szeredi <miklos@szeredi.hu> wrote:
+> > > > >
+> > > > > On Thu, Jul 23, 2020 at 12:40 PM Zhi Zhang <zhang.david2011@gmail.com> wrote:
+> >
+> > > > > > We are using distributed filesystem ceph-fuse and we enabled writeback
+> > > > > > cache on fuse which improves the write performance, but the file's
+> > > > > > size attribute can't be updated on another client even if the users on
+> > > > > > this client only read this file.
+> > > > > >
+> > > > > > From my understanding, if the file is not opened in write mode and
+> > > > > > already writes its buffered data to userspace filesystem like
+> > > > > > ceph-fuse, then its state should be clean. The upper userspace and
+> > > > > > remote server should be responsible for the data and consistency. So
+> > > > > > at this moment fuse could trust the attributes from the server which
+> > > > > > has the most authoritative information about this file.
+> > > > > >
+> > > > > > Please let me know your thoughts, then I can work on this patch. Thanks.
+> > > > >
+> > > > > Hi,
+> > > > >
+> > > > > Something like this makes sense, but I think we should be adding an
+> > > > > explicit state (a lease to read/write the data) to the fuse inode.
+> > > > >
+> > > > > Opening for write would automatically acquire the WRITE lease,
+> > > > > similarly opening for read would acquire the READ lease.  Then we need
+> > > > > a new notification for revoking a lease (FUSE_NOTIFY_REVOKE).  And we
+> > > > > need a new request for re-acquiring a lease (FUSE_REACQUIRE).
+> > > > >
+> > > > > Does that make sense?
 
---61jdw2sOBCFtR2d/
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Sounds right.
 
-On Tue, Sep 29, 2020 at 02:50:15PM -0400, Vivek Goyal wrote:
-> Following commit added a flag to invalidate guest page cache automaticall=
-y.
->=20
-> 72d0d248ca823 fuse: add FUSE_AUTO_INVAL_DATA init flag
->=20
-> Idea seemed to be that for network file systmes if client A modifies
-> the file, then client B should be able to detect that mtime of file
-> change and invalidate its own cache and fetch new data from server.
->=20
-> There are few questions/issues with this method.
->=20
-> How soon client B able to detect that file has changed. Should it
-> first GETATTR from server for every READ and compare mtime. That
-> will be much stronger cache coherency but very slow because every
-> READ will first be preceeded by a GETATTR.
->=20
-> Or should this be driven by inode timeout. That is if inode cached attrs
-> (including mtime) have timed out, we fetch new mtime from server and
-> invalidate cache based on that.
->=20
-> Current logic calls fuse_update_attr() on every READ. But that method
-> will result in GETATTR only if either attrs have timedout or if cached
-> attrs have been invalidated.
->=20
-> If client B is only doing READs (and not WRITEs), then attrs should be
-> valid for inode timeout interval. And that means client B will detect
-> mtime change only after timeout interval.
->=20
-> But if client B is also doing WRITE, then once WRITE completes, we
-> invalidate cached attrs. That means next READ will force GETATTR()
-> and invalidate page cache. In this case client B will detect the
-> change by client A much sooner but it can't differentiate between
-> its own WRITEs and by another client WRITE. So every WRITE followed
-> by READ will result in GETATTR, followed by page cache invalidation
-> and performance suffers in mixed read/write workloads.
->=20
-> I am assuming that intent of auto_inval_data is to detect changes
-> by another client but it can take up to "inode timeout" seconds
-> to detect that change. (And it does not guarantee an immidiate change
-> detection).
->=20
-> If above assumption is acceptable, then I am proposing this patch
-> which will update attrs on READ only if attrs have timed out. This
-> means every second we will do a GETATTR and invalidate page cache.
->=20
-> This is also suboptimal because only if client B is writing, our
-> cache is still valid but we will still invalidate it after 1 second.
-> But we don't have a good mechanism to differentiate between our own
-> changes and another client's changes. So this is probably second
-> best method to reduce the extent of issue.
->=20
-> I am running equivalent of following fio workload on virtiofs (cache=3Dau=
-to)
-> and there I see a performance improvement of roughly 12%.
->=20
-> fio --direct=3D1 --gtod_reduce=3D1 --name=3Dtest --filename=3Drandom_read=
-_write.fio
-> +--bs=3D4k --iodepth=3D64 --size=3D4G --readwrite=3Drandrw --rwmixread=3D=
-75
-> +--output=3D/output/fio.txt
->=20
-> NAME                    WORKLOAD                Bandwidth       IOPS
-> vtfs-auto-sh		randrw-psync            43.3mb/14.4mb   10.8k/3709
-> vtfs-auto-sh-invaltime  randrw-psync            48.9mb/16.3mb   12.2k/4197
->=20
-> Signee-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  fs/fuse/dir.c    |  6 ++++++
->  fs/fuse/file.c   | 21 +++++++++++++++------
->  fs/fuse/fuse_i.h |  1 +
->  3 files changed, 22 insertions(+), 6 deletions(-)
+Linking to MS docs for reference, because I find their documentation
+most comprehensive and SMBv3.1 semantics is much richer than NFSv4,
+so maybe useful examples can be found there:
+https://docs.microsoft.com/en-us/windows/win32/fileio/breaking-opportunistic-locks
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+I would consider adopting the downgrade/upgrade terminology, because
+REVOKE/REACQUIRE sounds like losing the old any taking a new lease
+when in fact downgrade from WRITE to READ and vice versa is a common
+case. But the name is not what matters, it's to get the functionality right.
 
---61jdw2sOBCFtR2d/
-Content-Type: application/pgp-signature; name="signature.asc"
+Thanks,
+Amir.
 
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl90SewACgkQnKSrs4Gr
-c8h0mggAoyljBPY2q3mlW+TCBJ5Ig/QXnVvLDMTgatjG0DXACJ3pWp78+LClzLZK
-sXvfGi1A69uvlZyGex/CHXg3IGO+47Acy/kNBTgjF1u5Uqt8XasCmR1Vdybc8gvQ
-kWBm+B3ovtmLEBd/dVOJETV6y/4ozLYum30efwMcVX55Atfn7kL4A11Way6HuSy0
-yB7ZwkfyuAxtfUyrJyObskqyygEP74VVo9kKULTxestDoUzP5p4u754q1Gx40Bcn
-aSuWAj0GeEcu93xkeC4xO5KyXte1yEIDVks7F1r/C9qWC8UYLW22Wm8Q+89aW8wW
-hcviFP7W5vr/d/b8uzuP16iKRrlH0g==
-=xSGE
------END PGP SIGNATURE-----
-
---61jdw2sOBCFtR2d/--
+> > > > >
+> > > > > Would you mind discussing this on the linux-fsdevel mailing lists?
+> > > > >
+> > > > > Thanks,
+> > > > > Miklos>
+> > > Hi Miklos,
+> > >
+> > > Thanks for the comments. I thought about it but I still have a couple
+> > > of questions about the lease.
+> > >
+> > > 1. After acquiring a WRITE lease, when should we release(revoke) it?
+> > > Before I assumed the file would be clean once we wrote buffered data
+> > > to the userspace file system. Now if we introduce the lease, should we
+> > > release the WRITE lease once we write the buffered data or we need to
+> > > wait for the revoking notification from userspace file system?
+> >
+> > I think it's easier to wait for the notification, instead of trying to
+> > guess.   When the file is closed (released) then the lease is also
+> > implicitly released.
+> >
+> > > 2. What is the purpose of READ lease?
+> > > Once we hold the READ lease, we could trust cached attributes and data
+> > > until revoking notification from userspace file system?
+> >
+> > Yes.
+> >
+> > > 3. What is the purpose of re-acquiring a lease and why do we need a new request?
+> > > From my understanding, the lease mechanism is only known by kernel
+> > > fuse, not for libfuse.
+> >
+> > We don't necessarily need a new request, it could be implicit in the
+> > first uncached write.
+> >
+> > > To re-acquire a lease here is actually for READ
+> > > lease by sending a sync getattr request.
+> >
+> > Yes.
+> >
+> > Thanks,
+> > Miklos
 

@@ -1,19 +1,16 @@
-Date: Fri, 2 Oct 2020 10:47:31 -0400
+Date: Fri, 2 Oct 2020 11:38:54 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20201002144731.GA10232@redhat.com>
-References: <20200929185015.GG220516@redhat.com>
-	<CAOQ4uxgMeWF_vitenBY6_N3Eu-ix92q8AO5ckDAF+SVxHTBXXw@mail.gmail.com>
-	<CAJfpegtH0TruLCnG_YJ8aUBHh7k5sqN_wVEegvDPJOoDcmwLSQ@mail.gmail.com>
-	<CAOQ4uxiity6zAW__Y+T=o+GHkzxo=fnVj+21Z8cRjdvFWbauRQ@mail.gmail.com>
-	<dfa0dbea-7046-0852-60c6-39bc24f24314@gmail.com>
-	<20201001135129.GG2807@work-vm>
-	<3deb375c-e234-f83c-159f-cebdd3a1876e@gmail.com>
+Message-ID: <20201002153854.GC3119@redhat.com>
+References: <20200720211359.GF502563@redhat.com>
+	<20200929043700.GL31514@linux.intel.com>
+	<20201001215508.GD3522@redhat.com>
+	<20201001223320.GI7474@linux.intel.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <3deb375c-e234-f83c-159f-cebdd3a1876e@gmail.com>
-Subject: Re: [Virtio-fs] Kudos: productivity boost using virtio-fs
+In-Reply-To: <20201001223320.GI7474@linux.intel.com>
+Subject: Re: [Virtio-fs] [PATCH v4] kvm,
+	x86: Exit to user space in case page fault error
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,77 +19,162 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Harry G. Coin" <hgcoin@gmail.com>
-Cc: virtio-fs@redhat.com
+To: Sean Christopherson <sean.j.christopherson@intel.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, pbonzini@redhat.com, vkuznets@redhat.com, linux-kernel@vger.kernel.org, kvm@vger.kernel.org
 
-On Thu, Oct 01, 2020 at 09:12:17AM -0500, Harry G. Coin wrote:
->=20
-> On 10/1/20 8:51 AM, Dr. David Alan Gilbert wrote:
-> > * Harry G. Coin (hgcoin@gmail.com) wrote:
-> >> Though it's likely been written before:
-> >>
-> >> Virtio-fs is a wonderful productivity boost in development environments
-> >> in which unrelated deadlocks, crashes and hard-lockups happen.=C2=A0=
-=C2=A0 Why?=C2=A0
-> >> Because the underlying file system is never corrupted (though individu=
-al
-> >> file contents may be, the file system itself is protected).=C2=A0=C2=
-=A0 For
-> >> example, using btrfs' snapshot ability in the underlying file system a=
-nd
-> >> comparing 'before and after' crashes creates a powerful debugging tool.
-> > Thanks!
-> >
-> > I'm curious, can you describe a bit more about how you're using it with
-> > btrfs - I don't think we've had anyone describe that before.
-> > (We mostly use it with overlayfs via the various container tools).
-> >
-> > Dave
->=20
-> The 3 host chassis I've set up so far to work with this has a=A0 btrfs
-> file system in a raid-1 setup.=A0 Btrfs does a good job with xattr support
-> which virtio-fs can be set to use well.
->=20
-> I have several vm's running on each chassis, each using virtio-fs.=A0 On
-> the host, there is a sub-volume for each vm.=A0 The vms=A0 use kernel
-> booting, and huge pages.=A0 So, on the bare-metal host, a simple 'btrfs su
-> snapshot <vm sub volume> <snap name> generates an 'almost free' (from a
-> resource perspective) look at the entire vm.=A0 Various risky experimental
-> things go on in the vm, which could lead to file system corruption owing
-> to deadlocks and hard freezes and race conditions.=A0 However with
-> virtio-fs, when that happens, all I need to do on the host is make a
-> another snapshot of the 'frozen' vm, stop the vm.=A0 Then I can compare
-> the exact state of the files at the time of the freeze with the 'known
-> good' versions at the snapshot time.=A0=A0 Delete the 'frozen' state
-> snapshot, make a new=A0 snapshot of the known good snapshot, reboot the vm
-> and the dev cycle can continue.=A0
+On Thu, Oct 01, 2020 at 03:33:20PM -0700, Sean Christopherson wrote:
+> On Thu, Oct 01, 2020 at 05:55:08PM -0400, Vivek Goyal wrote:
+> > On Mon, Sep 28, 2020 at 09:37:00PM -0700, Sean Christopherson wrote:
+> > > On Mon, Jul 20, 2020 at 05:13:59PM -0400, Vivek Goyal wrote:
+> > > > @@ -10369,6 +10378,36 @@ void kvm_set_rflags(struct kvm_vcpu *vcpu, unsigned long rflags)
+> > > >  }
+> > > >  EXPORT_SYMBOL_GPL(kvm_set_rflags);
+> > > >  
+> > > > +static inline u32 kvm_error_gfn_hash_fn(gfn_t gfn)
+> > > > +{
+> > > > +	BUILD_BUG_ON(!is_power_of_2(ERROR_GFN_PER_VCPU));
+> > > > +
+> > > > +	return hash_32(gfn & 0xffffffff, order_base_2(ERROR_GFN_PER_VCPU));
+> > > > +}
+> > > > +
+> > > > +static void kvm_add_error_gfn(struct kvm_vcpu *vcpu, gfn_t gfn)
+> > > > +{
+> > > > +	u32 key = kvm_error_gfn_hash_fn(gfn);
+> > > > +
+> > > > +	/*
+> > > > +	 * Overwrite the previous gfn. This is just a hint to do
+> > > > +	 * sync page fault.
+> > > > +	 */
+> > > > +	vcpu->arch.apf.error_gfns[key] = gfn;
+> > > > +}
+> > > > +
+> > > > +/* Returns true if gfn was found in hash table, false otherwise */
+> > > > +static bool kvm_find_and_remove_error_gfn(struct kvm_vcpu *vcpu, gfn_t gfn)
+> > > > +{
+> > > > +	u32 key = kvm_error_gfn_hash_fn(gfn);
+> > > 
+> > > Mostly out of curiosity, do we really need a hash?  E.g. could we get away
+> > > with an array of 4 values?  2 values?  Just wondering if we can avoid 64*8
+> > > bytes per CPU.
+> > 
+> > We are relying on returning error when guest task retries fault. Fault
+> > will be retried on same address if same task is run by vcpu after
+> > "page ready" event. There is no guarantee that same task will be
+> > run. In theory, this cpu could have a large number of tasks queued
+> > and run these tasks before the faulting task is run again. Now say
+> > there are 128 tasks being run and 32 of them have page fault
+> > errors. Then if we keep 4 values, newer failures will simply
+> > overwrite older failures and we will keep spinning instead of
+> > exiting to user space.
+> > 
+> > That's why this array of 64 gfns and add gfns based on hash. This
+> > does not completely elimiante the above possibility but chances
+> > of one hitting this are very very slim.
+> 
+> But have you actually tried such a scenario?  In other words, is there good
+> justification for burning the extra memory?
 
-IIUC, using virtio-fs saved one reboot of the host. Otherwise
-one can just run keep one known good copy and run workload on=20
-another copy. Once system deadlocks, reboot and compare good and
-bad copy? Did I miss the point completely.
+Its not easy to try and reproduce. So it is all theory  at this point of time.
+If you are worried about memory usage, we can probably reduce the size
+of hash table. Say from 64, reduce it to 8. I am fine with that. I think
+initially I had a single error_gfn. But Vitaly had concerns about
+above scenario, so I implemeted a hash table.
 
->=20
-> Even if the cause of the freeze wasn't evident in the file system
-> deltas, knowing there isn't corruption in the underlying fs is a big
-> time saver.
->=20
-> I expect when dax makes it out of the development bubble this
-> configuration will be a very high performance, easy to maintain, high
-> security arrangement.=A0 Much harder to 'break out' of a vm than the
-> various container options.
+I think reducing hash table size to 8 or 16 probaly is a good middle
+ground.
 
-DAX should be exciting. Looking forward to it.
+> 
+> Alternatively, what about adding a new KVM request type to handle this?
+> E.g. when the APF comes back with -EFAULT, snapshot the GFN and make a
+> request.  The vCPU then gets kicked and exits to userspace.  Before exiting
+> to userspace, the request handler resets vcpu->arch.apf.error_gfn.  Bad GFNs
+> simply get if error_gfn is "valid", i.e. there's a pending request.
 
-One restriction right now it will put is
-that don't share the directory with other clients or host. Because
-if they truncate the file (which has been mapped inside guest), and
-guest accesses that after truncation, then we don't have mechanism
-to handle error and guest spins forever.
+Sorry, I did not understand the above proposal. Can you please elaborate
+a bit more. Part of it is that I don't know much about KVM requests.
+Looking at the code it looks like that main loop is parsing if some
+kvm request is pending and executing that action.
 
-Trying to solve that issue in KVM but it does not seem to be a trivial
-fix.
+Don't we want to make sure that we exit to user space when guest retries
+error gfn access again. In this case once we get -EFAULT, we will still
+inject page_ready into guest. And then either same process or a different
+process might run. 
+
+So when exactly code raises a kvm request. If I raise it right when
+I get -EFAULT, then kvm will exit to user space upon next entry
+time. But there is no guarantee guest vcpu is running the process which
+actually accessed the error gfn. And that probably means that register
+state of cpu does not mean much and one can not easily figure out
+which task tried to access the bad memory and when.
+
+That's why we prepare a list of error gfn and only exit to user space
+when error_gfn access is retried so that guest vcpu context is correct.
+
+What am I missing?
 
 Thanks
 Vivek
+
+> 
+> That would guarantee the error is propagated to userspace, and doesn't lose
+> any guest information as dropping error GFNs just means the guest will take
+> more page fault exits.
+> 
+> > > One thought would be to use the index to handle the case of no error gfns so
+> > > that the size of the array doesn't affect lookup for the common case, e.g.
+> > 
+> > We are calculating hash of gfn (used as index in array). So lookup cost
+> > is not driven by size of array. Its O(1) and not O(N). We just lookup
+> > at one element in array and if it does not match, we return false.
+> > 
+> > 	u32 key = kvm_error_gfn_hash_fn(gfn);
+> > 
+> > 	if (vcpu->arch.apf.error_gfns[key] != gfn)
+> > 		return 0;
+> > 
+> > 
+> > > 
+> > > 	...
+> > > 
+> > > 		u8 error_gfn_head;
+> > > 		gfn_t error_gfns[ERROR_GFN_PER_VCPU];
+> > > 	} apf;	
+> > > 
+> > > 
+> > > 	if (vcpu->arch.apf.error_gfn_head == 0xff)
+> > > 		return false;
+> > > 
+> > > 	for (i = 0; i < vcpu->arch.apf.error_gfn_head; i++) {
+> > > 		if (vcpu->arch.apf.error_gfns[i] == gfn) {
+> > > 			vcpu->arch.apf.error_gfns[i] = INVALID_GFN;
+> > > 			return true;
+> > > 		}
+> > > 	}
+> > > 	return true;
+> > > 
+> > > Or you could even avoid INVALID_GFN altogether by compacting the array on
+> > > removal.  The VM is probably dead anyways, burning a few cycles to clean
+> > > things up is a non-issue.  Ditto for slow insertion.
+> > 
+> > Same for insertion. Its O(1) and not dependent on size of array. Also
+> > insertion anyway is very infrequent event because it will not be
+> > often that error will happen.
+> 
+> I know, I was saying that if we move to an array then we'd technically be
+> subject to O(whatever) search and delete, but that it's irrelevant from a
+> performance perspective because the guest is already toast if it hits a bad
+> GFN.
+> 
+> > > > +
+> > > > +	if (vcpu->arch.apf.error_gfns[key] != gfn)
+> > > > +		return 0;
+> > > 
+> > > Should be "return false".
+> > 
+> > Will fix.
+> > 
+> > Thanks
+> > Vivek
+> > 
+> 
 

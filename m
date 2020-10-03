@@ -1,21 +1,12 @@
-Date: Fri, 2 Oct 2020 14:13:14 -0700
-From: Sean Christopherson <sean.j.christopherson@intel.com>
-Message-ID: <20201002211314.GE24460@linux.intel.com>
-References: <20200720211359.GF502563@redhat.com>
-	<20200929043700.GL31514@linux.intel.com>
-	<20201001215508.GD3522@redhat.com>
-	<20201001223320.GI7474@linux.intel.com>
-	<20201002153854.GC3119@redhat.com>
-	<20201002183036.GB24460@linux.intel.com>
-	<20201002192734.GD3119@redhat.com>
-	<20201002194517.GD24460@linux.intel.com>
-	<20201002200214.GB10232@redhat.com>
-MIME-Version: 1.0
-In-Reply-To: <20201002200214.GB10232@redhat.com>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH v4] kvm,
-	x86: Exit to user space in case page fault error
+Message-ID: <a2810c3a656115fab85fc173186f3e2c02a98182.camel@redhat.com>
+From: Qian Cai <cai@redhat.com>
+Date: Fri, 02 Oct 2020 22:44:37 -0400
+In-Reply-To: <5ea77e9f6cb8c2db43b09fbd4158ab2d8c066a0a.camel@redhat.com>
+References: <5ea77e9f6cb8c2db43b09fbd4158ab2d8c066a0a.camel@redhat.com>
+Content-Type: text/plain; charset="UTF-8"
+Mime-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] virtiofs: WARN_ON(out_sgs + in_sgs != total_sgs)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,157 +15,142 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, pbonzini@redhat.com, vkuznets@redhat.com, linux-kernel@vger.kernel.org, kvm@vger.kernel.org
+To: Vivek Goyal <vgoyal@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, linux-kernel@vger.kernel.org
 
-On Fri, Oct 02, 2020 at 04:02:14PM -0400, Vivek Goyal wrote:
-> On Fri, Oct 02, 2020 at 12:45:18PM -0700, Sean Christopherson wrote:
-> > On Fri, Oct 02, 2020 at 03:27:34PM -0400, Vivek Goyal wrote:
-> > > On Fri, Oct 02, 2020 at 11:30:37AM -0700, Sean Christopherson wrote:
-> > > > On Fri, Oct 02, 2020 at 11:38:54AM -0400, Vivek Goyal wrote:
-> > > > I don't think it's necessary to provide userspace with the register state of
-> > > > the guest task that hit the bad page.  Other than debugging, I don't see how
-> > > > userspace can do anything useful which such information.
-> > > 
-> > > I think debugging is the whole point so that user can figure out which
-> > > access by guest task resulted in bad memory access. I would think this
-> > > will be important piece of information.
-> > 
-> > But isn't this failure due to a truncation in the host?  Why would we care
-> > about debugging the guest?  It hasn't done anything wrong, has it?  Or am I
-> > misunderstanding the original problem statement.
+On Fri, 2020-10-02 at 12:28 -0400, Qian Cai wrote:
+> Running some fuzzing on virtiofs from a non-privileged user could trigger a
+> warning in virtio_fs_enqueue_req():
 > 
-> I think you understood problem statement right. If guest has right
-> context, it just gives additional information who tried to access
-> the missing memory page. 
+> WARN_ON(out_sgs + in_sgs != total_sgs);
 
-Yes, but it's not actionable, e.g. QEMU can't do anything differently given
-a guest RIP.  It's useful information for hands-on debug, but the information
-can be easily collected through other means when doing hands-on debug.
- 
-> > > > To fully handle the situation, the guest needs to remove the bad page from
-> > > > its memory pool.  Once the page is offlined, the guest kernel's error
-> > > > handling will kick in when a task accesses the bad page (or nothing ever
-> > > > touches the bad page again and everyone is happy).
-> > > 
-> > > This is not really a case of bad page as such. It is more of a page
-> > > gone missing/trucated. And no new user can map it. We just need to
-> > > worry about existing users who already have it mapped.
-> > 
-> > What do you mean by "no new user can map it"?  Are you talking about guest
-> > tasks or host tasks?  If guest tasks, how would the guest know the page is
-> > missing and thus prevent mapping the non-existent page?
-> 
-> If a new task wants mmap(), it will send a request to virtiofsd/qemu
-> on host. If file has been truncated, then mapping beyond file size
-> will fail and process will get error.  So they will not be able to
-> map a page which has been truncated.
+Okay, I can reproduce this after running for a few hours:
 
-Ah.  Is there anything that prevents the notification side of things from
-being handled purely within the virtiofs layer?  E.g. host notifies the guest
-that a file got truncated, virtiofs driver in the guest invokes a kernel API
-to remove the page(s).
+out_sgs = 3, in_sgs = 2, total_sgs = 6
 
-> > > > Note, I'm not necessarily suggesting that QEMU piggyback its #MC injection
-> > > > to handle this, but I suspect the resulting behavior will look quite similar,
-> > > > e.g. notify the virtiofs driver in the guest, which does some magic to take
-> > > > the offending region offline, and then guest tasks get SIGBUS or whatever.
-> > > > 
-> > > > I also don't think it's KVM's responsibility to _directly_ handle such a
-> > > > scenario.  As I said in an earlier version, KVM can't possibly know _why_ a
-> > > > page fault came back with -EFAULT, only userspace can connect the dots of
-> > > > GPA -> HVA -> vm_area_struct -> file -> inject event.  KVM definitely should
-> > > > exit to userspace on the -EFAULT instead of hanging the guest, but that can
-> > > > be done via a new request, as suggested.
-> > > 
-> > > KVM atleast should have the mechanism to report this back to guest. And
-> > > we don't have any. There only seems to be #MC stuff for poisoned pages.
-> > > I am not sure how much we can build on top of #MC stuff to take care
-> > > of this case. One problem with #MC I found was that it generates
-> > > synchronous #MC only on load and not store. So all the code is
-> > > written in such a way that synchronous #MC can happen only on load
-> > > and hence the error handling. 
-> > > 
-> > > Stores generate different kind of #MC that too asynchronously and
-> > > caller will not know about it immiditely. But in this case we need
-> > > to know about error in the context of caller both for loads and stores.
-> > > 
-> > > Anyway, I agree that this patch does not solve the problem of race
-> > > free synchronous event inject into the guest. That's something yet
-> > > to be solved either by #VE or by #MC or by #foo.
-> > > 
-> > > This patch is only doing two things.
-> > > 
-> > > - Because we don't have a mechanism to report errors to guest, use
-> > >   the second best method and exit to user space.
-> > 
-> > Not that it matters at this point, but IMO exiting to userspace is the
-> > correct behavior, not simply "second best method".  Again, KVM by design
-> > does not know what lies behind any given HVA, and therefore should not be
-> > making decisions about how to handle bad HVAs.
-> >  
-> > > - Make behavior consistent between synchronous fault and async faults.
-> > >   Currently sync faults exit to user space on error while async
-> > >    faults spin infinitely.
-> > 
-> > Yes, and this part can be done with a new request type.  Adding a new
-> > request doesn't commit KVM to any ABI changes, e.g. userspace will still
-> > see an -EFAULT return, and nothing more.  I.e. handling this via request
-> > doesn't prevent switching to synchronous exits in the future, if such a
-> > feature is required.
-> 
-> I am really not sure what benfit this kvm request is bringing to the
-> table. To me maintaining a hash table and exiting when guest retries
-> is much nicer desgin.
+and this time from flush_bg_queue() instead of fuse_simple_request().
 
-8 bytes pre vCPU versus 512 bytes per vCPU, with no guesswork.  I.e. the
-request can guarantee the first access to a truncated file will be reported
-to userspace.
+>From the log, the last piece of code is:
 
-> In fact, once we have the mechanism to inject error into the guest using an
-> exception, We can easily plug that into the same path.
+ftruncate(fd=186, length=4)
 
-You're blurring the two things together.  The first step is to fix the
-infinite loop by exiting to userspace with -EFAULT.  Notifying the guest of
-the truncated file is a completely different problem to solve.  Reporting
--EFAULT to userspace is a pure bug fix, and is not unique to DAX.
+which is a test file on virtiofs:
 
-> If memory usage is a concern, we can reduce the hash table size to say
-> 4 or 8.
-> 
-> How is this change commiting KVM to an ABI?
+[main]  testfile fd:186 filename:trinity-testfile3 flags:2 fopened:1 fcntl_flags:2000 global:1
+[main]   start: 0x7f47c1199000 size:4KB  name: trinity-testfile3 global:1
 
-I didn't mean to imply this patch changes the ABI.  What I was trying to say
-is that going with the request-based implementation doesn't commit KVM to
-new behavior, e.g. we can yank out the request implementation in favor of
-something else if the need arises.
 
-> > > Once we have a method to report errors back to guest, then we first
-> > > should report error back to guest. And only in the absense of such
-> > > mechanism we should exit to user space.
-> > 
-> > I don't see the value in extending KVM's ABI to avoid the exit to userspace.
-> > E.g. we could add a memslot flag to autoreflect -EFAULT as an event of some
-> > form, but this is a slow path, the extra time should be a non-issue.
-> 
-> IIUC, you are saying that this becomes the property of memory region. Some
-> memory regions can choose their errors being reported back to guest
-> (using some kind of flag in memslot). And in the absense of such flag,
-> default behavior will continue to be exit to user space?
-> 
-> I guess that's fine if we don't want to treat all the memory areas in
-> same way. I can't think why reporting errors for all areas to guest
-> is a bad idea.
-
-Because it'd be bleeding host information to the guest.  E.g. if there's a
-a host kernel bug that causes gup() to fail, then KVM would inject a random
-fault into the guest, which is all kinds of bad.
-
-> Let guest either handle the error or die if it can't
-> handle it. But that discussion is for some other day. Our first problem
-> is that we don't have a race free mechanism to report errors.
-> 
-> Thanks
-> Vivek
-> 
+[ 9863.468502] WARNING: CPU: 16 PID: 286083 at fs/fuse/virtio_fs.c:1152 virtio_fs_enqueue_req+0xd36/0xde0 [virtiofs]
+[ 9863.474442] Modules linked in: dlci 8021q garp mrp bridge stp llc ieee802154_socket ieee802154 vsock_loopback vmw_vsock_virtio_transport_common vmw_vsock_vmci_transport vsock mpls_router vmw_vmci ip_tunnel as
+[ 9863.474555]  ata_piix fuse serio_raw libata e1000 sunrpc dm_mirror dm_region_hash dm_log dm_mod
+[ 9863.535805] CPU: 16 PID: 286083 Comm: trinity-c5 Kdump: loaded Not tainted 5.9.0-rc7-next-20201002+ #2
+[ 9863.544368] Hardware name: Red Hat KVM, BIOS 1.14.0-1.module+el8.3.0+7638+07cf13d2 04/01/2014
+[ 9863.550129] RIP: 0010:virtio_fs_enqueue_req+0xd36/0xde0 [virtiofs]
+[ 9863.552998] Code: 60 09 23 d9 e9 44 fa ff ff e8 56 09 23 d9 e9 70 fa ff ff 48 89 cf 48 89 4c 24 08 e8 44 09 23 d9 48 8b 4c 24 08 e9 7c fa ff ff <0f> 0b 48 c7 c7 c0 85 60 c0 44 89 e1 44 89 fa 44 89 ee e8 e3 b7
+[ 9863.561720] RSP: 0018:ffff888a696ef6f8 EFLAGS: 00010202
+[ 9863.565420] RAX: 0000000000000000 RBX: ffff88892e030008 RCX: 0000000000000000
+[ 9863.568735] RDX: 0000000000000005 RSI: 0000000000000000 RDI: ffff888a696ef8ac
+[ 9863.572037] RBP: ffff888a49d03d30 R08: ffffed114d2ddf18 R09: ffff888a696ef8a0
+[ 9863.575383] R10: ffff888a696ef8bf R11: ffffed114d2ddf17 R12: 0000000000000006
+[ 9863.578668] R13: 0000000000000003 R14: 0000000000000002 R15: 0000000000000002
+[ 9863.581971] FS:  00007f47c12f5740(0000) GS:ffff888a7f800000(0000) knlGS:0000000000000000
+[ 9863.585752] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+[ 9863.590232] CR2: 0000000000000000 CR3: 0000000a63570005 CR4: 0000000000770ee0
+[ 9863.594698] DR0: 00007f6642e43000 DR1: 0000000000000000 DR2: 0000000000000000
+[ 9863.598521] DR3: 0000000000000000 DR6: 00000000ffff0ff0 DR7: 0000000000000600
+[ 9863.601861] PKRU: 55555540
+[ 9863.603173] Call Trace:
+[ 9863.604382]  ? virtio_fs_probe+0x13e0/0x13e0 [virtiofs]
+[ 9863.606838]  ? is_bpf_text_address+0x21/0x30
+[ 9863.608869]  ? kernel_text_address+0x125/0x140
+[ 9863.610962]  ? __kernel_text_address+0xe/0x30
+[ 9863.613117]  ? unwind_get_return_address+0x5f/0xa0
+[ 9863.615427]  ? create_prof_cpu_mask+0x20/0x20
+[ 9863.617435]  ? _raw_write_lock_irqsave+0xe0/0xe0
+[ 9863.619627]  virtio_fs_wake_pending_and_unlock+0x1ea/0x610 [virtiofs]
+[ 9863.622638]  ? queue_request_and_unlock+0x115/0x280 [fuse]
+[ 9863.625224]  flush_bg_queue+0x24c/0x3e0 [fuse]
+[ 9863.627325]  fuse_simple_background+0x3d7/0x6c0 [fuse]
+[ 9863.629735]  fuse_send_writepage+0x173/0x420 [fuse]
+[ 9863.632031]  fuse_flush_writepages+0x1fe/0x330 [fuse]
+[ 9863.634463]  ? make_kgid+0x13/0x20
+[ 9863.636064]  ? fuse_change_attributes_common+0x2de/0x940 [fuse]
+[ 9863.638850]  fuse_do_setattr+0xe84/0x13c0 [fuse]
+[ 9863.641024]  ? migrate_swap_stop+0x8d1/0x920
+[ 9863.643041]  ? fuse_flush_times+0x390/0x390 [fuse]
+[ 9863.645347]  ? avc_has_perm_noaudit+0x390/0x390
+[ 9863.647465]  fuse_setattr+0x197/0x400 [fuse]
+[ 9863.649466]  notify_change+0x744/0xda0
+[ 9863.651247]  ? __down_timeout+0x2a0/0x2a0
+[ 9863.653125]  ? do_truncate+0xe2/0x180
+[ 9863.654854]  do_truncate+0xe2/0x180
+[ 9863.656509]  ? __x64_sys_openat2+0x1c0/0x1c0
+[ 9863.658512]  ? alarm_setitimer+0xa0/0x110
+[ 9863.660418]  do_sys_ftruncate+0x1ee/0x2c0
+[ 9863.662311]  do_syscall_64+0x33/0x40
+[ 9863.663980]  entry_SYSCALL_64_after_hwframe+0x44/0xa9
+[ 9863.666384] RIP: 0033:0x7f47c0c0878d
+[ 9863.668061] Code: 00 c3 66 2e 0f 1f 84 00 00 00 00 00 90 f3 0f 1e fa 48 89 f8 48 89 f7 48 89 d6 48 89 ca 4d 89 c2 4d 89 c8 4c 8b 4c 24 08 0f 05 <48> 3d 01 f0 ff ff 73 01 c3 48 8b 0d cb 56 2c 00 f7 d8 64 89 08
+[ 9863.676717] RSP: 002b:00007fff515c2598 EFLAGS: 00000246 ORIG_RAX: 000000000000004d
+[ 9863.680226] RAX: ffffffffffffffda RBX: 000000000000004d RCX: 00007f47c0c0878d
+[ 9863.688055] RDX: 0000000000800000 RSI: 0000000000000004 RDI: 00000000000000ba
+[ 9863.693672] RBP: 000000000000004d R08: 000000000000003a R09: 0000000000000001
+[ 9863.699423] R10: 0000000000000005 R11: 0000000000000246 R12: 0000000000000002
+[ 9863.708897] R13: 00007f47c12cb058 R14: 00007f47c12f56c0 R15: 00007f47c12cb000
+[ 9863.713106] CPU: 16 PID: 286083 Comm: trinity-c5 Kdump: loaded Not tainted 5.9.0-rc7-next-20201002+ #2
+[ 9863.717465] Hardware name: Red Hat KVM, BIOS 1.14.0-1.module+el8.3.0+7638+07cf13d2 04/01/2014
+[ 9863.721389] Call Trace:
+[ 9863.722547]  dump_stack+0x7c/0xa2
+[ 9863.724110]  __warn.cold.13+0xe/0x47
+[ 9863.725804]  ? virtio_fs_enqueue_req+0xd36/0xde0 [virtiofs]
+[ 9863.728427]  report_bug+0x1af/0x260
+[ 9863.730054]  handle_bug+0x44/0x80
+[ 9863.731652]  exc_invalid_op+0x13/0x40
+[ 9863.734911]  asm_exc_invalid_op+0x12/0x20
+[ 9863.736940] RIP: 0010:virtio_fs_enqueue_req+0xd36/0xde0 [virtiofs]
+[ 9863.739833] Code: 60 09 23 d9 e9 44 fa ff ff e8 56 09 23 d9 e9 70 fa ff ff 48 89 cf 48 89 4c 24 08 e8 44 09 23 d9 48 8b 4c 24 08 e9 7c fa ff ff <0f> 0b 48 c7 c7 c0 85 60 c0 44 89 e1 44 89 fa 44 89 ee e8 e3 b7
+[ 9863.748519] RSP: 0018:ffff888a696ef6f8 EFLAGS: 00010202
+[ 9863.750935] RAX: 0000000000000000 RBX: ffff88892e030008 RCX: 0000000000000000
+[ 9863.754247] RDX: 0000000000000005 RSI: 0000000000000000 RDI: ffff888a696ef8ac
+[ 9863.760885] RBP: ffff888a49d03d30 R08: ffffed114d2ddf18 R09: ffff888a696ef8a0
+[ 9863.764814] R10: ffff888a696ef8bf R11: ffffed114d2ddf17 R12: 0000000000000006
+[ 9863.768148] R13: 0000000000000003 R14: 0000000000000002 R15: 0000000000000002
+[ 9863.771492]  ? virtio_fs_probe+0x13e0/0x13e0 [virtiofs]
+[ 9863.773950]  ? is_bpf_text_address+0x21/0x30
+[ 9863.775979]  ? kernel_text_address+0x125/0x140
+[ 9863.778061]  ? __kernel_text_address+0xe/0x30
+[ 9863.780124]  ? unwind_get_return_address+0x5f/0xa0
+[ 9863.782395]  ? create_prof_cpu_mask+0x20/0x20
+[ 9863.784451]  ? _raw_write_lock_irqsave+0xe0/0xe0
+[ 9863.786602]  virtio_fs_wake_pending_and_unlock+0x1ea/0x610 [virtiofs]
+[ 9863.789614]  ? queue_request_and_unlock+0x115/0x280 [fuse]
+[ 9863.792178]  flush_bg_queue+0x24c/0x3e0 [fuse]
+[ 9863.796678]  fuse_simple_background+0x3d7/0x6c0 [fuse]
+[ 9863.802329]  fuse_send_writepage+0x173/0x420 [fuse]
+[ 9863.808342]  fuse_flush_writepages+0x1fe/0x330 [fuse]
+[ 9863.812086]  ? make_kgid+0x13/0x20
+[ 9863.813681]  ? fuse_change_attributes_common+0x2de/0x940 [fuse]
+[ 9863.816465]  fuse_do_setattr+0xe84/0x13c0 [fuse]
+[ 9863.819633]  ? migrate_swap_stop+0x8d1/0x920
+[ 9863.824285]  ? fuse_flush_times+0x390/0x390 [fuse]
+[ 9863.827331]  ? avc_has_perm_noaudit+0x390/0x390
+[ 9863.875278]  fuse_setattr+0x197/0x400 [fuse]
+[ 9863.878496]  notify_change+0x744/0xda0
+[ 9863.880640]  ? __down_timeout+0x2a0/0x2a0
+[ 9863.882960]  ? do_truncate+0xe2/0x180
+[ 9863.886311]  do_truncate+0xe2/0x180
+[ 9863.888392]  ? __x64_sys_openat2+0x1c0/0x1c0
+[ 9863.890418]  ? alarm_setitimer+0xa0/0x110
+[ 9863.894430]  do_sys_ftruncate+0x1ee/0x2c0
+[ 9863.896468]  do_syscall_64+0x33/0x40
+[ 9863.898167]  entry_SYSCALL_64_after_hwframe+0x44/0xa9
+[ 9863.901089] RIP: 0033:0x7f47c0c0878d
+[ 9863.903447] Code: 00 c3 66 2e 0f 1f 84 00 00 00 00 00 90 f3 0f 1e fa 48 89 f8 48 89 f7 48 89 d6 48 89 ca 4d 89 c2 4d 89 c8 4c 8b 4c 24 08 0f 05 <48> 3d 01 f0 ff ff 73 01 c3 48 8b 0d cb 56 2c 00 f7 d8 64 89 08
+[ 9863.914356] RSP: 002b:00007fff515c2598 EFLAGS: 00000246 ORIG_RAX: 000000000000004d
+[ 9863.917998] RAX: ffffffffffffffda RBX: 000000000000004d RCX: 00007f47c0c0878d
+[ 9863.921364] RDX: 0000000000800000 RSI: 0000000000000004 RDI: 00000000000000ba
+[ 9863.928285] RBP: 000000000000004d R08: 000000000000003a R09: 0000000000000001
+[ 9863.932523] R10: 0000000000000005 R11: 0000000000000246 R12: 0000000000000002
+[ 9863.935835] R13: 00007f47c12cb058 R14: 00007f47c12f56c0 R15: 00007f47c12cb000
+[ 9863.939183] ---[ end trace f6f5d958c186bcee ]---
 

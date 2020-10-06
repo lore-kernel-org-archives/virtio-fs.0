@@ -1,9 +1,12 @@
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Tue,  6 Oct 2020 10:58:26 +0100
-Message-Id: <20201006095826.59813-1-stefanha@redhat.com>
+Date: Tue, 6 Oct 2020 12:03:39 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20201006110339.GC3000@work-vm>
+References: <20201006095826.59813-1-stefanha@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: base64
-Subject: [Virtio-fs] [PATCH] virtiofsd: avoid /proc/self/fd tempdir
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20201006095826.59813-1-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: avoid /proc/self/fd tempdir
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -12,73 +15,128 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: virtio-fs@redhat.com, Jens Freimann <jfreimann@redhat.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, Jens Freimann <jfreimann@redhat.com>, qemu-devel@nongnu.org
 
-SW4gb3JkZXIgdG8gcHJldmVudCAvcHJvYy9zZWxmL2ZkIGVzY2FwZXMgYSB0ZW1wb3JhcnkgZGly
-ZWN0b3J5IGlzCmNyZWF0ZWQgd2hlcmUgL3Byb2Mvc2VsZi9mZCBpcyBiaW5kLW1vdW50ZWQuIFRo
-aXMgZG9lc24ndCB3b3JrIG9uCnJlYWQtb25seSBmaWxlIHN5c3RlbXMuCgpBdm9pZCB0aGUgdGVt
-cG9yYXJ5IGRpcmVjdG9yeSBieSBiaW5kLW1vdW50aW5nIC9wcm9jL3NlbGYvZmQgb3ZlciAvcHJv
-Yy4KVGhpcyBkb2VzIG5vdCBhZmZlY3Qgb3RoZXIgcHJvY2Vzc2VzIHNpbmNlIHdlIHJlbW91bnRl
-ZCAvIHdpdGggTVNfUkVDIHwKTVNfU0xBVkUuIC9wcm9jIG11c3QgZXhpc3QgYW5kIHZpcnRpb2Zz
-ZCBkb2VzIG5vdCB1c2UgaXQgc28gaXQncyBzYWZlIHRvCmRvIHRoaXMuCgpQYXRoIHRyYXZlcnNh
-bCBjYW4gYmUgdGVzdGVkIHdpdGggdGhlIGZvbGxvd2luZyBmdW5jdGlvbjoKCiAgc3RhdGljIHZv
-aWQgdGVzdF9wcm9jX2ZkX2VzY2FwZShzdHJ1Y3QgbG9fZGF0YSAqbG8pCiAgewogICAgICBpbnQg
-ZmQ7CiAgICAgIGludCBsZXZlbCA9IDA7CiAgICAgIGlub190IGxhc3RfaW5vID0gMDsKCiAgICAg
-IGZkID0gbG8tPnByb2Nfc2VsZl9mZDsKICAgICAgZm9yICg7OykgewogICAgICAgICAgc3RydWN0
-IHN0YXQgc3Q7CgogICAgICAgICAgaWYgKGZzdGF0KGZkLCAmc3QpICE9IDApIHsKICAgICAgICAg
-ICAgICBwZXJyb3IoImZzdGF0Iik7CiAgICAgICAgICAgICAgcmV0dXJuOwogICAgICAgICAgfQog
-ICAgICAgICAgaWYgKGxhc3RfaW5vICYmIHN0LnN0X2lubyA9PSBsYXN0X2lubykgewogICAgICAg
-ICAgICAgIGZwcmludGYoc3RkZXJyLCAiaW5vZGUgbnVtYmVyIHVuY2hhbmdlZCwgc3RvcHBpbmdc
-biIpOwogICAgICAgICAgICAgIHJldHVybjsKICAgICAgICAgIH0KICAgICAgICAgIGxhc3RfaW5v
-ID0gc3Quc3RfaW5vOwoKICAgICAgICAgIGZwcmludGYoc3RkZXJyLCAiTGV2ZWwgJWQgZGV2ICVs
-dSBpbm8gJWx1XG4iLCBsZXZlbCwKICAgICAgICAgICAgICAgICAgKHVuc2lnbmVkIGxvbmcpc3Qu
-c3RfZGV2LAogICAgICAgICAgICAgICAgICAodW5zaWduZWQgbG9uZylsYXN0X2lubyk7CiAgICAg
-ICAgICBmZCA9IG9wZW5hdChmZCwgIi4uIiwgT19QQVRIIHwgT19ESVJFQ1RPUlkgfCBPX05PRk9M
-TE9XKTsKICAgICAgICAgIGxldmVsKys7CiAgICAgIH0KICB9CgpCZWZvcmUgYW5kIGFmdGVyIHRo
-aXMgcGF0Y2ggb25seSBMZXZlbCAwIGlzIGRpc3BsYXllZC4gV2l0aG91dAovcHJvYy9zZWxmL2Zk
-IGJpbmQtbW91bnQgcHJvdGVjdGlvbiBpdCBpcyBwb3NzaWJsZSB0byB0cmF2ZXJzZSBwYXJlbnQK
-ZGlyZWN0b3JpZXMuCgpGaXhlczogMzk3YWU5ODJmNGRmNCAoInZpcnRpb2ZzZDogamFpbCBsby0+
-cHJvY19zZWxmX2ZkIikKQ2M6IE1pa2xvcyBTemVyZWRpIDxtc3plcmVkaUByZWRoYXQuY29tPgpD
-YzogSmVucyBGcmVpbWFubiA8amZyZWltYW5uQHJlZGhhdC5jb20+ClNpZ25lZC1vZmYtYnk6IFN0
-ZWZhbiBIYWpub2N6aSA8c3RlZmFuaGFAcmVkaGF0LmNvbT4KLS0tCiB0b29scy92aXJ0aW9mc2Qv
-cGFzc3Rocm91Z2hfbGwuYyB8IDM0ICsrKysrKysrKysrLS0tLS0tLS0tLS0tLS0tLS0tLS0tCiAx
-IGZpbGUgY2hhbmdlZCwgMTEgaW5zZXJ0aW9ucygrKSwgMjMgZGVsZXRpb25zKC0pCgpkaWZmIC0t
-Z2l0IGEvdG9vbHMvdmlydGlvZnNkL3Bhc3N0aHJvdWdoX2xsLmMgYi90b29scy92aXJ0aW9mc2Qv
-cGFzc3Rocm91Z2hfbGwuYwppbmRleCAwYjIyOWViZDU3Li42YWU3ZmZjZGQ3IDEwMDY0NAotLS0g
-YS90b29scy92aXJ0aW9mc2QvcGFzc3Rocm91Z2hfbGwuYworKysgYi90b29scy92aXJ0aW9mc2Qv
-cGFzc3Rocm91Z2hfbGwuYwpAQCAtMjM5Myw4ICsyMzkzLDYgQEAgc3RhdGljIHZvaWQgc2V0dXBf
-d2FpdF9wYXJlbnRfY2FwYWJpbGl0aWVzKHZvaWQpCiBzdGF0aWMgdm9pZCBzZXR1cF9uYW1lc3Bh
-Y2VzKHN0cnVjdCBsb19kYXRhICpsbywgc3RydWN0IGZ1c2Vfc2Vzc2lvbiAqc2UpCiB7CiAgICAg
-cGlkX3QgY2hpbGQ7Ci0gICAgY2hhciB0ZW1wbGF0ZVtdID0gInZpcnRpb2ZzZC1YWFhYWFgiOwot
-ICAgIGNoYXIgKnRtcGRpcjsKIAogICAgIC8qCiAgICAgICogQ3JlYXRlIGEgbmV3IHBpZCBuYW1l
-c3BhY2UgZm9yICpjaGlsZCogcHJvY2Vzc2VzLiAgV2UnbGwgaGF2ZSB0bwpAQCAtMjQ1OCwzMyAr
-MjQ1NiwyMyBAQCBzdGF0aWMgdm9pZCBzZXR1cF9uYW1lc3BhY2VzKHN0cnVjdCBsb19kYXRhICps
-bywgc3RydWN0IGZ1c2Vfc2Vzc2lvbiAqc2UpCiAgICAgICAgIGV4aXQoMSk7CiAgICAgfQogCi0g
-ICAgdG1wZGlyID0gbWtkdGVtcCh0ZW1wbGF0ZSk7Ci0gICAgaWYgKCF0bXBkaXIpIHsKLSAgICAg
-ICAgZnVzZV9sb2coRlVTRV9MT0dfRVJSLCAidG1wZGlyKCVzKTogJW1cbiIsIHRlbXBsYXRlKTsK
-KyAgICAvKgorICAgICAqIFdlIG9ubHkgbmVlZCAvcHJvYy9zZWxmL2ZkLiBQcmV2ZW50ICIuLiIg
-ZnJvbSBhY2Nlc3NpbmcgcGFyZW50CisgICAgICogZGlyZWN0b3JpZXMgb2YgL3Byb2Mvc2VsZi9m
-ZCBieSBiaW5kLW1vdW50aW5nIGl0IG92ZXIgL3Byb2MuIFNpbmNlIC8gd2FzCisgICAgICogcHJl
-dmlvdXNseSByZW1vdW50ZWQgd2l0aCBNU19SRUMgfCBNU19TTEFWRSB0aGlzIG1vdW50IGNoYW5n
-ZSBvbmx5CisgICAgICogYWZmZWN0cyBvdXIgcHJvY2Vzcy4KKyAgICAgKi8KKyAgICBpZiAobW91
-bnQoIi9wcm9jL3NlbGYvZmQiLCAiL3Byb2MiLCBOVUxMLCBNU19CSU5ELCBOVUxMKSA8IDApIHsK
-KyAgICAgICAgZnVzZV9sb2coRlVTRV9MT0dfRVJSLCAibW91bnQoL3Byb2Mvc2VsZi9mZCwgTVNf
-QklORCk6ICVtXG4iKTsKICAgICAgICAgZXhpdCgxKTsKICAgICB9CiAKLSAgICBpZiAobW91bnQo
-Ii9wcm9jL3NlbGYvZmQiLCB0bXBkaXIsIE5VTEwsIE1TX0JJTkQsIE5VTEwpIDwgMCkgewotICAg
-ICAgICBmdXNlX2xvZyhGVVNFX0xPR19FUlIsICJtb3VudCgvcHJvYy9zZWxmL2ZkLCAlcywgTVNf
-QklORCk6ICVtXG4iLAotICAgICAgICAgICAgICAgICB0bXBkaXIpOwotICAgICAgICBleGl0KDEp
-OwotICAgIH0KLQotICAgIC8qIE5vdyB3ZSBjYW4gZ2V0IG91ciAvcHJvYy9zZWxmL2ZkIGRpcmVj
-dG9yeSBmaWxlIGRlc2NyaXB0b3IgKi8KLSAgICBsby0+cHJvY19zZWxmX2ZkID0gb3Blbih0bXBk
-aXIsIE9fUEFUSCk7CisgICAgLyogR2V0IHRoZSAvcHJvYyAoYWN0dWFsbHkgL3Byb2Mvc2VsZi9m
-ZCwgc2VlIGFib3ZlKSBmaWxlIGRlc2NyaXB0b3IgKi8KKyAgICBsby0+cHJvY19zZWxmX2ZkID0g
-b3BlbigiL3Byb2MiLCBPX1BBVEgpOwogICAgIGlmIChsby0+cHJvY19zZWxmX2ZkID09IC0xKSB7
-Ci0gICAgICAgIGZ1c2VfbG9nKEZVU0VfTE9HX0VSUiwgIm9wZW4oJXMsIE9fUEFUSCk6ICVtXG4i
-LCB0bXBkaXIpOworICAgICAgICBmdXNlX2xvZyhGVVNFX0xPR19FUlIsICJvcGVuKC9wcm9jLCBP
-X1BBVEgpOiAlbVxuIik7CiAgICAgICAgIGV4aXQoMSk7CiAgICAgfQotCi0gICAgaWYgKHVtb3Vu
-dDIodG1wZGlyLCBNTlRfREVUQUNIKSA8IDApIHsKLSAgICAgICAgZnVzZV9sb2coRlVTRV9MT0df
-RVJSLCAidW1vdW50MiglcywgTU5UX0RFVEFDSCk6ICVtXG4iLCB0bXBkaXIpOwotICAgICAgICBl
-eGl0KDEpOwotICAgIH0KLQotICAgIGlmIChybWRpcih0bXBkaXIpIDwgMCkgewotICAgICAgICBm
-dXNlX2xvZyhGVVNFX0xPR19FUlIsICJybWRpciglcyk6ICVtXG4iLCB0bXBkaXIpOwotICAgIH0K
-IH0KIAogLyoKLS0gCjIuMjYuMgoK
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> In order to prevent /proc/self/fd escapes a temporary directory is
+> created where /proc/self/fd is bind-mounted. This doesn't work on
+> read-only file systems.
+> 
+> Avoid the temporary directory by bind-mounting /proc/self/fd over /proc.
+> This does not affect other processes since we remounted / with MS_REC |
+> MS_SLAVE. /proc must exist and virtiofsd does not use it so it's safe to
+> do this.
+> 
+> Path traversal can be tested with the following function:
+> 
+>   static void test_proc_fd_escape(struct lo_data *lo)
+>   {
+>       int fd;
+>       int level = 0;
+>       ino_t last_ino = 0;
+> 
+>       fd = lo->proc_self_fd;
+>       for (;;) {
+>           struct stat st;
+> 
+>           if (fstat(fd, &st) != 0) {
+>               perror("fstat");
+>               return;
+>           }
+>           if (last_ino && st.st_ino == last_ino) {
+>               fprintf(stderr, "inode number unchanged, stopping\n");
+>               return;
+>           }
+>           last_ino = st.st_ino;
+> 
+>           fprintf(stderr, "Level %d dev %lu ino %lu\n", level,
+>                   (unsigned long)st.st_dev,
+>                   (unsigned long)last_ino);
+>           fd = openat(fd, "..", O_PATH | O_DIRECTORY | O_NOFOLLOW);
+>           level++;
+>       }
+>   }
+> 
+> Before and after this patch only Level 0 is displayed. Without
+> /proc/self/fd bind-mount protection it is possible to traverse parent
+> directories.
+> 
+> Fixes: 397ae982f4df4 ("virtiofsd: jail lo->proc_self_fd")
+> Cc: Miklos Szeredi <mszeredi@redhat.com>
+> Cc: Jens Freimann <jfreimann@redhat.com>
+> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+
+Yes, getting rid of the tmpdir altogether seems better.
+
+
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 34 +++++++++++---------------------
+>  1 file changed, 11 insertions(+), 23 deletions(-)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 0b229ebd57..6ae7ffcdd7 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -2393,8 +2393,6 @@ static void setup_wait_parent_capabilities(void)
+>  static void setup_namespaces(struct lo_data *lo, struct fuse_session *se)
+>  {
+>      pid_t child;
+> -    char template[] = "virtiofsd-XXXXXX";
+> -    char *tmpdir;
+>  
+>      /*
+>       * Create a new pid namespace for *child* processes.  We'll have to
+> @@ -2458,33 +2456,23 @@ static void setup_namespaces(struct lo_data *lo, struct fuse_session *se)
+>          exit(1);
+>      }
+>  
+> -    tmpdir = mkdtemp(template);
+> -    if (!tmpdir) {
+> -        fuse_log(FUSE_LOG_ERR, "tmpdir(%s): %m\n", template);
+> +    /*
+> +     * We only need /proc/self/fd. Prevent ".." from accessing parent
+> +     * directories of /proc/self/fd by bind-mounting it over /proc. Since / was
+> +     * previously remounted with MS_REC | MS_SLAVE this mount change only
+> +     * affects our process.
+> +     */
+> +    if (mount("/proc/self/fd", "/proc", NULL, MS_BIND, NULL) < 0) {
+> +        fuse_log(FUSE_LOG_ERR, "mount(/proc/self/fd, MS_BIND): %m\n");
+>          exit(1);
+>      }
+>  
+> -    if (mount("/proc/self/fd", tmpdir, NULL, MS_BIND, NULL) < 0) {
+> -        fuse_log(FUSE_LOG_ERR, "mount(/proc/self/fd, %s, MS_BIND): %m\n",
+> -                 tmpdir);
+> -        exit(1);
+> -    }
+> -
+> -    /* Now we can get our /proc/self/fd directory file descriptor */
+> -    lo->proc_self_fd = open(tmpdir, O_PATH);
+> +    /* Get the /proc (actually /proc/self/fd, see above) file descriptor */
+> +    lo->proc_self_fd = open("/proc", O_PATH);
+>      if (lo->proc_self_fd == -1) {
+> -        fuse_log(FUSE_LOG_ERR, "open(%s, O_PATH): %m\n", tmpdir);
+> +        fuse_log(FUSE_LOG_ERR, "open(/proc, O_PATH): %m\n");
+>          exit(1);
+>      }
+> -
+> -    if (umount2(tmpdir, MNT_DETACH) < 0) {
+> -        fuse_log(FUSE_LOG_ERR, "umount2(%s, MNT_DETACH): %m\n", tmpdir);
+> -        exit(1);
+> -    }
+> -
+> -    if (rmdir(tmpdir) < 0) {
+> -        fuse_log(FUSE_LOG_ERR, "rmdir(%s): %m\n", tmpdir);
+> -    }
+>  }
+>  
+>  /*
+> -- 
+> 2.26.2
+> 
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

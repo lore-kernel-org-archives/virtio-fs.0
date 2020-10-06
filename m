@@ -1,15 +1,22 @@
-References: <20200909184603.263700-1-mreitz@redhat.com>
-	<CAJfpegt92oj88FbGxphce80AWtU51Qgm87KuZqYD9kfpSVq2tA@mail.gmail.com>
-From: Max Reitz <mreitz@redhat.com>
-Message-ID: <e640c06b-2918-5b90-e792-24e38e55e7e7@redhat.com>
-Date: Wed, 23 Sep 2020 17:20:28 +0200
+Date: Tue, 6 Oct 2020 09:12:00 -0700
+From: Sean Christopherson <sean.j.christopherson@intel.com>
+Message-ID: <20201006161200.GB17610@linux.intel.com>
+References: <20201002200214.GB10232@redhat.com>
+	<20201002211314.GE24460@linux.intel.com>
+	<20201005153318.GA4302@redhat.com>
+	<20201005161620.GC11938@linux.intel.com>
+	<20201006134629.GB5306@redhat.com>
+	<877ds38n6r.fsf@vitty.brq.redhat.com>
+	<20201006141501.GC5306@redhat.com>
+	<874kn78l2z.fsf@vitty.brq.redhat.com>
+	<20201006150817.GD5306@redhat.com>
+	<871rib8ji1.fsf@vitty.brq.redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <CAJfpegt92oj88FbGxphce80AWtU51Qgm87KuZqYD9kfpSVq2tA@mail.gmail.com>
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature";
-	boundary="h4aY4OHth12nA2N2yieMOG5oEiBnplTD9"
-Subject: Re: [Virtio-fs] [fuse-devel] [PATCH 0/9] fuse: Mirror virtio-fs
-	submounts
+In-Reply-To: <871rib8ji1.fsf@vitty.brq.redhat.com>
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: Re: [Virtio-fs] [PATCH v4] kvm,
+	x86: Exit to user space in case page fault error
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,75 +25,26 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, fuse-devel <fuse-devel@lists.sourceforge.net>
+To: Vitaly Kuznetsov <vkuznets@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, pbonzini@redhat.com, kvm@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>, linux-kernel@vger.kernel.org
 
-This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
---h4aY4OHth12nA2N2yieMOG5oEiBnplTD9
-Content-Type: multipart/mixed; boundary="wV07ROAVvwym7kwH9AFLSUYsgd8pNzX0O"
+On Tue, Oct 06, 2020 at 05:24:54PM +0200, Vitaly Kuznetsov wrote:
+> Vivek Goyal <vgoyal@redhat.com> writes:
+> > So you will have to report token (along with -EFAULT) to user space. So this
+> > is basically the 3rd proposal which is extension of kvm API and will
+> > report say HVA/GFN also to user space along with -EFAULT.
+> 
+> Right, I meant to say that guest kernel has full register state of the
+> userspace process which caused APF to get queued and instead of trying
+> to extract it in KVM and pass to userspace in case of a (later) failure
+> we limit KVM api change to contain token or GFN only and somehow keep
+> the rest in the guest. This should help with TDX/SEV-ES.
 
---wV07ROAVvwym7kwH9AFLSUYsgd8pNzX0O
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
-Content-Transfer-Encoding: quoted-printable
+Whatever gets reported to userspace should be identical with and without
+async page faults, i.e. it definitely shouldn't have token information.
 
-On 18.09.20 17:25, Miklos Szeredi wrote:
-> Pushed an updated version to fuse.git#submounts.
->=20
-> Also attached incremental patch (against rebase of
-> virtiofs-submounts-v2 on fuse.git#for-next).
->=20
-> Changes:
->=20
->  1) rebased on top of DAX patches
->  2) fixed CUSE
->  3) added locking for fc->mounts list
->  4) dissociate lifetime of fc from lifetime of root mount
->  5) do not hash mountpoint inodes
->  6) add FUSE_SUBMOUNTS init flag (replaces FUSE_ATTR_FLAGS but
-> slightly different usage)
->  7) various cleanups
-
-[...]
-
-> Please review and test.  If there are no major issues, this should be
-> good to go for v5.10.
-
-submounts-update.patch looks good to me.  Thanks again!
-(I have to admit I found it quite hard to review because it=E2=80=99s the=
- 7
-changes noted above rolled into a single diff, so it took me quite a whil=
-e.)
-
-The only thing I noticed was that fuse_init_node() shouldn=E2=80=99t decl=
-are @fc
-any longer.  (I also don=E2=80=99t quite understand why in fuse_i.h some =
-/** are
-replaced by /*, but that isn=E2=80=99t really relevant.)
-
-(I=E2=80=99ll look at virtiofsd-use-mount-id.patch tomorrow.)
-
-Max
-
-
---wV07ROAVvwym7kwH9AFLSUYsgd8pNzX0O--
-
---h4aY4OHth12nA2N2yieMOG5oEiBnplTD9
-Content-Type: application/pgp-signature; name="signature.asc"
-Content-Description: OpenPGP digital signature
-Content-Disposition: attachment; filename="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEkb62CjDbPohX0Rgp9AfbAGHVz0AFAl9rZ7wACgkQ9AfbAGHV
-z0D5dwgAmDrrG/wbTixEPEVzsnbLvKipRM2ZRRRYIfJQdTMAu3HB8xqZUsKQoswt
-b9JsD+k8CUKx0SPzbiHTL4BqzLCa4sV1+HtESphVh2uK1ZZEQJvOJOjT2DYzaf+e
-Dujgv5P2rlimPPLrZmD8TrOR68jsUl54VzG7o4tOgHlE9zUHqlHV19TAR4CLCsrq
-5c04FEZWHM9AbgKh8DB4n2ljwJgK86GoDLzTVnYr4WSvZRWnVO692dbZpL+2JtPk
-myPrtiiyVm3I4M0I/yZ8LTDQC02kzs8boiFzrKOxBCVdB7EhJ5C93mu3og7FKI3+
-MoqejpijL0cYVBVAN9LwO7RsdUKmwg==
-=G5CA
------END PGP SIGNATURE-----
-
---h4aY4OHth12nA2N2yieMOG5oEiBnplTD9--
+Note, TDX doesn't allow injection exceptions, so reflecting a #PF back
+into the guest is not an option.  Nor do I think that's "correct"
+behavior (see everyone's objections to using #PF for APF fixed).  I.e. the
+event should probably be an IRQ.
 

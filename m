@@ -1,12 +1,15 @@
-Date: Tue, 6 Oct 2020 12:03:39 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20201006110339.GC3000@work-vm>
-References: <20201006095826.59813-1-stefanha@redhat.com>
+Date: Tue, 6 Oct 2020 09:06:38 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20201006130638.GA5306@redhat.com>
+References: <5ea77e9f6cb8c2db43b09fbd4158ab2d8c066a0a.camel@redhat.com>
+	<a2810c3a656115fab85fc173186f3e2c02a98182.camel@redhat.com>
+	<20201004143119.GA58616@redhat.com>
+	<20201006090427.GA41482@stefanha-x1.localdomain>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20201006095826.59813-1-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: avoid /proc/self/fd tempdir
+In-Reply-To: <20201006090427.GA41482@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] virtiofs: WARN_ON(out_sgs + in_sgs != total_sgs)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,127 +19,64 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, Jens Freimann <jfreimann@redhat.com>, qemu-devel@nongnu.org
+Cc: Qian Cai <cai@redhat.com>, linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, linux-kernel@vger.kernel.org, Miklos Szeredi <miklos@szeredi.hu>
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> In order to prevent /proc/self/fd escapes a temporary directory is
-> created where /proc/self/fd is bind-mounted. This doesn't work on
-> read-only file systems.
+On Tue, Oct 06, 2020 at 10:04:27AM +0100, Stefan Hajnoczi wrote:
+> On Sun, Oct 04, 2020 at 10:31:19AM -0400, Vivek Goyal wrote:
+> > On Fri, Oct 02, 2020 at 10:44:37PM -0400, Qian Cai wrote:
+> > > On Fri, 2020-10-02 at 12:28 -0400, Qian Cai wrote:
+> > > > Running some fuzzing on virtiofs from a non-privileged user could trigger a
+> > > > warning in virtio_fs_enqueue_req():
+> > > > 
+> > > > WARN_ON(out_sgs + in_sgs != total_sgs);
+> > > 
+> > > Okay, I can reproduce this after running for a few hours:
+> > > 
+> > > out_sgs = 3, in_sgs = 2, total_sgs = 6
+> > 
+> > Thanks. I can also reproduce it simply by calling.
+> > 
+> > ioctl(fd, 0x5a004000, buf);
+> > 
+> > I think following WARN_ON() is not correct.
+> > 
+> > WARN_ON(out_sgs + in_sgs != total_sgs)
+> > 
+> > toal_sgs should actually be max sgs. It looks at ap->num_pages and
+> > counts one sg for each page. And it assumes that same number of
+> > pages will be used both for input and output.
+> > 
+> > But there are no such guarantees. With above ioctl() call, I noticed
+> > we are using 2 pages for input (out_sgs) and one page for output (in_sgs).
+> > 
+> > So out_sgs=4, in_sgs=3 and total_sgs=8 and warning triggers.
+> > 
+> > I think total sgs is actually max number of sgs and warning
+> > should probably be.
+> > 
+> > WARN_ON(out_sgs + in_sgs >  total_sgs)
+> > 
+> > Stefan, WDYT?
 > 
-> Avoid the temporary directory by bind-mounting /proc/self/fd over /proc.
-> This does not affect other processes since we remounted / with MS_REC |
-> MS_SLAVE. /proc must exist and virtiofsd does not use it so it's safe to
-> do this.
-> 
-> Path traversal can be tested with the following function:
-> 
->   static void test_proc_fd_escape(struct lo_data *lo)
->   {
->       int fd;
->       int level = 0;
->       ino_t last_ino = 0;
-> 
->       fd = lo->proc_self_fd;
->       for (;;) {
->           struct stat st;
-> 
->           if (fstat(fd, &st) != 0) {
->               perror("fstat");
->               return;
->           }
->           if (last_ino && st.st_ino == last_ino) {
->               fprintf(stderr, "inode number unchanged, stopping\n");
->               return;
->           }
->           last_ino = st.st_ino;
-> 
->           fprintf(stderr, "Level %d dev %lu ino %lu\n", level,
->                   (unsigned long)st.st_dev,
->                   (unsigned long)last_ino);
->           fd = openat(fd, "..", O_PATH | O_DIRECTORY | O_NOFOLLOW);
->           level++;
->       }
->   }
-> 
-> Before and after this patch only Level 0 is displayed. Without
-> /proc/self/fd bind-mount protection it is possible to traverse parent
-> directories.
-> 
-> Fixes: 397ae982f4df4 ("virtiofsd: jail lo->proc_self_fd")
-> Cc: Miklos Szeredi <mszeredi@redhat.com>
-> Cc: Jens Freimann <jfreimann@redhat.com>
-> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> It should be possible to calculate total_sgs precisely (not a maximum).
+> Treating it as a maximum could hide bugs.
 
-Yes, getting rid of the tmpdir altogether seems better.
+I thought about calculating total_sgs as well. Then became little lazy.
+I will redo the patch and then calculate total_sgs precisely.
 
-
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-
-> ---
->  tools/virtiofsd/passthrough_ll.c | 34 +++++++++++---------------------
->  1 file changed, 11 insertions(+), 23 deletions(-)
 > 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 0b229ebd57..6ae7ffcdd7 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2393,8 +2393,6 @@ static void setup_wait_parent_capabilities(void)
->  static void setup_namespaces(struct lo_data *lo, struct fuse_session *se)
->  {
->      pid_t child;
-> -    char template[] = "virtiofsd-XXXXXX";
-> -    char *tmpdir;
->  
->      /*
->       * Create a new pid namespace for *child* processes.  We'll have to
-> @@ -2458,33 +2456,23 @@ static void setup_namespaces(struct lo_data *lo, struct fuse_session *se)
->          exit(1);
->      }
->  
-> -    tmpdir = mkdtemp(template);
-> -    if (!tmpdir) {
-> -        fuse_log(FUSE_LOG_ERR, "tmpdir(%s): %m\n", template);
-> +    /*
-> +     * We only need /proc/self/fd. Prevent ".." from accessing parent
-> +     * directories of /proc/self/fd by bind-mounting it over /proc. Since / was
-> +     * previously remounted with MS_REC | MS_SLAVE this mount change only
-> +     * affects our process.
-> +     */
-> +    if (mount("/proc/self/fd", "/proc", NULL, MS_BIND, NULL) < 0) {
-> +        fuse_log(FUSE_LOG_ERR, "mount(/proc/self/fd, MS_BIND): %m\n");
->          exit(1);
->      }
->  
-> -    if (mount("/proc/self/fd", tmpdir, NULL, MS_BIND, NULL) < 0) {
-> -        fuse_log(FUSE_LOG_ERR, "mount(/proc/self/fd, %s, MS_BIND): %m\n",
-> -                 tmpdir);
-> -        exit(1);
-> -    }
-> -
-> -    /* Now we can get our /proc/self/fd directory file descriptor */
-> -    lo->proc_self_fd = open(tmpdir, O_PATH);
-> +    /* Get the /proc (actually /proc/self/fd, see above) file descriptor */
-> +    lo->proc_self_fd = open("/proc", O_PATH);
->      if (lo->proc_self_fd == -1) {
-> -        fuse_log(FUSE_LOG_ERR, "open(%s, O_PATH): %m\n", tmpdir);
-> +        fuse_log(FUSE_LOG_ERR, "open(/proc, O_PATH): %m\n");
->          exit(1);
->      }
-> -
-> -    if (umount2(tmpdir, MNT_DETACH) < 0) {
-> -        fuse_log(FUSE_LOG_ERR, "umount2(%s, MNT_DETACH): %m\n", tmpdir);
-> -        exit(1);
-> -    }
-> -
-> -    if (rmdir(tmpdir) < 0) {
-> -        fuse_log(FUSE_LOG_ERR, "rmdir(%s): %m\n", tmpdir);
-> -    }
->  }
->  
->  /*
-> -- 
-> 2.26.2
+> Maybe sg_count_fuse_req() should count in_args/out_args[numargs -
+> 1].size pages instead of adding ap->num_pages.
+
+That should work, I guess. Will try.
+
+Vivek
 > 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> Do you have the details of struct fuse_req and struct fuse_args_pages
+> fields for the ioctl in question?
+
+> 
+> Thanks,
+> Stefan
+
 

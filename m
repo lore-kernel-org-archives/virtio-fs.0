@@ -1,22 +1,13 @@
-From: Vitaly Kuznetsov <vkuznets@redhat.com>
-In-Reply-To: <20201006150817.GD5306@redhat.com>
-References: <20201002192734.GD3119@redhat.com>
-	<20201002194517.GD24460@linux.intel.com>
-	<20201002200214.GB10232@redhat.com>
-	<20201002211314.GE24460@linux.intel.com>
-	<20201005153318.GA4302@redhat.com>
-	<20201005161620.GC11938@linux.intel.com>
-	<20201006134629.GB5306@redhat.com>
-	<877ds38n6r.fsf@vitty.brq.redhat.com>
-	<20201006141501.GC5306@redhat.com>
-	<874kn78l2z.fsf@vitty.brq.redhat.com>
-	<20201006150817.GD5306@redhat.com>
-Date: Tue, 06 Oct 2020 17:24:54 +0200
-Message-ID: <871rib8ji1.fsf@vitty.brq.redhat.com>
+Date: Tue, 6 Oct 2020 16:39:33 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20201006153933.GA87345@stefanha-x1.localdomain>
+References: <20201005174531.GB4302@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain
-Subject: Re: [Virtio-fs] [PATCH v4] kvm,
-	x86: Exit to user space in case page fault error
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="azLHFNyN32YCQGCU"
+Content-Disposition: inline
+In-Reply-To: <20201005174531.GB4302@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofs: Fix false positive warning
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -26,56 +17,89 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, pbonzini@redhat.com, kvm@vger.kernel.org, Sean Christopherson <sean.j.christopherson@intel.com>, linux-kernel@vger.kernel.org
+Cc: Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, CAI Qian <caiqian@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>
 
-Vivek Goyal <vgoyal@redhat.com> writes:
 
-> On Tue, Oct 06, 2020 at 04:50:44PM +0200, Vitaly Kuznetsov wrote:
->> Vivek Goyal <vgoyal@redhat.com> writes:
->> 
->> > On Tue, Oct 06, 2020 at 04:05:16PM +0200, Vitaly Kuznetsov wrote:
->> >> Vivek Goyal <vgoyal@redhat.com> writes:
->> >> 
->> >> > A. Just exit to user space with -EFAULT (using kvm request) and don't
->> >> >    wait for the accessing task to run on vcpu again. 
->> >> 
->> >> What if we also save the required information (RIP, GFN, ...) in the
->> >> guest along with the APF token
->> >
->> > Can you elaborate a bit more on this. You mean save GFN on stack before
->> > it starts waiting for PAGE_READY event?
->> 
->> When PAGE_NOT_PRESENT event is injected as #PF (for now) in the guest
->> kernel gets all the registers of the userspace process (except for CR2
->> which is replaced with a token). In case it is not trivial to extract
->> accessed GFN from this data we can extend the shared APF structure and
->> add it there, KVM has it when it queues APF.
->> 
->> >
->> >> so in case of -EFAULT we can just 'crash'
->> >> the guest and the required information can easily be obtained from
->> >> kdump? This will solve the debugging problem even for TDX/SEV-ES (if
->> >> kdump is possible there).
->> >
->> > Just saving additional info in guest will not help because there might
->> > be many tasks waiting and you don't know which GFN is problematic one.
->> 
->> But KVM knows which token caused the -EFAULT when we exit to userspace
->> (and we can pass this information to it) so to debug the situation you
->> take this token and then explore the kdump searching for what's
->> associated with this exact token.
->
-> So you will have to report token (along with -EFAULT) to user space. So this
-> is basically the 3rd proposal which is extension of kvm API and will
-> report say HVA/GFN also to user space along with -EFAULT.
->
+--azLHFNyN32YCQGCU
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Right, I meant to say that guest kernel has full register state of the
-userspace process which caused APF to get queued and instead of trying
-to extract it in KVM and pass to userspace in case of a (later) failure
-we limit KVM api change to contain token or GFN only and somehow keep
-the rest in the guest. This should help with TDX/SEV-ES.
+On Mon, Oct 05, 2020 at 01:45:31PM -0400, Vivek Goyal wrote:
+> virtiofs currently maps various buffers in scatter gather list and it loo=
+ks
+> at number of pages (ap->pages) and assumes that same number of pages will
+> be used both for input and output (sg_count_fuse_req()), and calculates
+> total number of scatterlist elements accordingly.
+>=20
+> But looks like this assumption is not valid in all the cases. For example,
+> Cai Qian reported that trinity, triggers warning with virtiofs sometimes.
+> A closer look revealed that if one calls ioctl(fd, 0x5a004000, buf), it
+> will trigger following warning.
+>=20
+> WARN_ON(out_sgs + in_sgs !=3D total_sgs)
+>=20
+> In this case, total_sgs =3D 8, out_sgs=3D4, in_sgs=3D3. Number of pages i=
+s 2
+> (ap->pages), but out_sgs are using both the pages but in_sgs are using
+> only one page. (fuse_do_ioctl() sets out_size to one page).
+>=20
+> So existing WARN_ON() seems to be wrong. Instead of total_sgs, it should
+> be max_sgs and make sure out_sgs and in_sgs don't cross max_sgs. This
+> will allow input and output pages numbers to be different.
+>=20
+> Reported-by: Qian Cai <cai@redhat.com>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> Link: https://lore.kernel.org/linux-fsdevel/5ea77e9f6cb8c2db43b09fbd4158a=
+b2d8c066a0a.camel@redhat.com/
+> ---
+>  fs/fuse/virtio_fs.c | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+>=20
+> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> index da3ede268604..3f4f2fa0bb96 100644
+> --- a/fs/fuse/virtio_fs.c
+> +++ b/fs/fuse/virtio_fs.c
+> @@ -1110,17 +1110,17 @@ static int virtio_fs_enqueue_req(struct virtio_fs=
+_vq *fsvq,
+>  	unsigned int argbuf_used =3D 0;
+>  	unsigned int out_sgs =3D 0;
+>  	unsigned int in_sgs =3D 0;
+> -	unsigned int total_sgs;
+> +	unsigned int  max_sgs;
+>  	unsigned int i;
+>  	int ret;
+>  	bool notify;
+>  	struct fuse_pqueue *fpq;
+> =20
+>  	/* Does the sglist fit on the stack? */
+> -	total_sgs =3D sg_count_fuse_req(req);
 
--- 
-Vitaly
+sg_count_fuse_req() should be exact. It's risky to treat it as a maximum
+unless all cases where in_sgs + out_sgs < total_sgs are understood. Even
+then, it's still possible that new bugs introduced to the code will go
+undetected due to the weaker WARN_ON() condition.
+
+Do you have the values of the relevant fuse_req and fuse_args_pages
+fields so we can understand exactly what happened? I think the issue is
+that sg_count_fuse_req() doesn't use the fuse_page_desc size field.
+
+Stefan
+
+--azLHFNyN32YCQGCU
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl98j7UACgkQnKSrs4Gr
+c8gB6gf/aZ4tHmBLaYFN2d9LhfdfFVtnA4Ey8AZGt4yF1aXTtvgX+PVs7dGnPxQK
+E2SPRJuNiFpxRN0VwtOxABWO7GG5osYU4l4Tc0+PIBfcyhQUbjWiFchh3TJ3aa+P
+Q55fXTSIhfVWi29hTCSofrfjGKyUoJYZ1FvBTjom38S7Bb+36pMWQ0L7Akvs3uTn
+gKJdfriolsjxqMPK5Pu/uX08RTcT9ty1gs3KYi9LtVvZZzlntFCEgqicMODevDst
+glPRwjRrtMRFVUpX6Xj56Y8XguFwZXgeVRKwdteF2hzbyelpxgutFwbA7gGqqt+Z
+9zhzdLjfpJ6T6jl7m5foLXAjuz9fFQ==
+=pEjP
+-----END PGP SIGNATURE-----
+
+--azLHFNyN32YCQGCU--
 

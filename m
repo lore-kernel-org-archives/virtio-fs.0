@@ -1,21 +1,22 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=gt2wzS9sg/tz5cTwzRf+vPp97870MYTgiWnXdUTamgQ=;
-	b=jNhHjheUOCy785oD2xMVoxsi05N+xF6TFWxL7jirUwtONGtn2kO8429eMVRkzGJ4+3
-	9uOKZS2u0GNeJzA4IR+plVV0tvUlFaOqtq34+Ysurek5jffGUM2yzh2WMbxR1GYJBuT3
-	eoxa7xPFYYX3ehApjOvkzLMSLSOs4/bjsm3gY=
+Date: Tue, 6 Oct 2020 18:21:48 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20201006172148.GI3000@work-vm>
+References: <20201005161620.GC11938@linux.intel.com>
+	<20201006134629.GB5306@redhat.com>
+	<877ds38n6r.fsf@vitty.brq.redhat.com>
+	<20201006141501.GC5306@redhat.com>
+	<874kn78l2z.fsf@vitty.brq.redhat.com>
+	<20201006150817.GD5306@redhat.com>
+	<871rib8ji1.fsf@vitty.brq.redhat.com>
+	<20201006161200.GB17610@linux.intel.com>
+	<87y2kj71gj.fsf@vitty.brq.redhat.com>
+	<20201006171704.GC17610@linux.intel.com>
 MIME-Version: 1.0
-References: <20200916161737.38028-1-vgoyal@redhat.com>
-	<20200916161737.38028-5-vgoyal@redhat.com>
-	<CAJfpegsncAteUfTAHAttwyVQmhGoK7FCeO_z+xcB_4QkYZEzsQ@mail.gmail.com>
-	<20200922200840.GF57620@redhat.com>
-In-Reply-To: <20200922200840.GF57620@redhat.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Tue, 22 Sep 2020 23:25:30 +0200
-Message-ID: <CAJfpegs3PO=OH_VDMByibCnQ3d8kZYC2BWvu05DxpdRjMuNjyg@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH v2 4/6] fuse: Kill suid/sgid using ATTR_MODE
-	if it is not truncate
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20201006171704.GC17610@linux.intel.com>
+Subject: Re: [Virtio-fs] [PATCH v4] kvm,
+ x86: Exit to user space in case page fault error
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,59 +25,68 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>
+To: Sean Christopherson <sean.j.christopherson@intel.com>
+Cc: kvm@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>, pbonzini@redhat.com, Vitaly Kuznetsov <vkuznets@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
-On Tue, Sep 22, 2020 at 10:08 PM Vivek Goyal <vgoyal@redhat.com> wrote:
->
-> On Tue, Sep 22, 2020 at 03:56:47PM +0200, Miklos Szeredi wrote:
-> > On Wed, Sep 16, 2020 at 6:18 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> >
-> > > But if this is non-truncate setattr then server will not kill suid/sgid.
-> > > So continue to send ATTR_MODE to kill suid/sgid for non-truncate setattr,
-> > > even if ->handle_killpriv_v2 is enabled.
-> >
-> > Sending ATTR_MODE doesn't make sense, since that is racy.   The
-> > refresh-recalculate makes the race window narrower, but it doesn't
-> > eliminate it.
->
-> Hi Miklos,
->
-> Agreed that it does not eliminate that race.
->
-> >
-> > I think I suggested sending write synchronously if suid/sgid/caps are
-> > set.  Do you see a problem with this?
->
-> Sorry, I might have missed it. So you are saying that for the case of
-> ->writeback_cache, force a synchronous WRITE if suid/sgid is set. But
-> this will only work if client sees the suid/sgid bits. If client B
-> set the suid/sgid which client A does not see then all the WRITEs
-> will be cached in client A and not clear suid/sgid bits.
+* Sean Christopherson (sean.j.christopherson@intel.com) wrote:
+> On Tue, Oct 06, 2020 at 06:39:56PM +0200, Vitaly Kuznetsov wrote:
+> > Sean Christopherson <sean.j.christopherson@intel.com> writes:
+> > 
+> > > On Tue, Oct 06, 2020 at 05:24:54PM +0200, Vitaly Kuznetsov wrote:
+> > >> Vivek Goyal <vgoyal@redhat.com> writes:
+> > >> > So you will have to report token (along with -EFAULT) to user space. So this
+> > >> > is basically the 3rd proposal which is extension of kvm API and will
+> > >> > report say HVA/GFN also to user space along with -EFAULT.
+> > >> 
+> > >> Right, I meant to say that guest kernel has full register state of the
+> > >> userspace process which caused APF to get queued and instead of trying
+> > >> to extract it in KVM and pass to userspace in case of a (later) failure
+> > >> we limit KVM api change to contain token or GFN only and somehow keep
+> > >> the rest in the guest. This should help with TDX/SEV-ES.
+> > >
+> > > Whatever gets reported to userspace should be identical with and without
+> > > async page faults, i.e. it definitely shouldn't have token information.
+> > >
+> > 
+> > Oh, right, when the error gets reported synchronously guest's kernel is
+> > not yet aware of the issue so it won't be possible to find anything in
+> > its kdump if userspace decides to crash it immediately. The register
+> > state (if available) will be actual though.
+> > 
+> > > Note, TDX doesn't allow injection exceptions, so reflecting a #PF back
+> > > into the guest is not an option.  
+> > 
+> > Not even #MC? So sad :-)
+> 
+> Heh, #MC isn't allowed either, yet...
+> 
+> > > Nor do I think that's "correct" behavior (see everyone's objections to
+> > > using #PF for APF fixed).  I.e. the event should probably be an IRQ.
+> > 
+> > I recall Paolo objected against making APF 'page not present' into in
+> > interrupt as it will require some very special handling to make sure it
+> > gets injected (and handled) immediately but I'm not really sure how big
+> > the hack is going to be, maybe in the light of TDX/SEV-ES it's worth a
+> > try.
+> 
+> This shouldn't have anything to do with APF.  Again, the event injection is
+> needed even in the synchronous case as the file truncation in the host can
+> affect existing mappings in the guest.
+> 
+> I don't know that the mechanism needs to be virtiofs specific or if there can
+> be a more generic "these PFNs have disappeared", but it's most definitely
+> orthogonal to APF.
 
-Unless the attributes are invalidated (either by timeout or
-explicitly) there's no way that in that situation the suid/sgid bits
-can be cleared.  That's true of your patch as well.
+There are other cases we get 'these PFNs have disappeared' other than
+virtiofs;  the classic is when people back the guest using a tmpfs that
+then runs out of room.
 
->
-> Also another problem is that if client sees suid/sgid and we make
-> WRITE synchronous, client's suid/sgid attrs are still cached till
-> next refresh (both for ->writeback_cache and non writeback_cache
-> case). So server is clearing suid/sgid bits but client still
-> keeps them cached. I hope none of the code paths end up using
-> this stale value and refresh attrs before using suid/sgid.
->
-> Shall we refresh attrs after WRITE if suid/sgid is set and client
-> expects it to clear after WRITE finishes to solve this problem. Or
-> this is something which is actually not a real problem and I am
-> overdesigning.
+Dave
 
-The fuse_perform_write() path already has the attribute invalidation,
-which will trigger GETATTR from fuse_update_attributes() in the next
-write.
-
-So I think all that should work fine.
-
-Thanks,
-Miklos
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

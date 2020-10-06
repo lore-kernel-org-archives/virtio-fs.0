@@ -1,13 +1,13 @@
-Date: Tue, 6 Oct 2020 16:39:33 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20201006153933.GA87345@stefanha-x1.localdomain>
-References: <20201005174531.GB4302@redhat.com>
+References: <20200827153657.111098-1-dgilbert@redhat.com>
+	<20200827153657.111098-4-dgilbert@redhat.com>
+From: Christophe de Dinechin <dinechin@redhat.com>
+In-reply-to: <20200827153657.111098-4-dgilbert@redhat.com>
+Date: Tue, 06 Oct 2020 17:51:00 +0200
+Message-ID: <lyimbnl5ej.fsf@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="azLHFNyN32YCQGCU"
-Content-Disposition: inline
-In-Reply-To: <20201005174531.GB4302@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofs: Fix false positive warning
+Content-Type: text/plain
+Subject: Re: [Virtio-fs] [PATCH v2 3/6] tools/virtiofsd: xattr name
+	mappings: Add option
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,90 +16,312 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, CAI Qian <caiqian@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>
+To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com, qemu-devel@nongnu.org
 
 
---azLHFNyN32YCQGCU
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Mon, Oct 05, 2020 at 01:45:31PM -0400, Vivek Goyal wrote:
-> virtiofs currently maps various buffers in scatter gather list and it loo=
-ks
-> at number of pages (ap->pages) and assumes that same number of pages will
-> be used both for input and output (sg_count_fuse_req()), and calculates
-> total number of scatterlist elements accordingly.
->=20
-> But looks like this assumption is not valid in all the cases. For example,
-> Cai Qian reported that trinity, triggers warning with virtiofs sometimes.
-> A closer look revealed that if one calls ioctl(fd, 0x5a004000, buf), it
-> will trigger following warning.
->=20
-> WARN_ON(out_sgs + in_sgs !=3D total_sgs)
->=20
-> In this case, total_sgs =3D 8, out_sgs=3D4, in_sgs=3D3. Number of pages i=
-s 2
-> (ap->pages), but out_sgs are using both the pages but in_sgs are using
-> only one page. (fuse_do_ioctl() sets out_size to one page).
->=20
-> So existing WARN_ON() seems to be wrong. Instead of total_sgs, it should
-> be max_sgs and make sure out_sgs and in_sgs don't cross max_sgs. This
-> will allow input and output pages numbers to be different.
->=20
-> Reported-by: Qian Cai <cai@redhat.com>
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> Link: https://lore.kernel.org/linux-fsdevel/5ea77e9f6cb8c2db43b09fbd4158a=
-b2d8c066a0a.camel@redhat.com/
+On 2020-08-27 at 17:36 CEST, Dr. David Alan Gilbert (git) wrote...
+> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+>
+> Add an option to define mappings of xattr names so that
+> the client and server filesystems see different views.
+> This can be used to have different SELinux mappings as
+> seen by the guest, to run the virtiofsd with less privileges
+> (e.g. in a case where it can't set trusted/system/security
+> xattrs but you want the guest to be able to), or to isolate
+> multiple users of the same name; e.g. trusted attributes
+> used by stacking overlayfs.
+>
+> A mapping engine is used wit 3 simple rules; the rules can
+> be combined to allow most useful mapping scenarios.
+> The ruleset is defined by -o xattrmap='rules...'.
+>
+> This patch doesn't use the rule maps yet.
+>
+> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 > ---
->  fs/fuse/virtio_fs.c | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
->=20
-> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-> index da3ede268604..3f4f2fa0bb96 100644
-> --- a/fs/fuse/virtio_fs.c
-> +++ b/fs/fuse/virtio_fs.c
-> @@ -1110,17 +1110,17 @@ static int virtio_fs_enqueue_req(struct virtio_fs=
-_vq *fsvq,
->  	unsigned int argbuf_used =3D 0;
->  	unsigned int out_sgs =3D 0;
->  	unsigned int in_sgs =3D 0;
-> -	unsigned int total_sgs;
-> +	unsigned int  max_sgs;
->  	unsigned int i;
->  	int ret;
->  	bool notify;
->  	struct fuse_pqueue *fpq;
-> =20
->  	/* Does the sglist fit on the stack? */
-> -	total_sgs =3D sg_count_fuse_req(req);
+>  docs/tools/virtiofsd.rst         |  55 ++++++++++++
+>  tools/virtiofsd/passthrough_ll.c | 148 +++++++++++++++++++++++++++++++
+>  2 files changed, 203 insertions(+)
+>
+> diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
+> index 824e713491..2efa16d3c5 100644
+> --- a/docs/tools/virtiofsd.rst
+> +++ b/docs/tools/virtiofsd.rst
+> @@ -107,6 +107,60 @@ Options
+>    performance.  ``auto`` acts similar to NFS with a 1 second metadata cache
+>    timeout.  ``always`` sets a long cache lifetime at the expense of coherency.
+>
+> +xattr-mapping
+> +-------------
+> +
+> +By default the name of xattr's used by the client are passed through to the server
+> +file system.  This can be a problem where either those xattr names are used
+> +by something on the server (e.g. selinux client/server confusion) or if the
+> +virtiofsd is running in a container with restricted priviliges where it cannot
+> +access some attributes.
+> +
+> +A mapping of xattr names can be made using -o xattrmap=mapping where the ``mapping``
+> +string consists of a series of rules.
+> +
+> +The first matching rule terminates the mapping.
+> +
+> +Each rule consists of a number of fields separated with a separator that is the
+> +first non-white space character in the rule.  This separator must then be used
+> +for the whole rule.
+> +White space may be added before and after each rule.
+> +Using ':' as the separator a rule is of the form:
+> +
+> +``:scope:type:key:prepend:``
+> +
+> +**scope** is:
+> +
+> +- 'client' - match 'key' against a xattr name from the client for
+> +             setxattr/getxattr/removexattr
+> +- 'server' - match 'prepend' against a xattr name from the server
+> +             for listxattr
+> +- 'all' - can be used to match both cases.
+> +
+> +**type** is one of:
+> +
+> +- 'prefix' - If 'key' matches the client then the 'prepend'
+> +  is added before the name is passed to the server.
+> +  For a server case, the prepend is tested and stripped
+> +  if matching.
+> +
+> +- 'ok' - The attribute name is OK and passed through to
+> +  the server unchanged.
+> +
+> +- 'bad' - If a client tries to use this name it's
+> +  denied using EPERM; when the server passes an attribute
+> +  name matching it's hidden.
+> +
+> +**key** is a string tested as a prefix on an attribute name originating
+> +on the client.  It maybe empty in which case a 'client' rule
+> +will always match on client names.
+> +
+> +**prepend** is a string tested as a prefix on an attribute name originiating
+> +on the server, and used as a new prefix.  It maybe empty
+> +in which case a 'server' rule will always match on all names from
+> +the server.
+> +
+> +
+>  Examples
+>  --------
+>
+> @@ -123,3 +177,4 @@ Export ``/var/lib/fs/vm001/`` on vhost-user UNIX domain socket
+>        -numa node,memdev=mem \
+>        ...
+>    guest# mount -t virtiofs myfs /mnt
+> +
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 083d17a960..00e96a10cd 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -64,6 +64,7 @@
+>  #include <syslog.h>
+>  #include <unistd.h>
+>
+> +#include "qemu/cutils.h"
+>  #include "passthrough_helpers.h"
+>  #include "passthrough_seccomp.h"
+>
+> @@ -144,6 +145,7 @@ struct lo_data {
+>      int flock;
+>      int posix_lock;
+>      int xattr;
+> +    char *xattrmap;
 
-sg_count_fuse_req() should be exact. It's risky to treat it as a maximum
-unless all cases where in_sgs + out_sgs < total_sgs are understood. Even
-then, it's still possible that new bugs introduced to the code will go
-undetected due to the weaker WARN_ON() condition.
+Who owns that field? Should it be cleaned up in fuse_lo_data_cleanup() just like
+source is?
 
-Do you have the values of the relevant fuse_req and fuse_args_pages
-fields so we can understand exactly what happened? I think the issue is
-that sg_count_fuse_req() doesn't use the fuse_page_desc size field.
+>      char *source;
+>      char *modcaps;
+>      double timeout;
+> @@ -171,6 +173,7 @@ static const struct fuse_opt lo_opts[] = {
+>      { "no_posix_lock", offsetof(struct lo_data, posix_lock), 0 },
+>      { "xattr", offsetof(struct lo_data, xattr), 1 },
+>      { "no_xattr", offsetof(struct lo_data, xattr), 0 },
+> +    { "xattrmap=%s", offsetof(struct lo_data, xattrmap), 0 },
+>      { "modcaps=%s", offsetof(struct lo_data, modcaps), 0 },
+>      { "timeout=%lf", offsetof(struct lo_data, timeout), 0 },
+>      { "timeout=", offsetof(struct lo_data, timeout_set), 1 },
+> @@ -2003,6 +2006,146 @@ static void lo_flock(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
+>      fuse_reply_err(req, res == -1 ? errno : 0);
+>  }
+>
+> +typedef struct xattr_map_entry {
+> +    const char *key;
+> +    const char *prepend;
+> +    unsigned int flags;
+> +} XattrMapEntry;
+> +
+> +/*
+> + * Exit; process attribute unmodified if matched.
+> + * An empty key applies to all.
+> + */
+> +#define XATTR_MAP_FLAG_END_OK  (1 <<  0)
+> +/*
+> + * The attribute is unwanted;
+> + * EPERM on write hidden on read.
+> + */
+> +#define XATTR_MAP_FLAG_END_BAD (1 <<  1)
+> +/*
+> + * For attr that start with 'key' prepend 'prepend'
+> + * 'key' maybe empty to prepend for all attrs
+> + * key is defined from set/remove point of view.
+> + * Automatically reversed on read
+> + */
+> +#define XATTR_MAP_FLAG_PREFIX  (1 <<  2)
+> +/* Apply rule to get/set/remove */
+> +#define XATTR_MAP_FLAG_CLIENT  (1 << 16)
+> +/* Apply rule to list */
+> +#define XATTR_MAP_FLAG_SERVER  (1 << 17)
+> +/* Apply rule to all */
+> +#define XATTR_MAP_FLAG_ALL   (XATTR_MAP_FLAG_SERVER | XATTR_MAP_FLAG_CLIENT)
+> +
+> +static XattrMapEntry *xattr_map_list;
 
-Stefan
+Curious why you made it a static variable and not a field in struct lo_data?
 
---azLHFNyN32YCQGCU
-Content-Type: application/pgp-signature; name="signature.asc"
+> +
+> +static XattrMapEntry *parse_xattrmap(const char *map)
+> +{
+> +    XattrMapEntry *res = NULL;
+> +    size_t nentries = 0;
+> +    const char *tmp;
+> +
+> +    while (*map) {
+> +        char sep;
+> +
+> +        if (isspace(*map)) {
+> +            map++;
+> +            continue;
+> +        }
+> +        /* The separator is the first non-space of the rule */
+> +        sep = *map++;
+> +        if (!sep) {
+> +            break;
+> +        }
+> +
+> +        /* Allocate some space for the rule */
+> +        res = g_realloc_n(res, ++nentries, sizeof(XattrMapEntry));
+> +        res[nentries - 1].flags = 0;
 
------BEGIN PGP SIGNATURE-----
+I would probably create an `entry` pointer to `res[nentries - 1]`
+since there are 9 uses for it.
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl98j7UACgkQnKSrs4Gr
-c8gB6gf/aZ4tHmBLaYFN2d9LhfdfFVtnA4Ey8AZGt4yF1aXTtvgX+PVs7dGnPxQK
-E2SPRJuNiFpxRN0VwtOxABWO7GG5osYU4l4Tc0+PIBfcyhQUbjWiFchh3TJ3aa+P
-Q55fXTSIhfVWi29hTCSofrfjGKyUoJYZ1FvBTjom38S7Bb+36pMWQ0L7Akvs3uTn
-gKJdfriolsjxqMPK5Pu/uX08RTcT9ty1gs3KYi9LtVvZZzlntFCEgqicMODevDst
-glPRwjRrtMRFVUpX6Xj56Y8XguFwZXgeVRKwdteF2hzbyelpxgutFwbA7gGqqt+Z
-9zhzdLjfpJ6T6jl7m5foLXAjuz9fFQ==
-=pEjP
------END PGP SIGNATURE-----
+> +
+> +        if (strstart(map, "client", &map)) {
+> +            res[nentries - 1].flags |= XATTR_MAP_FLAG_CLIENT;
+> +        } else if (strstart(map, "server", &map)) {
+> +            res[nentries - 1].flags |= XATTR_MAP_FLAG_SERVER;
+> +        } else if (strstart(map, "all", &map)) {
+> +            res[nentries - 1].flags |= XATTR_MAP_FLAG_ALL;
+> +        } else {
+> +            fuse_log(FUSE_LOG_ERR,
+> +                     "%s: Unexpected scope;"
+> +                     " Expecting 'client', 'server', or 'all', in rule %zu\n",
+> +                     __func__, nentries);
+> +            exit(1);
+> +        }
+> +
+> +
+> +        if (*map != sep) {
+> +            fuse_log(FUSE_LOG_ERR,
+> +                     "%s: Expecting '%c' found '%c'"
+> +                     " after scope in rule %zu\n",
+> +                     __func__, sep, *map, nentries + 1);
 
---azLHFNyN32YCQGCU--
+I think it should be `nentries` here like in the others
+
+> +            exit(1);
+> +        }
+> +        /* Skip the separator, now at the start of the 'type' */
+> +        map++;
+> +
+> +        /* Start of 'type' */
+> +        if (strstart(map, "prefix", &map)) {
+> +            res[nentries - 1].flags |= XATTR_MAP_FLAG_PREFIX;
+> +        } else if (strstart(map, "ok", &map)) {
+> +            res[nentries - 1].flags |= XATTR_MAP_FLAG_END_OK;
+> +        } else if (strstart(map, "bad", &map)) {
+> +            res[nentries - 1].flags |= XATTR_MAP_FLAG_END_BAD;
+> +        } else {
+> +            fuse_log(FUSE_LOG_ERR,
+> +                     "%s: Unexpected type;"
+> +                     "Expecting 'prefix', 'ok', or 'bad' in rule %zu\n",
+> +                     __func__, nentries);
+> +            exit(1);
+> +        }
+> +
+> +        if (*map++ != sep) {
+> +            fuse_log(FUSE_LOG_ERR,
+> +                     "%s: Missing '%c' at end of type field of rule %zu\n",
+> +                     __func__, sep, nentries);
+> +            exit(1);
+> +        }
+> +
+> +        /* At start of 'key' field */
+> +        tmp = strchr(map, sep);
+> +        if (!tmp) {
+> +            fuse_log(FUSE_LOG_ERR,
+> +                     "%s: Missing '%c' at end of key field of rule %zu",
+> +                     __func__, sep, nentries);
+> +            exit(1);
+> +        }
+> +        res[nentries - 1].key = g_strndup(map, tmp - map);
+> +        map = tmp + 1;
+> +
+> +        /* At start of 'prepend' field */
+> +        tmp = strchr(map, sep);
+> +        if (!tmp) {
+> +            fuse_log(FUSE_LOG_ERR,
+> +                     "%s: Missing '%c' at end of prepend field of rule %zu",
+> +                     __func__, sep, nentries);
+> +            exit(1);
+> +        }
+> +        res[nentries - 1].prepend = g_strndup(map, tmp - map);
+> +        map = tmp + 1;
+> +        /* End of rule - go around again for another rule */
+> +    }
+> +
+> +    if (!nentries) {
+> +        fuse_log(FUSE_LOG_ERR, "Empty xattr map\n");
+> +        exit(1);
+> +    }
+> +
+> +    /* Add a terminator to error in cases the user hasn't specified */
+> +    res = g_realloc_n(res, ++nentries, sizeof(XattrMapEntry));
+> +    res[nentries - 1].flags = XATTR_MAP_FLAG_ALL | XATTR_MAP_FLAG_END_BAD;
+> +    res[nentries - 1].key = g_strdup("");
+> +    res[nentries - 1].prepend = g_strdup("");
+> +
+> +    return res;
+> +}
+> +
+>  static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
+>                          size_t size)
+>  {
+> @@ -2909,6 +3052,11 @@ int main(int argc, char *argv[])
+>      } else {
+>          lo.source = strdup("/");
+>      }
+> +
+> +    if (lo.xattrmap) {
+> +        xattr_map_list = parse_xattrmap(lo.xattrmap);
+
+This is never freed. If you put the static in struct lo_data, you could
+naturally clean it up in fuse_lo_data_cleanup.
+
+> +    }
+> +
+>      if (!lo.timeout_set) {
+>          switch (lo.cache) {
+>          case CACHE_NONE:
+
+
+--
+Cheers,
+Christophe de Dinechin (IRC c3d)
 

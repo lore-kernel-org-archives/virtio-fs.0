@@ -1,13 +1,13 @@
-Date: Wed, 7 Oct 2020 11:42:11 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20201007104211.GA22258@work-vm>
-References: <20200827153657.111098-1-dgilbert@redhat.com>
-	<20200827153657.111098-2-dgilbert@redhat.com>
+References: <20201007092913.1524199-1-misono.tomohiro@jp.fujitsu.com>
+From: Paolo Bonzini <pbonzini@redhat.com>
+Message-ID: <15796673-2daf-70a8-4b20-b861d4c22e62@redhat.com>
+Date: Wed, 7 Oct 2020 17:30:36 +0200
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200827153657.111098-2-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v2 1/6] virtiofsd: Silence gcc warning
+In-Reply-To: <20201007092913.1524199-1-misono.tomohiro@jp.fujitsu.com>
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH] configure: add option for virtiofsd
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,40 +16,78 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, virtio-fs@redhat.com
+To: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com
 
-* Dr. David Alan Gilbert (git) (dgilbert@redhat.com) wrote:
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+On 07/10/20 11:29, Misono Tomohiro wrote:
+> Currently it is unknown whether virtiofsd will be built at
+> configuration time. It will be automatically built when dependency
+> is met. Also, required libraries are not clear.
 > 
-> Gcc worries fd might be used unset, in reality it's always set if
-> fi is set, and only used if fi is set so it's safe.  Initialise it to -1
-> just to keep gcc happy for now.
+> To make this clear, add configure option --{enable,disable}-virtiofsd.
+> The default is the same as current (enabled if available) like many
+> other options. When --enable-virtiofsd is given and dependency is not
+> met, we get:
 > 
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+>   ERROR: virtiofsd requires libcap-ng devel, seccomp devel, vhost user and tools support
+> 
+> In addition, configuration summary now includes virtiofsd entry:
+> 
+>   build virtiofs daemon: YES/NO
+> 
+> Sidenote: this patch defines CONFIG_VIRTIOFSD for config-host.mak
+> to avoid duplicate dependency check in tools/meson.build.
+> 
+> Signed-off-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
 
-Queued (just this patch)
+Hi Misono,
 
-> ---
->  tools/virtiofsd/passthrough_ll.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+can you please handle the option via meson_options.txt?  That is, just
+pass the value (auto/enabled/disabled) through from configure to meson,
+and handle the default in tools/meson.build.  The logic will be
+something like this:
+
+have_virtiofsd = (targetos == 'linux' and
+    'CONFIG_SECCOMP' in config_host and
+    'CONFIG_LIBCAP_NG' in config_host)
+
+if get_option('virtiofsd').enabled()
+  if not have_virtiofsd
+    if targetos != 'linux'
+      error('virtiofsd requires Linux')
+    else
+      error('virtiofsd requires libcap-ng-devel and seccomp-devel')
+    endif
+  endif
+elif get_option('virtiofsd').disabled() or not have_tools or \
+     not 'CONFIG_VHOST_USER' in config_host
+  have_virtiofsd = false
+endif
+
+if have_virtiofsd
+  subdir('virtiofsd')
+endif
+
+This is because, when adding the option, there are some conditions that
+should disable virtiofsd by default but can be overridden with
+--enable-virtiofsd.
+
+More information on how to create a new Meson option can be found in
+docs/devel/build-system.rst.
+
+Thanks,
+
+Paolo
+
+> -have_virtiofsd = (have_system and
+> -    have_tools and
+> -    'CONFIG_LINUX' in config_host and 
+> -    'CONFIG_SECCOMP' in config_host and
+> -    'CONFIG_LIBCAP_NG' in config_host and
+> -    'CONFIG_VHOST_USER' in config_host)
+> -
+> -if have_virtiofsd
+> +if 'CONFIG_VIRTIOFSD' in config_host
+>    subdir('virtiofsd')
+>  endif
 > 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 63d1d00565..083d17a960 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -617,7 +617,7 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
->      struct lo_inode *inode;
->      int ifd;
->      int res;
-> -    int fd;
-> +    int fd = -1;
->  
->      inode = lo_inode(req, ino);
->      if (!inode) {
-> -- 
-> 2.26.2
-> 
-> 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

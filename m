@@ -1,15 +1,13 @@
-References: <20201007092913.1524199-1-misono.tomohiro@jp.fujitsu.com>
-	<15796673-2daf-70a8-4b20-b861d4c22e62@redhat.com>
-	<OSBPR01MB45820C38F613E3D38A565CCEE50B0@OSBPR01MB4582.jpnprd01.prod.outlook.com>
+References: <20201008103133.2722903-1-misono.tomohiro@jp.fujitsu.com>
 From: Paolo Bonzini <pbonzini@redhat.com>
-Message-ID: <0cab3544-b9c3-ae8f-3a9d-62d026d062e6@redhat.com>
-Date: Thu, 8 Oct 2020 12:43:54 +0200
+Message-ID: <ea7dc73c-7ca5-924e-756e-02a5e66f85c7@redhat.com>
+Date: Thu, 8 Oct 2020 12:45:20 +0200
 MIME-Version: 1.0
-In-Reply-To: <OSBPR01MB45820C38F613E3D38A565CCEE50B0@OSBPR01MB4582.jpnprd01.prod.outlook.com>
+In-Reply-To: <20201008103133.2722903-1-misono.tomohiro@jp.fujitsu.com>
 Content-Type: text/plain; charset=utf-8
 Content-Language: en-US
 Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH] configure: add option for virtiofsd
+Subject: Re: [Virtio-fs] [PATCH v2] configure: add option for virtiofsd
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,41 +16,139 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+To: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com
 
-On 08/10/20 11:17, misono.tomohiro@fujitsu.com wrote:
-> Hi Paolo
+On 08/10/20 12:31, Misono Tomohiro wrote:
+> Currently it is unknown whether virtiofsd will be built at
+> configuration time. It will be automatically built when dependency
+> is met. Also, required libraries are not clear.
 > 
-> Thanks a lot for the clear explanation. I will update the patch to follow the meson style.
-> I realized virtiofsd actually needs tools (i.e. "--disable-tools --enable-virtiofsd"
-> does not work with above meson.build) since virtiofsd requires libvhost_user which will
-> be built ony when tools are built. So, I will keep the current dependency check (except 'have_system').
+> To make this clear, add configure option --{enable,disable}-virtiofsd.
+> The default is the same as current (enabled if available) like many
+> other options. When --enable-virtiofsd is given and dependency is not
+> met, we get:
+> 
+>   ERROR: Problem encountered: virtiofsd requires libcap-ng-devel and seccomp-devel
+> or
+>   ERROR: Problem encountered: virtiofsd needs tools and vhost-user support
+> 
+> In addition, configuration summary now includes virtiofsd entry:
+> 
+>   build virtiofs daemon: YES/NO
+> 
+> Signed-off-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+> ---
+> This patch is based on current master branch
+> 
+> v1 ... https://lore.kernel.org/qemu-devel/20201007092913.1524199-1-misono.tomohiro@jp.fujitsu.com/
+> v1 -> v2: Update to follow the current meson build style
+> 
+>  configure         |  8 +++++++-
+>  meson.build       |  1 +
+>  meson_options.txt |  2 ++
+>  tools/meson.build | 17 +++++++++++++++--
+>  4 files changed, 25 insertions(+), 3 deletions(-)
+> 
+> diff --git a/configure b/configure
+> index 28df227db5..2bd8419b1f 100755
+> --- a/configure
+> +++ b/configure
+> @@ -302,6 +302,7 @@ netmap="no"
+>  sdl="auto"
+>  sdl_image="auto"
+>  virtfs=""
+> +virtiofsd="auto"
+>  mpath="auto"
+>  vnc="enabled"
+>  sparse="auto"
+> @@ -1004,6 +1005,10 @@ for opt do
+>    ;;
+>    --enable-virtfs) virtfs="yes"
+>    ;;
+> +  --disable-virtiofsd) virtiofsd="disabled"
+> +  ;;
+> +  --enable-virtiofsd) virtiofsd="enabled"
+> +  ;;
+>    --disable-mpath) mpath="disabled"
+>    ;;
+>    --enable-mpath) mpath="enabled"
+> @@ -1761,6 +1766,7 @@ disabled with --disable-FEATURE, default is enabled if available:
+>    vnc-png         PNG compression for VNC server
+>    cocoa           Cocoa UI (Mac OS X only)
+>    virtfs          VirtFS
+> +  virtiofsd       build virtiofs daemon (virtiofsd)
+>    mpath           Multipath persistent reservation passthrough
+>    xen             xen backend driver support
+>    xen-pci-passthrough    PCI passthrough support for Xen
+> @@ -7215,7 +7221,7 @@ NINJA=${ninja:-$PWD/ninjatool} $meson setup \
+>  	-Dxen=$xen -Dxen_pci_passthrough=$xen_pci_passthrough -Dtcg=$tcg \
+>  	-Dcocoa=$cocoa -Dmpath=$mpath -Dsdl=$sdl -Dsdl_image=$sdl_image \
+>  	-Dvnc=$vnc -Dvnc_sasl=$vnc_sasl -Dvnc_jpeg=$vnc_jpeg -Dvnc_png=$vnc_png \
+> -	-Dgettext=$gettext -Dxkbcommon=$xkbcommon -Du2f=$u2f \
+> +	-Dgettext=$gettext -Dxkbcommon=$xkbcommon -Du2f=$u2f -Dvirtiofsd=$virtiofsd \
+>  	-Dcapstone=$capstone -Dslirp=$slirp -Dfdt=$fdt \
+>          $cross_arg \
+>          "$PWD" "$source_path"
+> diff --git a/meson.build b/meson.build
+> index 17c89c87c6..a087239009 100644
+> --- a/meson.build
+> +++ b/meson.build
+> @@ -1843,6 +1843,7 @@ summary_info += {'Audio drivers':     config_host['CONFIG_AUDIO_DRIVERS']}
+>  summary_info += {'Block whitelist (rw)': config_host['CONFIG_BDRV_RW_WHITELIST']}
+>  summary_info += {'Block whitelist (ro)': config_host['CONFIG_BDRV_RO_WHITELIST']}
+>  summary_info += {'VirtFS support':    config_host.has_key('CONFIG_VIRTFS')}
+> +summary_info += {'build virtiofs daemon': have_virtiofsd}
+>  summary_info += {'Multipath support': mpathpersist.found()}
+>  summary_info += {'VNC support':       vnc.found()}
+>  if vnc.found()
+> diff --git a/meson_options.txt b/meson_options.txt
+> index 1d3c94840a..80637ada63 100644
+> --- a/meson_options.txt
+> +++ b/meson_options.txt
+> @@ -48,6 +48,8 @@ option('vnc_sasl', type : 'feature', value : 'auto',
+>         description: 'SASL authentication for VNC server')
+>  option('xkbcommon', type : 'feature', value : 'auto',
+>         description: 'xkbcommon support')
+> +option('virtiofsd', type: 'feature', value: 'auto',
+> +       description: 'build virtiofs daemon (virtiofsd)')
+>  
+>  option('capstone', type: 'combo', value: 'auto',
+>         choices: ['disabled', 'enabled', 'auto', 'system', 'internal'],
+> diff --git a/tools/meson.build b/tools/meson.build
+> index 513bd2ff4f..76bf84df52 100644
+> --- a/tools/meson.build
+> +++ b/tools/meson.build
+> @@ -1,10 +1,23 @@
+> -have_virtiofsd = (have_system and
+> +have_virtiofsd = (targetos == 'linux' and
+>      have_tools and
+> -    'CONFIG_LINUX' in config_host and 
+>      'CONFIG_SECCOMP' in config_host and
+>      'CONFIG_LIBCAP_NG' in config_host and
+>      'CONFIG_VHOST_USER' in config_host)
+>  
+> +if get_option('virtiofsd').enabled()
+> +  if not have_virtiofsd
+> +    if targetos != 'linux'
+> +      error('virtiofsd requires Linux')
+> +    elif 'CONFIG_SECCOMP' not in config_host or 'CONFIG_LIBCAP_NG' not in config_host
+> +      error('virtiofsd requires libcap-ng-devel and seccomp-devel')
+> +    elif not have_tools or 'CONFIG_VHOST_USER' not in config_host
+> +      error('virtiofsd needs tools and vhost-user support')
+> +    endif
+> +  endif
+> +elif get_option('virtiofsd').disabled() or not have_system
+> +  have_virtiofsd = false
+> +endif
+> +
+>  if have_virtiofsd
+>    subdir('virtiofsd')
+>  endif
+> 
 
-I'm thinking the behavior for --disable-tools --enable-virtiofsd would
-be confusing.  Therefore, another possibility is not introducing
---enable-virtiofsd.  Instead, you can reuse --enable-vhost-user-fs:
-
-- --enable-vhost-user-fs will fail if tools are enabled and cap-ng or
-seccomp are unavailable
-
-- --enable-vhost-user-fs --disable-tools will not look for cap-ng or
-seccomp, because then the flag only controls inclusion of vhost-user-fs
-in the emulators
-
-- if "--enable-vhost-user-fs" is not specified and tools are enabled,
-vhost-user-fs will only be included in the emulators if cap-ng and
-seccomp are available
-
-- if "--enable-vhost-user-fs" is not specified, tools are enabled and
-cap-ng/seccomp are unavilable, vhost-user-fs will not be included in the
-emulators either
-
-- if "--enable-vhost-user-fs" is not specified but tools are not
-enabled, configure will not check if cap-ng or seccomp.
-
-In this case reusing most of your previous patch, and not moving
-everything to meson, is totally okay.  I don't want you to impose more
-transition work.
+This looks good and the way you solved --enable-virtiofsd
+--disable-tools makes sense.  I'll let David pick it up or decide if he
+wants a different approach.
 
 Paolo
 

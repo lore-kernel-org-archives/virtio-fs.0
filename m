@@ -1,11 +1,10 @@
-Message-ID: <c4cb4b41655bc890b9dbf40bd2c133cbcbef734d.camel@redhat.com>
-From: Qian Cai <cai@redhat.com>
-Date: Wed, 07 Oct 2020 16:08:50 -0400
-Content-Type: text/plain; charset="UTF-8"
-Mime-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Subject: [Virtio-fs] WARN_ON(fuse_insert_writeback(root,
-	wpa)) in tree_insert()
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Date: Thu,  8 Oct 2020 09:55:34 +0100
+Message-Id: <20201008085534.16070-1-stefanha@redhat.com>
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+Subject: [Virtio-fs] [PATCH v3] virtiofsd: add container-friendly -o
+	sandbox=chroot option
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,142 +13,145 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>, linux-kernel@vger.kernel.org
+To: qemu-devel@nongnu.org
+Cc: vromanso@redhat.com, rmohr@redhat.com, virtio-fs@redhat.com, Al Viro <viro@zeniv.linux.org.uk>, mpatel@redhat.com, vgoyal@redhat.com
 
-Running some fuzzing by a unprivileged user on virtiofs could trigger the
-warning below. The warning was introduced not long ago by the commit
-c146024ec44c ("fuse: fix warning in tree_insert() and clean up writepage
-insertion").
-
->From the logs, the last piece of the fuzzing code is:
-
-fgetxattr(fd=426, name=0x7f39a69af000, value=0x7f39a8abf000, size=1)
-
-[main]  testfile fd:426 filename:trinity-testfile2 flags:2 fopened:1 fcntl_flags:42c00 global:1
-[main]   start: 0x7f39a58e6000 size:4KB  name: trinity-testfile2 global:1
-
-[15969.175004][T179559] WARNING: CPU: 0 PID: 179559 at fs/fuse/file.c:1732 tree_insert.part.40+0x0/0x10 [fuse]
-[15969.180644][T179559] Modules linked in: loop isofs kvm_intel kvm irqbypass nls_ascii nls_cp437 vfat fat ip_tables x_tables virtiofs fuse sr_mod sd_mod cdrom ata_piix virtio_pci virtio_ring e1000 virtio libat]
-[15969.197671][T179559] CPU: 0 PID: 179559 Comm: trinity-c24 Tainted: G           O      5.9.0-rc8-next-20201007+ #1
-[15969.204027][T179559] Hardware name: Red Hat KVM, BIOS 1.13.0-2.module+el8.3.0+7353+9de0a3cc 04/01/2014
-[15969.208993][T179559] RIP: 0010:tree_insert.part.40+0x0/0x10 [fuse]
-[15969.213593][T179559] Code: 44 24 10 48 8b 74 24 08 48 8b 0c 24 e9 40 fc ff ff 66 0f 1f 84 00 00 00 00 00 0f 0b c3 0f 1f 00 66 2e 0f 1f 84 00 00 00 00 00 <0f> 0b c3 0f 1f 00 66 2e 0f 1f 84 00 00 00 00 00 48 b0
-[15969.224348][T179559] RSP: 0018:ffffc90007fc77f8 EFLAGS: 00010286
-[15969.227798][T179559] RAX: ffff8884b8f73500 RBX: ffff8884b8f76900 RCX: ffff8889e45ff910
-[15969.233572][T179559] RDX: 0000000000000000 RSI: ffff8884b8f76900 RDI: ffff8884b8f735b0
-[15969.238282][T179559] RBP: ffffea000550c880 R08: ffff8884b8f769f8 R09: fffff52000ff8ef2
-[15969.243394][T179559] R10: 0000000000000003 R11: fffff52000ff8ef2 R12: ffff8889e45ff480
-[15969.247845][T179559] R13: ffffea0004d71380 R14: ffff88818285c000 R15: ffff8889e45ff9b0
-[15969.252884][T179559] FS:  00007f39a8ab7740(0000) GS:ffff888bcc600000(0000) knlGS:0000000000000000
-[15969.258385][T179559] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
-[15969.262647][T179559] CR2: 000000000000008f CR3: 0000000557d56005 CR4: 0000000000770ef0
-[15969.268492][T179559] DR0: 0000000000000000 DR1: 0000000000000000 DR2: 0000000000000000
-[15969.273773][T179559] DR3: 0000000000000000 DR6: 00000000fffe0ff0 DR7: 0000000000000600
-[15969.278030][T179559] PKRU: 55555554
-[15969.279920][T179559] Call Trace:
-[15969.282279][T179559]  fuse_writepage_locked+0xa20/0xd10 [fuse]
-[15969.285587][T179559]  fuse_launder_page+0x5b/0xc0 [fuse]
-[15969.288303][T179559]  invalidate_inode_pages2_range+0x709/0xa90
-invalidate_inode_pages2_range at mm/truncate.c:765
-[15969.292495][T179559]  ? truncate_exceptional_pvec_entries.part.18+0x460/0x460
-[15969.296605][T179559]  ? rcu_read_lock_sched_held+0x9c/0xd0
-[15969.301015][T179559]  ? rcu_read_lock_bh_held+0xb0/0xb0
-[15969.304427][T179559]  ? rcu_read_unlock+0x40/0x40
-[15969.306759][T179559]  ? _raw_spin_unlock+0x1a/0x30
-[15969.309124][T179559]  ? fuse_change_attributes+0x237/0x540 [fuse]
-[15969.313701][T179559]  fuse_do_getattr+0x28b/0xd50 [fuse]
-fuse_do_getattr at fs/fuse/dir.c:962
-[15969.316774][T179559]  ? do_syscall_64+0x33/0x40
-[15969.319617][T179559]  ? fuse_dentry_revalidate+0x6c0/0x6c0 [fuse]
-[15969.323498][T179559]  ? rcu_read_lock_bh_held+0xb0/0xb0
-[15969.326591][T179559]  ? find_held_lock+0x33/0x1c0
-[15969.328989][T179559]  ? rwlock_bug.part.1+0x90/0x90
-[15969.332202][T179559]  fuse_permission+0x29c/0x3c0 [fuse]
-[15969.335564][T179559]  ? __kasan_kmalloc.constprop.11+0xc1/0xd0
-[15969.338445][T179559]  inode_permission+0x2c1/0x390
-[15969.342187][T179559]  vfs_getxattr+0x43/0x80
-[15969.344605][T179559]  getxattr+0xe5/0x210
-[15969.347120][T179559]  ? path_listxattr+0x100/0x100
-[15969.350019][T179559]  ? rcu_read_lock_sched_held+0x9c/0xd0
-[15969.354014][T179559]  ? rcu_read_lock_bh_held+0xb0/0xb0
-[15969.356977][T179559]  ? find_held_lock+0x33/0x1c0
-[15969.359631][T179559]  ? __task_pid_nr_ns+0x127/0x3a0
-[15969.363099][T179559]  ? lock_downgrade+0x730/0x730
-[15969.365714][T179559]  ? syscall_enter_from_user_mode+0x17/0x50
-[15969.369104][T179559]  ? rcu_read_lock_sched_held+0x9c/0xd0
-[15969.374492][T179559]  __x64_sys_fgetxattr+0xd9/0x140
-[15969.377317][T179559]  do_syscall_64+0x33/0x40
-[15969.380588][T179559]  entry_SYSCALL_64_after_hwframe+0x44/0xa9
-[15969.384059][T179559] RIP: 0033:0x7f39a83ca78d
-[15969.386559][T179559] Code: 00 c3 66 2e 0f 1f 84 00 00 00 00 00 90 f3 0f 1e fa 48 89 f8 48 89 f7 48 89 d6 48 89 ca 4d 89 c2 4d 89 c8 4c 8b 4c 24 08 0f 05 <48> 3d 01 f0 ff ff 73 01 c3 48 8b 0d cb 56 2c 00 f7 d8
-[15969.399200][T179559] RSP: 002b:00007ffe920f3778 EFLAGS: 00000246 ORIG_RAX: 00000000000000c1
-[15969.405661][T179559] RAX: ffffffffffffffda RBX: 00000000000000c1 RCX: 00007f39a83ca78d
-[15969.411274][T179559] RDX: 00007f39a8abf000 RSI: 00007f39a69af000 RDI: 00000000000001aa
-[15969.415813][T179559] RBP: 00000000000000c1 R08: 0000000004800000 R09: 000000000000003e
-[15969.421984][T179559] R10: 0000000000000001 R11: 0000000000000246 R12: 0000000000000002
-[15969.426794][T179559] R13: 00007f39a8a08058 R14: 00007f39a8ab76c0 R15: 00007f39a8a08000
-[15969.432779][T179559] CPU: 0 PID: 179559 Comm: trinity-c24 Tainted: G           O      5.9.0-rc8-next-20201007+ #1
-[15969.439042][T179559] Hardware name: Red Hat KVM, BIOS 1.13.0-2.module+el8.3.0+7353+9de0a3cc 04/01/2014
-[15969.442756][T179559] Call Trace:
-[15969.442756][T179559]  dump_stack+0x99/0xcb
-[15969.448559][T179559]  __warn.cold.13+0xe/0x55
-[15969.450606][T179559]  ? fuse_write_file_get.isra.35.part.36+0x10/0x10 [fuse]
-[15969.450606][T179559]  report_bug+0x1af/0x260
-[15969.460111][T179559]  handle_bug+0x44/0x80
-[15969.462805][T179559]  exc_invalid_op+0x13/0x40
-[15969.462805][T179559]  asm_exc_invalid_op+0x12/0x20
-[15969.462805][T179559] RIP: 0010:tree_insert.part.40+0x0/0x10 [fuse]
-[15969.474710][T179559] Code: 44 24 10 48 8b 74 24 08 48 8b 0c 24 e9 40 fc ff ff 66 0f 1f 84 00 00 00 00 00 0f 0b c3 0f 1f 00 66 2e 0f 1f 84 00 00 00 00 00 <0f> 0b c3 0f 1f 00 66 2e 0f 1f 84 00 00 00 00 00 48 b0
-[15969.474710][T179559] RSP: 0018:ffffc90007fc77f8 EFLAGS: 00010286
-[15969.497893][T179559] RAX: ffff8884b8f73500 RBX: ffff8884b8f76900 RCX: ffff8889e45ff910
-[15969.497893][T179559] RDX: 0000000000000000 RSI: ffff8884b8f76900 RDI: ffff8884b8f735b0
-[15969.497893][T179559] RBP: ffffea000550c880 R08: ffff8884b8f769f8 R09: fffff52000ff8ef2
-[15969.510577][T179559] R10: 0000000000000003 R11: fffff52000ff8ef2 R12: ffff8889e45ff480
-[15969.516419][T179559] R13: ffffea0004d71380 R14: ffff88818285c000 R15: ffff8889e45ff9b0
-[15969.516419][T179559]  fuse_writepage_locked+0xa20/0xd10 [fuse]
-[15969.516419][T179559]  fuse_launder_page+0x5b/0xc0 [fuse]
-[15969.532794][T179559]  invalidate_inode_pages2_range+0x709/0xa90
-[15969.532794][T179559]  ? truncate_exceptional_pvec_entries.part.18+0x460/0x460
-[15969.541808][T179559]  ? rcu_read_lock_sched_held+0x9c/0xd0
-[15969.544178][T179559]  ? rcu_read_lock_bh_held+0xb0/0xb0
-[15969.544178][T179559]  ? rcu_read_unlock+0x40/0x40
-[15969.552839][T179559]  ? _raw_spin_unlock+0x1a/0x30
-[15969.552839][T179559]  ? fuse_change_attributes+0x237/0x540 [fuse]
-[15969.552839][T179559]  fuse_do_getattr+0x28b/0xd50 [fuse]
-[15969.552839][T179559]  ? do_syscall_64+0x33/0x40
-[15969.552839][T179559]  ? fuse_dentry_revalidate+0x6c0/0x6c0 [fuse]
-[15969.552839][T179559]  ? rcu_read_lock_bh_held+0xb0/0xb0
-[15969.552839][T179559]  ? find_held_lock+0x33/0x1c0
-[15969.552839][T179559]  ? rwlock_bug.part.1+0x90/0x90
-[15969.552839][T179559]  fuse_permission+0x29c/0x3c0 [fuse]
-[15969.552839][T179559]  ? __kasan_kmalloc.constprop.11+0xc1/0xd0
-[15969.590685][T179559]  inode_permission+0x2c1/0x390
-[15969.590685][T179559]  vfs_getxattr+0x43/0x80
-[15969.590685][T179559]  getxattr+0xe5/0x210
-[15969.590685][T179559]  ? path_listxattr+0x100/0x100
-[15969.600479][T179559]  ? rcu_read_lock_sched_held+0x9c/0xd0
-[15969.600479][T179559]  ? rcu_read_lock_bh_held+0xb0/0xb0
-[15969.600479][T179559]  ? find_held_lock+0x33/0x1c0
-[15969.600479][T179559]  ? __task_pid_nr_ns+0x127/0x3a0
-[15969.600479][T179559]  ? lock_downgrade+0x730/0x730
-[15969.600479][T179559]  ? syscall_enter_from_user_mode+0x17/0x50
-[15969.600479][T179559]  ? rcu_read_lock_sched_held+0x9c/0xd0
-[15969.600479][T179559]  __x64_sys_fgetxattr+0xd9/0x140
-[15969.630463][T179559]  do_syscall_64+0x33/0x40
-[15969.630463][T179559]  entry_SYSCALL_64_after_hwframe+0x44/0xa9
-[15969.630463][T179559] RIP: 0033:0x7f39a83ca78d
-[15969.630463][T179559] Code: 00 c3 66 2e 0f 1f 84 00 00 00 00 00 90 f3 0f 1e fa 48 89 f8 48 89 f7 48 89 d6 48 89 ca 4d 89 c2 4d 89 c8 4c 8b 4c 24 08 0f 05 <48> 3d 01 f0 ff ff 73 01 c3 48 8b 0d cb 56 2c 00 f7 d8
-[15969.650571][T179559] RSP: 002b:00007ffe920f3778 EFLAGS: 00000246 ORIG_RAX: 00000000000000c1
-[15969.650571][T179559] RAX: ffffffffffffffda RBX: 00000000000000c1 RCX: 00007f39a83ca78d
-[15969.650571][T179559] RDX: 00007f39a8abf000 RSI: 00007f39a69af000 RDI: 00000000000001aa
-[15969.672210][T179559] RBP: 00000000000000c1 R08: 0000000004800000 R09: 000000000000003e
-[15969.672418][T179559] R10: 0000000000000001 R11: 0000000000000246 R12: 0000000000000002
-[15969.680577][T179559] R13: 00007f39a8a08058 R14: 00007f39a8ab76c0 R15: 00007f39a8a08000
-[15969.689364][T179559] irq event stamp: 2861013
-[15969.692445][T179559] hardirqs last  enabled at (2861023): [<ffffffff84c2aecf>] console_unlock+0x81f/0xa20
-[15969.698923][T179559] hardirqs last disabled at (2861030): [<ffffffff84c2addb>] console_unlock+0x72b/0xa20
-[15969.706311][T179559] softirqs last  enabled at (2860498): [<ffffffff8600061b>] __do_softirq+0x61b/0x95d
-[15969.713236][T179559] softirqs last disabled at (2860383): [<ffffffff85e00ec2>] asm_call_irq_on_stack+0x12/0x20
-[15969.720777][T179559] ---[ end trace b6274835e0c14c38 ]---
+dmlydGlvZnNkIGNhbm5vdCBydW4gaW4gYSBjb250YWluZXIgYmVjYXVzZSBDQVBfU1lTX0FETUlO
+IGlzIHJlcXVpcmVkIHRvCmNyZWF0ZSBuYW1lc3BhY2VzLgoKSW50cm9kdWNlIGEgd2Vha2VyIHNh
+bmRib3ggbW9kZSB0aGF0IGlzIHN1ZmZpY2llbnQgaW4gY29udGFpbmVyCmVudmlyb25tZW50cyBi
+ZWNhdXNlIHRoZSBjb250YWluZXIgcnVudGltZSBhbHJlYWR5IHNldHMgdXAgbmFtZXNwYWNlcy4K
+VXNlIGNocm9vdCB0byByZXN0cmljdCBwYXRoIHRyYXZlcnNhbCB0byB0aGUgc2hhcmVkIGRpcmVj
+dG9yeS4KCnZpcnRpb2ZzZCBsb3NlcyB0aGUgZm9sbG93aW5nOgoKMS4gTW91bnQgbmFtZXNwYWNl
+LiBUaGUgcHJvY2VzcyBjaHJvb3RzIHRvIHRoZSBzaGFyZWQgZGlyZWN0b3J5IGJ1dAogICBsZWF2
+ZXMgdGhlIG1vdW50cyBpbiBwbGFjZS4gU2VjY29tcCByZWplY3RzIG1vdW50KDIpL3Vtb3VudCgy
+KQogICBzeXNjYWxscy4KCjIuIFBpZCBuYW1lc3BhY2UuIFRoaXMgc2hvdWxkIGJlIGZpbmUgYmVj
+YXVzZSB2aXJ0aW9mc2QgaXMgdGhlIG9ubHkKICAgcHJvY2VzcyBydW5uaW5nIGluIHRoZSBjb250
+YWluZXIuCgozLiBOZXR3b3JrIG5hbWVzcGFjZS4gVGhpcyBzaG91bGQgYmUgZmluZSBiZWNhdXNl
+IHNlY2NvbXAgYWxyZWFkeQogICByZWplY3RzIHRoZSBjb25uZWN0KDIpIHN5c2NhbGwsIGJ1dCBh
+biBhZGRpdGlvbmFsIGxheWVyIG9mIHNlY3VyaXR5CiAgIGlzIGxvc3QuIENvbnRhaW5lciBydW50
+aW1lLXNwZWNpZmljIG5ldHdvcmsgc2VjdXJpdHkgcG9saWNpZXMgY2FuIGJlCiAgIHVzZWQgZHJv
+cCBuZXR3b3JrIHRyYWZmaWMgKGV4Y2VwdCBmb3IgdGhlIHZob3N0LXVzZXIgVU5JWCBkb21haW4K
+ICAgc29ja2V0KS4KClNpZ25lZC1vZmYtYnk6IFN0ZWZhbiBIYWpub2N6aSA8c3RlZmFuaGFAcmVk
+aGF0LmNvbT4KLS0tCnYzOgogKiBSZWJhc2VkIG9udG8gRGF2aWQgR2lsYmVydCdzIGxhdGVzdCBt
+aWdyYXRpb24gJiB2aXJ0aW9mc2QgcHVsbAogICByZXF1ZXN0CgogdG9vbHMvdmlydGlvZnNkL2hl
+bHBlci5jICAgICAgICAgfCAgOCArKysrKwogdG9vbHMvdmlydGlvZnNkL3Bhc3N0aHJvdWdoX2xs
+LmMgfCA1NyArKysrKysrKysrKysrKysrKysrKysrKysrKysrKystLQogZG9jcy90b29scy92aXJ0
+aW9mc2QucnN0ICAgICAgICAgfCAzMiArKysrKysrKysrKysrKy0tLS0KIDMgZmlsZXMgY2hhbmdl
+ZCwgODggaW5zZXJ0aW9ucygrKSwgOSBkZWxldGlvbnMoLSkKCmRpZmYgLS1naXQgYS90b29scy92
+aXJ0aW9mc2QvaGVscGVyLmMgYi90b29scy92aXJ0aW9mc2QvaGVscGVyLmMKaW5kZXggODU3NzBk
+NjNmMS4uMmUxODFhNDliNSAxMDA2NDQKLS0tIGEvdG9vbHMvdmlydGlvZnNkL2hlbHBlci5jCisr
+KyBiL3Rvb2xzL3ZpcnRpb2ZzZC9oZWxwZXIuYwpAQCAtMTY2LDYgKzE2NiwxNCBAQCB2b2lkIGZ1
+c2VfY21kbGluZV9oZWxwKHZvaWQpCiAgICAgICAgICAgICIgICAgICAgICAgICAgICAgICAgICAg
+ICAgICAgICAgZW5hYmxlL2Rpc2FibGUgcmVhZGlycGx1c1xuIgogICAgICAgICAgICAiICAgICAg
+ICAgICAgICAgICAgICAgICAgICAgICAgIGRlZmF1bHQ6IHJlYWRkaXJwbHVzIGV4Y2VwdCB3aXRo
+ICIKICAgICAgICAgICAgImNhY2hlPW5vbmVcbiIKKyAgICAgICAgICAgIiAgICAtbyBzYW5kYm94
+PW5hbWVzcGFjZXxjaHJvb3RcbiIKKyAgICAgICAgICAgIiAgICAgICAgICAgICAgICAgICAgICAg
+ICAgICAgICBzYW5kYm94aW5nIG1vZGU6XG4iCisgICAgICAgICAgICIgICAgICAgICAgICAgICAg
+ICAgICAgICAgICAgICAgLSBuYW1lc3BhY2U6IG1vdW50LCBwaWQsIGFuZCBuZXRcbiIKKyAgICAg
+ICAgICAgIiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG5hbWVzcGFjZXMgd2l0aCBw
+aXZvdF9yb290KDIpXG4iCisgICAgICAgICAgICIgICAgICAgICAgICAgICAgICAgICAgICAgICAg
+ICAgICBpbnRvIHNoYXJlZCBkaXJlY3RvcnlcbiIKKyAgICAgICAgICAgIiAgICAgICAgICAgICAg
+ICAgICAgICAgICAgICAgICAtIGNocm9vdDogY2hyb290KDIpIGludG8gc2hhcmVkXG4iCisgICAg
+ICAgICAgICIgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBkaXJlY3RvcnkgKHVzZSBp
+biBjb250YWluZXJzKVxuIgorICAgICAgICAgICAiICAgICAgICAgICAgICAgICAgICAgICAgICAg
+ICAgIGRlZmF1bHQ6IG5hbWVzcGFjZVxuIgogICAgICAgICAgICAiICAgIC1vIHRpbWVvdXQ9PG51
+bWJlcj4gICAgICAgIEkvTyB0aW1lb3V0IChzZWNvbmRzKVxuIgogICAgICAgICAgICAiICAgICAg
+ICAgICAgICAgICAgICAgICAgICAgICAgIGRlZmF1bHQ6IGRlcGVuZHMgb24gY2FjaGU9IG9wdGlv
+bi5cbiIKICAgICAgICAgICAgIiAgICAtbyB3cml0ZWJhY2t8bm9fd3JpdGViYWNrICBlbmFibGUv
+ZGlzYWJsZSB3cml0ZWJhY2sgY2FjaGVcbiIKZGlmZiAtLWdpdCBhL3Rvb2xzL3ZpcnRpb2ZzZC9w
+YXNzdGhyb3VnaF9sbC5jIGIvdG9vbHMvdmlydGlvZnNkL3Bhc3N0aHJvdWdoX2xsLmMKaW5kZXgg
+ZmY1M2RmNDQ1MS4uNWI5MDY0Mjc4YSAxMDA2NDQKLS0tIGEvdG9vbHMvdmlydGlvZnNkL3Bhc3N0
+aHJvdWdoX2xsLmMKKysrIGIvdG9vbHMvdmlydGlvZnNkL3Bhc3N0aHJvdWdoX2xsLmMKQEAgLTEz
+Nyw4ICsxMzcsMTQgQEAgZW51bSB7CiAgICAgQ0FDSEVfQUxXQVlTLAogfTsKIAorZW51bSB7Cisg
+ICAgU0FOREJPWF9OQU1FU1BBQ0UsCisgICAgU0FOREJPWF9DSFJPT1QsCit9OworCiBzdHJ1Y3Qg
+bG9fZGF0YSB7CiAgICAgcHRocmVhZF9tdXRleF90IG11dGV4OworICAgIGludCBzYW5kYm94Owog
+ICAgIGludCBkZWJ1ZzsKICAgICBpbnQgd3JpdGViYWNrOwogICAgIGludCBmbG9jazsKQEAgLTE2
+Myw2ICsxNjksMTIgQEAgc3RydWN0IGxvX2RhdGEgewogfTsKIAogc3RhdGljIGNvbnN0IHN0cnVj
+dCBmdXNlX29wdCBsb19vcHRzW10gPSB7CisgICAgeyAic2FuZGJveD1uYW1lc3BhY2UiLAorICAg
+ICAgb2Zmc2V0b2Yoc3RydWN0IGxvX2RhdGEsIHNhbmRib3gpLAorICAgICAgU0FOREJPWF9OQU1F
+U1BBQ0UgfSwKKyAgICB7ICJzYW5kYm94PWNocm9vdCIsCisgICAgICBvZmZzZXRvZihzdHJ1Y3Qg
+bG9fZGF0YSwgc2FuZGJveCksCisgICAgICBTQU5EQk9YX0NIUk9PVCB9LAogICAgIHsgIndyaXRl
+YmFjayIsIG9mZnNldG9mKHN0cnVjdCBsb19kYXRhLCB3cml0ZWJhY2spLCAxIH0sCiAgICAgeyAi
+bm9fd3JpdGViYWNrIiwgb2Zmc2V0b2Yoc3RydWN0IGxvX2RhdGEsIHdyaXRlYmFjayksIDAgfSwK
+ICAgICB7ICJzb3VyY2U9JXMiLCBvZmZzZXRvZihzdHJ1Y3QgbG9fZGF0YSwgc291cmNlKSwgMCB9
+LApAQCAtMjY2MCw2ICsyNjcyLDQxIEBAIHN0YXRpYyB2b2lkIHNldHVwX2NhcGFiaWxpdGllcyhj
+aGFyICptb2RjYXBzX2luKQogICAgIHB0aHJlYWRfbXV0ZXhfdW5sb2NrKCZjYXAubXV0ZXgpOwog
+fQogCisvKgorICogVXNlIGNocm9vdCBhcyBhIHdlYWtlciBzYW5kYm94IGZvciBlbnZpcm9ubWVu
+dHMgd2hlcmUgdGhlIHByb2Nlc3MgaXMKKyAqIGxhdW5jaGVkIHdpdGhvdXQgQ0FQX1NZU19BRE1J
+Ti4KKyAqLworc3RhdGljIHZvaWQgc2V0dXBfY2hyb290KHN0cnVjdCBsb19kYXRhICpsbykKK3sK
+KyAgICBsby0+cHJvY19zZWxmX2ZkID0gb3BlbigiL3Byb2Mvc2VsZi9mZCIsIE9fUEFUSCk7Cisg
+ICAgaWYgKGxvLT5wcm9jX3NlbGZfZmQgPT0gLTEpIHsKKyAgICAgICAgZnVzZV9sb2coRlVTRV9M
+T0dfRVJSLCAib3BlbihcIi9wcm9jL3NlbGYvZmRcIiwgT19QQVRIKTogJW1cbiIpOworICAgICAg
+ICBleGl0KDEpOworICAgIH0KKworICAgIC8qCisgICAgICogTWFrZSB0aGUgc2hhcmVkIGRpcmVj
+dG9yeSB0aGUgZmlsZSBzeXN0ZW0gcm9vdCBzbyB0aGF0IEZVU0VfT1BFTgorICAgICAqIChsb19v
+cGVuKCkpIGNhbm5vdCBlc2NhcGUgdGhlIHNoYXJlZCBkaXJlY3RvcnkgYnkgb3BlbmluZyBhIHN5
+bWxpbmsuCisgICAgICoKKyAgICAgKiBUaGUgY2hyb290KDIpIHN5c2NhbGwgaXMgbGF0ZXIgZGlz
+YWJsZWQgYnkgc2VjY29tcCBhbmQgdGhlCisgICAgICogQ0FQX1NZU19DSFJPT1QgY2FwYWJpbGl0
+eSBpcyBkcm9wcGVkIHNvIHRoYXQgdGFtcGVyaW5nIHdpdGggdGhlIGNocm9vdAorICAgICAqIGlz
+IG5vdCBwb3NzaWJsZS4KKyAgICAgKgorICAgICAqIEhvd2V2ZXIsIGl0J3Mgc3RpbGwgcG9zc2li
+bGUgdG8gZXNjYXBlIHRoZSBjaHJvb3QgdmlhIGxvLT5wcm9jX3NlbGZfZmQKKyAgICAgKiBidXQg
+dGhhdCByZXF1aXJlcyBmaXJzdCBnYWluaW5nIGNvbnRyb2wgb2YgdGhlIHByb2Nlc3MuCisgICAg
+ICovCisgICAgaWYgKGNocm9vdChsby0+c291cmNlKSAhPSAwKSB7CisgICAgICAgIGZ1c2VfbG9n
+KEZVU0VfTE9HX0VSUiwgImNocm9vdChcIiVzXCIpOiAlbVxuIiwgbG8tPnNvdXJjZSk7CisgICAg
+ICAgIGV4aXQoMSk7CisgICAgfQorCisgICAgLyogTW92ZSBpbnRvIHRoZSBjaHJvb3QgKi8KKyAg
+ICBpZiAoY2hkaXIoIi8iKSAhPSAwKSB7CisgICAgICAgIGZ1c2VfbG9nKEZVU0VfTE9HX0VSUiwg
+ImNoZGlyKFwiL1wiKTogJW1cbiIpOworICAgICAgICBleGl0KDEpOworICAgIH0KK30KKwogLyoK
+ICAqIExvY2sgZG93biB0aGlzIHByb2Nlc3MgdG8gcHJldmVudCBhY2Nlc3MgdG8gb3RoZXIgcHJv
+Y2Vzc2VzIG9yIGZpbGVzIG91dHNpZGUKICAqIHNvdXJjZSBkaXJlY3RvcnkuICBUaGlzIHJlZHVj
+ZXMgdGhlIGltcGFjdCBvZiBhcmJpdHJhcnkgY29kZSBleGVjdXRpb24gYnVncy4KQEAgLTI2Njcs
+OCArMjcxNCwxMyBAQCBzdGF0aWMgdm9pZCBzZXR1cF9jYXBhYmlsaXRpZXMoY2hhciAqbW9kY2Fw
+c19pbikKIHN0YXRpYyB2b2lkIHNldHVwX3NhbmRib3goc3RydWN0IGxvX2RhdGEgKmxvLCBzdHJ1
+Y3QgZnVzZV9zZXNzaW9uICpzZSwKICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9vbCBlbmFi
+bGVfc3lzbG9nKQogewotICAgIHNldHVwX25hbWVzcGFjZXMobG8sIHNlKTsKLSAgICBzZXR1cF9t
+b3VudHMobG8tPnNvdXJjZSk7CisgICAgaWYgKGxvLT5zYW5kYm94ID09IFNBTkRCT1hfTkFNRVNQ
+QUNFKSB7CisgICAgICAgIHNldHVwX25hbWVzcGFjZXMobG8sIHNlKTsKKyAgICAgICAgc2V0dXBf
+bW91bnRzKGxvLT5zb3VyY2UpOworICAgIH0gZWxzZSB7CisgICAgICAgIHNldHVwX2Nocm9vdChs
+byk7CisgICAgfQorCiAgICAgc2V0dXBfc2VjY29tcChlbmFibGVfc3lzbG9nKTsKICAgICBzZXR1
+cF9jYXBhYmlsaXRpZXMoZ19zdHJkdXAobG8tPm1vZGNhcHMpKTsKIH0KQEAgLTI4MTUsNiArMjg2
+Nyw3IEBAIGludCBtYWluKGludCBhcmdjLCBjaGFyICphcmd2W10pCiAgICAgc3RydWN0IGZ1c2Vf
+c2Vzc2lvbiAqc2U7CiAgICAgc3RydWN0IGZ1c2VfY21kbGluZV9vcHRzIG9wdHM7CiAgICAgc3Ry
+dWN0IGxvX2RhdGEgbG8gPSB7CisgICAgICAgIC5zYW5kYm94ID0gU0FOREJPWF9OQU1FU1BBQ0Us
+CiAgICAgICAgIC5kZWJ1ZyA9IDAsCiAgICAgICAgIC53cml0ZWJhY2sgPSAwLAogICAgICAgICAu
+cG9zaXhfbG9jayA9IDAsCmRpZmYgLS1naXQgYS9kb2NzL3Rvb2xzL3ZpcnRpb2ZzZC5yc3QgYi9k
+b2NzL3Rvb2xzL3ZpcnRpb2ZzZC5yc3QKaW5kZXggN2VjZWU0OTgzNC4uNjVmOGU3NjU2OSAxMDA2
+NDQKLS0tIGEvZG9jcy90b29scy92aXJ0aW9mc2QucnN0CisrKyBiL2RvY3MvdG9vbHMvdmlydGlv
+ZnNkLnJzdApAQCAtMTcsMTMgKzE3LDI0IEBAIFRoaXMgcHJvZ3JhbSBpcyBkZXNpZ25lZCB0byB3
+b3JrIHdpdGggUUVNVSdzIGBgLS1kZXZpY2Ugdmhvc3QtdXNlci1mcy1wY2lgYAogYnV0IHNob3Vs
+ZCB3b3JrIHdpdGggYW55IHZpcnR1YWwgbWFjaGluZSBtb25pdG9yIChWTU0pIHRoYXQgc3VwcG9y
+dHMKIHZob3N0LXVzZXIuICBTZWUgdGhlIEV4YW1wbGVzIHNlY3Rpb24gYmVsb3cuCiAKLVRoaXMg
+cHJvZ3JhbSBtdXN0IGJlIHJ1biBhcyB0aGUgcm9vdCB1c2VyLiAgVXBvbiBzdGFydHVwIHRoZSBw
+cm9ncmFtIHdpbGwKLXN3aXRjaCBpbnRvIGEgbmV3IGZpbGUgc3lzdGVtIG5hbWVzcGFjZSB3aXRo
+IHRoZSBzaGFyZWQgZGlyZWN0b3J5IHRyZWUgYXMgaXRzCi1yb290LiAgVGhpcyBwcmV2ZW50cyAi
+ZmlsZSBzeXN0ZW0gZXNjYXBlcyIgZHVlIHRvIHN5bWxpbmtzIGFuZCBvdGhlciBmaWxlCi1zeXN0
+ZW0gb2JqZWN0cyB0aGF0IG1pZ2h0IGxlYWQgdG8gZmlsZXMgb3V0c2lkZSB0aGUgc2hhcmVkIGRp
+cmVjdG9yeS4gIFRoZQotcHJvZ3JhbSBhbHNvIHNhbmRib3hlcyBpdHNlbGYgdXNpbmcgc2VjY29t
+cCgyKSB0byBwcmV2ZW50IHB0cmFjZSgyKSBhbmQgb3RoZXIKLXZlY3RvcnMgdGhhdCBjb3VsZCBh
+bGxvdyBhbiBhdHRhY2tlciB0byBjb21wcm9taXNlIHRoZSBzeXN0ZW0gYWZ0ZXIgZ2FpbmluZwot
+Y29udHJvbCBvZiB0aGUgdmlydGlvZnNkIHByb2Nlc3MuCitUaGlzIHByb2dyYW0gbXVzdCBiZSBy
+dW4gYXMgdGhlIHJvb3QgdXNlci4gIFRoZSBwcm9ncmFtIGRyb3BzIHByaXZpbGVnZXMgd2hlcmUK
+K3Bvc3NpYmxlIGR1cmluZyBzdGFydHVwIGFsdGhvdWdoIGl0IG11c3QgYmUgYWJsZSB0byBjcmVh
+dGUgYW5kIGFjY2VzcyBmaWxlcword2l0aCBhbnkgdWlkL2dpZDoKKworKiBUaGUgYWJpbGl0eSB0
+byBpbnZva2Ugc3lzY2FsbHMgaXMgbGltaXRlZCB1c2luZyBzZWNjb21wKDIpLgorKiBMaW51eCBj
+YXBhYmlsaXRpZXMoNykgYXJlIGRyb3BwZWQuCisKK0luICJuYW1lc3BhY2UiIHNhbmRib3ggbW9k
+ZSB0aGUgcHJvZ3JhbSBzd2l0Y2hlcyBpbnRvIGEgbmV3IGZpbGUgc3lzdGVtCituYW1lc3BhY2Ug
+YW5kIGludm9rZXMgcGl2b3Rfcm9vdCgyKSB0byBtYWtlIHRoZSBzaGFyZWQgZGlyZWN0b3J5IHRy
+ZWUgaXRzIHJvb3QuCitBIG5ldyBwaWQgYW5kIG5ldCBuYW1lc3BhY2UgaXMgYWxzbyBjcmVhdGVk
+IHRvIGlzb2xhdGUgdGhlIHByb2Nlc3MuCisKK0luICJjaHJvb3QiIHNhbmRib3ggbW9kZSB0aGUg
+cHJvZ3JhbSBpbnZva2VzIGNocm9vdCgyKSB0byBtYWtlIHRoZSBzaGFyZWQKK2RpcmVjdG9yeSB0
+cmVlIGl0cyByb290LiBUaGlzIG1vZGUgaXMgaW50ZW5kZWQgZm9yIGNvbnRhaW5lciBlbnZpcm9u
+bWVudHMgd2hlcmUKK3RoZSBjb250YWluZXIgcnVudGltZSBoYXMgYWxyZWFkeSBzZXQgdXAgdGhl
+IG5hbWVzcGFjZXMgYW5kIHRoZSBwcm9ncmFtIGRvZXMKK25vdCBoYXZlIHBlcm1pc3Npb24gdG8g
+Y3JlYXRlIG5hbWVzcGFjZXMgaXRzZWxmLgorCitCb3RoIHNhbmRib3ggbW9kZXMgcHJldmVudCAi
+ZmlsZSBzeXN0ZW0gZXNjYXBlcyIgZHVlIHRvIHN5bWxpbmtzIGFuZCBvdGhlciBmaWxlCitzeXN0
+ZW0gb2JqZWN0cyB0aGF0IG1pZ2h0IGxlYWQgdG8gZmlsZXMgb3V0c2lkZSB0aGUgc2hhcmVkIGRp
+cmVjdG9yeS4KIAogT3B0aW9ucwogLS0tLS0tLQpAQCAtNjksNiArODAsMTMgQEAgT3B0aW9ucwog
+ICAqIHJlYWRkaXJwbHVzfG5vX3JlYWRkaXJwbHVzIC0KICAgICBFbmFibGUvZGlzYWJsZSByZWFk
+ZGlycGx1cy4gIFRoZSBkZWZhdWx0IGlzIGBgcmVhZGRpcnBsdXNgYC4KIAorICAqIHNhbmRib3g9
+bmFtZXNwYWNlfGNocm9vdCAtCisgICAgU2FuZGJveCBtb2RlOgorICAgIC0gbmFtZXNwYWNlOiBD
+cmVhdGUgbW91bnQsIHBpZCwgYW5kIG5ldCBuYW1lc3BhY2VzIGFuZCBwaXZvdF9yb290KDIpIGlu
+dG8KKyAgICB0aGUgc2hhcmVkIGRpcmVjdG9yeS4KKyAgICAtIGNocm9vdDogY2hyb290KDIpIGlu
+dG8gc2hhcmVkIGRpcmVjdG9yeSAodXNlIGluIGNvbnRhaW5lcnMpLgorICAgIFRoZSBkZWZhdWx0
+IGlzICJuYW1lc3BhY2UiLgorCiAgICogc291cmNlPVBBVEggLQogICAgIFNoYXJlIGhvc3QgZGly
+ZWN0b3J5IHRyZWUgbG9jYXRlZCBhdCBQQVRILiAgVGhpcyBvcHRpb24gaXMgcmVxdWlyZWQuCiAK
+LS0gCjIuMjYuMgoK
 

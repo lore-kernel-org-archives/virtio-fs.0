@@ -1,15 +1,19 @@
-References: <20200909184603.263700-1-mreitz@redhat.com>
-	<CAJfpegt92oj88FbGxphce80AWtU51Qgm87KuZqYD9kfpSVq2tA@mail.gmail.com>
-From: Max Reitz <mreitz@redhat.com>
-Message-ID: <e87d7603-100b-173a-07c6-3ef4c2400e94@redhat.com>
-Date: Wed, 23 Sep 2020 17:45:12 +0200
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+	d=fujitsu.onmicrosoft.com; s=selector2-fujitsu-onmicrosoft-com;
+	h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+	bh=xPGoBBRTCml1F5dz3uuqK9OxnkJkn2Y5RhSxMCK/z5E=;
+	b=GI4LF79rzs1bE66iKrKuQSrUxQbF0qbh0cO22wIrCUxRixupC6FL+KITzdhwrEYTOmNYHQmAfrOHHUq5iYkC1SiIwWp8P1b11yFLEl+eXvp70ohpOb4yQzACxV+1pI5R+KX1LeJjeT+mSSeWO2/Olsd8slQvwmoBJO53lH2pHI4=
+From: "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>
+Date: Thu, 8 Oct 2020 09:17:08 +0000
+Message-ID: <OSBPR01MB45820C38F613E3D38A565CCEE50B0@OSBPR01MB4582.jpnprd01.prod.outlook.com>
+References: <20201007092913.1524199-1-misono.tomohiro@jp.fujitsu.com>
+	<15796673-2daf-70a8-4b20-b861d4c22e62@redhat.com>
+In-Reply-To: <15796673-2daf-70a8-4b20-b861d4c22e62@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <CAJfpegt92oj88FbGxphce80AWtU51Qgm87KuZqYD9kfpSVq2tA@mail.gmail.com>
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature";
-	boundary="D3yaQC4PhGCiMfbllP3mpMHbnPyxXz5u0"
-Subject: Re: [Virtio-fs] [fuse-devel] [PATCH 0/9] fuse: Mirror virtio-fs
-	submounts
+Content-Language: ja-JP
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH] configure: add option for virtiofsd
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,122 +22,102 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, fuse-devel <fuse-devel@lists.sourceforge.net>
+To: 'Paolo Bonzini' <pbonzini@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
-This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
---D3yaQC4PhGCiMfbllP3mpMHbnPyxXz5u0
-Content-Type: multipart/mixed; boundary="7i5goZqX2gCn7QACs9juBqVvX7VfQZpW5"
+> On 07/10/20 11:29, Misono Tomohiro wrote:
+> > Currently it is unknown whether virtiofsd will be built at
+> > configuration time. It will be automatically built when dependency is
+> > met. Also, required libraries are not clear.
+> >
+> > To make this clear, add configure option --{enable,disable}-virtiofsd.
+> > The default is the same as current (enabled if available) like many
+> > other options. When --enable-virtiofsd is given and dependency is not
+> > met, we get:
+> >
+> >   ERROR: virtiofsd requires libcap-ng devel, seccomp devel, vhost user
+> > and tools support
+> >
+> > In addition, configuration summary now includes virtiofsd entry:
+> >
+> >   build virtiofs daemon: YES/NO
+> >
+> > Sidenote: this patch defines CONFIG_VIRTIOFSD for config-host.mak to
+> > avoid duplicate dependency check in tools/meson.build.
+> >
+> > Signed-off-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+> 
+> Hi Misono,
+> 
+> can you please handle the option via meson_options.txt?  That is, just pass the value (auto/enabled/disabled) through
+> from configure to meson, and handle the default in tools/meson.build.  The logic will be something like this:
+> 
+> have_virtiofsd = (targetos == 'linux' and
+>     'CONFIG_SECCOMP' in config_host and
+>     'CONFIG_LIBCAP_NG' in config_host)
+> 
+> if get_option('virtiofsd').enabled()
+>   if not have_virtiofsd
+>     if targetos != 'linux'
+>       error('virtiofsd requires Linux')
+>     else
+>       error('virtiofsd requires libcap-ng-devel and seccomp-devel')
+>     endif
+>   endif
+> elif get_option('virtiofsd').disabled() or not have_tools or \
+>      not 'CONFIG_VHOST_USER' in config_host
+>   have_virtiofsd = false
+> endif
+> 
+> if have_virtiofsd
+>   subdir('virtiofsd')
+> endif
+> 
+> This is because, when adding the option, there are some conditions that should disable virtiofsd by default but can be
+> overridden with --enable-virtiofsd.
+> 
+> More information on how to create a new Meson option can be found in docs/devel/build-system.rst.
 
---7i5goZqX2gCn7QACs9juBqVvX7VfQZpW5
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
-Content-Transfer-Encoding: quoted-printable
+Hi Paolo
 
-On 18.09.20 17:25, Miklos Szeredi wrote:
-> Pushed an updated version to fuse.git#submounts.
->=20
-> Also attached incremental patch (against rebase of
-> virtiofs-submounts-v2 on fuse.git#for-next).
->=20
-> Changes:
->=20
->  1) rebased on top of DAX patches
->  2) fixed CUSE
->  3) added locking for fc->mounts list
->  4) dissociate lifetime of fc from lifetime of root mount
->  5) do not hash mountpoint inodes
->  6) add FUSE_SUBMOUNTS init flag (replaces FUSE_ATTR_FLAGS but
-> slightly different usage)
->  7) various cleanups
->=20
-> Note, the effect of 5 can only be observed if the same directory is
-> bind mounted into multiple places:
->=20
-> HOST:
-> cd /mnt
-> mkdir 1 2
-> mount --bind /dev/shm 1
-> mount --bind /dev/shm 2
->=20
-> GUEST:
-> mount -t virtiofs mnt /mnt
-> cd /mnt/1
-> ls ../2
-> /bin/pwd
->=20
-> If the mountpoint is hashed, then the "ls ../2" will basically result
-> in /mnt/1 inode being moved to /mnt/2, which is not what we want.  I
-> don't think there's any negative side effect of the mountpoint being
-> unhashed, but this is a bit subtle.
->=20
->=20
-> On the server side, keying on just st_ino/st_dev is a really crude way
-> of mapping out mounts.  Take this example:
->=20
-> HOST:
-> cd /mnt
-> mkdir 1
-> mount --bind /dev/shm 1
-> cd 1
-> mkdir 2
-> mount --bind /mnt 2
-> ls /mnt/1/2/1
->=20
-> GUEST:
-> mount -t virtiofs mnt /mnt
-> ls /mnt/1/2/1
-> 2
-> ls /mnt/1/2/1/2/1/2/1/
-> 2
->=20
-> So what we really need is keying on mount ID as well.
->=20
-> Attaching an incremental patch to do that.  Needs v5.8 kernel on host
-> to actually make a difference, but commit fa2fcf4f1df1 ("statx: add
-> mount ID") is trivial to backport to any kernel that has statx.
->=20
-> Please review and test.  If there are no major issues, this should be
-> good to go for v5.10.
+Thanks a lot for the clear explanation. I will update the patch to follow the meson style.
+I realized virtiofsd actually needs tools (i.e. "--disable-tools --enable-virtiofsd"
+does not work with above meson.build) since virtiofsd requires libvhost_user which will
+be built ony when tools are built. So, I will keep the current dependency check (except 'have_system').
 
-As for the virtiofsd patch, I wonder about:
+BTW, while testing the updated patch, I noticed current master branch (as of 10/08) fails to execute virtiofsd.
+backtrace from coredump shows:
+#0  get_relocated_path (dir=0x560f4d2f2ef0 "/usr/local/var/run/virtiofsd") at ../util/cutils.c:924
+#1  0x0000560f4baab6da in qemu_get_local_state_pathname (relative_pathname=relative_pathname@entry=0x560f4bac6cf1 "run/virtiofsd")
+    at ../util/oslib-posix.c:345
+#2  0x0000560f4baa1b09 in fv_socket_lock (se=0x560f4d2f2f20) at ../tools/virtiofsd/fuse_virtio.c:865
+#3  fv_create_listen_socket (se=0x560f4d2f2f20) at ../tools/virtiofsd/fuse_virtio.c:906
+#4  virtio_session_mount (se=0x560f4d2f2f20) at ../tools/virtiofsd/fuse_virtio.c:968
+#5  0x0000560f4ba99725 in main (argc=<optimized out>, argv=<optimized out>) at ../tools/virtiofsd/passthrough_ll.c:2947
 
-> #if 0 && defined(HAVE_STATX) && STATX_MNT_ID
+So, this is related to: https://github.com/qemu/qemu/commit/f4f5ed2cbde65acaa1bd88d00cc23fa8bf6b5ed9#diff-ae9b732998587b609c0854bae40b2fe6R924
 
-Shouldn=E2=80=99t the 0 not be there?  And should STATX_MNT_ID be wrapped=
- in
-defined()?
+Adding  "qemu_init_exec_dir(argv[0]);" in virtiofs's main() seems solve the problem, 
+but is it correct fix?
 
-Furthermore I wonder why you have removed the parent_dev logic.  With
-your patch, FUSE_ATTR_SUBMOUNT can be announced only by those functions
-that invoke lo_do_lookup().  Is it OK to do so only there, and not every
-time a fuse_attr is returned (be it as part of fuse_entry_out, as by
-lo_link(), or directly by lo_getattr())?
+Regards,
+Misono
 
-(Also, the virtiofsd series will need a bit of an update with
-FUSE_SUBMOUNTS replacing FUSE_ATTR_FLAGS.)
+> 
+> Thanks,
+> 
+> Paolo
+> 
+> > -have_virtiofsd = (have_system and
+> > -    have_tools and
+> > -    'CONFIG_LINUX' in config_host and
+> > -    'CONFIG_SECCOMP' in config_host and
+> > -    'CONFIG_LIBCAP_NG' in config_host and
+> > -    'CONFIG_VHOST_USER' in config_host)
+> > -
+> > -if have_virtiofsd
+> > +if 'CONFIG_VIRTIOFSD' in config_host
+> >    subdir('virtiofsd')
+> >  endif
+> >
 
-Max
-
-
---7i5goZqX2gCn7QACs9juBqVvX7VfQZpW5--
-
---D3yaQC4PhGCiMfbllP3mpMHbnPyxXz5u0
-Content-Type: application/pgp-signature; name="signature.asc"
-Content-Description: OpenPGP digital signature
-Content-Disposition: attachment; filename="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEkb62CjDbPohX0Rgp9AfbAGHVz0AFAl9rbYgACgkQ9AfbAGHV
-z0D1WQgAlkwOII8t10BtHTCH5AevYVUXZqTqDLjdbARK3D8kES1fS49EOtJpRYZe
-apUsmi8c2OjEhDMtrdePYDmcfbKfY4dFveopV5o4FeVwuHb1avF47vlu6et6CY52
-zNczYzGuoolJCI2+KU8MfEGGekv+GodIeDYXSsV21iAmUAbczrcpXNv9LH31k0uR
-RlBR9QC8wc9UMu84Btu5O27biNbmt33eOT26VhDLHgVljgbfllHyCYaKrLCJA45Q
-9N5KmMoBOi10J2enFmAlcHKRv9GFh3WXhEO1dBafBxvqXap81O6UOKfljUTWPoTy
-VLowkFXgKyOhQfSHL8jwahQCuGboXA==
-=bNdc
------END PGP SIGNATURE-----
-
---D3yaQC4PhGCiMfbllP3mpMHbnPyxXz5u0--
 

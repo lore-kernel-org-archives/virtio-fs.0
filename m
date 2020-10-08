@@ -1,14 +1,15 @@
-Date: Thu, 8 Oct 2020 10:55:05 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20201008095505.GA2962@work-vm>
-References: <20201007092913.1524199-1-misono.tomohiro@jp.fujitsu.com>
-	<15796673-2daf-70a8-4b20-b861d4c22e62@redhat.com>
-	<OSBPR01MB45820C38F613E3D38A565CCEE50B0@OSBPR01MB4582.jpnprd01.prod.outlook.com>
+Date: Thu, 8 Oct 2020 11:13:12 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20201008101312.GA17253@stefanha-x1.localdomain>
+References: <20201005174531.GB4302@redhat.com>
+	<20201006153933.GA87345@stefanha-x1.localdomain>
+	<20201006190949.GH5306@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="ibTvN161/egqYuK8"
 Content-Disposition: inline
-In-Reply-To: <OSBPR01MB45820C38F613E3D38A565CCEE50B0@OSBPR01MB4582.jpnprd01.prod.outlook.com>
-Subject: Re: [Virtio-fs] [PATCH] configure: add option for virtiofsd
+In-Reply-To: <20201006190949.GH5306@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofs: Fix false positive warning
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,116 +18,146 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "misono.tomohiro@fujitsu.com" <misono.tomohiro@fujitsu.com>
-Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>, 'Paolo Bonzini' <pbonzini@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, CAI Qian <caiqian@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>
 
-* misono.tomohiro@fujitsu.com (misono.tomohiro@fujitsu.com) wrote:
-> > On 07/10/20 11:29, Misono Tomohiro wrote:
-> > > Currently it is unknown whether virtiofsd will be built at
-> > > configuration time. It will be automatically built when dependency is
-> > > met. Also, required libraries are not clear.
-> > >
-> > > To make this clear, add configure option --{enable,disable}-virtiofsd.
-> > > The default is the same as current (enabled if available) like many
-> > > other options. When --enable-virtiofsd is given and dependency is not
-> > > met, we get:
-> > >
-> > >   ERROR: virtiofsd requires libcap-ng devel, seccomp devel, vhost user
-> > > and tools support
-> > >
-> > > In addition, configuration summary now includes virtiofsd entry:
-> > >
-> > >   build virtiofs daemon: YES/NO
-> > >
-> > > Sidenote: this patch defines CONFIG_VIRTIOFSD for config-host.mak to
-> > > avoid duplicate dependency check in tools/meson.build.
-> > >
-> > > Signed-off-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
-> > 
-> > Hi Misono,
-> > 
-> > can you please handle the option via meson_options.txt?  That is, just pass the value (auto/enabled/disabled) through
-> > from configure to meson, and handle the default in tools/meson.build.  The logic will be something like this:
-> > 
-> > have_virtiofsd = (targetos == 'linux' and
-> >     'CONFIG_SECCOMP' in config_host and
-> >     'CONFIG_LIBCAP_NG' in config_host)
-> > 
-> > if get_option('virtiofsd').enabled()
-> >   if not have_virtiofsd
-> >     if targetos != 'linux'
-> >       error('virtiofsd requires Linux')
-> >     else
-> >       error('virtiofsd requires libcap-ng-devel and seccomp-devel')
-> >     endif
-> >   endif
-> > elif get_option('virtiofsd').disabled() or not have_tools or \
-> >      not 'CONFIG_VHOST_USER' in config_host
-> >   have_virtiofsd = false
-> > endif
-> > 
-> > if have_virtiofsd
-> >   subdir('virtiofsd')
-> > endif
-> > 
-> > This is because, when adding the option, there are some conditions that should disable virtiofsd by default but can be
-> > overridden with --enable-virtiofsd.
-> > 
-> > More information on how to create a new Meson option can be found in docs/devel/build-system.rst.
-> 
-> Hi Paolo
-> 
-> Thanks a lot for the clear explanation. I will update the patch to follow the meson style.
-> I realized virtiofsd actually needs tools (i.e. "--disable-tools --enable-virtiofsd"
-> does not work with above meson.build) since virtiofsd requires libvhost_user which will
-> be built ony when tools are built. So, I will keep the current dependency check (except 'have_system').
-> 
-> BTW, while testing the updated patch, I noticed current master branch (as of 10/08) fails to execute virtiofsd.
-> backtrace from coredump shows:
-> #0  get_relocated_path (dir=0x560f4d2f2ef0 "/usr/local/var/run/virtiofsd") at ../util/cutils.c:924
-> #1  0x0000560f4baab6da in qemu_get_local_state_pathname (relative_pathname=relative_pathname@entry=0x560f4bac6cf1 "run/virtiofsd")
->     at ../util/oslib-posix.c:345
-> #2  0x0000560f4baa1b09 in fv_socket_lock (se=0x560f4d2f2f20) at ../tools/virtiofsd/fuse_virtio.c:865
-> #3  fv_create_listen_socket (se=0x560f4d2f2f20) at ../tools/virtiofsd/fuse_virtio.c:906
-> #4  virtio_session_mount (se=0x560f4d2f2f20) at ../tools/virtiofsd/fuse_virtio.c:968
-> #5  0x0000560f4ba99725 in main (argc=<optimized out>, argv=<optimized out>) at ../tools/virtiofsd/passthrough_ll.c:2947
-> 
-> So, this is related to: https://github.com/qemu/qemu/commit/f4f5ed2cbde65acaa1bd88d00cc23fa8bf6b5ed9#diff-ae9b732998587b609c0854bae40b2fe6R924
-> 
-> Adding  "qemu_init_exec_dir(argv[0]);" in virtiofs's main() seems solve the problem, 
-> but is it correct fix?
 
-Yes, I've already posted the fix for that,
-   https://lists.gnu.org/archive/html/qemu-devel/2020-10/msg01852.html
+--ibTvN161/egqYuK8
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Dave
+On Tue, Oct 06, 2020 at 03:09:49PM -0400, Vivek Goyal wrote:
+> On Tue, Oct 06, 2020 at 04:39:33PM +0100, Stefan Hajnoczi wrote:
+> > On Mon, Oct 05, 2020 at 01:45:31PM -0400, Vivek Goyal wrote:
+> > > virtiofs currently maps various buffers in scatter gather list and it=
+ looks
+> > > at number of pages (ap->pages) and assumes that same number of pages =
+will
+> > > be used both for input and output (sg_count_fuse_req()), and calculat=
+es
+> > > total number of scatterlist elements accordingly.
+> > >=20
+> > > But looks like this assumption is not valid in all the cases. For exa=
+mple,
+> > > Cai Qian reported that trinity, triggers warning with virtiofs someti=
+mes.
+> > > A closer look revealed that if one calls ioctl(fd, 0x5a004000, buf), =
+it
+> > > will trigger following warning.
+> > >=20
+> > > WARN_ON(out_sgs + in_sgs !=3D total_sgs)
+> > >=20
+> > > In this case, total_sgs =3D 8, out_sgs=3D4, in_sgs=3D3. Number of pag=
+es is 2
+> > > (ap->pages), but out_sgs are using both the pages but in_sgs are using
+> > > only one page. (fuse_do_ioctl() sets out_size to one page).
+> > >=20
+> > > So existing WARN_ON() seems to be wrong. Instead of total_sgs, it sho=
+uld
+> > > be max_sgs and make sure out_sgs and in_sgs don't cross max_sgs. This
+> > > will allow input and output pages numbers to be different.
+> > >=20
+> > > Reported-by: Qian Cai <cai@redhat.com>
+> > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > > Link: https://lore.kernel.org/linux-fsdevel/5ea77e9f6cb8c2db43b09fbd4=
+158ab2d8c066a0a.camel@redhat.com/
+> > > ---
+> > >  fs/fuse/virtio_fs.c | 14 +++++++-------
+> > >  1 file changed, 7 insertions(+), 7 deletions(-)
+> > >=20
+> > > diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> > > index da3ede268604..3f4f2fa0bb96 100644
+> > > --- a/fs/fuse/virtio_fs.c
+> > > +++ b/fs/fuse/virtio_fs.c
+> > > @@ -1110,17 +1110,17 @@ static int virtio_fs_enqueue_req(struct virti=
+o_fs_vq *fsvq,
+> > >  	unsigned int argbuf_used =3D 0;
+> > >  	unsigned int out_sgs =3D 0;
+> > >  	unsigned int in_sgs =3D 0;
+> > > -	unsigned int total_sgs;
+> > > +	unsigned int  max_sgs;
+> > >  	unsigned int i;
+> > >  	int ret;
+> > >  	bool notify;
+> > >  	struct fuse_pqueue *fpq;
+> > > =20
+> > >  	/* Does the sglist fit on the stack? */
+> > > -	total_sgs =3D sg_count_fuse_req(req);
+> >=20
+> > sg_count_fuse_req() should be exact. It's risky to treat it as a maximum
+> > unless all cases where in_sgs + out_sgs < total_sgs are understood. Even
+> > then, it's still possible that new bugs introduced to the code will go
+> > undetected due to the weaker WARN_ON() condition.
+> >=20
+> > Do you have the values of the relevant fuse_req and fuse_args_pages
+> > fields so we can understand exactly what happened? I think the issue is
+> > that sg_count_fuse_req() doesn't use the fuse_page_desc size field.
+>=20
+> Hi Stefan,
+>=20
+> I revised the patch. How about following. This calculates number of
+> sgs accurately by going through ap->descs and size fields.
+>=20
+> Thanks
+> Vivek
+>=20
+> From 24b590ebc2ffc8ed02c013b11818af89d0b135ba Mon Sep 17 00:00:00 2001
+> From: Vivek Goyal <vgoyal@redhat.com>
+> Date: Tue, 6 Oct 2020 14:53:06 -0400
+> Subject: [PATCH 1/1] virtiofs: Calculate number of scatter-gather elements
+>  accurately
+>=20
+> virtiofs currently maps various buffers in scatter gather list and it loo=
+ks
+> at number of pages (ap->pages) and assumes that same number of pages will
+> be used both for input and output (sg_count_fuse_req()), and calculates
+> total number of scatterlist elements accordingly.
+>=20
+> But looks like this assumption is not valid in all the cases. For example,
+> Cai Qian reported that trinity, triggers warning with virtiofs sometimes.
+> A closer look revealed that if one calls ioctl(fd, 0x5a004000, buf), it
+> will trigger following warning.
+>=20
+> WARN_ON(out_sgs + in_sgs !=3D total_sgs)
+>=20
+> In this case, total_sgs =3D 8, out_sgs=3D4, in_sgs=3D3. Number of pages i=
+s 2
+> (ap->pages), but out_sgs are using both the pages but in_sgs are using
+> only one page. In this case, fuse_do_ioctl() sets different size values
+> for input and output.
+>=20
+> args->in_args[args->in_numargs - 1].size =3D=3D 6656
+> args->out_args[args->out_numargs - 1].size =3D=3D 4096
+>=20
+> So current method of calculating how many scatter-gather list elements
+> will be used is not accurate. Make calculations more precise by parsing
+> size and ap->descs.
+>=20
+> Reported-by: Qian Cai <cai@redhat.com>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> Link: https://lore.kernel.org/linux-fsdevel/5ea77e9f6cb8c2db43b09fbd4158a=
+b2d8c066a0a.camel@redhat.com/
+> ---
+>  fs/fuse/virtio_fs.c | 30 ++++++++++++++++++++++++++----
+>  1 file changed, 26 insertions(+), 4 deletions(-)
 
-> Regards,
-> Misono
-> 
-> > 
-> > Thanks,
-> > 
-> > Paolo
-> > 
-> > > -have_virtiofsd = (have_system and
-> > > -    have_tools and
-> > > -    'CONFIG_LINUX' in config_host and
-> > > -    'CONFIG_SECCOMP' in config_host and
-> > > -    'CONFIG_LIBCAP_NG' in config_host and
-> > > -    'CONFIG_VHOST_USER' in config_host)
-> > > -
-> > > -if have_virtiofsd
-> > > +if 'CONFIG_VIRTIOFSD' in config_host
-> > >    subdir('virtiofsd')
-> > >  endif
-> > >
-> 
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+
+--ibTvN161/egqYuK8
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl9+5jYACgkQnKSrs4Gr
+c8hoPggAgtJqc+a6Y+IJS5ZWLq4Bl2BM2uwK5omJKVMZgR1Zobelex5q/PUDAuis
+yIIRkL0WEXOZafdrBgP5m45z4BEB23GgsMFsj1m0xoc1zysNQnqEi26DxOJyAsTj
+q7zecSpM6wiqlPjzKl9u1FcCPRzODrqbXvAoYpGZ+A6V7OMyQXzje5XK1iXc19bB
+91kr+TbROk2LdQLmWaqU1dC7ICSYWdtQ7gZ4MomuxiKiWFXX+eEl9CpEk+NlYl21
+36sP1umT77PBcas4n7ntMjQp8LyG5P5ovfCm2IAT/KrlMuFqhdE7WIgj7ZYpI5+L
+I4qVdVD1BKTE4TuFbBF9SiTKX+ZqFw==
+=JlBb
+-----END PGP SIGNATURE-----
+
+--ibTvN161/egqYuK8--
 

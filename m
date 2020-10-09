@@ -1,13 +1,12 @@
-Date: Fri, 9 Oct 2020 13:13:29 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20201009121329.GH3071@work-vm>
-References: <20201008103133.2722903-1-misono.tomohiro@jp.fujitsu.com>
-	<ea7dc73c-7ca5-924e-756e-02a5e66f85c7@redhat.com>
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Fri,  9 Oct 2020 14:15:07 -0400
+Message-Id: <20201009181512.65496-2-vgoyal@redhat.com>
+In-Reply-To: <20201009181512.65496-1-vgoyal@redhat.com>
+References: <20201009181512.65496-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <ea7dc73c-7ca5-924e-756e-02a5e66f85c7@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v2] configure: add option for virtiofsd
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v3 1/6] fuse: Introduce the notion of
+	FUSE_HANDLE_KILLPRIV_V2
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,155 +15,115 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Paolo Bonzini <pbonzini@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: linux-fsdevel@vger.kernel.org, miklos@szeredi.hu
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
-* Paolo Bonzini (pbonzini@redhat.com) wrote:
-> On 08/10/20 12:31, Misono Tomohiro wrote:
-> > Currently it is unknown whether virtiofsd will be built at
-> > configuration time. It will be automatically built when dependency
-> > is met. Also, required libraries are not clear.
-> > 
-> > To make this clear, add configure option --{enable,disable}-virtiofsd.
-> > The default is the same as current (enabled if available) like many
-> > other options. When --enable-virtiofsd is given and dependency is not
-> > met, we get:
-> > 
-> >   ERROR: Problem encountered: virtiofsd requires libcap-ng-devel and seccomp-devel
-> > or
-> >   ERROR: Problem encountered: virtiofsd needs tools and vhost-user support
-> > 
-> > In addition, configuration summary now includes virtiofsd entry:
-> > 
-> >   build virtiofs daemon: YES/NO
-> > 
-> > Signed-off-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
-> > ---
-> > This patch is based on current master branch
-> > 
-> > v1 ... https://lore.kernel.org/qemu-devel/20201007092913.1524199-1-misono.tomohiro@jp.fujitsu.com/
-> > v1 -> v2: Update to follow the current meson build style
-> > 
-> >  configure         |  8 +++++++-
-> >  meson.build       |  1 +
-> >  meson_options.txt |  2 ++
-> >  tools/meson.build | 17 +++++++++++++++--
-> >  4 files changed, 25 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/configure b/configure
-> > index 28df227db5..2bd8419b1f 100755
-> > --- a/configure
-> > +++ b/configure
-> > @@ -302,6 +302,7 @@ netmap="no"
-> >  sdl="auto"
-> >  sdl_image="auto"
-> >  virtfs=""
-> > +virtiofsd="auto"
-> >  mpath="auto"
-> >  vnc="enabled"
-> >  sparse="auto"
-> > @@ -1004,6 +1005,10 @@ for opt do
-> >    ;;
-> >    --enable-virtfs) virtfs="yes"
-> >    ;;
-> > +  --disable-virtiofsd) virtiofsd="disabled"
-> > +  ;;
-> > +  --enable-virtiofsd) virtiofsd="enabled"
-> > +  ;;
-> >    --disable-mpath) mpath="disabled"
-> >    ;;
-> >    --enable-mpath) mpath="enabled"
-> > @@ -1761,6 +1766,7 @@ disabled with --disable-FEATURE, default is enabled if available:
-> >    vnc-png         PNG compression for VNC server
-> >    cocoa           Cocoa UI (Mac OS X only)
-> >    virtfs          VirtFS
-> > +  virtiofsd       build virtiofs daemon (virtiofsd)
-> >    mpath           Multipath persistent reservation passthrough
-> >    xen             xen backend driver support
-> >    xen-pci-passthrough    PCI passthrough support for Xen
-> > @@ -7215,7 +7221,7 @@ NINJA=${ninja:-$PWD/ninjatool} $meson setup \
-> >  	-Dxen=$xen -Dxen_pci_passthrough=$xen_pci_passthrough -Dtcg=$tcg \
-> >  	-Dcocoa=$cocoa -Dmpath=$mpath -Dsdl=$sdl -Dsdl_image=$sdl_image \
-> >  	-Dvnc=$vnc -Dvnc_sasl=$vnc_sasl -Dvnc_jpeg=$vnc_jpeg -Dvnc_png=$vnc_png \
-> > -	-Dgettext=$gettext -Dxkbcommon=$xkbcommon -Du2f=$u2f \
-> > +	-Dgettext=$gettext -Dxkbcommon=$xkbcommon -Du2f=$u2f -Dvirtiofsd=$virtiofsd \
-> >  	-Dcapstone=$capstone -Dslirp=$slirp -Dfdt=$fdt \
-> >          $cross_arg \
-> >          "$PWD" "$source_path"
-> > diff --git a/meson.build b/meson.build
-> > index 17c89c87c6..a087239009 100644
-> > --- a/meson.build
-> > +++ b/meson.build
-> > @@ -1843,6 +1843,7 @@ summary_info += {'Audio drivers':     config_host['CONFIG_AUDIO_DRIVERS']}
-> >  summary_info += {'Block whitelist (rw)': config_host['CONFIG_BDRV_RW_WHITELIST']}
-> >  summary_info += {'Block whitelist (ro)': config_host['CONFIG_BDRV_RO_WHITELIST']}
-> >  summary_info += {'VirtFS support':    config_host.has_key('CONFIG_VIRTFS')}
-> > +summary_info += {'build virtiofs daemon': have_virtiofsd}
-> >  summary_info += {'Multipath support': mpathpersist.found()}
-> >  summary_info += {'VNC support':       vnc.found()}
-> >  if vnc.found()
-> > diff --git a/meson_options.txt b/meson_options.txt
-> > index 1d3c94840a..80637ada63 100644
-> > --- a/meson_options.txt
-> > +++ b/meson_options.txt
-> > @@ -48,6 +48,8 @@ option('vnc_sasl', type : 'feature', value : 'auto',
-> >         description: 'SASL authentication for VNC server')
-> >  option('xkbcommon', type : 'feature', value : 'auto',
-> >         description: 'xkbcommon support')
-> > +option('virtiofsd', type: 'feature', value: 'auto',
-> > +       description: 'build virtiofs daemon (virtiofsd)')
-> >  
-> >  option('capstone', type: 'combo', value: 'auto',
-> >         choices: ['disabled', 'enabled', 'auto', 'system', 'internal'],
-> > diff --git a/tools/meson.build b/tools/meson.build
-> > index 513bd2ff4f..76bf84df52 100644
-> > --- a/tools/meson.build
-> > +++ b/tools/meson.build
-> > @@ -1,10 +1,23 @@
-> > -have_virtiofsd = (have_system and
-> > +have_virtiofsd = (targetos == 'linux' and
-> >      have_tools and
-> > -    'CONFIG_LINUX' in config_host and 
-> >      'CONFIG_SECCOMP' in config_host and
-> >      'CONFIG_LIBCAP_NG' in config_host and
-> >      'CONFIG_VHOST_USER' in config_host)
-> >  
-> > +if get_option('virtiofsd').enabled()
-> > +  if not have_virtiofsd
-> > +    if targetos != 'linux'
-> > +      error('virtiofsd requires Linux')
-> > +    elif 'CONFIG_SECCOMP' not in config_host or 'CONFIG_LIBCAP_NG' not in config_host
-> > +      error('virtiofsd requires libcap-ng-devel and seccomp-devel')
-> > +    elif not have_tools or 'CONFIG_VHOST_USER' not in config_host
-> > +      error('virtiofsd needs tools and vhost-user support')
-> > +    endif
-> > +  endif
-> > +elif get_option('virtiofsd').disabled() or not have_system
-> > +  have_virtiofsd = false
-> > +endif
-> > +
-> >  if have_virtiofsd
-> >    subdir('virtiofsd')
-> >  endif
-> > 
-> 
-> This looks good and the way you solved --enable-virtiofsd
-> --disable-tools makes sense.  I'll let David pick it up or decide if he
-> wants a different approach.
+We already have FUSE_HANDLE_KILLPRIV flag that says that file server will
+remove suid/sgid/caps on truncate/chown/write. But that's little different
+from what Linux VFS implements.
 
-In that case I'll take your word the meson bit is OK, so:
+To be consistent with Linux VFS behavior what we want is.
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+- caps are always cleared on chown/write/truncate
+- suid is always cleared on chown, while for truncate/write it is cleared
+  only if caller does not have CAP_FSETID.
+- sgid is always cleared on chown, while for truncate/write it is cleared
+  only if caller does not have CAP_FSETID as well as file has group execute
+  permission.
 
-(I've also hit this, wondering why virtiofsd hasn't been built and
-realising I was missing capng on a new host).
+As previous flag did not provide above semantics. Implement a V2 of the
+protocol with above said constraints.
 
-> Paolo
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
+Server does not know if caller has CAP_FSETID or not. So for the case
+of write()/truncate(), client will send information in special flag to
+indicate whether to kill priviliges or not. These changes are in subsequent
+patches.
+
+FUSE_HANDLE_KILLPRIV_V2 relies on WRITE being sent to server to clear
+suid/sgid/security.capability. But with ->writeback_cache, WRITES are
+cached in guest. So it is not recommended to use FUSE_HANDLE_KILLPRIV_V2
+and writeback_cache together. Though it probably might be good enough
+for lot of use cases.
+
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/fuse_i.h          | 6 ++++++
+ fs/fuse/inode.c           | 5 ++++-
+ include/uapi/linux/fuse.h | 7 +++++++
+ 3 files changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index dbaae2f6c73e..3dd1578be405 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -631,6 +631,12 @@ struct fuse_conn {
+ 	/* show legacy mount options */
+ 	unsigned int legacy_opts_show:1;
+ 
++	/** fs kills suid/sgid/cap on write/chown/trunc. suid is
++	    killed on write/trunc only if caller did not have CAP_FSETID.
++	    sgid is killed on write/truncate only if caller did not have
++	    CAP_FSETID as well as file has group execute permission. */
++	unsigned handle_killpriv_v2:1;
++
+ 	/*
+ 	 * The following bitfields are only for optimization purposes
+ 	 * and hence races in setting them will not cause malfunction
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index d252237219bf..20740b61f12b 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -993,6 +993,8 @@ static void process_init_reply(struct fuse_conn *fc, struct fuse_args *args,
+ 			    !fuse_dax_check_alignment(fc, arg->map_alignment)) {
+ 				ok = false;
+ 			}
++			if (arg->flags & FUSE_HANDLE_KILLPRIV_V2)
++				fc->handle_killpriv_v2 = 1;
+ 		} else {
+ 			ra_pages = fc->max_read / PAGE_SIZE;
+ 			fc->no_lock = 1;
+@@ -1035,7 +1037,8 @@ void fuse_send_init(struct fuse_conn *fc)
+ 		FUSE_WRITEBACK_CACHE | FUSE_NO_OPEN_SUPPORT |
+ 		FUSE_PARALLEL_DIROPS | FUSE_HANDLE_KILLPRIV | FUSE_POSIX_ACL |
+ 		FUSE_ABORT_ERROR | FUSE_MAX_PAGES | FUSE_CACHE_SYMLINKS |
+-		FUSE_NO_OPENDIR_SUPPORT | FUSE_EXPLICIT_INVAL_DATA;
++		FUSE_NO_OPENDIR_SUPPORT | FUSE_EXPLICIT_INVAL_DATA |
++		FUSE_HANDLE_KILLPRIV_V2;
+ #ifdef CONFIG_FUSE_DAX
+ 	if (fc->dax)
+ 		ia->in.flags |= FUSE_MAP_ALIGNMENT;
+diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
+index 8899e4862309..3ae3f222a0ed 100644
+--- a/include/uapi/linux/fuse.h
++++ b/include/uapi/linux/fuse.h
+@@ -172,6 +172,7 @@
+  *  - add FUSE_WRITE_KILL_PRIV flag
+  *  - add FUSE_SETUPMAPPING and FUSE_REMOVEMAPPING
+  *  - add map_alignment to fuse_init_out, add FUSE_MAP_ALIGNMENT flag
++ *  - add FUSE_HANDLE_KILLPRIV_V2
+  */
+ 
+ #ifndef _LINUX_FUSE_H
+@@ -316,6 +317,11 @@ struct fuse_file_lock {
+  * FUSE_MAP_ALIGNMENT: init_out.map_alignment contains log2(byte alignment) for
+  *		       foffset and moffset fields in struct
+  *		       fuse_setupmapping_out and fuse_removemapping_one.
++ * FUSE_HANDLE_KILLPRIV_V2: fs kills suid/sgid/cap on write/chown/trunc.
++ * 			Upon write/truncate suid/sgid is only killed if caller
++ * 			does not have CAP_FSETID. Additionally upon
++ * 			write/truncate sgid is killed only if file has group
++ * 			execute permission. (Same as Linux VFS behavior).
+  */
+ #define FUSE_ASYNC_READ		(1 << 0)
+ #define FUSE_POSIX_LOCKS	(1 << 1)
+@@ -344,6 +350,7 @@ struct fuse_file_lock {
+ #define FUSE_NO_OPENDIR_SUPPORT (1 << 24)
+ #define FUSE_EXPLICIT_INVAL_DATA (1 << 25)
+ #define FUSE_MAP_ALIGNMENT	(1 << 26)
++#define FUSE_HANDLE_KILLPRIV_V2	(1 << 27)
+ 
+ /**
+  * CUSE INIT request/reply flags
 -- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+2.25.4
 

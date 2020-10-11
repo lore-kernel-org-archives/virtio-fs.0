@@ -1,13 +1,25 @@
-Date: Fri, 9 Oct 2020 14:24:24 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20201009182424.GA44737@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=to:references:from:subject:message-id:date:user-agent:mime-version
+	:in-reply-to:content-transfer-encoding:content-language;
+	bh=LfICx60tWN9QO3x7xn7r1r0cR3v2pmTxeBBxwhX2sK4=;
+	b=MyWYjHorkO0v/taWYoRax8xn6ncHJsXjIeqZmiWAEFXX4YT21LqlDuKdr+162A58lw
+	NsUJe6c0D6TAmvV/0GX6uv781LdH5koNdJXRz+0pe1iMYx7cX3czw89WGJ3bxi9sFvJI
+	mSFUaNCtR/qMesnZT+SLKMxlyZ/frgjym3I84C+KyQYGZrr9st+je/7V4OfoINC7WnZ2
+	iMtdczmS/TjK1+32RDLB4NhgBRNSMs/KsqkeTBp8i7N7SxCAZsDLF7CEH9g95WoltrEJ
+	e//Fo8mol4SEheycOSzGX2o3CEMRvbPlbbNRtbniN/NYIXBJwOJb94ndX3BFvfRaayMU
+	zk1A==
 References: <20200916163553.GA39212@redhat.com>
+	<20201009182424.GA44737@redhat.com>
+From: "Harry G. Coin" <hgcoin@gmail.com>
+Message-ID: <5419d4a1-c689-2e97-08d7-6e32ee3f9fd2@gmail.com>
+Date: Sun, 11 Oct 2020 17:14:13 -0500
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20200916163553.GA39212@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Add support for
- FUSE_HANDLE_KILLPRIV_V2
+In-Reply-To: <20201009182424.GA44737@redhat.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Language: en-US
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] HOWTO: direct kernel 'root=virtiofs:myfs' boot on
+ 'vanilla' Fedora/RHEL/Centos releases.
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,347 +28,307 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>
+To: virtio-fs@redhat.com
 
-On Wed, Sep 16, 2020 at 12:35:53PM -0400, Vivek Goyal wrote:
-> This patch adds basic support for FUSE_HANDLE_KILLPRIV_V2. virtiofsd
-> can enable/disable this by specifying option "-o killpriv_v2/no_killpriv_v2".
-> By default this is enabled as long as client supports it.
-> 
-> I have posted corresponding kernel patches here.
-> 
-> https://www.redhat.com/archives/virtio-fs/2020-September/msg00054.html
+To allow direct kernel booting on a non-customized or 'vanilla distro'
+Fedora / RHEL /Centos system, some extensions to dracut are required. 
+They are below.
 
-I have posted of V3 of kernel patches now. This patch remains unchanged.
+Kindly consider editing the following information and replacing the
+instructions for the 'direct kernel booting' advice on the virtio-fs web
+page.
 
-https://lore.kernel.org/linux-fsdevel/20201009181512.65496-1-vgoyal@redhat.com/T/#m4a6ba7d6bc9defdde0882cf21b89b768ce837663
+These steps allow the only 'kernel args' necessary to be in the same
+pattern used for other root file systems.  For example,
+"root=virtiofs:myfs".
 
-Thanks
-Vivek
+These steps worked for me, feel free to incorporate them as you like.
 
-> 
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  include/standard-headers/linux/fuse.h |  10 ++-
->  tools/virtiofsd/fuse_common.h         |  10 +++
->  tools/virtiofsd/fuse_lowlevel.c       |  10 ++-
->  tools/virtiofsd/fuse_lowlevel.h       |   1 +
->  tools/virtiofsd/passthrough_ll.c      | 116 ++++++++++++++++++++++++--
->  5 files changed, 136 insertions(+), 11 deletions(-)
-> 
-> diff --git a/include/standard-headers/linux/fuse.h b/include/standard-headers/linux/fuse.h
-> index 26e7de1b43..744498bc5a 100644
-> --- a/include/standard-headers/linux/fuse.h
-> +++ b/include/standard-headers/linux/fuse.h
-> @@ -338,6 +338,7 @@ struct fuse_file_lock {
->  #define FUSE_NO_OPENDIR_SUPPORT (1 << 24)
->  #define FUSE_EXPLICIT_INVAL_DATA (1 << 25)
->  #define FUSE_MAP_ALIGNMENT	(1 << 26)
-> +#define FUSE_HANDLE_KILLPRIV_V2	(1 << 27)
->  
->  /**
->   * CUSE INIT request/reply flags
-> @@ -413,6 +414,13 @@ struct fuse_file_lock {
->   */
->  #define FUSE_FSYNC_FDATASYNC	(1 << 0)
->  
-> +/**
-> + * Open flags
-> + * FUSE_OPEN_KILL_PRIV: Kill suid/sgid/security.capability. sgid is cleared
-> + *                      only if file has group execute permission.
-> + */
-> +#define FUSE_OPEN_KILL_PRIV    (1 << 0)
-> +
->  enum fuse_opcode {
->  	FUSE_LOOKUP		= 1,
->  	FUSE_FORGET		= 2,  /* no reply */
-> @@ -579,7 +587,7 @@ struct fuse_setattr_in {
->  
->  struct fuse_open_in {
->  	uint32_t	flags;
-> -	uint32_t	unused;
-> +	uint32_t	open_flags;
->  };
->  
->  struct fuse_create_in {
-> diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
-> index aa7e6ed31a..a8d8217687 100644
-> --- a/tools/virtiofsd/fuse_common.h
-> +++ b/tools/virtiofsd/fuse_common.h
-> @@ -352,6 +352,16 @@ struct fuse_file_info {
->   */
->  #define FUSE_CAP_NO_OPENDIR_SUPPORT (1 << 24)
->  
-> +/**
-> + * Indicates that the filesystem is responsible for unsetting
-> + * setuid and setgid bits when a file is written, truncated, or
-> + * its owner is changed. setuid/setgid is cleared on WRITE/truncate
-> + * only if caller does not have CAP_FSETID. For WRITE requests
-> + * this is communicated through write flag FUSE_WRITE_KILL_PRIV.
-> + *
-> + */
-> +#define FUSE_CAP_HANDLE_KILLPRIV_V2 (1 << 27)
-> +
->  /**
->   * Ioctl flags
->   *
-> diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-> index a34a611a90..90afffd6de 100644
-> --- a/tools/virtiofsd/fuse_lowlevel.c
-> +++ b/tools/virtiofsd/fuse_lowlevel.c
-> @@ -881,7 +881,7 @@ static void do_setattr(fuse_req_t req, fuse_ino_t nodeid,
->                        FUSE_SET_ATTR_GID | FUSE_SET_ATTR_SIZE |
->                        FUSE_SET_ATTR_ATIME | FUSE_SET_ATTR_MTIME |
->                        FUSE_SET_ATTR_ATIME_NOW | FUSE_SET_ATTR_MTIME_NOW |
-> -                      FUSE_SET_ATTR_CTIME;
-> +                      FUSE_SET_ATTR_CTIME | FUSE_SET_ATTR_KILL_PRIV;
->  
->          req->se->op.setattr(req, nodeid, &stbuf, arg->valid, fi);
->      } else {
-> @@ -1118,6 +1118,7 @@ static void do_open(fuse_req_t req, fuse_ino_t nodeid,
->  
->      memset(&fi, 0, sizeof(fi));
->      fi.flags = arg->flags;
-> +    fi.kill_priv = arg->open_flags & FUSE_OPEN_KILL_PRIV;
->  
->      if (req->se->op.open) {
->          req->se->op.open(req, nodeid, &fi);
-> @@ -2081,6 +2082,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
->              bufsize = max_bufsize;
->          }
->      }
-> +    if (arg->flags & FUSE_HANDLE_KILLPRIV_V2) {
-> +        se->conn.capable |= FUSE_CAP_HANDLE_KILLPRIV_V2;
-> +    }
->  #ifdef HAVE_SPLICE
->  #ifdef HAVE_VMSPLICE
->      se->conn.capable |= FUSE_CAP_SPLICE_WRITE | FUSE_CAP_SPLICE_MOVE;
-> @@ -2218,6 +2222,10 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
->          outarg.map_alignment = ffsl(sysconf(_SC_PAGE_SIZE)) - 1;
->      }
->  
-> +    if (se->conn.want & FUSE_CAP_HANDLE_KILLPRIV_V2) {
-> +        outarg.flags |= FUSE_HANDLE_KILLPRIV_V2;
-> +    }
-> +
->      fuse_log(FUSE_LOG_DEBUG, "   INIT: %u.%u\n", outarg.major, outarg.minor);
->      fuse_log(FUSE_LOG_DEBUG, "   flags=0x%08x\n", outarg.flags);
->      fuse_log(FUSE_LOG_DEBUG, "   max_readahead=0x%08x\n", outarg.max_readahead);
-> diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
-> index d488b88882..fdc256b5ce 100644
-> --- a/tools/virtiofsd/fuse_lowlevel.h
-> +++ b/tools/virtiofsd/fuse_lowlevel.h
-> @@ -145,6 +145,7 @@ struct fuse_forget_data {
->  #define FUSE_SET_ATTR_ATIME_NOW (1 << 7)
->  #define FUSE_SET_ATTR_MTIME_NOW (1 << 8)
->  #define FUSE_SET_ATTR_CTIME (1 << 10)
-> +#define FUSE_SET_ATTR_KILL_PRIV (1 << 14)
->  
->  /*
->   * Request methods and replies
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 6514674f04..33f74a1a46 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -170,6 +170,7 @@ struct lo_data {
->  
->      /* An O_PATH file descriptor to /proc/self/fd/ */
->      int proc_self_fd;
-> +    int user_killpriv_v2, killpriv_v2;
->  };
->  
->  static const struct fuse_opt lo_opts[] = {
-> @@ -192,6 +193,8 @@ static const struct fuse_opt lo_opts[] = {
->      { "no_shared", offsetof(struct lo_data, shared), 0 },
->      { "readdirplus", offsetof(struct lo_data, readdirplus_set), 1 },
->      { "no_readdirplus", offsetof(struct lo_data, readdirplus_clear), 1 },
-> +    { "killpriv_v2", offsetof(struct lo_data, user_killpriv_v2), 1 },
-> +    { "no_killpriv_v2", offsetof(struct lo_data, user_killpriv_v2), 0 },
->      FUSE_OPT_END
->  };
->  static bool use_syslog = false;
-> @@ -588,6 +591,30 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
->          fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling readdirplus\n");
->          conn->want &= ~FUSE_CAP_READDIRPLUS;
->      }
-> +
-> +    if (lo->user_killpriv_v2 == 1) {
-> +        /* User explicitly asked for this option. Enable it unconditionally.
-> +         * If connection does not have this capability, it should fail
-> +         * in fuse_lowlevel.c
-> +         */
-> +        fuse_log(FUSE_LOG_DEBUG, "lo_init: enabling killpriv_v2\n");
-> +        conn->want |= FUSE_CAP_HANDLE_KILLPRIV_V2;
-> +	lo->killpriv_v2 = 1;
-> +    } else if (lo->user_killpriv_v2 == -1 &&
-> +               conn->capable & FUSE_CAP_HANDLE_KILLPRIV_V2) {
-> +        /* User did not specify a value for killpriv_v2. By default enable it
-> +         * if connection offers this capability */
-> +        fuse_log(FUSE_LOG_DEBUG, "lo_init: enabling killpriv_v2\n");
-> +        conn->want |= FUSE_CAP_HANDLE_KILLPRIV_V2;
-> +        lo->killpriv_v2 = 1;
-> +    } else {
-> +        /* Either user specified to disable killpriv_v2, or connection does
-> +         * not offer this capability. Disable killpriv_v2 in both the cases
-> +         */
-> +        fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling killpriv_v2\n");
-> +        conn->want &= ~FUSE_CAP_HANDLE_KILLPRIV_V2;
-> +        lo->killpriv_v2 = 0;
-> +    }
->  }
->  
->  static int64_t *version_ptr(struct lo_data *lo, struct lo_inode *inode)
-> @@ -686,6 +713,14 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
->          uid_t uid = (valid & FUSE_SET_ATTR_UID) ? attr->st_uid : (uid_t)-1;
->          gid_t gid = (valid & FUSE_SET_ATTR_GID) ? attr->st_gid : (gid_t)-1;
->  
-> +        /* if fc->killpriv_v2 is set, change of ownership should clear
-> +         * suid/sgid/caps.
-> +         *
-> +         * TODO: On ext4/xfs above works with fchownat() call without
-> +         * doing anything extra. If there are filesystem where this
-> +         * does not work, virtiofsd needs to take care of this.
-> +         */
-> +
->          res = fchownat(ifd, "", uid, gid, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
->          if (res == -1) {
->              goto out_err;
-> @@ -693,7 +728,18 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
->      }
->      if (valid & FUSE_SET_ATTR_SIZE) {
->          int truncfd;
-> -
-> +        bool kill_priv = lo->killpriv_v2 && (valid & FUSE_SET_ATTR_KILL_PRIV);
-> +        bool cap_fsetid_dropped = false;
-> +
-> +        /* if fc->killpriv_v2 is set, change of size should clear caps
-> +         * always. suid should be cleared if FUSE_SETATTR_KILL_PRIV is
-> +         * set. And sgid should be cleared if FUSE_SETATTR_KILL_PRIV is
-> +         * set as well as group execute permission is on.
-> +         *
-> +         * TODO: On ext4/xfs above works with truncate() call without
-> +         * doing anything extra. If there are filesystem where this
-> +         * does not work, virtiofsd needs to take care of this.
-> +         */
->          if (fi) {
->              truncfd = fd;
->          } else {
-> @@ -704,12 +750,26 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
->              }
->          }
->  
-> +        if (kill_priv) {
-> +            res = drop_effective_cap("FSETID", &cap_fsetid_dropped);
-> +            if (res != 0) {
-> +                lo_inode_put(lo, &inode);
-> +                fuse_reply_err(req, res);
-> +            }
-> +        }
->          res = ftruncate(truncfd, attr->st_size);
-> +        saverr = errno;
-> +        if (cap_fsetid_dropped) {
-> +            res = gain_effective_cap("FSETID");
-> +            if(res) {
-> +                fuse_log(FUSE_LOG_ERR, "Failed to gain CAP_FSETID\n");
-> +            }
-> +        }
->          if (!fi) {
-> -            saverr = errno;
->              close(truncfd);
-> -            errno = saverr;
->          }
-> +
-> +        errno = saverr;
->          if (res == -1) {
->              goto out_err;
->          }
-> @@ -1943,20 +2003,45 @@ static void lo_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
->  
->  static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
->  {
-> -    int fd;
-> +    int fd, ret, saverr;
->      ssize_t fh;
->      char buf[64];
->      struct lo_data *lo = lo_data(req);
-> +    bool cap_fsetid_dropped = false;
->  
-> -    fuse_log(FUSE_LOG_DEBUG, "lo_open(ino=%" PRIu64 ", flags=%d)\n", ino,
-> -             fi->flags);
-> +    fuse_log(FUSE_LOG_DEBUG, "lo_open(ino=%" PRIu64 ", flags=%d, kill_priv=%d)"
-> +             "\n", ino, fi->flags, fi->kill_priv);
->  
->      update_open_flags(lo->writeback, fi);
->  
->      sprintf(buf, "%i", lo_fd(req, ino));
-> +
-> +    /*
-> +     * fi->kill_priv is set if file server opted for killpriv_v2 feature
-> +     * and client did open(O_TRUNC) and caller did not have CAP_FSETID.
-> +     * In that case suid/sgid/security.capability needs to be killed
-> +     * according to certain rules. Dropping capability does right thing
-> +     * on ext4/xfs already.
-> +     */
-> +    if (fi->kill_priv) {
-> +        ret = drop_effective_cap("FSETID", &cap_fsetid_dropped);
-> +        if (ret != 0) {
-> +            fuse_reply_err(req, ret);
-> +            return;
-> +        }
-> +    }
-> +
->      fd = openat(lo->proc_self_fd, buf, fi->flags & ~O_NOFOLLOW);
-> +    saverr = errno;
-> +    if (cap_fsetid_dropped) {
-> +        ret = gain_effective_cap("FSETID");
-> +        if (ret) {
-> +            fuse_log(FUSE_LOG_ERR, "Failed to gain CAP_FSETID\n");
-> +        }
-> +    }
-> +
->      if (fd == -1) {
-> -        return (void)fuse_reply_err(req, errno);
-> +        return (void)fuse_reply_err(req, saverr);
->      }
->  
->      pthread_mutex_lock(&lo->mutex);
-> @@ -2091,8 +2176,20 @@ static void lo_write_buf(fuse_req_t req, fuse_ino_t ino,
->      out_buf.buf[0].pos = off;
->  
->      fuse_log(FUSE_LOG_DEBUG,
-> -             "lo_write_buf(ino=%" PRIu64 ", size=%zd, off=%lu)\n", ino,
-> -             out_buf.buf[0].size, (unsigned long)off);
-> +             "lo_write_buf(ino=%" PRIu64 ", size=%zd, off=%lu kill_priv=%d)\n",
-> +             ino, out_buf.buf[0].size, (unsigned long)off, fi->kill_priv);
-> +
-> +    /*
-> +     * If lo->killpriv_v2 is set, then we are supposed to kill caps
-> +     * and also kill suid/sgid if fi->kill_priv is set. Current
-> +     * common filesystem ext4/xfs already drop security.capability
-> +     * on WRITE. So we don't have to do anything special.
-> +     *
-> +     * TODO: If we are running on to of a file system which does not
-> +     * remove caps on WRITE, then we will have to remove it ourselves
-> +     * explicitly. Same is true for removing SUID/SGID if CAP_FSETID
-> +     * is not there.
-> +     */
->  
->      /*
->       * If kill_priv is set, drop CAP_FSETID which should lead to kernel
-> @@ -3210,6 +3307,7 @@ int main(int argc, char *argv[])
->          .writeback = 0,
->          .posix_lock = 1,
->          .proc_self_fd = -1,
-> +        .user_killpriv_v2 = -1,
->      };
->      struct lo_map_elem *root_elem;
->      int ret = -1;
-> -- 
-> 2.25.4
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
+1) Use other guides/resources to create a fedora file system tree in a
+sub-directory on the host.  This was written using Fedora 33 beta.  I
+mention a couple options at the end of this email.
+
+2) Use virtio-fs existing guides/resources to set up a virtual machine
+with the shared memory and other file system xml for virtiofs, with
+virtiofs changes set to point to the above mentioned tree.  Do not start
+the virtual machine.
+
+3) Then, on the host:
+
+FIRST:
+
+cd fedora_root_on_host_system
+mount --bind /proc proc
+mount --bind /sys sys
+mount --bind /dev dev
+mount --bind /dev/pts dev/pts
+mount --bind /run run
+chroot .
+#(later, after the all work below, exit, then umount run, dev/pts, dev,
+sys, proc..)
+#Do the following within the chroot
+dnf upgrade  
+#debug/repeat until that runs without error, so you are confident of a
+minimal working setup.
+#then these changes:
+
+#A)  Changes to allow user and root logins to succeed.  In the
+alternative you can set /etc/selinux/config to permissive.
+
+cat > /root/virtiofs_kernel_boot.te << EOF
+
+module virtiofs_kernel_boot 1.0;
+
+require {
+    type unconfined_t;
+    type unlabeled_t;
+    type kernel_t;
+    type rpm_script_t;
+    class process transition;
+    class file entrypoint;
+}
+
+#============= kernel_t ==============
+allow kernel_t unconfined_t:process transition;
+
+#============= rpm_script_t ==============
+allow rpm_script_t unlabeled_t:file entrypoint;
+
+#============= unconfined_t ==============
+allow unconfined_t unlabeled_t:file entrypoint;
+
+EOF
+
+#then
+cd /root
+checkmodule -M -m -o virtiofs_kernel_boot.mod virtiofs_kernel_boot.te
+#then
+semodule_package -o virtiofs_kernel_boot.pp -m virtiofs_kernel_boot.mod
+#then
+semodule -i virtiofs_kernel_boot.pp
+
+#B) Next step, amend dracut (Patterned after 9p examples):
+
+cat > /etc/dracut.conf.d/addvirtiofs.conf  <<EOF
+add_dracutmodules+=" virtiofs "
+filesystems+=" virtiofs "
+
+EOF
+
+#When the below becomes standard in dracut, the above should
+
+#be the only necessary change per instance. I hope some version of
+
+#the three files below become standard in dracut releases.
+
+cat > /usr/lib/dracut/modules.d/95virtiofs/module-setup.sh  <<EOF
+
+#!/usr/bin/bash
+
+# called by dracut
+check() {
+   [[ $hostonly ]] || [[ $mount_needs ]] && {
+       for fs in "${host_fs_types[@]}"; do
+           [[ "$fs" == "virtiofs" ]] && return 0
+       done
+       return 255
+   }
+
+   is_qemu_virtualized && return 0
+
+   return 255
+}
+
+# called by dracut
+depends() {
+   return 0
+}
+
+# called by dracut
+installkernel() {
+   instmods virtiofs
+}
+
+# called by dracut
+install() {
+   inst_hook cmdline 95 "$moddir/parse-virtiofs.sh"
+   inst_hook pre-mount 99 "$moddir/mount-virtiofs.sh"
+}
+
+EOF
+
+cat > /usr/lib/dracut/modules.d/95virtiofs/parse-virtiofs.sh   <<EOF
+#!/usr/bin/sh
+
+if [ "${root%%:*}" = "virtiofs" ] ; then
+   modprobe virtiofs
+
+   rootok=1
+fi
+
+EOF
+
+cat > /usr/lib/dracut/modules.d/95virtiofs/mount-virtiofs.sh  <<EOF
+#!/usr/bin/sh
+
+type getarg >/dev/null 2>&1 || . /lib/dracut-lib.sh
+
+filter_rootopts() {
+   rootopts=$1
+   # strip ro and rw options
+   local OLDIFS="$IFS"
+   IFS=,
+   set -- $rootopts
+   IFS="$OLDIFS"
+   local v
+   while [ $# -gt 0 ]; do
+       case $1 in
+           rw|ro);;
+           defaults);;
+           *)
+               v="$v,${1}";;
+       esac
+       shift
+   done
+   rootopts=${v#,}
+   echo $rootopts
+}
+
+mount_root() {
+   local _ret
+
+   rootfs="virtiofs"
+   rflags="rw"
+
+   modprobe virtiofs
+
+   mount -t ${rootfs} -o "$rflags",ro "${root#virtiofs:}" "$NEWROOT"
+
+   rootopts=
+   if getargbool 1 rd.fstab -n rd_NO_FSTAB \
+       && ! getarg rootflags \
+       && [ -f "$NEWROOT/etc/fstab" ] \
+       && ! [ -L "$NEWROOT/etc/fstab" ]; then
+       # if $NEWROOT/etc/fstab contains special mount options for
+       # the root filesystem,
+       # remount it with the proper options
+       rootopts="defaults"
+       while read dev mp fs opts rest || [ -n "$dev" ]; do
+           # skip comments
+           [ "${dev%%#*}" != "$dev" ] && continue
+
+           if [ "$mp" = "/" ]; then
+               rootopts=$opts
+               break
+           fi
+       done < "$NEWROOT/etc/fstab"
+
+       rootopts=$(filter_rootopts $rootopts)
+   fi
+
+   # we want rootflags (rflags) to take precedence so prepend rootopts to
+   # them; rflags is guaranteed to not be empty
+   rflags="${rootopts:+${rootopts},}${rflags}"
+
+   umount "$NEWROOT"
+
+   info "Remounting ${root#virtiofs:} with -o ${rflags}"
+   mount -t ${rootfs} -o "$rflags" "${root#virtiofs:}" "$NEWROOT" 2>&1 |
+vinfo
+
+   [ -f "$NEWROOT"/forcefsck ] && rm -f -- "$NEWROOT"/forcefsck 2>/dev/null
+   [ -f "$NEWROOT"/.autofsck ] && rm -f -- "$NEWROOT"/.autofsck 2>/dev/null
+}
+
+if [ -n "$root" -a -z "${root%%virtiofs:*}" ]; then
+   mount_root
+fi
+:
+EOF
+
+
+#Look in /boot in the image, find the file like
+vmlinuz-5.8.14-300.fc33.x86_64
+#Let X be everything after vmlinuz- so in this case 5.8.14-300.fc33.x86_64
+#Give the command
+#dracut --force --kver X
+#or in this case
+dracut --force --kver 5.8.14-300.fc33.x86_64
+
+#That should complete without error.
+exit
+#Don't forget to unmount dev dev/pts proc sys run
+
+In your libvirt setup, Enable 'direct kernel boot'.
+On my host, the vm root image is in /vmsystems/fedora_generic,
+So change the following to fit your case.
+
+Change the kernel path to the then current variation on:
+
+/vmsystems/fedora_generic/boot/vmlinuz-5.8.14-300.fc33.x86_64
+
+Change the Initrd path to the then current variation on:
+
+/vmsystems/fedora_generic/boot/initramfs-5.8.14-300.fc33.x86_64.img
+
+Change the kernel args to be only, or at least to include:
+
+root=virtiofs:myfs
+
+Where 'myfs' matches the 'target dir' setting in the libvirt xml:
+<filesystem type="mount" accessmode="passthrough">
+  <driver type="virtiofs" queue="1024"/>
+...
+  <target dir="myfs"/>
+...
+
+And.... That's it.
+
+You should be able to boot a standard fedora/rhel/centos distro that
+uses yum/dnf/dracut  directly from the underlying file system.  My
+Fedora 33 beta boots reliably with exactly the setup above using a
+direct kernel boot.    The underlying file system on the host is
+btrfs.... and this setup is a complete rocket compared to a .qcow2 or
+raw underlying image.  I think the reason for the speed is all the guest
+VM's rely on just and only the host file system to manage the block
+devices underneath, so you get all the benefits of the caching, the seek
+optimizations, etc.   And it's 'really nice' to be able to sync or shut
+down the vm, take a snapshot on the host (which is 'free' in terms of
+extra space used) then be able to roll back, etc.
+
+To get the initial file system tree I did a default 'iso' install to a
+vm, then mounted the qcow2 file on the host, mounted the partitions in a
+tree in tmp, then did an rsync -a to the host systems 'fedora_generic'
+tree.  There are variations on
+
+dnf -y --releasever=33 --installroot=/vmsystems/fedora_generic install
+fedora-release systemd passwd rootfiles sudo dracut dracut-network
+nfs-utils vim-minimal dnf
+detailed at
+https://fedoramagazine.org/how-to-build-a-netboot-server-part-1/ for a
+more 'hands on' methods
+
+In the 'would be nice' category:   I wish in the guest filesystem tree
+there was a link named 'vmlinuz' and 'initrd.img' that pointed to the
+latest installed kernel, so I wouldn't have to update where the host
+looks for the boot info in the guest.
+
+In the 'questions I have' department, I'd like the virtio-fs folks to
+determine what the default flags should be for the generic kernel,
+specifically whether there is a test for whether dax is available and to
+use it by default if it is, etc.
+
+Perhaps others might suggest tweaking the above files then asking dracut
+maintainers to include the /usr/lib/dracut... items as standard .
+
+Best to all
+
+Harry Coin
+
+Bettendorf, Iowa
+
+
+
+
+
 

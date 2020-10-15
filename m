@@ -1,13 +1,25 @@
-Message-ID: <df388727036a6ad85d5ad23f44da5420dda49b4d.camel@lca.pw>
-From: Qian Cai <cai@lca.pw>
-Date: Thu, 15 Oct 2020 09:18:36 -0400
-In-Reply-To: <20201013184026.GC142988@redhat.com>
-References: <7d350903c2aa8f318f8441eaffafe10b7796d17b.camel@redhat.com>
-	<20201013184026.GC142988@redhat.com>
-Content-Type: text/plain; charset="UTF-8"
-Mime-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] Unbreakable loop in fuse_fill_write_pages()
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=to:references:from:subject:message-id:date:user-agent:mime-version
+	:in-reply-to:content-transfer-encoding:content-language;
+	bh=NZ9jFMhZgyNB/uNJMB/ss75VZUSyirXEHwwlWjteg5M=;
+	b=EtI+PfgXepYMOPpyHZ2IdQk/GH6CBBwr77lvftQStN8hdMPoFixq+/MTVMGDEK8uHC
+	lVL9/ki9xSXdR5TKZZcjRglZomkx/RN1haASyV0EWSAQ+NJl08sVpGgls81ipm5jJrjF
+	3KThb0AYR1+nno3yZf7l2Tp5w+fNHVEP/h4mvjo32lWPWZPUXZEc/WS6+llX8mwE8w3b
+	lrnJmaCSKFtVbL6U38qljA3+sRmuFGSKF8X+Xay0Jk+ozgjqQXb0350q2B+n/4mg+SkM
+	jAfhgfWpviXoy4TWePo8WK2CkkXF25QDrn3+h6mTC/DZK4r71ohn8U9uff/jJ3KV0n1q
+	e/gw==
+References: <20201014180209.49299-1-dgilbert@redhat.com>
+	<20201014180209.49299-4-dgilbert@redhat.com>
+From: "Harry G. Coin" <hgcoin@gmail.com>
+Message-ID: <bd3c072f-dc6c-23a8-cd48-543bafa46363@gmail.com>
+Date: Thu, 15 Oct 2020 18:57:09 -0500
+MIME-Version: 1.0
+In-Reply-To: <20201014180209.49299-4-dgilbert@redhat.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Language: en-US
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] Puzzle about rootflags,
+	restorecon "operation not supported"
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,42 +28,26 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, Alexander Viro <viro@zeniv.linux.org.uk>, linux-kernel@vger.kernel.org
+To: virtio-fs@redhat.com
 
-On Tue, 2020-10-13 at 14:40 -0400, Vivek Goyal wrote:
-> > == the thread is stuck in the loop ==
-> > [10813.290694] task:trinity-c33     state:D stack:25888 pid:254219 ppid:
-> > 87180
-> > flags:0x00004004
-> > [10813.292671] Call Trace:
-> > [10813.293379]  __schedule+0x71d/0x1b50
-> > [10813.294182]  ? __sched_text_start+0x8/0x8
-> > [10813.295146]  ? mark_held_locks+0xb0/0x110
-> > [10813.296117]  schedule+0xbf/0x270
-> > [10813.296782]  ? __lock_page_killable+0x276/0x830
-> > [10813.297867]  io_schedule+0x17/0x60
-> > [10813.298772]  __lock_page_killable+0x33b/0x830
-> 
-> This seems to suggest that filemap_fault() is blocked on page lock and
-> is sleeping. For some reason it never wakes up. Not sure why.
-> 
-> And this will be called from.
-> 
-> fuse_fill_write_pages()
->    iov_iter_fault_in_readable()
-> 
-> So fuse code will take inode_lock() and then looks like same process
-> is sleeping waiting on page lock. And rest of the processes get blocked
-> behind inode lock.
-> 
-> If we are woken up (while waiting on page lock), we should make forward
-> progress. Question is what page it is and why the entity which is
-> holding lock is not releasing lock.
+The 'mainline generic' version of the latest kernel fails to parse
+'fuse' virtiofs options on root kernel boots.  Not only dax, but all the
+'fuse' usual ones as well.  (None of
+default_permissions,allow_other,user_id=0 etc are accepted).
 
-FYI, it was mentioned that this is likely a deadlock in FUSE:
+Is that what you expected of the mainline kernel?  I learned of this
+when trying to understand this further problem:
 
-https://lore.kernel.org/linux-fsdevel/CAHk-=wh9Eu-gNHzqgfvUAAiO=vJ+pWnzxkv+tX55xhGPFy+cOw@mail.gmail.com/
+SELinux's 'restorecon' and other attempts to change security attributes
+then fails with "operation not supported".
+
+I could only get sshd able to accept connections by changing SELinux to
+permissive.  The commands necessary to change the security attributes
+failed with the 'operation not supported' issue.
+
+Ideas?
+
+
 
 
 

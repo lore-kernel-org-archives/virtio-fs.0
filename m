@@ -1,28 +1,16 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
-	h=to:cc:references:from:subject:message-id:date:user-agent
-	:mime-version:in-reply-to:content-transfer-encoding:content-language;
-	bh=1lORAc+gbFR4CxZkOisjqLZ7mkl4N+qv7fkBns3RD2M=;
-	b=kl9PioNPX6WenoWDqU3p+R2JOQAQHDtE/npCxHYVogGmlQtzIK80IaGN63QtIjmghj
-	a3/UHAPYyWHSOi/IJQzstE2Aiwhau4RGWEdSMwluKSEmcb924hhZSU2ixwPViyg/qZ03
-	LmiMYnV5WfEoox++INGlMv5kUn0FuAny23CwTyNEfwsqQhVo4b50xuKEiYMVWw/0kisG
-	oq7JxQjU/Rh5oG/A/AAk3K1eDXmtqc1lL4m2Nssy/SBgT9nmtpgIHmn1+T5zeARjnZlT
-	XbNAszh5pYSIezs4lw66WxxtmeniWFUw4DCXIUCwlagHsNSK1o12FWjOcZl05+SwSEPo
-	aKHw==
+Date: Tue, 20 Oct 2020 16:34:43 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20201020153443.GD2962@work-vm>
 References: <20201014180209.49299-1-dgilbert@redhat.com>
-	<20201014180209.49299-4-dgilbert@redhat.com>
-	<bd3c072f-dc6c-23a8-cd48-543bafa46363@gmail.com>
-	<20201020095401.GD140014@stefanha-x1.localdomain>
-	<CAOssrKfbOF7UgkWDZ6t8mmPLt8Vr+4aPpMFpZvV_bYznThZPZg@mail.gmail.com>
-From: "Harry G. Coin" <hgcoin@gmail.com>
-Message-ID: <273c2f8c-e607-ca37-3042-f2a5a2586dca@gmail.com>
-Date: Tue, 20 Oct 2020 09:55:29 -0500
+	<20201014180209.49299-5-dgilbert@redhat.com>
+	<20201020144041.GC380917@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <CAOssrKfbOF7UgkWDZ6t8mmPLt8Vr+4aPpMFpZvV_bYznThZPZg@mail.gmail.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Language: en-US
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20201020144041.GC380917@redhat.com>
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] Puzzle about rootflags,
- restorecon "operation not supported"
+Subject: Re: [Virtio-fs] [PATCH v3 4/5] tools/virtiofsd: xattr name mapping
+	examples
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,90 +19,153 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <mszeredi@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: dinechin@redhat.com, virtio-fs@redhat.com, qemu-devel@nongnu.org
 
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> On Wed, Oct 14, 2020 at 07:02:08PM +0100, Dr. David Alan Gilbert (git) wrote:
+> > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+> > 
+> > Add a few examples of xattrmaps to the documentation.
+> > 
+> > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> > ---
+> >  docs/tools/virtiofsd.rst | 50 ++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 50 insertions(+)
+> > 
+> > diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
+> > index a3a120da2f..5cb64612ed 100644
+> > --- a/docs/tools/virtiofsd.rst
+> > +++ b/docs/tools/virtiofsd.rst
+> > @@ -163,6 +163,56 @@ in which case a 'server' rule will always match on all names from
+> >  the server.
+> >  
+> >  
+> > +xattr-mapping Examples
+> > +----------------------
+> > +
+> > +1) Prefix all attributes with 'user.virtiofs.'
+> > +
+> > +::
+> > +
+> > +-o xattrmap=":prefix:all::user.virtiofs.::bad:all:::"
+> > +
+> 
+> Staring at rule.
+> 
+> ":bad:all:::"
+> 
+> and trying to map this to ":type:scope:key:prepend:"
+> 
+> type==bad
+> scope==all
+> key==""
+> prepend==""
 
-On 10/20/20 7:57 AM, Miklos Szeredi wrote:
-> On Tue, Oct 20, 2020 at 11:54 AM Stefan Hajnoczi <stefanha@redhat.com> wrote:
->> On Thu, Oct 15, 2020 at 06:57:09PM -0500, Harry G. Coin wrote:
->>> The 'mainline generic' version of the latest kernel fails to parse
->>> 'fuse' virtiofs options on root kernel boots.  Not only dax, but all the
->>> 'fuse' usual ones as well.  (None of
->>> default_permissions,allow_other,user_id=0 etc are accepted).
->>>
->>> Is that what you expected of the mainline kernel?  I learned of this
->>> when trying to understand this further problem:
->>>
->>> SELinux's 'restorecon' and other attempts to change security attributes
->>> then fails with "operation not supported".
->>>
->>> I could only get sshd able to accept connections by changing SELinux to
->>> permissive.  The commands necessary to change the security attributes
->>> failed with the 'operation not supported' issue.
->>>
->>> Ideas?
->> Hi Harry,
->> FUSE mount options were removed from virtiofs at one point. I think this
->> is expected. The reason is because the options you listed are the
->> default for virtiofs and don't need to be specified explicitly.
->>
->> I have CCed Miklos in case things have changed or I missed something.
-> Removing the fuse mount options is expected.  Removing the selinux
-> option is probably a bug.
->
-> With the DAX patches the option parsing was restored.  Was the selinux
-> option parsing also restored?
+Correct.
 
-I suggest a small effort at these user-facing doc updates would help
-adoption.  A lot.
+> > +
+> > +This uses two rules, using : as the field separator;
+> > +the first rule prefixes and strips 'user.virtiofs.',
+> > +the second rule hides any non-prefixed attributes that
+> > +the host set.
+> 
+> What is non-prefixed xattr in this context. If client sends
+> "security.selinux", is prefixed or non-prefixed.
 
-What would help the most on the gitlab web page is: a roster of all
-guest side mount options, with notes as to deprecated and no longer
-implemented options, and notes if an option requires a particular
-host-side xml or qemu or virtiofsd setting, and notes if guest kernel
-option is not available at kernel boot time.  If there's an 'selinux
-option' somewhere to be found I at least missed it on the official
-virtiofs doc page.
+Note that anything originating at the client (i.e. starting with "")
+will get caught by the first rule and be prefixed with 'user.virtiofs.'
+This second rule will only be triggered by an xattr name coming
+from the server (i.e a listxattr) for a name that doesn't begin
+with user.virtiofs. (i.e. didn't match the 1st rule for a server xattr).
+This makes sure that only guest created xattr's (that were set and
+had a prefix added) are then visible to the guest.
 
-The kernel.org 'filesystems latest' virtiofs doc is dated 2019. It
-contains "virtiofs supports general VFS mount options, for example,
-remount, ro, rw, context, etc. It also supports FUSE mount options." 
-Which appears to be out of date (file systems using those options fail
-to mount/boot).
+> Documentation in first patch said.
+> 
+> +- 'bad' - If a client tries to use this name it's
+> +  denied using EPERM; when the server passes an attribute
+> +  name matching it's hidden.
+> 
+> I am not sure which xattr name will be blocked if key=="" and prepend==""
 
-The libvirt page discusses host setup xml, but doesn't include much of 
-the option suite virtiofsd's manpage offers.
+All of them; they're still matched at the beginning; as the first
+patch says 'It maybe empty in which case a 'client' rule will always
+match on client names'
 
-Both kernel.org and libvirt reference the gitlab page, nowhere in which
-do I find references to fedora past v 29 (now up to 33...). 
+> > +2) Prefix 'trusted.' attributes, allow others through
+> > +
+> > +::
+> > +
+> > +   "/prefix/all/trusted./user.virtiofs./
+> > +    /bad/server//trusted./
+> > +    /bad/client/user.virtiofs.//
+> > +    /ok/all///"
+> > +
+> > +
+> > +Here there are four rules, using / as the field
+> > +separator, and also demonstrating that new lines can
+> > +be included between rules.
+> > +The first rule is the prefixing of 'trusted.' and
+> > +stripping of 'user.virtiofs.'.
+> 
+> So this is bidrectional rule, right. For setxattr(), "trusted."
+> will be replaced with "user.virtiofs" and for listxattr(),
+> server will replace user.virtiofs with trusted. ?
 
-I suggest the 'standalone virtio-fs' page include a link to two
-different known-good kernel '.config' files.  One  that when compiled
-will deliver the virtio-fs features built into the kernel that supports
-booting without an initrd, and another that enables as modules the
-necessary for initrd or non-virtiofsd-as-root use.  Earlier I offered
-the updates to dracut necessary to create an initrd using the kernel
-command grammar other packages use, but those should by default support
-SELinux , so the default flags need updating.
+prefixed not replaced; so it'll turn "trusted." into
+"user.virtiofs.trusted." and strip it back off for listxattr.
 
-Thanks for the focus and your work on this!
+> > +The second rule hides unprefixed 'trusted.' attributes
+> > +on the host.
+> 
+> If host has "trusted.*", we are not hiding it and as per first
+> rule we are converting it to "user.virtiofs.trusted.*", right?
+> So why this second rule is needed.
 
-Harry Coin
+No, the first rule will only prefix strings provided by the guest
+and strip strings provided by the server. This rule hides
+existing server 'trusted.' xattrs - so if the guest sets
+trusted.foo it's not confused by also seeing a server trusted.foo
 
+> > +The third rule stops a guest from explicitly setting
+> > +the 'user.viritofs.' path directly.
+> > +Finally, the fourth rule lets all remaining attributes
+> > +through.
+> 
+> So If I don't specify third rule, and client does
+> setxattr(user.virtiofs.*), it will simply be a passthrough?
 
+Right; and that's dangerous, because a non-privileged guest
+process can set a user. xattr; so a non-priv guest process could
+set user.virtiofs.trusted.foo and then it would get read back
+and be used as trusted.foo that has an impact on priviliged processes.
 
+Dave
 
-
-
-
-
-
->
-> Thanks,
-> Miklos
->
->
->> Stefan
-
+> Thanks
+> Vivek
+> 
+> > +
+> > +3) Hide 'security.' attributes, and allow everything else
+> > +
+> > +::
+> > +
+> > +    "/bad/all/security./security./
+> > +     /ok/all///'
+> > +
+> > +The first rule combines what could be separate client and server
+> > +rules into a single 'all' rule, matching 'security.' in either
+> > +client arguments or lists returned from the host.  This stops
+> > +the client seeing any 'security.' attributes on the server and
+> > +stops it setting any.
+> > +
+> >  Examples
+> >  --------
+> >  
+> > -- 
+> > 2.28.0
+> > 
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

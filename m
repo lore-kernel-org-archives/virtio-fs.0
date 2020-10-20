@@ -1,15 +1,16 @@
-Date: Tue, 20 Oct 2020 10:52:37 +0100
+Date: Tue, 20 Oct 2020 10:54:01 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20201020095237.GC140014@stefanha-x1.localdomain>
+Message-ID: <20201020095401.GD140014@stefanha-x1.localdomain>
 References: <20201014180209.49299-1-dgilbert@redhat.com>
 	<20201014180209.49299-4-dgilbert@redhat.com>
+	<bd3c072f-dc6c-23a8-cd48-543bafa46363@gmail.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="zCKi3GIZzVBPywwA"
+	protocol="application/pgp-signature"; boundary="ylS2wUBXLOxYXZFQ"
 Content-Disposition: inline
-In-Reply-To: <20201014180209.49299-4-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 3/5] tools/virtiofsd: xattr name
- mappings: Map server xattr names
+In-Reply-To: <bd3c072f-dc6c-23a8-cd48-543bafa46363@gmail.com>
+Subject: Re: [Virtio-fs] Puzzle about rootflags,
+ restorecon "operation not supported"
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,43 +19,56 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: dinechin@redhat.com, virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
+To: "Harry G. Coin" <hgcoin@gmail.com>
+Cc: virtio-fs@redhat.com
 
 
---zCKi3GIZzVBPywwA
-Content-Type: text/plain; charset=us-ascii
+--ylS2wUBXLOxYXZFQ
+Content-Type: text/plain; charset=iso-8859-1
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Wed, Oct 14, 2020 at 07:02:07PM +0100, Dr. David Alan Gilbert (git) wrot=
-e:
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+On Thu, Oct 15, 2020 at 06:57:09PM -0500, Harry G. Coin wrote:
+> The 'mainline generic' version of the latest kernel fails to parse
+> 'fuse' virtiofs options on root kernel boots.=A0 Not only dax, but all the
+> 'fuse' usual ones as well.=A0 (None of
+> default_permissions,allow_other,user_id=3D0 etc are accepted).
 >=20
-> Map xattr names coming from the server, i.e. the host filesystem;
-> currently this is only from listxattr.
+> Is that what you expected of the mainline kernel?=A0 I learned of this
+> when trying to understand this further problem:
 >=20
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> ---
->  tools/virtiofsd/passthrough_ll.c | 89 ++++++++++++++++++++++++++++++++
->  1 file changed, 89 insertions(+)
+> SELinux's 'restorecon' and other attempts to change security attributes
+> then fails with "operation not supported".
+>=20
+> I could only get sshd able to accept connections by changing SELinux to
+> permissive.=A0 The commands necessary to change the security attributes
+> failed with the 'operation not supported' issue.
+>=20
+> Ideas?
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+Hi Harry,
+FUSE mount options were removed from virtiofs at one point. I think this
+is expected. The reason is because the options you listed are the
+default for virtiofs and don't need to be specified explicitly.
 
---zCKi3GIZzVBPywwA
+I have CCed Miklos in case things have changed or I missed something.
+
+Stefan
+
+--ylS2wUBXLOxYXZFQ
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl+Os2UACgkQnKSrs4Gr
-c8harwf/QbnDmhsN2ddgSULa0eG4vqrBqKHj7Fqj4d+cf4NGQ8Ff/2jC30T6DgcE
-ilC/kF/f2xp0PgXxRXro3A6pcYVcoqYpnpmyxeatVfSK0j7IPim/R7hBr27wATdF
-0xa2qlPHoxS23e3+BK0M/Mb48jerBHf4lAaun58J4EkxN5GsLw7uI8ySWOKTIQKC
-5sQ3zKXadQ0DvEjfZCd1OYaVyTISO7RPoB/bDsGDP6j1CWdbPer717jiv6JwfU6z
-hCWD5ord9vyyY1Y6Pg8FoWE+uUJtgCRxoTmLKS0E79eu5DNcVfUHWCPRaND5Hrhc
-LiWwR0exq+RsuBB8P1C4+tbrOUY8VA==
-=Szjr
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl+Os7kACgkQnKSrs4Gr
+c8iMOQf7BfolfITnXeBLwogYzS68qGmdSQvG9OhVjHJC1O/NhYLYXjULwNJa9YKu
+bw5a1IRS/myFq6WxF4sgYbEb7DtCcZU0Fzx1XHgWkUaTRb6qkbVLE0xYDEYtvSep
+idazEqVm6rFqFZehgXCnXCGngM7ezXvfHYXum83fmna3+Rk0/U7Qt6wMtG0A7Mgl
+plSUgea3oPCgX5ZsvzyNxpM8kQkb9nJI0Ed8/Mua/oO1sHCOZL+s/X0opJKymcH2
+8fHN9TxndCy2jQ64leza7zPnyP5WoFtJZwM2oDv7yFxDfXIzB/Y0xxpcv1z6Zlko
+Mt6mjsFEwSu97hlrXNhA7cgj/mqmtA==
+=FIGN
 -----END PGP SIGNATURE-----
 
---zCKi3GIZzVBPywwA--
+--ylS2wUBXLOxYXZFQ--
 

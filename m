@@ -1,15 +1,15 @@
-Date: Tue, 20 Oct 2020 10:56:48 +0100
+Date: Tue, 20 Oct 2020 11:09:22 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20201020095648.GE140014@stefanha-x1.localdomain>
+Message-ID: <20201020100922.GF140014@stefanha-x1.localdomain>
 References: <20201014180209.49299-1-dgilbert@redhat.com>
-	<20201014180209.49299-5-dgilbert@redhat.com>
+	<20201014180209.49299-6-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="BQPnanjtCNWHyqYD"
+	protocol="application/pgp-signature"; boundary="lIrNkN/7tmsD/ALM"
 Content-Disposition: inline
-In-Reply-To: <20201014180209.49299-5-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 4/5] tools/virtiofsd: xattr name mapping
-	examples
+In-Reply-To: <20201014180209.49299-6-dgilbert@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v3 5/5] tools/virtiofsd: xattr name
+	mappings: Simple 'map'
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,38 +22,49 @@ To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
 Cc: dinechin@redhat.com, virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
 
 
---BQPnanjtCNWHyqYD
+--lIrNkN/7tmsD/ALM
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
 
-On Wed, Oct 14, 2020 at 07:02:08PM +0100, Dr. David Alan Gilbert (git) wrot=
-e:
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
->=20
-> Add a few examples of xattrmaps to the documentation.
->=20
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> ---
->  docs/tools/virtiofsd.rst | 50 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 50 insertions(+)
+On Wed, Oct 14, 2020 at 07:02:09PM +0100, Dr. David Alan Gilbert (git) wrote:
+> +static XattrMapEntry *parse_xattrmap_map(const char *rule,
+> +                                         XattrMapEntry *map,
+> +                                         size_t *nentries)
+> +{
+> +    char sep = *rule++;
+> +    const char *tmp;
+> +    char *key;
+> +    char *prefix;
+> +    XattrMapEntry tmp_entry;
+> +
+> +    /* At start of 'key' field */
+> +    tmp = strchr(rule, sep);
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+Missing sep == '\0' check. The strchr(3) man page says:
 
---BQPnanjtCNWHyqYD
+  The terminating null byte is considered part of the string, so that if
+  c is specified as '\0', these functions return a pointer to the
+  terminator.
+
+So the code in this patch will eventually access beyond the end of the
+string:
+
+  rule = tmp + 1; <-- tmp is already at the NUL terminator
+
+--lIrNkN/7tmsD/ALM
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl+OtGAACgkQnKSrs4Gr
-c8htDwf/YGHHmPe3DtThJiExnFnADbQqRo9XIjltlLuqGklmBHNuccQQpBJyGTPc
-UIDEeRoARRRDkNP4n2+blbUQ8EhBdZcG8GdUhVWJVKrvHUbazAKK6IzSgCi//Je0
-Otcg4jVMkicZPawUDLQmTOYZEwyAob06Ie0nN43CS8kLD9zAxptZeq2XssSh36Zj
-vDqDdNqrmrTTHUu5jP1m0IgeUYhml9hi2Zc5UowTup5nUi3J22V/LO6rsegPfTmk
-3/qqad6wChpduKY2nfAClOMEZZ+9JuOTV055dku44T3dZ2B/jXqUYsPJzP0IKiOM
-qbd7jd7BWeb0NZuXrDX8k307rRl7ig==
-=k8kN
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl+Ot1EACgkQnKSrs4Gr
+c8joDwf+LjvGfFhjtzgTWfk0XXiPUPH2CZKehHLqMydxgUVhtEwSASvy/0VE8DQV
+f4qGlYyDmMwMKrOBytazuHu4bc9mdSdB0NuG24gaDLB/vajiX8gbXfSchTV5rXGz
+QDnjZbYLqB9b7KbrYWVpDKhYXtqq035xQY1zdjAvAl1aRy1AlCk+yc2M8KRpnkzE
+EOGEMBjRoX9dmo54WhZi93VTsJhIb7j/kRAhISrEjDjXHcXE2QtANswX9tnjWQmn
+mNsorHNQ71MVe00iLNWsaOLcTdkmFBU93SwSol5exXbOK1cFwcqNE8y/XAJVQFWE
+1okVx/sV9Y8LdtelwivbdM2MHlv80Q==
+=vlQF
 -----END PGP SIGNATURE-----
 
---BQPnanjtCNWHyqYD--
+--lIrNkN/7tmsD/ALM--
 

@@ -1,18 +1,15 @@
-Date: Wed, 21 Oct 2020 09:44:08 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20201021134408.GA442437@redhat.com>
+Date: Wed, 21 Oct 2020 18:13:50 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20201021171350.GA3720@work-vm>
 References: <20201014180209.49299-1-dgilbert@redhat.com>
-	<20201014180209.49299-5-dgilbert@redhat.com>
-	<20201020144041.GC380917@redhat.com>
-	<20201020153443.GD2962@work-vm>
-	<20201020175600.GE380917@redhat.com>
-	<20201020190237.GG2962@work-vm>
+	<20201014180209.49299-2-dgilbert@redhat.com>
+	<20201020090755.GA140014@stefanha-x1.localdomain>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20201020190237.GG2962@work-vm>
-Subject: Re: [Virtio-fs] [PATCH v3 4/5] tools/virtiofsd: xattr name mapping
-	examples
+In-Reply-To: <20201020090755.GA140014@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH v3 1/5] tools/virtiofsd: xattr name
+	mappings: Add option
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,119 +18,248 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: dinechin@redhat.com, virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: dinechin@redhat.com, virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
 
-On Tue, Oct 20, 2020 at 08:02:37PM +0100, Dr. David Alan Gilbert wrote:
-
-[..]
-> > > > > +2) Prefix 'trusted.' attributes, allow others through
-> > > > > +
-> > > > > +::
-> > > > > +
-> > > > > +   "/prefix/all/trusted./user.virtiofs./
-> > > > > +    /bad/server//trusted./
-> > > > > +    /bad/client/user.virtiofs.//
-> > > > > +    /ok/all///"
-> > > > > +
-> > > > > +
-> > > > > +Here there are four rules, using / as the field
-> > > > > +separator, and also demonstrating that new lines can
-> > > > > +be included between rules.
-> > > > > +The first rule is the prefixing of 'trusted.' and
-> > > > > +stripping of 'user.virtiofs.'.
-> > > > 
-> > > > So this is bidrectional rule, right. For setxattr(), "trusted."
-> > > > will be replaced with "user.virtiofs" and for listxattr(),
-> > > > server will replace user.virtiofs with trusted. ?
-> > > 
-> > > prefixed not replaced; so it'll turn "trusted." into
-> > > "user.virtiofs.trusted." and strip it back off for listxattr.
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> On Wed, Oct 14, 2020 at 07:02:05PM +0100, Dr. David Alan Gilbert (git) wrote:
+> > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 > > 
-> > Ok. Got it. I am wondering how will I specify these rules so that
-> > they work in nested configuration. Say I have L0 host, L1 guest and
-> > L2 guest. Say virtiofsd0 is running on L0 and virtiofsd1 is running
-> > on L1. 
+> > Add an option to define mappings of xattr names so that
+> > the client and server filesystems see different views.
+> > This can be used to have different SELinux mappings as
+> > seen by the guest, to run the virtiofsd with less privileges
+> > (e.g. in a case where it can't set trusted/system/security
+> > xattrs but you want the guest to be able to), or to isolate
+> > multiple users of the same name; e.g. trusted attributes
+> > used by stacking overlayfs.
 > > 
-> > I am wondering how will I specify the rules on virtiofsd0 and virtiofsd1
-> > so that it works. Will it be same or rules are level dependent.
+> > A mapping engine is used wit 3 simple rules; the rules can
 > 
-> I'm hoping it'll be the same, see below.
+> s/wit/with/
+
+Done.
+
+> > +``:type:scope:key:prepend:``
+> > +
+> > +**type** is one of:
+> > +
+> > +- 'prefix' - If 'key' matches the client then the 'prepend'
+> > +  is added before the name is passed to the server.
+> > +  For a server case, the prepend is tested and stripped
+> > +  if matching.
 > 
-> > > 
-> > > > > +The second rule hides unprefixed 'trusted.' attributes
-> > > > > +on the host.
-> > > > 
-> > > > If host has "trusted.*", we are not hiding it and as per first
-> > > > rule we are converting it to "user.virtiofs.trusted.*", right?
-> > > > So why this second rule is needed.
-> > > 
-> > > No, the first rule will only prefix strings provided by the guest
-> > > and strip strings provided by the server. This rule hides
-> > > existing server 'trusted.' xattrs - so if the guest sets
-> > > trusted.foo it's not confused by also seeing a server trusted.foo
-> > > 
-> > > > > +The third rule stops a guest from explicitly setting
-> > > > > +the 'user.viritofs.' path directly.
-> > > > > +Finally, the fourth rule lets all remaining attributes
-> > > > > +through.
-> > > > 
-> > > > So If I don't specify third rule, and client does
-> > > > setxattr(user.virtiofs.*), it will simply be a passthrough?
-> > > 
-> > > Right; and that's dangerous, because a non-privileged guest
-> > > process can set a user. xattr; so a non-priv guest process could
-> > > set user.virtiofs.trusted.foo and then it would get read back
-> > > and be used as trusted.foo that has an impact on priviliged processes.
-> > 
-> > Right. We don't want unpriviliged process to be able to setup
-> > user.virtiofs.trusted.*. But that's what precisely happen in
-> > a nested configuration.
-> > 
-> > In above example, L2 will set trusted.foo, virtiofsd1 wil convert it
-> > to user.virtiofs.trusted.foo and virtiofsd0 will reject it, breaking
-> > the nested virtiofs.
+> It may be clearer to document rule types like this:
 > 
-> So to allow nesting you need to nest the user.virtiofs. as well, not
-> just the trusted. So either you do an all, or if you want to be more
-> selective then I think the following would work:
+>   - :prefix:client:key:prepend: - Add 'prepend' before the name if it
+>                                   starts with 'key'.
 > 
->  1  /prefix/client/trusted./user.virtiofs./
->  2  /prefix/client/user.virtiofs./user.virtiofs./
-
-Ok, so basically instead of blocking user.virtiofs.trusted. from client,
-prefix it with "user.virtiofs." one more time. IOW, allow client to
-set user.virtiofs.trusted. because it will get back user.virtiofs.trusted.
-and not "trusted." which is ok. Now client user space can't fool client
-kernel with setting arbitrary user.virtiofs.trusted xattrs.
-
-And if client kernel sends, trusted., it will get back trusted.
-
-Only thing which can happen is that client1 sets user.virtiofs.trusted.
-and nested client2 will get it as trusted. So client1 user space can
-fool nested client's kernel. But given client1 has launched nested
-client2, we should be able to trust some user on client1 and make
-sure other users can't see this shared dir and this probably is
-not an issue.
-
->  3  /prefix/server//user.virtiofs./
->  4  /bad/server//trusted./
->  5  /ok/all///
+>   - :prefix:server::prepend: - Strip 'prepend' if the name starts with
+>                                it.
 > 
-> 1 causes any getattr/setattr to convert 'trusted.'
->                                    to   'user.virtiofs.trusted.'
-> 2 causes any getattr/setattr to convert 'user.virtiofs.'
->                                    to   'user.virtiofs.user.virtiofs.'
-> 3 causes any listattr to lose a layer of user.virtiofs.
-> 4 blocks any trusted. from the layer beneath
-> 5 lets anything else through
+> The client vs server behavior is independent so it's clearer to list
+> them as separate cases. In addition, using the full rule syntax shows
+> which fields are valid arguments and which ones are ignored.
 > 
-> (I'm trying to convince myself if we need a
-> /bad/server//user.virtiofs.trusted.  to stop the previous level being
-> visible).
+> The 'all' scope can be documented later as "Combines both the 'client'
+> and 'server' scope behavior".
 
-user.virtiofs.trusted on server will be converted to trusted., right?
-Can't block it otherwise L1 client breaks, isn't it?
+OK, I've reworked this quite a bit, into a simpler part for each of the
+type entries with examples of each below.
 
-Vivek
+> > +
+> > +- 'ok' - The attribute name is OK and passed through to
+> > +  the server unchanged.
+> 
+> The documentation isn't explicit but I think the default behavior is to
+> allow all xattr names?
+> 
+> What is the purpose of the 'ok' rule? I guess it's to define an
+> exception to a later 'prefix' or 'bad' rule. It would be nice to make
+> this clear.
+> 
+> The documentation only mentions :client: behavior, leaving :server:
+> undefined. Please indicate whether this rule has an effect in server
+> scope.
+
+What I have now is:
++**scope** is:
++
++- 'client' - match 'key' against a xattr name from the client for
++             setxattr/getxattr/removexattr
++- 'server' - match 'prepend' against a xattr name from the server
++             for listxattr
++- 'all' - can be used to make a single rule where both the server
++          and client matches are triggered.
++
++**type** is one of:
++
++- 'prefix' - is designed to prepend and strip a prefix;  the modified
++  attributes then being passed on to the client/server.
++
++- 'ok' - Causes the rule set to be terminated when a match is found
++  while allowing matching xattr's through unchanged.
++  It is intended both as a way of explicitly terminating
++  the list of rules, and to allow some xattr's to skip following rules.
++
++- 'bad' - If a client tries to use a name matching 'key' it's
++  denied using EPERM; when the server passes an attribute
++  name matching 'prepend' it's hidden.  In many ways it's use is very like
++  'ok' as either an explict terminator or for special handling of certain
++  patterns.
++
++**key** is a string tested as a prefix on an attribute name originating
++on the client.  It maybe empty in which case a 'client' rule
++will always match on client names.
++
++**prepend** is a string tested as a prefix on an attribute name originating
++on the server, and used as a new prefix.  It may be empty
++in which case a 'server' rule will always match on all names from
++the server.
++
++e.g.:
++
++  ``:prefix:client:trusted.:user.virtiofs.:``
++
++  will match 'trusted.' attributes in client calls and prefix them before
++  passing them to the server.
++
++  ``:prefix:server::user.virtiofs.:``
++
++  will strip 'user.virtiofs.' from all server replies.
++
++  ``:prefix:all:trusted.:user.virtiofs.:``
++
++  combines the previous two cases into a single rule.
++
++  ``:ok:client:user.::``
++
++  will allow get/set xattr for 'user.' xattr's and ignore
++  following rules.
++
++  ``:ok:server::security.:``
++
++  will pass 'securty.' xattr's in listxattr from the server
++  and ignore following rules.
++
++  ``:ok:all:::``
++
++  will terminate the rule search passing any remaining attributes
++  in both directions.
++
++  ``:bad:server::security.:``
++
++  would hide 'security.' xattr's in listxattr from the server.
+
+so I'm hoping that addresses both the prefix and OK sections
+at least.
+
+> > +
+> > +- 'bad' - If a client tries to use this name it's
+> > +  denied using EPERM; when the server passes an attribute
+> > +  name matching it's hidden.
+> > +
+> > +**scope** is:
+> > +
+> > +- 'client' - match 'key' against a xattr name from the client for
+> > +             setxattr/getxattr/removexattr
+> > +- 'server' - match 'prepend' against a xattr name from the server
+> > +             for listxattr
+> > +- 'all' - can be used to match both cases.
+> > +
+> > +**key** is a string tested as a prefix on an attribute name originating
+> > +on the client.  It maybe empty in which case a 'client' rule
+> > +will always match on client names.
+> 
+> Is there a way to match a full string instead of a prefix (regexp
+> ^<pattern>$ instead of ^<pattern>)?
+
+No there isn't; can you think of a way of representing that in the
+syntax without making it much more complex?
+
+> > @@ -2010,6 +2020,169 @@ static void lo_flock(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
+> >      fuse_reply_err(req, res == -1 ? errno : 0);
+> >  }
+> >  
+> > +/*
+> > + * Exit; process attribute unmodified if matched.
+> > + * An empty key applies to all.
+> > + */
+> > +#define XATTR_MAP_FLAG_END_OK  (1 <<  0)
+> > +/*
+> > + * The attribute is unwanted;
+> > + * EPERM on write hidden on read.
+> 
+> Making this sentence easier to parse:
+> 
+> s/write hidden/write, hidden/
+
+Done.
+
+> 
+> > + */
+> > +#define XATTR_MAP_FLAG_END_BAD (1 <<  1)
+> > +/*
+> > + * For attr that start with 'key' prepend 'prepend'
+> > + * 'key' maybe empty to prepend for all attrs
+> 
+> s/maybe/may be/
+
+Hmm OK.
+
+> > +    /* Add a terminator to error in cases the user hasn't specified */
+> > +    tmp_entry.flags = XATTR_MAP_FLAG_ALL | XATTR_MAP_FLAG_END_BAD |
+> > +                      XATTR_MAP_FLAG_LAST;
+> 
+> The comment is slightly misleading. This entry must be added in all
+> cases since it terminates the lo->xattr_map_list with the
+> XATTR_MAP_FLAG_LAST flag. If we don't add this entry then
+> free_xattrmap() will iterate beyond the end of lo->xattr_map_list.
+> 
+> Another approach is to set XATTR_MAP_FLAG_LAST in add_xattrmap_entry()
+> (and clear it on the previous last entry). That way adding the 'bad'
+> catch-all truly is optional and just for cases where the user hasn't
+> defined a catch-all rule themselves.
+
+I've changed the comment.
+
+> > +    tmp_entry.key = g_strdup("");
+> > +    tmp_entry.prepend = g_strdup("");
+> > +    lo->xattr_map_list = add_xattrmap_entry(lo->xattr_map_list, &nentries,
+> > +                                            &tmp_entry);
+> > +
+> > +    return res;
+> > +}
+> > +
+> >  static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
+> >                          size_t size)
+> >  {
+> > @@ -2806,6 +2979,8 @@ static void fuse_lo_data_cleanup(struct lo_data *lo)
+> >          close(lo->root.fd);
+> >      }
+> >  
+> > +    free(lo->xattrmap);
+> > +    free_xattrmap(lo->xattr_map_list);
+> >      free(lo->source);
+> >  }
+> >  
+> > @@ -2906,6 +3081,11 @@ int main(int argc, char *argv[])
+> >      } else {
+> >          lo.source = strdup("/");
+> >      }
+> > +
+> > +    if (lo.xattrmap) {
+> > +        lo.xattr_map_list = parse_xattrmap(&lo);
+> > +    }
+> 
+> The function always returns NULL. Has this been tested?
+
+Hmm; I moved that xattr_map_list late and only retested with the
+'map' shortcut which still returned it. Fixed.
+
+Dave
+
+
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

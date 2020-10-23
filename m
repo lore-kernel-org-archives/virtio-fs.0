@@ -1,14 +1,15 @@
-Date: Thu, 22 Oct 2020 15:24:42 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20201022192442.GE512900@redhat.com>
-References: <20201008085534.16070-1-stefanha@redhat.com>
-	<20201022191954.GK2951@work-vm>
+Date: Fri, 23 Oct 2020 14:05:04 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20201023130504.GD3038@work-vm>
+References: <20201014180209.49299-1-dgilbert@redhat.com>
+	<20201014180209.49299-6-dgilbert@redhat.com>
+	<20201022134206.GA512900@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20201022191954.GK2951@work-vm>
-Subject: Re: [Virtio-fs] [PATCH v3] virtiofsd: add container-friendly -o
- sandbox=chroot option
+In-Reply-To: <20201022134206.GA512900@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v3 5/5] tools/virtiofsd: xattr name
+	mappings: Simple 'map'
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,232 +18,262 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: vromanso@redhat.com, qemu-devel@nongnu.org, rmohr@redhat.com, virtio-fs@redhat.com, Al Viro <viro@zeniv.linux.org.uk>, mpatel@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: dinechin@redhat.com, virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Thu, Oct 22, 2020 at 08:19:54PM +0100, Dr. David Alan Gilbert wrote:
-> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> > virtiofsd cannot run in a container because CAP_SYS_ADMIN is required to
-> > create namespaces.
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> On Wed, Oct 14, 2020 at 07:02:09PM +0100, Dr. David Alan Gilbert (git) wrote:
+> > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 > > 
-> > Introduce a weaker sandbox mode that is sufficient in container
-> > environments because the container runtime already sets up namespaces.
-> > Use chroot to restrict path traversal to the shared directory.
+> > The mapping rule system implemented in the last few patches is
+> > extremely flexible, but not easy to use.  Add a simple
+> > 'map' type as a sprinkling of sugar to make it easy.
 > > 
-> > virtiofsd loses the following:
+> > e.g.
 > > 
-> > 1. Mount namespace. The process chroots to the shared directory but
-> >    leaves the mounts in place. Seccomp rejects mount(2)/umount(2)
-> >    syscalls.
+> >   -o xattrmap=":map::user.virtiofs.:"
 > > 
-> > 2. Pid namespace. This should be fine because virtiofsd is the only
-> >    process running in the container.
+> > would be sufficient to prefix all xattr's
+> > or
 > > 
-> > 3. Network namespace. This should be fine because seccomp already
-> >    rejects the connect(2) syscall, but an additional layer of security
-> >    is lost. Container runtime-specific network security policies can be
-> >    used drop network traffic (except for the vhost-user UNIX domain
-> >    socket).
+> >   -o xattrmap=":map:trusted.:user.virtiofs.:"
 > > 
-> > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> > would just prefix 'trusted.' xattr's and leave
+> > everything else alone.
 > 
-> I've just tripped over another case where this probably helps (but not
-> yet tested...); pivot_root doesn't work if your current / isn't a
-> mountpoint - so you can't currently run the existing virtiofsd inside
-> a chroot.
+> Will it block "user.virtiofs.trusted." from client? As we discussed
+> that either we need to block it or we need to prefix it with another
+> user.virtiofs. I mean this rule alone is problematic and needs
+> to be coupled with more rules.
 
-Can we avoid that issue simply by doing a bind mount of directory
-before chroot().
+It blocked user.virtiofs. more generically:
 
-Vivek
++        /* 2nd: Hide non-prefixed but matching entries on the host */
++        tmp_entry.flags = XATTR_MAP_FLAG_END_BAD | XATTR_MAP_FLAG_SERVER;
++        tmp_entry.key = g_strdup(""); /* Not used */
++        tmp_entry.prepend = g_strdup(key);
++        map = add_xattrmap_entry(map, nentries, &tmp_entry);
+
+i.e. hides 'trusted.'
+
++        /* 3rd: Stop the client accessing prefixed attributes directly */
++        tmp_entry.flags = XATTR_MAP_FLAG_END_BAD | XATTR_MAP_FLAG_CLIENT;
++        tmp_entry.key = g_strdup(prefix);
++        tmp_entry.prepend = g_strdup(""); /* Not used */
++        map = add_xattrmap_entry(map, nentries, &tmp_entry);
+
+i.e. blocks client from 'user.virtiofs.'
+
+Note, that is a problem for nesting, since having that at L1 means it
+stops L2 from settings user.virtiofs.trusted.something (which it wants
+to become user.virtiofs.user.virtiofs.trusted.something).
+
+Using :map::user.virtiofs.:  works nicely for nesting (I've just tried
+it), since that nests everything.
+
+> I am assuming one can specify multiple xattrmap on single line. So
+> one can also say.
+> 
+> -o xattrmap=":map:trusted.:user.virtiofs.:" -o xattrmap=":map:user.virtiofs.:user.virtiofs."
+
+No, the existing core option parser we're using overrides on subsequent
+entries; so that would ignore the first -o xattrmap=
+
+Dave
 
 > 
-> (pivot_root is awful for telling you this - it has 6 different manpage
-> listed reasons it might return EINVAL and leaves you to figure out how
-> you offended it).
+> Thanks
+> Vivek
 > 
-> Dave
-> 
+> > 
+> > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 > > ---
-> > v3:
-> >  * Rebased onto David Gilbert's latest migration & virtiofsd pull
-> >    request
+> >  docs/tools/virtiofsd.rst         |  18 ++++++
+> >  tools/virtiofsd/passthrough_ll.c | 108 ++++++++++++++++++++++++++++++-
+> >  2 files changed, 125 insertions(+), 1 deletion(-)
 > > 
-> >  tools/virtiofsd/helper.c         |  8 +++++
-> >  tools/virtiofsd/passthrough_ll.c | 57 ++++++++++++++++++++++++++++++--
-> >  docs/tools/virtiofsd.rst         | 32 ++++++++++++++----
-> >  3 files changed, 88 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
-> > index 85770d63f1..2e181a49b5 100644
-> > --- a/tools/virtiofsd/helper.c
-> > +++ b/tools/virtiofsd/helper.c
-> > @@ -166,6 +166,14 @@ void fuse_cmdline_help(void)
-> >             "                               enable/disable readirplus\n"
-> >             "                               default: readdirplus except with "
-> >             "cache=none\n"
-> > +           "    -o sandbox=namespace|chroot\n"
-> > +           "                               sandboxing mode:\n"
-> > +           "                               - namespace: mount, pid, and net\n"
-> > +           "                                 namespaces with pivot_root(2)\n"
-> > +           "                                 into shared directory\n"
-> > +           "                               - chroot: chroot(2) into shared\n"
-> > +           "                                 directory (use in containers)\n"
-> > +           "                               default: namespace\n"
-> >             "    -o timeout=<number>        I/O timeout (seconds)\n"
-> >             "                               default: depends on cache= option.\n"
-> >             "    -o writeback|no_writeback  enable/disable writeback cache\n"
+> > diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
+> > index 5cb64612ed..e388ef253e 100644
+> > --- a/docs/tools/virtiofsd.rst
+> > +++ b/docs/tools/virtiofsd.rst
+> > @@ -127,6 +127,7 @@ Each rule consists of a number of fields separated with a separator that is the
+> >  first non-white space character in the rule.  This separator must then be used
+> >  for the whole rule.
+> >  White space may be added before and after each rule.
+> > +
+> >  Using ':' as the separator a rule is of the form:
+> >  
+> >  ``:type:scope:key:prepend:``
+> > @@ -162,6 +163,13 @@ on the server, and used as a new prefix.  It may be empty
+> >  in which case a 'server' rule will always match on all names from
+> >  the server.
+> >  
+> > +A simpler 'map' type provides a shorter syntax for the common case:
+> > +
+> > +``:map:key:prepend:``
+> > +
+> > +The 'map' type adds a number of separate rules to add **prepend** as a prefix
+> > +to the matched **key** (or all attributes if **key** is empty).
+> > +There may be at most one 'map' rule and it must be the last rule in the set.
+> >  
+> >  xattr-mapping Examples
+> >  ----------------------
+> > @@ -178,6 +186,11 @@ the first rule prefixes and strips 'user.virtiofs.',
+> >  the second rule hides any non-prefixed attributes that
+> >  the host set.
+> >  
+> > +This is equivalent to the 'map' rule:
+> > +
+> > +::
+> > +-o xattrmap=":map::user.virtiofs.:"
+> > +
+> >  2) Prefix 'trusted.' attributes, allow others through
+> >  
+> >  ::
+> > @@ -200,6 +213,11 @@ the 'user.viritofs.' path directly.
+> >  Finally, the fourth rule lets all remaining attributes
+> >  through.
+> >  
+> > +This is equivalent to the 'map' rule:
+> > +
+> > +::
+> > +-o xattrmap="/map/trusted./user.virtiofs./"
+> > +
+> >  3) Hide 'security.' attributes, and allow everything else
+> >  
+> >  ::
 > > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> > index ff53df4451..5b9064278a 100644
+> > index 8406a2ae86..a1b3364ba3 100644
 > > --- a/tools/virtiofsd/passthrough_ll.c
 > > +++ b/tools/virtiofsd/passthrough_ll.c
-> > @@ -137,8 +137,14 @@ enum {
-> >      CACHE_ALWAYS,
-> >  };
-> >  
-> > +enum {
-> > +    SANDBOX_NAMESPACE,
-> > +    SANDBOX_CHROOT,
-> > +};
-> > +
-> >  struct lo_data {
-> >      pthread_mutex_t mutex;
-> > +    int sandbox;
-> >      int debug;
-> >      int writeback;
-> >      int flock;
-> > @@ -163,6 +169,12 @@ struct lo_data {
-> >  };
-> >  
-> >  static const struct fuse_opt lo_opts[] = {
-> > +    { "sandbox=namespace",
-> > +      offsetof(struct lo_data, sandbox),
-> > +      SANDBOX_NAMESPACE },
-> > +    { "sandbox=chroot",
-> > +      offsetof(struct lo_data, sandbox),
-> > +      SANDBOX_CHROOT },
-> >      { "writeback", offsetof(struct lo_data, writeback), 1 },
-> >      { "no_writeback", offsetof(struct lo_data, writeback), 0 },
-> >      { "source=%s", offsetof(struct lo_data, source), 0 },
-> > @@ -2660,6 +2672,41 @@ static void setup_capabilities(char *modcaps_in)
-> >      pthread_mutex_unlock(&cap.mutex);
+> > @@ -2074,6 +2074,106 @@ static void free_xattrmap(XattrMapEntry *map)
+> >      g_free(map);
 > >  }
 > >  
 > > +/*
-> > + * Use chroot as a weaker sandbox for environments where the process is
-> > + * launched without CAP_SYS_ADMIN.
+> > + * Handle the 'map' type, which is sugar for a set of commands
+> > + * for the common case of prefixing a subset or everything,
+> > + * and allowing anything not prefixed through.
+> > + * It must be the last entry in the stream, although there
+> > + * can be other entries before it.
+> > + * The form is:
+> > + *    :map:key:prefix:
+> > + *
+> > + * key maybe empty in which case all entries are prefixed.
 > > + */
-> > +static void setup_chroot(struct lo_data *lo)
+> > +static XattrMapEntry *parse_xattrmap_map(const char *rule,
+> > +                                         XattrMapEntry *map,
+> > +                                         size_t *nentries)
 > > +{
-> > +    lo->proc_self_fd = open("/proc/self/fd", O_PATH);
-> > +    if (lo->proc_self_fd == -1) {
-> > +        fuse_log(FUSE_LOG_ERR, "open(\"/proc/self/fd\", O_PATH): %m\n");
+> > +    char sep = *rule++;
+> > +    const char *tmp;
+> > +    char *key;
+> > +    char *prefix;
+> > +    XattrMapEntry tmp_entry;
+> > +
+> > +    /* At start of 'key' field */
+> > +    tmp = strchr(rule, sep);
+> > +    if (!tmp) {
+> > +        fuse_log(FUSE_LOG_ERR,
+> > +                 "%s: Missing '%c' at end of key field in map rule\n",
+> > +                 __func__, sep);
 > > +        exit(1);
 > > +    }
+> > +
+> > +    key = g_strndup(rule, tmp - rule);
+> > +    rule = tmp + 1;
+> > +
+> > +    /* At start of prefix field */
+> > +    tmp = strchr(rule, sep);
+> > +    if (!tmp) {
+> > +        fuse_log(FUSE_LOG_ERR,
+> > +                 "%s: Missing '%c' at end of prefix field in map rule\n",
+> > +                 __func__, sep);
+> > +        exit(1);
+> > +    }
+> > +
+> > +    prefix = g_strndup(rule, tmp - rule);
+> > +    rule = tmp + 1;
 > > +
 > > +    /*
-> > +     * Make the shared directory the file system root so that FUSE_OPEN
-> > +     * (lo_open()) cannot escape the shared directory by opening a symlink.
-> > +     *
-> > +     * The chroot(2) syscall is later disabled by seccomp and the
-> > +     * CAP_SYS_CHROOT capability is dropped so that tampering with the chroot
-> > +     * is not possible.
-> > +     *
-> > +     * However, it's still possible to escape the chroot via lo->proc_self_fd
-> > +     * but that requires first gaining control of the process.
+> > +     * This should be the end of the string, we don't allow
+> > +     * any more commands after 'map'.
 > > +     */
-> > +    if (chroot(lo->source) != 0) {
-> > +        fuse_log(FUSE_LOG_ERR, "chroot(\"%s\"): %m\n", lo->source);
+> > +    if (*rule) {
+> > +        fuse_log(FUSE_LOG_ERR,
+> > +                 "%s: Expecting end of command after map, found '%c'\n",
+> > +                 __func__, *rule);
 > > +        exit(1);
 > > +    }
 > > +
-> > +    /* Move into the chroot */
-> > +    if (chdir("/") != 0) {
-> > +        fuse_log(FUSE_LOG_ERR, "chdir(\"/\"): %m\n");
-> > +        exit(1);
+> > +    /* 1st: Prefix matches/everything */
+> > +    tmp_entry.flags = XATTR_MAP_FLAG_PREFIX | XATTR_MAP_FLAG_ALL;
+> > +    tmp_entry.key = g_strdup(key);
+> > +    tmp_entry.prepend = g_strdup(prefix);
+> > +    map = add_xattrmap_entry(map, nentries, &tmp_entry);
+> > +
+> > +    if (!*key) {
+> > +        /* Prefix all case */
+> > +
+> > +        /* 2nd: Hide any non-prefixed entries on the host */
+> > +        tmp_entry.flags = XATTR_MAP_FLAG_END_BAD | XATTR_MAP_FLAG_ALL |
+> > +                          XATTR_MAP_FLAG_LAST;
+> > +        tmp_entry.key = g_strdup("");
+> > +        tmp_entry.prepend = g_strdup("");
+> > +        map = add_xattrmap_entry(map, nentries, &tmp_entry);
+> > +    } else {
+> > +        /* Prefix matching case */
+> > +
+> > +        /* 2nd: Hide non-prefixed but matching entries on the host */
+> > +        tmp_entry.flags = XATTR_MAP_FLAG_END_BAD | XATTR_MAP_FLAG_SERVER;
+> > +        tmp_entry.key = g_strdup(""); /* Not used */
+> > +        tmp_entry.prepend = g_strdup(key);
+> > +        map = add_xattrmap_entry(map, nentries, &tmp_entry);
+> > +
+> > +        /* 3rd: Stop the client accessing prefixed attributes directly */
+> > +        tmp_entry.flags = XATTR_MAP_FLAG_END_BAD | XATTR_MAP_FLAG_CLIENT;
+> > +        tmp_entry.key = g_strdup(prefix);
+> > +        tmp_entry.prepend = g_strdup(""); /* Not used */
+> > +        map = add_xattrmap_entry(map, nentries, &tmp_entry);
+> > +
+> > +        /* 4th: Everything else is OK */
+> > +        tmp_entry.flags = XATTR_MAP_FLAG_END_OK | XATTR_MAP_FLAG_ALL |
+> > +                          XATTR_MAP_FLAG_LAST;
+> > +        tmp_entry.key = g_strdup("");
+> > +        tmp_entry.prepend = g_strdup("");
+> > +        map = add_xattrmap_entry(map, nentries, &tmp_entry);
 > > +    }
+> > +
+> > +    g_free(key);
+> > +    g_free(prefix);
+> > +
+> > +    return map;
 > > +}
 > > +
-> >  /*
-> >   * Lock down this process to prevent access to other processes or files outside
-> >   * source directory.  This reduces the impact of arbitrary code execution bugs.
-> > @@ -2667,8 +2714,13 @@ static void setup_capabilities(char *modcaps_in)
-> >  static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
-> >                            bool enable_syslog)
+> >  static XattrMapEntry *parse_xattrmap(struct lo_data *lo)
 > >  {
-> > -    setup_namespaces(lo, se);
-> > -    setup_mounts(lo->source);
-> > +    if (lo->sandbox == SANDBOX_NAMESPACE) {
-> > +        setup_namespaces(lo, se);
-> > +        setup_mounts(lo->source);
-> > +    } else {
-> > +        setup_chroot(lo);
-> > +    }
-> > +
-> >      setup_seccomp(enable_syslog);
-> >      setup_capabilities(g_strdup(lo->modcaps));
-> >  }
-> > @@ -2815,6 +2867,7 @@ int main(int argc, char *argv[])
-> >      struct fuse_session *se;
-> >      struct fuse_cmdline_opts opts;
-> >      struct lo_data lo = {
-> > +        .sandbox = SANDBOX_NAMESPACE,
-> >          .debug = 0,
-> >          .writeback = 0,
-> >          .posix_lock = 0,
-> > diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-> > index 7ecee49834..65f8e76569 100644
-> > --- a/docs/tools/virtiofsd.rst
-> > +++ b/docs/tools/virtiofsd.rst
-> > @@ -17,13 +17,24 @@ This program is designed to work with QEMU's ``--device vhost-user-fs-pci``
-> >  but should work with any virtual machine monitor (VMM) that supports
-> >  vhost-user.  See the Examples section below.
-> >  
-> > -This program must be run as the root user.  Upon startup the program will
-> > -switch into a new file system namespace with the shared directory tree as its
-> > -root.  This prevents "file system escapes" due to symlinks and other file
-> > -system objects that might lead to files outside the shared directory.  The
-> > -program also sandboxes itself using seccomp(2) to prevent ptrace(2) and other
-> > -vectors that could allow an attacker to compromise the system after gaining
-> > -control of the virtiofsd process.
-> > +This program must be run as the root user.  The program drops privileges where
-> > +possible during startup although it must be able to create and access files
-> > +with any uid/gid:
-> > +
-> > +* The ability to invoke syscalls is limited using seccomp(2).
-> > +* Linux capabilities(7) are dropped.
-> > +
-> > +In "namespace" sandbox mode the program switches into a new file system
-> > +namespace and invokes pivot_root(2) to make the shared directory tree its root.
-> > +A new pid and net namespace is also created to isolate the process.
-> > +
-> > +In "chroot" sandbox mode the program invokes chroot(2) to make the shared
-> > +directory tree its root. This mode is intended for container environments where
-> > +the container runtime has already set up the namespaces and the program does
-> > +not have permission to create namespaces itself.
-> > +
-> > +Both sandbox modes prevent "file system escapes" due to symlinks and other file
-> > +system objects that might lead to files outside the shared directory.
-> >  
-> >  Options
-> >  -------
-> > @@ -69,6 +80,13 @@ Options
-> >    * readdirplus|no_readdirplus -
-> >      Enable/disable readdirplus.  The default is ``readdirplus``.
-> >  
-> > +  * sandbox=namespace|chroot -
-> > +    Sandbox mode:
-> > +    - namespace: Create mount, pid, and net namespaces and pivot_root(2) into
-> > +    the shared directory.
-> > +    - chroot: chroot(2) into shared directory (use in containers).
-> > +    The default is "namespace".
-> > +
-> >    * source=PATH -
-> >      Share host directory tree located at PATH.  This option is required.
-> >  
+> >      XattrMapEntry *res = NULL;
+> > @@ -2102,10 +2202,16 @@ static XattrMapEntry *parse_xattrmap(struct lo_data *lo)
+> >              tmp_entry.flags |= XATTR_MAP_FLAG_END_OK;
+> >          } else if (strstart(map, "bad", &map)) {
+> >              tmp_entry.flags |= XATTR_MAP_FLAG_END_BAD;
+> > +        } else if (strstart(map, "map", &map)) {
+> > +            /*
+> > +             * map is sugar that adds a number of rules, and must be
+> > +             * the last entry.
+> > +             */
+> > +            return parse_xattrmap_map(map, res, &nentries);
+> >          } else {
+> >              fuse_log(FUSE_LOG_ERR,
+> >                       "%s: Unexpected type;"
+> > -                     "Expecting 'prefix', 'ok', or 'bad' in rule %zu\n",
+> > +                     "Expecting 'prefix', 'ok', 'bad' or 'map' in rule %zu\n",
+> >                       __func__, nentries);
+> >              exit(1);
+> >          }
 > > -- 
-> > 2.26.2
+> > 2.28.0
 > > 
-> -- 
-> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

@@ -1,15 +1,15 @@
-Date: Fri, 23 Oct 2020 16:04:29 +0100
+Date: Fri, 23 Oct 2020 16:46:58 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20201023150429.GF3038@work-vm>
+Message-ID: <20201023154658.GG3038@work-vm>
 References: <20201014180209.49299-1-dgilbert@redhat.com>
-	<20201014180209.49299-3-dgilbert@redhat.com>
-	<20201022152853.GC512900@redhat.com>
+	<20201014180209.49299-2-dgilbert@redhat.com>
+	<20201022145242.GB512900@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20201022152853.GC512900@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 2/5] tools/virtiofsd: xattr name
- mappings: Map client xattr names
+In-Reply-To: <20201022145242.GB512900@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v3 1/5] tools/virtiofsd: xattr name
+	mappings: Add option
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,88 +22,210 @@ To: Vivek Goyal <vgoyal@redhat.com>
 Cc: dinechin@redhat.com, virtio-fs@redhat.com, qemu-devel@nongnu.org
 
 * Vivek Goyal (vgoyal@redhat.com) wrote:
-> On Wed, Oct 14, 2020 at 07:02:06PM +0100, Dr. David Alan Gilbert (git) wrote:
-> > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-> > 
-> > Map xattr names originating at the client; from get/set/remove xattr.
-> > 
-> > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> > ---
-> >  tools/virtiofsd/passthrough_ll.c | 101 ++++++++++++++++++++++++++++++-
-> >  1 file changed, 98 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> > index f5a33014f9..57ebe17ed6 100644
-> > --- a/tools/virtiofsd/passthrough_ll.c
-> > +++ b/tools/virtiofsd/passthrough_ll.c
-> > @@ -2183,20 +2183,80 @@ static XattrMapEntry *parse_xattrmap(struct lo_data *lo)
-> >      return res;
-> >  }
-> >  
-> > -static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
+> On Wed, Oct 14, 2020 at 07:02:05PM +0100, Dr. David Alan Gilbert (git) wrote:
+> 
+> [..]
 > > +/*
-> > + * For use with getxattr/setxattr/removexattr, where the client
-> > + * gives us a name and we may need to choose a different one.
-> > + * Allocates a buffer for the result placing it in *out_name.
-> > + *   If there's no change then *out_name is not set.
-> > + * Returns 0 on success
-> > + * Can return -EPERM to indicate we block a given attribute
-> > + *   (in which case out_name is not allocated)
-> > + * Can return -ENOMEM to indicate out_name couldn't be allocated.
+> > + * Exit; process attribute unmodified if matched.
+> > + * An empty key applies to all.
 > > + */
-> > +static int xattr_map_client(const struct lo_data *lo, const char *client_name,
-> > +                            char **out_name)
-> > +{
-> > +    const XattrMapEntry *cur_entry;
+> > +#define XATTR_MAP_FLAG_END_OK  (1 <<  0)
+> > +/*
+> > + * The attribute is unwanted;
+> > + * EPERM on write hidden on read.
+> > + */
+> > +#define XATTR_MAP_FLAG_END_BAD (1 <<  1)
+> > +/*
+> > + * For attr that start with 'key' prepend 'prepend'
+> > + * 'key' maybe empty to prepend for all attrs
+> > + * key is defined from set/remove point of view.
+> > + * Automatically reversed on read
+> > + */
+> > +#define XATTR_MAP_FLAG_PREFIX  (1 <<  2)
+> > +/* Apply rule to get/set/remove */
+> > +#define XATTR_MAP_FLAG_CLIENT  (1 << 16)
+> > +/* Apply rule to list */
+> > +#define XATTR_MAP_FLAG_SERVER  (1 << 17)
+> > +/* Apply rule to all */
+> > +#define XATTR_MAP_FLAG_ALL   (XATTR_MAP_FLAG_SERVER | XATTR_MAP_FLAG_CLIENT)
 > > +
-> > +    for (cur_entry = lo->xattr_map_list; ; cur_entry++) {
-> > +        if ((cur_entry->flags & XATTR_MAP_FLAG_CLIENT) &&
-> > +            (strstart(client_name, cur_entry->key, NULL))) {
-> > +            if (cur_entry->flags & XATTR_MAP_FLAG_END_BAD) {
-> > +                return -EPERM;
-> > +            }
-> > +            if (cur_entry->flags & XATTR_MAP_FLAG_END_OK) {
-> > +                /* Unmodified name */
-> > +                return 0;
-> > +            }
-> > +            if (cur_entry->flags & XATTR_MAP_FLAG_PREFIX) {
+> > +/* Last rule in the XATTR_MAP */
+> > +#define XATTR_MAP_FLAG_LAST    (1 << 30)
 > 
-> I am wondering why do have "END" substring in BAD and OK flags while
-> we don't have one in PREFIX flag. IOW, why not simply call these
-> flags as XATTR_MAP_FLAG_OK and XATTR_MAP_FLAG_BAD respectively.
+> I see that you are using bit positions for flags. Not clear why you
+> used bit 0,1,2 and then jumped to 16,17 and then to 30. May be you
+> are doing some sort of reservation of bits. Will be nice to explain
+> that a bit so that next person modifying it can use bits from
+> correct pool.
 
-OK, the END_'s have gone.
+I've added a 'types' and a 'scopes' comment pair to hopefully make it
+clear how I split it up.
 
-> > +                *out_name = g_try_malloc(strlen(client_name) +
-> > +                                         strlen(cur_entry->prepend) + 1);
+> > +
+> > +static XattrMapEntry *add_xattrmap_entry(XattrMapEntry *orig_map,
+> > +                                         size_t *nentries,
+> > +                                         const XattrMapEntry *new_entry)
+> > +{
+> > +    XattrMapEntry *res = g_realloc_n(orig_map, ++*nentries,
+> > +                                     sizeof(XattrMapEntry));
+> > +    res[*nentries - 1] = *new_entry;
+> > +
+> > +    return res;
+> > +}
+> > +
+> > +static void free_xattrmap(XattrMapEntry *map)
+> > +{
+> > +    XattrMapEntry *curr = map;
+> > +
+> > +    if (!map) {
+> > +        return;
+> > +    };
 > 
-> Should we check for cur_entry->prepend to be NULL before we try to
-> allocate out_name. One could say.
-> 
-> "prefix:client:trusted.::". In that case we are not supposed to prefix
-> anything?
+> ; after } is not needed.
 
-We shouldn't need to do the NULL check; cur_entry->prepend should = ""
-in that case, not NULL.
+Gone.
+
+> > +
+> > +    do {
+> > +        g_free(curr->key);
+> > +        g_free(curr->prepend);
+> > +    } while (!(curr++->flags & XATTR_MAP_FLAG_LAST));
+> > +
+> > +    g_free(map);
+> > +}
+> > +
+> > +static XattrMapEntry *parse_xattrmap(struct lo_data *lo)
+> > +{
+> > +    XattrMapEntry *res = NULL;
+> > +    XattrMapEntry tmp_entry;
+> > +    size_t nentries = 0;
+> 
+> If you are calculating number of entries (nentries), may be this could
+> be stored in lo_data so that can be later used to free entries or loop
+> through rules etc.
+
+Done; and that removes the need for _LAST.
+
+> > +    const char *map = lo->xattrmap;
+> > +    const char *tmp;
+> > +
+> > +    while (*map) {
+> > +        char sep;
+> > +
+> > +        if (isspace(*map)) {
+> > +            map++;
+> > +            continue;
+> > +        }
+> > +        /* The separator is the first non-space of the rule */
+> > +        sep = *map++;
+> > +        if (!sep) {
+> > +            break;
+> > +        }
+> 
+> When can sep be NULL? In that case while loop will not even continue.
+
+The end of the rule list.
+
+> > +
+> > +        /* Start of 'type' */
+> > +        if (strstart(map, "prefix", &map)) {
+> > +            tmp_entry.flags |= XATTR_MAP_FLAG_PREFIX;
+> > +        } else if (strstart(map, "ok", &map)) {
+> > +            tmp_entry.flags |= XATTR_MAP_FLAG_END_OK;
+> > +        } else if (strstart(map, "bad", &map)) {
+> > +            tmp_entry.flags |= XATTR_MAP_FLAG_END_BAD;
+> > +        } else {
+> > +            fuse_log(FUSE_LOG_ERR,
+> > +                     "%s: Unexpected type;"
+> > +                     "Expecting 'prefix', 'ok', or 'bad' in rule %zu\n",
+> > +                     __func__, nentries);
+> > +            exit(1);
+> > +        }
+> > +
+> > +        if (*map++ != sep) {
+> > +            fuse_log(FUSE_LOG_ERR,
+> > +                     "%s: Missing '%c' at end of type field of rule %zu\n",
+> > +                     __func__, sep, nentries);
+> > +            exit(1);
+> > +        }
+> > +
+> > +        /* Start of 'scope' */
+> > +        if (strstart(map, "client", &map)) {
+> > +            tmp_entry.flags |= XATTR_MAP_FLAG_CLIENT;
+> > +        } else if (strstart(map, "server", &map)) {
+> > +            tmp_entry.flags |= XATTR_MAP_FLAG_SERVER;
+> > +        } else if (strstart(map, "all", &map)) {
+> > +            tmp_entry.flags |= XATTR_MAP_FLAG_ALL;
+> > +        } else {
+> > +            fuse_log(FUSE_LOG_ERR,
+> > +                     "%s: Unexpected scope;"
+> > +                     " Expecting 'client', 'server', or 'all', in rule %zu\n",
+> > +                     __func__, nentries);
+> > +            exit(1);
+> > +        }
+> > +
+> > +        if (*map++ != sep) {
+> > +            fuse_log(FUSE_LOG_ERR,
+> > +                     "%s: Expecting '%c' found '%c'"
+> > +                     " after scope in rule %zu\n",
+> > +                     __func__, sep, *map, nentries);
+> > +            exit(1);
+> > +        }
+> > +
+> > +        /* At start of 'key' field */
+> > +        tmp = strchr(map, sep);
+> > +        if (!tmp) {
+> > +            fuse_log(FUSE_LOG_ERR,
+> > +                     "%s: Missing '%c' at end of key field of rule %zu",
+> > +                     __func__, sep, nentries);
+> > +            exit(1);
+> > +        }
+> > +        tmp_entry.key = g_strndup(map, tmp - map);
+> > +        map = tmp + 1;
+> > +
+> > +        /* At start of 'prepend' field */
+> > +        tmp = strchr(map, sep);
+> > +        if (!tmp) {
+> > +            fuse_log(FUSE_LOG_ERR,
+> > +                     "%s: Missing '%c' at end of prepend field of rule %zu",
+> > +                     __func__, sep, nentries);
+> > +            exit(1);
+> > +        }
+> > +        tmp_entry.prepend = g_strndup(map, tmp - map);
+> > +        map = tmp + 1;
+> > +
+> > +        lo->xattr_map_list = add_xattrmap_entry(lo->xattr_map_list, &nentries,
+> > +                                                &tmp_entry);
+> > +        /* End of rule - go around again for another rule */
+> > +    }
+> > +
+> > +    if (!nentries) {
+> > +        fuse_log(FUSE_LOG_ERR, "Empty xattr map\n");
+> > +        exit(1);
+> > +    }
+> > +
+> > +    /* Add a terminator to error in cases the user hasn't specified */
+> > +    tmp_entry.flags = XATTR_MAP_FLAG_ALL | XATTR_MAP_FLAG_END_BAD |
+> > +                      XATTR_MAP_FLAG_LAST;
+> > +    tmp_entry.key = g_strdup("");
+> > +    tmp_entry.prepend = g_strdup("");
+> > +    lo->xattr_map_list = add_xattrmap_entry(lo->xattr_map_list, &nentries,
+> > +                                            &tmp_entry);
+> 
+> Not sure why this default rule is needed when user has not specified one.
+> 
+> This seems to be equivalent of ":bad:all:::". Will this not block all
+> the xattrs which have not been caught by previous rules. And user
+> probably did not want it. 
+
+I might be able to get rid of that now;  my preference is to tell the
+users they should be explicit about what happens.
 
 Dave
 
-
-> > +                if (!*out_name) {
-> > +                    return -ENOMEM;
-> > +                }
-> > +                sprintf(*out_name, "%s%s", cur_entry->prepend, client_name);
-> > +                return 0;
-> > +            }
-> > +        }
-> > +    }
-> > +
-> > +    /* Shouldn't get here - rules should have an END_* */
-> > +    abort();
-> > +}
-> 
 > Thanks
 > Vivek
+> 
 -- 
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

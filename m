@@ -1,11 +1,15 @@
-From: Fotis Xenakis <foxen@windowslive.com>
-Date: Mon, 26 Oct 2020 13:57:53 +0000
-Message-ID: <AM0PR03MB6292B7495BBCF452714B7C8CA6190@AM0PR03MB6292.eurprd03.prod.outlook.com>
+Date: Mon, 26 Oct 2020 14:59:04 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20201026145904.GC52035@stefanha-x1.localdomain>
+References: <20201023165812.36028-1-dgilbert@redhat.com>
+	<20201023165812.36028-2-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Language: en-US
-Content-Type: multipart/alternative;
-	boundary="_000_AM0PR03MB6292B7495BBCF452714B7C8CA6190AM0PR03MB6292eurp_"
-Subject: Re: [Virtio-fs] Architecture diagram license
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="ALfTUftag+2gvp1h"
+Content-Disposition: inline
+In-Reply-To: <20201023165812.36028-2-dgilbert@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v4 1/5] tools/virtiofsd: xattr name
+	mappings: Add option
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,107 +18,56 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Cc: dinechin@redhat.com, virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
 
---_000_AM0PR03MB6292B7495BBCF452714B7C8CA6190AM0PR03MB6292eurp_
-Content-Type: text/plain; charset="iso-8859-1"
+
+--ALfTUftag+2gvp1h
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-That would work great actually, thank you very much for the prompt response=
-!
+On Fri, Oct 23, 2020 at 05:58:08PM +0100, Dr. David Alan Gilbert (git) wrot=
+e:
+> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+>=20
+> Add an option to define mappings of xattr names so that
+> the client and server filesystems see different views.
+> This can be used to have different SELinux mappings as
+> seen by the guest, to run the virtiofsd with less privileges
+> (e.g. in a case where it can't set trusted/system/security
+> xattrs but you want the guest to be able to), or to isolate
+> multiple users of the same name; e.g. trusted attributes
+> used by stacking overlayfs.
+>=20
+> A mapping engine is used with 3 simple rules; the rules can
+> be combined to allow most useful mapping scenarios.
+> The ruleset is defined by -o xattrmap=3D'rules...'.
+>=20
+> This patch doesn't use the rule maps yet.
+>=20
+> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> ---
+>  docs/tools/virtiofsd.rst         |  92 ++++++++++++++++
+>  tools/virtiofsd/passthrough_ll.c | 173 +++++++++++++++++++++++++++++++
+>  2 files changed, 265 insertions(+)
 
-Fotis
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
-________________________________
-From: Stefan Hajnoczi
-Sent: Monday, October 26, 2020 15:49
-To: Fotis Xenakis
-Cc: virtio-fs-list
-Subject: Re: [Virtio-fs] Architecture diagram license
+--ALfTUftag+2gvp1h
+Content-Type: application/pgp-signature; name="signature.asc"
 
-On Mon, Oct 26, 2020 at 09:20:36AM +0000, Fotis Xenakis wrote:
-> As a student completing his thesis, which involved adding virtio-fs DAX s=
-upport to OSv [1], it would be nice if I could include the architecture dia=
-gram [2] featured in the website.
-> Yet, I see no licensing notice in the repo, so I guess it's copyrighted a=
-tm (?). Could you clarify on this, or ideally license it to allow usage in =
-this context?
+-----BEGIN PGP SIGNATURE-----
 
-Hi Fotis,
-There is no explicit license yet.
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl+W5DgACgkQnKSrs4Gr
+c8hXnAf9FRtyTrpmi38Fkm6CGlb2OCJiWoJvjz0oEPb82LFKPmDQglfbALDYRtNe
+r0/iJScUlsbemrzhqow6+B/DgjQn5J/HgYXBLxi5HHvi2flAnHVUvB1fb9BCwOGH
+loxODG1b6lBXDHfh6+2Ikk9sClPhM0dak6W4+2p8gmqFpvDcNs1TrC8Y46C36P+O
+9zKijiF8g+OWl+Uy2W7G+pmWCP3dJqttKKP2KsDII47JTTlboVWJMVTPlJo8lxA+
+Ig78ZfthyF8zwqunMZS6wBJICiJ8Awc2pGV0OcVgy/iUNo1UTTGn9jMR0aJJB9A8
+gzt9o06tX7bOsbmb/BAY4mri57BmFA==
+=lUXW
+-----END PGP SIGNATURE-----
 
-I created the diagram and suggest the following license:
-https://creativecommons.org/licenses/by-sa/4.0/
-
-Does that work for you?
-
-Stefan
-
---_000_AM0PR03MB6292B7495BBCF452714B7C8CA6190AM0PR03MB6292eurp_
-Content-Type: text/html; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
-
-<html>
-<head>
-<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Diso-8859-=
-1">
-<style type=3D"text/css" style=3D"display:none;"> P {margin-top:0;margin-bo=
-ttom:0;} </style>
-</head>
-<body dir=3D"ltr">
-<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
- color: rgb(0, 0, 0);">
-That would work great actually, thank you very much for the prompt response=
-!</div>
-<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
- color: rgb(0, 0, 0);">
-<br>
-</div>
-<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
- color: rgb(0, 0, 0);">
-Fotis</div>
-<div>
-<div><br>
-</div>
-<div style=3D"font-family:Calibri,Arial,Helvetica,sans-serif; font-size:12p=
-t; color:rgb(0,0,0);">
-<hr tabindex=3D"-1" style=3D"display:inline-block; width:98%;">
-<b>From:</b> Stefan Hajnoczi<br>
-<b>Sent:</b> Monday, October 26, 2020 15:49<br>
-<b>To:</b> Fotis Xenakis<br>
-<b>Cc:</b> virtio-fs-list<br>
-<b>Subject:</b> Re: [Virtio-fs] Architecture diagram license
-<div><br>
-</div>
-</div>
-<div class=3D"BodyFragment"><font size=3D"2"><span style=3D"font-size:11pt;=
-">
-<div class=3D"PlainText">On Mon, Oct 26, 2020 at 09:20:36AM +0000, Fotis Xe=
-nakis wrote:<br>
-&gt; As a student completing his thesis, which involved adding virtio-fs DA=
-X support to OSv [1], it would be nice if I could include the architecture =
-diagram [2] featured in the website.<br>
-&gt; Yet, I see no licensing notice in the repo, so I guess it's copyrighte=
-d atm (?). Could you clarify on this, or ideally license it to allow usage =
-in this context?<br>
-<br>
-Hi Fotis,<br>
-There is no explicit license yet.<br>
-<br>
-I created the diagram and suggest the following license:<br>
-<a href=3D"https://creativecommons.org/licenses/by-sa/4.0/" target=3D"_blan=
-k" rel=3D"noopener noreferrer" data-auth=3D"NotApplicable">https://creative=
-commons.org/licenses/by-sa/4.0/</a><br>
-<br>
-Does that work for you?<br>
-<br>
-Stefan<br>
-</div>
-</span></font></div>
-</div>
-</body>
-</html>
-
---_000_AM0PR03MB6292B7495BBCF452714B7C8CA6190AM0PR03MB6292eurp_--
+--ALfTUftag+2gvp1h--
 

@@ -1,13 +1,10 @@
-Date: Mon, 9 Nov 2020 10:11:02 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20201109101102.GE3024@work-vm>
-References: <20201105194416.GA1384085@redhat.com>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Mon, 26 Oct 2020 18:43:15 +0000
+Message-Id: <20201026184331.272953-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20201105194416.GA1384085@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Use --thread-pool-size=0 to mean
- no thread pool
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PULL 00/16] virtiofs queue
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,102 +13,87 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, jose.carlos.venegas.munoz@intel.com, qemu-devel@nongnu.org
+To: qemu-devel@nongnu.org, stefanha@redhat.com, mreitz@redhat.com, misono.tomohiro@jp.fujitsu.com
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> Right now we create a thread pool and main thread hands over the request
-> to thread in thread pool to process. Number of threads in thread pool
-> can be managed by option --thread-pool-size.
-> 
-> There is a chance that in case of some workloads, we might get better
-> performance if we don't handover the request to a different thread
-> and process in the context of thread receiving the request.
-> 
-> To implement that, redefine the meaning of --thread-pool-size=0 to
-> mean that don't use a thread pool. Instead process the request in
-> the context of thread receiving request from the queue.
-> 
-> I can't think how --thread-pool-size=0 is useful and hence using
-> that. If it is already useful somehow, I could look at defining
-> a new option say "--no-thread-pool".
-> 
-> I think this patch will be used more as a debug help to do comparison
-> when it is more effecient to do not hand over the requests to a
-> thread pool.
-> 
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-I think this is OK, but you need to fix the style to match qemu rather
-than kernel style.
-(See qemu's scripts/checpatch.pl)
+The following changes since commit a95e0396c805735c491a049b01de6f5a713fb91b:
 
-Dave
+  Merge remote-tracking branch 'remotes/bonzini-gitlab/tags/for-upstream' into staging (2020-10-26 15:49:11 +0000)
 
-> ---
->  tools/virtiofsd/fuse_virtio.c | 33 ++++++++++++++++++++++++---------
->  1 file changed, 24 insertions(+), 9 deletions(-)
-> 
-> diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-> index ff86f6d1ce..60aa7cd3e5 100644
-> --- a/tools/virtiofsd/fuse_virtio.c
-> +++ b/tools/virtiofsd/fuse_virtio.c
-> @@ -695,13 +695,17 @@ static void *fv_queue_thread(void *opaque)
->      struct VuDev *dev = &qi->virtio_dev->dev;
->      struct VuVirtq *q = vu_get_queue(dev, qi->qidx);
->      struct fuse_session *se = qi->virtio_dev->se;
-> -    GThreadPool *pool;
-> -
-> -    pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size, FALSE,
-> -                             NULL);
-> -    if (!pool) {
-> -        fuse_log(FUSE_LOG_ERR, "%s: g_thread_pool_new failed\n", __func__);
-> -        return NULL;
-> +    GThreadPool *pool = NULL;
-> +    GList *req_list = NULL;
-> +
-> +    if (se->thread_pool_size) {
-> +        fuse_log(FUSE_LOG_DEBUG, "%s: Creating thread pool for Queue %d\n", __func__, qi->qidx);
-> +        pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size,
-> +                                 FALSE, NULL);
-> +        if (!pool) {
-> +            fuse_log(FUSE_LOG_ERR, "%s: g_thread_pool_new failed\n", __func__);
-> +            return NULL;
-> +        }
->      }
->  
->      fuse_log(FUSE_LOG_INFO, "%s: Start for queue %d kick_fd %d\n", __func__,
-> @@ -780,14 +784,25 @@ static void *fv_queue_thread(void *opaque)
->              req->bad_in_num = bad_in_num;
->              req->bad_out_num = bad_out_num;
->  
-> -            g_thread_pool_push(pool, req, NULL);
-> +            if (!se->thread_pool_size)
-> +                req_list = g_list_prepend(req_list, req);
-> +            else
-> +                g_thread_pool_push(pool, req, NULL);
->          }
->  
->          pthread_mutex_unlock(&qi->vq_lock);
->          pthread_rwlock_unlock(&qi->virtio_dev->vu_dispatch_rwlock);
-> +
-> +        // Process all the requests.
-> +        if (!se->thread_pool_size && req_list != NULL) {
-> +	    g_list_foreach(req_list, fv_queue_worker, qi);
-> +	    g_list_free(req_list);
-> +            req_list = NULL;
-> +	}
->      }
->  
-> -    g_thread_pool_free(pool, FALSE, TRUE);
-> +    if (pool)
-> +        g_thread_pool_free(pool, FALSE, TRUE);
->  
->      return NULL;
->  }
-> -- 
-> 2.25.4
-> 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+are available in the Git repository at:
+
+  https://gitlab.com/dagrh/qemu.git tags/pull-virtiofs-20201026
+
+for you to fetch changes up to c93a656f7b6585d9b6f8639d1fbb74dd944be239:
+
+  tests/acceptance: Add virtiofs_submounts.py (2020-10-26 18:35:32 +0000)
+
+----------------------------------------------------------------
+virtiofsd pull 2020-10-26
+
+Misono
+   Set default log level to info
+   Explicit build option for virtiofsd
+
+Me
+   xattr name mapping
+
+Stefan
+  Alternative chroot sandbox method
+
+Max
+  Submount mechanism
+
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+
+----------------------------------------------------------------
+Dr. David Alan Gilbert (5):
+      tools/virtiofsd: xattr name mappings: Add option
+      tools/virtiofsd: xattr name mappings: Map client xattr names
+      tools/virtiofsd: xattr name mappings: Map server xattr names
+      tools/virtiofsd: xattr name mapping examples
+      tools/virtiofsd: xattr name mappings: Simple 'map'
+
+Max Reitz (8):
+      linux/fuse.h: Pull in from Linux
+      virtiofsd: Announce FUSE_ATTR_FLAGS
+      virtiofsd: Add attr_flags to fuse_entry_param
+      virtiofsd: Add fuse_reply_attr_with_flags()
+      virtiofsd: Store every lo_inode's parent_dev
+      virtiofsd: Announce sub-mount points
+      tests/acceptance/boot_linux: Accept SSH pubkey
+      tests/acceptance: Add virtiofs_submounts.py
+
+Misono Tomohiro (2):
+      configure: add option for virtiofsd
+      virtiofsd: passthrough_ll: set FUSE_LOG_INFO as default log_level
+
+Stefan Hajnoczi (1):
+      virtiofsd: add container-friendly -o sandbox=chroot option
+
+ configure                                          |   8 +-
+ docs/tools/virtiofsd.rst                           | 193 ++++++-
+ include/standard-headers/linux/fuse.h              |  11 +-
+ meson.build                                        |   1 +
+ meson_options.txt                                  |   2 +
+ tests/acceptance/boot_linux.py                     |  13 +-
+ tests/acceptance/virtiofs_submounts.py             | 289 ++++++++++
+ .../virtiofs_submounts.py.data/cleanup.sh          |  46 ++
+ .../virtiofs_submounts.py.data/guest-cleanup.sh    |  30 +
+ .../acceptance/virtiofs_submounts.py.data/guest.sh | 138 +++++
+ .../acceptance/virtiofs_submounts.py.data/host.sh  | 127 +++++
+ tools/meson.build                                  |  17 +-
+ tools/virtiofsd/fuse_common.h                      |   8 +
+ tools/virtiofsd/fuse_lowlevel.c                    |  34 +-
+ tools/virtiofsd/fuse_lowlevel.h                    |  20 +
+ tools/virtiofsd/helper.c                           |   9 +
+ tools/virtiofsd/passthrough_ll.c                   | 622 ++++++++++++++++++++-
+ 17 files changed, 1528 insertions(+), 40 deletions(-)
+ create mode 100644 tests/acceptance/virtiofs_submounts.py
+ create mode 100644 tests/acceptance/virtiofs_submounts.py.data/cleanup.sh
+ create mode 100644 tests/acceptance/virtiofs_submounts.py.data/guest-cleanup.sh
+ create mode 100644 tests/acceptance/virtiofs_submounts.py.data/guest.sh
+ create mode 100644 tests/acceptance/virtiofs_submounts.py.data/host.sh
 

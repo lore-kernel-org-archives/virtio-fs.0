@@ -1,13 +1,11 @@
-From: Haotian Li <lihaotian9@huawei.com>
-References: <3477d902-ace9-1aa1-531a-9d20d6e93a05@huawei.com>
-Message-ID: <29fc87c2-b87c-4c34-40d4-75381f228849@huawei.com>
-Date: Wed, 11 Nov 2020 09:05:56 +0800
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Mon, 26 Oct 2020 18:43:27 +0000
+Message-Id: <20201026184331.272953-13-dgilbert@redhat.com>
+In-Reply-To: <20201026184331.272953-1-dgilbert@redhat.com>
+References: <20201026184331.272953-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <3477d902-ace9-1aa1-531a-9d20d6e93a05@huawei.com>
-Content-Type: text/plain; charset="gbk"
-Content-Transfer-Encoding: 7bit
-Subject: [Virtio-fs] [PATCH 1/3] tools/virtiofsd/buffer.c: check whether buf
- is NULL in fuse_bufvec_advance func
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PULL 12/16] virtiofsd: Add fuse_reply_attr_with_flags()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,33 +14,86 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com
-Cc: linfeilong@huawei.com
+To: qemu-devel@nongnu.org, stefanha@redhat.com, mreitz@redhat.com, misono.tomohiro@jp.fujitsu.com
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
-In fuse_bufvec_advance func, calling fuse_bufvec_current func
-may return NULL, so we should check whether buf is NULL before
-using it.
+From: Max Reitz <mreitz@redhat.com>
 
-Signed-off-by: Haotian Li <lihaotian9@huawei.com>
-Signed-off-by: Zhiqiang Liu <liuzhiqiang26@huawei.com>
+The plain fuse_reply_attr() function does not allow setting
+fuse_attr.flags, so add this new function that does.
+
+Make fuse_reply_attr() a wrapper around it.
+
+Signed-off-by: Max Reitz <mreitz@redhat.com>
+Message-Id: <20200909184028.262297-5-mreitz@redhat.com>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 ---
- tools/virtiofsd/buffer.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ tools/virtiofsd/fuse_lowlevel.c | 14 ++++++++++++--
+ tools/virtiofsd/fuse_lowlevel.h | 15 +++++++++++++++
+ 2 files changed, 27 insertions(+), 2 deletions(-)
 
-diff --git a/tools/virtiofsd/buffer.c b/tools/virtiofsd/buffer.c
-index 27c1377f22..bdc608c221 100644
---- a/tools/virtiofsd/buffer.c
-+++ b/tools/virtiofsd/buffer.c
-@@ -246,6 +246,10 @@ static int fuse_bufvec_advance(struct fuse_bufvec *bufv, size_t len)
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index 00da84432c..5198f627bc 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -426,8 +426,8 @@ int fuse_reply_create(fuse_req_t req, const struct fuse_entry_param *e,
+     return send_reply_ok(req, buf, entrysize + sizeof(struct fuse_open_out));
+ }
+ 
+-int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
+-                    double attr_timeout)
++int fuse_reply_attr_with_flags(fuse_req_t req, const struct stat *attr,
++                               double attr_timeout, uint32_t attr_flags)
  {
-     const struct fuse_buf *buf = fuse_bufvec_current(bufv);
-
-+    if (!buf) {
-+        return 0;
+     struct fuse_attr_out arg;
+     size_t size = sizeof(arg);
+@@ -437,9 +437,19 @@ int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
+     arg.attr_valid_nsec = calc_timeout_nsec(attr_timeout);
+     convert_stat(attr, &arg.attr);
+ 
++    if (req->se->conn.capable & FUSE_CAP_ATTR_FLAGS) {
++        arg.attr.flags = attr_flags;
 +    }
 +
-     bufv->off += len;
-     assert(bufv->off <= buf->size);
-     if (bufv->off == buf->size) {
+     return send_reply_ok(req, &arg, size);
+ }
+ 
++int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
++                    double attr_timeout)
++{
++    return fuse_reply_attr_with_flags(req, attr, attr_timeout, 0);
++}
++
+ int fuse_reply_readlink(fuse_req_t req, const char *linkname)
+ {
+     return send_reply_ok(req, linkname, strlen(linkname));
+diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
+index 9c06240f9e..1ff6ba1e4f 100644
+--- a/tools/virtiofsd/fuse_lowlevel.h
++++ b/tools/virtiofsd/fuse_lowlevel.h
+@@ -1313,6 +1313,21 @@ int fuse_reply_create(fuse_req_t req, const struct fuse_entry_param *e,
+ int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
+                     double attr_timeout);
+ 
++/**
++ * Reply with attributes and set fuse_attr.flags
++ *
++ * Possible requests:
++ *   getattr, setattr
++ *
++ * @param req request handle
++ * @param attr the attributes
++ * @param attr_timeout validity timeout (in seconds) for the attributes
++ * @param attr_flags flags to put into fuse_attr.flags
++ * @return zero for success, -errno for failure to send reply
++ */
++int fuse_reply_attr_with_flags(fuse_req_t req, const struct stat *attr,
++                               double attr_timeout, uint32_t attr_flags);
++
+ /**
+  * Reply with the contents of a symbolic link
+  *
 -- 
+2.28.0
 

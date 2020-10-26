@@ -1,10 +1,11 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Mon, 26 Oct 2020 18:43:15 +0000
-Message-Id: <20201026184331.272953-1-dgilbert@redhat.com>
+Date: Mon, 26 Oct 2020 18:43:25 +0000
+Message-Id: <20201026184331.272953-11-dgilbert@redhat.com>
+In-Reply-To: <20201026184331.272953-1-dgilbert@redhat.com>
+References: <20201026184331.272953-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 00/16] virtiofs queue
+Subject: [Virtio-fs] [PULL 10/16] virtiofsd: Announce FUSE_ATTR_FLAGS
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,84 +17,72 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, stefanha@redhat.com, mreitz@redhat.com, misono.tomohiro@jp.fujitsu.com
 Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+From: Max Reitz <mreitz@redhat.com>
 
-The following changes since commit a95e0396c805735c491a049b01de6f5a713fb91b:
+The fuse_attr.flags field is currently just initialized to 0, which is
+valid.  Thus, there is no reason not to always announce FUSE_ATTR_FLAGS
+(when the kernel supports it).
 
-  Merge remote-tracking branch 'remotes/bonzini-gitlab/tags/for-upstream' into staging (2020-10-26 15:49:11 +0000)
-
-are available in the Git repository at:
-
-  https://gitlab.com/dagrh/qemu.git tags/pull-virtiofs-20201026
-
-for you to fetch changes up to c93a656f7b6585d9b6f8639d1fbb74dd944be239:
-
-  tests/acceptance: Add virtiofs_submounts.py (2020-10-26 18:35:32 +0000)
-
-----------------------------------------------------------------
-virtiofsd pull 2020-10-26
-
-Misono
-   Set default log level to info
-   Explicit build option for virtiofsd
-
-Me
-   xattr name mapping
-
-Stefan
-  Alternative chroot sandbox method
-
-Max
-  Submount mechanism
-
+Signed-off-by: Max Reitz <mreitz@redhat.com>
+Message-Id: <20200909184028.262297-3-mreitz@redhat.com>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+---
+ tools/virtiofsd/fuse_common.h   | 8 ++++++++
+ tools/virtiofsd/fuse_lowlevel.c | 7 +++++++
+ 2 files changed, 15 insertions(+)
 
-----------------------------------------------------------------
-Dr. David Alan Gilbert (5):
-      tools/virtiofsd: xattr name mappings: Add option
-      tools/virtiofsd: xattr name mappings: Map client xattr names
-      tools/virtiofsd: xattr name mappings: Map server xattr names
-      tools/virtiofsd: xattr name mapping examples
-      tools/virtiofsd: xattr name mappings: Simple 'map'
-
-Max Reitz (8):
-      linux/fuse.h: Pull in from Linux
-      virtiofsd: Announce FUSE_ATTR_FLAGS
-      virtiofsd: Add attr_flags to fuse_entry_param
-      virtiofsd: Add fuse_reply_attr_with_flags()
-      virtiofsd: Store every lo_inode's parent_dev
-      virtiofsd: Announce sub-mount points
-      tests/acceptance/boot_linux: Accept SSH pubkey
-      tests/acceptance: Add virtiofs_submounts.py
-
-Misono Tomohiro (2):
-      configure: add option for virtiofsd
-      virtiofsd: passthrough_ll: set FUSE_LOG_INFO as default log_level
-
-Stefan Hajnoczi (1):
-      virtiofsd: add container-friendly -o sandbox=chroot option
-
- configure                                          |   8 +-
- docs/tools/virtiofsd.rst                           | 193 ++++++-
- include/standard-headers/linux/fuse.h              |  11 +-
- meson.build                                        |   1 +
- meson_options.txt                                  |   2 +
- tests/acceptance/boot_linux.py                     |  13 +-
- tests/acceptance/virtiofs_submounts.py             | 289 ++++++++++
- .../virtiofs_submounts.py.data/cleanup.sh          |  46 ++
- .../virtiofs_submounts.py.data/guest-cleanup.sh    |  30 +
- .../acceptance/virtiofs_submounts.py.data/guest.sh | 138 +++++
- .../acceptance/virtiofs_submounts.py.data/host.sh  | 127 +++++
- tools/meson.build                                  |  17 +-
- tools/virtiofsd/fuse_common.h                      |   8 +
- tools/virtiofsd/fuse_lowlevel.c                    |  34 +-
- tools/virtiofsd/fuse_lowlevel.h                    |  20 +
- tools/virtiofsd/helper.c                           |   9 +
- tools/virtiofsd/passthrough_ll.c                   | 622 ++++++++++++++++++++-
- 17 files changed, 1528 insertions(+), 40 deletions(-)
- create mode 100644 tests/acceptance/virtiofs_submounts.py
- create mode 100644 tests/acceptance/virtiofs_submounts.py.data/cleanup.sh
- create mode 100644 tests/acceptance/virtiofs_submounts.py.data/guest-cleanup.sh
- create mode 100644 tests/acceptance/virtiofs_submounts.py.data/guest.sh
- create mode 100644 tests/acceptance/virtiofs_submounts.py.data/host.sh
+diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
+index 686c42c0a5..870544fe13 100644
+--- a/tools/virtiofsd/fuse_common.h
++++ b/tools/virtiofsd/fuse_common.h
+@@ -352,6 +352,14 @@ struct fuse_file_info {
+  */
+ #define FUSE_CAP_NO_OPENDIR_SUPPORT (1 << 24)
+ 
++/**
++ * Indicates that the client will provide fuse_attr.flags, and the kernel will
++ * interpret it.
++ *
++ * This feature is enabled by default when supported by the kernel.
++ */
++#define FUSE_CAP_ATTR_FLAGS (1 << 27)
++
+ /**
+  * Ioctl flags
+  *
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index 4d1ba2925d..8679594255 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -1988,6 +1988,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+             bufsize = max_bufsize;
+         }
+     }
++    if (arg->flags & FUSE_ATTR_FLAGS) {
++        se->conn.capable |= FUSE_CAP_ATTR_FLAGS;
++    }
+ #ifdef HAVE_SPLICE
+ #ifdef HAVE_VMSPLICE
+     se->conn.capable |= FUSE_CAP_SPLICE_WRITE | FUSE_CAP_SPLICE_MOVE;
+@@ -2014,6 +2017,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+     LL_SET_DEFAULT(1, FUSE_CAP_ASYNC_DIO);
+     LL_SET_DEFAULT(1, FUSE_CAP_IOCTL_DIR);
+     LL_SET_DEFAULT(1, FUSE_CAP_ATOMIC_O_TRUNC);
++    LL_SET_DEFAULT(1, FUSE_CAP_ATTR_FLAGS);
+     LL_SET_DEFAULT(se->op.write_buf, FUSE_CAP_SPLICE_READ);
+     LL_SET_DEFAULT(se->op.getlk && se->op.setlk, FUSE_CAP_POSIX_LOCKS);
+     LL_SET_DEFAULT(se->op.flock, FUSE_CAP_FLOCK_LOCKS);
+@@ -2103,6 +2107,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+     if (se->conn.want & FUSE_CAP_POSIX_ACL) {
+         outarg.flags |= FUSE_POSIX_ACL;
+     }
++    if (se->conn.want & FUSE_CAP_ATTR_FLAGS) {
++        outarg.flags |= FUSE_ATTR_FLAGS;
++    }
+     outarg.max_readahead = se->conn.max_readahead;
+     outarg.max_write = se->conn.max_write;
+     if (se->conn.max_background >= (1 << 16)) {
+-- 
+2.28.0
 

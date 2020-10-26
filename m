@@ -1,10 +1,12 @@
-From: Max Reitz <mreitz@redhat.com>
-Date: Tue,  3 Nov 2020 17:41:35 +0100
-Message-Id: <20201103164135.169325-1-mreitz@redhat.com>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Mon, 26 Oct 2020 18:43:22 +0000
+Message-Id: <20201026184331.272953-8-dgilbert@redhat.com>
+In-Reply-To: <20201026184331.272953-1-dgilbert@redhat.com>
+References: <20201026184331.272953-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH for-5.2] virtiofsd: Announce submounts even
-	without statx()
+Subject: [Virtio-fs] [PULL 07/16] tools/virtiofsd: xattr name mapping
+	examples
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,64 +15,83 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: virtio-fs@redhat.com, Max Reitz <mreitz@redhat.com>
+To: qemu-devel@nongnu.org, stefanha@redhat.com, mreitz@redhat.com, misono.tomohiro@jp.fujitsu.com
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
-Contrary to what the check (and warning) in lo_init() claims, we can
-announce submounts just fine even without statx() -- the check is based
-on comparing both the mount ID and st_dev of parent and child.  Without
-statx(), we will not have the mount ID; but we always have st_dev.
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-The only problems we have (without statx() and its mount ID) are:
+Add a few examples of xattrmaps to the documentation.
 
-(1) Mounting the same device twice may lead to both trees being treated
-    as exactly the same tree by virtiofsd.  But that is a problem that
-    is completely independent of mirroring host submounts in the guest.
-    Both submount roots will still show the FUSE_SUBMOUNT flag, because
-    their st_dev still differs from their respective parent.
-
-(2) There is only one exception to (1), and that is if you mount a
-    device inside a mount of itself: Then, its st_dev will be the same
-    as that of its parent, and so without a mount ID, virtiofsd will not
-    be able to recognize the nested mount's root as a submount.
-    However, thanks to virtiofsd then treating both trees as exactly the
-    same tree, it will be caught up in a loop when the guest tries to
-    examine the nested submount, so the guest will always see nothing
-    but an ELOOP there.  Therefore, this case is just fully broken
-    without statx(), whether we check for submounts (based on st_dev) or
-    not.
-
-All in all, checking for submounts works well even without comparing the
-mount ID (i.e., without statx()).  The only concern is an edge case
-that, without statx() mount IDs, is utterly broken anyway.
-
-Thus, drop said check in lo_init().
-
-Reported-by: Miklos Szeredi <mszeredi@redhat.com>
-Signed-off-by: Max Reitz <mreitz@redhat.com>
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+Message-Id: <20201023165812.36028-5-dgilbert@redhat.com>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 8 --------
- 1 file changed, 8 deletions(-)
+ docs/tools/virtiofsd.rst | 50 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index ec1008bceb..6c64b03f1a 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -610,14 +610,6 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
-                  "does not support it\n");
-         lo->announce_submounts = false;
-     }
--
--#ifndef CONFIG_STATX
--    if (lo->announce_submounts) {
--        fuse_log(FUSE_LOG_WARNING, "lo_init: Cannot announce submounts, there "
--                 "is no statx()\n");
--        lo->announce_submounts = false;
--    }
--#endif
- }
+diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
+index 67c16f9df0..d80c078d80 100644
+--- a/docs/tools/virtiofsd.rst
++++ b/docs/tools/virtiofsd.rst
+@@ -219,6 +219,56 @@ e.g.:
  
- static void lo_getattr(fuse_req_t req, fuse_ino_t ino,
+   would hide 'security.' xattr's in listxattr from the server.
+ 
++xattr-mapping Examples
++----------------------
++
++1) Prefix all attributes with 'user.virtiofs.'
++
++::
++
++-o xattrmap=":prefix:all::user.virtiofs.::bad:all:::"
++
++
++This uses two rules, using : as the field separator;
++the first rule prefixes and strips 'user.virtiofs.',
++the second rule hides any non-prefixed attributes that
++the host set.
++
++2) Prefix 'trusted.' attributes, allow others through
++
++::
++
++   "/prefix/all/trusted./user.virtiofs./
++    /bad/server//trusted./
++    /bad/client/user.virtiofs.//
++    /ok/all///"
++
++
++Here there are four rules, using / as the field
++separator, and also demonstrating that new lines can
++be included between rules.
++The first rule is the prefixing of 'trusted.' and
++stripping of 'user.virtiofs.'.
++The second rule hides unprefixed 'trusted.' attributes
++on the host.
++The third rule stops a guest from explicitly setting
++the 'user.virtiofs.' path directly.
++Finally, the fourth rule lets all remaining attributes
++through.
++
++3) Hide 'security.' attributes, and allow everything else
++
++::
++
++    "/bad/all/security./security./
++     /ok/all///'
++
++The first rule combines what could be separate client and server
++rules into a single 'all' rule, matching 'security.' in either
++client arguments or lists returned from the host.  This stops
++the client seeing any 'security.' attributes on the server and
++stops it setting any.
++
+ Examples
+ --------
+ 
 -- 
-2.26.2
+2.28.0
 

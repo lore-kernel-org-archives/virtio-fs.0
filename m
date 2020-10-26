@@ -1,11 +1,12 @@
-Date: Thu, 5 Nov 2020 14:44:16 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20201105194416.GA1384085@redhat.com>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Mon, 26 Oct 2020 18:43:23 +0000
+Message-Id: <20201026184331.272953-9-dgilbert@redhat.com>
+In-Reply-To: <20201026184331.272953-1-dgilbert@redhat.com>
+References: <20201026184331.272953-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: [Virtio-fs] [PATCH] virtiofsd: Use --thread-pool-size=0 to mean no
-	thread pool
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PULL 08/16] tools/virtiofsd: xattr name mappings:
+	Simple 'map'
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,91 +15,220 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs-list <virtio-fs@redhat.com>
-Cc: jose.carlos.venegas.munoz@intel.com
+To: qemu-devel@nongnu.org, stefanha@redhat.com, mreitz@redhat.com, misono.tomohiro@jp.fujitsu.com
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
-Right now we create a thread pool and main thread hands over the request
-to thread in thread pool to process. Number of threads in thread pool
-can be managed by option --thread-pool-size.
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-There is a chance that in case of some workloads, we might get better
-performance if we don't handover the request to a different thread
-and process in the context of thread receiving the request.
+The mapping rule system implemented in the last few patches is
+extremely flexible, but not easy to use.  Add a simple
+'map' type as a sprinkling of sugar to make it easy.
 
-To implement that, redefine the meaning of --thread-pool-size=0 to
-mean that don't use a thread pool. Instead process the request in
-the context of thread receiving request from the queue.
+e.g.
 
-I can't think how --thread-pool-size=0 is useful and hence using
-that. If it is already useful somehow, I could look at defining
-a new option say "--no-thread-pool".
+  -o xattrmap=":map::user.virtiofs.:"
 
-I think this patch will be used more as a debug help to do comparison
-when it is more effecient to do not hand over the requests to a
-thread pool.
+would be sufficient to prefix all xattr's
+or
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+  -o xattrmap=":map:trusted.:user.virtiofs.:"
+
+would just prefix 'trusted.' xattr's and leave
+everything else alone.
+
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Message-Id: <20201023165812.36028-6-dgilbert@redhat.com>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 ---
- tools/virtiofsd/fuse_virtio.c | 33 ++++++++++++++++++++++++---------
- 1 file changed, 24 insertions(+), 9 deletions(-)
+ docs/tools/virtiofsd.rst         |  19 ++++++
+ tools/virtiofsd/passthrough_ll.c | 112 ++++++++++++++++++++++++++++++-
+ 2 files changed, 130 insertions(+), 1 deletion(-)
 
-diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-index ff86f6d1ce..60aa7cd3e5 100644
---- a/tools/virtiofsd/fuse_virtio.c
-+++ b/tools/virtiofsd/fuse_virtio.c
-@@ -695,13 +695,17 @@ static void *fv_queue_thread(void *opaque)
-     struct VuDev *dev = &qi->virtio_dev->dev;
-     struct VuVirtq *q = vu_get_queue(dev, qi->qidx);
-     struct fuse_session *se = qi->virtio_dev->se;
--    GThreadPool *pool;
--
--    pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size, FALSE,
--                             NULL);
--    if (!pool) {
--        fuse_log(FUSE_LOG_ERR, "%s: g_thread_pool_new failed\n", __func__);
--        return NULL;
-+    GThreadPool *pool = NULL;
-+    GList *req_list = NULL;
+diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
+index d80c078d80..34a9e40146 100644
+--- a/docs/tools/virtiofsd.rst
++++ b/docs/tools/virtiofsd.rst
+@@ -147,6 +147,7 @@ Each rule consists of a number of fields separated with a separator that is the
+ first non-white space character in the rule.  This separator must then be used
+ for the whole rule.
+ White space may be added before and after each rule.
 +
-+    if (se->thread_pool_size) {
-+        fuse_log(FUSE_LOG_DEBUG, "%s: Creating thread pool for Queue %d\n", __func__, qi->qidx);
-+        pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size,
-+                                 FALSE, NULL);
-+        if (!pool) {
-+            fuse_log(FUSE_LOG_ERR, "%s: g_thread_pool_new failed\n", __func__);
-+            return NULL;
-+        }
-     }
+ Using ':' as the separator a rule is of the form:
  
-     fuse_log(FUSE_LOG_INFO, "%s: Start for queue %d kick_fd %d\n", __func__,
-@@ -780,14 +784,25 @@ static void *fv_queue_thread(void *opaque)
-             req->bad_in_num = bad_in_num;
-             req->bad_out_num = bad_out_num;
+ ``:type:scope:key:prepend:``
+@@ -219,6 +220,14 @@ e.g.:
  
--            g_thread_pool_push(pool, req, NULL);
-+            if (!se->thread_pool_size)
-+                req_list = g_list_prepend(req_list, req);
-+            else
-+                g_thread_pool_push(pool, req, NULL);
-         }
+   would hide 'security.' xattr's in listxattr from the server.
  
-         pthread_mutex_unlock(&qi->vq_lock);
-         pthread_rwlock_unlock(&qi->virtio_dev->vu_dispatch_rwlock);
++A simpler 'map' type provides a shorter syntax for the common case:
 +
-+        // Process all the requests.
-+        if (!se->thread_pool_size && req_list != NULL) {
-+	    g_list_foreach(req_list, fv_queue_worker, qi);
-+	    g_list_free(req_list);
-+            req_list = NULL;
-+	}
-     }
++``:map:key:prepend:``
++
++The 'map' type adds a number of separate rules to add **prepend** as a prefix
++to the matched **key** (or all attributes if **key** is empty).
++There may be at most one 'map' rule and it must be the last rule in the set.
++
+ xattr-mapping Examples
+ ----------------------
  
--    g_thread_pool_free(pool, FALSE, TRUE);
-+    if (pool)
-+        g_thread_pool_free(pool, FALSE, TRUE);
+@@ -234,6 +243,11 @@ the first rule prefixes and strips 'user.virtiofs.',
+ the second rule hides any non-prefixed attributes that
+ the host set.
  
-     return NULL;
++This is equivalent to the 'map' rule:
++
++::
++-o xattrmap=":map::user.virtiofs.:"
++
+ 2) Prefix 'trusted.' attributes, allow others through
+ 
+ ::
+@@ -256,6 +270,11 @@ the 'user.virtiofs.' path directly.
+ Finally, the fourth rule lets all remaining attributes
+ through.
+ 
++This is equivalent to the 'map' rule:
++
++::
++-o xattrmap="/map/trusted./user.virtiofs./"
++
+ 3) Hide 'security.' attributes, and allow everything else
+ 
+ ::
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 8c0187498a..a0beb986f3 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -2090,6 +2090,109 @@ static void free_xattrmap(struct lo_data *lo)
+     lo->xattr_map_nentries = -1;
  }
+ 
++/*
++ * Handle the 'map' type, which is sugar for a set of commands
++ * for the common case of prefixing a subset or everything,
++ * and allowing anything not prefixed through.
++ * It must be the last entry in the stream, although there
++ * can be other entries before it.
++ * The form is:
++ *    :map:key:prefix:
++ *
++ * key maybe empty in which case all entries are prefixed.
++ */
++static void parse_xattrmap_map(struct lo_data *lo,
++                               const char *rule, char sep)
++{
++    const char *tmp;
++    char *key;
++    char *prefix;
++    XattrMapEntry tmp_entry;
++
++    if (*rule != sep) {
++        fuse_log(FUSE_LOG_ERR,
++                 "%s: Expecting '%c' after 'map' keyword, found '%c'\n",
++                 __func__, sep, *rule);
++        exit(1);
++    }
++
++    rule++;
++
++    /* At start of 'key' field */
++    tmp = strchr(rule, sep);
++    if (!tmp) {
++        fuse_log(FUSE_LOG_ERR,
++                 "%s: Missing '%c' at end of key field in map rule\n",
++                 __func__, sep);
++        exit(1);
++    }
++
++    key = g_strndup(rule, tmp - rule);
++    rule = tmp + 1;
++
++    /* At start of prefix field */
++    tmp = strchr(rule, sep);
++    if (!tmp) {
++        fuse_log(FUSE_LOG_ERR,
++                 "%s: Missing '%c' at end of prefix field in map rule\n",
++                 __func__, sep);
++        exit(1);
++    }
++
++    prefix = g_strndup(rule, tmp - rule);
++    rule = tmp + 1;
++
++    /*
++     * This should be the end of the string, we don't allow
++     * any more commands after 'map'.
++     */
++    if (*rule) {
++        fuse_log(FUSE_LOG_ERR,
++                 "%s: Expecting end of command after map, found '%c'\n",
++                 __func__, *rule);
++        exit(1);
++    }
++
++    /* 1st: Prefix matches/everything */
++    tmp_entry.flags = XATTR_MAP_FLAG_PREFIX | XATTR_MAP_FLAG_ALL;
++    tmp_entry.key = g_strdup(key);
++    tmp_entry.prepend = g_strdup(prefix);
++    add_xattrmap_entry(lo, &tmp_entry);
++
++    if (!*key) {
++        /* Prefix all case */
++
++        /* 2nd: Hide any non-prefixed entries on the host */
++        tmp_entry.flags = XATTR_MAP_FLAG_BAD | XATTR_MAP_FLAG_ALL;
++        tmp_entry.key = g_strdup("");
++        tmp_entry.prepend = g_strdup("");
++        add_xattrmap_entry(lo, &tmp_entry);
++    } else {
++        /* Prefix matching case */
++
++        /* 2nd: Hide non-prefixed but matching entries on the host */
++        tmp_entry.flags = XATTR_MAP_FLAG_BAD | XATTR_MAP_FLAG_SERVER;
++        tmp_entry.key = g_strdup(""); /* Not used */
++        tmp_entry.prepend = g_strdup(key);
++        add_xattrmap_entry(lo, &tmp_entry);
++
++        /* 3rd: Stop the client accessing prefixed attributes directly */
++        tmp_entry.flags = XATTR_MAP_FLAG_BAD | XATTR_MAP_FLAG_CLIENT;
++        tmp_entry.key = g_strdup(prefix);
++        tmp_entry.prepend = g_strdup(""); /* Not used */
++        add_xattrmap_entry(lo, &tmp_entry);
++
++        /* 4th: Everything else is OK */
++        tmp_entry.flags = XATTR_MAP_FLAG_OK | XATTR_MAP_FLAG_ALL;
++        tmp_entry.key = g_strdup("");
++        tmp_entry.prepend = g_strdup("");
++        add_xattrmap_entry(lo, &tmp_entry);
++    }
++
++    g_free(key);
++    g_free(prefix);
++}
++
+ static void parse_xattrmap(struct lo_data *lo)
+ {
+     const char *map = lo->xattrmap;
+@@ -2118,10 +2221,17 @@ static void parse_xattrmap(struct lo_data *lo)
+             tmp_entry.flags |= XATTR_MAP_FLAG_OK;
+         } else if (strstart(map, "bad", &map)) {
+             tmp_entry.flags |= XATTR_MAP_FLAG_BAD;
++        } else if (strstart(map, "map", &map)) {
++            /*
++             * map is sugar that adds a number of rules, and must be
++             * the last entry.
++             */
++            parse_xattrmap_map(lo, map, sep);
++            return;
+         } else {
+             fuse_log(FUSE_LOG_ERR,
+                      "%s: Unexpected type;"
+-                     "Expecting 'prefix', 'ok', or 'bad' in rule %zu\n",
++                     "Expecting 'prefix', 'ok', 'bad' or 'map' in rule %zu\n",
+                      __func__, lo->xattr_map_nentries);
+             exit(1);
+         }
 -- 
-2.25.4
+2.28.0
 

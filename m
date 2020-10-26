@@ -1,14 +1,12 @@
-Date: Mon, 2 Nov 2020 13:55:24 -0500
-From: Eduardo Habkost <ehabkost@redhat.com>
-Message-ID: <20201102185524.GT5733@habkost.net>
-References: <20201102161859.156603-1-mreitz@redhat.com>
-	<20201102161859.156603-8-mreitz@redhat.com>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Mon, 26 Oct 2020 18:43:21 +0000
+Message-Id: <20201026184331.272953-7-dgilbert@redhat.com>
+In-Reply-To: <20201026184331.272953-1-dgilbert@redhat.com>
+References: <20201026184331.272953-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=utf-8
-Content-Disposition: inline
-In-Reply-To: <20201102161859.156603-8-mreitz@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 7/7] tests/acceptance: Add
-	virtiofs_submounts.py
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PULL 06/16] tools/virtiofsd: xattr name mappings: Map
+	server xattr names
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,40 +15,132 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: qemu-devel@nongnu.org, stefanha@redhat.com, mreitz@redhat.com, misono.tomohiro@jp.fujitsu.com
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
-On Mon, Nov 02, 2020 at 05:18:59PM +0100, Max Reitz wrote:
-> This test invokes several shell scripts to create a random directory
-> tree full of submounts, and then check in the VM whether every submount
-> has its own ID and the structure looks as expected.
-> 
-> (Note that the test scripts must be non-executable, so Avocado will not
-> try to execute them as if they were tests on their own, too.)
-> 
-> Because at this commit's date it is unlikely that the Linux kernel on
-> the image provided by boot_linux.py supports submounts in virtio-fs, the
-> test will be cancelled if no custom Linux binary is provided through the
-> vmlinuz parameter.  (The on-image kernel can be used by providing an
-> empty string via vmlinuz=.)
-> 
-> So, invoking the test can be done as follows:
-> $ avocado run \
->     tests/acceptance/virtiofs_submounts.py \
->     -p vmlinuz=/path/to/linux/build/arch/x86/boot/bzImage
-> 
-> This test requires root privileges (through passwordless sudo -n),
-> because at this point, virtiofsd requires them.  (If you have a
-> timestamp_timeout period for sudoers (e.g. the default of 5 min), you
-> can provide this by executing something like "sudo true" before invoking
-> Avocado.)
-> 
-> Signed-off-by: Max Reitz <mreitz@redhat.com>
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Fixes the issue detected in v3.
+Map xattr names coming from the server, i.e. the host filesystem;
+currently this is only from listxattr.
 
-Tested-by: Eduardo Habkost <ehabkost@redhat.com>
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Message-Id: <20201023165812.36028-4-dgilbert@redhat.com>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c | 90 ++++++++++++++++++++++++++++++++
+ 1 file changed, 90 insertions(+)
 
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index cf67737751..8c0187498a 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -2229,6 +2229,44 @@ static int xattr_map_client(const struct lo_data *lo, const char *client_name,
+     return -EPERM;
+ }
+ 
++/*
++ * For use with listxattr where the server fs gives us a name and we may need
++ * to sanitize this for the client.
++ * Returns a pointer to the result in *out_name
++ *   This is always the original string or the current string with some prefix
++ *   removed; no reallocation is done.
++ * Returns 0 on success
++ * Can return -ENODATA to indicate the name should be dropped from the list.
++ */
++static int xattr_map_server(const struct lo_data *lo, const char *server_name,
++                            const char **out_name)
++{
++    size_t i;
++    const char *end;
++
++    for (i = 0; i < lo->xattr_map_nentries; i++) {
++        const XattrMapEntry *cur_entry = lo->xattr_map_list + i;
++
++        if ((cur_entry->flags & XATTR_MAP_FLAG_SERVER) &&
++            (strstart(server_name, cur_entry->prepend, &end))) {
++            if (cur_entry->flags & XATTR_MAP_FLAG_BAD) {
++                return -ENODATA;
++            }
++            if (cur_entry->flags & XATTR_MAP_FLAG_OK) {
++                *out_name = server_name;
++                return 0;
++            }
++            if (cur_entry->flags & XATTR_MAP_FLAG_PREFIX) {
++                /* Remove prefix */
++                *out_name = end;
++                return 0;
++            }
++        }
++    }
++
++    return -ENODATA;
++}
++
+ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+                         size_t size)
+ {
+@@ -2383,8 +2421,60 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
+         if (ret == 0) {
+             goto out;
+         }
++
++        if (lo->xattr_map_list) {
++            /*
++             * Map the names back, some attributes might be dropped,
++             * some shortened, but not increased, so we shouldn't
++             * run out of room.
++             */
++            size_t out_index, in_index;
++            out_index = 0;
++            in_index = 0;
++            while (in_index < ret) {
++                const char *map_out;
++                char *in_ptr = value + in_index;
++                /* Length of current attribute name */
++                size_t in_len = strlen(value + in_index) + 1;
++
++                int mapret = xattr_map_server(lo, in_ptr, &map_out);
++                if (mapret != -ENODATA && mapret != 0) {
++                    /* Shouldn't happen */
++                    saverr = -mapret;
++                    goto out;
++                }
++                if (mapret == 0) {
++                    /* Either unchanged, or truncated */
++                    size_t out_len;
++                    if (map_out != in_ptr) {
++                        /* +1 copies the NIL */
++                        out_len = strlen(map_out) + 1;
++                    } else {
++                        /* No change */
++                        out_len = in_len;
++                    }
++                    /*
++                     * Move result along, may still be needed for an unchanged
++                     * entry if a previous entry was changed.
++                     */
++                    memmove(value + out_index, map_out, out_len);
++
++                    out_index += out_len;
++                }
++                in_index += in_len;
++            }
++            ret = out_index;
++            if (ret == 0) {
++                goto out;
++            }
++        }
+         fuse_reply_buf(req, value, ret);
+     } else {
++        /*
++         * xattrmap only ever shortens the result,
++         * so we don't need to do anything clever with the
++         * allocation length here.
++         */
+         fuse_reply_xattr(req, ret);
+     }
+ out_free:
 -- 
-Eduardo
+2.28.0
 

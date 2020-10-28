@@ -1,20 +1,13 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=TacXGm0yUALIKf0NNmUteMlWj7hp0bwcpOLuk6Yh51w=;
-	b=feOiEfPTL68eZ6di6nyd30J7mDG5CrL+czwXWQf8kZffdC5NEg+p1UAkmWF012Nepb
-	cS9CLUm+GBPHfUR1Sp2U88KM4xi5F1Pnm8kPKByryi1ZDTGdm78G+lDNLo77JEsTaEnc
-	2qvk/xTnGERMiOpilW9iHLw9vSzuv2y7Mv6RlZ4lEoBNB9M8wIcP4AvKr28ZGFCK4c5R
-	rb/RgmB9HUExqpKf2tVXxgAoU5k5KIpHkOghQKNn+Xr6MREwPTts9bZjVhKVMCQ/+8U6
-	lTqpSm2g+lHCs05FllE/AqHrV0rRx4zq69Vpaol9Au5+oNJ+pYailc514mEEc3VoWDxW
-	Zubg==
+Date: Wed, 28 Oct 2020 10:53:27 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20201028105327.GD221115@stefanha-x1.localdomain>
+References: <AM0PR03MB6292A6819675EF4384D80510A6190@AM0PR03MB6292.eurprd03.prod.outlook.com>
 MIME-Version: 1.0
-References: <20201026184331.272953-1-dgilbert@redhat.com>
-In-Reply-To: <20201026184331.272953-1-dgilbert@redhat.com>
-From: Peter Maydell <peter.maydell@linaro.org>
-Date: Tue, 27 Oct 2020 16:58:23 +0000
-Message-ID: <CAFEAcA8mcgk2ansZGStesf+Whdg8swkS466rVYvXuFMUWDzVAQ@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PULL 00/16] virtiofs queue
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="EP0wieDxd4TSJjHq"
+Content-Disposition: inline
+In-Reply-To: <AM0PR03MB6292A6819675EF4384D80510A6190@AM0PR03MB6292.eurprd03.prod.outlook.com>
+Subject: Re: [Virtio-fs] Architecture diagram license
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,50 +16,50 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: QEMU Developers <qemu-devel@nongnu.org>, virtio-fs@redhat.com, Max Reitz <mreitz@redhat.com>, vgoyal@redhat.com
-
-On Mon, 26 Oct 2020 at 18:51, Dr. David Alan Gilbert (git)
-<dgilbert@redhat.com> wrote:
->
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
->
-> The following changes since commit a95e0396c805735c491a049b01de6f5a713fb91b:
->
->   Merge remote-tracking branch 'remotes/bonzini-gitlab/tags/for-upstream' into staging (2020-10-26 15:49:11 +0000)
->
-> are available in the Git repository at:
->
->   https://gitlab.com/dagrh/qemu.git tags/pull-virtiofs-20201026
->
-> for you to fetch changes up to c93a656f7b6585d9b6f8639d1fbb74dd944be239:
->
->   tests/acceptance: Add virtiofs_submounts.py (2020-10-26 18:35:32 +0000)
->
-> ----------------------------------------------------------------
-> virtiofsd pull 2020-10-26
->
-> Misono
->    Set default log level to info
->    Explicit build option for virtiofsd
->
-> Me
->    xattr name mapping
->
-> Stefan
->   Alternative chroot sandbox method
->
-> Max
->   Submount mechanism
->
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
->
+To: Fotis Xenakis <foxen@windowslive.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
 
-Applied, thanks.
+--EP0wieDxd4TSJjHq
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
 
-Please update the changelog at https://wiki.qemu.org/ChangeLog/5.2
-for any user-visible changes.
+On Mon, Oct 26, 2020 at 11:31:54PM +0000, Fotis Xenakis wrote:
+> OSv is a unikernel happily running on QEMU/KVM, supporting different filesystems. Virtio-fs is a great fit for unikernels: it offers an escape route from rebuilding images for every change and very competitive performance just to name a couple of factors.
+> I decided as part of my thesis to tackle read-only virtio-fs DAX window support on the OSv side (nothing big, no comparison to linux). This has been merged and works on OSv and I 've been working on evaluating it (spoiler: it works very nicely and performance is pretty good).
+> Unfortunately, the thesis containing the detailed evaluation is mostly in Greek, in any case you can find it here https://github.com/foxeng/diploma. When time allows, I will also do an English write-up for sharing. If anyone's interested, I 'll make sure to post it here too!
 
--- PMM
+You are welcome to write a guest post on the QEMU blog
+(https://qemu.org/blog/) that gives an overview of OSv and the virtio-fs
+device interface. I imagine people would be interested in learning about
+both these topics.
+
+The git repo for the QEMU website and blog is here:
+https://gitlab.com/qemu-project/qemu-web
+
+You can create a new blog post by dropping a Markdown file into _posts/.
+Images can be added to screenshots/ directory.
+
+The blog post can be sent to the QEMU mailing list using
+git-send-email(1) with Thomas Huth <thuth@redhat.com> CCed. Please also
+CC virtio-fs@redhat.com and we'll review it.
+
+Stefan
+
+--EP0wieDxd4TSJjHq
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl+ZTacACgkQnKSrs4Gr
+c8jm2gf9FtOt2LETfxM0Dzt2bIbNwTvJj/OgBFT/mxa2/IYsq4z8mCiCxP+tuJTO
+GH/YYAnm6wwtRaAEhO9XicryvYGLhK9GPn8/YaGPMP4lDigpLTfwAjG6sPqRPzCr
+RhMx7Dng/ho29pKkT1lWEfnyzlkZUO+IYmV7TNRWTBdVgrybZa/1/RFRGzABr3D3
+u6/ZkDhQdNOzBzjGo/nIua3gRgjJs5yBx3ObL7ISNR6NHH0Yh1OHIKp8Xhr1sZAy
+ZgO1K+EgbsnQkA/3u9V5Bz1uwruu3/ZNNb5HMfUbSLIwNHGCNuZeCVViejJNJmnA
+cafBn6PASSFI+lqFyZ1TU0WpVzCTyw==
+=8ZgR
+-----END PGP SIGNATURE-----
+
+--EP0wieDxd4TSJjHq--
 

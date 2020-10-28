@@ -1,12 +1,10 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Mon, 26 Oct 2020 18:43:17 +0000
-Message-Id: <20201026184331.272953-3-dgilbert@redhat.com>
-In-Reply-To: <20201026184331.272953-1-dgilbert@redhat.com>
-References: <20201026184331.272953-1-dgilbert@redhat.com>
+Date: Wed, 28 Oct 2020 19:00:18 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20201028190018.GA4858@work-vm>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 02/16] virtiofsd: passthrough_ll: set
-	FUSE_LOG_INFO as default log_level
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: [Virtio-fs] Changes in -dev branch
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,43 +13,28 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, stefanha@redhat.com, mreitz@redhat.com, misono.tomohiro@jp.fujitsu.com
-Cc: virtio-fs@redhat.com, vgoyal@redhat.com
+To: virtio-fs@redhat.com
 
-From: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+Hi,
+   I've just pushed a new version of the virtio-fs-dev branch in
+  https://gitlab.com/virtio-fs/qemu
 
-Just noticed that although help message says default log level is INFO,
-it is actually 0 (EMRGE) and no mesage will be shown when error occurs.
-It's better to follow help message.
+This is based off a very recent qemu tree, and we've got some new
+virtiofs features in (thanks to all contributors):
 
-Signed-off-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
-Message-Id: <20201008110148.2757734-1-misono.tomohiro@jp.fujitsu.com>
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
----
- tools/virtiofsd/passthrough_ll.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+  a) A new sandbox option that uses chroot rather than pivot_root
+    and namespacing
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index ff53df4451..13fdb12367 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -2878,12 +2878,11 @@ int main(int argc, char *argv[])
-         goto err_out1;
-     }
- 
--    /*
--     * log_level is 0 if not configured via cmd options (0 is LOG_EMERG,
--     * and we don't use this log level).
--     */
-     if (opts.log_level != 0) {
-         current_log_level = opts.log_level;
-+    } else {
-+        /* default log level is INFO */
-+        current_log_level = FUSE_LOG_INFO;
-     }
-     lo.debug = opts.debug;
-     if (lo.debug) {
+  b) A mechanism that lets xattr names be translated between the
+    host and guest.
+
+  c) an explicit configure option (--enable-virtiofsd) to force
+   compilation of virtiofsd - the build system will then tell
+   you if you're missing build dependencies rather than quietly
+   disabling it.
+
+Dave
+
 -- 
-2.28.0
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

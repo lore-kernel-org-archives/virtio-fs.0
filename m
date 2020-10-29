@@ -1,12 +1,13 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Mon, 26 Oct 2020 18:43:18 +0000
-Message-Id: <20201026184331.272953-4-dgilbert@redhat.com>
-In-Reply-To: <20201026184331.272953-1-dgilbert@redhat.com>
-References: <20201026184331.272953-1-dgilbert@redhat.com>
+From: Max Reitz <mreitz@redhat.com>
+Date: Thu, 29 Oct 2020 18:17:41 +0100
+Message-Id: <20201029171744.150726-5-mreitz@redhat.com>
+In-Reply-To: <20201029171744.150726-1-mreitz@redhat.com>
+References: <20201029171744.150726-1-mreitz@redhat.com>
 MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 03/16] virtiofsd: add container-friendly -o
-	sandbox=chroot option
+Subject: [Virtio-fs] [PATCH v2 4/7] virtiofsd: Add mount ID to the lo_inode
+	key
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,210 +16,276 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, stefanha@redhat.com, mreitz@redhat.com, misono.tomohiro@jp.fujitsu.com
-Cc: virtio-fs@redhat.com, vgoyal@redhat.com
+To: qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, Max Reitz <mreitz@redhat.com>
 
-From: Stefan Hajnoczi <stefanha@redhat.com>
+Using st_dev is not sufficient to uniquely identify a mount: You can
+mount the same device twice, but those are still separate trees, and
+e.g. by mounting something else inside one of them, they may differ.
 
-virtiofsd cannot run in a container because CAP_SYS_ADMIN is required to
-create namespaces.
+Using statx(), we can get a mount ID that uniquely identifies a mount.
+If that is available, add it to the lo_inode key.
 
-Introduce a weaker sandbox mode that is sufficient in container
-environments because the container runtime already sets up namespaces.
-Use chroot to restrict path traversal to the shared directory.
+Most of this patch is taken from Miklos's mail here:
+https://marc.info/?l=fuse-devel&m=160062521827983
+(virtiofsd-use-mount-id.patch attachment)
 
-virtiofsd loses the following:
-
-1. Mount namespace. The process chroots to the shared directory but
-   leaves the mounts in place. Seccomp rejects mount(2)/umount(2)
-   syscalls.
-
-2. Pid namespace. This should be fine because virtiofsd is the only
-   process running in the container.
-
-3. Network namespace. This should be fine because seccomp already
-   rejects the connect(2) syscall, but an additional layer of security
-   is lost. Container runtime-specific network security policies can be
-   used drop network traffic (except for the vhost-user UNIX domain
-   socket).
-
-Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-Message-Id: <20201008085534.16070-1-stefanha@redhat.com>
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Suggested-by: Miklos Szeredi <mszeredi@redhat.com>
+Signed-off-by: Max Reitz <mreitz@redhat.com>
 ---
- docs/tools/virtiofsd.rst         | 32 ++++++++++++++----
- tools/virtiofsd/helper.c         |  8 +++++
- tools/virtiofsd/passthrough_ll.c | 57 ++++++++++++++++++++++++++++++--
- 3 files changed, 88 insertions(+), 9 deletions(-)
+I’m not sure how to better mark Miklos as the original author of this
+patch, since he didn’t give an S-o-b on virtiofsd-use-mount-id.patch.
+The best would be if he could give it now (or at least review or ack
+this patch).
 
-diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-index 7ecee49834..65f8e76569 100644
---- a/docs/tools/virtiofsd.rst
-+++ b/docs/tools/virtiofsd.rst
-@@ -17,13 +17,24 @@ This program is designed to work with QEMU's ``--device vhost-user-fs-pci``
- but should work with any virtual machine monitor (VMM) that supports
- vhost-user.  See the Examples section below.
- 
--This program must be run as the root user.  Upon startup the program will
--switch into a new file system namespace with the shared directory tree as its
--root.  This prevents "file system escapes" due to symlinks and other file
--system objects that might lead to files outside the shared directory.  The
--program also sandboxes itself using seccomp(2) to prevent ptrace(2) and other
--vectors that could allow an attacker to compromise the system after gaining
--control of the virtiofsd process.
-+This program must be run as the root user.  The program drops privileges where
-+possible during startup although it must be able to create and access files
-+with any uid/gid:
-+
-+* The ability to invoke syscalls is limited using seccomp(2).
-+* Linux capabilities(7) are dropped.
-+
-+In "namespace" sandbox mode the program switches into a new file system
-+namespace and invokes pivot_root(2) to make the shared directory tree its root.
-+A new pid and net namespace is also created to isolate the process.
-+
-+In "chroot" sandbox mode the program invokes chroot(2) to make the shared
-+directory tree its root. This mode is intended for container environments where
-+the container runtime has already set up the namespaces and the program does
-+not have permission to create namespaces itself.
-+
-+Both sandbox modes prevent "file system escapes" due to symlinks and other file
-+system objects that might lead to files outside the shared directory.
- 
- Options
- -------
-@@ -69,6 +80,13 @@ Options
-   * readdirplus|no_readdirplus -
-     Enable/disable readdirplus.  The default is ``readdirplus``.
- 
-+  * sandbox=namespace|chroot -
-+    Sandbox mode:
-+    - namespace: Create mount, pid, and net namespaces and pivot_root(2) into
-+    the shared directory.
-+    - chroot: chroot(2) into shared directory (use in containers).
-+    The default is "namespace".
-+
-   * source=PATH -
-     Share host directory tree located at PATH.  This option is required.
- 
-diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
-index 85770d63f1..2e181a49b5 100644
---- a/tools/virtiofsd/helper.c
-+++ b/tools/virtiofsd/helper.c
-@@ -166,6 +166,14 @@ void fuse_cmdline_help(void)
-            "                               enable/disable readirplus\n"
-            "                               default: readdirplus except with "
-            "cache=none\n"
-+           "    -o sandbox=namespace|chroot\n"
-+           "                               sandboxing mode:\n"
-+           "                               - namespace: mount, pid, and net\n"
-+           "                                 namespaces with pivot_root(2)\n"
-+           "                                 into shared directory\n"
-+           "                               - chroot: chroot(2) into shared\n"
-+           "                                 directory (use in containers)\n"
-+           "                               default: namespace\n"
-            "    -o timeout=<number>        I/O timeout (seconds)\n"
-            "                               default: depends on cache= option.\n"
-            "    -o writeback|no_writeback  enable/disable writeback cache\n"
+I made some changes, most notably:
+- Set use_statx unconditionally, not just with announce_submounts.  It
+  fixes a real bug that has nothing to do with submounts.
+
+- Squashed some hunks into other patches of my series (thus directly
+  obsoleting “Store every lo_inode's parent_dev”, and indirectly also
+  “Add fuse_reply_attr_with_flags”)
+
+- Spun out the configure check (whether statx() is available) into a
+  dedicated patch, and translated it to Meson
+
+- errno isn’t negative (the original patch checked for errno != -ENOSYS)
+---
+ tools/virtiofsd/passthrough_ll.c      | 95 ++++++++++++++++++++++++---
+ tools/virtiofsd/passthrough_seccomp.c |  1 +
+ 2 files changed, 86 insertions(+), 10 deletions(-)
+
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 13fdb12367..f03b1f9a69 100644
+index a0beb986f3..34d107975f 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -137,8 +137,14 @@ enum {
-     CACHE_ALWAYS,
+@@ -94,6 +94,7 @@ struct lo_map {
+ struct lo_key {
+     ino_t ino;
+     dev_t dev;
++    uint64_t mnt_id;
  };
  
-+enum {
-+    SANDBOX_NAMESPACE,
-+    SANDBOX_CHROOT,
-+};
-+
- struct lo_data {
-     pthread_mutex_t mutex;
-+    int sandbox;
-     int debug;
-     int writeback;
-     int flock;
-@@ -163,6 +169,12 @@ struct lo_data {
- };
+ struct lo_inode {
+@@ -166,6 +167,7 @@ struct lo_data {
+     int readdirplus_set;
+     int readdirplus_clear;
+     int allow_direct_io;
++    bool use_statx;
+     struct lo_inode root;
+     GHashTable *inodes; /* protected by lo->mutex */
+     struct lo_map ino_map; /* protected by lo->mutex */
+@@ -219,7 +221,8 @@ static struct {
+ /* That we loaded cap-ng in the current thread from the saved */
+ static __thread bool cap_loaded = 0;
  
- static const struct fuse_opt lo_opts[] = {
-+    { "sandbox=namespace",
-+      offsetof(struct lo_data, sandbox),
-+      SANDBOX_NAMESPACE },
-+    { "sandbox=chroot",
-+      offsetof(struct lo_data, sandbox),
-+      SANDBOX_CHROOT },
-     { "writeback", offsetof(struct lo_data, writeback), 1 },
-     { "no_writeback", offsetof(struct lo_data, writeback), 0 },
-     { "source=%s", offsetof(struct lo_data, source), 0 },
-@@ -2660,6 +2672,41 @@ static void setup_capabilities(char *modcaps_in)
-     pthread_mutex_unlock(&cap.mutex);
+-static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st);
++static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
++                                uint64_t mnt_id);
+ 
+ static int is_dot_or_dotdot(const char *name)
+ {
+@@ -741,12 +744,14 @@ out_err:
+     fuse_reply_err(req, saverr);
  }
  
-+/*
-+ * Use chroot as a weaker sandbox for environments where the process is
-+ * launched without CAP_SYS_ADMIN.
-+ */
-+static void setup_chroot(struct lo_data *lo)
+-static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st)
++static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
++                                uint64_t mnt_id)
+ {
+     struct lo_inode *p;
+     struct lo_key key = {
+         .ino = st->st_ino,
+         .dev = st->st_dev,
++        .mnt_id = mnt_id,
+     };
+ 
+     pthread_mutex_lock(&lo->mutex);
+@@ -774,6 +779,60 @@ static void posix_locks_value_destroy(gpointer data)
+     free(plock);
+ }
+ 
++static int do_statx(struct lo_data *lo, int dirfd, const char *pathname,
++                    struct stat *statbuf, int flags, uint64_t *mnt_id)
 +{
-+    lo->proc_self_fd = open("/proc/self/fd", O_PATH);
-+    if (lo->proc_self_fd == -1) {
-+        fuse_log(FUSE_LOG_ERR, "open(\"/proc/self/fd\", O_PATH): %m\n");
-+        exit(1);
-+    }
++    int res;
 +
-+    /*
-+     * Make the shared directory the file system root so that FUSE_OPEN
-+     * (lo_open()) cannot escape the shared directory by opening a symlink.
-+     *
-+     * The chroot(2) syscall is later disabled by seccomp and the
-+     * CAP_SYS_CHROOT capability is dropped so that tampering with the chroot
-+     * is not possible.
-+     *
-+     * However, it's still possible to escape the chroot via lo->proc_self_fd
-+     * but that requires first gaining control of the process.
-+     */
-+    if (chroot(lo->source) != 0) {
-+        fuse_log(FUSE_LOG_ERR, "chroot(\"%s\"): %m\n", lo->source);
-+        exit(1);
-+    }
++#if defined(CONFIG_STATX) && defined(STATX_MNT_ID)
++    if (lo->use_statx) {
++        struct statx statxbuf;
 +
-+    /* Move into the chroot */
-+    if (chdir("/") != 0) {
-+        fuse_log(FUSE_LOG_ERR, "chdir(\"/\"): %m\n");
-+        exit(1);
++        res = statx(dirfd, pathname, flags, STATX_BASIC_STATS | STATX_MNT_ID,
++                    &statxbuf);
++        if (!res) {
++            memset(statbuf, 0, sizeof(*statbuf));
++            statbuf->st_dev = makedev(statxbuf.stx_dev_major,
++                                      statxbuf.stx_dev_minor);
++            statbuf->st_ino = statxbuf.stx_ino;
++            statbuf->st_mode = statxbuf.stx_mode;
++            statbuf->st_nlink = statxbuf.stx_nlink;
++            statbuf->st_uid = statxbuf.stx_uid;
++            statbuf->st_gid = statxbuf.stx_gid;
++            statbuf->st_rdev = makedev(statxbuf.stx_rdev_major,
++                                       statxbuf.stx_rdev_minor);
++            statbuf->st_size = statxbuf.stx_size;
++            statbuf->st_blksize = statxbuf.stx_blksize;
++            statbuf->st_blocks = statxbuf.stx_blocks;
++            statbuf->st_atim.tv_sec = statxbuf.stx_atime.tv_sec;
++            statbuf->st_atim.tv_nsec = statxbuf.stx_atime.tv_nsec;
++            statbuf->st_mtim.tv_sec = statxbuf.stx_mtime.tv_sec;
++            statbuf->st_mtim.tv_nsec = statxbuf.stx_mtime.tv_nsec;
++            statbuf->st_ctim.tv_sec = statxbuf.stx_ctime.tv_sec;
++            statbuf->st_ctim.tv_nsec = statxbuf.stx_ctime.tv_nsec;
++
++            if (statxbuf.stx_mask & STATX_MNT_ID) {
++                *mnt_id = statxbuf.stx_mnt_id;
++            } else {
++                *mnt_id = 0;
++            }
++            return 0;
++        } else if (errno != ENOSYS) {
++            return -1;
++        }
++        lo->use_statx = false;
++        /* fallback */
 +    }
++#endif
++    res = fstatat(dirfd, pathname, statbuf, flags);
++    if (res == -1) {
++        return -1;
++    }
++    *mnt_id = 0;
++
++    return 0;
 +}
 +
  /*
-  * Lock down this process to prevent access to other processes or files outside
-  * source directory.  This reduces the impact of arbitrary code execution bugs.
-@@ -2667,8 +2714,13 @@ static void setup_capabilities(char *modcaps_in)
- static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
-                           bool enable_syslog)
+  * Increments nlookup and caller must release refcount using
+  * lo_inode_put(&parent).
+@@ -784,6 +843,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+     int newfd;
+     int res;
+     int saverr;
++    uint64_t mnt_id;
+     struct lo_data *lo = lo_data(req);
+     struct lo_inode *inode = NULL;
+     struct lo_inode *dir = lo_inode(req, parent);
+@@ -811,12 +871,13 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+         goto out_err;
+     }
+ 
+-    res = fstatat(newfd, "", &e->attr, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
++    res = do_statx(lo, newfd, "", &e->attr, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW,
++                   &mnt_id);
+     if (res == -1) {
+         goto out_err;
+     }
+ 
+-    inode = lo_find(lo, &e->attr);
++    inode = lo_find(lo, &e->attr, mnt_id);
+     if (inode) {
+         close(newfd);
+     } else {
+@@ -838,6 +899,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+         inode->fd = newfd;
+         inode->key.ino = e->attr.st_ino;
+         inode->key.dev = e->attr.st_dev;
++        inode->key.mnt_id = mnt_id;
+         pthread_mutex_init(&inode->plock_mutex, NULL);
+         inode->posix_locks = g_hash_table_new_full(
+             g_direct_hash, g_direct_equal, NULL, posix_locks_value_destroy);
+@@ -1090,15 +1152,23 @@ static struct lo_inode *lookup_name(fuse_req_t req, fuse_ino_t parent,
+                                     const char *name)
  {
--    setup_namespaces(lo, se);
--    setup_mounts(lo->source);
-+    if (lo->sandbox == SANDBOX_NAMESPACE) {
-+        setup_namespaces(lo, se);
-+        setup_mounts(lo->source);
-+    } else {
-+        setup_chroot(lo);
+     int res;
++    uint64_t mnt_id;
+     struct stat attr;
++    struct lo_data *lo = lo_data(req);
++    struct lo_inode *dir = lo_inode(req, parent);
+ 
+-    res = fstatat(lo_fd(req, parent), name, &attr,
+-                  AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
++    if (!dir) {
++        return NULL;
 +    }
 +
-     setup_seccomp(enable_syslog);
-     setup_capabilities(g_strdup(lo->modcaps));
++    res = do_statx(lo, dir->fd, name, &attr,
++                   AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW, &mnt_id);
++    lo_inode_put(lo, &dir);
+     if (res == -1) {
+         return NULL;
+     }
+ 
+-    return lo_find(lo_data(req), &attr);
++    return lo_find(lo, &attr, mnt_id);
  }
-@@ -2815,6 +2867,7 @@ int main(int argc, char *argv[])
-     struct fuse_session *se;
-     struct fuse_cmdline_opts opts;
-     struct lo_data lo = {
-+        .sandbox = SANDBOX_NAMESPACE,
-         .debug = 0,
-         .writeback = 0,
-         .posix_lock = 0,
+ 
+ static void lo_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name)
+@@ -3266,6 +3336,7 @@ static void setup_root(struct lo_data *lo, struct lo_inode *root)
+ {
+     int fd, res;
+     struct stat stat;
++    uint64_t mnt_id;
+ 
+     fd = open("/", O_PATH);
+     if (fd == -1) {
+@@ -3273,7 +3344,8 @@ static void setup_root(struct lo_data *lo, struct lo_inode *root)
+         exit(1);
+     }
+ 
+-    res = fstatat(fd, "", &stat, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
++    res = do_statx(lo, fd, "", &stat, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW,
++                   &mnt_id);
+     if (res == -1) {
+         fuse_log(FUSE_LOG_ERR, "fstatat(%s): %m\n", lo->source);
+         exit(1);
+@@ -3283,6 +3355,7 @@ static void setup_root(struct lo_data *lo, struct lo_inode *root)
+     root->fd = fd;
+     root->key.ino = stat.st_ino;
+     root->key.dev = stat.st_dev;
++    root->key.mnt_id = mnt_id;
+     root->nlookup = 2;
+     g_atomic_int_set(&root->refcount, 2);
+ }
+@@ -3291,7 +3364,7 @@ static guint lo_key_hash(gconstpointer key)
+ {
+     const struct lo_key *lkey = key;
+ 
+-    return (guint)lkey->ino + (guint)lkey->dev;
++    return (guint)lkey->ino + (guint)lkey->dev + (guint)lkey->mnt_id;
+ }
+ 
+ static gboolean lo_key_equal(gconstpointer a, gconstpointer b)
+@@ -3299,7 +3372,7 @@ static gboolean lo_key_equal(gconstpointer a, gconstpointer b)
+     const struct lo_key *la = a;
+     const struct lo_key *lb = b;
+ 
+-    return la->ino == lb->ino && la->dev == lb->dev;
++    return la->ino == lb->ino && la->dev == lb->dev && la->mnt_id == lb->mnt_id;
+ }
+ 
+ static void fuse_lo_data_cleanup(struct lo_data *lo)
+@@ -3445,6 +3518,8 @@ int main(int argc, char *argv[])
+         exit(1);
+     }
+ 
++    lo.use_statx = true;
++
+     se = fuse_session_new(&args, &lo_oper, sizeof(lo_oper), &lo);
+     if (se == NULL) {
+         goto err_out1;
+diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
+index eb9af8265f..751e15fa39 100644
+--- a/tools/virtiofsd/passthrough_seccomp.c
++++ b/tools/virtiofsd/passthrough_seccomp.c
+@@ -76,6 +76,7 @@ static const int syscall_whitelist[] = {
+     SCMP_SYS(mremap),
+     SCMP_SYS(munmap),
+     SCMP_SYS(newfstatat),
++    SCMP_SYS(statx),
+     SCMP_SYS(open),
+     SCMP_SYS(openat),
+     SCMP_SYS(ppoll),
 -- 
-2.28.0
+2.26.2
 

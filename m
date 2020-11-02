@@ -1,11 +1,12 @@
 From: Max Reitz <mreitz@redhat.com>
-Date: Mon,  2 Nov 2020 17:18:53 +0100
-Message-Id: <20201102161859.156603-2-mreitz@redhat.com>
+Date: Mon,  2 Nov 2020 17:18:54 +0100
+Message-Id: <20201102161859.156603-3-mreitz@redhat.com>
 In-Reply-To: <20201102161859.156603-1-mreitz@redhat.com>
 References: <20201102161859.156603-1-mreitz@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 1/7] virtiofsd: Check FUSE_SUBMOUNTS
+Subject: [Virtio-fs] [PATCH v3 2/7] virtiofsd: Add attr_flags to
+	fuse_entry_param
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,50 +18,48 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org
 Cc: Eduardo Habkost <ehabkost@redhat.com>, Max Reitz <mreitz@redhat.com>, virtio-fs@redhat.com
 
-FUSE_SUBMOUNTS is a pure indicator by the kernel to signal that it
-supports submounts.  It does not check its state in the init reply, so
-there is nothing for fuse_lowlevel.c to do but to check its existence
-and copy it into fuse_conn_info.capable.
+fuse_entry_param is converted to fuse_attr on the line (by
+fill_entry()), so it should have a member that mirrors fuse_attr.flags.
+
+fill_entry() should then copy this fuse_entry_param.attr_flags to
+fuse_attr.flags.
 
 Signed-off-by: Max Reitz <mreitz@redhat.com>
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- tools/virtiofsd/fuse_common.h   | 7 +++++++
- tools/virtiofsd/fuse_lowlevel.c | 3 +++
- 2 files changed, 10 insertions(+)
+ tools/virtiofsd/fuse_lowlevel.h | 5 +++++
+ tools/virtiofsd/fuse_lowlevel.c | 2 ++
+ 2 files changed, 7 insertions(+)
 
-diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
-index 686c42c0a5..5aee5193eb 100644
---- a/tools/virtiofsd/fuse_common.h
-+++ b/tools/virtiofsd/fuse_common.h
-@@ -352,6 +352,13 @@ struct fuse_file_info {
-  */
- #define FUSE_CAP_NO_OPENDIR_SUPPORT (1 << 24)
- 
-+/**
-+ * Indicates that the kernel supports the FUSE_ATTR_SUBMOUNT flag.
-+ *
-+ * Setting (or unsetting) this flag in the `want` field has *no effect*.
-+ */
-+#define FUSE_CAP_SUBMOUNTS (1 << 27)
+diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
+index 562fd5241e..9c06240f9e 100644
+--- a/tools/virtiofsd/fuse_lowlevel.h
++++ b/tools/virtiofsd/fuse_lowlevel.h
+@@ -102,6 +102,11 @@ struct fuse_entry_param {
+      *  large value.
+      */
+     double entry_timeout;
 +
++    /**
++     * Flags for fuse_attr.flags that do not fit into attr.
++     */
++    uint32_t attr_flags;
+ };
+ 
  /**
-  * Ioctl flags
-  *
 diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index 4d1ba2925d..370222339b 100644
+index 370222339b..c70fb16a9a 100644
 --- a/tools/virtiofsd/fuse_lowlevel.c
 +++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -1988,6 +1988,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-             bufsize = max_bufsize;
-         }
-     }
-+    if (arg->flags & FUSE_SUBMOUNTS) {
-+        se->conn.capable |= FUSE_CAP_SUBMOUNTS;
-+    }
- #ifdef HAVE_SPLICE
- #ifdef HAVE_VMSPLICE
-     se->conn.capable |= FUSE_CAP_SPLICE_WRITE | FUSE_CAP_SPLICE_MOVE;
+@@ -341,6 +341,8 @@ static void fill_entry(struct fuse_entry_out *arg,
+         .attr_valid_nsec = calc_timeout_nsec(e->attr_timeout),
+     };
+     convert_stat(&e->attr, &arg->attr);
++
++    arg->attr.flags = e->attr_flags;
+ }
+ 
+ /*
 -- 
 2.26.2
 

@@ -1,6 +1,6 @@
-Message-ID: <8b57dd7972f54fcf271a5790696cbd6c950269ff.camel@redhat.com>
+Message-ID: <77529e99ca9c2d228a67dd8d789d83afdcd1ace3.camel@redhat.com>
 From: Qian Cai <cai@redhat.com>
-Date: Fri, 30 Oct 2020 08:00:03 -0400
+Date: Mon, 02 Nov 2020 09:25:57 -0500
 In-Reply-To: <CAJfpegv4jLewQ4G_GdxraTE8fGHy7-d52gPSi4ZAOp0N4aYJnw@mail.gmail.com>
 References: <c4cb4b41655bc890b9dbf40bd2c133cbcbef734d.camel@redhat.com>
 	<89f0dbf6713ebd44ec519425e3a947e71f7aed55.camel@redhat.com>
@@ -38,6 +38,6 @@ On Thu, 2020-10-29 at 16:20 +0100, Miklos Szeredi wrote:
 > 
 > Can you please try the attached patch?
 
-So far so good. I'll keep running it over the weekend to be a little bit sure.
-It was taking a while to reproduce.
+It has survived the testing over the weekend. There is a issue that virtiofsd
+hung, but it looks like a separate issue.
 

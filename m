@@ -1,15 +1,18 @@
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=mime-version:from:date:message-id:subject:to:cc;
+	bh=cxIu75+g0J4bSrH0j7Yt3TeZ3amqKVezRNgAROpWclU=;
+	b=nZWippeM7Z9Gx4R8EY8y/VaB4K/IIyHjmXUJCcqv+6/5wpTtR3HFrvuqx9aLxQ8R/n
+	LkdZkB4O7USelKzshrZnCEsFMDGfUwOYII+m3E3VTiHcwnyJTjVGNK7LBf+Zt4odwDjv
+	WjrbNIkhz5QtQgQkQRrql9IVeWHsSZtfOcTGz9Z6EDRmu5QQIR5BNmz8gq/PUdh5t9bB
+	VXXnfQwq5OLXXNFhkn4qaalxZP2urOZsiUAS6NZBBVV/3IVQWxpM8cAzu1SlF3/JtevN
+	zPXs9Wx8gDuVYF7+nYEKhedDw4kKwfY8bB5efD/Bx9H1UTImRSM2riMorKL7I9HUAlod
+	nWyw==
 MIME-Version: 1.0
-References: <20201102161859.156603-1-mreitz@redhat.com>
-	<20201102161859.156603-6-mreitz@redhat.com>
-	<CAOssrKdrRV6vbooVnMH2Hrq3XPAG6uX4N8nxgwxRDzAyKF1A1g@mail.gmail.com>
-	<cecb2ca8-d15a-76e7-a34d-c37b85929961@redhat.com>
-In-Reply-To: <cecb2ca8-d15a-76e7-a34d-c37b85929961@redhat.com>
-From: Miklos Szeredi <mszeredi@redhat.com>
-Date: Tue, 3 Nov 2020 10:14:03 +0100
-Message-ID: <CAOssrKcqyQyYrsR9wxGKjeJ7KMAEuZ=avW3u9bhg2fhB1Y4Ypg@mail.gmail.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH v3 5/7] virtiofsd: Announce sub-mount points
+From: Jonas Andradas <j.andradas@gmail.com>
+Date: Tue, 3 Nov 2020 17:14:44 +0100
+Message-ID: <CAGFMKp_Q=pN6aKMRQWvSLY8HV6Z_977kTXiRAr=28RzTWeW8Fg@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="000000000000d9387505b336297c"
+Subject: [Virtio-fs] Mount several mount tags in Windows using VirtioFS
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,161 +21,100 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Eduardo Habkost <ehabkost@redhat.com>, QEMU Developers <qemu-devel@nongnu.org>
+To: virtio-fs@redhat.com
+Cc: Gal Hammer <ghammer@redhat.com>
 
-On Tue, Nov 3, 2020 at 10:00 AM Max Reitz <mreitz@redhat.com> wrote:
->
-> On 03.11.20 09:10, Miklos Szeredi wrote:
-> > On Mon, Nov 2, 2020 at 5:19 PM Max Reitz <mreitz@redhat.com> wrote:
-> >>
-> >> Whenever we encounter a directory with an st_dev or mount ID that
-> >> differs from that of its parent, we set the FUSE_ATTR_SUBMOUNT flag so
-> >> the guest can create a submount for it.
-> >>
-> >> We only need to do so in lo_do_lookup().  The following functions return
-> >> a fuse_attr object:
-> >> - lo_create(), though fuse_reply_create(): Calls lo_do_lookup().
-> >> - lo_lookup(), though fuse_reply_entry(): Calls lo_do_lookup().
-> >> - lo_mknod_symlink(), through fuse_reply_entry(): Calls lo_do_lookup().
-> >> - lo_link(), through fuse_reply_entry(): Creating a link cannot create a
-> >>   submount, so there is no need to check for it.
-> >> - lo_getattr(), through fuse_reply_attr(): Announcing submounts when the
-> >>   node is first detected (at lookup) is sufficient.  We do not need to
-> >>   return the submount attribute later.
-> >> - lo_do_readdir(), through fuse_add_direntry_plus(): Calls
-> >>   lo_do_lookup().
-> >>
-> >> Make announcing submounts optional, so submounts are only announced to
-> >> the guest with the announce_submounts option.  Some users may prefer the
-> >> current behavior, so that the guest learns nothing about the host mount
-> >> structure.
-> >>
-> >> (announce_submounts is force-disabled when the guest does not present
-> >> the FUSE_SUBMOUNTS capability, or when there is no statx().)
-> >>
-> >> Signed-off-by: Max Reitz <mreitz@redhat.com>
-> >> Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-> >> ---
-> >>  tools/virtiofsd/helper.c         |  1 +
-> >>  tools/virtiofsd/passthrough_ll.c | 22 ++++++++++++++++++++++
-> >>  2 files changed, 23 insertions(+)
-> >>
-> >> diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
-> >> index 2e181a49b5..4433724d3a 100644
-> >> --- a/tools/virtiofsd/helper.c
-> >> +++ b/tools/virtiofsd/helper.c
-> >> @@ -190,6 +190,7 @@ void fuse_cmdline_help(void)
-> >>             "                               retain/discard O_DIRECT flags passed down\n"
-> >>             "                               to virtiofsd from guest applications.\n"
-> >>             "                               default: no_allow_direct_io\n"
-> >> +           "    -o announce_submounts      Announce sub-mount points to the guest\n"
-> >>             );
-> >>  }
-> >>
-> >> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> >> index 34d107975f..ec1008bceb 100644
-> >> --- a/tools/virtiofsd/passthrough_ll.c
-> >> +++ b/tools/virtiofsd/passthrough_ll.c
-> >> @@ -40,6 +40,7 @@
-> >>  #include "fuse_virtio.h"
-> >>  #include "fuse_log.h"
-> >>  #include "fuse_lowlevel.h"
-> >> +#include "standard-headers/linux/fuse.h"
-> >>  #include <assert.h>
-> >>  #include <cap-ng.h>
-> >>  #include <dirent.h>
-> >> @@ -167,6 +168,7 @@ struct lo_data {
-> >>      int readdirplus_set;
-> >>      int readdirplus_clear;
-> >>      int allow_direct_io;
-> >> +    int announce_submounts;
-> >>      bool use_statx;
-> >>      struct lo_inode root;
-> >>      GHashTable *inodes; /* protected by lo->mutex */
-> >> @@ -207,6 +209,7 @@ static const struct fuse_opt lo_opts[] = {
-> >>      { "no_readdirplus", offsetof(struct lo_data, readdirplus_clear), 1 },
-> >>      { "allow_direct_io", offsetof(struct lo_data, allow_direct_io), 1 },
-> >>      { "no_allow_direct_io", offsetof(struct lo_data, allow_direct_io), 0 },
-> >> +    { "announce_submounts", offsetof(struct lo_data, announce_submounts), 1 },
-> >>      FUSE_OPT_END
-> >>  };
-> >>  static bool use_syslog = false;
-> >> @@ -601,6 +604,20 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
-> >>          fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling readdirplus\n");
-> >>          conn->want &= ~FUSE_CAP_READDIRPLUS;
-> >>      }
-> >> +
-> >> +    if (!(conn->capable & FUSE_CAP_SUBMOUNTS) && lo->announce_submounts) {
-> >> +        fuse_log(FUSE_LOG_WARNING, "lo_init: Cannot announce submounts, client "
-> >> +                 "does not support it\n");
-> >> +        lo->announce_submounts = false;
-> >> +    }
-> >> +
-> >> +#ifndef CONFIG_STATX
-> >> +    if (lo->announce_submounts) {
-> >> +        fuse_log(FUSE_LOG_WARNING, "lo_init: Cannot announce submounts, there "
-> >> +                 "is no statx()\n");
-> >> +        lo->announce_submounts = false;
-> >
-> > Minor issue: this warns only when libc doesn't have statx, and not
-> > when kernel doesn't have it.
-> >
-> >> +    }
-> >> +#endif
-> >>  }
-> >>
-> >>  static void lo_getattr(fuse_req_t req, fuse_ino_t ino,
-> >> @@ -877,6 +894,11 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-> >>          goto out_err;
-> >>      }
-> >>
-> >> +    if (S_ISDIR(e->attr.st_mode) && lo->announce_submounts &&
-> >> +        (e->attr.st_dev != dir->key.dev || mnt_id != dir->key.mnt_id)) {
-> >> +        e->attr_flags |= FUSE_ATTR_SUBMOUNT;
-> >> +    }
-> >
-> > ... and since announce_submounts isn't turned off in case the kernel
-> > doesn't have STATX_MNT_ID, this will trigger a submount when crossing
-> > into a different filesystem.
->
-> Oh.  Yes.  I totally forgot that when writing the warning.
->
-> > Possible solutions:
-> >
-> > a) test and warn at startup in case kernel doesn't have statx
-> >
-> > b) do not test st_dev, only mnt_id (which will always be zero if not supported)
-> >
-> > c) merge announce_submounts and use_statx, which are basically doing
-> > the same thing
->
-> Isn’t that a single thing?  I.e., if we decide not to test st_dev, then
-> we should do all of these, I think.
->
-> OTOH, we could also just drop the warning (that statx()) isn’t
-> available, because as the code is, we can still announce submounts.  The
-> only problem is that we’ll suffer from the bug fixed by patch 4
-> (different mounts with the same st_dev being treated as the same tree),
-> but that’s unrelated to announcing submounts.
->
-> (Well, to be fair, not having statx() does break one thing about
-> submounts: I suppose you could mount a device inside of its own mount
-> (“mount $mount_opts $dir; mount $mount_opts $dir/sub” – then $dir/sub
-> wouldn’t be marked as a submount without statx()), but that probably
-> yields a host of other problems besides not announcing the nested mount
-> as a submount (virtiofsd would treat $dir/sub as the same node as $dir,
-> I think), so again, I wouldn’t worry too much about not getting the
-> FUSE_SUBMOUNT flag right.)
->
-> So I think I’d rather just drop the warning and leave the rest as it is.
->  Not least because STATX_MNT_ID is rather new.
+--000000000000d9387505b336297c
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-Okay, makes sense.   The nested  bind mount case is likely not very
-likely to turn up in real life, and if it does, submounts can still be
-disabled explicitly.
+Hello,
 
-Thanks,
-Miklos
+TL;DR - Is there a way to mount more than one filesystem from a Linux host
+inside a Windows guest using VirtioFS?
 
+I have a Windows guest running on a Linux host, and I wanted to share
+several directories from the host inside the guest using VirtioFS.
+
+I followed the instructions I found in several places [1][2][3], and have
+installed the VirtioFS drivers and WinFPS. I first tried with one
+filesystem, and I can mount it and browse it fine.
+
+I then configured my Windows guest XML definition so it has 2 'filesystems'
+to, each with its own mount_tag (e.g. 'software' for '/home/user/software'
+and 'documents' for '/home/user/documents').  Windows shows 2 "Virtio FS
+Devices" in the device manager, so this looks promising.
+
+However, when I run 'virtiofs.exe' within Windows (or the service [1]
+suggests starts), I get a "Z:" mount (or whichever letter I specify with
+'-m <DRIVE>') with the first filesystem I specified ('software' in the
+example above).  If I then run 'virtiofs.exe' for a second time, I get a
+new mount (e.g. Y:), but with the same filesystem ('software', and not
+'documents').
+
+I tried adding the mount_tag to the virtiofs.exe command line, or even
+the PCI path Windows sees the devices on, but this fails (understandably
+so, since the help does not indicate how to specify which filesystem should
+be mounted).
+
+My question was whether (and if so, how) it is actually possible to mount
+more than one directory from the host inside a Windows guest using VirtioFS
+(as can be done in Linux guests).
+
+[1] https://virtio-fs.gitlab.io/howto-windows.html
+[2]
+https://github.com/virtio-win/kvm-guest-drivers-windows/issues/126#issuecom=
+ment-667432487
+[3]
+https://www.reddit.com/r/VFIO/comments/i12uyn/virtiofs_is_amazing_plus_how_=
+i_set_it_up/g12o5qt/
+
+Thank you very much in advance,
+
+--=20
+Jon=C3=A1s Andradas
+
+--000000000000d9387505b336297c
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr">Hello,=C2=A0<div><br></div><div>TL;DR - Is there a way to =
+mount more than one filesystem from a Linux host inside a Windows guest usi=
+ng VirtioFS?</div><div><br></div><div>I have a Windows guest running on a L=
+inux host, and I wanted to share several directories from the host inside t=
+he guest using VirtioFS.=C2=A0</div><div><br></div><div>I followed the inst=
+ructions I found in several places [1][2][3], and have installed the Virtio=
+FS drivers and WinFPS. I first tried with one filesystem, and I can mount i=
+t and browse it fine.</div><div><br></div><div>I then configured my=C2=A0Wi=
+ndows guest XML definition so it has=C2=A02 &#39;filesystems&#39; to, each =
+with its own mount_tag (e.g. &#39;software&#39; for &#39;/home/user/softwar=
+e&#39; and &#39;documents&#39; for &#39;/home/user/documents&#39;).=C2=A0 W=
+indows shows 2 &quot;Virtio FS Devices&quot; in the device manager, so this=
+ looks promising.=C2=A0</div><div><br></div><div>However, when I run &#39;v=
+irtiofs.exe&#39; within Windows (or the service [1] suggests starts), I get=
+ a &quot;Z:&quot; mount (or whichever letter I specify with &#39;-m &lt;DRI=
+VE&gt;&#39;) with the first filesystem I specified (&#39;software&#39; in t=
+he example above).=C2=A0 If I then run &#39;virtiofs.exe&#39; for a second =
+time, I get a new mount (e.g. Y:), but with the same filesystem (&#39;softw=
+are&#39;, and not &#39;documents&#39;).=C2=A0=C2=A0</div><div><br></div><di=
+v>I tried adding the mount_tag to the virtiofs.exe command line, or even th=
+e=C2=A0PCI path Windows sees the devices on, but this fails (understandably=
+ so, since the help does not indicate how to specify which filesystem=C2=A0=
+should be mounted).</div><div><br></div><div>My question was whether (and i=
+f so, how) it is actually possible to mount more than one directory from th=
+e host inside a Windows guest using VirtioFS (as can be done in Linux guest=
+s).</div><div><br></div><div>[1]=C2=A0<a href=3D"https://virtio-fs.gitlab.i=
+o/howto-windows.html">https://virtio-fs.gitlab.io/howto-windows.html</a></d=
+iv><div>[2]=C2=A0<a href=3D"https://github.com/virtio-win/kvm-guest-drivers=
+-windows/issues/126#issuecomment-667432487">https://github.com/virtio-win/k=
+vm-guest-drivers-windows/issues/126#issuecomment-667432487</a></div><div>[3=
+]=C2=A0<a href=3D"https://www.reddit.com/r/VFIO/comments/i12uyn/virtiofs_is=
+_amazing_plus_how_i_set_it_up/g12o5qt/">https://www.reddit.com/r/VFIO/comme=
+nts/i12uyn/virtiofs_is_amazing_plus_how_i_set_it_up/g12o5qt/</a><br clear=
+=3D"all"><div><br></div><div>Thank you very much in advance,</div><div><br>=
+</div>-- <br><div dir=3D"ltr" class=3D"gmail_signature" data-smartmail=3D"g=
+mail_signature"><div dir=3D"ltr"><div>Jon=C3=A1s Andradas<br><br></div></di=
+v></div></div></div>
+
+--000000000000d9387505b336297c--
 

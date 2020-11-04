@@ -1,10 +1,13 @@
-From: Fotis Xenakis <foxen@windowslive.com>
-Date: Wed,  4 Nov 2020 02:42:22 +0200
-Message-ID: <AM0PR03MB62920E8F53722876D6FD3D30A6EF0@AM0PR03MB6292.eurprd03.prod.outlook.com>
 MIME-Version: 1.0
-Content-Type: text/plain
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [qemu-web PATCH] Add virtio-fs in OSv overview blog post
+References: <CAGFMKp_Q=pN6aKMRQWvSLY8HV6Z_977kTXiRAr=28RzTWeW8Fg@mail.gmail.com>
+	<CAA2ifQx7=8xr2v449JG_Z-6TPwAsBesk5btLqiaf3yoaWFbYJA@mail.gmail.com>
+	<CAGFMKp_i3uSpoKCeB=zfk9hwzqzC52C5K8GrE_2xvyH7NJt2SA@mail.gmail.com>
+In-Reply-To: <CAGFMKp_i3uSpoKCeB=zfk9hwzqzC52C5K8GrE_2xvyH7NJt2SA@mail.gmail.com>
+From: Gal Hammer <ghammer@redhat.com>
+Date: Wed, 4 Nov 2020 08:33:27 +0200
+Message-ID: <CAA2ifQxNpXAH6+6fiAC0gxOLXdjSckbXb3d62rC4wu2Ge584MQ@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="000000000000e9180705b34228b7"
+Subject: Re: [Virtio-fs] Mount several mount tags in Windows using VirtioFS
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,161 +16,196 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: virtio-fs@redhat.com, thuth@redhat.com
+To: Jonas Andradas <j.andradas@gmail.com>
+Cc: virtio-fs@redhat.com
 
-This post briefly goes over the main points of virtio-fs and OSv, a
-unikernel running under QEMU/KVM and taking advantage of its virtio-fs
-implementation.
+--000000000000e9180705b34228b7
+Content-Type: text/plain; charset="UTF-8"
 
-Feel free to review, I will be more than happy to address any comments.
+Hi Jonas,
 
-Signed-off-by: Fotis Xenakis <foxen@windowslive.com>
----
- _posts/2020-11-04-osv-virtio-fs.md           | 123 +++++++++++++++++++
- screenshots/2020-11-04-unikernel-vs-gpos.svg |   1 +
- 2 files changed, 124 insertions(+)
- create mode 100644 _posts/2020-11-04-osv-virtio-fs.md
- create mode 100644 screenshots/2020-11-04-unikernel-vs-gpos.svg
+On Tue, 3 Nov 2020 at 18:51, Jonas Andradas <j.andradas@gmail.com> wrote:
 
-diff --git a/_posts/2020-11-04-osv-virtio-fs.md b/_posts/2020-11-04-osv-virtio-fs.md
-new file mode 100644
-index 0000000..af5bb0d
---- /dev/null
-+++ b/_posts/2020-11-04-osv-virtio-fs.md
-@@ -0,0 +1,123 @@
-+---
-+layout: post
-+title:  "Using virtio-fs on a unikernel"
-+author: Fotis Xenakis
-+date:   2020-11-04 02:00:00 +0200
-+categories: [storage, virtio-fs, unikernel, OSv]
-+---
-+
-+This article provides an overview of virtio-fs, a novel way for sharing the host
-+file system with guests and OSv, a specialized, light-weight operating system
-+(unikernel) for the cloud, as well as how these two fit together.
-+
-+## virtio-fs
-+
-+[Virtio-fs](https://virtio-fs.gitlab.io/) is a new host-guest shared filesystem,
-+purpose-built for local file system semantics and performance. To that end, it
-+takes full advantage of the host's and the guest's colocation on the same
-+physical machine, unlike network-based efforts, like virtio-9p.
-+
-+As the name suggests, virtio-fs builds on virtio for providing an efficient
-+transport: it is included in the (currently draft, to become v1.2) virtio
-+[specification](https://github.com/oasis-tcs/virtio-spec) as a new device. The
-+protocol used by the device is a slightly extended version of
-+[FUSE](https://github.com/libfuse/libfuse), providing a solid foundation for
-+all file system operations native on Linux. Implementation-wise, on the QEMU
-+side, it takes the approach of splitting between the guest interface (handled
-+by QEMU) and the host file system interface (the device "backend"). The latter
-+is handled by virtiofsd ("virtio-fs daemon"), running as a separate process,
-+utilizing the
-+[vhost-user](https://www.qemu.org/docs/master/interop/vhost-user.html) protocol
-+to communicate with QEMU.
-+
-+One prominent performance feature of virtio-fs is the DAX (Direct Access)
-+window. What is that? It's a shared memory window between the host and the
-+guest, exposed as device memory (a PCI BAR) to the second. How is it used? Upon
-+request, the host (QEMU) maps file contents to the window for the guest to
-+access directly. This bears performance gains due to taking VMEXITs out of the
-+read/write data path and bypassing the guest page cache on Linux, while not
-+counting against the VM's memory (since it's just device memory, managed on the
-+host).
-+
-+![virtio-fs DAX architecture](https://gitlab.com/virtio-fs/virtio-fs.gitlab.io/-/raw/master/architecture.svg)
-+
-+Virtio-fs is under active development, with its community focussing on a pair of
-+device implementation in QEMU and device driver in Linux. Both components are
-+already available upstream in their initial iterations, while upstreaming
-+continues further e.g. with DAX window support.
-+
-+## OSv
-+
-+[OSv](https://github.com/cloudius-systems/osv) is a
-+[unikernel](https://en.wikipedia.org/wiki/Unikernel) (framework). The two
-+defining characteristics of a unikernel are:
-+
-+- **Application-specialized**: a unikernel is an executable machine image,
-+  consisting of an application and supporting code (drivers, memory management,
-+  runtime etc.) linked together, running in a single address space (typically
-+  in guest "kernel mode").
-+- **Library OS**: each unikernel only contains the functionality mandated by its
-+  application in terms of non-application code, i.e. no unused drivers, or even
-+  whole subsystems (e.g. networking, if the application doesn't use the
-+  network).
-+
-+OSv in particular strives for binary compatibility with Linux. What this means
-+is that applications built for Linux should run as OSv unikernels without
-+requiring modifications or even rebuilding, at least most of the time. Of
-+course, not the whole Linux ABI is supported, with system calls like `fork()`
-+and relatives missing by design in all unikernels, which lack the notion of a
-+process. Despite this limitation, OSv is quite full featured, with full SMP
-+support, virtual memory, a virtual file system (and many filesystem
-+implementations, including ZFS) as well as a mature networking stack, based of
-+off FreeBSD's.
-+
-+At this point, one is sure to wonder "Why bother with unikernels?". The problem
-+they were originally
-+[introduced](http://unikernel.org/files/2013-asplos-mirage.pdf) to solve is
-+that of bloat in the modern cloud software stack. Running general-purpose
-+operating systems as guests, typically for a single application/service, on top
-+of a hypervisor which already takes care of isolation and provides a standard
-+device model means duplication, as well as loss of efficiency. This is were
-+unikernels come in, trying to be just enough to support a single application
-+and as light-weight as possible, based on the assumption that they are executing
-+inside a VM. Below is an illustration of the comparison between
-+general-purpose OS, unikernels and containers (as another approach to the same
-+problem, for completeness).
-+
-+![Unikernels vs GPOS vs containers](/screenshots/2020-11-04-unikernel-vs-gpos.svg)
-+
-+## OSv, meet virtio-fs
-+
-+As is apparent e.g. from the container world, it is very common for applications
-+running in isolated environments (such as containers, or unikernels even more
-+so) to require host file system access. Whereas containers sharing the host
-+kernel thus have an obvious, controlled path to the host file system, with
-+unikernels this has been more complex: all solutions were somewhat heavyweight,
-+requiring a network link or indirection through network protocols. Virtio-fs
-+then provided a significantly more attractive route: straight-forward mapping of
-+fs operations (via FUSE), reusing the existing virtio transport and decent
-+performance without high memory overhead.
-+
-+The OSv community quickly identified the opportunity and came up with a
-+read-only implementation on its side, when executing under QEMU. This emphasized
-+being lightweight complexity-wise, while catering to many of its applications'
-+requirements (they are stateless, think e.g. serverless). Notably, it includes
-+support for the DAX window (even before that's merged in upstream QEMU),
-+providing [excellent performance](https://github.com/foxeng/diploma), directly
-+rivalling that of its local (non-shared) counterparts such as ZFS and ROFS (an
-+OSv-specific read-only file system).
-+
-+One central point is OSv's support for booting from virtio-fs: this enables
-+deploying a modified version or a whole new application **without rebuilding**
-+the image, just by adjusting its root file system contents on the host. Last,
-+owing to the DAX window practically providing low-overhead access to the host's
-+page cache, scalability is also expected to excel, with it being a common
-+concern due to the potentially high density of unikernels per host.
-+
-+## Conclusion
-+
-+OSv has gained a prominent new feature, powered by virtio-fs and its QEMU
-+implementation. This allows efficient, lightweight and performant access to the
-+host's file system, thanks to the native virtio transport, usage of the FUSE
-+protocol and the DAX window architecture. In turn, it enables use cases like
-+rapid unikernel reconfiguration.
-diff --git a/screenshots/2020-11-04-unikernel-vs-gpos.svg b/screenshots/2020-11-04-unikernel-vs-gpos.svg
-new file mode 100644
-index 0000000..010db7e
---- /dev/null
-+++ b/screenshots/2020-11-04-unikernel-vs-gpos.svg
-@@ -0,0 +1 @@
-+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="681px" height="201px" viewBox="-0.5 -0.5 681 201"><defs/><g><rect x="40" y="160" width="160" height="40" fill="#f5f5f5" stroke="#666666" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 158px; height: 1px; padding-top: 180px; margin-left: 41px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #333333; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">Hardware</div></div></div></foreignObject><text x="120" y="184" fill="#333333" font-family="Helvetica" font-size="12px" text-anchor="middle">Hardware</text></switch></g><rect x="40" y="120" width="160" height="40" fill="#dae8fc" stroke="#6c8ebf" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 158px; height: 1px; padding-top: 140px; margin-left: 41px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">Host OS</div></div></div></foreignObject><text x="120" y="144" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">Host OS</text></switch></g><rect x="40" y="80" width="160" height="40" fill="#dae8fc" stroke="#6c8ebf" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 158px; height: 1px; padding-top: 100px; margin-left: 41px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">Hypervisor</div></div></div></foreignObject><text x="120" y="104" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">Hypervisor</text></switch></g><rect x="40" y="40" width="160" height="40" fill="#f8cecc" stroke="#b85450" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 158px; height: 1px; padding-top: 60px; margin-left: 41px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">Guest OS</div></div></div></foreignObject><text x="120" y="64" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">Guest OS</text></switch></g><rect x="40" y="0" width="160" height="40" fill="#f8cecc" stroke="#b85450" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 158px; height: 1px; padding-top: 20px; margin-left: 41px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">Application</div></div></div></foreignObject><text x="120" y="24" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">Application</text></switch></g><rect x="0" y="120" width="40" height="40" fill="#ffffff" stroke="#000000" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 38px; height: 1px; padding-top: 140px; margin-left: 1px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">HKS</div></div></div></foreignObject><text x="20" y="144" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">HKS</text></switch></g><rect x="0" y="80" width="40" height="40" fill="#ffffff" stroke="#000000" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 38px; height: 1px; padding-top: 100px; margin-left: 1px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">HUS</div></div></div></foreignObject><text x="20" y="104" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">HUS</text></switch></g><rect x="0" y="40" width="40" height="40" fill="#ffffff" stroke="#000000" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 38px; height: 1px; padding-top: 60px; margin-left: 1px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">GKS</div></div></div></foreignObject><text x="20" y="64" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">GKS</text></switch></g><rect x="0" y="0" width="40" height="40" fill="#ffffff" stroke="#000000" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 38px; height: 1px; padding-top: 20px; margin-left: 1px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">GUS</div></div></div></foreignObject><text x="20" y="24" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">GUS</text></switch></g><rect x="280" y="160" width="160" height="40" fill="#f5f5f5" stroke="#666666" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 158px; height: 1px; padding-top: 180px; margin-left: 281px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #333333; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">Hardware</div></div></div></foreignObject><text x="360" y="184" fill="#333333" font-family="Helvetica" font-size="12px" text-anchor="middle">Hardware</text></switch></g><rect x="280" y="120" width="160" height="40" fill="#dae8fc" stroke="#6c8ebf" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 158px; height: 1px; padding-top: 140px; margin-left: 281px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">Host OS</div></div></div></foreignObject><text x="360" y="144" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">Host OS</text></switch></g><rect x="280" y="80" width="160" height="40" fill="#dae8fc" stroke="#6c8ebf" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 158px; height: 1px; padding-top: 100px; margin-left: 281px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">Hypervisor</div></div></div></foreignObject><text x="360" y="104" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">Hypervisor</text></switch></g><rect x="280" y="40" width="160" height="40" fill="#f8cecc" stroke="#b85450" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 158px; height: 1px; padding-top: 60px; margin-left: 281px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">Unikernel</div></div></div></foreignObject><text x="360" y="64" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">Unikernel</text></switch></g><rect x="240" y="120" width="40" height="40" fill="#ffffff" stroke="#000000" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 38px; height: 1px; padding-top: 140px; margin-left: 241px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">HKS</div></div></div></foreignObject><text x="260" y="144" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">HKS</text></switch></g><rect x="240" y="80" width="40" height="40" fill="#ffffff" stroke="#000000" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 38px; height: 1px; padding-top: 100px; margin-left: 241px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">HUS</div></div></div></foreignObject><text x="260" y="104" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">HUS</text></switch></g><rect x="240" y="40" width="40" height="40" fill="#ffffff" stroke="#000000" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 38px; height: 1px; padding-top: 60px; margin-left: 241px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">GKS</div></div></div></foreignObject><text x="260" y="64" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">GKS</text></switch></g><rect x="520" y="160" width="160" height="40" fill="#f5f5f5" stroke="#666666" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 158px; height: 1px; padding-top: 180px; margin-left: 521px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #333333; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">Hardware</div></div></div></foreignObject><text x="600" y="184" fill="#333333" font-family="Helvetica" font-size="12px" text-anchor="middle">Hardware</text></switch></g><rect x="520" y="120" width="160" height="40" fill="#dae8fc" stroke="#6c8ebf" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 158px; height: 1px; padding-top: 140px; margin-left: 521px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">Host OS</div></div></div></foreignObject><text x="600" y="144" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">Host OS</text></switch></g><rect x="520" y="80" width="160" height="40" fill="#dae8fc" stroke="#6c8ebf" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 158px; height: 1px; padding-top: 100px; margin-left: 521px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">Container runtime</div></div></div></foreignObject><text x="600" y="104" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">Container runtime</text></switch></g><rect x="520" y="40" width="160" height="40" fill="#fff2cc" stroke="#d6b656" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 158px; height: 1px; padding-top: 60px; margin-left: 521px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">Container</div></div></div></foreignObject><text x="600" y="64" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">Container</text></switch></g><rect x="480" y="120" width="40" height="40" fill="#ffffff" stroke="#000000" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 38px; height: 1px; padding-top: 140px; margin-left: 481px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">HKS</div></div></div></foreignObject><text x="500" y="144" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">HKS</text></switch></g><rect x="480" y="40" width="40" height="80" fill="#ffffff" stroke="#000000" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 38px; height: 1px; padding-top: 80px; margin-left: 481px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">HUS</div></div></div></foreignObject><text x="500" y="84" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">HUS</text></switch></g></g><switch><g requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"/><a transform="translate(0,-5)" xlink:href="https://desk.draw.io/support/solutions/articles/16000042487" target="_blank"><text text-anchor="middle" font-size="10px" x="50%" y="100%">Viewer does not support full SVG 1.1</text></a></switch></svg>
-\ No newline at end of file
--- 
-2.29.2
+> Hi Gal,
+>
+> On Tue, Nov 3, 2020 at 5:32 PM Gal Hammer <ghammer@redhat.com> wrote:
+>
+>> Hi Jonas,
+>>
+>> On Tue, 3 Nov 2020 at 18:15, Jonas Andradas <j.andradas@gmail.com> wrote:
+>>
+>>> Hello,
+>>>
+>>> TL;DR - Is there a way to mount more than one filesystem from a Linux
+>>> host inside a Windows guest using VirtioFS?
+>>>
+>>
+>> TL;DR No.
+>>
+>>
+> Thanks for the information/confirmation!
+>
 
+You're welcome. ;-)
+
+
+>
+>
+>> I didn't implement (yet?) the code to track all the instances of PCI
+>> devices and mount a folder or a drive for each one.
+>>
+>>
+> For the moment, I will mount a temporary folder from the host and copy
+> to/from it the files as needed.  My first approach to work around this was
+> to create symbolic links within this shared folder, to the directories I
+> wanted to share, but Windows sees the symbolic links (1 KB files) rather
+> than following the link and thus being able to access the 2 or 3 different
+> host directories by mounting just one.
+>
+
+Yeah, I'm aware of that as well. The symbolic link support is not
+implemented.
+
+
+>
+> I have a Windows guest running on a Linux host, and I wanted to share
+>>> several directories from the host inside the guest using VirtioFS.
+>>>
+>>> I followed the instructions I found in several places [1][2][3], and
+>>> have installed the VirtioFS drivers and WinFPS. I first tried with one
+>>> filesystem, and I can mount it and browse it fine.
+>>>
+>>> I then configured my Windows guest XML definition so it has 2
+>>> 'filesystems' to, each with its own mount_tag (e.g. 'software' for
+>>> '/home/user/software' and 'documents' for '/home/user/documents').  Windows
+>>> shows 2 "Virtio FS Devices" in the device manager, so this looks promising.
+>>>
+>>> However, when I run 'virtiofs.exe' within Windows (or the service [1]
+>>> suggests starts), I get a "Z:" mount (or whichever letter I specify with
+>>> '-m <DRIVE>') with the first filesystem I specified ('software' in the
+>>> example above).  If I then run 'virtiofs.exe' for a second time, I get a
+>>> new mount (e.g. Y:), but with the same filesystem ('software', and not
+>>> 'documents').
+>>>
+>>> I tried adding the mount_tag to the virtiofs.exe command line, or even
+>>> the PCI path Windows sees the devices on, but this fails (understandably
+>>> so, since the help does not indicate how to specify which filesystem should
+>>> be mounted).
+>>>
+>>> My question was whether (and if so, how) it is actually possible to
+>>> mount more than one directory from the host inside a Windows guest using
+>>> VirtioFS (as can be done in Linux guests).
+>>>
+>>> [1] https://virtio-fs.gitlab.io/howto-windows.html
+>>> [2]
+>>> https://github.com/virtio-win/kvm-guest-drivers-windows/issues/126#issuecomment-667432487
+>>> [3]
+>>> https://www.reddit.com/r/VFIO/comments/i12uyn/virtiofs_is_amazing_plus_how_i_set_it_up/g12o5qt/
+>>>
+>>> (...)
+>>>
+>>>
+>>     Gal.
+>>
+>
+> Cheers,
+> Jonas.
+>
+
+    Gal.
+
+--000000000000e9180705b34228b7
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><div dir=3D"ltr"><div class=3D"gmail_default" style=3D"fon=
+t-family:verdana,sans-serif">Hi Jonas,<br></div></div><br><div class=3D"gma=
+il_quote"><div dir=3D"ltr" class=3D"gmail_attr">On Tue, 3 Nov 2020 at 18:51=
+, Jonas Andradas &lt;<a href=3D"mailto:j.andradas@gmail.com">j.andradas@gma=
+il.com</a>&gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"m=
+argin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left=
+:1ex"><div dir=3D"ltr"><div>Hi Gal,</div><br><div class=3D"gmail_quote"><di=
+v dir=3D"ltr" class=3D"gmail_attr">On Tue, Nov 3, 2020 at 5:32 PM Gal Hamme=
+r &lt;<a href=3D"mailto:ghammer@redhat.com" target=3D"_blank">ghammer@redha=
+t.com</a>&gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"ma=
+rgin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:=
+1ex"><div dir=3D"ltr"><div dir=3D"ltr"><div style=3D"font-family:verdana,sa=
+ns-serif">Hi Jonas,<br></div></div><br><div class=3D"gmail_quote"><div dir=
+=3D"ltr" class=3D"gmail_attr">On Tue, 3 Nov 2020 at 18:15, Jonas Andradas &=
+lt;<a href=3D"mailto:j.andradas@gmail.com" target=3D"_blank">j.andradas@gma=
+il.com</a>&gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"m=
+argin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left=
+:1ex"><div dir=3D"ltr">Hello,=C2=A0<div><br></div><div>TL;DR - Is there a w=
+ay to mount more than one filesystem from a Linux host inside a Windows gue=
+st using VirtioFS?</div></div></blockquote><div><br></div><div><div style=
+=3D"font-family:verdana,sans-serif">TL;DR No.</div></div><div><br></div></d=
+iv></div></blockquote><div><br></div><div>Thanks for the information/confir=
+mation!</div></div></div></blockquote><div><br></div><div><div style=3D"fon=
+t-family:verdana,sans-serif" class=3D"gmail_default">You&#39;re welcome. ;-=
+) </div></div><div>=C2=A0</div><blockquote class=3D"gmail_quote" style=3D"m=
+argin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left=
+:1ex"><div dir=3D"ltr"><div class=3D"gmail_quote"><div>=C2=A0</div><blockqu=
+ote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px=
+ solid rgb(204,204,204);padding-left:1ex"><div dir=3D"ltr"><div class=3D"gm=
+ail_quote"><div></div><div><div style=3D"font-family:verdana,sans-serif">I =
+didn&#39;t implement (yet?) the code to track all the instances of PCI devi=
+ces and mount a folder or a drive for each one.</div><div style=3D"font-fam=
+ily:verdana,sans-serif"></div></div><div><br></div></div></div></blockquote=
+><div><br></div><div>For the moment, I will mount a temporary folder from t=
+he host and copy to/from it the files as needed.=C2=A0 My first approach to=
+ work around this was to create symbolic links within this shared folder, t=
+o the directories I wanted to share, but Windows sees the symbolic links (1=
+ KB files) rather than following the link and thus being able to access the=
+ 2 or 3 different host directories by mounting just one.</div></div></div><=
+/blockquote><div><br></div><div><div style=3D"font-family:verdana,sans-seri=
+f" class=3D"gmail_default">Yeah, I&#39;m aware of that as well. The symboli=
+c link support is not implemented. <br></div></div><div>=C2=A0</div><blockq=
+uote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1p=
+x solid rgb(204,204,204);padding-left:1ex"><div dir=3D"ltr"><div class=3D"g=
+mail_quote"><div><br></div><blockquote class=3D"gmail_quote" style=3D"margi=
+n:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex=
+"><div dir=3D"ltr"><div class=3D"gmail_quote"><div></div><blockquote class=
+=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rg=
+b(204,204,204);padding-left:1ex"><div dir=3D"ltr"><div>I have a Windows gue=
+st running on a Linux host, and I wanted to share several directories from =
+the host inside the guest using VirtioFS.=C2=A0</div><div><br></div><div>I =
+followed the instructions I found in several places [1][2][3], and have ins=
+talled the VirtioFS drivers and WinFPS. I first tried with one filesystem, =
+and I can mount it and browse it fine.</div><div><br></div><div>I then conf=
+igured my=C2=A0Windows guest XML definition so it has=C2=A02 &#39;filesyste=
+ms&#39; to, each with its own mount_tag (e.g. &#39;software&#39; for &#39;/=
+home/user/software&#39; and &#39;documents&#39; for &#39;/home/user/documen=
+ts&#39;).=C2=A0 Windows shows 2 &quot;Virtio FS Devices&quot; in the device=
+ manager, so this looks promising.=C2=A0</div><div><br></div><div>However, =
+when I run &#39;virtiofs.exe&#39; within Windows (or the service [1] sugges=
+ts starts), I get a &quot;Z:&quot; mount (or whichever letter I specify wit=
+h &#39;-m &lt;DRIVE&gt;&#39;) with the first filesystem I specified (&#39;s=
+oftware&#39; in the example above).=C2=A0 If I then run &#39;virtiofs.exe&#=
+39; for a second time, I get a new mount (e.g. Y:), but with the same files=
+ystem (&#39;software&#39;, and not &#39;documents&#39;).=C2=A0=C2=A0</div><=
+div><br></div><div>I tried adding the mount_tag to the virtiofs.exe command=
+ line, or even the=C2=A0PCI path Windows sees the devices on, but this fail=
+s (understandably so, since the help does not indicate how to specify which=
+ filesystem=C2=A0should be mounted).</div><div><br></div><div>My question w=
+as whether (and if so, how) it is actually possible to mount more than one =
+directory from the host inside a Windows guest using VirtioFS (as can be do=
+ne in Linux guests).</div><div><br></div><div>[1]=C2=A0<a href=3D"https://v=
+irtio-fs.gitlab.io/howto-windows.html" target=3D"_blank">https://virtio-fs.=
+gitlab.io/howto-windows.html</a></div><div>[2]=C2=A0<a href=3D"https://gith=
+ub.com/virtio-win/kvm-guest-drivers-windows/issues/126#issuecomment-6674324=
+87" target=3D"_blank">https://github.com/virtio-win/kvm-guest-drivers-windo=
+ws/issues/126#issuecomment-667432487</a></div><div>[3]=C2=A0<a href=3D"http=
+s://www.reddit.com/r/VFIO/comments/i12uyn/virtiofs_is_amazing_plus_how_i_se=
+t_it_up/g12o5qt/" target=3D"_blank">https://www.reddit.com/r/VFIO/comments/=
+i12uyn/virtiofs_is_amazing_plus_how_i_set_it_up/g12o5qt/</a><br clear=3D"al=
+l"><div><br></div><div>(...)</div><div dir=3D"ltr"><div dir=3D"ltr"><div><b=
+r></div></div></div></div></div></blockquote><div><br></div><div style=3D"f=
+ont-family:verdana,sans-serif">=C2=A0=C2=A0=C2=A0 Gal.<br></div></div></div=
+>
+</blockquote></div><br clear=3D"all"><div>Cheers,</div><div>Jonas.</div></d=
+iv></blockquote><div><br></div><div style=3D"font-family:verdana,sans-serif=
+" class=3D"gmail_default">=C2=A0=C2=A0=C2=A0 Gal.</div><div style=3D"font-f=
+amily:verdana,sans-serif" class=3D"gmail_default"><br></div></div></div>
+
+--000000000000e9180705b34228b7--
 

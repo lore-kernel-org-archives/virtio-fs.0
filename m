@@ -1,12 +1,13 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Mon, 26 Oct 2020 18:43:23 +0000
-Message-Id: <20201026184331.272953-9-dgilbert@redhat.com>
-In-Reply-To: <20201026184331.272953-1-dgilbert@redhat.com>
-References: <20201026184331.272953-1-dgilbert@redhat.com>
+Date: Thu, 5 Nov 2020 14:52:53 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20201105195253.GB1384085@redhat.com>
+References: <20201105194416.GA1384085@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 08/16] tools/virtiofsd: xattr name mappings:
-	Simple 'map'
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20201105194416.GA1384085@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Use --thread-pool-size=0 to mean
+ no thread pool
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,220 +16,129 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, stefanha@redhat.com, mreitz@redhat.com, misono.tomohiro@jp.fujitsu.com
-Cc: virtio-fs@redhat.com, vgoyal@redhat.com
+To: qemu-devel@nongnu.org, virtio-fs-list <virtio-fs@redhat.com>
+Cc: jose.carlos.venegas.munoz@intel.com
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+On Thu, Nov 05, 2020 at 02:44:16PM -0500, Vivek Goyal wrote:
+> Right now we create a thread pool and main thread hands over the request
+> to thread in thread pool to process. Number of threads in thread pool
+> can be managed by option --thread-pool-size.
+> 
+> There is a chance that in case of some workloads, we might get better
+> performance if we don't handover the request to a different thread
+> and process in the context of thread receiving the request.
+> 
+> To implement that, redefine the meaning of --thread-pool-size=0 to
+> mean that don't use a thread pool. Instead process the request in
+> the context of thread receiving request from the queue.
+> 
+> I can't think how --thread-pool-size=0 is useful and hence using
+> that. If it is already useful somehow, I could look at defining
+> a new option say "--no-thread-pool".
+> 
+> I think this patch will be used more as a debug help to do comparison
+> when it is more effecient to do not hand over the requests to a
+> thread pool.
 
-The mapping rule system implemented in the last few patches is
-extremely flexible, but not easy to use.  Add a simple
-'map' type as a sprinkling of sugar to make it easy.
+I ran virtiofs-tests to comapre --thread-pool-size=0 and
+--thread-pool-size=64. And results seem to be all over the place. In
+some cases thread pool seems to perform batter and in other cases
+no-thread-pool seems to perform better.
 
-e.g.
+But in general it looks like that except for the case of libaio workload,
+no-thread-pool is helping.
 
-  -o xattrmap=":map::user.virtiofs.:"
+Thanks
+Vivek
 
-would be sufficient to prefix all xattr's
-or
+NAME                    WORKLOAD                Bandwidth       IOPS            
+thread-pool             seqread-psync           682.4mb         170.6k          
+no-thread-pool          seqread-psync           679.3mb         169.8k          
 
-  -o xattrmap=":map:trusted.:user.virtiofs.:"
+thread-pool             seqread-psync-multi     2415.9mb        603.9k          
+no-thread-pool          seqread-psync-multi     2528.5mb        632.1k          
 
-would just prefix 'trusted.' xattr's and leave
-everything else alone.
+thread-pool             seqread-mmap            591.7mb         147.9k          
+no-thread-pool          seqread-mmap            595.6mb         148.9k          
 
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Message-Id: <20201023165812.36028-6-dgilbert@redhat.com>
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
----
- docs/tools/virtiofsd.rst         |  19 ++++++
- tools/virtiofsd/passthrough_ll.c | 112 ++++++++++++++++++++++++++++++-
- 2 files changed, 130 insertions(+), 1 deletion(-)
+thread-pool             seqread-mmap-multi      2195.3mb        548.8k          
+no-thread-pool          seqread-mmap-multi      2286.1mb        571.5k          
 
-diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-index d80c078d80..34a9e40146 100644
---- a/docs/tools/virtiofsd.rst
-+++ b/docs/tools/virtiofsd.rst
-@@ -147,6 +147,7 @@ Each rule consists of a number of fields separated with a separator that is the
- first non-white space character in the rule.  This separator must then be used
- for the whole rule.
- White space may be added before and after each rule.
-+
- Using ':' as the separator a rule is of the form:
- 
- ``:type:scope:key:prepend:``
-@@ -219,6 +220,14 @@ e.g.:
- 
-   would hide 'security.' xattr's in listxattr from the server.
- 
-+A simpler 'map' type provides a shorter syntax for the common case:
-+
-+``:map:key:prepend:``
-+
-+The 'map' type adds a number of separate rules to add **prepend** as a prefix
-+to the matched **key** (or all attributes if **key** is empty).
-+There may be at most one 'map' rule and it must be the last rule in the set.
-+
- xattr-mapping Examples
- ----------------------
- 
-@@ -234,6 +243,11 @@ the first rule prefixes and strips 'user.virtiofs.',
- the second rule hides any non-prefixed attributes that
- the host set.
- 
-+This is equivalent to the 'map' rule:
-+
-+::
-+-o xattrmap=":map::user.virtiofs.:"
-+
- 2) Prefix 'trusted.' attributes, allow others through
- 
- ::
-@@ -256,6 +270,11 @@ the 'user.virtiofs.' path directly.
- Finally, the fourth rule lets all remaining attributes
- through.
- 
-+This is equivalent to the 'map' rule:
-+
-+::
-+-o xattrmap="/map/trusted./user.virtiofs./"
-+
- 3) Hide 'security.' attributes, and allow everything else
- 
- ::
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 8c0187498a..a0beb986f3 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -2090,6 +2090,109 @@ static void free_xattrmap(struct lo_data *lo)
-     lo->xattr_map_nentries = -1;
- }
- 
-+/*
-+ * Handle the 'map' type, which is sugar for a set of commands
-+ * for the common case of prefixing a subset or everything,
-+ * and allowing anything not prefixed through.
-+ * It must be the last entry in the stream, although there
-+ * can be other entries before it.
-+ * The form is:
-+ *    :map:key:prefix:
-+ *
-+ * key maybe empty in which case all entries are prefixed.
-+ */
-+static void parse_xattrmap_map(struct lo_data *lo,
-+                               const char *rule, char sep)
-+{
-+    const char *tmp;
-+    char *key;
-+    char *prefix;
-+    XattrMapEntry tmp_entry;
-+
-+    if (*rule != sep) {
-+        fuse_log(FUSE_LOG_ERR,
-+                 "%s: Expecting '%c' after 'map' keyword, found '%c'\n",
-+                 __func__, sep, *rule);
-+        exit(1);
-+    }
-+
-+    rule++;
-+
-+    /* At start of 'key' field */
-+    tmp = strchr(rule, sep);
-+    if (!tmp) {
-+        fuse_log(FUSE_LOG_ERR,
-+                 "%s: Missing '%c' at end of key field in map rule\n",
-+                 __func__, sep);
-+        exit(1);
-+    }
-+
-+    key = g_strndup(rule, tmp - rule);
-+    rule = tmp + 1;
-+
-+    /* At start of prefix field */
-+    tmp = strchr(rule, sep);
-+    if (!tmp) {
-+        fuse_log(FUSE_LOG_ERR,
-+                 "%s: Missing '%c' at end of prefix field in map rule\n",
-+                 __func__, sep);
-+        exit(1);
-+    }
-+
-+    prefix = g_strndup(rule, tmp - rule);
-+    rule = tmp + 1;
-+
-+    /*
-+     * This should be the end of the string, we don't allow
-+     * any more commands after 'map'.
-+     */
-+    if (*rule) {
-+        fuse_log(FUSE_LOG_ERR,
-+                 "%s: Expecting end of command after map, found '%c'\n",
-+                 __func__, *rule);
-+        exit(1);
-+    }
-+
-+    /* 1st: Prefix matches/everything */
-+    tmp_entry.flags = XATTR_MAP_FLAG_PREFIX | XATTR_MAP_FLAG_ALL;
-+    tmp_entry.key = g_strdup(key);
-+    tmp_entry.prepend = g_strdup(prefix);
-+    add_xattrmap_entry(lo, &tmp_entry);
-+
-+    if (!*key) {
-+        /* Prefix all case */
-+
-+        /* 2nd: Hide any non-prefixed entries on the host */
-+        tmp_entry.flags = XATTR_MAP_FLAG_BAD | XATTR_MAP_FLAG_ALL;
-+        tmp_entry.key = g_strdup("");
-+        tmp_entry.prepend = g_strdup("");
-+        add_xattrmap_entry(lo, &tmp_entry);
-+    } else {
-+        /* Prefix matching case */
-+
-+        /* 2nd: Hide non-prefixed but matching entries on the host */
-+        tmp_entry.flags = XATTR_MAP_FLAG_BAD | XATTR_MAP_FLAG_SERVER;
-+        tmp_entry.key = g_strdup(""); /* Not used */
-+        tmp_entry.prepend = g_strdup(key);
-+        add_xattrmap_entry(lo, &tmp_entry);
-+
-+        /* 3rd: Stop the client accessing prefixed attributes directly */
-+        tmp_entry.flags = XATTR_MAP_FLAG_BAD | XATTR_MAP_FLAG_CLIENT;
-+        tmp_entry.key = g_strdup(prefix);
-+        tmp_entry.prepend = g_strdup(""); /* Not used */
-+        add_xattrmap_entry(lo, &tmp_entry);
-+
-+        /* 4th: Everything else is OK */
-+        tmp_entry.flags = XATTR_MAP_FLAG_OK | XATTR_MAP_FLAG_ALL;
-+        tmp_entry.key = g_strdup("");
-+        tmp_entry.prepend = g_strdup("");
-+        add_xattrmap_entry(lo, &tmp_entry);
-+    }
-+
-+    g_free(key);
-+    g_free(prefix);
-+}
-+
- static void parse_xattrmap(struct lo_data *lo)
- {
-     const char *map = lo->xattrmap;
-@@ -2118,10 +2221,17 @@ static void parse_xattrmap(struct lo_data *lo)
-             tmp_entry.flags |= XATTR_MAP_FLAG_OK;
-         } else if (strstart(map, "bad", &map)) {
-             tmp_entry.flags |= XATTR_MAP_FLAG_BAD;
-+        } else if (strstart(map, "map", &map)) {
-+            /*
-+             * map is sugar that adds a number of rules, and must be
-+             * the last entry.
-+             */
-+            parse_xattrmap_map(lo, map, sep);
-+            return;
-         } else {
-             fuse_log(FUSE_LOG_ERR,
-                      "%s: Unexpected type;"
--                     "Expecting 'prefix', 'ok', or 'bad' in rule %zu\n",
-+                     "Expecting 'prefix', 'ok', 'bad' or 'map' in rule %zu\n",
-                      __func__, lo->xattr_map_nentries);
-             exit(1);
-         }
--- 
-2.28.0
+thread-pool             seqread-libaio          329.1mb         82.2k           
+no-thread-pool          seqread-libaio          271.5mb         67.8k           
+
+thread-pool             seqread-libaio-multi    1387.1mb        346.7k          
+no-thread-pool          seqread-libaio-multi    1508.2mb        377.0k          
+
+thread-pool             randread-psync          59.0mb          14.7k           
+no-thread-pool          randread-psync          78.5mb          19.6k           
+
+thread-pool             randread-psync-multi    226.4mb         56.6k           
+no-thread-pool          randread-psync-multi    289.2mb         72.3k           
+
+thread-pool             randread-mmap           48.4mb          12.1k           
+no-thread-pool          randread-mmap           57.4mb          14.3k           
+
+thread-pool             randread-mmap-multi     183.5mb         45.8k           
+no-thread-pool          randread-mmap-multi     240.5mb         60.1k           
+
+thread-pool             randread-libaio         329.4mb         82.3k           
+no-thread-pool          randread-libaio         261.8mb         65.4k           
+
+thread-pool             randread-libaio-multi   252.1mb         63.0k           
+no-thread-pool          randread-libaio-multi   278.3mb         69.5k           
+
+thread-pool             seqwrite-psync          54.9mb          13.7k           
+no-thread-pool          seqwrite-psync          77.8mb          19.4k           
+
+thread-pool             seqwrite-psync-multi    219.9mb         54.9k           
+no-thread-pool          seqwrite-psync-multi    314.8mb         78.7k           
+
+thread-pool             seqwrite-mmap           191.7mb         47.9k           
+no-thread-pool          seqwrite-mmap           201.4mb         50.3k           
+
+thread-pool             seqwrite-mmap-multi     346.6mb         86.6k           
+no-thread-pool          seqwrite-mmap-multi     387.6mb         96.9k           
+
+thread-pool             seqwrite-libaio         306.4mb         76.6k           
+no-thread-pool          seqwrite-libaio         248.2mb         62.0k           
+
+thread-pool             seqwrite-libaio-multi   328.5mb         82.1k           
+no-thread-pool          seqwrite-libaio-multi   305.6mb         76.4k           
+
+thread-pool             randwrite-psync         55.6mb          13.9k           
+no-thread-pool          randwrite-psync         81.2mb          20.3k           
+
+thread-pool             randwrite-psync-multi   227.0mb         56.7k           
+no-thread-pool          randwrite-psync-multi   311.6mb         77.8k           
+
+thread-pool             randwrite-mmap          35.3mb          9038            
+no-thread-pool          randwrite-mmap          58.1mb          14.5k           
+
+thread-pool             randwrite-mmap-multi    140.8mb         35.2k           
+no-thread-pool          randwrite-mmap-multi    210.5mb         52.6k           
+
+thread-pool             randwrite-libaio        307.1mb         76.7k           
+no-thread-pool          randwrite-libaio        279.4mb         69.8k           
+
+thread-pool             randwrite-libaio-multi  361.3mb         90.3k           
+no-thread-pool          randwrite-libaio-multi  302.6mb         75.6k           
+
+thread-pool             randrw-psync            34.1mb/11.4mb   8754/2929       
+no-thread-pool          randrw-psync            38.7mb/12.9mb   9919/3321       
+
+thread-pool             randrw-psync-multi      126.2mb/42.3mb  31.5k/10.5k     
+no-thread-pool          randrw-psync-multi      172.2mb/57.7mb  43.0k/14.4k     
+
+thread-pool             randrw-mmap             24.1mb/8270kb   6194/2067       
+no-thread-pool          randrw-mmap             42.0mb/14.0mb   10.5k/3606      
+
+thread-pool             randrw-mmap-multi       127.9mb/42.8mb  31.9k/10.7k     
+no-thread-pool          randrw-mmap-multi       179.4mb/60.0mb  44.8k/15.0k     
+
+thread-pool             randrw-libaio           64.0mb/21.4mb   16.0k/5485      
+no-thread-pool          randrw-libaio           79.6mb/26.6mb   19.9k/6831      
+
+thread-pool             randrw-libaio-multi     174.2mb/58.3mb  43.5k/14.5k     
+no-thread-pool          randrw-libaio-multi     201.6mb/67.5mb  50.4k/16.8k     
 

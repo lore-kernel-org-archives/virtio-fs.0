@@ -1,15 +1,13 @@
-Date: Fri, 6 Nov 2020 12:18:43 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20201106171843.GA1445528@redhat.com>
-References: <20201009181512.65496-1-vgoyal@redhat.com>
-	<20201009181512.65496-4-vgoyal@redhat.com>
-	<CAJfpegu=ooDmc3hT9cOe2WEUHQN=twX01xbV+YfPQPJUHFMs-g@mail.gmail.com>
+Date: Fri, 6 Nov 2020 18:11:55 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20201106181155.GR3576@work-vm>
+References: <AM0PR03MB629226965B72D3808EFB8795A6EF0@AM0PR03MB6292.eurprd03.prod.outlook.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <CAJfpegu=ooDmc3hT9cOe2WEUHQN=twX01xbV+YfPQPJUHFMs-g@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH v3 3/6] fuse: setattr should set
- FATTR_KILL_PRIV upon size change
+In-Reply-To: <AM0PR03MB629226965B72D3808EFB8795A6EF0@AM0PR03MB6292.eurprd03.prod.outlook.com>
+Subject: Re: [Virtio-fs] [qemu-web PATCH v2] Add virtio-fs in OSv overview
+ blog post
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,68 +16,36 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>
+To: Fotis Xenakis <foxen@windowslive.com>
+Cc: virtio-fs@redhat.com, thuth@redhat.com, qemu-devel@nongnu.org
 
-On Fri, Nov 06, 2020 at 03:39:29PM +0100, Miklos Szeredi wrote:
-> On Fri, Oct 9, 2020 at 8:16 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> >
-> > If fc->handle_killpriv_v2 is enabled, we expect file server to clear
-> > suid/sgid/security.capbility upon chown/truncate/write as appropriate.
-> >
-> > Upon truncate (ATTR_SIZE), suid/sgid is cleared only if caller does
-> > not have CAP_FSETID. File server does not know whether caller has
-> > CAP_FSETID or not. Hence set FATTR_KILL_PRIV upon truncate to let
-> > file server know that caller does not have CAP_FSETID and it should
-> > kill suid/sgid as appropriate.
-> >
-> > We don't have to send this information for chown (ATTR_UID/ATTR_GID)
-> > as that always clears suid/sgid irrespective of capabilities of
-> > calling process.
+* Fotis Xenakis (foxen@windowslive.com) wrote:
+> This post briefly goes over the main points of virtio-fs and OSv, a
+> unikernel running under QEMU/KVM and taking advantage of its virtio-fs
+> implementation.
 > 
-> I'm  undecided on this.   Would it hurt to set it on chown?  That
-> might make the logic in some servers simpler, no?
+> Changes since v1:
+> - Fixed wording and links, as suggested by Thomas Huth.
+> - Added a short example of virtio-fs usage in OSv.
 > 
-> What would be the drawback of setting FATTR_KILL_PRIV for chown as well?
+> Signed-off-by: Fotis Xenakis <foxen@windowslive.com>
 
-Hi Miklos,
+> +One central point is OSv's support for booting from virtio-fs: this enables
+> +deploying a modified version or a whole new application **without rebuilding**
+> +the image, just by adjusting its root file system contents on the host. Last,
+> +owing to the DAX window practically providing low-overhead access to the host's
+> +page cache, scalability is also expected to excel, with it being a common
+> +concern due to the potentially high density of unikernels per host.
 
-Thinking loud.
+Hi Fotis,
+  Since I'm not used to unikernels, I'm a little confused by this; I'd
+appreciate some explanation.
 
-So these are the rules we expect from VFS point of view.
+  In your unikernel, does the root filesystem just contain data?  I mean
+being a 'unikernel' aren't all the binaries and support all linked into
+the kernel itself?
 
-- caps are always cleared on chown/write/truncate
-- suid is always cleared on chown, while for truncate/write it is cleared
-  only if caller does not have CAP_FSETID.
-- sgid is always cleared on chown, while for truncate/write it is cleared
-  only if caller does not have CAP_FSETID as well as file has group execute
-  permission.
-
->From server point of view, these rules become.
-
-- caps are always cleared on chown/write/truncate
-- suid is always cleared on chown, while for truncate/write it is cleared
-  only if client set appropriate flag.
-  	- For truncate, this flag will either be FUSE_OPEN_KILL_PRIV or
-	  FATTR_KILL_PRIV.
-	- For write, FUSE_WRITE_KILL_PRIV will be set.
-- sgid is always cleared on chown, while for truncate/write it is cleared
-  only if caller has set a flag as well as file has group execute permission.
-  	- For truncate, this flag will either be FUSE_OPEN_KILL_PRIV or
-	  FATTR_KILL_PRIV.
-	- For write, FUSE_WRITE_KILL_PRIV will be set.
-
-Above rules assumes that chown() will always clear caps/suid/sgid and
-server does not have to rely on any flags.
-
-I think it does not hurt to start passing FATTR_KILL_PRIV for chown()
-as well. In that case, server will always clear caps on chown but
-clear suid/sgid only if FATTR_KILL_PRIV is set. (Which will always
-be set).
-
-So anything is fine. We just need to document it well. I think I will
-write it very clearly in qemu patch depending on what goes in kernel.
-
-Thanks
-Vivek
+Dave
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

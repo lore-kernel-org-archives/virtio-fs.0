@@ -1,19 +1,15 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=sxqVLa3iciqPLgCG+JwX1CHkcPF2gNhZXkGpXNNWzqI=;
-	b=iAgDYvkBrhl4CMU3P9ur27IlYwOJCc4vApoUuHrs99MpyhdVw0SZ5rmcOzqUBTJl4j
-	JnqRJxTOnYOX05Sb/afsRtaDDhpZt0WPeFuzsStMIIfnfLt1S7PT0trtzbWfFBagCxbE
-	3/cX38U0+NVDf3cx1ZzBfE6xivZfHrCfanNhE=
-MIME-Version: 1.0
+Date: Fri, 6 Nov 2020 11:00:15 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20201106160015.GD1436035@redhat.com>
 References: <20201009181512.65496-1-vgoyal@redhat.com>
-	<20201009181512.65496-4-vgoyal@redhat.com>
-In-Reply-To: <20201009181512.65496-4-vgoyal@redhat.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Fri, 6 Nov 2020 15:39:29 +0100
-Message-ID: <CAJfpegu=ooDmc3hT9cOe2WEUHQN=twX01xbV+YfPQPJUHFMs-g@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH v3 3/6] fuse: setattr should set
-	FATTR_KILL_PRIV upon size change
+	<20201009181512.65496-6-vgoyal@redhat.com>
+	<CAJfpegvhK+5-Zze7qZFrXkUkXbN_4M1CpEqyL9Rq9UNOtb2ckg@mail.gmail.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAJfpegvhK+5-Zze7qZFrXkUkXbN_4M1CpEqyL9Rq9UNOtb2ckg@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH v3 5/6] fuse: Add a flag FUSE_OPEN_KILL_PRIV
+ for open() request
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,29 +18,40 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
+To: Miklos Szeredi <miklos@szeredi.hu>
 Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>
 
-On Fri, Oct 9, 2020 at 8:16 PM Vivek Goyal <vgoyal@redhat.com> wrote:
->
-> If fc->handle_killpriv_v2 is enabled, we expect file server to clear
-> suid/sgid/security.capbility upon chown/truncate/write as appropriate.
->
-> Upon truncate (ATTR_SIZE), suid/sgid is cleared only if caller does
-> not have CAP_FSETID. File server does not know whether caller has
-> CAP_FSETID or not. Hence set FATTR_KILL_PRIV upon truncate to let
-> file server know that caller does not have CAP_FSETID and it should
-> kill suid/sgid as appropriate.
->
-> We don't have to send this information for chown (ATTR_UID/ATTR_GID)
-> as that always clears suid/sgid irrespective of capabilities of
-> calling process.
+On Fri, Nov 06, 2020 at 02:55:11PM +0100, Miklos Szeredi wrote:
+> On Fri, Oct 9, 2020 at 8:16 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> >
+> > With FUSE_HANDLE_KILLPRIV_V2 support, server will need to kill
+> > suid/sgid/security.capability on open(O_TRUNC), if server supports
+> > FUSE_ATOMIC_O_TRUNC.
+> >
+> > But server needs to kill suid/sgid only if caller does not have
+> > CAP_FSETID. Given server does not have this information, client
+> > needs to send this info to server.
+> >
+> > So add a flag FUSE_OPEN_KILL_PRIV to fuse_open_in request which tells
+> > server to kill suid/sgid(only if group execute is set).
+> 
+> This is needed for FUSE_CREATE as well (which may act as a normal open
+> in case the file exists, and no O_EXCL was specified), right?
 
-I'm  undecided on this.   Would it hurt to set it on chown?  That
-might make the logic in some servers simpler, no?
+Hi Miklos,
 
-What would be the drawback of setting FATTR_KILL_PRIV for chown as well?
+IIUC, In current code we seem to use FUSE_CREATE only if file does not exist.
+If file exists, then we probably will take FUSE_OPEN path.
 
-Thanks,
-Miklos
+Are you concerned about future proofing where somebody decides to use
+FUSE_CREATE for create + open on a file which exists. If yes, I agree that
+patching FUSE_CREATE makes sense.
+
+> 
+> I can edit the patch, if you agree.
+
+Please do.
+
+Thanks
+Vivek
 

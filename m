@@ -1,16 +1,15 @@
-Date: Fri, 6 Nov 2020 17:35:24 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20201106223524.GG1436035@redhat.com>
-References: <20201105194416.GA1384085@redhat.com>
-	<20201105195253.GB1384085@redhat.com>
-	<D9233684-9B76-468E-A5F1-B35DA3F3C091@intel.com>
+From: Fotis Xenakis <foxen@windowslive.com>
+Date: Fri, 6 Nov 2020 22:43:48 +0000
+Message-ID: <AM0PR03MB62922C93066A83FBB8480E5EA6ED0@AM0PR03MB6292.eurprd03.prod.outlook.com>
+References: <AM0PR03MB629226965B72D3808EFB8795A6EF0@AM0PR03MB6292.eurprd03.prod.outlook.com>,
+	<20201106181155.GR3576@work-vm>
+In-Reply-To: <20201106181155.GR3576@work-vm>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <D9233684-9B76-468E-A5F1-B35DA3F3C091@intel.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Use --thread-pool-size=0 to mean
- no thread pool
+Content-Language: en-US
+Content-Type: multipart/alternative;
+	boundary="_000_AM0PR03MB62922C93066A83FBB8480E5EA6ED0AM0PR03MB6292eurp_"
+Subject: Re: [Virtio-fs] [qemu-web PATCH v2] Add virtio-fs in OSv overview
+ blog post
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,211 +18,209 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Venegas Munoz, Jose Carlos" <jose.carlos.venegas.munoz@intel.com>
-Cc: Miklos Szeredi <miklos@szeredi.hu>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, virtio-fs-list <virtio-fs@redhat.com>, "Shinde,
-	Archana M" <archana.m.shinde@intel.com>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "thuth@redhat.com" <thuth@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>
 
-On Fri, Nov 06, 2020 at 08:33:50PM +0000, Venegas Munoz, Jose Carlos wrote:
-> Hi Vivek,
-> 
-> I have tested with Kata 1.12-apha0, the results seems that are better for the use fio config I am tracking. 
-> 
-> The fio config does  randrw:
-> 
-> fio --direct=1 --gtod_reduce=1 --name=test --filename=random_read_write.fio --bs=4k --iodepth=64 --size=200M --readwrite=randrw --rwmixread=75
-> 
+--_000_AM0PR03MB62922C93066A83FBB8480E5EA6ED0AM0PR03MB6292eurp_
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 
-Hi Carlos,
+From: Dr. David Alan Gilbert <dgilbert@redhat.com>
+* Fotis Xenakis (foxen@windowslive.com) wrote:
+> This post briefly goes over the main points of virtio-fs and OSv, a
+> unikernel running under QEMU/KVM and taking advantage of its virtio-fs
+> implementation.
+>
+> Changes since v1:
+> - Fixed wording and links, as suggested by Thomas Huth.
+> - Added a short example of virtio-fs usage in OSv.
+>
+> Signed-off-by: Fotis Xenakis <foxen@windowslive.com>
 
-Thanks for the testing. 
+> +One central point is OSv's support for booting from virtio-fs: this enab=
+les
+> +deploying a modified version or a whole new application **without rebuil=
+ding**
+> +the image, just by adjusting its root file system contents on the host. =
+Last,
+> +owing to the DAX window practically providing low-overhead access to the=
+ host's
+> +page cache, scalability is also expected to excel, with it being a commo=
+n
+> +concern due to the potentially high density of unikernels per host.
 
-So basically two conclusions from your tests.
+Hi Fotis,
+Hello Dave,
+  Since I'm not used to unikernels, I'm a little confused by this; I'd
+appreciate some explanation.
 
-- for virtiofs, --thread-pool-size=0 is performing better as comapred
-  to --thread-pool-size=1 as well as --thread-pool-size=64. Approximately
-  35-40% better.
+  In your unikernel, does the root filesystem just contain data?  I mean
+being a 'unikernel' aren't all the binaries and support all linked into
+the kernel itself?
+Short answer: the root file system doesn't contain only data, the
+executable can also be loaded from it. Although a unikernel, it
+supports both the embedded-in-kernel and separate-filesystem
+approaches.
 
-- virtio-9p is still approximately 30% better than virtiofs
-  --thread-pool-size=0.
+OSv is more heavy-weight than most unikernels, in the sense that it
+supports a lot of features found in general-purpose OSs. One could
+just describe it as a specialized, light-weight OS. On the filesystem
+side, it's actually pretty close e.g. to Linux: it has a VFS and multiple
+filesystems:
 
-As I had done the analysis that this particular workload (mixed read and
-write) is bad with virtiofs because after every write we are invalidating
-attrs and cache so next read ends up fetching attrs again. I had posted
-patches to gain some of the performance.
+  *   pseudo-fs (devfs and others)
+  *   ramfs, which is indeed embedded into the kernel
+  *   ZFS and ROFS, on regular block devices
+  *   NFS, virtio-fs
 
-https://lore.kernel.org/linux-fsdevel/20200929185015.GG220516@redhat.com/
+Also like Linux, it initially boots into its initramfs (embedded in the
+kernel) and then typically mounts a root file system from a device
+(ZFS, ROFS or virtio-fs), before executing the application code.
 
-But I got the feedback to look into implementing file leases instead.
+In case this is not clear, please feel free to ask further!
 
-Anyway, good to know that --thread-pool-size=0 narrows the performance
-gap substantially (more than half) for this workload. I will look into
-identifying further bottlenecks.
+Fotis
 
-Given in my tests, most of the workload benefited from
---thread-pool-size=0, may be this can be the default and user can
-opt-in for a thread pool (--thread-pool-size=64) once it is known
-that a particular workload benefits from it.
+Dave
+--
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 
-David, Stefan, WDYT?
 
-Thanks
-Vivek
+--_000_AM0PR03MB62922C93066A83FBB8480E5EA6ED0AM0PR03MB6292eurp_
+Content-Type: text/html; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 
-> - I can see better results with this patch
-> - 9pfs is still better in the case of Kata because of the use of:
-> https://github.com/kata-containers/packaging/blob/stable-1.12/qemu/patches/5.0.x/0001-9p-removing-coroutines-of-9p-to-increase-the-I-O-per.patch
-> 
-> Results:
-> ./fio-results-run_virtiofs_tread_pool_0
->    READ: bw=42.8MiB/s (44.8MB/s), 42.8MiB/s-42.8MiB/s (44.8MB/s-44.8MB/s), io=150MiB (157MB), run=3507-3507msec
->   WRITE: bw=14.3MiB/s (14.9MB/s), 14.3MiB/s-14.3MiB/s (14.9MB/s-14.9MB/s), io=49.0MiB (52.4MB), run=3507-3507msec
-> ./fio-results-run_9pfs
->    READ: bw=55.1MiB/s (57.8MB/s), 55.1MiB/s-55.1MiB/s (57.8MB/s-57.8MB/s), io=150MiB (157MB), run=2722-2722msec
->   WRITE: bw=18.4MiB/s (19.3MB/s), 18.4MiB/s-18.4MiB/s (19.3MB/s-19.3MB/s), io=49.0MiB (52.4MB), run=2722-2722msec
-> ./fio-results-run_virtiofs_tread_pool_1
->    READ: bw=34.5MiB/s (36.1MB/s), 34.5MiB/s-34.5MiB/s (36.1MB/s-36.1MB/s), io=150MiB (157MB), run=4354-4354msec
->   WRITE: bw=11.5MiB/s (12.0MB/s), 11.5MiB/s-11.5MiB/s (12.0MB/s-12.0MB/s), io=49.0MiB (52.4MB), run=4354-4354msec
-> ./fio-results-run_virtiofs_tread_pool_64
->    READ: bw=32.3MiB/s (33.8MB/s), 32.3MiB/s-32.3MiB/s (33.8MB/s-33.8MB/s), io=150MiB (157MB), run=4648-4648msec
->   WRITE: bw=10.8MiB/s (11.3MB/s), 10.8MiB/s-10.8MiB/s (11.3MB/s-11.3MB/s), io=49.0MiB (52.4MB), run=4648-4648msec
-> 
-> Next: 
-> - run https://github.com/rhvgoyal/virtiofs-tests for  tread_pool_0, tread_pool_64, and 9pfs
-> - Test https://lore.kernel.org/linux-fsdevel/20201009181512.65496-1-vgoyal@redhat.com/
-> 
-> All the testing  for kata is based in:
-> https://github.com/jcvenegas/mrunner/blob/master/scripts/bash_workloads/build-qemu-and-run-fio-test.sh
-> 
-> I ran this using an azure VM.
-> 
-> Cheers,
-> Carlos
-> 
-> 
-> ﻿On 05/11/20 13:53, "Vivek Goyal" <vgoyal@redhat.com> wrote:
-> 
->     On Thu, Nov 05, 2020 at 02:44:16PM -0500, Vivek Goyal wrote:
->     > Right now we create a thread pool and main thread hands over the request
->     > to thread in thread pool to process. Number of threads in thread pool
->     > can be managed by option --thread-pool-size.
->     > 
->     > There is a chance that in case of some workloads, we might get better
->     > performance if we don't handover the request to a different thread
->     > and process in the context of thread receiving the request.
->     > 
->     > To implement that, redefine the meaning of --thread-pool-size=0 to
->     > mean that don't use a thread pool. Instead process the request in
->     > the context of thread receiving request from the queue.
->     > 
->     > I can't think how --thread-pool-size=0 is useful and hence using
->     > that. If it is already useful somehow, I could look at defining
->     > a new option say "--no-thread-pool".
->     > 
->     > I think this patch will be used more as a debug help to do comparison
->     > when it is more effecient to do not hand over the requests to a
->     > thread pool.
-> 
->     I ran virtiofs-tests to comapre --thread-pool-size=0 and
->     --thread-pool-size=64. And results seem to be all over the place. In
->     some cases thread pool seems to perform batter and in other cases
->     no-thread-pool seems to perform better.
-> 
->     But in general it looks like that except for the case of libaio workload,
->     no-thread-pool is helping.
-> 
->     Thanks
->     Vivek
-> 
->     NAME                    WORKLOAD                Bandwidth       IOPS            
->     thread-pool             seqread-psync           682.4mb         170.6k          
->     no-thread-pool          seqread-psync           679.3mb         169.8k          
-> 
->     thread-pool             seqread-psync-multi     2415.9mb        603.9k          
->     no-thread-pool          seqread-psync-multi     2528.5mb        632.1k          
-> 
->     thread-pool             seqread-mmap            591.7mb         147.9k          
->     no-thread-pool          seqread-mmap            595.6mb         148.9k          
-> 
->     thread-pool             seqread-mmap-multi      2195.3mb        548.8k          
->     no-thread-pool          seqread-mmap-multi      2286.1mb        571.5k          
-> 
->     thread-pool             seqread-libaio          329.1mb         82.2k           
->     no-thread-pool          seqread-libaio          271.5mb         67.8k           
-> 
->     thread-pool             seqread-libaio-multi    1387.1mb        346.7k          
->     no-thread-pool          seqread-libaio-multi    1508.2mb        377.0k          
-> 
->     thread-pool             randread-psync          59.0mb          14.7k           
->     no-thread-pool          randread-psync          78.5mb          19.6k           
-> 
->     thread-pool             randread-psync-multi    226.4mb         56.6k           
->     no-thread-pool          randread-psync-multi    289.2mb         72.3k           
-> 
->     thread-pool             randread-mmap           48.4mb          12.1k           
->     no-thread-pool          randread-mmap           57.4mb          14.3k           
-> 
->     thread-pool             randread-mmap-multi     183.5mb         45.8k           
->     no-thread-pool          randread-mmap-multi     240.5mb         60.1k           
-> 
->     thread-pool             randread-libaio         329.4mb         82.3k           
->     no-thread-pool          randread-libaio         261.8mb         65.4k           
-> 
->     thread-pool             randread-libaio-multi   252.1mb         63.0k           
->     no-thread-pool          randread-libaio-multi   278.3mb         69.5k           
-> 
->     thread-pool             seqwrite-psync          54.9mb          13.7k           
->     no-thread-pool          seqwrite-psync          77.8mb          19.4k           
-> 
->     thread-pool             seqwrite-psync-multi    219.9mb         54.9k           
->     no-thread-pool          seqwrite-psync-multi    314.8mb         78.7k           
-> 
->     thread-pool             seqwrite-mmap           191.7mb         47.9k           
->     no-thread-pool          seqwrite-mmap           201.4mb         50.3k           
-> 
->     thread-pool             seqwrite-mmap-multi     346.6mb         86.6k           
->     no-thread-pool          seqwrite-mmap-multi     387.6mb         96.9k           
-> 
->     thread-pool             seqwrite-libaio         306.4mb         76.6k           
->     no-thread-pool          seqwrite-libaio         248.2mb         62.0k           
-> 
->     thread-pool             seqwrite-libaio-multi   328.5mb         82.1k           
->     no-thread-pool          seqwrite-libaio-multi   305.6mb         76.4k           
-> 
->     thread-pool             randwrite-psync         55.6mb          13.9k           
->     no-thread-pool          randwrite-psync         81.2mb          20.3k           
-> 
->     thread-pool             randwrite-psync-multi   227.0mb         56.7k           
->     no-thread-pool          randwrite-psync-multi   311.6mb         77.8k           
-> 
->     thread-pool             randwrite-mmap          35.3mb          9038            
->     no-thread-pool          randwrite-mmap          58.1mb          14.5k           
-> 
->     thread-pool             randwrite-mmap-multi    140.8mb         35.2k           
->     no-thread-pool          randwrite-mmap-multi    210.5mb         52.6k           
-> 
->     thread-pool             randwrite-libaio        307.1mb         76.7k           
->     no-thread-pool          randwrite-libaio        279.4mb         69.8k           
-> 
->     thread-pool             randwrite-libaio-multi  361.3mb         90.3k           
->     no-thread-pool          randwrite-libaio-multi  302.6mb         75.6k           
-> 
->     thread-pool             randrw-psync            34.1mb/11.4mb   8754/2929       
->     no-thread-pool          randrw-psync            38.7mb/12.9mb   9919/3321       
-> 
->     thread-pool             randrw-psync-multi      126.2mb/42.3mb  31.5k/10.5k     
->     no-thread-pool          randrw-psync-multi      172.2mb/57.7mb  43.0k/14.4k     
-> 
->     thread-pool             randrw-mmap             24.1mb/8270kb   6194/2067       
->     no-thread-pool          randrw-mmap             42.0mb/14.0mb   10.5k/3606      
-> 
->     thread-pool             randrw-mmap-multi       127.9mb/42.8mb  31.9k/10.7k     
->     no-thread-pool          randrw-mmap-multi       179.4mb/60.0mb  44.8k/15.0k     
-> 
->     thread-pool             randrw-libaio           64.0mb/21.4mb   16.0k/5485      
->     no-thread-pool          randrw-libaio           79.6mb/26.6mb   19.9k/6831      
-> 
->     thread-pool             randrw-libaio-multi     174.2mb/58.3mb  43.5k/14.5k     
->     no-thread-pool          randrw-libaio-multi     201.6mb/67.5mb  50.4k/16.8k     
-> 
-> 
+<html>
+<head>
+<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Diso-8859-=
+1">
+<style type=3D"text/css" style=3D"display:none;"> P {margin-top:0;margin-bo=
+ttom:0;} </style>
+</head>
+<body dir=3D"ltr">
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0);">
+</div>
+<div dir=3D"ltr"><font face=3D"Calibri, sans-serif" color=3D"#000000" style=
+=3D"font-size:11pt"><b>From:</b> Dr. David Alan Gilbert &lt;dgilbert@redhat=
+.com&gt;<br>
+</font></div>
+<blockquote class=3D"quotableTextTraining" style=3D"border-left: 3px solid =
+rgb(200, 200, 200); border-top-color: rgb(200, 200, 200); border-right-colo=
+r: rgb(200, 200, 200); border-bottom-color: rgb(200, 200, 200); padding-lef=
+t: 1ex; margin-left: 0.8ex; color: rgb(102, 102, 102);">
+<div id=3D"divRplyFwdMsg" dir=3D"ltr">
+<div>* Fotis Xenakis (foxen@windowslive.com) wrote:<br>
+</div>
+</div>
+<div class=3D"BodyFragment"><font size=3D"2"><span style=3D"font-size:11pt"=
+>
+<div class=3D"PlainText">&gt; This post briefly goes over the main points o=
+f virtio-fs and OSv, a<br>
+&gt; unikernel running under QEMU/KVM and taking advantage of its virtio-fs=
+<br>
+&gt; implementation.<br>
+&gt; <br>
+&gt; Changes since v1:<br>
+&gt; - Fixed wording and links, as suggested by Thomas Huth.<br>
+&gt; - Added a short example of virtio-fs usage in OSv.<br>
+&gt; <br>
+&gt; Signed-off-by: Fotis Xenakis &lt;foxen@windowslive.com&gt;<br>
+<br>
+&gt; +One central point is OSv's support for booting from virtio-fs: this e=
+nables<br>
+&gt; +deploying a modified version or a whole new application **without reb=
+uilding**<br>
+&gt; +the image, just by adjusting its root file system contents on the hos=
+t. Last,<br>
+&gt; +owing to the DAX window practically providing low-overhead access to =
+the host's<br>
+&gt; +page cache, scalability is also expected to excel, with it being a co=
+mmon<br>
+&gt; +concern due to the potentially high density of unikernels per host.<b=
+r>
+<br>
+</div>
+<div class=3D"PlainText">Hi Fotis,<br>
+</div>
+</span></font></div>
+</blockquote>
+<div class=3D"PlainText">Hello Dave,</div>
+<blockquote class=3D"quotableTextTraining" style=3D"border-left: 3px solid =
+rgb(200, 200, 200); border-top-color: rgb(200, 200, 200); border-right-colo=
+r: rgb(200, 200, 200); border-bottom-color: rgb(200, 200, 200); padding-lef=
+t: 1ex; margin-left: 0.8ex; color: rgb(102, 102, 102);">
+<div class=3D"BodyFragment"><font size=3D"2"><span style=3D"font-size:11pt"=
+>
+<div class=3D"PlainText">&nbsp; Since I'm not used to unikernels, I'm a lit=
+tle confused by this; I'd<br>
+appreciate some explanation.<br>
+<br>
+&nbsp; In your unikernel, does the root filesystem just contain data?&nbsp;=
+ I mean<br>
+being a 'unikernel' aren't all the binaries and support all linked into<br>
+</div>
+<div class=3D"PlainText">the kernel itself?<br>
+</div>
+</span></font></div>
+</blockquote>
+<div class=3D"PlainText">Short answer: the root file system doesn't contain=
+ only data, the</div>
+<div class=3D"PlainText">executable can also be loaded from it. Although a =
+unikernel, it</div>
+<div class=3D"PlainText">supports both the embedded-in-kernel and separate-=
+filesystem</div>
+<div class=3D"PlainText">approaches.</div>
+<div class=3D"PlainText"><br>
+</div>
+<div class=3D"PlainText">OSv is more heavy-weight than most unikernels, in =
+the sense that it<br>
+</div>
+<div class=3D"PlainText">supports a lot of features found in general-purpos=
+e OSs. One could</div>
+<div class=3D"PlainText">just describe it as a specialized, light-weight OS=
+. On the filesystem</div>
+<div class=3D"PlainText">side, it's actually pretty close e.g. to Linux: it=
+ has a VFS and multiple</div>
+<div class=3D"PlainText">filesystems:</div>
+<div class=3D"PlainText">
+<ul>
+<li>pseudo-fs (devfs and others)</li><li>ramfs, which is indeed embedded in=
+to the kernel</li><li>ZFS and ROFS, on regular block devices</li><li>NFS, v=
+irtio-fs<br>
+</li></ul>
+<div>Also like Linux, it initially boots into its initramfs (embedded in th=
+e</div>
+<div>kernel) and then typically mounts a root file system from a device</di=
+v>
+<div>(ZFS, ROFS or virtio-fs), before executing the application code.</div>
+<div><br>
+</div>
+<div>In case this is not clear, please feel free to ask further!</div>
+<div><br>
+</div>
+<div>Fotis</div>
+</div>
+<blockquote class=3D"quotableTextTraining" style=3D"border-left: 3px solid =
+rgb(200, 200, 200); border-top-color: rgb(200, 200, 200); border-right-colo=
+r: rgb(200, 200, 200); border-bottom-color: rgb(200, 200, 200); padding-lef=
+t: 1ex; margin-left: 0.8ex; color: rgb(102, 102, 102);">
+<div class=3D"BodyFragment"><font size=3D"2"><span style=3D"font-size:11pt"=
+>
+<div class=3D"PlainText"><br>
+Dave<br>
+-- <br>
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK<br>
+</div>
+</span></font></div>
+</blockquote>
+<div class=3D"BodyFragment"><font size=3D"2"><span style=3D"font-size:11pt"=
+>
+<div class=3D"PlainText"><br>
+</div>
+</span></font></div>
+</body>
+</html>
+
+--_000_AM0PR03MB62922C93066A83FBB8480E5EA6ED0AM0PR03MB6292eurp_--
 

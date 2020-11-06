@@ -1,13 +1,21 @@
-Date: Thu, 5 Nov 2020 14:52:53 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20201105195253.GB1384085@redhat.com>
-References: <20201105194416.GA1384085@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=cj9aU3bU6Mlez1/jNuR19+XJKdPcL+MH8EXhEAlY4Uo=;
+	b=lol22UeLwiMXamApuDJFhU2xmyUymt91OXHzV2LUp33ZXuJpYQgpx6XtX1QJ6WmtCC
+	OZYJnZAuJI/irOUzVyzDgJlNyZ7+w+mSX4A3mORO2OG2i9eJqfgqx8LAU5/d0gfnjsHV
+	iVMnqrg5+zRNArjxud2hqEv5d2S6/ypVev6HY=
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20201105194416.GA1384085@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Use --thread-pool-size=0 to mean
- no thread pool
+References: <c4cb4b41655bc890b9dbf40bd2c133cbcbef734d.camel@redhat.com>
+	<89f0dbf6713ebd44ec519425e3a947e71f7aed55.camel@redhat.com>
+	<CAJfpegv4jLewQ4G_GdxraTE8fGHy7-d52gPSi4ZAOp0N4aYJnw@mail.gmail.com>
+	<77529e99ca9c2d228a67dd8d789d83afdcd1ace3.camel@redhat.com>
+In-Reply-To: <77529e99ca9c2d228a67dd8d789d83afdcd1ace3.camel@redhat.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Fri, 6 Nov 2020 10:29:28 +0100
+Message-ID: <CAJfpegsuYAW+W7xN3QGdfzEHROdMhVOJS5K=u8JQe-_WaY8VsA@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] WARN_ON(fuse_insert_writeback(root,
+	wpa)) in tree_insert()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,129 +24,32 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs-list <virtio-fs@redhat.com>
-Cc: jose.carlos.venegas.munoz@intel.com
+To: Qian Cai <cai@redhat.com>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>, Vivek Goyal <vgoyal@redhat.com>, linux-kernel@vger.kernel.org
 
-On Thu, Nov 05, 2020 at 02:44:16PM -0500, Vivek Goyal wrote:
-> Right now we create a thread pool and main thread hands over the request
-> to thread in thread pool to process. Number of threads in thread pool
-> can be managed by option --thread-pool-size.
-> 
-> There is a chance that in case of some workloads, we might get better
-> performance if we don't handover the request to a different thread
-> and process in the context of thread receiving the request.
-> 
-> To implement that, redefine the meaning of --thread-pool-size=0 to
-> mean that don't use a thread pool. Instead process the request in
-> the context of thread receiving request from the queue.
-> 
-> I can't think how --thread-pool-size=0 is useful and hence using
-> that. If it is already useful somehow, I could look at defining
-> a new option say "--no-thread-pool".
-> 
-> I think this patch will be used more as a debug help to do comparison
-> when it is more effecient to do not hand over the requests to a
-> thread pool.
+On Mon, Nov 2, 2020 at 3:26 PM Qian Cai <cai@redhat.com> wrote:
+>
+> On Thu, 2020-10-29 at 16:20 +0100, Miklos Szeredi wrote:
+> > On Thu, Oct 29, 2020 at 4:02 PM Qian Cai <cai@redhat.com> wrote:
+> > > On Wed, 2020-10-07 at 16:08 -0400, Qian Cai wrote:
+> > > > Running some fuzzing by a unprivileged user on virtiofs could trigger the
+> > > > warning below. The warning was introduced not long ago by the commit
+> > > > c146024ec44c ("fuse: fix warning in tree_insert() and clean up writepage
+> > > > insertion").
+> > > >
+> > > > From the logs, the last piece of the fuzzing code is:
+> > > >
+> > > > fgetxattr(fd=426, name=0x7f39a69af000, value=0x7f39a8abf000, size=1)
+> > >
+> > > I can still reproduce it on today's linux-next. Any idea on how to debug it
+> > > further?
+> >
+> > Can you please try the attached patch?
+>
+> It has survived the testing over the weekend. There is a issue that virtiofsd
+> hung, but it looks like a separate issue.
 
-I ran virtiofs-tests to comapre --thread-pool-size=0 and
---thread-pool-size=64. And results seem to be all over the place. In
-some cases thread pool seems to perform batter and in other cases
-no-thread-pool seems to perform better.
+Thanks very much for the testing.   Queued up the patch.
 
-But in general it looks like that except for the case of libaio workload,
-no-thread-pool is helping.
-
-Thanks
-Vivek
-
-NAME                    WORKLOAD                Bandwidth       IOPS            
-thread-pool             seqread-psync           682.4mb         170.6k          
-no-thread-pool          seqread-psync           679.3mb         169.8k          
-
-thread-pool             seqread-psync-multi     2415.9mb        603.9k          
-no-thread-pool          seqread-psync-multi     2528.5mb        632.1k          
-
-thread-pool             seqread-mmap            591.7mb         147.9k          
-no-thread-pool          seqread-mmap            595.6mb         148.9k          
-
-thread-pool             seqread-mmap-multi      2195.3mb        548.8k          
-no-thread-pool          seqread-mmap-multi      2286.1mb        571.5k          
-
-thread-pool             seqread-libaio          329.1mb         82.2k           
-no-thread-pool          seqread-libaio          271.5mb         67.8k           
-
-thread-pool             seqread-libaio-multi    1387.1mb        346.7k          
-no-thread-pool          seqread-libaio-multi    1508.2mb        377.0k          
-
-thread-pool             randread-psync          59.0mb          14.7k           
-no-thread-pool          randread-psync          78.5mb          19.6k           
-
-thread-pool             randread-psync-multi    226.4mb         56.6k           
-no-thread-pool          randread-psync-multi    289.2mb         72.3k           
-
-thread-pool             randread-mmap           48.4mb          12.1k           
-no-thread-pool          randread-mmap           57.4mb          14.3k           
-
-thread-pool             randread-mmap-multi     183.5mb         45.8k           
-no-thread-pool          randread-mmap-multi     240.5mb         60.1k           
-
-thread-pool             randread-libaio         329.4mb         82.3k           
-no-thread-pool          randread-libaio         261.8mb         65.4k           
-
-thread-pool             randread-libaio-multi   252.1mb         63.0k           
-no-thread-pool          randread-libaio-multi   278.3mb         69.5k           
-
-thread-pool             seqwrite-psync          54.9mb          13.7k           
-no-thread-pool          seqwrite-psync          77.8mb          19.4k           
-
-thread-pool             seqwrite-psync-multi    219.9mb         54.9k           
-no-thread-pool          seqwrite-psync-multi    314.8mb         78.7k           
-
-thread-pool             seqwrite-mmap           191.7mb         47.9k           
-no-thread-pool          seqwrite-mmap           201.4mb         50.3k           
-
-thread-pool             seqwrite-mmap-multi     346.6mb         86.6k           
-no-thread-pool          seqwrite-mmap-multi     387.6mb         96.9k           
-
-thread-pool             seqwrite-libaio         306.4mb         76.6k           
-no-thread-pool          seqwrite-libaio         248.2mb         62.0k           
-
-thread-pool             seqwrite-libaio-multi   328.5mb         82.1k           
-no-thread-pool          seqwrite-libaio-multi   305.6mb         76.4k           
-
-thread-pool             randwrite-psync         55.6mb          13.9k           
-no-thread-pool          randwrite-psync         81.2mb          20.3k           
-
-thread-pool             randwrite-psync-multi   227.0mb         56.7k           
-no-thread-pool          randwrite-psync-multi   311.6mb         77.8k           
-
-thread-pool             randwrite-mmap          35.3mb          9038            
-no-thread-pool          randwrite-mmap          58.1mb          14.5k           
-
-thread-pool             randwrite-mmap-multi    140.8mb         35.2k           
-no-thread-pool          randwrite-mmap-multi    210.5mb         52.6k           
-
-thread-pool             randwrite-libaio        307.1mb         76.7k           
-no-thread-pool          randwrite-libaio        279.4mb         69.8k           
-
-thread-pool             randwrite-libaio-multi  361.3mb         90.3k           
-no-thread-pool          randwrite-libaio-multi  302.6mb         75.6k           
-
-thread-pool             randrw-psync            34.1mb/11.4mb   8754/2929       
-no-thread-pool          randrw-psync            38.7mb/12.9mb   9919/3321       
-
-thread-pool             randrw-psync-multi      126.2mb/42.3mb  31.5k/10.5k     
-no-thread-pool          randrw-psync-multi      172.2mb/57.7mb  43.0k/14.4k     
-
-thread-pool             randrw-mmap             24.1mb/8270kb   6194/2067       
-no-thread-pool          randrw-mmap             42.0mb/14.0mb   10.5k/3606      
-
-thread-pool             randrw-mmap-multi       127.9mb/42.8mb  31.9k/10.7k     
-no-thread-pool          randrw-mmap-multi       179.4mb/60.0mb  44.8k/15.0k     
-
-thread-pool             randrw-libaio           64.0mb/21.4mb   16.0k/5485      
-no-thread-pool          randrw-libaio           79.6mb/26.6mb   19.9k/6831      
-
-thread-pool             randrw-libaio-multi     174.2mb/58.3mb  43.5k/14.5k     
-no-thread-pool          randrw-libaio-multi     201.6mb/67.5mb  50.4k/16.8k     
+Miklos
 

@@ -1,15 +1,11 @@
-From: Fotis Xenakis <foxen@windowslive.com>
-Date: Mon, 9 Nov 2020 11:27:18 +0000
-Message-ID: <AM0PR03MB62923C15DE8F5D150AC2BB88A6EA0@AM0PR03MB6292.eurprd03.prod.outlook.com>
-References: <AM0PR03MB629226965B72D3808EFB8795A6EF0@AM0PR03MB6292.eurprd03.prod.outlook.com>,
-	<ac1fe8d1-ac26-950d-6905-008f2f1189a8@redhat.com>
-In-Reply-To: <ac1fe8d1-ac26-950d-6905-008f2f1189a8@redhat.com>
+Date: Mon, 9 Nov 2020 09:35:48 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20201109143548.GA1479853@redhat.com>
 MIME-Version: 1.0
-Content-Language: en-US
-Content-Type: multipart/alternative;
-	boundary="_000_AM0PR03MB62923C15DE8F5D150AC2BB88A6EA0AM0PR03MB6292eurp_"
-Subject: Re: [Virtio-fs] [qemu-web PATCH v2] Add virtio-fs in OSv overview
-	blog post
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: [Virtio-fs] [PATCH V2] virtiofsd: Use --thread-pool-size=0 to mean
+	no thread pool
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,102 +14,93 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Thomas Huth <thuth@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>
-Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+To: qemu-devel@nongnu.org, virtio-fs-list <virtio-fs@redhat.com>
+Cc: jose.carlos.venegas.munoz@intel.com
 
---_000_AM0PR03MB62923C15DE8F5D150AC2BB88A6EA0AM0PR03MB6292eurp_
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: quoted-printable
+Right now we create a thread pool and main thread hands over the request
+to thread in thread pool to process. Number of threads in thread pool
+can be managed by option --thread-pool-size.
 
-Thank you for your time and the precious feedback!
+In tests we have noted that many of the workloads are getting better
+performance if we don't use a thread pool at all and process all
+the requests in the context of a thread receiving the request.
 
-Fotis
-________________________________
-From: Thomas Huth <thuth@redhat.com>
-Sent: Monday, November 9, 2020 12:54
-To: Fotis Xenakis <foxen@windowslive.com>; qemu-devel@nongnu.org <qemu-deve=
-l@nongnu.org>
-Cc: virtio-fs@redhat.com <virtio-fs@redhat.com>
-Subject: Re: [qemu-web PATCH v2] Add virtio-fs in OSv overview blog post
+Hence give user an option to be able to run virtiofsd without using
+a thread pool.
 
-On 04/11/2020 17.46, Fotis Xenakis wrote:
-> This post briefly goes over the main points of virtio-fs and OSv, a
-> unikernel running under QEMU/KVM and taking advantage of its virtio-fs
-> implementation.
->
-> Changes since v1:
-> - Fixed wording and links, as suggested by Thomas Huth.
-> - Added a short example of virtio-fs usage in OSv.
->
-> Signed-off-by: Fotis Xenakis <foxen@windowslive.com>
-> ---
+To implement this, I have used existing option --thread-pool-size. This
+option defines how many maximum threads can be in the thread pool.
+Thread pool size zero freezes thead pool. I can't see why will one
+start virtiofsd with a frozen thread pool (hence frozen file system).
+So I am redefining --thread-pool-size=0 to mean, don't use a thread pool.
+Instead process the request in the context of thread receiving request
+from the queue.
 
-Thanks, pushed now!
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ tools/virtiofsd/fuse_virtio.c | 36 ++++++++++++++++++++++++++---------
+ 1 file changed, 27 insertions(+), 9 deletions(-)
 
- Thomas
-
-
-
---_000_AM0PR03MB62923C15DE8F5D150AC2BB88A6EA0AM0PR03MB6292eurp_
-Content-Type: text/html; charset="us-ascii"
-Content-Transfer-Encoding: quoted-printable
-
-<html>
-<head>
-<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dus-ascii"=
->
-<style type=3D"text/css" style=3D"display:none;"> P {margin-top:0;margin-bo=
-ttom:0;} </style>
-</head>
-<body dir=3D"ltr">
-<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
- color: rgb(0, 0, 0);">
-Thank you for your time and the precious feedback!</div>
-<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
- color: rgb(0, 0, 0);">
-<br>
-</div>
-<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
- color: rgb(0, 0, 0);">
-Fotis</div>
-<div id=3D"appendonsend"></div>
-<hr style=3D"display:inline-block;width:98%" tabindex=3D"-1">
-<div id=3D"divRplyFwdMsg" dir=3D"ltr"><font face=3D"Calibri, sans-serif" st=
-yle=3D"font-size:11pt" color=3D"#000000"><b>From:</b> Thomas Huth &lt;thuth=
-@redhat.com&gt;<br>
-<b>Sent:</b> Monday, November 9, 2020 12:54<br>
-<b>To:</b> Fotis Xenakis &lt;foxen@windowslive.com&gt;; qemu-devel@nongnu.o=
-rg &lt;qemu-devel@nongnu.org&gt;<br>
-<b>Cc:</b> virtio-fs@redhat.com &lt;virtio-fs@redhat.com&gt;<br>
-<b>Subject:</b> Re: [qemu-web PATCH v2] Add virtio-fs in OSv overview blog =
-post</font>
-<div>&nbsp;</div>
-</div>
-<div class=3D"BodyFragment"><font size=3D"2"><span style=3D"font-size:11pt;=
-">
-<div class=3D"PlainText">On 04/11/2020 17.46, Fotis Xenakis wrote:<br>
-&gt; This post briefly goes over the main points of virtio-fs and OSv, a<br=
->
-&gt; unikernel running under QEMU/KVM and taking advantage of its virtio-fs=
-<br>
-&gt; implementation.<br>
-&gt; <br>
-&gt; Changes since v1:<br>
-&gt; - Fixed wording and links, as suggested by Thomas Huth.<br>
-&gt; - Added a short example of virtio-fs usage in OSv.<br>
-&gt; <br>
-&gt; Signed-off-by: Fotis Xenakis &lt;foxen@windowslive.com&gt;<br>
-&gt; ---<br>
-<br>
-Thanks, pushed now!<br>
-<br>
-&nbsp;Thomas<br>
-<br>
-<br>
-</div>
-</span></font></div>
-</body>
-</html>
-
---_000_AM0PR03MB62923C15DE8F5D150AC2BB88A6EA0AM0PR03MB6292eurp_--
+diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+index 83ba07c6cd..944b9a577c 100644
+--- a/tools/virtiofsd/fuse_virtio.c
++++ b/tools/virtiofsd/fuse_virtio.c
+@@ -588,13 +588,18 @@ static void *fv_queue_thread(void *opaque)
+     struct VuDev *dev = &qi->virtio_dev->dev;
+     struct VuVirtq *q = vu_get_queue(dev, qi->qidx);
+     struct fuse_session *se = qi->virtio_dev->se;
+-    GThreadPool *pool;
+-
+-    pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size, FALSE,
+-                             NULL);
+-    if (!pool) {
+-        fuse_log(FUSE_LOG_ERR, "%s: g_thread_pool_new failed\n", __func__);
+-        return NULL;
++    GThreadPool *pool = NULL;
++    GList *req_list = NULL;
++
++    if (se->thread_pool_size) {
++        fuse_log(FUSE_LOG_DEBUG, "%s: Creating thread pool for Queue %d\n",
++                 __func__, qi->qidx);
++        pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size,
++                                 FALSE, NULL);
++        if (!pool) {
++            fuse_log(FUSE_LOG_ERR, "%s: g_thread_pool_new failed\n", __func__);
++            return NULL;
++        }
+     }
+ 
+     fuse_log(FUSE_LOG_INFO, "%s: Start for queue %d kick_fd %d\n", __func__,
+@@ -669,14 +674,27 @@ static void *fv_queue_thread(void *opaque)
+ 
+             req->reply_sent = false;
+ 
+-            g_thread_pool_push(pool, req, NULL);
++            if (!se->thread_pool_size) {
++                req_list = g_list_prepend(req_list, req);
++            } else {
++                g_thread_pool_push(pool, req, NULL);
++            }
+         }
+ 
+         pthread_mutex_unlock(&qi->vq_lock);
+         pthread_rwlock_unlock(&qi->virtio_dev->vu_dispatch_rwlock);
++
++        /* Process all the requests. */
++        if (!se->thread_pool_size && req_list != NULL) {
++            g_list_foreach(req_list, fv_queue_worker, qi);
++            g_list_free(req_list);
++            req_list = NULL;
++        }
+     }
+ 
+-    g_thread_pool_free(pool, FALSE, TRUE);
++    if (pool) {
++        g_thread_pool_free(pool, FALSE, TRUE);
++    }
+ 
+     return NULL;
+ }
+-- 
+2.25.4
 

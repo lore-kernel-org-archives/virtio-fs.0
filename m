@@ -1,14 +1,14 @@
-Date: Wed, 11 Nov 2020 19:55:00 +0000
+Date: Wed, 11 Nov 2020 19:59:01 +0000
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20201111195500.GP3232@work-vm>
+Message-ID: <20201111195901.GQ3232@work-vm>
 References: <3477d902-ace9-1aa1-531a-9d20d6e93a05@huawei.com>
-	<f1e48ca8-d6de-d901-63c8-4f4024bda518@huawei.com>
+	<29fc87c2-b87c-4c34-40d4-75381f228849@huawei.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <f1e48ca8-d6de-d901-63c8-4f4024bda518@huawei.com>
-Subject: Re: [Virtio-fs] [PATCH 3/3] virtiofsd: check whether strdup
- lo.source return NULL in main func
+In-Reply-To: <29fc87c2-b87c-4c34-40d4-75381f228849@huawei.com>
+Subject: Re: [Virtio-fs] [PATCH 1/3] tools/virtiofsd/buffer.c: check whether
+ buf is NULL in fuse_bufvec_advance func
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,35 +21,34 @@ To: Haotian Li <lihaotian9@huawei.com>
 Cc: virtio-fs@redhat.com, linfeilong@huawei.com, qemu-devel@nongnu.org
 
 * Haotian Li (lihaotian9@huawei.com) wrote:
-> In main func, strdup lo.source may fail. So check whether strdup
-> lo.source return NULL before using it.
+> In fuse_bufvec_advance func, calling fuse_bufvec_current func
+> may return NULL, so we should check whether buf is NULL before
+> using it.
 > 
 > Signed-off-by: Haotian Li <lihaotian9@huawei.com>
 > Signed-off-by: Zhiqiang Liu <liuzhiqiang26@huawei.com>
 > ---
->  tools/virtiofsd/passthrough_ll.c | 4 ++++
+>  tools/virtiofsd/buffer.c | 4 ++++
 >  1 file changed, 4 insertions(+)
 > 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 3e9bbc7a04..0c11134fb5 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -3525,6 +3525,10 @@ int main(int argc, char *argv[])
->          }
->      } else {
->          lo.source = strdup("/");
-> +        if (!lo.source) {
-> +            fuse_log(FUSE_LOG_ERR, "failed to strdup source\n");
-> +            goto err_out1;
-> +        }
->      }
+> diff --git a/tools/virtiofsd/buffer.c b/tools/virtiofsd/buffer.c
+> index 27c1377f22..bdc608c221 100644
+> --- a/tools/virtiofsd/buffer.c
+> +++ b/tools/virtiofsd/buffer.c
+> @@ -246,6 +246,10 @@ static int fuse_bufvec_advance(struct fuse_bufvec *bufv, size_t len)
+>  {
+>      const struct fuse_buf *buf = fuse_bufvec_current(bufv);
 > 
-
-(It's interesting we use exit's in some places, goto's in others)
+> +    if (!buf) {
+> +        return 0;
+> +    }
+> +
 
 Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 
->      if (lo.xattrmap) {
+>      bufv->off += len;
+>      assert(bufv->off <= buf->size);
+>      if (bufv->off == buf->size) {
 > -- 
 > 
 > _______________________________________________

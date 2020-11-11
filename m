@@ -1,15 +1,21 @@
-References: <20201103164135.169325-1-mreitz@redhat.com>
-	<20201110185749.GH3108@work-vm>
-From: Max Reitz <mreitz@redhat.com>
-Message-ID: <50b9de71-017f-1253-f912-a1568f733958@redhat.com>
-Date: Wed, 11 Nov 2020 13:07:47 +0100
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=IppUYQ8GF/7LuBlILBgrSqpEAXjuA5Ok93a1QoZUdgs=;
+	b=ZQL1SDTMWchSpBu6572KAIf9vY6HqcyfOBt08vmb/plT8QnQEeE82ipV5agcqGarSb
+	De7BcSwnUKKIXbUKL+CH8DrsMIcof9QDryXiVGIOCq0Hl/gZ0w68liLomJiZrBoTQfQq
+	ZwDg/T5sQ75ew9je9uIK/q5OMNyn1TPDcQPx0=
 MIME-Version: 1.0
-In-Reply-To: <20201110185749.GH3108@work-vm>
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Language: en-US
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH for-5.2] virtiofsd: Announce submounts even
- without statx()
+References: <20201009181512.65496-1-vgoyal@redhat.com>
+	<20201009181512.65496-4-vgoyal@redhat.com>
+	<CAJfpegu=ooDmc3hT9cOe2WEUHQN=twX01xbV+YfPQPJUHFMs-g@mail.gmail.com>
+	<20201106171843.GA1445528@redhat.com>
+In-Reply-To: <20201106171843.GA1445528@redhat.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Wed, 11 Nov 2020 14:54:43 +0100
+Message-ID: <CAJfpegvvGL=GJX0a+cDUVhX754NibudTvHvtrBrCnk-FEnfQ6A@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PATCH v3 3/6] fuse: setattr should set
+	FATTR_KILL_PRIV upon size change
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,55 +24,54 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>
 
-On 10.11.20 19:57, Dr. David Alan Gilbert wrote:
-> * Max Reitz (mreitz@redhat.com) wrote:
->> Contrary to what the check (and warning) in lo_init() claims, we can
->> announce submounts just fine even without statx() -- the check is based
->> on comparing both the mount ID and st_dev of parent and child.  Without
->> statx(), we will not have the mount ID; but we always have st_dev.
->>
->> The only problems we have (without statx() and its mount ID) are:
->>
->> (1) Mounting the same device twice may lead to both trees being treated
->>      as exactly the same tree by virtiofsd.  But that is a problem that
->>      is completely independent of mirroring host submounts in the guest.
->>      Both submount roots will still show the FUSE_SUBMOUNT flag, because
->>      their st_dev still differs from their respective parent.
->>
->> (2) There is only one exception to (1), and that is if you mount a
->>      device inside a mount of itself: Then, its st_dev will be the same
->>      as that of its parent, and so without a mount ID, virtiofsd will not
->>      be able to recognize the nested mount's root as a submount.
->>      However, thanks to virtiofsd then treating both trees as exactly the
->>      same tree, it will be caught up in a loop when the guest tries to
->>      examine the nested submount, so the guest will always see nothing
->>      but an ELOOP there.  Therefore, this case is just fully broken
->>      without statx(), whether we check for submounts (based on st_dev) or
->>      not.
->>
->> All in all, checking for submounts works well even without comparing the
->> mount ID (i.e., without statx()).  The only concern is an edge case
->> that, without statx() mount IDs, is utterly broken anyway.
->>
->> Thus, drop said check in lo_init().
->>
->> Reported-by: Miklos Szeredi <mszeredi@redhat.com>
->> Signed-off-by: Max Reitz <mreitz@redhat.com>
-> 
-> OK, that seems to have been the outcome of the discussion here:
->    https://lists.gnu.org/archive/html/qemu-devel/2020-11/msg00500.html
+On Fri, Nov 6, 2020 at 6:18 PM Vivek Goyal <vgoyal@redhat.com> wrote:
 
-That’s right.
+> I think it does not hurt to start passing FATTR_KILL_PRIV for chown()
+> as well. In that case, server will always clear caps on chown but
+> clear suid/sgid only if FATTR_KILL_PRIV is set. (Which will always
+> be set).
 
-> so
-> 
-> 
-> Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Okay.
 
-Thanks :)
+More thoughts for FUSE_HANDLE_KILLPRIV_V2:
 
-Max
+ - clear "security.capability" on write, truncate and chown unconditionally
+ - clear suid/sgid if
+    o setattr has FATTR_SIZE and  FATTR_KILL_PRIV
+    o setattr has FATTR_UID or FATTR_GID
+    o open has O_TRUNC and FUSE_OPEN_KILL_PRIV
+    o write has FUSE_WRITE_KILL_PRIV
+
+Kernel has:
+ATTR_KILL_PRIV -> clear "security.capability"
+ATTR_KILL_SUID -> clear S_ISUID
+ATTR_KILL_SGID -> clear S_ISGID if executable
+
+Fuse has:
+FUSE_*KILL_PRIV -> clear S_ISUID and S_ISGID if executable
+
+So the fuse meaning of FUSE_*KILL_PRIV has a complementary meaning to
+that of ATTR_KILL_PRIV, which is somewhat confusing.  Also "PRIV"
+implies all privileges, including "security.capability" but the fuse
+ones relate to suid/sgid only.
+
+How about FUSE_*KILL_SUIDGID (FUSE_WRITE_KILL_SUIDGID being an alias
+for FUSE_WRITE_KILL_PRIV)?
+
+Thanks,
+Miklos
+
+
+
+
+>
+> So anything is fine. We just need to document it well. I think I will
+> write it very clearly in qemu patch depending on what goes in kernel.
+>
+> Thanks
+> Vivek
+>
 

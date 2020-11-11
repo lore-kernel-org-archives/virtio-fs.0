@@ -1,11 +1,13 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Mon, 26 Oct 2020 18:43:27 +0000
-Message-Id: <20201026184331.272953-13-dgilbert@redhat.com>
-In-Reply-To: <20201026184331.272953-1-dgilbert@redhat.com>
-References: <20201026184331.272953-1-dgilbert@redhat.com>
+From: Haotian Li <lihaotian9@huawei.com>
+References: <3477d902-ace9-1aa1-531a-9d20d6e93a05@huawei.com>
+Message-ID: <48887813-1c95-048c-6d10-48e3dd2bac71@huawei.com>
+Date: Wed, 11 Nov 2020 09:09:12 +0800
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 12/16] virtiofsd: Add fuse_reply_attr_with_flags()
+In-Reply-To: <3477d902-ace9-1aa1-531a-9d20d6e93a05@huawei.com>
+Content-Type: text/plain; charset="gbk"
+Content-Transfer-Encoding: 7bit
+Subject: [Virtio-fs] [PATCH 2/3] virtiofsd: check whether lo_map_reserve
+ returns NULL in, main func
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,86 +16,50 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, stefanha@redhat.com, mreitz@redhat.com, misono.tomohiro@jp.fujitsu.com
-Cc: virtio-fs@redhat.com, vgoyal@redhat.com
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com
+Cc: linfeilong@huawei.com
 
-From: Max Reitz <mreitz@redhat.com>
+In main func, func lo_map_reserve is called without NULL check.
+If reallocing new_elems fails in func lo_map_grow, the func
+lo_map_reserve may return NULL. We should check whether
+lo_map_reserve returns NULL before using it.
 
-The plain fuse_reply_attr() function does not allow setting
-fuse_attr.flags, so add this new function that does.
-
-Make fuse_reply_attr() a wrapper around it.
-
-Signed-off-by: Max Reitz <mreitz@redhat.com>
-Message-Id: <20200909184028.262297-5-mreitz@redhat.com>
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Signed-off-by: Haotian Li <lihaotian9@huawei.com>
+Signed-off-by: Zhiqiang Liu <liuzhiqiang26@huawei.com>
 ---
- tools/virtiofsd/fuse_lowlevel.c | 14 ++++++++++++--
- tools/virtiofsd/fuse_lowlevel.h | 15 +++++++++++++++
- 2 files changed, 27 insertions(+), 2 deletions(-)
+ tools/virtiofsd/passthrough_ll.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index 00da84432c..5198f627bc 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -426,8 +426,8 @@ int fuse_reply_create(fuse_req_t req, const struct fuse_entry_param *e,
-     return send_reply_ok(req, buf, entrysize + sizeof(struct fuse_open_out));
- }
- 
--int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
--                    double attr_timeout)
-+int fuse_reply_attr_with_flags(fuse_req_t req, const struct stat *attr,
-+                               double attr_timeout, uint32_t attr_flags)
- {
-     struct fuse_attr_out arg;
-     size_t size = sizeof(arg);
-@@ -437,9 +437,19 @@ int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
-     arg.attr_valid_nsec = calc_timeout_nsec(attr_timeout);
-     convert_stat(attr, &arg.attr);
- 
-+    if (req->se->conn.capable & FUSE_CAP_ATTR_FLAGS) {
-+        arg.attr.flags = attr_flags;
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index ec1008bceb..3e9bbc7a04 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -3433,6 +3433,7 @@ int main(int argc, char *argv[])
+         .proc_self_fd = -1,
+     };
+     struct lo_map_elem *root_elem;
++    struct lo_map_elem *reserve_elem;
+     int ret = -1;
+
+     /* Don't mask creation mode, kernel already did that */
+@@ -3452,8 +3453,17 @@ int main(int argc, char *argv[])
+      * [1] Root inode
+      */
+     lo_map_init(&lo.ino_map);
+-    lo_map_reserve(&lo.ino_map, 0)->in_use = false;
++    reserve_elem = lo_map_reserve(&lo.ino_map, 0);
++    if (!reserve_elem) {
++        fuse_log(FUSE_LOG_ERR, "failed to alloc reserve_elem.\n");
++        goto err_out1;
 +    }
-+
-     return send_reply_ok(req, &arg, size);
- }
- 
-+int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
-+                    double attr_timeout)
-+{
-+    return fuse_reply_attr_with_flags(req, attr, attr_timeout, 0);
-+}
-+
- int fuse_reply_readlink(fuse_req_t req, const char *linkname)
- {
-     return send_reply_ok(req, linkname, strlen(linkname));
-diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
-index 9c06240f9e..1ff6ba1e4f 100644
---- a/tools/virtiofsd/fuse_lowlevel.h
-+++ b/tools/virtiofsd/fuse_lowlevel.h
-@@ -1313,6 +1313,21 @@ int fuse_reply_create(fuse_req_t req, const struct fuse_entry_param *e,
- int fuse_reply_attr(fuse_req_t req, const struct stat *attr,
-                     double attr_timeout);
- 
-+/**
-+ * Reply with attributes and set fuse_attr.flags
-+ *
-+ * Possible requests:
-+ *   getattr, setattr
-+ *
-+ * @param req request handle
-+ * @param attr the attributes
-+ * @param attr_timeout validity timeout (in seconds) for the attributes
-+ * @param attr_flags flags to put into fuse_attr.flags
-+ * @return zero for success, -errno for failure to send reply
-+ */
-+int fuse_reply_attr_with_flags(fuse_req_t req, const struct stat *attr,
-+                               double attr_timeout, uint32_t attr_flags);
-+
- /**
-  * Reply with the contents of a symbolic link
-  *
++    reserve_elem->in_use = false;
+     root_elem = lo_map_reserve(&lo.ino_map, lo.root.fuse_ino);
++    if (!root_elem) {
++        fuse_log(FUSE_LOG_ERR, "failed to alloc root_elem.\n");
++        goto err_out1;
++    }
+     root_elem->inode = &lo.root;
+
+     lo_map_init(&lo.dirp_map);
 -- 
-2.28.0
 

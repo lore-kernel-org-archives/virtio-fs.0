@@ -1,15 +1,13 @@
+Date: Thu, 12 Nov 2020 15:41:42 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20201112154142.GG13424@work-vm>
+References: <20201103164135.169325-1-mreitz@redhat.com>
 MIME-Version: 1.0
-References: <20201105194416.GA1384085@redhat.com>
-	<20201106223524.GG1436035@redhat.com>
-	<CAOssrKcJr9a_5EUTU19BTp1UaST64Shh9w0UeR6TXPLqkN7bBw@mail.gmail.com>
-	<2033635.TJ2JW7Qltq@silver>
-In-Reply-To: <2033635.TJ2JW7Qltq@silver>
-From: Miklos Szeredi <mszeredi@redhat.com>
-Date: Thu, 12 Nov 2020 14:01:31 +0100
-Message-ID: <CAOssrKdNVwXsXA_q3UzcN0c7QKt3Bn-V758d8UJp=72cofQvug@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Use --thread-pool-size=0 to mean
- no thread pool
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20201103164135.169325-1-mreitz@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH for-5.2] virtiofsd: Announce submounts even
+ without statx()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,28 +16,72 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Christian Schoenebeck <qemu_oss@crudebyte.com>
-Cc: Miklos Szeredi <miklos@szeredi.hu>, "Venegas Munoz,
-	Jose Carlos" <jose.carlos.venegas.munoz@intel.com>, QEMU Developers <qemu-devel@nongnu.org>, Greg Kurz <groug@kaod.org>, virtio-fs-list <virtio-fs@redhat.com>, "Shinde,
-	Archana M" <archana.m.shinde@intel.com>, Vivek Goyal <vgoyal@redhat.com>
+To: Max Reitz <mreitz@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Thu, Nov 12, 2020 at 12:34 PM Christian Schoenebeck
-<qemu_oss@crudebyte.com> wrote:
->
-> On Donnerstag, 12. November 2020 10:06:37 CET Miklos Szeredi wrote:
-> >
-> > 9p:cache=none  <-> virtiofs:cache=none
-> > 9p:cache=loose <-> virtiofs:cache=always
-> >
-> > "9p:cache=mmap" and "virtiofs:cache=auto" have no match.
->
-> What does 'auto' do exactly?
+* Max Reitz (mreitz@redhat.com) wrote:
+> Contrary to what the check (and warning) in lo_init() claims, we can
+> announce submounts just fine even without statx() -- the check is based
+> on comparing both the mount ID and st_dev of parent and child.  Without
+> statx(), we will not have the mount ID; but we always have st_dev.
+> 
+> The only problems we have (without statx() and its mount ID) are:
+> 
+> (1) Mounting the same device twice may lead to both trees being treated
+>     as exactly the same tree by virtiofsd.  But that is a problem that
+>     is completely independent of mirroring host submounts in the guest.
+>     Both submount roots will still show the FUSE_SUBMOUNT flag, because
+>     their st_dev still differs from their respective parent.
+> 
+> (2) There is only one exception to (1), and that is if you mount a
+>     device inside a mount of itself: Then, its st_dev will be the same
+>     as that of its parent, and so without a mount ID, virtiofsd will not
+>     be able to recognize the nested mount's root as a submount.
+>     However, thanks to virtiofsd then treating both trees as exactly the
+>     same tree, it will be caught up in a loop when the guest tries to
+>     examine the nested submount, so the guest will always see nothing
+>     but an ELOOP there.  Therefore, this case is just fully broken
+>     without statx(), whether we check for submounts (based on st_dev) or
+>     not.
+> 
+> All in all, checking for submounts works well even without comparing the
+> mount ID (i.e., without statx()).  The only concern is an edge case
+> that, without statx() mount IDs, is utterly broken anyway.
+> 
+> Thus, drop said check in lo_init().
+> 
+> Reported-by: Miklos Szeredi <mszeredi@redhat.com>
+> Signed-off-by: Max Reitz <mreitz@redhat.com>
 
-It has a configurable timeout (default is 1s) for the attribute and
-lookup cache and close-to-open consistency for data (flush on close,
-invalidate on open).  This is similar to, but less refined as NFS.
-It's something that could easily be improved if there's a need for it.
+Queued
 
-Thanks,
-Miklos
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 8 --------
+>  1 file changed, 8 deletions(-)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index ec1008bceb..6c64b03f1a 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -610,14 +610,6 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
+>                   "does not support it\n");
+>          lo->announce_submounts = false;
+>      }
+> -
+> -#ifndef CONFIG_STATX
+> -    if (lo->announce_submounts) {
+> -        fuse_log(FUSE_LOG_WARNING, "lo_init: Cannot announce submounts, there "
+> -                 "is no statx()\n");
+> -        lo->announce_submounts = false;
+> -    }
+> -#endif
+>  }
+>  
+>  static void lo_getattr(fuse_req_t req, fuse_ino_t ino,
+> -- 
+> 2.26.2
+> 
+> 
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

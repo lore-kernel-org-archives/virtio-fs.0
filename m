@@ -1,12 +1,26 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Mon, 26 Oct 2020 18:43:28 +0000
-Message-Id: <20201026184331.272953-14-dgilbert@redhat.com>
-In-Reply-To: <20201026184331.272953-1-dgilbert@redhat.com>
-References: <20201026184331.272953-1-dgilbert@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+	d=crudebyte.com; s=lizzy; h=Content-Type:Content-Transfer-Encoding:
+	MIME-Version:References:In-Reply-To:Message-ID:Date:Subject:Cc:To:From:
+	Content-ID:Content-Description;
+	bh=JS4J2r13IX0uz1UzHbnrnVR0FqoGyewGghCIHJvCVIQ=;
+	b=Gt30WFyaVl7iEZrQZMeHVeB5mB
+	iUAykfS6sU51djmwfsUKgA9lUiE/e+pj259Cx+inRkP6+cZpl9AAL/D07fR3H/j62RZIAFA9bHapS
+	bHzKGGvCGqz/Fxvj/OVsGQCMtKgu0rUcuVPp33dJVLmWMken0KjEp9ofpiWKwuDac4vVyl8uW2iKh
+	f3L9JgqbrxctSPiuSGL+NGHyZxyRXST/nGMbssdn4M1cVWpAXVwc+C0/g7ZtD732i8VEZf9wEocL+
+	AB2RM6UMv5+Vdt0z64JdKs+GR41WVcv2YKN4op5viFlC3spXOz3LejQHZMBG30iyExjGm3gW1RvYB
+	+vPsHPog==
+From: Christian Schoenebeck <qemu_oss@crudebyte.com>
+Date: Thu, 12 Nov 2020 12:00:03 +0100
+Message-ID: <2033635.TJ2JW7Qltq@silver>
+In-Reply-To: <CAOssrKcJr9a_5EUTU19BTp1UaST64Shh9w0UeR6TXPLqkN7bBw@mail.gmail.com>
+References: <20201105194416.GA1384085@redhat.com>
+	<20201106223524.GG1436035@redhat.com>
+	<CAOssrKcJr9a_5EUTU19BTp1UaST64Shh9w0UeR6TXPLqkN7bBw@mail.gmail.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 13/16] virtiofsd: Store every lo_inode's
-	parent_dev
+Content-Transfer-Encoding: 7Bit
+Content-Type: text/plain; charset="us-ascii"
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Use --thread-pool-size=0 to mean
+	no thread pool
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,74 +29,78 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, stefanha@redhat.com, mreitz@redhat.com, misono.tomohiro@jp.fujitsu.com
-Cc: virtio-fs@redhat.com, vgoyal@redhat.com
+To: qemu-devel@nongnu.org
+Cc: Miklos Szeredi <miklos@szeredi.hu>, "Venegas Munoz,
+	Jose Carlos" <jose.carlos.venegas.munoz@intel.com>, Greg Kurz <groug@kaod.org>, virtio-fs-list <virtio-fs@redhat.com>, "Shinde,
+	Archana M" <archana.m.shinde@intel.com>, Vivek Goyal <vgoyal@redhat.com>
 
-From: Max Reitz <mreitz@redhat.com>
+On Donnerstag, 12. November 2020 10:06:37 CET Miklos Szeredi wrote:
+> On Fri, Nov 6, 2020 at 11:35 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> > On Fri, Nov 06, 2020 at 08:33:50PM +0000, Venegas Munoz, Jose Carlos 
+wrote:
+> > > Hi Vivek,
+> > > 
+> > > I have tested with Kata 1.12-apha0, the results seems that are better
+> > > for the use fio config I am tracking.
+> > > 
+> > > The fio config does  randrw:
+> > > 
+> > > fio --direct=1 --gtod_reduce=1 --name=test
+> > > --filename=random_read_write.fio --bs=4k --iodepth=64 --size=200M
+> > > --readwrite=randrw --rwmixread=75> 
+> > Hi Carlos,
+> > 
+> > Thanks for the testing.
+> > 
+> > So basically two conclusions from your tests.
+> > 
+> > - for virtiofs, --thread-pool-size=0 is performing better as comapred
+> > 
+> >   to --thread-pool-size=1 as well as --thread-pool-size=64. Approximately
+> >   35-40% better.
+> > 
+> > - virtio-9p is still approximately 30% better than virtiofs
+> > 
+> >   --thread-pool-size=0.
+> > 
+> > As I had done the analysis that this particular workload (mixed read and
+> > write) is bad with virtiofs because after every write we are invalidating
+> > attrs and cache so next read ends up fetching attrs again. I had posted
+> > patches to gain some of the performance.
+> > 
+> > https://lore.kernel.org/linux-fsdevel/20200929185015.GG220516@redhat.com/
+> > 
+> > But I got the feedback to look into implementing file leases instead.
+> 
+> Hmm, the FUSE_AUTO_INVAL_DATA feature is buggy, how about turning it
+> off for now?   9p doesn't have it, so no point in enabling it for
+> virtiofs by default.
+> 
+> Also I think some confusion comes from cache=auto being the default
+> for virtiofs.    Not sure what the default is for 9p, but comparing
+> default to default will definitely not be apples to apples since this
+> mode is nonexistent in 9p.
 
-We want to detect mount points in the shared tree.  We report them to
-the guest by setting the FUSE_ATTR_SUBMOUNT flag in fuse_attr.flags, but
-because the FUSE client will create a submount for every directory that
-has this flag set, we must do this only for the actual mount points.
+The default for 9p is cache=none.
 
-We can detect mount points by comparing a directory's st_dev with its
-parent's st_dev.  To be able to do so, we need to store the parent's
-st_dev in the lo_inode object.
+That should be changed to cache=mmap being default IMO, because if users stick 
+with the default setting 'none', it breaks software relying on mmap() calls.
 
-Note that mount points need not necessarily be directories; a single
-file can be a mount point as well.  However, for the sake of simplicity
-let us ignore any non-directory mount points for now.
+> 
+> 9p:cache=none  <-> virtiofs:cache=none
+> 9p:cache=loose <-> virtiofs:cache=always
+> 
+> "9p:cache=mmap" and "virtiofs:cache=auto" have no match.
 
-Signed-off-by: Max Reitz <mreitz@redhat.com>
-Message-Id: <20200909184028.262297-6-mreitz@redhat.com>
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
----
- tools/virtiofsd/passthrough_ll.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+What does 'auto' do exactly?
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index a0beb986f3..4188bf3ad2 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -125,6 +125,14 @@ struct lo_inode {
-     GHashTable *posix_locks; /* protected by lo_inode->plock_mutex */
- 
-     mode_t filetype;
-+
-+    /*
-+     * So we can detect crossmount roots
-+     * (As such, this only needs to be valid for directories.  Note
-+     * that files can have multiple parents due to hard links, and so
-+     * their parent_dev may fluctuate.)
-+     */
-+    dev_t parent_dev;
- };
- 
- struct lo_cred {
-@@ -847,6 +855,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-         g_hash_table_insert(lo->inodes, &inode->key, inode);
-         pthread_mutex_unlock(&lo->mutex);
-     }
-+    inode->parent_dev = dir->key.dev;
-     e->ino = inode->fuse_ino;
-     lo_inode_put(lo, &inode);
-     lo_inode_put(lo, &dir);
-@@ -1073,6 +1082,14 @@ static void lo_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t parent,
-     fuse_log(FUSE_LOG_DEBUG, "  %lli/%s -> %lli\n", (unsigned long long)parent,
-              name, (unsigned long long)e.ino);
- 
-+    /*
-+     * No need to update inode->parent_dev, because
-+     * (1) We cannot, the inode now has more than one parent,
-+     * (2) Directories cannot have more than one parent, so link()
-+     *     does not work for them; but parent_dev only needs to be
-+     *     valid for directories.
-+     */
-+
-     fuse_reply_entry(req, &e);
-     lo_inode_put(lo, &parent_inode);
-     lo_inode_put(lo, &inode);
--- 
-2.28.0
+> 
+> Untested patch attached.
+> 
+> Thanks,
+> Miklos
+
+Best regards,
+Christian Schoenebeck
+
 

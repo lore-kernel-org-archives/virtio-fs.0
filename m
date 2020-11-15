@@ -1,22 +1,21 @@
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
 	h=to:from:subject:message-id:date:user-agent:mime-version
 	:content-transfer-encoding:content-language;
-	bh=bjkqti83SqPjD5IwjVEGo4Pnr8Zwz2xxMhXMVoFUG2E=;
-	b=o2oW/uZO5D8K9Qa0p/O7mHLVUPFF8v0eyAihV0mWN4hqd7IimDdhXRXpTAmqd+28QJ
-	QhcAsC0M/I/TqWD0jY0L0/+zL41k/kLcZ0BdOp4jSjFgFUisyqeqWQF9EJixxGq1m/am
-	NbTKSa9a9DtODAUN5fa+0a31wfe8J5TBIwLrSoYy4XygFZlhyBtQBFFscr2Qb4nzUI76
-	PxcasaBM45SSvHEyqeGvuYUQFXRFmC+88jg/NuVpv1t2QewWL8CDc+lol0BaB7ldfYLl
-	9BttkTIdVcTuXEqIMz1dExypE+etsXLZrwb76zZEnBepWPyke2a8m3oJu4K3ZK7/vMvR
-	gPXQ==
+	bh=KJ7RT2ikzr2tDrPh2Y9bhPYGspcF4mBv8FORXIe3Hjg=;
+	b=F772xMm7eiQRGfGXvyospY+Z5X4fqochJOnUK2i7rsVV2fifpMWQ4ntt6l1ReBNj/1
+	I8fGMcd+pfcnPmlexjp/bqesIMiQzbFg4RV50NtPOHR9dZ+U5ki2duaXssx442PhlCZA
+	f5URPJBWeVWJSg/Ca8j+jz2CTxd4Le6cYDzQc1bmDwc6X3HxDFKV1Kv/U2UoOWJ4wxXQ
+	nb6lBbHc+KzgVtx5xMja9/h1lCKhl38zC4LvaizvknWP4qCdyvZYhmJj0bODpAOBSr6A
+	xUlUoanH01IFxULO8S3ig+Whv/36mPsFAaCK+7QgY8qJEQzjeQWFMkCZWqB5PG5iAzuo
+	2s/g==
 From: "Harry G. Coin" <hgcoin@gmail.com>
-Message-ID: <f51a7a42-1dc9-1f61-7fe0-a5edba8c68d9@gmail.com>
-Date: Sat, 14 Nov 2020 13:49:25 -0600
+Message-ID: <49924235-5ce7-9d5d-cf98-ace0743505fd@gmail.com>
+Date: Sun, 15 Nov 2020 01:30:40 -0600
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Language: en-US
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] Convenience vmlinuz link auto-update patch for
-	direct-kernel booting
+Subject: [Virtio-fs] restorecon "operation not supported" root virtiofs?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,59 +24,25 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: virtio-fs-list <virtio-fs@redhat.com>
 
-It's bothersome to require VM hosts using direct kernel virtio-fs
-booting to have to puzzle out what the latest kernel / initramfs rev is
-in the guest.
+When the host's fs is btrfs, and on the host we have:
 
-If in the guest you create /etc/kernel/postinst.d/update_boot_links
+/usr/lib/qemu/virtiofsd --fd=46 -o
+source=/vmsystems/fedora_generic,xattr,flock,no_posix_lock -o writeback
 
-with this:
+On generic fedora 33, kernel 5.9.8-200.fc33.x86_64
 
-#!/bin/bash
-#Used by vm host to boot latest kernel without having to update kernel
-spec in the host.
-KERNEL_VERSION="$1"
-#KERNEL_IMAGE="$2"
+[administrator@fedora Downloads]$ touch foo;restorecon foo
+restorecon: Could not set context for
+/home/administrator/Downloads/foo:  Operation not supported
 
-cd /boot
-ln -sf vmlinuz-$KERNEL_VERSION /boot/vmlinuz
-ln -sf initramfs-$KERNEL_VERSION.img /boot/initrd.img
+What, if anything, am I missing to enable proper restorecon / SELinux
+operations?
 
-then
-
-chmod 0755 /etc/kernel/postinst.d/update_boot_links
-
-Then in on the host under 'boot options' put as the kernel path
-
-/path/to/guest/vmlinuz  
-
-and
-
-/path/to/guest/initrd.img
-
-in the initrd path and
-
-root=virtiofs:myfs  rd.shell
-
-in the kernel args (and have updated dracut as indicated in the message
-titled
-
-HOWTO: direct kernel 'root=virtiofs:myfs' boot on 'vanilla'
-Fedora/RHEL/Centos releases.
-
-)
-
-Your vm will boot the most recently installed kernel without your having
-to update the xml spec in the host.
-
-Hope this helps!
+Thanks!
 
 Harry Coin
-
-
-
 
 
 

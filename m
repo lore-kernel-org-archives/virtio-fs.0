@@ -1,18 +1,11 @@
-Date: Tue, 17 Nov 2020 13:55:40 -0500
+Date: Tue, 17 Nov 2020 14:41:31 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20201117185540.GB91497@redhat.com>
-References: <20201105194416.GA1384085@redhat.com>
-	<20201105195253.GB1384085@redhat.com>
-	<D9233684-9B76-468E-A5F1-B35DA3F3C091@intel.com>
-	<20201106223524.GG1436035@redhat.com>
-	<CAOssrKcJr9a_5EUTU19BTp1UaST64Shh9w0UeR6TXPLqkN7bBw@mail.gmail.com>
-	<C5CAD300-DB1D-4C6A-A2D3-2E6BA9F901DF@intel.com>
+Message-ID: <20201117194131.GA96587@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <C5CAD300-DB1D-4C6A-A2D3-2E6BA9F901DF@intel.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Use --thread-pool-size=0 to mean
- no thread pool
+Subject: [Virtio-fs] [PATCH v3] virtiofsd: Use --thread-pool-size=0 to mean
+	no thread pool
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,45 +14,101 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Venegas Munoz, Jose Carlos" <jose.carlos.venegas.munoz@intel.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, "Shinde,
-	Archana M" <archana.m.shinde@intel.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, Miklos Szeredi <miklos@szeredi.hu>
+To: qemu-devel@nongnu.org, virtio-fs-list <virtio-fs@redhat.com>
+Cc: jose.carlos.venegas.munoz@intel.com
 
-On Tue, Nov 17, 2020 at 04:00:09PM +0000, Venegas Munoz, Jose Carlos wrote:
-> >   Not sure what the default is for 9p, but comparing
-> >   default to default will definitely not be apples to apples since this
-> >   mode is nonexistent in 9p.
-> 
-> In Kata we are looking for the best config for fs compatibility and performance. So even if are no apples to apples,
-> we are for the best config for both and comparing the best that each of them can do.
-> 
-> In the case of Kata for 9pfs(this is the config we have found has better performance and fs compatibility  in general) we have:
-> ```
-> -device virtio-9p-pci # device type
-> ,disable-modern=false 
-> ,fsdev=extra-9p-kataShared # attr: device id  for fsdev
-> ,mount_tag=kataShared  # attr: tag on how will be found de sharedfs 
-> ,romfile= 
-> -fsdev local  #local: Simply lets QEMU call the individual VFS functions (more or less) directly on host.
-> ,id=extra-9p-kataShared 
-> ,path=${SHARED_PATH} # attrs: path to share
-> ,security_model=none #    
-> #    passthrough: Files are stored using the same credentials as they are created on the guest. This requires QEMU to run as # root.
-> #    none: Same as "passthrough" except the sever won't report failures if it fails to set file attributes like ownership # 
-> #  (chown). This makes a passthrough like security model usable for people who run kvm as non root.
-> ,multidevs=remap
-> ```
-> 
-> The mount options are:
-> ```
-> trans=virtio 
->     ,version=9p2000.L 
->     ,cache=mmap 
->     ,"nodev" # Security: The nodev mount option specifies that the filesystem cannot contain special devices. 
->     ,"msize=8192" # msize: Maximum packet size including any headers.
-> ```
+This is V3 of the patch. A minor change since V2 is to reverse the list
+before executing requests. We are prepending elements to the list and that
+means when we start processing requests, we are processing these in
+the reverse order. Though we don't guarantee any ordering but it does
+not hurt to process requests in same order as received as much as
+possible.
 
-How much RAM you are giving to these containers when using virtio-9p?
+Right now we create a thread pool and main thread hands over the request
+to thread in thread pool to process. Number of threads in thread pool
+can be managed by option --thread-pool-size.
 
-Vivek
+In tests we have noted that many of the workloads are getting better
+performance if we don't use a thread pool at all and process all
+the requests in the context of a thread receiving the request.
+
+Hence give user an option to be able to run virtiofsd without using
+a thread pool.
+
+To implement this, I have used existing option --thread-pool-size. This
+option defines how many maximum threads can be in the thread pool.
+Thread pool size zero freezes thead pool. I can't see why will one
+start virtiofsd with a frozen thread pool (hence frozen file system).
+So I am redefining --thread-pool-size=0 to mean, don't use a thread pool.
+Instead process the request in the context of thread receiving request
+from the queue.
+
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ tools/virtiofsd/fuse_virtio.c | 37 ++++++++++++++++++++++++++---------
+ 1 file changed, 28 insertions(+), 9 deletions(-)
+
+diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+index 83ba07c6cd..6c56e606ef 100644
+--- a/tools/virtiofsd/fuse_virtio.c
++++ b/tools/virtiofsd/fuse_virtio.c
+@@ -588,13 +588,18 @@ static void *fv_queue_thread(void *opaque)
+     struct VuDev *dev = &qi->virtio_dev->dev;
+     struct VuVirtq *q = vu_get_queue(dev, qi->qidx);
+     struct fuse_session *se = qi->virtio_dev->se;
+-    GThreadPool *pool;
+-
+-    pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size, FALSE,
+-                             NULL);
+-    if (!pool) {
+-        fuse_log(FUSE_LOG_ERR, "%s: g_thread_pool_new failed\n", __func__);
+-        return NULL;
++    GThreadPool *pool = NULL;
++    GList *req_list = NULL;
++
++    if (se->thread_pool_size) {
++        fuse_log(FUSE_LOG_DEBUG, "%s: Creating thread pool for Queue %d\n",
++                 __func__, qi->qidx);
++        pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size,
++                                 FALSE, NULL);
++        if (!pool) {
++            fuse_log(FUSE_LOG_ERR, "%s: g_thread_pool_new failed\n", __func__);
++            return NULL;
++        }
+     }
+ 
+     fuse_log(FUSE_LOG_INFO, "%s: Start for queue %d kick_fd %d\n", __func__,
+@@ -669,14 +674,28 @@ static void *fv_queue_thread(void *opaque)
+ 
+             req->reply_sent = false;
+ 
+-            g_thread_pool_push(pool, req, NULL);
++            if (!se->thread_pool_size) {
++                req_list = g_list_prepend(req_list, req);
++            } else {
++                g_thread_pool_push(pool, req, NULL);
++            }
+         }
+ 
+         pthread_mutex_unlock(&qi->vq_lock);
+         pthread_rwlock_unlock(&qi->virtio_dev->vu_dispatch_rwlock);
++
++        /* Process all the requests. */
++        if (!se->thread_pool_size && req_list != NULL) {
++            req_list = g_list_reverse(req_list);
++            g_list_foreach(req_list, fv_queue_worker, qi);
++            g_list_free(req_list);
++            req_list = NULL;
++        }
+     }
+ 
+-    g_thread_pool_free(pool, FALSE, TRUE);
++    if (pool) {
++        g_thread_pool_free(pool, FALSE, TRUE);
++    }
+ 
+     return NULL;
+ }
+-- 
+2.25.4
 

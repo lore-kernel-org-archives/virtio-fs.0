@@ -1,18 +1,14 @@
-Date: Tue, 17 Nov 2020 17:24:50 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20201117222450.GC91497@redhat.com>
-References: <20201105194416.GA1384085@redhat.com>
-	<20201105195253.GB1384085@redhat.com>
-	<D9233684-9B76-468E-A5F1-B35DA3F3C091@intel.com>
-	<20201106223524.GG1436035@redhat.com>
-	<CAOssrKcJr9a_5EUTU19BTp1UaST64Shh9w0UeR6TXPLqkN7bBw@mail.gmail.com>
-	<C5CAD300-DB1D-4C6A-A2D3-2E6BA9F901DF@intel.com>
+Date: Wed, 18 Nov 2020 08:48:03 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20201118084803.GA182763@stefanha-x1.localdomain>
+References: <20201117194131.GA96587@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="k+w/mQv8wyuph6w0"
 Content-Disposition: inline
-In-Reply-To: <C5CAD300-DB1D-4C6A-A2D3-2E6BA9F901DF@intel.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Use --thread-pool-size=0 to mean
- no thread pool
+In-Reply-To: <20201117194131.GA96587@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v3] virtiofsd: Use --thread-pool-size=0 to
+ mean no thread pool
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,40 +17,64 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Venegas Munoz, Jose Carlos" <jose.carlos.venegas.munoz@intel.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, "Shinde,
-	Archana M" <archana.m.shinde@intel.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, Miklos Szeredi <miklos@szeredi.hu>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, jose.carlos.venegas.munoz@intel.com, qemu-devel@nongnu.org
 
-On Tue, Nov 17, 2020 at 04:00:09PM +0000, Venegas Munoz, Jose Carlos wrote:
-> >   Not sure what the default is for 9p, but comparing
-> >   default to default will definitely not be apples to apples since this
-> >   mode is nonexistent in 9p.
-> 
-> In Kata we are looking for the best config for fs compatibility and performance. So even if are no apples to apples,
-> we are for the best config for both and comparing the best that each of them can do.
 
-Can we run tests in more than one configuration. Right now you are using
-cache=mmap for virtio-9p and cache=auto for virtiofs and as Miklos
-said this is not apples to apples comparison.
+--k+w/mQv8wyuph6w0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-So you can continue to run above but also run additional tests if
-time permits.
+On Tue, Nov 17, 2020 at 02:41:31PM -0500, Vivek Goyal wrote:
+> This is V3 of the patch. A minor change since V2 is to reverse the list
+> before executing requests. We are prepending elements to the list and that
+> means when we start processing requests, we are processing these in
+> the reverse order. Though we don't guarantee any ordering but it does
+> not hurt to process requests in same order as received as much as
+> possible.
+>=20
+> Right now we create a thread pool and main thread hands over the request
+> to thread in thread pool to process. Number of threads in thread pool
+> can be managed by option --thread-pool-size.
+>=20
+> In tests we have noted that many of the workloads are getting better
+> performance if we don't use a thread pool at all and process all
+> the requests in the context of a thread receiving the request.
+>=20
+> Hence give user an option to be able to run virtiofsd without using
+> a thread pool.
+>=20
+> To implement this, I have used existing option --thread-pool-size. This
+> option defines how many maximum threads can be in the thread pool.
+> Thread pool size zero freezes thead pool. I can't see why will one
+> start virtiofsd with a frozen thread pool (hence frozen file system).
+> So I am redefining --thread-pool-size=3D0 to mean, don't use a thread poo=
+l.
+> Instead process the request in the context of thread receiving request
+> from the queue.
+>=20
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  tools/virtiofsd/fuse_virtio.c | 37 ++++++++++++++++++++++++++---------
+>  1 file changed, 28 insertions(+), 9 deletions(-)
 
-virtio-9p	virtio-fs
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
-cache=mmap	cache=none + DAX
-cache=none	cache=none
-cache=loose	cache=always
+--k+w/mQv8wyuph6w0
+Content-Type: application/pgp-signature; name="signature.asc"
 
-Given you are using cache=mmap for virtio-9p, "cache=none + DAX" is
-somewhat equivalent of that. Provides strong coherency as well as
-allow for mmap() to work.
+-----BEGIN PGP SIGNATURE-----
 
-Now kernel virtiofs DAX support got merged in 5.10-rc1. For qemu,
-you can use virtio-fs-dev branch.
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl+038MACgkQnKSrs4Gr
+c8hXUAgAkj0Nt9AV1TD3uyF86ErMcdzhVgmisE8gOBeOO+/AxWgulIZKasUQ+wvT
+Vvn1uLcwO7wFGI+Np0UafiweWjnc257DrBOCs5IYM3m2X+ddJGxXCIKNed3Z7JJr
+JTPQc8l0hLwiIgGtDOsj0OKPlw8ywRkU7IU3U4nQ4voWYR5I03OJcVGpnmMGlmfy
+ogd/JD1qjY/umChUChpNvD5AdXUcpe4JA87Bmk2/atVeXYwHoQvplICIAf3egNPP
+6LHKoCBKx66YepRrpgDVD2zWJf7B94ogF0w5lQGcELfguKk9ZIC9DmRRlFkVDSuX
++0BUILQJWdFIUcarTU64vqoSv/8RjQ==
+=3F15
+-----END PGP SIGNATURE-----
 
-https://gitlab.com/virtio-fs/qemu/-/commits/virtio-fs-dev
-
-Thanks
-Vivek
+--k+w/mQv8wyuph6w0--
 

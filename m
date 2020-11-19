@@ -1,18 +1,15 @@
-Date: Wed, 18 Nov 2020 15:19:30 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20201118201930.GC111728@redhat.com>
-References: <20201105194416.GA1384085@redhat.com>
-	<20201105195253.GB1384085@redhat.com>
-	<D9233684-9B76-468E-A5F1-B35DA3F3C091@intel.com>
-	<20201106223524.GG1436035@redhat.com>
-	<CAOssrKcJr9a_5EUTU19BTp1UaST64Shh9w0UeR6TXPLqkN7bBw@mail.gmail.com>
-	<CAOssrKeyRVSxCCyvPJvjoXgPYd3Dkkwn5fwAzxeyj-h3g8FqqA@mail.gmail.com>
+Date: Thu, 19 Nov 2020 15:42:08 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20201119154208.GA919560@stefanha-x1.localdomain>
+References: <20201112182418.25395-1-vgoyal@redhat.com>
+	<20201112182418.25395-3-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="8t9RHnE3ZwKMSgU+"
 Content-Disposition: inline
-In-Reply-To: <CAOssrKeyRVSxCCyvPJvjoXgPYd3Dkkwn5fwAzxeyj-h3g8FqqA@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Use --thread-pool-size=0 to mean
- no thread pool
+In-Reply-To: <20201112182418.25395-3-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v2 2/2] viriofsd: Add support for
+ FUSE_HANDLE_KILLPRIV_V2
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,61 +18,101 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <mszeredi@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, "Shinde,
-	Archana M" <archana.m.shinde@intel.com>, "Venegas Munoz,
-	Jose Carlos" <jose.carlos.venegas.munoz@intel.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, Miklos Szeredi <miklos@szeredi.hu>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Thu, Nov 12, 2020 at 10:57:11AM +0100, Miklos Szeredi wrote:
-[..]
-> 
-> Another performance issue with virtiofs could be due to the strict
-> page writeback rules in fuse that are meant to prevent misuse of
-> kernel memory by unprivileged processes.   Since virtiofs isn't
-> subject to that limitation, these could be relaxed.
 
-Hi Miklos,
+--8t9RHnE3ZwKMSgU+
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-I tried this patch with some of the write mmap workloads and it seems
-to help. I ran virtiofsd with following options.
+On Thu, Nov 12, 2020 at 01:24:18PM -0500, Vivek Goyal wrote:
+> This patch adds basic support for FUSE_HANDLE_KILLPRIV_V2. virtiofsd
+> can enable/disable this by specifying option "-o killpriv_v2/no_killpriv_=
+v2".
+> By default this is enabled as long as client supports it
+>=20
+> Enabling this option helps with performance in write path. Without this
+> option, currently every write is first preceeded with a getxattr() operat=
+ion
+> to find out if security.capability is set. (Write is supposed to clear
+> security.capability). With this option enabled, server is signing up for
+> clearing security.capability on every WRITE and also clearing suid/sgid
+> subject to certain rules. This gets rid of extra getxattr() call for every
+> WRITE and improves performance. This is true when virtiofsd is run with
+> option -o xattr.
+>=20
+> What does enabling FUSE_HANDLE_KILLPRIV_V2 mean for file server implement=
+ation.
+> It needs to adhere to following rules. Thanks to Miklos for this summary.
+>=20
+> - clear "security.capability" on write, truncate and chown unconditionally
+> - clear suid/sgid in case of following. Note, sgid is cleared only if
+>   group executable bit is set.
+>     o setattr has FATTR_SIZE and FATTR_KILL_SUIDGID set.
+>     o setattr has FATTR_UID or FATTR_GID
+>     o open has O_TRUNC and FUSE_OPEN_KILL_SUIDGID
+>     o create has O_TRUNC and FUSE_OPEN_KILL_SUIDGID flag set.
+>     o write has FUSE_WRITE_KILL_SUIDGID
+>=20
+> >From Linux VFS client perspective, here are the requirements.
+>=20
+> - caps are always cleared on chown/write/truncate
+> - suid is always cleared on chown, while for truncate/write it is cleared
+>   only if caller does not have CAP_FSETID.
+> - sgid is always cleared on chown, while for truncate/write it is cleared
+>   only if caller does not have CAP_FSETID as well as file has group execu=
+te
+>   permission.
+>=20
+> virtiofsd implementation has not changed much to adhere to above ruls. And
+> reason being that current assumption is that we are running on Linux
+> and on top of filesystems like ext4/xfs which already follow above rules.
+> On write, truncate, chown, seucurity.capability is cleared. And virtiofsd
+> drops CAP_FSETID if need be and that will lead to clearing of suid/sgid.
+>=20
+> But if virtiofsd is running on top a filesystem which breaks above assump=
+tions,
+> then it will have to take extra actions to emulate above. That's a TODO
+> for later when need arises.
+>=20
+> Note: create normally is supposed to be called only when file does not
+>       exist. So generally there should not be any question of clearing
+>       setuid/setgid. But it is possible that after client checks that
+>       file is not present, some other client creates file on server
+>       and this race can trigger sending FUSE_CREATE. In that case, if
+>       O_TRUNC is set, we should clear suid/sgid if FUSE_OPEN_KILL_SUIDGID
+>       is also set.
+>=20
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  include/standard-headers/linux/fuse.h |  28 ++++++-
+>  tools/virtiofsd/fuse_common.h         |  15 ++++
+>  tools/virtiofsd/fuse_lowlevel.c       |  11 ++-
+>  tools/virtiofsd/fuse_lowlevel.h       |   1 +
+>  tools/virtiofsd/passthrough_ll.c      | 108 +++++++++++++++++++++++---
+>  5 files changed, 148 insertions(+), 15 deletions(-)
 
-$ virtiofsd --socket-path=/tmp/vhostqemu -o source=/mnt//virtiofs-source -o no_posix_lock  -o cache=auto --thread-pool-size=0 --daemonize
+Looks complicated but the implementation is simple since we rely on the
+host file system to honor the semantics.
 
-Note, these workloads are not doing any fsync after write. So
-they are effectively testing how fast one can do cached writes.
+Acked-by: Stefan Hajnoczi <stefanha@redhat.com>
 
-NAME                    WORKLOAD                Bandwidth       IOPS
-limit-bdi               seqwrite-mmap           201.4mb         50.3k
-nolimit-bdi             seqwrite-mmap           253.4mb         63.3k
+--8t9RHnE3ZwKMSgU+
+Content-Type: application/pgp-signature; name="signature.asc"
 
-limit-bdi               seqwrite-mmap-multi     386.7mb         96.6k
-nolimit-bdi             seqwrite-mmap-multi     752.2mb         188.0k
+-----BEGIN PGP SIGNATURE-----
 
-limit-bdi               randwrite-mmap          53.5mb          13.3k
-nolimit-bdi             randwrite-mmap          60.6mb          15.1k
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl+2klAACgkQnKSrs4Gr
+c8ggWgf7BgztJEmZ0GMLHiMeAwew4JmhyfF2ZR2fJhYKu1My7CypEti0MjdtrMPM
+BITDHZFytuL9VagDaZCD21Oo4Ou9HK5KXUeUuHUEmI3Cth0vNYcD7RRL0Of0isvZ
+c9DsPqcWftGXlBqlQSi4KG5Cc0xhd4PmoxB9egaSTBeK/mT5corGXFDTOMmDjr61
+42LSVKlsGw4x2i4kUriOY8UdM0odHqMypC9Fo9KR/UsUErhjGlUGcDHT7rJ5ZjrO
++lXhzrhKJD6JQ4dA5k6l3N6IKgQmkLrE4Dl2vF8uTnz7mQP68GsVZr/TjbuAXrgV
+v5umuYGEBcH7ue+zx8AWrAlfQLRvkQ==
+=/wtT
+-----END PGP SIGNATURE-----
 
-limit-bdi               randwrite-mmap-multi    206.3mb         51.5k
-nolimit-bdi             randwrite-mmap-multi    255.5mb         63.8k
-
-seqwrite-mmap-multi seems to see the biggest jump.
-
-So it might be a good idea to apply this patch.
-
-> 
-> Attaching a patch that does one half of this.  The other half is
-> getting rid of the page copying, that's a bit more involved, but
-> shouldn't be too difficult.  Just need to duplicate the cached
-> writeback callbacks for virtiofs and do away with the complex temp
-> page stuff.
-
-Aha..., so we don't need all the complexity related to allocating
-those temporary pages and then keeping track of writes in rb tree
-and waiting for writes to finish etc. And it could be more like
-a regular filesystem where lot of this stuff could be taken care
-by common code for the case of virtiofs. That will be really nice.
-Less code complexity to deal with. Also might provide performance
-improvement.
-
-Thanks
-Vivek
+--8t9RHnE3ZwKMSgU+--
 

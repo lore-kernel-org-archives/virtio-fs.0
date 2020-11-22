@@ -1,20 +1,14 @@
-Date: Fri, 20 Nov 2020 13:55:57 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20201120185557.GC3105@redhat.com>
-References: <0503b244-b426-0779-7b9e-ff63dfa1165c@gmail.com>
-	<20201119181635.GA3300@redhat.com>
-	<04959049-62bf-c7dc-70b5-aacbc649c474@gmail.com>
-	<20201119183841.GB3300@redhat.com>
-	<20201119184436.GC3300@redhat.com>
-	<20201119194424.GD3300@redhat.com>
-	<d6a20a5e-3da3-b73b-03b6-24eb044c05a6@redhat.com>
-	<eecb8c4e-9fd9-39ba-024b-c35953e769ef@gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <eecb8c4e-9fd9-39ba-024b-c35953e769ef@gmail.com>
-Subject: Re: [Virtio-fs] restorcon/SELinux virtiofs question
+References: <951c3359-f820-5c61-aa05-3419916761dc@jwatt.org>
+	<CAGFMKp_nG4D7jZo=F8S=zhLUetOLF+nbN4h9teZgzSdnNp-cgQ@mail.gmail.com>
+	<20201117095509.GA131917@stefanha-x1.localdomain>
+In-Reply-To: <20201117095509.GA131917@stefanha-x1.localdomain>
+From: Gal Hammer <ghammer@redhat.com>
+Date: Sun, 22 Nov 2020 11:01:54 +0200
+Message-ID: <CAA2ifQzPHFpauPPwJ-Q-kQcZ-e6rgMtuFqayyR+fbL5BJ7NuoQ@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="00000000000054571f05b4ae55a1"
+Subject: Re: [Virtio-fs] Issues with the virtio-fs Windows how-to
+ (unexpected read-only file system)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,160 +17,313 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Harry G. Coin" <hgcoin@gmail.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
 Cc: virtio-fs@redhat.com
 
-On Fri, Nov 20, 2020 at 11:11:28AM -0600, Harry G. Coin wrote:
->=20
-> On 11/20/20 9:01 AM, Daniel Walsh wrote:
-> > On 11/19/20 14:44, Vivek Goyal wrote:
-> >> On Thu, Nov 19, 2020 at 01:44:36PM -0500, Vivek Goyal wrote:
-> >>> On Thu, Nov 19, 2020 at 01:38:41PM -0500, Vivek Goyal wrote:
-> >>>> On Thu, Nov 19, 2020 at 12:27:20PM -0600, Harry G. Coin wrote:
-> >>>>> On 11/19/20 12:16 PM, Vivek Goyal wrote:
-> >>>>>> On Thu, Nov 19, 2020 at 10:52:51AM -0600, Harry G. Coin wrote:
-> >>>>>>> Hello virtiofs team.=C2=A0 I need clarification about a 'restorec=
-on'
-> >>>>>>> selinux
-> >>>>>>> guest giving an 'operation not supported' response.
-> >>>>>>>
-> >>>>>>> If the host fs is btrfs (with xattr enabled in virtiofsd) but not
-> >>>>>>> running SELinux,
-> >>>>>> I suspect that on host setxattr(security.selinux) is failing with
-> >>>>>> "operation not supported".
-> >>>>>>
-> >>>>>> What do you mean by host "not running SELinux". SElinux is not
-> >>>>>> compiled
-> >>>>>> in? Or it is disabled or in passive mode?
-> >>>>>>
-> >>>>>> Is it working with filesystems other than btrfs, say ext4 or xfs.
-> >>>>>>
-> >>>>>> Now qemu supports xattr remapping. You might want to run virtiofsd
-> >>>>>> to remap security.selinux. I think that might get you going till
-> >>>>>> the root cause of the issue is found.
-> >>>>>>
-> >>>>>> Vivek
-> >>>>> Thank you for the focus.=A0=A0 The host os in this instance is not
-> >>>>> from the
-> >>>>> fedora/rhel/centos world with selinux running.=A0 My case is a debi=
-an
-> >>>>> sourced distro (ubuntu).=A0 That world uses 'apparmor' by default, =
-not
-> >>>>> selinux.=A0=A0 I think it's reasonable to suppose there are a lot of
-> >>>>> servers
-> >>>>> out there not running selinux that have lots of vms running on
-> >>>>> them, not
-> >>>>> all using virtiofs.=A0 There should be a documented way to allow the
-> >>>>> 'restorcon' command on one of many guests on such hosts to work.=A0=
- I
-> >>>>> suppose to wrap this up:
-> >>>>>
-> >>>>> For the future readers who got here by searching,=A0 could you give=
- the
-> >>>>> first kernel version that supports a non-selinux host supporting an
-> >>>>> selinux enabled guest and the virtiofsd command line necessary to g=
-et
-> >>>>> the restorecon command to work normally?
-> >>>> I don't know yet. Because I don't know what's the root cause of the
-> >>>> issue.
-> >>>>
-> >>>> The way you are explaining it, looks like host kernel somehow is
-> >>>> blocking setxattr(security.selinux). And I have no idea why. Is it
-> >>>> apparmor or something else.
-> >>>>
-> >>>> If no selinux module is loaded on host, then as long as virtiofsd
-> >>>> process has CAP_SYS_ADMIN, it should be able to set security.selinux.
-> >>>>
-> >>>> "Operation not supported" means error "EOPNOTSUP". I am assuming
-> >>>> you are running virtiofsd with "-o xattr" to make sure virtiofsd
-> >>>> supports xattr. If that's the case somehow kernel is returning
-> >>>> "EOPNOTSUP".
-> >>>>
-> >>>> Can you run virtiofsd with debug option -d and try to install that
-> >>>> package in guest and capture outout of virtiofsd and post here. It
-> >>>> might confirm that host kernel is returning error.
-> >>> I tried doing "chcon unconfined_u:object_r:admin_home_t:s0 bar.txt"
-> >>> on a file in virtiofs and got "Operation not supported". I think
-> >>> guest kernel failed this. Will need to debug further.
-> >> Ok, Dan Walsh says that it probably is due to the fact that selinux
-> >> policy in guest is not aware of virtiofs. He has opened a PR to
-> >> add that.
-> >>
-> >> https://github.com/fedora-selinux/selinux-policy/pull/478
-> >>
-> >> I am not sure what distribution you are running as guest but it
-> >> probably will require similar changes. Once this package is built
-> >> I will give it a try.
-> >>
-> >> Thanks
-> >> Vivek
+--00000000000054571f05b4ae55a1
+Content-Type: text/plain; charset="UTF-8"
+
+Hello,
+
+On Tue, 17 Nov 2020 at 11:55, Stefan Hajnoczi <stefanha@redhat.com> wrote:
+
+> On Mon, Nov 16, 2020 at 07:59:27PM +0100, Jonas Andradas wrote:
+> > On Mon, Nov 16, 2020 at 12:36 PM Jonathan Watt <jwatt@jwatt.org> wrote:
+>
+> CCing Gal Hammer regarding the Windows virtio-fs drivers.
+>
+> When you find a solution we can update the howto. Pull requests for
+> making changes to the website can be sent here:
+> https://gitlab.com/virtio-fs/virtio-fs.gitlab.io
+>
 > >
-> > Correct. The Guest OS Has to have SELinux enabled and the virtiofs
-> > file system within the VM
+> > > Hello list,
+> > >
+> > > Thank you all for your work on virtio-fs. It's a very exciting step
+> > > forward!
+> > >
+> > > Like others[1], I've encountered the issue where virtio-fs mounted file
+> > > systems
+> > > are unexpectedly read-only/inaccessible on Windows.
+> > >
+> > > I worked through the Windows how-to page[2], but the "Installing the
+> > > virtio-fs
+> > > service" instructions at the bottom did not work for me, as written.
+> The
+> > > instructions are to set the new `VirtioFsSvc` service to depend on both
+> > > `WinFsp.Launcher` and `VirtioFsDrv`. However, like others, I found that
+> > > the new
+> > > service would not run since `VirtioFsDrv` does not appear to exist (be
+> a
+> > > service).
+>
+
+You can run "sc query type=driver" to locate the "VirtIO FS Driver"
+(DISPLAY_NAME) and see what is the SERVICE_NAME for the driver that is
+installed on your computer. It was renamed a few patches ago in order to
+resolve another dependency issue.
+
+I was able to reproduce the restart problem and I'll work to resolve it.
+
+> I too did not manage this to work, and initially removed any dependencies,
+> > thus resulting in the same behaviour you mention.
 > >
-> > needs to have SELinux policy that says it support labeling on Xattrs.=A0
-> > Otherwise when you attempt
 > >
-> > to set labels on the file system.=A0 SELinux in side of the kernel will
-> > say that virtiofs does not support
+> > > After opening `regedit`, opening the key:
+> > >
+> > >   HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\VirtioFsSvc
+> > >
+> > > removing `VirtioFsDrv` from the value of `DependsOnService`, and then
+> > > restarting
+> > > the `VirtioFsSvc` service, the file system shared via virtio-fs
+> appeared at
+> > > 'Z:\' and worked as expected. However, this only works until the
+> Windows
+> > > VM is
+> > > rebooted.
+> > >
+> > > On rebooting the Windows VM, the shared file system becomes read-only
+> and
+> > > its
+> > > sub-directories cannot be opened. Manually restarting the `VirtioFsSvc`
+> > > service
+> > > gets the share working again (until next reboot). This seems to
+> indicate
+> > > that
+> > > `VirtioFsSvc` is running too early, and that it really does need to
+> wait
+> > > for
+> > > *something* else to be ready before starting.
+> > >
+> > > I suppose the first question is what is `VirtioFsDrv` and where is it
+> > > supposed
+> > >
+> > to come from? Are there steps missing from the Windows how-to or has the
+> > > name of
+> > > this service changed?
+> > >
+> > >
+> > I checked the Virtio FS driver, both from the Device Manager (Properties
+> > and then checking the "Service" name associated with it) and also using
+> the
+> > "driverquery" command.  Based on this, I modified the service to depend
+> > both on WinFps.Launcher and this driver ("VirtFS") by issuing the
+> following
+> > command:
 > >
-> > SELinux labels, which is what you are seeing.
+> > sc.exe config VirtioFSsvc depend= WinFsp.Launcher/VirtFS
 > >
-> It is the advertising and presumption of those using 'virtual machines'
-> that they are 'runnable' on any host.=A0 If I read the above correctly,
-> because there's no telling which of the hundreds of packages in the
-> fedora/centos/rhel world will fail on built-in restorecon calls,
-> virtiofs is now excluded for general use except on SELinux enabled hosts
-> .
+> > However, so far I have not had better results than you, as when I reboot
+> I
+> > still have the shared folder as read-only, and only restarting the
+> service
+> > manually fixes it.
+> >
+> > I have tried different combinations by adding all the drivers I saw which
+> > could be involved (although unlikely, but just in case), resulting in
+> > dependencies such as:
+> >
+> > sc.exe config VirtioFSsvc depend=
+> > WinFsp.Launcher/VirtFS/vioscsi/viostor/VirtioSerial/WinFsp
+>
 
-Hi,
+This is "a bit" overkill. The service only uses the WinFsp and the virtiofs
+driver.
 
-This is SELinux policy change required in guest (and not host). So after
-this change in selinux policy in guest it should work in your setup
-(where you are not running SELinux on host). Can you please give it
-a try. selinux developers provided simple instructions to test it.
+Thanks for spotting the problem.
 
-https://github.com/fedora-selinux/selinux-policy/pull/478#issuecomment-7312=
-90656
+    Gal.
 
-*********************
-FWIW, you can apply the fix locally without rebuilding the selinux-policy R=
-PM as follows:
 
-# echo '(fsuse xattr virtiofs (system_u object_r fs_t ((s0) (s0))))' >virti=
-ofs.cil
-# semodule -i virtiofs.cil
-And to check that the change is applied:
+> >
+> > But, still, to no avail.
+>
 
-# seinfo --fs_use | grep virtiofs
-    fs_use_xattr virtiofs system_u:object_r:fs_t:s0;
-To revert the local workaround:
 
-# semodule -r virtiofs
-***********************************
+> >
+> > > -Jonathan
+> > >
+> > > 1. For example, the comments starting here:
+> > >
+> > >
+> https://github.com/virtio-win/kvm-guest-drivers-windows/issues/473#issuecomment-658379853
+> > >
+> > > 2. https://virtio-fs.gitlab.io/howto-windows.html
+> > >
+>
+> > _______________________________________________
+> > Virtio-fs mailing list
+> > Virtio-fs@redhat.com
+> > https://www.redhat.com/mailman/listinfo/virtio-fs
+>
+>
 
-So please load above policy module in guest (and not host) and then try
-installing the package which was failing for you. Please let us know
-if this fixes the issue you are seeing or not.=20
+--00000000000054571f05b4ae55a1
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-I tested it and it fixed the chcon issue I was seeing.
+<div dir=3D"ltr"><div dir=3D"ltr"><div class=3D"gmail_default" style=3D"fon=
+t-family:verdana,sans-serif">Hello,<br></div></div><br><div class=3D"gmail_=
+quote"><div dir=3D"ltr" class=3D"gmail_attr">On Tue, 17 Nov 2020 at 11:55, =
+Stefan Hajnoczi &lt;<a href=3D"mailto:stefanha@redhat.com">stefanha@redhat.=
+com</a>&gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"marg=
+in:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1e=
+x">On Mon, Nov 16, 2020 at 07:59:27PM +0100, Jonas Andradas wrote:<br>
+&gt; On Mon, Nov 16, 2020 at 12:36 PM Jonathan Watt &lt;<a href=3D"mailto:j=
+watt@jwatt.org" target=3D"_blank">jwatt@jwatt.org</a>&gt; wrote:<br>
+<br>
+CCing Gal Hammer regarding the Windows virtio-fs drivers.<br>
+<br>
+When you find a solution we can update the howto. Pull requests for<br>
+making changes to the website can be sent here:<br>
+<a href=3D"https://gitlab.com/virtio-fs/virtio-fs.gitlab.io" rel=3D"norefer=
+rer" target=3D"_blank">https://gitlab.com/virtio-fs/virtio-fs.gitlab.io</a>=
+<br>
+<br>
+&gt; <br>
+&gt; &gt; Hello list,<br>
+&gt; &gt;<br>
+&gt; &gt; Thank you all for your work on virtio-fs. It&#39;s a very excitin=
+g step<br>
+&gt; &gt; forward!<br>
+&gt; &gt;<br>
+&gt; &gt; Like others[1], I&#39;ve encountered the issue where virtio-fs mo=
+unted file<br>
+&gt; &gt; systems<br>
+&gt; &gt; are unexpectedly read-only/inaccessible on Windows.<br>
+&gt; &gt;<br>
+&gt; &gt; I worked through the Windows how-to page[2], but the &quot;Instal=
+ling the<br>
+&gt; &gt; virtio-fs<br>
+&gt; &gt; service&quot; instructions at the bottom did not work for me, as =
+written. The<br>
+&gt; &gt; instructions are to set the new `VirtioFsSvc` service to depend o=
+n both<br>
+&gt; &gt; `WinFsp.Launcher` and `VirtioFsDrv`. However, like others, I foun=
+d that<br>
+&gt; &gt; the new<br>
+&gt; &gt; service would not run since `VirtioFsDrv` does not appear to exis=
+t (be a<br>
+&gt; &gt; service).<br>
+<span class=3D"gmail_default" style=3D"font-family:verdana,sans-serif"></sp=
+an></blockquote><div><br></div><div><div style=3D"font-family:verdana,sans-=
+serif" class=3D"gmail_default">You can run &quot;sc query type=3Ddriver&quo=
+t; to locate the &quot;VirtIO FS Driver&quot; (DISPLAY_NAME) and see what i=
+s the SERVICE_NAME for the driver that is installed on your computer. It wa=
+s renamed a few patches ago in order to resolve another dependency issue.</=
+div><div style=3D"font-family:verdana,sans-serif" class=3D"gmail_default"><=
+br></div><div style=3D"font-family:verdana,sans-serif" class=3D"gmail_defau=
+lt">I was able to reproduce the restart problem and I&#39;ll work to resolv=
+e it.<br></div><div style=3D"font-family:verdana,sans-serif" class=3D"gmail=
+_default"><br></div></div><blockquote class=3D"gmail_quote" style=3D"margin=
+:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex"=
+>&gt; I too did not manage this to work, and initially removed any dependen=
+cies,<br>
+&gt; thus resulting in the same behaviour you mention.<br>
+&gt; <br>
+&gt; <br>
+&gt; &gt; After opening `regedit`, opening the key:<br>
+&gt; &gt;<br>
+&gt; &gt;=C2=A0 =C2=A0HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\=
+VirtioFsSvc<br>
+&gt; &gt;<br>
+&gt; &gt; removing `VirtioFsDrv` from the value of `DependsOnService`, and =
+then<br>
+&gt; &gt; restarting<br>
+&gt; &gt; the `VirtioFsSvc` service, the file system shared via virtio-fs a=
+ppeared at<br>
+&gt; &gt; &#39;Z:\&#39; and worked as expected. However, this only works un=
+til the Windows<br>
+&gt; &gt; VM is<br>
+&gt; &gt; rebooted.<br>
+&gt; &gt;<br>
+&gt; &gt; On rebooting the Windows VM, the shared file system becomes read-=
+only and<br>
+&gt; &gt; its<br>
+&gt; &gt; sub-directories cannot be opened. Manually restarting the `Virtio=
+FsSvc`<br>
+&gt; &gt; service<br>
+&gt; &gt; gets the share working again (until next reboot). This seems to i=
+ndicate<br>
+&gt; &gt; that<br>
+&gt; &gt; `VirtioFsSvc` is running too early, and that it really does need =
+to wait<br>
+&gt; &gt; for<br>
+&gt; &gt; *something* else to be ready before starting.<br>
+&gt; &gt;<br>
+&gt; &gt; I suppose the first question is what is `VirtioFsDrv` and where i=
+s it<br>
+&gt; &gt; supposed<br>
+&gt; &gt;<br>
+&gt; to come from? Are there steps missing from the Windows how-to or has t=
+he<br>
+&gt; &gt; name of<br>
+&gt; &gt; this service changed?<br>
+&gt; &gt;<br>
+&gt; &gt;<br>
+&gt; I checked the Virtio FS driver, both from the Device Manager (Properti=
+es<br>
+&gt; and then checking the &quot;Service&quot; name associated with it) and=
+ also using the<br>
+&gt; &quot;driverquery&quot; command.=C2=A0 Based on this, I modified the s=
+ervice to depend<br>
+&gt; both on WinFps.Launcher and this driver (&quot;VirtFS&quot;) by issuin=
+g the following<br>
+&gt; command:<br>
+&gt; <br>
+&gt; sc.exe config VirtioFSsvc depend=3D WinFsp.Launcher/VirtFS<br>
+&gt; <br>
+&gt; However, so far I have not had better results than you, as when I rebo=
+ot I<br>
+&gt; still have the shared folder as read-only, and only restarting the ser=
+vice<br>
+&gt; manually fixes it.<br>
+&gt; <br>
+&gt; I have tried different combinations by adding all the drivers I saw wh=
+ich<br>
+&gt; could be involved (although unlikely, but just in case), resulting in<=
+br>
+&gt; dependencies such as:<br>
+&gt; <br>
+&gt; sc.exe config VirtioFSsvc depend=3D<br>
+&gt; WinFsp.Launcher/VirtFS/vioscsi/viostor/VirtioSerial/WinFsp<br></blockq=
+uote><div><br></div><div><div style=3D"font-family:verdana,sans-serif" clas=
+s=3D"gmail_default">This is &quot;a bit&quot; overkill. The service only us=
+es the WinFsp and the virtiofs driver.<br></div></div><div><br><div style=
+=3D"font-family:verdana,sans-serif" class=3D"gmail_default">Thanks for spot=
+ting the problem.</div><div style=3D"font-family:verdana,sans-serif" class=
+=3D"gmail_default"><br></div><div style=3D"font-family:verdana,sans-serif" =
+class=3D"gmail_default">=C2=A0=C2=A0=C2=A0 Gal.</div>=C2=A0</div><blockquot=
+e class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px s=
+olid rgb(204,204,204);padding-left:1ex">
+&gt; <br>
+&gt; But, still, to no avail.<br>=C2=A0</blockquote><blockquote class=3D"gm=
+ail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,=
+204,204);padding-left:1ex"> <br>
+&gt; <br>
+&gt; &gt; -Jonathan<br>
+&gt; &gt;<br>
+&gt; &gt; 1. For example, the comments starting here:<br>
+&gt; &gt;<br>
+&gt; &gt; <a href=3D"https://github.com/virtio-win/kvm-guest-drivers-window=
+s/issues/473#issuecomment-658379853" rel=3D"noreferrer" target=3D"_blank">h=
+ttps://github.com/virtio-win/kvm-guest-drivers-windows/issues/473#issuecomm=
+ent-658379853</a><br>
+&gt; &gt;<br>
+&gt; &gt; 2. <a href=3D"https://virtio-fs.gitlab.io/howto-windows.html" rel=
+=3D"noreferrer" target=3D"_blank">https://virtio-fs.gitlab.io/howto-windows=
+.html</a><br>
+&gt; &gt;<br>
+<br>
+&gt; _______________________________________________<br>
+&gt; Virtio-fs mailing list<br>
+&gt; <a href=3D"mailto:Virtio-fs@redhat.com" target=3D"_blank">Virtio-fs@re=
+dhat.com</a><br>
+&gt; <a href=3D"https://www.redhat.com/mailman/listinfo/virtio-fs" rel=3D"n=
+oreferrer" target=3D"_blank">https://www.redhat.com/mailman/listinfo/virtio=
+-fs</a><br>
+<br>
+</blockquote></div></div>
 
->=A0There are, (cough) a fair few hosts out there which are not running
-> SElinux, whose operators hope/need to provide vm guest services to the
-> fedora/rhel/centos package users.=A0 So, I ask the virtiofs folks to
-> consider creating or defining an option allowing fedora/rhel/centos
-> guests a way to succeed.=A0 Or, in the alternative, a clear warning that
-> virtiofs is not a good choice for=A0 rhel/centos/fedora guests on other
-> than rhel/centos/fedora bare-metal requiring selinux enabled.
-
-To enable selinux in guest, we don't need selinux to be enabled=20
-on host.
-
-In fact selinux policy on on host can potentially interfere with guest
-policy. So I think we should run virtiofsd with remapped
-"security.capability" xattr in qemu. That way both guest and host can
-have their own selinux policy.
-
-Thanks
-Vivek
+--00000000000054571f05b4ae55a1--
 

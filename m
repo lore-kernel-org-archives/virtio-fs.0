@@ -1,14 +1,21 @@
-Date: Mon, 26 Oct 2020 17:54:57 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20201026175457.GF152260@work-vm>
-References: <20200909184028.262297-1-mreitz@redhat.com>
+From: "Venegas Munoz, Jose Carlos" <jose.carlos.venegas.munoz@intel.com>
+Date: Mon, 23 Nov 2020 15:07:46 +0000
+Message-ID: <BAA622CA-4535-4577-B16F-66C8BE74E574@intel.com>
+References: <20201105194416.GA1384085@redhat.com>
+	<20201105195253.GB1384085@redhat.com>
+	<D9233684-9B76-468E-A5F1-B35DA3F3C091@intel.com>
+	<20201106223524.GG1436035@redhat.com>
+	<CAOssrKcJr9a_5EUTU19BTp1UaST64Shh9w0UeR6TXPLqkN7bBw@mail.gmail.com>
+	<C5CAD300-DB1D-4C6A-A2D3-2E6BA9F901DF@intel.com>
+	<20201117222450.GC91497@redhat.com>
+In-Reply-To: <20201117222450.GC91497@redhat.com>
 MIME-Version: 1.0
+Content-Language: en-US
 Content-Type: text/plain; charset="utf-8"
-Content-Disposition: inline
+Content-ID: <E1D9DF7FD306CE4CB97CFFC47142CD61@intel.com>
 Content-Transfer-Encoding: 8bit
-In-Reply-To: <20200909184028.262297-1-mreitz@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 0/8] virtiofsd: Announce submounts to the
-	guest
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Use --thread-pool-size=0 to mean
+ no thread pool
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,148 +24,46 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, "Shinde,
+	Archana M" <archana.m.shinde@intel.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, Miklos Szeredi <miklos@szeredi.hu>
 
-* Max Reitz (mreitz@redhat.com) wrote:
-> RFC: https://www.redhat.com/archives/virtio-fs/2020-May/msg00024.html
-> 
-> Branch: https://github.com/XanClic/qemu.git virtiofs-submounts-v2
-> Branch: https://git.xanclic.moe/XanClic/qemu.git virtiofs-submounts-v2
+Cool, thanks I will bring some results this week.
 
-Queued
+﻿On 17/11/20 16:24, "Vivek Goyal" <vgoyal@redhat.com> wrote:
 
-> 
-> 
-> (Note that there is an accompanying Linux (kernel) series
-> “fuse: Mirror virtio-fs submounts”.)
-> 
-> 
-> Hi,
-> 
-> We want to (be able to) announce the host mount structure of the shared
-> directory to the guest so it can replicate that structure.  This ensures
-> that whenever the combination of st_dev and st_ino is unique on the
-> host, it will be unique in the guest as well.
-> 
-> This feature is optional and needs to be enabled explicitly, so that the
-> mount structure isn’t leaked to the guest if the user doesn’t want it to
-> be.
-> 
-> The last patch in this series adds a test script.  For it to pass, you
-> need to compile a kernel with the accompanying “fuse: Mirror virtio-fs
-> submounts” patch series, and provide it to the test (as described in the
-> test patch).
-> 
-> 
-> Known caveats:
-> - stat(2) doesn’t trigger auto-mounting.  Therefore, issuing a stat() on
->   a sub-mountpoint before it’s been auto-mounted will show its parent’s
->   st_dev together with the st_ino it has in the sub-mounted filesystem.
-> 
->   For example, imagine you want to share a whole filesystem with the
->   guest, which on the host first looks like this:
-> 
->     root/           (st_dev=64, st_ino=128)
->       sub_fs/       (st_dev=64, st_ino=234)
-> 
->   And then you mount another filesystem under sub_fs, so it looks like
->   this:
-> 
->     root/           (st_dev=64, st_ino=128)
->       sub_fs/       (st_dev=96, st_ino=128)
->         ...
-> 
->   As you can see, sub_fs becomes a mount point, so its st_dev and st_ino
->   change from what they were on root’s filesystem to what they are in
->   the sub-filesystem.  In fact, root and sub_fs now have the same
->   st_ino, which is not unlikely given that both are root nodes in their
->   respective filesystems.
-> 
->   Now, this filesystem is shared with the guest through virtiofsd.
->   There is no way for virtiofsd to uncover sub_fs’s original st_ino
->   value of 234, so it will always provide st_ino=128 to the guest.
->   However, virtiofsd does notice that sub_fs is a mount point and
->   announces this fact to the guest.
-> 
->   We want this to result in something like the following tree in the
->   guest:
-> 
->     root/           (st_dev=32, st_ino=128)
->       sub_fs/       (st_dev=33, st_ino=128)
->         ...
-> 
->   That is, sub_fs should be a different filesystem that’s auto-mounted.
->   However, as stated above, stat(2) doesn’t trigger auto-mounting, so
->   before it happens, the following structure will be visible:
-> 
->     root/           (st_dev=32, st_ino=128)
->       sub_fs/       (st_dev=32, st_ino=128)
-> 
->   That is, sub_fs and root will have the same st_dev/st_ino combination.
-> 
->   This can easily be seen by executing find(1) on root in the guest,
->   which will subsequently complain about an alleged filesystem loop.
-> 
->   To properly fix this problem, we probably would have to be able to
->   uncover sub_fs’s original st_ino value (i.e. 234) and let the guest
->   use that until the auto-mount happens.  However, there is no way to
->   get that value (from userspace at least).
-> 
->   Note that NFS with crossmnt has the exact same issue.
-> 
-> 
-> - You can unmount auto-mounted submounts in the guest, but then you
->   still cannot unmount them on the host.  The guest still holds a
->   reference to the submount’s root directory, because that’s just a
->   normal entry in its parent directory (on the submount’s parent
->   filesystem).
-> 
->   This is kind of related to the issue noted above: When the submount is
->   unmounted, the guest shouldn’t have a reference to sub_fs as the
->   submount’s root directory (host’s st_dev=96, st_ino=128), but to it as
->   a normal entry in its parent filesystem (st_dev=64, st_ino=234).
-> 
->   (When you have multiple nesting levels, you can unmount inner mounts
->   when the outer ones have been unmounted in the guest.  For example,
->   say you have a structure A/B/C/D, where each is a mount point, then
->   unmounting D, C, and B in the guest will allow the host to unmount D
->   and C.)
-> 
-> 
-> Max Reitz (8):
->   linux/fuse.h: Pull in from Linux
->   virtiofsd: Announce FUSE_ATTR_FLAGS
->   virtiofsd: Add attr_flags to fuse_entry_param
->   virtiofsd: Add fuse_reply_attr_with_flags()
->   virtiofsd: Store every lo_inode's parent_dev
->   virtiofsd: Announce sub-mount points
->   tests/acceptance/boot_linux: Accept SSH pubkey
->   tests/acceptance: Add virtiofs_submounts.py
-> 
->  include/standard-headers/linux/fuse.h         |  11 +-
->  tools/virtiofsd/fuse_common.h                 |   8 +
->  tools/virtiofsd/fuse_lowlevel.h               |  20 ++
->  tools/virtiofsd/fuse_lowlevel.c               |  34 ++-
->  tools/virtiofsd/helper.c                      |   1 +
->  tools/virtiofsd/passthrough_ll.c              |  84 ++++-
->  tests/acceptance/boot_linux.py                |  13 +-
->  tests/acceptance/virtiofs_submounts.py        | 289 ++++++++++++++++++
->  .../virtiofs_submounts.py.data/cleanup.sh     |  46 +++
->  .../guest-cleanup.sh                          |  30 ++
->  .../virtiofs_submounts.py.data/guest.sh       | 138 +++++++++
->  .../virtiofs_submounts.py.data/host.sh        | 127 ++++++++
->  12 files changed, 780 insertions(+), 21 deletions(-)
->  create mode 100644 tests/acceptance/virtiofs_submounts.py
->  create mode 100644 tests/acceptance/virtiofs_submounts.py.data/cleanup.sh
->  create mode 100644 tests/acceptance/virtiofs_submounts.py.data/guest-cleanup.sh
->  create mode 100644 tests/acceptance/virtiofs_submounts.py.data/guest.sh
->  create mode 100644 tests/acceptance/virtiofs_submounts.py.data/host.sh
-> 
-> -- 
-> 2.26.2
-> 
-> 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+    On Tue, Nov 17, 2020 at 04:00:09PM +0000, Venegas Munoz, Jose Carlos wrote:
+    > >   Not sure what the default is for 9p, but comparing
+    > >   default to default will definitely not be apples to apples since this
+    > >   mode is nonexistent in 9p.
+    > 
+    > In Kata we are looking for the best config for fs compatibility and performance. So even if are no apples to apples,
+    > we are for the best config for both and comparing the best that each of them can do.
+
+    Can we run tests in more than one configuration. Right now you are using
+    cache=mmap for virtio-9p and cache=auto for virtiofs and as Miklos
+    said this is not apples to apples comparison.
+
+    So you can continue to run above but also run additional tests if
+    time permits.
+
+    virtio-9p	virtio-fs
+
+    cache=mmap	cache=none + DAX
+    cache=none	cache=none
+    cache=loose	cache=always
+
+    Given you are using cache=mmap for virtio-9p, "cache=none + DAX" is
+    somewhat equivalent of that. Provides strong coherency as well as
+    allow for mmap() to work.
+
+    Now kernel virtiofs DAX support got merged in 5.10-rc1. For qemu,
+    you can use virtio-fs-dev branch.
+
+    https://gitlab.com/virtio-fs/qemu/-/commits/virtio-fs-dev
+
+    Thanks
+    Vivek
+
+
 

@@ -1,13 +1,32 @@
-Date: Wed, 2 Dec 2020 13:59:09 +0000
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20201202135909.GB655829@stefanha-x1.localdomain>
-References: <20201202123410.GD3226@work-vm>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=subject:to:cc:references:from:message-id:date:user-agent
+	:mime-version:in-reply-to:content-transfer-encoding:content-language;
+	bh=2cu0WXmjhFpH/YUMjw62CMzrNFmWPtfIabxVLCVVcvs=;
+	b=ueXe8jbI83iWSHgQKYAbALHhnL5IlJpRV2Hn5LbdGbq3LltBzewvvUo9GXzg+wNkUB
+	PUJZgth523mHUfNPS0t+En0kJQO2wjUSn4E/G15gsOgF8gJvaDUEg9c9fnVEbHsBmSKg
+	JWU/Xw6NVfyyooBbOEe5U4ZAShN8LpXKrhOhY4iGHjKJ4YkbmpWTej4jMZAs4FRdc6y2
+	Cncu+bzIhHzL4KfyAeO/kHXK4LeIg4Xj1m0NocjHvMFf4K/LQ9sDRPENtmvlvL/o32WY
+	vN7/+a5IXEEWvkf8huI/ibHKgcj298QxjlOxGCM6Et107tMOEl5lGSC+rDg9NdspO1Kw
+	604g==
+References: <0503b244-b426-0779-7b9e-ff63dfa1165c@gmail.com>
+	<20201119181635.GA3300@redhat.com>
+	<04959049-62bf-c7dc-70b5-aacbc649c474@gmail.com>
+	<20201119183841.GB3300@redhat.com> <20201119184436.GC3300@redhat.com>
+	<20201119194424.GD3300@redhat.com>
+	<d6a20a5e-3da3-b73b-03b6-24eb044c05a6@redhat.com>
+	<eecb8c4e-9fd9-39ba-024b-c35953e769ef@gmail.com>
+	<20201120185557.GC3105@redhat.com>
+	<34ee3c42-8948-13a7-9c3f-8417bb4e948e@gmail.com>
+	<20201130144955.GA14328@redhat.com>
+From: "Harry G. Coin" <hgcoin@gmail.com>
+Message-ID: <6e058959-20e1-fdf5-1e34-4de249111cf8@gmail.com>
+Date: Thu, 3 Dec 2020 12:24:04 -0600
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="pvezYHf7grwyp3Bc"
-Content-Disposition: inline
-In-Reply-To: <20201202123410.GD3226@work-vm>
-Subject: Re: [Virtio-fs] virtiofsd-rs: A rust virtiofs daemon
+In-Reply-To: <20201130144955.GA14328@redhat.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Content-Language: en-US
+Subject: Re: [Virtio-fs] restorcon/SELinux virtiofs question
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,55 +35,39 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, ameynarkhede03@gmail.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com
 
+During further testing, and with the selinux patch above in place,
+during an ordinary dnf package install, (virtiofs root), I see this:
 
---pvezYHf7grwyp3Bc
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+...
 
-On Wed, Dec 02, 2020 at 12:34:10PM +0000, Dr. David Alan Gilbert wrote:
->   Sergio has been working on virtiofsd-rs, a virtiofs daemon
-> written in rust, and which can be found at:
->=20
->   https://gitlab.com/virtio-fs/virtiofsd-rs
->=20
-> It started life originally as part of the crosvm project, got
-> ported to vhost-user as part of the Cloud Hypervisor project, and
-> has now been split out.
->=20
-> While the C version of virtiofsd isn't going away for now, the hope
-> is to stabilise virtiofsd-rs, add some missing features and start
-> preferentially adding new features and new work onto the Rust version
-> rather than the C version.
->=20
-> So please try it, and let the list (and Sergio!) know how you get on.
+  Running scriptlet:
+bind-dyndb-ldap-11.3-5.fc33.x86_64                   13/14
 
-Awesome, really happy that the Rust daemon has come so far. Thanks
-Chirantan, Sebastien, Sergio, and everyone else who developed it.
+  Installing       :
+freeipa-server-dns-4.8.10-6.fc33.noarch              14/14
+  Running scriptlet:
+freeipa-server-dns-4.8.10-6.fc33.noarch              14/14
+/usr/lib/tmpfiles.d/krb5-krb5kdc.conf:1: Line references path below
+legacy directory /var/run/, updating /var/run/krb5kdc → /run/krb5kdc;
+please update the tmpfiles.d/ drop-in file accordingly.
+Cannot set file attribute for '/var/log/journal', value=0x00800000,
+mask=0x00800000, ignoring: Function not implemented
+Cannot set file attribute for
+'/var/log/journal/659f950795794c76814a499623c1ddf1', value=0x00800000,
+mask=0x00800000, ignoring: Function not implemented
 
-I talked to Sergio and he is currently looking at what's missing for
-feature parity with C virtiofsd. This is an opportunity for anyone who
-wants to contribute.
+  Verifying        :
+bind-32:9.11.24-2.fc33.x86_64                         1/14
+  Verifying        :
+bind-dnssec-doc-32:9.11.24-2.fc33.noarch              2/14
 
-Stefan
+...
 
---pvezYHf7grwyp3Bc
-Content-Type: application/pgp-signature; name="signature.asc"
+Any ideas?
 
------BEGIN PGP SIGNATURE-----
+Harry
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAl/Hna0ACgkQnKSrs4Gr
-c8ingAf/RKVz8Y8xO4DDt5KN5d/TtxxKOOAs5EmZzJ6GMJ9+H5vb6MMVqeddkJKg
-9kv+fP2yKNtTnq6yhggF8lVNflXmpzSk+GH1yPxaunYPkaN92QHvzaLppf86b8wG
-S/dZ8JhYVqdG+MunTPooor1639+R4r7cWiCd3doFshS4gvUMJ+KTZr7piuntcADQ
-Pzy+lGma/jchd4tsi+oDGLdJXfkbfwZfTQn0Oofgnd70n0E1L/0cKdErAL5KpGyA
-EQpcJhM9BFTMfycZbH3VyGYTHGUUe9JLkDASedcT1YrLQ94k3xMUC+K1IpRfu/oS
-NWWhCiCgtR0ooeD/Tnm47lg9n1xBYA==
-=x9qC
------END PGP SIGNATURE-----
-
---pvezYHf7grwyp3Bc--
 

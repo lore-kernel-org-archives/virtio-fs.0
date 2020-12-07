@@ -1,11 +1,14 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Mon, 26 Oct 2020 18:43:16 +0000
-Message-Id: <20201026184331.272953-2-dgilbert@redhat.com>
-In-Reply-To: <20201026184331.272953-1-dgilbert@redhat.com>
-References: <20201026184331.272953-1-dgilbert@redhat.com>
+Date: Mon, 7 Dec 2020 15:52:09 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20201207205209.GD3107@redhat.com>
+References: <CAFqZXNsGabHBfV36nNAVLJgEzjkBev-O3YZ1vnmXyVoaDdjiHQ@mail.gmail.com>
+	<CAHC9VhRCu5W4YOzcidUhv7biVc+a4QrRknVn-57YVSM3vWZH+Q@mail.gmail.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 01/16] configure: add option for virtiofsd
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAHC9VhRCu5W4YOzcidUhv7biVc+a4QrRknVn-57YVSM3vWZH+Q@mail.gmail.com>
+Subject: Re: [Virtio-fs] virtiofs and its optional xattr support vs.
+	fs_use_xattr
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,135 +17,37 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, stefanha@redhat.com, mreitz@redhat.com, misono.tomohiro@jp.fujitsu.com
-Cc: virtio-fs@redhat.com, vgoyal@redhat.com
+To: Paul Moore <paul@paul-moore.com>
+Cc: SElinux list <selinux@vger.kernel.org>, Stephen Smalley <stephen.smalley.work@gmail.com>, Ondrej Mosnacek <omosnace@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, Zdenek Pytela <zpytela@redhat.com>
 
-From: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+On Mon, Dec 07, 2020 at 10:03:24AM -0500, Paul Moore wrote:
+> On Mon, Dec 7, 2020 at 9:43 AM Ondrej Mosnacek <omosnace@redhat.com> wrote:
+> >
+> > Hi everyone,
+> >
+> > In [1] we ran into a problem with the current handling of filesystem
+> > labeling rules. Basically, it is only possible to specify either
+> > genfscon or fs_use_xattr for a given filesystem, but in the case of
+> > virtiofs, certain mounts may support security xattrs, while other ones
+> > may not.
+> 
 
-Currently it is unknown whether virtiofsd will be built at
-configuration time. It will be automatically built when dependency
-is met. Also, required libraries are not clear.
+[ cc virtio-fs list and miklos ]
+> Quickly skimming the linked GH issue, it appears that the problem
+> really lies in the fact that virtiofs allows one to enable/disable
+> xattrs at mount time.  What isn't clear to me is why one would need to
+> disable xattrs, can you explain that use case?  Why does enabling
+> xattrs in virtiofs cause problems?
 
-To make this clear, add configure option --{enable,disable}-virtiofsd.
-The default is the same as current (enabled if available) like many
-other options. When --enable-virtiofsd is given and dependency is not
-met, we get:
+Its not exactly a mount time option. Its a virtiofs file server option.
 
-  ERROR: Problem encountered: virtiofsd requires libcap-ng-devel and seccomp-devel
-or
-  ERROR: Problem encountered: virtiofsd needs tools and vhost-user support
+xattr support by default is disabled because it has performance
+penalty. Users can enable it if they want to.
 
-In addition, configuration summary now includes virtiofsd entry:
+So if virtiofsd starts without xattr support and somebody runs a
+VM with SELinux enabled, they should still be able to mount virtiofs,
+I guess (instead of failing it).
 
-  build virtiofs daemon: YES/NO
-
-Signed-off-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
-Message-Id: <20201008103133.2722903-1-misono.tomohiro@jp.fujitsu.com>
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-  Manual merge
----
- configure         |  8 +++++++-
- meson.build       |  1 +
- meson_options.txt |  2 ++
- tools/meson.build | 17 +++++++++++++++--
- 4 files changed, 25 insertions(+), 3 deletions(-)
-
-diff --git a/configure b/configure
-index 55e07c82dd..83610b0db8 100755
---- a/configure
-+++ b/configure
-@@ -302,6 +302,7 @@ fdt="auto"
- netmap="no"
- sdl="auto"
- sdl_image="auto"
-+virtiofsd="auto"
- virtfs=""
- libudev="auto"
- mpath="auto"
-@@ -999,6 +1000,10 @@ for opt do
-   ;;
-   --enable-libudev) libudev="enabled"
-   ;;
-+  --disable-virtiofsd) virtiofsd="disabled"
-+  ;;
-+  --enable-virtiofsd) virtiofsd="enabled"
-+  ;;
-   --disable-mpath) mpath="disabled"
-   ;;
-   --enable-mpath) mpath="enabled"
-@@ -1758,6 +1763,7 @@ disabled with --disable-FEATURE, default is enabled if available:
-   vnc-png         PNG compression for VNC server
-   cocoa           Cocoa UI (Mac OS X only)
-   virtfs          VirtFS
-+  virtiofsd       build virtiofs daemon (virtiofsd)
-   libudev         Use libudev to enumerate host devices
-   mpath           Multipath persistent reservation passthrough
-   xen             xen backend driver support
-@@ -6972,7 +6978,7 @@ NINJA=$ninja $meson setup \
-         -Dxen=$xen -Dxen_pci_passthrough=$xen_pci_passthrough -Dtcg=$tcg \
-         -Dcocoa=$cocoa -Dmpath=$mpath -Dsdl=$sdl -Dsdl_image=$sdl_image \
-         -Dvnc=$vnc -Dvnc_sasl=$vnc_sasl -Dvnc_jpeg=$vnc_jpeg -Dvnc_png=$vnc_png \
--        -Dgettext=$gettext -Dxkbcommon=$xkbcommon -Du2f=$u2f \
-+        -Dgettext=$gettext -Dxkbcommon=$xkbcommon -Du2f=$u2f -Dvirtiofsd=$virtiofsd \
-         -Dcapstone=$capstone -Dslirp=$slirp -Dfdt=$fdt \
-         -Diconv=$iconv -Dcurses=$curses -Dlibudev=$libudev\
-         -Ddocs=$docs -Dsphinx_build=$sphinx_build -Dinstall_blobs=$blobs \
-diff --git a/meson.build b/meson.build
-index 835424999d..47e32e1fcb 100644
---- a/meson.build
-+++ b/meson.build
-@@ -2045,6 +2045,7 @@ summary_info += {'Audio drivers':     config_host['CONFIG_AUDIO_DRIVERS']}
- summary_info += {'Block whitelist (rw)': config_host['CONFIG_BDRV_RW_WHITELIST']}
- summary_info += {'Block whitelist (ro)': config_host['CONFIG_BDRV_RO_WHITELIST']}
- summary_info += {'VirtFS support':    config_host.has_key('CONFIG_VIRTFS')}
-+summary_info += {'build virtiofs daemon': have_virtiofsd}
- summary_info += {'Multipath support': mpathpersist.found()}
- summary_info += {'VNC support':       vnc.found()}
- if vnc.found()
-diff --git a/meson_options.txt b/meson_options.txt
-index 48ab4ce7d0..b4f1801875 100644
---- a/meson_options.txt
-+++ b/meson_options.txt
-@@ -62,6 +62,8 @@ option('vnc_sasl', type : 'feature', value : 'auto',
-        description: 'SASL authentication for VNC server')
- option('xkbcommon', type : 'feature', value : 'auto',
-        description: 'xkbcommon support')
-+option('virtiofsd', type: 'feature', value: 'auto',
-+       description: 'build virtiofs daemon (virtiofsd)')
- 
- option('capstone', type: 'combo', value: 'auto',
-        choices: ['disabled', 'enabled', 'auto', 'system', 'internal'],
-diff --git a/tools/meson.build b/tools/meson.build
-index 513bd2ff4f..76bf84df52 100644
---- a/tools/meson.build
-+++ b/tools/meson.build
-@@ -1,10 +1,23 @@
--have_virtiofsd = (have_system and
-+have_virtiofsd = (targetos == 'linux' and
-     have_tools and
--    'CONFIG_LINUX' in config_host and 
-     'CONFIG_SECCOMP' in config_host and
-     'CONFIG_LIBCAP_NG' in config_host and
-     'CONFIG_VHOST_USER' in config_host)
- 
-+if get_option('virtiofsd').enabled()
-+  if not have_virtiofsd
-+    if targetos != 'linux'
-+      error('virtiofsd requires Linux')
-+    elif 'CONFIG_SECCOMP' not in config_host or 'CONFIG_LIBCAP_NG' not in config_host
-+      error('virtiofsd requires libcap-ng-devel and seccomp-devel')
-+    elif not have_tools or 'CONFIG_VHOST_USER' not in config_host
-+      error('virtiofsd needs tools and vhost-user support')
-+    endif
-+  endif
-+elif get_option('virtiofsd').disabled() or not have_system
-+  have_virtiofsd = false
-+endif
-+
- if have_virtiofsd
-   subdir('virtiofsd')
- endif
--- 
-2.28.0
+Thanks
+Vivek
 

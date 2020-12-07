@@ -1,14 +1,12 @@
-Date: Mon, 7 Dec 2020 14:55:39 -0500
+Date: Mon, 7 Dec 2020 15:28:19 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20201207195539.GB3107@redhat.com>
-References: <20201207183021.22752-1-vgoyal@redhat.com>
-	<20201207183021.22752-2-vgoyal@redhat.com>
+Message-ID: <20201207202819.GC3107@redhat.com>
+References: <f0944d13-19d4-d4c2-8e38-be96cfba84a1@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20201207183021.22752-2-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 1/3] virtiofsd: Set up posix_lock hash table
- for root inode
+In-Reply-To: <f0944d13-19d4-d4c2-8e38-be96cfba84a1@redhat.com>
+Subject: Re: [Virtio-fs] bug in lo_do_readdir()?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,48 +15,68 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: virtio-fs@redhat.com, lersek@redhat.com
+To: Laszlo Ersek <lersek@redhat.com>
+Cc: virtio-fs@redhat.com
 
-We setup per inode hash table ->posix_lock to support remote posix locks.
-But we forgot to initialize this table for root inode.
+On Mon, Dec 07, 2020 at 06:32:26PM +0100, Laszlo Ersek wrote:
+> Hi,
+> 
+> I believe lo_do_readdir() has a bug: for FUSE_READDIR (not
+> FUSE_READDIRPLUS), it does not call lo_do_lookup() -- which seems fine
+> in itself --, but then it doesn't load the inode into the inode map (?)
+> *at all*.
+> 
+> A subsequent FUSE_GETATTR that refers to one of the inode(s) learned via
+> FUSE_READDIR (not FUSE_READDIRPLUS) gets -EBADF, because the requested
+> inode is not in the map.
+> 
+> Because the inode is shared with the client through the normal (not
+> "plus") dirent format too (that is, via FUSE_READDIR and not
+> FUSE_READDIRPLUS), the server should remember the inode(s) from the
+> FUSE_READDIR request as well, in my opinion.
+> 
 
-Laszlo managed to trigger an issue where he sent a FUSE_FLUSH request for
-root inode and lo_flush() found inode with inode->posix_lock NULL and
-accessing this table crashed virtiofsd.
+tools/virtiofsd/fuse_lowlevel.h documents that readdir() does not
+affect lookup count.
 
-May be we can get rid of initializing this hash table for directory
-objects completely. But that optimization is for another day.
+     * Returning a directory entry from readdir() does not affect
+     * its lookup count.
 
-Reported-by: Laszlo Ersek <lersek@redhat.com>
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- tools/virtiofsd/passthrough_ll.c |    7 +++++++
- 1 file changed, 7 insertions(+)
+While, readdirplus() does change it.
 
-Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
-===================================================================
---- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2020-12-07 14:46:22.198359486 -0500
-+++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2020-12-07 14:48:07.873737472 -0500
-@@ -3372,6 +3372,9 @@ static void setup_root(struct lo_data *l
-     root->key.mnt_id = mnt_id;
-     root->nlookup = 2;
-     g_atomic_int_set(&root->refcount, 2);
-+    pthread_mutex_init(&root->plock_mutex, NULL);
-+    root->posix_locks = g_hash_table_new_full(
-+        g_direct_hash, g_direct_equal, NULL, posix_locks_value_destroy);
- }
- 
- static guint lo_key_hash(gconstpointer key)
-@@ -3394,6 +3397,10 @@ static void fuse_lo_data_cleanup(struct
-     if (lo->inodes) {
-         g_hash_table_destroy(lo->inodes);
-     }
-+
-+    if (lo->root.posix_locks) {
-+        g_hash_table_destroy(lo->root.posix_locks);
-+    }
-     lo_map_destroy(&lo->fd_map);
-     lo_map_destroy(&lo->dirp_map);
-     lo_map_destroy(&lo->ino_map);
+     * In contrast to readdir() (which does not affect the lookup counts),
+     * the lookup count of every entry returned by readdirplus(), except "."
+     * and "..", is incremented by one.
+
+
+Thanks
+Vivek
+
+> Sorry if I'm mistaken.
+> 
+> The reason I'm not using FUSE_READDIRPLUS is three-fold:
+> 
+> - one fewer wrapper to implement (I need FUSE_READ anyway, for reading
+> regular files, and FUSE_READDIR is identical, except for the opcode,
+> while FUSE_READDIRPLUS isn't),
+> 
+> - FUSE_READDIRPLUS requires feature negotiation, while FUSE_READDIR
+> doesn't, as far as I understand,
+> 
+> - performance for the firmware is not critical, so I'm fine calling a
+> separate FUSE_GETATTR on each inode learned through FUSE_READDIR -- I
+> don't need the attributes to come back together with the dirent.
+> 
+> Unfortunately, I'm not familiar enough with the virtiofsd internals at
+> this point to propose a patch. It feels like adding a lookup-like, but
+> lighter-weight, call, to the non-plus branch in lo_do_readdir(), should
+> do the trick.
+> 
+> Thanks!
+> Laszlo
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 

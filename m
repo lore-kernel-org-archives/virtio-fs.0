@@ -1,11 +1,12 @@
-From: Laszlo Ersek <lersek@redhat.com>
-Message-ID: <061ca370-eba8-55bc-c974-7a8e595ca9ee@redhat.com>
-Date: Mon, 7 Dec 2020 18:39:03 +0100
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Mon,  7 Dec 2020 13:30:20 -0500
+Message-Id: <20201207183021.22752-3-vgoyal@redhat.com>
+In-Reply-To: <20201207183021.22752-1-vgoyal@redhat.com>
+References: <20201207183021.22752-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: [Virtio-fs] debug log timestamp idea
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 2/3] virtiofsd: Disable posix_lock hash table if
+	remote locks are not enabled
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,82 +15,127 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <mszeredi@redhat.com>
-Cc: virtio-fs@redhat.com
+To: qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, lersek@redhat.com, vgoyal@redhat.com
 
-Hi again :)
+If remote posix locks are not enabled (lo->posix_lock == false), then disable
+code paths taken to initialize inode->posix_lock hash table and corresponding
+destruction and search etc.
 
-I find the current debug log hard to associate with actions I perform in
-the client; primarily because the timestamps are not human-readable, and
-so I can't easily notice time boundaries between actions.
+lo_getlk() and lo_setlk() have been modified to return ENOSYS if daemon
+does not support posix lock but client still sends a lock/unlock request.
 
-For comparison:
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c | 51 +++++++++++++++++++++-----------
+ 1 file changed, 34 insertions(+), 17 deletions(-)
 
-[2020-12-07 18:11:35.51+0100] [ID: 00000003] fv_queue_thread: Got queue event on Queue 1
-[2020-12-07 18:11:35.51+0100] [ID: 00000003] fv_queue_thread: Queue 1 gave evalue: 1 available: in: 16 out: 64
-[2020-12-07 18:11:35.51+0100] [ID: 00000003] fv_queue_thread: Waiting for Queue 1 event
-[2020-12-07 18:11:35.51+0100] [ID: 00000006] fv_queue_worker: elem 0: with 2 out desc of length 64
-[2020-12-07 18:11:35.51+0100] [ID: 00000006] unique: 108, opcode: RELEASEDIR (29), nodeid: 1, insize: 64, pid: 1
-[2020-12-07 18:11:35.51+0100] [ID: 00000006]    unique: 108, success, outsize: 16
-[2020-12-07 18:11:35.51+0100] [ID: 00000006] virtio_send_msg: elem 0: with 1 in desc of length 16
-[2020-12-07 18:17:54.82+0100] [ID: 00000001] virtio_loop: Got VU event
-[2020-12-07 18:17:54.82+0100] [ID: 00000001] fv_queue_set_started: qidx=1 started=0
-[2020-12-07 18:17:54.82+0100] [ID: 00000003] fv_queue_thread: kill event on queue 1 - quitting
-[2020-12-07 18:17:54.82+0100] [ID: 00000001] fv_remove_watch: TODO! fd=9
-[2020-12-07 18:17:54.82+0100] [ID: 00000001] virtio_loop: Waiting for VU event
-[2020-12-07 18:17:54.82+0100] [ID: 00000001] virtio_loop: Got VU event
-[2020-12-07 18:17:54.82+0100] [ID: 00000001] virtio_loop: Waiting for VU event
-[2020-12-07 18:17:54.82+0100] [ID: 00000001] virtio_loop: Got VU event
-[2020-12-07 18:17:54.82+0100] [ID: 00000001] virtio_loop: Waiting for VU event
-[2020-12-07 18:17:54.85+0100] [ID: 00000001] virtio_loop: Unexpected poll revents 11
-[2020-12-07 18:17:54.85+0100] [ID: 00000001] virtio_loop: Exit
-
-I think this is nicer; note the clear visual jump between "18:11:35" and
-"18:17:54"
-
-The patch:
-
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 0e4c7ddce0a8..5522f96d33d0 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -3302,9 +3302,19 @@ static void log_func(enum fuse_log_level level, const char *fmt, va_list ap)
->      }
->
->      if (current_log_level == FUSE_LOG_DEBUG) {
-> -        if (!use_syslog) {
-> -            localfmt = g_strdup_printf("[%" PRId64 "] [ID: %08ld] %s",
-> -                                       get_clock(), syscall(__NR_gettid), fmt);
-> +        struct timespec ts;
-> +        if (!use_syslog && clock_gettime (CLOCK_REALTIME, &ts) == 0) {
-> +            struct tm tm;
-> +            char sec_fmt[20];
-> +            char zone_fmt[6];
-> +
-> +            localtime_r(&ts.tv_sec, &tm);
-> +            strftime(sec_fmt, sizeof sec_fmt, "%Y-%m-%d %H:%M:%S", &tm);
-> +            strftime(zone_fmt, sizeof zone_fmt, "%z", &tm);
-> +
-> +            localfmt = g_strdup_printf("[%s.%02ld%s] [ID: %08ld] %s", sec_fmt,
-> +                                       ts.tv_nsec / (10L * 1000 * 1000),
-> +                                       zone_fmt, syscall(__NR_gettid), fmt);
->          } else {
->              localfmt = g_strdup_printf("[ID: %08ld] %s", syscall(__NR_gettid),
->                                         fmt);
-> @@ -3428,6 +3438,8 @@ int main(int argc, char *argv[])
->      struct lo_map_elem *reserve_elem;
->      int ret = -1;
->
-> +    tzset();
-> +
->      /* Don't mask creation mode, kernel already did that */
->      umask(0);
-
-The patch probably violates a bunch of QEMU standards (such as referring
-to CLOCK_REALTIME, using localtime_r() which may not be available on
-Windows (?), etc). I'm OK to carry it myself for debugging, I just
-thought I'd ask for opinions.
-
-Thanks
-Laszlo
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 59202a843b..8ba79f503a 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -914,10 +914,11 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+         inode->key.ino = e->attr.st_ino;
+         inode->key.dev = e->attr.st_dev;
+         inode->key.mnt_id = mnt_id;
+-        pthread_mutex_init(&inode->plock_mutex, NULL);
+-        inode->posix_locks = g_hash_table_new_full(
+-            g_direct_hash, g_direct_equal, NULL, posix_locks_value_destroy);
+-
++        if (lo->posix_lock) {
++            pthread_mutex_init(&inode->plock_mutex, NULL);
++            inode->posix_locks = g_hash_table_new_full(
++                g_direct_hash, g_direct_equal, NULL, posix_locks_value_destroy);
++        }
+         pthread_mutex_lock(&lo->mutex);
+         inode->fuse_ino = lo_add_inode_mapping(req, inode);
+         g_hash_table_insert(lo->inodes, &inode->key, inode);
+@@ -1303,12 +1304,13 @@ static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
+     if (!inode->nlookup) {
+         lo_map_remove(&lo->ino_map, inode->fuse_ino);
+         g_hash_table_remove(lo->inodes, &inode->key);
+-        if (g_hash_table_size(inode->posix_locks)) {
+-            fuse_log(FUSE_LOG_WARNING, "Hash table is not empty\n");
++        if (lo->posix_lock) {
++            if (g_hash_table_size(inode->posix_locks)) {
++                fuse_log(FUSE_LOG_WARNING, "Hash table is not empty\n");
++            }
++            g_hash_table_destroy(inode->posix_locks);
++            pthread_mutex_destroy(&inode->plock_mutex);
+         }
+-        g_hash_table_destroy(inode->posix_locks);
+-        pthread_mutex_destroy(&inode->plock_mutex);
+-
+         /* Drop our refcount from lo_do_lookup() */
+         lo_inode_put(lo, &inode);
+     }
+@@ -1784,6 +1786,11 @@ static void lo_getlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
+              ino, fi->flags, fi->lock_owner, lock->l_type, lock->l_start,
+              lock->l_len);
+ 
++    if (!lo->posix_lock) {
++        fuse_reply_err(req, ENOSYS);
++        return;
++    }
++
+     inode = lo_inode(req, ino);
+     if (!inode) {
+         fuse_reply_err(req, EBADF);
+@@ -1829,6 +1836,11 @@ static void lo_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
+              ino, fi->flags, lock->l_type, lock->l_pid, fi->lock_owner, sleep,
+              lock->l_whence, lock->l_start, lock->l_len);
+ 
++    if (!lo->posix_lock) {
++        fuse_reply_err(req, ENOSYS);
++        return;
++    }
++
+     if (sleep) {
+         fuse_reply_err(req, EOPNOTSUPP);
+         return;
+@@ -1953,6 +1965,7 @@ static void lo_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+     int res;
+     (void)ino;
+     struct lo_inode *inode;
++    struct lo_data *lo = lo_data(req);
+ 
+     inode = lo_inode(req, ino);
+     if (!inode) {
+@@ -1961,12 +1974,14 @@ static void lo_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+     }
+ 
+     /* An fd is going away. Cleanup associated posix locks */
+-    pthread_mutex_lock(&inode->plock_mutex);
+-    g_hash_table_remove(inode->posix_locks, GUINT_TO_POINTER(fi->lock_owner));
+-    pthread_mutex_unlock(&inode->plock_mutex);
+-
++    if (lo->posix_lock) {
++        pthread_mutex_lock(&inode->plock_mutex);
++        g_hash_table_remove(inode->posix_locks,
++            GUINT_TO_POINTER(fi->lock_owner));
++        pthread_mutex_unlock(&inode->plock_mutex);
++    }
+     res = close(dup(lo_fi_fd(req, fi)));
+-    lo_inode_put(lo_data(req), &inode);
++    lo_inode_put(lo, &inode);
+     fuse_reply_err(req, res == -1 ? errno : 0);
+ }
+ 
+@@ -3372,9 +3387,11 @@ static void setup_root(struct lo_data *lo, struct lo_inode *root)
+     root->key.mnt_id = mnt_id;
+     root->nlookup = 2;
+     g_atomic_int_set(&root->refcount, 2);
+-    pthread_mutex_init(&root->plock_mutex, NULL);
+-    root->posix_locks = g_hash_table_new_full(
+-        g_direct_hash, g_direct_equal, NULL, posix_locks_value_destroy);
++    if (lo->posix_lock) {
++        pthread_mutex_init(&root->plock_mutex, NULL);
++        root->posix_locks = g_hash_table_new_full(
++            g_direct_hash, g_direct_equal, NULL, posix_locks_value_destroy);
++    }
+ }
+ 
+ static guint lo_key_hash(gconstpointer key)
+-- 
+2.25.4
 

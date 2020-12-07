@@ -1,14 +1,14 @@
-Resent-Message-Id: <202012071912.0B7JCwlR013536@lists01.pubmisc.prod.ext.phx2.redhat.com>
-In-Reply-To: <20201207183021.22752-1-vgoyal@redhat.com>
-Message-ID: <160736836218.30250.12305333017578341080@600e7e483b3a>
+Date: Mon, 7 Dec 2020 14:55:39 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20201207195539.GB3107@redhat.com>
+References: <20201207183021.22752-1-vgoyal@redhat.com>
+	<20201207183021.22752-2-vgoyal@redhat.com>
 MIME-Version: 1.0
-From: no-reply@patchew.org
-Date: Mon, 7 Dec 2020 11:12:43 -0800 (PST)
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 0/3] virtiofsd: Fix lo_flush() and
-	inode->posix_lock init
-Reply-To: qemu-devel@nongnu.org
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20201207183021.22752-2-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 1/3] virtiofsd: Set up posix_lock hash table
+ for root inode
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,67 +17,48 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: vgoyal@redhat.com
-Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, lersek@redhat.com
+To: qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, lersek@redhat.com
 
-Patchew URL: https://patchew.org/QEMU/20201207183021.22752-1-vgoyal@redhat.com/
+We setup per inode hash table ->posix_lock to support remote posix locks.
+But we forgot to initialize this table for root inode.
 
+Laszlo managed to trigger an issue where he sent a FUSE_FLUSH request for
+root inode and lo_flush() found inode with inode->posix_lock NULL and
+accessing this table crashed virtiofsd.
 
+May be we can get rid of initializing this hash table for directory
+objects completely. But that optimization is for another day.
 
-Hi,
-
-This series seems to have some coding style problems. See output below for
-more information:
-
-Type: series
-Message-id: 20201207183021.22752-1-vgoyal@redhat.com
-Subject: [PATCH 0/3] virtiofsd: Fix lo_flush() and inode->posix_lock init
-
-=== TEST SCRIPT BEGIN ===
-#!/bin/bash
-git rev-parse base > /dev/null || exit 0
-git config --local diff.renamelimit 0
-git config --local diff.renames True
-git config --local diff.algorithm histogram
-./scripts/checkpatch.pl --mailback base..
-=== TEST SCRIPT END ===
-
-Updating 3c8cf5a9c21ff8782164d1def7f44bd888713384
->From https://github.com/patchew-project/qemu
- * [new tag]         patchew/20201207183021.22752-1-vgoyal@redhat.com -> patchew/20201207183021.22752-1-vgoyal@redhat.com
-Switched to a new branch 'test'
-86f3bb1 virtiofsd: Check file type in lo_flush()
-92a5c9d virtiofsd: Disable posix_lock hash table if remote locks are not enabled
-fbdcaf1 virtiofsd: Set up posix_lock hash table for root inode
-
-=== OUTPUT BEGIN ===
-1/3 Checking commit fbdcaf172aed (virtiofsd: Set up posix_lock hash table for root inode)
-ERROR: suspect code indent for conditional statements (4, 7)
-#40: FILE: tools/virtiofsd/passthrough_ll.c:3401:
-+    if (lo->root.posix_locks)
-+       g_hash_table_destroy(lo->root.posix_locks);
-
-ERROR: braces {} are necessary for all arms of this statement
-#40: FILE: tools/virtiofsd/passthrough_ll.c:3401:
-+    if (lo->root.posix_locks)
-[...]
-
-total: 2 errors, 0 warnings, 19 lines checked
-
-Patch 1/3 has style problems, please review.  If any of these errors
-are false positives report them to the maintainer, see
-CHECKPATCH in MAINTAINERS.
-
-2/3 Checking commit 92a5c9d35c7d (virtiofsd: Disable posix_lock hash table if remote locks are not enabled)
-3/3 Checking commit 86f3bb1cf5b8 (virtiofsd: Check file type in lo_flush())
-=== OUTPUT END ===
-
-Test command exited with code: 1
-
-
-The full log is available at
-http://patchew.org/logs/20201207183021.22752-1-vgoyal@redhat.com/testing.checkpatch/?type=message.
+Reported-by: Laszlo Ersek <lersek@redhat.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
-Email generated automatically by Patchew [https://patchew.org/].
-Please send your feedback to patchew-devel@redhat.com
+ tools/virtiofsd/passthrough_ll.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
+
+Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
+===================================================================
+--- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2020-12-07 14:46:22.198359486 -0500
++++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2020-12-07 14:48:07.873737472 -0500
+@@ -3372,6 +3372,9 @@ static void setup_root(struct lo_data *l
+     root->key.mnt_id = mnt_id;
+     root->nlookup = 2;
+     g_atomic_int_set(&root->refcount, 2);
++    pthread_mutex_init(&root->plock_mutex, NULL);
++    root->posix_locks = g_hash_table_new_full(
++        g_direct_hash, g_direct_equal, NULL, posix_locks_value_destroy);
+ }
+ 
+ static guint lo_key_hash(gconstpointer key)
+@@ -3394,6 +3397,10 @@ static void fuse_lo_data_cleanup(struct
+     if (lo->inodes) {
+         g_hash_table_destroy(lo->inodes);
+     }
++
++    if (lo->root.posix_locks) {
++        g_hash_table_destroy(lo->root.posix_locks);
++    }
+     lo_map_destroy(&lo->fd_map);
+     lo_map_destroy(&lo->dirp_map);
+     lo_map_destroy(&lo->ino_map);
 

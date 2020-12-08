@@ -1,14 +1,14 @@
-References: <061ca370-eba8-55bc-c974-7a8e595ca9ee@redhat.com>
-	<20201207183332.GG3135@work-vm>
+References: <20201207183021.22752-1-vgoyal@redhat.com>
 From: Laszlo Ersek <lersek@redhat.com>
-Message-ID: <023059b9-ee98-d045-3797-7a0d73dbf390@redhat.com>
-Date: Tue, 8 Dec 2020 03:19:15 +0100
+Message-ID: <861a96f9-34fa-cd1f-4bbf-4a3506c9afa2@redhat.com>
+Date: Tue, 8 Dec 2020 05:51:34 +0100
 MIME-Version: 1.0
-In-Reply-To: <20201207183332.GG3135@work-vm>
+In-Reply-To: <20201207183021.22752-1-vgoyal@redhat.com>
 Content-Type: text/plain; charset=utf-8
 Content-Language: en-US
 Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] debug log timestamp idea
+Subject: Re: [Virtio-fs] [PATCH 0/3] virtiofsd: Fix lo_flush() and
+	inode->posix_lock init
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,141 +17,53 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>, qemu-devel@nongnu.org
 Cc: virtio-fs@redhat.com
 
-On 12/07/20 19:33, Dr. David Alan Gilbert wrote:
-> * Laszlo Ersek (lersek@redhat.com) wrote:
->> Hi again :)
->>
->> I find the current debug log hard to associate with actions I perform in
->> the client; primarily because the timestamps are not human-readable, and
->> so I can't easily notice time boundaries between actions.
->>
->> For comparison:
->>
->> [2020-12-07 18:11:35.51+0100] [ID: 00000003] fv_queue_thread: Got queue event on Queue 1
->> [2020-12-07 18:11:35.51+0100] [ID: 00000003] fv_queue_thread: Queue 1 gave evalue: 1 available: in: 16 out: 64
->> [2020-12-07 18:11:35.51+0100] [ID: 00000003] fv_queue_thread: Waiting for Queue 1 event
->> [2020-12-07 18:11:35.51+0100] [ID: 00000006] fv_queue_worker: elem 0: with 2 out desc of length 64
->> [2020-12-07 18:11:35.51+0100] [ID: 00000006] unique: 108, opcode: RELEASEDIR (29), nodeid: 1, insize: 64, pid: 1
->> [2020-12-07 18:11:35.51+0100] [ID: 00000006]    unique: 108, success, outsize: 16
->> [2020-12-07 18:11:35.51+0100] [ID: 00000006] virtio_send_msg: elem 0: with 1 in desc of length 16
->> [2020-12-07 18:17:54.82+0100] [ID: 00000001] virtio_loop: Got VU event
->> [2020-12-07 18:17:54.82+0100] [ID: 00000001] fv_queue_set_started: qidx=1 started=0
->> [2020-12-07 18:17:54.82+0100] [ID: 00000003] fv_queue_thread: kill event on queue 1 - quitting
->> [2020-12-07 18:17:54.82+0100] [ID: 00000001] fv_remove_watch: TODO! fd=9
->> [2020-12-07 18:17:54.82+0100] [ID: 00000001] virtio_loop: Waiting for VU event
->> [2020-12-07 18:17:54.82+0100] [ID: 00000001] virtio_loop: Got VU event
->> [2020-12-07 18:17:54.82+0100] [ID: 00000001] virtio_loop: Waiting for VU event
->> [2020-12-07 18:17:54.82+0100] [ID: 00000001] virtio_loop: Got VU event
->> [2020-12-07 18:17:54.82+0100] [ID: 00000001] virtio_loop: Waiting for VU event
->> [2020-12-07 18:17:54.85+0100] [ID: 00000001] virtio_loop: Unexpected poll revents 11
->> [2020-12-07 18:17:54.85+0100] [ID: 00000001] virtio_loop: Exit
+Hi Vivek,
+
+On 12/07/20 19:30, Vivek Goyal wrote:
+> Laszlo is writing a virtiofs client for OVMF and noticed that if he
+> sends fuse FLUSH command for directory object, virtiofsd crashes.
+> virtiofsd does not expect a FLUSH arriving for a directory object.
 > 
-> So, you don't think in Unix time, hmmmmm....
-
-At least not in nanosecond precision :)
-
+> This patch series has one of the patches which fixes that. It also
+> has couple of posix lock fixes as a result of lo_flush() related debugging.
 > 
->> I think this is nicer; note the clear visual jump between "18:11:35" and
->> "18:17:54"
->>
->> The patch:
->>
->>> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
->>> index 0e4c7ddce0a8..5522f96d33d0 100644
->>> --- a/tools/virtiofsd/passthrough_ll.c
->>> +++ b/tools/virtiofsd/passthrough_ll.c
->>> @@ -3302,9 +3302,19 @@ static void log_func(enum fuse_log_level level, const char *fmt, va_list ap)
->>>      }
->>>
->>>      if (current_log_level == FUSE_LOG_DEBUG) {
->>> -        if (!use_syslog) {
->>> -            localfmt = g_strdup_printf("[%" PRId64 "] [ID: %08ld] %s",
->>> -                                       get_clock(), syscall(__NR_gettid), fmt);
->>> +        struct timespec ts;
->>> +        if (!use_syslog && clock_gettime (CLOCK_REALTIME, &ts) == 0) {
->>> +            struct tm tm;
->>> +            char sec_fmt[20];
+> Vivek Goyal (3):
+>   virtiofsd: Set up posix_lock hash table for root inode
+>   virtiofsd: Disable posix_lock hash table if remote locks are not
+>     enabled
+>   virtiofsd: Check file type in lo_flush()
 > 
-> Are you sure that shouldn't be 21?
-
-Yes, sure:
-
-$ wc -L <<< "2020-12-07 18:17:54"
-19
-
-(But it would be more defensive to check the return value of strftime(),
-yes.)
-
-
+>  tools/virtiofsd/passthrough_ll.c | 54 +++++++++++++++++++++++---------
+>  1 file changed, 39 insertions(+), 15 deletions(-)
 > 
->>> +            char zone_fmt[6];
->>> +
->>> +            localtime_r(&ts.tv_sec, &tm);
->>> +            strftime(sec_fmt, sizeof sec_fmt, "%Y-%m-%d %H:%M:%S", &tm);
->>> +            strftime(zone_fmt, sizeof zone_fmt, "%z", &tm);
->>> +
->>> +            localfmt = g_strdup_printf("[%s.%02ld%s] [ID: %08ld] %s", sec_fmt,
->>> +                                       ts.tv_nsec / (10L * 1000 * 1000),
->>> +                                       zone_fmt, syscall(__NR_gettid), fmt);
-> 
-> I wonder about using:
-> https://developer.gnome.org/glib/stable/glib-GDateTime.html#g-date-time-format-iso8601
-> 
-> instead?
 
-I've known of that format; I just can't befriend the capital T stuck in
-the middle. Makes for a difficult reading:
+I put back the (wrong) FLUSH for the root dir into my code temporarily, to reproduce the crash (it does, with v5.2.0-rc4).
 
-https://en.wikipedia.org/wiki/ISO_8601#Combined_date_and_time_representations
+Then I applied your series [*], and retested.
 
-  "2007-04-05T14:30"
+[*] I'm unsure about the email you sent in response to 1/3, namely <https://lists.gnu.org/archive/html/qemu-devel/2020-12/msg01504.html>; I ignored that when applying the patches.
 
-Well, wikipedia says, "Separating date and time parts with other
-characters such as space is not allowed in ISO 8601, but allowed in its
-profile RFC 3339".
+Indeed now I get a graceful -EBADF:
 
-Hmm.... yes it seems mentioned at the end of this paragraph:
-<https://tools.ietf.org/html/rfc3339#section-5.6>:
+[13316825985314] [ID: 00000004] unique: 60, opcode: FLUSH (25), nodeid: 1, insize: 64, pid: 1
+[13316825993517] [ID: 00000004]    unique: 60, error: -9 (Bad file descriptor), outsize: 16
 
-      NOTE: ISO 8601 defines date and time separated by "T".
-      Applications using this syntax may choose, for the sake of
-      readability, to specify a full-date and full-time separated by
-      (say) a space character.
+For whichever patch in the series my testing is relevant:
 
-I'm glad I'm not alone with the opinion that the "T" makes for a hard
-reading.
+Tested-by: Laszlo Ersek <lersek@redhat.com>
 
-Not sure if g_date_time_format_iso8601() supports RFC 3339 though.
+(I'm having some difficulty figuring out which patch(es) should carry my T-b.
 
-> 
->>>          } else {
->>>              localfmt = g_strdup_printf("[ID: %08ld] %s", syscall(__NR_gettid),
->>>                                         fmt);
->>> @@ -3428,6 +3438,8 @@ int main(int argc, char *argv[])
->>>      struct lo_map_elem *reserve_elem;
->>>      int ret = -1;
->>>
->>> +    tzset();
->>> +
->>>      /* Don't mask creation mode, kernel already did that */
->>>      umask(0);
->>
->> The patch probably violates a bunch of QEMU standards (such as referring
->> to CLOCK_REALTIME, using localtime_r() which may not be available on
->> Windows (?), etc). I'm OK to carry it myself for debugging, I just
->> thought I'd ask for opinions.
-> 
-> I don't think any of those things are problems to stop a patch going in
-> - virtiofsd is only built on Linux (I think) - if you send a patch that
-> passes qemu's scripts/checkpatch.pl or has a reasonable reason why not
-> then I'd be fine with that.
+- I think I didn't really test patch#2 with the above, so that one should likely not get the T-b
 
-Should virtiofsd patches be cross-posted to this list and qemu-devel, or
-posted just to this list (and then a maintainer submits a pull request
-to qemu-devel later)?
+- I think patch#3 is what I really tested.
+
+- But, if that's the case, doesn't patch#3 make the fix in patch#1 untestable, in my scenario? I believe the code is no longer reached in lo_flush(), due to patch#3, where the change from patch#1 would matter. Patch#1 seems correct, and the last paragraph of its commit message relevant, but I think my testing currently only covered patch#3.
+
+I'll let you decide where to apply my T-b.)
 
 Thanks!
 Laszlo

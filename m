@@ -1,22 +1,14 @@
-Date: Fri, 8 Jan 2021 18:18:03 +0800
-From: Eryu Guan <eguan@linux.alibaba.com>
-Message-ID: <20210108101803.GU80581@e18g06458.et15sqa>
-References: <20210104185655.GN2972@work-vm>
-	<CAOQ4uxiw2rXnzFUdixo7qPTiKihsSoxZAbGappGdMcjssgSVSA@mail.gmail.com>
-	<CAJfpegtHh_m9DpMqC+hBvvV1ioRcydj2cHqMzo41rLcXc148Zw@mail.gmail.com>
-	<CAOQ4uxgfW2BZ04hSahymzyerz==YVNLyRmxkUysZPYmnt6n7QA@mail.gmail.com>
-	<CAJfpegsSKfaFbpovOZpJQOP_xrpQpJa2mBK=xefV5k1XsCbfbQ@mail.gmail.com>
-	<20210106165759.GA9679@redhat.com>
-	<CAJfpegtO+X9rk5pTTRmDv9LWGK4fbvUuwNJvRP_o77B5Y5D3mA@mail.gmail.com>
-	<CAOQ4uxjTerAAxvjpDmDMQO363ju01MsEhbgBmHHSQb92hoL1_g@mail.gmail.com>
-	<20210108041252.GT80581@e18g06458.et15sqa>
-	<CAOQ4uxjDESmpEfOJ+PEVfnz=2pa1ahvUM3FWtzdkG1WaB8eRQQ@mail.gmail.com>
+Date: Tue, 8 Dec 2020 09:16:08 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20201208141608.GA3212@redhat.com>
+References: <20201207183021.22752-1-vgoyal@redhat.com>
+	<861a96f9-34fa-cd1f-4bbf-4a3506c9afa2@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <CAOQ4uxjDESmpEfOJ+PEVfnz=2pa1ahvUM3FWtzdkG1WaB8eRQQ@mail.gmail.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: Re: [Virtio-fs] [fuse-devel] 'FORGET' ordering semantics (vs unlink
- & NFS)
+In-Reply-To: <861a96f9-34fa-cd1f-4bbf-4a3506c9afa2@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 0/3] virtiofsd: Fix lo_flush() and
+	inode->posix_lock init
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,96 +17,66 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Amir Goldstein <amir73il@gmail.com>
-Cc: Miklos Szeredi <miklos@szeredi.hu>, fuse-devel <fuse-devel@lists.sourceforge.net>, Max Reitz <mreitz@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, bergwolf@hyper.sh, gerry@linux.alibaba.com, Vivek Goyal <vgoyal@redhat.com>
+To: Laszlo Ersek <lersek@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Fri, Jan 08, 2021 at 11:08:41AM +0200, Amir Goldstein wrote:
-> > > Miklos,
-> > >
-> > > I would like to point out that this discussion is relevant to any low level
-> > > fuse filesystem, but especially those that are proxying a real filesystem.
-> > >
-> > > I have raised this question before in the FUSE_PASSTHROUGH threads.
-> > > There is a lot of code duplication among various low-level fuse projects and
-> > > as we get to NFS export support and complex issues like this one, is it
-> > > getting unlikely that all projects will handle this correctly.
-> > >
-> > > Do you think there is room for some more generic code in libfuse and if
-> > > so how? Following an example implementation (assuming it gets fixed)
-> > > and hand picking fixes to projects cannot scale for long.
-> > >
-> > > The challenge is that most of the generic code would be in lookup and
-> > > maintaining the internal inode cache, but each filesystem may need
-> > > different representations of the Inode object.
-> > >
-> > > I was thinking of something along the lines of an OO library that
-> > > implements the generic lookup/inode cache for a base FuseInode class
-> > > that implementers can inherit from.
-> > >
-> > > This doesn't need to be in the libfuse project at all.
-> > > Seeing the virtiofsd already has a Rust implementation that is BSD
-> > > licensed, maybe that can be used as a starting point?
-> > >
-> > > David,
-> > >
-> > > How hard do you think it would be to re-factor virtiofsd-rs to
-> > > an implementation that inherits from a base passthroughfsd-rs?
-> > >
-> > > BTW, is virtiofsd-rs the offical virtiofsd or an experimental one?
-> > > Which tree does Miklos' patch apply to?
-> > >
-> > > Anyone has other thoughts about how to reduce fragmentation in
-> > > implementations?
-> >
-> > There's an fuse-backend-rs[1] project hosted on cloud-hypervisor, it is
-> > a library to communicate with the Linux FUSE clients, which includes:
-> >
-> > - ABI layer, which defines all data structures shared between linux Fuse
-> >   framework and Fuse daemons.
-> > - API layer, defines the interfaces for Fuse daemons to implement a
-> >   userspace file system.
-> > - Transport layer, which supports both the Linux Fuse device and
-> >   virtio-fs protocol.
-> > - VFS/pseudo_fs, an abstraction layer to support multiple file systems
-> >   by a single virtio-fs device.
-> > - A sample passthrough file system implementation, which passes through
-> >   files from daemons to clients.
-> >
-> > I'm wondering if fuse-backend-rs is a proper project to work on, and
-> > maybe virtiofsd-rs could be switched to use it as well in the future.
-> >
-> > Thanks,
-> > Eryu
-> >
-> > [1] https://github.com/cloud-hypervisor/fuse-backend-rs
+On Tue, Dec 08, 2020 at 05:51:34AM +0100, Laszlo Ersek wrote:
+> Hi Vivek,
 > 
+> On 12/07/20 19:30, Vivek Goyal wrote:
+> > Laszlo is writing a virtiofs client for OVMF and noticed that if he
+> > sends fuse FLUSH command for directory object, virtiofsd crashes.
+> > virtiofsd does not expect a FLUSH arriving for a directory object.
+> > 
+> > This patch series has one of the patches which fixes that. It also
+> > has couple of posix lock fixes as a result of lo_flush() related debugging.
+> > 
+> > Vivek Goyal (3):
+> >   virtiofsd: Set up posix_lock hash table for root inode
+> >   virtiofsd: Disable posix_lock hash table if remote locks are not
+> >     enabled
+> >   virtiofsd: Check file type in lo_flush()
+> > 
+> >  tools/virtiofsd/passthrough_ll.c | 54 +++++++++++++++++++++++---------
+> >  1 file changed, 39 insertions(+), 15 deletions(-)
+> > 
 > 
-> Hi Eryu!
+> I put back the (wrong) FLUSH for the root dir into my code temporarily, to reproduce the crash (it does, with v5.2.0-rc4).
 > 
-> This looks very interesting.
-> Can you guys say a few words about the maturity of this project.
-> Does it have any CI? any beta/production workloads that use it?
+> Then I applied your series [*], and retested.
+> 
+> [*] I'm unsure about the email you sent in response to 1/3, namely <https://lists.gnu.org/archive/html/qemu-devel/2020-12/msg01504.html>; I ignored that when applying the patches.
 
-We do have secure container workloads running in production env (limited
-scale for testing though) and using fuse-backend-rs to passthrough fs
-operations.
+Hi Laszlo,
 
-> I would be happy to contribute the open_by_handle_at() changes
-> if I know they will get properly tested.
+Thank you for the testing.
 
-Yes, as Liu Jiang said, we have similar issues when using viriofs, and
-are happy to test the open_by_handle code!
-
-Thanks,
-Eryu
+I reposed patch 1 to take care of coding style issues. Functionally both
+the versions are same.
 
 > 
-> As demonstrated in this demo fs [1], with xfs/ext4 as underlying filesystem,
-> full NFS support can be implemented by implementing lookup in filesystem
-> by inode only, before fuse adds support to LOOKUP_HANDLE in the protocol.
+> Indeed now I get a graceful -EBADF:
 > 
-> Thanks,
-> Amir.
+> [13316825985314] [ID: 00000004] unique: 60, opcode: FLUSH (25), nodeid: 1, insize: 64, pid: 1
+> [13316825993517] [ID: 00000004]    unique: 60, error: -9 (Bad file descriptor), outsize: 16
 > 
-> [1] https://github.com/amir73il/libfuse/commits/cachegwfs
+> For whichever patch in the series my testing is relevant:
+> 
+> Tested-by: Laszlo Ersek <lersek@redhat.com>
+> 
+> (I'm having some difficulty figuring out which patch(es) should carry my T-b.
+> 
+> - I think I didn't really test patch#2 with the above, so that one should likely not get the T-b
+> 
+> - I think patch#3 is what I really tested.
+> 
+> - But, if that's the case, doesn't patch#3 make the fix in patch#1 untestable, in my scenario? I believe the code is no longer reached in lo_flush(), due to patch#3, where the change from patch#1 would matter. Patch#1 seems correct, and the last paragraph of its commit message relevant, but I think my testing currently only covered patch#3.
+> 
+> I'll let you decide where to apply my T-b.)
+
+David Gilbert can add your Tested-by: while applying this patch series.
+I think adding it to patch 3 makes most sense.
+
+Thanks
+Vivek
 

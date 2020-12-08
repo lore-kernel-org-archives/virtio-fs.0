@@ -1,16 +1,15 @@
-Date: Fri, 11 Dec 2020 15:01:08 -0500
+Date: Tue, 8 Dec 2020 09:33:36 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20201211200108.GG3285@redhat.com>
-References: <20201210161126.GA125438@redhat.com>
-	<CAOssrKcKaosJo1W+sek0AOA3CdyE+ZUWzx8KPsn=Gz3Nor+_iQ@mail.gmail.com>
-	<20201211160603.GD3285@redhat.com> <20201211182956.GF3380@work-vm>
-	<20201211192517.GF3285@redhat.com>
+Message-ID: <20201208143336.GB3212@redhat.com>
+References: <CAFqZXNsGabHBfV36nNAVLJgEzjkBev-O3YZ1vnmXyVoaDdjiHQ@mail.gmail.com>
+	<CAHC9VhRCu5W4YOzcidUhv7biVc+a4QrRknVn-57YVSM3vWZH+Q@mail.gmail.com>
+	<20201207205209.GD3107@redhat.com> <ypjlczzlmhus.fsf@defensec.nl>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20201211192517.GF3285@redhat.com>
-Subject: Re: [Virtio-fs] Some performance numbers for virtiofs,
-	DAX and virtio-9p
+In-Reply-To: <ypjlczzlmhus.fsf@defensec.nl>
+Subject: Re: [Virtio-fs] virtiofs and its optional xattr support vs.
+	fs_use_xattr
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,48 +18,72 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: "Venegas Munoz, Jose Carlos" <jose.carlos.venegas.munoz@intel.com>, Christian Schoenebeck <qemu_oss@crudebyte.com>, QEMU Developers <qemu-devel@nongnu.org>, virtio-fs-list <virtio-fs@redhat.com>
+To: Dominick Grift <dominick.grift@defensec.nl>
+Cc: Paul Moore <paul@paul-moore.com>, SElinux list <selinux@vger.kernel.org>, Stephen Smalley <stephen.smalley.work@gmail.com>, Ondrej Mosnacek <omosnace@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, Zdenek Pytela <zpytela@redhat.com>
 
-On Fri, Dec 11, 2020 at 02:25:17PM -0500, Vivek Goyal wrote:
-> On Fri, Dec 11, 2020 at 06:29:56PM +0000, Dr. David Alan Gilbert wrote:
+On Mon, Dec 07, 2020 at 10:22:35PM +0100, Dominick Grift wrote:
+> Vivek Goyal <vgoyal@redhat.com> writes:
 > 
-> [..]
-> > > > 
-> > > > Could we measure at what point does a large window size actually make
-> > > > performance worse?
-> > > 
-> > > Will do. Will run tests with varying window sizes (small to large)
-> > > and see how does it impact performance for same workload with
-> > > same guest memory.
-> > 
-> > I wonder how realistic it is though;  it makes some sense if you have a
-> > scenario like a fairly small root filesystem - something tractable;  but
-> > if you have a large FS you're not realistically going to be able to set
-> > the cache size to match it - that's why it's a cache!
+> > On Mon, Dec 07, 2020 at 10:03:24AM -0500, Paul Moore wrote:
+> >> On Mon, Dec 7, 2020 at 9:43 AM Ondrej Mosnacek <omosnace@redhat.com> wrote:
+> >> >
+> >> > Hi everyone,
+> >> >
+> >> > In [1] we ran into a problem with the current handling of filesystem
+> >> > labeling rules. Basically, it is only possible to specify either
+> >> > genfscon or fs_use_xattr for a given filesystem, but in the case of
+> >> > virtiofs, certain mounts may support security xattrs, while other ones
+> >> > may not.
+> >> 
+> >
+> > [ cc virtio-fs list and miklos ]
+> >> Quickly skimming the linked GH issue, it appears that the problem
+> >> really lies in the fact that virtiofs allows one to enable/disable
+> >> xattrs at mount time.  What isn't clear to me is why one would need to
+> >> disable xattrs, can you explain that use case?  Why does enabling
+> >> xattrs in virtiofs cause problems?
+> >
+> > Its not exactly a mount time option. Its a virtiofs file server option.
+> >
+> > xattr support by default is disabled because it has performance
+> > penalty. Users can enable it if they want to.
 > 
-> I think its more about active dataset size and not necessarily total
-> FS size. FS might be big but if application is not accessing all of
-> the in reasonabl small time window, then it does not matter.
+> if SELinux is enabled then you should preferably just use fs_use xattr unconditionally
 > 
-> What worries me most is that cost of reclaim of a dax range seems
-> too high (or keeps the process blocked for long enogh), that it
-> kills the performance. I will need to revisit the reclaim path
-> and see if I can optimize something.
+> >
+> > So if virtiofsd starts without xattr support and somebody runs a
+> > VM with SELinux enabled, they should still be able to mount virtiofs,
+> > I guess (instead of failing it).
+> 
+> SELinux requires that everything is always labeled one way or another
+> and so if SELinux is enabled one should either use genfscon or fs_use xattr
+> 
+> Since is support fs_use xattr that should be the default and if any
+> would for any reason want to replace that with genfscon then that is
+> something they have to address (by excluding the fs_use xattr rule and
+> replacing it with a genfscon rule (not sure why anyone would ever want
+> that)
+> 
+> Gist is that if SELinux is enabled then one of the two should be
+> present, preferably fs_use xattr (so thats the default).
 
-I see that while reclaiming a range, we are sending a remvemapping
-command to virtiofsd. We are holding locks so that no new mappings
-can be added to that inode.
+I understand that current state is that one needs to choose either
+genfscon or fs_use_xattr depending on filesystem type. Will be nice
+if this was more flexibile.
 
-We had decided that removemapping is not necessary. It helps in
-the sense that if guest is not using a mapping, qemu will unmap
-it too.
+If virtiofsd is running on top of a filesystem which does not support
+xattr, then also virtiofs mount will fail.
 
-If we stop sending remove mapping, then it might improve reclaim
-performance significantly. With the downside that host will
-have something mapped (despite the fact that guest is not using
-it anymore). And these will be cleaned up only when guest shuts
-down.
+IOW, with virtiofs both kind of configurations can be easily produed
+(xattr enabled or disabled). So none of the defaults (genfscon or
+fs_use_xattr) seems to be ideal.
 
+IIUC, policy is assuming that virtiofs will either always support xattr
+or will not always support xattrs. Which probably is true for many
+filesystems. But not necessarily in this case. So hard coding one
+assumption will break other configurations. It will be nice if we there
+is a way to fix this in policy.
+
+Thanks
 Vivek
 

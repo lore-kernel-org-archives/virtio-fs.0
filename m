@@ -1,13 +1,24 @@
-From: Laszlo Ersek <lersek@redhat.com>
-Date: Wed, 16 Dec 2020 22:10:49 +0100
-Message-Id: <20201216211125.19496-13-lersek@redhat.com>
-In-Reply-To: <20201216211125.19496-1-lersek@redhat.com>
-References: <20201216211125.19496-1-lersek@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+	d=paul-moore-com.20150623.gappssmtp.com; s=20150623;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=0styejjvaAGmzemOZ5MgVk/FxItoWovN4p8t1k68Ido=;
+	b=zQ9miL8kae4D2P0vHCXxyu6zOLNOtsMXBhVjDzSeDAgWDgQezVOte9VFwMnx0nJFF6
+	W2W1++Tp0cqsk14cyNspQDcpKVeuChDDiv6r6hRB53n9YF6AJWWyachsJXXvs/FmcT2d
+	tiKKG49oNDAx3Dfd5s7Uvnrr6wrmsyRzGcgflUNMFd1NTSHrXCLBVeUSvgak8SsEY9Ms
+	gTC/ktstcbpYkqzBLGb52MSTAOY8QY+PAmfun9yn8qyH1hFwUIoRcnHy54jMGHDemWSn
+	oHiy3sdklNTw4k7QZEXXOhwjv5AtQZPKbp6U2H2HW0NNed2mAxUE3wkRfSFzkB0onVLQ
+	ADqA==
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [edk2 PATCH 12/48] OvmfPkg/VirtioFsDxe: implement the
-	wrapper function for FUSE_FORGET
+References: <CAFqZXNsGabHBfV36nNAVLJgEzjkBev-O3YZ1vnmXyVoaDdjiHQ@mail.gmail.com>
+	<CAHC9VhRCu5W4YOzcidUhv7biVc+a4QrRknVn-57YVSM3vWZH+Q@mail.gmail.com>
+	<20201207205209.GD3107@redhat.com>
+In-Reply-To: <20201207205209.GD3107@redhat.com>
+From: Paul Moore <paul@paul-moore.com>
+Date: Tue, 8 Dec 2020 18:41:17 -0500
+Message-ID: <CAHC9VhTHXxZRKaUybvLzPMFLP08co9e6yNjB3upVJyCPbh3=+g@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] virtiofs and its optional xattr support vs.
+	fs_use_xattr
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,215 +27,39 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: devel@edk2.groups.io, virtio-fs@redhat.com, lersek@redhat.com
-Cc: Jordan Justen <jordan.l.justen@intel.com>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@redhat.com>, Ard Biesheuvel <ard.biesheuvel@arm.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: SElinux list <selinux@vger.kernel.org>, Stephen Smalley <stephen.smalley.work@gmail.com>, Ondrej Mosnacek <omosnace@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, Zdenek Pytela <zpytela@redhat.com>
 
-Add the VirtioFsFuseForget() function, for sending the FUSE_FORGET command
-to the Virtio Filesystem device.
+On Mon, Dec 7, 2020 at 3:52 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> On Mon, Dec 07, 2020 at 10:03:24AM -0500, Paul Moore wrote:
+> > On Mon, Dec 7, 2020 at 9:43 AM Ondrej Mosnacek <omosnace@redhat.com> wrote:
+> > >
+> > > Hi everyone,
+> > >
+> > > In [1] we ran into a problem with the current handling of filesystem
+> > > labeling rules. Basically, it is only possible to specify either
+> > > genfscon or fs_use_xattr for a given filesystem, but in the case of
+> > > virtiofs, certain mounts may support security xattrs, while other ones
+> > > may not.
+>
+> [ cc virtio-fs list and miklos ]
+> > Quickly skimming the linked GH issue, it appears that the problem
+> > really lies in the fact that virtiofs allows one to enable/disable
+> > xattrs at mount time.  What isn't clear to me is why one would need to
+> > disable xattrs, can you explain that use case?  Why does enabling
+> > xattrs in virtiofs cause problems?
+>
+> Its not exactly a mount time option. Its a virtiofs file server option.
+>
+> xattr support by default is disabled because it has performance
+> penalty. Users can enable it if they want to.
 
-This is an unusual command in that it doesn't generate any response from
-the FUSE server.
+Oh the number of sins against security that have been committed under
+the banner of performance! ;)
 
-Cc: Ard Biesheuvel <ard.biesheuvel@arm.com>
-Cc: Jordan Justen <jordan.l.justen@intel.com>
-Cc: Philippe Mathieu-Daudé <philmd@redhat.com>
-Ref: https://bugzilla.tianocore.org/show_bug.cgi?id=3097
-Signed-off-by: Laszlo Ersek <lersek@redhat.com>
----
- OvmfPkg/Include/IndustryStandard/VirtioFs.h |  8 ++
- OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf         |  1 +
- OvmfPkg/VirtioFsDxe/VirtioFsDxe.h           |  6 ++
- OvmfPkg/VirtioFsDxe/FuseForget.c            | 85 ++++++++++++++++++++
- 4 files changed, 100 insertions(+)
+Regardless, thanks for the explanation, that helps.
 
-diff --git a/OvmfPkg/Include/IndustryStandard/VirtioFs.h b/OvmfPkg/Include/IndustryStandard/VirtioFs.h
-index 67fcf975e8b2..0241daf1e8d6 100644
---- a/OvmfPkg/Include/IndustryStandard/VirtioFs.h
-+++ b/OvmfPkg/Include/IndustryStandard/VirtioFs.h
-@@ -80,16 +80,17 @@ typedef struct {
- // The inode number of the root directory.
- //
- #define VIRTIO_FS_FUSE_ROOT_DIR_NODE_ID 1
- 
- //
- // FUSE operation codes.
- //
- typedef enum {
-+  VirtioFsFuseOpForget      =  2,
-   VirtioFsFuseOpRelease     = 18,
-   VirtioFsFuseOpInit        = 26,
-   VirtioFsFuseOpOpenDir     = 27,
-   VirtioFsFuseOpReleaseDir  = 29,
- } VIRTIO_FS_FUSE_OPCODE;
- 
- #pragma pack (1)
- //
-@@ -107,16 +108,23 @@ typedef struct {
- } VIRTIO_FS_FUSE_REQUEST;
- 
- typedef struct {
-   UINT32 Len;
-   INT32  Error;
-   UINT64 Unique;
- } VIRTIO_FS_FUSE_RESPONSE;
- 
-+//
-+// Header for VirtioFsFuseOpForget.
-+//
-+typedef struct {
-+  UINT64 NumberOfLookups;
-+} VIRTIO_FS_FUSE_FORGET_REQUEST;
-+
- //
- // Header for VirtioFsFuseOpRelease and VirtioFsFuseOpReleaseDir.
- //
- typedef struct {
-   UINT64 FileHandle;
-   UINT32 Flags;
-   UINT32 ReleaseFlags;
-   UINT64 LockOwner;
-diff --git a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
-index 28e66082ecfe..baeb741be18f 100644
---- a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
-+++ b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
-@@ -77,16 +77,17 @@ [Defines]
-   ENTRY_POINT                           = VirtioFsEntryPoint
- 
- [Packages]
-   MdePkg/MdePkg.dec
-   OvmfPkg/OvmfPkg.dec
- 
- [Sources]
-   DriverBinding.c
-+  FuseForget.c
-   FuseInit.c
-   FuseOpenDir.c
-   FuseRelease.c
-   Helpers.c
-   SimpleFsClose.c
-   SimpleFsDelete.c
-   SimpleFsFlush.c
-   SimpleFsGetInfo.c
-diff --git a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
-index 34574d0596fc..68ed6cd7e6a1 100644
---- a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
-+++ b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
-@@ -190,16 +190,22 @@ EFI_STATUS
- VirtioFsErrnoToEfiStatus (
-   IN INT32 Errno
-   );
- 
- //
- // Wrapper functions for FUSE commands (primitives).
- //
- 
-+EFI_STATUS
-+VirtioFsFuseForget (
-+  IN OUT VIRTIO_FS *VirtioFs,
-+  IN     UINT64    NodeId
-+  );
-+
- EFI_STATUS
- VirtioFsFuseReleaseFileOrDir (
-   IN OUT VIRTIO_FS *VirtioFs,
-   IN     UINT64    NodeId,
-   IN     UINT64    FuseHandle,
-   IN     BOOLEAN   IsDir
-   );
- 
-diff --git a/OvmfPkg/VirtioFsDxe/FuseForget.c b/OvmfPkg/VirtioFsDxe/FuseForget.c
-new file mode 100644
-index 000000000000..fdee42cffbff
---- /dev/null
-+++ b/OvmfPkg/VirtioFsDxe/FuseForget.c
-@@ -0,0 +1,85 @@
-+/** @file
-+  FUSE_FORGET wrapper for the Virtio Filesystem device.
-+
-+  Copyright (C) 2020, Red Hat, Inc.
-+
-+  SPDX-License-Identifier: BSD-2-Clause-Patent
-+**/
-+
-+#include "VirtioFsDxe.h"
-+
-+/**
-+  Make the Virtio Filesysem device drop one reference count from a NodeId that
-+  the driver looked up by filename.
-+
-+  Send the FUSE_FORGET request to the Virtio Filesysem device for this. Unlike
-+  most other FUSE requests, FUSE_FORGET doesn't elicit a response, not even the
-+  common VIRTIO_FS_FUSE_RESPONSE header.
-+
-+  The function may only be called after VirtioFsFuseInitSession() returns
-+  successfully and before VirtioFsUninit() is called.
-+
-+  @param[in,out] VirtioFs  The Virtio Filesystem device to send the FUSE_FORGET
-+                           request to. On output, the FUSE request counter
-+                           "VirtioFs->RequestId" will have been incremented.
-+
-+  @param[in] NodeId        The inode number that the client learned by way of
-+                           lookup, and that the server should now un-reference
-+                           exactly once.
-+
-+  @retval EFI_SUCCESS  The FUSE_FORGET request has been submitted.
-+
-+  @return              Error codes propagated from VirtioFsSgListsValidate(),
-+                       VirtioFsFuseNewRequest(), VirtioFsSgListsSubmit().
-+**/
-+EFI_STATUS
-+VirtioFsFuseForget (
-+  IN OUT VIRTIO_FS *VirtioFs,
-+  IN     UINT64    NodeId
-+  )
-+{
-+  VIRTIO_FS_FUSE_REQUEST        CommonReq;
-+  VIRTIO_FS_FUSE_FORGET_REQUEST ForgetReq;
-+  VIRTIO_FS_IO_VECTOR           ReqIoVec[2];
-+  VIRTIO_FS_SCATTER_GATHER_LIST ReqSgList;
-+  EFI_STATUS                    Status;
-+
-+  //
-+  // Set up the scatter-gather list (note: only request).
-+  //
-+  ReqIoVec[0].Buffer = &CommonReq;
-+  ReqIoVec[0].Size   = sizeof CommonReq;
-+  ReqIoVec[1].Buffer = &ForgetReq;
-+  ReqIoVec[1].Size   = sizeof ForgetReq;
-+  ReqSgList.IoVec    = ReqIoVec;
-+  ReqSgList.NumVec   = ARRAY_SIZE (ReqIoVec);
-+
-+  //
-+  // Validate the scatter-gather list (request only); calculate the total
-+  // transfer size.
-+  //
-+  Status = VirtioFsSgListsValidate (VirtioFs, &ReqSgList, NULL);
-+  if (EFI_ERROR (Status)) {
-+    return Status;
-+  }
-+
-+  //
-+  // Populate the common request header.
-+  //
-+  Status = VirtioFsFuseNewRequest (VirtioFs, &CommonReq, ReqSgList.TotalSize,
-+             VirtioFsFuseOpForget, NodeId);
-+  if (EFI_ERROR (Status)) {
-+    return Status;
-+  }
-+
-+  //
-+  // Populate the FUSE_FORGET-specific fields.
-+  //
-+  ForgetReq.NumberOfLookups = 1;
-+
-+  //
-+  // Submit the request. There's not going to be a response.
-+  //
-+  Status = VirtioFsSgListsSubmit (VirtioFs, &ReqSgList, NULL);
-+  return Status;
-+}
 -- 
-2.19.1.3.g30247aa5d201
-
-
+paul moore
+www.paul-moore.com
 

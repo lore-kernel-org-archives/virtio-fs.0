@@ -1,13 +1,13 @@
-From: Laszlo Ersek <lersek@redhat.com>
-Date: Wed, 16 Dec 2020 22:11:10 +0100
-Message-Id: <20201216211125.19496-34-lersek@redhat.com>
-In-Reply-To: <20201216211125.19496-1-lersek@redhat.com>
-References: <20201216211125.19496-1-lersek@redhat.com>
+Date: Thu, 10 Dec 2020 12:23:11 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20201210122311.GB12670@work-vm>
+References: <20201208055043.31548-1-lersek@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [edk2 PATCH 33/48] OvmfPkg/VirtioFsDxe: implement
-	EFI_FILE_PROTOCOL.Read() for regular files
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20201208055043.31548-1-lersek@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: make the debug log timestamp on
+ stderr more human-readable
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,120 +16,128 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: devel@edk2.groups.io, virtio-fs@redhat.com, lersek@redhat.com
-Cc: Jordan Justen <jordan.l.justen@intel.com>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@redhat.com>, Ard Biesheuvel <ard.biesheuvel@arm.com>
+To: Laszlo Ersek <lersek@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-Using the functions introduced previously, we can now implement
-VirtioFsSimpleFileRead(); for regular files at first.
+* Laszlo Ersek (lersek@redhat.com) wrote:
+> The current timestamp format doesn't help me visually notice small jumps
+> in time ("small" as defined on human scale, such as a few seconds or a few
+> ten seconds). Replace it with a local time format where such differences
+> stand out.
+> 
+> Before:
+> 
+> > [13316826770337] [ID: 00000004] unique: 62, opcode: RELEASEDIR (29), nodeid: 1, insize: 64, pid: 1
+> > [13316826778175] [ID: 00000004]    unique: 62, success, outsize: 16
+> > [13316826781156] [ID: 00000004] virtio_send_msg: elem 0: with 1 in desc of length 16
+> > [15138279317927] [ID: 00000001] virtio_loop: Got VU event
+> > [15138279504884] [ID: 00000001] fv_queue_set_started: qidx=1 started=0
+> > [15138279519034] [ID: 00000003] fv_queue_thread: kill event on queue 1 - quitting
+> > [15138280876463] [ID: 00000001] fv_remove_watch: TODO! fd=9
+> > [15138280897381] [ID: 00000001] virtio_loop: Waiting for VU event
+> > [15138280946834] [ID: 00000001] virtio_loop: Got VU event
+> > [15138281175421] [ID: 00000001] virtio_loop: Waiting for VU event
+> > [15138281182387] [ID: 00000001] virtio_loop: Got VU event
+> > [15138281189474] [ID: 00000001] virtio_loop: Waiting for VU event
+> > [15138309321936] [ID: 00000001] virtio_loop: Unexpected poll revents 11
+> > [15138309434150] [ID: 00000001] virtio_loop: Exit
+> 
+> (Notice how you don't (easily) notice the gap in time after
+> "virtio_send_msg", and especially the amount of time passed is hard to
+> estimate.)
+> 
+> After:
+> 
+> > [2020-12-08 06:43:22.58+0100] [ID: 00000004] unique: 51, opcode: RELEASEDIR (29), nodeid: 1, insize: 64, pid: 1
+> > [2020-12-08 06:43:22.58+0100] [ID: 00000004]    unique: 51, success, outsize: 16
+> > [2020-12-08 06:43:22.58+0100] [ID: 00000004] virtio_send_msg: elem 0: with 1 in desc of length 16
+> > [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Got VU event
+> > [2020-12-08 06:43:29.34+0100] [ID: 00000001] fv_queue_set_started: qidx=1 started=0
+> > [2020-12-08 06:43:29.34+0100] [ID: 00000003] fv_queue_thread: kill event on queue 1 - quitting
+> > [2020-12-08 06:43:29.34+0100] [ID: 00000001] fv_remove_watch: TODO! fd=9
+> > [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Waiting for VU event
+> > [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Got VU event
+> > [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Waiting for VU event
+> > [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Got VU event
+> > [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Waiting for VU event
+> > [2020-12-08 06:43:29.37+0100] [ID: 00000001] virtio_loop: Unexpected poll revents 11
+> > [2020-12-08 06:43:29.37+0100] [ID: 00000001] virtio_loop: Exit
+> 
+> Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+> Cc: Stefan Hajnoczi <stefanha@redhat.com>
+> Signed-off-by: Laszlo Ersek <lersek@redhat.com>
 
-Cc: Ard Biesheuvel <ard.biesheuvel@arm.com>
-Cc: Jordan Justen <jordan.l.justen@intel.com>
-Cc: Philippe Mathieu-Daudé <philmd@redhat.com>
-Ref: https://bugzilla.tianocore.org/show_bug.cgi?id=3097
-Signed-off-by: Laszlo Ersek <lersek@redhat.com>
----
- OvmfPkg/VirtioFsDxe/SimpleFsRead.c | 75 +++++++++++++++++++-
- 1 file changed, 74 insertions(+), 1 deletion(-)
 
-diff --git a/OvmfPkg/VirtioFsDxe/SimpleFsRead.c b/OvmfPkg/VirtioFsDxe/SimpleFsRead.c
-index e737d5e33204..c4ad07c9aec4 100644
---- a/OvmfPkg/VirtioFsDxe/SimpleFsRead.c
-+++ b/OvmfPkg/VirtioFsDxe/SimpleFsRead.c
-@@ -3,18 +3,91 @@
- 
-   Copyright (C) 2020, Red Hat, Inc.
- 
-   SPDX-License-Identifier: BSD-2-Clause-Patent
- **/
- 
- #include "VirtioFsDxe.h"
- 
-+/**
-+  Read from a regular file.
-+**/
-+STATIC
-+EFI_STATUS
-+ReadRegularFile (
-+  IN OUT VIRTIO_FS_FILE *VirtioFsFile,
-+  IN OUT UINTN          *BufferSize,
-+     OUT VOID           *Buffer
-+  )
-+{
-+  VIRTIO_FS                          *VirtioFs;
-+  EFI_STATUS                         Status;
-+  VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE FuseAttr;
-+  UINTN                              Transferred;
-+  UINTN                              Left;
-+
-+  VirtioFs = VirtioFsFile->OwnerFs;
-+  //
-+  // The UEFI spec forbids reads that start beyond the end of the file.
-+  //
-+  Status = VirtioFsFuseGetAttr (VirtioFs, VirtioFsFile->NodeId, &FuseAttr);
-+  if (EFI_ERROR (Status) || VirtioFsFile->FilePosition > FuseAttr.Size) {
-+    return EFI_DEVICE_ERROR;
-+  }
-+
-+  Status      = EFI_SUCCESS;
-+  Transferred = 0;
-+  Left        = *BufferSize;
-+  while (Left > 0) {
-+    UINT32 ReadSize;
-+
-+    //
-+    // FUSE_READ cannot express a >=4GB buffer size.
-+    //
-+    ReadSize = (UINT32)MIN ((UINTN)MAX_UINT32, Left);
-+    Status = VirtioFsFuseReadFileOrDir (
-+               VirtioFs,
-+               VirtioFsFile->NodeId,
-+               VirtioFsFile->FuseHandle,
-+               FALSE,                                    // IsDir
-+               VirtioFsFile->FilePosition + Transferred,
-+               &ReadSize,
-+               (UINT8 *)Buffer + Transferred
-+               );
-+    if (EFI_ERROR (Status) || ReadSize == 0) {
-+      break;
-+    }
-+    Transferred += ReadSize;
-+    Left        -= ReadSize;
-+  }
-+
-+  *BufferSize = Transferred;
-+  VirtioFsFile->FilePosition += Transferred;
-+  //
-+  // If we managed to read some data, return success. If zero bytes were
-+  // transferred due to zero-sized buffer on input or due to EOF on first read,
-+  // return SUCCESS. Otherwise, return the error due to which zero bytes were
-+  // transferred.
-+  //
-+  return (Transferred > 0) ? EFI_SUCCESS : Status;
-+}
-+
- EFI_STATUS
- EFIAPI
- VirtioFsSimpleFileRead (
-   IN     EFI_FILE_PROTOCOL *This,
-   IN OUT UINTN             *BufferSize,
-      OUT VOID              *Buffer
-   )
- {
--  return EFI_NO_MEDIA;
-+  VIRTIO_FS_FILE *VirtioFsFile;
-+  EFI_STATUS     Status;
-+
-+  VirtioFsFile = VIRTIO_FS_FILE_FROM_SIMPLE_FILE (This);
-+
-+  if (VirtioFsFile->IsDirectory) {
-+    Status = EFI_NO_MEDIA;
-+  } else {
-+    Status = ReadRegularFile (VirtioFsFile, BufferSize, Buffer);
-+  }
-+  return Status;
- }
+(I'd have probably not bothered with the day and given a few more digits
+of the subseconds instead, but that's mostly just rpeference)
+
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+
+and queued.
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 31 +++++++++++++++++++++++++++----
+>  1 file changed, 27 insertions(+), 4 deletions(-)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 48a109d3f682..06543b20dcbb 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -3311,18 +3311,38 @@ static void setup_nofile_rlimit(unsigned long rlimit_nofile)
+>  static void log_func(enum fuse_log_level level, const char *fmt, va_list ap)
+>  {
+>      g_autofree char *localfmt = NULL;
+> +    struct timespec ts;
+> +    struct tm tm;
+> +    char sec_fmt[sizeof "2020-12-07 18:17:54"];
+> +    char zone_fmt[sizeof "+0100"];
+>  
+>      if (current_log_level < level) {
+>          return;
+>      }
+>  
+>      if (current_log_level == FUSE_LOG_DEBUG) {
+> -        if (!use_syslog) {
+> -            localfmt = g_strdup_printf("[%" PRId64 "] [ID: %08ld] %s",
+> -                                       get_clock(), syscall(__NR_gettid), fmt);
+> -        } else {
+> +        if (use_syslog) {
+> +            /* no timestamp needed */
+>              localfmt = g_strdup_printf("[ID: %08ld] %s", syscall(__NR_gettid),
+>                                         fmt);
+> +        } else {
+> +            /* try formatting a broken-down timestamp */
+> +            if (clock_gettime(CLOCK_REALTIME, &ts) != -1 &&
+> +                localtime_r(&ts.tv_sec, &tm) != NULL &&
+> +                strftime(sec_fmt, sizeof sec_fmt, "%Y-%m-%d %H:%M:%S",
+> +                         &tm) != 0 &&
+> +                strftime(zone_fmt, sizeof zone_fmt, "%z", &tm) != 0) {
+> +                localfmt = g_strdup_printf("[%s.%02ld%s] [ID: %08ld] %s",
+> +                                           sec_fmt,
+> +                                           ts.tv_nsec / (10L * 1000 * 1000),
+> +                                           zone_fmt, syscall(__NR_gettid),
+> +                                           fmt);
+> +            } else {
+> +                /* fall back to a flat timestamp */
+> +                localfmt = g_strdup_printf("[%" PRId64 "] [ID: %08ld] %s",
+> +                                           get_clock(), syscall(__NR_gettid),
+> +                                           fmt);
+> +            }
+>          }
+>          fmt = localfmt;
+>      }
+> @@ -3452,6 +3472,9 @@ int main(int argc, char *argv[])
+>      struct lo_map_elem *reserve_elem;
+>      int ret = -1;
+>  
+> +    /* Initialize time conversion information for localtime_r(). */
+> +    tzset();
+> +
+>      /* Don't mask creation mode, kernel already did that */
+>      umask(0);
+>  
+> -- 
+> 2.19.1.3.g30247aa5d201
+> 
 -- 
-2.19.1.3.g30247aa5d201
-
-
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

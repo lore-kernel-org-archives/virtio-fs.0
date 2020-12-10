@@ -1,13 +1,14 @@
-Date: Mon, 4 Jan 2021 14:16:52 -0500
+Date: Thu, 10 Dec 2020 15:09:31 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210104191652.GD63879@redhat.com>
-References: <20210104160013.GG2972@work-vm> <20210104184527.GC63879@redhat.com>
-	<20210104185655.GN2972@work-vm> <20210104190439.GC73873@redhat.com>
+Message-ID: <20201210200931.GA185111@redhat.com>
+References: <20201207183021.22752-1-vgoyal@redhat.com>
+	<20201207183021.22752-4-vgoyal@redhat.com>
+	<20201210200303.GN3629@work-vm>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210104190439.GC73873@redhat.com>
-Subject: Re: [Virtio-fs] 'FORGET' ordering semantics (vs unlink & NFS)
+In-Reply-To: <20201210200303.GN3629@work-vm>
+Subject: Re: [Virtio-fs] [PATCH 3/3] virtiofsd: Check file type in lo_flush()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,66 +18,46 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: fuse-devel@lists.sourceforge.net, virtio-fs@redhat.com
+Cc: virtio-fs@redhat.com, lersek@redhat.com, qemu-devel@nongnu.org
 
-On Mon, Jan 04, 2021 at 02:04:39PM -0500, Vivek Goyal wrote:
-> On Mon, Jan 04, 2021 at 06:56:55PM +0000, Dr. David Alan Gilbert wrote:
-> > * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > > On Mon, Jan 04, 2021 at 04:00:13PM +0000, Dr. David Alan Gilbert wrote:
-> > > > Hi,
-> > > >   On virtio-fs we're hitting a problem with NFS, where
-> > > > unlinking a file in a directory and then rmdir'ing that
-> > > > directory fails complaining about the directory not being empty.
-> > > > 
-> > > > The problem here is that if a file has an open fd, NFS doesn't
-> > > > actually delete the file on unlink, it just renames it to
-> > > > a hidden file (e.g. .nfs*******).  That open file is there because
-> > > > the 'FORGET' hasn't completed yet by the time the rmdir is issued.
-> > > > 
-> > > > Question:
-> > > >   a) In the FUSE protocol, are requests assumed to complete in order;
-> > > > i.e.  unlink, forget, rmdir   is it required that 'forget' completes
-> > > > before the rmdir is processed?
-> > > >      (In virtiofs we've been processing requests, in parallel, and
-> > > > have sent forgets down a separate queue to keep them out of the way).
-> > > > 
-> > > >   b) 'forget' doesn't send a reply - so the kernel can't wait for the
-> > > > client to have finished it;  do we need a synchronous forget here?
-> > > 
-> > > Even if we introduce a synchronous forget, will that really fix the
-> > > issue. For example, this could also happen if file has been unlinked
-> > > but it is still open and directory is being removed.
-> > > 
-> > > fd = open(foo/bar.txt)
-> > > unlink foo/bar.txt
-> > > rmdir foo
-> > > close(fd).
-> > > 
-> > > In this case, final forget should go after fd has been closed. Its
-> > > not a forget race. 
-> > > 
-> > > I wrote a test case for this and it works on regular file systems.
-> > > 
-> > > https://github.com/rhvgoyal/misc/blob/master/virtiofs-tests/rmdir.c
-> > > 
-> > > I suspect it will fail on nfs because I am assuming that temporary
-> > > file will be there till final close(fd) happens. If that's the
-> > > case this is a NFS specific issue because its behavior is different
-> > > from other file systems.
+On Thu, Dec 10, 2020 at 08:03:03PM +0000, Dr. David Alan Gilbert wrote:
+> * Vivek Goyal (vgoyal@redhat.com) wrote:
+> > Currently lo_flush() is written in such a way that it expects to receive
+> > a FLUSH requests on a regular file (and not directories). For example,
+> > we call lo_fi_fd() which searches lo->fd_map. If we open directories
+> > using opendir(), we keep don't keep track of these in lo->fd_map instead
+> > we keep them in lo->dir_map. So we expect lo_flush() to be called on
+> > regular files only.
 > > 
-> > That's true; but that's NFS just being NFS; in our case we're keeping
-> > an fd open even though the guest has been smart enough not to; so we're
-> > causing the NFS oddity when it wouldn't normally happen.
+> > Even linux fuse client calls FLUSH only for regular files and not
+> > directories. So put a check for filetype and return EBADF if
+> > lo_flush() is called on a non-regular file.
+> > 
+> > Reported-by: Laszlo Ersek <lersek@redhat.com>
+> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > ---
+> >  tools/virtiofsd/passthrough_ll.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> > index 8ba79f503a..48a109d3f6 100644
+> > --- a/tools/virtiofsd/passthrough_ll.c
+> > +++ b/tools/virtiofsd/passthrough_ll.c
+> > @@ -1968,7 +1968,7 @@ static void lo_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+> >      struct lo_data *lo = lo_data(req);
+> >  
+> >      inode = lo_inode(req, ino);
+> > -    if (!inode) {
+> > +    if (!inode || !S_ISREG(inode->filetype)) {
+> >          fuse_reply_err(req, EBADF);
 > 
-> So what file descriptor is that? Is it because of O_PATH fd we have
-> stashed away in lo_inode?
-> 
-> Will NFS keep .nfsXXXX file around even if O_PATH fd is open for
-> unlinked file?
+> Does that need a lo_inode_put(lo, &inode) in the new case?
 
-If this issue is due to O_PATH fd opened by virtiofsd, then I guess
-we will have look into introducing synchronous and use that instead
-when inode is being dropped (I guess in fuse_evict_inode()).
+Good catch. Yes if inode is valid but file type is not regular, we need
+to put inode reference.
+
+Do you want me to post a new patch or you will like to take care of
+it.
 
 Vivek
 

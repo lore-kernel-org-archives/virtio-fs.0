@@ -1,13 +1,15 @@
+References: <20201208055043.31548-1-lersek@redhat.com>
+	<20201208165725.GB20722@redhat.com>
 From: Laszlo Ersek <lersek@redhat.com>
-Date: Wed, 16 Dec 2020 22:10:57 +0100
-Message-Id: <20201216211125.19496-21-lersek@redhat.com>
-In-Reply-To: <20201216211125.19496-1-lersek@redhat.com>
-References: <20201216211125.19496-1-lersek@redhat.com>
+Message-ID: <9e1966ea-049e-1c3d-b81a-a6ce17f5f134@redhat.com>
+Date: Thu, 10 Dec 2020 08:55:26 +0100
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [edk2 PATCH 20/48] OvmfPkg/VirtioFsDxe: implement the
-	wrapper function for FUSE_CREATE
+In-Reply-To: <20201208165725.GB20722@redhat.com>
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: make the debug log timestamp on
+ stderr more human-readable
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,308 +18,134 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: devel@edk2.groups.io, virtio-fs@redhat.com, lersek@redhat.com
-Cc: Jordan Justen <jordan.l.justen@intel.com>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@redhat.com>, Ard Biesheuvel <ard.biesheuvel@arm.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-Add the VirtioFsFuseOpenOrCreate() function, for sending the FUSE_CREATE
-command to the Virtio Filesystem device.
+On 12/08/20 17:57, Vivek Goyal wrote:
+> On Tue, Dec 08, 2020 at 06:50:43AM +0100, Laszlo Ersek wrote:
+>> The current timestamp format doesn't help me visually notice small jumps
+>> in time ("small" as defined on human scale, such as a few seconds or a few
+>> ten seconds). Replace it with a local time format where such differences
+>> stand out.
+> 
+> Switching to a human readable time stamp makes sense. That seems much
+> more helpful for debugging, IMHO.
 
-Cc: Ard Biesheuvel <ard.biesheuvel@arm.com>
-Cc: Jordan Justen <jordan.l.justen@intel.com>
-Cc: Philippe Mathieu-Daudé <philmd@redhat.com>
-Ref: https://bugzilla.tianocore.org/show_bug.cgi?id=3097
-Signed-off-by: Laszlo Ersek <lersek@redhat.com>
----
- OvmfPkg/Include/IndustryStandard/VirtioFs.h |  17 +++
- OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf         |   1 +
- OvmfPkg/VirtioFsDxe/VirtioFsDxe.h           |   9 ++
- OvmfPkg/VirtioFsDxe/FuseOpenOrCreate.c      | 155 ++++++++++++++++++++
- 4 files changed, 182 insertions(+)
+Thanks! (for the other review as well)
+laszlo
 
-diff --git a/OvmfPkg/Include/IndustryStandard/VirtioFs.h b/OvmfPkg/Include/IndustryStandard/VirtioFs.h
-index 9ffeb9c8c954..63aced229e9b 100644
---- a/OvmfPkg/Include/IndustryStandard/VirtioFs.h
-+++ b/OvmfPkg/Include/IndustryStandard/VirtioFs.h
-@@ -80,18 +80,24 @@ typedef struct {
- // The inode number of the root directory.
- //
- #define VIRTIO_FS_FUSE_ROOT_DIR_NODE_ID 1
- 
- //
- // File mode bitmasks.
- //
- #define VIRTIO_FS_FUSE_MODE_PERM_RWXU 0000700u
-+#define VIRTIO_FS_FUSE_MODE_PERM_RUSR 0000400u
-+#define VIRTIO_FS_FUSE_MODE_PERM_WUSR 0000200u
- #define VIRTIO_FS_FUSE_MODE_PERM_RWXG 0000070u
-+#define VIRTIO_FS_FUSE_MODE_PERM_RGRP 0000040u
-+#define VIRTIO_FS_FUSE_MODE_PERM_WGRP 0000020u
- #define VIRTIO_FS_FUSE_MODE_PERM_RWXO 0000007u
-+#define VIRTIO_FS_FUSE_MODE_PERM_ROTH 0000004u
-+#define VIRTIO_FS_FUSE_MODE_PERM_WOTH 0000002u
- 
- //
- // Flags for VirtioFsFuseOpOpen.
- //
- #define VIRTIO_FS_FUSE_OPEN_REQ_F_RDONLY 0
- #define VIRTIO_FS_FUSE_OPEN_REQ_F_RDWR   2
- 
- //
-@@ -103,16 +109,17 @@ typedef enum {
-   VirtioFsFuseOpOpen        = 14,
-   VirtioFsFuseOpRelease     = 18,
-   VirtioFsFuseOpFsync       = 20,
-   VirtioFsFuseOpFlush       = 25,
-   VirtioFsFuseOpInit        = 26,
-   VirtioFsFuseOpOpenDir     = 27,
-   VirtioFsFuseOpReleaseDir  = 29,
-   VirtioFsFuseOpFsyncDir    = 30,
-+  VirtioFsFuseOpCreate      = 35,
- } VIRTIO_FS_FUSE_OPCODE;
- 
- #pragma pack (1)
- //
- // Request-response headers common to all request types.
- //
- typedef struct {
-   UINT32 Len;
-@@ -246,11 +253,21 @@ typedef struct {
-   UINT16 MaxBackground;
-   UINT16 CongestionThreshold;
-   UINT32 MaxWrite;
-   UINT32 TimeGran;
-   UINT16 MaxPages;
-   UINT16 MapAlignment;
-   UINT32 Unused[8];
- } VIRTIO_FS_FUSE_INIT_RESPONSE;
-+
-+//
-+// Header for VirtioFsFuseOpCreate.
-+//
-+typedef struct {
-+  UINT32 Flags;
-+  UINT32 Mode;
-+  UINT32 Umask;
-+  UINT32 Padding;
-+} VIRTIO_FS_FUSE_CREATE_REQUEST;
- #pragma pack ()
- 
- #endif // VIRTIO_FS_H_
-diff --git a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
-index eebb86f7c275..b942baa4a772 100644
---- a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
-+++ b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
-@@ -84,16 +84,17 @@ [Sources]
-   DriverBinding.c
-   FuseFlush.c
-   FuseForget.c
-   FuseFsync.c
-   FuseInit.c
-   FuseMkDir.c
-   FuseOpen.c
-   FuseOpenDir.c
-+  FuseOpenOrCreate.c
-   FuseRelease.c
-   Helpers.c
-   SimpleFsClose.c
-   SimpleFsDelete.c
-   SimpleFsFlush.c
-   SimpleFsGetInfo.c
-   SimpleFsGetPosition.c
-   SimpleFsOpen.c
-diff --git a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
-index 8fd56bdbf6e1..795cf4ee5d7d 100644
---- a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
-+++ b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
-@@ -281,16 +281,25 @@ VirtioFsFuseInitSession (
- 
- EFI_STATUS
- VirtioFsFuseOpenDir (
-   IN OUT VIRTIO_FS *VirtioFs,
-   IN     UINT64    NodeId,
-      OUT UINT64    *FuseHandle
-   );
- 
-+EFI_STATUS
-+VirtioFsFuseOpenOrCreate (
-+  IN OUT VIRTIO_FS *VirtioFs,
-+  IN     UINT64    ParentNodeId,
-+  IN     CHAR8     *Name,
-+     OUT UINT64    *NodeId,
-+     OUT UINT64    *FuseHandle
-+  );
-+
- //
- // EFI_SIMPLE_FILE_SYSTEM_PROTOCOL member functions for the Virtio Filesystem
- // driver.
- //
- 
- EFI_STATUS
- EFIAPI
- VirtioFsOpenVolume (
-diff --git a/OvmfPkg/VirtioFsDxe/FuseOpenOrCreate.c b/OvmfPkg/VirtioFsDxe/FuseOpenOrCreate.c
-new file mode 100644
-index 000000000000..60ab002bcd99
---- /dev/null
-+++ b/OvmfPkg/VirtioFsDxe/FuseOpenOrCreate.c
-@@ -0,0 +1,155 @@
-+/** @file
-+  FUSE_CREATE wrapper for the Virtio Filesystem device.
-+
-+  Copyright (C) 2020, Red Hat, Inc.
-+
-+  SPDX-License-Identifier: BSD-2-Clause-Patent
-+**/
-+
-+#include <Library/BaseLib.h> // AsciiStrSize()
-+
-+#include "VirtioFsDxe.h"
-+
-+/**
-+  Send a FUSE_CREATE request to the Virtio Filesystem device, for opening a
-+  regular file with (O_RDWR | O_CREAT) semantics.
-+
-+  The function may only be called after VirtioFsFuseInitSession() returns
-+  successfully and before VirtioFsUninit() is called.
-+
-+  @param[in,out] VirtioFs  The Virtio Filesystem device to send the FUSE_CREATE
-+                           request to. On output, the FUSE request counter
-+                           "VirtioFs->RequestId" will have been incremented.
-+
-+  @param[in] ParentNodeId  The inode number of the direct parent directory of
-+                           the regular file to open or create.
-+
-+  @param[in] Name          The single-component filename of the regular file to
-+                           open or create, under the parent directory
-+                           identified by ParentNodeId.
-+
-+  @param[out] NodeId       The inode number of the regular file, returned by
-+                           the Virtio Filesystem device.
-+
-+  @param[out] FuseHandle   The open file handle returned by the Virtio
-+                           Filesystem device.
-+
-+  @retval EFI_SUCCESS  The regular file has been opened, and (if necessary)
-+                       created.
-+
-+  @return              The "errno" value mapped to an EFI_STATUS code, if the
-+                       Virtio Filesystem device explicitly reported an error.
-+
-+  @return              Error codes propagated from VirtioFsSgListsValidate(),
-+                       VirtioFsFuseNewRequest(), VirtioFsSgListsSubmit(),
-+                       VirtioFsFuseCheckResponse().
-+**/
-+EFI_STATUS
-+VirtioFsFuseOpenOrCreate (
-+  IN OUT VIRTIO_FS *VirtioFs,
-+  IN     UINT64    ParentNodeId,
-+  IN     CHAR8     *Name,
-+     OUT UINT64    *NodeId,
-+     OUT UINT64    *FuseHandle
-+  )
-+{
-+  VIRTIO_FS_FUSE_REQUEST             CommonReq;
-+  VIRTIO_FS_FUSE_CREATE_REQUEST      CreateReq;
-+  VIRTIO_FS_IO_VECTOR                ReqIoVec[3];
-+  VIRTIO_FS_SCATTER_GATHER_LIST      ReqSgList;
-+  VIRTIO_FS_FUSE_RESPONSE            CommonResp;
-+  VIRTIO_FS_FUSE_NODE_RESPONSE       NodeResp;
-+  VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE AttrResp;
-+  VIRTIO_FS_FUSE_OPEN_RESPONSE       OpenResp;
-+  VIRTIO_FS_IO_VECTOR                RespIoVec[4];
-+  VIRTIO_FS_SCATTER_GATHER_LIST      RespSgList;
-+  EFI_STATUS                         Status;
-+
-+  //
-+  // Set up the scatter-gather lists.
-+  //
-+  ReqIoVec[0].Buffer = &CommonReq;
-+  ReqIoVec[0].Size   = sizeof CommonReq;
-+  ReqIoVec[1].Buffer = &CreateReq;
-+  ReqIoVec[1].Size   = sizeof CreateReq;
-+  ReqIoVec[2].Buffer = Name;
-+  ReqIoVec[2].Size   = AsciiStrSize (Name);
-+  ReqSgList.IoVec    = ReqIoVec;
-+  ReqSgList.NumVec   = ARRAY_SIZE (ReqIoVec);
-+
-+  RespIoVec[0].Buffer = &CommonResp;
-+  RespIoVec[0].Size   = sizeof CommonResp;
-+  RespIoVec[1].Buffer = &NodeResp;
-+  RespIoVec[1].Size   = sizeof NodeResp;
-+  RespIoVec[2].Buffer = &AttrResp;
-+  RespIoVec[2].Size   = sizeof AttrResp;
-+  RespIoVec[3].Buffer = &OpenResp;
-+  RespIoVec[3].Size   = sizeof OpenResp;
-+  RespSgList.IoVec    = RespIoVec;
-+  RespSgList.NumVec   = ARRAY_SIZE (RespIoVec);
-+
-+  //
-+  // Validate the scatter-gather lists; calculate the total transfer sizes.
-+  //
-+  Status = VirtioFsSgListsValidate (VirtioFs, &ReqSgList, &RespSgList);
-+  if (EFI_ERROR (Status)) {
-+    return Status;
-+  }
-+
-+  //
-+  // Populate the common request header.
-+  //
-+  Status = VirtioFsFuseNewRequest (VirtioFs, &CommonReq, ReqSgList.TotalSize,
-+             VirtioFsFuseOpCreate, ParentNodeId);
-+  if (EFI_ERROR (Status)) {
-+    return Status;
-+  }
-+
-+  //
-+  // Populate the FUSE_CREATE-specific fields.
-+  //
-+  // VIRTIO_FS_FUSE_OPEN_REQ_F_RDWR is why this request can never open a
-+  // directory (EISDIR). And VIRTIO_FS_FUSE_OPEN_REQ_F_RDWR is consistent with
-+  // the only OpenMode of EFI_FILE_PROTOCOL.Open() that enables filesystem
-+  // object creation -- that is, Create/Read/Write.
-+  //
-+  CreateReq.Flags   = VIRTIO_FS_FUSE_OPEN_REQ_F_RDWR;
-+  CreateReq.Mode    = (VIRTIO_FS_FUSE_MODE_PERM_RUSR |
-+                       VIRTIO_FS_FUSE_MODE_PERM_WUSR |
-+                       VIRTIO_FS_FUSE_MODE_PERM_RGRP |
-+                       VIRTIO_FS_FUSE_MODE_PERM_WGRP |
-+                       VIRTIO_FS_FUSE_MODE_PERM_ROTH |
-+                       VIRTIO_FS_FUSE_MODE_PERM_WOTH);
-+  CreateReq.Umask   = 0;
-+  CreateReq.Padding = 0;
-+
-+  //
-+  // Submit the request.
-+  //
-+  Status = VirtioFsSgListsSubmit (VirtioFs, &ReqSgList, &RespSgList);
-+  if (EFI_ERROR (Status)) {
-+    return Status;
-+  }
-+
-+  //
-+  // Verify the response (all response buffers are fixed size).
-+  //
-+  Status = VirtioFsFuseCheckResponse (&RespSgList, CommonReq.Unique, NULL);
-+  if (EFI_ERROR (Status)) {
-+    if (Status == EFI_DEVICE_ERROR) {
-+      DEBUG ((DEBUG_ERROR, "%a: Label=\"%s\" ParentNodeId=%Lu Name=\"%a\" "
-+        "Errno=%d\n", __FUNCTION__, VirtioFs->Label, ParentNodeId, Name,
-+        CommonResp.Error));
-+      Status = VirtioFsErrnoToEfiStatus (CommonResp.Error);
-+    }
-+    return Status;
-+  }
-+
-+  //
-+  // Output the NodeId of the (possibly new) regular file. Also output the open
-+  // file handle.
-+  //
-+  *NodeId     = NodeResp.NodeId;
-+  *FuseHandle = OpenResp.FileHandle;
-+  return EFI_SUCCESS;
-+}
--- 
-2.19.1.3.g30247aa5d201
-
-
+> 
+> Thanks
+> Vivek
+> 
+>>
+>> Before:
+>>
+>>> [13316826770337] [ID: 00000004] unique: 62, opcode: RELEASEDIR (29), nodeid: 1, insize: 64, pid: 1
+>>> [13316826778175] [ID: 00000004]    unique: 62, success, outsize: 16
+>>> [13316826781156] [ID: 00000004] virtio_send_msg: elem 0: with 1 in desc of length 16
+>>> [15138279317927] [ID: 00000001] virtio_loop: Got VU event
+>>> [15138279504884] [ID: 00000001] fv_queue_set_started: qidx=1 started=0
+>>> [15138279519034] [ID: 00000003] fv_queue_thread: kill event on queue 1 - quitting
+>>> [15138280876463] [ID: 00000001] fv_remove_watch: TODO! fd=9
+>>> [15138280897381] [ID: 00000001] virtio_loop: Waiting for VU event
+>>> [15138280946834] [ID: 00000001] virtio_loop: Got VU event
+>>> [15138281175421] [ID: 00000001] virtio_loop: Waiting for VU event
+>>> [15138281182387] [ID: 00000001] virtio_loop: Got VU event
+>>> [15138281189474] [ID: 00000001] virtio_loop: Waiting for VU event
+>>> [15138309321936] [ID: 00000001] virtio_loop: Unexpected poll revents 11
+>>> [15138309434150] [ID: 00000001] virtio_loop: Exit
+>>
+>> (Notice how you don't (easily) notice the gap in time after
+>> "virtio_send_msg", and especially the amount of time passed is hard to
+>> estimate.)
+>>
+>> After:
+>>
+>>> [2020-12-08 06:43:22.58+0100] [ID: 00000004] unique: 51, opcode: RELEASEDIR (29), nodeid: 1, insize: 64, pid: 1
+>>> [2020-12-08 06:43:22.58+0100] [ID: 00000004]    unique: 51, success, outsize: 16
+>>> [2020-12-08 06:43:22.58+0100] [ID: 00000004] virtio_send_msg: elem 0: with 1 in desc of length 16
+>>> [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Got VU event
+>>> [2020-12-08 06:43:29.34+0100] [ID: 00000001] fv_queue_set_started: qidx=1 started=0
+>>> [2020-12-08 06:43:29.34+0100] [ID: 00000003] fv_queue_thread: kill event on queue 1 - quitting
+>>> [2020-12-08 06:43:29.34+0100] [ID: 00000001] fv_remove_watch: TODO! fd=9
+>>> [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Waiting for VU event
+>>> [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Got VU event
+>>> [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Waiting for VU event
+>>> [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Got VU event
+>>> [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Waiting for VU event
+>>> [2020-12-08 06:43:29.37+0100] [ID: 00000001] virtio_loop: Unexpected poll revents 11
+>>> [2020-12-08 06:43:29.37+0100] [ID: 00000001] virtio_loop: Exit
+>>
+>> Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+>> Cc: Stefan Hajnoczi <stefanha@redhat.com>
+>> Signed-off-by: Laszlo Ersek <lersek@redhat.com>
+>> ---
+>>  tools/virtiofsd/passthrough_ll.c | 31 +++++++++++++++++++++++++++----
+>>  1 file changed, 27 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+>> index 48a109d3f682..06543b20dcbb 100644
+>> --- a/tools/virtiofsd/passthrough_ll.c
+>> +++ b/tools/virtiofsd/passthrough_ll.c
+>> @@ -3311,18 +3311,38 @@ static void setup_nofile_rlimit(unsigned long rlimit_nofile)
+>>  static void log_func(enum fuse_log_level level, const char *fmt, va_list ap)
+>>  {
+>>      g_autofree char *localfmt = NULL;
+>> +    struct timespec ts;
+>> +    struct tm tm;
+>> +    char sec_fmt[sizeof "2020-12-07 18:17:54"];
+>> +    char zone_fmt[sizeof "+0100"];
+>>  
+>>      if (current_log_level < level) {
+>>          return;
+>>      }
+>>  
+>>      if (current_log_level == FUSE_LOG_DEBUG) {
+>> -        if (!use_syslog) {
+>> -            localfmt = g_strdup_printf("[%" PRId64 "] [ID: %08ld] %s",
+>> -                                       get_clock(), syscall(__NR_gettid), fmt);
+>> -        } else {
+>> +        if (use_syslog) {
+>> +            /* no timestamp needed */
+>>              localfmt = g_strdup_printf("[ID: %08ld] %s", syscall(__NR_gettid),
+>>                                         fmt);
+>> +        } else {
+>> +            /* try formatting a broken-down timestamp */
+>> +            if (clock_gettime(CLOCK_REALTIME, &ts) != -1 &&
+>> +                localtime_r(&ts.tv_sec, &tm) != NULL &&
+>> +                strftime(sec_fmt, sizeof sec_fmt, "%Y-%m-%d %H:%M:%S",
+>> +                         &tm) != 0 &&
+>> +                strftime(zone_fmt, sizeof zone_fmt, "%z", &tm) != 0) {
+>> +                localfmt = g_strdup_printf("[%s.%02ld%s] [ID: %08ld] %s",
+>> +                                           sec_fmt,
+>> +                                           ts.tv_nsec / (10L * 1000 * 1000),
+>> +                                           zone_fmt, syscall(__NR_gettid),
+>> +                                           fmt);
+>> +            } else {
+>> +                /* fall back to a flat timestamp */
+>> +                localfmt = g_strdup_printf("[%" PRId64 "] [ID: %08ld] %s",
+>> +                                           get_clock(), syscall(__NR_gettid),
+>> +                                           fmt);
+>> +            }
+>>          }
+>>          fmt = localfmt;
+>>      }
+>> @@ -3452,6 +3472,9 @@ int main(int argc, char *argv[])
+>>      struct lo_map_elem *reserve_elem;
+>>      int ret = -1;
+>>  
+>> +    /* Initialize time conversion information for localtime_r(). */
+>> +    tzset();
+>> +
+>>      /* Don't mask creation mode, kernel already did that */
+>>      umask(0);
+>>  
+>> -- 
+>> 2.19.1.3.g30247aa5d201
+>>
+>> _______________________________________________
+>> Virtio-fs mailing list
+>> Virtio-fs@redhat.com
+>> https://www.redhat.com/mailman/listinfo/virtio-fs
 

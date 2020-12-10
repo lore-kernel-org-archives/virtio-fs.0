@@ -1,13 +1,13 @@
-From: Laszlo Ersek <lersek@redhat.com>
-Date: Wed, 16 Dec 2020 22:11:04 +0100
-Message-Id: <20201216211125.19496-28-lersek@redhat.com>
-In-Reply-To: <20201216211125.19496-1-lersek@redhat.com>
-References: <20201216211125.19496-1-lersek@redhat.com>
+Date: Thu, 10 Dec 2020 10:56:13 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20201210105613.GA12670@work-vm>
+References: <20201109143548.GA1479853@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [edk2 PATCH 27/48] OvmfPkg/VirtioFsDxe: erase the dir.
-	entry in EFI_FILE_PROTOCOL.Delete()
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20201109143548.GA1479853@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH V2] virtiofsd: Use --thread-pool-size=0 to
+ mean no thread pool
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,93 +16,101 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: devel@edk2.groups.io, virtio-fs@redhat.com, lersek@redhat.com
-Cc: Jordan Justen <jordan.l.justen@intel.com>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@redhat.com>, Ard Biesheuvel <ard.biesheuvel@arm.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, jose.carlos.venegas.munoz@intel.com, qemu-devel@nongnu.org
 
-At this point, the infrastructure is available for looking up the directly
-containing directory of the file in EFI_FILE_PROTOCOL.Delete(), and to
-remove the file in that directory by last pathname component. Do so.
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> Right now we create a thread pool and main thread hands over the request
+> to thread in thread pool to process. Number of threads in thread pool
+> can be managed by option --thread-pool-size.
+> 
+> In tests we have noted that many of the workloads are getting better
+> performance if we don't use a thread pool at all and process all
+> the requests in the context of a thread receiving the request.
+> 
+> Hence give user an option to be able to run virtiofsd without using
+> a thread pool.
+> 
+> To implement this, I have used existing option --thread-pool-size. This
+> option defines how many maximum threads can be in the thread pool.
+> Thread pool size zero freezes thead pool. I can't see why will one
+> start virtiofsd with a frozen thread pool (hence frozen file system).
+> So I am redefining --thread-pool-size=0 to mean, don't use a thread pool.
+> Instead process the request in the context of thread receiving request
+> from the queue.
+> 
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 
-The "RM" UEFI shell command will start working only later in the series;
-the shell needs more EFI_FILE_PROTOCOL members to function before it calls
-Delete().
+Queued.
 
-Cc: Ard Biesheuvel <ard.biesheuvel@arm.com>
-Cc: Jordan Justen <jordan.l.justen@intel.com>
-Cc: Philippe Mathieu-Daudé <philmd@redhat.com>
-Ref: https://bugzilla.tianocore.org/show_bug.cgi?id=3097
-Signed-off-by: Laszlo Ersek <lersek@redhat.com>
----
- OvmfPkg/VirtioFsDxe/SimpleFsDelete.c | 44 ++++++++++++++++++--
- 1 file changed, 41 insertions(+), 3 deletions(-)
-
-diff --git a/OvmfPkg/VirtioFsDxe/SimpleFsDelete.c b/OvmfPkg/VirtioFsDxe/SimpleFsDelete.c
-index e2fc2d72dfeb..76cfee5bceb1 100644
---- a/OvmfPkg/VirtioFsDxe/SimpleFsDelete.c
-+++ b/OvmfPkg/VirtioFsDxe/SimpleFsDelete.c
-@@ -41,19 +41,57 @@ VirtioFsSimpleFileDelete (
-   VirtioFsFuseReleaseFileOrDir (VirtioFs, VirtioFsFile->NodeId,
-     VirtioFsFile->FuseHandle, VirtioFsFile->IsDirectory);
- 
-   //
-   // VirtioFsFile->FuseHandle is gone at this point, but VirtioFsFile->NodeId
-   // is still valid. Continue with removing the file or directory. The result
-   // of this operation determines the return status of the function.
-   //
--  // TODO
--  //
--  Status = EFI_WARN_DELETE_FAILURE;
-+  if (VirtioFsFile->IsOpenForWriting) {
-+    UINT64 ParentNodeId;
-+    CHAR8  *LastComponent;
-+
-+    //
-+    // Split our canonical pathname into most specific parent directory
-+    // (identified by NodeId), and single-component filename within that
-+    // directory. If This stands for the root directory "/", then the following
-+    // function call will gracefully fail.
-+    //
-+    Status = VirtioFsLookupMostSpecificParentDir (
-+               VirtioFs,
-+               VirtioFsFile->CanonicalPathname,
-+               &ParentNodeId,
-+               &LastComponent
-+               );
-+    if (!EFI_ERROR (Status)) {
-+      //
-+      // Attempt the actual removal. Regardless of the outcome, ParentNodeId
-+      // must be forgotten right after (unless it stands for the root
-+      // directory).
-+      //
-+      Status = VirtioFsFuseRemoveFileOrDir (
-+                 VirtioFs,
-+                 ParentNodeId,
-+                 LastComponent,
-+                 VirtioFsFile->IsDirectory
-+                 );
-+      if (ParentNodeId != VIRTIO_FS_FUSE_ROOT_DIR_NODE_ID) {
-+        VirtioFsFuseForget (VirtioFs, ParentNodeId);
-+      }
-+    }
-+    if (EFI_ERROR (Status)) {
-+      //
-+      // Map any failure to the spec-mandated warning code.
-+      //
-+      Status = EFI_WARN_DELETE_FAILURE;
-+    }
-+  } else {
-+    Status = EFI_WARN_DELETE_FAILURE;
-+  }
- 
-   //
-   // Finally, if we've known VirtioFsFile->NodeId from a lookup, then we should
-   // also ask the server to forget it *once*.
-   //
-   if (VirtioFsFile->NodeId != VIRTIO_FS_FUSE_ROOT_DIR_NODE_ID) {
-     VirtioFsFuseForget (VirtioFs, VirtioFsFile->NodeId);
-   }
+> ---
+>  tools/virtiofsd/fuse_virtio.c | 36 ++++++++++++++++++++++++++---------
+>  1 file changed, 27 insertions(+), 9 deletions(-)
+> 
+> diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+> index 83ba07c6cd..944b9a577c 100644
+> --- a/tools/virtiofsd/fuse_virtio.c
+> +++ b/tools/virtiofsd/fuse_virtio.c
+> @@ -588,13 +588,18 @@ static void *fv_queue_thread(void *opaque)
+>      struct VuDev *dev = &qi->virtio_dev->dev;
+>      struct VuVirtq *q = vu_get_queue(dev, qi->qidx);
+>      struct fuse_session *se = qi->virtio_dev->se;
+> -    GThreadPool *pool;
+> -
+> -    pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size, FALSE,
+> -                             NULL);
+> -    if (!pool) {
+> -        fuse_log(FUSE_LOG_ERR, "%s: g_thread_pool_new failed\n", __func__);
+> -        return NULL;
+> +    GThreadPool *pool = NULL;
+> +    GList *req_list = NULL;
+> +
+> +    if (se->thread_pool_size) {
+> +        fuse_log(FUSE_LOG_DEBUG, "%s: Creating thread pool for Queue %d\n",
+> +                 __func__, qi->qidx);
+> +        pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size,
+> +                                 FALSE, NULL);
+> +        if (!pool) {
+> +            fuse_log(FUSE_LOG_ERR, "%s: g_thread_pool_new failed\n", __func__);
+> +            return NULL;
+> +        }
+>      }
+>  
+>      fuse_log(FUSE_LOG_INFO, "%s: Start for queue %d kick_fd %d\n", __func__,
+> @@ -669,14 +674,27 @@ static void *fv_queue_thread(void *opaque)
+>  
+>              req->reply_sent = false;
+>  
+> -            g_thread_pool_push(pool, req, NULL);
+> +            if (!se->thread_pool_size) {
+> +                req_list = g_list_prepend(req_list, req);
+> +            } else {
+> +                g_thread_pool_push(pool, req, NULL);
+> +            }
+>          }
+>  
+>          pthread_mutex_unlock(&qi->vq_lock);
+>          pthread_rwlock_unlock(&qi->virtio_dev->vu_dispatch_rwlock);
+> +
+> +        /* Process all the requests. */
+> +        if (!se->thread_pool_size && req_list != NULL) {
+> +            g_list_foreach(req_list, fv_queue_worker, qi);
+> +            g_list_free(req_list);
+> +            req_list = NULL;
+> +        }
+>      }
+>  
+> -    g_thread_pool_free(pool, FALSE, TRUE);
+> +    if (pool) {
+> +        g_thread_pool_free(pool, FALSE, TRUE);
+> +    }
+>  
+>      return NULL;
+>  }
+> -- 
+> 2.25.4
+> 
+> 
 -- 
-2.19.1.3.g30247aa5d201
-
-
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

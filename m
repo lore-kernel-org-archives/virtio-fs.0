@@ -1,13 +1,12 @@
-From: Laszlo Ersek <lersek@redhat.com>
-Date: Wed, 16 Dec 2020 22:11:25 +0100
-Message-Id: <20201216211125.19496-49-lersek@redhat.com>
-In-Reply-To: <20201216211125.19496-1-lersek@redhat.com>
-References: <20201216211125.19496-1-lersek@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [edk2 PATCH 48/48] OvmfPkg/VirtioFsDxe: handle
-	attribute updates in EFI_FILE_PROTOCOL.SetInfo
+References: <20201210161126.GA125438@redhat.com>
+In-Reply-To: <20201210161126.GA125438@redhat.com>
+From: Miklos Szeredi <mszeredi@redhat.com>
+Date: Thu, 10 Dec 2020 20:29:21 +0100
+Message-ID: <CAOssrKcKaosJo1W+sek0AOA3CdyE+ZUWzx8KPsn=Gz3Nor+_iQ@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] Some performance numbers for virtiofs,
+	DAX and virtio-9p
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,167 +15,52 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: devel@edk2.groups.io, virtio-fs@redhat.com, lersek@redhat.com
-Cc: Jordan Justen <jordan.l.justen@intel.com>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@redhat.com>, Ard Biesheuvel <ard.biesheuvel@arm.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: "Venegas Munoz, Jose Carlos" <jose.carlos.venegas.munoz@intel.com>, Christian Schoenebeck <qemu_oss@crudebyte.com>, QEMU Developers <qemu-devel@nongnu.org>, virtio-fs-list <virtio-fs@redhat.com>
 
-Using the functions introduced previously, we can now update file
-attributes in VirtioFsSimpleFileSetInfo().
+On Thu, Dec 10, 2020 at 5:11 PM Vivek Goyal <vgoyal@redhat.com> wrote:
 
-Cc: Ard Biesheuvel <ard.biesheuvel@arm.com>
-Cc: Jordan Justen <jordan.l.justen@intel.com>
-Cc: Philippe Mathieu-Daudé <philmd@redhat.com>
-Ref: https://bugzilla.tianocore.org/show_bug.cgi?id=3097
-Signed-off-by: Laszlo Ersek <lersek@redhat.com>
----
- OvmfPkg/VirtioFsDxe/SimpleFsSetInfo.c | 107 +++++++++++++++++++-
- 1 file changed, 106 insertions(+), 1 deletion(-)
+> Conclusion
+> -----------
+> - virtiofs DAX seems to help a lot in many workloads.
+>
+>   Note, DAX performance well only if data fits in cache window. My total
+>   data is 16G and cache window size is 16G as well. If data is larger
+>   than DAX cache window, then performance of dax suffers a lot. Overhead
+>   of reclaiming old mapping and setting up a new one is very high.
 
-diff --git a/OvmfPkg/VirtioFsDxe/SimpleFsSetInfo.c b/OvmfPkg/VirtioFsDxe/SimpleFsSetInfo.c
-index 55169dde78b7..e7cc3d5dc399 100644
---- a/OvmfPkg/VirtioFsDxe/SimpleFsSetInfo.c
-+++ b/OvmfPkg/VirtioFsDxe/SimpleFsSetInfo.c
-@@ -303,16 +303,121 @@ Rename (
- 
- FreeDestination:
-   if (Destination != NULL) {
-     FreePool (Destination);
-   }
-   return Status;
- }
- 
-+/**
-+  Update the attributes of a VIRTIO_FS_FILE as requested in EFI_FILE_INFO.
-+
-+  @param[in,out] VirtioFsFile  The VIRTIO_FS_FILE to update the attributes of.
-+
-+  @param[in] NewFileInfo       The new attributes requested by
-+                               EFI_FILE_PROTOCOL.SetInfo(). NewFileInfo->Size
-+                               and NewFileInfo->FileName are ignored.
-+
-+  @retval EFI_SUCCESS        No attributes had to be updated.
-+
-+  @retval EFI_SUCCESS        The required set of attribute updates has been
-+                             determined and performed successfully.
-+
-+  @retval EFI_ACCESS_DENIED  NewFileInfo requests an update to a property
-+                             different from the EFI_FILE_READ_ONLY bit in the
-+                             Attribute field, but VirtioFsFile is not open for
-+                             writing.
-+
-+  @return                    Error codes propagated from underlying functions.
-+**/
-+STATIC
-+EFI_STATUS
-+UpdateAttributes (
-+  IN OUT VIRTIO_FS_FILE *VirtioFsFile,
-+  IN     EFI_FILE_INFO  *NewFileInfo
-+  )
-+{
-+  VIRTIO_FS                          *VirtioFs;
-+  EFI_STATUS                         Status;
-+  VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE FuseAttr;
-+  EFI_FILE_INFO                      FileInfo;
-+  BOOLEAN                            UpdateFileSize;
-+  UINT64                             FileSize;
-+  BOOLEAN                            UpdateAtime;
-+  BOOLEAN                            UpdateMtime;
-+  UINT64                             Atime;
-+  UINT64                             Mtime;
-+  BOOLEAN                            UpdateMode;
-+  UINT32                             Mode;
-+
-+  VirtioFs = VirtioFsFile->OwnerFs;
-+
-+  //
-+  // Fetch the current attributes first, so we can build the difference between
-+  // them and NewFileInfo.
-+  //
-+  Status = VirtioFsFuseGetAttr (VirtioFs, VirtioFsFile->NodeId, &FuseAttr);
-+  if (EFI_ERROR (Status)) {
-+    return Status;
-+  }
-+  Status = VirtioFsFuseAttrToEfiFileInfo (&FuseAttr, &FileInfo);
-+  if (EFI_ERROR (Status)) {
-+    return Status;
-+  }
-+  //
-+  // Collect the updates.
-+  //
-+  if (VirtioFsFile->IsDirectory) {
-+    UpdateFileSize = FALSE;
-+  } else {
-+    VirtioFsGetFuseSizeUpdate (&FileInfo, NewFileInfo, &UpdateFileSize,
-+      &FileSize);
-+  }
-+
-+  Status = VirtioFsGetFuseTimeUpdates (&FileInfo, NewFileInfo, &UpdateAtime,
-+             &UpdateMtime, &Atime, &Mtime);
-+  if (EFI_ERROR (Status)) {
-+    return Status;
-+  }
-+
-+  Status = VirtioFsGetFuseModeUpdate (&FileInfo, NewFileInfo, &UpdateMode,
-+             &Mode);
-+  if (EFI_ERROR (Status)) {
-+    return Status;
-+  }
-+
-+  //
-+  // If no attribute updates are necessary, we're done.
-+  //
-+  if (!UpdateFileSize && !UpdateAtime && !UpdateMtime && !UpdateMode) {
-+    return EFI_SUCCESS;
-+  }
-+  //
-+  // If the file is not open for writing, then only Mode may be updated (for
-+  // toggling EFI_FILE_READ_ONLY).
-+  //
-+  if (!VirtioFsFile->IsOpenForWriting &&
-+      (UpdateFileSize || UpdateAtime || UpdateMtime)) {
-+    return EFI_ACCESS_DENIED;
-+  }
-+  //
-+  // Send the FUSE_SETATTR request now.
-+  //
-+  Status = VirtioFsFuseSetAttr (
-+             VirtioFs,
-+             VirtioFsFile->NodeId,
-+             UpdateFileSize ? &FileSize : NULL,
-+             UpdateAtime    ? &Atime    : NULL,
-+             UpdateMtime    ? &Mtime    : NULL,
-+             UpdateMode     ? &Mode     : NULL
-+             );
-+  return Status;
-+}
-+
- /**
-   Process an EFI_FILE_INFO setting request.
- **/
- STATIC
- EFI_STATUS
- SetFileInfo (
-   IN EFI_FILE_PROTOCOL *This,
-   IN UINTN             BufferSize,
-@@ -345,17 +450,17 @@ SetFileInfo (
-   //
-   Status = Rename (VirtioFsFile, FileInfo->FileName);
-   if (EFI_ERROR (Status)) {
-     return Status;
-   }
-   //
-   // Update any attributes requested.
-   //
--  Status = EFI_UNSUPPORTED;
-+  Status = UpdateAttributes (VirtioFsFile, FileInfo);
-   //
-   // The UEFI spec does not speak about partial failure in
-   // EFI_FILE_PROTOCOL.SetInfo(); we won't try to roll back the rename (if
-   // there was one) in case the attribute updates fail.
-   //
-   return Status;
- }
- 
--- 
-2.19.1.3.g30247aa5d201
+Which begs the question: what is the optimal window size?
 
+What is the cost per GB of window to the host and guest?
+
+Could we measure at what point does a large window size actually make
+performance worse?
+
+>
+> NAME                    WORKLOAD                Bandwidth       IOPS
+> 9p-none                 seqread-psync           98.6mb          24.6k
+> 9p-mmap                 seqread-psync           97.5mb          24.3k
+> 9p-loose                seqread-psync           91.6mb          22.9k
+> vtfs-none               seqread-psync           98.4mb          24.6k
+> vtfs-none-dax           seqread-psync           660.3mb         165.0k
+> vtfs-auto               seqread-psync           650.0mb         162.5k
+> vtfs-auto-dax           seqread-psync           703.1mb         175.7k
+> vtfs-always             seqread-psync           671.3mb         167.8k
+> vtfs-always-dax         seqread-psync           687.2mb         171.8k
+>
+> 9p-none                 seqread-psync-multi     397.6mb         99.4k
+> 9p-mmap                 seqread-psync-multi     382.7mb         95.6k
+> 9p-loose                seqread-psync-multi     350.5mb         87.6k
+> vtfs-none               seqread-psync-multi     360.0mb         90.0k
+> vtfs-none-dax           seqread-psync-multi     2281.1mb        570.2k
+> vtfs-auto               seqread-psync-multi     2530.7mb        632.6k
+> vtfs-auto-dax           seqread-psync-multi     2423.9mb        605.9k
+> vtfs-always             seqread-psync-multi     2535.7mb        633.9k
+> vtfs-always-dax         seqread-psync-multi     2406.1mb        601.5k
+
+Seems like in all the -multi tests 9p-none performs consistently
+better than vtfs-none.   Could that be due to the single queue?
+
+Thanks,
+Miklos
 

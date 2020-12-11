@@ -1,10 +1,17 @@
-From: Laszlo Ersek <lersek@redhat.com>
-Date: Tue,  8 Dec 2020 06:50:43 +0100
-Message-Id: <20201208055043.31548-1-lersek@redhat.com>
+Date: Fri, 11 Dec 2020 11:05:22 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20201211110522.GB3380@work-vm>
+References: <20201207183021.22752-1-vgoyal@redhat.com>
+	<20201207183021.22752-4-vgoyal@redhat.com>
+	<20201210200303.GN3629@work-vm>
+	<20201210200931.GA185111@redhat.com>
+	<97a0de57-8422-2fdc-e16e-0d6f133f615c@gmail.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: base64
-Subject: [Virtio-fs] [PATCH] virtiofsd: make the debug log timestamp on
-	stderr more human-readable
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+In-Reply-To: <97a0de57-8422-2fdc-e16e-0d6f133f615c@gmail.com>
+Subject: Re: [Virtio-fs] ceph + freeipa ubuntu/fedora common small bug
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,98 +20,50 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com
+To: "Harry G. Coin" <hgcoin@gmail.com>
+Cc: virtio-fs@redhat.com, lersek@redhat.com, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
 
-VGhlIGN1cnJlbnQgdGltZXN0YW1wIGZvcm1hdCBkb2Vzbid0IGhlbHAgbWUgdmlzdWFsbHkgbm90
-aWNlIHNtYWxsIGp1bXBzCmluIHRpbWUgKCJzbWFsbCIgYXMgZGVmaW5lZCBvbiBodW1hbiBzY2Fs
-ZSwgc3VjaCBhcyBhIGZldyBzZWNvbmRzIG9yIGEgZmV3CnRlbiBzZWNvbmRzKS4gUmVwbGFjZSBp
-dCB3aXRoIGEgbG9jYWwgdGltZSBmb3JtYXQgd2hlcmUgc3VjaCBkaWZmZXJlbmNlcwpzdGFuZCBv
-dXQuCgpCZWZvcmU6Cgo+IFsxMzMxNjgyNjc3MDMzN10gW0lEOiAwMDAwMDAwNF0gdW5pcXVlOiA2
-Miwgb3Bjb2RlOiBSRUxFQVNFRElSICgyOSksIG5vZGVpZDogMSwgaW5zaXplOiA2NCwgcGlkOiAx
-Cj4gWzEzMzE2ODI2Nzc4MTc1XSBbSUQ6IDAwMDAwMDA0XSAgICB1bmlxdWU6IDYyLCBzdWNjZXNz
-LCBvdXRzaXplOiAxNgo+IFsxMzMxNjgyNjc4MTE1Nl0gW0lEOiAwMDAwMDAwNF0gdmlydGlvX3Nl
-bmRfbXNnOiBlbGVtIDA6IHdpdGggMSBpbiBkZXNjIG9mIGxlbmd0aCAxNgo+IFsxNTEzODI3OTMx
-NzkyN10gW0lEOiAwMDAwMDAwMV0gdmlydGlvX2xvb3A6IEdvdCBWVSBldmVudAo+IFsxNTEzODI3
-OTUwNDg4NF0gW0lEOiAwMDAwMDAwMV0gZnZfcXVldWVfc2V0X3N0YXJ0ZWQ6IHFpZHg9MSBzdGFy
-dGVkPTAKPiBbMTUxMzgyNzk1MTkwMzRdIFtJRDogMDAwMDAwMDNdIGZ2X3F1ZXVlX3RocmVhZDog
-a2lsbCBldmVudCBvbiBxdWV1ZSAxIC0gcXVpdHRpbmcKPiBbMTUxMzgyODA4NzY0NjNdIFtJRDog
-MDAwMDAwMDFdIGZ2X3JlbW92ZV93YXRjaDogVE9ETyEgZmQ9OQo+IFsxNTEzODI4MDg5NzM4MV0g
-W0lEOiAwMDAwMDAwMV0gdmlydGlvX2xvb3A6IFdhaXRpbmcgZm9yIFZVIGV2ZW50Cj4gWzE1MTM4
-MjgwOTQ2ODM0XSBbSUQ6IDAwMDAwMDAxXSB2aXJ0aW9fbG9vcDogR290IFZVIGV2ZW50Cj4gWzE1
-MTM4MjgxMTc1NDIxXSBbSUQ6IDAwMDAwMDAxXSB2aXJ0aW9fbG9vcDogV2FpdGluZyBmb3IgVlUg
-ZXZlbnQKPiBbMTUxMzgyODExODIzODddIFtJRDogMDAwMDAwMDFdIHZpcnRpb19sb29wOiBHb3Qg
-VlUgZXZlbnQKPiBbMTUxMzgyODExODk0NzRdIFtJRDogMDAwMDAwMDFdIHZpcnRpb19sb29wOiBX
-YWl0aW5nIGZvciBWVSBldmVudAo+IFsxNTEzODMwOTMyMTkzNl0gW0lEOiAwMDAwMDAwMV0gdmly
-dGlvX2xvb3A6IFVuZXhwZWN0ZWQgcG9sbCByZXZlbnRzIDExCj4gWzE1MTM4MzA5NDM0MTUwXSBb
-SUQ6IDAwMDAwMDAxXSB2aXJ0aW9fbG9vcDogRXhpdAoKKE5vdGljZSBob3cgeW91IGRvbid0IChl
-YXNpbHkpIG5vdGljZSB0aGUgZ2FwIGluIHRpbWUgYWZ0ZXIKInZpcnRpb19zZW5kX21zZyIsIGFu
-ZCBlc3BlY2lhbGx5IHRoZSBhbW91bnQgb2YgdGltZSBwYXNzZWQgaXMgaGFyZCB0bwplc3RpbWF0
-ZS4pCgpBZnRlcjoKCj4gWzIwMjAtMTItMDggMDY6NDM6MjIuNTgrMDEwMF0gW0lEOiAwMDAwMDAw
-NF0gdW5pcXVlOiA1MSwgb3Bjb2RlOiBSRUxFQVNFRElSICgyOSksIG5vZGVpZDogMSwgaW5zaXpl
-OiA2NCwgcGlkOiAxCj4gWzIwMjAtMTItMDggMDY6NDM6MjIuNTgrMDEwMF0gW0lEOiAwMDAwMDAw
-NF0gICAgdW5pcXVlOiA1MSwgc3VjY2Vzcywgb3V0c2l6ZTogMTYKPiBbMjAyMC0xMi0wOCAwNjo0
-MzoyMi41OCswMTAwXSBbSUQ6IDAwMDAwMDA0XSB2aXJ0aW9fc2VuZF9tc2c6IGVsZW0gMDogd2l0
-aCAxIGluIGRlc2Mgb2YgbGVuZ3RoIDE2Cj4gWzIwMjAtMTItMDggMDY6NDM6MjkuMzQrMDEwMF0g
-W0lEOiAwMDAwMDAwMV0gdmlydGlvX2xvb3A6IEdvdCBWVSBldmVudAo+IFsyMDIwLTEyLTA4IDA2
-OjQzOjI5LjM0KzAxMDBdIFtJRDogMDAwMDAwMDFdIGZ2X3F1ZXVlX3NldF9zdGFydGVkOiBxaWR4
-PTEgc3RhcnRlZD0wCj4gWzIwMjAtMTItMDggMDY6NDM6MjkuMzQrMDEwMF0gW0lEOiAwMDAwMDAw
-M10gZnZfcXVldWVfdGhyZWFkOiBraWxsIGV2ZW50IG9uIHF1ZXVlIDEgLSBxdWl0dGluZwo+IFsy
-MDIwLTEyLTA4IDA2OjQzOjI5LjM0KzAxMDBdIFtJRDogMDAwMDAwMDFdIGZ2X3JlbW92ZV93YXRj
-aDogVE9ETyEgZmQ9OQo+IFsyMDIwLTEyLTA4IDA2OjQzOjI5LjM0KzAxMDBdIFtJRDogMDAwMDAw
-MDFdIHZpcnRpb19sb29wOiBXYWl0aW5nIGZvciBWVSBldmVudAo+IFsyMDIwLTEyLTA4IDA2OjQz
-OjI5LjM0KzAxMDBdIFtJRDogMDAwMDAwMDFdIHZpcnRpb19sb29wOiBHb3QgVlUgZXZlbnQKPiBb
-MjAyMC0xMi0wOCAwNjo0MzoyOS4zNCswMTAwXSBbSUQ6IDAwMDAwMDAxXSB2aXJ0aW9fbG9vcDog
-V2FpdGluZyBmb3IgVlUgZXZlbnQKPiBbMjAyMC0xMi0wOCAwNjo0MzoyOS4zNCswMTAwXSBbSUQ6
-IDAwMDAwMDAxXSB2aXJ0aW9fbG9vcDogR290IFZVIGV2ZW50Cj4gWzIwMjAtMTItMDggMDY6NDM6
-MjkuMzQrMDEwMF0gW0lEOiAwMDAwMDAwMV0gdmlydGlvX2xvb3A6IFdhaXRpbmcgZm9yIFZVIGV2
-ZW50Cj4gWzIwMjAtMTItMDggMDY6NDM6MjkuMzcrMDEwMF0gW0lEOiAwMDAwMDAwMV0gdmlydGlv
-X2xvb3A6IFVuZXhwZWN0ZWQgcG9sbCByZXZlbnRzIDExCj4gWzIwMjAtMTItMDggMDY6NDM6Mjku
-MzcrMDEwMF0gW0lEOiAwMDAwMDAwMV0gdmlydGlvX2xvb3A6IEV4aXQKCkNjOiAiRHIuIERhdmlk
-IEFsYW4gR2lsYmVydCIgPGRnaWxiZXJ0QHJlZGhhdC5jb20+CkNjOiBTdGVmYW4gSGFqbm9jemkg
-PHN0ZWZhbmhhQHJlZGhhdC5jb20+ClNpZ25lZC1vZmYtYnk6IExhc3psbyBFcnNlayA8bGVyc2Vr
-QHJlZGhhdC5jb20+Ci0tLQogdG9vbHMvdmlydGlvZnNkL3Bhc3N0aHJvdWdoX2xsLmMgfCAzMSAr
-KysrKysrKysrKysrKysrKysrKysrKysrKystLS0tCiAxIGZpbGUgY2hhbmdlZCwgMjcgaW5zZXJ0
-aW9ucygrKSwgNCBkZWxldGlvbnMoLSkKCmRpZmYgLS1naXQgYS90b29scy92aXJ0aW9mc2QvcGFz
-c3Rocm91Z2hfbGwuYyBiL3Rvb2xzL3ZpcnRpb2ZzZC9wYXNzdGhyb3VnaF9sbC5jCmluZGV4IDQ4
-YTEwOWQzZjY4Mi4uMDY1NDNiMjBkY2JiIDEwMDY0NAotLS0gYS90b29scy92aXJ0aW9mc2QvcGFz
-c3Rocm91Z2hfbGwuYworKysgYi90b29scy92aXJ0aW9mc2QvcGFzc3Rocm91Z2hfbGwuYwpAQCAt
-MzMxMSwxOCArMzMxMSwzOCBAQCBzdGF0aWMgdm9pZCBzZXR1cF9ub2ZpbGVfcmxpbWl0KHVuc2ln
-bmVkIGxvbmcgcmxpbWl0X25vZmlsZSkKIHN0YXRpYyB2b2lkIGxvZ19mdW5jKGVudW0gZnVzZV9s
-b2dfbGV2ZWwgbGV2ZWwsIGNvbnN0IGNoYXIgKmZtdCwgdmFfbGlzdCBhcCkKIHsKICAgICBnX2F1
-dG9mcmVlIGNoYXIgKmxvY2FsZm10ID0gTlVMTDsKKyAgICBzdHJ1Y3QgdGltZXNwZWMgdHM7Cisg
-ICAgc3RydWN0IHRtIHRtOworICAgIGNoYXIgc2VjX2ZtdFtzaXplb2YgIjIwMjAtMTItMDcgMTg6
-MTc6NTQiXTsKKyAgICBjaGFyIHpvbmVfZm10W3NpemVvZiAiKzAxMDAiXTsKIAogICAgIGlmIChj
-dXJyZW50X2xvZ19sZXZlbCA8IGxldmVsKSB7CiAgICAgICAgIHJldHVybjsKICAgICB9CiAKICAg
-ICBpZiAoY3VycmVudF9sb2dfbGV2ZWwgPT0gRlVTRV9MT0dfREVCVUcpIHsKLSAgICAgICAgaWYg
-KCF1c2Vfc3lzbG9nKSB7Ci0gICAgICAgICAgICBsb2NhbGZtdCA9IGdfc3RyZHVwX3ByaW50Zigi
-WyUiIFBSSWQ2NCAiXSBbSUQ6ICUwOGxkXSAlcyIsCi0gICAgICAgICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgICAgICBnZXRfY2xvY2soKSwgc3lzY2FsbChfX05SX2dldHRpZCksIGZtdCk7Ci0g
-ICAgICAgIH0gZWxzZSB7CisgICAgICAgIGlmICh1c2Vfc3lzbG9nKSB7CisgICAgICAgICAgICAv
-KiBubyB0aW1lc3RhbXAgbmVlZGVkICovCiAgICAgICAgICAgICBsb2NhbGZtdCA9IGdfc3RyZHVw
-X3ByaW50ZigiW0lEOiAlMDhsZF0gJXMiLCBzeXNjYWxsKF9fTlJfZ2V0dGlkKSwKICAgICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGZtdCk7CisgICAgICAgIH0gZWxzZSB7Cisg
-ICAgICAgICAgICAvKiB0cnkgZm9ybWF0dGluZyBhIGJyb2tlbi1kb3duIHRpbWVzdGFtcCAqLwor
-ICAgICAgICAgICAgaWYgKGNsb2NrX2dldHRpbWUoQ0xPQ0tfUkVBTFRJTUUsICZ0cykgIT0gLTEg
-JiYKKyAgICAgICAgICAgICAgICBsb2NhbHRpbWVfcigmdHMudHZfc2VjLCAmdG0pICE9IE5VTEwg
-JiYKKyAgICAgICAgICAgICAgICBzdHJmdGltZShzZWNfZm10LCBzaXplb2Ygc2VjX2ZtdCwgIiVZ
-LSVtLSVkICVIOiVNOiVTIiwKKyAgICAgICAgICAgICAgICAgICAgICAgICAmdG0pICE9IDAgJiYK
-KyAgICAgICAgICAgICAgICBzdHJmdGltZSh6b25lX2ZtdCwgc2l6ZW9mIHpvbmVfZm10LCAiJXoi
-LCAmdG0pICE9IDApIHsKKyAgICAgICAgICAgICAgICBsb2NhbGZtdCA9IGdfc3RyZHVwX3ByaW50
-ZigiWyVzLiUwMmxkJXNdIFtJRDogJTA4bGRdICVzIiwKKyAgICAgICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgICAgICAgICAgICBzZWNfZm10LAorICAgICAgICAgICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgICAgICAgIHRzLnR2X25zZWMgLyAoMTBMICogMTAwMCAqIDEwMDApLAorICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHpvbmVfZm10LCBzeXNjYWxsKF9f
-TlJfZ2V0dGlkKSwKKyAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBm
-bXQpOworICAgICAgICAgICAgfSBlbHNlIHsKKyAgICAgICAgICAgICAgICAvKiBmYWxsIGJhY2sg
-dG8gYSBmbGF0IHRpbWVzdGFtcCAqLworICAgICAgICAgICAgICAgIGxvY2FsZm10ID0gZ19zdHJk
-dXBfcHJpbnRmKCJbJSIgUFJJZDY0ICJdIFtJRDogJTA4bGRdICVzIiwKKyAgICAgICAgICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgICAgICBnZXRfY2xvY2soKSwgc3lzY2FsbChfX05SX2dl
-dHRpZCksCisgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZm10KTsK
-KyAgICAgICAgICAgIH0KICAgICAgICAgfQogICAgICAgICBmbXQgPSBsb2NhbGZtdDsKICAgICB9
-CkBAIC0zNDUyLDYgKzM0NzIsOSBAQCBpbnQgbWFpbihpbnQgYXJnYywgY2hhciAqYXJndltdKQog
-ICAgIHN0cnVjdCBsb19tYXBfZWxlbSAqcmVzZXJ2ZV9lbGVtOwogICAgIGludCByZXQgPSAtMTsK
-IAorICAgIC8qIEluaXRpYWxpemUgdGltZSBjb252ZXJzaW9uIGluZm9ybWF0aW9uIGZvciBsb2Nh
-bHRpbWVfcigpLiAqLworICAgIHR6c2V0KCk7CisKICAgICAvKiBEb24ndCBtYXNrIGNyZWF0aW9u
-IG1vZGUsIGtlcm5lbCBhbHJlYWR5IGRpZCB0aGF0ICovCiAgICAgdW1hc2soMCk7CiAKLS0gCjIu
-MTkuMS4zLmczMDI0N2FhNWQyMDEKCg==
+* Harry G. Coin (hgcoin@gmail.com) wrote:
+> FYI.=A0 Same thing we saw on Fedora installing freeipa, this on ubuntu
+> with ceph.=A0 Identical bitmask report.
+>=20
+> ...
+>=20
+> Fixing /var/run/ceph ownership....done
+>=20
+> Cannot set file attribute for '/var/log/journal', value=3D0x00800000,
+> mask=3D0x00800000, ignoring: Function not implemented
+>=20
+> Cannot set file attribute for
+> '/var/log/journal/fd007229322043ad8778c214d19ed3ac', value=3D0x00800000,
+> mask=3D0x00800000, ignoring: Function not implemented
+
+This looks like it comes out of systemd's  src/tmpfiles/tmpfiles.c:
+
+        r =3D chattr_fd(procfs_fd, f, item->attribute_mask, NULL);
+        if (r < 0)
+                log_full_errno(IN_SET(r, -ENOTTY, -EOPNOTSUPP) ? LOG_DEBUG =
+: LOG_WARNING,
+                               r,
+                               "Cannot set file attribute for '%s', value=
+=3D0x%08x, mask=3D0x%08x, ignoring: %m",
+                               path, item->attribute_value, item->attribute=
+_mask);
+
+and it's chattr_fd is in it's src/basic/chattr-util.c
+which is using FS_IOC_GET/SETFLAGS, which seems to be an older
+way of doing things.
+
+Now, is that supposed to promote itself to a newer call or is it OK?
+
+Dave
+
+> ...
+>=20
+> Host has xattrs on, btrfs.
+>=20
+>=20
+>=20
+--=20
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

@@ -1,18 +1,14 @@
-Date: Fri, 11 Dec 2020 10:06:24 -0500
+Date: Fri, 11 Dec 2020 11:06:03 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20201211150624.GC3285@redhat.com>
-References: <20201207183021.22752-1-vgoyal@redhat.com>
-	<20201207183021.22752-4-vgoyal@redhat.com>
-	<20201210200303.GN3629@work-vm>
-	<20201210200931.GA185111@redhat.com>
-	<97a0de57-8422-2fdc-e16e-0d6f133f615c@gmail.com>
-	<20201211110522.GB3380@work-vm>
+Message-ID: <20201211160603.GD3285@redhat.com>
+References: <20201210161126.GA125438@redhat.com>
+	<CAOssrKcKaosJo1W+sek0AOA3CdyE+ZUWzx8KPsn=Gz3Nor+_iQ@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <20201211110522.GB3380@work-vm>
-Subject: Re: [Virtio-fs] ceph + freeipa ubuntu/fedora common small bug
+In-Reply-To: <CAOssrKcKaosJo1W+sek0AOA3CdyE+ZUWzx8KPsn=Gz3Nor+_iQ@mail.gmail.com>
+Subject: Re: [Virtio-fs] Some performance numbers for virtiofs,
+	DAX and virtio-9p
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,51 +17,98 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, lersek@redhat.com, qemu-devel@nongnu.org
+To: Miklos Szeredi <mszeredi@redhat.com>
+Cc: "Venegas Munoz, Jose Carlos" <jose.carlos.venegas.munoz@intel.com>, Christian Schoenebeck <qemu_oss@crudebyte.com>, QEMU Developers <qemu-devel@nongnu.org>, virtio-fs-list <virtio-fs@redhat.com>
 
-On Fri, Dec 11, 2020 at 11:05:22AM +0000, Dr. David Alan Gilbert wrote:
-> * Harry G. Coin (hgcoin@gmail.com) wrote:
-> > FYI.=A0 Same thing we saw on Fedora installing freeipa, this on ubuntu
-> > with ceph.=A0 Identical bitmask report.
-> >=20
-> > ...
-> >=20
-> > Fixing /var/run/ceph ownership....done
-> >=20
-> > Cannot set file attribute for '/var/log/journal', value=3D0x00800000,
-> > mask=3D0x00800000, ignoring: Function not implemented
-> >=20
-> > Cannot set file attribute for
-> > '/var/log/journal/fd007229322043ad8778c214d19ed3ac', value=3D0x00800000,
-> > mask=3D0x00800000, ignoring: Function not implemented
->=20
-> This looks like it comes out of systemd's  src/tmpfiles/tmpfiles.c:
->=20
->         r =3D chattr_fd(procfs_fd, f, item->attribute_mask, NULL);
->         if (r < 0)
->                 log_full_errno(IN_SET(r, -ENOTTY, -EOPNOTSUPP) ? LOG_DEBU=
-G : LOG_WARNING,
->                                r,
->                                "Cannot set file attribute for '%s', value=
-=3D0x%08x, mask=3D0x%08x, ignoring: %m",
->                                path, item->attribute_value, item->attribu=
-te_mask);
->=20
-> and it's chattr_fd is in it's src/basic/chattr-util.c
-> which is using FS_IOC_GET/SETFLAGS, which seems to be an older
-> way of doing things.
->=20
-> Now, is that supposed to promote itself to a newer call or is it OK?
+On Thu, Dec 10, 2020 at 08:29:21PM +0100, Miklos Szeredi wrote:
+> On Thu, Dec 10, 2020 at 5:11 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> 
+> > Conclusion
+> > -----------
+> > - virtiofs DAX seems to help a lot in many workloads.
+> >
+> >   Note, DAX performance well only if data fits in cache window. My total
+> >   data is 16G and cache window size is 16G as well. If data is larger
+> >   than DAX cache window, then performance of dax suffers a lot. Overhead
+> >   of reclaiming old mapping and setting up a new one is very high.
+> 
+> Which begs the question: what is the optimal window size?
 
-I see that we don't have any ->ioctl function registered in
-passthrough_ll.c and that's why do_ioctl() (fuse_lowlevel.c) will
-return -ENOSYS.
+Yep. I will need to run some more tests with data size being constant
+and varying DAX window size.
 
-So we probably need to modify passthrough_ll.c to support some select
-ioctls. Right now it looks like all fs ioctls will return -ENOSYS.
+For now, I would say optimal window size is same as data size. But
+knowing data size might be hard in advance. So a rough guideline
+could be that it could be same as amount of RAM given to guest.
 
-I tried "chattr +i foo.txt" and that return -ENOSYS as well.
+> 
+> What is the cost per GB of window to the host and guest?
 
+Inside guest, I think two primary structures are allocated. There
+will be "struct page" allocated per 4K page. Size of struct page
+seems to be 64. And then there will be "struct fuse_dax_mapping"
+allocated per 2MB. Size of "struct fuse_dax_mapping" is 112.
+
+This means per 2MB of DAX window, memory needed in guest is.
+
+memory per 2MB of DAX window = 112 + 64 * 512 = 32880 bytes.
+memory per 1GB of DAX window = 32880 * 512 = 16834560 (16MB approx)
+
+I think "struct page" allocation is biggest memory allocation
+and that's roughly 1.56% (64/4096) of DAX window size. And that also
+results in 16MB memory allocation per GB of dax window.
+
+So if a guest has 4G RAM and 4G dax window, then 64MB will be
+consumed in dax window struct pages. I will say no too bad.
+
+I am looking at qemu code and its not obvious to me what memory
+allocation will be needed 1GB of guest. Looks like it just 
+stores the cache window location and size and when mapping
+request comes, it simply adds offset to cache window start. So
+it might not be allocating memory per page of dax window.
+
+mmap(cache_host + sm->c_offset[i], sm->len[i]....
+
+David, you most likely have a better idea about this.
+
+> 
+> Could we measure at what point does a large window size actually make
+> performance worse?
+
+Will do. Will run tests with varying window sizes (small to large)
+and see how does it impact performance for same workload with
+same guest memory.
+
+> 
+> >
+> > NAME                    WORKLOAD                Bandwidth       IOPS
+> > 9p-none                 seqread-psync           98.6mb          24.6k
+> > 9p-mmap                 seqread-psync           97.5mb          24.3k
+> > 9p-loose                seqread-psync           91.6mb          22.9k
+> > vtfs-none               seqread-psync           98.4mb          24.6k
+> > vtfs-none-dax           seqread-psync           660.3mb         165.0k
+> > vtfs-auto               seqread-psync           650.0mb         162.5k
+> > vtfs-auto-dax           seqread-psync           703.1mb         175.7k
+> > vtfs-always             seqread-psync           671.3mb         167.8k
+> > vtfs-always-dax         seqread-psync           687.2mb         171.8k
+> >
+> > 9p-none                 seqread-psync-multi     397.6mb         99.4k
+> > 9p-mmap                 seqread-psync-multi     382.7mb         95.6k
+> > 9p-loose                seqread-psync-multi     350.5mb         87.6k
+> > vtfs-none               seqread-psync-multi     360.0mb         90.0k
+> > vtfs-none-dax           seqread-psync-multi     2281.1mb        570.2k
+> > vtfs-auto               seqread-psync-multi     2530.7mb        632.6k
+> > vtfs-auto-dax           seqread-psync-multi     2423.9mb        605.9k
+> > vtfs-always             seqread-psync-multi     2535.7mb        633.9k
+> > vtfs-always-dax         seqread-psync-multi     2406.1mb        601.5k
+> 
+> Seems like in all the -multi tests 9p-none performs consistently
+> better than vtfs-none.   Could that be due to the single queue?
+
+Not sure. In the past I had run -multi tests with shared thread pool
+(cache=auto) and single thread seemed to perform better. I can
+try shared pool and run -multi tests again and see if that helps.
+
+Thanks
 Vivek
 

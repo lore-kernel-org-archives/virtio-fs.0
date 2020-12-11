@@ -1,16 +1,16 @@
-Date: Fri, 11 Dec 2020 19:54:14 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20201211195414.GG3380@work-vm>
-References: <20201207183021.22752-1-vgoyal@redhat.com>
-	<20201207183021.22752-4-vgoyal@redhat.com>
-	<20201210200303.GN3629@work-vm>
-	<20201210200931.GA185111@redhat.com>
-	<20201210201431.GP3629@work-vm> <20201211142544.GB3285@redhat.com>
+Date: Fri, 11 Dec 2020 15:01:08 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20201211200108.GG3285@redhat.com>
+References: <20201210161126.GA125438@redhat.com>
+	<CAOssrKcKaosJo1W+sek0AOA3CdyE+ZUWzx8KPsn=Gz3Nor+_iQ@mail.gmail.com>
+	<20201211160603.GD3285@redhat.com> <20201211182956.GF3380@work-vm>
+	<20201211192517.GF3285@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20201211142544.GB3285@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 3/3] virtiofsd: Check file type in lo_flush()
+In-Reply-To: <20201211192517.GF3285@redhat.com>
+Subject: Re: [Virtio-fs] Some performance numbers for virtiofs,
+	DAX and virtio-9p
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,117 +19,48 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, lersek@redhat.com, qemu-devel@nongnu.org
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: "Venegas Munoz, Jose Carlos" <jose.carlos.venegas.munoz@intel.com>, Christian Schoenebeck <qemu_oss@crudebyte.com>, QEMU Developers <qemu-devel@nongnu.org>, virtio-fs-list <virtio-fs@redhat.com>
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> On Thu, Dec 10, 2020 at 08:14:31PM +0000, Dr. David Alan Gilbert wrote:
-> > * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > > On Thu, Dec 10, 2020 at 08:03:03PM +0000, Dr. David Alan Gilbert wrote:
-> > > > * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > > > > Currently lo_flush() is written in such a way that it expects to receive
-> > > > > a FLUSH requests on a regular file (and not directories). For example,
-> > > > > we call lo_fi_fd() which searches lo->fd_map. If we open directories
-> > > > > using opendir(), we keep don't keep track of these in lo->fd_map instead
-> > > > > we keep them in lo->dir_map. So we expect lo_flush() to be called on
-> > > > > regular files only.
-> > > > > 
-> > > > > Even linux fuse client calls FLUSH only for regular files and not
-> > > > > directories. So put a check for filetype and return EBADF if
-> > > > > lo_flush() is called on a non-regular file.
-> > > > > 
-> > > > > Reported-by: Laszlo Ersek <lersek@redhat.com>
-> > > > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > > > > ---
-> > > > >  tools/virtiofsd/passthrough_ll.c | 2 +-
-> > > > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > > > 
-> > > > > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> > > > > index 8ba79f503a..48a109d3f6 100644
-> > > > > --- a/tools/virtiofsd/passthrough_ll.c
-> > > > > +++ b/tools/virtiofsd/passthrough_ll.c
-> > > > > @@ -1968,7 +1968,7 @@ static void lo_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
-> > > > >      struct lo_data *lo = lo_data(req);
-> > > > >  
-> > > > >      inode = lo_inode(req, ino);
-> > > > > -    if (!inode) {
-> > > > > +    if (!inode || !S_ISREG(inode->filetype)) {
-> > > > >          fuse_reply_err(req, EBADF);
+On Fri, Dec 11, 2020 at 02:25:17PM -0500, Vivek Goyal wrote:
+> On Fri, Dec 11, 2020 at 06:29:56PM +0000, Dr. David Alan Gilbert wrote:
+> 
+> [..]
 > > > > 
-> > > > Does that need a lo_inode_put(lo, &inode) in the new case?
+> > > > Could we measure at what point does a large window size actually make
+> > > > performance worse?
 > > > 
-> > > Good catch. Yes if inode is valid but file type is not regular, we need
-> > > to put inode reference.
-> > > 
-> > > Do you want me to post a new patch or you will like to take care of
-> > > it.
+> > > Will do. Will run tests with varying window sizes (small to large)
+> > > and see how does it impact performance for same workload with
+> > > same guest memory.
 > > 
-> > OK, so if we make this :
-> > 
-> >   if (!inode) {
-> >       fuse_reply_err(req, EBADF);
-> >       return;
-> >   }
-> > 
-> >   if (!S_ISREG(inode->filetype)) {
-> >       lo_inode_put(lo_data(req), &inode);
-> >       fuse_reply_err(req, EBADF);
-> >       return;
-> >   }
-> > 
-> > (Untested)
+> > I wonder how realistic it is though;  it makes some sense if you have a
+> > scenario like a fairly small root filesystem - something tractable;  but
+> > if you have a large FS you're not realistically going to be able to set
+> > the cache size to match it - that's why it's a cache!
 > 
-> Hi Dave,
+> I think its more about active dataset size and not necessarily total
+> FS size. FS might be big but if application is not accessing all of
+> the in reasonabl small time window, then it does not matter.
 > 
-> Above looks good. For your convenience, I updated the patch and also
-> tested it by running blogbench and things look fine.
-> 
-> Vivek
-> 
-> Subject: virtiofsd: Check file type in lo_flush()
-> 
-> Currently lo_flush() is written in such a way that it expects to receive
-> a FLUSH requests on a regular file (and not directories). For example,
-> we call lo_fi_fd() which searches lo->fd_map. If we open directories
-> using opendir(), we keep don't keep track of these in lo->fd_map instead
-> we keep them in lo->dir_map. So we expect lo_flush() to be called on
-> regular files only.
-> 
-> Even linux fuse client calls FLUSH only for regular files and not
-> directories. So put a check for filetype and return EBADF if 
-> lo_flush() is called on a non-regular file.
-> 
-> Reported-by: Laszlo Ersek <lersek@redhat.com>
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> What worries me most is that cost of reclaim of a dax range seems
+> too high (or keeps the process blocked for long enogh), that it
+> kills the performance. I will need to revisit the reclaim path
+> and see if I can optimize something.
 
-OK< thanks
+I see that while reclaiming a range, we are sending a remvemapping
+command to virtiofsd. We are holding locks so that no new mappings
+can be added to that inode.
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+We had decided that removemapping is not necessary. It helps in
+the sense that if guest is not using a mapping, qemu will unmap
+it too.
 
-and queued.
-(I've dropped the Tested-by since it's had a bit of forceful rework).
+If we stop sending remove mapping, then it might improve reclaim
+performance significantly. With the downside that host will
+have something mapped (despite the fact that guest is not using
+it anymore). And these will be cleaned up only when guest shuts
+down.
 
-> ---
->  tools/virtiofsd/passthrough_ll.c |    6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
-> ===================================================================
-> --- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2020-12-11 09:00:28.787669761 -0500
-> +++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2020-12-11 09:03:38.239496505 -0500
-> @@ -1973,6 +1973,12 @@ static void lo_flush(fuse_req_t req, fus
->          return;
->      }
->  
-> +    if (!S_ISREG(inode->filetype)) {
-> +        lo_inode_put(lo, &inode);
-> +        fuse_reply_err(req, EBADF);
-> +        return;
-> +    }
-> +
->      /* An fd is going away. Cleanup associated posix locks */
->      if (lo->posix_lock) {
->          pthread_mutex_lock(&inode->plock_mutex);
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+Vivek
 

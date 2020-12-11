@@ -1,17 +1,16 @@
-Date: Fri, 11 Dec 2020 11:05:22 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20201211110522.GB3380@work-vm>
+Date: Fri, 11 Dec 2020 09:25:44 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20201211142544.GB3285@redhat.com>
 References: <20201207183021.22752-1-vgoyal@redhat.com>
 	<20201207183021.22752-4-vgoyal@redhat.com>
 	<20201210200303.GN3629@work-vm>
 	<20201210200931.GA185111@redhat.com>
-	<97a0de57-8422-2fdc-e16e-0d6f133f615c@gmail.com>
+	<20201210201431.GP3629@work-vm>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <97a0de57-8422-2fdc-e16e-0d6f133f615c@gmail.com>
-Subject: Re: [Virtio-fs] ceph + freeipa ubuntu/fedora common small bug
+In-Reply-To: <20201210201431.GP3629@work-vm>
+Subject: Re: [Virtio-fs] [PATCH 3/3] virtiofsd: Check file type in lo_flush()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,50 +19,106 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Harry G. Coin" <hgcoin@gmail.com>
-Cc: virtio-fs@redhat.com, lersek@redhat.com, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, lersek@redhat.com, qemu-devel@nongnu.org
 
-* Harry G. Coin (hgcoin@gmail.com) wrote:
-> FYI.=A0 Same thing we saw on Fedora installing freeipa, this on ubuntu
-> with ceph.=A0 Identical bitmask report.
->=20
-> ...
->=20
-> Fixing /var/run/ceph ownership....done
->=20
-> Cannot set file attribute for '/var/log/journal', value=3D0x00800000,
-> mask=3D0x00800000, ignoring: Function not implemented
->=20
-> Cannot set file attribute for
-> '/var/log/journal/fd007229322043ad8778c214d19ed3ac', value=3D0x00800000,
-> mask=3D0x00800000, ignoring: Function not implemented
+On Thu, Dec 10, 2020 at 08:14:31PM +0000, Dr. David Alan Gilbert wrote:
+> * Vivek Goyal (vgoyal@redhat.com) wrote:
+> > On Thu, Dec 10, 2020 at 08:03:03PM +0000, Dr. David Alan Gilbert wrote:
+> > > * Vivek Goyal (vgoyal@redhat.com) wrote:
+> > > > Currently lo_flush() is written in such a way that it expects to receive
+> > > > a FLUSH requests on a regular file (and not directories). For example,
+> > > > we call lo_fi_fd() which searches lo->fd_map. If we open directories
+> > > > using opendir(), we keep don't keep track of these in lo->fd_map instead
+> > > > we keep them in lo->dir_map. So we expect lo_flush() to be called on
+> > > > regular files only.
+> > > > 
+> > > > Even linux fuse client calls FLUSH only for regular files and not
+> > > > directories. So put a check for filetype and return EBADF if
+> > > > lo_flush() is called on a non-regular file.
+> > > > 
+> > > > Reported-by: Laszlo Ersek <lersek@redhat.com>
+> > > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > > > ---
+> > > >  tools/virtiofsd/passthrough_ll.c | 2 +-
+> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > > 
+> > > > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> > > > index 8ba79f503a..48a109d3f6 100644
+> > > > --- a/tools/virtiofsd/passthrough_ll.c
+> > > > +++ b/tools/virtiofsd/passthrough_ll.c
+> > > > @@ -1968,7 +1968,7 @@ static void lo_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+> > > >      struct lo_data *lo = lo_data(req);
+> > > >  
+> > > >      inode = lo_inode(req, ino);
+> > > > -    if (!inode) {
+> > > > +    if (!inode || !S_ISREG(inode->filetype)) {
+> > > >          fuse_reply_err(req, EBADF);
+> > > 
+> > > Does that need a lo_inode_put(lo, &inode) in the new case?
+> > 
+> > Good catch. Yes if inode is valid but file type is not regular, we need
+> > to put inode reference.
+> > 
+> > Do you want me to post a new patch or you will like to take care of
+> > it.
+> 
+> OK, so if we make this :
+> 
+>   if (!inode) {
+>       fuse_reply_err(req, EBADF);
+>       return;
+>   }
+> 
+>   if (!S_ISREG(inode->filetype)) {
+>       lo_inode_put(lo_data(req), &inode);
+>       fuse_reply_err(req, EBADF);
+>       return;
+>   }
+> 
+> (Untested)
 
-This looks like it comes out of systemd's  src/tmpfiles/tmpfiles.c:
+Hi Dave,
 
-        r =3D chattr_fd(procfs_fd, f, item->attribute_mask, NULL);
-        if (r < 0)
-                log_full_errno(IN_SET(r, -ENOTTY, -EOPNOTSUPP) ? LOG_DEBUG =
-: LOG_WARNING,
-                               r,
-                               "Cannot set file attribute for '%s', value=
-=3D0x%08x, mask=3D0x%08x, ignoring: %m",
-                               path, item->attribute_value, item->attribute=
-_mask);
+Above looks good. For your convenience, I updated the patch and also
+tested it by running blogbench and things look fine.
 
-and it's chattr_fd is in it's src/basic/chattr-util.c
-which is using FS_IOC_GET/SETFLAGS, which seems to be an older
-way of doing things.
+Vivek
 
-Now, is that supposed to promote itself to a newer call or is it OK?
+Subject: virtiofsd: Check file type in lo_flush()
 
-Dave
+Currently lo_flush() is written in such a way that it expects to receive
+a FLUSH requests on a regular file (and not directories). For example,
+we call lo_fi_fd() which searches lo->fd_map. If we open directories
+using opendir(), we keep don't keep track of these in lo->fd_map instead
+we keep them in lo->dir_map. So we expect lo_flush() to be called on
+regular files only.
 
-> ...
->=20
-> Host has xattrs on, btrfs.
->=20
->=20
->=20
---=20
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+Even linux fuse client calls FLUSH only for regular files and not
+directories. So put a check for filetype and return EBADF if 
+lo_flush() is called on a non-regular file.
+
+Reported-by: Laszlo Ersek <lersek@redhat.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
+
+Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
+===================================================================
+--- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2020-12-11 09:00:28.787669761 -0500
++++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2020-12-11 09:03:38.239496505 -0500
+@@ -1973,6 +1973,12 @@ static void lo_flush(fuse_req_t req, fus
+         return;
+     }
+ 
++    if (!S_ISREG(inode->filetype)) {
++        lo_inode_put(lo, &inode);
++        fuse_reply_err(req, EBADF);
++        return;
++    }
++
+     /* An fd is going away. Cleanup associated posix locks */
+     if (lo->posix_lock) {
+         pthread_mutex_lock(&inode->plock_mutex);
 

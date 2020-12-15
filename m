@@ -1,27 +1,22 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
-	h=date:user-agent:in-reply-to:references:mime-version
-	:content-transfer-encoding:subject:to:cc:from:message-id;
-	bh=2A8Gvcs0ZfBxXhdP9NS8gJ1322/gHycBfScmYscfDVg=;
-	b=Z/JNzSkxJZgQ3/zqMdnteiuzSfe/kFSi74VQQ5XIbChEe8wEdnFWPO+4XJUOds4vX5
-	YRfkllSNPPB3Jo0OXwgaiIKWRHfJUhZHQsbffMET1gc2ykBOwEyM6LrSD/z1S+1u17lc
-	rvbvHVAgliDWM9Q2Sp8S5a7BcqIrCD75zcqX53BkuUk/axDfg7Gz2iSYov02kS6iHO14
-	kmB++/T7qLc/8VOnaiGyn+t/36tCeHbnUQGbhGWtihvHcAmGknfacrDwcS085y9ixr92
-	FubDmMqyB4f8U02nbUk2rYgQZh4EEb+EODOcrugioKjBn+wgqQ3azKr0IR9pvfwXMEHl
-	hE4A==
-Date: Sat, 12 Dec 2020 00:39:08 -0600
-In-Reply-To: <20201211110522.GB3380@work-vm>
-References: <20201207183021.22752-1-vgoyal@redhat.com>
-	<20201207183021.22752-4-vgoyal@redhat.com>
-	<20201210200303.GN3629@work-vm>
-	<20201210200931.GA185111@redhat.com>
-	<97a0de57-8422-2fdc-e16e-0d6f133f615c@gmail.com>
-	<20201211110522.GB3380@work-vm>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+	d=bytedance-com.20150623.gappssmtp.com; s=20150623;
+	h=from:to:cc:subject:date:message-id:mime-version
+	:content-transfer-encoding;
+	bh=bqpP+QK4GIBCdeAY8wBqv5k9tOk5+xF27b2NprepG5o=;
+	b=hB7RvfOTd2iQQz542/4Thlmv/jt2Hxn7Ck7mctLiZ4b7a1dMhJZS5PqUBiAjNcDZWr
+	12W2TfHjbaU01IcOHnbpVf07esRgsB0heZBd25H3D0G5XdOordFSmv1BzMqhTpR4CiAh
+	kxXcUUWUL46rATlG0QL5iQJQSqidSq5dCHlNwXAquniWfgL/i7D9tm914yITLzI/ciZk
+	VIl5bYBtuL+eu5lD8NDaIP1f8zb/AHJov2ccrV9gDtqdFWMrA7WzuKMUYASK9OWbGJOn
+	ZZJi5jNolh3+8jJxYISv9Zxrhk8sfftkVv4HSYuKbDdLPNyWvkClZiI7Oe4WYr95YXsK
+	TGqg==
+From: Jiachen Zhang <zhangjiachen.jaycee@bytedance.com>
+Date: Wed, 16 Dec 2020 00:21:10 +0800
+Message-Id: <20201215162119.27360-1-zhangjiachen.jaycee@bytedance.com>
 MIME-Version: 1.0
-From: Harry Coin <hgcoin@gmail.com>
-Message-ID: <0E76031D-6231-40E8-A5CF-1829177BA5C7@gmail.com>
-Content-Type: multipart/alternative;
-	boundary="----YPVLCBTHDUOMGBKH79PEI6PNN1EFZM"
-Subject: Re: [Virtio-fs] ceph + freeipa ubuntu/fedora common small bug
+Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [RFC PATCH 0/9] Support for Virtio-fs daemon crash
+	reconnection
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -30,100 +25,118 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, lersek@redhat.com, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
+To: "Dr . David Alan Gilbert" <dgilbert@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Xie Yongji <xieyongji@bytedance.com>
+Cc: virtio-fs@redhat.com, Jiachen Zhang <zhangjiachen.jaycee@bytedance.com>, qemu-devel@nongnu.org
 
-------YPVLCBTHDUOMGBKH79PEI6PNN1EFZM
-Content-Type: text/plain;
- charset=utf-8
-Content-Transfer-Encoding: quoted-printable
+Hi, all
 
-It's the latest ubuntu and fedora distros.
+We implement virtio-fs crash reconnection in this patchset. The crash
+reconnection of virtiofsd here is completely transparent to guest, no
+remount in guest is needed, even the inflight requests can be handled
+normally after reconnection. We are looking forward to any comments. 
+
+Thanks,
+Jiachen
 
 
-On December 11, 2020 5:05:22 AM CST, "Dr. David Alan Gilbert" <dgilbert@red=
-hat.com> wrote:
->* Harry G. Coin (hgcoin@gmail.com) wrote:
->> FYI.=C3=82=C2=A0 Same thing we saw on Fedora installing freeipa, this on=
- ubuntu
->> with ceph.=C3=82=C2=A0 Identical bitmask report.
->>=20
->> ...
->>=20
->> Fixing /var/run/ceph ownership....done
->>=20
->> Cannot set file attribute for '/var/log/journal', value=3D0x00800000,
->> mask=3D0x00800000, ignoring: Function not implemented
->>=20
->> Cannot set file attribute for
->> '/var/log/journal/fd007229322043ad8778c214d19ed3ac',
->value=3D0x00800000,
->> mask=3D0x00800000, ignoring: Function not implemented
->
->This looks like it comes out of systemd's  src/tmpfiles/tmpfiles.c:
->
->        r =3D chattr_fd(procfs_fd, f, item->attribute_mask, NULL);
->        if (r < 0)
->log_full_errno(IN_SET(r, -ENOTTY, -EOPNOTSUPP) ? LOG_DEBUG :
->LOG_WARNING,
->                               r,
->"Cannot set file attribute for '%s', value=3D0x%08x, mask=3D0x%08x,
->ignoring: %m",
->                    path, item->attribute_value, item->attribute_mask);
->
->and it's chattr_fd is in it's src/basic/chattr-util.c
->which is using FS_IOC_GET/SETFLAGS, which seems to be an older
->way of doing things.
->
->Now, is that supposed to promote itself to a newer call or is it OK?
->
->Dave
->
->> ...
->>=20
->> Host has xattrs on, btrfs.
->>=20
->>=20
->>=20
->--=20
->Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+OVERVIEW:
 
---=20
-Sent from my Android device with K-9 Mail. Please excuse my brevity.
-------YPVLCBTHDUOMGBKH79PEI6PNN1EFZM
-Content-Type: text/html;
- charset=utf-8
-Content-Transfer-Encoding: quoted-printable
+To support virtio-fs crash reconnection, we need to support the recovery
+of 1) inflight FUSE request, and 2) virtiofsd internal status information.
 
-<html><head></head><body>It's the latest ubuntu and fedora distros.<br><br>=
-<br><div class=3D"gmail_quote">On December 11, 2020 5:05:22 AM CST, "Dr. Da=
-vid Alan Gilbert" &lt;dgilbert@redhat.com&gt; wrote:<blockquote class=3D"gm=
-ail_quote" style=3D"margin: 0pt 0pt 0pt 0.8ex; border-left: 1px solid rgb(2=
-04, 204, 204); padding-left: 1ex;">
-<pre class=3D"k9mail">* Harry G. Coin (hgcoin@gmail.com) wrote:<br><blockqu=
-ote class=3D"gmail_quote" style=3D"margin: 0pt 0pt 1ex 0.8ex; border-left: =
-1px solid #729fcf; padding-left: 1ex;">FYI.=C3=82&nbsp; Same thing we saw o=
-n Fedora installing freeipa, this on ubuntu<br>with ceph.=C3=82&nbsp; Ident=
-ical bitmask report.<br><br>...<br><br>Fixing /var/run/ceph ownership....do=
-ne<br><br>Cannot set file attribute for '/var/log/journal', value=3D0x00800=
-000,<br>mask=3D0x00800000, ignoring: Function not implemented<br><br>Cannot=
- set file attribute for<br>'/var/log/journal/fd007229322043ad8778c214d19ed3=
-ac', value=3D0x00800000,<br>mask=3D0x00800000, ignoring: Function not imple=
-mented<br></blockquote><br>This looks like it comes out of systemd's  src/t=
-mpfiles/tmpfiles.c:<br><br>        r =3D chattr_fd(procfs_fd, f, item-&gt;a=
-ttribute_mask, NULL);<br>        if (r &lt; 0)<br>                log_full_=
-errno(IN_SET(r, -ENOTTY, -EOPNOTSUPP) ? LOG_DEBUG : LOG_WARNING,<br>       =
-                        r,<br>                               "Cannot set fi=
-le attribute for '%s', value=3D0x%08x, mask=3D0x%08x, ignoring: %m",<br>   =
-                            path, item-&gt;attribute_value, item-&gt;attrib=
-ute_mask);<br><br>and it's chattr_fd is in it's src/basic/chattr-util.c<br>=
-which is using FS_IOC_GET/SETFLAGS, which seems to be an older<br>way of do=
-ing things.<br><br>Now, is that supposed to promote itself to a newer call =
-or is it OK?<br><br>Dave<br><br><blockquote class=3D"gmail_quote" style=3D"=
-margin: 0pt 0pt 1ex 0.8ex; border-left: 1px solid #729fcf; padding-left: 1e=
-x;">...<br><br>Host has xattrs on, btrfs.<br><br><br><br></blockquote>-- <b=
-r>Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK<br><br></pr=
-e></blockquote></div><br>-- <br>Sent from my Android device with K-9 Mail. =
-Please excuse my brevity.</body></html>
-------YPVLCBTHDUOMGBKH79PEI6PNN1EFZM--
+Fortunately, QEMU's vhost-user reconnection framework already supports
+inflight I/O tracking by using VHOST_USER_GET_INFLIGHT_FD and
+VHOST_USER_SET_INFLIGHT_FD (see 5ad204bf2 and 5f9ff1eff for details).
+As the FUSE requests are transferred by virtqueue I/O requests, by using
+the vhost-user inflight I/O tracking, we can recover the inflight FUSE
+requests.
+
+To support virtiofsd internal status recovery, we introduce 4 new
+vhost-user message types. As shown in the following diagram, two of them
+are used to persist shared lo_maps and opened fds to QEMU, the other two
+message types are used to restore the status when reconnecting.
+
+                               VHOST_USER_SLAVE_SHM
+                               VHOST_USER_SLAVE_FD
+    +--------------+       Persist       +--------------------+
+    |              <---------------------+                    |
+    |     QEMU     |                     |  Virtio-fs Daemon  |
+    |              +--------------------->                    |
+    +--------------+       Restore       +--------------------+
+            VHOST_USER_SET_SHM
+            VHOST_USER_SET_FD
+
+Although the 4 newly added message types are to support virtiofsd
+reconnection in this patchset, it might be potential in other situation.
+So we keep in mind to make them more general when add them to vhost
+related source files. VHOST_USER_SLAVE_SHM and VHOST_USER_SET_SHM can be
+used for memory sharing between a vhost-user daemon and QEMU,
+VHOST_USER_SLAVE_FD and VHOST_USER_SET_FD would be useful if we want to
+shared opened fds between QEMU process and vhost-user daemon process.
+
+
+USAGE and NOTES:
+
+- The commits are rebased to a recent QEMU master commit b4d939133dca0fa2b.
+
+- ",reconnect=1" should be added to the "-chardev socket" of vhost-user-fs-pci
+in the QEMU command line, for example:
+
+    qemu-system-x86_64 ... \
+    -chardev socket,id=char0,path=/tmp/vhostqemu,reconnect=1 \
+    -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs \
+    ...
+
+- We add new options for virtiofsd to enable or disable crash reconnection.
+And some options are not supported by crash reconnection. So add following
+options to virtiofsd to enable reconnection:
+
+    virtiofsd ... -o reconnect -o no_mount_ns -o no_flock -o no_posix_lock
+    -o no_xattr ...
+
+- The reasons why virtiofsd-side locking, extended attributes, and mount
+namespace are not supported is explained in the commit message of the 6th
+patch (virtiofsd: Add two new options for crash reconnection).
+
+- The 9th patch is a work-around that will not affect the overall correctness.
+We remove the qsort related codes because we found that when resubmit_num is
+larger than 64, seccomp will kill the virtiofsd process.
+
+- Support for dax version virtiofsd is very possible and requires almost no
+additional change to this patchset.
+
+
+Jiachen Zhang (9):
+  vhost-user-fs: Add support for reconnection of vhost-user-fs backend
+  vhost: Add vhost-user message types for sending shared memory and file
+    fds
+  vhost-user-fs: Support virtiofsd crash reconnection
+  libvhost-user: Add vhost-user message types for sending shared memory
+    and file fds
+  virtiofsd: Convert the struct lo_map array to a more flatten layout
+  virtiofsd: Add two new options for crash reconnection
+  virtiofsd: Persist/restore lo_map and opened fds to/from QEMU
+  virtiofsd: Ensure crash consistency after reconnection
+  virtiofsd: (work around) Comment qsort in inflight I/O tracking
+
+ contrib/libvhost-user/libvhost-user.c | 106 +++-
+ contrib/libvhost-user/libvhost-user.h |  70 +++
+ docs/interop/vhost-user.rst           |  41 ++
+ hw/virtio/vhost-user-fs.c             | 334 ++++++++++-
+ hw/virtio/vhost-user.c                | 123 ++++
+ hw/virtio/vhost.c                     |  42 ++
+ include/hw/virtio/vhost-backend.h     |   6 +
+ include/hw/virtio/vhost-user-fs.h     |  16 +-
+ include/hw/virtio/vhost.h             |  42 ++
+ tools/virtiofsd/fuse_lowlevel.c       |  24 +-
+ tools/virtiofsd/fuse_virtio.c         |  44 ++
+ tools/virtiofsd/fuse_virtio.h         |   1 +
+ tools/virtiofsd/helper.c              |   9 +
+ tools/virtiofsd/passthrough_helpers.h |   2 +-
+ tools/virtiofsd/passthrough_ll.c      | 830 ++++++++++++++++++--------
+ tools/virtiofsd/passthrough_seccomp.c |   1 +
+ 16 files changed, 1413 insertions(+), 278 deletions(-)
+
+-- 
+2.20.1
 

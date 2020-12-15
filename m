@@ -1,24 +1,24 @@
-DKIM-Filter: OpenDKIM Filter v2.11.0 agnus.defensec.nl EF6592A0065
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=defensec.nl;
-	s=default; t=1607440426;
-	bh=K9UZuythnB4Eq8VtzwtQoKqxBsOKQFGPrw1fCgRhxh8=;
-	h=From:To:Cc:Subject:References:Date:In-Reply-To:From;
-	b=dwUUet1Gxo5sR6XgiyYyZCnQLPLCYVuHmSol9W0eOxwuTpMGAwIg1m1gK9tgK8d75
-	sQAOjPiAjq9IVZ0Rr6Yv0zQKdYkOvqHWvLcAKC1ZA0Eb0n/XblLfISgy+9vTnP0Teb
-	gWj1Q5DJWbMLdJC6Stq9RArhNCgLz0modBqPphoo=
-From: Dominick Grift <dominick.grift@defensec.nl>
-References: <CAFqZXNsGabHBfV36nNAVLJgEzjkBev-O3YZ1vnmXyVoaDdjiHQ@mail.gmail.com>
-	<CAHC9VhRCu5W4YOzcidUhv7biVc+a4QrRknVn-57YVSM3vWZH+Q@mail.gmail.com>
-	<20201207205209.GD3107@redhat.com> <ypjlczzlmhus.fsf@defensec.nl>
-	<20201208143336.GB3212@redhat.com>
-Date: Tue, 08 Dec 2020 16:13:42 +0100
-In-Reply-To: <20201208143336.GB3212@redhat.com> (Vivek Goyal's message of
-	"Tue, 8 Dec 2020 09:33:36 -0500")
-Message-ID: <ypjl8sa8miu1.fsf@defensec.nl>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+	d=bytedance-com.20150623.gappssmtp.com; s=20150623;
+	h=from:to:cc:subject:date:message-id:in-reply-to:references
+	:mime-version:content-transfer-encoding;
+	bh=31S5+f8dwsso9OndOrxakIf/1jOOz+jIZXJdlzrod04=;
+	b=DWtl1tIssyOypHqtQ+S69tVsBmwn8GM4pDAT4i8lwhPAdlz8SBNNRp7CYQW2u1PMJ+
+	k2uO/I7XoFdOTQQGIVkfUFQBIK9IQoKgjSM3lcP42nKjPR5wGPWk0RulSjfKlB+IbfUm
+	ik6iV8Fi8Hxj/s01bdgyilqtwQ1tHLGjHaZnTZEzoxdT1i1k87ZwVi0AQuC85XcoUesj
+	BNtfj0ZzVxqjwXFq/VFiQttHWdiUcs4q3ujdNi7tws+xdfvW/0h9Rb7Z1XjGmOSun10d
+	3GOcRh1cRzpBPLB571T4ckNHiS0UZv8Txd1YDtcuHVM8+WoPhvEpwW+1/4ilfrJzLwf6
+	5OmA==
+From: Jiachen Zhang <zhangjiachen.jaycee@bytedance.com>
+Date: Wed, 16 Dec 2020 00:21:16 +0800
+Message-Id: <20201215162119.27360-7-zhangjiachen.jaycee@bytedance.com>
+In-Reply-To: <20201215162119.27360-1-zhangjiachen.jaycee@bytedance.com>
+References: <20201215162119.27360-1-zhangjiachen.jaycee@bytedance.com>
 MIME-Version: 1.0
-Content-Type: text/plain
-Subject: Re: [Virtio-fs] virtiofs and its optional xattr support vs.
-	fs_use_xattr
+Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [RFC PATCH 6/9] virtiofsd: Add two new options for
+	crash reconnection
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,91 +27,247 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: Paul Moore <paul@paul-moore.com>, SElinux list <selinux@vger.kernel.org>, Smalley <stephen.smalley.work@gmail.com>, Ondrej Mosnacek <omosnace@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, Stephen, Zdenek Pytela <zpytela@redhat.com>
+To: "Dr . David Alan Gilbert" <dgilbert@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Xie Yongji <xieyongji@bytedance.com>
+Cc: virtio-fs@redhat.com, Jiachen Zhang <zhangjiachen.jaycee@bytedance.com>, qemu-devel@nongnu.org
 
-Vivek Goyal <vgoyal@redhat.com> writes:
+We add two options for virtiofsd crash reconnection: reconnect |
+no_reconnect(default) and
 
-> On Mon, Dec 07, 2020 at 10:22:35PM +0100, Dominick Grift wrote:
->> Vivek Goyal <vgoyal@redhat.com> writes:
->> 
->> > On Mon, Dec 07, 2020 at 10:03:24AM -0500, Paul Moore wrote:
->> >> On Mon, Dec 7, 2020 at 9:43 AM Ondrej Mosnacek <omosnace@redhat.com> wrote:
->> >> >
->> >> > Hi everyone,
->> >> >
->> >> > In [1] we ran into a problem with the current handling of filesystem
->> >> > labeling rules. Basically, it is only possible to specify either
->> >> > genfscon or fs_use_xattr for a given filesystem, but in the case of
->> >> > virtiofs, certain mounts may support security xattrs, while other ones
->> >> > may not.
->> >> 
->> >
->> > [ cc virtio-fs list and miklos ]
->> >> Quickly skimming the linked GH issue, it appears that the problem
->> >> really lies in the fact that virtiofs allows one to enable/disable
->> >> xattrs at mount time.  What isn't clear to me is why one would need to
->> >> disable xattrs, can you explain that use case?  Why does enabling
->> >> xattrs in virtiofs cause problems?
->> >
->> > Its not exactly a mount time option. Its a virtiofs file server option.
->> >
->> > xattr support by default is disabled because it has performance
->> > penalty. Users can enable it if they want to.
->> 
->> if SELinux is enabled then you should preferably just use fs_use xattr unconditionally
->> 
->> >
->> > So if virtiofsd starts without xattr support and somebody runs a
->> > VM with SELinux enabled, they should still be able to mount virtiofs,
->> > I guess (instead of failing it).
->> 
->> SELinux requires that everything is always labeled one way or another
->> and so if SELinux is enabled one should either use genfscon or fs_use xattr
->> 
->> Since is support fs_use xattr that should be the default and if any
->> would for any reason want to replace that with genfscon then that is
->> something they have to address (by excluding the fs_use xattr rule and
->> replacing it with a genfscon rule (not sure why anyone would ever want
->> that)
->> 
->> Gist is that if SELinux is enabled then one of the two should be
->> present, preferably fs_use xattr (so thats the default).
->
-> I understand that current state is that one needs to choose either
-> genfscon or fs_use_xattr depending on filesystem type. Will be nice
-> if this was more flexibile.
+User of virtiofsd should set "-o reconnect" for crash reconnection. Note
+that, when "-o reconnect" is set, some options will not be supported and we
+need to disable them:
 
->
-> If virtiofsd is running on top of a filesystem which does not support
-> xattr, then also virtiofs mount will fail.
+  - mount namespace: When mount namespace is enabled, reconnected
+    virtiofsd will failed to link/rename for EXDEV. The reason is, when
+    virtiofsd is sandboxed by mount namespace, attempts to link/rename
+    the fds opened before crashing (also recovered from QEMU) will be
+    considered as across mount operations between mounts, which is not
+    allowed by host kernel.
 
->
-> IOW, with virtiofs both kind of configurations can be easily produed
-> (xattr enabled or disabled). So none of the defaults (genfscon or
-> fs_use_xattr) seems to be ideal.
->
-> IIUC, policy is assuming that virtiofs will either always support xattr
-> or will not always support xattrs. Which probably is true for many
-> filesystems. But not necessarily in this case. So hard coding one
-> assumption will break other configurations. It will be nice if we there
-> is a way to fix this in policy.
+    So we introduce another option "-o mount_ns|no_mount_ns" (mount_ns
+    by default, and takes no effect when sandbox=chroot is specified).
+    The option "-o no_mount_ns" should be used with "-o reconnect".
 
-Sorry I think I misunderstood the issue. James Carter's solution sounds
-like the way to go.
+  - remote locking: As it is hard to determine wether a file is locked or
+    not when handling inflight locking requests, we should specify "-o
+    no_posix_lock" (default) and "-o no_flock" (default).
 
-Either that or just dont support fs_use xattr and always mount the whole
-location with a context specified from configuration (mount -t virtiofs -o context=).
+  - extended attributes: When handling inflight removexattr requests after
+    reconnecting, it is hard to determine wether a attr is already removed
+    or not. Therefore, we should also use "-o noxattr" (default) with "-o
+    reconnect".
 
+Signed-off-by: Jiachen Zhang <zhangjiachen.jaycee@bytedance.com>
+Signed-off-by: Xie Yongji <xieyongji@bytedance.com>
+---
+ tools/virtiofsd/helper.c         |   9 +++
+ tools/virtiofsd/passthrough_ll.c | 112 ++++++++++++++++++++++---------
+ 2 files changed, 88 insertions(+), 33 deletions(-)
 
->
-> Thanks
-> Vivek
->
-
+diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
+index 75ac48dec2..e0d6525b1a 100644
+--- a/tools/virtiofsd/helper.c
++++ b/tools/virtiofsd/helper.c
+@@ -174,6 +174,10 @@ void fuse_cmdline_help(void)
+            "                               - chroot: chroot(2) into shared\n"
+            "                                 directory (use in containers)\n"
+            "                               default: namespace\n"
++           "    -o mount_ns|no_mount_ns    enable/disable mount namespace\n"
++           "                               default: mount_ns\n"
++           "                               note: if chroot sandbox mode is used,\n"
++           "                               mount_ns will not take effect.\n"
+            "    -o timeout=<number>        I/O timeout (seconds)\n"
+            "                               default: depends on cache= option.\n"
+            "    -o writeback|no_writeback  enable/disable writeback cache\n"
+@@ -191,6 +195,11 @@ void fuse_cmdline_help(void)
+            "                               to virtiofsd from guest applications.\n"
+            "                               default: no_allow_direct_io\n"
+            "    -o announce_submounts      Announce sub-mount points to the guest\n"
++           "    -o reconnect|no_reconnect  enable/disable crash reconnection\n"
++           "                               to enable crash reconnection, the options\n"
++           "                               no_mount_ns, no_flock, no_posix_lock, and\n"
++           "                               no_xattr should also be set.\n"
++           "                               default: no_reconnect\n"
+            );
+ }
+ 
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 815b001076..73a50bd7a3 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -170,6 +170,8 @@ struct lo_data {
+     pthread_mutex_t mutex;
+     int sandbox;
+     int debug;
++    int mount_ns;
++    int reconnect;
+     int writeback;
+     int flock;
+     int posix_lock;
+@@ -204,8 +206,12 @@ static const struct fuse_opt lo_opts[] = {
+     { "sandbox=chroot",
+       offsetof(struct lo_data, sandbox),
+       SANDBOX_CHROOT },
++    { "reconnect", offsetof(struct lo_data, reconnect), 1 },
++    { "no_reconnect", offsetof(struct lo_data, reconnect), 0 },
+     { "writeback", offsetof(struct lo_data, writeback), 1 },
+     { "no_writeback", offsetof(struct lo_data, writeback), 0 },
++    { "mount_ns", offsetof(struct lo_data, mount_ns), 1 },
++    { "no_mount_ns", offsetof(struct lo_data, mount_ns), 0 },
+     { "source=%s", offsetof(struct lo_data, source), 0 },
+     { "flock", offsetof(struct lo_data, flock), 1 },
+     { "no_flock", offsetof(struct lo_data, flock), 0 },
+@@ -3047,8 +3053,14 @@ static void setup_namespaces(struct lo_data *lo, struct fuse_session *se)
+      * an empty network namespace to prevent TCP/IP and other network
+      * activity in case this process is compromised.
+      */
+-    if (unshare(CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWNET) != 0) {
+-        fuse_log(FUSE_LOG_ERR, "unshare(CLONE_NEWPID | CLONE_NEWNS): %m\n");
++    int unshare_flag;
++    if (lo->mount_ns) {
++        unshare_flag = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWNET;
++    } else {
++        unshare_flag = CLONE_NEWPID | CLONE_NEWNET;
++    }
++    if (unshare(unshare_flag) != 0) {
++        fuse_log(FUSE_LOG_ERR, "unshare(): %m\n");
+         exit(1);
+     }
+ 
+@@ -3083,38 +3095,47 @@ static void setup_namespaces(struct lo_data *lo, struct fuse_session *se)
+     /* Send us SIGTERM when the parent thread terminates, see prctl(2) */
+     prctl(PR_SET_PDEATHSIG, SIGTERM);
+ 
+-    /*
+-     * If the mounts have shared propagation then we want to opt out so our
+-     * mount changes don't affect the parent mount namespace.
+-     */
+-    if (mount(NULL, "/", NULL, MS_REC | MS_SLAVE, NULL) < 0) {
+-        fuse_log(FUSE_LOG_ERR, "mount(/, MS_REC|MS_SLAVE): %m\n");
+-        exit(1);
+-    }
++    if (lo->mount_ns) {
++        /*
++         * If the mounts have shared propagation then we want to opt out so our
++         * mount changes don't affect the parent mount namespace.
++         */
++        if (mount(NULL, "/", NULL, MS_REC | MS_SLAVE, NULL) < 0) {
++            fuse_log(FUSE_LOG_ERR, "mount(/, MS_REC|MS_SLAVE): %m\n");
++            exit(1);
++        }
+ 
+-    /* The child must remount /proc to use the new pid namespace */
+-    if (mount("proc", "/proc", "proc",
+-              MS_NODEV | MS_NOEXEC | MS_NOSUID | MS_RELATIME, NULL) < 0) {
+-        fuse_log(FUSE_LOG_ERR, "mount(/proc): %m\n");
+-        exit(1);
+-    }
++        /* The child must remount /proc to use the new pid namespace */
++        if (mount("proc", "/proc", "proc",
++                  MS_NODEV | MS_NOEXEC | MS_NOSUID | MS_RELATIME, NULL) < 0) {
++            fuse_log(FUSE_LOG_ERR, "mount(/proc): %m\n");
++            exit(1);
++        }
+ 
+-    /*
+-     * We only need /proc/self/fd. Prevent ".." from accessing parent
+-     * directories of /proc/self/fd by bind-mounting it over /proc. Since / was
+-     * previously remounted with MS_REC | MS_SLAVE this mount change only
+-     * affects our process.
+-     */
+-    if (mount("/proc/self/fd", "/proc", NULL, MS_BIND, NULL) < 0) {
+-        fuse_log(FUSE_LOG_ERR, "mount(/proc/self/fd, MS_BIND): %m\n");
+-        exit(1);
+-    }
++        /*
++         * We only need /proc/self/fd. Prevent ".." from accessing parent
++         * directories of /proc/self/fd by bind-mounting it over /proc. Since
++         * / was previously remounted with MS_REC | MS_SLAVE this mount change
++         * only affects our process.
++         */
++        if (mount("/proc/self/fd", "/proc", NULL, MS_BIND, NULL) < 0) {
++            fuse_log(FUSE_LOG_ERR, "mount(/proc/self/fd, MS_BIND): %m\n");
++            exit(1);
++        }
+ 
+-    /* Get the /proc (actually /proc/self/fd, see above) file descriptor */
+-    lo->proc_self_fd = open("/proc", O_PATH);
+-    if (lo->proc_self_fd == -1) {
+-        fuse_log(FUSE_LOG_ERR, "open(/proc, O_PATH): %m\n");
+-        exit(1);
++        /* Get the /proc (actually /proc/self/fd, see above) file descriptor */
++        lo->proc_self_fd = open("/proc", O_PATH);
++        if (lo->proc_self_fd == -1) {
++            fuse_log(FUSE_LOG_ERR, "open(/proc, O_PATH): %m\n");
++            exit(1);
++        }
++    } else {
++        /* Now we can get our /proc/self/fd directory file descriptor */
++        lo->proc_self_fd = open("/proc/self/fd", O_PATH);
++        if (lo->proc_self_fd == -1) {
++            fuse_log(FUSE_LOG_ERR, "open(/proc/self/fd, O_PATH): %m\n");
++            exit(1);
++        }
+     }
+ }
+ 
+@@ -3347,7 +3368,9 @@ static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
+ {
+     if (lo->sandbox == SANDBOX_NAMESPACE) {
+         setup_namespaces(lo, se);
+-        setup_mounts(lo->source);
++        if (lo->mount_ns) {
++            setup_mounts(lo->source);
++        }
+     } else {
+         setup_chroot(lo);
+     }
+@@ -3438,7 +3461,11 @@ static void setup_root(struct lo_data *lo, struct lo_inode *root)
+     struct stat stat;
+     uint64_t mnt_id;
+ 
+-    fd = open("/", O_PATH);
++    if (lo->mount_ns) {
++        fd = open("/", O_PATH);
++    } else {
++        fd = open(lo->source, O_PATH);
++    }
+     if (fd == -1) {
+         fuse_log(FUSE_LOG_ERR, "open(%s, O_PATH): %m\n", lo->source);
+         exit(1);
+@@ -3515,6 +3542,9 @@ int main(int argc, char *argv[])
+     lo.allow_direct_io = 0,
+     lo.proc_self_fd = -1;
+ 
++    lo.reconnect = 0;
++    lo.mount_ns = 1;
++
+     /* Don't mask creation mode, kernel already did that */
+     umask(0);
+ 
+@@ -3577,6 +3607,22 @@ int main(int argc, char *argv[])
+         goto err_out1;
+     }
+ 
++    /* For sandbox mode "chroot", set the mount_ns option to 0. */
++    if (lo.sandbox == SANDBOX_CHROOT) {
++        lo.mount_ns = 0;
++    }
++
++    if (lo.reconnect) {
++        if ((lo.sandbox == SANDBOX_NAMESPACE && lo.mount_ns) || lo.flock
++                                               || lo.posix_lock || lo.xattr) {
++            printf("Mount namespace, remote lock, and extended attributes"
++                   " are not supported by reconnection (-o reconnect). Please "
++                   "specify  -o no_mount_ns, -o no_flock (default), -o"
++                   "no_posix_lock (default), and -o no_xattr (default).\n");
++            exit(1);
++        }
++    }
++
+     if (opts.log_level != 0) {
+         current_log_level = opts.log_level;
+     } else {
 -- 
-gpg --locate-keys dominick.grift@defensec.nl
-Key fingerprint = FCD2 3660 5D6B 9D27 7FC6  E0FF DA7E 521F 10F6 4098
-https://sks-keyservers.net/pks/lookup?op=get&search=0xDA7E521F10F64098
-Dominick Grift
+2.20.1
 

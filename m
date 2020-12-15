@@ -2,23 +2,23 @@ DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
 	d=bytedance-com.20150623.gappssmtp.com; s=20150623;
 	h=from:to:cc:subject:date:message-id:in-reply-to:references
 	:mime-version:content-transfer-encoding;
-	bh=IB+k29zP6M9ZuhdJ/l7Jim5BnTeNatYhCvVUNikRT68=;
-	b=pcihtQV+33xGQ7k8w8sI4Ck9P5nbKk6pGh1Dyp/av240t1M7Thz0p/8XjQiK9X/1wu
-	Lam4BdOGUrGEqj+d/WO6u61ceFaeOW/CpYqsJD4smECikXHDyr7sDGdGB6j/aiABK1K6
-	XH+W0zeoM1X1YYBciONIsE97JuU9ly6rkBANLV9rE49GqlAUsXjCWixnDaAfKBdTjTn7
-	uQJbQamoD8dYm0XIVkxyukLqrtDdUiqTtBgr6psnwk6hgzgdeCtluhObh0euyvNyRHnj
-	2ywqbq8vHHtoy4+vsGoM+NqELmLimrIsUqtVnDnO6aQpPhINFZyfW9M6Vy6bA+3ewRPp
-	jQbw==
+	bh=H52nasZ7BGuO7xuet/cKD9fD7bI69Ap/AdAM6/fVCZw=;
+	b=NFIVQ3wJXi5NLtPFuJI2waRd/OCk6kjCZNMuCp/jtzS7y2g0Xu7FBO8jwFk7KJI3uK
+	FtkNXy7GhedijGdnYi5DpB+1oa2HTsACMVa1LWIN27f2IaW0NxUd4VYwvz9WaWrziRbt
+	+Rl1+jZuxvIbjbEovFxHYi4/XY/TU1NFzFlSZxnE9sW/tZboW1Qn6OUgVUIZDi3sLSUV
+	fDyHP1LialgB6cLFdKKlKZzk39NHRUC0Z4BgYy/Vfi+Ec+ojTgE4JW3hyJMvOKfZfb2l
+	zPjGNd7geimd3BGSXdMpAxH4BfBjjL4IrKfqddHp7aGfW1ziHEDaxm3oA12t5pHxgDUN
+	WJIw==
 From: Jiachen Zhang <zhangjiachen.jaycee@bytedance.com>
-Date: Wed, 16 Dec 2020 00:21:13 +0800
-Message-Id: <20201215162119.27360-4-zhangjiachen.jaycee@bytedance.com>
+Date: Wed, 16 Dec 2020 00:21:14 +0800
+Message-Id: <20201215162119.27360-5-zhangjiachen.jaycee@bytedance.com>
 In-Reply-To: <20201215162119.27360-1-zhangjiachen.jaycee@bytedance.com>
 References: <20201215162119.27360-1-zhangjiachen.jaycee@bytedance.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [RFC PATCH 3/9] vhost-user-fs: Support virtiofsd crash
-	reconnection
+Subject: [Virtio-fs] [RFC PATCH 4/9] libvhost-user: Add vhost-user message
+	types for sending shared memory and file fds
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -30,221 +30,254 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: "Dr . David Alan Gilbert" <dgilbert@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Xie Yongji <xieyongji@bytedance.com>
 Cc: virtio-fs@redhat.com, Jiachen Zhang <zhangjiachen.jaycee@bytedance.com>, qemu-devel@nongnu.org
 
-This commit adds vhost-user-fs device-end support for the virtio-fs crash
-reconnection, mainly the vhost-user callbacks. The VhostUserFSPersist
-structure is also added to save the virtiofsd status at QEMU-side:
+Add libvhost-user support for the 4 new vhost-user messages types:
 
-    typedef struct {
-        bool need_restore;
-
-        /* for persistent of lo_maps */
-        VhostUserShm maps[MAP_TYPE_NUM];
-        int map_fds[MAP_TYPE_NUM];
-
-        /* for persistent of fds */
-        GHashTable *fd_ht;
-    } VhostUserFSPersist;
-
-The fd_ht GHashTable is to save the opened file descriptors sent from
-virtiofsd, the maps and map_fds are to save the shared memory related
-status sent from virtiofsd.
+    VHOST_USER_SET_SHM
+    VHOST_USER_SET_FD
+    VHOST_USER_SLAVE_SHM
+    VHOST_USER_SLAVE_FD
 
 Signed-off-by: Jiachen Zhang <zhangjiachen.jaycee@bytedance.com>
 Signed-off-by: Xie Yongji <xieyongji@bytedance.com>
 ---
- hw/virtio/vhost-user-fs.c         | 118 +++++++++++++++++++++++++++++-
- include/hw/virtio/vhost-user-fs.h |  14 +++-
- 2 files changed, 130 insertions(+), 2 deletions(-)
+ contrib/libvhost-user/libvhost-user.c | 88 +++++++++++++++++++++++++++
+ contrib/libvhost-user/libvhost-user.h | 70 +++++++++++++++++++++
+ 2 files changed, 158 insertions(+)
 
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index ce343101d4..a4f58821b3 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -72,6 +72,18 @@ static int vuf_start(VirtIODevice *vdev)
-         }
-     }
+diff --git a/contrib/libvhost-user/libvhost-user.c b/contrib/libvhost-user/libvhost-user.c
+index bfec8a881a..8c97013e59 100644
+--- a/contrib/libvhost-user/libvhost-user.c
++++ b/contrib/libvhost-user/libvhost-user.c
+@@ -140,6 +140,8 @@ vu_request_to_string(unsigned int req)
+         REQ(VHOST_USER_ADD_MEM_REG),
+         REQ(VHOST_USER_REM_MEM_REG),
+         REQ(VHOST_USER_MAX),
++        REQ(VHOST_USER_SET_SHM),
++        REQ(VHOST_USER_SET_FD),
+     };
+ #undef REQ
  
-+    ret = vhost_dev_set_shm(&fs->vhost_dev);
-+    if (ret < 0) {
-+        error_report("Error set fs maps: %d", -ret);
-+        goto err_guest_notifiers;
-+    }
-+
-+    ret = vhost_dev_set_fd(&fs->vhost_dev);
-+    if (ret < 0) {
-+        error_report("Error set fs proc fds: %d", -ret);
-+        goto err_guest_notifiers;
-+    }
-+
-     ret = vhost_dev_set_inflight(&fs->vhost_dev, fs->inflight);
-     if (ret < 0) {
-         error_report("Error set inflight: %d", -ret);
-@@ -220,6 +232,102 @@ static void vuf_reset(VirtIODevice *vdev)
-     vhost_dev_free_inflight(fs->inflight);
+@@ -1718,6 +1720,77 @@ vu_set_inflight_fd(VuDev *dev, VhostUserMsg *vmsg)
+     return false;
  }
  
-+static int vhost_user_fs_persist_map(struct vhost_dev *dev,
-+                                     struct VhostUserShm *shm, int fd)
++bool vu_slave_send_shm(VuDev *dev, int memfd, uint64_t size, int map_type)
 +{
-+    VHostUserFS *fs = container_of(dev, VHostUserFS, vhost_dev);
-+    VhostUserFSPersist *persist = &fs->persist;
++    VhostUserMsg vmsg = {
++        .request = VHOST_USER_SLAVE_SHM,
++        .flags = VHOST_USER_VERSION,
++        .size = sizeof(VhostUserShm),
++        .payload.shm = {
++            .id = map_type,
++            .size = size,
++            .offset = 0,
++        },
++    };
 +
-+    if (persist->map_fds[shm->id] != -1) {
-+        close(persist->map_fds[shm->id]);
++    vmsg.fd_num = 1;
++    vmsg.fds[0] = memfd;
++
++    if (!vu_has_protocol_feature(dev, VHOST_USER_PROTOCOL_F_SLAVE_SEND_FD)) {
++        return false;
 +    }
 +
-+    persist->need_restore = true;
-+    memcpy(&persist->maps[shm->id], shm, sizeof(VhostUserShm));
-+    persist->map_fds[shm->id] = dup(fd);
++    pthread_mutex_lock(&dev->slave_mutex);
++    if (!vu_message_write(dev, dev->slave_fd, &vmsg)) {
++        pthread_mutex_unlock(&dev->slave_mutex);
++        return false;
++    }
 +
-+    return 0;
++    /* Also unlocks the slave_mutex */
++    return vu_process_message_reply(dev, &vmsg);
 +}
 +
-+static int vhost_user_fs_map_info(struct vhost_dev *dev, int id,
-+                                  uint64_t *size, uint64_t *offset,
-+                                  int *memfd)
++static bool vu_slave_send_fd(VuDev *dev, int fd, int fd_key, int flag)
 +{
-+    if (!dev) {
-+        return -1;
++    VhostUserMsg vmsg = {
++        .request = VHOST_USER_SLAVE_FD,
++        .flags = VHOST_USER_VERSION,
++        .size = sizeof(vmsg.payload.fdinfo),
++    };
++
++    vmsg.payload.fdinfo.key = fd_key;
++    vmsg.payload.fdinfo.flag = flag;
++    if (flag == VU_FD_FLAG_ADD) {
++        vmsg.fds[0] = fd;
++    }
++    vmsg.fd_num = 1;
++
++    if (!vu_has_protocol_feature(dev, VHOST_USER_PROTOCOL_F_SLAVE_SEND_FD)) {
++        return false;
 +    }
 +
-+    if (id >= MAP_TYPE_NUM) {
-+        return -1;
++    pthread_mutex_lock(&dev->slave_mutex);
++    if (!vu_message_write(dev, dev->slave_fd, &vmsg)) {
++        pthread_mutex_unlock(&dev->slave_mutex);
++        return false;
 +    }
 +
-+    VHostUserFS *fs = container_of(dev, VHostUserFS, vhost_dev);
-+    VhostUserFSPersist *persist = &fs->persist;
-+    if (!persist->need_restore || (persist->map_fds[id] == -1)) {
-+        return -1;
-+    }
-+
-+    *size = persist->maps[id].size;
-+    *offset = persist->maps[id].offset;
-+    *memfd = persist->map_fds[id];
-+
-+    return 0;
++    /* Also unlocks the slave_mutex */
++    bool ret =
++    vu_process_message_reply(dev, &vmsg);
++    return ret;
 +}
 +
-+static int vhost_user_fs_persist_fd(struct vhost_dev *dev,
-+                                    struct VhostUserFd *fdinfo, int fd)
++bool vu_slave_send_fd_add(VuDev *dev, int fd, int fd_key)
 +{
-+    VHostUserFS *fs = container_of(dev, VHostUserFS, vhost_dev);
-+    VhostUserFSPersist *persist = &fs->persist;
-+
-+    persist->need_restore = true;
-+
-+    if (fdinfo->flag == VU_FD_FLAG_ADD) {
-+        assert(persist->fd_ht != NULL);
-+        int newfd = dup(fd);
-+        g_hash_table_insert(persist->fd_ht, GINT_TO_POINTER(fdinfo->key),
-+                                                    GINT_TO_POINTER(newfd));
-+    } else if (fdinfo->flag == VU_FD_FLAG_DEL) {
-+        gpointer fd_p = g_hash_table_lookup(persist->fd_ht,
-+                                            GINT_TO_POINTER(fdinfo->key));
-+        if (fd_p != NULL) {
-+            int fd = GPOINTER_TO_INT(fd_p);
-+            close(fd);
-+            g_hash_table_remove(persist->fd_ht,
-+                                        GINT_TO_POINTER(fdinfo->key));
-+        }
-+    }
-+
-+    return 0;
++    return vu_slave_send_fd(dev, fd, fd_key, VU_FD_FLAG_ADD);
 +}
 +
-+static int vhost_user_fs_fd_info(struct vhost_dev *dev, GHashTable **fd_ht_p)
++bool vu_slave_send_fd_del(VuDev *dev, int fd_key)
 +{
-+    if (!dev) {
-+        return -1;
-+    }
-+
-+    VHostUserFS *fs = container_of(dev, VHostUserFS, vhost_dev);
-+    VhostUserFSPersist *persist = &fs->persist;
-+    if (!persist->need_restore) {
-+        return -1;
-+    }
-+
-+    *fd_ht_p = persist->fd_ht;
-+    return 0;
++    return vu_slave_send_fd(dev, -1, fd_key, VU_FD_FLAG_DEL);
 +}
 +
-+
-+const VhostDevShmOps fs_shm_ops = {
-+        .vhost_dev_slave_shm = vhost_user_fs_persist_map,
-+        .vhost_dev_shm_info = vhost_user_fs_map_info,
-+};
-+
-+const VhostDevFdOps fs_fd_ops = {
-+        .vhost_dev_slave_fd = vhost_user_fs_persist_fd,
-+        .vhost_dev_fd_info = vhost_user_fs_fd_info,
-+};
-+
- static int vuf_connect(DeviceState *dev)
+ static bool
+ vu_handle_vring_kick(VuDev *dev, VhostUserMsg *vmsg)
  {
-     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
-@@ -242,6 +350,9 @@ static int vuf_connect(DeviceState *dev)
-         return ret;
-     }
- 
-+    vhost_dev_set_shm_ops(&fs->vhost_dev, &fs_shm_ops);
-+    vhost_dev_set_fd_ops(&fs->vhost_dev, &fs_fd_ops);
-+
-     /* restore vhost state */
-     if (vdev->started) {
-         ret = vuf_start(vdev);
-@@ -380,7 +491,11 @@ static void vuf_device_realize(DeviceState *dev, Error **errp)
-     /* init reconnection related variables */
-     fs->inflight = g_new0(struct vhost_inflight, 1);
-     fs->connected = false;
--
-+    fs->persist.need_restore = false;
-+    for (i = 0; i < MAP_TYPE_NUM; i++) {
-+        fs->persist.map_fds[i] = -1;
-+    }
-+    fs->persist.fd_ht = g_hash_table_new(NULL, NULL);
-     qemu_chr_fe_set_handlers(&fs->conf.chardev,  NULL, NULL, vuf_event,
-                                  NULL, (void *)dev, NULL, true);
- 
-@@ -440,6 +555,7 @@ static void vuf_device_unrealize(DeviceState *dev)
-     fs->vhost_dev.vqs = NULL;
-     g_free(fs->inflight);
-     fs->inflight = NULL;
-+    g_hash_table_destroy(fs->persist.fd_ht);
+@@ -1762,6 +1835,9 @@ static bool vu_handle_get_max_memslots(VuDev *dev, VhostUserMsg *vmsg)
+     return false;
  }
  
- static const VMStateDescription vuf_vmstate = {
-diff --git a/include/hw/virtio/vhost-user-fs.h b/include/hw/virtio/vhost-user-fs.h
-index 9ef47568e7..c2b77ffc53 100644
---- a/include/hw/virtio/vhost-user-fs.h
-+++ b/include/hw/virtio/vhost-user-fs.h
-@@ -30,6 +30,18 @@ typedef struct {
-     uint16_t queue_size;
- } VHostUserFSConf;
++bool (*vu_set_shm_cb)(VuDev *dev, VhostUserMsg *vmsg);
++bool (*vu_set_fd_cb)(VuDev *dev, VhostUserMsg *vmsg);
++
+ static bool
+ vu_process_message(VuDev *dev, VhostUserMsg *vmsg)
+ {
+@@ -1852,6 +1928,18 @@ vu_process_message(VuDev *dev, VhostUserMsg *vmsg)
+         return vu_add_mem_reg(dev, vmsg);
+     case VHOST_USER_REM_MEM_REG:
+         return vu_rem_mem_reg(dev, vmsg);
++    case VHOST_USER_SET_SHM:
++        if (vu_set_shm_cb) {
++            return vu_set_shm_cb(dev, vmsg);
++        } else  {
++            return false;
++        }
++    case VHOST_USER_SET_FD:
++        if (vu_set_fd_cb) {
++            return vu_set_fd_cb(dev, vmsg);
++        } else  {
++            return false;
++        }
+     default:
+         vmsg_close_fds(vmsg);
+         vu_panic(dev, "Unhandled request: %d", vmsg->request);
+diff --git a/contrib/libvhost-user/libvhost-user.h b/contrib/libvhost-user/libvhost-user.h
+index a1539dbb69..5448dc5818 100644
+--- a/contrib/libvhost-user/libvhost-user.h
++++ b/contrib/libvhost-user/libvhost-user.h
+@@ -64,6 +64,7 @@ enum VhostUserProtocolFeature {
+     VHOST_USER_PROTOCOL_F_INFLIGHT_SHMFD = 12,
+     VHOST_USER_PROTOCOL_F_INBAND_NOTIFICATIONS = 14,
+     VHOST_USER_PROTOCOL_F_CONFIGURE_MEM_SLOTS = 15,
++    VHOST_USER_PROTOCOL_F_MAP_SHMFD = 17,
  
-+#define MAP_TYPE_NUM 3
-+typedef struct {
-+    bool need_restore;
-+
-+    /* for persistent of lo_maps */
-+    VhostUserShm maps[MAP_TYPE_NUM];
-+    int map_fds[MAP_TYPE_NUM];
-+
-+    /* for persistent of fds */
-+    GHashTable *fd_ht;
-+} VhostUserFSPersist;
-+
- struct VHostUserFS {
-     /*< private >*/
-     VirtIODevice parent;
-@@ -41,7 +53,7 @@ struct VHostUserFS {
-     VirtQueue *hiprio_vq;
-     struct vhost_inflight *inflight;
-     bool connected;
--
-+    VhostUserFSPersist persist;
-     /*< public >*/
+     VHOST_USER_PROTOCOL_F_MAX
  };
+@@ -109,6 +110,8 @@ typedef enum VhostUserRequest {
+     VHOST_USER_GET_MAX_MEM_SLOTS = 36,
+     VHOST_USER_ADD_MEM_REG = 37,
+     VHOST_USER_REM_MEM_REG = 38,
++    VHOST_USER_SET_SHM = 41,
++    VHOST_USER_SET_FD = 42,
+     VHOST_USER_MAX
+ } VhostUserRequest;
  
+@@ -119,6 +122,8 @@ typedef enum VhostUserSlaveRequest {
+     VHOST_USER_SLAVE_VRING_HOST_NOTIFIER_MSG = 3,
+     VHOST_USER_SLAVE_VRING_CALL = 4,
+     VHOST_USER_SLAVE_VRING_ERR = 5,
++    VHOST_USER_SLAVE_SHM = 6,
++    VHOST_USER_SLAVE_FD = 7,
+     VHOST_USER_SLAVE_MAX
+ }  VhostUserSlaveRequest;
+ 
+@@ -170,6 +175,29 @@ typedef struct VhostUserInflight {
+     uint16_t queue_size;
+ } VhostUserInflight;
+ 
++#ifndef VU_PERSIST_STRUCTS
++#define VU_PERSIST_STRUCTS
++
++typedef struct VhostUserShm {
++    int id;
++    uint64_t size;
++    uint64_t offset;
++} VhostUserShm;
++
++typedef enum VhostUserFdFlag {
++    VU_FD_FLAG_ADD = 0,
++    VU_FD_FLAG_DEL = 1,
++    VU_FD_FLAG_RESTORE = 2,
++    VU_FD_FLAG_MAX
++} VhostUserFdFlag;
++
++typedef struct VhostUserFd {
++    int key;
++    VhostUserFdFlag flag;
++} VhostUserFd;
++#endif
++
++
+ #if defined(_WIN32) && (defined(__x86_64__) || defined(__i386__))
+ # define VU_PACKED __attribute__((gcc_struct, packed))
+ #else
+@@ -197,6 +225,8 @@ typedef struct VhostUserMsg {
+         VhostUserConfig config;
+         VhostUserVringArea area;
+         VhostUserInflight inflight;
++        VhostUserShm shm;
++        VhostUserFd fdinfo;
+     } payload;
+ 
+     int fds[VHOST_MEMORY_BASELINE_NREGIONS];
+@@ -687,4 +717,44 @@ void vu_queue_get_avail_bytes(VuDev *vdev, VuVirtq *vq, unsigned int *in_bytes,
+ bool vu_queue_avail_bytes(VuDev *dev, VuVirtq *vq, unsigned int in_bytes,
+                           unsigned int out_bytes);
+ 
++/**
++ * vu_slave_send_shm:
++ * @dev: a VuDev context
++ * @memfd: the shared memory fd to sync with QEMU
++ * @size: shared memory lenth
++ * @map_type: the lo_map type number
++ *
++ * Sync the map_type region that shared with QEMU when memfd or its size
++ * is changed.
++ *
++ * Returns: true on success.
++ */
++bool vu_slave_send_shm(VuDev *dev, int memfd, uint64_t size, int map_type);
++
++/**
++ * vu_slave_send_fd_add:
++ * @dev: a VuDev context
++ * @fd: the fd to send to QEMU
++ * @fd_key: the fingerprint of the fd
++ *
++ * Send a opened file fd to QEMU.
++ *
++ * Returns: true on success.
++ */
++bool vu_slave_send_fd_add(VuDev *dev, int fd, int fd_key);
++
++/**
++ * vu_slave_send_fd_del:
++ * @dev: a VuDev context
++ * @fd_key: the fingerprint of the fd
++ *
++ * Remove a file fd from QEMU.
++ *
++ * Returns: true on success.
++ */
++bool vu_slave_send_fd_del(VuDev *dev, int fd_key);
++
++extern bool (*vu_set_shm_cb)(VuDev *dev, VhostUserMsg *vmsg);
++extern bool (*vu_set_fd_cb)(VuDev *dev, VhostUserMsg *vmsg);
++
+ #endif /* LIBVHOST_USER_H */
 -- 
 2.20.1
 

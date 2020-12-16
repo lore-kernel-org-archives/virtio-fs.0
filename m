@@ -1,13 +1,13 @@
-Date: Thu, 10 Dec 2020 12:23:11 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20201210122311.GB12670@work-vm>
-References: <20201208055043.31548-1-lersek@redhat.com>
+From: Laszlo Ersek <lersek@redhat.com>
+Date: Wed, 16 Dec 2020 22:11:11 +0100
+Message-Id: <20201216211125.19496-35-lersek@redhat.com>
+In-Reply-To: <20201216211125.19496-1-lersek@redhat.com>
+References: <20201216211125.19496-1-lersek@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20201208055043.31548-1-lersek@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: make the debug log timestamp on
- stderr more human-readable
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [edk2 PATCH 34/48] OvmfPkg/VirtioFsDxe: convert FUSE
+	dirent filename to EFI_FILE_INFO
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,128 +16,150 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Laszlo Ersek <lersek@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: devel@edk2.groups.io, virtio-fs@redhat.com, lersek@redhat.com
+Cc: Jordan Justen <jordan.l.justen@intel.com>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@redhat.com>, Ard Biesheuvel <ard.biesheuvel@arm.com>
 
-* Laszlo Ersek (lersek@redhat.com) wrote:
-> The current timestamp format doesn't help me visually notice small jumps
-> in time ("small" as defined on human scale, such as a few seconds or a few
-> ten seconds). Replace it with a local time format where such differences
-> stand out.
-> 
-> Before:
-> 
-> > [13316826770337] [ID: 00000004] unique: 62, opcode: RELEASEDIR (29), nodeid: 1, insize: 64, pid: 1
-> > [13316826778175] [ID: 00000004]    unique: 62, success, outsize: 16
-> > [13316826781156] [ID: 00000004] virtio_send_msg: elem 0: with 1 in desc of length 16
-> > [15138279317927] [ID: 00000001] virtio_loop: Got VU event
-> > [15138279504884] [ID: 00000001] fv_queue_set_started: qidx=1 started=0
-> > [15138279519034] [ID: 00000003] fv_queue_thread: kill event on queue 1 - quitting
-> > [15138280876463] [ID: 00000001] fv_remove_watch: TODO! fd=9
-> > [15138280897381] [ID: 00000001] virtio_loop: Waiting for VU event
-> > [15138280946834] [ID: 00000001] virtio_loop: Got VU event
-> > [15138281175421] [ID: 00000001] virtio_loop: Waiting for VU event
-> > [15138281182387] [ID: 00000001] virtio_loop: Got VU event
-> > [15138281189474] [ID: 00000001] virtio_loop: Waiting for VU event
-> > [15138309321936] [ID: 00000001] virtio_loop: Unexpected poll revents 11
-> > [15138309434150] [ID: 00000001] virtio_loop: Exit
-> 
-> (Notice how you don't (easily) notice the gap in time after
-> "virtio_send_msg", and especially the amount of time passed is hard to
-> estimate.)
-> 
-> After:
-> 
-> > [2020-12-08 06:43:22.58+0100] [ID: 00000004] unique: 51, opcode: RELEASEDIR (29), nodeid: 1, insize: 64, pid: 1
-> > [2020-12-08 06:43:22.58+0100] [ID: 00000004]    unique: 51, success, outsize: 16
-> > [2020-12-08 06:43:22.58+0100] [ID: 00000004] virtio_send_msg: elem 0: with 1 in desc of length 16
-> > [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Got VU event
-> > [2020-12-08 06:43:29.34+0100] [ID: 00000001] fv_queue_set_started: qidx=1 started=0
-> > [2020-12-08 06:43:29.34+0100] [ID: 00000003] fv_queue_thread: kill event on queue 1 - quitting
-> > [2020-12-08 06:43:29.34+0100] [ID: 00000001] fv_remove_watch: TODO! fd=9
-> > [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Waiting for VU event
-> > [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Got VU event
-> > [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Waiting for VU event
-> > [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Got VU event
-> > [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Waiting for VU event
-> > [2020-12-08 06:43:29.37+0100] [ID: 00000001] virtio_loop: Unexpected poll revents 11
-> > [2020-12-08 06:43:29.37+0100] [ID: 00000001] virtio_loop: Exit
-> 
-> Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-> Cc: Stefan Hajnoczi <stefanha@redhat.com>
-> Signed-off-by: Laszlo Ersek <lersek@redhat.com>
+Introduce the VirtioFsFuseDirentPlusToEfiFileInfo() function, for
+converting the VIRTIO_FS_FUSE_DIRENTPLUS_RESPONSE filename byte array to
+EFI_FILE_INFO.
 
+This new function updates those EFI_FILE_INFO fields (Size, FileName) that
+the earlier helper function VirtioFsFuseAttrToEfiFileInfo() does not set.
 
-(I'd have probably not bothered with the day and given a few more digits
-of the subseconds instead, but that's mostly just rpeference)
+Both functions together will be able to fill in EFI_FILE_INFO completely,
+from FUSE_READDIRPLUS.
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@arm.com>
+Cc: Jordan Justen <jordan.l.justen@intel.com>
+Cc: Philippe Mathieu-Daudé <philmd@redhat.com>
+Ref: https://bugzilla.tianocore.org/show_bug.cgi?id=3097
+Signed-off-by: Laszlo Ersek <lersek@redhat.com>
+---
+ OvmfPkg/VirtioFsDxe/VirtioFsDxe.h |  6 ++
+ OvmfPkg/VirtioFsDxe/Helpers.c     | 79 ++++++++++++++++++++
+ 2 files changed, 85 insertions(+)
 
-and queued.
-> ---
->  tools/virtiofsd/passthrough_ll.c | 31 +++++++++++++++++++++++++++----
->  1 file changed, 27 insertions(+), 4 deletions(-)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 48a109d3f682..06543b20dcbb 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -3311,18 +3311,38 @@ static void setup_nofile_rlimit(unsigned long rlimit_nofile)
->  static void log_func(enum fuse_log_level level, const char *fmt, va_list ap)
->  {
->      g_autofree char *localfmt = NULL;
-> +    struct timespec ts;
-> +    struct tm tm;
-> +    char sec_fmt[sizeof "2020-12-07 18:17:54"];
-> +    char zone_fmt[sizeof "+0100"];
->  
->      if (current_log_level < level) {
->          return;
->      }
->  
->      if (current_log_level == FUSE_LOG_DEBUG) {
-> -        if (!use_syslog) {
-> -            localfmt = g_strdup_printf("[%" PRId64 "] [ID: %08ld] %s",
-> -                                       get_clock(), syscall(__NR_gettid), fmt);
-> -        } else {
-> +        if (use_syslog) {
-> +            /* no timestamp needed */
->              localfmt = g_strdup_printf("[ID: %08ld] %s", syscall(__NR_gettid),
->                                         fmt);
-> +        } else {
-> +            /* try formatting a broken-down timestamp */
-> +            if (clock_gettime(CLOCK_REALTIME, &ts) != -1 &&
-> +                localtime_r(&ts.tv_sec, &tm) != NULL &&
-> +                strftime(sec_fmt, sizeof sec_fmt, "%Y-%m-%d %H:%M:%S",
-> +                         &tm) != 0 &&
-> +                strftime(zone_fmt, sizeof zone_fmt, "%z", &tm) != 0) {
-> +                localfmt = g_strdup_printf("[%s.%02ld%s] [ID: %08ld] %s",
-> +                                           sec_fmt,
-> +                                           ts.tv_nsec / (10L * 1000 * 1000),
-> +                                           zone_fmt, syscall(__NR_gettid),
-> +                                           fmt);
-> +            } else {
-> +                /* fall back to a flat timestamp */
-> +                localfmt = g_strdup_printf("[%" PRId64 "] [ID: %08ld] %s",
-> +                                           get_clock(), syscall(__NR_gettid),
-> +                                           fmt);
-> +            }
->          }
->          fmt = localfmt;
->      }
-> @@ -3452,6 +3472,9 @@ int main(int argc, char *argv[])
->      struct lo_map_elem *reserve_elem;
->      int ret = -1;
->  
-> +    /* Initialize time conversion information for localtime_r(). */
-> +    tzset();
-> +
->      /* Don't mask creation mode, kernel already did that */
->      umask(0);
->  
-> -- 
-> 2.19.1.3.g30247aa5d201
-> 
+diff --git a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
+index f5501af7d0a4..2b419048c232 100644
+--- a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
++++ b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
+@@ -243,16 +243,22 @@ VirtioFsGetBasename (
+   );
+ 
+ EFI_STATUS
+ VirtioFsFuseAttrToEfiFileInfo (
+   IN     VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE *FuseAttr,
+      OUT EFI_FILE_INFO                      *FileInfo
+   );
+ 
++EFI_STATUS
++VirtioFsFuseDirentPlusToEfiFileInfo (
++  IN     VIRTIO_FS_FUSE_DIRENTPLUS_RESPONSE *FuseDirent,
++  IN OUT EFI_FILE_INFO                      *FileInfo
++  );
++
+ //
+ // Wrapper functions for FUSE commands (primitives).
+ //
+ 
+ EFI_STATUS
+ VirtioFsFuseLookup (
+   IN OUT VIRTIO_FS                          *VirtioFs,
+   IN     UINT64                             DirNodeId,
+diff --git a/OvmfPkg/VirtioFsDxe/Helpers.c b/OvmfPkg/VirtioFsDxe/Helpers.c
+index 77f718e91233..cdaa8557a17b 100644
+--- a/OvmfPkg/VirtioFsDxe/Helpers.c
++++ b/OvmfPkg/VirtioFsDxe/Helpers.c
+@@ -1895,8 +1895,87 @@ VirtioFsFuseAttrToEfiFileInfo (
+   // A hard link count greater than 1 is not supported for regular files.
+   //
+   if ((FileInfo->Attribute & EFI_FILE_DIRECTORY) == 0 && FuseAttr->Nlink > 1) {
+     return EFI_UNSUPPORTED;
+   }
+ 
+   return EFI_SUCCESS;
+ }
++
++/**
++  Convert a VIRTIO_FS_FUSE_DIRENTPLUS_RESPONSE filename to an EFI_FILE_INFO
++  filename.
++
++  @param[in] FuseDirent    The VIRTIO_FS_FUSE_DIRENTPLUS_RESPONSE object to
++                           convert the filename byte array from. The caller is
++                           responsible for ensuring that FuseDirent->Namelen
++                           describe valid storage.
++
++  @param[in,out] FileInfo  The EFI_FILE_INFO structure to modify. On input, the
++                           caller is responsible for setting FileInfo->Size
++                           according to the allocated size. On successful
++                           return, FileInfo->Size is reduced to reflect the
++                           filename converted into FileInfo->FileName.
++                           FileInfo->FileName is set from the filename byte
++                           array that directly follows the FuseDirent header
++                           object. Fields other than FileInfo->Size and
++                           FileInfo->FileName are not modified.
++
++  @retval EFI_SUCCESS            Conversion successful.
++
++  @retval EFI_INVALID_PARAMETER  VIRTIO_FS_FUSE_DIRENTPLUS_RESPONSE_SIZE()
++                                 returns zero for FuseDirent->Namelen.
++
++  @retval EFI_BUFFER_TOO_SMALL   On input, FileInfo->Size does not provide
++                                 enough room for converting the filename byte
++                                 array from FuseDirent.
++
++  @retval EFI_UNSUPPORTED        The FuseDirent filename byte array contains a
++                                 byte that falls outside of the printable ASCII
++                                 range, or is a forward slash or a backslash.
++**/
++EFI_STATUS
++VirtioFsFuseDirentPlusToEfiFileInfo (
++  IN     VIRTIO_FS_FUSE_DIRENTPLUS_RESPONSE *FuseDirent,
++  IN OUT EFI_FILE_INFO                      *FileInfo
++  )
++{
++  UINTN  DirentSize;
++  UINTN  FileInfoSize;
++  UINT8  *DirentName;
++  UINT32 Idx;
++
++  DirentSize = VIRTIO_FS_FUSE_DIRENTPLUS_RESPONSE_SIZE (FuseDirent->Namelen);
++  if (DirentSize == 0) {
++    return EFI_INVALID_PARAMETER;
++  }
++  //
++  // We're now safe from overflow in the calculation below.
++  //
++  FileInfoSize = (OFFSET_OF (EFI_FILE_INFO, FileName) +
++                  ((UINTN)FuseDirent->Namelen + 1) * sizeof (CHAR16));
++  if (FileInfoSize > FileInfo->Size) {
++    return EFI_BUFFER_TOO_SMALL;
++  }
++
++  //
++  // Convert the name.
++  //
++  DirentName = (UINT8 *)(FuseDirent + 1);
++  for (Idx = 0; Idx < FuseDirent->Namelen; Idx++) {
++    UINT8 NameByte;
++
++    NameByte = DirentName[Idx];
++    if (NameByte < 0x20 || NameByte > 0x7E ||
++        NameByte == '/' || NameByte == '\\') {
++      return EFI_UNSUPPORTED;
++    }
++    FileInfo->FileName[Idx] = (CHAR16)NameByte;
++  }
++  FileInfo->FileName[Idx++] = L'\0';
++  //
++  // Set the (possibly reduced) size.
++  //
++  FileInfo->Size = FileInfoSize;
++
++  return EFI_SUCCESS;
++}
 -- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+2.19.1.3.g30247aa5d201
+
+
 

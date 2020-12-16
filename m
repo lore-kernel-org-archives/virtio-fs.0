@@ -1,13 +1,13 @@
-Date: Thu, 10 Dec 2020 10:56:13 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20201210105613.GA12670@work-vm>
-References: <20201109143548.GA1479853@redhat.com>
+From: Laszlo Ersek <lersek@redhat.com>
+Date: Wed, 16 Dec 2020 22:11:05 +0100
+Message-Id: <20201216211125.19496-29-lersek@redhat.com>
+In-Reply-To: <20201216211125.19496-1-lersek@redhat.com>
+References: <20201216211125.19496-1-lersek@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20201109143548.GA1479853@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH V2] virtiofsd: Use --thread-pool-size=0 to
- mean no thread pool
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [edk2 PATCH 28/48] OvmfPkg/VirtioFsDxe: implement the
+	wrapper function for FUSE_STATFS
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,101 +16,239 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, jose.carlos.venegas.munoz@intel.com, qemu-devel@nongnu.org
+To: devel@edk2.groups.io, virtio-fs@redhat.com, lersek@redhat.com
+Cc: Jordan Justen <jordan.l.justen@intel.com>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@redhat.com>, Ard Biesheuvel <ard.biesheuvel@arm.com>
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> Right now we create a thread pool and main thread hands over the request
-> to thread in thread pool to process. Number of threads in thread pool
-> can be managed by option --thread-pool-size.
-> 
-> In tests we have noted that many of the workloads are getting better
-> performance if we don't use a thread pool at all and process all
-> the requests in the context of a thread receiving the request.
-> 
-> Hence give user an option to be able to run virtiofsd without using
-> a thread pool.
-> 
-> To implement this, I have used existing option --thread-pool-size. This
-> option defines how many maximum threads can be in the thread pool.
-> Thread pool size zero freezes thead pool. I can't see why will one
-> start virtiofsd with a frozen thread pool (hence frozen file system).
-> So I am redefining --thread-pool-size=0 to mean, don't use a thread pool.
-> Instead process the request in the context of thread receiving request
-> from the queue.
-> 
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Add the VirtioFsFuseStatFs() function, for sending the FUSE_STATFS command
+to the Virtio Filesystem device.
 
-Queued.
+Cc: Ard Biesheuvel <ard.biesheuvel@arm.com>
+Cc: Jordan Justen <jordan.l.justen@intel.com>
+Cc: Philippe Mathieu-Daudé <philmd@redhat.com>
+Ref: https://bugzilla.tianocore.org/show_bug.cgi?id=3097
+Signed-off-by: Laszlo Ersek <lersek@redhat.com>
+---
+ OvmfPkg/Include/IndustryStandard/VirtioFs.h |  17 ++++
+ OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf         |   1 +
+ OvmfPkg/VirtioFsDxe/VirtioFsDxe.h           |   7 ++
+ OvmfPkg/VirtioFsDxe/FuseStatFs.c            | 102 ++++++++++++++++++++
+ 4 files changed, 127 insertions(+)
 
-> ---
->  tools/virtiofsd/fuse_virtio.c | 36 ++++++++++++++++++++++++++---------
->  1 file changed, 27 insertions(+), 9 deletions(-)
-> 
-> diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-> index 83ba07c6cd..944b9a577c 100644
-> --- a/tools/virtiofsd/fuse_virtio.c
-> +++ b/tools/virtiofsd/fuse_virtio.c
-> @@ -588,13 +588,18 @@ static void *fv_queue_thread(void *opaque)
->      struct VuDev *dev = &qi->virtio_dev->dev;
->      struct VuVirtq *q = vu_get_queue(dev, qi->qidx);
->      struct fuse_session *se = qi->virtio_dev->se;
-> -    GThreadPool *pool;
-> -
-> -    pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size, FALSE,
-> -                             NULL);
-> -    if (!pool) {
-> -        fuse_log(FUSE_LOG_ERR, "%s: g_thread_pool_new failed\n", __func__);
-> -        return NULL;
-> +    GThreadPool *pool = NULL;
-> +    GList *req_list = NULL;
-> +
-> +    if (se->thread_pool_size) {
-> +        fuse_log(FUSE_LOG_DEBUG, "%s: Creating thread pool for Queue %d\n",
-> +                 __func__, qi->qidx);
-> +        pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size,
-> +                                 FALSE, NULL);
-> +        if (!pool) {
-> +            fuse_log(FUSE_LOG_ERR, "%s: g_thread_pool_new failed\n", __func__);
-> +            return NULL;
-> +        }
->      }
->  
->      fuse_log(FUSE_LOG_INFO, "%s: Start for queue %d kick_fd %d\n", __func__,
-> @@ -669,14 +674,27 @@ static void *fv_queue_thread(void *opaque)
->  
->              req->reply_sent = false;
->  
-> -            g_thread_pool_push(pool, req, NULL);
-> +            if (!se->thread_pool_size) {
-> +                req_list = g_list_prepend(req_list, req);
-> +            } else {
-> +                g_thread_pool_push(pool, req, NULL);
-> +            }
->          }
->  
->          pthread_mutex_unlock(&qi->vq_lock);
->          pthread_rwlock_unlock(&qi->virtio_dev->vu_dispatch_rwlock);
-> +
-> +        /* Process all the requests. */
-> +        if (!se->thread_pool_size && req_list != NULL) {
-> +            g_list_foreach(req_list, fv_queue_worker, qi);
-> +            g_list_free(req_list);
-> +            req_list = NULL;
-> +        }
->      }
->  
-> -    g_thread_pool_free(pool, FALSE, TRUE);
-> +    if (pool) {
-> +        g_thread_pool_free(pool, FALSE, TRUE);
-> +    }
->  
->      return NULL;
->  }
-> -- 
-> 2.25.4
-> 
-> 
+diff --git a/OvmfPkg/Include/IndustryStandard/VirtioFs.h b/OvmfPkg/Include/IndustryStandard/VirtioFs.h
+index efcf57941c59..800d3651e12b 100644
+--- a/OvmfPkg/Include/IndustryStandard/VirtioFs.h
++++ b/OvmfPkg/Include/IndustryStandard/VirtioFs.h
+@@ -114,16 +114,17 @@ typedef struct {
+ typedef enum {
+   VirtioFsFuseOpLookup      =  1,
+   VirtioFsFuseOpForget      =  2,
+   VirtioFsFuseOpGetAttr     =  3,
+   VirtioFsFuseOpMkDir       =  9,
+   VirtioFsFuseOpUnlink      = 10,
+   VirtioFsFuseOpRmDir       = 11,
+   VirtioFsFuseOpOpen        = 14,
++  VirtioFsFuseOpStatFs      = 17,
+   VirtioFsFuseOpRelease     = 18,
+   VirtioFsFuseOpFsync       = 20,
+   VirtioFsFuseOpFlush       = 25,
+   VirtioFsFuseOpInit        = 26,
+   VirtioFsFuseOpOpenDir     = 27,
+   VirtioFsFuseOpReleaseDir  = 29,
+   VirtioFsFuseOpFsyncDir    = 30,
+   VirtioFsFuseOpCreate      = 35,
+@@ -228,16 +229,32 @@ typedef struct {
+ } VIRTIO_FS_FUSE_OPEN_REQUEST;
+ 
+ typedef struct {
+   UINT64 FileHandle;
+   UINT32 OpenFlags;
+   UINT32 Padding;
+ } VIRTIO_FS_FUSE_OPEN_RESPONSE;
+ 
++//
++// Header for VirtioFsFuseOpStatFs.
++//
++typedef struct {
++  UINT64 Blocks;
++  UINT64 Bfree;
++  UINT64 Bavail;
++  UINT64 Files;
++  UINT64 Ffree;
++  UINT32 Bsize;
++  UINT32 Namelen;
++  UINT32 Frsize;
++  UINT32 Padding;
++  UINT32 Spare[6];
++} VIRTIO_FS_FUSE_STATFS_RESPONSE;
++
+ //
+ // Header for VirtioFsFuseOpRelease and VirtioFsFuseOpReleaseDir.
+ //
+ typedef struct {
+   UINT64 FileHandle;
+   UINT32 Flags;
+   UINT32 ReleaseFlags;
+   UINT64 LockOwner;
+diff --git a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
+index 233c0c5c0f9a..318449db3e63 100644
+--- a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
++++ b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
+@@ -89,16 +89,17 @@ [Sources]
+   FuseGetAttr.c
+   FuseInit.c
+   FuseLookup.c
+   FuseMkDir.c
+   FuseOpen.c
+   FuseOpenDir.c
+   FuseOpenOrCreate.c
+   FuseRelease.c
++  FuseStatFs.c
+   FuseUnlink.c
+   Helpers.c
+   SimpleFsClose.c
+   SimpleFsDelete.c
+   SimpleFsFlush.c
+   SimpleFsGetInfo.c
+   SimpleFsGetPosition.c
+   SimpleFsOpen.c
+diff --git a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
+index 3bf64c0146fa..029c568b39c7 100644
+--- a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
++++ b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
+@@ -285,16 +285,23 @@ VirtioFsFuseRemoveFileOrDir (
+ EFI_STATUS
+ VirtioFsFuseOpen (
+   IN OUT VIRTIO_FS *VirtioFs,
+   IN     UINT64    NodeId,
+   IN     BOOLEAN   ReadWrite,
+      OUT UINT64    *FuseHandle
+   );
+ 
++EFI_STATUS
++VirtioFsFuseStatFs (
++  IN OUT VIRTIO_FS                      *VirtioFs,
++  IN     UINT64                         NodeId,
++     OUT VIRTIO_FS_FUSE_STATFS_RESPONSE *FilesysAttr
++     );
++
+ EFI_STATUS
+ VirtioFsFuseReleaseFileOrDir (
+   IN OUT VIRTIO_FS *VirtioFs,
+   IN     UINT64    NodeId,
+   IN     UINT64    FuseHandle,
+   IN     BOOLEAN   IsDir
+   );
+ 
+diff --git a/OvmfPkg/VirtioFsDxe/FuseStatFs.c b/OvmfPkg/VirtioFsDxe/FuseStatFs.c
+new file mode 100644
+index 000000000000..e794f8977a48
+--- /dev/null
++++ b/OvmfPkg/VirtioFsDxe/FuseStatFs.c
+@@ -0,0 +1,102 @@
++/** @file
++  FUSE_STATFS wrapper for the Virtio Filesystem device.
++
++  Copyright (C) 2020, Red Hat, Inc.
++
++  SPDX-License-Identifier: BSD-2-Clause-Patent
++**/
++
++#include "VirtioFsDxe.h"
++
++/**
++  Send the FUSE_STATFS request to the Virtio Filesysem device, for retrieving
++  the attributes of the host-side filesystem that contains NodeId.
++
++  The function may only be called after VirtioFsFuseInitSession() returns
++  successfully and before VirtioFsUninit() is called.
++
++  @param[in,out] VirtioFs  The Virtio Filesystem device to send the FUSE_STATFS
++                           request to. On output, the FUSE request counter
++                           "VirtioFs->RequestId" will have been incremented.
++
++  @param[in] NodeId        The inode whose containing filesystem is to be
++                           queried for its attributes.
++
++  @param[out] FilesysAttr  The VIRTIO_FS_FUSE_STATFS_RESPONSE object describing
++                           the filesystem that underlies NodeId.
++
++  @retval EFI_SUCCESS  FilesysAttr has been filled in.
++
++  @return              The "errno" value mapped to an EFI_STATUS code, if the
++                       Virtio Filesystem device explicitly reported an error.
++
++  @return              Error codes propagated from VirtioFsSgListsValidate(),
++                       VirtioFsFuseNewRequest(), VirtioFsSgListsSubmit(),
++                       VirtioFsFuseCheckResponse().
++**/
++EFI_STATUS
++VirtioFsFuseStatFs (
++  IN OUT VIRTIO_FS                      *VirtioFs,
++  IN     UINT64                         NodeId,
++     OUT VIRTIO_FS_FUSE_STATFS_RESPONSE *FilesysAttr
++     )
++{
++  VIRTIO_FS_FUSE_REQUEST        CommonReq;
++  VIRTIO_FS_IO_VECTOR           ReqIoVec[1];
++  VIRTIO_FS_SCATTER_GATHER_LIST ReqSgList;
++  VIRTIO_FS_FUSE_RESPONSE       CommonResp;
++  VIRTIO_FS_IO_VECTOR           RespIoVec[2];
++  VIRTIO_FS_SCATTER_GATHER_LIST RespSgList;
++  EFI_STATUS                    Status;
++
++  //
++  // Set up the scatter-gather lists.
++  //
++  ReqIoVec[0].Buffer = &CommonReq;
++  ReqIoVec[0].Size   = sizeof CommonReq;
++  ReqSgList.IoVec    = ReqIoVec;
++  ReqSgList.NumVec   = ARRAY_SIZE (ReqIoVec);
++
++  RespIoVec[0].Buffer = &CommonResp;
++  RespIoVec[0].Size   = sizeof CommonResp;
++  RespIoVec[1].Buffer = FilesysAttr;
++  RespIoVec[1].Size   = sizeof *FilesysAttr;
++  RespSgList.IoVec    = RespIoVec;
++  RespSgList.NumVec   = ARRAY_SIZE (RespIoVec);
++
++  //
++  // Validate the scatter-gather lists; calculate the total transfer sizes.
++  //
++  Status = VirtioFsSgListsValidate (VirtioFs, &ReqSgList, &RespSgList);
++  if (EFI_ERROR (Status)) {
++    return Status;
++  }
++
++  //
++  // Populate the common request header.
++  //
++  Status = VirtioFsFuseNewRequest (VirtioFs, &CommonReq, ReqSgList.TotalSize,
++             VirtioFsFuseOpStatFs, NodeId);
++  if (EFI_ERROR (Status)) {
++    return Status;
++  }
++
++  //
++  // Submit the request.
++  //
++  Status = VirtioFsSgListsSubmit (VirtioFs, &ReqSgList, &RespSgList);
++  if (EFI_ERROR (Status)) {
++    return Status;
++  }
++
++  //
++  // Verify the response (all response buffers are fixed size).
++  //
++  Status = VirtioFsFuseCheckResponse (&RespSgList, CommonReq.Unique, NULL);
++  if (Status == EFI_DEVICE_ERROR) {
++    DEBUG ((DEBUG_ERROR, "%a: Label=\"%s\" NodeId=%Lu Errno=%d\n",
++      __FUNCTION__, VirtioFs->Label, NodeId, CommonResp.Error));
++    Status = VirtioFsErrnoToEfiStatus (CommonResp.Error);
++  }
++  return Status;
++}
 -- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+2.19.1.3.g30247aa5d201
+
+
 

@@ -1,15 +1,13 @@
-References: <20201208055043.31548-1-lersek@redhat.com>
-	<20201208165725.GB20722@redhat.com>
 From: Laszlo Ersek <lersek@redhat.com>
-Message-ID: <9e1966ea-049e-1c3d-b81a-a6ce17f5f134@redhat.com>
-Date: Thu, 10 Dec 2020 08:55:26 +0100
+Date: Wed, 16 Dec 2020 22:10:58 +0100
+Message-Id: <20201216211125.19496-22-lersek@redhat.com>
+In-Reply-To: <20201216211125.19496-1-lersek@redhat.com>
+References: <20201216211125.19496-1-lersek@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20201208165725.GB20722@redhat.com>
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: make the debug log timestamp on
- stderr more human-readable
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [edk2 PATCH 21/48] OvmfPkg/VirtioFsDxe: convert FUSE
+	inode attributes to EFI_FILE_INFO
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,134 +16,361 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: devel@edk2.groups.io, virtio-fs@redhat.com, lersek@redhat.com
+Cc: Jordan Justen <jordan.l.justen@intel.com>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@redhat.com>, Ard Biesheuvel <ard.biesheuvel@arm.com>
 
-On 12/08/20 17:57, Vivek Goyal wrote:
-> On Tue, Dec 08, 2020 at 06:50:43AM +0100, Laszlo Ersek wrote:
->> The current timestamp format doesn't help me visually notice small jumps
->> in time ("small" as defined on human scale, such as a few seconds or a few
->> ten seconds). Replace it with a local time format where such differences
->> stand out.
-> 
-> Switching to a human readable time stamp makes sense. That seems much
-> more helpful for debugging, IMHO.
+Introduce the VirtioFsFuseAttrToEfiFileInfo() function, for converting
+FUSE inode attributes to EFI_FILE_INFO.
 
-Thanks! (for the other review as well)
-laszlo
+The EpochToEfiTime() function from EmbeddedPkg's TimeBaseLib proves
+invaluable for converting the file access times.
 
-> 
-> Thanks
-> Vivek
-> 
->>
->> Before:
->>
->>> [13316826770337] [ID: 00000004] unique: 62, opcode: RELEASEDIR (29), nodeid: 1, insize: 64, pid: 1
->>> [13316826778175] [ID: 00000004]    unique: 62, success, outsize: 16
->>> [13316826781156] [ID: 00000004] virtio_send_msg: elem 0: with 1 in desc of length 16
->>> [15138279317927] [ID: 00000001] virtio_loop: Got VU event
->>> [15138279504884] [ID: 00000001] fv_queue_set_started: qidx=1 started=0
->>> [15138279519034] [ID: 00000003] fv_queue_thread: kill event on queue 1 - quitting
->>> [15138280876463] [ID: 00000001] fv_remove_watch: TODO! fd=9
->>> [15138280897381] [ID: 00000001] virtio_loop: Waiting for VU event
->>> [15138280946834] [ID: 00000001] virtio_loop: Got VU event
->>> [15138281175421] [ID: 00000001] virtio_loop: Waiting for VU event
->>> [15138281182387] [ID: 00000001] virtio_loop: Got VU event
->>> [15138281189474] [ID: 00000001] virtio_loop: Waiting for VU event
->>> [15138309321936] [ID: 00000001] virtio_loop: Unexpected poll revents 11
->>> [15138309434150] [ID: 00000001] virtio_loop: Exit
->>
->> (Notice how you don't (easily) notice the gap in time after
->> "virtio_send_msg", and especially the amount of time passed is hard to
->> estimate.)
->>
->> After:
->>
->>> [2020-12-08 06:43:22.58+0100] [ID: 00000004] unique: 51, opcode: RELEASEDIR (29), nodeid: 1, insize: 64, pid: 1
->>> [2020-12-08 06:43:22.58+0100] [ID: 00000004]    unique: 51, success, outsize: 16
->>> [2020-12-08 06:43:22.58+0100] [ID: 00000004] virtio_send_msg: elem 0: with 1 in desc of length 16
->>> [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Got VU event
->>> [2020-12-08 06:43:29.34+0100] [ID: 00000001] fv_queue_set_started: qidx=1 started=0
->>> [2020-12-08 06:43:29.34+0100] [ID: 00000003] fv_queue_thread: kill event on queue 1 - quitting
->>> [2020-12-08 06:43:29.34+0100] [ID: 00000001] fv_remove_watch: TODO! fd=9
->>> [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Waiting for VU event
->>> [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Got VU event
->>> [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Waiting for VU event
->>> [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Got VU event
->>> [2020-12-08 06:43:29.34+0100] [ID: 00000001] virtio_loop: Waiting for VU event
->>> [2020-12-08 06:43:29.37+0100] [ID: 00000001] virtio_loop: Unexpected poll revents 11
->>> [2020-12-08 06:43:29.37+0100] [ID: 00000001] virtio_loop: Exit
->>
->> Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
->> Cc: Stefan Hajnoczi <stefanha@redhat.com>
->> Signed-off-by: Laszlo Ersek <lersek@redhat.com>
->> ---
->>  tools/virtiofsd/passthrough_ll.c | 31 +++++++++++++++++++++++++++----
->>  1 file changed, 27 insertions(+), 4 deletions(-)
->>
->> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
->> index 48a109d3f682..06543b20dcbb 100644
->> --- a/tools/virtiofsd/passthrough_ll.c
->> +++ b/tools/virtiofsd/passthrough_ll.c
->> @@ -3311,18 +3311,38 @@ static void setup_nofile_rlimit(unsigned long rlimit_nofile)
->>  static void log_func(enum fuse_log_level level, const char *fmt, va_list ap)
->>  {
->>      g_autofree char *localfmt = NULL;
->> +    struct timespec ts;
->> +    struct tm tm;
->> +    char sec_fmt[sizeof "2020-12-07 18:17:54"];
->> +    char zone_fmt[sizeof "+0100"];
->>  
->>      if (current_log_level < level) {
->>          return;
->>      }
->>  
->>      if (current_log_level == FUSE_LOG_DEBUG) {
->> -        if (!use_syslog) {
->> -            localfmt = g_strdup_printf("[%" PRId64 "] [ID: %08ld] %s",
->> -                                       get_clock(), syscall(__NR_gettid), fmt);
->> -        } else {
->> +        if (use_syslog) {
->> +            /* no timestamp needed */
->>              localfmt = g_strdup_printf("[ID: %08ld] %s", syscall(__NR_gettid),
->>                                         fmt);
->> +        } else {
->> +            /* try formatting a broken-down timestamp */
->> +            if (clock_gettime(CLOCK_REALTIME, &ts) != -1 &&
->> +                localtime_r(&ts.tv_sec, &tm) != NULL &&
->> +                strftime(sec_fmt, sizeof sec_fmt, "%Y-%m-%d %H:%M:%S",
->> +                         &tm) != 0 &&
->> +                strftime(zone_fmt, sizeof zone_fmt, "%z", &tm) != 0) {
->> +                localfmt = g_strdup_printf("[%s.%02ld%s] [ID: %08ld] %s",
->> +                                           sec_fmt,
->> +                                           ts.tv_nsec / (10L * 1000 * 1000),
->> +                                           zone_fmt, syscall(__NR_gettid),
->> +                                           fmt);
->> +            } else {
->> +                /* fall back to a flat timestamp */
->> +                localfmt = g_strdup_printf("[%" PRId64 "] [ID: %08ld] %s",
->> +                                           get_clock(), syscall(__NR_gettid),
->> +                                           fmt);
->> +            }
->>          }
->>          fmt = localfmt;
->>      }
->> @@ -3452,6 +3472,9 @@ int main(int argc, char *argv[])
->>      struct lo_map_elem *reserve_elem;
->>      int ret = -1;
->>  
->> +    /* Initialize time conversion information for localtime_r(). */
->> +    tzset();
->> +
->>      /* Don't mask creation mode, kernel already did that */
->>      umask(0);
->>  
->> -- 
->> 2.19.1.3.g30247aa5d201
->>
->> _______________________________________________
->> Virtio-fs mailing list
->> Virtio-fs@redhat.com
->> https://www.redhat.com/mailman/listinfo/virtio-fs
+This is the first time we consume TimeBaseLib in OvmfPkg, so add the
+necessary lib class resolution. We need not modify any ArmVirtPkg DSC
+files: see commit af5fed90bfbf ("ArmPlatformPkg,ArmVirtPkg: delete
+redundant PL031 functions", 2017-05-10).
+
+Cc: Ard Biesheuvel <ard.biesheuvel@arm.com>
+Cc: Jordan Justen <jordan.l.justen@intel.com>
+Cc: Philippe Mathieu-Daudé <philmd@redhat.com>
+Ref: https://bugzilla.tianocore.org/show_bug.cgi?id=3097
+Signed-off-by: Laszlo Ersek <lersek@redhat.com>
+---
+ OvmfPkg/OvmfPkgIa32.dsc                     |   1 +
+ OvmfPkg/OvmfPkgIa32X64.dsc                  |   1 +
+ OvmfPkg/OvmfPkgX64.dsc                      |   1 +
+ OvmfPkg/Include/IndustryStandard/VirtioFs.h |   3 +
+ OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf         |   2 +
+ OvmfPkg/VirtioFsDxe/VirtioFsDxe.h           |   7 ++
+ OvmfPkg/VirtioFsDxe/Helpers.c               | 119 ++++++++++++++++++++
+ 7 files changed, 134 insertions(+)
+
+diff --git a/OvmfPkg/OvmfPkgIa32.dsc b/OvmfPkg/OvmfPkgIa32.dsc
+index 4ff70674fb6e..26a013ec353e 100644
+--- a/OvmfPkg/OvmfPkgIa32.dsc
++++ b/OvmfPkg/OvmfPkgIa32.dsc
+@@ -120,16 +120,17 @@ [SkuIds]
+ [LibraryClasses]
+   PcdLib|MdePkg/Library/BasePcdLibNull/BasePcdLibNull.inf
+   TimerLib|OvmfPkg/Library/AcpiTimerLib/BaseAcpiTimerLib.inf
+   ResetSystemLib|OvmfPkg/Library/ResetSystemLib/BaseResetSystemLib.inf
+   PrintLib|MdePkg/Library/BasePrintLib/BasePrintLib.inf
+   BaseMemoryLib|MdePkg/Library/BaseMemoryLibRepStr/BaseMemoryLibRepStr.inf
+   BaseLib|MdePkg/Library/BaseLib/BaseLib.inf
+   SafeIntLib|MdePkg/Library/BaseSafeIntLib/BaseSafeIntLib.inf
++  TimeBaseLib|EmbeddedPkg/Library/TimeBaseLib/TimeBaseLib.inf
+   BmpSupportLib|MdeModulePkg/Library/BaseBmpSupportLib/BaseBmpSupportLib.inf
+   SynchronizationLib|MdePkg/Library/BaseSynchronizationLib/BaseSynchronizationLib.inf
+   CpuLib|MdePkg/Library/BaseCpuLib/BaseCpuLib.inf
+   PerformanceLib|MdePkg/Library/BasePerformanceLibNull/BasePerformanceLibNull.inf
+   PeCoffLib|MdePkg/Library/BasePeCoffLib/BasePeCoffLib.inf
+   CacheMaintenanceLib|MdePkg/Library/BaseCacheMaintenanceLib/BaseCacheMaintenanceLib.inf
+   UefiDecompressLib|MdePkg/Library/BaseUefiDecompressLib/BaseUefiDecompressLib.inf
+   UefiHiiServicesLib|MdeModulePkg/Library/UefiHiiServicesLib/UefiHiiServicesLib.inf
+diff --git a/OvmfPkg/OvmfPkgIa32X64.dsc b/OvmfPkg/OvmfPkgIa32X64.dsc
+index d40a59183c79..10579fe46c5b 100644
+--- a/OvmfPkg/OvmfPkgIa32X64.dsc
++++ b/OvmfPkg/OvmfPkgIa32X64.dsc
+@@ -124,16 +124,17 @@ [SkuIds]
+ [LibraryClasses]
+   PcdLib|MdePkg/Library/BasePcdLibNull/BasePcdLibNull.inf
+   TimerLib|OvmfPkg/Library/AcpiTimerLib/BaseAcpiTimerLib.inf
+   ResetSystemLib|OvmfPkg/Library/ResetSystemLib/BaseResetSystemLib.inf
+   PrintLib|MdePkg/Library/BasePrintLib/BasePrintLib.inf
+   BaseMemoryLib|MdePkg/Library/BaseMemoryLibRepStr/BaseMemoryLibRepStr.inf
+   BaseLib|MdePkg/Library/BaseLib/BaseLib.inf
+   SafeIntLib|MdePkg/Library/BaseSafeIntLib/BaseSafeIntLib.inf
++  TimeBaseLib|EmbeddedPkg/Library/TimeBaseLib/TimeBaseLib.inf
+   BmpSupportLib|MdeModulePkg/Library/BaseBmpSupportLib/BaseBmpSupportLib.inf
+   SynchronizationLib|MdePkg/Library/BaseSynchronizationLib/BaseSynchronizationLib.inf
+   CpuLib|MdePkg/Library/BaseCpuLib/BaseCpuLib.inf
+   PerformanceLib|MdePkg/Library/BasePerformanceLibNull/BasePerformanceLibNull.inf
+   PeCoffLib|MdePkg/Library/BasePeCoffLib/BasePeCoffLib.inf
+   CacheMaintenanceLib|MdePkg/Library/BaseCacheMaintenanceLib/BaseCacheMaintenanceLib.inf
+   UefiDecompressLib|MdePkg/Library/BaseUefiDecompressLib/BaseUefiDecompressLib.inf
+   UefiHiiServicesLib|MdeModulePkg/Library/UefiHiiServicesLib/UefiHiiServicesLib.inf
+diff --git a/OvmfPkg/OvmfPkgX64.dsc b/OvmfPkg/OvmfPkgX64.dsc
+index ec7886235acf..c9235e48ad62 100644
+--- a/OvmfPkg/OvmfPkgX64.dsc
++++ b/OvmfPkg/OvmfPkgX64.dsc
+@@ -124,16 +124,17 @@ [SkuIds]
+ [LibraryClasses]
+   PcdLib|MdePkg/Library/BasePcdLibNull/BasePcdLibNull.inf
+   TimerLib|OvmfPkg/Library/AcpiTimerLib/BaseAcpiTimerLib.inf
+   ResetSystemLib|OvmfPkg/Library/ResetSystemLib/BaseResetSystemLib.inf
+   PrintLib|MdePkg/Library/BasePrintLib/BasePrintLib.inf
+   BaseMemoryLib|MdePkg/Library/BaseMemoryLibRepStr/BaseMemoryLibRepStr.inf
+   BaseLib|MdePkg/Library/BaseLib/BaseLib.inf
+   SafeIntLib|MdePkg/Library/BaseSafeIntLib/BaseSafeIntLib.inf
++  TimeBaseLib|EmbeddedPkg/Library/TimeBaseLib/TimeBaseLib.inf
+   BmpSupportLib|MdeModulePkg/Library/BaseBmpSupportLib/BaseBmpSupportLib.inf
+   SynchronizationLib|MdePkg/Library/BaseSynchronizationLib/BaseSynchronizationLib.inf
+   CpuLib|MdePkg/Library/BaseCpuLib/BaseCpuLib.inf
+   PerformanceLib|MdePkg/Library/BasePerformanceLibNull/BasePerformanceLibNull.inf
+   PeCoffLib|MdePkg/Library/BasePeCoffLib/BasePeCoffLib.inf
+   CacheMaintenanceLib|MdePkg/Library/BaseCacheMaintenanceLib/BaseCacheMaintenanceLib.inf
+   UefiDecompressLib|MdePkg/Library/BaseUefiDecompressLib/BaseUefiDecompressLib.inf
+   UefiHiiServicesLib|MdeModulePkg/Library/UefiHiiServicesLib/UefiHiiServicesLib.inf
+diff --git a/OvmfPkg/Include/IndustryStandard/VirtioFs.h b/OvmfPkg/Include/IndustryStandard/VirtioFs.h
+index 63aced229e9b..5d1d990a2d83 100644
+--- a/OvmfPkg/Include/IndustryStandard/VirtioFs.h
++++ b/OvmfPkg/Include/IndustryStandard/VirtioFs.h
+@@ -79,16 +79,19 @@ typedef struct {
+ //
+ // The inode number of the root directory.
+ //
+ #define VIRTIO_FS_FUSE_ROOT_DIR_NODE_ID 1
+ 
+ //
+ // File mode bitmasks.
+ //
++#define VIRTIO_FS_FUSE_MODE_TYPE_MASK 0170000u
++#define VIRTIO_FS_FUSE_MODE_TYPE_REG  0100000u
++#define VIRTIO_FS_FUSE_MODE_TYPE_DIR  0040000u
+ #define VIRTIO_FS_FUSE_MODE_PERM_RWXU 0000700u
+ #define VIRTIO_FS_FUSE_MODE_PERM_RUSR 0000400u
+ #define VIRTIO_FS_FUSE_MODE_PERM_WUSR 0000200u
+ #define VIRTIO_FS_FUSE_MODE_PERM_RWXG 0000070u
+ #define VIRTIO_FS_FUSE_MODE_PERM_RGRP 0000040u
+ #define VIRTIO_FS_FUSE_MODE_PERM_WGRP 0000020u
+ #define VIRTIO_FS_FUSE_MODE_PERM_RWXO 0000007u
+ #define VIRTIO_FS_FUSE_MODE_PERM_ROTH 0000004u
+diff --git a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
+index b942baa4a772..7d7272188465 100644
+--- a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
++++ b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
+@@ -72,16 +72,17 @@
+ [Defines]
+   INF_VERSION                           = 1.29
+   BASE_NAME                             = VirtioFsDxe
+   FILE_GUID                             = 7BD9DDF7-8B83-488E-AEC9-24C78610289C
+   MODULE_TYPE                           = UEFI_DRIVER
+   ENTRY_POINT                           = VirtioFsEntryPoint
+ 
+ [Packages]
++  EmbeddedPkg/EmbeddedPkg.dec
+   MdePkg/MdePkg.dec
+   OvmfPkg/OvmfPkg.dec
+ 
+ [Sources]
+   DriverBinding.c
+   FuseFlush.c
+   FuseForget.c
+   FuseFsync.c
+@@ -105,16 +106,17 @@ [Sources]
+   SimpleFsWrite.c
+   VirtioFsDxe.h
+ 
+ [LibraryClasses]
+   BaseLib
+   BaseMemoryLib
+   DebugLib
+   MemoryAllocationLib
++  TimeBaseLib
+   UefiBootServicesTableLib
+   UefiDriverEntryPoint
+   VirtioLib
+ 
+ [Protocols]
+   gEfiComponentName2ProtocolGuid        ## PRODUCES
+   gEfiDriverBindingProtocolGuid         ## PRODUCES
+   gEfiSimpleFileSystemProtocolGuid      ## BY_START
+diff --git a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
+index 795cf4ee5d7d..6cc5257bab40 100644
+--- a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
++++ b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
+@@ -6,16 +6,17 @@
+ 
+   SPDX-License-Identifier: BSD-2-Clause-Patent
+ **/
+ 
+ #ifndef VIRTIO_FS_DXE_H_
+ #define VIRTIO_FS_DXE_H_
+ 
+ #include <Base.h>                      // SIGNATURE_64()
++#include <Guid/FileInfo.h>             // EFI_FILE_INFO
+ #include <IndustryStandard/VirtioFs.h> // VIRTIO_FS_TAG_BYTES
+ #include <Library/DebugLib.h>          // CR()
+ #include <Protocol/SimpleFileSystem.h> // EFI_SIMPLE_FILE_SYSTEM_PROTOCOL
+ #include <Protocol/VirtioDevice.h>     // VIRTIO_DEVICE_PROTOCOL
+ #include <Uefi/UefiBaseType.h>         // EFI_EVENT
+ 
+ #define VIRTIO_FS_SIG SIGNATURE_64 ('V', 'I', 'R', 'T', 'I', 'O', 'F', 'S')
+ 
+@@ -220,16 +221,22 @@ VirtioFsErrnoToEfiStatus (
+ EFI_STATUS
+ VirtioFsAppendPath (
+   IN     CHAR8   *LhsPath8,
+   IN     CHAR16  *RhsPath16,
+      OUT CHAR8   **ResultPath8,
+      OUT BOOLEAN *RootEscape
+   );
+ 
++EFI_STATUS
++VirtioFsFuseAttrToEfiFileInfo (
++  IN     VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE *FuseAttr,
++     OUT EFI_FILE_INFO                      *FileInfo
++  );
++
+ //
+ // Wrapper functions for FUSE commands (primitives).
+ //
+ 
+ EFI_STATUS
+ VirtioFsFuseForget (
+   IN OUT VIRTIO_FS *VirtioFs,
+   IN     UINT64    NodeId
+diff --git a/OvmfPkg/VirtioFsDxe/Helpers.c b/OvmfPkg/VirtioFsDxe/Helpers.c
+index 4a7b59332ca9..fa656bb535b8 100644
+--- a/OvmfPkg/VirtioFsDxe/Helpers.c
++++ b/OvmfPkg/VirtioFsDxe/Helpers.c
+@@ -4,16 +4,17 @@
+   Copyright (C) 2020, Red Hat, Inc.
+ 
+   SPDX-License-Identifier: BSD-2-Clause-Patent
+ **/
+ 
+ #include <Library/BaseLib.h>             // StrLen()
+ #include <Library/BaseMemoryLib.h>       // CopyMem()
+ #include <Library/MemoryAllocationLib.h> // AllocatePool()
++#include <Library/TimeBaseLib.h>         // EpochToEfiTime()
+ #include <Library/VirtioLib.h>           // Virtio10WriteFeatures()
+ 
+ #include "VirtioFsDxe.h"
+ 
+ /**
+   Read the Virtio Filesystem device configuration structure in full.
+ 
+   @param[in] Virtio   The Virtio protocol underlying the VIRTIO_FS object.
+@@ -1584,8 +1585,126 @@ VirtioFsAppendPath (
+   if (RhsPath8[0] != '/') {
+     FreePool (BufferToSanitize);
+   }
+ 
+ FreeRhsPath8:
+   FreePool (RhsPath8);
+   return Status;
+ }
++
++/**
++  Convert select fields of a VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE object to
++  corresponding fields in EFI_FILE_INFO.
++
++  @param[in] FuseAttr   The VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE object to
++                        convert the relevant fields from.
++
++  @param[out] FileInfo  The EFI_FILE_INFO structure to modify. Importantly, the
++                        FileInfo->Size and FileInfo->FileName fields are not
++                        overwritten.
++
++  @retval EFI_SUCCESS      Conversion successful.
++
++  @retval EFI_UNSUPPORTED  The allocated size of the file is inexpressible in
++                           EFI_FILE_INFO.
++
++  @retval EFI_UNSUPPORTED  One of the file access times is inexpressible in
++                           EFI_FILE_INFO.
++
++  @retval EFI_UNSUPPORTED  The file type is inexpressible in EFI_FILE_INFO.
++
++  @retval EFI_UNSUPPORTED  The file is a regular file that has multiple names
++                           on the host side (i.e., its hard link count is
++                           greater than one).
++**/
++EFI_STATUS
++VirtioFsFuseAttrToEfiFileInfo (
++  IN     VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE *FuseAttr,
++     OUT EFI_FILE_INFO                      *FileInfo
++  )
++{
++  UINT64   EpochTime[3];
++  EFI_TIME *ConvertedTime[ARRAY_SIZE (EpochTime)];
++  UINTN    Idx;
++
++  FileInfo->FileSize = FuseAttr->Size;
++
++  //
++  // The unit for FuseAttr->Blocks is 512B.
++  //
++  if (FuseAttr->Blocks >= BIT55) {
++    return EFI_UNSUPPORTED;
++  }
++  FileInfo->PhysicalSize = LShiftU64 (FuseAttr->Blocks, 9);
++
++  //
++  // Convert the timestamps. File creation time is not tracked by the Virtio
++  // Filesystem device, so set FileInfo->CreateTime from FuseAttr->Mtime as
++  // well.
++  //
++  EpochTime[0]     = FuseAttr->Mtime;
++  EpochTime[1]     = FuseAttr->Atime;
++  EpochTime[2]     = FuseAttr->Mtime;
++  ConvertedTime[0] = &FileInfo->CreateTime;
++  ConvertedTime[1] = &FileInfo->LastAccessTime;
++  ConvertedTime[2] = &FileInfo->ModificationTime;
++
++  for (Idx = 0; Idx < ARRAY_SIZE (EpochTime); Idx++) {
++    //
++    // EpochToEfiTime() takes a UINTN for seconds.
++    //
++    if (EpochTime[Idx] > MAX_UINTN) {
++      return EFI_UNSUPPORTED;
++    }
++    //
++    // Set the following fields in the converted time: Year, Month, Day, Hour,
++    // Minute, Second, Nanosecond.
++    //
++    EpochToEfiTime ((UINTN)EpochTime[Idx], ConvertedTime[Idx]);
++    //
++    // The times are all expressed in UTC. Consequently, they are not affected
++    // by daylight saving.
++    //
++    ConvertedTime[Idx]->TimeZone = 0;
++    ConvertedTime[Idx]->Daylight = 0;
++    //
++    // Clear the padding fields.
++    //
++    ConvertedTime[Idx]->Pad1 = 0;
++    ConvertedTime[Idx]->Pad2 = 0;
++  }
++
++  //
++  // Set the attributes.
++  //
++  switch (FuseAttr->Mode & VIRTIO_FS_FUSE_MODE_TYPE_MASK) {
++  case VIRTIO_FS_FUSE_MODE_TYPE_DIR:
++    FileInfo->Attribute = EFI_FILE_DIRECTORY;
++    break;
++  case VIRTIO_FS_FUSE_MODE_TYPE_REG:
++    FileInfo->Attribute = 0;
++    break;
++  default:
++    //
++    // Other file types are not supported.
++    //
++    return EFI_UNSUPPORTED;
++  }
++  //
++  // Report the regular file or directory as read-only if all classes lack
++  // write permission.
++  //
++  if ((FuseAttr->Mode & (VIRTIO_FS_FUSE_MODE_PERM_WUSR |
++                         VIRTIO_FS_FUSE_MODE_PERM_WGRP |
++                         VIRTIO_FS_FUSE_MODE_PERM_WOTH)) == 0) {
++    FileInfo->Attribute |= EFI_FILE_READ_ONLY;
++  }
++
++  //
++  // A hard link count greater than 1 is not supported for regular files.
++  //
++  if ((FileInfo->Attribute & EFI_FILE_DIRECTORY) == 0 && FuseAttr->Nlink > 1) {
++    return EFI_UNSUPPORTED;
++  }
++
++  return EFI_SUCCESS;
++}
+-- 
+2.19.1.3.g30247aa5d201
+
+
 

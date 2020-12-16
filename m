@@ -1,13 +1,13 @@
 From: Laszlo Ersek <lersek@redhat.com>
-Date: Wed, 16 Dec 2020 22:11:05 +0100
-Message-Id: <20201216211125.19496-29-lersek@redhat.com>
+Date: Wed, 16 Dec 2020 22:11:06 +0100
+Message-Id: <20201216211125.19496-30-lersek@redhat.com>
 In-Reply-To: <20201216211125.19496-1-lersek@redhat.com>
 References: <20201216211125.19496-1-lersek@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [edk2 PATCH 28/48] OvmfPkg/VirtioFsDxe: implement the
-	wrapper function for FUSE_STATFS
+Subject: [Virtio-fs] [edk2 PATCH 29/48] OvmfPkg/VirtioFsDxe: add helper for
+	formatting UEFI basenames
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,8 +19,10 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: devel@edk2.groups.io, virtio-fs@redhat.com, lersek@redhat.com
 Cc: Jordan Justen <jordan.l.justen@intel.com>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@redhat.com>, Ard Biesheuvel <ard.biesheuvel@arm.com>
 
-Add the VirtioFsFuseStatFs() function, for sending the FUSE_STATFS command
-to the Virtio Filesystem device.
+The EFI_FILE_INFO structure, which is output by
+EFI_FILE_PROTOCOL.GetInfo(), ends with a flexible CHAR16 array called
+"FileName". Add the VirtioFsGetBasename() function, for determining the
+required array size, and for filling the array as well.
 
 Cc: Ard Biesheuvel <ard.biesheuvel@arm.com>
 Cc: Jordan Justen <jordan.l.justen@intel.com>
@@ -28,225 +30,120 @@ Cc: Philippe Mathieu-Daudé <philmd@redhat.com>
 Ref: https://bugzilla.tianocore.org/show_bug.cgi?id=3097
 Signed-off-by: Laszlo Ersek <lersek@redhat.com>
 ---
- OvmfPkg/Include/IndustryStandard/VirtioFs.h |  17 ++++
- OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf         |   1 +
- OvmfPkg/VirtioFsDxe/VirtioFsDxe.h           |   7 ++
- OvmfPkg/VirtioFsDxe/FuseStatFs.c            | 102 ++++++++++++++++++++
- 4 files changed, 127 insertions(+)
+ OvmfPkg/VirtioFsDxe/VirtioFsDxe.h |  7 +++
+ OvmfPkg/VirtioFsDxe/Helpers.c     | 61 ++++++++++++++++++++
+ 2 files changed, 68 insertions(+)
 
-diff --git a/OvmfPkg/Include/IndustryStandard/VirtioFs.h b/OvmfPkg/Include/IndustryStandard/VirtioFs.h
-index efcf57941c59..800d3651e12b 100644
---- a/OvmfPkg/Include/IndustryStandard/VirtioFs.h
-+++ b/OvmfPkg/Include/IndustryStandard/VirtioFs.h
-@@ -114,16 +114,17 @@ typedef struct {
- typedef enum {
-   VirtioFsFuseOpLookup      =  1,
-   VirtioFsFuseOpForget      =  2,
-   VirtioFsFuseOpGetAttr     =  3,
-   VirtioFsFuseOpMkDir       =  9,
-   VirtioFsFuseOpUnlink      = 10,
-   VirtioFsFuseOpRmDir       = 11,
-   VirtioFsFuseOpOpen        = 14,
-+  VirtioFsFuseOpStatFs      = 17,
-   VirtioFsFuseOpRelease     = 18,
-   VirtioFsFuseOpFsync       = 20,
-   VirtioFsFuseOpFlush       = 25,
-   VirtioFsFuseOpInit        = 26,
-   VirtioFsFuseOpOpenDir     = 27,
-   VirtioFsFuseOpReleaseDir  = 29,
-   VirtioFsFuseOpFsyncDir    = 30,
-   VirtioFsFuseOpCreate      = 35,
-@@ -228,16 +229,32 @@ typedef struct {
- } VIRTIO_FS_FUSE_OPEN_REQUEST;
- 
- typedef struct {
-   UINT64 FileHandle;
-   UINT32 OpenFlags;
-   UINT32 Padding;
- } VIRTIO_FS_FUSE_OPEN_RESPONSE;
- 
-+//
-+// Header for VirtioFsFuseOpStatFs.
-+//
-+typedef struct {
-+  UINT64 Blocks;
-+  UINT64 Bfree;
-+  UINT64 Bavail;
-+  UINT64 Files;
-+  UINT64 Ffree;
-+  UINT32 Bsize;
-+  UINT32 Namelen;
-+  UINT32 Frsize;
-+  UINT32 Padding;
-+  UINT32 Spare[6];
-+} VIRTIO_FS_FUSE_STATFS_RESPONSE;
-+
- //
- // Header for VirtioFsFuseOpRelease and VirtioFsFuseOpReleaseDir.
- //
- typedef struct {
-   UINT64 FileHandle;
-   UINT32 Flags;
-   UINT32 ReleaseFlags;
-   UINT64 LockOwner;
-diff --git a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
-index 233c0c5c0f9a..318449db3e63 100644
---- a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
-+++ b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
-@@ -89,16 +89,17 @@ [Sources]
-   FuseGetAttr.c
-   FuseInit.c
-   FuseLookup.c
-   FuseMkDir.c
-   FuseOpen.c
-   FuseOpenDir.c
-   FuseOpenOrCreate.c
-   FuseRelease.c
-+  FuseStatFs.c
-   FuseUnlink.c
-   Helpers.c
-   SimpleFsClose.c
-   SimpleFsDelete.c
-   SimpleFsFlush.c
-   SimpleFsGetInfo.c
-   SimpleFsGetPosition.c
-   SimpleFsOpen.c
 diff --git a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
-index 3bf64c0146fa..029c568b39c7 100644
+index 029c568b39c7..d1b746c0d8cf 100644
 --- a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
 +++ b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
-@@ -285,16 +285,23 @@ VirtioFsFuseRemoveFileOrDir (
+@@ -229,16 +229,23 @@ VirtioFsAppendPath (
  EFI_STATUS
- VirtioFsFuseOpen (
+ VirtioFsLookupMostSpecificParentDir (
    IN OUT VIRTIO_FS *VirtioFs,
-   IN     UINT64    NodeId,
-   IN     BOOLEAN   ReadWrite,
-      OUT UINT64    *FuseHandle
+   IN OUT CHAR8     *Path,
+      OUT UINT64    *DirNodeId,
+      OUT CHAR8     **LastComponent
    );
  
 +EFI_STATUS
-+VirtioFsFuseStatFs (
-+  IN OUT VIRTIO_FS                      *VirtioFs,
-+  IN     UINT64                         NodeId,
-+     OUT VIRTIO_FS_FUSE_STATFS_RESPONSE *FilesysAttr
-+     );
++VirtioFsGetBasename (
++  IN     CHAR8  *Path,
++     OUT CHAR16 *Basename     OPTIONAL,
++  IN OUT UINTN  *BasenameSize
++  );
 +
  EFI_STATUS
- VirtioFsFuseReleaseFileOrDir (
-   IN OUT VIRTIO_FS *VirtioFs,
-   IN     UINT64    NodeId,
-   IN     UINT64    FuseHandle,
-   IN     BOOLEAN   IsDir
+ VirtioFsFuseAttrToEfiFileInfo (
+   IN     VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE *FuseAttr,
+      OUT EFI_FILE_INFO                      *FileInfo
    );
  
-diff --git a/OvmfPkg/VirtioFsDxe/FuseStatFs.c b/OvmfPkg/VirtioFsDxe/FuseStatFs.c
-new file mode 100644
-index 000000000000..e794f8977a48
---- /dev/null
-+++ b/OvmfPkg/VirtioFsDxe/FuseStatFs.c
-@@ -0,0 +1,102 @@
-+/** @file
-+  FUSE_STATFS wrapper for the Virtio Filesystem device.
-+
-+  Copyright (C) 2020, Red Hat, Inc.
-+
-+  SPDX-License-Identifier: BSD-2-Clause-Patent
-+**/
-+
-+#include "VirtioFsDxe.h"
-+
+ //
+ // Wrapper functions for FUSE commands (primitives).
+diff --git a/OvmfPkg/VirtioFsDxe/Helpers.c b/OvmfPkg/VirtioFsDxe/Helpers.c
+index 6adc0341dee6..77f718e91233 100644
+--- a/OvmfPkg/VirtioFsDxe/Helpers.c
++++ b/OvmfPkg/VirtioFsDxe/Helpers.c
+@@ -1717,16 +1717,77 @@ VirtioFsLookupMostSpecificParentDir (
+   *LastComponent = Slash + 1;
+   return EFI_SUCCESS;
+ 
+ ForgetNextDirNodeId:
+   VirtioFsFuseForget (VirtioFs, NextDirNodeId);
+   return Status;
+ }
+ 
 +/**
-+  Send the FUSE_STATFS request to the Virtio Filesysem device, for retrieving
-+  the attributes of the host-side filesystem that contains NodeId.
++  Format the last component of a canonical pathname into a caller-provided
++  CHAR16 array.
 +
-+  The function may only be called after VirtioFsFuseInitSession() returns
-+  successfully and before VirtioFsUninit() is called.
++  @param[in] Path              The canonical pathname (as defined in the
++                               description of VirtioFsAppendPath()) to format
++                               the last component of.
 +
-+  @param[in,out] VirtioFs  The Virtio Filesystem device to send the FUSE_STATFS
-+                           request to. On output, the FUSE request counter
-+                           "VirtioFs->RequestId" will have been incremented.
++  @param[out] Basename         If BasenameSize is zero on input, Basename may
++                               be NULL. Otherwise, Basename is allocated by the
++                               caller. On successful return, Basename contains
++                               the last component of Path, formatted as a
++                               NUL-terminated CHAR16 string. When Path is "/"
++                               on input, Basename is L"" on output.
 +
-+  @param[in] NodeId        The inode whose containing filesystem is to be
-+                           queried for its attributes.
++  @param[in,out] BasenameSize  On input, the number of bytes the caller
++                               provides in Basename. On output, regardless of
++                               return value, the number of bytes required for
++                               formatting Basename, including the terminating
++                               L'\0'.
 +
-+  @param[out] FilesysAttr  The VIRTIO_FS_FUSE_STATFS_RESPONSE object describing
-+                           the filesystem that underlies NodeId.
++  @retval EFI_SUCCESS           Basename has been filled in.
 +
-+  @retval EFI_SUCCESS  FilesysAttr has been filled in.
-+
-+  @return              The "errno" value mapped to an EFI_STATUS code, if the
-+                       Virtio Filesystem device explicitly reported an error.
-+
-+  @return              Error codes propagated from VirtioFsSgListsValidate(),
-+                       VirtioFsFuseNewRequest(), VirtioFsSgListsSubmit(),
-+                       VirtioFsFuseCheckResponse().
++  @retval EFI_BUFFER_TOO_SMALL  BasenameSize was too small on input; Basename
++                                has not been modified.
 +**/
 +EFI_STATUS
-+VirtioFsFuseStatFs (
-+  IN OUT VIRTIO_FS                      *VirtioFs,
-+  IN     UINT64                         NodeId,
-+     OUT VIRTIO_FS_FUSE_STATFS_RESPONSE *FilesysAttr
-+     )
++VirtioFsGetBasename (
++  IN     CHAR8  *Path,
++     OUT CHAR16 *Basename     OPTIONAL,
++  IN OUT UINTN  *BasenameSize
++  )
 +{
-+  VIRTIO_FS_FUSE_REQUEST        CommonReq;
-+  VIRTIO_FS_IO_VECTOR           ReqIoVec[1];
-+  VIRTIO_FS_SCATTER_GATHER_LIST ReqSgList;
-+  VIRTIO_FS_FUSE_RESPONSE       CommonResp;
-+  VIRTIO_FS_IO_VECTOR           RespIoVec[2];
-+  VIRTIO_FS_SCATTER_GATHER_LIST RespSgList;
-+  EFI_STATUS                    Status;
++  UINTN AllocSize;
++  UINTN LastComponent;
++  UINTN Idx;
++  UINTN PathSize;
 +
-+  //
-+  // Set up the scatter-gather lists.
-+  //
-+  ReqIoVec[0].Buffer = &CommonReq;
-+  ReqIoVec[0].Size   = sizeof CommonReq;
-+  ReqSgList.IoVec    = ReqIoVec;
-+  ReqSgList.NumVec   = ARRAY_SIZE (ReqIoVec);
++  AllocSize = *BasenameSize;
 +
-+  RespIoVec[0].Buffer = &CommonResp;
-+  RespIoVec[0].Size   = sizeof CommonResp;
-+  RespIoVec[1].Buffer = FilesysAttr;
-+  RespIoVec[1].Size   = sizeof *FilesysAttr;
-+  RespSgList.IoVec    = RespIoVec;
-+  RespSgList.NumVec   = ARRAY_SIZE (RespIoVec);
++  LastComponent = MAX_UINTN;
++  for (Idx = 0; Path[Idx] != '\0'; Idx++) {
++    if (Path[Idx] == '/') {
++      LastComponent = Idx;
++    }
++  }
++  PathSize = Idx + 1;
++  ASSERT (LastComponent < MAX_UINTN);
++  LastComponent++;
++  *BasenameSize = (PathSize - LastComponent) * sizeof Basename[0];
 +
-+  //
-+  // Validate the scatter-gather lists; calculate the total transfer sizes.
-+  //
-+  Status = VirtioFsSgListsValidate (VirtioFs, &ReqSgList, &RespSgList);
-+  if (EFI_ERROR (Status)) {
-+    return Status;
++  if (*BasenameSize > AllocSize) {
++    return EFI_BUFFER_TOO_SMALL;
 +  }
 +
-+  //
-+  // Populate the common request header.
-+  //
-+  Status = VirtioFsFuseNewRequest (VirtioFs, &CommonReq, ReqSgList.TotalSize,
-+             VirtioFsFuseOpStatFs, NodeId);
-+  if (EFI_ERROR (Status)) {
-+    return Status;
++  for (Idx = LastComponent; Idx < PathSize; Idx++) {
++    Basename[Idx - LastComponent] = Path[Idx];
 +  }
-+
-+  //
-+  // Submit the request.
-+  //
-+  Status = VirtioFsSgListsSubmit (VirtioFs, &ReqSgList, &RespSgList);
-+  if (EFI_ERROR (Status)) {
-+    return Status;
-+  }
-+
-+  //
-+  // Verify the response (all response buffers are fixed size).
-+  //
-+  Status = VirtioFsFuseCheckResponse (&RespSgList, CommonReq.Unique, NULL);
-+  if (Status == EFI_DEVICE_ERROR) {
-+    DEBUG ((DEBUG_ERROR, "%a: Label=\"%s\" NodeId=%Lu Errno=%d\n",
-+      __FUNCTION__, VirtioFs->Label, NodeId, CommonResp.Error));
-+    Status = VirtioFsErrnoToEfiStatus (CommonResp.Error);
-+  }
-+  return Status;
++  return EFI_SUCCESS;
 +}
++
+ /**
+   Convert select fields of a VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE object to
+   corresponding fields in EFI_FILE_INFO.
+ 
+   @param[in] FuseAttr   The VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE object to
+                         convert the relevant fields from.
+ 
+   @param[out] FileInfo  The EFI_FILE_INFO structure to modify. Importantly, the
 -- 
 2.19.1.3.g30247aa5d201
 

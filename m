@@ -1,13 +1,13 @@
 From: Laszlo Ersek <lersek@redhat.com>
-Date: Wed, 16 Dec 2020 22:11:02 +0100
-Message-Id: <20201216211125.19496-26-lersek@redhat.com>
+Date: Wed, 16 Dec 2020 22:11:03 +0100
+Message-Id: <20201216211125.19496-27-lersek@redhat.com>
 In-Reply-To: <20201216211125.19496-1-lersek@redhat.com>
 References: <20201216211125.19496-1-lersek@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [edk2 PATCH 25/48] OvmfPkg/VirtioFsDxe: implement the
-	wrapper function for FUSE_GETATTR
+Subject: [Virtio-fs] [edk2 PATCH 26/48] OvmfPkg/VirtioFsDxe: implement
+	EFI_FILE_PROTOCOL.Open()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,8 +19,10 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: devel@edk2.groups.io, virtio-fs@redhat.com, lersek@redhat.com
 Cc: Jordan Justen <jordan.l.justen@intel.com>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@redhat.com>, Ard Biesheuvel <ard.biesheuvel@arm.com>
 
-Add the VirtioFsFuseGetAttr() function, for sending the FUSE_GETATTR
-command to the Virtio Filesystem device.
+Using the functions introduced previously, we can now implement
+VirtioFsSimpleFileOpen().
+
+This lets the "MKDIR" command to work in the UEFI shell, for example.
 
 Cc: Ard Biesheuvel <ard.biesheuvel@arm.com>
 Cc: Jordan Justen <jordan.l.justen@intel.com>
@@ -28,238 +30,515 @@ Cc: Philippe Mathieu-Daudé <philmd@redhat.com>
 Ref: https://bugzilla.tianocore.org/show_bug.cgi?id=3097
 Signed-off-by: Laszlo Ersek <lersek@redhat.com>
 ---
- OvmfPkg/Include/IndustryStandard/VirtioFs.h |  16 +++
- OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf         |   1 +
- OvmfPkg/VirtioFsDxe/VirtioFsDxe.h           |   7 ++
- OvmfPkg/VirtioFsDxe/FuseGetAttr.c           | 116 ++++++++++++++++++++
- 4 files changed, 140 insertions(+)
+ OvmfPkg/VirtioFsDxe/SimpleFsOpen.c | 480 +++++++++++++++++++-
+ 1 file changed, 479 insertions(+), 1 deletion(-)
 
-diff --git a/OvmfPkg/Include/IndustryStandard/VirtioFs.h b/OvmfPkg/Include/IndustryStandard/VirtioFs.h
-index f49452830abc..efcf57941c59 100644
---- a/OvmfPkg/Include/IndustryStandard/VirtioFs.h
-+++ b/OvmfPkg/Include/IndustryStandard/VirtioFs.h
-@@ -109,16 +109,17 @@ typedef struct {
- #define VIRTIO_FS_FUSE_OPEN_REQ_F_RDWR   2
+diff --git a/OvmfPkg/VirtioFsDxe/SimpleFsOpen.c b/OvmfPkg/VirtioFsDxe/SimpleFsOpen.c
+index f0e249184079..2649c796ac97 100644
+--- a/OvmfPkg/VirtioFsDxe/SimpleFsOpen.c
++++ b/OvmfPkg/VirtioFsDxe/SimpleFsOpen.c
+@@ -1,22 +1,500 @@
+ /** @file
+   EFI_FILE_PROTOCOL.Open() member function for the Virtio Filesystem driver.
  
- //
- // FUSE operation codes.
- //
- typedef enum {
-   VirtioFsFuseOpLookup      =  1,
-   VirtioFsFuseOpForget      =  2,
-+  VirtioFsFuseOpGetAttr     =  3,
-   VirtioFsFuseOpMkDir       =  9,
-   VirtioFsFuseOpUnlink      = 10,
-   VirtioFsFuseOpRmDir       = 11,
-   VirtioFsFuseOpOpen        = 14,
-   VirtioFsFuseOpRelease     = 18,
-   VirtioFsFuseOpFsync       = 20,
-   VirtioFsFuseOpFlush       = 25,
-   VirtioFsFuseOpInit        = 26,
-@@ -190,16 +191,31 @@ typedef struct {
+   Copyright (C) 2020, Red Hat, Inc.
  
- //
- // Header for VirtioFsFuseOpForget.
- //
- typedef struct {
-   UINT64 NumberOfLookups;
- } VIRTIO_FS_FUSE_FORGET_REQUEST;
+   SPDX-License-Identifier: BSD-2-Clause-Patent
+ **/
  
-+//
-+// Headers for VirtioFsFuseOpGetAttr.
-+//
-+typedef struct {
-+  UINT32 GetAttrFlags;
-+  UINT32 Dummy;
-+  UINT64 FileHandle;
-+} VIRTIO_FS_FUSE_GETATTR_REQUEST;
++#include <Library/BaseLib.h>             // AsciiStrCmp()
++#include <Library/MemoryAllocationLib.h> // AllocatePool()
 +
-+typedef struct {
-+  UINT64 AttrValid;
-+  UINT32 AttrValidNsec;
-+  UINT32 Dummy;
-+} VIRTIO_FS_FUSE_GETATTR_RESPONSE;
-+
- //
- // Header for VirtioFsFuseOpMkDir.
- //
- typedef struct {
-   UINT32 Mode;
-   UINT32 Umask;
- } VIRTIO_FS_FUSE_MKDIR_REQUEST;
+ #include "VirtioFsDxe.h"
  
-diff --git a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
-index 2332aa3ee551..233c0c5c0f9a 100644
---- a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
-+++ b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
-@@ -81,16 +81,17 @@ [Packages]
-   MdePkg/MdePkg.dec
-   OvmfPkg/OvmfPkg.dec
- 
- [Sources]
-   DriverBinding.c
-   FuseFlush.c
-   FuseForget.c
-   FuseFsync.c
-+  FuseGetAttr.c
-   FuseInit.c
-   FuseLookup.c
-   FuseMkDir.c
-   FuseOpen.c
-   FuseOpenDir.c
-   FuseOpenOrCreate.c
-   FuseRelease.c
-   FuseUnlink.c
-diff --git a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
-index 0e4f2109eb02..3bf64c0146fa 100644
---- a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
-+++ b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
-@@ -254,16 +254,23 @@ VirtioFsFuseLookup (
-   );
- 
- EFI_STATUS
- VirtioFsFuseForget (
-   IN OUT VIRTIO_FS *VirtioFs,
-   IN     UINT64    NodeId
-   );
- 
-+EFI_STATUS
-+VirtioFsFuseGetAttr (
-+  IN OUT VIRTIO_FS                          *VirtioFs,
-+  IN     UINT64                             NodeId,
-+     OUT VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE *FuseAttr
-+  );
-+
- EFI_STATUS
- VirtioFsFuseMkDir (
-   IN OUT VIRTIO_FS *VirtioFs,
-   IN     UINT64    ParentNodeId,
-   IN     CHAR8     *Name,
-      OUT UINT64    *NodeId
-   );
- 
-diff --git a/OvmfPkg/VirtioFsDxe/FuseGetAttr.c b/OvmfPkg/VirtioFsDxe/FuseGetAttr.c
-new file mode 100644
-index 000000000000..29d8ec8190e1
---- /dev/null
-+++ b/OvmfPkg/VirtioFsDxe/FuseGetAttr.c
-@@ -0,0 +1,116 @@
-+/** @file
-+  FUSE_GETATTR wrapper for the Virtio Filesystem device.
-+
-+  Copyright (C) 2020, Red Hat, Inc.
-+
-+  SPDX-License-Identifier: BSD-2-Clause-Patent
-+**/
-+
-+#include "VirtioFsDxe.h"
-+
 +/**
-+  Send a FUSE_GETATTR request to the Virtio Filesystem device, for fetching the
-+  attributes of an inode.
++  Open the root directory, possibly for writing.
 +
-+  The function may only be called after VirtioFsFuseInitSession() returns
-+  successfully and before VirtioFsUninit() is called.
++  @param[in,out] VirtioFs    The Virtio Filesystem device whose root directory
++                             should be opened.
 +
-+  @param[in,out] VirtioFs  The Virtio Filesystem device to send the
-+                           FUSE_GETATTR request to. On output, the FUSE request
-+                           counter "VirtioFs->RequestId" will have been
-+                           incremented.
++  @param[out] NewHandle      The new EFI_FILE_PROTOCOL instance through which
++                             the root directory can be accessed.
 +
-+  @param[in] NodeId        The inode number for which the attributes should be
-+                           retrieved.
++  @param[in] OpenForWriting  TRUE if the root directory should be opened for
++                             read-write access. FALSE if the root directory
++                             should be opened for read-only access. Opening the
++                             root directory for read-write access is useful for
++                             calling EFI_FILE_PROTOCOL.Flush() or
++                             EFI_FILE_PROTOCOL.SetInfo() later, for syncing or
++                             touching the root directory, respectively.
 +
-+  @param[out] FuseAttr     The VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE object
-+                           describing the properties of the inode.
++  @retval EFI_SUCCESS        The root directory has been opened successfully.
 +
-+  @retval EFI_SUCCESS  FuseAttr has been filled in.
++  @retval EFI_ACCESS_DENIED  OpenForWriting is TRUE, but the root directory is
++                             marked as read-only.
 +
-+  @return              The "errno" value mapped to an EFI_STATUS code, if the
-+                       Virtio Filesystem device explicitly reported an error.
-+
-+  @return              Error codes propagated from VirtioFsSgListsValidate(),
-+                       VirtioFsFuseNewRequest(), VirtioFsSgListsSubmit(),
-+                       VirtioFsFuseCheckResponse().
++  @return                    Error codes propagated from underlying functions.
 +**/
++STATIC
 +EFI_STATUS
-+VirtioFsFuseGetAttr (
-+  IN OUT VIRTIO_FS                          *VirtioFs,
-+  IN     UINT64                             NodeId,
-+     OUT VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE *FuseAttr
++OpenRootDirectory (
++  IN OUT VIRTIO_FS         *VirtioFs,
++     OUT EFI_FILE_PROTOCOL **NewHandle,
++  IN     BOOLEAN           OpenForWriting
 +  )
 +{
-+  VIRTIO_FS_FUSE_REQUEST          CommonReq;
-+  VIRTIO_FS_FUSE_GETATTR_REQUEST  GetAttrReq;
-+  VIRTIO_FS_IO_VECTOR             ReqIoVec[2];
-+  VIRTIO_FS_SCATTER_GATHER_LIST   ReqSgList;
-+  VIRTIO_FS_FUSE_RESPONSE         CommonResp;
-+  VIRTIO_FS_FUSE_GETATTR_RESPONSE GetAttrResp;
-+  VIRTIO_FS_IO_VECTOR             RespIoVec[3];
-+  VIRTIO_FS_SCATTER_GATHER_LIST   RespSgList;
-+  EFI_STATUS                      Status;
++  EFI_STATUS     Status;
++  VIRTIO_FS_FILE *NewVirtioFsFile;
 +
 +  //
-+  // Set up the scatter-gather lists.
++  // VirtioFsOpenVolume() opens the root directory for read-only access. If the
++  // current request is to open the root directory for read-write access, so
++  // that EFI_FILE_PROTOCOL.Flush() or EFI_FILE_PROTOCOL.SetInfo()+timestamps
++  // can be used on the root directory later, then we have to check for write
++  // permission first.
 +  //
-+  ReqIoVec[0].Buffer = &CommonReq;
-+  ReqIoVec[0].Size   = sizeof CommonReq;
-+  ReqIoVec[1].Buffer = &GetAttrReq;
-+  ReqIoVec[1].Size   = sizeof GetAttrReq;
-+  ReqSgList.IoVec    = ReqIoVec;
-+  ReqSgList.NumVec   = ARRAY_SIZE (ReqIoVec);
++  if (OpenForWriting) {
++    VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE FuseAttr;
++    EFI_FILE_INFO                      FileInfo;
 +
-+  RespIoVec[0].Buffer = &CommonResp;
-+  RespIoVec[0].Size   = sizeof CommonResp;
-+  RespIoVec[1].Buffer = &GetAttrResp;
-+  RespIoVec[1].Size   = sizeof GetAttrResp;
-+  RespIoVec[2].Buffer = FuseAttr;
-+  RespIoVec[2].Size   = sizeof *FuseAttr;
-+  RespSgList.IoVec    = RespIoVec;
-+  RespSgList.NumVec   = ARRAY_SIZE (RespIoVec);
++    Status = VirtioFsFuseGetAttr (VirtioFs, VIRTIO_FS_FUSE_ROOT_DIR_NODE_ID,
++               &FuseAttr);
++    if (EFI_ERROR (Status)) {
++      return Status;
++    }
++    Status = VirtioFsFuseAttrToEfiFileInfo (&FuseAttr, &FileInfo);
++    if (EFI_ERROR (Status)) {
++      return Status;
++    }
++    if ((FileInfo.Attribute & EFI_FILE_READ_ONLY) != 0) {
++      return EFI_ACCESS_DENIED;
++    }
++  }
 +
-+  //
-+  // Validate the scatter-gather lists; calculate the total transfer sizes.
-+  //
-+  Status = VirtioFsSgListsValidate (VirtioFs, &ReqSgList, &RespSgList);
++  Status = VirtioFsOpenVolume (&VirtioFs->SimpleFs, NewHandle);
 +  if (EFI_ERROR (Status)) {
 +    return Status;
 +  }
 +
-+  //
-+  // Populate the common request header.
-+  //
-+  Status = VirtioFsFuseNewRequest (VirtioFs, &CommonReq, ReqSgList.TotalSize,
-+             VirtioFsFuseOpGetAttr, NodeId);
++  NewVirtioFsFile = VIRTIO_FS_FILE_FROM_SIMPLE_FILE (*NewHandle);
++  NewVirtioFsFile->IsOpenForWriting = OpenForWriting;
++  return EFI_SUCCESS;
++}
++
++/**
++  Open an existent regular file or non-root directory.
++
++  @param[in,out] VirtioFs      The Virtio Filesystem device on which the
++                               regular file or directory should be opened.
++
++  @param[in] DirNodeId         The inode number of the immediate parent
++                               directory of the regular file or directory to
++                               open.
++
++  @param[in] Name              The single-component filename of the regular
++                               file or directory to open, under the immediate
++                               parent directory identified by DirNodeId.
++
++  @param[in] OpenForWriting    TRUE if the regular file or directory should be
++                               opened for read-write access. FALSE if the
++                               regular file or directory should be opened for
++                               read-only access. Opening a directory for
++                               read-write access is useful for deleting,
++                               renaming, syncing or touching the directory
++                               later.
++
++  @param[out] NodeId           The inode number of the regular file or
++                               directory, returned by the Virtio Filesystem
++                               device.
++
++  @param[out] FuseHandle       The open handle to the regular file or
++                               directory, returned by the Virtio Filesystem
++                               device.
++
++  @param[out] NodeIsDirectory  Set to TRUE on output if Name was found to refer
++                               to a directory. Set to FALSE if Name was found
++                               to refer to a regular file.
++
++  @retval EFI_SUCCESS        The regular file or directory has been looked up
++                             and opened successfully.
++
++  @retval EFI_ACCESS_DENIED  OpenForWriting is TRUE, but the regular file or
++                             directory is marked read-only.
++
++  @retval EFI_NOT_FOUND      A directory entry called Name was not found in the
++                             directory identified by DirNodeId. (EFI_NOT_FOUND
++                             is not returned for any other condition.)
++
++  @return                    Errors propagated from underlying functions. If
++                             the error code to propagate were EFI_NOT_FOUND, it
++                             is remapped to EFI_DEVICE_ERROR.
++**/
++STATIC
++EFI_STATUS
++OpenExistentFileOrDirectory (
++  IN OUT VIRTIO_FS *VirtioFs,
++  IN     UINT64    DirNodeId,
++  IN     CHAR8     *Name,
++  IN     BOOLEAN   OpenForWriting,
++     OUT UINT64    *NodeId,
++     OUT UINT64    *FuseHandle,
++     OUT BOOLEAN   *NodeIsDirectory
++  )
++{
++  EFI_STATUS                         Status;
++  UINT64                             ResolvedNodeId;
++  VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE FuseAttr;
++  EFI_FILE_INFO                      FileInfo;
++  BOOLEAN                            IsDirectory;
++  UINT64                             NewFuseHandle;
++
++  Status = VirtioFsFuseLookup (VirtioFs, DirNodeId, Name, &ResolvedNodeId,
++             &FuseAttr);
++  if (EFI_ERROR (Status)) {
++    return Status;
++  }
++  Status = VirtioFsFuseAttrToEfiFileInfo (&FuseAttr, &FileInfo);
++  if (EFI_ERROR (Status)) {
++    goto ForgetResolvedNodeId;
++  }
++
++  if (OpenForWriting && (FileInfo.Attribute & EFI_FILE_READ_ONLY) != 0) {
++    Status = EFI_ACCESS_DENIED;
++    goto ForgetResolvedNodeId;
++  }
++
++  IsDirectory = (BOOLEAN)((FileInfo.Attribute & EFI_FILE_DIRECTORY) != 0);
++  if (IsDirectory) {
++    //
++    // If OpenForWriting is TRUE here, that's not passed to
++    // VirtioFsFuseOpenDir(); it does not affect the FUSE_OPENDIR request we
++    // send. OpenForWriting=TRUE will only permit attempts to delete, rename,
++    // flush (sync), and touch the directory.
++    //
++    Status = VirtioFsFuseOpenDir (VirtioFs, ResolvedNodeId, &NewFuseHandle);
++  } else {
++    Status = VirtioFsFuseOpen (VirtioFs, ResolvedNodeId, OpenForWriting,
++               &NewFuseHandle);
++  }
++  if (EFI_ERROR (Status)) {
++    goto ForgetResolvedNodeId;
++  }
++
++  *NodeId          = ResolvedNodeId;
++  *FuseHandle      = NewFuseHandle;
++  *NodeIsDirectory = IsDirectory;
++  return EFI_SUCCESS;
++
++ForgetResolvedNodeId:
++  VirtioFsFuseForget (VirtioFs, ResolvedNodeId);
++  return (Status == EFI_NOT_FOUND) ? EFI_DEVICE_ERROR : Status;
++}
++
++/**
++  Create a directory.
++
++  @param[in,out] VirtioFs  The Virtio Filesystem device on which the directory
++                           should be created.
++
++  @param[in] DirNodeId     The inode number of the immediate parent directory
++                           of the directory to create.
++
++  @param[in] Name          The single-component filename of the directory to
++                           create, under the immediate parent directory
++                           identified by DirNodeId.
++
++  @param[out] NodeId       The inode number of the directory created, returned
++                           by the Virtio Filesystem device.
++
++  @param[out] FuseHandle   The open handle to the directory created, returned
++                           by the Virtio Filesystem device.
++
++  @retval EFI_SUCCESS  The directory has been created successfully.
++
++  @return              Errors propagated from underlying functions.
++**/
++STATIC
++EFI_STATUS
++CreateDirectory (
++  IN OUT VIRTIO_FS *VirtioFs,
++  IN     UINT64    DirNodeId,
++  IN     CHAR8     *Name,
++     OUT UINT64    *NodeId,
++     OUT UINT64    *FuseHandle
++  )
++{
++  EFI_STATUS Status;
++  UINT64     NewChildDirNodeId;
++  UINT64     NewFuseHandle;
++
++  Status = VirtioFsFuseMkDir (VirtioFs, DirNodeId, Name, &NewChildDirNodeId);
 +  if (EFI_ERROR (Status)) {
 +    return Status;
 +  }
 +
-+  //
-+  // Populate the FUSE_GETATTR-specific fields.
-+  //
-+  GetAttrReq.GetAttrFlags = 0;
-+  GetAttrReq.Dummy        = 0;
-+  GetAttrReq.FileHandle   = 0;
-+
-+  //
-+  // Submit the request.
-+  //
-+  Status = VirtioFsSgListsSubmit (VirtioFs, &ReqSgList, &RespSgList);
++  Status = VirtioFsFuseOpenDir (VirtioFs, NewChildDirNodeId, &NewFuseHandle);
 +  if (EFI_ERROR (Status)) {
-+    return Status;
++    goto RemoveNewChildDir;
 +  }
 +
-+  //
-+  // Verify the response (all response buffers are fixed size).
-+  //
-+  Status = VirtioFsFuseCheckResponse (&RespSgList, CommonReq.Unique, NULL);
-+  if (Status == EFI_DEVICE_ERROR) {
-+    DEBUG ((DEBUG_ERROR, "%a: Label=\"%s\" NodeId=%Lu Errno=%d\n",
-+      __FUNCTION__, VirtioFs->Label, NodeId, CommonResp.Error));
-+    Status = VirtioFsErrnoToEfiStatus (CommonResp.Error);
-+  }
++  *NodeId     = NewChildDirNodeId;
++  *FuseHandle = NewFuseHandle;
++  return EFI_SUCCESS;
++
++RemoveNewChildDir:
++  VirtioFsFuseRemoveFileOrDir (VirtioFs, DirNodeId, Name, TRUE /* IsDir */);
++  VirtioFsFuseForget (VirtioFs, NewChildDirNodeId);
 +  return Status;
 +}
++
++/**
++  Create a regular file.
++
++  @param[in,out] VirtioFs  The Virtio Filesystem device on which the regular
++                           file should be created.
++
++  @param[in] DirNodeId     The inode number of the immediate parent directory
++                           of the regular file to create.
++
++  @param[in] Name          The single-component filename of the regular file to
++                           create, under the immediate parent directory
++                           identified by DirNodeId.
++
++  @param[out] NodeId       The inode number of the regular file created,
++                           returned by the Virtio Filesystem device.
++
++  @param[out] FuseHandle   The open handle to the regular file created,
++                           returned by the Virtio Filesystem device.
++
++  @retval EFI_SUCCESS  The regular file has been created successfully.
++
++  @return              Errors propagated from underlying functions.
++**/
++STATIC
++EFI_STATUS
++CreateRegularFile (
++  IN OUT VIRTIO_FS *VirtioFs,
++  IN     UINT64    DirNodeId,
++  IN     CHAR8     *Name,
++     OUT UINT64    *NodeId,
++     OUT UINT64    *FuseHandle
++  )
++{
++  return VirtioFsFuseOpenOrCreate (VirtioFs, DirNodeId, Name, NodeId,
++           FuseHandle);
++}
++
+ EFI_STATUS
+ EFIAPI
+ VirtioFsSimpleFileOpen (
+   IN     EFI_FILE_PROTOCOL *This,
+      OUT EFI_FILE_PROTOCOL **NewHandle,
+   IN     CHAR16            *FileName,
+   IN     UINT64            OpenMode,
+   IN     UINT64            Attributes
+   )
+ {
+-  return EFI_NO_MEDIA;
++  VIRTIO_FS_FILE *VirtioFsFile;
++  VIRTIO_FS      *VirtioFs;
++  BOOLEAN        OpenForWriting;
++  BOOLEAN        PermitCreation;
++  BOOLEAN        CreateDirectoryIfCreating;
++  VIRTIO_FS_FILE *NewVirtioFsFile;
++  EFI_STATUS     Status;
++  CHAR8          *NewCanonicalPath;
++  BOOLEAN        RootEscape;
++  UINT64         DirNodeId;
++  CHAR8          *LastComponent;
++  UINT64         NewNodeId;
++  UINT64         NewFuseHandle;
++  BOOLEAN        NewNodeIsDirectory;
++
++  VirtioFsFile = VIRTIO_FS_FILE_FROM_SIMPLE_FILE (This);
++  VirtioFs     = VirtioFsFile->OwnerFs;
++
++  //
++  // Validate OpenMode.
++  //
++  switch (OpenMode) {
++  case EFI_FILE_MODE_READ:
++    OpenForWriting = FALSE;
++    PermitCreation = FALSE;
++    break;
++  case EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE:
++    OpenForWriting = TRUE;
++    PermitCreation = FALSE;
++    break;
++  case EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_CREATE:
++    OpenForWriting = TRUE;
++    PermitCreation = TRUE;
++    break;
++  default:
++    return EFI_INVALID_PARAMETER;
++  }
++
++  //
++  // Validate the Attributes requested for the case when the file ends up being
++  // created, provided creation is permitted.
++  //
++  if (PermitCreation) {
++    if ((Attributes & ~EFI_FILE_VALID_ATTR) != 0) {
++      //
++      // Unknown attribute requested.
++      //
++      return EFI_INVALID_PARAMETER;
++    }
++
++    ASSERT (OpenForWriting);
++    if ((Attributes & EFI_FILE_READ_ONLY) != 0) {
++      DEBUG ((
++        DEBUG_ERROR,
++        ("%a: Label=\"%s\" CanonicalPathname=\"%a\" FileName=\"%s\" "
++         "OpenMode=0x%Lx Attributes=0x%Lx: nonsensical request to possibly "
++         "create a file marked read-only, for read-write access\n"),
++        __FUNCTION__,
++        VirtioFs->Label,
++        VirtioFsFile->CanonicalPathname,
++        FileName,
++        OpenMode,
++        Attributes
++        ));
++      return EFI_INVALID_PARAMETER;
++    }
++    CreateDirectoryIfCreating = (BOOLEAN)((Attributes &
++                                           EFI_FILE_DIRECTORY) != 0);
++  }
++
++  //
++  // Referring to a file relative to a regular file makes no sense (or at least
++  // it cannot be implemented consistently with how a file is referred to
++  // relative to a directory).
++  //
++  if (!VirtioFsFile->IsDirectory) {
++    DEBUG ((
++      DEBUG_ERROR,
++      ("%a: Label=\"%s\" CanonicalPathname=\"%a\" FileName=\"%s\": "
++       "nonsensical request to open a file or directory relative to a regular "
++       "file\n"),
++      __FUNCTION__,
++      VirtioFs->Label,
++      VirtioFsFile->CanonicalPathname,
++      FileName
++      ));
++    return EFI_INVALID_PARAMETER;
++  }
++
++  //
++  // Allocate the new VIRTIO_FS_FILE object.
++  //
++  NewVirtioFsFile = AllocatePool (sizeof *NewVirtioFsFile);
++  if (NewVirtioFsFile == NULL) {
++    return EFI_OUT_OF_RESOURCES;
++  }
++
++  //
++  // Create the canonical pathname at which the desired file is expected to
++  // exist.
++  //
++  Status = VirtioFsAppendPath (VirtioFsFile->CanonicalPathname, FileName,
++             &NewCanonicalPath, &RootEscape);
++  if (EFI_ERROR (Status)) {
++    goto FreeNewVirtioFsFile;
++  }
++  if (RootEscape) {
++    Status = EFI_ACCESS_DENIED;
++    goto FreeNewCanonicalPath;
++  }
++
++  //
++  // If the desired file is the root directory, just open the volume one more
++  // time, without looking up anything.
++  //
++  if (AsciiStrCmp (NewCanonicalPath, "/") == 0) {
++    FreePool (NewCanonicalPath);
++    FreePool (NewVirtioFsFile);
++    return OpenRootDirectory (VirtioFs, NewHandle, OpenForWriting);
++  }
++
++  //
++  // Split the new canonical pathname into most specific parent directory
++  // (given by DirNodeId) and last pathname component (i.e., immediate child
++  // within that parent directory).
++  //
++  Status = VirtioFsLookupMostSpecificParentDir (VirtioFs, NewCanonicalPath,
++             &DirNodeId, &LastComponent);
++  if (EFI_ERROR (Status)) {
++    goto FreeNewCanonicalPath;
++  }
++
++  //
++  // Try to open LastComponent directly under DirNodeId, as an existent regular
++  // file or directory.
++  //
++  Status = OpenExistentFileOrDirectory (VirtioFs, DirNodeId, LastComponent,
++             OpenForWriting, &NewNodeId, &NewFuseHandle, &NewNodeIsDirectory);
++  //
++  // If LastComponent could not be found under DirNodeId, but the request
++  // allows us to create a new entry, attempt creating the requested regular
++  // file or directory.
++  //
++  if (Status == EFI_NOT_FOUND && PermitCreation) {
++    ASSERT (OpenForWriting);
++    if (CreateDirectoryIfCreating) {
++      Status = CreateDirectory (VirtioFs, DirNodeId, LastComponent, &NewNodeId,
++                 &NewFuseHandle);
++    } else {
++      Status = CreateRegularFile (VirtioFs, DirNodeId, LastComponent,
++                 &NewNodeId, &NewFuseHandle);
++    }
++    NewNodeIsDirectory = CreateDirectoryIfCreating;
++  }
++
++  //
++  // Regardless of the branch taken, we're done with DirNodeId.
++  //
++  if (DirNodeId != VIRTIO_FS_FUSE_ROOT_DIR_NODE_ID) {
++    VirtioFsFuseForget (VirtioFs, DirNodeId);
++  }
++
++  if (EFI_ERROR (Status)) {
++    goto FreeNewCanonicalPath;
++  }
++
++  //
++  // Populate the new VIRTIO_FS_FILE object.
++  //
++  NewVirtioFsFile->Signature              = VIRTIO_FS_FILE_SIG;
++  NewVirtioFsFile->SimpleFile.Revision    = EFI_FILE_PROTOCOL_REVISION;
++  NewVirtioFsFile->SimpleFile.Open        = VirtioFsSimpleFileOpen;
++  NewVirtioFsFile->SimpleFile.Close       = VirtioFsSimpleFileClose;
++  NewVirtioFsFile->SimpleFile.Delete      = VirtioFsSimpleFileDelete;
++  NewVirtioFsFile->SimpleFile.Read        = VirtioFsSimpleFileRead;
++  NewVirtioFsFile->SimpleFile.Write       = VirtioFsSimpleFileWrite;
++  NewVirtioFsFile->SimpleFile.GetPosition = VirtioFsSimpleFileGetPosition;
++  NewVirtioFsFile->SimpleFile.SetPosition = VirtioFsSimpleFileSetPosition;
++  NewVirtioFsFile->SimpleFile.GetInfo     = VirtioFsSimpleFileGetInfo;
++  NewVirtioFsFile->SimpleFile.SetInfo     = VirtioFsSimpleFileSetInfo;
++  NewVirtioFsFile->SimpleFile.Flush       = VirtioFsSimpleFileFlush;
++  NewVirtioFsFile->IsDirectory            = NewNodeIsDirectory;
++  NewVirtioFsFile->IsOpenForWriting       = OpenForWriting;
++  NewVirtioFsFile->OwnerFs                = VirtioFs;
++  NewVirtioFsFile->CanonicalPathname      = NewCanonicalPath;
++  NewVirtioFsFile->NodeId                 = NewNodeId;
++  NewVirtioFsFile->FuseHandle             = NewFuseHandle;
++
++  //
++  // One more file is now open for the filesystem.
++  //
++  InsertTailList (&VirtioFs->OpenFiles, &NewVirtioFsFile->OpenFilesEntry);
++
++  *NewHandle = &NewVirtioFsFile->SimpleFile;
++  return EFI_SUCCESS;
++
++FreeNewCanonicalPath:
++  FreePool (NewCanonicalPath);
++
++FreeNewVirtioFsFile:
++  FreePool (NewVirtioFsFile);
++
++  return Status;
+ }
 -- 
 2.19.1.3.g30247aa5d201
 

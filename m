@@ -1,13 +1,13 @@
 From: Laszlo Ersek <lersek@redhat.com>
-Date: Wed, 16 Dec 2020 22:11:19 +0100
-Message-Id: <20201216211125.19496-43-lersek@redhat.com>
+Date: Wed, 16 Dec 2020 22:11:20 +0100
+Message-Id: <20201216211125.19496-44-lersek@redhat.com>
 In-Reply-To: <20201216211125.19496-1-lersek@redhat.com>
 References: <20201216211125.19496-1-lersek@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [edk2 PATCH 42/48] OvmfPkg/VirtioFsDxe: add helper for
-	composing rename/move destination path
+Subject: [Virtio-fs] [edk2 PATCH 43/48] OvmfPkg/VirtioFsDxe: handle file
+	rename/move in EFI_FILE_PROTOCOL.SetInfo
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,45 +19,10 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: devel@edk2.groups.io, virtio-fs@redhat.com, lersek@redhat.com
 Cc: Jordan Justen <jordan.l.justen@intel.com>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@redhat.com>, Ard Biesheuvel <ard.biesheuvel@arm.com>
 
-The EFI_FILE_PROTOCOL.SetInfo() member is somewhat under-specified; one of
-its modes of operation is renaming/moving the file.
+Using the functions introduced previously, we can now implement the rename
+operation in VirtioFsSimpleFileSetInfo().
 
-In order to create the destination pathname in canonical format, 2*2=4
-cases have to be considered. For the sake of discussion, assume the
-current canonical pathname of a VIRTIO_FS_FILE is "/home/user/f1.txt".
-Then, consider the following rename/move requests from
-EFI_FILE_PROTOCOL.SetInfo():
-
-  Destination requested  Destination  Move into   Destination in
-  by SetInfo()           relative?    directory?  canonical format
-  ---------------------  -----------  ----------  -----------------------
-  L"\\dir\\f2.txt"       no           no          "/dir/f2.txt"
-  L"\\dir\\"             no           yes         "/dir/f1.txt"
-  L"dir\\f2.txt"         yes          no          "/home/user/dir/f2.txt"
-  L"dir\\"               yes          yes         "/home/user/dir/f1.txt"
-
-Add the VirtioFsComposeRenameDestination() function, for composing the
-last column from the current canonical pathname and the SetInfo() input.
-
-The function works on the following principles:
-
-- The prefix of the destination path is "/", if the SetInfo() rename
-  request is absolute.
-
-  Otherwise, the dest prefix is the "current directory" (the most specific
-  parent directory) of the original pathname (in the above example,
-  "/home/user").
-
-- The suffix of the destination path is precisely the SetInfo() request
-  string, if the "move into directory" convenience format -- the trailing
-  backslash -- is not used. (In the above example, L"\\dir\\f2.txt" and
-  L"dir\\f2.txt".)
-
-  Otherwise, the suffix is the SetInfo() request, plus the original
-  basename (in the above example, L"\\dir\\f1.txt" and L"dir\\f1.txt").
-
-- The complete destination is created by fusing the dest prefix and the
-  dest suffix, using the VirtioFsAppendPath() function.
+Attribute updates come later.
 
 Cc: Ard Biesheuvel <ard.biesheuvel@arm.com>
 Cc: Jordan Justen <jordan.l.justen@intel.com>
@@ -65,254 +30,298 @@ Cc: Philippe Mathieu-Daudé <philmd@redhat.com>
 Ref: https://bugzilla.tianocore.org/show_bug.cgi?id=3097
 Signed-off-by: Laszlo Ersek <lersek@redhat.com>
 ---
- OvmfPkg/VirtioFsDxe/VirtioFsDxe.h |   8 +
- OvmfPkg/VirtioFsDxe/Helpers.c     | 194 ++++++++++++++++++++
- 2 files changed, 202 insertions(+)
+ OvmfPkg/VirtioFsDxe/SimpleFsSetInfo.c | 234 +++++++++++++++++++-
+ 1 file changed, 233 insertions(+), 1 deletion(-)
 
-diff --git a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
-index 9334e5434c51..a6dfac71f4a7 100644
---- a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
-+++ b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
-@@ -257,16 +257,24 @@ VirtioFsLookupMostSpecificParentDir (
+diff --git a/OvmfPkg/VirtioFsDxe/SimpleFsSetInfo.c b/OvmfPkg/VirtioFsDxe/SimpleFsSetInfo.c
+index 895b5c029a9e..55169dde78b7 100644
+--- a/OvmfPkg/VirtioFsDxe/SimpleFsSetInfo.c
++++ b/OvmfPkg/VirtioFsDxe/SimpleFsSetInfo.c
+@@ -5,16 +5,17 @@
  
- EFI_STATUS
- VirtioFsGetBasename (
-   IN     CHAR8  *Path,
-      OUT CHAR16 *Basename     OPTIONAL,
-   IN OUT UINTN  *BasenameSize
-   );
+   SPDX-License-Identifier: BSD-2-Clause-Patent
+ **/
  
-+EFI_STATUS
-+VirtioFsComposeRenameDestination (
-+  IN     CHAR8   *LhsPath8,
-+  IN     CHAR16  *RhsPath16,
-+     OUT CHAR8   **ResultPath8,
-+     OUT BOOLEAN *RootEscape
-+  );
-+
- EFI_STATUS
- VirtioFsFuseAttrToEfiFileInfo (
-   IN     VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE *FuseAttr,
-      OUT EFI_FILE_INFO                      *FileInfo
-   );
+ #include <Guid/FileSystemInfo.h>            // gEfiFileSystemInfoGuid
+ #include <Guid/FileSystemVolumeLabelInfo.h> // gEfiFileSystemVolumeLabelInfo...
+ #include <Library/BaseLib.h>                // StrCmp()
+ #include <Library/BaseMemoryLib.h>          // CompareGuid()
++#include <Library/MemoryAllocationLib.h>    // FreePool()
  
- EFI_STATUS
- VirtioFsFuseDirentPlusToEfiFileInfo (
-diff --git a/OvmfPkg/VirtioFsDxe/Helpers.c b/OvmfPkg/VirtioFsDxe/Helpers.c
-index cdaa8557a17b..b741cf753495 100644
---- a/OvmfPkg/VirtioFsDxe/Helpers.c
-+++ b/OvmfPkg/VirtioFsDxe/Helpers.c
-@@ -1778,16 +1778,210 @@ VirtioFsGetBasename (
+ #include "VirtioFsDxe.h"
+ 
+ /**
+   Validate a buffer that the EFI_FILE_PROTOCOL.SetInfo() caller passes in for a
+   particular InformationType GUID.
+ 
+   The structure to be validated is supposed to end with a variable-length,
+@@ -122,16 +123,247 @@ ValidateInfoStructure (
+   NameField = (CHAR16 *)((UINT8 *)Buffer + NameFieldByteOffset);
+   if (NameField[NameFieldChar16s - 1] != L'\0') {
+     return EFI_INVALID_PARAMETER;
    }
  
-   for (Idx = LastComponent; Idx < PathSize; Idx++) {
-     Basename[Idx - LastComponent] = Path[Idx];
-   }
    return EFI_SUCCESS;
  }
  
 +/**
-+  Format the destination of a rename/move operation as a dynamically allocated
-+  canonical pathname.
++  Rename a VIRTIO_FS_FILE as requested in EFI_FILE_INFO.FileName.
 +
-+  Any dot-dot in RhsPath16 that would remove the root directory is dropped, and
-+  reported through RootEscape, without failing the function call.
++  @param[in,out] VirtioFsFile  The VIRTIO_FS_FILE to rename.
 +
-+  @param[in] LhsPath8     The source pathname operand of the rename/move
-+                          operation, expressed as a canonical pathname (as
-+                          defined in the description of VirtioFsAppendPath()).
-+                          The root directory "/" cannot be renamed/moved, and
-+                          will be rejected.
++  @param[in] NewFileName       The new file name requested by
++                               EFI_FILE_PROTOCOL.SetInfo().
 +
-+  @param[in] RhsPath16    The destination pathname operand expressed as a
-+                          UEFI-style CHAR16 pathname.
++  @retval EFI_SUCCESS        The canonical format destination path that is
++                             determined from the input value of
++                             VirtioFsFile->CanonicalPathname and from
++                             NewFileName is identical to the input value of
++                             VirtioFsFile->CanonicalPathname. This means that
++                             EFI_FILE_INFO does not constitute a rename
++                             request. VirtioFsFile has not been changed.
 +
-+                          If RhsPath16 starts with a backslash, then RhsPath16
-+                          is considered absolute. Otherwise, RhsPath16 is
-+                          interpreted relative to the most specific parent
-+                          directory found in LhsPath8.
++  @retval EFI_SUCCESS        VirtioFsFile has been renamed.
++                             VirtioFsFile->CanonicalPathname has assumed the
++                             destination pathname in canonical format.
 +
-+                          Independently, if RhsPath16 ends with a backslash
-+                          (i.e., RhsPath16 is given in the "move into
-+                          directory" convenience form), then RhsPath16 is
-+                          interpreted with the basename of LhsPath8 appended.
-+                          Otherwise, the last pathname component of RhsPath16
-+                          is taken as the last pathname component of the
-+                          rename/move destination.
++  @retval EFI_ACCESS_DENIED  VirtioFsFile refers to the root directory, and
++                             NewFileName expresses an actual rename/move
++                             request.
 +
-+                          An empty RhsPath16 is rejected.
++  @retval EFI_ACCESS_DENIED  VirtioFsFile is the (possibly indirect) parent
++                             directory of at least one other VIRTIO_FS_FILE
++                             that is open for the same Virtio Filesystem
++                             (identified by VirtioFsFile->OwnerFs). Renaming
++                             VirtioFsFile would invalidate the canonical
++                             pathnames of those VIRTIO_FS_FILE instances;
++                             therefore the request has been rejected.
 +
-+  @param[out] ResultPath8  The POSIX-style, canonical format pathname that
-+                           leads to the renamed/moved file. After use, the
-+                           caller is responsible for freeing ResultPath8.
++  @retval EFI_ACCESS_DENIED  VirtioFsFile is not open for writing, but
++                             NewFileName expresses an actual rename/move
++                             request.
 +
-+  @param[out] RootEscape   Set to TRUE if at least one dot-dot component in
-+                           RhsPath16 attempted to escape the root directory;
-+                           set to FALSE otherwise.
++  @retval EFI_NOT_FOUND      At least one dot-dot component in NewFileName
++                             attempted to escape the root directory.
 +
-+  @retval EFI_SUCCESS            ResultPath8 has been produced. RootEscape has
-+                                 been output.
-+
-+  @retval EFI_INVALID_PARAMETER  LhsPath8 is "/".
-+
-+  @retval EFI_INVALID_PARAMETER  RhsPath16 is zero-length.
-+
-+  @retval EFI_INVALID_PARAMETER  RhsPath16 failed the
-+                                 VIRTIO_FS_MAX_PATHNAME_LENGTH check.
-+
-+  @retval EFI_OUT_OF_RESOURCES   Memory allocation failed.
-+
-+  @retval EFI_OUT_OF_RESOURCES   ResultPath8 would have failed the
-+                                 VIRTIO_FS_MAX_PATHNAME_LENGTH check.
-+
-+  @retval EFI_UNSUPPORTED        RhsPath16 contains a character that either
-+                                 falls outside of the printable ASCII set, or
-+                                 is a forward slash.
++  @return                    Error codes propagated from underlying functions.
 +**/
++STATIC
 +EFI_STATUS
-+VirtioFsComposeRenameDestination (
-+  IN     CHAR8   *LhsPath8,
-+  IN     CHAR16  *RhsPath16,
-+     OUT CHAR8   **ResultPath8,
-+     OUT BOOLEAN *RootEscape
++Rename (
++  IN OUT VIRTIO_FS_FILE *VirtioFsFile,
++  IN     CHAR16         *NewFileName
 +  )
 +{
-+  //
-+  // Lengths are expressed as numbers of characters (CHAR8 or CHAR16),
-+  // excluding terminating NULs. Sizes are expressed as byte counts, including
-+  // the bytes taken up by terminating NULs.
-+  //
-+  UINTN      RhsLen;
-+  UINTN      LhsBasename16Size;
++
++  VIRTIO_FS  *VirtioFs;
 +  EFI_STATUS Status;
-+  UINTN      LhsBasenameLen;
-+  UINTN      DestSuffix16Size;
-+  CHAR16     *DestSuffix16;
-+  CHAR8      *DestPrefix8;
++  CHAR8      *Destination;
++  BOOLEAN    RootEscape;
++  UINT64     OldParentDirNodeId;
++  CHAR8      *OldLastComponent;
++  UINT64     NewParentDirNodeId;
++  CHAR8      *NewLastComponent;
++
++  VirtioFs = VirtioFsFile->OwnerFs;
 +
 +  //
-+  // An empty destination operand for the rename/move operation is not allowed.
++  // The root directory cannot be renamed.
 +  //
-+  RhsLen = StrLen (RhsPath16);
-+  if (RhsLen == 0) {
-+    return EFI_INVALID_PARAMETER;
-+  }
-+  //
-+  // Enforce length restriction on RhsPath16.
-+  //
-+  if (RhsLen > VIRTIO_FS_MAX_PATHNAME_LENGTH) {
-+    return EFI_INVALID_PARAMETER;
-+  }
-+
-+  //
-+  // Determine the length of the basename of LhsPath8.
-+  //
-+  LhsBasename16Size = 0;
-+  Status = VirtioFsGetBasename (LhsPath8, NULL, &LhsBasename16Size);
-+  ASSERT (Status == EFI_BUFFER_TOO_SMALL);
-+  ASSERT (LhsBasename16Size >= sizeof (CHAR16));
-+  ASSERT (LhsBasename16Size % sizeof (CHAR16) == 0);
-+  LhsBasenameLen = LhsBasename16Size / sizeof (CHAR16) - 1;
-+  if (LhsBasenameLen == 0) {
-+    //
-+    // The root directory cannot be renamed/moved.
-+    //
-+    return EFI_INVALID_PARAMETER;
++  if (AsciiStrCmp (VirtioFsFile->CanonicalPathname, "/") == 0) {
++    if (StrCmp (NewFileName, L"") == 0) {
++      //
++      // Not a rename request anyway.
++      //
++      return EFI_SUCCESS;
++    }
++    return EFI_ACCESS_DENIED;
 +  }
 +
 +  //
-+  // Resolve the "move into directory" convenience form in RhsPath16.
++  // Compose the canonical pathname for the destination.
 +  //
-+  if (RhsPath16[RhsLen - 1] == L'\\') {
-+    //
-+    // Append the basename of LhsPath8 as a CHAR16 string to RhsPath16.
-+    //
-+    DestSuffix16Size = RhsLen * sizeof (CHAR16) + LhsBasename16Size;
-+    DestSuffix16 = AllocatePool (DestSuffix16Size);
-+    if (DestSuffix16 == NULL) {
-+      return EFI_OUT_OF_RESOURCES;
++  Status = VirtioFsComposeRenameDestination (VirtioFsFile->CanonicalPathname,
++             NewFileName, &Destination, &RootEscape);
++  if (EFI_ERROR (Status)) {
++    return Status;
++  }
++  if (RootEscape) {
++    Status = EFI_NOT_FOUND;
++    goto FreeDestination;
++  }
++  //
++  // If the rename would leave VirtioFsFile->CanonicalPathname unchanged, then
++  // EFI_FILE_PROTOCOL.SetInfo() isn't asking for a rename actually.
++  //
++  if (AsciiStrCmp (VirtioFsFile->CanonicalPathname, Destination) == 0) {
++    Status = EFI_SUCCESS;
++    goto FreeDestination;
++  }
++  //
++  // Check if the rename would break the canonical pathnames of other
++  // VIRTIO_FS_FILE instances of the same VIRTIO_FS.
++  //
++  if (VirtioFsFile->IsDirectory) {
++    UINTN      PathLen;
++    LIST_ENTRY *OpenFilesEntry;
++
++    PathLen = AsciiStrLen (VirtioFsFile->CanonicalPathname);
++    BASE_LIST_FOR_EACH (OpenFilesEntry, &VirtioFs->OpenFiles) {
++      VIRTIO_FS_FILE *OtherFile;
++
++      OtherFile = VIRTIO_FS_FILE_FROM_OPEN_FILES_ENTRY (OpenFilesEntry);
++      if (OtherFile != VirtioFsFile &&
++          AsciiStrnCmp (VirtioFsFile->CanonicalPathname,
++            OtherFile->CanonicalPathname, PathLen) == 0 &&
++          (OtherFile->CanonicalPathname[PathLen] == '\0' ||
++           OtherFile->CanonicalPathname[PathLen] == '/')) {
++        //
++        // OtherFile refers to the same directory as VirtioFsFile, or is a
++        // (possibly indirect) child of the directory referred to by
++        // VirtioFsFile.
++        //
++        Status = EFI_ACCESS_DENIED;
++        goto FreeDestination;
++      }
 +    }
-+    CopyMem (DestSuffix16, RhsPath16, RhsLen * sizeof (CHAR16));
-+    Status = VirtioFsGetBasename (LhsPath8, DestSuffix16 + RhsLen,
-+               &LhsBasename16Size);
-+    ASSERT_EFI_ERROR (Status);
-+  } else {
-+    //
-+    // Just create a copy of RhsPath16.
-+    //
-+    DestSuffix16Size = (RhsLen + 1) * sizeof (CHAR16);
-+    DestSuffix16 = AllocateCopyPool (DestSuffix16Size, RhsPath16);
-+    if (DestSuffix16 == NULL) {
-+      return EFI_OUT_OF_RESOURCES;
-+    }
++  }
++  //
++  // From this point on, the file needs to be open for writing.
++  //
++  if (!VirtioFsFile->IsOpenForWriting) {
++    Status = EFI_ACCESS_DENIED;
++    goto FreeDestination;
++  }
++  //
++  // Split both source and destination canonical pathnames into (most specific
++  // parent directory, last component) pairs.
++  //
++  Status = VirtioFsLookupMostSpecificParentDir (VirtioFs,
++             VirtioFsFile->CanonicalPathname, &OldParentDirNodeId,
++             &OldLastComponent);
++  if (EFI_ERROR (Status)) {
++    goto FreeDestination;
++  }
++  Status = VirtioFsLookupMostSpecificParentDir (VirtioFs, Destination,
++             &NewParentDirNodeId, &NewLastComponent);
++  if (EFI_ERROR (Status)) {
++    goto ForgetOldParentDirNodeId;
++  }
++  //
++  // Perform the rename. If the destination path exists, the rename will fail.
++  //
++  Status = VirtioFsFuseRename (VirtioFs, OldParentDirNodeId, OldLastComponent,
++             NewParentDirNodeId, NewLastComponent);
++  if (EFI_ERROR (Status)) {
++    goto ForgetNewParentDirNodeId;
 +  }
 +
 +  //
-+  // If the destination operand is absolute, it will be interpreted relative to
-+  // the root directory.
++  // Swap in the new canonical pathname.
 +  //
-+  // Otherwise (i.e., if the destination operand is relative), then create the
-+  // canonical pathname that the destination operand is interpreted relatively
-+  // to; that is, the canonical pathname of the most specific parent directory
-+  // found in LhsPath8.
-+  //
-+  if (DestSuffix16[0] == L'\\') {
-+    DestPrefix8 = AllocateCopyPool (sizeof "/", "/");
-+    if (DestPrefix8 == NULL) {
-+      Status = EFI_OUT_OF_RESOURCES;
-+      goto FreeDestSuffix16;
-+    }
-+  } else {
-+    UINTN LhsLen;
-+    UINTN DestPrefixLen;
++  FreePool (VirtioFsFile->CanonicalPathname);
++  VirtioFsFile->CanonicalPathname = Destination;
++  Destination = NULL;
++  Status = EFI_SUCCESS;
 +
-+    //
-+    // Strip the basename of LhsPath8.
-+    //
-+    LhsLen = AsciiStrLen (LhsPath8);
-+    ASSERT (LhsBasenameLen < LhsLen);
-+    DestPrefixLen = LhsLen - LhsBasenameLen;
-+    ASSERT (LhsPath8[DestPrefixLen - 1] == '/');
-+    //
-+    // If we're not at the root directory, strip the slash too.
-+    //
-+    if (DestPrefixLen > 1) {
-+      DestPrefixLen--;
-+    }
-+    DestPrefix8 = AllocatePool (DestPrefixLen + 1);
-+    if (DestPrefix8 == NULL) {
-+      Status = EFI_OUT_OF_RESOURCES;
-+      goto FreeDestSuffix16;
-+    }
-+    CopyMem (DestPrefix8, LhsPath8, DestPrefixLen);
-+    DestPrefix8[DestPrefixLen] = '\0';
-+  }
-+
-+  //
-+  // Now combine DestPrefix8 and DestSuffix16 into the final canonical
-+  // pathname.
-+  //
-+  Status = VirtioFsAppendPath (DestPrefix8, DestSuffix16, ResultPath8,
-+             RootEscape);
-+
-+  FreePool (DestPrefix8);
 +  //
 +  // Fall through.
 +  //
-+FreeDestSuffix16:
-+  FreePool (DestSuffix16);
++ForgetNewParentDirNodeId:
++  if (NewParentDirNodeId != VIRTIO_FS_FUSE_ROOT_DIR_NODE_ID) {
++    VirtioFsFuseForget (VirtioFs, NewParentDirNodeId);
++  }
 +
++ForgetOldParentDirNodeId:
++  if (OldParentDirNodeId != VIRTIO_FS_FUSE_ROOT_DIR_NODE_ID) {
++    VirtioFsFuseForget (VirtioFs, OldParentDirNodeId);
++  }
++
++FreeDestination:
++  if (Destination != NULL) {
++    FreePool (Destination);
++  }
++  return Status;
++}
++
++/**
++  Process an EFI_FILE_INFO setting request.
++**/
++STATIC
++EFI_STATUS
++SetFileInfo (
++  IN EFI_FILE_PROTOCOL *This,
++  IN UINTN             BufferSize,
++  IN VOID              *Buffer
++  )
++{
++  VIRTIO_FS_FILE *VirtioFsFile;
++  EFI_STATUS     Status;
++  EFI_FILE_INFO  *FileInfo;
++
++  VirtioFsFile = VIRTIO_FS_FILE_FROM_SIMPLE_FILE (This);
++
++  //
++  // Validate if Buffer passes as EFI_FILE_INFO.
++  //
++  Status = ValidateInfoStructure (
++             BufferSize,                    // SizeByProtocolCaller
++             OFFSET_OF (EFI_FILE_INFO,
++               FileName) + sizeof (CHAR16), // MinimumStructSize
++             TRUE,                          // IsSizeByInfoPresent
++             Buffer
++             );
++  if (EFI_ERROR (Status)) {
++    return Status;
++  }
++  FileInfo = Buffer;
++
++  //
++  // Perform the rename/move request, if any.
++  //
++  Status = Rename (VirtioFsFile, FileInfo->FileName);
++  if (EFI_ERROR (Status)) {
++    return Status;
++  }
++  //
++  // Update any attributes requested.
++  //
++  Status = EFI_UNSUPPORTED;
++  //
++  // The UEFI spec does not speak about partial failure in
++  // EFI_FILE_PROTOCOL.SetInfo(); we won't try to roll back the rename (if
++  // there was one) in case the attribute updates fail.
++  //
 +  return Status;
 +}
 +
  /**
-   Convert select fields of a VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE object to
-   corresponding fields in EFI_FILE_INFO.
+   Process an EFI_FILE_SYSTEM_INFO setting request.
+ **/
+ STATIC
+ EFI_STATUS
+ SetFileSystemInfo (
+   IN EFI_FILE_PROTOCOL *This,
+   IN UINTN             BufferSize,
+@@ -225,17 +457,17 @@ EFIAPI
+ VirtioFsSimpleFileSetInfo (
+   IN EFI_FILE_PROTOCOL *This,
+   IN EFI_GUID          *InformationType,
+   IN UINTN             BufferSize,
+   IN VOID              *Buffer
+   )
+ {
+   if (CompareGuid (InformationType, &gEfiFileInfoGuid)) {
+-    return EFI_UNSUPPORTED;
++    return SetFileInfo (This, BufferSize, Buffer);
+   }
  
-   @param[in] FuseAttr   The VIRTIO_FS_FUSE_ATTRIBUTES_RESPONSE object to
-                         convert the relevant fields from.
+   if (CompareGuid (InformationType, &gEfiFileSystemInfoGuid)) {
+     return SetFileSystemInfo (This, BufferSize, Buffer);
+   }
  
-   @param[out] FileInfo  The EFI_FILE_INFO structure to modify. Importantly, the
+   if (CompareGuid (InformationType, &gEfiFileSystemVolumeLabelInfoIdGuid)) {
+     return SetFileSystemVolumeLabelInfo (This, BufferSize, Buffer);
 -- 
 2.19.1.3.g30247aa5d201
 

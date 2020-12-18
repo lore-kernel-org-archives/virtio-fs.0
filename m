@@ -1,14 +1,14 @@
 References: <20201216211125.19496-1-lersek@redhat.com>
-	<20201216211125.19496-2-lersek@redhat.com>
 From: Ard Biesheuvel <ard.biesheuvel@arm.com>
-Message-ID: <57ec49d2-1540-f693-23ef-12a0cf217a81@arm.com>
-Date: Fri, 18 Dec 2020 18:42:43 +0100
+Message-ID: <f307b0a1-a885-4379-15f3-a3ac1a5f2a5d@arm.com>
+Date: Fri, 18 Dec 2020 18:44:20 +0100
 MIME-Version: 1.0
-In-Reply-To: <20201216211125.19496-2-lersek@redhat.com>
+In-Reply-To: <20201216211125.19496-1-lersek@redhat.com>
 Content-Type: text/plain; charset="utf-8"
 Content-Language: en-US
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [edk2 PATCH 01/48] OvmfPkg: introduce VirtioFsDxe
+Subject: Re: [Virtio-fs] [edk2 PATCH 00/48] ArmVirtPkg,
+	OvmfPkg: virtio filesystem driver
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,406 +18,196 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Laszlo Ersek <lersek@redhat.com>, devel@edk2.groups.io, virtio-fs@redhat.com
-Cc: Jordan Justen <jordan.l.justen@intel.com>, =?UTF-8?Q?Philippe_Mathieu-Daud=c3=a9?= <philmd@redhat.com>
+Cc: Jordan Justen <jordan.l.justen@intel.com>, Leif Lindholm <leif@nuviainc.com>, =?UTF-8?Q?Philippe_Mathieu-Daud=c3=a9?= <philmd@redhat.com>
 
 On 12/16/20 10:10 PM, Laszlo Ersek wrote:
-> The purpose of the driver is to ease file exchange (file sharing) between
-> the guest firmware and the virtualization host. The driver is supposed to
-> interoperate with QEMU's "virtiofsd" (Virtio Filesystem Daemon).
+> Ref:    https://bugzilla.tianocore.org/show_bug.cgi?id=3097
+> Repo:   https://pagure.io/lersek/edk2.git
+> Branch: virtio-fs (@ b8fd76d649d2)
 > 
-> References:
-> - https://virtio-fs.gitlab.io/
+> The first commit and the bugzilla ticket state the use case.
+> 
+> References, including setup instructions:
 > - https://libvirt.org/kbase/virtiofs.html
+> - https://virtio-fs.gitlab.io/
 > 
-> VirtioFsDxe will bind virtio-fs devices, and produce
-> EFI_SIMPLE_FILE_SYSTEM_PROTOCOL instances on them.
+> Useful UEFI shell commands for testing: output redirections, attrib,
+> connect, cp, disconnect, edit, eficompress, efidecompress, hexedit, ls,
+> map, mkdir, mv, rm, setsize, timezone, touch, type, vol.
 > 
-> In the longer term, assuming QEMU will create "bootorder" fw_cfg file
-> entries for virtio-fs devices, booting guest OSes from host-side
-> directories should become possible (dependent on the matching
-> QemuBootOrderLib enhancement).
-> 
-> Add the skeleton of the driver. Install EFI_DRIVER_BINDING_PROTOCOL with
-> stub member functions. Install EFI_COMPONENT_NAME2_PROTOCOL with final
-> member functions. This suffices for the DRIVERS command in the UEFI Shell
-> to list the driver with a human-readable name.
-> 
-> The file permission model is described immediately in the INF file as a
-> comment block, for future reference.
+> The series is largely structured as follows:
+> - helper functions and FUSE command wrappers are implemented as required
+>   by the next EFI_FILE_PROTOCOL interface,
+> - said EFI_FILE_PROTOCOL interface is implemented,
+> - lather, rinse, repeat.
 > 
 > Cc: Ard Biesheuvel <ard.biesheuvel@arm.com>
 > Cc: Jordan Justen <jordan.l.justen@intel.com>
+> Cc: Leif Lindholm <leif@nuviainc.com>
 > Cc: Philippe Mathieu-Daudé <philmd@redhat.com>
-> Ref: https://bugzilla.tianocore.org/show_bug.cgi?id=3097
-> Signed-off-by: Laszlo Ersek <lersek@redhat.com>
-> ---
->  OvmfPkg/OvmfPkgIa32.dsc             |   1 +
->  OvmfPkg/OvmfPkgIa32X64.dsc          |   1 +
->  OvmfPkg/OvmfPkgX64.dsc              |   1 +
->  OvmfPkg/OvmfPkgIa32.fdf             |   1 +
->  OvmfPkg/OvmfPkgIa32X64.fdf          |   1 +
->  OvmfPkg/OvmfPkgX64.fdf              |   1 +
->  OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf |  92 ++++++++++++++++
->  OvmfPkg/VirtioFsDxe/DriverBinding.c | 112 ++++++++++++++++++++
->  8 files changed, 210 insertions(+)
 > 
-> diff --git a/OvmfPkg/OvmfPkgIa32.dsc b/OvmfPkg/OvmfPkgIa32.dsc
-> index 8eede796a8bd..4ff70674fb6e 100644
-> --- a/OvmfPkg/OvmfPkgIa32.dsc
-> +++ b/OvmfPkg/OvmfPkgIa32.dsc
-> @@ -807,16 +807,17 @@ [Components]
->    }
->    MdeModulePkg/Universal/PrintDxe/PrintDxe.inf
->    MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
->    MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
->    MdeModulePkg/Universal/Disk/RamDiskDxe/RamDiskDxe.inf
->    MdeModulePkg/Universal/Disk/UnicodeCollation/EnglishDxe/EnglishDxe.inf
->    FatPkg/EnhancedFatDxe/Fat.inf
->    MdeModulePkg/Universal/Disk/UdfDxe/UdfDxe.inf
-> +  OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
->    MdeModulePkg/Bus/Scsi/ScsiBusDxe/ScsiBusDxe.inf
->    MdeModulePkg/Bus/Scsi/ScsiDiskDxe/ScsiDiskDxe.inf
->    OvmfPkg/SataControllerDxe/SataControllerDxe.inf
->    MdeModulePkg/Bus/Ata/AtaAtapiPassThru/AtaAtapiPassThru.inf
->    MdeModulePkg/Bus/Ata/AtaBusDxe/AtaBusDxe.inf
->    MdeModulePkg/Bus/Pci/NvmExpressDxe/NvmExpressDxe.inf
->    MdeModulePkg/Universal/HiiDatabaseDxe/HiiDatabaseDxe.inf
->    MdeModulePkg/Universal/SetupBrowserDxe/SetupBrowserDxe.inf
-> diff --git a/OvmfPkg/OvmfPkgIa32X64.dsc b/OvmfPkg/OvmfPkgIa32X64.dsc
-> index f9f82a48f4b9..d40a59183c79 100644
-> --- a/OvmfPkg/OvmfPkgIa32X64.dsc
-> +++ b/OvmfPkg/OvmfPkgIa32X64.dsc
-> @@ -821,16 +821,17 @@ [Components.X64]
->    }
->    MdeModulePkg/Universal/PrintDxe/PrintDxe.inf
->    MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
->    MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
->    MdeModulePkg/Universal/Disk/RamDiskDxe/RamDiskDxe.inf
->    MdeModulePkg/Universal/Disk/UnicodeCollation/EnglishDxe/EnglishDxe.inf
->    FatPkg/EnhancedFatDxe/Fat.inf
->    MdeModulePkg/Universal/Disk/UdfDxe/UdfDxe.inf
-> +  OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
->    MdeModulePkg/Bus/Scsi/ScsiBusDxe/ScsiBusDxe.inf
->    MdeModulePkg/Bus/Scsi/ScsiDiskDxe/ScsiDiskDxe.inf
->    OvmfPkg/SataControllerDxe/SataControllerDxe.inf
->    MdeModulePkg/Bus/Ata/AtaAtapiPassThru/AtaAtapiPassThru.inf
->    MdeModulePkg/Bus/Ata/AtaBusDxe/AtaBusDxe.inf
->    MdeModulePkg/Bus/Pci/NvmExpressDxe/NvmExpressDxe.inf
->    MdeModulePkg/Universal/HiiDatabaseDxe/HiiDatabaseDxe.inf
->    MdeModulePkg/Universal/SetupBrowserDxe/SetupBrowserDxe.inf
-> diff --git a/OvmfPkg/OvmfPkgX64.dsc b/OvmfPkg/OvmfPkgX64.dsc
-> index e59ae05b73aa..ec7886235acf 100644
-> --- a/OvmfPkg/OvmfPkgX64.dsc
-> +++ b/OvmfPkg/OvmfPkgX64.dsc
-> @@ -817,16 +817,17 @@ [Components]
->    }
->    MdeModulePkg/Universal/PrintDxe/PrintDxe.inf
->    MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
->    MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
->    MdeModulePkg/Universal/Disk/RamDiskDxe/RamDiskDxe.inf
->    MdeModulePkg/Universal/Disk/UnicodeCollation/EnglishDxe/EnglishDxe.inf
->    FatPkg/EnhancedFatDxe/Fat.inf
->    MdeModulePkg/Universal/Disk/UdfDxe/UdfDxe.inf
-> +  OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
->    MdeModulePkg/Bus/Scsi/ScsiBusDxe/ScsiBusDxe.inf
->    MdeModulePkg/Bus/Scsi/ScsiDiskDxe/ScsiDiskDxe.inf
->    OvmfPkg/SataControllerDxe/SataControllerDxe.inf
->    MdeModulePkg/Bus/Ata/AtaAtapiPassThru/AtaAtapiPassThru.inf
->    MdeModulePkg/Bus/Ata/AtaBusDxe/AtaBusDxe.inf
->    MdeModulePkg/Bus/Pci/NvmExpressDxe/NvmExpressDxe.inf
->    MdeModulePkg/Universal/HiiDatabaseDxe/HiiDatabaseDxe.inf
->    MdeModulePkg/Universal/SetupBrowserDxe/SetupBrowserDxe.inf
-> diff --git a/OvmfPkg/OvmfPkgIa32.fdf b/OvmfPkg/OvmfPkgIa32.fdf
-> index c07b775d0a2d..f400c845b9c9 100644
-> --- a/OvmfPkg/OvmfPkgIa32.fdf
-> +++ b/OvmfPkg/OvmfPkgIa32.fdf
-> @@ -285,16 +285,17 @@ [FV.DXEFV]
->  INF  OvmfPkg/AcpiPlatformDxe/AcpiPlatformDxe.inf
->  INF  RuleOverride=ACPITABLE OvmfPkg/AcpiTables/AcpiTables.inf
->  INF  MdeModulePkg/Universal/Acpi/S3SaveStateDxe/S3SaveStateDxe.inf
->  INF  MdeModulePkg/Universal/Acpi/BootScriptExecutorDxe/BootScriptExecutorDxe.inf
->  INF  MdeModulePkg/Universal/Acpi/BootGraphicsResourceTableDxe/BootGraphicsResourceTableDxe.inf
->  
->  INF  FatPkg/EnhancedFatDxe/Fat.inf
->  INF  MdeModulePkg/Universal/Disk/UdfDxe/UdfDxe.inf
-> +INF  OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
->  
->  !if $(TOOL_CHAIN_TAG) != "XCODE5"
->  INF  ShellPkg/DynamicCommand/TftpDynamicCommand/TftpDynamicCommand.inf
->  INF  ShellPkg/DynamicCommand/HttpDynamicCommand/HttpDynamicCommand.inf
->  INF  OvmfPkg/LinuxInitrdDynamicShellCommand/LinuxInitrdDynamicShellCommand.inf
->  !endif
->  INF  ShellPkg/Application/Shell/Shell.inf
->  
-> diff --git a/OvmfPkg/OvmfPkgIa32X64.fdf b/OvmfPkg/OvmfPkgIa32X64.fdf
-> index 9adf1525c135..d055552fd09f 100644
-> --- a/OvmfPkg/OvmfPkgIa32X64.fdf
-> +++ b/OvmfPkg/OvmfPkgIa32X64.fdf
-> @@ -286,16 +286,17 @@ [FV.DXEFV]
->  INF  OvmfPkg/AcpiPlatformDxe/AcpiPlatformDxe.inf
->  INF  RuleOverride=ACPITABLE OvmfPkg/AcpiTables/AcpiTables.inf
->  INF  MdeModulePkg/Universal/Acpi/S3SaveStateDxe/S3SaveStateDxe.inf
->  INF  MdeModulePkg/Universal/Acpi/BootScriptExecutorDxe/BootScriptExecutorDxe.inf
->  INF  MdeModulePkg/Universal/Acpi/BootGraphicsResourceTableDxe/BootGraphicsResourceTableDxe.inf
->  
->  INF  FatPkg/EnhancedFatDxe/Fat.inf
->  INF  MdeModulePkg/Universal/Disk/UdfDxe/UdfDxe.inf
-> +INF  OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
->  
->  !if $(TOOL_CHAIN_TAG) != "XCODE5"
->  INF  ShellPkg/DynamicCommand/TftpDynamicCommand/TftpDynamicCommand.inf
->  INF  ShellPkg/DynamicCommand/HttpDynamicCommand/HttpDynamicCommand.inf
->  INF  OvmfPkg/LinuxInitrdDynamicShellCommand/LinuxInitrdDynamicShellCommand.inf
->  !endif
->  INF  ShellPkg/Application/Shell/Shell.inf
->  
-> diff --git a/OvmfPkg/OvmfPkgX64.fdf b/OvmfPkg/OvmfPkgX64.fdf
-> index 17ba9e177ac3..1a2ef5bf2ae3 100644
-> --- a/OvmfPkg/OvmfPkgX64.fdf
-> +++ b/OvmfPkg/OvmfPkgX64.fdf
-> @@ -295,16 +295,17 @@ [FV.DXEFV]
->  INF  OvmfPkg/AcpiPlatformDxe/AcpiPlatformDxe.inf
->  INF  RuleOverride=ACPITABLE OvmfPkg/AcpiTables/AcpiTables.inf
->  INF  MdeModulePkg/Universal/Acpi/S3SaveStateDxe/S3SaveStateDxe.inf
->  INF  MdeModulePkg/Universal/Acpi/BootScriptExecutorDxe/BootScriptExecutorDxe.inf
->  INF  MdeModulePkg/Universal/Acpi/BootGraphicsResourceTableDxe/BootGraphicsResourceTableDxe.inf
->  
->  INF  FatPkg/EnhancedFatDxe/Fat.inf
->  INF  MdeModulePkg/Universal/Disk/UdfDxe/UdfDxe.inf
-> +INF  OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
->  
->  !if $(TOOL_CHAIN_TAG) != "XCODE5"
->  INF  ShellPkg/DynamicCommand/TftpDynamicCommand/TftpDynamicCommand.inf
->  INF  ShellPkg/DynamicCommand/HttpDynamicCommand/HttpDynamicCommand.inf
->  INF  OvmfPkg/LinuxInitrdDynamicShellCommand/LinuxInitrdDynamicShellCommand.inf
->  !endif
->  INF  ShellPkg/Application/Shell/Shell.inf
->  
-> diff --git a/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
-> new file mode 100644
-> index 000000000000..69cb44bc7c96
-> --- /dev/null
-> +++ b/OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
-> @@ -0,0 +1,92 @@
-> +## @file
-> +# Provide EFI_SIMPLE_FILE_SYSTEM_PROTOCOL instances on virtio-fs devices.
-> +#
-> +# Copyright (C) 2020, Red Hat, Inc.
-> +#
-> +# SPDX-License-Identifier: BSD-2-Clause-Patent
-> +#
-> +#
-> +# Permission Model of this driver:
-> +#
-> +# Regardless of the UID and GID values this driver send in the FUSE request
-> +# header, the daemon (that is, the Virtio Filesystem device) always acts with
-> +# root privileges on the host side. The only time the daemon considers said UID
-> +# and GID fields is when creating a new file or directory. Thus, the guest
-> +# driver cannot rely on the host for enforcing any file mode permissions,
-> +# regardless of the "personality" that the guest driver poses as, because
-> +# "root" on the host side ignores all file mode bits.
-> +#
-> +# Therefore the guest driver has to do its own permission checking, and use the
-> +# host-side file mode bits only as a kind of "metadata storage" or "reminder"
-> +# -- hopefully in a way that makes some sense on the host side too.
-> +#
+> Thanks,
+> Laszlo
+> 
+> Laszlo Ersek (48):
+>   OvmfPkg: introduce VirtioFsDxe
+>   ArmVirtPkg: include VirtioFsDxe in the ArmVirtQemu* platforms
+>   OvmfPkg/VirtioFsDxe: DriverBinding: open VirtioDevice, install
+>     SimpleFs
+>   OvmfPkg/VirtioFsDxe: implement virtio device (un)initialization
+>   OvmfPkg/VirtioFsDxe: add a scatter-gather list data type
+>   OvmfPkg/VirtioFsDxe: introduce the basic FUSE request/response headers
+>   OvmfPkg/VirtioFsDxe: map "errno" values to EFI_STATUS
+>   OvmfPkg/VirtioFsDxe: submit the FUSE_INIT request to the device
+>   OvmfPkg/VirtioFsDxe: implement the wrapper function for FUSE_OPENDIR
+>   OvmfPkg/VirtioFsDxe: add shared wrapper for FUSE_RELEASE /
+>     FUSE_RELEASEDIR
+>   OvmfPkg/VirtioFsDxe: implement
+>     EFI_SIMPLE_FILE_SYSTEM_PROTOCOL.OpenVolume()
+>   OvmfPkg/VirtioFsDxe: implement the wrapper function for FUSE_FORGET
+>   OvmfPkg/VirtioFsDxe: add a shared wrapper for FUSE_FSYNC /
+>     FUSE_FSYNCDIR
+>   OvmfPkg/VirtioFsDxe: implement the wrapper function for FUSE_FLUSH
+>   OvmfPkg/VirtioFsDxe: flush, sync, release and forget in Close() /
+>     Delete()
+>   OvmfPkg/VirtioFsDxe: add helper for appending and sanitizing paths
+>   OvmfPkg/VirtioFsDxe: manage path lifecycle in OpenVolume, Close,
+>     Delete
+>   OvmfPkg/VirtioFsDxe: implement the wrapper function for FUSE_OPEN
+>   OvmfPkg/VirtioFsDxe: implement the wrapper function for FUSE_MKDIR
+>   OvmfPkg/VirtioFsDxe: implement the wrapper function for FUSE_CREATE
+>   OvmfPkg/VirtioFsDxe: convert FUSE inode attributes to EFI_FILE_INFO
+>   OvmfPkg/VirtioFsDxe: implement the wrapper function for FUSE_LOOKUP
+>   OvmfPkg/VirtioFsDxe: split canon. path into last parent + last
+>     component
+>   OvmfPkg/VirtioFsDxe: add a shared wrapper for FUSE_UNLINK / FUSE_RMDIR
+>   OvmfPkg/VirtioFsDxe: implement the wrapper function for FUSE_GETATTR
+>   OvmfPkg/VirtioFsDxe: implement EFI_FILE_PROTOCOL.Open()
+>   OvmfPkg/VirtioFsDxe: erase the dir. entry in
+>     EFI_FILE_PROTOCOL.Delete()
+>   OvmfPkg/VirtioFsDxe: implement the wrapper function for FUSE_STATFS
+>   OvmfPkg/VirtioFsDxe: add helper for formatting UEFI basenames
+>   OvmfPkg/VirtioFsDxe: implement EFI_FILE_PROTOCOL.GetInfo()
+>   OvmfPkg/VirtioFsDxe: implement EFI_FILE_PROTOCOL.GetPosition,
+>     .SetPosition
+>   OvmfPkg/VirtioFsDxe: add a shared wrapper for FUSE_READ /
+>     FUSE_READDIRPLUS
+>   OvmfPkg/VirtioFsDxe: implement EFI_FILE_PROTOCOL.Read() for regular
+>     files
+>   OvmfPkg/VirtioFsDxe: convert FUSE dirent filename to EFI_FILE_INFO
+>   OvmfPkg/VirtioFsDxe: add EFI_FILE_INFO cache fields to VIRTIO_FS_FILE
+>   OvmfPkg/VirtioFsDxe: implement EFI_FILE_PROTOCOL.Read() for
+>     directories
+>   OvmfPkg/VirtioFsDxe: implement EFI_FILE_PROTOCOL.Flush()
+>   OvmfPkg/VirtioFsDxe: implement the wrapper function for FUSE_WRITE
+>   OvmfPkg/VirtioFsDxe: implement EFI_FILE_PROTOCOL.Write()
+>   OvmfPkg/VirtioFsDxe: handle the volume label in
+>     EFI_FILE_PROTOCOL.SetInfo
+>   OvmfPkg/VirtioFsDxe: implement the wrapper function for FUSE_RENAME2
+>   OvmfPkg/VirtioFsDxe: add helper for composing rename/move destination
+>     path
+>   OvmfPkg/VirtioFsDxe: handle file rename/move in
+>     EFI_FILE_PROTOCOL.SetInfo
+>   OvmfPkg/VirtioFsDxe: implement the wrapper function for FUSE_SETATTR
+>   OvmfPkg/VirtioFsDxe: add helper for determining file size update
+>   OvmfPkg/VirtioFsDxe: add helper for determining access time updates
+>   OvmfPkg/VirtioFsDxe: add helper for determining file mode bits update
+>   OvmfPkg/VirtioFsDxe: handle attribute updates in
+>     EFI_FILE_PROTOCOL.SetInfo
+> 
 
-Can you please explain why this is safe? Or should virtio-fs only be
-used with guests that can be trusted with root privileges on the host?
+This looks carefully crafted, and modulo my two questions, I won't be
+able to spend more time on this than I have going through these patches
+today.
 
--- 
-Ard.
+So please feel free to merge this whenever you feel it's ready.
+
+For the series,
+
+Acked-by: Ard Biesheuvel <ard.biesheuvel@arm.com>
 
 
 
-> +# The complete mapping between the EFI_FILE_PROTOCOL and the host-side file
-> +# mode bits is described below.
-> +#
-> +# - The guest driver poses as UID 0, GID 0, PID 1.
-> +#
-> +# - If and only if all "w" bits are missing from a file on the host side, then
-> +#   the file or directory is reported as EFI_FILE_READ_ONLY in the guest. When
-> +#   setting EFI_FILE_READ_ONLY in the guest, all "w" bits (0222) are cleared on
-> +#   the host; when clearing EFI_FILE_READ_ONLY in the guest, all "w" bits are
-> +#   set on the host. Viewed from the host side, this sort of reflects that an
-> +#   EFI_FILE_READ_ONLY file should not be written by anyone.
-> +#
-> +# - The attributes EFI_FILE_HIDDEN, EFI_FILE_SYSTEM, EFI_FILE_RESERVED, and
-> +#   EFI_FILE_ARCHIVE are never reported in the guest, and they are silently
-> +#   ignored when a SetInfo() call or a file-creating Open() call requests them.
-> +#
-> +# - On the host, files are created with 0666 file mode bits, directories are
-> +#   created with 0777 file mode bits.
-> +#
-> +# - In the guest, the EFI_FILE_READ_ONLY attribute only controls the permitted
-> +#   open mode. In particular, on directories, the EFI_FILE_READ_ONLY attribute
-> +#   does not prevent the creation or deletion of entries inside the directory;
-> +#   EFI_FILE_READ_ONLY only prevents the renaming, deleting, flushing (syncing)
-> +#   and touching of the directory itself (with "touching" meaning updating the
-> +#   timestamps). The fact that EFI_FILE_READ_ONLY being set on a directory is
-> +#   irrelevant in the guest with regard to entry creation/deletion, is
-> +#   well-mirrored by the fact that virtiofsd -- which runs as root, regardless
-> +#   of guest driver personality -- ignores the absence of "w" permissions on a
-> +#   host-side directory, when creating or removing entries in it.
-> +#
-> +# - When an EFI_FILE_PROTOCOL is opened read-only, then the Delete(), Write()
-> +#   and Flush() member functions are disabled for it. Additionally, SetInfo()
-> +#   is restricted to flipping the EFI_FILE_READ_ONLY bit (which takes effect at
-> +#   the next Open()).
-> +#
-> +# - As a consequence of the above, for deleting a directory, it must be
-> +#   presented in the guest as openable for writing.
-> +#
-> +# - We diverge from the UEFI spec, and permit Flush() on a directory that has
-> +#   been opened read-write; otherwise the only way to invoke FUSE_FSYNCDIR on a
-> +#   directory would be to Close() it.
-> +#
-> +# - OpenVolume() opens the root directory for read-only access. The Open()
-> +#   member function may open it for read-write access. While the root directory
-> +#   cannot be renamed or deleted, opening it for read-write access is useful
-> +#   for calling Flush(), according to the previous paragraph, or for updating
-> +#   the root directory's timestamps with SetInfo().
-> +##
-> +
-> +[Defines]
-> +  INF_VERSION                           = 1.29
-> +  BASE_NAME                             = VirtioFsDxe
-> +  FILE_GUID                             = 7BD9DDF7-8B83-488E-AEC9-24C78610289C
-> +  MODULE_TYPE                           = UEFI_DRIVER
-> +  ENTRY_POINT                           = VirtioFsEntryPoint
-> +
-> +[Packages]
-> +  MdePkg/MdePkg.dec
-> +
-> +[Sources]
-> +  DriverBinding.c
-> +
-> +[LibraryClasses]
-> +  BaseLib
-> +  UefiBootServicesTableLib
-> +  UefiDriverEntryPoint
-> +
-> +[Protocols]
-> +  gEfiComponentName2ProtocolGuid        ## PRODUCES
-> +  gEfiDriverBindingProtocolGuid         ## PRODUCES
-> diff --git a/OvmfPkg/VirtioFsDxe/DriverBinding.c b/OvmfPkg/VirtioFsDxe/DriverBinding.c
-> new file mode 100644
-> index 000000000000..ac0a6330f01b
-> --- /dev/null
-> +++ b/OvmfPkg/VirtioFsDxe/DriverBinding.c
-> @@ -0,0 +1,112 @@
-> +/** @file
-> +  Provide EFI_SIMPLE_FILE_SYSTEM_PROTOCOL instances on virtio-fs devices.
-> +
-> +  Copyright (C) 2020, Red Hat, Inc.
-> +
-> +  SPDX-License-Identifier: BSD-2-Clause-Patent
-> +**/
-> +
-> +#include <Library/BaseLib.h>                  // AsciiStrCmp()
-> +#include <Library/UefiBootServicesTableLib.h> // gBS
-> +#include <Protocol/ComponentName2.h>          // EFI_COMPONENT_NAME2_PROTOCOL
-> +#include <Protocol/DriverBinding.h>           // EFI_DRIVER_BINDING_PROTOCOL
-> +
-> +//
-> +// UEFI Driver Model protocol instances.
-> +//
-> +STATIC EFI_DRIVER_BINDING_PROTOCOL  mDriverBinding;
-> +STATIC EFI_COMPONENT_NAME2_PROTOCOL mComponentName2;
-> +
-> +//
-> +// UEFI Driver Model protocol member functions.
-> +//
-> +EFI_STATUS
-> +EFIAPI
-> +VirtioFsBindingSupported (
-> +  IN EFI_DRIVER_BINDING_PROTOCOL *This,
-> +  IN EFI_HANDLE                  ControllerHandle,
-> +  IN EFI_DEVICE_PATH_PROTOCOL    *RemainingDevicePath OPTIONAL
-> +  )
-> +{
-> +  return EFI_UNSUPPORTED;
-> +}
-> +
-> +EFI_STATUS
-> +EFIAPI
-> +VirtioFsBindingStart (
-> +  IN EFI_DRIVER_BINDING_PROTOCOL *This,
-> +  IN EFI_HANDLE                  ControllerHandle,
-> +  IN EFI_DEVICE_PATH_PROTOCOL    *RemainingDevicePath OPTIONAL
-> +  )
-> +{
-> +  return EFI_DEVICE_ERROR;
-> +}
-> +
-> +EFI_STATUS
-> +EFIAPI
-> +VirtioFsBindingStop (
-> +  IN EFI_DRIVER_BINDING_PROTOCOL *This,
-> +  IN EFI_HANDLE                  ControllerHandle,
-> +  IN UINTN                       NumberOfChildren,
-> +  IN EFI_HANDLE                  *ChildHandleBuffer OPTIONAL
-> +  )
-> +{
-> +  return EFI_DEVICE_ERROR;
-> +}
-> +
-> +EFI_STATUS
-> +EFIAPI
-> +VirtioFsGetDriverName (
-> +  IN  EFI_COMPONENT_NAME2_PROTOCOL *This,
-> +  IN  CHAR8                        *Language,
-> +  OUT CHAR16                       **DriverName
-> +  )
-> +{
-> +  if (AsciiStrCmp (Language, "en") != 0) {
-> +    return EFI_UNSUPPORTED;
-> +  }
-> +  *DriverName = L"Virtio Filesystem Driver";
-> +  return EFI_SUCCESS;
-> +}
-> +
-> +EFI_STATUS
-> +EFIAPI
-> +VirtioFsGetControllerName (
-> +  IN  EFI_COMPONENT_NAME2_PROTOCOL *This,
-> +  IN  EFI_HANDLE                   ControllerHandle,
-> +  IN  EFI_HANDLE                   ChildHandle OPTIONAL,
-> +  IN  CHAR8                        *Language,
-> +  OUT CHAR16                       **ControllerName
-> +  )
-> +{
-> +  return EFI_UNSUPPORTED;
-> +}
-> +
-> +//
-> +// Entry point of this driver.
-> +//
-> +EFI_STATUS
-> +EFIAPI
-> +VirtioFsEntryPoint (
-> +  IN EFI_HANDLE       ImageHandle,
-> +  IN EFI_SYSTEM_TABLE *SystemTable
-> +  )
-> +{
-> +  EFI_STATUS Status;
-> +
-> +  mDriverBinding.Supported           = VirtioFsBindingSupported;
-> +  mDriverBinding.Start               = VirtioFsBindingStart;
-> +  mDriverBinding.Stop                = VirtioFsBindingStop;
-> +  mDriverBinding.Version             = 0x10;
-> +  mDriverBinding.ImageHandle         = ImageHandle;
-> +  mDriverBinding.DriverBindingHandle = ImageHandle;
-> +
-> +  mComponentName2.GetDriverName      = VirtioFsGetDriverName;
-> +  mComponentName2.GetControllerName  = VirtioFsGetControllerName;
-> +  mComponentName2.SupportedLanguages = "en";
-> +
-> +  Status = gBS->InstallMultipleProtocolInterfaces (&ImageHandle,
-> +                  &gEfiDriverBindingProtocolGuid, &mDriverBinding,
-> +                  &gEfiComponentName2ProtocolGuid, &mComponentName2, NULL);
-> +  return Status;
-> +}
+>  ArmVirtPkg/ArmVirtQemu.dsc                  |    3 +-
+>  ArmVirtPkg/ArmVirtQemuFvMain.fdf.inc        |    3 +-
+>  ArmVirtPkg/ArmVirtQemuKernel.dsc            |    3 +-
+>  OvmfPkg/Include/IndustryStandard/Virtio10.h |    5 +
+>  OvmfPkg/Include/IndustryStandard/VirtioFs.h |  454 ++++
+>  OvmfPkg/OvmfPkgIa32.dsc                     |    2 +
+>  OvmfPkg/OvmfPkgIa32.fdf                     |    1 +
+>  OvmfPkg/OvmfPkgIa32X64.dsc                  |    2 +
+>  OvmfPkg/OvmfPkgIa32X64.fdf                  |    1 +
+>  OvmfPkg/OvmfPkgX64.dsc                      |    2 +
+>  OvmfPkg/OvmfPkgX64.fdf                      |    1 +
+>  OvmfPkg/VirtioFsDxe/DriverBinding.c         |  232 ++
+>  OvmfPkg/VirtioFsDxe/FuseFlush.c             |  111 +
+>  OvmfPkg/VirtioFsDxe/FuseForget.c            |   85 +
+>  OvmfPkg/VirtioFsDxe/FuseFsync.c             |  121 +
+>  OvmfPkg/VirtioFsDxe/FuseGetAttr.c           |  116 +
+>  OvmfPkg/VirtioFsDxe/FuseInit.c              |  142 ++
+>  OvmfPkg/VirtioFsDxe/FuseLookup.c            |  148 ++
+>  OvmfPkg/VirtioFsDxe/FuseMkDir.c             |  134 ++
+>  OvmfPkg/VirtioFsDxe/FuseOpen.c              |  126 +
+>  OvmfPkg/VirtioFsDxe/FuseOpenDir.c           |  120 +
+>  OvmfPkg/VirtioFsDxe/FuseOpenOrCreate.c      |  155 ++
+>  OvmfPkg/VirtioFsDxe/FuseRead.c              |  191 ++
+>  OvmfPkg/VirtioFsDxe/FuseRelease.c           |  121 +
+>  OvmfPkg/VirtioFsDxe/FuseRename.c            |  131 ++
+>  OvmfPkg/VirtioFsDxe/FuseSetAttr.c           |  174 ++
+>  OvmfPkg/VirtioFsDxe/FuseStatFs.c            |  102 +
+>  OvmfPkg/VirtioFsDxe/FuseUnlink.c            |  114 +
+>  OvmfPkg/VirtioFsDxe/FuseWrite.c             |  155 ++
+>  OvmfPkg/VirtioFsDxe/Helpers.c               | 2416 ++++++++++++++++++++
+>  OvmfPkg/VirtioFsDxe/SimpleFsClose.c         |   68 +
+>  OvmfPkg/VirtioFsDxe/SimpleFsDelete.c        |  110 +
+>  OvmfPkg/VirtioFsDxe/SimpleFsFlush.c         |   42 +
+>  OvmfPkg/VirtioFsDxe/SimpleFsGetInfo.c       |  209 ++
+>  OvmfPkg/VirtioFsDxe/SimpleFsGetPosition.c   |   27 +
+>  OvmfPkg/VirtioFsDxe/SimpleFsOpen.c          |  505 ++++
+>  OvmfPkg/VirtioFsDxe/SimpleFsOpenVolume.c    |   98 +
+>  OvmfPkg/VirtioFsDxe/SimpleFsRead.c          |  434 ++++
+>  OvmfPkg/VirtioFsDxe/SimpleFsSetInfo.c       |  582 +++++
+>  OvmfPkg/VirtioFsDxe/SimpleFsSetPosition.c   |   67 +
+>  OvmfPkg/VirtioFsDxe/SimpleFsWrite.c         |   81 +
+>  OvmfPkg/VirtioFsDxe/VirtioFsDxe.h           |  544 +++++
+>  OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf         |  136 ++
+>  43 files changed, 8271 insertions(+), 3 deletions(-)
+>  create mode 100644 OvmfPkg/Include/IndustryStandard/VirtioFs.h
+>  create mode 100644 OvmfPkg/VirtioFsDxe/DriverBinding.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/FuseFlush.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/FuseForget.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/FuseFsync.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/FuseGetAttr.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/FuseInit.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/FuseLookup.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/FuseMkDir.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/FuseOpen.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/FuseOpenDir.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/FuseOpenOrCreate.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/FuseRead.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/FuseRelease.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/FuseRename.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/FuseSetAttr.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/FuseStatFs.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/FuseUnlink.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/FuseWrite.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/Helpers.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/SimpleFsClose.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/SimpleFsDelete.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/SimpleFsFlush.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/SimpleFsGetInfo.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/SimpleFsGetPosition.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/SimpleFsOpen.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/SimpleFsOpenVolume.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/SimpleFsRead.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/SimpleFsSetInfo.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/SimpleFsSetPosition.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/SimpleFsWrite.c
+>  create mode 100644 OvmfPkg/VirtioFsDxe/VirtioFsDxe.h
+>  create mode 100644 OvmfPkg/VirtioFsDxe/VirtioFsDxe.inf
+> 
+> 
+> base-commit: e6ae24e1d676bb2bdc0fc715b49b04908f41fc10
 > 
 
 

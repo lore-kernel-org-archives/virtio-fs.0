@@ -1,13 +1,15 @@
-Date: Thu, 10 Dec 2020 20:03:03 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20201210200303.GN3629@work-vm>
-References: <20201207183021.22752-1-vgoyal@redhat.com>
-	<20201207183021.22752-4-vgoyal@redhat.com>
+References: <a3ba5685-54b0-006d-abb4-ca3340be33ec@gmail.com>
+From: Daniel Walsh <dwalsh@redhat.com>
+Message-ID: <3c0acb1d-eef1-0289-3c48-dbc19a735b96@redhat.com>
+Date: Mon, 21 Dec 2020 15:08:19 -0500
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20201207183021.22752-4-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 3/3] virtiofsd: Check file type in lo_flush()
+In-Reply-To: <a3ba5685-54b0-006d-abb4-ca3340be33ec@gmail.com>
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Transfer-Encoding: 8bit
+Content-Language: en-US
+Subject: Re: [Virtio-fs] What did I miss / SELinux avcs needed for virtiofs
+ root.
+Reply-To: dwalsh@redhat.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,48 +18,325 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, lersek@redhat.com, qemu-devel@nongnu.org
+To: virtio-fs@redhat.com
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> Currently lo_flush() is written in such a way that it expects to receive
-> a FLUSH requests on a regular file (and not directories). For example,
-> we call lo_fi_fd() which searches lo->fd_map. If we open directories
-> using opendir(), we keep don't keep track of these in lo->fd_map instead
-> we keep them in lo->dir_map. So we expect lo_flush() to be called on
-> regular files only.
-> 
-> Even linux fuse client calls FLUSH only for regular files and not
-> directories. So put a check for filetype and return EBADF if
-> lo_flush() is called on a non-regular file.
-> 
-> Reported-by: Laszlo Ersek <lersek@redhat.com>
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  tools/virtiofsd/passthrough_ll.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 8ba79f503a..48a109d3f6 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -1968,7 +1968,7 @@ static void lo_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
->      struct lo_data *lo = lo_data(req);
->  
->      inode = lo_inode(req, ino);
-> -    if (!inode) {
-> +    if (!inode || !S_ISREG(inode->filetype)) {
->          fuse_reply_err(req, EBADF);
+On 12/18/20 12:06, Harry G. Coin wrote:
+> Below is the roster of avc / SELinux corrections needed to have a
+> virtiofs root on Fedora 33.  There has got to be an easier way.  Any ideas?
+>
+> I installed Fedora workstation 33 to a qcow2 file.  Then in the VM
+> mounted an empty virtiofs backed by xattr enabled host in tmp, did a  cp
+> -a /, /home and /boot to the virtio fs, added files to dracut to build
+> an initramfs that permitted root mounting on the default kernel, and a
+> script to generate a link to the latest kernel with an unchanging name
+> in /boot for easy direct kernel booting in the vm.  then I booted and
+> rebooted each time doing 'audit2allow -a -M fileX;semodule -i
+> fileX.pp;reboot' until there were no new avcs recorded in the boot process.
+>
+> Initially I had to add init=/bin/bash to the command line there were so
+> many avc's the system wouldn't boot.   The following are enough to get
+> to a console prompt in a GUI log in without throwing further AVC's.
+> Obviously it's the 'unlabeled-t' that's at issue.  This is with the
+>
+> (fsuse xattr virtiofs (system_u object_r fs_t ((s0) (s0))))
+>
+> in place.  Did I miss a mount option?  This shouldn't have been so hard,
+> I feel like I must have missed something.  What?
+>
+> ----
+>
+>
+> #============= NetworkManager_t ==============
+>
+> allow NetworkManager_t unlabeled_t:file { map rename unlink write };
+>
+> allow NetworkManager_t unlabeled_t:lnk_file read;
+>
+> allow NetworkManager_t unlabeled_t:sock_file write;
+>
+> #============= abrt_dump_oops_t ==============
+>
+> allow abrt_dump_oops_t unlabeled_t:sock_file write;
+>
+> #============= abrt_t ==============
+>
+> allow abrt_t unlabeled_t:dir { add_name read remove_name write };
+>
+> allow abrt_t unlabeled_t:file { create map open read };
+>
+> allow abrt_t unlabeled_t:lnk_file create;
+>
+> allow abrt_t unlabeled_t:sock_file write;
+>
+> #============= accountsd_t ==============
+>
+> allow accountsd_t unlabeled_t:file { getattr map open read rename
+> setattr unlink write };
+>
+> allow accountsd_t unlabeled_t:sock_file write;
+>
+> #============= alsa_t ==============
+>
+> allow alsa_t unlabeled_t:file { getattr map open read rename unlink write };
+>
+> #============= auditd_t ==============
+>
+> allow auditd_t unlabeled_t:file { getattr map open read };
+>
+> allow auditd_t unlabeled_t:sock_file write;
+>
+> #============= avahi_t ==============
+>
+> allow avahi_t unlabeled_t:file { getattr map open read };
+>
+> allow avahi_t unlabeled_t:sock_file write;
+>
+> #============= chkpwd_t ==============
+>
+> allow chkpwd_t unlabeled_t:file { getattr map open read };
+>
+> allow chkpwd_t unlabeled_t:sock_file write;
+>
+> #============= chronyc_t ==============
+>
+> allow chronyc_t unlabeled_t:file map;
+>
+> #============= chronyd_t ==============
+>
+> allow chronyd_t initrc_var_run_t:file read;
+>
+> allow chronyd_t unlabeled_t:file { getattr map open read rename unlink
+> write };
+>
+> allow chronyd_t unlabeled_t:lnk_file read;
+>
+> allow chronyd_t unlabeled_t:sock_file write;
+>
+> #============= colord_t ==============
+>
+> allow colord_t unlabeled_t:file { getattr map open read };
+>
+> allow colord_t unlabeled_t:sock_file write;
+>
+> #============= cupsd_t ==============
+>
+> allow cupsd_t unlabeled_t:file { getattr map open read rename setattr
+> unlink write };
+>
+> allow cupsd_t unlabeled_t:lnk_file read;
+>
+> allow cupsd_t unlabeled_t:sock_file write;
+>
+> #============= firewalld_t ==============
+>
+> allow firewalld_t unlabeled_t:file { getattr map open read };
+>
+> allow firewalld_t unlabeled_t:sock_file write;
+>
+> #============= fprintd_t ==============
+>
+> allow fprintd_t unlabeled_t:file { getattr map open read };
+>
+> #============= geoclue_t ==============
+>
+> allow geoclue_t unlabeled_t:file { getattr map open read };
+>
+> allow geoclue_t unlabeled_t:lnk_file read;
+>
+> #============= getty_t ==============
+>
+> allow getty_t unlabeled_t:file read;
+>
+> allow getty_t unlabeled_t:sock_file write;
+>
+> #============= gssproxy_t ==============
+>
+> allow gssproxy_t unlabeled_t:file { getattr map open read };
+>
+> allow gssproxy_t unlabeled_t:lnk_file read;
+>
+> allow gssproxy_t unlabeled_t:sock_file unlink;
+>
+> #============= init_t ==============
+>
+> allow init_t unlabeled_t:dir { add_name remove_name rmdir };
+>
+> allow init_t unlabeled_t:file { map rename setattr unlink write };
+>
+> allow init_t unlabeled_t:sock_file write;
+>
+> #============= iptables_t ==============
+>
+> allow iptables_t unlabeled_t:file { getattr map open read };
+>
+> #============= iscsid_t ==============
+>
+> allow iscsid_t unlabeled_t:file { getattr map open read };
+>
+> #============= kernel_t ==============
+>
+> allow kernel_t unconfined_t:process transition;
+>
+> #============= local_login_t ==============
+>
+> allow local_login_t unlabeled_t:file read;
+>
+> allow local_login_t unlabeled_t:sock_file write;
+>
+> #============= logrotate_t ==============
+>
+> allow logrotate_t unlabeled_t:file { open read write };
+>
+> allow logrotate_t unlabeled_t:sock_file write;
+>
+> #============= mandb_t ==============
+>
+> allow mandb_t unlabeled_t:file { open read unlink write };
+>
+> #============= mcelog_t ==============
+>
+> allow mcelog_t unlabeled_t:file { getattr map open read };
+>
+> allow mcelog_t unlabeled_t:sock_file write;
+>
+> #============= modemmanager_t ==============
+>
+> allow modemmanager_t unlabeled_t:file { getattr map open read };
+>
+> #============= named_t ==============
+>
+> allow named_t unlabeled_t:file { open write };
+>
+> #============= nfsd_t ==============
+>
+> allow nfsd_t unlabeled_t:file map;
+>
+> #============= pcscd_t ==============
+>
+> allow pcscd_t unlabeled_t:file { getattr map open read };
+>
+> #============= plymouthd_t ==============
+>
+> allow plymouthd_t unlabeled_t:file { getattr map open read };
+>
+> #============= policykit_auth_t ==============
+>
+> allow policykit_auth_t unlabeled_t:file { getattr map open read };
+>
+> allow policykit_auth_t unlabeled_t:sock_file write;
+>
+> #============= policykit_t ==============
+>
+> allow policykit_t unlabeled_t:file { getattr map open read };
+>
+> allow policykit_t unlabeled_t:sock_file write;
+>
+> #============= rngd_t ==============
+>
+> allow rngd_t unlabeled_t:file { getattr map open read };
+>
+> #============= rpcd_t ==============
+>
+> allow rpcd_t unlabeled_t:file { getattr map open read };
+>
+> #============= rtkit_daemon_t ==============
+>
+> allow rtkit_daemon_t unlabeled_t:file { getattr map open read };
+>
+>
+> allow rtkit_daemon_t unlabeled_t:sock_file write;
+>
+> #============= sssd_t ==============
+>
+> allow sssd_t init_var_run_t:dir read;
+>
+> allow sssd_t unlabeled_t:file { getattr lock map open read setattr
+> unlink write };
+>
+> allow sssd_t unlabeled_t:lnk_file { read unlink };
+>
+> allow sssd_t unlabeled_t:sock_file { getattr setattr unlink write };
+>
+> #============= system_dbusd_t ==============
+>
+> allow system_dbusd_t unlabeled_t:file { getattr map open };
+>
+> #============= systemd_gpt_generator_t ==============
+>
+> allow systemd_gpt_generator_t unlabeled_t:file read;
+>
+> #============= systemd_hostnamed_t ==============
+>
+> allow systemd_hostnamed_t unlabeled_t:file { getattr map open read };
+>
+> #============= systemd_localed_t ==============
+>
+> allow systemd_localed_t unlabeled_t:file { getattr map open read };
+>
+> #============= systemd_logind_t ==============
+>
+> allow systemd_logind_t unlabeled_t:file { getattr map open read };
+>
+> allow systemd_logind_t unlabeled_t:sock_file write;
+>
+> #============= systemd_resolved_t ==============
+>
+> allow systemd_resolved_t unlabeled_t:file { getattr map open read };
+>
+> allow systemd_resolved_t unlabeled_t:lnk_file read;
+>
+>
+> allow systemd_resolved_t unlabeled_t:sock_file write;
+>
+> #============= systemd_tmpfiles_t ==============
+>
+>
+> allow systemd_tmpfiles_t unlabeled_t:file map;
+>
+> #============= systemd_userdbd_t ==============
+>
+>
+> allow systemd_userdbd_t unlabeled_t:file { getattr map open read };
+>
+>
+> allow systemd_userdbd_t unlabeled_t:sock_file write;
+>
+> #============= vdagent_t ==============
+>
+>
+> allow vdagent_t unlabeled_t:file { getattr map open read };
+>
+> #============= virt_qemu_ga_t ==============
+>
+>
+> allow virt_qemu_ga_t power_unit_file_t:service status;
+>
+>
+> allow virt_qemu_ga_t unlabeled_t:file { getattr map open read };
+>
+> #============= xdm_t ==============
+>
+>
+> allow xdm_t unlabeled_t:file { getattr map open read rename unlink write };
+>
+>
+> allow xdm_t unlabeled_t:lnk_file read;
+>
+>
+> allow xdm_t unlabeled_t:sock_file write;
+>
+>
+>
+>
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://www.redhat.com/mailman/listinfo/virtio-fs
 
-Does that need a lo_inode_put(lo, &inode) in the new case?
+The problem is the image has no label associated with it, so that it is 
+treated as unlabeled_t.
 
-Dave
-
->          return;
->      }
-> -- 
-> 2.25.4
-> 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+ From the AVCs, I am seeing it looks like /run directory is part of the 
+image?  If so you should be mounting a tmpfs on /run and not using 
+virtio for this activity.
 

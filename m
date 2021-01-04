@@ -1,9 +1,10 @@
-From: Laszlo Ersek <lersek@redhat.com>
-Date: Mon,  4 Jan 2021 14:24:01 +0100
-Message-Id: <20210104132401.5100-1-lersek@redhat.com>
+Date: Mon, 4 Jan 2021 16:00:13 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20210104160013.GG2972@work-vm>
 MIME-Version: 1.0
-Content-Transfer-Encoding: base64
-Subject: [Virtio-fs] [PATCH] vhost-user-fs: add the "bootindex" property
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: [Virtio-fs] 'FORGET' ordering semantics (vs unlink & NFS)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -12,72 +13,33 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu devel list <qemu-devel@nongnu.org>
-Cc: virtio-fs@redhat.com, "Michael S. Tsirkin" <mst@redhat.com>, Cornelia Huck <cohuck@redhat.com>, Halil Pasic <pasic@linux.ibm.com>, Christian Borntraeger <borntraeger@de.ibm.com>, qemu-s390x@nongnu.org
+To: fuse-devel@lists.sourceforge.net
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
-dmlydGlvLWZzIHF1YWxpZmllcyBhcyBhIGJvb3RhYmxlIGRldmljZSBtaW5pbWFsbHkgdW5kZXIg
-T1ZNRiwgYnV0CmN1cnJlbnRseSB0aGUgbmVjZXNzYXJ5ICJib290aW5kZXgiIHByb3BlcnR5IGlz
-IG1pc3NpbmcgKGZ3X2NmZyBrZXJuZWwKYm9vdCBub3R3aXRoc3RhbmRpbmcpLgoKQWRkIHRoZSBw
-cm9wZXJ0eS4gRm9yIGNvbXBsZXRlbmVzcywgYWRkIGl0IHRvIHRoZSBDQ1cgZGV2aWNlIGFzIHdl
-bGw7Cm90aGVyIHZpcnRpby1jY3cgZGV2aWNlcyBzZWVtIHRvIGhhdmUgImJvb3RpbmRleCIgcHJv
-cGVydGllcyB0b28uCgpFeGFtcGxlIE9wZW5GaXJtd2FyZSBkZXZpY2UgcGF0aCBmb3IgdGhlICJ2
-aG9zdC11c2VyLWZzLXBjaSIgZGV2aWNlIGluIHRoZQoiYm9vdG9yZGVyIiBmd19jZmcgZmlsZToK
-CiAgL3BjaUBpMGNmOC9wY2ktYnJpZGdlQDEsNi9wY2kxYWY0LDEwNWFAMC9maWxlc3lzdGVtQDAK
-CkNjOiAiRHIuIERhdmlkIEFsYW4gR2lsYmVydCIgPGRnaWxiZXJ0QHJlZGhhdC5jb20+CkNjOiAi
-TWljaGFlbCBTLiBUc2lya2luIiA8bXN0QHJlZGhhdC5jb20+CkNjOiBDaHJpc3RpYW4gQm9ybnRy
-YWVnZXIgPGJvcm50cmFlZ2VyQGRlLmlibS5jb20+CkNjOiBDb3JuZWxpYSBIdWNrIDxjb2h1Y2tA
-cmVkaGF0LmNvbT4KQ2M6IEhhbGlsIFBhc2ljIDxwYXNpY0BsaW51eC5pYm0uY29tPgpDYzogU3Rl
-ZmFuIEhham5vY3ppIDxzdGVmYW5oYUByZWRoYXQuY29tPgpDYzogcWVtdS1zMzkweEBub25nbnUu
-b3JnCkNjOiB2aXJ0aW8tZnNAcmVkaGF0LmNvbQpTaWduZWQtb2ZmLWJ5OiBMYXN6bG8gRXJzZWsg
-PGxlcnNla0ByZWRoYXQuY29tPgotLS0KIGluY2x1ZGUvaHcvdmlydGlvL3Zob3N0LXVzZXItZnMu
-aCB8ICAxICsKIGh3L3MzOTB4L3Zob3N0LXVzZXItZnMtY2N3LmMgICAgICB8ICAyICsrCiBody92
-aXJ0aW8vdmhvc3QtdXNlci1mcy1wY2kuYyAgICAgfCAgMiArKwogaHcvdmlydGlvL3Zob3N0LXVz
-ZXItZnMuYyAgICAgICAgIHwgMTAgKysrKysrKysrKwogNCBmaWxlcyBjaGFuZ2VkLCAxNSBpbnNl
-cnRpb25zKCspCgpkaWZmIC0tZ2l0IGEvaW5jbHVkZS9ody92aXJ0aW8vdmhvc3QtdXNlci1mcy5o
-IGIvaW5jbHVkZS9ody92aXJ0aW8vdmhvc3QtdXNlci1mcy5oCmluZGV4IDY5ODU3NTI3NzEwMS4u
-MGQ2MjgzNGMyNTEwIDEwMDY0NAotLS0gYS9pbmNsdWRlL2h3L3ZpcnRpby92aG9zdC11c2VyLWZz
-LmgKKysrIGIvaW5jbHVkZS9ody92aXJ0aW8vdmhvc3QtdXNlci1mcy5oCkBAIC0zOSw2ICszOSw3
-IEBAIHN0cnVjdCBWSG9zdFVzZXJGUyB7CiAgICAgVmhvc3RVc2VyU3RhdGUgdmhvc3RfdXNlcjsK
-ICAgICBWaXJ0UXVldWUgKipyZXFfdnFzOwogICAgIFZpcnRRdWV1ZSAqaGlwcmlvX3ZxOworICAg
-IGludDMyX3QgYm9vdGluZGV4OwogCiAgICAgLyo8IHB1YmxpYyA+Ki8KIH07CmRpZmYgLS1naXQg
-YS9ody9zMzkweC92aG9zdC11c2VyLWZzLWNjdy5jIGIvaHcvczM5MHgvdmhvc3QtdXNlci1mcy1j
-Y3cuYwppbmRleCA2YzZmMjY5MjkzMDEuLjQ3NGU5N2U5MzdiOCAxMDA2NDQKLS0tIGEvaHcvczM5
-MHgvdmhvc3QtdXNlci1mcy1jY3cuYworKysgYi9ody9zMzkweC92aG9zdC11c2VyLWZzLWNjdy5j
-CkBAIC00Nyw2ICs0Nyw4IEBAIHN0YXRpYyB2b2lkIHZob3N0X3VzZXJfZnNfY2N3X2luc3RhbmNl
-X2luaXQoT2JqZWN0ICpvYmopCiAgICAgY2N3X2Rldi0+Zm9yY2VfcmV2aXNpb25fMSA9IHRydWU7
-CiAgICAgdmlydGlvX2luc3RhbmNlX2luaXRfY29tbW9uKG9iaiwgJmRldi0+dmRldiwgc2l6ZW9m
-KGRldi0+dmRldiksCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIFRZUEVfVkhPU1Rf
-VVNFUl9GUyk7CisgICAgb2JqZWN0X3Byb3BlcnR5X2FkZF9hbGlhcyhvYmosICJib290aW5kZXgi
-LCBPQkpFQ1QoJmRldi0+dmRldiksCisgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAiYm9v
-dGluZGV4Iik7CiB9CiAKIHN0YXRpYyB2b2lkIHZob3N0X3VzZXJfZnNfY2N3X2NsYXNzX2luaXQo
-T2JqZWN0Q2xhc3MgKmtsYXNzLCB2b2lkICpkYXRhKQpkaWZmIC0tZ2l0IGEvaHcvdmlydGlvL3Zo
-b3N0LXVzZXItZnMtcGNpLmMgYi9ody92aXJ0aW8vdmhvc3QtdXNlci1mcy1wY2kuYwppbmRleCA4
-YmIzODliZDI4MmEuLjJlZDg0OTJiM2ZhMyAxMDA2NDQKLS0tIGEvaHcvdmlydGlvL3Zob3N0LXVz
-ZXItZnMtcGNpLmMKKysrIGIvaHcvdmlydGlvL3Zob3N0LXVzZXItZnMtcGNpLmMKQEAgLTY4LDYg
-KzY4LDggQEAgc3RhdGljIHZvaWQgdmhvc3RfdXNlcl9mc19wY2lfaW5zdGFuY2VfaW5pdChPYmpl
-Y3QgKm9iaikKIAogICAgIHZpcnRpb19pbnN0YW5jZV9pbml0X2NvbW1vbihvYmosICZkZXYtPnZk
-ZXYsIHNpemVvZihkZXYtPnZkZXYpLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBU
-WVBFX1ZIT1NUX1VTRVJfRlMpOworICAgIG9iamVjdF9wcm9wZXJ0eV9hZGRfYWxpYXMob2JqLCAi
-Ym9vdGluZGV4IiwgT0JKRUNUKCZkZXYtPnZkZXYpLAorICAgICAgICAgICAgICAgICAgICAgICAg
-ICAgICAgImJvb3RpbmRleCIpOwogfQogCiBzdGF0aWMgY29uc3QgVmlydGlvUENJRGV2aWNlVHlw
-ZUluZm8gdmhvc3RfdXNlcl9mc19wY2lfaW5mbyA9IHsKZGlmZiAtLWdpdCBhL2h3L3ZpcnRpby92
-aG9zdC11c2VyLWZzLmMgYi9ody92aXJ0aW8vdmhvc3QtdXNlci1mcy5jCmluZGV4IGVkMDM2YWQ5
-YzEzZi4uYWM0ZmMzNGIzNmEyIDEwMDY0NAotLS0gYS9ody92aXJ0aW8vdmhvc3QtdXNlci1mcy5j
-CisrKyBiL2h3L3ZpcnRpby92aG9zdC11c2VyLWZzLmMKQEAgLTIyLDYgKzIyLDcgQEAKICNpbmNs
-dWRlICJxZW11L2Vycm9yLXJlcG9ydC5oIgogI2luY2x1ZGUgImh3L3ZpcnRpby92aG9zdC11c2Vy
-LWZzLmgiCiAjaW5jbHVkZSAibW9uaXRvci9tb25pdG9yLmgiCisjaW5jbHVkZSAic3lzZW11L3N5
-c2VtdS5oIgogCiBzdGF0aWMgdm9pZCB2dWZfZ2V0X2NvbmZpZyhWaXJ0SU9EZXZpY2UgKnZkZXYs
-IHVpbnQ4X3QgKmNvbmZpZykKIHsKQEAgLTI3OSw2ICsyODAsMTQgQEAgc3RhdGljIFByb3BlcnR5
-IHZ1Zl9wcm9wZXJ0aWVzW10gPSB7CiAgICAgREVGSU5FX1BST1BfRU5EX09GX0xJU1QoKSwKIH07
-CiAKK3N0YXRpYyB2b2lkIHZ1Zl9pbnN0YW5jZV9pbml0KE9iamVjdCAqb2JqKQoreworICAgIFZI
-b3N0VXNlckZTICpmcyA9IFZIT1NUX1VTRVJfRlMob2JqKTsKKworICAgIGRldmljZV9hZGRfYm9v
-dGluZGV4X3Byb3BlcnR5KG9iaiwgJmZzLT5ib290aW5kZXgsICJib290aW5kZXgiLAorICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgICAgICIvZmlsZXN5c3RlbUAwIiwgREVWSUNFKG9iaikp
-OworfQorCiBzdGF0aWMgdm9pZCB2dWZfY2xhc3NfaW5pdChPYmplY3RDbGFzcyAqa2xhc3MsIHZv
-aWQgKmRhdGEpCiB7CiAgICAgRGV2aWNlQ2xhc3MgKmRjID0gREVWSUNFX0NMQVNTKGtsYXNzKTsK
-QEAgLTMwMCw2ICszMDksNyBAQCBzdGF0aWMgY29uc3QgVHlwZUluZm8gdnVmX2luZm8gPSB7CiAg
-ICAgLm5hbWUgPSBUWVBFX1ZIT1NUX1VTRVJfRlMsCiAgICAgLnBhcmVudCA9IFRZUEVfVklSVElP
-X0RFVklDRSwKICAgICAuaW5zdGFuY2Vfc2l6ZSA9IHNpemVvZihWSG9zdFVzZXJGUyksCisgICAg
-Lmluc3RhbmNlX2luaXQgPSB2dWZfaW5zdGFuY2VfaW5pdCwKICAgICAuY2xhc3NfaW5pdCA9IHZ1
-Zl9jbGFzc19pbml0LAogfTsKIAotLSAKMi4xOS4xLjMuZzMwMjQ3YWE1ZDIwMQoK
+Hi,
+  On virtio-fs we're hitting a problem with NFS, where
+unlinking a file in a directory and then rmdir'ing that
+directory fails complaining about the directory not being empty.
+
+The problem here is that if a file has an open fd, NFS doesn't
+actually delete the file on unlink, it just renames it to
+a hidden file (e.g. .nfs*******).  That open file is there because
+the 'FORGET' hasn't completed yet by the time the rmdir is issued.
+
+Question:
+  a) In the FUSE protocol, are requests assumed to complete in order;
+i.e.  unlink, forget, rmdir   is it required that 'forget' completes
+before the rmdir is processed?
+     (In virtiofs we've been processing requests, in parallel, and
+have sent forgets down a separate queue to keep them out of the way).
+
+  b) 'forget' doesn't send a reply - so the kernel can't wait for the
+client to have finished it;  do we need a synchronous forget here?
+
+  c) Has this problem been hit by any other fuse users (with NFS or otherwise)?
+
+Dave
+
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

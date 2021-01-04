@@ -1,17 +1,9 @@
-References: <a3ba5685-54b0-006d-abb4-ca3340be33ec@gmail.com>
-	<3c0acb1d-eef1-0289-3c48-dbc19a735b96@redhat.com>
-	<2af4770c-2148-ec0f-bcad-0b03829476da@gmail.com>
-From: Daniel Walsh <dwalsh@redhat.com>
-Message-ID: <14038e00-0425-3d56-2c46-b8e0c010b675@redhat.com>
-Date: Tue, 22 Dec 2020 08:11:25 -0500
+From: Laszlo Ersek <lersek@redhat.com>
+Date: Mon,  4 Jan 2021 14:24:01 +0100
+Message-Id: <20210104132401.5100-1-lersek@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <2af4770c-2148-ec0f-bcad-0b03829476da@gmail.com>
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Transfer-Encoding: 8bit
-Content-Language: en-US
-Subject: Re: [Virtio-fs] What did I miss / SELinux avcs needed for virtiofs
- root.
-Reply-To: dwalsh@redhat.com
+Content-Transfer-Encoding: base64
+Subject: [Virtio-fs] [PATCH] vhost-user-fs: add the "bootindex" property
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,358 +12,72 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: qemu devel list <qemu-devel@nongnu.org>
+Cc: virtio-fs@redhat.com, "Michael S. Tsirkin" <mst@redhat.com>, Cornelia Huck <cohuck@redhat.com>, Halil Pasic <pasic@linux.ibm.com>, Christian Borntraeger <borntraeger@de.ibm.com>, qemu-s390x@nongnu.org
 
-On 12/21/20 15:57, Harry G. Coin wrote:
-> On 12/21/20 2:08 PM, Daniel Walsh wrote:
->> On 12/18/20 12:06, Harry G. Coin wrote:
->>> Below is the roster of avc / SELinux corrections needed to have a
->>> virtiofs root on Fedora 33.  There has got to be an easier way.  Any
->>> ideas?
->>>
->>> I installed Fedora workstation 33 to a qcow2 file.  Then in the VM
->>> mounted an empty virtiofs backed by xattr enabled host in tmp, did a  cp
->>> -a /, /home and /boot to the virtio fs, added files to dracut to build
->>> an initramfs that permitted root mounting on the default kernel, and a
->>> script to generate a link to the latest kernel with an unchanging name
->>> in /boot for easy direct kernel booting in the vm.  then I booted and
->>> rebooted each time doing 'audit2allow -a -M fileX;semodule -i
->>> fileX.pp;reboot' until there were no new avcs recorded in the boot
->>> process.
->>>
->>> Initially I had to add init=/bin/bash to the command line there were so
->>> many avc's the system wouldn't boot.   The following are enough to get
->>> to a console prompt in a GUI log in without throwing further AVC's.
->>> Obviously it's the 'unlabeled-t' that's at issue.  This is with the
->>>
->>> (fsuse xattr virtiofs (system_u object_r fs_t ((s0) (s0))))
->>>
->>> in place.  Did I miss a mount option?  This shouldn't have been so hard,
->>> I feel like I must have missed something.  What?
->>>
->>> ----
->>>
->>>
->>> #============= NetworkManager_t ==============
->>>
->>> allow NetworkManager_t unlabeled_t:file { map rename unlink write };
->>>
->>> allow NetworkManager_t unlabeled_t:lnk_file read;
->>>
->>> allow NetworkManager_t unlabeled_t:sock_file write;
->>>
->>> #============= abrt_dump_oops_t ==============
->>>
->>> allow abrt_dump_oops_t unlabeled_t:sock_file write;
->>>
->>> #============= abrt_t ==============
->>>
->>> allow abrt_t unlabeled_t:dir { add_name read remove_name write };
->>>
->>> allow abrt_t unlabeled_t:file { create map open read };
->>>
->>> allow abrt_t unlabeled_t:lnk_file create;
->>>
->>> allow abrt_t unlabeled_t:sock_file write;
->>>
->>> #============= accountsd_t ==============
->>>
->>> allow accountsd_t unlabeled_t:file { getattr map open read rename
->>> setattr unlink write };
->>>
->>> allow accountsd_t unlabeled_t:sock_file write;
->>>
->>> #============= alsa_t ==============
->>>
->>> allow alsa_t unlabeled_t:file { getattr map open read rename unlink
->>> write };
->>>
->>> #============= auditd_t ==============
->>>
->>> allow auditd_t unlabeled_t:file { getattr map open read };
->>>
->>> allow auditd_t unlabeled_t:sock_file write;
->>>
->>> #============= avahi_t ==============
->>>
->>> allow avahi_t unlabeled_t:file { getattr map open read };
->>>
->>> allow avahi_t unlabeled_t:sock_file write;
->>>
->>> #============= chkpwd_t ==============
->>>
->>> allow chkpwd_t unlabeled_t:file { getattr map open read };
->>>
->>> allow chkpwd_t unlabeled_t:sock_file write;
->>>
->>> #============= chronyc_t ==============
->>>
->>> allow chronyc_t unlabeled_t:file map;
->>>
->>> #============= chronyd_t ==============
->>>
->>> allow chronyd_t initrc_var_run_t:file read;
->>>
->>> allow chronyd_t unlabeled_t:file { getattr map open read rename unlink
->>> write };
->>>
->>> allow chronyd_t unlabeled_t:lnk_file read;
->>>
->>> allow chronyd_t unlabeled_t:sock_file write;
->>>
->>> #============= colord_t ==============
->>>
->>> allow colord_t unlabeled_t:file { getattr map open read };
->>>
->>> allow colord_t unlabeled_t:sock_file write;
->>>
->>> #============= cupsd_t ==============
->>>
->>> allow cupsd_t unlabeled_t:file { getattr map open read rename setattr
->>> unlink write };
->>>
->>> allow cupsd_t unlabeled_t:lnk_file read;
->>>
->>> allow cupsd_t unlabeled_t:sock_file write;
->>>
->>> #============= firewalld_t ==============
->>>
->>> allow firewalld_t unlabeled_t:file { getattr map open read };
->>>
->>> allow firewalld_t unlabeled_t:sock_file write;
->>>
->>> #============= fprintd_t ==============
->>>
->>> allow fprintd_t unlabeled_t:file { getattr map open read };
->>>
->>> #============= geoclue_t ==============
->>>
->>> allow geoclue_t unlabeled_t:file { getattr map open read };
->>>
->>> allow geoclue_t unlabeled_t:lnk_file read;
->>>
->>> #============= getty_t ==============
->>>
->>> allow getty_t unlabeled_t:file read;
->>>
->>> allow getty_t unlabeled_t:sock_file write;
->>>
->>> #============= gssproxy_t ==============
->>>
->>> allow gssproxy_t unlabeled_t:file { getattr map open read };
->>>
->>> allow gssproxy_t unlabeled_t:lnk_file read;
->>>
->>> allow gssproxy_t unlabeled_t:sock_file unlink;
->>>
->>> #============= init_t ==============
->>>
->>> allow init_t unlabeled_t:dir { add_name remove_name rmdir };
->>>
->>> allow init_t unlabeled_t:file { map rename setattr unlink write };
->>>
->>> allow init_t unlabeled_t:sock_file write;
->>>
->>> #============= iptables_t ==============
->>>
->>> allow iptables_t unlabeled_t:file { getattr map open read };
->>>
->>> #============= iscsid_t ==============
->>>
->>> allow iscsid_t unlabeled_t:file { getattr map open read };
->>>
->>> #============= kernel_t ==============
->>>
->>> allow kernel_t unconfined_t:process transition;
->>>
->>> #============= local_login_t ==============
->>>
->>> allow local_login_t unlabeled_t:file read;
->>>
->>> allow local_login_t unlabeled_t:sock_file write;
->>>
->>> #============= logrotate_t ==============
->>>
->>> allow logrotate_t unlabeled_t:file { open read write };
->>>
->>> allow logrotate_t unlabeled_t:sock_file write;
->>>
->>> #============= mandb_t ==============
->>>
->>> allow mandb_t unlabeled_t:file { open read unlink write };
->>>
->>> #============= mcelog_t ==============
->>>
->>> allow mcelog_t unlabeled_t:file { getattr map open read };
->>>
->>> allow mcelog_t unlabeled_t:sock_file write;
->>>
->>> #============= modemmanager_t ==============
->>>
->>> allow modemmanager_t unlabeled_t:file { getattr map open read };
->>>
->>> #============= named_t ==============
->>>
->>> allow named_t unlabeled_t:file { open write };
->>>
->>> #============= nfsd_t ==============
->>>
->>> allow nfsd_t unlabeled_t:file map;
->>>
->>> #============= pcscd_t ==============
->>>
->>> allow pcscd_t unlabeled_t:file { getattr map open read };
->>>
->>> #============= plymouthd_t ==============
->>>
->>> allow plymouthd_t unlabeled_t:file { getattr map open read };
->>>
->>> #============= policykit_auth_t ==============
->>>
->>> allow policykit_auth_t unlabeled_t:file { getattr map open read };
->>>
->>> allow policykit_auth_t unlabeled_t:sock_file write;
->>>
->>> #============= policykit_t ==============
->>>
->>> allow policykit_t unlabeled_t:file { getattr map open read };
->>>
->>> allow policykit_t unlabeled_t:sock_file write;
->>>
->>> #============= rngd_t ==============
->>>
->>> allow rngd_t unlabeled_t:file { getattr map open read };
->>>
->>> #============= rpcd_t ==============
->>>
->>> allow rpcd_t unlabeled_t:file { getattr map open read };
->>>
->>> #============= rtkit_daemon_t ==============
->>>
->>> allow rtkit_daemon_t unlabeled_t:file { getattr map open read };
->>>
->>>
->>> allow rtkit_daemon_t unlabeled_t:sock_file write;
->>>
->>> #============= sssd_t ==============
->>>
->>> allow sssd_t init_var_run_t:dir read;
->>>
->>> allow sssd_t unlabeled_t:file { getattr lock map open read setattr
->>> unlink write };
->>>
->>> allow sssd_t unlabeled_t:lnk_file { read unlink };
->>>
->>> allow sssd_t unlabeled_t:sock_file { getattr setattr unlink write };
->>>
->>> #============= system_dbusd_t ==============
->>>
->>> allow system_dbusd_t unlabeled_t:file { getattr map open };
->>>
->>> #============= systemd_gpt_generator_t ==============
->>>
->>> allow systemd_gpt_generator_t unlabeled_t:file read;
->>>
->>> #============= systemd_hostnamed_t ==============
->>>
->>> allow systemd_hostnamed_t unlabeled_t:file { getattr map open read };
->>>
->>> #============= systemd_localed_t ==============
->>>
->>> allow systemd_localed_t unlabeled_t:file { getattr map open read };
->>>
->>> #============= systemd_logind_t ==============
->>>
->>> allow systemd_logind_t unlabeled_t:file { getattr map open read };
->>>
->>> allow systemd_logind_t unlabeled_t:sock_file write;
->>>
->>> #============= systemd_resolved_t ==============
->>>
->>> allow systemd_resolved_t unlabeled_t:file { getattr map open read };
->>>
->>> allow systemd_resolved_t unlabeled_t:lnk_file read;
->>>
->>>
->>> allow systemd_resolved_t unlabeled_t:sock_file write;
->>>
->>> #============= systemd_tmpfiles_t ==============
->>>
->>>
->>> allow systemd_tmpfiles_t unlabeled_t:file map;
->>>
->>> #============= systemd_userdbd_t ==============
->>>
->>>
->>> allow systemd_userdbd_t unlabeled_t:file { getattr map open read };
->>>
->>>
->>> allow systemd_userdbd_t unlabeled_t:sock_file write;
->>>
->>> #============= vdagent_t ==============
->>>
->>>
->>> allow vdagent_t unlabeled_t:file { getattr map open read };
->>>
->>> #============= virt_qemu_ga_t ==============
->>>
->>>
->>> allow virt_qemu_ga_t power_unit_file_t:service status;
->>>
->>>
->>> allow virt_qemu_ga_t unlabeled_t:file { getattr map open read };
->>>
->>> #============= xdm_t ==============
->>>
->>>
->>> allow xdm_t unlabeled_t:file { getattr map open read rename unlink
->>> write };
->>>
->>>
->>> allow xdm_t unlabeled_t:lnk_file read;
->>>
->>>
->>> allow xdm_t unlabeled_t:sock_file write;
->>>
->>>
->>>
->>>
->>> _______________________________________________
->>> Virtio-fs mailing list
->>> Virtio-fs@redhat.com
->>> https://www.redhat.com/mailman/listinfo/virtio-fs
->> The problem is the image has no label associated with it, so that it
->> is treated as unlabeled_t.
->>
->>  From the AVCs, I am seeing it looks like /run directory is part of the
->> image?  If so you should be mounting a tmpfs on /run and not using
->> virtio for this activity.
-> Thanks for the note.   In this case virtiofs is deployed as the root
-> file system in the qemu/kvm guest, as contemplated and advertised in the
-> official virtiofs documents available here:
-> https://virtio-fs.gitlab.io/howto-boot.html
->
-> So I don't think I was, as the phrase goes, pushing the identified
-> boundaries of intended use.
->
-> For what it's worth, I have implemented dracut modules, patterned after
-> 9p as a root fs, that allow the kernel command line to have the same
-> syntax as other rootfs file systems.  I've posted those on this mailing
-> list.  Presently selinux has to either disabled or permissive for
-> anything close to normal operation on a fedora workstation rev 33.
->
-Yes, this is true and is being discussed currently.  But I still believe 
-you should
-
-be using a tmpfs on /run, and not having this directory used through 
-virtiofs.
-
->
->
->
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
-
+dmlydGlvLWZzIHF1YWxpZmllcyBhcyBhIGJvb3RhYmxlIGRldmljZSBtaW5pbWFsbHkgdW5kZXIg
+T1ZNRiwgYnV0CmN1cnJlbnRseSB0aGUgbmVjZXNzYXJ5ICJib290aW5kZXgiIHByb3BlcnR5IGlz
+IG1pc3NpbmcgKGZ3X2NmZyBrZXJuZWwKYm9vdCBub3R3aXRoc3RhbmRpbmcpLgoKQWRkIHRoZSBw
+cm9wZXJ0eS4gRm9yIGNvbXBsZXRlbmVzcywgYWRkIGl0IHRvIHRoZSBDQ1cgZGV2aWNlIGFzIHdl
+bGw7Cm90aGVyIHZpcnRpby1jY3cgZGV2aWNlcyBzZWVtIHRvIGhhdmUgImJvb3RpbmRleCIgcHJv
+cGVydGllcyB0b28uCgpFeGFtcGxlIE9wZW5GaXJtd2FyZSBkZXZpY2UgcGF0aCBmb3IgdGhlICJ2
+aG9zdC11c2VyLWZzLXBjaSIgZGV2aWNlIGluIHRoZQoiYm9vdG9yZGVyIiBmd19jZmcgZmlsZToK
+CiAgL3BjaUBpMGNmOC9wY2ktYnJpZGdlQDEsNi9wY2kxYWY0LDEwNWFAMC9maWxlc3lzdGVtQDAK
+CkNjOiAiRHIuIERhdmlkIEFsYW4gR2lsYmVydCIgPGRnaWxiZXJ0QHJlZGhhdC5jb20+CkNjOiAi
+TWljaGFlbCBTLiBUc2lya2luIiA8bXN0QHJlZGhhdC5jb20+CkNjOiBDaHJpc3RpYW4gQm9ybnRy
+YWVnZXIgPGJvcm50cmFlZ2VyQGRlLmlibS5jb20+CkNjOiBDb3JuZWxpYSBIdWNrIDxjb2h1Y2tA
+cmVkaGF0LmNvbT4KQ2M6IEhhbGlsIFBhc2ljIDxwYXNpY0BsaW51eC5pYm0uY29tPgpDYzogU3Rl
+ZmFuIEhham5vY3ppIDxzdGVmYW5oYUByZWRoYXQuY29tPgpDYzogcWVtdS1zMzkweEBub25nbnUu
+b3JnCkNjOiB2aXJ0aW8tZnNAcmVkaGF0LmNvbQpTaWduZWQtb2ZmLWJ5OiBMYXN6bG8gRXJzZWsg
+PGxlcnNla0ByZWRoYXQuY29tPgotLS0KIGluY2x1ZGUvaHcvdmlydGlvL3Zob3N0LXVzZXItZnMu
+aCB8ICAxICsKIGh3L3MzOTB4L3Zob3N0LXVzZXItZnMtY2N3LmMgICAgICB8ICAyICsrCiBody92
+aXJ0aW8vdmhvc3QtdXNlci1mcy1wY2kuYyAgICAgfCAgMiArKwogaHcvdmlydGlvL3Zob3N0LXVz
+ZXItZnMuYyAgICAgICAgIHwgMTAgKysrKysrKysrKwogNCBmaWxlcyBjaGFuZ2VkLCAxNSBpbnNl
+cnRpb25zKCspCgpkaWZmIC0tZ2l0IGEvaW5jbHVkZS9ody92aXJ0aW8vdmhvc3QtdXNlci1mcy5o
+IGIvaW5jbHVkZS9ody92aXJ0aW8vdmhvc3QtdXNlci1mcy5oCmluZGV4IDY5ODU3NTI3NzEwMS4u
+MGQ2MjgzNGMyNTEwIDEwMDY0NAotLS0gYS9pbmNsdWRlL2h3L3ZpcnRpby92aG9zdC11c2VyLWZz
+LmgKKysrIGIvaW5jbHVkZS9ody92aXJ0aW8vdmhvc3QtdXNlci1mcy5oCkBAIC0zOSw2ICszOSw3
+IEBAIHN0cnVjdCBWSG9zdFVzZXJGUyB7CiAgICAgVmhvc3RVc2VyU3RhdGUgdmhvc3RfdXNlcjsK
+ICAgICBWaXJ0UXVldWUgKipyZXFfdnFzOwogICAgIFZpcnRRdWV1ZSAqaGlwcmlvX3ZxOworICAg
+IGludDMyX3QgYm9vdGluZGV4OwogCiAgICAgLyo8IHB1YmxpYyA+Ki8KIH07CmRpZmYgLS1naXQg
+YS9ody9zMzkweC92aG9zdC11c2VyLWZzLWNjdy5jIGIvaHcvczM5MHgvdmhvc3QtdXNlci1mcy1j
+Y3cuYwppbmRleCA2YzZmMjY5MjkzMDEuLjQ3NGU5N2U5MzdiOCAxMDA2NDQKLS0tIGEvaHcvczM5
+MHgvdmhvc3QtdXNlci1mcy1jY3cuYworKysgYi9ody9zMzkweC92aG9zdC11c2VyLWZzLWNjdy5j
+CkBAIC00Nyw2ICs0Nyw4IEBAIHN0YXRpYyB2b2lkIHZob3N0X3VzZXJfZnNfY2N3X2luc3RhbmNl
+X2luaXQoT2JqZWN0ICpvYmopCiAgICAgY2N3X2Rldi0+Zm9yY2VfcmV2aXNpb25fMSA9IHRydWU7
+CiAgICAgdmlydGlvX2luc3RhbmNlX2luaXRfY29tbW9uKG9iaiwgJmRldi0+dmRldiwgc2l6ZW9m
+KGRldi0+dmRldiksCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIFRZUEVfVkhPU1Rf
+VVNFUl9GUyk7CisgICAgb2JqZWN0X3Byb3BlcnR5X2FkZF9hbGlhcyhvYmosICJib290aW5kZXgi
+LCBPQkpFQ1QoJmRldi0+dmRldiksCisgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAiYm9v
+dGluZGV4Iik7CiB9CiAKIHN0YXRpYyB2b2lkIHZob3N0X3VzZXJfZnNfY2N3X2NsYXNzX2luaXQo
+T2JqZWN0Q2xhc3MgKmtsYXNzLCB2b2lkICpkYXRhKQpkaWZmIC0tZ2l0IGEvaHcvdmlydGlvL3Zo
+b3N0LXVzZXItZnMtcGNpLmMgYi9ody92aXJ0aW8vdmhvc3QtdXNlci1mcy1wY2kuYwppbmRleCA4
+YmIzODliZDI4MmEuLjJlZDg0OTJiM2ZhMyAxMDA2NDQKLS0tIGEvaHcvdmlydGlvL3Zob3N0LXVz
+ZXItZnMtcGNpLmMKKysrIGIvaHcvdmlydGlvL3Zob3N0LXVzZXItZnMtcGNpLmMKQEAgLTY4LDYg
+KzY4LDggQEAgc3RhdGljIHZvaWQgdmhvc3RfdXNlcl9mc19wY2lfaW5zdGFuY2VfaW5pdChPYmpl
+Y3QgKm9iaikKIAogICAgIHZpcnRpb19pbnN0YW5jZV9pbml0X2NvbW1vbihvYmosICZkZXYtPnZk
+ZXYsIHNpemVvZihkZXYtPnZkZXYpLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBU
+WVBFX1ZIT1NUX1VTRVJfRlMpOworICAgIG9iamVjdF9wcm9wZXJ0eV9hZGRfYWxpYXMob2JqLCAi
+Ym9vdGluZGV4IiwgT0JKRUNUKCZkZXYtPnZkZXYpLAorICAgICAgICAgICAgICAgICAgICAgICAg
+ICAgICAgImJvb3RpbmRleCIpOwogfQogCiBzdGF0aWMgY29uc3QgVmlydGlvUENJRGV2aWNlVHlw
+ZUluZm8gdmhvc3RfdXNlcl9mc19wY2lfaW5mbyA9IHsKZGlmZiAtLWdpdCBhL2h3L3ZpcnRpby92
+aG9zdC11c2VyLWZzLmMgYi9ody92aXJ0aW8vdmhvc3QtdXNlci1mcy5jCmluZGV4IGVkMDM2YWQ5
+YzEzZi4uYWM0ZmMzNGIzNmEyIDEwMDY0NAotLS0gYS9ody92aXJ0aW8vdmhvc3QtdXNlci1mcy5j
+CisrKyBiL2h3L3ZpcnRpby92aG9zdC11c2VyLWZzLmMKQEAgLTIyLDYgKzIyLDcgQEAKICNpbmNs
+dWRlICJxZW11L2Vycm9yLXJlcG9ydC5oIgogI2luY2x1ZGUgImh3L3ZpcnRpby92aG9zdC11c2Vy
+LWZzLmgiCiAjaW5jbHVkZSAibW9uaXRvci9tb25pdG9yLmgiCisjaW5jbHVkZSAic3lzZW11L3N5
+c2VtdS5oIgogCiBzdGF0aWMgdm9pZCB2dWZfZ2V0X2NvbmZpZyhWaXJ0SU9EZXZpY2UgKnZkZXYs
+IHVpbnQ4X3QgKmNvbmZpZykKIHsKQEAgLTI3OSw2ICsyODAsMTQgQEAgc3RhdGljIFByb3BlcnR5
+IHZ1Zl9wcm9wZXJ0aWVzW10gPSB7CiAgICAgREVGSU5FX1BST1BfRU5EX09GX0xJU1QoKSwKIH07
+CiAKK3N0YXRpYyB2b2lkIHZ1Zl9pbnN0YW5jZV9pbml0KE9iamVjdCAqb2JqKQoreworICAgIFZI
+b3N0VXNlckZTICpmcyA9IFZIT1NUX1VTRVJfRlMob2JqKTsKKworICAgIGRldmljZV9hZGRfYm9v
+dGluZGV4X3Byb3BlcnR5KG9iaiwgJmZzLT5ib290aW5kZXgsICJib290aW5kZXgiLAorICAgICAg
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICIvZmlsZXN5c3RlbUAwIiwgREVWSUNFKG9iaikp
+OworfQorCiBzdGF0aWMgdm9pZCB2dWZfY2xhc3NfaW5pdChPYmplY3RDbGFzcyAqa2xhc3MsIHZv
+aWQgKmRhdGEpCiB7CiAgICAgRGV2aWNlQ2xhc3MgKmRjID0gREVWSUNFX0NMQVNTKGtsYXNzKTsK
+QEAgLTMwMCw2ICszMDksNyBAQCBzdGF0aWMgY29uc3QgVHlwZUluZm8gdnVmX2luZm8gPSB7CiAg
+ICAgLm5hbWUgPSBUWVBFX1ZIT1NUX1VTRVJfRlMsCiAgICAgLnBhcmVudCA9IFRZUEVfVklSVElP
+X0RFVklDRSwKICAgICAuaW5zdGFuY2Vfc2l6ZSA9IHNpemVvZihWSG9zdFVzZXJGUyksCisgICAg
+Lmluc3RhbmNlX2luaXQgPSB2dWZfaW5zdGFuY2VfaW5pdCwKICAgICAuY2xhc3NfaW5pdCA9IHZ1
+Zl9jbGFzc19pbml0LAogfTsKIAotLSAKMi4xOS4xLjMuZzMwMjQ3YWE1ZDIwMQoK
 

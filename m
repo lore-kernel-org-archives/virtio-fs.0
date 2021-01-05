@@ -1,15 +1,15 @@
-Date: Tue, 5 Jan 2021 12:28:06 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20210105122806.GB2945@work-vm>
-References: <20210104160013.GG2972@work-vm>
- <87turvsnfm.fsf@vostro.rath.org>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <87turvsnfm.fsf@vostro.rath.org>
-Subject: Re: [Virtio-fs] [fuse-devel] 'FORGET' ordering semantics (vs unlink
-	& NFS)
+References: <20201210161126.GA125438@redhat.com>
+	<CAOssrKcKaosJo1W+sek0AOA3CdyE+ZUWzx8KPsn=Gz3Nor+_iQ@mail.gmail.com>
+	<20201211160603.GD3285@redhat.com> <20201211182956.GF3380@work-vm>
+	<20201211192517.GF3285@redhat.com>
+In-Reply-To: <20201211192517.GF3285@redhat.com>
+From: Miklos Szeredi <mszeredi@redhat.com>
+Date: Tue, 5 Jan 2021 16:08:34 +0100
+Message-ID: <CAOssrKejTsvg6jZtOFVZ-5iGRmh=RdgfiAre+cbYDQLrrosvJA@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] Some performance numbers for virtiofs,
+	DAX and virtio-9p
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,55 +18,45 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: fuse-devel@lists.sourceforge.net, virtio-fs@redhat.com, mszeredi@redhat.com, vgoyal@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: "Venegas Munoz, Jose Carlos" <jose.carlos.venegas.munoz@intel.com>, Christian Schoenebeck <qemu_oss@crudebyte.com>, QEMU Developers <qemu-devel@nongnu.org>, virtio-fs-list <virtio-fs@redhat.com>
 
-* Nikolaus Rath (Nikolaus@rath.org) wrote:
-> On Jan 04 2021, "Dr. David Alan Gilbert" <dgilbert@redhat.com> wrote:
-> > Hi,
-> >   On virtio-fs we're hitting a problem with NFS, where
-> > unlinking a file in a directory and then rmdir'ing that
-> > directory fails complaining about the directory not being empty.
+On Fri, Dec 11, 2020 at 8:25 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> On Fri, Dec 11, 2020 at 06:29:56PM +0000, Dr. David Alan Gilbert wrote:
+>
+> [..]
+> > > >
+> > > > Could we measure at what point does a large window size actually make
+> > > > performance worse?
+> > >
+> > > Will do. Will run tests with varying window sizes (small to large)
+> > > and see how does it impact performance for same workload with
+> > > same guest memory.
 > >
-> > The problem here is that if a file has an open fd, NFS doesn't
-> > actually delete the file on unlink, it just renames it to
-> > a hidden file (e.g. .nfs*******).  That open file is there because
-> > the 'FORGET' hasn't completed yet by the time the rmdir is issued.
->=20
->=20
-> Are you really talking about FORGET and file descriptors here? I always
-> assumed that the kernel will only drop dentries (aka emit FORGET) when
-> all fds are closed and never saw otherwise in practice.
->=20
-> Do you mean RELEASE rather than FORGET, or dentry rather than file descri=
-ptor?
+> > I wonder how realistic it is though;  it makes some sense if you have a
+> > scenario like a fairly small root filesystem - something tractable;  but
+> > if you have a large FS you're not realistically going to be able to set
+> > the cache size to match it - that's why it's a cache!
+>
+> I think its more about active dataset size and not necessarily total
+> FS size. FS might be big but if application is not accessing all of
+> the in reasonabl small time window, then it does not matter.
+>
+> What worries me most is that cost of reclaim of a dax range seems
+> too high (or keeps the process blocked for long enogh), that it
+> kills the performance. I will need to revisit the reclaim path
+> and see if I can optimize something.
 
-<reads code again> I still think I mean FORGET, and deamons fd.
+Can we dynamically increase the dax window size?  Or hot plug
+additional dax ranges on demand?
 
-In the (passthrough_ll) daemon we have two fd's; if I've got this right
-then RELEASE closes fi->fh (i.e. a normal fd) where as FORGET
-will close inode->fd which is the O_PATH fd.
+That would solve the problem of trying to find the active set size in advance.
 
-If the user was to do:
+We'd still need reclaim in order to prevent the window from growing
+indefinitely, but that would always be background reclaim and be done
+after some time of inactivity.
 
-    1 touch a/x
-    2 rm a/x
-    3 rmdir a/x
-
-They would close(2) the fd at the end of the touch; so I think that
-would cause us to see the RELEASE - but we don't see the FORGET yet.
-Only after the 'rm' when a/x shouldn't exist any more; then I think we
-can get a FORGET and close our inode->fd
-
-Dave
-
-> Best,
-> -Nikolaus
->=20
-> --=20
-> GPG Fingerprint: ED31 791B 2C5C 1613 AF38 8B8A D113 FCAC 3C4E 599F
->=20
->              =BBTime flies like an arrow, fruit flies like a Banana.=AB
->=20
---=20
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+Thanks,
+Miklos
 

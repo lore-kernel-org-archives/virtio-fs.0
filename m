@@ -1,14 +1,35 @@
-Date: Thu, 10 Dec 2020 15:09:31 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20201210200931.GA185111@redhat.com>
-References: <20201207183021.22752-1-vgoyal@redhat.com>
-	<20201207183021.22752-4-vgoyal@redhat.com>
-	<20201210200303.GN3629@work-vm>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=rath.org; h=from
+	:to:cc:subject:references:date:in-reply-to:message-id
+	:mime-version:content-type:content-transfer-encoding; s=fm1; bh=
+	b/JaRXMnZdfCEeurWxv6+1jf9b9QjVrYUPb5jlRij+Y=; b=jS5+US0YEGH/d3rd
+	HPUI8MgXhiV5sv8VRNwcj0yBzx7nis3PeSNLPB5cDR49c2MuneWisQ+DYgCnOZIH
+	dbQq8WncYEfZffXBDx3VDUcuW/91tx59g/V5xQl6hLffc8C1xipsqUKzLuzUm4mK
+	DEPfzFiy8AlyskdEEygtJFb/6aNH3WD/4NEglbrGyGPcWqSyN3doKfAgAwBz394w
+	Z28FIf+AFlbRjmtPsqVekN7+4CclCKtbfVSvvKhazOxegvhih7Ftsh1n2xhppSV5
+	TL1+O+R3NAa1y9papXnBjxI72t3zgwSX8L3uG0oB2FP4GRR7tzuxF7wixFY72RXq
+	4bBHDw==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=cc:content-transfer-encoding:content-type
+	:date:from:in-reply-to:message-id:mime-version:references
+	:subject:to:x-me-proxy:x-me-proxy:x-me-sender:x-me-sender
+	:x-sasl-enc; s=fm1; bh=b/JaRXMnZdfCEeurWxv6+1jf9b9QjVrYUPb5jlRij
+	+Y=; b=dFoEAXdnkYDNnzUGsDqNRDge+aL6YAHw8NgIZPUn6kDVmnJPO2O9xaRRz
+	FPsZQqUfNVFfG8UTtK0RrZUYw+Fb+J0IeXI46dQKMrdz9SedF9dvuq25GA/ljHJY
+	5yEm5hR5bZICNKE+/2MYyybgmqC4cp5/cvcmjlvaOZxOW2n40VU4HTScwUItiUHw
+	gMyeCi4vRFPMrwY1ILWf0PWBqjcRg9FA1/KCHpvecKsHI78a9L2sozqvCuBXW5v8
+	L0HejnrMGBaCISlOMBvsFwewqJZ4DsklIfiFrUD5TzyiFzDS5lGsKagyoe3WipXW
+	1WZoQPGAYR1pH6K/o02IsDYKoNHuw==
+From: Nikolaus Rath <Nikolaus@rath.org>
+References: <20210104160013.GG2972@work-vm>
+Date: Tue, 05 Jan 2021 10:11:41 +0000
+In-Reply-To: <20210104160013.GG2972@work-vm> (David Alan Gilbert's message of
+	"Mon, 4 Jan 2021 16:00:13 +0000")
+Message-ID: <87turvsnfm.fsf@vostro.rath.org>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20201210200303.GN3629@work-vm>
-Subject: Re: [Virtio-fs] [PATCH 3/3] virtiofsd: Check file type in lo_flush()
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [fuse-devel] 'FORGET' ordering semantics (vs unlink
+	& NFS)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,46 +39,32 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, lersek@redhat.com, qemu-devel@nongnu.org
+Cc: fuse-devel@lists.sourceforge.net, virtio-fs@redhat.com, vgoyal@redhat.com
 
-On Thu, Dec 10, 2020 at 08:03:03PM +0000, Dr. David Alan Gilbert wrote:
-> * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > Currently lo_flush() is written in such a way that it expects to receive
-> > a FLUSH requests on a regular file (and not directories). For example,
-> > we call lo_fi_fd() which searches lo->fd_map. If we open directories
-> > using opendir(), we keep don't keep track of these in lo->fd_map instead
-> > we keep them in lo->dir_map. So we expect lo_flush() to be called on
-> > regular files only.
-> > 
-> > Even linux fuse client calls FLUSH only for regular files and not
-> > directories. So put a check for filetype and return EBADF if
-> > lo_flush() is called on a non-regular file.
-> > 
-> > Reported-by: Laszlo Ersek <lersek@redhat.com>
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > ---
-> >  tools/virtiofsd/passthrough_ll.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> > index 8ba79f503a..48a109d3f6 100644
-> > --- a/tools/virtiofsd/passthrough_ll.c
-> > +++ b/tools/virtiofsd/passthrough_ll.c
-> > @@ -1968,7 +1968,7 @@ static void lo_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
-> >      struct lo_data *lo = lo_data(req);
-> >  
-> >      inode = lo_inode(req, ino);
-> > -    if (!inode) {
-> > +    if (!inode || !S_ISREG(inode->filetype)) {
-> >          fuse_reply_err(req, EBADF);
-> 
-> Does that need a lo_inode_put(lo, &inode) in the new case?
+On Jan 04 2021, "Dr. David Alan Gilbert" <dgilbert@redhat.com> wrote:
+> Hi,
+>   On virtio-fs we're hitting a problem with NFS, where
+> unlinking a file in a directory and then rmdir'ing that
+> directory fails complaining about the directory not being empty.
+>
+> The problem here is that if a file has an open fd, NFS doesn't
+> actually delete the file on unlink, it just renames it to
+> a hidden file (e.g. .nfs*******).  That open file is there because
+> the 'FORGET' hasn't completed yet by the time the rmdir is issued.
 
-Good catch. Yes if inode is valid but file type is not regular, we need
-to put inode reference.
 
-Do you want me to post a new patch or you will like to take care of
-it.
+Are you really talking about FORGET and file descriptors here? I always
+assumed that the kernel will only drop dentries (aka emit FORGET) when
+all fds are closed and never saw otherwise in practice.
 
-Vivek
+Do you mean RELEASE rather than FORGET, or dentry rather than file descriptor?
+
+Best,
+-Nikolaus
+
+-- 
+GPG Fingerprint: ED31 791B 2C5C 1613 AF38 8B8A D113 FCAC 3C4E 599F
+
+             »Time flies like an arrow, fruit flies like a Banana.«
+
 

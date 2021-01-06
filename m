@@ -1,12 +1,9 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
 	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=dVCc9AlYdPstvgl/kWIBuAsXFWyjG9Ne0kemj0nfUsY=;
-	b=diq4nbdppgyicmXSuPgOIQCYcqPs9nnW293ezsxMCnBiYmhL3KD9CXqDLkTsPiCZ/6
-	z0EFNYZl28m2/L7b6YVlQ6zVHvgdU+KGp7+8J6466Nh9dsLqoNLBcXj7M9nKD59A7Njk
-	fGy8b6crdND5gfJsFIOMTTQDmEktP4jKYqYtJr9IgFcSdw+bH8YYAZ1IZOmC9e3OqmJF
-	30jfHY4tgcRPOyMg/oEIpBS1GU2Acxrv24LKbxf6HIpKfl/BUpKFcTzZU7id7BZuQmdR
-	Hwkhs4KXe/aQqAdZlwu1+Uw6aZQ6+u+eFWcTBtRM9OF0hEg1SZwDQQYxX1/J5pvxechQ
-	ezAg==
+	:cc; bh=Ms5AyjnVSaW3BAcvP0zikZOjXLn54HVw2/Ku/XAy5qY=;
+	b=MjgfLUQhQ/7z/27DZ7P3NM5mTVlTa90LKnBloIQK1gsae9yXX/AR60XjPinoUu4f5g
+	ONj8XLin6Iy7eTrbaOrWyqrmPAcXyDq2wZd7d41CtJE+UTFrltA7cdhXjop/F4YBuC7Z
+	RfS++sEzjdHL4UchhL3mv7LJJmwrm61MEdexU=
 MIME-Version: 1.0
 References: <20210104160013.GG2972@work-vm> <20210104184527.GC63879@redhat.com>
 	<20210104185655.GN2972@work-vm>
@@ -14,10 +11,10 @@ References: <20210104160013.GG2972@work-vm> <20210104184527.GC63879@redhat.com>
 	<CAJfpegtHh_m9DpMqC+hBvvV1ioRcydj2cHqMzo41rLcXc148Zw@mail.gmail.com>
 	<CAOQ4uxgfW2BZ04hSahymzyerz==YVNLyRmxkUysZPYmnt6n7QA@mail.gmail.com>
 In-Reply-To: <CAOQ4uxgfW2BZ04hSahymzyerz==YVNLyRmxkUysZPYmnt6n7QA@mail.gmail.com>
-From: Amir Goldstein <amir73il@gmail.com>
-Date: Wed, 6 Jan 2021 11:27:20 +0200
-Message-ID: <CAOQ4uxg7wjT=md4R9or-XRnx3hPE10eQ=dxAPHcQV8m-DwZLEA@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Wed, 6 Jan 2021 14:40:45 +0100
+Message-ID: <CAJfpegsSKfaFbpovOZpJQOP_xrpQpJa2mBK=xefV5k1XsCbfbQ@mail.gmail.com>
+Content-Type: multipart/mixed; boundary="0000000000000b3c1905b83b7983"
 Subject: Re: [Virtio-fs] [fuse-devel] 'FORGET' ordering semantics (vs unlink
 	& NFS)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -28,116 +25,123 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
+To: Amir Goldstein <amir73il@gmail.com>
 Cc: fuse-devel <fuse-devel@lists.sourceforge.net>, Max Reitz <mreitz@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
-On Wed, Jan 6, 2021 at 11:16 AM Amir Goldstein <amir73il@gmail.com> wrote:
->
-> On Wed, Jan 6, 2021 at 10:02 AM Miklos Szeredi <miklos@szeredi.hu> wrote:
-> >
-> > On Wed, Jan 6, 2021 at 5:29 AM Amir Goldstein <amir73il@gmail.com> wrote:
-> > >
-> > > On Mon, Jan 4, 2021 at 8:57 PM Dr. David Alan Gilbert
-> > > <dgilbert@redhat.com> wrote:
-> > > >
-> > > > * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > > > > On Mon, Jan 04, 2021 at 04:00:13PM +0000, Dr. David Alan Gilbert wrote:
-> > > > > > Hi,
-> > > > > >   On virtio-fs we're hitting a problem with NFS, where
-> > > > > > unlinking a file in a directory and then rmdir'ing that
-> > > > > > directory fails complaining about the directory not being empty.
-> > > > > >
-> > > > > > The problem here is that if a file has an open fd, NFS doesn't
-> > > > > > actually delete the file on unlink, it just renames it to
-> > > > > > a hidden file (e.g. .nfs*******).  That open file is there because
-> > > > > > the 'FORGET' hasn't completed yet by the time the rmdir is issued.
-> > > > > >
-> > > > > > Question:
-> > > > > >   a) In the FUSE protocol, are requests assumed to complete in order;
-> > > > > > i.e.  unlink, forget, rmdir   is it required that 'forget' completes
-> > > > > > before the rmdir is processed?
-> > > > > >      (In virtiofs we've been processing requests, in parallel, and
-> > > > > > have sent forgets down a separate queue to keep them out of the way).
-> > > > > >
-> > > > > >   b) 'forget' doesn't send a reply - so the kernel can't wait for the
-> > > > > > client to have finished it;  do we need a synchronous forget here?
-> > > > >
-> > > > > Even if we introduce a synchronous forget, will that really fix the
-> > > > > issue. For example, this could also happen if file has been unlinked
-> > > > > but it is still open and directory is being removed.
-> > > > >
-> > > > > fd = open(foo/bar.txt)
-> > > > > unlink foo/bar.txt
-> > > > > rmdir foo
-> > > > > close(fd).
-> > > > >
-> > > > > In this case, final forget should go after fd has been closed. Its
-> > > > > not a forget race.
-> > > > >
-> > > > > I wrote a test case for this and it works on regular file systems.
-> > > > >
-> > > > > https://github.com/rhvgoyal/misc/blob/master/virtiofs-tests/rmdir.c
-> > > > >
-> > > > > I suspect it will fail on nfs because I am assuming that temporary
-> > > > > file will be there till final close(fd) happens. If that's the
-> > > > > case this is a NFS specific issue because its behavior is different
-> > > > > from other file systems.
-> > > >
-> > > > That's true; but that's NFS just being NFS; in our case we're keeping
-> > > > an fd open even though the guest has been smart enough not to; so we're
-> > > > causing the NFS oddity when it wouldn't normally happen.
-> > > >
-> > >
-> > > Are you sure that you really need this oddity?
-> > >
-> > > My sense from looking virtiofsd is that the open O_PATH fd
-> > > in InodeData for non-directories are an overkill and even the need
-> > > for open fd for all directories is questionable.
-> > >
-> > > If you store a FileHandle (name_to_handle_at(2)) instead of an open fd
-> > > for non-directories, you won't be keeping a reference on the underlying inode
-> > > so no unlink issue.
-> > >
-> > > open_by_handle_at(2) is very cheap for non-directory when underlying inode
-> > > is cached and as cheap as it can get even when inode is not in cache, so no
-> > > performance penalty is expected.
-> >
-> > You are perfectly right that using file handles would solve a number
-> > of issues, one being too many open file descriptors.
-> >
-> > The issue with open_by_handle_at(2) is that it needs
-> > CAP_DAC_READ_SEARCH in the initial user namespace. That currently
-> > makes it impossible to use in containers and such.
->
-> Is that a problem for virtiofsd? does it also run inside a container??
->
+--0000000000000b3c1905b83b7983
+Content-Type: text/plain; charset="UTF-8"
+
+On Wed, Jan 6, 2021 at 10:16 AM Amir Goldstein <amir73il@gmail.com> wrote:
+
 > Please note that NFS doesn't do "silly rename" for directories,
 > so mitigation is mostly needed for non-dir.
->
+
+Okay.
+
 > An alternative method if daemon is not capable, is to store parent dirfd
 > in addition to filehandle and implement open_child_by_handle_at(int
 > parent_fd, ...):
 > - readdir(parend_fd)
 > - search a match for d_ino
 > - name_to_handle_at() and verify match to stored filehandle
-
-That would have to be AT_EMPTY_PATH after opening the file
-by name.
-
 >
 > This is essentially what open_by_handle_at(2) does under the covers
 > with a "connectable" non-dir filehandle after having resolved the
-> parent file handle part.
+> parent file handle part. And "connectable" file handles are used by nfsd
+> to enforce "subtree_check" to make sure that file wasn't moved outside
+> obtainable path after initial lookup.
 
-I meant this is what's done under the covers for the non cached inode case
-of "connectable" non-dir filehandles. Of course we cannot do that on
-every lookup.
+Yes, sort of makes sense, but will have corner cases for hard links in
+different directories, open files after unlink, etc..
 
-What I forgot to say is that with this method we can close file fds if
-we have too many open files or on unlink() and open the file again in
-this method
-if needed.
+Also back to the original problem: what we really want is to close the
+O_PATH descriptor on unlink().  This should be possible, regardless of
+any FORGET, assuming
+
+1) no open files exist that reference the inode
+2) no aliases have been looked up (i.e. just one cached dentry)
+
+The attached untested patch tries to do this.
 
 Thanks,
-Amir.
+Miklos
+
+--0000000000000b3c1905b83b7983
+Content-Type: text/x-patch; charset="US-ASCII";
+	name="virtiofsd-close-on-unlink.patch"
+Content-Disposition: attachment; filename="virtiofsd-close-on-unlink.patch"
+Content-Transfer-Encoding: base64
+Content-ID: <f_kjlgyuxv0>
+X-Attachment-Id: f_kjlgyuxv0
+
+ZGlmZiAtLWdpdCBhL3Rvb2xzL3ZpcnRpb2ZzZC9wYXNzdGhyb3VnaF9sbC5jIGIvdG9vbHMvdmly
+dGlvZnNkL3Bhc3N0aHJvdWdoX2xsLmMKaW5kZXggZWMxMDA4YmNlYmE4Li5kOWMwM2U4N2U1N2Qg
+MTAwNjQ0Ci0tLSBhL3Rvb2xzL3ZpcnRpb2ZzZC9wYXNzdGhyb3VnaF9sbC5jCisrKyBiL3Rvb2xz
+L3ZpcnRpb2ZzZC9wYXNzdGhyb3VnaF9sbC5jCkBAIC0xMDcsNiArMTA3LDExIEBAIHN0cnVjdCBs
+b19pbm9kZSB7CiAgICAgICovCiAgICAgZ2ludCByZWZjb3VudDsKIAorICAgIC8qCisgICAgICog
+TnVtYmVyIG9mIG9wZW4gaW5zdGFuY2VzCisgICAgICovCisgICAgZ2ludCBvcGVuY291bnQ7CisK
+ICAgICBzdHJ1Y3QgbG9fa2V5IGtleTsKIAogICAgIC8qCkBAIC05MDEsNiArOTA2LDE4IEBAIHN0
+YXRpYyBpbnQgbG9fZG9fbG9va3VwKGZ1c2VfcmVxX3QgcmVxLCBmdXNlX2lub190IHBhcmVudCwg
+Y29uc3QgY2hhciAqbmFtZSwKIAogICAgIGlub2RlID0gbG9fZmluZChsbywgJmUtPmF0dHIsIG1u
+dF9pZCk7CiAgICAgaWYgKGlub2RlKSB7CisgICAgICAgIGNoYXIgYnVmMVtQQVRIX01BWCArIDFd
+LCBidWYyW1BBVEhfTUFYICsgMV0sIHByb2NuYW1lWzY0XTsKKyAgICAgICAgc3NpemVfdCBzaXox
+LCBzaXoyOworCisgICAgICAgIHNwcmludGYocHJvY25hbWUsICIlaSIsIGlub2RlLT5mZCk7Cisg
+ICAgICAgIHNpejEgPSByZWFkbGlua2F0KGxvLT5wcm9jX3NlbGZfZmQsIHByb2NuYW1lLCBidWYx
+LCBzaXplb2YoYnVmMSkpOworICAgICAgICBzcHJpbnRmKHByb2NuYW1lLCAiJWkiLCBuZXdmZCk7
+CisgICAgICAgIHNpejIgPSByZWFkbGlua2F0KGxvLT5wcm9jX3NlbGZfZmQsIHByb2NuYW1lLCBi
+dWYyLCBzaXplb2YoYnVmMikpOworCisgICAgICAgIC8qIGRpc2FibGUgY2xvc2Ugb24gdW5saW5r
+IGlmIGFsaWFzIGlzIGRldGVjdGVkICovCisgICAgICAgIGlmIChzaXoxICE9IHNpejIgfHwgbWVt
+Y21wKGJ1ZjEsIGJ1ZjIsIHNpejEpKQorICAgICAgICAgICAgZ19hdG9taWNfaW50X2luYygmaW5v
+ZGUtPm9wZW5jb3VudCk7CisKICAgICAgICAgY2xvc2UobmV3ZmQpOwogICAgIH0gZWxzZSB7CiAg
+ICAgICAgIGlub2RlID0gY2FsbG9jKDEsIHNpemVvZihzdHJ1Y3QgbG9faW5vZGUpKTsKQEAgLTkx
+Nyw2ICs5MzQsNyBAQCBzdGF0aWMgaW50IGxvX2RvX2xvb2t1cChmdXNlX3JlcV90IHJlcSwgZnVz
+ZV9pbm9fdCBwYXJlbnQsIGNvbnN0IGNoYXIgKm5hbWUsCiAgICAgICAgICAqLwogICAgICAgICBn
+X2F0b21pY19pbnRfc2V0KCZpbm9kZS0+cmVmY291bnQsIDIpOwogCisgICAgICAgIGdfYXRvbWlj
+X2ludF9zZXQoJmlub2RlLT5vcGVuY291bnQsIDApOwogICAgICAgICBpbm9kZS0+bmxvb2t1cCA9
+IDE7CiAgICAgICAgIGlub2RlLT5mZCA9IG5ld2ZkOwogICAgICAgICBpbm9kZS0+a2V5LmlubyA9
+IGUtPmF0dHIuc3RfaW5vOwpAQCAtMTI5NSw2ICsxMzEzLDEwIEBAIHN0YXRpYyB2b2lkIGxvX3Vu
+bGluayhmdXNlX3JlcV90IHJlcSwgZnVzZV9pbm9fdCBwYXJlbnQsIGNvbnN0IGNoYXIgKm5hbWUp
+CiAgICAgcmVzID0gdW5saW5rYXQobG9fZmQocmVxLCBwYXJlbnQpLCBuYW1lLCAwKTsKIAogICAg
+IGZ1c2VfcmVwbHlfZXJyKHJlcSwgcmVzID09IC0xID8gZXJybm8gOiAwKTsKKyAgICBpZiAoIWdf
+YXRvbWljX2ludF9nZXQoJmlub2RlLT5vcGVuY291bnQpKSB7CisgICAgICAgIGNsb3NlKGlub2Rl
+LT5mZCk7CisgICAgICAgIGlub2RlLT5mZCA9IC0xOworICAgIH0KICAgICB1bnJlZl9pbm9kZV9s
+b2xvY2tlZChsbywgaW5vZGUsIDEpOwogICAgIGxvX2lub2RlX3B1dChsbywgJmlub2RlKTsKIH0K
+QEAgLTE5MDQsMjUgKzE5MjYsMzAgQEAgc3RhdGljIHZvaWQgbG9fb3BlbihmdXNlX3JlcV90IHJl
+cSwgZnVzZV9pbm9fdCBpbm8sIHN0cnVjdCBmdXNlX2ZpbGVfaW5mbyAqZmkpCiAgICAgc3NpemVf
+dCBmaDsKICAgICBjaGFyIGJ1Zls2NF07CiAgICAgc3RydWN0IGxvX2RhdGEgKmxvID0gbG9fZGF0
+YShyZXEpOworICAgIHN0cnVjdCBsb19pbm9kZSAqaW5vZGUgPSBsb19pbm9kZShyZXEsIGlubyk7
+CisgICAgaW50IGVyciA9IEVCQURGOworCisgICAgaWYgKCFpbm9kZSkKKyAgICAgICAgZ290byBv
+dXRfZXJyOwogCiAgICAgZnVzZV9sb2coRlVTRV9MT0dfREVCVUcsICJsb19vcGVuKGlubz0lIiBQ
+Ukl1NjQgIiwgZmxhZ3M9JWQpXG4iLCBpbm8sCiAgICAgICAgICAgICAgZmktPmZsYWdzKTsKIAog
+ICAgIHVwZGF0ZV9vcGVuX2ZsYWdzKGxvLT53cml0ZWJhY2ssIGxvLT5hbGxvd19kaXJlY3RfaW8s
+IGZpKTsKIAotICAgIHNwcmludGYoYnVmLCAiJWkiLCBsb19mZChyZXEsIGlubykpOworICAgIHNw
+cmludGYoYnVmLCAiJWkiLCBpbm9kZS0+ZmQpOwogICAgIGZkID0gb3BlbmF0KGxvLT5wcm9jX3Nl
+bGZfZmQsIGJ1ZiwgZmktPmZsYWdzICYgfk9fTk9GT0xMT1cpOwotICAgIGlmIChmZCA9PSAtMSkg
+ewotICAgICAgICByZXR1cm4gKHZvaWQpZnVzZV9yZXBseV9lcnIocmVxLCBlcnJubyk7Ci0gICAg
+fQorICAgIGVyciA9IGVycm5vOworICAgIGlmIChmZCA9PSAtMSkKKyAgICAgICAgZ290byBvdXRf
+ZXJyOwogCiAgICAgcHRocmVhZF9tdXRleF9sb2NrKCZsby0+bXV0ZXgpOwogICAgIGZoID0gbG9f
+YWRkX2ZkX21hcHBpbmcocmVxLCBmZCk7CiAgICAgcHRocmVhZF9tdXRleF91bmxvY2soJmxvLT5t
+dXRleCk7CiAgICAgaWYgKGZoID09IC0xKSB7CiAgICAgICAgIGNsb3NlKGZkKTsKLSAgICAgICAg
+ZnVzZV9yZXBseV9lcnIocmVxLCBFTk9NRU0pOwotICAgICAgICByZXR1cm47CisgICAgICAgIGVy
+ciA9IEVOT01FTTsKKyAgICAgICAgZ290byBvdXRfZXJyOwogICAgIH0KIAogICAgIGZpLT5maCA9
+IGZoOwpAQCAtMTkzMSwxOCArMTk1OCwyNiBAQCBzdGF0aWMgdm9pZCBsb19vcGVuKGZ1c2VfcmVx
+X3QgcmVxLCBmdXNlX2lub190IGlubywgc3RydWN0IGZ1c2VfZmlsZV9pbmZvICpmaSkKICAgICB9
+IGVsc2UgaWYgKGxvLT5jYWNoZSA9PSBDQUNIRV9BTFdBWVMpIHsKICAgICAgICAgZmktPmtlZXBf
+Y2FjaGUgPSAxOwogICAgIH0KKyAgICBnX2F0b21pY19pbnRfaW5jKCZpbm9kZS0+b3BlbmNvdW50
+KTsKKyAgICBsb19pbm9kZV9wdXQobG8sICZpbm9kZSk7CiAgICAgZnVzZV9yZXBseV9vcGVuKHJl
+cSwgZmkpOworICAgIHJldHVybjsKKworb3V0X2VycjoKKyAgICBsb19pbm9kZV9wdXQobG8sICZp
+bm9kZSk7CisgICAgZnVzZV9yZXBseV9lcnIocmVxLCBlcnIpOwogfQogCiBzdGF0aWMgdm9pZCBs
+b19yZWxlYXNlKGZ1c2VfcmVxX3QgcmVxLCBmdXNlX2lub190IGlubywKICAgICAgICAgICAgICAg
+ICAgICAgICAgc3RydWN0IGZ1c2VfZmlsZV9pbmZvICpmaSkKIHsKICAgICBzdHJ1Y3QgbG9fZGF0
+YSAqbG8gPSBsb19kYXRhKHJlcSk7CisgICAgc3RydWN0IGxvX2lub2RlICppbm9kZSA9IGxvX2lu
+b2RlKHJlcSwgaW5vKTsKICAgICBzdHJ1Y3QgbG9fbWFwX2VsZW0gKmVsZW07CiAgICAgaW50IGZk
+ID0gLTE7CiAKLSAgICAodm9pZClpbm87Ci0KKyAgICBpZiAoaW5vZGUpCisgICAgICAgIGdfYXRv
+bWljX2ludF9kZWNfYW5kX3Rlc3QoJmlub2RlLT5vcGVuY291bnQpOwogICAgIHB0aHJlYWRfbXV0
+ZXhfbG9jaygmbG8tPm11dGV4KTsKICAgICBlbGVtID0gbG9fbWFwX2dldCgmbG8tPmZkX21hcCwg
+ZmktPmZoKTsKICAgICBpZiAoZWxlbSkgewpAQCAtMTk1MSw2ICsxOTg2LDcgQEAgc3RhdGljIHZv
+aWQgbG9fcmVsZWFzZShmdXNlX3JlcV90IHJlcSwgZnVzZV9pbm9fdCBpbm8sCiAgICAgICAgIGxv
+X21hcF9yZW1vdmUoJmxvLT5mZF9tYXAsIGZpLT5maCk7CiAgICAgfQogICAgIHB0aHJlYWRfbXV0
+ZXhfdW5sb2NrKCZsby0+bXV0ZXgpOworICAgIGxvX2lub2RlX3B1dChsbywgJmlub2RlKTsKIAog
+ICAgIGNsb3NlKGZkKTsKICAgICBmdXNlX3JlcGx5X2VycihyZXEsIDApOwo=
+--0000000000000b3c1905b83b7983--
 

@@ -1,6 +1,6 @@
-Date: Thu, 7 Jan 2021 20:10:31 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20210107201031.GI2918@work-vm>
+Date: Fri, 8 Jan 2021 12:12:52 +0800
+From: Eryu Guan <eguan@linux.alibaba.com>
+Message-ID: <20210108041252.GT80581@e18g06458.et15sqa>
 References: <20210104160013.GG2972@work-vm> <20210104184527.GC63879@redhat.com>
 	<20210104185655.GN2972@work-vm>
 	<CAOQ4uxiw2rXnzFUdixo7qPTiKihsSoxZAbGappGdMcjssgSVSA@mail.gmail.com>
@@ -11,11 +11,11 @@ References: <20210104160013.GG2972@work-vm> <20210104184527.GC63879@redhat.com>
 	<CAJfpegtO+X9rk5pTTRmDv9LWGK4fbvUuwNJvRP_o77B5Y5D3mA@mail.gmail.com>
 	<CAOQ4uxjTerAAxvjpDmDMQO363ju01MsEhbgBmHHSQb92hoL1_g@mail.gmail.com>
 MIME-Version: 1.0
+In-Reply-To: <CAOQ4uxjTerAAxvjpDmDMQO363ju01MsEhbgBmHHSQb92hoL1_g@mail.gmail.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <CAOQ4uxjTerAAxvjpDmDMQO363ju01MsEhbgBmHHSQb92hoL1_g@mail.gmail.com>
 Subject: Re: [Virtio-fs] [fuse-devel] 'FORGET' ordering semantics (vs unlink
-	& NFS)
+ & NFS)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,10 +24,10 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Amir Goldstein <amir73il@gmail.com>, slp@redhat.com
-Cc: Miklos Szeredi <miklos@szeredi.hu>, fuse-devel <fuse-devel@lists.sourceforge.net>, Max Reitz <mreitz@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
+To: Amir Goldstein <amir73il@gmail.com>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, fuse-devel <fuse-devel@lists.sourceforge.net>, Max Reitz <mreitz@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, bergwolf@hyper.sh, gerry@linux.alibaba.com, Vivek Goyal <vgoyal@redhat.com>
 
-* Amir Goldstein (amir73il@gmail.com) wrote:
+On Thu, Jan 07, 2021 at 12:42:00PM +0200, Amir Goldstein wrote:
 > On Thu, Jan 7, 2021 at 10:44 AM Miklos Szeredi <miklos@szeredi.hu> wrote:
 > >
 > > On Wed, Jan 6, 2021 at 5:58 PM Vivek Goyal <vgoyal@redhat.com> wrote:
@@ -132,19 +132,29 @@ Cc: Miklos Szeredi <miklos@szeredi.hu>, fuse-devel <fuse-devel@lists.sourceforge
 > 
 > BTW, is virtiofsd-rs the offical virtiofsd or an experimental one?
 > Which tree does Miklos' patch apply to?
-
-The C version is the current main one, but the Rust version is catching
-up fast and I hope it will displace the C one sometime this year.
-Sergio owns the Rust version, cc'd (slp@ )
-
+> 
 > Anyone has other thoughts about how to reduce fragmentation in
 > implementations?
-> 
-> Thanks,
-> Amir.
 
-Dave
+There's an fuse-backend-rs[1] project hosted on cloud-hypervisor, it is
+a library to communicate with the Linux FUSE clients, which includes:
 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+- ABI layer, which defines all data structures shared between linux Fuse
+  framework and Fuse daemons.
+- API layer, defines the interfaces for Fuse daemons to implement a
+  userspace file system.
+- Transport layer, which supports both the Linux Fuse device and
+  virtio-fs protocol.
+- VFS/pseudo_fs, an abstraction layer to support multiple file systems
+  by a single virtio-fs device.
+- A sample passthrough file system implementation, which passes through
+  files from daemons to clients.
+
+I'm wondering if fuse-backend-rs is a proper project to work on, and
+maybe virtiofsd-rs could be switched to use it as well in the future.
+
+Thanks,
+Eryu
+
+[1] https://github.com/cloud-hypervisor/fuse-backend-rs
 

@@ -1,7 +1,18 @@
-From: Laszlo Ersek <lersek@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ibm.com;
+	h=subject : to : cc :
+	references : from : message-id : date : mime-version : in-reply-to :
+	content-type : content-transfer-encoding; s=pp1;
+	bh=ItrIfx1YNuyHTNeOf33J+V0QCsMMJ872rZLTmqbNzT8=;
+	b=eW8p9s+apV4yn68mQd5n9R0CyxfKLKBTcc2u4c5HUFwDaCe+ASqOrZCALP1k7OlOabCT
+	8NVcAqMhT6Xuy+ULaGm+Ri4bj8vBeH2dcGOg1PrpncxloVfgLZzR3p/vEB/zTaWKsP6Z
+	frsd1g/MtJ/eMI3AK0HQcznNDTTD5NvS8GdXvyEMGXp7zDfN3jwo1qn/rEbHO/MFf1tR
+	15KgV7LbfodpJCKq4CAGfJcwDCdYAKvJcECmIaTLR5CsjjiJAsILr/hijETSI72vCgH1
+	7RrqdEHEdCMJSSQYtPduaUGrexa7z3mJ2lRDVTqThOkhEj0ESgpdI1G7jQ/XqPeFuy5W
+	eQ==
 References: <20210104132401.5100-1-lersek@redhat.com>
-Message-ID: <408e6983-c378-b565-1da9-2cf30a9b5f96@redhat.com>
-Date: Mon, 11 Jan 2021 09:50:12 +0100
+From: Christian Borntraeger <borntraeger@de.ibm.com>
+Message-ID: <f296274e-3c4b-bb90-ca4a-273c3bd97f7f@de.ibm.com>
+Date: Mon, 11 Jan 2021 10:46:06 +0100
 MIME-Version: 1.0
 In-Reply-To: <20210104132401.5100-1-lersek@redhat.com>
 Content-Type: text/plain; charset=utf-8
@@ -16,18 +27,26 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu devel list <qemu-devel@nongnu.org>
-Cc: Halil Pasic <pasic@linux.ibm.com>, "Michael S. Tsirkin" <mst@redhat.com>, Cornelia Huck <cohuck@redhat.com>, virtio-fs@redhat.com, Christian Borntraeger <borntraeger@de.ibm.com>, qemu-s390x@nongnu.org
+To: Laszlo Ersek <lersek@redhat.com>, qemu devel list <qemu-devel@nongnu.org>
+Cc: virtio-fs@redhat.com, "Michael S. Tsirkin" <mst@redhat.com>, Cornelia Huck <cohuck@redhat.com>, Halil Pasic <pasic@linux.ibm.com>, qemu-s390x@nongnu.org
 
-Ping
 
-On 01/04/21 14:24, Laszlo Ersek wrote:
+
+On 04.01.21 14:24, Laszlo Ersek wrote:
 > virtio-fs qualifies as a bootable device minimally under OVMF, but
 > currently the necessary "bootindex" property is missing (fw_cfg kernel
 > boot notwithstanding).
 > 
 > Add the property. For completeness, add it to the CCW device as well;
 > other virtio-ccw devices seem to have "bootindex" properties too.
+
+Currently we do not have boot support for virtiofs on s390x (ccw)
+Not sure if it is better if we should add the property now or whenever
+boot support is implemented. 
+As of today we do have bootindex for block and net. Maybe it is better
+to defer bootindex for virtio-fs-ccw until we can boot from it? In
+that way management software can detect if this is bootable or not?
+
 > 
 > Example OpenFirmware device path for the "vhost-user-fs-pci" device in the
 > "bootorder" fw_cfg file:

@@ -1,18 +1,23 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
-	h=mime-version:from:date:message-id:subject:to;
-	bh=yhaf3fT5Kf4lDvCw364/7ZHuJYstIJd2PDy0w9/goxA=;
-	b=Iyw0Y4FAmZ4ib9OasO92fGvzNnxHOZfTbwabbv/H5CFqTXcNC8mSbLHsDXbo5r3unQ
-	eORiKI1CnTcY7fC0nhoWQBGUUFE1/C9mthw58nOWiEUVbSqnaO0qPJTQc4pWz+Ry9ODX
-	dTve6Kb9tvag3hycEBPcXpl0MVbIy8+lI+rY15wkQkrGZB922b3WftJLaqzIyjKeR/6c
-	tiWnINNH0jN1IsVqXq8tsogq4HPCFvCwjXKq88SikZlcTKdp913nk4FH7w1J6Z0FK3kH
-	EhRAqK2GmIMLrkZ72N06Ij7TZ9c0r3ASRNZH165V7Q+AltCNtMIIe10KNzWt6KOeeWVk
-	IXIw==
+References: <20210104184527.GC63879@redhat.com> <20210104185655.GN2972@work-vm>
+	<CAOQ4uxiw2rXnzFUdixo7qPTiKihsSoxZAbGappGdMcjssgSVSA@mail.gmail.com>
+	<CAJfpegtHh_m9DpMqC+hBvvV1ioRcydj2cHqMzo41rLcXc148Zw@mail.gmail.com>
+	<CAOQ4uxgfW2BZ04hSahymzyerz==YVNLyRmxkUysZPYmnt6n7QA@mail.gmail.com>
+	<CAJfpegsSKfaFbpovOZpJQOP_xrpQpJa2mBK=xefV5k1XsCbfbQ@mail.gmail.com>
+	<20210106165759.GA9679@redhat.com>
+	<CAJfpegtO+X9rk5pTTRmDv9LWGK4fbvUuwNJvRP_o77B5Y5D3mA@mail.gmail.com>
+	<CAOQ4uxjTerAAxvjpDmDMQO363ju01MsEhbgBmHHSQb92hoL1_g@mail.gmail.com>
+	<20210108041252.GT80581@e18g06458.et15sqa>
+	<20210108152646.GC46319@redhat.com>
+From: Peng Tao <tao.peng@linux.alibaba.com>
+Message-ID: <ffacf891-9179-d71e-dce5-e10bf2733f5e@linux.alibaba.com>
+Date: Fri, 15 Jan 2021 18:20:15 +0800
 MIME-Version: 1.0
-From: Eric Ernst <eric.g.ernst@gmail.com>
-Date: Fri, 22 Jan 2021 08:58:05 -0800
-Message-ID: <CAAQbG+U9m91sxsm9swLB7gYNh3NT47Z0kb9LbgEZXUMV65StLQ@mail.gmail.com>
-Content-Type: multipart/alternative; boundary="0000000000002ac5b105b98018a8"
-Subject: [Virtio-fs] Lack of inotify for virtio-fs backed files/directories
+In-Reply-To: <20210108152646.GC46319@redhat.com>
+Content-Type: text/plain; charset=utf-8; format=flowed
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [fuse-devel] 'FORGET' ordering semantics (vs unlink
+ & NFS)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,61 +26,44 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>, Eryu Guan <eguan@linux.alibaba.com>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, fuse-devel <fuse-devel@lists.sourceforge.net>, Amir Goldstein <amir73il@gmail.com>, Max Reitz <mreitz@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, gerry@linux.alibaba.com, bergwolf@hyper.sh
 
---0000000000002ac5b105b98018a8
-Content-Type: text/plain; charset="UTF-8"
 
-Hey ya'll,
 
-As highlighted nicely at [1], a common pattern in Kubernetes is to watch
-for changes to files/directories passed in as Configmaps or secrets.
-Sidecars typically use inotify to watch for changes and then signal the
-primary container or perform other changes based on the reconfiguration.
+On 2021/1/8 23:26, Vivek Goyal wrote:
+> On Fri, Jan 08, 2021 at 12:12:52PM +0800, Eryu Guan wrote:
+> 
+> [..]
+>>> Anyone has other thoughts about how to reduce fragmentation in
+>>> implementations?
+>>
+>> There's an fuse-backend-rs[1] project hosted on cloud-hypervisor, it is
+>> a library to communicate with the Linux FUSE clients, which includes:
+>>
+>> - ABI layer, which defines all data structures shared between linux Fuse
+>>    framework and Fuse daemons.
+>> - API layer, defines the interfaces for Fuse daemons to implement a
+>>    userspace file system.
+>> - Transport layer, which supports both the Linux Fuse device and
+>>    virtio-fs protocol.
+>> - VFS/pseudo_fs, an abstraction layer to support multiple file systems
+>>    by a single virtio-fs device.
+>> - A sample passthrough file system implementation, which passes through
+>>    files from daemons to clients.
+>>
+> 
+> So at a high level, is this equivalent of libfuse written in rust?
+Yes, they are similar in concept. Though fuse-backend-rs only provides 
+interfaces like the libfuse lowlevel APIs for filesystem 
+implementations. The fuse session handling part is still outside [1] but 
+we are planning to move it into fuse-backend-rs as well.
 
-In the context of Kata, these files/dirs are passed in utilizing virtio-fs.
-Since FUSE itself doesn't support inotify, this pattern will fail. I'm
-looking at ways to work-around this gap, including:
+Cheers,
+Tao
 
-1) documenting this as a compatibility limitation ("don't do this!").
-2) suggesting end-users modify their sidecars and utilize poll
-3) doing an inotify on the host, and when changes are identified, notify
-the guest agent who can then modify the files on disk to trigger an inotify
-4) Working on contributing to libfuse in order to add inotify support.
-
-(4) is the right thing, but will take quite a bit of time before it can be
-used. I'm curious if other folks have suggestions for workarounds (I don't
-like any of the ones I suggested), and if anyone has taken a look at (4)?
-
-Thanks,
-Eric
-
-[1] - https://github.com/kata-containers/runtime/issues/1505
-
---0000000000002ac5b105b98018a8
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr"><div dir=3D"ltr">Hey ya&#39;ll,<div><br></div><div>As high=
-lighted nicely at [1], a common pattern in Kubernetes is to watch for chang=
-es to files/directories passed in as Configmaps or secrets. Sidecars=C2=A0t=
-ypically use inotify to watch for changes and then signal the primary conta=
-iner or perform other changes based on the reconfiguration.</div><div><br><=
-/div><div>In the context of Kata, these files/dirs are passed in utilizing =
-virtio-fs. Since FUSE itself doesn&#39;t support inotify, this pattern will=
- fail. I&#39;m looking at ways to work-around this gap, including:</div><di=
-v><br></div><div>1) documenting this as a compatibility limitation (&quot;d=
-on&#39;t do this!&quot;).</div><div>2) suggesting end-users modify their si=
-decars and utilize poll</div><div>3) doing an inotify on the host, and when=
- changes are identified, notify the guest agent who can then modify the fil=
-es on disk to trigger an inotify</div><div>4) Working on contributing to li=
-bfuse in order to add inotify support.</div><div><br></div><div>(4) is the =
-right thing, but will take quite a bit of time before it can be used. I&#39=
-;m curious if other folks have suggestions for workarounds (I don&#39;t lik=
-e any of the ones I suggested), and if anyone has taken a look at (4)?</div=
-><div><br></div><div>Thanks,</div><div>Eric</div><div><br></div><div>[1] -=
-=C2=A0<a href=3D"https://github.com/kata-containers/runtime/issues/1505">ht=
-tps://github.com/kata-containers/runtime/issues/1505</a></div></div></div>
-
---0000000000002ac5b105b98018a8--
+[1] 
+https://github.com/dragonflyoss/image-service/blob/master/utils/src/fuse.rs
+-- 
+Into something rich and strange.
 

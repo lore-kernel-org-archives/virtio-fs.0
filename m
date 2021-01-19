@@ -1,21 +1,14 @@
-Date: Wed, 27 Jan 2021 16:35:24 +0100
-From: Greg Kurz <groug@kaod.org>
-Message-ID: <20210127163524.4e34596d@bahia.lan>
-In-Reply-To: <CAOssrKc=kSQQLmrAR2VrKfDzkyNDEAAa5qusK1x6+-fCM4+yCA@mail.gmail.com>
-References: <20210126103502.260758-1-stefanha@redhat.com>
-	<20210126181604.1a4c69c6@bahia.lan>
-	<CAOssrKdh3kqKN4uGE=s5eiymd2MXKsRXUegqRH-TFhqYOK7WOA@mail.gmail.com>
-	<20210127112023.0e97f909@bahia.lan>
-	<CAOssrKfezsvcECQ=mO_4T2B09e+2S4LA3=_U6TQyiTtPbE=OYg@mail.gmail.com>
-	<20210127144909.22dd778e@bahia.lan>
-	<CAOssrKeN9iYT-Z46FVtzdKnWcTLfMqK77b1faf78m3XTXnEVGw@mail.gmail.com>
-	<20210127160920.062e47f0@bahia.lan>
-	<CAOssrKc=kSQQLmrAR2VrKfDzkyNDEAAa5qusK1x6+-fCM4+yCA@mail.gmail.com>
+Date: Tue, 19 Jan 2021 20:04:29 +0530 (IST)
+From: P J P <ppandit@redhat.com>
+In-Reply-To: <20210118165541.GD255498@stefanha-x1.localdomain>
+Message-ID: <9qo964n3-7p75-7992-7s7p-3srrs4q650n@erqung.pbz>
+References: <rprnspo3-119s-qnoo-2o93-sn40rq40ns@erqung.pbz>
+	<20210114133424.GA299876@stefanha-x1.localdomain>
+	<qn527287-65qq-227p-2r48-1528r6rr386@erqung.pbz>
+	<20210118165541.GD255498@stefanha-x1.localdomain>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="US-ASCII"
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: prevent opening of special
- files (CVE-2020-35517)
+Content-Type: text/plain; charset=US-ASCII
+Subject: Re: [Virtio-fs] [RFC] About non-root virtiofsd(1) process
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,42 +17,31 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <mszeredi@redhat.com>
-Cc: Daniel Berrange <berrange@redhat.com>, QEMU Developers <qemu-devel@nongnu.org>, P J P <ppandit@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, Alex Xu <alex@alxu.ca>, Laszlo Ersek <lersek@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com
 
-On Wed, 27 Jan 2021 16:22:49 +0100
-Miklos Szeredi <mszeredi@redhat.com> wrote:
++-- On Mon, 18 Jan 2021, Stefan Hajnoczi wrote --+
+| Guest applications may run with different uids/gids. The host has no control 
+| over that.
+| 
+| Imagine booting a guest form a virtio-fs root file system and installing 
+| packages. The guest must be able to control uids/gids for that to work.
 
-> On Wed, Jan 27, 2021 at 4:09 PM Greg Kurz <groug@kaod.org> wrote:
-> >
-> > On Wed, 27 Jan 2021 15:09:50 +0100
-> > Miklos Szeredi <mszeredi@redhat.com> wrote:
-> > > The semantics of O_CREATE are that it can fail neither because the
-> > > file exists nor because it doesn't.  This doesn't matter if the
-> > > exported tree is not modified outside of a single guest, because of
-> > > locking provided by the guest kernel.
-> > >
-> >
-> > Wrong. O_CREAT can legitimately fail with ENOENT if one element
-> 
-> Let me make my  statement more precise:
-> 
-> O_CREAT cannot fail with ENOENT if parent directory exists throughout
-> the operation.
-> 
+* I see; I'll try to better understand how it's done.
 
-True, but I still don't see what guarantees guest userspace that the
-parent directory doesn't go away... I must have missed something.
-Please elaborate.
+* With UID namespaces, I thought virtiofsd(1) would be able to operate files 
+  with arbitrary uid/gid, even after dropping its root privileges to acquire 
+  non-root privileges on the host; Because it has 'root' privileges under the 
+  shared directory & UID namespace.
 
-> I'm sure this property is used all over the place in userspace code,
-> and hence should be supported in strict coherence (cache=none) mode.
-> 
-> For relaxed coherence (cache=auto) I'm not quite sure.  NFS is usually
-> the reference, we'd need to look into what guarantees it provides wrt.
-> O_CREAT and remote racing unlink.
-> 
-> Thanks,
-> Miklos
-> 
+| > $ ./virtiofsd -runas test -o source=...
+| 
+| Patches for this are welcome.
+
+* Okay, will try.
+
+Thank you.
+--
+Prasad J Pandit / Red Hat Product Security Team
+8685 545E B54C 486B C6EB 271E E285 8B5A F050 DE8D
 

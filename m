@@ -1,21 +1,14 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=UQ0FvqEsvwhOk1J4aJRozU/5FhgB0VGKiDGGsG4//rw=;
-	b=Ab9CSnmhQzkZR/cpBXjY3+uocCQDKvCeWJ2Wz00b5LoSap8nsI6+fmijNjeHlg0Z4n
-	XCBY1dzAwTmXk3uzdZyJb7E3tXsC8yIyupAoqpzh0wcwN7/xFU5rPWLSAD00ZPbzMXCn
-	jFWc8TRG18Ru05TR7exOajo3NUy4zOdPTOVhU=
+Date: Thu, 21 Jan 2021 14:48:03 +0000
+From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+Message-ID: <20210121144803.GN3125227@redhat.com>
+References: <20210121144429.58885-1-stefanha@redhat.com>
 MIME-Version: 1.0
-References: <20210127112131.308451-1-stefanha@redhat.com>
-	<20210128184416.4dbdd23b@bahia.lan>
-	<20210201171440.GA180539@stefanha-x1.localdomain>
-	<20210201182215.GA221556@stefanha-x1.localdomain>
-In-Reply-To: <20210201182215.GA221556@stefanha-x1.localdomain>
-From: Chirantan Ekbote <chirantan@chromium.org>
-Date: Sat, 6 Feb 2021 00:29:11 +0900
-Message-ID: <CAJFHJrq9Miy91T1fmb9iSTYya7U7kwPNpX3y9pvL2JHW=eav=A@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH v3] virtiofsd: prevent opening of special
- files (CVE-2020-35517)
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+In-Reply-To: <20210121144429.58885-1-stefanha@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: prevent opening of special files
+ (CVE-2020-35517)
+Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,41 +18,99 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: Daniel Berrange <berrange@redhat.com>, qemu-devel@nongnu.org, P J P <ppandit@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, Alex Xu <alex@alxu.ca>, Laszlo Ersek <lersek@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
+Cc: qemu-devel@nongnu.org, P J P <ppandit@redhat.com>, virtio-fs@redhat.com, Alex Xu <alex@alxu.ca>, vgoyal@redhat.com
 
-On Tue, Feb 2, 2021 at 3:22 AM Stefan Hajnoczi <stefanha@redhat.com> wrote:
-> Hi Chirantan,
-> I wanted to bring this CVE to your attention because the discussion has
-> revealed a number of other issues (not necessarily security issues) in
-> virtiofsd that may also be present in other virtio-fs daemon
-> implementations.
->
+On Thu, Jan 21, 2021 at 02:44:29PM +0000, Stefan Hajnoczi wrote:
+> A well-behaved FUSE client does not attempt to open special files with
+> FUSE_OPEN because they are handled on the client side (e.g. device nodes
+> are handled by client-side device drivers).
+> 
+> The check to prevent virtiofsd from opening special files is missing in
+> a few cases, most notably FUSE_OPEN. A malicious client can cause
+> virtiofsd to open a device node, potentially allowing the guest to
+> escape. This can be exploited by a modified guest device driver. It is
+> not exploitable from guest userspace since the guest kernel will handle
+> special files inside the guest instead of sending FUSE requests.
+> 
+> This patch adds the missing checks to virtiofsd. This is a short-term
+> solution because it does not prevent a compromised virtiofsd process
+> from opening device nodes on the host.
+> 
+> Reported-by: Alex Xu <alex@alxu.ca>
+> Fixes: CVE-2020-35517
+> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> ---
+> This issue was diagnosed on public IRC and is therefore already known
+> and not embargoed.
+> 
+> A stronger fix, and the long-term solution, is for users to mount the
+> shared directory and any sub-mounts with nodev, as well as nosuid and
+> noexec. Unfortunately virtiofsd cannot do this automatically because
+> bind mounts added by the user after virtiofsd has launched would not be
+> detected. I suggest the following:
+> 
+> 1. Modify libvirt and Kata Containers to explicitly set these mount
+>    options.
+> 2. Then modify virtiofsd to check that the shared directory has the
+>    necessary options at startup. Refuse to start if the options are
+>    missing so that the user is aware of the security requirements.
+> 
+> As a bonus this also increases the likelihood that other host processes
+> besides virtiofsd will be protected by nosuid/noexec/nodev so that a
+> malicious guest cannot drop these files in place and then arrange for a
+> host process to come across them.
+> 
+> Additionally, user namespaces have been discussed. They seem like a
+> worthwhile addition as an unprivileged or privilege-separated mode
+> although there are limitations with respect to security xattrs and the
+> actual uid/gid stored on the host file system not corresponding to the
+> guest uid/gid.
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 84 +++++++++++++++++++++-----------
+>  1 file changed, 56 insertions(+), 28 deletions(-)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 5fb36d9407..e08352d649 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -555,6 +555,29 @@ static int lo_fd(fuse_req_t req, fuse_ino_t ino)
+>      return fd;
+>  }
+>  
+> +/*
+> + * Open a file descriptor for an inode. Returns -EBADF if the inode is not a
+> + * regular file or a directory. Use this helper function instead of raw
+> + * openat(2) to prevent security issues when a malicious client opens special
+> + * files such as block device nodes.
+> + */
+> +static int lo_inode_open(struct lo_data *lo, struct lo_inode *inode,
+> +                         int open_flags)
+> +{
+> +    g_autofree char *fd_str = g_strdup_printf("%d", inode->fd);
+> +    int fd;
+> +
+> +    if (!S_ISREG(inode->filetype) && !S_ISDIR(inode->filetype)) {
+> +        return -EBADF;
+> +    }
+> +
+> +    fd = openat(lo->proc_self_fd, fd_str, open_flags);
 
-Hi Stefan,
+Whats the intended behaviour with symlinks ?  Do we need to
+allow S_ISLNK, or are we assuming the symlink has already
+been expanded to the target file by this point ? If the latter
+adding a comment about this would be useful.
 
-Thanks for the heads up.  I'm going to summarize the thread just to
-make sure I understood correctly.
+> +    if (fd < 0) {
+> +        return -errno;
+> +    }
+> +    return fd;
+> +}
+> +
 
-The CVE seems to be that the virtio-fs daemon allows opening special
-files and the short-term fix is to detect and block this in the
-daemon.  The long term fix is to mount the data with
-nosuid,nodev,noexec.  I think crosvm's virtio-fs also doesn't check
-the file type before opening it but chrome os has mounted all stateful
-data as nosuid,nodev,noexec as long as I can remember so I think we
-got lucky there.  It's probably still worth adding the check to the
-server.
-
-The other issue is that there is a race between when an entry is
-created and when we look it up by name where it may be modified and
-replaced by an external process.  While I can see how this can be
-fixed for files, it seems like there's no choice for directories.
-It's not like mkdirat returns an fd for the newly created directory.
-Though, it seems like every process is affected by this.  I guess if
-you wanted to be really paranoid you could do something like mkdtemp,
-get an fd, and then rename to the real name.
-
-Did I miss anything?
-
-Thanks,
-Chirantan
+Regards,
+Daniel
+-- 
+|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
+|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
+|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
 

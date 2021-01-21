@@ -1,14 +1,13 @@
-Date: Thu, 11 Feb 2021 10:25:55 +0000
+Date: Thu, 21 Jan 2021 17:03:28 +0000
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20210211102555.GG247031@stefanha-x1.localdomain>
-References: <20210209190224.62827-1-dgilbert@redhat.com>
-	<20210209190224.62827-7-dgilbert@redhat.com>
+Message-ID: <20210121170328.GE59088@stefanha-x1.localdomain>
+References: <20210119221849.GC77840@redhat.com> <20210120104501.GB2930@work-vm>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="j2AXaZ4YhVcLc+PQ"
+	protocol="application/pgp-signature"; boundary="u5E4XgoOPWr4PD9E"
 Content-Disposition: inline
-In-Reply-To: <20210209190224.62827-7-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 06/24] DAX: virtio-fs: Add cache BAR
+In-Reply-To: <20210120104501.GB2930@work-vm>
+Subject: Re: [Virtio-fs] What are libvhost-user locking requirements
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,82 +16,40 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com, mst@redhat.com
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: gkurz@redhat.com, johannes.berg@intel.com, qemu-devel@nongnu.org, virtio-fs-list <virtio-fs@redhat.com>, marcandre.lureau@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
 
---j2AXaZ4YhVcLc+PQ
+--u5E4XgoOPWr4PD9E
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Tue, Feb 09, 2021 at 07:02:06PM +0000, Dr. David Alan Gilbert (git) wrot=
-e:
-> @@ -46,6 +51,26 @@ static void vhost_user_fs_pci_realize(VirtIOPCIProxy *=
-vpci_dev, Error **errp)
->      }
-> =20
->      qdev_realize(vdev, BUS(&vpci_dev->bus), errp);
-> +    cachesize =3D dev->vdev.conf.cache_size;
-> +
-> +    /*
-> +     * The bar starts with the data/DAX cache
-> +     * Others will be added later.
-> +     */
-> +    memory_region_init(&dev->cachebar, OBJECT(vpci_dev),
-> +                       "vhost-fs-pci-cachebar", cachesize);
+On Wed, Jan 20, 2021 at 10:45:01AM +0000, Dr. David Alan Gilbert wrote:
+> * Vivek Goyal (vgoyal@redhat.com) wrote:
+> > - what's the locking model needed to use libvhost-user. Is there one?=
+=20
+>=20
+> I don't think it really had one.
 
-s/vhost-fs/vhost-user-fs/ for consistency. Only worth changing if you
-respin.
+Same. Most libvhost-user applications are single-threaded.
 
-> +    if (cachesize) {
-> +        memory_region_add_subregion(&dev->cachebar, 0, &dev->vdev.cache);
-> +        virtio_pci_add_shm_cap(vpci_dev, VIRTIO_FS_PCI_CACHE_BAR, 0, cac=
-hesize,
-> +                               VIRTIO_FS_SHMCAP_ID_CACHE);
-> +    }
-> +
-> +    /* After 'realized' so the memory region exists */
-> +    pci_register_bar(&vpci_dev->pci_dev, VIRTIO_FS_PCI_CACHE_BAR,
-> +                     PCI_BASE_ADDRESS_SPACE_MEMORY |
-> +                     PCI_BASE_ADDRESS_MEM_PREFETCH |
-> +                     PCI_BASE_ADDRESS_MEM_TYPE_64,
-> +                     &dev->cachebar);
+Stefan
 
-Please include a comment explainig why it's okay to use BAR 2, which is
-already used for the virtio-pci modern io bar (off by default):
-
-    /*
-     * virtio pci bar layout used by default.
-     * subclasses can re-arrange things if needed.
-     *
-     *   region 0   --  virtio legacy io bar
-     *   region 1   --  msi-x bar
-     *   region 2   --  virtio modern io bar (off by default)
-     *   region 4+5 --  virtio modern memory (64bit) bar
-     *
-     */
-
-I guess the idea is that the io bar is available since it's off by
-default. What happens if the io bar is enabled?
-
-Should this bar registration should be conditional (only when cache size
-is greater than 0)?
-
---j2AXaZ4YhVcLc+PQ
+--u5E4XgoOPWr4PD9E
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAlBjMACgkQnKSrs4Gr
-c8jgpggAoNEPtR4HQ7BVPbSA4ugAaffqqeoLpyqr7Kf864GsSdgEZC7+SlSZjfxl
-vme32YgLleKLA4f0S72KtPwbdrJepO6tWAhdmzCK40NWDah+IpyM1I5rsSqDpB8y
-D2UgNh5px6RiCEiitxkAqwSLydIPEkvlH94SJUJ9wKqNiDi9DjI+81+CCMZ4FdDf
-XpcBpUU7HYvnu5BScBwwcb94dU2Dog+VcQ9q3I5FAdg2u91oW2QK14apT8xjuyo8
-0ZlHZuqcFV9jvr6pexc4XDBY8vdLa8UecG650rShNDIHC7PoZCkx1lif3yUjGE/R
-gbEG5u/6cWXrfjW7mVsuTfRww4DbqQ==
-=2swU
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAJs+AACgkQnKSrs4Gr
+c8h6DggAhqheaeMFWe1tnHAqYPpYcacSoGr8yUTVsy94B750Ro+mSXuvRbFl6lS5
+bCV/VeNTjoJFRb9/Le1twrnodelEsrlKP6hL9MMDVfaBDp56mmmbG5e1GfVzkt0R
+MIIrsArluXkXwLCuzq04Lj8A+33/+vmL1ELHCDgsw82ODIEzpE7HzmN8WNlr2nAT
+6phl0OMln38CtLnNrUe/rAfj3lDdf6/Z68IXBKDb9natMpfwtZBdg7XYHU2LPE5B
+HT9WoVbk4KR/oH94nK5oQ+vQUhpcYLk0WbD2bbFffccxT5vS5MWQINkZalNYp72s
+brbNqD4tsutKhhAr/YvmY8MJVSp84Q==
+=/2ur
 -----END PGP SIGNATURE-----
 
---j2AXaZ4YhVcLc+PQ--
+--u5E4XgoOPWr4PD9E--
 

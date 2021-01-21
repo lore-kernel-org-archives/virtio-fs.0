@@ -1,11 +1,25 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Tue,  9 Feb 2021 19:02:05 +0000
-Message-Id: <20210209190224.62827-6-dgilbert@redhat.com>
-In-Reply-To: <20210209190224.62827-1-dgilbert@redhat.com>
-References: <20210209190224.62827-1-dgilbert@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alxu.ca; s=default;
+	t=1611240617;
+	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+	to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+	content-transfer-encoding:content-transfer-encoding:
+	in-reply-to:in-reply-to:references:references;
+	bh=XXvN/2ywSjw/5QngZ1tZzibD8n/j9vdFtF06JkcFtWg=;
+	b=WaMwm5GST1tEjJMlVvF4ZFn/mYph472/n0YuHRGpGd7q6SvV5wswfuAHcJ0xuSA5NPoN6G
+	43FxgszeydOekOqJRuq1LmukpobnDMDBVqncIhhlX6n+mGENJ+02eUV61Ipn22biLD93HC
+	8hILk1fG/6WhZtx0xVv8T/B4f8PdCrGDsQz362NE9MSpgfpNX0uv8Bex9omAAXnzsW4Fj2
+	X983JP71Vds4h9UPHe6YoVrRZoyKp+JDbtBmnsAnFM9cJDrU5FrBIJlHGeL33805wSwby7
+	ZWH4x3pyO2sOCjG+57vwq3V1zBJx5nJn8rVyskk+yZCwQ2S1HrcfUnbOC+ktog==
+Date: Thu, 21 Jan 2021 09:50:15 -0500
+From: Alex Xu <alex@alxu.ca>
+References: <20210121144429.58885-1-stefanha@redhat.com>
+In-Reply-To: <20210121144429.58885-1-stefanha@redhat.com>
 MIME-Version: 1.0
+Message-Id: <1611240546.prykd5to6n.none@localhost>
+Content-Type: text/plain; charset=utf-8
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 05/24] DAX: virtio: Add shared memory capability
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: prevent opening of special files
+ (CVE-2020-35517)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,67 +28,59 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, virtio-fs@redhat.com, marcandre.lureau@redhat.com, mst@redhat.com
+To: qemu-devel@nongnu.org, Stefan Hajnoczi <stefanha@redhat.com>
+Cc: P J P <ppandit@redhat.com>, virtio-fs@redhat.com, vgoyal@redhat.com
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Excerpts from Stefan Hajnoczi's message of January 21, 2021 9:44 am:
+> A well-behaved FUSE client does not attempt to open special files with
+> FUSE_OPEN because they are handled on the client side (e.g. device nodes
+> are handled by client-side device drivers).
+> 
+> The check to prevent virtiofsd from opening special files is missing in
+> a few cases, most notably FUSE_OPEN. A malicious client can cause
+> virtiofsd to open a device node, potentially allowing the guest to
+> escape. This can be exploited by a modified guest device driver. It is
+> not exploitable from guest userspace since the guest kernel will handle
+> special files inside the guest instead of sending FUSE requests.
+> 
+> This patch adds the missing checks to virtiofsd. This is a short-term
+> solution because it does not prevent a compromised virtiofsd process
+> from opening device nodes on the host.
+> 
+> Reported-by: Alex Xu <alex@alxu.ca>
+> Fixes: CVE-2020-35517
+> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> ---
+> This issue was diagnosed on public IRC and is therefore already known
+> and not embargoed.
+> 
+> A stronger fix, and the long-term solution, is for users to mount the
+> shared directory and any sub-mounts with nodev, as well as nosuid and
+> noexec. Unfortunately virtiofsd cannot do this automatically because
+> bind mounts added by the user after virtiofsd has launched would not be
+> detected. I suggest the following:
+> 
+> 1. Modify libvirt and Kata Containers to explicitly set these mount
+>    options.
+> 2. Then modify virtiofsd to check that the shared directory has the
+>    necessary options at startup. Refuse to start if the options are
+>    missing so that the user is aware of the security requirements.
+> 
+> As a bonus this also increases the likelihood that other host processes
+> besides virtiofsd will be protected by nosuid/noexec/nodev so that a
+> malicious guest cannot drop these files in place and then arrange for a
+> host process to come across them.
+> 
+> Additionally, user namespaces have been discussed. They seem like a
+> worthwhile addition as an unprivileged or privilege-separated mode
+> although there are limitations with respect to security xattrs and the
+> actual uid/gid stored on the host file system not corresponding to the
+> guest uid/gid.
 
-Define a new capability type 'VIRTIO_PCI_CAP_SHARED_MEMORY_CFG'
-and the data structure 'virtio_pci_cap64' to go with it.
-They allow defining shared memory regions with sizes and offsets
-of 2^32 and more.
-Multiple instances of the capability are allowed and distinguished
-by the 'id' field in the base capability.
+I haven't looked too closely at the code, but the commit message seems 
+reasonable to me.
 
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
----
- hw/virtio/virtio-pci.c | 20 ++++++++++++++++++++
- hw/virtio/virtio-pci.h |  4 ++++
- 2 files changed, 24 insertions(+)
+Thanks,
+Alex.
 
-diff --git a/hw/virtio/virtio-pci.c b/hw/virtio/virtio-pci.c
-index 094c36aa3e..de378c594e 100644
---- a/hw/virtio/virtio-pci.c
-+++ b/hw/virtio/virtio-pci.c
-@@ -1138,6 +1138,26 @@ static int virtio_pci_add_mem_cap(VirtIOPCIProxy *proxy,
-     return offset;
- }
- 
-+int virtio_pci_add_shm_cap(VirtIOPCIProxy *proxy,
-+                           uint8_t bar, uint64_t offset, uint64_t length,
-+                           uint8_t id)
-+{
-+    struct virtio_pci_cap64 cap = {
-+        .cap.cap_len = sizeof cap,
-+        .cap.cfg_type = VIRTIO_PCI_CAP_SHARED_MEMORY_CFG,
-+    };
-+    uint32_t mask32 = ~0;
-+
-+    cap.cap.bar = bar;
-+    cap.cap.id = id;
-+    cap.cap.length = cpu_to_le32(length & mask32);
-+    cap.length_hi = cpu_to_le32((length >> 32) & mask32);
-+    cap.cap.offset = cpu_to_le32(offset & mask32);
-+    cap.offset_hi = cpu_to_le32((offset >> 32) & mask32);
-+
-+    return virtio_pci_add_mem_cap(proxy, &cap.cap);
-+}
-+
- static uint64_t virtio_pci_common_read(void *opaque, hwaddr addr,
-                                        unsigned size)
- {
-diff --git a/hw/virtio/virtio-pci.h b/hw/virtio/virtio-pci.h
-index d7d5d403a9..31ca339099 100644
---- a/hw/virtio/virtio-pci.h
-+++ b/hw/virtio/virtio-pci.h
-@@ -247,4 +247,8 @@ void virtio_pci_types_register(const VirtioPCIDeviceTypeInfo *t);
-  */
- unsigned virtio_pci_optimal_num_queues(unsigned fixed_queues);
- 
-+int virtio_pci_add_shm_cap(VirtIOPCIProxy *proxy,
-+                           uint8_t bar, uint64_t offset, uint64_t length,
-+                           uint8_t id);
-+
- #endif
--- 
-2.29.2
 

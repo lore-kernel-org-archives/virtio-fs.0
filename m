@@ -1,14 +1,26 @@
-Date: Wed, 10 Feb 2021 14:58:14 +0000
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20210210145814.GA231286@stefanha-x1.localdomain>
-References: <20210209224754.GG3171@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alxu.ca; s=default;
+	t=1611244334;
+	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+	to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+	content-transfer-encoding:content-transfer-encoding:
+	in-reply-to:in-reply-to:references:references;
+	bh=hwusA5u2Bv03DQWiw/c6bTo7Qi3VBtEU4lc3gAbI9eY=;
+	b=oekxjd5dpyKb11J/oyvxyzhVOVLncAKUT52ZZnyiUnl82AxZWrr/L3pDQkAF2Z+9cZMNku
+	jYdMCEwqAmvL2/EqzT02kA8PxSik9QYV58fB9pDI0169e0H5JPSgUJgE/LVsVP3y6RMKFY
+	G+MXerc/RHRUke+y8pdacfnVgNKZ4ihdk60RoPZsEKoIccTnEhhOZQesdcYwlWFg8ZsvJU
+	F+L3dkQSrzqr307ahO/YzZE/njwCaNPGaBMiH4VFthi17RL6Ya4w5SeZUu5Bgnho3/4SGI
+	InZ+lreIfLpEPMLraYLYxLcn48x4pnZIWnpM/9i6nRMLhMP/SUk7xLDEgoYihg==
+Date: Thu, 21 Jan 2021 10:52:10 -0500
+From: Alex Xu <alex@alxu.ca>
+References: <20210121144429.58885-1-stefanha@redhat.com>
+	<f5fc73e5-334e-c1ef-3982-227715efc26b@redhat.com>
+In-Reply-To: <f5fc73e5-334e-c1ef-3982-227715efc26b@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="+HP7ph2BbKc20aGI"
-Content-Disposition: inline
-In-Reply-To: <20210209224754.GG3171@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofs: Fail dax mount if device does not
-	support it
+Message-Id: <1611243688.4854bsewsj.none@localhost>
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: prevent opening of special files
+ (CVE-2020-35517)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,72 +29,60 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>
+To: Laszlo Ersek <lersek@redhat.com>, qemu-devel@nongnu.org
+Cc: P J P <ppandit@redhat.com>, virtio-fs@redhat.com, vgoyal@redhat.com
 
+Excerpts from Laszlo Ersek's message of January 21, 2021 10:32 am:
+> Assuming a benign / trusted guest, is there going to be an override for
+> this?
+> 
+> Asked differently -- if we don't want to set up a separate block device
+> on the host, to contain the filesystem that is mounted as the shared
+> directory, can unionfs (?) / overlayfs be used to re-mount an existent
+> host-side directory as the shared directory, but with
+> "noexec,nosuid,nodev" *bolted-on*?
+> 
+> If people have to create separate block devices (on the host side) for
+> innocent use cases such as running tests in a trusted guest, that's not
+> going to qualify as "usability progress" relative to having a qcow2 (or
+> raw) image file.
+> 
+> "nodev,nosuid" is kind of a no-brainer for any host-side *data* volume
+> anyway (such as the one underlying "/home", even), so I don't see those
+> options as a challenge. But "noexec" is different.
+> 
+> Thanks,
+> Laszlo
 
---+HP7ph2BbKc20aGI
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+On Linux, there are two types of mount options: per-superblock, and 
+per-point. Most filesystem-specific options are per-superblock, and 
+apply to all mounts of that device. noexec, nosuid, and nodev are 
+per-mount options, and apply individually to each mount, bind or 
+otherwise, of a given device. Bind mounts copy the parent per-mount 
+options, but can be individually altered. Note also that it is not 
+required to create a new location for a bind mount.
 
-On Tue, Feb 09, 2021 at 05:47:54PM -0500, Vivek Goyal wrote:
-> Right now "mount -t virtiofs -o dax myfs /mnt/virtiofs" succeeds even
-> if filesystem deivce does not have a cache window and hence DAX can't
-> be supported.
->=20
-> This gives a false sense to user that they are using DAX with virtiofs
-> but fact of the matter is that they are not.
->=20
-> Fix this by returning error if dax can't be supported and user has asked
-> for it.
->=20
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  fs/fuse/virtio_fs.c |    9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
->=20
-> Index: redhat-linux/fs/fuse/virtio_fs.c
-> =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
-=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
-=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
-> --- redhat-linux.orig/fs/fuse/virtio_fs.c	2021-02-04 10:40:21.704370721 -=
-0500
-> +++ redhat-linux/fs/fuse/virtio_fs.c	2021-02-09 15:56:45.693653979 -0500
-> @@ -1324,8 +1324,15 @@ static int virtio_fs_fill_super(struct s
-> =20
->  	/* virtiofs allocates and installs its own fuse devices */
->  	ctx->fudptr =3D NULL;
-> -	if (ctx->dax)
-> +	if (ctx->dax) {
-> +		if (!fs->dax_dev) {
-> +			err =3D -EINVAL;
-> +			pr_err("virtio-fs: dax can't be enabled as filesystem"
-> +			       " device does not support it.\n");
-> +			goto err_free_fuse_devs;
-> +		}
->  		ctx->dax_dev =3D fs->dax_dev;
-> +	}
->  	err =3D fuse_fill_super_common(sb, ctx);
->  	if (err < 0)
->  		goto err_free_fuse_devs;
+For example, invoking:
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+mount --bind -o noexec,nosuid,nodev /var/lib/vms/source1 /var/lib/vms/source1
 
---+HP7ph2BbKc20aGI
-Content-Type: application/pgp-signature; name="signature.asc"
+would effectively secure a source directory. This can also be inserted 
+in /etc/fstab, such as:
 
------BEGIN PGP SIGNATURE-----
+/var/lib/vms/source1 /var/lib/vms/source1 none bind,noexec,nosuid,nodev 0 0
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAj9IYACgkQnKSrs4Gr
-c8hKswgAx8cnf0HAP8eDaXN2en5yHDUSGwKbvCKrRN5KNUKPcwK372PNnX+H2Kp2
-/ngf5Umzb1oxvofxNWuZUuHRYl/LFVIcYlICW6IvccaR4DFHEKj9tHOA9SiEbg8j
-o9F3P7wgB2V6Hq5fH4556VUJJjWYTKQQO9WRWoQKJL1zeRUHcuhJIIFsJOpWQgTP
-k98uM6spvg21o0BFH+QVh3shizFkzYzYz6CtGhiKfPuEN0mMvr3zcwJpgETgNpOf
-DuMdsxNLf/DZc1Y5K3Kzhc5tf3EszcunGrFbbxhU3dAXX2CUQbB1fVEBRWwNPrlf
-8Kd8n7XyHtehZIGHabdIQNWGW0yyoA==
-=X28C
------END PGP SIGNATURE-----
+Note that, as explained in Stefan's initial email, this hides any 
+submounts below source. Each of those must be individually protected, 
+either by initially mounting with the security options or by creating a 
+new bind mount as above. Although these cases should be infrequent, they 
+are common enough that Stefan and I think that they should be supported, 
+or at the very least not silently behave in unexpected or insecure ways.
 
---+HP7ph2BbKc20aGI--
+Additionally, while it's possible to use overlayfs for this purpose, 
+it's overkill, and as far as I understand, doesn't solve the problem of 
+hiding sub-mounts.
+
+Regards,
+Alex.
+
 

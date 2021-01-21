@@ -1,12 +1,14 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Tue,  9 Feb 2021 19:02:18 +0000
-Message-Id: <20210209190224.62827-19-dgilbert@redhat.com>
-In-Reply-To: <20210209190224.62827-1-dgilbert@redhat.com>
-References: <20210209190224.62827-1-dgilbert@redhat.com>
+References: <20210121144429.58885-1-stefanha@redhat.com>
+From: Laszlo Ersek <lersek@redhat.com>
+Message-ID: <f5fc73e5-334e-c1ef-3982-227715efc26b@redhat.com>
+Date: Thu, 21 Jan 2021 16:32:26 +0100
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 18/24] DAX/unmap virtiofsd: Parse unmappable
-	elements
+In-Reply-To: <20210121144429.58885-1-stefanha@redhat.com>
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: prevent opening of special files
+ (CVE-2020-35517)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,337 +17,249 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, virtio-fs@redhat.com, marcandre.lureau@redhat.com, mst@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>, qemu-devel@nongnu.org
+Cc: P J P <ppandit@redhat.com>, virtio-fs@redhat.com, Alex Xu <alex@alxu.ca>, vgoyal@redhat.com
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+On 01/21/21 15:44, Stefan Hajnoczi wrote:
+> A well-behaved FUSE client does not attempt to open special files with
+> FUSE_OPEN because they are handled on the client side (e.g. device nodes
+> are handled by client-side device drivers).
+> 
+> The check to prevent virtiofsd from opening special files is missing in
+> a few cases, most notably FUSE_OPEN. A malicious client can cause
+> virtiofsd to open a device node, potentially allowing the guest to
+> escape. This can be exploited by a modified guest device driver. It is
+> not exploitable from guest userspace since the guest kernel will handle
+> special files inside the guest instead of sending FUSE requests.
+> 
+> This patch adds the missing checks to virtiofsd. This is a short-term
+> solution because it does not prevent a compromised virtiofsd process
+> from opening device nodes on the host.
+> 
+> Reported-by: Alex Xu <alex@alxu.ca>
+> Fixes: CVE-2020-35517
+> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> ---
+> This issue was diagnosed on public IRC and is therefore already known
+> and not embargoed.
+> 
+> A stronger fix, and the long-term solution, is for users to mount the
+> shared directory and any sub-mounts with nodev, as well as nosuid and
+> noexec. Unfortunately virtiofsd cannot do this automatically because
+> bind mounts added by the user after virtiofsd has launched would not be
+> detected. I suggest the following:
+> 
+> 1. Modify libvirt and Kata Containers to explicitly set these mount
+>    options.
+> 2. Then modify virtiofsd to check that the shared directory has the
+>    necessary options at startup. Refuse to start if the options are
+>    missing so that the user is aware of the security requirements.
 
-For some read/writes the virtio queue elements are unmappable by
-the daemon; these are cases where the data is to be read/written
-from non-RAM.  In viritofs's case this is typically a direct read/write
-into an mmap'd DAX file also on virtiofs (possibly on another instance).
+Assuming a benign / trusted guest, is there going to be an override for
+this?
 
-When we receive a virtio queue element, check that we have enough
-mappable data to handle the headers.  Make a note of the number of
-unmappable 'in' entries (ie. for read data back to the VMM),
-and flag the fuse_bufvec for 'out' entries with a new flag
-FUSE_BUF_PHYS_ADDR.
+Asked differently -- if we don't want to set up a separate block device
+on the host, to contain the filesystem that is mounted as the shared
+directory, can unionfs (?) / overlayfs be used to re-mount an existent
+host-side directory as the shared directory, but with
+"noexec,nosuid,nodev" *bolted-on*?
 
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-with fix by:
-Signed-off-by: Liu Bo <bo.liu@linux.alibaba.com>
----
- tools/virtiofsd/buffer.c      |   4 +-
- tools/virtiofsd/fuse_common.h |   7 ++
- tools/virtiofsd/fuse_virtio.c | 191 ++++++++++++++++++++++++----------
- 3 files changed, 145 insertions(+), 57 deletions(-)
+If people have to create separate block devices (on the host side) for
+innocent use cases such as running tests in a trusted guest, that's not
+going to qualify as "usability progress" relative to having a qcow2 (or
+raw) image file.
 
-diff --git a/tools/virtiofsd/buffer.c b/tools/virtiofsd/buffer.c
-index 874f01c488..1a050aa441 100644
---- a/tools/virtiofsd/buffer.c
-+++ b/tools/virtiofsd/buffer.c
-@@ -77,6 +77,7 @@ static ssize_t fuse_buf_write(const struct fuse_buf *dst, size_t dst_off,
-     ssize_t res = 0;
-     size_t copied = 0;
- 
-+    assert(!(src->flags & FUSE_BUF_PHYS_ADDR));
-     while (len) {
-         if (dst->flags & FUSE_BUF_FD_SEEK) {
-             res = pwrite(dst->fd, (char *)src->mem + src_off, len,
-@@ -272,7 +273,8 @@ ssize_t fuse_buf_copy(struct fuse_bufvec *dstv, struct fuse_bufvec *srcv)
-      * process
-      */
-     for (i = 0; i < srcv->count; i++) {
--        if (srcv->buf[i].flags & FUSE_BUF_IS_FD) {
-+        if ((srcv->buf[i].flags & FUSE_BUF_PHYS_ADDR) ||
-+            (srcv->buf[i].flags & FUSE_BUF_IS_FD)) {
-             break;
-         }
-     }
-diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
-index a090040bb2..ed9280de91 100644
---- a/tools/virtiofsd/fuse_common.h
-+++ b/tools/virtiofsd/fuse_common.h
-@@ -611,6 +611,13 @@ enum fuse_buf_flags {
-      * detected.
-      */
-     FUSE_BUF_FD_RETRY = (1 << 3),
-+
-+    /**
-+     * The addresses in the iovec represent guest physical addresses
-+     * that can't be mapped by the daemon process.
-+     * IO must be bounced back to the VMM to do it.
-+     */
-+    FUSE_BUF_PHYS_ADDR = (1 << 4),
- };
- 
- /**
-diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-index 8feb3c0261..8fa438525f 100644
---- a/tools/virtiofsd/fuse_virtio.c
-+++ b/tools/virtiofsd/fuse_virtio.c
-@@ -49,6 +49,10 @@ typedef struct {
-     VuVirtqElement elem;
-     struct fuse_chan ch;
- 
-+    /* Number of unmappable iovecs */
-+    unsigned bad_in_num;
-+    unsigned bad_out_num;
-+
-     /* Used to complete requests that involve no reply */
-     bool reply_sent;
- } FVRequest;
-@@ -291,8 +295,10 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
- 
-     /* The 'in' part of the elem is to qemu */
-     unsigned int in_num = elem->in_num;
-+    unsigned int bad_in_num = req->bad_in_num;
-     struct iovec *in_sg = elem->in_sg;
-     size_t in_len = iov_size(in_sg, in_num);
-+    size_t in_len_writeable = iov_size(in_sg, in_num - bad_in_num);
-     fuse_log(FUSE_LOG_DEBUG, "%s: elem %d: with %d in desc of length %zd\n",
-              __func__, elem->index, in_num, in_len);
- 
-@@ -300,7 +306,7 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
-      * The elem should have room for a 'fuse_out_header' (out from fuse)
-      * plus the data based on the len in the header.
-      */
--    if (in_len < sizeof(struct fuse_out_header)) {
-+    if (in_len_writeable < sizeof(struct fuse_out_header)) {
-         fuse_log(FUSE_LOG_ERR, "%s: elem %d too short for out_header\n",
-                  __func__, elem->index);
-         ret = E2BIG;
-@@ -327,7 +333,7 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
-     memcpy(in_sg_cpy, in_sg, sizeof(struct iovec) * in_num);
-     /* These get updated as we skip */
-     struct iovec *in_sg_ptr = in_sg_cpy;
--    int in_sg_cpy_count = in_num;
-+    int in_sg_cpy_count = in_num - bad_in_num;
- 
-     /* skip over parts of in_sg that contained the header iov */
-     size_t skip_size = iov_len;
-@@ -460,17 +466,21 @@ static void fv_queue_worker(gpointer data, gpointer user_data)
- 
-     /* The 'out' part of the elem is from qemu */
-     unsigned int out_num = elem->out_num;
-+    unsigned int out_num_readable = out_num - req->bad_out_num;
-     struct iovec *out_sg = elem->out_sg;
-     size_t out_len = iov_size(out_sg, out_num);
-+    size_t out_len_readable = iov_size(out_sg, out_num_readable);
-     fuse_log(FUSE_LOG_DEBUG,
--             "%s: elem %d: with %d out desc of length %zd\n",
--             __func__, elem->index, out_num, out_len);
-+             "%s: elem %d: with %d out desc of length %zd"
-+             " bad_in_num=%u bad_out_num=%u\n",
-+             __func__, elem->index, out_num, out_len, req->bad_in_num,
-+             req->bad_out_num);
- 
-     /*
-      * The elem should contain a 'fuse_in_header' (in to fuse)
-      * plus the data based on the len in the header.
-      */
--    if (out_len < sizeof(struct fuse_in_header)) {
-+    if (out_len_readable < sizeof(struct fuse_in_header)) {
-         fuse_log(FUSE_LOG_ERR, "%s: elem %d too short for in_header\n",
-                  __func__, elem->index);
-         assert(0); /* TODO */
-@@ -484,63 +494,129 @@ static void fv_queue_worker(gpointer data, gpointer user_data)
-     copy_from_iov(&fbuf, 1, out_sg);
- 
-     pbufv = NULL; /* Compiler thinks an unitialised path */
--    if (out_num > 2 &&
--        out_sg[0].iov_len == sizeof(struct fuse_in_header) &&
--        ((struct fuse_in_header *)fbuf.mem)->opcode == FUSE_WRITE &&
--        out_sg[1].iov_len == sizeof(struct fuse_write_in)) {
--        /*
--         * For a write we don't actually need to copy the
--         * data, we can just do it straight out of guest memory
--         * but we must still copy the headers in case the guest
--         * was nasty and changed them while we were using them.
--         */
--        fuse_log(FUSE_LOG_DEBUG, "%s: Write special case\n", __func__);
--
--        /* copy the fuse_write_in header afte rthe fuse_in_header */
--        fbuf.mem += out_sg->iov_len;
--        copy_from_iov(&fbuf, 1, out_sg + 1);
--        fbuf.mem -= out_sg->iov_len;
--        fbuf.size = out_sg[0].iov_len + out_sg[1].iov_len;
--
--        /* Allocate the bufv, with space for the rest of the iov */
--        pbufv = malloc(sizeof(struct fuse_bufvec) +
--                       sizeof(struct fuse_buf) * (out_num - 2));
--        if (!pbufv) {
--            fuse_log(FUSE_LOG_ERR, "%s: pbufv malloc failed\n",
--                    __func__);
--            goto out;
--        }
-+    if (req->bad_in_num || req->bad_out_num) {
-+        bool handled_unmappable = false;
-+
-+        if (out_num > 2 && out_num_readable >= 2 && !req->bad_in_num &&
-+            out_sg[0].iov_len == sizeof(struct fuse_in_header) &&
-+            ((struct fuse_in_header *)fbuf.mem)->opcode == FUSE_WRITE &&
-+            out_sg[1].iov_len == sizeof(struct fuse_write_in)) {
-+            handled_unmappable = true;
-+
-+            /* copy the fuse_write_in header after fuse_in_header */
-+            fbuf.mem += out_sg->iov_len;
-+            copy_from_iov(&fbuf, 1, out_sg + 1);
-+            fbuf.mem -= out_sg->iov_len;
-+            fbuf.size = out_sg[0].iov_len + out_sg[1].iov_len;
-+
-+            /* Allocate the bufv, with space for the rest of the iov */
-+            pbufv = malloc(sizeof(struct fuse_bufvec) +
-+                           sizeof(struct fuse_buf) * (out_num - 2));
-+            if (!pbufv) {
-+                fuse_log(FUSE_LOG_ERR, "%s: pbufv malloc failed\n",
-+                        __func__);
-+                goto out;
-+            }
- 
--        allocated_bufv = true;
--        pbufv->count = 1;
--        pbufv->buf[0] = fbuf;
-+            allocated_bufv = true;
-+            pbufv->count = 1;
-+            pbufv->buf[0] = fbuf;
-+
-+            size_t iovindex, pbufvindex;
-+            iovindex = 2; /* 2 headers, separate iovs */
-+            pbufvindex = 1; /* 2 headers, 1 fusebuf */
-+
-+            for (; iovindex < out_num; iovindex++, pbufvindex++) {
-+                pbufv->count++;
-+                pbufv->buf[pbufvindex].pos = ~0; /* Dummy */
-+                pbufv->buf[pbufvindex].flags =
-+                    (iovindex < out_num_readable) ? 0 :
-+                                                    FUSE_BUF_PHYS_ADDR;
-+                pbufv->buf[pbufvindex].mem = out_sg[iovindex].iov_base;
-+                pbufv->buf[pbufvindex].size = out_sg[iovindex].iov_len;
-+            }
-+        }
- 
--        size_t iovindex, pbufvindex;
--        iovindex = 2; /* 2 headers, separate iovs */
--        pbufvindex = 1; /* 2 headers, 1 fusebuf */
-+        if (out_num == 2 && out_num_readable == 2 && req->bad_in_num &&
-+            out_sg[0].iov_len == sizeof(struct fuse_in_header) &&
-+            ((struct fuse_in_header *)fbuf.mem)->opcode == FUSE_READ &&
-+            out_sg[1].iov_len == sizeof(struct fuse_read_in)) {
-+            fuse_log(FUSE_LOG_DEBUG,
-+                     "Unmappable read case "
-+                     "in_num=%d bad_in_num=%d\n",
-+                     elem->in_num, req->bad_in_num);
-+            handled_unmappable = true;
-+        }
- 
--        for (; iovindex < out_num; iovindex++, pbufvindex++) {
--            pbufv->count++;
--            pbufv->buf[pbufvindex].pos = ~0; /* Dummy */
--            pbufv->buf[pbufvindex].flags = 0;
--            pbufv->buf[pbufvindex].mem = out_sg[iovindex].iov_base;
--            pbufv->buf[pbufvindex].size = out_sg[iovindex].iov_len;
-+        if (!handled_unmappable) {
-+            fuse_log(FUSE_LOG_ERR,
-+                     "Unhandled unmappable element: out: %d(b:%d) in: "
-+                     "%d(b:%d)",
-+                     out_num, req->bad_out_num, elem->in_num, req->bad_in_num);
-+            fv_panic(dev, "Unhandled unmappable element");
-         }
--    } else {
--        /* Normal (non fast write) path */
-+    }
-+
-+    if (!req->bad_out_num) {
-+        if (out_num > 2 &&
-+            out_sg[0].iov_len == sizeof(struct fuse_in_header) &&
-+            ((struct fuse_in_header *)fbuf.mem)->opcode == FUSE_WRITE &&
-+            out_sg[1].iov_len == sizeof(struct fuse_write_in)) {
-+            /*
-+             * For a write we don't actually need to copy the
-+             * data, we can just do it straight out of guest memory
-+             * but we must still copy the headers in case the guest
-+             * was nasty and changed them while we were using them.
-+             */
-+            fuse_log(FUSE_LOG_DEBUG, "%s: Write special case\n",
-+                     __func__);
-+
-+            /* copy the fuse_write_in header after fuse_in_header */
-+            fbuf.mem += out_sg->iov_len;
-+            copy_from_iov(&fbuf, 1, out_sg + 1);
-+            fbuf.mem -= out_sg->iov_len;
-+            fbuf.size = out_sg[0].iov_len + out_sg[1].iov_len;
-+
-+            /* Allocate the bufv, with space for the rest of the iov */
-+            pbufv = malloc(sizeof(struct fuse_bufvec) +
-+                           sizeof(struct fuse_buf) * (out_num - 2));
-+            if (!pbufv) {
-+                fuse_log(FUSE_LOG_ERR, "%s: pbufv malloc failed\n",
-+                        __func__);
-+                goto out;
-+            }
- 
--        /* Copy the rest of the buffer */
--        fbuf.mem += out_sg->iov_len;
--        copy_from_iov(&fbuf, out_num - 1, out_sg + 1);
--        fbuf.mem -= out_sg->iov_len;
--        fbuf.size = out_len;
-+            allocated_bufv = true;
-+            pbufv->count = 1;
-+            pbufv->buf[0] = fbuf;
- 
--        /* TODO! Endianness of header */
-+            size_t iovindex, pbufvindex;
-+            iovindex = 2; /* 2 headers, separate iovs */
-+            pbufvindex = 1; /* 2 headers, 1 fusebuf */
- 
--        /* TODO: Add checks for fuse_session_exited */
--        bufv.buf[0] = fbuf;
--        bufv.count = 1;
--        pbufv = &bufv;
-+            for (; iovindex < out_num; iovindex++, pbufvindex++) {
-+                pbufv->count++;
-+                pbufv->buf[pbufvindex].pos = ~0; /* Dummy */
-+                pbufv->buf[pbufvindex].flags = 0;
-+                pbufv->buf[pbufvindex].mem = out_sg[iovindex].iov_base;
-+                pbufv->buf[pbufvindex].size = out_sg[iovindex].iov_len;
-+            }
-+        } else {
-+            /* Normal (non fast write) path */
-+
-+            /* Copy the rest of the buffer */
-+            fbuf.mem += out_sg->iov_len;
-+            copy_from_iov(&fbuf, out_num - 1, out_sg + 1);
-+            fbuf.mem -= out_sg->iov_len;
-+            fbuf.size = out_len;
-+
-+            /* TODO! Endianness of header */
-+
-+            /* TODO: Add checks for fuse_session_exited */
-+            bufv.buf[0] = fbuf;
-+            bufv.count = 1;
-+            pbufv = &bufv;
-+        }
-     }
-     pbufv->idx = 0;
-     pbufv->off = 0;
-@@ -657,13 +733,16 @@ static void *fv_queue_thread(void *opaque)
-                  __func__, qi->qidx, (size_t)evalue, in_bytes, out_bytes);
- 
-         while (1) {
-+            unsigned int bad_in_num = 0, bad_out_num = 0;
-             FVRequest *req = vu_queue_pop(dev, q, sizeof(FVRequest),
--                                          NULL, NULL);
-+                                          &bad_in_num, &bad_out_num);
-             if (!req) {
-                 break;
-             }
- 
-             req->reply_sent = false;
-+            req->bad_in_num = bad_in_num;
-+            req->bad_out_num = bad_out_num;
- 
-             if (!se->thread_pool_size) {
-                 req_list = g_list_prepend(req_list, req);
--- 
-2.29.2
+"nodev,nosuid" is kind of a no-brainer for any host-side *data* volume
+anyway (such as the one underlying "/home", even), so I don't see those
+options as a challenge. But "noexec" is different.
+
+Thanks,
+Laszlo
+
+> 
+> As a bonus this also increases the likelihood that other host processes
+> besides virtiofsd will be protected by nosuid/noexec/nodev so that a
+> malicious guest cannot drop these files in place and then arrange for a
+> host process to come across them.
+> 
+> Additionally, user namespaces have been discussed. They seem like a
+> worthwhile addition as an unprivileged or privilege-separated mode
+> although there are limitations with respect to security xattrs and the
+> actual uid/gid stored on the host file system not corresponding to the
+> guest uid/gid.
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 84 +++++++++++++++++++++-----------
+>  1 file changed, 56 insertions(+), 28 deletions(-)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 5fb36d9407..e08352d649 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -555,6 +555,29 @@ static int lo_fd(fuse_req_t req, fuse_ino_t ino)
+>      return fd;
+>  }
+>  
+> +/*
+> + * Open a file descriptor for an inode. Returns -EBADF if the inode is not a
+> + * regular file or a directory. Use this helper function instead of raw
+> + * openat(2) to prevent security issues when a malicious client opens special
+> + * files such as block device nodes.
+> + */
+> +static int lo_inode_open(struct lo_data *lo, struct lo_inode *inode,
+> +                         int open_flags)
+> +{
+> +    g_autofree char *fd_str = g_strdup_printf("%d", inode->fd);
+> +    int fd;
+> +
+> +    if (!S_ISREG(inode->filetype) && !S_ISDIR(inode->filetype)) {
+> +        return -EBADF;
+> +    }
+> +
+> +    fd = openat(lo->proc_self_fd, fd_str, open_flags);
+> +    if (fd < 0) {
+> +        return -errno;
+> +    }
+> +    return fd;
+> +}
+> +
+>  static void lo_init(void *userdata, struct fuse_conn_info *conn)
+>  {
+>      struct lo_data *lo = (struct lo_data *)userdata;
+> @@ -684,8 +707,7 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
+>          if (fi) {
+>              truncfd = fd;
+>          } else {
+> -            sprintf(procname, "%i", ifd);
+> -            truncfd = openat(lo->proc_self_fd, procname, O_RDWR);
+> +            truncfd = lo_inode_open(lo, inode, O_RDWR);
+>              if (truncfd < 0) {
+>                  goto out_err;
+>              }
+> @@ -1725,7 +1747,6 @@ static struct lo_inode_plock *lookup_create_plock_ctx(struct lo_data *lo,
+>                                                        pid_t pid, int *err)
+>  {
+>      struct lo_inode_plock *plock;
+> -    char procname[64];
+>      int fd;
+>  
+>      plock =
+> @@ -1742,12 +1763,10 @@ static struct lo_inode_plock *lookup_create_plock_ctx(struct lo_data *lo,
+>      }
+>  
+>      /* Open another instance of file which can be used for ofd locks. */
+> -    sprintf(procname, "%i", inode->fd);
+> -
+>      /* TODO: What if file is not writable? */
+> -    fd = openat(lo->proc_self_fd, procname, O_RDWR);
+> -    if (fd == -1) {
+> -        *err = errno;
+> +    fd = lo_inode_open(lo, inode, O_RDWR);
+> +    if (fd < 0) {
+> +        *err = -fd;
+>          free(plock);
+>          return NULL;
+>      }
+> @@ -1894,18 +1913,24 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+>  {
+>      int fd;
+>      ssize_t fh;
+> -    char buf[64];
+>      struct lo_data *lo = lo_data(req);
+> +    struct lo_inode *inode = lo_inode(req, ino);
+>  
+>      fuse_log(FUSE_LOG_DEBUG, "lo_open(ino=%" PRIu64 ", flags=%d)\n", ino,
+>               fi->flags);
+>  
+> +    if (!inode) {
+> +        fuse_reply_err(req, EBADF);
+> +        return;
+> +    }
+> +
+>      update_open_flags(lo->writeback, lo->allow_direct_io, fi);
+>  
+> -    sprintf(buf, "%i", lo_fd(req, ino));
+> -    fd = openat(lo->proc_self_fd, buf, fi->flags & ~O_NOFOLLOW);
+> -    if (fd == -1) {
+> -        return (void)fuse_reply_err(req, errno);
+> +    fd = lo_inode_open(lo, inode, fi->flags & ~O_NOFOLLOW);
+> +    if (fd < 0) {
+> +        lo_inode_put(lo, &inode);
+> +        fuse_reply_err(req, -fd);
+> +        return;
+>      }
+>  
+>      pthread_mutex_lock(&lo->mutex);
+> @@ -1913,6 +1938,7 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+>      pthread_mutex_unlock(&lo->mutex);
+>      if (fh == -1) {
+>          close(fd);
+> +        lo_inode_put(lo, &inode);
+>          fuse_reply_err(req, ENOMEM);
+>          return;
+>      }
+> @@ -1923,6 +1949,7 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+>      } else if (lo->cache == CACHE_ALWAYS) {
+>          fi->keep_cache = 1;
+>      }
+> +    lo_inode_put(lo, &inode);
+>      fuse_reply_open(req, fi);
+>  }
+>  
+> @@ -1982,39 +2009,40 @@ static void lo_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+>  static void lo_fsync(fuse_req_t req, fuse_ino_t ino, int datasync,
+>                       struct fuse_file_info *fi)
+>  {
+> +    struct lo_inode *inode = lo_inode(req, ino);
+> +    struct lo_data *lo = lo_data(req);
+>      int res;
+>      int fd;
+> -    char *buf;
+>  
+>      fuse_log(FUSE_LOG_DEBUG, "lo_fsync(ino=%" PRIu64 ", fi=0x%p)\n", ino,
+>               (void *)fi);
+>  
+> +    if (!inode) {
+> +        fuse_reply_err(req, EBADF);
+> +        return;
+> +    }
+> +
+>      if (!fi) {
+> -        struct lo_data *lo = lo_data(req);
+> -
+> -        res = asprintf(&buf, "%i", lo_fd(req, ino));
+> -        if (res == -1) {
+> -            return (void)fuse_reply_err(req, errno);
+> -        }
+> -
+> -        fd = openat(lo->proc_self_fd, buf, O_RDWR);
+> -        free(buf);
+> -        if (fd == -1) {
+> -            return (void)fuse_reply_err(req, errno);
+> +        fd = lo_inode_open(lo, inode, O_RDWR);
+> +        if (fd < 0) {
+> +            res = -fd;
+> +            goto out;
+>          }
+>      } else {
+>          fd = lo_fi_fd(req, fi);
+>      }
+>  
+>      if (datasync) {
+> -        res = fdatasync(fd);
+> +        res = fdatasync(fd) == -1 ? errno : 0;
+>      } else {
+> -        res = fsync(fd);
+> +        res = fsync(fd) == -1 ? errno : 0;
+>      }
+>      if (!fi) {
+>          close(fd);
+>      }
+> -    fuse_reply_err(req, res == -1 ? errno : 0);
+> +out:
+> +    lo_inode_put(lo, &inode);
+> +    fuse_reply_err(req, res);
+>  }
+>  
+>  static void lo_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t offset,
+> 
 

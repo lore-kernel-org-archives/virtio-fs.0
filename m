@@ -1,6 +1,6 @@
-Date: Thu, 21 Jan 2021 19:00:03 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20210121190003.GP3072@work-vm>
+Date: Fri, 22 Jan 2021 10:40:54 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210122154054.GA120574@redhat.com>
 References: <20210121144429.58885-1-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
@@ -17,9 +17,9 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: qemu-devel@nongnu.org, P J P <ppandit@redhat.com>, virtio-fs@redhat.com, Alex Xu <alex@alxu.ca>, vgoyal@redhat.com
+Cc: qemu-devel@nongnu.org, P J P <ppandit@redhat.com>, virtio-fs@redhat.com, Alex Xu <alex@alxu.ca>
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+On Thu, Jan 21, 2021 at 02:44:29PM +0000, Stefan Hajnoczi wrote:
 > A well-behaved FUSE client does not attempt to open special files with
 > FUSE_OPEN because they are handled on the client side (e.g. device nodes
 > are handled by client-side device drivers).
@@ -39,10 +39,20 @@ Cc: qemu-devel@nongnu.org, P J P <ppandit@redhat.com>, virtio-fs@redhat.com, Ale
 > Fixes: CVE-2020-35517
 > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 
-(With a response to Dan's question about Symlinks)
+It looks good to me. I see there is another openat() instance in
+lo_opendir(). May be we can convert it to use lo_inode_open() as well?
 
+Initially I thought that remove posix locks will be broken on special
+files like named pipes (fifo). But looks like in that case posix lock
+request does not come to virtiofsd at all (despite the fact remote
+posix locks are enabled). So it probably is fine to modify openat()
+there.
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Ran blogbench and pjdfstests and they run fine for me, So..
+
+Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
+
+Vivek
 
 > ---
 > This issue was diagnosed on public IRC and is therefore already known
@@ -247,6 +257,4 @@ Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 > -- 
 > 2.29.2
 > 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

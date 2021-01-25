@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Mon, 25 Jan 2021 13:01:12 -0500
-Message-Id: <20210125180115.22936-4-vgoyal@redhat.com>
+Date: Mon, 25 Jan 2021 13:01:10 -0500
+Message-Id: <20210125180115.22936-2-vgoyal@redhat.com>
 In-Reply-To: <20210125180115.22936-1-vgoyal@redhat.com>
 References: <20210125180115.22936-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 3/6] vhost-user: Return error code from
-	slave_read()
+Subject: [Virtio-fs] [PATCH 1/6] virtiofsd: Drop ->vu_dispatch_rwlock while
+	waiting for thread to exit
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,121 +18,91 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: marcandre.lureau@redhat.com, vgoyal@redhat.com, mst@redhat.com
 
-Right now slave_read() is called through main event loop and does not
-return error. In next few patches I want to call slave_read() from
-vhost device shutdown path as well and want to know if an error
-happened so that caller can give up and return error accordingly.
+When we are shutting down virtqueues, virtio_loop() receives a message
+VHOST_USER_GET_VRING_BASE from master. We acquire ->vu_dispatch_rwlock
+and get into the process of shutting down virtqueue. In one of the
+final steps, we are waiting for fv_queue_thread() to exit/finish and
+wait with ->vu_dispatch_rwlock held.
 
-Hence, create helper function do_slave_read(), which returns an
-integer. Success is 0 and negative number is error code. slave_read()
-calls do_slave_read() and ignores error code.
+But it is possible that fv_queue_thread() itself is waiting to get
+->vu_dispatch_rwlock (With --thread-pool=0 option). If requests
+are being processed by fv_queue_worker(), then fv_queue_worker()
+can wait for the ->vu_dispatch_rwlock, and fv_queue_thread() will
+wait for fv_queue_worker() before thread pool can be stopped.
+
+IOW, if guest is shutdown uncleanly (some sort of emergency reboot),
+it is possible that virtiofsd is processing a fs request and
+qemu initiates device shutdown sequence. In that case there seem
+to be two options. Either abort the existing request completely or
+let existing request finish.
+
+This patch is taking second approach. That is drop the ->vu_dispatch_rwlock
+temporarily so that fv_queue_thread() can finish and deadlock does not
+happen.
+
+->vu_dispatch_rwlock provides mutual exclusion between virtio_loop()
+(handling vhost-user protocol messages) and fv_queue_thread() (handling
+fuse filesystem requests). Rational seems to be that protocol message
+might change queue memory mappings, so we don't want both to proceed
+at the same time.
+
+In this case queue is shutting down, so I hope it is fine for fv_queue_thread() to send response back while virtio_loop() is still waiting (and not handling
+any further vho-user protocol messages).
+
+IOW, assumption here is that while virto_loop is blocked processing
+VHOST_USER_GET_VRING_BASE message, it is still ok to send back the
+response on vq by fv_queue_thread().
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- hw/virtio/vhost-user.c | 43 ++++++++++++++++++++++++++++++++++++------
- 1 file changed, 37 insertions(+), 6 deletions(-)
+ tools/virtiofsd/fuse_virtio.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
-index d95dbc39e3..867cac034f 100644
---- a/hw/virtio/vhost-user.c
-+++ b/hw/virtio/vhost-user.c
-@@ -1401,7 +1401,7 @@ static uint64_t vhost_user_slave_handle_vring_host_notifier(
-     return false;
- }
- 
--static void slave_read(void *opaque)
-+static int do_slave_read(void *opaque)
- {
-     struct vhost_dev *dev = opaque;
-     struct vhost_user *u = dev->opaque;
-@@ -1432,13 +1432,22 @@ static void slave_read(void *opaque)
-         size = recvmsg(u->slave_fd, &msgh, 0);
-     } while (size < 0 && (errno == EINTR || errno == EAGAIN));
- 
--    if (size != VHOST_USER_HDR_SIZE) {
-+    if (size < 0) {
-+        ret = -errno;
-         error_report("Failed to read from slave.");
-         goto err;
+diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+index 9577eaa68d..6805d8ba01 100644
+--- a/tools/virtiofsd/fuse_virtio.c
++++ b/tools/virtiofsd/fuse_virtio.c
+@@ -813,11 +813,20 @@ static void fv_queue_cleanup_thread(struct fv_VuDev *vud, int qidx)
+         fuse_log(FUSE_LOG_ERR, "Eventfd_write for queue %d: %s\n",
+                  qidx, strerror(errno));
      }
- 
-+    if (size != VHOST_USER_HDR_SIZE) {
-+        error_report("Failed to read %lu bytes from slave.",
-+                     VHOST_USER_HDR_SIZE);
-+        ret = -EBADMSG;
-+        goto err;
-+    }
 +
-     if (msgh.msg_flags & MSG_CTRUNC) {
-         error_report("Truncated message.");
-+        ret = -EBADMSG;
-         goto err;
++    /*
++     * Drop ->vu_dispath_rwlock and reacquire. We are about to wait for
++     * for fv_queue_thread() and that might require ->vu_dispatch_rwlock
++     * to finish.
++     */
++    pthread_rwlock_unlock(&vud->vu_dispatch_rwlock);
+     ret = pthread_join(ourqi->thread, NULL);
+     if (ret) {
+         fuse_log(FUSE_LOG_ERR, "%s: Failed to join thread idx %d err %d\n",
+                  __func__, qidx, ret);
      }
- 
-@@ -1456,6 +1465,7 @@ static void slave_read(void *opaque)
-         error_report("Failed to read msg header."
-                 " Size %d exceeds the maximum %zu.", hdr.size,
-                 VHOST_USER_PAYLOAD_SIZE);
-+        ret = -EBADMSG;
-         goto err;
-     }
- 
-@@ -1464,8 +1474,15 @@ static void slave_read(void *opaque)
-         size = read(u->slave_fd, &payload, hdr.size);
-     } while (size < 0 && (errno == EINTR || errno == EAGAIN));
- 
--    if (size != hdr.size) {
-+    if (size == -1) {
-         error_report("Failed to read payload from slave.");
-+        ret = errno;
-+        goto err;
-+    }
++    pthread_rwlock_wrlock(&vud->vu_dispatch_rwlock);
 +
-+    if (size != hdr.size) {
-+        error_report("Failed to read %d payload bytes from slave.", hdr.size);
-+        ret = -EBADMSG;
-         goto err;
-     }
- 
-@@ -1529,13 +1546,22 @@ static void slave_read(void *opaque)
-             size = writev(u->slave_fd, iovec, ARRAY_SIZE(iovec));
-         } while (size < 0 && (errno == EINTR || errno == EAGAIN));
- 
--        if (size != VHOST_USER_HDR_SIZE + hdr.size) {
-+        if (size == -1) {
-             error_report("Failed to send msg reply to slave.");
-+            ret = -errno;
-+            goto err;
-+        }
+     pthread_mutex_destroy(&ourqi->vq_lock);
+     close(ourqi->kill_fd);
+     ourqi->kick_fd = -1;
+@@ -952,7 +961,11 @@ int virtio_loop(struct fuse_session *se)
+     /*
+      * Make sure all fv_queue_thread()s quit on exit, as we're about to
+      * free virtio dev and fuse session, no one should access them anymore.
++     * Hold ->vu_dispatch_rwlock in write mode as fv_queue_cleanup_thread()
++     * assumes mutex is locked and unlocks/re-locks it.
+      */
 +
-+        if (size != VHOST_USER_HDR_SIZE + hdr.size) {
-+            error_report("Failed to send msg reply to slave. Wrote %d bytes"
-+                         " expected %lu bytes.", size,
-+                         VHOST_USER_HDR_SIZE + hdr.size);
-+            ret = -EIO;
-             goto err;
-         }
++    pthread_rwlock_wrlock(&se->virtio_dev->vu_dispatch_rwlock);
+     for (int i = 0; i < se->virtio_dev->nqueues; i++) {
+         if (!se->virtio_dev->qi[i]) {
+             continue;
+@@ -961,6 +974,7 @@ int virtio_loop(struct fuse_session *se)
+         fuse_log(FUSE_LOG_INFO, "%s: Stopping queue %d thread\n", __func__, i);
+         fv_queue_cleanup_thread(se->virtio_dev, i);
      }
++    pthread_rwlock_unlock(&se->virtio_dev->vu_dispatch_rwlock);
  
--    return;
-+    return 0;
+     fuse_log(FUSE_LOG_INFO, "%s: Exit\n", __func__);
  
- err:
-     qemu_set_fd_handler(u->slave_fd, NULL, NULL, NULL);
-@@ -1546,7 +1572,12 @@ err:
-             close(fd[i]);
-         }
-     }
--    return;
-+    return ret;
-+}
-+
-+static void slave_read(void *opaque)
-+{
-+    do_slave_read(opaque);
- }
- 
- static int vhost_setup_slave_channel(struct vhost_dev *dev)
 -- 
 2.25.4
 

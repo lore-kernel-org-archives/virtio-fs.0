@@ -1,23 +1,15 @@
-References: <20210104184527.GC63879@redhat.com> <20210104185655.GN2972@work-vm>
-	<CAOQ4uxiw2rXnzFUdixo7qPTiKihsSoxZAbGappGdMcjssgSVSA@mail.gmail.com>
-	<CAJfpegtHh_m9DpMqC+hBvvV1ioRcydj2cHqMzo41rLcXc148Zw@mail.gmail.com>
-	<CAOQ4uxgfW2BZ04hSahymzyerz==YVNLyRmxkUysZPYmnt6n7QA@mail.gmail.com>
-	<CAJfpegsSKfaFbpovOZpJQOP_xrpQpJa2mBK=xefV5k1XsCbfbQ@mail.gmail.com>
-	<20210106165759.GA9679@redhat.com>
-	<CAJfpegtO+X9rk5pTTRmDv9LWGK4fbvUuwNJvRP_o77B5Y5D3mA@mail.gmail.com>
-	<CAOQ4uxjTerAAxvjpDmDMQO363ju01MsEhbgBmHHSQb92hoL1_g@mail.gmail.com>
-	<20210108041252.GT80581@e18g06458.et15sqa>
-	<20210108152646.GC46319@redhat.com>
-From: Peng Tao <tao.peng@linux.alibaba.com>
-Message-ID: <ffacf891-9179-d71e-dce5-e10bf2733f5e@linux.alibaba.com>
-Date: Fri, 15 Jan 2021 18:20:15 +0800
+Date: Mon, 25 Jan 2021 14:53:30 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20210125145330.GA226981@stefanha-x1.localdomain>
+References: <20210121144429.58885-1-stefanha@redhat.com>
+	<20210121144803.GN3125227@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20210108152646.GC46319@redhat.com>
-Content-Type: text/plain; charset=utf-8; format=flowed
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [fuse-devel] 'FORGET' ordering semantics (vs unlink
- & NFS)
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="YZ5djTAD1cGYuMQK"
+Content-Disposition: inline
+In-Reply-To: <20210121144803.GN3125227@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: prevent opening of special files
+ (CVE-2020-35517)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -26,44 +18,121 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>, Eryu Guan <eguan@linux.alibaba.com>
-Cc: Miklos Szeredi <miklos@szeredi.hu>, fuse-devel <fuse-devel@lists.sourceforge.net>, Amir Goldstein <amir73il@gmail.com>, Max Reitz <mreitz@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, gerry@linux.alibaba.com, bergwolf@hyper.sh
+To: Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>
+Cc: qemu-devel@nongnu.org, P J P <ppandit@redhat.com>, virtio-fs@redhat.com, Alex Xu <alex@alxu.ca>, vgoyal@redhat.com
 
 
+--YZ5djTAD1cGYuMQK
+Content-Type: text/plain; charset=iso-8859-1
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-On 2021/1/8 23:26, Vivek Goyal wrote:
-> On Fri, Jan 08, 2021 at 12:12:52PM +0800, Eryu Guan wrote:
-> 
-> [..]
->>> Anyone has other thoughts about how to reduce fragmentation in
->>> implementations?
->>
->> There's an fuse-backend-rs[1] project hosted on cloud-hypervisor, it is
->> a library to communicate with the Linux FUSE clients, which includes:
->>
->> - ABI layer, which defines all data structures shared between linux Fuse
->>    framework and Fuse daemons.
->> - API layer, defines the interfaces for Fuse daemons to implement a
->>    userspace file system.
->> - Transport layer, which supports both the Linux Fuse device and
->>    virtio-fs protocol.
->> - VFS/pseudo_fs, an abstraction layer to support multiple file systems
->>    by a single virtio-fs device.
->> - A sample passthrough file system implementation, which passes through
->>    files from daemons to clients.
->>
-> 
-> So at a high level, is this equivalent of libfuse written in rust?
-Yes, they are similar in concept. Though fuse-backend-rs only provides 
-interfaces like the libfuse lowlevel APIs for filesystem 
-implementations. The fuse session handling part is still outside [1] but 
-we are planning to move it into fuse-backend-rs as well.
+On Thu, Jan 21, 2021 at 02:48:03PM +0000, Daniel P. Berrang=E9 wrote:
+> On Thu, Jan 21, 2021 at 02:44:29PM +0000, Stefan Hajnoczi wrote:
+> > A well-behaved FUSE client does not attempt to open special files with
+> > FUSE_OPEN because they are handled on the client side (e.g. device nodes
+> > are handled by client-side device drivers).
+> >=20
+> > The check to prevent virtiofsd from opening special files is missing in
+> > a few cases, most notably FUSE_OPEN. A malicious client can cause
+> > virtiofsd to open a device node, potentially allowing the guest to
+> > escape. This can be exploited by a modified guest device driver. It is
+> > not exploitable from guest userspace since the guest kernel will handle
+> > special files inside the guest instead of sending FUSE requests.
+> >=20
+> > This patch adds the missing checks to virtiofsd. This is a short-term
+> > solution because it does not prevent a compromised virtiofsd process
+> > from opening device nodes on the host.
+> >=20
+> > Reported-by: Alex Xu <alex@alxu.ca>
+> > Fixes: CVE-2020-35517
+> > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> > ---
+> > This issue was diagnosed on public IRC and is therefore already known
+> > and not embargoed.
+> >=20
+> > A stronger fix, and the long-term solution, is for users to mount the
+> > shared directory and any sub-mounts with nodev, as well as nosuid and
+> > noexec. Unfortunately virtiofsd cannot do this automatically because
+> > bind mounts added by the user after virtiofsd has launched would not be
+> > detected. I suggest the following:
+> >=20
+> > 1. Modify libvirt and Kata Containers to explicitly set these mount
+> >    options.
+> > 2. Then modify virtiofsd to check that the shared directory has the
+> >    necessary options at startup. Refuse to start if the options are
+> >    missing so that the user is aware of the security requirements.
+> >=20
+> > As a bonus this also increases the likelihood that other host processes
+> > besides virtiofsd will be protected by nosuid/noexec/nodev so that a
+> > malicious guest cannot drop these files in place and then arrange for a
+> > host process to come across them.
+> >=20
+> > Additionally, user namespaces have been discussed. They seem like a
+> > worthwhile addition as an unprivileged or privilege-separated mode
+> > although there are limitations with respect to security xattrs and the
+> > actual uid/gid stored on the host file system not corresponding to the
+> > guest uid/gid.
+> > ---
+> >  tools/virtiofsd/passthrough_ll.c | 84 +++++++++++++++++++++-----------
+> >  1 file changed, 56 insertions(+), 28 deletions(-)
+> >=20
+> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthr=
+ough_ll.c
+> > index 5fb36d9407..e08352d649 100644
+> > --- a/tools/virtiofsd/passthrough_ll.c
+> > +++ b/tools/virtiofsd/passthrough_ll.c
+> > @@ -555,6 +555,29 @@ static int lo_fd(fuse_req_t req, fuse_ino_t ino)
+> >      return fd;
+> >  }
+> > =20
+> > +/*
+> > + * Open a file descriptor for an inode. Returns -EBADF if the inode is=
+ not a
+> > + * regular file or a directory. Use this helper function instead of raw
+> > + * openat(2) to prevent security issues when a malicious client opens =
+special
+> > + * files such as block device nodes.
+> > + */
+> > +static int lo_inode_open(struct lo_data *lo, struct lo_inode *inode,
+> > +                         int open_flags)
+> > +{
+> > +    g_autofree char *fd_str =3D g_strdup_printf("%d", inode->fd);
+> > +    int fd;
+> > +
+> > +    if (!S_ISREG(inode->filetype) && !S_ISDIR(inode->filetype)) {
+> > +        return -EBADF;
+> > +    }
+> > +
+> > +    fd =3D openat(lo->proc_self_fd, fd_str, open_flags);
+>=20
+> Whats the intended behaviour with symlinks ?  Do we need to
+> allow S_ISLNK, or are we assuming the symlink has already
+> been expanded to the target file by this point ? If the latter
+> adding a comment about this would be useful.
 
-Cheers,
-Tao
+I will add a comment. The FUSE client is expected to resolve symlinks
+on the client side.
 
-[1] 
-https://github.com/dragonflyoss/image-service/blob/master/utils/src/fuse.rs
--- 
-Into something rich and strange.
+In other words, the client does not open the symlink inode in order to
+access the target of the symlink. It must open the target directly.
+
+Stefan
+
+--YZ5djTAD1cGYuMQK
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAO22oACgkQnKSrs4Gr
+c8hIWwf9GmpnwRx10Flg4TZV96v3TJmJa7pZ8cSfEiUqP/9hPUpiaPz06yeXb8Qk
+2EcGTb+9afyxzxhhg88N1/xQPSI15qBYsSi/lCA65hVO/AG9W0SuGiTx2B03ADKu
+4kpHrzEzkm58S04ui2sm/wojdowvmBgv4TlUP49XpnA4r7P44Kt8STqEQwRiHSAr
+6V4qFwZcyB64MWYpvqe3oLjD2WTZ9DO8gSgJVBrVAVMvasZn+aYxmxp03+a57gqR
+Qi0PMqhWveWtfvMqwR3DKEx3oC3aawji/s2jd5w0mopPBzKNtpnkXN/7FBNd+dju
+UsnVM/gtOxHLHzVUD7T9etTr/p78Zw==
+=r5EZ
+-----END PGP SIGNATURE-----
+
+--YZ5djTAD1cGYuMQK--
 

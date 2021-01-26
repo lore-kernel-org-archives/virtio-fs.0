@@ -1,13 +1,15 @@
-Date: Sun, 17 Jan 2021 06:46:20 -0500
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20210117114519.539647-3-mst@redhat.com>
-References: <20210117114519.539647-1-mst@redhat.com>
+Date: Tue, 26 Jan 2021 11:19:47 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20210126111947.GD250425@stefanha-x1.localdomain>
+References: <CAAQbG+U9m91sxsm9swLB7gYNh3NT47Z0kb9LbgEZXUMV65StLQ@mail.gmail.com>
+	<CAOssrKd6JkEKt98F7XhHeUhcCYP+gwnrHLE8VKTg0K-ABUxDEA@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <20210117114519.539647-1-mst@redhat.com>
-Content-Type: text/plain; charset="utf-8"
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="Xm/fll+QQv+hsKip"
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 02/10] vhost-user-fs: add the "bootindex" property
+In-Reply-To: <CAOssrKd6JkEKt98F7XhHeUhcCYP+gwnrHLE8VKTg0K-ABUxDEA@mail.gmail.com>
+Subject: Re: [Virtio-fs] Lack of inotify for virtio-fs backed
+ files/directories
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,106 +18,73 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: Peter Maydell <peter.maydell@linaro.org>, virtio-fs@redhat.com, Laszlo Ersek <lersek@redhat.com>
+To: Miklos Szeredi <mszeredi@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-From: Laszlo Ersek <lersek@redhat.com>
 
-virtio-fs qualifies as a bootable device minimally under OVMF, but
-currently the necessary "bootindex" property is missing. Add the property.
+--Xm/fll+QQv+hsKip
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Expose the property only in the PCI device, for now. There is no boot
-support for virtiofs on s390x (ccw) for the time being [1] [2], so leave
-the CCW device unchanged. Add the property to the base device still,
-because adding the alias to the CCW device later will be easier this way
-[3].
+On Mon, Jan 25, 2021 at 08:22:32PM +0100, Miklos Szeredi wrote:
+> On Fri, Jan 22, 2021 at 5:58 PM Eric Ernst <eric.g.ernst@gmail.com> wrote:
+> >
+> > Hey ya'll,
+> >
+> > As highlighted nicely at [1], a common pattern in Kubernetes is to watc=
+h for changes to files/directories passed in as Configmaps or secrets. Side=
+cars typically use inotify to watch for changes and then signal the primary=
+ container or perform other changes based on the reconfiguration.
+> >
+> > In the context of Kata, these files/dirs are passed in utilizing virtio=
+-fs. Since FUSE itself doesn't support inotify, this pattern will fail. I'm=
+ looking at ways to work-around this gap, including:
+> >
+> > 1) documenting this as a compatibility limitation ("don't do this!").
+> > 2) suggesting end-users modify their sidecars and utilize poll
+> > 3) doing an inotify on the host, and when changes are identified, notif=
+y the guest agent who can then modify the files on disk to trigger an inoti=
+fy
+> > 4) Working on contributing to libfuse in order to add inotify support.
+> >
+> > (4) is the right thing, but will take quite a bit of time before it can=
+ be used. I'm curious if other folks have suggestions for workarounds (I do=
+n't like any of the ones I suggested), and if anyone has taken a look at (4=
+)?
+>=20
+> Here's a thread on enabling inotify in remote fs:
+>=20
+> https://lore.kernel.org/linux-fsdevel/20190507085707.GD30899@veci.piliscs=
+aba.redhat.com/
+>=20
+> The discussion didn't get too far, it seems there's not a very big
+> interest in this, but conceptually it doesn't seem too difficult.
 
-[1] https://lists.gnu.org/archive/html/qemu-devel/2021-01/msg01745.html
-[2] https://lists.gnu.org/archive/html/qemu-devel/2021-01/msg01870.html
-[3] https://lists.gnu.org/archive/html/qemu-devel/2021-01/msg01751.html
+Vivek Goyal previously experimented with adding a notification virtqueue
+to the virtio-fs device so that FUSE_NOTIFY_* messages can be supported.
+That code can be brought back and merged.
 
-Example OpenFirmware device path for the "vhost-user-fs-pci" device in the
-"bootorder" fw_cfg file:
+However, due to the number of flags in inotify(7) I think this is a
+non-trivial project. Whoever wants to tackle this feature should be
+aware that it may take a few months (3?) to fully implement and test.
 
-  /pci@i0cf8/pci-bridge@1,6/pci1af4,105a@0/filesystem@0
+Stefan
 
-Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: "Michael S. Tsirkin" <mst@redhat.com>
-Cc: Ján Tomko <jtomko@redhat.com>
-Cc: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com
-Signed-off-by: Laszlo Ersek <lersek@redhat.com>
-Acked-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Message-Id: <20210112131603.12686-1-lersek@redhat.com>
-Acked-by: Stefan Hajnoczi <stefanha@redhat.com>
-Reviewed-by: Michael S. Tsirkin <mst@redhat.com>
-Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
----
- include/hw/virtio/vhost-user-fs.h |  1 +
- hw/virtio/vhost-user-fs-pci.c     |  2 ++
- hw/virtio/vhost-user-fs.c         | 10 ++++++++++
- 3 files changed, 13 insertions(+)
+--Xm/fll+QQv+hsKip
+Content-Type: application/pgp-signature; name="signature.asc"
 
-diff --git a/include/hw/virtio/vhost-user-fs.h b/include/hw/virtio/vhost-user-fs.h
-index 6985752771..0d62834c25 100644
---- a/include/hw/virtio/vhost-user-fs.h
-+++ b/include/hw/virtio/vhost-user-fs.h
-@@ -39,6 +39,7 @@ struct VHostUserFS {
-     VhostUserState vhost_user;
-     VirtQueue **req_vqs;
-     VirtQueue *hiprio_vq;
-+    int32_t bootindex;
- 
-     /*< public >*/
- };
-diff --git a/hw/virtio/vhost-user-fs-pci.c b/hw/virtio/vhost-user-fs-pci.c
-index 8bb389bd28..2ed8492b3f 100644
---- a/hw/virtio/vhost-user-fs-pci.c
-+++ b/hw/virtio/vhost-user-fs-pci.c
-@@ -68,6 +68,8 @@ static void vhost_user_fs_pci_instance_init(Object *obj)
- 
-     virtio_instance_init_common(obj, &dev->vdev, sizeof(dev->vdev),
-                                 TYPE_VHOST_USER_FS);
-+    object_property_add_alias(obj, "bootindex", OBJECT(&dev->vdev),
-+                              "bootindex");
- }
- 
- static const VirtioPCIDeviceTypeInfo vhost_user_fs_pci_info = {
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index ed036ad9c1..ac4fc34b36 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -22,6 +22,7 @@
- #include "qemu/error-report.h"
- #include "hw/virtio/vhost-user-fs.h"
- #include "monitor/monitor.h"
-+#include "sysemu/sysemu.h"
- 
- static void vuf_get_config(VirtIODevice *vdev, uint8_t *config)
- {
-@@ -279,6 +280,14 @@ static Property vuf_properties[] = {
-     DEFINE_PROP_END_OF_LIST(),
- };
- 
-+static void vuf_instance_init(Object *obj)
-+{
-+    VHostUserFS *fs = VHOST_USER_FS(obj);
-+
-+    device_add_bootindex_property(obj, &fs->bootindex, "bootindex",
-+                                  "/filesystem@0", DEVICE(obj));
-+}
-+
- static void vuf_class_init(ObjectClass *klass, void *data)
- {
-     DeviceClass *dc = DEVICE_CLASS(klass);
-@@ -300,6 +309,7 @@ static const TypeInfo vuf_info = {
-     .name = TYPE_VHOST_USER_FS,
-     .parent = TYPE_VIRTIO_DEVICE,
-     .instance_size = sizeof(VHostUserFS),
-+    .instance_init = vuf_instance_init,
-     .class_init = vuf_class_init,
- };
- 
--- 
-MST
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAP+tMACgkQnKSrs4Gr
+c8iBVgf/WWBFy8/lEMNWjvyDbAAZtEqafynSCEpXeW9Yi6ZALtEiocfcyicsk4Op
+2nbD/51ZKo+WfcM+VubWh9+G+BC64lTCxUhWChjX4yAwIhY0ZJ2TRzL0A2hWYkmA
+eIKgIfBUBtj8whdUwa6UuqQQ8W+ZU2XWspl32+FndwSLe7mGi0Ypu+oW2QbU0rx2
+9dPiUGT2oMoPbbDJKxfcf0AEX7RnpQc3nqj7xfWOJw7CXAWd7NyY72i3vbpAAFGt
+CTOdjzJ5DBePvNKn9Q7dmO18TnDUS6CBoJSehVXRGaGT8mOqNLibp8pm0isOYf5g
+orN/NfC0ayyNlp69X2qnyHhrKl7B6A==
+=slgL
+-----END PGP SIGNATURE-----
+
+--Xm/fll+QQv+hsKip--
 

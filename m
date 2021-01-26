@@ -1,15 +1,30 @@
-Date: Tue, 26 Jan 2021 11:19:47 +0000
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20210126111947.GD250425@stefanha-x1.localdomain>
-References: <CAAQbG+U9m91sxsm9swLB7gYNh3NT47Z0kb9LbgEZXUMV65StLQ@mail.gmail.com>
-	<CAOssrKd6JkEKt98F7XhHeUhcCYP+gwnrHLE8VKTg0K-ABUxDEA@mail.gmail.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
+	h=subject : to : cc :
+	references : from : message-id : date : in-reply-to : content-type :
+	content-transfer-encoding : mime-version; s=corp-2020-01-29;
+	bh=CZksD+woiUFxuasOpc898fZGqaG2cWGYr37E3Ru6xBw=;
+	b=CbbSsXx7aG5z1Cpbt5CU9JOiCgKZoYFig3r9O1JctOjMzSQ+c/Yb98G5WbsoxACC4EAJ
+	umHgzVMjZ3vg9mMHXwyEg5uzfrZi9XSB5cD3h52psjJ7tKjSG/XxvVpZm6oJJE8dILY/
+	OLrS1ekQJ8kikMoNKhx3MHY0RRpsnDKQg+J7VKwT4cHBMsSOLKBrvkHXBOfRygOu64nj
+	8sCzdxNkilshK9dC64aRvTb7hQ68411g/pKX+0KOafxc8zitr8QMskUEl6JDLbzRdjiK
+	73ujtIXoIEJkHe9/MK0w7M991/1cw6EuWVoDOqSPXmkmp82llyYAzmbQ6DnXsOeoqnQb
+	rA==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+	d=oracle.onmicrosoft.com; s=selector2-oracle-onmicrosoft-com;
+	h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+	bh=CZksD+woiUFxuasOpc898fZGqaG2cWGYr37E3Ru6xBw=;
+	b=sXwWRdKz0sVR63uJ3krBuUbfl5tDtw7g1wJ6/3ejMpid4I887yxSGKwKT7aN3i0+SGQG+ZP4XDUmeHRCaD0ysmBv8Ic486nOyV45AOMm1fd6wZULAG9SOgZcRnVDExum4LryiokZ4z4hN7ySCStXTE10wJ7iEokQL97c8HocnRo=
+References: <20210126103502.260758-1-stefanha@redhat.com>
+From: Liam Merwick <liam.merwick@oracle.com>
+Message-ID: <a0e6ec06-14bb-29c4-7b6a-21b060a88de8@oracle.com>
+Date: Tue, 26 Jan 2021 10:47:13 +0000
+In-Reply-To: <20210126103502.260758-1-stefanha@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="Xm/fll+QQv+hsKip"
-Content-Disposition: inline
-In-Reply-To: <CAOssrKd6JkEKt98F7XhHeUhcCYP+gwnrHLE8VKTg0K-ABUxDEA@mail.gmail.com>
-Subject: Re: [Virtio-fs] Lack of inotify for virtio-fs backed
- files/directories
+Content-Type: text/plain; charset=utf-8; format=flowed
+Content-Language: en-GB
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: prevent opening of special
+ files (CVE-2020-35517)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,73 +33,72 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <mszeredi@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>, qemu-devel@nongnu.org
+Cc: Daniel Berrange <berrange@redhat.com>, P J P <ppandit@redhat.com>, virtio-fs@redhat.com, Alex Xu <alex@alxu.ca>, Laszlo Ersek <lersek@redhat.com>, vgoyal@redhat.com
+
+On 26/01/2021 10:35, Stefan Hajnoczi wrote:
+> A well-behaved FUSE client does not attempt to open special files with
+> FUSE_OPEN because they are handled on the client side (e.g. device nodes
+> are handled by client-side device drivers).
+> 
+> The check to prevent virtiofsd from opening special files is missing in
+> a few cases, most notably FUSE_OPEN. A malicious client can cause
+> virtiofsd to open a device node, potentially allowing the guest to
+> escape. This can be exploited by a modified guest device driver. It is
+> not exploitable from guest userspace since the guest kernel will handle
+> special files inside the guest instead of sending FUSE requests.
+> 
+> This patch adds the missing checks to virtiofsd. This is a short-term
+> solution because it does not prevent a compromised virtiofsd process
+> from opening device nodes on the host.
+> 
+> Reported-by: Alex Xu <alex@alxu.ca>
+> Fixes: CVE-2020-35517
 
 
---Xm/fll+QQv+hsKip
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Should this also explicitly
 
-On Mon, Jan 25, 2021 at 08:22:32PM +0100, Miklos Szeredi wrote:
-> On Fri, Jan 22, 2021 at 5:58 PM Eric Ernst <eric.g.ernst@gmail.com> wrote:
-> >
-> > Hey ya'll,
-> >
-> > As highlighted nicely at [1], a common pattern in Kubernetes is to watc=
-h for changes to files/directories passed in as Configmaps or secrets. Side=
-cars typically use inotify to watch for changes and then signal the primary=
- container or perform other changes based on the reconfiguration.
-> >
-> > In the context of Kata, these files/dirs are passed in utilizing virtio=
--fs. Since FUSE itself doesn't support inotify, this pattern will fail. I'm=
- looking at ways to work-around this gap, including:
-> >
-> > 1) documenting this as a compatibility limitation ("don't do this!").
-> > 2) suggesting end-users modify their sidecars and utilize poll
-> > 3) doing an inotify on the host, and when changes are identified, notif=
-y the guest agent who can then modify the files on disk to trigger an inoti=
-fy
-> > 4) Working on contributing to libfuse in order to add inotify support.
-> >
-> > (4) is the right thing, but will take quite a bit of time before it can=
- be used. I'm curious if other folks have suggestions for workarounds (I do=
-n't like any of the ones I suggested), and if anyone has taken a look at (4=
-)?
->=20
-> Here's a thread on enabling inotify in remote fs:
->=20
-> https://lore.kernel.org/linux-fsdevel/20190507085707.GD30899@veci.piliscs=
-aba.redhat.com/
->=20
-> The discussion didn't get too far, it seems there's not a very big
-> interest in this, but conceptually it doesn't seem too difficult.
+Cc: qemu-stable@nongnu.org
 
-Vivek Goyal previously experimented with adding a notification virtqueue
-to the virtio-fs device so that FUSE_NOTIFY_* messages can be supported.
-That code can be brought back and merged.
+Or would only a long-term fix target that?
 
-However, due to the number of flags in inotify(7) I think this is a
-non-trivial project. Whoever wants to tackle this feature should be
-aware that it may take a few months (3?) to fully implement and test.
+Reviewed-by: Liam Merwick <liam.merwick@oracle.com>
 
-Stefan
-
---Xm/fll+QQv+hsKip
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAP+tMACgkQnKSrs4Gr
-c8iBVgf/WWBFy8/lEMNWjvyDbAAZtEqafynSCEpXeW9Yi6ZALtEiocfcyicsk4Op
-2nbD/51ZKo+WfcM+VubWh9+G+BC64lTCxUhWChjX4yAwIhY0ZJ2TRzL0A2hWYkmA
-eIKgIfBUBtj8whdUwa6UuqQQ8W+ZU2XWspl32+FndwSLe7mGi0Ypu+oW2QbU0rx2
-9dPiUGT2oMoPbbDJKxfcf0AEX7RnpQc3nqj7xfWOJw7CXAWd7NyY72i3vbpAAFGt
-CTOdjzJ5DBePvNKn9Q7dmO18TnDUS6CBoJSehVXRGaGT8mOqNLibp8pm0isOYf5g
-orN/NfC0ayyNlp69X2qnyHhrKl7B6A==
-=slgL
------END PGP SIGNATURE-----
-
---Xm/fll+QQv+hsKip--
+> Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
+> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> ---
+> v2:
+>   * Add doc comment clarifying that symlinks are traversed client-side
+>     [Daniel]
+> 
+> This issue was diagnosed on public IRC and is therefore already known
+> and not embargoed.
+> 
+> A stronger fix, and the long-term solution, is for users to mount the
+> shared directory and any sub-mounts with nodev, as well as nosuid and
+> noexec. Unfortunately virtiofsd cannot do this automatically because
+> bind mounts added by the user after virtiofsd has launched would not be
+> detected. I suggest the following:
+> 
+> 1. Modify libvirt and Kata Containers to explicitly set these mount
+>     options.
+> 2. Then modify virtiofsd to check that the shared directory has the
+>     necessary options at startup. Refuse to start if the options are
+>     missing so that the user is aware of the security requirements.
+> 
+> As a bonus this also increases the likelihood that other host processes
+> besides virtiofsd will be protected by nosuid/noexec/nodev so that a
+> malicious guest cannot drop these files in place and then arrange for a
+> host process to come across them.
+> 
+> Additionally, user namespaces have been discussed. They seem like a
+> worthwhile addition as an unprivileged or privilege-separated mode
+> although there are limitations with respect to security xattrs and the
+> actual uid/gid stored on the host file system not corresponding to the
+> guest uid/gid.
+> ---
+>   tools/virtiofsd/passthrough_ll.c | 85 +++++++++++++++++++++-----------
+>   1 file changed, 57 insertions(+), 28 deletions(-)
+> 
 

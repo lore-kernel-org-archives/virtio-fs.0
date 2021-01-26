@@ -1,13 +1,15 @@
-Date: Tue, 26 Jan 2021 18:16:04 +0100
-From: Greg Kurz <groug@kaod.org>
-Message-ID: <20210126181604.1a4c69c6@bahia.lan>
-In-Reply-To: <20210126103502.260758-1-stefanha@redhat.com>
-References: <20210126103502.260758-1-stefanha@redhat.com>
+Date: Tue, 26 Jan 2021 13:33:36 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210126183336.GB3239@redhat.com>
+References: <20210125180115.22936-1-vgoyal@redhat.com>
+	<20210125180115.22936-2-vgoyal@redhat.com>
+	<20210126165600.7bbe369d@bahia.lan>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="US-ASCII"
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: prevent opening of special
- files (CVE-2020-35517)
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20210126165600.7bbe369d@bahia.lan>
+Subject: Re: [Virtio-fs] [PATCH 1/6] virtiofsd: Drop ->vu_dispatch_rwlock
+ while waiting for thread to exit
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,251 +18,145 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: Daniel Berrange <berrange@redhat.com>, qemu-devel@nongnu.org, P J P <ppandit@redhat.com>, virtio-fs@redhat.com, Alex Xu <alex@alxu.ca>, Laszlo Ersek <lersek@redhat.com>, vgoyal@redhat.com
+To: Greg Kurz <groug@kaod.org>
+Cc: mst@redhat.com, qemu-devel@nongnu.org, virtio-fs@redhat.com, marcandre.lureau@redhat.com
 
-On Tue, 26 Jan 2021 10:35:02 +0000
-Stefan Hajnoczi <stefanha@redhat.com> wrote:
+On Tue, Jan 26, 2021 at 04:56:00PM +0100, Greg Kurz wrote:
+> On Mon, 25 Jan 2021 13:01:10 -0500
+> Vivek Goyal <vgoyal@redhat.com> wrote:
+> 
+> > When we are shutting down virtqueues, virtio_loop() receives a message
+> > VHOST_USER_GET_VRING_BASE from master. We acquire ->vu_dispatch_rwlock
+> > and get into the process of shutting down virtqueue. In one of the
+> > final steps, we are waiting for fv_queue_thread() to exit/finish and
+> > wait with ->vu_dispatch_rwlock held.
+> > 
+> > But it is possible that fv_queue_thread() itself is waiting to get
+> > ->vu_dispatch_rwlock (With --thread-pool=0 option). If requests
+> > are being processed by fv_queue_worker(), then fv_queue_worker()
+> > can wait for the ->vu_dispatch_rwlock, and fv_queue_thread() will
+> > wait for fv_queue_worker() before thread pool can be stopped.
+> > 
+> > IOW, if guest is shutdown uncleanly (some sort of emergency reboot),
+> > it is possible that virtiofsd is processing a fs request and
+> > qemu initiates device shutdown sequence. In that case there seem
+> > to be two options. Either abort the existing request completely or
+> > let existing request finish.
+> > 
+> > This patch is taking second approach. That is drop the ->vu_dispatch_rwlock
+> > temporarily so that fv_queue_thread() can finish and deadlock does not
+> > happen.
+> > 
+> > ->vu_dispatch_rwlock provides mutual exclusion between virtio_loop()
+> > (handling vhost-user protocol messages) and fv_queue_thread() (handling
+> > fuse filesystem requests). Rational seems to be that protocol message
+> > might change queue memory mappings, so we don't want both to proceed
+> > at the same time.
+> > 
+> > In this case queue is shutting down, so I hope it is fine for fv_queue_thread() to send response back while virtio_loop() is still waiting (and not handling
+> 
+> It looks this lacks a \n after "fine for"
 
-> A well-behaved FUSE client does not attempt to open special files with
-> FUSE_OPEN because they are handled on the client side (e.g. device nodes
-> are handled by client-side device drivers).
-> 
-> The check to prevent virtiofsd from opening special files is missing in
-> a few cases, most notably FUSE_OPEN. A malicious client can cause
-> virtiofsd to open a device node, potentially allowing the guest to
-> escape. 
+Hi Greg,
 
-or pretty much anything nasty you can think of, e.g. DoS if the malicious
-client repeatedly asks virtiofsd to open FIFOs the other side of which is
-never opened.
+Will fix.
 
-> This can be exploited by a modified guest device driver. It is
-> not exploitable from guest userspace since the guest kernel will handle
-> special files inside the guest instead of sending FUSE requests.
 > 
-> This patch adds the missing checks to virtiofsd. This is a short-term
-> solution because it does not prevent a compromised virtiofsd process
-> from opening device nodes on the host.
+> > any further vho-user protocol messages).
+> > 
+> > IOW, assumption here is that while virto_loop is blocked processing
+> > VHOST_USER_GET_VRING_BASE message, it is still ok to send back the
+> > response on vq by fv_queue_thread().
+> > 
+> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > ---
+> >  tools/virtiofsd/fuse_virtio.c | 14 ++++++++++++++
+> >  1 file changed, 14 insertions(+)
+> > 
+> > diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+> > index 9577eaa68d..6805d8ba01 100644
+> > --- a/tools/virtiofsd/fuse_virtio.c
+> > +++ b/tools/virtiofsd/fuse_virtio.c
+> > @@ -813,11 +813,20 @@ static void fv_queue_cleanup_thread(struct fv_VuDev *vud, int qidx)
+> >          fuse_log(FUSE_LOG_ERR, "Eventfd_write for queue %d: %s\n",
+> >                   qidx, strerror(errno));
+> >      }
+> > +
+> > +    /*
+> > +     * Drop ->vu_dispath_rwlock and reacquire. We are about to wait for
+> > +     * for fv_queue_thread() and that might require ->vu_dispatch_rwlock
+> > +     * to finish.
+> > +     */
+> > +    pthread_rwlock_unlock(&vud->vu_dispatch_rwlock);
+> >      ret = pthread_join(ourqi->thread, NULL);
+> >      if (ret) {
+> >          fuse_log(FUSE_LOG_ERR, "%s: Failed to join thread idx %d err %d\n",
+> >                   __func__, qidx, ret);
+> >      }
+> > +    pthread_rwlock_wrlock(&vud->vu_dispatch_rwlock);
+> > +
 > 
-> Reported-by: Alex Xu <alex@alxu.ca>
-> Fixes: CVE-2020-35517
-> Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
-> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-> ---
+> So this is assuming that fv_queue_cleanup_thread() is called with
+> vu_dispatch_rwlock already taken for writing, but there are no
+> clear evidence in the code why it should care for the locking at
+> all in the first place.
+> 
+> On the contrary, one of its two callers is a vhost-user callback,
+> in which we can reasonably have this assumption, while we can
+> have the opposite assumption for the other one in virtio_loop().
+> 
+> This makes me think that the drop/reacquire trick should only
+> be done in fv_queue_set_started(), instead of...
 
-The patch looks pretty good to me. It just seems to be missing a change in
-lo_create():
+I think this sounds reasonable. I will drop lock/re-acquire in
+fv_queue_set_started() around the call to fv_queue_cleanup_thread().
 
-    fd = openat(parent_inode->fd, name, (fi->flags | O_CREAT) & ~O_NOFOLLOW,
-                mode);
+> 
+> >      pthread_mutex_destroy(&ourqi->vq_lock);
+> >      close(ourqi->kill_fd);
+> >      ourqi->kick_fd = -1;
+> > @@ -952,7 +961,11 @@ int virtio_loop(struct fuse_session *se)
+> >      /*
+> >       * Make sure all fv_queue_thread()s quit on exit, as we're about to
+> >       * free virtio dev and fuse session, no one should access them anymore.
+> > +     * Hold ->vu_dispatch_rwlock in write mode as fv_queue_cleanup_thread()
+> > +     * assumes mutex is locked and unlocks/re-locks it.
+> >       */
+> > +
+> > +    pthread_rwlock_wrlock(&se->virtio_dev->vu_dispatch_rwlock);
+> 
+> 
+> ... artificially introducing another critical section here.
+> 
+> The issue isn't even specific to vu_dispatch_rwlock actually :
+> fv_queue_cleanup_thread() shouldn't be called with any lock
+> held because it might sleep in pthread_join() and cause a
+> deadlock all the same. So I'd rather document that instead :
+> drop all locks before calling fv_queue_cleanup_thread().
 
-A malicious guest could have created anything called ${name} in this directory
-before calling FUSE_CREATE and we'll open it blindly, or I'm missing something ?
+Sounds good. Will do.
 
-> v2:
->  * Add doc comment clarifying that symlinks are traversed client-side
->    [Daniel]
 > 
-> This issue was diagnosed on public IRC and is therefore already known
-> and not embargoed.
+> Also, since pthread_rwlock_wrlock() can fail, I think we should
+> always check it's return value, at least with an assert() like
+> already done elsewhere.
+
+Will check return code of pthread_rwlock_wrlock() and probably use
+assert().
+
+Vivek
+
 > 
-> A stronger fix, and the long-term solution, is for users to mount the
-> shared directory and any sub-mounts with nodev, as well as nosuid and
-> noexec. Unfortunately virtiofsd cannot do this automatically because
-> bind mounts added by the user after virtiofsd has launched would not be
-> detected. I suggest the following:
+> >      for (int i = 0; i < se->virtio_dev->nqueues; i++) {
+> >          if (!se->virtio_dev->qi[i]) {
+> >              continue;
+> > @@ -961,6 +974,7 @@ int virtio_loop(struct fuse_session *se)
+> >          fuse_log(FUSE_LOG_INFO, "%s: Stopping queue %d thread\n", __func__, i);
+> >          fv_queue_cleanup_thread(se->virtio_dev, i);
+> >      }
+> > +    pthread_rwlock_unlock(&se->virtio_dev->vu_dispatch_rwlock);
+> >  
+> >      fuse_log(FUSE_LOG_INFO, "%s: Exit\n", __func__);
+> >  
 > 
-> 1. Modify libvirt and Kata Containers to explicitly set these mount
->    options.
-> 2. Then modify virtiofsd to check that the shared directory has the
->    necessary options at startup. Refuse to start if the options are
->    missing so that the user is aware of the security requirements.
-> 
-> As a bonus this also increases the likelihood that other host processes
-> besides virtiofsd will be protected by nosuid/noexec/nodev so that a
-> malicious guest cannot drop these files in place and then arrange for a
-> host process to come across them.
-> 
-> Additionally, user namespaces have been discussed. They seem like a
-> worthwhile addition as an unprivileged or privilege-separated mode
-> although there are limitations with respect to security xattrs and the
-> actual uid/gid stored on the host file system not corresponding to the
-> guest uid/gid.
-> ---
->  tools/virtiofsd/passthrough_ll.c | 85 +++++++++++++++++++++-----------
->  1 file changed, 57 insertions(+), 28 deletions(-)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 5fb36d9407..b722f43809 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -555,6 +555,30 @@ static int lo_fd(fuse_req_t req, fuse_ino_t ino)
->      return fd;
->  }
->  
-> +/*
-> + * Open a file descriptor for an inode. Returns -EBADF if the inode is not a
-> + * regular file or a directory. Use this helper function instead of raw
-> + * openat(2) to prevent security issues when a malicious client opens special
-> + * files such as block device nodes. Symlink inodes are also rejected since
-> + * symlinks must already have been traversed on the client side.
-> + */
-> +static int lo_inode_open(struct lo_data *lo, struct lo_inode *inode,
-> +                         int open_flags)
-> +{
-> +    g_autofree char *fd_str = g_strdup_printf("%d", inode->fd);
-> +    int fd;
-> +
-> +    if (!S_ISREG(inode->filetype) && !S_ISDIR(inode->filetype)) {
-> +        return -EBADF;
-> +    }
-> +
-> +    fd = openat(lo->proc_self_fd, fd_str, open_flags);
-> +    if (fd < 0) {
-> +        return -errno;
-> +    }
-> +    return fd;
-> +}
-> +
->  static void lo_init(void *userdata, struct fuse_conn_info *conn)
->  {
->      struct lo_data *lo = (struct lo_data *)userdata;
-> @@ -684,8 +708,7 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
->          if (fi) {
->              truncfd = fd;
->          } else {
-> -            sprintf(procname, "%i", ifd);
-> -            truncfd = openat(lo->proc_self_fd, procname, O_RDWR);
-> +            truncfd = lo_inode_open(lo, inode, O_RDWR);
->              if (truncfd < 0) {
->                  goto out_err;
->              }
-> @@ -1725,7 +1748,6 @@ static struct lo_inode_plock *lookup_create_plock_ctx(struct lo_data *lo,
->                                                        pid_t pid, int *err)
->  {
->      struct lo_inode_plock *plock;
-> -    char procname[64];
->      int fd;
->  
->      plock =
-> @@ -1742,12 +1764,10 @@ static struct lo_inode_plock *lookup_create_plock_ctx(struct lo_data *lo,
->      }
->  
->      /* Open another instance of file which can be used for ofd locks. */
-> -    sprintf(procname, "%i", inode->fd);
-> -
->      /* TODO: What if file is not writable? */
-> -    fd = openat(lo->proc_self_fd, procname, O_RDWR);
-> -    if (fd == -1) {
-> -        *err = errno;
-> +    fd = lo_inode_open(lo, inode, O_RDWR);
-> +    if (fd < 0) {
-> +        *err = -fd;
->          free(plock);
->          return NULL;
->      }
-> @@ -1894,18 +1914,24 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
->  {
->      int fd;
->      ssize_t fh;
-> -    char buf[64];
->      struct lo_data *lo = lo_data(req);
-> +    struct lo_inode *inode = lo_inode(req, ino);
->  
->      fuse_log(FUSE_LOG_DEBUG, "lo_open(ino=%" PRIu64 ", flags=%d)\n", ino,
->               fi->flags);
->  
-> +    if (!inode) {
-> +        fuse_reply_err(req, EBADF);
-> +        return;
-> +    }
-> +
->      update_open_flags(lo->writeback, lo->allow_direct_io, fi);
->  
-> -    sprintf(buf, "%i", lo_fd(req, ino));
-> -    fd = openat(lo->proc_self_fd, buf, fi->flags & ~O_NOFOLLOW);
-> -    if (fd == -1) {
-> -        return (void)fuse_reply_err(req, errno);
-> +    fd = lo_inode_open(lo, inode, fi->flags & ~O_NOFOLLOW);
-> +    if (fd < 0) {
-> +        lo_inode_put(lo, &inode);
-> +        fuse_reply_err(req, -fd);
-> +        return;
->      }
->  
->      pthread_mutex_lock(&lo->mutex);
-> @@ -1913,6 +1939,7 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
->      pthread_mutex_unlock(&lo->mutex);
->      if (fh == -1) {
->          close(fd);
-> +        lo_inode_put(lo, &inode);
->          fuse_reply_err(req, ENOMEM);
->          return;
->      }
-> @@ -1923,6 +1950,7 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
->      } else if (lo->cache == CACHE_ALWAYS) {
->          fi->keep_cache = 1;
->      }
-> +    lo_inode_put(lo, &inode);
->      fuse_reply_open(req, fi);
->  }
->  
-> @@ -1982,39 +2010,40 @@ static void lo_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
->  static void lo_fsync(fuse_req_t req, fuse_ino_t ino, int datasync,
->                       struct fuse_file_info *fi)
->  {
-> +    struct lo_inode *inode = lo_inode(req, ino);
-> +    struct lo_data *lo = lo_data(req);
->      int res;
->      int fd;
-> -    char *buf;
->  
->      fuse_log(FUSE_LOG_DEBUG, "lo_fsync(ino=%" PRIu64 ", fi=0x%p)\n", ino,
->               (void *)fi);
->  
-> +    if (!inode) {
-> +        fuse_reply_err(req, EBADF);
-> +        return;
-> +    }
-> +
->      if (!fi) {
-> -        struct lo_data *lo = lo_data(req);
-> -
-> -        res = asprintf(&buf, "%i", lo_fd(req, ino));
-> -        if (res == -1) {
-> -            return (void)fuse_reply_err(req, errno);
-> -        }
-> -
-> -        fd = openat(lo->proc_self_fd, buf, O_RDWR);
-> -        free(buf);
-> -        if (fd == -1) {
-> -            return (void)fuse_reply_err(req, errno);
-> +        fd = lo_inode_open(lo, inode, O_RDWR);
-> +        if (fd < 0) {
-> +            res = -fd;
-> +            goto out;
->          }
->      } else {
->          fd = lo_fi_fd(req, fi);
->      }
->  
->      if (datasync) {
-> -        res = fdatasync(fd);
-> +        res = fdatasync(fd) == -1 ? errno : 0;
->      } else {
-> -        res = fsync(fd);
-> +        res = fsync(fd) == -1 ? errno : 0;
->      }
->      if (!fi) {
->          close(fd);
->      }
-> -    fuse_reply_err(req, res == -1 ? errno : 0);
-> +out:
-> +    lo_inode_put(lo, &inode);
-> +    fuse_reply_err(req, res);
->  }
->  
->  static void lo_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t offset,
 

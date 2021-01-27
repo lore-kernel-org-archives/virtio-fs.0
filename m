@@ -1,16 +1,14 @@
+Date: Wed, 27 Jan 2021 14:14:30 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20210127141430.GA310142@stefanha-x1.localdomain>
+References: <20210127112131.308451-1-stefanha@redhat.com>
+	<CAOssrKfY7zDOH3NNbtyARHMCdJJN1tKQJri8ec=igjBf=K6Dog@mail.gmail.com>
 MIME-Version: 1.0
-References: <20210126103502.260758-1-stefanha@redhat.com>
-	<20210126181604.1a4c69c6@bahia.lan>
-	<CAOssrKdh3kqKN4uGE=s5eiymd2MXKsRXUegqRH-TFhqYOK7WOA@mail.gmail.com>
-	<20210127112023.0e97f909@bahia.lan>
-	<CAOssrKfezsvcECQ=mO_4T2B09e+2S4LA3=_U6TQyiTtPbE=OYg@mail.gmail.com>
-	<20210127144909.22dd778e@bahia.lan>
-In-Reply-To: <20210127144909.22dd778e@bahia.lan>
-From: Miklos Szeredi <mszeredi@redhat.com>
-Date: Wed, 27 Jan 2021 15:09:50 +0100
-Message-ID: <CAOssrKeN9iYT-Z46FVtzdKnWcTLfMqK77b1faf78m3XTXnEVGw@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: prevent opening of special
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="k1lZvvs/B4yU6o8G"
+Content-Disposition: inline
+In-Reply-To: <CAOssrKfY7zDOH3NNbtyARHMCdJJN1tKQJri8ec=igjBf=K6Dog@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH v3] virtiofsd: prevent opening of special
  files (CVE-2020-35517)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
@@ -20,60 +18,95 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
-Cc: Daniel Berrange <berrange@redhat.com>, QEMU Developers <qemu-devel@nongnu.org>, P J P <ppandit@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, Alex Xu <alex@alxu.ca>, Laszlo Ersek <lersek@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
+To: Miklos Szeredi <mszeredi@redhat.com>
+Cc: Daniel Berrange <berrange@redhat.com>, QEMU Developers <qemu-devel@nongnu.org>, virtio-fs-list <virtio-fs@redhat.com>, Alex Xu <alex@alxu.ca>, P J P <ppandit@redhat.com>, Laszlo Ersek <lersek@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
-On Wed, Jan 27, 2021 at 2:49 PM Greg Kurz <groug@kaod.org> wrote:
->
-> On Wed, 27 Jan 2021 11:34:52 +0100
-> Miklos Szeredi <mszeredi@redhat.com> wrote:
 
-> > Another solution specifically for O_CREAT without O_EXCL would be to
-> > turn it into an exclusive create.
->
-> Would this added O_EXCL then appear on the client side, e.g. to
-> guest userspace doing fcntl(F_GETFL) ?
+--k1lZvvs/B4yU6o8G
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-No.  Guest kernel keeps track of open flags.
-
-> > If that fails with EEXIST then try
-> > the normal open path (open with O_PATH, fstat, open proc symlink).  If
->
-> open(O_PATH | O_NOFOLLOW) + fstatat(AT_EMPTY_PATH|AT_SYMLINK_NOFOLLOW)
-> would indeed allow to filter out anything that isn't a directory and
-> to safely open the proc symlink.
->
-> > that fails with ENOENT, then retry the whole thing a certain number of
->
-> Indeed someone could have unlinked the file in the meantime, in which
-> case the open(O_PATH | O_NOFOLLOW) would fail, but if it succeeds then
-> we cannot hit ENOENT anymore AFAICT.
-
-Right.
-
-> > times.  If it still fails then somebody is definitely messing with us
-> > and we can fail the request with EIO.
+On Wed, Jan 27, 2021 at 02:01:54PM +0100, Miklos Szeredi wrote:
+> On Wed, Jan 27, 2021 at 12:21 PM Stefan Hajnoczi <stefanha@redhat.com> wr=
+ote:
+>               }
+> > @@ -1654,9 +1677,11 @@ static void update_open_flags(int writeback, int=
+ allow_direct_io,
+> >  static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *n=
+ame,
+> >                        mode_t mode, struct fuse_file_info *fi)
+> >  {
+> > +    int open_flags =3D (fi->flags | O_CREAT) & ~O_NOFOLLOW;
+> >      int fd;
+> >      struct lo_data *lo =3D lo_data(req);
+> >      struct lo_inode *parent_inode;
+> > +    struct lo_inode *existing_inode =3D NULL;
+> >      struct fuse_entry_param e;
+> >      int err;
+> >      struct lo_cred old =3D {};
+> > @@ -1682,11 +1707,23 @@ static void lo_create(fuse_req_t req, fuse_ino_=
+t parent, const char *name,
 > >
->
-> Not sure what the retry+timeout is trying to mitigate here... why not
-> returning EIO right away ?
+> >      update_open_flags(lo->writeback, lo->allow_direct_io, fi);
+> >
+> > -    fd =3D openat(parent_inode->fd, name, (fi->flags | O_CREAT) & ~O_N=
+OFOLLOW,
+> > -                mode);
+> > +    /* First, try to create a new file but don't open existing files */
+> > +    fd =3D openat(parent_inode->fd, name, open_flags | O_EXCL, mode);
+> >      err =3D fd =3D=3D -1 ? errno : 0;
+> > +
+> >      lo_restore_cred(&old);
+> >
+> > +    /* Second, open existing files if O_EXCL was not specified */
+> > +    if (err =3D=3D EEXIST && !(fi->flags & O_EXCL)) {
+> > +        existing_inode =3D lookup_name(req, parent, name);
+> > +        if (existing_inode) {
+> > +            fd =3D lo_inode_open(lo, existing_inode, open_flags);
+> > +            if (fd < 0) {
+> > +                err =3D -fd;
+> > +            }
+> > +        }
+> > +    }
+> > +
+> >      if (!err) {
+> >          ssize_t fh;
+>=20
+> It's more of a mess than I thought.
+>=20
+> The problem here is there can also be a race between the open and the
+> subsequent lo_do_lookup().
+>=20
+> At this point it's probably enough to verify that fuse_entry_param
+> refers to the same object as the fh (using fstat and comparing st_dev
+> and st_ino).
 
-The semantics of O_CREATE are that it can fail neither because the
-file exists nor because it doesn't.  This doesn't matter if the
-exported tree is not modified outside of a single guest, because of
-locking provided by the guest kernel.
+Can you describe the race in detail? FUSE_CREATE vs FUSE_OPEN?
+FUSE_CREATE vs FUSE_CREATE?
 
-However if we want to support shared access to a tree then O_CREAT
-semantics should work even in the face of races due to external
-modification of the tree.  I.e. following race:
+> Also O_CREAT open is not supposed to return ENOENT, so failure to open
+> without O_CREAT (race between O_CREAT open and plain open) should at
+> least translate error to ESTALE or EIO.
 
-virtiofsd: open(foo, O_CREAT | O_EXCL) -> EEXIST
-other task: unlink(foo)
-virtiofsd: open(foo, O_PATH | O_NOFOLLOW) -> ENOENT
+Thanks, will fix.
 
-To properly support the above the O_CREAT | O_EXCL open would need to
-be retried.
+Sstefan
 
-Thanks,
-Miklos
+--k1lZvvs/B4yU6o8G
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmARdUUACgkQnKSrs4Gr
+c8jciAf9FyW8VXDVqTl3unEErorqJH0YcYolxd4/L14XaZqJUqLKSEHm8DmVFfEM
+T3O91pjNUrlqVvkE/UdRkOEufO8KqjKumQjcL+n2iX9GJ5+XgNpkzJc3Nh6obP61
+lLU5pt6iYvPXqDJhRwRlVHV+Ib8dmA5/ZbD1aFcUa0s97ylouU4LTZV9ygS3mq36
+2PqcxVo6yaw6qYyyJL0KDvPmdvQEEBGI8bFaAVxkYRyc5D2PR3lUmuYTVOno3tk+
+FWZM82M6dohhHsXqu7x24ZvUqFEa82hh1+nxJ/Ff3AsmXSxzm4RgVGKlnTBJiT+T
+8xdiVadSa/Xb7lnK7VGwf+NiuUuOSA==
+=xq0v
+-----END PGP SIGNATURE-----
+
+--k1lZvvs/B4yU6o8G--
 

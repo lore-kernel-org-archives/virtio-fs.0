@@ -1,21 +1,21 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
-	h=to:from:subject:message-id:date:user-agent:mime-version
-	:content-transfer-encoding:content-language;
-	bh=cVQJ9l6PbkVVPrA93K9y/ncT+nggdqVCoQtRPNf3PSU=;
-	b=vM1NsLIWioepzvyVAo4FpfRHrsyJwiUkXnzKFq3MVnxxerPnS/Wow6FK+3OoYC5Oxt
-	b80uMUhcs5F4J9CZqZkBJ5KuId/Ls2XZfJQEp8Mz9cZcBBv9jMVDj7biccJqsiYq2aCW
-	gE2M7DTd4ygJe0CCio4HFfA1rqG4vtIBEJO0n0+zZWSkHytxYh4yTCzbguWKUN+7B6/E
-	7d8CG398qkxkpGC3DQuLC5AONnNQBlPyArj9pWQKq8axj7bOsRbUBp1QPAt6SC14QDi7
-	k2BZly+TyvRTlK5xyF0zRtl9iJjEXxEH78n4tVEwmGcdGoPjEodX7rQ7LzLir+21W9jA
-	LqGg==
-From: "Harry G. Coin" <hgcoin@gmail.com>
-Message-ID: <e262f9ea-cf4d-a841-6b56-ce00295ff03e@gmail.com>
-Date: Wed, 27 Jan 2021 09:27:17 -0600
+Date: Wed, 27 Jan 2021 16:35:24 +0100
+From: Greg Kurz <groug@kaod.org>
+Message-ID: <20210127163524.4e34596d@bahia.lan>
+In-Reply-To: <CAOssrKc=kSQQLmrAR2VrKfDzkyNDEAAa5qusK1x6+-fCM4+yCA@mail.gmail.com>
+References: <20210126103502.260758-1-stefanha@redhat.com>
+	<20210126181604.1a4c69c6@bahia.lan>
+	<CAOssrKdh3kqKN4uGE=s5eiymd2MXKsRXUegqRH-TFhqYOK7WOA@mail.gmail.com>
+	<20210127112023.0e97f909@bahia.lan>
+	<CAOssrKfezsvcECQ=mO_4T2B09e+2S4LA3=_U6TQyiTtPbE=OYg@mail.gmail.com>
+	<20210127144909.22dd778e@bahia.lan>
+	<CAOssrKeN9iYT-Z46FVtzdKnWcTLfMqK77b1faf78m3XTXnEVGw@mail.gmail.com>
+	<20210127160920.062e47f0@bahia.lan>
+	<CAOssrKc=kSQQLmrAR2VrKfDzkyNDEAAa5qusK1x6+-fCM4+yCA@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Content-Language: en-US
-Subject: [Virtio-fs] Is dax the default in 5.10.10?
+Content-Type: text/plain; charset="US-ASCII"
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: prevent opening of special
+ files (CVE-2020-35517)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,13 +24,42 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs-list <virtio-fs@redhat.com>
+To: Miklos Szeredi <mszeredi@redhat.com>
+Cc: Daniel Berrange <berrange@redhat.com>, QEMU Developers <qemu-devel@nongnu.org>, P J P <ppandit@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, Alex Xu <alex@alxu.ca>, Laszlo Ersek <lersek@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
-Is dax available and if so the default in kernel v5.10.10?  Or does it
-need a mount option?
+On Wed, 27 Jan 2021 16:22:49 +0100
+Miklos Szeredi <mszeredi@redhat.com> wrote:
 
-Thanks for all the work!
+> On Wed, Jan 27, 2021 at 4:09 PM Greg Kurz <groug@kaod.org> wrote:
+> >
+> > On Wed, 27 Jan 2021 15:09:50 +0100
+> > Miklos Szeredi <mszeredi@redhat.com> wrote:
+> > > The semantics of O_CREATE are that it can fail neither because the
+> > > file exists nor because it doesn't.  This doesn't matter if the
+> > > exported tree is not modified outside of a single guest, because of
+> > > locking provided by the guest kernel.
+> > >
+> >
+> > Wrong. O_CREAT can legitimately fail with ENOENT if one element
+> 
+> Let me make my  statement more precise:
+> 
+> O_CREAT cannot fail with ENOENT if parent directory exists throughout
+> the operation.
+> 
 
-Harry Coin
+True, but I still don't see what guarantees guest userspace that the
+parent directory doesn't go away... I must have missed something.
+Please elaborate.
 
+> I'm sure this property is used all over the place in userspace code,
+> and hence should be supported in strict coherence (cache=none) mode.
+> 
+> For relaxed coherence (cache=auto) I'm not quite sure.  NFS is usually
+> the reference, we'd need to look into what guarantees it provides wrt.
+> O_CREAT and remote racing unlink.
+> 
+> Thanks,
+> Miklos
+> 
 

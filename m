@@ -1,13 +1,19 @@
-Date: Thu, 14 Jan 2021 13:34:24 +0000
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20210114133424.GA299876@stefanha-x1.localdomain>
-References: <rprnspo3-119s-qnoo-2o93-sn40rq40ns@erqung.pbz>
+Date: Wed, 27 Jan 2021 16:09:20 +0100
+From: Greg Kurz <groug@kaod.org>
+Message-ID: <20210127160920.062e47f0@bahia.lan>
+In-Reply-To: <CAOssrKeN9iYT-Z46FVtzdKnWcTLfMqK77b1faf78m3XTXnEVGw@mail.gmail.com>
+References: <20210126103502.260758-1-stefanha@redhat.com>
+	<20210126181604.1a4c69c6@bahia.lan>
+	<CAOssrKdh3kqKN4uGE=s5eiymd2MXKsRXUegqRH-TFhqYOK7WOA@mail.gmail.com>
+	<20210127112023.0e97f909@bahia.lan>
+	<CAOssrKfezsvcECQ=mO_4T2B09e+2S4LA3=_U6TQyiTtPbE=OYg@mail.gmail.com>
+	<20210127144909.22dd778e@bahia.lan>
+	<CAOssrKeN9iYT-Z46FVtzdKnWcTLfMqK77b1faf78m3XTXnEVGw@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="fUYQa+Pmc3FrFX/N"
-Content-Disposition: inline
-In-Reply-To: <rprnspo3-119s-qnoo-2o93-sn40rq40ns@erqung.pbz>
-Subject: Re: [Virtio-fs] [RFC] About non-root virtiofsd(1) process
+Content-Type: text/plain; charset="US-ASCII"
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: prevent opening of special
+ files (CVE-2020-35517)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,88 +22,105 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: P J P <ppandit@redhat.com>
-Cc: virtio-fs@redhat.com
+To: Miklos Szeredi <mszeredi@redhat.com>
+Cc: Daniel Berrange <berrange@redhat.com>, QEMU Developers <qemu-devel@nongnu.org>, P J P <ppandit@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, Alex Xu <alex@alxu.ca>, Laszlo Ersek <lersek@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
+On Wed, 27 Jan 2021 15:09:50 +0100
+Miklos Szeredi <mszeredi@redhat.com> wrote:
 
---fUYQa+Pmc3FrFX/N
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+> On Wed, Jan 27, 2021 at 2:49 PM Greg Kurz <groug@kaod.org> wrote:
+> >
+> > On Wed, 27 Jan 2021 11:34:52 +0100
+> > Miklos Szeredi <mszeredi@redhat.com> wrote:
+> 
+> > > Another solution specifically for O_CREAT without O_EXCL would be to
+> > > turn it into an exclusive create.
+> >
+> > Would this added O_EXCL then appear on the client side, e.g. to
+> > guest userspace doing fcntl(F_GETFL) ?
+> 
+> No.  Guest kernel keeps track of open flags.
+> 
 
-On Thu, Jan 14, 2021 at 02:11:28PM +0530, P J P wrote:
->   Hello,
->=20
-> * Recently I realised that virtiofsd(1) process does not drop its 'root'
->   privileges while sharing host directory tree with a guest VM.
->=20
->   Libvirtd(8) generally starts a guest VM with non-root system user (ex. =
-qemu)
->   privileges. If virtiofsd(1) has 'root' privileges, that makes it an
->   accomplice in a potential guest-to-host privilege escalation scenario. =
-Which
->   is not good.
->=20
-> * IMHO, ideally virtiofsd(1) should not run with 'root' privileges at all.
->=20
-> * But If it has to, then atleast all default configuration settings must =
-be
->   utmost strict and restrictive as possible. Ex. By default offer only re=
-ad
->   access to guest VM.
+That was my impression as well as I didn't find a FUSE_GETFL request.
+Thanks for confirming that !
 
-That's not useful. Most users require read-write.
+> > > If that fails with EEXIST then try
+> > > the normal open path (open with O_PATH, fstat, open proc symlink).  If
+> >
+> > open(O_PATH | O_NOFOLLOW) + fstatat(AT_EMPTY_PATH|AT_SYMLINK_NOFOLLOW)
+> > would indeed allow to filter out anything that isn't a directory and
+> > to safely open the proc symlink.
+> >
+> > > that fails with ENOENT, then retry the whole thing a certain number of
+> >
+> > Indeed someone could have unlinked the file in the meantime, in which
+> > case the open(O_PATH | O_NOFOLLOW) would fail, but if it succeeds then
+> > we cannot hit ENOENT anymore AFAICT.
+> 
+> Right.
+> 
+> > > times.  If it still fails then somebody is definitely messing with us
+> > > and we can fail the request with EIO.
+> > >
+> >
+> > Not sure what the retry+timeout is trying to mitigate here... why not
+> > returning EIO right away ?
+> 
+> The semantics of O_CREATE are that it can fail neither because the
+> file exists nor because it doesn't.  This doesn't matter if the
+> exported tree is not modified outside of a single guest, because of
+> locking provided by the guest kernel.
+> 
 
-> * Another option is for root virtiofsd(1) process to fork a sub-process w=
-hich
->   will run with non-root (ex. qemu) system user privileges.
->=20
->    - All file I/O operations for sharing a host directory with a guest are
->      performed by the sub-process with non-root system user privileges.
->=20
->    - Sub-process shall talk to the parent virtiofsd(1) process only when
->      privileged operation/assistance is required.
->=20
->   Ex. https://www.nginx.com/blog/inside-nginx-how-we-designed-for-perform=
-ance-scale/
->=20
-> ...wdyt?
+Wrong. O_CREAT can legitimately fail with ENOENT if one element
+of the pathname doesn't exist. And even if pathname only has
+one element, you can still have O_CREAT to fail the same way
+if the path of the parent directory is removed.
 
-Please take a look at the current sandboxing implementation in
-virtiofsd. It greatly restricts the process. virtiofsd is not just a
-process running freely with uid root.
+cat>enoent.c<<EOF
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
-Unlike nginx, virtiofsd needs to perform privileged operations as part
-of serving requests. The fundamental issue is that the server must be
-able to create, access, and modify files with arbitrary uids/gids.
+int main(int argc, char **argv)
+{
+	mkdir("foo", 0777);
+	chdir("foo");
+	rmdir("../foo");
+	open("bar", O_CREAT);
+}
+EOF
+make enoent
+strace ./enoent
 
-If you have specific ideas, let's discuss them. We have been following
-user namespace and uid/gid mapping/shifting features. They are not
-widely available in Linux yet, but once they are it should be possible
-to run with root only inside the user namespace (i.e. actually
-unprivileged).
+[...]
 
-There is also an unfinished security document here that we could discuss
-further and publish:
-https://gitlab.com/virtio-fs/qemu/-/merge_requests/6/diffs?commit_id=3D718c=
-71fa44f6b92ac27558c903d27935236b08ef
+mkdir("foo", 0777)                      = 0
+chdir("foo")                            = 0
+rmdir("../foo")                         = 0
+openat(AT_FDCWD, "bar", O_RDONLY|O_CREAT, 0117130) = -1 ENOENT (No such file or directory)
 
-Stefan
+> However if we want to support shared access to a tree then O_CREAT
+> semantics should work even in the face of races due to external
+> modification of the tree.  I.e. following race:
+> 
 
---fUYQa+Pmc3FrFX/N
-Content-Type: application/pgp-signature; name="signature.asc"
+Yeah, handling shared access is where the fun starts :)
 
------BEGIN PGP SIGNATURE-----
+> virtiofsd: open(foo, O_CREAT | O_EXCL) -> EEXIST
+> other task: unlink(foo)
+> virtiofsd: open(foo, O_PATH | O_NOFOLLOW) -> ENOENT
+> 
+> To properly support the above the O_CREAT | O_EXCL open would need to
+> be retried.
+> 
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAASGAACgkQnKSrs4Gr
-c8jTYwgAvFrOkWosLBia7KPo1JZxOHdd2QqGAnia1uh8br5k1MI9RkXXleCN0eU/
-3R9qjoi+beTVz2gmaZ5u3urRB72zuK0QEUarO8gYcea1KhQ/rVpQWs4zfUgW8KOq
-GSgemckqg4hJZnagGTFf9c/C+AweL963hDTP6diciIzE17d9SEeSQY9Nq35EyB6r
-dS1emQZiPfpWqMia9zRsTI46tX2yM3OtG0tr0vz3eH6STU7g/hqDCjjW5Qh17XAE
-7BDQt4f4bIF7l90z/f+mhLdcKt+Gob6EESJISR36ikSdSEfeE2MB7UL5m55MZHMf
-A68wj1vYBDd0dRTymdIB6Yu3oFWV1A==
-=fzMr
------END PGP SIGNATURE-----
+But in this case, it seems fine to return ENOENT since
+the guest userspace cannot really assume it never happens.
 
---fUYQa+Pmc3FrFX/N--
+> Thanks,
+> Miklos
+> 
 

@@ -1,13 +1,13 @@
-Date: Wed, 27 Jan 2021 10:18:05 +0000
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20210127101805.GD299797@stefanha-x1.localdomain>
+MIME-Version: 1.0
 References: <20210126103502.260758-1-stefanha@redhat.com>
 	<20210126181604.1a4c69c6@bahia.lan>
-MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="zbGR4y+acU1DwHSi"
-Content-Disposition: inline
-In-Reply-To: <20210126181604.1a4c69c6@bahia.lan>
+	<CAOssrKdh3kqKN4uGE=s5eiymd2MXKsRXUegqRH-TFhqYOK7WOA@mail.gmail.com>
+	<20210127112023.0e97f909@bahia.lan>
+In-Reply-To: <20210127112023.0e97f909@bahia.lan>
+From: Miklos Szeredi <mszeredi@redhat.com>
+Date: Wed, 27 Jan 2021 11:34:52 +0100
+Message-ID: <CAOssrKfezsvcECQ=mO_4T2B09e+2S4LA3=_U6TQyiTtPbE=OYg@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
 Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: prevent opening of special
  files (CVE-2020-35517)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -19,76 +19,57 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Greg Kurz <groug@kaod.org>
-Cc: Daniel Berrange <berrange@redhat.com>, qemu-devel@nongnu.org, P J P <ppandit@redhat.com>, virtio-fs@redhat.com, Alex Xu <alex@alxu.ca>, Laszlo Ersek <lersek@redhat.com>, vgoyal@redhat.com
+Cc: Daniel Berrange <berrange@redhat.com>, QEMU Developers <qemu-devel@nongnu.org>, P J P <ppandit@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, Alex Xu <alex@alxu.ca>, Laszlo Ersek <lersek@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
+On Wed, Jan 27, 2021 at 11:20 AM Greg Kurz <groug@kaod.org> wrote:
+>
+> On Wed, 27 Jan 2021 10:25:28 +0100
+> Miklos Szeredi <mszeredi@redhat.com> wrote:
+>
+> > On Tue, Jan 26, 2021 at 6:18 PM Greg Kurz <groug@kaod.org> wrote:
+> > >
+> > > On Tue, 26 Jan 2021 10:35:02 +0000
+> > > Stefan Hajnoczi <stefanha@redhat.com> wrote:
+> >
+> > > The patch looks pretty good to me. It just seems to be missing a change in
+> > > lo_create():
+> > >
+> > >     fd = openat(parent_inode->fd, name, (fi->flags | O_CREAT) & ~O_NOFOLLOW,
+> > >                 mode);
+> > >
+> > > A malicious guest could have created anything called ${name} in this directory
+> > > before calling FUSE_CREATE and we'll open it blindly, or I'm missing something ?
+> >
+> > Right, this seems like an omission.
+> >
+> > Also the "& ~O_NOFOLLOW" looks like a copy-paste bug, since unlike
+> > lo_open(), lo_create() is not opening a proc symlink.
+> >
+> > So that should be replaced with "| O_NOFOLLOW"
+> >
+>
+>
+> Yes, I've realized that later on. We should definitely enforce O_NOFOLLOW
+> to avoid symlink escapes.
+>
+> Then comes the case of special files... A well-known case is the FIFO that
+> causes openat() to block as described in my response. FWIW, we addressed
+> this one in 9P by adding O_NONBLOCK and fixing the flags to the client
+> expectation with fcntl(F_SETFL). But this is just a protection against
+> being blocked. Blindly opening a special file can lead to any kind of
+> troubles you can think of... so it really looks that the only sane way
+> to be safe from such an attack is to forbid openat() of special files at
+> the filesystem level.
 
---zbGR4y+acU1DwHSi
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Another solution specifically for O_CREAT without O_EXCL would be to
+turn it into an exclusive create.   If that fails with EEXIST then try
+the normal open path (open with O_PATH, fstat, open proc symlink).  If
+that fails with ENOENT, then retry the whole thing a certain number of
+times.  If it still fails then somebody is definitely messing with us
+and we can fail the request with EIO.
 
-On Tue, Jan 26, 2021 at 06:16:04PM +0100, Greg Kurz wrote:
-> On Tue, 26 Jan 2021 10:35:02 +0000
-> Stefan Hajnoczi <stefanha@redhat.com> wrote:
->=20
-> > A well-behaved FUSE client does not attempt to open special files with
-> > FUSE_OPEN because they are handled on the client side (e.g. device nodes
-> > are handled by client-side device drivers).
-> >=20
-> > The check to prevent virtiofsd from opening special files is missing in
-> > a few cases, most notably FUSE_OPEN. A malicious client can cause
-> > virtiofsd to open a device node, potentially allowing the guest to
-> > escape.=20
->=20
-> or pretty much anything nasty you can think of, e.g. DoS if the malicious
-> client repeatedly asks virtiofsd to open FIFOs the other side of which is
-> never opened.
->=20
-> > This can be exploited by a modified guest device driver. It is
-> > not exploitable from guest userspace since the guest kernel will handle
-> > special files inside the guest instead of sending FUSE requests.
-> >=20
-> > This patch adds the missing checks to virtiofsd. This is a short-term
-> > solution because it does not prevent a compromised virtiofsd process
-> > from opening device nodes on the host.
-> >=20
-> > Reported-by: Alex Xu <alex@alxu.ca>
-> > Fixes: CVE-2020-35517
-> > Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> > Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
-> > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-> > ---
->=20
-> The patch looks pretty good to me. It just seems to be missing a change in
-> lo_create():
->=20
->     fd =3D openat(parent_inode->fd, name, (fi->flags | O_CREAT) & ~O_NOFO=
-LLOW,
->                 mode);
->=20
-> A malicious guest could have created anything called ${name} in this dire=
-ctory
-> before calling FUSE_CREATE and we'll open it blindly, or I'm missing some=
-thing ?
+Rather ugly, but I can't think of anything better.
 
-Good point! I will send another revision.
-
-Stefan
-
---zbGR4y+acU1DwHSi
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmARPd0ACgkQnKSrs4Gr
-c8gNIgf/YdElsWhjcT1Hu1brzUPWC4zSiIUK/CUDnKO015eJiCh2jyQ/7tyuAHOO
-njwtXBydBtlbR45lSsDmusMJjpAICE0dJvqShMjYD7WwMXD81Fl8KJFoBseenU8g
-HBrIBouy7OTuuHtOdJ8ofvopuR+CR4zWicrZRmChRRhpKM7UfQPEjbgof4FtpvPL
-XK4CVTGeTtci++icwTQgGPAnvUYn3RJv0be37pIbzKjABfKaAk/NGf3d8HXxLN/9
-n7sJQGj+Lt9y849TfZUhR1/7woPCmBSFBEM2fCpQfTIsU20V7QhgSQMOI4qD0hi0
-T2l7yvHbjKBqXshib1TJA8FFoh2D5w==
-=RnDm
------END PGP SIGNATURE-----
-
---zbGR4y+acU1DwHSi--
+Thanks,
+Miklos
 

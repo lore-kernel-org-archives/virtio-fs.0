@@ -1,26 +1,14 @@
-Date: Thu, 28 Jan 2021 15:26:41 +0100
+Date: Thu, 28 Jan 2021 15:31:23 +0100
 From: Greg Kurz <groug@kaod.org>
-Message-ID: <20210128152641.0e9d5fa0@bahia.lan>
-In-Reply-To: <CAOssrKff8FyC0i+Q1MY0paEiXdARp2=vkSnTwNHZxpntyV7oxA@mail.gmail.com>
-References: <20210126103502.260758-1-stefanha@redhat.com>
-	<20210126181604.1a4c69c6@bahia.lan>
-	<CAOssrKdh3kqKN4uGE=s5eiymd2MXKsRXUegqRH-TFhqYOK7WOA@mail.gmail.com>
-	<20210127112023.0e97f909@bahia.lan>
-	<CAOssrKfezsvcECQ=mO_4T2B09e+2S4LA3=_U6TQyiTtPbE=OYg@mail.gmail.com>
-	<20210127144909.22dd778e@bahia.lan>
-	<CAOssrKeN9iYT-Z46FVtzdKnWcTLfMqK77b1faf78m3XTXnEVGw@mail.gmail.com>
-	<20210127160920.062e47f0@bahia.lan>
-	<CAOssrKc=kSQQLmrAR2VrKfDzkyNDEAAa5qusK1x6+-fCM4+yCA@mail.gmail.com>
-	<20210127163524.4e34596d@bahia.lan>
-	<CAOssrKcbymmsVtU=jMMcE=K1T9oC=NmOzt3aSCe27K7TxXF61A@mail.gmail.com>
-	<CAOssrKfGuDOoJKvia4yLcYy7udYDHHs-EtFeEvjrfKiV9UkLPw@mail.gmail.com>
-	<20210128131454.2f66ed21@bahia.lan>
-	<CAOssrKff8FyC0i+Q1MY0paEiXdARp2=vkSnTwNHZxpntyV7oxA@mail.gmail.com>
+Message-ID: <20210128153123.4aba231c@bahia.lan>
+In-Reply-To: <20210125180115.22936-3-vgoyal@redhat.com>
+References: <20210125180115.22936-1-vgoyal@redhat.com>
+	<20210125180115.22936-3-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="US-ASCII"
 Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: prevent opening of special
- files (CVE-2020-35517)
+Subject: Re: [Virtio-fs] [PATCH 2/6] libvhost-user: Use slave_mutex in all
+ slave messages
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -29,114 +17,130 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <mszeredi@redhat.com>
-Cc: Daniel Berrange <berrange@redhat.com>, QEMU Developers <qemu-devel@nongnu.org>, P J P <ppandit@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, Alex Xu <alex@alxu.ca>, Laszlo Ersek <lersek@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: mst@redhat.com, qemu-devel@nongnu.org, virtio-fs@redhat.com, marcandre.lureau@redhat.com
 
-On Thu, 28 Jan 2021 15:00:58 +0100
-Miklos Szeredi <mszeredi@redhat.com> wrote:
+On Mon, 25 Jan 2021 13:01:11 -0500
+Vivek Goyal <vgoyal@redhat.com> wrote:
 
-> On Thu, Jan 28, 2021 at 1:15 PM Greg Kurz <groug@kaod.org> wrote:
-> >
-> > On Wed, 27 Jan 2021 16:52:56 +0100
-> > Miklos Szeredi <mszeredi@redhat.com> wrote:
-> >
-> > > On Wed, Jan 27, 2021 at 4:47 PM Miklos Szeredi <mszeredi@redhat.com> wrote:
-> > > >
-> > > > On Wed, Jan 27, 2021 at 4:35 PM Greg Kurz <groug@kaod.org> wrote:
-> > > > >
-> > > > > On Wed, 27 Jan 2021 16:22:49 +0100
-> > > > > Miklos Szeredi <mszeredi@redhat.com> wrote:
-> > > > >
-> > > > > > On Wed, Jan 27, 2021 at 4:09 PM Greg Kurz <groug@kaod.org> wrote:
-> > > > > > >
-> > > > > > > On Wed, 27 Jan 2021 15:09:50 +0100
-> > > > > > > Miklos Szeredi <mszeredi@redhat.com> wrote:
-> > > > > > > > The semantics of O_CREATE are that it can fail neither because the
-> > > > > > > > file exists nor because it doesn't.  This doesn't matter if the
-> > > > > > > > exported tree is not modified outside of a single guest, because of
-> > > > > > > > locking provided by the guest kernel.
-> > > > > > > >
-> > > > > > >
-> > > > > > > Wrong. O_CREAT can legitimately fail with ENOENT if one element
-> > > > > >
-> > > > > > Let me make my  statement more precise:
-> > > > > >
-> > > > > > O_CREAT cannot fail with ENOENT if parent directory exists throughout
-> > > > > > the operation.
-> > > > > >
-> > > > >
-> > > > > True, but I still don't see what guarantees guest userspace that the
-> > > > > parent directory doesn't go away... I must have missed something.
-> > > > > Please elaborate.
-> > > >
-> > > > Generally there's no guarantee, however there can be certain
-> > > > situations where the caller can indeed rely on the existence of the
-> > > > parent (e.g. /tmp).
-> > >
-> > > Example from the virtiofs repo:
-> > >
-> > > https://gitlab.com/virtio-fs/ireg/-/blob/master/ireg.c#L315
-> > > https://gitlab.com/virtio-fs/ireg/-/blob/master/ireg.c#L382
-> > >
-> > > In that case breaking O_CREAT would be harmless, since no two
-> > > instances are allowed anyway, so it would just give a confusing error.
-> > > But it is breakage and it probably wouldn't be hard to find much worse
-> > > breakage in real life applications.
-> > >
-> >
-> > Ok, I get your point : a guest userspace application can't expect
-> > to hit ENOENT when doing open("/some_dir/foo", O_CREAT) even if
-> > someone else is doing unlink("/some_dir/foo"), which is a different
-> > case than somebody doing rmdir("/some_dir").
-> >
-> > But we still have a TOCTOU : the open(O_CREAT|O_EXCL) acts as
-> > the check to use open(O_PATH) and retry+timeout can't fix it
-> > reliably.
+> dev->slave_mutex needs to be taken when sending messages on slave_fd.
+> Currently _vu_queue_notify() does not do that.
 > 
-> Right.
-> 
-> > A possible fix for the case where the race comes from the
-> > client itself would be to serialize FUSE requests that
-> > create/remove paths in the same directory. I don't know
-> > enough the code yet to assess if it's doable though.
-> >
-> > Then this would leave the case where something else on
-> > the host is racing with virtiofsd. IMHO this belongs to
-> > the broader family of "bad things the host can do
-> > in our back". This requires a bigger hammer than
-> > adding band-aids here and there IMHO. So in the
-> > scope of this patch, I don't think we should retry
-> > and timeout, but just return whatever errno that
-> > makes sense.
-> 
-> I never suggested a timeout, that would indeed be nonsense.
+> Introduce a helper vu_message_slave_send_receive() which sends as well
+> as receive response. Use this helper in all the paths which send
+> message on slave_fd channel.
 > 
 
-Yeah sorry for that, by timeout I was lazily expressing "retry
-a bit and bail out if it doesn't work".
+Does this fix any known bug ?
 
-> Just do a simple retry loop with a counter.  I'd set counter to a
-> small number (5 or whatever), so that basically any accidental races
-> are cared for, and the only case that would trigger the EIO is if the
-> file was constantly removed and recreated (and even in that case it
-> would be pretty difficult to trigger).  This would add only minimal
-> complexity or overhead.
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+
+LGTM
+
+Reviewed-by: Greg Kurz <groug@kaod.org>
+
+>  subprojects/libvhost-user/libvhost-user.c | 50 ++++++++++++-----------
+>  1 file changed, 27 insertions(+), 23 deletions(-)
 > 
-
-I still don't like the counter thing very much but I can't think of
-anything better that _works_ in all cases in the short term... so be
-it.
-
-> The proper solution might be adding O_REGULAR, and it actually would
-> be useful for other O_CREAT users, since it's probably what they want
-> anyway (but existing semantics can't be changed).
-> 
-
-Yeah only the kernel can handle this race gracefully and O_REGULAR
-would be great, but it might take some time until this percolates
-up to QEMU.
-
-> Thanks,
-> Miklos
-> 
+> diff --git a/subprojects/libvhost-user/libvhost-user.c b/subprojects/libvhost-user/libvhost-user.c
+> index 4cf4aef63d..7a56c56dc8 100644
+> --- a/subprojects/libvhost-user/libvhost-user.c
+> +++ b/subprojects/libvhost-user/libvhost-user.c
+> @@ -403,7 +403,7 @@ vu_send_reply(VuDev *dev, int conn_fd, VhostUserMsg *vmsg)
+>   * Processes a reply on the slave channel.
+>   * Entered with slave_mutex held and releases it before exit.
+>   * Returns true on success.
+> - * *payload is written on success
+> + * *payload is written on success, if payload is not NULL.
+>   */
+>  static bool
+>  vu_process_message_reply(VuDev *dev, const VhostUserMsg *vmsg,
+> @@ -427,7 +427,9 @@ vu_process_message_reply(VuDev *dev, const VhostUserMsg *vmsg,
+>          goto out;
+>      }
+>  
+> -    *payload = msg_reply.payload.u64;
+> +    if (payload) {
+> +        *payload = msg_reply.payload.u64;
+> +    }
+>      result = true;
+>  
+>  out:
+> @@ -435,6 +437,25 @@ out:
+>      return result;
+>  }
+>  
+> +/* Returns true on success, false otherwise */
+> +static bool
+> +vu_message_slave_send_receive(VuDev *dev, VhostUserMsg *vmsg, uint64_t *payload)
+> +{
+> +    pthread_mutex_lock(&dev->slave_mutex);
+> +    if (!vu_message_write(dev, dev->slave_fd, vmsg)) {
+> +        pthread_mutex_unlock(&dev->slave_mutex);
+> +        return false;
+> +    }
+> +
+> +    if ((vmsg->flags & VHOST_USER_NEED_REPLY_MASK) == 0) {
+> +        pthread_mutex_unlock(&dev->slave_mutex);
+> +        return true;
+> +    }
+> +
+> +    /* Also unlocks the slave_mutex */
+> +    return vu_process_message_reply(dev, vmsg, payload);
+> +}
+> +
+>  /* Kick the log_call_fd if required. */
+>  static void
+>  vu_log_kick(VuDev *dev)
+> @@ -1340,16 +1361,8 @@ bool vu_set_queue_host_notifier(VuDev *dev, VuVirtq *vq, int fd,
+>          return false;
+>      }
+>  
+> -    pthread_mutex_lock(&dev->slave_mutex);
+> -    if (!vu_message_write(dev, dev->slave_fd, &vmsg)) {
+> -        pthread_mutex_unlock(&dev->slave_mutex);
+> -        return false;
+> -    }
+> -
+> -    /* Also unlocks the slave_mutex */
+> -    res = vu_process_message_reply(dev, &vmsg, &payload);
+> +    res = vu_message_slave_send_receive(dev, &vmsg, &payload);
+>      res = res && (payload == 0);
+> -
+>      return res;
+>  }
+>  
+> @@ -2395,10 +2408,7 @@ static void _vu_queue_notify(VuDev *dev, VuVirtq *vq, bool sync)
+>              vmsg.flags |= VHOST_USER_NEED_REPLY_MASK;
+>          }
+>  
+> -        vu_message_write(dev, dev->slave_fd, &vmsg);
+> -        if (ack) {
+> -            vu_message_read_default(dev, dev->slave_fd, &vmsg);
+> -        }
+> +        vu_message_slave_send_receive(dev, &vmsg, NULL);
+>          return;
+>      }
+>  
+> @@ -2942,17 +2952,11 @@ int64_t vu_fs_cache_request(VuDev *dev, VhostUserSlaveRequest req, int fd,
+>          return -EINVAL;
+>      }
+>  
+> -    pthread_mutex_lock(&dev->slave_mutex);
+> -    if (!vu_message_write(dev, dev->slave_fd, &vmsg)) {
+> -        pthread_mutex_unlock(&dev->slave_mutex);
+> -        return -EIO;
+> -    }
+> -
+> -    /* Also unlocks the slave_mutex */
+> -    res = vu_process_message_reply(dev, &vmsg, &payload);
+> +    res = vu_message_slave_send_receive(dev, &vmsg, &payload);
+>      if (!res) {
+>          return -EIO;
+>      }
+> +
+>      /*
+>       * Payload is delivered as uint64_t but is actually signed for
+>       * errors.
 

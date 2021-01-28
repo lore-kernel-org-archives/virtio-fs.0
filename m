@@ -1,16 +1,17 @@
-Date: Thu, 28 Jan 2021 16:06:25 +0100
-From: Greg Kurz <groug@kaod.org>
-Message-ID: <20210128160625.45cf09fc@bahia.lan>
-In-Reply-To: <20210128144835.GA3342@redhat.com>
-References: <20210125180115.22936-1-vgoyal@redhat.com>
-	<20210125180115.22936-3-vgoyal@redhat.com>
-	<20210128153123.4aba231c@bahia.lan>
-	<20210128144835.GA3342@redhat.com>
+Date: Thu, 28 Jan 2021 15:32:58 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20210128153258.GA20377@stefanha-x1.localdomain>
+References: <20210127112131.308451-1-stefanha@redhat.com>
+	<CAOssrKfY7zDOH3NNbtyARHMCdJJN1tKQJri8ec=igjBf=K6Dog@mail.gmail.com>
+	<20210127141430.GA310142@stefanha-x1.localdomain>
+	<CAOssrKdmpjMG1fVRJBBG7DKy4Fy46HaBz5gHvWZfOTy6FGF+6Q@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="US-ASCII"
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH 2/6] libvhost-user: Use slave_mutex in all
- slave messages
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="YZ5djTAD1cGYuMQK"
+Content-Disposition: inline
+In-Reply-To: <CAOssrKdmpjMG1fVRJBBG7DKy4Fy46HaBz5gHvWZfOTy6FGF+6Q@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH v3] virtiofsd: prevent opening of special
+ files (CVE-2020-35517)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,149 +20,75 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: mst@redhat.com, qemu-devel@nongnu.org, virtio-fs@redhat.com, marcandre.lureau@redhat.com
+To: Miklos Szeredi <mszeredi@redhat.com>
+Cc: Daniel Berrange <berrange@redhat.com>, QEMU Developers <qemu-devel@nongnu.org>, virtio-fs-list <virtio-fs@redhat.com>, Alex Xu <alex@alxu.ca>, P J P <ppandit@redhat.com>, Laszlo Ersek <lersek@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
-On Thu, 28 Jan 2021 09:48:35 -0500
-Vivek Goyal <vgoyal@redhat.com> wrote:
 
-> On Thu, Jan 28, 2021 at 03:31:23PM +0100, Greg Kurz wrote:
-> > On Mon, 25 Jan 2021 13:01:11 -0500
-> > Vivek Goyal <vgoyal@redhat.com> wrote:
-> > 
-> > > dev->slave_mutex needs to be taken when sending messages on slave_fd.
-> > > Currently _vu_queue_notify() does not do that.
-> > > 
-> > > Introduce a helper vu_message_slave_send_receive() which sends as well
-> > > as receive response. Use this helper in all the paths which send
-> > > message on slave_fd channel.
-> > > 
-> > 
-> > Does this fix any known bug ?
-> 
-> I am not aware of any bug. This fix is based on code inspection.
-> 
-> Also I wanted a central place/function to send messages on slave channel
-> so that I can check state of slave channel (open/close) and act
-> accordingly. Otherwise I will have to do the check at every place
-> which is trying to send/receive message on slave channel.
-> 
+--YZ5djTAD1cGYuMQK
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Makes sense. Thanks for the clarification.
+On Wed, Jan 27, 2021 at 03:27:23PM +0100, Miklos Szeredi wrote:
+> On Wed, Jan 27, 2021 at 3:14 PM Stefan Hajnoczi <stefanha@redhat.com> wro=
+te:
+> >
+> > On Wed, Jan 27, 2021 at 02:01:54PM +0100, Miklos Szeredi wrote:
+>=20
+> > > The problem here is there can also be a race between the open and the
+> > > subsequent lo_do_lookup().
+> > >
+> > > At this point it's probably enough to verify that fuse_entry_param
+> > > refers to the same object as the fh (using fstat and comparing st_dev
+> > > and st_ino).
+> >
+> > Can you describe the race in detail? FUSE_CREATE vs FUSE_OPEN?
+> > FUSE_CREATE vs FUSE_CREATE?
+>=20
+> A race between FUSE_CREATE and external modification:
+>=20
+> VIRTIOFSD: lo_create() {
+> VIRTIOFSD:     fd =3D open(foo, O_CREAT | O_EXCL)
+> EXTERNAL:  unlink(foo)
+> EXTERNAL:  open(foo, O_CREAT)
+> VIRTIOFSD:     lo_do_lookup() {
+> VIRTIOFSD:         newfd =3D open(foo, O_PATH | O_NOFOLLOW)
+>=20
+> Nothing serious will happen, but there will be a discrepancy between
+> the open file and the inode that it references.  I.e.  the following
+> in the client will yield weird results:
+>=20
+> open(foo, O_CREAT) -> fd
+> sprintf(procname, "/proc/self/fd/%i", fd);
+> open(procname, O_RDONLY) -> fd2
+> write(fd, buf, bufsize)
+> read(fd2, buf, bufsize)
+>=20
+> This is probably not a security issue, more of a quality of
+> implementation issue.
 
-> Vivek
-> 
-> > 
-> > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > > ---
-> > 
-> > LGTM
-> > 
-> > Reviewed-by: Greg Kurz <groug@kaod.org>
-> > 
-> > >  subprojects/libvhost-user/libvhost-user.c | 50 ++++++++++++-----------
-> > >  1 file changed, 27 insertions(+), 23 deletions(-)
-> > > 
-> > > diff --git a/subprojects/libvhost-user/libvhost-user.c b/subprojects/libvhost-user/libvhost-user.c
-> > > index 4cf4aef63d..7a56c56dc8 100644
-> > > --- a/subprojects/libvhost-user/libvhost-user.c
-> > > +++ b/subprojects/libvhost-user/libvhost-user.c
-> > > @@ -403,7 +403,7 @@ vu_send_reply(VuDev *dev, int conn_fd, VhostUserMsg *vmsg)
-> > >   * Processes a reply on the slave channel.
-> > >   * Entered with slave_mutex held and releases it before exit.
-> > >   * Returns true on success.
-> > > - * *payload is written on success
-> > > + * *payload is written on success, if payload is not NULL.
-> > >   */
-> > >  static bool
-> > >  vu_process_message_reply(VuDev *dev, const VhostUserMsg *vmsg,
-> > > @@ -427,7 +427,9 @@ vu_process_message_reply(VuDev *dev, const VhostUserMsg *vmsg,
-> > >          goto out;
-> > >      }
-> > >  
-> > > -    *payload = msg_reply.payload.u64;
-> > > +    if (payload) {
-> > > +        *payload = msg_reply.payload.u64;
-> > > +    }
-> > >      result = true;
-> > >  
-> > >  out:
-> > > @@ -435,6 +437,25 @@ out:
-> > >      return result;
-> > >  }
-> > >  
-> > > +/* Returns true on success, false otherwise */
-> > > +static bool
-> > > +vu_message_slave_send_receive(VuDev *dev, VhostUserMsg *vmsg, uint64_t *payload)
-> > > +{
-> > > +    pthread_mutex_lock(&dev->slave_mutex);
-> > > +    if (!vu_message_write(dev, dev->slave_fd, vmsg)) {
-> > > +        pthread_mutex_unlock(&dev->slave_mutex);
-> > > +        return false;
-> > > +    }
-> > > +
-> > > +    if ((vmsg->flags & VHOST_USER_NEED_REPLY_MASK) == 0) {
-> > > +        pthread_mutex_unlock(&dev->slave_mutex);
-> > > +        return true;
-> > > +    }
-> > > +
-> > > +    /* Also unlocks the slave_mutex */
-> > > +    return vu_process_message_reply(dev, vmsg, payload);
-> > > +}
-> > > +
-> > >  /* Kick the log_call_fd if required. */
-> > >  static void
-> > >  vu_log_kick(VuDev *dev)
-> > > @@ -1340,16 +1361,8 @@ bool vu_set_queue_host_notifier(VuDev *dev, VuVirtq *vq, int fd,
-> > >          return false;
-> > >      }
-> > >  
-> > > -    pthread_mutex_lock(&dev->slave_mutex);
-> > > -    if (!vu_message_write(dev, dev->slave_fd, &vmsg)) {
-> > > -        pthread_mutex_unlock(&dev->slave_mutex);
-> > > -        return false;
-> > > -    }
-> > > -
-> > > -    /* Also unlocks the slave_mutex */
-> > > -    res = vu_process_message_reply(dev, &vmsg, &payload);
-> > > +    res = vu_message_slave_send_receive(dev, &vmsg, &payload);
-> > >      res = res && (payload == 0);
-> > > -
-> > >      return res;
-> > >  }
-> > >  
-> > > @@ -2395,10 +2408,7 @@ static void _vu_queue_notify(VuDev *dev, VuVirtq *vq, bool sync)
-> > >              vmsg.flags |= VHOST_USER_NEED_REPLY_MASK;
-> > >          }
-> > >  
-> > > -        vu_message_write(dev, dev->slave_fd, &vmsg);
-> > > -        if (ack) {
-> > > -            vu_message_read_default(dev, dev->slave_fd, &vmsg);
-> > > -        }
-> > > +        vu_message_slave_send_receive(dev, &vmsg, NULL);
-> > >          return;
-> > >      }
-> > >  
-> > > @@ -2942,17 +2952,11 @@ int64_t vu_fs_cache_request(VuDev *dev, VhostUserSlaveRequest req, int fd,
-> > >          return -EINVAL;
-> > >      }
-> > >  
-> > > -    pthread_mutex_lock(&dev->slave_mutex);
-> > > -    if (!vu_message_write(dev, dev->slave_fd, &vmsg)) {
-> > > -        pthread_mutex_unlock(&dev->slave_mutex);
-> > > -        return -EIO;
-> > > -    }
-> > > -
-> > > -    /* Also unlocks the slave_mutex */
-> > > -    res = vu_process_message_reply(dev, &vmsg, &payload);
-> > > +    res = vu_message_slave_send_receive(dev, &vmsg, &payload);
-> > >      if (!res) {
-> > >          return -EIO;
-> > >      }
-> > > +
-> > >      /*
-> > >       * Payload is delivered as uint64_t but is actually signed for
-> > >       * errors.
-> > 
-> 
+Thanks for explaining. This is related to consistency when the shared
+directory is accessed by multiple systems (e.g. other guests or the
+host). virtiofsd doesn't support consistency in that case yet.
+
+Let's treat this as a separate issue.
+
+Stefan
+
+--YZ5djTAD1cGYuMQK
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAS2SYACgkQnKSrs4Gr
+c8hKSQf/bjaMIB+c5JK/IX+azZaL78TpuZsbWwuA3cXr8zGhTCJUHURkH9qBJr6O
+ySoxNFF1kUkHpF3VEbvSLJaoKrNVBQ1TC3l1nHhD2mhL9xQlJGOVq0oORUIaF5Vh
+e47i7YqsLUYyA1WA+Z+d7vYmv8JaoFWkUXshtIHVGxUg0bSLEPelIcWuxsWyFTxM
+jO+VFxFJ9UiZJyiu7X1XrwIeOnKaPUtPCEpMkhvxZjCYYaAHbnziklFL+aRX5wKr
+8S3u64VU2ADDxoNPscMv8n0BTHbxMgIXdTxvz/w3JbAw9qkJeg/dFuUjlCLTZOqy
+24cneiLEqmkVZyiXG6YBpJm2MjHwKw==
+=9Ba+
+-----END PGP SIGNATURE-----
+
+--YZ5djTAD1cGYuMQK--
 

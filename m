@@ -1,10 +1,16 @@
-Date: Tue, 19 Jan 2021 17:18:49 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210119221849.GC77840@redhat.com>
+Date: Thu, 28 Jan 2021 16:06:25 +0100
+From: Greg Kurz <groug@kaod.org>
+Message-ID: <20210128160625.45cf09fc@bahia.lan>
+In-Reply-To: <20210128144835.GA3342@redhat.com>
+References: <20210125180115.22936-1-vgoyal@redhat.com>
+	<20210125180115.22936-3-vgoyal@redhat.com>
+	<20210128153123.4aba231c@bahia.lan>
+	<20210128144835.GA3342@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: [Virtio-fs] What are libvhost-user locking requirements
+Content-Type: text/plain; charset="US-ASCII"
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH 2/6] libvhost-user: Use slave_mutex in all
+ slave messages
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,49 +19,149 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
-Cc: gkurz@redhat.com, johannes.berg@intel.com, marcandre.lureau@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: mst@redhat.com, qemu-devel@nongnu.org, virtio-fs@redhat.com, marcandre.lureau@redhat.com
 
-Hi,
+On Thu, 28 Jan 2021 09:48:35 -0500
+Vivek Goyal <vgoyal@redhat.com> wrote:
 
-Current virtiofsd code uses libvhost-user and I am assuming virtiofsd-rs
-uses it too. I am wondering what are the locking requirements for
-this library.
+> On Thu, Jan 28, 2021 at 03:31:23PM +0100, Greg Kurz wrote:
+> > On Mon, 25 Jan 2021 13:01:11 -0500
+> > Vivek Goyal <vgoyal@redhat.com> wrote:
+> > 
+> > > dev->slave_mutex needs to be taken when sending messages on slave_fd.
+> > > Currently _vu_queue_notify() does not do that.
+> > > 
+> > > Introduce a helper vu_message_slave_send_receive() which sends as well
+> > > as receive response. Use this helper in all the paths which send
+> > > message on slave_fd channel.
+> > > 
+> > 
+> > Does this fix any known bug ?
+> 
+> I am not aware of any bug. This fix is based on code inspection.
+> 
+> Also I wanted a central place/function to send messages on slave channel
+> so that I can check state of slave channel (open/close) and act
+> accordingly. Otherwise I will have to do the check at every place
+> which is trying to send/receive message on slave channel.
+> 
 
-Looking at it it does not look like thread safe. Well parts of of kind
-of look thread safe. For example, David Gilbert introduced a slave_mutex
-to control reading/writeing on slave_fd. But dev->slave_fd can be modified
-vu_set_slave_req_fd() without any locks. Similiarly _vu_queue_notify()
-uses dev->slave_fd but  does not take any lock. May be these are just
-bugs and we can take slave_mutex in those paths so not a big deal.
+Makes sense. Thanks for the clarification.
 
-But this library does not talk about locking at all. Of course there
-are many shared data structures like "struct VuDev" and helpers which
-access this structure. Is client supposed to provide locking and
-make sure not more than one thread is calling into the library
-at one point of time.
-
-But in virtiofsd I see that we seem to be in mixed mode. In some cases
-we are holding ->vu_dispatch_rwlock in read-only mode. So that will
-allow multipler threads to call into library for one queue.
-
-In other places like lo_setupmapping() and lo_removemapping(), we are
-not holding ->vu_dispatch_rwlock() at all and simply call into
-library vu_fs_cache_request(VHOST_USER_SLAVE_FS_MAP/...). So multiple
-threads can call in. I think precisely for this use case dev->slave_mutex
-has been introduced in library.
-
-So few queries.
-
-- what's the locking model needed to use libvhost-user. Is there one? 
-
-- Is it ok to selectively add locking for some data structures in
-  libvhost-user. As slave_mutex has been added. So user will have to
-  go through the code to figure out which paths can be called without
-  locks and which paths can't be.
-
-/me is confused and trying to wrap my head around the locking requirements
-while using libvhost-user.
-
-Vivek
+> Vivek
+> 
+> > 
+> > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > > ---
+> > 
+> > LGTM
+> > 
+> > Reviewed-by: Greg Kurz <groug@kaod.org>
+> > 
+> > >  subprojects/libvhost-user/libvhost-user.c | 50 ++++++++++++-----------
+> > >  1 file changed, 27 insertions(+), 23 deletions(-)
+> > > 
+> > > diff --git a/subprojects/libvhost-user/libvhost-user.c b/subprojects/libvhost-user/libvhost-user.c
+> > > index 4cf4aef63d..7a56c56dc8 100644
+> > > --- a/subprojects/libvhost-user/libvhost-user.c
+> > > +++ b/subprojects/libvhost-user/libvhost-user.c
+> > > @@ -403,7 +403,7 @@ vu_send_reply(VuDev *dev, int conn_fd, VhostUserMsg *vmsg)
+> > >   * Processes a reply on the slave channel.
+> > >   * Entered with slave_mutex held and releases it before exit.
+> > >   * Returns true on success.
+> > > - * *payload is written on success
+> > > + * *payload is written on success, if payload is not NULL.
+> > >   */
+> > >  static bool
+> > >  vu_process_message_reply(VuDev *dev, const VhostUserMsg *vmsg,
+> > > @@ -427,7 +427,9 @@ vu_process_message_reply(VuDev *dev, const VhostUserMsg *vmsg,
+> > >          goto out;
+> > >      }
+> > >  
+> > > -    *payload = msg_reply.payload.u64;
+> > > +    if (payload) {
+> > > +        *payload = msg_reply.payload.u64;
+> > > +    }
+> > >      result = true;
+> > >  
+> > >  out:
+> > > @@ -435,6 +437,25 @@ out:
+> > >      return result;
+> > >  }
+> > >  
+> > > +/* Returns true on success, false otherwise */
+> > > +static bool
+> > > +vu_message_slave_send_receive(VuDev *dev, VhostUserMsg *vmsg, uint64_t *payload)
+> > > +{
+> > > +    pthread_mutex_lock(&dev->slave_mutex);
+> > > +    if (!vu_message_write(dev, dev->slave_fd, vmsg)) {
+> > > +        pthread_mutex_unlock(&dev->slave_mutex);
+> > > +        return false;
+> > > +    }
+> > > +
+> > > +    if ((vmsg->flags & VHOST_USER_NEED_REPLY_MASK) == 0) {
+> > > +        pthread_mutex_unlock(&dev->slave_mutex);
+> > > +        return true;
+> > > +    }
+> > > +
+> > > +    /* Also unlocks the slave_mutex */
+> > > +    return vu_process_message_reply(dev, vmsg, payload);
+> > > +}
+> > > +
+> > >  /* Kick the log_call_fd if required. */
+> > >  static void
+> > >  vu_log_kick(VuDev *dev)
+> > > @@ -1340,16 +1361,8 @@ bool vu_set_queue_host_notifier(VuDev *dev, VuVirtq *vq, int fd,
+> > >          return false;
+> > >      }
+> > >  
+> > > -    pthread_mutex_lock(&dev->slave_mutex);
+> > > -    if (!vu_message_write(dev, dev->slave_fd, &vmsg)) {
+> > > -        pthread_mutex_unlock(&dev->slave_mutex);
+> > > -        return false;
+> > > -    }
+> > > -
+> > > -    /* Also unlocks the slave_mutex */
+> > > -    res = vu_process_message_reply(dev, &vmsg, &payload);
+> > > +    res = vu_message_slave_send_receive(dev, &vmsg, &payload);
+> > >      res = res && (payload == 0);
+> > > -
+> > >      return res;
+> > >  }
+> > >  
+> > > @@ -2395,10 +2408,7 @@ static void _vu_queue_notify(VuDev *dev, VuVirtq *vq, bool sync)
+> > >              vmsg.flags |= VHOST_USER_NEED_REPLY_MASK;
+> > >          }
+> > >  
+> > > -        vu_message_write(dev, dev->slave_fd, &vmsg);
+> > > -        if (ack) {
+> > > -            vu_message_read_default(dev, dev->slave_fd, &vmsg);
+> > > -        }
+> > > +        vu_message_slave_send_receive(dev, &vmsg, NULL);
+> > >          return;
+> > >      }
+> > >  
+> > > @@ -2942,17 +2952,11 @@ int64_t vu_fs_cache_request(VuDev *dev, VhostUserSlaveRequest req, int fd,
+> > >          return -EINVAL;
+> > >      }
+> > >  
+> > > -    pthread_mutex_lock(&dev->slave_mutex);
+> > > -    if (!vu_message_write(dev, dev->slave_fd, &vmsg)) {
+> > > -        pthread_mutex_unlock(&dev->slave_mutex);
+> > > -        return -EIO;
+> > > -    }
+> > > -
+> > > -    /* Also unlocks the slave_mutex */
+> > > -    res = vu_process_message_reply(dev, &vmsg, &payload);
+> > > +    res = vu_message_slave_send_receive(dev, &vmsg, &payload);
+> > >      if (!res) {
+> > >          return -EIO;
+> > >      }
+> > > +
+> > >      /*
+> > >       * Payload is delivered as uint64_t but is actually signed for
+> > >       * errors.
+> > 
+> 
 

@@ -1,15 +1,15 @@
-Date: Fri, 29 Jan 2021 09:16:00 -0500
+Date: Fri, 29 Jan 2021 10:02:50 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210129141600.GA3146@redhat.com>
+Message-ID: <20210129150250.GB3146@redhat.com>
 References: <20210125180115.22936-1-vgoyal@redhat.com>
-	<20210125180115.22936-5-vgoyal@redhat.com>
-	<20210128165234.GC20377@stefanha-x1.localdomain>
+	<20210125180115.22936-4-vgoyal@redhat.com>
+	<20210129104507.1ade37a7@bahia.lan>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210128165234.GC20377@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH 4/6] qemu,
- vhost-user: Extend protocol to start/stop/flush slave channel
+In-Reply-To: <20210129104507.1ade37a7@bahia.lan>
+Subject: Re: [Virtio-fs] [PATCH 3/6] vhost-user: Return error code from
+	slave_read()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,108 +18,176 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, mst@redhat.com, qemu-devel@nongnu.org
+To: Greg Kurz <groug@kaod.org>
+Cc: mst@redhat.com, qemu-devel@nongnu.org, virtio-fs@redhat.com, marcandre.lureau@redhat.com
 
-On Thu, Jan 28, 2021 at 04:52:34PM +0000, Stefan Hajnoczi wrote:
-> On Mon, Jan 25, 2021 at 01:01:13PM -0500, Vivek Goyal wrote:
-> > Currently we don't have a mechanism to flush slave channel while shutting
-> > down vhost-user device and that can result a deadlock. Consider following
-> > scenario.
-> > 
-> > 1. Slave gets a request from guest on virtqueue (say index 1, vq1), to map
-> >    a portion of file in qemu address space.
-> > 
-> > 2. Thread serving vq1 receives this request and sends a message to qemu on
-> >    slave channel/fd and gets blocked in waiting for a response from qemu.
-> > 
-> > 3. In the mean time, user does "echo b > /proc/sysrq-trigger" in guest. This
-> >    leads to qemu reset and ultimately in main thread we end up in
-> >    vhost_dev_stop() which is trying to shutdown virtqueues for the device.
-> > 
-> > 4. Slave gets VHOST_USER_GET_VRING_BASE message to shutdown a virtqueue on
-> >    unix socket being used for communication.
-> > 
-> > 5. Slave tries to shutdown the thread serving vq1 and waits for it to
-> >    terminate. But vq1 thread can't terminate because it is waiting for
-> >    a response from qemu on slave_fd. And qemu is not processing slave_fd
-> >    anymore as qemu is ressing (and not running main event loop anymore)
-> >    and is waiting for a response to VHOST_USER_GET_VRING_BASE.
-> > 
-> > So we have a deadlock. Qemu is waiting on slave to response to
-> > VHOST_USER_GET_VRING_BASE message and slave is waiting on qemu to
-> > respond to request it sent on slave_fd.
-> > 
-> > I can reliably reproduce this race with virtio-fs.
-> > 
-> > Hence here is the proposal to solve this problem. Enhance vhost-user
-> > protocol to properly shutdown slave_fd channel. And if there are pending
-> > requests, flush the channel completely before sending the request to
-> > shutdown virtqueues.
-> > 
-> > New workflow to shutdown slave channel is.
-> > 
-> > - Qemu sends VHOST_USER_STOP_SLAVE_CHANNEL request to slave. It waits
-> >   for an reply from guest.
-> > 
-> > - Then qemu sits in a tight loop waiting for
-> >   VHOST_USER_SLAVE_STOP_CHANNEL_COMPLETE message from slave on slave_fd.
-> >   And while waiting for this message, qemu continues to process requests
-> >   on slave_fd to flush any pending requests. This will unblock threads
-> >   in slave and allow slave to shutdown slave channel.
-> > 
-> > - Once qemu gets VHOST_USER_SLAVE_STOP_CHANNEL_COMPLETE message, it knows
-> >   no more requests will come on slave_fd and it can continue to shutdown
-> >   virtqueues now.
-> > 
-> > - Once device starts again, qemu will send VHOST_USER_START_SLAVE_CHANNEL
-> >   message to slave to open the slave channel and receive requests.
-> > 
-> > IOW, this allows for proper shutdown of slave channel, making sure
-> > no threads in slave are blocked on sending/receiving message. And
-> > this in-turn allows for shutting down of virtqueues, hence resolving
-> > the deadlock.
+On Fri, Jan 29, 2021 at 10:45:07AM +0100, Greg Kurz wrote:
+> On Mon, 25 Jan 2021 13:01:12 -0500
+> Vivek Goyal <vgoyal@redhat.com> wrote:
 > 
-> Is the new message necessary?
-
-Hi Stefan,
-
-It probably is not necessary but it feels like a cleaner and simpler
-solution.
-
-There slave is a separate channel from virtqueues. And if device is
-stopping, we want to make sure there are no pending requests in
-slave channel. It is possible that virtqueue shutodwn is successful
-but other entity could still be sending messages on slave channel. In
-that case, shall we say device shutdown complete and stop polling
-slave channel?
-
-IOW, the way we have explicit protocol messages to shutdown each
-vring, it makes sense to have explicit protocol message to shutdown
-slave channel as well. Right now there is no mechanism to do that.
-
-IMHO, introducing an explicit mechanism in protocol to shutdown
-slave channel feels better as compared to say keep on serving
-slave channel in parallel while waiting for virtuqueues to shutdown
-and stop serving slave as soon as last virtuqueue is stopped (there
-could still be pending slave message right after last virtuqueue
-got shutdown).
-
-
-> How about letting QEMU handle slave fd
-> activity while waiting for virtqueues to stop instead?
+> > Right now slave_read() is called through main event loop and does not
+> > return error. In next few patches I want to call slave_read() from
+> > vhost device shutdown path as well and want to know if an error
+> > happened so that caller can give up and return error accordingly.
+> > 
+> > Hence, create helper function do_slave_read(), which returns an
+> > integer. Success is 0 and negative number is error code. slave_read()
+> > calls do_slave_read() and ignores error code.
+> > 
+> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > ---
+> >  hw/virtio/vhost-user.c | 43 ++++++++++++++++++++++++++++++++++++------
+> >  1 file changed, 37 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
+> > index d95dbc39e3..867cac034f 100644
+> > --- a/hw/virtio/vhost-user.c
+> > +++ b/hw/virtio/vhost-user.c
+> > @@ -1401,7 +1401,7 @@ static uint64_t vhost_user_slave_handle_vring_host_notifier(
+> >      return false;
+> >  }
+> >  
+> > -static void slave_read(void *opaque)
+> > +static int do_slave_read(void *opaque)
+> >  {
+> >      struct vhost_dev *dev = opaque;
+> >      struct vhost_user *u = dev->opaque;
+> > @@ -1432,13 +1432,22 @@ static void slave_read(void *opaque)
+> >          size = recvmsg(u->slave_fd, &msgh, 0);
+> >      } while (size < 0 && (errno == EINTR || errno == EAGAIN));
+> >  
+> > -    if (size != VHOST_USER_HDR_SIZE) {
+> > +    if (size < 0) {
+> > +        ret = -errno;
+> >          error_report("Failed to read from slave.");
+> >          goto err;
+> >      }
+> >  
+> > +    if (size != VHOST_USER_HDR_SIZE) {
+> > +        error_report("Failed to read %lu bytes from slave.",
+> > +                     VHOST_USER_HDR_SIZE);
 > 
-> In other words, QEMU should monitor both the UNIX domain socket and the
-> slave fd after it has sent VHOST_USER_GET_VRING_BASE and is awaiting the
-> response.
+> Maybe also print size ?
 
-I can give it a try. If there is a strong preference for this solution.
-I guess I can patch vhost_user_get_vring_base() to poll and serve both
-unix domain socket and slave fd.
+Sounds good. That way it will be clear how many bytes we were expecting
+and how many did we get.
 
-But at this point of time I do think that adding a mechanism to shutodwn
-slave channel (the way we have mechanism to shutdown vring), sounds
-better from design point of view.
+> 
+> And, question from a newbie : any idea why short reads are
+> considered as errors instead of retrying ? Same question
+> stands for the other locations where we check the numbers
+> of read/written bytes in this function.
+
+I had same question when I was modifying the code. Atleast recvmsg()
+man page does not say anything about read number of bytes can less
+than number of bytes requested. But read() man page does say that
+fewer bytes can be returned.
+
+So maybe something to improve upon down the line.
+
+> 
+> > +        ret = -EBADMSG;
+> > +        goto err;
+> > +    }
+> > +
+> >      if (msgh.msg_flags & MSG_CTRUNC) {
+> >          error_report("Truncated message.");
+> > +        ret = -EBADMSG;
+> >          goto err;
+> >      }
+> >  
+> > @@ -1456,6 +1465,7 @@ static void slave_read(void *opaque)
+> >          error_report("Failed to read msg header."
+> >                  " Size %d exceeds the maximum %zu.", hdr.size,
+> >                  VHOST_USER_PAYLOAD_SIZE);
+> > +        ret = -EBADMSG;
+> >          goto err;
+> >      }
+> >  
+> > @@ -1464,8 +1474,15 @@ static void slave_read(void *opaque)
+> >          size = read(u->slave_fd, &payload, hdr.size);
+> >      } while (size < 0 && (errno == EINTR || errno == EAGAIN));
+> >  
+> > -    if (size != hdr.size) {
+> > +    if (size == -1) {
+> 
+> Maybe make it (size < 0) for consistency with the error checking
+> added above ? And this seems to be the preferred way in the QEMU
+> tree :)
+
+Ok, will do. Don't have any strong preferene. read() man page says
+it returns -1 in case of error, so checked for that.
+
+> 
+> >          error_report("Failed to read payload from slave.");
+> > +        ret = errno;
+> 
+>     ret = -errno;
+> 
+> And this should be done before error_report() to ensure errno
+> isn't cloberred.
+
+Aha.. good catch. Will fix it.
+
+> 
+> > +        goto err;
+> > +    }
+> > +
+> > +    if (size != hdr.size) {
+> > +        error_report("Failed to read %d payload bytes from slave.", hdr.size);
+> > +        ret = -EBADMSG;
+> >          goto err;
+> >      }
+> >  
+> > @@ -1529,13 +1546,22 @@ static void slave_read(void *opaque)
+> >              size = writev(u->slave_fd, iovec, ARRAY_SIZE(iovec));
+> >          } while (size < 0 && (errno == EINTR || errno == EAGAIN));
+> >  
+> > -        if (size != VHOST_USER_HDR_SIZE + hdr.size) {
+> > +        if (size == -1) {
+> 
+> size < 0
+> 
+> >              error_report("Failed to send msg reply to slave.");
+> > +            ret = -errno;
+> 
+> Move before error_report()
+
+Will do. 
 
 Vivek
+
+> 
+> > +            goto err;
+> > +        }
+> > +
+> > +        if (size != VHOST_USER_HDR_SIZE + hdr.size) {
+> > +            error_report("Failed to send msg reply to slave. Wrote %d bytes"
+> > +                         " expected %lu bytes.", size,
+> > +                         VHOST_USER_HDR_SIZE + hdr.size);
+> > +            ret = -EIO;
+> >              goto err;
+> >          }
+> >      }
+> >  
+> > -    return;
+> > +    return 0;
+> >  
+> >  err:
+> >      qemu_set_fd_handler(u->slave_fd, NULL, NULL, NULL);
+> > @@ -1546,7 +1572,12 @@ err:
+> >              close(fd[i]);
+> >          }
+> >      }
+> > -    return;
+> > +    return ret;
+> > +}
+> > +
+> > +static void slave_read(void *opaque)
+> > +{
+> > +    do_slave_read(opaque);
+> >  }
+> >  
+> >  static int vhost_setup_slave_channel(struct vhost_dev *dev)
+> 
 

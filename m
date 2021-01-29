@@ -1,21 +1,16 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=mgazO6bfi1JYI28igOU36tjNtPL+9PMTbmUOsnqHc3k=;
-	b=EnW+9fdNY+eBqndzJHKsb6d0dgzmLbzhAY9238ZjVsfjJYX1GWzGB9vFtC7AZ+hxQB
-	f4hzRal2IH6AvOvLkqN8eT+jd2fLdeRe1ATZq2Ez9im53da7zBIWUBSf0OATMmPTQ6+3
-	wjlBBhlAiNyWWPYuH0TT9urGokENEz81z3WEc=
+Date: Fri, 29 Jan 2021 10:11:55 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210129151155.GD3146@redhat.com>
+References: <20210125180115.22936-1-vgoyal@redhat.com>
+	<20210125180115.22936-5-vgoyal@redhat.com>
+	<20210128165234.GC20377@stefanha-x1.localdomain>
+	<20210129141600.GA3146@redhat.com>
 MIME-Version: 1.0
-References: <rprnspo3-119s-qnoo-2o93-sn40rq40ns@erqung.pbz>
-	<20210114133424.GA299876@stefanha-x1.localdomain>
-	<qn527287-65qq-227p-2r48-1528r6rr386@erqung.pbz>
-	<20210118165541.GD255498@stefanha-x1.localdomain>
-	<9qo964n3-7p75-7992-7s7p-3srrs4q650n@erqung.pbz>
-In-Reply-To: <9qo964n3-7p75-7992-7s7p-3srrs4q650n@erqung.pbz>
-From: Chirantan Ekbote <chirantan@chromium.org>
-Date: Wed, 20 Jan 2021 14:49:52 +0900
-Message-ID: <CAJFHJroGX7YYPK2KzxBtM3Pnf7heUxsjZXOvoH0GR7gMrDTuuQ@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [RFC] About non-root virtiofsd(1) process
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20210129141600.GA3146@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 4/6] qemu,
+ vhost-user: Extend protocol to start/stop/flush slave channel
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,43 +19,128 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: P J P <ppandit@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, mst@redhat.com, qemu-devel@nongnu.org
 
-On Tue, Jan 19, 2021 at 11:34 PM P J P <ppandit@redhat.com> wrote:
->
-> +-- On Mon, 18 Jan 2021, Stefan Hajnoczi wrote --+
-> | Guest applications may run with different uids/gids. The host has no control
-> | over that.
-> |
-> | Imagine booting a guest form a virtio-fs root file system and installing
-> | packages. The guest must be able to control uids/gids for that to work.
->
-> * I see; I'll try to better understand how it's done.
->
-> * With UID namespaces, I thought virtiofsd(1) would be able to operate files
->   with arbitrary uid/gid, even after dropping its root privileges to acquire
->   non-root privileges on the host; Because it has 'root' privileges under the
->   shared directory & UID namespace.
->
+On Fri, Jan 29, 2021 at 09:16:00AM -0500, Vivek Goyal wrote:
+> On Thu, Jan 28, 2021 at 04:52:34PM +0000, Stefan Hajnoczi wrote:
+> > On Mon, Jan 25, 2021 at 01:01:13PM -0500, Vivek Goyal wrote:
+> > > Currently we don't have a mechanism to flush slave channel while shutting
+> > > down vhost-user device and that can result a deadlock. Consider following
+> > > scenario.
+> > > 
+> > > 1. Slave gets a request from guest on virtqueue (say index 1, vq1), to map
+> > >    a portion of file in qemu address space.
+> > > 
+> > > 2. Thread serving vq1 receives this request and sends a message to qemu on
+> > >    slave channel/fd and gets blocked in waiting for a response from qemu.
+> > > 
+> > > 3. In the mean time, user does "echo b > /proc/sysrq-trigger" in guest. This
+> > >    leads to qemu reset and ultimately in main thread we end up in
+> > >    vhost_dev_stop() which is trying to shutdown virtqueues for the device.
+> > > 
+> > > 4. Slave gets VHOST_USER_GET_VRING_BASE message to shutdown a virtqueue on
+> > >    unix socket being used for communication.
+> > > 
+> > > 5. Slave tries to shutdown the thread serving vq1 and waits for it to
+> > >    terminate. But vq1 thread can't terminate because it is waiting for
+> > >    a response from qemu on slave_fd. And qemu is not processing slave_fd
+> > >    anymore as qemu is ressing (and not running main event loop anymore)
+> > >    and is waiting for a response to VHOST_USER_GET_VRING_BASE.
+> > > 
+> > > So we have a deadlock. Qemu is waiting on slave to response to
+> > > VHOST_USER_GET_VRING_BASE message and slave is waiting on qemu to
+> > > respond to request it sent on slave_fd.
+> > > 
+> > > I can reliably reproduce this race with virtio-fs.
+> > > 
+> > > Hence here is the proposal to solve this problem. Enhance vhost-user
+> > > protocol to properly shutdown slave_fd channel. And if there are pending
+> > > requests, flush the channel completely before sending the request to
+> > > shutdown virtqueues.
+> > > 
+> > > New workflow to shutdown slave channel is.
+> > > 
+> > > - Qemu sends VHOST_USER_STOP_SLAVE_CHANNEL request to slave. It waits
+> > >   for an reply from guest.
+> > > 
+> > > - Then qemu sits in a tight loop waiting for
+> > >   VHOST_USER_SLAVE_STOP_CHANNEL_COMPLETE message from slave on slave_fd.
+> > >   And while waiting for this message, qemu continues to process requests
+> > >   on slave_fd to flush any pending requests. This will unblock threads
+> > >   in slave and allow slave to shutdown slave channel.
+> > > 
+> > > - Once qemu gets VHOST_USER_SLAVE_STOP_CHANNEL_COMPLETE message, it knows
+> > >   no more requests will come on slave_fd and it can continue to shutdown
+> > >   virtqueues now.
+> > > 
+> > > - Once device starts again, qemu will send VHOST_USER_START_SLAVE_CHANNEL
+> > >   message to slave to open the slave channel and receive requests.
+> > > 
+> > > IOW, this allows for proper shutdown of slave channel, making sure
+> > > no threads in slave are blocked on sending/receiving message. And
+> > > this in-turn allows for shutting down of virtqueues, hence resolving
+> > > the deadlock.
+> > 
+> > Is the new message necessary?
+> 
+> Hi Stefan,
+> 
+> It probably is not necessary but it feels like a cleaner and simpler
+> solution.
+> 
+> There slave is a separate channel from virtqueues. And if device is
+> stopping, we want to make sure there are no pending requests in
+> slave channel. It is possible that virtqueue shutodwn is successful
+> but other entity could still be sending messages on slave channel. In
+> that case, shall we say device shutdown complete and stop polling
+> slave channel?
+> 
+> IOW, the way we have explicit protocol messages to shutdown each
+> vring, it makes sense to have explicit protocol message to shutdown
+> slave channel as well. Right now there is no mechanism to do that.
+> 
 
-This is actually what we do in crosvm.  It works pretty well but has a
-few limitations:
+Thinking more from "slave" point of view. It might have a separate thread
+to send messages on slave channel. It has no idea when to stop sending
+messages on slave channel, as there is no mechanism to shutdown slave.
+Only method seems to be that master will close slave fd and that
+will close connection.
 
-- Setting up the uidmap and gidmap requires CAP_SETUID and CAP_SETGID
-(unless you're only mapping in the current euid/egid) so a user
-without sudo access cannot do it.
-- The daemon cannot do anything that requires caps in the init
-namespace.  For example, it cannot set any security.* or trusted.*
-xattrs but that can be worked around by re-mapping them into the
-user.* xattr namespace.  Another example is anything to do with
-filesystem quotas.  We deal with this by forwarding them to another
-daemon running in the init namespace but it's not ideal.
+That means if a device is being stopped (and not removed), then it
+is possible virtqueues got stopped but a thread in slave is blocked
+on slave channel (recvmsg()) and expecting a response back.
 
-Overall I think we're pretty happy with the user namespace sandbox.  I
-think the benefit of dropping all privileges in the init namespace has
-been worth the cost of dealing with the limitations we've run into so
-far.
+That's why I think enhancing protocol to explicitly shutdown slave
+channel makes sense. Instead of assuming that stopping a virtuqueue
+should automatically mean slave channel is stopped.
 
-Chirantan
+Vivek
+
+
+
+> IMHO, introducing an explicit mechanism in protocol to shutdown
+> slave channel feels better as compared to say keep on serving
+> slave channel in parallel while waiting for virtuqueues to shutdown
+> and stop serving slave as soon as last virtuqueue is stopped (there
+> could still be pending slave message right after last virtuqueue
+> got shutdown).
+> 
+> 
+> > How about letting QEMU handle slave fd
+> > activity while waiting for virtqueues to stop instead?
+> > 
+> > In other words, QEMU should monitor both the UNIX domain socket and the
+> > slave fd after it has sent VHOST_USER_GET_VRING_BASE and is awaiting the
+> > response.
+> 
+> I can give it a try. If there is a strong preference for this solution.
+> I guess I can patch vhost_user_get_vring_base() to poll and serve both
+> unix domain socket and slave fd.
+> 
+> But at this point of time I do think that adding a mechanism to shutodwn
+> slave channel (the way we have mechanism to shutdown vring), sounds
+> better from design point of view.
+> 
+> Vivek
 

@@ -1,14 +1,13 @@
-Date: Mon, 1 Feb 2021 18:22:15 +0000
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20210201182215.GA221556@stefanha-x1.localdomain>
+Date: Mon, 1 Feb 2021 20:26:25 +0100
+From: Greg Kurz <groug@kaod.org>
+Message-ID: <20210201202625.7559f17a@bahia.lan>
+In-Reply-To: <20210201171440.GA180539@stefanha-x1.localdomain>
 References: <20210127112131.308451-1-stefanha@redhat.com>
 	<20210128184416.4dbdd23b@bahia.lan>
 	<20210201171440.GA180539@stefanha-x1.localdomain>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="nFreZHaLTZJo0R7j"
-Content-Disposition: inline
-In-Reply-To: <20210201171440.GA180539@stefanha-x1.localdomain>
+Content-Type: multipart/signed; boundary="Sig_/+0o=LGwsQ8Q=Ov3.OcpdNju";
+	protocol="application/pgp-signature"; micalg=pgp-sha256
 Subject: Re: [Virtio-fs] [PATCH v3] virtiofsd: prevent opening of special
  files (CVE-2020-35517)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -19,21 +18,22 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Chirantan Ekbote <chirantan@chromium.org>
+To: Stefan Hajnoczi <stefanha@redhat.com>
 Cc: Daniel Berrange <berrange@redhat.com>, qemu-devel@nongnu.org, P J P <ppandit@redhat.com>, virtio-fs@redhat.com, Alex Xu <alex@alxu.ca>, Laszlo Ersek <lersek@redhat.com>, vgoyal@redhat.com
 
-
---nFreZHaLTZJo0R7j
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
+--Sig_/+0o=LGwsQ8Q=Ov3.OcpdNju
+Content-Type: text/plain; charset=US-ASCII
 Content-Transfer-Encoding: quoted-printable
 
-On Mon, Feb 01, 2021 at 05:14:40PM +0000, Stefan Hajnoczi wrote:
+On Mon, 1 Feb 2021 17:14:40 +0000
+Stefan Hajnoczi <stefanha@redhat.com> wrote:
+
 > On Thu, Jan 28, 2021 at 06:44:16PM +0100, Greg Kurz wrote:
 > > On Wed, 27 Jan 2021 11:21:31 +0000
 > > Stefan Hajnoczi <stefanha@redhat.com> wrote:
 > >=20
-> > > A well-behaved FUSE client does not attempt to open special files with
+> > > A well-behaved FUSE client does not attempt to open special files wit=
+h
 > > > FUSE_OPEN because they are handled on the client side (e.g. device no=
 des
 > > > are handled by client-side device drivers).
@@ -42,7 +42,8 @@ des
 in
 > > > a few cases, most notably FUSE_OPEN. A malicious client can cause
 > > > virtiofsd to open a device node, potentially allowing the guest to
-> > > escape. This can be exploited by a modified guest device driver. It is
+> > > escape. This can be exploited by a modified guest device driver. It i=
+s
 > > > not exploitable from guest userspace since the guest kernel will hand=
 le
 > > > special files inside the guest instead of sending FUSE requests.
@@ -88,8 +89,10 @@ es
 > > >=20
 > > > Additionally, user namespaces have been discussed. They seem like a
 > > > worthwhile addition as an unprivileged or privilege-separated mode
-> > > although there are limitations with respect to security xattrs and the
-> > > actual uid/gid stored on the host file system not corresponding to the
+> > > although there are limitations with respect to security xattrs and th=
+e
+> > > actual uid/gid stored on the host file system not corresponding to th=
+e
 > > > guest uid/gid.
 > > > ---
 > > >  tools/virtiofsd/passthrough_ll.c | 104 ++++++++++++++++++++++-------=
@@ -171,7 +174,8 @@ _NOFOLLOW,
 > > > -                mode);
 > > > +    /* First, try to create a new file but don't open existing files=
  */
-> > > +    fd =3D openat(parent_inode->fd, name, open_flags | O_EXCL, mode);
+> > > +    fd =3D openat(parent_inode->fd, name, open_flags | O_EXCL, mode)=
+;
 > > >      err =3D fd =3D=3D -1 ? errno : 0;
 > > > +
 > > >      lo_restore_cred(&old);
@@ -206,33 +210,41 @@ _NOFOLLOW,
 > lo_rmdir(), lo_unlink(), and lo_rename() all behave this way too. That's
 > another issue that needs to be addressed separately :).
 >=20
+
+I'm not questioning the fact that lookup_name() can fail, but rather
+the error that is returned to the client. lo_rmdir() and friends
+all return EIO when lookup_name() returns NULL. Maybe do the same
+here ?
+
 > I have an idea for unifying lo_open() and lo_create(). It will solve
 > this issue by creating new inodes if necessary.
 >=20
+
+Great !
+
 > Stefan
 
-Hi Chirantan,
-I wanted to bring this CVE to your attention because the discussion has
-revealed a number of other issues (not necessarily security issues) in
-virtiofsd that may also be present in other virtio-fs daemon
-implementations.
 
-Stefan
-
---nFreZHaLTZJo0R7j
-Content-Type: application/pgp-signature; name="signature.asc"
+--Sig_/+0o=LGwsQ8Q=Ov3.OcpdNju
+Content-Type: application/pgp-signature
+Content-Description: OpenPGP digital signature
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAYRtcACgkQnKSrs4Gr
-c8jxyAf6AwktbVAXh4UIci8tmkl6UImJO5ehp6I4KffAbgMwtM1RQhIrebb1jZCp
-FjOIDGKzFPCPB+UBQDDEADr6G17HW+0Rzmwh3ODUToBw8bvg6FH1H6jTByUA/PiE
-qbYIZtzMn8OcfixufhYmRc3MkJhM4OJC8rxelp4j9Cw6Xbiv2GUG/4GMjcHHhOsW
-N/AgsO3GiO/BtqHVe2HGE5EPvPcRqMHAZhdAAbz4Lj+lraj5n08wvi/3kbyYPCjq
-p5Xw910avhbZISJ2cA9jgoZk1qKXfWbFHX/3IGkX5oj5jXJ9HNR9WypkSBlAxX0z
-t3R7Ypf3HcZF8FHm+UmwZczWDtHoUQ==
-=oU/3
+iQIzBAEBCAAdFiEEtIKLr5QxQM7yo0kQcdTV5YIvc9YFAmAYVeEACgkQcdTV5YIv
+c9ZTiQ/+O97nk8R/ilP5BUGlfojWDEyw6M/Gi4Ly5XJnZDhnZuuLV291/RjnGO+F
+ls/wwhtmmpTe3/MpEyYc/82KxvNz0qzSRhoswIjSfAtkjLlRPbky937AmtnJICmP
+ZUbRqAE3E75rO+DxmnhMl+qXhRWssz5DJqDvZRvdVf/hoCLaPliB+0HAnoU6vkxc
+0vPKJ1QDMqZFHUn/7o3/FIeog/h5jTOUbqsnygkVeWEqbI1TyjgY19gSrFYjyrx8
+Qng98XfTFQwJv5wMtPrAf8iXFgVTfg/yzfAtP9xTti1PDzF4e4x7Tw5BLm0sB3AZ
+QwfvwdAT1+Sq2DcLFooTCu6RDXxDi/Lv6j1UJwLIsfAz0kw8KBcDiyRdccb4k0Nv
+pfGh014yfZuIjPE+dYrUcwWl4TYcmnreh/kj5GY2JvNC+VtYp5qgmyNgu+tH1dNv
+/w92jPz7azyV0xM1FvWej1LCBUhCyd6AkQoCzD3IsH9RQXRVCHaMSw5Ijygxo4K4
+ukfgGBA3eBheNvxJTbygwLfkCD0JFVS21RzAOBol9M5AlV8DseVsZ3uh84JMmE6V
+egD/SGo2VzJWWUTyy1njyddL4unspR6tRgCbCF3M99ZyGl3umO3pWxO/Ft/G0Amr
+FyMmVE77TbL4HunLQlY3Ly08HdcdoJErww/aP2si967ib0O37uQ=
+=SB/K
 -----END PGP SIGNATURE-----
 
---nFreZHaLTZJo0R7j--
+--Sig_/+0o=LGwsQ8Q=Ov3.OcpdNju--
 

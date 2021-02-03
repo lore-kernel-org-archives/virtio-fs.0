@@ -1,12 +1,14 @@
-Date: Wed, 20 Jan 2021 10:45:01 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20210120104501.GB2930@work-vm>
-References: <20210119221849.GC77840@redhat.com>
+Resent-Message-Id: <202102031201.113C1mVE030663@lists01.pubmisc.prod.ext.phx2.redhat.com>
+In-Reply-To: <20210203113719.83633-1-stefanha@redhat.com>
+Message-ID: <161235277962.8956.11104117114280995469@c667a6b167f6>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210119221849.GC77840@redhat.com>
-Subject: Re: [Virtio-fs] What are libvhost-user locking requirements
+From: no-reply@patchew.org
+Date: Wed, 3 Feb 2021 03:46:21 -0800 (PST)
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH v4 0/3] virtiofsd: prevent opening of
+	special files (CVE-2020-35517)
+Reply-To: qemu-devel@nongnu.org
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,78 +17,59 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: gkurz@redhat.com, johannes.berg@intel.com, qemu-devel@nongnu.org, virtio-fs-list <virtio-fs@redhat.com>, marcandre.lureau@redhat.com
+To: stefanha@redhat.com
+Cc: berrange@redhat.com, qemu-devel@nongnu.org, virtio-fs@redhat.com, alex@alxu.ca, vgoyal@redhat.com, ppandit@redhat.com, lersek@redhat.com
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> Hi,
-> 
-> Current virtiofsd code uses libvhost-user and I am assuming virtiofsd-rs
-> uses it too. I am wondering what are the locking requirements for
-> this library.
+Patchew URL: https://patchew.org/QEMU/20210203113719.83633-1-stefanha@redhat.com/
 
-No, virtiofsd-rs uses the rust crate: https://github.com/rust-vmm/vhost-user-backend
-I guess that's where they get their dose of 'Fearless concurrency'
 
-> Looking at it it does not look like thread safe. Well parts of of kind
-> of look thread safe. For example, David Gilbert introduced a slave_mutex
-> to control reading/writeing on slave_fd. But dev->slave_fd can be modified
-> vu_set_slave_req_fd() without any locks. Similiarly _vu_queue_notify()
-> uses dev->slave_fd but  does not take any lock. May be these are just
-> bugs and we can take slave_mutex in those paths so not a big deal.
 
-That would be my assumption; I don't think libvhost-user really thought
-about it much.
+Hi,
 
-> But this library does not talk about locking at all. Of course there
-> are many shared data structures like "struct VuDev" and helpers which
-> access this structure. Is client supposed to provide locking and
-> make sure not more than one thread is calling into the library
-> at one point of time.
+This series seems to have some coding style problems. See output below for
+more information:
 
-I don't think it's defined.
+Type: series
+Message-id: 20210203113719.83633-1-stefanha@redhat.com
+Subject: [PATCH v4 0/3] virtiofsd: prevent opening of special files (CVE-2020-35517)
 
-> But in virtiofsd I see that we seem to be in mixed mode. In some cases
-> we are holding ->vu_dispatch_rwlock in read-only mode. So that will
-> allow multipler threads to call into library for one queue.
+=== TEST SCRIPT BEGIN ===
+#!/bin/bash
+git rev-parse base > /dev/null || exit 0
+git config --local diff.renamelimit 0
+git config --local diff.renames True
+git config --local diff.algorithm histogram
+./scripts/checkpatch.pl --mailback base..
+=== TEST SCRIPT END ===
 
-I think that lock is really protecting against the queue management
-actions on vhost-user remapping the queue conflicting with things
-operating on the queue.
+Updating 3c8cf5a9c21ff8782164d1def7f44bd888713384
+Switched to a new branch 'test'
+9e44f0e virtiofsd: prevent opening of special files (CVE-2020-35517)
+e3ddfae virtiofsd: optionally return inode pointer from lo_do_lookup()
+a6c73fd virtiofsd: extract lo_do_open() from lo_open()
 
-> In other places like lo_setupmapping() and lo_removemapping(), we are
-> not holding ->vu_dispatch_rwlock() at all and simply call into
-> library vu_fs_cache_request(VHOST_USER_SLAVE_FS_MAP/...). So multiple
-> threads can call in. I think precisely for this use case dev->slave_mutex
-> has been introduced in library.
+=== OUTPUT BEGIN ===
+1/3 Checking commit a6c73fd0a630 (virtiofsd: extract lo_do_open() from lo_open())
+ERROR: return of an errno should typically be -ve (return -ENOMEM)
+#70: FILE: tools/virtiofsd/passthrough_ll.c:1674:
++        return ENOMEM;
 
-Note that those calls don't actually read/write interact on the queue
-itself; so I don't *think* they need the vu_dispatch_rwlock.
+total: 1 errors, 0 warnings, 114 lines checked
 
-> So few queries.
-> 
-> - what's the locking model needed to use libvhost-user. Is there one? 
+Patch 1/3 has style problems, please review.  If any of these errors
+are false positives report them to the maintainer, see
+CHECKPATCH in MAINTAINERS.
 
-I don't think it really had one.
+2/3 Checking commit e3ddfaebb90a (virtiofsd: optionally return inode pointer from lo_do_lookup())
+3/3 Checking commit 9e44f0e0be3a (virtiofsd: prevent opening of special files (CVE-2020-35517))
+=== OUTPUT END ===
 
-> - Is it ok to selectively add locking for some data structures in
->   libvhost-user. As slave_mutex has been added. So user will have to
->   go through the code to figure out which paths can be called without
->   locks and which paths can't be.
+Test command exited with code: 1
 
-Well it certainly needed something added; hence why I added slave_mutex,
-but the slave_mutex is mostly separate from the actual queue processing,
-and actually rarely used.
 
-> /me is confused and trying to wrap my head around the locking requirements
-> while using libvhost-user.
-
-It's not well defined at all.
-
-Dave
-
-> 
-> Vivek
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+The full log is available at
+http://patchew.org/logs/20210203113719.83633-1-stefanha@redhat.com/testing.checkpatch/?type=message.
+---
+Email generated automatically by Patchew [https://patchew.org/].
+Please send your feedback to patchew-devel@redhat.com
 

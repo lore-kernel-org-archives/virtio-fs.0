@@ -1,14 +1,14 @@
-Resent-Message-Id: <202102031201.113C1mVE030663@lists01.pubmisc.prod.ext.phx2.redhat.com>
-In-Reply-To: <20210203113719.83633-1-stefanha@redhat.com>
-Message-ID: <161235277962.8956.11104117114280995469@c667a6b167f6>
+Date: Wed, 3 Feb 2021 15:20:14 +0100
+From: Greg Kurz <groug@kaod.org>
+Message-ID: <20210203152014.443a8b29@bahia.lan>
+In-Reply-To: <20210203113719.83633-3-stefanha@redhat.com>
+References: <20210203113719.83633-1-stefanha@redhat.com>
+	<20210203113719.83633-3-stefanha@redhat.com>
 MIME-Version: 1.0
-From: no-reply@patchew.org
-Date: Wed, 3 Feb 2021 03:46:21 -0800 (PST)
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH v4 0/3] virtiofsd: prevent opening of
-	special files (CVE-2020-35517)
-Reply-To: qemu-devel@nongnu.org
+Content-Type: text/plain; charset="US-ASCII"
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH v4 2/3] virtiofsd: optionally return inode
+ pointer from lo_do_lookup()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,59 +17,116 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: stefanha@redhat.com
-Cc: berrange@redhat.com, qemu-devel@nongnu.org, virtio-fs@redhat.com, alex@alxu.ca, vgoyal@redhat.com, ppandit@redhat.com, lersek@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: Daniel Berrange <berrange@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, P J P <ppandit@redhat.com>, Laszlo Ersek <lersek@redhat.com>, vgoyal@redhat.com
 
-Patchew URL: https://patchew.org/QEMU/20210203113719.83633-1-stefanha@redhat.com/
+On Wed,  3 Feb 2021 11:37:18 +0000
+Stefan Hajnoczi <stefanha@redhat.com> wrote:
 
+> lo_do_lookup() finds an existing inode or allocates a new one. It
+> increments nlookup so that the inode stays alive until the client
+> releases it.
+> 
+> Existing callers don't need the struct lo_inode so the function doesn't
+> return it. Extend the function to optionally return the inode. The next
+> commit will need it.
+> 
+> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 29 +++++++++++++++++++++--------
+>  1 file changed, 21 insertions(+), 8 deletions(-)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index e63cbd3fb7..c87a1f3d72 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -831,11 +831,13 @@ static int do_statx(struct lo_data *lo, int dirfd, const char *pathname,
+>  }
+>  
+>  /*
+> - * Increments nlookup and caller must release refcount using
+> - * lo_inode_put(&parent).
+> + * Increments nlookup on the inode on success. unref_inode_lolocked() must be
+> + * called eventually to decrement nlookup again. If inodep is non-NULL, the
+> + * inode pointer is stored and the caller must call lo_inode_put().
+>   */
+>  static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+> -                        struct fuse_entry_param *e)
+> +                        struct fuse_entry_param *e,
+> +                        struct lo_inode **inodep)
+>  {
+>      int newfd;
+>      int res;
+> @@ -845,6 +847,10 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+>      struct lo_inode *inode = NULL;
+>      struct lo_inode *dir = lo_inode(req, parent);
+>  
+> +    if (inodep) {
+> +        *inodep = NULL;
+> +    }
+> +
 
+Is this side-effect needed ? If lo_do_lookup() returns an error, it
+rather seems that the caller shouldn't expect anything to be written
+here, i.e. the content of *inodep still belongs to the caller and
+whatever value it previously put in there (as patch 3/3 does) should
+be preserved IMHO.
 
-Hi,
+Apart from that LGTM.
 
-This series seems to have some coding style problems. See output below for
-more information:
-
-Type: series
-Message-id: 20210203113719.83633-1-stefanha@redhat.com
-Subject: [PATCH v4 0/3] virtiofsd: prevent opening of special files (CVE-2020-35517)
-
-=== TEST SCRIPT BEGIN ===
-#!/bin/bash
-git rev-parse base > /dev/null || exit 0
-git config --local diff.renamelimit 0
-git config --local diff.renames True
-git config --local diff.algorithm histogram
-./scripts/checkpatch.pl --mailback base..
-=== TEST SCRIPT END ===
-
-Updating 3c8cf5a9c21ff8782164d1def7f44bd888713384
-Switched to a new branch 'test'
-9e44f0e virtiofsd: prevent opening of special files (CVE-2020-35517)
-e3ddfae virtiofsd: optionally return inode pointer from lo_do_lookup()
-a6c73fd virtiofsd: extract lo_do_open() from lo_open()
-
-=== OUTPUT BEGIN ===
-1/3 Checking commit a6c73fd0a630 (virtiofsd: extract lo_do_open() from lo_open())
-ERROR: return of an errno should typically be -ve (return -ENOMEM)
-#70: FILE: tools/virtiofsd/passthrough_ll.c:1674:
-+        return ENOMEM;
-
-total: 1 errors, 0 warnings, 114 lines checked
-
-Patch 1/3 has style problems, please review.  If any of these errors
-are false positives report them to the maintainer, see
-CHECKPATCH in MAINTAINERS.
-
-2/3 Checking commit e3ddfaebb90a (virtiofsd: optionally return inode pointer from lo_do_lookup())
-3/3 Checking commit 9e44f0e0be3a (virtiofsd: prevent opening of special files (CVE-2020-35517))
-=== OUTPUT END ===
-
-Test command exited with code: 1
-
-
-The full log is available at
-http://patchew.org/logs/20210203113719.83633-1-stefanha@redhat.com/testing.checkpatch/?type=message.
----
-Email generated automatically by Patchew [https://patchew.org/].
-Please send your feedback to patchew-devel@redhat.com
+>      /*
+>       * name_to_handle_at() and open_by_handle_at() can reach here with fuse
+>       * mount point in guest, but we don't have its inode info in the
+> @@ -913,7 +919,14 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+>          pthread_mutex_unlock(&lo->mutex);
+>      }
+>      e->ino = inode->fuse_ino;
+> -    lo_inode_put(lo, &inode);
+> +
+> +    /* Transfer ownership of inode pointer to caller or drop it */
+> +    if (inodep) {
+> +        *inodep = inode;
+> +    } else {
+> +        lo_inode_put(lo, &inode);
+> +    }
+> +
+>      lo_inode_put(lo, &dir);
+>  
+>      fuse_log(FUSE_LOG_DEBUG, "  %lli/%s -> %lli\n", (unsigned long long)parent,
+> @@ -948,7 +961,7 @@ static void lo_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
+>          return;
+>      }
+>  
+> -    err = lo_do_lookup(req, parent, name, &e);
+> +    err = lo_do_lookup(req, parent, name, &e, NULL);
+>      if (err) {
+>          fuse_reply_err(req, err);
+>      } else {
+> @@ -1056,7 +1069,7 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
+>          goto out;
+>      }
+>  
+> -    saverr = lo_do_lookup(req, parent, name, &e);
+> +    saverr = lo_do_lookup(req, parent, name, &e, NULL);
+>      if (saverr) {
+>          goto out;
+>      }
+> @@ -1534,7 +1547,7 @@ static void lo_do_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
+>  
+>          if (plus) {
+>              if (!is_dot_or_dotdot(name)) {
+> -                err = lo_do_lookup(req, ino, name, &e);
+> +                err = lo_do_lookup(req, ino, name, &e, NULL);
+>                  if (err) {
+>                      goto error;
+>                  }
+> @@ -1732,7 +1745,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+>          }
+>  
+>          fi->fh = fh;
+> -        err = lo_do_lookup(req, parent, name, &e);
+> +        err = lo_do_lookup(req, parent, name, &e, NULL);
+>      }
+>      if (lo->cache == CACHE_NONE) {
+>          fi->direct_io = 1;
 

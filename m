@@ -1,11 +1,12 @@
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Wed,  3 Feb 2021 11:37:16 +0000
-Message-Id: <20210203113719.83633-1-stefanha@redhat.com>
-Content-Type: text/plain; charset="utf-8"
+Date: Wed,  3 Feb 2021 11:37:17 +0000
+Message-Id: <20210203113719.83633-2-stefanha@redhat.com>
+In-Reply-To: <20210203113719.83633-1-stefanha@redhat.com>
+References: <20210203113719.83633-1-stefanha@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v4 0/3] virtiofsd: prevent opening of special
-	files (CVE-2020-35517)
+Content-Transfer-Encoding: base64
+Subject: [Virtio-fs] [PATCH v4 1/3] virtiofsd: extract lo_do_open() from
+	lo_open()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,49 +16,76 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: qemu-devel@nongnu.org
-Cc: Daniel Berrange <berrange@redhat.com>, virtio-fs@redhat.com, Alex Xu <alex@alxu.ca>, P J P <ppandit@redhat.com>, Laszlo Ersek <lersek@redhat.com>, vgoyal@redhat.com
+Cc: Daniel Berrange <berrange@redhat.com>, virtio-fs@redhat.com, P J P <ppandit@redhat.com>, Laszlo Ersek <lersek@redhat.com>, vgoyal@redhat.com
 
-v3:
- * Restructure lo_create() to handle externally-created files (we need
-   to allocate an inode for them) [Greg]
- * Patch 1 & 2 refactor the code so that Patch 3 can implement the CVE fix
-v3:
- * Protect lo_create() [Greg]
-v2:
- * Add doc comment clarifying that symlinks are traversed client-side
-   [Daniel]
-
-A well-behaved FUSE client does not attempt to open special files with
-FUSE_OPEN because they are handled on the client side (e.g. device nodes
-are handled by client-side device drivers).
-
-The check to prevent virtiofsd from opening special files is missing in
-a few cases, most notably FUSE_OPEN. A malicious client can cause
-virtiofsd to open a device node, potentially allowing the guest to
-escape. This can be exploited by a modified guest device driver. It is
-not exploitable from guest userspace since the guest kernel will handle
-special files inside the guest instead of sending FUSE requests.
-
-This patch series fixes this issue by introducing the lo_inode_open() function
-to check the file type before opening it. This is a short-term solution because
-it does not prevent a compromised virtiofsd process from opening device nodes
-on the host.
-
-This issue was diagnosed on public IRC and is therefore already known
-and not embargoed.
-
-Reported-by: Alex Xu <alex@alxu.ca>
-Fixes: CVE-2020-35517
-
-Stefan Hajnoczi (3):
-  virtiofsd: extract lo_do_open() from lo_open()
-  virtiofsd: optionally return inode pointer from lo_do_lookup()
-  virtiofsd: prevent opening of special files (CVE-2020-35517)
-
- tools/virtiofsd/passthrough_ll.c | 221 ++++++++++++++++++++-----------
- 1 file changed, 145 insertions(+), 76 deletions(-)
-
--- 
-2.29.2
-
+Qm90aCBsb19vcGVuKCkgYW5kIGxvX2NyZWF0ZSgpIGhhdmUgc2ltaWxhciBjb2RlIHRvIG9wZW4g
+YSBmaWxlLiBFeHRyYWN0CmEgY29tbW9uIGxvX2RvX29wZW4oKSBmdW5jdGlvbiBmcm9tIGxvX29w
+ZW4oKSB0aGF0IHdpbGwgYmUgdXNlZCBieQpsb19jcmVhdGUoKSBpbiBhIGxhdGVyIGNvbW1pdC4K
+ClNpbmNlIGxvX2RvX29wZW4oKSBkb2VzIG5vdCBvdGhlcndpc2UgbmVlZCBmdXNlX3JlcV90IHJl
+cSwgY29udmVydApsb19hZGRfZmRfbWFwcGluZygpIHRvIHVzZSBzdHJ1Y3QgbG9fZGF0YSAqbG8g
+aW5zdGVhZC4KClNpZ25lZC1vZmYtYnk6IFN0ZWZhbiBIYWpub2N6aSA8c3RlZmFuaGFAcmVkaGF0
+LmNvbT4KLS0tCiB0b29scy92aXJ0aW9mc2QvcGFzc3Rocm91Z2hfbGwuYyB8IDczICsrKysrKysr
+KysrKysrKysrKysrLS0tLS0tLS0tLS0tCiAxIGZpbGUgY2hhbmdlZCwgNDYgaW5zZXJ0aW9ucygr
+KSwgMjcgZGVsZXRpb25zKC0pCgpkaWZmIC0tZ2l0IGEvdG9vbHMvdmlydGlvZnNkL3Bhc3N0aHJv
+dWdoX2xsLmMgYi90b29scy92aXJ0aW9mc2QvcGFzc3Rocm91Z2hfbGwuYwppbmRleCA1ZmIzNmQ5
+NDA3Li5lNjNjYmQzZmI3IDEwMDY0NAotLS0gYS90b29scy92aXJ0aW9mc2QvcGFzc3Rocm91Z2hf
+bGwuYworKysgYi90b29scy92aXJ0aW9mc2QvcGFzc3Rocm91Z2hfbGwuYwpAQCAtNDU5LDE3ICs0
+NTksMTcgQEAgc3RhdGljIHZvaWQgbG9fbWFwX3JlbW92ZShzdHJ1Y3QgbG9fbWFwICptYXAsIHNp
+emVfdCBrZXkpCiB9CiAKIC8qIEFzc3VtZXMgbG8tPm11dGV4IGlzIGhlbGQgKi8KLXN0YXRpYyBz
+c2l6ZV90IGxvX2FkZF9mZF9tYXBwaW5nKGZ1c2VfcmVxX3QgcmVxLCBpbnQgZmQpCitzdGF0aWMg
+c3NpemVfdCBsb19hZGRfZmRfbWFwcGluZyhzdHJ1Y3QgbG9fZGF0YSAqbG8sIGludCBmZCkKIHsK
+ICAgICBzdHJ1Y3QgbG9fbWFwX2VsZW0gKmVsZW07CiAKLSAgICBlbGVtID0gbG9fbWFwX2FsbG9j
+X2VsZW0oJmxvX2RhdGEocmVxKS0+ZmRfbWFwKTsKKyAgICBlbGVtID0gbG9fbWFwX2FsbG9jX2Vs
+ZW0oJmxvLT5mZF9tYXApOwogICAgIGlmICghZWxlbSkgewogICAgICAgICByZXR1cm4gLTE7CiAg
+ICAgfQogCiAgICAgZWxlbS0+ZmQgPSBmZDsKLSAgICByZXR1cm4gZWxlbSAtIGxvX2RhdGEocmVx
+KS0+ZmRfbWFwLmVsZW1zOworICAgIHJldHVybiBlbGVtIC0gbG8tPmZkX21hcC5lbGVtczsKIH0K
+IAogLyogQXNzdW1lcyBsby0+bXV0ZXggaXMgaGVsZCAqLwpAQCAtMTY1MSw2ICsxNjUxLDM4IEBA
+IHN0YXRpYyB2b2lkIHVwZGF0ZV9vcGVuX2ZsYWdzKGludCB3cml0ZWJhY2ssIGludCBhbGxvd19k
+aXJlY3RfaW8sCiAgICAgfQogfQogCitzdGF0aWMgaW50IGxvX2RvX29wZW4oc3RydWN0IGxvX2Rh
+dGEgKmxvLCBzdHJ1Y3QgbG9faW5vZGUgKmlub2RlLAorICAgICAgICAgICAgICAgICAgICAgIHN0
+cnVjdCBmdXNlX2ZpbGVfaW5mbyAqZmkpCit7CisgICAgY2hhciBidWZbNjRdOworICAgIHNzaXpl
+X3QgZmg7CisgICAgaW50IGZkOworCisgICAgdXBkYXRlX29wZW5fZmxhZ3MobG8tPndyaXRlYmFj
+aywgbG8tPmFsbG93X2RpcmVjdF9pbywgZmkpOworCisgICAgc3ByaW50ZihidWYsICIlaSIsIGlu
+b2RlLT5mZCk7CisgICAgZmQgPSBvcGVuYXQobG8tPnByb2Nfc2VsZl9mZCwgYnVmLCBmaS0+Zmxh
+Z3MgJiB+T19OT0ZPTExPVyk7CisgICAgaWYgKGZkID09IC0xKSB7CisgICAgICAgIHJldHVybiAt
+ZXJybm87CisgICAgfQorCisgICAgcHRocmVhZF9tdXRleF9sb2NrKCZsby0+bXV0ZXgpOworICAg
+IGZoID0gbG9fYWRkX2ZkX21hcHBpbmcobG8sIGZkKTsKKyAgICBwdGhyZWFkX211dGV4X3VubG9j
+aygmbG8tPm11dGV4KTsKKyAgICBpZiAoZmggPT0gLTEpIHsKKyAgICAgICAgY2xvc2UoZmQpOwor
+ICAgICAgICByZXR1cm4gRU5PTUVNOworICAgIH0KKworICAgIGZpLT5maCA9IGZoOworICAgIGlm
+IChsby0+Y2FjaGUgPT0gQ0FDSEVfTk9ORSkgeworICAgICAgICBmaS0+ZGlyZWN0X2lvID0gMTsK
+KyAgICB9IGVsc2UgaWYgKGxvLT5jYWNoZSA9PSBDQUNIRV9BTFdBWVMpIHsKKyAgICAgICAgZmkt
+PmtlZXBfY2FjaGUgPSAxOworICAgIH0KKyAgICByZXR1cm4gMDsKK30KKwogc3RhdGljIHZvaWQg
+bG9fY3JlYXRlKGZ1c2VfcmVxX3QgcmVxLCBmdXNlX2lub190IHBhcmVudCwgY29uc3QgY2hhciAq
+bmFtZSwKICAgICAgICAgICAgICAgICAgICAgICBtb2RlX3QgbW9kZSwgc3RydWN0IGZ1c2VfZmls
+ZV9pbmZvICpmaSkKIHsKQEAgLTE2OTEsNyArMTcyMyw3IEBAIHN0YXRpYyB2b2lkIGxvX2NyZWF0
+ZShmdXNlX3JlcV90IHJlcSwgZnVzZV9pbm9fdCBwYXJlbnQsIGNvbnN0IGNoYXIgKm5hbWUsCiAg
+ICAgICAgIHNzaXplX3QgZmg7CiAKICAgICAgICAgcHRocmVhZF9tdXRleF9sb2NrKCZsby0+bXV0
+ZXgpOwotICAgICAgICBmaCA9IGxvX2FkZF9mZF9tYXBwaW5nKHJlcSwgZmQpOworICAgICAgICBm
+aCA9IGxvX2FkZF9mZF9tYXBwaW5nKGxvLCBmZCk7CiAgICAgICAgIHB0aHJlYWRfbXV0ZXhfdW5s
+b2NrKCZsby0+bXV0ZXgpOwogICAgICAgICBpZiAoZmggPT0gLTEpIHsKICAgICAgICAgICAgIGNs
+b3NlKGZkKTsKQEAgLTE4OTIsMzggKzE5MjQsMjUgQEAgc3RhdGljIHZvaWQgbG9fZnN5bmNkaXIo
+ZnVzZV9yZXFfdCByZXEsIGZ1c2VfaW5vX3QgaW5vLCBpbnQgZGF0YXN5bmMsCiAKIHN0YXRpYyB2
+b2lkIGxvX29wZW4oZnVzZV9yZXFfdCByZXEsIGZ1c2VfaW5vX3QgaW5vLCBzdHJ1Y3QgZnVzZV9m
+aWxlX2luZm8gKmZpKQogewotICAgIGludCBmZDsKLSAgICBzc2l6ZV90IGZoOwotICAgIGNoYXIg
+YnVmWzY0XTsKICAgICBzdHJ1Y3QgbG9fZGF0YSAqbG8gPSBsb19kYXRhKHJlcSk7CisgICAgc3Ry
+dWN0IGxvX2lub2RlICppbm9kZSA9IGxvX2lub2RlKHJlcSwgaW5vKTsKKyAgICBpbnQgZXJyOwog
+CiAgICAgZnVzZV9sb2coRlVTRV9MT0dfREVCVUcsICJsb19vcGVuKGlubz0lIiBQUkl1NjQgIiwg
+ZmxhZ3M9JWQpXG4iLCBpbm8sCiAgICAgICAgICAgICAgZmktPmZsYWdzKTsKIAotICAgIHVwZGF0
+ZV9vcGVuX2ZsYWdzKGxvLT53cml0ZWJhY2ssIGxvLT5hbGxvd19kaXJlY3RfaW8sIGZpKTsKLQot
+ICAgIHNwcmludGYoYnVmLCAiJWkiLCBsb19mZChyZXEsIGlubykpOwotICAgIGZkID0gb3BlbmF0
+KGxvLT5wcm9jX3NlbGZfZmQsIGJ1ZiwgZmktPmZsYWdzICYgfk9fTk9GT0xMT1cpOwotICAgIGlm
+IChmZCA9PSAtMSkgewotICAgICAgICByZXR1cm4gKHZvaWQpZnVzZV9yZXBseV9lcnIocmVxLCBl
+cnJubyk7Ci0gICAgfQotCi0gICAgcHRocmVhZF9tdXRleF9sb2NrKCZsby0+bXV0ZXgpOwotICAg
+IGZoID0gbG9fYWRkX2ZkX21hcHBpbmcocmVxLCBmZCk7Ci0gICAgcHRocmVhZF9tdXRleF91bmxv
+Y2soJmxvLT5tdXRleCk7Ci0gICAgaWYgKGZoID09IC0xKSB7Ci0gICAgICAgIGNsb3NlKGZkKTsK
+LSAgICAgICAgZnVzZV9yZXBseV9lcnIocmVxLCBFTk9NRU0pOworICAgIGlmICghaW5vZGUpIHsK
+KyAgICAgICAgZnVzZV9yZXBseV9lcnIocmVxLCBFQkFERik7CiAgICAgICAgIHJldHVybjsKICAg
+ICB9CiAKLSAgICBmaS0+ZmggPSBmaDsKLSAgICBpZiAobG8tPmNhY2hlID09IENBQ0hFX05PTkUp
+IHsKLSAgICAgICAgZmktPmRpcmVjdF9pbyA9IDE7Ci0gICAgfSBlbHNlIGlmIChsby0+Y2FjaGUg
+PT0gQ0FDSEVfQUxXQVlTKSB7Ci0gICAgICAgIGZpLT5rZWVwX2NhY2hlID0gMTsKKyAgICBlcnIg
+PSBsb19kb19vcGVuKGxvLCBpbm9kZSwgZmkpOworICAgIGxvX2lub2RlX3B1dChsbywgJmlub2Rl
+KTsKKyAgICBpZiAoZXJyKSB7CisgICAgICAgIGZ1c2VfcmVwbHlfZXJyKHJlcSwgZXJyKTsKKyAg
+ICB9IGVsc2UgeworICAgICAgICBmdXNlX3JlcGx5X29wZW4ocmVxLCBmaSk7CiAgICAgfQotICAg
+IGZ1c2VfcmVwbHlfb3BlbihyZXEsIGZpKTsKIH0KIAogc3RhdGljIHZvaWQgbG9fcmVsZWFzZShm
+dXNlX3JlcV90IHJlcSwgZnVzZV9pbm9fdCBpbm8sCi0tIAoyLjI5LjIKCg==
 

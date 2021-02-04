@@ -1,18 +1,16 @@
-Date: Wed, 3 Feb 2021 16:14:41 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210203211441.GH3307@redhat.com>
+Date: Thu, 4 Feb 2021 09:25:28 +0100
+From: Greg Kurz <groug@kaod.org>
+Message-ID: <20210204092528.0f4b3200@bahia.lan>
+In-Reply-To: <20210203170006.GK74271@stefanha-x1.localdomain>
 References: <20210203113719.83633-1-stefanha@redhat.com>
-	<20210203113719.83633-4-stefanha@redhat.com>
-	<20210203152850.GA3307@redhat.com>
-	<20210203170237.0c98f95f@bahia.lan>
-	<20210203160858.GC3307@redhat.com>
-	<20210203170514.GL74271@stefanha-x1.localdomain>
+	<20210203113719.83633-3-stefanha@redhat.com>
+	<20210203152014.443a8b29@bahia.lan>
+	<20210203170006.GK74271@stefanha-x1.localdomain>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210203170514.GL74271@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH v4 3/3] virtiofsd: prevent opening of
- special files (CVE-2020-35517)
+Content-Type: multipart/signed; boundary="Sig_/1E9Ev5psbM7H+GMPlMXCCEO";
+	protocol="application/pgp-signature"; micalg=pgp-sha256
+Subject: Re: [Virtio-fs] [PATCH v4 2/3] virtiofsd: optionally return inode
+ pointer from lo_do_lookup()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,62 +20,117 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: Daniel Berrange <berrange@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, Alex Xu <alex@alxu.ca>, P J P <ppandit@redhat.com>, Laszlo Ersek <lersek@redhat.com>
+Cc: Daniel Berrange <berrange@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, P J P <ppandit@redhat.com>, Laszlo Ersek <lersek@redhat.com>, vgoyal@redhat.com
 
-On Wed, Feb 03, 2021 at 05:05:14PM +0000, Stefan Hajnoczi wrote:
-> On Wed, Feb 03, 2021 at 11:08:58AM -0500, Vivek Goyal wrote:
-> > On Wed, Feb 03, 2021 at 05:02:37PM +0100, Greg Kurz wrote:
-> > > On Wed, 3 Feb 2021 10:28:50 -0500
-> > > Vivek Goyal <vgoyal@redhat.com> wrote:
-> > > 
-> > > > On Wed, Feb 03, 2021 at 11:37:19AM +0000, Stefan Hajnoczi wrote:
-> > > > 
-> > > > [..]
-> > > > > @@ -1727,36 +1764,38 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
-> > > > >  
-> > > > >      update_open_flags(lo->writeback, lo->allow_direct_io, fi);
-> > > > >  
-> > > > > -    fd = openat(parent_inode->fd, name, (fi->flags | O_CREAT) & ~O_NOFOLLOW,
-> > > > > -                mode);
-> > > > > +    /* Try to create a new file but don't open existing files */
-> > > > > +    fd = openat(parent_inode->fd, name, fi->flags | O_CREAT | O_EXCL, mode);
-> > > > >      err = fd == -1 ? errno : 0;
-> > > > > +
-> > > > >      lo_restore_cred(&old);
-> > > > >  
-> > > > > -    if (!err) {
-> > > > > -        ssize_t fh;
-> > > > > -
-> > > > > -        pthread_mutex_lock(&lo->mutex);
-> > > > > -        fh = lo_add_fd_mapping(lo, fd);
-> > > > > -        pthread_mutex_unlock(&lo->mutex);
-> > > > > -        if (fh == -1) {
-> > > > > -            close(fd);
-> > > > > -            err = ENOMEM;
-> > > > > -            goto out;
-> > > > > -        }
-> > > > > +    /* Ignore the error if file exists and O_EXCL was not given */
-> > > > > +    if (err && !(err == EEXIST && !(fi->flags & O_EXCL))) {
-> > > > 
-> > > > Can this check be simplified to.
-> > > >        if (err && (err == EEXIST && (fi->flags & O_EXCL)) {
-> > > 
-> > > I guess you meant :
-> > > 
-> > >         if (err && (err != EEXIST || fi->flags & O_EXCL) {
-> > 
-> > This sounds correct. I forgot to take into account that if error is
-> > not -EEXIST, we still want to bail out irrespective of O_EXCL.
-> 
-> I thought about De Morgan's law too but found the OR expression is not
-> easier to read than the AND expression :(. If you prefer it written this
-> way I can change it though.
+--Sig_/1E9Ev5psbM7H+GMPlMXCCEO
+Content-Type: text/plain; charset=US-ASCII
+Content-Transfer-Encoding: quoted-printable
 
-I personally find this one to read. And not because of AND but because
-of double logical negation (!x) in previous expression.
+On Wed, 3 Feb 2021 17:00:06 +0000
+Stefan Hajnoczi <stefanha@redhat.com> wrote:
 
-But I am not particular about it. If you don't find it easier to
-read, I can live with previous one.
+> On Wed, Feb 03, 2021 at 03:20:14PM +0100, Greg Kurz wrote:
+> > On Wed,  3 Feb 2021 11:37:18 +0000
+> > Stefan Hajnoczi <stefanha@redhat.com> wrote:
+> >=20
+> > > lo_do_lookup() finds an existing inode or allocates a new one. It
+> > > increments nlookup so that the inode stays alive until the client
+> > > releases it.
+> > >=20
+> > > Existing callers don't need the struct lo_inode so the function doesn=
+'t
+> > > return it. Extend the function to optionally return the inode. The ne=
+xt
+> > > commit will need it.
+> > >=20
+> > > Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> > > ---
+> > >  tools/virtiofsd/passthrough_ll.c | 29 +++++++++++++++++++++--------
+> > >  1 file changed, 21 insertions(+), 8 deletions(-)
+> > >=20
+> > > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passt=
+hrough_ll.c
+> > > index e63cbd3fb7..c87a1f3d72 100644
+> > > --- a/tools/virtiofsd/passthrough_ll.c
+> > > +++ b/tools/virtiofsd/passthrough_ll.c
+> > > @@ -831,11 +831,13 @@ static int do_statx(struct lo_data *lo, int dir=
+fd, const char *pathname,
+> > >  }
+> > > =20
+> > >  /*
+> > > - * Increments nlookup and caller must release refcount using
+> > > - * lo_inode_put(&parent).
+> > > + * Increments nlookup on the inode on success. unref_inode_lolocked(=
+) must be
+> > > + * called eventually to decrement nlookup again. If inodep is non-NU=
+LL, the
+> > > + * inode pointer is stored and the caller must call lo_inode_put().
+> > >   */
+> > >  static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const cha=
+r *name,
+> > > -                        struct fuse_entry_param *e)
+> > > +                        struct fuse_entry_param *e,
+> > > +                        struct lo_inode **inodep)
+> > >  {
+> > >      int newfd;
+> > >      int res;
+> > > @@ -845,6 +847,10 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino=
+_t parent, const char *name,
+> > >      struct lo_inode *inode =3D NULL;
+> > >      struct lo_inode *dir =3D lo_inode(req, parent);
+> > > =20
+> > > +    if (inodep) {
+> > > +        *inodep =3D NULL;
+> > > +    }
+> > > +
+> >=20
+> > Is this side-effect needed ? If lo_do_lookup() returns an error, it
+> > rather seems that the caller shouldn't expect anything to be written
+> > here, i.e. the content of *inodep still belongs to the caller and
+> > whatever value it previously put in there (as patch 3/3 does) should
+> > be preserved IMHO.
+> >=20
+> > Apart from that LGTM.
+>=20
+> I like this approach because it prevents accessing uninitialized memory
+> in the caller:
+>=20
+>   struct lo_inode *inode;
+>=20
+>   if (lo_do_lookup(..., &inodep) !=3D 0) {
+>     goto err;
+>   }
+>   ...
+>=20
+>   err:
+>   lo_inode_put(&inode); <-- uninitialized in the error case!
 
-Vivek
+My point is that it is the caller's business to ensure that inode
+doesn't contain garbage if it is to be used irrespective of the
+outcome of lo_do_lookup(). This is precisely what patch 3/3 does,
+so I don't understand the ultimate purpose of nullifying the
+inode pointer _again_ in lo_do_lookup()...
+
+--Sig_/1E9Ev5psbM7H+GMPlMXCCEO
+Content-Type: application/pgp-signature
+Content-Description: OpenPGP digital signature
+
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCAAdFiEEtIKLr5QxQM7yo0kQcdTV5YIvc9YFAmAbr3gACgkQcdTV5YIv
+c9bZkRAAksgKW+l5JBklGUgl5b2gvoL5F0sjX2LDJKtX3lTT+vy9jrE5U2otcqqo
+7oyeC3m1+/BkakV3TrphqYrBr4cpA4icDd78brJFu9opXNsy6CwyC3uagzd9huID
+Ga6YbeH/MZBR/Acmjf07fR0OucmZulcYbE6+ajVGhbDmuDxpk5u/1TTCoPKse0tv
+1WzF4Xhztryc3qYdK3jAS7V7avqYBIBv+fDP7zihYz/4RkWu4Kt1hnC6zUnOxt/v
+zEu2B1t1pflTzXADquorPaVVZt5wJL6FyZZ2RLplB1oAw3O9ha8UN3s36gP8cxr7
+RAhRQMq47EqyKFnUOCueWAzTLDIsgm2S2MOm7V6ToeivrOMclz8ug37XO+w8UVeK
+Cn7uJ5v9sGYGbhVwT6iVo3z8HJViRUTxMZVNDSe9yoRBuXRJs8NoAXE6DJENz9Ww
++CLgwoMc3lNICGK6r75VZd/WxM2uYznYNce99P/6nlgugUWiObsqpnlVKHXAfgNQ
+loTaAFQZ9GsgUPAXFhQ6FY0qABLpky9ik/3J35LWYS9Ken/9kl6xqofSwJNQNMGH
+BicpOz24IH4XGzJXAqzWovuMh/8zi3BjywiyA6vUVT6UneVUHATKDrh/6w2UXl0c
+fhKUzcuJ69uv6yURaJ7nhgkI6v/P08Gk+2Dca0YzL5YCa1irJdA=
+=lr6D
+-----END PGP SIGNATURE-----
+
+--Sig_/1E9Ev5psbM7H+GMPlMXCCEO--
 

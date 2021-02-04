@@ -1,10 +1,14 @@
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Thu, 21 Jan 2021 14:44:29 +0000
-Message-Id: <20210121144429.58885-1-stefanha@redhat.com>
+Date: Thu, 4 Feb 2021 18:08:05 +0100
+From: Greg Kurz <groug@kaod.org>
+Message-ID: <20210204180805.34f907b7@bahia.lan>
+In-Reply-To: <20210204150208.367837-2-stefanha@redhat.com>
+References: <20210204150208.367837-1-stefanha@redhat.com>
+	<20210204150208.367837-2-stefanha@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: base64
-Subject: [Virtio-fs] [PATCH] virtiofsd: prevent opening of special files
-	(CVE-2020-35517)
+Content-Type: text/plain; charset="US-ASCII"
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH v5 1/3] virtiofsd: extract lo_do_open() from
+	lo_open()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,139 +17,150 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: P J P <ppandit@redhat.com>, virtio-fs@redhat.com, Alex Xu <alex@alxu.ca>, vgoyal@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: Daniel Berrange <berrange@redhat.com>, qemu-devel@nongnu.org, P J P <ppandit@redhat.com>, virtio-fs@redhat.com, vgoyal@redhat.com, Laszlo Ersek <lersek@redhat.com>
 
-QSB3ZWxsLWJlaGF2ZWQgRlVTRSBjbGllbnQgZG9lcyBub3QgYXR0ZW1wdCB0byBvcGVuIHNwZWNp
-YWwgZmlsZXMgd2l0aApGVVNFX09QRU4gYmVjYXVzZSB0aGV5IGFyZSBoYW5kbGVkIG9uIHRoZSBj
-bGllbnQgc2lkZSAoZS5nLiBkZXZpY2Ugbm9kZXMKYXJlIGhhbmRsZWQgYnkgY2xpZW50LXNpZGUg
-ZGV2aWNlIGRyaXZlcnMpLgoKVGhlIGNoZWNrIHRvIHByZXZlbnQgdmlydGlvZnNkIGZyb20gb3Bl
-bmluZyBzcGVjaWFsIGZpbGVzIGlzIG1pc3NpbmcgaW4KYSBmZXcgY2FzZXMsIG1vc3Qgbm90YWJs
-eSBGVVNFX09QRU4uIEEgbWFsaWNpb3VzIGNsaWVudCBjYW4gY2F1c2UKdmlydGlvZnNkIHRvIG9w
-ZW4gYSBkZXZpY2Ugbm9kZSwgcG90ZW50aWFsbHkgYWxsb3dpbmcgdGhlIGd1ZXN0IHRvCmVzY2Fw
-ZS4gVGhpcyBjYW4gYmUgZXhwbG9pdGVkIGJ5IGEgbW9kaWZpZWQgZ3Vlc3QgZGV2aWNlIGRyaXZl
-ci4gSXQgaXMKbm90IGV4cGxvaXRhYmxlIGZyb20gZ3Vlc3QgdXNlcnNwYWNlIHNpbmNlIHRoZSBn
-dWVzdCBrZXJuZWwgd2lsbCBoYW5kbGUKc3BlY2lhbCBmaWxlcyBpbnNpZGUgdGhlIGd1ZXN0IGlu
-c3RlYWQgb2Ygc2VuZGluZyBGVVNFIHJlcXVlc3RzLgoKVGhpcyBwYXRjaCBhZGRzIHRoZSBtaXNz
-aW5nIGNoZWNrcyB0byB2aXJ0aW9mc2QuIFRoaXMgaXMgYSBzaG9ydC10ZXJtCnNvbHV0aW9uIGJl
-Y2F1c2UgaXQgZG9lcyBub3QgcHJldmVudCBhIGNvbXByb21pc2VkIHZpcnRpb2ZzZCBwcm9jZXNz
-CmZyb20gb3BlbmluZyBkZXZpY2Ugbm9kZXMgb24gdGhlIGhvc3QuCgpSZXBvcnRlZC1ieTogQWxl
-eCBYdSA8YWxleEBhbHh1LmNhPgpGaXhlczogQ1ZFLTIwMjAtMzU1MTcKU2lnbmVkLW9mZi1ieTog
-U3RlZmFuIEhham5vY3ppIDxzdGVmYW5oYUByZWRoYXQuY29tPgotLS0KVGhpcyBpc3N1ZSB3YXMg
-ZGlhZ25vc2VkIG9uIHB1YmxpYyBJUkMgYW5kIGlzIHRoZXJlZm9yZSBhbHJlYWR5IGtub3duCmFu
-ZCBub3QgZW1iYXJnb2VkLgoKQSBzdHJvbmdlciBmaXgsIGFuZCB0aGUgbG9uZy10ZXJtIHNvbHV0
-aW9uLCBpcyBmb3IgdXNlcnMgdG8gbW91bnQgdGhlCnNoYXJlZCBkaXJlY3RvcnkgYW5kIGFueSBz
-dWItbW91bnRzIHdpdGggbm9kZXYsIGFzIHdlbGwgYXMgbm9zdWlkIGFuZApub2V4ZWMuIFVuZm9y
-dHVuYXRlbHkgdmlydGlvZnNkIGNhbm5vdCBkbyB0aGlzIGF1dG9tYXRpY2FsbHkgYmVjYXVzZQpi
-aW5kIG1vdW50cyBhZGRlZCBieSB0aGUgdXNlciBhZnRlciB2aXJ0aW9mc2QgaGFzIGxhdW5jaGVk
-IHdvdWxkIG5vdCBiZQpkZXRlY3RlZC4gSSBzdWdnZXN0IHRoZSBmb2xsb3dpbmc6CgoxLiBNb2Rp
-ZnkgbGlidmlydCBhbmQgS2F0YSBDb250YWluZXJzIHRvIGV4cGxpY2l0bHkgc2V0IHRoZXNlIG1v
-dW50CiAgIG9wdGlvbnMuCjIuIFRoZW4gbW9kaWZ5IHZpcnRpb2ZzZCB0byBjaGVjayB0aGF0IHRo
-ZSBzaGFyZWQgZGlyZWN0b3J5IGhhcyB0aGUKICAgbmVjZXNzYXJ5IG9wdGlvbnMgYXQgc3RhcnR1
-cC4gUmVmdXNlIHRvIHN0YXJ0IGlmIHRoZSBvcHRpb25zIGFyZQogICBtaXNzaW5nIHNvIHRoYXQg
-dGhlIHVzZXIgaXMgYXdhcmUgb2YgdGhlIHNlY3VyaXR5IHJlcXVpcmVtZW50cy4KCkFzIGEgYm9u
-dXMgdGhpcyBhbHNvIGluY3JlYXNlcyB0aGUgbGlrZWxpaG9vZCB0aGF0IG90aGVyIGhvc3QgcHJv
-Y2Vzc2VzCmJlc2lkZXMgdmlydGlvZnNkIHdpbGwgYmUgcHJvdGVjdGVkIGJ5IG5vc3VpZC9ub2V4
-ZWMvbm9kZXYgc28gdGhhdCBhCm1hbGljaW91cyBndWVzdCBjYW5ub3QgZHJvcCB0aGVzZSBmaWxl
-cyBpbiBwbGFjZSBhbmQgdGhlbiBhcnJhbmdlIGZvciBhCmhvc3QgcHJvY2VzcyB0byBjb21lIGFj
-cm9zcyB0aGVtLgoKQWRkaXRpb25hbGx5LCB1c2VyIG5hbWVzcGFjZXMgaGF2ZSBiZWVuIGRpc2N1
-c3NlZC4gVGhleSBzZWVtIGxpa2UgYQp3b3J0aHdoaWxlIGFkZGl0aW9uIGFzIGFuIHVucHJpdmls
-ZWdlZCBvciBwcml2aWxlZ2Utc2VwYXJhdGVkIG1vZGUKYWx0aG91Z2ggdGhlcmUgYXJlIGxpbWl0
-YXRpb25zIHdpdGggcmVzcGVjdCB0byBzZWN1cml0eSB4YXR0cnMgYW5kIHRoZQphY3R1YWwgdWlk
-L2dpZCBzdG9yZWQgb24gdGhlIGhvc3QgZmlsZSBzeXN0ZW0gbm90IGNvcnJlc3BvbmRpbmcgdG8g
-dGhlCmd1ZXN0IHVpZC9naWQuCi0tLQogdG9vbHMvdmlydGlvZnNkL3Bhc3N0aHJvdWdoX2xsLmMg
-fCA4NCArKysrKysrKysrKysrKysrKysrKystLS0tLS0tLS0tLQogMSBmaWxlIGNoYW5nZWQsIDU2
-IGluc2VydGlvbnMoKyksIDI4IGRlbGV0aW9ucygtKQoKZGlmZiAtLWdpdCBhL3Rvb2xzL3ZpcnRp
-b2ZzZC9wYXNzdGhyb3VnaF9sbC5jIGIvdG9vbHMvdmlydGlvZnNkL3Bhc3N0aHJvdWdoX2xsLmMK
-aW5kZXggNWZiMzZkOTQwNy4uZTA4MzUyZDY0OSAxMDA2NDQKLS0tIGEvdG9vbHMvdmlydGlvZnNk
-L3Bhc3N0aHJvdWdoX2xsLmMKKysrIGIvdG9vbHMvdmlydGlvZnNkL3Bhc3N0aHJvdWdoX2xsLmMK
-QEAgLTU1NSw2ICs1NTUsMjkgQEAgc3RhdGljIGludCBsb19mZChmdXNlX3JlcV90IHJlcSwgZnVz
-ZV9pbm9fdCBpbm8pCiAgICAgcmV0dXJuIGZkOwogfQogCisvKgorICogT3BlbiBhIGZpbGUgZGVz
-Y3JpcHRvciBmb3IgYW4gaW5vZGUuIFJldHVybnMgLUVCQURGIGlmIHRoZSBpbm9kZSBpcyBub3Qg
-YQorICogcmVndWxhciBmaWxlIG9yIGEgZGlyZWN0b3J5LiBVc2UgdGhpcyBoZWxwZXIgZnVuY3Rp
-b24gaW5zdGVhZCBvZiByYXcKKyAqIG9wZW5hdCgyKSB0byBwcmV2ZW50IHNlY3VyaXR5IGlzc3Vl
-cyB3aGVuIGEgbWFsaWNpb3VzIGNsaWVudCBvcGVucyBzcGVjaWFsCisgKiBmaWxlcyBzdWNoIGFz
-IGJsb2NrIGRldmljZSBub2Rlcy4KKyAqLworc3RhdGljIGludCBsb19pbm9kZV9vcGVuKHN0cnVj
-dCBsb19kYXRhICpsbywgc3RydWN0IGxvX2lub2RlICppbm9kZSwKKyAgICAgICAgICAgICAgICAg
-ICAgICAgICBpbnQgb3Blbl9mbGFncykKK3sKKyAgICBnX2F1dG9mcmVlIGNoYXIgKmZkX3N0ciA9
-IGdfc3RyZHVwX3ByaW50ZigiJWQiLCBpbm9kZS0+ZmQpOworICAgIGludCBmZDsKKworICAgIGlm
-ICghU19JU1JFRyhpbm9kZS0+ZmlsZXR5cGUpICYmICFTX0lTRElSKGlub2RlLT5maWxldHlwZSkp
-IHsKKyAgICAgICAgcmV0dXJuIC1FQkFERjsKKyAgICB9CisKKyAgICBmZCA9IG9wZW5hdChsby0+
-cHJvY19zZWxmX2ZkLCBmZF9zdHIsIG9wZW5fZmxhZ3MpOworICAgIGlmIChmZCA8IDApIHsKKyAg
-ICAgICAgcmV0dXJuIC1lcnJubzsKKyAgICB9CisgICAgcmV0dXJuIGZkOworfQorCiBzdGF0aWMg
-dm9pZCBsb19pbml0KHZvaWQgKnVzZXJkYXRhLCBzdHJ1Y3QgZnVzZV9jb25uX2luZm8gKmNvbm4p
-CiB7CiAgICAgc3RydWN0IGxvX2RhdGEgKmxvID0gKHN0cnVjdCBsb19kYXRhICopdXNlcmRhdGE7
-CkBAIC02ODQsOCArNzA3LDcgQEAgc3RhdGljIHZvaWQgbG9fc2V0YXR0cihmdXNlX3JlcV90IHJl
-cSwgZnVzZV9pbm9fdCBpbm8sIHN0cnVjdCBzdGF0ICphdHRyLAogICAgICAgICBpZiAoZmkpIHsK
-ICAgICAgICAgICAgIHRydW5jZmQgPSBmZDsKICAgICAgICAgfSBlbHNlIHsKLSAgICAgICAgICAg
-IHNwcmludGYocHJvY25hbWUsICIlaSIsIGlmZCk7Ci0gICAgICAgICAgICB0cnVuY2ZkID0gb3Bl
-bmF0KGxvLT5wcm9jX3NlbGZfZmQsIHByb2NuYW1lLCBPX1JEV1IpOworICAgICAgICAgICAgdHJ1
-bmNmZCA9IGxvX2lub2RlX29wZW4obG8sIGlub2RlLCBPX1JEV1IpOwogICAgICAgICAgICAgaWYg
-KHRydW5jZmQgPCAwKSB7CiAgICAgICAgICAgICAgICAgZ290byBvdXRfZXJyOwogICAgICAgICAg
-ICAgfQpAQCAtMTcyNSw3ICsxNzQ3LDYgQEAgc3RhdGljIHN0cnVjdCBsb19pbm9kZV9wbG9jayAq
-bG9va3VwX2NyZWF0ZV9wbG9ja19jdHgoc3RydWN0IGxvX2RhdGEgKmxvLAogICAgICAgICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgcGlkX3QgcGlkLCBpbnQg
-KmVycikKIHsKICAgICBzdHJ1Y3QgbG9faW5vZGVfcGxvY2sgKnBsb2NrOwotICAgIGNoYXIgcHJv
-Y25hbWVbNjRdOwogICAgIGludCBmZDsKIAogICAgIHBsb2NrID0KQEAgLTE3NDIsMTIgKzE3NjMs
-MTAgQEAgc3RhdGljIHN0cnVjdCBsb19pbm9kZV9wbG9jayAqbG9va3VwX2NyZWF0ZV9wbG9ja19j
-dHgoc3RydWN0IGxvX2RhdGEgKmxvLAogICAgIH0KIAogICAgIC8qIE9wZW4gYW5vdGhlciBpbnN0
-YW5jZSBvZiBmaWxlIHdoaWNoIGNhbiBiZSB1c2VkIGZvciBvZmQgbG9ja3MuICovCi0gICAgc3By
-aW50Zihwcm9jbmFtZSwgIiVpIiwgaW5vZGUtPmZkKTsKLQogICAgIC8qIFRPRE86IFdoYXQgaWYg
-ZmlsZSBpcyBub3Qgd3JpdGFibGU/ICovCi0gICAgZmQgPSBvcGVuYXQobG8tPnByb2Nfc2VsZl9m
-ZCwgcHJvY25hbWUsIE9fUkRXUik7Ci0gICAgaWYgKGZkID09IC0xKSB7Ci0gICAgICAgICplcnIg
-PSBlcnJubzsKKyAgICBmZCA9IGxvX2lub2RlX29wZW4obG8sIGlub2RlLCBPX1JEV1IpOworICAg
-IGlmIChmZCA8IDApIHsKKyAgICAgICAgKmVyciA9IC1mZDsKICAgICAgICAgZnJlZShwbG9jayk7
-CiAgICAgICAgIHJldHVybiBOVUxMOwogICAgIH0KQEAgLTE4OTQsMTggKzE5MTMsMjQgQEAgc3Rh
-dGljIHZvaWQgbG9fb3BlbihmdXNlX3JlcV90IHJlcSwgZnVzZV9pbm9fdCBpbm8sIHN0cnVjdCBm
-dXNlX2ZpbGVfaW5mbyAqZmkpCiB7CiAgICAgaW50IGZkOwogICAgIHNzaXplX3QgZmg7Ci0gICAg
-Y2hhciBidWZbNjRdOwogICAgIHN0cnVjdCBsb19kYXRhICpsbyA9IGxvX2RhdGEocmVxKTsKKyAg
-ICBzdHJ1Y3QgbG9faW5vZGUgKmlub2RlID0gbG9faW5vZGUocmVxLCBpbm8pOwogCiAgICAgZnVz
-ZV9sb2coRlVTRV9MT0dfREVCVUcsICJsb19vcGVuKGlubz0lIiBQUkl1NjQgIiwgZmxhZ3M9JWQp
-XG4iLCBpbm8sCiAgICAgICAgICAgICAgZmktPmZsYWdzKTsKIAorICAgIGlmICghaW5vZGUpIHsK
-KyAgICAgICAgZnVzZV9yZXBseV9lcnIocmVxLCBFQkFERik7CisgICAgICAgIHJldHVybjsKKyAg
-ICB9CisKICAgICB1cGRhdGVfb3Blbl9mbGFncyhsby0+d3JpdGViYWNrLCBsby0+YWxsb3dfZGly
-ZWN0X2lvLCBmaSk7CiAKLSAgICBzcHJpbnRmKGJ1ZiwgIiVpIiwgbG9fZmQocmVxLCBpbm8pKTsK
-LSAgICBmZCA9IG9wZW5hdChsby0+cHJvY19zZWxmX2ZkLCBidWYsIGZpLT5mbGFncyAmIH5PX05P
-Rk9MTE9XKTsKLSAgICBpZiAoZmQgPT0gLTEpIHsKLSAgICAgICAgcmV0dXJuICh2b2lkKWZ1c2Vf
-cmVwbHlfZXJyKHJlcSwgZXJybm8pOworICAgIGZkID0gbG9faW5vZGVfb3BlbihsbywgaW5vZGUs
-IGZpLT5mbGFncyAmIH5PX05PRk9MTE9XKTsKKyAgICBpZiAoZmQgPCAwKSB7CisgICAgICAgIGxv
-X2lub2RlX3B1dChsbywgJmlub2RlKTsKKyAgICAgICAgZnVzZV9yZXBseV9lcnIocmVxLCAtZmQp
-OworICAgICAgICByZXR1cm47CiAgICAgfQogCiAgICAgcHRocmVhZF9tdXRleF9sb2NrKCZsby0+
-bXV0ZXgpOwpAQCAtMTkxMyw2ICsxOTM4LDcgQEAgc3RhdGljIHZvaWQgbG9fb3BlbihmdXNlX3Jl
-cV90IHJlcSwgZnVzZV9pbm9fdCBpbm8sIHN0cnVjdCBmdXNlX2ZpbGVfaW5mbyAqZmkpCiAgICAg
-cHRocmVhZF9tdXRleF91bmxvY2soJmxvLT5tdXRleCk7CiAgICAgaWYgKGZoID09IC0xKSB7CiAg
-ICAgICAgIGNsb3NlKGZkKTsKKyAgICAgICAgbG9faW5vZGVfcHV0KGxvLCAmaW5vZGUpOwogICAg
-ICAgICBmdXNlX3JlcGx5X2VycihyZXEsIEVOT01FTSk7CiAgICAgICAgIHJldHVybjsKICAgICB9
-CkBAIC0xOTIzLDYgKzE5NDksNyBAQCBzdGF0aWMgdm9pZCBsb19vcGVuKGZ1c2VfcmVxX3QgcmVx
-LCBmdXNlX2lub190IGlubywgc3RydWN0IGZ1c2VfZmlsZV9pbmZvICpmaSkKICAgICB9IGVsc2Ug
-aWYgKGxvLT5jYWNoZSA9PSBDQUNIRV9BTFdBWVMpIHsKICAgICAgICAgZmktPmtlZXBfY2FjaGUg
-PSAxOwogICAgIH0KKyAgICBsb19pbm9kZV9wdXQobG8sICZpbm9kZSk7CiAgICAgZnVzZV9yZXBs
-eV9vcGVuKHJlcSwgZmkpOwogfQogCkBAIC0xOTgyLDM5ICsyMDA5LDQwIEBAIHN0YXRpYyB2b2lk
-IGxvX2ZsdXNoKGZ1c2VfcmVxX3QgcmVxLCBmdXNlX2lub190IGlubywgc3RydWN0IGZ1c2VfZmls
-ZV9pbmZvICpmaSkKIHN0YXRpYyB2b2lkIGxvX2ZzeW5jKGZ1c2VfcmVxX3QgcmVxLCBmdXNlX2lu
-b190IGlubywgaW50IGRhdGFzeW5jLAogICAgICAgICAgICAgICAgICAgICAgc3RydWN0IGZ1c2Vf
-ZmlsZV9pbmZvICpmaSkKIHsKKyAgICBzdHJ1Y3QgbG9faW5vZGUgKmlub2RlID0gbG9faW5vZGUo
-cmVxLCBpbm8pOworICAgIHN0cnVjdCBsb19kYXRhICpsbyA9IGxvX2RhdGEocmVxKTsKICAgICBp
-bnQgcmVzOwogICAgIGludCBmZDsKLSAgICBjaGFyICpidWY7CiAKICAgICBmdXNlX2xvZyhGVVNF
-X0xPR19ERUJVRywgImxvX2ZzeW5jKGlubz0lIiBQUkl1NjQgIiwgZmk9MHglcClcbiIsIGlubywK
-ICAgICAgICAgICAgICAodm9pZCAqKWZpKTsKIAorICAgIGlmICghaW5vZGUpIHsKKyAgICAgICAg
-ZnVzZV9yZXBseV9lcnIocmVxLCBFQkFERik7CisgICAgICAgIHJldHVybjsKKyAgICB9CisKICAg
-ICBpZiAoIWZpKSB7Ci0gICAgICAgIHN0cnVjdCBsb19kYXRhICpsbyA9IGxvX2RhdGEocmVxKTsK
-LQotICAgICAgICByZXMgPSBhc3ByaW50ZigmYnVmLCAiJWkiLCBsb19mZChyZXEsIGlubykpOwot
-ICAgICAgICBpZiAocmVzID09IC0xKSB7Ci0gICAgICAgICAgICByZXR1cm4gKHZvaWQpZnVzZV9y
-ZXBseV9lcnIocmVxLCBlcnJubyk7Ci0gICAgICAgIH0KLQotICAgICAgICBmZCA9IG9wZW5hdChs
-by0+cHJvY19zZWxmX2ZkLCBidWYsIE9fUkRXUik7Ci0gICAgICAgIGZyZWUoYnVmKTsKLSAgICAg
-ICAgaWYgKGZkID09IC0xKSB7Ci0gICAgICAgICAgICByZXR1cm4gKHZvaWQpZnVzZV9yZXBseV9l
-cnIocmVxLCBlcnJubyk7CisgICAgICAgIGZkID0gbG9faW5vZGVfb3BlbihsbywgaW5vZGUsIE9f
-UkRXUik7CisgICAgICAgIGlmIChmZCA8IDApIHsKKyAgICAgICAgICAgIHJlcyA9IC1mZDsKKyAg
-ICAgICAgICAgIGdvdG8gb3V0OwogICAgICAgICB9CiAgICAgfSBlbHNlIHsKICAgICAgICAgZmQg
-PSBsb19maV9mZChyZXEsIGZpKTsKICAgICB9CiAKICAgICBpZiAoZGF0YXN5bmMpIHsKLSAgICAg
-ICAgcmVzID0gZmRhdGFzeW5jKGZkKTsKKyAgICAgICAgcmVzID0gZmRhdGFzeW5jKGZkKSA9PSAt
-MSA/IGVycm5vIDogMDsKICAgICB9IGVsc2UgewotICAgICAgICByZXMgPSBmc3luYyhmZCk7Cisg
-ICAgICAgIHJlcyA9IGZzeW5jKGZkKSA9PSAtMSA/IGVycm5vIDogMDsKICAgICB9CiAgICAgaWYg
-KCFmaSkgewogICAgICAgICBjbG9zZShmZCk7CiAgICAgfQotICAgIGZ1c2VfcmVwbHlfZXJyKHJl
-cSwgcmVzID09IC0xID8gZXJybm8gOiAwKTsKK291dDoKKyAgICBsb19pbm9kZV9wdXQobG8sICZp
-bm9kZSk7CisgICAgZnVzZV9yZXBseV9lcnIocmVxLCByZXMpOwogfQogCiBzdGF0aWMgdm9pZCBs
-b19yZWFkKGZ1c2VfcmVxX3QgcmVxLCBmdXNlX2lub190IGlubywgc2l6ZV90IHNpemUsIG9mZl90
-IG9mZnNldCwKLS0gCjIuMjkuMgoK
+On Thu,  4 Feb 2021 15:02:06 +0000
+Stefan Hajnoczi <stefanha@redhat.com> wrote:
+
+> Both lo_open() and lo_create() have similar code to open a file. Extract
+> a common lo_do_open() function from lo_open() that will be used by
+> lo_create() in a later commit.
+> 
+> Since lo_do_open() does not otherwise need fuse_req_t req, convert
+> lo_add_fd_mapping() to use struct lo_data *lo instead.
+> 
+> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> ---
+
+Reviewed-by: Greg Kurz <groug@kaod.org>
+
+> v4:
+>  * Return positive errno if openat(2) fails in lo_do_open() [Greg]
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 73 ++++++++++++++++++++------------
+>  1 file changed, 46 insertions(+), 27 deletions(-)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 5fb36d9407..f14fa5124d 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -459,17 +459,17 @@ static void lo_map_remove(struct lo_map *map, size_t key)
+>  }
+>  
+>  /* Assumes lo->mutex is held */
+> -static ssize_t lo_add_fd_mapping(fuse_req_t req, int fd)
+> +static ssize_t lo_add_fd_mapping(struct lo_data *lo, int fd)
+>  {
+>      struct lo_map_elem *elem;
+>  
+> -    elem = lo_map_alloc_elem(&lo_data(req)->fd_map);
+> +    elem = lo_map_alloc_elem(&lo->fd_map);
+>      if (!elem) {
+>          return -1;
+>      }
+>  
+>      elem->fd = fd;
+> -    return elem - lo_data(req)->fd_map.elems;
+> +    return elem - lo->fd_map.elems;
+>  }
+>  
+>  /* Assumes lo->mutex is held */
+> @@ -1651,6 +1651,38 @@ static void update_open_flags(int writeback, int allow_direct_io,
+>      }
+>  }
+>  
+> +static int lo_do_open(struct lo_data *lo, struct lo_inode *inode,
+> +                      struct fuse_file_info *fi)
+> +{
+> +    char buf[64];
+> +    ssize_t fh;
+> +    int fd;
+> +
+> +    update_open_flags(lo->writeback, lo->allow_direct_io, fi);
+> +
+> +    sprintf(buf, "%i", inode->fd);
+> +    fd = openat(lo->proc_self_fd, buf, fi->flags & ~O_NOFOLLOW);
+> +    if (fd == -1) {
+> +        return errno;
+> +    }
+> +
+> +    pthread_mutex_lock(&lo->mutex);
+> +    fh = lo_add_fd_mapping(lo, fd);
+> +    pthread_mutex_unlock(&lo->mutex);
+> +    if (fh == -1) {
+> +        close(fd);
+> +        return ENOMEM;
+> +    }
+> +
+> +    fi->fh = fh;
+> +    if (lo->cache == CACHE_NONE) {
+> +        fi->direct_io = 1;
+> +    } else if (lo->cache == CACHE_ALWAYS) {
+> +        fi->keep_cache = 1;
+> +    }
+> +    return 0;
+> +}
+> +
+>  static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+>                        mode_t mode, struct fuse_file_info *fi)
+>  {
+> @@ -1691,7 +1723,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+>          ssize_t fh;
+>  
+>          pthread_mutex_lock(&lo->mutex);
+> -        fh = lo_add_fd_mapping(req, fd);
+> +        fh = lo_add_fd_mapping(lo, fd);
+>          pthread_mutex_unlock(&lo->mutex);
+>          if (fh == -1) {
+>              close(fd);
+> @@ -1892,38 +1924,25 @@ static void lo_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
+>  
+>  static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+>  {
+> -    int fd;
+> -    ssize_t fh;
+> -    char buf[64];
+>      struct lo_data *lo = lo_data(req);
+> +    struct lo_inode *inode = lo_inode(req, ino);
+> +    int err;
+>  
+>      fuse_log(FUSE_LOG_DEBUG, "lo_open(ino=%" PRIu64 ", flags=%d)\n", ino,
+>               fi->flags);
+>  
+> -    update_open_flags(lo->writeback, lo->allow_direct_io, fi);
+> -
+> -    sprintf(buf, "%i", lo_fd(req, ino));
+> -    fd = openat(lo->proc_self_fd, buf, fi->flags & ~O_NOFOLLOW);
+> -    if (fd == -1) {
+> -        return (void)fuse_reply_err(req, errno);
+> -    }
+> -
+> -    pthread_mutex_lock(&lo->mutex);
+> -    fh = lo_add_fd_mapping(req, fd);
+> -    pthread_mutex_unlock(&lo->mutex);
+> -    if (fh == -1) {
+> -        close(fd);
+> -        fuse_reply_err(req, ENOMEM);
+> +    if (!inode) {
+> +        fuse_reply_err(req, EBADF);
+>          return;
+>      }
+>  
+> -    fi->fh = fh;
+> -    if (lo->cache == CACHE_NONE) {
+> -        fi->direct_io = 1;
+> -    } else if (lo->cache == CACHE_ALWAYS) {
+> -        fi->keep_cache = 1;
+> +    err = lo_do_open(lo, inode, fi);
+> +    lo_inode_put(lo, &inode);
+> +    if (err) {
+> +        fuse_reply_err(req, err);
+> +    } else {
+> +        fuse_reply_open(req, fi);
+>      }
+> -    fuse_reply_open(req, fi);
+>  }
+>  
+>  static void lo_release(fuse_req_t req, fuse_ino_t ino,
 

@@ -1,13 +1,9 @@
-Date: Thu, 4 Feb 2021 18:14:17 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20210204181417.GN3039@work-vm>
-References: <20210204150208.367837-1-stefanha@redhat.com>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Thu,  4 Feb 2021 18:34:34 +0000
+Message-Id: <20210204183439.546918-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210204150208.367837-1-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v5 0/3] virtiofsd: prevent opening of
- special files (CVE-2020-35517)
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PULL 0/5] virtiofs queue: Security fix
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,60 +12,41 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: Daniel Berrange <berrange@redhat.com>, qemu-devel@nongnu.org, P J P <ppandit@redhat.com>, virtio-fs@redhat.com, Alex Xu <alex@alxu.ca>, Laszlo Ersek <lersek@redhat.com>, vgoyal@redhat.com
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com, stefanha@redhat.com, groug@kaod.org, qemu-stable@nongnu.org
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> v4:
->  * Patch 1: Return positive errno if openat(2) fails in lo_do_open() [Greg]
->  * Patch 3: Return -fd instead or -errno after lo_inode_open() in lo_do_open() [Greg]
->  * Patch 3: Use De Morgan's Law to simplify the boolean expression in lo_create() [Vivek]
->  * Patch 3: Add missing errno = -truncfd after lo_inode_open() call in lo_setattr
-> v3:
->  * Restructure lo_create() to handle externally-created files (we need
->    to allocate an inode for them) [Greg]
->  * Patch 1 & 2 refactor the code so that Patch 3 can implement the CVE fix
-> v3:
->  * Protect lo_create() [Greg]
-> v2:
->  * Add doc comment clarifying that symlinks are traversed client-side
->    [Daniel]
-> 
-> A well-behaved FUSE client does not attempt to open special files with
-> FUSE_OPEN because they are handled on the client side (e.g. device nodes
-> are handled by client-side device drivers).
-> 
-> The check to prevent virtiofsd from opening special files is missing in
-> a few cases, most notably FUSE_OPEN. A malicious client can cause
-> virtiofsd to open a device node, potentially allowing the guest to
-> escape. This can be exploited by a modified guest device driver. It is
-> not exploitable from guest userspace since the guest kernel will handle
-> special files inside the guest instead of sending FUSE requests.
-> 
-> This patch series fixes this issue by introducing the lo_inode_open() function
-> to check the file type before opening it. This is a short-term solution because
-> it does not prevent a compromised virtiofsd process from opening device nodes
-> on the host.
-> 
-> This issue was diagnosed on public IRC and is therefore already known
-> and not embargoed.
-> 
-> Reported-by: Alex Xu <alex@alxu.ca>
-> Fixes: CVE-2020-35517
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Queued
+The following changes since commit 1ba089f2255bfdb071be3ce6ac6c3069e8012179:
 
-> Stefan Hajnoczi (3):
->   virtiofsd: extract lo_do_open() from lo_open()
->   virtiofsd: optionally return inode pointer from lo_do_lookup()
->   virtiofsd: prevent opening of special files (CVE-2020-35517)
-> 
->  tools/virtiofsd/passthrough_ll.c | 224 ++++++++++++++++++++-----------
->  1 file changed, 148 insertions(+), 76 deletions(-)
-> 
-> -- 
-> 2.29.2
-> 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+  Merge remote-tracking branch 'remotes/armbru/tags/pull-qmp-2021-02-04' into staging (2021-02-04 14:15:35 +0000)
+
+are available in the Git repository at:
+
+  https://gitlab.com/dagrh/qemu.git tags/pull-virtiofs-20210204
+
+for you to fetch changes up to cf269ff8032392bbdd700e7bfd21823ad9eee3a9:
+
+  virtiofsd: Add restart_syscall to the seccomp whitelist (2021-02-04 17:50:08 +0000)
+
+----------------------------------------------------------------
+virtiofs: Security pull 2021-02-04
+
+This contains an important CVE fix for virtiofsd,
+together with two fixes for over-eager seccomp rules.
+
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+
+----------------------------------------------------------------
+Greg Kurz (2):
+      virtiofsd: Add _llseek to the seccomp whitelist
+      virtiofsd: Add restart_syscall to the seccomp whitelist
+
+Stefan Hajnoczi (3):
+      virtiofsd: extract lo_do_open() from lo_open()
+      virtiofsd: optionally return inode pointer from lo_do_lookup()
+      virtiofsd: prevent opening of special files (CVE-2020-35517)
+
+ tools/virtiofsd/passthrough_ll.c      | 224 ++++++++++++++++++++++------------
+ tools/virtiofsd/passthrough_seccomp.c |   2 +
+ 2 files changed, 150 insertions(+), 76 deletions(-)
 

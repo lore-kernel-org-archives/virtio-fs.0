@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Thu,  4 Feb 2021 18:34:35 +0000
-Message-Id: <20210204183439.546918-2-dgilbert@redhat.com>
+Date: Thu,  4 Feb 2021 18:34:36 +0000
+Message-Id: <20210204183439.546918-3-dgilbert@redhat.com>
 In-Reply-To: <20210204183439.546918-1-dgilbert@redhat.com>
 References: <20210204183439.546918-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 1/5] virtiofsd: extract lo_do_open() from
-	lo_open()
+Subject: [Virtio-fs] [PULL 2/5] virtiofsd: optionally return inode pointer
+	from lo_do_lookup()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,143 +19,106 @@ To: qemu-devel@nongnu.org, virtio-fs@redhat.com, stefanha@redhat.com, groug@kaod
 
 From: Stefan Hajnoczi <stefanha@redhat.com>
 
-Both lo_open() and lo_create() have similar code to open a file. Extract
-a common lo_do_open() function from lo_open() that will be used by
-lo_create() in a later commit.
+lo_do_lookup() finds an existing inode or allocates a new one. It
+increments nlookup so that the inode stays alive until the client
+releases it.
 
-Since lo_do_open() does not otherwise need fuse_req_t req, convert
-lo_add_fd_mapping() to use struct lo_data *lo instead.
+Existing callers don't need the struct lo_inode so the function doesn't
+return it. Extend the function to optionally return the inode. The next
+commit will need it.
 
 Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-Message-Id: <20210204150208.367837-2-stefanha@redhat.com>
 Reviewed-by: Greg Kurz <groug@kaod.org>
+Message-Id: <20210204150208.367837-3-stefanha@redhat.com>
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 73 ++++++++++++++++++++------------
- 1 file changed, 46 insertions(+), 27 deletions(-)
+ tools/virtiofsd/passthrough_ll.c | 29 +++++++++++++++++++++--------
+ 1 file changed, 21 insertions(+), 8 deletions(-)
 
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 5fb36d9407..f14fa5124d 100644
+index f14fa5124d..aa35fc6ba5 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -459,17 +459,17 @@ static void lo_map_remove(struct lo_map *map, size_t key)
+@@ -831,11 +831,13 @@ static int do_statx(struct lo_data *lo, int dirfd, const char *pathname,
  }
  
- /* Assumes lo->mutex is held */
--static ssize_t lo_add_fd_mapping(fuse_req_t req, int fd)
-+static ssize_t lo_add_fd_mapping(struct lo_data *lo, int fd)
+ /*
+- * Increments nlookup and caller must release refcount using
+- * lo_inode_put(&parent).
++ * Increments nlookup on the inode on success. unref_inode_lolocked() must be
++ * called eventually to decrement nlookup again. If inodep is non-NULL, the
++ * inode pointer is stored and the caller must call lo_inode_put().
+  */
+ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+-                        struct fuse_entry_param *e)
++                        struct fuse_entry_param *e,
++                        struct lo_inode **inodep)
  {
-     struct lo_map_elem *elem;
+     int newfd;
+     int res;
+@@ -845,6 +847,10 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+     struct lo_inode *inode = NULL;
+     struct lo_inode *dir = lo_inode(req, parent);
  
--    elem = lo_map_alloc_elem(&lo_data(req)->fd_map);
-+    elem = lo_map_alloc_elem(&lo->fd_map);
-     if (!elem) {
-         return -1;
-     }
- 
-     elem->fd = fd;
--    return elem - lo_data(req)->fd_map.elems;
-+    return elem - lo->fd_map.elems;
- }
- 
- /* Assumes lo->mutex is held */
-@@ -1651,6 +1651,38 @@ static void update_open_flags(int writeback, int allow_direct_io,
-     }
- }
- 
-+static int lo_do_open(struct lo_data *lo, struct lo_inode *inode,
-+                      struct fuse_file_info *fi)
-+{
-+    char buf[64];
-+    ssize_t fh;
-+    int fd;
-+
-+    update_open_flags(lo->writeback, lo->allow_direct_io, fi);
-+
-+    sprintf(buf, "%i", inode->fd);
-+    fd = openat(lo->proc_self_fd, buf, fi->flags & ~O_NOFOLLOW);
-+    if (fd == -1) {
-+        return errno;
++    if (inodep) {
++        *inodep = NULL;
 +    }
 +
-+    pthread_mutex_lock(&lo->mutex);
-+    fh = lo_add_fd_mapping(lo, fd);
-+    pthread_mutex_unlock(&lo->mutex);
-+    if (fh == -1) {
-+        close(fd);
-+        return ENOMEM;
-+    }
-+
-+    fi->fh = fh;
-+    if (lo->cache == CACHE_NONE) {
-+        fi->direct_io = 1;
-+    } else if (lo->cache == CACHE_ALWAYS) {
-+        fi->keep_cache = 1;
-+    }
-+    return 0;
-+}
-+
- static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
-                       mode_t mode, struct fuse_file_info *fi)
- {
-@@ -1691,7 +1723,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
-         ssize_t fh;
- 
-         pthread_mutex_lock(&lo->mutex);
--        fh = lo_add_fd_mapping(req, fd);
-+        fh = lo_add_fd_mapping(lo, fd);
+     /*
+      * name_to_handle_at() and open_by_handle_at() can reach here with fuse
+      * mount point in guest, but we don't have its inode info in the
+@@ -913,7 +919,14 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
          pthread_mutex_unlock(&lo->mutex);
-         if (fh == -1) {
-             close(fd);
-@@ -1892,38 +1924,25 @@ static void lo_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
+     }
+     e->ino = inode->fuse_ino;
+-    lo_inode_put(lo, &inode);
++
++    /* Transfer ownership of inode pointer to caller or drop it */
++    if (inodep) {
++        *inodep = inode;
++    } else {
++        lo_inode_put(lo, &inode);
++    }
++
+     lo_inode_put(lo, &dir);
  
- static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
- {
--    int fd;
--    ssize_t fh;
--    char buf[64];
-     struct lo_data *lo = lo_data(req);
-+    struct lo_inode *inode = lo_inode(req, ino);
-+    int err;
- 
-     fuse_log(FUSE_LOG_DEBUG, "lo_open(ino=%" PRIu64 ", flags=%d)\n", ino,
-              fi->flags);
- 
--    update_open_flags(lo->writeback, lo->allow_direct_io, fi);
--
--    sprintf(buf, "%i", lo_fd(req, ino));
--    fd = openat(lo->proc_self_fd, buf, fi->flags & ~O_NOFOLLOW);
--    if (fd == -1) {
--        return (void)fuse_reply_err(req, errno);
--    }
--
--    pthread_mutex_lock(&lo->mutex);
--    fh = lo_add_fd_mapping(req, fd);
--    pthread_mutex_unlock(&lo->mutex);
--    if (fh == -1) {
--        close(fd);
--        fuse_reply_err(req, ENOMEM);
-+    if (!inode) {
-+        fuse_reply_err(req, EBADF);
+     fuse_log(FUSE_LOG_DEBUG, "  %lli/%s -> %lli\n", (unsigned long long)parent,
+@@ -948,7 +961,7 @@ static void lo_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
          return;
      }
  
--    fi->fh = fh;
--    if (lo->cache == CACHE_NONE) {
--        fi->direct_io = 1;
--    } else if (lo->cache == CACHE_ALWAYS) {
--        fi->keep_cache = 1;
-+    err = lo_do_open(lo, inode, fi);
-+    lo_inode_put(lo, &inode);
-+    if (err) {
-+        fuse_reply_err(req, err);
-+    } else {
-+        fuse_reply_open(req, fi);
+-    err = lo_do_lookup(req, parent, name, &e);
++    err = lo_do_lookup(req, parent, name, &e, NULL);
+     if (err) {
+         fuse_reply_err(req, err);
+     } else {
+@@ -1056,7 +1069,7 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
+         goto out;
      }
--    fuse_reply_open(req, fi);
- }
  
- static void lo_release(fuse_req_t req, fuse_ino_t ino,
+-    saverr = lo_do_lookup(req, parent, name, &e);
++    saverr = lo_do_lookup(req, parent, name, &e, NULL);
+     if (saverr) {
+         goto out;
+     }
+@@ -1534,7 +1547,7 @@ static void lo_do_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
+ 
+         if (plus) {
+             if (!is_dot_or_dotdot(name)) {
+-                err = lo_do_lookup(req, ino, name, &e);
++                err = lo_do_lookup(req, ino, name, &e, NULL);
+                 if (err) {
+                     goto error;
+                 }
+@@ -1732,7 +1745,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+         }
+ 
+         fi->fh = fh;
+-        err = lo_do_lookup(req, parent, name, &e);
++        err = lo_do_lookup(req, parent, name, &e, NULL);
+     }
+     if (lo->cache == CACHE_NONE) {
+         fi->direct_io = 1;
 -- 
 2.29.2
 

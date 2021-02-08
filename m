@@ -1,14 +1,18 @@
-Date: Mon, 8 Feb 2021 17:35:39 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <20210208173539.GE3033@work-vm>
-References: <20201112182418.25395-1-vgoyal@redhat.com>
-	<20201112182418.25395-3-vgoyal@redhat.com>
+Date: Mon, 8 Feb 2021 17:41:43 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20210208174143.GA9994@stefanha-x1.localdomain>
+References: <20210125180115.22936-1-vgoyal@redhat.com>
+	<20210125180115.22936-5-vgoyal@redhat.com>
+	<20210128165234.GC20377@stefanha-x1.localdomain>
+	<20210129141600.GA3146@redhat.com>
+	<20210129151155.GD3146@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="6c2NcOVqGQ03X4Wi"
 Content-Disposition: inline
-In-Reply-To: <20201112182418.25395-3-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v2 2/2] viriofsd: Add support for
- FUSE_HANDLE_KILLPRIV_V2
+In-Reply-To: <20210129151155.GD3146@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 4/6] qemu,
+ vhost-user: Extend protocol to start/stop/flush slave channel
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,378 +22,159 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, mst@redhat.com, qemu-devel@nongnu.org
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> This patch adds basic support for FUSE_HANDLE_KILLPRIV_V2. virtiofsd
-> can enable/disable this by specifying option "-o killpriv_v2/no_killpriv_v2".
-> By default this is enabled as long as client supports it
-> 
-> Enabling this option helps with performance in write path. Without this
-> option, currently every write is first preceeded with a getxattr() operation
-> to find out if security.capability is set. (Write is supposed to clear
-> security.capability). With this option enabled, server is signing up for
-> clearing security.capability on every WRITE and also clearing suid/sgid
-> subject to certain rules. This gets rid of extra getxattr() call for every
-> WRITE and improves performance. This is true when virtiofsd is run with
-> option -o xattr.
-> 
-> What does enabling FUSE_HANDLE_KILLPRIV_V2 mean for file server implementation.
-> It needs to adhere to following rules. Thanks to Miklos for this summary.
-> 
-> - clear "security.capability" on write, truncate and chown unconditionally
-> - clear suid/sgid in case of following. Note, sgid is cleared only if
->   group executable bit is set.
->     o setattr has FATTR_SIZE and FATTR_KILL_SUIDGID set.
->     o setattr has FATTR_UID or FATTR_GID
->     o open has O_TRUNC and FUSE_OPEN_KILL_SUIDGID
->     o create has O_TRUNC and FUSE_OPEN_KILL_SUIDGID flag set.
->     o write has FUSE_WRITE_KILL_SUIDGID
-> 
-> >From Linux VFS client perspective, here are the requirements.
-> 
-> - caps are always cleared on chown/write/truncate
-> - suid is always cleared on chown, while for truncate/write it is cleared
->   only if caller does not have CAP_FSETID.
-> - sgid is always cleared on chown, while for truncate/write it is cleared
->   only if caller does not have CAP_FSETID as well as file has group execute
->   permission.
-> 
-> virtiofsd implementation has not changed much to adhere to above ruls. And
-> reason being that current assumption is that we are running on Linux
-> and on top of filesystems like ext4/xfs which already follow above rules.
-> On write, truncate, chown, seucurity.capability is cleared. And virtiofsd
-> drops CAP_FSETID if need be and that will lead to clearing of suid/sgid.
-> 
-> But if virtiofsd is running on top a filesystem which breaks above assumptions,
-> then it will have to take extra actions to emulate above. That's a TODO
-> for later when need arises.
-> 
-> Note: create normally is supposed to be called only when file does not
->       exist. So generally there should not be any question of clearing
->       setuid/setgid. But it is possible that after client checks that
->       file is not present, some other client creates file on server
->       and this race can trigger sending FUSE_CREATE. In that case, if
->       O_TRUNC is set, we should clear suid/sgid if FUSE_OPEN_KILL_SUIDGID
->       is also set.
-> 
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  include/standard-headers/linux/fuse.h |  28 ++++++-
->  tools/virtiofsd/fuse_common.h         |  15 ++++
->  tools/virtiofsd/fuse_lowlevel.c       |  11 ++-
->  tools/virtiofsd/fuse_lowlevel.h       |   1 +
->  tools/virtiofsd/passthrough_ll.c      | 108 +++++++++++++++++++++++---
->  5 files changed, 148 insertions(+), 15 deletions(-)
-> 
-> diff --git a/include/standard-headers/linux/fuse.h b/include/standard-headers/linux/fuse.h
-> index 82c0a38b59..a233f3ac02 100644
-> --- a/include/standard-headers/linux/fuse.h
-> +++ b/include/standard-headers/linux/fuse.h
 
-Qemu already has these changes because the whole kernel header set was
-resync'd at rc2 a few weeks back.
+--6c2NcOVqGQ03X4Wi
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-<snip>
+On Fri, Jan 29, 2021 at 10:11:55AM -0500, Vivek Goyal wrote:
+> On Fri, Jan 29, 2021 at 09:16:00AM -0500, Vivek Goyal wrote:
+> > On Thu, Jan 28, 2021 at 04:52:34PM +0000, Stefan Hajnoczi wrote:
+> > > On Mon, Jan 25, 2021 at 01:01:13PM -0500, Vivek Goyal wrote:
+> > > > Currently we don't have a mechanism to flush slave channel while sh=
+utting
+> > > > down vhost-user device and that can result a deadlock. Consider fol=
+lowing
+> > > > scenario.
+> > > >=20
+> > > > 1. Slave gets a request from guest on virtqueue (say index 1, vq1),=
+ to map
+> > > >    a portion of file in qemu address space.
+> > > >=20
+> > > > 2. Thread serving vq1 receives this request and sends a message to =
+qemu on
+> > > >    slave channel/fd and gets blocked in waiting for a response from=
+ qemu.
+> > > >=20
+> > > > 3. In the mean time, user does "echo b > /proc/sysrq-trigger" in gu=
+est. This
+> > > >    leads to qemu reset and ultimately in main thread we end up in
+> > > >    vhost_dev_stop() which is trying to shutdown virtqueues for the =
+device.
+> > > >=20
+> > > > 4. Slave gets VHOST_USER_GET_VRING_BASE message to shutdown a virtq=
+ueue on
+> > > >    unix socket being used for communication.
+> > > >=20
+> > > > 5. Slave tries to shutdown the thread serving vq1 and waits for it =
+to
+> > > >    terminate. But vq1 thread can't terminate because it is waiting =
+for
+> > > >    a response from qemu on slave_fd. And qemu is not processing sla=
+ve_fd
+> > > >    anymore as qemu is ressing (and not running main event loop anym=
+ore)
+> > > >    and is waiting for a response to VHOST_USER_GET_VRING_BASE.
+> > > >=20
+> > > > So we have a deadlock. Qemu is waiting on slave to response to
+> > > > VHOST_USER_GET_VRING_BASE message and slave is waiting on qemu to
+> > > > respond to request it sent on slave_fd.
+> > > >=20
+> > > > I can reliably reproduce this race with virtio-fs.
+> > > >=20
+> > > > Hence here is the proposal to solve this problem. Enhance vhost-user
+> > > > protocol to properly shutdown slave_fd channel. And if there are pe=
+nding
+> > > > requests, flush the channel completely before sending the request to
+> > > > shutdown virtqueues.
+> > > >=20
+> > > > New workflow to shutdown slave channel is.
+> > > >=20
+> > > > - Qemu sends VHOST_USER_STOP_SLAVE_CHANNEL request to slave. It wai=
+ts
+> > > >   for an reply from guest.
+> > > >=20
+> > > > - Then qemu sits in a tight loop waiting for
+> > > >   VHOST_USER_SLAVE_STOP_CHANNEL_COMPLETE message from slave on slav=
+e_fd.
+> > > >   And while waiting for this message, qemu continues to process req=
+uests
+> > > >   on slave_fd to flush any pending requests. This will unblock thre=
+ads
+> > > >   in slave and allow slave to shutdown slave channel.
+> > > >=20
+> > > > - Once qemu gets VHOST_USER_SLAVE_STOP_CHANNEL_COMPLETE message, it=
+ knows
+> > > >   no more requests will come on slave_fd and it can continue to shu=
+tdown
+> > > >   virtqueues now.
+> > > >=20
+> > > > - Once device starts again, qemu will send VHOST_USER_START_SLAVE_C=
+HANNEL
+> > > >   message to slave to open the slave channel and receive requests.
+> > > >=20
+> > > > IOW, this allows for proper shutdown of slave channel, making sure
+> > > > no threads in slave are blocked on sending/receiving message. And
+> > > > this in-turn allows for shutting down of virtqueues, hence resolving
+> > > > the deadlock.
+> > >=20
+> > > Is the new message necessary?
+> >=20
+> > Hi Stefan,
+> >=20
+> > It probably is not necessary but it feels like a cleaner and simpler
+> > solution.
+> >=20
+> > There slave is a separate channel from virtqueues. And if device is
+> > stopping, we want to make sure there are no pending requests in
+> > slave channel. It is possible that virtqueue shutodwn is successful
+> > but other entity could still be sending messages on slave channel. In
+> > that case, shall we say device shutdown complete and stop polling
+> > slave channel?
+> >=20
+> > IOW, the way we have explicit protocol messages to shutdown each
+> > vring, it makes sense to have explicit protocol message to shutdown
+> > slave channel as well. Right now there is no mechanism to do that.
+> >=20
+>=20
+> Thinking more from "slave" point of view. It might have a separate thread
+> to send messages on slave channel. It has no idea when to stop sending
+> messages on slave channel, as there is no mechanism to shutdown slave.
+> Only method seems to be that master will close slave fd and that
+> will close connection.
+>=20
+> That means if a device is being stopped (and not removed), then it
+> is possible virtqueues got stopped but a thread in slave is blocked
+> on slave channel (recvmsg()) and expecting a response back.
+>=20
+> That's why I think enhancing protocol to explicitly shutdown slave
+> channel makes sense. Instead of assuming that stopping a virtuqueue
+> should automatically mean slave channel is stopped.
 
-other than that, I think it's OK, so:
+This deadlock can occur during any vhost-user protocol message, not just
+shutdown:
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+When QEMU's vhost-user master implementation sends a vhost-user protocol
+message, vhost_user_read() does a "blocking" read during which slave_fd
+is not monitored by QEMU.
 
-> diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
-> index 5aee5193eb..6f4a1ff3a9 100644
-> --- a/tools/virtiofsd/fuse_common.h
-> +++ b/tools/virtiofsd/fuse_common.h
-> @@ -359,6 +359,21 @@ struct fuse_file_info {
->   */
->  #define FUSE_CAP_SUBMOUNTS (1 << 27)
->  
-> +/**
-> + * Indicates that the filesystem is responsible for clearing
-> + * security.capability xattr and clearing setuid and setgid bits. Following
-> + * are the rules.
-> + * - clear "security.capability" on write, truncate and chown unconditionally
-> + * - clear suid/sgid if following is true. Note, sgid is cleared only if
-> + *   group executable bit is set.
-> + *    o setattr has FATTR_SIZE and FATTR_KILL_SUIDGID set.
-> + *    o setattr has FATTR_UID or FATTR_GID
-> + *    o open has O_TRUNC and FUSE_OPEN_KILL_SUIDGID
-> + *    o create has O_TRUNC and FUSE_OPEN_KILL_SUIDGID flag set.
-> + *    o write has FUSE_WRITE_KILL_SUIDGID
-> + */
-> +#define FUSE_CAP_HANDLE_KILLPRIV_V2 (1 << 28)
-> +
->  /**
->   * Ioctl flags
->   *
-> diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-> index c70fb16a9a..65f01a3fe3 100644
-> --- a/tools/virtiofsd/fuse_lowlevel.c
-> +++ b/tools/virtiofsd/fuse_lowlevel.c
-> @@ -865,7 +865,7 @@ static void do_setattr(fuse_req_t req, fuse_ino_t nodeid,
->                        FUSE_SET_ATTR_GID | FUSE_SET_ATTR_SIZE |
->                        FUSE_SET_ATTR_ATIME | FUSE_SET_ATTR_MTIME |
->                        FUSE_SET_ATTR_ATIME_NOW | FUSE_SET_ATTR_MTIME_NOW |
-> -                      FUSE_SET_ATTR_CTIME;
-> +                      FUSE_SET_ATTR_CTIME | FUSE_SET_ATTR_KILL_SUIDGID;
->  
->          req->se->op.setattr(req, nodeid, &stbuf, arg->valid, fi);
->      } else {
-> @@ -1079,6 +1079,7 @@ static void do_create(fuse_req_t req, fuse_ino_t nodeid,
->  
->          memset(&fi, 0, sizeof(fi));
->          fi.flags = arg->flags;
-> +        fi.kill_priv = arg->open_flags & FUSE_OPEN_KILL_SUIDGID;
->  
->          req->ctx.umask = arg->umask;
->  
-> @@ -1102,6 +1103,7 @@ static void do_open(fuse_req_t req, fuse_ino_t nodeid,
->  
->      memset(&fi, 0, sizeof(fi));
->      fi.flags = arg->flags;
-> +    fi.kill_priv = arg->open_flags & FUSE_OPEN_KILL_SUIDGID;
->  
->      if (req->se->op.open) {
->          req->se->op.open(req, nodeid, &fi);
-> @@ -1993,6 +1995,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
->      if (arg->flags & FUSE_SUBMOUNTS) {
->          se->conn.capable |= FUSE_CAP_SUBMOUNTS;
->      }
-> +    if (arg->flags & FUSE_HANDLE_KILLPRIV_V2) {
-> +        se->conn.capable |= FUSE_CAP_HANDLE_KILLPRIV_V2;
-> +    }
->  #ifdef HAVE_SPLICE
->  #ifdef HAVE_VMSPLICE
->      se->conn.capable |= FUSE_CAP_SPLICE_WRITE | FUSE_CAP_SPLICE_MOVE;
-> @@ -2124,6 +2129,10 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
->      outarg.congestion_threshold = se->conn.congestion_threshold;
->      outarg.time_gran = se->conn.time_gran;
->  
-> +    if (se->conn.want & FUSE_CAP_HANDLE_KILLPRIV_V2) {
-> +        outarg.flags |= FUSE_HANDLE_KILLPRIV_V2;
-> +    }
-> +
->      fuse_log(FUSE_LOG_DEBUG, "   INIT: %u.%u\n", outarg.major, outarg.minor);
->      fuse_log(FUSE_LOG_DEBUG, "   flags=0x%08x\n", outarg.flags);
->      fuse_log(FUSE_LOG_DEBUG, "   max_readahead=0x%08x\n", outarg.max_readahead);
-> diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
-> index 9c06240f9e..96d10defc8 100644
-> --- a/tools/virtiofsd/fuse_lowlevel.h
-> +++ b/tools/virtiofsd/fuse_lowlevel.h
-> @@ -146,6 +146,7 @@ struct fuse_forget_data {
->  #define FUSE_SET_ATTR_ATIME_NOW (1 << 7)
->  #define FUSE_SET_ATTR_MTIME_NOW (1 << 8)
->  #define FUSE_SET_ATTR_CTIME (1 << 10)
-> +#define FUSE_SET_ATTR_KILL_SUIDGID (1 << 11)
->  
->  /*
->   * Request methods and replies
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 6407b1a2e1..36bdca449a 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -180,6 +180,7 @@ struct lo_data {
->  
->      /* An O_PATH file descriptor to /proc/self/fd/ */
->      int proc_self_fd;
-> +    int user_killpriv_v2, killpriv_v2;
->  };
->  
->  static const struct fuse_opt lo_opts[] = {
-> @@ -210,6 +211,8 @@ static const struct fuse_opt lo_opts[] = {
->      { "allow_direct_io", offsetof(struct lo_data, allow_direct_io), 1 },
->      { "no_allow_direct_io", offsetof(struct lo_data, allow_direct_io), 0 },
->      { "announce_submounts", offsetof(struct lo_data, announce_submounts), 1 },
-> +    { "killpriv_v2", offsetof(struct lo_data, user_killpriv_v2), 1 },
-> +    { "no_killpriv_v2", offsetof(struct lo_data, user_killpriv_v2), 0 },
->      FUSE_OPT_END
->  };
->  static bool use_syslog = false;
-> @@ -618,6 +621,34 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
->          lo->announce_submounts = false;
->      }
->  #endif
-> +
-> +    if (lo->user_killpriv_v2 == 1) {
-> +        /*
-> +         * User explicitly asked for this option. Enable it unconditionally.
-> +         * If connection does not have this capability, it should fail
-> +         * in fuse_lowlevel.c
-> +         */
+So the problem is more general and is not fully solved by an explicit
+shutdown message. If the slave needs slave channel reply in order to
+process a vhost-user protocol message then a deadlock can occur.
 
-So that would fail with an old guest?
+This can be solved by monitoring both the vhost-user fd and slave_fd in
+vhost_user_read(). I don't think there is a need to shutdown the slave
+channel BTW.
 
-> +        fuse_log(FUSE_LOG_DEBUG, "lo_init: enabling killpriv_v2\n");
-> +        conn->want |= FUSE_CAP_HANDLE_KILLPRIV_V2;
-> +        lo->killpriv_v2 = 1;
-> +    } else if (lo->user_killpriv_v2 == -1 &&
-> +               conn->capable & FUSE_CAP_HANDLE_KILLPRIV_V2) {
-> +        /*
-> +         * User did not specify a value for killpriv_v2. By default enable it
-> +         * if connection offers this capability
-> +         */
-> +        fuse_log(FUSE_LOG_DEBUG, "lo_init: enabling killpriv_v2\n");
-> +        conn->want |= FUSE_CAP_HANDLE_KILLPRIV_V2;
-> +        lo->killpriv_v2 = 1;
-> +    } else {
-> +        /*
-> +         * Either user specified to disable killpriv_v2, or connection does
-> +         * not offer this capability. Disable killpriv_v2 in both the cases
-> +         */
-> +        fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling killpriv_v2\n");
-> +        conn->want &= ~FUSE_CAP_HANDLE_KILLPRIV_V2;
-> +        lo->killpriv_v2 = 0;
-> +    }
->  }
->  
->  static void lo_getattr(fuse_req_t req, fuse_ino_t ino,
-> @@ -702,7 +733,10 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
->      }
->      if (valid & FUSE_SET_ATTR_SIZE) {
->          int truncfd;
-> +        bool kill_suidgid;
-> +        bool cap_fsetid_dropped = false;
->  
-> +        kill_suidgid = lo->killpriv_v2 && (valid & FUSE_SET_ATTR_KILL_SUIDGID);
->          if (fi) {
->              truncfd = fd;
->          } else {
-> @@ -714,8 +748,25 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
->              }
->          }
->  
-> +        if (kill_suidgid) {
-> +            res = drop_effective_cap("FSETID", &cap_fsetid_dropped);
-> +            if (res != 0) {
-> +                saverr = res;
-> +                if (!fi) {
-> +                    close(truncfd);
-> +                }
-> +                goto out_err;
-> +            }
-> +        }
-> +
->          res = ftruncate(truncfd, attr->st_size);
->          saverr = res == -1 ? errno : 0;
-> +
-> +        if (cap_fsetid_dropped) {
-> +            if (gain_effective_cap("FSETID")) {
-> +                fuse_log(FUSE_LOG_ERR, "Failed to gain CAP_FSETID\n");
-> +            }
-> +        }
->          if (!fi) {
->              close(truncfd);
->          }
-> @@ -1680,9 +1731,11 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
->      struct fuse_entry_param e;
->      int err;
->      struct lo_cred old = {};
-> +    bool cap_fsetid_dropped = false;
-> +    bool kill_suidgid = lo->killpriv_v2 && fi->kill_priv;
->  
-> -    fuse_log(FUSE_LOG_DEBUG, "lo_create(parent=%" PRIu64 ", name=%s)\n", parent,
-> -             name);
-> +    fuse_log(FUSE_LOG_DEBUG, "lo_create(parent=%" PRIu64 ", name=%s)"
-> +             " kill_priv=%d\n", parent, name, fi->kill_priv);
->  
->      if (!is_safe_path_component(name)) {
->          fuse_reply_err(req, EINVAL);
-> @@ -1702,9 +1755,23 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
->  
->      update_open_flags(lo->writeback, lo->allow_direct_io, fi);
->  
-> +    if (kill_suidgid) {
-> +        err = drop_effective_cap("FSETID", &cap_fsetid_dropped);
-> +        if (err != 0) {
-> +            lo_restore_cred(&old);
-> +            goto out;
-> +        }
-> +    }
-> +
->      fd = openat(parent_inode->fd, name, (fi->flags | O_CREAT) & ~O_NOFOLLOW,
->                  mode);
->      err = fd == -1 ? errno : 0;
-> +
-> +    if (cap_fsetid_dropped) {
-> +        if (gain_effective_cap("FSETID")) {
-> +            fuse_log(FUSE_LOG_ERR, "Failed to gain CAP_FSETID\n");
-> +        }
-> +    }
->      lo_restore_cred(&old);
->  
->      if (!err) {
-> @@ -1902,20 +1969,38 @@ static void lo_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
->  
->  static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
->  {
-> -    int fd;
-> +    int fd, ret;
->      ssize_t fh;
->      char buf[64];
->      struct lo_data *lo = lo_data(req);
-> +    bool cap_fsetid_dropped = false;
-> +    bool kill_suidgid = lo->killpriv_v2 && fi->kill_priv;
->  
-> -    fuse_log(FUSE_LOG_DEBUG, "lo_open(ino=%" PRIu64 ", flags=%d)\n", ino,
-> -             fi->flags);
-> +    fuse_log(FUSE_LOG_DEBUG, "lo_open(ino=%" PRIu64 ", flags=%d, kill_priv=%d)"
-> +             "\n", ino, fi->flags, fi->kill_priv);
->  
->      update_open_flags(lo->writeback, lo->allow_direct_io, fi);
->  
->      sprintf(buf, "%i", lo_fd(req, ino));
-> +
-> +    if (kill_suidgid) {
-> +        ret = drop_effective_cap("FSETID", &cap_fsetid_dropped);
-> +        if (ret != 0) {
-> +            fuse_reply_err(req, ret);
-> +            return;
-> +        }
-> +    }
-> +
->      fd = openat(lo->proc_self_fd, buf, fi->flags & ~O_NOFOLLOW);
-> -    if (fd == -1) {
-> -        return (void)fuse_reply_err(req, errno);
-> +    ret = fd == -1 ? errno : 0;
-> +    if (cap_fsetid_dropped) {
-> +        if (gain_effective_cap("FSETID")) {
-> +            fuse_log(FUSE_LOG_ERR, "Failed to gain CAP_FSETID\n");
-> +        }
-> +    }
-> +
-> +    if (ret) {
-> +        return (void)fuse_reply_err(req, ret);
->      }
->  
->      pthread_mutex_lock(&lo->mutex);
-> @@ -2049,12 +2134,14 @@ static void lo_write_buf(fuse_req_t req, fuse_ino_t ino,
->      out_buf.buf[0].pos = off;
->  
->      fuse_log(FUSE_LOG_DEBUG,
-> -             "lo_write_buf(ino=%" PRIu64 ", size=%zd, off=%lu)\n", ino,
-> -             out_buf.buf[0].size, (unsigned long)off);
-> +             "lo_write_buf(ino=%" PRIu64 ", size=%zd, off=%lu kill_priv=%d)\n",
-> +             ino, out_buf.buf[0].size, (unsigned long)off, fi->kill_priv);
->  
->      /*
->       * If kill_priv is set, drop CAP_FSETID which should lead to kernel
-> -     * clearing setuid/setgid on file.
-> +     * clearing setuid/setgid on file. Note, for WRITE, we need to do
-> +     * this even if killpriv_v2 is not enabled. fuse direct write path
-> +     * relies on this.
->       */
->      if (fi->kill_priv) {
->          res = drop_effective_cap("FSETID", &cap_fsetid_dropped);
-> @@ -3433,6 +3520,7 @@ int main(int argc, char *argv[])
->          .posix_lock = 0,
->          .allow_direct_io = 0,
->          .proc_self_fd = -1,
-> +        .user_killpriv_v2 = -1,
->      };
->      struct lo_map_elem *root_elem;
->      int ret = -1;
-> -- 
-> 2.25.4
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+Stefan
+
+--6c2NcOVqGQ03X4Wi
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAhd9cACgkQnKSrs4Gr
+c8gO/gf7Bkrh8s3tHjBLyII0PlRjyoMtnf0VdCTYrFDQry/3xigRpfc/ZFu+tbzd
+lhu+lFWGbVy5HovRAb+Q2ILvImFj4WUHNj4erwEN5CRsg0SIioBu2l1enL0+NwKu
+Fsav08+c2LiZ7NIdtFVLBYCai65+0kRFJkbrnLpdKpIw89/o1KdjBXQTqzUluaw7
+SdM7qtlpTJkwnpO3AKMqRbvkfVDVGXqmCuPac3ed6ZdiP8X2YFQjrDZX/CpImKHP
+HMsdlFuIT0ZKRWgCS0+8nWGnGtFJ/IocQbpayuafvDF93IBIWwE2MFYNDyDKi0Ve
+RYPBLPjH1gJZZKcnauFzqi6O2Q75bQ==
+=bgxd
+-----END PGP SIGNATURE-----
+
+--6c2NcOVqGQ03X4Wi--
 

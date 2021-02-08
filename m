@@ -1,14 +1,14 @@
-Date: Thu, 21 Jan 2021 14:48:03 +0000
-From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
-Message-ID: <20210121144803.GN3125227@redhat.com>
-References: <20210121144429.58885-1-stefanha@redhat.com>
+Date: Mon, 8 Feb 2021 17:05:05 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <20210208170505.GD3033@work-vm>
+References: <20201112182418.25395-1-vgoyal@redhat.com>
+	<20201112182418.25395-2-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=utf-8
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210121144429.58885-1-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: prevent opening of special files
- (CVE-2020-35517)
-Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+In-Reply-To: <20201112182418.25395-2-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v2 1/2] virtiofsd: Save error code early at
+ the failure callsite
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,100 +17,96 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: qemu-devel@nongnu.org, P J P <ppandit@redhat.com>, virtio-fs@redhat.com, Alex Xu <alex@alxu.ca>, vgoyal@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Thu, Jan 21, 2021 at 02:44:29PM +0000, Stefan Hajnoczi wrote:
-> A well-behaved FUSE client does not attempt to open special files with
-> FUSE_OPEN because they are handled on the client side (e.g. device nodes
-> are handled by client-side device drivers).
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> Change error code handling slightly in lo_setattr(). Right now we seem
+> to jump to out_err and assume that "errno" is valid and use that to
+> send reply.
 > 
-> The check to prevent virtiofsd from opening special files is missing in
-> a few cases, most notably FUSE_OPEN. A malicious client can cause
-> virtiofsd to open a device node, potentially allowing the guest to
-> escape. This can be exploited by a modified guest device driver. It is
-> not exploitable from guest userspace since the guest kernel will handle
-> special files inside the guest instead of sending FUSE requests.
+> But if caller has to do some other operations before jumping to out_err,
+> then it does the dance of first saving errno to saverr and the restore
+> errno before jumping to out_err. This makes it more confusing.
 > 
-> This patch adds the missing checks to virtiofsd. This is a short-term
-> solution because it does not prevent a compromised virtiofsd process
-> from opening device nodes on the host.
+> I am about to make more changes where caller will have to do some
+> work after error before jumping to out_err. I found it easier to
+> change the convention a bit. That is caller saves error in "saverr"
+> before jumping to out_err. And out_err uses "saverr" to send error
+> back and does not rely on "errno" having actual error.
 > 
-> Reported-by: Alex Xu <alex@alxu.ca>
-> Fixes: CVE-2020-35517
-> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+
+Yes, that looks OK, so
+
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+
+but please can you send a rebased version, Stefan's recent
+security fix changes it around the openat.
+
+Dave
+
+
 > ---
-> This issue was diagnosed on public IRC and is therefore already known
-> and not embargoed.
-> 
-> A stronger fix, and the long-term solution, is for users to mount the
-> shared directory and any sub-mounts with nodev, as well as nosuid and
-> noexec. Unfortunately virtiofsd cannot do this automatically because
-> bind mounts added by the user after virtiofsd has launched would not be
-> detected. I suggest the following:
-> 
-> 1. Modify libvirt and Kata Containers to explicitly set these mount
->    options.
-> 2. Then modify virtiofsd to check that the shared directory has the
->    necessary options at startup. Refuse to start if the options are
->    missing so that the user is aware of the security requirements.
-> 
-> As a bonus this also increases the likelihood that other host processes
-> besides virtiofsd will be protected by nosuid/noexec/nodev so that a
-> malicious guest cannot drop these files in place and then arrange for a
-> host process to come across them.
-> 
-> Additionally, user namespaces have been discussed. They seem like a
-> worthwhile addition as an unprivileged or privilege-separated mode
-> although there are limitations with respect to security xattrs and the
-> actual uid/gid stored on the host file system not corresponding to the
-> guest uid/gid.
-> ---
->  tools/virtiofsd/passthrough_ll.c | 84 +++++++++++++++++++++-----------
->  1 file changed, 56 insertions(+), 28 deletions(-)
+>  tools/virtiofsd/passthrough_ll.c | 8 +++++---
+>  1 file changed, 5 insertions(+), 3 deletions(-)
 > 
 > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 5fb36d9407..e08352d649 100644
+> index ec1008bceb..6407b1a2e1 100644
 > --- a/tools/virtiofsd/passthrough_ll.c
 > +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -555,6 +555,29 @@ static int lo_fd(fuse_req_t req, fuse_ino_t ino)
->      return fd;
->  }
+> @@ -686,6 +686,7 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
+>              res = fchmodat(lo->proc_self_fd, procname, attr->st_mode, 0);
+>          }
+>          if (res == -1) {
+> +            saverr = errno;
+>              goto out_err;
+>          }
+>      }
+> @@ -695,6 +696,7 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 >  
-> +/*
-> + * Open a file descriptor for an inode. Returns -EBADF if the inode is not a
-> + * regular file or a directory. Use this helper function instead of raw
-> + * openat(2) to prevent security issues when a malicious client opens special
-> + * files such as block device nodes.
-> + */
-> +static int lo_inode_open(struct lo_data *lo, struct lo_inode *inode,
-> +                         int open_flags)
-> +{
-> +    g_autofree char *fd_str = g_strdup_printf("%d", inode->fd);
-> +    int fd;
-> +
-> +    if (!S_ISREG(inode->filetype) && !S_ISDIR(inode->filetype)) {
-> +        return -EBADF;
-> +    }
-> +
-> +    fd = openat(lo->proc_self_fd, fd_str, open_flags);
-
-Whats the intended behaviour with symlinks ?  Do we need to
-allow S_ISLNK, or are we assuming the symlink has already
-been expanded to the target file by this point ? If the latter
-adding a comment about this would be useful.
-
-> +    if (fd < 0) {
-> +        return -errno;
-> +    }
-> +    return fd;
-> +}
-> +
-
-Regards,
-Daniel
+>          res = fchownat(ifd, "", uid, gid, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
+>          if (res == -1) {
+> +            saverr = errno;
+>              goto out_err;
+>          }
+>      }
+> @@ -707,15 +709,15 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
+>              sprintf(procname, "%i", ifd);
+>              truncfd = openat(lo->proc_self_fd, procname, O_RDWR);
+>              if (truncfd < 0) {
+> +                saverr = errno;
+>                  goto out_err;
+>              }
+>          }
+>  
+>          res = ftruncate(truncfd, attr->st_size);
+> +        saverr = res == -1 ? errno : 0;
+>          if (!fi) {
+> -            saverr = errno;
+>              close(truncfd);
+> -            errno = saverr;
+>          }
+>          if (res == -1) {
+>              goto out_err;
+> @@ -748,6 +750,7 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
+>              res = utimensat(lo->proc_self_fd, procname, tv, 0);
+>          }
+>          if (res == -1) {
+> +            saverr = errno;
+>              goto out_err;
+>          }
+>      }
+> @@ -756,7 +759,6 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
+>      return lo_getattr(req, ino, fi);
+>  
+>  out_err:
+> -    saverr = errno;
+>      lo_inode_put(lo, &inode);
+>      fuse_reply_err(req, saverr);
+>  }
+> -- 
+> 2.25.4
 -- 
-|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
-|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
-|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

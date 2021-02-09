@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Tue,  9 Feb 2021 19:02:19 +0000
-Message-Id: <20210209190224.62827-20-dgilbert@redhat.com>
+Date: Tue,  9 Feb 2021 19:02:20 +0000
+Message-Id: <20210209190224.62827-21-dgilbert@redhat.com>
 In-Reply-To: <20210209190224.62827-1-dgilbert@redhat.com>
 References: <20210209190224.62827-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 19/24] DAX/unmap virtiofsd: Route unmappable
-	reads
+Subject: [Virtio-fs] [PATCH 20/24] DAX/unmap virtiofsd: route unmappable
+	write to slave command
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,56 +19,118 @@ To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, virtio-fs@red
 
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-When a read with unmappable buffers is found, map it to a slave
-read command.
+When a fuse_buf_copy is performed on an element with FUSE_BUF_PHYS_ADDR
+route it to a fuse_virtio_write request that does a slave command to
+perform the write.
 
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 ---
- tools/virtiofsd/fuse_virtio.c | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ tools/virtiofsd/buffer.c         | 14 +++++++++++---
+ tools/virtiofsd/fuse_common.h    |  6 +++++-
+ tools/virtiofsd/fuse_lowlevel.h  |  3 ---
+ tools/virtiofsd/passthrough_ll.c |  2 +-
+ 4 files changed, 17 insertions(+), 8 deletions(-)
 
-diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-index 8fa438525f..316d1f2463 100644
---- a/tools/virtiofsd/fuse_virtio.c
-+++ b/tools/virtiofsd/fuse_virtio.c
-@@ -397,6 +397,37 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
-         in_sg_left -= ret;
-         len -= ret;
-     } while (in_sg_left);
-+
-+    if (bad_in_num) {
-+        while (len && bad_in_num) {
-+            VhostUserFSSlaveMsg msg = { 0 };
-+            msg.flags[0] = VHOST_USER_FS_FLAG_MAP_R;
-+            msg.fd_offset[0] = buf->buf[0].pos;
-+            msg.c_offset[0] = (uint64_t)(uintptr_t)in_sg_ptr[0].iov_base;
-+            msg.len[0] = in_sg_ptr[0].iov_len;
-+            if (len < msg.len[0]) {
-+                msg.len[0] = len;
-+            }
-+            int64_t req_res = fuse_virtio_io(se, &msg, buf->buf[0].fd);
-+            fuse_log(FUSE_LOG_DEBUG,
-+                     "%s: bad loop; len=%zd bad_in_num=%d fd_offset=%zd "
-+                     "c_offset=%p req_res=%ld\n",
-+                     __func__, len, bad_in_num, buf->buf[0].pos,
-+                     in_sg_ptr[0].iov_base, req_res);
-+            if (req_res > 0) {
-+                len -= msg.len[0];
-+                buf->buf[0].pos += msg.len[0];
-+                in_sg_ptr++;
-+                bad_in_num--;
-+            } else if (req_res == 0) {
-+                break;
-+            } else {
-+                ret = req_res;
-+                free(in_sg_cpy);
-+                goto err;
-+            }
-+        }
-+    }
-     free(in_sg_cpy);
+diff --git a/tools/virtiofsd/buffer.c b/tools/virtiofsd/buffer.c
+index 1a050aa441..8135d52d2a 100644
+--- a/tools/virtiofsd/buffer.c
++++ b/tools/virtiofsd/buffer.c
+@@ -200,13 +200,20 @@ static ssize_t fuse_buf_fd_to_fd(const struct fuse_buf *dst, size_t dst_off,
+     return copied;
+ }
  
-     /* Need to fix out->len on EOF */
+-static ssize_t fuse_buf_copy_one(const struct fuse_buf *dst, size_t dst_off,
++static ssize_t fuse_buf_copy_one(fuse_req_t req,
++                                 const struct fuse_buf *dst, size_t dst_off,
+                                  const struct fuse_buf *src, size_t src_off,
+                                  size_t len)
+ {
+     int src_is_fd = src->flags & FUSE_BUF_IS_FD;
+     int dst_is_fd = dst->flags & FUSE_BUF_IS_FD;
++    int src_is_phys = src->flags & FUSE_BUF_PHYS_ADDR;
++    int dst_is_phys = src->flags & FUSE_BUF_PHYS_ADDR;
+ 
++    if (src_is_phys && !src_is_fd && dst_is_fd) {
++        return fuse_virtio_write(req, dst, dst_off, src, src_off, len);
++    }
++    assert(!src_is_phys && !dst_is_phys);
+     if (!src_is_fd && !dst_is_fd) {
+         char *dstmem = (char *)dst->mem + dst_off;
+         char *srcmem = (char *)src->mem + src_off;
+@@ -259,7 +266,8 @@ static int fuse_bufvec_advance(struct fuse_bufvec *bufv, size_t len)
+     return 1;
+ }
+ 
+-ssize_t fuse_buf_copy(struct fuse_bufvec *dstv, struct fuse_bufvec *srcv)
++ssize_t fuse_buf_copy(fuse_req_t req, struct fuse_bufvec *dstv,
++                      struct fuse_bufvec *srcv)
+ {
+     size_t copied = 0, i;
+ 
+@@ -301,7 +309,7 @@ ssize_t fuse_buf_copy(struct fuse_bufvec *dstv, struct fuse_bufvec *srcv)
+         dst_len = dst->size - dstv->off;
+         len = min_size(src_len, dst_len);
+ 
+-        res = fuse_buf_copy_one(dst, dstv->off, src, srcv->off, len);
++        res = fuse_buf_copy_one(req, dst, dstv->off, src, srcv->off, len);
+         if (res < 0) {
+             if (!copied) {
+                 return res;
+diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
+index ed9280de91..05d56883dd 100644
+--- a/tools/virtiofsd/fuse_common.h
++++ b/tools/virtiofsd/fuse_common.h
+@@ -495,6 +495,8 @@ struct fuse_conn_info {
+ struct fuse_session;
+ struct fuse_pollhandle;
+ struct fuse_conn_info_opts;
++struct fuse_req;
++typedef struct fuse_req *fuse_req_t;
+ 
+ /**
+  * This function parses several command-line options that can be used
+@@ -713,11 +715,13 @@ size_t fuse_buf_size(const struct fuse_bufvec *bufv);
+ /**
+  * Copy data from one buffer vector to another
+  *
++ * @param req The request this copy is part of
+  * @param dst destination buffer vector
+  * @param src source buffer vector
+  * @return actual number of bytes copied or -errno on error
+  */
+-ssize_t fuse_buf_copy(struct fuse_bufvec *dst, struct fuse_bufvec *src);
++ssize_t fuse_buf_copy(fuse_req_t req,
++                      struct fuse_bufvec *dst, struct fuse_bufvec *src);
+ 
+ /**
+  * Memory buffer iterator
+diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
+index af928b262f..b36140c565 100644
+--- a/tools/virtiofsd/fuse_lowlevel.h
++++ b/tools/virtiofsd/fuse_lowlevel.h
+@@ -42,9 +42,6 @@
+ /** Inode number type */
+ typedef uint64_t fuse_ino_t;
+ 
+-/** Request pointer type */
+-typedef struct fuse_req *fuse_req_t;
+-
+ /**
+  * Session
+  *
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 21ddb434ae..5baf4f1d50 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -2135,7 +2135,7 @@ static void lo_write_buf(fuse_req_t req, fuse_ino_t ino,
+         }
+     }
+ 
+-    res = fuse_buf_copy(&out_buf, in_buf);
++    res = fuse_buf_copy(req, &out_buf, in_buf);
+     if (res < 0) {
+         fuse_reply_err(req, -res);
+     } else {
 -- 
 2.29.2
 

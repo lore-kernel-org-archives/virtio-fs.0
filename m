@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Tue,  9 Feb 2021 19:02:21 +0000
-Message-Id: <20210209190224.62827-22-dgilbert@redhat.com>
+Date: Tue,  9 Feb 2021 19:02:22 +0000
+Message-Id: <20210209190224.62827-23-dgilbert@redhat.com>
 In-Reply-To: <20210209190224.62827-1-dgilbert@redhat.com>
 References: <20210209190224.62827-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 21/24] DAX:virtiofsd: implement FUSE_INIT
-	map_alignment field
+Subject: [Virtio-fs] [PATCH 22/24] vhost-user-fs: Extend VhostUserFSSlaveMsg
+	to pass additional info
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,50 +17,81 @@ List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, virtio-fs@redhat.com, marcandre.lureau@redhat.com, mst@redhat.com
 
-From: Stefan Hajnoczi <stefanha@redhat.com>
+From: Vivek Goyal <vgoyal@redhat.com>
 
-Communicate the host page size to the FUSE client so that
-FUSE_SETUPMAPPING/FUSE_REMOVEMAPPING requests are aware of our alignment
-constraints.
+Extend VhostUserFSSlaveMsg so that slave can ask it to drop CAP_FSETID
+before doing I/O on fd.
 
-Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+In some cases, virtiofsd takes the onus of clearing setuid bit on a file
+when WRITE happens. Generally virtiofsd does the WRITE to fd (from guest
+memory which is mapped in virtiofsd as well), but if this memory is
+unmappable in virtiofsd (like cache window), then virtiofsd asks qemu
+to do the I/O instead.
+
+To retain the capability to drop suid bit on write, qemu needs to
+drop the CAP_FSETID as well before write to fd. Extend VhostUserFSSlaveMsg
+so that virtiofsd can specify in message if CAP_FSETID needs to be
+dropped.
+
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- tools/virtiofsd/fuse_lowlevel.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ hw/virtio/vhost-user-fs.c                 | 5 +++++
+ include/hw/virtio/vhost-user-fs.h         | 6 ++++++
+ subprojects/libvhost-user/libvhost-user.h | 6 ++++++
+ 3 files changed, 17 insertions(+)
 
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index 99ba000c2e..df4527acc9 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -10,6 +10,7 @@
-  */
+diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+index 357bc1d04e..61e891c82d 100644
+--- a/hw/virtio/vhost-user-fs.c
++++ b/hw/virtio/vhost-user-fs.c
+@@ -176,6 +176,11 @@ uint64_t vhost_user_fs_slave_io(struct vhost_dev *dev, VhostUserFSSlaveMsg *sm,
+         return (uint64_t)-1;
+     }
  
- #include "qemu/osdep.h"
-+#include "qemu/host-utils.h"
- #include "fuse_i.h"
- #include "standard-headers/linux/fuse.h"
- #include "fuse_misc.h"
-@@ -2188,6 +2189,12 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-     outarg.max_background = se->conn.max_background;
-     outarg.congestion_threshold = se->conn.congestion_threshold;
-     outarg.time_gran = se->conn.time_gran;
-+    if (arg->flags & FUSE_MAP_ALIGNMENT) {
-+        outarg.flags |= FUSE_MAP_ALIGNMENT;
-+
-+        /* This constraint comes from mmap(2) and munmap(2) */
-+        outarg.map_alignment = ctz64(sysconf(_SC_PAGE_SIZE));
++    if (sm->gen_flags & VHOST_USER_FS_GENFLAG_DROP_FSETID) {
++        error_report("Dropping CAP_FSETID is not supported");
++        return (uint64_t)-ENOTSUP;
 +    }
++
+     for (i = 0; i < VHOST_USER_FS_SLAVE_ENTRIES && !res; i++) {
+         if (sm->len[i] == 0) {
+             continue;
+diff --git a/include/hw/virtio/vhost-user-fs.h b/include/hw/virtio/vhost-user-fs.h
+index ffd3165c29..e646eb004a 100644
+--- a/include/hw/virtio/vhost-user-fs.h
++++ b/include/hw/virtio/vhost-user-fs.h
+@@ -30,7 +30,13 @@ OBJECT_DECLARE_SIMPLE_TYPE(VHostUserFS, VHOST_USER_FS)
+ #define VHOST_USER_FS_FLAG_MAP_R (1ull << 0)
+ #define VHOST_USER_FS_FLAG_MAP_W (1ull << 1)
  
-     fuse_log(FUSE_LOG_DEBUG, "   INIT: %u.%u\n", outarg.major, outarg.minor);
-     fuse_log(FUSE_LOG_DEBUG, "   flags=0x%08x\n", outarg.flags);
-@@ -2197,6 +2204,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-     fuse_log(FUSE_LOG_DEBUG, "   congestion_threshold=%i\n",
-              outarg.congestion_threshold);
-     fuse_log(FUSE_LOG_DEBUG, "   time_gran=%u\n", outarg.time_gran);
-+    fuse_log(FUSE_LOG_DEBUG, "   map_alignment=%u\n", outarg.map_alignment);
++/* Generic flags for the overall message and not individual ranges */
++/* Drop capability CAP_FSETID during the operation */
++#define VHOST_USER_FS_GENFLAG_DROP_FSETID (1ull << 0)
++
+ typedef struct {
++    /* Generic flags for the overall message */
++    uint64_t gen_flags;
+     /* Offsets within the file being mapped */
+     uint64_t fd_offset[VHOST_USER_FS_SLAVE_ENTRIES];
+     /* Offsets within the cache */
+diff --git a/subprojects/libvhost-user/libvhost-user.h b/subprojects/libvhost-user/libvhost-user.h
+index a398148ed9..f7de8f6387 100644
+--- a/subprojects/libvhost-user/libvhost-user.h
++++ b/subprojects/libvhost-user/libvhost-user.h
+@@ -132,7 +132,13 @@ typedef enum VhostUserSlaveRequest {
+ #define VHOST_USER_FS_FLAG_MAP_R (1ull << 0)
+ #define VHOST_USER_FS_FLAG_MAP_W (1ull << 1)
  
-     send_reply_ok(req, &outarg, outargsize);
- }
++/* Generic flags for the overall message and not individual ranges */
++/* Drop capability CAP_FSETID during the operation */
++#define VHOST_USER_FS_GENFLAG_DROP_FSETID (1ull << 0)
++
+ typedef struct {
++    /* Generic flags for the overall message */
++    uint64_t gen_flags;
+     /* Offsets within the file being mapped */
+     uint64_t fd_offset[VHOST_USER_FS_SLAVE_ENTRIES];
+     /* Offsets within the cache */
 -- 
 2.29.2
 

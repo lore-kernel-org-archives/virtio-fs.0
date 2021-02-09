@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Tue,  9 Feb 2021 19:02:14 +0000
-Message-Id: <20210209190224.62827-15-dgilbert@redhat.com>
+Date: Tue,  9 Feb 2021 19:02:15 +0000
+Message-Id: <20210209190224.62827-16-dgilbert@redhat.com>
 In-Reply-To: <20210209190224.62827-1-dgilbert@redhat.com>
 References: <20210209190224.62827-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 14/24] DAX: virtiofsd: route se down to destroy
-	method
+Subject: [Virtio-fs] [PATCH 15/24] DAX: virtiofsd: Perform an unmap on
+	destroy
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,73 +19,35 @@ To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, virtio-fs@red
 
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-We're going to need to pass the session down to destroy so that it can
-pass it back to do the remove mapping.
+Force unmap all remaining dax cache entries on a destroy.
 
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 ---
- tools/virtiofsd/fuse_lowlevel.c  | 6 +++---
- tools/virtiofsd/fuse_lowlevel.h  | 2 +-
- tools/virtiofsd/passthrough_ll.c | 2 +-
- 3 files changed, 5 insertions(+), 5 deletions(-)
+ tools/virtiofsd/passthrough_ll.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index f74583e095..99ba000c2e 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -2212,7 +2212,7 @@ static void do_destroy(fuse_req_t req, fuse_ino_t nodeid,
-     se->got_destroy = 1;
-     se->got_init = 0;
-     if (se->op.destroy) {
--        se->op.destroy(se->userdata);
-+        se->op.destroy(se->userdata, se);
-     }
- 
-     send_reply_ok(req, NULL, 0);
-@@ -2439,7 +2439,7 @@ void fuse_session_process_buf_int(struct fuse_session *se,
-             se->got_destroy = 1;
-             se->got_init = 0;
-             if (se->op.destroy) {
--                se->op.destroy(se->userdata);
-+                se->op.destroy(se->userdata, se);
-             }
-         } else {
-             goto reply_err;
-@@ -2527,7 +2527,7 @@ void fuse_session_destroy(struct fuse_session *se)
- {
-     if (se->got_init && !se->got_destroy) {
-         if (se->op.destroy) {
--            se->op.destroy(se->userdata);
-+            se->op.destroy(se->userdata, se);
-         }
-     }
-     pthread_rwlock_destroy(&se->init_rwlock);
-diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
-index 014564ff07..53439f5432 100644
---- a/tools/virtiofsd/fuse_lowlevel.h
-+++ b/tools/virtiofsd/fuse_lowlevel.h
-@@ -208,7 +208,7 @@ struct fuse_lowlevel_ops {
-      *
-      * @param userdata the user data passed to fuse_session_new()
-      */
--    void (*destroy)(void *userdata);
-+    void (*destroy)(void *userdata, struct fuse_session *se);
- 
-     /**
-      * Look up a directory entry by name and get its attributes.
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 971ff2b2ea..badac23fef 100644
+index badac23fef..21ddb434ae 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -2943,7 +2943,7 @@ static void lo_lseek(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
-     }
- }
- 
--static void lo_destroy(void *userdata)
-+static void lo_destroy(void *userdata, struct fuse_session *se)
+@@ -2947,6 +2947,17 @@ static void lo_destroy(void *userdata, struct fuse_session *se)
  {
      struct lo_data *lo = (struct lo_data *)userdata;
  
++    if (fuse_lowlevel_is_virtio(se)) {
++        VhostUserFSSlaveMsg msg = { 0 };
++
++        msg.len[0] = ~(uint64_t)0; /* Special: means 'all' */
++        msg.c_offset[0] = 0;
++        if (fuse_virtio_unmap(se, &msg)) {
++            fuse_log(FUSE_LOG_ERR, "%s: unmap during destroy failed\n",
++                     __func__);
++        }
++    }
++
+     pthread_mutex_lock(&lo->mutex);
+     while (true) {
+         GHashTableIter iter;
 -- 
 2.29.2
 

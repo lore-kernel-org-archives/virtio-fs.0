@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Tue,  9 Feb 2021 19:02:01 +0000
-Message-Id: <20210209190224.62827-2-dgilbert@redhat.com>
+Date: Tue,  9 Feb 2021 19:02:02 +0000
+Message-Id: <20210209190224.62827-3-dgilbert@redhat.com>
 In-Reply-To: <20210209190224.62827-1-dgilbert@redhat.com>
 References: <20210209190224.62827-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 01/24] DAX: vhost-user: Rework slave return
-	values
+Subject: [Virtio-fs] [PATCH 02/24] DAX: libvhost-user: Route slave message
+	payload
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,174 +19,62 @@ To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, virtio-fs@red
 
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-All the current slave handlers on the qemu side generate an 'int'
-return value that's squashed down to a bool (!!ret) and stuffed into
-a uint64_t (field of a union) to be returned.
-
-Move the uint64_t type back up through the individual handlers so
-that we can mkae one actually return a full uint64_t.
-
-Note that the definition in the interop spec says most of these
-cases are defined as returning 0 on success and non-0 for failure,
-so it's OK to change from a bool to another non-0.
-
-Vivek:
-This is needed because upcoming patches in series will add new functions
-which want to return full error code. Existing functions continue to
-return true/false so, it should not lead to change of behavior for
-existing users.
+Route the uint64 payload from message replies on the slave back up
+through vu_process_message_reply and to the callers.
 
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 ---
- hw/virtio/vhost-backend.c         |  4 ++--
- hw/virtio/vhost-user.c            | 32 ++++++++++++++++---------------
- include/hw/virtio/vhost-backend.h |  2 +-
- 3 files changed, 20 insertions(+), 18 deletions(-)
+ subprojects/libvhost-user/libvhost-user.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/hw/virtio/vhost-backend.c b/hw/virtio/vhost-backend.c
-index 31b33bde37..21082084ea 100644
---- a/hw/virtio/vhost-backend.c
-+++ b/hw/virtio/vhost-backend.c
-@@ -401,7 +401,7 @@ int vhost_backend_invalidate_device_iotlb(struct vhost_dev *dev,
-     return -ENODEV;
- }
- 
--int vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
-+uint64_t vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
-                                           struct vhost_iotlb_msg *imsg)
+diff --git a/subprojects/libvhost-user/libvhost-user.c b/subprojects/libvhost-user/libvhost-user.c
+index fab7ca17ee..937f64480d 100644
+--- a/subprojects/libvhost-user/libvhost-user.c
++++ b/subprojects/libvhost-user/libvhost-user.c
+@@ -403,9 +403,11 @@ vu_send_reply(VuDev *dev, int conn_fd, VhostUserMsg *vmsg)
+  * Processes a reply on the slave channel.
+  * Entered with slave_mutex held and releases it before exit.
+  * Returns true on success.
++ * *payload is written on success
+  */
+ static bool
+-vu_process_message_reply(VuDev *dev, const VhostUserMsg *vmsg)
++vu_process_message_reply(VuDev *dev, const VhostUserMsg *vmsg,
++                         uint64_t *payload)
  {
-     int ret = 0;
-@@ -429,5 +429,5 @@ int vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
-         break;
+     VhostUserMsg msg_reply;
+     bool result = false;
+@@ -425,7 +427,8 @@ vu_process_message_reply(VuDev *dev, const VhostUserMsg *vmsg)
+         goto out;
      }
  
--    return ret;
-+    return !!ret;
- }
-diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
-index 2fdd5daf74..13789cc55e 100644
---- a/hw/virtio/vhost-user.c
-+++ b/hw/virtio/vhost-user.c
-@@ -1317,24 +1317,25 @@ static int vhost_user_reset_device(struct vhost_dev *dev)
-     return 0;
- }
+-    result = msg_reply.payload.u64 == 0;
++    *payload = msg_reply.payload.u64;
++    result = true;
  
--static int vhost_user_slave_handle_config_change(struct vhost_dev *dev)
-+static uint64_t vhost_user_slave_handle_config_change(struct vhost_dev *dev)
+ out:
+     pthread_mutex_unlock(&dev->slave_mutex);
+@@ -1312,6 +1315,8 @@ bool vu_set_queue_host_notifier(VuDev *dev, VuVirtq *vq, int fd,
  {
-     int ret = -1;
- 
-     if (!dev->config_ops) {
--        return -1;
-+        return true;
+     int qidx = vq - dev->vq;
+     int fd_num = 0;
++    bool res;
++    uint64_t payload = 0;
+     VhostUserMsg vmsg = {
+         .request = VHOST_USER_SLAVE_VRING_HOST_NOTIFIER_MSG,
+         .flags = VHOST_USER_VERSION | VHOST_USER_NEED_REPLY_MASK,
+@@ -1342,7 +1347,10 @@ bool vu_set_queue_host_notifier(VuDev *dev, VuVirtq *vq, int fd,
      }
  
-     if (dev->config_ops->vhost_dev_config_notifier) {
-         ret = dev->config_ops->vhost_dev_config_notifier(dev);
-     }
- 
--    return ret;
-+    return !!ret;
+     /* Also unlocks the slave_mutex */
+-    return vu_process_message_reply(dev, &vmsg);
++    res = vu_process_message_reply(dev, &vmsg, &payload);
++    res = res && (payload == 0);
++
++    return res;
  }
  
--static int vhost_user_slave_handle_vring_host_notifier(struct vhost_dev *dev,
--                                                       VhostUserVringArea *area,
--                                                       int fd)
-+static uint64_t vhost_user_slave_handle_vring_host_notifier(
-+                struct vhost_dev *dev,
-+               VhostUserVringArea *area,
-+               int fd)
- {
-     int queue_idx = area->u64 & VHOST_USER_VRING_IDX_MASK;
-     size_t page_size = qemu_real_host_page_size;
-@@ -1348,7 +1349,7 @@ static int vhost_user_slave_handle_vring_host_notifier(struct vhost_dev *dev,
-     if (!virtio_has_feature(dev->protocol_features,
-                             VHOST_USER_PROTOCOL_F_HOST_NOTIFIER) ||
-         vdev == NULL || queue_idx >= virtio_get_num_queues(vdev)) {
--        return -1;
-+        return true;
-     }
- 
-     n = &user->notifier[queue_idx];
-@@ -1361,18 +1362,18 @@ static int vhost_user_slave_handle_vring_host_notifier(struct vhost_dev *dev,
-     }
- 
-     if (area->u64 & VHOST_USER_VRING_NOFD_MASK) {
--        return 0;
-+        return false;
-     }
- 
-     /* Sanity check. */
-     if (area->size != page_size) {
--        return -1;
-+        return true;
-     }
- 
-     addr = mmap(NULL, page_size, PROT_READ | PROT_WRITE, MAP_SHARED,
-                 fd, area->offset);
-     if (addr == MAP_FAILED) {
--        return -1;
-+        return true;
-     }
- 
-     name = g_strdup_printf("vhost-user/host-notifier@%p mmaps[%d]",
-@@ -1383,13 +1384,13 @@ static int vhost_user_slave_handle_vring_host_notifier(struct vhost_dev *dev,
- 
-     if (virtio_queue_set_host_notifier_mr(vdev, queue_idx, &n->mr, true)) {
-         munmap(addr, page_size);
--        return -1;
-+        return true;
-     }
- 
-     n->addr = addr;
-     n->set = true;
- 
--    return 0;
-+    return false;
- }
- 
- static void slave_read(void *opaque)
-@@ -1398,7 +1399,8 @@ static void slave_read(void *opaque)
-     struct vhost_user *u = dev->opaque;
-     VhostUserHeader hdr = { 0, };
-     VhostUserPayload payload = { 0, };
--    int size, ret = 0;
-+    int size;
-+    uint64_t ret = 0;
-     struct iovec iov;
-     struct msghdr msgh;
-     int fd[VHOST_USER_SLAVE_MAX_FDS];
-@@ -1472,7 +1474,7 @@ static void slave_read(void *opaque)
-         break;
-     default:
-         error_report("Received unexpected msg type: %d.", hdr.request);
--        ret = -EINVAL;
-+        ret = (uint64_t)-EINVAL;
-     }
- 
-     /* Close the remaining file descriptors. */
-@@ -1493,7 +1495,7 @@ static void slave_read(void *opaque)
-         hdr.flags &= ~VHOST_USER_NEED_REPLY_MASK;
-         hdr.flags |= VHOST_USER_REPLY_MASK;
- 
--        payload.u64 = !!ret;
-+        payload.u64 = ret;
-         hdr.size = sizeof(payload.u64);
- 
-         iovec[0].iov_base = &hdr;
-diff --git a/include/hw/virtio/vhost-backend.h b/include/hw/virtio/vhost-backend.h
-index 8a6f8e2a7a..64ac6b6444 100644
---- a/include/hw/virtio/vhost-backend.h
-+++ b/include/hw/virtio/vhost-backend.h
-@@ -186,7 +186,7 @@ int vhost_backend_update_device_iotlb(struct vhost_dev *dev,
- int vhost_backend_invalidate_device_iotlb(struct vhost_dev *dev,
-                                                  uint64_t iova, uint64_t len);
- 
--int vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
-+uint64_t vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
-                                           struct vhost_iotlb_msg *imsg);
- 
- int vhost_user_gpu_set_socket(struct vhost_dev *dev, int fd);
+ static bool
 -- 
 2.29.2
 

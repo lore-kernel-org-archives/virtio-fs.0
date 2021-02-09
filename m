@@ -1,12 +1,12 @@
-Date: Fri, 15 Jan 2021 12:39:13 +0530 (IST)
-From: P J P <ppandit@redhat.com>
-In-Reply-To: <20210114133424.GA299876@stefanha-x1.localdomain>
-Message-ID: <qn527287-65qq-227p-2r48-1528r6rr386@erqung.pbz>
-References: <rprnspo3-119s-qnoo-2o93-sn40rq40ns@erqung.pbz>
-	<20210114133424.GA299876@stefanha-x1.localdomain>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Tue,  9 Feb 2021 19:02:14 +0000
+Message-Id: <20210209190224.62827-15-dgilbert@redhat.com>
+In-Reply-To: <20210209190224.62827-1-dgilbert@redhat.com>
+References: <20210209190224.62827-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=US-ASCII
-Subject: Re: [Virtio-fs] [RFC] About non-root virtiofsd(1) process
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 14/24] DAX: virtiofsd: route se down to destroy
+	method
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,46 +15,77 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com
+To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, virtio-fs@redhat.com, marcandre.lureau@redhat.com, mst@redhat.com
 
-  Hello,
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-+-- On Thu, 14 Jan 2021, Stefan Hajnoczi wrote --+
-| On Thu, Jan 14, 2021 at 02:11:28PM +0530, P J P wrote:
-| > Ex. By default offer only read access to guest VM.
-| 
-| That's not useful. Most users require read-write.
+We're going to need to pass the session down to destroy so that it can
+pass it back to do the remove mapping.
 
-* Agreed. I meant let 'rw' access be user's choice than the default for 
-  virtiofsd(1).
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+---
+ tools/virtiofsd/fuse_lowlevel.c  | 6 +++---
+ tools/virtiofsd/fuse_lowlevel.h  | 2 +-
+ tools/virtiofsd/passthrough_ll.c | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index f74583e095..99ba000c2e 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -2212,7 +2212,7 @@ static void do_destroy(fuse_req_t req, fuse_ino_t nodeid,
+     se->got_destroy = 1;
+     se->got_init = 0;
+     if (se->op.destroy) {
+-        se->op.destroy(se->userdata);
++        se->op.destroy(se->userdata, se);
+     }
  
-| The fundamental issue is that the server must be able to create, access, and 
-| modify files with arbitrary uids/gids.
-
-* Why arbitrary uids/gids? Once a directory is shared with a guest, its 
-  uids/gids would stay same, no?
-
-* We also start separate virtiofsd(1) process for each share/guest too. ie.  
-  single virtiofsd(1) daemon is not catering to multiple guests and their
-  respective shared directories, right?
-
-| If you have specific ideas, let's discuss them.
-
-* One was to have a command line switch similar to 'qemu -runas <user>'
-
-     $ ./virtiofsd -runas test -o source=...
-
-  If a user wants to run virtiofsd(1) with non-root privileges, it'll be 
-  handy.
-
-| https://gitlab.com/virtio-fs/qemu/-/merge_requests/6/diffs?commit_id=718c71fa44f6b92ac27558c903d27935236b08ef
-
-* I'll go through it.
-
-
-Thank you.
---
-Prasad J Pandit / Red Hat Product Security Team
-8685 545E B54C 486B C6EB 271E E285 8B5A F050 DE8D
+     send_reply_ok(req, NULL, 0);
+@@ -2439,7 +2439,7 @@ void fuse_session_process_buf_int(struct fuse_session *se,
+             se->got_destroy = 1;
+             se->got_init = 0;
+             if (se->op.destroy) {
+-                se->op.destroy(se->userdata);
++                se->op.destroy(se->userdata, se);
+             }
+         } else {
+             goto reply_err;
+@@ -2527,7 +2527,7 @@ void fuse_session_destroy(struct fuse_session *se)
+ {
+     if (se->got_init && !se->got_destroy) {
+         if (se->op.destroy) {
+-            se->op.destroy(se->userdata);
++            se->op.destroy(se->userdata, se);
+         }
+     }
+     pthread_rwlock_destroy(&se->init_rwlock);
+diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
+index 014564ff07..53439f5432 100644
+--- a/tools/virtiofsd/fuse_lowlevel.h
++++ b/tools/virtiofsd/fuse_lowlevel.h
+@@ -208,7 +208,7 @@ struct fuse_lowlevel_ops {
+      *
+      * @param userdata the user data passed to fuse_session_new()
+      */
+-    void (*destroy)(void *userdata);
++    void (*destroy)(void *userdata, struct fuse_session *se);
+ 
+     /**
+      * Look up a directory entry by name and get its attributes.
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 971ff2b2ea..badac23fef 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -2943,7 +2943,7 @@ static void lo_lseek(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
+     }
+ }
+ 
+-static void lo_destroy(void *userdata)
++static void lo_destroy(void *userdata, struct fuse_session *se)
+ {
+     struct lo_data *lo = (struct lo_data *)userdata;
+ 
+-- 
+2.29.2
 

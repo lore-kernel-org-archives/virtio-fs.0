@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Tue,  9 Feb 2021 19:02:08 +0000
-Message-Id: <20210209190224.62827-9-dgilbert@redhat.com>
+Date: Tue,  9 Feb 2021 19:02:09 +0000
+Message-Id: <20210209190224.62827-10-dgilbert@redhat.com>
 In-Reply-To: <20210209190224.62827-1-dgilbert@redhat.com>
 References: <20210209190224.62827-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 08/24] DAX: virtio-fs: Fill in slave commands
-	for mapping
+Subject: [Virtio-fs] [PATCH 09/24] DAX: virtiofsd Add cache accessor
+	functions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,145 +19,78 @@ To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, virtio-fs@red
 
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Fill in definitions for map, unmap and sync commands.
+Add low level functions that the clients can use to map/unmap cache
+areas.
 
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-with fix by misono.tomohiro@fujitsu.com
 ---
- hw/virtio/vhost-user-fs.c | 115 ++++++++++++++++++++++++++++++++++++--
- 1 file changed, 111 insertions(+), 4 deletions(-)
+ tools/virtiofsd/fuse_lowlevel.h | 21 +++++++++++++++++++++
+ tools/virtiofsd/fuse_virtio.c   | 18 ++++++++++++++++++
+ 2 files changed, 39 insertions(+)
 
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index 78401d2ff1..5f2fca4d82 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -37,15 +37,122 @@
- uint64_t vhost_user_fs_slave_map(struct vhost_dev *dev, VhostUserFSSlaveMsg *sm,
-                                  int fd)
- {
--    /* TODO */
--    return (uint64_t)-1;
-+    VHostUserFS *fs = VHOST_USER_FS(dev->vdev);
-+    if (!fs) {
-+        /* Shouldn't happen - but seen on error path */
-+        error_report("Bad fs ptr");
-+        return (uint64_t)-1;
-+    }
-+    size_t cache_size = fs->conf.cache_size;
-+    if (!cache_size) {
-+        error_report("map called when DAX cache not present");
-+        return (uint64_t)-1;
-+    }
-+    void *cache_host = memory_region_get_ram_ptr(&fs->cache);
-+
-+    unsigned int i;
-+    int res = 0;
-+
-+    if (fd < 0) {
-+        error_report("Bad fd for map");
-+        return (uint64_t)-1;
-+    }
-+
-+    for (i = 0; i < VHOST_USER_FS_SLAVE_ENTRIES; i++) {
-+        if (sm->len[i] == 0) {
-+            continue;
-+        }
-+
-+        if ((sm->c_offset[i] + sm->len[i]) < sm->len[i] ||
-+            (sm->c_offset[i] + sm->len[i]) > cache_size) {
-+            error_report("Bad offset/len for map [%d] %" PRIx64 "+%" PRIx64,
-+                         i, sm->c_offset[i], sm->len[i]);
-+            res = -1;
-+            break;
-+        }
-+
-+        if (mmap(cache_host + sm->c_offset[i], sm->len[i],
-+                 ((sm->flags[i] & VHOST_USER_FS_FLAG_MAP_R) ? PROT_READ : 0) |
-+                 ((sm->flags[i] & VHOST_USER_FS_FLAG_MAP_W) ? PROT_WRITE : 0),
-+                 MAP_SHARED | MAP_FIXED,
-+                 fd, sm->fd_offset[i]) != (cache_host + sm->c_offset[i])) {
-+            res = -errno;
-+            error_report("map failed err %d [%d] %" PRIx64 "+%" PRIx64 " from %"
-+                         PRIx64, errno, i, sm->c_offset[i], sm->len[i],
-+                         sm->fd_offset[i]);
-+            break;
-+        }
-+    }
-+
-+    if (res) {
-+        /* Something went wrong, unmap them all */
-+        vhost_user_fs_slave_unmap(dev, sm);
-+    }
-+    return (uint64_t)res;
- }
+diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
+index 0e10a14bc9..c0ff4f07a4 100644
+--- a/tools/virtiofsd/fuse_lowlevel.h
++++ b/tools/virtiofsd/fuse_lowlevel.h
+@@ -29,6 +29,8 @@
+ #include <sys/uio.h>
+ #include <utime.h>
  
- uint64_t vhost_user_fs_slave_unmap(struct vhost_dev *dev,
-                                    VhostUserFSSlaveMsg *sm)
- {
--    /* TODO */
--    return (uint64_t)-1;
-+    VHostUserFS *fs = VHOST_USER_FS(dev->vdev);
-+    if (!fs) {
-+        /* Shouldn't happen - but seen on error path */
-+        error_report("Bad fs ptr");
-+        return (uint64_t)-1;
-+    }
-+    size_t cache_size = fs->conf.cache_size;
-+    if (!cache_size) {
-+        /*
-+         * Since dax cache is disabled, there should be no unmap request.
-+         * Howerver we still receives whole range unmap request during umount
-+         * for cleanup. Ignore it.
-+         */
-+        if (sm->len[0] == ~(uint64_t)0) {
-+            return 0;
-+        }
++#include "subprojects/libvhost-user/libvhost-user.h"
 +
-+        error_report("unmap called when DAX cache not present");
-+        return (uint64_t)-1;
-+    }
-+    void *cache_host = memory_region_get_ram_ptr(&fs->cache);
-+
-+    unsigned int i;
-+    int res = 0;
-+
-+    /*
-+     * Note even if one unmap fails we try the rest, since the effect
-+     * is to clean up as much as possible.
-+     */
-+    for (i = 0; i < VHOST_USER_FS_SLAVE_ENTRIES; i++) {
-+        void *ptr;
-+        if (sm->len[i] == 0) {
-+            continue;
-+        }
-+
-+        if (sm->len[i] == ~(uint64_t)0) {
-+            /* Special case meaning the whole arena */
-+            sm->len[i] = cache_size;
-+        }
-+
-+        if ((sm->c_offset[i] + sm->len[i]) < sm->len[i] ||
-+            (sm->c_offset[i] + sm->len[i]) > cache_size) {
-+            error_report("Bad offset/len for unmap [%d] %" PRIx64 "+%" PRIx64,
-+                         i, sm->c_offset[i], sm->len[i]);
-+            res = -1;
-+            continue;
-+        }
-+
-+        ptr = mmap(cache_host + sm->c_offset[i], sm->len[i], DAX_WINDOW_PROT,
-+                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
-+        if (ptr != (cache_host + sm->c_offset[i])) {
-+            res = -errno;
-+            error_report("mmap failed (%s) [%d] %" PRIx64 "+%" PRIx64 " from %"
-+                         PRIx64 " res: %p", strerror(errno), i, sm->c_offset[i],
-+                         sm->len[i], sm->fd_offset[i], ptr);
-+        }
-+    }
-+
-+    return (uint64_t)res;
- }
+ /*
+  * Miscellaneous definitions
+  */
+@@ -1970,4 +1972,23 @@ void fuse_session_process_buf(struct fuse_session *se,
+  */
+ int fuse_session_receive_buf(struct fuse_session *se, struct fuse_buf *buf);
  
- static void vuf_get_config(VirtIODevice *vdev, uint8_t *config)
++/**
++ * For use with virtio-fs; request an fd be mapped into the cache
++ *
++ * @param req The request that triggered this action
++ * @param msg A set of mapping requests
++ * @param fd The fd to map
++ * @return Zero on success
++ */
++int64_t fuse_virtio_map(fuse_req_t req, VhostUserFSSlaveMsg *msg, int fd);
++
++/**
++ * For use with virtio-fs; request unmapping of part of the cache
++ *
++ * @param se The session this request is on
++ * @param msg A set of unmapping requests
++ * @return Zero on success
++ */
++int64_t fuse_virtio_unmap(struct fuse_session *se, VhostUserFSSlaveMsg *msg);
++
+ #endif /* FUSE_LOWLEVEL_H_ */
+diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+index bd19358437..f217a093c8 100644
+--- a/tools/virtiofsd/fuse_virtio.c
++++ b/tools/virtiofsd/fuse_virtio.c
+@@ -1044,3 +1044,21 @@ void virtio_session_close(struct fuse_session *se)
+     free(se->virtio_dev);
+     se->virtio_dev = NULL;
+ }
++
++int64_t fuse_virtio_map(fuse_req_t req, VhostUserFSSlaveMsg *msg, int fd)
++{
++    if (!req->se->virtio_dev) {
++        return -ENODEV;
++    }
++    return vu_fs_cache_request(&req->se->virtio_dev->dev,
++                               VHOST_USER_SLAVE_FS_MAP, fd, msg);
++}
++
++int64_t fuse_virtio_unmap(struct fuse_session *se, VhostUserFSSlaveMsg *msg)
++{
++    if (!se->virtio_dev) {
++        return -ENODEV;
++    }
++    return vu_fs_cache_request(&se->virtio_dev->dev, VHOST_USER_SLAVE_FS_UNMAP,
++                               -1, msg);
++}
 -- 
 2.29.2
 

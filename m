@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Tue,  9 Feb 2021 19:02:22 +0000
-Message-Id: <20210209190224.62827-23-dgilbert@redhat.com>
+Date: Tue,  9 Feb 2021 19:02:23 +0000
+Message-Id: <20210209190224.62827-24-dgilbert@redhat.com>
 In-Reply-To: <20210209190224.62827-1-dgilbert@redhat.com>
 References: <20210209190224.62827-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 22/24] vhost-user-fs: Extend VhostUserFSSlaveMsg
-	to pass additional info
+Subject: [Virtio-fs] [PATCH 23/24] vhost-user-fs: Implement drop CAP_FSETID
+	functionality
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,79 +19,180 @@ To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, virtio-fs@red
 
 From: Vivek Goyal <vgoyal@redhat.com>
 
-Extend VhostUserFSSlaveMsg so that slave can ask it to drop CAP_FSETID
-before doing I/O on fd.
+As part of slave_io message, slave can ask to do I/O on an fd. Additionally
+slave can ask for dropping CAP_FSETID (if master has it) before doing I/O.
+Implement functionality to drop CAP_FSETID and gain it back after the
+operation.
 
-In some cases, virtiofsd takes the onus of clearing setuid bit on a file
-when WRITE happens. Generally virtiofsd does the WRITE to fd (from guest
-memory which is mapped in virtiofsd as well), but if this memory is
-unmappable in virtiofsd (like cache window), then virtiofsd asks qemu
-to do the I/O instead.
-
-To retain the capability to drop suid bit on write, qemu needs to
-drop the CAP_FSETID as well before write to fd. Extend VhostUserFSSlaveMsg
-so that virtiofsd can specify in message if CAP_FSETID needs to be
-dropped.
+This also creates a dependency on libcap-ng.
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- hw/virtio/vhost-user-fs.c                 | 5 +++++
- include/hw/virtio/vhost-user-fs.h         | 6 ++++++
- subprojects/libvhost-user/libvhost-user.h | 6 ++++++
- 3 files changed, 17 insertions(+)
+ hw/virtio/meson.build     |  1 +
+ hw/virtio/vhost-user-fs.c | 92 ++++++++++++++++++++++++++++++++++++++-
+ meson.build               |  6 +++
+ 3 files changed, 97 insertions(+), 2 deletions(-)
 
+diff --git a/hw/virtio/meson.build b/hw/virtio/meson.build
+index fbff9bc9d4..bdcdc82e13 100644
+--- a/hw/virtio/meson.build
++++ b/hw/virtio/meson.build
+@@ -18,6 +18,7 @@ virtio_ss.add(when: 'CONFIG_VIRTIO_BALLOON', if_true: files('virtio-balloon.c'))
+ virtio_ss.add(when: 'CONFIG_VIRTIO_CRYPTO', if_true: files('virtio-crypto.c'))
+ virtio_ss.add(when: ['CONFIG_VIRTIO_CRYPTO', 'CONFIG_VIRTIO_PCI'], if_true: files('virtio-crypto-pci.c'))
+ virtio_ss.add(when: 'CONFIG_VHOST_USER_FS', if_true: files('vhost-user-fs.c'))
++virtio_ss.add(when: 'CONFIG_VHOST_USER_FS', if_true: libcap_ng)
+ virtio_ss.add(when: ['CONFIG_VHOST_USER_FS', 'CONFIG_VIRTIO_PCI'], if_true: files('vhost-user-fs-pci.c'))
+ virtio_ss.add(when: 'CONFIG_VIRTIO_PMEM', if_true: files('virtio-pmem.c'))
+ virtio_ss.add(when: 'CONFIG_VHOST_VSOCK', if_true: files('vhost-vsock.c', 'vhost-vsock-common.c'))
 diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index 357bc1d04e..61e891c82d 100644
+index 61e891c82d..0d6ec27edd 100644
 --- a/hw/virtio/vhost-user-fs.c
 +++ b/hw/virtio/vhost-user-fs.c
-@@ -176,6 +176,11 @@ uint64_t vhost_user_fs_slave_io(struct vhost_dev *dev, VhostUserFSSlaveMsg *sm,
-         return (uint64_t)-1;
-     }
+@@ -13,6 +13,8 @@
  
-+    if (sm->gen_flags & VHOST_USER_FS_GENFLAG_DROP_FSETID) {
-+        error_report("Dropping CAP_FSETID is not supported");
-+        return (uint64_t)-ENOTSUP;
+ #include "qemu/osdep.h"
+ #include <sys/ioctl.h>
++#include <cap-ng.h>
++#include <sys/syscall.h>
+ #include "standard-headers/linux/virtio_fs.h"
+ #include "qapi/error.h"
+ #include "hw/qdev-properties.h"
+@@ -36,6 +38,84 @@
+ #define DAX_WINDOW_PROT PROT_NONE
+ #endif
+ 
++/*
++ * Helpers for dropping and regaining effective capabilities. Returns 0
++ * on success, error otherwise
++ */
++static int drop_effective_cap(const char *cap_name, bool *cap_dropped)
++{
++    int cap, ret;
++
++    cap = capng_name_to_capability(cap_name);
++    if (cap < 0) {
++        ret = -errno;
++        error_report("capng_name_to_capability(%s) failed:%s", cap_name,
++                     strerror(errno));
++        goto out;
 +    }
 +
++    if (capng_get_caps_process()) {
++        ret = -errno;
++        error_report("capng_get_caps_process() failed:%s", strerror(errno));
++        goto out;
++    }
++
++    /* We dont have this capability in effective set already. */
++    if (!capng_have_capability(CAPNG_EFFECTIVE, cap)) {
++        ret = 0;
++        goto out;
++    }
++
++    if (capng_update(CAPNG_DROP, CAPNG_EFFECTIVE, cap)) {
++        ret = -errno;
++        error_report("capng_update(DROP,) failed");
++        goto out;
++    }
++    if (capng_apply(CAPNG_SELECT_CAPS)) {
++        ret = -errno;
++        error_report("drop:capng_apply() failed");
++        goto out;
++    }
++
++    ret = 0;
++    if (cap_dropped) {
++        *cap_dropped = true;
++    }
++
++out:
++    return ret;
++}
++
++static int gain_effective_cap(const char *cap_name)
++{
++    int cap;
++    int ret = 0;
++
++    cap = capng_name_to_capability(cap_name);
++    if (cap < 0) {
++        ret = -errno;
++        error_report("capng_name_to_capability(%s) failed:%s", cap_name,
++                     strerror(errno));
++        goto out;
++    }
++
++    if (capng_update(CAPNG_ADD, CAPNG_EFFECTIVE, cap)) {
++        ret = -errno;
++        error_report("capng_update(ADD,) failed");
++        goto out;
++    }
++
++    if (capng_apply(CAPNG_SELECT_CAPS)) {
++        ret = -errno;
++        error_report("gain:capng_apply() failed");
++        goto out;
++    }
++    ret = 0;
++
++out:
++    return ret;
++}
++
+ uint64_t vhost_user_fs_slave_map(struct vhost_dev *dev, VhostUserFSSlaveMsg *sm,
+                                  int fd)
+ {
+@@ -170,6 +250,7 @@ uint64_t vhost_user_fs_slave_io(struct vhost_dev *dev, VhostUserFSSlaveMsg *sm,
+     unsigned int i;
+     int res = 0;
+     size_t done = 0;
++    bool cap_fsetid_dropped = false;
+ 
+     if (fd < 0) {
+         error_report("Bad fd for map");
+@@ -177,8 +258,10 @@ uint64_t vhost_user_fs_slave_io(struct vhost_dev *dev, VhostUserFSSlaveMsg *sm,
+     }
+ 
+     if (sm->gen_flags & VHOST_USER_FS_GENFLAG_DROP_FSETID) {
+-        error_report("Dropping CAP_FSETID is not supported");
+-        return (uint64_t)-ENOTSUP;
++        res = drop_effective_cap("FSETID", &cap_fsetid_dropped);
++        if (res != 0) {
++            return (uint64_t)res;
++        }
+     }
+ 
      for (i = 0; i < VHOST_USER_FS_SLAVE_ENTRIES && !res; i++) {
-         if (sm->len[i] == 0) {
-             continue;
-diff --git a/include/hw/virtio/vhost-user-fs.h b/include/hw/virtio/vhost-user-fs.h
-index ffd3165c29..e646eb004a 100644
---- a/include/hw/virtio/vhost-user-fs.h
-+++ b/include/hw/virtio/vhost-user-fs.h
-@@ -30,7 +30,13 @@ OBJECT_DECLARE_SIMPLE_TYPE(VHostUserFS, VHOST_USER_FS)
- #define VHOST_USER_FS_FLAG_MAP_R (1ull << 0)
- #define VHOST_USER_FS_FLAG_MAP_W (1ull << 1)
+@@ -237,6 +320,11 @@ uint64_t vhost_user_fs_slave_io(struct vhost_dev *dev, VhostUserFSSlaveMsg *sm,
+     }
+     close(fd);
  
-+/* Generic flags for the overall message and not individual ranges */
-+/* Drop capability CAP_FSETID during the operation */
-+#define VHOST_USER_FS_GENFLAG_DROP_FSETID (1ull << 0)
-+
- typedef struct {
-+    /* Generic flags for the overall message */
-+    uint64_t gen_flags;
-     /* Offsets within the file being mapped */
-     uint64_t fd_offset[VHOST_USER_FS_SLAVE_ENTRIES];
-     /* Offsets within the cache */
-diff --git a/subprojects/libvhost-user/libvhost-user.h b/subprojects/libvhost-user/libvhost-user.h
-index a398148ed9..f7de8f6387 100644
---- a/subprojects/libvhost-user/libvhost-user.h
-+++ b/subprojects/libvhost-user/libvhost-user.h
-@@ -132,7 +132,13 @@ typedef enum VhostUserSlaveRequest {
- #define VHOST_USER_FS_FLAG_MAP_R (1ull << 0)
- #define VHOST_USER_FS_FLAG_MAP_W (1ull << 1)
++    if (cap_fsetid_dropped) {
++        if (gain_effective_cap("FSETID")) {
++            error_report("Failed to gain CAP_FSETID");
++        }
++    }
+     trace_vhost_user_fs_slave_io_exit(res, done);
+     if (res < 0) {
+         return (uint64_t)res;
+diff --git a/meson.build b/meson.build
+index 2d8b433ff0..99a7fbacc1 100644
+--- a/meson.build
++++ b/meson.build
+@@ -1060,6 +1060,12 @@ elif get_option('virtfs').disabled()
+   have_virtfs = false
+ endif
  
-+/* Generic flags for the overall message and not individual ranges */
-+/* Drop capability CAP_FSETID during the operation */
-+#define VHOST_USER_FS_GENFLAG_DROP_FSETID (1ull << 0)
++if config_host.has_key('CONFIG_VHOST_USER_FS')
++  if not libcap_ng.found()
++    error('vhost-user-fs requires libcap-ng-devel')
++  endif
++endif
 +
- typedef struct {
-+    /* Generic flags for the overall message */
-+    uint64_t gen_flags;
-     /* Offsets within the file being mapped */
-     uint64_t fd_offset[VHOST_USER_FS_SLAVE_ENTRIES];
-     /* Offsets within the cache */
+ config_host_data.set_quoted('CONFIG_BINDIR', get_option('prefix') / get_option('bindir'))
+ config_host_data.set_quoted('CONFIG_PREFIX', get_option('prefix'))
+ config_host_data.set_quoted('CONFIG_QEMU_CONFDIR', get_option('prefix') / qemu_confdir)
 -- 
 2.29.2
 

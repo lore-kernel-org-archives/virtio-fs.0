@@ -1,25 +1,11 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alxu.ca; s=default;
-	t=1611240617;
-	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
-	to:to:cc:cc:mime-version:mime-version:content-type:content-type:
-	content-transfer-encoding:content-transfer-encoding:
-	in-reply-to:in-reply-to:references:references;
-	bh=XXvN/2ywSjw/5QngZ1tZzibD8n/j9vdFtF06JkcFtWg=;
-	b=WaMwm5GST1tEjJMlVvF4ZFn/mYph472/n0YuHRGpGd7q6SvV5wswfuAHcJ0xuSA5NPoN6G
-	43FxgszeydOekOqJRuq1LmukpobnDMDBVqncIhhlX6n+mGENJ+02eUV61Ipn22biLD93HC
-	8hILk1fG/6WhZtx0xVv8T/B4f8PdCrGDsQz362NE9MSpgfpNX0uv8Bex9omAAXnzsW4Fj2
-	X983JP71Vds4h9UPHe6YoVrRZoyKp+JDbtBmnsAnFM9cJDrU5FrBIJlHGeL33805wSwby7
-	ZWH4x3pyO2sOCjG+57vwq3V1zBJx5nJn8rVyskk+yZCwQ2S1HrcfUnbOC+ktog==
-Date: Thu, 21 Jan 2021 09:50:15 -0500
-From: Alex Xu <alex@alxu.ca>
-References: <20210121144429.58885-1-stefanha@redhat.com>
-In-Reply-To: <20210121144429.58885-1-stefanha@redhat.com>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Tue,  9 Feb 2021 19:02:06 +0000
+Message-Id: <20210209190224.62827-7-dgilbert@redhat.com>
+In-Reply-To: <20210209190224.62827-1-dgilbert@redhat.com>
+References: <20210209190224.62827-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Message-Id: <1611240546.prykd5to6n.none@localhost>
-Content-Type: text/plain; charset=utf-8
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: prevent opening of special files
- (CVE-2020-35517)
+Subject: [Virtio-fs] [PATCH 06/24] DAX: virtio-fs: Add cache BAR
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -28,59 +14,163 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, Stefan Hajnoczi <stefanha@redhat.com>
-Cc: P J P <ppandit@redhat.com>, virtio-fs@redhat.com, vgoyal@redhat.com
+To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, virtio-fs@redhat.com, marcandre.lureau@redhat.com, mst@redhat.com
 
-Excerpts from Stefan Hajnoczi's message of January 21, 2021 9:44 am:
-> A well-behaved FUSE client does not attempt to open special files with
-> FUSE_OPEN because they are handled on the client side (e.g. device nodes
-> are handled by client-side device drivers).
-> 
-> The check to prevent virtiofsd from opening special files is missing in
-> a few cases, most notably FUSE_OPEN. A malicious client can cause
-> virtiofsd to open a device node, potentially allowing the guest to
-> escape. This can be exploited by a modified guest device driver. It is
-> not exploitable from guest userspace since the guest kernel will handle
-> special files inside the guest instead of sending FUSE requests.
-> 
-> This patch adds the missing checks to virtiofsd. This is a short-term
-> solution because it does not prevent a compromised virtiofsd process
-> from opening device nodes on the host.
-> 
-> Reported-by: Alex Xu <alex@alxu.ca>
-> Fixes: CVE-2020-35517
-> Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-> ---
-> This issue was diagnosed on public IRC and is therefore already known
-> and not embargoed.
-> 
-> A stronger fix, and the long-term solution, is for users to mount the
-> shared directory and any sub-mounts with nodev, as well as nosuid and
-> noexec. Unfortunately virtiofsd cannot do this automatically because
-> bind mounts added by the user after virtiofsd has launched would not be
-> detected. I suggest the following:
-> 
-> 1. Modify libvirt and Kata Containers to explicitly set these mount
->    options.
-> 2. Then modify virtiofsd to check that the shared directory has the
->    necessary options at startup. Refuse to start if the options are
->    missing so that the user is aware of the security requirements.
-> 
-> As a bonus this also increases the likelihood that other host processes
-> besides virtiofsd will be protected by nosuid/noexec/nodev so that a
-> malicious guest cannot drop these files in place and then arrange for a
-> host process to come across them.
-> 
-> Additionally, user namespaces have been discussed. They seem like a
-> worthwhile addition as an unprivileged or privilege-separated mode
-> although there are limitations with respect to security xattrs and the
-> actual uid/gid stored on the host file system not corresponding to the
-> guest uid/gid.
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-I haven't looked too closely at the code, but the commit message seems 
-reasonable to me.
+Add a cache BAR into which files will be directly mapped.
+The size can be set with the cache-size= property, e.g.
+   -device vhost-user-fs-pci,chardev=char0,tag=myfs,cache-size=16G
 
-Thanks,
-Alex.
+The default is no cache.
 
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+with PPC fixes by:
+Signed-off-by: Fabiano Rosas <farosas@linux.ibm.com>
+---
+ hw/virtio/vhost-user-fs-pci.c     | 25 ++++++++++++++++++++++++
+ hw/virtio/vhost-user-fs.c         | 32 +++++++++++++++++++++++++++++++
+ include/hw/virtio/vhost-user-fs.h |  2 ++
+ 3 files changed, 59 insertions(+)
+
+diff --git a/hw/virtio/vhost-user-fs-pci.c b/hw/virtio/vhost-user-fs-pci.c
+index 2ed8492b3f..0388e063c6 100644
+--- a/hw/virtio/vhost-user-fs-pci.c
++++ b/hw/virtio/vhost-user-fs-pci.c
+@@ -16,10 +16,14 @@
+ #include "hw/virtio/vhost-user-fs.h"
+ #include "virtio-pci.h"
+ #include "qom/object.h"
++#include "standard-headers/linux/virtio_fs.h"
++
++#define VIRTIO_FS_PCI_CACHE_BAR 2
+ 
+ struct VHostUserFSPCI {
+     VirtIOPCIProxy parent_obj;
+     VHostUserFS vdev;
++    MemoryRegion cachebar;
+ };
+ 
+ typedef struct VHostUserFSPCI VHostUserFSPCI;
+@@ -39,6 +43,7 @@ static void vhost_user_fs_pci_realize(VirtIOPCIProxy *vpci_dev, Error **errp)
+ {
+     VHostUserFSPCI *dev = VHOST_USER_FS_PCI(vpci_dev);
+     DeviceState *vdev = DEVICE(&dev->vdev);
++    uint64_t cachesize;
+ 
+     if (vpci_dev->nvectors == DEV_NVECTORS_UNSPECIFIED) {
+         /* Also reserve config change and hiprio queue vectors */
+@@ -46,6 +51,26 @@ static void vhost_user_fs_pci_realize(VirtIOPCIProxy *vpci_dev, Error **errp)
+     }
+ 
+     qdev_realize(vdev, BUS(&vpci_dev->bus), errp);
++    cachesize = dev->vdev.conf.cache_size;
++
++    /*
++     * The bar starts with the data/DAX cache
++     * Others will be added later.
++     */
++    memory_region_init(&dev->cachebar, OBJECT(vpci_dev),
++                       "vhost-fs-pci-cachebar", cachesize);
++    if (cachesize) {
++        memory_region_add_subregion(&dev->cachebar, 0, &dev->vdev.cache);
++        virtio_pci_add_shm_cap(vpci_dev, VIRTIO_FS_PCI_CACHE_BAR, 0, cachesize,
++                               VIRTIO_FS_SHMCAP_ID_CACHE);
++    }
++
++    /* After 'realized' so the memory region exists */
++    pci_register_bar(&vpci_dev->pci_dev, VIRTIO_FS_PCI_CACHE_BAR,
++                     PCI_BASE_ADDRESS_SPACE_MEMORY |
++                     PCI_BASE_ADDRESS_MEM_PREFETCH |
++                     PCI_BASE_ADDRESS_MEM_TYPE_64,
++                     &dev->cachebar);
+ }
+ 
+ static void vhost_user_fs_pci_class_init(ObjectClass *klass, void *data)
+diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+index ac4fc34b36..b077d8e705 100644
+--- a/hw/virtio/vhost-user-fs.c
++++ b/hw/virtio/vhost-user-fs.c
+@@ -24,6 +24,16 @@
+ #include "monitor/monitor.h"
+ #include "sysemu/sysemu.h"
+ 
++/*
++ * The powerpc kernel code expects the memory to be accessible during
++ * addition/removal.
++ */
++#if defined(TARGET_PPC64) && defined(CONFIG_LINUX)
++#define DAX_WINDOW_PROT PROT_READ
++#else
++#define DAX_WINDOW_PROT PROT_NONE
++#endif
++
+ static void vuf_get_config(VirtIODevice *vdev, uint8_t *config)
+ {
+     VHostUserFS *fs = VHOST_USER_FS(vdev);
+@@ -163,6 +173,7 @@ static void vuf_device_realize(DeviceState *dev, Error **errp)
+ {
+     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+     VHostUserFS *fs = VHOST_USER_FS(dev);
++    void *cache_ptr;
+     unsigned int i;
+     size_t len;
+     int ret;
+@@ -202,6 +213,26 @@ static void vuf_device_realize(DeviceState *dev, Error **errp)
+                    VIRTQUEUE_MAX_SIZE);
+         return;
+     }
++    if (fs->conf.cache_size &&
++        (!is_power_of_2(fs->conf.cache_size) ||
++          fs->conf.cache_size < qemu_real_host_page_size)) {
++        error_setg(errp, "cache-size property must be a power of 2 "
++                         "no smaller than the page size");
++        return;
++    }
++    if (fs->conf.cache_size) {
++        /* Anonymous, private memory is not counted as overcommit */
++        cache_ptr = mmap(NULL, fs->conf.cache_size, DAX_WINDOW_PROT,
++                         MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
++        if (cache_ptr == MAP_FAILED) {
++            error_setg(errp, "Unable to mmap blank cache");
++            return;
++        }
++
++        memory_region_init_ram_ptr(&fs->cache, OBJECT(vdev),
++                                   "virtio-fs-cache",
++                                   fs->conf.cache_size, cache_ptr);
++    }
+ 
+     if (!vhost_user_init(&fs->vhost_user, &fs->conf.chardev, errp)) {
+         return;
+@@ -277,6 +308,7 @@ static Property vuf_properties[] = {
+     DEFINE_PROP_UINT16("num-request-queues", VHostUserFS,
+                        conf.num_request_queues, 1),
+     DEFINE_PROP_UINT16("queue-size", VHostUserFS, conf.queue_size, 128),
++    DEFINE_PROP_SIZE("cache-size", VHostUserFS, conf.cache_size, 0),
+     DEFINE_PROP_END_OF_LIST(),
+ };
+ 
+diff --git a/include/hw/virtio/vhost-user-fs.h b/include/hw/virtio/vhost-user-fs.h
+index 0d62834c25..04596799e3 100644
+--- a/include/hw/virtio/vhost-user-fs.h
++++ b/include/hw/virtio/vhost-user-fs.h
+@@ -28,6 +28,7 @@ typedef struct {
+     char *tag;
+     uint16_t num_request_queues;
+     uint16_t queue_size;
++    uint64_t cache_size;
+ } VHostUserFSConf;
+ 
+ struct VHostUserFS {
+@@ -42,6 +43,7 @@ struct VHostUserFS {
+     int32_t bootindex;
+ 
+     /*< public >*/
++    MemoryRegion cache;
+ };
+ 
+ #endif /* _QEMU_VHOST_USER_FS_H */
+-- 
+2.29.2
 

@@ -1,12 +1,13 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 10 Feb 2021 13:27:44 -0500
-Message-Id: <20210210182744.27324-2-vgoyal@redhat.com>
-In-Reply-To: <20210210182744.27324-1-vgoyal@redhat.com>
-References: <20210210182744.27324-1-vgoyal@redhat.com>
+Date: Wed, 10 Feb 2021 16:39:06 -0500
+From: "Michael S. Tsirkin" <mst@redhat.com>
+Message-ID: <20210210163830-mutt-send-email-mst@kernel.org>
+References: <20210125180115.22936-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 1/1] virtiofsd: Do not use a thread pool by
-	default
+In-Reply-To: <20210125180115.22936-1-vgoyal@redhat.com>
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: Re: [Virtio-fs] [RFC PATCH 0/6] vhost-user: Shutdown/Flush slave
+	channel properly
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,42 +16,60 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com
-Cc: vgoyal@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, qemu-devel@nongnu.org
 
-Currently we created a thread pool (With 64 max threads per pool) for
-each virtqueue. We hoped that this will provide us with better scalability
-and performance.
+On Mon, Jan 25, 2021 at 01:01:09PM -0500, Vivek Goyal wrote:
+> Hi,
+> 
+> We are working on DAX support in virtiofs and have some patches out of
+> the tree hosted here.
+> 
+> https://gitlab.com/virtio-fs/qemu/-/commits/virtio-fs-dev
+> 
+> These patches have not been proposed for merge yet, becasue David
+> Gilbert noticed that we can run into a deadlock during an emergency
+> reboot of guest kernel. (echo b > /proc/sysrq-trigger).
+> 
+> I have provided details of deadlock in 4th path of the series with
+> subject "qemu, vhost-user: Extend protocol to start/stop/flush slave
+> channel".
+> 
+> Basic problem seems to be that we don't have a proper mechanism to
+> shutdown slave channel when vhost-user device is stopping. This means
+> there might be pending messages in slave channel and slave is blocked
+> and waiting for response.
+> 
+> This is an RFC patch series to enhance vhost-user protocol to 
+> properly shutdown/flush slave channel and avoid the deadlock. Though
+> we faced the issue in the context of virtiofs, any vhost-user
+> device using slave channel can potentially run into issues and
+> can benefit from these patches.
+> 
+> Any feedback is welcome. Currently patches are based on out of
+> tree code but after I get some feedback, I can only take pieces
+> which are relevant to upstream and post separately.
+> 
+> Thanks
+> Vivek
 
-But in practice, we are getting better numbers in most of the cases
-when we don't create a thread pool at all and a single thread per
-virtqueue receives the request and processes it.
+No comments so far - do you plan to post a non-RFC patchset?
 
-Hence, I am proposing that we switch to no thread pool by default
-(equivalent of --thread-pool-size=0). This will provide out of
-box better performance to most of the users. In fact other users
-have confirmed that not using a thread pool gives them better
-numbers. So why not use this as default. It can be changed when
-somebody can fix the issues with thread pool performance.
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- tools/virtiofsd/fuse_lowlevel.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index e94b71110b..fbdf62ee9b 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -18,7 +18,7 @@
- 
- #include <sys/file.h>
- 
--#define THREAD_POOL_SIZE 64
-+#define THREAD_POOL_SIZE 0
- 
- #define OFFSET_MAX 0x7fffffffffffffffLL
- 
--- 
-2.25.4
+> Vivek Goyal (6):
+>   virtiofsd: Drop ->vu_dispatch_rwlock while waiting for thread to exit
+>   libvhost-user: Use slave_mutex in all slave messages
+>   vhost-user: Return error code from slave_read()
+>   qemu, vhost-user: Extend protocol to start/stop/flush slave channel
+>   libvhost-user: Add support to start/stop/flush slave channel
+>   virtiofsd: Opt in for slave start/stop/shutdown functionality
+> 
+>  hw/virtio/vhost-user.c                    | 151 +++++++++++++++++++++-
+>  subprojects/libvhost-user/libvhost-user.c | 147 +++++++++++++++++----
+>  subprojects/libvhost-user/libvhost-user.h |   8 +-
+>  tools/virtiofsd/fuse_virtio.c             |  20 +++
+>  4 files changed, 294 insertions(+), 32 deletions(-)
+> 
+> -- 
+> 2.25.4
 

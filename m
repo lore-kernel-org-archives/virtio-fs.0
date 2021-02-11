@@ -1,15 +1,15 @@
-Date: Thu, 11 Feb 2021 10:32:03 +0000
+Date: Thu, 11 Feb 2021 10:57:55 +0000
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20210211103203.GH247031@stefanha-x1.localdomain>
+Message-ID: <20210211105755.GI247031@stefanha-x1.localdomain>
 References: <20210209190224.62827-1-dgilbert@redhat.com>
-	<20210209190224.62827-8-dgilbert@redhat.com>
+	<20210209190224.62827-9-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="FUaywKC54iCcLzqT"
+	protocol="application/pgp-signature"; boundary="PMULwz+zIGJzpDN9"
 Content-Disposition: inline
-In-Reply-To: <20210209190224.62827-8-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 07/24] DAX: virtio-fs: Add vhost-user slave
- commands for mapping
+In-Reply-To: <20210209190224.62827-9-dgilbert@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 08/24] DAX: virtio-fs: Fill in slave
+	commands for mapping
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,72 +22,83 @@ To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
 Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com, mst@redhat.com
 
 
---FUaywKC54iCcLzqT
+--PMULwz+zIGJzpDN9
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Tue, Feb 09, 2021 at 07:02:07PM +0000, Dr. David Alan Gilbert (git) wrot=
+On Tue, Feb 09, 2021 at 07:02:08PM +0000, Dr. David Alan Gilbert (git) wrot=
 e:
-> diff --git a/docs/interop/vhost-user.rst b/docs/interop/vhost-user.rst
-> index d6085f7045..1deedd3407 100644
-> --- a/docs/interop/vhost-user.rst
-> +++ b/docs/interop/vhost-user.rst
-> @@ -1432,6 +1432,26 @@ Slave message types
-> =20
->    The state.num field is currently reserved and must be set to 0.
-> =20
-> +``VHOST_USER_SLAVE_FS_MAP``
-> +  :id: 6
-> +  :equivalent ioctl: N/A
-> +  :slave payload: fd + n * (offset + address + len)
+> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+>=20
+> Fill in definitions for map, unmap and sync commands.
+>=20
+> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> with fix by misono.tomohiro@fujitsu.com
+> ---
+>  hw/virtio/vhost-user-fs.c | 115 ++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 111 insertions(+), 4 deletions(-)
+>=20
+> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+> index 78401d2ff1..5f2fca4d82 100644
+> --- a/hw/virtio/vhost-user-fs.c
+> +++ b/hw/virtio/vhost-user-fs.c
+> @@ -37,15 +37,122 @@
+>  uint64_t vhost_user_fs_slave_map(struct vhost_dev *dev, VhostUserFSSlave=
+Msg *sm,
+>                                   int fd)
+>  {
+> -    /* TODO */
+> -    return (uint64_t)-1;
+> +    VHostUserFS *fs =3D VHOST_USER_FS(dev->vdev);
+> +    if (!fs) {
+> +        /* Shouldn't happen - but seen on error path */
+> +        error_report("Bad fs ptr");
+> +        return (uint64_t)-1;
+> +    }
 
-I'm not sure I understand this notation. '+' means field concatenation?
-Is 'fd' a field or does it indicate file descriptor passing?
+If a non-vhost-user-fs vhost-user device backend sends this message
+VHOST_USER_FS() -> object_dynamic_cast_assert() there will either be an
+assertion failure (CONFIG_QOM_CAST_DEBUG) or the pointer will be
+silently cast to the wrong type (!CONFIG_QOM_CAST_DEBUG).
 
-I suggest using a struct name instead of informal notation so that the
-payload size and representation is clear.
+Both of these outcomes are not suitable for input validation. We need to
+fail cleanly here:
 
-The same applies for VHOST_USER_SLAVE_FS_UNMAP.
+  VhostUserFS *fs =3D (VHostUserFS *)object_dynamic_cast(OBJECT(dev->vdev),
+                                                       TYPE_VHOST_USER_FS);
+  if (!fs) {
+      ...handle failure...
+  }
 
-> +  :master payload: N/A
-> +
-> +  Requests that the QEMU mmap the given fd into the virtio-fs cache;
+>  uint64_t vhost_user_fs_slave_unmap(struct vhost_dev *dev,
+>                                     VhostUserFSSlaveMsg *sm)
+>  {
+> -    /* TODO */
+> -    return (uint64_t)-1;
+> +    VHostUserFS *fs =3D VHOST_USER_FS(dev->vdev);
+> +    if (!fs) {
+> +        /* Shouldn't happen - but seen on error path */
+> +        error_report("Bad fs ptr");
+> +        return (uint64_t)-1;
+> +    }
 
-s/QEMU mmap the given fd/given fd be mmapped/
+Same here.
 
-Please avoid mentioning QEMU specifically. Any VMM should be able to
-implement this spec.
-
-The same applies for VHOST_USER_SLAVE_FS_UNMAP.
-
-> +  multiple chunks can be mapped in one command.
-> +  A reply is generated indicating whether mapping succeeded.
-> +
-> +``VHOST_USER_SLAVE_FS_UNMAP``
-> +  :id: 7
-> +  :equivalent ioctl: N/A
-> +  :slave payload: n * (address + len)
-> +  :master payload: N/A
-> +
-> +  Requests that the QEMU un-mmap the given range in the virtio-fs cache;
-> +  multiple chunks can be unmapped in one command.
-> +  A reply is generated indicating whether unmapping succeeded.
-
---FUaywKC54iCcLzqT
+--PMULwz+zIGJzpDN9
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAlB6MACgkQnKSrs4Gr
-c8jcowf9HLRW3wAQ6DWqqDUQI5gIbsSaQpT2V3uW5lE7BmR/l/AstkBdWbl+QNrF
-vuRLB/7cqST/vpzdtcJkaLt9AU6p4uN6U0lfa9qAtkdtD3sSDlCxqMYxdpUPznvs
-clWkKB7XPn/a0gRh8cOZp6UQ0mlJtaOCs/RWHV+X/YFFwGxmrFSH5ymjWGIZOFzI
-o9PjInIInB2gCCciadHoHEpGxlQtJkCTpDnt3/6cFs4Kp3UTCh8AhKIfqh0x/oh8
-uqXEgfbJbfrcXMBDdOIopzX5QMMaiphPXipENKnYmn12hhP25uJTlc48ghnE2EZJ
-i95UpNCqyZoEPrDN4pyJctSg7mnW4Q==
-=DNUJ
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAlDbIACgkQnKSrs4Gr
+c8hW6gf/aJgUGTdbX9p4a37+cBG404CPh6LK05bKhArHTzvD0Di9MMv/SwxxdDSQ
+eWXa4SirTGJZNv3wZ9IuQlCYpD3BMrA87cFiIqVSQRRn+ZModcKPmEm74rXXilF3
+Red1R5fmtseU4rv+dlvYhM1ZMUvL1TRNAoqhwIMuGj1UPfFXTqWVkqSvhEQNA7Mr
+Pu9m0KNtlz3Kf7fVXdAADxYKm3gJnIsPJ/7aO2YTtScVL+IOGMuJEbAhgqucMWpK
+2rtR3SB/7Zdz1K9RZtGUFTvQF9vNQhzMU4K7fEtizNfwdczbCIZwpYjsz6cn284G
+GoO4T+ppmC5mOvNvdKssUWffQPIxYw==
+=/5Gk
 -----END PGP SIGNATURE-----
 
---FUaywKC54iCcLzqT--
+--PMULwz+zIGJzpDN9--
 

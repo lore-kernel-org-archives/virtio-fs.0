@@ -1,15 +1,15 @@
-Date: Thu, 11 Feb 2021 12:41:45 +0000
+Date: Thu, 11 Feb 2021 12:42:00 +0000
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20210211124145.GN247031@stefanha-x1.localdomain>
+Message-ID: <20210211124200.GO247031@stefanha-x1.localdomain>
 References: <20210209190224.62827-1-dgilbert@redhat.com>
-	<20210209190224.62827-14-dgilbert@redhat.com>
+	<20210209190224.62827-15-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="tpyx7gKuSYt+mjHM"
+	protocol="application/pgp-signature"; boundary="V7BlxAaPrdhzdIM1"
 Content-Disposition: inline
-In-Reply-To: <20210209190224.62827-14-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 13/24] DAX: virtiofsd: Make
-	lo_removemapping() work
+In-Reply-To: <20210209190224.62827-15-dgilbert@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 14/24] DAX: virtiofsd: route se down to
+	destroy method
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,43 +22,41 @@ To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
 Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com, mst@redhat.com
 
 
---tpyx7gKuSYt+mjHM
+--V7BlxAaPrdhzdIM1
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Tue, Feb 09, 2021 at 07:02:13PM +0000, Dr. David Alan Gilbert (git) wrot=
+On Tue, Feb 09, 2021 at 07:02:14PM +0000, Dr. David Alan Gilbert (git) wrot=
 e:
-> From: Vivek Goyal <vgoyal@redhat.com>
+> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 >=20
-> Let guest pass in the offset in dax window a mapping is currently
-> mapped at and needs to be removed.
+> We're going to need to pass the session down to destroy so that it can
+> pass it back to do the remove mapping.
 >=20
-> Vivek added the initial support to remove single mapping and later Peng
-> added patch to support removing multiple mappings in single command.
->=20
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
+> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 > ---
->  tools/virtiofsd/passthrough_ll.c | 26 ++++++++++++++++++++++++--
->  1 file changed, 24 insertions(+), 2 deletions(-)
+>  tools/virtiofsd/fuse_lowlevel.c  | 6 +++---
+>  tools/virtiofsd/fuse_lowlevel.h  | 2 +-
+>  tools/virtiofsd/passthrough_ll.c | 2 +-
+>  3 files changed, 5 insertions(+), 5 deletions(-)
 
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
---tpyx7gKuSYt+mjHM
+--V7BlxAaPrdhzdIM1
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAlJgkACgkQnKSrs4Gr
-c8gv6ggAt7o8D5KrYv0lhlbHz0vL+9buvBKhYo5kqvt9vY87FYNbLNBZLdKYslzL
-616NXlwAp90xMZXBbNhntOEU8O9nMKfQLgF645ePG1NsvW08OSSw5+1HC0yEkHFc
-rE89wTrW/VCrMG1PEinuAjom+BnCRMtaIi83OmKCYP6nU3537CwOgRrm0FFgBsSo
-ztR2Lbcm+OIRzPChP4QayWt7gLLXwYdn3qohaPrE02yAC+GzWaPpUgce1gwj0gjj
-w8UYHrvjUWnpJEfPR/IJXSFEMuipC9Hgd7jdgs8Z2eSUAqmqxUFIB1Tq9gWJv+sN
-Dn5VohT2NcJnApsXqyunCZNt8tWX8w==
-=GZqo
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAlJhgACgkQnKSrs4Gr
+c8hghwgAra6W5sssj/Tvl+kCSWvJKsc4e7drZ0BkASSShPe2fk2CuIVDhIdRv7UW
+wMI/QMV274uzA7osBsW3NDVE7JjN64ixt9EeJzOQzpugLf9mnDMxy9WOWOegUzyP
+mJvbzH36OWSj6TveM+vb0FhSh7AHQy2kZjLSUzdQhWicEnqaWgGXp6YQJyAX808Z
+VKfiDTvVEC/o2qCK2NRJUgUxbnHJ4+5w3CHpSSRoJ5lcwYP9Q/MEZ4tFxcDpNtOr
+w6p+z/nbIIf+i3JmGOqd9JI812tQrJDf2XZ8e1xz+E5TBlJZDjGImObvO7VqZKnv
+BA32QbY5oTyIl/nsPEJ/tq8j0zcipQ==
+=kiAP
 -----END PGP SIGNATURE-----
 
---tpyx7gKuSYt+mjHM--
+--V7BlxAaPrdhzdIM1--
 

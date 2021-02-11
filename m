@@ -1,15 +1,14 @@
-Date: Thu, 11 Feb 2021 10:17:23 +0000
+Date: Thu, 11 Feb 2021 10:25:55 +0000
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20210211101723.GF247031@stefanha-x1.localdomain>
+Message-ID: <20210211102555.GG247031@stefanha-x1.localdomain>
 References: <20210209190224.62827-1-dgilbert@redhat.com>
-	<20210209190224.62827-6-dgilbert@redhat.com>
+	<20210209190224.62827-7-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="DO5DiztRLs659m5i"
+	protocol="application/pgp-signature"; boundary="j2AXaZ4YhVcLc+PQ"
 Content-Disposition: inline
-In-Reply-To: <20210209190224.62827-6-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 05/24] DAX: virtio: Add shared memory
-	capability
+In-Reply-To: <20210209190224.62827-7-dgilbert@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 06/24] DAX: virtio-fs: Add cache BAR
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,44 +21,78 @@ To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
 Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com, mst@redhat.com
 
 
---DO5DiztRLs659m5i
+--j2AXaZ4YhVcLc+PQ
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Tue, Feb 09, 2021 at 07:02:05PM +0000, Dr. David Alan Gilbert (git) wrot=
+On Tue, Feb 09, 2021 at 07:02:06PM +0000, Dr. David Alan Gilbert (git) wrot=
 e:
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
->=20
-> Define a new capability type 'VIRTIO_PCI_CAP_SHARED_MEMORY_CFG'
-> and the data structure 'virtio_pci_cap64' to go with it.
-> They allow defining shared memory regions with sizes and offsets
-> of 2^32 and more.
-> Multiple instances of the capability are allowed and distinguished
-> by the 'id' field in the base capability.
->=20
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> ---
->  hw/virtio/virtio-pci.c | 20 ++++++++++++++++++++
->  hw/virtio/virtio-pci.h |  4 ++++
->  2 files changed, 24 insertions(+)
+> @@ -46,6 +51,26 @@ static void vhost_user_fs_pci_realize(VirtIOPCIProxy *=
+vpci_dev, Error **errp)
+>      }
+> =20
+>      qdev_realize(vdev, BUS(&vpci_dev->bus), errp);
+> +    cachesize =3D dev->vdev.conf.cache_size;
+> +
+> +    /*
+> +     * The bar starts with the data/DAX cache
+> +     * Others will be added later.
+> +     */
+> +    memory_region_init(&dev->cachebar, OBJECT(vpci_dev),
+> +                       "vhost-fs-pci-cachebar", cachesize);
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+s/vhost-fs/vhost-user-fs/ for consistency. Only worth changing if you
+respin.
 
---DO5DiztRLs659m5i
+> +    if (cachesize) {
+> +        memory_region_add_subregion(&dev->cachebar, 0, &dev->vdev.cache);
+> +        virtio_pci_add_shm_cap(vpci_dev, VIRTIO_FS_PCI_CACHE_BAR, 0, cac=
+hesize,
+> +                               VIRTIO_FS_SHMCAP_ID_CACHE);
+> +    }
+> +
+> +    /* After 'realized' so the memory region exists */
+> +    pci_register_bar(&vpci_dev->pci_dev, VIRTIO_FS_PCI_CACHE_BAR,
+> +                     PCI_BASE_ADDRESS_SPACE_MEMORY |
+> +                     PCI_BASE_ADDRESS_MEM_PREFETCH |
+> +                     PCI_BASE_ADDRESS_MEM_TYPE_64,
+> +                     &dev->cachebar);
+
+Please include a comment explainig why it's okay to use BAR 2, which is
+already used for the virtio-pci modern io bar (off by default):
+
+    /*
+     * virtio pci bar layout used by default.
+     * subclasses can re-arrange things if needed.
+     *
+     *   region 0   --  virtio legacy io bar
+     *   region 1   --  msi-x bar
+     *   region 2   --  virtio modern io bar (off by default)
+     *   region 4+5 --  virtio modern memory (64bit) bar
+     *
+     */
+
+I guess the idea is that the io bar is available since it's off by
+default. What happens if the io bar is enabled?
+
+Should this bar registration should be conditional (only when cache size
+is greater than 0)?
+
+--j2AXaZ4YhVcLc+PQ
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAlBDMACgkQnKSrs4Gr
-c8gveAgArWaZE1Fb9BZKC1pUHUzsnYYLBnOUihMMx0xOMzgF3A+OUXVgi+CkjOGz
-CZ9rsnaV+Iy6+H8imuM91h06hi2NtZhY7dadwl1AlN8jUDMJ2k5pCXDQAaNCcPBX
-6zsbhpGonzhaDBb9tEEm28aRKFA3PT3wy1qirXgnL+eXUv10seV5wHHN1ZlWj59z
-b3XGri7GPpBL7+Crfw/kNdJ7M1R4qEMRhehaOk31QOqwuddDDEevpgGqnMI9Ac6+
-Ju6j+Wqj4UO7rQB2GRSQeM+DAZLXWjpZKGKWbj5/BXIJDDf2v/LA43+9bKpDe3I5
-EJJzN9W96XEqMvYNHZ0hk90/Nza7oQ==
-=LU5a
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAlBjMACgkQnKSrs4Gr
+c8jgpggAoNEPtR4HQ7BVPbSA4ugAaffqqeoLpyqr7Kf864GsSdgEZC7+SlSZjfxl
+vme32YgLleKLA4f0S72KtPwbdrJepO6tWAhdmzCK40NWDah+IpyM1I5rsSqDpB8y
+D2UgNh5px6RiCEiitxkAqwSLydIPEkvlH94SJUJ9wKqNiDi9DjI+81+CCMZ4FdDf
+XpcBpUU7HYvnu5BScBwwcb94dU2Dog+VcQ9q3I5FAdg2u91oW2QK14apT8xjuyo8
+0ZlHZuqcFV9jvr6pexc4XDBY8vdLa8UecG650rShNDIHC7PoZCkx1lif3yUjGE/R
+gbEG5u/6cWXrfjW7mVsuTfRww4DbqQ==
+=2swU
 -----END PGP SIGNATURE-----
 
---DO5DiztRLs659m5i--
+--j2AXaZ4YhVcLc+PQ--
 

@@ -1,61 +1,63 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Tue, 16 Feb 2021 18:37:34 +0000
-Message-Id: <20210216183734.57810-7-dgilbert@redhat.com>
-In-Reply-To: <20210216183734.57810-1-dgilbert@redhat.com>
-References: <20210216183734.57810-1-dgilbert@redhat.com>
-MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 6/6] virtiofsd: Do not use a thread pool by
-	default
-List-Id: Development discussions about virtio-fs <virtio-fs.listman.redhat.com>
-List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
-	<mailto:virtio-fs-request@listman.redhat.com?subject=unsubscribe>
-List-Archive: <https://listman.redhat.com/archives/virtio-fs>
-List-Post: <mailto:virtio-fs@listman.redhat.com>
-List-Help: <mailto:virtio-fs-request@listman.redhat.com?subject=help>
-List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
-	<mailto:virtio-fs-request@listman.redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, wainersm@redhat.com, groug@kaod.org, philmd@redhat.com, vgoyal@redhat.com
-Cc: virtio-fs@redhat.com
-
+Date: Thu, 11 Feb 2021 13:30:20 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210211183020.GA29443@redhat.com>
+References: <20210209190224.62827-1-dgilbert@redhat.com>
+	<20210209190224.62827-11-dgilbert@redhat.com>
+	<20210211123738.GK247031@stefanha-x1.localdomain>
+	<YCVduoTmMuV4sOZF@work-vm>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <YCVduoTmMuV4sOZF@work-vm>
+Subject: Re: [Virtio-fs] [PATCH 10/24] DAX: virtiofsd: Add setup/remove
+ mappings fuse commands
+List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
+List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
+	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
+List-Archive: <https://www.redhat.com/archives/virtio-fs>
+List-Post: <mailto:virtio-fs@redhat.com>
+List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
+List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
+	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, qemu-devel@nongnu.org, mst@redhat.com
 
-Currently we created a thread pool (With 64 max threads per pool) for
-each virtqueue. We hoped that this will provide us with better scalability
-and performance.
+On Thu, Feb 11, 2021 at 04:39:22PM +0000, Dr. David Alan Gilbert wrote:
+> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > On Tue, Feb 09, 2021 at 07:02:10PM +0000, Dr. David Alan Gilbert (git) wrote:
+> > > +static void do_removemapping(fuse_req_t req, fuse_ino_t nodeid,
+> > > +                             struct fuse_mbuf_iter *iter)
+> > > +{
+> > > +    struct fuse_removemapping_in *arg;
+> > > +    struct fuse_removemapping_one *one;
+> > > +
+> > > +    arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
+> > > +    if (!arg || arg->count <= 0) {
+> > 
+> > arg->count is unsigned so < is tautologous.
+> > 
+> > > +        fuse_log(FUSE_LOG_ERR, "do_removemapping: invalid arg %p\n", arg);
+> > > +        fuse_reply_err(req, EINVAL);
+> > > +        return;
+> > > +    }
+> > > +
+> > > +    one = fuse_mbuf_iter_advance(iter, arg->count * sizeof(*one));
+> > 
+> > arg->count * sizeof(*one) is an integer overflow on 32-bit hosts. I
+> > think we should be more defensive here since this input comes from the
+> > guest.
+> 
+> OK, so I've gone with:
+> 
+>     if (!arg || !arg->count || 
+>         (uint64_t)arg->count * sizeof(*one) >= SIZE_MAX) {
+>         fuse_log(FUSE_LOG_ERR, "do_removemapping: invalid arg %p\n", arg);
+>         fuse_reply_err(req, EINVAL);
+>         return;
 
-But in practice, we are getting better numbers in most of the cases
-when we don't create a thread pool at all and a single thread per
-virtqueue receives the request and processes it.
+If we did not want to get into unit64_t business, can we alternatively do.
+     if (!arg || !arg->count || arg->count > SIZE_MAX/sizeof(*one)) {
+     }
 
-Hence, I am proposing that we switch to no thread pool by default
-(equivalent of --thread-pool-size=0). This will provide out of
-box better performance to most of the users. In fact other users
-have confirmed that not using a thread pool gives them better
-numbers. So why not use this as default. It can be changed when
-somebody can fix the issues with thread pool performance.
-
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-Message-Id: <20210210182744.27324-2-vgoyal@redhat.com>
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
----
- tools/virtiofsd/fuse_lowlevel.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index f78692ef66..1aa26c6333 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -18,7 +18,7 @@
- 
- #include <sys/file.h>
- 
--#define THREAD_POOL_SIZE 64
-+#define THREAD_POOL_SIZE 0
- 
- #define OFFSET_MAX 0x7fffffffffffffffLL
- 
--- 
-2.29.2
+Vivek
 

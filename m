@@ -1,15 +1,15 @@
-Date: Thu, 11 Feb 2021 10:05:16 +0000
+Date: Thu, 11 Feb 2021 10:12:03 +0000
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <20210211100516.GC247031@stefanha-x1.localdomain>
+Message-ID: <20210211101203.GD247031@stefanha-x1.localdomain>
 References: <20210209190224.62827-1-dgilbert@redhat.com>
-	<20210209190224.62827-3-dgilbert@redhat.com>
+	<20210209190224.62827-4-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="RIYY1s2vRbPFwWeW"
+	protocol="application/pgp-signature"; boundary="Qrgsu6vtpU/OV/zm"
 Content-Disposition: inline
-In-Reply-To: <20210209190224.62827-3-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 02/24] DAX: libvhost-user: Route slave
-	message payload
+In-Reply-To: <20210209190224.62827-4-dgilbert@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 03/24] DAX: libvhost-user: Allow popping a
+ queue element with bad pointers
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,39 +22,51 @@ To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
 Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com, mst@redhat.com
 
 
---RIYY1s2vRbPFwWeW
+--Qrgsu6vtpU/OV/zm
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Tue, Feb 09, 2021 at 07:02:02PM +0000, Dr. David Alan Gilbert (git) wrot=
+On Tue, Feb 09, 2021 at 07:02:03PM +0000, Dr. David Alan Gilbert (git) wrot=
 e:
 > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 >=20
-> Route the uint64 payload from message replies on the slave back up
-> through vu_process_message_reply and to the callers.
+> Allow a daemon implemented with libvhost-user to accept an
+> element with pointers to memory that aren't in the mapping table.
+> The daemon might have some special way to deal with some special
+> cases of this.
+>=20
+> The default behaviour doesn't change.
 >=20
 > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 > ---
->  subprojects/libvhost-user/libvhost-user.c | 14 +++++++++++---
->  1 file changed, 11 insertions(+), 3 deletions(-)
+>  block/export/vhost-user-blk-server.c      |  2 +-
+>  contrib/vhost-user-blk/vhost-user-blk.c   |  3 +-
+>  contrib/vhost-user-gpu/vhost-user-gpu.c   |  5 ++-
+>  contrib/vhost-user-input/main.c           |  4 +-
+>  contrib/vhost-user-scsi/vhost-user-scsi.c |  2 +-
+>  subprojects/libvhost-user/libvhost-user.c | 51 ++++++++++++++++++-----
+>  subprojects/libvhost-user/libvhost-user.h |  8 +++-
+>  tests/vhost-user-bridge.c                 |  4 +-
+>  tools/virtiofsd/fuse_virtio.c             |  3 +-
+>  9 files changed, 60 insertions(+), 22 deletions(-)
 
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
---RIYY1s2vRbPFwWeW
+--Qrgsu6vtpU/OV/zm
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAlAVwACgkQnKSrs4Gr
-c8huKAf9HKzk9xXP/UcXfbQAV1aNDTTJVbYZHXfGUnGzQyIwFjntanmaZ4tiavQR
-Q8ppS9nZLiYcQosKG0NECS0Nx57iai4hfj3YjHPedLT0mt6AcHcZs05JVgPt9rVA
-PnYwJ9uJtjoi1WcaVc0P362/G30HPistjhl3Q7ee15glpiCYbcz83g8lcAbzqVyR
-UIDE5XlUKMozpWC/HVXxPpr0wXS2dzQDPhwGBy9xWy7XSylwqLsn9tRUpXIHgAXH
-a9ZadkwUhnWx87Rhq4njmXjRKRWR3wFhQeMC2xvw/gkC5mbkhVhQDBIwq2UO2voG
-psFi/k6EiRU2WrliLC0CPh+6bIu7vQ==
-=egj8
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAlAvMACgkQnKSrs4Gr
+c8ilsQf8CSqsiNBkY6EsYDPIyLsiF1zWKe6HBkpeVe4EH6SLuof7IGHKbXhWAH2m
+Ro/wB4i2YLydIJAkNcibQb9MpC/N92trxjefaWiCIDZlv23xy74o10neWVuFz/cl
+02cHnaORj0I62338RCdeHoowNP47Wr1D1e2tOpcIRIdtFxglrqdxeGxUz4QHP4J5
+2zGYlhltqb/ABJ6dCIYDB9CliEL2j3Dkg7LvToW9Iu3yRa2PnTmmd1YpgN0XTeME
+uXuxQCt3GHQ9nfVae5lUFPnOy/3EmNED5j/zI4Xf9/GKWnNH7yT+mYQIuGeBgguO
+DQPz4KEZb9B+CqzgFVGBp6jfJRgXpQ==
+=5yjg
 -----END PGP SIGNATURE-----
 
---RIYY1s2vRbPFwWeW--
+--Qrgsu6vtpU/OV/zm--
 

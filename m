@@ -1,99 +1,72 @@
-Date: Mon, 8 Mar 2021 17:03:31 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210308220331.GB29382@redhat.com>
-References: <34a26a91-c73d-18cb-95ad-9b2c6192091c@redhat.com>
-	<CAOssrKcY7o_LOabLiy+86LFZ1aQdqq8EOaM=qjRqHKGUqRup6w@mail.gmail.com>
+Date: Thu, 11 Feb 2021 19:50:37 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YCWKjRST1AYW+//G@work-vm>
+References: <20210209190224.62827-1-dgilbert@redhat.com>
+	<20210209190224.62827-11-dgilbert@redhat.com>
+	<20210211123738.GK247031@stefanha-x1.localdomain>
+	<YCVduoTmMuV4sOZF@work-vm> <20210211183020.GA29443@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <CAOssrKcY7o_LOabLiy+86LFZ1aQdqq8EOaM=qjRqHKGUqRup6w@mail.gmail.com>
-Subject: Re: [Virtio-fs] Securing file handles
+In-Reply-To: <20210211183020.GA29443@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 10/24] DAX: virtiofsd: Add setup/remove
+ mappings fuse commands
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
-List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
+List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
-List-Archive: <https://listman.redhat.com/archives/virtio-fs>
+List-Archive: <https://www.redhat.com/archives/virtio-fs>
 List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
-List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
+List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <mszeredi@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Max Reitz <mreitz@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, qemu-devel@nongnu.org, mst@redhat.com
 
-On Mon, Mar 08, 2021 at 10:54:58AM +0100, Miklos Szeredi wrote:
-> Hi,
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> On Thu, Feb 11, 2021 at 04:39:22PM +0000, Dr. David Alan Gilbert wrote:
+> > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > > On Tue, Feb 09, 2021 at 07:02:10PM +0000, Dr. David Alan Gilbert (git) wrote:
+> > > > +static void do_removemapping(fuse_req_t req, fuse_ino_t nodeid,
+> > > > +                             struct fuse_mbuf_iter *iter)
+> > > > +{
+> > > > +    struct fuse_removemapping_in *arg;
+> > > > +    struct fuse_removemapping_one *one;
+> > > > +
+> > > > +    arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
+> > > > +    if (!arg || arg->count <= 0) {
+> > > 
+> > > arg->count is unsigned so < is tautologous.
+> > > 
+> > > > +        fuse_log(FUSE_LOG_ERR, "do_removemapping: invalid arg %p\n", arg);
+> > > > +        fuse_reply_err(req, EINVAL);
+> > > > +        return;
+> > > > +    }
+> > > > +
+> > > > +    one = fuse_mbuf_iter_advance(iter, arg->count * sizeof(*one));
+> > > 
+> > > arg->count * sizeof(*one) is an integer overflow on 32-bit hosts. I
+> > > think we should be more defensive here since this input comes from the
+> > > guest.
+> > 
+> > OK, so I've gone with:
+> > 
+> >     if (!arg || !arg->count || 
+> >         (uint64_t)arg->count * sizeof(*one) >= SIZE_MAX) {
+> >         fuse_log(FUSE_LOG_ERR, "do_removemapping: invalid arg %p\n", arg);
+> >         fuse_reply_err(req, EINVAL);
+> >         return;
 > 
-> Thanks for the good summary.
-> 
-> Another aspect is what the file handle will be used for:
-> 
->  a) allowing server to close O_PATH descriptors any time because they
-> can be reconstructed using the file handle
+> If we did not want to get into unit64_t business, can we alternatively do.
+>      if (!arg || !arg->count || arg->count > SIZE_MAX/sizeof(*one)) {
 
-I am probably missing something, so I will ask. To solve problem a)
-can we simply store the file handle in lo_inode. (say inode->fh).
-and close inode->fd.
+I tried that and the compiler moaned that it was always false; which on
+a 64bit host it is since arg->count is uint32_t.
 
-And when we need to, do open_by_handle_at(inode->fh). 
+Dave
 
-Given we already have lo->ino_map redirection, guest can't pass
-an arbitrary file handle. So it seems to solve the issue of
-arbitrary file handles from guest without MAC stuff and we don't
-keep O_PATH fd around.
-
-What am I missing?
-
-Vivek
-
+>      }
 > 
->  b) allowing NFS export on client, or just name_to_handle_at(2)
-> open_by_handle_at(2).
-> 
-> The requirements are slightly different, since file handles used for
-> (a) do not have to persist after a guest reboot (since the VFS cache
-> referencing those handles is gone).  While (b) requires persistence
-> after a reboot.
-> 
-> Yet another issue is global CAP_DAC_READ_SEARCH required by the server
-> for file handle decode.
-> 
-> Taking this into account, I think the final solution has to be in the
-> host kernel.   E.g. it seems okay to allow user namespace owner to
-> decode file handles on filesystems it actually owns.   That would not
-> generally help us, though, since virtiofs will want to export root
-> owned fs as well.
-> 
-> Addition of a MAC header to the file handle by name_to_handle_at(2)
-> could solve some or all of the above problems.  The question is where
-> the key comes from and what the security implications are.
-> 
-> A per-process (e.g. associated with task->files, generated by the
-> kernel on demand and discarded on process exit) key would suffice to
-> replace O_PATH descriptors.  In this case the only difference between
-> keeping the O_PATH fd open and
-> 
->   name_to_handle_at(opathfd, &handle);
->   close(opathfd);
->   opathfd=open_by_handle_at(&handle);
-> 
-> would be that the resulting fd might point to a disconnected dentry
-> and hence would result in incomplete path information under
-> /proc/self/fd/.  Need to think hard about whether this has any
-> security implications for unprivileged users.
-> 
-> Adding key management would solve the other aspects, but would also
-> possibly open up holes for accessing arbitrary files, so this would
-> need to be done carefully.
-> 
-> Adding subtree checking to the kernel is also a possibility (i.e.
-> limit the opened fd to the subtree of the bind mount).   It would have
-> the advantage of not resulting in disconnected dentries, but
-> disadvantage of not working if the file was moved across directories.
-> 
-> Thanks,
-> Miklos
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
+> Vivek
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

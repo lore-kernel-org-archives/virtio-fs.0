@@ -1,14 +1,15 @@
-Date: Wed, 10 Feb 2021 17:15:44 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210210221544.GC3200@redhat.com>
-References: <20210125180115.22936-1-vgoyal@redhat.com>
-	<20210210163830-mutt-send-email-mst@kernel.org>
+Date: Thu, 11 Feb 2021 09:59:36 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20210211095936.GB247031@stefanha-x1.localdomain>
+References: <20210209190224.62827-1-dgilbert@redhat.com>
+	<20210209190224.62827-2-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="5I6of5zJg18YgZEa"
 Content-Disposition: inline
-In-Reply-To: <20210210163830-mutt-send-email-mst@kernel.org>
-Subject: Re: [Virtio-fs] [RFC PATCH 0/6] vhost-user: Shutdown/Flush slave
-	channel properly
+In-Reply-To: <20210209190224.62827-2-dgilbert@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 01/24] DAX: vhost-user: Rework slave return
+	values
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,69 +18,59 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Michael S. Tsirkin" <mst@redhat.com>
-Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, qemu-devel@nongnu.org
+To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com, mst@redhat.com
 
-On Wed, Feb 10, 2021 at 04:39:06PM -0500, Michael S. Tsirkin wrote:
-> On Mon, Jan 25, 2021 at 01:01:09PM -0500, Vivek Goyal wrote:
-> > Hi,
-> > 
-> > We are working on DAX support in virtiofs and have some patches out of
-> > the tree hosted here.
-> > 
-> > https://gitlab.com/virtio-fs/qemu/-/commits/virtio-fs-dev
-> > 
-> > These patches have not been proposed for merge yet, becasue David
-> > Gilbert noticed that we can run into a deadlock during an emergency
-> > reboot of guest kernel. (echo b > /proc/sysrq-trigger).
-> > 
-> > I have provided details of deadlock in 4th path of the series with
-> > subject "qemu, vhost-user: Extend protocol to start/stop/flush slave
-> > channel".
-> > 
-> > Basic problem seems to be that we don't have a proper mechanism to
-> > shutdown slave channel when vhost-user device is stopping. This means
-> > there might be pending messages in slave channel and slave is blocked
-> > and waiting for response.
-> > 
-> > This is an RFC patch series to enhance vhost-user protocol to 
-> > properly shutdown/flush slave channel and avoid the deadlock. Though
-> > we faced the issue in the context of virtiofs, any vhost-user
-> > device using slave channel can potentially run into issues and
-> > can benefit from these patches.
-> > 
-> > Any feedback is welcome. Currently patches are based on out of
-> > tree code but after I get some feedback, I can only take pieces
-> > which are relevant to upstream and post separately.
-> > 
-> > Thanks
-> > Vivek
-> 
-> No comments so far - do you plan to post a non-RFC patchset?
 
-Yes. Stefan wants me to poll both unix fd and slave fd in device
-shutdown path and serve both of these in parallel, instead of
-adding a new slave channel shutdown message. I am planning to give
-it a try and post new patches.
+--5I6of5zJg18YgZEa
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
 
-Vivek
-> 
-> 
-> > Vivek Goyal (6):
-> >   virtiofsd: Drop ->vu_dispatch_rwlock while waiting for thread to exit
-> >   libvhost-user: Use slave_mutex in all slave messages
-> >   vhost-user: Return error code from slave_read()
-> >   qemu, vhost-user: Extend protocol to start/stop/flush slave channel
-> >   libvhost-user: Add support to start/stop/flush slave channel
-> >   virtiofsd: Opt in for slave start/stop/shutdown functionality
-> > 
-> >  hw/virtio/vhost-user.c                    | 151 +++++++++++++++++++++-
-> >  subprojects/libvhost-user/libvhost-user.c | 147 +++++++++++++++++----
-> >  subprojects/libvhost-user/libvhost-user.h |   8 +-
-> >  tools/virtiofsd/fuse_virtio.c             |  20 +++
-> >  4 files changed, 294 insertions(+), 32 deletions(-)
-> > 
-> > -- 
-> > 2.25.4
-> 
+On Tue, Feb 09, 2021 at 07:02:01PM +0000, Dr. David Alan Gilbert (git) wrote:
+> +static uint64_t vhost_user_slave_handle_vring_host_notifier(
+> +                struct vhost_dev *dev,
+> +               VhostUserVringArea *area,
+> +               int fd)
+
+Indentation looks off. Only worth changing if you respin.
+
+> @@ -1398,7 +1399,8 @@ static void slave_read(void *opaque)
+>      struct vhost_user *u = dev->opaque;
+>      VhostUserHeader hdr = { 0, };
+>      VhostUserPayload payload = { 0, };
+> -    int size, ret = 0;
+> +    int size;
+> +    uint64_t ret = 0;
+>      struct iovec iov;
+>      struct msghdr msgh;
+>      int fd[VHOST_USER_SLAVE_MAX_FDS];
+> @@ -1472,7 +1474,7 @@ static void slave_read(void *opaque)
+>          break;
+>      default:
+>          error_report("Received unexpected msg type: %d.", hdr.request);
+> -        ret = -EINVAL;
+> +        ret = (uint64_t)-EINVAL;
+
+The !!ret was removed below so it would have previously been true (1).
+Now it has changed value.
+
+If there is no specific reason to change the value, please keep it true
+(1) just in case a vhost-user device backend depends on that value.
+
+--5I6of5zJg18YgZEa
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAlAAgACgkQnKSrs4Gr
+c8j1Kgf/fZt238LWQCca4Gpguk6XJFxiYj3jOx2sPqTTORynV35/etPqJfQrFOE6
+diwJ/x4F2XmowMmraAX8TQ+nTer6sRxE6CWuJfv3j/I9XIlB9g4nQY+PH8SU/DFy
+v1X2RjcWwbTWHC/xMF3abyP8kjBAuqLJ94nLf9ACPVfl2m21rLditeiZ6qPkqiOD
+Idpn3i1uO+EGLsZhbLaAYH68O7gberHE7dy8VxWEiw9EteHYybJNOX3uxPSd63M/
+LEgJOmq3Ykr1UxfjQx8jHKVc6wQmYtq2XcwcM6hyEyOUKLgrLBAaLRu6T9M6ud1h
+nMALP8DtZI/jtq/8Fluy2fm0iAFVsQ==
+=+Zqx
+-----END PGP SIGNATURE-----
+
+--5I6of5zJg18YgZEa--
 

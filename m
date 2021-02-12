@@ -1,58 +1,51 @@
 From: Luis Henriques <lhenriques@suse.de>
-References: <20210216233611.33400-1-vgoyal@redhat.com>
-Date: Wed, 17 Feb 2021 09:32:53 +0000
-In-Reply-To: <20210216233611.33400-1-vgoyal@redhat.com> (Vivek Goyal's message
-	of "Tue, 16 Feb 2021 18:36:08 -0500")
-Message-ID: <87zh03hwe2.fsf@suse.de>
+Date: Fri, 12 Feb 2021 10:30:13 +0000
+Message-ID: <87r1llk28a.fsf@suse.de>
 MIME-Version: 1.0
 Content-Type: text/plain
-Subject: Re: [Virtio-fs] [PATCH 0/3] virtiofsd: Add options to
-	enable/disable posix acl
-List-Id: Development discussions about virtio-fs <virtio-fs.listman.redhat.com>
-List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
-	<mailto:virtio-fs-request@listman.redhat.com?subject=unsubscribe>
-List-Archive: <https://listman.redhat.com/archives/virtio-fs>
-List-Post: <mailto:virtio-fs@listman.redhat.com>
-List-Help: <mailto:virtio-fs-request@listman.redhat.com?subject=help>
-List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
-	<mailto:virtio-fs-request@listman.redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, miklos@szeredi.hu, qemu-devel@nongnu.org
+Subject: [Virtio-fs] Question on ACLs support in virtiofs
+List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
+List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
+	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
+List-Archive: <https://www.redhat.com/archives/virtio-fs>
+List-Post: <mailto:virtio-fs@redhat.com>
+List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
+List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
+	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
+To: virtio-fs@redhat.com
 
-Vivek Goyal <vgoyal@redhat.com> writes:
+Hi!
 
-> Luis Henriques reported that fstest generic/099 fails with virtiofs.
-> Little debugging showed that we don't enable acl support. So this
-> patch series provides option to enable/disable posix acl support. By
-> default it is disabled.
->
-> I have run blogbench and pjdfstests with posix acl enabled and
-> things work fine. 
->
-> Luis, can you please apply these patches, and run virtiofsd with
-> "-o posix_acl" and see if it fixes the failure you are seeing. I
-> ran the steps you provided manually and it fixes the issue for
-> me.
+I've recently executed the generic fstests on virtiofs and decided to have
+a closer look at generic/099 failure.  In a nutshell, here's the sequence
+of commands that reproduce that failure:
 
-Awesome, thanks for looking into this.  I'll have a look and test these
-patches.  I expect to be able to report back later today.
+# umask 0
+# mkdir acldir
+# chacl -b "u::rwx,g::rwx,o::rwx" "u::r-x,g::r--,o::---" acldir
+# touch acldir/file1
+# umask 722
+# touch acldir/file2
+# ls -l acldir
+total 0
+-r--r----- 1 root root 0 Feb 12 10:04 file1
+----r----- 1 root root 0 Feb 12 10:05 file2
+
+The failure is that setting umask to 722 shouldn't affect the new file2
+because acldir has a default ACL (from umask(2): "... if the parent
+directory has a default ACL (see acl(5)), the umask is ignored...").
+
+So... I tried to have look at the code, and initially I thought that the
+problem was in (kernel) function fuse_create_open(), where we have this:
+
+	if (!fm->fc->dont_mask)
+		mode &= ~current_umask();
+
+but then I went down the rabbit hole, into the user-space code, and
+couldn't reach a conclusion.  Maybe the issue is that there's in fact no
+support for this POSIX ACLs in virtiofs/FUSE?  Any ideas?
 
 Cheers,
 -- 
 Luis
-
-
->
-> Vivek Goyal (3):
->   virtiofsd: Add an option to enable/disable posix acls
->   virtiofsd: Add umask to seccom allow list
->   virtiofsd: Change umask if posix acls are enabled
->
->  tools/virtiofsd/passthrough_ll.c      | 45 +++++++++++++++++++++++----
->  tools/virtiofsd/passthrough_seccomp.c |  1 +
->  2 files changed, 40 insertions(+), 6 deletions(-)
->
-> -- 
-> 2.25.4
->
 

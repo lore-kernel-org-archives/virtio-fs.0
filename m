@@ -1,83 +1,97 @@
-From: Luis Henriques <lhenriques@suse.de>
-References: <20210217233046.81418-1-vgoyal@redhat.com>
-	<87pn0wgtsx.fsf@suse.de> <20210219143403.GA3270@redhat.com>
-	<CAJfpeguanq6PEf7jd9Ur_JO7aJ0eoojs65LXb6ukhoGGb_Ccdw@mail.gmail.com>
-Date: Fri, 19 Feb 2021 16:15:38 +0000
-In-Reply-To: <CAJfpeguanq6PEf7jd9Ur_JO7aJ0eoojs65LXb6ukhoGGb_Ccdw@mail.gmail.com>
-	(Miklos Szeredi's message of "Fri, 19 Feb 2021 16:55:06 +0100")
-Message-ID: <87im6oghjp.fsf@suse.de>
+Date: Mon, 15 Feb 2021 13:25:13 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YCp2OSa3LQT4vIEm@work-vm>
+References: <20210209190224.62827-1-dgilbert@redhat.com>
+	<20210209190224.62827-8-dgilbert@redhat.com>
+	<CAJFHJrqioXu7K8Z=dFgMQDWoKoNK3pddcgf9znCS72BR4WHSYA@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain
-Subject: Re: [Virtio-fs] [PATCH v2 0/3] virtiofsd: Add options to
-	enable/disable posix acl
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAJFHJrqioXu7K8Z=dFgMQDWoKoNK3pddcgf9znCS72BR4WHSYA@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 07/24] DAX: virtio-fs: Add vhost-user slave
+ commands for mapping
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
-List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
+List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
-List-Archive: <https://listman.redhat.com/archives/virtio-fs>
+List-Archive: <https://www.redhat.com/archives/virtio-fs>
 List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
-List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
+List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
+To: Chirantan Ekbote <chirantan@chromium.org>
+Cc: mst@redhat.com, qemu-devel@nongnu.org, virtio-fs-list <virtio-fs@redhat.com>, marcandre.lureau@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
-Miklos Szeredi <miklos@szeredi.hu> writes:
+* Chirantan Ekbote (chirantan@chromium.org) wrote:
+> On Wed, Feb 10, 2021 at 4:04 AM Dr. David Alan Gilbert (git)
+> <dgilbert@redhat.com> wrote:
+> >
+> > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+> > +
+> > +typedef struct {
+> > +    /* Offsets within the file being mapped */
+> > +    uint64_t fd_offset[VHOST_USER_FS_SLAVE_ENTRIES];
+> > +    /* Offsets within the cache */
+> > +    uint64_t c_offset[VHOST_USER_FS_SLAVE_ENTRIES];
+> > +    /* Lengths of sections */
+> > +    uint64_t len[VHOST_USER_FS_SLAVE_ENTRIES];
+> > +    /* Flags, from VHOST_USER_FS_FLAG_* */
+> > +    uint64_t flags[VHOST_USER_FS_SLAVE_ENTRIES];
+> > +} VhostUserFSSlaveMsg;
+> > +
+> 
+> Is it too late to change this?
 
-> On Fri, Feb 19, 2021 at 3:34 PM Vivek Goyal <vgoyal@redhat.com> wrote:
->>
->> On Fri, Feb 19, 2021 at 11:50:54AM +0000, Luis Henriques wrote:
->> > Vivek Goyal <vgoyal@redhat.com> writes:
->> >
->> > > Hi,
->> > >
->> > > This is V2 of the patches. Changes since v1 are.
->> > >
->> > > - Rebased on top of latest master.
->> > > - Took care of Miklos's comments to block acl xattrs if user
->> > >   explicitly disabled posix acl.
->> > >
->> > > Luis Henriques reported that fstest generic/099 fails with virtiofs.
->> > > Little debugging showed that we don't enable acl support. So this
->> > > patch series provides option to enable/disable posix acl support. By
->> > > default it is disabled.
->> > >
->> > > I have run blogbench and pjdfstests with posix acl enabled and
->> > > things work fine.
->> > >
->> > > Luis, can you please apply these patches, and run virtiofsd with
->> > > "-o posix_acl" and see if it fixes the failure you are seeing. I
->> > > ran the steps you provided manually and it fixes the issue for
->> > > me.
->> >
->> > Sorry for the delay.  I've finally tested these patches and they indeed
->> > fix the problem I reported.  My only question about this fix is why is
->> > this option not enabled by default, since this is the documented behavior
->> > in acl(5) and umask(2)?  In fact, why is this an option at all?
->>
->> You mean why to not enable acl by default?
->>
->> I am concerned about performance drop this can lead to because extra
->> GETXATTR(system.posix_acl_*) messages which will trigger if acls are enabled.
->> And not all users might require these. That's why I preferred to not enable
->> acl by default. Those who need it can enable it explicitly.
->>
->> Another example is xattr support. Due to performance concerns, we don't
->> enable xattrs by default either.
->
-> Actually generic xattr is much worse, since there's no caching for
-> them currently, as opposed to posix acls, which are cached both when
-> positive and negative.
->
-> If we enable ACL by default in case xattrs are enabled, we should be
-> safe, I think.  Having an option to disable acls still makes sense,
-> but it's an optional plus.
+No; this is a message defined as part of this series so still up for
+review.  It's not guest visible; just on the vhist-user pipe.
 
-Great, thanks for clarifying that the reason for having these options is
-really for performance.
+> This struct allocates space for up to
+> 8 entries but most of the time the server will only try to set up one
+> mapping at a time so only 32 out of the 256 bytes in the message are
+> actually being used.  We're just wasting time memcpy'ing bytes that
+> will never be used.  Is there some reason this can't be dynamically
+> sized?  Something like:
+> 
+> typedef struct {
+>     /* Number of mapping requests */
+>     uint16_t num_requests;
+>     /* `num_requests` mapping requests */
+>    MappingRequest requests[];
+> } VhostUserFSSlaveMsg;
+> 
+> typedef struct {
+>     /* Offset within the file being mapped */
+>     uint64_t fd_offset;
+>     /* Offset within the cache */
+>     uint64_t c_offset;
+>     /* Length of section */
+>     uint64_t len;
+>     /* Flags, from VHOST_USER_FS_FLAG_* */
+>     uint64_t flags;
+> } MappingRequest;
+> 
+> The current pre-allocated structure both wastes space when there are
+> fewer than 8 requests and requires extra messages to be sent when
+> there are more than 8 requests.  I realize that in the grand scheme of
+> things copying 224 extra bytes is basically not noticeable but it just
+> irks me that we could fix this really easily before it gets propagated
+> to too many other places.
 
-Anyway, thanks a lot for looking at this and fixing it.
+Sure; I'll have a look.  I think at the moment the only
+more-than-one-entry case is the remove mapping case.
 
-Cheers,
+Dave
+
+> Chirantan
+> 
+> > --
+> > 2.29.2
+> >
+> > _______________________________________________
+> > Virtio-fs mailing list
+> > Virtio-fs@redhat.com
+> > https://www.redhat.com/mailman/listinfo/virtio-fs
+> >
+> 
 -- 
-Luis
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

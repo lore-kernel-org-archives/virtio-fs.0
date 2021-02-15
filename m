@@ -1,143 +1,105 @@
-Date: Mon, 1 Mar 2021 11:33:24 -0500
+Date: Mon, 15 Feb 2021 15:52:21 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210301163324.GC186178@redhat.com>
-References: <20210226183357.28467-1-lhenriques@suse.de>
+Message-ID: <20210215205221.GB3331@redhat.com>
+References: <87r1llk28a.fsf@suse.de>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210226183357.28467-1-lhenriques@suse.de>
-Subject: Re: [Virtio-fs] [RFC PATCH] fuse: Clear SGID bit when setting mode
-	in setacl
+In-Reply-To: <87r1llk28a.fsf@suse.de>
+Subject: Re: [Virtio-fs] Question on ACLs support in virtiofs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
-List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
+List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
-List-Archive: <https://listman.redhat.com/archives/virtio-fs>
+List-Archive: <https://www.redhat.com/archives/virtio-fs>
 List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
-List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
+List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Luis Henriques <lhenriques@suse.de>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, linux-kernel@vger.kernel.org, Miklos Szeredi <miklos@szeredi.hu>
+Cc: virtio-fs@redhat.com, Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>, Miklos Szeredi <miklos@szeredi.hu>
 
-On Fri, Feb 26, 2021 at 06:33:57PM +0000, Luis Henriques wrote:
-> Setting file permissions with POSIX ACLs (setxattr) isn't clearing the
-> setgid bit.  This seems to be CVE-2016-7097, detected by running fstest
-> generic/375 in virtiofs.  Unfortunately, when the fix for this CVE landed
-> in the kernel with commit 073931017b49 ("posix_acl: Clear SGID bit when
-> setting file permissions"), FUSE didn't had ACLs support yet.
+On Fri, Feb 12, 2021 at 10:30:13AM +0000, Luis Henriques wrote:
+> Hi!
+> 
+> I've recently executed the generic fstests on virtiofs and decided to have
+> a closer look at generic/099 failure.  In a nutshell, here's the sequence
+> of commands that reproduce that failure:
+> 
+> # umask 0
+> # mkdir acldir
+> # chacl -b "u::rwx,g::rwx,o::rwx" "u::r-x,g::r--,o::---" acldir
+> # touch acldir/file1
+> # umask 722
+> # touch acldir/file2
+> # ls -l acldir
+> total 0
+> -r--r----- 1 root root 0 Feb 12 10:04 file1
+> ----r----- 1 root root 0 Feb 12 10:05 file2
+> 
+> The failure is that setting umask to 722 shouldn't affect the new file2
+> because acldir has a default ACL (from umask(2): "... if the parent
+> directory has a default ACL (see acl(5)), the umask is ignored...").
+> 
+> So... I tried to have look at the code, and initially I thought that the
+> problem was in (kernel) function fuse_create_open(), where we have this:
+> 
+> 	if (!fm->fc->dont_mask)
+> 		mode &= ~current_umask();
+> 
+> but then I went down the rabbit hole, into the user-space code, and
+> couldn't reach a conclusion.  Maybe the issue is that there's in fact no
+> support for this POSIX ACLs in virtiofs/FUSE?  Any ideas?
 
-Hi Luis,
+Hi,
 
-Interesting. I did not know that "chmod" can lead to clearing of SGID
-as well. Recently we implemented FUSE_HANDLE_KILLPRIV_V2 flag which
-means that file server is responsible for clearing of SUID/SGID/caps
-as per following rules.
+[ CC Miklos and linux-fsdevel ]
 
-    - caps are always cleared on chown/write/truncate
-    - suid is always cleared on chown, while for truncate/write it is cleared
-      only if caller does not have CAP_FSETID.
-    - sgid is always cleared on chown, while for truncate/write it is cleared
-      only if caller does not have CAP_FSETID as well as file has group execute
-      permission.
+I debugged into this a little. There are many knobs and it is little
+confusing that what are right set of fixes. 
 
-And we don't have anything about "chmod" in this list. Well, I will test
-this and come back to this little later.
+So what's happening in this case is that fc->dont_mask is not set. That
+means fuse client is modifying mode using umask. First time you
+touch file, umask is 0, so there is no modification. But next time,
+you set umask to 722, and fuse modifies mode before sending file
+create request to server. virtiofs server is already running with
+umask 0, so it does not touch the mode.
 
-I see following comment in fuse_set_acl().
+So that means, that in case of default acl, fuse client should not
+be modifying mode using umask. But question is when should fuse
+skip applying umask.
 
-                /*
-                 * Fuse userspace is responsible for updating access
-                 * permissions in the inode, if needed. fuse_setxattr
-                 * invalidates the inode attributes, which will force
-                 * them to be refreshed the next time they are used,
-                 * and it also updates i_ctime.
-                 */
+I see that fuse always sets SB_POSIXACL. That means VFS is not
+going to apply umask and all the umask handling is with-in fuse.
 
-So looks like that original code has been written with intent that
-file server is responsible for updating inode permissions. I am
-assuming this will include clearing of S_ISGID if needed.
+sb->s_flags |= SB_POSIXACL;
 
-But question is, does file server has enough information to be able
-to handle proper clearing of S_ISGID info. IIUC, file server will need
-two pieces of information atleast.
+Currently fuse sets fc->dont_mask in two conditions.
 
-- gid of the caller.
-- Whether caller has CAP_FSETID or not.
+- If the caller mounted with flag MS_POSIXACL, then fc->dont_mask is set.
+- If fuse server opted in for option FUSE_DONT_MASK, then fc->dont_mask
+  is set. 
 
-I think we have first piece of information but not the second one. May
-be we need to send this in fuse_setxattr_in->flags. And file server
-can drop CAP_FSETID while doing setxattr().
+I see that for virtiofs, both the conditions are not true out of the
+box. In fact looks like ACL support is not fully enabled, because
+I don't see fuse server opting in for FUSE_POSIX_ACL.
 
-What about "gid" info. We don't change to caller's uid/gid while doing
-setxattr(). So host might not clear S_ISGID or clear it when it should
-not. I am wondering that can we switch to caller's uid/gid in setxattr(),
-atleast while setting acls.
+I suspect that we probably should provide an option in virtiofsd to
+enable/disable acl support.
 
-Thanks
+Setting FUSE_DONT_MASK is tricky. If we leave it to fuse, that means
+fuse will have to query acl to figure out if default acl is set or
+not on parent dir. And that data could be stale and there could be
+races w.r.t setting acls from other client.
+
+If we do set FUSE_DONT_MASK, that means in file creation path virtiofsd
+server will have to switch its umask to one provided in request. Given
+its a per process property, we will have to have some locks to make
+sure other create requests are not progressing in parallel. And that
+hope host does the right thing. That is apply umask if parent dir does
+not have default acl otherwise apply umask (as set by virtiofsd process).
+
+Miklos, does above sound reasonable. You might have more thoughts on
+how to handle this best in fuse/virtiofs.
+
 Vivek
-
-> 
-> Signed-off-by: Luis Henriques <lhenriques@suse.de>
-> ---
->  fs/fuse/acl.c | 29 ++++++++++++++++++++++++++---
->  1 file changed, 26 insertions(+), 3 deletions(-)
-> 
-> diff --git a/fs/fuse/acl.c b/fs/fuse/acl.c
-> index f529075a2ce8..1b273277c1c9 100644
-> --- a/fs/fuse/acl.c
-> +++ b/fs/fuse/acl.c
-> @@ -54,7 +54,9 @@ int fuse_set_acl(struct inode *inode, struct posix_acl *acl, int type)
->  {
->  	struct fuse_conn *fc = get_fuse_conn(inode);
->  	const char *name;
-> +	umode_t mode = inode->i_mode;
->  	int ret;
-> +	bool update_mode = false;
->  
->  	if (fuse_is_bad(inode))
->  		return -EIO;
-> @@ -62,11 +64,18 @@ int fuse_set_acl(struct inode *inode, struct posix_acl *acl, int type)
->  	if (!fc->posix_acl || fc->no_setxattr)
->  		return -EOPNOTSUPP;
->  
-> -	if (type == ACL_TYPE_ACCESS)
-> +	if (type == ACL_TYPE_ACCESS) {
->  		name = XATTR_NAME_POSIX_ACL_ACCESS;
-> -	else if (type == ACL_TYPE_DEFAULT)
-> +		if (acl) {
-> +			ret = posix_acl_update_mode(inode, &mode, &acl);
-> +			if (ret)
-> +				return ret;
-> +			if (inode->i_mode != mode)
-> +				update_mode = true;
-> +		}
-> +	} else if (type == ACL_TYPE_DEFAULT) {
->  		name = XATTR_NAME_POSIX_ACL_DEFAULT;
-> -	else
-> +	} else
->  		return -EINVAL;
->  
->  	if (acl) {
-> @@ -98,6 +107,20 @@ int fuse_set_acl(struct inode *inode, struct posix_acl *acl, int type)
->  	} else {
->  		ret = fuse_removexattr(inode, name);
->  	}
-> +	if (!ret && update_mode) {
-> +		struct dentry *entry;
-> +		struct iattr attr;
-> +
-> +		entry = d_find_alias(inode);
-> +		if (entry) {
-> +			memset(&attr, 0, sizeof(attr));
-> +			attr.ia_valid = ATTR_MODE | ATTR_CTIME;
-> +			attr.ia_mode = mode;
-> +			attr.ia_ctime = current_time(inode);
-> +			ret = fuse_do_setattr(entry, &attr, NULL);
-> +			dput(entry);
-> +		}
-> +	}
->  	forget_all_cached_acls(inode);
->  	fuse_invalidate_attr(inode);
->  
-> 
 

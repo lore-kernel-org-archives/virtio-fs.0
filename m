@@ -1,83 +1,80 @@
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=crudebyte.com; s=kylie; h=Content-Type:Content-Transfer-Encoding:
-	MIME-Version:References:In-Reply-To:Message-ID:Date:Subject:Cc:To:From:
-	Content-ID:Content-Description;
-	bh=/y6xFzyCzw1KT1sJVP9w0ePufQ9CHZv14Yo6pv/8g4s=;
-	b=lPaezqxKKhgEdyb2GpcJ7yFIjl
-	ztGSuf6Rn/WteaZ3Oj3ZwnFFAChUJWeyUEu6HxWonSS3LF0NsMJOWdTDPlC555Az9Mj7akIHAKR6x
-	6dOkznyj5KZLIwMGqrx9YaHAzP/xg/fCTm1WK2+DLoAY5owuBTzAKRXcNm+HMv9FAAxED/gW4bJL+
-	zVkhnY/jF9pRj7LExnfAPhb0dMRYRijDKBZhKABA/SiHGQEu2R2748brJ8RlSLv+wFBuqNEjSS1o8
-	czR7nVCx0qOipRdXf0VpW4fhCu4zU073NViCLWrk1bHGpq1zJVLaVARrhb4cWr+KqaLM/MXBWuPtc
-	2EvAOaM22f4fFSC6Uy60LZZXtzQ/AcqE3KfRaFk80lOaWd6fayTHA0urUjf1zo9ChDW7X5ZYsa5mZ
-	kmJ5BGieBhfq/rdVpcarA5Yj1vj5FoiDIvzCwtl13AOqjhUYcXnJlJ6qzHI4CGKndxPxtJL4uDxZ2
-	mhH4AObrOSAt9W871eHOq3ysC41NERxeecRhLYjAteTbwWWIVWpFWDMSCcqRuj9LAzCPXYdrA0MI2
-	8/yzb5pZmkMs6Mq0leUhZoAuNG8RbwQEkLiK9KIFiKkW94g7P8fc9a2hwTnI5LQY3Q9IOx9QulDCE
-	eA6+C1b+0UcNYLQb8bPHu9yPveIsDMbEQA5tU4tAQ=
-From: Christian Schoenebeck <qemu_oss@crudebyte.com>
-Date: Wed, 24 Feb 2021 16:16:52 +0100
-Message-ID: <2006960.IAZaadA1hq@silver>
-In-Reply-To: <20210223090531-mutt-send-email-mst@kernel.org>
-References: <20200918213436.GA3520@redhat.com> <6115734.fQeFoySBn5@silver>
-	<20210223090531-mutt-send-email-mst@kernel.org>
+Date: Mon, 15 Feb 2021 15:57:11 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <20210215155711.GA95852@stefanha-x1.localdomain>
+References: <20210209190224.62827-1-dgilbert@redhat.com>
+	<20210209190224.62827-24-dgilbert@redhat.com>
+	<20210211143542.GT247031@stefanha-x1.localdomain>
+	<20210211144031.GB5014@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 7Bit
-Content-Type: text/plain; charset="us-ascii"
-Subject: Re: [Virtio-fs] Can not set high msize with virtio-9p (Was: Re:
-	virtiofs vs 9p performance)
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="d6Gm4EdcadzBjdND"
+Content-Disposition: inline
+In-Reply-To: <20210211144031.GB5014@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 23/24] vhost-user-fs: Implement drop
+ CAP_FSETID functionality
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
-List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
+List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
-List-Archive: <https://listman.redhat.com/archives/virtio-fs>
+List-Archive: <https://www.redhat.com/archives/virtio-fs>
 List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
-List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
+List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Michael S. Tsirkin" <mst@redhat.com>
-Cc: "cdupontd@redhat.com" <cdupontd@redhat.com>, Dominique Martinet <asmadeus@codewreck.org>, "Venegas Munoz,
-	Jose Carlos" <jose.carlos.venegas.munoz@intel.com>, qemu-devel@nongnu.org, virtio-fs-list <virtio-fs@redhat.com>, v9fs-developer@lists.sourceforge.net, "Shinde,
-	Archana M" <archana.m.shinde@intel.com>, Vivek Goyal <vgoyal@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, mst@redhat.com, qemu-devel@nongnu.org
 
-On Dienstag, 23. Februar 2021 15:07:31 CET Michael S. Tsirkin wrote:
-> > Michael, Dominique,
-> > 
-> > we are wondering here about the message size limitation of just 5 kiB in
-> > the 9p Linux client (using virtio transport) which imposes a performance
-> > bottleneck, introduced by this kernel commit:
-> > 
-> > commit b49d8b5d7007a673796f3f99688b46931293873e
-> > Author: Aneesh Kumar K.V <aneesh.kumar@linux.vnet.ibm.com>
-> > Date:   Wed Aug 17 16:56:04 2011 +0000
-> > 
-> >     net/9p: Fix kernel crash with msize 512K
-> >     
-> >     With msize equal to 512K (PAGE_SIZE * VIRTQUEUE_NUM), we hit multiple
-> >     crashes. This patch fix those.
-> >     
-> >     Signed-off-by: Aneesh Kumar K.V <aneesh.kumar@linux.vnet.ibm.com>
-> >     Signed-off-by: Eric Van Hensbergen <ericvh@gmail.com>
-> 
-> Well the change I see is:
-> 
-> -       .maxsize = PAGE_SIZE*VIRTQUEUE_NUM,
-> +       .maxsize = PAGE_SIZE * (VIRTQUEUE_NUM - 3),
-> 
-> 
-> so how come you say it changes 512K to 5K?
-> Looks more like 500K to me.
 
-Misapprehension + typo(s) in my previous message, sorry Michael. That's 500k 
-of course (not 5k), yes.
+--d6Gm4EdcadzBjdND
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Let me rephrase that question: are you aware of something in virtio that would 
-per se mandate an absolute hard coded message size limit (e.g. from virtio 
-specs perspective or maybe some compatibility issue)?
+On Thu, Feb 11, 2021 at 09:40:31AM -0500, Vivek Goyal wrote:
+> On Thu, Feb 11, 2021 at 02:35:42PM +0000, Stefan Hajnoczi wrote:
+> > On Tue, Feb 09, 2021 at 07:02:23PM +0000, Dr. David Alan Gilbert (git) =
+wrote:
+> > > From: Vivek Goyal <vgoyal@redhat.com>
+> > >=20
+> > > As part of slave_io message, slave can ask to do I/O on an fd. Additi=
+onally
+> > > slave can ask for dropping CAP_FSETID (if master has it) before doing=
+ I/O.
+> > > Implement functionality to drop CAP_FSETID and gain it back after the
+> > > operation.
+> > >=20
+> > > This also creates a dependency on libcap-ng.
+> >=20
+> > Is this patch only for the case where QEMU is running as root?
+> >=20
+>=20
+> Yes, it primarily is for the case where qemu is running as root, or
+> somebody managed to launch it non-root but with still having capability
+> CAP_FSETID.
 
-If not, we would try getting rid of that hard coded limit of the 9p client on 
-kernel side in the first place, because the kernel's 9p client already has a 
-dynamic runtime option 'msize' and that hard coded enforced limit (500k) is a 
-performance bottleneck like I said.
+Running QEMU as root is not encouraged because the security model is
+designed around the principle of least privilege (only give QEMU access
+to resources that belong to the guest).
 
-Best regards,
-Christian Schoenebeck
+What happens in the case where QEMU is not root? Does that mean QEMU
+will drop suid/guid bits even if the FUSE client wanted them to be
+preserved?
 
+Stefan
+
+--d6Gm4EdcadzBjdND
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmAqmdcACgkQnKSrs4Gr
+c8iYPQf+ItykL4kTL3tGtciggQvbGHX/AMImfY87LtKrT9teSO+cRq7s70fnwhqj
+3EExD7CtMYVO1q0CrJgfN7ICd2melPLkD5FHc2oAm4KW1Zb4/B1KoB8A+j3SJLsO
+6zfqx5JMCVaHheEUxqoiMfsgwyH1H8rhBjQjr4/XQ3vNZJ+OsWiYFsENqi3HcH6S
+tF83XT4iXzsyXXJ4N/59bSQWtJHnWQ/9o6tD513aMwJiU5d9HxYqjp4avBXKs5zy
+mk2vRkr7gi8maknAOIfzcNggQAhsHNIfW1FPvzUbBdr5Y+MMohVNCUNX+9BLsq/O
+zV2WMshVc4YPGk9SqGPOETlKsEsQhQ==
+=GsZz
+-----END PGP SIGNATURE-----
+
+--d6Gm4EdcadzBjdND--
 

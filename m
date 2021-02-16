@@ -1,97 +1,82 @@
-Date: Tue, 16 Mar 2021 14:17:18 -0400
+Date: Tue, 16 Feb 2021 13:04:29 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210316181718.GG270529@redhat.com>
-References: <20210316170234.21736-1-lhenriques@suse.de>
+Message-ID: <20210216180429.GC3196@redhat.com>
+References: <20210210182744.27324-1-vgoyal@redhat.com>
+	<20210210182744.27324-2-vgoyal@redhat.com>
+	<YCwHDvMDDYMy+4de@work-vm>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210316170234.21736-1-lhenriques@suse.de>
-Subject: Re: [Virtio-fs] [PATCH] virtiofs: fix memory leak in
-	virtio_fs_probe()
-List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
+In-Reply-To: <YCwHDvMDDYMy+4de@work-vm>
+Subject: Re: [Virtio-fs] [PATCH 1/1] virtiofsd: Do not use a thread pool by
+ default
+List-Id: Development discussions about virtio-fs <virtio-fs.listman.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
-	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
+	<mailto:virtio-fs-request@listman.redhat.com?subject=unsubscribe>
 List-Archive: <https://listman.redhat.com/archives/virtio-fs>
-List-Post: <mailto:virtio-fs@redhat.com>
-List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
+List-Post: <mailto:virtio-fs@listman.redhat.com>
+List-Help: <mailto:virtio-fs-request@listman.redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
-	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Luis Henriques <lhenriques@suse.de>
-Cc: Miklos Szeredi <miklos@szeredi.hu>, linux-kernel@vger.kernel.org, stable@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs-list <virtio-fs@redhat.com>, linux-fsdevel@vger.kernel.org
+	<mailto:virtio-fs-request@listman.redhat.com?subject=subscribe>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Tue, Mar 16, 2021 at 05:02:34PM +0000, Luis Henriques wrote:
-> When accidentally passing twice the same tag to qemu, kmemleak ended up
-> reporting a memory leak in virtiofs.  Also, looking at the log I saw the
-> following error (that's when I realised the duplicated tag):
+On Tue, Feb 16, 2021 at 05:55:26PM +0000, Dr. David Alan Gilbert wrote:
+> * Vivek Goyal (vgoyal@redhat.com) wrote:
+> > Currently we created a thread pool (With 64 max threads per pool) for
+> > each virtqueue. We hoped that this will provide us with better scalability
+> > and performance.
+> > 
+> > But in practice, we are getting better numbers in most of the cases
+> > when we don't create a thread pool at all and a single thread per
+> > virtqueue receives the request and processes it.
+> > 
+> > Hence, I am proposing that we switch to no thread pool by default
+> > (equivalent of --thread-pool-size=0). This will provide out of
+> > box better performance to most of the users. In fact other users
+> > have confirmed that not using a thread pool gives them better
+> > numbers. So why not use this as default. It can be changed when
+> > somebody can fix the issues with thread pool performance.
+> > 
+> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 > 
->   virtiofs: probe of virtio5 failed with error -17
-> 
-> Here's the kmemleak log for reference:
-> 
-> unreferenced object 0xffff888103d47800 (size 1024):
->   comm "systemd-udevd", pid 118, jiffies 4294893780 (age 18.340s)
->   hex dump (first 32 bytes):
->     00 00 00 00 ad 4e ad de ff ff ff ff 00 00 00 00  .....N..........
->     ff ff ff ff ff ff ff ff 80 90 02 a0 ff ff ff ff  ................
->   backtrace:
->     [<000000000ebb87c1>] virtio_fs_probe+0x171/0x7ae [virtiofs]
->     [<00000000f8aca419>] virtio_dev_probe+0x15f/0x210
->     [<000000004d6baf3c>] really_probe+0xea/0x430
->     [<00000000a6ceeac8>] device_driver_attach+0xa8/0xb0
->     [<00000000196f47a7>] __driver_attach+0x98/0x140
->     [<000000000b20601d>] bus_for_each_dev+0x7b/0xc0
->     [<00000000399c7b7f>] bus_add_driver+0x11b/0x1f0
->     [<0000000032b09ba7>] driver_register+0x8f/0xe0
->     [<00000000cdd55998>] 0xffffffffa002c013
->     [<000000000ea196a2>] do_one_initcall+0x64/0x2e0
->     [<0000000008f727ce>] do_init_module+0x5c/0x260
->     [<000000003cdedab6>] __do_sys_finit_module+0xb5/0x120
->     [<00000000ad2f48c6>] do_syscall_64+0x33/0x40
->     [<00000000809526b5>] entry_SYSCALL_64_after_hwframe+0x44/0xae
-> 
-> Cc: stable@vger.kernel.org
-> Signed-off-by: Luis Henriques <lhenriques@suse.de>
+> OK, lets try it - I still worry it really means we're missing something
+> silly about them, you'd really think eventually the threads should help.
 
-Hi Luis,
+Agreed. Once we figure out what are we missing with threading and
+start getting better performance with multi-threading, we will need
+to make thread pool default again.
 
-Thanks for the report and the fix. So looks like leak is happening
-because we are not doing kfree(fs->vqs) in error path.
-
-> ---
->  fs/fuse/virtio_fs.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-> index 8868ac31a3c0..4e6ef9f24e84 100644
-> --- a/fs/fuse/virtio_fs.c
-> +++ b/fs/fuse/virtio_fs.c
-> @@ -899,7 +899,7 @@ static int virtio_fs_probe(struct virtio_device *vdev)
->  
->  out:
->  	vdev->priv = NULL;
-> -	kfree(fs);
-> +	virtio_fs_put(fs);
-
-[ CC virtio-fs list ]
-
-fs object is not fully formed. So calling virtio_fs_put() is little odd.
-I will expect it to be called if somebody takes a reference using _get()
-or in the final virtio_fs_remove() when creation reference should go
-away.
-
-How about open coding it and free fs->vqs explicitly. Something like
-as follows.
-
-@@ -896,7 +896,7 @@ static int virtio_fs_probe(struct virtio
- out_vqs:
-        vdev->config->reset(vdev);
-        virtio_fs_cleanup_vqs(vdev, fs);
--
-+       kfree(fs->vqs);
- out:
-        vdev->priv = NULL;
-        kfree(fs);
-
-Thanks
 Vivek
+> 
+> 
+> 
+> Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> 
+> > ---
+> >  tools/virtiofsd/fuse_lowlevel.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+> > index e94b71110b..fbdf62ee9b 100644
+> > --- a/tools/virtiofsd/fuse_lowlevel.c
+> > +++ b/tools/virtiofsd/fuse_lowlevel.c
+> > @@ -18,7 +18,7 @@
+> >  
+> >  #include <sys/file.h>
+> >  
+> > -#define THREAD_POOL_SIZE 64
+> > +#define THREAD_POOL_SIZE 0
+> >  
+> >  #define OFFSET_MAX 0x7fffffffffffffffLL
+> >  
+> > -- 
+> > 2.25.4
+> -- 
+> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@listman.redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
 

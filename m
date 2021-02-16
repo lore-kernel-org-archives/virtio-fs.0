@@ -1,70 +1,85 @@
-Date: Sun, 14 Mar 2021 19:36:28 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210314233628.GD223210@redhat.com>
-References: <20210312141003.819108-1-groug@kaod.org>
-	<20210312141003.819108-3-groug@kaod.org>
+Date: Tue, 16 Feb 2021 16:58:33 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YCv5uRWyJcMMLwjy@work-vm>
+References: <20210208224024.43555-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210312141003.819108-3-groug@kaod.org>
-Subject: Re: [Virtio-fs] [PATCH 2/3] virtiofsd: Convert some functions to
- return bool
-List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
+In-Reply-To: <20210208224024.43555-1-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v3 0/2] viritofsd: Add support for
+	FUSE_HANDLE_KILLPRIV_V2
+List-Id: Development discussions about virtio-fs <virtio-fs.listman.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
-	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
+	<mailto:virtio-fs-request@listman.redhat.com?subject=unsubscribe>
 List-Archive: <https://listman.redhat.com/archives/virtio-fs>
-List-Post: <mailto:virtio-fs@redhat.com>
-List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
+List-Post: <mailto:virtio-fs@listman.redhat.com>
+List-Help: <mailto:virtio-fs-request@listman.redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
-	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
+	<mailto:virtio-fs-request@listman.redhat.com?subject=subscribe>
+To: Vivek Goyal <vgoyal@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Fri, Mar 12, 2021 at 03:10:02PM +0100, Greg Kurz wrote:
-> Both currently only return 0 or 1.
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> Hi,
 > 
-> Signed-off-by: Greg Kurz <groug@kaod.org>
-
-Looks good to me.
-
-Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
-
-Vivek
-
-> ---
->  tools/virtiofsd/passthrough_ll.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+> This is V3 of the patches. V2 had been posted here.
 > 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 27a6c636dcaf..f63016d35626 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -221,17 +221,17 @@ static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
->  static int xattr_map_client(const struct lo_data *lo, const char *client_name,
->                              char **out_name);
->  
-> -static int is_dot_or_dotdot(const char *name)
-> +static bool is_dot_or_dotdot(const char *name)
->  {
->      return name[0] == '.' &&
->             (name[1] == '\0' || (name[1] == '.' && name[2] == '\0'));
->  }
->  
->  /* Is `path` a single path component that is not "." or ".."? */
-> -static int is_safe_path_component(const char *path)
-> +static bool is_safe_path_component(const char *path)
->  {
->      if (strchr(path, '/')) {
-> -        return 0;
-> +        return false;
->      }
->  
->      return !is_dot_or_dotdot(path);
+> https://listman.redhat.com/archives/virtio-fs/2020-November/msg00084.html
+> 
+> These patches add support for FUSE_HANDLE_KILLPRIV_V2. This is basically
+> a feature file server can opt-in. And with xattr enabled, this improves
+> write performance many fold. Ran following fio command while virtiofsd is
+> running with options "-o cache=auto" and "-o xattr".
+
+Queued
+
+> fio libaio random writes
+> ------------------------
+> fio --ioengine=libaio --direct=1 --gtod_reduce=1 --name=test --filename=/mnt/virtiofs/random_read_write.fio --bs=4k --iodepth=64 --size=4G --readwrite=randwrite
+> 
+> Without patches:
+>  WRITE: bw=84.6MiB/s (88.7MB/s), 84.6MiB/s-84.6MiB/s (88.7MB/s-88.7MB/s), io=4096MiB (4295MB), run=48436-48436msec
+> 
+> With patches:
+>   WRITE: bw=273MiB/s (286MB/s), 273MiB/s-273MiB/s (286MB/s-286MB/s), io=4096MiB (4295MB), run=15003-15003msec
+> 
+> So with these patches, for this particular workload, there is roughly
+> more than 200% improvement.
+> 
+> fio psync random writes
+> -----------------------
+> Even, single queue depth writes with ioengine=psync, how significant
+> improvement. Performance jumps from roughly 35MiB/s to 70MiB/s.
+> 
+> fio --ioengine=psync --name=test --filename=/mnt/virtiofs/random_read_write.fio --bs=4k --size=4G --readwrite=randwrite
+> 
+> Without patches:
+>   WRITE: bw=35.0MiB/s (36.7MB/s), 35.0MiB/s-35.0MiB/s (36.7MB/s-36.7MB/s), io=4096MiB (4295MB), run=116932-116932msec
+> 
+> With patches:
+>  WRITE: bw=69.9MiB/s (73.3MB/s), 69.9MiB/s-69.9MiB/s (73.3MB/s-73.3MB/s), io=4096MiB (4295MB), run=58596-58596msec
+> 
+> In V3 I rebased these patches to latest upstream. There were few
+> conflicts due to recent security fixes from Stefan. Resolved these
+> conflicts.
+> 
+> Thanks
+> Vivek
+> 
+> Vivek Goyal (2):
+>   virtiofsd: Save error code early at the failure callsite
+>   viriofsd: Add support for FUSE_HANDLE_KILLPRIV_V2
+> 
+>  tools/virtiofsd/fuse_common.h    | 15 ++++++
+>  tools/virtiofsd/fuse_lowlevel.c  | 11 +++-
+>  tools/virtiofsd/fuse_lowlevel.h  |  1 +
+>  tools/virtiofsd/passthrough_ll.c | 93 ++++++++++++++++++++++++++++----
+>  4 files changed, 108 insertions(+), 12 deletions(-)
+> 
 > -- 
-> 2.26.2
+> 2.25.4
 > 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
+> 
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

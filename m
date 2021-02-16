@@ -1,133 +1,62 @@
-From: Greg Kurz <groug@kaod.org>
-Date: Fri, 12 Mar 2021 15:10:03 +0100
-Message-Id: <20210312141003.819108-4-groug@kaod.org>
-In-Reply-To: <20210312141003.819108-1-groug@kaod.org>
-References: <20210312141003.819108-1-groug@kaod.org>
+Date: Tue, 16 Feb 2021 10:57:10 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210216155710.GB10195@redhat.com>
+References: <20210209190224.62827-1-dgilbert@redhat.com>
+	<20210209190224.62827-24-dgilbert@redhat.com>
+	<20210211143542.GT247031@stefanha-x1.localdomain>
+	<20210211144031.GB5014@redhat.com>
+	<20210215155711.GA95852@stefanha-x1.localdomain>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 3/3] virtiofsd: Don't allow empty filenames
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20210215155711.GA95852@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH 23/24] vhost-user-fs: Implement drop
+ CAP_FSETID functionality
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
-List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
+List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
-List-Archive: <https://listman.redhat.com/archives/virtio-fs>
+List-Archive: <https://www.redhat.com/archives/virtio-fs>
 List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
-List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
+List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: virtio-fs@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, mst@redhat.com, qemu-devel@nongnu.org
 
-POSIX.1-2017 clearly stipulates that empty filenames aren't
-allowed ([1] and [2]). Since virtiofsd is supposed to mirror
-the host file system hierarchy and the host can be assumed to
-be linux, we don't really expect clients to pass requests with
-an empty path in it. If they do so anyway, this would eventually
-cause an error when trying to create/lookup the actual inode
-on the underlying POSIX filesystem. But this could still confuse
-some code that wouldn't be ready to cope with this.
+On Mon, Feb 15, 2021 at 03:57:11PM +0000, Stefan Hajnoczi wrote:
+> On Thu, Feb 11, 2021 at 09:40:31AM -0500, Vivek Goyal wrote:
+> > On Thu, Feb 11, 2021 at 02:35:42PM +0000, Stefan Hajnoczi wrote:
+> > > On Tue, Feb 09, 2021 at 07:02:23PM +0000, Dr. David Alan Gilbert (git) wrote:
+> > > > From: Vivek Goyal <vgoyal@redhat.com>
+> > > > 
+> > > > As part of slave_io message, slave can ask to do I/O on an fd. Additionally
+> > > > slave can ask for dropping CAP_FSETID (if master has it) before doing I/O.
+> > > > Implement functionality to drop CAP_FSETID and gain it back after the
+> > > > operation.
+> > > > 
+> > > > This also creates a dependency on libcap-ng.
+> > > 
+> > > Is this patch only for the case where QEMU is running as root?
+> > > 
+> > 
+> > Yes, it primarily is for the case where qemu is running as root, or
+> > somebody managed to launch it non-root but with still having capability
+> > CAP_FSETID.
+> 
+> Running QEMU as root is not encouraged because the security model is
+> designed around the principle of least privilege (only give QEMU access
+> to resources that belong to the guest).
+> 
+> What happens in the case where QEMU is not root? Does that mean QEMU
+> will drop suid/guid bits even if the FUSE client wanted them to be
+> preserved?
 
-Filter out empty names coming from the client at the top level,
-so that the rest doesn't have to care about it. This is done
-everywhere we already call is_safe_path_component(), but
-in a separate helper since the usual error for empty path
-names is ENOENT instead of EINVAL.
+QEMU will drop CAP_FSETID only if vhost-user slave asked for it. There
+is no notion of gaining CAP_FSETID.
 
-[1] https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html#tag_03_170
-[2] https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_13
+IOW, yes, if qemu is running unpriviliged and does not have CAP_FSETID,
+then we will end up clearing setuid bit on host. Not sure how that
+problem can be fixed.
 
-Signed-off-by: Greg Kurz <groug@kaod.org>
----
- tools/virtiofsd/passthrough_ll.c | 35 ++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
-
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index f63016d35626..bff9dc2cd26d 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -237,6 +237,11 @@ static bool is_safe_path_component(const char *path)
-     return !is_dot_or_dotdot(path);
- }
- 
-+static bool is_empty(const char *name)
-+{
-+    return name[0] == '\0';
-+}
-+
- static struct lo_data *lo_data(fuse_req_t req)
- {
-     return (struct lo_data *)fuse_req_userdata(req);
-@@ -1083,6 +1088,11 @@ static void lo_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
-     fuse_log(FUSE_LOG_DEBUG, "lo_lookup(parent=%" PRIu64 ", name=%s)\n", parent,
-              name);
- 
-+    if (is_empty(name)) {
-+        fuse_reply_err(req, ENOENT);
-+        return;
-+    }
-+
-     /*
-      * Don't use is_safe_path_component(), allow "." and ".." for NFS export
-      * support.
-@@ -1174,6 +1184,11 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
-     struct fuse_entry_param e;
-     struct lo_cred old = {};
- 
-+    if (is_empty(name)) {
-+        fuse_reply_err(req, ENOENT);
-+        return;
-+    }
-+
-     if (!is_safe_path_component(name)) {
-         fuse_reply_err(req, EINVAL);
-         return;
-@@ -1246,6 +1261,11 @@ static void lo_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t parent,
-     char procname[64];
-     int saverr;
- 
-+    if (is_empty(name)) {
-+        fuse_reply_err(req, ENOENT);
-+        return;
-+    }
-+
-     if (!is_safe_path_component(name)) {
-         fuse_reply_err(req, EINVAL);
-         return;
-@@ -1323,6 +1343,11 @@ static void lo_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name)
-     struct lo_inode *inode;
-     struct lo_data *lo = lo_data(req);
- 
-+    if (is_empty(name)) {
-+        fuse_reply_err(req, ENOENT);
-+        return;
-+    }
-+
-     if (!is_safe_path_component(name)) {
-         fuse_reply_err(req, EINVAL);
-         return;
-@@ -1352,6 +1377,11 @@ static void lo_rename(fuse_req_t req, fuse_ino_t parent, const char *name,
-     struct lo_inode *newinode = NULL;
-     struct lo_data *lo = lo_data(req);
- 
-+    if (is_empty(name) || is_empty(newname)) {
-+        fuse_reply_err(req, ENOENT);
-+        return;
-+    }
-+
-     if (!is_safe_path_component(name) || !is_safe_path_component(newname)) {
-         fuse_reply_err(req, EINVAL);
-         return;
-@@ -1405,6 +1435,11 @@ static void lo_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
-     struct lo_inode *inode;
-     struct lo_data *lo = lo_data(req);
- 
-+    if (is_empty(name)) {
-+        fuse_reply_err(req, ENOENT);
-+        return;
-+    }
-+
-     if (!is_safe_path_component(name)) {
-         fuse_reply_err(req, EINVAL);
-         return;
--- 
-2.26.2
+Vivek
 

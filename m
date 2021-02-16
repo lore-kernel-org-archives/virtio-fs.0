@@ -1,11 +1,10 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue, 16 Feb 2021 18:36:10 -0500
-Message-Id: <20210216233611.33400-3-vgoyal@redhat.com>
-In-Reply-To: <20210216233611.33400-1-vgoyal@redhat.com>
-References: <20210216233611.33400-1-vgoyal@redhat.com>
+Date: Tue, 16 Feb 2021 18:36:08 -0500
+Message-Id: <20210216233611.33400-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 2/3] virtiofsd: Add umask to seccom allow list
+Subject: [Virtio-fs] [PATCH 0/3] virtiofsd: Add options to enable/disable
+	posix acl
 List-Id: Development discussions about virtio-fs <virtio-fs.listman.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@listman.redhat.com?subject=unsubscribe>
@@ -17,25 +16,28 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: miklos@szeredi.hu, vgoyal@redhat.com
 
-Next patch is going to make use of "umask" syscall. So allow it.
+Luis Henriques reported that fstest generic/099 fails with virtiofs.
+Little debugging showed that we don't enable acl support. So this
+patch series provides option to enable/disable posix acl support. By
+default it is disabled.
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- tools/virtiofsd/passthrough_seccomp.c | 1 +
- 1 file changed, 1 insertion(+)
+I have run blogbench and pjdfstests with posix acl enabled and
+things work fine. 
 
-diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
-index ea852e2e33..f0313c5ce4 100644
---- a/tools/virtiofsd/passthrough_seccomp.c
-+++ b/tools/virtiofsd/passthrough_seccomp.c
-@@ -114,6 +114,7 @@ static const int syscall_whitelist[] = {
-     SCMP_SYS(utimensat),
-     SCMP_SYS(write),
-     SCMP_SYS(writev),
-+    SCMP_SYS(umask),
- };
- 
- /* Syscalls used when --syslog is enabled */
+Luis, can you please apply these patches, and run virtiofsd with
+"-o posix_acl" and see if it fixes the failure you are seeing. I
+ran the steps you provided manually and it fixes the issue for
+me.
+
+Vivek Goyal (3):
+  virtiofsd: Add an option to enable/disable posix acls
+  virtiofsd: Add umask to seccom allow list
+  virtiofsd: Change umask if posix acls are enabled
+
+ tools/virtiofsd/passthrough_ll.c      | 45 +++++++++++++++++++++++----
+ tools/virtiofsd/passthrough_seccomp.c |  1 +
+ 2 files changed, 40 insertions(+), 6 deletions(-)
+
 -- 
 2.25.4
 

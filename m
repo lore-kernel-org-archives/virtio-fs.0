@@ -1,10 +1,14 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue, 16 Feb 2021 18:36:08 -0500
-Message-Id: <20210216233611.33400-1-vgoyal@redhat.com>
+Resent-Message-Id: <202102162346.11GNk2Hi029547@lists01.pubmisc.prod.ext.phx2.redhat.com>
+In-Reply-To: <20210216233611.33400-1-vgoyal@redhat.com>
+Message-ID: <161351914495.372.17420007914971008741@c667a6b167f6>
 MIME-Version: 1.0
+From: no-reply@patchew.org
+Date: Tue, 16 Feb 2021 15:45:46 -0800 (PST)
+Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 0/3] virtiofsd: Add options to enable/disable
-	posix acl
+Subject: Re: [Virtio-fs] [PATCH 0/3] virtiofsd: Add options to
+	enable/disable posix acl
+Reply-To: qemu-devel@nongnu.org
 List-Id: Development discussions about virtio-fs <virtio-fs.listman.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@listman.redhat.com?subject=unsubscribe>
@@ -13,31 +17,77 @@ List-Post: <mailto:virtio-fs@listman.redhat.com>
 List-Help: <mailto:virtio-fs-request@listman.redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@listman.redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com
-Cc: miklos@szeredi.hu, vgoyal@redhat.com
+To: vgoyal@redhat.com
+Cc: miklos@szeredi.hu, qemu-devel@nongnu.org, virtio-fs@redhat.com
 
-Luis Henriques reported that fstest generic/099 fails with virtiofs.
-Little debugging showed that we don't enable acl support. So this
-patch series provides option to enable/disable posix acl support. By
-default it is disabled.
+Patchew URL: https://patchew.org/QEMU/20210216233611.33400-1-vgoyal@redhat.com/
 
-I have run blogbench and pjdfstests with posix acl enabled and
-things work fine. 
 
-Luis, can you please apply these patches, and run virtiofsd with
-"-o posix_acl" and see if it fixes the failure you are seeing. I
-ran the steps you provided manually and it fixes the issue for
-me.
 
-Vivek Goyal (3):
-  virtiofsd: Add an option to enable/disable posix acls
-  virtiofsd: Add umask to seccom allow list
-  virtiofsd: Change umask if posix acls are enabled
+Hi,
 
- tools/virtiofsd/passthrough_ll.c      | 45 +++++++++++++++++++++++----
- tools/virtiofsd/passthrough_seccomp.c |  1 +
- 2 files changed, 40 insertions(+), 6 deletions(-)
+This series seems to have some coding style problems. See output below for
+more information:
 
--- 
-2.25.4
+Type: series
+Message-id: 20210216233611.33400-1-vgoyal@redhat.com
+Subject: [PATCH 0/3] virtiofsd: Add options to enable/disable posix acl
+
+=== TEST SCRIPT BEGIN ===
+#!/bin/bash
+git rev-parse base > /dev/null || exit 0
+git config --local diff.renamelimit 0
+git config --local diff.renames True
+git config --local diff.algorithm histogram
+./scripts/checkpatch.pl --mailback base..
+=== TEST SCRIPT END ===
+
+Updating 3c8cf5a9c21ff8782164d1def7f44bd888713384
+>From https://github.com/patchew-project/qemu
+ * [new tag]         patchew/20210216233611.33400-1-vgoyal@redhat.com -> patchew/20210216233611.33400-1-vgoyal@redhat.com
+Switched to a new branch 'test'
+599c357 virtiofsd: Change umask if posix acls are enabled
+599cc19 virtiofsd: Add umask to seccom allow list
+72ea185 virtiofsd: Add an option to enable/disable posix acls
+
+=== OUTPUT BEGIN ===
+1/3 Checking commit 72ea185ac754 (virtiofsd: Add an option to enable/disable posix acls)
+WARNING: Block comments should align the * on each line
+#56: FILE: tools/virtiofsd/passthrough_ll.c:648:
++         * Either user specified to disable posix_acl, or did not specify
++          * anything. In both the cases do not enable posix acl.
+
+WARNING: Block comments should align the * on each line
+#57: FILE: tools/virtiofsd/passthrough_ll.c:649:
++          * anything. In both the cases do not enable posix acl.
++         */
+
+total: 0 errors, 2 warnings, 45 lines checked
+
+Patch 1/3 has style problems, please review.  If any of these errors
+are false positives report them to the maintainer, see
+CHECKPATCH in MAINTAINERS.
+2/3 Checking commit 599cc19faf56 (virtiofsd: Add umask to seccom allow list)
+3/3 Checking commit 599c3575ec83 (virtiofsd: Change umask if posix acls are enabled)
+ERROR: braces {} are necessary for all arms of this statement
+#95: FILE: tools/virtiofsd/passthrough_ll.c:1072:
++    if (change_umask)
+[...]
+
+total: 1 errors, 0 warnings, 96 lines checked
+
+Patch 3/3 has style problems, please review.  If any of these errors
+are false positives report them to the maintainer, see
+CHECKPATCH in MAINTAINERS.
+
+=== OUTPUT END ===
+
+Test command exited with code: 1
+
+
+The full log is available at
+http://patchew.org/logs/20210216233611.33400-1-vgoyal@redhat.com/testing.checkpatch/?type=message.
+---
+Email generated automatically by Patchew [https://patchew.org/].
+Please send your feedback to patchew-devel@redhat.com
 

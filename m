@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue, 16 Feb 2021 18:36:11 -0500
-Message-Id: <20210216233611.33400-4-vgoyal@redhat.com>
+Date: Tue, 16 Feb 2021 18:36:09 -0500
+Message-Id: <20210216233611.33400-2-vgoyal@redhat.com>
 In-Reply-To: <20210216233611.33400-1-vgoyal@redhat.com>
 References: <20210216233611.33400-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 3/3] virtiofsd: Change umask if posix acls are
-	enabled
+Subject: [Virtio-fs] [PATCH 1/3] virtiofsd: Add an option to enable/disable
+	posix acls
 List-Id: Development discussions about virtio-fs <virtio-fs.listman.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@listman.redhat.com?subject=unsubscribe>
@@ -18,151 +18,70 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: miklos@szeredi.hu, vgoyal@redhat.com
 
-When parent directory has default acl and a file is created in that
-directory, then umask is ignored and final file permissions are
-determined using default acl instead. (man 2 umask).
+fuse has an option FUSE_POSIX_ACL which needs to be opted in by fuse
+server to enable posix acls.
 
-Currently, fuse applies the umask and sends modified mode in create
-request accordingly. fuse server can set FUSE_DONT_MASK and tell
-fuse client to not apply umask and fuse server will take care of
-it as needed.
+Add virtiofsd option "-o posix_acl/no_posix_acl" to let users enable/disable
+posix acl support. By default it is disabled as of now.
 
-With posix acls enabled, requirement will be that we want umask
-to determine final file mode if parent directory does not have
-default acl.
-
-So if posix acls are enabled, opt in for FUSE_DONT_MASK. virtiofsd
-will set umask of the thread doing file creation. And host kernel
-should use that umask if parent directory does not have default
-acls, otherwise umask does not take affect.
-
-Miklos mentioned that we already call unshare(CLONE_FS) for
-every thread. That means umask has now become property of per
-thread and it should be ok to manipulate it in file creation path.
-
-So this patch opts in for FUSE_DONT_MASK if posix acls are enabled
-and changes umask to caller umask before file creation and restores
-original umask after file creation is done.
-
-This should fix fstest generic/099.
-
-Reported-by: Luis Henriques <lhenriques@suse.de>
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 26 +++++++++++++++++++-------
- 1 file changed, 19 insertions(+), 7 deletions(-)
+ tools/virtiofsd/passthrough_ll.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 34b2848e61..84691571d2 100644
+index 147b59338a..34b2848e61 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -120,6 +120,7 @@ struct lo_inode {
- struct lo_cred {
-     uid_t euid;
-     gid_t egid;
-+    mode_t umask;
- };
+@@ -168,6 +168,7 @@ struct lo_data {
  
- enum {
-@@ -169,6 +170,8 @@ struct lo_data {
      /* An O_PATH file descriptor to /proc/self/fd/ */
      int proc_self_fd;
-     int user_posix_acl;
-+    /* If set, virtiofsd is responsible for setting umask during creation */
-+    bool change_umask;
++    int user_posix_acl;
  };
  
  static const struct fuse_opt lo_opts[] = {
-@@ -641,7 +644,8 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
-          * in fuse_lowlevel.c
-          */
-         fuse_log(FUSE_LOG_DEBUG, "lo_init: enabling posix acl\n");
--        conn->want |= FUSE_CAP_POSIX_ACL;
-+        conn->want |= FUSE_CAP_POSIX_ACL | FUSE_CAP_DONT_MASK;
-+        lo->change_umask = true;
-     } else {
-         /*
-          * Either user specified to disable posix_acl, or did not specify
-@@ -649,6 +653,7 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
-          */
-         fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling posix_acl\n");
-         conn->want &= ~FUSE_CAP_POSIX_ACL;
-+        lo->change_umask = false;
-     }
- }
- 
-@@ -1043,7 +1048,8 @@ static void lo_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
-  * ownership of caller.
-  * TODO: What about selinux context?
-  */
--static int lo_change_cred(fuse_req_t req, struct lo_cred *old)
-+static int lo_change_cred(fuse_req_t req, struct lo_cred *old,
-+                          bool change_umask)
- {
-     int res;
- 
-@@ -1063,11 +1069,14 @@ static int lo_change_cred(fuse_req_t req, struct lo_cred *old)
-         return errno_save;
-     }
- 
-+    if (change_umask)
-+        old->umask = umask(req->ctx.umask);
-+
-     return 0;
- }
- 
- /* Regain Privileges */
--static void lo_restore_cred(struct lo_cred *old)
-+static void lo_restore_cred(struct lo_cred *old, bool restore_umask)
- {
-     int res;
- 
-@@ -1082,6 +1091,9 @@ static void lo_restore_cred(struct lo_cred *old)
-         fuse_log(FUSE_LOG_ERR, "setegid(%u): %m\n", old->egid);
-         exit(1);
+@@ -198,6 +199,8 @@ static const struct fuse_opt lo_opts[] = {
+     { "allow_direct_io", offsetof(struct lo_data, allow_direct_io), 1 },
+     { "no_allow_direct_io", offsetof(struct lo_data, allow_direct_io), 0 },
+     { "announce_submounts", offsetof(struct lo_data, announce_submounts), 1 },
++    { "posix_acl", offsetof(struct lo_data, user_posix_acl), 1 },
++    { "no_posix_acl", offsetof(struct lo_data, user_posix_acl), 0 },
+     FUSE_OPT_END
+ };
+ static bool use_syslog = false;
+@@ -630,6 +633,23 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
+                  "does not support it\n");
+         lo->announce_submounts = false;
      }
 +
-+    if (restore_umask)
-+        umask(old->umask);
++    if (lo->user_posix_acl == 1) {
++        /*
++         * User explicitly asked for this option. Enable it unconditionally.
++         * If connection does not have this capability, it should fail
++         * in fuse_lowlevel.c
++         */
++        fuse_log(FUSE_LOG_DEBUG, "lo_init: enabling posix acl\n");
++        conn->want |= FUSE_CAP_POSIX_ACL;
++    } else {
++        /*
++         * Either user specified to disable posix_acl, or did not specify
++          * anything. In both the cases do not enable posix acl.
++         */
++        fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling posix_acl\n");
++        conn->want &= ~FUSE_CAP_POSIX_ACL;
++    }
  }
  
- static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
-@@ -1106,7 +1118,7 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
-         return;
-     }
- 
--    saverr = lo_change_cred(req, &old);
-+    saverr = lo_change_cred(req, &old, lo->change_umask && !S_ISLNK(mode));
-     if (saverr) {
-         goto out;
-     }
-@@ -1115,7 +1127,7 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
- 
-     saverr = errno;
- 
--    lo_restore_cred(&old);
-+    lo_restore_cred(&old, lo->change_umask && !S_ISLNK(mode));
- 
-     if (res == -1) {
-         goto out;
-@@ -1780,7 +1792,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
-         return;
-     }
- 
--    err = lo_change_cred(req, &old);
-+    err = lo_change_cred(req, &old, lo->change_umask);
-     if (err) {
-         goto out;
-     }
-@@ -1791,7 +1803,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
-     fd = openat(parent_inode->fd, name, fi->flags | O_CREAT | O_EXCL, mode);
-     err = fd == -1 ? errno : 0;
- 
--    lo_restore_cred(&old);
-+    lo_restore_cred(&old, lo->change_umask);
- 
-     /* Ignore the error if file exists and O_EXCL was not given */
-     if (err && (err != EEXIST || (fi->flags & O_EXCL))) {
+ static void lo_getattr(fuse_req_t req, fuse_ino_t ino,
+@@ -3533,6 +3553,7 @@ int main(int argc, char *argv[])
+         .posix_lock = 0,
+         .allow_direct_io = 0,
+         .proc_self_fd = -1,
++        .user_posix_acl = -1,
+     };
+     struct lo_map_elem *root_elem;
+     struct lo_map_elem *reserve_elem;
 -- 
 2.25.4
 

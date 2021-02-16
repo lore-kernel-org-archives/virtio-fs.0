@@ -1,223 +1,186 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Thu,  4 Mar 2021 10:24:45 +0000
-Message-Id: <20210304102445.22475-1-dgilbert@redhat.com>
+Date: Tue, 16 Feb 2021 11:24:34 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YCurchq2xzD+QyaO@work-vm>
+References: <20210203182434.93870-1-groug@kaod.org>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH] virtiofs: drop remapped security.capability
-	xattr as needed
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20210203182434.93870-1-groug@kaod.org>
+Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: vu_dispatch locking should
+	never fail
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
-List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
+List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
-List-Archive: <https://listman.redhat.com/archives/virtio-fs>
+List-Archive: <https://www.redhat.com/archives/virtio-fs>
 List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
-List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
+List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com
-Cc: virtio-fs@redhat.com
+To: Greg Kurz <groug@kaod.org>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+* Greg Kurz (groug@kaod.org) wrote:
+> pthread_rwlock_rdlock() and pthread_rwlock_wrlock() can fail if a
+> deadlock condition is detected or the current thread already owns
+> the lock. They can also fail, like pthread_rwlock_unlock(), if the
+> mutex wasn't properly initialized. None of these are ever expected
+> to happen with fv_VuDev::vu_dispatch_rwlock.
+> 
+> Some users already check the return value and assert, some others
+> don't. Introduce rdlock/wrlock/unlock wrappers that just do the
+> former and use them everywhere for improved consistency and
+> robustness.
+> 
+> This is just cleanup. It doesn't fix any actual issue.
+> 
+> Signed-off-by: Greg Kurz <groug@kaod.org>
 
-On Linux, the 'security.capability' xattr holds a set of
-capabilities that can change when an executable is run, giving
-a limited form of privilege escalation to those programs that
-the writer of the file deemed worthy.
+Queued
 
-Any write causes the 'security.capability' xattr to be dropped,
-stopping anyone from gaining privilege by modifying a blessed
-file.
-
-Fuse relies on the daemon to do this dropping, and in turn the
-daemon relies on the host kernel to drop the xattr for it.  However,
-with the addition of -o xattrmap, the xattr that the guest
-stores its capabilities in is now not the same as the one that
-the host kernel automatically clears.
-
-Where the mapping changes 'security.capability', explicitly clear
-the remapped name to preserve the same behaviour.
-
-This bug is assigned CVE-2021-20263.
-
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
----
- docs/tools/virtiofsd.rst         |  4 ++
- tools/virtiofsd/passthrough_ll.c | 77 +++++++++++++++++++++++++++++++-
- 2 files changed, 80 insertions(+), 1 deletion(-)
-
-diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-index 866b7db3ee..00554c75bd 100644
---- a/docs/tools/virtiofsd.rst
-+++ b/docs/tools/virtiofsd.rst
-@@ -228,6 +228,10 @@ The 'map' type adds a number of separate rules to add **prepend** as a prefix
- to the matched **key** (or all attributes if **key** is empty).
- There may be at most one 'map' rule and it must be the last rule in the set.
- 
-+Note: When the 'security.capability' xattr is remapped, the daemon has to do
-+extra work to remove it during many operations, which the host kernel normally
-+does itself.
-+
- xattr-mapping Examples
- ----------------------
- 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 58d24c0010..fc7e1b1e8e 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -148,6 +148,7 @@ struct lo_data {
-     int posix_lock;
-     int xattr;
-     char *xattrmap;
-+    char *xattr_security_capability;
-     char *source;
-     char *modcaps;
-     double timeout;
-@@ -217,6 +218,8 @@ static __thread bool cap_loaded = 0;
- 
- static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
-                                 uint64_t mnt_id);
-+static int xattr_map_client(const struct lo_data *lo, const char *client_name,
-+                            char **out_name);
- 
- static int is_dot_or_dotdot(const char *name)
- {
-@@ -356,6 +359,37 @@ out:
-     return ret;
- }
- 
-+/*
-+ * The host kernel normally drops security.capability xattr's on
-+ * any write, however if we're remapping xattr names we need to drop
-+ * whatever the clients security.capability is actually stored as.
-+ */
-+static int drop_security_capability(const struct lo_data *lo, int fd)
-+{
-+    if (!lo->xattr_security_capability) {
-+        /* We didn't remap the name, let the host kernel do it */
-+        return 0;
-+    }
-+    if (!fremovexattr(fd, lo->xattr_security_capability)) {
-+        /* All good */
-+        return 0;
-+    }
-+
-+    switch (errno) {
-+    case ENODATA:
-+        /* Attribute didn't exist, that's fine */
-+        return 0;
-+
-+    case ENOTSUP:
-+        /* FS didn't support attribute anyway, also fine */
-+        return 0;
-+
-+    default:
-+        /* Hmm other error */
-+        return errno;
-+    }
-+}
-+
- static void lo_map_init(struct lo_map *map)
- {
-     map->elems = NULL;
-@@ -737,6 +771,11 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
-         uid_t uid = (valid & FUSE_SET_ATTR_UID) ? attr->st_uid : (uid_t)-1;
-         gid_t gid = (valid & FUSE_SET_ATTR_GID) ? attr->st_gid : (gid_t)-1;
- 
-+        saverr = drop_security_capability(lo, ifd);
-+        if (saverr) {
-+            goto out_err;
-+        }
-+
-         res = fchownat(ifd, "", uid, gid, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
-         if (res == -1) {
-             saverr = errno;
-@@ -759,6 +798,14 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
-             }
-         }
- 
-+        saverr = drop_security_capability(lo, truncfd);
-+        if (saverr) {
-+            if (!fi) {
-+                close(truncfd);
-+            }
-+            goto out_err;
-+        }
-+
-         if (kill_suidgid) {
-             res = drop_effective_cap("FSETID", &cap_fsetid_dropped);
-             if (res != 0) {
-@@ -1784,6 +1831,13 @@ static int lo_do_open(struct lo_data *lo, struct lo_inode *inode,
-         if (fd < 0) {
-             return -fd;
-         }
-+        if (fi->flags & (O_TRUNC)) {
-+            int err = drop_security_capability(lo, fd);
-+            if (err) {
-+                close(fd);
-+                return err;
-+            }
-+        }
-     }
- 
-     pthread_mutex_lock(&lo->mutex);
-@@ -2191,6 +2245,12 @@ static void lo_write_buf(fuse_req_t req, fuse_ino_t ino,
-              "lo_write_buf(ino=%" PRIu64 ", size=%zd, off=%lu kill_priv=%d)\n",
-              ino, out_buf.buf[0].size, (unsigned long)off, fi->kill_priv);
- 
-+    res = drop_security_capability(lo_data(req), out_buf.buf[0].fd);
-+    if (res) {
-+        fuse_reply_err(req, res);
-+        return;
-+    }
-+
-     /*
-      * If kill_priv is set, drop CAP_FSETID which should lead to kernel
-      * clearing setuid/setgid on file. Note, for WRITE, we need to do
-@@ -2432,6 +2492,7 @@ static void parse_xattrmap(struct lo_data *lo)
- {
-     const char *map = lo->xattrmap;
-     const char *tmp;
-+    int ret;
- 
-     lo->xattr_map_nentries = 0;
-     while (*map) {
-@@ -2462,7 +2523,7 @@ static void parse_xattrmap(struct lo_data *lo)
-              * the last entry.
-              */
-             parse_xattrmap_map(lo, map, sep);
--            return;
-+            break;
-         } else {
-             fuse_log(FUSE_LOG_ERR,
-                      "%s: Unexpected type;"
-@@ -2531,6 +2592,19 @@ static void parse_xattrmap(struct lo_data *lo)
-         fuse_log(FUSE_LOG_ERR, "Empty xattr map\n");
-         exit(1);
-     }
-+
-+    ret = xattr_map_client(lo, "security.capability",
-+                           &lo->xattr_security_capability);
-+    if (ret) {
-+        fuse_log(FUSE_LOG_ERR, "Failed to map security.capability: %s\n",
-+                strerror(ret));
-+        exit(1);
-+    }
-+    if (!strcmp(lo->xattr_security_capability, "security.capability")) {
-+        /* 1-1 mapping, don't need to do anything */
-+        free(lo->xattr_security_capability);
-+        lo->xattr_security_capability = NULL;
-+    }
- }
- 
- /*
-@@ -3588,6 +3662,7 @@ static void fuse_lo_data_cleanup(struct lo_data *lo)
- 
-     free(lo->xattrmap);
-     free_xattrmap(lo);
-+    free(lo->xattr_security_capability);
-     free(lo->source);
- }
- 
+> ---
+> 
+> v2: - open-code helpers instead of defining them with a macro (Vivek, Stefan)
+>     - fixed rd/wr typo in fv_queue_thread() (Stefan)
+>     - make it clear in the changelog this is just cleanup (Stefan)
+> 
+>  tools/virtiofsd/fuse_virtio.c | 49 +++++++++++++++++++++++++----------
+>  1 file changed, 35 insertions(+), 14 deletions(-)
+> 
+> diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+> index ddcefee4272f..523ee64fb7ae 100644
+> --- a/tools/virtiofsd/fuse_virtio.c
+> +++ b/tools/virtiofsd/fuse_virtio.c
+> @@ -187,6 +187,31 @@ static void copy_iov(struct iovec *src_iov, int src_count,
+>      }
+>  }
+>  
+> +/*
+> + * pthread_rwlock_rdlock() and pthread_rwlock_wrlock can fail if
+> + * a deadlock condition is detected or the current thread already
+> + * owns the lock. They can also fail, like pthread_rwlock_unlock(),
+> + * if the mutex wasn't properly initialized. None of these are ever
+> + * expected to happen.
+> + */
+> +static void vu_dispatch_rdlock(struct fv_VuDev *vud)
+> +{
+> +    int ret = pthread_rwlock_rdlock(&vud->vu_dispatch_rwlock);
+> +    assert(ret == 0);
+> +}
+> +
+> +static void vu_dispatch_wrlock(struct fv_VuDev *vud)
+> +{
+> +    int ret = pthread_rwlock_wrlock(&vud->vu_dispatch_rwlock);
+> +    assert(ret == 0);
+> +}
+> +
+> +static void vu_dispatch_unlock(struct fv_VuDev *vud)
+> +{
+> +    int ret = pthread_rwlock_unlock(&vud->vu_dispatch_rwlock);
+> +    assert(ret == 0);
+> +}
+> +
+>  /*
+>   * Called back by ll whenever it wants to send a reply/message back
+>   * The 1st element of the iov starts with the fuse_out_header
+> @@ -240,12 +265,12 @@ int virtio_send_msg(struct fuse_session *se, struct fuse_chan *ch,
+>  
+>      copy_iov(iov, count, in_sg, in_num, tosend_len);
+>  
+> -    pthread_rwlock_rdlock(&qi->virtio_dev->vu_dispatch_rwlock);
+> +    vu_dispatch_rdlock(qi->virtio_dev);
+>      pthread_mutex_lock(&qi->vq_lock);
+>      vu_queue_push(dev, q, elem, tosend_len);
+>      vu_queue_notify(dev, q);
+>      pthread_mutex_unlock(&qi->vq_lock);
+> -    pthread_rwlock_unlock(&qi->virtio_dev->vu_dispatch_rwlock);
+> +    vu_dispatch_unlock(qi->virtio_dev);
+>  
+>      req->reply_sent = true;
+>  
+> @@ -403,12 +428,12 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+>  
+>      ret = 0;
+>  
+> -    pthread_rwlock_rdlock(&qi->virtio_dev->vu_dispatch_rwlock);
+> +    vu_dispatch_rdlock(qi->virtio_dev);
+>      pthread_mutex_lock(&qi->vq_lock);
+>      vu_queue_push(dev, q, elem, tosend_len);
+>      vu_queue_notify(dev, q);
+>      pthread_mutex_unlock(&qi->vq_lock);
+> -    pthread_rwlock_unlock(&qi->virtio_dev->vu_dispatch_rwlock);
+> +    vu_dispatch_unlock(qi->virtio_dev);
+>  
+>  err:
+>      if (ret == 0) {
+> @@ -558,12 +583,12 @@ out:
+>          fuse_log(FUSE_LOG_DEBUG, "%s: elem %d no reply sent\n", __func__,
+>                   elem->index);
+>  
+> -        pthread_rwlock_rdlock(&qi->virtio_dev->vu_dispatch_rwlock);
+> +        vu_dispatch_rdlock(qi->virtio_dev);
+>          pthread_mutex_lock(&qi->vq_lock);
+>          vu_queue_push(dev, q, elem, 0);
+>          vu_queue_notify(dev, q);
+>          pthread_mutex_unlock(&qi->vq_lock);
+> -        pthread_rwlock_unlock(&qi->virtio_dev->vu_dispatch_rwlock);
+> +        vu_dispatch_unlock(qi->virtio_dev);
+>      }
+>  
+>      pthread_mutex_destroy(&req->ch.lock);
+> @@ -596,7 +621,6 @@ static void *fv_queue_thread(void *opaque)
+>               qi->qidx, qi->kick_fd);
+>      while (1) {
+>          struct pollfd pf[2];
+> -        int ret;
+>  
+>          pf[0].fd = qi->kick_fd;
+>          pf[0].events = POLLIN;
+> @@ -645,8 +669,7 @@ static void *fv_queue_thread(void *opaque)
+>              break;
+>          }
+>          /* Mutual exclusion with virtio_loop() */
+> -        ret = pthread_rwlock_rdlock(&qi->virtio_dev->vu_dispatch_rwlock);
+> -        assert(ret == 0); /* there is no possible error case */
+> +        vu_dispatch_rdlock(qi->virtio_dev);
+>          pthread_mutex_lock(&qi->vq_lock);
+>          /* out is from guest, in is too guest */
+>          unsigned int in_bytes, out_bytes;
+> @@ -672,7 +695,7 @@ static void *fv_queue_thread(void *opaque)
+>          }
+>  
+>          pthread_mutex_unlock(&qi->vq_lock);
+> -        pthread_rwlock_unlock(&qi->virtio_dev->vu_dispatch_rwlock);
+> +        vu_dispatch_unlock(qi->virtio_dev);
+>  
+>          /* Process all the requests. */
+>          if (!se->thread_pool_size && req_list != NULL) {
+> @@ -799,7 +822,6 @@ int virtio_loop(struct fuse_session *se)
+>      while (!fuse_session_exited(se)) {
+>          struct pollfd pf[1];
+>          bool ok;
+> -        int ret;
+>          pf[0].fd = se->vu_socketfd;
+>          pf[0].events = POLLIN;
+>          pf[0].revents = 0;
+> @@ -825,12 +847,11 @@ int virtio_loop(struct fuse_session *se)
+>          assert(pf[0].revents & POLLIN);
+>          fuse_log(FUSE_LOG_DEBUG, "%s: Got VU event\n", __func__);
+>          /* Mutual exclusion with fv_queue_thread() */
+> -        ret = pthread_rwlock_wrlock(&se->virtio_dev->vu_dispatch_rwlock);
+> -        assert(ret == 0); /* there is no possible error case */
+> +        vu_dispatch_wrlock(se->virtio_dev);
+>  
+>          ok = vu_dispatch(&se->virtio_dev->dev);
+>  
+> -        pthread_rwlock_unlock(&se->virtio_dev->vu_dispatch_rwlock);
+> +        vu_dispatch_unlock(se->virtio_dev);
+>  
+>          if (!ok) {
+>              fuse_log(FUSE_LOG_ERR, "%s: vu_dispatch failed\n", __func__);
+> -- 
+> 2.26.2
+> 
+> 
 -- 
-2.29.2
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

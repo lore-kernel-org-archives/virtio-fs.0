@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Tue, 16 Feb 2021 18:37:31 +0000
-Message-Id: <20210216183734.57810-4-dgilbert@redhat.com>
+Date: Tue, 16 Feb 2021 18:37:32 +0000
+Message-Id: <20210216183734.57810-5-dgilbert@redhat.com>
 In-Reply-To: <20210216183734.57810-1-dgilbert@redhat.com>
 References: <20210216183734.57810-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 3/6] tools/virtiofsd: Replace the word 'whitelist'
+Subject: [Virtio-fs] [PULL 4/6] virtiofsd: Save error code early at the
+	failure callsite
 List-Id: Development discussions about virtio-fs <virtio-fs.listman.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@listman.redhat.com?subject=unsubscribe>
@@ -18,90 +18,87 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, wainersm@redhat.com, groug@kaod.org, philmd@redhat.com, vgoyal@redhat.com
 Cc: virtio-fs@redhat.com
 
-From: Philippe Mathieu-Daudé <philmd@redhat.com>
+From: Vivek Goyal <vgoyal@redhat.com>
 
-Follow the inclusive terminology from the "Conscious Language in your
-Open Source Projects" guidelines [*] and replace the words "whitelist"
-appropriately.
+Change error code handling slightly in lo_setattr(). Right now we seem
+to jump to out_err and assume that "errno" is valid and use that to
+send reply.
 
-[*] https://github.com/conscious-lang/conscious-lang-docs/blob/main/faq.md
+But if caller has to do some other operations before jumping to out_err,
+then it does the dance of first saving errno to saverr and the restore
+errno before jumping to out_err. This makes it more confusing.
 
+I am about to make more changes where caller will have to do some
+work after error before jumping to out_err. I found it easier to
+change the convention a bit. That is caller saves error in "saverr"
+before jumping to out_err. And out_err uses "saverr" to send error
+back and does not rely on "errno" having actual error.
+
+v3: Resolved conflicts in lo_setattr() due to lo_inode_open() changes.
+
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Reviewed-by: Daniel P. Berrangé <berrange@redhat.com>
-Signed-off-by: Philippe Mathieu-Daudé <philmd@redhat.com>
-Message-Id: <20210205171817.2108907-3-philmd@redhat.com>
+Message-Id: <20210208224024.43555-2-vgoyal@redhat.com>
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c      |  6 +++---
- tools/virtiofsd/passthrough_seccomp.c | 12 ++++++------
- 2 files changed, 9 insertions(+), 9 deletions(-)
+ tools/virtiofsd/passthrough_ll.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 147b59338a..5f3afe8557 100644
+index 5f3afe8557..216c0bc026 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -3204,7 +3204,7 @@ static void setup_mounts(const char *source)
+@@ -698,6 +698,7 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
+             res = fchmodat(lo->proc_self_fd, procname, attr->st_mode, 0);
+         }
+         if (res == -1) {
++            saverr = errno;
+             goto out_err;
+         }
+     }
+@@ -707,6 +708,7 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
+ 
+         res = fchownat(ifd, "", uid, gid, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
+         if (res == -1) {
++            saverr = errno;
+             goto out_err;
+         }
+     }
+@@ -718,16 +720,15 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
+         } else {
+             truncfd = lo_inode_open(lo, inode, O_RDWR);
+             if (truncfd < 0) {
+-                errno = -truncfd;
++                saverr = -truncfd;
+                 goto out_err;
+             }
+         }
+ 
+         res = ftruncate(truncfd, attr->st_size);
++        saverr = res == -1 ? errno : 0;
+         if (!fi) {
+-            saverr = errno;
+             close(truncfd);
+-            errno = saverr;
+         }
+         if (res == -1) {
+             goto out_err;
+@@ -760,6 +761,7 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
+             res = utimensat(lo->proc_self_fd, procname, tv, 0);
+         }
+         if (res == -1) {
++            saverr = errno;
+             goto out_err;
+         }
+     }
+@@ -768,7 +770,6 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
+     return lo_getattr(req, ino, fi);
+ 
+ out_err:
+-    saverr = errno;
+     lo_inode_put(lo, &inode);
+     fuse_reply_err(req, saverr);
  }
- 
- /*
-- * Only keep whitelisted capabilities that are needed for file system operation
-+ * Only keep capabilities in allowlist that are needed for file system operation
-  * The (possibly NULL) modcaps_in string passed in is free'd before exit.
-  */
- static void setup_capabilities(char *modcaps_in)
-@@ -3214,8 +3214,8 @@ static void setup_capabilities(char *modcaps_in)
-     capng_restore_state(&cap.saved);
- 
-     /*
--     * Whitelist file system-related capabilities that are needed for a file
--     * server to act like root.  Drop everything else like networking and
-+     * Add to allowlist file system-related capabilities that are needed for a
-+     * file server to act like root.  Drop everything else like networking and
-      * sysadmin capabilities.
-      *
-      * Exclusions:
-diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
-index ea852e2e33..62441cfcdb 100644
---- a/tools/virtiofsd/passthrough_seccomp.c
-+++ b/tools/virtiofsd/passthrough_seccomp.c
-@@ -21,7 +21,7 @@
- #endif
- #endif
- 
--static const int syscall_whitelist[] = {
-+static const int syscall_allowlist[] = {
-     /* TODO ireg sem*() syscalls */
-     SCMP_SYS(brk),
-     SCMP_SYS(capget), /* For CAP_FSETID */
-@@ -117,12 +117,12 @@ static const int syscall_whitelist[] = {
- };
- 
- /* Syscalls used when --syslog is enabled */
--static const int syscall_whitelist_syslog[] = {
-+static const int syscall_allowlist_syslog[] = {
-     SCMP_SYS(send),
-     SCMP_SYS(sendto),
- };
- 
--static void add_whitelist(scmp_filter_ctx ctx, const int syscalls[], size_t len)
-+static void add_allowlist(scmp_filter_ctx ctx, const int syscalls[], size_t len)
- {
-     size_t i;
- 
-@@ -153,10 +153,10 @@ void setup_seccomp(bool enable_syslog)
-         exit(1);
-     }
- 
--    add_whitelist(ctx, syscall_whitelist, G_N_ELEMENTS(syscall_whitelist));
-+    add_allowlist(ctx, syscall_allowlist, G_N_ELEMENTS(syscall_allowlist));
-     if (enable_syslog) {
--        add_whitelist(ctx, syscall_whitelist_syslog,
--                      G_N_ELEMENTS(syscall_whitelist_syslog));
-+        add_allowlist(ctx, syscall_allowlist_syslog,
-+                      G_N_ELEMENTS(syscall_allowlist_syslog));
-     }
- 
-     /* libvhost-user calls this for post-copy migration, we don't need it */
 -- 
 2.29.2
 

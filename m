@@ -1,87 +1,107 @@
-Date: Thu, 11 Feb 2021 15:15:18 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210211201518.GA32784@redhat.com>
-References: <20210209190224.62827-1-dgilbert@redhat.com>
-	<20210209190224.62827-11-dgilbert@redhat.com>
-	<20210211123738.GK247031@stefanha-x1.localdomain>
-	<YCVduoTmMuV4sOZF@work-vm> <20210211183020.GA29443@redhat.com>
-	<YCWKjRST1AYW+//G@work-vm>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Tue, 16 Feb 2021 18:37:31 +0000
+Message-Id: <20210216183734.57810-4-dgilbert@redhat.com>
+In-Reply-To: <20210216183734.57810-1-dgilbert@redhat.com>
+References: <20210216183734.57810-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <YCWKjRST1AYW+//G@work-vm>
-Subject: Re: [Virtio-fs] [PATCH 10/24] DAX: virtiofsd: Add setup/remove
- mappings fuse commands
-List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
-List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
-	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
-List-Archive: <https://www.redhat.com/archives/virtio-fs>
-List-Post: <mailto:virtio-fs@redhat.com>
-List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
-List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
-	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, qemu-devel@nongnu.org, mst@redhat.com
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PULL 3/6] tools/virtiofsd: Replace the word 'whitelist'
+List-Id: Development discussions about virtio-fs <virtio-fs.listman.redhat.com>
+List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
+	<mailto:virtio-fs-request@listman.redhat.com?subject=unsubscribe>
+List-Archive: <https://listman.redhat.com/archives/virtio-fs>
+List-Post: <mailto:virtio-fs@listman.redhat.com>
+List-Help: <mailto:virtio-fs-request@listman.redhat.com?subject=help>
+List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
+	<mailto:virtio-fs-request@listman.redhat.com?subject=subscribe>
+To: qemu-devel@nongnu.org, wainersm@redhat.com, groug@kaod.org, philmd@redhat.com, vgoyal@redhat.com
+Cc: virtio-fs@redhat.com
 
-On Thu, Feb 11, 2021 at 07:50:37PM +0000, Dr. David Alan Gilbert wrote:
-> * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > On Thu, Feb 11, 2021 at 04:39:22PM +0000, Dr. David Alan Gilbert wrote:
-> > > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> > > > On Tue, Feb 09, 2021 at 07:02:10PM +0000, Dr. David Alan Gilbert (git) wrote:
-> > > > > +static void do_removemapping(fuse_req_t req, fuse_ino_t nodeid,
-> > > > > +                             struct fuse_mbuf_iter *iter)
-> > > > > +{
-> > > > > +    struct fuse_removemapping_in *arg;
-> > > > > +    struct fuse_removemapping_one *one;
-> > > > > +
-> > > > > +    arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
-> > > > > +    if (!arg || arg->count <= 0) {
-> > > > 
-> > > > arg->count is unsigned so < is tautologous.
-> > > > 
-> > > > > +        fuse_log(FUSE_LOG_ERR, "do_removemapping: invalid arg %p\n", arg);
-> > > > > +        fuse_reply_err(req, EINVAL);
-> > > > > +        return;
-> > > > > +    }
-> > > > > +
-> > > > > +    one = fuse_mbuf_iter_advance(iter, arg->count * sizeof(*one));
-> > > > 
-> > > > arg->count * sizeof(*one) is an integer overflow on 32-bit hosts. I
-> > > > think we should be more defensive here since this input comes from the
-> > > > guest.
-> > > 
-> > > OK, so I've gone with:
-> > > 
-> > >     if (!arg || !arg->count || 
-> > >         (uint64_t)arg->count * sizeof(*one) >= SIZE_MAX) {
-> > >         fuse_log(FUSE_LOG_ERR, "do_removemapping: invalid arg %p\n", arg);
-> > >         fuse_reply_err(req, EINVAL);
-> > >         return;
-> > 
-> > If we did not want to get into unit64_t business, can we alternatively do.
-> >      if (!arg || !arg->count || arg->count > SIZE_MAX/sizeof(*one)) {
-> 
-> I tried that and the compiler moaned that it was always false; which on
-> a 64bit host it is since arg->count is uint32_t.
+From: Philippe Mathieu-Daudé <philmd@redhat.com>
 
-Hmm.... May be something like.
+Follow the inclusive terminology from the "Conscious Language in your
+Open Source Projects" guidelines [*] and replace the words "whitelist"
+appropriately.
 
-bool is_arg_count_valid()
-{
-  if (!arg->count)
-      return false;
+[*] https://github.com/conscious-lang/conscious-lang-docs/blob/main/faq.md
 
-#if __WORDSIZE == 64
-   return true;
-#elif
-  if (argc->count > SIZE_MAX/sizeof(*one))
-      return false;
-#fi
-  return true;
-}
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Reviewed-by: Daniel P. Berrangé <berrange@redhat.com>
+Signed-off-by: Philippe Mathieu-Daudé <philmd@redhat.com>
+Message-Id: <20210205171817.2108907-3-philmd@redhat.com>
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c      |  6 +++---
+ tools/virtiofsd/passthrough_seccomp.c | 12 ++++++------
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
-if (!argc || !is_arg_count_valie()) {
-}
-
-Vivek
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 147b59338a..5f3afe8557 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -3204,7 +3204,7 @@ static void setup_mounts(const char *source)
+ }
+ 
+ /*
+- * Only keep whitelisted capabilities that are needed for file system operation
++ * Only keep capabilities in allowlist that are needed for file system operation
+  * The (possibly NULL) modcaps_in string passed in is free'd before exit.
+  */
+ static void setup_capabilities(char *modcaps_in)
+@@ -3214,8 +3214,8 @@ static void setup_capabilities(char *modcaps_in)
+     capng_restore_state(&cap.saved);
+ 
+     /*
+-     * Whitelist file system-related capabilities that are needed for a file
+-     * server to act like root.  Drop everything else like networking and
++     * Add to allowlist file system-related capabilities that are needed for a
++     * file server to act like root.  Drop everything else like networking and
+      * sysadmin capabilities.
+      *
+      * Exclusions:
+diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
+index ea852e2e33..62441cfcdb 100644
+--- a/tools/virtiofsd/passthrough_seccomp.c
++++ b/tools/virtiofsd/passthrough_seccomp.c
+@@ -21,7 +21,7 @@
+ #endif
+ #endif
+ 
+-static const int syscall_whitelist[] = {
++static const int syscall_allowlist[] = {
+     /* TODO ireg sem*() syscalls */
+     SCMP_SYS(brk),
+     SCMP_SYS(capget), /* For CAP_FSETID */
+@@ -117,12 +117,12 @@ static const int syscall_whitelist[] = {
+ };
+ 
+ /* Syscalls used when --syslog is enabled */
+-static const int syscall_whitelist_syslog[] = {
++static const int syscall_allowlist_syslog[] = {
+     SCMP_SYS(send),
+     SCMP_SYS(sendto),
+ };
+ 
+-static void add_whitelist(scmp_filter_ctx ctx, const int syscalls[], size_t len)
++static void add_allowlist(scmp_filter_ctx ctx, const int syscalls[], size_t len)
+ {
+     size_t i;
+ 
+@@ -153,10 +153,10 @@ void setup_seccomp(bool enable_syslog)
+         exit(1);
+     }
+ 
+-    add_whitelist(ctx, syscall_whitelist, G_N_ELEMENTS(syscall_whitelist));
++    add_allowlist(ctx, syscall_allowlist, G_N_ELEMENTS(syscall_allowlist));
+     if (enable_syslog) {
+-        add_whitelist(ctx, syscall_whitelist_syslog,
+-                      G_N_ELEMENTS(syscall_whitelist_syslog));
++        add_allowlist(ctx, syscall_allowlist_syslog,
++                      G_N_ELEMENTS(syscall_allowlist_syslog));
+     }
+ 
+     /* libvhost-user calls this for post-copy migration, we don't need it */
+-- 
+2.29.2
 

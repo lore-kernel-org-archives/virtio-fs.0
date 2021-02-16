@@ -1,103 +1,125 @@
-Date: Mon, 8 Mar 2021 17:04:06 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YEZZBlojfa6PH3Wb@work-vm>
-References: <20210209190224.62827-1-dgilbert@redhat.com>
-	<20210209190224.62827-8-dgilbert@redhat.com>
-	<20210211103203.GH247031@stefanha-x1.localdomain>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=fkpfzd4aYSlLQT9wHF53AZoEikZ81xJA6Jh0FUGLl58=;
+	b=in8FJsq9M/08Gi+KYE9en1xmf52ShDXnTfNlyqBKVHuIgUzZrEjssCvLHi7SQgkurR
+	Deh59jNn233u0zhuj4LBUT/13GFXCL39JlPuUIro6D2SuBeleeAwjaMmWEDqwvPS5Sgb
+	mxreSaiDrsrpJO5MN9k/OYAJGc97lq07oPbGg=
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210211103203.GH247031@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH 07/24] DAX: virtio-fs: Add vhost-user slave
- commands for mapping
+References: <87r1llk28a.fsf@suse.de> <20210215205221.GB3331@redhat.com>
+In-Reply-To: <20210215205221.GB3331@redhat.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Tue, 16 Feb 2021 16:11:20 +0100
+Message-ID: <CAJfpegsEa6ZCXBFUpER6Fiagp3TEpxa82qBo0a4NydjC3ucnTw@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] Question on ACLs support in virtiofs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
-List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
+List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
-List-Archive: <https://listman.redhat.com/archives/virtio-fs>
+List-Archive: <https://www.redhat.com/archives/virtio-fs>
 List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
-List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
+List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com, mst@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> On Tue, Feb 09, 2021 at 07:02:07PM +0000, Dr. David Alan Gilbert (git) wrote:
-> > diff --git a/docs/interop/vhost-user.rst b/docs/interop/vhost-user.rst
-> > index d6085f7045..1deedd3407 100644
-> > --- a/docs/interop/vhost-user.rst
-> > +++ b/docs/interop/vhost-user.rst
-> > @@ -1432,6 +1432,26 @@ Slave message types
-> >  
-> >    The state.num field is currently reserved and must be set to 0.
-> >  
-> > +``VHOST_USER_SLAVE_FS_MAP``
-> > +  :id: 6
-> > +  :equivalent ioctl: N/A
-> > +  :slave payload: fd + n * (offset + address + len)
-> 
-> I'm not sure I understand this notation. '+' means field concatenation?
-> Is 'fd' a field or does it indicate file descriptor passing?
-> 
-> I suggest using a struct name instead of informal notation so that the
-> payload size and representation is clear.
-> 
-> The same applies for VHOST_USER_SLAVE_FS_UNMAP.
-> 
-> > +  :master payload: N/A
-> > +
-> > +  Requests that the QEMU mmap the given fd into the virtio-fs cache;
-> 
-> s/QEMU mmap the given fd/given fd be mmapped/
-> 
-> Please avoid mentioning QEMU specifically. Any VMM should be able to
-> implement this spec.
-> 
-> The same applies for VHOST_USER_SLAVE_FS_UNMAP.
+On Mon, Feb 15, 2021 at 9:52 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> On Fri, Feb 12, 2021 at 10:30:13AM +0000, Luis Henriques wrote:
+> > Hi!
+> >
+> > I've recently executed the generic fstests on virtiofs and decided to have
+> > a closer look at generic/099 failure.  In a nutshell, here's the sequence
+> > of commands that reproduce that failure:
+> >
+> > # umask 0
+> > # mkdir acldir
+> > # chacl -b "u::rwx,g::rwx,o::rwx" "u::r-x,g::r--,o::---" acldir
+> > # touch acldir/file1
+> > # umask 722
+> > # touch acldir/file2
+> > # ls -l acldir
+> > total 0
+> > -r--r----- 1 root root 0 Feb 12 10:04 file1
+> > ----r----- 1 root root 0 Feb 12 10:05 file2
+> >
+> > The failure is that setting umask to 722 shouldn't affect the new file2
+> > because acldir has a default ACL (from umask(2): "... if the parent
+> > directory has a default ACL (see acl(5)), the umask is ignored...").
+> >
+> > So... I tried to have look at the code, and initially I thought that the
+> > problem was in (kernel) function fuse_create_open(), where we have this:
+> >
+> >       if (!fm->fc->dont_mask)
+> >               mode &= ~current_umask();
+> >
+> > but then I went down the rabbit hole, into the user-space code, and
+> > couldn't reach a conclusion.  Maybe the issue is that there's in fact no
+> > support for this POSIX ACLs in virtiofs/FUSE?  Any ideas?
+>
+> Hi,
+>
+> [ CC Miklos and linux-fsdevel ]
+>
+> I debugged into this a little. There are many knobs and it is little
+> confusing that what are right set of fixes.
+>
+> So what's happening in this case is that fc->dont_mask is not set. That
+> means fuse client is modifying mode using umask. First time you
+> touch file, umask is 0, so there is no modification. But next time,
+> you set umask to 722, and fuse modifies mode before sending file
+> create request to server. virtiofs server is already running with
+> umask 0, so it does not touch the mode.
+>
+> So that means, that in case of default acl, fuse client should not
+> be modifying mode using umask. But question is when should fuse
+> skip applying umask.
+>
+> I see that fuse always sets SB_POSIXACL. That means VFS is not
+> going to apply umask and all the umask handling is with-in fuse.
+>
+> sb->s_flags |= SB_POSIXACL;
+>
+> Currently fuse sets fc->dont_mask in two conditions.
+>
+> - If the caller mounted with flag MS_POSIXACL, then fc->dont_mask is set.
+> - If fuse server opted in for option FUSE_DONT_MASK, then fc->dont_mask
+>   is set.
+>
+> I see that for virtiofs, both the conditions are not true out of the
+> box. In fact looks like ACL support is not fully enabled, because
+> I don't see fuse server opting in for FUSE_POSIX_ACL.
+>
+> I suspect that we probably should provide an option in virtiofsd to
+> enable/disable acl support.
 
-OK, I've changed this to:
+Sounds good.
 
-+``VHOST_USER_SLAVE_FS_MAP``
-+  :id: 6
-+  :equivalent ioctl: N/A
-+  :slave payload: ``struct VhostUserFSSlaveMsg``
-+  :master payload: N/A
-+
-+  Requests that an fd, provided in the ancillary data, be mmapped
-+  into the virtio-fs cache; multiple chunks can be mapped in one
-+  command.
-+  A reply is generated indicating whether mapping succeeded.
-+
-+``VHOST_USER_SLAVE_FS_UNMAP``
-+  :id: 7
-+  :equivalent ioctl: N/A
-+  :slave payload: ``struct VhostUserFSSlaveMsg``
-+  :master payload: N/A
-+
-+  Requests that the range in the virtio-fs cache is unmapped;
-+  multiple chunks can be unmapped in one command.
-+  A reply is generated indicating whether unmapping succeeded.
-+
+> Setting FUSE_DONT_MASK is tricky. If we leave it to fuse, that means
+> fuse will have to query acl to figure out if default acl is set or
+> not on parent dir. And that data could be stale and there could be
+> races w.r.t setting acls from other client.
+>
+> If we do set FUSE_DONT_MASK, that means in file creation path virtiofsd
+> server will have to switch its umask to one provided in request. Given
+> its a per process property, we will have to have some locks to make
+> sure other create requests are not progressing in parallel. And that
+> hope host does the right thing. That is apply umask if parent dir does
+> not have default acl otherwise apply umask (as set by virtiofsd process).
+>
+> Miklos, does above sound reasonable. You might have more thoughts on
+> how to handle this best in fuse/virtiofs.
 
-(Although it'll get a little more complicated as I rework for
-Chirantan's comment)
+fv_queue_worker() does unshare(CLONE_FS) for the fchdir() call in
+xattr ops, which means that umask is now a per-thread propery in
+virtiofsd.
 
-Dave
+So setting umask before create ops sounds like a good solution.
 
-> > +  multiple chunks can be mapped in one command.
-> > +  A reply is generated indicating whether mapping succeeded.
-> > +
-> > +``VHOST_USER_SLAVE_FS_UNMAP``
-> > +  :id: 7
-> > +  :equivalent ioctl: N/A
-> > +  :slave payload: n * (address + len)
-> > +  :master payload: N/A
-> > +
-> > +  Requests that the QEMU un-mmap the given range in the virtio-fs cache;
-> > +  multiple chunks can be unmapped in one command.
-> > +  A reply is generated indicating whether unmapping succeeded.
+Thanks,
+Miklos
 
-
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+>
+> Vivek
+>
 

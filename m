@@ -1,19 +1,13 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=iGNOIOy2GJaYx3HOn2Z3RLtBKccx+R0p/5yVtYw9ok4=;
-	b=D+1vgZDiWyROF/evG30igtWDyAjFPZhBACNTdWWzns/kgwnqMe8veh/jWWTSPEgYmZ
-	i7iOuksrQPAxFuL4GNGZ/8AbPp/UR+DOW/rQGbFlErYXPIfNx33rIbGpZL+HeEK0I8/s
-	obSSxS0jSqziioYDb/YwT/E17z+jgxNrAzOnI=
-MIME-Version: 1.0
+From: Luis Henriques <lhenriques@suse.de>
 References: <20210216233611.33400-1-vgoyal@redhat.com>
-	<20210216233611.33400-2-vgoyal@redhat.com>
-In-Reply-To: <20210216233611.33400-2-vgoyal@redhat.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Wed, 17 Feb 2021 09:53:04 +0100
-Message-ID: <CAJfpegspJGL_W+8zaXyHfuAhtB_Q7V0YyOZJEhpCd=KaL_W71A@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH 1/3] virtiofsd: Add an option to
-	enable/disable posix acls
+Date: Wed, 17 Feb 2021 09:32:53 +0000
+In-Reply-To: <20210216233611.33400-1-vgoyal@redhat.com> (Vivek Goyal's message
+	of "Tue, 16 Feb 2021 18:36:08 -0500")
+Message-ID: <87zh03hwe2.fsf@suse.de>
+MIME-Version: 1.0
+Content-Type: text/plain
+Subject: Re: [Virtio-fs] [PATCH 0/3] virtiofsd: Add options to
+	enable/disable posix acl
 List-Id: Development discussions about virtio-fs <virtio-fs.listman.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@listman.redhat.com?subject=unsubscribe>
@@ -23,28 +17,42 @@ List-Help: <mailto:virtio-fs-request@listman.redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@listman.redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, miklos@szeredi.hu, qemu-devel@nongnu.org
 
-On Wed, Feb 17, 2021 at 12:36 AM Vivek Goyal <vgoyal@redhat.com> wrote:
+Vivek Goyal <vgoyal@redhat.com> writes:
+
+> Luis Henriques reported that fstest generic/099 fails with virtiofs.
+> Little debugging showed that we don't enable acl support. So this
+> patch series provides option to enable/disable posix acl support. By
+> default it is disabled.
 >
-> fuse has an option FUSE_POSIX_ACL which needs to be opted in by fuse
-> server to enable posix acls.
+> I have run blogbench and pjdfstests with posix acl enabled and
+> things work fine. 
 >
-> Add virtiofsd option "-o posix_acl/no_posix_acl" to let users enable/disable
-> posix acl support. By default it is disabled as of now.
+> Luis, can you please apply these patches, and run virtiofsd with
+> "-o posix_acl" and see if it fixes the failure you are seeing. I
+> ran the steps you provided manually and it fixes the issue for
+> me.
 
-If I read the code correctly, then no_posix_acl will still result in
-system.posix_acl_* xattr ops being passed through to virtiofsd, which
-will forward them to the underlying fs, resulting in posix acls
-appearing to work, but doing so incorrectly (i.e. no change from
-previous behavior).   Possibly better would be to have three different
-modes of operation:
+Awesome, thanks for looking into this.  I'll have a look and test these
+patches.  I expect to be able to report back later today.
 
-1) no option: default fall back to broken acl support for backward
-compat (this could be removed in the future)
-2) no_posix_acl: really disable acl support
-3) posix_acl: enable proper acl support
+Cheers,
+-- 
+Luis
 
-Thanks,
-Miklos
+
+>
+> Vivek Goyal (3):
+>   virtiofsd: Add an option to enable/disable posix acls
+>   virtiofsd: Add umask to seccom allow list
+>   virtiofsd: Change umask if posix acls are enabled
+>
+>  tools/virtiofsd/passthrough_ll.c      | 45 +++++++++++++++++++++++----
+>  tools/virtiofsd/passthrough_seccomp.c |  1 +
+>  2 files changed, 40 insertions(+), 6 deletions(-)
+>
+> -- 
+> 2.25.4
+>
 

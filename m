@@ -1,10 +1,11 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 17 Feb 2021 18:30:43 -0500
-Message-Id: <20210217233046.81418-1-vgoyal@redhat.com>
+Date: Wed, 17 Feb 2021 18:30:45 -0500
+Message-Id: <20210217233046.81418-3-vgoyal@redhat.com>
+In-Reply-To: <20210217233046.81418-1-vgoyal@redhat.com>
+References: <20210217233046.81418-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 0/3] virtiofsd: Add options to enable/disable
-	posix acl
+Subject: [Virtio-fs] [PATCH v2 2/3] virtiofsd: Add umask to seccom allow list
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,36 +17,25 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: vgoyal@redhat.com, miklos@szeredi.hu
 
-Hi,
+Next patch is going to make use of "umask" syscall. So allow it.
 
-This is V2 of the patches. Changes since v1 are.
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ tools/virtiofsd/passthrough_seccomp.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-- Rebased on top of latest master.
-- Took care of Miklos's comments to block acl xattrs if user
-  explicitly disabled posix acl.
-
-Luis Henriques reported that fstest generic/099 fails with virtiofs.
-Little debugging showed that we don't enable acl support. So this
-patch series provides option to enable/disable posix acl support. By
-default it is disabled.
-
-I have run blogbench and pjdfstests with posix acl enabled and
-things work fine.
-
-Luis, can you please apply these patches, and run virtiofsd with
-"-o posix_acl" and see if it fixes the failure you are seeing. I
-ran the steps you provided manually and it fixes the issue for
-me.
-
-Vivek Goyal (3):
-  virtiofsd: Add an option to enable/disable posix acls
-  virtiofsd: Add umask to seccom allow list
-  virtiofsd: Change umask if posix acls are enabled
-
- tools/virtiofsd/passthrough_ll.c      | 119 ++++++++++++++++++++++++--
- tools/virtiofsd/passthrough_seccomp.c |   1 +
- 2 files changed, 113 insertions(+), 7 deletions(-)
-
+diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
+index 62441cfcdb..f49ed94b5e 100644
+--- a/tools/virtiofsd/passthrough_seccomp.c
++++ b/tools/virtiofsd/passthrough_seccomp.c
+@@ -114,6 +114,7 @@ static const int syscall_allowlist[] = {
+     SCMP_SYS(utimensat),
+     SCMP_SYS(write),
+     SCMP_SYS(writev),
++    SCMP_SYS(umask),
+ };
+ 
+ /* Syscalls used when --syslog is enabled */
 -- 
 2.25.4
 

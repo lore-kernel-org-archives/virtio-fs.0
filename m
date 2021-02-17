@@ -1,21 +1,20 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
 	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=nN7jya7fChsML9MEHG3PnvzmEDHji9tedC6c5+Y2oD8=;
-	b=OkYPJCCYQRPx4CJviYQnV1NkHd3ofJ519Qs0wAt4shrQMe/Y4ZZF65b3PRh0vpHAAX
-	QqI/oAVjfluVtlG0qtbFbdpjCNNj237r9hK2kCOjDeRWVr4PR3RnDEBMu/3Uy9jRQM8R
-	gVTOV43bsG1ugJHU/qNHxbGXhziUIpQO6/7zQ=
+	:cc; bh=JnRiIQa/xqD86XgiFLKEbX1OcI+MqgFHAAoNBHUPRXU=;
+	b=oSHaGAtmKD3bdwF/gSpntcgSiPeKzA02Q5/5EPrQycxeEBrraX/7wU7V7G3voCaUeV
+	15L3r3ZaxC1gjL4k5l4rB5u8IYs5Op5wwyYMqxH5Dm0h4cY7cDpGj35a8pm/TC5J/F85
+	TABwKg8A01zP3F2RCS0+YBP7Him3DxYf3QJWj5PZZ51vTTi12wBlgrADFutTCa7ld1qT
+	lxZdBEGv+4sw5+6zCIDo+vqSXafy3immNpJuZI308rKPLlcj5b1Qye6QiKUe6mswqmfu
+	ifaiGZ0ruYpKhW2nC4XVC2YaboNee4N1wcti7PfKPIwHQZL3jyqqrKAGFJ9qTi44HSGW
+	mxMg==
 MIME-Version: 1.0
-References: <20210216233611.33400-1-vgoyal@redhat.com>
-	<20210216233611.33400-2-vgoyal@redhat.com>
-	<CAJfpegspJGL_W+8zaXyHfuAhtB_Q7V0YyOZJEhpCd=KaL_W71A@mail.gmail.com>
-	<20210217150721.GB31184@redhat.com>
-In-Reply-To: <20210217150721.GB31184@redhat.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Wed, 17 Feb 2021 16:23:54 +0100
-Message-ID: <CAJfpegvTav=VZM-x5gWWg==Zpcp1NtGjo=jh2XyxVOROPG95mQ@mail.gmail.com>
+References: <20210216183734.57810-1-dgilbert@redhat.com>
+In-Reply-To: <20210216183734.57810-1-dgilbert@redhat.com>
+From: Peter Maydell <peter.maydell@linaro.org>
+Date: Wed, 17 Feb 2021 19:18:21 +0000
+Message-ID: <CAFEAcA9wzrta4Us2kdWe6x2XMHuF60uVU3qGFzpL98LrYVEZUw@mail.gmail.com>
 Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH 1/3] virtiofsd: Add an option to
-	enable/disable posix acls
+Subject: Re: [Virtio-fs] [PULL 0/6] virtiofs queue
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,73 +23,39 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
+To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Cc: QEMU Developers <qemu-devel@nongnu.org>, Wainer dos Santos Moschetta <wainersm@redhat.com>, virtio-fs@redhat.com, =?UTF-8?Q?Philippe_Mathieu=2DDaud=C3=A9?= <philmd@redhat.com>, vgoyal@redhat.com
 
-On Wed, Feb 17, 2021 at 4:07 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+On Tue, 16 Feb 2021 at 18:45, Dr. David Alan Gilbert (git)
+<dgilbert@redhat.com> wrote:
 >
-> On Wed, Feb 17, 2021 at 09:53:04AM +0100, Miklos Szeredi wrote:
-> > On Wed, Feb 17, 2021 at 12:36 AM Vivek Goyal <vgoyal@redhat.com> wrote:
-> > >
-> > > fuse has an option FUSE_POSIX_ACL which needs to be opted in by fuse
-> > > server to enable posix acls.
-> > >
-> > > Add virtiofsd option "-o posix_acl/no_posix_acl" to let users enable/disable
-> > > posix acl support. By default it is disabled as of now.
-> >
-> > If I read the code correctly, then no_posix_acl will still result in
-> > system.posix_acl_* xattr ops being passed through to virtiofsd, which
-> > will forward them to the underlying fs, resulting in posix acls
-> > appearing to work, but doing so incorrectly (i.e. no change from
-> > previous behavior).
+> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 >
-> Yes, and this is confuing me a lot. fuse server has not indicated
-> support for POSIX_ACL, still user can get and set ACLs. fuse_xattr_get()
-> and fuse_xattr_set() must be kicking in.
+> The following changes since commit 18543229fd7a2c79dcd6818c7b1f0f62512b5220:
 >
-> I do see that we have fuse_no_acl_xattr_handlers and that should
-> be able to block setting/getting acls if acl support is not there
-> but we register it only if we are not mounted in init_user_ns.
+>   Merge remote-tracking branch 'remotes/cleber-gitlab/tags/python-next-pull-request' into staging (2021-02-16 14:37:57 +0000)
 >
->         if (sb->s_user_ns != &init_user_ns)
->                 sb->s_xattr = fuse_no_acl_xattr_handlers;
+> are available in the Git repository at:
 >
-> So question is, should fuse client be fixed as well to block setting
-> and getting acls if fuse server does not support ACL? Or we now need
-> to keep it around for backward compatibility.
+>   https://gitlab.com/dagrh/qemu.git tags/pull-virtiofs-20210216
+>
+> for you to fetch changes up to 26ec1909648e0c06ff06ebc3ddb2f88ebeeaa6a9:
+>
+>   virtiofsd: Do not use a thread pool by default (2021-02-16 17:54:18 +0000)
+>
+> ----------------------------------------------------------------
+> virtiofsd pull 2021-02-16
+>
+> Vivek's support for new FUSE KILLPRIV_V2
+> and some smaller cleanups.
+>
+> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+>
 
-Yes, this is a compatibility thing.   User namespaces don't work
-without actual ACL ops, so this was disabled in that case and no
-backward compatibility worries in that case.   We should have disabled
-this for virtiofs from the start, but at this point we are again stuck
-with a backward compatibility issue.
+Applied, thanks.
 
-Alternatively make posix_acl the default, hence fixing the bad
-behavior is unlikely to cause a regression.
+Please update the changelog at https://wiki.qemu.org/ChangeLog/6.0
+for any user-visible changes.
 
->
-> > Possibly better would be to have three different
-> > modes of operation:
-> >
-> > 1) no option: default fall back to broken acl support for backward
-> > compat (this could be removed in the future)
->
-> What about FUSE_DONT_MASK in this mode. ACLs are not enabled but
-> user can get/set these. Should that mean we still honor default
-> acl and not apply umask?
->
-> Probably I should opt for FUSE_DONT_MASK only if posix_acl support is
-> enabled. Given this does not work even today (atleast for virtiofs), so
-> it is not a backward compatibility issue. And its confusing anyway.
->
-> > 2) no_posix_acl: really disable acl support
->
-> That is block getting and setting system.posix_acl xattr. Will do that.
-> I think we will have to block it even if somebody has remapped xattrs
-> in virtiofsd.
-
-Okay.
-
-Thanks,
-Miklos
+-- PMM
 

@@ -1,87 +1,85 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=lT/LLKzu5HIqoSbSW/QvdHYh/J21YhqJ53RuEd1nGlY=;
-	b=SVdhVZvVixektXLbPk6WMBq4bXc46Awf+Jc+6NUZnaPK/wk2YTVrQG7ohz9xPW4tcK
-	KEkrHrQTEYhkgbxwDIXCRpVQn+hTOrPTJE5dEwIxg3DoIOHh/QnRh5FOy7rt6zmxi71A
-	1/ONnfRJFnirbDGgsJQtyWWxJxc9f1M+oxGlc=
-MIME-Version: 1.0
+Date: Thu, 18 Feb 2021 10:59:52 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YC5IqMK+6UUjaE04@work-vm>
 References: <20210209190224.62827-1-dgilbert@redhat.com>
-	<20210209190224.62827-8-dgilbert@redhat.com>
-In-Reply-To: <20210209190224.62827-8-dgilbert@redhat.com>
-From: Chirantan Ekbote <chirantan@chromium.org>
-Date: Mon, 15 Feb 2021 19:35:53 +0900
-Message-ID: <CAJFHJrqioXu7K8Z=dFgMQDWoKoNK3pddcgf9znCS72BR4WHSYA@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH 07/24] DAX: virtio-fs: Add vhost-user slave
- commands for mapping
+	<20210209190224.62827-9-dgilbert@redhat.com>
+	<20210211105755.GI247031@stefanha-x1.localdomain>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20210211105755.GI247031@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH 08/24] DAX: virtio-fs: Fill in slave
+	commands for mapping
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
-List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
+List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
-List-Archive: <https://www.redhat.com/archives/virtio-fs>
+List-Archive: <https://listman.redhat.com/archives/virtio-fs>
 List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
-List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
+List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: mst@redhat.com, qemu-devel@nongnu.org, virtio-fs-list <virtio-fs@redhat.com>, marcandre.lureau@redhat.com, Vivek Goyal <vgoyal@redhat.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com, mst@redhat.com
 
-On Wed, Feb 10, 2021 at 4:04 AM Dr. David Alan Gilbert (git)
-<dgilbert@redhat.com> wrote:
->
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-> +
-> +typedef struct {
-> +    /* Offsets within the file being mapped */
-> +    uint64_t fd_offset[VHOST_USER_FS_SLAVE_ENTRIES];
-> +    /* Offsets within the cache */
-> +    uint64_t c_offset[VHOST_USER_FS_SLAVE_ENTRIES];
-> +    /* Lengths of sections */
-> +    uint64_t len[VHOST_USER_FS_SLAVE_ENTRIES];
-> +    /* Flags, from VHOST_USER_FS_FLAG_* */
-> +    uint64_t flags[VHOST_USER_FS_SLAVE_ENTRIES];
-> +} VhostUserFSSlaveMsg;
-> +
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> On Tue, Feb 09, 2021 at 07:02:08PM +0000, Dr. David Alan Gilbert (git) wrote:
+> > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+> > 
+> > Fill in definitions for map, unmap and sync commands.
+> > 
+> > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> > with fix by misono.tomohiro@fujitsu.com
+> > ---
+> >  hw/virtio/vhost-user-fs.c | 115 ++++++++++++++++++++++++++++++++++++--
+> >  1 file changed, 111 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+> > index 78401d2ff1..5f2fca4d82 100644
+> > --- a/hw/virtio/vhost-user-fs.c
+> > +++ b/hw/virtio/vhost-user-fs.c
+> > @@ -37,15 +37,122 @@
+> >  uint64_t vhost_user_fs_slave_map(struct vhost_dev *dev, VhostUserFSSlaveMsg *sm,
+> >                                   int fd)
+> >  {
+> > -    /* TODO */
+> > -    return (uint64_t)-1;
+> > +    VHostUserFS *fs = VHOST_USER_FS(dev->vdev);
+> > +    if (!fs) {
+> > +        /* Shouldn't happen - but seen on error path */
+> > +        error_report("Bad fs ptr");
+> > +        return (uint64_t)-1;
+> > +    }
+> 
+> If a non-vhost-user-fs vhost-user device backend sends this message
+> VHOST_USER_FS() -> object_dynamic_cast_assert() there will either be an
+> assertion failure (CONFIG_QOM_CAST_DEBUG) or the pointer will be
+> silently cast to the wrong type (!CONFIG_QOM_CAST_DEBUG).
+> 
+> Both of these outcomes are not suitable for input validation. We need to
+> fail cleanly here:
+> 
+>   VhostUserFS *fs = (VHostUserFS *)object_dynamic_cast(OBJECT(dev->vdev),
+>                                                        TYPE_VHOST_USER_FS);
+>   if (!fs) {
+>       ...handle failure...
+>   }
+> 
+> >  uint64_t vhost_user_fs_slave_unmap(struct vhost_dev *dev,
+> >                                     VhostUserFSSlaveMsg *sm)
+> >  {
+> > -    /* TODO */
+> > -    return (uint64_t)-1;
+> > +    VHostUserFS *fs = VHOST_USER_FS(dev->vdev);
+> > +    if (!fs) {
+> > +        /* Shouldn't happen - but seen on error path */
+> > +        error_report("Bad fs ptr");
+> > +        return (uint64_t)-1;
+> > +    }
+> 
+> Same here.
 
-Is it too late to change this?  This struct allocates space for up to
-8 entries but most of the time the server will only try to set up one
-mapping at a time so only 32 out of the 256 bytes in the message are
-actually being used.  We're just wasting time memcpy'ing bytes that
-will never be used.  Is there some reason this can't be dynamically
-sized?  Something like:
+Thanks, fixed.
 
-typedef struct {
-    /* Number of mapping requests */
-    uint16_t num_requests;
-    /* `num_requests` mapping requests */
-   MappingRequest requests[];
-} VhostUserFSSlaveMsg;
-
-typedef struct {
-    /* Offset within the file being mapped */
-    uint64_t fd_offset;
-    /* Offset within the cache */
-    uint64_t c_offset;
-    /* Length of section */
-    uint64_t len;
-    /* Flags, from VHOST_USER_FS_FLAG_* */
-    uint64_t flags;
-} MappingRequest;
-
-The current pre-allocated structure both wastes space when there are
-fewer than 8 requests and requires extra messages to be sent when
-there are more than 8 requests.  I realize that in the grand scheme of
-things copying 224 extra bytes is basically not noticeable but it just
-irks me that we could fix this really easily before it gets propagated
-to too many other places.
-
-Chirantan
-
-> --
-> 2.29.2
->
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
->
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

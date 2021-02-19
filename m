@@ -1,11 +1,17 @@
-Date: Fri, 19 Feb 2021 09:34:03 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210219143403.GA3270@redhat.com>
-References: <20210217233046.81418-1-vgoyal@redhat.com> <87pn0wgtsx.fsf@suse.de>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=3f9/KIEhjHz/f5OUekOg8TjqaaRrTrdZ6lRHNlW+PSo=;
+	b=RntPNxbOG6X4yw1b7H+R0BWmIh7+RPkWgQbBP8NBkV0EmJuCBByb++ZENv9FYF8ytY
+	m4fUWCsHqE3GymRJTPPx5RfilxAzbcxj0Kp2lpS/i/azbX4YrGcZ7E5/TZY/DzLtLSdo
+	Q1q1+AnGC1+tmcc8tr/SzJRAeEq43PaKX30Rk=
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <87pn0wgtsx.fsf@suse.de>
+References: <20210217233046.81418-1-vgoyal@redhat.com> <87pn0wgtsx.fsf@suse.de>
+	<20210219143403.GA3270@redhat.com>
+In-Reply-To: <20210219143403.GA3270@redhat.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Fri, 19 Feb 2021 16:55:06 +0100
+Message-ID: <CAJfpeguanq6PEf7jd9Ur_JO7aJ0eoojs65LXb6ukhoGGb_Ccdw@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
 Subject: Re: [Virtio-fs] [PATCH v2 0/3] virtiofsd: Add options to
 	enable/disable posix acl
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -16,48 +22,58 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Luis Henriques <lhenriques@suse.de>
-Cc: virtio-fs@redhat.com, miklos@szeredi.hu, qemu-devel@nongnu.org
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
 
-On Fri, Feb 19, 2021 at 11:50:54AM +0000, Luis Henriques wrote:
-> Vivek Goyal <vgoyal@redhat.com> writes:
-> 
-> > Hi,
+On Fri, Feb 19, 2021 at 3:34 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> On Fri, Feb 19, 2021 at 11:50:54AM +0000, Luis Henriques wrote:
+> > Vivek Goyal <vgoyal@redhat.com> writes:
 > >
-> > This is V2 of the patches. Changes since v1 are.
+> > > Hi,
+> > >
+> > > This is V2 of the patches. Changes since v1 are.
+> > >
+> > > - Rebased on top of latest master.
+> > > - Took care of Miklos's comments to block acl xattrs if user
+> > >   explicitly disabled posix acl.
+> > >
+> > > Luis Henriques reported that fstest generic/099 fails with virtiofs.
+> > > Little debugging showed that we don't enable acl support. So this
+> > > patch series provides option to enable/disable posix acl support. By
+> > > default it is disabled.
+> > >
+> > > I have run blogbench and pjdfstests with posix acl enabled and
+> > > things work fine.
+> > >
+> > > Luis, can you please apply these patches, and run virtiofsd with
+> > > "-o posix_acl" and see if it fixes the failure you are seeing. I
+> > > ran the steps you provided manually and it fixes the issue for
+> > > me.
 > >
-> > - Rebased on top of latest master.
-> > - Took care of Miklos's comments to block acl xattrs if user
-> >   explicitly disabled posix acl.
-> >
-> > Luis Henriques reported that fstest generic/099 fails with virtiofs.
-> > Little debugging showed that we don't enable acl support. So this
-> > patch series provides option to enable/disable posix acl support. By
-> > default it is disabled.
-> >
-> > I have run blogbench and pjdfstests with posix acl enabled and
-> > things work fine.
-> >
-> > Luis, can you please apply these patches, and run virtiofsd with
-> > "-o posix_acl" and see if it fixes the failure you are seeing. I
-> > ran the steps you provided manually and it fixes the issue for
-> > me.
-> 
-> Sorry for the delay.  I've finally tested these patches and they indeed
-> fix the problem I reported.  My only question about this fix is why is
-> this option not enabled by default, since this is the documented behavior
-> in acl(5) and umask(2)?  In fact, why is this an option at all? 
+> > Sorry for the delay.  I've finally tested these patches and they indeed
+> > fix the problem I reported.  My only question about this fix is why is
+> > this option not enabled by default, since this is the documented behavior
+> > in acl(5) and umask(2)?  In fact, why is this an option at all?
+>
+> You mean why to not enable acl by default?
+>
+> I am concerned about performance drop this can lead to because extra
+> GETXATTR(system.posix_acl_*) messages which will trigger if acls are enabled.
+> And not all users might require these. That's why I preferred to not enable
+> acl by default. Those who need it can enable it explicitly.
+>
+> Another example is xattr support. Due to performance concerns, we don't
+> enable xattrs by default either.
 
-You mean why to not enable acl by default?
+Actually generic xattr is much worse, since there's no caching for
+them currently, as opposed to posix acls, which are cached both when
+positive and negative.
 
-I am concerned about performance drop this can lead to because extra
-GETXATTR(system.posix_acl_*) messages which will trigger if acls are enabled.
-And not all users might require these. That's why I preferred to not enable
-acl by default. Those who need it can enable it explicitly.
+If we enable ACL by default in case xattrs are enabled, we should be
+safe, I think.  Having an option to disable acls still makes sense,
+but it's an optional plus.
 
-Another example is xattr support. Due to performance concerns, we don't
-enable xattrs by default either.
-
-Thanks
-Vivek
+Thanks,
+Miklos
 

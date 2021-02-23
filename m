@@ -1,11 +1,12 @@
-Date: Tue, 23 Feb 2021 09:14:16 -0500
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20210223091358-mutt-send-email-mst@kernel.org>
+Date: Tue, 23 Feb 2021 09:23:30 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210223142330.GA3153@redhat.com>
 References: <20210125180115.22936-1-vgoyal@redhat.com>
+	<20210223091358-mutt-send-email-mst@kernel.org>
 MIME-Version: 1.0
-In-Reply-To: <20210125180115.22936-1-vgoyal@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
+In-Reply-To: <20210223091358-mutt-send-email-mst@kernel.org>
 Subject: Re: [Virtio-fs] [RFC PATCH 0/6] vhost-user: Shutdown/Flush slave
 	channel properly
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -16,59 +17,77 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, qemu-devel@nongnu.org
+To: "Michael S. Tsirkin" <mst@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, marcandre.lureau@redhat.com
 
-On Mon, Jan 25, 2021 at 01:01:09PM -0500, Vivek Goyal wrote:
-> Hi,
+On Tue, Feb 23, 2021 at 09:14:16AM -0500, Michael S. Tsirkin wrote:
+> On Mon, Jan 25, 2021 at 01:01:09PM -0500, Vivek Goyal wrote:
+> > Hi,
+> > 
+> > We are working on DAX support in virtiofs and have some patches out of
+> > the tree hosted here.
+> > 
+> > https://gitlab.com/virtio-fs/qemu/-/commits/virtio-fs-dev
 > 
-> We are working on DAX support in virtiofs and have some patches out of
-> the tree hosted here.
-> 
-> https://gitlab.com/virtio-fs/qemu/-/commits/virtio-fs-dev
+> any plans to post a non RFC version?
 
-any plans to post a non RFC version?
+We want to post a non-RFC version. But review comments have not been
+taken care of yet.
 
-> These patches have not been proposed for merge yet, becasue David
-> Gilbert noticed that we can run into a deadlock during an emergency
-> reboot of guest kernel. (echo b > /proc/sysrq-trigger).
+Stefan says don't extend vhost-user protocl. Instead, modify
+vhost_user_read() so that it polls both u->user->chr (unix domain socket)
+as well as u->slave_fd. IOW, keep on servicing slave fd request while we
+are waiting for vhost user message response.
+
+Have not been able to figure out how to do that given unix domain
+socket details are abstracted behind char device interface. 
+
+CCing Greg, He might have ideas on how do that.
+
+Vivek
+
 > 
-> I have provided details of deadlock in 4th path of the series with
-> subject "qemu, vhost-user: Extend protocol to start/stop/flush slave
-> channel".
+> > These patches have not been proposed for merge yet, becasue David
+> > Gilbert noticed that we can run into a deadlock during an emergency
+> > reboot of guest kernel. (echo b > /proc/sysrq-trigger).
+> > 
+> > I have provided details of deadlock in 4th path of the series with
+> > subject "qemu, vhost-user: Extend protocol to start/stop/flush slave
+> > channel".
+> > 
+> > Basic problem seems to be that we don't have a proper mechanism to
+> > shutdown slave channel when vhost-user device is stopping. This means
+> > there might be pending messages in slave channel and slave is blocked
+> > and waiting for response.
+> > 
+> > This is an RFC patch series to enhance vhost-user protocol to 
+> > properly shutdown/flush slave channel and avoid the deadlock. Though
+> > we faced the issue in the context of virtiofs, any vhost-user
+> > device using slave channel can potentially run into issues and
+> > can benefit from these patches.
+> > 
+> > Any feedback is welcome. Currently patches are based on out of
+> > tree code but after I get some feedback, I can only take pieces
+> > which are relevant to upstream and post separately.
+> > 
+> > Thanks
+> > Vivek
+> > 
+> > Vivek Goyal (6):
+> >   virtiofsd: Drop ->vu_dispatch_rwlock while waiting for thread to exit
+> >   libvhost-user: Use slave_mutex in all slave messages
+> >   vhost-user: Return error code from slave_read()
+> >   qemu, vhost-user: Extend protocol to start/stop/flush slave channel
+> >   libvhost-user: Add support to start/stop/flush slave channel
+> >   virtiofsd: Opt in for slave start/stop/shutdown functionality
+> > 
+> >  hw/virtio/vhost-user.c                    | 151 +++++++++++++++++++++-
+> >  subprojects/libvhost-user/libvhost-user.c | 147 +++++++++++++++++----
+> >  subprojects/libvhost-user/libvhost-user.h |   8 +-
+> >  tools/virtiofsd/fuse_virtio.c             |  20 +++
+> >  4 files changed, 294 insertions(+), 32 deletions(-)
+> > 
+> > -- 
+> > 2.25.4
 > 
-> Basic problem seems to be that we don't have a proper mechanism to
-> shutdown slave channel when vhost-user device is stopping. This means
-> there might be pending messages in slave channel and slave is blocked
-> and waiting for response.
-> 
-> This is an RFC patch series to enhance vhost-user protocol to 
-> properly shutdown/flush slave channel and avoid the deadlock. Though
-> we faced the issue in the context of virtiofs, any vhost-user
-> device using slave channel can potentially run into issues and
-> can benefit from these patches.
-> 
-> Any feedback is welcome. Currently patches are based on out of
-> tree code but after I get some feedback, I can only take pieces
-> which are relevant to upstream and post separately.
-> 
-> Thanks
-> Vivek
-> 
-> Vivek Goyal (6):
->   virtiofsd: Drop ->vu_dispatch_rwlock while waiting for thread to exit
->   libvhost-user: Use slave_mutex in all slave messages
->   vhost-user: Return error code from slave_read()
->   qemu, vhost-user: Extend protocol to start/stop/flush slave channel
->   libvhost-user: Add support to start/stop/flush slave channel
->   virtiofsd: Opt in for slave start/stop/shutdown functionality
-> 
->  hw/virtio/vhost-user.c                    | 151 +++++++++++++++++++++-
->  subprojects/libvhost-user/libvhost-user.c | 147 +++++++++++++++++----
->  subprojects/libvhost-user/libvhost-user.h |   8 +-
->  tools/virtiofsd/fuse_virtio.c             |  20 +++
->  4 files changed, 294 insertions(+), 32 deletions(-)
-> 
-> -- 
-> 2.25.4
 

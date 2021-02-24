@@ -1,15 +1,13 @@
-Date: Wed, 24 Feb 2021 12:25:48 +0000
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YDZFzGSkzlNC2xz+@stefanha-x1.localdomain>
+Date: Wed, 24 Feb 2021 09:58:51 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210224145851.GC3148@redhat.com>
 References: <20210223225250.23945-1-vgoyal@redhat.com>
-	<20210223225250.23945-2-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="LQ1RUayJWBLhbxyk"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210223225250.23945-2-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 1/2] virtiofsd: Add umask to seccom allow
-	list
+In-Reply-To: <20210223225250.23945-1-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v3 0/2] virtiofsd: Enable posix_acl by
+	default
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,40 +16,54 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, miklos@szeredi.hu, qemu-devel@nongnu.org
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com
+Cc: miklos@szeredi.hu
 
+On Tue, Feb 23, 2021 at 05:52:48PM -0500, Vivek Goyal wrote:
+> Hi,
+> 
+> This is V3 of the patches. Changes since v2 are.
+> 
+> - I dropped the patch to give user an option to enable/disable acls.
+>   Now acls are enabled by default if xattrs are enabled and fuse
+>   client offers FUSE_POSIX_ACL capability.
+>  
+> Miklos mentioned that ACLS might not have lot of overhead as these
+> can be cached. So it might make sense to enable these by default.
 
---LQ1RUayJWBLhbxyk
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Maybe ACL caching will only work well with cache=auto and cache=always.
+With cache=none it probably will show most extra overhead.
 
-On Tue, Feb 23, 2021 at 05:52:49PM -0500, Vivek Goyal wrote:
-> Patches in this series  are going to make use of "umask" syscall.
-> So allow it.
->=20
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  tools/virtiofsd/passthrough_seccomp.c | 1 +
->  1 file changed, 1 insertion(+)
+For example, with cache=none, I did "su test". And then did "cat foo.txt"
+and every time it results in two GETXATTR(system.posix_acl_access) calls.
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+2021-02-24 09:56:09.45-0500] [ID: 00000004] lo_getxattr(ino=1, name=system.posix_acl_access size=4096)
+[2021-02-24 09:56:09.45-0500] [ID: 00000004] lo_getxattr(ino=2, name=system.posix_acl_access size=4096)
 
---LQ1RUayJWBLhbxyk
-Content-Type: application/pgp-signature; name="signature.asc"
+So this will definitely impact the performance with cache=none negatively.
 
------BEGIN PGP SIGNATURE-----
+I am now inclined to respin the patches and add options to enable/disable
+acl and keep acl disabled by default. Those who need it, can enable it.
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmA2RcwACgkQnKSrs4Gr
-c8j5bwf9GOjSn9zhlXu6g9boOZzii6dzYutZpyVLXbqc0XFLZv4nXb0T/eA0ZhlL
-B//PSDpkBD/lrk6kQJz9UcIUw2LYvC3GGFVye1Ys80WFcVGate4k/j3H6Se9PPhf
-dqkPDKcfP+HkKpzb1pbCUPj1XUGLVh8iTbDWQCZQTbsfMQw+jnLLvaejTUPWAgPK
-IE4QLhD8RcZW/b4wso9Q2jGNqZ8KJ1/O3P4LRTstVFF6Tfr3/IuS8hwG4oLfc4SQ
-QrsYAUYumdYFXT2lf+nNMa25HHftByZ3xPMwzLL3LzFgu+8qnhI09OexJPiU5ifH
-WZInBHD4fbse40hRCCJqfIFTVj/i5A==
-=AaQM
------END PGP SIGNATURE-----
+Vivek
 
---LQ1RUayJWBLhbxyk--
+> 
+> If we run into performance issues, then we can add another patch to
+> give option to enable/disable and disable it by default.
+> 
+> Luis Henriques reported that fstest generic/099 fails with virtiofs.
+> Little debugging showed that we don't enable acl support. This
+> patch series should fix the issue
+> 
+> Vivek Goyal (2):
+>   virtiofsd: Add umask to seccom allow list
+>   virtiofsd: Enable posix_acls by default if xattrs are enabled
+> 
+>  tools/virtiofsd/passthrough_ll.c      | 29 +++++++++++++++++++++------
+>  tools/virtiofsd/passthrough_seccomp.c |  1 +
+>  2 files changed, 24 insertions(+), 6 deletions(-)
+> 
+> -- 
+> 2.25.4
+> 
 

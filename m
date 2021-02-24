@@ -1,15 +1,29 @@
-Date: Wed, 24 Feb 2021 15:02:48 +0000
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YDZqmFRjo7EfuSA2@stefanha-x1.localdomain>
-References: <20210223225250.23945-1-vgoyal@redhat.com>
-	<20210223225250.23945-3-vgoyal@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+	d=crudebyte.com; s=kylie; h=Content-Type:Content-Transfer-Encoding:
+	MIME-Version:References:In-Reply-To:Message-ID:Date:Subject:Cc:To:From:
+	Content-ID:Content-Description;
+	bh=/y6xFzyCzw1KT1sJVP9w0ePufQ9CHZv14Yo6pv/8g4s=;
+	b=lPaezqxKKhgEdyb2GpcJ7yFIjl
+	ztGSuf6Rn/WteaZ3Oj3ZwnFFAChUJWeyUEu6HxWonSS3LF0NsMJOWdTDPlC555Az9Mj7akIHAKR6x
+	6dOkznyj5KZLIwMGqrx9YaHAzP/xg/fCTm1WK2+DLoAY5owuBTzAKRXcNm+HMv9FAAxED/gW4bJL+
+	zVkhnY/jF9pRj7LExnfAPhb0dMRYRijDKBZhKABA/SiHGQEu2R2748brJ8RlSLv+wFBuqNEjSS1o8
+	czR7nVCx0qOipRdXf0VpW4fhCu4zU073NViCLWrk1bHGpq1zJVLaVARrhb4cWr+KqaLM/MXBWuPtc
+	2EvAOaM22f4fFSC6Uy60LZZXtzQ/AcqE3KfRaFk80lOaWd6fayTHA0urUjf1zo9ChDW7X5ZYsa5mZ
+	kmJ5BGieBhfq/rdVpcarA5Yj1vj5FoiDIvzCwtl13AOqjhUYcXnJlJ6qzHI4CGKndxPxtJL4uDxZ2
+	mhH4AObrOSAt9W871eHOq3ysC41NERxeecRhLYjAteTbwWWIVWpFWDMSCcqRuj9LAzCPXYdrA0MI2
+	8/yzb5pZmkMs6Mq0leUhZoAuNG8RbwQEkLiK9KIFiKkW94g7P8fc9a2hwTnI5LQY3Q9IOx9QulDCE
+	eA6+C1b+0UcNYLQb8bPHu9yPveIsDMbEQA5tU4tAQ=
+From: Christian Schoenebeck <qemu_oss@crudebyte.com>
+Date: Wed, 24 Feb 2021 16:16:52 +0100
+Message-ID: <2006960.IAZaadA1hq@silver>
+In-Reply-To: <20210223090531-mutt-send-email-mst@kernel.org>
+References: <20200918213436.GA3520@redhat.com> <6115734.fQeFoySBn5@silver>
+	<20210223090531-mutt-send-email-mst@kernel.org>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="qeak9ylNud5wPNaF"
-Content-Disposition: inline
-In-Reply-To: <20210223225250.23945-3-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 2/2] virtiofsd: Enable posix_acls by
- default if xattrs are enabled
+Content-Transfer-Encoding: 7Bit
+Content-Type: text/plain; charset="us-ascii"
+Subject: Re: [Virtio-fs] Can not set high msize with virtio-9p (Was: Re:
+	virtiofs vs 9p performance)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,70 +32,52 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, miklos@szeredi.hu, qemu-devel@nongnu.org
+To: "Michael S. Tsirkin" <mst@redhat.com>
+Cc: "cdupontd@redhat.com" <cdupontd@redhat.com>, Dominique Martinet <asmadeus@codewreck.org>, "Venegas Munoz,
+	Jose Carlos" <jose.carlos.venegas.munoz@intel.com>, qemu-devel@nongnu.org, virtio-fs-list <virtio-fs@redhat.com>, v9fs-developer@lists.sourceforge.net, "Shinde,
+	Archana M" <archana.m.shinde@intel.com>, Vivek Goyal <vgoyal@redhat.com>
 
+On Dienstag, 23. Februar 2021 15:07:31 CET Michael S. Tsirkin wrote:
+> > Michael, Dominique,
+> > 
+> > we are wondering here about the message size limitation of just 5 kiB in
+> > the 9p Linux client (using virtio transport) which imposes a performance
+> > bottleneck, introduced by this kernel commit:
+> > 
+> > commit b49d8b5d7007a673796f3f99688b46931293873e
+> > Author: Aneesh Kumar K.V <aneesh.kumar@linux.vnet.ibm.com>
+> > Date:   Wed Aug 17 16:56:04 2011 +0000
+> > 
+> >     net/9p: Fix kernel crash with msize 512K
+> >     
+> >     With msize equal to 512K (PAGE_SIZE * VIRTQUEUE_NUM), we hit multiple
+> >     crashes. This patch fix those.
+> >     
+> >     Signed-off-by: Aneesh Kumar K.V <aneesh.kumar@linux.vnet.ibm.com>
+> >     Signed-off-by: Eric Van Hensbergen <ericvh@gmail.com>
+> 
+> Well the change I see is:
+> 
+> -       .maxsize = PAGE_SIZE*VIRTQUEUE_NUM,
+> +       .maxsize = PAGE_SIZE * (VIRTQUEUE_NUM - 3),
+> 
+> 
+> so how come you say it changes 512K to 5K?
+> Looks more like 500K to me.
 
---qeak9ylNud5wPNaF
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Misapprehension + typo(s) in my previous message, sorry Michael. That's 500k 
+of course (not 5k), yes.
 
-On Tue, Feb 23, 2021 at 05:52:50PM -0500, Vivek Goyal wrote:
-> Fuse protocl wants file server to opt in for FUSE_POSIX_ACL if posix
-> acls are to be enabled. Right now virtiofsd does not enable it. This
-> patch opts in for FUSE_POSIX_ACL if xattr support is enabled.
->=20
-> When parent directory has default acl and a file is created in that
-> directory, then umask is ignored and final file permissions are
-> determined using default acl instead. (man 2 umask).
->=20
-> Currently, fuse applies the umask and sends modified mode in create
-> request accordingly. fuse server can set FUSE_DONT_MASK and tell
-> fuse client to not apply umask and fuse server will take care of
-> it as needed.
->=20
-> With posix acls enabled, requirement will be that we want umask
-> to determine final file mode if parent directory does not have
-> default acl.
->=20
-> So if posix acls are enabled, opt in for FUSE_DONT_MASK. virtiofsd
-> will set umask of the thread doing file creation. And host kernel
-> should use that umask if parent directory does not have default
-> acls, otherwise umask does not take affect.
->=20
-> Miklos mentioned that we already call unshare(CLONE_FS) for
-> every thread. That means umask has now become property of per
-> thread and it should be ok to manipulate it in file creation path.
->=20
-> So this patch also opts in for FUSE_DONT_MASK if posix acls are enabled
-> and changes umask to caller umask before file creation and restores
-> original umask after file creation is done.
->=20
-> This should fix fstest generic/099.
->=20
-> Reported-by: Luis Henriques <lhenriques@suse.de>
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  tools/virtiofsd/passthrough_ll.c | 29 +++++++++++++++++++++++------
->  1 file changed, 23 insertions(+), 6 deletions(-)
+Let me rephrase that question: are you aware of something in virtio that would 
+per se mandate an absolute hard coded message size limit (e.g. from virtio 
+specs perspective or maybe some compatibility issue)?
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+If not, we would try getting rid of that hard coded limit of the 9p client on 
+kernel side in the first place, because the kernel's 9p client already has a 
+dynamic runtime option 'msize' and that hard coded enforced limit (500k) is a 
+performance bottleneck like I said.
 
---qeak9ylNud5wPNaF
-Content-Type: application/pgp-signature; name="signature.asc"
+Best regards,
+Christian Schoenebeck
 
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmA2apgACgkQnKSrs4Gr
-c8hohggArikNHhycv2EGxYGzN2/ktYvmeaDlAOhQ/xB11j26Bx3xo2QoV3Zf1MfV
-nlBGEH6iCYzUcCj9jg9F1yWN2O8z1StkyIFUuccwxKoCLYt1ag4J0j8EYnNPrubE
-A1Pi72Zyl8xrdTr8P/E7Sq++ybmiGmrKzUgSjsER6u3NeSQ6Ok7lOphE8gS9Z3WV
-kYBu8Wqs0bclBd8XD2eKZm/kdOZWdR3VIl98XNL5pvL0Rg5Kbs+u46y86t+lPanL
-yfpSfVPOtVMU0kSsYKNjx6Hky4Et4rZpRxyMIfITuH43K1y3soGfu1HJZ4FiKYD5
-ZQIxRclZoYFyh4/4ddj2BXeUgwLhUQ==
-=i7ub
------END PGP SIGNATURE-----
-
---qeak9ylNud5wPNaF--
 

@@ -1,10 +1,11 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 24 Feb 2021 11:58:34 -0500
-Message-Id: <20210224165837.21983-1-vgoyal@redhat.com>
+Date: Wed, 24 Feb 2021 11:58:35 -0500
+Message-Id: <20210224165837.21983-2-vgoyal@redhat.com>
+In-Reply-To: <20210224165837.21983-1-vgoyal@redhat.com>
+References: <20210224165837.21983-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v4 0/3] virtiofsd: Add support to enable/disable
-	posix acls
+Subject: [Virtio-fs] [PATCH v4 1/3] virtiofsd: Add umask to seccom allow list
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,47 +17,27 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: vgoyal@redhat.com, miklos@szeredi.hu
 
-Hi,
+Patches in this series  are going to make use of "umask" syscall.
+So allow it.
 
-This is V4 of patches.
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ tools/virtiofsd/passthrough_seccomp.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-In V3 I enabled posix_acl by default. Then I tested with cache=none and
-a simple "cat foo.txt" results in two extra GETXATTR(system.posix_acl)
-calls. (Note, this happens only if caller is not owner of file). And
-this happens on every call of "cat foo.txt" because cache=none does
-not cache anything in guest.
-
-So this make me rethink the idea of enabling posix_acl by default. I
-prefer not to have any performance regressions in any of the mode
-out of the box.
-
-Hence proposing this V4 where posix_acls are disabled by default and
-user needs to enable it explicitly if the want posix acls. This probably
-can change down the line once somebody can prove enabling it by deafult
-really does not impact us much.
-
-Change since V3.
-
-- Do not enable posix_acl by default.
-- Error out if user wants to enable it but xattr are disabled.
-- Modified help message and docs/tools/virtiofsd.rst to add
-  documentation for this new knob (Luis Henriques).
-- Captured Reviewed-by tags from Stefan from V3.
-
-Thanks
-Vivek
-
-Vivek Goyal (3):
-  virtiofsd: Add umask to seccom allow list
-  virtiofsd: Add capability to change/restore umask
-  virtiofsd: Add an option to enable/disable posix acls
-
- docs/tools/virtiofsd.rst              |   3 +
- tools/virtiofsd/helper.c              |   1 +
- tools/virtiofsd/passthrough_ll.c      | 125 ++++++++++++++++++++++++--
- tools/virtiofsd/passthrough_seccomp.c |   1 +
- 4 files changed, 123 insertions(+), 7 deletions(-)
-
+diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
+index 62441cfcdb..f49ed94b5e 100644
+--- a/tools/virtiofsd/passthrough_seccomp.c
++++ b/tools/virtiofsd/passthrough_seccomp.c
+@@ -114,6 +114,7 @@ static const int syscall_allowlist[] = {
+     SCMP_SYS(utimensat),
+     SCMP_SYS(write),
+     SCMP_SYS(writev),
++    SCMP_SYS(umask),
+ };
+ 
+ /* Syscalls used when --syslog is enabled */
 -- 
 2.25.4
 

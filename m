@@ -1,13 +1,15 @@
-Date: Wed, 24 Feb 2021 09:58:51 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210224145851.GC3148@redhat.com>
+Date: Wed, 24 Feb 2021 15:02:48 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <YDZqmFRjo7EfuSA2@stefanha-x1.localdomain>
 References: <20210223225250.23945-1-vgoyal@redhat.com>
+	<20210223225250.23945-3-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="qeak9ylNud5wPNaF"
 Content-Disposition: inline
-In-Reply-To: <20210223225250.23945-1-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 0/2] virtiofsd: Enable posix_acl by
-	default
+In-Reply-To: <20210223225250.23945-3-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v3 2/2] virtiofsd: Enable posix_acls by
+ default if xattrs are enabled
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,54 +18,70 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com
-Cc: miklos@szeredi.hu
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, miklos@szeredi.hu, qemu-devel@nongnu.org
 
-On Tue, Feb 23, 2021 at 05:52:48PM -0500, Vivek Goyal wrote:
-> Hi,
-> 
-> This is V3 of the patches. Changes since v2 are.
-> 
-> - I dropped the patch to give user an option to enable/disable acls.
->   Now acls are enabled by default if xattrs are enabled and fuse
->   client offers FUSE_POSIX_ACL capability.
->  
-> Miklos mentioned that ACLS might not have lot of overhead as these
-> can be cached. So it might make sense to enable these by default.
 
-Maybe ACL caching will only work well with cache=auto and cache=always.
-With cache=none it probably will show most extra overhead.
+--qeak9ylNud5wPNaF
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-For example, with cache=none, I did "su test". And then did "cat foo.txt"
-and every time it results in two GETXATTR(system.posix_acl_access) calls.
+On Tue, Feb 23, 2021 at 05:52:50PM -0500, Vivek Goyal wrote:
+> Fuse protocl wants file server to opt in for FUSE_POSIX_ACL if posix
+> acls are to be enabled. Right now virtiofsd does not enable it. This
+> patch opts in for FUSE_POSIX_ACL if xattr support is enabled.
+>=20
+> When parent directory has default acl and a file is created in that
+> directory, then umask is ignored and final file permissions are
+> determined using default acl instead. (man 2 umask).
+>=20
+> Currently, fuse applies the umask and sends modified mode in create
+> request accordingly. fuse server can set FUSE_DONT_MASK and tell
+> fuse client to not apply umask and fuse server will take care of
+> it as needed.
+>=20
+> With posix acls enabled, requirement will be that we want umask
+> to determine final file mode if parent directory does not have
+> default acl.
+>=20
+> So if posix acls are enabled, opt in for FUSE_DONT_MASK. virtiofsd
+> will set umask of the thread doing file creation. And host kernel
+> should use that umask if parent directory does not have default
+> acls, otherwise umask does not take affect.
+>=20
+> Miklos mentioned that we already call unshare(CLONE_FS) for
+> every thread. That means umask has now become property of per
+> thread and it should be ok to manipulate it in file creation path.
+>=20
+> So this patch also opts in for FUSE_DONT_MASK if posix acls are enabled
+> and changes umask to caller umask before file creation and restores
+> original umask after file creation is done.
+>=20
+> This should fix fstest generic/099.
+>=20
+> Reported-by: Luis Henriques <lhenriques@suse.de>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 29 +++++++++++++++++++++++------
+>  1 file changed, 23 insertions(+), 6 deletions(-)
 
-2021-02-24 09:56:09.45-0500] [ID: 00000004] lo_getxattr(ino=1, name=system.posix_acl_access size=4096)
-[2021-02-24 09:56:09.45-0500] [ID: 00000004] lo_getxattr(ino=2, name=system.posix_acl_access size=4096)
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
-So this will definitely impact the performance with cache=none negatively.
+--qeak9ylNud5wPNaF
+Content-Type: application/pgp-signature; name="signature.asc"
 
-I am now inclined to respin the patches and add options to enable/disable
-acl and keep acl disabled by default. Those who need it, can enable it.
+-----BEGIN PGP SIGNATURE-----
 
-Vivek
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmA2apgACgkQnKSrs4Gr
+c8hohggArikNHhycv2EGxYGzN2/ktYvmeaDlAOhQ/xB11j26Bx3xo2QoV3Zf1MfV
+nlBGEH6iCYzUcCj9jg9F1yWN2O8z1StkyIFUuccwxKoCLYt1ag4J0j8EYnNPrubE
+A1Pi72Zyl8xrdTr8P/E7Sq++ybmiGmrKzUgSjsER6u3NeSQ6Ok7lOphE8gS9Z3WV
+kYBu8Wqs0bclBd8XD2eKZm/kdOZWdR3VIl98XNL5pvL0Rg5Kbs+u46y86t+lPanL
+yfpSfVPOtVMU0kSsYKNjx6Hky4Et4rZpRxyMIfITuH43K1y3soGfu1HJZ4FiKYD5
+ZQIxRclZoYFyh4/4ddj2BXeUgwLhUQ==
+=i7ub
+-----END PGP SIGNATURE-----
 
-> 
-> If we run into performance issues, then we can add another patch to
-> give option to enable/disable and disable it by default.
-> 
-> Luis Henriques reported that fstest generic/099 fails with virtiofs.
-> Little debugging showed that we don't enable acl support. This
-> patch series should fix the issue
-> 
-> Vivek Goyal (2):
->   virtiofsd: Add umask to seccom allow list
->   virtiofsd: Enable posix_acls by default if xattrs are enabled
-> 
->  tools/virtiofsd/passthrough_ll.c      | 29 +++++++++++++++++++++------
->  tools/virtiofsd/passthrough_seccomp.c |  1 +
->  2 files changed, 24 insertions(+), 6 deletions(-)
-> 
-> -- 
-> 2.25.4
-> 
+--qeak9ylNud5wPNaF--
 

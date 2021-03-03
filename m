@@ -1,15 +1,29 @@
-Date: Tue, 2 Mar 2021 11:25:54 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210302162554.GE220334@redhat.com>
-References: <20210226183357.28467-1-lhenriques@suse.de>
-	<20210301163324.GC186178@redhat.com> <YD0wbmulcBVZ7VZy@suse.de>
-	<20210302160033.GD220334@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+	d=crudebyte.com; s=kylie; h=Content-Type:Content-Transfer-Encoding:
+	MIME-Version:References:In-Reply-To:Message-ID:Date:Subject:Cc:To:From:
+	Content-ID:Content-Description;
+	bh=vK60LVqZ1MizhW17MFO70pzqiivCnOEjbQpiOY4eEnQ=;
+	b=BhoDwYUpxPKYsSIrcxOSQn0Ye6
+	xoEKDA3F5AjYG7a9vuosWfQ1ARAEAW9NNdLjYixzHzr+D4Z+HZg6IbJJfQIiFb+bL/OsDOhDSVBDA
+	AaDkbzoOI0fnWcjmRSgUe8FLsG/OulyKqeVxfmsrMxu8OdLFuAP3+WcOGqnElUgIT+xpcMusNi/U9
+	//eG3/gOV9KS24Rb0WC/sj5o6g87YXj61vnyQl4y8SedEaLIJlZjsUkLtyL55NRZE4vCQEcbvNkGO
+	mRvGKFSUmRkrIZVxLbHFvXsEoB/ARjYsElLg85/T4XuLFbDmWQLIw7wmZyC3911oZGBD4rcvnFrBj
+	cSWQM5D3QeV6HJR1K6LbdcMXQsjoKX3U5/l/7uleEtRUGypRNOKvA24C8/W3ifZUJEpCRpdDTM9Yd
+	gBYeoViKxA46gY0p+vZ91Hrm6Wgn2mukuiNHhJnmh4+P/web1yFRWebDz12CkEfyRIH9VudNUkUeM
+	XkY7Mmg3Zgn6fZn+PXrhnXGLHzDs2asduD9CxWabIMJZ5x2rMlsOAUV5Bos12jL7ywEzmosyQ13y+
+	hQ53SkdqgBeK2qlXnSdc0VfjVyjkoVgBujQt8iFI3QWrdxbSdb9U6yVyp51f0cHfhz6rXJWdYJYyB
+	981BUHDc4hgb3Xj9DoGVRGstUdoSbv1GwcGtoo6B4=
+From: Christian Schoenebeck <qemu_oss@crudebyte.com>
+Date: Wed, 03 Mar 2021 15:04:21 +0100
+Message-ID: <1805660.C9YIKG4Ep7@silver>
+In-Reply-To: <YDmMXCxxOqo1xKgq@odin>
+References: <20200918213436.GA3520@redhat.com> <1918692.k70u9Ml6kK@silver>
+	<YDmMXCxxOqo1xKgq@odin>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210302160033.GD220334@redhat.com>
-Subject: Re: [Virtio-fs] [RFC PATCH] fuse: Clear SGID bit when setting mode
-	in setacl
+Content-Transfer-Encoding: 7Bit
+Content-Type: text/plain; charset="us-ascii"
+Subject: Re: [Virtio-fs] Can not set high msize with virtio-9p (Was: Re:
+	virtiofs vs 9p performance)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,197 +32,154 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Luis Henriques <lhenriques@suse.de>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, linux-kernel@vger.kernel.org, Miklos Szeredi <miklos@szeredi.hu>
+To: qemu-devel@nongnu.org
+Cc: "cdupontd@redhat.com" <cdupontd@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Dominique Martinet <asmadeus@codewreck.org>, "Venegas Munoz,
+	Jose Carlos" <jose.carlos.venegas.munoz@intel.com>, virtio-fs-list <virtio-fs@redhat.com>, v9fs-developer@lists.sourceforge.net, "Shinde,
+	Archana M" <archana.m.shinde@intel.com>, Vivek Goyal <vgoyal@redhat.com>
 
-On Tue, Mar 02, 2021 at 11:00:33AM -0500, Vivek Goyal wrote:
-> On Mon, Mar 01, 2021 at 06:20:30PM +0000, Luis Henriques wrote:
-> > On Mon, Mar 01, 2021 at 11:33:24AM -0500, Vivek Goyal wrote:
-> > > On Fri, Feb 26, 2021 at 06:33:57PM +0000, Luis Henriques wrote:
-> > > > Setting file permissions with POSIX ACLs (setxattr) isn't clearing the
-> > > > setgid bit.  This seems to be CVE-2016-7097, detected by running fstest
-> > > > generic/375 in virtiofs.  Unfortunately, when the fix for this CVE landed
-> > > > in the kernel with commit 073931017b49 ("posix_acl: Clear SGID bit when
-> > > > setting file permissions"), FUSE didn't had ACLs support yet.
-> > > 
-> > > Hi Luis,
-> > > 
-> > > Interesting. I did not know that "chmod" can lead to clearing of SGID
-> > > as well. Recently we implemented FUSE_HANDLE_KILLPRIV_V2 flag which
-> > > means that file server is responsible for clearing of SUID/SGID/caps
-> > > as per following rules.
-> > > 
-> > >     - caps are always cleared on chown/write/truncate
-> > >     - suid is always cleared on chown, while for truncate/write it is cleared
-> > >       only if caller does not have CAP_FSETID.
-> > >     - sgid is always cleared on chown, while for truncate/write it is cleared
-> > >       only if caller does not have CAP_FSETID as well as file has group execute
-> > >       permission.
-> > > 
-> > > And we don't have anything about "chmod" in this list. Well, I will test
-> > > this and come back to this little later.
-> > > 
-> > > I see following comment in fuse_set_acl().
-> > > 
-> > >                 /*
-> > >                  * Fuse userspace is responsible for updating access
-> > >                  * permissions in the inode, if needed. fuse_setxattr
-> > >                  * invalidates the inode attributes, which will force
-> > >                  * them to be refreshed the next time they are used,
-> > >                  * and it also updates i_ctime.
-> > >                  */
-> > > 
-> > > So looks like that original code has been written with intent that
-> > > file server is responsible for updating inode permissions. I am
-> > > assuming this will include clearing of S_ISGID if needed.
-> > > 
-> > > But question is, does file server has enough information to be able
-> > > to handle proper clearing of S_ISGID info. IIUC, file server will need
-> > > two pieces of information atleast.
-> > > 
-> > > - gid of the caller.
-> > > - Whether caller has CAP_FSETID or not.
-> > > 
-> > > I think we have first piece of information but not the second one. May
-> > > be we need to send this in fuse_setxattr_in->flags. And file server
-> > > can drop CAP_FSETID while doing setxattr().
-> > > 
-> > > What about "gid" info. We don't change to caller's uid/gid while doing
-> > > setxattr(). So host might not clear S_ISGID or clear it when it should
-> > > not. I am wondering that can we switch to caller's uid/gid in setxattr(),
-> > > atleast while setting acls.
+On Samstag, 27. Februar 2021 01:03:40 CET Dominique Martinet wrote:
+> Christian Schoenebeck wrote on Fri, Feb 26, 2021 at 02:49:12PM +0100:
+> > Right now the client uses a hard coded amount of 128 elements. So what
+> > about replacing VIRTQUEUE_NUM by a variable which is initialized with a
+> > value according to the user's requested 'msize' option at init time?
 > > 
-> > Thank for looking into this.  To be honest, initially I thought that the
-> > fix should be done in the server too, but when I looked into the code I
-> > couldn't find an easy way to get that done (without modifying the data
-> > being passed from the kernel in setxattr).
+> > According to the virtio specs the max. amount of elements in a virtqueue
+> > is
+> > 32768. So 32768 * 4k = 128M as new upper limit would already be a
+> > significant improvement and would not require too many changes to the
+> > client code, right?
+> The current code inits the chan->sg at probe time (when driver is
+> loader) and not mount time, and it is currently embedded in the chan
+> struct, so that would need allocating at mount time (p9_client_create ;
+> either resizing if required or not sharing) but it doesn't sound too
+> intrusive yes.
+> 
+> I don't see more adherenences to VIRTQUEUE_NUM that would hurt trying.
+
+Ok, then I will look into changing this when I hopefully have some time in few 
+weeks.
+
+> > > On the 9p side itself, unrelated to virtio, we don't want to make it
+> > > *too* big as the client code doesn't use any scatter-gather and will
+> > > want to allocate upfront contiguous buffers of the size that got
+> > > negotiated -- that can get ugly quite fast, but we can leave it up to
+> > > users to decide.
 > > 
-> > So, what I've done was to look at what other filesystems were doing in the
-> > ACL code, and that's where I found out about this CVE.  The CVE fix for
-> > the other filesystems looked easy enough to be included in FUSE too.
+> > With ugly you just mean that it's occupying this memory for good as long
+> > as
+> > the driver is loaded, or is there some runtime performance penalty as well
+> > to be aware of?
 > 
-> Hi Luis,
+> The main problem is memory fragmentation, see /proc/buddyinfo on various
+> systems.
+> After a fresh boot memory is quite clean and there is no problem
+> allocating 2MB contiguous buffers, but after a while depending on the
+> workload it can be hard to even allocate large buffers.
+> I've had that problem at work in the past with a RDMA driver that wanted
+> to allocate 256KB and could get that to fail quite reliably with our
+> workload, so it really depends on what the client does.
 > 
-> I still feel that it should probably be fixed in virtiofsd, given fuse client
-> is expecting file server to take care of any change of mode (file
-> permission bits).
+> In the 9p case, the memory used to be allocated for good and per client
+> (= mountpoint), so if you had 15 9p mounts that could do e.g. 32
+> requests in parallel with 1MB buffers you could lock 500MB of idling
+> ram. I changed that to a dedicated slab a while ago, so that should no
+> longer be so much of a problem -- the slab will keep the buffers around
+> as well if used frequently so the performance hit wasn't bad even for
+> larger msizes
 
-Havid said that, there is one disadvantage of relying on server to
-do this. Now idmapped mount patches have been merged. If virtiofs
-were to ever support idmapped mounts, this will become an issue.
-Server does not know about idmapped mounts, and it does not have
-information on how to shift inode gid to determine if SGID should
-be cleared or not.
+Ah ok, good to know.
 
-So if we were to keep possible future support of idmapped mounts in mind,
-then solving it in client makes more sense.  (/me is afraid that there
-might be other dependencies like this elsewhere).
+BTW qemu now handles multiple filesystems below one 9p share correctly by 
+(optionally) remapping inode numbers from host side -> guest side 
+appropriately to prevent potential file ID collisions. This might reduce the 
+need to have a large amount of 9p mount points on guest side.
 
-Miklos, WDYT.
+For instance I am running entire guest systems entirely on one 9p mount point 
+as root fs that is. The guest system is divided into multiple filesystems on 
+host side (e.g. multiple zfs datasets), not on guest side.
 
-Thanks
-Vivek
+> > > One of my very-long-term goal would be to tend to that, if someone has
+> > > cycles to work on it I'd gladly review any patch in that area.
+> > > A possible implementation path would be to have transport define
+> > > themselves if they support it or not and handle it accordingly until all
+> > > transports migrated, so one wouldn't need to care about e.g. rdma or xen
+> > > if you don't have hardware to test in the short term.
+> > 
+> > Sounds like something that Greg suggested before for a slightly different,
+> > even though related issue: right now the default 'msize' on Linux client
+> > side is 8k, which really hurts performance wise as virtually all 9p
+> > messages have to be split into a huge number of request and response
+> > messages. OTOH you don't want to set this default value too high. So Greg
+> > noted that virtio could suggest a default msize, i.e. a value that would
+> > suit host's storage hardware appropriately.
+> 
+> We can definitely increase the default, for all transports in my
+> opinion.
+> As a first step, 64 or 128k?
 
+Just to throw some numbers first; when linearly reading a 12 GB file on guest 
+(i.e. "time cat test.dat > /dev/null") on a test machine, these are the 
+results that I get (cache=mmap):
+
+msize=16k: 2min7s (95 MB/s)
+msize=64k: 17s (706 MB/s)
+msize=128k: 12s (1000 MB/s)
+msize=256k: 8s (1500 MB/s)
+msize=512k: 6.5s (1846 MB/s)
+
+Personally I would raise the default msize value at least to 128k.
+
+> > > The next best thing would be David's netfs helpers and sending
+> > > concurrent requests if you use cache, but that's not merged yet either
+> > > so it'll be a few cycles as well.
+> > 
+> > So right now the Linux client is always just handling one request at a
+> > time; it sends a 9p request and waits for its response before processing
+> > the next request?
 > 
-> I wrote a proof of concept patch and this should fix this. But it
-> drop CAP_FSETID always. So I will need to modify kernel to pass
-> this information to file server and that should properly fix
-> generic/375. 
+> Requests are handled concurrently just fine - if you have multiple
+> processes all doing their things it will all go out in parallel.
 > 
-> Please have a look. This applies on top of fuse acl support V4 patches
-> I had posted. I have pushed all the patches on a temporary git branch
-> as well.
-> 
-> https://github.com/rhvgoyal/qemu/commits/acl-sgid
-> 
-> Vivek
-> 
-> 
-> Subject: virtiofsd: Switch creds, drop FSETID for system.posix_acl_access xattr
-> 
-> When posix access acls are set on a file, it can lead to adjusting file
-> permissions (mode) as well. If caller does not have CAP_FSETID and it
-> also does not have membership of owner group, this will lead to clearing
-> SGID bit in mode.
-> 
-> Current fuse code is written in such a way that it expects file server
-> to take care of chaning file mode (permission), if there is a need.
-> Right now, host kernel does not clear SGID bit because virtiofsd is
-> running as root and has CAP_FSETID. For host kernel to clear SGID,
-> virtiofsd need to switch to gid of caller in guest and also drop
-> CAP_FSETID (if caller did not have it to begin with).
-> 
-> This is a proof of concept patch which switches to caller's uid/gid
-> and alwasys drops CAP_FSETID in lo_setxattr(system.posix_acl_access).
-> This should fix the xfstest generic/375 test case.
-> 
-> This patch is not complete yet. Kernel should pass information when
-> to drop CAP_FSETID and when not to. I will look into modifying
-> kernel to pass this information to file server.
-> 
-> Reported-by: Luis Henriques <lhenriques@suse.de>
-> Yet-to-be-signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  tools/virtiofsd/passthrough_ll.c |   28 +++++++++++++++++++++++++++-
->  1 file changed, 27 insertions(+), 1 deletion(-)
-> 
-> Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
-> ===================================================================
-> --- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2021-03-02 08:06:20.539820330 -0500
-> +++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2021-03-02 10:46:40.901334665 -0500
-> @@ -172,7 +172,7 @@ struct lo_data {
->      int user_killpriv_v2, killpriv_v2;
->      /* If set, virtiofsd is responsible for setting umask during creation */
->      bool change_umask;
-> -    int user_posix_acl;
-> +    int user_posix_acl, posix_acl;
->  };
->  
->  static const struct fuse_opt lo_opts[] = {
-> @@ -677,6 +677,7 @@ static void lo_init(void *userdata, stru
->          fuse_log(FUSE_LOG_DEBUG, "lo_init: enabling posix acl\n");
->          conn->want |= FUSE_CAP_POSIX_ACL | FUSE_CAP_DONT_MASK;
->          lo->change_umask = true;
-> +        lo->posix_acl = true;
->      } else {
->          /* User either did not specify anything or wants it disabled */
->          fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling posix_acl\n");
-> @@ -2981,12 +2982,37 @@ static void lo_setxattr(fuse_req_t req,
->  
->      sprintf(procname, "%i", inode->fd);
->      if (S_ISREG(inode->filetype) || S_ISDIR(inode->filetype)) {
-> +        bool switched_creds = false;
-> +        struct lo_cred old = {};
-> +
->          fd = openat(lo->proc_self_fd, procname, O_RDONLY);
->          if (fd < 0) {
->              saverr = errno;
->              goto out;
->          }
-> +
-> +        if (lo->posix_acl && !strcmp(name, "system.posix_acl_access")) {
-> +            ret = lo_change_cred(req, &old, false);
-> +            if (ret) {
-> +                saverr = ret;
-> +                goto out;
-> +            }
-> +            ret = drop_effective_cap("FSETID", NULL);
-> +            if (ret != 0) {
-> +                lo_restore_cred(&old, false);
-> +                saverr = ret;
-> +                goto out;
-> +            }
-> +            switched_creds = true;
-> +        }
-> +
->          ret = fsetxattr(fd, name, value, size, flags);
-> +
-> +        if (switched_creds) {
-> +            if (gain_effective_cap("FSETID"))
-> +                fuse_log(FUSE_LOG_ERR, "Failed to gain CAP_FSETID\n");
-> +            lo_restore_cred(&old, false);
-> +        }
->      } else {
->          /* fchdir should not fail here */
->          assert(fchdir(lo->proc_self_fd) == 0);
+> The bottleneck people generally complain about (and where things hurt)
+> is if you have a single process reading then there is currently no
+> readahead as far as I know, so reads are really sent one at a time,
+> waiting for reply and sending next.
+
+So that also means if you are running a multi-threaded app (in one process) on 
+guest side, then none of its I/O requests are handled in parallel right now. 
+It would be desirable to have parallel requests for multi-threaded apps as 
+well.
+
+Personally I don't find raw I/O the worst performance issue right now. As you 
+can see from the numbers above, if 'msize' is raised and I/O being performed 
+with large chunk sizes (e.g. 'cat' automatically uses a chunk size according 
+to the iounit advertised by stat) then the I/O results are okay.
+
+What hurts IMO the most in practice is the sluggish behaviour regarding 
+dentries ATM. The following is with cache=mmap (on guest side):
+
+$ time ls /etc/ > /dev/null
+real    0m0.091s
+user    0m0.000s
+sys     0m0.044s
+$ time ls -l /etc/ > /dev/null
+real    0m0.259s
+user    0m0.008s
+sys     0m0.016s
+$ ls -l /etc/ | wc -l
+113
+$
+
+With cache=loose there is some improvement; on the first "ls" run (when its 
+not in the dentry cache I assume) the results are similar. The subsequent runs 
+then improve to around 50ms for "ls" and around 70ms for "ls -l". But that's 
+still far from numbers I would expect.
+
+Keep in mind, even when you just open() & read() a file, then directory 
+components have to be walked for checking ownership and permissions. I have 
+seen huge slowdowns in deep directory structures for that reason.
+
+Best regards,
+Christian Schoenebeck
+
 

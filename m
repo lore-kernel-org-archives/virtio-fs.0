@@ -1,13 +1,10 @@
-References: <20210303182027.GA3793@redhat.com>
-From: Max Reitz <mreitz@redhat.com>
-Message-ID: <d205a848-845c-bea0-25bf-a10db1f3fafc@redhat.com>
-Date: Thu, 4 Mar 2021 10:02:32 +0100
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Thu,  4 Mar 2021 10:24:45 +0000
+Message-Id: <20210304102445.22475-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20210303182027.GA3793@redhat.com>
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Language: en-US
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] Query about announce_submounts and ro/rw mounts
+Subject: [Virtio-fs] [PATCH] virtiofs: drop remapped security.capability
+	xattr as needed
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,49 +13,211 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>
+To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com
+Cc: virtio-fs@redhat.com
 
-On 03.03.21 19:20, Vivek Goyal wrote:
-> Hi Max,
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Hi Vivek,
+On Linux, the 'security.capability' xattr holds a set of
+capabilities that can change when an executable is run, giving
+a limited form of privilege escalation to those programs that
+the writer of the file deemed worthy.
 
-> I was playing with "announce_submounts". I have a read-only bind mounted
-> mount point in shared directory. Inside guest, when I step into that
-> directory, I see that a mount point got created but its "rw" and not "ro".
-> 
-> Is that intentional.
+Any write causes the 'security.capability' xattr to be dropped,
+stopping anyone from gaining privilege by modifying a blessed
+file.
 
-No, that isn’t intentional.  I just didn’t think of sharing such 
-information with the guest.
+Fuse relies on the daemon to do this dropping, and in turn the
+daemon relies on the host kernel to drop the xattr for it.  However,
+with the addition of -o xattrmap, the xattr that the guest
+stores its capabilities in is now not the same as the one that
+the host kernel automatically clears.
 
-> Can we send property of mount also to guest when
-> notifying guest about mount point.
+Where the mapping changes 'security.capability', explicitly clear
+the remapped name to preserve the same behaviour.
 
-I suppose we can send it (by adding a new flag alongside 
-FUSE_ATTR_SUBMOUNT), and we can make the mount ro by setting the 
-SB_RDONLY flag in fuse_dentry_automount().
+This bug is assigned CVE-2021-20263.
 
-If we implemented this for RDONLY, are there other flags that we might 
-want to consider as well?  (e.g. nodev etc.)
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ docs/tools/virtiofsd.rst         |  4 ++
+ tools/virtiofsd/passthrough_ll.c | 77 +++++++++++++++++++++++++++++++-
+ 2 files changed, 80 insertions(+), 1 deletion(-)
 
-OTOH, I just tested NFS, and it doesn’t pass through the RO flag:
-
-[...]
-/tmp/xfs.img on ~/tmp/test-nfs/mount type xfs (ro,...)
-[...]
-127.0.0.1:~/tmp/test-nfs on /mnt/tmp type nfs4 (rw,...)
-127.0.0.1:~/tmp/test-nfs/mount on /mnt/tmp/mount type nfs4 (rw,...)
-
-So is it really important or more a matter of style?
-
-> Does it make sense? I guess then next problem will be what if mount
-> changes back to "rw" and how to we propagate to guest. IIUC, we will
-> probably need monitor it and send notifications. Or notice this chagne
-> on next lookup.
-
-Yes, I imagine that would be rather complicated.  Is there a way to 
-monitor mount changes?
-
-Max
+diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
+index 866b7db3ee..00554c75bd 100644
+--- a/docs/tools/virtiofsd.rst
++++ b/docs/tools/virtiofsd.rst
+@@ -228,6 +228,10 @@ The 'map' type adds a number of separate rules to add **prepend** as a prefix
+ to the matched **key** (or all attributes if **key** is empty).
+ There may be at most one 'map' rule and it must be the last rule in the set.
+ 
++Note: When the 'security.capability' xattr is remapped, the daemon has to do
++extra work to remove it during many operations, which the host kernel normally
++does itself.
++
+ xattr-mapping Examples
+ ----------------------
+ 
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 58d24c0010..fc7e1b1e8e 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -148,6 +148,7 @@ struct lo_data {
+     int posix_lock;
+     int xattr;
+     char *xattrmap;
++    char *xattr_security_capability;
+     char *source;
+     char *modcaps;
+     double timeout;
+@@ -217,6 +218,8 @@ static __thread bool cap_loaded = 0;
+ 
+ static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
+                                 uint64_t mnt_id);
++static int xattr_map_client(const struct lo_data *lo, const char *client_name,
++                            char **out_name);
+ 
+ static int is_dot_or_dotdot(const char *name)
+ {
+@@ -356,6 +359,37 @@ out:
+     return ret;
+ }
+ 
++/*
++ * The host kernel normally drops security.capability xattr's on
++ * any write, however if we're remapping xattr names we need to drop
++ * whatever the clients security.capability is actually stored as.
++ */
++static int drop_security_capability(const struct lo_data *lo, int fd)
++{
++    if (!lo->xattr_security_capability) {
++        /* We didn't remap the name, let the host kernel do it */
++        return 0;
++    }
++    if (!fremovexattr(fd, lo->xattr_security_capability)) {
++        /* All good */
++        return 0;
++    }
++
++    switch (errno) {
++    case ENODATA:
++        /* Attribute didn't exist, that's fine */
++        return 0;
++
++    case ENOTSUP:
++        /* FS didn't support attribute anyway, also fine */
++        return 0;
++
++    default:
++        /* Hmm other error */
++        return errno;
++    }
++}
++
+ static void lo_map_init(struct lo_map *map)
+ {
+     map->elems = NULL;
+@@ -737,6 +771,11 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
+         uid_t uid = (valid & FUSE_SET_ATTR_UID) ? attr->st_uid : (uid_t)-1;
+         gid_t gid = (valid & FUSE_SET_ATTR_GID) ? attr->st_gid : (gid_t)-1;
+ 
++        saverr = drop_security_capability(lo, ifd);
++        if (saverr) {
++            goto out_err;
++        }
++
+         res = fchownat(ifd, "", uid, gid, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
+         if (res == -1) {
+             saverr = errno;
+@@ -759,6 +798,14 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
+             }
+         }
+ 
++        saverr = drop_security_capability(lo, truncfd);
++        if (saverr) {
++            if (!fi) {
++                close(truncfd);
++            }
++            goto out_err;
++        }
++
+         if (kill_suidgid) {
+             res = drop_effective_cap("FSETID", &cap_fsetid_dropped);
+             if (res != 0) {
+@@ -1784,6 +1831,13 @@ static int lo_do_open(struct lo_data *lo, struct lo_inode *inode,
+         if (fd < 0) {
+             return -fd;
+         }
++        if (fi->flags & (O_TRUNC)) {
++            int err = drop_security_capability(lo, fd);
++            if (err) {
++                close(fd);
++                return err;
++            }
++        }
+     }
+ 
+     pthread_mutex_lock(&lo->mutex);
+@@ -2191,6 +2245,12 @@ static void lo_write_buf(fuse_req_t req, fuse_ino_t ino,
+              "lo_write_buf(ino=%" PRIu64 ", size=%zd, off=%lu kill_priv=%d)\n",
+              ino, out_buf.buf[0].size, (unsigned long)off, fi->kill_priv);
+ 
++    res = drop_security_capability(lo_data(req), out_buf.buf[0].fd);
++    if (res) {
++        fuse_reply_err(req, res);
++        return;
++    }
++
+     /*
+      * If kill_priv is set, drop CAP_FSETID which should lead to kernel
+      * clearing setuid/setgid on file. Note, for WRITE, we need to do
+@@ -2432,6 +2492,7 @@ static void parse_xattrmap(struct lo_data *lo)
+ {
+     const char *map = lo->xattrmap;
+     const char *tmp;
++    int ret;
+ 
+     lo->xattr_map_nentries = 0;
+     while (*map) {
+@@ -2462,7 +2523,7 @@ static void parse_xattrmap(struct lo_data *lo)
+              * the last entry.
+              */
+             parse_xattrmap_map(lo, map, sep);
+-            return;
++            break;
+         } else {
+             fuse_log(FUSE_LOG_ERR,
+                      "%s: Unexpected type;"
+@@ -2531,6 +2592,19 @@ static void parse_xattrmap(struct lo_data *lo)
+         fuse_log(FUSE_LOG_ERR, "Empty xattr map\n");
+         exit(1);
+     }
++
++    ret = xattr_map_client(lo, "security.capability",
++                           &lo->xattr_security_capability);
++    if (ret) {
++        fuse_log(FUSE_LOG_ERR, "Failed to map security.capability: %s\n",
++                strerror(ret));
++        exit(1);
++    }
++    if (!strcmp(lo->xattr_security_capability, "security.capability")) {
++        /* 1-1 mapping, don't need to do anything */
++        free(lo->xattr_security_capability);
++        lo->xattr_security_capability = NULL;
++    }
+ }
+ 
+ /*
+@@ -3588,6 +3662,7 @@ static void fuse_lo_data_cleanup(struct lo_data *lo)
+ 
+     free(lo->xattrmap);
+     free_xattrmap(lo);
++    free(lo->xattr_security_capability);
+     free(lo->source);
+ }
+ 
+-- 
+2.29.2
 

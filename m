@@ -1,10 +1,13 @@
-Date: Wed, 3 Mar 2021 14:53:39 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210303195339.GB3793@redhat.com>
+References: <20210303182027.GA3793@redhat.com>
+From: Max Reitz <mreitz@redhat.com>
+Message-ID: <d205a848-845c-bea0-25bf-a10db1f3fafc@redhat.com>
+Date: Thu, 4 Mar 2021 10:02:32 +0100
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: [Virtio-fs] [PATCH] virtiofsd: Add qemu version and copyright info
+In-Reply-To: <20210303182027.GA3793@redhat.com>
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Language: en-US
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] Query about announce_submounts and ro/rw mounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,70 +16,49 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
+To: Vivek Goyal <vgoyal@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>
 
-Option "-V" currently displays the fuse protocol version virtiofsd is
-using. For example, I see this.
+On 03.03.21 19:20, Vivek Goyal wrote:
+> Hi Max,
 
-$ ./virtiofsd -V
-"using FUSE kernel interface version 7.33"
+Hi Vivek,
 
-People also want to know software version of virtiofsd so that they can
-figure out if a certain fix is part of currently running virtiofsd or
-not. Eric Ernst ran into this issue.
+> I was playing with "announce_submounts". I have a read-only bind mounted
+> mount point in shared directory. Inside guest, when I step into that
+> directory, I see that a mount point got created but its "rw" and not "ro".
+> 
+> Is that intentional.
 
-David Gilbert thinks that it probably is best that we simply carry the
-qemu version and display that information given we are part of qemu
-tree. 
+No, that isn’t intentional.  I just didn’t think of sharing such 
+information with the guest.
 
-So this patch enhances version information and also adds qemu version
-and copyright info. Not sure if copyright information is supposed
-to be displayed along with version info. Given qemu-storage-daemon
-and other utilities are doing it, so I continued with same pattern.
-This is how now output looks like.
+> Can we send property of mount also to guest when
+> notifying guest about mount point.
 
-$ ./virtiofsd -V
-virtiofsd version 5.2.50 (v5.2.0-2357-gcbcf09872a-dirty)
-Copyright (c) 2003-2020 Fabrice Bellard and the QEMU Project developers
-using FUSE kernel interface version 7.33
+I suppose we can send it (by adding a new flag alongside 
+FUSE_ATTR_SUBMOUNT), and we can make the mount ro by setting the 
+SB_RDONLY flag in fuse_dentry_automount().
 
-Reported-by: Eric Ernst <eric.g.ernst@gmail.com>
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- tools/virtiofsd/passthrough_ll.c |    8 ++++++++
- 1 file changed, 8 insertions(+)
+If we implemented this for RDONLY, are there other flags that we might 
+want to consider as well?  (e.g. nodev etc.)
 
-Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
-===================================================================
---- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2021-03-03 14:28:04.893672524 -0500
-+++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2021-03-03 14:37:29.381712706 -0500
-@@ -37,6 +37,8 @@
- 
- #include "qemu/osdep.h"
- #include "qemu/timer.h"
-+#include "qemu-version.h"
-+#include "qemu-common.h"
- #include "fuse_virtio.h"
- #include "fuse_log.h"
- #include "fuse_lowlevel.h"
-@@ -3591,6 +3593,11 @@ static void fuse_lo_data_cleanup(struct
-     free(lo->source);
- }
- 
-+static void qemu_version(void)
-+{
-+    printf("virtiofsd version " QEMU_FULL_VERSION "\n" QEMU_COPYRIGHT "\n");
-+}
-+
- int main(int argc, char *argv[])
- {
-     struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
-@@ -3662,6 +3669,7 @@ int main(int argc, char *argv[])
-         ret = 0;
-         goto err_out1;
-     } else if (opts.show_version) {
-+        qemu_version();
-         fuse_lowlevel_version();
-         ret = 0;
-         goto err_out1;
+OTOH, I just tested NFS, and it doesn’t pass through the RO flag:
+
+[...]
+/tmp/xfs.img on ~/tmp/test-nfs/mount type xfs (ro,...)
+[...]
+127.0.0.1:~/tmp/test-nfs on /mnt/tmp type nfs4 (rw,...)
+127.0.0.1:~/tmp/test-nfs/mount on /mnt/tmp/mount type nfs4 (rw,...)
+
+So is it really important or more a matter of style?
+
+> Does it make sense? I guess then next problem will be what if mount
+> changes back to "rw" and how to we propagate to guest. IIUC, we will
+> probably need monitor it and send notifications. Or notice this chagne
+> on next lookup.
+
+Yes, I imagine that would be rather complicated.  Is there a way to 
+monitor mount changes?
+
+Max
 

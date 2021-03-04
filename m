@@ -1,16 +1,9 @@
-Date: Thu, 4 Mar 2021 17:23:46 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YEEXoqs4rYuyYaPs@work-vm>
-References: <20210303182027.GA3793@redhat.com>
-	<d205a848-845c-bea0-25bf-a10db1f3fafc@redhat.com>
-	<YEENM+SP4TPg6T6M@work-vm>
-	<d8ddbe5e-e726-b679-8f2d-7af7db354e24@redhat.com>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Thu,  4 Mar 2021 17:45:36 +0000
+Message-Id: <20210304174536.54446-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-In-Reply-To: <d8ddbe5e-e726-b679-8f2d-7af7db354e24@redhat.com>
-Subject: Re: [Virtio-fs] Query about announce_submounts and ro/rw mounts
+Subject: [Virtio-fs] [PATCH] virtiofsd: Don't assume header layout
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,77 +12,163 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
+To: virtio-fs@redhat.com, stefanha@redhat.com
+Cc: vgoyal@redhat.com
 
-* Max Reitz (mreitz@redhat.com) wrote:
-> On 04.03.21 17:39, Dr. David Alan Gilbert wrote:
-> > * Max Reitz (mreitz@redhat.com) wrote:
-> > > On 03.03.21 19:20, Vivek Goyal wrote:
-> > > > Hi Max,
-> > > 
-> > > Hi Vivek,
-> > > 
-> > > > I was playing with "announce_submounts". I have a read-only bind mounted
-> > > > mount point in shared directory. Inside guest, when I step into that
-> > > > directory, I see that a mount point got created but its "rw" and not "ro".
-> > > > 
-> > > > Is that intentional.
-> > > 
-> > > No, that isn’t intentional.  I just didn’t think of sharing such information
-> > > with the guest.
-> > > 
-> > > > Can we send property of mount also to guest when
-> > > > notifying guest about mount point.
-> > > 
-> > > I suppose we can send it (by adding a new flag alongside
-> > > FUSE_ATTR_SUBMOUNT), and we can make the mount ro by setting the SB_RDONLY
-> > > flag in fuse_dentry_automount().
-> > > 
-> > > If we implemented this for RDONLY, are there other flags that we might want
-> > > to consider as well?  (e.g. nodev etc.)
-> > > 
-> > > OTOH, I just tested NFS, and it doesn’t pass through the RO flag:
-> > > 
-> > > [...]
-> > > /tmp/xfs.img on ~/tmp/test-nfs/mount type xfs (ro,...)
-> > > [...]
-> > > 127.0.0.1:~/tmp/test-nfs on /mnt/tmp type nfs4 (rw,...)
-> > > 127.0.0.1:~/tmp/test-nfs/mount on /mnt/tmp/mount type nfs4 (rw,...)
-> > > 
-> > > So is it really important or more a matter of style?
-> > 
-> > So what happens if you try and write a file in /mnt/tmp/mount ?
-> 
-> Well, the EROFS gets passed through from host to client:
-> 
-> $ LANG=C sudo touch /mnt/tmp/mount/foo
-> touch: cannot touch '/mnt/tmp/mount/foo': Read-only file system
-> $ mount
-> [...]
-> 127.0.0.1:~/tmp/test-nfs on /mnt/tmp type nfs4 (rw,...)
-> 127.0.0.1:~/tmp/test-nfs/mount on /mnt/tmp/mount type nfs4 (rw,...)
-> 
-> (So the submount still appears rw – NFS doesn’t reevaluate when it receives
-> EROFS.)
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Oh OK, that's not as bad as I feared.
+virtiofsd incorrectly assumed a fixed set of header layout in the virt
+queue; assuming that the fuse and write headers were conveniently
+separated from the data;  the spec doesn't allow us to take that
+convenience, so fix it up to deal with it the hard way.
 
-> 
-> On virtio-fs, it’s the same:
-> 
-> $ LANG=C sudo touch /mnt/mnt1
-> touch: cannot touch '/mnt/mnt1/foo': Read-only file system
-> $ mount
-> [...]
-> host on /mnt type virtiofs (rw,relatime)
-> none on /mnt/mnt1 type virtiofs (rw,relatime)
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+---
+ tools/virtiofsd/fuse_virtio.c | 84 ++++++++++++++++++++++++++---------
+ 1 file changed, 63 insertions(+), 21 deletions(-)
 
-Good.
-
-Dave
-
-> Max
+diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+index 523ee64fb7..55e2e057ec 100644
+--- a/tools/virtiofsd/fuse_virtio.c
++++ b/tools/virtiofsd/fuse_virtio.c
+@@ -129,18 +129,55 @@ static void fv_panic(VuDev *dev, const char *err)
+  * Copy from an iovec into a fuse_buf (memory only)
+  * Caller must ensure there is space
+  */
+-static void copy_from_iov(struct fuse_buf *buf, size_t out_num,
+-                          const struct iovec *out_sg)
++static size_t copy_from_iov(struct fuse_buf *buf, size_t out_num,
++                            const struct iovec *out_sg,
++                            size_t max)
+ {
+     void *dest = buf->mem;
++    size_t copied = 0;
+ 
+-    while (out_num) {
++    while (out_num && max) {
+         size_t onelen = out_sg->iov_len;
++        onelen = MIN(onelen, max);
+         memcpy(dest, out_sg->iov_base, onelen);
+         dest += onelen;
++        copied += onelen;
+         out_sg++;
+         out_num--;
++        max -= onelen;
+     }
++
++    return copied;
++}
++
++/*
++ * Skip 'skip' bytes in the iov; 'sg_1stindex' is set as
++ * the index for the 1st iovec to read data from, and
++ * 'sg_1stskip' is the number of bytes to skip in that entry.
++ *
++ * Returns True if there are at least 'skip' bytes in the iovec
++ *
++ */
++static bool skip_iov(const struct iovec *sg, size_t sg_size,
++                     size_t skip,
++                     size_t *sg_1stindex, size_t *sg_1stskip)
++{
++    size_t vec;
++
++    for (vec = 0; vec < sg_size; vec++) {
++        if (sg[vec].iov_len > skip) {
++            *sg_1stskip = skip;
++            *sg_1stindex = vec;
++
++            return true;
++        }
++
++        skip -= sg[vec].iov_len;
++    }
++
++    *sg_1stindex = vec;
++    *sg_1stskip = 0;
++    return skip == 0;
+ }
+ 
+ /*
+@@ -505,14 +542,14 @@ static void fv_queue_worker(gpointer data, gpointer user_data)
+                  elem->index);
+         assert(0); /* TODO */
+     }
+-    /* Copy just the first element and look at it */
+-    copy_from_iov(&fbuf, 1, out_sg);
++    /* Copy just the fuse_in_header and look at it */
++    copy_from_iov(&fbuf, out_num, out_sg,
++                  sizeof(struct fuse_in_header));
+ 
+     pbufv = NULL; /* Compiler thinks an unitialised path */
+-    if (out_num > 2 &&
+-        out_sg[0].iov_len == sizeof(struct fuse_in_header) &&
+-        ((struct fuse_in_header *)fbuf.mem)->opcode == FUSE_WRITE &&
+-        out_sg[1].iov_len == sizeof(struct fuse_write_in)) {
++    if (((struct fuse_in_header *)fbuf.mem)->opcode == FUSE_WRITE &&
++        out_len >= (sizeof(struct fuse_in_header) +
++                    sizeof(struct fuse_write_in))) {
+         /*
+          * For a write we don't actually need to copy the
+          * data, we can just do it straight out of guest memory
+@@ -521,15 +558,13 @@ static void fv_queue_worker(gpointer data, gpointer user_data)
+          */
+         fuse_log(FUSE_LOG_DEBUG, "%s: Write special case\n", __func__);
+ 
+-        /* copy the fuse_write_in header afte rthe fuse_in_header */
+-        fbuf.mem += out_sg->iov_len;
+-        copy_from_iov(&fbuf, 1, out_sg + 1);
+-        fbuf.mem -= out_sg->iov_len;
+-        fbuf.size = out_sg[0].iov_len + out_sg[1].iov_len;
++        fbuf.size = copy_from_iov(&fbuf, out_num, out_sg,
++                                  sizeof(struct fuse_in_header) +
++                                  sizeof(struct fuse_write_in));
+ 
+         /* Allocate the bufv, with space for the rest of the iov */
+         pbufv = malloc(sizeof(struct fuse_bufvec) +
+-                       sizeof(struct fuse_buf) * (out_num - 2));
++                       sizeof(struct fuse_buf) * out_num);
+         if (!pbufv) {
+             fuse_log(FUSE_LOG_ERR, "%s: pbufv malloc failed\n",
+                     __func__);
+@@ -540,24 +575,31 @@ static void fv_queue_worker(gpointer data, gpointer user_data)
+         pbufv->count = 1;
+         pbufv->buf[0] = fbuf;
+ 
+-        size_t iovindex, pbufvindex;
+-        iovindex = 2; /* 2 headers, separate iovs */
++        size_t iovindex, pbufvindex, skip;
+         pbufvindex = 1; /* 2 headers, 1 fusebuf */
+ 
++        skip_iov(out_sg, out_num,
++                 sizeof(struct fuse_in_header) +
++                 sizeof(struct fuse_write_in),
++                 &iovindex, &skip);
++
+         for (; iovindex < out_num; iovindex++, pbufvindex++) {
+             pbufv->count++;
+             pbufv->buf[pbufvindex].pos = ~0; /* Dummy */
+             pbufv->buf[pbufvindex].flags = 0;
+             pbufv->buf[pbufvindex].mem = out_sg[iovindex].iov_base;
+             pbufv->buf[pbufvindex].size = out_sg[iovindex].iov_len;
++
++            if (skip) {
++                pbufv->buf[pbufvindex].mem += skip;
++                pbufv->buf[pbufvindex].size -= skip;
++                skip = 0;
++            }
+         }
+     } else {
+         /* Normal (non fast write) path */
+ 
+-        /* Copy the rest of the buffer */
+-        fbuf.mem += out_sg->iov_len;
+-        copy_from_iov(&fbuf, out_num - 1, out_sg + 1);
+-        fbuf.mem -= out_sg->iov_len;
++        copy_from_iov(&fbuf, out_num, out_sg, se->bufsize);
+         fbuf.size = out_len;
+ 
+         /* TODO! Endianness of header */
 -- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+2.29.2
 

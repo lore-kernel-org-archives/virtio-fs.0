@@ -1,125 +1,99 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=fkpfzd4aYSlLQT9wHF53AZoEikZ81xJA6Jh0FUGLl58=;
-	b=in8FJsq9M/08Gi+KYE9en1xmf52ShDXnTfNlyqBKVHuIgUzZrEjssCvLHi7SQgkurR
-	Deh59jNn233u0zhuj4LBUT/13GFXCL39JlPuUIro6D2SuBeleeAwjaMmWEDqwvPS5Sgb
-	mxreSaiDrsrpJO5MN9k/OYAJGc97lq07oPbGg=
+Date: Mon, 8 Mar 2021 17:03:31 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210308220331.GB29382@redhat.com>
+References: <34a26a91-c73d-18cb-95ad-9b2c6192091c@redhat.com>
+	<CAOssrKcY7o_LOabLiy+86LFZ1aQdqq8EOaM=qjRqHKGUqRup6w@mail.gmail.com>
 MIME-Version: 1.0
-References: <87r1llk28a.fsf@suse.de> <20210215205221.GB3331@redhat.com>
-In-Reply-To: <20210215205221.GB3331@redhat.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Tue, 16 Feb 2021 16:11:20 +0100
-Message-ID: <CAJfpegsEa6ZCXBFUpER6Fiagp3TEpxa82qBo0a4NydjC3ucnTw@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] Question on ACLs support in virtiofs
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAOssrKcY7o_LOabLiy+86LFZ1aQdqq8EOaM=qjRqHKGUqRup6w@mail.gmail.com>
+Subject: Re: [Virtio-fs] Securing file handles
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
-List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
+List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
-List-Archive: <https://www.redhat.com/archives/virtio-fs>
+List-Archive: <https://listman.redhat.com/archives/virtio-fs>
 List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
-List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
+List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>
+To: Miklos Szeredi <mszeredi@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, Max Reitz <mreitz@redhat.com>
 
-On Mon, Feb 15, 2021 at 9:52 PM Vivek Goyal <vgoyal@redhat.com> wrote:
->
-> On Fri, Feb 12, 2021 at 10:30:13AM +0000, Luis Henriques wrote:
-> > Hi!
-> >
-> > I've recently executed the generic fstests on virtiofs and decided to have
-> > a closer look at generic/099 failure.  In a nutshell, here's the sequence
-> > of commands that reproduce that failure:
-> >
-> > # umask 0
-> > # mkdir acldir
-> > # chacl -b "u::rwx,g::rwx,o::rwx" "u::r-x,g::r--,o::---" acldir
-> > # touch acldir/file1
-> > # umask 722
-> > # touch acldir/file2
-> > # ls -l acldir
-> > total 0
-> > -r--r----- 1 root root 0 Feb 12 10:04 file1
-> > ----r----- 1 root root 0 Feb 12 10:05 file2
-> >
-> > The failure is that setting umask to 722 shouldn't affect the new file2
-> > because acldir has a default ACL (from umask(2): "... if the parent
-> > directory has a default ACL (see acl(5)), the umask is ignored...").
-> >
-> > So... I tried to have look at the code, and initially I thought that the
-> > problem was in (kernel) function fuse_create_open(), where we have this:
-> >
-> >       if (!fm->fc->dont_mask)
-> >               mode &= ~current_umask();
-> >
-> > but then I went down the rabbit hole, into the user-space code, and
-> > couldn't reach a conclusion.  Maybe the issue is that there's in fact no
-> > support for this POSIX ACLs in virtiofs/FUSE?  Any ideas?
->
+On Mon, Mar 08, 2021 at 10:54:58AM +0100, Miklos Szeredi wrote:
 > Hi,
->
-> [ CC Miklos and linux-fsdevel ]
->
-> I debugged into this a little. There are many knobs and it is little
-> confusing that what are right set of fixes.
->
-> So what's happening in this case is that fc->dont_mask is not set. That
-> means fuse client is modifying mode using umask. First time you
-> touch file, umask is 0, so there is no modification. But next time,
-> you set umask to 722, and fuse modifies mode before sending file
-> create request to server. virtiofs server is already running with
-> umask 0, so it does not touch the mode.
->
-> So that means, that in case of default acl, fuse client should not
-> be modifying mode using umask. But question is when should fuse
-> skip applying umask.
->
-> I see that fuse always sets SB_POSIXACL. That means VFS is not
-> going to apply umask and all the umask handling is with-in fuse.
->
-> sb->s_flags |= SB_POSIXACL;
->
-> Currently fuse sets fc->dont_mask in two conditions.
->
-> - If the caller mounted with flag MS_POSIXACL, then fc->dont_mask is set.
-> - If fuse server opted in for option FUSE_DONT_MASK, then fc->dont_mask
->   is set.
->
-> I see that for virtiofs, both the conditions are not true out of the
-> box. In fact looks like ACL support is not fully enabled, because
-> I don't see fuse server opting in for FUSE_POSIX_ACL.
->
-> I suspect that we probably should provide an option in virtiofsd to
-> enable/disable acl support.
+> 
+> Thanks for the good summary.
+> 
+> Another aspect is what the file handle will be used for:
+> 
+>  a) allowing server to close O_PATH descriptors any time because they
+> can be reconstructed using the file handle
 
-Sounds good.
+I am probably missing something, so I will ask. To solve problem a)
+can we simply store the file handle in lo_inode. (say inode->fh).
+and close inode->fd.
 
-> Setting FUSE_DONT_MASK is tricky. If we leave it to fuse, that means
-> fuse will have to query acl to figure out if default acl is set or
-> not on parent dir. And that data could be stale and there could be
-> races w.r.t setting acls from other client.
->
-> If we do set FUSE_DONT_MASK, that means in file creation path virtiofsd
-> server will have to switch its umask to one provided in request. Given
-> its a per process property, we will have to have some locks to make
-> sure other create requests are not progressing in parallel. And that
-> hope host does the right thing. That is apply umask if parent dir does
-> not have default acl otherwise apply umask (as set by virtiofsd process).
->
-> Miklos, does above sound reasonable. You might have more thoughts on
-> how to handle this best in fuse/virtiofs.
+And when we need to, do open_by_handle_at(inode->fh). 
 
-fv_queue_worker() does unshare(CLONE_FS) for the fchdir() call in
-xattr ops, which means that umask is now a per-thread propery in
-virtiofsd.
+Given we already have lo->ino_map redirection, guest can't pass
+an arbitrary file handle. So it seems to solve the issue of
+arbitrary file handles from guest without MAC stuff and we don't
+keep O_PATH fd around.
 
-So setting umask before create ops sounds like a good solution.
+What am I missing?
 
-Thanks,
-Miklos
+Vivek
 
->
-> Vivek
->
+> 
+>  b) allowing NFS export on client, or just name_to_handle_at(2)
+> open_by_handle_at(2).
+> 
+> The requirements are slightly different, since file handles used for
+> (a) do not have to persist after a guest reboot (since the VFS cache
+> referencing those handles is gone).  While (b) requires persistence
+> after a reboot.
+> 
+> Yet another issue is global CAP_DAC_READ_SEARCH required by the server
+> for file handle decode.
+> 
+> Taking this into account, I think the final solution has to be in the
+> host kernel.   E.g. it seems okay to allow user namespace owner to
+> decode file handles on filesystems it actually owns.   That would not
+> generally help us, though, since virtiofs will want to export root
+> owned fs as well.
+> 
+> Addition of a MAC header to the file handle by name_to_handle_at(2)
+> could solve some or all of the above problems.  The question is where
+> the key comes from and what the security implications are.
+> 
+> A per-process (e.g. associated with task->files, generated by the
+> kernel on demand and discarded on process exit) key would suffice to
+> replace O_PATH descriptors.  In this case the only difference between
+> keeping the O_PATH fd open and
+> 
+>   name_to_handle_at(opathfd, &handle);
+>   close(opathfd);
+>   opathfd=open_by_handle_at(&handle);
+> 
+> would be that the resulting fd might point to a disconnected dentry
+> and hence would result in incomplete path information under
+> /proc/self/fd/.  Need to think hard about whether this has any
+> security implications for unprivileged users.
+> 
+> Adding key management would solve the other aspects, but would also
+> possibly open up holes for accessing arbitrary files, so this would
+> need to be done carefully.
+> 
+> Adding subtree checking to the kernel is also a possibility (i.e.
+> limit the opened fd to the subtree of the bind mount).   It would have
+> the advantage of not resulting in disconnected dentries, but
+> disadvantage of not working if the file was moved across directories.
+> 
+> Thanks,
+> Miklos
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
 

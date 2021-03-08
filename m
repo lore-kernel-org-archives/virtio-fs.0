@@ -1,12 +1,14 @@
-MIME-Version: 1.0
 References: <34a26a91-c73d-18cb-95ad-9b2c6192091c@redhat.com>
 	<CAOssrKcY7o_LOabLiy+86LFZ1aQdqq8EOaM=qjRqHKGUqRup6w@mail.gmail.com>
 	<2d94bc7c-e999-44b1-7813-6269cbfcf54e@redhat.com>
-In-Reply-To: <2d94bc7c-e999-44b1-7813-6269cbfcf54e@redhat.com>
-From: Miklos Szeredi <mszeredi@redhat.com>
-Date: Mon, 8 Mar 2021 13:30:05 +0100
-Message-ID: <CAOssrKeVf-8pNyFuyVpTTUZbMaU9N8E-Q3-p7xfa=gsmQYk-1A@mail.gmail.com>
-Content-Type: text/plain; charset="utf-8"
+	<CAOssrKeVf-8pNyFuyVpTTUZbMaU9N8E-Q3-p7xfa=gsmQYk-1A@mail.gmail.com>
+From: Max Reitz <mreitz@redhat.com>
+Message-ID: <2622824d-5f59-0d4a-635b-4257ee7cab3c@redhat.com>
+Date: Mon, 8 Mar 2021 14:39:20 +0100
+MIME-Version: 1.0
+In-Reply-To: <CAOssrKeVf-8pNyFuyVpTTUZbMaU9N8E-Q3-p7xfa=gsmQYk-1A@mail.gmail.com>
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Language: en-US
 Content-Transfer-Encoding: 8bit
 Subject: Re: [Virtio-fs] Securing file handles
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -17,110 +19,133 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
+To: Miklos Szeredi <mszeredi@redhat.com>
 Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-On Mon, Mar 8, 2021 at 12:29 PM Max Reitz <mreitz@redhat.com> wrote:
->
-> On 08.03.21 10:54, Miklos Szeredi wrote:
-> > Hi,
-> >
-> > Thanks for the good summary.
-> >
-> > Another aspect is what the file handle will be used for:
-> >
-> >   a) allowing server to close O_PATH descriptors any time because they
-> > can be reconstructed using the file handle
-> >
-> >   b) allowing NFS export on client, or just name_to_handle_at(2)
-> > open_by_handle_at(2).
-> >
-> > The requirements are slightly different, since file handles used for
-> > (a) do not have to persist after a guest reboot (since the VFS cache
-> > referencing those handles is gone).  While (b) requires persistence
-> > after a reboot.
->
-> I’m not even sure we need file handles in the guest for (a).  For
-> example, we could just store the file handle for each node in the table
-> virtiofsd keeps.
+On 08.03.21 13:30, Miklos Szeredi wrote:
+> On Mon, Mar 8, 2021 at 12:29 PM Max Reitz <mreitz@redhat.com> wrote:
+>>
+>> On 08.03.21 10:54, Miklos Szeredi wrote:
+>>> Hi,
+>>>
+>>> Thanks for the good summary.
+>>>
+>>> Another aspect is what the file handle will be used for:
+>>>
+>>>    a) allowing server to close O_PATH descriptors any time because they
+>>> can be reconstructed using the file handle
+>>>
+>>>    b) allowing NFS export on client, or just name_to_handle_at(2)
+>>> open_by_handle_at(2).
+>>>
+>>> The requirements are slightly different, since file handles used for
+>>> (a) do not have to persist after a guest reboot (since the VFS cache
+>>> referencing those handles is gone).  While (b) requires persistence
+>>> after a reboot.
+>>
+>> I’m not even sure we need file handles in the guest for (a).  For
+>> example, we could just store the file handle for each node in the table
+>> virtiofsd keeps.
+> 
+> Right.
+> 
+> 
+>>   Or perhaps we don’t even need that, because we can
+>> always reopen nodes with something like
+>>
+>>     openat(self.parent.fd.get(), self.name)
+>>
+>> (which may recurse quite a bit).  The problem with that would be “what
+>> happens when a directory is moved”, but well, what does happen then?  Is
+>> that change propagated to the guest today?  Or will things break?  If
+>> so, how will they break?
+> 
+> Today this should work because of the O_PATH descriptors that are kept
+> open for all cached objects.  Those descriptors track any local
+> movement of objects and possibly even remote (depends on the
+> underlying filesystem).
+> 
+>>> Yet another issue is global CAP_DAC_READ_SEARCH required by the server
+>>> for file handle decode.
+>>>
+>>> Taking this into account, I think the final solution has to be in the
+>>> host kernel.   E.g. it seems okay to allow user namespace owner to
+>>> decode file handles on filesystems it actually owns.
+>>
+>> What do you mean by “owns”?  That the process’s user is the owner of the
+>> FS root?
+> 
+> User namespaces each have an owner (the user which has additional
+> capabilities in that user namespace) and each filesystem has an owning
+> user namespace (s_user_ns).   E.g. the following will create a tmpfs
+> instance owned by $USER:
+> 
+> $ unshare -rUm
+> # mount -t tmpfs tmpfs /mnt
+> 
+> On this mount $USER has superuser privileges on all files and
+> directories, which includes CAP_DAC_READ_SEARCH.
+> 
+>>> That would not
+>>> generally help us, though, since virtiofs will want to export root
+>>> owned fs as well.
+>>>
+>>> Addition of a MAC header to the file handle by name_to_handle_at(2)
+>>> could solve some or all of the above problems.  The question is where
+>>> the key comes from and what the security implications are.
+>>>
+>>> A per-process (e.g. associated with task->files, generated by the
+>>> kernel on demand and discarded on process exit) key would suffice to
+>>> replace O_PATH descriptors.  In this case the only difference between
+>>> keeping the O_PATH fd open and
+>>>
+>>>     name_to_handle_at(opathfd, &handle);
+>>>     close(opathfd);
+>>>     opathfd=open_by_handle_at(&handle);
+>>>
+>>> would be that the resulting fd might point to a disconnected dentry
+>>> and hence would result in incomplete path information under
+>>> /proc/self/fd/.  Need to think hard about whether this has any
+>>> security implications for unprivileged users.
+>>>
+>>> Adding key management would solve the other aspects, but would also
+>>> possibly open up holes for accessing arbitrary files, so this would
+>>> need to be done carefully.
+>>
+>> I have a bad feeling in my stomach when thinking about adding such
+>> things to the kernel.
+> 
+> Yet it could be more generally useful, not just for virtiofsd.   An
+> RFC patch should be simple enough and feedback from VFS and security
+> folks could help decide whether to pursue this route or not.
 
-Right.
+Well, I imagine the helper process could also be used by other users 
+than virtiofsd.
 
+> I've not yet used the crypto API in the kernel, but I guess generating
+> a key and creating a MAC are not such a big deal.  Do you want to have
+> a go at this, or should I?
 
->  Or perhaps we don’t even need that, because we can
-> always reopen nodes with something like
->
->    openat(self.parent.fd.get(), self.name)
->
-> (which may recurse quite a bit).  The problem with that would be “what
-> happens when a directory is moved”, but well, what does happen then?  Is
-> that change propagated to the guest today?  Or will things break?  If
-> so, how will they break?
+Admittedly I’m not yet at the point where I feel comfortable doing 
+changes to the kernel at all, so if you have the time, I’d appreciate 
+it.  (If you don’t really have the time, I could try my hand first and 
+then we’d see.)
 
-Today this should work because of the O_PATH descriptors that are kept
-open for all cached objects.  Those descriptors track any local
-movement of objects and possibly even remote (depends on the
-underlying filesystem).
+So AFAIU you want to put this in the kernel so we can get rid of needing 
+the capability, because when you can only open handles that were 
+previously generated for you, there wouldn’t be a security problem, right?
 
-> > Yet another issue is global CAP_DAC_READ_SEARCH required by the server
-> > for file handle decode.
-> >
-> > Taking this into account, I think the final solution has to be in the
-> > host kernel.   E.g. it seems okay to allow user namespace owner to
-> > decode file handles on filesystems it actually owns.
->
-> What do you mean by “owns”?  That the process’s user is the owner of the
-> FS root?
+But what about cases where a file is made inaccessible to some process 
+between generating the handle and later opening it?  E.g. in
+/path/to/file, the “to” directory is changed to go-x (and the current 
+user is not the owner), so opening /path/to/file wouldn’t be possible by 
+path anymore.  Sure, if the FD remained open, you could still open the 
+file anyway; but I consider it different in semantics.  (E.g. you could 
+check that there are no processes that have “file” open anymore, and so 
+you could assume that it’s now inaccessible.)
 
-User namespaces each have an owner (the user which has additional
-capabilities in that user namespace) and each filesystem has an owning
-user namespace (s_user_ns).   E.g. the following will create a tmpfs
-instance owned by $USER:
+(I’m asking, because if this is kind of problematic, then it seems to me 
+like a capability would still be needed.)
 
-$ unshare -rUm
-# mount -t tmpfs tmpfs /mnt
-
-On this mount $USER has superuser privileges on all files and
-directories, which includes CAP_DAC_READ_SEARCH.
-
-> > That would not
-> > generally help us, though, since virtiofs will want to export root
-> > owned fs as well.
-> >
-> > Addition of a MAC header to the file handle by name_to_handle_at(2)
-> > could solve some or all of the above problems.  The question is where
-> > the key comes from and what the security implications are.
-> >
-> > A per-process (e.g. associated with task->files, generated by the
-> > kernel on demand and discarded on process exit) key would suffice to
-> > replace O_PATH descriptors.  In this case the only difference between
-> > keeping the O_PATH fd open and
-> >
-> >    name_to_handle_at(opathfd, &handle);
-> >    close(opathfd);
-> >    opathfd=open_by_handle_at(&handle);
-> >
-> > would be that the resulting fd might point to a disconnected dentry
-> > and hence would result in incomplete path information under
-> > /proc/self/fd/.  Need to think hard about whether this has any
-> > security implications for unprivileged users.
-> >
-> > Adding key management would solve the other aspects, but would also
-> > possibly open up holes for accessing arbitrary files, so this would
-> > need to be done carefully.
->
-> I have a bad feeling in my stomach when thinking about adding such
-> things to the kernel.
-
-Yet it could be more generally useful, not just for virtiofsd.   An
-RFC patch should be simple enough and feedback from VFS and security
-folks could help decide whether to pursue this route or not.
-
-I've not yet used the crypto API in the kernel, but I guess generating
-a key and creating a MAC are not such a big deal.  Do you want to have
-a go at this, or should I?
-
-Thanks,
-Miklos
-
+Max
 

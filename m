@@ -1,14 +1,14 @@
-Date: Mon, 8 Mar 2021 15:15:44 +0100
-From: Sergio Lopez <slp@redhat.com>
-Message-ID: <20210308141544.3ioxhrcu6uhiwukj@mhamilton>
-References: <34a26a91-c73d-18cb-95ad-9b2c6192091c@redhat.com>
-	<20210308090650.i5ow6pq23asygrod@mhamilton>
-	<b2b29e3c-f87b-03fd-a465-2ac6d1084a82@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="thcu6gozsh6ud5zn"
-Content-Disposition: inline
-In-Reply-To: <b2b29e3c-f87b-03fd-a465-2ac6d1084a82@redhat.com>
+References: <34a26a91-c73d-18cb-95ad-9b2c6192091c@redhat.com>
+	<CAOssrKcY7o_LOabLiy+86LFZ1aQdqq8EOaM=qjRqHKGUqRup6w@mail.gmail.com>
+	<2d94bc7c-e999-44b1-7813-6269cbfcf54e@redhat.com>
+	<CAOssrKeVf-8pNyFuyVpTTUZbMaU9N8E-Q3-p7xfa=gsmQYk-1A@mail.gmail.com>
+	<2622824d-5f59-0d4a-635b-4257ee7cab3c@redhat.com>
+In-Reply-To: <2622824d-5f59-0d4a-635b-4257ee7cab3c@redhat.com>
+From: Miklos Szeredi <mszeredi@redhat.com>
+Date: Mon, 8 Mar 2021 15:50:22 +0100
+Message-ID: <CAOssrKdn-RkxK4DjRy_36se=oE4edL3Yq5FsY3SknV-cYEY9Jg@mail.gmail.com>
+Content-Type: multipart/mixed; boundary="0000000000004d553905bd078ece"
 Subject: Re: [Virtio-fs] Securing file handles
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -21,91 +21,146 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: Max Reitz <mreitz@redhat.com>
 Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-
---thcu6gozsh6ud5zn
-Content-Type: text/plain; charset=utf-8
-Content-Disposition: inline
+--0000000000004d553905bd078ece
+Content-Type: text/plain; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 
-On Mon, Mar 08, 2021 at 11:52:58AM +0100, Max Reitz wrote:
-> On 08.03.21 10:06, Sergio Lopez wrote:
-> > On Fri, Mar 05, 2021 at 05:22:56PM +0100, Max Reitz wrote:
-> > > =3D=3D Summary =3D=3D
-> > >=20
-> > > So, my current position is:
-> > >=20
-> > > - Bind mounts don=E2=80=99t help with restricting file handles to the=
- exported
-> > >    directory.
-> > >=20
-> > > - A MAC is not very elegant, and we might encounter problems where a
-> > >    file may be moved outside of the shared directory, but remains
-> > >    accessible (because moving a file doesn=E2=80=99t change its handl=
-e).
-> > >    (If we consider that a problem.  NFS evidently doesn=E2=80=99t, be=
-cause
-> > >    without subtree_check, it has absolutely no protection against
-> > >    arbitrary file handles being opened (on the FS where the export
-> > >    resides), so valid file handles always remain valid.)
-> > >=20
-> > > - A solution such as NFS=E2=80=99s subtree_check (i.e., storing the f=
-ile=E2=80=99s
-> > >    parent=E2=80=99s handle in addition to the file=E2=80=99s handle i=
-tself, then
-> > >    verifying that the file does still reside in that directory when t=
-he
-> > >    handle is opened, and then going up the tree to see whether we can
-> > >    trace it back to the shared directory) is interesting and can perh=
-aps
-> > >    be considered elegant, but it requires iterating the directory the
-> > >    file resides in when it is opened, and it will result in file hand=
-les
-> > >    being invalidated whenever a file is moved (outside of its directo=
-ry).
-> > >    Perhaps also other issues.  In any case, there are reasons why NFS=
- has
-> > >    basically deprecated this.
-> > >=20
-> > > Opinions? :)
-> >=20
-> > While the MAC option doesn't look too bad to me, I can't help but feel
-> > that we're working around a kernel (mis)feature, which is something
-> > that's risky and tends to backfire.
->=20
-> Which misfeature do you mean exactly?  That you can open arbitrary files =
-by
-> specifying the right magic number (i.e. its handle)?
->=20
-> That in itself is nothing we=E2=80=99re really working around, but rather=
- something
-> that we actively want to pass through to the guest.
+On Mon, Mar 8, 2021 at 2:39 PM Max Reitz <mreitz@redhat.com> wrote:
 
-But I think those file handles should be constrained to some context
-other than the backing file system. In any case, I see Miklos has
-highlighted the same issue with more detail in his response, so let's
-follow up this conversation there to avoid dispersion.
+> Admittedly I=E2=80=99m not yet at the point where I feel comfortable doin=
+g
+> changes to the kernel at all, so if you have the time, I=E2=80=99d apprec=
+iate
+> it.  (If you don=E2=80=99t really have the time, I could try my hand firs=
+t and
+> then we=E2=80=99d see.)
 
-Sergio.
+I'd hate to context switch away from the fuse leases to the kernel
+crypto, so it would have to wait some time...
 
---thcu6gozsh6ud5zn
-Content-Type: application/pgp-signature; name="signature.asc"
+But I've attached an incomplete patch that just missing the crypto
+bits and testing.
 
------BEGIN PGP SIGNATURE-----
+Would you mind having a go at it?
 
-iQIzBAABCAAdFiEEvtX891EthoCRQuii9GknjS8MAjUFAmBGMY8ACgkQ9GknjS8M
-AjX88A//eAD4YaYJ9iFU+e/ugRCBvA6t/CepzQZqGpwJxxy+Kv3Zh++mZZ0tUYJo
-wK9fAYieljSYr7Cw1SxwkQNmSkSZ9q/wzXBiTcEbQPLvLBFXWoD+ipKLT4HqViWO
-54u4OTHrMSBbghkmxLs1WOA/46kxEgJqPFulgvUPF4IxSfMyIAzba2/a1okyJLdS
-2IDcM0BkkylvbJbBsZsrRzwb+kUvzfcFXmgMkMuMI8/hhnYgm6LczxTF8Tlpcb1o
-guBTg072XGcYZ2eQXJDQHl0UQHcZ7w6BSzhCXlzVEa0inV+9O3oNMC20tvfzig0I
-DOYGBDQB99+B9nku0Eiz3hpuPhIfaNg7NQ2DXuMTPEQtGnq4362ZPD1MCIzb9i9X
-kwVyWAsUcz8wWd3aG3ofI4bjXP0JVmyttY5NS9OqBr8Vu77pwpQcUdZtkNHav8jW
-oND+gGis5o1Ue5Q8wHmPH2owYuJ+v9DDJ7AUIY/np14v9mfih9VWyxt0aKCt7lTS
-9I9JDjo8E+YAL6A8i0L/oFz9DRTPg5zyBjPfKIrIugj0JitdzTNr82YpGuvJck7B
-i1DQPKQAYtJj8TxvyH/4wjElgec/53AA3O07ZX5Ss/7AcOXZgEqCzCrsW8bd1P3+
-Q9X6YhRS1T6nb1LuOJQ6zVXulcFZSja8SygJ6jl6sZ9OhZWp/bs=
-=lRme
------END PGP SIGNATURE-----
+>
+> So AFAIU you want to put this in the kernel so we can get rid of needing
+> the capability, because when you can only open handles that were
+> previously generated for you, there wouldn=E2=80=99t be a security proble=
+m, right?
 
---thcu6gozsh6ud5zn--
+Something like that.
+
+> But what about cases where a file is made inaccessible to some process
+> between generating the handle and later opening it?  E.g. in
+> /path/to/file, the =E2=80=9Cto=E2=80=9D directory is changed to go-x (and=
+ the current
+> user is not the owner), so opening /path/to/file wouldn=E2=80=99t be poss=
+ible by
+> path anymore.  Sure, if the FD remained open, you could still open the
+> file anyway; but I consider it different in semantics.  (E.g. you could
+> check that there are no processes that have =E2=80=9Cfile=E2=80=9D open a=
+nymore, and so
+> you could assume that it=E2=80=99s now inaccessible.)
+
+That could be a concern, yes.   Requiring CAP_DAC_READ_SEARCH in the
+current user namespace, as my template patch does, might mitigate
+those worries somewhat.
+
+Thanks,
+Miklos
+
+--0000000000004d553905bd078ece
+Content-Type: text/x-patch; charset="US-ASCII"; name="fhandle-mac.patch"
+Content-Disposition: attachment; filename="fhandle-mac.patch"
+Content-Transfer-Encoding: base64
+Content-ID: <f_km0pb1um0>
+X-Attachment-Id: f_km0pb1um0
+
+ZGlmZiAtLWdpdCBhL2ZzL2ZoYW5kbGUuYyBiL2ZzL2ZoYW5kbGUuYwppbmRleCBlYzZmZWVjY2My
+NzYuLjE3YzA2NmJlMGE1ZCAxMDA2NDQKLS0tIGEvZnMvZmhhbmRsZS5jCisrKyBiL2ZzL2ZoYW5k
+bGUuYwpAQCAtMTQsOSArMTQsNDAgQEAKICNpbmNsdWRlICJpbnRlcm5hbC5oIgogI2luY2x1ZGUg
+Im1vdW50LmgiCiAKK3N0YXRpYyBpbnQgZmhhbmRsZV9hZGRfbWFjKHN0cnVjdCBmaWxlX2hhbmRs
+ZSAqaGFuZGxlLCBzaXplX3QgaGFuZGxlX2FsbG9jKQoreworCXN0cnVjdCBmaWxlc19zdHJ1Y3Qg
+KmZpbGVzID0gY3VycmVudC0+ZmlsZXM7CisJc3RydWN0IGZoYW5kbGVfbWFjX2tleSAqa2V5ID0g
+UkVBRF9PTkNFKGZpbGVzLT5rZXkpLCAqb2xkOworCXNpemVfdCBtYWNfc2l6ZSA9IDg7IC8qIG9y
+IHdoYXRldmVyICovCisKKwloYW5kbGUtPmhhbmRsZV9ieXRlcyArPSBtYWNfc2l6ZTsKKworCWlm
+IChoYW5kbGUtPmhhbmRsZV90eXBlID09IEZJTEVJRF9JTlZBTElEIHx8CisJICAgIGhhbmRsZS0+
+aGFuZGxlX2J5dGVzID4gaGFuZGxlX2FsbG9jKQorCQlyZXR1cm4gRklMRUlEX0lOVkFMSUQ7CisK
+KwlpZiAoIWtleSkgeworCQlrZXkgPSAvKiBnZW5lcmF0ZV9rZXkgKi87CisJCWlmICgha2V5KQor
+CQkJcmV0dXJuIC1FTk9NRU07CisJCW9sZCA9IGNtcHhjaGcoJmZpbGVzLT5rZXksIE5VTEwsIGtl
+eSk7CisJCWlmIChvbGQpIHsKKwkJCS8qIHJhY2UgKi8KKwkJCWtmcmVlKGtleSk7CisJCQlrZXkg
+PSBvbGQ7CisJCX0KKwl9CisKKwkvKiBhZGQgTUFDIHRvIHRoZSBlbmQgb2YgdGhlIGN1cnJlbnQg
+aGFuZGxlIHVzaW5nIGtleSAqLworCisJaGFuZGxlLT5oYW5kbGVfdHlwZSB8PSBGSUxFSURfTUFD
+OgorCisJcmV0dXJuIDA7Cit9CisKIHN0YXRpYyBsb25nIGRvX3N5c19uYW1lX3RvX2hhbmRsZShz
+dHJ1Y3QgcGF0aCAqcGF0aCwKIAkJCQkgIHN0cnVjdCBmaWxlX2hhbmRsZSBfX3VzZXIgKnVmaCwK
+LQkJCQkgIGludCBfX3VzZXIgKm1udF9pZCkKKwkJCQkgIGludCBfX3VzZXIgKm1udF9pZCwgYm9v
+bCBtYWMpCiB7CiAJbG9uZyByZXR2YWw7CiAJc3RydWN0IGZpbGVfaGFuZGxlIGZfaGFuZGxlOwpA
+QCAtNDksMTIgKzgwLDIwIEBAIHN0YXRpYyBsb25nIGRvX3N5c19uYW1lX3RvX2hhbmRsZShzdHJ1
+Y3QgcGF0aCAqcGF0aCwKIAlyZXR2YWwgPSBleHBvcnRmc19lbmNvZGVfZmgocGF0aC0+ZGVudHJ5
+LAogCQkJCSAgICAoc3RydWN0IGZpZCAqKWhhbmRsZS0+Zl9oYW5kbGUsCiAJCQkJICAgICZoYW5k
+bGVfZHdvcmRzLCAgMCk7CisJaWYgKHJldHZhbCA9PSAtRU5PU1BDKQorCQlyZXR2YWwgPSBGSUxF
+SURfSU5WQUxJRDsKIAloYW5kbGUtPmhhbmRsZV90eXBlID0gcmV0dmFsOwogCS8qIGNvbnZlcnQg
+aGFuZGxlIHNpemUgdG8gYnl0ZXMgKi8KIAloYW5kbGVfYnl0ZXMgPSBoYW5kbGVfZHdvcmRzICog
+c2l6ZW9mKHUzMik7CiAJaGFuZGxlLT5oYW5kbGVfYnl0ZXMgPSBoYW5kbGVfYnl0ZXM7CisJaWYg
+KG1hYykgeworCQlyZXR2YWwgPSBmaGFuZGxlX2FkZF9tYWMoaGFuZGxlLCBmX2hhbmRsZS5oYW5k
+bGVfYnl0ZXMpOworCQlpZiAocmV0dmFsIDwgMCkKKwkJCWdvdG8gb3V0OworCQloYW5kbGVfYnl0
+ZXMgPSBoYW5kbGUtPmhhbmRsZV9ieXRlczsKKwl9CiAJaWYgKChoYW5kbGUtPmhhbmRsZV9ieXRl
+cyA+IGZfaGFuZGxlLmhhbmRsZV9ieXRlcykgfHwKLQkgICAgKHJldHZhbCA9PSBGSUxFSURfSU5W
+QUxJRCkgfHwgKHJldHZhbCA9PSAtRU5PU1BDKSkgeworCSAgICByZXR2YWwgPT0gRklMRUlEX0lO
+VkFMSUQpCiAJCS8qIEFzIHBlciBvbGQgZXhwb3J0ZnNfZW5jb2RlX2ZoIGRvY3VtZW50YXRpb24K
+IAkJICogd2UgY291bGQgcmV0dXJuIEVOT1NQQyB0byBpbmRpY2F0ZSBvdmVyZmxvdwogCQkgKiBC
+dXQgZmlsZSBzeXN0ZW0gcmV0dXJuZWQgMjU1IGFsd2F5cy4gU28gaGFuZGxlCkBAIC03Myw2ICsx
+MTIsNyBAQCBzdGF0aWMgbG9uZyBkb19zeXNfbmFtZV90b19oYW5kbGUoc3RydWN0IHBhdGggKnBh
+dGgsCiAJICAgIGNvcHlfdG9fdXNlcih1ZmgsIGhhbmRsZSwKIAkJCSBzaXplb2Yoc3RydWN0IGZp
+bGVfaGFuZGxlKSArIGhhbmRsZV9ieXRlcykpCiAJCXJldHZhbCA9IC1FRkFVTFQ7CitvdXQ6CiAJ
+a2ZyZWUoaGFuZGxlKTsKIAlyZXR1cm4gcmV0dmFsOwogfQpAQCAtOTgsNyArMTM4LDcgQEAgU1lT
+Q0FMTF9ERUZJTkU1KG5hbWVfdG9faGFuZGxlX2F0LCBpbnQsIGRmZCwgY29uc3QgY2hhciBfX3Vz
+ZXIgKiwgbmFtZSwKIAlpbnQgbG9va3VwX2ZsYWdzOwogCWludCBlcnI7CiAKLQlpZiAoKGZsYWcg
+JiB+KEFUX1NZTUxJTktfRk9MTE9XIHwgQVRfRU1QVFlfUEFUSCkpICE9IDApCisJaWYgKChmbGFn
+ICYgfihBVF9TWU1MSU5LX0ZPTExPVyB8IEFUX0VNUFRZX1BBVEggfCBBVF9IQU5ETEVfTUFDKSkg
+IT0gMCkKIAkJcmV0dXJuIC1FSU5WQUw7CiAKIAlsb29rdXBfZmxhZ3MgPSAoZmxhZyAmIEFUX1NZ
+TUxJTktfRk9MTE9XKSA/IExPT0tVUF9GT0xMT1cgOiAwOwpAQCAtMTA2LDcgKzE0Niw4IEBAIFNZ
+U0NBTExfREVGSU5FNShuYW1lX3RvX2hhbmRsZV9hdCwgaW50LCBkZmQsIGNvbnN0IGNoYXIgX191
+c2VyICosIG5hbWUsCiAJCWxvb2t1cF9mbGFncyB8PSBMT09LVVBfRU1QVFk7CiAJZXJyID0gdXNl
+cl9wYXRoX2F0KGRmZCwgbmFtZSwgbG9va3VwX2ZsYWdzLCAmcGF0aCk7CiAJaWYgKCFlcnIpIHsK
+LQkJZXJyID0gZG9fc3lzX25hbWVfdG9faGFuZGxlKCZwYXRoLCBoYW5kbGUsIG1udF9pZCk7CisJ
+CWVyciA9IGRvX3N5c19uYW1lX3RvX2hhbmRsZSgmcGF0aCwgaGFuZGxlLCBtbnRfaWQsCisJCQlm
+bGFnICYgQVRfSEFORExFX01BQyk7CiAJCXBhdGhfcHV0KCZwYXRoKTsKIAl9CiAJcmV0dXJuIGVy
+cjsKQEAgLTE0Nyw2ICsxODgsMTQgQEAgc3RhdGljIGludCBkb19oYW5kbGVfdG9fcGF0aChpbnQg
+bW91bnRkaXJmZCwgc3RydWN0IGZpbGVfaGFuZGxlICpoYW5kbGUsCiAJCXJldHZhbCA9IFBUUl9F
+UlIocGF0aC0+bW50KTsKIAkJZ290byBvdXRfZXJyOwogCX0KKworCWlmIChoYW5kbGUtPmhhbmRs
+ZV90eXBlICYgRklMRUlEX01BQykgeworCQkvKiB2ZXJpZnkgbWFjIHVzaW5nIGN1cnJlbnQtPmZp
+bGVzLT5rZXkgKi8KKwkJaGFuZGxlLT5oYW5kbGVfYnl0ZXMgLT0gODsKKwl9IGVsc2UgaWYoIW5z
+X2NhcGFibGUocGF0aC0+bW50LT5tbnRfc2ItPnNfdXNlcl9ucywgQ0FQX0RBQ19SRUFEX1NFQVJD
+SCkpIHsKKwkJcmV0dXJuIC1FUEVSTTsKKwl9CisKIAkvKiBjaGFuZ2UgdGhlIGhhbmRsZSBzaXpl
+IHRvIG11bHRpcGxlIG9mIHNpemVvZih1MzIpICovCiAJaGFuZGxlX2R3b3JkcyA9IGhhbmRsZS0+
+aGFuZGxlX2J5dGVzID4+IDI7CiAJcGF0aC0+ZGVudHJ5ID0gZXhwb3J0ZnNfZGVjb2RlX2ZoKHBh
+dGgtPm1udCwKQEAgLTE3Niw3ICsyMjUsNyBAQCBzdGF0aWMgaW50IGhhbmRsZV90b19wYXRoKGlu
+dCBtb3VudGRpcmZkLCBzdHJ1Y3QgZmlsZV9oYW5kbGUgX191c2VyICp1ZmgsCiAJICogZGlyZWN0
+b3J5LiBJZGVhbGx5IHdlIHdvdWxkIGxpa2UgQ0FQX0RBQ19TRUFSQ0guCiAJICogQnV0IHdlIGRv
+bid0IGhhdmUgdGhhdAogCSAqLwotCWlmICghY2FwYWJsZShDQVBfREFDX1JFQURfU0VBUkNIKSkg
+eworCWlmICghbnNfY2FwYWJsZShjdXJyZW50X3VzZXJfbnMoKSwgQ0FQX0RBQ19SRUFEX1NFQVJD
+SCkpIHsKIAkJcmV0dmFsID0gLUVQRVJNOwogCQlnb3RvIG91dF9lcnI7CiAJfQpkaWZmIC0tZ2l0
+IGEvZnMvZmlsZS5jIGIvZnMvZmlsZS5jCmluZGV4IGYzYTRiYWMyY2JlOS4uOWU0MWI4YmVlYTUy
+IDEwMDY0NAotLS0gYS9mcy9maWxlLmMKKysrIGIvZnMvZmlsZS5jCkBAIC00MjAsNiArNDIwLDgg
+QEAgdm9pZCBwdXRfZmlsZXNfc3RydWN0KHN0cnVjdCBmaWxlc19zdHJ1Y3QgKmZpbGVzKQogCQkv
+KiBmcmVlIHRoZSBhcnJheXMgaWYgdGhleSBhcmUgbm90IGVtYmVkZGVkICovCiAJCWlmIChmZHQg
+IT0gJmZpbGVzLT5mZHRhYikKIAkJCV9fZnJlZV9mZHRhYmxlKGZkdCk7CisKKwkJZmhhbmRsZV9r
+ZXlfZnJlZShmaWxlcy0+a2V5KTsKIAkJa21lbV9jYWNoZV9mcmVlKGZpbGVzX2NhY2hlcCwgZmls
+ZXMpOwogCX0KIH0KZGlmZiAtLWdpdCBhL2luY2x1ZGUvbGludXgvZXhwb3J0ZnMuaCBiL2luY2x1
+ZGUvbGludXgvZXhwb3J0ZnMuaAppbmRleCBmZTg0ODkwMWZjYzMuLmE2ZmRkOWJiZTk4YSAxMDA2
+NDQKLS0tIGEvaW5jbHVkZS9saW51eC9leHBvcnRmcy5oCisrKyBiL2luY2x1ZGUvbGludXgvZXhw
+b3J0ZnMuaApAQCAtMTEzLDYgKzExMyw5IEBAIGVudW0gZmlkX3R5cGUgewogCSAqIEZpbGVzeXN0
+ZW1zIG11c3Qgbm90IHVzZSAweGZmIGZpbGUgSUQuCiAJICovCiAJRklMRUlEX0lOVkFMSUQgPSAw
+eGZmLAorCisJLyogT1ItZWQgd2l0aCB0aGUgYWN0dWFsIElEOyB1c2VkIGJ5IHRoZSBmaGFuZGxl
+IEFQSS4gKi8KKwlGSUxFSURfTUFDID0gMHgxMDAwMDAwMDsKIH07CiAKIHN0cnVjdCBmaWQgewpk
+aWZmIC0tZ2l0IGEvaW5jbHVkZS9saW51eC9mZHRhYmxlLmggYi9pbmNsdWRlL2xpbnV4L2ZkdGFi
+bGUuaAppbmRleCBkMGU3ODE3NDg3NGEuLjE4OTVkMjE0MzVhYyAxMDA2NDQKLS0tIGEvaW5jbHVk
+ZS9saW51eC9mZHRhYmxlLmgKKysrIGIvaW5jbHVkZS9saW51eC9mZHRhYmxlLmgKQEAgLTU2LDYg
+KzU2LDggQEAgc3RydWN0IGZpbGVzX3N0cnVjdCB7CiAKIAlzdHJ1Y3QgZmR0YWJsZSBfX3JjdSAq
+ZmR0OwogCXN0cnVjdCBmZHRhYmxlIGZkdGFiOworCisJc3RydWN0IGZoYW5kbGVfbWFjX2tleSAq
+a2V5OwogICAvKgogICAgKiB3cml0dGVuIHBhcnQgb24gYSBzZXBhcmF0ZSBjYWNoZSBsaW5lIGlu
+IFNNUAogICAgKi8K
+--0000000000004d553905bd078ece--
 

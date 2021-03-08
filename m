@@ -1,75 +1,126 @@
-Date: Tue, 16 Feb 2021 09:39:54 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210216143954.GB3196@redhat.com>
-References: <rprnspo3-119s-qnoo-2o93-sn40rq40ns@erqung.pbz>
-	<20210114133424.GA299876@stefanha-x1.localdomain>
-	<qn527287-65qq-227p-2r48-1528r6rr386@erqung.pbz>
-	<20210118165541.GD255498@stefanha-x1.localdomain>
-	<9qo964n3-7p75-7992-7s7p-3srrs4q650n@erqung.pbz>
-	<CAJFHJroGX7YYPK2KzxBtM3Pnf7heUxsjZXOvoH0GR7gMrDTuuQ@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <CAJFHJroGX7YYPK2KzxBtM3Pnf7heUxsjZXOvoH0GR7gMrDTuuQ@mail.gmail.com>
-Subject: Re: [Virtio-fs] [RFC] About non-root virtiofsd(1) process
+References: <34a26a91-c73d-18cb-95ad-9b2c6192091c@redhat.com>
+	<CAOssrKcY7o_LOabLiy+86LFZ1aQdqq8EOaM=qjRqHKGUqRup6w@mail.gmail.com>
+	<2d94bc7c-e999-44b1-7813-6269cbfcf54e@redhat.com>
+In-Reply-To: <2d94bc7c-e999-44b1-7813-6269cbfcf54e@redhat.com>
+From: Miklos Szeredi <mszeredi@redhat.com>
+Date: Mon, 8 Mar 2021 13:30:05 +0100
+Message-ID: <CAOssrKeVf-8pNyFuyVpTTUZbMaU9N8E-Q3-p7xfa=gsmQYk-1A@mail.gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] Securing file handles
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
-List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
+List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
-List-Archive: <https://www.redhat.com/archives/virtio-fs>
+List-Archive: <https://listman.redhat.com/archives/virtio-fs>
 List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
-List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
+List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Chirantan Ekbote <chirantan@chromium.org>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, P J P <ppandit@redhat.com>
+To: Max Reitz <mreitz@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-On Wed, Jan 20, 2021 at 02:49:52PM +0900, Chirantan Ekbote wrote:
-> On Tue, Jan 19, 2021 at 11:34 PM P J P <ppandit@redhat.com> wrote:
+On Mon, Mar 8, 2021 at 12:29 PM Max Reitz <mreitz@redhat.com> wrote:
+>
+> On 08.03.21 10:54, Miklos Szeredi wrote:
+> > Hi,
 > >
-> > +-- On Mon, 18 Jan 2021, Stefan Hajnoczi wrote --+
-> > | Guest applications may run with different uids/gids. The host has no control
-> > | over that.
-> > |
-> > | Imagine booting a guest form a virtio-fs root file system and installing
-> > | packages. The guest must be able to control uids/gids for that to work.
+> > Thanks for the good summary.
 > >
-> > * I see; I'll try to better understand how it's done.
+> > Another aspect is what the file handle will be used for:
 > >
-> > * With UID namespaces, I thought virtiofsd(1) would be able to operate files
-> >   with arbitrary uid/gid, even after dropping its root privileges to acquire
-> >   non-root privileges on the host; Because it has 'root' privileges under the
-> >   shared directory & UID namespace.
+> >   a) allowing server to close O_PATH descriptors any time because they
+> > can be reconstructed using the file handle
 > >
-> 
-> This is actually what we do in crosvm.  It works pretty well but has a
-> few limitations:
-> 
-> - Setting up the uidmap and gidmap requires CAP_SETUID and CAP_SETGID
-> (unless you're only mapping in the current euid/egid) so a user
-> without sudo access cannot do it.
-> - The daemon cannot do anything that requires caps in the init
-> namespace.  For example, it cannot set any security.* or trusted.*
-> xattrs but that can be worked around by re-mapping them into the
-> user.* xattr namespace.  Another example is anything to do with
-> filesystem quotas.  We deal with this by forwarding them to another
-> daemon running in the init namespace but it's not ideal.
+> >   b) allowing NFS export on client, or just name_to_handle_at(2)
+> > open_by_handle_at(2).
+> >
+> > The requirements are slightly different, since file handles used for
+> > (a) do not have to persist after a guest reboot (since the VFS cache
+> > referencing those handles is gone).  While (b) requires persistence
+> > after a reboot.
+>
+> I’m not even sure we need file handles in the guest for (a).  For
+> example, we could just store the file handle for each node in the table
+> virtiofsd keeps.
 
-As of now probably "chown" is another limitation. One has to chown
-all uid/gid to appropriate mapping. Also if directory is shared
-between two VMs, then they have to be using same uid/gid map.
+Right.
 
-Vivek
 
-> 
-> Overall I think we're pretty happy with the user namespace sandbox.  I
-> think the benefit of dropping all privileges in the init namespace has
-> been worth the cost of dealing with the limitations we've run into so
-> far.
-> 
-> Chirantan
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://www.redhat.com/mailman/listinfo/virtio-fs
+>  Or perhaps we don’t even need that, because we can
+> always reopen nodes with something like
+>
+>    openat(self.parent.fd.get(), self.name)
+>
+> (which may recurse quite a bit).  The problem with that would be “what
+> happens when a directory is moved”, but well, what does happen then?  Is
+> that change propagated to the guest today?  Or will things break?  If
+> so, how will they break?
+
+Today this should work because of the O_PATH descriptors that are kept
+open for all cached objects.  Those descriptors track any local
+movement of objects and possibly even remote (depends on the
+underlying filesystem).
+
+> > Yet another issue is global CAP_DAC_READ_SEARCH required by the server
+> > for file handle decode.
+> >
+> > Taking this into account, I think the final solution has to be in the
+> > host kernel.   E.g. it seems okay to allow user namespace owner to
+> > decode file handles on filesystems it actually owns.
+>
+> What do you mean by “owns”?  That the process’s user is the owner of the
+> FS root?
+
+User namespaces each have an owner (the user which has additional
+capabilities in that user namespace) and each filesystem has an owning
+user namespace (s_user_ns).   E.g. the following will create a tmpfs
+instance owned by $USER:
+
+$ unshare -rUm
+# mount -t tmpfs tmpfs /mnt
+
+On this mount $USER has superuser privileges on all files and
+directories, which includes CAP_DAC_READ_SEARCH.
+
+> > That would not
+> > generally help us, though, since virtiofs will want to export root
+> > owned fs as well.
+> >
+> > Addition of a MAC header to the file handle by name_to_handle_at(2)
+> > could solve some or all of the above problems.  The question is where
+> > the key comes from and what the security implications are.
+> >
+> > A per-process (e.g. associated with task->files, generated by the
+> > kernel on demand and discarded on process exit) key would suffice to
+> > replace O_PATH descriptors.  In this case the only difference between
+> > keeping the O_PATH fd open and
+> >
+> >    name_to_handle_at(opathfd, &handle);
+> >    close(opathfd);
+> >    opathfd=open_by_handle_at(&handle);
+> >
+> > would be that the resulting fd might point to a disconnected dentry
+> > and hence would result in incomplete path information under
+> > /proc/self/fd/.  Need to think hard about whether this has any
+> > security implications for unprivileged users.
+> >
+> > Adding key management would solve the other aspects, but would also
+> > possibly open up holes for accessing arbitrary files, so this would
+> > need to be done carefully.
+>
+> I have a bad feeling in my stomach when thinking about adding such
+> things to the kernel.
+
+Yet it could be more generally useful, not just for virtiofsd.   An
+RFC patch should be simple enough and feedback from VFS and security
+folks could help decide whether to pursue this route or not.
+
+I've not yet used the crypto API in the kernel, but I guess generating
+a key and creating a MAC are not such a big deal.  Do you want to have
+a go at this, or should I?
+
+Thanks,
+Miklos
+
 

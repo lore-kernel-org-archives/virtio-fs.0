@@ -1,13 +1,14 @@
-Date: Mon, 8 Mar 2021 16:14:04 +0000
+Date: Mon, 8 Mar 2021 16:17:22 +0000
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YEZNTFOT2noej13i@stefanha-x1.localdomain>
-References: <20210304174536.54446-1-dgilbert@redhat.com>
+Message-ID: <YEZOEiGwbXsy4Q8T@stefanha-x1.localdomain>
+References: <20210303195339.GB3793@redhat.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="oUmqqy8k+NY1XmB9"
+	protocol="application/pgp-signature"; boundary="M33DtmudPaRThzn/"
 Content-Disposition: inline
-In-Reply-To: <20210304174536.54446-1-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Don't assume header layout
+In-Reply-To: <20210303195339.GB3793@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Add qemu version and copyright
+ info
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,202 +17,107 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, vgoyal@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
 
 
---oUmqqy8k+NY1XmB9
+--M33DtmudPaRThzn/
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Thu, Mar 04, 2021 at 05:45:36PM +0000, Dr. David Alan Gilbert (git) wrot=
-e:
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+On Wed, Mar 03, 2021 at 02:53:39PM -0500, Vivek Goyal wrote:
+> Option "-V" currently displays the fuse protocol version virtiofsd is
+> using. For example, I see this.
 >=20
-> virtiofsd incorrectly assumed a fixed set of header layout in the virt
-> queue; assuming that the fuse and write headers were conveniently
-> separated from the data;  the spec doesn't allow us to take that
-> convenience, so fix it up to deal with it the hard way.
+> $ ./virtiofsd -V
+> "using FUSE kernel interface version 7.33"
 >=20
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> People also want to know software version of virtiofsd so that they can
+> figure out if a certain fix is part of currently running virtiofsd or
+> not. Eric Ernst ran into this issue.
+>=20
+> David Gilbert thinks that it probably is best that we simply carry the
+> qemu version and display that information given we are part of qemu
+> tree.=20
+>=20
+> So this patch enhances version information and also adds qemu version
+> and copyright info. Not sure if copyright information is supposed
+> to be displayed along with version info. Given qemu-storage-daemon
+> and other utilities are doing it, so I continued with same pattern.
+> This is how now output looks like.
+>=20
+> $ ./virtiofsd -V
+> virtiofsd version 5.2.50 (v5.2.0-2357-gcbcf09872a-dirty)
+> Copyright (c) 2003-2020 Fabrice Bellard and the QEMU Project developers
+> using FUSE kernel interface version 7.33
+>=20
+> Reported-by: Eric Ernst <eric.g.ernst@gmail.com>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 > ---
->  tools/virtiofsd/fuse_virtio.c | 84 ++++++++++++++++++++++++++---------
->  1 file changed, 63 insertions(+), 21 deletions(-)
+>  tools/virtiofsd/passthrough_ll.c |    8 ++++++++
+>  1 file changed, 8 insertions(+)
 >=20
-> diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-> index 523ee64fb7..55e2e057ec 100644
-> --- a/tools/virtiofsd/fuse_virtio.c
-> +++ b/tools/virtiofsd/fuse_virtio.c
-> @@ -129,18 +129,55 @@ static void fv_panic(VuDev *dev, const char *err)
->   * Copy from an iovec into a fuse_buf (memory only)
->   * Caller must ensure there is space
->   */
-> -static void copy_from_iov(struct fuse_buf *buf, size_t out_num,
-> -                          const struct iovec *out_sg)
-> +static size_t copy_from_iov(struct fuse_buf *buf, size_t out_num,
-> +                            const struct iovec *out_sg,
-> +                            size_t max)
->  {
->      void *dest =3D buf->mem;
-> +    size_t copied =3D 0;
+> Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
+> =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+> --- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2021-03-03 14:28:=
+04.893672524 -0500
+> +++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2021-03-03 14:37:29.38=
+1712706 -0500
+> @@ -37,6 +37,8 @@
 > =20
-> -    while (out_num) {
-> +    while (out_num && max) {
->          size_t onelen =3D out_sg->iov_len;
-> +        onelen =3D MIN(onelen, max);
->          memcpy(dest, out_sg->iov_base, onelen);
->          dest +=3D onelen;
-> +        copied +=3D onelen;
->          out_sg++;
->          out_num--;
-> +        max -=3D onelen;
->      }
-> +
-> +    return copied;
+>  #include "qemu/osdep.h"
+>  #include "qemu/timer.h"
+> +#include "qemu-version.h"
+> +#include "qemu-common.h"
+>  #include "fuse_virtio.h"
+>  #include "fuse_log.h"
+>  #include "fuse_lowlevel.h"
+> @@ -3591,6 +3593,11 @@ static void fuse_lo_data_cleanup(struct
+>      free(lo->source);
+>  }
+> =20
+> +static void qemu_version(void)
+> +{
+> +    printf("virtiofsd version " QEMU_FULL_VERSION "\n" QEMU_COPYRIGHT "\=
+n");
 > +}
 > +
-> +/*
-> + * Skip 'skip' bytes in the iov; 'sg_1stindex' is set as
-> + * the index for the 1st iovec to read data from, and
-> + * 'sg_1stskip' is the number of bytes to skip in that entry.
-> + *
-> + * Returns True if there are at least 'skip' bytes in the iovec
-> + *
-> + */
-> +static bool skip_iov(const struct iovec *sg, size_t sg_size,
-> +                     size_t skip,
-> +                     size_t *sg_1stindex, size_t *sg_1stskip)
-> +{
-> +    size_t vec;
-> +
-> +    for (vec =3D 0; vec < sg_size; vec++) {
-> +        if (sg[vec].iov_len > skip) {
-> +            *sg_1stskip =3D skip;
-> +            *sg_1stindex =3D vec;
-> +
-> +            return true;
-> +        }
-> +
-> +        skip -=3D sg[vec].iov_len;
-> +    }
-> +
-> +    *sg_1stindex =3D vec;
-> +    *sg_1stskip =3D 0;
-> +    return skip =3D=3D 0;
->  }
-
-This comment does not match the code: "Returns True if there are at
-least 'skip' bytes in the iovec". When skip =3D=3D iov_length(sg, sg_size)
-the function returns false.
-
-> =20
->  /*
-> @@ -505,14 +542,14 @@ static void fv_queue_worker(gpointer data, gpointer=
- user_data)
->                   elem->index);
->          assert(0); /* TODO */
->      }
-> -    /* Copy just the first element and look at it */
-> -    copy_from_iov(&fbuf, 1, out_sg);
-> +    /* Copy just the fuse_in_header and look at it */
-> +    copy_from_iov(&fbuf, out_num, out_sg,
-> +                  sizeof(struct fuse_in_header));
-> =20
->      pbufv =3D NULL; /* Compiler thinks an unitialised path */
-> -    if (out_num > 2 &&
-> -        out_sg[0].iov_len =3D=3D sizeof(struct fuse_in_header) &&
-> -        ((struct fuse_in_header *)fbuf.mem)->opcode =3D=3D FUSE_WRITE &&
-> -        out_sg[1].iov_len =3D=3D sizeof(struct fuse_write_in)) {
-> +    if (((struct fuse_in_header *)fbuf.mem)->opcode =3D=3D FUSE_WRITE &&
-> +        out_len >=3D (sizeof(struct fuse_in_header) +
-> +                    sizeof(struct fuse_write_in))) {
->          /*
->           * For a write we don't actually need to copy the
->           * data, we can just do it straight out of guest memory
-> @@ -521,15 +558,13 @@ static void fv_queue_worker(gpointer data, gpointer=
- user_data)
->           */
->          fuse_log(FUSE_LOG_DEBUG, "%s: Write special case\n", __func__);
-> =20
-> -        /* copy the fuse_write_in header afte rthe fuse_in_header */
-> -        fbuf.mem +=3D out_sg->iov_len;
-> -        copy_from_iov(&fbuf, 1, out_sg + 1);
-> -        fbuf.mem -=3D out_sg->iov_len;
-> -        fbuf.size =3D out_sg[0].iov_len + out_sg[1].iov_len;
-> +        fbuf.size =3D copy_from_iov(&fbuf, out_num, out_sg,
-> +                                  sizeof(struct fuse_in_header) +
-> +                                  sizeof(struct fuse_write_in));
-> =20
->          /* Allocate the bufv, with space for the rest of the iov */
->          pbufv =3D malloc(sizeof(struct fuse_bufvec) +
-> -                       sizeof(struct fuse_buf) * (out_num - 2));
-> +                       sizeof(struct fuse_buf) * out_num);
->          if (!pbufv) {
->              fuse_log(FUSE_LOG_ERR, "%s: pbufv malloc failed\n",
->                      __func__);
-> @@ -540,24 +575,31 @@ static void fv_queue_worker(gpointer data, gpointer=
- user_data)
->          pbufv->count =3D 1;
->          pbufv->buf[0] =3D fbuf;
-> =20
-> -        size_t iovindex, pbufvindex;
-> -        iovindex =3D 2; /* 2 headers, separate iovs */
-> +        size_t iovindex, pbufvindex, skip;
->          pbufvindex =3D 1; /* 2 headers, 1 fusebuf */
-> =20
-> +        skip_iov(out_sg, out_num,
-> +                 sizeof(struct fuse_in_header) +
-> +                 sizeof(struct fuse_write_in),
-> +                 &iovindex, &skip);
-> +
->          for (; iovindex < out_num; iovindex++, pbufvindex++) {
-
-What happens when iov_length(out_sg, out_num) =3D=3D sizeof(struct
-fuse_in_header) + sizeof(struct fuse_write_in)? I think it will add a
-bogus pbufv element.
-
->              pbufv->count++;
->              pbufv->buf[pbufvindex].pos =3D ~0; /* Dummy */
->              pbufv->buf[pbufvindex].flags =3D 0;
->              pbufv->buf[pbufvindex].mem =3D out_sg[iovindex].iov_base;
->              pbufv->buf[pbufvindex].size =3D out_sg[iovindex].iov_len;
-> +
-> +            if (skip) {
-> +                pbufv->buf[pbufvindex].mem +=3D skip;
-> +                pbufv->buf[pbufvindex].size -=3D skip;
-> +                skip =3D 0;
-> +            }
->          }
->      } else {
->          /* Normal (non fast write) path */
-> =20
-> -        /* Copy the rest of the buffer */
-> -        fbuf.mem +=3D out_sg->iov_len;
-> -        copy_from_iov(&fbuf, out_num - 1, out_sg + 1);
-> -        fbuf.mem -=3D out_sg->iov_len;
-> +        copy_from_iov(&fbuf, out_num, out_sg, se->bufsize);
->          fbuf.size =3D out_len;
-> =20
->          /* TODO! Endianness of header */
-> --=20
-> 2.29.2
+>  int main(int argc, char *argv[])
+>  {
+>      struct fuse_args args =3D FUSE_ARGS_INIT(argc, argv);
+> @@ -3662,6 +3669,7 @@ int main(int argc, char *argv[])
+>          ret =3D 0;
+>          goto err_out1;
+>      } else if (opts.show_version) {
+> +        qemu_version();
+>          fuse_lowlevel_version();
+>          ret =3D 0;
+>          goto err_out1;
 >=20
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
 
---oUmqqy8k+NY1XmB9
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+
+--M33DtmudPaRThzn/
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmBGTUwACgkQnKSrs4Gr
-c8gmcwgAujxy/paw228S6TVDLQ7MQyNUhIxN/pOzIPt1v71myOkiPAygyc3q8FAK
-jEPGCgLA6mrXAwH537CqaHM1KTOv7R+e7mYPODvXWRZs5AuPexfyXZYUSLTDkI80
-C9o6+gbMMez+ZCAaAREW1nKv/h6p/xpcWBA3egUwuGFQO7Oi0P/9RDqLYLu4cXLB
-b//CgeUfoOGoMMVwa0eeWh2wPJzBBffFrYA5xt1sacEoy5G6b1yE1h+Vk9aJuKsz
-7kZ+QvbRm6WMH5jBfmT9mnFBZ8kda+abDsnj6+XudZ4zKxNolWdrYq9J99jtx9M9
-Oo7/eFuDuflpRFCeJjm6zt/zJdbo4Q==
-=CTxl
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmBGThIACgkQnKSrs4Gr
+c8jzyggAvXL8MbXBNIkGZ82fE7HvzIumuSuRnjINTmIWo5Et0PPie1w/JKrKagdI
+R+Q6LVUDn30xE0XcRZVH0ES/wUgDQRLcaJEtjtm35/DuSwsbrh6MWHntiC3urqR1
+ktpkii0Ar6w189BWQh/eAo9Z691WrDzLpTcrmNXW9CtDb+FSm99Sk9ypcOH1LbUQ
+OOET/HCjsmIpaxC2B8bSjSdNm3RMsNoVRd7m9/NE5/hdVHXopW+8e+2GMnI4wkH8
+1XWUR1DJMezxc9kFKGxZKyYWdQ1Dhw7sT7WLfOdJtfFhm/B/GrE5zIbCIQ10/5BJ
+W/DTcy84uXRlyhFRjNrfbKUfvUTOsQ==
+=0yPC
 -----END PGP SIGNATURE-----
 
---oUmqqy8k+NY1XmB9--
+--M33DtmudPaRThzn/--
 

@@ -1,12 +1,12 @@
-Date: Thu, 11 Mar 2021 14:22:54 +0000
+Date: Thu, 11 Mar 2021 14:58:09 +0000
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YEonvgxWxncLgsHU@work-vm>
+Message-ID: <YEowAVzkMBo1oKTU@work-vm>
 References: <20210304174536.54446-1-dgilbert@redhat.com>
-	<20210305160609.GC109162@redhat.com>
+	<YEZNTFOT2noej13i@stefanha-x1.localdomain>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210305160609.GC109162@redhat.com>
+In-Reply-To: <YEZNTFOT2noej13i@stefanha-x1.localdomain>
 Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Don't assume header layout
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -16,10 +16,10 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
 > On Thu, Mar 04, 2021 at 05:45:36PM +0000, Dr. David Alan Gilbert (git) wrote:
 > > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 > > 
@@ -87,13 +87,24 @@ Cc: virtio-fs@redhat.com
 > > +            return true;
 > > +        }
 > > +
-> > +        skip -= sg[vec].iov_len;
+ (1)         skip -= sg[vec].iov_len;
 > > +    }
 > > +
-> > +    *sg_1stindex = vec;
+ (2)     *sg_1stindex = vec;
 > > +    *sg_1stskip = 0;
-> > +    return skip == 0;
+ (3)     return skip == 0;
 > >  }
+> 
+> This comment does not match the code: "Returns True if there are at
+> least 'skip' bytes in the iovec". When skip == iov_length(sg, sg_size)
+> the function returns false.
+
+I'm not seeing how; in that case, it'll loop around executing (1) for
+each vector, so skip will reduce, then it falls out of the for loop
+and if it was equal to the size of the vector, (1) would have subtracted
+the whole vector out, so skip would now be 0, hence the 'skip == 0' at 2 and
+so it should return true.
+
 > >  
 > >  /*
 > > @@ -505,14 +542,14 @@ static void fv_queue_worker(gpointer data, gpointer user_data)
@@ -122,16 +133,6 @@ Cc: virtio-fs@redhat.com
 > >          fuse_log(FUSE_LOG_DEBUG, "%s: Write special case\n", __func__);
 > >  
 > > -        /* copy the fuse_write_in header afte rthe fuse_in_header */
-> 
-> Hi Dave,
-> 
-> I was scratching my head that why FUSE_WRITE path is being handled
-> differently than rest of the requests. Then I happened to look
-> at description of fuse_session_process_buf_int() and that expects
-> a certain layout for FUSE_WRITE requests. Thats why...
-
-Ah, hop=efully this solves it.
-
 > > -        fbuf.mem += out_sg->iov_len;
 > > -        copy_from_iov(&fbuf, 1, out_sg + 1);
 > > -        fbuf.mem -= out_sg->iov_len;
@@ -139,16 +140,6 @@ Ah, hop=efully this solves it.
 > > +        fbuf.size = copy_from_iov(&fbuf, out_num, out_sg,
 > > +                                  sizeof(struct fuse_in_header) +
 > > +                                  sizeof(struct fuse_write_in));
-> 
-> You are not trusting guest that it can change iovecs. So is it a good
-> idea to copy fuse_in_header again. I mean we copied once, looked at
-> it and now are copying again. It is possible that guest changed it
-> and our assumption of this being a WRITE request might be broken now.
-
-OK, the easiest way is to copy it out and back; it's easier than
-modifying copy_from_iov to skip.
-
-> 
 > >  
 > >          /* Allocate the bufv, with space for the rest of the iov */
 > >          pbufv = malloc(sizeof(struct fuse_bufvec) +
@@ -164,14 +155,6 @@ modifying copy_from_iov to skip.
 > > -        size_t iovindex, pbufvindex;
 > > -        iovindex = 2; /* 2 headers, separate iovs */
 > > +        size_t iovindex, pbufvindex, skip;
-> 
-> How about renaming "skip" to say "iov_byte_skip" or something like that.
-> Too many variables are in there. It just makes it clear to skip few
-> bytes in iov. Just a suggestion. Feel free to ignore if you are not
-> convinced.
-
-Done.
-
 > >          pbufvindex = 1; /* 2 headers, 1 fusebuf */
 > >  
 > > +        skip_iov(out_sg, out_num,
@@ -179,25 +162,17 @@ Done.
 > > +                 sizeof(struct fuse_write_in),
 > > +                 &iovindex, &skip);
 > > +
+> >          for (; iovindex < out_num; iovindex++, pbufvindex++) {
 > 
-> How about looking at return code of skip_iov(). Just in case guest
-> has changed it by now.
-> 
-> May be a safer practice will be to always first copy out_sg in a
-> temporary buffer and then we should parse it and organize in
-> pbufv/bufv for fuse consumption. But I guess that adds one extra
-> copy and it might not be worth it. So may be solve it when it
-> creates a real problem.
+> What happens when iov_length(out_sg, out_num) == sizeof(struct
+> fuse_in_header) + sizeof(struct fuse_write_in)? I think it will add a
+> bogus pbufv element.
 
-I've added a check on skip_iov's return.
+skip_iov should have set iovindex=out_num in that case and so that loop
+won't happen.
 
 Dave
 
-
-> Thanks
-> Vivek
-> 
-> >          for (; iovindex < out_num; iovindex++, pbufvindex++) {
 > >              pbufv->count++;
 > >              pbufv->buf[pbufvindex].pos = ~0; /* Dummy */
 > >              pbufv->buf[pbufvindex].flags = 0;
@@ -224,6 +199,8 @@ Dave
 > > -- 
 > > 2.29.2
 > > 
+
+
 -- 
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

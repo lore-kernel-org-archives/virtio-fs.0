@@ -1,122 +1,81 @@
-Date: Tue, 16 Feb 2021 10:54:16 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210216155416.GA10195@redhat.com>
-References: <87r1llk28a.fsf@suse.de> <20210215205221.GB3331@redhat.com>
-	<CAJfpegsEa6ZCXBFUpER6Fiagp3TEpxa82qBo0a4NydjC3ucnTw@mail.gmail.com>
+From: Greg Kurz <groug@kaod.org>
+Date: Fri, 12 Mar 2021 10:22:07 +0100
+Message-Id: <20210312092212.782255-3-groug@kaod.org>
+In-Reply-To: <20210312092212.782255-1-groug@kaod.org>
+References: <20210312092212.782255-1-groug@kaod.org>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <CAJfpegsEa6ZCXBFUpER6Fiagp3TEpxa82qBo0a4NydjC3ucnTw@mail.gmail.com>
-Subject: Re: [Virtio-fs] Question on ACLs support in virtiofs
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2 2/7] vhost-user: Fix double-close on
+	slave_read() error path
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
-List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
+List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
-List-Archive: <https://www.redhat.com/archives/virtio-fs>
+List-Archive: <https://listman.redhat.com/archives/virtio-fs>
 List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
-List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
+List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>
+To: qemu-devel@nongnu.org
+Cc: =?UTF-8?q?Daniel=20P=20=2E=20Berrang=C3=A9?= <berrange@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
-On Tue, Feb 16, 2021 at 04:11:20PM +0100, Miklos Szeredi wrote:
-> On Mon, Feb 15, 2021 at 9:52 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> >
-> > On Fri, Feb 12, 2021 at 10:30:13AM +0000, Luis Henriques wrote:
-> > > Hi!
-> > >
-> > > I've recently executed the generic fstests on virtiofs and decided to have
-> > > a closer look at generic/099 failure.  In a nutshell, here's the sequence
-> > > of commands that reproduce that failure:
-> > >
-> > > # umask 0
-> > > # mkdir acldir
-> > > # chacl -b "u::rwx,g::rwx,o::rwx" "u::r-x,g::r--,o::---" acldir
-> > > # touch acldir/file1
-> > > # umask 722
-> > > # touch acldir/file2
-> > > # ls -l acldir
-> > > total 0
-> > > -r--r----- 1 root root 0 Feb 12 10:04 file1
-> > > ----r----- 1 root root 0 Feb 12 10:05 file2
-> > >
-> > > The failure is that setting umask to 722 shouldn't affect the new file2
-> > > because acldir has a default ACL (from umask(2): "... if the parent
-> > > directory has a default ACL (see acl(5)), the umask is ignored...").
-> > >
-> > > So... I tried to have look at the code, and initially I thought that the
-> > > problem was in (kernel) function fuse_create_open(), where we have this:
-> > >
-> > >       if (!fm->fc->dont_mask)
-> > >               mode &= ~current_umask();
-> > >
-> > > but then I went down the rabbit hole, into the user-space code, and
-> > > couldn't reach a conclusion.  Maybe the issue is that there's in fact no
-> > > support for this POSIX ACLs in virtiofs/FUSE?  Any ideas?
-> >
-> > Hi,
-> >
-> > [ CC Miklos and linux-fsdevel ]
-> >
-> > I debugged into this a little. There are many knobs and it is little
-> > confusing that what are right set of fixes.
-> >
-> > So what's happening in this case is that fc->dont_mask is not set. That
-> > means fuse client is modifying mode using umask. First time you
-> > touch file, umask is 0, so there is no modification. But next time,
-> > you set umask to 722, and fuse modifies mode before sending file
-> > create request to server. virtiofs server is already running with
-> > umask 0, so it does not touch the mode.
-> >
-> > So that means, that in case of default acl, fuse client should not
-> > be modifying mode using umask. But question is when should fuse
-> > skip applying umask.
-> >
-> > I see that fuse always sets SB_POSIXACL. That means VFS is not
-> > going to apply umask and all the umask handling is with-in fuse.
-> >
-> > sb->s_flags |= SB_POSIXACL;
-> >
-> > Currently fuse sets fc->dont_mask in two conditions.
-> >
-> > - If the caller mounted with flag MS_POSIXACL, then fc->dont_mask is set.
-> > - If fuse server opted in for option FUSE_DONT_MASK, then fc->dont_mask
-> >   is set.
-> >
-> > I see that for virtiofs, both the conditions are not true out of the
-> > box. In fact looks like ACL support is not fully enabled, because
-> > I don't see fuse server opting in for FUSE_POSIX_ACL.
-> >
-> > I suspect that we probably should provide an option in virtiofsd to
-> > enable/disable acl support.
-> 
-> Sounds good.
-> 
-> > Setting FUSE_DONT_MASK is tricky. If we leave it to fuse, that means
-> > fuse will have to query acl to figure out if default acl is set or
-> > not on parent dir. And that data could be stale and there could be
-> > races w.r.t setting acls from other client.
-> >
-> > If we do set FUSE_DONT_MASK, that means in file creation path virtiofsd
-> > server will have to switch its umask to one provided in request. Given
-> > its a per process property, we will have to have some locks to make
-> > sure other create requests are not progressing in parallel. And that
-> > hope host does the right thing. That is apply umask if parent dir does
-> > not have default acl otherwise apply umask (as set by virtiofsd process).
-> >
-> > Miklos, does above sound reasonable. You might have more thoughts on
-> > how to handle this best in fuse/virtiofs.
-> 
-> fv_queue_worker() does unshare(CLONE_FS) for the fchdir() call in
-> xattr ops, which means that umask is now a per-thread propery in
-> virtiofsd.
+Some message types, e.g. VHOST_USER_SLAVE_VRING_HOST_NOTIFIER_MSG,
+can convey file descriptors. These must be closed before returning
+from slave_read() to avoid being leaked. This can currently be done
+in two different places:
 
-Aha.. I forgot about that. Thanks. 
-> 
-> So setting umask before create ops sounds like a good solution.
+[1] just after the request has been processed
 
-I will give it a try along with an option to enable/disable acl
-support in virtiofsd. 
+[2] on the error path, under the goto label err:
 
-Vivek
+These path are supposed to be mutually exclusive but they are not
+actually. If the VHOST_USER_NEED_REPLY_MASK flag was passed and the
+sending of the reply fails, both [1] and [2] are performed with the
+same descriptor values. This can potentially cause subtle bugs if one
+of the descriptor was recycled by some other thread in the meantime.
+
+This code duplication complicates rollback for no real good benefit.
+Do the closing in a unique place, under a new fdcleanup: goto label
+at the end of the function.
+
+Signed-off-by: Greg Kurz <groug@kaod.org>
+---
+ hw/virtio/vhost-user.c | 11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
+
+diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
+index 6af9b43a7232..acde1d293684 100644
+--- a/hw/virtio/vhost-user.c
++++ b/hw/virtio/vhost-user.c
+@@ -1475,13 +1475,6 @@ static void slave_read(void *opaque)
+         ret = -EINVAL;
+     }
+ 
+-    /* Close the remaining file descriptors. */
+-    for (i = 0; i < fdsize; i++) {
+-        if (fd[i] != -1) {
+-            close(fd[i]);
+-        }
+-    }
+-
+     /*
+      * REPLY_ACK feature handling. Other reply types has to be managed
+      * directly in their request handlers.
+@@ -1511,12 +1504,14 @@ static void slave_read(void *opaque)
+         }
+     }
+ 
+-    return;
++    goto fdcleanup;
+ 
+ err:
+     qemu_set_fd_handler(u->slave_fd, NULL, NULL, NULL);
+     close(u->slave_fd);
+     u->slave_fd = -1;
++
++fdcleanup:
+     for (i = 0; i < fdsize; i++) {
+         if (fd[i] != -1) {
+             close(fd[i]);
+-- 
+2.26.2
 

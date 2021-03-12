@@ -1,16 +1,10 @@
-Date: Thu, 11 Mar 2021 18:52:17 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YEpm4YCYN2zuyD8w@work-vm>
-References: <20210209190224.62827-1-dgilbert@redhat.com>
-	<20210209190224.62827-8-dgilbert@redhat.com>
-	<CAJFHJrqioXu7K8Z=dFgMQDWoKoNK3pddcgf9znCS72BR4WHSYA@mail.gmail.com>
-	<YEoJzfLRy/Kk6SOf@work-vm> <20210311135050.GA145441@redhat.com>
+From: Greg Kurz <groug@kaod.org>
+Date: Fri, 12 Mar 2021 10:22:05 +0100
+Message-Id: <20210312092212.782255-1-groug@kaod.org>
+Content-Type: text/plain; charset="utf-8"
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210311135050.GA145441@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 07/24] DAX: virtio-fs: Add vhost-user slave
- commands for mapping
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2 0/7] virtiofsd: Avoid potential deadlocks
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,128 +13,79 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: mst@redhat.com, qemu-devel@nongnu.org, virtio-fs-list <virtio-fs@redhat.com>, marcandre.lureau@redhat.com
+To: qemu-devel@nongnu.org
+Cc: =?UTF-8?q?Daniel=20P=20=2E=20Berrang=C3=A9?= <berrange@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> On Thu, Mar 11, 2021 at 12:15:09PM +0000, Dr. David Alan Gilbert wrote:
-> > * Chirantan Ekbote (chirantan@chromium.org) wrote:
-> > > On Wed, Feb 10, 2021 at 4:04 AM Dr. David Alan Gilbert (git)
-> > > <dgilbert@redhat.com> wrote:
-> > > >
-> > > > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-> > > > +
-> > > > +typedef struct {
-> > > > +    /* Offsets within the file being mapped */
-> > > > +    uint64_t fd_offset[VHOST_USER_FS_SLAVE_ENTRIES];
-> > > > +    /* Offsets within the cache */
-> > > > +    uint64_t c_offset[VHOST_USER_FS_SLAVE_ENTRIES];
-> > > > +    /* Lengths of sections */
-> > > > +    uint64_t len[VHOST_USER_FS_SLAVE_ENTRIES];
-> > > > +    /* Flags, from VHOST_USER_FS_FLAG_* */
-> > > > +    uint64_t flags[VHOST_USER_FS_SLAVE_ENTRIES];
-> > > > +} VhostUserFSSlaveMsg;
-> > > > +
-> > > 
-> > > Is it too late to change this?  This struct allocates space for up to
-> > > 8 entries but most of the time the server will only try to set up one
-> > > mapping at a time so only 32 out of the 256 bytes in the message are
-> > > actually being used.  We're just wasting time memcpy'ing bytes that
-> > > will never be used.  Is there some reason this can't be dynamically
-> > > sized?  Something like:
-> > > 
-> > > typedef struct {
-> > >     /* Number of mapping requests */
-> > >     uint16_t num_requests;
-> > >     /* `num_requests` mapping requests */
-> > >    MappingRequest requests[];
-> > > } VhostUserFSSlaveMsg;
-> > > 
-> > > typedef struct {
-> > >     /* Offset within the file being mapped */
-> > >     uint64_t fd_offset;
-> > >     /* Offset within the cache */
-> > >     uint64_t c_offset;
-> > >     /* Length of section */
-> > >     uint64_t len;
-> > >     /* Flags, from VHOST_USER_FS_FLAG_* */
-> > >     uint64_t flags;
-> > > } MappingRequest;
-> > > 
-> > > The current pre-allocated structure both wastes space when there are
-> > > fewer than 8 requests and requires extra messages to be sent when
-> > > there are more than 8 requests.  I realize that in the grand scheme of
-> > > things copying 224 extra bytes is basically not noticeable but it just
-> > > irks me that we could fix this really easily before it gets propagated
-> > > to too many other places.
-> > 
-> > So this has come out as:
-> > 
-> > typedef struct {
-> >     /* Offsets within the file being mapped */
-> >     uint64_t fd_offset;
-> >     /* Offsets within the cache */
-> >     uint64_t c_offset;
-> >     /* Lengths of sections */
-> >     uint64_t len;
-> >     /* Flags, from VHOST_USER_FS_FLAG_* */
-> >     uint64_t flags;
-> > } VhostUserFSSlaveMsgEntry;
-> >  
-> > typedef struct {
-> >     /* Generic flags for the overall message */
-> >     uint32_t flags;
-> >     /* Number of entries */
-> >     uint16_t count;
-> >     /* Spare */
-> >     uint16_t align;
-> >  
-> >     VhostUserFSSlaveMsgEntry entries[];
-> > } VhostUserFSSlaveMsg;
-> > 
-> > which seems to work OK.
-> > I've still got a:
-> > #define VHOST_USER_FS_SLAVE_MAX_ENTRIES 8
-> 
-> Hi Dave,
-> 
-> So if we were to raise this limit down the line, will it be just a matter
-> of changing this numebr and recompile qemu + virtiofsd? Or this is just
-> a limit on sender and qemu does not care.
+A deadlock condition potentially exists if a vhost-user process needs
+to request something to QEMU on the slave channel while processing a
+vhost-user message.
 
-They have to agree; 
-> If qemu cares about number of entries, then it will be good to raise this
-> limit to say 32 or 64.
+This doesn't seem to affect any vhost-user implementation so far, but
+this is currently biting the upcoming enablement of DAX with virtio-fs.
+The issue is being observed when the guest does an emergency reboot while
+a mapping still exits in the DAX window, which is very easy to get with
+a busy enough workload (e.g. as simulated by blogbench [1]) :
 
-I've bumped it to 32.
+- QEMU sends VHOST_USER_GET_VRING_BASE to virtiofsd.
 
-Dave
+- In order to complete the request, virtiofsd then asks QEMU to remove
+  the mapping on the slave channel.
 
-> Otherwise new definitions look good.
-> 
-> Thanks
-> Vivek
-> 
-> > 
-> > to limit the size VhostUserFSSlaveMsg can get to.
-> > The variable length array makes the union in the reader a bit more
-> > hairy, but it's OK.
-> > 
-> > Dave
-> > 
-> > > Chirantan
-> > > 
-> > > > --
-> > > > 2.29.2
-> > > >
-> > > > _______________________________________________
-> > > > Virtio-fs mailing list
-> > > > Virtio-fs@redhat.com
-> > > > https://www.redhat.com/mailman/listinfo/virtio-fs
-> > > >
-> > > 
-> > -- 
-> > Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+All these dialogs are synchronous, hence the deadlock.
+
+Another deadlock condition exists in the virtiofsd code itself, related
+to the use of the vu_dispatch rwlock.
+
+This series supercedes Vivek's previous tentative [1] to fix the deadlocks.
+Basically, instead of introducing new vhost-user protocol message to
+specifically shutdown the slave channel, this series introduces a nested
+event loop in vhost_user_read() as suggested by Stefan Hajnoczi. This
+allows to monitor and service requests on the slave channel while
+waiting for virtiofsd to answer to a vhost-user request.
+
+This was tested with the latest DAX patchset posted to the virtio-fs
+list [2], rebased on top of the present series [3]. Testing scenario
+is:
+1) start VM with DAX capable vhost-user-fs device
+2) mount -o dax in the guest
+3) run Blogbench [4] in virtiofs mount
+4) wait 10s, which is enough to have active mappings
+5) echo b > /proc/sysrq-trigger
+6) wait for the guest to reboot and start over from step 2
+
+Without this series, only a couple of reboots ( < 5) are needed to
+hit a deadlock. With this series applied, an overnight test could
+reboot the guest 1500+ times without any issues.
+
+[1] https://listman.redhat.com/archives/virtio-fs/2021-January/msg00073.html
+
+[2] https://listman.redhat.com/archives/virtio-fs/2021-February/msg00058.html
+
+[3] Tree with this series + DAX available at:
+
+    https://gitlab.com/gkurz/qemu/-/commits/virtio-fs-dax-no-deadlock
+
+[4] https://github.com/jedisct1/Blogbench
+
+Changes since v2:
+ - added some preliminary fixes and cleanups for the slave channel code
+ - re-factored some code and addressed comments (see individual patches)
+ - more testing
+
+Greg Kurz (7):
+  vhost-user: Drop misleading EAGAIN checks in slave_read()
+  vhost-user: Fix double-close on slave_read() error path
+  vhost-user: Factor out duplicated slave_fd teardown code
+  vhost-user: Convert slave channel to QIOChannelSocket
+  vhost-user: Introduce nested event loop in vhost_user_read()
+  vhost-user: Monitor slave channel in vhost_user_read()
+  virtiofsd: Release vu_dispatch_lock when stopping queue
+
+ hw/virtio/vhost-user.c        | 217 +++++++++++++++++++++-------------
+ tools/virtiofsd/fuse_virtio.c |   6 +
+ 2 files changed, 144 insertions(+), 79 deletions(-)
+
 -- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+2.26.2
+
 

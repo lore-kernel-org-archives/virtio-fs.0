@@ -1,62 +1,75 @@
-Date: Tue, 16 Feb 2021 10:57:10 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210216155710.GB10195@redhat.com>
-References: <20210209190224.62827-1-dgilbert@redhat.com>
-	<20210209190224.62827-24-dgilbert@redhat.com>
-	<20210211143542.GT247031@stefanha-x1.localdomain>
-	<20210211144031.GB5014@redhat.com>
-	<20210215155711.GA95852@stefanha-x1.localdomain>
+References: <20210312141003.819108-1-groug@kaod.org>
+	<20210312141003.819108-2-groug@kaod.org>
+From: Connor Kuehl <ckuehl@redhat.com>
+Message-ID: <d2b63edf-8326-a645-659e-67ad04a6db0b@redhat.com>
+Date: Fri, 12 Mar 2021 09:13:36 -0600
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210215155711.GA95852@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH 23/24] vhost-user-fs: Implement drop
- CAP_FSETID functionality
+In-Reply-To: <20210312141003.819108-2-groug@kaod.org>
+Content-Type: text/plain; charset=utf-8; format=flowed
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH 1/3] virtiofsd: Don't allow empty paths in
+ lookup_name()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
-List-Unsubscribe: <https://www.redhat.com/mailman/options/virtio-fs>,
+List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
-List-Archive: <https://www.redhat.com/archives/virtio-fs>
+List-Archive: <https://listman.redhat.com/archives/virtio-fs>
 List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
-List-Subscribe: <https://www.redhat.com/mailman/listinfo/virtio-fs>,
+List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, mst@redhat.com, qemu-devel@nongnu.org
+To: Greg Kurz <groug@kaod.org>, qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com
 
-On Mon, Feb 15, 2021 at 03:57:11PM +0000, Stefan Hajnoczi wrote:
-> On Thu, Feb 11, 2021 at 09:40:31AM -0500, Vivek Goyal wrote:
-> > On Thu, Feb 11, 2021 at 02:35:42PM +0000, Stefan Hajnoczi wrote:
-> > > On Tue, Feb 09, 2021 at 07:02:23PM +0000, Dr. David Alan Gilbert (git) wrote:
-> > > > From: Vivek Goyal <vgoyal@redhat.com>
-> > > > 
-> > > > As part of slave_io message, slave can ask to do I/O on an fd. Additionally
-> > > > slave can ask for dropping CAP_FSETID (if master has it) before doing I/O.
-> > > > Implement functionality to drop CAP_FSETID and gain it back after the
-> > > > operation.
-> > > > 
-> > > > This also creates a dependency on libcap-ng.
-> > > 
-> > > Is this patch only for the case where QEMU is running as root?
-> > > 
-> > 
-> > Yes, it primarily is for the case where qemu is running as root, or
-> > somebody managed to launch it non-root but with still having capability
-> > CAP_FSETID.
+On 3/12/21 8:10 AM, Greg Kurz wrote:
+> When passed an empty filename, lookup_name() returns the inode of
+> the parent directory, unless the parent is the root in which case
+> the st_dev doesn't match and lo_find() returns NULL. This is
+> because lookup_name() passes AT_EMPTY_PATH down to fstatat() or
+> statx().
 > 
-> Running QEMU as root is not encouraged because the security model is
-> designed around the principle of least privilege (only give QEMU access
-> to resources that belong to the guest).
+> This behavior doesn't quite make sense because users of lookup_name()
+> then pass the name to unlinkat(), renameat() or renameat2(), all of
+> which will always fail on empty names.
 > 
-> What happens in the case where QEMU is not root? Does that mean QEMU
-> will drop suid/guid bits even if the FUSE client wanted them to be
-> preserved?
+> Drop AT_EMPTY_PATH from the flags in lookup_name() so that it has
+> the consistent behavior of "returning an existing child inode or
+> NULL" for all directories.
+> 
+> Signed-off-by: Greg Kurz <groug@kaod.org>
+> ---
+>   tools/virtiofsd/passthrough_ll.c | 3 +--
+>   1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index fc7e1b1e8e2b..27a6c636dcaf 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -1308,8 +1308,7 @@ static struct lo_inode *lookup_name(fuse_req_t req, fuse_ino_t parent,
+>           return NULL;
+>       }
+>   
+> -    res = do_statx(lo, dir->fd, name, &attr,
+> -                   AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW, &mnt_id);
+> +    res = do_statx(lo, dir->fd, name, &attr, AT_SYMLINK_NOFOLLOW, &mnt_id);
+>       lo_inode_put(lo, &dir);
+>       if (res == -1) {
+>           return NULL;
+> 
 
-QEMU will drop CAP_FSETID only if vhost-user slave asked for it. There
-is no notion of gaining CAP_FSETID.
+Should the statx() in lo_do_lookup() have this flag removed as well? I 
+don't think its callers will pass in an empty name because:
 
-IOW, yes, if qemu is running unpriviliged and does not have CAP_FSETID,
-then we will end up clearing setuid bit on host. Not sure how that
-problem can be fixed.
+   - One of your later patches prevents lo_mknod_symlink() from doing so
+   - lo_create() will fail an earlier call against the host file system 
+(open)
+   - lo_do_readdir() shouldn't be reading empty names because that 
+implies someone was able to pull off making an entry with an empty name
 
-Vivek
+However, I don't know if there will one day be future callers to 
+lo_do_lookup() that will depend on that flag.
+
+If the answer to the above is no, then:
+
+Reviewed-by: Connor Kuehl <ckuehl@redhat.com>
 

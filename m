@@ -1,12 +1,12 @@
 From: Greg Kurz <groug@kaod.org>
-Date: Fri, 12 Mar 2021 10:22:11 +0100
-Message-Id: <20210312092212.782255-7-groug@kaod.org>
+Date: Fri, 12 Mar 2021 10:22:12 +0100
+Message-Id: <20210312092212.782255-8-groug@kaod.org>
 In-Reply-To: <20210312092212.782255-1-groug@kaod.org>
 References: <20210312092212.782255-1-groug@kaod.org>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 6/7] vhost-user: Monitor slave channel in
-	vhost_user_read()
+Subject: [Virtio-fs] [PATCH v2 7/7] virtiofsd: Release vu_dispatch_lock when
+	stopping queue
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,88 +18,77 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org
 Cc: =?UTF-8?q?Daniel=20P=20=2E=20Berrang=C3=A9?= <berrange@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
-Now that everything is in place, have the nested event loop to monitor
-the slave channel. The source in the main event loop is destroyed and
-recreated to ensure any pending even for the slave channel that was
-previously detected is purged. This guarantees that the main loop
-wont invoke slave_read() based on an event that was already handled
-by the nested loop.
+QEMU can stop a virtqueue by sending a VHOST_USER_GET_VRING_BASE request
+to virtiofsd. As with all other vhost-user protocol messages, the thread
+that runs the main event loop in virtiofsd takes the vu_dispatch lock in
+write mode. This ensures that no other thread can access virtqueues or
+memory tables at the same time.
+
+In the case of VHOST_USER_GET_VRING_BASE, the main thread basically
+notifies the queue thread that it should terminate and waits for its
+termination:
+
+main()
+ virtio_loop()
+  vu_dispatch_wrlock()
+  vu_dispatch()
+   vu_process_message()
+    vu_get_vring_base_exec()
+     fv_queue_cleanup_thread()
+      pthread_join()
+
+Unfortunately, the queue thread ends up calling virtio_send_msg()
+at some point, which itself needs to grab the lock:
+
+fv_queue_thread()
+ g_list_foreach()
+  fv_queue_worker()
+   fuse_session_process_buf_int()
+    do_release()
+     lo_release()
+      fuse_reply_err()
+       send_reply()
+        send_reply_iov()
+         fuse_send_reply_iov_nofree()
+          fuse_send_msg()
+           virtio_send_msg()
+            vu_dispatch_rdlock() <-- Deadlock !
+
+Simply have the main thread to release the lock before going to
+sleep and take it back afterwards. A very similar patch was already
+sent by Vivek Goyal sometime back:
+
+https://listman.redhat.com/archives/virtio-fs/2021-January/msg00073.html
+
+The only difference here is that this done in fv_queue_set_started()
+because fv_queue_cleanup_thread() can also be called from virtio_loop()
+without the lock being held.
 
 Signed-off-by: Greg Kurz <groug@kaod.org>
+Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
-v2: - also monitor G_IO_HUP (Stefan)
-    - refactored the code a bit
----
- hw/virtio/vhost-user.c | 35 ++++++++++++++++++++++++++++++++---
- 1 file changed, 32 insertions(+), 3 deletions(-)
+ tools/virtiofsd/fuse_virtio.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
-index 00256fa318a6..ded0c1045309 100644
---- a/hw/virtio/vhost-user.c
-+++ b/hw/virtio/vhost-user.c
-@@ -345,6 +345,35 @@ end:
-     return G_SOURCE_REMOVE;
+diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+index 523ee64fb7ae..3e13997406bf 100644
+--- a/tools/virtiofsd/fuse_virtio.c
++++ b/tools/virtiofsd/fuse_virtio.c
+@@ -792,7 +792,13 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
+             assert(0);
+         }
+     } else {
++        /*
++         * Temporarily drop write-lock taken in virtio_loop() so that
++         * the queue thread doesn't block in virtio_send_msg().
++         */
++        vu_dispatch_unlock(vud);
+         fv_queue_cleanup_thread(vud, qidx);
++        vu_dispatch_wrlock(vud);
+     }
  }
  
-+static gboolean slave_read(QIOChannel *ioc, GIOCondition condition,
-+                           gpointer opaque);
-+
-+/*
-+ * This updates the read handler to use a new event loop context.
-+ * Event sources are removed from the previous context : this ensures
-+ * that events detected in the previous context are purged. They will
-+ * be re-detected and processed in the new context.
-+ */
-+static void slave_update_read_handler(struct vhost_dev *dev,
-+                                      GMainContext *ctxt)
-+{
-+    struct vhost_user *u = dev->opaque;
-+
-+    if (!u->slave_ioc) {
-+        return;
-+    }
-+
-+    if (u->slave_src) {
-+        g_source_destroy(u->slave_src);
-+        g_source_unref(u->slave_src);
-+    }
-+
-+    u->slave_src = qio_channel_add_watch_source(u->slave_ioc,
-+                                                G_IO_IN | G_IO_HUP,
-+                                                slave_read, dev, NULL,
-+                                                ctxt);
-+}
-+
- static int vhost_user_read(struct vhost_dev *dev, VhostUserMsg *msg)
- {
-     struct vhost_user *u = dev->opaque;
-@@ -366,6 +395,7 @@ static int vhost_user_read(struct vhost_dev *dev, VhostUserMsg *msg)
-      * be prepared for re-entrancy. So we create a new one and switch chr
-      * to use it.
-      */
-+    slave_update_read_handler(dev, ctxt);
-     qemu_chr_be_update_read_handlers(chr->chr, ctxt);
-     qemu_chr_fe_add_watch(chr, G_IO_IN | G_IO_HUP, vhost_user_read_cb, &data);
- 
-@@ -377,6 +407,7 @@ static int vhost_user_read(struct vhost_dev *dev, VhostUserMsg *msg)
-      * context that have been processed by the nested loop are purged.
-      */
-     qemu_chr_be_update_read_handlers(chr->chr, prev_ctxt);
-+    slave_update_read_handler(dev, NULL);
- 
-     g_main_loop_unref(loop);
-     g_main_context_unref(ctxt);
-@@ -1580,9 +1611,7 @@ static int vhost_setup_slave_channel(struct vhost_dev *dev)
-         return -1;
-     }
-     u->slave_ioc = ioc;
--    u->slave_src = qio_channel_add_watch_source(u->slave_ioc,
--                                                G_IO_IN | G_IO_HUP,
--                                                slave_read, dev, NULL, NULL);
-+    slave_update_read_handler(dev, NULL);
- 
-     if (reply_supported) {
-         msg.hdr.flags |= VHOST_USER_NEED_REPLY_MASK;
 -- 
 2.26.2
 

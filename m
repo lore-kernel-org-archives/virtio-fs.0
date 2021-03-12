@@ -1,12 +1,10 @@
 From: Greg Kurz <groug@kaod.org>
-Date: Fri, 12 Mar 2021 10:22:12 +0100
-Message-Id: <20210312092212.782255-8-groug@kaod.org>
-In-Reply-To: <20210312092212.782255-1-groug@kaod.org>
-References: <20210312092212.782255-1-groug@kaod.org>
+Date: Fri, 12 Mar 2021 15:10:00 +0100
+Message-Id: <20210312141003.819108-1-groug@kaod.org>
+Content-Type: text/plain; charset="utf-8"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 7/7] virtiofsd: Release vu_dispatch_lock when
-	stopping queue
+Subject: [Virtio-fs] [PATCH 0/3] virtiofsd: Deal with empty filenames
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,79 +14,50 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: qemu-devel@nongnu.org
-Cc: =?UTF-8?q?Daniel=20P=20=2E=20Berrang=C3=A9?= <berrange@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com
 
-QEMU can stop a virtqueue by sending a VHOST_USER_GET_VRING_BASE request
-to virtiofsd. As with all other vhost-user protocol messages, the thread
-that runs the main event loop in virtiofsd takes the vu_dispatch lock in
-write mode. This ensures that no other thread can access virtqueues or
-memory tables at the same time.
+There's no such thing as an empty file name in POSIX-compliant file systems.
+The current code base doesn't ensure the client doesn't send requests with
+such empty names. I've audited the code and only found one place where
+the behavior is somewhat altered in lookup_name() :
 
-In the case of VHOST_USER_GET_VRING_BASE, the main thread basically
-notifies the queue thread that it should terminate and waits for its
-termination:
+    res = do_statx(lo, dir->fd, name, &attr,
+                   AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW, &mnt_id);
 
-main()
- virtio_loop()
-  vu_dispatch_wrlock()
-  vu_dispatch()
-   vu_process_message()
-    vu_get_vring_base_exec()
-     fv_queue_cleanup_thread()
-      pthread_join()
+lookup_name() is used by lo_rmdir(), lo_rename() and lo_unlink() which
+all share the same behavior of doing some action on a file or directory
+under a given parent directory. But if an empty name reaches the code
+above, do_statx() returns the attributes of the parent directory itself
+and lookup_name() might return the inode of the parent directory. This
+could potentially cause security concerns in the callers.
 
-Unfortunately, the queue thread ends up calling virtio_send_msg()
-at some point, which itself needs to grab the lock:
+Fortunately, it doesn't as of today. If the parent directory is the root
+inode, lookup_name() returns NULL because lo_find() fails to find an
+inode with a matching .st_dev. Otherwise, lookup_name() does return the
+parent inode but the empty name then gets passed to either unlinkat(),
+renameat() or renameat2(), all of which fail with ENOENT in this case.
 
-fv_queue_thread()
- g_list_foreach()
-  fv_queue_worker()
-   fuse_session_process_buf_int()
-    do_release()
-     lo_release()
-      fuse_reply_err()
-       send_reply()
-        send_reply_iov()
-         fuse_send_reply_iov_nofree()
-          fuse_send_msg()
-           virtio_send_msg()
-            vu_dispatch_rdlock() <-- Deadlock !
+Drop AT_EMPTY_PATH from the above code anyway to make it clear empty
+names aren't expected by the existing callers. If the need for it
+arises in the future, it can be added back but stay safe for now.
 
-Simply have the main thread to release the lock before going to
-sleep and take it back afterwards. A very similar patch was already
-sent by Vivek Goyal sometime back:
+The FUSE protocol doesn't have a notion of AT_EMPTY_PATH actually. The
+server should hence never see empty names in client requests. Detect
+this early and systematically fail the request with ENOENT in this
+case.
 
-https://listman.redhat.com/archives/virtio-fs/2021-January/msg00073.html
+No regression is observed with the POSIX-oriented pjdfstest file system
+test suite (https://github.com/pjd/pjdfstest).
 
-The only difference here is that this done in fv_queue_set_started()
-because fv_queue_cleanup_thread() can also be called from virtio_loop()
-without the lock being held.
+Greg Kurz (3):
+  virtiofsd: Don't allow empty paths in lookup_name()
+  virtiofsd: Convert some functions to return bool
+  virtiofsd: Don't allow empty filenames
 
-Signed-off-by: Greg Kurz <groug@kaod.org>
-Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
----
- tools/virtiofsd/fuse_virtio.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ tools/virtiofsd/passthrough_ll.c | 44 ++++++++++++++++++++++++++++----
+ 1 file changed, 39 insertions(+), 5 deletions(-)
 
-diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-index 523ee64fb7ae..3e13997406bf 100644
---- a/tools/virtiofsd/fuse_virtio.c
-+++ b/tools/virtiofsd/fuse_virtio.c
-@@ -792,7 +792,13 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
-             assert(0);
-         }
-     } else {
-+        /*
-+         * Temporarily drop write-lock taken in virtio_loop() so that
-+         * the queue thread doesn't block in virtio_send_msg().
-+         */
-+        vu_dispatch_unlock(vud);
-         fv_queue_cleanup_thread(vud, qidx);
-+        vu_dispatch_wrlock(vud);
-     }
- }
- 
 -- 
 2.26.2
+
 

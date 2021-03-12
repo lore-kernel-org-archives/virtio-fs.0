@@ -1,12 +1,12 @@
 From: Greg Kurz <groug@kaod.org>
-Date: Fri, 12 Mar 2021 10:22:07 +0100
-Message-Id: <20210312092212.782255-3-groug@kaod.org>
+Date: Fri, 12 Mar 2021 10:22:08 +0100
+Message-Id: <20210312092212.782255-4-groug@kaod.org>
 In-Reply-To: <20210312092212.782255-1-groug@kaod.org>
 References: <20210312092212.782255-1-groug@kaod.org>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 2/7] vhost-user: Fix double-close on
-	slave_read() error path
+Subject: [Virtio-fs] [PATCH v2 3/7] vhost-user: Factor out duplicated
+	slave_fd teardown code
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,64 +18,62 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org
 Cc: =?UTF-8?q?Daniel=20P=20=2E=20Berrang=C3=A9?= <berrange@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
-Some message types, e.g. VHOST_USER_SLAVE_VRING_HOST_NOTIFIER_MSG,
-can convey file descriptors. These must be closed before returning
-from slave_read() to avoid being leaked. This can currently be done
-in two different places:
-
-[1] just after the request has been processed
-
-[2] on the error path, under the goto label err:
-
-These path are supposed to be mutually exclusive but they are not
-actually. If the VHOST_USER_NEED_REPLY_MASK flag was passed and the
-sending of the reply fails, both [1] and [2] are performed with the
-same descriptor values. This can potentially cause subtle bugs if one
-of the descriptor was recycled by some other thread in the meantime.
-
-This code duplication complicates rollback for no real good benefit.
-Do the closing in a unique place, under a new fdcleanup: goto label
-at the end of the function.
-
 Signed-off-by: Greg Kurz <groug@kaod.org>
 ---
- hw/virtio/vhost-user.c | 11 +++--------
- 1 file changed, 3 insertions(+), 8 deletions(-)
+ hw/virtio/vhost-user.c | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
 
 diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
-index 6af9b43a7232..acde1d293684 100644
+index acde1d293684..cb0c98f30a8d 100644
 --- a/hw/virtio/vhost-user.c
 +++ b/hw/virtio/vhost-user.c
-@@ -1475,13 +1475,6 @@ static void slave_read(void *opaque)
-         ret = -EINVAL;
-     }
+@@ -1392,6 +1392,13 @@ static int vhost_user_slave_handle_vring_host_notifier(struct vhost_dev *dev,
+     return 0;
+ }
  
--    /* Close the remaining file descriptors. */
--    for (i = 0; i < fdsize; i++) {
--        if (fd[i] != -1) {
--            close(fd[i]);
--        }
--    }
--
-     /*
-      * REPLY_ACK feature handling. Other reply types has to be managed
-      * directly in their request handlers.
-@@ -1511,12 +1504,14 @@ static void slave_read(void *opaque)
-         }
-     }
- 
--    return;
-+    goto fdcleanup;
++static void close_slave_channel(struct vhost_user *u)
++{
++    qemu_set_fd_handler(u->slave_fd, NULL, NULL, NULL);
++    close(u->slave_fd);
++    u->slave_fd = -1;
++}
++
+ static void slave_read(void *opaque)
+ {
+     struct vhost_dev *dev = opaque;
+@@ -1507,9 +1514,7 @@ static void slave_read(void *opaque)
+     goto fdcleanup;
  
  err:
-     qemu_set_fd_handler(u->slave_fd, NULL, NULL, NULL);
-     close(u->slave_fd);
-     u->slave_fd = -1;
-+
-+fdcleanup:
+-    qemu_set_fd_handler(u->slave_fd, NULL, NULL, NULL);
+-    close(u->slave_fd);
+-    u->slave_fd = -1;
++    close_slave_channel(u);
+ 
+ fdcleanup:
      for (i = 0; i < fdsize; i++) {
-         if (fd[i] != -1) {
-             close(fd[i]);
+@@ -1560,9 +1565,7 @@ static int vhost_setup_slave_channel(struct vhost_dev *dev)
+ out:
+     close(sv[1]);
+     if (ret) {
+-        qemu_set_fd_handler(u->slave_fd, NULL, NULL, NULL);
+-        close(u->slave_fd);
+-        u->slave_fd = -1;
++        close_slave_channel(u);
+     }
+ 
+     return ret;
+@@ -1915,9 +1918,7 @@ static int vhost_user_backend_cleanup(struct vhost_dev *dev)
+         u->postcopy_fd.handler = NULL;
+     }
+     if (u->slave_fd >= 0) {
+-        qemu_set_fd_handler(u->slave_fd, NULL, NULL, NULL);
+-        close(u->slave_fd);
+-        u->slave_fd = -1;
++        close_slave_channel(u);
+     }
+     g_free(u->region_rb);
+     u->region_rb = NULL;
 -- 
 2.26.2
 

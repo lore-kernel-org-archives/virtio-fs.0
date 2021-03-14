@@ -1,85 +1,71 @@
-Date: Tue, 16 Feb 2021 16:58:33 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YCv5uRWyJcMMLwjy@work-vm>
-References: <20210208224024.43555-1-vgoyal@redhat.com>
+Date: Sun, 14 Mar 2021 19:38:32 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210314233832.GE223210@redhat.com>
+References: <20210312141003.819108-1-groug@kaod.org>
+	<20210312141003.819108-2-groug@kaod.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210208224024.43555-1-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 0/2] viritofsd: Add support for
-	FUSE_HANDLE_KILLPRIV_V2
-List-Id: Development discussions about virtio-fs <virtio-fs.listman.redhat.com>
+In-Reply-To: <20210312141003.819108-2-groug@kaod.org>
+Subject: Re: [Virtio-fs] [PATCH 1/3] virtiofsd: Don't allow empty paths in
+ lookup_name()
+List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
-	<mailto:virtio-fs-request@listman.redhat.com?subject=unsubscribe>
+	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
 List-Archive: <https://listman.redhat.com/archives/virtio-fs>
-List-Post: <mailto:virtio-fs@listman.redhat.com>
-List-Help: <mailto:virtio-fs-request@listman.redhat.com?subject=help>
+List-Post: <mailto:virtio-fs@redhat.com>
+List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
-	<mailto:virtio-fs-request@listman.redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
+	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
+To: Greg Kurz <groug@kaod.org>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> Hi,
+On Fri, Mar 12, 2021 at 03:10:01PM +0100, Greg Kurz wrote:
+> When passed an empty filename, lookup_name() returns the inode of
+> the parent directory, unless the parent is the root in which case
+> the st_dev doesn't match and lo_find() returns NULL. This is
+> because lookup_name() passes AT_EMPTY_PATH down to fstatat() or
+> statx().
 > 
-> This is V3 of the patches. V2 had been posted here.
+> This behavior doesn't quite make sense because users of lookup_name()
+> then pass the name to unlinkat(), renameat() or renameat2(), all of
+> which will always fail on empty names.
 > 
-> https://listman.redhat.com/archives/virtio-fs/2020-November/msg00084.html
+> Drop AT_EMPTY_PATH from the flags in lookup_name() so that it has
+> the consistent behavior of "returning an existing child inode or
+> NULL" for all directories.
 > 
-> These patches add support for FUSE_HANDLE_KILLPRIV_V2. This is basically
-> a feature file server can opt-in. And with xattr enabled, this improves
-> write performance many fold. Ran following fio command while virtiofsd is
-> running with options "-o cache=auto" and "-o xattr".
+> Signed-off-by: Greg Kurz <groug@kaod.org>
 
-Queued
+Looks good to me. Can't think in what cases fuse will need to pass in
+empty path for lookup.
 
-> fio libaio random writes
-> ------------------------
-> fio --ioengine=libaio --direct=1 --gtod_reduce=1 --name=test --filename=/mnt/virtiofs/random_read_write.fio --bs=4k --iodepth=64 --size=4G --readwrite=randwrite
+Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
+
+Vivek
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 > 
-> Without patches:
->  WRITE: bw=84.6MiB/s (88.7MB/s), 84.6MiB/s-84.6MiB/s (88.7MB/s-88.7MB/s), io=4096MiB (4295MB), run=48436-48436msec
-> 
-> With patches:
->   WRITE: bw=273MiB/s (286MB/s), 273MiB/s-273MiB/s (286MB/s-286MB/s), io=4096MiB (4295MB), run=15003-15003msec
-> 
-> So with these patches, for this particular workload, there is roughly
-> more than 200% improvement.
-> 
-> fio psync random writes
-> -----------------------
-> Even, single queue depth writes with ioengine=psync, how significant
-> improvement. Performance jumps from roughly 35MiB/s to 70MiB/s.
-> 
-> fio --ioengine=psync --name=test --filename=/mnt/virtiofs/random_read_write.fio --bs=4k --size=4G --readwrite=randwrite
-> 
-> Without patches:
->   WRITE: bw=35.0MiB/s (36.7MB/s), 35.0MiB/s-35.0MiB/s (36.7MB/s-36.7MB/s), io=4096MiB (4295MB), run=116932-116932msec
-> 
-> With patches:
->  WRITE: bw=69.9MiB/s (73.3MB/s), 69.9MiB/s-69.9MiB/s (73.3MB/s-73.3MB/s), io=4096MiB (4295MB), run=58596-58596msec
-> 
-> In V3 I rebased these patches to latest upstream. There were few
-> conflicts due to recent security fixes from Stefan. Resolved these
-> conflicts.
-> 
-> Thanks
-> Vivek
-> 
-> Vivek Goyal (2):
->   virtiofsd: Save error code early at the failure callsite
->   viriofsd: Add support for FUSE_HANDLE_KILLPRIV_V2
-> 
->  tools/virtiofsd/fuse_common.h    | 15 ++++++
->  tools/virtiofsd/fuse_lowlevel.c  | 11 +++-
->  tools/virtiofsd/fuse_lowlevel.h  |  1 +
->  tools/virtiofsd/passthrough_ll.c | 93 ++++++++++++++++++++++++++++----
->  4 files changed, 108 insertions(+), 12 deletions(-)
-> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index fc7e1b1e8e2b..27a6c636dcaf 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -1308,8 +1308,7 @@ static struct lo_inode *lookup_name(fuse_req_t req, fuse_ino_t parent,
+>          return NULL;
+>      }
+>  
+> -    res = do_statx(lo, dir->fd, name, &attr,
+> -                   AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW, &mnt_id);
+> +    res = do_statx(lo, dir->fd, name, &attr, AT_SYMLINK_NOFOLLOW, &mnt_id);
+>      lo_inode_put(lo, &dir);
+>      if (res == -1) {
+>          return NULL;
 > -- 
-> 2.25.4
+> 2.26.2
 > 
-> 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
 

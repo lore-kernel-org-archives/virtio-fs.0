@@ -1,14 +1,13 @@
-Date: Mon, 15 Mar 2021 14:57:17 +0000
+Date: Mon, 15 Mar 2021 15:04:19 +0000
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YE91zZZu6PlE4zhz@work-vm>
-References: <20210312092212.782255-1-groug@kaod.org>
-	<20210312092212.782255-8-groug@kaod.org>
+Message-ID: <YE93cwGU75LPUx2N@work-vm>
+References: <20210303195339.GB3793@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210312092212.782255-8-groug@kaod.org>
-Subject: Re: [Virtio-fs] [PATCH v2 7/7] virtiofsd: Release vu_dispatch_lock
- when stopping queue
+In-Reply-To: <20210303195339.GB3793@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Add qemu version and copyright
+	info
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,89 +16,78 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
-Cc: Daniel P =?iso-8859-1?Q?=2E_Berrang=E9?= <berrange@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
 
-* Greg Kurz (groug@kaod.org) wrote:
-> QEMU can stop a virtqueue by sending a VHOST_USER_GET_VRING_BASE request
-> to virtiofsd. As with all other vhost-user protocol messages, the thread
-> that runs the main event loop in virtiofsd takes the vu_dispatch lock in
-> write mode. This ensures that no other thread can access virtqueues or
-> memory tables at the same time.
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> Option "-V" currently displays the fuse protocol version virtiofsd is
+> using. For example, I see this.
 > 
-> In the case of VHOST_USER_GET_VRING_BASE, the main thread basically
-> notifies the queue thread that it should terminate and waits for its
-> termination:
+> $ ./virtiofsd -V
+> "using FUSE kernel interface version 7.33"
 > 
-> main()
->  virtio_loop()
->   vu_dispatch_wrlock()
->   vu_dispatch()
->    vu_process_message()
->     vu_get_vring_base_exec()
->      fv_queue_cleanup_thread()
->       pthread_join()
+> People also want to know software version of virtiofsd so that they can
+> figure out if a certain fix is part of currently running virtiofsd or
+> not. Eric Ernst ran into this issue.
 > 
-> Unfortunately, the queue thread ends up calling virtio_send_msg()
-> at some point, which itself needs to grab the lock:
+> David Gilbert thinks that it probably is best that we simply carry the
+> qemu version and display that information given we are part of qemu
+> tree. 
 > 
-> fv_queue_thread()
->  g_list_foreach()
->   fv_queue_worker()
->    fuse_session_process_buf_int()
->     do_release()
->      lo_release()
->       fuse_reply_err()
->        send_reply()
->         send_reply_iov()
->          fuse_send_reply_iov_nofree()
->           fuse_send_msg()
->            virtio_send_msg()
->             vu_dispatch_rdlock() <-- Deadlock !
+> So this patch enhances version information and also adds qemu version
+> and copyright info. Not sure if copyright information is supposed
+> to be displayed along with version info. Given qemu-storage-daemon
+> and other utilities are doing it, so I continued with same pattern.
+> This is how now output looks like.
 > 
-> Simply have the main thread to release the lock before going to
-> sleep and take it back afterwards. A very similar patch was already
-> sent by Vivek Goyal sometime back:
+> $ ./virtiofsd -V
+> virtiofsd version 5.2.50 (v5.2.0-2357-gcbcf09872a-dirty)
+> Copyright (c) 2003-2020 Fabrice Bellard and the QEMU Project developers
+> using FUSE kernel interface version 7.33
 > 
-> https://listman.redhat.com/archives/virtio-fs/2021-January/msg00073.html
-> 
-> The only difference here is that this done in fv_queue_set_started()
-> because fv_queue_cleanup_thread() can also be called from virtio_loop()
-> without the lock being held.
-> 
-> Signed-off-by: Greg Kurz <groug@kaod.org>
-> Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
-> Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+> Reported-by: Eric Ernst <eric.g.ernst@gmail.com>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 
-I've queued just this 7/7 in the virtiofsd pull I'm just making at the
-moment.  I'll leave the rest to ride the vhost-user train.
-
-Dave
+Queued
 
 > ---
->  tools/virtiofsd/fuse_virtio.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+>  tools/virtiofsd/passthrough_ll.c |    8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-> index 523ee64fb7ae..3e13997406bf 100644
-> --- a/tools/virtiofsd/fuse_virtio.c
-> +++ b/tools/virtiofsd/fuse_virtio.c
-> @@ -792,7 +792,13 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
->              assert(0);
->          }
->      } else {
-> +        /*
-> +         * Temporarily drop write-lock taken in virtio_loop() so that
-> +         * the queue thread doesn't block in virtio_send_msg().
-> +         */
-> +        vu_dispatch_unlock(vud);
->          fv_queue_cleanup_thread(vud, qidx);
-> +        vu_dispatch_wrlock(vud);
->      }
+> Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
+> ===================================================================
+> --- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2021-03-03 14:28:04.893672524 -0500
+> +++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2021-03-03 14:37:29.381712706 -0500
+> @@ -37,6 +37,8 @@
+>  
+>  #include "qemu/osdep.h"
+>  #include "qemu/timer.h"
+> +#include "qemu-version.h"
+> +#include "qemu-common.h"
+>  #include "fuse_virtio.h"
+>  #include "fuse_log.h"
+>  #include "fuse_lowlevel.h"
+> @@ -3591,6 +3593,11 @@ static void fuse_lo_data_cleanup(struct
+>      free(lo->source);
 >  }
 >  
-> -- 
-> 2.26.2
+> +static void qemu_version(void)
+> +{
+> +    printf("virtiofsd version " QEMU_FULL_VERSION "\n" QEMU_COPYRIGHT "\n");
+> +}
+> +
+>  int main(int argc, char *argv[])
+>  {
+>      struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
+> @@ -3662,6 +3669,7 @@ int main(int argc, char *argv[])
+>          ret = 0;
+>          goto err_out1;
+>      } else if (opts.show_version) {
+> +        qemu_version();
+>          fuse_lowlevel_version();
+>          ret = 0;
+>          goto err_out1;
+> 
 > 
 -- 
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK

@@ -1,15 +1,14 @@
-Date: Mon, 15 Mar 2021 10:38:40 +0000
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YE85MJl5VNnsN6Y2@stefanha-x1.localdomain>
-References: <20210312092212.782255-1-groug@kaod.org>
-	<20210312092212.782255-6-groug@kaod.org>
+Date: Mon, 15 Mar 2021 11:06:30 +0100
+From: Greg Kurz <groug@kaod.org>
+Message-ID: <20210315110630.5ae99490@bahia.lan>
+In-Reply-To: <20210314233604.GC223210@redhat.com>
+References: <20210312141003.819108-1-groug@kaod.org>
+	<20210312141003.819108-4-groug@kaod.org>
+	<20210314233604.GC223210@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="yUNiXaIpp1Pn1aSL"
-Content-Disposition: inline
-In-Reply-To: <20210312092212.782255-6-groug@kaod.org>
-Subject: Re: [Virtio-fs] [PATCH v2 5/7] vhost-user: Introduce nested event
- loop in vhost_user_read()
+Content-Type: text/plain; charset="US-ASCII"
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH 3/3] virtiofsd: Don't allow empty filenames
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,74 +17,182 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
-Cc: Daniel P =?iso-8859-1?Q?=2E_Berrang=E9?= <berrange@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
+On Sun, 14 Mar 2021 19:36:04 -0400
+Vivek Goyal <vgoyal@redhat.com> wrote:
 
---yUNiXaIpp1Pn1aSL
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+> On Fri, Mar 12, 2021 at 03:10:03PM +0100, Greg Kurz wrote:
+> > POSIX.1-2017 clearly stipulates that empty filenames aren't
+> > allowed ([1] and [2]). Since virtiofsd is supposed to mirror
+> > the host file system hierarchy and the host can be assumed to
+> > be linux, we don't really expect clients to pass requests with
+> > an empty path in it. If they do so anyway, this would eventually
+> > cause an error when trying to create/lookup the actual inode
+> > on the underlying POSIX filesystem. But this could still confuse
+> > some code that wouldn't be ready to cope with this.
+> > 
+> > Filter out empty names coming from the client at the top level,
+> > so that the rest doesn't have to care about it. This is done
+> > everywhere we already call is_safe_path_component(), but
+> > in a separate helper since the usual error for empty path
+> > names is ENOENT instead of EINVAL.
+> > 
+> > [1] https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html#tag_03_170
+> > [2] https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_13
+> > 
+> > Signed-off-by: Greg Kurz <groug@kaod.org>
+> 
+> Hi Greg,
+> 
+> Minor nit, if you happen to respin this patch, it probably should come
+> before the first patch in series. Once we make it clear that file server
+> is not expecting empty path in these top level functions, then it is
+> easy to clear AT_EMPTY_PATH in function these paths are calling as
+> appropriate.
+> 
 
-On Fri, Mar 12, 2021 at 10:22:10AM +0100, Greg Kurz wrote:
-> A deadlock condition potentially exists if a vhost-user process needs
-> to request something to QEMU on the slave channel while processing a
-> vhost-user message.
->=20
-> This doesn't seem to affect any vhost-user implementation so far, but
-> this is currently biting the upcoming enablement of DAX with virtio-fs.
-> The issue is being observed when the guest does an emergency reboot while
-> a mapping still exits in the DAX window, which is very easy to get with
-> a busy enough workload (e.g. as simulated by blogbench [1]) :
->=20
-> - QEMU sends VHOST_USER_GET_VRING_BASE to virtiofsd.
->=20
-> - In order to complete the request, virtiofsd then asks QEMU to remove
->   the mapping on the slave channel.
->=20
-> All these dialogs are synchronous, hence the deadlock.
->=20
-> As pointed out by Stefan Hajnoczi:
->=20
-> When QEMU's vhost-user master implementation sends a vhost-user protocol
-> message, vhost_user_read() does a "blocking" read during which slave_fd
-> is not monitored by QEMU.
->=20
-> The natural solution for this issue is an event loop. The main event
-> loop cannot be nested though since we have no guarantees that its
-> fd handlers are prepared for re-entrancy.
->=20
-> Introduce a new event loop that only monitors the chardev I/O for now
-> in vhost_user_read() and push the actual reading to a one-shot handler.
-> A subsequent patch will teach the loop to monitor and process messages
-> from the slave channel as well.
->=20
-> [1] https://github.com/jedisct1/Blogbench
->=20
-> Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
-> Signed-off-by: Greg Kurz <groug@kaod.org>
-> ---
-> v2: - Document why a nested loop is needed in vhost_user_read() (Stefan)
-> ---
->  hw/virtio/vhost-user.c | 65 ++++++++++++++++++++++++++++++++++++++----
->  1 file changed, 60 insertions(+), 5 deletions(-)
+The patch order is chronological : I just spotted the AT_EMPTY_PATH
+oddity before coming up with the bigger hammer of patch 3. But you're
+right, it probably makes more sense to do the other way around.
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+> What about lo_create(). Should we put a check in there as well.
+> 
 
---yUNiXaIpp1Pn1aSL
-Content-Type: application/pgp-signature; name="signature.asc"
+Good catch ! I'll post a v2 then ;)
 
------BEGIN PGP SIGNATURE-----
+> We are passed xattr names in lo_getxattr()/lo_removexattr()/lo_setxattr().
+> In general, should we put an empty in_name check there as well and
+> probably simply return -EINVAL.
+> 
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmBPOTAACgkQnKSrs4Gr
-c8iz3Qf9HMski1feNXJekhs+KM5/P/56ISBX8w6ypbdqlLk7oS72vh9mtXQ0Ydg9
-uAcyK0A0rUR1Js7+ZNQwp+zGAeBicsNn4aEn52cnKW343c7KjtSox5b+czgun9Rz
-HSB+pZqRlo4aj/yZr6ezHAoF4r1RTyZDnTPpiVHYPgZoODQDq/3HPI4N5IRdM9pm
-PuZnEi+JHXIB4L9gbkC4895MPMhPqvPJiK7PRh7VPv05FXIm+FhFPghEYvcaVL9g
-973Z6rfSBh7+W/YVLNrquQYoHBObJPp3CFWNPKpQDsjXIVVC3kjL35TBnoVMMM9N
-/KUSBuD9CRimZrNg8irdNAlBO0u1EQ==
-=KF9+
------END PGP SIGNATURE-----
+An empty xattr name doesn't likely make sense either, even if this
+isn't written down anywhere, not in an explicit manner at least.
 
---yUNiXaIpp1Pn1aSL--
+The kernel checks this in setxattr() and errors out with -ERANGE
+in this case.
+
+        error = strncpy_from_user(kname, name, sizeof(kname));
+        if (error == 0 || error == sizeof(kname))
+                error = -ERANGE;
+        if (error < 0)
+                return error;
+
+Same goes for the other *xattr() syscalls, i.e. nothing nasty can ever
+happen with an empty xattr name since this is always considered as an
+error by the kernel. Not sure this would bring much to also check this
+in QEMU. This is a bit different from the empty path name case because
+an empty path name is valid for syscalls that support AT_EMPTY_PATH,
+and we just want to make sure these are never exercised with names
+from the client.
+
+Cheers,
+
+--
+Greg
+
+> Thanks
+> Vivek
+> 
+> > ---
+> >  tools/virtiofsd/passthrough_ll.c | 35 ++++++++++++++++++++++++++++++++
+> >  1 file changed, 35 insertions(+)
+> > 
+> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> > index f63016d35626..bff9dc2cd26d 100644
+> > --- a/tools/virtiofsd/passthrough_ll.c
+> > +++ b/tools/virtiofsd/passthrough_ll.c
+> > @@ -237,6 +237,11 @@ static bool is_safe_path_component(const char *path)
+> >      return !is_dot_or_dotdot(path);
+> >  }
+> >  
+> > +static bool is_empty(const char *name)
+> > +{
+> > +    return name[0] == '\0';
+> > +}
+> > +
+> >  static struct lo_data *lo_data(fuse_req_t req)
+> >  {
+> >      return (struct lo_data *)fuse_req_userdata(req);
+> > @@ -1083,6 +1088,11 @@ static void lo_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
+> >      fuse_log(FUSE_LOG_DEBUG, "lo_lookup(parent=%" PRIu64 ", name=%s)\n", parent,
+> >               name);
+> >  
+> > +    if (is_empty(name)) {
+> > +        fuse_reply_err(req, ENOENT);
+> > +        return;
+> > +    }
+> > +
+> >      /*
+> >       * Don't use is_safe_path_component(), allow "." and ".." for NFS export
+> >       * support.
+> > @@ -1174,6 +1184,11 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
+> >      struct fuse_entry_param e;
+> >      struct lo_cred old = {};
+> >  
+> > +    if (is_empty(name)) {
+> > +        fuse_reply_err(req, ENOENT);
+> > +        return;
+> > +    }
+> > +
+> >      if (!is_safe_path_component(name)) {
+> >          fuse_reply_err(req, EINVAL);
+> >          return;
+> > @@ -1246,6 +1261,11 @@ static void lo_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t parent,
+> >      char procname[64];
+> >      int saverr;
+> >  
+> > +    if (is_empty(name)) {
+> > +        fuse_reply_err(req, ENOENT);
+> > +        return;
+> > +    }
+> > +
+> >      if (!is_safe_path_component(name)) {
+> >          fuse_reply_err(req, EINVAL);
+> >          return;
+> > @@ -1323,6 +1343,11 @@ static void lo_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name)
+> >      struct lo_inode *inode;
+> >      struct lo_data *lo = lo_data(req);
+> >  
+> > +    if (is_empty(name)) {
+> > +        fuse_reply_err(req, ENOENT);
+> > +        return;
+> > +    }
+> > +
+> >      if (!is_safe_path_component(name)) {
+> >          fuse_reply_err(req, EINVAL);
+> >          return;
+> > @@ -1352,6 +1377,11 @@ static void lo_rename(fuse_req_t req, fuse_ino_t parent, const char *name,
+> >      struct lo_inode *newinode = NULL;
+> >      struct lo_data *lo = lo_data(req);
+> >  
+> > +    if (is_empty(name) || is_empty(newname)) {
+> > +        fuse_reply_err(req, ENOENT);
+> > +        return;
+> > +    }
+> > +
+> >      if (!is_safe_path_component(name) || !is_safe_path_component(newname)) {
+> >          fuse_reply_err(req, EINVAL);
+> >          return;
+> > @@ -1405,6 +1435,11 @@ static void lo_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
+> >      struct lo_inode *inode;
+> >      struct lo_data *lo = lo_data(req);
+> >  
+> > +    if (is_empty(name)) {
+> > +        fuse_reply_err(req, ENOENT);
+> > +        return;
+> > +    }
+> > +
+> >      if (!is_safe_path_component(name)) {
+> >          fuse_reply_err(req, EINVAL);
+> >          return;
+> > -- 
+> > 2.26.2
+> > 
+> > _______________________________________________
+> > Virtio-fs mailing list
+> > Virtio-fs@redhat.com
+> > https://listman.redhat.com/mailman/listinfo/virtio-fs
+> 
 

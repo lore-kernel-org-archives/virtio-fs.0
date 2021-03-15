@@ -1,15 +1,15 @@
-Date: Mon, 15 Mar 2021 10:37:46 +0000
+Date: Mon, 15 Mar 2021 10:38:40 +0000
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YE84+q2TovYnEaOt@stefanha-x1.localdomain>
+Message-ID: <YE85MJl5VNnsN6Y2@stefanha-x1.localdomain>
 References: <20210312092212.782255-1-groug@kaod.org>
-	<20210312092212.782255-5-groug@kaod.org>
+	<20210312092212.782255-6-groug@kaod.org>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="c85XUR3y/frWUTJ3"
+	protocol="application/pgp-signature"; boundary="yUNiXaIpp1Pn1aSL"
 Content-Disposition: inline
-In-Reply-To: <20210312092212.782255-5-groug@kaod.org>
-Subject: Re: [Virtio-fs] [PATCH v2 4/7] vhost-user: Convert slave channel to
- QIOChannelSocket
+In-Reply-To: <20210312092212.782255-6-groug@kaod.org>
+Subject: Re: [Virtio-fs] [PATCH v2 5/7] vhost-user: Introduce nested event
+ loop in vhost_user_read()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,67 +22,70 @@ To: Greg Kurz <groug@kaod.org>
 Cc: Daniel P =?iso-8859-1?Q?=2E_Berrang=E9?= <berrange@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
 
---c85XUR3y/frWUTJ3
+--yUNiXaIpp1Pn1aSL
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Fri, Mar 12, 2021 at 10:22:09AM +0100, Greg Kurz wrote:
-> The slave channel is implemented with socketpair() : QEMU creates
-> the pair, passes one of the socket to virtiofsd and monitors the
-> other one with the main event loop using qemu_set_fd_handler().
+On Fri, Mar 12, 2021 at 10:22:10AM +0100, Greg Kurz wrote:
+> A deadlock condition potentially exists if a vhost-user process needs
+> to request something to QEMU on the slave channel while processing a
+> vhost-user message.
 >=20
-> In order to fix a potential deadlock between QEMU and a vhost-user
-> external process (e.g. virtiofsd with DAX), we want to be able to
-> monitor and service the slave channel while handling vhost-user
-> requests.
+> This doesn't seem to affect any vhost-user implementation so far, but
+> this is currently biting the upcoming enablement of DAX with virtio-fs.
+> The issue is being observed when the guest does an emergency reboot while
+> a mapping still exits in the DAX window, which is very easy to get with
+> a busy enough workload (e.g. as simulated by blogbench [1]) :
 >=20
-> Prepare ground for this by converting the slave channel to be a
-> QIOChannelSocket. This will make monitoring of the slave channel
-> as simple as calling qio_channel_add_watch_source(). Since the
-> connection is already established between the two sockets, only
-> incoming I/O (G_IO_IN) and disconnect (G_IO_HUP) need to be
-> serviced.
+> - QEMU sends VHOST_USER_GET_VRING_BASE to virtiofsd.
 >=20
-> This also allows to get rid of the ancillary data parsing since
-> QIOChannelSocket can do this for us. Note that the MSG_CTRUNC
-> check is dropped on the way because QIOChannelSocket ignores this
-> case. This isn't a problem since slave_read() provisions space for
-> 8 file descriptors, but affected vhost-user slave protocol messages
-> generally only convey one. If for some reason a buggy implementation
-> passes more file descriptors, no need to break the connection, just
-> like we don't break it if some other type of ancillary data is
-> received : this isn't explicitely violating the protocol per-se so
-> it seems better to ignore it.
+> - In order to complete the request, virtiofsd then asks QEMU to remove
+>   the mapping on the slave channel.
 >=20
-> The current code errors out on short reads and writes. Use the
-> qio_channel_*_all() variants to address this on the way.
+> All these dialogs are synchronous, hence the deadlock.
 >=20
+> As pointed out by Stefan Hajnoczi:
+>=20
+> When QEMU's vhost-user master implementation sends a vhost-user protocol
+> message, vhost_user_read() does a "blocking" read during which slave_fd
+> is not monitored by QEMU.
+>=20
+> The natural solution for this issue is an event loop. The main event
+> loop cannot be nested though since we have no guarantees that its
+> fd handlers are prepared for re-entrancy.
+>=20
+> Introduce a new event loop that only monitors the chardev I/O for now
+> in vhost_user_read() and push the actual reading to a one-shot handler.
+> A subsequent patch will teach the loop to monitor and process messages
+> from the slave channel as well.
+>=20
+> [1] https://github.com/jedisct1/Blogbench
+>=20
+> Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
 > Signed-off-by: Greg Kurz <groug@kaod.org>
 > ---
-> v2: - also monitor G_IO_HUP (Stefan)
->     - use the qio_channel_*_all() variants (Daniel)
->     - simplified thanks to previous refactoring
+> v2: - Document why a nested loop is needed in vhost_user_read() (Stefan)
 > ---
->  hw/virtio/vhost-user.c | 99 +++++++++++++++++-------------------------
->  1 file changed, 39 insertions(+), 60 deletions(-)
+>  hw/virtio/vhost-user.c | 65 ++++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 60 insertions(+), 5 deletions(-)
 
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
---c85XUR3y/frWUTJ3
+--yUNiXaIpp1Pn1aSL
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmBPOPoACgkQnKSrs4Gr
-c8ijcQf/Qu2ubAfZz5af2E39xRaithVNomVYwwHT/O5lLGZS2pP36o++umCZMgzY
-v4w6pSC0qUUmf5/4CIWr5NfY7beh7GG/O/lXD/eYzZlJ4Y2DqRx7TBZi8ZZR/lzd
-3YQi/gwcmnkDHYC1LQDhNyF+I12D15+1Fv52UwXTWN89Pz/4YUxGiZ8yiFcZsCWe
-QFc2VGzFOn1Iq65GYqj93/YTMj3kmxrGurp/ED0hnkp0QL3ckR2XDxJGvbwO1fhs
-eLcwr28MgsCxCIbX/JkrJkrFXW/YxOE/GWnR5DpzBfUgG5IQ1kywekJyFuD5IqqK
-qjAbY7oZAouuyexs+6D21XLWsE8fjg==
-=VFJP
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmBPOTAACgkQnKSrs4Gr
+c8iz3Qf9HMski1feNXJekhs+KM5/P/56ISBX8w6ypbdqlLk7oS72vh9mtXQ0Ydg9
+uAcyK0A0rUR1Js7+ZNQwp+zGAeBicsNn4aEn52cnKW343c7KjtSox5b+czgun9Rz
+HSB+pZqRlo4aj/yZr6ezHAoF4r1RTyZDnTPpiVHYPgZoODQDq/3HPI4N5IRdM9pm
+PuZnEi+JHXIB4L9gbkC4895MPMhPqvPJiK7PRh7VPv05FXIm+FhFPghEYvcaVL9g
+973Z6rfSBh7+W/YVLNrquQYoHBObJPp3CFWNPKpQDsjXIVVC3kjL35TBnoVMMM9N
+/KUSBuD9CRimZrNg8irdNAlBO0u1EQ==
+=KF9+
 -----END PGP SIGNATURE-----
 
---c85XUR3y/frWUTJ3--
+--yUNiXaIpp1Pn1aSL--
 

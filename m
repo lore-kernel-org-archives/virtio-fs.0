@@ -1,13 +1,15 @@
-Date: Mon, 15 Mar 2021 15:04:19 +0000
+Date: Mon, 15 Mar 2021 15:18:48 +0000
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YE93cwGU75LPUx2N@work-vm>
-References: <20210303195339.GB3793@redhat.com>
+Message-ID: <YE962LeQCJfR03NZ@work-vm>
+References: <20210312141003.819108-1-groug@kaod.org>
+	<20210312141003.819108-4-groug@kaod.org>
+	<20210314233604.GC223210@redhat.com>
+	<20210315110630.5ae99490@bahia.lan>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210303195339.GB3793@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Add qemu version and copyright
-	info
+In-Reply-To: <20210315110630.5ae99490@bahia.lan>
+Subject: Re: [Virtio-fs] [PATCH 3/3] virtiofsd: Don't allow empty filenames
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,79 +18,196 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
+To: Greg Kurz <groug@kaod.org>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> Option "-V" currently displays the fuse protocol version virtiofsd is
-> using. For example, I see this.
+* Greg Kurz (groug@kaod.org) wrote:
+> On Sun, 14 Mar 2021 19:36:04 -0400
+> Vivek Goyal <vgoyal@redhat.com> wrote:
 > 
-> $ ./virtiofsd -V
-> "using FUSE kernel interface version 7.33"
+> > On Fri, Mar 12, 2021 at 03:10:03PM +0100, Greg Kurz wrote:
+> > > POSIX.1-2017 clearly stipulates that empty filenames aren't
+> > > allowed ([1] and [2]). Since virtiofsd is supposed to mirror
+> > > the host file system hierarchy and the host can be assumed to
+> > > be linux, we don't really expect clients to pass requests with
+> > > an empty path in it. If they do so anyway, this would eventually
+> > > cause an error when trying to create/lookup the actual inode
+> > > on the underlying POSIX filesystem. But this could still confuse
+> > > some code that wouldn't be ready to cope with this.
+> > > 
+> > > Filter out empty names coming from the client at the top level,
+> > > so that the rest doesn't have to care about it. This is done
+> > > everywhere we already call is_safe_path_component(), but
+> > > in a separate helper since the usual error for empty path
+> > > names is ENOENT instead of EINVAL.
+> > > 
+> > > [1] https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html#tag_03_170
+> > > [2] https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_13
+> > > 
+> > > Signed-off-by: Greg Kurz <groug@kaod.org>
+> > 
+> > Hi Greg,
+> > 
+> > Minor nit, if you happen to respin this patch, it probably should come
+> > before the first patch in series. Once we make it clear that file server
+> > is not expecting empty path in these top level functions, then it is
+> > easy to clear AT_EMPTY_PATH in function these paths are calling as
+> > appropriate.
+> > 
 > 
-> People also want to know software version of virtiofsd so that they can
-> figure out if a certain fix is part of currently running virtiofsd or
-> not. Eric Ernst ran into this issue.
+> The patch order is chronological : I just spotted the AT_EMPTY_PATH
+> oddity before coming up with the bigger hammer of patch 3. But you're
+> right, it probably makes more sense to do the other way around.
 > 
-> David Gilbert thinks that it probably is best that we simply carry the
-> qemu version and display that information given we are part of qemu
-> tree. 
+> > What about lo_create(). Should we put a check in there as well.
+> > 
 > 
-> So this patch enhances version information and also adds qemu version
-> and copyright info. Not sure if copyright information is supposed
-> to be displayed along with version info. Given qemu-storage-daemon
-> and other utilities are doing it, so I continued with same pattern.
-> This is how now output looks like.
-> 
-> $ ./virtiofsd -V
-> virtiofsd version 5.2.50 (v5.2.0-2357-gcbcf09872a-dirty)
-> Copyright (c) 2003-2020 Fabrice Bellard and the QEMU Project developers
-> using FUSE kernel interface version 7.33
-> 
-> Reported-by: Eric Ernst <eric.g.ernst@gmail.com>
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> Good catch ! I'll post a v2 then ;)
 
-Queued
+I'm just brewing a pull now, since soft freeze is tomorrow.
+I'll take 3,1,2 - please follow up with a separate lo_create one - we
+can add that later.
 
-> ---
->  tools/virtiofsd/passthrough_ll.c |    8 ++++++++
->  1 file changed, 8 insertions(+)
+Dave
+
+> > We are passed xattr names in lo_getxattr()/lo_removexattr()/lo_setxattr().
+> > In general, should we put an empty in_name check there as well and
+> > probably simply return -EINVAL.
+> > 
 > 
-> Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
-> ===================================================================
-> --- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2021-03-03 14:28:04.893672524 -0500
-> +++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2021-03-03 14:37:29.381712706 -0500
-> @@ -37,6 +37,8 @@
->  
->  #include "qemu/osdep.h"
->  #include "qemu/timer.h"
-> +#include "qemu-version.h"
-> +#include "qemu-common.h"
->  #include "fuse_virtio.h"
->  #include "fuse_log.h"
->  #include "fuse_lowlevel.h"
-> @@ -3591,6 +3593,11 @@ static void fuse_lo_data_cleanup(struct
->      free(lo->source);
->  }
->  
-> +static void qemu_version(void)
-> +{
-> +    printf("virtiofsd version " QEMU_FULL_VERSION "\n" QEMU_COPYRIGHT "\n");
-> +}
-> +
->  int main(int argc, char *argv[])
->  {
->      struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
-> @@ -3662,6 +3669,7 @@ int main(int argc, char *argv[])
->          ret = 0;
->          goto err_out1;
->      } else if (opts.show_version) {
-> +        qemu_version();
->          fuse_lowlevel_version();
->          ret = 0;
->          goto err_out1;
+> An empty xattr name doesn't likely make sense either, even if this
+> isn't written down anywhere, not in an explicit manner at least.
 > 
+> The kernel checks this in setxattr() and errors out with -ERANGE
+> in this case.
 > 
+>         error = strncpy_from_user(kname, name, sizeof(kname));
+>         if (error == 0 || error == sizeof(kname))
+>                 error = -ERANGE;
+>         if (error < 0)
+>                 return error;
+> 
+> Same goes for the other *xattr() syscalls, i.e. nothing nasty can ever
+> happen with an empty xattr name since this is always considered as an
+> error by the kernel. Not sure this would bring much to also check this
+> in QEMU. This is a bit different from the empty path name case because
+> an empty path name is valid for syscalls that support AT_EMPTY_PATH,
+> and we just want to make sure these are never exercised with names
+> from the client.
+> 
+> Cheers,
+> 
+> --
+> Greg
+> 
+> > Thanks
+> > Vivek
+> > 
+> > > ---
+> > >  tools/virtiofsd/passthrough_ll.c | 35 ++++++++++++++++++++++++++++++++
+> > >  1 file changed, 35 insertions(+)
+> > > 
+> > > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> > > index f63016d35626..bff9dc2cd26d 100644
+> > > --- a/tools/virtiofsd/passthrough_ll.c
+> > > +++ b/tools/virtiofsd/passthrough_ll.c
+> > > @@ -237,6 +237,11 @@ static bool is_safe_path_component(const char *path)
+> > >      return !is_dot_or_dotdot(path);
+> > >  }
+> > >  
+> > > +static bool is_empty(const char *name)
+> > > +{
+> > > +    return name[0] == '\0';
+> > > +}
+> > > +
+> > >  static struct lo_data *lo_data(fuse_req_t req)
+> > >  {
+> > >      return (struct lo_data *)fuse_req_userdata(req);
+> > > @@ -1083,6 +1088,11 @@ static void lo_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
+> > >      fuse_log(FUSE_LOG_DEBUG, "lo_lookup(parent=%" PRIu64 ", name=%s)\n", parent,
+> > >               name);
+> > >  
+> > > +    if (is_empty(name)) {
+> > > +        fuse_reply_err(req, ENOENT);
+> > > +        return;
+> > > +    }
+> > > +
+> > >      /*
+> > >       * Don't use is_safe_path_component(), allow "." and ".." for NFS export
+> > >       * support.
+> > > @@ -1174,6 +1184,11 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
+> > >      struct fuse_entry_param e;
+> > >      struct lo_cred old = {};
+> > >  
+> > > +    if (is_empty(name)) {
+> > > +        fuse_reply_err(req, ENOENT);
+> > > +        return;
+> > > +    }
+> > > +
+> > >      if (!is_safe_path_component(name)) {
+> > >          fuse_reply_err(req, EINVAL);
+> > >          return;
+> > > @@ -1246,6 +1261,11 @@ static void lo_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t parent,
+> > >      char procname[64];
+> > >      int saverr;
+> > >  
+> > > +    if (is_empty(name)) {
+> > > +        fuse_reply_err(req, ENOENT);
+> > > +        return;
+> > > +    }
+> > > +
+> > >      if (!is_safe_path_component(name)) {
+> > >          fuse_reply_err(req, EINVAL);
+> > >          return;
+> > > @@ -1323,6 +1343,11 @@ static void lo_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name)
+> > >      struct lo_inode *inode;
+> > >      struct lo_data *lo = lo_data(req);
+> > >  
+> > > +    if (is_empty(name)) {
+> > > +        fuse_reply_err(req, ENOENT);
+> > > +        return;
+> > > +    }
+> > > +
+> > >      if (!is_safe_path_component(name)) {
+> > >          fuse_reply_err(req, EINVAL);
+> > >          return;
+> > > @@ -1352,6 +1377,11 @@ static void lo_rename(fuse_req_t req, fuse_ino_t parent, const char *name,
+> > >      struct lo_inode *newinode = NULL;
+> > >      struct lo_data *lo = lo_data(req);
+> > >  
+> > > +    if (is_empty(name) || is_empty(newname)) {
+> > > +        fuse_reply_err(req, ENOENT);
+> > > +        return;
+> > > +    }
+> > > +
+> > >      if (!is_safe_path_component(name) || !is_safe_path_component(newname)) {
+> > >          fuse_reply_err(req, EINVAL);
+> > >          return;
+> > > @@ -1405,6 +1435,11 @@ static void lo_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
+> > >      struct lo_inode *inode;
+> > >      struct lo_data *lo = lo_data(req);
+> > >  
+> > > +    if (is_empty(name)) {
+> > > +        fuse_reply_err(req, ENOENT);
+> > > +        return;
+> > > +    }
+> > > +
+> > >      if (!is_safe_path_component(name)) {
+> > >          fuse_reply_err(req, EINVAL);
+> > >          return;
+> > > -- 
+> > > 2.26.2
+> > > 
+> > > _______________________________________________
+> > > Virtio-fs mailing list
+> > > Virtio-fs@redhat.com
+> > > https://listman.redhat.com/mailman/listinfo/virtio-fs
+> > 
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
 -- 
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

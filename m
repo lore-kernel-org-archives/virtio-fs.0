@@ -1,15 +1,15 @@
-Date: Mon, 15 Mar 2021 10:34:16 +0000
+Date: Mon, 15 Mar 2021 10:36:10 +0000
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YE84KNmp83FLmT36@stefanha-x1.localdomain>
+Message-ID: <YE84mp9zLcGthhDg@stefanha-x1.localdomain>
 References: <20210312092212.782255-1-groug@kaod.org>
-	<20210312092212.782255-2-groug@kaod.org>
+	<20210312092212.782255-3-groug@kaod.org>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="h7ASQcmT1/dJBGxR"
+	protocol="application/pgp-signature"; boundary="mZrQjOpYGClovNAv"
 Content-Disposition: inline
-In-Reply-To: <20210312092212.782255-2-groug@kaod.org>
-Subject: Re: [Virtio-fs] [PATCH v2 1/7] vhost-user: Drop misleading EAGAIN
- checks in slave_read()
+In-Reply-To: <20210312092212.782255-3-groug@kaod.org>
+Subject: Re: [Virtio-fs] [PATCH v2 2/7] vhost-user: Fix double-close on
+ slave_read() error path
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,42 +22,52 @@ To: Greg Kurz <groug@kaod.org>
 Cc: Daniel P =?iso-8859-1?Q?=2E_Berrang=E9?= <berrange@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
 
---h7ASQcmT1/dJBGxR
+--mZrQjOpYGClovNAv
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Fri, Mar 12, 2021 at 10:22:06AM +0100, Greg Kurz wrote:
-> slave_read() checks EAGAIN when reading or writing to the socket
-> fails. This gives the impression that the slave channel is in
-> non-blocking mode, which is certainly not the case with the current
-> code base. And the rest of the code isn't actually ready to cope
-> with non-blocking I/O.
+On Fri, Mar 12, 2021 at 10:22:07AM +0100, Greg Kurz wrote:
+> Some message types, e.g. VHOST_USER_SLAVE_VRING_HOST_NOTIFIER_MSG,
+> can convey file descriptors. These must be closed before returning
+> from slave_read() to avoid being leaked. This can currently be done
+> in two different places:
 >=20
-> Just drop the checks everywhere in this function for the sake of
-> clarity.
+> [1] just after the request has been processed
+>=20
+> [2] on the error path, under the goto label err:
+>=20
+> These path are supposed to be mutually exclusive but they are not
+> actually. If the VHOST_USER_NEED_REPLY_MASK flag was passed and the
+> sending of the reply fails, both [1] and [2] are performed with the
+> same descriptor values. This can potentially cause subtle bugs if one
+> of the descriptor was recycled by some other thread in the meantime.
+>=20
+> This code duplication complicates rollback for no real good benefit.
+> Do the closing in a unique place, under a new fdcleanup: goto label
+> at the end of the function.
 >=20
 > Signed-off-by: Greg Kurz <groug@kaod.org>
 > ---
->  hw/virtio/vhost-user.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>  hw/virtio/vhost-user.c | 11 +++--------
+>  1 file changed, 3 insertions(+), 8 deletions(-)
 
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
---h7ASQcmT1/dJBGxR
+--mZrQjOpYGClovNAv
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmBPOCgACgkQnKSrs4Gr
-c8jKGwf+ItwXJlgnHNQ6Ge+37OeUgwiUHr3roZ8idwRXNqxYil7KpCOXcu/8cHvP
-t3YW7Hb7LgPCg6IYNcgMr2bIZSS/znBuMnthbnmnBkpfPYVXvuWTXFJRufa3z61g
-kyoQ3DJn2nB+lWFt3MZgYSBAq134wSg01AeLAARAF0NQ0mcfT1sZYlsqRChRJU/S
-lBSbzSv2RGUCagd0q8kfaz5AZOvTY8RCxWCAaPCkEPKG6WGOv5WKhZSGAyXbiWAd
-1wE4JbCq4AC7QNORBiEgDaz0GRT5zxxJDj3uw3+sTZF5xFoWTrhu2N8EYz/yLLjd
-E6nOvYzG82cC/Pe9GBsPnDlXQyYm5A==
-=OjTR
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmBPOJoACgkQnKSrs4Gr
+c8i6uwf+JwmQhn/F/YcxZJKo1B0eaXq7LNzPWlWuAkMTo6UKxobGYWbE3Mp5rpPm
+4+VirdQ58yz7nyhEBwlVG5O+Nk6ddFVSizWK6BEifgebahfCMGRLIqTY1K44hjon
+T5eyc9Qd7SZE1velPFapxSr6ydybn7895bB48dysAM3MF9NC+I//qPhh0J/ZtbI6
+w0t+Nm47URhsYZlljJZP3Wt4T5oQfWTY9D5ycfriDwDey5tnZLJHsSI0x90jLyVd
+YpynF4ibsLMEjXEH2O0fzAPelF/YGG1wqpp5eroPzZbaURmyypuuNhywi3m1SCoX
+7LQ33ra2Z6frm6/iMmvVy4Cnogf83g==
+=Y75D
 -----END PGP SIGNATURE-----
 
---h7ASQcmT1/dJBGxR--
+--mZrQjOpYGClovNAv--
 

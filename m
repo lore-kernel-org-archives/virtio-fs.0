@@ -1,11 +1,18 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue, 16 Mar 2021 12:01:47 -0400
-Message-Id: <20210316160147.289193-2-vgoyal@redhat.com>
-In-Reply-To: <20210316160147.289193-1-vgoyal@redhat.com>
-References: <20210316160147.289193-1-vgoyal@redhat.com>
+References: <34a26a91-c73d-18cb-95ad-9b2c6192091c@redhat.com>
+	<CAOssrKcY7o_LOabLiy+86LFZ1aQdqq8EOaM=qjRqHKGUqRup6w@mail.gmail.com>
+	<2d94bc7c-e999-44b1-7813-6269cbfcf54e@redhat.com>
+	<CAOssrKeVf-8pNyFuyVpTTUZbMaU9N8E-Q3-p7xfa=gsmQYk-1A@mail.gmail.com>
+	<2622824d-5f59-0d4a-635b-4257ee7cab3c@redhat.com>
+	<CAOssrKdn-RkxK4DjRy_36se=oE4edL3Yq5FsY3SknV-cYEY9Jg@mail.gmail.com>
+From: Max Reitz <mreitz@redhat.com>
+Message-ID: <fc44b1ac-6b9a-14c5-42f5-f7fc50fbfb74@redhat.com>
+Date: Tue, 16 Mar 2021 18:28:24 +0100
 MIME-Version: 1.0
+In-Reply-To: <CAOssrKdn-RkxK4DjRy_36se=oE4edL3Yq5FsY3SknV-cYEY9Jg@mail.gmail.com>
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Language: en-US
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 1/1] fuse: send file mode updates using SETATTR
+Subject: Re: [Virtio-fs] Securing file handles
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,238 +21,66 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, miklos@szeredi.hu
-Cc: seth.forshee@canonical.com, Vivek Goyal <vgoyal@redhat.com>
+To: Miklos Szeredi <mszeredi@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-If ACL changes, it is possible that file mode permission bits change. As of
-now fuse client relies on file server to make those changes. But it does
-not send enough information to server so that it can decide where SGID
-bit should be cleared or not. Server does not know if caller has CAP_FSETID
-or not. It also does not know what are caller's group memberships and if any
-of the groups match file owner group.
+On 08.03.21 15:50, Miklos Szeredi wrote:
+> On Mon, Mar 8, 2021 at 2:39 PM Max Reitz <mreitz@redhat.com> wrote:
+> 
+>> Admittedly I’m not yet at the point where I feel comfortable doing
+>> changes to the kernel at all, so if you have the time, I’d appreciate
+>> it.  (If you don’t really have the time, I could try my hand first and
+>> then we’d see.)
+> 
+> I'd hate to context switch away from the fuse leases to the kernel
+> crypto, so it would have to wait some time...
+> 
+> But I've attached an incomplete patch that just missing the crypto
+> bits and testing.
+> 
+> Would you mind having a go at it?
 
-So add a flag FUSE_POSIX_ACL_UPDATE_MODE where server can specify that if
-mode changes due to ACL change, then client needs to send explicit SETATTR
-to update mode.
+Thanks, I’ll look into the crypto stuff and have a go.  (Sorry for the 
+delay...)
 
-Reported-by: Luis Henriques <lhenriques@suse.de>
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/acl.c             | 54 ++++++++++++++++++++++++++++++++++++---
- fs/fuse/dir.c             | 11 ++++----
- fs/fuse/fuse_i.h          |  9 ++++++-
- fs/fuse/inode.c           |  4 ++-
- include/uapi/linux/fuse.h |  5 ++++
- 5 files changed, 71 insertions(+), 12 deletions(-)
+I’d still prefer a service process instead of putting this in the 
+kernel, but let’s see how complicated it would be.  I suppose one 
+problem with putting it into a service process is that doing so wouldn’t 
+help with containers: If containers don’t allow CAP_DAC_READ_SEARCH, we 
+I suppose it’ll be difficult to give it even to such a service process.
 
-diff --git a/fs/fuse/acl.c b/fs/fuse/acl.c
-index e9c0f916349d..38920dcfb710 100644
---- a/fs/fuse/acl.c
-+++ b/fs/fuse/acl.c
-@@ -50,10 +50,31 @@ struct posix_acl *fuse_get_acl(struct inode *inode, int type)
- 	return acl;
- }
- 
-+static int fuse_acl_mode_setattr(struct inode *inode, umode_t mode)
-+{
-+	struct fuse_mount *fm = get_fuse_mount(inode);
-+	FUSE_ARGS(args);
-+	struct fuse_setattr_in inarg;
-+	struct fuse_attr_out outarg;
-+
-+	memset(&inarg, 0, sizeof(inarg));
-+	memset(&outarg, 0, sizeof(outarg));
-+
-+	inarg.valid = FATTR_MODE;
-+	inarg.mode = mode;
-+	fuse_setattr_fill(fm->fc, &args, inode, &inarg, &outarg);
-+
-+	return fuse_simple_request(fm, &args);
-+}
-+
- int fuse_set_acl(struct user_namespace *mnt_userns, struct inode *inode,
- 		 struct posix_acl *acl, int type)
- {
- 	struct fuse_conn *fc = get_fuse_conn(inode);
-+	umode_t new_mode;
-+	bool update_mode = false;
-+	size_t size = 0;
-+	void *value =  NULL;
- 	const char *name;
- 	int ret;
- 
-@@ -63,9 +84,24 @@ int fuse_set_acl(struct user_namespace *mnt_userns, struct inode *inode,
- 	if (!fc->posix_acl || fc->no_setxattr)
- 		return -EOPNOTSUPP;
- 
--	if (type == ACL_TYPE_ACCESS)
-+	if (type == ACL_TYPE_ACCESS) {
- 		name = XATTR_NAME_POSIX_ACL_ACCESS;
--	else if (type == ACL_TYPE_DEFAULT)
-+		if (acl && fc->posix_acl_update_mode) {
-+			/*
-+			 * Setting access ACL might clear SGID.
-+			 * Refresh inode->i_mode before making a decision.
-+			 */
-+			ret = fuse_do_getattr(inode, NULL, NULL);
-+			if (ret)
-+				return ret;
-+			ret = posix_acl_update_mode(&init_user_ns, inode,
-+						    &new_mode, &acl);
-+			if (ret)
-+				return ret;
-+			if (new_mode != inode->i_mode)
-+				update_mode = true;
-+		}
-+	} else if (type == ACL_TYPE_DEFAULT)
- 		name = XATTR_NAME_POSIX_ACL_DEFAULT;
- 	else
- 		return -EINVAL;
-@@ -78,8 +114,7 @@ int fuse_set_acl(struct user_namespace *mnt_userns, struct inode *inode,
- 		 * them to be refreshed the next time they are used,
- 		 * and it also updates i_ctime.
- 		 */
--		size_t size = posix_acl_xattr_size(acl->a_count);
--		void *value;
-+		size = posix_acl_xattr_size(acl->a_count);
- 
- 		if (size > PAGE_SIZE)
- 			return -E2BIG;
-@@ -93,8 +128,19 @@ int fuse_set_acl(struct user_namespace *mnt_userns, struct inode *inode,
- 			kfree(value);
- 			return ret;
- 		}
-+	}
-+
-+	if (update_mode) {
-+		ret = fuse_acl_mode_setattr(inode, new_mode);
-+		if (ret < 0) {
-+			kfree(value);
-+			return ret;
-+		}
-+	}
- 
-+	if (acl) {
- 		ret = fuse_setxattr(inode, name, value, size, 0);
-+		/* TODO: If setxattr failed, should we restore mode ? */
- 		kfree(value);
- 	} else {
- 		ret = fuse_removexattr(inode, name);
-diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
-index 06a18700a845..1d5c5aafb82d 100644
---- a/fs/fuse/dir.c
-+++ b/fs/fuse/dir.c
-@@ -1022,8 +1022,7 @@ static void fuse_fillattr(struct inode *inode, struct fuse_attr *attr,
- 	stat->blksize = 1 << blkbits;
- }
- 
--static int fuse_do_getattr(struct inode *inode, struct kstat *stat,
--			   struct file *file)
-+int fuse_do_getattr(struct inode *inode, struct kstat *stat, struct file *file)
- {
- 	int err;
- 	struct fuse_getattr_in inarg;
-@@ -1541,10 +1540,10 @@ void fuse_release_nowrite(struct inode *inode)
- 	spin_unlock(&fi->lock);
- }
- 
--static void fuse_setattr_fill(struct fuse_conn *fc, struct fuse_args *args,
--			      struct inode *inode,
--			      struct fuse_setattr_in *inarg_p,
--			      struct fuse_attr_out *outarg_p)
-+void fuse_setattr_fill(struct fuse_conn *fc, struct fuse_args *args,
-+		       struct inode *inode,
-+		       struct fuse_setattr_in *inarg_p,
-+		       struct fuse_attr_out *outarg_p)
- {
- 	args->opcode = FUSE_SETATTR;
- 	args->nodeid = get_node_id(inode);
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 68cca8d4db6e..ba836daecd08 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -731,6 +731,9 @@ struct fuse_conn {
- 	/** Does the filesystem support posix acls? */
- 	unsigned posix_acl:1;
- 
-+	/** If posix acl results in file mode change, send update to fs */
-+	unsigned posix_acl_update_mode:1;
-+
- 	/** Check permissions based on the file mode or not? */
- 	unsigned default_permissions:1;
- 
-@@ -1097,6 +1100,7 @@ u64 fuse_lock_owner_id(struct fuse_conn *fc, fl_owner_t id);
- 
- void fuse_update_ctime(struct inode *inode);
- 
-+int fuse_do_getattr(struct inode *inode, struct kstat *stat, struct file *file);
- int fuse_update_attributes(struct inode *inode, struct file *file);
- 
- void fuse_flush_writepages(struct inode *inode);
-@@ -1162,7 +1166,10 @@ int fuse_write_inode(struct inode *inode, struct writeback_control *wbc);
- 
- int fuse_do_setattr(struct dentry *dentry, struct iattr *attr,
- 		    struct file *file);
--
-+void fuse_setattr_fill(struct fuse_conn *fc, struct fuse_args *args,
-+                       struct inode *inode,
-+                       struct fuse_setattr_in *inarg_p,
-+                       struct fuse_attr_out *outarg_p);
- void fuse_set_initialized(struct fuse_conn *fc);
- 
- void fuse_unlock_inode(struct inode *inode, bool locked);
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index b0e18b470e91..678145f987d1 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -1052,6 +1052,8 @@ static void process_init_reply(struct fuse_mount *fm, struct fuse_args *args,
- 				fc->handle_killpriv_v2 = 1;
- 				fm->sb->s_flags |= SB_NOSEC;
- 			}
-+			if (arg->flags & FUSE_POSIX_ACL_UPDATE_MODE)
-+				fc->posix_acl_update_mode = 1;
- 		} else {
- 			ra_pages = fc->max_read / PAGE_SIZE;
- 			fc->no_lock = 1;
-@@ -1095,7 +1097,7 @@ void fuse_send_init(struct fuse_mount *fm)
- 		FUSE_PARALLEL_DIROPS | FUSE_HANDLE_KILLPRIV | FUSE_POSIX_ACL |
- 		FUSE_ABORT_ERROR | FUSE_MAX_PAGES | FUSE_CACHE_SYMLINKS |
- 		FUSE_NO_OPENDIR_SUPPORT | FUSE_EXPLICIT_INVAL_DATA |
--		FUSE_HANDLE_KILLPRIV_V2;
-+		FUSE_HANDLE_KILLPRIV_V2 | FUSE_POSIX_ACL_UPDATE_MODE;
- #ifdef CONFIG_FUSE_DAX
- 	if (fm->fc->dax)
- 		ia->in.flags |= FUSE_MAP_ALIGNMENT;
-diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-index 98ca64d1beb6..89c3a88354f4 100644
---- a/include/uapi/linux/fuse.h
-+++ b/include/uapi/linux/fuse.h
-@@ -179,6 +179,7 @@
-  *  7.33
-  *  - add FUSE_HANDLE_KILLPRIV_V2, FUSE_WRITE_KILL_SUIDGID, FATTR_KILL_SUIDGID
-  *  - add FUSE_OPEN_KILL_SUIDGID
-+ *  - add FUSE_POSIX_ACL_UPDATE_MODE
-  */
- 
- #ifndef _LINUX_FUSE_H
-@@ -330,6 +331,9 @@ struct fuse_file_lock {
-  *			does not have CAP_FSETID. Additionally upon
-  *			write/truncate sgid is killed only if file has group
-  *			execute permission. (Same as Linux VFS behavior).
-+ * FUSE_POSIX_ACL_UPDATE_MODE: When posix acl setting results in a mode change,
-+ *                             client should send explicit setattr message to
-+ *                             update mode.
-  */
- #define FUSE_ASYNC_READ		(1 << 0)
- #define FUSE_POSIX_LOCKS	(1 << 1)
-@@ -360,6 +364,7 @@ struct fuse_file_lock {
- #define FUSE_MAP_ALIGNMENT	(1 << 26)
- #define FUSE_SUBMOUNTS		(1 << 27)
- #define FUSE_HANDLE_KILLPRIV_V2	(1 << 28)
-+#define FUSE_POSIX_ACL_UPDATE_MODE	(1 << 29)
- 
- /**
-  * CUSE INIT request/reply flags
--- 
-2.25.4
+One thing that also needs to be solved is how to specify a persistent 
+key.  I suppose the idea in your patch is to generate a random key for 
+every new process, but we would need a persistent key.  With a service 
+process, it could be configured by the user to use a specific key, or 
+perhaps it has kind of small database and virtiofsd selects its 
+persistent key by a hash of it or some other ID that it has received 
+from the service process.
+
+I don’t know how you’d go making the kernel store persistent keys, though.
+
+Max
+
+>> So AFAIU you want to put this in the kernel so we can get rid of needing
+>> the capability, because when you can only open handles that were
+>> previously generated for you, there wouldn’t be a security problem, right?
+> 
+> Something like that.
+> 
+>> But what about cases where a file is made inaccessible to some process
+>> between generating the handle and later opening it?  E.g. in
+>> /path/to/file, the “to” directory is changed to go-x (and the current
+>> user is not the owner), so opening /path/to/file wouldn’t be possible by
+>> path anymore.  Sure, if the FD remained open, you could still open the
+>> file anyway; but I consider it different in semantics.  (E.g. you could
+>> check that there are no processes that have “file” open anymore, and so
+>> you could assume that it’s now inaccessible.)
+> 
+> That could be a concern, yes.   Requiring CAP_DAC_READ_SEARCH in the
+> current user namespace, as my template patch does, might mitigate
+> those worries somewhat.
+> 
+> Thanks,
+> Miklos
+> 
 

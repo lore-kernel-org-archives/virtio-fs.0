@@ -1,18 +1,13 @@
-References: <34a26a91-c73d-18cb-95ad-9b2c6192091c@redhat.com>
-	<CAOssrKcY7o_LOabLiy+86LFZ1aQdqq8EOaM=qjRqHKGUqRup6w@mail.gmail.com>
-	<2d94bc7c-e999-44b1-7813-6269cbfcf54e@redhat.com>
-	<CAOssrKeVf-8pNyFuyVpTTUZbMaU9N8E-Q3-p7xfa=gsmQYk-1A@mail.gmail.com>
-	<2622824d-5f59-0d4a-635b-4257ee7cab3c@redhat.com>
-	<CAOssrKdn-RkxK4DjRy_36se=oE4edL3Yq5FsY3SknV-cYEY9Jg@mail.gmail.com>
-From: Max Reitz <mreitz@redhat.com>
-Message-ID: <fc44b1ac-6b9a-14c5-42f5-f7fc50fbfb74@redhat.com>
-Date: Tue, 16 Mar 2021 18:28:24 +0100
+Date: Tue, 16 Mar 2021 14:17:18 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210316181718.GG270529@redhat.com>
+References: <20210316170234.21736-1-lhenriques@suse.de>
 MIME-Version: 1.0
-In-Reply-To: <CAOssrKdn-RkxK4DjRy_36se=oE4edL3Yq5FsY3SknV-cYEY9Jg@mail.gmail.com>
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Language: en-US
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] Securing file handles
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20210316170234.21736-1-lhenriques@suse.de>
+Subject: Re: [Virtio-fs] [PATCH] virtiofs: fix memory leak in
+	virtio_fs_probe()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,66 +16,82 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <mszeredi@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: Luis Henriques <lhenriques@suse.de>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, linux-kernel@vger.kernel.org, stable@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs-list <virtio-fs@redhat.com>, linux-fsdevel@vger.kernel.org
 
-On 08.03.21 15:50, Miklos Szeredi wrote:
-> On Mon, Mar 8, 2021 at 2:39 PM Max Reitz <mreitz@redhat.com> wrote:
+On Tue, Mar 16, 2021 at 05:02:34PM +0000, Luis Henriques wrote:
+> When accidentally passing twice the same tag to qemu, kmemleak ended up
+> reporting a memory leak in virtiofs.  Also, looking at the log I saw the
+> following error (that's when I realised the duplicated tag):
 > 
->> Admittedly I’m not yet at the point where I feel comfortable doing
->> changes to the kernel at all, so if you have the time, I’d appreciate
->> it.  (If you don’t really have the time, I could try my hand first and
->> then we’d see.)
+>   virtiofs: probe of virtio5 failed with error -17
 > 
-> I'd hate to context switch away from the fuse leases to the kernel
-> crypto, so it would have to wait some time...
+> Here's the kmemleak log for reference:
 > 
-> But I've attached an incomplete patch that just missing the crypto
-> bits and testing.
+> unreferenced object 0xffff888103d47800 (size 1024):
+>   comm "systemd-udevd", pid 118, jiffies 4294893780 (age 18.340s)
+>   hex dump (first 32 bytes):
+>     00 00 00 00 ad 4e ad de ff ff ff ff 00 00 00 00  .....N..........
+>     ff ff ff ff ff ff ff ff 80 90 02 a0 ff ff ff ff  ................
+>   backtrace:
+>     [<000000000ebb87c1>] virtio_fs_probe+0x171/0x7ae [virtiofs]
+>     [<00000000f8aca419>] virtio_dev_probe+0x15f/0x210
+>     [<000000004d6baf3c>] really_probe+0xea/0x430
+>     [<00000000a6ceeac8>] device_driver_attach+0xa8/0xb0
+>     [<00000000196f47a7>] __driver_attach+0x98/0x140
+>     [<000000000b20601d>] bus_for_each_dev+0x7b/0xc0
+>     [<00000000399c7b7f>] bus_add_driver+0x11b/0x1f0
+>     [<0000000032b09ba7>] driver_register+0x8f/0xe0
+>     [<00000000cdd55998>] 0xffffffffa002c013
+>     [<000000000ea196a2>] do_one_initcall+0x64/0x2e0
+>     [<0000000008f727ce>] do_init_module+0x5c/0x260
+>     [<000000003cdedab6>] __do_sys_finit_module+0xb5/0x120
+>     [<00000000ad2f48c6>] do_syscall_64+0x33/0x40
+>     [<00000000809526b5>] entry_SYSCALL_64_after_hwframe+0x44/0xae
 > 
-> Would you mind having a go at it?
+> Cc: stable@vger.kernel.org
+> Signed-off-by: Luis Henriques <lhenriques@suse.de>
 
-Thanks, I’ll look into the crypto stuff and have a go.  (Sorry for the 
-delay...)
+Hi Luis,
 
-I’d still prefer a service process instead of putting this in the 
-kernel, but let’s see how complicated it would be.  I suppose one 
-problem with putting it into a service process is that doing so wouldn’t 
-help with containers: If containers don’t allow CAP_DAC_READ_SEARCH, we 
-I suppose it’ll be difficult to give it even to such a service process.
+Thanks for the report and the fix. So looks like leak is happening
+because we are not doing kfree(fs->vqs) in error path.
 
-One thing that also needs to be solved is how to specify a persistent 
-key.  I suppose the idea in your patch is to generate a random key for 
-every new process, but we would need a persistent key.  With a service 
-process, it could be configured by the user to use a specific key, or 
-perhaps it has kind of small database and virtiofsd selects its 
-persistent key by a hash of it or some other ID that it has received 
-from the service process.
+> ---
+>  fs/fuse/virtio_fs.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> index 8868ac31a3c0..4e6ef9f24e84 100644
+> --- a/fs/fuse/virtio_fs.c
+> +++ b/fs/fuse/virtio_fs.c
+> @@ -899,7 +899,7 @@ static int virtio_fs_probe(struct virtio_device *vdev)
+>  
+>  out:
+>  	vdev->priv = NULL;
+> -	kfree(fs);
+> +	virtio_fs_put(fs);
 
-I don’t know how you’d go making the kernel store persistent keys, though.
+[ CC virtio-fs list ]
 
-Max
+fs object is not fully formed. So calling virtio_fs_put() is little odd.
+I will expect it to be called if somebody takes a reference using _get()
+or in the final virtio_fs_remove() when creation reference should go
+away.
 
->> So AFAIU you want to put this in the kernel so we can get rid of needing
->> the capability, because when you can only open handles that were
->> previously generated for you, there wouldn’t be a security problem, right?
-> 
-> Something like that.
-> 
->> But what about cases where a file is made inaccessible to some process
->> between generating the handle and later opening it?  E.g. in
->> /path/to/file, the “to” directory is changed to go-x (and the current
->> user is not the owner), so opening /path/to/file wouldn’t be possible by
->> path anymore.  Sure, if the FD remained open, you could still open the
->> file anyway; but I consider it different in semantics.  (E.g. you could
->> check that there are no processes that have “file” open anymore, and so
->> you could assume that it’s now inaccessible.)
-> 
-> That could be a concern, yes.   Requiring CAP_DAC_READ_SEARCH in the
-> current user namespace, as my template patch does, might mitigate
-> those worries somewhat.
-> 
-> Thanks,
-> Miklos
-> 
+How about open coding it and free fs->vqs explicitly. Something like
+as follows.
+
+@@ -896,7 +896,7 @@ static int virtio_fs_probe(struct virtio
+ out_vqs:
+        vdev->config->reset(vdev);
+        virtio_fs_cleanup_vqs(vdev, fs);
+-
++       kfree(fs->vqs);
+ out:
+        vdev->priv = NULL;
+        kfree(fs);
+
+Thanks
+Vivek
 

@@ -1,64 +1,70 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Tue, 16 Feb 2021 18:37:28 +0000
-Message-Id: <20210216183734.57810-1-dgilbert@redhat.com>
+Date: Wed, 17 Mar 2021 13:41:25 +0100
+From: Sergio Lopez <slp@redhat.com>
+Message-ID: <20210317124100.2bepcspqmi6knspi@mhamilton>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 0/6] virtiofs queue
-List-Id: Development discussions about virtio-fs <virtio-fs.listman.redhat.com>
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="jhcg5vjdqed7xi6t"
+Content-Disposition: inline
+Subject: [Virtio-fs] Notifications from virtiofsd-rs project
+List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
-	<mailto:virtio-fs-request@listman.redhat.com?subject=unsubscribe>
+	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
 List-Archive: <https://listman.redhat.com/archives/virtio-fs>
-List-Post: <mailto:virtio-fs@listman.redhat.com>
-List-Help: <mailto:virtio-fs-request@listman.redhat.com?subject=help>
+List-Post: <mailto:virtio-fs@redhat.com>
+List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
-	<mailto:virtio-fs-request@listman.redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, wainersm@redhat.com, groug@kaod.org, philmd@redhat.com, vgoyal@redhat.com
-Cc: virtio-fs@redhat.com
+	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
+To: virtio-fs@redhat.com
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-The following changes since commit 18543229fd7a2c79dcd6818c7b1f0f62512b5220:
+--jhcg5vjdqed7xi6t
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-  Merge remote-tracking branch 'remotes/cleber-gitlab/tags/python-next-pull-request' into staging (2021-02-16 14:37:57 +0000)
+Hi,
 
-are available in the Git repository at:
+I've just created a service [1] that receives GitLab webhook events
+=66rom the virtiofsd-rs project and sends an email to this mailing
+list.
 
-  https://gitlab.com/dagrh/qemu.git tags/pull-virtiofs-20210216
+To keep the noise as low as possible, it only sends an event when an
+Issue or Merge Request is opened, reopened, merged or closed. If you
+want to receive a notification for other events (such as when a
+comment is added to an Issue or MR), you'd still need to subscribe to
+them (you can subscribe only to a single Issue or MR) using the GitLab
+interface.
 
-for you to fetch changes up to 26ec1909648e0c06ff06ebc3ddb2f88ebeeaa6a9:
+In case you want to filter those messages, the mails will have
+"virtiofs-bot@sinrega.org" as the sender.
 
-  virtiofsd: Do not use a thread pool by default (2021-02-16 17:54:18 +0000)
+If you find those notifications to be an inconvenience, please let me
+now.
 
-----------------------------------------------------------------
-virtiofsd pull 2021-02-16
+Thanks!
+Sergio.
 
-Vivek's support for new FUSE KILLPRIV_V2
-and some smaller cleanups.
+[1] https://gitlab.com/slp/gitlab-webhooks-email
 
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+--jhcg5vjdqed7xi6t
+Content-Type: application/pgp-signature; name="signature.asc"
 
-----------------------------------------------------------------
-Greg Kurz (1):
-      virtiofsd: vu_dispatch locking should never fail
+-----BEGIN PGP SIGNATURE-----
 
-Philippe Mathieu-Daudé (1):
-      tools/virtiofsd: Replace the word 'whitelist'
+iQIzBAABCAAdFiEEvtX891EthoCRQuii9GknjS8MAjUFAmBR+PUACgkQ9GknjS8M
+AjWbeA//Q20F1i3cDeDFD6yRoHe8W1IaX1mD+eBX5Ly3J+atozapz5y1wfOwp+3n
+XscYZ1HSxcN+7VhPg7siihv+jd0FlkV50X02XqBgiNRLCBqOPDD0QAyLGC78djEI
+C5LF8u3X/wLeEu24lFBcIx4uG7oj8lsM1wJB1M9OiO1MkuOBDxHN3OlVPimUMMiJ
+LJMBG8fOFp2UIEhtcOxBX5e6XMXyRoNv/QFipKFG5TcjipwfC/PqGBg78xZhD151
+fAot/Jc+OmtIoRgUtCPLF/HUdpH9LEmdoD3pNL/egM6/eu9AbdW3YDY60jOj0SOW
+ZtOYOXzkkdkYu19MSiyGO8xZKm/M+qdA3dsNyoev/JB8ImZfGXyoqYja3TpirlT7
+MPZSmbWyDiq1XertVJSAhJ1/kO7CKTWBHUHGv+KQ0Y9leUAgXt1fNX9zUtJG2kOr
+SRhtRPFRixjkMK/cP5q9p48+ddekQU24PU3Fwe/xLi8stkH4F6DkpPf/gba3uGih
+2ECtKW/shox8mIbEWCKaBE6csGN54Nf40e9uwxl5FUL7uTtkieVADd3iS/xQR07D
+TMAYCx4fqDAQv38nEjhy+LHjxytXZFoN0UlGDrKwD4TdyiaNrWHaJn7i9UKpyXPU
+bk5RGyS5jyr+efxxU4uSwap4eupRrsMgVdUePcJ9JYEsGhqETFc=
+=ymY9
+-----END PGP SIGNATURE-----
 
-Vivek Goyal (3):
-      virtiofsd: Save error code early at the failure callsite
-      viriofsd: Add support for FUSE_HANDLE_KILLPRIV_V2
-      virtiofsd: Do not use a thread pool by default
-
-Wainer dos Santos Moschetta (1):
-      virtiofsd: Allow to build it without the tools
-
- tools/meson.build                     |  7 ++-
- tools/virtiofsd/fuse_common.h         | 15 ++++++
- tools/virtiofsd/fuse_lowlevel.c       | 13 ++++-
- tools/virtiofsd/fuse_lowlevel.h       |  1 +
- tools/virtiofsd/fuse_virtio.c         | 49 ++++++++++++-----
- tools/virtiofsd/passthrough_ll.c      | 99 ++++++++++++++++++++++++++++++-----
- tools/virtiofsd/passthrough_seccomp.c | 12 ++---
- 7 files changed, 158 insertions(+), 38 deletions(-)
+--jhcg5vjdqed7xi6t--
 

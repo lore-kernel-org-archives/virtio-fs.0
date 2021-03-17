@@ -1,13 +1,25 @@
-Date: Wed, 17 Mar 2021 08:31:37 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210317123137.GA324911@redhat.com>
-References: <20210317084443.22657-1-lhenriques@suse.de>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+	d=bytedance-com.20150623.gappssmtp.com; s=20150623;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=wwTbuNPne9pTDpqWEBar9ogzQkO9XEiXzRQcmGkEMNw=;
+	b=gCKfMWfPRCBcIrEgzD5LWIEdI8O0W7zntE76aG7NhdKUvSoZf1JeDyCbr88wiMGMK/
+	J1tzci2SDWrjpQ5vCqon8CEuU+Bxo32PzkaZa8tOSrP43PCCoNOKytVKL8nVrzjZR4Uo
+	4gBHZsHRh5ikmxRxUDqbXRhJCRqH7jsO/JoGjvrtT70S9Ioy4v262uLI9tqdPivgSN8x
+	sfPmzNwpi8H4xeR2OtyeEmYQOt+FCjKdY7Tdeem5/PQ4QyCF/b0mrGB/xpgwkKbgTTrY
+	hf8F8a6tadMu5leSdcbkMgJKBeiiNfOncIjGH0DL0xZO6+vC6CVjAnqXFUg2nwRyIBPS
+	W4wQ==
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210317084443.22657-1-lhenriques@suse.de>
-Subject: Re: [Virtio-fs] [PATCH v2] virtiofs: fix memory leak in
-	virtio_fs_probe()
+References: <20201215162119.27360-1-zhangjiachen.jaycee@bytedance.com>
+	<CAJ+F1CLZ4VtgKp5fEdC70m22PgV2VHvRHunR-nPOWDnJPFvqqg@mail.gmail.com>
+	<CAFQAk7hCqSMMfRjUO8vtK-B2cKxJZZTJgSDAbRycd1AOSktM_w@mail.gmail.com>
+	<YFHUbEdszo4nursr@stefanha-x1.localdomain>
+In-Reply-To: <YFHUbEdszo4nursr@stefanha-x1.localdomain>
+From: Jiachen Zhang <zhangjiachen.jaycee@bytedance.com>
+Date: Wed, 17 Mar 2021 20:32:31 +0800
+Message-ID: <CAFQAk7ia5HsX0e4WBrhDtytGKnd5LsPrUSz9DJVFoo+ShDRP7Q@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="000000000000e66ecd05bdbaadc9"
+Subject: Re: [Virtio-fs] [External] Re: [RFC PATCH 0/9] Support for
+	Virtio-fs daemon crash reconnection
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,65 +28,128 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Luis Henriques <lhenriques@suse.de>
-Cc: Miklos Szeredi <miklos@szeredi.hu>, linux-kernel@vger.kernel.org, stable@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: "Daniel P. Berrange" <berrange@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, QEMU <qemu-devel@nongnu.org>, virtio-fs@redhat.com, Xie Yongji <xieyongji@bytedance.com>, =?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@gmail.com>
 
-On Wed, Mar 17, 2021 at 08:44:43AM +0000, Luis Henriques wrote:
-> When accidentally passing twice the same tag to qemu, kmemleak ended up
-> reporting a memory leak in virtiofs.  Also, looking at the log I saw the
-> following error (that's when I realised the duplicated tag):
-> 
->   virtiofs: probe of virtio5 failed with error -17
-> 
-> Here's the kmemleak log for reference:
-> 
-> unreferenced object 0xffff888103d47800 (size 1024):
->   comm "systemd-udevd", pid 118, jiffies 4294893780 (age 18.340s)
->   hex dump (first 32 bytes):
->     00 00 00 00 ad 4e ad de ff ff ff ff 00 00 00 00  .....N..........
->     ff ff ff ff ff ff ff ff 80 90 02 a0 ff ff ff ff  ................
->   backtrace:
->     [<000000000ebb87c1>] virtio_fs_probe+0x171/0x7ae [virtiofs]
->     [<00000000f8aca419>] virtio_dev_probe+0x15f/0x210
->     [<000000004d6baf3c>] really_probe+0xea/0x430
->     [<00000000a6ceeac8>] device_driver_attach+0xa8/0xb0
->     [<00000000196f47a7>] __driver_attach+0x98/0x140
->     [<000000000b20601d>] bus_for_each_dev+0x7b/0xc0
->     [<00000000399c7b7f>] bus_add_driver+0x11b/0x1f0
->     [<0000000032b09ba7>] driver_register+0x8f/0xe0
->     [<00000000cdd55998>] 0xffffffffa002c013
->     [<000000000ea196a2>] do_one_initcall+0x64/0x2e0
->     [<0000000008f727ce>] do_init_module+0x5c/0x260
->     [<000000003cdedab6>] __do_sys_finit_module+0xb5/0x120
->     [<00000000ad2f48c6>] do_syscall_64+0x33/0x40
->     [<00000000809526b5>] entry_SYSCALL_64_after_hwframe+0x44/0xae
-> 
-> Cc: stable@vger.kernel.org
-> Signed-off-by: Luis Henriques <lhenriques@suse.de>
+--000000000000e66ecd05bdbaadc9
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
+On Wed, Mar 17, 2021 at 6:05 PM Stefan Hajnoczi <stefanha@redhat.com> wrote=
+:
 
-Thanks
-Vivek
+> On Fri, Dec 18, 2020 at 05:39:34PM +0800, Jiachen Zhang wrote:
+> > Thanks for the suggestions. Actually, we choose to save all state
+> > information to QEMU because a virtiofsd has the same lifecycle as its
+> > QEMU master. However, saving things to a file do avoid communication wi=
+th
+> > QEMU, and we no longer need to increase the complexity of vhost-user
+> > protocol. The suggestion to save fds to the systemd is also very
+> reasonable
+> > if we don't consider the lifecycle issues, we will try it.
+>
+> Hi,
+> We recently discussed crash recovery in the virtio-fs bi-weekly call and
+> I read some of this email thread because it's a topic I'm interested in.
+>
+> I agree with Marc-Andr=C3=A9 that storing file descriptors does not need =
+to
+> be in the vhost-user protocol. The lifetime of a vhost-user device
+> backend is not controlled by the VMM since the device backend is
+> launched separately. Therefore it's reasonable for the component that
+> launched the device backend to also have the responsibility of cleaning
+> up the vhost-user device backend.
+>
+> Using the sd_notify(3) interface is a neat idea. It's supported natively
+> by systemd but you can also implement a compatible interface in your own
+> software. This way the vhost-user device backend can be launched using
+> systemd or your own software.
+>
+> That said, if people find it more convenient to store fds using the
+> vhost-user protocol, then I think that is enough justification to add a
+> generic message to the vhost-user protocol. The important thing is to
+> make the message generic so it solves all crash recovery use cases. The
+> inflight fd messages were too specific and now we're having to think
+> about adding more messages again.
+>
+> Stefan
+>
 
-> ---
-> Changes since v1:
-> - Use kfree() to free fs->vqs instead of calling virtio_fs_put()
-> 
->  fs/fuse/virtio_fs.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-> index 8868ac31a3c0..989ef4f88636 100644
-> --- a/fs/fuse/virtio_fs.c
-> +++ b/fs/fuse/virtio_fs.c
-> @@ -896,6 +896,7 @@ static int virtio_fs_probe(struct virtio_device *vdev)
->  out_vqs:
->  	vdev->config->reset(vdev);
->  	virtio_fs_cleanup_vqs(vdev, fs);
-> +	kfree(fs->vqs);
->  
->  out:
->  	vdev->priv = NULL;
-> 
+
+Hi, Stefan,
+
+I agreed with you that a virtiofsd must be launched by a software like
+systemd. So we are planning to define more generic persist/restore
+interfaces (callbacks). Then anyone can implement their own persist/restore
+callbacks to store states to proper places.  And I think in the next
+version we will implement default callbacks for the interfaces. Instead of
+vhost-user messages, systemd's sd_notify(3) will be the default method for
+storing fds, and several tmpfs files can be the default place to store the
+shm regions.
+
+Jiachen
+
+--000000000000e66ecd05bdbaadc9
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><div dir=3D"ltr">On Wed, Mar 17, 2021 at 6:05 PM Stefan Ha=
+jnoczi &lt;<a href=3D"mailto:stefanha@redhat.com">stefanha@redhat.com</a>&g=
+t; wrote:<br></div><div class=3D"gmail_quote"><blockquote class=3D"gmail_qu=
+ote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,20=
+4);padding-left:1ex">On Fri, Dec 18, 2020 at 05:39:34PM +0800, Jiachen Zhan=
+g wrote:<br>
+&gt; Thanks for the suggestions. Actually, we choose to save all state<br>
+&gt; information to QEMU because a virtiofsd has the same lifecycle as its<=
+br>
+&gt; QEMU master. However, saving things to a file do avoid communication w=
+ith<br>
+&gt; QEMU, and we no longer need to increase the complexity of vhost-user<b=
+r>
+&gt; protocol. The suggestion to save fds to the systemd is also very reaso=
+nable<br>
+&gt; if we don&#39;t consider the lifecycle issues, we will try it.<br>
+<br>
+Hi,<br>
+We recently discussed crash recovery in the virtio-fs bi-weekly call and<br=
+>
+I read some of this email thread because it&#39;s a topic I&#39;m intereste=
+d in.<br>
+<br>
+I agree with Marc-Andr=C3=A9 that storing file descriptors does not need to=
+<br>
+be in the vhost-user protocol. The lifetime of a vhost-user device<br>
+backend is not controlled by the VMM since the device backend is<br>
+launched separately. Therefore it&#39;s reasonable for the component that<b=
+r>
+launched the device backend to also have the responsibility of cleaning<br>
+up the vhost-user device backend.<br>
+<br>
+Using the sd_notify(3) interface is a neat idea. It&#39;s supported nativel=
+y<br>
+by systemd but you can also implement a compatible interface in your own<br=
+>
+software. This way the vhost-user device backend can be launched using<br>
+systemd or your own software.<br>
+<br>
+That said, if people find it more convenient to store fds using the<br>
+vhost-user protocol, then I think that is enough justification to add a<br>
+generic message to the vhost-user protocol. The important thing is to<br>
+make the message generic so it solves all crash recovery use cases. The<br>
+inflight fd messages were too specific and now we&#39;re having to think<br=
+>
+about adding more messages again.<br>
+<br>
+Stefan<br></blockquote><div><br></div><div><br></div><div>Hi, Stefan,</div>=
+<div><br></div><div>I agreed with you that a virtiofsd must be launched by =
+a software like systemd. So we are planning to define more generic persist/=
+restore interfaces (callbacks). Then anyone can implement their own persist=
+/restore callbacks to store states to proper places.=C2=A0 And I think in t=
+he next version we will implement default callbacks for the interfaces. Ins=
+tead of vhost-user messages, systemd&#39;s sd_notify(3) will be the default=
+ method for storing fds, and several tmpfs files can be the default place t=
+o store the shm regions.</div><div><br></div><div>Jiachen</div><div><br></d=
+iv><div><br></div></div></div>
+
+--000000000000e66ecd05bdbaadc9--
 

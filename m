@@ -1,14 +1,19 @@
-Date: Wed, 17 Mar 2021 14:29:03 +0000
-From: Luis Henriques <lhenriques@suse.de>
-Message-ID: <YFISL+dvR/qy6P+1@suse.de>
-References: <20210316160147.289193-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20210316160147.289193-1-vgoyal@redhat.com>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [PATCH 0/1] fuse: acl: Send file mode updates using
-	SETATTR
+References: <34a26a91-c73d-18cb-95ad-9b2c6192091c@redhat.com>
+	<CAOssrKcY7o_LOabLiy+86LFZ1aQdqq8EOaM=qjRqHKGUqRup6w@mail.gmail.com>
+	<2d94bc7c-e999-44b1-7813-6269cbfcf54e@redhat.com>
+	<CAOssrKeVf-8pNyFuyVpTTUZbMaU9N8E-Q3-p7xfa=gsmQYk-1A@mail.gmail.com>
+	<2622824d-5f59-0d4a-635b-4257ee7cab3c@redhat.com>
+	<CAOssrKdn-RkxK4DjRy_36se=oE4edL3Yq5FsY3SknV-cYEY9Jg@mail.gmail.com>
+	<fc44b1ac-6b9a-14c5-42f5-f7fc50fbfb74@redhat.com>
+	<20210317131906.GB324911@redhat.com>
+In-Reply-To: <20210317131906.GB324911@redhat.com>
+From: Miklos Szeredi <mszeredi@redhat.com>
+Date: Wed, 17 Mar 2021 16:13:37 +0100
+Message-ID: <CAOssrKdnsRph+a1_qP_z2QT0i4NourtotUovdpV2uDDVKcN7Pw@mail.gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] Securing file handles
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,83 +23,43 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, seth.forshee@canonical.com, miklos@szeredi.hu
+Cc: virtio-fs-list <virtio-fs@redhat.com>, "Howells,
+	David" <dhowells@redhat.com>, Max Reitz <mreitz@redhat.com>
 
-On Tue, Mar 16, 2021 at 12:01:46PM -0400, Vivek Goyal wrote:
-> Hi Miklos,
->=20
-> Please find attached a patch to fix the SGID clearing issue upon=20
-> ACL change.=20
->=20
-> Luis reported that currently fstests generic/375 fails on virtiofs. And
-> reason being that we don't clear SGID when it should be.
->=20
-> Setting ACL can lead to file mode change. And this in-turn also can
-> lead to clearing SGID bit if.
->=20
-> - None of caller's groups match file owner group.
-> AND
-> - Caller does not have CAP_FSETID.
->=20
-> Current implementation relies on server updating the mode. But file
-> server does not have enough information to do so.=20
->=20
-> Initially I thought of sending CAP_FSETID information to server but
-> then I realized, it is just one of the pieces. What about all the
-> groups caller is a member of. If this has to work correctly, then
-> all the information will have to be sent to virtiofsd somehow. Just
-> sending CAP_FSETID information required adding V2 of fuse_setxattr_in
-> because we don't have any space for sending extra information.
->=20
-> https://github.com/rhvgoyal/linux/commit/681cf5bdbba9c965c3dbd4337c16e9b1=
-7f27debe
->=20
-> Also this approach will not work with idmapped mounts because server
-> does not have information about idmapped mappings.
->=20
-> So I started to look at the approach of sending file mode updates
-> using SETATTR. As filesystems like 9pfs and ceph are doing. This
-> seems simpler approach. Though it has its issues too.
->=20
-> - File mode update and setxattr(system.posix_acl_access) are not atomic.
+[CC] David Howells.
 
-After reviewing (and testing) the patch, the only comment I have is that
-we should at least pr_warn() an eventual failure in setxattr().  But f
-that operation fails at that point, probably something went wrong on the
-other side and the kernel is unlikely to be able to revert the mode
-changes anyway.
+On Wed, Mar 17, 2021 at 2:19 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> On Tue, Mar 16, 2021 at 06:28:24PM +0100, Max Reitz wrote:
 
-(And a nit: your patch seems to require some whitespaces clean-up.)
+> > One thing that also needs to be solved is how to specify a persistent key.
+> > I suppose the idea in your patch is to generate a random key for every new
+> > process, but we would need a persistent key.  With a service process, it
+> > could be configured by the user to use a specific key, or perhaps it has
+> > kind of small database and virtiofsd selects its persistent key by a hash of
+> > it or some other ID that it has received from the service process.
+> >
+> > I don’t know how you’d go making the kernel store persistent keys, though.
+>
+> Is it possible to load persistent key from user space into a keyring
+> using keyctl.
 
-Cheers,
---
-Lu=EDs
+Context for David:
 
+We'd like unprivileged open_by_handle_at(2).   One idea is for the
+kernel to authenticate file handles (add an authentication header)
+using a secret key, so that unprivileged open_by_handle_at() only
+works on handles obtained through file_to_handle_at(), and will reject
+any maliciously crafted file handles.
 
-> None of the approaches seem very clean to me. But sending SETATTR
-> explicitly seems to be lesser of two evils to me at this point of time.
-> Hence I am proposing this patch.=20
->=20
-> I have run fstests acl tests and they pass. (./check -g acl).
->=20
-> Corresponding virtiofsd patches are here.
->=20
-> https://github.com/rhvgoyal/qemu/commits/acl-sgid-setattr
->=20
-> What do you think.
->=20
-> Vivek Goyal (1):
->   fuse: Add a mode where fuse client sends mode changes on ACL change
->=20
->  fs/fuse/acl.c             | 54 ++++++++++++++++++++++++++++++++++++---
->  fs/fuse/dir.c             | 11 ++++----
->  fs/fuse/fuse_i.h          |  9 ++++++-
->  fs/fuse/inode.c           |  4 ++-
->  include/uapi/linux/fuse.h |  5 ++++
->  5 files changed, 71 insertions(+), 12 deletions(-)
->=20
-> --=20
-> 2.25.4
->=20
+So the question is how the authentication keys should be managed.
+
+The unprivileged process must not have access to the key, obviously,
+but it should be possible to save the key across restarts.
+
+Any ideas?
+
+Thanks,
+Miklos
 
 

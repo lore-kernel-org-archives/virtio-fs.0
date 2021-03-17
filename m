@@ -1,14 +1,16 @@
-Date: Wed, 17 Mar 2021 09:36:47 +0000
+Date: Wed, 17 Mar 2021 10:05:32 +0000
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YFHNr/Sqgo6QnoGV@stefanha-x1.localdomain>
-References: <20210317084443.22657-1-lhenriques@suse.de>
+Message-ID: <YFHUbEdszo4nursr@stefanha-x1.localdomain>
+References: <20201215162119.27360-1-zhangjiachen.jaycee@bytedance.com>
+	<CAJ+F1CLZ4VtgKp5fEdC70m22PgV2VHvRHunR-nPOWDnJPFvqqg@mail.gmail.com>
+	<CAFQAk7hCqSMMfRjUO8vtK-B2cKxJZZTJgSDAbRycd1AOSktM_w@mail.gmail.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="Ut6GBzXLkDIRjWkj"
+	protocol="application/pgp-signature"; boundary="9Vc79ZT7RY7KtoLf"
 Content-Disposition: inline
-In-Reply-To: <20210317084443.22657-1-lhenriques@suse.de>
-Subject: Re: [Virtio-fs] [PATCH v2] virtiofs: fix memory leak in
-	virtio_fs_probe()
+In-Reply-To: <CAFQAk7hCqSMMfRjUO8vtK-B2cKxJZZTJgSDAbRycd1AOSktM_w@mail.gmail.com>
+Subject: Re: [Virtio-fs] [External] Re: [RFC PATCH 0/9] Support for
+ Virtio-fs daemon crash reconnection
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,70 +19,63 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Luis Henriques <lhenriques@suse.de>
-Cc: Miklos Szeredi <miklos@szeredi.hu>, linux-kernel@vger.kernel.org, stable@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
+To: Jiachen Zhang <zhangjiachen.jaycee@bytedance.com>
+Cc: "Daniel P. Berrange" <berrange@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, QEMU <qemu-devel@nongnu.org>, virtio-fs@redhat.com, Xie Yongji <xieyongji@bytedance.com>, =?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@gmail.com>
 
 
---Ut6GBzXLkDIRjWkj
-Content-Type: text/plain; charset=us-ascii
+--9Vc79ZT7RY7KtoLf
+Content-Type: text/plain; charset=iso-8859-1
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Wed, Mar 17, 2021 at 08:44:43AM +0000, Luis Henriques wrote:
-> When accidentally passing twice the same tag to qemu, kmemleak ended up
-> reporting a memory leak in virtiofs.  Also, looking at the log I saw the
-> following error (that's when I realised the duplicated tag):
->=20
->   virtiofs: probe of virtio5 failed with error -17
->=20
-> Here's the kmemleak log for reference:
->=20
-> unreferenced object 0xffff888103d47800 (size 1024):
->   comm "systemd-udevd", pid 118, jiffies 4294893780 (age 18.340s)
->   hex dump (first 32 bytes):
->     00 00 00 00 ad 4e ad de ff ff ff ff 00 00 00 00  .....N..........
->     ff ff ff ff ff ff ff ff 80 90 02 a0 ff ff ff ff  ................
->   backtrace:
->     [<000000000ebb87c1>] virtio_fs_probe+0x171/0x7ae [virtiofs]
->     [<00000000f8aca419>] virtio_dev_probe+0x15f/0x210
->     [<000000004d6baf3c>] really_probe+0xea/0x430
->     [<00000000a6ceeac8>] device_driver_attach+0xa8/0xb0
->     [<00000000196f47a7>] __driver_attach+0x98/0x140
->     [<000000000b20601d>] bus_for_each_dev+0x7b/0xc0
->     [<00000000399c7b7f>] bus_add_driver+0x11b/0x1f0
->     [<0000000032b09ba7>] driver_register+0x8f/0xe0
->     [<00000000cdd55998>] 0xffffffffa002c013
->     [<000000000ea196a2>] do_one_initcall+0x64/0x2e0
->     [<0000000008f727ce>] do_init_module+0x5c/0x260
->     [<000000003cdedab6>] __do_sys_finit_module+0xb5/0x120
->     [<00000000ad2f48c6>] do_syscall_64+0x33/0x40
->     [<00000000809526b5>] entry_SYSCALL_64_after_hwframe+0x44/0xae
->=20
-> Cc: stable@vger.kernel.org
-> Signed-off-by: Luis Henriques <lhenriques@suse.de>
-> ---
-> Changes since v1:
-> - Use kfree() to free fs->vqs instead of calling virtio_fs_put()
->=20
->  fs/fuse/virtio_fs.c | 1 +
->  1 file changed, 1 insertion(+)
+On Fri, Dec 18, 2020 at 05:39:34PM +0800, Jiachen Zhang wrote:
+> Thanks for the suggestions. Actually, we choose to save all state
+> information to QEMU because a virtiofsd has the same lifecycle as its
+> QEMU master. However, saving things to a file do avoid communication with
+> QEMU, and we no longer need to increase the complexity of vhost-user
+> protocol. The suggestion to save fds to the systemd is also very reasonab=
+le
+> if we don't consider the lifecycle issues, we will try it.
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+Hi,
+We recently discussed crash recovery in the virtio-fs bi-weekly call and
+I read some of this email thread because it's a topic I'm interested in.
 
---Ut6GBzXLkDIRjWkj
+I agree with Marc-Andr=E9 that storing file descriptors does not need to
+be in the vhost-user protocol. The lifetime of a vhost-user device
+backend is not controlled by the VMM since the device backend is
+launched separately. Therefore it's reasonable for the component that
+launched the device backend to also have the responsibility of cleaning
+up the vhost-user device backend.
+
+Using the sd_notify(3) interface is a neat idea. It's supported natively
+by systemd but you can also implement a compatible interface in your own
+software. This way the vhost-user device backend can be launched using
+systemd or your own software.
+
+That said, if people find it more convenient to store fds using the
+vhost-user protocol, then I think that is enough justification to add a
+generic message to the vhost-user protocol. The important thing is to
+make the message generic so it solves all crash recovery use cases. The
+inflight fd messages were too specific and now we're having to think
+about adding more messages again.
+
+Stefan
+
+--9Vc79ZT7RY7KtoLf
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmBRza8ACgkQnKSrs4Gr
-c8jnxQgArLrpuXxh9hc3EbwX0Cb5eLWUCOMDFF3Nd6fM4WjDFDc/ZBYzk2W8iZIj
-S8uH8ZpSF1RTgM327Zo+XqkFFfuSgdjqCrmW9z6iR7gSpnqOuSD2HReZcu3XxRln
-gfW+XA3v0IB97Xpm6mDgdJFnZaowJVPiGafLQsc6VZiv3UtkHI4FXwYJzM7pWknS
-HX/lMfSAi1TRkkJEY4zAkZKPVV3Jmgx5MOsMLbjjIa8griE4FnHQ7q5FlU3xDXla
-ooBxfh2hqUb/p9SAlNh6zxg8VCgQTRMo6a5kZupcH9PhVorr8Ki2tYvZUpmKwEwm
-y/8FuXXLTWEGnuX27koOOzoGvcl1Ag==
-=3lq4
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmBR1GwACgkQnKSrs4Gr
+c8jYOQf9E6s0sDs+N1LozftpB4f74CvIEp3WRfZUHlIxK70WayhhZXu41S7McL8I
+XOIod9IFtXJ01ZobnW5MqAFuuz/iLjwd2bqItZl/FiYB6xGLpNBzBNST9a5MIuFs
+CfRvdol5zaPKp1BMfXCKaBEMIAycyd3p+Pt1pfBt6MswfbSgFEKPaRB4UbNz8EmH
+Km7fKIjeLYqUHlTUgq5tFlfZaFtXW3uG8aMc2jm35SbCn2NxyYBBKJpyfpYBmVXH
+Xf6dVYNoPtLc/KPP8jCsKfWhhhQTHr9mR+m3yEXU9QUGQi4pQNnQ1i4RWpEnrSBi
+K3igrjfGyc6XiPYwaFaZXOZWSEapWQ==
+=GuLY
 -----END PGP SIGNATURE-----
 
---Ut6GBzXLkDIRjWkj--
+--9Vc79ZT7RY7KtoLf--
 

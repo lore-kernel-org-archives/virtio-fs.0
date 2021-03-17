@@ -1,15 +1,30 @@
-Date: Wed, 17 Mar 2021 10:33:38 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YFHbAmxmHLI5l67t@work-vm>
-References: <20210209190224.62827-1-dgilbert@redhat.com>
-	<20210209190224.62827-19-dgilbert@redhat.com>
-	<20210211142948.GS247031@stefanha-x1.localdomain>
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+	d=crudebyte.com; s=kylie; h=Content-Type:Content-Transfer-Encoding:
+	MIME-Version:References:In-Reply-To:Message-ID:Date:Subject:Cc:To:From:
+	Content-ID:Content-Description;
+	bh=WEz1d/e2FD0Bb0jqfPmPixKcTTK0zElGy1qtD/uutw4=;
+	b=e6VZHa0ehiWNW2azoEfh57Fe81
+	w6yfNMssKw9JSlLqXclxE7MyqDhVyzx+effkHOjH5VKSqSOgpfuQ4QrbvTYidGGa0QycvE2Vyt3px
+	7QD6Tc+H4jUVovMSFjI3fQIK4/Ag9zUgfksL2LcrMgVMU8iQLO1pwdR2HG/NTOGTSlsKPmtfEG14C
+	y8DXZpa3eWLKj5AGh3QrbxiLAI61kwT1CCEVgUMU27EWTI07LdHiRG9pmIpmHK4IajXLWDtSnv4F4
+	UnJs8B82GxvoR89jJl7Gc9MTENOZZsFkzFqNtnJAOqqJwTZmT81gV0sOWJOIShgnDZryqAtZO+D4o
+	I+RbA6Dx49JlFrOSlZt+eEwm3rNSGZOhSZCABiFkZ5FYb+/oQdE4CdK1tBDr4MYmKNzif9Srftxs0
+	+L8OB0RAuOcaPrcUNz3cNkbROR9qyp693T5xfXA0C85y81Hgn66FJ2f1bJQErOlmo7tsmtRIpNQpC
+	LBARVO2qVjwxrNh+LzygwlwbWIiNRJDmojVvpLTKmn3Pp5V6hlG9UvzGijGSRrsrVZqpetfmAJXmi
+	a8QHHAN4YRAzuom7qzQOIMgThHsfVgpznONXIA/2g+8NoUc9uVNw9s2qedFxhKYP1mCf+Mc7JxBga
+	KCljkb/oKljv3bIMZKQlzWgMMO6mWz9vvSgHpOL9Y=
+From: Christian Schoenebeck <qemu_oss@crudebyte.com>
+Date: Wed, 17 Mar 2021 12:49:37 +0100
+Message-ID: <1709993.NBFj2RoZ23@silver>
+In-Reply-To: <YFHUbEdszo4nursr@stefanha-x1.localdomain>
+References: <20201215162119.27360-1-zhangjiachen.jaycee@bytedance.com>
+	<CAFQAk7hCqSMMfRjUO8vtK-B2cKxJZZTJgSDAbRycd1AOSktM_w@mail.gmail.com>
+	<YFHUbEdszo4nursr@stefanha-x1.localdomain>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210211142948.GS247031@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH 18/24] DAX/unmap virtiofsd: Parse unmappable
-	elements
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [External] Re: [RFC PATCH 0/9] Support for
+	Virtio-fs daemon crash reconnection
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,94 +33,36 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com, mst@redhat.com
+To: qemu-devel@nongnu.org
+Cc: "Daniel P. Berrange" <berrange@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, Xie Yongji <xieyongji@bytedance.com>, =?ISO-8859-1?Q?Marc=2DAndr=E9?= Lureau <marcandre.lureau@gmail.com>
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> On Tue, Feb 09, 2021 at 07:02:18PM +0000, Dr. David Alan Gilbert (git) wrote:
-> > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-> > 
-> > For some read/writes the virtio queue elements are unmappable by
-> > the daemon; these are cases where the data is to be read/written
-> > from non-RAM.  In viritofs's case this is typically a direct read/write
-> > into an mmap'd DAX file also on virtiofs (possibly on another instance).
-> > 
-> > When we receive a virtio queue element, check that we have enough
-> > mappable data to handle the headers.  Make a note of the number of
-> > unmappable 'in' entries (ie. for read data back to the VMM),
-> > and flag the fuse_bufvec for 'out' entries with a new flag
-> > FUSE_BUF_PHYS_ADDR.
-> 
-> Looking back at this I think vhost-user will need generic
-> READ_MEMORY/WRITE_MEMORY commands. It's okay for virtio-fs to have its
-> own IO command (although not strictly necessary).
-> 
-> With generic READ_MEMORY/WRITE_MEMORY libvhost-user and other vhost-user
-> device backend implementations can handle vring descriptors that point
-> into the DAX window. This can be done transparently so individual device
-> implementations (net, blk, etc) don't even know when memory is copied vs
-> zero-copy shared memory access.
-> 
-> So this approach is okay for virtio-fs but it's not a long-term solution
-> for all of vhost-user. Eventually the long-term solution may be needed
-> so that other VIRTIO devices that have shared memory resources work.
-> 
-> Another bonus of READ_MEMORY/WRITE_MEMORY is that users that prefer an
-> enforcing vIOMMU can disable shared memory (maybe just keep the vring
-> itself mmapped).
+On Mittwoch, 17. M=E4rz 2021 11:05:32 CET Stefan Hajnoczi wrote:
+> On Fri, Dec 18, 2020 at 05:39:34PM +0800, Jiachen Zhang wrote:
+> > Thanks for the suggestions. Actually, we choose to save all state
+> > information to QEMU because a virtiofsd has the same lifecycle as its
+> > QEMU master. However, saving things to a file do avoid communication wi=
+th
+> > QEMU, and we no longer need to increase the complexity of vhost-user
+> > protocol. The suggestion to save fds to the systemd is also very
+> > reasonable
+> > if we don't consider the lifecycle issues, we will try it.
+>=20
+> Hi,
+> We recently discussed crash recovery in the virtio-fs bi-weekly call and
+> I read some of this email thread because it's a topic I'm interested in.
 
-Yes, although in this case we're doing read/write to an fd rather than
-arbitrary data to be read/written.
+I just had a quick fly over the patches so far. Shouldn't there be some kin=
+d=20
+of constraint for an automatic reconnection feature after a crash to preven=
+t=20
+this being exploited by ROP brute force attacks?
 
-> I just wanted to share this idea but don't expect it to be addressed in
-> this patch series.
-> 
-> > diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
-> > index a090040bb2..ed9280de91 100644
-> > --- a/tools/virtiofsd/fuse_common.h
-> > +++ b/tools/virtiofsd/fuse_common.h
-> > @@ -611,6 +611,13 @@ enum fuse_buf_flags {
-> >       * detected.
-> >       */
-> >      FUSE_BUF_FD_RETRY = (1 << 3),
-> > +
-> > +    /**
-> > +     * The addresses in the iovec represent guest physical addresses
-> > +     * that can't be mapped by the daemon process.
-> > +     * IO must be bounced back to the VMM to do it.
-> > +     */
-> > +    FUSE_BUF_PHYS_ADDR = (1 << 4),
-> 
-> With a vIOMMU it's an IOVA. Without a vIOMMU it's a GPA. This constant
-> may need to be renamed in the future, but it is okay for now.
+E.g. adding some (maybe continuously increasing) delay and/or limiting the =
 
-Do we have a name for something that's either an IOVA or a GPA?
+amount of reconnects within a certain time frame would come to my mind.
 
-> > +    if (req->bad_in_num || req->bad_out_num) {
-> > +        bool handled_unmappable = false;
-> > +
-> > +        if (out_num > 2 && out_num_readable >= 2 && !req->bad_in_num &&
-> > +            out_sg[0].iov_len == sizeof(struct fuse_in_header) &&
-> > +            ((struct fuse_in_header *)fbuf.mem)->opcode == FUSE_WRITE &&
-> > +            out_sg[1].iov_len == sizeof(struct fuse_write_in)) {
-> 
-> This violates the VIRTIO specification:
-> 
->   2.6.4.1 Device Requirements: Message Framing
-> 
->   The device MUST NOT make assumptions about the particular arrangement of descriptors.
-> 
->   https://docs.oasis-open.org/virtio/virtio/v1.1/cs01/virtio-v1.1-cs01.html#x1-280004
-> 
-> The driver is not obligated to submit separate iovecs. out_num == 1 is
-> valid and the device needs to process it byte-wise instead of making
-> assumptions about iovec layout.
-
-Yep, already fixed.
-
-Dave
+Best regards,
+Christian Schoenebeck
 
 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

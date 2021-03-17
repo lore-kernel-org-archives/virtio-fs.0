@@ -1,30 +1,13 @@
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=crudebyte.com; s=kylie; h=Content-Type:Content-Transfer-Encoding:
-	MIME-Version:References:In-Reply-To:Message-ID:Date:Subject:Cc:To:From:
-	Content-ID:Content-Description;
-	bh=WEz1d/e2FD0Bb0jqfPmPixKcTTK0zElGy1qtD/uutw4=;
-	b=e6VZHa0ehiWNW2azoEfh57Fe81
-	w6yfNMssKw9JSlLqXclxE7MyqDhVyzx+effkHOjH5VKSqSOgpfuQ4QrbvTYidGGa0QycvE2Vyt3px
-	7QD6Tc+H4jUVovMSFjI3fQIK4/Ag9zUgfksL2LcrMgVMU8iQLO1pwdR2HG/NTOGTSlsKPmtfEG14C
-	y8DXZpa3eWLKj5AGh3QrbxiLAI61kwT1CCEVgUMU27EWTI07LdHiRG9pmIpmHK4IajXLWDtSnv4F4
-	UnJs8B82GxvoR89jJl7Gc9MTENOZZsFkzFqNtnJAOqqJwTZmT81gV0sOWJOIShgnDZryqAtZO+D4o
-	I+RbA6Dx49JlFrOSlZt+eEwm3rNSGZOhSZCABiFkZ5FYb+/oQdE4CdK1tBDr4MYmKNzif9Srftxs0
-	+L8OB0RAuOcaPrcUNz3cNkbROR9qyp693T5xfXA0C85y81Hgn66FJ2f1bJQErOlmo7tsmtRIpNQpC
-	LBARVO2qVjwxrNh+LzygwlwbWIiNRJDmojVvpLTKmn3Pp5V6hlG9UvzGijGSRrsrVZqpetfmAJXmi
-	a8QHHAN4YRAzuom7qzQOIMgThHsfVgpznONXIA/2g+8NoUc9uVNw9s2qedFxhKYP1mCf+Mc7JxBga
-	KCljkb/oKljv3bIMZKQlzWgMMO6mWz9vvSgHpOL9Y=
-From: Christian Schoenebeck <qemu_oss@crudebyte.com>
-Date: Wed, 17 Mar 2021 12:49:37 +0100
-Message-ID: <1709993.NBFj2RoZ23@silver>
-In-Reply-To: <YFHUbEdszo4nursr@stefanha-x1.localdomain>
-References: <20201215162119.27360-1-zhangjiachen.jaycee@bytedance.com>
-	<CAFQAk7hCqSMMfRjUO8vtK-B2cKxJZZTJgSDAbRycd1AOSktM_w@mail.gmail.com>
-	<YFHUbEdszo4nursr@stefanha-x1.localdomain>
+Date: Wed, 17 Mar 2021 08:31:37 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210317123137.GA324911@redhat.com>
+References: <20210317084443.22657-1-lhenriques@suse.de>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [External] Re: [RFC PATCH 0/9] Support for
-	Virtio-fs daemon crash reconnection
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20210317084443.22657-1-lhenriques@suse.de>
+Subject: Re: [Virtio-fs] [PATCH v2] virtiofs: fix memory leak in
+	virtio_fs_probe()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,36 +16,65 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: "Daniel P. Berrange" <berrange@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, virtio-fs@redhat.com, Xie Yongji <xieyongji@bytedance.com>, =?ISO-8859-1?Q?Marc=2DAndr=E9?= Lureau <marcandre.lureau@gmail.com>
+To: Luis Henriques <lhenriques@suse.de>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, linux-kernel@vger.kernel.org, stable@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
 
-On Mittwoch, 17. M=E4rz 2021 11:05:32 CET Stefan Hajnoczi wrote:
-> On Fri, Dec 18, 2020 at 05:39:34PM +0800, Jiachen Zhang wrote:
-> > Thanks for the suggestions. Actually, we choose to save all state
-> > information to QEMU because a virtiofsd has the same lifecycle as its
-> > QEMU master. However, saving things to a file do avoid communication wi=
-th
-> > QEMU, and we no longer need to increase the complexity of vhost-user
-> > protocol. The suggestion to save fds to the systemd is also very
-> > reasonable
-> > if we don't consider the lifecycle issues, we will try it.
->=20
-> Hi,
-> We recently discussed crash recovery in the virtio-fs bi-weekly call and
-> I read some of this email thread because it's a topic I'm interested in.
+On Wed, Mar 17, 2021 at 08:44:43AM +0000, Luis Henriques wrote:
+> When accidentally passing twice the same tag to qemu, kmemleak ended up
+> reporting a memory leak in virtiofs.  Also, looking at the log I saw the
+> following error (that's when I realised the duplicated tag):
+> 
+>   virtiofs: probe of virtio5 failed with error -17
+> 
+> Here's the kmemleak log for reference:
+> 
+> unreferenced object 0xffff888103d47800 (size 1024):
+>   comm "systemd-udevd", pid 118, jiffies 4294893780 (age 18.340s)
+>   hex dump (first 32 bytes):
+>     00 00 00 00 ad 4e ad de ff ff ff ff 00 00 00 00  .....N..........
+>     ff ff ff ff ff ff ff ff 80 90 02 a0 ff ff ff ff  ................
+>   backtrace:
+>     [<000000000ebb87c1>] virtio_fs_probe+0x171/0x7ae [virtiofs]
+>     [<00000000f8aca419>] virtio_dev_probe+0x15f/0x210
+>     [<000000004d6baf3c>] really_probe+0xea/0x430
+>     [<00000000a6ceeac8>] device_driver_attach+0xa8/0xb0
+>     [<00000000196f47a7>] __driver_attach+0x98/0x140
+>     [<000000000b20601d>] bus_for_each_dev+0x7b/0xc0
+>     [<00000000399c7b7f>] bus_add_driver+0x11b/0x1f0
+>     [<0000000032b09ba7>] driver_register+0x8f/0xe0
+>     [<00000000cdd55998>] 0xffffffffa002c013
+>     [<000000000ea196a2>] do_one_initcall+0x64/0x2e0
+>     [<0000000008f727ce>] do_init_module+0x5c/0x260
+>     [<000000003cdedab6>] __do_sys_finit_module+0xb5/0x120
+>     [<00000000ad2f48c6>] do_syscall_64+0x33/0x40
+>     [<00000000809526b5>] entry_SYSCALL_64_after_hwframe+0x44/0xae
+> 
+> Cc: stable@vger.kernel.org
+> Signed-off-by: Luis Henriques <lhenriques@suse.de>
 
-I just had a quick fly over the patches so far. Shouldn't there be some kin=
-d=20
-of constraint for an automatic reconnection feature after a crash to preven=
-t=20
-this being exploited by ROP brute force attacks?
+Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
 
-E.g. adding some (maybe continuously increasing) delay and/or limiting the =
+Thanks
+Vivek
 
-amount of reconnects within a certain time frame would come to my mind.
-
-Best regards,
-Christian Schoenebeck
-
-
+> ---
+> Changes since v1:
+> - Use kfree() to free fs->vqs instead of calling virtio_fs_put()
+> 
+>  fs/fuse/virtio_fs.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> index 8868ac31a3c0..989ef4f88636 100644
+> --- a/fs/fuse/virtio_fs.c
+> +++ b/fs/fuse/virtio_fs.c
+> @@ -896,6 +896,7 @@ static int virtio_fs_probe(struct virtio_device *vdev)
+>  out_vqs:
+>  	vdev->config->reset(vdev);
+>  	virtio_fs_cleanup_vqs(vdev, fs);
+> +	kfree(fs->vqs);
+>  
+>  out:
+>  	vdev->priv = NULL;
+> 
 

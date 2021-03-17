@@ -1,19 +1,14 @@
-Date: Wed, 17 Mar 2021 09:19:06 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210317131906.GB324911@redhat.com>
-References: <34a26a91-c73d-18cb-95ad-9b2c6192091c@redhat.com>
-	<CAOssrKcY7o_LOabLiy+86LFZ1aQdqq8EOaM=qjRqHKGUqRup6w@mail.gmail.com>
-	<2d94bc7c-e999-44b1-7813-6269cbfcf54e@redhat.com>
-	<CAOssrKeVf-8pNyFuyVpTTUZbMaU9N8E-Q3-p7xfa=gsmQYk-1A@mail.gmail.com>
-	<2622824d-5f59-0d4a-635b-4257ee7cab3c@redhat.com>
-	<CAOssrKdn-RkxK4DjRy_36se=oE4edL3Yq5FsY3SknV-cYEY9Jg@mail.gmail.com>
-	<fc44b1ac-6b9a-14c5-42f5-f7fc50fbfb74@redhat.com>
+Date: Wed, 17 Mar 2021 14:29:03 +0000
+From: Luis Henriques <lhenriques@suse.de>
+Message-ID: <YFISL+dvR/qy6P+1@suse.de>
+References: <20210316160147.289193-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
+In-Reply-To: <20210316160147.289193-1-vgoyal@redhat.com>
+Content-Type: text/plain; charset="iso-8859-1"
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <fc44b1ac-6b9a-14c5-42f5-f7fc50fbfb74@redhat.com>
-Subject: Re: [Virtio-fs] Securing file handles
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH 0/1] fuse: acl: Send file mode updates using
+	SETATTR
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,77 +17,84 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, seth.forshee@canonical.com, miklos@szeredi.hu
 
-On Tue, Mar 16, 2021 at 06:28:24PM +0100, Max Reitz wrote:
-> On 08.03.21 15:50, Miklos Szeredi wrote:
-> > On Mon, Mar 8, 2021 at 2:39 PM Max Reitz <mreitz@redhat.com> wrote:
-> > 
-> > > Admittedly I’m not yet at the point where I feel comfortable doing
-> > > changes to the kernel at all, so if you have the time, I’d appreciate
-> > > it.  (If you don’t really have the time, I could try my hand first and
-> > > then we’d see.)
-> > 
-> > I'd hate to context switch away from the fuse leases to the kernel
-> > crypto, so it would have to wait some time...
-> > 
-> > But I've attached an incomplete patch that just missing the crypto
-> > bits and testing.
-> > 
-> > Would you mind having a go at it?
-> 
-> Thanks, I’ll look into the crypto stuff and have a go.  (Sorry for the
-> delay...)
-> 
-> I’d still prefer a service process instead of putting this in the kernel,
-> but let’s see how complicated it would be.  I suppose one problem with
-> putting it into a service process is that doing so wouldn’t help with
-> containers: If containers don’t allow CAP_DAC_READ_SEARCH, we I suppose
-> it’ll be difficult to give it even to such a service process.
-> 
-> One thing that also needs to be solved is how to specify a persistent key.
-> I suppose the idea in your patch is to generate a random key for every new
-> process, but we would need a persistent key.  With a service process, it
-> could be configured by the user to use a specific key, or perhaps it has
-> kind of small database and virtiofsd selects its persistent key by a hash of
-> it or some other ID that it has received from the service process.
-> 
-> I don’t know how you’d go making the kernel store persistent keys, though.
+On Tue, Mar 16, 2021 at 12:01:46PM -0400, Vivek Goyal wrote:
+> Hi Miklos,
+>=20
+> Please find attached a patch to fix the SGID clearing issue upon=20
+> ACL change.=20
+>=20
+> Luis reported that currently fstests generic/375 fails on virtiofs. And
+> reason being that we don't clear SGID when it should be.
+>=20
+> Setting ACL can lead to file mode change. And this in-turn also can
+> lead to clearing SGID bit if.
+>=20
+> - None of caller's groups match file owner group.
+> AND
+> - Caller does not have CAP_FSETID.
+>=20
+> Current implementation relies on server updating the mode. But file
+> server does not have enough information to do so.=20
+>=20
+> Initially I thought of sending CAP_FSETID information to server but
+> then I realized, it is just one of the pieces. What about all the
+> groups caller is a member of. If this has to work correctly, then
+> all the information will have to be sent to virtiofsd somehow. Just
+> sending CAP_FSETID information required adding V2 of fuse_setxattr_in
+> because we don't have any space for sending extra information.
+>=20
+> https://github.com/rhvgoyal/linux/commit/681cf5bdbba9c965c3dbd4337c16e9b1=
+7f27debe
+>=20
+> Also this approach will not work with idmapped mounts because server
+> does not have information about idmapped mappings.
+>=20
+> So I started to look at the approach of sending file mode updates
+> using SETATTR. As filesystems like 9pfs and ceph are doing. This
+> seems simpler approach. Though it has its issues too.
+>=20
+> - File mode update and setxattr(system.posix_acl_access) are not atomic.
 
-Is it possible to load persistent key from user space into a keyring
-using keyctl. 
+After reviewing (and testing) the patch, the only comment I have is that
+we should at least pr_warn() an eventual failure in setxattr().  But f
+that operation fails at that point, probably something went wrong on the
+other side and the kernel is unlikely to be able to revert the mode
+changes anyway.
 
-Vivek
+(And a nit: your patch seems to require some whitespaces clean-up.)
 
-> 
-> Max
-> 
-> > > So AFAIU you want to put this in the kernel so we can get rid of needing
-> > > the capability, because when you can only open handles that were
-> > > previously generated for you, there wouldn’t be a security problem, right?
-> > 
-> > Something like that.
-> > 
-> > > But what about cases where a file is made inaccessible to some process
-> > > between generating the handle and later opening it?  E.g. in
-> > > /path/to/file, the “to” directory is changed to go-x (and the current
-> > > user is not the owner), so opening /path/to/file wouldn’t be possible by
-> > > path anymore.  Sure, if the FD remained open, you could still open the
-> > > file anyway; but I consider it different in semantics.  (E.g. you could
-> > > check that there are no processes that have “file” open anymore, and so
-> > > you could assume that it’s now inaccessible.)
-> > 
-> > That could be a concern, yes.   Requiring CAP_DAC_READ_SEARCH in the
-> > current user namespace, as my template patch does, might mitigate
-> > those worries somewhat.
-> > 
-> > Thanks,
-> > Miklos
-> > 
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
+Cheers,
+--
+Lu=EDs
+
+
+> None of the approaches seem very clean to me. But sending SETATTR
+> explicitly seems to be lesser of two evils to me at this point of time.
+> Hence I am proposing this patch.=20
+>=20
+> I have run fstests acl tests and they pass. (./check -g acl).
+>=20
+> Corresponding virtiofsd patches are here.
+>=20
+> https://github.com/rhvgoyal/qemu/commits/acl-sgid-setattr
+>=20
+> What do you think.
+>=20
+> Vivek Goyal (1):
+>   fuse: Add a mode where fuse client sends mode changes on ACL change
+>=20
+>  fs/fuse/acl.c             | 54 ++++++++++++++++++++++++++++++++++++---
+>  fs/fuse/dir.c             | 11 ++++----
+>  fs/fuse/fuse_i.h          |  9 ++++++-
+>  fs/fuse/inode.c           |  4 ++-
+>  include/uapi/linux/fuse.h |  5 ++++
+>  5 files changed, 71 insertions(+), 12 deletions(-)
+>=20
+> --=20
+> 2.25.4
+>=20
+
 

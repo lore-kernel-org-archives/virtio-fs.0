@@ -1,16 +1,15 @@
-Date: Wed, 17 Mar 2021 10:05:32 +0000
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YFHUbEdszo4nursr@stefanha-x1.localdomain>
-References: <20201215162119.27360-1-zhangjiachen.jaycee@bytedance.com>
-	<CAJ+F1CLZ4VtgKp5fEdC70m22PgV2VHvRHunR-nPOWDnJPFvqqg@mail.gmail.com>
-	<CAFQAk7hCqSMMfRjUO8vtK-B2cKxJZZTJgSDAbRycd1AOSktM_w@mail.gmail.com>
+Date: Wed, 17 Mar 2021 10:33:38 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YFHbAmxmHLI5l67t@work-vm>
+References: <20210209190224.62827-1-dgilbert@redhat.com>
+	<20210209190224.62827-19-dgilbert@redhat.com>
+	<20210211142948.GS247031@stefanha-x1.localdomain>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="9Vc79ZT7RY7KtoLf"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <CAFQAk7hCqSMMfRjUO8vtK-B2cKxJZZTJgSDAbRycd1AOSktM_w@mail.gmail.com>
-Subject: Re: [Virtio-fs] [External] Re: [RFC PATCH 0/9] Support for
- Virtio-fs daemon crash reconnection
+In-Reply-To: <20210211142948.GS247031@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH 18/24] DAX/unmap virtiofsd: Parse unmappable
+	elements
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,63 +18,94 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Jiachen Zhang <zhangjiachen.jaycee@bytedance.com>
-Cc: "Daniel P. Berrange" <berrange@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, QEMU <qemu-devel@nongnu.org>, virtio-fs@redhat.com, Xie Yongji <xieyongji@bytedance.com>, =?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@gmail.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com, mst@redhat.com
+
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> On Tue, Feb 09, 2021 at 07:02:18PM +0000, Dr. David Alan Gilbert (git) wrote:
+> > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+> > 
+> > For some read/writes the virtio queue elements are unmappable by
+> > the daemon; these are cases where the data is to be read/written
+> > from non-RAM.  In viritofs's case this is typically a direct read/write
+> > into an mmap'd DAX file also on virtiofs (possibly on another instance).
+> > 
+> > When we receive a virtio queue element, check that we have enough
+> > mappable data to handle the headers.  Make a note of the number of
+> > unmappable 'in' entries (ie. for read data back to the VMM),
+> > and flag the fuse_bufvec for 'out' entries with a new flag
+> > FUSE_BUF_PHYS_ADDR.
+> 
+> Looking back at this I think vhost-user will need generic
+> READ_MEMORY/WRITE_MEMORY commands. It's okay for virtio-fs to have its
+> own IO command (although not strictly necessary).
+> 
+> With generic READ_MEMORY/WRITE_MEMORY libvhost-user and other vhost-user
+> device backend implementations can handle vring descriptors that point
+> into the DAX window. This can be done transparently so individual device
+> implementations (net, blk, etc) don't even know when memory is copied vs
+> zero-copy shared memory access.
+> 
+> So this approach is okay for virtio-fs but it's not a long-term solution
+> for all of vhost-user. Eventually the long-term solution may be needed
+> so that other VIRTIO devices that have shared memory resources work.
+> 
+> Another bonus of READ_MEMORY/WRITE_MEMORY is that users that prefer an
+> enforcing vIOMMU can disable shared memory (maybe just keep the vring
+> itself mmapped).
+
+Yes, although in this case we're doing read/write to an fd rather than
+arbitrary data to be read/written.
+
+> I just wanted to share this idea but don't expect it to be addressed in
+> this patch series.
+> 
+> > diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
+> > index a090040bb2..ed9280de91 100644
+> > --- a/tools/virtiofsd/fuse_common.h
+> > +++ b/tools/virtiofsd/fuse_common.h
+> > @@ -611,6 +611,13 @@ enum fuse_buf_flags {
+> >       * detected.
+> >       */
+> >      FUSE_BUF_FD_RETRY = (1 << 3),
+> > +
+> > +    /**
+> > +     * The addresses in the iovec represent guest physical addresses
+> > +     * that can't be mapped by the daemon process.
+> > +     * IO must be bounced back to the VMM to do it.
+> > +     */
+> > +    FUSE_BUF_PHYS_ADDR = (1 << 4),
+> 
+> With a vIOMMU it's an IOVA. Without a vIOMMU it's a GPA. This constant
+> may need to be renamed in the future, but it is okay for now.
+
+Do we have a name for something that's either an IOVA or a GPA?
+
+> > +    if (req->bad_in_num || req->bad_out_num) {
+> > +        bool handled_unmappable = false;
+> > +
+> > +        if (out_num > 2 && out_num_readable >= 2 && !req->bad_in_num &&
+> > +            out_sg[0].iov_len == sizeof(struct fuse_in_header) &&
+> > +            ((struct fuse_in_header *)fbuf.mem)->opcode == FUSE_WRITE &&
+> > +            out_sg[1].iov_len == sizeof(struct fuse_write_in)) {
+> 
+> This violates the VIRTIO specification:
+> 
+>   2.6.4.1 Device Requirements: Message Framing
+> 
+>   The device MUST NOT make assumptions about the particular arrangement of descriptors.
+> 
+>   https://docs.oasis-open.org/virtio/virtio/v1.1/cs01/virtio-v1.1-cs01.html#x1-280004
+> 
+> The driver is not obligated to submit separate iovecs. out_num == 1 is
+> valid and the device needs to process it byte-wise instead of making
+> assumptions about iovec layout.
+
+Yep, already fixed.
+
+Dave
 
 
---9Vc79ZT7RY7KtoLf
-Content-Type: text/plain; charset=iso-8859-1
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Fri, Dec 18, 2020 at 05:39:34PM +0800, Jiachen Zhang wrote:
-> Thanks for the suggestions. Actually, we choose to save all state
-> information to QEMU because a virtiofsd has the same lifecycle as its
-> QEMU master. However, saving things to a file do avoid communication with
-> QEMU, and we no longer need to increase the complexity of vhost-user
-> protocol. The suggestion to save fds to the systemd is also very reasonab=
-le
-> if we don't consider the lifecycle issues, we will try it.
-
-Hi,
-We recently discussed crash recovery in the virtio-fs bi-weekly call and
-I read some of this email thread because it's a topic I'm interested in.
-
-I agree with Marc-Andr=E9 that storing file descriptors does not need to
-be in the vhost-user protocol. The lifetime of a vhost-user device
-backend is not controlled by the VMM since the device backend is
-launched separately. Therefore it's reasonable for the component that
-launched the device backend to also have the responsibility of cleaning
-up the vhost-user device backend.
-
-Using the sd_notify(3) interface is a neat idea. It's supported natively
-by systemd but you can also implement a compatible interface in your own
-software. This way the vhost-user device backend can be launched using
-systemd or your own software.
-
-That said, if people find it more convenient to store fds using the
-vhost-user protocol, then I think that is enough justification to add a
-generic message to the vhost-user protocol. The important thing is to
-make the message generic so it solves all crash recovery use cases. The
-inflight fd messages were too specific and now we're having to think
-about adding more messages again.
-
-Stefan
-
---9Vc79ZT7RY7KtoLf
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmBR1GwACgkQnKSrs4Gr
-c8jYOQf9E6s0sDs+N1LozftpB4f74CvIEp3WRfZUHlIxK70WayhhZXu41S7McL8I
-XOIod9IFtXJ01ZobnW5MqAFuuz/iLjwd2bqItZl/FiYB6xGLpNBzBNST9a5MIuFs
-CfRvdol5zaPKp1BMfXCKaBEMIAycyd3p+Pt1pfBt6MswfbSgFEKPaRB4UbNz8EmH
-Km7fKIjeLYqUHlTUgq5tFlfZaFtXW3uG8aMc2jm35SbCn2NxyYBBKJpyfpYBmVXH
-Xf6dVYNoPtLc/KPP8jCsKfWhhhQTHr9mR+m3yEXU9QUGQi4pQNnQ1i4RWpEnrSBi
-K3igrjfGyc6XiPYwaFaZXOZWSEapWQ==
-=GuLY
------END PGP SIGNATURE-----
-
---9Vc79ZT7RY7KtoLf--
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

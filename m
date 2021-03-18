@@ -1,14 +1,13 @@
+From: Connor Kuehl <ckuehl@redhat.com>
+Date: Thu, 18 Mar 2021 08:52:21 -0500
+Message-Id: <20210318135223.1342795-2-ckuehl@redhat.com>
+In-Reply-To: <20210318135223.1342795-1-ckuehl@redhat.com>
 References: <20210318135223.1342795-1-ckuehl@redhat.com>
-	<20210318135223.1342795-4-ckuehl@redhat.com>
-From: Jason Wang <jasowang@redhat.com>
-Message-ID: <71b3495d-655e-2258-969d-076c48d9f265@redhat.com>
-Date: Mon, 22 Mar 2021 11:42:46 +0800
 MIME-Version: 1.0
-In-Reply-To: <20210318135223.1342795-4-ckuehl@redhat.com>
-Content-Type: text/plain; charset="gbk"; format="flowed"
-Content-Transfer-Encoding: base64
-Subject: Re: [Virtio-fs] [PATCH 3/3] fuse: fix typo for fuse_conn.max_pages
-	comment
+Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [PATCH 1/3] virtio_ring: always warn when descriptor
+	chain exceeds queue size
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,20 +16,60 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Connor Kuehl <ckuehl@redhat.com>, virtio-fs@redhat.com
-Cc: miklos@szeredi.hu, mst@redhat.com, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, linux-fsdevel@vger.kernel.org, vgoyal@redhat.com
+To: virtio-fs@redhat.com
+Cc: miklos@szeredi.hu, jasowang@redhat.com, mst@redhat.com, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, linux-fsdevel@vger.kernel.org, vgoyal@redhat.com
 
-CtTaIDIwMjEvMy8xOCDPws7nOTo1MiwgQ29ubm9yIEt1ZWhsINC0tcA6Cj4gJ01heG11bScgLT4g
-J01heGltdW0nCgoKTmVlZCBhIGJldHRlciBsb2cgaGVyZS4KCldpdGggdGhlIGNvbW1pdCBsb2cg
-Zml4ZWQuCgpBY2tlZC1ieTogSmFzb24gV2FuZyA8amFzb3dhbmdAcmVkaGF0LmNvbT4KCgo+Cj4g
-U2lnbmVkLW9mZi1ieTogQ29ubm9yIEt1ZWhsIDxja3VlaGxAcmVkaGF0LmNvbT4KPiAtLS0KPiAg
-IGZzL2Z1c2UvZnVzZV9pLmggfCAyICstCj4gICAxIGZpbGUgY2hhbmdlZCwgMSBpbnNlcnRpb24o
-KyksIDEgZGVsZXRpb24oLSkKPgo+IGRpZmYgLS1naXQgYS9mcy9mdXNlL2Z1c2VfaS5oIGIvZnMv
-ZnVzZS9mdXNlX2kuaAo+IGluZGV4IGYwZTRlZTkwNjQ2NC4uOGJkZWU3OWJhNTkzIDEwMDY0NAo+
-IC0tLSBhL2ZzL2Z1c2UvZnVzZV9pLmgKPiArKysgYi9mcy9mdXNlL2Z1c2VfaS5oCj4gQEAgLTU1
-Miw3ICs1NTIsNyBAQCBzdHJ1Y3QgZnVzZV9jb25uIHsKPiAgIAkvKiogTWF4aW11bSB3cml0ZSBz
-aXplICovCj4gICAJdW5zaWduZWQgbWF4X3dyaXRlOwo+ICAgCj4gLQkvKiogTWF4bXVtIG51bWJl
-ciBvZiBwYWdlcyB0aGF0IGNhbiBiZSB1c2VkIGluIGEgc2luZ2xlIHJlcXVlc3QgKi8KPiArCS8q
-KiBNYXhpbXVtIG51bWJlciBvZiBwYWdlcyB0aGF0IGNhbiBiZSB1c2VkIGluIGEgc2luZ2xlIHJl
-cXVlc3QgKi8KPiAgIAl1bnNpZ25lZCBpbnQgbWF4X3BhZ2VzOwo+ICAgCj4gICAjaWYgSVNfRU5B
-QkxFRChDT05GSUdfVklSVElPX0ZTKQoK
+>From section 2.6.5.3.1 (Driver Requirements: Indirect Descriptors)
+of the virtio spec:
+
+  "A driver MUST NOT create a descriptor chain longer than the Queue
+  Size of the device."
+
+This text suggests that the warning should trigger even if
+indirect descriptors are in use.
+
+Reported-by: Stefan Hajnoczi <stefanha@redhat.com>
+Signed-off-by: Connor Kuehl <ckuehl@redhat.com>
+---
+ drivers/virtio/virtio_ring.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/virtio/virtio_ring.c b/drivers/virtio/virtio_ring.c
+index 71e16b53e9c1..1bc290f9ba13 100644
+--- a/drivers/virtio/virtio_ring.c
++++ b/drivers/virtio/virtio_ring.c
+@@ -444,11 +444,12 @@ static inline int virtqueue_add_split(struct virtqueue *_vq,
+ 
+ 	head = vq->free_head;
+ 
++	WARN_ON_ONCE(total_sg > vq->split.vring.num);
++
+ 	if (virtqueue_use_indirect(_vq, total_sg))
+ 		desc = alloc_indirect_split(_vq, total_sg, gfp);
+ 	else {
+ 		desc = NULL;
+-		WARN_ON_ONCE(total_sg > vq->split.vring.num && !vq->indirect);
+ 	}
+ 
+ 	if (desc) {
+@@ -1118,6 +1119,8 @@ static inline int virtqueue_add_packed(struct virtqueue *_vq,
+ 
+ 	BUG_ON(total_sg == 0);
+ 
++	WARN_ON_ONCE(total_sg > vq->packed.vring.num);
++
+ 	if (virtqueue_use_indirect(_vq, total_sg))
+ 		return virtqueue_add_indirect_packed(vq, sgs, total_sg,
+ 				out_sgs, in_sgs, data, gfp);
+@@ -1125,8 +1128,6 @@ static inline int virtqueue_add_packed(struct virtqueue *_vq,
+ 	head = vq->packed.next_avail_idx;
+ 	avail_used_flags = vq->packed.avail_used_flags;
+ 
+-	WARN_ON_ONCE(total_sg > vq->packed.vring.num && !vq->indirect);
+-
+ 	desc = vq->packed.vring.desc;
+ 	i = head;
+ 	descs_used = total_sg;
+-- 
+2.30.2
+

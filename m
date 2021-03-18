@@ -1,17 +1,21 @@
-Date: Tue, 23 Mar 2021 14:25:29 +0000
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YFn6WX/S1VRzkmel@stefanha-x1.localdomain>
-References: <20201215162119.27360-1-zhangjiachen.jaycee@bytedance.com>
-	<1711593.yAA9ihpmTb@silver>
-	<YFh3gIMbEEEYDdS/@stefanha-x1.localdomain>
-	<2732080.qQGZu95Wvu@silver>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=date:from:to:cc:subject:message-id:references:mime-version
+	:content-disposition:in-reply-to;
+	bh=mDhtpthkra5FR1QobgMI7rXBQ3u37AScVadxTXIiiws=;
+	b=rfi6ZFrFzWHRwJNIj9d3b2TY9HCj2RsBMVq0iA0Ht1giyZMnvTXWk4CMUScdkfEUke
+	uOVuuATQfXXLxvXpqW7IudzlolIvUpcYDmMJFmoQOKCVtaH+kTxNVBS7t5uiHz0uXI66
+	fMqEwdB0Q92SRiYcwTLMq49s8ayFSEwmIF/hQ=
+Date: Thu, 18 Mar 2021 16:17:51 +0100
+From: Miklos Szeredi <miklos@szeredi.hu>
+Message-ID: <YFNvH8w4l7WyEMyr@miu.piliscsaba.redhat.com>
+References: <20210318135223.1342795-1-ckuehl@redhat.com>
+	<20210318135223.1342795-3-ckuehl@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="32voxJ6tmJj5Rjdk"
+In-Reply-To: <20210318135223.1342795-3-ckuehl@redhat.com>
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <2732080.qQGZu95Wvu@silver>
-Subject: Re: [Virtio-fs] [External] Re: [RFC PATCH 0/9] Support for
- Virtio-fs daemon crash reconnection
+Subject: Re: [Virtio-fs] [PATCH 2/3] virtiofs: split requests that exceed
+	virtqueue size
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,111 +24,154 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Christian Schoenebeck <qemu_oss@crudebyte.com>
-Cc: "Daniel P. Berrange" <berrange@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, Xie Yongji <xieyongji@bytedance.com>, =?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@gmail.com>
+To: Connor Kuehl <ckuehl@redhat.com>
+Cc: mst@redhat.com, jasowang@redhat.com, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, vgoyal@redhat.com
+
+On Thu, Mar 18, 2021 at 08:52:22AM -0500, Connor Kuehl wrote:
+> If an incoming FUSE request can't fit on the virtqueue, the request is
+> placed onto a workqueue so a worker can try to resubmit it later where
+> there will (hopefully) be space for it next time.
+> 
+> This is fine for requests that aren't larger than a virtqueue's maximum
+> capacity. However, if a request's size exceeds the maximum capacity of
+> the virtqueue (even if the virtqueue is empty), it will be doomed to a
+> life of being placed on the workqueue, removed, discovered it won't fit,
+> and placed on the workqueue yet again.
+> 
+> Furthermore, from section 2.6.5.3.1 (Driver Requirements: Indirect
+> Descriptors) of the virtio spec:
+> 
+>   "A driver MUST NOT create a descriptor chain longer than the Queue
+>   Size of the device."
+> 
+> To fix this, limit the number of pages FUSE will use for an overall
+> request. This way, each request can realistically fit on the virtqueue
+> when it is decomposed into a scattergather list and avoid violating
+> section 2.6.5.3.1 of the virtio spec.
+
+I removed the conditional compilation and renamed the limit.  Also made
+virtio_fs_get_tree() bail out if it hit the WARN_ON().  Updated patch below.
+
+The virtio_ring patch in this series should probably go through the respective
+subsystem tree.
 
 
---32voxJ6tmJj5Rjdk
-Content-Type: text/plain; charset=iso-8859-1
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Thanks,
+Miklos
 
-On Tue, Mar 23, 2021 at 01:54:46PM +0100, Christian Schoenebeck wrote:
-> On Montag, 22. M=E4rz 2021 11:54:56 CET Stefan Hajnoczi wrote:
-> > > > Thanks, Christian. I am still trying to figure out the details of t=
-he
-> > > > ROP
-> > > > attacks.
-> > > >=20
-> > > > However, QEMU's vhost-user reconnection is based on chardev socket
-> > > > reconnection. The socket reconnection can be enabled by the "--char=
-dev
-> > > > socket,...,reconnect=3DN" in QEMU command options, in which N means=
- QEMU
-> > > > will
-> > > > try to connect the disconnected socket every N seconds. We can incr=
-ease
-> > > > N
-> > > > to increase the reconnect delay. If we want to change the reconnect
-> > > > delay
-> > > > dynamically, I think we should change the chardev socket reconnecti=
-on
-> > > > code.
-> > > > It is a more generic mechanism than vhost-user-fs and vhost-user
-> > > > backend.
-> > > >=20
-> > > > By the way, I also considered the socket reconnection delay time in=
- the
-> > > > performance aspect. As the reconnection delay increase, if an
-> > > > application
-> > > > in the guest is doing I/Os, it will suffer larger tail latency. And=
- for
-> > > > now, the smallest delay is 1 second, which is rather large for
-> > > > high-performance virtual I/O devices today. I think maybe a more
-> > > > performant
-> > > > and safer reconnect delay adjustment mechanism should be considered=
- in
-> > > > the
-> > > > future. What are your thoughts?
-> > >=20
-> > > So with N=3D1 an attacker could e.g. bypass a 16-bit PAC by brute-for=
-ce in
-> > > ~18 hours (e.g. on Arm if PAC + MTE was enabled). With 24-bit PAC (no
-> > > MTE) it would be ~194 days. Independent of what architecture and defe=
-nd
-> > > mechanism is used, there is always the possibility though that some k=
-ind
-> > > of side channel attack exists that might require a much lower amount =
-of
-> > > attempts. So in an untrusted environment I would personally limit the
-> > > amount of automatic reconnects and rather accept a down time for furt=
-her
-> > > investigation if a suspicious high amount of crashes happened.
-> > >=20
-> > > And yes, if a dynamic delay scheme was deployed in future then starti=
-ng
-> > > with a value smaller than 1 second would make sense.
-> >=20
-> > If we're talking about repeatedly crashing the process to find out its
-> > memory map, shouldn't each process have a different randomized memory
-> > layout?
-> >=20
-> > Stefan
->=20
-> Yes, ASLR is enabled on Linux and other OSes by default for more than 10=
-=20
-> years. But ASLR does not prevent ROP attacks which are commonly using rel=
-ative=20
-> offsets, tweaking the stack, indirect jumps, as well as heap spraying. Pl=
-us=20
-> side channels exist to gain access to direct addresses.
->=20
-> The situation might improve significantly when shadow stacks (e.g. Intel =
-CET)=20
-> become widely used in future. But in the meantime I would be cautious if=
-=20
-> something is crashing too often in a certain time frame.
+---
+From: Connor Kuehl <ckuehl@redhat.com>
+Subject: virtiofs: split requests that exceed virtqueue size
+Date: Thu, 18 Mar 2021 08:52:22 -0500
 
-It's a good point for performance as well. A broken service should not
-hog CPU by constantly restarting itself. If it's broken badly it may
-never come back up and should be throttled.
+If an incoming FUSE request can't fit on the virtqueue, the request is
+placed onto a workqueue so a worker can try to resubmit it later where
+there will (hopefully) be space for it next time.
 
-Stefan
+This is fine for requests that aren't larger than a virtqueue's maximum
+capacity.  However, if a request's size exceeds the maximum capacity of the
+virtqueue (even if the virtqueue is empty), it will be doomed to a life of
+being placed on the workqueue, removed, discovered it won't fit, and placed
+on the workqueue yet again.
 
---32voxJ6tmJj5Rjdk
-Content-Type: application/pgp-signature; name="signature.asc"
+Furthermore, from section 2.6.5.3.1 (Driver Requirements: Indirect
+Descriptors) of the virtio spec:
 
------BEGIN PGP SIGNATURE-----
+  "A driver MUST NOT create a descriptor chain longer than the Queue
+  Size of the device."
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmBZ+lkACgkQnKSrs4Gr
-c8j4+wf/Z3D1NpNwfPwBAmvVIgM2UCcpv04AAVbQwAK2uLVWvesoQ8rDnLizkeWw
-TOJ8NbwQAlKFfMhLBMSYKlzFmUNJnbn7pofPpccywhQFeu8jTkNBYDpikICi0Qug
-sD5Ovk0TUCqzwb+K2uxdnaDB+ZMiZLYDGwQ4T14pAinO1RndTjtTNp1OYT56hQGk
-KsiNZF9fEvkNGZ4zWCo4YDK4gNUE0fjdPNvukhtPJF2dF5Jh0NVGpZPtNAz+8QPT
-d2StGsqyF71gYZpCCVFNEpjiRApwnDxSqVfZSPkRBk+O9Whk0VIGQxztQ+Rl4n25
-aJgFSdUW8UdkFsL5z1HtviV81lbKoQ==
-=YMcq
------END PGP SIGNATURE-----
+To fix this, limit the number of pages FUSE will use for an overall
+request.  This way, each request can realistically fit on the virtqueue
+when it is decomposed into a scattergather list and avoid violating section
+2.6.5.3.1 of the virtio spec.
 
---32voxJ6tmJj5Rjdk--
+Signed-off-by: Connor Kuehl <ckuehl@redhat.com>
+Signed-off-by: Miklos Szeredi <mszeredi@redhat.com>
+---
+ fs/fuse/fuse_i.h    |    3 +++
+ fs/fuse/inode.c     |    3 ++-
+ fs/fuse/virtio_fs.c |   19 +++++++++++++++++--
+ 3 files changed, 22 insertions(+), 3 deletions(-)
+
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -555,6 +555,9 @@ struct fuse_conn {
+ 	/** Maxmum number of pages that can be used in a single request */
+ 	unsigned int max_pages;
+ 
++	/** Constrain ->max_pages to this value during feature negotiation */
++	unsigned int max_pages_limit;
++
+ 	/** Input queue */
+ 	struct fuse_iqueue iq;
+ 
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -712,6 +712,7 @@ void fuse_conn_init(struct fuse_conn *fc
+ 	fc->pid_ns = get_pid_ns(task_active_pid_ns(current));
+ 	fc->user_ns = get_user_ns(user_ns);
+ 	fc->max_pages = FUSE_DEFAULT_MAX_PAGES_PER_REQ;
++	fc->max_pages_limit = FUSE_MAX_MAX_PAGES;
+ 
+ 	INIT_LIST_HEAD(&fc->mounts);
+ 	list_add(&fm->fc_entry, &fc->mounts);
+@@ -1040,7 +1041,7 @@ static void process_init_reply(struct fu
+ 				fc->abort_err = 1;
+ 			if (arg->flags & FUSE_MAX_PAGES) {
+ 				fc->max_pages =
+-					min_t(unsigned int, FUSE_MAX_MAX_PAGES,
++					min_t(unsigned int, fc->max_pages_limit,
+ 					max_t(unsigned int, arg->max_pages, 1));
+ 			}
+ 			if (IS_ENABLED(CONFIG_FUSE_DAX) &&
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -18,6 +18,12 @@
+ #include <linux/uio.h>
+ #include "fuse_i.h"
+ 
++/* Used to help calculate the FUSE connection's max_pages limit for a request's
++ * size. Parts of the struct fuse_req are sliced into scattergather lists in
++ * addition to the pages used, so this can help account for that overhead.
++ */
++#define FUSE_HEADER_OVERHEAD    4
++
+ /* List of virtio-fs device instances and a lock for the list. Also provides
+  * mutual exclusion in device removal and mounting path
+  */
+@@ -1413,9 +1419,10 @@ static int virtio_fs_get_tree(struct fs_
+ {
+ 	struct virtio_fs *fs;
+ 	struct super_block *sb;
+-	struct fuse_conn *fc;
++	struct fuse_conn *fc = NULL;
+ 	struct fuse_mount *fm;
+-	int err;
++	unsigned int virtqueue_size;
++	int err = -EIO;
+ 
+ 	/* This gets a reference on virtio_fs object. This ptr gets installed
+ 	 * in fc->iq->priv. Once fuse_conn is going away, it calls ->put()
+@@ -1427,6 +1434,10 @@ static int virtio_fs_get_tree(struct fs_
+ 		return -EINVAL;
+ 	}
+ 
++	virtqueue_size = virtqueue_get_vring_size(fs->vqs[VQ_REQUEST].vq);
++	if (WARN_ON(virtqueue_size <= FUSE_HEADER_OVERHEAD))
++		goto out_err;
++
+ 	err = -ENOMEM;
+ 	fc = kzalloc(sizeof(struct fuse_conn), GFP_KERNEL);
+ 	if (!fc)
+@@ -1442,6 +1453,10 @@ static int virtio_fs_get_tree(struct fs_
+ 	fc->delete_stale = true;
+ 	fc->auto_submounts = true;
+ 
++	/* Tell FUSE to split requests that exceed the virtqueue's size */
++	fc->max_pages_limit = min_t(unsigned int, fc->max_pages_limit,
++				    virtqueue_size - FUSE_HEADER_OVERHEAD);
++
+ 	fsc->s_fs_info = fm;
+ 	sb = sget_fc(fsc, virtio_fs_test_super, set_anon_super_fc);
+ 	if (fsc->s_fs_info) {
 

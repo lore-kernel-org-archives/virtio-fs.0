@@ -1,18 +1,15 @@
-Date: Tue, 23 Mar 2021 10:32:33 +0100
-From: Christian Brauner <christian.brauner@ubuntu.com>
-Message-ID: <20210323093233.iyl4k6x432ytb72c@wittgenstein>
-References: <20210319195547.427371-1-vgoyal@redhat.com>
-	<20210319195547.427371-2-vgoyal@redhat.com>
-	<CAHpGcMKhFxotKDxPryfKdhNMMDWO4Ws33s6fEm2NP0u_4vffnQ@mail.gmail.com>
-	<20210320100322.ox5gzgauo7iqf2fv@gmail.com>
-	<20210322170111.GE446288@redhat.com>
+References: <810089e0-3a09-0d8f-9f8e-be5b3ac70587@redhat.com>
+	<20210318135600.GA368102@redhat.com>
+From: Connor Kuehl <ckuehl@redhat.com>
+Message-ID: <19c488d0-2006-4a96-610d-f4825aa43cb3@redhat.com>
+Date: Thu, 18 Mar 2021 08:58:54 -0500
 MIME-Version: 1.0
-In-Reply-To: <20210322170111.GE446288@redhat.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 1/3] posic_acl: Add a helper determine if
- SGID should be cleared
+In-Reply-To: <20210318135600.GA368102@redhat.com>
+Content-Type: text/plain; charset=utf-8; format=flowed
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] Question about sg_count_fuse_req() in
+	linux/fs/fuse/virtio_fs.c
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,89 +19,67 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: Jan Kara <jack@suse.cz>, Andreas Gruenbacher <agruenba@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, Andreas =?utf-8?Q?Gr=C3=BCnbacher?= <andreas.gruenbacher@gmail.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, virtio-fs@redhat.com, Seth Forshee <seth.forshee@canonical.com>, Christian Brauner <christian.brauner@canonical.com>, Alexander Viro <viro@zeniv.linux.org.uk>, Linux FS-devel Mailing List <linux-fsdevel@vger.kernel.org>
+Cc: miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
 
-On Mon, Mar 22, 2021 at 01:01:11PM -0400, Vivek Goyal wrote:
-> On Sat, Mar 20, 2021 at 11:03:22AM +0100, Christian Brauner wrote:
-> > On Fri, Mar 19, 2021 at 11:42:48PM +0100, Andreas Grünbacher wrote:
-> > > Hi,
-> > > 
-> > > Am Fr., 19. März 2021 um 20:58 Uhr schrieb Vivek Goyal <vgoyal@redhat.com>:
-> > > > posix_acl_update_mode() determines what's the equivalent mode and if SGID
-> > > > needs to be cleared or not. I need to make use of this code in fuse
-> > > > as well. Fuse will send this information to virtiofs file server and
-> > > > file server will take care of clearing SGID if it needs to be done.
-> > > >
-> > > > Hence move this code in a separate helper so that more than one place
-> > > > can call into it.
-> > > >
-> > > > Cc: Jan Kara <jack@suse.cz>
-> > > > Cc: Andreas Gruenbacher <agruenba@redhat.com>
-> > > > Cc: Alexander Viro <viro@zeniv.linux.org.uk>
-> > > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > > > ---
-> > > >  fs/posix_acl.c            |  3 +--
-> > > >  include/linux/posix_acl.h | 11 +++++++++++
-> > > >  2 files changed, 12 insertions(+), 2 deletions(-)
-> > > >
-> > > > diff --git a/fs/posix_acl.c b/fs/posix_acl.c
-> > > > index f3309a7edb49..2d62494c4a5b 100644
-> > > > --- a/fs/posix_acl.c
-> > > > +++ b/fs/posix_acl.c
-> > > > @@ -684,8 +684,7 @@ int posix_acl_update_mode(struct user_namespace *mnt_userns,
-> > > >                 return error;
-> > > >         if (error == 0)
-> > > >                 *acl = NULL;
-> > > > -       if (!in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
-> > > > -           !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID))
-> > > > +       if (posix_acl_mode_clear_sgid(mnt_userns, inode))
-> > > >                 mode &= ~S_ISGID;
-> > > >         *mode_p = mode;
-> > > >         return 0;
-> > > > diff --git a/include/linux/posix_acl.h b/include/linux/posix_acl.h
-> > > > index 307094ebb88c..073c5e546de3 100644
-> > > > --- a/include/linux/posix_acl.h
-> > > > +++ b/include/linux/posix_acl.h
-> > > > @@ -59,6 +59,17 @@ posix_acl_release(struct posix_acl *acl)
-> > > >  }
-> > > >
-> > > >
-> > > > +static inline bool
-> > > > +posix_acl_mode_clear_sgid(struct user_namespace *mnt_userns,
-> > > > +                         struct inode *inode)
-> > > > +{
-> > > > +       if (!in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
-> > > > +           !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID))
-> > > > +               return true;
-> > > > +
-> > > > +       return false;
-> > > 
-> > > That's just
-> > > 
-> > > return !in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
-> > >     !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID);
-> > > 
-> > > The same pattern we have in posix_acl_update_mode also exists in
-> > > setattr_copy and inode_init_owner, and almost the same pattern exists
-> > > in setattr_prepare, so can this be cleaned up as well? The function
-> > > also isn't POSIX ACL specific, so the function name is misleading.
-> > 
-> > Good idea but that should probably be spun into a separate patchset that
-> > only touches the vfs parts.
+On 3/18/21 8:56 AM, Vivek Goyal wrote:
+> I think all the in args are being mapped into a single scatter gather
+> element and that's why it does not matter whether in_numargs is 3, 2 or 1.
+> They will be mapped in a single element.
 > 
-> IIUC, suggestion is that I should write a VFS helper (and not posix
-> acl helper) and use that helper at other places too in the code. 
-
-If there are other callers outside of acls (which should be iirc) then
-yes.
-
+> sg_init_fuse_args()
+> {
+>          len = fuse_len_args(numargs - argpages, args);
+>          if (len)
+>                  sg_init_one(&sg[total_sgs++], argbuf, len);
+> }
 > 
-> I will do that and post in a separate patch series.
+>          out_sgs += sg_init_fuse_args(&sg[out_sgs], req,
+>                                       (struct fuse_arg *)args->in_args,
+>                                       args->in_numargs, args->in_pages,
+>                                       req->argbuf, &argbuf_used);
+> 
+> When we are sending some data in some pages, then we set args->in_pages
+> to true. And in that case, last element of args->in_args[] contains the
+> total size of bytes in additional pages we are sending and is not part
+> of in_args being mapped to scatter gather element. That's why this
+> check.
+> 
+> 	if (args->in_numargs - args->in_pages)
+> 		total_sgs += 1;
 
-Yeah, I think that makes more sense to have this be a separate change
-instead of putting it together with the fuse change if it touches more
-than one place.
+Aha! Thank you, Vivek. That makes sense.
 
-Thanks!
-Christian
+> Not sure when we will have a case where args->in_numargs = 1 and
+> args->in_pages=true. Do we ever hit that.
+
+Not in my experience. My previous mail was examining this routine mainly 
+in a vacuum.
+
+Connor
+
+> Thanks
+> Vivek
+> 
+>>
+>> Especially since the block right below it counts pages if args->in_pages is
+>> true:
+>>
+>>          if (args->in_pages) {
+>>                  size = args->in_args[args->in_numargs - 1].size;
+>>                  total_sgs += sg_count_fuse_pages(ap->descs, ap->num_pages,
+>>                                                   size);
+>>          }
+>>
+>> The rest of the routine goes on similarly but for the 'out' components.
+>>
+>> I doubt incrementing 'total_sgs' in the first if-statement I showed above is
+>> vestigial, I just think my mental model of what is happening here is
+>> incomplete.
+>>
+>> Any clarification is much appreciated!
+> 
+>>
+>> Connor
+>>
+> 
 

@@ -1,27 +1,12 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	to:subject:message-id:date:from; s=fm3; bh=lz20C//rV6ZYZArjE52wV
-	ehRiGD5xuhhGOVRuFwSh9o=; b=Q01LlNTXpuHoELCWJF81HsVU77Naa9MaWpp8A
-	JIBjdMGaP7Hr56GH1d2C0okA7xUiTW51G8ZyEpoI7/7GOVWA8BDZFblDfJvTcI+Z
-	tnqzsFmwlXYgCg4gbVjW5OGCnXQVVeJeQbuvgzroUF4xrC73ACHmD8gRIS9LOXGz
-	sWmcoTryMvp88NkRWP9PI8LgnPzm4zn4xpKB3meb5xU+5PRANItLqby5icHT0uST
-	IfieQh79YhxHcHIkUL27DUP6j3de2pxK5bkJ5CnIzND97E4AlXUE4vwdTT766QTL
-	1fUCetYWFMiVkZB33zP9ngU7OwClak4AsZIvXwp9ivYuWAmIg==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=date:from:message-id:subject:to
-	:x-me-proxy:x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=
-	fm2; bh=lz20C//rV6ZYZArjE52wVehRiGD5xuhhGOVRuFwSh9o=; b=IsRp5Btq
-	gA4wwmALTMolmfZCUpl3y7w40JUb3+yQX61bFeccq3QX6lOLPEYZTWXiVHwLDOtd
-	eNiblrngEfs8bKAOI0iMiWplyYnQ9eGi4E3iIq270v/JW9cgmXvB482qqPq6iMhG
-	xBM3Y+IiLoTdTJNzjys0szyn0kT2oqHlSkNArcyiyxWUhG+L78bQCh1Ge+NvO6DV
-	NF0rEB8cQNJ6huh+U/kGNFNgW+28VjbZdTTnt2NK2pYH0DFu9HZcR9BZhNUX6ILW
-	XdroykLulhmFZ4ScRJZCdqq23ZSJsctR8Ymoq/mURrE0+D4xoJjOuaw8cet6L0XD
-	r9vZIpCzarjkiQ==
-Message-Id: <20210405154451.0CCC91080054@mailuser.nyi.internal>
-Date: Mon,  5 Apr 2021 11:44:51 -0400 (EDT)
-From: virtiofs-bot@sinrega.org
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] MR opened: Set up uid/gid mappings in
-	user_namespace sandbox
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Fri, 19 Mar 2021 15:55:47 -0400
+Message-Id: <20210319195547.427371-4-vgoyal@redhat.com>
+In-Reply-To: <20210319195547.427371-1-vgoyal@redhat.com>
+References: <20210319195547.427371-1-vgoyal@redhat.com>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 3/3] fuse: Add a flag
+	FUSE_SETXATTR_ACL_KILL_SGID to kill SGID
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -30,15 +15,79 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, miklos@szeredi.hu
+Cc: seth.forshee@canonical.com, vgoyal@redhat.com
 
-When using the namespace sandbox mode with a non-privileged user, set
-up 1-to-1 mappings for the current process uid and gid. This allows
-both root and a user with the same uid/gid in the VM to access the
-files served by us. This scenario fits nicely with the "shared folder"
-use case.
+When posix access ACL is set, it can have an effect on file mode and
+it can also need to clear SGID if.
 
-Signed-off-by: Sergio Lopez <slp@redhat.com>
+- None of caller's group/supplementary groups match file owner group.
+AND
+- Caller is not priviliged (No CAP_FSETID).
+
+As of now fuser server is responsible for changing the file mode as well. But
+it does not know whether to clear SGID or not.
+
+So add a flag FUSE_SETXATTR_ACL_KILL_SGID and send this info with
+SETXATTR to let file server know that sgid needs to be cleared as well.
+
+Reported-by: Luis Henriques <lhenriques@suse.de>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/16
+ fs/fuse/acl.c             | 7 ++++++-
+ include/uapi/linux/fuse.h | 7 +++++++
+ 2 files changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/fs/fuse/acl.c b/fs/fuse/acl.c
+index d31260a139d4..45358124181a 100644
+--- a/fs/fuse/acl.c
++++ b/fs/fuse/acl.c
+@@ -71,6 +71,7 @@ int fuse_set_acl(struct user_namespace *mnt_userns, struct inode *inode,
+ 		return -EINVAL;
+ 
+ 	if (acl) {
++		unsigned extra_flags = 0;
+ 		/*
+ 		 * Fuse userspace is responsible for updating access
+ 		 * permissions in the inode, if needed. fuse_setxattr
+@@ -94,7 +95,11 @@ int fuse_set_acl(struct user_namespace *mnt_userns, struct inode *inode,
+ 			return ret;
+ 		}
+ 
+-		ret = fuse_setxattr(inode, name, value, size, 0, 0);
++		if (fc->setxattr_v2 &&
++		    posix_acl_mode_clear_sgid(&init_user_ns, inode))
++			extra_flags |= FUSE_SETXATTR_ACL_KILL_SGID;
++
++		ret = fuse_setxattr(inode, name, value, size, 0, extra_flags);
+ 		kfree(value);
+ 	} else {
+ 		ret = fuse_removexattr(inode, name);
+diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
+index 1bb555c1c117..08c11a7beaa7 100644
+--- a/include/uapi/linux/fuse.h
++++ b/include/uapi/linux/fuse.h
+@@ -180,6 +180,7 @@
+  *  - add FUSE_HANDLE_KILLPRIV_V2, FUSE_WRITE_KILL_SUIDGID, FATTR_KILL_SUIDGID
+  *  - add FUSE_OPEN_KILL_SUIDGID
+  *  - add FUSE_SETXATTR_V2
++ *  - add FUSE_SETXATTR_ACL_KILL_SGID
+  */
+ 
+ #ifndef _LINUX_FUSE_H
+@@ -454,6 +455,12 @@ struct fuse_file_lock {
+  */
+ #define FUSE_OPEN_KILL_SUIDGID	(1 << 0)
+ 
++/**
++ * setxattr flags
++ * FUSE_SETXATTR_ACL_KILL_SGID: Clear SGID when system.posix_acl_access is set
++ */
++#define FUSE_SETXATTR_ACL_KILL_SGID	(1 << 0)
++
+ enum fuse_opcode {
+ 	FUSE_LOOKUP		= 1,
+ 	FUSE_FORGET		= 2,  /* no reply */
+-- 
+2.25.4
 

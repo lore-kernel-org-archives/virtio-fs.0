@@ -1,14 +1,12 @@
-Date: Mon, 12 Apr 2021 08:02:06 +0200
-From: Sergio Lopez <slp@redhat.com>
-Message-ID: <20210412060206.ehp3tme2mzvc46w4@mhamilton>
-References: <CABpfLih7gTh8a=SYtFT4hGo03K3cnCmAK-+FUXC8X9MhLBwfzg@mail.gmail.com>
-	<20210409134158.GD1111800@redhat.com>
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Fri, 19 Mar 2021 15:55:45 -0400
+Message-Id: <20210319195547.427371-2-vgoyal@redhat.com>
+In-Reply-To: <20210319195547.427371-1-vgoyal@redhat.com>
+References: <20210319195547.427371-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="efvdldvsmx55hn6u"
-Content-Disposition: inline
-In-Reply-To: <20210409134158.GD1111800@redhat.com>
-Subject: Re: [Virtio-fs] Compiling virtio-fs/qemu on Mac
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 1/3] posic_acl: Add a helper determine if SGID
+	should be cleared
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,63 +15,62 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, Anthony J Rabbito <hello@anthonyrabbito.com>
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, miklos@szeredi.hu
+Cc: Jan Kara <jack@suse.cz>, Andreas Gruenbacher <agruenba@redhat.com>, seth.forshee@canonical.com, Alexander Viro <viro@zeniv.linux.org.uk>, vgoyal@redhat.com
 
+posix_acl_update_mode() determines what's the equivalent mode and if SGID
+needs to be cleared or not. I need to make use of this code in fuse
+as well. Fuse will send this information to virtiofs file server and
+file server will take care of clearing SGID if it needs to be done.
 
---efvdldvsmx55hn6u
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Hence move this code in a separate helper so that more than one place
+can call into it.
 
-On Fri, Apr 09, 2021 at 09:41:58AM -0400, Vivek Goyal wrote:
-> On Thu, Apr 08, 2021 at 08:36:37PM -0400, Anthony J Rabbito wrote:
-> > Hi All,
-> > I'm having some trouble getting virt9p built with Qemu on Darwin. Given
-> > that virtio-fs is progressing nicely i'm wondering if anyone has had any
-> > success building for Darwin?
-> > Looking to build a podman machine with shared directories.
-> > Thanks,
->=20
-> Hi Anthony,=20
->=20
-> I have never tried building qemu/virtiofsd for Darwin.
->=20
-> My understanding is that virtiofsd is supposed to be running on Linux.
-> It has code which makes assumption about linux specific behavior. So
-> I doubt it will work correctly on Darwin even if you managed to
-> compile it.
+Cc: Jan Kara <jack@suse.cz>
+Cc: Andreas Gruenbacher <agruenba@redhat.com>
+Cc: Alexander Viro <viro@zeniv.linux.org.uk>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/posix_acl.c            |  3 +--
+ include/linux/posix_acl.h | 11 +++++++++++
+ 2 files changed, 12 insertions(+), 2 deletions(-)
 
-Yes, this is the case. For the macOS port of libkrun, which integrates
-a virtio-fs server, I had to rewrite a significant part of the
-passthrough implementation [1]. And even with all the workarounds
-there, the semantics aren't 100% compatible, just good enough for the
-common use cases.
-
-Sergio.
-
-[1] https://github.com/containers/libkrun/blob/main/src/devices/src/virtio/=
-fs/macos/passthrough.rs
-
---efvdldvsmx55hn6u
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAABCAAdFiEEvtX891EthoCRQuii9GknjS8MAjUFAmBz4loACgkQ9GknjS8M
-AjVNgQ/+OeP0zH1XJ/J4AF2JasVd2JDqdYiGpE3ZY+5/U6ryvbquXPvkcI9zAZDh
-J9WBEEBgXLZ1ux/zZcGuV7z0rLj+QOYRrjgONXpVVleJLlJ8Y15JVQA0C9IvQpp8
-F1fxSk1JxowbIYlcvdM3LQRxzMhSbRr+dD/Ab8jWSJPMcaCAnGOpx2/OdfFsjTlS
-EPWFDsnT8z6lZyOJq1NMhyTndCpju3ZTjOhF03VkxbQqMqjiZCzekWQO0wazzw/R
-C3kjLz+EB7j8cbYKp/G+JwXRsfvztKjGqKibPY53YqMLP9v3C0Vwl2hPPOUYCDjZ
-x/AZdfTfqQMb9hIOjm/0158SueHEDkKI08YyYyheO2K7ewNMyACHgU9tE95ABMIU
-NJ0ARTAKXcrgmA5pDvUgv7ufJXVZIu65NKlcb+FYLPBmxNMUcGKbUTLKjURhZESd
-t4Xfpr7fNqYLzrM1tGDVQ+BdYZ0GltfmQORpFD/9UpFGcPX6RP/224dqmDWeEFwI
-IEwKXoID06sqhrNNQJJfTwPgNIzlrqUMJ7zLNpcaxUW1qgrv2KStgkwo77PjGLmR
-18lmXqDsSIpey++FaQH7X/eG+a7RgLvCXOaCVgrR/LhZuvFcyV3UWxx0sUAo07HZ
-43TYU35thupLV+czH7fXiMR/S3Pf+oJCbjOn44Z8f0xJ09v5Xrk=
-=WRiZ
------END PGP SIGNATURE-----
-
---efvdldvsmx55hn6u--
+diff --git a/fs/posix_acl.c b/fs/posix_acl.c
+index f3309a7edb49..2d62494c4a5b 100644
+--- a/fs/posix_acl.c
++++ b/fs/posix_acl.c
+@@ -684,8 +684,7 @@ int posix_acl_update_mode(struct user_namespace *mnt_userns,
+ 		return error;
+ 	if (error == 0)
+ 		*acl = NULL;
+-	if (!in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
+-	    !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID))
++	if (posix_acl_mode_clear_sgid(mnt_userns, inode))
+ 		mode &= ~S_ISGID;
+ 	*mode_p = mode;
+ 	return 0;
+diff --git a/include/linux/posix_acl.h b/include/linux/posix_acl.h
+index 307094ebb88c..073c5e546de3 100644
+--- a/include/linux/posix_acl.h
++++ b/include/linux/posix_acl.h
+@@ -59,6 +59,17 @@ posix_acl_release(struct posix_acl *acl)
+ }
+ 
+ 
++static inline bool
++posix_acl_mode_clear_sgid(struct user_namespace *mnt_userns,
++			  struct inode *inode)
++{
++	if (!in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
++	    !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID))
++		return true;
++
++	return false;
++}
++
+ /* posix_acl.c */
+ 
+ extern void posix_acl_init(struct posix_acl *, int);
+-- 
+2.25.4
 

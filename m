@@ -1,12 +1,16 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Wed, 14 Apr 2021 16:51:26 +0100
-Message-Id: <20210414155137.46522-15-dgilbert@redhat.com>
-In-Reply-To: <20210414155137.46522-1-dgilbert@redhat.com>
-References: <20210414155137.46522-1-dgilbert@redhat.com>
+Date: Sat, 20 Mar 2021 16:04:44 -0400
+From: "Michael S. Tsirkin" <mst@redhat.com>
+Message-ID: <20210320160430-mutt-send-email-mst@kernel.org>
+References: <20210318135223.1342795-1-ckuehl@redhat.com>
+	<20210318135223.1342795-3-ckuehl@redhat.com>
+	<YFNvH8w4l7WyEMyr@miu.piliscsaba.redhat.com>
+	<00c5dce8-fc2d-6e68-e3bc-a958ca5d2342@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 14/25] DAX: virtiofsd: Make
-	lo_removemapping() work
+In-Reply-To: <00c5dce8-fc2d-6e68-e3bc-a958ca5d2342@redhat.com>
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: Re: [Virtio-fs] [PATCH 2/3] virtiofs: split requests that exceed
+	virtqueue size
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,66 +19,27 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com, virtio-fs@redhat.com
+To: Connor Kuehl <ckuehl@redhat.com>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, jasowang@redhat.com, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, vgoyal@redhat.com
 
-From: Vivek Goyal <vgoyal@redhat.com>
+On Thu, Mar 18, 2021 at 10:52:14AM -0500, Connor Kuehl wrote:
+> On 3/18/21 10:17 AM, Miklos Szeredi wrote:
+> > I removed the conditional compilation and renamed the limit.  Also made
+> > virtio_fs_get_tree() bail out if it hit the WARN_ON().  Updated patch below.
+> 
+> Thanks, Miklos. I think it looks better with those changes.
+> 
+> > The virtio_ring patch in this series should probably go through the respective
+> > subsystem tree.
+> 
+> Makes sense. I've CC'd everyone that ./scripts/get_maintainers.pl suggested
+> for that patch on this entire series as well. Should I resend patch #1
+> through just that subsystem to avoid confusion or wait to see if it gets
+> picked out of this series?
 
-Let guest pass in the offset in dax window a mapping is currently
-mapped at and needs to be removed.
+Yes pls post separately. Thanks!
 
-Vivek added the initial support to remove single mapping and later Peng
-added patch to support removing multiple mappings in single command.
-
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
----
- tools/virtiofsd/passthrough_ll.c | 32 ++++++++++++++++++++++++++++++--
- 1 file changed, 30 insertions(+), 2 deletions(-)
-
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index bf7a7f3c23..a9f0505414 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -3209,8 +3209,36 @@ static void lo_removemapping(fuse_req_t req, struct fuse_session *se,
-                              fuse_ino_t ino, unsigned num,
-                              struct fuse_removemapping_one *argp)
- {
--    /* TODO */
--    fuse_reply_err(req, ENOSYS);
-+    VhostUserFSSlaveMsg *msg;
-+    size_t alloc_count = (num > VHOST_USER_FS_SLAVE_MAX_ENTRIES) ?
-+                              VHOST_USER_FS_SLAVE_MAX_ENTRIES : num;
-+    int ret = 0;
-+    msg = g_malloc0(sizeof(VhostUserFSSlaveMsg) +
-+                    alloc_count * sizeof(VhostUserFSSlaveMsgEntry));
-+
-+    for (int i = 0, o = 0; num > 0; i++, argp++) {
-+        VhostUserFSSlaveMsgEntry *e = &msg->entries[o];
-+
-+        e->len = argp->len;
-+        e->c_offset = argp->moffset;
-+
-+        o++;
-+        if (--num == 0 || o == VHOST_USER_FS_SLAVE_MAX_ENTRIES) {
-+            msg->count = o;
-+            ret = fuse_virtio_unmap(se, msg);
-+            if (ret < 0) {
-+                fuse_log(FUSE_LOG_ERR,
-+                         "%s: unmap over virtio failed "
-+                         "(offset=0x%lx, len=0x%lx). err=%d\n",
-+                         __func__, argp->moffset, argp->len, ret);
-+                break;
-+            }
-+            o = 0;
-+        }
-+    }
-+
-+    fuse_reply_err(req, -ret);
-+    g_free(msg);
- }
- 
- static struct fuse_lowlevel_ops lo_oper = {
--- 
-2.31.1
+> Thanks again,
+> 
+> Connor
 

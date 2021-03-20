@@ -1,12 +1,16 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Wed, 14 Apr 2021 16:51:17 +0100
-Message-Id: <20210414155137.46522-6-dgilbert@redhat.com>
-In-Reply-To: <20210414155137.46522-1-dgilbert@redhat.com>
-References: <20210414155137.46522-1-dgilbert@redhat.com>
+Date: Sat, 20 Mar 2021 11:03:22 +0100
+From: Christian Brauner <christian.brauner@canonical.com>
+Message-ID: <20210320100322.ox5gzgauo7iqf2fv@gmail.com>
+References: <20210319195547.427371-1-vgoyal@redhat.com>
+	<20210319195547.427371-2-vgoyal@redhat.com>
+	<CAHpGcMKhFxotKDxPryfKdhNMMDWO4Ws33s6fEm2NP0u_4vffnQ@mail.gmail.com>
 MIME-Version: 1.0
+In-Reply-To: <CAHpGcMKhFxotKDxPryfKdhNMMDWO4Ws33s6fEm2NP0u_4vffnQ@mail.gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 05/25] DAX subprojects/libvhost-user: Add
-	virtio-fs slave types
+Subject: Re: [Virtio-fs] [PATCH 1/3] posic_acl: Add a helper determine if
+ SGID should be cleared
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,138 +19,74 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com, virtio-fs@redhat.com
+To: Andreas =?utf-8?Q?Gr=C3=BCnbacher?= <andreas.gruenbacher@gmail.com>
+Cc: Jan Kara <jack@suse.cz>, Andreas Gruenbacher <agruenba@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, virtio-fs@redhat.com, Seth Forshee <seth.forshee@canonical.com>, Linux FS-devel Mailing List <linux-fsdevel@vger.kernel.org>, Vivek Goyal <vgoyal@redhat.com>, Alexander Viro <viro@zeniv.linux.org.uk>
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+On Fri, Mar 19, 2021 at 11:42:48PM +0100, Andreas Grünbacher wrote:
+> Hi,
+> 
+> Am Fr., 19. März 2021 um 20:58 Uhr schrieb Vivek Goyal <vgoyal@redhat.com>:
+> > posix_acl_update_mode() determines what's the equivalent mode and if SGID
+> > needs to be cleared or not. I need to make use of this code in fuse
+> > as well. Fuse will send this information to virtiofs file server and
+> > file server will take care of clearing SGID if it needs to be done.
+> >
+> > Hence move this code in a separate helper so that more than one place
+> > can call into it.
+> >
+> > Cc: Jan Kara <jack@suse.cz>
+> > Cc: Andreas Gruenbacher <agruenba@redhat.com>
+> > Cc: Alexander Viro <viro@zeniv.linux.org.uk>
+> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > ---
+> >  fs/posix_acl.c            |  3 +--
+> >  include/linux/posix_acl.h | 11 +++++++++++
+> >  2 files changed, 12 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/fs/posix_acl.c b/fs/posix_acl.c
+> > index f3309a7edb49..2d62494c4a5b 100644
+> > --- a/fs/posix_acl.c
+> > +++ b/fs/posix_acl.c
+> > @@ -684,8 +684,7 @@ int posix_acl_update_mode(struct user_namespace *mnt_userns,
+> >                 return error;
+> >         if (error == 0)
+> >                 *acl = NULL;
+> > -       if (!in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
+> > -           !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID))
+> > +       if (posix_acl_mode_clear_sgid(mnt_userns, inode))
+> >                 mode &= ~S_ISGID;
+> >         *mode_p = mode;
+> >         return 0;
+> > diff --git a/include/linux/posix_acl.h b/include/linux/posix_acl.h
+> > index 307094ebb88c..073c5e546de3 100644
+> > --- a/include/linux/posix_acl.h
+> > +++ b/include/linux/posix_acl.h
+> > @@ -59,6 +59,17 @@ posix_acl_release(struct posix_acl *acl)
+> >  }
+> >
+> >
+> > +static inline bool
+> > +posix_acl_mode_clear_sgid(struct user_namespace *mnt_userns,
+> > +                         struct inode *inode)
+> > +{
+> > +       if (!in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
+> > +           !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID))
+> > +               return true;
+> > +
+> > +       return false;
+> 
+> That's just
+> 
+> return !in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
+>     !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID);
+> 
+> The same pattern we have in posix_acl_update_mode also exists in
+> setattr_copy and inode_init_owner, and almost the same pattern exists
+> in setattr_prepare, so can this be cleaned up as well? The function
+> also isn't POSIX ACL specific, so the function name is misleading.
 
-Add virtio-fs definitions to libvhost-user
+Good idea but that should probably be spun into a separate patchset that
+only touches the vfs parts.
 
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
----
- subprojects/libvhost-user/libvhost-user.c | 48 +++++++++++++++++++++++
- subprojects/libvhost-user/libvhost-user.h | 40 +++++++++++++++++++
- 2 files changed, 88 insertions(+)
-
-diff --git a/subprojects/libvhost-user/libvhost-user.c b/subprojects/libvhost-user/libvhost-user.c
-index 68eb165755..97c909c6a8 100644
---- a/subprojects/libvhost-user/libvhost-user.c
-+++ b/subprojects/libvhost-user/libvhost-user.c
-@@ -2918,3 +2918,51 @@ vu_queue_push(VuDev *dev, VuVirtq *vq,
-     vu_queue_flush(dev, vq, 1);
-     vu_queue_inflight_post_put(dev, vq, elem->index);
- }
-+
-+int64_t vu_fs_cache_request(VuDev *dev, VhostUserSlaveRequest req, int fd,
-+                            VhostUserFSSlaveMsg *fsm)
-+{
-+    int fd_num = 0;
-+    bool res;
-+    uint64_t payload = 0;
-+    VhostUserMsg vmsg = {
-+        .request = req,
-+        .flags = VHOST_USER_VERSION | VHOST_USER_NEED_REPLY_MASK,
-+        .payload.fs = *fsm,
-+    };
-+
-+    if (fsm->count > VHOST_USER_FS_SLAVE_MAX_ENTRIES) {
-+        return -EINVAL;
-+    }
-+
-+    vmsg.size = sizeof(VhostUserFSSlaveMsg) +
-+                fsm->count * sizeof(VhostUserFSSlaveMsgEntry);
-+    memcpy(&vmsg.payload.fs, fsm, vmsg.size);
-+
-+    if (fd != -1) {
-+        vmsg.fds[fd_num++] = fd;
-+    }
-+
-+    vmsg.fd_num = fd_num;
-+
-+    if (!vu_has_protocol_feature(dev, VHOST_USER_PROTOCOL_F_SLAVE_SEND_FD)) {
-+        return -EINVAL;
-+    }
-+
-+    pthread_mutex_lock(&dev->slave_mutex);
-+    if (!vu_message_write(dev, dev->slave_fd, &vmsg)) {
-+        pthread_mutex_unlock(&dev->slave_mutex);
-+        return -EIO;
-+    }
-+
-+    /* Also unlocks the slave_mutex */
-+    res = vu_process_message_reply(dev, &vmsg, &payload);
-+    if (!res) {
-+        return -EIO;
-+    }
-+    /*
-+     * Payload is delivered as uint64_t but is actually signed for
-+     * errors.
-+     */
-+    return (int64_t)payload;
-+}
-diff --git a/subprojects/libvhost-user/libvhost-user.h b/subprojects/libvhost-user/libvhost-user.h
-index 330b61c005..70fc61171f 100644
---- a/subprojects/libvhost-user/libvhost-user.h
-+++ b/subprojects/libvhost-user/libvhost-user.h
-@@ -122,6 +122,33 @@ typedef enum VhostUserSlaveRequest {
-     VHOST_USER_SLAVE_MAX
- }  VhostUserSlaveRequest;
- 
-+/* Structures carried over the slave channel back to QEMU */
-+#define VHOST_USER_FS_SLAVE_MAX_ENTRIES 32
-+
-+/* For the flags field of VhostUserFSSlaveMsg */
-+#define VHOST_USER_FS_FLAG_MAP_R (1u << 0)
-+#define VHOST_USER_FS_FLAG_MAP_W (1u << 1)
-+
-+typedef struct {
-+    /* Offsets within the file being mapped */
-+    uint64_t fd_offset;
-+    /* Offsets within the cache */
-+    uint64_t c_offset;
-+    /* Lengths of sections */
-+    uint64_t len;
-+    /* Flags, from VHOST_USER_FS_FLAG_* */
-+    uint64_t flags;
-+} VhostUserFSSlaveMsgEntry;
-+
-+typedef struct {
-+    /* Number of entries */
-+    uint16_t count;
-+    /* Spare */
-+    uint16_t align;
-+
-+    VhostUserFSSlaveMsgEntry entries[];
-+} VhostUserFSSlaveMsg;
-+
- typedef struct VhostUserMemoryRegion {
-     uint64_t guest_phys_addr;
-     uint64_t memory_size;
-@@ -197,6 +224,7 @@ typedef struct VhostUserMsg {
-         VhostUserConfig config;
-         VhostUserVringArea area;
-         VhostUserInflight inflight;
-+        VhostUserFSSlaveMsg fs;
-     } payload;
- 
-     int fds[VHOST_MEMORY_BASELINE_NREGIONS];
-@@ -693,4 +721,16 @@ void vu_queue_get_avail_bytes(VuDev *vdev, VuVirtq *vq, unsigned int *in_bytes,
- bool vu_queue_avail_bytes(VuDev *dev, VuVirtq *vq, unsigned int in_bytes,
-                           unsigned int out_bytes);
- 
-+/**
-+ * vu_fs_cache_request: Send a slave message for an fs client
-+ * @dev: a VuDev context
-+ * @req: The request type (map, unmap, sync)
-+ * @fd: an fd (only required for map, else must be -1)
-+ * @fsm: The body of the message
-+ *
-+ * Returns: 0 or above for success, nevative errno on error
-+ */
-+int64_t vu_fs_cache_request(VuDev *dev, VhostUserSlaveRequest req, int fd,
-+                            VhostUserFSSlaveMsg *fsm);
-+
- #endif /* LIBVHOST_USER_H */
--- 
-2.31.1
+Christian
 

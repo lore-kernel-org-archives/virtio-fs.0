@@ -1,18 +1,14 @@
-Date: Mon, 22 Mar 2021 11:00:52 +0000
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YFh45AUkh1OzbE6H@stefanha-x1.localdomain>
-References: <20201215162119.27360-1-zhangjiachen.jaycee@bytedance.com>
-	<CAJ+F1CLZ4VtgKp5fEdC70m22PgV2VHvRHunR-nPOWDnJPFvqqg@mail.gmail.com>
-	<CAFQAk7hCqSMMfRjUO8vtK-B2cKxJZZTJgSDAbRycd1AOSktM_w@mail.gmail.com>
-	<YFHUbEdszo4nursr@stefanha-x1.localdomain>
-	<CAFQAk7ia5HsX0e4WBrhDtytGKnd5LsPrUSz9DJVFoo+ShDRP7Q@mail.gmail.com>
+Date: Mon, 22 Mar 2021 10:42:41 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210322144241.GB446288@redhat.com>
+References: <CAAQbG+XwZdcyEopmBV9J=Y8m++QCV8BOKAnPWTrsnwk4sesG1Q@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="LHuo8nVlDM+kCL5G"
+Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
-In-Reply-To: <CAFQAk7ia5HsX0e4WBrhDtytGKnd5LsPrUSz9DJVFoo+ShDRP7Q@mail.gmail.com>
-Subject: Re: [Virtio-fs] [External] Re: [RFC PATCH 0/9] Support for
- Virtio-fs daemon crash reconnection
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <CAAQbG+XwZdcyEopmBV9J=Y8m++QCV8BOKAnPWTrsnwk4sesG1Q@mail.gmail.com>
+Subject: Re: [Virtio-fs] Large memory consumption by virtiofsd,
+ suspecting fd's aren't being closed?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,53 +17,62 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Jiachen Zhang <zhangjiachen.jaycee@bytedance.com>
-Cc: "Daniel P. Berrange" <berrange@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, QEMU <qemu-devel@nongnu.org>, virtio-fs@redhat.com, Xie Yongji <xieyongji@bytedance.com>, =?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@gmail.com>
+To: Eric Ernst <eric.g.ernst@gmail.com>
+Cc: virtio-fs@redhat.com
 
+On Sun, Mar 21, 2021 at 09:14:37PM -0700, Eric Ernst wrote:
+> Hey ya’ll,
+> 
+> One challenge I’ve been looking at is how to setup an appropriate memory
+> cgroup limit for workloads that are leveraging virtiofs (ie, running pods
+> with Kata Containers that leverage virtiofs). I noticed that memory usage
+> of the daemon itself can grow considerably depending on the workload;
+> though much more than I’d expect.
+> 
+> I’m running workload that simply runs a build on kernel sources with -j3.
+> In doing this, the source of the linux kernel are shared via virtiofs (no
+> DAX), so as the build goes on, there are a lot of files opened, closed, as
+> well as created. The rss memory of virtiofsd grows into several hundreds of
+> MBs.
+> 
+> When taking a look, I’m suspecting that virtiofsd is carrying out the
+> opens, but never actually closing fds. In the guest, I’m seeing fd’s on the
+> order of 10-40 for all the container processes as it runs, whereas I see
+> the number of fds for virtiofsd continually increasing, reaching over
+> 80,000 fds. I’m guessing this isn’t expected?
+> 
+> Can any ya’ll help shed some light, or where I can look?
 
---LHuo8nVlDM+kCL5G
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
+Hi Eric,
 
-On Wed, Mar 17, 2021 at 08:32:31PM +0800, Jiachen Zhang wrote:
-> On Wed, Mar 17, 2021 at 6:05 PM Stefan Hajnoczi <stefanha@redhat.com> wrote:
-> > On Fri, Dec 18, 2020 at 05:39:34PM +0800, Jiachen Zhang wrote:
-> I agreed with you that a virtiofsd must be launched by a software like
-> systemd. So we are planning to define more generic persist/restore
-> interfaces (callbacks). Then anyone can implement their own persist/restore
-> callbacks to store states to proper places.  And I think in the next
-> version we will implement default callbacks for the interfaces. Instead of
-> vhost-user messages, systemd's sd_notify(3) will be the default method for
-> storing fds, and several tmpfs files can be the default place to store the
-> shm regions.
+What cache mode you are using? cache=auto? 
 
-Okay, great!
+Yes virtiofsd keeps inode->fd open (using O_PATH). Guest kernel caches
+inodes (and dentries), and that means equivalent inode is cached
+in virtiofsd and that also means that inode->fd will remain open.
 
-I was thinking about how to make the crash recovery mechanism reusable
-as a C library or Rust crate. The mechanism is a combination of:
-1. sd_listen_fds(3) for restoring the fds on restart.
-2. sd_notify(3) for storing the fds.
-3. memfd or tmpfs for storing state (could be mmapped).
+Max Reitz is looking into making file handle work with virtiofsd so
+that inode->fd can be closed and reopened using open_by_handle_at(). But
+there are technical challenges there and it might take a while.
 
-I'm not sure if there is enough common behavior to create a reusable API
-or if this is quite application-specific.
+But that only takes care  of inode->fd. Inode will continue to be
+cached. So I think real issue is that guest is caching inodes and
+that leads to caching on virtiofsd and memory usage grows.
 
-Stefan
+If you try with cache=none, then memory usage might be significanlty
+lower (as once file is closed in guest, inode will be dropped).
 
---LHuo8nVlDM+kCL5G
-Content-Type: application/pgp-signature; name="signature.asc"
+To experiment, you can try "echo 3 > /proc/sys/vm/drop_caches" in guest and
+that should drop dentry/inode caches for some inode and free up 
+memory in virtiofsd.
 
------BEGIN PGP SIGNATURE-----
+Vivek.
+> 
+> Thanks,
+> Eric
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmBYeOQACgkQnKSrs4Gr
-c8hnBQf9FKlO4m/ENo2rmyPC4ebpXwhckWnx4pd+GgxyREWwFcAKW4eSIo3PRmJ8
-URE5mL5N3EAl7vi3YPb0lYzEBP1rGtbvhZAbcwOUVqJ6S1XbteLlLI+hxcjAwAFt
-Ls3JACYr/wbvY6ZT44SaOdiMXVoMUtJi8F39yct+KOVtL84Roevuc1jtpIcfLQ1H
-0izz6I3dRMwXWcob2tyufZS1v8AIc+c0PaBbuhRAfg8i26I7xtGVT1MdE0jf4rXh
-R2BaqlBlSopsYqsCEtwvYwRRXgsTyRQ1V8hzjfaRkH88JU4DpKKfQfrzvjI3geqs
-o7mOBl9icf7dmRpIyCzsYjmjkoOmdA==
-=KfS+
------END PGP SIGNATURE-----
-
---LHuo8nVlDM+kCL5G--
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
 

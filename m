@@ -1,14 +1,15 @@
-Date: Mon, 22 Mar 2021 10:42:41 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210322144241.GB446288@redhat.com>
-References: <CAAQbG+XwZdcyEopmBV9J=Y8m++QCV8BOKAnPWTrsnwk4sesG1Q@mail.gmail.com>
+Date: Mon, 22 Mar 2021 15:47:37 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <YFi8GYrRG/ks2BBz@stefanha-x1.localdomain>
+References: <20210318135223.1342795-1-ckuehl@redhat.com>
+	<20210318135223.1342795-3-ckuehl@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="EBlwIFYriryzFVKW"
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <CAAQbG+XwZdcyEopmBV9J=Y8m++QCV8BOKAnPWTrsnwk4sesG1Q@mail.gmail.com>
-Subject: Re: [Virtio-fs] Large memory consumption by virtiofsd,
- suspecting fd's aren't being closed?
+In-Reply-To: <20210318135223.1342795-3-ckuehl@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 2/3] virtiofs: split requests that exceed
+	virtqueue size
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,62 +18,62 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Eric Ernst <eric.g.ernst@gmail.com>
-Cc: virtio-fs@redhat.com
+To: Connor Kuehl <ckuehl@redhat.com>
+Cc: miklos@szeredi.hu, jasowang@redhat.com, mst@redhat.com, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, vgoyal@redhat.com
 
-On Sun, Mar 21, 2021 at 09:14:37PM -0700, Eric Ernst wrote:
-> Hey ya’ll,
-> 
-> One challenge I’ve been looking at is how to setup an appropriate memory
-> cgroup limit for workloads that are leveraging virtiofs (ie, running pods
-> with Kata Containers that leverage virtiofs). I noticed that memory usage
-> of the daemon itself can grow considerably depending on the workload;
-> though much more than I’d expect.
-> 
-> I’m running workload that simply runs a build on kernel sources with -j3.
-> In doing this, the source of the linux kernel are shared via virtiofs (no
-> DAX), so as the build goes on, there are a lot of files opened, closed, as
-> well as created. The rss memory of virtiofsd grows into several hundreds of
-> MBs.
-> 
-> When taking a look, I’m suspecting that virtiofsd is carrying out the
-> opens, but never actually closing fds. In the guest, I’m seeing fd’s on the
-> order of 10-40 for all the container processes as it runs, whereas I see
-> the number of fds for virtiofsd continually increasing, reaching over
-> 80,000 fds. I’m guessing this isn’t expected?
-> 
-> Can any ya’ll help shed some light, or where I can look?
 
-Hi Eric,
+--EBlwIFYriryzFVKW
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-What cache mode you are using? cache=auto? 
+On Thu, Mar 18, 2021 at 08:52:22AM -0500, Connor Kuehl wrote:
+> If an incoming FUSE request can't fit on the virtqueue, the request is
+> placed onto a workqueue so a worker can try to resubmit it later where
+> there will (hopefully) be space for it next time.
+>=20
+> This is fine for requests that aren't larger than a virtqueue's maximum
+> capacity. However, if a request's size exceeds the maximum capacity of
+> the virtqueue (even if the virtqueue is empty), it will be doomed to a
+> life of being placed on the workqueue, removed, discovered it won't fit,
+> and placed on the workqueue yet again.
+>=20
+> Furthermore, from section 2.6.5.3.1 (Driver Requirements: Indirect
+> Descriptors) of the virtio spec:
+>=20
+>   "A driver MUST NOT create a descriptor chain longer than the Queue
+>   Size of the device."
+>=20
+> To fix this, limit the number of pages FUSE will use for an overall
+> request. This way, each request can realistically fit on the virtqueue
+> when it is decomposed into a scattergather list and avoid violating
+> section 2.6.5.3.1 of the virtio spec.
+>=20
+> Signed-off-by: Connor Kuehl <ckuehl@redhat.com>
+> ---
+>  fs/fuse/fuse_i.h    |  5 +++++
+>  fs/fuse/inode.c     |  7 +++++++
+>  fs/fuse/virtio_fs.c | 14 ++++++++++++++
+>  3 files changed, 26 insertions(+)
 
-Yes virtiofsd keeps inode->fd open (using O_PATH). Guest kernel caches
-inodes (and dentries), and that means equivalent inode is cached
-in virtiofsd and that also means that inode->fd will remain open.
+Nice that FUSE already has max_pages :-).
 
-Max Reitz is looking into making file handle work with virtiofsd so
-that inode->fd can be closed and reopened using open_by_handle_at(). But
-there are technical challenges there and it might take a while.
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
-But that only takes care  of inode->fd. Inode will continue to be
-cached. So I think real issue is that guest is caching inodes and
-that leads to caching on virtiofsd and memory usage grows.
+--EBlwIFYriryzFVKW
+Content-Type: application/pgp-signature; name="signature.asc"
 
-If you try with cache=none, then memory usage might be significanlty
-lower (as once file is closed in guest, inode will be dropped).
+-----BEGIN PGP SIGNATURE-----
 
-To experiment, you can try "echo 3 > /proc/sys/vm/drop_caches" in guest and
-that should drop dentry/inode caches for some inode and free up 
-memory in virtiofsd.
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmBYvBkACgkQnKSrs4Gr
+c8gL7Qf+MIRWqCCYkNEZwL6tftu8+lg4QxBigZvpmryZKX9xCLbLzcTZuUzPQC6I
+HiFj77t2jUhUbSv9edImKSWoSYad0kT0bCsWnwghojx+ta5lIXveKMwv4qHCkF9J
+CsnZqKYSW+9gCyjC/mCLLl1lHKSoSHJsDSVuJQ7gwlGg1n1Bv5IKE4ZX2+hlXGY3
+FWtCTz17sqzrlCIceUnG5jN10TcXqsXSDEH3oOV6ZSWl8HTXWFyJjcRWau4u9S2R
+iIZJEcByDMVqWWCHWVySksdompYzM9xFbXLebPE5Rnn9BaK5m/BdISHbS1R5dZaU
+LPExG+DiEtEx/j/imqIq7YtJlXxA5g==
+=KXHl
+-----END PGP SIGNATURE-----
 
-Vivek.
-> 
-> Thanks,
-> Eric
-
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
+--EBlwIFYriryzFVKW--
 

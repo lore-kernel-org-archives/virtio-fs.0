@@ -1,13 +1,15 @@
-Date: Thu, 18 Mar 2021 09:56:00 -0400
+Date: Mon, 22 Mar 2021 12:47:04 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210318135600.GA368102@redhat.com>
-References: <810089e0-3a09-0d8f-9f8e-be5b3ac70587@redhat.com>
+Message-ID: <20210322164704.GD446288@redhat.com>
+References: <2148A6EA-09CC-4DD2-8E03-8D51633D4137@apple.com>
+	<CAOssrKdGOL3Zqmhz4VGEccWw8N0tp1kP7qooB8gN7JOi5+5gew@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
-In-Reply-To: <810089e0-3a09-0d8f-9f8e-be5b3ac70587@redhat.com>
-Subject: Re: [Virtio-fs] Question about sg_count_fuse_req() in
-	linux/fs/fuse/virtio_fs.c
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <CAOssrKdGOL3Zqmhz4VGEccWw8N0tp1kP7qooB8gN7JOi5+5gew@mail.gmail.com>
+Subject: Re: [Virtio-fs] Large memory consumption by virtiofsd,
+ suspecting fd's aren't being closed?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,83 +18,54 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Connor Kuehl <ckuehl@redhat.com>
-Cc: miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
+To: Miklos Szeredi <mszeredi@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, Eric Ernst <eric_ernst@apple.com>
 
-On Wed, Mar 17, 2021 at 01:12:01PM -0500, Connor Kuehl wrote:
-> Hi,
+On Mon, Mar 22, 2021 at 05:09:32PM +0100, Miklos Szeredi wrote:
+> On Mon, Mar 22, 2021 at 6:52 AM Eric Ernst <eric_ernst@apple.com> wrote:
+> >
+> > Hey ya’ll,
+> >
+> > One challenge I’ve been looking at is how to setup an appropriate memory cgroup limit for workloads that are leveraging virtiofs (ie, running pods with Kata Containers). I noticed that memory usage of the daemon itself can grow considerably depending on the workload; though much more than I’d expect.
+> >
+> > I’m running workload that simply runs a build on kernel sources with -j3. In doing this, the source of the linux kernel are shared via virtiofs (no DAX), so as the build goes on, there are a lot of files opened, closed, as well as created. The rss memory of virtiofsd grows into several hundreds of MBs.
+> >
+> > When taking a look, I’m suspecting that virtiofsd is carrying out the opens, but never actually closing fds. In the guest, I’m seeing fd’s on the order of 10-40 for all the container processes as it runs, whereas I see the number of fds for virtiofsd continually increasing, reaching over 80,000 fds. I’m guessing this isn’t expected?
 > 
-> I've been familiarizing myself with the virtiofs guest kernel module and I'm
-> trying to better understand how virtiofs maps a FUSE request into
-> scattergather lists.
+> The reason could be that guest is keeping a ref on the inodes
+> (dcache->dentry->inode) and current implementation of server keeps an
+> O_PATH fd open for each inode referenced by the client.
 > 
-> sg_count_fuse_req() starts knowing that there will be at least one in
-> header, as shown here (which makes sense):
+> One way to avoid this is to use the "cache=none" option, which forces
+> the client to drop dentries immediately from the cache if not in use.
+> This is not desirable if cache is actually in use.
 > 
->         unsigned int size, total_sgs = 1 /* fuse_in_header */;
-> 
-> However, I'm confused about this snippet right beneath it:
-> 
->         if (args->in_numargs - args->in_pages)
->                 total_sgs += 1;
-> 
-> What is the significance of the sg that is needed in the cases where this
-> branch is taken? I'm not sure what its relationship is with args->in_numargs
-> since it will increment total_sgs regardless args->in_numargs is 3, 2, or
-> even 1 if args->in_pages is false.
+> The memory use of the server should still be limited by the memory use
+> of the guest:  if there's memory pressure in the guest kernel, then it
+> will clean out caches, which results in the memory use decreasing in
+> the server as well.  If the server memory use looks unbounded, that
+> might be indicative of too much memory used for dcache in the guest
+> (cat /proc/slabinfo | grep ^dentry).     Can you verify?
 
-Hi Conor,
+Hi Miklos,
 
-I think all the in args are being mapped into a single scatter gather
-element and that's why it does not matter whether in_numargs is 3, 2 or 1.
-They will be mapped in a single element.
+Apart from above, we identified one more issue on IRC. I asked Eric
+to drop caches manually in guest. (echo 3 > /proc/sys/vm/drop_caches)
+and while it reduced the fds open it did not seem to free up significant
+amount of memory.
 
-sg_init_fuse_args()
-{
-        len = fuse_len_args(numargs - argpages, args);
-        if (len)
-                sg_init_one(&sg[total_sgs++], argbuf, len);
-}
+So question remains where is that memory. One possibility is that we
+have memory allocated for mapping arrays (inode and fd). These arrays
+only grow and never shrink. So they can lock down some memory.
 
-        out_sgs += sg_init_fuse_args(&sg[out_sgs], req,
-                                     (struct fuse_arg *)args->in_args,
-                                     args->in_numargs, args->in_pages,
-                                     req->argbuf, &argbuf_used);
+But still, lot of lo_inode memory should have been freed when
+echo 3 > /proc/sys/vm/drop_caches was done. Why all that did not
+show up in virtiofsd RSS usage, that's kind of little confusing.
 
-When we are sending some data in some pages, then we set args->in_pages
-to true. And in that case, last element of args->in_args[] contains the
-total size of bytes in additional pages we are sending and is not part
-of in_args being mapped to scatter gather element. That's why this
-check.
-
-	if (args->in_numargs - args->in_pages)
-		total_sgs += 1;
-
-Not sure when we will have a case where args->in_numargs = 1 and
-args->in_pages=true. Do we ever hit that.
+cache=none is an alternative only if application is not using mmap.
+I think even kernel compilation now uses mmap towards the end and
+fails with cache=none. 
 
 Thanks
 Vivek
-
-> 
-> Especially since the block right below it counts pages if args->in_pages is
-> true:
-> 
->         if (args->in_pages) {
->                 size = args->in_args[args->in_numargs - 1].size;
->                 total_sgs += sg_count_fuse_pages(ap->descs, ap->num_pages,
->                                                  size);
->         }
-> 
-> The rest of the routine goes on similarly but for the 'out' components.
-> 
-> I doubt incrementing 'total_sgs' in the first if-statement I showed above is
-> vestigial, I just think my mental model of what is happening here is
-> incomplete.
-> 
-> Any clarification is much appreciated!
-
-> 
-> Connor
-> 
 

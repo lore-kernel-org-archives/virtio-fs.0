@@ -1,15 +1,15 @@
-Date: Mon, 22 Mar 2021 15:01:45 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210322190145.GF446288@redhat.com>
-References: <20210318135223.1342795-1-ckuehl@redhat.com>
-	<20210318135223.1342795-3-ckuehl@redhat.com>
-	<YFNvH8w4l7WyEMyr@miu.piliscsaba.redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <YFNvH8w4l7WyEMyr@miu.piliscsaba.redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 2/3] virtiofs: split requests that exceed
-	virtqueue size
+References: <2148A6EA-09CC-4DD2-8E03-8D51633D4137@apple.com>
+	<CAOssrKdGOL3Zqmhz4VGEccWw8N0tp1kP7qooB8gN7JOi5+5gew@mail.gmail.com>
+	<20210322164704.GD446288@redhat.com>
+In-Reply-To: <20210322164704.GD446288@redhat.com>
+From: Miklos Szeredi <mszeredi@redhat.com>
+Date: Mon, 22 Mar 2021 20:15:49 +0100
+Message-ID: <CAOssrKdNEUTMJ3TM_uKSaqvTKb+Ob_fvzQg45MXRz75Aj-=mZQ@mail.gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] Large memory consumption by virtiofsd,
+ suspecting fd's aren't being closed?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,163 +18,62 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: mst@redhat.com, jasowang@redhat.com, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, Eric Ernst <eric_ernst@apple.com>
 
-On Thu, Mar 18, 2021 at 04:17:51PM +0100, Miklos Szeredi wrote:
-> On Thu, Mar 18, 2021 at 08:52:22AM -0500, Connor Kuehl wrote:
-> > If an incoming FUSE request can't fit on the virtqueue, the request is
-> > placed onto a workqueue so a worker can try to resubmit it later where
-> > there will (hopefully) be space for it next time.
-> > 
-> > This is fine for requests that aren't larger than a virtqueue's maximum
-> > capacity. However, if a request's size exceeds the maximum capacity of
-> > the virtqueue (even if the virtqueue is empty), it will be doomed to a
-> > life of being placed on the workqueue, removed, discovered it won't fit,
-> > and placed on the workqueue yet again.
-> > 
-> > Furthermore, from section 2.6.5.3.1 (Driver Requirements: Indirect
-> > Descriptors) of the virtio spec:
-> > 
-> >   "A driver MUST NOT create a descriptor chain longer than the Queue
-> >   Size of the device."
-> > 
-> > To fix this, limit the number of pages FUSE will use for an overall
-> > request. This way, each request can realistically fit on the virtqueue
-> > when it is decomposed into a scattergather list and avoid violating
-> > section 2.6.5.3.1 of the virtio spec.
-> 
-> I removed the conditional compilation and renamed the limit.  Also made
-> virtio_fs_get_tree() bail out if it hit the WARN_ON().  Updated patch below.
-> 
-> The virtio_ring patch in this series should probably go through the respective
-> subsystem tree.
-> 
-> 
-> Thanks,
-> Miklos
-> 
-> ---
-> From: Connor Kuehl <ckuehl@redhat.com>
-> Subject: virtiofs: split requests that exceed virtqueue size
-> Date: Thu, 18 Mar 2021 08:52:22 -0500
-> 
-> If an incoming FUSE request can't fit on the virtqueue, the request is
-> placed onto a workqueue so a worker can try to resubmit it later where
-> there will (hopefully) be space for it next time.
-> 
-> This is fine for requests that aren't larger than a virtqueue's maximum
-> capacity.  However, if a request's size exceeds the maximum capacity of the
-> virtqueue (even if the virtqueue is empty), it will be doomed to a life of
-> being placed on the workqueue, removed, discovered it won't fit, and placed
-> on the workqueue yet again.
-> 
-> Furthermore, from section 2.6.5.3.1 (Driver Requirements: Indirect
-> Descriptors) of the virtio spec:
-> 
->   "A driver MUST NOT create a descriptor chain longer than the Queue
->   Size of the device."
-> 
-> To fix this, limit the number of pages FUSE will use for an overall
-> request.  This way, each request can realistically fit on the virtqueue
-> when it is decomposed into a scattergather list and avoid violating section
-> 2.6.5.3.1 of the virtio spec.
-> 
-> Signed-off-by: Connor Kuehl <ckuehl@redhat.com>
-> Signed-off-by: Miklos Szeredi <mszeredi@redhat.com>
-> ---
+On Mon, Mar 22, 2021 at 5:47 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> On Mon, Mar 22, 2021 at 05:09:32PM +0100, Miklos Szeredi wrote:
+> > On Mon, Mar 22, 2021 at 6:52 AM Eric Ernst <eric_ernst@apple.com> wrote:
+> > >
+> > > Hey ya’ll,
+> > >
+> > > One challenge I’ve been looking at is how to setup an appropriate memory cgroup limit for workloads that are leveraging virtiofs (ie, running pods with Kata Containers). I noticed that memory usage of the daemon itself can grow considerably depending on the workload; though much more than I’d expect.
+> > >
+> > > I’m running workload that simply runs a build on kernel sources with -j3. In doing this, the source of the linux kernel are shared via virtiofs (no DAX), so as the build goes on, there are a lot of files opened, closed, as well as created. The rss memory of virtiofsd grows into several hundreds of MBs.
+> > >
+> > > When taking a look, I’m suspecting that virtiofsd is carrying out the opens, but never actually closing fds. In the guest, I’m seeing fd’s on the order of 10-40 for all the container processes as it runs, whereas I see the number of fds for virtiofsd continually increasing, reaching over 80,000 fds. I’m guessing this isn’t expected?
+> >
+> > The reason could be that guest is keeping a ref on the inodes
+> > (dcache->dentry->inode) and current implementation of server keeps an
+> > O_PATH fd open for each inode referenced by the client.
+> >
+> > One way to avoid this is to use the "cache=none" option, which forces
+> > the client to drop dentries immediately from the cache if not in use.
+> > This is not desirable if cache is actually in use.
+> >
+> > The memory use of the server should still be limited by the memory use
+> > of the guest:  if there's memory pressure in the guest kernel, then it
+> > will clean out caches, which results in the memory use decreasing in
+> > the server as well.  If the server memory use looks unbounded, that
+> > might be indicative of too much memory used for dcache in the guest
+> > (cat /proc/slabinfo | grep ^dentry).     Can you verify?
+>
+> Hi Miklos,
+>
+> Apart from above, we identified one more issue on IRC. I asked Eric
+> to drop caches manually in guest. (echo 3 > /proc/sys/vm/drop_caches)
+> and while it reduced the fds open it did not seem to free up significant
+> amount of memory.
+>
+> So question remains where is that memory. One possibility is that we
+> have memory allocated for mapping arrays (inode and fd). These arrays
+> only grow and never shrink. So they can lock down some memory.
+>
+> But still, lot of lo_inode memory should have been freed when
+> echo 3 > /proc/sys/vm/drop_caches was done. Why all that did not
+> show up in virtiofsd RSS usage, that's kind of little confusing.
 
-Looks good to me.
+Could be due to fragmentation.   I have no idea how the libc allocator works.
 
-Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
+>
+> cache=none is an alternative only if application is not using mmap.
+> I think even kernel compilation now uses mmap towards the end and
+> fails with cache=none.
 
-Vivek
+Yes, I have plans to fix mmap with cache=none.
 
->  fs/fuse/fuse_i.h    |    3 +++
->  fs/fuse/inode.c     |    3 ++-
->  fs/fuse/virtio_fs.c |   19 +++++++++++++++++--
->  3 files changed, 22 insertions(+), 3 deletions(-)
-> 
-> --- a/fs/fuse/fuse_i.h
-> +++ b/fs/fuse/fuse_i.h
-> @@ -555,6 +555,9 @@ struct fuse_conn {
->  	/** Maxmum number of pages that can be used in a single request */
->  	unsigned int max_pages;
->  
-> +	/** Constrain ->max_pages to this value during feature negotiation */
-> +	unsigned int max_pages_limit;
-> +
->  	/** Input queue */
->  	struct fuse_iqueue iq;
->  
-> --- a/fs/fuse/inode.c
-> +++ b/fs/fuse/inode.c
-> @@ -712,6 +712,7 @@ void fuse_conn_init(struct fuse_conn *fc
->  	fc->pid_ns = get_pid_ns(task_active_pid_ns(current));
->  	fc->user_ns = get_user_ns(user_ns);
->  	fc->max_pages = FUSE_DEFAULT_MAX_PAGES_PER_REQ;
-> +	fc->max_pages_limit = FUSE_MAX_MAX_PAGES;
->  
->  	INIT_LIST_HEAD(&fc->mounts);
->  	list_add(&fm->fc_entry, &fc->mounts);
-> @@ -1040,7 +1041,7 @@ static void process_init_reply(struct fu
->  				fc->abort_err = 1;
->  			if (arg->flags & FUSE_MAX_PAGES) {
->  				fc->max_pages =
-> -					min_t(unsigned int, FUSE_MAX_MAX_PAGES,
-> +					min_t(unsigned int, fc->max_pages_limit,
->  					max_t(unsigned int, arg->max_pages, 1));
->  			}
->  			if (IS_ENABLED(CONFIG_FUSE_DAX) &&
-> --- a/fs/fuse/virtio_fs.c
-> +++ b/fs/fuse/virtio_fs.c
-> @@ -18,6 +18,12 @@
->  #include <linux/uio.h>
->  #include "fuse_i.h"
->  
-> +/* Used to help calculate the FUSE connection's max_pages limit for a request's
-> + * size. Parts of the struct fuse_req are sliced into scattergather lists in
-> + * addition to the pages used, so this can help account for that overhead.
-> + */
-> +#define FUSE_HEADER_OVERHEAD    4
-> +
->  /* List of virtio-fs device instances and a lock for the list. Also provides
->   * mutual exclusion in device removal and mounting path
->   */
-> @@ -1413,9 +1419,10 @@ static int virtio_fs_get_tree(struct fs_
->  {
->  	struct virtio_fs *fs;
->  	struct super_block *sb;
-> -	struct fuse_conn *fc;
-> +	struct fuse_conn *fc = NULL;
->  	struct fuse_mount *fm;
-> -	int err;
-> +	unsigned int virtqueue_size;
-> +	int err = -EIO;
->  
->  	/* This gets a reference on virtio_fs object. This ptr gets installed
->  	 * in fc->iq->priv. Once fuse_conn is going away, it calls ->put()
-> @@ -1427,6 +1434,10 @@ static int virtio_fs_get_tree(struct fs_
->  		return -EINVAL;
->  	}
->  
-> +	virtqueue_size = virtqueue_get_vring_size(fs->vqs[VQ_REQUEST].vq);
-> +	if (WARN_ON(virtqueue_size <= FUSE_HEADER_OVERHEAD))
-> +		goto out_err;
-> +
->  	err = -ENOMEM;
->  	fc = kzalloc(sizeof(struct fuse_conn), GFP_KERNEL);
->  	if (!fc)
-> @@ -1442,6 +1453,10 @@ static int virtio_fs_get_tree(struct fs_
->  	fc->delete_stale = true;
->  	fc->auto_submounts = true;
->  
-> +	/* Tell FUSE to split requests that exceed the virtqueue's size */
-> +	fc->max_pages_limit = min_t(unsigned int, fc->max_pages_limit,
-> +				    virtqueue_size - FUSE_HEADER_OVERHEAD);
-> +
->  	fsc->s_fs_info = fm;
->  	sb = sget_fc(fsc, virtio_fs_test_super, set_anon_super_fc);
->  	if (fsc->s_fs_info) {
-> 
+Thanks,
+Miklos
+
 

@@ -1,12 +1,18 @@
-Date: Mon, 22 Mar 2021 15:34:15 -0400
+Date: Mon, 22 Mar 2021 16:13:26 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210322193415.GG446288@redhat.com>
-References: <20210318154157.1357224-1-ckuehl@redhat.com>
+Message-ID: <20210322201326.GH446288@redhat.com>
+References: <20201215162119.27360-1-zhangjiachen.jaycee@bytedance.com>
+	<CAJ+F1CLZ4VtgKp5fEdC70m22PgV2VHvRHunR-nPOWDnJPFvqqg@mail.gmail.com>
+	<CAFQAk7hCqSMMfRjUO8vtK-B2cKxJZZTJgSDAbRycd1AOSktM_w@mail.gmail.com>
+	<YFHUbEdszo4nursr@stefanha-x1.localdomain>
+	<CAFQAk7ia5HsX0e4WBrhDtytGKnd5LsPrUSz9DJVFoo+ShDRP7Q@mail.gmail.com>
+	<YFh45AUkh1OzbE6H@stefanha-x1.localdomain>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210318154157.1357224-1-ckuehl@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] MAINTAINERS: add virtio-fs mailing list
+In-Reply-To: <YFh45AUkh1OzbE6H@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [External] Re: [RFC PATCH 0/9] Support for
+ Virtio-fs daemon crash reconnection
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,39 +21,38 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Connor Kuehl <ckuehl@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: "Daniel P. Berrange" <berrange@redhat.com>, "Michael S . Tsirkin" <mst@redhat.com>, QEMU <qemu-devel@nongnu.org>, virtio-fs@redhat.com, Xie Yongji <xieyongji@bytedance.com>, =?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@gmail.com>
 
-On Thu, Mar 18, 2021 at 10:41:57AM -0500, Connor Kuehl wrote:
-> General discussion and patch reviews take place on this list for both
-> virtiofsd (tools/virtiofsd/*) and the guest kernel module.
+On Mon, Mar 22, 2021 at 11:00:52AM +0000, Stefan Hajnoczi wrote:
+> On Wed, Mar 17, 2021 at 08:32:31PM +0800, Jiachen Zhang wrote:
+> > On Wed, Mar 17, 2021 at 6:05 PM Stefan Hajnoczi <stefanha@redhat.com> wrote:
+> > > On Fri, Dec 18, 2020 at 05:39:34PM +0800, Jiachen Zhang wrote:
+> > I agreed with you that a virtiofsd must be launched by a software like
+> > systemd. So we are planning to define more generic persist/restore
+> > interfaces (callbacks). Then anyone can implement their own persist/restore
+> > callbacks to store states to proper places.  And I think in the next
+> > version we will implement default callbacks for the interfaces. Instead of
+> > vhost-user messages, systemd's sd_notify(3) will be the default method for
+> > storing fds, and several tmpfs files can be the default place to store the
+> > shm regions.
 > 
-> Signed-off-by: Connor Kuehl <ckuehl@redhat.com>
-> ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
+> Okay, great!
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 25fc49d1dc..8921bc2119 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1917,6 +1917,7 @@ F: tools/virtiofsd/*
->  F: hw/virtio/vhost-user-fs*
->  F: include/hw/virtio/vhost-user-fs.h
->  F: docs/tools/virtiofsd.rst
-> +L: virtio-fs@redhat.com
+> I was thinking about how to make the crash recovery mechanism reusable
+> as a C library or Rust crate. The mechanism is a combination of:
+> 1. sd_listen_fds(3) for restoring the fds on restart.
+> 2. sd_notify(3) for storing the fds.
+> 3. memfd or tmpfs for storing state (could be mmapped).
+> 
+> I'm not sure if there is enough common behavior to create a reusable API
+> or if this is quite application-specific.
 
-Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
+I am wondering what will happen for use cases where virtiofsd is running
+inside a container (with no systemd inside containers).
+
+Do container managers offer systemd like services to save and restore
+state.
 
 Vivek
->  
->  virtio-input
->  M: Gerd Hoffmann <kraxel@redhat.com>
-> -- 
-> 2.30.2
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
 

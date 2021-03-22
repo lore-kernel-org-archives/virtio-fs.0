@@ -1,13 +1,19 @@
-From: Connor Kuehl <ckuehl@redhat.com>
-Date: Thu, 18 Mar 2021 08:52:21 -0500
-Message-Id: <20210318135223.1342795-2-ckuehl@redhat.com>
-In-Reply-To: <20210318135223.1342795-1-ckuehl@redhat.com>
-References: <20210318135223.1342795-1-ckuehl@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=mime-version:from:date:message-id:subject:to;
+	bh=fBYDkaWXcVkKctIQSdIY46Eh4MER691ULL/hAhN8dcM=;
+	b=R7MAhbAlyui+MLf0fdRfgptxC48nxHEcoL8gSPygQO/IsVqYLxUaUnO3rSyrm3JJuT
+	/3SBwsza0ZzCmFOo35ZhcVBEHVNByDUQ0lRPE+VspD+/+TJTQ9UuJ5FD1pr6BjdNRVr/
+	PDFqhLNPO/SMtxbMe8mkFQcmyCik6KT7G5IZizHUz9UK0QY8XPlvkKFKWTxPBKD02Q4j
+	kgcLh9vC9fmfgIZUeV2kUWgkX/uOQECXFBK16o0a1GYNLM7LTBn67bvvEdWxRkSg4ZRx
+	NRDg0EoywBqC1wl9SqJ/uqrgr2RQNv+r9vzcRILNWDTzZS9i9d5Czdyxm7U3EM7RgArH
+	nrEQ==
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH 1/3] virtio_ring: always warn when descriptor
-	chain exceeds queue size
+From: Eric Ernst <eric.g.ernst@gmail.com>
+Date: Sun, 21 Mar 2021 21:14:37 -0700
+Message-ID: <CAAQbG+XwZdcyEopmBV9J=Y8m++QCV8BOKAnPWTrsnwk4sesG1Q@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="0000000000006e481605be184e34"
+Subject: [Virtio-fs] Large memory consumption by virtiofsd,
+	suspecting fd's aren't being closed?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,59 +23,74 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
-Cc: miklos@szeredi.hu, jasowang@redhat.com, mst@redhat.com, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, linux-fsdevel@vger.kernel.org, vgoyal@redhat.com
 
->From section 2.6.5.3.1 (Driver Requirements: Indirect Descriptors)
-of the virtio spec:
+--0000000000006e481605be184e34
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-  "A driver MUST NOT create a descriptor chain longer than the Queue
-  Size of the device."
+Hey ya=E2=80=99ll,
 
-This text suggests that the warning should trigger even if
-indirect descriptors are in use.
+One challenge I=E2=80=99ve been looking at is how to setup an appropriate m=
+emory
+cgroup limit for workloads that are leveraging virtiofs (ie, running pods
+with Kata Containers that leverage virtiofs). I noticed that memory usage
+of the daemon itself can grow considerably depending on the workload;
+though much more than I=E2=80=99d expect.
 
-Reported-by: Stefan Hajnoczi <stefanha@redhat.com>
-Signed-off-by: Connor Kuehl <ckuehl@redhat.com>
----
- drivers/virtio/virtio_ring.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+I=E2=80=99m running workload that simply runs a build on kernel sources wit=
+h -j3.
+In doing this, the source of the linux kernel are shared via virtiofs (no
+DAX), so as the build goes on, there are a lot of files opened, closed, as
+well as created. The rss memory of virtiofsd grows into several hundreds of
+MBs.
 
-diff --git a/drivers/virtio/virtio_ring.c b/drivers/virtio/virtio_ring.c
-index 71e16b53e9c1..1bc290f9ba13 100644
---- a/drivers/virtio/virtio_ring.c
-+++ b/drivers/virtio/virtio_ring.c
-@@ -444,11 +444,12 @@ static inline int virtqueue_add_split(struct virtqueue *_vq,
- 
- 	head = vq->free_head;
- 
-+	WARN_ON_ONCE(total_sg > vq->split.vring.num);
-+
- 	if (virtqueue_use_indirect(_vq, total_sg))
- 		desc = alloc_indirect_split(_vq, total_sg, gfp);
- 	else {
- 		desc = NULL;
--		WARN_ON_ONCE(total_sg > vq->split.vring.num && !vq->indirect);
- 	}
- 
- 	if (desc) {
-@@ -1118,6 +1119,8 @@ static inline int virtqueue_add_packed(struct virtqueue *_vq,
- 
- 	BUG_ON(total_sg == 0);
- 
-+	WARN_ON_ONCE(total_sg > vq->packed.vring.num);
-+
- 	if (virtqueue_use_indirect(_vq, total_sg))
- 		return virtqueue_add_indirect_packed(vq, sgs, total_sg,
- 				out_sgs, in_sgs, data, gfp);
-@@ -1125,8 +1128,6 @@ static inline int virtqueue_add_packed(struct virtqueue *_vq,
- 	head = vq->packed.next_avail_idx;
- 	avail_used_flags = vq->packed.avail_used_flags;
- 
--	WARN_ON_ONCE(total_sg > vq->packed.vring.num && !vq->indirect);
--
- 	desc = vq->packed.vring.desc;
- 	i = head;
- 	descs_used = total_sg;
--- 
-2.30.2
+When taking a look, I=E2=80=99m suspecting that virtiofsd is carrying out t=
+he
+opens, but never actually closing fds. In the guest, I=E2=80=99m seeing fd=
+=E2=80=99s on the
+order of 10-40 for all the container processes as it runs, whereas I see
+the number of fds for virtiofsd continually increasing, reaching over
+80,000 fds. I=E2=80=99m guessing this isn=E2=80=99t expected?
+
+Can any ya=E2=80=99ll help shed some light, or where I can look?
+
+Thanks,
+Eric
+
+--0000000000006e481605be184e34
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><div dir=3D"ltr"><font color=3D"#000000"><span style=3D"fo=
+nt-family:Helvetica;font-size:12px">Hey ya=E2=80=99ll,</span><br style=3D"f=
+ont-family:Helvetica;font-size:12px"><br style=3D"font-family:Helvetica;fon=
+t-size:12px"><span style=3D"font-family:Helvetica;font-size:12px">One chall=
+enge I=E2=80=99ve been looking at is how to setup an appropriate memory cgr=
+oup limit for workloads that are leveraging virtiofs (ie, running pods with=
+ Kata Containers that leverage virtiofs). I noticed that memory usage of th=
+e daemon itself can grow considerably depending on the workload; though muc=
+h more than I=E2=80=99d expect.</span><br style=3D"font-family:Helvetica;fo=
+nt-size:12px"><br style=3D"font-family:Helvetica;font-size:12px"><span styl=
+e=3D"font-family:Helvetica;font-size:12px">I=E2=80=99m running workload tha=
+t simply runs a build on kernel sources with -j3. In doing this, the source=
+ of the linux kernel are shared via virtiofs (no DAX), so as the build goes=
+ on, there are a lot of files opened, closed, as well as created. The rss m=
+emory of virtiofsd grows into several hundreds of MBs.</span><br style=3D"f=
+ont-family:Helvetica;font-size:12px"><br style=3D"font-family:Helvetica;fon=
+t-size:12px"><span style=3D"font-family:Helvetica;font-size:12px">When taki=
+ng a look, I=E2=80=99m suspecting that virtiofsd is carrying out the opens,=
+ but never actually closing fds. In the guest, I=E2=80=99m seeing fd=E2=80=
+=99s on the order of 10-40 for all the container processes as it runs, wher=
+eas I see the number of fds for virtiofsd continually increasing, reaching =
+over 80,000 fds. I=E2=80=99m guessing this isn=E2=80=99t expected?</span><b=
+r style=3D"font-family:Helvetica;font-size:12px"><br style=3D"font-family:H=
+elvetica;font-size:12px"><span style=3D"font-family:Helvetica;font-size:12p=
+x">Can any ya=E2=80=99ll help shed some light, or where I can look?</span><=
+br style=3D"font-family:Helvetica;font-size:12px"><br style=3D"font-family:=
+Helvetica;font-size:12px"><span style=3D"font-family:Helvetica;font-size:12=
+px">Thanks,</span><br style=3D"font-family:Helvetica;font-size:12px"><span =
+style=3D"font-family:Helvetica;font-size:12px">Eric</span></font><br></div>=
+</div>
+
+--0000000000006e481605be184e34--
 

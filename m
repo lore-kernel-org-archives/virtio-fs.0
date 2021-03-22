@@ -1,15 +1,13 @@
-Date: Mon, 22 Mar 2021 15:47:37 +0000
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YFi8GYrRG/ks2BBz@stefanha-x1.localdomain>
-References: <20210318135223.1342795-1-ckuehl@redhat.com>
-	<20210318135223.1342795-3-ckuehl@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="EBlwIFYriryzFVKW"
-Content-Disposition: inline
-In-Reply-To: <20210318135223.1342795-3-ckuehl@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 2/3] virtiofs: split requests that exceed
-	virtqueue size
+References: <2148A6EA-09CC-4DD2-8E03-8D51633D4137@apple.com>
+In-Reply-To: <2148A6EA-09CC-4DD2-8E03-8D51633D4137@apple.com>
+From: Miklos Szeredi <mszeredi@redhat.com>
+Date: Mon, 22 Mar 2021 17:09:32 +0100
+Message-ID: <CAOssrKdGOL3Zqmhz4VGEccWw8N0tp1kP7qooB8gN7JOi5+5gew@mail.gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] Large memory consumption by virtiofsd,
+ suspecting fd's aren't being closed?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,62 +16,35 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Connor Kuehl <ckuehl@redhat.com>
-Cc: miklos@szeredi.hu, jasowang@redhat.com, mst@redhat.com, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, vgoyal@redhat.com
+To: Eric Ernst <eric_ernst@apple.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
+On Mon, Mar 22, 2021 at 6:52 AM Eric Ernst <eric_ernst@apple.com> wrote:
+>
+> Hey ya’ll,
+>
+> One challenge I’ve been looking at is how to setup an appropriate memory cgroup limit for workloads that are leveraging virtiofs (ie, running pods with Kata Containers). I noticed that memory usage of the daemon itself can grow considerably depending on the workload; though much more than I’d expect.
+>
+> I’m running workload that simply runs a build on kernel sources with -j3. In doing this, the source of the linux kernel are shared via virtiofs (no DAX), so as the build goes on, there are a lot of files opened, closed, as well as created. The rss memory of virtiofsd grows into several hundreds of MBs.
+>
+> When taking a look, I’m suspecting that virtiofsd is carrying out the opens, but never actually closing fds. In the guest, I’m seeing fd’s on the order of 10-40 for all the container processes as it runs, whereas I see the number of fds for virtiofsd continually increasing, reaching over 80,000 fds. I’m guessing this isn’t expected?
 
---EBlwIFYriryzFVKW
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+The reason could be that guest is keeping a ref on the inodes
+(dcache->dentry->inode) and current implementation of server keeps an
+O_PATH fd open for each inode referenced by the client.
 
-On Thu, Mar 18, 2021 at 08:52:22AM -0500, Connor Kuehl wrote:
-> If an incoming FUSE request can't fit on the virtqueue, the request is
-> placed onto a workqueue so a worker can try to resubmit it later where
-> there will (hopefully) be space for it next time.
->=20
-> This is fine for requests that aren't larger than a virtqueue's maximum
-> capacity. However, if a request's size exceeds the maximum capacity of
-> the virtqueue (even if the virtqueue is empty), it will be doomed to a
-> life of being placed on the workqueue, removed, discovered it won't fit,
-> and placed on the workqueue yet again.
->=20
-> Furthermore, from section 2.6.5.3.1 (Driver Requirements: Indirect
-> Descriptors) of the virtio spec:
->=20
->   "A driver MUST NOT create a descriptor chain longer than the Queue
->   Size of the device."
->=20
-> To fix this, limit the number of pages FUSE will use for an overall
-> request. This way, each request can realistically fit on the virtqueue
-> when it is decomposed into a scattergather list and avoid violating
-> section 2.6.5.3.1 of the virtio spec.
->=20
-> Signed-off-by: Connor Kuehl <ckuehl@redhat.com>
-> ---
->  fs/fuse/fuse_i.h    |  5 +++++
->  fs/fuse/inode.c     |  7 +++++++
->  fs/fuse/virtio_fs.c | 14 ++++++++++++++
->  3 files changed, 26 insertions(+)
+One way to avoid this is to use the "cache=none" option, which forces
+the client to drop dentries immediately from the cache if not in use.
+This is not desirable if cache is actually in use.
 
-Nice that FUSE already has max_pages :-).
+The memory use of the server should still be limited by the memory use
+of the guest:  if there's memory pressure in the guest kernel, then it
+will clean out caches, which results in the memory use decreasing in
+the server as well.  If the server memory use looks unbounded, that
+might be indicative of too much memory used for dcache in the guest
+(cat /proc/slabinfo | grep ^dentry).     Can you verify?
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+Thanks,
+Miklos
 
---EBlwIFYriryzFVKW
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmBYvBkACgkQnKSrs4Gr
-c8gL7Qf+MIRWqCCYkNEZwL6tftu8+lg4QxBigZvpmryZKX9xCLbLzcTZuUzPQC6I
-HiFj77t2jUhUbSv9edImKSWoSYad0kT0bCsWnwghojx+ta5lIXveKMwv4qHCkF9J
-CsnZqKYSW+9gCyjC/mCLLl1lHKSoSHJsDSVuJQ7gwlGg1n1Bv5IKE4ZX2+hlXGY3
-FWtCTz17sqzrlCIceUnG5jN10TcXqsXSDEH3oOV6ZSWl8HTXWFyJjcRWau4u9S2R
-iIZJEcByDMVqWWCHWVySksdompYzM9xFbXLebPE5Rnn9BaK5m/BdISHbS1R5dZaU
-LPExG+DiEtEx/j/imqIq7YtJlXxA5g==
-=KXHl
------END PGP SIGNATURE-----
-
---EBlwIFYriryzFVKW--
 

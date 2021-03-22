@@ -1,11 +1,14 @@
-Mime-Version: 1.0
-From: "Connor Kuehl" <ckuehl@redhat.com>
-Date: Wed, 14 Apr 2021 16:44:26 -0500
-Message-Id: <CANRX0ORJA43.22ADKWIJW7DI0@redhat>
-In-Reply-To: <20210414201207.3612432-3-jose.carlos.venegas.munoz@intel.com>
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 2/2] virtiofsd: Add help for -o xattr-mapping
+References: <20210318135223.1342795-1-ckuehl@redhat.com>
+	<20210318135223.1342795-2-ckuehl@redhat.com>
+From: Jason Wang <jasowang@redhat.com>
+Message-ID: <fa4988fa-a671-0abf-f922-6b362faf10d5@redhat.com>
+Date: Mon, 22 Mar 2021 11:22:15 +0800
+MIME-Version: 1.0
+In-Reply-To: <20210318135223.1342795-2-ckuehl@redhat.com>
+Content-Type: text/plain; charset="gbk"; format="flowed"
+Content-Transfer-Encoding: base64
+Subject: Re: [Virtio-fs] [PATCH 1/3] virtio_ring: always warn when
+ descriptor chain exceeds queue size
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,36 +17,56 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Carlos Venegas <jose.carlos.venegas.munoz@intel.com>, virtio-fs@redhat.com
-Cc: qemu-devel@nongnu.org, vgoyal@redhat.com
+To: Connor Kuehl <ckuehl@redhat.com>, virtio-fs@redhat.com
+Cc: miklos@szeredi.hu, mst@redhat.com, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, linux-fsdevel@vger.kernel.org, vgoyal@redhat.com
 
-On Wed Apr 14, 2021 at 3:12 PM CDT, Carlos Venegas wrote:
-> The option is not documented in help.
->
-> Add small help about the option.
->
-> Signed-off-by: Carlos Venegas <jose.carlos.venegas.munoz@intel.com>
-> ---
-> tools/virtiofsd/helper.c | 3 +++
-> 1 file changed, 3 insertions(+)
->
-> diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
-> index 28243b51b2..5e98ed702b 100644
-> --- a/tools/virtiofsd/helper.c
-> +++ b/tools/virtiofsd/helper.c
-> @@ -172,6 +172,9 @@ void fuse_cmdline_help(void)
-> " default: no_writeback\n"
-> " -o xattr|no_xattr enable/disable xattr\n"
-> " default: no_xattr\n"
-> + " -o xattrmap=<mapping> Enable xattr mapping (enables xattr)\n"
-> + " <mapping> is a string consists of a series of rules\n"
-> + " e.g. -o xattrmap=:map::user.virtiofs.:\n"
-
-This is a helpful note, but it doesn't tell the whole story. I think
-it'd be helpful to add one last note to this option which is to
-recommend reading the virtiofsd(1) man-page for more information on
-xattrmap rules.
-
-Connor
-
-
+CtTaIDIwMjEvMy8xOCDPws7nOTo1MiwgQ29ubm9yIEt1ZWhsINC0tcA6Cj4gIEZyb20gc2VjdGlv
+biAyLjYuNS4zLjEgKERyaXZlciBSZXF1aXJlbWVudHM6IEluZGlyZWN0IERlc2NyaXB0b3JzKQo+
+IG9mIHRoZSB2aXJ0aW8gc3BlYzoKPgo+ICAgICJBIGRyaXZlciBNVVNUIE5PVCBjcmVhdGUgYSBk
+ZXNjcmlwdG9yIGNoYWluIGxvbmdlciB0aGFuIHRoZSBRdWV1ZQo+ICAgIFNpemUgb2YgdGhlIGRl
+dmljZS4iCj4KPiBUaGlzIHRleHQgc3VnZ2VzdHMgdGhhdCB0aGUgd2FybmluZyBzaG91bGQgdHJp
+Z2dlciBldmVuIGlmCj4gaW5kaXJlY3QgZGVzY3JpcHRvcnMgYXJlIGluIHVzZS4KCgpTbyBJIHRo
+aW5rIGF0IGxlYXN0IHRoZSBjb21taXQgbG9nIG5lZWRzIHNvbWUgdHdlYWsuCgpGb3Igc3BsaXQg
+dmlydHF1ZXVlLiBXZSBoYWQ6CgoyLjYuNS4yIERyaXZlciBSZXF1aXJlbWVudHM6IFRoZSBWaXJ0
+cXVldWUgRGVzY3JpcHRvciBUYWJsZQoKRHJpdmVycyBNVVNUIE5PVCBhZGQgYSBkZXNjcmlwdG9y
+IGNoYWluIGxvbmdlciB0aGFuIDJeMzIgYnl0ZXMgaW4gdG90YWw7IAp0aGlzIGltcGxpZXMgdGhh
+dCBsb29wcyBpbiB0aGUgZGVzY3JpcHRvciBjaGFpbiBhcmUgZm9yYmlkZGVuIQoKMi42LjUuMy4x
+IERyaXZlciBSZXF1aXJlbWVudHM6IEluZGlyZWN0IERlc2NyaXB0b3JzCgpBIGRyaXZlciBNVVNU
+IE5PVCBjcmVhdGUgYSBkZXNjcmlwdG9yIGNoYWluIGxvbmdlciB0aGFuIHRoZSBRdWV1ZSBTaXpl
+IApvZiB0aGUgZGV2aWNlLgoKSWYgSSB1bmRlcnN0YW5kIHRoZSBzcGVjIGNvcnJlY3RseSwgdGhl
+IGNoZWNrIGlzIG9ubHkgbmVlZGVkIGZvciBhIApzaW5nbGUgaW5kaXJlY3QgZGVzY3JpcHRvciB0
+YWJsZT8KCkZvciBwYWNrZWQgdmlydHF1ZXVlLiBXZSBoYWQ6CgoyLjcuMTcgRHJpdmVyIFJlcXVp
+cmVtZW50czogU2NhdHRlci1HYXRoZXIgU3VwcG9ydAoKQSBkcml2ZXIgTVVTVCBOT1QgY3JlYXRl
+IGEgZGVzY3JpcHRvciBsaXN0IGxvbmdlciB0aGFuIGFsbG93ZWQgYnkgdGhlIApkZXZpY2UuCgpB
+IGRyaXZlciBNVVNUIE5PVCBjcmVhdGUgYSBkZXNjcmlwdG9yIGxpc3QgbG9uZ2VyIHRoYW4gdGhl
+IFF1ZXVlIFNpemUuCgoyLjcuMTkgRHJpdmVyIFJlcXVpcmVtZW50czogSW5kaXJlY3QgRGVzY3Jp
+cHRvcnMKCkEgZHJpdmVyIE1VU1QgTk9UIGNyZWF0ZSBhIGRlc2NyaXB0b3IgY2hhaW4gbG9uZ2Vy
+IHRoYW4gYWxsb3dlZCBieSB0aGUgCmRldmljZS4KClNvIGl0IGxvb2tzIHRvIG1lIHRoZSBwYWNr
+ZWQgcGFydCBpcyBmaW5lLgoKTm90ZSB0aGF0IGlmIEkgdW5kZXJzdGFuZCB0aGUgc3BlYyBjb3Jy
+ZWN0bHkgMi43LjE3IGltcGxpZXMgMi43LjE5LgoKVGhhbmtzCgoKPgo+IFJlcG9ydGVkLWJ5OiBT
+dGVmYW4gSGFqbm9jemkgPHN0ZWZhbmhhQHJlZGhhdC5jb20+Cj4gU2lnbmVkLW9mZi1ieTogQ29u
+bm9yIEt1ZWhsIDxja3VlaGxAcmVkaGF0LmNvbT4KPiAtLS0KPiAgIGRyaXZlcnMvdmlydGlvL3Zp
+cnRpb19yaW5nLmMgfCA3ICsrKystLS0KPiAgIDEgZmlsZSBjaGFuZ2VkLCA0IGluc2VydGlvbnMo
+KyksIDMgZGVsZXRpb25zKC0pCj4KPiBkaWZmIC0tZ2l0IGEvZHJpdmVycy92aXJ0aW8vdmlydGlv
+X3JpbmcuYyBiL2RyaXZlcnMvdmlydGlvL3ZpcnRpb19yaW5nLmMKPiBpbmRleCA3MWUxNmI1M2U5
+YzEuLjFiYzI5MGY5YmExMyAxMDA2NDQKPiAtLS0gYS9kcml2ZXJzL3ZpcnRpby92aXJ0aW9fcmlu
+Zy5jCj4gKysrIGIvZHJpdmVycy92aXJ0aW8vdmlydGlvX3JpbmcuYwo+IEBAIC00NDQsMTEgKzQ0
+NCwxMiBAQCBzdGF0aWMgaW5saW5lIGludCB2aXJ0cXVldWVfYWRkX3NwbGl0KHN0cnVjdCB2aXJ0
+cXVldWUgKl92cSwKPiAgIAo+ICAgCWhlYWQgPSB2cS0+ZnJlZV9oZWFkOwo+ICAgCj4gKwlXQVJO
+X09OX09OQ0UodG90YWxfc2cgPiB2cS0+c3BsaXQudnJpbmcubnVtKTsKPiArCj4gICAJaWYgKHZp
+cnRxdWV1ZV91c2VfaW5kaXJlY3QoX3ZxLCB0b3RhbF9zZykpCj4gICAJCWRlc2MgPSBhbGxvY19p
+bmRpcmVjdF9zcGxpdChfdnEsIHRvdGFsX3NnLCBnZnApOwo+ICAgCWVsc2Ugewo+ICAgCQlkZXNj
+ID0gTlVMTDsKPiAtCQlXQVJOX09OX09OQ0UodG90YWxfc2cgPiB2cS0+c3BsaXQudnJpbmcubnVt
+ICYmICF2cS0+aW5kaXJlY3QpOwo+ICAgCX0KPiAgIAo+ICAgCWlmIChkZXNjKSB7Cj4gQEAgLTEx
+MTgsNiArMTExOSw4IEBAIHN0YXRpYyBpbmxpbmUgaW50IHZpcnRxdWV1ZV9hZGRfcGFja2VkKHN0
+cnVjdCB2aXJ0cXVldWUgKl92cSwKPiAgIAo+ICAgCUJVR19PTih0b3RhbF9zZyA9PSAwKTsKPiAg
+IAo+ICsJV0FSTl9PTl9PTkNFKHRvdGFsX3NnID4gdnEtPnBhY2tlZC52cmluZy5udW0pOwo+ICsK
+PiAgIAlpZiAodmlydHF1ZXVlX3VzZV9pbmRpcmVjdChfdnEsIHRvdGFsX3NnKSkKPiAgIAkJcmV0
+dXJuIHZpcnRxdWV1ZV9hZGRfaW5kaXJlY3RfcGFja2VkKHZxLCBzZ3MsIHRvdGFsX3NnLAo+ICAg
+CQkJCW91dF9zZ3MsIGluX3NncywgZGF0YSwgZ2ZwKTsKPiBAQCAtMTEyNSw4ICsxMTI4LDYgQEAg
+c3RhdGljIGlubGluZSBpbnQgdmlydHF1ZXVlX2FkZF9wYWNrZWQoc3RydWN0IHZpcnRxdWV1ZSAq
+X3ZxLAo+ICAgCWhlYWQgPSB2cS0+cGFja2VkLm5leHRfYXZhaWxfaWR4Owo+ICAgCWF2YWlsX3Vz
+ZWRfZmxhZ3MgPSB2cS0+cGFja2VkLmF2YWlsX3VzZWRfZmxhZ3M7Cj4gICAKPiAtCVdBUk5fT05f
+T05DRSh0b3RhbF9zZyA+IHZxLT5wYWNrZWQudnJpbmcubnVtICYmICF2cS0+aW5kaXJlY3QpOwo+
+IC0KPiAgIAlkZXNjID0gdnEtPnBhY2tlZC52cmluZy5kZXNjOwo+ICAgCWkgPSBoZWFkOwo+ICAg
+CWRlc2NzX3VzZWQgPSB0b3RhbF9zZzsKCg==

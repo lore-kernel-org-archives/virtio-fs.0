@@ -1,15 +1,12 @@
-References: <810089e0-3a09-0d8f-9f8e-be5b3ac70587@redhat.com>
-	<20210318135600.GA368102@redhat.com>
-From: Connor Kuehl <ckuehl@redhat.com>
-Message-ID: <19c488d0-2006-4a96-610d-f4825aa43cb3@redhat.com>
-Date: Thu, 18 Mar 2021 08:58:54 -0500
+Date: Tue, 23 Mar 2021 10:02:56 +0100
+From: Greg Kurz <groug@kaod.org>
+Message-ID: <20210323100256.1f0b43dc@bahia.lan>
+In-Reply-To: <714BD741-AE3F-4BC5-8DFB-F5C74A8623B1@netapp.com>
+References: <714BD741-AE3F-4BC5-8DFB-F5C74A8623B1@netapp.com>
 MIME-Version: 1.0
-In-Reply-To: <20210318135600.GA368102@redhat.com>
-Content-Type: text/plain; charset=utf-8; format=flowed
-Content-Language: en-US
+Content-Type: text/plain; charset="US-ASCII"
 Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] Question about sg_count_fuse_req() in
-	linux/fs/fuse/virtio_fs.c
+Subject: Re: [Virtio-fs] Live migration support for virtio-fs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,68 +15,35 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
+To: "Ge, Xiongzi" <Xiongzi.Ge@netapp.com>
+Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
-On 3/18/21 8:56 AM, Vivek Goyal wrote:
-> I think all the in args are being mapped into a single scatter gather
-> element and that's why it does not matter whether in_numargs is 3, 2 or 1.
-> They will be mapped in a single element.
-> 
-> sg_init_fuse_args()
-> {
->          len = fuse_len_args(numargs - argpages, args);
->          if (len)
->                  sg_init_one(&sg[total_sgs++], argbuf, len);
-> }
-> 
->          out_sgs += sg_init_fuse_args(&sg[out_sgs], req,
->                                       (struct fuse_arg *)args->in_args,
->                                       args->in_numargs, args->in_pages,
->                                       req->argbuf, &argbuf_used);
-> 
-> When we are sending some data in some pages, then we set args->in_pages
-> to true. And in that case, last element of args->in_args[] contains the
-> total size of bytes in additional pages we are sending and is not part
-> of in_args being mapped to scatter gather element. That's why this
-> check.
-> 
-> 	if (args->in_numargs - args->in_pages)
-> 		total_sgs += 1;
+On Tue, 23 Mar 2021 01:35:58 +0000
+"Ge, Xiongzi" <Xiongzi.Ge@netapp.com> wrote:
 
-Aha! Thank you, Vivek. That makes sense.
-
-> Not sure when we will have a case where args->in_numargs = 1 and
-> args->in_pages=true. Do we ever hit that.
-
-Not in my experience. My previous mail was examining this routine mainly 
-in a vacuum.
-
-Connor
-
-> Thanks
-> Vivek
+> Hello Vivek, Dr. Gilbert, and the virtio-fs team,
 > 
->>
->> Especially since the block right below it counts pages if args->in_pages is
->> true:
->>
->>          if (args->in_pages) {
->>                  size = args->in_args[args->in_numargs - 1].size;
->>                  total_sgs += sg_count_fuse_pages(ap->descs, ap->num_pages,
->>                                                   size);
->>          }
->>
->> The rest of the routine goes on similarly but for the 'out' components.
->>
->> I doubt incrementing 'total_sgs' in the first if-statement I showed above is
->> vestigial, I just think my mental model of what is happening here is
->> incomplete.
->>
->> Any clarification is much appreciated!
+> It seems that virtio-fs does not support live migration. Once a vm is
+> configured with virtio-fs, live migration cannot be performed even it
+> is not mounted on the guest. Is there any progress for this? If the
+
+Live migration of virtio-fs is still at the early discussion stage AFAICT.
+It might take time before we have something working. But in the meantime,
+it seems abusive to block migration if we have a guarantee that the device
+isn't servicing requests. FWIW virtio-9p only blocks migration when the
+shared directory is mounted on the guest.
+
+> shared directory is from a distributed file system like Ceph, would it
+> be easier than the general case to be implemented? 
 > 
->>
->> Connor
->>
+> Thanks,
+> Xiongzi
+> 
+> 
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
 > 
 

@@ -1,19 +1,13 @@
-Date: Tue, 23 Mar 2021 11:31:50 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210323153150.GA488493@redhat.com>
-References: <2148A6EA-09CC-4DD2-8E03-8D51633D4137@apple.com>
-	<CAOssrKdGOL3Zqmhz4VGEccWw8N0tp1kP7qooB8gN7JOi5+5gew@mail.gmail.com>
-	<20210322164704.GD446288@redhat.com>
-	<20210323115451.oxe4a4go32brca7z@mhamilton>
-	<20210323134733.GA483930@redhat.com>
-	<CAAQbG+UxuFYKiNAL0=dUg1oSVs0tqf7vi0C4xVA6h6ft77UcNQ@mail.gmail.com>
+Date: Tue, 23 Mar 2021 17:39:11 +0100
+From: Sergio Lopez <slp@redhat.com>
+Message-ID: <20210323163911.5lxnlv5tn66smscn@mhamilton>
+References: <47a35ffe-ef39-d098-2c29-34cf7d4eb7ef@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="fh2qvbhklrpchl6w"
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <CAAQbG+UxuFYKiNAL0=dUg1oSVs0tqf7vi0C4xVA6h6ft77UcNQ@mail.gmail.com>
-Subject: Re: [Virtio-fs] Large memory consumption by virtiofsd,
- suspecting fd's aren't being closed?
+In-Reply-To: <47a35ffe-ef39-d098-2c29-34cf7d4eb7ef@redhat.com>
+Subject: Re: [Virtio-fs] Current file handle status and open questions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,200 +16,138 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Eric Ernst <eric.g.ernst@gmail.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Eric Ernst <eric_ernst@apple.com>
+To: Max Reitz <mreitz@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-On Tue, Mar 23, 2021 at 07:52:22AM -0700, Eric Ernst wrote:
-> On Tue, Mar 23, 2021 at 6:47 AM Vivek Goyal <vgoyal@redhat.com> wrote:
-> 
-> > On Tue, Mar 23, 2021 at 12:55:26PM +0100, Sergio Lopez wrote:
-> > > On Mon, Mar 22, 2021 at 12:47:04PM -0400, Vivek Goyal wrote:
-> > > > On Mon, Mar 22, 2021 at 05:09:32PM +0100, Miklos Szeredi wrote:
-> > > > > On Mon, Mar 22, 2021 at 6:52 AM Eric Ernst <eric_ernst@apple.com>
-> > wrote:
-> > > > > >
-> > > > > > Hey ya’ll,
-> > > > > >
-> > > > > > One challenge I’ve been looking at is how to setup an appropriate
-> > memory cgroup limit for workloads that are leveraging virtiofs (ie, running
-> > pods with Kata Containers). I noticed that memory usage of the daemon
-> > itself can grow considerably depending on the workload; though much more
-> > than I’d expect.
-> > > > > >
-> > > > > > I’m running workload that simply runs a build on kernel sources
-> > with -j3. In doing this, the source of the linux kernel are shared via
-> > virtiofs (no DAX), so as the build goes on, there are a lot of files
-> > opened, closed, as well as created. The rss memory of virtiofsd grows into
-> > several hundreds of MBs.
-> > > > > >
-> > > > > > When taking a look, I’m suspecting that virtiofsd is carrying out
-> > the opens, but never actually closing fds. In the guest, I’m seeing fd’s on
-> > the order of 10-40 for all the container processes as it runs, whereas I
-> > see the number of fds for virtiofsd continually increasing, reaching over
-> > 80,000 fds. I’m guessing this isn’t expected?
-> > > > >
-> > > > > The reason could be that guest is keeping a ref on the inodes
-> > > > > (dcache->dentry->inode) and current implementation of server keeps an
-> > > > > O_PATH fd open for each inode referenced by the client.
-> > > > >
-> > > > > One way to avoid this is to use the "cache=none" option, which forces
-> > > > > the client to drop dentries immediately from the cache if not in use.
-> > > > > This is not desirable if cache is actually in use.
-> > > > >
-> > > > > The memory use of the server should still be limited by the memory
-> > use
-> > > > > of the guest:  if there's memory pressure in the guest kernel, then
-> > it
-> > > > > will clean out caches, which results in the memory use decreasing in
-> > > > > the server as well.  If the server memory use looks unbounded, that
-> > > > > might be indicative of too much memory used for dcache in the guest
-> > > > > (cat /proc/slabinfo | grep ^dentry).     Can you verify?
-> > > >
-> > > > Hi Miklos,
-> > > >
-> > > > Apart from above, we identified one more issue on IRC. I asked Eric
-> > > > to drop caches manually in guest. (echo 3 > /proc/sys/vm/drop_caches)
-> > > > and while it reduced the fds open it did not seem to free up
-> > significant
-> > > > amount of memory.
-> > > >
-> > > > So question remains where is that memory. One possibility is that we
-> > > > have memory allocated for mapping arrays (inode and fd). These arrays
-> > > > only grow and never shrink. So they can lock down some memory.
-> > > >
-> > > > But still, lot of lo_inode memory should have been freed when
-> > > > echo 3 > /proc/sys/vm/drop_caches was done. Why all that did not
-> > > > show up in virtiofsd RSS usage, that's kind of little confusing.
-> > >
-> > > Are you including "RssShmem" in "RSS usage"? If so, that could be
-> > > misleading. When virtiofsd[-rs] touches pages that reside in the
-> > > memory mapping that's shared with QEMU, those pages are accounted
-> > > in the virtiofsd[-rs] process's RssShmem too.
-> > >
-> > > In other words, the RSS value of the virtiofsd[-rs] process may be
-> > > overinflated because it includes pages that are actually shared
-> > > (there's no a second copy of them) with the QEMU process.
-> > >
-> > > This can be observed using a tool like "smem". Here's an example
-> > >
-> > >  - This virtiofsd-rs process appears to have a RSS of ~633 MiB
-> > >
-> > > root       13879 46.1  7.9 8467492 649132 pts/1  Sl+  11:33   0:52
-> > ./target/debug/virtiofsd-rs
-> > > root       13947 69.3 13.4 5638580 1093876 pts/0 Sl+  11:33   1:14
-> > qemu-system-x86_64
-> > >
-> > >  - In /proc/13879/status we can observe most of that memory is
-> > >    actually RssShmem:
-> > >
-> > > RssAnon:          9624 kB
-> > > RssFile:          5136 kB
-> > > RssShmem:       634372 kB
-> >
-> > Hi Sergio,
-> >
-> > Thanks for this observation about RssShmem. I also ran virtiofsd and
-> > observed memory usage just now and it indeed looks like that only
-> > RssShmem usage is very high.
-> >
-> > RssAnon:            4884 kB
-> > RssFile:            1900 kB
-> > RssShmem:        1050244 kB
-> >
-> > And as you point out that this memory is being shared with QEMU. So
-> > looks like from cgroup point of view, we should put virtiofsd and
-> > qemu in same cgroup and have a combined memory limit so that this
-> > shared memory is accounting looks proper.
-> >
-> > Eric, does this sound reasonable.
-> >
-> 
-> Sergio, Vivek --
-> 
-> Today QEMU/virtiofsd do live within the same memory cgroup, and are bound
-> by that same overhead I need to introduce. Good to know regarding the
-> sharing (this restores some sanity to my observations, thank you!), but the
-> real crux of the problem is two items:
->  1) the FDs are held long after the application in guest is done with them
-> because of dentry cache in the guest (when cache=auto for virtiofsd).
->  2) virtiofsd/QEMU is holding on to the memory after the fds are released
 
-Which memory you are specifically concerned about. I am assuming you are
-referring to "RssAnon". I think this number continues to be high even
-after unmounting of virtiofs because glibc has not released memory back
-to system. It probably is keeping it around so that future allocations
-can be done faster.
+--fh2qvbhklrpchl6w
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-To confirm this, I patched virtiofsd and called malloc_trim(0) in 
-lo_destroy(). So this should force glibc to return heap memory to
-system (whatever is possible). And that led to reduced RssAnon.
+On Thu, Mar 18, 2021 at 06:09:58PM +0100, Max Reitz wrote:
+> Hi,
+>=20
+> As threatened in our last meeting, I=E2=80=99ve written this mail to give=
+ an
+> overview on where we stand with regards to virtiofsd(-rs) using file
+> handles.
+>=20
+> Technically, this should be a reply to the =E2=80=9CSecurint file handles=
+=E2=80=9D
+> thread, but this mail is so long I think it=E2=80=99s better to split it =
+off.
+>=20
+> There are multiple problems that somehow relate to file handles, the
+> ones I=E2=80=99m aware of are:
+>=20
+> (A) We have a problem with too many FDs open.  To solve it, we could
+>     attach a file handle to each node, then close the FD (as far as
+>     possible) and reopen it when needed from the file handle.
+>=20
+> (B) We want to allow the guest to use persistent file handles.
+>=20
+> (C) For live migration, the problem isn=E2=80=99t even clear yet, but it =
+seems
+>     like we=E2=80=99ll want to translate nodes into their file handles and
+>     transmit those and open them again on the destination (at least on
+>     shared filesystems).
+>=20
+> Now every case has its own specific tricky bits:
+>=20
+> Case (A) is something that we=E2=80=99d really like to have by default, a=
+nd it
+> would need to work all the time during runtime.  So the problem here is
+> that we=E2=80=99d need CAP_DAC_READ_SEARCH, and we=E2=80=99d need it all =
+the time, but
+> we don=E2=80=99t want that.  One interesting bit is that we don=E2=80=99t=
+ need these
+> file handles to be persistent between virtiofsd invocations.
+>=20
+> For (B) we have the problem of needing to protect against a potentially
+> malicious guest, i.e. that it must not be able to reference files
+> outside the shared directory.  (Perhaps except for cases where the file
+> was once reachable, i.e. where a file handle was generated by the guest,
+> then the file was moved outside of the shared directory, but remains
+> accessible through the file handle.)  Furthermore, file handles should
+> really be persistent between virtiofsd invocations.  On the positive
+> side, it would be easier for us to require CAP_DAC_READ_SEARCH for this
+> case, because it really is optional.  We could require users to give us
+> that capability if they want file handles in the guest (and we find no
+> way to avoid requiring that capability).
+>=20
+> (C) needs persistency between source and destination, but on the
+> positive side, we only need to be able to open file handles during the
+> in-migrate phase on the destination.  So requiring CAP_DAC_READ_SEARCH
+> only during that phase might not be that big of a deal.
+>=20
+>=20
+> (Ideally, we=E2=80=99d want all cases to work without CAP_DAC_READ_SEARCH=
+, but
+> as you can see, that requirement is weakened for cases (B) and
+> especially (C).)
+>=20
+>=20
+> As far as I=E2=80=99ve understood, (A) is the case that we want to focus =
+on
+> first, and the main problem there is that we need to open file handles
+> without CAP_DAC_READ_SEARCH.
+>=20
+> To do that, I at one point proposed a service process that has
+> CAP_DAC_READ_SEARCH and would open file handles for virtiofsd.  But that
+> probably won=E2=80=99t really be an improvement, because this process too=
+ would
+> probably need to run in the container and so if we can=E2=80=99t give vir=
+tiofsd
+> that capability, we can=E2=80=99t give it to that service process either.
+>=20
+> What Miklos proposed was to modify the kernel to allow processes to open
+> file handles even if they don=E2=80=99t have CAP_DAC_READ_SEARCH as long =
+as
+> those files are in the process=E2=80=99s scope.  One way to implement this
+> restriction (in a very restrictive manner) is to only allow opening file
+> handles that the process has generated before, e.g. by appending a MAC
+> to every file handle (generated with a process-specific key) and
+> checking that when opening a handle.  (You would request this MAC with a
+> new AT_* flag passed to name_to_handle_at().  open_by_handle_at()
+> recognizes it due to a special file handle type value.)
+>=20
+> (Process-specific key =3D stored in current->files, i.e. the files_struct.
+> I=E2=80=99m not 100% sure what this is, but I guess this is the structure=
+ that
+> keeps a process=E2=80=99s open file descriptors, and so should generally =
+be
+> unique to a process, or at least unique to a group of processes that
+> share the same FDs.)
 
-After compilation finished:
+Does this mean that if we have, let's say, 3 virtiofsd instances each
+one "remembering" (because there's a reference in the dentry cache of
+the guest they are servicing) 10.000 files, the Host's kernel would
+need to keep 30.000 entries holding the host_file+MAC information? Or
+is there some kind of VFS trickery at play here that allows to do the
+check without holding all that information?
 
-RssAnon:           11936 kB
-RssFile:            1964 kB
-RssShmem:        1036232 kB
+Sergio.
 
-After unmounting virtiofs (with malloc_trim(0))
+--fh2qvbhklrpchl6w
+Content-Type: application/pgp-signature; name="signature.asc"
 
-RssAnon:            3428 kB
-RssFile:            1968 kB
-RssShmem:        1037036 kB
+-----BEGIN PGP SIGNATURE-----
 
-So RssAnon usage dropped by roughly 75% with a call to malloc_trim(). 
+iQIzBAABCAAdFiEEvtX891EthoCRQuii9GknjS8MAjUFAmBaGa4ACgkQ9GknjS8M
+AjUEWg/8DMHac/ymAIStgNvLPTijgZ/lGTC5+lkumXCmLcrNsNGvZxg7nq2G4XOJ
+Y2Z9IQjVz4UUP0LFZfG9Q2rM0qfGXGHj7ytQ/c7miN1iTP/bF2GGmjKYBCrtZc6n
+vRPckiIpybF2ctdY9lGqqXQ5gOgCDg/ng3sSjQEB7e+A0KeoCNHcRjxfSZKQWB2i
+9awHQvdchUtITOBYiE6vyYC0xgJYDnd8HxHC752HiCF6zOuie99gB2qQnjviJybr
+vXUa6D2Zv9nONfMjhViV+0ZPmEy3ax0tbraz6REYAk88OHZL3BfIhz1buJtOawM0
+HRWXLwnlkzrC2D17anEPfGNjVTJOggUhMIGTYikjCalTwIG2+KPtYEVNn3t1LOAc
+kdE11WsKz3DcGzOasXXsJ9DBNGMgKoE/7ygoqLJcwu8ZfrKONJ8M3VOLLEj0NRZB
+pwHZkKd2ytSlrzec4pdGvn1ccrJRwFb9lFQUbroBw4qbQSUxTFmKQzYCWRJ6WufV
+pCEol3VVAVEQbHn8clqXGAoqOaGbZOtETtNN/u0tV2OKQdkPGyfS2O9vuGv6/+02
+Thea2hhcxj/uxBl6oyV+QadGFb0anZbQx4G5T2bSCeMFCLzhx6XmqEnBZGO0Y5MF
+i85Mk2xac5jsWKeyBi8mTKZ83X2IOyNt9LLMR7CLCYUzgHImebI=
+=sKTT
+-----END PGP SIGNATURE-----
 
-I think this can be further optimized if our mapping arrays can be
-shrunk too. 
-
-But point is that these number look reasonably small to not worry
-about it. I mean for a kernel compilation, peak RssAnon is 12MB
-in this run. And that does not sound too bad to me.
-
-Thanks
-Vivek
-
-> 
-> --Eric
-> 
-> 
-> 
-> >
-> > Thanks
-> > Vivek
-> >
-> > >
-> > >  - In "smem", we can see a similar amount of RSS, but the PSS is
-> > >    roughly half the size because "smem" is splitting it up between
-> > >    virtiofsd-rs and QEMU:
-> > >
-> > > [root@localhost ~]# smem -P virtiofsd-rs -P qemu
-> > >   PID User     Command                         Swap      USS      PSS
-> >   RSS
-> > > 13879 root     ./target/debug/virtiofsd-rs        0    13412   337019
-> >  662392
-> > > 13947 root     qemu-system-x86_64 -enable-        0   434224   760096
-> > 1094392
-> > >
-> > >  - If we terminate the virtiofsd-rs process, the output of "smem" now
-> > >    shows that QEMU's PSS has grown to account for the PSS that was
-> > >    previously assigned to virtiofsd-rs too, so we can confirm that was
-> > >    memory shared between both processes.
-> > >
-> > >   PID User     Command                         Swap      USS      PSS
-> >   RSS
-> > > 13947 root     qemu-system-x86_64 -enable-        0  1082656  1084966
-> > 1095692
-> > >
-> > > Just to be 100% sure, I've also run "heaptrack" on a virtiofsd-rs
-> > > instance, and can confirm that the actual heap usage of the process
-> > > was around 5-6 MiB.
-> > >
-> > > Sergio.
-> >
-> >
-> > _______________________________________________
-> > Virtio-fs mailing list
-> > Virtio-fs@redhat.com
-> > https://listman.redhat.com/mailman/listinfo/virtio-fs
-> >
+--fh2qvbhklrpchl6w--
 

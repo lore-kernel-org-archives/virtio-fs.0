@@ -1,16 +1,18 @@
-References: <20210318135223.1342795-1-ckuehl@redhat.com>
-	<20210318135223.1342795-2-ckuehl@redhat.com>
-	<fa4988fa-a671-0abf-f922-6b362faf10d5@redhat.com>
-	<20210322041414-mutt-send-email-mst@kernel.org>
-From: Jason Wang <jasowang@redhat.com>
-Message-ID: <a6eb72e0-50be-1231-f7b5-3ebb822ee1b5@redhat.com>
-Date: Tue, 23 Mar 2021 10:38:41 +0800
+Date: Tue, 23 Mar 2021 10:32:33 +0100
+From: Christian Brauner <christian.brauner@ubuntu.com>
+Message-ID: <20210323093233.iyl4k6x432ytb72c@wittgenstein>
+References: <20210319195547.427371-1-vgoyal@redhat.com>
+	<20210319195547.427371-2-vgoyal@redhat.com>
+	<CAHpGcMKhFxotKDxPryfKdhNMMDWO4Ws33s6fEm2NP0u_4vffnQ@mail.gmail.com>
+	<20210320100322.ox5gzgauo7iqf2fv@gmail.com>
+	<20210322170111.GE446288@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20210322041414-mutt-send-email-mst@kernel.org>
-Content-Type: text/plain; charset="utf-8"; format="flowed"
+In-Reply-To: <20210322170111.GE446288@redhat.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 1/3] virtio_ring: always warn when
- descriptor chain exceeds queue size
+Subject: Re: [Virtio-fs] [PATCH 1/3] posic_acl: Add a helper determine if
+ SGID should be cleared
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,110 +21,90 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Michael S. Tsirkin" <mst@redhat.com>
-Cc: miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, vgoyal@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: Jan Kara <jack@suse.cz>, Andreas Gruenbacher <agruenba@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, Andreas =?utf-8?Q?Gr=C3=BCnbacher?= <andreas.gruenbacher@gmail.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, virtio-fs@redhat.com, Seth Forshee <seth.forshee@canonical.com>, Christian Brauner <christian.brauner@canonical.com>, Alexander Viro <viro@zeniv.linux.org.uk>, Linux FS-devel Mailing List <linux-fsdevel@vger.kernel.org>
 
+On Mon, Mar 22, 2021 at 01:01:11PM -0400, Vivek Goyal wrote:
+> On Sat, Mar 20, 2021 at 11:03:22AM +0100, Christian Brauner wrote:
+> > On Fri, Mar 19, 2021 at 11:42:48PM +0100, Andreas Grünbacher wrote:
+> > > Hi,
+> > > 
+> > > Am Fr., 19. März 2021 um 20:58 Uhr schrieb Vivek Goyal <vgoyal@redhat.com>:
+> > > > posix_acl_update_mode() determines what's the equivalent mode and if SGID
+> > > > needs to be cleared or not. I need to make use of this code in fuse
+> > > > as well. Fuse will send this information to virtiofs file server and
+> > > > file server will take care of clearing SGID if it needs to be done.
+> > > >
+> > > > Hence move this code in a separate helper so that more than one place
+> > > > can call into it.
+> > > >
+> > > > Cc: Jan Kara <jack@suse.cz>
+> > > > Cc: Andreas Gruenbacher <agruenba@redhat.com>
+> > > > Cc: Alexander Viro <viro@zeniv.linux.org.uk>
+> > > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > > > ---
+> > > >  fs/posix_acl.c            |  3 +--
+> > > >  include/linux/posix_acl.h | 11 +++++++++++
+> > > >  2 files changed, 12 insertions(+), 2 deletions(-)
+> > > >
+> > > > diff --git a/fs/posix_acl.c b/fs/posix_acl.c
+> > > > index f3309a7edb49..2d62494c4a5b 100644
+> > > > --- a/fs/posix_acl.c
+> > > > +++ b/fs/posix_acl.c
+> > > > @@ -684,8 +684,7 @@ int posix_acl_update_mode(struct user_namespace *mnt_userns,
+> > > >                 return error;
+> > > >         if (error == 0)
+> > > >                 *acl = NULL;
+> > > > -       if (!in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
+> > > > -           !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID))
+> > > > +       if (posix_acl_mode_clear_sgid(mnt_userns, inode))
+> > > >                 mode &= ~S_ISGID;
+> > > >         *mode_p = mode;
+> > > >         return 0;
+> > > > diff --git a/include/linux/posix_acl.h b/include/linux/posix_acl.h
+> > > > index 307094ebb88c..073c5e546de3 100644
+> > > > --- a/include/linux/posix_acl.h
+> > > > +++ b/include/linux/posix_acl.h
+> > > > @@ -59,6 +59,17 @@ posix_acl_release(struct posix_acl *acl)
+> > > >  }
+> > > >
+> > > >
+> > > > +static inline bool
+> > > > +posix_acl_mode_clear_sgid(struct user_namespace *mnt_userns,
+> > > > +                         struct inode *inode)
+> > > > +{
+> > > > +       if (!in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
+> > > > +           !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID))
+> > > > +               return true;
+> > > > +
+> > > > +       return false;
+> > > 
+> > > That's just
+> > > 
+> > > return !in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
+> > >     !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID);
+> > > 
+> > > The same pattern we have in posix_acl_update_mode also exists in
+> > > setattr_copy and inode_init_owner, and almost the same pattern exists
+> > > in setattr_prepare, so can this be cleaned up as well? The function
+> > > also isn't POSIX ACL specific, so the function name is misleading.
+> > 
+> > Good idea but that should probably be spun into a separate patchset that
+> > only touches the vfs parts.
+> 
+> IIUC, suggestion is that I should write a VFS helper (and not posix
+> acl helper) and use that helper at other places too in the code. 
 
-在 2021/3/22 下午4:17, Michael S. Tsirkin 写道:
-> On Mon, Mar 22, 2021 at 11:22:15AM +0800, Jason Wang wrote:
->> 在 2021/3/18 下午9:52, Connor Kuehl 写道:
->>>   From section 2.6.5.3.1 (Driver Requirements: Indirect Descriptors)
->>> of the virtio spec:
->>>
->>>     "A driver MUST NOT create a descriptor chain longer than the Queue
->>>     Size of the device."
->>>
->>> This text suggests that the warning should trigger even if
->>> indirect descriptors are in use.
->>
->> So I think at least the commit log needs some tweak.
->>
->> For split virtqueue. We had:
->>
->> 2.6.5.2 Driver Requirements: The Virtqueue Descriptor Table
->>
->> Drivers MUST NOT add a descriptor chain longer than 2^32 bytes in total;
->> this implies that loops in the descriptor chain are forbidden!
->>
->> 2.6.5.3.1 Driver Requirements: Indirect Descriptors
->>
->> A driver MUST NOT create a descriptor chain longer than the Queue Size of
->> the device.
->>
->> If I understand the spec correctly, the check is only needed for a single
->> indirect descriptor table?
->>
->> For packed virtqueue. We had:
->>
->> 2.7.17 Driver Requirements: Scatter-Gather Support
->>
->> A driver MUST NOT create a descriptor list longer than allowed by the
->> device.
->>
->> A driver MUST NOT create a descriptor list longer than the Queue Size.
->>
->> 2.7.19 Driver Requirements: Indirect Descriptors
->>
->> A driver MUST NOT create a descriptor chain longer than allowed by the
->> device.
->>
->> So it looks to me the packed part is fine.
->>
->> Note that if I understand the spec correctly 2.7.17 implies 2.7.19.
->>
->> Thanks
-> It would be quite strange for packed and split to differ here:
-> so for packed would you say there's no limit on # of descriptors at all?
->
-> I am guessing I just forgot to move this part from
-> the format specific to the common part of the spec.
->
-> This needs discussion in the TC mailing list - want to start a thread
-> there?
+If there are other callers outside of acls (which should be iirc) then
+yes.
 
+> 
+> I will do that and post in a separate patch series.
 
-Will do.
+Yeah, I think that makes more sense to have this be a separate change
+instead of putting it together with the fuse change if it touches more
+than one place.
 
-Thanks
-
-
->
->
->
->>> Reported-by: Stefan Hajnoczi <stefanha@redhat.com>
->>> Signed-off-by: Connor Kuehl <ckuehl@redhat.com>
->>> ---
->>>    drivers/virtio/virtio_ring.c | 7 ++++---
->>>    1 file changed, 4 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/virtio/virtio_ring.c b/drivers/virtio/virtio_ring.c
->>> index 71e16b53e9c1..1bc290f9ba13 100644
->>> --- a/drivers/virtio/virtio_ring.c
->>> +++ b/drivers/virtio/virtio_ring.c
->>> @@ -444,11 +444,12 @@ static inline int virtqueue_add_split(struct virtqueue *_vq,
->>>    	head = vq->free_head;
->>> +	WARN_ON_ONCE(total_sg > vq->split.vring.num);
->>> +
->>>    	if (virtqueue_use_indirect(_vq, total_sg))
->>>    		desc = alloc_indirect_split(_vq, total_sg, gfp);
->>>    	else {
->>>    		desc = NULL;
->>> -		WARN_ON_ONCE(total_sg > vq->split.vring.num && !vq->indirect);
->>>    	}
->>>    	if (desc) {
->>> @@ -1118,6 +1119,8 @@ static inline int virtqueue_add_packed(struct virtqueue *_vq,
->>>    	BUG_ON(total_sg == 0);
->>> +	WARN_ON_ONCE(total_sg > vq->packed.vring.num);
->>> +
->>>    	if (virtqueue_use_indirect(_vq, total_sg))
->>>    		return virtqueue_add_indirect_packed(vq, sgs, total_sg,
->>>    				out_sgs, in_sgs, data, gfp);
->>> @@ -1125,8 +1128,6 @@ static inline int virtqueue_add_packed(struct virtqueue *_vq,
->>>    	head = vq->packed.next_avail_idx;
->>>    	avail_used_flags = vq->packed.avail_used_flags;
->>> -	WARN_ON_ONCE(total_sg > vq->packed.vring.num && !vq->indirect);
->>> -
->>>    	desc = vq->packed.vring.desc;
->>>    	i = head;
->>>    	descs_used = total_sg;
+Thanks!
+Christian
 

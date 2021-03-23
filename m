@@ -1,6 +1,6 @@
-Date: Tue, 23 Mar 2021 16:19:40 +0100
-From: Sergio Lopez <slp@redhat.com>
-Message-ID: <20210323151940.rao4zhik7r57nzcs@mhamilton>
+Date: Tue, 23 Mar 2021 11:31:50 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210323153150.GA488493@redhat.com>
 References: <2148A6EA-09CC-4DD2-8E03-8D51633D4137@apple.com>
 	<CAOssrKdGOL3Zqmhz4VGEccWw8N0tp1kP7qooB8gN7JOi5+5gew@mail.gmail.com>
 	<20210322164704.GD446288@redhat.com>
@@ -8,9 +8,9 @@ References: <2148A6EA-09CC-4DD2-8E03-8D51633D4137@apple.com>
 	<20210323134733.GA483930@redhat.com>
 	<CAAQbG+UxuFYKiNAL0=dUg1oSVs0tqf7vi0C4xVA6h6ft77UcNQ@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="r2n5xwrcwu2pwxfj"
+Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
 In-Reply-To: <CAAQbG+UxuFYKiNAL0=dUg1oSVs0tqf7vi0C4xVA6h6ft77UcNQ@mail.gmail.com>
 Subject: Re: [Virtio-fs] Large memory consumption by virtiofsd,
  suspecting fd's aren't being closed?
@@ -23,86 +23,64 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Eric Ernst <eric.g.ernst@gmail.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Eric Ernst <eric_ernst@apple.com>, Vivek Goyal <vgoyal@redhat.com>
-
-
---r2n5xwrcwu2pwxfj
-Content-Type: text/plain; charset=utf-8
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Cc: virtio-fs-list <virtio-fs@redhat.com>, Eric Ernst <eric_ernst@apple.com>
 
 On Tue, Mar 23, 2021 at 07:52:22AM -0700, Eric Ernst wrote:
 > On Tue, Mar 23, 2021 at 6:47 AM Vivek Goyal <vgoyal@redhat.com> wrote:
->=20
+> 
 > > On Tue, Mar 23, 2021 at 12:55:26PM +0100, Sergio Lopez wrote:
 > > > On Mon, Mar 22, 2021 at 12:47:04PM -0400, Vivek Goyal wrote:
 > > > > On Mon, Mar 22, 2021 at 05:09:32PM +0100, Miklos Szeredi wrote:
 > > > > > On Mon, Mar 22, 2021 at 6:52 AM Eric Ernst <eric_ernst@apple.com>
 > > wrote:
 > > > > > >
-> > > > > > Hey ya=E2=80=99ll,
+> > > > > > Hey ya’ll,
 > > > > > >
-> > > > > > One challenge I=E2=80=99ve been looking at is how to setup an a=
-ppropriate
-> > memory cgroup limit for workloads that are leveraging virtiofs (ie, run=
-ning
+> > > > > > One challenge I’ve been looking at is how to setup an appropriate
+> > memory cgroup limit for workloads that are leveraging virtiofs (ie, running
 > > pods with Kata Containers). I noticed that memory usage of the daemon
 > > itself can grow considerably depending on the workload; though much more
-> > than I=E2=80=99d expect.
+> > than I’d expect.
 > > > > > >
-> > > > > > I=E2=80=99m running workload that simply runs a build on kernel=
- sources
+> > > > > > I’m running workload that simply runs a build on kernel sources
 > > with -j3. In doing this, the source of the linux kernel are shared via
 > > virtiofs (no DAX), so as the build goes on, there are a lot of files
-> > opened, closed, as well as created. The rss memory of virtiofsd grows i=
-nto
+> > opened, closed, as well as created. The rss memory of virtiofsd grows into
 > > several hundreds of MBs.
 > > > > > >
-> > > > > > When taking a look, I=E2=80=99m suspecting that virtiofsd is ca=
-rrying out
-> > the opens, but never actually closing fds. In the guest, I=E2=80=99m se=
-eing fd=E2=80=99s on
+> > > > > > When taking a look, I’m suspecting that virtiofsd is carrying out
+> > the opens, but never actually closing fds. In the guest, I’m seeing fd’s on
 > > the order of 10-40 for all the container processes as it runs, whereas I
-> > see the number of fds for virtiofsd continually increasing, reaching ov=
-er
-> > 80,000 fds. I=E2=80=99m guessing this isn=E2=80=99t expected?
+> > see the number of fds for virtiofsd continually increasing, reaching over
+> > 80,000 fds. I’m guessing this isn’t expected?
 > > > > >
 > > > > > The reason could be that guest is keeping a ref on the inodes
-> > > > > (dcache->dentry->inode) and current implementation of server keep=
-s an
+> > > > > (dcache->dentry->inode) and current implementation of server keeps an
 > > > > > O_PATH fd open for each inode referenced by the client.
 > > > > >
-> > > > > One way to avoid this is to use the "cache=3Dnone" option, which =
-forces
-> > > > > the client to drop dentries immediately from the cache if not in =
-use.
+> > > > > One way to avoid this is to use the "cache=none" option, which forces
+> > > > > the client to drop dentries immediately from the cache if not in use.
 > > > > > This is not desirable if cache is actually in use.
 > > > > >
 > > > > > The memory use of the server should still be limited by the memory
 > > use
-> > > > > of the guest:  if there's memory pressure in the guest kernel, th=
-en
+> > > > > of the guest:  if there's memory pressure in the guest kernel, then
 > > it
-> > > > > will clean out caches, which results in the memory use decreasing=
- in
-> > > > > the server as well.  If the server memory use looks unbounded, th=
-at
-> > > > > might be indicative of too much memory used for dcache in the gue=
-st
+> > > > > will clean out caches, which results in the memory use decreasing in
+> > > > > the server as well.  If the server memory use looks unbounded, that
+> > > > > might be indicative of too much memory used for dcache in the guest
 > > > > > (cat /proc/slabinfo | grep ^dentry).     Can you verify?
 > > > >
 > > > > Hi Miklos,
 > > > >
 > > > > Apart from above, we identified one more issue on IRC. I asked Eric
-> > > > to drop caches manually in guest. (echo 3 > /proc/sys/vm/drop_cache=
-s)
+> > > > to drop caches manually in guest. (echo 3 > /proc/sys/vm/drop_caches)
 > > > > and while it reduced the fds open it did not seem to free up
 > > significant
 > > > > amount of memory.
 > > > >
 > > > > So question remains where is that memory. One possibility is that we
-> > > > have memory allocated for mapping arrays (inode and fd). These arra=
-ys
+> > > > have memory allocated for mapping arrays (inode and fd). These arrays
 > > > > only grow and never shrink. So they can lock down some memory.
 > > > >
 > > > > But still, lot of lo_inode memory should have been freed when
@@ -151,43 +129,56 @@ ys
 > >
 > > Eric, does this sound reasonable.
 > >
->=20
+> 
 > Sergio, Vivek --
->=20
+> 
 > Today QEMU/virtiofsd do live within the same memory cgroup, and are bound
 > by that same overhead I need to introduce. Good to know regarding the
-> sharing (this restores some sanity to my observations, thank you!), but t=
-he
+> sharing (this restores some sanity to my observations, thank you!), but the
 > real crux of the problem is two items:
 >  1) the FDs are held long after the application in guest is done with them
-> because of dentry cache in the guest (when cache=3Dauto for
-> virtiofsd).
-
-Yeah, we're looking into mechanisms that would allow us to avoid
-needing to hold an FD for each reference in the dentry cache, but
-it'll take a while. :-/
-
-If this becomes a problem, I'm afraid the only short term solution
-would be fixing mmap for "cache=3Dnone", and then accepting the
-performance hit that may suppose.
-
+> because of dentry cache in the guest (when cache=auto for virtiofsd).
 >  2) virtiofsd/QEMU is holding on to the memory after the fds are released
 
-The shared memory mapping between virtiofsd[-rs] and QEMU is actually
-the same one that's backing the guest's RAM. It's expected that the
-guest OS will eventually touch most of the pages available to it,
-making QEMU's RSS to grow to a number close to the amount of RAM
-configured for the VM. This should happen with or without virtio-fs.
+Which memory you are specifically concerned about. I am assuming you are
+referring to "RssAnon". I think this number continues to be high even
+after unmounting of virtiofs because glibc has not released memory back
+to system. It probably is keeping it around so that future allocations
+can be done faster.
 
-Are you using virtio-balloon's free page reporting or some other
-feature to return free pages to the Host?
+To confirm this, I patched virtiofsd and called malloc_trim(0) in 
+lo_destroy(). So this should force glibc to return heap memory to
+system (whatever is possible). And that led to reduced RssAnon.
 
-Sergio.
+After compilation finished:
 
+RssAnon:           11936 kB
+RssFile:            1964 kB
+RssShmem:        1036232 kB
+
+After unmounting virtiofs (with malloc_trim(0))
+
+RssAnon:            3428 kB
+RssFile:            1968 kB
+RssShmem:        1037036 kB
+
+So RssAnon usage dropped by roughly 75% with a call to malloc_trim(). 
+
+I think this can be further optimized if our mapping arrays can be
+shrunk too. 
+
+But point is that these number look reasonably small to not worry
+about it. I mean for a kernel compilation, peak RssAnon is 12MB
+in this run. And that does not sound too bad to me.
+
+Thanks
+Vivek
+
+> 
 > --Eric
->=20
->=20
->=20
+> 
+> 
+> 
 > >
 > > Thanks
 > > Vivek
@@ -227,26 +218,4 @@ Sergio.
 > > Virtio-fs@redhat.com
 > > https://listman.redhat.com/mailman/listinfo/virtio-fs
 > >
-
---r2n5xwrcwu2pwxfj
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAABCAAdFiEEvtX891EthoCRQuii9GknjS8MAjUFAmBaBwsACgkQ9GknjS8M
-AjVsTw/9E/5A1hdddMLwK15zUnn+iLAKs/xLJdagbTQuT1Q28xWqdaZQrX0AWZhw
-KQBx561WxrRROjHuoJfXKsd5hPfwLy8pviTi1CDHdI6b1Nbt1r5QJc6CM9BIH5k9
-YTvid8p5Eno5CW7iC/J1OnPiaCG2EQMbJ3NwFl/ZSCVI5XyQL9hZjS6t0P3NKNtj
-irVIDxww6WtjHX5jNz7tgSGllPfwl8jCuloMAYaCd9e7bVFa1bexjxN5sB5a3bGm
-cfB3CPq1RTl28SdM6mqAfCzqgq6CYK9krWU4PMQFTTDpfIhWEmnYrFxy64F0h50r
-sj1/QGoEZDSQaIUtskbEKjmE5Atk2vP3vhcO9pPy8348gSy1hXT+e0LfB2USuazi
-T/ai3y3z3sRbX06dY0J2frgxVcF8bo5x5/C2KBDN8mibPE7WAz5t2cSFIMqnvDWm
-KdA5irifAyM76cmLE86x00CIb91OlcG41/YgTHcDPfoITTWtEF3nENI+T79HmWhu
-icm9KYKdZJlmqkbPBf9O/f27bZLKo443gjo59K41hbfWj4N2c9Zh1Wv8u8P7905U
-lpbSNk87dZgLK31vixQExyt7ZsXOTuUX4tcSbl4Xe8fB1mUvC+2dtK5rEXLx9sBL
-j/vdjmkdkmj59VX7Fa4HlnCVv4+3G72V59KGgOgxg1H/BexGZf0=
-=igUp
------END PGP SIGNATURE-----
-
---r2n5xwrcwu2pwxfj--
 

@@ -1,11 +1,11 @@
-Date: Tue, 23 Mar 2021 10:02:56 +0100
-From: Greg Kurz <groug@kaod.org>
-Message-ID: <20210323100256.1f0b43dc@bahia.lan>
-In-Reply-To: <714BD741-AE3F-4BC5-8DFB-F5C74A8623B1@netapp.com>
+Date: Tue, 23 Mar 2021 10:29:09 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YFnC9QXo6uP+2zC1@work-vm>
 References: <714BD741-AE3F-4BC5-8DFB-F5C74A8623B1@netapp.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="US-ASCII"
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <714BD741-AE3F-4BC5-8DFB-F5C74A8623B1@netapp.com>
 Subject: Re: [Virtio-fs] Live migration support for virtio-fs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -18,32 +18,43 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: "Ge, Xiongzi" <Xiongzi.Ge@netapp.com>
 Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
-On Tue, 23 Mar 2021 01:35:58 +0000
-"Ge, Xiongzi" <Xiongzi.Ge@netapp.com> wrote:
-
+* Ge, Xiongzi (Xiongzi.Ge@netapp.com) wrote:
 > Hello Vivek, Dr. Gilbert, and the virtio-fs team,
-> 
-> It seems that virtio-fs does not support live migration. Once a vm is
-> configured with virtio-fs, live migration cannot be performed even it
-> is not mounted on the guest. Is there any progress for this? If the
 
-Live migration of virtio-fs is still at the early discussion stage AFAICT.
-It might take time before we have something working. But in the meantime,
-it seems abusive to block migration if we have a guarantee that the device
-isn't servicing requests. FWIW virtio-9p only blocks migration when the
-shared directory is mounted on the guest.
+Hi Xiongzi,
 
+> It seems that virtio-fs does not support live migration. Once a vm
+> is configured with virtio-fs, live migration cannot be performed even
+> it is not mounted on the guest.
+
+Right.
+
+> Is there any progress for this?
+
+Max Reitz is looking at some parts of it; in particular storing file
+handles that can later be reopened.
+But there are a bunch of other parts we've not looked at yet either
+(like the dirty page marking around all syscalls).
+
+> If the
 > shared directory is from a distributed file system like Ceph, would it
-> be easier than the general case to be implemented? 
+> be easier than the general case to be implemented?
+
+Maybe; there are some tricky semantics problems; for example, lets
+imagine that you open the file   'a/b/c'  on the source, and sometime
+after you open it, 'b' gets renamed to 'd';  when you resume on the
+destination you need to make sure you know how to get to that file.
+Depending on the filesystem semantics you might need to make that work
+even if 'a/b/c' had been deleted but you still had it open.
+
+Dave
+
+
 > 
 > Thanks,
 > Xiongzi
 > 
 > 
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
-> 
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

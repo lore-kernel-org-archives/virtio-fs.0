@@ -1,18 +1,14 @@
-References: <20210318135223.1342795-1-ckuehl@redhat.com>
-	<20210318135223.1342795-3-ckuehl@redhat.com>
-	<YFNvH8w4l7WyEMyr@miu.piliscsaba.redhat.com>
-	<04e46a8c-df26-3b58-71f8-c0b94c546d70@redhat.com>
-	<CAJfpeguzdPV13LhXFL0U_bfKcpOHQCvg2wfxF6ryksp==tjVWA@mail.gmail.com>
-From: Connor Kuehl <ckuehl@redhat.com>
-Message-ID: <9879ca3f-548a-25d4-78f0-f307e1189231@redhat.com>
-Date: Wed, 24 Mar 2021 10:31:49 -0500
+Date: Wed, 24 Mar 2021 16:44:53 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YFtshUTbNF9omBGv@work-vm>
+References: <47a35ffe-ef39-d098-2c29-34cf7d4eb7ef@redhat.com>
+	<YFsnwtUqfmr3e7dI@stefanha-x1.localdomain>
 MIME-Version: 1.0
-In-Reply-To: <CAJfpeguzdPV13LhXFL0U_bfKcpOHQCvg2wfxF6ryksp==tjVWA@mail.gmail.com>
-Content-Type: text/plain; charset=utf-8; format=flowed
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH 2/3] virtiofs: split requests that exceed
-	virtqueue size
+Content-Type: text/plain; charset="utf-8"
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <YFsnwtUqfmr3e7dI@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] Current file handle status and open questions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,24 +17,64 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: "Michael S. Tsirkin" <mst@redhat.com>, Jason Wang <jasowang@redhat.com>, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs-list <virtio-fs@redhat.com>, linux-fsdevel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, Max Reitz <mreitz@redhat.com>
 
-On 3/24/21 10:30 AM, Miklos Szeredi wrote:
-> On Wed, Mar 24, 2021 at 4:09 PM Connor Kuehl <ckuehl@redhat.com> wrote:
->>
->> On 3/18/21 10:17 AM, Miklos Szeredi wrote:
->>> I removed the conditional compilation and renamed the limit.  Also made
->>> virtio_fs_get_tree() bail out if it hit the WARN_ON().  Updated patch below.
->>
->> Hi Miklos,
->>
->> Has this patch been queued?
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> On Thu, Mar 18, 2021 at 06:09:58PM +0100, Max Reitz wrote:
+> > So, overall it seems like it may be workable to extend the in-kernel MAC
+> > verification to allow for persistent keys, but I still have some open
+> > questions, and I don’t know whether I should just defer them until we
+> > get to the point where we need persistency.
 > 
-> It's in my internal patch queue at the moment.   Will push to
-> fuse.git#for-next in a couple of days.
+> It seems worth refining these ideas a little bit further until they
+> reach solid ground. Then we can be sure that there is at least one
+> possible solution. At the moment it seems like most the components of a
+> solution are known but it's not clear how they all fit together - and
+> they have a nasty tendency of failing to meet the requirements if they
+> aren't put together in exactly the right way :).
+> 
+> > (Of note: If we implement something where a user space process (or
+> > multiple in conjunction) can arbitrarily choose a MAC key, then this
+> > will also be usable for live migration, because you can continue to use
+> > the key from the source on the destination.)
+> 
+> Definitely. Taking migration into account is worthwhile. One question
+> about that:
+> 
+> Are Linux file handles transferrable between systems? Basic
+> configurations that come to mind:
+> 1. XFS, brtfs, ext4 on SAN (e.g. FibreChannel SCSI LUN)
+> 2. NFS
+> 
+> I assumed they were in previous discussions but has anyone checked the
+> file handle implementations to see whether this is really the case?
+> 
+> > Final minor question that doesn’t really fit in fully elsewhere: When
+> > generating a MAC over a file handle, should the mount ID be included?
+> > I’m worried that this might definitely break persistency, but I think we
+> > should include some FS ID.  Maybe the kernel should query the FS UUID
+> > for this MAC calculation, and use that instead of the mount ID?
+> 
+> This is a good point. If the file handle is not tied to a particular
+> file system mount then an application can stash a well-known file handle
+> (e.g. /) from one mount it has full access to and then use open a file
+> on a mount that it does not have full directory treeaccess to (e.g. a
+> bind mount/sub-tree?).
 
-Cool! Thank you :-)
+I'd be surprised if the mount-id was the same between two hosts.
 
-Connor
+Dave
+
+> Stefan
+
+
+
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
+
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

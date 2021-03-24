@@ -1,10 +1,10 @@
 References: <47a35ffe-ef39-d098-2c29-34cf7d4eb7ef@redhat.com>
-	<20210323163911.5lxnlv5tn66smscn@mhamilton>
+	<20210323195232.GG483930@redhat.com>
 From: Max Reitz <mreitz@redhat.com>
-Message-ID: <8fdd157d-68ce-b743-7841-7fd80f7ccf2e@redhat.com>
-Date: Wed, 24 Mar 2021 08:40:26 +0100
+Message-ID: <67344983-547a-c4cc-aafc-d2780bbc0718@redhat.com>
+Date: Wed, 24 Mar 2021 09:06:52 +0100
 MIME-Version: 1.0
-In-Reply-To: <20210323163911.5lxnlv5tn66smscn@mhamilton>
+In-Reply-To: <20210323195232.GG483930@redhat.com>
 Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Language: en-US
 Content-Transfer-Encoding: 8bit
@@ -17,10 +17,10 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Sergio Lopez <slp@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
 Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-On 23.03.21 17:39, Sergio Lopez wrote:
+On 23.03.21 20:52, Vivek Goyal wrote:
 > On Thu, Mar 18, 2021 at 06:09:58PM +0100, Max Reitz wrote:
 >> Hi,
 >>
@@ -102,16 +102,66 @@ On 23.03.21 17:39, Sergio Lopez wrote:
 >> unique to a process, or at least unique to a group of processes that
 >> share the same FDs.)
 > 
-> Does this mean that if we have, let's say, 3 virtiofsd instances each
-> one "remembering" (because there's a reference in the dentry cache of
-> the guest they are servicing) 10.000 files, the Host's kernel would
-> need to keep 30.000 entries holding the host_file+MAC information? Or
-> is there some kind of VFS trickery at play here that allows to do the
-> check without holding all that information?
+> People are now discussing the idea of doing crash recovery for virtiofsd
+> and pass all the information to systemd(or other process) and get it
+> back once virtiofsd restarts. So tying the key to process life time
+> might not work with crash recovery.
 
-No, you only store one MAC key per process.  The MAC is appended to the 
-file handle that is handed back to virtiofsd, so the kernel doesn’t need 
-to store it.
+Well, this would be solved by having the "persistency between virtiofsd 
+invocations" I go on to sketch.
+
+> May be we can have a kernel system wide keyring and kernel can generate
+> a key and load there and that key can be used for the lifetime of kernel.
+> And every reboot will generate a new key.
+
+Hm.  The problem I see with a system-wide key, i.e. one that isn’t 
+process-specific, is that processes could exchange file handles among 
+each other.  Probably not a real problem, because again, if processes 
+can share file handles, they can probably do I/O for each other.  OTOH, 
+a file handle persists after a process has exited, so maybe this isn’t 
+truly equivalent.
+
+The nice thing about a global key would be that it would make true 
+persistency easier, too, because you could let it be uploaded from an 
+arbitrary user space process and don’t have to deal with having to 
+assign it to virtiofsd somehow.
+
+But the question remains whether it is a good idea to have a single key 
+for all processes.  I feel uneasy about it.
+
+
+Or did you mean that the kernel would generate a new key per process, 
+put it into the keyring, and then after a restart the application could 
+select its old key again?  I don’t know how you’d verify that the 
+application has the right to do so.  I think this would have the same 
+problem as a global key, because a process could quit and let some 
+different application use its key and its file handles.
+
+> I don't know much about encryption. How does HMAC key look like. Typically
+> with asymmetric keys, we sign kernel modules during build outside the
+> kernel and build public key into the kernel. Is this HMAC key a single
+> key which can be used both for encoding and decoding operation.
+
+Yes.  You basically combine a single secret key with the message to be 
+authenticated, hash it twice, and the resulting hash is the MAC.
+
+For verification, you do exactly the same process (i.e., it’s the same 
+key) and check whether the MAC matches.
+
+> If same key can be used both for encoding/decoding, then question
+> arises, what are the chances that this key can leak to user space
+> and then user space can artifically encode file handles and be
+> able to open any files. I guess that's the reason TPM kind of things
+> are there to entrust that hardware with private key and nobody else
+> can get to it. (Sorry, I know very little about cryptography, so lot
+> of above might be wrong).
+
+I don’t understand this question.  We would have the same problem with 
+an asymmetric key, right?  The private key could leak to user space.
+
+The chances are as high as it is for user space applications to read 
+kernel space.  I guess when you upload a key with keyctl() so that no 
+other process may read it, you rely on the same protection.
 
 Max
 

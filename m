@@ -1,19 +1,14 @@
-Date: Tue, 23 Mar 2021 18:50:46 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210323225046.GH483930@redhat.com>
-References: <20210319195547.427371-1-vgoyal@redhat.com>
-	<20210319195547.427371-2-vgoyal@redhat.com>
-	<CAHpGcMKhFxotKDxPryfKdhNMMDWO4Ws33s6fEm2NP0u_4vffnQ@mail.gmail.com>
-	<20210320100322.ox5gzgauo7iqf2fv@gmail.com>
-	<20210322170111.GE446288@redhat.com>
-	<20210323093233.iyl4k6x432ytb72c@wittgenstein>
+References: <47a35ffe-ef39-d098-2c29-34cf7d4eb7ef@redhat.com>
+	<20210323163911.5lxnlv5tn66smscn@mhamilton>
+From: Max Reitz <mreitz@redhat.com>
+Message-ID: <8fdd157d-68ce-b743-7841-7fd80f7ccf2e@redhat.com>
+Date: Wed, 24 Mar 2021 08:40:26 +0100
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <20210323093233.iyl4k6x432ytb72c@wittgenstein>
-Subject: Re: [Virtio-fs] [PATCH 1/3] posic_acl: Add a helper determine if
- SGID should be cleared
+In-Reply-To: <20210323163911.5lxnlv5tn66smscn@mhamilton>
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Language: en-US
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] Current file handle status and open questions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,110 +17,101 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Christian Brauner <christian.brauner@ubuntu.com>
-Cc: Jan Kara <jack@suse.cz>, Andreas Gruenbacher <agruenba@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, Andreas =?iso-8859-1?Q?Gr=FCnbacher?= <andreas.gruenbacher@gmail.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, virtio-fs@redhat.com, Seth Forshee <seth.forshee@canonical.com>, Christian Brauner <christian.brauner@canonical.com>, Alexander Viro <viro@zeniv.linux.org.uk>, Linux FS-devel Mailing List <linux-fsdevel@vger.kernel.org>
+To: Sergio Lopez <slp@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-On Tue, Mar 23, 2021 at 10:32:33AM +0100, Christian Brauner wrote:
-> On Mon, Mar 22, 2021 at 01:01:11PM -0400, Vivek Goyal wrote:
-> > On Sat, Mar 20, 2021 at 11:03:22AM +0100, Christian Brauner wrote:
-> > > On Fri, Mar 19, 2021 at 11:42:48PM +0100, Andreas Gr=FCnbacher wrote:
-> > > > Hi,
-> > > >=20
-> > > > Am Fr., 19. M=E4rz 2021 um 20:58 Uhr schrieb Vivek Goyal <vgoyal@re=
-dhat.com>:
-> > > > > posix_acl_update_mode() determines what's the equivalent mode and=
- if SGID
-> > > > > needs to be cleared or not. I need to make use of this code in fu=
-se
-> > > > > as well. Fuse will send this information to virtiofs file server =
-and
-> > > > > file server will take care of clearing SGID if it needs to be don=
-e.
-> > > > >
-> > > > > Hence move this code in a separate helper so that more than one p=
-lace
-> > > > > can call into it.
-> > > > >
-> > > > > Cc: Jan Kara <jack@suse.cz>
-> > > > > Cc: Andreas Gruenbacher <agruenba@redhat.com>
-> > > > > Cc: Alexander Viro <viro@zeniv.linux.org.uk>
-> > > > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > > > > ---
-> > > > >  fs/posix_acl.c            |  3 +--
-> > > > >  include/linux/posix_acl.h | 11 +++++++++++
-> > > > >  2 files changed, 12 insertions(+), 2 deletions(-)
-> > > > >
-> > > > > diff --git a/fs/posix_acl.c b/fs/posix_acl.c
-> > > > > index f3309a7edb49..2d62494c4a5b 100644
-> > > > > --- a/fs/posix_acl.c
-> > > > > +++ b/fs/posix_acl.c
-> > > > > @@ -684,8 +684,7 @@ int posix_acl_update_mode(struct user_namespa=
-ce *mnt_userns,
-> > > > >                 return error;
-> > > > >         if (error =3D=3D 0)
-> > > > >                 *acl =3D NULL;
-> > > > > -       if (!in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
-> > > > > -           !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSET=
-ID))
-> > > > > +       if (posix_acl_mode_clear_sgid(mnt_userns, inode))
-> > > > >                 mode &=3D ~S_ISGID;
-> > > > >         *mode_p =3D mode;
-> > > > >         return 0;
-> > > > > diff --git a/include/linux/posix_acl.h b/include/linux/posix_acl.h
-> > > > > index 307094ebb88c..073c5e546de3 100644
-> > > > > --- a/include/linux/posix_acl.h
-> > > > > +++ b/include/linux/posix_acl.h
-> > > > > @@ -59,6 +59,17 @@ posix_acl_release(struct posix_acl *acl)
-> > > > >  }
-> > > > >
-> > > > >
-> > > > > +static inline bool
-> > > > > +posix_acl_mode_clear_sgid(struct user_namespace *mnt_userns,
-> > > > > +                         struct inode *inode)
-> > > > > +{
-> > > > > +       if (!in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
-> > > > > +           !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSET=
-ID))
-> > > > > +               return true;
-> > > > > +
-> > > > > +       return false;
-> > > >=20
-> > > > That's just
-> > > >=20
-> > > > return !in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
-> > > >     !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID);
-> > > >=20
-> > > > The same pattern we have in posix_acl_update_mode also exists in
-> > > > setattr_copy and inode_init_owner, and almost the same pattern exis=
-ts
-> > > > in setattr_prepare, so can this be cleaned up as well? The function
-> > > > also isn't POSIX ACL specific, so the function name is misleading.
-> > >=20
-> > > Good idea but that should probably be spun into a separate patchset t=
-hat
-> > > only touches the vfs parts.
-> >=20
-> > IIUC, suggestion is that I should write a VFS helper (and not posix
-> > acl helper) and use that helper at other places too in the code.=20
->=20
-> If there are other callers outside of acls (which should be iirc) then
-> yes.
->=20
-> >=20
-> > I will do that and post in a separate patch series.
->=20
-> Yeah, I think that makes more sense to have this be a separate change
-> instead of putting it together with the fuse change if it touches more
-> than one place.
+On 23.03.21 17:39, Sergio Lopez wrote:
+> On Thu, Mar 18, 2021 at 06:09:58PM +0100, Max Reitz wrote:
+>> Hi,
+>>
+>> As threatened in our last meeting, I’ve written this mail to give an
+>> overview on where we stand with regards to virtiofsd(-rs) using file
+>> handles.
+>>
+>> Technically, this should be a reply to the “Securint file handles”
+>> thread, but this mail is so long I think it’s better to split it off.
+>>
+>> There are multiple problems that somehow relate to file handles, the
+>> ones I’m aware of are:
+>>
+>> (A) We have a problem with too many FDs open.  To solve it, we could
+>>      attach a file handle to each node, then close the FD (as far as
+>>      possible) and reopen it when needed from the file handle.
+>>
+>> (B) We want to allow the guest to use persistent file handles.
+>>
+>> (C) For live migration, the problem isn’t even clear yet, but it seems
+>>      like we’ll want to translate nodes into their file handles and
+>>      transmit those and open them again on the destination (at least on
+>>      shared filesystems).
+>>
+>> Now every case has its own specific tricky bits:
+>>
+>> Case (A) is something that we’d really like to have by default, and it
+>> would need to work all the time during runtime.  So the problem here is
+>> that we’d need CAP_DAC_READ_SEARCH, and we’d need it all the time, but
+>> we don’t want that.  One interesting bit is that we don’t need these
+>> file handles to be persistent between virtiofsd invocations.
+>>
+>> For (B) we have the problem of needing to protect against a potentially
+>> malicious guest, i.e. that it must not be able to reference files
+>> outside the shared directory.  (Perhaps except for cases where the file
+>> was once reachable, i.e. where a file handle was generated by the guest,
+>> then the file was moved outside of the shared directory, but remains
+>> accessible through the file handle.)  Furthermore, file handles should
+>> really be persistent between virtiofsd invocations.  On the positive
+>> side, it would be easier for us to require CAP_DAC_READ_SEARCH for this
+>> case, because it really is optional.  We could require users to give us
+>> that capability if they want file handles in the guest (and we find no
+>> way to avoid requiring that capability).
+>>
+>> (C) needs persistency between source and destination, but on the
+>> positive side, we only need to be able to open file handles during the
+>> in-migrate phase on the destination.  So requiring CAP_DAC_READ_SEARCH
+>> only during that phase might not be that big of a deal.
+>>
+>>
+>> (Ideally, we’d want all cases to work without CAP_DAC_READ_SEARCH, but
+>> as you can see, that requirement is weakened for cases (B) and
+>> especially (C).)
+>>
+>>
+>> As far as I’ve understood, (A) is the case that we want to focus on
+>> first, and the main problem there is that we need to open file handles
+>> without CAP_DAC_READ_SEARCH.
+>>
+>> To do that, I at one point proposed a service process that has
+>> CAP_DAC_READ_SEARCH and would open file handles for virtiofsd.  But that
+>> probably won’t really be an improvement, because this process too would
+>> probably need to run in the container and so if we can’t give virtiofsd
+>> that capability, we can’t give it to that service process either.
+>>
+>> What Miklos proposed was to modify the kernel to allow processes to open
+>> file handles even if they don’t have CAP_DAC_READ_SEARCH as long as
+>> those files are in the process’s scope.  One way to implement this
+>> restriction (in a very restrictive manner) is to only allow opening file
+>> handles that the process has generated before, e.g. by appending a MAC
+>> to every file handle (generated with a process-specific key) and
+>> checking that when opening a handle.  (You would request this MAC with a
+>> new AT_* flag passed to name_to_handle_at().  open_by_handle_at()
+>> recognizes it due to a special file handle type value.)
+>>
+>> (Process-specific key = stored in current->files, i.e. the files_struct.
+>> I’m not 100% sure what this is, but I guess this is the structure that
+>> keeps a process’s open file descriptors, and so should generally be
+>> unique to a process, or at least unique to a group of processes that
+>> share the same FDs.)
+> 
+> Does this mean that if we have, let's say, 3 virtiofsd instances each
+> one "remembering" (because there's a reference in the dentry cache of
+> the guest they are servicing) 10.000 files, the Host's kernel would
+> need to keep 30.000 entries holding the host_file+MAC information? Or
+> is there some kind of VFS trickery at play here that allows to do the
+> check without holding all that information?
 
-I do see that there are few places where this pattern is used and atleast
-some of them should be straight forward conversion.
+No, you only store one MAC key per process.  The MAC is appended to the 
+file handle that is handed back to virtiofsd, so the kernel doesn’t need 
+to store it.
 
-I will follow this up in separate patch series. I suspect that this
-might take little bit of back and forth, so will follow with fuse
-changes in parallel and open code there. Once this series gets merged
-will send another patch for fuse.
-
-Thanks
-Vivek
+Max
 

@@ -1,14 +1,10 @@
-References: <47a35ffe-ef39-d098-2c29-34cf7d4eb7ef@redhat.com>
-	<YFsnwtUqfmr3e7dI@stefanha-x1.localdomain> <YFtshUTbNF9omBGv@work-vm>
-From: Max Reitz <mreitz@redhat.com>
-Message-ID: <a45982bc-a749-0eb6-27ce-4feb0c6ce103@redhat.com>
-Date: Wed, 24 Mar 2021 17:57:13 +0100
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Thu, 25 Mar 2021 11:18:21 -0400
+Message-Id: <20210325151823.572089-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <YFtshUTbNF9omBGv@work-vm>
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Language: en-US
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] Current file handle status and open questions
+Subject: [Virtio-fs] [PATCH v2 0/2] fuse: Fix clearing SGID when access ACL
+	is set
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,31 +13,56 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, miklos@szeredi.hu
+Cc: seth.forshee@canonical.com, vgoyal@redhat.com
 
-On 24.03.21 17:44, Dr. David Alan Gilbert wrote:
-> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
->> On Thu, Mar 18, 2021 at 06:09:58PM +0100, Max Reitz wrote:
 
-[...]
+Hi,
 
->>> Final minor question that doesn’t really fit in fully elsewhere: When
->>> generating a MAC over a file handle, should the mount ID be included?
->>> I’m worried that this might definitely break persistency, but I think we
->>> should include some FS ID.  Maybe the kernel should query the FS UUID
->>> for this MAC calculation, and use that instead of the mount ID?
->>
->> This is a good point. If the file handle is not tied to a particular
->> file system mount then an application can stash a well-known file handle
->> (e.g. /) from one mount it has full access to and then use open a file
->> on a mount that it does not have full directory treeaccess to (e.g. a
->> bind mount/sub-tree?).
-> 
-> I'd be surprised if the mount-id was the same between two hosts.
+This is V2 of the patchset. Posted V1 here.
 
-True, and it’s also not persistent between reboots, that’s why I 
-proposed for the kernel to query the FS UUID for the MAC calculation.
+https://lore.kernel.org/linux-fsdevel/20210319195547.427371-1-vgoyal@redhat.com/
 
-Max
+Changes since V1:
+
+- Dropped the helper to determine if SGID should be cleared and open
+  coded it instead. I will follow up on helper separately in a different
+  patch series. There are few places already which open code this, so
+  for now fuse can do the same. Atleast I can make progress on this
+  and virtiofs can enable ACL support.
+
+Luis reported that xfstests generic/375 fails with virtiofs. Little
+debugging showed that when posix access acl is set that in some
+cases SGID needs to be cleared and that does not happen with virtiofs.
+
+Setting posix access acl can lead to mode change and it can also lead
+to clear of SGID. fuse relies on file server taking care of all
+the mode changes. But file server does not have enough information to
+determine whether SGID should be cleared or not.
+
+Hence this patch series add support to send a flag in SETXATTR message
+to tell server to clear SGID.
+
+I have staged corresponding virtiofsd patches here.
+
+https://github.com/rhvgoyal/qemu/commits/acl-sgid-setxattr-flag
+
+With these patches applied "./check -g acl" passes now on virtiofs.
+
+Thanks
+Vivek
+
+Vivek Goyal (2):
+  fuse: Add support for FUSE_SETXATTR_V2
+  fuse: Add a flag FUSE_SETXATTR_ACL_KILL_SGID to kill SGID
+
+ fs/fuse/acl.c             |  8 +++++++-
+ fs/fuse/fuse_i.h          |  5 ++++-
+ fs/fuse/inode.c           |  4 +++-
+ fs/fuse/xattr.c           | 21 +++++++++++++++------
+ include/uapi/linux/fuse.h | 17 +++++++++++++++++
+ 5 files changed, 46 insertions(+), 9 deletions(-)
+
+-- 
+2.25.4
 

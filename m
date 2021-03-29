@@ -1,6 +1,6 @@
-Date: Mon, 29 Mar 2021 15:50:37 +0100
+Date: Mon, 29 Mar 2021 15:54:03 +0100
 From: Luis Henriques <lhenriques@suse.de>
-Message-ID: <YGHpPWcZYQQWMvAi@suse.de>
+Message-ID: <YGHqC7bZuh+ytg+p@suse.de>
 References: <20210325151823.572089-1-vgoyal@redhat.com>
 	<20210325151823.572089-2-vgoyal@redhat.com>
 MIME-Version: 1.0
@@ -65,15 +65,6 @@ uct inode *inode,
 > +	/** Does file server support setxattr_v2 */
 > +	unsigned setxattr_v2:1;
 > +
-
-Minor (pedantic!) comment: most of the fields here start with 'no_*', so
-maybe it's worth setting the logic to use 'no_setxattr_v2' instead?
-
-Cheers,
---
-Lu=EDs
-
-
 >  	/** Is getxattr not implemented by fs? */
 >  	unsigned no_getxattr:1;
 > =20
@@ -152,6 +143,17 @@ ue,
 > -	args.in_args[0].value =3D &inarg;
 > +	args.in_args[0].size =3D setxattr_v2 ? sizeof(inarg_v2) : sizeof(inarg);
 > +	args.in_args[0].value =3D setxattr_v2 ? &inarg_v2 : (void *)&inarg;
+
+And yet another minor:
+
+It's a bit awkward to have to cast '&inarg' to 'void *' just because
+you're using the ternary operator.  Why not use an 'if' statement instead
+for initializing .size and .value?
+
+Cheers,
+--
+Lu=EDs
+
 >  	args.in_args[1].size =3D strlen(name) + 1;
 >  	args.in_args[1].value =3D name;
 >  	args.in_args[2].size =3D size;

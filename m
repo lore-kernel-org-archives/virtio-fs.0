@@ -1,15 +1,15 @@
-Date: Mon, 29 Mar 2021 16:35:57 +0100
-From: Luis Henriques <lhenriques@suse.de>
-Message-ID: <YGHz3a9JCAV21Aun@suse.de>
-References: <20210325153852.572927-1-vgoyal@redhat.com>
-	<20210325153852.572927-6-vgoyal@redhat.com>
+Date: Mon, 29 Mar 2021 14:16:51 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210329181651.GD676525@redhat.com>
+References: <20210325151823.572089-1-vgoyal@redhat.com>
+	<20210325151823.572089-2-vgoyal@redhat.com>
+	<YGHpPWcZYQQWMvAi@suse.de>
 MIME-Version: 1.0
-In-Reply-To: <20210325153852.572927-6-vgoyal@redhat.com>
-Content-Type: text/plain; charset="iso-8859-1"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [PATCH v5 5/5] virtiofsd: Switch creds,
- drop FSETID for system.posix_acl_access xattr
+In-Reply-To: <YGHpPWcZYQQWMvAi@suse.de>
+Subject: Re: [Virtio-fs] [PATCH v2 1/2] fuse: Add support for
+	FUSE_SETXATTR_V2
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,176 +18,69 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, miklos@szeredi.hu, qemu-devel@nongnu.org
+To: Luis Henriques <lhenriques@suse.de>
+Cc: miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, seth.forshee@canonical.com, linux-fsdevel@vger.kernel.org
 
-On Thu, Mar 25, 2021 at 11:38:52AM -0400, Vivek Goyal wrote:
-> When posix access acls are set on a file, it can lead to adjusting file
-> permissions (mode) as well. If caller does not have CAP_FSETID and it
-> also does not have membership of owner group, this will lead to clearing
-> SGID bit in mode.
->=20
-> Current fuse code is written in such a way that it expects file server
-> to take care of chaning file mode (permission), if there is a need.
-> Right now, host kernel does not clear SGID bit because virtiofsd is
-> running as root and has CAP_FSETID. For host kernel to clear SGID,
-> virtiofsd need to switch to gid of caller in guest and also drop
-> CAP_FSETID (if caller did not have it to begin with).
->=20
-> If SGID needs to be cleared, client will set the flag
-> FUSE_SETXATTR_ACL_KILL_SGID in setxattr request. In that case server
-> should kill sgid.
->=20
-> Currently just switch to uid/gid of the caller and drop CAP_FSETID
-> and that should do it.
->=20
-> This should fix the xfstest generic/375 test case.
->=20
-> We don't have to switch uid for this to work. That could be one optimizat=
-ion
-> that pass a parameter to lo_change_cred() to only switch gid and not uid.
->=20
-> Also this will not work whenever (if ever) we support idmapped mounts. In
-> that case it is possible that uid/gid in request are 0/0 but still we
-> need to clear SGID. So we will have to pick a non-root sgid and switch
-> to that instead. That's an TODO item for future when idmapped mount
-> support is introduced.
->=20
-> Reported-by: Luis Henriques <lhenriques@suse.de>
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  include/standard-headers/linux/fuse.h |  7 +++++
->  tools/virtiofsd/passthrough_ll.c      | 42 +++++++++++++++++++++++++--
->  2 files changed, 47 insertions(+), 2 deletions(-)
->=20
-> diff --git a/include/standard-headers/linux/fuse.h b/include/standard-hea=
-ders/linux/fuse.h
-> index cc87ff27d0..4eb79399d4 100644
-> --- a/include/standard-headers/linux/fuse.h
-> +++ b/include/standard-headers/linux/fuse.h
-> @@ -180,6 +180,7 @@
->   *  - add FUSE_HANDLE_KILLPRIV_V2, FUSE_WRITE_KILL_SUIDGID, FATTR_KILL_S=
-UIDGID
->   *  - add FUSE_OPEN_KILL_SUIDGID
->   *  - add FUSE_SETXATTR_V2
-> + *  - add FUSE_SETXATTR_ACL_KILL_SGID
->   */
-> =20
->  #ifndef _LINUX_FUSE_H
-> @@ -450,6 +451,12 @@ struct fuse_file_lock {
->   */
->  #define FUSE_OPEN_KILL_SUIDGID	(1 << 0)
-> =20
-> +/**
-> + * setxattr flags
-> + * FUSE_SETXATTR_ACL_KILL_SGID: Clear SGID when system.posix_acl_access =
-is set
-> + */
-> +#define FUSE_SETXATTR_ACL_KILL_SGID    (1 << 0)
-> +
->  enum fuse_opcode {
->  	FUSE_LOOKUP		=3D 1,
->  	FUSE_FORGET		=3D 2,  /* no reply */
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrou=
-gh_ll.c
-> index 3f5c267604..8a48071d0b 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -175,7 +175,7 @@ struct lo_data {
->      int user_killpriv_v2, killpriv_v2;
->      /* If set, virtiofsd is responsible for setting umask during creatio=
-n */
->      bool change_umask;
-> -    int user_posix_acl;
-> +    int user_posix_acl, posix_acl;
->  };
-> =20
->  static const struct fuse_opt lo_opts[] =3D {
-> @@ -716,8 +716,10 @@ static void lo_init(void *userdata, struct fuse_conn=
-_info *conn)
->           * in fuse_lowlevel.c
->           */
->          fuse_log(FUSE_LOG_DEBUG, "lo_init: enabling posix acl\n");
-> -        conn->want |=3D FUSE_CAP_POSIX_ACL | FUSE_CAP_DONT_MASK;
-> +        conn->want |=3D FUSE_CAP_POSIX_ACL | FUSE_CAP_DONT_MASK |
-> +                      FUSE_CAP_SETXATTR_V2;
+On Mon, Mar 29, 2021 at 03:50:37PM +0100, Luis Henriques wrote:
+> On Thu, Mar 25, 2021 at 11:18:22AM -0400, Vivek Goyal wrote:
+> > Fuse client needs to send additional information to file server when
+> > it calls SETXATTR(system.posix_acl_access). Right now there is no extra
+> > space in fuse_setxattr_in. So introduce a v2 of the structure which has
+> > more space in it and can be used to send extra flags.
+> > 
+> > "struct fuse_setxattr_in_v2" is only used if file server opts-in for it using
+> > flag FUSE_SETXATTR_V2 during feature negotiations.
+> > 
+> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > ---
+> >  fs/fuse/acl.c             |  2 +-
+> >  fs/fuse/fuse_i.h          |  5 ++++-
+> >  fs/fuse/inode.c           |  4 +++-
+> >  fs/fuse/xattr.c           | 21 +++++++++++++++------
+> >  include/uapi/linux/fuse.h | 10 ++++++++++
+> >  5 files changed, 33 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/fs/fuse/acl.c b/fs/fuse/acl.c
+> > index e9c0f916349d..d31260a139d4 100644
+> > --- a/fs/fuse/acl.c
+> > +++ b/fs/fuse/acl.c
+> > @@ -94,7 +94,7 @@ int fuse_set_acl(struct user_namespace *mnt_userns, struct inode *inode,
+> >  			return ret;
+> >  		}
+> >  
+> > -		ret = fuse_setxattr(inode, name, value, size, 0);
+> > +		ret = fuse_setxattr(inode, name, value, size, 0, 0);
+> >  		kfree(value);
+> >  	} else {
+> >  		ret = fuse_removexattr(inode, name);
+> > diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+> > index 63d97a15ffde..d00bf0b9a38c 100644
+> > --- a/fs/fuse/fuse_i.h
+> > +++ b/fs/fuse/fuse_i.h
+> > @@ -668,6 +668,9 @@ struct fuse_conn {
+> >  	/** Is setxattr not implemented by fs? */
+> >  	unsigned no_setxattr:1;
+> >  
+> > +	/** Does file server support setxattr_v2 */
+> > +	unsigned setxattr_v2:1;
+> > +
+> 
+> Minor (pedantic!) comment: most of the fields here start with 'no_*', so
+> maybe it's worth setting the logic to use 'no_setxattr_v2' instead?
 
-An annoying thing with this is that if we're using a kernel without
-_V2 support the mount will still succeed.  But we'll see:
+Hi Luis,
 
-ls: cannot access '/mnt': Connection refused
+"setxattr_v2" kind of makes more sense to me because it is disabled
+by default untile and unless client opts in. If I use no_setxattr_v2,
+then it means by default I will have to initialize it to 1. Right
+now, following automatically takes care of it.
 
-and in the userspace:
+fc = kzalloc(sizeof(struct fuse_conn), GFP_KERNEL);
 
-fuse: error: filesystem requested capabilities 0x20000000 that are not supp=
-orted by kernel, aborting.
+Also, there are other examples which don't use "no_" prefix.
 
-Maybe it would be worth to automatically disable acl support if this
-happens (with an error message) but still allow the filesystem to be
-used.  Or, which is probably better, to handle the EPROTO error in the
-kernel during mount.
+auto_inval_data, explicit_inval_data, do_readdirplus, readdirplus_auto, 
+async_dio..... and list goes on.
 
-Cheers,
---
-Lu=EDs
-
->          lo->change_umask =3D true;
-> +        lo->posix_acl =3D true;
->      } else {
->          /* User either did not specify anything or wants it disabled */
->          fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling posix_acl\n");
-> @@ -3092,12 +3094,48 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_=
-t ino, const char *in_name,
-> =20
->      sprintf(procname, "%i", inode->fd);
->      if (S_ISREG(inode->filetype) || S_ISDIR(inode->filetype)) {
-> +        bool switched_creds =3D false;
-> +        struct lo_cred old =3D {};
-> +
->          fd =3D openat(lo->proc_self_fd, procname, O_RDONLY);
->          if (fd < 0) {
->              saverr =3D errno;
->              goto out;
->          }
-> +
-> +        /*
-> +         * If we are setting posix access acl and if SGID needs to be
-> +         * cleared, then switch to caller's gid and drop CAP_FSETID
-> +         * and that should make sure host kernel clears SGID.
-> +         *
-> +         * This probably will not work when we support idmapped mounts.
-> +         * In that case we will need to find a non-root gid and switch
-> +         * to it. (Instead of gid in request). Fix it when we support
-> +         * idmapped mounts.
-> +         */
-> +        if (lo->posix_acl && !strcmp(name, "system.posix_acl_access")
-> +            && (extra_flags & FUSE_SETXATTR_ACL_KILL_SGID)) {
-> +            ret =3D lo_change_cred(req, &old, false);
-> +            if (ret) {
-> +                saverr =3D ret;
-> +                goto out;
-> +            }
-> +            ret =3D drop_effective_cap("FSETID", NULL);
-> +            if (ret !=3D 0) {
-> +                lo_restore_cred(&old, false);
-> +                saverr =3D ret;
-> +                goto out;
-> +            }
-> +            switched_creds =3D true;
-> +        }
-> +
->          ret =3D fsetxattr(fd, name, value, size, flags);
-> +
-> +        if (switched_creds) {
-> +            if (gain_effective_cap("FSETID"))
-> +                fuse_log(FUSE_LOG_ERR, "Failed to gain CAP_FSETID\n");
-> +            lo_restore_cred(&old, false);
-> +        }
->      } else {
->          /* fchdir should not fail here */
->          assert(fchdir(lo->proc_self_fd) =3D=3D 0);
-> --=20
-> 2.25.4
->=20
-
+Vivek
 

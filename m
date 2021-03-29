@@ -1,16 +1,15 @@
-Date: Mon, 29 Mar 2021 14:24:08 -0400
+Date: Mon, 29 Mar 2021 15:51:51 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210329182408.GE676525@redhat.com>
-References: <20210325151823.572089-1-vgoyal@redhat.com>
-	<20210325151823.572089-2-vgoyal@redhat.com>
-	<YGHqC7bZuh+ytg+p@suse.de>
+Message-ID: <20210329195151.GF676525@redhat.com>
+References: <20210325153852.572927-1-vgoyal@redhat.com>
+	<20210325153852.572927-6-vgoyal@redhat.com>
+	<YGHz3a9JCAV21Aun@suse.de>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <YGHqC7bZuh+ytg+p@suse.de>
-Subject: Re: [Virtio-fs] [PATCH v2 1/2] fuse: Add support for
-	FUSE_SETXATTR_V2
+In-Reply-To: <YGHz3a9JCAV21Aun@suse.de>
+Subject: Re: [Virtio-fs] [PATCH v5 5/5] virtiofsd: Switch creds,
+ drop FSETID for system.posix_acl_access xattr
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,216 +19,153 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Luis Henriques <lhenriques@suse.de>
-Cc: miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, seth.forshee@canonical.com, linux-fsdevel@vger.kernel.org
+Cc: virtio-fs@redhat.com, miklos@szeredi.hu, qemu-devel@nongnu.org
 
-On Mon, Mar 29, 2021 at 03:54:03PM +0100, Luis Henriques wrote:
-> On Thu, Mar 25, 2021 at 11:18:22AM -0400, Vivek Goyal wrote:
-> > Fuse client needs to send additional information to file server when
-> > it calls SETXATTR(system.posix_acl_access). Right now there is no extra
-> > space in fuse_setxattr_in. So introduce a v2 of the structure which has
-> > more space in it and can be used to send extra flags.
-> >=20
-> > "struct fuse_setxattr_in_v2" is only used if file server opts-in for it=
- using
-> > flag FUSE_SETXATTR_V2 during feature negotiations.
-> >=20
+On Mon, Mar 29, 2021 at 04:35:57PM +0100, Luis Henriques wrote:
+> On Thu, Mar 25, 2021 at 11:38:52AM -0400, Vivek Goyal wrote:
+> > When posix access acls are set on a file, it can lead to adjusting file
+> > permissions (mode) as well. If caller does not have CAP_FSETID and it
+> > also does not have membership of owner group, this will lead to clearing
+> > SGID bit in mode.
+> > 
+> > Current fuse code is written in such a way that it expects file server
+> > to take care of chaning file mode (permission), if there is a need.
+> > Right now, host kernel does not clear SGID bit because virtiofsd is
+> > running as root and has CAP_FSETID. For host kernel to clear SGID,
+> > virtiofsd need to switch to gid of caller in guest and also drop
+> > CAP_FSETID (if caller did not have it to begin with).
+> > 
+> > If SGID needs to be cleared, client will set the flag
+> > FUSE_SETXATTR_ACL_KILL_SGID in setxattr request. In that case server
+> > should kill sgid.
+> > 
+> > Currently just switch to uid/gid of the caller and drop CAP_FSETID
+> > and that should do it.
+> > 
+> > This should fix the xfstest generic/375 test case.
+> > 
+> > We don't have to switch uid for this to work. That could be one optimization
+> > that pass a parameter to lo_change_cred() to only switch gid and not uid.
+> > 
+> > Also this will not work whenever (if ever) we support idmapped mounts. In
+> > that case it is possible that uid/gid in request are 0/0 but still we
+> > need to clear SGID. So we will have to pick a non-root sgid and switch
+> > to that instead. That's an TODO item for future when idmapped mount
+> > support is introduced.
+> > 
+> > Reported-by: Luis Henriques <lhenriques@suse.de>
 > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 > > ---
-> >  fs/fuse/acl.c             |  2 +-
-> >  fs/fuse/fuse_i.h          |  5 ++++-
-> >  fs/fuse/inode.c           |  4 +++-
-> >  fs/fuse/xattr.c           | 21 +++++++++++++++------
-> >  include/uapi/linux/fuse.h | 10 ++++++++++
-> >  5 files changed, 33 insertions(+), 9 deletions(-)
-> >=20
-> > diff --git a/fs/fuse/acl.c b/fs/fuse/acl.c
-> > index e9c0f916349d..d31260a139d4 100644
-> > --- a/fs/fuse/acl.c
-> > +++ b/fs/fuse/acl.c
-> > @@ -94,7 +94,7 @@ int fuse_set_acl(struct user_namespace *mnt_userns, s=
-truct inode *inode,
-> >  			return ret;
-> >  		}
-> > =20
-> > -		ret =3D fuse_setxattr(inode, name, value, size, 0);
-> > +		ret =3D fuse_setxattr(inode, name, value, size, 0, 0);
-> >  		kfree(value);
-> >  	} else {
-> >  		ret =3D fuse_removexattr(inode, name);
-> > diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-> > index 63d97a15ffde..d00bf0b9a38c 100644
-> > --- a/fs/fuse/fuse_i.h
-> > +++ b/fs/fuse/fuse_i.h
-> > @@ -668,6 +668,9 @@ struct fuse_conn {
-> >  	/** Is setxattr not implemented by fs? */
-> >  	unsigned no_setxattr:1;
-> > =20
-> > +	/** Does file server support setxattr_v2 */
-> > +	unsigned setxattr_v2:1;
+> >  include/standard-headers/linux/fuse.h |  7 +++++
+> >  tools/virtiofsd/passthrough_ll.c      | 42 +++++++++++++++++++++++++--
+> >  2 files changed, 47 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/include/standard-headers/linux/fuse.h b/include/standard-headers/linux/fuse.h
+> > index cc87ff27d0..4eb79399d4 100644
+> > --- a/include/standard-headers/linux/fuse.h
+> > +++ b/include/standard-headers/linux/fuse.h
+> > @@ -180,6 +180,7 @@
+> >   *  - add FUSE_HANDLE_KILLPRIV_V2, FUSE_WRITE_KILL_SUIDGID, FATTR_KILL_SUIDGID
+> >   *  - add FUSE_OPEN_KILL_SUIDGID
+> >   *  - add FUSE_SETXATTR_V2
+> > + *  - add FUSE_SETXATTR_ACL_KILL_SGID
+> >   */
+> >  
+> >  #ifndef _LINUX_FUSE_H
+> > @@ -450,6 +451,12 @@ struct fuse_file_lock {
+> >   */
+> >  #define FUSE_OPEN_KILL_SUIDGID	(1 << 0)
+> >  
+> > +/**
+> > + * setxattr flags
+> > + * FUSE_SETXATTR_ACL_KILL_SGID: Clear SGID when system.posix_acl_access is set
+> > + */
+> > +#define FUSE_SETXATTR_ACL_KILL_SGID    (1 << 0)
 > > +
-> >  	/** Is getxattr not implemented by fs? */
-> >  	unsigned no_getxattr:1;
-> > =20
-> > @@ -1170,7 +1173,7 @@ void fuse_unlock_inode(struct inode *inode, bool =
-locked);
-> >  bool fuse_lock_inode(struct inode *inode);
-> > =20
-> >  int fuse_setxattr(struct inode *inode, const char *name, const void *v=
-alue,
-> > -		  size_t size, int flags);
-> > +		  size_t size, int flags, unsigned extra_flags);
-> >  ssize_t fuse_getxattr(struct inode *inode, const char *name, void *val=
-ue,
-> >  		      size_t size);
-> >  ssize_t fuse_listxattr(struct dentry *entry, char *list, size_t size);
-> > diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-> > index b0e18b470e91..1c726df13f80 100644
-> > --- a/fs/fuse/inode.c
-> > +++ b/fs/fuse/inode.c
-> > @@ -1052,6 +1052,8 @@ static void process_init_reply(struct fuse_mount =
-*fm, struct fuse_args *args,
-> >  				fc->handle_killpriv_v2 =3D 1;
-> >  				fm->sb->s_flags |=3D SB_NOSEC;
-> >  			}
-> > +			if (arg->flags & FUSE_SETXATTR_V2)
-> > +				fc->setxattr_v2 =3D 1;
-> >  		} else {
-> >  			ra_pages =3D fc->max_read / PAGE_SIZE;
-> >  			fc->no_lock =3D 1;
-> > @@ -1095,7 +1097,7 @@ void fuse_send_init(struct fuse_mount *fm)
-> >  		FUSE_PARALLEL_DIROPS | FUSE_HANDLE_KILLPRIV | FUSE_POSIX_ACL |
-> >  		FUSE_ABORT_ERROR | FUSE_MAX_PAGES | FUSE_CACHE_SYMLINKS |
-> >  		FUSE_NO_OPENDIR_SUPPORT | FUSE_EXPLICIT_INVAL_DATA |
-> > -		FUSE_HANDLE_KILLPRIV_V2;
-> > +		FUSE_HANDLE_KILLPRIV_V2 | FUSE_SETXATTR_V2;
-> >  #ifdef CONFIG_FUSE_DAX
-> >  	if (fm->fc->dax)
-> >  		ia->in.flags |=3D FUSE_MAP_ALIGNMENT;
-> > diff --git a/fs/fuse/xattr.c b/fs/fuse/xattr.c
-> > index 1a7d7ace54e1..f2aae72653dc 100644
-> > --- a/fs/fuse/xattr.c
-> > +++ b/fs/fuse/xattr.c
-> > @@ -12,24 +12,33 @@
-> >  #include <linux/posix_acl_xattr.h>
-> > =20
-> >  int fuse_setxattr(struct inode *inode, const char *name, const void *v=
-alue,
-> > -		  size_t size, int flags)
-> > +		  size_t size, int flags, unsigned extra_flags)
-> >  {
-> >  	struct fuse_mount *fm =3D get_fuse_mount(inode);
-> >  	FUSE_ARGS(args);
-> >  	struct fuse_setxattr_in inarg;
-> > +	struct fuse_setxattr_in_v2 inarg_v2;
-> > +	bool setxattr_v2 =3D fm->fc->setxattr_v2;
-> >  	int err;
-> > =20
-> >  	if (fm->fc->no_setxattr)
-> >  		return -EOPNOTSUPP;
-> > =20
-> >  	memset(&inarg, 0, sizeof(inarg));
-> > -	inarg.size =3D size;
-> > -	inarg.flags =3D flags;
-> > +	memset(&inarg_v2, 0, sizeof(inarg_v2));
-> > +	if (setxattr_v2) {
-> > +		inarg_v2.size =3D size;
-> > +		inarg_v2.flags =3D flags;
-> > +		inarg_v2.setxattr_flags =3D extra_flags;
-> > +	} else {
-> > +		inarg.size =3D size;
-> > +		inarg.flags =3D flags;
-> > +	}
-> >  	args.opcode =3D FUSE_SETXATTR;
-> >  	args.nodeid =3D get_node_id(inode);
-> >  	args.in_numargs =3D 3;
-> > -	args.in_args[0].size =3D sizeof(inarg);
-> > -	args.in_args[0].value =3D &inarg;
-> > +	args.in_args[0].size =3D setxattr_v2 ? sizeof(inarg_v2) : sizeof(inar=
-g);
-> > +	args.in_args[0].value =3D setxattr_v2 ? &inarg_v2 : (void *)&inarg;
->=20
-> And yet another minor:
->=20
-> It's a bit awkward to have to cast '&inarg' to 'void *' just because
-> you're using the ternary operator.  Why not use an 'if' statement instead
-> for initializing .size and .value?
+> >  enum fuse_opcode {
+> >  	FUSE_LOOKUP		= 1,
+> >  	FUSE_FORGET		= 2,  /* no reply */
+> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> > index 3f5c267604..8a48071d0b 100644
+> > --- a/tools/virtiofsd/passthrough_ll.c
+> > +++ b/tools/virtiofsd/passthrough_ll.c
+> > @@ -175,7 +175,7 @@ struct lo_data {
+> >      int user_killpriv_v2, killpriv_v2;
+> >      /* If set, virtiofsd is responsible for setting umask during creation */
+> >      bool change_umask;
+> > -    int user_posix_acl;
+> > +    int user_posix_acl, posix_acl;
+> >  };
+> >  
+> >  static const struct fuse_opt lo_opts[] = {
+> > @@ -716,8 +716,10 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
+> >           * in fuse_lowlevel.c
+> >           */
+> >          fuse_log(FUSE_LOG_DEBUG, "lo_init: enabling posix acl\n");
+> > -        conn->want |= FUSE_CAP_POSIX_ACL | FUSE_CAP_DONT_MASK;
+> > +        conn->want |= FUSE_CAP_POSIX_ACL | FUSE_CAP_DONT_MASK |
+> > +                      FUSE_CAP_SETXATTR_V2;
+> 
+> An annoying thing with this is that if we're using a kernel without
+> _V2 support the mount will still succeed.  But we'll see:
+> 
+> ls: cannot access '/mnt': Connection refused
+> 
+> and in the userspace:
+> 
+> fuse: error: filesystem requested capabilities 0x20000000 that are not supported by kernel, aborting.
+> 
+> Maybe it would be worth to automatically disable acl support if this
+> happens (with an error message) but still allow the filesystem to be
+> used.
 
-Yes, I had to use (void *), otherwise compiler was complaining about
-returning different types of pointers. Interesting that compiler
-expects to return same type of pointer.
+If user specific "-o posix_acl" then it is better to fail explicitly
+if posix_acl can't be enabled. If user did not specify anything, then
+it makes sense to automatically disable posix acl  and continue.
 
-I think I am fine with this as well as adding explicit if statement. I
-guess just a matter of taste.=20
+> Or, which is probably better, to handle the EPROTO error in the
+> kernel during mount.
 
-Miklos, what do you think? If you also prefer if statement instead,
-I will make changes and post again.
+This will have been idea but in fuse, init process handling happens
+asynchronously. That is mount returns to user space while init
+command might complete at a later point of time. So can't return
+-EPROTO at mount time.
+
+So one of the problems seem to be that error message is not very
+clear. How about adding following so that user is clear that posix acl
+can't be enabled.
 
 Vivek
 
->=20
-> Cheers,
-> --
-> Lu=EDs
->=20
-> >  	args.in_args[1].size =3D strlen(name) + 1;
-> >  	args.in_args[1].value =3D name;
-> >  	args.in_args[2].size =3D size;
-> > @@ -199,7 +208,7 @@ static int fuse_xattr_set(const struct xattr_handle=
-r *handler,
-> >  	if (!value)
-> >  		return fuse_removexattr(inode, name);
-> > =20
-> > -	return fuse_setxattr(inode, name, value, size, flags);
-> > +	return fuse_setxattr(inode, name, value, size, flags, 0);
-> >  }
-> > =20
-> >  static bool no_xattr_list(struct dentry *dentry)
-> > diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-> > index 54442612c48b..1bb555c1c117 100644
-> > --- a/include/uapi/linux/fuse.h
-> > +++ b/include/uapi/linux/fuse.h
-> > @@ -179,6 +179,7 @@
-> >   *  7.33
-> >   *  - add FUSE_HANDLE_KILLPRIV_V2, FUSE_WRITE_KILL_SUIDGID, FATTR_KILL=
-_SUIDGID
-> >   *  - add FUSE_OPEN_KILL_SUIDGID
-> > + *  - add FUSE_SETXATTR_V2
-> >   */
-> > =20
-> >  #ifndef _LINUX_FUSE_H
-> > @@ -330,6 +331,7 @@ struct fuse_file_lock {
-> >   *			does not have CAP_FSETID. Additionally upon
-> >   *			write/truncate sgid is killed only if file has group
-> >   *			execute permission. (Same as Linux VFS behavior).
-> > + * FUSE_SETXATTR_V2:	Does file server support V2 of struct fuse_setxat=
-tr_in
-> >   */
-> >  #define FUSE_ASYNC_READ		(1 << 0)
-> >  #define FUSE_POSIX_LOCKS	(1 << 1)
-> > @@ -360,6 +362,7 @@ struct fuse_file_lock {
-> >  #define FUSE_MAP_ALIGNMENT	(1 << 26)
-> >  #define FUSE_SUBMOUNTS		(1 << 27)
-> >  #define FUSE_HANDLE_KILLPRIV_V2	(1 << 28)
-> > +#define FUSE_SETXATTR_V2	(1 << 29)
-> > =20
-> >  /**
-> >   * CUSE INIT request/reply flags
-> > @@ -686,6 +689,13 @@ struct fuse_setxattr_in {
-> >  	uint32_t	flags;
-> >  };
-> > =20
-> > +struct fuse_setxattr_in_v2 {
-> > +	uint32_t	size;
-> > +	uint32_t	flags;
-> > +	uint32_t	setxattr_flags;
-> > +	uint32_t	padding;
-> > +};
-> > +
-> >  struct fuse_getxattr_in {
-> >  	uint32_t	size;
-> >  	uint32_t	padding;
-> > --=20
-> > 2.25.4
-> >=20
->=20
+---
+ tools/virtiofsd/passthrough_ll.c |   14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
+
+Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
+===================================================================
+--- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2021-03-29 14:59:28.483340964 -0400
++++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2021-03-29 15:42:21.797482846 -0400
+@@ -712,10 +712,18 @@ static void lo_init(void *userdata, stru
+     if (lo->user_posix_acl == 1) {
+         /*
+          * User explicitly asked for this option. Enable it unconditionally.
+-         * If connection does not have this capability, it should fail
+-         * in fuse_lowlevel.c
++         * If connection does not have this capability, give out message
++         * now. fuse_lowlevel.c will error out.
+          */
+-        fuse_log(FUSE_LOG_DEBUG, "lo_init: enabling posix acl\n");
++        if (!(conn->capable & FUSE_CAP_POSIX_ACL) ||
++            !(conn->capable & FUSE_CAP_DONT_MASK) ||
++            !(conn->capable & FUSE_CAP_SETXATTR_V2)) {
++            fuse_log(FUSE_LOG_ERR, "lo_init: Can not enable posix acl."
++                     " kernel does not support FUSE_POSIX_ACL, FUSE_DONT_MASK"
++                     " or FUSE_SETXATTR_V2 capability.\n");
++        } else {
++            fuse_log(FUSE_LOG_DEBUG, "lo_init: enabling posix acl\n");
++        }
+         conn->want |= FUSE_CAP_POSIX_ACL | FUSE_CAP_DONT_MASK |
+                       FUSE_CAP_SETXATTR_V2;
+         lo->change_umask = true;
+
 

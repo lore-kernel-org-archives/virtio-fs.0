@@ -1,14 +1,15 @@
-Date: Fri, 19 Mar 2021 09:49:48 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210319134948.GA402287@redhat.com>
-References: <20210318135223.1342795-1-ckuehl@redhat.com>
-	<20210318135223.1342795-3-ckuehl@redhat.com>
+Date: Mon, 29 Mar 2021 16:35:57 +0100
+From: Luis Henriques <lhenriques@suse.de>
+Message-ID: <YGHz3a9JCAV21Aun@suse.de>
+References: <20210325153852.572927-1-vgoyal@redhat.com>
+	<20210325153852.572927-6-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+In-Reply-To: <20210325153852.572927-6-vgoyal@redhat.com>
+Content-Type: text/plain; charset="iso-8859-1"
 Content-Disposition: inline
-In-Reply-To: <20210318135223.1342795-3-ckuehl@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 2/3] virtiofs: split requests that exceed
-	virtqueue size
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH v5 5/5] virtiofsd: Switch creds,
+ drop FSETID for system.posix_acl_access xattr
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,60 +18,176 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Connor Kuehl <ckuehl@redhat.com>
-Cc: miklos@szeredi.hu, jasowang@redhat.com, mst@redhat.com, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, miklos@szeredi.hu, qemu-devel@nongnu.org
 
-On Thu, Mar 18, 2021 at 08:52:22AM -0500, Connor Kuehl wrote:
-> If an incoming FUSE request can't fit on the virtqueue, the request is
-> placed onto a workqueue so a worker can try to resubmit it later where
-> there will (hopefully) be space for it next time.
-> 
-> This is fine for requests that aren't larger than a virtqueue's maximum
-> capacity. However, if a request's size exceeds the maximum capacity of
-> the virtqueue (even if the virtqueue is empty), it will be doomed to a
-> life of being placed on the workqueue, removed, discovered it won't fit,
-> and placed on the workqueue yet again.
-> 
-> Furthermore, from section 2.6.5.3.1 (Driver Requirements: Indirect
-> Descriptors) of the virtio spec:
-> 
->   "A driver MUST NOT create a descriptor chain longer than the Queue
->   Size of the device."
-> 
-> To fix this, limit the number of pages FUSE will use for an overall
-> request. This way, each request can realistically fit on the virtqueue
-> when it is decomposed into a scattergather list and avoid violating
-> section 2.6.5.3.1 of the virtio spec.
-
-Hi Connor,
-
-So as of now if a request is bigger than what virtqueue can support,
-it never gets dispatched and caller waits infinitely? So this patch
-will fix it by forcing fuse to split the request. That sounds good.
-
-
-[..]
-> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-> index 8868ac31a3c0..a6ffba85d59a 100644
-> --- a/fs/fuse/virtio_fs.c
-> +++ b/fs/fuse/virtio_fs.c
-> @@ -18,6 +18,12 @@
->  #include <linux/uio.h>
->  #include "fuse_i.h"
->  
-> +/* Used to help calculate the FUSE connection's max_pages limit for a request's
-> + * size. Parts of the struct fuse_req are sliced into scattergather lists in
-> + * addition to the pages used, so this can help account for that overhead.
+On Thu, Mar 25, 2021 at 11:38:52AM -0400, Vivek Goyal wrote:
+> When posix access acls are set on a file, it can lead to adjusting file
+> permissions (mode) as well. If caller does not have CAP_FSETID and it
+> also does not have membership of owner group, this will lead to clearing
+> SGID bit in mode.
+>=20
+> Current fuse code is written in such a way that it expects file server
+> to take care of chaning file mode (permission), if there is a need.
+> Right now, host kernel does not clear SGID bit because virtiofsd is
+> running as root and has CAP_FSETID. For host kernel to clear SGID,
+> virtiofsd need to switch to gid of caller in guest and also drop
+> CAP_FSETID (if caller did not have it to begin with).
+>=20
+> If SGID needs to be cleared, client will set the flag
+> FUSE_SETXATTR_ACL_KILL_SGID in setxattr request. In that case server
+> should kill sgid.
+>=20
+> Currently just switch to uid/gid of the caller and drop CAP_FSETID
+> and that should do it.
+>=20
+> This should fix the xfstest generic/375 test case.
+>=20
+> We don't have to switch uid for this to work. That could be one optimizat=
+ion
+> that pass a parameter to lo_change_cred() to only switch gid and not uid.
+>=20
+> Also this will not work whenever (if ever) we support idmapped mounts. In
+> that case it is possible that uid/gid in request are 0/0 but still we
+> need to clear SGID. So we will have to pick a non-root sgid and switch
+> to that instead. That's an TODO item for future when idmapped mount
+> support is introduced.
+>=20
+> Reported-by: Luis Henriques <lhenriques@suse.de>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  include/standard-headers/linux/fuse.h |  7 +++++
+>  tools/virtiofsd/passthrough_ll.c      | 42 +++++++++++++++++++++++++--
+>  2 files changed, 47 insertions(+), 2 deletions(-)
+>=20
+> diff --git a/include/standard-headers/linux/fuse.h b/include/standard-hea=
+ders/linux/fuse.h
+> index cc87ff27d0..4eb79399d4 100644
+> --- a/include/standard-headers/linux/fuse.h
+> +++ b/include/standard-headers/linux/fuse.h
+> @@ -180,6 +180,7 @@
+>   *  - add FUSE_HANDLE_KILLPRIV_V2, FUSE_WRITE_KILL_SUIDGID, FATTR_KILL_S=
+UIDGID
+>   *  - add FUSE_OPEN_KILL_SUIDGID
+>   *  - add FUSE_SETXATTR_V2
+> + *  - add FUSE_SETXATTR_ACL_KILL_SGID
+>   */
+> =20
+>  #ifndef _LINUX_FUSE_H
+> @@ -450,6 +451,12 @@ struct fuse_file_lock {
+>   */
+>  #define FUSE_OPEN_KILL_SUIDGID	(1 << 0)
+> =20
+> +/**
+> + * setxattr flags
+> + * FUSE_SETXATTR_ACL_KILL_SGID: Clear SGID when system.posix_acl_access =
+is set
 > + */
-> +#define FUSE_HEADER_OVERHEAD    4
+> +#define FUSE_SETXATTR_ACL_KILL_SGID    (1 << 0)
+> +
+>  enum fuse_opcode {
+>  	FUSE_LOOKUP		=3D 1,
+>  	FUSE_FORGET		=3D 2,  /* no reply */
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrou=
+gh_ll.c
+> index 3f5c267604..8a48071d0b 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -175,7 +175,7 @@ struct lo_data {
+>      int user_killpriv_v2, killpriv_v2;
+>      /* If set, virtiofsd is responsible for setting umask during creatio=
+n */
+>      bool change_umask;
+> -    int user_posix_acl;
+> +    int user_posix_acl, posix_acl;
+>  };
+> =20
+>  static const struct fuse_opt lo_opts[] =3D {
+> @@ -716,8 +716,10 @@ static void lo_init(void *userdata, struct fuse_conn=
+_info *conn)
+>           * in fuse_lowlevel.c
+>           */
+>          fuse_log(FUSE_LOG_DEBUG, "lo_init: enabling posix acl\n");
+> -        conn->want |=3D FUSE_CAP_POSIX_ACL | FUSE_CAP_DONT_MASK;
+> +        conn->want |=3D FUSE_CAP_POSIX_ACL | FUSE_CAP_DONT_MASK |
+> +                      FUSE_CAP_SETXATTR_V2;
 
-How did yo arrive at this overhead. Is it following.
+An annoying thing with this is that if we're using a kernel without
+_V2 support the mount will still succeed.  But we'll see:
 
-- One sg element for fuse_in_header.
-- One sg element for input arguments.
-- One sg element for fuse_out_header.
-- One sg element for output args.
+ls: cannot access '/mnt': Connection refused
 
-Thanks
-Vivek
+and in the userspace:
+
+fuse: error: filesystem requested capabilities 0x20000000 that are not supp=
+orted by kernel, aborting.
+
+Maybe it would be worth to automatically disable acl support if this
+happens (with an error message) but still allow the filesystem to be
+used.  Or, which is probably better, to handle the EPROTO error in the
+kernel during mount.
+
+Cheers,
+--
+Lu=EDs
+
+>          lo->change_umask =3D true;
+> +        lo->posix_acl =3D true;
+>      } else {
+>          /* User either did not specify anything or wants it disabled */
+>          fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling posix_acl\n");
+> @@ -3092,12 +3094,48 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_=
+t ino, const char *in_name,
+> =20
+>      sprintf(procname, "%i", inode->fd);
+>      if (S_ISREG(inode->filetype) || S_ISDIR(inode->filetype)) {
+> +        bool switched_creds =3D false;
+> +        struct lo_cred old =3D {};
+> +
+>          fd =3D openat(lo->proc_self_fd, procname, O_RDONLY);
+>          if (fd < 0) {
+>              saverr =3D errno;
+>              goto out;
+>          }
+> +
+> +        /*
+> +         * If we are setting posix access acl and if SGID needs to be
+> +         * cleared, then switch to caller's gid and drop CAP_FSETID
+> +         * and that should make sure host kernel clears SGID.
+> +         *
+> +         * This probably will not work when we support idmapped mounts.
+> +         * In that case we will need to find a non-root gid and switch
+> +         * to it. (Instead of gid in request). Fix it when we support
+> +         * idmapped mounts.
+> +         */
+> +        if (lo->posix_acl && !strcmp(name, "system.posix_acl_access")
+> +            && (extra_flags & FUSE_SETXATTR_ACL_KILL_SGID)) {
+> +            ret =3D lo_change_cred(req, &old, false);
+> +            if (ret) {
+> +                saverr =3D ret;
+> +                goto out;
+> +            }
+> +            ret =3D drop_effective_cap("FSETID", NULL);
+> +            if (ret !=3D 0) {
+> +                lo_restore_cred(&old, false);
+> +                saverr =3D ret;
+> +                goto out;
+> +            }
+> +            switched_creds =3D true;
+> +        }
+> +
+>          ret =3D fsetxattr(fd, name, value, size, flags);
+> +
+> +        if (switched_creds) {
+> +            if (gain_effective_cap("FSETID"))
+> +                fuse_log(FUSE_LOG_ERR, "Failed to gain CAP_FSETID\n");
+> +            lo_restore_cred(&old, false);
+> +        }
+>      } else {
+>          /* fchdir should not fail here */
+>          assert(fchdir(lo->proc_self_fd) =3D=3D 0);
+> --=20
+> 2.25.4
+>=20
+
 

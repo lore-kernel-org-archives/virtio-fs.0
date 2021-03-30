@@ -1,16 +1,12 @@
-References: <20210318135223.1342795-1-ckuehl@redhat.com>
-	<20210318135223.1342795-3-ckuehl@redhat.com>
-	<20210319134948.GA402287@redhat.com>
-From: Connor Kuehl <ckuehl@redhat.com>
-Message-ID: <6a44908d-7e2d-d239-c56a-68730c5357cd@redhat.com>
-Date: Fri, 19 Mar 2021 09:16:15 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Tue, 30 Mar 2021 10:09:22 -0400
+Message-Id: <20210330140925.730449-3-vgoyal@redhat.com>
+In-Reply-To: <20210330140925.730449-1-vgoyal@redhat.com>
+References: <20210330140925.730449-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20210319134948.GA402287@redhat.com>
-Content-Type: text/plain; charset=utf-8; format=flowed
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH 2/3] virtiofs: split requests that exceed
-	virtqueue size
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v6 2/5] virtiofsd: Add capability to
+	change/restore umask
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,92 +15,137 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: miklos@szeredi.hu, jasowang@redhat.com, mst@redhat.com, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com
+Cc: vgoyal@redhat.com, miklos@szeredi.hu
 
-On 3/19/21 8:49 AM, Vivek Goyal wrote:
-> On Thu, Mar 18, 2021 at 08:52:22AM -0500, Connor Kuehl wrote:
->> If an incoming FUSE request can't fit on the virtqueue, the request is
->> placed onto a workqueue so a worker can try to resubmit it later where
->> there will (hopefully) be space for it next time.
->>
->> This is fine for requests that aren't larger than a virtqueue's maximum
->> capacity. However, if a request's size exceeds the maximum capacity of
->> the virtqueue (even if the virtqueue is empty), it will be doomed to a
->> life of being placed on the workqueue, removed, discovered it won't fit,
->> and placed on the workqueue yet again.
->>
->> Furthermore, from section 2.6.5.3.1 (Driver Requirements: Indirect
->> Descriptors) of the virtio spec:
->>
->>    "A driver MUST NOT create a descriptor chain longer than the Queue
->>    Size of the device."
->>
->> To fix this, limit the number of pages FUSE will use for an overall
->> request. This way, each request can realistically fit on the virtqueue
->> when it is decomposed into a scattergather list and avoid violating
->> section 2.6.5.3.1 of the virtio spec.
-> 
-> Hi Connor,
-> 
-> So as of now if a request is bigger than what virtqueue can support,
-> it never gets dispatched and caller waits infinitely? So this patch
-> will fix it by forcing fuse to split the request. That sounds good.
+When parent directory has default acl and a file is created in that
+directory, then umask is ignored and final file permissions are
+determined using default acl instead. (man 2 umask).
 
-Right, in theory. Certain configurations make it easier to avoid this 
-from happening, such as using indirect descriptors; however, in that 
-case, the virtio spec says even if indirect descriptors are used, the 
-descriptor chain length shouldn't exceed the length of the queue's size 
-anyways. So having FUSE split the request also helps to uphold that 
-property.
+Currently, fuse applies the umask and sends modified mode in create
+request accordingly. fuse server can set FUSE_DONT_MASK and tell
+fuse client to not apply umask and fuse server will take care of
+it as needed.
 
-This is my reading of the potential looping problem:
+With posix acls enabled, requirement will be that we want umask
+to determine final file mode if parent directory does not have
+default acl.
 
-virtio_fs_wake_pending_and_unlock
-   calls
-     virtio_fs_enqueue_req
-       calls
-         virtqueue_add_sgs
+So if posix acls are enabled, opt in for FUSE_DONT_MASK. virtiofsd
+will set umask of the thread doing file creation. And host kernel
+should use that umask if parent directory does not have default
+acls, otherwise umask does not take affect.
 
-virtqueue_add_sgs can return -ENOSPC if there aren't enough descriptors 
-available.
+Miklos mentioned that we already call unshare(CLONE_FS) for
+every thread. That means umask has now become property of per
+thread and it should be ok to manipulate it in file creation path.
 
-This error gets propagated back down to 
-virtio_fs_wake_pending_and_unlock which checks for this exact issue and 
-places the request on a workqueue to retry submission later.
+This patch only adds capability to change umask and restore it. It
+does not enable it yet. Next patch will add capability to enable it
+based on if user enabled posix_acl or not.
 
-Resubmission occurs in virtio_fs_request_dispatch_work, which does a 
-similar dance, where if the request fails with -ENOSPC it just puts it 
-back in the queue. However, for a sufficiently large request that would 
-exceed the capacity of the virtqueue (even when empty), no amount of 
-retrying will ever make it fit.
+This should fix fstest generic/099.
 
-> 
-> 
-> [..]
->> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
->> index 8868ac31a3c0..a6ffba85d59a 100644
->> --- a/fs/fuse/virtio_fs.c
->> +++ b/fs/fuse/virtio_fs.c
->> @@ -18,6 +18,12 @@
->>   #include <linux/uio.h>
->>   #include "fuse_i.h"
->>   
->> +/* Used to help calculate the FUSE connection's max_pages limit for a request's
->> + * size. Parts of the struct fuse_req are sliced into scattergather lists in
->> + * addition to the pages used, so this can help account for that overhead.
->> + */
->> +#define FUSE_HEADER_OVERHEAD    4
-> 
-> How did yo arrive at this overhead. Is it following.
-> 
-> - One sg element for fuse_in_header.
-> - One sg element for input arguments.
-> - One sg element for fuse_out_header.
-> - One sg element for output args.
+Reported-by: Luis Henriques <lhenriques@suse.de>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c | 22 ++++++++++++++++------
+ 1 file changed, 16 insertions(+), 6 deletions(-)
 
-Yes, that's exactly how I got to that number.
-
-Connor
-
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index b144320e48..e6ae3d38d7 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -122,6 +122,7 @@ struct lo_inode {
+ struct lo_cred {
+     uid_t euid;
+     gid_t egid;
++    mode_t umask;
+ };
+ 
+ enum {
+@@ -172,6 +173,8 @@ struct lo_data {
+     /* An O_PATH file descriptor to /proc/self/fd/ */
+     int proc_self_fd;
+     int user_killpriv_v2, killpriv_v2;
++    /* If set, virtiofsd is responsible for setting umask during creation */
++    bool change_umask;
+ };
+ 
+ static const struct fuse_opt lo_opts[] = {
+@@ -1134,7 +1137,8 @@ static void lo_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
+  * ownership of caller.
+  * TODO: What about selinux context?
+  */
+-static int lo_change_cred(fuse_req_t req, struct lo_cred *old)
++static int lo_change_cred(fuse_req_t req, struct lo_cred *old,
++                          bool change_umask)
+ {
+     int res;
+ 
+@@ -1154,11 +1158,14 @@ static int lo_change_cred(fuse_req_t req, struct lo_cred *old)
+         return errno_save;
+     }
+ 
++    if (change_umask) {
++        old->umask = umask(req->ctx.umask);
++    }
+     return 0;
+ }
+ 
+ /* Regain Privileges */
+-static void lo_restore_cred(struct lo_cred *old)
++static void lo_restore_cred(struct lo_cred *old, bool restore_umask)
+ {
+     int res;
+ 
+@@ -1173,6 +1180,9 @@ static void lo_restore_cred(struct lo_cred *old)
+         fuse_log(FUSE_LOG_ERR, "setegid(%u): %m\n", old->egid);
+         exit(1);
+     }
++
++    if (restore_umask)
++        umask(old->umask);
+ }
+ 
+ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
+@@ -1202,7 +1212,7 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
+         return;
+     }
+ 
+-    saverr = lo_change_cred(req, &old);
++    saverr = lo_change_cred(req, &old, lo->change_umask && !S_ISLNK(mode));
+     if (saverr) {
+         goto out;
+     }
+@@ -1211,7 +1221,7 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
+ 
+     saverr = errno;
+ 
+-    lo_restore_cred(&old);
++    lo_restore_cred(&old, lo->change_umask && !S_ISLNK(mode));
+ 
+     if (res == -1) {
+         goto out;
+@@ -1918,7 +1928,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+         return;
+     }
+ 
+-    err = lo_change_cred(req, &old);
++    err = lo_change_cred(req, &old, lo->change_umask);
+     if (err) {
+         goto out;
+     }
+@@ -1929,7 +1939,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+     fd = openat(parent_inode->fd, name, fi->flags | O_CREAT | O_EXCL, mode);
+     err = fd == -1 ? errno : 0;
+ 
+-    lo_restore_cred(&old);
++    lo_restore_cred(&old, lo->change_umask);
+ 
+     /* Ignore the error if file exists and O_EXCL was not given */
+     if (err && (err != EEXIST || (fi->flags & O_EXCL))) {
+-- 
+2.25.4
 

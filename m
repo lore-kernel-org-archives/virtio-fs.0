@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue, 30 Mar 2021 10:09:22 -0400
-Message-Id: <20210330140925.730449-3-vgoyal@redhat.com>
+Date: Tue, 30 Mar 2021 10:09:25 -0400
+Message-Id: <20210330140925.730449-6-vgoyal@redhat.com>
 In-Reply-To: <20210330140925.730449-1-vgoyal@redhat.com>
 References: <20210330140925.730449-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v6 2/5] virtiofsd: Add capability to
-	change/restore umask
+Subject: [Virtio-fs] [PATCH v6 5/5] virtiofsd: Switch creds,
+	drop FSETID for system.posix_acl_access xattr
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,134 +18,155 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: vgoyal@redhat.com, miklos@szeredi.hu
 
-When parent directory has default acl and a file is created in that
-directory, then umask is ignored and final file permissions are
-determined using default acl instead. (man 2 umask).
+When posix access acls are set on a file, it can lead to adjusting file
+permissions (mode) as well. If caller does not have CAP_FSETID and it
+also does not have membership of owner group, this will lead to clearing
+SGID bit in mode.
 
-Currently, fuse applies the umask and sends modified mode in create
-request accordingly. fuse server can set FUSE_DONT_MASK and tell
-fuse client to not apply umask and fuse server will take care of
-it as needed.
+Current fuse code is written in such a way that it expects file server
+to take care of chaning file mode (permission), if there is a need.
+Right now, host kernel does not clear SGID bit because virtiofsd is
+running as root and has CAP_FSETID. For host kernel to clear SGID,
+virtiofsd need to switch to gid of caller in guest and also drop
+CAP_FSETID (if caller did not have it to begin with).
 
-With posix acls enabled, requirement will be that we want umask
-to determine final file mode if parent directory does not have
-default acl.
+If SGID needs to be cleared, client will set the flag
+FUSE_SETXATTR_ACL_KILL_SGID in setxattr request. In that case server
+should kill sgid.
 
-So if posix acls are enabled, opt in for FUSE_DONT_MASK. virtiofsd
-will set umask of the thread doing file creation. And host kernel
-should use that umask if parent directory does not have default
-acls, otherwise umask does not take affect.
+Currently just switch to uid/gid of the caller and drop CAP_FSETID
+and that should do it.
 
-Miklos mentioned that we already call unshare(CLONE_FS) for
-every thread. That means umask has now become property of per
-thread and it should be ok to manipulate it in file creation path.
+This should fix the xfstest generic/375 test case.
 
-This patch only adds capability to change umask and restore it. It
-does not enable it yet. Next patch will add capability to enable it
-based on if user enabled posix_acl or not.
+We don't have to switch uid for this to work. That could be one optimization
+that pass a parameter to lo_change_cred() to only switch gid and not uid.
 
-This should fix fstest generic/099.
+Also this will not work whenever (if ever) we support idmapped mounts. In
+that case it is possible that uid/gid in request are 0/0 but still we
+need to clear SGID. So we will have to pick a non-root sgid and switch
+to that instead. That's an TODO item for future when idmapped mount
+support is introduced.
 
 Reported-by: Luis Henriques <lhenriques@suse.de>
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 22 ++++++++++++++++------
- 1 file changed, 16 insertions(+), 6 deletions(-)
+ include/standard-headers/linux/fuse.h |  7 ++++
+ tools/virtiofsd/passthrough_ll.c      | 50 ++++++++++++++++++++++++---
+ 2 files changed, 52 insertions(+), 5 deletions(-)
 
+diff --git a/include/standard-headers/linux/fuse.h b/include/standard-headers/linux/fuse.h
+index cc87ff27d0..4eb79399d4 100644
+--- a/include/standard-headers/linux/fuse.h
++++ b/include/standard-headers/linux/fuse.h
+@@ -180,6 +180,7 @@
+  *  - add FUSE_HANDLE_KILLPRIV_V2, FUSE_WRITE_KILL_SUIDGID, FATTR_KILL_SUIDGID
+  *  - add FUSE_OPEN_KILL_SUIDGID
+  *  - add FUSE_SETXATTR_V2
++ *  - add FUSE_SETXATTR_ACL_KILL_SGID
+  */
+ 
+ #ifndef _LINUX_FUSE_H
+@@ -450,6 +451,12 @@ struct fuse_file_lock {
+  */
+ #define FUSE_OPEN_KILL_SUIDGID	(1 << 0)
+ 
++/**
++ * setxattr flags
++ * FUSE_SETXATTR_ACL_KILL_SGID: Clear SGID when system.posix_acl_access is set
++ */
++#define FUSE_SETXATTR_ACL_KILL_SGID    (1 << 0)
++
+ enum fuse_opcode {
+ 	FUSE_LOOKUP		= 1,
+ 	FUSE_FORGET		= 2,  /* no reply */
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index b144320e48..e6ae3d38d7 100644
+index c5a589441d..a968dc4e61 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -122,6 +122,7 @@ struct lo_inode {
- struct lo_cred {
-     uid_t euid;
-     gid_t egid;
-+    mode_t umask;
- };
- 
- enum {
-@@ -172,6 +173,8 @@ struct lo_data {
-     /* An O_PATH file descriptor to /proc/self/fd/ */
-     int proc_self_fd;
+@@ -175,7 +175,7 @@ struct lo_data {
      int user_killpriv_v2, killpriv_v2;
-+    /* If set, virtiofsd is responsible for setting umask during creation */
-+    bool change_umask;
+     /* If set, virtiofsd is responsible for setting umask during creation */
+     bool change_umask;
+-    int user_posix_acl;
++    int user_posix_acl, posix_acl;
  };
  
  static const struct fuse_opt lo_opts[] = {
-@@ -1134,7 +1137,8 @@ static void lo_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
-  * ownership of caller.
-  * TODO: What about selinux context?
-  */
--static int lo_change_cred(fuse_req_t req, struct lo_cred *old)
-+static int lo_change_cred(fuse_req_t req, struct lo_cred *old,
-+                          bool change_umask)
- {
-     int res;
+@@ -716,16 +716,19 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
+          * now. It will fail later in fuse_lowlevel.c
+          */
+         if (!(conn->capable & FUSE_CAP_POSIX_ACL) ||
+-            !(conn->capable & FUSE_CAP_DONT_MASK)) {
++            !(conn->capable & FUSE_CAP_DONT_MASK) ||
++            !(conn->capable & FUSE_CAP_SETXATTR_V2)) {
+             fuse_log(FUSE_LOG_ERR, "lo_init: Can not enable posix acl."
+-                     " kernel does not support FUSE_POSIX_ACL or FUSE_DONT_MASK"
+-                     " capability.\n");
++                     " kernel does not support FUSE_POSIX_ACL, FUSE_DONT_MASK"
++                     " or FUSE_SETXATTR_V2 capability.\n");
+         } else {
+             fuse_log(FUSE_LOG_DEBUG, "lo_init: enabling posix acl\n");
+         }
  
-@@ -1154,11 +1158,14 @@ static int lo_change_cred(fuse_req_t req, struct lo_cred *old)
-         return errno_save;
-     }
+-        conn->want |= FUSE_CAP_POSIX_ACL | FUSE_CAP_DONT_MASK;
++        conn->want |= FUSE_CAP_POSIX_ACL | FUSE_CAP_DONT_MASK |
++                      FUSE_CAP_SETXATTR_V2;
+         lo->change_umask = true;
++        lo->posix_acl = true;
+     } else {
+         /* User either did not specify anything or wants it disabled */
+         fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling posix_acl\n");
+@@ -3100,12 +3103,49 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
  
-+    if (change_umask) {
-+        old->umask = umask(req->ctx.umask);
-+    }
-     return 0;
- }
- 
- /* Regain Privileges */
--static void lo_restore_cred(struct lo_cred *old)
-+static void lo_restore_cred(struct lo_cred *old, bool restore_umask)
- {
-     int res;
- 
-@@ -1173,6 +1180,9 @@ static void lo_restore_cred(struct lo_cred *old)
-         fuse_log(FUSE_LOG_ERR, "setegid(%u): %m\n", old->egid);
-         exit(1);
-     }
+     sprintf(procname, "%i", inode->fd);
+     if (S_ISREG(inode->filetype) || S_ISDIR(inode->filetype)) {
++        bool switched_creds = false;
++        struct lo_cred old = {};
 +
-+    if (restore_umask)
-+        umask(old->umask);
- }
- 
- static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
-@@ -1202,7 +1212,7 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
-         return;
-     }
- 
--    saverr = lo_change_cred(req, &old);
-+    saverr = lo_change_cred(req, &old, lo->change_umask && !S_ISLNK(mode));
-     if (saverr) {
-         goto out;
-     }
-@@ -1211,7 +1221,7 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
- 
-     saverr = errno;
- 
--    lo_restore_cred(&old);
-+    lo_restore_cred(&old, lo->change_umask && !S_ISLNK(mode));
- 
-     if (res == -1) {
-         goto out;
-@@ -1918,7 +1928,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
-         return;
-     }
- 
--    err = lo_change_cred(req, &old);
-+    err = lo_change_cred(req, &old, lo->change_umask);
-     if (err) {
-         goto out;
-     }
-@@ -1929,7 +1939,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
-     fd = openat(parent_inode->fd, name, fi->flags | O_CREAT | O_EXCL, mode);
-     err = fd == -1 ? errno : 0;
- 
--    lo_restore_cred(&old);
-+    lo_restore_cred(&old, lo->change_umask);
- 
-     /* Ignore the error if file exists and O_EXCL was not given */
-     if (err && (err != EEXIST || (fi->flags & O_EXCL))) {
+         fd = openat(lo->proc_self_fd, procname, O_RDONLY);
+         if (fd < 0) {
+             saverr = errno;
+             goto out;
+         }
++
++        /*
++         * If we are setting posix access acl and if SGID needs to be
++         * cleared, then switch to caller's gid and drop CAP_FSETID
++         * and that should make sure host kernel clears SGID.
++         *
++         * This probably will not work when we support idmapped mounts.
++         * In that case we will need to find a non-root gid and switch
++         * to it. (Instead of gid in request). Fix it when we support
++         * idmapped mounts.
++         */
++        if (lo->posix_acl && !strcmp(name, "system.posix_acl_access")
++            && (extra_flags & FUSE_SETXATTR_ACL_KILL_SGID)) {
++            ret = lo_change_cred(req, &old, false);
++            if (ret) {
++                saverr = ret;
++                goto out;
++            }
++            ret = drop_effective_cap("FSETID", NULL);
++            if (ret != 0) {
++                lo_restore_cred(&old, false);
++                saverr = ret;
++                goto out;
++            }
++            switched_creds = true;
++        }
++
+         ret = fsetxattr(fd, name, value, size, flags);
++
++        if (switched_creds) {
++            if (gain_effective_cap("FSETID")) {
++                fuse_log(FUSE_LOG_ERR, "Failed to gain CAP_FSETID\n");
++            }
++            lo_restore_cred(&old, false);
++        }
+     } else {
+         /* fchdir should not fail here */
+         assert(fchdir(lo->proc_self_fd) == 0);
 -- 
 2.25.4
 

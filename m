@@ -1,17 +1,17 @@
-Date: Wed, 31 Mar 2021 11:12:33 +0100
+Date: Wed, 31 Mar 2021 11:14:27 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YGRLERYNqhZrsWiK@stefanha-x1.localdomain>
+Message-ID: <YGRLgzlo1DgA5uQv@stefanha-x1.localdomain>
 References: <20210209190224.62827-1-dgilbert@redhat.com>
-	<20210209190224.62827-17-dgilbert@redhat.com>
-	<20210211141734.GQ247031@stefanha-x1.localdomain>
-	<YFEOP+zJF4ciZ3ap@work-vm>
+	<20210209190224.62827-19-dgilbert@redhat.com>
+	<20210211142948.GS247031@stefanha-x1.localdomain>
+	<YDd5swx5HA+WinFF@work-vm>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="bDzkdXzQdU6j8nqA"
+	protocol="application/pgp-signature"; boundary="4AZoSTMUp9LDSKPC"
 Content-Disposition: inline
-In-Reply-To: <YFEOP+zJF4ciZ3ap@work-vm>
-Subject: Re: [Virtio-fs] [PATCH 16/24] DAX/unmap: virtiofsd: Add
-	VHOST_USER_SLAVE_FS_IO
+In-Reply-To: <YDd5swx5HA+WinFF@work-vm>
+Subject: Re: [Virtio-fs] [PATCH 18/24] DAX/unmap virtiofsd: Parse unmappable
+	elements
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,60 +24,56 @@ To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 Cc: virtio-fs@redhat.com, marcandre.lureau@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com, mst@redhat.com
 
 
---bDzkdXzQdU6j8nqA
+--4AZoSTMUp9LDSKPC
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Tue, Mar 16, 2021 at 07:59:59PM +0000, Dr. David Alan Gilbert wrote:
+On Thu, Feb 25, 2021 at 10:19:31AM +0000, Dr. David Alan Gilbert wrote:
 > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> > On Tue, Feb 09, 2021 at 07:02:16PM +0000, Dr. David Alan Gilbert (git) =
+> > On Tue, Feb 09, 2021 at 07:02:18PM +0000, Dr. David Alan Gilbert (git) =
 wrote:
-> > > +            if (!mrs_size) {
-> > > +                error_report("No guest region found for 0x%" HWADDR_=
-PRIx, gpa);
-> > > +                res =3D -EFAULT;
-> > > +                break;
-> > > +            }
+> > > diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_com=
+mon.h
+> > > index a090040bb2..ed9280de91 100644
+> > > --- a/tools/virtiofsd/fuse_common.h
+> > > +++ b/tools/virtiofsd/fuse_common.h
+> > > @@ -611,6 +611,13 @@ enum fuse_buf_flags {
+> > >       * detected.
+> > >       */
+> > >      FUSE_BUF_FD_RETRY =3D (1 << 3),
 > > > +
-> > > +            trace_vhost_user_fs_slave_io_loop(mrs.mr->name,
-> > > +                                          (uint64_t)mrs.offset_withi=
-n_region,
-> > > +                                          memory_region_is_ram(mrs.m=
-r),
-> > > +                                          memory_region_is_romd(mrs.=
-mr),
-> > > +                                          (size_t)mrs_size);
-> > > +
-> > > +            void *hostptr =3D qemu_map_ram_ptr(mrs.mr->ram_block,
-> > > +                                             mrs.offset_within_regio=
-n);
-> > > +            ssize_t transferred;
-> > > +            if (sm->flags[i] & VHOST_USER_FS_FLAG_MAP_R) {
+> > > +    /**
+> > > +     * The addresses in the iovec represent guest physical addresses
+> > > +     * that can't be mapped by the daemon process.
+> > > +     * IO must be bounced back to the VMM to do it.
+> > > +     */
+> > > +    FUSE_BUF_PHYS_ADDR =3D (1 << 4),
 > >=20
-> > The flag name is specific to map requests but it's shared with the IO
-> > request. Perhaps rename the flags?
+> > With a vIOMMU it's an IOVA. Without a vIOMMU it's a GPA. This constant
+> > may need to be renamed in the future, but it is okay for now.
 >=20
-> They're both read/write's; do you have a preferred alternative?
+> Do we have any naming for something that's either a GPA or a IOVA?
 
-VHOST_USER_FS_FLAG_<what it does> (read? readwrite? etc)
+I don't remember but I think the naming is confusing in core vhost code
+too :). I just don't remember if it's called a "physical address" there.
 
 Stefan
 
---bDzkdXzQdU6j8nqA
+--4AZoSTMUp9LDSKPC
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmBkSxEACgkQnKSrs4Gr
-c8jfDAf+L4BV1nKhkV3QM9yHyn2ypD2dql7Qt780o5QMbd7zpNHdMifVuOcNA6LH
-f3lqPQ6+NnQXjsOjiJNgkJ4Yd/AW1nNi4YitlYtDpf7p62fwGZjfUc/FJwvo0gih
-vb1qEoskPLWChQuh6SGGL/pFV+B8vCKsSlXI7pKoRLuz/96ezJXOEAKSYK3M5/yh
-mYSfGz7r5bLNM7rn6zRsINziPhCYxeISR+dh9qSL4vDGxFmywxdQ+aWHZyKTzWtn
-03nUiG7ah40uRudsA7ewn3gdqXJg0GdZPhTg2qA5w/jJyoUW+zlIQ6yugumN+C2n
-JPKb2Xg3/c916R0C6F4IvWnAKYVK7g==
-=Ny5n
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmBkS4MACgkQnKSrs4Gr
+c8iepggAibhDpVfW5Ttxe6osMKNmSL2sZSo+pWdQH1at8h1Nbfh+fzFta+FSJCvf
+X84KkOnP+i7q1ObryGsy4WWDiyeL5Z2HE9lUhwuySKylK+x4/KdHykgioPKJ2+sL
+N5926Qb59qNo/icI/XdQ7ghvAE3Rm7gKYz9DaaCVTxVq+V4tawFdjEoE7XevQ0LH
+ft93Muo8ya9lCN/EPBZ3UYWxC7Gtj4Hst9dDA2ZMhTHDlxdElLbv1VaeJxAc2kt9
+T5FDFLmbVwMyWwlfXE7GpjvbsIpZ1waJ0Zm0hV/SPGlGuMq8EMR2MAPc/yVx2tfp
+ngiq+I/40avjVfrz0M3UjugPj6sDVA==
+=J+P8
 -----END PGP SIGNATURE-----
 
---bDzkdXzQdU6j8nqA--
+--4AZoSTMUp9LDSKPC--
 

@@ -1,14 +1,27 @@
-References: <20210401145845.78445-1-dgilbert@redhat.com>
-From: Connor Kuehl <ckuehl@redhat.com>
-Message-ID: <041f5453-cd97-e31f-2855-7083ba6614fc@redhat.com>
-Date: Thu, 1 Apr 2021 10:48:34 -0500
-MIME-Version: 1.0
-In-Reply-To: <20210401145845.78445-1-dgilbert@redhat.com>
-Content-Type: text/plain; charset=utf-8; format=flowed
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Fix security.capability
-	comparison
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	to:subject:message-id:date:from; s=fm3; bh=Z+yRq1r/td9CSNOBf3aqw
+	KTxRf75BfHjSd9P+9sdY9s=; b=jIoHT+3Bxvxy7oZZGfWly3cKZLtA8xGRY3gvK
+	DnQKANluL2CiX0MbS/wwIEJ9jBmTxVCHyCj4fs6SJ0PmtdYu9JbXyQXO/FEky1Cg
+	B9xzEvnk/wEjdK6KzM41lNhDCmlM7sgxom5QbHalS7ea6wy1lw2Dxs4iIQXSQmvg
+	oanYdd7JC/6g/gkdipcWiDWyIa/LMbHtSl1Ew0XZKkQGb4Ouj1+EQA98/CfWH2G9
+	QB+6gShDKWqJXZS1mAGpFfmBiQrGhg75LcuPyU/R3ZDQed3qCT6x+k2j4Hw11YLN
+	Oouwn/SgKRZJDrP1vTiVMpG8VUGu654wyNIwduuCbjl5IferQ==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=date:from:message-id:subject:to
+	:x-me-proxy:x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=
+	fm2; bh=Z+yRq1r/td9CSNOBf3aqwKTxRf75BfHjSd9P+9sdY9s=; b=Dg6Ggmzh
+	S/UYndPBCe+MQZtPtdFEWO5wNWwrWCGR6mSS7o7tcxyyMxktxrmW7wxEevbyJutE
+	Fqs8GoFE3hi3W/Yo8weHCUk3YUcALqGvB7kwpex/JiqPOjv7jwwh9O2tYaGX6v+i
+	BneaGOUjv/SFMP393bcDzRf5xy5pZetVMRPvHBbCZKNz9T/C2s/TbOHAAztivjjn
+	VcTnTFU39QY0sf3PmEgo15avkPvjTViDNNeRSdf5U0qtuDM1eUO8WDW6HuTU061/
+	lZoHXjO1QUQ8fneQUqg1a/cSu4pWsYLPRYQUPg/VKt80F/g1XrNDQqCvFiFWkP1C
+	OTVhGJpCZnzxYg==
+Message-Id: <20210405123403.1ED0124005C@mailuser.nyi.internal>
+Date: Mon,  5 Apr 2021 08:34:03 -0400 (EDT)
+From: virtiofs-bot@sinrega.org
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd-rs] Issue closed: Implement xattr name
+	mappings
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,40 +30,11 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>, qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com, virtio-fs@redhat.com
+To: virtiofs-bot@sinrega.org
 
-On 4/1/21 9:58 AM, Dr. David Alan Gilbert (git) wrote:
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-> 
-> My security fix for the security.capability remap has a silly early
-> segfault in a simple case where there is an xattrmapping but it doesn't
-> remap the securty.capability.
+This is present in the C implementation, and allows the user of virtiofsd to define a fairly flexible mapping from the view of the xattr names the host fs has and the ones that the guest sees.
 
-s/securty/security
-
-> 
-> Fixes: e586edcb41054 ("virtiofs: drop remapped security.capability xattr as needed")
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-
-Reviewed-by: Connor Kuehl <ckuehl@redhat.com>
-
-> ---
->   tools/virtiofsd/passthrough_ll.c | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index b144320e48..1553d2ef45 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2636,7 +2636,8 @@ static void parse_xattrmap(struct lo_data *lo)
->                   strerror(ret));
->           exit(1);
->       }
-> -    if (!strcmp(lo->xattr_security_capability, "security.capability")) {
-> +    if (!lo->xattr_security_capability ||
-> +        !strcmp(lo->xattr_security_capability, "security.capability")) {
->           /* 1-1 mapping, don't need to do anything */
->           free(lo->xattr_security_capability);
->           lo->xattr_security_capability = NULL;
-> 
+https://www.redhat.com/archives/virtio-fs/2020-August/msg00112.html
+---
+https://gitlab.com/virtio-fs/virtiofsd-rs/-/issues/3
 

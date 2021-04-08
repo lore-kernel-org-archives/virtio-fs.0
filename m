@@ -1,10 +1,17 @@
-Date: Thu, 8 Apr 2021 13:51:50 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210408175150.GA1053917@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yandex-team.ru;
+	s=default; 
+	t=1617911741; bh=0cXgFcT8xOU8p8L5hm9l9js6IafAhuGK/tDoLr3mTbs=;
+	h=Message-Id:Date:Subject:To:From:Cc;
+	b=yVHPMQp91xARDoul5+Ta0953hh4ZgUd7DyH1VYHnbkSWpid9sc2q4HHKrgxMNE3W8
+	IywF/MoYdcKptMGKqM+HQuNB52PH9u9pwYB4S1puzvv6mEYEbMaHxkelYV/yTYFIWJ
+	vlEPfDY5IRdB46JOkHAjQlWtxAZKSExrwEUQZX7s=
+From: Anton Kuchin <antonkuchin@yandex-team.ru>
+Date: Thu,  8 Apr 2021 22:55:34 +0300
+Message-Id: <20210408195534.647895-1-antonkuchin@yandex-team.ru>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: [Virtio-fs] [RFC] Using hard links instead of lo_inode->fd
+Content-Type: text/plain; charset="US-ASCII"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH] vhost-user-fs: fix features handling
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,41 +20,57 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs-list <virtio-fs@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>
-Cc: Max Reitz <mreitz@redhat.com>
+To: qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, Anton Kuchin <antonkuchin@yandex-team.ru>, "Michael S. Tsirkin" <mst@redhat.com>
 
-Hi All,
+Make virtio-fs take into account server capabilities.
 
-Max has been trying to solve the problem of not having to keep an O_PATH
-fd open for every file (until inode goes away). Lot of inodes can get
-cached in guest inode cache and soon we can hit number of max fd limit.
+Just returning requested features assumes they all of then are implemented
+by server and results in setting unsupported configuration if some of them
+are absent.
 
-Today Christophe de Dinechin mentioned that can we maintain hardlinks
-for these files and open these hardlinks instead whenever we need
-lo_inode->fd.
+Signed-off-by: Anton Kuchin <antonkuchin@yandex-team.ru>
+---
+ hw/virtio/vhost-user-fs.c | 17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
 
-So say there is a notion of "workdir" which is passed to virtiofs where
-virtiofsd can create hardlinks. Once inode comes into existence, we
-create this link in workdir/<file-link>. Once last reference to inode
-is dropped, workdir/<file-link> is removed.
+diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+index ac4fc34b36..6cf983ba0e 100644
+--- a/hw/virtio/vhost-user-fs.c
++++ b/hw/virtio/vhost-user-fs.c
+@@ -24,6 +24,14 @@
+ #include "monitor/monitor.h"
+ #include "sysemu/sysemu.h"
+ 
++static const int user_feature_bits[] = {
++    VIRTIO_F_VERSION_1,
++    VIRTIO_RING_F_INDIRECT_DESC,
++    VIRTIO_RING_F_EVENT_IDX,
++    VIRTIO_F_NOTIFY_ON_EMPTY,
++    VHOST_INVALID_FEATURE_BIT
++};
++
+ static void vuf_get_config(VirtIODevice *vdev, uint8_t *config)
+ {
+     VHostUserFS *fs = VHOST_USER_FS(vdev);
+@@ -129,11 +137,12 @@ static void vuf_set_status(VirtIODevice *vdev, uint8_t status)
+ }
+ 
+ static uint64_t vuf_get_features(VirtIODevice *vdev,
+-                                      uint64_t requested_features,
+-                                      Error **errp)
++                                 uint64_t features,
++                                 Error **errp)
+ {
+-    /* No feature bits used yet */
+-    return requested_features;
++    VHostUserFS *fs = VHOST_USER_FS(vdev);
++
++    return vhost_get_features(&fs->vhost_dev, user_feature_bits, features);
+ }
+ 
+ static void vuf_handle_output(VirtIODevice *vdev, VirtQueue *vq)
+-- 
+2.25.1
 
-Now any operation which needs the lo_inode->fd, can do operation on
-workdir/<file-link>.
-
-How does this proposal sound. What are the issues where. Some of the
-which came to surface during discussion with david gilbert are.
-
-1. links can't be created for directories. So this will only help with
-  regular files. 
-
-2. There might be a performance penalty. We don't know yet.
-
-3. More overhead of managing workdir by the user/tools.
-
-
-Anything else? Is this a viable idea even if we can implement only
-for regular files.
-
-Thanks
-Vivek
 

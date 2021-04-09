@@ -1,14 +1,12 @@
-References: <20210409100627.451573-1-groug@kaod.org>
-	<daa895d8-7fbc-e4f5-3cfe-29cae4cd193a@weilnetz.de>
-From: =?UTF-8?Q?Philippe_Mathieu-Daud=c3=a9?= <philmd@redhat.com>
-Message-ID: <94bab651-8514-3f16-b61e-0f33a8e2d248@redhat.com>
-Date: Fri, 9 Apr 2021 17:24:09 +0200
+Date: Fri, 9 Apr 2021 11:56:57 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210409155657.GE1111800@redhat.com>
+References: <20210408195534.647895-1-antonkuchin@yandex-team.ru>
 MIME-Version: 1.0
-In-Reply-To: <daa895d8-7fbc-e4f5-3cfe-29cae4cd193a@weilnetz.de>
-Content-Type: text/plain; charset="windows-1252"
-Content-Language: en-US
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Fix side-effect in assert()
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20210408195534.647895-1-antonkuchin@yandex-team.ru>
+Subject: Re: [Virtio-fs] [PATCH] vhost-user-fs: fix features handling
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,72 +15,90 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Weil <sw@weilnetz.de>, Greg Kurz <groug@kaod.org>, qemu-devel@nongnu.org
-Cc: virtio-fs@redhat.com
+To: Anton Kuchin <antonkuchin@yandex-team.ru>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>
 
-Hi Stefan,
+On Thu, Apr 08, 2021 at 10:55:34PM +0300, Anton Kuchin wrote:
+> Make virtio-fs take into account server capabilities.
+> 
+> Just returning requested features assumes they all of then are implemented
+> by server and results in setting unsupported configuration if some of them
+> are absent.
+> 
+> Signed-off-by: Anton Kuchin <antonkuchin@yandex-team.ru>
 
-On 4/9/21 5:11 PM, Stefan Weil wrote:
-> Am 09.04.21 um 12:06 schrieb Greg Kurz:
->=20
->> It is bad practice to put an expression with a side-effect in
->> assert() because the side-effect won't happen if the code is
->> compiled with -DNDEBUG.
->>
->> Use an intermediate variable. Consolidate this in an macro to
->> have proper line numbers when the assertion is hit.
->>
->> virtiofsd: ../../tools/virtiofsd/passthrough_ll.c:2797: lo_getxattr:
->> =A0 Assertion `fchdir_res =3D=3D 0' failed.
->> Aborted
->>
->> =A0=A0 2796=A0=A0=A0=A0=A0=A0=A0=A0=A0 /* fchdir should not fail here */
->> =3D>2797=A0=A0=A0=A0=A0=A0=A0=A0=A0 FCHDIR_NOFAIL(lo->proc_self_fd);
->> =A0=A0 2798=A0=A0=A0=A0=A0=A0=A0=A0=A0 ret =3D getxattr(procname, name, =
-value, size);
->> =A0=A0 2799=A0=A0=A0=A0=A0=A0=A0=A0=A0 FCHDIR_NOFAIL(lo->root.fd);
->>
->> Fixes: bdfd66788349 ("virtiofsd: Fix xattr operations")
->> Cc: misono.tomohiro@jp.fujitsu.com
->> Signed-off-by: Greg Kurz <groug@kaod.org>
->> ---
->> =A0 tools/virtiofsd/passthrough_ll.c | 21 +++++++++++++--------
->> =A0 1 file changed, 13 insertions(+), 8 deletions(-)
->>
->> diff --git a/tools/virtiofsd/passthrough_ll.c
->> b/tools/virtiofsd/passthrough_ll.c
->> index 1553d2ef454f..6592f96f685e 100644
->> --- a/tools/virtiofsd/passthrough_ll.c
->> +++ b/tools/virtiofsd/passthrough_ll.c
->> @@ -2723,6 +2723,11 @@ static int xattr_map_server(const struct lo_data =
+[CC stefan and qemu-devel.]
 
-> *lo, const char *server_name,
->> =A0=A0=A0=A0=A0 return -ENODATA;
->> =A0 }
->> =A0 +#define FCHDIR_NOFAIL(fd) do {=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=
-=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0 \
->> +=A0=A0=A0=A0=A0=A0=A0 int fchdir_res =3D fchdir(fd);=A0=A0=A0=A0=A0=A0=
-=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0 \
->> +=A0=A0=A0=A0=A0=A0=A0 assert(fchdir_res =3D=3D 0);=A0=A0=A0=A0=A0=A0=A0=
-=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0 \
->> +=A0=A0=A0 } while (0)
->> +
->> =A0 static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char
->> *in_name,
->> =A0=20
->=20
->=20
-> I am afraid that this will raise a compiler warning (or error with
-> -Werror) when NDEBUG is defined because the variable is unused in that
-> case ([-Wunused-variable]).
->=20
-> I suggest to use different implementations of the macro depending on
-> NDEBUG.
+Can you give more details of what problem exactly you are facing. Or
+this fix is about avoiding a future problem where device can refuse
+to support a feature qemu is requesting for.
 
-QEMU doesn't build with NDEBUG, see commit 262a69f4282
-("osdep.h: Prohibit disabling assert() in supported builds").
+IIUC, this patch is preparing a list of features vhost-user-fs device
+can support. Then it calls vhost_get_features() which makes sure that
+all these features are support by real vhost-user device (hdev->features).
+If not, then corresponding feature is reset and remaining features
+are returned to caller.
 
-Regards,
+This feature negotion bit is called in so many places that I am kind of
+lost that who should be doing what. Will leave it to Stefan who
+understands it much better.
 
-Phil.
+
+> ---
+>  hw/virtio/vhost-user-fs.c | 17 +++++++++++++----
+>  1 file changed, 13 insertions(+), 4 deletions(-)
+> 
+> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+> index ac4fc34b36..6cf983ba0e 100644
+> --- a/hw/virtio/vhost-user-fs.c
+> +++ b/hw/virtio/vhost-user-fs.c
+> @@ -24,6 +24,14 @@
+>  #include "monitor/monitor.h"
+>  #include "sysemu/sysemu.h"
+>  
+> +static const int user_feature_bits[] = {
+> +    VIRTIO_F_VERSION_1,
+> +    VIRTIO_RING_F_INDIRECT_DESC,
+> +    VIRTIO_RING_F_EVENT_IDX,
+> +    VIRTIO_F_NOTIFY_ON_EMPTY,
+> +    VHOST_INVALID_FEATURE_BIT
+> +};
+> +
+>  static void vuf_get_config(VirtIODevice *vdev, uint8_t *config)
+>  {
+>      VHostUserFS *fs = VHOST_USER_FS(vdev);
+> @@ -129,11 +137,12 @@ static void vuf_set_status(VirtIODevice *vdev, uint8_t status)
+>  }
+>  
+>  static uint64_t vuf_get_features(VirtIODevice *vdev,
+> -                                      uint64_t requested_features,
+> -                                      Error **errp)
+> +                                 uint64_t features,
+
+Will it make sense to keep the name requested_features. This kind of
+makes it clear that caller is requesting these features.
+
+I feel there should be few lines of comments also to make it clear
+what this function is actually doing.
+
+Vivek
+
+> +                                 Error **errp)
+>  {
+> -    /* No feature bits used yet */
+> -    return requested_features;
+> +    VHostUserFS *fs = VHOST_USER_FS(vdev);
+> +
+> +    return vhost_get_features(&fs->vhost_dev, user_feature_bits, features);
+>  }
+>  
+>  static void vuf_handle_output(VirtIODevice *vdev, VirtQueue *vq)
+> -- 
+> 2.25.1
+> 
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
 

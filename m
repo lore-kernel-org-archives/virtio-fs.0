@@ -1,12 +1,13 @@
-Date: Fri, 9 Apr 2021 09:41:58 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210409134158.GD1111800@redhat.com>
-References: <CABpfLih7gTh8a=SYtFT4hGo03K3cnCmAK-+FUXC8X9MhLBwfzg@mail.gmail.com>
+References: <20210409100627.451573-1-groug@kaod.org>
+From: Wainer dos Santos Moschetta <wainersm@redhat.com>
+Message-ID: <ec1a4ef9-c246-ba61-3c3d-92d0321b35a8@redhat.com>
+Date: Fri, 9 Apr 2021 11:40:40 -0300
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <CABpfLih7gTh8a=SYtFT4hGo03K3cnCmAK-+FUXC8X9MhLBwfzg@mail.gmail.com>
-Subject: Re: [Virtio-fs] Compiling virtio-fs/qemu on Mac
+In-Reply-To: <20210409100627.451573-1-groug@kaod.org>
+Content-Type: text/plain; charset=windows-1252; format=flowed
+Content-Transfer-Encoding: 7bit
+Content-Language: en-US
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Fix side-effect in assert()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,32 +16,101 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Anthony J Rabbito <hello@anthonyrabbito.com>
+To: Greg Kurz <groug@kaod.org>, qemu-devel@nongnu.org
 Cc: virtio-fs@redhat.com
 
-On Thu, Apr 08, 2021 at 08:36:37PM -0400, Anthony J Rabbito wrote:
-> Hi All,
-> I'm having some trouble getting virt9p built with Qemu on Darwin. Given
-> that virtio-fs is progressing nicely i'm wondering if anyone has had any
-> success building for Darwin?
-> Looking to build a podman machine with shared directories.
-> Thanks,
 
-Hi Anthony, 
+On 4/9/21 7:06 AM, Greg Kurz wrote:
+> It is bad practice to put an expression with a side-effect in
+> assert() because the side-effect won't happen if the code is
+> compiled with -DNDEBUG.
+>
+> Use an intermediate variable. Consolidate this in an macro to
+> have proper line numbers when the assertion is hit.
+>
+> virtiofsd: ../../tools/virtiofsd/passthrough_ll.c:2797: lo_getxattr:
+>   Assertion `fchdir_res == 0' failed.
+> Aborted
+>
+>    2796          /* fchdir should not fail here */
+> =>2797          FCHDIR_NOFAIL(lo->proc_self_fd);
+>    2798          ret = getxattr(procname, name, value, size);
+>    2799          FCHDIR_NOFAIL(lo->root.fd);
+>
+> Fixes: bdfd66788349 ("virtiofsd: Fix xattr operations")
+> Cc: misono.tomohiro@jp.fujitsu.com
+> Signed-off-by: Greg Kurz <groug@kaod.org>
+> ---
+>   tools/virtiofsd/passthrough_ll.c | 21 +++++++++++++--------
+>   1 file changed, 13 insertions(+), 8 deletions(-)
 
-I have never tried building qemu/virtiofsd for Darwin.
 
-My understanding is that virtiofsd is supposed to be running on Linux.
-It has code which makes assumption about linux specific behavior. So
-I doubt it will work correctly on Darwin even if you managed to
-compile it.
+Reviewed-by: Wainer dos Santos Moschetta <wainersm@redhat.com>
 
-Vivek
 
-> Anthony Rabbito
-
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
+>
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 1553d2ef454f..6592f96f685e 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -2723,6 +2723,11 @@ static int xattr_map_server(const struct lo_data *lo, const char *server_name,
+>       return -ENODATA;
+>   }
+>   
+> +#define FCHDIR_NOFAIL(fd) do {                         \
+> +        int fchdir_res = fchdir(fd);                   \
+> +        assert(fchdir_res == 0);                       \
+> +    } while (0)
+> +
+>   static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+>                           size_t size)
+>   {
+> @@ -2789,9 +2794,9 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+>           ret = fgetxattr(fd, name, value, size);
+>       } else {
+>           /* fchdir should not fail here */
+> -        assert(fchdir(lo->proc_self_fd) == 0);
+> +        FCHDIR_NOFAIL(lo->proc_self_fd);
+>           ret = getxattr(procname, name, value, size);
+> -        assert(fchdir(lo->root.fd) == 0);
+> +        FCHDIR_NOFAIL(lo->root.fd);
+>       }
+>   
+>       if (ret == -1) {
+> @@ -2864,9 +2869,9 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
+>           ret = flistxattr(fd, value, size);
+>       } else {
+>           /* fchdir should not fail here */
+> -        assert(fchdir(lo->proc_self_fd) == 0);
+> +        FCHDIR_NOFAIL(lo->proc_self_fd);
+>           ret = listxattr(procname, value, size);
+> -        assert(fchdir(lo->root.fd) == 0);
+> +        FCHDIR_NOFAIL(lo->root.fd);
+>       }
+>   
+>       if (ret == -1) {
+> @@ -3000,9 +3005,9 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+>           ret = fsetxattr(fd, name, value, size, flags);
+>       } else {
+>           /* fchdir should not fail here */
+> -        assert(fchdir(lo->proc_self_fd) == 0);
+> +        FCHDIR_NOFAIL(lo->proc_self_fd);
+>           ret = setxattr(procname, name, value, size, flags);
+> -        assert(fchdir(lo->root.fd) == 0);
+> +        FCHDIR_NOFAIL(lo->root.fd);
+>       }
+>   
+>       saverr = ret == -1 ? errno : 0;
+> @@ -3066,9 +3071,9 @@ static void lo_removexattr(fuse_req_t req, fuse_ino_t ino, const char *in_name)
+>           ret = fremovexattr(fd, name);
+>       } else {
+>           /* fchdir should not fail here */
+> -        assert(fchdir(lo->proc_self_fd) == 0);
+> +        FCHDIR_NOFAIL(lo->proc_self_fd);
+>           ret = removexattr(procname, name);
+> -        assert(fchdir(lo->root.fd) == 0);
+> +        FCHDIR_NOFAIL(lo->root.fd);
+>       }
+>   
+>       saverr = ret == -1 ? errno : 0;
 

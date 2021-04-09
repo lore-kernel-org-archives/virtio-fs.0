@@ -1,12 +1,21 @@
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+	h=references:user-agent:from:to:cc:subject:date:in-reply-to
+	:message-id:mime-version:content-transfer-encoding;
+	bh=YvHq1wtiylmBZ/fLtqU0SAhkEqotrOTWBp6a4PlVVEI=;
+	b=ObVEs6d9T0josJav3mJPdMJ8B/u+UFLMv+McnTsDYXEEnPKpCu2mzmbGHqz6FQv0Ta
+	HN9p05N6lzqAyPpqANse1zfO6/S4PomjdEzZqDJUP6Ym4xNaWmh+d38dGBsZeuqOyBiL
+	E0yTBhPJac9ckwReMj1AEAf9pODs/SAwwI1C6DM3lS3x2KvhY62IDYK8AT2eQj8aU5I2
+	jitd76cz554Gi9aoEUftINa1gy72jT5SK9XR+qbUoVVN9gRCoAxYWoPN4Uc9Bgk4/jcd
+	iiFGaMomyJoXeC1a1Rxm9F3SHK9KY8ohuq9M8XFYcpdjzbdD5cgo7iGltz8XwjelILOC
+	MFcw==
 References: <20210409100627.451573-1-groug@kaod.org>
-From: Wainer dos Santos Moschetta <wainersm@redhat.com>
-Message-ID: <ec1a4ef9-c246-ba61-3c3d-92d0321b35a8@redhat.com>
-Date: Fri, 9 Apr 2021 11:40:40 -0300
+From: Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>
+Date: Fri, 09 Apr 2021 15:56:36 +0100
+In-reply-to: <20210409100627.451573-1-groug@kaod.org>
+Message-ID: <87im4vsdzn.fsf@linaro.org>
 MIME-Version: 1.0
-In-Reply-To: <20210409100627.451573-1-groug@kaod.org>
-Content-Type: text/plain; charset=windows-1252; format=flowed
-Content-Transfer-Encoding: 7bit
-Content-Language: en-US
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
 Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Fix side-effect in assert()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -16,11 +25,12 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>, qemu-devel@nongnu.org
-Cc: virtio-fs@redhat.com
+To: Greg Kurz <groug@kaod.org>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
 
-On 4/9/21 7:06 AM, Greg Kurz wrote:
+Greg Kurz <groug@kaod.org> writes:
+
 > It is bad practice to put an expression with a side-effect in
 > assert() because the side-effect won't happen if the code is
 > compiled with -DNDEBUG.
@@ -29,88 +39,21 @@ On 4/9/21 7:06 AM, Greg Kurz wrote:
 > have proper line numbers when the assertion is hit.
 >
 > virtiofsd: ../../tools/virtiofsd/passthrough_ll.c:2797: lo_getxattr:
->   Assertion `fchdir_res == 0' failed.
+>  Assertion `fchdir_res == 0' failed.
 > Aborted
 >
->    2796          /* fchdir should not fail here */
+>   2796          /* fchdir should not fail here */
 > =>2797          FCHDIR_NOFAIL(lo->proc_self_fd);
->    2798          ret = getxattr(procname, name, value, size);
->    2799          FCHDIR_NOFAIL(lo->root.fd);
+>   2798          ret = getxattr(procname, name, value, size);
+>   2799          FCHDIR_NOFAIL(lo->root.fd);
 >
 > Fixes: bdfd66788349 ("virtiofsd: Fix xattr operations")
 > Cc: misono.tomohiro@jp.fujitsu.com
 > Signed-off-by: Greg Kurz <groug@kaod.org>
-> ---
->   tools/virtiofsd/passthrough_ll.c | 21 +++++++++++++--------
->   1 file changed, 13 insertions(+), 8 deletions(-)
 
+Reviewed-by: Alex Bennée <alex.bennee@linaro.org>
 
-Reviewed-by: Wainer dos Santos Moschetta <wainersm@redhat.com>
+-- 
+Alex Bennée
 
-
->
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 1553d2ef454f..6592f96f685e 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2723,6 +2723,11 @@ static int xattr_map_server(const struct lo_data *lo, const char *server_name,
->       return -ENODATA;
->   }
->   
-> +#define FCHDIR_NOFAIL(fd) do {                         \
-> +        int fchdir_res = fchdir(fd);                   \
-> +        assert(fchdir_res == 0);                       \
-> +    } while (0)
-> +
->   static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
->                           size_t size)
->   {
-> @@ -2789,9 +2794,9 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
->           ret = fgetxattr(fd, name, value, size);
->       } else {
->           /* fchdir should not fail here */
-> -        assert(fchdir(lo->proc_self_fd) == 0);
-> +        FCHDIR_NOFAIL(lo->proc_self_fd);
->           ret = getxattr(procname, name, value, size);
-> -        assert(fchdir(lo->root.fd) == 0);
-> +        FCHDIR_NOFAIL(lo->root.fd);
->       }
->   
->       if (ret == -1) {
-> @@ -2864,9 +2869,9 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
->           ret = flistxattr(fd, value, size);
->       } else {
->           /* fchdir should not fail here */
-> -        assert(fchdir(lo->proc_self_fd) == 0);
-> +        FCHDIR_NOFAIL(lo->proc_self_fd);
->           ret = listxattr(procname, value, size);
-> -        assert(fchdir(lo->root.fd) == 0);
-> +        FCHDIR_NOFAIL(lo->root.fd);
->       }
->   
->       if (ret == -1) {
-> @@ -3000,9 +3005,9 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
->           ret = fsetxattr(fd, name, value, size, flags);
->       } else {
->           /* fchdir should not fail here */
-> -        assert(fchdir(lo->proc_self_fd) == 0);
-> +        FCHDIR_NOFAIL(lo->proc_self_fd);
->           ret = setxattr(procname, name, value, size, flags);
-> -        assert(fchdir(lo->root.fd) == 0);
-> +        FCHDIR_NOFAIL(lo->root.fd);
->       }
->   
->       saverr = ret == -1 ? errno : 0;
-> @@ -3066,9 +3071,9 @@ static void lo_removexattr(fuse_req_t req, fuse_ino_t ino, const char *in_name)
->           ret = fremovexattr(fd, name);
->       } else {
->           /* fchdir should not fail here */
-> -        assert(fchdir(lo->proc_self_fd) == 0);
-> +        FCHDIR_NOFAIL(lo->proc_self_fd);
->           ret = removexattr(procname, name);
-> -        assert(fchdir(lo->root.fd) == 0);
-> +        FCHDIR_NOFAIL(lo->root.fd);
->       }
->   
->       saverr = ret == -1 ? errno : 0;
 

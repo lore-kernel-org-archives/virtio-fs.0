@@ -1,14 +1,12 @@
-Date: Fri, 9 Apr 2021 08:59:17 -0400
+Date: Fri, 9 Apr 2021 09:30:06 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210409125917.GB1111800@redhat.com>
-References: <20210408175150.GA1053917@redhat.com>
-	<927a6729-4b5d-f323-2a05-869256ff946d@redhat.com>
+Message-ID: <20210409133006.GC1111800@redhat.com>
+References: <20210409100627.451573-1-groug@kaod.org>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <927a6729-4b5d-f323-2a05-869256ff946d@redhat.com>
-Subject: Re: [Virtio-fs] [RFC] Using hard links instead of lo_inode->fd
+In-Reply-To: <20210409100627.451573-1-groug@kaod.org>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Fix side-effect in assert()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,52 +15,109 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>
+To: Greg Kurz <groug@kaod.org>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Fri, Apr 09, 2021 at 11:53:34AM +0200, Max Reitz wrote:
-> On 08.04.21 19:51, Vivek Goyal wrote:
-> > Hi All,
-> > 
-> > Max has been trying to solve the problem of not having to keep an O_PATH
-> > fd open for every file (until inode goes away). Lot of inodes can get
-> > cached in guest inode cache and soon we can hit number of max fd limit.
-> > 
-> > Today Christophe de Dinechin mentioned that can we maintain hardlinks
-> > for these files and open these hardlinks instead whenever we need
-> > lo_inode->fd.
-> > 
-> > So say there is a notion of "workdir" which is passed to virtiofs where
-> > virtiofsd can create hardlinks. Once inode comes into existence, we
-> > create this link in workdir/<file-link>. Once last reference to inode
-> > is dropped, workdir/<file-link> is removed.
-> > 
-> > Now any operation which needs the lo_inode->fd, can do operation on
-> > workdir/<file-link>.
-> > 
-> > How does this proposal sound. What are the issues where. Some of the
-> > which came to surface during discussion with david gilbert are.
-> > 
-> > 1. links can't be created for directories. So this will only help with
-> >    regular files.
-> > 
-> > 2. There might be a performance penalty. We don't know yet.
-> > 
-> > 3. More overhead of managing workdir by the user/tools.
-> > 
-> > 
-> > Anything else? Is this a viable idea even if we can implement only
-> > for regular files.
+On Fri, Apr 09, 2021 at 12:06:27PM +0200, Greg Kurz wrote:
+> It is bad practice to put an expression with a side-effect in
+> assert() because the side-effect won't happen if the code is
+> compiled with -DNDEBUG.
 > 
-> What would happen with submounts?  Wouldn’t we need a workdir per shared
-> filesystem then?  (Perhaps not with bind mounts as submounts, I don’t know
-> whether hard links work across all bind mounts of some FS.)
+> Use an intermediate variable. Consolidate this in an macro to
+> have proper line numbers when the assertion is hit.
+> 
+> virtiofsd: ../../tools/virtiofsd/passthrough_ll.c:2797: lo_getxattr:
+>  Assertion `fchdir_res == 0' failed.
+> Aborted
+> 
+>   2796          /* fchdir should not fail here */
+> =>2797          FCHDIR_NOFAIL(lo->proc_self_fd);
+>   2798          ret = getxattr(procname, name, value, size);
+>   2799          FCHDIR_NOFAIL(lo->root.fd);
+> 
+> Fixes: bdfd66788349 ("virtiofsd: Fix xattr operations")
+> Cc: misono.tomohiro@jp.fujitsu.com
+> Signed-off-by: Greg Kurz <groug@kaod.org>
 
-That's a good point Max. I don't think hard links can be created
-across FS boundaries. So if there are submounts from other filesystems,
-then there will have to be workdir on that filesystem, IIUC. Hmm..,
-this sounds like a very significant limitation of this proposal.
+Looks good to me.
 
-Thanks
+Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
+
 Vivek
+
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 21 +++++++++++++--------
+>  1 file changed, 13 insertions(+), 8 deletions(-)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 1553d2ef454f..6592f96f685e 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -2723,6 +2723,11 @@ static int xattr_map_server(const struct lo_data *lo, const char *server_name,
+>      return -ENODATA;
+>  }
+>  
+> +#define FCHDIR_NOFAIL(fd) do {                         \
+> +        int fchdir_res = fchdir(fd);                   \
+> +        assert(fchdir_res == 0);                       \
+> +    } while (0)
+> +
+>  static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+>                          size_t size)
+>  {
+> @@ -2789,9 +2794,9 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+>          ret = fgetxattr(fd, name, value, size);
+>      } else {
+>          /* fchdir should not fail here */
+> -        assert(fchdir(lo->proc_self_fd) == 0);
+> +        FCHDIR_NOFAIL(lo->proc_self_fd);
+>          ret = getxattr(procname, name, value, size);
+> -        assert(fchdir(lo->root.fd) == 0);
+> +        FCHDIR_NOFAIL(lo->root.fd);
+>      }
+>  
+>      if (ret == -1) {
+> @@ -2864,9 +2869,9 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
+>          ret = flistxattr(fd, value, size);
+>      } else {
+>          /* fchdir should not fail here */
+> -        assert(fchdir(lo->proc_self_fd) == 0);
+> +        FCHDIR_NOFAIL(lo->proc_self_fd);
+>          ret = listxattr(procname, value, size);
+> -        assert(fchdir(lo->root.fd) == 0);
+> +        FCHDIR_NOFAIL(lo->root.fd);
+>      }
+>  
+>      if (ret == -1) {
+> @@ -3000,9 +3005,9 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+>          ret = fsetxattr(fd, name, value, size, flags);
+>      } else {
+>          /* fchdir should not fail here */
+> -        assert(fchdir(lo->proc_self_fd) == 0);
+> +        FCHDIR_NOFAIL(lo->proc_self_fd);
+>          ret = setxattr(procname, name, value, size, flags);
+> -        assert(fchdir(lo->root.fd) == 0);
+> +        FCHDIR_NOFAIL(lo->root.fd);
+>      }
+>  
+>      saverr = ret == -1 ? errno : 0;
+> @@ -3066,9 +3071,9 @@ static void lo_removexattr(fuse_req_t req, fuse_ino_t ino, const char *in_name)
+>          ret = fremovexattr(fd, name);
+>      } else {
+>          /* fchdir should not fail here */
+> -        assert(fchdir(lo->proc_self_fd) == 0);
+> +        FCHDIR_NOFAIL(lo->proc_self_fd);
+>          ret = removexattr(procname, name);
+> -        assert(fchdir(lo->root.fd) == 0);
+> +        FCHDIR_NOFAIL(lo->root.fd);
+>      }
+>  
+>      saverr = ret == -1 ? errno : 0;
+> -- 
+> 2.26.3
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
 

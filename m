@@ -1,19 +1,26 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-	d=anthonyrabbito-com.20150623.gappssmtp.com; s=20150623;
-	h=mime-version:from:date:message-id:subject:to;
-	bh=1igxOc0LPRrRWSa/VLr346MnGO9KtEg0ED5dx3+I9aQ=;
-	b=j/9MyIEnJAUtSaN9IJRJZvfPH7kWg+YvaiTaXotQCqMJ3GvbXcconduVSPDYxic8t/
-	VrXrEmVxIjly8TBadci2n6q2Xu7B74GMyGJhDVsCO3mzR/quWeKJrkaAPfLqOcm3FOzd
-	ono/MXmBIFlQ4xscSwCzVfBQXF2TZ4E+Ug6NBi77KwcqxHKARCHHgYAb1z3xhHs5agzr
-	ZCGIMebHXNKJTnqNbwWpKIrUVL5Py8qAo3YJIodUfQX4gAhypNo4oLlHBrYhRJnfFEmQ
-	pQRbmCDu+v+yX0DdjLFuINdJZ44araA5B4XZU+llAmTuhCoVjZ0tcbes59B7i479gKlR
-	UNbA==
-MIME-Version: 1.0
-From: Anthony J Rabbito <hello@anthonyrabbito.com>
-Date: Thu, 8 Apr 2021 20:36:37 -0400
-Message-ID: <CABpfLih7gTh8a=SYtFT4hGo03K3cnCmAK-+FUXC8X9MhLBwfzg@mail.gmail.com>
-Content-Type: multipart/alternative; boundary="000000000000f5335f05bf7f5b0c"
-Subject: [Virtio-fs] Compiling virtio-fs/qemu on Mac
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	to:subject:message-id:date:from; s=fm3; bh=uUEFZi1fbWEKZ8f5YDGs9
+	0KErAdKbfrpzgTjNw+EMTo=; b=expgcwAmQuEPDYt/fsRlpynGRnBOxoxjNCev8
+	ohPnis7EDBqMKNQj7C+NioBy33AKiVIEo+fyYERWDHZaS+4+4TXtU36p8C1r6ma/
+	W/fjtNV2LMSfy302kPpOZ+qqK1e23YI6b1KJjjdx54ofOmsUOZGKuS9yothl4VSb
+	w9LMBk+PfpBPFF25cU6Jx2+SPHLfzt0DPZh43DDJV/AkC+bAW7BTxHhjEzUX1A2p
+	wydTspy7jExa3B+h/AHZ/m2VvHJe9o/ZhvHzDA4xC994wzWIvVE5PGAcFib45e2A
+	nUmF85LSYff9wrNmIL1gEjiVqW+aJVngd5mpf/T9klT85wjSg==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=date:from:message-id:subject:to
+	:x-me-proxy:x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=
+	fm2; bh=uUEFZi1fbWEKZ8f5YDGs90KErAdKbfrpzgTjNw+EMTo=; b=Cc1djQIw
+	vh2dgazuDqgddKmBWqrTajneCaTNJUJrenOEVvyVT68XtHvoyOeIJT92qvvPLJnm
+	juVZ7HNjgE8qHN9ZlgrsbZj28PjH3so7ABsiSIw9wpUUX8nFwjQ0CN9rFeLHYY90
+	Gy4+mH0D3L/jTQXTRvqzpe7x3K+o2NXKwnYw/puWp03ALZpe1KL43Ud1pQ9eCHFK
+	0OTGcariOd3uSWsEgBO5HK3NlrAOdjA5xvBonrSRznHCGkDNAXKJkXp7vqQHeRyZ
+	pdrRYQbHvgVjfNNKsIXCnh+exJjgl9Z+M1Qb8T1KLUMzI2OMFgaoCoz7gsY+/rPD
+	PcO5W9zu+gs4jg==
+Message-Id: <20210409052933.EA8F9240057@mailuser.nyi.internal>
+Date: Fri,  9 Apr 2021 01:29:33 -0400 (EDT)
+From: virtiofs-bot@sinrega.org
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd-rs] MR opened: Refactor arg parsing code
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,24 +31,17 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
---000000000000f5335f05bf7f5b0c
-Content-Type: text/plain; charset="UTF-8"
+This merge request switches the option parser from `clap` to `structopt`.
+This reduces a considerable amt. of duplicate code & improves readability.
 
-Hi All,
-I'm having some trouble getting virt9p built with Qemu on Darwin. Given
-that virtio-fs is progressing nicely i'm wondering if anyone has had any
-success building for Darwin?
-Looking to build a podman machine with shared directories.
-Thanks,
-Anthony Rabbito
+Internally `structopt` uses `clap` but provides a nice way to define arg parsing in a declarative way. It also re-exports `clap`.
+In the next upcoming major version of `clap`, support for the same will be added to the crate itself with the same syntax, except that `#[derive(Structopt)]` will change to `#[derive(Clap)]`. [1] <br>
+Also, beta version of clap-v3 is available for testing. [2]
 
---000000000000f5335f05bf7f5b0c
-Content-Type: text/html; charset="UTF-8"
+[1] https://github.com/poma/clap#how-does-clap-compare-to-structopt <br>
+[2] https://crates.io/crates/clap-v3
 
-<div dir="ltr"><div>Hi All,</div><div>
-</div><div>I&#39;m having some trouble getting virt9p built with Qemu on Darwin. Given that virtio-fs is progressing nicely i&#39;m wondering if anyone has had any success building for Darwin?</div><div>
-</div><div>Looking to build a podman machine with shared directories.</div><div>
-</div><div>Thanks,</div><div>Anthony Rabbito</div></div>
-
---000000000000f5335f05bf7f5b0c--
+Signed-off-by: Mihir Luthra luthramihir708@gmail.com
+---
+https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/17
 

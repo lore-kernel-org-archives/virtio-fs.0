@@ -1,12 +1,27 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri, 19 Mar 2021 15:55:45 -0400
-Message-Id: <20210319195547.427371-2-vgoyal@redhat.com>
-In-Reply-To: <20210319195547.427371-1-vgoyal@redhat.com>
-References: <20210319195547.427371-1-vgoyal@redhat.com>
-MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 1/3] posic_acl: Add a helper determine if SGID
-	should be cleared
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	to:subject:message-id:date:from; s=fm3; bh=AohTzW2iCf55qgyXthxu7
+	Ovk3LfKU/RdHANWV8j1GbU=; b=dZs4IWzLGLiFeaPFLvKyRkY+XPb4pF6AuT8wE
+	f6VypmFAALjUbUNqc4Yem4XmiGNATUhoSbG/iTnI4JQpHMHi33V96mmjwUTD1sg0
+	etqSgGZMZYUd+4GKhlO4eZOY4ZMjrndTM/9/9h0UcM2bvVpSfsoy81E4Z2Xfsr0J
+	ciQrMOg0xOaEl1vdOA0GeDrUw3T2Tywcapn3hvYeY0rWGXX+TNqgGMCoHMPh1wsy
+	uwcomGHvYMACaGdJzNUxseTw50QMpfU2eNIW3X332jRijCHNCf4RPodmUeRSuI9F
+	vdbdo4kKRy2smz+uqzo7erhF9G+QkUJpzV7arhq7jA1+o2i5g==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=date:from:message-id:subject:to
+	:x-me-proxy:x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=
+	fm2; bh=AohTzW2iCf55qgyXthxu7Ovk3LfKU/RdHANWV8j1GbU=; b=GeS3Ykfj
+	ZROXul9XXF4vFPc8hm9A6nsDXsXVKJUk2KcrXF0VwxuH9cTT6Xv4goMNcBQafyga
+	Pp/aSGPxdUIBiJNovod8YLM8WH1l9O0mcUHzukCGQysvjn49wdd3qQb7j9QRBMGg
+	8pwPV7K1F2/NbADZ7TaulrpxZawJgbDkHjWdElI8EKVwJflPmKNgpB+Q/W8SUeas
+	7tpRY+v/c7ZHvz7aRmd+DZftyVtkrOexOQ39fcQ/T86MhsLLgZRKkmtbIqiEzQxd
+	ikOKZF9YsOvLGPBXDtS3OQpmoPrkTl8I9D5D6ilS9OKQACzshWU/ovao0hjKeW4N
+	MFGITbUDR36aSg==
+Message-Id: <20210412114647.A03EE1080057@mailuser.nyi.internal>
+Date: Mon, 12 Apr 2021 07:46:47 -0400 (EDT)
+From: virtiofs-bot@sinrega.org
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd-rs] MR opened: Add statx() (so we can use
+	mount IDs)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,62 +30,11 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, miklos@szeredi.hu
-Cc: Jan Kara <jack@suse.cz>, Andreas Gruenbacher <agruenba@redhat.com>, seth.forshee@canonical.com, Alexander Viro <viro@zeniv.linux.org.uk>, vgoyal@redhat.com
+To: virtio-fs@redhat.com
 
-posix_acl_update_mode() determines what's the equivalent mode and if SGID
-needs to be cleared or not. I need to make use of this code in fuse
-as well. Fuse will send this information to virtiofs file server and
-file server will take care of clearing SGID if it needs to be done.
+This series of commits adds support for `statx()` (if available) as the preferred alternative over `fstatat64()`. The advantage of `statx()` is that it gives us a mount ID to identify a mount, which is better than the device ID, because a single filesystem (same device ID) may be mounted multiple times (different mount IDs), and every tree may be different (because of submounts in those trees).
 
-Hence move this code in a separate helper so that more than one place
-can call into it.
-
-Cc: Jan Kara <jack@suse.cz>
-Cc: Andreas Gruenbacher <agruenba@redhat.com>
-Cc: Alexander Viro <viro@zeniv.linux.org.uk>
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Then we use this mount ID as an additional field in `InodeAltKey` so that inodes on the same filesystem but on different mounts are treated separately. Furthermore, when checking for submounts, we have to consider the mount ID in addition to the device ID.
 ---
- fs/posix_acl.c            |  3 +--
- include/linux/posix_acl.h | 11 +++++++++++
- 2 files changed, 12 insertions(+), 2 deletions(-)
-
-diff --git a/fs/posix_acl.c b/fs/posix_acl.c
-index f3309a7edb49..2d62494c4a5b 100644
---- a/fs/posix_acl.c
-+++ b/fs/posix_acl.c
-@@ -684,8 +684,7 @@ int posix_acl_update_mode(struct user_namespace *mnt_userns,
- 		return error;
- 	if (error == 0)
- 		*acl = NULL;
--	if (!in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
--	    !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID))
-+	if (posix_acl_mode_clear_sgid(mnt_userns, inode))
- 		mode &= ~S_ISGID;
- 	*mode_p = mode;
- 	return 0;
-diff --git a/include/linux/posix_acl.h b/include/linux/posix_acl.h
-index 307094ebb88c..073c5e546de3 100644
---- a/include/linux/posix_acl.h
-+++ b/include/linux/posix_acl.h
-@@ -59,6 +59,17 @@ posix_acl_release(struct posix_acl *acl)
- }
- 
- 
-+static inline bool
-+posix_acl_mode_clear_sgid(struct user_namespace *mnt_userns,
-+			  struct inode *inode)
-+{
-+	if (!in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
-+	    !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID))
-+		return true;
-+
-+	return false;
-+}
-+
- /* posix_acl.c */
- 
- extern void posix_acl_init(struct posix_acl *, int);
--- 
-2.25.4
+https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/18
 

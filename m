@@ -1,21 +1,14 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yandex-team.ru;
-	s=default; 
-	t=1618122116; bh=GXEAeIfGDAFAAVqSMscghhalkmu8Yl/N+Qa7ske4RZE=;
-	h=In-Reply-To:References:Date:Message-ID:To:Subject:From:Cc;
-	b=tRMHLv7YiAGegdsixDT4rLKi8DvPoLhoQbgfQi+mQFrdeDqtPaGsM+vmq+Qi5fkL7
-	Ht0S0UXW40Zev/ElLUk9Xzy2AHB1xtGJJvmGAlp+VXJhyhQ3BlBTT+mTgQCboJo7Gv
-	JjuPRcx6aJZyEMqwSbCgF5PT06TspQQLVzropkNQ=
-From: Anton Kuchin <antonkuchin@yandex-team.ru>
-References: <20210408195534.647895-1-antonkuchin@yandex-team.ru>
-	<20210409155657.GE1111800@redhat.com>
-Message-ID: <14f05a3d-7db6-2c01-7fe0-f83586ff1fd6@yandex-team.ru>
-Date: Sun, 11 Apr 2021 09:21:54 +0300
+Date: Mon, 12 Apr 2021 08:02:06 +0200
+From: Sergio Lopez <slp@redhat.com>
+Message-ID: <20210412060206.ehp3tme2mzvc46w4@mhamilton>
+References: <CABpfLih7gTh8a=SYtFT4hGo03K3cnCmAK-+FUXC8X9MhLBwfzg@mail.gmail.com>
+	<20210409134158.GD1111800@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20210409155657.GE1111800@redhat.com>
-Content-Type: text/plain; charset=utf-8; format=flowed
-Content-Transfer-Encoding: 7bit
-Content-Language: en-US
-Subject: Re: [Virtio-fs] [PATCH] vhost-user-fs: fix features handling
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="efvdldvsmx55hn6u"
+Content-Disposition: inline
+In-Reply-To: <20210409134158.GD1111800@redhat.com>
+Subject: Re: [Virtio-fs] Compiling virtio-fs/qemu on Mac
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,112 +18,62 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>
+Cc: virtio-fs@redhat.com, Anthony J Rabbito <hello@anthonyrabbito.com>
 
 
-On 09/04/2021 18:56, Vivek Goyal wrote:
-> On Thu, Apr 08, 2021 at 10:55:34PM +0300, Anton Kuchin wrote:
->> Make virtio-fs take into account server capabilities.
->>
->> Just returning requested features assumes they all of then are implemented
->> by server and results in setting unsupported configuration if some of them
->> are absent.
->>
->> Signed-off-by: Anton Kuchin<antonkuchin@yandex-team.ru>
-> [CC stefan and qemu-devel.]
->
-> Can you give more details of what problem exactly you are facing. Or
-> this fix is about avoiding a future problem where device can refuse
-> to support a feature qemu is requesting for.
+--efvdldvsmx55hn6u
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-This fixes existing problem that qemu ignores features (un)supported by 
-backend and this works fine only if backend features match features of 
-qemu. Otherwise qemu incorrectly assumes that backend suports all of 
-them and calls vhost_set_features() not taking into account result of 
-previous vhost_get_features() call. This breaks protocol and can crash 
-server or cause incorrect behavior.
+On Fri, Apr 09, 2021 at 09:41:58AM -0400, Vivek Goyal wrote:
+> On Thu, Apr 08, 2021 at 08:36:37PM -0400, Anthony J Rabbito wrote:
+> > Hi All,
+> > I'm having some trouble getting virt9p built with Qemu on Darwin. Given
+> > that virtio-fs is progressing nicely i'm wondering if anyone has had any
+> > success building for Darwin?
+> > Looking to build a podman machine with shared directories.
+> > Thanks,
+>=20
+> Hi Anthony,=20
+>=20
+> I have never tried building qemu/virtiofsd for Darwin.
+>=20
+> My understanding is that virtiofsd is supposed to be running on Linux.
+> It has code which makes assumption about linux specific behavior. So
+> I doubt it will work correctly on Darwin even if you managed to
+> compile it.
 
-This is why I hope it to be accepted in time for 6.0 release.
+Yes, this is the case. For the macOS port of libkrun, which integrates
+a virtio-fs server, I had to rewrite a significant part of the
+passthrough implementation [1]. And even with all the workarounds
+there, the semantics aren't 100% compatible, just good enough for the
+common use cases.
 
-> IIUC, this patch is preparing a list of features vhost-user-fs device
-> can support. Then it calls vhost_get_features() which makes sure that
-> all these features are support by real vhost-user device (hdev->features).
-> If not, then corresponding feature is reset and remaining features
-> are returned to caller.
-When this callback is executed in virtio_bus_device_plugged() list of 
-features that vhost-backend supports has been already obtained earlier 
-by vhost_user_get_features() in vuf_device_realize() and stored in 
-hdev->features. vuf_get_features() should return bitmask of features 
-that are common for vhost backend (hdev->features) and frontend 
-(vdev->host_features). But instead it just returns host features.
-> This feature negotion bit is called in so many places that I am kind of
-> lost that who should be doing what. Will leave it to Stefan who
-> understands it much better.
->
->
->> ---
->>   hw/virtio/vhost-user-fs.c | 17 +++++++++++++----
->>   1 file changed, 13 insertions(+), 4 deletions(-)
->>
->> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
->> index ac4fc34b36..6cf983ba0e 100644
->> --- a/hw/virtio/vhost-user-fs.c
->> +++ b/hw/virtio/vhost-user-fs.c
->> @@ -24,6 +24,14 @@
->>   #include "monitor/monitor.h"
->>   #include "sysemu/sysemu.h"
->>   
->> +static const int user_feature_bits[] = {
->> +    VIRTIO_F_VERSION_1,
->> +    VIRTIO_RING_F_INDIRECT_DESC,
->> +    VIRTIO_RING_F_EVENT_IDX,
->> +    VIRTIO_F_NOTIFY_ON_EMPTY,
->> +    VHOST_INVALID_FEATURE_BIT
->> +};
->> +
->>   static void vuf_get_config(VirtIODevice *vdev, uint8_t *config)
->>   {
->>       VHostUserFS *fs = VHOST_USER_FS(vdev);
->> @@ -129,11 +137,12 @@ static void vuf_set_status(VirtIODevice *vdev, uint8_t status)
->>   }
->>   
->>   static uint64_t vuf_get_features(VirtIODevice *vdev,
->> -                                      uint64_t requested_features,
->> -                                      Error **errp)
->> +                                 uint64_t features,
-> Will it make sense to keep the name requested_features. This kind of
-> makes it clear that caller is requesting these features.
->
-> I feel there should be few lines of comments also to make it clear
-> what this function is actually doing.
+Sergio.
 
-This fix was inspired by similar functions in 
-hw/scsi/vhost-scsi-common.c, hw/virtio/vhost-user-vsock.c, 
-hw/block/vhost-user-blk.c and hw/net/vhost_net.c and I borrowed naming 
-from them just to be consistent.
+[1] https://github.com/containers/libkrun/blob/main/src/devices/src/virtio/=
+fs/macos/passthrough.rs
 
-IMO this looks like a good place for refactoring because we have more 
-and more vhost-user devices that duplicate that code, but it can be done 
-after the bug is fixed.
+--efvdldvsmx55hn6u
+Content-Type: application/pgp-signature; name="signature.asc"
 
-> Vivek
->
->> +                                 Error **errp)
->>   {
->> -    /* No feature bits used yet */
->> -    return requested_features;
->> +    VHostUserFS *fs = VHOST_USER_FS(vdev);
->> +
->> +    return vhost_get_features(&fs->vhost_dev, user_feature_bits, features);
->>   }
->>   
->>   static void vuf_handle_output(VirtIODevice *vdev, VirtQueue *vq)
->> -- 
->> 2.25.1
->>
->>
->> _______________________________________________
->> Virtio-fs mailing list
->> Virtio-fs@redhat.com
->> https://listman.redhat.com/mailman/listinfo/virtio-fs
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAABCAAdFiEEvtX891EthoCRQuii9GknjS8MAjUFAmBz4loACgkQ9GknjS8M
+AjVNgQ/+OeP0zH1XJ/J4AF2JasVd2JDqdYiGpE3ZY+5/U6ryvbquXPvkcI9zAZDh
+J9WBEEBgXLZ1ux/zZcGuV7z0rLj+QOYRrjgONXpVVleJLlJ8Y15JVQA0C9IvQpp8
+F1fxSk1JxowbIYlcvdM3LQRxzMhSbRr+dD/Ab8jWSJPMcaCAnGOpx2/OdfFsjTlS
+EPWFDsnT8z6lZyOJq1NMhyTndCpju3ZTjOhF03VkxbQqMqjiZCzekWQO0wazzw/R
+C3kjLz+EB7j8cbYKp/G+JwXRsfvztKjGqKibPY53YqMLP9v3C0Vwl2hPPOUYCDjZ
+x/AZdfTfqQMb9hIOjm/0158SueHEDkKI08YyYyheO2K7ewNMyACHgU9tE95ABMIU
+NJ0ARTAKXcrgmA5pDvUgv7ufJXVZIu65NKlcb+FYLPBmxNMUcGKbUTLKjURhZESd
+t4Xfpr7fNqYLzrM1tGDVQ+BdYZ0GltfmQORpFD/9UpFGcPX6RP/224dqmDWeEFwI
+IEwKXoID06sqhrNNQJJfTwPgNIzlrqUMJ7zLNpcaxUW1qgrv2KStgkwo77PjGLmR
+18lmXqDsSIpey++FaQH7X/eG+a7RgLvCXOaCVgrR/LhZuvFcyV3UWxx0sUAo07HZ
+43TYU35thupLV+czH7fXiMR/S3Pf+oJCbjOn44Z8f0xJ09v5Xrk=
+=WRiZ
+-----END PGP SIGNATURE-----
+
+--efvdldvsmx55hn6u--
 

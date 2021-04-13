@@ -1,13 +1,13 @@
-Date: Tue, 13 Apr 2021 16:38:31 -0400
+Date: Tue, 13 Apr 2021 16:41:02 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210413203831.GJ1235549@redhat.com>
-References: <20210406140706.GB934253@redhat.com>
+Message-ID: <20210413204102.GK1235549@redhat.com>
+References: <20210325151823.572089-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210406140706.GB934253@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] fuse: Invalidate attrs when page writeback
- completes
+In-Reply-To: <20210325151823.572089-1-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v2 0/2] fuse: Fix clearing SGID when access
+ ACL is set
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,83 +16,63 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, Miklos Szeredi <miklos@szeredi.hu>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, eric.auger@redhat.com
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, miklos@szeredi.hu
+Cc: seth.forshee@canonical.com
 
 Hi Miklos,
 
-Ping.
+Ping for this patch series.
 
-Thanks
 Vivek
 
-On Tue, Apr 06, 2021 at 10:07:06AM -0400, Vivek Goyal wrote:
-> In fuse when a direct/write-through write happens we invalidate attrs because
-> that might have updated mtime/ctime on server and cached mtime/ctime
-> will be stale.
+On Thu, Mar 25, 2021 at 11:18:21AM -0400, Vivek Goyal wrote:
 > 
-> What about page writeback path. Looks like we don't invalidate attrs there.
-> To be consistent, invalidate attrs in writeback path as well. Only exception
-> is when writeback_cache is enabled. In that case we strust local mtime/ctime
-> and there is no need to invalidate attrs.
+> Hi,
 > 
-> Recently users started experiencing failure of xfstests generic/080,
-> geneirc/215 and generic/614 on virtiofs. This happened only newer
-> "stat" utility and not older one. This patch fixes the issue.
+> This is V2 of the patchset. Posted V1 here.
 > 
-> So what's the root cause of the issue. Here is detailed explanation.
+> https://lore.kernel.org/linux-fsdevel/20210319195547.427371-1-vgoyal@redhat.com/
 > 
-> generic/080 test does mmap write to a file, closes the file and then
-> checks if mtime has been updated or not. When file is closed, it
-> leads to flushing of dirty pages (and that should update mtime/ctime
-> on server). But we did not explicitly invalidate attrs after writeback
-> finished. Still generic/080 passed so far and reason being that we
-> invalidated atime in fuse_readpages_end(). This is called in fuse_readahead()
-> path and always seems to trigger before mmaped write.
+> Changes since V1:
 > 
-> So after mmaped write when lstat() is called, it sees that atleast one
-> of the fields being asked for is invalid (atime) and that results in
-> generating GETATTR to server and mtime/ctime also get updated and test
-> passes.
+> - Dropped the helper to determine if SGID should be cleared and open
+>   coded it instead. I will follow up on helper separately in a different
+>   patch series. There are few places already which open code this, so
+>   for now fuse can do the same. Atleast I can make progress on this
+>   and virtiofs can enable ACL support.
 > 
-> But newer /usr/bin/stat seems to have moved to using statx() syscall now
-> (instead of using lstat()). And statx() allows it to query only ctime
-> or mtime (and not rest of the basic stat fields). That means when
-> querying for mtime, fuse_update_get_attr() sees that mtime is not
-> invalid (only atime is invalid). So it does not generate a new GETATTR
-> and fill stat with cached mtime/ctime. And that means updated mtime
-> is not seen by xfstest and tests start failing.
+> Luis reported that xfstests generic/375 fails with virtiofs. Little
+> debugging showed that when posix access acl is set that in some
+> cases SGID needs to be cleared and that does not happen with virtiofs.
 > 
-> Invalidating attrs after writeback completion should solve this problem
-> in a generic manner.
+> Setting posix access acl can lead to mode change and it can also lead
+> to clear of SGID. fuse relies on file server taking care of all
+> the mode changes. But file server does not have enough information to
+> determine whether SGID should be cleared or not.
 > 
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  fs/fuse/file.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
+> Hence this patch series add support to send a flag in SETXATTR message
+> to tell server to clear SGID.
 > 
-> diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-> index 8cccecb55fb8..482281bf170a 100644
-> --- a/fs/fuse/file.c
-> +++ b/fs/fuse/file.c
-> @@ -1759,8 +1759,17 @@ static void fuse_writepage_end(struct fuse_mount *fm, struct fuse_args *args,
->  		container_of(args, typeof(*wpa), ia.ap.args);
->  	struct inode *inode = wpa->inode;
->  	struct fuse_inode *fi = get_fuse_inode(inode);
-> +	struct fuse_conn *fc = get_fuse_conn(inode);
->  
->  	mapping_set_error(inode->i_mapping, error);
-> +	/*
-> +	 * A writeback finished and this might have updated mtime/ctime on
-> +	 * server making local mtime/ctime stale. Hence invalidate attrs.
-> +	 * Do this only if writeback_cache is not enabled. If writeback_cache
-> +	 * is enabled, we trust local ctime/mtime.
-> +	 */
-> +	if (!fc->writeback_cache)
-> +		fuse_invalidate_attr(inode);
->  	spin_lock(&fi->lock);
->  	rb_erase(&wpa->writepages_entry, &fi->writepages);
->  	while (wpa->next) {
+> I have staged corresponding virtiofsd patches here.
+> 
+> https://github.com/rhvgoyal/qemu/commits/acl-sgid-setxattr-flag
+> 
+> With these patches applied "./check -g acl" passes now on virtiofs.
+> 
+> Thanks
+> Vivek
+> 
+> Vivek Goyal (2):
+>   fuse: Add support for FUSE_SETXATTR_V2
+>   fuse: Add a flag FUSE_SETXATTR_ACL_KILL_SGID to kill SGID
+> 
+>  fs/fuse/acl.c             |  8 +++++++-
+>  fs/fuse/fuse_i.h          |  5 ++++-
+>  fs/fuse/inode.c           |  4 +++-
+>  fs/fuse/xattr.c           | 21 +++++++++++++++------
+>  include/uapi/linux/fuse.h | 17 +++++++++++++++++
+>  5 files changed, 46 insertions(+), 9 deletions(-)
+> 
 > -- 
 > 2.25.4
 > 

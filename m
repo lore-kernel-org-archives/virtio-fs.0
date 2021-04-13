@@ -1,12 +1,13 @@
-Date: Tue, 13 Apr 2021 10:05:44 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210413140544.GD1235549@redhat.com>
 References: <47a35ffe-ef39-d098-2c29-34cf7d4eb7ef@redhat.com>
+	<20210413140544.GD1235549@redhat.com>
+From: Max Reitz <mreitz@redhat.com>
+Message-ID: <0985ca36-2ba5-9913-99a2-a887d0eb96d2@redhat.com>
+Date: Tue, 13 Apr 2021 16:14:57 +0200
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Disposition: inline
+In-Reply-To: <20210413140544.GD1235549@redhat.com>
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Language: en-US
 Content-Transfer-Encoding: 8bit
-In-Reply-To: <47a35ffe-ef39-d098-2c29-34cf7d4eb7ef@redhat.com>
 Subject: Re: [Virtio-fs] Current file handle status and open questions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -16,217 +17,75 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
 Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-On Thu, Mar 18, 2021 at 06:09:58PM +0100, Max Reitz wrote:
-> Hi,
+On 13.04.21 16:05, Vivek Goyal wrote:
+> On Thu, Mar 18, 2021 at 06:09:58PM +0100, Max Reitz wrote:
+>> Hi,
+>>
+>> As threatened in our last meeting, I’ve written this mail to give an
+>> overview on where we stand with regards to virtiofsd(-rs) using file
+>> handles.
+>>
+>> Technically, this should be a reply to the “Securint file handles”
+>> thread, but this mail is so long I think it’s better to split it off.
+>>
+>> There are multiple problems that somehow relate to file handles, the
+>> ones I’m aware of are:
+>>
+>> (A) We have a problem with too many FDs open.  To solve it, we could
+>>      attach a file handle to each node, then close the FD (as far as
+>>      possible) and reopen it when needed from the file handle.
+>>
+>> (B) We want to allow the guest to use persistent file handles.
+>>
+>> (C) For live migration, the problem isn’t even clear yet, but it seems
+>>      like we’ll want to translate nodes into their file handles and
+>>      transmit those and open them again on the destination (at least on
+>>      shared filesystems).
+>>
+>> Now every case has its own specific tricky bits:
+>>
+>> Case (A) is something that we’d really like to have by default, and it
+>> would need to work all the time during runtime.  So the problem here is
+>> that we’d need CAP_DAC_READ_SEARCH, and we’d need it all the time, but
+>> we don’t want that.  One interesting bit is that we don’t need these
+>> file handles to be persistent between virtiofsd invocations.
 > 
-> As threatened in our last meeting, I’ve written this mail to give an
-> overview on where we stand with regards to virtiofsd(-rs) using file
-> handles.
+> Hi Max,
 > 
-> Technically, this should be a reply to the “Securint file handles”
-> thread, but this mail is so long I think it’s better to split it off.
+> A question about CAP_DAC_READ_SEARCH. I get it that in long term we
+> don't want it beacuse current limitation is that CAP_DAC_READ_SEARCH
+> is needed in init_user_ns. And we want to run virtiofsd in user
+> namespace and it will not have CAP_DAC_READ_SEARCH in init_user_ns.
 > 
-> There are multiple problems that somehow relate to file handles, the
-> ones I’m aware of are:
+> But as of now we are running virtiofsd in init_user_ns
+> CAP_DAC_READ_SEARCH.
 > 
-> (A) We have a problem with too many FDs open.  To solve it, we could
->     attach a file handle to each node, then close the FD (as far as
->     possible) and reopen it when needed from the file handle.
+> So question is that if virtiofsd has CAP_DAC_READ_SEARCH, can we
+> try to fall back to using name_to_handle_at()/open_by_handle_at()
+> for lo_inode->fd. And this should help solve the problem
+> A and C.
 > 
-> (B) We want to allow the guest to use persistent file handles.
-> 
-> (C) For live migration, the problem isn’t even clear yet, but it seems
->     like we’ll want to translate nodes into their file handles and
->     transmit those and open them again on the destination (at least on
->     shared filesystems).
-> 
-> Now every case has its own specific tricky bits:
-> 
-> Case (A) is something that we’d really like to have by default, and it
-> would need to work all the time during runtime.  So the problem here is
-> that we’d need CAP_DAC_READ_SEARCH, and we’d need it all the time, but
-> we don’t want that.  One interesting bit is that we don’t need these
-> file handles to be persistent between virtiofsd invocations.
+> And once a solution comes along which does not require CAP_DAC_READ_SEARCH
+> we could move to that. In fact virtiofsd probably will have to deal
+> with both so that we could continue to work with older kernels.
 
-Hi Max,
+For A, we basically don’t need to change anything regardless of whether 
+(1) we have CAP_DAC_READ_SEARCH, or whether (2) we don’t have that 
+capability, but the kernel supports MAC-ed file handles for that case.
 
-A question about CAP_DAC_READ_SEARCH. I get it that in long term we
-don't want it beacuse current limitation is that CAP_DAC_READ_SEARCH
-is needed in init_user_ns. And we want to run virtiofsd in user
-namespace and it will not have CAP_DAC_READ_SEARCH in init_user_ns.
-
-But as of now we are running virtiofsd in init_user_ns
+When we want to replace lo_inode->fd, virtiofsd only generates file 
+handles (and stores them instead of the fd) and opens them later (when 
+the fd is needed), that’s it.  The only difference would be that it 
+needs to pass a new flag (AT_HANDLE_MAC) when generating handles without 
 CAP_DAC_READ_SEARCH.
 
-So question is that if virtiofsd has CAP_DAC_READ_SEARCH, can we
-try to fall back to using name_to_handle_at()/open_by_handle_at()
-for lo_inode->fd. And this should help solve the problem
-A and C.
 
-And once a solution comes along which does not require CAP_DAC_READ_SEARCH
-we could move to that. In fact virtiofsd probably will have to deal
-with both so that we could continue to work with older kernels.
+And then we should be able to use those handles for live migration, too, 
+yes.  As I said, I suppose perhaps we can just live with requiring 
+CAP_DAC_READ_SEARCH during the initial phase.
 
-Thanks
-Vivek
-
-> 
-> For (B) we have the problem of needing to protect against a potentially
-> malicious guest, i.e. that it must not be able to reference files
-> outside the shared directory.  (Perhaps except for cases where the file
-> was once reachable, i.e. where a file handle was generated by the guest,
-> then the file was moved outside of the shared directory, but remains
-> accessible through the file handle.)  Furthermore, file handles should
-> really be persistent between virtiofsd invocations.  On the positive
-> side, it would be easier for us to require CAP_DAC_READ_SEARCH for this
-> case, because it really is optional.  We could require users to give us
-> that capability if they want file handles in the guest (and we find no
-> way to avoid requiring that capability).
-> 
-> (C) needs persistency between source and destination, but on the
-> positive side, we only need to be able to open file handles during the
-> in-migrate phase on the destination.  So requiring CAP_DAC_READ_SEARCH
-> only during that phase might not be that big of a deal.
-> 
-> 
-> (Ideally, we’d want all cases to work without CAP_DAC_READ_SEARCH, but
-> as you can see, that requirement is weakened for cases (B) and
-> especially (C).)
-> 
-> 
-> As far as I’ve understood, (A) is the case that we want to focus on
-> first, and the main problem there is that we need to open file handles
-> without CAP_DAC_READ_SEARCH.
-> 
-> To do that, I at one point proposed a service process that has
-> CAP_DAC_READ_SEARCH and would open file handles for virtiofsd.  But that
-> probably won’t really be an improvement, because this process too would
-> probably need to run in the container and so if we can’t give virtiofsd
-> that capability, we can’t give it to that service process either.
-> 
-> What Miklos proposed was to modify the kernel to allow processes to open
-> file handles even if they don’t have CAP_DAC_READ_SEARCH as long as
-> those files are in the process’s scope.  One way to implement this
-> restriction (in a very restrictive manner) is to only allow opening file
-> handles that the process has generated before, e.g. by appending a MAC
-> to every file handle (generated with a process-specific key) and
-> checking that when opening a handle.  (You would request this MAC with a
-> new AT_* flag passed to name_to_handle_at().  open_by_handle_at()
-> recognizes it due to a special file handle type value.)
-> 
-> (Process-specific key = stored in current->files, i.e. the files_struct.
-> I’m not 100% sure what this is, but I guess this is the structure that
-> keeps a process’s open file descriptors, and so should generally be
-> unique to a process, or at least unique to a group of processes that
-> share the same FDs.)
-> 
-> 
-> So far so good.
-> 
-> What I’m now worried about is whether we can make use of that kernel
-> feature for (B) and (C), too.  I don’t really want to design completely
-> independent solutions for those problems.
-> 
-> I don’t think it’s important that we come up with exactly plotted
-> implementations for (B) and (C) now, but a rough sketch on how we might
-> approach them would be nice.
-> 
-> What we need for (B) is persistency between virtiofsd invocations.  For
-> (C), we can decide whether we just don’t want to care (i.e., we simply
-> require CAP_DAC_READ_SEARCH during the in-migrate phase on the
-> destination), or whether we need some way to transfer the MAC key from
-> the source to the destination.  (But if we want (B) with live migration,
-> we will need to transfer the key to the destination.)
-> 
-> Let’s talk about (B).
-> 
-> I can’t imagine a design where the kernel could create persistent keys
-> without having a user space process store them.  Well, except something
-> where you measure a program image to derive its specific MAC key from
-> some persistent platform key, but I don’t think that’s feasible (for
-> multiple reasons), and it’d also make it impossible to migrate a VM to a
-> different host and keep guest file handles valid.
-> 
-> So I think we need some way to let a user space process upload a key for
-> some other key to use.  Vivek has proposed using keyctl(2) for that.
-> I’m not exactly sure how we’d approach that in practice, though...  I
-> suppose we’d add the key to some global keyring (write-only), and then
-> somehow we’d need to let virtiofsd inform the kernel which key to use
-> for its MACs.  (Perhaps we can do the last bit with keyctl_search(), by
-> copying a key from the upload keyring to a process-specific keyring,
-> perhaps even a keyring that exists only to hold the process’s MAC key?)
-> 
-> A problem here is that when a process (a) uploads a key for some other
-> process (b) to use, you can effectively give (b) CAP_DAC_READ_SEARCH;
-> because if (a) then shared the key with (b), (b) could forge all of its
-> MACs and thus bypass the MAC protection (so it effectively gains
-> CAP_DAC_READ_SEARCH).  To be allowed this, (a) would need a level of
-> privilege that’s equivalent to being able to grant arbitrary processes
-> CAP_DAC_READ_SEARCH.  Miklos suggested that we might as well fall back
-> to requiring to CAP_SYS_ADMIN, and I think that’s reasonable.
-> 
-> The next question is, how would we require this capability for a key
-> upload?  I don’t think keyctl currently has a solution for that.  I
-> suppose we would need to have a special global keyring for such MACs and
-> only allow privileged processes to upload keys there, so once a process
-> asks for a specific key to be used, we can fetch it from that keyring
-> and be sure that key has been uploaded by a privileged application.
-> 
-> Then, there’d be the question of how an application would select its key
-> from the upload keyring.  I think we would need to prevent it from
-> selecting a key that’s intended for some other application, because then
-> it could use that other application’s file handles...  Which I don’t
-> think is a problem if that other application willingly shares that
-> ability (because in such a case, that other application might as well
-> just do I/O on the first application’s behalf), but other applications’
-> keys must not be reachable by guessing.  So perhaps a key description of
-> high entropy would do (that’s given to keyctl_search()).
-> 
-> I think Dave also suggested using a certificate-based system, but I’m
-> afraid I don’t fully understand it.  As far as I had guessed, that would
-> mean the privileged process only configures what CAs are to be trusted,
-> and then every process could upload its own MAC key along with a
-> certificate from a trusted CA.  That would get around the whole keyring
-> stuff, but it means you’d need to be able to provide trusted CAs and
-> we’d need to check those certificates in the kernel.  I have no idea how
-> we’d do that, I don’t think keyctl could help us there.
-> 
-> Furthermore, the obvious problem with my interpretation of the
-> certificate proposal is that the uploading application would see its own
-> key, which would be bad.  I suspect it would need to be encrypted
-> somehow, but if we do that, we might as well skip the certificate part
-> and just let the privileged process upload one or more global encryption
-> keys, right?  (Applications could then upload encrypted keys with nonces
-> and a hash, I guess, so the kernel can verify that the key is valid.)
-> 
-> 
-> So, overall it seems like it may be workable to extend the in-kernel MAC
-> verification to allow for persistent keys, but I still have some open
-> questions, and I don’t know whether I should just defer them until we
-> get to the point where we need persistency.
-> 
-> (Of note: If we implement something where a user space process (or
-> multiple in conjunction) can arbitrarily choose a MAC key, then this
-> will also be usable for live migration, because you can continue to use
-> the key from the source on the destination.)
-> 
-> 
-> Final minor question that doesn’t really fit in fully elsewhere: When
-> generating a MAC over a file handle, should the mount ID be included?
-> I’m worried that this might definitely break persistency, but I think we
-> should include some FS ID.  Maybe the kernel should query the FS UUID
-> for this MAC calculation, and use that instead of the mount ID?
-> 
-> 
-> Thanks for reading and all your help,
-> 
-> Max
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
+Max
 

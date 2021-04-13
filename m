@@ -1,6 +1,6 @@
-Date: Tue, 13 Apr 2021 12:36:43 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YHWCSwKBZlvJL5th@work-vm>
+Date: Tue, 13 Apr 2021 09:35:34 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210413133534.GA1235549@redhat.com>
 References: <20210408195534.647895-1-antonkuchin@yandex-team.ru>
 	<YHVakoU5hY0wif2n@stefanha-x1.localdomain>
 MIME-Version: 1.0
@@ -19,7 +19,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: Stefan Hajnoczi <stefanha@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Anton Kuchin <antonkuchin@yandex-team.ru>, "Michael S. Tsirkin" <mst@redhat.com>
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+On Tue, Apr 13, 2021 at 09:47:14AM +0100, Stefan Hajnoczi wrote:
 > On Thu, Apr 08, 2021 at 10:55:34PM +0300, Anton Kuchin wrote:
 > > Make virtio-fs take into account server capabilities.
 > > 
@@ -52,23 +52,36 @@ Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Anton Kuchin <antonkuchin@yande
 > 
 > VIRTIO_F_RING_PACKED
 > VIRTIO_F_IOMMU_PLATFORM
+
+Hi Stefan,
+
+What about
+
+VIRTIO_F_ANY_LAYOUT
+
+I see this one is currently set in requested_features. IIUC, qemu will
+assume that device supports VIRTIO_F_ANY_LAYOUT if we don't reset it.
+
+And I see two more flags.
+
+VIRTIO_F_ORDER_PLATFORM
+VIRTIO_F_SR_IOV
+
+Should this be part of user_feature_bits[] too?
+
+Thanks
+Vivek
+
 > 
 > QEMU's virtiofsd does not enable either of these for now, but it's worth
 > allowing the vhost-user device backend to participate in negotiation so
 > that this can change in the future (or alternative virtiofsd
 > implementations can support these features).
 
-OK, so:
 
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-
-
-and queued, I'll add those extra 2 lines.  We seem pretty inconsistent
-about all the different vhost-user devices.
-
-Dave
-
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
 

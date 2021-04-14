@@ -1,18 +1,19 @@
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
 	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=ZzbLJJzdVatWgDfJz2ZZ1Lv5UzxGtXQuOI1FrNqTbkE=;
-	b=VQ4gp9rlip34pGr7jx9IKm0jVOGMV7Ht8tFoasoB90S6Pub2HPVW88RmORxiXeJjFM
-	S/rWcMWz3pUoLB6h+5VLnps7dA94+o03/0V25Jy/QX5i5YAfzXQEEoLyCr+nj03HDoFL
-	yiUZfx8PatrfT6Xt9BQx6h/2/nIXy1nNZ4BbI=
+	:cc; bh=U0MGv1y1F0WYbwqNAIg1w6XGdt99IUf8puJ2a4PrjtQ=;
+	b=eVDJOwASSOF6O4gCTeM7sHeK9zcoZ3LffJdSqKnhm0rK9/hTOw/bNYTGCm/u8jD7sj
+	PbYKwUAKHudkOae5TQvheCGPwHVTSrnQNSzLMq2QW5C/q986g1yCrOlgaR6cibwRp9eu
+	9KGzw74/LwFEoYQokLEHB/SPig0QC/W21DrqI=
 MIME-Version: 1.0
-References: <20210325151823.572089-1-vgoyal@redhat.com>
-In-Reply-To: <20210325151823.572089-1-vgoyal@redhat.com>
+References: <20210412145919.GE1184147@redhat.com>
+	<CAJfpegsaY05jSRNFTcquNFyMr+GMpPBMgoEO0YZcXxfqBi3g2A@mail.gmail.com>
+	<20210414135622.4d677fd7@bahia.lan>
+In-Reply-To: <20210414135622.4d677fd7@bahia.lan>
 From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Wed, 14 Apr 2021 13:57:01 +0200
-Message-ID: <CAJfpegvU9zjT7qV=Rj4ok4kfYz-9BPhjp+xKz9odfSWaFxshyA@mail.gmail.com>
+Date: Wed, 14 Apr 2021 13:58:58 +0200
+Message-ID: <CAJfpegv60U4EecWhZSE27iC0n13kxOBfT83UZD6ziSRE4h9xVA@mail.gmail.com>
 Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH v2 0/2] fuse: Fix clearing SGID when access
-	ACL is set
+Subject: Re: [Virtio-fs] Query about fuse ->sync_fs and virtiofs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,45 +22,38 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: linux-kernel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>, Seth Forshee <seth.forshee@canonical.com>, linux-fsdevel@vger.kernel.org
+To: Greg Kurz <groug@kaod.org>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>, Robert Krawitz <rkrawitz@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
-On Thu, Mar 25, 2021 at 4:19 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+On Wed, Apr 14, 2021 at 1:56 PM Greg Kurz <groug@kaod.org> wrote:
 >
+> On Mon, 12 Apr 2021 17:08:26 +0200
+> Miklos Szeredi <miklos@szeredi.hu> wrote:
 >
-> Hi,
+> > On Mon, Apr 12, 2021 at 4:59 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> > >
+> > > Hi Miklos,
+> > >
+> > > Robert Krawitz drew attention to the fact that fuse does not seem to
+> > > have a ->sync_fs implementation. That probably means that in case of
+> > > virtiofs, upon sync()/syncfs(), host cache will not be written back
+> > > to disk. And that's not something people expect.
+> > >
+> > > I read somewhere that fuse did not implement ->sync_fs because file
+> > > server might not be trusted and it could block sync().
+> > >
+> > > In case of virtiofs, file server is trusted entity (w.r.t guest kernel),
+> > > so it probably should be ok to implement ->sync_fs atleast for virtiofs?
+> >
+> > Yes, that looks like a good idea.
+> >
 >
-> This is V2 of the patchset. Posted V1 here.
->
-> https://lore.kernel.org/linux-fsdevel/20210319195547.427371-1-vgoyal@redhat.com/
->
-> Changes since V1:
->
-> - Dropped the helper to determine if SGID should be cleared and open
->   coded it instead. I will follow up on helper separately in a different
->   patch series. There are few places already which open code this, so
->   for now fuse can do the same. Atleast I can make progress on this
->   and virtiofs can enable ACL support.
->
-> Luis reported that xfstests generic/375 fails with virtiofs. Little
-> debugging showed that when posix access acl is set that in some
-> cases SGID needs to be cleared and that does not happen with virtiofs.
->
-> Setting posix access acl can lead to mode change and it can also lead
-> to clear of SGID. fuse relies on file server taking care of all
-> the mode changes. But file server does not have enough information to
-> determine whether SGID should be cleared or not.
->
-> Hence this patch series add support to send a flag in SETXATTR message
-> to tell server to clear SGID.
+> I've started looking into this. First observation is that implementing
+> ->sync_fs() is file server agnostic, so if we want this to only be used
+> by a trusted file server, we need to introduce such a notion in FUSE.
+> Not sure where though... in struct fuse_fs_context maybe ?
 
-Changed it to have a single extended structure for the request, which
-is how this has always been handled in the fuse API.
-
-The ABI is unchanged, but you'll need to update the userspace part
-according to the API change.  Otherwise looks good.
-
-Applied and pushed to fuse.git#for-next.
+Yep, makes sense.
 
 Thanks,
 Miklos

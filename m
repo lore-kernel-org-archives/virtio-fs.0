@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Wed, 14 Apr 2021 16:51:36 +0100
-Message-Id: <20210414155137.46522-25-dgilbert@redhat.com>
+Date: Wed, 14 Apr 2021 16:51:37 +0100
+Message-Id: <20210414155137.46522-26-dgilbert@redhat.com>
 In-Reply-To: <20210414155137.46522-1-dgilbert@redhat.com>
 References: <20210414155137.46522-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 24/25] vhost-user-fs: Implement drop
-	CAP_FSETID functionality
+Subject: [Virtio-fs] [PATCH v2 25/25] virtiofsd: Ask qemu to drop CAP_FSETID
+	if client asked for it
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,180 +19,137 @@ To: qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com, virtio-fs@red
 
 From: Vivek Goyal <vgoyal@redhat.com>
 
-As part of slave_io message, slave can ask to do I/O on an fd. Additionally
-slave can ask for dropping CAP_FSETID (if master has it) before doing I/O.
-Implement functionality to drop CAP_FSETID and gain it back after the
-operation.
-
-This also creates a dependency on libcap-ng.
+If qemu guest asked to drop CAP_FSETID upon write, send that info
+to qemu in SLAVE_FS_IO message so that qemu can drop capability
+before WRITE. This is to make sure that any setuid bit is killed
+on fd (if there is one set).
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- hw/virtio/meson.build     |  1 +
- hw/virtio/vhost-user-fs.c | 92 ++++++++++++++++++++++++++++++++++++++-
- meson.build               |  6 +++
- 3 files changed, 97 insertions(+), 2 deletions(-)
+ tools/virtiofsd/buffer.c         | 10 ++++++----
+ tools/virtiofsd/fuse_common.h    |  6 +++++-
+ tools/virtiofsd/fuse_lowlevel.h  |  6 +++++-
+ tools/virtiofsd/fuse_virtio.c    |  5 ++++-
+ tools/virtiofsd/passthrough_ll.c |  2 +-
+ 5 files changed, 21 insertions(+), 8 deletions(-)
 
-diff --git a/hw/virtio/meson.build b/hw/virtio/meson.build
-index fbff9bc9d4..bdcdc82e13 100644
---- a/hw/virtio/meson.build
-+++ b/hw/virtio/meson.build
-@@ -18,6 +18,7 @@ virtio_ss.add(when: 'CONFIG_VIRTIO_BALLOON', if_true: files('virtio-balloon.c'))
- virtio_ss.add(when: 'CONFIG_VIRTIO_CRYPTO', if_true: files('virtio-crypto.c'))
- virtio_ss.add(when: ['CONFIG_VIRTIO_CRYPTO', 'CONFIG_VIRTIO_PCI'], if_true: files('virtio-crypto-pci.c'))
- virtio_ss.add(when: 'CONFIG_VHOST_USER_FS', if_true: files('vhost-user-fs.c'))
-+virtio_ss.add(when: 'CONFIG_VHOST_USER_FS', if_true: libcap_ng)
- virtio_ss.add(when: ['CONFIG_VHOST_USER_FS', 'CONFIG_VIRTIO_PCI'], if_true: files('vhost-user-fs-pci.c'))
- virtio_ss.add(when: 'CONFIG_VIRTIO_PMEM', if_true: files('virtio-pmem.c'))
- virtio_ss.add(when: 'CONFIG_VHOST_VSOCK', if_true: files('vhost-vsock.c', 'vhost-vsock-common.c'))
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index 23bb8436e1..09947257f1 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -13,6 +13,8 @@
+diff --git a/tools/virtiofsd/buffer.c b/tools/virtiofsd/buffer.c
+index 8135d52d2a..b4cda7db9a 100644
+--- a/tools/virtiofsd/buffer.c
++++ b/tools/virtiofsd/buffer.c
+@@ -203,7 +203,7 @@ static ssize_t fuse_buf_fd_to_fd(const struct fuse_buf *dst, size_t dst_off,
+ static ssize_t fuse_buf_copy_one(fuse_req_t req,
+                                  const struct fuse_buf *dst, size_t dst_off,
+                                  const struct fuse_buf *src, size_t src_off,
+-                                 size_t len)
++                                 size_t len, bool dropped_cap_fsetid)
+ {
+     int src_is_fd = src->flags & FUSE_BUF_IS_FD;
+     int dst_is_fd = dst->flags & FUSE_BUF_IS_FD;
+@@ -211,7 +211,8 @@ static ssize_t fuse_buf_copy_one(fuse_req_t req,
+     int dst_is_phys = src->flags & FUSE_BUF_PHYS_ADDR;
  
- #include "qemu/osdep.h"
- #include <sys/ioctl.h>
-+#include <cap-ng.h>
-+#include <sys/syscall.h>
- #include "standard-headers/linux/virtio_fs.h"
- #include "qapi/error.h"
- #include "hw/qdev-properties.h"
-@@ -91,6 +93,84 @@ static bool check_slave_message_entries(const VhostUserFSSlaveMsg *sm,
-     return true;
+     if (src_is_phys && !src_is_fd && dst_is_fd) {
+-        return fuse_virtio_write(req, dst, dst_off, src, src_off, len);
++        return fuse_virtio_write(req, dst, dst_off, src, src_off, len,
++                                 dropped_cap_fsetid);
+     }
+     assert(!src_is_phys && !dst_is_phys);
+     if (!src_is_fd && !dst_is_fd) {
+@@ -267,7 +268,7 @@ static int fuse_bufvec_advance(struct fuse_bufvec *bufv, size_t len)
  }
  
-+/*
-+ * Helpers for dropping and regaining effective capabilities. Returns 0
-+ * on success, error otherwise
-+ */
-+static int drop_effective_cap(const char *cap_name, bool *cap_dropped)
-+{
-+    int cap, ret;
-+
-+    cap = capng_name_to_capability(cap_name);
-+    if (cap < 0) {
-+        ret = -errno;
-+        error_report("capng_name_to_capability(%s) failed:%s", cap_name,
-+                     strerror(errno));
-+        goto out;
-+    }
-+
-+    if (capng_get_caps_process()) {
-+        ret = -errno;
-+        error_report("capng_get_caps_process() failed:%s", strerror(errno));
-+        goto out;
-+    }
-+
-+    /* We dont have this capability in effective set already. */
-+    if (!capng_have_capability(CAPNG_EFFECTIVE, cap)) {
-+        ret = 0;
-+        goto out;
-+    }
-+
-+    if (capng_update(CAPNG_DROP, CAPNG_EFFECTIVE, cap)) {
-+        ret = -errno;
-+        error_report("capng_update(DROP,) failed");
-+        goto out;
-+    }
-+    if (capng_apply(CAPNG_SELECT_CAPS)) {
-+        ret = -errno;
-+        error_report("drop:capng_apply() failed");
-+        goto out;
-+    }
-+
-+    ret = 0;
-+    if (cap_dropped) {
-+        *cap_dropped = true;
-+    }
-+
-+out:
-+    return ret;
-+}
-+
-+static int gain_effective_cap(const char *cap_name)
-+{
-+    int cap;
-+    int ret = 0;
-+
-+    cap = capng_name_to_capability(cap_name);
-+    if (cap < 0) {
-+        ret = -errno;
-+        error_report("capng_name_to_capability(%s) failed:%s", cap_name,
-+                     strerror(errno));
-+        goto out;
-+    }
-+
-+    if (capng_update(CAPNG_ADD, CAPNG_EFFECTIVE, cap)) {
-+        ret = -errno;
-+        error_report("capng_update(ADD,) failed");
-+        goto out;
-+    }
-+
-+    if (capng_apply(CAPNG_SELECT_CAPS)) {
-+        ret = -errno;
-+        error_report("gain:capng_apply() failed");
-+        goto out;
-+    }
-+    ret = 0;
-+
-+out:
-+    return ret;
-+}
-+
- uint64_t vhost_user_fs_slave_map(struct vhost_dev *dev, int message_size,
-                                  VhostUserFSSlaveMsg *sm, int fd)
+ ssize_t fuse_buf_copy(fuse_req_t req, struct fuse_bufvec *dstv,
+-                      struct fuse_bufvec *srcv)
++                      struct fuse_bufvec *srcv, bool dropped_cap_fsetid)
  {
-@@ -238,6 +318,7 @@ uint64_t vhost_user_fs_slave_io(struct vhost_dev *dev, int message_size,
-     unsigned int i;
-     int res = 0;
-     size_t done = 0;
-+    bool cap_fsetid_dropped = false;
+     size_t copied = 0, i;
  
-     if (fd < 0) {
-         error_report("Bad fd for map");
-@@ -245,8 +326,10 @@ uint64_t vhost_user_fs_slave_io(struct vhost_dev *dev, int message_size,
-     }
+@@ -309,7 +310,8 @@ ssize_t fuse_buf_copy(fuse_req_t req, struct fuse_bufvec *dstv,
+         dst_len = dst->size - dstv->off;
+         len = min_size(src_len, dst_len);
  
-     if (sm->flags & VHOST_USER_FS_GENFLAG_DROP_FSETID) {
--        error_report("Dropping CAP_FSETID is not supported");
--        return (uint64_t)-ENOTSUP;
-+        res = drop_effective_cap("FSETID", &cap_fsetid_dropped);
-+        if (res != 0) {
-+            return (uint64_t)res;
-+        }
-     }
+-        res = fuse_buf_copy_one(req, dst, dstv->off, src, srcv->off, len);
++        res = fuse_buf_copy_one(req, dst, dstv->off, src, srcv->off, len,
++                                dropped_cap_fsetid);
+         if (res < 0) {
+             if (!copied) {
+                 return res;
+diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
+index beed03aa93..8a75729be9 100644
+--- a/tools/virtiofsd/fuse_common.h
++++ b/tools/virtiofsd/fuse_common.h
+@@ -733,10 +733,14 @@ size_t fuse_buf_size(const struct fuse_bufvec *bufv);
+  * @param req The request this copy is part of
+  * @param dst destination buffer vector
+  * @param src source buffer vector
++ * @param dropped_cap_fsetid Caller has dropped CAP_FSETID. If work is handed
++ *        over to a different thread/process, CAP_FSETID needs to be dropped
++ *        there as well.
+  * @return actual number of bytes copied or -errno on error
+  */
+ ssize_t fuse_buf_copy(fuse_req_t req,
+-                      struct fuse_bufvec *dst, struct fuse_bufvec *src);
++                      struct fuse_bufvec *dst, struct fuse_bufvec *src,
++                      bool dropped_cap_fsetid);
  
-     for (i = 0; i < sm->count && !res; i++) {
-@@ -313,6 +396,11 @@ uint64_t vhost_user_fs_slave_io(struct vhost_dev *dev, int message_size,
-     }
-     close(fd);
+ /**
+  * Memory buffer iterator
+diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
+index 24e580aafe..dfd7e1525c 100644
+--- a/tools/virtiofsd/fuse_lowlevel.h
++++ b/tools/virtiofsd/fuse_lowlevel.h
+@@ -2030,9 +2030,13 @@ int64_t fuse_virtio_io(struct fuse_session *se, VhostUserFSSlaveMsg *msg,
+  * @param src The source (memory) buffer
+  * @param src_off The GPA
+  * @param len Length in bytes
++ * @param dropped_cap_fsetid Caller dropped CAP_FSETID. If it is being handed
++ *        over to different thread/process, CAP_FSETID needs to be dropped
++ *        before write.
+  */
+ ssize_t fuse_virtio_write(fuse_req_t req, const struct fuse_buf *dst,
+                           size_t dst_off, const struct fuse_buf *src,
+-                          size_t src_off, size_t len);
++                          size_t src_off, size_t len,
++                          bool dropped_cap_fsetid);
  
-+    if (cap_fsetid_dropped) {
-+        if (gain_effective_cap("FSETID")) {
-+            error_report("Failed to gain CAP_FSETID");
-+        }
+ #endif /* FUSE_LOWLEVEL_H_ */
+diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+index 887e79a126..525452d036 100644
+--- a/tools/virtiofsd/fuse_virtio.c
++++ b/tools/virtiofsd/fuse_virtio.c
+@@ -1291,7 +1291,7 @@ int64_t fuse_virtio_io(struct fuse_session *se, VhostUserFSSlaveMsg *msg,
+  */
+ ssize_t fuse_virtio_write(fuse_req_t req, const struct fuse_buf *dst,
+                           size_t dst_off, const struct fuse_buf *src,
+-                          size_t src_off, size_t len)
++                          size_t src_off, size_t len, bool dropped_cap_fsetid)
+ {
+     VhostUserFSSlaveMsg *msg = g_malloc0(sizeof(VhostUserFSSlaveMsg) +
+                                          sizeof(VhostUserFSSlaveMsgEntry));
+@@ -1311,6 +1311,9 @@ ssize_t fuse_virtio_write(fuse_req_t req, const struct fuse_buf *dst,
+     msg->entries[0].c_offset = (uintptr_t)src->mem + src_off;
+     msg->entries[0].len = len;
+     msg->entries[0].flags = VHOST_USER_FS_FLAG_MAP_W;
++    if (dropped_cap_fsetid) {
++        msg->flags |= VHOST_USER_FS_GENFLAG_DROP_FSETID;
 +    }
-     trace_vhost_user_fs_slave_io_exit(res, done);
-     if (res < 0) {
-         return (uint64_t)res;
-diff --git a/meson.build b/meson.build
-index c6f4b0cf5e..71899d0993 100644
---- a/meson.build
-+++ b/meson.build
-@@ -1081,6 +1081,12 @@ elif get_option('virtfs').disabled()
-   have_virtfs = false
- endif
  
-+if config_host.has_key('CONFIG_VHOST_USER_FS')
-+  if not libcap_ng.found()
-+    error('vhost-user-fs requires libcap-ng-devel')
-+  endif
-+endif
-+
- config_host_data.set_quoted('CONFIG_BINDIR', get_option('prefix') / get_option('bindir'))
- config_host_data.set_quoted('CONFIG_PREFIX', get_option('prefix'))
- config_host_data.set_quoted('CONFIG_QEMU_CONFDIR', get_option('prefix') / qemu_confdir)
+     int64_t result = fuse_virtio_io(req->se, msg, dst->fd);
+     fuse_log(FUSE_LOG_DEBUG, "%s: result=%ld\n", __func__, result);
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index b3954376b3..d0fa7de538 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -2301,7 +2301,7 @@ static void lo_write_buf(fuse_req_t req, fuse_ino_t ino,
+         }
+     }
+ 
+-    res = fuse_buf_copy(req, &out_buf, in_buf);
++    res = fuse_buf_copy(req, &out_buf, in_buf, fi->kill_priv);
+     if (res < 0) {
+         fuse_reply_err(req, -res);
+     } else {
 -- 
 2.31.1
 

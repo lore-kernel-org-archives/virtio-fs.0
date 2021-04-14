@@ -1,14 +1,9 @@
-Date: Wed, 14 Apr 2021 08:58:54 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210414125854.GL1235549@redhat.com>
-References: <20210325151823.572089-1-vgoyal@redhat.com>
-	<CAJfpegvU9zjT7qV=Rj4ok4kfYz-9BPhjp+xKz9odfSWaFxshyA@mail.gmail.com>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Wed, 14 Apr 2021 16:51:12 +0100
+Message-Id: <20210414155137.46522-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <CAJfpegvU9zjT7qV=Rj4ok4kfYz-9BPhjp+xKz9odfSWaFxshyA@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH v2 0/2] fuse: Fix clearing SGID when access
-	ACL is set
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2 00/25] virtiofs dax patches
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,55 +12,109 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: linux-kernel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>, Seth Forshee <seth.forshee@canonical.com>, linux-fsdevel@vger.kernel.org
+To: qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com, virtio-fs@redhat.com
 
-On Wed, Apr 14, 2021 at 01:57:01PM +0200, Miklos Szeredi wrote:
-> On Thu, Mar 25, 2021 at 4:19 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> >
-> >
-> > Hi,
-> >
-> > This is V2 of the patchset. Posted V1 here.
-> >
-> > https://lore.kernel.org/linux-fsdevel/20210319195547.427371-1-vgoyal@redhat.com/
-> >
-> > Changes since V1:
-> >
-> > - Dropped the helper to determine if SGID should be cleared and open
-> >   coded it instead. I will follow up on helper separately in a different
-> >   patch series. There are few places already which open code this, so
-> >   for now fuse can do the same. Atleast I can make progress on this
-> >   and virtiofs can enable ACL support.
-> >
-> > Luis reported that xfstests generic/375 fails with virtiofs. Little
-> > debugging showed that when posix access acl is set that in some
-> > cases SGID needs to be cleared and that does not happen with virtiofs.
-> >
-> > Setting posix access acl can lead to mode change and it can also lead
-> > to clear of SGID. fuse relies on file server taking care of all
-> > the mode changes. But file server does not have enough information to
-> > determine whether SGID should be cleared or not.
-> >
-> > Hence this patch series add support to send a flag in SETXATTR message
-> > to tell server to clear SGID.
-> 
-> Changed it to have a single extended structure for the request, which
-> is how this has always been handled in the fuse API.
-> 
-> The ABI is unchanged, but you'll need to update the userspace part
-> according to the API change.  Otherwise looks good.
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Hi Miklos,
+  This series adds support for acceleration of virtiofs via DAX
+mapping, using features added in the 5.11 Linux kernel.
 
-Thanks. Patches look good. I will update userspace part and repost.
+  DAX originally existed in the kernel for mapping real storage
+devices directly into memory, so that reads/writes turn into
+reads/writes directly mapped into the storage device.
 
-Vivek
+  virtiofs's DAX support is similar; a PCI BAR is exposed on the
+virtiofs device corresponding to a DAX 'cache' of a user defined size.
+The guest daemon then requests files to be mapped into that cache;
+when that happens the virtiofsd sends filedescriptors and commands back
+to the QEMU that mmap's those files directly into the memory slot
+exposed to kvm.  The guest can then directly read/write to the files
+exposed by virtiofs by reading/writing into the BAR.
 
-> 
-> Applied and pushed to fuse.git#for-next.
-> 
-> Thanks,
-> Miklos
-> 
+  A typical invocation would be:
+     -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs,cache-size=4G 
+
+and then the guest must mount with -o dax
+
+  Note that the cache doesn't really take VM up on the host, because
+everything placed there is just an mmap of a file, so you can afford
+to use quite a large cache size.
+
+  Unlike a real DAX device, the cache is a finite size that's
+potentially smaller than the underlying filesystem (especially when
+mapping granuality is taken into account).  Mapping, unmapping and
+remapping must take place to juggle files into the cache if it's too
+small.  Some workloads benefit more than others.
+
+Gotchas:
+  a) If something else on the host truncates an mmap'd file,
+kvm gets rather upset;  for this reason it's advised that DAX is
+currently only suitable for use on non-shared filesystems.
+
+Dave
+
+v2
+  Cleanups from first review, rebase on current head
+
+Dr. David Alan Gilbert (20):
+  DAX: vhost-user: Rework slave return values
+  virtiofsd: Don't assume header layout
+  DAX: libvhost-user: Route slave message payload
+  DAX: libvhost-user: Allow popping a queue element with bad pointers
+  DAX subprojects/libvhost-user: Add virtio-fs slave types
+  DAX: virtio: Add shared memory capability
+  DAX: virtio-fs: Add cache BAR
+  DAX: virtio-fs: Add vhost-user slave commands for mapping
+  DAX: virtio-fs: Fill in slave commands for mapping
+  DAX: virtiofsd Add cache accessor functions
+  DAX: virtiofsd: Add setup/remove mappings fuse commands
+  DAX: virtiofsd: Add setup/remove mapping handlers to passthrough_ll
+  DAX: virtiofsd: Wire up passthrough_ll's lo_setupmapping
+  DAX: virtiofsd: route se down to destroy method
+  DAX: virtiofsd: Perform an unmap on destroy
+  DAX/unmap: virtiofsd: Add VHOST_USER_SLAVE_FS_IO
+  DAX/unmap virtiofsd: Add wrappers for VHOST_USER_SLAVE_FS_IO
+  DAX/unmap virtiofsd: Parse unmappable elements
+  DAX/unmap virtiofsd: Route unmappable reads
+  DAX/unmap virtiofsd: route unmappable write to slave command
+
+Stefan Hajnoczi (1):
+  DAX:virtiofsd: implement FUSE_INIT map_alignment field
+
+Vivek Goyal (4):
+  DAX: virtiofsd: Make lo_removemapping() work
+  vhost-user-fs: Extend VhostUserFSSlaveMsg to pass additional info
+  vhost-user-fs: Implement drop CAP_FSETID functionality
+  virtiofsd: Ask qemu to drop CAP_FSETID if client asked for it
+
+ block/export/vhost-user-blk-server.c      |   2 +-
+ contrib/vhost-user-blk/vhost-user-blk.c   |   3 +-
+ contrib/vhost-user-gpu/vhost-user-gpu.c   |   5 +-
+ contrib/vhost-user-input/main.c           |   4 +-
+ contrib/vhost-user-scsi/vhost-user-scsi.c |   2 +-
+ docs/interop/vhost-user.rst               |  37 ++
+ hw/virtio/meson.build                     |   1 +
+ hw/virtio/trace-events                    |   6 +
+ hw/virtio/vhost-backend.c                 |   6 +-
+ hw/virtio/vhost-user-fs-pci.c             |  32 ++
+ hw/virtio/vhost-user-fs.c                 | 395 ++++++++++++++++++++++
+ hw/virtio/vhost-user.c                    |  60 +++-
+ hw/virtio/virtio-pci.c                    |  20 ++
+ hw/virtio/virtio-pci.h                    |   4 +
+ include/hw/virtio/vhost-backend.h         |   2 +-
+ include/hw/virtio/vhost-user-fs.h         |  43 +++
+ meson.build                               |   6 +
+ subprojects/libvhost-user/libvhost-user.c | 113 ++++++-
+ subprojects/libvhost-user/libvhost-user.h |  57 +++-
+ tests/vhost-user-bridge.c                 |   4 +-
+ tools/virtiofsd/buffer.c                  |  22 +-
+ tools/virtiofsd/fuse_common.h             |  17 +-
+ tools/virtiofsd/fuse_lowlevel.c           |  92 ++++-
+ tools/virtiofsd/fuse_lowlevel.h           |  78 ++++-
+ tools/virtiofsd/fuse_virtio.c             | 372 ++++++++++++++++----
+ tools/virtiofsd/passthrough_ll.c          | 117 ++++++-
+ 26 files changed, 1380 insertions(+), 120 deletions(-)
+
+-- 
+2.31.1
 

@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Wed, 14 Apr 2021 16:51:33 +0100
-Message-Id: <20210414155137.46522-22-dgilbert@redhat.com>
+Date: Wed, 14 Apr 2021 16:51:34 +0100
+Message-Id: <20210414155137.46522-23-dgilbert@redhat.com>
 In-Reply-To: <20210414155137.46522-1-dgilbert@redhat.com>
 References: <20210414155137.46522-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 21/25] DAX/unmap virtiofsd: route unmappable
-	write to slave command
+Subject: [Virtio-fs] [PATCH v2 22/25] DAX:virtiofsd: implement FUSE_INIT
+	map_alignment field
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,120 +17,50 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com, virtio-fs@redhat.com
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+From: Stefan Hajnoczi <stefanha@redhat.com>
 
-When a fuse_buf_copy is performed on an element with FUSE_BUF_PHYS_ADDR
-route it to a fuse_virtio_write request that does a slave command to
-perform the write.
+Communicate the host page size to the FUSE client so that
+FUSE_SETUPMAPPING/FUSE_REMOVEMAPPING requests are aware of our alignment
+constraints.
 
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- tools/virtiofsd/buffer.c         | 14 +++++++++++---
- tools/virtiofsd/fuse_common.h    |  6 +++++-
- tools/virtiofsd/fuse_lowlevel.h  |  3 ---
- tools/virtiofsd/passthrough_ll.c |  2 +-
- 4 files changed, 17 insertions(+), 8 deletions(-)
+ tools/virtiofsd/fuse_lowlevel.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/tools/virtiofsd/buffer.c b/tools/virtiofsd/buffer.c
-index 1a050aa441..8135d52d2a 100644
---- a/tools/virtiofsd/buffer.c
-+++ b/tools/virtiofsd/buffer.c
-@@ -200,13 +200,20 @@ static ssize_t fuse_buf_fd_to_fd(const struct fuse_buf *dst, size_t dst_off,
-     return copied;
- }
- 
--static ssize_t fuse_buf_copy_one(const struct fuse_buf *dst, size_t dst_off,
-+static ssize_t fuse_buf_copy_one(fuse_req_t req,
-+                                 const struct fuse_buf *dst, size_t dst_off,
-                                  const struct fuse_buf *src, size_t src_off,
-                                  size_t len)
- {
-     int src_is_fd = src->flags & FUSE_BUF_IS_FD;
-     int dst_is_fd = dst->flags & FUSE_BUF_IS_FD;
-+    int src_is_phys = src->flags & FUSE_BUF_PHYS_ADDR;
-+    int dst_is_phys = src->flags & FUSE_BUF_PHYS_ADDR;
- 
-+    if (src_is_phys && !src_is_fd && dst_is_fd) {
-+        return fuse_virtio_write(req, dst, dst_off, src, src_off, len);
-+    }
-+    assert(!src_is_phys && !dst_is_phys);
-     if (!src_is_fd && !dst_is_fd) {
-         char *dstmem = (char *)dst->mem + dst_off;
-         char *srcmem = (char *)src->mem + src_off;
-@@ -259,7 +266,8 @@ static int fuse_bufvec_advance(struct fuse_bufvec *bufv, size_t len)
-     return 1;
- }
- 
--ssize_t fuse_buf_copy(struct fuse_bufvec *dstv, struct fuse_bufvec *srcv)
-+ssize_t fuse_buf_copy(fuse_req_t req, struct fuse_bufvec *dstv,
-+                      struct fuse_bufvec *srcv)
- {
-     size_t copied = 0, i;
- 
-@@ -301,7 +309,7 @@ ssize_t fuse_buf_copy(struct fuse_bufvec *dstv, struct fuse_bufvec *srcv)
-         dst_len = dst->size - dstv->off;
-         len = min_size(src_len, dst_len);
- 
--        res = fuse_buf_copy_one(dst, dstv->off, src, srcv->off, len);
-+        res = fuse_buf_copy_one(req, dst, dstv->off, src, srcv->off, len);
-         if (res < 0) {
-             if (!copied) {
-                 return res;
-diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
-index af43cf19f9..beed03aa93 100644
---- a/tools/virtiofsd/fuse_common.h
-+++ b/tools/virtiofsd/fuse_common.h
-@@ -510,6 +510,8 @@ struct fuse_conn_info {
- struct fuse_session;
- struct fuse_pollhandle;
- struct fuse_conn_info_opts;
-+struct fuse_req;
-+typedef struct fuse_req *fuse_req_t;
- 
- /**
-  * This function parses several command-line options that can be used
-@@ -728,11 +730,13 @@ size_t fuse_buf_size(const struct fuse_bufvec *bufv);
- /**
-  * Copy data from one buffer vector to another
-  *
-+ * @param req The request this copy is part of
-  * @param dst destination buffer vector
-  * @param src source buffer vector
-  * @return actual number of bytes copied or -errno on error
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index e82edce72a..08999a6bc5 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -10,6 +10,7 @@
   */
--ssize_t fuse_buf_copy(struct fuse_bufvec *dst, struct fuse_bufvec *src);
-+ssize_t fuse_buf_copy(fuse_req_t req,
-+                      struct fuse_bufvec *dst, struct fuse_bufvec *src);
  
- /**
-  * Memory buffer iterator
-diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
-index 757cdae49b..24e580aafe 100644
---- a/tools/virtiofsd/fuse_lowlevel.h
-+++ b/tools/virtiofsd/fuse_lowlevel.h
-@@ -42,9 +42,6 @@
- /** Inode number type */
- typedef uint64_t fuse_ino_t;
+ #include "qemu/osdep.h"
++#include "qemu/host-utils.h"
+ #include "fuse_i.h"
+ #include "standard-headers/linux/fuse.h"
+ #include "fuse_misc.h"
+@@ -2194,6 +2195,12 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+     outarg.max_background = se->conn.max_background;
+     outarg.congestion_threshold = se->conn.congestion_threshold;
+     outarg.time_gran = se->conn.time_gran;
++    if (arg->flags & FUSE_MAP_ALIGNMENT) {
++        outarg.flags |= FUSE_MAP_ALIGNMENT;
++
++        /* This constraint comes from mmap(2) and munmap(2) */
++        outarg.map_alignment = ctz64(sysconf(_SC_PAGE_SIZE));
++    }
  
--/** Request pointer type */
--typedef struct fuse_req *fuse_req_t;
--
- /**
-  * Session
-  *
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 726343677e..b3954376b3 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -2301,7 +2301,7 @@ static void lo_write_buf(fuse_req_t req, fuse_ino_t ino,
-         }
-     }
+     if (se->conn.want & FUSE_CAP_HANDLE_KILLPRIV_V2) {
+         outarg.flags |= FUSE_HANDLE_KILLPRIV_V2;
+@@ -2207,6 +2214,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+     fuse_log(FUSE_LOG_DEBUG, "   congestion_threshold=%i\n",
+              outarg.congestion_threshold);
+     fuse_log(FUSE_LOG_DEBUG, "   time_gran=%u\n", outarg.time_gran);
++    fuse_log(FUSE_LOG_DEBUG, "   map_alignment=%u\n", outarg.map_alignment);
  
--    res = fuse_buf_copy(&out_buf, in_buf);
-+    res = fuse_buf_copy(req, &out_buf, in_buf);
-     if (res < 0) {
-         fuse_reply_err(req, -res);
-     } else {
+     send_reply_ok(req, &outarg, outargsize);
+ }
 -- 
 2.31.1
 

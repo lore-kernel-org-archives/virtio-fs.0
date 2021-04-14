@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Wed, 14 Apr 2021 16:51:25 +0100
-Message-Id: <20210414155137.46522-14-dgilbert@redhat.com>
+Date: Wed, 14 Apr 2021 16:51:26 +0100
+Message-Id: <20210414155137.46522-15-dgilbert@redhat.com>
 In-Reply-To: <20210414155137.46522-1-dgilbert@redhat.com>
 References: <20210414155137.46522-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 13/25] DAX: virtiofsd: Wire up
-	passthrough_ll's lo_setupmapping
+Subject: [Virtio-fs] [PATCH v2 14/25] DAX: virtiofsd: Make
+	lo_removemapping() work
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,116 +17,64 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com, virtio-fs@redhat.com
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+From: Vivek Goyal <vgoyal@redhat.com>
 
-Wire up passthrough_ll's setupmapping to allocate, send to virtio
-and then reply OK.
+Let guest pass in the offset in dax window a mapping is currently
+mapped at and needs to be removed.
 
-Guest might not pass file pointer. In that case using inode info, open
-the file again, mmap() and close fd.
+Vivek added the initial support to remove single mapping and later Peng
+added patch to support removing multiple mappings in single command.
 
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-With fix from:
-Signed-off-by: Fotis Xenakis <foxen@windowslive.com>
+Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- tools/virtiofsd/fuse_lowlevel.c  | 13 ++++++--
- tools/virtiofsd/passthrough_ll.c | 57 ++++++++++++++++++++++++++++++--
- 2 files changed, 66 insertions(+), 4 deletions(-)
+ tools/virtiofsd/passthrough_ll.c | 32 ++++++++++++++++++++++++++++++--
+ 1 file changed, 30 insertions(+), 2 deletions(-)
 
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index 1a00307879..81c4c2b373 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -1899,8 +1899,17 @@ static void do_setupmapping(fuse_req_t req, fuse_ino_t nodeid,
-     }
- 
-     if (req->se->op.setupmapping) {
--        req->se->op.setupmapping(req, nodeid, arg->foffset, arg->len,
--                                 arg->moffset, genflags, &fi);
-+        /*
-+         * TODO: Add a flag to request which tells if arg->fh is
-+         * valid or not.
-+         */
-+        if (fi.fh == (uint64_t)-1) {
-+            req->se->op.setupmapping(req, nodeid, arg->foffset, arg->len,
-+                                     arg->moffset, genflags, NULL);
-+        } else {
-+            req->se->op.setupmapping(req, nodeid, arg->foffset, arg->len,
-+                                     arg->moffset, genflags, &fi);
-+        }
-     } else {
-         fuse_reply_err(req, ENOSYS);
-     }
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index afa86650c1..bf7a7f3c23 100644
+index bf7a7f3c23..a9f0505414 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -3148,8 +3148,61 @@ static void lo_setupmapping(fuse_req_t req, fuse_ino_t ino, uint64_t foffset,
-                             uint64_t len, uint64_t moffset, uint64_t flags,
-                             struct fuse_file_info *fi)
+@@ -3209,8 +3209,36 @@ static void lo_removemapping(fuse_req_t req, struct fuse_session *se,
+                              fuse_ino_t ino, unsigned num,
+                              struct fuse_removemapping_one *argp)
  {
 -    /* TODO */
 -    fuse_reply_err(req, ENOSYS);
-+    struct lo_data *lo = lo_data(req);
-+    int ret = 0, fd;
-+    VhostUserFSSlaveMsg *msg = g_malloc0(sizeof(VhostUserFSSlaveMsg) +
-+                                         sizeof(VhostUserFSSlaveMsgEntry));
-+    uint64_t vhu_flags;
-+    char *buf;
-+    bool writable = flags & O_RDWR;
++    VhostUserFSSlaveMsg *msg;
++    size_t alloc_count = (num > VHOST_USER_FS_SLAVE_MAX_ENTRIES) ?
++                              VHOST_USER_FS_SLAVE_MAX_ENTRIES : num;
++    int ret = 0;
++    msg = g_malloc0(sizeof(VhostUserFSSlaveMsg) +
++                    alloc_count * sizeof(VhostUserFSSlaveMsgEntry));
 +
-+    fuse_log(FUSE_LOG_DEBUG,
-+             "lo_setupmapping(ino=%" PRIu64 ", fi=0x%p,"
-+             " foffset=%" PRIu64 ", len=%" PRIu64 ", moffset=%" PRIu64
-+             ", flags=%" PRIu64 ")\n",
-+             ino, (void *)fi, foffset, len, moffset, flags);
++    for (int i = 0, o = 0; num > 0; i++, argp++) {
++        VhostUserFSSlaveMsgEntry *e = &msg->entries[o];
 +
-+    vhu_flags = VHOST_USER_FS_FLAG_MAP_R;
-+    if (writable) {
-+        vhu_flags |= VHOST_USER_FS_FLAG_MAP_W;
-+    }
++        e->len = argp->len;
++        e->c_offset = argp->moffset;
 +
-+    msg->count = 1;
-+    msg->entries[0].fd_offset = foffset;
-+    msg->entries[0].len = len;
-+    msg->entries[0].c_offset = moffset;
-+    msg->entries[0].flags = vhu_flags;
-+
-+    if (fi) {
-+        fd = lo_fi_fd(req, fi);
-+    } else {
-+        ret = asprintf(&buf, "%i", lo_fd(req, ino));
-+        if (ret == -1) {
-+            g_free(msg);
-+            return (void)fuse_reply_err(req, errno);
-+        }
-+
-+        fd = openat(lo->proc_self_fd, buf, flags);
-+        free(buf);
-+        if (fd == -1) {
-+            g_free(msg);
-+            return (void)fuse_reply_err(req, errno);
++        o++;
++        if (--num == 0 || o == VHOST_USER_FS_SLAVE_MAX_ENTRIES) {
++            msg->count = o;
++            ret = fuse_virtio_unmap(se, msg);
++            if (ret < 0) {
++                fuse_log(FUSE_LOG_ERR,
++                         "%s: unmap over virtio failed "
++                         "(offset=0x%lx, len=0x%lx). err=%d\n",
++                         __func__, argp->moffset, argp->len, ret);
++                break;
++            }
++            o = 0;
 +        }
 +    }
 +
-+    ret = fuse_virtio_map(req, msg, fd);
-+    if (ret < 0) {
-+        fuse_log(FUSE_LOG_ERR,
-+                 "%s: map over virtio failed (ino=%" PRId64
-+                 "fd=%d moffset=0x%" PRIx64 "). err = %d\n",
-+                 __func__, ino, fd, moffset, ret);
-+    }
-+
-+    if (!fi) {
-+        close(fd);
-+    }
 +    fuse_reply_err(req, -ret);
 +    g_free(msg);
  }
  
- static void lo_removemapping(fuse_req_t req, struct fuse_session *se,
+ static struct fuse_lowlevel_ops lo_oper = {
 -- 
 2.31.1
 

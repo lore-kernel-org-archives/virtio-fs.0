@@ -1,12 +1,14 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Wed, 14 Apr 2021 16:51:37 +0100
-Message-Id: <20210414155137.46522-26-dgilbert@redhat.com>
-In-Reply-To: <20210414155137.46522-1-dgilbert@redhat.com>
+Date: Wed, 14 Apr 2021 18:35:07 +0200
+From: Greg Kurz <groug@kaod.org>
+Message-ID: <20210414183507.4bffd57d@bahia.lan>
+In-Reply-To: <20210414155137.46522-9-dgilbert@redhat.com>
 References: <20210414155137.46522-1-dgilbert@redhat.com>
+	<20210414155137.46522-9-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 25/25] virtiofsd: Ask qemu to drop CAP_FSETID
-	if client asked for it
+Content-Type: text/plain; charset="US-ASCII"
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH v2 08/25] DAX: virtio-fs: Add vhost-user
+ slave commands for mapping
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,141 +17,268 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com, virtio-fs@redhat.com
+To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
 
-From: Vivek Goyal <vgoyal@redhat.com>
+On Wed, 14 Apr 2021 16:51:20 +0100
+"Dr. David Alan Gilbert (git)" <dgilbert@redhat.com> wrote:
 
-If qemu guest asked to drop CAP_FSETID upon write, send that info
-to qemu in SLAVE_FS_IO message so that qemu can drop capability
-before WRITE. This is to make sure that any setuid bit is killed
-on fd (if there is one set).
+> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+> 
+> The daemon may request that fd's be mapped into the virtio-fs cache
+> visible to the guest.
+> These mappings are triggered by commands sent over the slave fd
+> from the daemon.
+> 
+> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> ---
+>  docs/interop/vhost-user.rst               | 21 ++++++++
+>  hw/virtio/vhost-user-fs.c                 | 66 +++++++++++++++++++++++
+>  hw/virtio/vhost-user.c                    | 25 +++++++++
+>  include/hw/virtio/vhost-user-fs.h         | 33 ++++++++++++
+>  subprojects/libvhost-user/libvhost-user.h |  2 +
+>  5 files changed, 147 insertions(+)
+> 
+> diff --git a/docs/interop/vhost-user.rst b/docs/interop/vhost-user.rst
+> index d6085f7045..09aee3565d 100644
+> --- a/docs/interop/vhost-user.rst
+> +++ b/docs/interop/vhost-user.rst
+> @@ -1432,6 +1432,27 @@ Slave message types
+>  
+>    The state.num field is currently reserved and must be set to 0.
+>  
+> +``VHOST_USER_SLAVE_FS_MAP``
+> +  :id: 6
+> +  :equivalent ioctl: N/A
+> +  :slave payload: ``struct VhostUserFSSlaveMsg``
+> +  :master payload: N/A
+> +
+> +  Requests that an fd, provided in the ancillary data, be mmapped
+> +  into the virtio-fs cache; multiple chunks can be mapped in one
+> +  command.
+> +  A reply is generated indicating whether mapping succeeded.
+> +
+> +``VHOST_USER_SLAVE_FS_UNMAP``
+> +  :id: 7
+> +  :equivalent ioctl: N/A
+> +  :slave payload: ``struct VhostUserFSSlaveMsg``
+> +  :master payload: N/A
+> +
+> +  Requests that the range in the virtio-fs cache is unmapped;
+> +  multiple chunks can be unmapped in one command.
+> +  A reply is generated indicating whether unmapping succeeded.
+> +
+>  .. _reply_ack:
+>  
+>  VHOST_USER_PROTOCOL_F_REPLY_ACK
+> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+> index dd0a02aa99..169a146e72 100644
+> --- a/hw/virtio/vhost-user-fs.c
+> +++ b/hw/virtio/vhost-user-fs.c
+> @@ -45,6 +45,72 @@ static const int user_feature_bits[] = {
+>  #define DAX_WINDOW_PROT PROT_NONE
+>  #endif
+>  
+> +/*
+> + * The message apparently had 'received_size' bytes, check this
+> + * matches the count in the message.
+> + *
+> + * Returns true if the size matches.
+> + */
+> +static bool check_slave_message_entries(const VhostUserFSSlaveMsg *sm,
+> +                                        int received_size)
+> +{
+> +    int tmp;
+> +
+> +    /*
+> +     * VhostUserFSSlaveMsg consists of a body followed by 'n' entries,
+> +     * (each VhostUserFSSlaveMsgEntry).  There's a maximum of
+> +     * VHOST_USER_FS_SLAVE_MAX_ENTRIES of these.
+> +     */
+> +    if (received_size <= sizeof(VhostUserFSSlaveMsg)) {
+> +        error_report("%s: Short VhostUserFSSlaveMsg size, %d", __func__,
+> +                     received_size);
+> +        return false;
+> +    }
+> +
+> +    tmp = received_size - sizeof(VhostUserFSSlaveMsg);
+> +    if (tmp % sizeof(VhostUserFSSlaveMsgEntry)) {
+> +        error_report("%s: Non-multiple VhostUserFSSlaveMsg size, %d", __func__,
+> +                     received_size);
+> +        return false;
+> +    }
+> +
+> +    tmp /= sizeof(VhostUserFSSlaveMsgEntry);
+> +    if (tmp != sm->count) {
+> +        error_report("%s: VhostUserFSSlaveMsg count mismatch, %d count: %d",
+> +                     __func__, tmp, sm->count);
+> +        return false;
+> +    }
+> +
+> +    if (sm->count > VHOST_USER_FS_SLAVE_MAX_ENTRIES) {
+> +        error_report("%s: VhostUserFSSlaveMsg too many entries: %d",
+> +                     __func__, sm->count);
+> +        return false;
+> +    }
+> +    return true;
+> +}
+> +
+> +uint64_t vhost_user_fs_slave_map(struct vhost_dev *dev, int message_size,
+> +                                 VhostUserFSSlaveMsg *sm, int fd)
+> +{
+> +    if (!check_slave_message_entries(sm, message_size)) {
+> +        return (uint64_t)-1;
+> +    }
+> +
+> +    /* TODO */
+> +    return (uint64_t)-1;
+> +}
+> +
+> +uint64_t vhost_user_fs_slave_unmap(struct vhost_dev *dev, int message_size,
+> +                                   VhostUserFSSlaveMsg *sm)
+> +{
+> +    if (!check_slave_message_entries(sm, message_size)) {
+> +        return (uint64_t)-1;
+> +    }
+> +
+> +    /* TODO */
+> +    return (uint64_t)-1;
+> +}
+> +
+>  static void vuf_get_config(VirtIODevice *vdev, uint8_t *config)
+>  {
+>      VHostUserFS *fs = VHOST_USER_FS(vdev);
+> diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
+> index 3e4a25e108..ad9170f8dc 100644
+> --- a/hw/virtio/vhost-user.c
+> +++ b/hw/virtio/vhost-user.c
+> @@ -12,6 +12,7 @@
+>  #include "qapi/error.h"
+>  #include "hw/virtio/vhost.h"
+>  #include "hw/virtio/vhost-user.h"
+> +#include "hw/virtio/vhost-user-fs.h"
+>  #include "hw/virtio/vhost-backend.h"
+>  #include "hw/virtio/virtio.h"
+>  #include "hw/virtio/virtio-net.h"
+> @@ -133,6 +134,10 @@ typedef enum VhostUserSlaveRequest {
+>      VHOST_USER_SLAVE_IOTLB_MSG = 1,
+>      VHOST_USER_SLAVE_CONFIG_CHANGE_MSG = 2,
+>      VHOST_USER_SLAVE_VRING_HOST_NOTIFIER_MSG = 3,
+> +    VHOST_USER_SLAVE_VRING_CALL = 4,
+> +    VHOST_USER_SLAVE_VRING_ERR = 5,
+> +    VHOST_USER_SLAVE_FS_MAP = 6,
+> +    VHOST_USER_SLAVE_FS_UNMAP = 7,
+>      VHOST_USER_SLAVE_MAX
+>  }  VhostUserSlaveRequest;
+>  
+> @@ -205,6 +210,16 @@ typedef struct {
+>      uint32_t size; /* the following payload size */
+>  } QEMU_PACKED VhostUserHeader;
+>  
+> +/*
+> + * VhostUserFSSlaveMsg is special since it has a variable entry count,
+> + * but it does have a maximum, so make a type for that to fit in our union
+> + * for max size.
+> + */
+> +typedef struct {
+> +    VhostUserFSSlaveMsg fs;
+> +    VhostUserFSSlaveMsgEntry entries[VHOST_USER_FS_SLAVE_MAX_ENTRIES];
+> +} QEMU_PACKED VhostUserFSSlaveMsgMax;
+> +
+>  typedef union {
+>  #define VHOST_USER_VRING_IDX_MASK   (0xff)
+>  #define VHOST_USER_VRING_NOFD_MASK  (0x1<<8)
+> @@ -219,6 +234,8 @@ typedef union {
+>          VhostUserCryptoSession session;
+>          VhostUserVringArea area;
+>          VhostUserInflight inflight;
+> +        VhostUserFSSlaveMsg fs;
+> +        VhostUserFSSlaveMsg fs_max; /* Never actually used */
+>  } VhostUserPayload;
+>  
+>  typedef struct VhostUserMsg {
+> @@ -1538,6 +1555,14 @@ static gboolean slave_read(QIOChannel *ioc, GIOCondition condition,
+>          ret = vhost_user_slave_handle_vring_host_notifier(dev, &payload.area,
+>                                                            fd ? fd[0] : -1);
+>          break;
+> +#ifdef CONFIG_VHOST_USER_FS
+> +    case VHOST_USER_SLAVE_FS_MAP:
+> +        ret = vhost_user_fs_slave_map(dev, hdr.size, &payload.fs, fd[0]);
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- tools/virtiofsd/buffer.c         | 10 ++++++----
- tools/virtiofsd/fuse_common.h    |  6 +++++-
- tools/virtiofsd/fuse_lowlevel.h  |  6 +++++-
- tools/virtiofsd/fuse_virtio.c    |  5 ++++-
- tools/virtiofsd/passthrough_ll.c |  2 +-
- 5 files changed, 21 insertions(+), 8 deletions(-)
+Since the QIOChannel conversion, the array of fds is dynamically allocated
+by qio_channel_readv_full_all() when needed. You should do "fd ? fd[0] : -1"
+like for vhost_user_slave_handle_vring_host_notifier() just above.
 
-diff --git a/tools/virtiofsd/buffer.c b/tools/virtiofsd/buffer.c
-index 8135d52d2a..b4cda7db9a 100644
---- a/tools/virtiofsd/buffer.c
-+++ b/tools/virtiofsd/buffer.c
-@@ -203,7 +203,7 @@ static ssize_t fuse_buf_fd_to_fd(const struct fuse_buf *dst, size_t dst_off,
- static ssize_t fuse_buf_copy_one(fuse_req_t req,
-                                  const struct fuse_buf *dst, size_t dst_off,
-                                  const struct fuse_buf *src, size_t src_off,
--                                 size_t len)
-+                                 size_t len, bool dropped_cap_fsetid)
- {
-     int src_is_fd = src->flags & FUSE_BUF_IS_FD;
-     int dst_is_fd = dst->flags & FUSE_BUF_IS_FD;
-@@ -211,7 +211,8 @@ static ssize_t fuse_buf_copy_one(fuse_req_t req,
-     int dst_is_phys = src->flags & FUSE_BUF_PHYS_ADDR;
- 
-     if (src_is_phys && !src_is_fd && dst_is_fd) {
--        return fuse_virtio_write(req, dst, dst_off, src, src_off, len);
-+        return fuse_virtio_write(req, dst, dst_off, src, src_off, len,
-+                                 dropped_cap_fsetid);
-     }
-     assert(!src_is_phys && !dst_is_phys);
-     if (!src_is_fd && !dst_is_fd) {
-@@ -267,7 +268,7 @@ static int fuse_bufvec_advance(struct fuse_bufvec *bufv, size_t len)
- }
- 
- ssize_t fuse_buf_copy(fuse_req_t req, struct fuse_bufvec *dstv,
--                      struct fuse_bufvec *srcv)
-+                      struct fuse_bufvec *srcv, bool dropped_cap_fsetid)
- {
-     size_t copied = 0, i;
- 
-@@ -309,7 +310,8 @@ ssize_t fuse_buf_copy(fuse_req_t req, struct fuse_bufvec *dstv,
-         dst_len = dst->size - dstv->off;
-         len = min_size(src_len, dst_len);
- 
--        res = fuse_buf_copy_one(req, dst, dstv->off, src, srcv->off, len);
-+        res = fuse_buf_copy_one(req, dst, dstv->off, src, srcv->off, len,
-+                                dropped_cap_fsetid);
-         if (res < 0) {
-             if (!copied) {
-                 return res;
-diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
-index beed03aa93..8a75729be9 100644
---- a/tools/virtiofsd/fuse_common.h
-+++ b/tools/virtiofsd/fuse_common.h
-@@ -733,10 +733,14 @@ size_t fuse_buf_size(const struct fuse_bufvec *bufv);
-  * @param req The request this copy is part of
-  * @param dst destination buffer vector
-  * @param src source buffer vector
-+ * @param dropped_cap_fsetid Caller has dropped CAP_FSETID. If work is handed
-+ *        over to a different thread/process, CAP_FSETID needs to be dropped
-+ *        there as well.
-  * @return actual number of bytes copied or -errno on error
-  */
- ssize_t fuse_buf_copy(fuse_req_t req,
--                      struct fuse_bufvec *dst, struct fuse_bufvec *src);
-+                      struct fuse_bufvec *dst, struct fuse_bufvec *src,
-+                      bool dropped_cap_fsetid);
- 
- /**
-  * Memory buffer iterator
-diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
-index 24e580aafe..dfd7e1525c 100644
---- a/tools/virtiofsd/fuse_lowlevel.h
-+++ b/tools/virtiofsd/fuse_lowlevel.h
-@@ -2030,9 +2030,13 @@ int64_t fuse_virtio_io(struct fuse_session *se, VhostUserFSSlaveMsg *msg,
-  * @param src The source (memory) buffer
-  * @param src_off The GPA
-  * @param len Length in bytes
-+ * @param dropped_cap_fsetid Caller dropped CAP_FSETID. If it is being handed
-+ *        over to different thread/process, CAP_FSETID needs to be dropped
-+ *        before write.
-  */
- ssize_t fuse_virtio_write(fuse_req_t req, const struct fuse_buf *dst,
-                           size_t dst_off, const struct fuse_buf *src,
--                          size_t src_off, size_t len);
-+                          size_t src_off, size_t len,
-+                          bool dropped_cap_fsetid);
- 
- #endif /* FUSE_LOWLEVEL_H_ */
-diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-index 887e79a126..525452d036 100644
---- a/tools/virtiofsd/fuse_virtio.c
-+++ b/tools/virtiofsd/fuse_virtio.c
-@@ -1291,7 +1291,7 @@ int64_t fuse_virtio_io(struct fuse_session *se, VhostUserFSSlaveMsg *msg,
-  */
- ssize_t fuse_virtio_write(fuse_req_t req, const struct fuse_buf *dst,
-                           size_t dst_off, const struct fuse_buf *src,
--                          size_t src_off, size_t len)
-+                          size_t src_off, size_t len, bool dropped_cap_fsetid)
- {
-     VhostUserFSSlaveMsg *msg = g_malloc0(sizeof(VhostUserFSSlaveMsg) +
-                                          sizeof(VhostUserFSSlaveMsgEntry));
-@@ -1311,6 +1311,9 @@ ssize_t fuse_virtio_write(fuse_req_t req, const struct fuse_buf *dst,
-     msg->entries[0].c_offset = (uintptr_t)src->mem + src_off;
-     msg->entries[0].len = len;
-     msg->entries[0].flags = VHOST_USER_FS_FLAG_MAP_W;
-+    if (dropped_cap_fsetid) {
-+        msg->flags |= VHOST_USER_FS_GENFLAG_DROP_FSETID;
-+    }
- 
-     int64_t result = fuse_virtio_io(req->se, msg, dst->fd);
-     fuse_log(FUSE_LOG_DEBUG, "%s: result=%ld\n", __func__, result);
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index b3954376b3..d0fa7de538 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -2301,7 +2301,7 @@ static void lo_write_buf(fuse_req_t req, fuse_ino_t ino,
-         }
-     }
- 
--    res = fuse_buf_copy(req, &out_buf, in_buf);
-+    res = fuse_buf_copy(req, &out_buf, in_buf, fi->kill_priv);
-     if (res < 0) {
-         fuse_reply_err(req, -res);
-     } else {
--- 
-2.31.1
+Same goes for patch 17 "DAX/unmap: virtiofsd: Add  VHOST_USER_SLAVE_FS_IO".
+
+> +        break;
+> +    case VHOST_USER_SLAVE_FS_UNMAP:
+> +        ret = vhost_user_fs_slave_unmap(dev, hdr.size, &payload.fs);
+> +        break;
+> +#endif
+>      default:
+>          error_report("Received unexpected msg type: %d.", hdr.request);
+>          ret = true;
+> diff --git a/include/hw/virtio/vhost-user-fs.h b/include/hw/virtio/vhost-user-fs.h
+> index 04596799e3..0766f17548 100644
+> --- a/include/hw/virtio/vhost-user-fs.h
+> +++ b/include/hw/virtio/vhost-user-fs.h
+> @@ -23,6 +23,33 @@
+>  #define TYPE_VHOST_USER_FS "vhost-user-fs-device"
+>  OBJECT_DECLARE_SIMPLE_TYPE(VHostUserFS, VHOST_USER_FS)
+>  
+> +/* Structures carried over the slave channel back to QEMU */
+> +#define VHOST_USER_FS_SLAVE_MAX_ENTRIES 32
+> +
+> +/* For the flags field of VhostUserFSSlaveMsg */
+> +#define VHOST_USER_FS_FLAG_MAP_R (1u << 0)
+> +#define VHOST_USER_FS_FLAG_MAP_W (1u << 1)
+> +
+> +typedef struct {
+> +    /* Offsets within the file being mapped */
+> +    uint64_t fd_offset;
+> +    /* Offsets within the cache */
+> +    uint64_t c_offset;
+> +    /* Lengths of sections */
+> +    uint64_t len;
+> +    /* Flags, from VHOST_USER_FS_FLAG_* */
+> +    uint64_t flags;
+> +} VhostUserFSSlaveMsgEntry;
+> +
+> +typedef struct {
+> +    /* Number of entries */
+> +    uint16_t count;
+> +    /* Spare */
+> +    uint16_t align;
+> +
+> +    VhostUserFSSlaveMsgEntry entries[];
+> +} VhostUserFSSlaveMsg;
+> +
+>  typedef struct {
+>      CharBackend chardev;
+>      char *tag;
+> @@ -46,4 +73,10 @@ struct VHostUserFS {
+>      MemoryRegion cache;
+>  };
+>  
+> +/* Callbacks from the vhost-user code for slave commands */
+> +uint64_t vhost_user_fs_slave_map(struct vhost_dev *dev, int message_size,
+> +                                 VhostUserFSSlaveMsg *sm, int fd);
+> +uint64_t vhost_user_fs_slave_unmap(struct vhost_dev *dev, int message_size,
+> +                                   VhostUserFSSlaveMsg *sm);
+> +
+>  #endif /* _QEMU_VHOST_USER_FS_H */
+> diff --git a/subprojects/libvhost-user/libvhost-user.h b/subprojects/libvhost-user/libvhost-user.h
+> index 70fc61171f..a98c5f5c11 100644
+> --- a/subprojects/libvhost-user/libvhost-user.h
+> +++ b/subprojects/libvhost-user/libvhost-user.h
+> @@ -119,6 +119,8 @@ typedef enum VhostUserSlaveRequest {
+>      VHOST_USER_SLAVE_VRING_HOST_NOTIFIER_MSG = 3,
+>      VHOST_USER_SLAVE_VRING_CALL = 4,
+>      VHOST_USER_SLAVE_VRING_ERR = 5,
+> +    VHOST_USER_SLAVE_FS_MAP = 6,
+> +    VHOST_USER_SLAVE_FS_UNMAP = 7,
+>      VHOST_USER_SLAVE_MAX
+>  }  VhostUserSlaveRequest;
+>  
 

@@ -1,16 +1,12 @@
-Date: Sat, 20 Mar 2021 16:04:44 -0400
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20210320160430-mutt-send-email-mst@kernel.org>
-References: <20210318135223.1342795-1-ckuehl@redhat.com>
-	<20210318135223.1342795-3-ckuehl@redhat.com>
-	<YFNvH8w4l7WyEMyr@miu.piliscsaba.redhat.com>
-	<00c5dce8-fc2d-6e68-e3bc-a958ca5d2342@redhat.com>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Wed, 14 Apr 2021 16:51:27 +0100
+Message-Id: <20210414155137.46522-16-dgilbert@redhat.com>
+In-Reply-To: <20210414155137.46522-1-dgilbert@redhat.com>
+References: <20210414155137.46522-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <00c5dce8-fc2d-6e68-e3bc-a958ca5d2342@redhat.com>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH 2/3] virtiofs: split requests that exceed
-	virtqueue size
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2 15/25] DAX: virtiofsd: route se down to
+	destroy method
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,27 +15,78 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Connor Kuehl <ckuehl@redhat.com>
-Cc: Miklos Szeredi <miklos@szeredi.hu>, jasowang@redhat.com, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, vgoyal@redhat.com
+To: qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com, virtio-fs@redhat.com
 
-On Thu, Mar 18, 2021 at 10:52:14AM -0500, Connor Kuehl wrote:
-> On 3/18/21 10:17 AM, Miklos Szeredi wrote:
-> > I removed the conditional compilation and renamed the limit.  Also made
-> > virtio_fs_get_tree() bail out if it hit the WARN_ON().  Updated patch below.
-> 
-> Thanks, Miklos. I think it looks better with those changes.
-> 
-> > The virtio_ring patch in this series should probably go through the respective
-> > subsystem tree.
-> 
-> Makes sense. I've CC'd everyone that ./scripts/get_maintainers.pl suggested
-> for that patch on this entire series as well. Should I resend patch #1
-> through just that subsystem to avoid confusion or wait to see if it gets
-> picked out of this series?
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Yes pls post separately. Thanks!
+We're going to need to pass the session down to destroy so that it can
+pass it back to do the remove mapping.
 
-> Thanks again,
-> 
-> Connor
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ tools/virtiofsd/fuse_lowlevel.c  | 6 +++---
+ tools/virtiofsd/fuse_lowlevel.h  | 2 +-
+ tools/virtiofsd/passthrough_ll.c | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index 81c4c2b373..e82edce72a 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -2222,7 +2222,7 @@ static void do_destroy(fuse_req_t req, fuse_ino_t nodeid,
+     se->got_destroy = 1;
+     se->got_init = 0;
+     if (se->op.destroy) {
+-        se->op.destroy(se->userdata);
++        se->op.destroy(se->userdata, se);
+     }
+ 
+     send_reply_ok(req, NULL, 0);
+@@ -2449,7 +2449,7 @@ void fuse_session_process_buf_int(struct fuse_session *se,
+             se->got_destroy = 1;
+             se->got_init = 0;
+             if (se->op.destroy) {
+-                se->op.destroy(se->userdata);
++                se->op.destroy(se->userdata, se);
+             }
+         } else {
+             goto reply_err;
+@@ -2538,7 +2538,7 @@ void fuse_session_destroy(struct fuse_session *se)
+ {
+     if (se->got_init && !se->got_destroy) {
+         if (se->op.destroy) {
+-            se->op.destroy(se->userdata);
++            se->op.destroy(se->userdata, se);
+         }
+     }
+     pthread_rwlock_destroy(&se->init_rwlock);
+diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
+index 0bf206264d..27b07bfc22 100644
+--- a/tools/virtiofsd/fuse_lowlevel.h
++++ b/tools/virtiofsd/fuse_lowlevel.h
+@@ -209,7 +209,7 @@ struct fuse_lowlevel_ops {
+      *
+      * @param userdata the user data passed to fuse_session_new()
+      */
+-    void (*destroy)(void *userdata);
++    void (*destroy)(void *userdata, struct fuse_session *se);
+ 
+     /**
+      * Look up a directory entry by name and get its attributes.
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index a9f0505414..910c4831fb 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -3124,7 +3124,7 @@ static void lo_lseek(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
+     }
+ }
+ 
+-static void lo_destroy(void *userdata)
++static void lo_destroy(void *userdata, struct fuse_session *se)
+ {
+     struct lo_data *lo = (struct lo_data *)userdata;
+ 
+-- 
+2.31.1
 

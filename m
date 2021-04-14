@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Wed, 14 Apr 2021 16:51:27 +0100
-Message-Id: <20210414155137.46522-16-dgilbert@redhat.com>
+Date: Wed, 14 Apr 2021 16:51:28 +0100
+Message-Id: <20210414155137.46522-17-dgilbert@redhat.com>
 In-Reply-To: <20210414155137.46522-1-dgilbert@redhat.com>
 References: <20210414155137.46522-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 15/25] DAX: virtiofsd: route se down to
-	destroy method
+Subject: [Virtio-fs] [PATCH v2 16/25] DAX: virtiofsd: Perform an unmap on
+	destroy
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,74 +19,39 @@ To: qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com, virtio-fs@red
 
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-We're going to need to pass the session down to destroy so that it can
-pass it back to do the remove mapping.
+Force unmap all remaining dax cache entries on a destroy.
 
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- tools/virtiofsd/fuse_lowlevel.c  | 6 +++---
- tools/virtiofsd/fuse_lowlevel.h  | 2 +-
- tools/virtiofsd/passthrough_ll.c | 2 +-
- 3 files changed, 5 insertions(+), 5 deletions(-)
+ tools/virtiofsd/passthrough_ll.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index 81c4c2b373..e82edce72a 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -2222,7 +2222,7 @@ static void do_destroy(fuse_req_t req, fuse_ino_t nodeid,
-     se->got_destroy = 1;
-     se->got_init = 0;
-     if (se->op.destroy) {
--        se->op.destroy(se->userdata);
-+        se->op.destroy(se->userdata, se);
-     }
- 
-     send_reply_ok(req, NULL, 0);
-@@ -2449,7 +2449,7 @@ void fuse_session_process_buf_int(struct fuse_session *se,
-             se->got_destroy = 1;
-             se->got_init = 0;
-             if (se->op.destroy) {
--                se->op.destroy(se->userdata);
-+                se->op.destroy(se->userdata, se);
-             }
-         } else {
-             goto reply_err;
-@@ -2538,7 +2538,7 @@ void fuse_session_destroy(struct fuse_session *se)
- {
-     if (se->got_init && !se->got_destroy) {
-         if (se->op.destroy) {
--            se->op.destroy(se->userdata);
-+            se->op.destroy(se->userdata, se);
-         }
-     }
-     pthread_rwlock_destroy(&se->init_rwlock);
-diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
-index 0bf206264d..27b07bfc22 100644
---- a/tools/virtiofsd/fuse_lowlevel.h
-+++ b/tools/virtiofsd/fuse_lowlevel.h
-@@ -209,7 +209,7 @@ struct fuse_lowlevel_ops {
-      *
-      * @param userdata the user data passed to fuse_session_new()
-      */
--    void (*destroy)(void *userdata);
-+    void (*destroy)(void *userdata, struct fuse_session *se);
- 
-     /**
-      * Look up a directory entry by name and get its attributes.
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index a9f0505414..910c4831fb 100644
+index 910c4831fb..726343677e 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -3124,7 +3124,7 @@ static void lo_lseek(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
-     }
- }
- 
--static void lo_destroy(void *userdata)
-+static void lo_destroy(void *userdata, struct fuse_session *se)
+@@ -3128,6 +3128,20 @@ static void lo_destroy(void *userdata, struct fuse_session *se)
  {
      struct lo_data *lo = (struct lo_data *)userdata;
  
++    if (fuse_lowlevel_is_virtio(se)) {
++        VhostUserFSSlaveMsg *msg = g_malloc0(sizeof(VhostUserFSSlaveMsg) +
++                                             sizeof(VhostUserFSSlaveMsgEntry));
++
++        msg->count = 0;
++        msg->entries[0].len = ~(uint64_t)0; /* Special: means 'all' */
++        msg->entries[0].c_offset = 0;
++        if (fuse_virtio_unmap(se, msg)) {
++            fuse_log(FUSE_LOG_ERR, "%s: unmap during destroy failed\n",
++                     __func__);
++        }
++        g_free(msg);
++    }
++
+     pthread_mutex_lock(&lo->mutex);
+     while (true) {
+         GHashTableIter iter;
 -- 
 2.31.1
 

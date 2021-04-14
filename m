@@ -1,16 +1,12 @@
-Date: Sat, 20 Mar 2021 11:03:22 +0100
-From: Christian Brauner <christian.brauner@canonical.com>
-Message-ID: <20210320100322.ox5gzgauo7iqf2fv@gmail.com>
-References: <20210319195547.427371-1-vgoyal@redhat.com>
-	<20210319195547.427371-2-vgoyal@redhat.com>
-	<CAHpGcMKhFxotKDxPryfKdhNMMDWO4Ws33s6fEm2NP0u_4vffnQ@mail.gmail.com>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Wed, 14 Apr 2021 16:51:18 +0100
+Message-Id: <20210414155137.46522-7-dgilbert@redhat.com>
+In-Reply-To: <20210414155137.46522-1-dgilbert@redhat.com>
+References: <20210414155137.46522-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <CAHpGcMKhFxotKDxPryfKdhNMMDWO4Ws33s6fEm2NP0u_4vffnQ@mail.gmail.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 1/3] posic_acl: Add a helper determine if
- SGID should be cleared
+Subject: [Virtio-fs] [PATCH v2 06/25] DAX: virtio: Add shared memory
+	capability
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,74 +15,68 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Andreas =?utf-8?Q?Gr=C3=BCnbacher?= <andreas.gruenbacher@gmail.com>
-Cc: Jan Kara <jack@suse.cz>, Andreas Gruenbacher <agruenba@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, virtio-fs@redhat.com, Seth Forshee <seth.forshee@canonical.com>, Linux FS-devel Mailing List <linux-fsdevel@vger.kernel.org>, Vivek Goyal <vgoyal@redhat.com>, Alexander Viro <viro@zeniv.linux.org.uk>
+To: qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com, virtio-fs@redhat.com
 
-On Fri, Mar 19, 2021 at 11:42:48PM +0100, Andreas Grünbacher wrote:
-> Hi,
-> 
-> Am Fr., 19. März 2021 um 20:58 Uhr schrieb Vivek Goyal <vgoyal@redhat.com>:
-> > posix_acl_update_mode() determines what's the equivalent mode and if SGID
-> > needs to be cleared or not. I need to make use of this code in fuse
-> > as well. Fuse will send this information to virtiofs file server and
-> > file server will take care of clearing SGID if it needs to be done.
-> >
-> > Hence move this code in a separate helper so that more than one place
-> > can call into it.
-> >
-> > Cc: Jan Kara <jack@suse.cz>
-> > Cc: Andreas Gruenbacher <agruenba@redhat.com>
-> > Cc: Alexander Viro <viro@zeniv.linux.org.uk>
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > ---
-> >  fs/posix_acl.c            |  3 +--
-> >  include/linux/posix_acl.h | 11 +++++++++++
-> >  2 files changed, 12 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/fs/posix_acl.c b/fs/posix_acl.c
-> > index f3309a7edb49..2d62494c4a5b 100644
-> > --- a/fs/posix_acl.c
-> > +++ b/fs/posix_acl.c
-> > @@ -684,8 +684,7 @@ int posix_acl_update_mode(struct user_namespace *mnt_userns,
-> >                 return error;
-> >         if (error == 0)
-> >                 *acl = NULL;
-> > -       if (!in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
-> > -           !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID))
-> > +       if (posix_acl_mode_clear_sgid(mnt_userns, inode))
-> >                 mode &= ~S_ISGID;
-> >         *mode_p = mode;
-> >         return 0;
-> > diff --git a/include/linux/posix_acl.h b/include/linux/posix_acl.h
-> > index 307094ebb88c..073c5e546de3 100644
-> > --- a/include/linux/posix_acl.h
-> > +++ b/include/linux/posix_acl.h
-> > @@ -59,6 +59,17 @@ posix_acl_release(struct posix_acl *acl)
-> >  }
-> >
-> >
-> > +static inline bool
-> > +posix_acl_mode_clear_sgid(struct user_namespace *mnt_userns,
-> > +                         struct inode *inode)
-> > +{
-> > +       if (!in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
-> > +           !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID))
-> > +               return true;
-> > +
-> > +       return false;
-> 
-> That's just
-> 
-> return !in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
->     !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID);
-> 
-> The same pattern we have in posix_acl_update_mode also exists in
-> setattr_copy and inode_init_owner, and almost the same pattern exists
-> in setattr_prepare, so can this be cleaned up as well? The function
-> also isn't POSIX ACL specific, so the function name is misleading.
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Good idea but that should probably be spun into a separate patchset that
-only touches the vfs parts.
+Define a new capability type 'VIRTIO_PCI_CAP_SHARED_MEMORY_CFG'
+and the data structure 'virtio_pci_cap64' to go with it.
+They allow defining shared memory regions with sizes and offsets
+of 2^32 and more.
+Multiple instances of the capability are allowed and distinguished
+by the 'id' field in the base capability.
 
-Christian
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ hw/virtio/virtio-pci.c | 20 ++++++++++++++++++++
+ hw/virtio/virtio-pci.h |  4 ++++
+ 2 files changed, 24 insertions(+)
+
+diff --git a/hw/virtio/virtio-pci.c b/hw/virtio/virtio-pci.c
+index b321604d9b..493014fdf7 100644
+--- a/hw/virtio/virtio-pci.c
++++ b/hw/virtio/virtio-pci.c
+@@ -1138,6 +1138,26 @@ static int virtio_pci_add_mem_cap(VirtIOPCIProxy *proxy,
+     return offset;
+ }
+ 
++int virtio_pci_add_shm_cap(VirtIOPCIProxy *proxy,
++                           uint8_t bar, uint64_t offset, uint64_t length,
++                           uint8_t id)
++{
++    struct virtio_pci_cap64 cap = {
++        .cap.cap_len = sizeof cap,
++        .cap.cfg_type = VIRTIO_PCI_CAP_SHARED_MEMORY_CFG,
++    };
++    uint32_t mask32 = ~0;
++
++    cap.cap.bar = bar;
++    cap.cap.id = id;
++    cap.cap.length = cpu_to_le32(length & mask32);
++    cap.length_hi = cpu_to_le32((length >> 32) & mask32);
++    cap.cap.offset = cpu_to_le32(offset & mask32);
++    cap.offset_hi = cpu_to_le32((offset >> 32) & mask32);
++
++    return virtio_pci_add_mem_cap(proxy, &cap.cap);
++}
++
+ static uint64_t virtio_pci_common_read(void *opaque, hwaddr addr,
+                                        unsigned size)
+ {
+diff --git a/hw/virtio/virtio-pci.h b/hw/virtio/virtio-pci.h
+index 2446dcd9ae..5e5c4a4c6d 100644
+--- a/hw/virtio/virtio-pci.h
++++ b/hw/virtio/virtio-pci.h
+@@ -252,4 +252,8 @@ void virtio_pci_types_register(const VirtioPCIDeviceTypeInfo *t);
+  */
+ unsigned virtio_pci_optimal_num_queues(unsigned fixed_queues);
+ 
++int virtio_pci_add_shm_cap(VirtIOPCIProxy *proxy,
++                           uint8_t bar, uint64_t offset, uint64_t length,
++                           uint8_t id);
++
+ #endif
+-- 
+2.31.1
 

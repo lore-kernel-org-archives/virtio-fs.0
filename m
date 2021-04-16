@@ -1,28 +1,10 @@
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=infradead.org; s=casper.20170209;
-	h=In-Reply-To:Content-Type:MIME-Version:
-	References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description;
-	bh=VZtC96Y0rpZ/52zKQRX4/P2lTW92hzX2CCMG++WmSmQ=;
-	b=l5o9ShQKethQzm+HeTC3GC8Hlb
-	bebQKKhYDn9xfC/9aQ2QcoabqTOygNoJ8pOuTjWO59kTWcX9EhLI/8A2m2RBTvW/wIcFo8tEpH6tj
-	opeJ3tYBPw/yDGReuzqf/FpZHo/MyRkf3UaOWV2ZqjeQm8FM91Ar136HMnSI/Eb+efyh46Oi5B+pp
-	twZglBMv+kmcX6Lfud0ZDZB0biZsG6PiYvrBHOR1e68fQtRvXn6GKDs7Dw2zPBRj8EqocFdMhFKKA
-	a6+3Ox02Yfqj8YptVWFCKtOcun+0OLE7r6yYfiT8G1+k9q8EE1+MzbUOtj3iy0ReIaEGi4y6pro5S
-	3BLhoOQQ==
-Date: Wed, 21 Apr 2021 17:16:24 +0100
-From: Matthew Wilcox <willy@infradead.org>
-Message-ID: <20210421161624.GJ3596236@casper.infradead.org>
-References: <20210419213636.1514816-1-vgoyal@redhat.com>
-	<20210419213636.1514816-2-vgoyal@redhat.com>
-	<20210421092440.GM8706@quack2.suse.cz>
-	<20210421155631.GC1579961@redhat.com>
+Date: Fri, 16 Apr 2021 13:35:24 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210416173524.GA1379987@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20210421155631.GC1579961@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH v3 1/3] dax: Add an enum for specifying dax
-	wakup mode
+Subject: [Virtio-fs] [PATCH] dax: Fix missed wakeup in put_unlocked_entry()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,33 +13,95 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: Jan Kara <jack@suse.cz>, miklos@szeredi.hu, linux-nvdimm@lists.01.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, dan.j.williams@intel.com
+To: Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>, Jan Kara <jack@suse.cz>, Dan Williams <dan.j.williams@intel.com>, willy@infradead.org
+Cc: virtio-fs-list <virtio-fs@redhat.com>, linux-nvdimm@lists.01.org, linux kernel mailing list <linux-kernel@vger.kernel.org>, Miklos Szeredi <miklos@szeredi.hu>
 
-On Wed, Apr 21, 2021 at 11:56:31AM -0400, Vivek Goyal wrote:
-> +/**
-> + * enum dax_entry_wake_mode: waitqueue wakeup toggle
+I am seeing missed wakeups which ultimately lead to a deadlock when I am
+using virtiofs with DAX enabled and running "make -j". I had to mount
+virtiofs as rootfs and also reduce to dax window size to 32M to reproduce
+the problem consistently.
 
-s/toggle/behaviour/ ?
+This is not a complete patch. I am just proposing this partial fix to
+highlight the issue and trying to figure out how it should be fixed.
+Should it be fixed in generic dax code or should filesystem (fuse/virtiofs)
+take care of this.
 
-> + * @WAKE_NEXT: wake only the first waiter in the waitqueue
-> + * @WAKE_ALL: wake all waiters in the waitqueue
-> + */
-> +enum dax_entry_wake_mode {
-> +	WAKE_NEXT,
-> +	WAKE_ALL,
-> +};
-> +
->  static wait_queue_head_t *dax_entry_waitqueue(struct xa_state *xas,
->  		void *entry, struct exceptional_entry_key *key)
->  {
-> @@ -182,7 +192,8 @@ static int wake_exceptional_entry_func(w
->   * The important information it's conveying is whether the entry at
->   * this index used to be a PMD entry.
->   */
-> -static void dax_wake_entry(struct xa_state *xas, void *entry, bool wake_all)
-> +static void dax_wake_entry(struct xa_state *xas, void *entry,
-> +			   enum dax_entry_wake_mode mode)
+So here is the problem. put_unlocked_entry() wakes up waiters only
+if entry is not null as well as !dax_is_conflict(entry). But if I
+call multiple instances of invalidate_inode_pages2() in parallel,
+then I can run into a situation where there are waiters on 
+this index but nobody will wait these.
 
-It's an awfully verbose name.  'dax_wake_mode'?
+invalidate_inode_pages2()
+  invalidate_inode_pages2_range()
+    invalidate_exceptional_entry2()
+      dax_invalidate_mapping_entry_sync()
+        __dax_invalidate_entry() {
+		xas_lock_irq(&xas);
+		entry = get_unlocked_entry(&xas, 0);
+		...
+		...
+		dax_disassociate_entry(entry, mapping, trunc);
+		xas_store(&xas, NULL);
+		...
+		...
+	        put_unlocked_entry(&xas, entry);
+        	xas_unlock_irq(&xas);
+	} 
+
+Say a fault in in progress and it has locked entry at offset say "0x1c".
+Now say three instances of invalidate_inode_pages2() are in progress
+(A, B, C) and they all try to invalidate entry at offset "0x1c". Given
+dax entry is locked, all tree instances A, B, C will wait in wait queue.
+
+When dax fault finishes, say A is woken up. It will store NULL entry
+at index "0x1c" and wake up B. When B comes along it will find "entry=0"
+at page offset 0x1c and it will call put_unlocked_entry(&xas, 0). And
+this means put_unlocked_entry() will not wake up next waiter, given
+the current code. And that means C continues to wait and is not woken
+up.
+
+In my case I am seeing that dax page fault path itself is waiting
+on grab_mapping_entry() and also invalidate_inode_page2() is 
+waiting in get_unlocked_entry() but entry has already been cleaned
+up and nobody woke up these processes. Atleast I think that's what
+is happening.
+
+This patch wakes up a process even if entry=0. And deadlock does not
+happen. I am running into some OOM issues, that will debug.
+
+So my question is that is it a dax issue and should it be fixed in
+dax layer. Or should it be handled in fuse to make sure that
+multiple instances of invalidate_inode_pages2() on same inode
+don't make progress in parallel and introduce enough locking
+around it.
+
+Right now fuse_finish_open() calls invalidate_inode_pages2() without
+any locking. That allows it to make progress in parallel to dax
+fault path as well as allows multiple instances of invalidate_inode_pages2()
+to run in parallel.
+
+Not-yet-signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/dax.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+Index: redhat-linux/fs/dax.c
+===================================================================
+--- redhat-linux.orig/fs/dax.c	2021-04-16 12:50:40.141363317 -0400
++++ redhat-linux/fs/dax.c	2021-04-16 12:51:42.385926390 -0400
+@@ -266,9 +266,10 @@ static void wait_entry_unlocked(struct x
+ 
+ static void put_unlocked_entry(struct xa_state *xas, void *entry)
+ {
+-	/* If we were the only waiter woken, wake the next one */
+-	if (entry && !dax_is_conflict(entry))
+-		dax_wake_entry(xas, entry, false);
++	if (dax_is_conflict(entry))
++		return;
++
++	dax_wake_entry(xas, entry, false);
+ }
+ 
+ /*
 

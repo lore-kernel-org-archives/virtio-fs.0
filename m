@@ -1,26 +1,27 @@
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	to:subject:message-id:date:from; s=fm3; bh=uUEFZi1fbWEKZ8f5YDGs9
-	0KErAdKbfrpzgTjNw+EMTo=; b=kWX1tyuaLXR1UgYXee4Qu1K9uiQSpHKgosZ1+
-	RpdxmbenGe5geX9YoMaAtUy5UzW1upv9CKJXzuuk2sHP+AZKnpa8gYYD8crX6Pmt
-	DVhYJlJPRb6sawJXAOTq7lSDjOr3cc7rAdufSpFzZFkbuvTuLNQ8GZgstX/4gz2J
-	EQZAYsLJGqkOlNpgc8ujctN5fHo9wZ9Y2QnbZZTFquR8k48cFYHVnkBMB3lBLt0D
-	GJ2ZIqs553Xyhce6jHve6dJFLn4S65e1CJ3G8S3RpC6td5EQxu+MC1h45Tlfqg/B
-	OusbFQHvpXcusZUvCNkwZ9B0sp04LOHSPZNTUpMNCDaKfua3g==
+	to:subject:message-id:date:from; s=fm3; bh=WdYfPNcuhe0LRKPzJ3/08
+	eHCdd1XwiOwCUWI+wPuGD8=; b=FTNQTom3ySIAO7N9yVx7b3jBLZlQ9GqC5cHNS
+	025RLAnGfz4qWGz6GF4hUXTJoGh6pkfUMRD00meVtbbtiksZbL4Nfnixo04RuCmv
+	RTpspONSwFim9pei/yDEY9yeGaO/4YXUzZmuR46OHlIOW0mWZDjBAizy7nqRcveW
+	IpQVSDN/C59WC18YoMEY04lbTo5vsDFmNJY/A8sCBDOlYarWDjaf7s3XTXNfJIKK
+	j6THpm6ViikXNn3WT8GzkVdh7bzPGKDlnRzxGUkot2If7B+WcjmuoqVp6GTgAUaJ
+	/0mnptIyD6XOQJldIk7g5+2EqA/z/wghY47d5wEfZ4EdJbnAQ==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=date:from:message-id:subject:to
 	:x-me-proxy:x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=
-	fm2; bh=uUEFZi1fbWEKZ8f5YDGs90KErAdKbfrpzgTjNw+EMTo=; b=Kv7UQWk6
-	02LBJeo2edlw3m4yjQzb+Jo0vPCmSMyzmU1uJ8+8PbMwWAHtRG/WnpEPKkoveDds
-	dkIE24KbFyv7aHIwQMn5fX6yMmA8teWf/cdduB+a3NPN6jlMa2fbHO/lYLAZrnA4
-	ASpXZPLX0rOu+lUmSnx0Dc8dJ8r8pdX3OnxH0HsZ0sQ+avv3wSCqJARDiPaeTuPF
-	UNSXZW0wvhEtDUPaTCJzDdThdpHM89ZTiqi3zbc5RwF1ru6iiGnMFUMwZ7jE3w2O
-	bc2UwUAltNb7e7ofWePf3oS0tnppM45snjn3hPACQnXkpCRp5E0cy0dhUGmAbEhw
-	L6LKlvZloGNEYw==
-Message-Id: <20210422125951.A7BAA108005F@mailuser.nyi.internal>
-Date: Thu, 22 Apr 2021 08:59:51 -0400 (EDT)
+	fm2; bh=WdYfPNcuhe0LRKPzJ3/08eHCdd1XwiOwCUWI+wPuGD8=; b=j5T3hmV4
+	jhJQpxYwECmDHtBYZPjlg1H02s6QzSRvEZR3MGWFDs7v+3tfelQp3NEI/aNQwLh6
+	5NlzlBFrPEY/bTqkLu1P3EoCkWgTsVYgh1t+xarWyg47CsRsa7ua8Z2tFTPtn+i7
+	4FwEwcgi7snMjp49mNiptUY1Eo7s+QQyvkVmpY55hc1Cg2wQdGRxzKrkJihhqgkN
+	WbsegPDISa5TiWy8i+UTJ4e5KPO+ICxCPKrgAxstZ26cKKiFQ7io+pDGwuR+YBgV
+	YNGUokZYNpDiV/4obNlfsGcPr5bNqHxbYgBFRE8HK0T9xZ1M7sheABN0J00qT/pO
+	vDOXcQZCiK620w==
+Message-Id: <20210416173745.C70F61080066@mailuser.nyi.internal>
+Date: Fri, 16 Apr 2021 13:37:45 -0400 (EDT)
 From: virtiofs-bot@sinrega.org
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] MR merged: Refactor arg parsing code
+Subject: [Virtio-fs] [virtiofsd-rs] MR opened: Add packaging-related content
+	to the manifest
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,17 +32,10 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-This merge request switches the option parser from `clap` to `structopt`.
-This reduces a considerable amt. of duplicate code & improves readability.
+This will be helpful when packaging virtiofsd-rs for crates.io and will
+simplify downstream packaging.
 
-Internally `structopt` uses `clap` but provides a nice way to define arg parsing in a declarative way. It also re-exports `clap`.
-In the next upcoming major version of `clap`, support for the same will be added to the crate itself with the same syntax, except that `#[derive(Structopt)]` will change to `#[derive(Clap)]`. [1] <br>
-Also, beta version of clap-v3 is available for testing. [2]
-
-[1] https://github.com/poma/clap#how-does-clap-compare-to-structopt <br>
-[2] https://crates.io/crates/clap-v3
-
-Signed-off-by: Mihir Luthra luthramihir708@gmail.com
+Signed-off-by: Connor Kuehl <ckuehl@redhat.com>
 ---
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/17
+https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/20
 

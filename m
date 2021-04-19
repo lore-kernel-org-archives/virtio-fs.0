@@ -1,10 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Mon, 19 Apr 2021 17:36:33 -0400
-Message-Id: <20210419213636.1514816-1-vgoyal@redhat.com>
+Date: Mon, 19 Apr 2021 17:36:36 -0400
+Message-Id: <20210419213636.1514816-4-vgoyal@redhat.com>
+In-Reply-To: <20210419213636.1514816-1-vgoyal@redhat.com>
+References: <20210419213636.1514816-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 0/3] dax: Fix missed wakeup in
-	put_unlocked_entry()
+Subject: [Virtio-fs] [PATCH v3 3/3] dax: Wake up all waiters after
+	invalidating dax entry
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,28 +18,71 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, dan.j.williams@intel.com, jack@suse.cz, willy@infradead.org
 Cc: linux-nvdimm@lists.01.org, miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, vgoyal@redhat.com
 
-Hi,
+I am seeing missed wakeups which ultimately lead to a deadlock when I am
+using virtiofs with DAX enabled and running "make -j". I had to mount
+virtiofs as rootfs and also reduce to dax window size to 256M to reproduce
+the problem consistently.
 
-This is V3 of patches. Posted V2 here.
+So here is the problem. put_unlocked_entry() wakes up waiters only
+if entry is not null as well as !dax_is_conflict(entry). But if I
+call multiple instances of invalidate_inode_pages2() in parallel,
+then I can run into a situation where there are waiters on
+this index but nobody will wait these.
 
-https://lore.kernel.org/linux-fsdevel/20210419184516.GC1472665@redhat.com/
+invalidate_inode_pages2()
+  invalidate_inode_pages2_range()
+    invalidate_exceptional_entry2()
+      dax_invalidate_mapping_entry_sync()
+        __dax_invalidate_entry() {
+                xas_lock_irq(&xas);
+                entry = get_unlocked_entry(&xas, 0);
+                ...
+                ...
+                dax_disassociate_entry(entry, mapping, trunc);
+                xas_store(&xas, NULL);
+                ...
+                ...
+                put_unlocked_entry(&xas, entry);
+                xas_unlock_irq(&xas);
+        }
 
-Changes since v2:
+Say a fault in in progress and it has locked entry at offset say "0x1c".
+Now say three instances of invalidate_inode_pages2() are in progress
+(A, B, C) and they all try to invalidate entry at offset "0x1c". Given
+dax entry is locked, all tree instances A, B, C will wait in wait queue.
 
-- Broke down patch in to a patch series (Dan)
-- Added an enum to communicate wake mode (Dan)
+When dax fault finishes, say A is woken up. It will store NULL entry
+at index "0x1c" and wake up B. When B comes along it will find "entry=0"
+at page offset 0x1c and it will call put_unlocked_entry(&xas, 0). And
+this means put_unlocked_entry() will not wake up next waiter, given
+the current code. And that means C continues to wait and is not woken
+up.
 
-Thanks
-Vivek
+This patch fixes the issue by waking up all waiters when a dax entry
+has been invalidated. This seems to fix the deadlock I am facing
+and I can make forward progress.
 
-Vivek Goyal (3):
-  dax: Add an enum for specifying dax wakup mode
-  dax: Add a wakeup mode parameter to put_unlocked_entry()
-  dax: Wake up all waiters after invalidating dax entry
+Reported-by: Sergio Lopez <slp@redhat.com>
+Fixes: ac401cc78242 ("dax: New fault locking")
+Suggested-by: Dan Williams <dan.j.williams@intel.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/dax.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- fs/dax.c | 34 +++++++++++++++++++++++-----------
- 1 file changed, 23 insertions(+), 11 deletions(-)
-
+diff --git a/fs/dax.c b/fs/dax.c
+index f19d76a6a493..cc497519be83 100644
+--- a/fs/dax.c
++++ b/fs/dax.c
+@@ -676,7 +676,7 @@ static int __dax_invalidate_entry(struct address_space *mapping,
+ 	mapping->nrexceptional--;
+ 	ret = 1;
+ out:
+-	put_unlocked_entry(&xas, entry, WAKE_NEXT);
++	put_unlocked_entry(&xas, entry, WAKE_ALL);
+ 	xas_unlock_irq(&xas);
+ 	return ret;
+ }
 -- 
 2.25.4
 

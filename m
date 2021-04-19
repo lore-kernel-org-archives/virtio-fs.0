@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Mon, 19 Apr 2021 17:36:35 -0400
-Message-Id: <20210419213636.1514816-3-vgoyal@redhat.com>
+Date: Mon, 19 Apr 2021 17:36:34 -0400
+Message-Id: <20210419213636.1514816-2-vgoyal@redhat.com>
 In-Reply-To: <20210419213636.1514816-1-vgoyal@redhat.com>
 References: <20210419213636.1514816-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 2/3] dax: Add a wakeup mode parameter to
-	put_unlocked_entry()
+Subject: [Virtio-fs] [PATCH v3 1/3] dax: Add an enum for specifying dax
+	wakup mode
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,73 +18,95 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, dan.j.williams@intel.com, jack@suse.cz, willy@infradead.org
 Cc: linux-nvdimm@lists.01.org, miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, vgoyal@redhat.com
 
-As of now put_unlocked_entry() always wakes up next waiter. In next
-patches we want to wake up all waiters at one callsite. Hence, add a
-parameter to the function.
+Dan mentioned that he is not very fond of passing around a boolean true/false
+to specify if only next waiter should be woken up or all waiters should be
+woken up. He instead prefers that we introduce an enum and make it very
+explicity at the callsite itself. Easier to read code.
 
-This patch does not introduce any change of behavior.
+This patch should not introduce any change of behavior.
 
 Suggested-by: Dan Williams <dan.j.williams@intel.com>
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- fs/dax.c | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+ fs/dax.c | 23 +++++++++++++++++------
+ 1 file changed, 17 insertions(+), 6 deletions(-)
 
 diff --git a/fs/dax.c b/fs/dax.c
-index 00978d0838b1..f19d76a6a493 100644
+index b3d27fdc6775..00978d0838b1 100644
 --- a/fs/dax.c
 +++ b/fs/dax.c
-@@ -275,11 +275,12 @@ static void wait_entry_unlocked(struct xa_state *xas, void *entry)
- 	finish_wait(wq, &ewait.wait);
- }
+@@ -144,6 +144,16 @@ struct wait_exceptional_entry_queue {
+ 	struct exceptional_entry_key key;
+ };
  
--static void put_unlocked_entry(struct xa_state *xas, void *entry)
-+static void put_unlocked_entry(struct xa_state *xas, void *entry,
-+			       enum dax_entry_wake_mode mode)
++/**
++ * enum dax_entry_wake_mode: waitqueue wakeup toggle
++ * @WAKE_NEXT: entry was not mutated
++ * @WAKE_ALL: entry was invalidated, or resized
++ */
++enum dax_entry_wake_mode {
++	WAKE_NEXT,
++	WAKE_ALL,
++};
++
+ static wait_queue_head_t *dax_entry_waitqueue(struct xa_state *xas,
+ 		void *entry, struct exceptional_entry_key *key)
  {
- 	/* If we were the only waiter woken, wake the next one */
- 	if (entry && !dax_is_conflict(entry))
--		dax_wake_entry(xas, entry, WAKE_NEXT);
-+		dax_wake_entry(xas, entry, mode);
+@@ -182,7 +192,8 @@ static int wake_exceptional_entry_func(wait_queue_entry_t *wait,
+  * The important information it's conveying is whether the entry at
+  * this index used to be a PMD entry.
+  */
+-static void dax_wake_entry(struct xa_state *xas, void *entry, bool wake_all)
++static void dax_wake_entry(struct xa_state *xas, void *entry,
++			   enum dax_entry_wake_mode mode)
+ {
+ 	struct exceptional_entry_key key;
+ 	wait_queue_head_t *wq;
+@@ -196,7 +207,7 @@ static void dax_wake_entry(struct xa_state *xas, void *entry, bool wake_all)
+ 	 * must be in the waitqueue and the following check will see them.
+ 	 */
+ 	if (waitqueue_active(wq))
+-		__wake_up(wq, TASK_NORMAL, wake_all ? 0 : 1, &key);
++		__wake_up(wq, TASK_NORMAL, mode == WAKE_ALL ? 0 : 1, &key);
  }
  
  /*
-@@ -633,7 +634,7 @@ struct page *dax_layout_busy_page_range(struct address_space *mapping,
- 			entry = get_unlocked_entry(&xas, 0);
- 		if (entry)
- 			page = dax_busy_page(entry);
--		put_unlocked_entry(&xas, entry);
-+		put_unlocked_entry(&xas, entry, WAKE_NEXT);
- 		if (page)
- 			break;
- 		if (++scanned % XA_CHECK_SCHED)
-@@ -675,7 +676,7 @@ static int __dax_invalidate_entry(struct address_space *mapping,
- 	mapping->nrexceptional--;
- 	ret = 1;
- out:
--	put_unlocked_entry(&xas, entry);
-+	put_unlocked_entry(&xas, entry, WAKE_NEXT);
- 	xas_unlock_irq(&xas);
- 	return ret;
- }
-@@ -954,7 +955,7 @@ static int dax_writeback_one(struct xa_state *xas, struct dax_device *dax_dev,
- 	return ret;
- 
-  put_unlocked:
--	put_unlocked_entry(xas, entry);
-+	put_unlocked_entry(xas, entry, WAKE_NEXT);
- 	return ret;
+@@ -268,7 +279,7 @@ static void put_unlocked_entry(struct xa_state *xas, void *entry)
+ {
+ 	/* If we were the only waiter woken, wake the next one */
+ 	if (entry && !dax_is_conflict(entry))
+-		dax_wake_entry(xas, entry, false);
++		dax_wake_entry(xas, entry, WAKE_NEXT);
  }
  
-@@ -1695,7 +1696,7 @@ dax_insert_pfn_mkwrite(struct vm_fault *vmf, pfn_t pfn, unsigned int order)
- 	/* Did we race with someone splitting entry or so? */
- 	if (!entry || dax_is_conflict(entry) ||
- 	    (order == 0 && !dax_is_pte_entry(entry))) {
--		put_unlocked_entry(&xas, entry);
-+		put_unlocked_entry(&xas, entry, WAKE_NEXT);
- 		xas_unlock_irq(&xas);
- 		trace_dax_insert_pfn_mkwrite_no_entry(mapping->host, vmf,
- 						      VM_FAULT_NOPAGE);
+ /*
+@@ -286,7 +297,7 @@ static void dax_unlock_entry(struct xa_state *xas, void *entry)
+ 	old = xas_store(xas, entry);
+ 	xas_unlock_irq(xas);
+ 	BUG_ON(!dax_is_locked(old));
+-	dax_wake_entry(xas, entry, false);
++	dax_wake_entry(xas, entry, WAKE_NEXT);
+ }
+ 
+ /*
+@@ -524,7 +535,7 @@ static void *grab_mapping_entry(struct xa_state *xas,
+ 
+ 		dax_disassociate_entry(entry, mapping, false);
+ 		xas_store(xas, NULL);	/* undo the PMD join */
+-		dax_wake_entry(xas, entry, true);
++		dax_wake_entry(xas, entry, WAKE_ALL);
+ 		mapping->nrexceptional--;
+ 		entry = NULL;
+ 		xas_set(xas, index);
+@@ -937,7 +948,7 @@ static int dax_writeback_one(struct xa_state *xas, struct dax_device *dax_dev,
+ 	xas_lock_irq(xas);
+ 	xas_store(xas, entry);
+ 	xas_clear_mark(xas, PAGECACHE_TAG_DIRTY);
+-	dax_wake_entry(xas, entry, false);
++	dax_wake_entry(xas, entry, WAKE_NEXT);
+ 
+ 	trace_dax_writeback_one(mapping->host, index, count);
+ 	return ret;
 -- 
 2.25.4
 

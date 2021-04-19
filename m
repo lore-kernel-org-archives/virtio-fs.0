@@ -1,14 +1,15 @@
-References: <20210318135223.1342795-1-ckuehl@redhat.com>
-	<20210318135223.1342795-2-ckuehl@redhat.com>
-From: Jason Wang <jasowang@redhat.com>
-Message-ID: <fa4988fa-a671-0abf-f922-6b362faf10d5@redhat.com>
-Date: Mon, 22 Mar 2021 11:22:15 +0800
+Date: Mon, 19 Apr 2021 16:42:24 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210419204224.GH1472665@redhat.com>
+References: <20210419184516.GC1472665@redhat.com>
+	<CAPcyv4jR5d+-99wVMm9SHxNBOsp0FUi7wzDNsefkZ1oqUZ7joQ@mail.gmail.com>
+	<20210419203947.GG1472665@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20210318135223.1342795-2-ckuehl@redhat.com>
-Content-Type: text/plain; charset="gbk"; format="flowed"
-Content-Transfer-Encoding: base64
-Subject: Re: [Virtio-fs] [PATCH 1/3] virtio_ring: always warn when
- descriptor chain exceeds queue size
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20210419203947.GG1472665@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH][v2] dax: Fix missed wakeup during dax entry
+	invalidation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,56 +18,132 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Connor Kuehl <ckuehl@redhat.com>, virtio-fs@redhat.com
-Cc: miklos@szeredi.hu, mst@redhat.com, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, linux-fsdevel@vger.kernel.org, vgoyal@redhat.com
+To: Dan Williams <dan.j.williams@intel.com>
+Cc: Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, linux-nvdimm <linux-nvdimm@lists.01.org>, linux kernel mailing list <linux-kernel@vger.kernel.org>, Matthew Wilcox <willy@infradead.org>, virtio-fs-list <virtio-fs@redhat.com>, Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>
 
-CtTaIDIwMjEvMy8xOCDPws7nOTo1MiwgQ29ubm9yIEt1ZWhsINC0tcA6Cj4gIEZyb20gc2VjdGlv
-biAyLjYuNS4zLjEgKERyaXZlciBSZXF1aXJlbWVudHM6IEluZGlyZWN0IERlc2NyaXB0b3JzKQo+
-IG9mIHRoZSB2aXJ0aW8gc3BlYzoKPgo+ICAgICJBIGRyaXZlciBNVVNUIE5PVCBjcmVhdGUgYSBk
-ZXNjcmlwdG9yIGNoYWluIGxvbmdlciB0aGFuIHRoZSBRdWV1ZQo+ICAgIFNpemUgb2YgdGhlIGRl
-dmljZS4iCj4KPiBUaGlzIHRleHQgc3VnZ2VzdHMgdGhhdCB0aGUgd2FybmluZyBzaG91bGQgdHJp
-Z2dlciBldmVuIGlmCj4gaW5kaXJlY3QgZGVzY3JpcHRvcnMgYXJlIGluIHVzZS4KCgpTbyBJIHRo
-aW5rIGF0IGxlYXN0IHRoZSBjb21taXQgbG9nIG5lZWRzIHNvbWUgdHdlYWsuCgpGb3Igc3BsaXQg
-dmlydHF1ZXVlLiBXZSBoYWQ6CgoyLjYuNS4yIERyaXZlciBSZXF1aXJlbWVudHM6IFRoZSBWaXJ0
-cXVldWUgRGVzY3JpcHRvciBUYWJsZQoKRHJpdmVycyBNVVNUIE5PVCBhZGQgYSBkZXNjcmlwdG9y
-IGNoYWluIGxvbmdlciB0aGFuIDJeMzIgYnl0ZXMgaW4gdG90YWw7IAp0aGlzIGltcGxpZXMgdGhh
-dCBsb29wcyBpbiB0aGUgZGVzY3JpcHRvciBjaGFpbiBhcmUgZm9yYmlkZGVuIQoKMi42LjUuMy4x
-IERyaXZlciBSZXF1aXJlbWVudHM6IEluZGlyZWN0IERlc2NyaXB0b3JzCgpBIGRyaXZlciBNVVNU
-IE5PVCBjcmVhdGUgYSBkZXNjcmlwdG9yIGNoYWluIGxvbmdlciB0aGFuIHRoZSBRdWV1ZSBTaXpl
-IApvZiB0aGUgZGV2aWNlLgoKSWYgSSB1bmRlcnN0YW5kIHRoZSBzcGVjIGNvcnJlY3RseSwgdGhl
-IGNoZWNrIGlzIG9ubHkgbmVlZGVkIGZvciBhIApzaW5nbGUgaW5kaXJlY3QgZGVzY3JpcHRvciB0
-YWJsZT8KCkZvciBwYWNrZWQgdmlydHF1ZXVlLiBXZSBoYWQ6CgoyLjcuMTcgRHJpdmVyIFJlcXVp
-cmVtZW50czogU2NhdHRlci1HYXRoZXIgU3VwcG9ydAoKQSBkcml2ZXIgTVVTVCBOT1QgY3JlYXRl
-IGEgZGVzY3JpcHRvciBsaXN0IGxvbmdlciB0aGFuIGFsbG93ZWQgYnkgdGhlIApkZXZpY2UuCgpB
-IGRyaXZlciBNVVNUIE5PVCBjcmVhdGUgYSBkZXNjcmlwdG9yIGxpc3QgbG9uZ2VyIHRoYW4gdGhl
-IFF1ZXVlIFNpemUuCgoyLjcuMTkgRHJpdmVyIFJlcXVpcmVtZW50czogSW5kaXJlY3QgRGVzY3Jp
-cHRvcnMKCkEgZHJpdmVyIE1VU1QgTk9UIGNyZWF0ZSBhIGRlc2NyaXB0b3IgY2hhaW4gbG9uZ2Vy
-IHRoYW4gYWxsb3dlZCBieSB0aGUgCmRldmljZS4KClNvIGl0IGxvb2tzIHRvIG1lIHRoZSBwYWNr
-ZWQgcGFydCBpcyBmaW5lLgoKTm90ZSB0aGF0IGlmIEkgdW5kZXJzdGFuZCB0aGUgc3BlYyBjb3Jy
-ZWN0bHkgMi43LjE3IGltcGxpZXMgMi43LjE5LgoKVGhhbmtzCgoKPgo+IFJlcG9ydGVkLWJ5OiBT
-dGVmYW4gSGFqbm9jemkgPHN0ZWZhbmhhQHJlZGhhdC5jb20+Cj4gU2lnbmVkLW9mZi1ieTogQ29u
-bm9yIEt1ZWhsIDxja3VlaGxAcmVkaGF0LmNvbT4KPiAtLS0KPiAgIGRyaXZlcnMvdmlydGlvL3Zp
-cnRpb19yaW5nLmMgfCA3ICsrKystLS0KPiAgIDEgZmlsZSBjaGFuZ2VkLCA0IGluc2VydGlvbnMo
-KyksIDMgZGVsZXRpb25zKC0pCj4KPiBkaWZmIC0tZ2l0IGEvZHJpdmVycy92aXJ0aW8vdmlydGlv
-X3JpbmcuYyBiL2RyaXZlcnMvdmlydGlvL3ZpcnRpb19yaW5nLmMKPiBpbmRleCA3MWUxNmI1M2U5
-YzEuLjFiYzI5MGY5YmExMyAxMDA2NDQKPiAtLS0gYS9kcml2ZXJzL3ZpcnRpby92aXJ0aW9fcmlu
-Zy5jCj4gKysrIGIvZHJpdmVycy92aXJ0aW8vdmlydGlvX3JpbmcuYwo+IEBAIC00NDQsMTEgKzQ0
-NCwxMiBAQCBzdGF0aWMgaW5saW5lIGludCB2aXJ0cXVldWVfYWRkX3NwbGl0KHN0cnVjdCB2aXJ0
-cXVldWUgKl92cSwKPiAgIAo+ICAgCWhlYWQgPSB2cS0+ZnJlZV9oZWFkOwo+ICAgCj4gKwlXQVJO
-X09OX09OQ0UodG90YWxfc2cgPiB2cS0+c3BsaXQudnJpbmcubnVtKTsKPiArCj4gICAJaWYgKHZp
-cnRxdWV1ZV91c2VfaW5kaXJlY3QoX3ZxLCB0b3RhbF9zZykpCj4gICAJCWRlc2MgPSBhbGxvY19p
-bmRpcmVjdF9zcGxpdChfdnEsIHRvdGFsX3NnLCBnZnApOwo+ICAgCWVsc2Ugewo+ICAgCQlkZXNj
-ID0gTlVMTDsKPiAtCQlXQVJOX09OX09OQ0UodG90YWxfc2cgPiB2cS0+c3BsaXQudnJpbmcubnVt
-ICYmICF2cS0+aW5kaXJlY3QpOwo+ICAgCX0KPiAgIAo+ICAgCWlmIChkZXNjKSB7Cj4gQEAgLTEx
-MTgsNiArMTExOSw4IEBAIHN0YXRpYyBpbmxpbmUgaW50IHZpcnRxdWV1ZV9hZGRfcGFja2VkKHN0
-cnVjdCB2aXJ0cXVldWUgKl92cSwKPiAgIAo+ICAgCUJVR19PTih0b3RhbF9zZyA9PSAwKTsKPiAg
-IAo+ICsJV0FSTl9PTl9PTkNFKHRvdGFsX3NnID4gdnEtPnBhY2tlZC52cmluZy5udW0pOwo+ICsK
-PiAgIAlpZiAodmlydHF1ZXVlX3VzZV9pbmRpcmVjdChfdnEsIHRvdGFsX3NnKSkKPiAgIAkJcmV0
-dXJuIHZpcnRxdWV1ZV9hZGRfaW5kaXJlY3RfcGFja2VkKHZxLCBzZ3MsIHRvdGFsX3NnLAo+ICAg
-CQkJCW91dF9zZ3MsIGluX3NncywgZGF0YSwgZ2ZwKTsKPiBAQCAtMTEyNSw4ICsxMTI4LDYgQEAg
-c3RhdGljIGlubGluZSBpbnQgdmlydHF1ZXVlX2FkZF9wYWNrZWQoc3RydWN0IHZpcnRxdWV1ZSAq
-X3ZxLAo+ICAgCWhlYWQgPSB2cS0+cGFja2VkLm5leHRfYXZhaWxfaWR4Owo+ICAgCWF2YWlsX3Vz
-ZWRfZmxhZ3MgPSB2cS0+cGFja2VkLmF2YWlsX3VzZWRfZmxhZ3M7Cj4gICAKPiAtCVdBUk5fT05f
-T05DRSh0b3RhbF9zZyA+IHZxLT5wYWNrZWQudnJpbmcubnVtICYmICF2cS0+aW5kaXJlY3QpOwo+
-IC0KPiAgIAlkZXNjID0gdnEtPnBhY2tlZC52cmluZy5kZXNjOwo+ICAgCWkgPSBoZWFkOwo+ICAg
-CWRlc2NzX3VzZWQgPSB0b3RhbF9zZzsKCg==
+On Mon, Apr 19, 2021 at 04:39:47PM -0400, Vivek Goyal wrote:
+> On Mon, Apr 19, 2021 at 12:48:58PM -0700, Dan Williams wrote:
+> > On Mon, Apr 19, 2021 at 11:45 AM Vivek Goyal <vgoyal@redhat.com> wrote:
+> > >
+> > > This is V2 of the patch. Posted V1 here.
+> > >
+> > > https://lore.kernel.org/linux-fsdevel/20210416173524.GA1379987@redhat.com/
+> > >
+> > > Based on feedback from Dan and Jan, modified the patch to wake up
+> > > all waiters when dax entry is invalidated. This solves the issues
+> > > of missed wakeups.
+> > 
+> > Care to send a formal patch with this commentary moved below the --- line?
+> > 
+> > One style fixup below...
+> > 
+> > >
+> > > I am seeing missed wakeups which ultimately lead to a deadlock when I am
+> > > using virtiofs with DAX enabled and running "make -j". I had to mount
+> > > virtiofs as rootfs and also reduce to dax window size to 256M to reproduce
+> > > the problem consistently.
+> > >
+> > > So here is the problem. put_unlocked_entry() wakes up waiters only
+> > > if entry is not null as well as !dax_is_conflict(entry). But if I
+> > > call multiple instances of invalidate_inode_pages2() in parallel,
+> > > then I can run into a situation where there are waiters on
+> > > this index but nobody will wait these.
+> > >
+> > > invalidate_inode_pages2()
+> > >   invalidate_inode_pages2_range()
+> > >     invalidate_exceptional_entry2()
+> > >       dax_invalidate_mapping_entry_sync()
+> > >         __dax_invalidate_entry() {
+> > >                 xas_lock_irq(&xas);
+> > >                 entry = get_unlocked_entry(&xas, 0);
+> > >                 ...
+> > >                 ...
+> > >                 dax_disassociate_entry(entry, mapping, trunc);
+> > >                 xas_store(&xas, NULL);
+> > >                 ...
+> > >                 ...
+> > >                 put_unlocked_entry(&xas, entry);
+> > >                 xas_unlock_irq(&xas);
+> > >         }
+> > >
+> > > Say a fault in in progress and it has locked entry at offset say "0x1c".
+> > > Now say three instances of invalidate_inode_pages2() are in progress
+> > > (A, B, C) and they all try to invalidate entry at offset "0x1c". Given
+> > > dax entry is locked, all tree instances A, B, C will wait in wait queue.
+> > >
+> > > When dax fault finishes, say A is woken up. It will store NULL entry
+> > > at index "0x1c" and wake up B. When B comes along it will find "entry=0"
+> > > at page offset 0x1c and it will call put_unlocked_entry(&xas, 0). And
+> > > this means put_unlocked_entry() will not wake up next waiter, given
+> > > the current code. And that means C continues to wait and is not woken
+> > > up.
+> > >
+> > > This patch fixes the issue by waking up all waiters when a dax entry
+> > > has been invalidated. This seems to fix the deadlock I am facing
+> > > and I can make forward progress.
+> > >
+> > > Reported-by: Sergio Lopez <slp@redhat.com>
+> > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > > ---
+> > >  fs/dax.c |   12 ++++++------
+> > >  1 file changed, 6 insertions(+), 6 deletions(-)
+> > >
+> > > Index: redhat-linux/fs/dax.c
+> > > ===================================================================
+> > > --- redhat-linux.orig/fs/dax.c  2021-04-16 14:16:44.332140543 -0400
+> > > +++ redhat-linux/fs/dax.c       2021-04-19 11:24:11.465213474 -0400
+> > > @@ -264,11 +264,11 @@ static void wait_entry_unlocked(struct x
+> > >         finish_wait(wq, &ewait.wait);
+> > >  }
+> > >
+> > > -static void put_unlocked_entry(struct xa_state *xas, void *entry)
+> > > +static void put_unlocked_entry(struct xa_state *xas, void *entry, bool wake_all)
+> > >  {
+> > >         /* If we were the only waiter woken, wake the next one */
+> > >         if (entry && !dax_is_conflict(entry))
+> > > -               dax_wake_entry(xas, entry, false);
+> > > +               dax_wake_entry(xas, entry, wake_all);
+> > >  }
+> > >
+> > >  /*
+> > > @@ -622,7 +622,7 @@ struct page *dax_layout_busy_page_range(
+> > >                         entry = get_unlocked_entry(&xas, 0);
+> > >                 if (entry)
+> > >                         page = dax_busy_page(entry);
+> > > -               put_unlocked_entry(&xas, entry);
+> > > +               put_unlocked_entry(&xas, entry, false);
+> > 
+> > I'm not a fan of raw true/false arguments because if you read this
+> > line in isolation you need to go read put_unlocked_entry() to recall
+> > what that argument means. So lets add something like:
+> > 
+> > /**
+> >  * enum dax_entry_wake_mode: waitqueue wakeup toggle
+> >  * @WAKE_NEXT: entry was not mutated
+> >  * @WAKE_ALL: entry was invalidated, or resized
+> >  */
+> > enum dax_entry_wake_mode {
+> >         WAKE_NEXT,
+> >         WAKE_ALL,
+> > }
+> > 
+> > ...and use that as the arg for dax_wake_entry(). So I'd expect this to
+> > be a 3 patch series, introduce dax_entry_wake_mode for
+> > dax_wake_entry(), introduce the argument for put_unlocked_entry()
+> > without changing the logic, and finally this bug fix. Feel free to add
+> > 'Fixes: ac401cc78242 ("dax: New fault locking")' in case you feel this
+> > needs to be backported.
+> 
+> Hi Dan,
+> 
+> I will make changes as you suggested and post another version.
+> 
+> I am wondering what to do with dax_wake_entry(). It also has a boolean
+> parameter wake_all. Should that be converted as well to make use of
+> enum dax_entry_wake_mode?
+
+oops, you already mentioned dax_wake_entry(). I read too fast. Sorry for
+the noise
+
+Vivek
+

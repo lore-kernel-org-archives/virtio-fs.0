@@ -1,12 +1,12 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Wed, 28 Apr 2021 12:00:48 +0100
-Message-Id: <20210428110100.27757-15-dgilbert@redhat.com>
-In-Reply-To: <20210428110100.27757-1-dgilbert@redhat.com>
-References: <20210428110100.27757-1-dgilbert@redhat.com>
+From: Greg Kurz <groug@kaod.org>
+Date: Mon, 19 Apr 2021 17:11:42 +0200
+Message-Id: <20210419151142.276439-3-groug@kaod.org>
+In-Reply-To: <20210419151142.276439-1-groug@kaod.org>
+References: <20210419151142.276439-1-groug@kaod.org>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 14/26] DAX: virtiofsd: Wire up
-	passthrough_ll's lo_setupmapping
+Subject: [Virtio-fs] [for-6.1 2/2] virtiofsd: Add support for FUSE_SYNCFS
+	request
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,119 +15,150 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, groug@kaod.org
-Cc: virtio-fs@redhat.com
+To: qemu-devel@nongnu.org
+Cc: Miklos Szeredi <miklos@szeredi.hu>, virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Honor the expected behavior of syncfs() to synchronously flush all
+data and metadata on linux systems. Like the ->sync_fs() superblock
+operation in the linux kernel, FUSE_SYNCFS has a 'wait' argument that
+tells whether the server should wait for outstanding I/Os to complete
+before replying to the client. Anything virtiofsd can do to flush
+the caches implies blocking syscalls, so nothing is done if waiting
+isn't requested.
 
-Wire up passthrough_ll's setupmapping to allocate, send to virtio
-and then reply OK.
+Flushing is done with syncfs(). This is suboptimal as it will also
+flush writes performed by any other process on the same file system,
+and thus add an unbounded time penalty to syncfs(). This may be
+optimized in the future, but enforce correctness first.
 
-Guest might not pass file pointer. In that case using inode info, open
-the file again, mmap() and close fd.
-
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-With fix from:
-Signed-off-by: Fotis Xenakis <foxen@windowslive.com>
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+Signed-off-by: Greg Kurz <groug@kaod.org>
 ---
- tools/virtiofsd/fuse_lowlevel.c  | 13 ++++++--
- tools/virtiofsd/passthrough_ll.c | 57 ++++++++++++++++++++++++++++++--
- 2 files changed, 66 insertions(+), 4 deletions(-)
+ tools/virtiofsd/fuse_lowlevel.c       | 19 ++++++++++++++++++
+ tools/virtiofsd/fuse_lowlevel.h       | 13 ++++++++++++
+ tools/virtiofsd/passthrough_ll.c      | 29 +++++++++++++++++++++++++++
+ tools/virtiofsd/passthrough_seccomp.c |  1 +
+ 4 files changed, 62 insertions(+)
 
 diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index a1a8730b73..4921f1bbb7 100644
+index 58e32fc96369..2d0c47a7a60e 100644
 --- a/tools/virtiofsd/fuse_lowlevel.c
 +++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -1899,8 +1899,17 @@ static void do_setupmapping(fuse_req_t req, fuse_ino_t nodeid,
+@@ -1870,6 +1870,24 @@ static void do_lseek(fuse_req_t req, fuse_ino_t nodeid,
      }
- 
-     if (req->se->op.setupmapping) {
--        req->se->op.setupmapping(req, nodeid, arg->foffset, arg->len,
--                                 arg->moffset, genflags, &fi);
-+        /*
-+         * TODO: Add a flag to request which tells if arg->fh is
-+         * valid or not.
-+         */
-+        if (fi.fh == (uint64_t)-1) {
-+            req->se->op.setupmapping(req, nodeid, arg->foffset, arg->len,
-+                                     arg->moffset, genflags, NULL);
-+        } else {
-+            req->se->op.setupmapping(req, nodeid, arg->foffset, arg->len,
-+                                     arg->moffset, genflags, &fi);
-+        }
-     } else {
-         fuse_reply_err(req, ENOSYS);
-     }
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index a16d425b78..6981737389 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -3149,8 +3149,61 @@ static void lo_setupmapping(fuse_req_t req, fuse_ino_t ino, uint64_t foffset,
-                             uint64_t len, uint64_t moffset, uint64_t flags,
-                             struct fuse_file_info *fi)
- {
--    /* TODO */
--    fuse_reply_err(req, ENOSYS);
-+    struct lo_data *lo = lo_data(req);
-+    int ret = 0, fd;
-+    VhostUserFSSlaveMsg *msg = g_malloc0(sizeof(VhostUserFSSlaveMsg) +
-+                                         sizeof(VhostUserFSSlaveMsgEntry));
-+    uint64_t vhu_flags;
-+    char *buf;
-+    bool writable = flags & O_RDWR;
-+
-+    fuse_log(FUSE_LOG_DEBUG,
-+             "lo_setupmapping(ino=%" PRIu64 ", fi=0x%p,"
-+             " foffset=%" PRIu64 ", len=%" PRIu64 ", moffset=%" PRIu64
-+             ", flags=%" PRIu64 ")\n",
-+             ino, (void *)fi, foffset, len, moffset, flags);
-+
-+    vhu_flags = VHOST_USER_FS_FLAG_MAP_R;
-+    if (writable) {
-+        vhu_flags |= VHOST_USER_FS_FLAG_MAP_W;
-+    }
-+
-+    msg->count = 1;
-+    msg->entries[0].fd_offset = foffset;
-+    msg->entries[0].len = len;
-+    msg->entries[0].c_offset = moffset;
-+    msg->entries[0].flags = vhu_flags;
-+
-+    if (fi) {
-+        fd = lo_fi_fd(req, fi);
-+    } else {
-+        ret = asprintf(&buf, "%i", lo_fd(req, ino));
-+        if (ret == -1) {
-+            g_free(msg);
-+            return (void)fuse_reply_err(req, errno);
-+        }
-+
-+        fd = openat(lo->proc_self_fd, buf, flags);
-+        free(buf);
-+        if (fd == -1) {
-+            g_free(msg);
-+            return (void)fuse_reply_err(req, errno);
-+        }
-+    }
-+
-+    ret = fuse_virtio_map(req, msg, fd);
-+    if (ret < 0) {
-+        fuse_log(FUSE_LOG_ERR,
-+                 "%s: map over virtio failed (ino=%" PRId64
-+                 "fd=%d moffset=0x%" PRIx64 "). err = %d\n",
-+                 __func__, ino, fd, moffset, ret);
-+    }
-+
-+    if (!fi) {
-+        close(fd);
-+    }
-+    fuse_reply_err(req, -ret);
-+    g_free(msg);
  }
  
- static void lo_removemapping(fuse_req_t req, struct fuse_session *se,
++static void do_syncfs(fuse_req_t req, fuse_ino_t nodeid,
++                      struct fuse_mbuf_iter *iter)
++{
++    struct fuse_syncfs_in *arg;
++
++    arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
++    if (!arg) {
++        fuse_reply_err(req, EINVAL);
++        return;
++    }
++
++    if (req->se->op.syncfs) {
++        req->se->op.syncfs(req, arg->wait);
++    } else {
++        fuse_reply_err(req, ENOSYS);
++    }
++}
++
+ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+                     struct fuse_mbuf_iter *iter)
+ {
+@@ -2267,6 +2285,7 @@ static struct {
+     [FUSE_RENAME2] = { do_rename2, "RENAME2" },
+     [FUSE_COPY_FILE_RANGE] = { do_copy_file_range, "COPY_FILE_RANGE" },
+     [FUSE_LSEEK] = { do_lseek, "LSEEK" },
++    [FUSE_SYNCFS] = { do_syncfs, "SYNCFS" },
+ };
+ 
+ #define FUSE_MAXOP (sizeof(fuse_ll_ops) / sizeof(fuse_ll_ops[0]))
+diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
+index 3bf786b03485..b5ac42c31799 100644
+--- a/tools/virtiofsd/fuse_lowlevel.h
++++ b/tools/virtiofsd/fuse_lowlevel.h
+@@ -1225,6 +1225,19 @@ struct fuse_lowlevel_ops {
+      */
+     void (*lseek)(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
+                   struct fuse_file_info *fi);
++
++    /**
++     * Synchronize file system content
++     *
++     * If this request is answered with an error code of ENOSYS,
++     * this is treated as success and future calls to syncfs() will
++     * succeed automatically without being sent to the filesystem
++     * process.
++     *
++     * @param req request handle
++     * @param wait whether to wait for outstanding I/Os to complete
++     */
++    void (*syncfs)(fuse_req_t req, int wait);
+ };
+ 
+ /**
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 1553d2ef454f..6b66f3208be0 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -3124,6 +3124,34 @@ static void lo_lseek(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
+     }
+ }
+ 
++static void lo_syncfs(fuse_req_t req, int wait)
++{
++    if (wait) {
++        struct lo_data *lo = lo_data(req);
++        int fd, ret;
++
++        fd = lo_inode_open(lo, &lo->root, O_RDONLY);
++        if (fd < 0) {
++            fuse_reply_err(req, errno);
++            return;
++        }
++
++        /*
++         * FIXME: this is suboptimal because it will also flush unrelated
++         *        writes not coming from the client. This can dramatically
++         *        increase the time spent in syncfs() if some process is
++         *        writing lots of data on the same filesystem as virtiofsd.
++         */
++        ret = syncfs(fd);
++        /* syncfs() never fails on a valid fd */
++        assert(ret == 0);
++
++        close(fd);
++    }
++
++    fuse_reply_err(req, 0);
++}
++
+ static void lo_destroy(void *userdata)
+ {
+     struct lo_data *lo = (struct lo_data *)userdata;
+@@ -3184,6 +3212,7 @@ static struct fuse_lowlevel_ops lo_oper = {
+     .copy_file_range = lo_copy_file_range,
+ #endif
+     .lseek = lo_lseek,
++    .syncfs = lo_syncfs,
+     .destroy = lo_destroy,
+ };
+ 
+diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
+index 62441cfcdb95..343188447901 100644
+--- a/tools/virtiofsd/passthrough_seccomp.c
++++ b/tools/virtiofsd/passthrough_seccomp.c
+@@ -107,6 +107,7 @@ static const int syscall_allowlist[] = {
+     SCMP_SYS(set_robust_list),
+     SCMP_SYS(setxattr),
+     SCMP_SYS(symlinkat),
++    SCMP_SYS(syncfs),
+     SCMP_SYS(time), /* Rarely needed, except on static builds */
+     SCMP_SYS(tgkill),
+     SCMP_SYS(unlinkat),
 -- 
-2.31.1
+2.26.3
 

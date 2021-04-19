@@ -1,15 +1,10 @@
-Date: Mon, 19 Apr 2021 16:42:24 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210419204224.GH1472665@redhat.com>
-References: <20210419184516.GC1472665@redhat.com>
-	<CAPcyv4jR5d+-99wVMm9SHxNBOsp0FUi7wzDNsefkZ1oqUZ7joQ@mail.gmail.com>
-	<20210419203947.GG1472665@redhat.com>
+Date: Mon, 19 Apr 2021 17:36:33 -0400
+Message-Id: <20210419213636.1514816-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210419203947.GG1472665@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH][v2] dax: Fix missed wakeup during dax entry
-	invalidation
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v3 0/3] dax: Fix missed wakeup in
+	put_unlocked_entry()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,132 +13,31 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Dan Williams <dan.j.williams@intel.com>
-Cc: Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, linux-nvdimm <linux-nvdimm@lists.01.org>, linux kernel mailing list <linux-kernel@vger.kernel.org>, Matthew Wilcox <willy@infradead.org>, virtio-fs-list <virtio-fs@redhat.com>, Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>
+To: linux-fsdevel@vger.kernel.org, dan.j.williams@intel.com, jack@suse.cz, willy@infradead.org
+Cc: linux-nvdimm@lists.01.org, miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, vgoyal@redhat.com
 
-On Mon, Apr 19, 2021 at 04:39:47PM -0400, Vivek Goyal wrote:
-> On Mon, Apr 19, 2021 at 12:48:58PM -0700, Dan Williams wrote:
-> > On Mon, Apr 19, 2021 at 11:45 AM Vivek Goyal <vgoyal@redhat.com> wrote:
-> > >
-> > > This is V2 of the patch. Posted V1 here.
-> > >
-> > > https://lore.kernel.org/linux-fsdevel/20210416173524.GA1379987@redhat.com/
-> > >
-> > > Based on feedback from Dan and Jan, modified the patch to wake up
-> > > all waiters when dax entry is invalidated. This solves the issues
-> > > of missed wakeups.
-> > 
-> > Care to send a formal patch with this commentary moved below the --- line?
-> > 
-> > One style fixup below...
-> > 
-> > >
-> > > I am seeing missed wakeups which ultimately lead to a deadlock when I am
-> > > using virtiofs with DAX enabled and running "make -j". I had to mount
-> > > virtiofs as rootfs and also reduce to dax window size to 256M to reproduce
-> > > the problem consistently.
-> > >
-> > > So here is the problem. put_unlocked_entry() wakes up waiters only
-> > > if entry is not null as well as !dax_is_conflict(entry). But if I
-> > > call multiple instances of invalidate_inode_pages2() in parallel,
-> > > then I can run into a situation where there are waiters on
-> > > this index but nobody will wait these.
-> > >
-> > > invalidate_inode_pages2()
-> > >   invalidate_inode_pages2_range()
-> > >     invalidate_exceptional_entry2()
-> > >       dax_invalidate_mapping_entry_sync()
-> > >         __dax_invalidate_entry() {
-> > >                 xas_lock_irq(&xas);
-> > >                 entry = get_unlocked_entry(&xas, 0);
-> > >                 ...
-> > >                 ...
-> > >                 dax_disassociate_entry(entry, mapping, trunc);
-> > >                 xas_store(&xas, NULL);
-> > >                 ...
-> > >                 ...
-> > >                 put_unlocked_entry(&xas, entry);
-> > >                 xas_unlock_irq(&xas);
-> > >         }
-> > >
-> > > Say a fault in in progress and it has locked entry at offset say "0x1c".
-> > > Now say three instances of invalidate_inode_pages2() are in progress
-> > > (A, B, C) and they all try to invalidate entry at offset "0x1c". Given
-> > > dax entry is locked, all tree instances A, B, C will wait in wait queue.
-> > >
-> > > When dax fault finishes, say A is woken up. It will store NULL entry
-> > > at index "0x1c" and wake up B. When B comes along it will find "entry=0"
-> > > at page offset 0x1c and it will call put_unlocked_entry(&xas, 0). And
-> > > this means put_unlocked_entry() will not wake up next waiter, given
-> > > the current code. And that means C continues to wait and is not woken
-> > > up.
-> > >
-> > > This patch fixes the issue by waking up all waiters when a dax entry
-> > > has been invalidated. This seems to fix the deadlock I am facing
-> > > and I can make forward progress.
-> > >
-> > > Reported-by: Sergio Lopez <slp@redhat.com>
-> > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > > ---
-> > >  fs/dax.c |   12 ++++++------
-> > >  1 file changed, 6 insertions(+), 6 deletions(-)
-> > >
-> > > Index: redhat-linux/fs/dax.c
-> > > ===================================================================
-> > > --- redhat-linux.orig/fs/dax.c  2021-04-16 14:16:44.332140543 -0400
-> > > +++ redhat-linux/fs/dax.c       2021-04-19 11:24:11.465213474 -0400
-> > > @@ -264,11 +264,11 @@ static void wait_entry_unlocked(struct x
-> > >         finish_wait(wq, &ewait.wait);
-> > >  }
-> > >
-> > > -static void put_unlocked_entry(struct xa_state *xas, void *entry)
-> > > +static void put_unlocked_entry(struct xa_state *xas, void *entry, bool wake_all)
-> > >  {
-> > >         /* If we were the only waiter woken, wake the next one */
-> > >         if (entry && !dax_is_conflict(entry))
-> > > -               dax_wake_entry(xas, entry, false);
-> > > +               dax_wake_entry(xas, entry, wake_all);
-> > >  }
-> > >
-> > >  /*
-> > > @@ -622,7 +622,7 @@ struct page *dax_layout_busy_page_range(
-> > >                         entry = get_unlocked_entry(&xas, 0);
-> > >                 if (entry)
-> > >                         page = dax_busy_page(entry);
-> > > -               put_unlocked_entry(&xas, entry);
-> > > +               put_unlocked_entry(&xas, entry, false);
-> > 
-> > I'm not a fan of raw true/false arguments because if you read this
-> > line in isolation you need to go read put_unlocked_entry() to recall
-> > what that argument means. So lets add something like:
-> > 
-> > /**
-> >  * enum dax_entry_wake_mode: waitqueue wakeup toggle
-> >  * @WAKE_NEXT: entry was not mutated
-> >  * @WAKE_ALL: entry was invalidated, or resized
-> >  */
-> > enum dax_entry_wake_mode {
-> >         WAKE_NEXT,
-> >         WAKE_ALL,
-> > }
-> > 
-> > ...and use that as the arg for dax_wake_entry(). So I'd expect this to
-> > be a 3 patch series, introduce dax_entry_wake_mode for
-> > dax_wake_entry(), introduce the argument for put_unlocked_entry()
-> > without changing the logic, and finally this bug fix. Feel free to add
-> > 'Fixes: ac401cc78242 ("dax: New fault locking")' in case you feel this
-> > needs to be backported.
-> 
-> Hi Dan,
-> 
-> I will make changes as you suggested and post another version.
-> 
-> I am wondering what to do with dax_wake_entry(). It also has a boolean
-> parameter wake_all. Should that be converted as well to make use of
-> enum dax_entry_wake_mode?
+Hi,
 
-oops, you already mentioned dax_wake_entry(). I read too fast. Sorry for
-the noise
+This is V3 of patches. Posted V2 here.
 
+https://lore.kernel.org/linux-fsdevel/20210419184516.GC1472665@redhat.com/
+
+Changes since v2:
+
+- Broke down patch in to a patch series (Dan)
+- Added an enum to communicate wake mode (Dan)
+
+Thanks
 Vivek
+
+Vivek Goyal (3):
+  dax: Add an enum for specifying dax wakup mode
+  dax: Add a wakeup mode parameter to put_unlocked_entry()
+  dax: Wake up all waiters after invalidating dax entry
+
+ fs/dax.c | 34 +++++++++++++++++++++++-----------
+ 1 file changed, 23 insertions(+), 11 deletions(-)
+
+-- 
+2.25.4
 

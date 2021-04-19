@@ -1,15 +1,14 @@
-Date: Tue, 4 May 2021 16:26:28 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YJFnpIwjrbdo2LPn@stefanha-x1.localdomain>
-References: <20210428110100.27757-1-dgilbert@redhat.com>
-	<20210428110100.27757-5-dgilbert@redhat.com>
+Date: Mon, 19 Apr 2021 16:39:47 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210419203947.GG1472665@redhat.com>
+References: <20210419184516.GC1472665@redhat.com>
+	<CAPcyv4jR5d+-99wVMm9SHxNBOsp0FUi7wzDNsefkZ1oqUZ7joQ@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="F71rP5MikdgOjNDk"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210428110100.27757-5-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 04/26] DAX: libvhost-user: Route slave
-	message payload
+In-Reply-To: <CAPcyv4jR5d+-99wVMm9SHxNBOsp0FUi7wzDNsefkZ1oqUZ7joQ@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH][v2] dax: Fix missed wakeup during dax entry
+	invalidation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,44 +17,129 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
+To: Dan Williams <dan.j.williams@intel.com>
+Cc: Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, linux-nvdimm <linux-nvdimm@lists.01.org>, linux kernel mailing list <linux-kernel@vger.kernel.org>, Matthew Wilcox <willy@infradead.org>, virtio-fs-list <virtio-fs@redhat.com>, Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>
 
+On Mon, Apr 19, 2021 at 12:48:58PM -0700, Dan Williams wrote:
+> On Mon, Apr 19, 2021 at 11:45 AM Vivek Goyal <vgoyal@redhat.com> wrote:
+> >
+> > This is V2 of the patch. Posted V1 here.
+> >
+> > https://lore.kernel.org/linux-fsdevel/20210416173524.GA1379987@redhat.com/
+> >
+> > Based on feedback from Dan and Jan, modified the patch to wake up
+> > all waiters when dax entry is invalidated. This solves the issues
+> > of missed wakeups.
+> 
+> Care to send a formal patch with this commentary moved below the --- line?
+> 
+> One style fixup below...
+> 
+> >
+> > I am seeing missed wakeups which ultimately lead to a deadlock when I am
+> > using virtiofs with DAX enabled and running "make -j". I had to mount
+> > virtiofs as rootfs and also reduce to dax window size to 256M to reproduce
+> > the problem consistently.
+> >
+> > So here is the problem. put_unlocked_entry() wakes up waiters only
+> > if entry is not null as well as !dax_is_conflict(entry). But if I
+> > call multiple instances of invalidate_inode_pages2() in parallel,
+> > then I can run into a situation where there are waiters on
+> > this index but nobody will wait these.
+> >
+> > invalidate_inode_pages2()
+> >   invalidate_inode_pages2_range()
+> >     invalidate_exceptional_entry2()
+> >       dax_invalidate_mapping_entry_sync()
+> >         __dax_invalidate_entry() {
+> >                 xas_lock_irq(&xas);
+> >                 entry = get_unlocked_entry(&xas, 0);
+> >                 ...
+> >                 ...
+> >                 dax_disassociate_entry(entry, mapping, trunc);
+> >                 xas_store(&xas, NULL);
+> >                 ...
+> >                 ...
+> >                 put_unlocked_entry(&xas, entry);
+> >                 xas_unlock_irq(&xas);
+> >         }
+> >
+> > Say a fault in in progress and it has locked entry at offset say "0x1c".
+> > Now say three instances of invalidate_inode_pages2() are in progress
+> > (A, B, C) and they all try to invalidate entry at offset "0x1c". Given
+> > dax entry is locked, all tree instances A, B, C will wait in wait queue.
+> >
+> > When dax fault finishes, say A is woken up. It will store NULL entry
+> > at index "0x1c" and wake up B. When B comes along it will find "entry=0"
+> > at page offset 0x1c and it will call put_unlocked_entry(&xas, 0). And
+> > this means put_unlocked_entry() will not wake up next waiter, given
+> > the current code. And that means C continues to wait and is not woken
+> > up.
+> >
+> > This patch fixes the issue by waking up all waiters when a dax entry
+> > has been invalidated. This seems to fix the deadlock I am facing
+> > and I can make forward progress.
+> >
+> > Reported-by: Sergio Lopez <slp@redhat.com>
+> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > ---
+> >  fs/dax.c |   12 ++++++------
+> >  1 file changed, 6 insertions(+), 6 deletions(-)
+> >
+> > Index: redhat-linux/fs/dax.c
+> > ===================================================================
+> > --- redhat-linux.orig/fs/dax.c  2021-04-16 14:16:44.332140543 -0400
+> > +++ redhat-linux/fs/dax.c       2021-04-19 11:24:11.465213474 -0400
+> > @@ -264,11 +264,11 @@ static void wait_entry_unlocked(struct x
+> >         finish_wait(wq, &ewait.wait);
+> >  }
+> >
+> > -static void put_unlocked_entry(struct xa_state *xas, void *entry)
+> > +static void put_unlocked_entry(struct xa_state *xas, void *entry, bool wake_all)
+> >  {
+> >         /* If we were the only waiter woken, wake the next one */
+> >         if (entry && !dax_is_conflict(entry))
+> > -               dax_wake_entry(xas, entry, false);
+> > +               dax_wake_entry(xas, entry, wake_all);
+> >  }
+> >
+> >  /*
+> > @@ -622,7 +622,7 @@ struct page *dax_layout_busy_page_range(
+> >                         entry = get_unlocked_entry(&xas, 0);
+> >                 if (entry)
+> >                         page = dax_busy_page(entry);
+> > -               put_unlocked_entry(&xas, entry);
+> > +               put_unlocked_entry(&xas, entry, false);
+> 
+> I'm not a fan of raw true/false arguments because if you read this
+> line in isolation you need to go read put_unlocked_entry() to recall
+> what that argument means. So lets add something like:
+> 
+> /**
+>  * enum dax_entry_wake_mode: waitqueue wakeup toggle
+>  * @WAKE_NEXT: entry was not mutated
+>  * @WAKE_ALL: entry was invalidated, or resized
+>  */
+> enum dax_entry_wake_mode {
+>         WAKE_NEXT,
+>         WAKE_ALL,
+> }
+> 
+> ...and use that as the arg for dax_wake_entry(). So I'd expect this to
+> be a 3 patch series, introduce dax_entry_wake_mode for
+> dax_wake_entry(), introduce the argument for put_unlocked_entry()
+> without changing the logic, and finally this bug fix. Feel free to add
+> 'Fixes: ac401cc78242 ("dax: New fault locking")' in case you feel this
+> needs to be backported.
 
---F71rP5MikdgOjNDk
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Hi Dan,
 
-On Wed, Apr 28, 2021 at 12:00:38PM +0100, Dr. David Alan Gilbert (git) wrot=
-e:
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
->=20
-> Route the uint64 payload from message replies on the slave back up
-> through vu_process_message_reply and to the callers.
->=20
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-> ---
->  subprojects/libvhost-user/libvhost-user.c | 14 +++++++++++---
->  1 file changed, 11 insertions(+), 3 deletions(-)
+I will make changes as you suggested and post another version.
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+I am wondering what to do with dax_wake_entry(). It also has a boolean
+parameter wake_all. Should that be converted as well to make use of
+enum dax_entry_wake_mode?
 
---F71rP5MikdgOjNDk
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmCRZ6QACgkQnKSrs4Gr
-c8ifswgAgMDIRKx/euJ0SnqqG+CY/C6cO5s87C7O3k2SEnpq9y0eJdWVaJWO10Bk
-VnKPx5AXC7oJXnwOnzxfcLAI4rlzkRY2vHNxPwAmFRRR0cUU8u8DffSVKAb8gveQ
-gXIxMmURaLsd8jsKKYMLPngRy9D7us5E4731LceAKWnOh+YFSqeGom/rmgs8CFMM
-PyFt5RDJyXzyzSTL67dBNLVfa3CwuQxtocDvMlCNDrKYhLN2pkibOsT4ZQs5Wezz
-ZzddCVUwvyYokfn1TW+VIdTBsarh0R3p5dskD3lX5kXrnTjSFYKDUKpCr8Y7cW16
-7cdAMEWC695FR/A9HfQ5jQd3v9QNPw==
-=Jv90
------END PGP SIGNATURE-----
-
---F71rP5MikdgOjNDk--
+Thanks
+Vivek
 

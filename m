@@ -1,12 +1,11 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Wed, 28 Apr 2021 12:00:58 +0100
-Message-Id: <20210428110100.27757-25-dgilbert@redhat.com>
-In-Reply-To: <20210428110100.27757-1-dgilbert@redhat.com>
-References: <20210428110100.27757-1-dgilbert@redhat.com>
+Date: Mon, 19 Apr 2021 14:45:16 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210419184516.GC1472665@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 24/26] vhost-user-fs: Extend
-	VhostUserFSSlaveMsg to pass additional info
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: [Virtio-fs] [PATCH][v2] dax: Fix missed wakeup during dax entry
+	invalidation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,96 +14,119 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, groug@kaod.org
-Cc: virtio-fs@redhat.com
+To: Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>, Jan Kara <jack@suse.cz>, Dan Williams <dan.j.williams@intel.com>, willy@infradead.org
+Cc: virtio-fs-list <virtio-fs@redhat.com>, linux-nvdimm@lists.01.org, linux kernel mailing list <linux-kernel@vger.kernel.org>, Miklos Szeredi <miklos@szeredi.hu>
 
-From: Vivek Goyal <vgoyal@redhat.com>
+This is V2 of the patch. Posted V1 here.
 
-Extend VhostUserFSSlaveMsg so that slave can ask it to drop CAP_FSETID
-before doing I/O on fd.
+https://lore.kernel.org/linux-fsdevel/20210416173524.GA1379987@redhat.com/
 
-In some cases, virtiofsd takes the onus of clearing setuid bit on a file
-when WRITE happens. Generally virtiofsd does the WRITE to fd (from guest
-memory which is mapped in virtiofsd as well), but if this memory is
-unmappable in virtiofsd (like cache window), then virtiofsd asks qemu
-to do the I/O instead.
+Based on feedback from Dan and Jan, modified the patch to wake up 
+all waiters when dax entry is invalidated. This solves the issues
+of missed wakeups.
 
-To retain the capability to drop suid bit on write, qemu needs to
-drop the CAP_FSETID as well before write to fd. Extend VhostUserFSSlaveMsg
-so that virtiofsd can specify in message if CAP_FSETID needs to be
-dropped.
+I am seeing missed wakeups which ultimately lead to a deadlock when I am
+using virtiofs with DAX enabled and running "make -j". I had to mount
+virtiofs as rootfs and also reduce to dax window size to 256M to reproduce
+the problem consistently.
 
+So here is the problem. put_unlocked_entry() wakes up waiters only
+if entry is not null as well as !dax_is_conflict(entry). But if I
+call multiple instances of invalidate_inode_pages2() in parallel,
+then I can run into a situation where there are waiters on
+this index but nobody will wait these.
+
+invalidate_inode_pages2()
+  invalidate_inode_pages2_range()
+    invalidate_exceptional_entry2()
+      dax_invalidate_mapping_entry_sync()
+        __dax_invalidate_entry() {
+                xas_lock_irq(&xas);
+                entry = get_unlocked_entry(&xas, 0);
+                ...
+                ...
+                dax_disassociate_entry(entry, mapping, trunc);
+                xas_store(&xas, NULL);
+                ...
+                ...
+                put_unlocked_entry(&xas, entry);
+                xas_unlock_irq(&xas);
+        }
+
+Say a fault in in progress and it has locked entry at offset say "0x1c".
+Now say three instances of invalidate_inode_pages2() are in progress
+(A, B, C) and they all try to invalidate entry at offset "0x1c". Given
+dax entry is locked, all tree instances A, B, C will wait in wait queue.
+
+When dax fault finishes, say A is woken up. It will store NULL entry
+at index "0x1c" and wake up B. When B comes along it will find "entry=0"
+at page offset 0x1c and it will call put_unlocked_entry(&xas, 0). And
+this means put_unlocked_entry() will not wake up next waiter, given
+the current code. And that means C continues to wait and is not woken
+up.
+
+This patch fixes the issue by waking up all waiters when a dax entry
+has been invalidated. This seems to fix the deadlock I am facing
+and I can make forward progress.
+
+Reported-by: Sergio Lopez <slp@redhat.com>
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- hw/virtio/vhost-user-fs.c                 | 5 +++++
- include/hw/virtio/vhost-user-fs.h         | 6 ++++++
- subprojects/libvhost-user/libvhost-user.h | 6 ++++++
- 3 files changed, 17 insertions(+)
+ fs/dax.c |   12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index ee600ce968..036ca17767 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -244,6 +244,11 @@ uint64_t vhost_user_fs_slave_io(struct vhost_dev *dev, int message_size,
-         return (uint64_t)-1;
-     }
+Index: redhat-linux/fs/dax.c
+===================================================================
+--- redhat-linux.orig/fs/dax.c	2021-04-16 14:16:44.332140543 -0400
++++ redhat-linux/fs/dax.c	2021-04-19 11:24:11.465213474 -0400
+@@ -264,11 +264,11 @@ static void wait_entry_unlocked(struct x
+ 	finish_wait(wq, &ewait.wait);
+ }
  
-+    if (sm->flags & VHOST_USER_FS_GENFLAG_DROP_FSETID) {
-+        error_report("Dropping CAP_FSETID is not supported");
-+        return (uint64_t)-ENOTSUP;
-+    }
-+
-     for (i = 0; i < sm->count && !res; i++) {
-         VhostUserFSSlaveMsgEntry *e = &sm->entries[i];
-         if (e->len == 0) {
-diff --git a/include/hw/virtio/vhost-user-fs.h b/include/hw/virtio/vhost-user-fs.h
-index 2931164e23..bcd797c0cc 100644
---- a/include/hw/virtio/vhost-user-fs.h
-+++ b/include/hw/virtio/vhost-user-fs.h
-@@ -30,6 +30,10 @@ OBJECT_DECLARE_SIMPLE_TYPE(VHostUserFS, VHOST_USER_FS)
- #define VHOST_USER_FS_FLAG_MAP_R (1u << 0)
- #define VHOST_USER_FS_FLAG_MAP_W (1u << 1)
+-static void put_unlocked_entry(struct xa_state *xas, void *entry)
++static void put_unlocked_entry(struct xa_state *xas, void *entry, bool wake_all)
+ {
+ 	/* If we were the only waiter woken, wake the next one */
+ 	if (entry && !dax_is_conflict(entry))
+-		dax_wake_entry(xas, entry, false);
++		dax_wake_entry(xas, entry, wake_all);
+ }
  
-+/* Generic flags for the overall message and not individual ranges */
-+/* Drop capability CAP_FSETID during the operation */
-+#define VHOST_USER_FS_GENFLAG_DROP_FSETID (1u << 0)
-+
- typedef struct {
-     /* Offsets within the file being mapped */
-     uint64_t fd_offset;
-@@ -42,6 +46,8 @@ typedef struct {
- } VhostUserFSSlaveMsgEntry;
+ /*
+@@ -622,7 +622,7 @@ struct page *dax_layout_busy_page_range(
+ 			entry = get_unlocked_entry(&xas, 0);
+ 		if (entry)
+ 			page = dax_busy_page(entry);
+-		put_unlocked_entry(&xas, entry);
++		put_unlocked_entry(&xas, entry, false);
+ 		if (page)
+ 			break;
+ 		if (++scanned % XA_CHECK_SCHED)
+@@ -664,7 +664,7 @@ static int __dax_invalidate_entry(struct
+ 	mapping->nrexceptional--;
+ 	ret = 1;
+ out:
+-	put_unlocked_entry(&xas, entry);
++	put_unlocked_entry(&xas, entry, true);
+ 	xas_unlock_irq(&xas);
+ 	return ret;
+ }
+@@ -943,7 +943,7 @@ static int dax_writeback_one(struct xa_s
+ 	return ret;
  
- typedef struct {
-+    /* Generic flags for the overall message */
-+    uint32_t flags;
-     /* Number of entries */
-     uint16_t count;
-     /* Spare */
-diff --git a/subprojects/libvhost-user/libvhost-user.h b/subprojects/libvhost-user/libvhost-user.h
-index 42b0833c4b..4dba4321f4 100644
---- a/subprojects/libvhost-user/libvhost-user.h
-+++ b/subprojects/libvhost-user/libvhost-user.h
-@@ -132,6 +132,10 @@ typedef enum VhostUserSlaveRequest {
- #define VHOST_USER_FS_FLAG_MAP_R (1u << 0)
- #define VHOST_USER_FS_FLAG_MAP_W (1u << 1)
+  put_unlocked:
+-	put_unlocked_entry(xas, entry);
++	put_unlocked_entry(xas, entry, false);
+ 	return ret;
+ }
  
-+/* Generic flags for the overall message and not individual ranges */
-+/* Drop capability CAP_FSETID during the operation */
-+#define VHOST_USER_FS_GENFLAG_DROP_FSETID (1u << 0)
-+
- typedef struct {
-     /* Offsets within the file being mapped */
-     uint64_t fd_offset;
-@@ -144,6 +148,8 @@ typedef struct {
- } VhostUserFSSlaveMsgEntry;
- 
- typedef struct {
-+    /* Generic flags for the overall message */
-+    uint32_t flags;
-     /* Number of entries */
-     uint16_t count;
-     /* Spare */
--- 
-2.31.1
+@@ -1684,7 +1684,7 @@ dax_insert_pfn_mkwrite(struct vm_fault *
+ 	/* Did we race with someone splitting entry or so? */
+ 	if (!entry || dax_is_conflict(entry) ||
+ 	    (order == 0 && !dax_is_pte_entry(entry))) {
+-		put_unlocked_entry(&xas, entry);
++		put_unlocked_entry(&xas, entry, false);
+ 		xas_unlock_irq(&xas);
+ 		trace_dax_insert_pfn_mkwrite_no_entry(mapping->host, vmf,
+ 						      VM_FAULT_NOPAGE);
 

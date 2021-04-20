@@ -1,12 +1,14 @@
-Date: Tue, 20 Apr 2021 14:42:26 -0400
+Date: Tue, 20 Apr 2021 14:57:19 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210420184226.GC1529659@redhat.com>
-References: <20210419150848.275757-1-groug@kaod.org>
+Message-ID: <20210420185719.GD1529659@redhat.com>
+References: <20210419151142.276439-1-groug@kaod.org>
+	<20210419151142.276439-3-groug@kaod.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210419150848.275757-1-groug@kaod.org>
-Subject: Re: [Virtio-fs] [PATCH] virtiofs: propagate sync() to file server
+In-Reply-To: <20210419151142.276439-3-groug@kaod.org>
+Subject: Re: [Virtio-fs] [for-6.1 2/2] virtiofsd: Add support for
+ FUSE_SYNCFS request
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,209 +18,200 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Greg Kurz <groug@kaod.org>
-Cc: Miklos Szeredi <miklos@szeredi.hu>, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Robert Krawitz <rlk@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Miklos Szeredi <miklos@szeredi.hu>
 
-On Mon, Apr 19, 2021 at 05:08:48PM +0200, Greg Kurz wrote:
-> Even if POSIX doesn't mandate it, linux users legitimately expect
-> sync() to flush all data and metadata to physical storage when it
-> is located on the same system. This isn't happening with virtiofs
-> though : sync() inside the guest returns right away even though
-> data still needs to be flushed from the host page cache.
+On Mon, Apr 19, 2021 at 05:11:42PM +0200, Greg Kurz wrote:
+> Honor the expected behavior of syncfs() to synchronously flush all
+> data and metadata on linux systems. Like the ->sync_fs() superblock
+> operation in the linux kernel, FUSE_SYNCFS has a 'wait' argument that
+> tells whether the server should wait for outstanding I/Os to complete
+> before replying to the client. Anything virtiofsd can do to flush
+> the caches implies blocking syscalls, so nothing is done if waiting
+> isn't requested.
 > 
-> This is easily demonstrated by doing the following in the guest:
+> Flushing is done with syncfs(). This is suboptimal as it will also
+> flush writes performed by any other process on the same file system,
+> and thus add an unbounded time penalty to syncfs(). This may be
+> optimized in the future, but enforce correctness first.
 > 
-> $ dd if=/dev/zero of=/mnt/foo bs=1M count=5K ; strace -T -e sync sync
-> 5120+0 records in
-> 5120+0 records out
-> 5368709120 bytes (5.4 GB, 5.0 GiB) copied, 5.22224 s, 1.0 GB/s
-> sync()                                  = 0 <0.024068>
-> +++ exited with 0 +++
-> 
-> and start the following in the host when the 'dd' command completes
-> in the guest:
-> 
-> $ strace -T -e fsync sync virtiofs/foo
-		       ^^^^
-That "sync" is not /usr/bin/sync and its your own binary to call fsync()?
-
-> fsync(3)                                = 0 <10.371640>
-> +++ exited with 0 +++
-> 
-> There are no good reasons not to honor the expected behavior of
-> sync() actually : it gives an unrealistic impression that virtiofs
-> is super fast and that data has safely landed on HW, which isn't
-> the case obviously.
-> 
-> Implement a ->sync_fs() superblock operation that sends a new
-> FUSE_SYNC request type for this purpose. The FUSE_SYNC request
-> conveys the 'wait' argument of ->sync_fs() in case the file
-> server has a use for it. Like with FUSE_FSYNC and FUSE_FSYNCDIR,
-> lack of support for FUSE_SYNC in the file server is treated as
-> permanent success.
-> 
-> Note that such an operation allows the file server to DoS sync().
-> Since a typical FUSE file server is an untrusted piece of software
-> running in userspace, this is disabled by default.  Only enable it
-> with virtiofs for now since virtiofsd is supposedly trusted by the
-> guest kernel.
-> 
-> Reported-by: Robert Krawitz <rlk@redhat.com>
 > Signed-off-by: Greg Kurz <groug@kaod.org>
 > ---
+>  tools/virtiofsd/fuse_lowlevel.c       | 19 ++++++++++++++++++
+>  tools/virtiofsd/fuse_lowlevel.h       | 13 ++++++++++++
+>  tools/virtiofsd/passthrough_ll.c      | 29 +++++++++++++++++++++++++++
+>  tools/virtiofsd/passthrough_seccomp.c |  1 +
+>  4 files changed, 62 insertions(+)
 > 
-> Can be tested using the following custom QEMU with FUSE_SYNCFS support:
-> 
-> https://gitlab.com/gkurz/qemu/-/tree/fuse-sync
-> 
-> ---
->  fs/fuse/fuse_i.h          |  3 +++
->  fs/fuse/inode.c           | 29 +++++++++++++++++++++++++++++
->  fs/fuse/virtio_fs.c       |  1 +
->  include/uapi/linux/fuse.h | 11 ++++++++++-
->  4 files changed, 43 insertions(+), 1 deletion(-)
-> 
-> diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-> index 63d97a15ffde..68e9ae96cbd4 100644
-> --- a/fs/fuse/fuse_i.h
-> +++ b/fs/fuse/fuse_i.h
-> @@ -755,6 +755,9 @@ struct fuse_conn {
->  	/* Auto-mount submounts announced by the server */
->  	unsigned int auto_submounts:1;
->  
-> +	/* Propagate syncfs() to server */
-> +	unsigned int sync_fs:1;
-> +
->  	/** The number of requests waiting for completion */
->  	atomic_t num_waiting;
->  
-> diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-> index b0e18b470e91..425d567a06c5 100644
-> --- a/fs/fuse/inode.c
-> +++ b/fs/fuse/inode.c
-> @@ -506,6 +506,34 @@ static int fuse_statfs(struct dentry *dentry, struct kstatfs *buf)
->  	return err;
+> diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+> index 58e32fc96369..2d0c47a7a60e 100644
+> --- a/tools/virtiofsd/fuse_lowlevel.c
+> +++ b/tools/virtiofsd/fuse_lowlevel.c
+> @@ -1870,6 +1870,24 @@ static void do_lseek(fuse_req_t req, fuse_ino_t nodeid,
+>      }
 >  }
 >  
-> +static int fuse_sync_fs(struct super_block *sb, int wait)
+> +static void do_syncfs(fuse_req_t req, fuse_ino_t nodeid,
+> +                      struct fuse_mbuf_iter *iter)
 > +{
-> +	struct fuse_mount *fm = get_fuse_mount_super(sb);
-> +	struct fuse_conn *fc = fm->fc;
-> +	struct fuse_syncfs_in inarg;
-> +	FUSE_ARGS(args);
-> +	int err;
+> +    struct fuse_syncfs_in *arg;
 > +
-> +	if (!fc->sync_fs)
-> +		return 0;
+> +    arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
+> +    if (!arg) {
+> +        fuse_reply_err(req, EINVAL);
+> +        return;
+> +    }
 > +
-> +	memset(&inarg, 0, sizeof(inarg));
-> +	inarg.wait = wait;
-> +	args.in_numargs = 1;
-> +	args.in_args[0].size = sizeof(inarg);
-> +	args.in_args[0].value = &inarg;
-> +	args.opcode = FUSE_SYNCFS;
-> +	args.out_numargs = 0;
-> +
-> +	err = fuse_simple_request(fm, &args);
-> +	if (err == -ENOSYS) {
-> +		fc->sync_fs = 0;
-> +		err = 0;
-> +	}
-
-I was wondering what will happen if older file server does not support
-FUSE_SYNCFS. So we will get -ENOSYS and future syncfs commmands will not
-be sent.
-
-> +
-> +	return err;
-
-Right now we don't propagate this error code all the way to user space.
-I think I should post my patch to fix it again.
-
-https://lore.kernel.org/linux-fsdevel/20201221195055.35295-2-vgoyal@redhat.com/
-
+> +    if (req->se->op.syncfs) {
+> +        req->se->op.syncfs(req, arg->wait);
+> +    } else {
+> +        fuse_reply_err(req, ENOSYS);
+> +    }
 > +}
 > +
->  enum {
->  	OPT_SOURCE,
->  	OPT_SUBTYPE,
-> @@ -909,6 +937,7 @@ static const struct super_operations fuse_super_operations = {
->  	.put_super	= fuse_put_super,
->  	.umount_begin	= fuse_umount_begin,
->  	.statfs		= fuse_statfs,
-> +	.sync_fs	= fuse_sync_fs,
->  	.show_options	= fuse_show_options,
+>  static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+>                      struct fuse_mbuf_iter *iter)
+>  {
+> @@ -2267,6 +2285,7 @@ static struct {
+>      [FUSE_RENAME2] = { do_rename2, "RENAME2" },
+>      [FUSE_COPY_FILE_RANGE] = { do_copy_file_range, "COPY_FILE_RANGE" },
+>      [FUSE_LSEEK] = { do_lseek, "LSEEK" },
+> +    [FUSE_SYNCFS] = { do_syncfs, "SYNCFS" },
 >  };
 >  
-> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-> index 4ee6f734ba83..a3c025308743 100644
-> --- a/fs/fuse/virtio_fs.c
-> +++ b/fs/fuse/virtio_fs.c
-> @@ -1441,6 +1441,7 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
->  	fc->release = fuse_free_conn;
->  	fc->delete_stale = true;
->  	fc->auto_submounts = true;
-> +	fc->sync_fs = true;
->  
->  	fsc->s_fs_info = fm;
->  	sb = sget_fc(fsc, virtio_fs_test_super, set_anon_super_fc);
-> diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-> index 54442612c48b..6e8c3cf3207c 100644
-> --- a/include/uapi/linux/fuse.h
-> +++ b/include/uapi/linux/fuse.h
-> @@ -179,6 +179,9 @@
->   *  7.33
->   *  - add FUSE_HANDLE_KILLPRIV_V2, FUSE_WRITE_KILL_SUIDGID, FATTR_KILL_SUIDGID
->   *  - add FUSE_OPEN_KILL_SUIDGID
-> + *
-> + *  7.34
-> + *  - add FUSE_SYNCFS
->   */
->  
->  #ifndef _LINUX_FUSE_H
-> @@ -214,7 +217,7 @@
->  #define FUSE_KERNEL_VERSION 7
->  
->  /** Minor version number of this interface */
-> -#define FUSE_KERNEL_MINOR_VERSION 33
-> +#define FUSE_KERNEL_MINOR_VERSION 34
-
-I have always wondered what's the usage of minor version and when should
-it be bumped up. IIUC, it is there to group features into a minor
-version. So that file server (and may be client too) can deny to not
-suppor client/server if a certain minimum version is not supported.
-
-So looks like you want to have capability to say it does not support
-an older client (<34) beacuse it wants to make sure SYNCFS is supported.
-Is that the reason to bump up the minor version or something else.
-
->  
->  /** The node ID of the root inode */
->  #define FUSE_ROOT_ID 1
-> @@ -499,6 +502,7 @@ enum fuse_opcode {
->  	FUSE_COPY_FILE_RANGE	= 47,
->  	FUSE_SETUPMAPPING	= 48,
->  	FUSE_REMOVEMAPPING	= 49,
-> +	FUSE_SYNCFS		= 50,
->  
->  	/* CUSE specific operations */
->  	CUSE_INIT		= 4096,
-> @@ -957,4 +961,9 @@ struct fuse_removemapping_one {
->  #define FUSE_REMOVEMAPPING_MAX_ENTRY   \
->  		(PAGE_SIZE / sizeof(struct fuse_removemapping_one))
->  
-> +struct fuse_syncfs_in {
-> +	/* Whether to wait for outstanding I/Os to complete */
-> +	uint32_t wait;
-> +};
+>  #define FUSE_MAXOP (sizeof(fuse_ll_ops) / sizeof(fuse_ll_ops[0]))
+> diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
+> index 3bf786b03485..b5ac42c31799 100644
+> --- a/tools/virtiofsd/fuse_lowlevel.h
+> +++ b/tools/virtiofsd/fuse_lowlevel.h
+> @@ -1225,6 +1225,19 @@ struct fuse_lowlevel_ops {
+>       */
+>      void (*lseek)(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
+>                    struct fuse_file_info *fi);
 > +
+> +    /**
+> +     * Synchronize file system content
+> +     *
+> +     * If this request is answered with an error code of ENOSYS,
+> +     * this is treated as success and future calls to syncfs() will
+> +     * succeed automatically without being sent to the filesystem
+> +     * process.
+> +     *
+> +     * @param req request handle
+> +     * @param wait whether to wait for outstanding I/Os to complete
+> +     */
+> +    void (*syncfs)(fuse_req_t req, int wait);
+>  };
+>  
+>  /**
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 1553d2ef454f..6b66f3208be0 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -3124,6 +3124,34 @@ static void lo_lseek(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
+>      }
+>  }
+>  
+> +static void lo_syncfs(fuse_req_t req, int wait)
+> +{
+> +    if (wait) {
+> +        struct lo_data *lo = lo_data(req);
+> +        int fd, ret;
+> +
+> +        fd = lo_inode_open(lo, &lo->root, O_RDONLY);
+> +        if (fd < 0) {
+> +            fuse_reply_err(req, errno);
+> +            return;
+> +        }
+> +
+> +        /*
+> +         * FIXME: this is suboptimal because it will also flush unrelated
+> +         *        writes not coming from the client. This can dramatically
+> +         *        increase the time spent in syncfs() if some process is
+> +         *        writing lots of data on the same filesystem as virtiofsd.
+> +         */
+> +        ret = syncfs(fd);
+> +        /* syncfs() never fails on a valid fd */
 
-Will it make sense to add a flag and use only one bit to signal whether
-wait is required or not. Then rest of the 31bits in future can potentially
-be used for something else if need be.
+Where does this come from. man page says.
 
-Looks like most of the fuse structures are 64bit aligned (except
-fuse_removemapping_in and now fuse_syncfs_in). I am wondering does
-it matter if it is 64bit aligned or not.
+       syncfs() can fail for at least the following reason:
+
+       EBADF  fd is not a valid file descriptor.
+
+It says "can fail for at least the following reason". Its not ruling out
+failures due to other reasons?
+
+Also kernel implementation of syscall is as follows.
+
+SYSCALL_DEFINE1(syncfs, int, fd)
+{
+	if (!f.file)
+                return -EBADF;
+        sb = f.file->f_path.dentry->d_sb;
+
+        down_read(&sb->s_umount);
+        ret = sync_filesystem(sb);
+        up_read(&sb->s_umount);
+
+        ret2 = errseq_check_and_advance(&sb->s_wb_err, &f.file->f_sb_err);
+
+        fdput(f);
+        return ret ? ret : ret2;
+}
+
+So it explicityly capture error code from sync_filesystem() and 
+errseq_check_and_advance() and returns one of them.
+
+> +        assert(ret == 0);
+> +
+> +        close(fd);
+> +    }
+> +
+> +    fuse_reply_err(req, 0);
+
+This probably could be better strucutred as.
+
+
+	if (!wait)
+		goto out;
+
+	/* Rest of the logic to call syncfs() */
+out:
+	fuse_reply_err(req, ret);
 
 Vivek
+
+> +}
+
+> +
+>  static void lo_destroy(void *userdata)
+>  {
+>      struct lo_data *lo = (struct lo_data *)userdata;
+> @@ -3184,6 +3212,7 @@ static struct fuse_lowlevel_ops lo_oper = {
+>      .copy_file_range = lo_copy_file_range,
+>  #endif
+>      .lseek = lo_lseek,
+> +    .syncfs = lo_syncfs,
+>      .destroy = lo_destroy,
+>  };
+>  
+> diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
+> index 62441cfcdb95..343188447901 100644
+> --- a/tools/virtiofsd/passthrough_seccomp.c
+> +++ b/tools/virtiofsd/passthrough_seccomp.c
+> @@ -107,6 +107,7 @@ static const int syscall_allowlist[] = {
+>      SCMP_SYS(set_robust_list),
+>      SCMP_SYS(setxattr),
+>      SCMP_SYS(symlinkat),
+> +    SCMP_SYS(syncfs),
+>      SCMP_SYS(time), /* Rarely needed, except on static builds */
+>      SCMP_SYS(tgkill),
+>      SCMP_SYS(unlinkat),
+> -- 
+> 2.26.3
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
 

@@ -1,26 +1,23 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	to:subject:message-id:date:from; s=fm3; bh=66IEjZQpaQRtziAI2rhrv
-	STpd6AwIoR3UAnnV8nv2KI=; b=lz+G0wPdCN5Y/Q12rPqoQ8q4TYB/o0Rg+4vAV
-	760j4DIYS/qge1zjCTRIP4EkwKkK7Qqa9lzrz5hDo205kCTDpzbDJ+qw2tdq8ic+
-	3DL/BbZ3y2mgzeMuzGSkm5GgyiJNjmUdRxnvkTqXlVTyr3AeTFO9Mx7gCEGGQ6Qp
-	DkaX9qvTUDaVivxFSg8NlYi4RuFdowb/lO0bXdBnQ97xAa6OeVq8V+gUCFVskjwB
-	XmSOEQZegntaQJMQppxOO3fCg6Vjqa2uiBN61+Vq2XLMU1ijdaNhBl8UW6UbN1oT
-	0Z9y/OJ0zCwYirbgt2WWXYIVkFxr66Uhgzry9Hz1/9q5KsCPw==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=date:from:message-id:subject:to
-	:x-me-proxy:x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=
-	fm2; bh=66IEjZQpaQRtziAI2rhrvSTpd6AwIoR3UAnnV8nv2KI=; b=afBgtnwo
-	N8wP66DZMyPeYAH+OgvwiUQjD/1/tkyE2+geFnucdGDLPW+neQnbnrlmBA5rt+lN
-	3nrz9sunMzWLZlWWJavquRohB/E2TSl3oH/dolCy8A9GgQhE/eYtHRTxrAqNEdUc
-	SmhkYD6lRy/wM8pskvDb20Au5HMn+x3xdnsujnH3qZo7+TKpnm2Px5cWniqsSeqC
-	YUs3v/l/3WXc8w44j5MdMUcjjVX7ROJZewihA90uoG0KOcOo76O4MMMz56d5FqGN
-	ONMZsqgej6r8zvLhIu/nR88yqkRMGXg77bzJsH9ewcUeMrf4kLdaigty4WOn6Oqe
-	Q+k+YNtE2XA6cQ==
-Message-Id: <20210416164622.7786F24005B@mailuser.nyi.internal>
-Date: Fri, 16 Apr 2021 12:46:22 -0400 (EDT)
-From: virtiofs-bot@sinrega.org
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=from:to:cc:subject:date:message-id:in-reply-to:references
+	:mime-version:content-transfer-encoding;
+	bh=fOv18K+unub7ZcSn/HwTIzHYjgGINDh3Dq3WE9rC+yI=;
+	b=HeWJrZL5P6pZHyUIGQj2wqIXoWEoWiW3SlTnGAGQrA0Cba04yoZfgs5UkJvtKEFeT+
+	kAazKfbVrCrnJHb12H04AMbyn2+59YrKteVySydZgEDTO27frRfHw43ni/Uikn/j85Lc
+	s/Mdj5Qy9pjUQw2aMufp52ctmTu+CwnZB+IsEeTBfiOz+qHbRg58+24GmmP9f4/UNuQr
+	P3USfD/556ybqexytkB6qccck7NENCc4TOs9xdI23BdjNprJNEmr2OSwRHaxZ4D3Sn3z
+	HNv0JOCJMfe+5D7NhjtMStI5W0qATLUooMVpb70VVmzZ9K3Y0owwBgdgE3E6+m07UpVj
+	Sh0w==
+From: Mahmoud Mandour <ma.mandourr@gmail.com>
+Date: Tue, 20 Apr 2021 17:46:36 +0200
+Message-Id: <20210420154643.58439-2-ma.mandourr@gmail.com>
+In-Reply-To: <20210420154643.58439-1-ma.mandourr@gmail.com>
+References: <20210420154643.58439-1-ma.mandourr@gmail.com>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] MR opened: Document the xattrmap module
+Subject: [Virtio-fs] [PATCH v2 1/7] virtiofsd: Changed allocations of
+	fuse_req to GLib functions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -29,13 +26,50 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: qemu-devel@nongnu.org
+Cc: "open list:virtiofs" <virtio-fs@redhat.com>, Mahmoud Mandour <ma.mandourr@gmail.com>
 
-For a more pleasant reading experience, I recommend
+Replaced the allocation and deallocation of fuse_req structs
+using calloc()/free() call pairs to a GLib's g_try_new0()
+and g_free().
 
-	$ cargo doc --no-deps --open
-
-Signed-off-by: Connor Kuehl <ckuehl@redhat.com>
+Signed-off-by: Mahmoud Mandour <ma.mandourr@gmail.com>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/19
+ tools/virtiofsd/fuse_lowlevel.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index 58e32fc963..812cef6ef6 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -106,7 +106,7 @@ static void list_add_req(struct fuse_req *req, struct fuse_req *next)
+ static void destroy_req(fuse_req_t req)
+ {
+     pthread_mutex_destroy(&req->lock);
+-    free(req);
++    g_free(req);
+ }
+ 
+ void fuse_free_req(fuse_req_t req)
+@@ -130,7 +130,7 @@ static struct fuse_req *fuse_ll_alloc_req(struct fuse_session *se)
+ {
+     struct fuse_req *req;
+ 
+-    req = (struct fuse_req *)calloc(1, sizeof(struct fuse_req));
++    req = g_try_new0(struct fuse_req, 1);
+     if (req == NULL) {
+         fuse_log(FUSE_LOG_ERR, "fuse: failed to allocate request\n");
+     } else {
+@@ -1684,7 +1684,7 @@ static struct fuse_req *check_interrupt(struct fuse_session *se,
+         if (curr->u.i.unique == req->unique) {
+             req->interrupted = 1;
+             list_del_req(curr);
+-            free(curr);
++            g_free(curr);
+             return NULL;
+         }
+     }
+-- 
+2.25.1
 

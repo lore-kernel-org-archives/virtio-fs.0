@@ -1,15 +1,25 @@
-Date: Wed, 21 Apr 2021 18:49:04 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YIBlkMlCayNbTj9+@work-vm>
-References: <20210414155137.46522-1-dgilbert@redhat.com>
-	<20210414155137.46522-9-dgilbert@redhat.com>
-	<20210414183507.4bffd57d@bahia.lan>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+	d=intel-com.20150623.gappssmtp.com; s=20150623;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=NBcAuPkDB8yn7vxrbycYSSA5wndCepu03NrNjeW39ik=;
+	b=pthqRNwvDGzcKw29vq+beBkIOvNN/fF7gZ2Xe3IXaGqVyzwBsLaqthgSuIMoUo8IW+
+	gumEibGbH+L9n3/IkDXke2EWisNXcNsuQf6FnbaaEy/QeVNwKXdGbkZ8gOO9PSRg/1tX
+	kwpHvf8Dnvam7XnxffqBhiCqCrOzMrFlKJ0zzdSJYgIVgPVSylOM6txrHN/8UiwP6HfA
+	yla17QS2aL3iB+isH0nkwPXzzVoti8Zr1k8OZUkULS65Qk4I6Ao+xwxtWVYQdJYqZq+u
+	WaYCdpb8iRaFCZA0dUw7sziGDrn8XZ0N4rnmBOYyoVOkjZHatSAF/GDUpT6/5BGbcEFC
+	b0/g==
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210414183507.4bffd57d@bahia.lan>
-Subject: Re: [Virtio-fs] [PATCH v2 08/25] DAX: virtio-fs: Add vhost-user
- slave commands for mapping
+References: <20210419213636.1514816-1-vgoyal@redhat.com>
+	<20210419213636.1514816-3-vgoyal@redhat.com>
+	<20210420093420.2eed3939@bahia.lan>
+	<20210420140033.GA1529659@redhat.com>
+In-Reply-To: <20210420140033.GA1529659@redhat.com>
+From: Dan Williams <dan.j.williams@intel.com>
+Date: Wed, 21 Apr 2021 12:09:54 -0700
+Message-ID: <CAPcyv4g2raipYhivwbiSvsHmSdgLO8wphh5dhY3hpjwko9G4Hw@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PATCH v3 2/3] dax: Add a wakeup mode parameter to
+	put_unlocked_entry()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,276 +28,132 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, linux-nvdimm <linux-nvdimm@lists.01.org>, Matthew Wilcox <willy@infradead.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, linux-fsdevel <linux-fsdevel@vger.kernel.org>
 
-* Greg Kurz (groug@kaod.org) wrote:
-> On Wed, 14 Apr 2021 16:51:20 +0100
-> "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com> wrote:
-> 
-> > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-> > 
-> > The daemon may request that fd's be mapped into the virtio-fs cache
-> > visible to the guest.
-> > These mappings are triggered by commands sent over the slave fd
-> > from the daemon.
-> > 
-> > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> > ---
-> >  docs/interop/vhost-user.rst               | 21 ++++++++
-> >  hw/virtio/vhost-user-fs.c                 | 66 +++++++++++++++++++++++
-> >  hw/virtio/vhost-user.c                    | 25 +++++++++
-> >  include/hw/virtio/vhost-user-fs.h         | 33 ++++++++++++
-> >  subprojects/libvhost-user/libvhost-user.h |  2 +
-> >  5 files changed, 147 insertions(+)
-> > 
-> > diff --git a/docs/interop/vhost-user.rst b/docs/interop/vhost-user.rst
-> > index d6085f7045..09aee3565d 100644
-> > --- a/docs/interop/vhost-user.rst
-> > +++ b/docs/interop/vhost-user.rst
-> > @@ -1432,6 +1432,27 @@ Slave message types
-> >  
-> >    The state.num field is currently reserved and must be set to 0.
-> >  
-> > +``VHOST_USER_SLAVE_FS_MAP``
-> > +  :id: 6
-> > +  :equivalent ioctl: N/A
-> > +  :slave payload: ``struct VhostUserFSSlaveMsg``
-> > +  :master payload: N/A
-> > +
-> > +  Requests that an fd, provided in the ancillary data, be mmapped
-> > +  into the virtio-fs cache; multiple chunks can be mapped in one
-> > +  command.
-> > +  A reply is generated indicating whether mapping succeeded.
-> > +
-> > +``VHOST_USER_SLAVE_FS_UNMAP``
-> > +  :id: 7
-> > +  :equivalent ioctl: N/A
-> > +  :slave payload: ``struct VhostUserFSSlaveMsg``
-> > +  :master payload: N/A
-> > +
-> > +  Requests that the range in the virtio-fs cache is unmapped;
-> > +  multiple chunks can be unmapped in one command.
-> > +  A reply is generated indicating whether unmapping succeeded.
-> > +
-> >  .. _reply_ack:
-> >  
-> >  VHOST_USER_PROTOCOL_F_REPLY_ACK
-> > diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-> > index dd0a02aa99..169a146e72 100644
-> > --- a/hw/virtio/vhost-user-fs.c
-> > +++ b/hw/virtio/vhost-user-fs.c
-> > @@ -45,6 +45,72 @@ static const int user_feature_bits[] = {
-> >  #define DAX_WINDOW_PROT PROT_NONE
-> >  #endif
-> >  
-> > +/*
-> > + * The message apparently had 'received_size' bytes, check this
-> > + * matches the count in the message.
-> > + *
-> > + * Returns true if the size matches.
-> > + */
-> > +static bool check_slave_message_entries(const VhostUserFSSlaveMsg *sm,
-> > +                                        int received_size)
-> > +{
-> > +    int tmp;
-> > +
-> > +    /*
-> > +     * VhostUserFSSlaveMsg consists of a body followed by 'n' entries,
-> > +     * (each VhostUserFSSlaveMsgEntry).  There's a maximum of
-> > +     * VHOST_USER_FS_SLAVE_MAX_ENTRIES of these.
-> > +     */
-> > +    if (received_size <= sizeof(VhostUserFSSlaveMsg)) {
-> > +        error_report("%s: Short VhostUserFSSlaveMsg size, %d", __func__,
-> > +                     received_size);
-> > +        return false;
-> > +    }
-> > +
-> > +    tmp = received_size - sizeof(VhostUserFSSlaveMsg);
-> > +    if (tmp % sizeof(VhostUserFSSlaveMsgEntry)) {
-> > +        error_report("%s: Non-multiple VhostUserFSSlaveMsg size, %d", __func__,
-> > +                     received_size);
-> > +        return false;
-> > +    }
-> > +
-> > +    tmp /= sizeof(VhostUserFSSlaveMsgEntry);
-> > +    if (tmp != sm->count) {
-> > +        error_report("%s: VhostUserFSSlaveMsg count mismatch, %d count: %d",
-> > +                     __func__, tmp, sm->count);
-> > +        return false;
-> > +    }
-> > +
-> > +    if (sm->count > VHOST_USER_FS_SLAVE_MAX_ENTRIES) {
-> > +        error_report("%s: VhostUserFSSlaveMsg too many entries: %d",
-> > +                     __func__, sm->count);
-> > +        return false;
-> > +    }
-> > +    return true;
-> > +}
-> > +
-> > +uint64_t vhost_user_fs_slave_map(struct vhost_dev *dev, int message_size,
-> > +                                 VhostUserFSSlaveMsg *sm, int fd)
-> > +{
-> > +    if (!check_slave_message_entries(sm, message_size)) {
-> > +        return (uint64_t)-1;
-> > +    }
-> > +
-> > +    /* TODO */
-> > +    return (uint64_t)-1;
-> > +}
-> > +
-> > +uint64_t vhost_user_fs_slave_unmap(struct vhost_dev *dev, int message_size,
-> > +                                   VhostUserFSSlaveMsg *sm)
-> > +{
-> > +    if (!check_slave_message_entries(sm, message_size)) {
-> > +        return (uint64_t)-1;
-> > +    }
-> > +
-> > +    /* TODO */
-> > +    return (uint64_t)-1;
-> > +}
-> > +
-> >  static void vuf_get_config(VirtIODevice *vdev, uint8_t *config)
-> >  {
-> >      VHostUserFS *fs = VHOST_USER_FS(vdev);
-> > diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
-> > index 3e4a25e108..ad9170f8dc 100644
-> > --- a/hw/virtio/vhost-user.c
-> > +++ b/hw/virtio/vhost-user.c
-> > @@ -12,6 +12,7 @@
-> >  #include "qapi/error.h"
-> >  #include "hw/virtio/vhost.h"
-> >  #include "hw/virtio/vhost-user.h"
-> > +#include "hw/virtio/vhost-user-fs.h"
-> >  #include "hw/virtio/vhost-backend.h"
-> >  #include "hw/virtio/virtio.h"
-> >  #include "hw/virtio/virtio-net.h"
-> > @@ -133,6 +134,10 @@ typedef enum VhostUserSlaveRequest {
-> >      VHOST_USER_SLAVE_IOTLB_MSG = 1,
-> >      VHOST_USER_SLAVE_CONFIG_CHANGE_MSG = 2,
-> >      VHOST_USER_SLAVE_VRING_HOST_NOTIFIER_MSG = 3,
-> > +    VHOST_USER_SLAVE_VRING_CALL = 4,
-> > +    VHOST_USER_SLAVE_VRING_ERR = 5,
-> > +    VHOST_USER_SLAVE_FS_MAP = 6,
-> > +    VHOST_USER_SLAVE_FS_UNMAP = 7,
-> >      VHOST_USER_SLAVE_MAX
-> >  }  VhostUserSlaveRequest;
-> >  
-> > @@ -205,6 +210,16 @@ typedef struct {
-> >      uint32_t size; /* the following payload size */
-> >  } QEMU_PACKED VhostUserHeader;
-> >  
-> > +/*
-> > + * VhostUserFSSlaveMsg is special since it has a variable entry count,
-> > + * but it does have a maximum, so make a type for that to fit in our union
-> > + * for max size.
-> > + */
-> > +typedef struct {
-> > +    VhostUserFSSlaveMsg fs;
-> > +    VhostUserFSSlaveMsgEntry entries[VHOST_USER_FS_SLAVE_MAX_ENTRIES];
-> > +} QEMU_PACKED VhostUserFSSlaveMsgMax;
-> > +
-> >  typedef union {
-> >  #define VHOST_USER_VRING_IDX_MASK   (0xff)
-> >  #define VHOST_USER_VRING_NOFD_MASK  (0x1<<8)
-> > @@ -219,6 +234,8 @@ typedef union {
-> >          VhostUserCryptoSession session;
-> >          VhostUserVringArea area;
-> >          VhostUserInflight inflight;
-> > +        VhostUserFSSlaveMsg fs;
-> > +        VhostUserFSSlaveMsg fs_max; /* Never actually used */
-> >  } VhostUserPayload;
-> >  
-> >  typedef struct VhostUserMsg {
-> > @@ -1538,6 +1555,14 @@ static gboolean slave_read(QIOChannel *ioc, GIOCondition condition,
-> >          ret = vhost_user_slave_handle_vring_host_notifier(dev, &payload.area,
-> >                                                            fd ? fd[0] : -1);
-> >          break;
-> > +#ifdef CONFIG_VHOST_USER_FS
-> > +    case VHOST_USER_SLAVE_FS_MAP:
-> > +        ret = vhost_user_fs_slave_map(dev, hdr.size, &payload.fs, fd[0]);
-> 
-> Since the QIOChannel conversion, the array of fds is dynamically allocated
-> by qio_channel_readv_full_all() when needed. You should do "fd ? fd[0] : -1"
-> like for vhost_user_slave_handle_vring_host_notifier() just above.
-> 
-> Same goes for patch 17 "DAX/unmap: virtiofsd: Add  VHOST_USER_SLAVE_FS_IO".
+On Tue, Apr 20, 2021 at 7:01 AM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> On Tue, Apr 20, 2021 at 09:34:20AM +0200, Greg Kurz wrote:
+> > On Mon, 19 Apr 2021 17:36:35 -0400
+> > Vivek Goyal <vgoyal@redhat.com> wrote:
+> >
+> > > As of now put_unlocked_entry() always wakes up next waiter. In next
+> > > patches we want to wake up all waiters at one callsite. Hence, add a
+> > > parameter to the function.
+> > >
+> > > This patch does not introduce any change of behavior.
+> > >
+> > > Suggested-by: Dan Williams <dan.j.williams@intel.com>
+> > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > > ---
+> > >  fs/dax.c | 13 +++++++------
+> > >  1 file changed, 7 insertions(+), 6 deletions(-)
+> > >
+> > > diff --git a/fs/dax.c b/fs/dax.c
+> > > index 00978d0838b1..f19d76a6a493 100644
+> > > --- a/fs/dax.c
+> > > +++ b/fs/dax.c
+> > > @@ -275,11 +275,12 @@ static void wait_entry_unlocked(struct xa_state *xas, void *entry)
+> > >     finish_wait(wq, &ewait.wait);
+> > >  }
+> > >
+> > > -static void put_unlocked_entry(struct xa_state *xas, void *entry)
+> > > +static void put_unlocked_entry(struct xa_state *xas, void *entry,
+> > > +                          enum dax_entry_wake_mode mode)
+> > >  {
+> > >     /* If we were the only waiter woken, wake the next one */
+> >
+> > With this change, the comment is no longer accurate since the
+> > function can now wake all waiters if passed mode == WAKE_ALL.
+> > Also, it paraphrases the code which is simple enough, so I'd
+> > simply drop it.
+> >
+> > This is minor though and it shouldn't prevent this fix to go
+> > forward.
+> >
+> > Reviewed-by: Greg Kurz <groug@kaod.org>
+>
+> Ok, here is the updated patch which drops that comment line.
+>
+> Vivek
 
-Thanks; fixed!
+Hi Vivek,
 
-Dave
+Can you get in the habit of not replying inline with new patches like
+this? Collect the review feedback, take a pause, and resend the full
+series so tooling like b4 and patchwork can track when a new posting
+supersedes a previous one. As is, this inline style inflicts manual
+effort on the maintainer.
 
-> > +        break;
-> > +    case VHOST_USER_SLAVE_FS_UNMAP:
-> > +        ret = vhost_user_fs_slave_unmap(dev, hdr.size, &payload.fs);
-> > +        break;
-> > +#endif
-> >      default:
-> >          error_report("Received unexpected msg type: %d.", hdr.request);
-> >          ret = true;
-> > diff --git a/include/hw/virtio/vhost-user-fs.h b/include/hw/virtio/vhost-user-fs.h
-> > index 04596799e3..0766f17548 100644
-> > --- a/include/hw/virtio/vhost-user-fs.h
-> > +++ b/include/hw/virtio/vhost-user-fs.h
-> > @@ -23,6 +23,33 @@
-> >  #define TYPE_VHOST_USER_FS "vhost-user-fs-device"
-> >  OBJECT_DECLARE_SIMPLE_TYPE(VHostUserFS, VHOST_USER_FS)
-> >  
-> > +/* Structures carried over the slave channel back to QEMU */
-> > +#define VHOST_USER_FS_SLAVE_MAX_ENTRIES 32
-> > +
-> > +/* For the flags field of VhostUserFSSlaveMsg */
-> > +#define VHOST_USER_FS_FLAG_MAP_R (1u << 0)
-> > +#define VHOST_USER_FS_FLAG_MAP_W (1u << 1)
-> > +
-> > +typedef struct {
-> > +    /* Offsets within the file being mapped */
-> > +    uint64_t fd_offset;
-> > +    /* Offsets within the cache */
-> > +    uint64_t c_offset;
-> > +    /* Lengths of sections */
-> > +    uint64_t len;
-> > +    /* Flags, from VHOST_USER_FS_FLAG_* */
-> > +    uint64_t flags;
-> > +} VhostUserFSSlaveMsgEntry;
-> > +
-> > +typedef struct {
-> > +    /* Number of entries */
-> > +    uint16_t count;
-> > +    /* Spare */
-> > +    uint16_t align;
-> > +
-> > +    VhostUserFSSlaveMsgEntry entries[];
-> > +} VhostUserFSSlaveMsg;
-> > +
-> >  typedef struct {
-> >      CharBackend chardev;
-> >      char *tag;
-> > @@ -46,4 +73,10 @@ struct VHostUserFS {
-> >      MemoryRegion cache;
-> >  };
-> >  
-> > +/* Callbacks from the vhost-user code for slave commands */
-> > +uint64_t vhost_user_fs_slave_map(struct vhost_dev *dev, int message_size,
-> > +                                 VhostUserFSSlaveMsg *sm, int fd);
-> > +uint64_t vhost_user_fs_slave_unmap(struct vhost_dev *dev, int message_size,
-> > +                                   VhostUserFSSlaveMsg *sm);
-> > +
-> >  #endif /* _QEMU_VHOST_USER_FS_H */
-> > diff --git a/subprojects/libvhost-user/libvhost-user.h b/subprojects/libvhost-user/libvhost-user.h
-> > index 70fc61171f..a98c5f5c11 100644
-> > --- a/subprojects/libvhost-user/libvhost-user.h
-> > +++ b/subprojects/libvhost-user/libvhost-user.h
-> > @@ -119,6 +119,8 @@ typedef enum VhostUserSlaveRequest {
-> >      VHOST_USER_SLAVE_VRING_HOST_NOTIFIER_MSG = 3,
-> >      VHOST_USER_SLAVE_VRING_CALL = 4,
-> >      VHOST_USER_SLAVE_VRING_ERR = 5,
-> > +    VHOST_USER_SLAVE_FS_MAP = 6,
-> > +    VHOST_USER_SLAVE_FS_UNMAP = 7,
-> >      VHOST_USER_SLAVE_MAX
-> >  }  VhostUserSlaveRequest;
-> >  
-> 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+>
+> Subject: dax: Add a wakeup mode parameter to put_unlocked_entry()
+>
+> As of now put_unlocked_entry() always wakes up next waiter. In next
+> patches we want to wake up all waiters at one callsite. Hence, add a
+> parameter to the function.
+>
+> This patch does not introduce any change of behavior.
+>
+> Suggested-by: Dan Williams <dan.j.williams@intel.com>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  fs/dax.c |   14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+>
+> Index: redhat-linux/fs/dax.c
+> ===================================================================
+> --- redhat-linux.orig/fs/dax.c  2021-04-20 09:55:45.105069893 -0400
+> +++ redhat-linux/fs/dax.c       2021-04-20 09:56:27.685822730 -0400
+> @@ -275,11 +275,11 @@ static void wait_entry_unlocked(struct x
+>         finish_wait(wq, &ewait.wait);
+>  }
+>
+> -static void put_unlocked_entry(struct xa_state *xas, void *entry)
+> +static void put_unlocked_entry(struct xa_state *xas, void *entry,
+> +                              enum dax_entry_wake_mode mode)
+>  {
+> -       /* If we were the only waiter woken, wake the next one */
+>         if (entry && !dax_is_conflict(entry))
+> -               dax_wake_entry(xas, entry, WAKE_NEXT);
+> +               dax_wake_entry(xas, entry, mode);
+>  }
+>
+>  /*
+> @@ -633,7 +633,7 @@ struct page *dax_layout_busy_page_range(
+>                         entry = get_unlocked_entry(&xas, 0);
+>                 if (entry)
+>                         page = dax_busy_page(entry);
+> -               put_unlocked_entry(&xas, entry);
+> +               put_unlocked_entry(&xas, entry, WAKE_NEXT);
+>                 if (page)
+>                         break;
+>                 if (++scanned % XA_CHECK_SCHED)
+> @@ -675,7 +675,7 @@ static int __dax_invalidate_entry(struct
+>         mapping->nrexceptional--;
+>         ret = 1;
+>  out:
+> -       put_unlocked_entry(&xas, entry);
+> +       put_unlocked_entry(&xas, entry, WAKE_NEXT);
+>         xas_unlock_irq(&xas);
+>         return ret;
+>  }
+> @@ -954,7 +954,7 @@ static int dax_writeback_one(struct xa_s
+>         return ret;
+>
+>   put_unlocked:
+> -       put_unlocked_entry(xas, entry);
+> +       put_unlocked_entry(xas, entry, WAKE_NEXT);
+>         return ret;
+>  }
+>
+> @@ -1695,7 +1695,7 @@ dax_insert_pfn_mkwrite(struct vm_fault *
+>         /* Did we race with someone splitting entry or so? */
+>         if (!entry || dax_is_conflict(entry) ||
+>             (order == 0 && !dax_is_pte_entry(entry))) {
+> -               put_unlocked_entry(&xas, entry);
+> +               put_unlocked_entry(&xas, entry, WAKE_NEXT);
+>                 xas_unlock_irq(&xas);
+>                 trace_dax_insert_pfn_mkwrite_no_entry(mapping->host, vmf,
+>                                                       VM_FAULT_NOPAGE);
+>
 

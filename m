@@ -1,27 +1,14 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	to:subject:message-id:date:from; s=fm3; bh=4TLFTDWcRr6HtVvMDUMwQ
-	Zb9iR6wInp0qmdK7g63J6c=; b=JQIOuJhbUBpydri91b+V3TcXgNli4N6ZrDZMG
-	aEpNfUefozys9xIZ7jbmD0+6GyxvfTWomjh/+0MLVFJvN/TjnN44DG6BKDj7DicI
-	G5b8w46M5AuUIQkmw2ksGUWeA8jxXwmVKcz/Arkx8jWN6MpIxWfwABZRj4Gdtb63
-	eof72qhTC2LbYWfnwgiA/Fo5Cf+6FgFXll78k7frM95DLwPzGNN0BLpy/WCdcdnT
-	ygKJl9L+ow1eCoMz8LYHlLBZcGLh3i4mlftzzsDO7A1GYue85oeQu8fc+QbH/jPs
-	j/Z8mxD2aaeFUyEsEC6OXu4qxWUoWdGAaHZMxuG/D9yeKVQ2w==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=date:from:message-id:subject:to
-	:x-me-proxy:x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=
-	fm2; bh=4TLFTDWcRr6HtVvMDUMwQZb9iR6wInp0qmdK7g63J6c=; b=n721ky1D
-	OdNq0mpRcjIqre1W48ZN2kYB28SzjJGNZ7DEL05mEtLGOGyZFVOEfiit9cFtUtAL
-	z2UtHMkOS+Tpu1m7KG8Pxc9bUhtvdVS6MIxoQ6q6LVGVLj4M/ObBny5s/tAOs0VY
-	z+cUKeWSOyjvEMLoDF5ZTCJ67SglT38G3fXFcQSV/DKydm7OpjnA/LEi1ZAKQ+/H
-	4yM4NVgC/p0qw44lZO7OT3t3WR8SjQL2kWA9PL4gEt3P4r0TiINZXMbvzlCLm6YV
-	bTnXy+tSz/oBl/KVauV8pkJJxKT5QpLlv5f8r16yARmlxTQBoJjKXpKb2pig4Bx0
-	3pOwo9FJLb98+A==
-Message-Id: <20210421092455.E6B65240066@mailuser.nyi.internal>
-Date: Wed, 21 Apr 2021 05:24:55 -0400 (EDT)
-From: virtiofs-bot@sinrega.org
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] Issue opened: build: Cargo fails to
-	build the project based on Ubuntu 18.04 environment
+Date: Wed, 21 Apr 2021 11:24:40 +0200
+From: Jan Kara <jack@suse.cz>
+Message-ID: <20210421092440.GM8706@quack2.suse.cz>
+References: <20210419213636.1514816-1-vgoyal@redhat.com>
+	<20210419213636.1514816-2-vgoyal@redhat.com>
+MIME-Version: 1.0
+In-Reply-To: <20210419213636.1514816-2-vgoyal@redhat.com>
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: Re: [Virtio-fs] [PATCH v3 1/3] dax: Add an enum for specifying dax
+	wakup mode
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -30,114 +17,116 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: jack@suse.cz, miklos@szeredi.hu, linux-nvdimm@lists.01.org, linux-kernel@vger.kernel.org, willy@infradead.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, dan.j.williams@intel.com
 
-I'm getting the following error when trying to build virtiofsd-rs on Ubuntu 18.04:
-```
-error: linking with `cc` failed: exit code: 1
-  |
-  = note: "cc" "-Wl,--as-needed" "-Wl,-z,noexecstack" "-m64"
-"-Wl,--eh-frame-hdr" "-L"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.0.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.1.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.10.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.11.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.12.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.13.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.14.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.15.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.2.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.3.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.4.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.5.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.6.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.7.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.8.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.9.rcgu.o"
-"-o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.23nu4c2xym2eqlov.rcgu.o"
-"-Wl,--gc-sections" "-pie" "-Wl,-zrelro" "-Wl,-znow" "-Wl,-O1"
-"-nodefaultlibs" "-L"
-"/root/workloads/virtiofsd_rs_build/target/release/deps" "-L"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib"
-"-Wl,-Bstatic"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libvirtiofsd_rs-db8a3339575369be.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libtempdir-f11ec1f478381911.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libremove_dir_all-a2db9479af3068ac.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/librand-aa16576ba5b9392c.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libvhost_user_backend-3c7c4e0b648f2048.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libepoll-731ef9040489f5aa.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libvm_virtio-0a4e924a77987334.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libvm_memory-8e36d6dac6c201c8.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libarc_swap-e6322bdd9bbda381.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libvirtio_bindings-f9a171ce7b13a7b5.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libvhost-1c8ac54972853645.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libvmm_sys_util-d9c56c4a2b27552c.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libseccomp-9888cb76b4b89f98.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/liblog-26151b12ef260e13.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libcfg_if-0b1d0733c6ac953a.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libfutures-cc61a9fd7f8900b0.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libfutures_executor-1d41c3b8dcbe87de.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libnum_cpus-383326fa85306546.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libfutures_util-dd34ea9b0be945a9.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libmemchr-63c5445cdbee0d67.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libfutures_io-4c0f5af5d6d14f1e.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libslab-7c378fecdd145a1f.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libfutures_channel-193b9d71b781f2ca.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libpin_project_lite-682d3321dc2bbe4a.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libfutures_sink-77fc5a4244377a96.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libfutures_task-c37495857747fe61.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libonce_cell-9bec28672c574ba9.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libpin_utils-772382b0bbe51e23.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libfutures_core-44fede59828ea2bf.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libclap-5276dbc49cf0a5cb.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libvec_map-7710e0aa1820f58b.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libtextwrap-5c146e6d5c5b1b6e.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libunicode_width-b8b37d5da2aa8f4a.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libterm_size-d106b04f81264f05.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libstrsim-be518b8b7cca0422.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libbitflags-5624065210ca120e.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libatty-f0ca163b1176c05c.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/liblibc-5b3ef7634a8413c7.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libansi_term-8403b5b7bcdb97e5.rlib"
-"-Wl,--start-group"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-b1047a2788193be4.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libpanic_unwind-e8e399e2092f3b2a.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libminiz_oxide-c6b02b522c91c060.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libadler-eaad965909c4200f.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libobject-dca728ac8ed54d87.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libaddr2line-4b4efaa8c4601753.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libgimli-d36e07ed2cc56ee4.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/librustc_demangle-3855d04b1bb40ceb.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libhashbrown-58a065cdff5508a2.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/librustc_std_workspace_alloc-82aeeedcc8d1450a.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libunwind-5c4d6c9d7595f844.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libcfg_if-2642d2bccc00517a.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/liblibc-760e48b3f782e7f5.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/liballoc-d4ef8bf89076ed01.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux
- -gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/librustc_std_workspace_core-36070e2029bb21ea.rlib" "/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libcore-3aaf8f932781f33e.rlib" "-Wl,--end-group" "/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libcompiler_builtins-e2523c360f03ba10.rlib" "-Wl,-Bdynamic" "-lgcc_s" "-lutil" "-lrt" "-lpthread" "-lm" "-ldl" "-lc"
-  = note: /root/workloads/virtiofsd_rs_build/target/release/deps/libvirtiofsd_rs-db8a3339575369be.rlib(virtiofsd_rs-db8a3339575369be.virtiofsd_rs.f1lp7avh-cgu.2.rcgu.o): In function `virtiofsd_rs::passthrough::PassthroughFs::new':
-          virtiofsd_rs.f1lp7avh-cgu.2:(.text._ZN12virtiofsd_rs11passthrough13PassthroughFs3new17h2c0f6b174348215dE+0xf9): undefined reference to `statx'
-          /root/workloads/virtiofsd_rs_build/target/release/deps/libvirtiofsd_rs-db8a3339575369be.rlib(virtiofsd_rs-db8a3339575369be.virtiofsd_rs.f1lp7avh-cgu.2.rcgu.o): In function `virtiofsd_rs::passthrough::PassthroughFs::do_lookup':
-          virtiofsd_rs.f1lp7avh-cgu.2:(.text._ZN12virtiofsd_rs11passthrough13PassthroughFs9do_lookup17hc8ba433e9e8847ffE+0x223): undefined reference to `statx'
-          /root/workloads/virtiofsd_rs_build/target/release/deps/libvirtiofsd_rs-db8a3339575369be.rlib(virtiofsd_rs-db8a3339575369be.virtiofsd_rs.f1lp7avh-cgu.2.rcgu.o): In function `virtiofsd_rs::passthrough::PassthroughFs::do_getattr':
-          virtiofsd_rs.f1lp7avh-cgu.2:(.text._ZN12virtiofsd_rs11passthrough13PassthroughFs10do_getattr17h20a69500901cdbebE+0x1de): undefined reference to `statx'
-          /root/workloads/virtiofsd_rs_build/target/release/deps/libvirtiofsd_rs-db8a3339575369be.rlib(virtiofsd_rs-db8a3339575369be.virtiofsd_rs.f1lp7avh-cgu.2.rcgu.o): In function `<virtiofsd_rs::passthrough::PassthroughFs as virtiofsd_rs::filesystem::FileSystem>::init':
-          virtiofsd_rs.f1lp7avh-cgu.2:(.text._ZN97_$LT$virtiofsd_rs..passthrough..PassthroughFs$u20$as$u20$virtiofsd_rs..filesystem..FileSystem$GT$4init17h1458bbcbdcf78211E+0x148): undefined reference to `statx'
-          /root/workloads/virtiofsd_rs_build/target/release/deps/libvirtiofsd_rs-db8a3339575369be.rlib(virtiofsd_rs-db8a3339575369be.virtiofsd_rs.f1lp7avh-cgu.2.rcgu.o): In function `<virtiofsd_rs::passthrough::PassthroughFs as virtiofsd_rs::filesystem::FileSystem>::access':
-          virtiofsd_rs.f1lp7avh-cgu.2:(.text._ZN97_$LT$virtiofsd_rs..passthrough..PassthroughFs$u20$as$u20$virtiofsd_rs..filesystem..FileSystem$GT$6access17h29a0480f57392834E+0x1ee): undefined reference to `statx'
-          collect2: error: ld returned 1 exit status
-          
+On Mon 19-04-21 17:36:34, Vivek Goyal wrote:
+> Dan mentioned that he is not very fond of passing around a boolean true/false
+> to specify if only next waiter should be woken up or all waiters should be
+> woken up. He instead prefers that we introduce an enum and make it very
+> explicity at the callsite itself. Easier to read code.
+> 
+> This patch should not introduce any change of behavior.
+> 
+> Suggested-by: Dan Williams <dan.j.williams@intel.com>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  fs/dax.c | 23 +++++++++++++++++------
+>  1 file changed, 17 insertions(+), 6 deletions(-)
+> 
+> diff --git a/fs/dax.c b/fs/dax.c
+> index b3d27fdc6775..00978d0838b1 100644
+> --- a/fs/dax.c
+> +++ b/fs/dax.c
+> @@ -144,6 +144,16 @@ struct wait_exceptional_entry_queue {
+>  	struct exceptional_entry_key key;
+>  };
+>  
+> +/**
+> + * enum dax_entry_wake_mode: waitqueue wakeup toggle
+> + * @WAKE_NEXT: entry was not mutated
+> + * @WAKE_ALL: entry was invalidated, or resized
 
-error: aborting due to previous error
+Let's document the constants in terms of what they do, not when they are
+expected to be called. So something like:
 
-error: could not compile `virtiofsd-rs`
-```
+@WAKE_NEXT: wake only the first waiter in the waitqueue
+@WAKE_ALL: wake all waiters in the waitqueue
 
-It seems the code expects statx() to be present, but that's not the case with Bionic Beaver.
----
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/issues/12
+Otherwise the patch looks good so feel free to add:
+
+Reviewed-by: Jan Kara <jack@suse.cz>
+
+								Honza
+
+> + */
+> +enum dax_entry_wake_mode {
+> +	WAKE_NEXT,
+> +	WAKE_ALL,
+> +};
+> +
+>  static wait_queue_head_t *dax_entry_waitqueue(struct xa_state *xas,
+>  		void *entry, struct exceptional_entry_key *key)
+>  {
+> @@ -182,7 +192,8 @@ static int wake_exceptional_entry_func(wait_queue_entry_t *wait,
+>   * The important information it's conveying is whether the entry at
+>   * this index used to be a PMD entry.
+>   */
+> -static void dax_wake_entry(struct xa_state *xas, void *entry, bool wake_all)
+> +static void dax_wake_entry(struct xa_state *xas, void *entry,
+> +			   enum dax_entry_wake_mode mode)
+>  {
+>  	struct exceptional_entry_key key;
+>  	wait_queue_head_t *wq;
+> @@ -196,7 +207,7 @@ static void dax_wake_entry(struct xa_state *xas, void *entry, bool wake_all)
+>  	 * must be in the waitqueue and the following check will see them.
+>  	 */
+>  	if (waitqueue_active(wq))
+> -		__wake_up(wq, TASK_NORMAL, wake_all ? 0 : 1, &key);
+> +		__wake_up(wq, TASK_NORMAL, mode == WAKE_ALL ? 0 : 1, &key);
+>  }
+>  
+>  /*
+> @@ -268,7 +279,7 @@ static void put_unlocked_entry(struct xa_state *xas, void *entry)
+>  {
+>  	/* If we were the only waiter woken, wake the next one */
+>  	if (entry && !dax_is_conflict(entry))
+> -		dax_wake_entry(xas, entry, false);
+> +		dax_wake_entry(xas, entry, WAKE_NEXT);
+>  }
+>  
+>  /*
+> @@ -286,7 +297,7 @@ static void dax_unlock_entry(struct xa_state *xas, void *entry)
+>  	old = xas_store(xas, entry);
+>  	xas_unlock_irq(xas);
+>  	BUG_ON(!dax_is_locked(old));
+> -	dax_wake_entry(xas, entry, false);
+> +	dax_wake_entry(xas, entry, WAKE_NEXT);
+>  }
+>  
+>  /*
+> @@ -524,7 +535,7 @@ static void *grab_mapping_entry(struct xa_state *xas,
+>  
+>  		dax_disassociate_entry(entry, mapping, false);
+>  		xas_store(xas, NULL);	/* undo the PMD join */
+> -		dax_wake_entry(xas, entry, true);
+> +		dax_wake_entry(xas, entry, WAKE_ALL);
+>  		mapping->nrexceptional--;
+>  		entry = NULL;
+>  		xas_set(xas, index);
+> @@ -937,7 +948,7 @@ static int dax_writeback_one(struct xa_state *xas, struct dax_device *dax_dev,
+>  	xas_lock_irq(xas);
+>  	xas_store(xas, entry);
+>  	xas_clear_mark(xas, PAGECACHE_TAG_DIRTY);
+> -	dax_wake_entry(xas, entry, false);
+> +	dax_wake_entry(xas, entry, WAKE_NEXT);
+>  
+>  	trace_dax_writeback_one(mapping->host, index, count);
+>  	return ret;
+> -- 
+> 2.25.4
+> 
+-- 
+Jan Kara <jack@suse.com>
+SUSE Labs, CR
 

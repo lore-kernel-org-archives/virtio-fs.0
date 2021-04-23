@@ -1,27 +1,22 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	to:subject:message-id:date:from; s=fm3; bh=yA5NEyjVMSeDdIK4uHgC+
-	RsQOYV2MoJ7o8MnT5E0n0M=; b=XA913gKNE7QylJCazN5aD7QpTtWz9roiYAlHm
-	aYWfwVunpkyRer1Hg1rCq6LarSizguC5H8HGZheDc3UenNmHnJRes92bulbHhvBC
-	uIJoxRwoZPlKmr4iCpZ8cgEibKXvoFXEg1/JjhzMx3x70fR2XuL3UoCWBh+/MqRw
-	xBf1CC5lHDaN4XY07A3zm7E+nFUgS0XdFh8kW2gDTGihtfSjtQcjUlsBavlbw4Ym
-	pRD4omMpdWJ+Yc+CTIH7Et94i863/r0kzly8exBXl9HsUQRDLNVrgsyCPWCw/VWd
-	XFC6P25p/IFihjZ5GIbNnCdwcw3J6ByHsrphhTG1ecy4EMw/w==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=date:from:message-id:subject:to
-	:x-me-proxy:x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=
-	fm2; bh=yA5NEyjVMSeDdIK4uHgC+RsQOYV2MoJ7o8MnT5E0n0M=; b=b/dBZz7h
-	yrux+H5x1xZfq68t5cXAWshvfqo1nAQzpc3mLTBvQjnrZsSVsKJbMvzwvW/pdS3R
-	7kUp7StIP2PyBLbKfIvtyn+l9JY/tt7xjVL7DnLei0dU1Wm4BqIjtkhQ3az2iZEN
-	BfeZY2nDH/VuY0k9AvUMSWCHQ2i03NODi1baDGJ1H0qotFSQZh55fgY2a/YJ6vey
-	Gp1eKHSqzBFVBOHpTBDLMCn1gNwH9kGXIwChMVJDcr+C7q5pN+n62C/CmuB63DgU
-	kXL6SaAbMOB5GuJQu/z7lGfGv73z2eCGXDEgFFPtzmftut2rzWVGoXYmeIhV2vhE
-	fZCyAmz5JiDnwg==
-Message-Id: <20210423153229.39721240054@mailuser.nyi.internal>
-Date: Fri, 23 Apr 2021 11:32:29 -0400 (EDT)
-From: virtiofs-bot@sinrega.org
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] MR opened: Fix killpriv v1 enforcement
-	on writes
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+	d=intel-com.20150623.gappssmtp.com; s=20150623;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=dfQYJoLyB6h5ZbM4eg6Kr44fOO/ylFVrCnfKWSRlupI=;
+	b=XIrgS7eZvzhqFQGzaCw99zsTJou6Zmn6+qlQS+jLXwjE4/FMmqnjZuwoAcS2cOq9MJ
+	YwLvedQjp6Xc7eib13/t2RHH1CRhgf4pLfr2ZnEmQ2s94gOCMX2a7ccCO4BrwX8ELRNz
+	pratDifm/U3Qz0LPqF5zfi5UiRmLchv91hKIKYZ7Tcw1b1ngICuDWkuFMKnVbs+PI+lF
+	Qx6B6YkP9fV1dUeP+TLUmymxhUAQdBr8fal4P+zCvMljDKJ2AR6ye99CxLvf1/n4xrTq
+	ImhgPSL3EFPtqiQITgBoMcFVvYbf3yVITE8jWKMGK2GZw/bT+aB9l6F5n9ZAlNFWYzuE
+	W3Eg==
+MIME-Version: 1.0
+References: <20210423130723.1673919-1-vgoyal@redhat.com>
+In-Reply-To: <20210423130723.1673919-1-vgoyal@redhat.com>
+From: Dan Williams <dan.j.williams@intel.com>
+Date: Fri, 23 Apr 2021 13:38:51 -0700
+Message-ID: <CAPcyv4hz=nHYQ89-m-7yVJWpEP4gZBYTY6E4POAms9mYDb_N+g@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PATCH v4 0/3] dax: Fix missed wakeup in
+	put_unlocked_entry()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -30,32 +25,22 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, linux-nvdimm <linux-nvdimm@lists.01.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Matthew Wilcox <willy@infradead.org>, virtio-fs-list <virtio-fs@redhat.com>, linux-fsdevel <linux-fsdevel@vger.kernel.org>
 
-The `set_creds` function returns a pair of ScopedUid/ScopedGid objects
-(well, they're `Option<Scoped...>`) that change the effective uid and
-gid of the calling thread for the duration of their scope. That is, once
-they're dropped, they "pop" the new uid/gid back to uid/gid 0.
+On Fri, Apr 23, 2021 at 6:07 AM Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> Hi,
+>
+> This is V4 of the patches. Posted V3 here.
+>
+> https://lore.kernel.org/linux-fsdevel/20210419213636.1514816-1-vgoyal@redhat.com/
+>
+> Changes since V3 are.
+>
+> - Renamed "enum dax_entry_wake_mode" to "enum dax_wake_mode" (Matthew Wilcox)
+> - Changed description of WAKE_NEXT and WAKE_ALL (Jan Kara)
+> - Got rid of a comment (Greg Kurz)
 
-Trouble is, right now, these objects' scope is actually the lexical
-block of the if statement. This means the current thread's uid/gid
-changes only for the scope of the if-statement and then is popped back
-to uid/gid 0 before attempting the write.
-
-To fix this, retain these objects for the enclosing function scope
-rather than just the scope of the if statement. This way, the thread's
-uid/gid change is effective for the duration of the write, which I
-believe was the original intent.
-
-Note: I was unable to test this with a mainline kernel. I dug into it,
-and I think it's a backwards compatibility mixup in the FUSE module. I
-sent a patch upstream[1]. I also tested _this_ patch with a patched kernel
-and verified this works as intended. I also verified that _without this
-patch_, the privileges are not killed.
-
-[1] https://lore.kernel.org/linux-fsdevel/20210423151919.195033-1-ckuehl@redhat.com/T/#u
-
-Signed-off-by: Connor Kuehl <ckuehl@redhat.com>
----
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/24
+Looks good Vivek, thanks for the resend.
 

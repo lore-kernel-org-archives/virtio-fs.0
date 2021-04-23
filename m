@@ -1,22 +1,11 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-	d=intel-com.20150623.gappssmtp.com; s=20150623;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=l12BmPzjPGQPhOVAK1+pGnVg6YOohJn2PXow4I2KCwo=;
-	b=nQnk4fUrtR73OTn0Bked0GsH77E4CU2Aryt7NrztyQzLtex0tRik3lEi7dybmcBzRH
-	imUnySkDeWbLpm1SmLfQ939xsEAUlHIlrHZFouijtfVnEwwG/v4ZQfXaj+HSc8sr43j+
-	v+8FG6MhnCm6G5B8vHIVVyp4FpcXRY7PYCkB9DDvlM+eVLprbZBp++dJAbMAVMCt5SYF
-	q/qG9Xpz56IlrdEJbFFzzSPDCCvk4OjPw1eqpC1um+tl/xs3BG0Rvpm0vl3JBc7b9mtP
-	P0H2tUoAEcqxONVhFCzFwaQG92PxbLWuDF0PKMf+1CmUgDTeVky9AKb8XU42U9NOfxiW
-	nrZA==
+Date: Fri, 23 Apr 2021 17:11:30 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210423211130.GA1668472@redhat.com>
 MIME-Version: 1.0
-References: <20210416173524.GA1379987@redhat.com>
-In-Reply-To: <20210416173524.GA1379987@redhat.com>
-From: Dan Williams <dan.j.williams@intel.com>
-Date: Fri, 16 Apr 2021 12:56:05 -0700
-Message-ID: <CAPcyv4h77oTMBQ50wg6eHLpkFMQ16oAHg2+D=d5zshT6iWgAfw@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH] dax: Fix missed wakeup in
-	put_unlocked_entry()
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: [Virtio-fs] [RFC] [PATCH] virtiofsd: Auto switch between inline and
+ thread-pool processing
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,99 +14,87 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, linux-nvdimm <linux-nvdimm@lists.01.org>, linux kernel mailing list <linux-kernel@vger.kernel.org>, Matthew Wilcox <willy@infradead.org>, virtio-fs-list <virtio-fs@redhat.com>, Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>
+To: virtio-fs-list <virtio-fs@redhat.com>
+Cc: Michey Mehta <mimehta@redhat.com>
 
-On Fri, Apr 16, 2021 at 10:35 AM Vivek Goyal <vgoyal@redhat.com> wrote:
->
-> I am seeing missed wakeups which ultimately lead to a deadlock when I am
-> using virtiofs with DAX enabled and running "make -j". I had to mount
-> virtiofs as rootfs and also reduce to dax window size to 32M to reproduce
-> the problem consistently.
->
-> This is not a complete patch. I am just proposing this partial fix to
-> highlight the issue and trying to figure out how it should be fixed.
-> Should it be fixed in generic dax code or should filesystem (fuse/virtiofs)
-> take care of this.
->
-> So here is the problem. put_unlocked_entry() wakes up waiters only
-> if entry is not null as well as !dax_is_conflict(entry). But if I
-> call multiple instances of invalidate_inode_pages2() in parallel,
-> then I can run into a situation where there are waiters on
-> this index but nobody will wait these.
->
-> invalidate_inode_pages2()
->   invalidate_inode_pages2_range()
->     invalidate_exceptional_entry2()
->       dax_invalidate_mapping_entry_sync()
->         __dax_invalidate_entry() {
->                 xas_lock_irq(&xas);
->                 entry = get_unlocked_entry(&xas, 0);
->                 ...
->                 ...
->                 dax_disassociate_entry(entry, mapping, trunc);
->                 xas_store(&xas, NULL);
->                 ...
->                 ...
->                 put_unlocked_entry(&xas, entry);
->                 xas_unlock_irq(&xas);
->         }
->
-> Say a fault in in progress and it has locked entry at offset say "0x1c".
-> Now say three instances of invalidate_inode_pages2() are in progress
-> (A, B, C) and they all try to invalidate entry at offset "0x1c". Given
-> dax entry is locked, all tree instances A, B, C will wait in wait queue.
->
-> When dax fault finishes, say A is woken up. It will store NULL entry
-> at index "0x1c" and wake up B. When B comes along it will find "entry=0"
-> at page offset 0x1c and it will call put_unlocked_entry(&xas, 0). And
-> this means put_unlocked_entry() will not wake up next waiter, given
-> the current code. And that means C continues to wait and is not woken
-> up.
->
-> In my case I am seeing that dax page fault path itself is waiting
-> on grab_mapping_entry() and also invalidate_inode_page2() is
-> waiting in get_unlocked_entry() but entry has already been cleaned
-> up and nobody woke up these processes. Atleast I think that's what
-> is happening.
->
-> This patch wakes up a process even if entry=0. And deadlock does not
-> happen. I am running into some OOM issues, that will debug.
->
-> So my question is that is it a dax issue and should it be fixed in
-> dax layer. Or should it be handled in fuse to make sure that
-> multiple instances of invalidate_inode_pages2() on same inode
-> don't make progress in parallel and introduce enough locking
-> around it.
->
-> Right now fuse_finish_open() calls invalidate_inode_pages2() without
-> any locking. That allows it to make progress in parallel to dax
-> fault path as well as allows multiple instances of invalidate_inode_pages2()
-> to run in parallel.
->
-> Not-yet-signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  fs/dax.c |    7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
->
-> Index: redhat-linux/fs/dax.c
-> ===================================================================
-> --- redhat-linux.orig/fs/dax.c  2021-04-16 12:50:40.141363317 -0400
-> +++ redhat-linux/fs/dax.c       2021-04-16 12:51:42.385926390 -0400
-> @@ -266,9 +266,10 @@ static void wait_entry_unlocked(struct x
->
->  static void put_unlocked_entry(struct xa_state *xas, void *entry)
->  {
-> -       /* If we were the only waiter woken, wake the next one */
-> -       if (entry && !dax_is_conflict(entry))
-> -               dax_wake_entry(xas, entry, false);
-> +       if (dax_is_conflict(entry))
-> +               return;
-> +
-> +       dax_wake_entry(xas, entry, false);
+This is just an RFC patch for now. I am still running performance numbers
+and see if this method of switching is good enough or not. I did one run
+and seemed to get higher performance on deeper queue depths. There were
+few tests where I did not match lower queue depth performance with 
+no thread pool. May be run to run variation.
 
-How does this work if entry is NULL? dax_entry_waitqueue() will not
-know if it needs to adjust the index. I think the fix might be to
-specify that put_unlocked_entry() in the invalidate path needs to do a
-wake_up_all().
+For low queue depth workloads, inline processing works well. But for 
+high queue depth (and multiple process/thread) workloads, parallel
+processing of thread pool can benefit.
+
+This patch is an experiment which tries to switch to between inline and
+thread-pool processing. If number of requests received on queue is
+1, inline processing is done. Otherwise requests are handed over to
+a thread pool for processing.
+
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ tools/virtiofsd/fuse_virtio.c |   27 +++++++++++++++++++--------
+ 1 file changed, 19 insertions(+), 8 deletions(-)
+
+Index: rhvgoyal-qemu/tools/virtiofsd/fuse_virtio.c
+===================================================================
+--- rhvgoyal-qemu.orig/tools/virtiofsd/fuse_virtio.c	2021-04-23 10:03:46.175920039 -0400
++++ rhvgoyal-qemu/tools/virtiofsd/fuse_virtio.c	2021-04-23 10:56:37.793722634 -0400
+@@ -446,6 +446,15 @@ err:
+ static __thread bool clone_fs_called;
+ 
+ /* Process one FVRequest in a thread pool */
++static void fv_queue_push_to_pool(gpointer data, gpointer user_data)
++{
++    FVRequest *req = data;
++    GThreadPool *pool = user_data;
++
++    g_thread_pool_push(pool, req, NULL);
++}
++
++/* Process one FVRequest in a thread pool */
+ static void fv_queue_worker(gpointer data, gpointer user_data)
+ {
+     struct fv_QueueInfo *qi = user_data;
+@@ -605,6 +614,7 @@ static void *fv_queue_thread(void *opaqu
+     struct fuse_session *se = qi->virtio_dev->se;
+     GThreadPool *pool = NULL;
+     GList *req_list = NULL;
++    int nr_req = 0;
+ 
+     if (se->thread_pool_size) {
+         fuse_log(FUSE_LOG_DEBUG, "%s: Creating thread pool for Queue %d\n",
+@@ -686,22 +696,23 @@ static void *fv_queue_thread(void *opaqu
+             }
+ 
+             req->reply_sent = false;
+-
+-            if (!se->thread_pool_size) {
+-                req_list = g_list_prepend(req_list, req);
+-            } else {
+-                g_thread_pool_push(pool, req, NULL);
+-            }
++            req_list = g_list_prepend(req_list, req);
++            nr_req++;
+         }
+ 
+         pthread_mutex_unlock(&qi->vq_lock);
+         vu_dispatch_unlock(qi->virtio_dev);
+ 
+         /* Process all the requests. */
+-        if (!se->thread_pool_size && req_list != NULL) {
+-            g_list_foreach(req_list, fv_queue_worker, qi);
++        if (req_list != NULL) {
++            if (!se->thread_pool_size || nr_req <= 2) {
++                g_list_foreach(req_list, fv_queue_worker, qi);
++            } else  {
++                g_list_foreach(req_list, fv_queue_push_to_pool, pool);
++            }
+             g_list_free(req_list);
+             req_list = NULL;
++            nr_req = 0;
+         }
+     }
+ 
 

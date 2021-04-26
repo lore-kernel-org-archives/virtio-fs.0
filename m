@@ -1,16 +1,28 @@
-Date: Mon, 26 Apr 2021 18:59:49 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YIb/lcwtZWZOL1/k@work-vm>
-References: <20210423211130.GA1668472@redhat.com>
-	<CAFQAk7i_u_xmBRVuDvWoN_dZDjGgHpRtZ_niCV5r86ezdYsKMQ@mail.gmail.com>
-	<20210426151150.GB1724699@redhat.com> <YIb7DCBfUi0ybTYM@work-vm>
-	<20210426175100.GC1741690@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+	d=infradead.org; s=casper.20170209;
+	h=In-Reply-To:Content-Type:MIME-Version:
+	References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description;
+	bh=PWkah+fwPe33ZZcVqLDlcUWqo58D207f7qzlEj7nZwY=;
+	b=GCyXjZT/CpYO/4ULivAxhOfL2e
+	t0+fXiuhp77Toc2bpsmMyGA5pKlvXqdOCQ6BY6f9QcP7f02vrnAGfLg/qTL3PqwbxefsOH5XwkviN
+	NGsMJi1ldPNllb+6J6c3TQhT0VsyOM8pqoJ6n4WgGNpxLiF05zsb2N7BNR5LSpzTiwLzL4L+2XP8j
+	szX8OM40R/GksXzf/AZUIdGzO6iVgiyvWY+IEYZpWbUVY8OmfA+xG7HSQof2Yn3OokpD+UCJpUbei
+	eOAVq+Twf6Xf8U2cVBFX3h4rvP1hzJixGETipmVcMHFX16aMbfe3yMQgr5SHicD71ImR99HvawHwx
+	2YsP+Oag==
+Date: Mon, 26 Apr 2021 19:02:11 +0100
+From: Matthew Wilcox <willy@infradead.org>
+Message-ID: <20210426180211.GP235567@casper.infradead.org>
+References: <20210423130723.1673919-1-vgoyal@redhat.com>
+	<20210423130723.1673919-2-vgoyal@redhat.com>
+	<20210426134632.GM235567@casper.infradead.org>
+	<20210426175217.GD1741690@redhat.com>
 MIME-Version: 1.0
+In-Reply-To: <20210426175217.GD1741690@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210426175100.GC1741690@redhat.com>
-Subject: Re: [Virtio-fs] [External] [RFC] [PATCH] virtiofsd: Auto switch
- between inline and thread-pool processing
+Subject: Re: [Virtio-fs] [PATCH v4 1/3] dax: Add an enum for specifying dax
+	wakup mode
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,155 +32,50 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Michey Mehta <mimehta@redhat.com>
+Cc: jack@suse.cz, miklos@szeredi.hu, linux-nvdimm@lists.01.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, dan.j.williams@intel.com
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> On Mon, Apr 26, 2021 at 06:40:28PM +0100, Dr. David Alan Gilbert wrote:
-> > * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > > On Sun, Apr 25, 2021 at 10:29:14AM +0800, Jiachen Zhang wrote:
-> > > > On Sat, Apr 24, 2021 at 5:11 AM Vivek Goyal <vgoyal@redhat.com> wrote:
-> > > > 
-> > > > > This is just an RFC patch for now. I am still running performance numbers
-> > > > > and see if this method of switching is good enough or not. I did one run
-> > > > > and seemed to get higher performance on deeper queue depths. There were
-> > > > > few tests where I did not match lower queue depth performance with
-> > > > > no thread pool. May be run to run variation.
-> > > > >
-> > > > >
-> > > > I think this is interesting. I guess the switch number between thread-pool
-> > > > and the inline method may change as the hardware or OS kernel changes.
-> > > > Looking forward to the results.
-> > > 
-> > > Hi Jiachen,
-> > > 
-> > > Agreed that threshold to switch between inline and thread-pool will vary
-> > > based on hardware and so many other factors. Having said that, there is
-> > > no good way to determine what's the most optimized threshold for a
-> > > particular setup. 
+On Mon, Apr 26, 2021 at 01:52:17PM -0400, Vivek Goyal wrote:
+> On Mon, Apr 26, 2021 at 02:46:32PM +0100, Matthew Wilcox wrote:
+> > On Fri, Apr 23, 2021 at 09:07:21AM -0400, Vivek Goyal wrote:
+> > > +enum dax_wake_mode {
+> > > +	WAKE_NEXT,
+> > > +	WAKE_ALL,
+> > > +};
 > > 
-> > I can imagine something based on the % of time a thread is utilised as
-> > being an indication you might need more/less; but that's an even more
-> > complicated heuristic.
+> > Why define them in this order when ...
+> > 
+> > > @@ -196,7 +207,7 @@ static void dax_wake_entry(struct xa_state *xas, void *entry, bool wake_all)
+> > >  	 * must be in the waitqueue and the following check will see them.
+> > >  	 */
+> > >  	if (waitqueue_active(wq))
+> > > -		__wake_up(wq, TASK_NORMAL, wake_all ? 0 : 1, &key);
+> > > +		__wake_up(wq, TASK_NORMAL, mode == WAKE_ALL ? 0 : 1, &key);
+> > 
+> > ... they're used like this?  This is almost as bad as
+> > 
+> > enum bool {
+> > 	true,
+> > 	false,
+> > };
 > 
-> Yes, that's even more complicated heuristic.
+> Hi Matthew,
 > 
-> Also not sure how to account for when thread blocks in kernel waiting for
-> I/O to finish. Thread is not keeping cpu busy but at the same time
-> can't make progress.
-
-Does it matter if the thread is blocked due to CPU or IO?  If you can
-just look at the time the thread is non-free then that gives you a
-utilisation.
-
-Dave
-
-
-> Vivek
+> So you prefer that I should switch order of WAKE_NEXT and WAKE_ALL? 
 > 
-> > 
-> > > Maybe we will have to just go with a default which works reasonably
-> > > well and also provide a knob to user to alter that threshold. Atleast
-> > > it can be useful to experiment with different thresholds.
-> > 
-> > Dave
-> > 
-> > > Vivek
-> > > 
-> > > > 
-> > > > Jiachen
-> > > > 
-> > > > 
-> > > > > For low queue depth workloads, inline processing works well. But for
-> > > > > high queue depth (and multiple process/thread) workloads, parallel
-> > > > > processing of thread pool can benefit.
-> > > > >
-> > > > > This patch is an experiment which tries to switch to between inline and
-> > > > > thread-pool processing. If number of requests received on queue is
-> > > > > 1, inline processing is done. Otherwise requests are handed over to
-> > > > > a thread pool for processing.
-> > > > >
-> > > > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > > > > ---
-> > > > >  tools/virtiofsd/fuse_virtio.c |   27 +++++++++++++++++++--------
-> > > > >  1 file changed, 19 insertions(+), 8 deletions(-)
-> > > > >
-> > > > > Index: rhvgoyal-qemu/tools/virtiofsd/fuse_virtio.c
-> > > > > ===================================================================
-> > > > > --- rhvgoyal-qemu.orig/tools/virtiofsd/fuse_virtio.c    2021-04-23
-> > > > > 10:03:46.175920039 -0400
-> > > > > +++ rhvgoyal-qemu/tools/virtiofsd/fuse_virtio.c 2021-04-23
-> > > > > 10:56:37.793722634 -0400
-> > > > > @@ -446,6 +446,15 @@ err:
-> > > > >  static __thread bool clone_fs_called;
-> > > > >
-> > > > >  /* Process one FVRequest in a thread pool */
-> > > > > +static void fv_queue_push_to_pool(gpointer data, gpointer user_data)
-> > > > > +{
-> > > > > +    FVRequest *req = data;
-> > > > > +    GThreadPool *pool = user_data;
-> > > > > +
-> > > > > +    g_thread_pool_push(pool, req, NULL);
-> > > > > +}
-> > > > > +
-> > > > > +/* Process one FVRequest in a thread pool */
-> > > > >  static void fv_queue_worker(gpointer data, gpointer user_data)
-> > > > >  {
-> > > > >      struct fv_QueueInfo *qi = user_data;
-> > > > > @@ -605,6 +614,7 @@ static void *fv_queue_thread(void *opaqu
-> > > > >      struct fuse_session *se = qi->virtio_dev->se;
-> > > > >      GThreadPool *pool = NULL;
-> > > > >      GList *req_list = NULL;
-> > > > > +    int nr_req = 0;
-> > > > >
-> > > > >      if (se->thread_pool_size) {
-> > > > >          fuse_log(FUSE_LOG_DEBUG, "%s: Creating thread pool for Queue
-> > > > > %d\n",
-> > > > > @@ -686,22 +696,23 @@ static void *fv_queue_thread(void *opaqu
-> > > > >              }
-> > > > >
-> > > > >              req->reply_sent = false;
-> > > > > -
-> > > > > -            if (!se->thread_pool_size) {
-> > > > > -                req_list = g_list_prepend(req_list, req);
-> > > > > -            } else {
-> > > > > -                g_thread_pool_push(pool, req, NULL);
-> > > > > -            }
-> > > > > +            req_list = g_list_prepend(req_list, req);
-> > > > > +            nr_req++;
-> > > > >          }
-> > > > >
-> > > > >          pthread_mutex_unlock(&qi->vq_lock);
-> > > > >          vu_dispatch_unlock(qi->virtio_dev);
-> > > > >
-> > > > >          /* Process all the requests. */
-> > > > > -        if (!se->thread_pool_size && req_list != NULL) {
-> > > > > -            g_list_foreach(req_list, fv_queue_worker, qi);
-> > > > > +        if (req_list != NULL) {
-> > > > > +            if (!se->thread_pool_size || nr_req <= 2) {
-> > > > > +                g_list_foreach(req_list, fv_queue_worker, qi);
-> > > > > +            } else  {
-> > > > > +                g_list_foreach(req_list, fv_queue_push_to_pool, pool);
-> > > > > +            }
-> > > > >              g_list_free(req_list);
-> > > > >              req_list = NULL;
-> > > > > +            nr_req = 0;
-> > > > >          }
-> > > > >      }
-> > > > >
-> > > > >
-> > > > > _______________________________________________
-> > > > > Virtio-fs mailing list
-> > > > > Virtio-fs@redhat.com
-> > > > > https://listman.redhat.com/mailman/listinfo/virtio-fs
-> > > > >
-> > > > >
-> > > 
-> > > _______________________________________________
-> > > Virtio-fs mailing list
-> > > Virtio-fs@redhat.com
-> > > https://listman.redhat.com/mailman/listinfo/virtio-fs
-> > -- 
-> > Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> enum dax_wake_mode {
+> 	WAKE_ALL,
+> 	WAKE_NEXT,
+> };
+
+That, yes.
+
+> And then do following to wake task.
+> 
+> if (waitqueue_active(wq))
+> 	__wake_up(wq, TASK_NORMAL, mode, &key);
+
+No, the third argument to __wake_up() is a count, not an enum.  It just so
+happens that '0' means 'all' and we only ever wake up 1 and not, say, 5.
+So the logical way to define the enum is ALL, NEXT which _just happens
+to match_ the usage of __wake_up().
 

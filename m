@@ -1,12 +1,17 @@
-From: Greg Kurz <groug@kaod.org>
-Date: Mon, 26 Apr 2021 17:21:35 +0200
-Message-Id: <20210426152135.842037-3-groug@kaod.org>
-In-Reply-To: <20210426152135.842037-1-groug@kaod.org>
-References: <20210426152135.842037-1-groug@kaod.org>
-MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [for-6.1 v2 2/2] virtiofsd: Add support for FUSE_SYNCFS
-	request
+Date: Mon, 26 Apr 2021 11:44:33 -0400
+From: virtiofs-bot@sinrega.org
+Message-Id: <81861.121042611442700585@us-mta-226.us.mimecast.lan>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=subject:to:x-me-proxy:x-me-proxy
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm2; bh=5hhHUXBOEaL27way0
+	I3A+nCclQWFn/xm0orVZ+Gcj1o=; b=VCKAzZOiP8QdOQzUEr3n6aLIa/aonQ9dr
+	PbfDebWLQ+zb8sRSCbARbbOH7OA0Oo2J9Tr1AE1IWGImabqaOwkyS1pTSlALQr7s
+	XSqJZdCb2ZKMOujXXAQq1QCdOaEWGemIAaC/9z/kW6hDOpJXX4uFd9YW2z+e09Fz
+	5MMBahUb76ICrogZl3QKrNMza7N1u1IAlHY1LJWW59Ulhsgwenvbu9+TD5RBgKmt
+	0n+XX7hDO9NEP2yOtPNfsdLBYxqwz4o1fwhGLZMBarOgvn1EMvzNkPZQfvTD8u2U
+	sFv8AlgDP369w5wlnLmJOnNws0Q5PJM7ap0PQdUcMF8LSbKe6nkfg==
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd-rs] MR opened: Avoid using libc::statx()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,145 +20,15 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: kvm@vger.kernel.org, Miklos Szeredi <miklos@szeredi.hu>, Cornelia Huck <cohuck@redhat.com>, virtio-fs@redhat.com, "Michael S. Tsirkin" <mst@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
+To: virtio-fs@redhat.com
 
-Honor the expected behavior of syncfs() to synchronously flush all
-data and metadata on linux systems.
+This patch should resolve issue #12 (in a different manner than !22, as suggested by Connor).
 
-Flushing is done with syncfs(). This is suboptimal as it will also
-flush writes performed by any other process on the same file system,
-and thus add an unbounded time penalty to syncfs(). This may be
-optimized in the future, but enforce correctness first.
+`libc::statx()` resolves to the system libc's `statx()` (unsurprisingly), which may or may not be present.  For example, in glibc before 2.28, it was not present (regardless of whether the kernel supports the statx system call or not), leading to 
 
-Signed-off-by: Greg Kurz <groug@kaod.org>
+The libc function is just a wrapper around the syscall anyway, so we might as well implement the wrapper ourselves.  This has the advantage of only relying on `libc::syscall()` (which, on Linux, is basically always there) and `libc::SYS_statx` (which is provided by the `libc` crate, so does not depend on the system libc).
+
+This way, we do not need to check whether the system libc provides the wrapper, and our `statx()` really works whenever the kernel supports it.
 ---
- tools/virtiofsd/fuse_lowlevel.c       | 19 ++++++++++++++++++
- tools/virtiofsd/fuse_lowlevel.h       | 13 ++++++++++++
- tools/virtiofsd/passthrough_ll.c      | 29 +++++++++++++++++++++++++++
- tools/virtiofsd/passthrough_seccomp.c |  1 +
- 4 files changed, 62 insertions(+)
-
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index 58e32fc96369..918ab11f54c2 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -1870,6 +1870,24 @@ static void do_lseek(fuse_req_t req, fuse_ino_t nodeid,
-     }
- }
- 
-+static void do_syncfs(fuse_req_t req, fuse_ino_t nodeid,
-+                      struct fuse_mbuf_iter *iter)
-+{
-+    struct fuse_syncfs_in *arg;
-+
-+    arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
-+    if (!arg) {
-+        fuse_reply_err(req, EINVAL);
-+        return;
-+    }
-+
-+    if (req->se->op.syncfs) {
-+        req->se->op.syncfs(req, arg->flags);
-+    } else {
-+        fuse_reply_err(req, ENOSYS);
-+    }
-+}
-+
- static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-                     struct fuse_mbuf_iter *iter)
- {
-@@ -2267,6 +2285,7 @@ static struct {
-     [FUSE_RENAME2] = { do_rename2, "RENAME2" },
-     [FUSE_COPY_FILE_RANGE] = { do_copy_file_range, "COPY_FILE_RANGE" },
-     [FUSE_LSEEK] = { do_lseek, "LSEEK" },
-+    [FUSE_SYNCFS] = { do_syncfs, "SYNCFS" },
- };
- 
- #define FUSE_MAXOP (sizeof(fuse_ll_ops) / sizeof(fuse_ll_ops[0]))
-diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
-index 3bf786b03485..220bb3db4898 100644
---- a/tools/virtiofsd/fuse_lowlevel.h
-+++ b/tools/virtiofsd/fuse_lowlevel.h
-@@ -1225,6 +1225,19 @@ struct fuse_lowlevel_ops {
-      */
-     void (*lseek)(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
-                   struct fuse_file_info *fi);
-+
-+    /**
-+     * Synchronize file system content
-+     *
-+     * If this request is answered with an error code of ENOSYS,
-+     * this is treated as success and future calls to syncfs() will
-+     * succeed automatically without being sent to the filesystem
-+     * process.
-+     *
-+     * @param req request handle
-+     * @param flags not used yet
-+     */
-+    void (*syncfs)(fuse_req_t req, uint64_t flags);
- };
- 
- /**
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 1553d2ef454f..6790a2f6fe10 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -3124,6 +3124,34 @@ static void lo_lseek(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
-     }
- }
- 
-+static void lo_syncfs(fuse_req_t req, uint64_t flags)
-+{
-+    struct lo_data *lo = lo_data(req);
-+    int fd, ret;
-+
-+    /* No flags supported yet */
-+    if (flags) {
-+        fuse_reply_err(req, EINVAL);
-+        return;
-+    }
-+
-+    fd = lo_inode_open(lo, &lo->root, O_RDONLY);
-+    if (fd < 0) {
-+        fuse_reply_err(req, errno);
-+        return;
-+    }
-+
-+    /*
-+     * FIXME: this is suboptimal because it will also flush unrelated
-+     *        writes not coming from the client. This can dramatically
-+     *        increase the time spent in syncfs() if some process is
-+     *        writing lots of data on the same filesystem as virtiofsd.
-+     */
-+    ret = syncfs(fd);
-+    fuse_reply_err(req, ret < 0 ? errno : 0);
-+    close(fd);
-+}
-+
- static void lo_destroy(void *userdata)
- {
-     struct lo_data *lo = (struct lo_data *)userdata;
-@@ -3184,6 +3212,7 @@ static struct fuse_lowlevel_ops lo_oper = {
-     .copy_file_range = lo_copy_file_range,
- #endif
-     .lseek = lo_lseek,
-+    .syncfs = lo_syncfs,
-     .destroy = lo_destroy,
- };
- 
-diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
-index 62441cfcdb95..343188447901 100644
---- a/tools/virtiofsd/passthrough_seccomp.c
-+++ b/tools/virtiofsd/passthrough_seccomp.c
-@@ -107,6 +107,7 @@ static const int syscall_allowlist[] = {
-     SCMP_SYS(set_robust_list),
-     SCMP_SYS(setxattr),
-     SCMP_SYS(symlinkat),
-+    SCMP_SYS(syncfs),
-     SCMP_SYS(time), /* Rarely needed, except on static builds */
-     SCMP_SYS(tgkill),
-     SCMP_SYS(unlinkat),
--- 
-2.26.3
+https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/25
 

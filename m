@@ -1,9 +1,14 @@
-From: Greg Kurz <groug@kaod.org>
-Date: Mon, 26 Apr 2021 17:10:11 +0200
-Message-Id: <20210426151011.840459-1-groug@kaod.org>
+Date: Mon, 26 Apr 2021 11:11:50 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210426151150.GB1724699@redhat.com>
+References: <20210423211130.GA1668472@redhat.com>
+	<CAFQAk7i_u_xmBRVuDvWoN_dZDjGgHpRtZ_niCV5r86ezdYsKMQ@mail.gmail.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2] virtiofs: propagate sync() to file server
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAFQAk7i_u_xmBRVuDvWoN_dZDjGgHpRtZ_niCV5r86ezdYsKMQ@mail.gmail.com>
+Subject: Re: [Virtio-fs] [External] [RFC] [PATCH] virtiofsd: Auto switch
+ between inline and thread-pool processing
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -12,187 +17,122 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Robert Krawitz <rlk@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
+To: Jiachen Zhang <zhangjiachen.jaycee@bytedance.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, Michey Mehta <mimehta@redhat.com>
 
-Even if POSIX doesn't mandate it, linux users legitimately expect
-sync() to flush all data and metadata to physical storage when it
-is located on the same system. This isn't happening with virtiofs
-though : sync() inside the guest returns right away even though
-data still needs to be flushed from the host page cache.
+On Sun, Apr 25, 2021 at 10:29:14AM +0800, Jiachen Zhang wrote:
+> On Sat, Apr 24, 2021 at 5:11 AM Vivek Goyal <vgoyal@redhat.com> wrote:
+> 
+> > This is just an RFC patch for now. I am still running performance numbers
+> > and see if this method of switching is good enough or not. I did one run
+> > and seemed to get higher performance on deeper queue depths. There were
+> > few tests where I did not match lower queue depth performance with
+> > no thread pool. May be run to run variation.
+> >
+> >
+> I think this is interesting. I guess the switch number between thread-pool
+> and the inline method may change as the hardware or OS kernel changes.
+> Looking forward to the results.
 
-This is easily demonstrated by doing the following in the guest:
+Hi Jiachen,
 
-$ dd if=/dev/zero of=/mnt/foo bs=1M count=5K ; strace -T -e sync sync
-5120+0 records in
-5120+0 records out
-5368709120 bytes (5.4 GB, 5.0 GiB) copied, 5.22224 s, 1.0 GB/s
-sync()                                  = 0 <0.024068>
-+++ exited with 0 +++
+Agreed that threshold to switch between inline and thread-pool will vary
+based on hardware and so many other factors. Having said that, there is
+no good way to determine what's the most optimized threshold for a
+particular setup. 
 
-and start the following in the host when the 'dd' command completes
-in the guest:
+Maybe we will have to just go with a default which works reasonably
+well and also provide a knob to user to alter that threshold. Atleast
+it can be useful to experiment with different thresholds.
 
-$ strace -T -e fsync /usr/bin/sync virtiofs/foo
-fsync(3)                                = 0 <10.371640>
-+++ exited with 0 +++
+Vivek
 
-There are no good reasons not to honor the expected behavior of
-sync() actually : it gives an unrealistic impression that virtiofs
-is super fast and that data has safely landed on HW, which isn't
-the case obviously.
-
-Implement a ->sync_fs() superblock operation that sends a new
-FUSE_SYNC request type for this purpose. Provision a 64-bit
-flags field for possible future extensions. Since the file
-server cannot handle the wait == 0 case, we skip it to avoid a
-gratuitous roundtrip.
-
-Like with FUSE_FSYNC and FUSE_FSYNCDIR, lack of support for
-FUSE_SYNC in the file server is treated as permanent success.
-This ensures compatibility with older file servers : the client
-will get the current behavior of sync() not being propagated to
-the file server.
-
-Note that such an operation allows the file server to DoS sync().
-Since a typical FUSE file server is an untrusted piece of software
-running in userspace, this is disabled by default.  Only enable it
-with virtiofs for now since virtiofsd is supposedly trusted by the
-guest kernel.
-
-Reported-by: Robert Krawitz <rlk@redhat.com>
-Signed-off-by: Greg Kurz <groug@kaod.org>
----
-
-v2: - clarify compatibility with older servers in changelog (Vivek)
-    - ignore the wait == 0 case (Miklos)
-    - 64-bit aligned argument structure (Vivek, Miklos)
-
- fs/fuse/fuse_i.h          |  3 +++
- fs/fuse/inode.c           | 35 +++++++++++++++++++++++++++++++++++
- fs/fuse/virtio_fs.c       |  1 +
- include/uapi/linux/fuse.h | 10 +++++++++-
- 4 files changed, 48 insertions(+), 1 deletion(-)
-
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 63d97a15ffde..68e9ae96cbd4 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -755,6 +755,9 @@ struct fuse_conn {
- 	/* Auto-mount submounts announced by the server */
- 	unsigned int auto_submounts:1;
- 
-+	/* Propagate syncfs() to server */
-+	unsigned int sync_fs:1;
-+
- 	/** The number of requests waiting for completion */
- 	atomic_t num_waiting;
- 
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index b0e18b470e91..ac184069b40f 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -506,6 +506,40 @@ static int fuse_statfs(struct dentry *dentry, struct kstatfs *buf)
- 	return err;
- }
- 
-+static int fuse_sync_fs(struct super_block *sb, int wait)
-+{
-+	struct fuse_mount *fm = get_fuse_mount_super(sb);
-+	struct fuse_conn *fc = fm->fc;
-+	struct fuse_syncfs_in inarg;
-+	FUSE_ARGS(args);
-+	int err;
-+
-+	/*
-+	 * Userspace cannot handle the wait == 0 case. Avoid a
-+	 * gratuitous roundtrip.
-+	 */
-+	if (!wait)
-+		return 0;
-+
-+	if (!fc->sync_fs)
-+		return 0;
-+
-+	memset(&inarg, 0, sizeof(inarg));
-+	args.in_numargs = 1;
-+	args.in_args[0].size = sizeof(inarg);
-+	args.in_args[0].value = &inarg;
-+	args.opcode = FUSE_SYNCFS;
-+	args.out_numargs = 0;
-+
-+	err = fuse_simple_request(fm, &args);
-+	if (err == -ENOSYS) {
-+		fc->sync_fs = 0;
-+		err = 0;
-+	}
-+
-+	return err;
-+}
-+
- enum {
- 	OPT_SOURCE,
- 	OPT_SUBTYPE,
-@@ -909,6 +943,7 @@ static const struct super_operations fuse_super_operations = {
- 	.put_super	= fuse_put_super,
- 	.umount_begin	= fuse_umount_begin,
- 	.statfs		= fuse_statfs,
-+	.sync_fs	= fuse_sync_fs,
- 	.show_options	= fuse_show_options,
- };
- 
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 4ee6f734ba83..a3c025308743 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -1441,6 +1441,7 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
- 	fc->release = fuse_free_conn;
- 	fc->delete_stale = true;
- 	fc->auto_submounts = true;
-+	fc->sync_fs = true;
- 
- 	fsc->s_fs_info = fm;
- 	sb = sget_fc(fsc, virtio_fs_test_super, set_anon_super_fc);
-diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-index 54442612c48b..1265ca17620c 100644
---- a/include/uapi/linux/fuse.h
-+++ b/include/uapi/linux/fuse.h
-@@ -179,6 +179,9 @@
-  *  7.33
-  *  - add FUSE_HANDLE_KILLPRIV_V2, FUSE_WRITE_KILL_SUIDGID, FATTR_KILL_SUIDGID
-  *  - add FUSE_OPEN_KILL_SUIDGID
-+ *
-+ *  7.34
-+ *  - add FUSE_SYNCFS
-  */
- 
- #ifndef _LINUX_FUSE_H
-@@ -214,7 +217,7 @@
- #define FUSE_KERNEL_VERSION 7
- 
- /** Minor version number of this interface */
--#define FUSE_KERNEL_MINOR_VERSION 33
-+#define FUSE_KERNEL_MINOR_VERSION 34
- 
- /** The node ID of the root inode */
- #define FUSE_ROOT_ID 1
-@@ -499,6 +502,7 @@ enum fuse_opcode {
- 	FUSE_COPY_FILE_RANGE	= 47,
- 	FUSE_SETUPMAPPING	= 48,
- 	FUSE_REMOVEMAPPING	= 49,
-+	FUSE_SYNCFS		= 50,
- 
- 	/* CUSE specific operations */
- 	CUSE_INIT		= 4096,
-@@ -957,4 +961,8 @@ struct fuse_removemapping_one {
- #define FUSE_REMOVEMAPPING_MAX_ENTRY   \
- 		(PAGE_SIZE / sizeof(struct fuse_removemapping_one))
- 
-+struct fuse_syncfs_in {
-+	uint64_t flags;
-+};
-+
- #endif /* _LINUX_FUSE_H */
--- 
-2.26.3
+> 
+> Jiachen
+> 
+> 
+> > For low queue depth workloads, inline processing works well. But for
+> > high queue depth (and multiple process/thread) workloads, parallel
+> > processing of thread pool can benefit.
+> >
+> > This patch is an experiment which tries to switch to between inline and
+> > thread-pool processing. If number of requests received on queue is
+> > 1, inline processing is done. Otherwise requests are handed over to
+> > a thread pool for processing.
+> >
+> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > ---
+> >  tools/virtiofsd/fuse_virtio.c |   27 +++++++++++++++++++--------
+> >  1 file changed, 19 insertions(+), 8 deletions(-)
+> >
+> > Index: rhvgoyal-qemu/tools/virtiofsd/fuse_virtio.c
+> > ===================================================================
+> > --- rhvgoyal-qemu.orig/tools/virtiofsd/fuse_virtio.c    2021-04-23
+> > 10:03:46.175920039 -0400
+> > +++ rhvgoyal-qemu/tools/virtiofsd/fuse_virtio.c 2021-04-23
+> > 10:56:37.793722634 -0400
+> > @@ -446,6 +446,15 @@ err:
+> >  static __thread bool clone_fs_called;
+> >
+> >  /* Process one FVRequest in a thread pool */
+> > +static void fv_queue_push_to_pool(gpointer data, gpointer user_data)
+> > +{
+> > +    FVRequest *req = data;
+> > +    GThreadPool *pool = user_data;
+> > +
+> > +    g_thread_pool_push(pool, req, NULL);
+> > +}
+> > +
+> > +/* Process one FVRequest in a thread pool */
+> >  static void fv_queue_worker(gpointer data, gpointer user_data)
+> >  {
+> >      struct fv_QueueInfo *qi = user_data;
+> > @@ -605,6 +614,7 @@ static void *fv_queue_thread(void *opaqu
+> >      struct fuse_session *se = qi->virtio_dev->se;
+> >      GThreadPool *pool = NULL;
+> >      GList *req_list = NULL;
+> > +    int nr_req = 0;
+> >
+> >      if (se->thread_pool_size) {
+> >          fuse_log(FUSE_LOG_DEBUG, "%s: Creating thread pool for Queue
+> > %d\n",
+> > @@ -686,22 +696,23 @@ static void *fv_queue_thread(void *opaqu
+> >              }
+> >
+> >              req->reply_sent = false;
+> > -
+> > -            if (!se->thread_pool_size) {
+> > -                req_list = g_list_prepend(req_list, req);
+> > -            } else {
+> > -                g_thread_pool_push(pool, req, NULL);
+> > -            }
+> > +            req_list = g_list_prepend(req_list, req);
+> > +            nr_req++;
+> >          }
+> >
+> >          pthread_mutex_unlock(&qi->vq_lock);
+> >          vu_dispatch_unlock(qi->virtio_dev);
+> >
+> >          /* Process all the requests. */
+> > -        if (!se->thread_pool_size && req_list != NULL) {
+> > -            g_list_foreach(req_list, fv_queue_worker, qi);
+> > +        if (req_list != NULL) {
+> > +            if (!se->thread_pool_size || nr_req <= 2) {
+> > +                g_list_foreach(req_list, fv_queue_worker, qi);
+> > +            } else  {
+> > +                g_list_foreach(req_list, fv_queue_push_to_pool, pool);
+> > +            }
+> >              g_list_free(req_list);
+> >              req_list = NULL;
+> > +            nr_req = 0;
+> >          }
+> >      }
+> >
+> >
+> > _______________________________________________
+> > Virtio-fs mailing list
+> > Virtio-fs@redhat.com
+> > https://listman.redhat.com/mailman/listinfo/virtio-fs
+> >
+> >
 

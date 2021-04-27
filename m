@@ -1,18 +1,12 @@
-Date: Tue, 27 Apr 2021 11:11:19 -0400
-From: virtiofs-bot@sinrega.org
-Message-Id: <36538.121042711111302393@us-mta-398.us.mimecast.lan>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm2; bh=4toJZf6GxfJoyFznS
-	0ddwR9kSPQ1Brv/tAaeN6f4Lh0=; b=WBX2mJFqzuj1vswbY9V+K5LxTtk+WyXIx
-	qW7RQ5r6xJrVQfJ2IHnNnSynLPWr5Xn+/AnrTrYc/5zKliYhwHKwBQO0tCb66SBa
-	BSKIFjnLSRLp9dSqwB5jOTKj97dbGFaFEXSc9BTmdaA/Qy0BjAKH1we/1mgHceeC
-	DNfEVxvVh866L9IRKtLyIJhfOgWCTlOeyUUnPcHMBkxj+8hVSsZ7Nhoz5PzFznH/
-	LqRjVfoniEgwGcLndvA1k80Dft2OBmj1Oq3FOd3JKoKnWfV0R4vDK+1r5sD9dXJn
-	tvFFkiwyFPT/BKJ0W9hOvMdezlbpTaW4sulAsisIv1bpzD7ltdvAQ==
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] Issue closed: build: Cargo fails to
-	build the project based on Ubuntu 18.04 environment
+Date: Tue, 27 Apr 2021 13:12:06 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210427171206.GA1805363@redhat.com>
+References: <20210426151011.840459-1-groug@kaod.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20210426151011.840459-1-groug@kaod.org>
+Subject: Re: [Virtio-fs] [PATCH v2] virtiofs: propagate sync() to file server
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,118 +15,209 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Greg Kurz <groug@kaod.org>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Robert Krawitz <rlk@redhat.com>
 
-I'm getting the following error when trying to build virtiofsd-rs on Ubuntu 18.04:
-```
-error: linking with `cc` failed: exit code: 1
-  |
-  = note: "cc" "-Wl,--as-needed" "-Wl,-z,noexecstack" "-m64"
-"-Wl,--eh-frame-hdr" "-L"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.0.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.1.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.10.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.11.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.12.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.13.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.14.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.15.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.2.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.3.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.4.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.5.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.6.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.7.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.8.rcgu.o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.virtiofsd_rs.5vwbdaed-cgu.9.rcgu.o"
-"-o"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/virtiofsd_rs-ae99b236cad712d1.23nu4c2xym2eqlov.rcgu.o"
-"-Wl,--gc-sections" "-pie" "-Wl,-zrelro" "-Wl,-znow" "-Wl,-O1"
-"-nodefaultlibs" "-L"
-"/root/workloads/virtiofsd_rs_build/target/release/deps" "-L"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib"
-"-Wl,-Bstatic"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libvirtiofsd_rs-db8a3339575369be.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libtempdir-f11ec1f478381911.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libremove_dir_all-a2db9479af3068ac.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/librand-aa16576ba5b9392c.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libvhost_user_backend-3c7c4e0b648f2048.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libepoll-731ef9040489f5aa.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libvm_virtio-0a4e924a77987334.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libvm_memory-8e36d6dac6c201c8.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libarc_swap-e6322bdd9bbda381.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libvirtio_bindings-f9a171ce7b13a7b5.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libvhost-1c8ac54972853645.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libvmm_sys_util-d9c56c4a2b27552c.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libseccomp-9888cb76b4b89f98.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/liblog-26151b12ef260e13.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libcfg_if-0b1d0733c6ac953a.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libfutures-cc61a9fd7f8900b0.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libfutures_executor-1d41c3b8dcbe87de.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libnum_cpus-383326fa85306546.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libfutures_util-dd34ea9b0be945a9.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libmemchr-63c5445cdbee0d67.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libfutures_io-4c0f5af5d6d14f1e.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libslab-7c378fecdd145a1f.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libfutures_channel-193b9d71b781f2ca.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libpin_project_lite-682d3321dc2bbe4a.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libfutures_sink-77fc5a4244377a96.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libfutures_task-c37495857747fe61.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libonce_cell-9bec28672c574ba9.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libpin_utils-772382b0bbe51e23.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libfutures_core-44fede59828ea2bf.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libclap-5276dbc49cf0a5cb.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libvec_map-7710e0aa1820f58b.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libtextwrap-5c146e6d5c5b1b6e.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libunicode_width-b8b37d5da2aa8f4a.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libterm_size-d106b04f81264f05.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libstrsim-be518b8b7cca0422.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libbitflags-5624065210ca120e.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libatty-f0ca163b1176c05c.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/liblibc-5b3ef7634a8413c7.rlib"
-"/root/workloads/virtiofsd_rs_build/target/release/deps/libansi_term-8403b5b7bcdb97e5.rlib"
-"-Wl,--start-group"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-b1047a2788193be4.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libpanic_unwind-e8e399e2092f3b2a.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libminiz_oxide-c6b02b522c91c060.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libadler-eaad965909c4200f.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libobject-dca728ac8ed54d87.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libaddr2line-4b4efaa8c4601753.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libgimli-d36e07ed2cc56ee4.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/librustc_demangle-3855d04b1bb40ceb.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libhashbrown-58a065cdff5508a2.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/librustc_std_workspace_alloc-82aeeedcc8d1450a.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libunwind-5c4d6c9d7595f844.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libcfg_if-2642d2bccc00517a.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/liblibc-760e48b3f782e7f5.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/liballoc-d4ef8bf89076ed01.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/librustc_std_workspace_core-36070e2029bb21ea.rlib"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libcore-3aaf8f932781f33e.rlib"
-"-Wl,--end-group"
-"/usr/local/rust/toolchains/1.51.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib/libcompiler_builtins-e2523c360f03ba10.rlib"
-"-Wl,-Bdynamic" "-lgcc_s" "-lutil" "-lrt" "-lpthread" "-lm" "-ldl"
-"-lc"
-  = note: /root/workloads/virtiofsd_rs_build/target/release/deps/libvirtiofsd_rs-db8a3339575369be.rlib(virtiofsd_rs-db8a3339575369be.virtiofsd_rs.f1lp7avh-cgu.2.rcgu.o): In function `virtiofsd_rs::passthrough::PassthroughFs::new':
-          virtiofsd_rs.f1lp7avh-cgu.2:(.text._ZN12virtiofsd_rs11passthrough13PassthroughFs3new17h2c0f6b174348215dE+0xf9): undefined reference to `statx'
-          /root/workloads/virtiofsd_rs_build/target/release/deps/libvirtiofsd_rs-db8a3339575369be.rlib(virtiofsd_rs-db8a3339575369be.virtiofsd_rs.f1lp7avh-cgu.2.rcgu.o): In function `virtiofsd_rs::passthrough::PassthroughFs::do_lookup':
-          virtiofsd_rs.f1lp7avh-cgu.2:(.text._ZN12virtiofsd_rs11passthrough13PassthroughFs9do_lookup17hc8ba433e9e8847ffE+0x223): undefined reference to `statx'
-          /root/workloads/virtiofsd_rs_build/target/release/deps/libvirtiofsd_rs-db8a3339575369be.rlib(virtiofsd_rs-db8a3339575369be.virtiofsd_rs.f1lp7avh-cgu.2.rcgu.o): In function `virtiofsd_rs::passthrough::PassthroughFs::do_getattr':
-          virtiofsd_rs.f1lp7avh-cgu.2:(.text._ZN12virtiofsd_rs11passthrough13PassthroughFs10do_getattr17h20a69500901cdbebE+0x1de): undefined reference to `statx'
-          /root/workloads/virtiofsd_rs_build/target/release/deps/libvirtiofsd_rs-db8a3339575369be.rlib(virtiofsd_rs-db8a3339575369be.virtiofsd_rs.f1lp7avh-cgu.2.rcgu.o): In function `<virtiofsd_rs::passthrough::PassthroughFs as virtiofsd_rs::filesystem::FileSystem>::init':
-          virtiofsd_rs.f1lp7avh-cgu.2:(.text._ZN97_$LT$virtiofsd_rs..passthrough..PassthroughFs$u20$as$u20$virtiofsd_rs..filesystem..FileSystem$GT$4init17h1458bbcbdcf78211E+0x148): undefined reference to `statx'
-          /root/workloads/virtiofsd_rs_build/target/release/deps/libvirtiofsd_rs-db8a3339575369be.rlib(virtiofsd_rs-db8a3339575369be.virtiofsd_rs.f1lp7avh-cgu.2.rcgu.o): In function `<virtiofsd_rs::passthrough::PassthroughFs as virtiofsd_rs::filesystem::FileSystem>::access':
-          virtiofsd_rs.f1lp7avh-cgu.2:(.text._ZN97_$LT$virtiofsd_rs..passthrough..PassthroughFs$u20$as$u20$virtiofsd_rs..filesystem..FileSystem$GT$6access17h29a0480f57392834E+0x1ee): undefined reference to `statx'
-          collect2: error: ld returned 1 exit status
-          
+On Mon, Apr 26, 2021 at 05:10:11PM +0200, Greg Kurz wrote:
+> Even if POSIX doesn't mandate it, linux users legitimately expect
+> sync() to flush all data and metadata to physical storage when it
+> is located on the same system. This isn't happening with virtiofs
+> though : sync() inside the guest returns right away even though
+> data still needs to be flushed from the host page cache.
+> 
+> This is easily demonstrated by doing the following in the guest:
+> 
+> $ dd if=/dev/zero of=/mnt/foo bs=1M count=5K ; strace -T -e sync sync
+> 5120+0 records in
+> 5120+0 records out
+> 5368709120 bytes (5.4 GB, 5.0 GiB) copied, 5.22224 s, 1.0 GB/s
+> sync()                                  = 0 <0.024068>
+> +++ exited with 0 +++
+> 
+> and start the following in the host when the 'dd' command completes
+> in the guest:
+> 
+> $ strace -T -e fsync /usr/bin/sync virtiofs/foo
+> fsync(3)                                = 0 <10.371640>
+> +++ exited with 0 +++
+> 
+> There are no good reasons not to honor the expected behavior of
+> sync() actually : it gives an unrealistic impression that virtiofs
+> is super fast and that data has safely landed on HW, which isn't
+> the case obviously.
+> 
+> Implement a ->sync_fs() superblock operation that sends a new
+> FUSE_SYNC request type for this purpose. Provision a 64-bit
+> flags field for possible future extensions. Since the file
+> server cannot handle the wait == 0 case, we skip it to avoid a
+> gratuitous roundtrip.
+> 
+> Like with FUSE_FSYNC and FUSE_FSYNCDIR, lack of support for
+> FUSE_SYNC in the file server is treated as permanent success.
+> This ensures compatibility with older file servers : the client
+> will get the current behavior of sync() not being propagated to
+> the file server.
+> 
+> Note that such an operation allows the file server to DoS sync().
+> Since a typical FUSE file server is an untrusted piece of software
+> running in userspace, this is disabled by default.  Only enable it
+> with virtiofs for now since virtiofsd is supposedly trusted by the
+> guest kernel.
+> 
+> Reported-by: Robert Krawitz <rlk@redhat.com>
+> Signed-off-by: Greg Kurz <groug@kaod.org>
+> ---
+> 
+> v2: - clarify compatibility with older servers in changelog (Vivek)
+>     - ignore the wait == 0 case (Miklos)
+>     - 64-bit aligned argument structure (Vivek, Miklos)
+> 
+>  fs/fuse/fuse_i.h          |  3 +++
+>  fs/fuse/inode.c           | 35 +++++++++++++++++++++++++++++++++++
+>  fs/fuse/virtio_fs.c       |  1 +
+>  include/uapi/linux/fuse.h | 10 +++++++++-
+>  4 files changed, 48 insertions(+), 1 deletion(-)
+> 
+> diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+> index 63d97a15ffde..68e9ae96cbd4 100644
+> --- a/fs/fuse/fuse_i.h
+> +++ b/fs/fuse/fuse_i.h
+> @@ -755,6 +755,9 @@ struct fuse_conn {
+>  	/* Auto-mount submounts announced by the server */
+>  	unsigned int auto_submounts:1;
+>  
+> +	/* Propagate syncfs() to server */
+> +	unsigned int sync_fs:1;
+> +
+>  	/** The number of requests waiting for completion */
+>  	atomic_t num_waiting;
+>  
+> diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+> index b0e18b470e91..ac184069b40f 100644
+> --- a/fs/fuse/inode.c
+> +++ b/fs/fuse/inode.c
+> @@ -506,6 +506,40 @@ static int fuse_statfs(struct dentry *dentry, struct kstatfs *buf)
+>  	return err;
+>  }
+>  
+> +static int fuse_sync_fs(struct super_block *sb, int wait)
+> +{
+> +	struct fuse_mount *fm = get_fuse_mount_super(sb);
+> +	struct fuse_conn *fc = fm->fc;
+> +	struct fuse_syncfs_in inarg;
+> +	FUSE_ARGS(args);
+> +	int err;
+> +
+> +	/*
+> +	 * Userspace cannot handle the wait == 0 case. Avoid a
+> +	 * gratuitous roundtrip.
+> +	 */
+> +	if (!wait)
+> +		return 0;
+> +
+> +	if (!fc->sync_fs)
+> +		return 0;
+> +
+> +	memset(&inarg, 0, sizeof(inarg));
+> +	args.in_numargs = 1;
+> +	args.in_args[0].size = sizeof(inarg);
+> +	args.in_args[0].value = &inarg;
+> +	args.opcode = FUSE_SYNCFS;
+> +	args.out_numargs = 0;
+> +
+> +	err = fuse_simple_request(fm, &args);
+> +	if (err == -ENOSYS) {
+> +		fc->sync_fs = 0;
+> +		err = 0;
+> +	}
+> +
+> +	return err;
+> +}
+> +
+>  enum {
+>  	OPT_SOURCE,
+>  	OPT_SUBTYPE,
+> @@ -909,6 +943,7 @@ static const struct super_operations fuse_super_operations = {
+>  	.put_super	= fuse_put_super,
+>  	.umount_begin	= fuse_umount_begin,
+>  	.statfs		= fuse_statfs,
+> +	.sync_fs	= fuse_sync_fs,
+>  	.show_options	= fuse_show_options,
+>  };
+>  
+> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> index 4ee6f734ba83..a3c025308743 100644
+> --- a/fs/fuse/virtio_fs.c
+> +++ b/fs/fuse/virtio_fs.c
+> @@ -1441,6 +1441,7 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
+>  	fc->release = fuse_free_conn;
+>  	fc->delete_stale = true;
+>  	fc->auto_submounts = true;
+> +	fc->sync_fs = true;
+>  
+>  	fsc->s_fs_info = fm;
+>  	sb = sget_fc(fsc, virtio_fs_test_super, set_anon_super_fc);
+> diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
+> index 54442612c48b..1265ca17620c 100644
+> --- a/include/uapi/linux/fuse.h
+> +++ b/include/uapi/linux/fuse.h
+> @@ -179,6 +179,9 @@
+>   *  7.33
+>   *  - add FUSE_HANDLE_KILLPRIV_V2, FUSE_WRITE_KILL_SUIDGID, FATTR_KILL_SUIDGID
+>   *  - add FUSE_OPEN_KILL_SUIDGID
+> + *
+> + *  7.34
+> + *  - add FUSE_SYNCFS
+>   */
+>  
+>  #ifndef _LINUX_FUSE_H
+> @@ -214,7 +217,7 @@
+>  #define FUSE_KERNEL_VERSION 7
+>  
+>  /** Minor version number of this interface */
+> -#define FUSE_KERNEL_MINOR_VERSION 33
+> +#define FUSE_KERNEL_MINOR_VERSION 34
+>  
+>  /** The node ID of the root inode */
+>  #define FUSE_ROOT_ID 1
+> @@ -499,6 +502,7 @@ enum fuse_opcode {
+>  	FUSE_COPY_FILE_RANGE	= 47,
+>  	FUSE_SETUPMAPPING	= 48,
+>  	FUSE_REMOVEMAPPING	= 49,
+> +	FUSE_SYNCFS		= 50,
+>  
+>  	/* CUSE specific operations */
+>  	CUSE_INIT		= 4096,
+> @@ -957,4 +961,8 @@ struct fuse_removemapping_one {
+>  #define FUSE_REMOVEMAPPING_MAX_ENTRY   \
+>  		(PAGE_SIZE / sizeof(struct fuse_removemapping_one))
+>  
+> +struct fuse_syncfs_in {
+> +	uint64_t flags;
+> +};
+> +
 
-error: aborting due to previous error
+Hi Greg,
 
-error: could not compile `virtiofsd-rs`
-```
+Will it be better if 32bits are for flags and reset 32 are
+padding and can be used in whatever manner.
 
-It seems the code expects statx() to be present, but that's not the case with Bionic Beaver.
----
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/issues/12
+struct fuse_syncfs_in {
+	uint32_t flags;
+	uint32_t padding;
+};
+
+This will increase the flexibility if we were to send more information
+in future.
+
+I already see bunch of structures where flags are 32 bit and reset
+are padding bits. fuse_read_in, fuse_write_in, fuse_rename2_in etc.
+
+Thanks
+Vivek
+
+>  #endif /* _LINUX_FUSE_H */
+> -- 
+> 2.26.3
+> 
 

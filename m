@@ -1,18 +1,18 @@
-Date: Tue, 27 Apr 2021 10:50:24 -0400
+Date: Tue, 27 Apr 2021 11:02:12 -0400
 From: virtiofs-bot@sinrega.org
-Message-Id: <59543.121042710502000137@us-mta-336.us.mimecast.lan>
+Message-Id: <81609.121042711020700920@us-mta-425.us.mimecast.lan>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm2; bh=Lm3ENkXazy8jzMXde
-	pffxoAWFHIIjn7lK7TfBDb4A9A=; b=qnH/odvBc2laKbJRmYr+rH3w1FrgBxwbM
-	6QJAfmIc0H7tuKPe0mfxaA4fwyECnFgxPHzUbcbQ6GdeZ2iMnzit8PDgKdtsGQL5
-	vGcYDkqiiSf0+lPN9/fZvpCfgqX80fpAtqN3K23e6l9DRfhr5ldBXTCpize4OhaB
-	I1JjOnV3N69qdnU84TKfaRhKv6vpaj7+TWRAjr3jftXpXYXcHEt4ZoemDFXpYQPT
-	UeKznmXulQNXg/WKtEHOMEYk0AoyAC4FTWPMH7xFOGXJzzcYsLtrh9f1Ac3dvZOZ
-	WnW/PeY3eT/kgBbI3BKmMrX10vSE7vL4eD/Q+TCpFgJuYrZDNVPKQ==
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm2; bh=yA5NEyjVMSeDdIK4u
+	HgC+RsQOYV2MoJ7o8MnT5E0n0M=; b=QSq1WEw4NFhgsnWoeF6vvuAkzuf4K3jF/
+	wGds3PlunvsChRGvF9DQ1MkhquOMBE3b/8wksH5UI/TTcCYrBLD+vSf2JMh0v+TX
+	mCAWs8A9HCQp8cCs/twu9A13OWV/C5VrsiKeI1X75sZ0R1Lg1gFSXNv84oSKvIJ2
+	TAFtCXuHxE+U5PSOH7j1jbhW69CfyKbAPVMKN6qG8vZq3mTtS6SxyOxG96tOUN49
+	BqAINjTTZ8Q0iIGrIicig2FVSCWg6VdsWP0aa5IOyvAiUatJWaNpe/GuMHcsJvXN
+	gGbMsJQohLsffy25Y8oyB0IWWhY7HcmBN+zZGOaZh8BUFacBuYmBg==
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] MR merged: Drop security.capability in
-	setattr() branches
+Subject: [Virtio-fs] [virtiofsd-rs] MR merged: Fix killpriv v1 enforcement
+	on writes
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,14 +23,30 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-If the security.capability xattr is mapped to something else for the
-guest, drop it when executing the uid/gid/trunc branches for setattr.
+The `set_creds` function returns a pair of ScopedUid/ScopedGid objects
+(well, they're `Option<Scoped...>`) that change the effective uid and
+gid of the calling thread for the duration of their scope. That is, once
+they're dropped, they "pop" the new uid/gid back to uid/gid 0.
 
-It must be dropped on all writes and the host kernel won't know to look
-for the mapped attribute; only the server knows what the mapped attribute
-name is.
+Trouble is, right now, these objects' scope is actually the lexical
+block of the if statement. This means the current thread's uid/gid
+changes only for the scope of the if-statement and then is popped back
+to uid/gid 0 before attempting the write.
+
+To fix this, retain these objects for the enclosing function scope
+rather than just the scope of the if statement. This way, the thread's
+uid/gid change is effective for the duration of the write, which I
+believe was the original intent.
+
+Note: I was unable to test this with a mainline kernel. I dug into it,
+and I think it's a backwards compatibility mixup in the FUSE module. I
+sent a patch upstream[1]. I also tested _this_ patch with a patched kernel
+and verified this works as intended. I also verified that _without this
+patch_, the privileges are not killed.
+
+[1] https://lore.kernel.org/linux-fsdevel/20210423151919.195033-1-ckuehl@redhat.com/T/#u
 
 Signed-off-by: Connor Kuehl <ckuehl@redhat.com>
 ---
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/21
+https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/24
 

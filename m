@@ -1,16 +1,17 @@
-Date: Mon, 26 Apr 2021 15:10:58 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210426191058.GH1741690@redhat.com>
-References: <20210423211130.GA1668472@redhat.com>
-	<20210424061243.GA36532@rsjd01523.et2sqa>
-	<20210426113954.GA1724699@redhat.com>
-	<20210426190315.GA114267@rsjd01523.et2sqa>
+Date: Tue, 27 Apr 2021 10:48:30 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YIfd7p/xDy8RqA1M@work-vm>
+References: <20210420154643.58439-1-ma.mandourr@gmail.com>
+	<20210420154643.58439-2-ma.mandourr@gmail.com>
+	<20210420190334.GE1529659@redhat.com>
+	<CAD-LL6jeKzfY5ehBU_D6Bnpm53jNneecWLvYs_seGTOmZ=Am6Q@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
-In-Reply-To: <20210426190315.GA114267@rsjd01523.et2sqa>
-Subject: Re: [Virtio-fs] [RFC] [PATCH] virtiofsd: Auto switch between inline
- and thread-pool processing
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <CAD-LL6jeKzfY5ehBU_D6Bnpm53jNneecWLvYs_seGTOmZ=Am6Q@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH v2 1/7] virtiofsd: Changed allocations of
+ fuse_req to GLib functions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,158 +20,99 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Liu Bo <bo.liu@linux.alibaba.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Michey Mehta <mimehta@redhat.com>
+To: Mahmoud Mandour <ma.mandourr@gmail.com>
+Cc: "open list:virtiofs" <virtio-fs@redhat.com>, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
 
-On Tue, Apr 27, 2021 at 03:03:43AM +0800, Liu Bo wrote:
-> On Mon, Apr 26, 2021 at 07:39:54AM -0400, Vivek Goyal wrote:
-> > On Sat, Apr 24, 2021 at 02:12:44PM +0800, Liu Bo wrote:
-> > > On Fri, Apr 23, 2021 at 05:11:30PM -0400, Vivek Goyal wrote:
-> > > > This is just an RFC patch for now. I am still running performance numbers
-> > > > and see if this method of switching is good enough or not. I did one run
-> > > > and seemed to get higher performance on deeper queue depths. There were
-> > > > few tests where I did not match lower queue depth performance with 
-> > > > no thread pool. May be run to run variation.
-> > > > 
-> > > > For low queue depth workloads, inline processing works well. But for 
-> > > > high queue depth (and multiple process/thread) workloads, parallel
-> > > > processing of thread pool can benefit.
-> > > > 
-> > > > This patch is an experiment which tries to switch to between inline and
-> > > > thread-pool processing. If number of requests received on queue is
-> > > > 1, inline processing is done. Otherwise requests are handed over to
-> > > > a thread pool for processing.
-> > > >
-> > > 
-> > > I'm looking forward to the results showing how many requests would it
-> > > beats the overhead of using thread pools.
-> > > 
-> > > This is a good idea indeed, and the switch mechanism also applies to
-> > > async IO framework like iouring.
-> > 
-> > Hi Liubo,
-> > 
-> > I have been thinking of using io_uring. Have you managed to make it work.
-> > Do we get better performance with io_uring.
+* Mahmoud Mandour (ma.mandourr@gmail.com) wrote:
+> On Tue, Apr 20, 2021 at 9:03 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> 
+> > On Tue, Apr 20, 2021 at 05:46:36PM +0200, Mahmoud Mandour wrote:
+> > > Replaced the allocation and deallocation of fuse_req structs
+> > > using calloc()/free() call pairs to a GLib's g_try_new0()
+> > > and g_free().
 > >
-> Hi Vivek,
-> 
-> With fuse-backend-rs, I did some experiments using rust async
-> framework and io_uring wrapper ringbahn, and my code is written to
-> provide a few rust coroutines to serve fuse process loop.
-> 
-> I tested the same 8k random read workload on three setups,
-> a) single thread
-> b) threads=4 multiple threads
-> c) coroutines=4 async 
-> 
-> the performance tests showed some expected feedbacks, in terms of IO
-> intensive workloads, "async" beats single thread, it comes with
-> overheads though, it performs about 80% of "multiple threads".
-> 
-> Note that the above tests were done with no limit of cpu/mem
-> resources, by limiting cpu to 1, "async" performs the best given the
-> async io kthreads were not limited.
-
-So if number of cpus are not limited for virtiofsd, then async (c)
-did not perform better than "multiple threads" (b)? 
-
-IOW, async performed better than multiple threads only if number
-of cpus was limited to 1 for virtiofsd.
-
-Did I understand it right?
-
-> 
-> So it looks like all three setups have pros and cons, it'd be great if
-> we can do switching between them on the fly.
-
-Agreed. It probably will make sense to add support for async I/O
-(probably using io_uring) and provide a knob to let user select
-whatever I/O interface they want to use.
-
-Vivek
-
-> 
-> thanks,
-> liubo
-> 
-> > Thanks
+> > Hi,
+> >
+> > What's the context of these patches. I see all of them are switching
+> > to glib functions. Why to do that? What's the advantage.
+> >
 > > Vivek
-> > 
-> > > 
-> > > thanks,
-> > > liubo
-> > > 
-> > > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > > > ---
-> > > >  tools/virtiofsd/fuse_virtio.c |   27 +++++++++++++++++++--------
-> > > >  1 file changed, 19 insertions(+), 8 deletions(-)
-> > > > 
-> > > > Index: rhvgoyal-qemu/tools/virtiofsd/fuse_virtio.c
-> > > > ===================================================================
-> > > > --- rhvgoyal-qemu.orig/tools/virtiofsd/fuse_virtio.c	2021-04-23 10:03:46.175920039 -0400
-> > > > +++ rhvgoyal-qemu/tools/virtiofsd/fuse_virtio.c	2021-04-23 10:56:37.793722634 -0400
-> > > > @@ -446,6 +446,15 @@ err:
-> > > >  static __thread bool clone_fs_called;
-> > > >  
-> > > >  /* Process one FVRequest in a thread pool */
-> > > > +static void fv_queue_push_to_pool(gpointer data, gpointer user_data)
-> > > > +{
-> > > > +    FVRequest *req = data;
-> > > > +    GThreadPool *pool = user_data;
-> > > > +
-> > > > +    g_thread_pool_push(pool, req, NULL);
-> > > > +}
-> > > > +
-> > > > +/* Process one FVRequest in a thread pool */
-> > > >  static void fv_queue_worker(gpointer data, gpointer user_data)
-> > > >  {
-> > > >      struct fv_QueueInfo *qi = user_data;
-> > > > @@ -605,6 +614,7 @@ static void *fv_queue_thread(void *opaqu
-> > > >      struct fuse_session *se = qi->virtio_dev->se;
-> > > >      GThreadPool *pool = NULL;
-> > > >      GList *req_list = NULL;
-> > > > +    int nr_req = 0;
-> > > >  
-> > > >      if (se->thread_pool_size) {
-> > > >          fuse_log(FUSE_LOG_DEBUG, "%s: Creating thread pool for Queue %d\n",
-> > > > @@ -686,22 +696,23 @@ static void *fv_queue_thread(void *opaqu
-> > > >              }
-> > > >  
-> > > >              req->reply_sent = false;
-> > > > -
-> > > > -            if (!se->thread_pool_size) {
-> > > > -                req_list = g_list_prepend(req_list, req);
-> > > > -            } else {
-> > > > -                g_thread_pool_push(pool, req, NULL);
-> > > > -            }
-> > > > +            req_list = g_list_prepend(req_list, req);
-> > > > +            nr_req++;
-> > > >          }
-> > > >  
-> > > >          pthread_mutex_unlock(&qi->vq_lock);
-> > > >          vu_dispatch_unlock(qi->virtio_dev);
-> > > >  
-> > > >          /* Process all the requests. */
-> > > > -        if (!se->thread_pool_size && req_list != NULL) {
-> > > > -            g_list_foreach(req_list, fv_queue_worker, qi);
-> > > > +        if (req_list != NULL) {
-> > > > +            if (!se->thread_pool_size || nr_req <= 2) {
-> > > > +                g_list_foreach(req_list, fv_queue_worker, qi);
-> > > > +            } else  {
-> > > > +                g_list_foreach(req_list, fv_queue_push_to_pool, pool);
-> > > > +            }
-> > > >              g_list_free(req_list);
-> > > >              req_list = NULL;
-> > > > +            nr_req = 0;
-> > > >          }
-> > > >      }
-> > > >  
-> > > > 
-> > > > _______________________________________________
-> > > > Virtio-fs mailing list
-> > > > Virtio-fs@redhat.com
-> > > > https://listman.redhat.com/mailman/listinfo/virtio-fs
-> > > 
+> >
+> > >
+> > > Signed-off-by: Mahmoud Mandour <ma.mandourr@gmail.com>
+> > > Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+> > > ---
+> > >  tools/virtiofsd/fuse_lowlevel.c | 6 +++---
+> > >  1 file changed, 3 insertions(+), 3 deletions(-)
+> > >
+> > > diff --git a/tools/virtiofsd/fuse_lowlevel.c
+> > b/tools/virtiofsd/fuse_lowlevel.c
+> > > index 58e32fc963..812cef6ef6 100644
+> > > --- a/tools/virtiofsd/fuse_lowlevel.c
+> > > +++ b/tools/virtiofsd/fuse_lowlevel.c
+> > > @@ -106,7 +106,7 @@ static void list_add_req(struct fuse_req *req,
+> > struct fuse_req *next)
+> > >  static void destroy_req(fuse_req_t req)
+> > >  {
+> > >      pthread_mutex_destroy(&req->lock);
+> > > -    free(req);
+> > > +    g_free(req);
+> > >  }
+> > >
+> > >  void fuse_free_req(fuse_req_t req)
+> > > @@ -130,7 +130,7 @@ static struct fuse_req *fuse_ll_alloc_req(struct
+> > fuse_session *se)
+> > >  {
+> > >      struct fuse_req *req;
+> > >
+> > > -    req = (struct fuse_req *)calloc(1, sizeof(struct fuse_req));
+> > > +    req = g_try_new0(struct fuse_req, 1);
+> > >      if (req == NULL) {
+> > >          fuse_log(FUSE_LOG_ERR, "fuse: failed to allocate request\n");
+> > >      } else {
+> > > @@ -1684,7 +1684,7 @@ static struct fuse_req *check_interrupt(struct
+> > fuse_session *se,
+> > >          if (curr->u.i.unique == req->unique) {
+> > >              req->interrupted = 1;
+> > >              list_del_req(curr);
+> > > -            free(curr);
+> > > +            g_free(curr);
+> > >              return NULL;
+> > >          }
+> > >      }
+> > > --
+> > > 2.25.1
+> > >
+> > > _______________________________________________
+> > > Virtio-fs mailing list
+> > > Virtio-fs@redhat.com
+> > > https://listman.redhat.com/mailman/listinfo/virtio-fs
+> >
+> >
+> Hello Vivek,
 > 
+> Taken from the Qemu Coding Style document in the documentation:
+> "Use of the malloc/free/realloc/calloc/valloc/memalign/posix_memalign APIs
+> is not allowed in the QEMU codebase. Instead of these routines, use the
+> GLib memory allocation routines
+> g_malloc/g_malloc0/g_new/g_new0/g_realloc/g_free or QEMU’s
+> qemu_memalign/qemu_blockalign/qemu_vfree APIs."
+> It's also in the bite-sized contributions page as a task.
+
+Yes I think generally that's OK; note that virtiofsd is a little unusual
+in that a lot of it is imported from an external library and then
+changed; so we've not done a lot of these type of qemu-speicific styles.
+
+Dave
+
+> Thanks,
+> Mahmoud
+
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
+
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

@@ -1,12 +1,23 @@
-Date: Tue, 27 Apr 2021 13:12:06 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210427171206.GA1805363@redhat.com>
-References: <20210426151011.840459-1-groug@kaod.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=from:to:cc:subject:date:message-id:in-reply-to:references
+	:mime-version:content-transfer-encoding;
+	bh=oL7tT4/EkZRAjRxNnXes8qHr1hKlD6EBXOmzh2nu7XY=;
+	b=CG5soQITWm+R8S0Ki19y7h/RwpwNxwNKGiJ3I+eyyVTJCUBxzn+CTgj5ueQyt+ua8Y
+	WH6GgkWZiIH/R+MDShlW493fobiA7TIDeSyawFbP7llB6ksipYrBsBuCBFrm6qLmp1rT
+	p3BVVdUSNMeFJn7+VIDLQ50A7RgFP2ytmpHaNbLLUURRmzZMNR1vTsqiZMF4zTUVld0b
+	a4kG/z7lRURoLHwNdX+HOD7p2rIF4rPx0JTgIuCVMYF2t5esAhmn7mJPwnYwR4LERG8Z
+	WcJwLTLJkQnbQTzWSOMKa42TF37BmdeDX+CCa2GWOBthVaAql7ke+SjT8cF2JRfIVlxZ
+	FCxA==
+From: Mahmoud Mandour <ma.mandourr@gmail.com>
+Date: Tue, 27 Apr 2021 20:13:33 +0200
+Message-Id: <20210427181333.148176-1-ma.mandourr@gmail.com>
+In-Reply-To: <YIf2d8HuyPqwqt9C@work-vm>
+References: <YIf2d8HuyPqwqt9C@work-vm>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210426151011.840459-1-groug@kaod.org>
-Subject: Re: [Virtio-fs] [PATCH v2] virtiofs: propagate sync() to file server
+Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [PATCH v3 2/7] virtiofsd: Changed allocations of iovec
+	to GLib's functions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,209 +26,186 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
-Cc: Miklos Szeredi <miklos@szeredi.hu>, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Robert Krawitz <rlk@redhat.com>
+To: qemu-devel@nongnu.org
+Cc: "open list:virtiofs" <virtio-fs@redhat.com>, Mahmoud Mandour <ma.mandourr@gmail.com>
 
-On Mon, Apr 26, 2021 at 05:10:11PM +0200, Greg Kurz wrote:
-> Even if POSIX doesn't mandate it, linux users legitimately expect
-> sync() to flush all data and metadata to physical storage when it
-> is located on the same system. This isn't happening with virtiofs
-> though : sync() inside the guest returns right away even though
-> data still needs to be flushed from the host page cache.
-> 
-> This is easily demonstrated by doing the following in the guest:
-> 
-> $ dd if=/dev/zero of=/mnt/foo bs=1M count=5K ; strace -T -e sync sync
-> 5120+0 records in
-> 5120+0 records out
-> 5368709120 bytes (5.4 GB, 5.0 GiB) copied, 5.22224 s, 1.0 GB/s
-> sync()                                  = 0 <0.024068>
-> +++ exited with 0 +++
-> 
-> and start the following in the host when the 'dd' command completes
-> in the guest:
-> 
-> $ strace -T -e fsync /usr/bin/sync virtiofs/foo
-> fsync(3)                                = 0 <10.371640>
-> +++ exited with 0 +++
-> 
-> There are no good reasons not to honor the expected behavior of
-> sync() actually : it gives an unrealistic impression that virtiofs
-> is super fast and that data has safely landed on HW, which isn't
-> the case obviously.
-> 
-> Implement a ->sync_fs() superblock operation that sends a new
-> FUSE_SYNC request type for this purpose. Provision a 64-bit
-> flags field for possible future extensions. Since the file
-> server cannot handle the wait == 0 case, we skip it to avoid a
-> gratuitous roundtrip.
-> 
-> Like with FUSE_FSYNC and FUSE_FSYNCDIR, lack of support for
-> FUSE_SYNC in the file server is treated as permanent success.
-> This ensures compatibility with older file servers : the client
-> will get the current behavior of sync() not being propagated to
-> the file server.
-> 
-> Note that such an operation allows the file server to DoS sync().
-> Since a typical FUSE file server is an untrusted piece of software
-> running in userspace, this is disabled by default.  Only enable it
-> with virtiofs for now since virtiofsd is supposedly trusted by the
-> guest kernel.
-> 
-> Reported-by: Robert Krawitz <rlk@redhat.com>
-> Signed-off-by: Greg Kurz <groug@kaod.org>
-> ---
-> 
-> v2: - clarify compatibility with older servers in changelog (Vivek)
->     - ignore the wait == 0 case (Miklos)
->     - 64-bit aligned argument structure (Vivek, Miklos)
-> 
->  fs/fuse/fuse_i.h          |  3 +++
->  fs/fuse/inode.c           | 35 +++++++++++++++++++++++++++++++++++
->  fs/fuse/virtio_fs.c       |  1 +
->  include/uapi/linux/fuse.h | 10 +++++++++-
->  4 files changed, 48 insertions(+), 1 deletion(-)
-> 
-> diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-> index 63d97a15ffde..68e9ae96cbd4 100644
-> --- a/fs/fuse/fuse_i.h
-> +++ b/fs/fuse/fuse_i.h
-> @@ -755,6 +755,9 @@ struct fuse_conn {
->  	/* Auto-mount submounts announced by the server */
->  	unsigned int auto_submounts:1;
->  
-> +	/* Propagate syncfs() to server */
-> +	unsigned int sync_fs:1;
-> +
->  	/** The number of requests waiting for completion */
->  	atomic_t num_waiting;
->  
-> diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-> index b0e18b470e91..ac184069b40f 100644
-> --- a/fs/fuse/inode.c
-> +++ b/fs/fuse/inode.c
-> @@ -506,6 +506,40 @@ static int fuse_statfs(struct dentry *dentry, struct kstatfs *buf)
->  	return err;
->  }
->  
-> +static int fuse_sync_fs(struct super_block *sb, int wait)
-> +{
-> +	struct fuse_mount *fm = get_fuse_mount_super(sb);
-> +	struct fuse_conn *fc = fm->fc;
-> +	struct fuse_syncfs_in inarg;
-> +	FUSE_ARGS(args);
-> +	int err;
-> +
-> +	/*
-> +	 * Userspace cannot handle the wait == 0 case. Avoid a
-> +	 * gratuitous roundtrip.
-> +	 */
-> +	if (!wait)
-> +		return 0;
-> +
-> +	if (!fc->sync_fs)
-> +		return 0;
-> +
-> +	memset(&inarg, 0, sizeof(inarg));
-> +	args.in_numargs = 1;
-> +	args.in_args[0].size = sizeof(inarg);
-> +	args.in_args[0].value = &inarg;
-> +	args.opcode = FUSE_SYNCFS;
-> +	args.out_numargs = 0;
-> +
-> +	err = fuse_simple_request(fm, &args);
-> +	if (err == -ENOSYS) {
-> +		fc->sync_fs = 0;
-> +		err = 0;
-> +	}
-> +
-> +	return err;
-> +}
-> +
->  enum {
->  	OPT_SOURCE,
->  	OPT_SUBTYPE,
-> @@ -909,6 +943,7 @@ static const struct super_operations fuse_super_operations = {
->  	.put_super	= fuse_put_super,
->  	.umount_begin	= fuse_umount_begin,
->  	.statfs		= fuse_statfs,
-> +	.sync_fs	= fuse_sync_fs,
->  	.show_options	= fuse_show_options,
->  };
->  
-> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-> index 4ee6f734ba83..a3c025308743 100644
-> --- a/fs/fuse/virtio_fs.c
-> +++ b/fs/fuse/virtio_fs.c
-> @@ -1441,6 +1441,7 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
->  	fc->release = fuse_free_conn;
->  	fc->delete_stale = true;
->  	fc->auto_submounts = true;
-> +	fc->sync_fs = true;
->  
->  	fsc->s_fs_info = fm;
->  	sb = sget_fc(fsc, virtio_fs_test_super, set_anon_super_fc);
-> diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-> index 54442612c48b..1265ca17620c 100644
-> --- a/include/uapi/linux/fuse.h
-> +++ b/include/uapi/linux/fuse.h
-> @@ -179,6 +179,9 @@
->   *  7.33
->   *  - add FUSE_HANDLE_KILLPRIV_V2, FUSE_WRITE_KILL_SUIDGID, FATTR_KILL_SUIDGID
->   *  - add FUSE_OPEN_KILL_SUIDGID
-> + *
-> + *  7.34
-> + *  - add FUSE_SYNCFS
->   */
->  
->  #ifndef _LINUX_FUSE_H
-> @@ -214,7 +217,7 @@
->  #define FUSE_KERNEL_VERSION 7
->  
->  /** Minor version number of this interface */
-> -#define FUSE_KERNEL_MINOR_VERSION 33
-> +#define FUSE_KERNEL_MINOR_VERSION 34
->  
->  /** The node ID of the root inode */
->  #define FUSE_ROOT_ID 1
-> @@ -499,6 +502,7 @@ enum fuse_opcode {
->  	FUSE_COPY_FILE_RANGE	= 47,
->  	FUSE_SETUPMAPPING	= 48,
->  	FUSE_REMOVEMAPPING	= 49,
-> +	FUSE_SYNCFS		= 50,
->  
->  	/* CUSE specific operations */
->  	CUSE_INIT		= 4096,
-> @@ -957,4 +961,8 @@ struct fuse_removemapping_one {
->  #define FUSE_REMOVEMAPPING_MAX_ENTRY   \
->  		(PAGE_SIZE / sizeof(struct fuse_removemapping_one))
->  
-> +struct fuse_syncfs_in {
-> +	uint64_t flags;
-> +};
-> +
+Replaced the calls to malloc()/calloc() and their respective
+calls to free() of iovec structs with GLib's allocation and
+deallocation functions and used g_autofree when appropriate.
 
-Hi Greg,
+Replaced the allocation of in_sg_cpy to g_new() instead of a call
+to calloc() and a null-checking assertion. Not g_new0()
+because the buffer is immediately overwritten using memcpy.
 
-Will it be better if 32bits are for flags and reset 32 are
-padding and can be used in whatever manner.
+Signed-off-by: Mahmoud Mandour <ma.mandourr@gmail.com>
+---
+v2 -> v3:
+    * Removed a wrongful combination of g_autofree and g_steel_pointer().
+    * Removed some goto paths that IMHO were not so useful any more.
+    * In v2, I allocated in_sg_cpy through g_new0(). This patch, I use
+      g_new() because the buffer is memcpy'd into right away so no need
+      to zero-initialize.
+    * Moved the declaration of in_sg_cpy to the top of the function
+      to match QEMU's style guidelines. 
 
-struct fuse_syncfs_in {
-	uint32_t flags;
-	uint32_t padding;
-};
+ tools/virtiofsd/fuse_lowlevel.c | 31 ++++++++++++-------------------
+ tools/virtiofsd/fuse_virtio.c   |  8 +++-----
+ 2 files changed, 15 insertions(+), 24 deletions(-)
 
-This will increase the flexibility if we were to send more information
-in future.
-
-I already see bunch of structures where flags are 32 bit and reset
-are padding bits. fuse_read_in, fuse_write_in, fuse_rename2_in etc.
-
-Thanks
-Vivek
-
->  #endif /* _LINUX_FUSE_H */
-> -- 
-> 2.26.3
-> 
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index c8bea246ab..7fe2cef1eb 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -217,9 +217,9 @@ static int send_reply(fuse_req_t req, int error, const void *arg,
+ int fuse_reply_iov(fuse_req_t req, const struct iovec *iov, int count)
+ {
+     int res;
+-    struct iovec *padded_iov;
++    g_autofree struct iovec *padded_iov = NULL;
+ 
+-    padded_iov = malloc((count + 1) * sizeof(struct iovec));
++    padded_iov = g_try_new(struct iovec, count + 1);
+     if (padded_iov == NULL) {
+         return fuse_reply_err(req, ENOMEM);
+     }
+@@ -228,7 +228,6 @@ int fuse_reply_iov(fuse_req_t req, const struct iovec *iov, int count)
+     count++;
+ 
+     res = send_reply_iov(req, 0, padded_iov, count);
+-    free(padded_iov);
+ 
+     return res;
+ }
+@@ -568,7 +567,7 @@ static struct fuse_ioctl_iovec *fuse_ioctl_iovec_copy(const struct iovec *iov,
+     struct fuse_ioctl_iovec *fiov;
+     size_t i;
+ 
+-    fiov = malloc(sizeof(fiov[0]) * count);
++    fiov = g_try_new(struct fuse_ioctl_iovec, count);
+     if (!fiov) {
+         return NULL;
+     }
+@@ -586,8 +585,8 @@ int fuse_reply_ioctl_retry(fuse_req_t req, const struct iovec *in_iov,
+                            size_t out_count)
+ {
+     struct fuse_ioctl_out arg;
+-    struct fuse_ioctl_iovec *in_fiov = NULL;
+-    struct fuse_ioctl_iovec *out_fiov = NULL;
++    g_autofree struct fuse_ioctl_iovec *in_fiov = NULL;
++    g_autofree struct fuse_ioctl_iovec *out_fiov = NULL;
+     struct iovec iov[4];
+     size_t count = 1;
+     int res;
+@@ -603,13 +602,14 @@ int fuse_reply_ioctl_retry(fuse_req_t req, const struct iovec *in_iov,
+     /* Can't handle non-compat 64bit ioctls on 32bit */
+     if (sizeof(void *) == 4 && req->ioctl_64bit) {
+         res = fuse_reply_err(req, EINVAL);
+-        goto out;
++        return res;
+     }
+ 
+     if (in_count) {
+         in_fiov = fuse_ioctl_iovec_copy(in_iov, in_count);
+         if (!in_fiov) {
+-            goto enomem;
++            res = fuse_reply_err(req, ENOMEM);
++            return res;
+         }
+ 
+         iov[count].iov_base = (void *)in_fiov;
+@@ -619,7 +619,8 @@ int fuse_reply_ioctl_retry(fuse_req_t req, const struct iovec *in_iov,
+     if (out_count) {
+         out_fiov = fuse_ioctl_iovec_copy(out_iov, out_count);
+         if (!out_fiov) {
+-            goto enomem;
++            res = fuse_reply_err(req, ENOMEM);
++            return res;
+         }
+ 
+         iov[count].iov_base = (void *)out_fiov;
+@@ -628,15 +629,8 @@ int fuse_reply_ioctl_retry(fuse_req_t req, const struct iovec *in_iov,
+     }
+ 
+     res = send_reply_iov(req, 0, iov, count);
+-out:
+-    free(in_fiov);
+-    free(out_fiov);
+ 
+     return res;
+-
+-enomem:
+-    res = fuse_reply_err(req, ENOMEM);
+-    goto out;
+ }
+ 
+ int fuse_reply_ioctl(fuse_req_t req, int result, const void *buf, size_t size)
+@@ -663,11 +657,11 @@ int fuse_reply_ioctl(fuse_req_t req, int result, const void *buf, size_t size)
+ int fuse_reply_ioctl_iov(fuse_req_t req, int result, const struct iovec *iov,
+                          int count)
+ {
+-    struct iovec *padded_iov;
++    g_autofree struct iovec *padded_iov = NULL;
+     struct fuse_ioctl_out arg;
+     int res;
+ 
+-    padded_iov = malloc((count + 2) * sizeof(struct iovec));
++    padded_iov = g_try_new(struct iovec, count + 2);
+     if (padded_iov == NULL) {
+         return fuse_reply_err(req, ENOMEM);
+     }
+@@ -680,7 +674,6 @@ int fuse_reply_ioctl_iov(fuse_req_t req, int result, const struct iovec *iov,
+     memcpy(&padded_iov[2], iov, count * sizeof(struct iovec));
+ 
+     res = send_reply_iov(req, 0, padded_iov, count + 2);
+-    free(padded_iov);
+ 
+     return res;
+ }
+diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+index 9e437618fb..9b00687cb0 100644
+--- a/tools/virtiofsd/fuse_virtio.c
++++ b/tools/virtiofsd/fuse_virtio.c
+@@ -295,6 +295,8 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+     VuVirtqElement *elem = &req->elem;
+     int ret = 0;
+ 
++    g_autofree struct iovec *in_sg_cpy = NULL;
++
+     assert(count >= 1);
+     assert(iov[0].iov_len >= sizeof(struct fuse_out_header));
+ 
+@@ -347,8 +349,7 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+      * Build a copy of the the in_sg iov so we can skip bits in it,
+      * including changing the offsets
+      */
+-    struct iovec *in_sg_cpy = calloc(sizeof(struct iovec), in_num);
+-    assert(in_sg_cpy);
++    in_sg_cpy = g_new(struct iovec, in_num);
+     memcpy(in_sg_cpy, in_sg, sizeof(struct iovec) * in_num);
+     /* These get updated as we skip */
+     struct iovec *in_sg_ptr = in_sg_cpy;
+@@ -386,7 +387,6 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+             ret = errno;
+             fuse_log(FUSE_LOG_DEBUG, "%s: preadv failed (%m) len=%zd\n",
+                      __func__, len);
+-            free(in_sg_cpy);
+             goto err;
+         }
+         fuse_log(FUSE_LOG_DEBUG, "%s: preadv ret=%d len=%zd\n", __func__,
+@@ -410,13 +410,11 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+         if (ret != len) {
+             fuse_log(FUSE_LOG_DEBUG, "%s: ret!=len\n", __func__);
+             ret = EIO;
+-            free(in_sg_cpy);
+             goto err;
+         }
+         in_sg_left -= ret;
+         len -= ret;
+     } while (in_sg_left);
+-    free(in_sg_cpy);
+ 
+     /* Need to fix out->len on EOF */
+     if (len) {
+-- 
+2.25.1
 

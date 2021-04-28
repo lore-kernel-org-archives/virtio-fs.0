@@ -1,14 +1,16 @@
-Date: Wed, 28 Apr 2021 13:03:29 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210428170329.GB1840673@redhat.com>
-References: <20210428165040.1856202-1-vgoyal@redhat.com>
-	<20210428165040.1856202-2-vgoyal@redhat.com>
+References: <20210428144813.417170-1-philmd@redhat.com>
+	<20210428144813.417170-3-philmd@redhat.com>
+	<e06f3f24-9ff2-bf3c-91c4-178af60c6c59@linaro.org>
+From: =?UTF-8?Q?Philippe_Mathieu-Daud=c3=a9?= <philmd@redhat.com>
+Message-ID: <160e4c85-e8c0-304d-7151-1040f8d310ba@redhat.com>
+Date: Wed, 28 Apr 2021 19:56:35 +0200
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210428165040.1856202-2-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v5 1/3] dax: Add an enum for specifying dax
-	wakup mode
+In-Reply-To: <e06f3f24-9ff2-bf3c-91c4-178af60c6c59@linaro.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Language: en-US
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH 2/2] util/meson: Build
+ iov/hexdump/buffer_is_zero with virtiofsd
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,108 +19,50 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com, dan.j.williams@intel.com
-Cc: jack@suse.cz, willy@infradead.org, miklos@szeredi.hu
+To: Richard Henderson <richard.henderson@linaro.org>, qemu-devel@nongnu.org
+Cc: Thomas Huth <thuth@redhat.com>, "Daniel P . Berrange" <berrange@redhat.com>, virtio-fs@redhat.com, Mahmoud Mandour <ma.mandourr@gmail.com>
 
-On Wed, Apr 28, 2021 at 12:50:38PM -0400, Vivek Goyal wrote:
-> Dan mentioned that he is not very fond of passing around a boolean true/false
-> to specify if only next waiter should be woken up or all waiters should be
-> woken up. He instead prefers that we introduce an enum and make it very
-> explicity at the callsite itself. Easier to read code.
+On 4/28/21 6:38 PM, Richard Henderson wrote:
+> On 4/28/21 7:48 AM, Philippe Mathieu-Daudé wrote:
+>> diff --git a/util/meson.build b/util/meson.build
+>> index 510765cde46..c2eda2d1374 100644
+>> --- a/util/meson.build
+>> +++ b/util/meson.build
+>> @@ -59,12 +59,10 @@
+>>     util_ss.add(files('aiocb.c', 'async.c', 'aio-wait.c'))
+>>     util_ss.add(files('base64.c'))
+>>     util_ss.add(files('buffer.c'))
+>> -  util_ss.add(files('bufferiszero.c'))
+>>    
+>> util_ss.add(files('coroutine-@0@.c'.format(config_host['CONFIG_COROUTINE_BACKEND'])))
+>>
+>>     util_ss.add(files('hbitmap.c'))
+>> -  util_ss.add(files('hexdump.c'))
+>>     util_ss.add(files('iova-tree.c'))
+>> -  util_ss.add(files('iov.c', 'qemu-sockets.c', 'uri.c'))
+>> +  util_ss.add(files('qemu-sockets.c', 'uri.c'))
+>>     util_ss.add(files('lockcnt.c'))
+>>     util_ss.add(files('main-loop.c'))
+>>     util_ss.add(files('nvdimm-utils.c'))
+>> @@ -83,3 +81,9 @@
+>>                                           if_false:
+>> files('filemonitor-stub.c'))
+>>     util_ss.add(when: 'CONFIG_LINUX', if_true: files('vfio-helpers.c'))
+>>   endif
+>> +
+>> +if have_block or config_host.has_key('CONFIG_VHOST_USER_FS')
+>> +  util_ss.add(files('hexdump.c'))
+>> +  util_ss.add(files('bufferiszero.c'))
+>> +  util_ss.add(files('iov.c'))
+>> +endif
 > 
-> This patch should not introduce any change of behavior.
-> 
-> Reviewed-by: Greg Kurz <groug@kaod.org>
-> Reviewed-by: Jan Kara <jack@suse.cz>
-> Suggested-by: Dan Williams <dan.j.williams@intel.com>
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  fs/dax.c | 23 +++++++++++++++++------
->  1 file changed, 17 insertions(+), 6 deletions(-)
-> 
-> diff --git a/fs/dax.c b/fs/dax.c
-> index b3d27fdc6775..c8cd2ae4440b 100644
-> --- a/fs/dax.c
-> +++ b/fs/dax.c
-> @@ -144,6 +144,16 @@ struct wait_exceptional_entry_queue {
->  	struct exceptional_entry_key key;
->  };
->  
-> +/**
-> + * enum dax_wake_mode: waitqueue wakeup behaviour
-> + * @WAKE_NEXT: wake only the first waiter in the waitqueue
-> + * @WAKE_ALL: wake all waiters in the waitqueue
-> + */
+> Isn't util a static library, built once?  Why are we avoiding building
+> these unconditionally?  Surely symbols will be included in any linked
+> binaries only as needed.
 
-I just noticed that I did not change order in comments. Will post
-another version. Sorry about the noise.
+Yes, in this case built once for $ configure
+--target-list=i386-linux-user --disable-tools --enable-virtiofsd.
 
-Vivek
-
-> +enum dax_wake_mode {
-> +	WAKE_ALL,
-> +	WAKE_NEXT,
-> +};
-> +
->  static wait_queue_head_t *dax_entry_waitqueue(struct xa_state *xas,
->  		void *entry, struct exceptional_entry_key *key)
->  {
-> @@ -182,7 +192,8 @@ static int wake_exceptional_entry_func(wait_queue_entry_t *wait,
->   * The important information it's conveying is whether the entry at
->   * this index used to be a PMD entry.
->   */
-> -static void dax_wake_entry(struct xa_state *xas, void *entry, bool wake_all)
-> +static void dax_wake_entry(struct xa_state *xas, void *entry,
-> +			   enum dax_wake_mode mode)
->  {
->  	struct exceptional_entry_key key;
->  	wait_queue_head_t *wq;
-> @@ -196,7 +207,7 @@ static void dax_wake_entry(struct xa_state *xas, void *entry, bool wake_all)
->  	 * must be in the waitqueue and the following check will see them.
->  	 */
->  	if (waitqueue_active(wq))
-> -		__wake_up(wq, TASK_NORMAL, wake_all ? 0 : 1, &key);
-> +		__wake_up(wq, TASK_NORMAL, mode == WAKE_ALL ? 0 : 1, &key);
->  }
->  
->  /*
-> @@ -268,7 +279,7 @@ static void put_unlocked_entry(struct xa_state *xas, void *entry)
->  {
->  	/* If we were the only waiter woken, wake the next one */
->  	if (entry && !dax_is_conflict(entry))
-> -		dax_wake_entry(xas, entry, false);
-> +		dax_wake_entry(xas, entry, WAKE_NEXT);
->  }
->  
->  /*
-> @@ -286,7 +297,7 @@ static void dax_unlock_entry(struct xa_state *xas, void *entry)
->  	old = xas_store(xas, entry);
->  	xas_unlock_irq(xas);
->  	BUG_ON(!dax_is_locked(old));
-> -	dax_wake_entry(xas, entry, false);
-> +	dax_wake_entry(xas, entry, WAKE_NEXT);
->  }
->  
->  /*
-> @@ -524,7 +535,7 @@ static void *grab_mapping_entry(struct xa_state *xas,
->  
->  		dax_disassociate_entry(entry, mapping, false);
->  		xas_store(xas, NULL);	/* undo the PMD join */
-> -		dax_wake_entry(xas, entry, true);
-> +		dax_wake_entry(xas, entry, WAKE_ALL);
->  		mapping->nrexceptional--;
->  		entry = NULL;
->  		xas_set(xas, index);
-> @@ -937,7 +948,7 @@ static int dax_writeback_one(struct xa_state *xas, struct dax_device *dax_dev,
->  	xas_lock_irq(xas);
->  	xas_store(xas, entry);
->  	xas_clear_mark(xas, PAGECACHE_TAG_DIRTY);
-> -	dax_wake_entry(xas, entry, false);
-> +	dax_wake_entry(xas, entry, WAKE_NEXT);
->  
->  	trace_dax_writeback_one(mapping->host, index, count);
->  	return ret;
-> -- 
-> 2.25.4
-> 
+Are you suggesting to remove the 'if have_block' check? This makes build
+a the files pointlessly for user-mode-only builds...
 

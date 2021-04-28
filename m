@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Wed, 28 Apr 2021 12:00:49 +0100
-Message-Id: <20210428110100.27757-16-dgilbert@redhat.com>
+Date: Wed, 28 Apr 2021 12:00:50 +0100
+Message-Id: <20210428110100.27757-17-dgilbert@redhat.com>
 In-Reply-To: <20210428110100.27757-1-dgilbert@redhat.com>
 References: <20210428110100.27757-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 15/26] DAX: virtiofsd: Make
-	lo_removemapping() work
+Subject: [Virtio-fs] [PATCH v3 16/26] DAX: virtiofsd: route se down to
+	destroy method
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,64 +18,76 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, groug@kaod.org
 Cc: virtio-fs@redhat.com
 
-From: Vivek Goyal <vgoyal@redhat.com>
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Let guest pass in the offset in dax window a mapping is currently
-mapped at and needs to be removed.
+We're going to need to pass the session down to destroy so that it can
+pass it back to do the remove mapping.
 
-Vivek added the initial support to remove single mapping and later Peng
-added patch to support removing multiple mappings in single command.
-
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-Signed-off-by: Peng Tao <tao.peng@linux.alibaba.com>
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 32 ++++++++++++++++++++++++++++++--
- 1 file changed, 30 insertions(+), 2 deletions(-)
+ tools/virtiofsd/fuse_lowlevel.c  | 6 +++---
+ tools/virtiofsd/fuse_lowlevel.h  | 2 +-
+ tools/virtiofsd/passthrough_ll.c | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index 4921f1bbb7..6930574aaf 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -2222,7 +2222,7 @@ static void do_destroy(fuse_req_t req, fuse_ino_t nodeid,
+     se->got_destroy = 1;
+     se->got_init = 0;
+     if (se->op.destroy) {
+-        se->op.destroy(se->userdata);
++        se->op.destroy(se->userdata, se);
+     }
+ 
+     send_reply_ok(req, NULL, 0);
+@@ -2449,7 +2449,7 @@ void fuse_session_process_buf_int(struct fuse_session *se,
+             se->got_destroy = 1;
+             se->got_init = 0;
+             if (se->op.destroy) {
+-                se->op.destroy(se->userdata);
++                se->op.destroy(se->userdata, se);
+             }
+         } else {
+             goto reply_err;
+@@ -2538,7 +2538,7 @@ void fuse_session_destroy(struct fuse_session *se)
+ {
+     if (se->got_init && !se->got_destroy) {
+         if (se->op.destroy) {
+-            se->op.destroy(se->userdata);
++            se->op.destroy(se->userdata, se);
+         }
+     }
+     pthread_rwlock_destroy(&se->init_rwlock);
+diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
+index 0bf206264d..27b07bfc22 100644
+--- a/tools/virtiofsd/fuse_lowlevel.h
++++ b/tools/virtiofsd/fuse_lowlevel.h
+@@ -209,7 +209,7 @@ struct fuse_lowlevel_ops {
+      *
+      * @param userdata the user data passed to fuse_session_new()
+      */
+-    void (*destroy)(void *userdata);
++    void (*destroy)(void *userdata, struct fuse_session *se);
+ 
+     /**
+      * Look up a directory entry by name and get its attributes.
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 6981737389..1a86378172 100644
+index 1a86378172..ed5b6c9e2d 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -3210,8 +3210,36 @@ static void lo_removemapping(fuse_req_t req, struct fuse_session *se,
-                              fuse_ino_t ino, unsigned num,
-                              struct fuse_removemapping_one *argp)
- {
--    /* TODO */
--    fuse_reply_err(req, ENOSYS);
-+    VhostUserFSSlaveMsg *msg;
-+    size_t alloc_count = (num > VHOST_USER_FS_SLAVE_MAX_ENTRIES) ?
-+                              VHOST_USER_FS_SLAVE_MAX_ENTRIES : num;
-+    int ret = 0;
-+    msg = g_malloc0(sizeof(VhostUserFSSlaveMsg) +
-+                    alloc_count * sizeof(VhostUserFSSlaveMsgEntry));
-+
-+    for (int i = 0, o = 0; num > 0; i++, argp++) {
-+        VhostUserFSSlaveMsgEntry *e = &msg->entries[o];
-+
-+        e->len = argp->len;
-+        e->c_offset = argp->moffset;
-+
-+        o++;
-+        if (--num == 0 || o == VHOST_USER_FS_SLAVE_MAX_ENTRIES) {
-+            msg->count = o;
-+            ret = fuse_virtio_unmap(se, msg);
-+            if (ret < 0) {
-+                fuse_log(FUSE_LOG_ERR,
-+                         "%s: unmap over virtio failed "
-+                         "(offset=0x%" PRIx64 ", len=0x%" PRIx64 "). err=%d\n",
-+                         __func__, argp->moffset, argp->len, ret);
-+                break;
-+            }
-+            o = 0;
-+        }
-+    }
-+
-+    fuse_reply_err(req, -ret);
-+    g_free(msg);
+@@ -3125,7 +3125,7 @@ static void lo_lseek(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
+     }
  }
  
- static struct fuse_lowlevel_ops lo_oper = {
+-static void lo_destroy(void *userdata)
++static void lo_destroy(void *userdata, struct fuse_session *se)
+ {
+     struct lo_data *lo = (struct lo_data *)userdata;
+ 
 -- 
 2.31.1
 

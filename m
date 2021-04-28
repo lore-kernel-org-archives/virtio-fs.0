@@ -1,11 +1,12 @@
-Date: Mon, 19 Apr 2021 14:45:16 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210419184516.GC1472665@redhat.com>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Wed, 28 Apr 2021 12:00:59 +0100
+Message-Id: <20210428110100.27757-26-dgilbert@redhat.com>
+In-Reply-To: <20210428110100.27757-1-dgilbert@redhat.com>
+References: <20210428110100.27757-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: [Virtio-fs] [PATCH][v2] dax: Fix missed wakeup during dax entry
-	invalidation
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v3 25/26] vhost-user-fs: Implement drop
+	CAP_FSETID functionality
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,119 +15,185 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>, Jan Kara <jack@suse.cz>, Dan Williams <dan.j.williams@intel.com>, willy@infradead.org
-Cc: virtio-fs-list <virtio-fs@redhat.com>, linux-nvdimm@lists.01.org, linux kernel mailing list <linux-kernel@vger.kernel.org>, Miklos Szeredi <miklos@szeredi.hu>
+To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, groug@kaod.org
+Cc: virtio-fs@redhat.com
 
-This is V2 of the patch. Posted V1 here.
+From: Vivek Goyal <vgoyal@redhat.com>
 
-https://lore.kernel.org/linux-fsdevel/20210416173524.GA1379987@redhat.com/
+As part of slave_io message, slave can ask to do I/O on an fd. Additionally
+slave can ask for dropping CAP_FSETID (if master has it) before doing I/O.
+Implement functionality to drop CAP_FSETID and gain it back after the
+operation.
 
-Based on feedback from Dan and Jan, modified the patch to wake up 
-all waiters when dax entry is invalidated. This solves the issues
-of missed wakeups.
+This also creates a dependency on libcap-ng.
 
-I am seeing missed wakeups which ultimately lead to a deadlock when I am
-using virtiofs with DAX enabled and running "make -j". I had to mount
-virtiofs as rootfs and also reduce to dax window size to 256M to reproduce
-the problem consistently.
-
-So here is the problem. put_unlocked_entry() wakes up waiters only
-if entry is not null as well as !dax_is_conflict(entry). But if I
-call multiple instances of invalidate_inode_pages2() in parallel,
-then I can run into a situation where there are waiters on
-this index but nobody will wait these.
-
-invalidate_inode_pages2()
-  invalidate_inode_pages2_range()
-    invalidate_exceptional_entry2()
-      dax_invalidate_mapping_entry_sync()
-        __dax_invalidate_entry() {
-                xas_lock_irq(&xas);
-                entry = get_unlocked_entry(&xas, 0);
-                ...
-                ...
-                dax_disassociate_entry(entry, mapping, trunc);
-                xas_store(&xas, NULL);
-                ...
-                ...
-                put_unlocked_entry(&xas, entry);
-                xas_unlock_irq(&xas);
-        }
-
-Say a fault in in progress and it has locked entry at offset say "0x1c".
-Now say three instances of invalidate_inode_pages2() are in progress
-(A, B, C) and they all try to invalidate entry at offset "0x1c". Given
-dax entry is locked, all tree instances A, B, C will wait in wait queue.
-
-When dax fault finishes, say A is woken up. It will store NULL entry
-at index "0x1c" and wake up B. When B comes along it will find "entry=0"
-at page offset 0x1c and it will call put_unlocked_entry(&xas, 0). And
-this means put_unlocked_entry() will not wake up next waiter, given
-the current code. And that means C continues to wait and is not woken
-up.
-
-This patch fixes the issue by waking up all waiters when a dax entry
-has been invalidated. This seems to fix the deadlock I am facing
-and I can make forward progress.
-
-Reported-by: Sergio Lopez <slp@redhat.com>
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- fs/dax.c |   12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ hw/virtio/meson.build     |  1 +
+ hw/virtio/vhost-user-fs.c | 92 ++++++++++++++++++++++++++++++++++++++-
+ meson.build               |  6 +++
+ 3 files changed, 97 insertions(+), 2 deletions(-)
 
-Index: redhat-linux/fs/dax.c
-===================================================================
---- redhat-linux.orig/fs/dax.c	2021-04-16 14:16:44.332140543 -0400
-+++ redhat-linux/fs/dax.c	2021-04-19 11:24:11.465213474 -0400
-@@ -264,11 +264,11 @@ static void wait_entry_unlocked(struct x
- 	finish_wait(wq, &ewait.wait);
+diff --git a/hw/virtio/meson.build b/hw/virtio/meson.build
+index fbff9bc9d4..bdcdc82e13 100644
+--- a/hw/virtio/meson.build
++++ b/hw/virtio/meson.build
+@@ -18,6 +18,7 @@ virtio_ss.add(when: 'CONFIG_VIRTIO_BALLOON', if_true: files('virtio-balloon.c'))
+ virtio_ss.add(when: 'CONFIG_VIRTIO_CRYPTO', if_true: files('virtio-crypto.c'))
+ virtio_ss.add(when: ['CONFIG_VIRTIO_CRYPTO', 'CONFIG_VIRTIO_PCI'], if_true: files('virtio-crypto-pci.c'))
+ virtio_ss.add(when: 'CONFIG_VHOST_USER_FS', if_true: files('vhost-user-fs.c'))
++virtio_ss.add(when: 'CONFIG_VHOST_USER_FS', if_true: libcap_ng)
+ virtio_ss.add(when: ['CONFIG_VHOST_USER_FS', 'CONFIG_VIRTIO_PCI'], if_true: files('vhost-user-fs-pci.c'))
+ virtio_ss.add(when: 'CONFIG_VIRTIO_PMEM', if_true: files('virtio-pmem.c'))
+ virtio_ss.add(when: 'CONFIG_VHOST_VSOCK', if_true: files('vhost-vsock.c', 'vhost-vsock-common.c'))
+diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+index 036ca17767..7afd9495c9 100644
+--- a/hw/virtio/vhost-user-fs.c
++++ b/hw/virtio/vhost-user-fs.c
+@@ -13,6 +13,8 @@
+ 
+ #include "qemu/osdep.h"
+ #include <sys/ioctl.h>
++#include <cap-ng.h>
++#include <sys/syscall.h>
+ #include "standard-headers/linux/virtio_fs.h"
+ #include "qapi/error.h"
+ #include "hw/qdev-properties.h"
+@@ -91,6 +93,84 @@ static bool check_slave_message_entries(const VhostUserFSSlaveMsg *sm,
+     return true;
  }
  
--static void put_unlocked_entry(struct xa_state *xas, void *entry)
-+static void put_unlocked_entry(struct xa_state *xas, void *entry, bool wake_all)
++/*
++ * Helpers for dropping and regaining effective capabilities. Returns 0
++ * on success, error otherwise
++ */
++static int drop_effective_cap(const char *cap_name, bool *cap_dropped)
++{
++    int cap, ret;
++
++    cap = capng_name_to_capability(cap_name);
++    if (cap < 0) {
++        ret = -errno;
++        error_report("capng_name_to_capability(%s) failed:%s", cap_name,
++                     strerror(errno));
++        goto out;
++    }
++
++    if (capng_get_caps_process()) {
++        ret = -errno;
++        error_report("capng_get_caps_process() failed:%s", strerror(errno));
++        goto out;
++    }
++
++    /* We dont have this capability in effective set already. */
++    if (!capng_have_capability(CAPNG_EFFECTIVE, cap)) {
++        ret = 0;
++        goto out;
++    }
++
++    if (capng_update(CAPNG_DROP, CAPNG_EFFECTIVE, cap)) {
++        ret = -errno;
++        error_report("capng_update(DROP,) failed");
++        goto out;
++    }
++    if (capng_apply(CAPNG_SELECT_CAPS)) {
++        ret = -errno;
++        error_report("drop:capng_apply() failed");
++        goto out;
++    }
++
++    ret = 0;
++    if (cap_dropped) {
++        *cap_dropped = true;
++    }
++
++out:
++    return ret;
++}
++
++static int gain_effective_cap(const char *cap_name)
++{
++    int cap;
++    int ret = 0;
++
++    cap = capng_name_to_capability(cap_name);
++    if (cap < 0) {
++        ret = -errno;
++        error_report("capng_name_to_capability(%s) failed:%s", cap_name,
++                     strerror(errno));
++        goto out;
++    }
++
++    if (capng_update(CAPNG_ADD, CAPNG_EFFECTIVE, cap)) {
++        ret = -errno;
++        error_report("capng_update(ADD,) failed");
++        goto out;
++    }
++
++    if (capng_apply(CAPNG_SELECT_CAPS)) {
++        ret = -errno;
++        error_report("gain:capng_apply() failed");
++        goto out;
++    }
++    ret = 0;
++
++out:
++    return ret;
++}
++
+ uint64_t vhost_user_fs_slave_map(struct vhost_dev *dev, int message_size,
+                                  VhostUserFSSlaveMsg *sm, int fd)
  {
- 	/* If we were the only waiter woken, wake the next one */
- 	if (entry && !dax_is_conflict(entry))
--		dax_wake_entry(xas, entry, false);
-+		dax_wake_entry(xas, entry, wake_all);
- }
+@@ -238,6 +318,7 @@ uint64_t vhost_user_fs_slave_io(struct vhost_dev *dev, int message_size,
+     unsigned int i;
+     int res = 0;
+     size_t done = 0;
++    bool cap_fsetid_dropped = false;
  
- /*
-@@ -622,7 +622,7 @@ struct page *dax_layout_busy_page_range(
- 			entry = get_unlocked_entry(&xas, 0);
- 		if (entry)
- 			page = dax_busy_page(entry);
--		put_unlocked_entry(&xas, entry);
-+		put_unlocked_entry(&xas, entry, false);
- 		if (page)
- 			break;
- 		if (++scanned % XA_CHECK_SCHED)
-@@ -664,7 +664,7 @@ static int __dax_invalidate_entry(struct
- 	mapping->nrexceptional--;
- 	ret = 1;
- out:
--	put_unlocked_entry(&xas, entry);
-+	put_unlocked_entry(&xas, entry, true);
- 	xas_unlock_irq(&xas);
- 	return ret;
- }
-@@ -943,7 +943,7 @@ static int dax_writeback_one(struct xa_s
- 	return ret;
+     if (fd < 0) {
+         error_report("Bad fd for io");
+@@ -245,8 +326,10 @@ uint64_t vhost_user_fs_slave_io(struct vhost_dev *dev, int message_size,
+     }
  
-  put_unlocked:
--	put_unlocked_entry(xas, entry);
-+	put_unlocked_entry(xas, entry, false);
- 	return ret;
- }
+     if (sm->flags & VHOST_USER_FS_GENFLAG_DROP_FSETID) {
+-        error_report("Dropping CAP_FSETID is not supported");
+-        return (uint64_t)-ENOTSUP;
++        res = drop_effective_cap("FSETID", &cap_fsetid_dropped);
++        if (res != 0) {
++            return (uint64_t)res;
++        }
+     }
  
-@@ -1684,7 +1684,7 @@ dax_insert_pfn_mkwrite(struct vm_fault *
- 	/* Did we race with someone splitting entry or so? */
- 	if (!entry || dax_is_conflict(entry) ||
- 	    (order == 0 && !dax_is_pte_entry(entry))) {
--		put_unlocked_entry(&xas, entry);
-+		put_unlocked_entry(&xas, entry, false);
- 		xas_unlock_irq(&xas);
- 		trace_dax_insert_pfn_mkwrite_no_entry(mapping->host, vmf,
- 						      VM_FAULT_NOPAGE);
+     for (i = 0; i < sm->count && !res; i++) {
+@@ -313,6 +396,11 @@ uint64_t vhost_user_fs_slave_io(struct vhost_dev *dev, int message_size,
+     }
+     close(fd);
+ 
++    if (cap_fsetid_dropped) {
++        if (gain_effective_cap("FSETID")) {
++            error_report("Failed to gain CAP_FSETID");
++        }
++    }
+     trace_vhost_user_fs_slave_io_exit(res, done);
+     if (res < 0) {
+         return (uint64_t)res;
+diff --git a/meson.build b/meson.build
+index c6f4b0cf5e..71899d0993 100644
+--- a/meson.build
++++ b/meson.build
+@@ -1081,6 +1081,12 @@ elif get_option('virtfs').disabled()
+   have_virtfs = false
+ endif
+ 
++if config_host.has_key('CONFIG_VHOST_USER_FS')
++  if not libcap_ng.found()
++    error('vhost-user-fs requires libcap-ng-devel')
++  endif
++endif
++
+ config_host_data.set_quoted('CONFIG_BINDIR', get_option('prefix') / get_option('bindir'))
+ config_host_data.set_quoted('CONFIG_PREFIX', get_option('prefix'))
+ config_host_data.set_quoted('CONFIG_QEMU_CONFDIR', get_option('prefix') / qemu_confdir)
+-- 
+2.31.1
 

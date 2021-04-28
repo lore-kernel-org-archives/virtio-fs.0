@@ -1,11 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Wed, 28 Apr 2021 12:00:36 +0100
-Message-Id: <20210428110100.27757-3-dgilbert@redhat.com>
+Date: Wed, 28 Apr 2021 12:00:37 +0100
+Message-Id: <20210428110100.27757-4-dgilbert@redhat.com>
 In-Reply-To: <20210428110100.27757-1-dgilbert@redhat.com>
 References: <20210428110100.27757-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 02/26] virtiofsd: Don't assume header layout
+Subject: [Virtio-fs] [PATCH v3 03/26] DAX: vhost-user: Rework slave return
+	values
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,175 +20,176 @@ Cc: virtio-fs@redhat.com
 
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-virtiofsd incorrectly assumed a fixed set of header layout in the virt
-queue; assuming that the fuse and write headers were conveniently
-separated from the data;  the spec doesn't allow us to take that
-convenience, so fix it up to deal with it the hard way.
+All the current slave handlers on the qemu side generate an 'int'
+return value that's squashed down to a bool (!!ret) and stuffed into
+a uint64_t (field of a union) to be returned.
+
+Move the uint64_t type back up through the individual handlers so
+that we can make one actually return a full uint64_t.
+
+Note that the definition in the interop spec says most of these
+cases are defined as returning 0 on success and non-0 for failure,
+so it's OK to change from a bool to another non-0.
+
+Vivek:
+This is needed because upcoming patches in series will add new functions
+which want to return full error code. Existing functions continue to
+return true/false so, it should not lead to change of behavior for
+existing users.
 
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Reviewed-by: Greg Kurz <groug@kaod.org>
 ---
- tools/virtiofsd/fuse_virtio.c | 94 +++++++++++++++++++++++++++--------
- 1 file changed, 73 insertions(+), 21 deletions(-)
+ hw/virtio/vhost-backend.c         |  6 +++---
+ hw/virtio/vhost-user.c            | 31 ++++++++++++++++---------------
+ include/hw/virtio/vhost-backend.h |  2 +-
+ 3 files changed, 20 insertions(+), 19 deletions(-)
 
-diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-index 3e13997406..6dd73c9b72 100644
---- a/tools/virtiofsd/fuse_virtio.c
-+++ b/tools/virtiofsd/fuse_virtio.c
-@@ -129,18 +129,55 @@ static void fv_panic(VuDev *dev, const char *err)
-  * Copy from an iovec into a fuse_buf (memory only)
-  * Caller must ensure there is space
-  */
--static void copy_from_iov(struct fuse_buf *buf, size_t out_num,
--                          const struct iovec *out_sg)
-+static size_t copy_from_iov(struct fuse_buf *buf, size_t out_num,
-+                            const struct iovec *out_sg,
-+                            size_t max)
- {
-     void *dest = buf->mem;
-+    size_t copied = 0;
- 
--    while (out_num) {
-+    while (out_num && max) {
-         size_t onelen = out_sg->iov_len;
-+        onelen = MIN(onelen, max);
-         memcpy(dest, out_sg->iov_base, onelen);
-         dest += onelen;
-+        copied += onelen;
-         out_sg++;
-         out_num--;
-+        max -= onelen;
-     }
-+
-+    return copied;
-+}
-+
-+/*
-+ * Skip 'skip' bytes in the iov; 'sg_1stindex' is set as
-+ * the index for the 1st iovec to read data from, and
-+ * 'sg_1stskip' is the number of bytes to skip in that entry.
-+ *
-+ * Returns True if there are at least 'skip' bytes in the iovec
-+ *
-+ */
-+static bool skip_iov(const struct iovec *sg, size_t sg_size,
-+                     size_t skip,
-+                     size_t *sg_1stindex, size_t *sg_1stskip)
-+{
-+    size_t vec;
-+
-+    for (vec = 0; vec < sg_size; vec++) {
-+        if (sg[vec].iov_len > skip) {
-+            *sg_1stskip = skip;
-+            *sg_1stindex = vec;
-+
-+            return true;
-+        }
-+
-+        skip -= sg[vec].iov_len;
-+    }
-+
-+    *sg_1stindex = vec;
-+    *sg_1stskip = 0;
-+    return skip == 0;
+diff --git a/hw/virtio/vhost-backend.c b/hw/virtio/vhost-backend.c
+index 31b33bde37..1686c94767 100644
+--- a/hw/virtio/vhost-backend.c
++++ b/hw/virtio/vhost-backend.c
+@@ -401,8 +401,8 @@ int vhost_backend_invalidate_device_iotlb(struct vhost_dev *dev,
+     return -ENODEV;
  }
  
- /*
-@@ -457,6 +494,7 @@ static void fv_queue_worker(gpointer data, gpointer user_data)
-     bool allocated_bufv = false;
-     struct fuse_bufvec bufv;
-     struct fuse_bufvec *pbufv;
-+    struct fuse_in_header inh;
+-int vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
+-                                          struct vhost_iotlb_msg *imsg)
++uint64_t vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
++                                        struct vhost_iotlb_msg *imsg)
+ {
+     int ret = 0;
  
-     assert(se->bufsize > sizeof(struct fuse_in_header));
- 
-@@ -505,14 +543,15 @@ static void fv_queue_worker(gpointer data, gpointer user_data)
-                  elem->index);
-         assert(0); /* TODO */
+@@ -429,5 +429,5 @@ int vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
+         break;
      }
--    /* Copy just the first element and look at it */
--    copy_from_iov(&fbuf, 1, out_sg);
-+    /* Copy just the fuse_in_header and look at it */
-+    copy_from_iov(&fbuf, out_num, out_sg,
-+                  sizeof(struct fuse_in_header));
-+    memcpy(&inh, fbuf.mem, sizeof(struct fuse_in_header));
  
-     pbufv = NULL; /* Compiler thinks an unitialised path */
--    if (out_num > 2 &&
--        out_sg[0].iov_len == sizeof(struct fuse_in_header) &&
--        ((struct fuse_in_header *)fbuf.mem)->opcode == FUSE_WRITE &&
--        out_sg[1].iov_len == sizeof(struct fuse_write_in)) {
-+    if (inh.opcode == FUSE_WRITE &&
-+        out_len >= (sizeof(struct fuse_in_header) +
-+                    sizeof(struct fuse_write_in))) {
-         /*
-          * For a write we don't actually need to copy the
-          * data, we can just do it straight out of guest memory
-@@ -521,15 +560,15 @@ static void fv_queue_worker(gpointer data, gpointer user_data)
-          */
-         fuse_log(FUSE_LOG_DEBUG, "%s: Write special case\n", __func__);
+-    return ret;
++    return !!ret;
+ }
+diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
+index ded0c10453..4a7d2786c6 100644
+--- a/hw/virtio/vhost-user.c
++++ b/hw/virtio/vhost-user.c
+@@ -1405,24 +1405,25 @@ static int vhost_user_reset_device(struct vhost_dev *dev)
+     return 0;
+ }
  
--        /* copy the fuse_write_in header afte rthe fuse_in_header */
--        fbuf.mem += out_sg->iov_len;
--        copy_from_iov(&fbuf, 1, out_sg + 1);
--        fbuf.mem -= out_sg->iov_len;
--        fbuf.size = out_sg[0].iov_len + out_sg[1].iov_len;
-+        fbuf.size = copy_from_iov(&fbuf, out_num, out_sg,
-+                                  sizeof(struct fuse_in_header) +
-+                                  sizeof(struct fuse_write_in));
-+        /* That copy reread the in_header, make sure we use the original */
-+        memcpy(fbuf.mem, &inh, sizeof(struct fuse_in_header));
+-static int vhost_user_slave_handle_config_change(struct vhost_dev *dev)
++static uint64_t vhost_user_slave_handle_config_change(struct vhost_dev *dev)
+ {
+     int ret = -1;
  
-         /* Allocate the bufv, with space for the rest of the iov */
-         pbufv = malloc(sizeof(struct fuse_bufvec) +
--                       sizeof(struct fuse_buf) * (out_num - 2));
-+                       sizeof(struct fuse_buf) * out_num);
-         if (!pbufv) {
-             fuse_log(FUSE_LOG_ERR, "%s: pbufv malloc failed\n",
-                     __func__);
-@@ -540,24 +579,37 @@ static void fv_queue_worker(gpointer data, gpointer user_data)
-         pbufv->count = 1;
-         pbufv->buf[0] = fbuf;
+     if (!dev->config_ops) {
+-        return -1;
++        return true;
+     }
  
--        size_t iovindex, pbufvindex;
--        iovindex = 2; /* 2 headers, separate iovs */
-+        size_t iovindex, pbufvindex, iov_bytes_skip;
-         pbufvindex = 1; /* 2 headers, 1 fusebuf */
+     if (dev->config_ops->vhost_dev_config_notifier) {
+         ret = dev->config_ops->vhost_dev_config_notifier(dev);
+     }
  
-+        if (!skip_iov(out_sg, out_num,
-+                      sizeof(struct fuse_in_header) +
-+                      sizeof(struct fuse_write_in),
-+                      &iovindex, &iov_bytes_skip)) {
-+            fuse_log(FUSE_LOG_ERR, "%s: skip failed\n",
-+                    __func__);
-+            goto out;
-+        }
-+
-         for (; iovindex < out_num; iovindex++, pbufvindex++) {
-             pbufv->count++;
-             pbufv->buf[pbufvindex].pos = ~0; /* Dummy */
-             pbufv->buf[pbufvindex].flags = 0;
-             pbufv->buf[pbufvindex].mem = out_sg[iovindex].iov_base;
-             pbufv->buf[pbufvindex].size = out_sg[iovindex].iov_len;
-+
-+            if (iov_bytes_skip) {
-+                pbufv->buf[pbufvindex].mem += iov_bytes_skip;
-+                pbufv->buf[pbufvindex].size -= iov_bytes_skip;
-+                iov_bytes_skip = 0;
-+            }
-         }
-     } else {
-         /* Normal (non fast write) path */
+-    return ret;
++    return !!ret;
+ }
  
--        /* Copy the rest of the buffer */
--        fbuf.mem += out_sg->iov_len;
--        copy_from_iov(&fbuf, out_num - 1, out_sg + 1);
--        fbuf.mem -= out_sg->iov_len;
-+        copy_from_iov(&fbuf, out_num, out_sg, se->bufsize);
-+        /* That copy reread the in_header, make sure we use the original */
-+        memcpy(fbuf.mem, &inh, sizeof(struct fuse_in_header));
-         fbuf.size = out_len;
+-static int vhost_user_slave_handle_vring_host_notifier(struct vhost_dev *dev,
+-                                                       VhostUserVringArea *area,
+-                                                       int fd)
++static uint64_t vhost_user_slave_handle_vring_host_notifier(
++                    struct vhost_dev *dev,
++                    VhostUserVringArea *area,
++                    int fd)
+ {
+     int queue_idx = area->u64 & VHOST_USER_VRING_IDX_MASK;
+     size_t page_size = qemu_real_host_page_size;
+@@ -1436,7 +1437,7 @@ static int vhost_user_slave_handle_vring_host_notifier(struct vhost_dev *dev,
+     if (!virtio_has_feature(dev->protocol_features,
+                             VHOST_USER_PROTOCOL_F_HOST_NOTIFIER) ||
+         vdev == NULL || queue_idx >= virtio_get_num_queues(vdev)) {
+-        return -1;
++        return true;
+     }
  
-         /* TODO! Endianness of header */
+     n = &user->notifier[queue_idx];
+@@ -1449,18 +1450,18 @@ static int vhost_user_slave_handle_vring_host_notifier(struct vhost_dev *dev,
+     }
+ 
+     if (area->u64 & VHOST_USER_VRING_NOFD_MASK) {
+-        return 0;
++        return false;
+     }
+ 
+     /* Sanity check. */
+     if (area->size != page_size) {
+-        return -1;
++        return true;
+     }
+ 
+     addr = mmap(NULL, page_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+                 fd, area->offset);
+     if (addr == MAP_FAILED) {
+-        return -1;
++        return true;
+     }
+ 
+     name = g_strdup_printf("vhost-user/host-notifier@%p mmaps[%d]",
+@@ -1471,13 +1472,13 @@ static int vhost_user_slave_handle_vring_host_notifier(struct vhost_dev *dev,
+ 
+     if (virtio_queue_set_host_notifier_mr(vdev, queue_idx, &n->mr, true)) {
+         munmap(addr, page_size);
+-        return -1;
++        return true;
+     }
+ 
+     n->addr = addr;
+     n->set = true;
+ 
+-    return 0;
++    return false;
+ }
+ 
+ static void close_slave_channel(struct vhost_user *u)
+@@ -1498,7 +1499,7 @@ static gboolean slave_read(QIOChannel *ioc, GIOCondition condition,
+     VhostUserPayload payload = { 0, };
+     Error *local_err = NULL;
+     gboolean rc = G_SOURCE_CONTINUE;
+-    int ret = 0;
++    uint64_t ret = 0;
+     struct iovec iov;
+     g_autofree int *fd = NULL;
+     size_t fdsize = 0;
+@@ -1539,7 +1540,7 @@ static gboolean slave_read(QIOChannel *ioc, GIOCondition condition,
+         break;
+     default:
+         error_report("Received unexpected msg type: %d.", hdr.request);
+-        ret = -EINVAL;
++        ret = true;
+     }
+ 
+     /*
+@@ -1553,7 +1554,7 @@ static gboolean slave_read(QIOChannel *ioc, GIOCondition condition,
+         hdr.flags &= ~VHOST_USER_NEED_REPLY_MASK;
+         hdr.flags |= VHOST_USER_REPLY_MASK;
+ 
+-        payload.u64 = !!ret;
++        payload.u64 = ret;
+         hdr.size = sizeof(payload.u64);
+ 
+         iovec[0].iov_base = &hdr;
+diff --git a/include/hw/virtio/vhost-backend.h b/include/hw/virtio/vhost-backend.h
+index 8a6f8e2a7a..64ac6b6444 100644
+--- a/include/hw/virtio/vhost-backend.h
++++ b/include/hw/virtio/vhost-backend.h
+@@ -186,7 +186,7 @@ int vhost_backend_update_device_iotlb(struct vhost_dev *dev,
+ int vhost_backend_invalidate_device_iotlb(struct vhost_dev *dev,
+                                                  uint64_t iova, uint64_t len);
+ 
+-int vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
++uint64_t vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
+                                           struct vhost_iotlb_msg *imsg);
+ 
+ int vhost_user_gpu_set_socket(struct vhost_dev *dev, int fd);
 -- 
 2.31.1
 

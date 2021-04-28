@@ -1,18 +1,24 @@
-References: <20210428144813.417170-1-philmd@redhat.com>
-	<20210428144813.417170-3-philmd@redhat.com>
-	<e06f3f24-9ff2-bf3c-91c4-178af60c6c59@linaro.org>
-	<160e4c85-e8c0-304d-7151-1040f8d310ba@redhat.com>
-	<a4dabeaf-4df8-2779-f028-3d135fe84bef@linaro.org>
-From: =?UTF-8?Q?Philippe_Mathieu-Daud=c3=a9?= <philmd@redhat.com>
-Message-ID: <3e3fabf2-9fed-6d15-51b3-eb0c284852ac@redhat.com>
-Date: Wed, 28 Apr 2021 21:34:18 +0200
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=subject:to:cc:references:from:message-id:date:user-agent
+	:mime-version:in-reply-to:content-transfer-encoding:content-language;
+	bh=nDED6uGDcNJ8RYJmmEhHhwGZgQqxHsl6xrI1QYYKNx8=;
+	b=i3Es1IGUxj2HxcvhFc6wRWUCd9eDJ8C9wmm8EIG3UcKXXjzwp79EHW0NDRT/cycnho
+	VI8TbOB9VncgwlSyO+yaIthBcQbMDsFANXam3pj+IZU1jzjUugVJvWAgsSdWGffbKU/H
+	Z7/IcaZWkOHPOTj+cdLWbOhTZyhpQVeU0cJliwsxgr60kc2IqTZiQS1ssma/T+25jYox
+	iCzOrkT4WNwili889BzCgoV4cP60QO3rTRl2dBOrf8HqkV7ADn9pWzA5hr0i59z/VwfM
+	Og+4yDnS6Odc2AdAVjzmhMn7lvAgfJd++tHrFTvjSn9BOtZ45a4mv3RuhkmDSmEMb5T/
+	2Hog==
+References: <6b2e27a4-8bee-3649-95a4-a2cea45a18e4@gmail.com>
+	<YIkZhqKaLat6Q9YH@work-vm>
+From: "Harry G. Coin" <hgcoin@gmail.com>
+Message-ID: <afb9df25-cf79-19d1-0085-fd72c6225013@gmail.com>
+Date: Wed, 28 Apr 2021 16:00:40 -0500
 MIME-Version: 1.0
-In-Reply-To: <a4dabeaf-4df8-2779-f028-3d135fe84bef@linaro.org>
+In-Reply-To: <YIkZhqKaLat6Q9YH@work-vm>
 Content-Type: text/plain; charset="utf-8"
-Content-Language: en-US
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 2/2] util/meson: Build
- iov/hexdump/buffer_is_zero with virtiofsd
+Content-Language: en-US
+Subject: Re: [Virtio-fs] Min host / vm kernel rev for basic DAX ops?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,26 +27,24 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Richard Henderson <richard.henderson@linaro.org>, qemu-devel@nongnu.org
-Cc: Thomas Huth <thuth@redhat.com>, "Daniel P . Berrange" <berrange@redhat.com>, virtio-fs@redhat.com, Mahmoud Mandour <ma.mandourr@gmail.com>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com
 
-On 4/28/21 9:24 PM, Richard Henderson wrote:
-> On 4/28/21 10:56 AM, Philippe Mathieu-Daudé wrote:
->> Are you suggesting to remove the 'if have_block' check? This makes build
->> a the files pointlessly for user-mode-only builds...
-> 
-> But since the objects are not included in the binary, I don't care.
-> 
-> The build system is already too complex, and building a couple of extra
-> small files makes only milliseconds of difference.
 
-Maybe for libqemuutil.a (this does make a difference with the Python
-QAPI generated files - another series).
+On 4/28/21 3:15 AM, Dr. David Alan Gilbert wrote:
+> * Harry G. Coin (hgcoin@gmail.com) wrote:
+>> Kindly answer a couple 'basic' virtiofs questions:
+>>
+>> 1) Which mainline kernel version is necessary for the host, and for the
+>> vm to enable reliable DAX operations -- supposing no shared host
+>> activity on the underlying fs.
+> I don't think there's any host kernel dependency for DAX
+> currently.
+> (You do need a guest with the DAX support)
 
-I'll wait if we get to a consensus about what exactly is virtiofsd,
-then revisit this series.
+At least the version of the 'virt-manager' on fedora 33 doesn't support
+the 'cache-size' host option, which as I understand from a post a few
+days ago should be around 4G.  That's why I asked about the host
+requirements.
 
-Thanks!
-
-Phil.
 

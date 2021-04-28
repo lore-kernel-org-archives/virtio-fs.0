@@ -1,26 +1,12 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc:content-transfer-encoding;
-	bh=hspDl4ilYQJm3YCqVfH3poxeWbfP/IepHQxmNhzct50=;
-	b=REPk1zFc35K+dcaxwOa9seK+8Gw+dPVsyuFfaHicNbemTjD0bUzTiFDHqD6lrUG0hk
-	4oqUrg8stHvjS1uMikJtAXbuIgOoVQ2y8kx/czQnApA1x16xm+dgIMGFFNmp3/0dSnKH
-	i3u0Gmpb96Ql5M4V4iO6AdIk1o8dZPbqBFL4mAk7Ndg5ELteIfKfORidlSy6tm1Ip+WT
-	BzmL1Vf+o2vQerbRzLG87JsKdlRbn+mnrU6ZVQhRxsqiEiSZXhOyA2NvsoQoZ0kMQcan
-	BHQ6PnxMtlITyOwkGZlegGBmvhs3K556wxK76E6iAoNnnFjyqAZCkEy+a85QxrgV0pW3
-	x+Mg==
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Wed, 28 Apr 2021 15:03:13 -0400
+Message-Id: <20210428190314.1865312-3-vgoyal@redhat.com>
+In-Reply-To: <20210428190314.1865312-1-vgoyal@redhat.com>
+References: <20210428190314.1865312-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-References: <20210428144813.417170-1-philmd@redhat.com>
-	<20210428144813.417170-2-philmd@redhat.com>
-	<15dbfc38-f0ba-65f1-382c-3ce5b961f108@linaro.org>
-	<e2f18183-2b7d-f7c1-b1a2-e624950c7627@redhat.com>
-In-Reply-To: <e2f18183-2b7d-f7c1-b1a2-e624950c7627@redhat.com>
-From: Peter Maydell <peter.maydell@linaro.org>
-Date: Wed, 28 Apr 2021 19:36:59 +0100
-Message-ID: <CAFEAcA9L5R3RfbcJx+D3LMTWmT6+_-0kB9sAEm-GcmcBzKmzAQ@mail.gmail.com>
-Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 1/2] meson: Check for seccomp/cap-ng
- libraries if virtiofsd is enabled
+Subject: [Virtio-fs] [PATCH v6 2/3] dax: Add a wakeup mode parameter to
+	put_unlocked_entry()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -29,30 +15,78 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: =?UTF-8?Q?Philippe_Mathieu=2DDaud=C3=A9?= <philmd@redhat.com>
-Cc: Thomas Huth <thuth@redhat.com>, "Daniel P . Berrange" <berrange@redhat.com>, Richard Henderson <richard.henderson@linaro.org>, QEMU Developers <qemu-devel@nongnu.org>, virtio-fs@redhat.com, Paolo Bonzini <pbonzini@redhat.com>, Mahmoud Mandour <ma.mandourr@gmail.com>
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com, dan.j.williams@intel.com
+Cc: jack@suse.cz, willy@infradead.org, vgoyal@redhat.com
 
-On Wed, 28 Apr 2021 at 19:02, Philippe Mathieu-Daudé <philmd@redhat.com> wrote:
-> On 4/28/21 6:34 PM, Richard Henderson wrote:
-> > I think the test should have been
-> >
-> >   if (have_system or have_tools) and
->
-> Yes but virtiofsd is not a tool... It is a standalone binary.
+As of now put_unlocked_entry() always wakes up next waiter. In next
+patches we want to wake up all waiters at one callsite. Hence, add a
+parameter to the function.
 
-This is not a distinction that our build/configure system
-currently makes. We have three categories:
- * user-mode emulator binaries
- * system-mode emulator binaries
- * tools
+This patch does not introduce any change of behavior.
 
-where essentially a "tool" is "any binary we build that isn't
-a QEMU binary proper".
+Reviewed-by: Greg Kurz <groug@kaod.org>
+Reviewed-by: Jan Kara <jack@suse.cz>
+Suggested-by: Dan Williams <dan.j.williams@intel.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/dax.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-If virtiofsd is genuinely not related to QEMU at all, what is
-it doing in our source tree ?
-
-thanks
--- PMM
-
+diff --git a/fs/dax.c b/fs/dax.c
+index 5ecee51c44ee..56eb1c759ca5 100644
+--- a/fs/dax.c
++++ b/fs/dax.c
+@@ -275,11 +275,11 @@ static void wait_entry_unlocked(struct xa_state *xas, void *entry)
+ 	finish_wait(wq, &ewait.wait);
+ }
+ 
+-static void put_unlocked_entry(struct xa_state *xas, void *entry)
++static void put_unlocked_entry(struct xa_state *xas, void *entry,
++			       enum dax_wake_mode mode)
+ {
+-	/* If we were the only waiter woken, wake the next one */
+ 	if (entry && !dax_is_conflict(entry))
+-		dax_wake_entry(xas, entry, WAKE_NEXT);
++		dax_wake_entry(xas, entry, mode);
+ }
+ 
+ /*
+@@ -633,7 +633,7 @@ struct page *dax_layout_busy_page_range(struct address_space *mapping,
+ 			entry = get_unlocked_entry(&xas, 0);
+ 		if (entry)
+ 			page = dax_busy_page(entry);
+-		put_unlocked_entry(&xas, entry);
++		put_unlocked_entry(&xas, entry, WAKE_NEXT);
+ 		if (page)
+ 			break;
+ 		if (++scanned % XA_CHECK_SCHED)
+@@ -675,7 +675,7 @@ static int __dax_invalidate_entry(struct address_space *mapping,
+ 	mapping->nrexceptional--;
+ 	ret = 1;
+ out:
+-	put_unlocked_entry(&xas, entry);
++	put_unlocked_entry(&xas, entry, WAKE_NEXT);
+ 	xas_unlock_irq(&xas);
+ 	return ret;
+ }
+@@ -954,7 +954,7 @@ static int dax_writeback_one(struct xa_state *xas, struct dax_device *dax_dev,
+ 	return ret;
+ 
+  put_unlocked:
+-	put_unlocked_entry(xas, entry);
++	put_unlocked_entry(xas, entry, WAKE_NEXT);
+ 	return ret;
+ }
+ 
+@@ -1695,7 +1695,7 @@ dax_insert_pfn_mkwrite(struct vm_fault *vmf, pfn_t pfn, unsigned int order)
+ 	/* Did we race with someone splitting entry or so? */
+ 	if (!entry || dax_is_conflict(entry) ||
+ 	    (order == 0 && !dax_is_pte_entry(entry))) {
+-		put_unlocked_entry(&xas, entry);
++		put_unlocked_entry(&xas, entry, WAKE_NEXT);
+ 		xas_unlock_irq(&xas);
+ 		trace_dax_insert_pfn_mkwrite_no_entry(mapping->host, vmf,
+ 						      VM_FAULT_NOPAGE);
+-- 
+2.25.4
 

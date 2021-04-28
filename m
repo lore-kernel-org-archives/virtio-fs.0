@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Wed, 28 Apr 2021 12:00:51 +0100
-Message-Id: <20210428110100.27757-18-dgilbert@redhat.com>
+Date: Wed, 28 Apr 2021 12:00:52 +0100
+Message-Id: <20210428110100.27757-19-dgilbert@redhat.com>
 In-Reply-To: <20210428110100.27757-1-dgilbert@redhat.com>
 References: <20210428110100.27757-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 17/26] DAX: virtiofsd: Perform an unmap on
-	destroy
+Subject: [Virtio-fs] [PATCH v3 18/26] DAX/unmap: virtiofsd: Add
+	VHOST_USER_SLAVE_FS_IO
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,39 +20,224 @@ Cc: virtio-fs@redhat.com
 
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-Force unmap all remaining dax cache entries on a destroy.
+Define a new slave command 'VHOST_USER_SLAVE_FS_IO' for a
+client to ask qemu to perform a read/write from an fd directly
+to GPA.
 
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ docs/interop/vhost-user.rst               | 16 ++++
+ hw/virtio/trace-events                    |  6 ++
+ hw/virtio/vhost-user-fs.c                 | 95 +++++++++++++++++++++++
+ hw/virtio/vhost-user.c                    |  5 ++
+ include/hw/virtio/vhost-user-fs.h         |  2 +
+ subprojects/libvhost-user/libvhost-user.h |  1 +
+ 6 files changed, 125 insertions(+)
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index ed5b6c9e2d..600e102839 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -3129,6 +3129,20 @@ static void lo_destroy(void *userdata, struct fuse_session *se)
- {
-     struct lo_data *lo = (struct lo_data *)userdata;
+diff --git a/docs/interop/vhost-user.rst b/docs/interop/vhost-user.rst
+index 09aee3565d..2fa62ea451 100644
+--- a/docs/interop/vhost-user.rst
++++ b/docs/interop/vhost-user.rst
+@@ -1453,6 +1453,22 @@ Slave message types
+   multiple chunks can be unmapped in one command.
+   A reply is generated indicating whether unmapping succeeded.
  
-+    if (fuse_lowlevel_is_virtio(se)) {
-+        VhostUserFSSlaveMsg *msg = g_malloc0(sizeof(VhostUserFSSlaveMsg) +
-+                                             sizeof(VhostUserFSSlaveMsgEntry));
++``VHOST_USER_SLAVE_FS_IO``
++  :id: 9
++  :equivalent ioctl: N/A
++  :slave payload: ``struct VhostUserFSSlaveMsg``
++  :master payload: N/A
 +
-+        msg->count = 0;
-+        msg->entries[0].len = ~(uint64_t)0; /* Special: means 'all' */
-+        msg->entries[0].c_offset = 0;
-+        if (fuse_virtio_unmap(se, msg)) {
-+            fuse_log(FUSE_LOG_ERR, "%s: unmap during destroy failed\n",
-+                     __func__);
-+        }
-+        g_free(msg);
++  Requests that IO be performed directly from an fd, passed in ancillary
++  data, to guest memory on behalf of the daemon; this is normally for a
++  case where a memory region isn't visible to the daemon. slave payload
++  has flags which determine the direction of IO operation.
++
++  The ``VHOST_USER_FS_FLAG_MAP_R`` flag must be set in the ``flags`` field to
++  read from the file into RAM.
++  The ``VHOST_USER_FS_FLAG_MAP_W`` flag must be set in the ``flags`` field to
++  write to the file from RAM.
++
+ .. _reply_ack:
+ 
+ VHOST_USER_PROTOCOL_F_REPLY_ACK
+diff --git a/hw/virtio/trace-events b/hw/virtio/trace-events
+index c62727f879..20557a078e 100644
+--- a/hw/virtio/trace-events
++++ b/hw/virtio/trace-events
+@@ -53,6 +53,12 @@ vhost_vdpa_get_features(void *dev, uint64_t features) "dev: %p features: 0x%"PRI
+ vhost_vdpa_set_owner(void *dev) "dev: %p"
+ vhost_vdpa_vq_get_addr(void *dev, void *vq, uint64_t desc_user_addr, uint64_t avail_user_addr, uint64_t used_user_addr) "dev: %p vq: %p desc_user_addr: 0x%"PRIx64" avail_user_addr: 0x%"PRIx64" used_user_addr: 0x%"PRIx64
+ 
++# vhost-user-fs.c
++
++vhost_user_fs_slave_io_loop(const char *name, uint64_t owr, int is_ram, int is_romd, size_t size) "region %s with internal offset 0x%"PRIx64 " ram=%d romd=%d mrs.size=%zd"
++vhost_user_fs_slave_io_loop_res(ssize_t transferred) "%zd"
++vhost_user_fs_slave_io_exit(int res, size_t done) "res: %d done: %zd"
++
+ # virtio.c
+ virtqueue_alloc_element(void *elem, size_t sz, unsigned in_num, unsigned out_num) "elem %p size %zd in_num %u out_num %u"
+ virtqueue_fill(void *vq, const void *elem, unsigned int len, unsigned int idx) "vq %p elem %p len %u idx %u"
+diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+index 963f694435..ee600ce968 100644
+--- a/hw/virtio/vhost-user-fs.c
++++ b/hw/virtio/vhost-user-fs.c
+@@ -23,6 +23,8 @@
+ #include "hw/virtio/vhost-user-fs.h"
+ #include "monitor/monitor.h"
+ #include "sysemu/sysemu.h"
++#include "exec/address-spaces.h"
++#include "trace.h"
+ 
+ static const int user_feature_bits[] = {
+     VIRTIO_F_VERSION_1,
+@@ -220,6 +222,99 @@ uint64_t vhost_user_fs_slave_unmap(struct vhost_dev *dev, int message_size,
+     return (uint64_t)res;
+ }
+ 
++uint64_t vhost_user_fs_slave_io(struct vhost_dev *dev, int message_size,
++                                VhostUserFSSlaveMsg *sm, int fd)
++{
++    VHostUserFS *fs = (VHostUserFS *)object_dynamic_cast(OBJECT(dev->vdev),
++                          TYPE_VHOST_USER_FS);
++    if (!fs) {
++        error_report("%s: Bad fs ptr", __func__);
++        return (uint64_t)-1;
++    }
++    if (!check_slave_message_entries(sm, message_size)) {
++        return (uint64_t)-1;
 +    }
 +
-     pthread_mutex_lock(&lo->mutex);
-     while (true) {
-         GHashTableIter iter;
++    unsigned int i;
++    int res = 0;
++    size_t done = 0;
++
++    if (fd < 0) {
++        error_report("Bad fd for io");
++        return (uint64_t)-1;
++    }
++
++    for (i = 0; i < sm->count && !res; i++) {
++        VhostUserFSSlaveMsgEntry *e = &sm->entries[i];
++        if (e->len == 0) {
++            continue;
++        }
++
++        size_t len = e->len;
++        uint64_t fd_offset = e->fd_offset;
++        hwaddr gpa = e->c_offset;
++
++        while (len && !res) {
++            hwaddr xlat, xlat_len;
++            bool is_write = e->flags & VHOST_USER_FS_FLAG_MAP_W;
++            MemoryRegion *mr = address_space_translate(dev->vdev->dma_as, gpa,
++                                                       &xlat, &xlat_len,
++                                                       is_write,
++                                                       MEMTXATTRS_UNSPECIFIED);
++            if (!mr || !xlat_len) {
++                error_report("No guest region found for 0x%" HWADDR_PRIx, gpa);
++                res = -EFAULT;
++                break;
++            }
++
++            trace_vhost_user_fs_slave_io_loop(mr->name,
++                                          (uint64_t)xlat,
++                                          memory_region_is_ram(mr),
++                                          memory_region_is_romd(mr),
++                                          (size_t)xlat_len);
++
++            void *hostptr = qemu_map_ram_ptr(mr->ram_block,
++                                             xlat);
++            ssize_t transferred;
++            if (e->flags & VHOST_USER_FS_FLAG_MAP_R) {
++                /* Read from file into RAM */
++                if (mr->readonly) {
++                    res = -EFAULT;
++                    break;
++                }
++                transferred = pread(fd, hostptr, xlat_len, fd_offset);
++            } else if (e->flags & VHOST_USER_FS_FLAG_MAP_W) {
++                /* Write into file from RAM */
++                transferred = pwrite(fd, hostptr, xlat_len, fd_offset);
++            } else {
++                transferred = EINVAL;
++            }
++
++            trace_vhost_user_fs_slave_io_loop_res(transferred);
++            if (transferred < 0) {
++                res = -errno;
++                break;
++            }
++            if (!transferred) {
++                /* EOF */
++                break;
++            }
++
++            done += transferred;
++            fd_offset += transferred;
++            gpa += transferred;
++            len -= transferred;
++        }
++    }
++    close(fd);
++
++    trace_vhost_user_fs_slave_io_exit(res, done);
++    if (res < 0) {
++        return (uint64_t)res;
++    }
++    return (uint64_t)done;
++}
++
+ static void vuf_get_config(VirtIODevice *vdev, uint8_t *config)
+ {
+     VHostUserFS *fs = VHOST_USER_FS(vdev);
+diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
+index 7d9b0ad45d..58af28cb79 100644
+--- a/hw/virtio/vhost-user.c
++++ b/hw/virtio/vhost-user.c
+@@ -138,6 +138,7 @@ typedef enum VhostUserSlaveRequest {
+     VHOST_USER_SLAVE_VRING_ERR = 5,
+     VHOST_USER_SLAVE_FS_MAP = 6,
+     VHOST_USER_SLAVE_FS_UNMAP = 7,
++    VHOST_USER_SLAVE_FS_IO = 8,
+     VHOST_USER_SLAVE_MAX
+ }  VhostUserSlaveRequest;
+ 
+@@ -1563,6 +1564,10 @@ static gboolean slave_read(QIOChannel *ioc, GIOCondition condition,
+     case VHOST_USER_SLAVE_FS_UNMAP:
+         ret = vhost_user_fs_slave_unmap(dev, hdr.size, &payload.fs);
+         break;
++    case VHOST_USER_SLAVE_FS_IO:
++        ret = vhost_user_fs_slave_io(dev, hdr.size, &payload.fs,
++                                     fd ? fd[0] : -1);
++        break;
+ #endif
+     default:
+         error_report("Received unexpected msg type: %d.", hdr.request);
+diff --git a/include/hw/virtio/vhost-user-fs.h b/include/hw/virtio/vhost-user-fs.h
+index 0766f17548..2931164e23 100644
+--- a/include/hw/virtio/vhost-user-fs.h
++++ b/include/hw/virtio/vhost-user-fs.h
+@@ -78,5 +78,7 @@ uint64_t vhost_user_fs_slave_map(struct vhost_dev *dev, int message_size,
+                                  VhostUserFSSlaveMsg *sm, int fd);
+ uint64_t vhost_user_fs_slave_unmap(struct vhost_dev *dev, int message_size,
+                                    VhostUserFSSlaveMsg *sm);
++uint64_t vhost_user_fs_slave_io(struct vhost_dev *dev, int message_size,
++                                VhostUserFSSlaveMsg *sm, int fd);
+ 
+ #endif /* _QEMU_VHOST_USER_FS_H */
+diff --git a/subprojects/libvhost-user/libvhost-user.h b/subprojects/libvhost-user/libvhost-user.h
+index a98c5f5c11..42b0833c4b 100644
+--- a/subprojects/libvhost-user/libvhost-user.h
++++ b/subprojects/libvhost-user/libvhost-user.h
+@@ -121,6 +121,7 @@ typedef enum VhostUserSlaveRequest {
+     VHOST_USER_SLAVE_VRING_ERR = 5,
+     VHOST_USER_SLAVE_FS_MAP = 6,
+     VHOST_USER_SLAVE_FS_UNMAP = 7,
++    VHOST_USER_SLAVE_FS_IO = 8,
+     VHOST_USER_SLAVE_MAX
+ }  VhostUserSlaveRequest;
+ 
 -- 
 2.31.1
 

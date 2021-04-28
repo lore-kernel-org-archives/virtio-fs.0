@@ -1,12 +1,21 @@
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+	h=subject:to:cc:references:from:message-id:date:user-agent
+	:mime-version:in-reply-to:content-language:content-transfer-encoding;
+	bh=4LZEHcMxypBZR5IOssG2yDi20GGzjiqgvJHoLZbj4x4=;
+	b=X2SdtEzgpeNS+Zno1KPUeevXFfuPf3K4BMKd5KDfYQMCofVrETTM6H7+nqy9YwZuz5
+	FHPNgbXqgW3M4oTkilaz27l3yq1iVCs4wRSuzjx+G/9cURRd6809IwEKYKaC4PICEi55
+	U/8SLWZISyYJbx1jYUOtjGd/NzEehUIMxp6GdG8vYyluO1i1i7I0TjXfR92byLqiBAVT
+	phZ8aWkPGm+faEwWN6ik4X4+Ca3lzjXF5uNpDR/To4W1mQdv/RV2F631n6Z54DVmuPPM
+	aUE4he50XQpsngQoxwhiqGgG6FbvcYC6+kJ/37q2P+DA7Ui2MDlhnkHG6qOW7H6qc0I3
+	EQEw==
 References: <20210428144813.417170-1-philmd@redhat.com>
 	<20210428144813.417170-2-philmd@redhat.com>
-	<CAFEAcA9chk8aEqe0jrYQouF0=UpznTrR+J8puVgNvf1VipPm2A@mail.gmail.com>
-From: =?UTF-8?Q?Philippe_Mathieu-Daud=c3=a9?= <philmd@redhat.com>
-Message-ID: <afabff90-7af3-f4fe-86de-e0c169e286dd@redhat.com>
-Date: Wed, 28 Apr 2021 17:34:08 +0200
+From: Richard Henderson <richard.henderson@linaro.org>
+Message-ID: <15dbfc38-f0ba-65f1-382c-3ce5b961f108@linaro.org>
+Date: Wed, 28 Apr 2021 09:34:56 -0700
 MIME-Version: 1.0
-In-Reply-To: <CAFEAcA9chk8aEqe0jrYQouF0=UpznTrR+J8puVgNvf1VipPm2A@mail.gmail.com>
-Content-Type: text/plain; charset="utf-8"
+In-Reply-To: <20210428144813.417170-2-philmd@redhat.com>
+Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Language: en-US
 Content-Transfer-Encoding: 8bit
 Subject: Re: [Virtio-fs] [PATCH 1/2] meson: Check for seccomp/cap-ng
@@ -19,89 +28,38 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Peter Maydell <peter.maydell@linaro.org>
-Cc: Thomas Huth <thuth@redhat.com>, "Daniel P . Berrange" <berrange@redhat.com>, QEMU Developers <qemu-devel@nongnu.org>, virtio-fs@redhat.com, Paolo Bonzini <pbonzini@redhat.com>, Mahmoud Mandour <ma.mandourr@gmail.com>
+To: =?UTF-8?Q?Philippe_Mathieu-Daud=c3=a9?= <philmd@redhat.com>, qemu-devel@nongnu.org
+Cc: Thomas Huth <thuth@redhat.com>, "Daniel P . Berrange" <berrange@redhat.com>, virtio-fs@redhat.com, Mahmoud Mandour <ma.mandourr@gmail.com>
 
-On 4/28/21 5:06 PM, Peter Maydell wrote:
-> On Wed, 28 Apr 2021 at 15:55, Philippe Mathieu-Daudé <philmd@redhat.com> wrote:
-> 
-> (cc'ing Paolo for a meson.build question below...)
-> 
->> When not explicitly select a sysemu target and building virtiofsd,
->> the seccomp/cap-ng libraries are not resolved, leading to this error:
->>
->>   $ configure --target-list=i386-linux-user --disable-tools --enable-virtiofsd
->>   tools/meson.build:12:6: ERROR: Problem encountered: virtiofsd requires libcap-ng-devel and seccomp-devel
->>
->> Fix by checking the seccomp/cap-ng libraries if virtiofsd is built.
->>
->> Reported-by: Mahmoud Mandour <ma.mandourr@gmail.com>
->> Signed-off-by: Philippe Mathieu-Daudé <philmd@redhat.com>
->> ---
->>  meson.build | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/meson.build b/meson.build
->> index c6f4b0cf5e8..b466b418fed 100644
->> --- a/meson.build
->> +++ b/meson.build
->> @@ -393,14 +393,14 @@
->>  endif
->>
->>  seccomp = not_found
->> -if not get_option('seccomp').auto() or have_system or have_tools
->> +if not get_option('seccomp').auto() or have_system or have_tools or not get_option('virtiofsd').auto()
->>    seccomp = dependency('libseccomp', version: '>=2.3.0',
->>                         required: get_option('seccomp'),
->>                         method: 'pkg-config', kwargs: static_kwargs)
->>  endif
->>
->>  libcap_ng = not_found
->> -if not get_option('cap_ng').auto() or have_system or have_tools
->> +if not get_option('cap_ng').auto() or have_system or have_tools or not get_option('virtiofsd').auto()
->>    libcap_ng = cc.find_library('cap-ng', has_headers: ['cap-ng.h'],
->>                                required: get_option('cap_ng'),
->>                                kwargs: static_kwargs)
-> 
-> Now we have "virtiofsd requires cap-ng and seccomp" recorded in three
-> places in different meson.build files:
->  * here, if this patch goes in
->  * in tools/meson.build, in its logic for setting have_virtiofsd
->    (I generously do not count the "decide which error message to print"
->    logic in that file as a separate item in this list...)
->  * in tools/virtiofsd/meson.build, where the executable('virtiofsd', ...)
->    lists them in its dependencies: setting
-> 
-> Is there some way to avoid this duplication?
+On 4/28/21 7:48 AM, Philippe Mathieu-Daudé wrote:
+>   seccomp = not_found
+> -if not get_option('seccomp').auto() or have_system or have_tools
+> +if not get_option('seccomp').auto() or have_system or have_tools or not get_option('virtiofsd').auto()
+>     seccomp = dependency('libseccomp', version: '>=2.3.0',
+>                          required: get_option('seccomp'),
+>                          method: 'pkg-config', kwargs: static_kwargs)
 
-I noticed that too, I think the problem is we never considered the case
-of a standalone binary buildable without sysemu / tools, such virtiofsd.
+This construct is wrong, both before and after, as I read it.
 
-TIL virtiofsd is not a tool, so tools/meson.build needs rework, in
-particular to remove the 'have_tools' but maybe to move it out of
-tools/:
+not get_option(foo).auto() is true for both enabled and disabled.  If disabled, 
+why are we examining the dependency?  If auto, if we have all of the 
+dependencies we want to enable the feature -- if we don't probe for the 
+dependency, how can we enable it?
 
-have_virtiofsd = (targetos == 'linux' and
-    have_tools and
-    seccomp.found() and
-    libcap_ng.found() and
-    'CONFIG_VHOST_USER' in config_host)
+This error seems to be offset by the OR have_* tests, for which the logic also 
+seems off.
 
-If virtiofsd requires Linux, shouldn't we check it directly
-in ./configure, not allowing --enable-virtiofsd on non-linux
-hosts?
-Maybe it is there for cross-compilation... Is it supported to
-cross-build it on non-Linux hosts?
+I think the test should have been
+
+   if (have_system or have_tools) and
+      (not get_option('seccomp').disabled() or
+       not get_option('virtiofsd').disabled())
+
+Then we need to combine the required: argument, probably like
+
+   required: get_option('seccomp').enabled() or
+             get_option('virtiofsd').enabled()
 
 
-It could be clearer to use:
-
-  want_virtiofsd = get_option('virtiofsd').auto()
-
-
-BTW to test I used:
-
-  $ configure --target-list=i386-linux-user --disable-tools
---enable-virtiofsd
-  $ ninja tools/virtiofsd/virtiofsd
+r~
 

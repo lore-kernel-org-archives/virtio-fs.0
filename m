@@ -1,13 +1,12 @@
-Date: Mon, 19 Apr 2021 15:07:53 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210419190753.GE1472665@redhat.com>
-References: <20210414201207.3612432-3-jose.carlos.venegas.munoz@intel.com>
-	<CANRX0ORJA43.22ADKWIJW7DI0@redhat>
+Date: Wed, 28 Apr 2021 12:50:39 -0400
+Message-Id: <20210428165040.1856202-3-vgoyal@redhat.com>
+In-Reply-To: <20210428165040.1856202-1-vgoyal@redhat.com>
+References: <20210428165040.1856202-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <CANRX0ORJA43.22ADKWIJW7DI0@redhat>
-Subject: Re: [Virtio-fs] [PATCH 2/2] virtiofsd: Add help for -o xattr-mapping
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v5 2/3] dax: Add a wakeup mode parameter to
+	put_unlocked_entry()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,39 +15,78 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Connor Kuehl <ckuehl@redhat.com>
-Cc: virtio-fs@redhat.com, Carlos Venegas <jose.carlos.venegas.munoz@intel.com>, qemu-devel@nongnu.org
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com, dan.j.williams@intel.com
+Cc: jack@suse.cz, miklos@szeredi.hu, willy@infradead.org, vgoyal@redhat.com
 
-On Wed, Apr 14, 2021 at 04:44:26PM -0500, Connor Kuehl wrote:
-> On Wed Apr 14, 2021 at 3:12 PM CDT, Carlos Venegas wrote:
-> > The option is not documented in help.
-> >
-> > Add small help about the option.
-> >
-> > Signed-off-by: Carlos Venegas <jose.carlos.venegas.munoz@intel.com>
-> > ---
-> > tools/virtiofsd/helper.c | 3 +++
-> > 1 file changed, 3 insertions(+)
-> >
-> > diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
-> > index 28243b51b2..5e98ed702b 100644
-> > --- a/tools/virtiofsd/helper.c
-> > +++ b/tools/virtiofsd/helper.c
-> > @@ -172,6 +172,9 @@ void fuse_cmdline_help(void)
-> > " default: no_writeback\n"
-> > " -o xattr|no_xattr enable/disable xattr\n"
-> > " default: no_xattr\n"
-> > + " -o xattrmap=<mapping> Enable xattr mapping (enables xattr)\n"
-> > + " <mapping> is a string consists of a series of rules\n"
-> > + " e.g. -o xattrmap=:map::user.virtiofs.:\n"
-> 
-> This is a helpful note, but it doesn't tell the whole story. I think
-> it'd be helpful to add one last note to this option which is to
-> recommend reading the virtiofsd(1) man-page for more information on
-> xattrmap rules.
+As of now put_unlocked_entry() always wakes up next waiter. In next
+patches we want to wake up all waiters at one callsite. Hence, add a
+parameter to the function.
 
-Is there a virtiofsd man page as well? All I see is
-docs/tools/virtiofsd.rst.
+This patch does not introduce any change of behavior.
 
-Vivek
+Reviewed-by: Greg Kurz <groug@kaod.org>
+Reviewed-by: Jan Kara <jack@suse.cz>
+Suggested-by: Dan Williams <dan.j.williams@intel.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/dax.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/fs/dax.c b/fs/dax.c
+index c8cd2ae4440b..e84dd240c35c 100644
+--- a/fs/dax.c
++++ b/fs/dax.c
+@@ -275,11 +275,11 @@ static void wait_entry_unlocked(struct xa_state *xas, void *entry)
+ 	finish_wait(wq, &ewait.wait);
+ }
+ 
+-static void put_unlocked_entry(struct xa_state *xas, void *entry)
++static void put_unlocked_entry(struct xa_state *xas, void *entry,
++			       enum dax_wake_mode mode)
+ {
+-	/* If we were the only waiter woken, wake the next one */
+ 	if (entry && !dax_is_conflict(entry))
+-		dax_wake_entry(xas, entry, WAKE_NEXT);
++		dax_wake_entry(xas, entry, mode);
+ }
+ 
+ /*
+@@ -633,7 +633,7 @@ struct page *dax_layout_busy_page_range(struct address_space *mapping,
+ 			entry = get_unlocked_entry(&xas, 0);
+ 		if (entry)
+ 			page = dax_busy_page(entry);
+-		put_unlocked_entry(&xas, entry);
++		put_unlocked_entry(&xas, entry, WAKE_NEXT);
+ 		if (page)
+ 			break;
+ 		if (++scanned % XA_CHECK_SCHED)
+@@ -675,7 +675,7 @@ static int __dax_invalidate_entry(struct address_space *mapping,
+ 	mapping->nrexceptional--;
+ 	ret = 1;
+ out:
+-	put_unlocked_entry(&xas, entry);
++	put_unlocked_entry(&xas, entry, WAKE_NEXT);
+ 	xas_unlock_irq(&xas);
+ 	return ret;
+ }
+@@ -954,7 +954,7 @@ static int dax_writeback_one(struct xa_state *xas, struct dax_device *dax_dev,
+ 	return ret;
+ 
+  put_unlocked:
+-	put_unlocked_entry(xas, entry);
++	put_unlocked_entry(xas, entry, WAKE_NEXT);
+ 	return ret;
+ }
+ 
+@@ -1695,7 +1695,7 @@ dax_insert_pfn_mkwrite(struct vm_fault *vmf, pfn_t pfn, unsigned int order)
+ 	/* Did we race with someone splitting entry or so? */
+ 	if (!entry || dax_is_conflict(entry) ||
+ 	    (order == 0 && !dax_is_pte_entry(entry))) {
+-		put_unlocked_entry(&xas, entry);
++		put_unlocked_entry(&xas, entry, WAKE_NEXT);
+ 		xas_unlock_irq(&xas);
+ 		trace_dax_insert_pfn_mkwrite_no_entry(mapping->host, vmf,
+ 						      VM_FAULT_NOPAGE);
+-- 
+2.25.4
 

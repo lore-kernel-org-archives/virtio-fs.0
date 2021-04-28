@@ -1,15 +1,10 @@
-References: <20210414201207.3612432-3-jose.carlos.venegas.munoz@intel.com>
-	<CANRX0ORJA43.22ADKWIJW7DI0@redhat>
-	<20210419190753.GE1472665@redhat.com>
-From: Connor Kuehl <ckuehl@redhat.com>
-Message-ID: <81c49957-0287-37f9-e310-5f9f21d03062@redhat.com>
-Date: Mon, 19 Apr 2021 14:21:11 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Wed, 28 Apr 2021 15:03:11 -0400
+Message-Id: <20210428190314.1865312-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20210419190753.GE1472665@redhat.com>
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH 2/2] virtiofsd: Add help for -o xattr-mapping
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v6 0/3] dax: Fix missed wakeup in
+	put_unlocked_entry()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,20 +13,24 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, Carlos Venegas <jose.carlos.venegas.munoz@intel.com>, qemu-devel@nongnu.org
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com, dan.j.williams@intel.com
+Cc: jack@suse.cz, willy@infradead.org, vgoyal@redhat.com
 
-On 4/19/21 2:07 PM, Vivek Goyal wrote:
->> This is a helpful note, but it doesn't tell the whole story. I think
->> it'd be helpful to add one last note to this option which is to
->> recommend reading the virtiofsd(1) man-page for more information on
->> xattrmap rules.
-> 
-> Is there a virtiofsd man page as well? All I see is
-> docs/tools/virtiofsd.rst.
+Hi,
 
-Yes, it's generated from that file. Should be located in
-qemu/build/docs/virtiofsd.1 after building QEMU.
+This is V6. Only change since V5 is that I changed order of WAKE_NEXT
+and WAKE_ALL in comments too.
 
-Connor
+Vivek
+
+Vivek Goyal (3):
+  dax: Add an enum for specifying dax wakup mode
+  dax: Add a wakeup mode parameter to put_unlocked_entry()
+  dax: Wake up all waiters after invalidating dax entry
+
+ fs/dax.c | 35 +++++++++++++++++++++++------------
+ 1 file changed, 23 insertions(+), 12 deletions(-)
+
+-- 
+2.25.4
 

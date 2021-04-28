@@ -1,12 +1,14 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 28 Apr 2021 12:50:39 -0400
-Message-Id: <20210428165040.1856202-3-vgoyal@redhat.com>
-In-Reply-To: <20210428165040.1856202-1-vgoyal@redhat.com>
-References: <20210428165040.1856202-1-vgoyal@redhat.com>
+Date: Wed, 28 Apr 2021 17:52:32 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YImS0CTG5OgqLgFe@work-vm>
+References: <20210428144813.417170-1-philmd@redhat.com>
+	<CAFEAcA9_5C4sLwb-MXwg-yCgN+Esb0mop=baCv5kgoW58UPQzA@mail.gmail.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v5 2/3] dax: Add a wakeup mode parameter to
-	put_unlocked_entry()
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+In-Reply-To: <CAFEAcA9_5C4sLwb-MXwg-yCgN+Esb0mop=baCv5kgoW58UPQzA@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: Meson build fixes
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,78 +17,28 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com, dan.j.williams@intel.com
-Cc: jack@suse.cz, miklos@szeredi.hu, willy@infradead.org, vgoyal@redhat.com
+To: Peter Maydell <peter.maydell@linaro.org>
+Cc: Thomas Huth <thuth@redhat.com>, "Daniel P . Berrange" <berrange@redhat.com>, QEMU Developers <qemu-devel@nongnu.org>, virtio-fs@redhat.com, Mahmoud Mandour <ma.mandourr@gmail.com>, Philippe =?iso-8859-1?Q?Mathieu-Daud=E9?= <philmd@redhat.com>
 
-As of now put_unlocked_entry() always wakes up next waiter. In next
-patches we want to wake up all waiters at one callsite. Hence, add a
-parameter to the function.
+* Peter Maydell (peter.maydell@linaro.org) wrote:
+> On Wed, 28 Apr 2021 at 15:53, Philippe Mathieu-Daud=E9 <philmd@redhat.com=
+> wrote:
+> >
+> > A pair of fixes to allow building virtiofsd without sysemu/tools.
+> >
+> > Should this configuration be tested in CI?
+>=20
+> Does the configuration make sense to support? I thought
+> virtiofsd was only of use with system emulation ?
 
-This patch does not introduce any change of behavior.
+It probably is; although arguably it makes sense to build
+virtiofsd by itself without either emulation.
 
-Reviewed-by: Greg Kurz <groug@kaod.org>
-Reviewed-by: Jan Kara <jack@suse.cz>
-Suggested-by: Dan Williams <dan.j.williams@intel.com>
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/dax.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+Dave
 
-diff --git a/fs/dax.c b/fs/dax.c
-index c8cd2ae4440b..e84dd240c35c 100644
---- a/fs/dax.c
-+++ b/fs/dax.c
-@@ -275,11 +275,11 @@ static void wait_entry_unlocked(struct xa_state *xas, void *entry)
- 	finish_wait(wq, &ewait.wait);
- }
- 
--static void put_unlocked_entry(struct xa_state *xas, void *entry)
-+static void put_unlocked_entry(struct xa_state *xas, void *entry,
-+			       enum dax_wake_mode mode)
- {
--	/* If we were the only waiter woken, wake the next one */
- 	if (entry && !dax_is_conflict(entry))
--		dax_wake_entry(xas, entry, WAKE_NEXT);
-+		dax_wake_entry(xas, entry, mode);
- }
- 
- /*
-@@ -633,7 +633,7 @@ struct page *dax_layout_busy_page_range(struct address_space *mapping,
- 			entry = get_unlocked_entry(&xas, 0);
- 		if (entry)
- 			page = dax_busy_page(entry);
--		put_unlocked_entry(&xas, entry);
-+		put_unlocked_entry(&xas, entry, WAKE_NEXT);
- 		if (page)
- 			break;
- 		if (++scanned % XA_CHECK_SCHED)
-@@ -675,7 +675,7 @@ static int __dax_invalidate_entry(struct address_space *mapping,
- 	mapping->nrexceptional--;
- 	ret = 1;
- out:
--	put_unlocked_entry(&xas, entry);
-+	put_unlocked_entry(&xas, entry, WAKE_NEXT);
- 	xas_unlock_irq(&xas);
- 	return ret;
- }
-@@ -954,7 +954,7 @@ static int dax_writeback_one(struct xa_state *xas, struct dax_device *dax_dev,
- 	return ret;
- 
-  put_unlocked:
--	put_unlocked_entry(xas, entry);
-+	put_unlocked_entry(xas, entry, WAKE_NEXT);
- 	return ret;
- }
- 
-@@ -1695,7 +1695,7 @@ dax_insert_pfn_mkwrite(struct vm_fault *vmf, pfn_t pfn, unsigned int order)
- 	/* Did we race with someone splitting entry or so? */
- 	if (!entry || dax_is_conflict(entry) ||
- 	    (order == 0 && !dax_is_pte_entry(entry))) {
--		put_unlocked_entry(&xas, entry);
-+		put_unlocked_entry(&xas, entry, WAKE_NEXT);
- 		xas_unlock_irq(&xas);
- 		trace_dax_insert_pfn_mkwrite_no_entry(mapping->host, vmf,
- 						      VM_FAULT_NOPAGE);
--- 
-2.25.4
+> thanks
+> -- PMM
+>=20
+--=20
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

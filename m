@@ -1,16 +1,13 @@
-Date: Wed, 28 Apr 2021 09:40:25 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210428134025.GA1840673@redhat.com>
-References: <20210423211130.GA1668472@redhat.com>
-	<CAFQAk7i_u_xmBRVuDvWoN_dZDjGgHpRtZ_niCV5r86ezdYsKMQ@mail.gmail.com>
-	<20210426151150.GB1724699@redhat.com> <YIb7DCBfUi0ybTYM@work-vm>
-	<20210426175100.GC1741690@redhat.com> <YIb/lcwtZWZOL1/k@work-vm>
+From: =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@redhat.com>
+Date: Wed, 28 Apr 2021 16:48:12 +0200
+Message-Id: <20210428144813.417170-2-philmd@redhat.com>
+In-Reply-To: <20210428144813.417170-1-philmd@redhat.com>
+References: <20210428144813.417170-1-philmd@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <YIb/lcwtZWZOL1/k@work-vm>
-Subject: Re: [Virtio-fs] [External] [RFC] [PATCH] virtiofsd: Auto switch
- between inline and thread-pool processing
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 1/2] meson: Check for seccomp/cap-ng libraries
+	if virtiofsd is enabled
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,53 +16,44 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Michey Mehta <mimehta@redhat.com>
+To: qemu-devel@nongnu.org
+Cc: Thomas Huth <thuth@redhat.com>, "Daniel P . Berrange" <berrange@redhat.com>, virtio-fs@redhat.com, Mahmoud Mandour <ma.mandourr@gmail.com>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@redhat.com>
 
-On Mon, Apr 26, 2021 at 06:59:49PM +0100, Dr. David Alan Gilbert wrote:
+When not explicitly select a sysemu target and building virtiofsd,
+the seccomp/cap-ng libraries are not resolved, leading to this error:
 
-[..]
-> > > I can imagine something based on the % of time a thread is utilised as
-> > > being an indication you might need more/less; but that's an even more
-> > > complicated heuristic.
-> > 
-> > Yes, that's even more complicated heuristic.
-> > 
-> > Also not sure how to account for when thread blocks in kernel waiting for
-> > I/O to finish. Thread is not keeping cpu busy but at the same time
-> > can't make progress.
-> 
-> Does it matter if the thread is blocked due to CPU or IO?  If you can
-> just look at the time the thread is non-free then that gives you a
-> utilisation.
+  $ configure --target-list=i386-linux-user --disable-tools --enable-virtiofsd
+  tools/meson.build:12:6: ERROR: Problem encountered: virtiofsd requires libcap-ng-devel and seccomp-devel
 
-Hmm.., i guess you are right. So one way of doing this will be take
-time snapshots.
+Fix by checking the seccomp/cap-ng libraries if virtiofsd is built.
 
-t1 = gettimeofday()
-thread-goes-to-sleep
-thread-wakes-up
-t2= gettimeofday()
-thread-pops-requests
-thread-processes-requests-inline
-t3=gettimeofday()
+Reported-by: Mahmoud Mandour <ma.mandourr@gmail.com>
+Signed-off-by: Philippe Mathieu-Daudé <philmd@redhat.com>
+---
+ meson.build | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-So effectively t2-t1 is free time and t3-t2 is busy time. So % utilization
-should be.
-
-%util=(t3-t2) * 100/(t3-t1)
-
-Once we swtich to thread pool, then we will also need something to go
-back to inline processing. Some notion of how busy thread pool is. If
-thread pool's %utilization is less then switch back to inline processing.
-This bit might be more tricky because we use glib thread pool and glib
-API might not provide us any of this data.
-
-https://developer.gnome.org/glib/2.68/glib-Thread-Pools.html
-
-I feel that heuristics based on number of requests are very simple to
-implement. So may be we can implement that for now.
-
-Thanks
-Vivek
+diff --git a/meson.build b/meson.build
+index c6f4b0cf5e8..b466b418fed 100644
+--- a/meson.build
++++ b/meson.build
+@@ -393,14 +393,14 @@
+ endif
+ 
+ seccomp = not_found
+-if not get_option('seccomp').auto() or have_system or have_tools
++if not get_option('seccomp').auto() or have_system or have_tools or not get_option('virtiofsd').auto()
+   seccomp = dependency('libseccomp', version: '>=2.3.0',
+                        required: get_option('seccomp'),
+                        method: 'pkg-config', kwargs: static_kwargs)
+ endif
+ 
+ libcap_ng = not_found
+-if not get_option('cap_ng').auto() or have_system or have_tools
++if not get_option('cap_ng').auto() or have_system or have_tools or not get_option('virtiofsd').auto()
+   libcap_ng = cc.find_library('cap-ng', has_headers: ['cap-ng.h'],
+                               required: get_option('cap_ng'),
+                               kwargs: static_kwargs)
+-- 
+2.26.3
 

@@ -1,11 +1,26 @@
-Date: Wed, 28 Apr 2021 14:06:39 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210428180639.GC1840673@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc:content-transfer-encoding;
+	bh=hspDl4ilYQJm3YCqVfH3poxeWbfP/IepHQxmNhzct50=;
+	b=REPk1zFc35K+dcaxwOa9seK+8Gw+dPVsyuFfaHicNbemTjD0bUzTiFDHqD6lrUG0hk
+	4oqUrg8stHvjS1uMikJtAXbuIgOoVQ2y8kx/czQnApA1x16xm+dgIMGFFNmp3/0dSnKH
+	i3u0Gmpb96Ql5M4V4iO6AdIk1o8dZPbqBFL4mAk7Ndg5ELteIfKfORidlSy6tm1Ip+WT
+	BzmL1Vf+o2vQerbRzLG87JsKdlRbn+mnrU6ZVQhRxsqiEiSZXhOyA2NvsoQoZ0kMQcan
+	BHQ6PnxMtlITyOwkGZlegGBmvhs3K556wxK76E6iAoNnnFjyqAZCkEy+a85QxrgV0pW3
+	x+Mg==
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: [Virtio-fs] [RFC] [PATCH][v2]: Auto switch between inline and
- thread pool processing
+References: <20210428144813.417170-1-philmd@redhat.com>
+	<20210428144813.417170-2-philmd@redhat.com>
+	<15dbfc38-f0ba-65f1-382c-3ce5b961f108@linaro.org>
+	<e2f18183-2b7d-f7c1-b1a2-e624950c7627@redhat.com>
+In-Reply-To: <e2f18183-2b7d-f7c1-b1a2-e624950c7627@redhat.com>
+From: Peter Maydell <peter.maydell@linaro.org>
+Date: Wed, 28 Apr 2021 19:36:59 +0100
+Message-ID: <CAFEAcA9L5R3RfbcJx+D3LMTWmT6+_-0kB9sAEm-GcmcBzKmzAQ@mail.gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH 1/2] meson: Check for seccomp/cap-ng
+ libraries if virtiofsd is enabled
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,145 +29,30 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs-list <virtio-fs@redhat.com>
+To: =?UTF-8?Q?Philippe_Mathieu=2DDaud=C3=A9?= <philmd@redhat.com>
+Cc: Thomas Huth <thuth@redhat.com>, "Daniel P . Berrange" <berrange@redhat.com>, Richard Henderson <richard.henderson@linaro.org>, QEMU Developers <qemu-devel@nongnu.org>, virtio-fs@redhat.com, Paolo Bonzini <pbonzini@redhat.com>, Mahmoud Mandour <ma.mandourr@gmail.com>
 
-For low queue depth workloads, inline processing works well. But for 
-high queue depth (and multiple process/thread) workloads, parallel
-processing of thread pool can benefit.
+On Wed, 28 Apr 2021 at 19:02, Philippe Mathieu-Daudé <philmd@redhat.com> wrote:
+> On 4/28/21 6:34 PM, Richard Henderson wrote:
+> > I think the test should have been
+> >
+> >   if (have_system or have_tools) and
+>
+> Yes but virtiofsd is not a tool... It is a standalone binary.
 
-This patch is an experiment which tries to switch to between inline and
-thread-pool processing.
+This is not a distinction that our build/configure system
+currently makes. We have three categories:
+ * user-mode emulator binaries
+ * system-mode emulator binaries
+ * tools
 
-If number of requests received on queue is less than or equal to user
-specified threshold, inline processing is done. Otherwise requests are
-handed over to a thread pool for processing.
+where essentially a "tool" is "any binary we build that isn't
+a QEMU binary proper".
 
-A user can specify the threshold using option
-"--auto-switch-threshold=<threshold>".
+If virtiofsd is genuinely not related to QEMU at all, what is
+it doing in our source tree ?
 
-I have got good results with "--thread-pool-size=16 --auto-switch-threshold=3" 
-on my system.
- 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
-Changes since v1:
+thanks
+-- PMM
 
-Added a knob to specify auto switch threshold. This will also enable
-auto switching. By default it is turned off.
-
----
- tools/virtiofsd/fuse_i.h        |    1 +
- tools/virtiofsd/fuse_lowlevel.c |    5 ++++-
- tools/virtiofsd/fuse_virtio.c   |   32 ++++++++++++++++++++++----------
- 3 files changed, 27 insertions(+), 11 deletions(-)
-
-Index: rhvgoyal-qemu/tools/virtiofsd/fuse_virtio.c
-===================================================================
---- rhvgoyal-qemu.orig/tools/virtiofsd/fuse_virtio.c	2021-04-28 13:42:34.855145073 -0400
-+++ rhvgoyal-qemu/tools/virtiofsd/fuse_virtio.c	2021-04-28 13:48:21.980538754 -0400
-@@ -446,6 +446,15 @@ err:
- static __thread bool clone_fs_called;
- 
- /* Process one FVRequest in a thread pool */
-+static void fv_queue_push_to_pool(gpointer data, gpointer user_data)
-+{
-+    FVRequest *req = data;
-+    GThreadPool *pool = user_data;
-+
-+    g_thread_pool_push(pool, req, NULL);
-+}
-+
-+/* Process one FVRequest in a thread pool */
- static void fv_queue_worker(gpointer data, gpointer user_data)
- {
-     struct fv_QueueInfo *qi = user_data;
-@@ -605,10 +614,12 @@ static void *fv_queue_thread(void *opaqu
-     struct fuse_session *se = qi->virtio_dev->se;
-     GThreadPool *pool = NULL;
-     GList *req_list = NULL;
-+    int nr_req = 0;
- 
-     if (se->thread_pool_size) {
--        fuse_log(FUSE_LOG_DEBUG, "%s: Creating thread pool for Queue %d\n",
--                 __func__, qi->qidx);
-+        fuse_log(FUSE_LOG_DEBUG, "%s: Creating thread pool for Queue %d."
-+                 " auto_switch_threshold=%u\n", __func__, qi->qidx,
-+                 se->auto_switch_threshold);
-         pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size,
-                                  FALSE, NULL);
-         if (!pool) {
-@@ -686,22 +697,23 @@ static void *fv_queue_thread(void *opaqu
-             }
- 
-             req->reply_sent = false;
--
--            if (!se->thread_pool_size) {
--                req_list = g_list_prepend(req_list, req);
--            } else {
--                g_thread_pool_push(pool, req, NULL);
--            }
-+            req_list = g_list_prepend(req_list, req);
-+            nr_req++;
-         }
- 
-         pthread_mutex_unlock(&qi->vq_lock);
-         vu_dispatch_unlock(qi->virtio_dev);
- 
-         /* Process all the requests. */
--        if (!se->thread_pool_size && req_list != NULL) {
--            g_list_foreach(req_list, fv_queue_worker, qi);
-+        if (req_list != NULL) {
-+            if (!se->thread_pool_size || nr_req <= se->auto_switch_threshold) {
-+                g_list_foreach(req_list, fv_queue_worker, qi);
-+            } else  {
-+                g_list_foreach(req_list, fv_queue_push_to_pool, pool);
-+            }
-             g_list_free(req_list);
-             req_list = NULL;
-+            nr_req = 0;
-         }
-     }
- 
-Index: rhvgoyal-qemu/tools/virtiofsd/fuse_i.h
-===================================================================
---- rhvgoyal-qemu.orig/tools/virtiofsd/fuse_i.h	2021-04-28 13:42:34.855145073 -0400
-+++ rhvgoyal-qemu/tools/virtiofsd/fuse_i.h	2021-04-28 13:42:35.903188526 -0400
-@@ -73,6 +73,7 @@ struct fuse_session {
-     int   vu_socketfd;
-     struct fv_VuDev *virtio_dev;
-     int thread_pool_size;
-+    unsigned auto_switch_threshold;
- };
- 
- struct fuse_chan {
-Index: rhvgoyal-qemu/tools/virtiofsd/fuse_lowlevel.c
-===================================================================
---- rhvgoyal-qemu.orig/tools/virtiofsd/fuse_lowlevel.c	2021-04-28 13:42:34.855145073 -0400
-+++ rhvgoyal-qemu/tools/virtiofsd/fuse_lowlevel.c	2021-04-28 13:42:35.904188567 -0400
-@@ -2432,6 +2432,7 @@ static const struct fuse_opt fuse_ll_opt
-     LL_OPTION("--socket-group=%s", vu_socket_group, 0),
-     LL_OPTION("--fd=%d", vu_listen_fd, 0),
-     LL_OPTION("--thread-pool-size=%d", thread_pool_size, 0),
-+    LL_OPTION("--auto-switch-threshold=%u", auto_switch_threshold, 0),
-     FUSE_OPT_END
- };
- 
-@@ -2452,7 +2453,8 @@ void fuse_lowlevel_help(void)
-         "    --socket-path=PATH         path for the vhost-user socket\n"
-         "    --socket-group=GRNAME      name of group for the vhost-user socket\n"
-         "    --fd=FDNUM                 fd number of vhost-user socket\n"
--        "    --thread-pool-size=NUM     thread pool size limit (default %d)\n",
-+        "    --thread-pool-size=NUM     thread pool size limit (default %d)\n"
-+        "    --auto-switch-threshold=NUM     number of request threshold to switch between inline and thread pool processing of request\n",
-         THREAD_POOL_SIZE);
- }
- 
-@@ -2508,6 +2510,7 @@ struct fuse_session *fuse_session_new(st
-     se->fd = -1;
-     se->vu_listen_fd = -1;
-     se->thread_pool_size = THREAD_POOL_SIZE;
-+    se->auto_switch_threshold = 0;
-     se->conn.max_write = UINT_MAX;
-     se->conn.max_readahead = UINT_MAX;
- 
 

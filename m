@@ -1,12 +1,27 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 28 Apr 2021 15:03:14 -0400
-Message-Id: <20210428190314.1865312-4-vgoyal@redhat.com>
-In-Reply-To: <20210428190314.1865312-1-vgoyal@redhat.com>
-References: <20210428190314.1865312-1-vgoyal@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+	h=subject:to:cc:references:from:message-id:date:user-agent
+	:mime-version:in-reply-to:content-language:content-transfer-encoding;
+	bh=iVSVHhA9vb7hyg4ixCNUXcIqNKVHe/Df9cZogeilUfA=;
+	b=RUKlpVcvuaXJ/p0q49U5T7rJ2MF6NsebYL52bbcKk1MsabpxkL8vdoFkSRb7z9hH8p
+	TXC9zv3Dof9NIA0N2u7obgd2pDm0PwleaHAPDYofhJaI8k+mhBH0JFKmUK32yTzTu9me
+	kSL1kOqi1JUg+KzUxOTCd+Ve31OannJLo8auybR6OKwiWAJMWZp1LVsy8LQ6ERZzy/i8
+	6LZU4VXV2Ur1FIsGOhjvEAjKj19Y6RgR5jtYzd8UwPDvjX8skkVuZ3vIUYN/RWd4mEbL
+	xEaHHCCMTWSCujvoxNIPFJiR69ESiNEu+aJ+k6/HoKnKeR902As9yx+dsYunnNB/IPKE
+	WwiQ==
+References: <20210428144813.417170-1-philmd@redhat.com>
+	<20210428144813.417170-3-philmd@redhat.com>
+	<e06f3f24-9ff2-bf3c-91c4-178af60c6c59@linaro.org>
+	<160e4c85-e8c0-304d-7151-1040f8d310ba@redhat.com>
+From: Richard Henderson <richard.henderson@linaro.org>
+Message-ID: <a4dabeaf-4df8-2779-f028-3d135fe84bef@linaro.org>
+Date: Wed, 28 Apr 2021 12:24:20 -0700
 MIME-Version: 1.0
+In-Reply-To: <160e4c85-e8c0-304d-7151-1040f8d310ba@redhat.com>
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Language: en-US
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v6 3/3] dax: Wake up all waiters after
-	invalidating dax entry
+Subject: Re: [Virtio-fs] [PATCH 2/2] util/meson: Build
+ iov/hexdump/buffer_is_zero with virtiofsd
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,75 +30,18 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-nvdimm@lists.01.org, virtio-fs@redhat.com, dan.j.williams@intel.com
-Cc: jack@suse.cz, willy@infradead.org, vgoyal@redhat.com
+To: =?UTF-8?Q?Philippe_Mathieu-Daud=c3=a9?= <philmd@redhat.com>, qemu-devel@nongnu.org
+Cc: Thomas Huth <thuth@redhat.com>, "Daniel P . Berrange" <berrange@redhat.com>, virtio-fs@redhat.com, Mahmoud Mandour <ma.mandourr@gmail.com>
 
-I am seeing missed wakeups which ultimately lead to a deadlock when I am
-using virtiofs with DAX enabled and running "make -j". I had to mount
-virtiofs as rootfs and also reduce to dax window size to 256M to reproduce
-the problem consistently.
+On 4/28/21 10:56 AM, Philippe Mathieu-Daudé wrote:
+> Are you suggesting to remove the 'if have_block' check? This makes build
+> a the files pointlessly for user-mode-only builds...
 
-So here is the problem. put_unlocked_entry() wakes up waiters only
-if entry is not null as well as !dax_is_conflict(entry). But if I
-call multiple instances of invalidate_inode_pages2() in parallel,
-then I can run into a situation where there are waiters on
-this index but nobody will wake these waiters.
+But since the objects are not included in the binary, I don't care.
 
-invalidate_inode_pages2()
-  invalidate_inode_pages2_range()
-    invalidate_exceptional_entry2()
-      dax_invalidate_mapping_entry_sync()
-        __dax_invalidate_entry() {
-                xas_lock_irq(&xas);
-                entry = get_unlocked_entry(&xas, 0);
-                ...
-                ...
-                dax_disassociate_entry(entry, mapping, trunc);
-                xas_store(&xas, NULL);
-                ...
-                ...
-                put_unlocked_entry(&xas, entry);
-                xas_unlock_irq(&xas);
-        }
+The build system is already too complex, and building a couple of extra small 
+files makes only milliseconds of difference.
 
-Say a fault in in progress and it has locked entry at offset say "0x1c".
-Now say three instances of invalidate_inode_pages2() are in progress
-(A, B, C) and they all try to invalidate entry at offset "0x1c". Given
-dax entry is locked, all tree instances A, B, C will wait in wait queue.
 
-When dax fault finishes, say A is woken up. It will store NULL entry
-at index "0x1c" and wake up B. When B comes along it will find "entry=0"
-at page offset 0x1c and it will call put_unlocked_entry(&xas, 0). And
-this means put_unlocked_entry() will not wake up next waiter, given
-the current code. And that means C continues to wait and is not woken
-up.
-
-This patch fixes the issue by waking up all waiters when a dax entry
-has been invalidated. This seems to fix the deadlock I am facing
-and I can make forward progress.
-
-Reported-by: Sergio Lopez <slp@redhat.com>
-Fixes: ac401cc78242 ("dax: New fault locking")
-Reviewed-by: Jan Kara <jack@suse.cz>
-Suggested-by: Dan Williams <dan.j.williams@intel.com>
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/dax.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/fs/dax.c b/fs/dax.c
-index 56eb1c759ca5..df5485b4bddf 100644
---- a/fs/dax.c
-+++ b/fs/dax.c
-@@ -675,7 +675,7 @@ static int __dax_invalidate_entry(struct address_space *mapping,
- 	mapping->nrexceptional--;
- 	ret = 1;
- out:
--	put_unlocked_entry(&xas, entry, WAKE_NEXT);
-+	put_unlocked_entry(&xas, entry, WAKE_ALL);
- 	xas_unlock_irq(&xas);
- 	return ret;
- }
--- 
-2.25.4
+r~
 

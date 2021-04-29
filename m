@@ -1,15 +1,14 @@
-Date: Thu, 29 Apr 2021 08:53:05 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210429125305.GA1883535@redhat.com>
-References: <6b2e27a4-8bee-3649-95a4-a2cea45a18e4@gmail.com>
-	<YIkZhqKaLat6Q9YH@work-vm>
-	<afb9df25-cf79-19d1-0085-fd72c6225013@gmail.com>
+Date: Thu, 29 Apr 2021 16:48:19 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YIrVQ8TUkgropuOw@work-vm>
+References: <20210428110100.27757-1-dgilbert@redhat.com>
+	<20210428110100.27757-7-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <afb9df25-cf79-19d1-0085-fd72c6225013@gmail.com>
-Subject: Re: [Virtio-fs] Min host / vm kernel rev for basic DAX ops?
+In-Reply-To: <20210428110100.27757-7-dgilbert@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v3 06/26] DAX subprojects/libvhost-user: Add
+ virtio-fs slave types
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,37 +17,93 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Harry G. Coin" <hgcoin@gmail.com>
+To: qemu-devel@nongnu.org, vgoyal@redhat.com, stefanha@redhat.com, groug@kaod.org, chirantan@chromium.org
 Cc: virtio-fs@redhat.com
 
-On Wed, Apr 28, 2021 at 04:00:40PM -0500, Harry G. Coin wrote:
->=20
-> On 4/28/21 3:15 AM, Dr. David Alan Gilbert wrote:
-> > * Harry G. Coin (hgcoin@gmail.com) wrote:
-> >> Kindly answer a couple 'basic' virtiofs questions:
-> >>
-> >> 1) Which mainline kernel version is necessary for the host, and for the
-> >> vm to enable reliable DAX operations -- supposing no shared host
-> >> activity on the underlying fs.
-> > I don't think there's any host kernel dependency for DAX
-> > currently.
-> > (You do need a guest with the DAX support)
->=20
-> At least the version of the 'virt-manager' on fedora 33 doesn't support
-> the 'cache-size' host option, which as I understand from a post a few
-> days ago should be around 4G.=A0 That's why I asked about the host
-> requirements.
+* Dr. David Alan Gilbert (git) (dgilbert@redhat.com) wrote:
+> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+> 
+> Add virtio-fs definitions to libvhost-user
+> 
+> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
-Generally there are no specifix host requirements. Guest kernel should
-have virtiofs DAX support. Also qemu needs dax support (option
-cache-size). That's not usptream yet. David has been posting patches
-for review. Hopefully it will be merged soon.
+I'm going to need to rework this
 
-W.r.t how big cache-size should be. I would say ideally it needs to
-be atleast as big as size of filesystem you are exporting into the
-guest. If filesystem is too small, I would think atleast 4G as minimum
-dax window size.
+> +/* Structures carried over the slave channel back to QEMU */
+> +#define VHOST_USER_FS_SLAVE_MAX_ENTRIES 32
+> +
+> +/* For the flags field of VhostUserFSSlaveMsg */
+> +#define VHOST_USER_FS_FLAG_MAP_R (1u << 0)
+> +#define VHOST_USER_FS_FLAG_MAP_W (1u << 1)
+> +
+> +typedef struct {
+> +    /* Offsets within the file being mapped */
+> +    uint64_t fd_offset;
+> +    /* Offsets within the cache */
+> +    uint64_t c_offset;
+> +    /* Lengths of sections */
+> +    uint64_t len;
+> +    /* Flags, from VHOST_USER_FS_FLAG_* */
+> +    uint64_t flags;
+> +} VhostUserFSSlaveMsgEntry;
+> +
+> +typedef struct {
+> +    /* Number of entries */
+> +    uint16_t count;
+> +    /* Spare */
+> +    uint16_t align;
+> +
+> +    VhostUserFSSlaveMsgEntry entries[];
+> +} VhostUserFSSlaveMsg;
+> +
+>  typedef struct VhostUserMemoryRegion {
+>      uint64_t guest_phys_addr;
+>      uint64_t memory_size;
+> @@ -197,6 +224,7 @@ typedef struct VhostUserMsg {
+>          VhostUserConfig config;
+>          VhostUserVringArea area;
+>          VhostUserInflight inflight;
+> +        VhostUserFSSlaveMsg fs;
+>      } payload;
+>  
+>      int fds[VHOST_MEMORY_BASELINE_NREGIONS];
 
-Thanks
-Vivek
+This fails Clang's build; because 'fs' is part of a union and
+given it's entries[] is a variable length type, and is not
+at the end of the union.   It's got a good point - I really don't know
+how gcc copes here; but also, what are vhost-user's rules
+on the length of 'payload' - it looks like me putting
+a larger message in there will break other demons.
+
+I'd changed it from a fixed size array to variable size based
+on Chirantan's comments on v1; but now I'm not even convinced
+the fixed size was right, given that I'm not convinced I'm
+allowed to change the length of payload.
+
+Dave
+
+> @@ -693,4 +721,16 @@ void vu_queue_get_avail_bytes(VuDev *vdev, VuVirtq *vq, unsigned int *in_bytes,
+>  bool vu_queue_avail_bytes(VuDev *dev, VuVirtq *vq, unsigned int in_bytes,
+>                            unsigned int out_bytes);
+>  
+> +/**
+> + * vu_fs_cache_request: Send a slave message for an fs client
+> + * @dev: a VuDev context
+> + * @req: The request type (map, unmap, sync)
+> + * @fd: an fd (only required for map, else must be -1)
+> + * @fsm: The body of the message
+> + *
+> + * Returns: 0 or above for success, nevative errno on error
+> + */
+> +int64_t vu_fs_cache_request(VuDev *dev, VhostUserSlaveRequest req, int fd,
+> +                            VhostUserFSSlaveMsg *fsm);
+> +
+>  #endif /* LIBVHOST_USER_H */
+> -- 
+> 2.31.1
+> 
+> 
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

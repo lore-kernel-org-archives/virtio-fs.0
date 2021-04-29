@@ -1,22 +1,17 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-	d=intel-com.20150623.gappssmtp.com; s=20150623;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=0pRdHORbMnYGgpAEqFhWtNH9/sxU/zrFmn1etVSS8ec=;
-	b=pbgttAEz2va7NMNY0DPCjAIrN3cvwgh1vLPTHCTYGogu5LS30biP0lrPVzo2ndKVug
-	c910hP3lyskv2p9CsZZmtyPWoONAJwqaunWQvnjFhjIX0Q5yZ5SChmgdBzPdhSyUJoj1
-	N3Sg+EygRrSverxWz+odjeJVoGWYQmzDyrbb4Xso5/JC8GcrmocAQUAI9cAzpzoQutzT
-	2xRp+1GLcu4i3ZpQVcRvSUUEnMYkP6bhFS1FBvK2WyY2dmofMG+PRGN1HZzKDoVhs+od
-	o9kzI7900pFwR78M2AFerahttXmuiaLedpc5P76RshFxO1Y3+hRfMsGLOUEcZgyZvF35
-	hCSQ==
+From: =?UTF-8?Q?Philippe_Mathieu-Daud=c3=a9?= <philmd@redhat.com>
+References: <20210428144813.417170-1-philmd@redhat.com>
+	<20210428144813.417170-2-philmd@redhat.com>
+	<15dbfc38-f0ba-65f1-382c-3ce5b961f108@linaro.org>
+	<e2f18183-2b7d-f7c1-b1a2-e624950c7627@redhat.com>
+Message-ID: <148855f5-05ef-3586-d291-96229d960f2c@redhat.com>
+Date: Thu, 29 Apr 2021 09:31:43 +0200
 MIME-Version: 1.0
-References: <20210419184516.GC1472665@redhat.com>
-In-Reply-To: <20210419184516.GC1472665@redhat.com>
-From: Dan Williams <dan.j.williams@intel.com>
-Date: Mon, 19 Apr 2021 12:48:58 -0700
-Message-ID: <CAPcyv4jR5d+-99wVMm9SHxNBOsp0FUi7wzDNsefkZ1oqUZ7joQ@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH][v2] dax: Fix missed wakeup during dax entry
-	invalidation
+In-Reply-To: <e2f18183-2b7d-f7c1-b1a2-e624950c7627@redhat.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Language: en-US
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH 1/2] meson: Check for seccomp/cap-ng
+ libraries if virtiofsd is enabled
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,117 +20,65 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, linux-nvdimm <linux-nvdimm@lists.01.org>, linux kernel mailing list <linux-kernel@vger.kernel.org>, Matthew Wilcox <willy@infradead.org>, virtio-fs-list <virtio-fs@redhat.com>, Linux fsdevel mailing list <linux-fsdevel@vger.kernel.org>
+To: Richard Henderson <richard.henderson@linaro.org>, qemu-devel@nongnu.org, Paolo Bonzini <pbonzini@redhat.com>
+Cc: Thomas Huth <thuth@redhat.com>, "Daniel P . Berrange" <berrange@redhat.com>, virtio-fs@redhat.com, Mahmoud Mandour <ma.mandourr@gmail.com>, =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>
 
-On Mon, Apr 19, 2021 at 11:45 AM Vivek Goyal <vgoyal@redhat.com> wrote:
->
-> This is V2 of the patch. Posted V1 here.
->
-> https://lore.kernel.org/linux-fsdevel/20210416173524.GA1379987@redhat.com/
->
-> Based on feedback from Dan and Jan, modified the patch to wake up
-> all waiters when dax entry is invalidated. This solves the issues
-> of missed wakeups.
+On 4/28/21 8:00 PM, Philippe Mathieu-Daudé wrote:
+> On 4/28/21 6:34 PM, Richard Henderson wrote:
+>> On 4/28/21 7:48 AM, Philippe Mathieu-Daudé wrote:
+>>>   seccomp = not_found
+>>> -if not get_option('seccomp').auto() or have_system or have_tools
+>>> +if not get_option('seccomp').auto() or have_system or have_tools or
+>>> not get_option('virtiofsd').auto()
+>>>     seccomp = dependency('libseccomp', version: '>=2.3.0',
+>>>                          required: get_option('seccomp'),
+>>>                          method: 'pkg-config', kwargs: static_kwargs)
+>>
+>> This construct is wrong, both before and after, as I read it.
+>>
+>> not get_option(foo).auto() is true for both enabled and disabled.  If
+>> disabled, why are we examining the dependency?  If auto, if we have all
+>> of the dependencies we want to enable the feature -- if we don't probe
+>> for the dependency, how can we enable it?
+>>
+>> This error seems to be offset by the OR have_* tests, for which the
+>> logic also seems off.
+>>
+>> I think the test should have been
+>>
+>>   if (have_system or have_tools) and
+> 
+> Yes but virtiofsd is not a tool... It is a standalone binary.
+> Maybe have_system is the culprit here:
+> 
+>   have_system = have_system or target.endswith('-softmmu')
+> 
+> We should somewhere add:
+> 
+>   have_system = have_system or something('virtiofsd')
 
-Care to send a formal patch with this commentary moved below the --- line?
+So this hunk does fix the issue ...:
 
-One style fixup below...
+-- >8 --
+--- a/meson.build
++++ b/meson.build
+@@ -52,4 +52,5 @@
+ endforeach
+ have_tools = 'CONFIG_TOOLS' in config_host
++# virtiofsd depends on sysemu
++have_system = have_system or not get_option('virtiofsd').disabled()
+ have_block = have_system or have_tools
 
->
-> I am seeing missed wakeups which ultimately lead to a deadlock when I am
-> using virtiofs with DAX enabled and running "make -j". I had to mount
-> virtiofs as rootfs and also reduce to dax window size to 256M to reproduce
-> the problem consistently.
->
-> So here is the problem. put_unlocked_entry() wakes up waiters only
-> if entry is not null as well as !dax_is_conflict(entry). But if I
-> call multiple instances of invalidate_inode_pages2() in parallel,
-> then I can run into a situation where there are waiters on
-> this index but nobody will wait these.
->
-> invalidate_inode_pages2()
->   invalidate_inode_pages2_range()
->     invalidate_exceptional_entry2()
->       dax_invalidate_mapping_entry_sync()
->         __dax_invalidate_entry() {
->                 xas_lock_irq(&xas);
->                 entry = get_unlocked_entry(&xas, 0);
->                 ...
->                 ...
->                 dax_disassociate_entry(entry, mapping, trunc);
->                 xas_store(&xas, NULL);
->                 ...
->                 ...
->                 put_unlocked_entry(&xas, entry);
->                 xas_unlock_irq(&xas);
->         }
->
-> Say a fault in in progress and it has locked entry at offset say "0x1c".
-> Now say three instances of invalidate_inode_pages2() are in progress
-> (A, B, C) and they all try to invalidate entry at offset "0x1c". Given
-> dax entry is locked, all tree instances A, B, C will wait in wait queue.
->
-> When dax fault finishes, say A is woken up. It will store NULL entry
-> at index "0x1c" and wake up B. When B comes along it will find "entry=0"
-> at page offset 0x1c and it will call put_unlocked_entry(&xas, 0). And
-> this means put_unlocked_entry() will not wake up next waiter, given
-> the current code. And that means C continues to wait and is not woken
-> up.
->
-> This patch fixes the issue by waking up all waiters when a dax entry
-> has been invalidated. This seems to fix the deadlock I am facing
-> and I can make forward progress.
->
-> Reported-by: Sergio Lopez <slp@redhat.com>
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  fs/dax.c |   12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
->
-> Index: redhat-linux/fs/dax.c
-> ===================================================================
-> --- redhat-linux.orig/fs/dax.c  2021-04-16 14:16:44.332140543 -0400
-> +++ redhat-linux/fs/dax.c       2021-04-19 11:24:11.465213474 -0400
-> @@ -264,11 +264,11 @@ static void wait_entry_unlocked(struct x
->         finish_wait(wq, &ewait.wait);
->  }
->
-> -static void put_unlocked_entry(struct xa_state *xas, void *entry)
-> +static void put_unlocked_entry(struct xa_state *xas, void *entry, bool wake_all)
->  {
->         /* If we were the only waiter woken, wake the next one */
->         if (entry && !dax_is_conflict(entry))
-> -               dax_wake_entry(xas, entry, false);
-> +               dax_wake_entry(xas, entry, wake_all);
->  }
->
->  /*
-> @@ -622,7 +622,7 @@ struct page *dax_layout_busy_page_range(
->                         entry = get_unlocked_entry(&xas, 0);
->                 if (entry)
->                         page = dax_busy_page(entry);
-> -               put_unlocked_entry(&xas, entry);
-> +               put_unlocked_entry(&xas, entry, false);
+---
 
-I'm not a fan of raw true/false arguments because if you read this
-line in isolation you need to go read put_unlocked_entry() to recall
-what that argument means. So lets add something like:
+> However I wonder if we aren't going to build many objects
+> that are irrelevant for virtiofsd.
 
-/**
- * enum dax_entry_wake_mode: waitqueue wakeup toggle
- * @WAKE_NEXT: entry was not mutated
- * @WAKE_ALL: entry was invalidated, or resized
- */
-enum dax_entry_wake_mode {
-        WAKE_NEXT,
-        WAKE_ALL,
-}
+Based on top of
+https://www.mail-archive.com/qemu-devel@nongnu.org/msg799069.html
+to remove libsoftfloat, 216 objects are required to build virtiofsd:
 
-...and use that as the arg for dax_wake_entry(). So I'd expect this to
-be a 3 patch series, introduce dax_entry_wake_mode for
-dax_wake_entry(), introduce the argument for put_unlocked_entry()
-without changing the logic, and finally this bug fix. Feel free to add
-'Fixes: ac401cc78242 ("dax: New fault locking")' in case you feel this
-needs to be backported.
+[216/216] Linking target tools/virtiofsd/virtiofsd
+
+This one-line fix seems good enough (to keep virtiofsd as a 'tool').
 

@@ -1,17 +1,15 @@
-From: =?UTF-8?Q?Philippe_Mathieu-Daud=c3=a9?= <philmd@redhat.com>
-References: <20210428144813.417170-1-philmd@redhat.com>
-	<20210428144813.417170-2-philmd@redhat.com>
-	<15dbfc38-f0ba-65f1-382c-3ce5b961f108@linaro.org>
-	<e2f18183-2b7d-f7c1-b1a2-e624950c7627@redhat.com>
-Message-ID: <148855f5-05ef-3586-d291-96229d960f2c@redhat.com>
-Date: Thu, 29 Apr 2021 09:31:43 +0200
+Date: Thu, 29 Apr 2021 08:53:05 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210429125305.GA1883535@redhat.com>
+References: <6b2e27a4-8bee-3649-95a4-a2cea45a18e4@gmail.com>
+	<YIkZhqKaLat6Q9YH@work-vm>
+	<afb9df25-cf79-19d1-0085-fd72c6225013@gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <e2f18183-2b7d-f7c1-b1a2-e624950c7627@redhat.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Language: en-US
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 1/2] meson: Check for seccomp/cap-ng
- libraries if virtiofsd is enabled
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+In-Reply-To: <afb9df25-cf79-19d1-0085-fd72c6225013@gmail.com>
+Subject: Re: [Virtio-fs] Min host / vm kernel rev for basic DAX ops?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,65 +18,37 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Richard Henderson <richard.henderson@linaro.org>, qemu-devel@nongnu.org, Paolo Bonzini <pbonzini@redhat.com>
-Cc: Thomas Huth <thuth@redhat.com>, "Daniel P . Berrange" <berrange@redhat.com>, virtio-fs@redhat.com, Mahmoud Mandour <ma.mandourr@gmail.com>, =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>
+To: "Harry G. Coin" <hgcoin@gmail.com>
+Cc: virtio-fs@redhat.com
 
-On 4/28/21 8:00 PM, Philippe Mathieu-Daudé wrote:
-> On 4/28/21 6:34 PM, Richard Henderson wrote:
->> On 4/28/21 7:48 AM, Philippe Mathieu-Daudé wrote:
->>>   seccomp = not_found
->>> -if not get_option('seccomp').auto() or have_system or have_tools
->>> +if not get_option('seccomp').auto() or have_system or have_tools or
->>> not get_option('virtiofsd').auto()
->>>     seccomp = dependency('libseccomp', version: '>=2.3.0',
->>>                          required: get_option('seccomp'),
->>>                          method: 'pkg-config', kwargs: static_kwargs)
->>
->> This construct is wrong, both before and after, as I read it.
->>
->> not get_option(foo).auto() is true for both enabled and disabled.  If
->> disabled, why are we examining the dependency?  If auto, if we have all
->> of the dependencies we want to enable the feature -- if we don't probe
->> for the dependency, how can we enable it?
->>
->> This error seems to be offset by the OR have_* tests, for which the
->> logic also seems off.
->>
->> I think the test should have been
->>
->>   if (have_system or have_tools) and
-> 
-> Yes but virtiofsd is not a tool... It is a standalone binary.
-> Maybe have_system is the culprit here:
-> 
->   have_system = have_system or target.endswith('-softmmu')
-> 
-> We should somewhere add:
-> 
->   have_system = have_system or something('virtiofsd')
+On Wed, Apr 28, 2021 at 04:00:40PM -0500, Harry G. Coin wrote:
+>=20
+> On 4/28/21 3:15 AM, Dr. David Alan Gilbert wrote:
+> > * Harry G. Coin (hgcoin@gmail.com) wrote:
+> >> Kindly answer a couple 'basic' virtiofs questions:
+> >>
+> >> 1) Which mainline kernel version is necessary for the host, and for the
+> >> vm to enable reliable DAX operations -- supposing no shared host
+> >> activity on the underlying fs.
+> > I don't think there's any host kernel dependency for DAX
+> > currently.
+> > (You do need a guest with the DAX support)
+>=20
+> At least the version of the 'virt-manager' on fedora 33 doesn't support
+> the 'cache-size' host option, which as I understand from a post a few
+> days ago should be around 4G.=A0 That's why I asked about the host
+> requirements.
 
-So this hunk does fix the issue ...:
+Generally there are no specifix host requirements. Guest kernel should
+have virtiofs DAX support. Also qemu needs dax support (option
+cache-size). That's not usptream yet. David has been posting patches
+for review. Hopefully it will be merged soon.
 
--- >8 --
---- a/meson.build
-+++ b/meson.build
-@@ -52,4 +52,5 @@
- endforeach
- have_tools = 'CONFIG_TOOLS' in config_host
-+# virtiofsd depends on sysemu
-+have_system = have_system or not get_option('virtiofsd').disabled()
- have_block = have_system or have_tools
+W.r.t how big cache-size should be. I would say ideally it needs to
+be atleast as big as size of filesystem you are exporting into the
+guest. If filesystem is too small, I would think atleast 4G as minimum
+dax window size.
 
----
-
-> However I wonder if we aren't going to build many objects
-> that are irrelevant for virtiofsd.
-
-Based on top of
-https://www.mail-archive.com/qemu-devel@nongnu.org/msg799069.html
-to remove libsoftfloat, 216 objects are required to build virtiofsd:
-
-[216/216] Linking target tools/virtiofsd/virtiofsd
-
-This one-line fix seems good enough (to keep virtiofsd as a 'tool').
+Thanks
+Vivek
 

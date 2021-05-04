@@ -1,11 +1,15 @@
-Date: Tue, 4 May 2021 11:18:41 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210504151841.GC135914@redhat.com>
+Date: Tue, 4 May 2021 16:23:38 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <YJFm+hocgArYnWAB@stefanha-x1.localdomain>
+References: <20210428110100.27757-1-dgilbert@redhat.com>
+	<20210428110100.27757-4-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="5/zrdj0q8vqjEIcX"
 Content-Disposition: inline
-Subject: [Virtio-fs] [RFC][PATCH][v3] virtiofsd: virtiofsd: Use thread pool
- only after certain queue depth
+In-Reply-To: <20210428110100.27757-4-dgilbert@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v3 03/26] DAX: vhost-user: Rework slave
+	return values
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,143 +18,82 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs-list <virtio-fs@redhat.com>
+To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
 
-For low queue depth workloads, inline processing works well. But for 
-high queue depth (and multiple process/thread) workloads, parallel
-processing of thread pool can benefit.
 
-This patch provides a knob --thread-pool-threshold=<nr-requests>, which
-uses a thread pool only if number of requests on virtqueue are more
-than nr-requests. IOW, upto nr-requests, requests are processed inline
-and anything more than nr-requests is sent for processing in thread
-pool.
+--5/zrdj0q8vqjEIcX
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-I have got good results with "--thread-pool-size=16 --thread-pool-threshold=3" 
-on my system.
- 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
+On Wed, Apr 28, 2021 at 12:00:37PM +0100, Dr. David Alan Gilbert (git) wrot=
+e:
+> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+>=20
+> All the current slave handlers on the qemu side generate an 'int'
+> return value that's squashed down to a bool (!!ret) and stuffed into
+> a uint64_t (field of a union) to be returned.
+>=20
+> Move the uint64_t type back up through the individual handlers so
+> that we can make one actually return a full uint64_t.
+>=20
+> Note that the definition in the interop spec says most of these
+> cases are defined as returning 0 on success and non-0 for failure,
+> so it's OK to change from a bool to another non-0.
+>=20
+> Vivek:
+> This is needed because upcoming patches in series will add new functions
+> which want to return full error code. Existing functions continue to
+> return true/false so, it should not lead to change of behavior for
+> existing users.
+>=20
+> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> Reviewed-by: Greg Kurz <groug@kaod.org>
+> ---
+>  hw/virtio/vhost-backend.c         |  6 +++---
+>  hw/virtio/vhost-user.c            | 31 ++++++++++++++++---------------
+>  include/hw/virtio/vhost-backend.h |  2 +-
+>  3 files changed, 20 insertions(+), 19 deletions(-)
+>=20
+> diff --git a/hw/virtio/vhost-backend.c b/hw/virtio/vhost-backend.c
+> index 31b33bde37..1686c94767 100644
+> --- a/hw/virtio/vhost-backend.c
+> +++ b/hw/virtio/vhost-backend.c
+> @@ -401,8 +401,8 @@ int vhost_backend_invalidate_device_iotlb(struct vhos=
+t_dev *dev,
+>      return -ENODEV;
+>  }
+> =20
+> -int vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
+> -                                          struct vhost_iotlb_msg *imsg)
+> +uint64_t vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
+> +                                        struct vhost_iotlb_msg *imsg)
+>  {
+>      int ret =3D 0;
 
-Test results with this patch are available here.
+This patch is messy. We want uint64_t but these functions use int ret
+internally. The actual return values are true/false instead of int 0 and
+1.
 
-https://github.com/rhvgoyal/virtiofs-tests/tree/master/performance-results/thread-pool-threshold/4-may-2021
+Please use uint64_t everywhere: return 0 for success and 1 for failure
+instead of bool literals and change the type of the local ret variables
+to uint64_t.
 
-Changes since v2:
-- Renamed knob name to "--thread-pool-threshold"
-- Started using GQueue instead of GList to keep a list of requests
-  received on virtqueue (Greg)
-- When threshold is crossed only requests above threshold are sent to
-  thread pool. Rest are still processed inline. (Greg)
----
- tools/virtiofsd/fuse_i.h        |    1 +
- tools/virtiofsd/fuse_lowlevel.c |    8 +++++++-
- tools/virtiofsd/fuse_virtio.c   |   27 +++++++++++++--------------
- 3 files changed, 21 insertions(+), 15 deletions(-)
+--5/zrdj0q8vqjEIcX
+Content-Type: application/pgp-signature; name="signature.asc"
 
-Index: rhvgoyal-qemu/tools/virtiofsd/fuse_virtio.c
-===================================================================
---- rhvgoyal-qemu.orig/tools/virtiofsd/fuse_virtio.c	2021-05-04 09:55:30.467514740 -0400
-+++ rhvgoyal-qemu/tools/virtiofsd/fuse_virtio.c	2021-05-04 10:06:32.453801299 -0400
-@@ -445,7 +445,6 @@ err:
- 
- static __thread bool clone_fs_called;
- 
--/* Process one FVRequest in a thread pool */
- static void fv_queue_worker(gpointer data, gpointer user_data)
- {
-     struct fv_QueueInfo *qi = user_data;
-@@ -604,11 +603,12 @@ static void *fv_queue_thread(void *opaqu
-     struct VuVirtq *q = vu_get_queue(dev, qi->qidx);
-     struct fuse_session *se = qi->virtio_dev->se;
-     GThreadPool *pool = NULL;
--    GList *req_list = NULL;
-+    GQueue req_queue = G_QUEUE_INIT;
- 
-     if (se->thread_pool_size) {
--        fuse_log(FUSE_LOG_DEBUG, "%s: Creating thread pool for Queue %d\n",
--                 __func__, qi->qidx);
-+        fuse_log(FUSE_LOG_DEBUG, "%s: Creating thread pool for Queue %d."
-+                 " thread_pool_threshold=%u\n", __func__, qi->qidx,
-+                 se->thread_pool_threshold);
-         pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size,
-                                  FALSE, NULL);
-         if (!pool) {
-@@ -686,22 +686,21 @@ static void *fv_queue_thread(void *opaqu
-             }
- 
-             req->reply_sent = false;
--
--            if (!se->thread_pool_size) {
--                req_list = g_list_prepend(req_list, req);
--            } else {
--                g_thread_pool_push(pool, req, NULL);
--            }
-+            g_queue_push_tail(&req_queue, req);
-         }
- 
-         pthread_mutex_unlock(&qi->vq_lock);
-         vu_dispatch_unlock(qi->virtio_dev);
- 
-         /* Process all the requests. */
--        if (!se->thread_pool_size && req_list != NULL) {
--            g_list_foreach(req_list, fv_queue_worker, qi);
--            g_list_free(req_list);
--            req_list = NULL;
-+        for (int i = g_queue_get_length(&req_queue); i > 0; i--) {
-+                FVRequest *req = g_queue_pop_head(&req_queue);
-+
-+                if (se->thread_pool_size && i > se->thread_pool_threshold) {
-+                    g_thread_pool_push(pool, req, NULL);
-+                } else {
-+                    fv_queue_worker(req, qi);
-+                }
-         }
-     }
- 
-Index: rhvgoyal-qemu/tools/virtiofsd/fuse_i.h
-===================================================================
---- rhvgoyal-qemu.orig/tools/virtiofsd/fuse_i.h	2021-05-04 09:55:30.467514740 -0400
-+++ rhvgoyal-qemu/tools/virtiofsd/fuse_i.h	2021-05-04 10:04:58.737938382 -0400
-@@ -73,6 +73,7 @@ struct fuse_session {
-     int   vu_socketfd;
-     struct fv_VuDev *virtio_dev;
-     int thread_pool_size;
-+    unsigned thread_pool_threshold;
- };
- 
- struct fuse_chan {
-Index: rhvgoyal-qemu/tools/virtiofsd/fuse_lowlevel.c
-===================================================================
---- rhvgoyal-qemu.orig/tools/virtiofsd/fuse_lowlevel.c	2021-05-04 09:55:30.467514740 -0400
-+++ rhvgoyal-qemu/tools/virtiofsd/fuse_lowlevel.c	2021-05-04 10:17:27.674809167 -0400
-@@ -2432,6 +2432,7 @@ static const struct fuse_opt fuse_ll_opt
-     LL_OPTION("--socket-group=%s", vu_socket_group, 0),
-     LL_OPTION("--fd=%d", vu_listen_fd, 0),
-     LL_OPTION("--thread-pool-size=%d", thread_pool_size, 0),
-+    LL_OPTION("--thread-pool-threshold=%u", thread_pool_threshold, 0),
-     FUSE_OPT_END
- };
- 
-@@ -2452,7 +2453,11 @@ void fuse_lowlevel_help(void)
-         "    --socket-path=PATH         path for the vhost-user socket\n"
-         "    --socket-group=GRNAME      name of group for the vhost-user socket\n"
-         "    --fd=FDNUM                 fd number of vhost-user socket\n"
--        "    --thread-pool-size=NUM     thread pool size limit (default %d)\n",
-+        "    --thread-pool-size=NUM     thread pool size limit (default %d)\n"
-+        "    --thread-pool-threshold=NUM\n"
-+        "                               number of request threshold to\n"
-+        "                               switch between inline and thread pool\n"
-+        "                               processing of request\n",
-         THREAD_POOL_SIZE);
- }
- 
-@@ -2508,6 +2513,7 @@ struct fuse_session *fuse_session_new(st
-     se->fd = -1;
-     se->vu_listen_fd = -1;
-     se->thread_pool_size = THREAD_POOL_SIZE;
-+    se->thread_pool_threshold = 0;
-     se->conn.max_write = UINT_MAX;
-     se->conn.max_readahead = UINT_MAX;
- 
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmCRZvoACgkQnKSrs4Gr
+c8hSxwgAhIRRgCfofoK5LR7BpWo9nxPvctmSjfFwzQ34/YadBAUgEFJ0CgFf1kpe
+1FT84oUOenqvSsYsoQPityAnwchQ/VyKu1LskP3TEOiUQmFuAW1cnfrNiIal1Oie
+hPnRXDWDSD/6tBKdfsOORbqU62yjS9YR4HUH6gJ38tKcRyPmV+Pb/PShsZDIYOI/
+XFL7ckZyATsbY4N4SOdczrEa/m+Xo0BIqbI5s6dhJCa4yzwEmFNgYsVTYpC+3J6f
+DMnShVLA1/q36hasc2SdZMQpt48VUgzGLQdptuasy7ttvJAXWk6oNraQPz39cP41
+65pRj7W5dcr4w9omMEkVrRFnbhLFGw==
+=l5IW
+-----END PGP SIGNATURE-----
+
+--5/zrdj0q8vqjEIcX--
 

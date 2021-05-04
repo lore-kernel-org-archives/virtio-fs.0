@@ -1,15 +1,11 @@
-Date: Tue, 4 May 2021 16:12:36 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YJFkZA4O+KT4nunq@stefanha-x1.localdomain>
-References: <20210428110100.27757-1-dgilbert@redhat.com>
-	<20210428110100.27757-3-dgilbert@redhat.com>
+Date: Tue, 4 May 2021 11:18:41 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210504151841.GC135914@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="+gHic+xH234Qie+K"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210428110100.27757-3-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 02/26] virtiofsd: Don't assume header
-	layout
+Subject: [Virtio-fs] [RFC][PATCH][v3] virtiofsd: virtiofsd: Use thread pool
+ only after certain queue depth
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,45 +14,143 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
+To: virtio-fs-list <virtio-fs@redhat.com>
 
+For low queue depth workloads, inline processing works well. But for 
+high queue depth (and multiple process/thread) workloads, parallel
+processing of thread pool can benefit.
 
---+gHic+xH234Qie+K
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+This patch provides a knob --thread-pool-threshold=<nr-requests>, which
+uses a thread pool only if number of requests on virtqueue are more
+than nr-requests. IOW, upto nr-requests, requests are processed inline
+and anything more than nr-requests is sent for processing in thread
+pool.
 
-On Wed, Apr 28, 2021 at 12:00:36PM +0100, Dr. David Alan Gilbert (git) wrot=
-e:
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
->=20
-> virtiofsd incorrectly assumed a fixed set of header layout in the virt
-> queue; assuming that the fuse and write headers were conveniently
-> separated from the data;  the spec doesn't allow us to take that
-> convenience, so fix it up to deal with it the hard way.
->=20
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> ---
->  tools/virtiofsd/fuse_virtio.c | 94 +++++++++++++++++++++++++++--------
->  1 file changed, 73 insertions(+), 21 deletions(-)
+I have got good results with "--thread-pool-size=16 --thread-pool-threshold=3" 
+on my system.
+ 
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
 
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+Test results with this patch are available here.
 
---+gHic+xH234Qie+K
-Content-Type: application/pgp-signature; name="signature.asc"
+https://github.com/rhvgoyal/virtiofs-tests/tree/master/performance-results/thread-pool-threshold/4-may-2021
 
------BEGIN PGP SIGNATURE-----
+Changes since v2:
+- Renamed knob name to "--thread-pool-threshold"
+- Started using GQueue instead of GList to keep a list of requests
+  received on virtqueue (Greg)
+- When threshold is crossed only requests above threshold are sent to
+  thread pool. Rest are still processed inline. (Greg)
+---
+ tools/virtiofsd/fuse_i.h        |    1 +
+ tools/virtiofsd/fuse_lowlevel.c |    8 +++++++-
+ tools/virtiofsd/fuse_virtio.c   |   27 +++++++++++++--------------
+ 3 files changed, 21 insertions(+), 15 deletions(-)
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmCRZGMACgkQnKSrs4Gr
-c8gANggAk+5DPo3kDQ9APbrx5HDtEJmdmbvgOH/NNIN6XRhmKOMpz0XOk+K/6+y7
-sdJPPsRatzXtl5PfxE5i4/bblNlcvFAD6hKU2ZGuJvMD73s66oQ2Vs+zr83K7cr4
-W209oPi2tZb7h8LUNy5CAi5JUtj1h62ey0oVBCZ/KSC80zH9G3iHU8v07jkILvdN
-hspYfdZHE61iNZwOUeucxoeEaoLuAWRoElb41YZ1zoXK0o/sW0GYZfKofoBGAn60
-6mJGrKQPWVkSMT+3KWHwo3bqleq/cS3ds6wCP8CPR0TrNeVWHhjX7pj3CJjq3oh9
-oLFIdjhyN0Hb5X9+AY/xrMVdnx02yw==
-=HQRB
------END PGP SIGNATURE-----
-
---+gHic+xH234Qie+K--
+Index: rhvgoyal-qemu/tools/virtiofsd/fuse_virtio.c
+===================================================================
+--- rhvgoyal-qemu.orig/tools/virtiofsd/fuse_virtio.c	2021-05-04 09:55:30.467514740 -0400
++++ rhvgoyal-qemu/tools/virtiofsd/fuse_virtio.c	2021-05-04 10:06:32.453801299 -0400
+@@ -445,7 +445,6 @@ err:
+ 
+ static __thread bool clone_fs_called;
+ 
+-/* Process one FVRequest in a thread pool */
+ static void fv_queue_worker(gpointer data, gpointer user_data)
+ {
+     struct fv_QueueInfo *qi = user_data;
+@@ -604,11 +603,12 @@ static void *fv_queue_thread(void *opaqu
+     struct VuVirtq *q = vu_get_queue(dev, qi->qidx);
+     struct fuse_session *se = qi->virtio_dev->se;
+     GThreadPool *pool = NULL;
+-    GList *req_list = NULL;
++    GQueue req_queue = G_QUEUE_INIT;
+ 
+     if (se->thread_pool_size) {
+-        fuse_log(FUSE_LOG_DEBUG, "%s: Creating thread pool for Queue %d\n",
+-                 __func__, qi->qidx);
++        fuse_log(FUSE_LOG_DEBUG, "%s: Creating thread pool for Queue %d."
++                 " thread_pool_threshold=%u\n", __func__, qi->qidx,
++                 se->thread_pool_threshold);
+         pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size,
+                                  FALSE, NULL);
+         if (!pool) {
+@@ -686,22 +686,21 @@ static void *fv_queue_thread(void *opaqu
+             }
+ 
+             req->reply_sent = false;
+-
+-            if (!se->thread_pool_size) {
+-                req_list = g_list_prepend(req_list, req);
+-            } else {
+-                g_thread_pool_push(pool, req, NULL);
+-            }
++            g_queue_push_tail(&req_queue, req);
+         }
+ 
+         pthread_mutex_unlock(&qi->vq_lock);
+         vu_dispatch_unlock(qi->virtio_dev);
+ 
+         /* Process all the requests. */
+-        if (!se->thread_pool_size && req_list != NULL) {
+-            g_list_foreach(req_list, fv_queue_worker, qi);
+-            g_list_free(req_list);
+-            req_list = NULL;
++        for (int i = g_queue_get_length(&req_queue); i > 0; i--) {
++                FVRequest *req = g_queue_pop_head(&req_queue);
++
++                if (se->thread_pool_size && i > se->thread_pool_threshold) {
++                    g_thread_pool_push(pool, req, NULL);
++                } else {
++                    fv_queue_worker(req, qi);
++                }
+         }
+     }
+ 
+Index: rhvgoyal-qemu/tools/virtiofsd/fuse_i.h
+===================================================================
+--- rhvgoyal-qemu.orig/tools/virtiofsd/fuse_i.h	2021-05-04 09:55:30.467514740 -0400
++++ rhvgoyal-qemu/tools/virtiofsd/fuse_i.h	2021-05-04 10:04:58.737938382 -0400
+@@ -73,6 +73,7 @@ struct fuse_session {
+     int   vu_socketfd;
+     struct fv_VuDev *virtio_dev;
+     int thread_pool_size;
++    unsigned thread_pool_threshold;
+ };
+ 
+ struct fuse_chan {
+Index: rhvgoyal-qemu/tools/virtiofsd/fuse_lowlevel.c
+===================================================================
+--- rhvgoyal-qemu.orig/tools/virtiofsd/fuse_lowlevel.c	2021-05-04 09:55:30.467514740 -0400
++++ rhvgoyal-qemu/tools/virtiofsd/fuse_lowlevel.c	2021-05-04 10:17:27.674809167 -0400
+@@ -2432,6 +2432,7 @@ static const struct fuse_opt fuse_ll_opt
+     LL_OPTION("--socket-group=%s", vu_socket_group, 0),
+     LL_OPTION("--fd=%d", vu_listen_fd, 0),
+     LL_OPTION("--thread-pool-size=%d", thread_pool_size, 0),
++    LL_OPTION("--thread-pool-threshold=%u", thread_pool_threshold, 0),
+     FUSE_OPT_END
+ };
+ 
+@@ -2452,7 +2453,11 @@ void fuse_lowlevel_help(void)
+         "    --socket-path=PATH         path for the vhost-user socket\n"
+         "    --socket-group=GRNAME      name of group for the vhost-user socket\n"
+         "    --fd=FDNUM                 fd number of vhost-user socket\n"
+-        "    --thread-pool-size=NUM     thread pool size limit (default %d)\n",
++        "    --thread-pool-size=NUM     thread pool size limit (default %d)\n"
++        "    --thread-pool-threshold=NUM\n"
++        "                               number of request threshold to\n"
++        "                               switch between inline and thread pool\n"
++        "                               processing of request\n",
+         THREAD_POOL_SIZE);
+ }
+ 
+@@ -2508,6 +2513,7 @@ struct fuse_session *fuse_session_new(st
+     se->fd = -1;
+     se->vu_listen_fd = -1;
+     se->thread_pool_size = THREAD_POOL_SIZE;
++    se->thread_pool_threshold = 0;
+     se->conn.max_write = UINT_MAX;
+     se->conn.max_readahead = UINT_MAX;
+ 
 

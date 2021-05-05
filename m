@@ -1,15 +1,15 @@
-Date: Wed, 5 May 2021 15:15:53 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YJKomatE4qqje5cY@stefanha-x1.localdomain>
-References: <20210428110100.27757-1-dgilbert@redhat.com>
-	<20210428110100.27757-10-dgilbert@redhat.com>
+Date: Wed, 5 May 2021 15:42:46 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YJKu5jfOeu5ubDXZ@work-vm>
+References: <20210505103702.521457-1-berrange@redhat.com>
+	<20210505103702.521457-2-berrange@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="RDhv9EiM8KNnMv4E"
+Content-Type: text/plain; charset="iso-8859-1"
 Content-Disposition: inline
-In-Reply-To: <20210428110100.27757-10-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 09/26] DAX: virtio-fs: Add vhost-user
- slave commands for mapping
+Content-Transfer-Encoding: quoted-printable
+In-Reply-To: <20210505103702.521457-2-berrange@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 1/7] migration: use GDateTime for formatting
+ timestamp in snapshot names
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,82 +18,68 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
+To: Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>
+Cc: Kevin Wolf <kwolf@redhat.com>, Jiri Pirko <jiri@resnulli.us>, qemu-block@nongnu.org, Juan Quintela <quintela@redhat.com>, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowang@redhat.com>, qemu-devel@nongnu.org, Laurent Vivier <laurent@vivier.eu>, virtio-fs@redhat.com, Gerd Hoffmann <kraxel@redhat.com>, Max Reitz <mreitz@redhat.com>, Brad Smith <brad@comstyle.com>
 
+* Daniel P. Berrang=E9 (berrange@redhat.com) wrote:
+> The GDateTime APIs provided by GLib avoid portability pitfalls, such
+> as some platforms where 'struct timeval.tv_sec' field is still 'long'
+> instead of 'time_t'. When combined with automatic cleanup, GDateTime
+> often results in simpler code too.
+>=20
+> Signed-off-by: Daniel P. Berrang=E9 <berrange@redhat.com>
 
---RDhv9EiM8KNnMv4E
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 
-On Wed, Apr 28, 2021 at 12:00:43PM +0100, Dr. David Alan Gilbert (git) wrot=
-e:
-> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-> index dd0a02aa99..169a146e72 100644
-> --- a/hw/virtio/vhost-user-fs.c
-> +++ b/hw/virtio/vhost-user-fs.c
-> @@ -45,6 +45,72 @@ static const int user_feature_bits[] =3D {
->  #define DAX_WINDOW_PROT PROT_NONE
->  #endif
+> ---
+>  migration/savevm.c | 13 +++++--------
+>  1 file changed, 5 insertions(+), 8 deletions(-)
+>=20
+> diff --git a/migration/savevm.c b/migration/savevm.c
+> index 52e2d72e4b..72848b946c 100644
+> --- a/migration/savevm.c
+> +++ b/migration/savevm.c
+> @@ -2775,8 +2775,7 @@ bool save_snapshot(const char *name, bool overwrite=
+, const char *vmstate,
+>      QEMUFile *f;
+>      int saved_vm_running;
+>      uint64_t vm_state_size;
+> -    qemu_timeval tv;
+> -    struct tm tm;
+> +    g_autoptr(GDateTime) now =3D g_date_time_new_now_local();
+>      AioContext *aio_context;
 > =20
-> +/*
-> + * The message apparently had 'received_size' bytes, check this
-> + * matches the count in the message.
-> + *
-> + * Returns true if the size matches.
-> + */
-> +static bool check_slave_message_entries(const VhostUserFSSlaveMsg *sm,
-> +                                        int received_size)
-> +{
-> +    int tmp;
-> +
-> +    /*
-> +     * VhostUserFSSlaveMsg consists of a body followed by 'n' entries,
-> +     * (each VhostUserFSSlaveMsgEntry).  There's a maximum of
-> +     * VHOST_USER_FS_SLAVE_MAX_ENTRIES of these.
-> +     */
-> +    if (received_size <=3D sizeof(VhostUserFSSlaveMsg)) {
-
-received_size is an int and we risk hitting checking against the coerced
-size_t value but then using the signed int received_size later. It's
-safer to convert to size_t once and then use that size_t value
-everywhere later.
-
-> +typedef struct {
-> +    /* Offsets within the file being mapped */
-> +    uint64_t fd_offset;
-> +    /* Offsets within the cache */
-> +    uint64_t c_offset;
-> +    /* Lengths of sections */
-> +    uint64_t len;
-> +    /* Flags, from VHOST_USER_FS_FLAG_* */
-> +    uint64_t flags;
-> +} VhostUserFSSlaveMsgEntry;
-> +
-> +typedef struct {
-> +    /* Number of entries */
-> +    uint16_t count;
-> +    /* Spare */
-> +    uint16_t align;
-
-VhostUserFSSlaveMsgEntry is aligned to 64 bits, so the 16-bit align
-field is not sufficient for full alignment.
-
---RDhv9EiM8KNnMv4E
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmCSqJkACgkQnKSrs4Gr
-c8jXzQgAmyg1B2TTNc7jlm/iJwpSGNBqjLHp1NhvN9XQ3O27BiPWFEtV/rokM32Q
-l4VdKETyC+TN4g7VHyMAcsb2VLG0vQqrj7VR3TH5zXZv/Pinsw8apI3fchRHMjZI
-AKLphvMlA8Z7/7KcQn8L/VmLOD+fNnU1AFxgsrQaVFONS2n9LVrJQhSFWDQNQdVL
-Es7LI4X/++ShGOgy7CsfsviKj8bhl9zsrwCp14RWX88iMGEtXDeJ8BbNhrsLEhvd
-QKuGBsgKstAeEotyucfQrFYhefBatfrMTS+0EchsZVWm9otDh0cDxNuWNUi7jFxn
-2ptKdoAFAs19xYuOx/EgDCgK+io9RQ==
-=45zR
------END PGP SIGNATURE-----
-
---RDhv9EiM8KNnMv4E--
+>      if (migration_is_blocked(errp)) {
+> @@ -2836,9 +2835,8 @@ bool save_snapshot(const char *name, bool overwrite=
+, const char *vmstate,
+>      memset(sn, 0, sizeof(*sn));
+> =20
+>      /* fill auxiliary fields */
+> -    qemu_gettimeofday(&tv);
+> -    sn->date_sec =3D tv.tv_sec;
+> -    sn->date_nsec =3D tv.tv_usec * 1000;
+> +    sn->date_sec =3D g_date_time_to_unix(now);
+> +    sn->date_nsec =3D g_date_time_get_microsecond(now) * 1000;
+>      sn->vm_clock_nsec =3D qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
+>      if (replay_mode !=3D REPLAY_MODE_NONE) {
+>          sn->icount =3D replay_get_current_icount();
+> @@ -2849,9 +2847,8 @@ bool save_snapshot(const char *name, bool overwrite=
+, const char *vmstate,
+>      if (name) {
+>          pstrcpy(sn->name, sizeof(sn->name), name);
+>      } else {
+> -        /* cast below needed for OpenBSD where tv_sec is still 'long' */
+> -        localtime_r((const time_t *)&tv.tv_sec, &tm);
+> -        strftime(sn->name, sizeof(sn->name), "vm-%Y%m%d%H%M%S", &tm);
+> +        g_autofree char *autoname =3D g_date_time_format(now,  "vm-%Y%m%=
+d%H%M%S");
+> +        pstrcpy(sn->name, sizeof(sn->name), autoname);
+>      }
+> =20
+>      /* save the VM state */
+> --=20
+> 2.31.1
+>=20
+--=20
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

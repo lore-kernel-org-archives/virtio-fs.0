@@ -1,12 +1,14 @@
-Date: Tue, 18 May 2021 16:34:50 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210518203450.GA682636@horse>
-References: <20210518190059.GB118510@rsjd01523.et2sqa>
+Date: Wed, 5 May 2021 12:06:42 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YJJ8Qs3a1tXWPODq@work-vm>
+References: <20210428110100.27757-1-dgilbert@redhat.com>
+	<20210428110100.27757-2-dgilbert@redhat.com>
+	<YJFgDGYi93A27ZFa@stefanha-x1.localdomain>
 MIME-Version: 1.0
-In-Reply-To: <20210518190059.GB118510@rsjd01523.et2sqa>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: Re: [Virtio-fs] [Question] can we make dax flag per-inode
+In-Reply-To: <YJFgDGYi93A27ZFa@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH v3 01/26] virtiofs: Fixup printf args
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,45 +17,35 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Liu Bo <bo.liu@linux.alibaba.com>
-Cc: virtio-fs@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
 
-On Wed, May 19, 2021 at 03:00:59AM +0800, Liu Bo wrote:
-> Hi,
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> On Wed, Apr 28, 2021 at 12:00:35PM +0100, Dr. David Alan Gilbert (git) wrote:
+> > @@ -3097,9 +3097,10 @@ static void lo_copy_file_range(fuse_req_t req, fuse_ino_t ino_in, off_t off_in,
+> >  
+> >      fuse_log(FUSE_LOG_DEBUG,
+> >               "lo_copy_file_range(ino=%" PRIu64 "/fd=%d, "
+> > -             "off=%lu, ino=%" PRIu64 "/fd=%d, "
+> > -             "off=%lu, size=%zd, flags=0x%x)\n",
+> > -             ino_in, in_fd, off_in, ino_out, out_fd, off_out, len, flags);
+> > +             "off=%ju, ino=%" PRIu64 "/fd=%d, "
+> > +             "off=%ju, size=%zd, flags=0x%x)\n",
+> > +             ino_in, in_fd, (intmax_t)off_in,
+> > +             ino_out, out_fd, (intmax_t)off_out, len, flags);
 > 
-> Currently dax mode is enabled through the mount option "dax", and it
-> affects all the file IO under virtiofs (Correct me if I was wrong).
-> 
-> My case is that there is only one virtiofs mount point in the guest,
-> but I don't think that dax would benefit all the files, such as some
-> files may only be accessed once and setupmapping+page fault overhead
-> is too much in such cases, thus I would like to see dax flag as a per
-> inode flag.
+> The rest of the patch used uint64_t. Why intmax_t here?
 
-So you know enough about filesystem and workload so you have figured
-out which files will benefit from dax? I am assuming its not just
-about file size. Because workload has to keep file mapped and reuse
-that data many times to benfit from dax.
+Because it seems to be the standard way of doing it for things that may
+be off_t.
 
-> 
-> So the questions come to, a) how do we set dax flags (we can do chattr
-> or fuse specific flags passed from the server side), b) should it be
-> toggled only once?
+> Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
-I think recently xfs added per inode dax flag option.
-Documentation/filesystem/dax.txt says.
+Thanks.
 
- 2. There exists a persistent flag FS_XFLAG_DAX that can be applied to regular
-    files and directories. This advisory flag can be set or cleared at any
-    time, but doing so does not immediately affect the S_DAX state.
+Dave
 
-So looks like we can look at similar approach. Set this flag on a file
-/directory we want to enable DAX on and then mount virtiofs with
-option "cache=inode".
 
-Not sure how much of work it is and if there are specific challenges
-in the context of fuse. Give it a try.
-
-Thanks
-Vivek
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

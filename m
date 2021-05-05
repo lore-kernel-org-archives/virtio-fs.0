@@ -1,14 +1,9 @@
-Date: Tue, 4 May 2021 12:09:09 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210504160909.GE135914@redhat.com>
-References: <20210504151841.GC135914@redhat.com>
-	<20210504175438.52468a40@bahia.lan>
+From: Greg Kurz <groug@kaod.org>
+Date: Wed,  5 May 2021 14:16:42 +0200
+Message-Id: <20210505121642.289191-1-groug@kaod.org>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210504175438.52468a40@bahia.lan>
-Subject: Re: [Virtio-fs] [RFC][PATCH][v3] virtiofsd: virtiofsd: Use thread
- pool only after certain queue depth
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v3] virtiofs: propagate sync() to file server
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,207 +12,189 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Robert Krawitz <rlk@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
-On Tue, May 04, 2021 at 05:54:38PM +0200, Greg Kurz wrote:
-> On Tue, 4 May 2021 11:18:41 -0400
-> Vivek Goyal <vgoyal@redhat.com> wrote:
-> 
-> > For low queue depth workloads, inline processing works well. But for 
-> > high queue depth (and multiple process/thread) workloads, parallel
-> > processing of thread pool can benefit.
-> > 
-> > This patch provides a knob --thread-pool-threshold=<nr-requests>, which
-> > uses a thread pool only if number of requests on virtqueue are more
-> > than nr-requests. IOW, upto nr-requests, requests are processed inline
-> > and anything more than nr-requests is sent for processing in thread
-> > pool.
-> > 
-> > I have got good results with "--thread-pool-size=16 --thread-pool-threshold=3" 
-> > on my system.
-> >  
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > ---
-> > 
-> > Test results with this patch are available here.
-> > 
-> > https://github.com/rhvgoyal/virtiofs-tests/tree/master/performance-results/thread-pool-threshold/4-may-2021
-> > 
-> > Changes since v2:
-> > - Renamed knob name to "--thread-pool-threshold"
-> > - Started using GQueue instead of GList to keep a list of requests
-> >   received on virtqueue (Greg)
-> > - When threshold is crossed only requests above threshold are sent to
-> >   thread pool. Rest are still processed inline. (Greg)
-> > ---
-> >  tools/virtiofsd/fuse_i.h        |    1 +
-> >  tools/virtiofsd/fuse_lowlevel.c |    8 +++++++-
-> >  tools/virtiofsd/fuse_virtio.c   |   27 +++++++++++++--------------
-> >  3 files changed, 21 insertions(+), 15 deletions(-)
-> > 
-> > Index: rhvgoyal-qemu/tools/virtiofsd/fuse_virtio.c
-> > ===================================================================
-> > --- rhvgoyal-qemu.orig/tools/virtiofsd/fuse_virtio.c	2021-05-04 09:55:30.467514740 -0400
-> > +++ rhvgoyal-qemu/tools/virtiofsd/fuse_virtio.c	2021-05-04 10:06:32.453801299 -0400
-> > @@ -445,7 +445,6 @@ err:
-> >  
-> >  static __thread bool clone_fs_called;
-> >  
-> > -/* Process one FVRequest in a thread pool */
-> >  static void fv_queue_worker(gpointer data, gpointer user_data)
-> >  {
-> >      struct fv_QueueInfo *qi = user_data;
-> > @@ -604,11 +603,12 @@ static void *fv_queue_thread(void *opaqu
-> >      struct VuVirtq *q = vu_get_queue(dev, qi->qidx);
-> >      struct fuse_session *se = qi->virtio_dev->se;
-> >      GThreadPool *pool = NULL;
-> > -    GList *req_list = NULL;
-> > +    GQueue req_queue = G_QUEUE_INIT;
-> >  
-> >      if (se->thread_pool_size) {
-> > -        fuse_log(FUSE_LOG_DEBUG, "%s: Creating thread pool for Queue %d\n",
-> > -                 __func__, qi->qidx);
-> > +        fuse_log(FUSE_LOG_DEBUG, "%s: Creating thread pool for Queue %d."
-> > +                 " thread_pool_threshold=%u\n", __func__, qi->qidx,
-> > +                 se->thread_pool_threshold);
-> >          pool = g_thread_pool_new(fv_queue_worker, qi, se->thread_pool_size,
-> >                                   FALSE, NULL);
-> >          if (!pool) {
-> > @@ -686,22 +686,21 @@ static void *fv_queue_thread(void *opaqu
-> >              }
-> >  
-> >              req->reply_sent = false;
-> > -
-> > -            if (!se->thread_pool_size) {
-> > -                req_list = g_list_prepend(req_list, req);
-> > -            } else {
-> > -                g_thread_pool_push(pool, req, NULL);
-> > -            }
-> > +            g_queue_push_tail(&req_queue, req);
-> 
-> So here you replace prepend() with push_tail() but...
-> 
-> >          }
-> >  
-> >          pthread_mutex_unlock(&qi->vq_lock);
-> >          vu_dispatch_unlock(qi->virtio_dev);
-> >  
-> >          /* Process all the requests. */
-> > -        if (!se->thread_pool_size && req_list != NULL) {
-> > -            g_list_foreach(req_list, fv_queue_worker, qi);
-> > -            g_list_free(req_list);
-> > -            req_list = NULL;
-> > +        for (int i = g_queue_get_length(&req_queue); i > 0; i--) {
-> > +                FVRequest *req = g_queue_pop_head(&req_queue);
-> 
-> ... this pops from the head. Isn't this reversing the order in which
-> requests are processed ? Not very harmful I guess.
+Even if POSIX doesn't mandate it, linux users legitimately expect
+sync() to flush all data and metadata to physical storage when it
+is located on the same system. This isn't happening with virtiofs
+though : sync() inside the guest returns right away even though
+data still needs to be flushed from the host page cache.
 
-IIUC, g_queue_push_tail() will add each new request to tail of the queue.
-So when I pop from head, I will first pop the element which came first.
-That will be FIFO order. Am I misunderstanding it?
+This is easily demonstrated by doing the following in the guest:
 
-> 
-> > +
-> > +                if (se->thread_pool_size && i > se->thread_pool_threshold) {
-> 
-> requests are pushed to the thread pool first, good. :)
-> 
-> > +                    g_thread_pool_push(pool, req, NULL);
-> > +                } else {
-> > +                    fv_queue_worker(req, qi);
-> > +                }
-> >          }
-> >      }
-> >  
-> > Index: rhvgoyal-qemu/tools/virtiofsd/fuse_i.h
-> > ===================================================================
-> > --- rhvgoyal-qemu.orig/tools/virtiofsd/fuse_i.h	2021-05-04 09:55:30.467514740 -0400
-> > +++ rhvgoyal-qemu/tools/virtiofsd/fuse_i.h	2021-05-04 10:04:58.737938382 -0400
-> > @@ -73,6 +73,7 @@ struct fuse_session {
-> >      int   vu_socketfd;
-> >      struct fv_VuDev *virtio_dev;
-> >      int thread_pool_size;
-> > +    unsigned thread_pool_threshold;
-> >  };
-> >  
-> >  struct fuse_chan {
-> > Index: rhvgoyal-qemu/tools/virtiofsd/fuse_lowlevel.c
-> > ===================================================================
-> > --- rhvgoyal-qemu.orig/tools/virtiofsd/fuse_lowlevel.c	2021-05-04 09:55:30.467514740 -0400
-> > +++ rhvgoyal-qemu/tools/virtiofsd/fuse_lowlevel.c	2021-05-04 10:17:27.674809167 -0400
-> > @@ -2432,6 +2432,7 @@ static const struct fuse_opt fuse_ll_opt
-> >      LL_OPTION("--socket-group=%s", vu_socket_group, 0),
-> >      LL_OPTION("--fd=%d", vu_listen_fd, 0),
-> >      LL_OPTION("--thread-pool-size=%d", thread_pool_size, 0),
-> > +    LL_OPTION("--thread-pool-threshold=%u", thread_pool_threshold, 0),
-> >      FUSE_OPT_END
-> >  };
-> >  
-> > @@ -2452,7 +2453,11 @@ void fuse_lowlevel_help(void)
-> >          "    --socket-path=PATH         path for the vhost-user socket\n"
-> >          "    --socket-group=GRNAME      name of group for the vhost-user socket\n"
-> >          "    --fd=FDNUM                 fd number of vhost-user socket\n"
-> > -        "    --thread-pool-size=NUM     thread pool size limit (default %d)\n",
-> > +        "    --thread-pool-size=NUM     thread pool size limit (default %d)\n"
-> > +        "    --thread-pool-threshold=NUM\n"
-> > +        "                               number of request threshold to\n"
-> > +        "                               switch between inline and thread pool\n"
-> > +        "                               processing of request\n",
-> 
-> The number of requests the queue thread pops out from the virtqueue
-> looks a bit cryptic from a user point of view IMHO. Is this really
-> something we want to expose in the API ? Shouldn't this be something
-> we want to only change internally depending one some heuristics in
-> the future ?
+$ dd if=/dev/zero of=/mnt/foo bs=1M count=5K ; strace -T -e sync sync
+5120+0 records in
+5120+0 records out
+5368709120 bytes (5.4 GB, 5.0 GiB) copied, 5.22224 s, 1.0 GB/s
+sync()                                  = 0 <0.024068>
++++ exited with 0 +++
 
-I think there are few things to consider.
+and start the following in the host when the 'dd' command completes
+in the guest:
 
-- We will always have capability to modify defaults internally until
-  and unless user overrides that with options. So even if user does
-  not specify --thread-pool-threshold, we can always use it internally
-  if we can get good results across broad range of systems.
+$ strace -T -e fsync /usr/bin/sync virtiofs/foo
+fsync(3)                                = 0 <10.371640>
++++ exited with 0 +++
 
-- Anohter option could be that we just give user a knob to enable
-  this switching behavior but number of requests are determined
-  internally. We can add that knob later as well. Right now I don't
-  feel like hardcoding this value "3" internally because it will
-  vary from systems to systems and from workload to worklaod 
-  probably. That's why I explicitly provided this interface
-  so that users can speicify this value.
+There are no good reasons not to honor the expected behavior of
+sync() actually : it gives an unrealistic impression that virtiofs
+is super fast and that data has safely landed on HW, which isn't
+the case obviously.
 
-  Having said that, this looks ugly. How a user is supposed to know
-  what value they should configure by default. That makes it more
-  of an interface usable in specific scenarios and not a generic
-  interface.
+Implement a ->sync_fs() superblock operation that sends a new
+FUSE_SYNC request type for this purpose. Provision a 64-bit
+placeholder for possible future extensions. Since the file
+server cannot handle the wait == 0 case, we skip it to avoid a
+gratuitous roundtrip.
 
-So question is how to arrive at better heuristics so that virtiofsd
-itself determines right threhosld and user should not have to specify
-the threshold. Users should probably choose between whether to
-opt-in/opt-out of that new behavior.
+Like with FUSE_FSYNC and FUSE_FSYNCDIR, lack of support for
+FUSE_SYNC in the file server is treated as permanent success.
+This ensures compatibility with older file servers : the client
+will get the current behavior of sync() not being propagated to
+the file server.
 
-That makes me think that this is a good experimental patch to show
-that we can improve performance across spectrum if we wisely choose
-between inline process and when to take help of thread pool. But we
-need to develop a method for some sort of smart heuristic to determine
-that and not leave it to user.
+Note that such an operation allows the file server to DoS sync().
+Since a typical FUSE file server is an untrusted piece of software
+running in userspace, this is disabled by default.  Only enable it
+with virtiofs for now since virtiofsd is supposedly trusted by the
+guest kernel.
 
-Thanks
-Vivek
+Reported-by: Robert Krawitz <rlk@redhat.com>
+Signed-off-by: Greg Kurz <groug@kaod.org>
+---
 
-> 
-> >          THREAD_POOL_SIZE);
-> >  }
-> >  
-> > @@ -2508,6 +2513,7 @@ struct fuse_session *fuse_session_new(st
-> >      se->fd = -1;
-> >      se->vu_listen_fd = -1;
-> >      se->thread_pool_size = THREAD_POOL_SIZE;
-> > +    se->thread_pool_threshold = 0;
-> >      se->conn.max_write = UINT_MAX;
-> >      se->conn.max_readahead = UINT_MAX;
-> >  
-> > 
-> 
+v3: - just keep a 64-bit padding field in the arg struct (Vivek)
+
+v2: - clarify compatibility with older servers in changelog (Vivek)
+    - ignore the wait == 0 case (Miklos)
+    - 64-bit aligned argument structure (Vivek, Miklos)
+
+ fs/fuse/fuse_i.h          |  3 +++
+ fs/fuse/inode.c           | 35 +++++++++++++++++++++++++++++++++++
+ fs/fuse/virtio_fs.c       |  1 +
+ include/uapi/linux/fuse.h | 10 +++++++++-
+ 4 files changed, 48 insertions(+), 1 deletion(-)
+
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index 7e463e220053..f48dd7ff32af 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -761,6 +761,9 @@ struct fuse_conn {
+ 	/* Auto-mount submounts announced by the server */
+ 	unsigned int auto_submounts:1;
+ 
++	/* Propagate syncfs() to server */
++	unsigned int sync_fs:1;
++
+ 	/** The number of requests waiting for completion */
+ 	atomic_t num_waiting;
+ 
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index 393e36b74dc4..d7900f616397 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -506,6 +506,40 @@ static int fuse_statfs(struct dentry *dentry, struct kstatfs *buf)
+ 	return err;
+ }
+ 
++static int fuse_sync_fs(struct super_block *sb, int wait)
++{
++	struct fuse_mount *fm = get_fuse_mount_super(sb);
++	struct fuse_conn *fc = fm->fc;
++	struct fuse_syncfs_in inarg;
++	FUSE_ARGS(args);
++	int err;
++
++	/*
++	 * Userspace cannot handle the wait == 0 case. Avoid a
++	 * gratuitous roundtrip.
++	 */
++	if (!wait)
++		return 0;
++
++	if (!fc->sync_fs)
++		return 0;
++
++	memset(&inarg, 0, sizeof(inarg));
++	args.in_numargs = 1;
++	args.in_args[0].size = sizeof(inarg);
++	args.in_args[0].value = &inarg;
++	args.opcode = FUSE_SYNCFS;
++	args.out_numargs = 0;
++
++	err = fuse_simple_request(fm, &args);
++	if (err == -ENOSYS) {
++		fc->sync_fs = 0;
++		err = 0;
++	}
++
++	return err;
++}
++
+ enum {
+ 	OPT_SOURCE,
+ 	OPT_SUBTYPE,
+@@ -909,6 +943,7 @@ static const struct super_operations fuse_super_operations = {
+ 	.put_super	= fuse_put_super,
+ 	.umount_begin	= fuse_umount_begin,
+ 	.statfs		= fuse_statfs,
++	.sync_fs	= fuse_sync_fs,
+ 	.show_options	= fuse_show_options,
+ };
+ 
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index bcb8a02e2d8b..f9809b1b82f0 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -1447,6 +1447,7 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
+ 	fc->release = fuse_free_conn;
+ 	fc->delete_stale = true;
+ 	fc->auto_submounts = true;
++	fc->sync_fs = true;
+ 
+ 	/* Tell FUSE to split requests that exceed the virtqueue's size */
+ 	fc->max_pages_limit = min_t(unsigned int, fc->max_pages_limit,
+diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
+index 271ae90a9bb7..3db9e1b729f6 100644
+--- a/include/uapi/linux/fuse.h
++++ b/include/uapi/linux/fuse.h
+@@ -181,6 +181,9 @@
+  *  - add FUSE_OPEN_KILL_SUIDGID
+  *  - extend fuse_setxattr_in, add FUSE_SETXATTR_EXT
+  *  - add FUSE_SETXATTR_ACL_KILL_SGID
++ *
++ *  7.34
++ *  - add FUSE_SYNCFS
+  */
+ 
+ #ifndef _LINUX_FUSE_H
+@@ -216,7 +219,7 @@
+ #define FUSE_KERNEL_VERSION 7
+ 
+ /** Minor version number of this interface */
+-#define FUSE_KERNEL_MINOR_VERSION 33
++#define FUSE_KERNEL_MINOR_VERSION 34
+ 
+ /** The node ID of the root inode */
+ #define FUSE_ROOT_ID 1
+@@ -509,6 +512,7 @@ enum fuse_opcode {
+ 	FUSE_COPY_FILE_RANGE	= 47,
+ 	FUSE_SETUPMAPPING	= 48,
+ 	FUSE_REMOVEMAPPING	= 49,
++	FUSE_SYNCFS		= 50,
+ 
+ 	/* CUSE specific operations */
+ 	CUSE_INIT		= 4096,
+@@ -971,4 +975,8 @@ struct fuse_removemapping_one {
+ #define FUSE_REMOVEMAPPING_MAX_ENTRY   \
+ 		(PAGE_SIZE / sizeof(struct fuse_removemapping_one))
+ 
++struct fuse_syncfs_in {
++	uint64_t padding;
++};
++
+ #endif /* _LINUX_FUSE_H */
+-- 
+2.26.3
 

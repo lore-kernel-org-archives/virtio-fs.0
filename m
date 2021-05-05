@@ -1,15 +1,13 @@
-Date: Tue, 11 May 2021 12:09:24 +0200
-From: Greg Kurz <groug@kaod.org>
-Message-ID: <20210511120924.1cf2ee60@bahia.lan>
-In-Reply-To: <20210510191502.GA193692@horse>
-References: <20210510155539.998747-1-groug@kaod.org>
-	<20210510155539.998747-4-groug@kaod.org>
-	<20210510191502.GA193692@horse>
+From: =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>
+Date: Wed,  5 May 2021 11:36:59 +0100
+Message-Id: <20210505103702.521457-5-berrange@redhat.com>
+In-Reply-To: <20210505103702.521457-1-berrange@redhat.com>
+References: <20210505103702.521457-1-berrange@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=US-ASCII
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [for-6.1 v3 3/3] virtiofsd: Add support for
-	FUSE_SYNCFS request
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 4/7] usb/dev-mtp: use GDateTime for formatting
+	timestamp for objects
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,167 +16,39 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: kvm@vger.kernel.org, "Michael S. Tsirkin" <mst@redhat.com>, Cornelia Huck <cohuck@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, Szeredi <miklos@szeredi.hu>, Miklos, Paolo Bonzini <pbonzini@redhat.com>
+To: qemu-devel@nongnu.org
+Cc: Kevin Wolf <kwolf@redhat.com>, Jiri Pirko <jiri@resnulli.us>, qemu-block@nongnu.org, Juan Quintela <quintela@redhat.com>, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowang@redhat.com>, Laurent Vivier <laurent@vivier.eu>, Max Reitz <mreitz@redhat.com>, virtio-fs@redhat.com, Gerd Hoffmann <kraxel@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Brad Smith <brad@comstyle.com>
 
-On Mon, 10 May 2021 15:15:02 -0400
-Vivek Goyal <vgoyal@redhat.com> wrote:
+The GDateTime APIs provided by GLib avoid portability pitfalls, such
+as some platforms where 'struct timeval.tv_sec' field is still 'long'
+instead of 'time_t'. When combined with automatic cleanup, GDateTime
+often results in simpler code too.
 
-> On Mon, May 10, 2021 at 05:55:39PM +0200, Greg Kurz wrote:
-> > Honor the expected behavior of syncfs() to synchronously flush all data
-> > and metadata on linux systems. Simply loop on all known submounts and
-> > call syncfs() on them.
-> > 
-> > Note that syncfs() might suffer from a time penalty if the submounts
-> > are being hammered by some unrelated workload on the host. The only
-> > solution to avoid that is to avoid shared submounts.
-> > 
-> > Signed-off-by: Greg Kurz <groug@kaod.org>
-> > ---
-> >  tools/virtiofsd/fuse_lowlevel.c       | 11 ++++++++
-> >  tools/virtiofsd/fuse_lowlevel.h       | 12 +++++++++
-> >  tools/virtiofsd/passthrough_ll.c      | 38 +++++++++++++++++++++++++++
-> >  tools/virtiofsd/passthrough_seccomp.c |  1 +
-> >  4 files changed, 62 insertions(+)
-> > 
-> > diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-> > index 58e32fc96369..3be95ec903c9 100644
-> > --- a/tools/virtiofsd/fuse_lowlevel.c
-> > +++ b/tools/virtiofsd/fuse_lowlevel.c
-> > @@ -1870,6 +1870,16 @@ static void do_lseek(fuse_req_t req, fuse_ino_t nodeid,
-> >      }
-> >  }
-> >  
-> > +static void do_syncfs(fuse_req_t req, fuse_ino_t nodeid,
-> > +                      struct fuse_mbuf_iter *iter)
-> > +{
-> > +    if (req->se->op.syncfs) {
-> > +        req->se->op.syncfs(req);
-> > +    } else {
-> > +        fuse_reply_err(req, ENOSYS);
-> > +    }
-> > +}
-> > +
-> >  static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-> >                      struct fuse_mbuf_iter *iter)
-> >  {
-> > @@ -2267,6 +2277,7 @@ static struct {
-> >      [FUSE_RENAME2] = { do_rename2, "RENAME2" },
-> >      [FUSE_COPY_FILE_RANGE] = { do_copy_file_range, "COPY_FILE_RANGE" },
-> >      [FUSE_LSEEK] = { do_lseek, "LSEEK" },
-> > +    [FUSE_SYNCFS] = { do_syncfs, "SYNCFS" },
-> >  };
-> >  
-> >  #define FUSE_MAXOP (sizeof(fuse_ll_ops) / sizeof(fuse_ll_ops[0]))
-> > diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
-> > index 3bf786b03485..890c520b195a 100644
-> > --- a/tools/virtiofsd/fuse_lowlevel.h
-> > +++ b/tools/virtiofsd/fuse_lowlevel.h
-> > @@ -1225,6 +1225,18 @@ struct fuse_lowlevel_ops {
-> >       */
-> >      void (*lseek)(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
-> >                    struct fuse_file_info *fi);
-> > +
-> > +    /**
-> > +     * Synchronize file system content
-> > +     *
-> > +     * If this request is answered with an error code of ENOSYS,
-> > +     * this is treated as success and future calls to syncfs() will
-> > +     * succeed automatically without being sent to the filesystem
-> > +     * process.
-> > +     *
-> > +     * @param req request handle
-> > +     */
-> > +    void (*syncfs)(fuse_req_t req);
-> >  };
-> >  
-> >  /**
-> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> > index dc940a1d048b..289900c6d274 100644
-> > --- a/tools/virtiofsd/passthrough_ll.c
-> > +++ b/tools/virtiofsd/passthrough_ll.c
-> > @@ -3153,6 +3153,43 @@ static void lo_lseek(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
-> >      }
-> >  }
-> >  
-> > +static void lo_syncfs(fuse_req_t req)
-> > +{
-> > +    struct lo_data *lo = lo_data(req);
-> > +    GHashTableIter iter;
-> > +    gpointer key, value;
-> > +    int err = 0;
-> > +
-> > +    pthread_mutex_lock(&lo->mutex);
-> > +
-> > +    g_hash_table_iter_init(&iter, lo->mnt_inodes);
-> > +    while (g_hash_table_iter_next(&iter, &key, &value)) {
-> > +        struct lo_inode *inode = value;
-> > +        int fd;
-> > +
-> > +        fuse_log(FUSE_LOG_DEBUG, "lo_syncfs(ino=%" PRIu64 ")\n",
-> > +                 inode->fuse_ino);
-> > +
-> > +        fd = lo_inode_open(lo, inode, O_RDONLY);
-> > +        if (fd < 0) {
-> > +            err = -fd;
-> > +            break;
-> > +        }
-> > +
-> > +        if (syncfs(fd) < 0) {
-> 
-> I don't have a good feeling about calling syncfs() with lo->mutex held.
-> This seems to be that global mutex which is held at so many places
-> and will serialize everything else. I think we agreed that syncfs()
-> can take 10s of seconds if fs is busy. And that means we will stall
-> other filesystem operations too.
-> 
-> So will be good if we can call syncfs() outside the lock. May be prepare
-> a list of inodes which are there, take a reference and drop the lock.
-> call syncfs and then drop the reference on inode.
-> 
+Signed-off-by: Daniel P. Berrangé <berrange@redhat.com>
+---
+ hw/usb/dev-mtp.c | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
 
-You're right. I'll do that.
-
-> Vivek
-> 
-> > +            err = errno;
-> > +            close(fd);
-> > +            break;
-> > +        }
-> > +
-> > +        close(fd);
-> > +    }
-> > +
-> > +    pthread_mutex_unlock(&lo->mutex);
-> > +
-> > +    fuse_reply_err(req, err);
-> > +}
-> > +
-> >  static void lo_destroy(void *userdata)
-> >  {
-> >      struct lo_data *lo = (struct lo_data *)userdata;
-> > @@ -3214,6 +3251,7 @@ static struct fuse_lowlevel_ops lo_oper = {
-> >      .copy_file_range = lo_copy_file_range,
-> >  #endif
-> >      .lseek = lo_lseek,
-> > +    .syncfs = lo_syncfs,
-> >      .destroy = lo_destroy,
-> >  };
-> >  
-> > diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
-> > index 62441cfcdb95..343188447901 100644
-> > --- a/tools/virtiofsd/passthrough_seccomp.c
-> > +++ b/tools/virtiofsd/passthrough_seccomp.c
-> > @@ -107,6 +107,7 @@ static const int syscall_allowlist[] = {
-> >      SCMP_SYS(set_robust_list),
-> >      SCMP_SYS(setxattr),
-> >      SCMP_SYS(symlinkat),
-> > +    SCMP_SYS(syncfs),
-> >      SCMP_SYS(time), /* Rarely needed, except on static builds */
-> >      SCMP_SYS(tgkill),
-> >      SCMP_SYS(unlinkat),
-> > -- 
-> > 2.26.3
-> > 
-> 
+diff --git a/hw/usb/dev-mtp.c b/hw/usb/dev-mtp.c
+index bbb8274344..a71fcc326d 100644
+--- a/hw/usb/dev-mtp.c
++++ b/hw/usb/dev-mtp.c
+@@ -772,12 +772,9 @@ static void usb_mtp_add_str(MTPData *data, const char *str)
+ 
+ static void usb_mtp_add_time(MTPData *data, time_t time)
+ {
+-    char buf[16];
+-    struct tm tm;
+-
+-    gmtime_r(&time, &tm);
+-    strftime(buf, sizeof(buf), "%Y%m%dT%H%M%S", &tm);
+-    usb_mtp_add_str(data, buf);
++    g_autoptr(GDateTime) then = g_date_time_new_from_unix_utc(time);
++    g_autofree char *thenstr = g_date_time_format(then, "%Y%m%dT%H%M%S");
++    usb_mtp_add_str(data, thenstr);
+ }
+ 
+ /* ----------------------------------------------------------------------- */
+-- 
+2.31.1
 

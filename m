@@ -1,13 +1,13 @@
-Date: Tue, 11 May 2021 16:37:13 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YJqkqYvWAAw3hZBG@stefanha-x1.localdomain>
-References: <BY5PR11MB44018CADDC7A5C04F3D32BC4EA539@BY5PR11MB4401.namprd11.prod.outlook.com>
+From: =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>
+Date: Wed,  5 May 2021 11:37:00 +0100
+Message-Id: <20210505103702.521457-6-berrange@redhat.com>
+In-Reply-To: <20210505103702.521457-1-berrange@redhat.com>
+References: <20210505103702.521457-1-berrange@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="EpkZhP9CHS3Tbg1c"
-Content-Disposition: inline
-In-Reply-To: <BY5PR11MB44018CADDC7A5C04F3D32BC4EA539@BY5PR11MB4401.namprd11.prod.outlook.com>
-Subject: Re: [Virtio-fs] vhost-user reconnection and crash recovery
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 5/7] io: use GDateTime for formatting timestamp
+	for websock headers
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,43 +16,41 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Boeuf, Sebastien" <sebastien.boeuf@intel.com>
-Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>
+To: qemu-devel@nongnu.org
+Cc: Kevin Wolf <kwolf@redhat.com>, Jiri Pirko <jiri@resnulli.us>, qemu-block@nongnu.org, Juan Quintela <quintela@redhat.com>, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowang@redhat.com>, Laurent Vivier <laurent@vivier.eu>, Max Reitz <mreitz@redhat.com>, virtio-fs@redhat.com, Gerd Hoffmann <kraxel@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Brad Smith <brad@comstyle.com>
 
+The GDateTime APIs provided by GLib avoid portability pitfalls, such
+as some platforms where 'struct timeval.tv_sec' field is still 'long'
+instead of 'time_t'. When combined with automatic cleanup, GDateTime
+often results in simpler code too.
 
---EpkZhP9CHS3Tbg1c
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
+Signed-off-by: Daniel P. Berrangé <berrange@redhat.com>
+---
+ io/channel-websock.c | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
-On Tue, May 11, 2021 at 03:00:05PM +0000, Boeuf, Sebastien wrote:
-> But what about the vhost-user backend initialization? Does
-> QEMU go again through initializing memory table, vrings, etc...
-> since it can't assume anything from the backend?
-
-Yes, the initial protocol messages are the same after reconnection.
-
-In QEMU's vhost-user-blk implementation there is a special code path
-involving vhost_dev_get_inflight(). This fetches and restores inflight
-virtqueue request state. The restore logic is called by
-vhost_user_blk_connect(). Aside from that reconnect is the same as
-establishing a new connection.
-
-Stefan
-
---EpkZhP9CHS3Tbg1c
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmCapKkACgkQnKSrs4Gr
-c8gNMgf+LzkxGK+rAezE6rmKw5eBWnTropxCouXYMwtLqrMhzJjjrxV5GUwiQSyG
-08xsNOvph3M+HGbB+EU3YFxBMTqGdvlgcrGdp9GoO6hrEI2eKMUVFtJQGxh8WMcD
-u04bc2vdYUnip8CeX7/3t8SQzEpBeJVYwrH/Pewpu8v2vktfFqGu9J7yjAQTHG/A
-jl/+2C0v5E0lqq8Pw4eJBy2eMC7UncfItFIRJqB6SkML8AcKzBWRSmm/H8E2/KDT
-p4rGYMHdsJqpzviuZiut2AdFqCSWr8VXjP8jgAkYSb4ZB6Bw+XyeN6Z1iXcNmOHh
-m6zoZ7b8eN0loaMo9Yxn/d2mjVU8dA==
-=4Jtb
------END PGP SIGNATURE-----
-
---EpkZhP9CHS3Tbg1c--
+diff --git a/io/channel-websock.c b/io/channel-websock.c
+index 03c1f7cb62..70889bb54d 100644
+--- a/io/channel-websock.c
++++ b/io/channel-websock.c
+@@ -177,15 +177,9 @@ qio_channel_websock_handshake_send_res(QIOChannelWebsock *ioc,
+ 
+ static gchar *qio_channel_websock_date_str(void)
+ {
+-    struct tm tm;
+-    time_t now = time(NULL);
+-    char datebuf[128];
++    g_autoptr(GDateTime) now = g_date_time_new_now_utc();
+ 
+-    gmtime_r(&now, &tm);
+-
+-    strftime(datebuf, sizeof(datebuf), "%a, %d %b %Y %H:%M:%S GMT", &tm);
+-
+-    return g_strdup(datebuf);
++    return g_date_time_format(now, "%a, %d %b %Y %H:%M:%S GMT");
+ }
+ 
+ static void qio_channel_websock_handshake_send_res_err(QIOChannelWebsock *ioc,
+-- 
+2.31.1
 

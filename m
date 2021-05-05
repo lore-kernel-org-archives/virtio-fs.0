@@ -1,21 +1,14 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=date:from:to:cc:subject:message-id:references:mime-version
-	:content-disposition:in-reply-to;
-	bh=9BT3Hx3P3B8a0YB8xDWcQzYi30cUttNenzj/Q+a2BuE=;
-	b=ZHFefVH2NnwfN6qqSETR6RWg6qE1d8/n84IVK9M8F1u0akSKx5Q7ErkV1KbVW9x27l
-	7HFRXFibKZd8ahV6ZQDpItgA6t0mQgPNTf8kbuXC+4bTQW8iIJKVPqXdy3KpKqnIO12q
-	xIxpuQl4VdPbLn0x6bDDouPcKq/civ6NhsluI=
-Date: Fri, 21 May 2021 10:19:48 +0200
-From: Miklos Szeredi <miklos@szeredi.hu>
-Message-ID: <YKdtJCo/06q594pM@miu.piliscsaba.redhat.com>
-References: <20210520154654.1791183-1-groug@kaod.org>
-	<20210520154654.1791183-3-groug@kaod.org>
+Date: Wed, 5 May 2021 13:12:01 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <YJKLkQA2s6sgF587@stefanha-x1.localdomain>
+References: <20210428110100.27757-1-dgilbert@redhat.com>
+	<20210428110100.27757-9-dgilbert@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20210520154654.1791183-3-groug@kaod.org>
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="VF0eZzRa3+i2nN3h"
 Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH v4 2/5] fuse: Call vfs_get_tree() for
-	submounts
+In-Reply-To: <20210428110100.27757-9-dgilbert@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v3 08/26] DAX: virtio-fs: Add cache BAR
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,51 +17,103 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
-Cc: linux-kernel@vger.kernel.org, Max Reitz <mreitz@redhat.com>, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org, Vivek Goyal <vgoyal@redhat.com>
+To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
 
-On Thu, May 20, 2021 at 05:46:51PM +0200, Greg Kurz wrote:
-> We don't set the SB_BORN flag on submounts superblocks. This is wrong
-> as these superblocks are then considered as partially constructed or
-> dying in the rest of the code and can break some assumptions.
-> 
-> One such case is when you have a virtiofs filesystem and you try to
-> mount it again : virtio_fs_get_tree() tries to obtain a superblock
-> with sget_fc(). The matching criteria in virtio_fs_test_super() is
-> the pointer of the underlying virtiofs device, which is shared by
-> the root mount and its submounts. This means that any submount can
-> be picked up instead of the root mount. This is itself a bug :
-> submounts should be ignored in this case. But, most importantly, it
-> then triggers an infinite loop in sget_fc() because it fails to grab
-> the superblock (very easy to reproduce).
-> 
-> The only viable solution is to set SB_BORN at some point. This
-> must be done with vfs_get_tree() because setting SB_BORN requires
-> special care, i.e. a memory barrier for super_cache_count() which
-> can check SB_BORN without taking any lock.
 
-Looks correct, but...
+--VF0eZzRa3+i2nN3h
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-as an easily backportable and verifiable bugfix I'd still go with the
-simple two liner:
+On Wed, Apr 28, 2021 at 12:00:42PM +0100, Dr. David Alan Gilbert (git) wrot=
+e:
+> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+>=20
+> Add a cache BAR into which files will be directly mapped.
+> The size can be set with the cache-size=3D property, e.g.
+>    -device vhost-user-fs-pci,chardev=3Dchar0,tag=3Dmyfs,cache-size=3D16G
+>=20
+> The default is no cache.
+>=20
+> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> with PPC fixes by:
+> Signed-off-by: Fabiano Rosas <farosas@linux.ibm.com>
+> ---
+>  hw/virtio/vhost-user-fs-pci.c     | 32 +++++++++++++++++++++++++++++++
+>  hw/virtio/vhost-user-fs.c         | 32 +++++++++++++++++++++++++++++++
+>  include/hw/virtio/vhost-user-fs.h |  2 ++
+>  3 files changed, 66 insertions(+)
+>=20
+> diff --git a/hw/virtio/vhost-user-fs-pci.c b/hw/virtio/vhost-user-fs-pci.c
+> index 2ed8492b3f..20e447631f 100644
+> --- a/hw/virtio/vhost-user-fs-pci.c
+> +++ b/hw/virtio/vhost-user-fs-pci.c
+> @@ -12,14 +12,19 @@
+>   */
+> =20
+>  #include "qemu/osdep.h"
+> +#include "qapi/error.h"
+>  #include "hw/qdev-properties.h"
+>  #include "hw/virtio/vhost-user-fs.h"
+>  #include "virtio-pci.h"
+>  #include "qom/object.h"
+> +#include "standard-headers/linux/virtio_fs.h"
+> +
+> +#define VIRTIO_FS_PCI_CACHE_BAR 2
+> =20
+>  struct VHostUserFSPCI {
+>      VirtIOPCIProxy parent_obj;
+>      VHostUserFS vdev;
+> +    MemoryRegion cachebar;
+>  };
+> =20
+>  typedef struct VHostUserFSPCI VHostUserFSPCI;
+> @@ -38,7 +43,9 @@ static Property vhost_user_fs_pci_properties[] =3D {
+>  static void vhost_user_fs_pci_realize(VirtIOPCIProxy *vpci_dev, Error **=
+errp)
+>  {
+>      VHostUserFSPCI *dev =3D VHOST_USER_FS_PCI(vpci_dev);
+> +    bool modern_pio =3D vpci_dev->flags & VIRTIO_PCI_FLAG_MODERN_PIO_NOT=
+IFY;
+>      DeviceState *vdev =3D DEVICE(&dev->vdev);
+> +    uint64_t cachesize;
+> =20
+>      if (vpci_dev->nvectors =3D=3D DEV_NVECTORS_UNSPECIFIED) {
+>          /* Also reserve config change and hiprio queue vectors */
+> @@ -46,6 +53,31 @@ static void vhost_user_fs_pci_realize(VirtIOPCIProxy *=
+vpci_dev, Error **errp)
+>      }
+> =20
+>      qdev_realize(vdev, BUS(&vpci_dev->bus), errp);
+> +    cachesize =3D dev->vdev.conf.cache_size;
+> +
+> +    if (cachesize && modern_pio) {
+> +        error_setg(errp, "DAX Cache can not be used together with modern=
+_pio");
 
---- a/fs/fuse/dir.c
-+++ b/fs/fuse/dir.c
-@@ -351,6 +351,9 @@ static struct vfsmount *fuse_dentry_automount(struct path *path)
- 	list_add_tail(&fm->fc_entry, &fc->mounts);
- 	up_write(&fc->killsb);
- 
-+	smp_wmb();
-+	sb->s_flags |= SB_BORN;
-+
- 	/* Create the submount */
- 	mnt = vfs_create_mount(fsc);
- 	if (IS_ERR(mnt)) {
+It's not necessary to respin but it would help to capture the reason for
+this limitation either in the error message or at least in a comment.
 
-And have this patch be the cleanup.
+The problem is that PCI BARs are limited resources and enabling modern
+PIO notify conflicts with the DAX Window BAR usage.
 
-Also we need Fixes: and a Cc: stable@... tags on that one.
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
-Thanks,
-Miklos
+--VF0eZzRa3+i2nN3h
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmCSi5EACgkQnKSrs4Gr
+c8ipBwf/dbWQcc1rtFMlUWSUUI8GtWI9VGtA+0cmpc49WP9Tj3Zfd0JFD3CO56S3
+TAE08mhCu4qh6vgwtdTYdxapo17k6l64WLMd2/XhgbTw25ic8liTSTmpbezlCHgU
+pkYJzrs+VbYvaMWUS05XnHLi9+CRdAmHq5XRVV+D0uVTNDo6kABWnTny8yC4F2bh
+hmCmB5y5tpkqZYFzjOEayKE3ny00Rnsz53stvW8S13/OhbXDZDlVkcTwT3h9pN53
+5IJnES9JtK81H07carmQvsFtteLqBGzWoGK3/FIwqlKSD3aCcuVy2UHP1R+I866n
+3CAqw9ATEcAm1cWqyfeUzAmO0o6kOg==
+=Glh0
+-----END PGP SIGNATURE-----
+
+--VF0eZzRa3+i2nN3h--
 

@@ -1,15 +1,15 @@
-Date: Wed, 5 May 2021 15:42:46 +0100
+Date: Wed, 5 May 2021 15:51:42 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YJKu5jfOeu5ubDXZ@work-vm>
+Message-ID: <YJKw/qcsSBvgB1hG@work-vm>
 References: <20210505103702.521457-1-berrange@redhat.com>
-	<20210505103702.521457-2-berrange@redhat.com>
+	<20210505103702.521457-8-berrange@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="iso-8859-1"
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <20210505103702.521457-2-berrange@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 1/7] migration: use GDateTime for formatting
- timestamp in snapshot names
+In-Reply-To: <20210505103702.521457-8-berrange@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 7/7] virtiofsd: use GDateTime for formatting
+ timestamp for debug messages
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -32,51 +32,64 @@ Cc: Kevin Wolf <kwolf@redhat.com>, Jiri Pirko <jiri@resnulli.us>, qemu-block@non
 Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 
 > ---
->  migration/savevm.c | 13 +++++--------
->  1 file changed, 5 insertions(+), 8 deletions(-)
+>  tools/virtiofsd/passthrough_ll.c | 25 ++++---------------------
+>  1 file changed, 4 insertions(+), 21 deletions(-)
 >=20
-> diff --git a/migration/savevm.c b/migration/savevm.c
-> index 52e2d72e4b..72848b946c 100644
-> --- a/migration/savevm.c
-> +++ b/migration/savevm.c
-> @@ -2775,8 +2775,7 @@ bool save_snapshot(const char *name, bool overwrite=
-, const char *vmstate,
->      QEMUFile *f;
->      int saved_vm_running;
->      uint64_t vm_state_size;
-> -    qemu_timeval tv;
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrou=
+gh_ll.c
+> index 1553d2ef45..cdd224918c 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -3558,10 +3558,6 @@ static void setup_nofile_rlimit(unsigned long rlim=
+it_nofile)
+>  static void log_func(enum fuse_log_level level, const char *fmt, va_list=
+ ap)
+>  {
+>      g_autofree char *localfmt =3D NULL;
+> -    struct timespec ts;
 > -    struct tm tm;
-> +    g_autoptr(GDateTime) now =3D g_date_time_new_now_local();
->      AioContext *aio_context;
+> -    char sec_fmt[sizeof "2020-12-07 18:17:54"];
+> -    char zone_fmt[sizeof "+0100"];
 > =20
->      if (migration_is_blocked(errp)) {
-> @@ -2836,9 +2835,8 @@ bool save_snapshot(const char *name, bool overwrite=
-, const char *vmstate,
->      memset(sn, 0, sizeof(*sn));
-> =20
->      /* fill auxiliary fields */
-> -    qemu_gettimeofday(&tv);
-> -    sn->date_sec =3D tv.tv_sec;
-> -    sn->date_nsec =3D tv.tv_usec * 1000;
-> +    sn->date_sec =3D g_date_time_to_unix(now);
-> +    sn->date_nsec =3D g_date_time_get_microsecond(now) * 1000;
->      sn->vm_clock_nsec =3D qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
->      if (replay_mode !=3D REPLAY_MODE_NONE) {
->          sn->icount =3D replay_get_current_icount();
-> @@ -2849,9 +2847,8 @@ bool save_snapshot(const char *name, bool overwrite=
-, const char *vmstate,
->      if (name) {
->          pstrcpy(sn->name, sizeof(sn->name), name);
->      } else {
-> -        /* cast below needed for OpenBSD where tv_sec is still 'long' */
-> -        localtime_r((const time_t *)&tv.tv_sec, &tm);
-> -        strftime(sn->name, sizeof(sn->name), "vm-%Y%m%d%H%M%S", &tm);
-> +        g_autofree char *autoname =3D g_date_time_format(now,  "vm-%Y%m%=
-d%H%M%S");
-> +        pstrcpy(sn->name, sizeof(sn->name), autoname);
+>      if (current_log_level < level) {
+>          return;
+> @@ -3573,23 +3569,10 @@ static void log_func(enum fuse_log_level level, c=
+onst char *fmt, va_list ap)
+>              localfmt =3D g_strdup_printf("[ID: %08ld] %s", syscall(__NR_=
+gettid),
+>                                         fmt);
+>          } else {
+> -            /* try formatting a broken-down timestamp */
+> -            if (clock_gettime(CLOCK_REALTIME, &ts) !=3D -1 &&
+> -                localtime_r(&ts.tv_sec, &tm) !=3D NULL &&
+> -                strftime(sec_fmt, sizeof sec_fmt, "%Y-%m-%d %H:%M:%S",
+> -                         &tm) !=3D 0 &&
+> -                strftime(zone_fmt, sizeof zone_fmt, "%z", &tm) !=3D 0) {
+> -                localfmt =3D g_strdup_printf("[%s.%02ld%s] [ID: %08ld] %=
+s",
+> -                                           sec_fmt,
+> -                                           ts.tv_nsec / (10L * 1000 * 10=
+00),
+> -                                           zone_fmt, syscall(__NR_gettid=
+),
+> -                                           fmt);
+> -            } else {
+> -                /* fall back to a flat timestamp */
+> -                localfmt =3D g_strdup_printf("[%" PRId64 "] [ID: %08ld] =
+%s",
+> -                                           get_clock(), syscall(__NR_get=
+tid),
+> -                                           fmt);
+> -            }
+> +            g_autoptr(GDateTime) now =3D g_date_time_new_now_local();
+> +            g_autofree char *nowstr =3D g_date_time_format(now, "%Y-%m-%=
+d %H:%M:%S.%f%z");
+> +            localfmt =3D g_strdup_printf("[%s] [ID: %08ld] %s",
+> +                                       nowstr, syscall(__NR_gettid), fmt=
+);
+>          }
+>          fmt =3D localfmt;
 >      }
-> =20
->      /* save the VM state */
 > --=20
 > 2.31.1
 >=20

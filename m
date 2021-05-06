@@ -1,15 +1,14 @@
-Date: Thu, 6 May 2021 08:14:28 +0200
-From: Greg Kurz <groug@kaod.org>
-Message-ID: <20210506081428.69d73bbc@bahia.lan>
-In-Reply-To: <20210505185242.GC244258@redhat.com>
-References: <20210426152135.842037-1-groug@kaod.org>
-	<20210426152135.842037-3-groug@kaod.org>
-	<20210505185242.GC244258@redhat.com>
+Date: Thu, 6 May 2021 10:39:18 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YJO5RsRYQzTbFH09@work-vm>
+References: <YIf2d8HuyPqwqt9C@work-vm>
+	<20210427181333.148176-1-ma.mandourr@gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="US-ASCII"
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [for-6.1 v2 2/2] virtiofsd: Add support for
-	FUSE_SYNCFS request
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20210427181333.148176-1-ma.mandourr@gmail.com>
+Subject: Re: [Virtio-fs] [PATCH v3 2/7] virtiofsd: Changed allocations of
+ iovec to GLib's functions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,174 +17,202 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: kvm@vger.kernel.org, Miklos Szeredi <miklos@szeredi.hu>, Cornelia Huck <cohuck@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, "Michael S. Tsirkin" <mst@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>
+To: Mahmoud Mandour <ma.mandourr@gmail.com>
+Cc: "open list:virtiofs" <virtio-fs@redhat.com>, qemu-devel@nongnu.org
 
-On Wed, 5 May 2021 14:52:42 -0400
-Vivek Goyal <vgoyal@redhat.com> wrote:
-
-> On Mon, Apr 26, 2021 at 05:21:35PM +0200, Greg Kurz wrote:
-> > Honor the expected behavior of syncfs() to synchronously flush all
-> > data and metadata on linux systems.
-> > 
-> > Flushing is done with syncfs(). This is suboptimal as it will also
-> > flush writes performed by any other process on the same file system,
-> > and thus add an unbounded time penalty to syncfs(). This may be
-> > optimized in the future, but enforce correctness first.
-> > 
-> > Signed-off-by: Greg Kurz <groug@kaod.org>
-> > ---
-> >  tools/virtiofsd/fuse_lowlevel.c       | 19 ++++++++++++++++++
-> >  tools/virtiofsd/fuse_lowlevel.h       | 13 ++++++++++++
-> >  tools/virtiofsd/passthrough_ll.c      | 29 +++++++++++++++++++++++++++
-> >  tools/virtiofsd/passthrough_seccomp.c |  1 +
-> >  4 files changed, 62 insertions(+)
-> > 
-> > diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-> > index 58e32fc96369..918ab11f54c2 100644
-> > --- a/tools/virtiofsd/fuse_lowlevel.c
-> > +++ b/tools/virtiofsd/fuse_lowlevel.c
-> > @@ -1870,6 +1870,24 @@ static void do_lseek(fuse_req_t req, fuse_ino_t nodeid,
-> >      }
-> >  }
-> >  
-> > +static void do_syncfs(fuse_req_t req, fuse_ino_t nodeid,
-> > +                      struct fuse_mbuf_iter *iter)
-> > +{
-> > +    struct fuse_syncfs_in *arg;
-> > +
-> > +    arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
-> > +    if (!arg) {
-> > +        fuse_reply_err(req, EINVAL);
-> > +        return;
-> > +    }
-> > +
-> > +    if (req->se->op.syncfs) {
-> > +        req->se->op.syncfs(req, arg->flags);
-> > +    } else {
-> > +        fuse_reply_err(req, ENOSYS);
-> > +    }
-> > +}
-> > +
-> >  static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-> >                      struct fuse_mbuf_iter *iter)
-> >  {
-> > @@ -2267,6 +2285,7 @@ static struct {
-> >      [FUSE_RENAME2] = { do_rename2, "RENAME2" },
-> >      [FUSE_COPY_FILE_RANGE] = { do_copy_file_range, "COPY_FILE_RANGE" },
-> >      [FUSE_LSEEK] = { do_lseek, "LSEEK" },
-> > +    [FUSE_SYNCFS] = { do_syncfs, "SYNCFS" },
-> >  };
-> >  
-> >  #define FUSE_MAXOP (sizeof(fuse_ll_ops) / sizeof(fuse_ll_ops[0]))
-> > diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
-> > index 3bf786b03485..220bb3db4898 100644
-> > --- a/tools/virtiofsd/fuse_lowlevel.h
-> > +++ b/tools/virtiofsd/fuse_lowlevel.h
-> > @@ -1225,6 +1225,19 @@ struct fuse_lowlevel_ops {
-> >       */
-> >      void (*lseek)(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
-> >                    struct fuse_file_info *fi);
-> > +
-> > +    /**
-> > +     * Synchronize file system content
-> > +     *
-> > +     * If this request is answered with an error code of ENOSYS,
-> > +     * this is treated as success and future calls to syncfs() will
-> > +     * succeed automatically without being sent to the filesystem
-> > +     * process.
-> > +     *
-> > +     * @param req request handle
-> > +     * @param flags not used yet
-> > +     */
-> > +    void (*syncfs)(fuse_req_t req, uint64_t flags);
-> >  };
-> >  
-> >  /**
-> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> > index 1553d2ef454f..6790a2f6fe10 100644
-> > --- a/tools/virtiofsd/passthrough_ll.c
-> > +++ b/tools/virtiofsd/passthrough_ll.c
-> > @@ -3124,6 +3124,34 @@ static void lo_lseek(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
-> >      }
-> >  }
-> >  
-> > +static void lo_syncfs(fuse_req_t req, uint64_t flags)
-> > +{
-> > +    struct lo_data *lo = lo_data(req);
-> > +    int fd, ret;
-> > +
-> > +    /* No flags supported yet */
-> > +    if (flags) {
-> > +        fuse_reply_err(req, EINVAL);
-> > +        return;
-> > +    }
-> > +
-> > +    fd = lo_inode_open(lo, &lo->root, O_RDONLY);
-> > +    if (fd < 0) {
-> > +        fuse_reply_err(req, errno);
-> > +        return;
-> > +    }
-> > +
-> > +    /*
-> > +     * FIXME: this is suboptimal because it will also flush unrelated
-> > +     *        writes not coming from the client. This can dramatically
-> > +     *        increase the time spent in syncfs() if some process is
-> > +     *        writing lots of data on the same filesystem as virtiofsd.
-> > +     */
-> > +    ret = syncfs(fd);
+* Mahmoud Mandour (ma.mandourr@gmail.com) wrote:
+> Replaced the calls to malloc()/calloc() and their respective
+> calls to free() of iovec structs with GLib's allocation and
+> deallocation functions and used g_autofree when appropriate.
 > 
-> Hi Greg,
+> Replaced the allocation of in_sg_cpy to g_new() instead of a call
+> to calloc() and a null-checking assertion. Not g_new0()
+> because the buffer is immediately overwritten using memcpy.
 > 
+> Signed-off-by: Mahmoud Mandour <ma.mandourr@gmail.com>
 
-Hi Vivek,
+Thanks,
 
-> As we discussed in the community call that this works only if there are
-> no other filesystems mounted as submounts under exported directory.
+
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+
+> ---
+> v2 -> v3:
+>     * Removed a wrongful combination of g_autofree and g_steel_pointer().
+>     * Removed some goto paths that IMHO were not so useful any more.
+>     * In v2, I allocated in_sg_cpy through g_new0(). This patch, I use
+>       g_new() because the buffer is memcpy'd into right away so no need
+>       to zero-initialize.
+>     * Moved the declaration of in_sg_cpy to the top of the function
+>       to match QEMU's style guidelines. 
 > 
-> We proably need to find a way to call syncfs() on all the filesystems
-> which are submounts of exported directory. Might not be easy at all.
+>  tools/virtiofsd/fuse_lowlevel.c | 31 ++++++++++++-------------------
+>  tools/virtiofsd/fuse_virtio.c   |  8 +++-----
+>  2 files changed, 15 insertions(+), 24 deletions(-)
 > 
+> diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+> index c8bea246ab..7fe2cef1eb 100644
+> --- a/tools/virtiofsd/fuse_lowlevel.c
+> +++ b/tools/virtiofsd/fuse_lowlevel.c
+> @@ -217,9 +217,9 @@ static int send_reply(fuse_req_t req, int error, const void *arg,
+>  int fuse_reply_iov(fuse_req_t req, const struct iovec *iov, int count)
+>  {
+>      int res;
+> -    struct iovec *padded_iov;
+> +    g_autofree struct iovec *padded_iov = NULL;
+>  
+> -    padded_iov = malloc((count + 1) * sizeof(struct iovec));
+> +    padded_iov = g_try_new(struct iovec, count + 1);
+>      if (padded_iov == NULL) {
+>          return fuse_reply_err(req, ENOMEM);
+>      }
+> @@ -228,7 +228,6 @@ int fuse_reply_iov(fuse_req_t req, const struct iovec *iov, int count)
+>      count++;
+>  
+>      res = send_reply_iov(req, 0, padded_iov, count);
+> -    free(padded_iov);
+>  
+>      return res;
+>  }
+> @@ -568,7 +567,7 @@ static struct fuse_ioctl_iovec *fuse_ioctl_iovec_copy(const struct iovec *iov,
+>      struct fuse_ioctl_iovec *fiov;
+>      size_t i;
+>  
+> -    fiov = malloc(sizeof(fiov[0]) * count);
+> +    fiov = g_try_new(struct fuse_ioctl_iovec, count);
+>      if (!fiov) {
+>          return NULL;
+>      }
+> @@ -586,8 +585,8 @@ int fuse_reply_ioctl_retry(fuse_req_t req, const struct iovec *in_iov,
+>                             size_t out_count)
+>  {
+>      struct fuse_ioctl_out arg;
+> -    struct fuse_ioctl_iovec *in_fiov = NULL;
+> -    struct fuse_ioctl_iovec *out_fiov = NULL;
+> +    g_autofree struct fuse_ioctl_iovec *in_fiov = NULL;
+> +    g_autofree struct fuse_ioctl_iovec *out_fiov = NULL;
+>      struct iovec iov[4];
+>      size_t count = 1;
+>      int res;
+> @@ -603,13 +602,14 @@ int fuse_reply_ioctl_retry(fuse_req_t req, const struct iovec *in_iov,
+>      /* Can't handle non-compat 64bit ioctls on 32bit */
+>      if (sizeof(void *) == 4 && req->ioctl_64bit) {
+>          res = fuse_reply_err(req, EINVAL);
+> -        goto out;
+> +        return res;
+>      }
+>  
+>      if (in_count) {
+>          in_fiov = fuse_ioctl_iovec_copy(in_iov, in_count);
+>          if (!in_fiov) {
+> -            goto enomem;
+> +            res = fuse_reply_err(req, ENOMEM);
+> +            return res;
 
-I must confess I didn't investigate this case. I'll start looking.
+That could have just been return fuse_reply_err(req, ENOMEM);
+but that's minor.
 
-> Just mentioning it here so that we have a note about the limitation of
-> current patch.
+Dave
+
+>          }
+>  
+>          iov[count].iov_base = (void *)in_fiov;
+> @@ -619,7 +619,8 @@ int fuse_reply_ioctl_retry(fuse_req_t req, const struct iovec *in_iov,
+>      if (out_count) {
+>          out_fiov = fuse_ioctl_iovec_copy(out_iov, out_count);
+>          if (!out_fiov) {
+> -            goto enomem;
+> +            res = fuse_reply_err(req, ENOMEM);
+> +            return res;
+>          }
+>  
+>          iov[count].iov_base = (void *)out_fiov;
+> @@ -628,15 +629,8 @@ int fuse_reply_ioctl_retry(fuse_req_t req, const struct iovec *in_iov,
+>      }
+>  
+>      res = send_reply_iov(req, 0, iov, count);
+> -out:
+> -    free(in_fiov);
+> -    free(out_fiov);
+>  
+>      return res;
+> -
+> -enomem:
+> -    res = fuse_reply_err(req, ENOMEM);
+> -    goto out;
+>  }
+>  
+>  int fuse_reply_ioctl(fuse_req_t req, int result, const void *buf, size_t size)
+> @@ -663,11 +657,11 @@ int fuse_reply_ioctl(fuse_req_t req, int result, const void *buf, size_t size)
+>  int fuse_reply_ioctl_iov(fuse_req_t req, int result, const struct iovec *iov,
+>                           int count)
+>  {
+> -    struct iovec *padded_iov;
+> +    g_autofree struct iovec *padded_iov = NULL;
+>      struct fuse_ioctl_out arg;
+>      int res;
+>  
+> -    padded_iov = malloc((count + 2) * sizeof(struct iovec));
+> +    padded_iov = g_try_new(struct iovec, count + 2);
+>      if (padded_iov == NULL) {
+>          return fuse_reply_err(req, ENOMEM);
+>      }
+> @@ -680,7 +674,6 @@ int fuse_reply_ioctl_iov(fuse_req_t req, int result, const struct iovec *iov,
+>      memcpy(&padded_iov[2], iov, count * sizeof(struct iovec));
+>  
+>      res = send_reply_iov(req, 0, padded_iov, count + 2);
+> -    free(padded_iov);
+>  
+>      return res;
+>  }
+> diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+> index 9e437618fb..9b00687cb0 100644
+> --- a/tools/virtiofsd/fuse_virtio.c
+> +++ b/tools/virtiofsd/fuse_virtio.c
+> @@ -295,6 +295,8 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+>      VuVirtqElement *elem = &req->elem;
+>      int ret = 0;
+>  
+> +    g_autofree struct iovec *in_sg_cpy = NULL;
+> +
+>      assert(count >= 1);
+>      assert(iov[0].iov_len >= sizeof(struct fuse_out_header));
+>  
+> @@ -347,8 +349,7 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+>       * Build a copy of the the in_sg iov so we can skip bits in it,
+>       * including changing the offsets
+>       */
+> -    struct iovec *in_sg_cpy = calloc(sizeof(struct iovec), in_num);
+> -    assert(in_sg_cpy);
+> +    in_sg_cpy = g_new(struct iovec, in_num);
+>      memcpy(in_sg_cpy, in_sg, sizeof(struct iovec) * in_num);
+>      /* These get updated as we skip */
+>      struct iovec *in_sg_ptr = in_sg_cpy;
+> @@ -386,7 +387,6 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+>              ret = errno;
+>              fuse_log(FUSE_LOG_DEBUG, "%s: preadv failed (%m) len=%zd\n",
+>                       __func__, len);
+> -            free(in_sg_cpy);
+>              goto err;
+>          }
+>          fuse_log(FUSE_LOG_DEBUG, "%s: preadv ret=%d len=%zd\n", __func__,
+> @@ -410,13 +410,11 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+>          if (ret != len) {
+>              fuse_log(FUSE_LOG_DEBUG, "%s: ret!=len\n", __func__);
+>              ret = EIO;
+> -            free(in_sg_cpy);
+>              goto err;
+>          }
+>          in_sg_left -= ret;
+>          len -= ret;
+>      } while (in_sg_left);
+> -    free(in_sg_cpy);
+>  
+>      /* Need to fix out->len on EOF */
+>      if (len) {
+> -- 
+> 2.25.1
 > 
-
-Sure. I'll add a note for that.
-
-> Vivek
-> 
-> > +    fuse_reply_err(req, ret < 0 ? errno : 0);
-> > +    close(fd);
-> > +}
-> > +
-> >  static void lo_destroy(void *userdata)
-> >  {
-> >      struct lo_data *lo = (struct lo_data *)userdata;
-> > @@ -3184,6 +3212,7 @@ static struct fuse_lowlevel_ops lo_oper = {
-> >      .copy_file_range = lo_copy_file_range,
-> >  #endif
-> >      .lseek = lo_lseek,
-> > +    .syncfs = lo_syncfs,
-> >      .destroy = lo_destroy,
-> >  };
-> >  
-> > diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
-> > index 62441cfcdb95..343188447901 100644
-> > --- a/tools/virtiofsd/passthrough_seccomp.c
-> > +++ b/tools/virtiofsd/passthrough_seccomp.c
-> > @@ -107,6 +107,7 @@ static const int syscall_allowlist[] = {
-> >      SCMP_SYS(set_robust_list),
-> >      SCMP_SYS(setxattr),
-> >      SCMP_SYS(symlinkat),
-> > +    SCMP_SYS(syncfs),
-> >      SCMP_SYS(time), /* Rarely needed, except on static builds */
-> >      SCMP_SYS(tgkill),
-> >      SCMP_SYS(unlinkat),
-> > -- 
-> > 2.26.3
-> > 
-> 
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

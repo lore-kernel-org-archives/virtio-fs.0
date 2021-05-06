@@ -1,16 +1,15 @@
-Date: Thu, 6 May 2021 17:00:31 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YJQSnyAIkww0ApJM@work-vm>
-References: <20210505103702.521457-1-berrange@redhat.com>
-	<20210505103702.521457-8-berrange@redhat.com>
-	<YJKw/qcsSBvgB1hG@work-vm>
+Date: Thu, 6 May 2021 12:02:23 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210506160223.GA277745@redhat.com>
+References: <20210428110100.27757-1-dgilbert@redhat.com>
+	<20210428110100.27757-27-dgilbert@redhat.com>
+	<YJQNIPaFCJlG7ZKc@stefanha-x1.localdomain>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <YJKw/qcsSBvgB1hG@work-vm>
-Subject: Re: [Virtio-fs] [PATCH 7/7] virtiofsd: use GDateTime for formatting
- timestamp for debug messages
+In-Reply-To: <YJQNIPaFCJlG7ZKc@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH v3 26/26] virtiofsd: Ask qemu to drop
+ CAP_FSETID if client asked for it
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,89 +18,52 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>
-Cc: Kevin Wolf <kwolf@redhat.com>, Jiri Pirko <jiri@resnulli.us>, qemu-block@nongnu.org, Juan Quintela <quintela@redhat.com>, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowang@redhat.com>, qemu-devel@nongnu.org, Laurent Vivier <laurent@vivier.eu>, virtio-fs@redhat.com, Gerd Hoffmann <kraxel@redhat.com>, Max Reitz <mreitz@redhat.com>, Brad Smith <brad@comstyle.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-* Dr. David Alan Gilbert (dgilbert@redhat.com) wrote:
-> * Daniel P. Berrang=E9 (berrange@redhat.com) wrote:
-> > The GDateTime APIs provided by GLib avoid portability pitfalls, such
-> > as some platforms where 'struct timeval.tv_sec' field is still 'long'
-> > instead of 'time_t'. When combined with automatic cleanup, GDateTime
-> > often results in simpler code too.
-> >=20
-> > Signed-off-by: Daniel P. Berrang=E9 <berrange@redhat.com>
->=20
-> Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+On Thu, May 06, 2021 at 04:37:04PM +0100, Stefan Hajnoczi wrote:
+> On Wed, Apr 28, 2021 at 12:01:00PM +0100, Dr. David Alan Gilbert (git) wrote:
+> > From: Vivek Goyal <vgoyal@redhat.com>
+> > 
+> > If qemu guest asked to drop CAP_FSETID upon write, send that info
+> > to qemu in SLAVE_FS_IO message so that qemu can drop capability
+> > before WRITE. This is to make sure that any setuid bit is killed
+> > on fd (if there is one set).
+> > 
+> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> 
+> I'm not sure if the QEMU FSETID patches make sense. QEMU shouldn't be
+> running with FSETID because QEMU is untrusted. FSETGID would allow QEMU
+> to create setgid files, thereby potentially allowing an attacker to gain
+> any GID.
 
-Queued this 7/7 via virtiofsd
+Sure, its not recommended to run QEMU as root, but we don't block that
+either and I do regularly test with qemu running as root.
 
-> > ---
-> >  tools/virtiofsd/passthrough_ll.c | 25 ++++---------------------
-> >  1 file changed, 4 insertions(+), 21 deletions(-)
-> >=20
-> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthr=
-ough_ll.c
-> > index 1553d2ef45..cdd224918c 100644
-> > --- a/tools/virtiofsd/passthrough_ll.c
-> > +++ b/tools/virtiofsd/passthrough_ll.c
-> > @@ -3558,10 +3558,6 @@ static void setup_nofile_rlimit(unsigned long rl=
-imit_nofile)
-> >  static void log_func(enum fuse_log_level level, const char *fmt, va_li=
-st ap)
-> >  {
-> >      g_autofree char *localfmt =3D NULL;
-> > -    struct timespec ts;
-> > -    struct tm tm;
-> > -    char sec_fmt[sizeof "2020-12-07 18:17:54"];
-> > -    char zone_fmt[sizeof "+0100"];
-> > =20
-> >      if (current_log_level < level) {
-> >          return;
-> > @@ -3573,23 +3569,10 @@ static void log_func(enum fuse_log_level level,=
- const char *fmt, va_list ap)
-> >              localfmt =3D g_strdup_printf("[ID: %08ld] %s", syscall(__N=
-R_gettid),
-> >                                         fmt);
-> >          } else {
-> > -            /* try formatting a broken-down timestamp */
-> > -            if (clock_gettime(CLOCK_REALTIME, &ts) !=3D -1 &&
-> > -                localtime_r(&ts.tv_sec, &tm) !=3D NULL &&
-> > -                strftime(sec_fmt, sizeof sec_fmt, "%Y-%m-%d %H:%M:%S",
-> > -                         &tm) !=3D 0 &&
-> > -                strftime(zone_fmt, sizeof zone_fmt, "%z", &tm) !=3D 0)=
- {
-> > -                localfmt =3D g_strdup_printf("[%s.%02ld%s] [ID: %08ld]=
- %s",
-> > -                                           sec_fmt,
-> > -                                           ts.tv_nsec / (10L * 1000 * =
-1000),
-> > -                                           zone_fmt, syscall(__NR_gett=
-id),
-> > -                                           fmt);
-> > -            } else {
-> > -                /* fall back to a flat timestamp */
-> > -                localfmt =3D g_strdup_printf("[%" PRId64 "] [ID: %08ld=
-] %s",
-> > -                                           get_clock(), syscall(__NR_g=
-ettid),
-> > -                                           fmt);
-> > -            }
-> > +            g_autoptr(GDateTime) now =3D g_date_time_new_now_local();
-> > +            g_autofree char *nowstr =3D g_date_time_format(now, "%Y-%m=
--%d %H:%M:%S.%f%z");
-> > +            localfmt =3D g_strdup_printf("[%s] [ID: %08ld] %s",
-> > +                                       nowstr, syscall(__NR_gettid), f=
-mt);
-> >          }
-> >          fmt =3D localfmt;
-> >      }
-> > --=20
-> > 2.31.1
-> >=20
-> --=20
-> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
->=20
->=20
---=20
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> 
+> I think it's better not to implement QEMU FSETID functionality at all
+> and to handle it another way.
+
+One way could be that virtiofsd tries to clear setuid bit after I/O
+has finished. But that will be non-atomic operation and it is filled
+with perils as it requires virtiofsd to know what all kernel will
+do if this write has been done with CAP_FSETID dropped.
+
+> In the worst case I/O requests should just
+> fail, it seems like a rare case anyway:
+
+Is there a way for virtiofsd to know if qemu is running with CAP_FSETID
+or not. If there is one, it might be reasonable to error out. If we
+don't know, then we can't fail all the operations.
+
+> I/O to a setuid/setgid file with
+> a memory buffer that is not mapped in virtiofsd.
+
+With DAX it is easily triggerable. User has to append to a setuid file
+in virtiofs and this path will trigger.
+
+I am fine with not supporting this patch but will also need a reaosonable
+alternative solution.
+
+Vivek
 

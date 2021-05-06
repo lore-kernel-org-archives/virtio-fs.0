@@ -1,13 +1,12 @@
-Date: Thu, 6 May 2021 16:37:43 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YJQNR2aTvyE5pWqk@stefanha-x1.localdomain>
-References: <20210428110100.27757-1-dgilbert@redhat.com>
+Date: Thu, 6 May 2021 16:46:45 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YJQPZcyfM6DAtHcn@work-vm>
+References: <20210409100627.451573-1-groug@kaod.org>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="lqhZRkdxYdMqldv1"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210428110100.27757-1-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 00/26] virtiofs dax patches
+In-Reply-To: <20210409100627.451573-1-groug@kaod.org>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Fix side-effect in assert()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,77 +15,104 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
+To: Greg Kurz <groug@kaod.org>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
+* Greg Kurz (groug@kaod.org) wrote:
+> It is bad practice to put an expression with a side-effect in
+> assert() because the side-effect won't happen if the code is
+> compiled with -DNDEBUG.
+> 
+> Use an intermediate variable. Consolidate this in an macro to
+> have proper line numbers when the assertion is hit.
+> 
+> virtiofsd: ../../tools/virtiofsd/passthrough_ll.c:2797: lo_getxattr:
+>  Assertion `fchdir_res == 0' failed.
+> Aborted
+> 
+>   2796          /* fchdir should not fail here */
+> =>2797          FCHDIR_NOFAIL(lo->proc_self_fd);
+>   2798          ret = getxattr(procname, name, value, size);
+>   2799          FCHDIR_NOFAIL(lo->root.fd);
+> 
+> Fixes: bdfd66788349 ("virtiofsd: Fix xattr operations")
+> Cc: misono.tomohiro@jp.fujitsu.com
+> Signed-off-by: Greg Kurz <groug@kaod.org>
 
---lqhZRkdxYdMqldv1
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Queued
 
-On Wed, Apr 28, 2021 at 12:00:34PM +0100, Dr. David Alan Gilbert (git) wrot=
-e:
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
->=20
->   This series adds support for acceleration of virtiofs via DAX
-> mapping, using features added in the 5.11 Linux kernel.
->=20
->   DAX originally existed in the kernel for mapping real storage
-> devices directly into memory, so that reads/writes turn into
-> reads/writes directly mapped into the storage device.
->=20
->   virtiofs's DAX support is similar; a PCI BAR is exposed on the
-> virtiofs device corresponding to a DAX 'cache' of a user defined size.
-> The guest daemon then requests files to be mapped into that cache;
-> when that happens the virtiofsd sends filedescriptors and commands back
-> to the QEMU that mmap's those files directly into the memory slot
-> exposed to kvm.  The guest can then directly read/write to the files
-> exposed by virtiofs by reading/writing into the BAR.
->=20
->   A typical invocation would be:
->      -device vhost-user-fs-pci,queue-size=3D1024,chardev=3Dchar0,tag=3Dmy=
-fs,cache-size=3D4G
->=20
-> and then the guest must mount with -o dax
->=20
->   Note that the cache doesn't really take VM up on the host, because
-> everything placed there is just an mmap of a file, so you can afford
-> to use quite a large cache size.
->=20
->   Unlike a real DAX device, the cache is a finite size that's
-> potentially smaller than the underlying filesystem (especially when
-> mapping granuality is taken into account).  Mapping, unmapping and
-> remapping must take place to juggle files into the cache if it's too
-> small.  Some workloads benefit more than others.
->=20
-> Gotchas:
->   a) If something else on the host truncates an mmap'd file,
-> kvm gets rather upset;  for this reason it's advised that DAX is
-> currently only suitable for use on non-shared filesystems.
->=20
-> (This series, with a couple of other patches, is at:
-> https://gitlab.com/virtio-fs/qemu/-/tree/dgilbert-dax-2021-04-28 )
-
-Overall this looks close but I don't think the FSETID support should be
-added to QEMU. Please see my comment on the final patch.
-
-Stefan
-
---lqhZRkdxYdMqldv1
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmCUDUcACgkQnKSrs4Gr
-c8j9jwf+JxfBvM1p05OJ2XVmZKvl3iREksfk277QH1LHCLzurox+5YovRH9TAQ+F
-ZJNQH23RrTYnJIGX2bxU5eG+xeOVY3LCn42gGg/uQPGTiqdK+fGm6CNwAHKGAogE
-42pBqdOO9xxDCQxf3XbH1Uf5RHgGpj/M7kN9pnvna47WuKvTZypORRNCqYQyg0PA
-Tzkrs636SFu6bpj0Sp+EWOBv3a94eEnFsHMmYqjxkkeprppK6V7oQ7eYRlXhpqJx
-RvTQpfUCKtqmZGYNIxpxUqj6fZ0docDCxERkAEC0CJ9zcZsy2/FFvlDQA3x22Kby
-6yiwtkPhSlXkKgq30szKNZjrJBx8KQ==
-=aKdo
------END PGP SIGNATURE-----
-
---lqhZRkdxYdMqldv1--
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 21 +++++++++++++--------
+>  1 file changed, 13 insertions(+), 8 deletions(-)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 1553d2ef454f..6592f96f685e 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -2723,6 +2723,11 @@ static int xattr_map_server(const struct lo_data *lo, const char *server_name,
+>      return -ENODATA;
+>  }
+>  
+> +#define FCHDIR_NOFAIL(fd) do {                         \
+> +        int fchdir_res = fchdir(fd);                   \
+> +        assert(fchdir_res == 0);                       \
+> +    } while (0)
+> +
+>  static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+>                          size_t size)
+>  {
+> @@ -2789,9 +2794,9 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+>          ret = fgetxattr(fd, name, value, size);
+>      } else {
+>          /* fchdir should not fail here */
+> -        assert(fchdir(lo->proc_self_fd) == 0);
+> +        FCHDIR_NOFAIL(lo->proc_self_fd);
+>          ret = getxattr(procname, name, value, size);
+> -        assert(fchdir(lo->root.fd) == 0);
+> +        FCHDIR_NOFAIL(lo->root.fd);
+>      }
+>  
+>      if (ret == -1) {
+> @@ -2864,9 +2869,9 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
+>          ret = flistxattr(fd, value, size);
+>      } else {
+>          /* fchdir should not fail here */
+> -        assert(fchdir(lo->proc_self_fd) == 0);
+> +        FCHDIR_NOFAIL(lo->proc_self_fd);
+>          ret = listxattr(procname, value, size);
+> -        assert(fchdir(lo->root.fd) == 0);
+> +        FCHDIR_NOFAIL(lo->root.fd);
+>      }
+>  
+>      if (ret == -1) {
+> @@ -3000,9 +3005,9 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+>          ret = fsetxattr(fd, name, value, size, flags);
+>      } else {
+>          /* fchdir should not fail here */
+> -        assert(fchdir(lo->proc_self_fd) == 0);
+> +        FCHDIR_NOFAIL(lo->proc_self_fd);
+>          ret = setxattr(procname, name, value, size, flags);
+> -        assert(fchdir(lo->root.fd) == 0);
+> +        FCHDIR_NOFAIL(lo->root.fd);
+>      }
+>  
+>      saverr = ret == -1 ? errno : 0;
+> @@ -3066,9 +3071,9 @@ static void lo_removexattr(fuse_req_t req, fuse_ino_t ino, const char *in_name)
+>          ret = fremovexattr(fd, name);
+>      } else {
+>          /* fchdir should not fail here */
+> -        assert(fchdir(lo->proc_self_fd) == 0);
+> +        FCHDIR_NOFAIL(lo->proc_self_fd);
+>          ret = removexattr(procname, name);
+> -        assert(fchdir(lo->root.fd) == 0);
+> +        FCHDIR_NOFAIL(lo->root.fd);
+>      }
+>  
+>      saverr = ret == -1 ? errno : 0;
+> -- 
+> 2.26.3
+> 
+> 
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

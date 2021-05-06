@@ -1,10 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Thu,  6 May 2021 19:56:29 +0100
-Message-Id: <20210506185641.284821-1-dgilbert@redhat.com>
+Date: Thu,  6 May 2021 19:56:30 +0100
+Message-Id: <20210506185641.284821-2-dgilbert@redhat.com>
+In-Reply-To: <20210506185641.284821-1-dgilbert@redhat.com>
+References: <20210506185641.284821-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
+Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 00/12] virtiofs queue
+Subject: [Virtio-fs] [PULL 01/12] virtiofsd: Fix side-effect in assert()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,56 +18,98 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, groug@kaod.org, jose.carlos.venegas.munoz@intel.com, ma.mandourr@gmail.com
 Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+From: Greg Kurz <groug@kaod.org>
 
-The following changes since commit d90f154867ec0ec22fd719164b88716e8fd48672:
+It is bad practice to put an expression with a side-effect in
+assert() because the side-effect won't happen if the code is
+compiled with -DNDEBUG.
 
-  Merge remote-tracking branch 'remotes/dg-gitlab/tags/ppc-for-6.1-20210504' into staging (2021-05-05 20:29:14 +0100)
+Use an intermediate variable. Consolidate this in an macro to
+have proper line numbers when the assertion is hit.
 
-are available in the Git repository at:
+virtiofsd: ../../tools/virtiofsd/passthrough_ll.c:2797: lo_getxattr:
+ Assertion `fchdir_res == 0' failed.
+Aborted
 
-  https://gitlab.com/dagrh/qemu.git tags/pull-virtiofs-20210506
+  2796          /* fchdir should not fail here */
+=>2797          FCHDIR_NOFAIL(lo->proc_self_fd);
+  2798          ret = getxattr(procname, name, value, size);
+  2799          FCHDIR_NOFAIL(lo->root.fd);
 
-for you to fetch changes up to 67a010f64cc9e33ba19ab389dedaa52013a9de8a:
-
-  virtiofsd/fuse_virtio.c: Changed allocations of locals to GLib (2021-05-06 19:47:44 +0100)
-
-----------------------------------------------------------------
-virtiofsd pull 2021-05-06
-
-A pile of cleanups:
-
-  Use of glib allocators from Mahmoud
-  Virtio spec compliance and printf cleanup from me.
-  Sugar to turn on xattr when defining xattr mapping from Carlos
-  an assert cleanup from Greg
-
+Fixes: bdfd66788349 ("virtiofsd: Fix xattr operations")
+Cc: misono.tomohiro@jp.fujitsu.com
+Signed-off-by: Greg Kurz <groug@kaod.org>
+Message-Id: <20210409100627.451573-1-groug@kaod.org>
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Reviewed-by: Philippe Mathieu-Daudé <philmd@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c | 21 +++++++++++++--------
+ 1 file changed, 13 insertions(+), 8 deletions(-)
 
-----------------------------------------------------------------
-Carlos Venegas (2):
-      virtiofsd: Allow use "-o xattrmap" without "-o xattr"
-      virtiofsd: Add help for -o xattr-mapping
-
-Dr. David Alan Gilbert (2):
-      virtiofs: Fixup printf args
-      virtiofsd: Don't assume header layout
-
-Greg Kurz (1):
-      virtiofsd: Fix side-effect in assert()
-
-Mahmoud Mandour (7):
-      virtiofsd: Changed allocations of fuse_req to GLib functions
-      virtiofsd: Changed allocations of iovec to GLib's functions
-      virtiofsd: Changed allocations of fuse_session to GLib's functions
-      virtiofsd: Changed allocation of lo_map_elems to GLib's functions
-      virtiofsd: Changed allocations of fv_VuDev & its internals to GLib functions
-      virtiofsd/passthrough_ll.c: Changed local allocations to GLib functions
-      virtiofsd/fuse_virtio.c: Changed allocations of locals to GLib
-
- tools/virtiofsd/fuse_lowlevel.c  |  43 ++++++-------
- tools/virtiofsd/fuse_virtio.c    | 129 ++++++++++++++++++++++++++-------------
- tools/virtiofsd/helper.c         |   3 +
- tools/virtiofsd/passthrough_ll.c |  64 +++++++++----------
- 4 files changed, 139 insertions(+), 100 deletions(-)
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 1553d2ef45..6592f96f68 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -2723,6 +2723,11 @@ static int xattr_map_server(const struct lo_data *lo, const char *server_name,
+     return -ENODATA;
+ }
+ 
++#define FCHDIR_NOFAIL(fd) do {                         \
++        int fchdir_res = fchdir(fd);                   \
++        assert(fchdir_res == 0);                       \
++    } while (0)
++
+ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+                         size_t size)
+ {
+@@ -2789,9 +2794,9 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+         ret = fgetxattr(fd, name, value, size);
+     } else {
+         /* fchdir should not fail here */
+-        assert(fchdir(lo->proc_self_fd) == 0);
++        FCHDIR_NOFAIL(lo->proc_self_fd);
+         ret = getxattr(procname, name, value, size);
+-        assert(fchdir(lo->root.fd) == 0);
++        FCHDIR_NOFAIL(lo->root.fd);
+     }
+ 
+     if (ret == -1) {
+@@ -2864,9 +2869,9 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
+         ret = flistxattr(fd, value, size);
+     } else {
+         /* fchdir should not fail here */
+-        assert(fchdir(lo->proc_self_fd) == 0);
++        FCHDIR_NOFAIL(lo->proc_self_fd);
+         ret = listxattr(procname, value, size);
+-        assert(fchdir(lo->root.fd) == 0);
++        FCHDIR_NOFAIL(lo->root.fd);
+     }
+ 
+     if (ret == -1) {
+@@ -3000,9 +3005,9 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+         ret = fsetxattr(fd, name, value, size, flags);
+     } else {
+         /* fchdir should not fail here */
+-        assert(fchdir(lo->proc_self_fd) == 0);
++        FCHDIR_NOFAIL(lo->proc_self_fd);
+         ret = setxattr(procname, name, value, size, flags);
+-        assert(fchdir(lo->root.fd) == 0);
++        FCHDIR_NOFAIL(lo->root.fd);
+     }
+ 
+     saverr = ret == -1 ? errno : 0;
+@@ -3066,9 +3071,9 @@ static void lo_removexattr(fuse_req_t req, fuse_ino_t ino, const char *in_name)
+         ret = fremovexattr(fd, name);
+     } else {
+         /* fchdir should not fail here */
+-        assert(fchdir(lo->proc_self_fd) == 0);
++        FCHDIR_NOFAIL(lo->proc_self_fd);
+         ret = removexattr(procname, name);
+-        assert(fchdir(lo->root.fd) == 0);
++        FCHDIR_NOFAIL(lo->root.fd);
+     }
+ 
+     saverr = ret == -1 ? errno : 0;
+-- 
+2.31.1
 

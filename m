@@ -1,11 +1,11 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Thu,  6 May 2021 19:56:32 +0100
-Message-Id: <20210506185641.284821-4-dgilbert@redhat.com>
+Date: Thu,  6 May 2021 19:56:33 +0100
+Message-Id: <20210506185641.284821-5-dgilbert@redhat.com>
 In-Reply-To: <20210506185641.284821-1-dgilbert@redhat.com>
 References: <20210506185641.284821-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 03/12] virtiofsd: Add help for -o xattr-mapping
+Subject: [Virtio-fs] [PULL 04/12] virtiofs: Fixup printf args
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,34 +17,65 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, groug@kaod.org, jose.carlos.venegas.munoz@intel.com, ma.mandourr@gmail.com
 Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
-From: Carlos Venegas <jose.carlos.venegas.munoz@intel.com>
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-The option is not documented in help.
+Fixup some fuse_log printf args for 32bit compatibility.
 
-Add small help about the option.
-
-Signed-off-by: Carlos Venegas <jose.carlos.venegas.munoz@intel.com>
-Message-Id: <20210414201207.3612432-3-jose.carlos.venegas.munoz@intel.com>
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Reviewed-by: Connor Kuehl <ckuehl@redhat.com>
+Message-Id: <20210428110100.27757-2-dgilbert@redhat.com>
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- tools/virtiofsd/helper.c | 3 +++
- 1 file changed, 3 insertions(+)
+ tools/virtiofsd/passthrough_ll.c | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
 
-diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
-index 28243b51b2..5e98ed702b 100644
---- a/tools/virtiofsd/helper.c
-+++ b/tools/virtiofsd/helper.c
-@@ -172,6 +172,9 @@ void fuse_cmdline_help(void)
-            "                               default: no_writeback\n"
-            "    -o xattr|no_xattr          enable/disable xattr\n"
-            "                               default: no_xattr\n"
-+           "    -o xattrmap=<mapping>      Enable xattr mapping (enables xattr)\n"
-+           "                               <mapping> is a string consists of a series of rules\n"
-+           "                               e.g. -o xattrmap=:map::user.virtiofs.:\n"
-            "    -o modcaps=CAPLIST         Modify the list of capabilities\n"
-            "                               e.g. -o modcaps=+sys_admin:-chown\n"
-            "    --rlimit-nofile=<num>      set maximum number of file descriptors\n"
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 2c36f4ec46..93a49db3cd 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -2011,10 +2011,10 @@ static void lo_getlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
+ 
+     fuse_log(FUSE_LOG_DEBUG,
+              "lo_getlk(ino=%" PRIu64 ", flags=%d)"
+-             " owner=0x%lx, l_type=%d l_start=0x%lx"
+-             " l_len=0x%lx\n",
+-             ino, fi->flags, fi->lock_owner, lock->l_type, lock->l_start,
+-             lock->l_len);
++             " owner=0x%" PRIx64 ", l_type=%d l_start=0x%" PRIx64
++             " l_len=0x%" PRIx64 "\n",
++             ino, fi->flags, fi->lock_owner, lock->l_type,
++             (uint64_t)lock->l_start, (uint64_t)lock->l_len);
+ 
+     if (!lo->posix_lock) {
+         fuse_reply_err(req, ENOSYS);
+@@ -2061,10 +2061,10 @@ static void lo_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
+ 
+     fuse_log(FUSE_LOG_DEBUG,
+              "lo_setlk(ino=%" PRIu64 ", flags=%d)"
+-             " cmd=%d pid=%d owner=0x%lx sleep=%d l_whence=%d"
+-             " l_start=0x%lx l_len=0x%lx\n",
++             " cmd=%d pid=%d owner=0x%" PRIx64 " sleep=%d l_whence=%d"
++             " l_start=0x%" PRIx64 " l_len=0x%" PRIx64 "\n",
+              ino, fi->flags, lock->l_type, lock->l_pid, fi->lock_owner, sleep,
+-             lock->l_whence, lock->l_start, lock->l_len);
++             lock->l_whence, (uint64_t)lock->l_start, (uint64_t)lock->l_len);
+ 
+     if (!lo->posix_lock) {
+         fuse_reply_err(req, ENOSYS);
+@@ -3102,9 +3102,10 @@ static void lo_copy_file_range(fuse_req_t req, fuse_ino_t ino_in, off_t off_in,
+ 
+     fuse_log(FUSE_LOG_DEBUG,
+              "lo_copy_file_range(ino=%" PRIu64 "/fd=%d, "
+-             "off=%lu, ino=%" PRIu64 "/fd=%d, "
+-             "off=%lu, size=%zd, flags=0x%x)\n",
+-             ino_in, in_fd, off_in, ino_out, out_fd, off_out, len, flags);
++             "off=%ju, ino=%" PRIu64 "/fd=%d, "
++             "off=%ju, size=%zd, flags=0x%x)\n",
++             ino_in, in_fd, (intmax_t)off_in,
++             ino_out, out_fd, (intmax_t)off_out, len, flags);
+ 
+     res = copy_file_range(in_fd, &off_in, out_fd, &off_out, len, flags);
+     if (res < 0) {
 -- 
 2.31.1
 

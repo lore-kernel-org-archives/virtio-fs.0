@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Thu,  6 May 2021 19:56:37 +0100
-Message-Id: <20210506185641.284821-9-dgilbert@redhat.com>
+Date: Thu,  6 May 2021 19:56:38 +0100
+Message-Id: <20210506185641.284821-10-dgilbert@redhat.com>
 In-Reply-To: <20210506185641.284821-1-dgilbert@redhat.com>
 References: <20210506185641.284821-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 08/12] virtiofsd: Changed allocations of
-	fuse_session to GLib's functions
+Subject: [Virtio-fs] [PULL 09/12] virtiofsd: Changed allocation of
+	lo_map_elems to GLib's functions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,48 +20,40 @@ Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
 From: Mahmoud Mandour <ma.mandourr@gmail.com>
 
-Replaced the allocation and deallocation of fuse_session structs
-from calloc() and free() calls to g_try_new0() and g_free().
+Replaced (re)allocation of lo_map_elem structs from realloc() to
+GLib's g_try_realloc_n() and replaced the respective free() call
+with a g_free().
 
 Signed-off-by: Mahmoud Mandour <ma.mandourr@gmail.com>
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-Message-Id: <20210420154643.58439-4-ma.mandourr@gmail.com>
+Message-Id: <20210420154643.58439-5-ma.mandourr@gmail.com>
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 ---
- tools/virtiofsd/fuse_lowlevel.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ tools/virtiofsd/passthrough_ll.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index 88496f9560..7fe2cef1eb 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -2470,7 +2470,7 @@ void fuse_session_destroy(struct fuse_session *se)
-     free(se->vu_socket_path);
-     se->vu_socket_path = NULL;
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 93a49db3cd..406b5bd10e 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -406,7 +406,7 @@ static void lo_map_init(struct lo_map *map)
  
--    free(se);
-+    g_free(se);
+ static void lo_map_destroy(struct lo_map *map)
+ {
+-    free(map->elems);
++    g_free(map->elems);
  }
  
- 
-@@ -2493,7 +2493,7 @@ struct fuse_session *fuse_session_new(struct fuse_args *args,
-         return NULL;
+ static int lo_map_grow(struct lo_map *map, size_t new_nelems)
+@@ -418,7 +418,7 @@ static int lo_map_grow(struct lo_map *map, size_t new_nelems)
+         return 1;
      }
  
--    se = (struct fuse_session *)calloc(1, sizeof(struct fuse_session));
-+    se = g_try_new0(struct fuse_session, 1);
-     if (se == NULL) {
-         fuse_log(FUSE_LOG_ERR, "fuse: failed to allocate fuse object\n");
-         goto out1;
-@@ -2553,7 +2553,7 @@ struct fuse_session *fuse_session_new(struct fuse_args *args,
- out4:
-     fuse_opt_free_args(args);
- out2:
--    free(se);
-+    g_free(se);
- out1:
-     return NULL;
- }
+-    new_elems = realloc(map->elems, sizeof(map->elems[0]) * new_nelems);
++    new_elems = g_try_realloc_n(map->elems, new_nelems, sizeof(map->elems[0]));
+     if (!new_elems) {
+         return 0;
+     }
 -- 
 2.31.1
 

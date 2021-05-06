@@ -1,12 +1,13 @@
-Date: Thu, 6 May 2021 16:46:45 +0100
+Date: Thu, 6 May 2021 16:52:33 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YJQPZcyfM6DAtHcn@work-vm>
-References: <20210409100627.451573-1-groug@kaod.org>
+Message-ID: <YJQQwcVgMiUWLQ5c@work-vm>
+References: <20210414201207.3612432-1-jose.carlos.venegas.munoz@intel.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210409100627.451573-1-groug@kaod.org>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Fix side-effect in assert()
+In-Reply-To: <20210414201207.3612432-1-jose.carlos.venegas.munoz@intel.com>
+Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: Enable xattr if xattrmap is
+	used
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,102 +16,30 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Carlos Venegas <jose.carlos.venegas.munoz@intel.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
 
-* Greg Kurz (groug@kaod.org) wrote:
-> It is bad practice to put an expression with a side-effect in
-> assert() because the side-effect won't happen if the code is
-> compiled with -DNDEBUG.
+* Carlos Venegas (jose.carlos.venegas.munoz@intel.com) wrote:
 > 
-> Use an intermediate variable. Consolidate this in an macro to
-> have proper line numbers when the assertion is hit.
-> 
-> virtiofsd: ../../tools/virtiofsd/passthrough_ll.c:2797: lo_getxattr:
->  Assertion `fchdir_res == 0' failed.
-> Aborted
-> 
->   2796          /* fchdir should not fail here */
-> =>2797          FCHDIR_NOFAIL(lo->proc_self_fd);
->   2798          ret = getxattr(procname, name, value, size);
->   2799          FCHDIR_NOFAIL(lo->root.fd);
-> 
-> Fixes: bdfd66788349 ("virtiofsd: Fix xattr operations")
-> Cc: misono.tomohiro@jp.fujitsu.com
-> Signed-off-by: Greg Kurz <groug@kaod.org>
+> Using xattrmap for Kata Containers we found that xattr is should be used
+> or xattrmap wont work.  These patches enable xattr when -o xattrmap is
+> used. Also, they add help for the xattrmap  option on `virtiofsd --help` output.
 
-Queued
+Queued.  You might like to submit some more patches to give the error
+that Greg was suggesting and/or update some docs.
 
-> ---
->  tools/virtiofsd/passthrough_ll.c | 21 +++++++++++++--------
->  1 file changed, 13 insertions(+), 8 deletions(-)
+Dave
+
+> Carlos Venegas (2):
+>   virtiofsd: Allow use "-o xattrmap" without "-o xattr"
+>   virtiofsd: Add help for -o xattr-mapping
 > 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 1553d2ef454f..6592f96f685e 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2723,6 +2723,11 @@ static int xattr_map_server(const struct lo_data *lo, const char *server_name,
->      return -ENODATA;
->  }
->  
-> +#define FCHDIR_NOFAIL(fd) do {                         \
-> +        int fchdir_res = fchdir(fd);                   \
-> +        assert(fchdir_res == 0);                       \
-> +    } while (0)
-> +
->  static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
->                          size_t size)
->  {
-> @@ -2789,9 +2794,9 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
->          ret = fgetxattr(fd, name, value, size);
->      } else {
->          /* fchdir should not fail here */
-> -        assert(fchdir(lo->proc_self_fd) == 0);
-> +        FCHDIR_NOFAIL(lo->proc_self_fd);
->          ret = getxattr(procname, name, value, size);
-> -        assert(fchdir(lo->root.fd) == 0);
-> +        FCHDIR_NOFAIL(lo->root.fd);
->      }
->  
->      if (ret == -1) {
-> @@ -2864,9 +2869,9 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
->          ret = flistxattr(fd, value, size);
->      } else {
->          /* fchdir should not fail here */
-> -        assert(fchdir(lo->proc_self_fd) == 0);
-> +        FCHDIR_NOFAIL(lo->proc_self_fd);
->          ret = listxattr(procname, value, size);
-> -        assert(fchdir(lo->root.fd) == 0);
-> +        FCHDIR_NOFAIL(lo->root.fd);
->      }
->  
->      if (ret == -1) {
-> @@ -3000,9 +3005,9 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
->          ret = fsetxattr(fd, name, value, size, flags);
->      } else {
->          /* fchdir should not fail here */
-> -        assert(fchdir(lo->proc_self_fd) == 0);
-> +        FCHDIR_NOFAIL(lo->proc_self_fd);
->          ret = setxattr(procname, name, value, size, flags);
-> -        assert(fchdir(lo->root.fd) == 0);
-> +        FCHDIR_NOFAIL(lo->root.fd);
->      }
->  
->      saverr = ret == -1 ? errno : 0;
-> @@ -3066,9 +3071,9 @@ static void lo_removexattr(fuse_req_t req, fuse_ino_t ino, const char *in_name)
->          ret = fremovexattr(fd, name);
->      } else {
->          /* fchdir should not fail here */
-> -        assert(fchdir(lo->proc_self_fd) == 0);
-> +        FCHDIR_NOFAIL(lo->proc_self_fd);
->          ret = removexattr(procname, name);
-> -        assert(fchdir(lo->root.fd) == 0);
-> +        FCHDIR_NOFAIL(lo->root.fd);
->      }
->  
->      saverr = ret == -1 ? errno : 0;
+>  tools/virtiofsd/helper.c         | 3 +++
+>  tools/virtiofsd/passthrough_ll.c | 1 +
+>  2 files changed, 4 insertions(+)
+> 
 > -- 
-> 2.26.3
+> 2.25.1
 > 
 > 
 -- 

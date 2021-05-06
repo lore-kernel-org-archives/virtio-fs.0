@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Thu,  6 May 2021 19:56:40 +0100
-Message-Id: <20210506185641.284821-12-dgilbert@redhat.com>
+Date: Thu,  6 May 2021 19:56:41 +0100
+Message-Id: <20210506185641.284821-13-dgilbert@redhat.com>
 In-Reply-To: <20210506185641.284821-1-dgilbert@redhat.com>
 References: <20210506185641.284821-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 11/12] virtiofsd/passthrough_ll.c: Changed local
-	allocations to GLib functions
+Subject: [Virtio-fs] [PULL 12/12] virtiofsd/fuse_virtio.c: Changed
+	allocations of locals to GLib
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,102 +20,63 @@ Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
 From: Mahmoud Mandour <ma.mandourr@gmail.com>
 
-Changed the allocations of some local variables to GLib's allocation
-functions, such as g_try_malloc0(), and annotated those variables
-as g_autofree. Subsequently, I was able to remove the calls to free().
+Replaced the allocation of local variables from malloc() to
+GLib allocation functions.
+
+In one instance, dropped the usage to an assert after a malloc()
+call and used g_malloc() instead.
 
 Signed-off-by: Mahmoud Mandour <ma.mandourr@gmail.com>
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-Message-Id: <20210420154643.58439-7-ma.mandourr@gmail.com>
+Message-Id: <20210420154643.58439-8-ma.mandourr@gmail.com>
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 17 ++++++-----------
- 1 file changed, 6 insertions(+), 11 deletions(-)
+ tools/virtiofsd/fuse_virtio.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 406b5bd10e..49c21fd855 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -1653,7 +1653,7 @@ static void lo_do_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
-     struct lo_data *lo = lo_data(req);
-     struct lo_dirp *d = NULL;
-     struct lo_inode *dinode;
--    char *buf = NULL;
-+    g_autofree char *buf = NULL;
-     char *p;
-     size_t rem = size;
-     int err = EBADF;
-@@ -1669,7 +1669,7 @@ static void lo_do_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
+diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+index 828f0fa590..1170f375a5 100644
+--- a/tools/virtiofsd/fuse_virtio.c
++++ b/tools/virtiofsd/fuse_virtio.c
+@@ -511,8 +511,7 @@ static void fv_queue_worker(gpointer data, gpointer user_data)
+      * They're spread over multiple descriptors in a scatter/gather set
+      * and we can't trust the guest to keep them still; so copy in/out.
+      */
+-    fbuf.mem = malloc(se->bufsize);
+-    assert(fbuf.mem);
++    fbuf.mem = g_malloc(se->bufsize);
+ 
+     fuse_mutex_init(&req->ch.lock);
+     req->ch.fd = -1;
+@@ -564,8 +563,8 @@ static void fv_queue_worker(gpointer data, gpointer user_data)
+         memcpy(fbuf.mem, &inh, sizeof(struct fuse_in_header));
+ 
+         /* Allocate the bufv, with space for the rest of the iov */
+-        pbufv = malloc(sizeof(struct fuse_bufvec) +
+-                       sizeof(struct fuse_buf) * out_num);
++        pbufv = g_try_malloc(sizeof(struct fuse_bufvec) +
++                             sizeof(struct fuse_buf) * out_num);
+         if (!pbufv) {
+             fuse_log(FUSE_LOG_ERR, "%s: pbufv malloc failed\n",
+                     __func__);
+@@ -622,7 +621,7 @@ static void fv_queue_worker(gpointer data, gpointer user_data)
+ 
+ out:
+     if (allocated_bufv) {
+-        free(pbufv);
++        g_free(pbufv);
      }
  
-     err = ENOMEM;
--    buf = calloc(1, size);
-+    buf = g_try_malloc0(size);
-     if (!buf) {
-         goto error;
+     /* If the request has no reply, still recycle the virtqueue element */
+@@ -641,7 +640,7 @@ out:
      }
-@@ -1755,7 +1755,6 @@ error:
-     } else {
-         fuse_reply_buf(req, buf, size - rem);
-     }
--    free(buf);
+ 
+     pthread_mutex_destroy(&req->ch.lock);
+-    free(fbuf.mem);
++    g_free(fbuf.mem);
+     free(req);
  }
  
- static void lo_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
-@@ -2732,7 +2731,7 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
-                         size_t size)
- {
-     struct lo_data *lo = lo_data(req);
--    char *value = NULL;
-+    g_autofree char *value = NULL;
-     char procname[64];
-     const char *name;
-     char *mapped_name;
-@@ -2773,7 +2772,7 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
-              ino, name, size);
- 
-     if (size) {
--        value = malloc(size);
-+        value = g_try_malloc(size);
-         if (!value) {
-             goto out_err;
-         }
-@@ -2812,8 +2811,6 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
-         fuse_reply_xattr(req, ret);
-     }
- out_free:
--    free(value);
--
-     if (fd >= 0) {
-         close(fd);
-     }
-@@ -2832,7 +2829,7 @@ out:
- static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
- {
-     struct lo_data *lo = lo_data(req);
--    char *value = NULL;
-+    g_autofree char *value = NULL;
-     char procname[64];
-     struct lo_inode *inode;
-     ssize_t ret;
-@@ -2854,7 +2851,7 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
-              size);
- 
-     if (size) {
--        value = malloc(size);
-+        value = g_try_malloc(size);
-         if (!value) {
-             goto out_err;
-         }
-@@ -2939,8 +2936,6 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
-         fuse_reply_xattr(req, ret);
-     }
- out_free:
--    free(value);
--
-     if (fd >= 0) {
-         close(fd);
-     }
 -- 
 2.31.1
 

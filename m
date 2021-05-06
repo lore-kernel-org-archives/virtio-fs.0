@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Thu,  6 May 2021 19:56:35 +0100
-Message-Id: <20210506185641.284821-7-dgilbert@redhat.com>
+Date: Thu,  6 May 2021 19:56:36 +0100
+Message-Id: <20210506185641.284821-8-dgilbert@redhat.com>
 In-Reply-To: <20210506185641.284821-1-dgilbert@redhat.com>
 References: <20210506185641.284821-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 06/12] virtiofsd: Changed allocations of fuse_req
-	to GLib functions
+Subject: [Virtio-fs] [PULL 07/12] virtiofsd: Changed allocations of iovec to
+	GLib's functions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,49 +20,176 @@ Cc: virtio-fs@redhat.com, vgoyal@redhat.com
 
 From: Mahmoud Mandour <ma.mandourr@gmail.com>
 
-Replaced the allocation and deallocation of fuse_req structs
-using calloc()/free() call pairs to a GLib's g_try_new0()
-and g_free().
+Replaced the calls to malloc()/calloc() and their respective
+calls to free() of iovec structs with GLib's allocation and
+deallocation functions and used g_autofree when appropriate.
+
+Replaced the allocation of in_sg_cpy to g_new() instead of a call
+to calloc() and a null-checking assertion. Not g_new0()
+because the buffer is immediately overwritten using memcpy.
 
 Signed-off-by: Mahmoud Mandour <ma.mandourr@gmail.com>
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-Message-Id: <20210420154643.58439-2-ma.mandourr@gmail.com>
+Message-Id: <20210427181333.148176-1-ma.mandourr@gmail.com>
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 ---
- tools/virtiofsd/fuse_lowlevel.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ tools/virtiofsd/fuse_lowlevel.c | 31 ++++++++++++-------------------
+ tools/virtiofsd/fuse_virtio.c   |  7 ++-----
+ 2 files changed, 14 insertions(+), 24 deletions(-)
 
 diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index 58e32fc963..812cef6ef6 100644
+index 812cef6ef6..88496f9560 100644
 --- a/tools/virtiofsd/fuse_lowlevel.c
 +++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -106,7 +106,7 @@ static void list_add_req(struct fuse_req *req, struct fuse_req *next)
- static void destroy_req(fuse_req_t req)
+@@ -217,9 +217,9 @@ static int send_reply(fuse_req_t req, int error, const void *arg,
+ int fuse_reply_iov(fuse_req_t req, const struct iovec *iov, int count)
  {
-     pthread_mutex_destroy(&req->lock);
--    free(req);
-+    g_free(req);
+     int res;
+-    struct iovec *padded_iov;
++    g_autofree struct iovec *padded_iov = NULL;
+ 
+-    padded_iov = malloc((count + 1) * sizeof(struct iovec));
++    padded_iov = g_try_new(struct iovec, count + 1);
+     if (padded_iov == NULL) {
+         return fuse_reply_err(req, ENOMEM);
+     }
+@@ -228,7 +228,6 @@ int fuse_reply_iov(fuse_req_t req, const struct iovec *iov, int count)
+     count++;
+ 
+     res = send_reply_iov(req, 0, padded_iov, count);
+-    free(padded_iov);
+ 
+     return res;
+ }
+@@ -568,7 +567,7 @@ static struct fuse_ioctl_iovec *fuse_ioctl_iovec_copy(const struct iovec *iov,
+     struct fuse_ioctl_iovec *fiov;
+     size_t i;
+ 
+-    fiov = malloc(sizeof(fiov[0]) * count);
++    fiov = g_try_new(struct fuse_ioctl_iovec, count);
+     if (!fiov) {
+         return NULL;
+     }
+@@ -586,8 +585,8 @@ int fuse_reply_ioctl_retry(fuse_req_t req, const struct iovec *in_iov,
+                            size_t out_count)
+ {
+     struct fuse_ioctl_out arg;
+-    struct fuse_ioctl_iovec *in_fiov = NULL;
+-    struct fuse_ioctl_iovec *out_fiov = NULL;
++    g_autofree struct fuse_ioctl_iovec *in_fiov = NULL;
++    g_autofree struct fuse_ioctl_iovec *out_fiov = NULL;
+     struct iovec iov[4];
+     size_t count = 1;
+     int res;
+@@ -603,13 +602,14 @@ int fuse_reply_ioctl_retry(fuse_req_t req, const struct iovec *in_iov,
+     /* Can't handle non-compat 64bit ioctls on 32bit */
+     if (sizeof(void *) == 4 && req->ioctl_64bit) {
+         res = fuse_reply_err(req, EINVAL);
+-        goto out;
++        return res;
+     }
+ 
+     if (in_count) {
+         in_fiov = fuse_ioctl_iovec_copy(in_iov, in_count);
+         if (!in_fiov) {
+-            goto enomem;
++            res = fuse_reply_err(req, ENOMEM);
++            return res;
+         }
+ 
+         iov[count].iov_base = (void *)in_fiov;
+@@ -619,7 +619,8 @@ int fuse_reply_ioctl_retry(fuse_req_t req, const struct iovec *in_iov,
+     if (out_count) {
+         out_fiov = fuse_ioctl_iovec_copy(out_iov, out_count);
+         if (!out_fiov) {
+-            goto enomem;
++            res = fuse_reply_err(req, ENOMEM);
++            return res;
+         }
+ 
+         iov[count].iov_base = (void *)out_fiov;
+@@ -628,15 +629,8 @@ int fuse_reply_ioctl_retry(fuse_req_t req, const struct iovec *in_iov,
+     }
+ 
+     res = send_reply_iov(req, 0, iov, count);
+-out:
+-    free(in_fiov);
+-    free(out_fiov);
+ 
+     return res;
+-
+-enomem:
+-    res = fuse_reply_err(req, ENOMEM);
+-    goto out;
  }
  
- void fuse_free_req(fuse_req_t req)
-@@ -130,7 +130,7 @@ static struct fuse_req *fuse_ll_alloc_req(struct fuse_session *se)
+ int fuse_reply_ioctl(fuse_req_t req, int result, const void *buf, size_t size)
+@@ -663,11 +657,11 @@ int fuse_reply_ioctl(fuse_req_t req, int result, const void *buf, size_t size)
+ int fuse_reply_ioctl_iov(fuse_req_t req, int result, const struct iovec *iov,
+                          int count)
  {
-     struct fuse_req *req;
+-    struct iovec *padded_iov;
++    g_autofree struct iovec *padded_iov = NULL;
+     struct fuse_ioctl_out arg;
+     int res;
  
--    req = (struct fuse_req *)calloc(1, sizeof(struct fuse_req));
-+    req = g_try_new0(struct fuse_req, 1);
-     if (req == NULL) {
-         fuse_log(FUSE_LOG_ERR, "fuse: failed to allocate request\n");
-     } else {
-@@ -1684,7 +1684,7 @@ static struct fuse_req *check_interrupt(struct fuse_session *se,
-         if (curr->u.i.unique == req->unique) {
-             req->interrupted = 1;
-             list_del_req(curr);
--            free(curr);
-+            g_free(curr);
-             return NULL;
-         }
+-    padded_iov = malloc((count + 2) * sizeof(struct iovec));
++    padded_iov = g_try_new(struct iovec, count + 2);
+     if (padded_iov == NULL) {
+         return fuse_reply_err(req, ENOMEM);
      }
+@@ -680,7 +674,6 @@ int fuse_reply_ioctl_iov(fuse_req_t req, int result, const struct iovec *iov,
+     memcpy(&padded_iov[2], iov, count * sizeof(struct iovec));
+ 
+     res = send_reply_iov(req, 0, padded_iov, count + 2);
+-    free(padded_iov);
+ 
+     return res;
+ }
+diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+index 6dd73c9b72..a3d37ab696 100644
+--- a/tools/virtiofsd/fuse_virtio.c
++++ b/tools/virtiofsd/fuse_virtio.c
+@@ -331,6 +331,7 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+     VuVirtq *q = vu_get_queue(dev, qi->qidx);
+     VuVirtqElement *elem = &req->elem;
+     int ret = 0;
++    g_autofree struct iovec *in_sg_cpy = NULL;
+ 
+     assert(count >= 1);
+     assert(iov[0].iov_len >= sizeof(struct fuse_out_header));
+@@ -384,8 +385,7 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+      * Build a copy of the the in_sg iov so we can skip bits in it,
+      * including changing the offsets
+      */
+-    struct iovec *in_sg_cpy = calloc(sizeof(struct iovec), in_num);
+-    assert(in_sg_cpy);
++    in_sg_cpy = g_new(struct iovec, in_num);
+     memcpy(in_sg_cpy, in_sg, sizeof(struct iovec) * in_num);
+     /* These get updated as we skip */
+     struct iovec *in_sg_ptr = in_sg_cpy;
+@@ -423,7 +423,6 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+             ret = errno;
+             fuse_log(FUSE_LOG_DEBUG, "%s: preadv failed (%m) len=%zd\n",
+                      __func__, len);
+-            free(in_sg_cpy);
+             goto err;
+         }
+         fuse_log(FUSE_LOG_DEBUG, "%s: preadv ret=%d len=%zd\n", __func__,
+@@ -447,13 +446,11 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+         if (ret != len) {
+             fuse_log(FUSE_LOG_DEBUG, "%s: ret!=len\n", __func__);
+             ret = EIO;
+-            free(in_sg_cpy);
+             goto err;
+         }
+         in_sg_left -= ret;
+         len -= ret;
+     } while (in_sg_left);
+-    free(in_sg_cpy);
+ 
+     /* Need to fix out->len on EOF */
+     if (len) {
 -- 
 2.31.1
 

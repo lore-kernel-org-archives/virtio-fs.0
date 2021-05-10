@@ -1,17 +1,12 @@
-Date: Mon, 10 May 2021 11:23:24 -0400
+Date: Mon, 10 May 2021 11:25:06 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210510152324.GB150402@horse>
-References: <20210428110100.27757-1-dgilbert@redhat.com>
-	<20210428110100.27757-27-dgilbert@redhat.com>
-	<YJQNIPaFCJlG7ZKc@stefanha-x1.localdomain>
-	<20210506160223.GA277745@redhat.com>
-	<YJj3RSxXKZHxmiKu@stefanha-x1.localdomain>
+Message-ID: <20210510152506.GC150402@horse>
+References: <20210507221527.699516-1-ckuehl@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <YJj3RSxXKZHxmiKu@stefanha-x1.localdomain>
+In-Reply-To: <20210507221527.699516-1-ckuehl@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH v3 26/26] virtiofsd: Ask qemu to drop
- CAP_FSETID if client asked for it
+Subject: Re: [Virtio-fs] [PATCH] virtiofs: Enable multiple request queues
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,97 +15,119 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Connor Kuehl <ckuehl@redhat.com>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
 
-On Mon, May 10, 2021 at 10:05:09AM +0100, Stefan Hajnoczi wrote:
-> On Thu, May 06, 2021 at 12:02:23PM -0400, Vivek Goyal wrote:
-> > On Thu, May 06, 2021 at 04:37:04PM +0100, Stefan Hajnoczi wrote:
-> > > On Wed, Apr 28, 2021 at 12:01:00PM +0100, Dr. David Alan Gilbert (git) wrote:
-> > > > From: Vivek Goyal <vgoyal@redhat.com>
-> > > > 
-> > > > If qemu guest asked to drop CAP_FSETID upon write, send that info
-> > > > to qemu in SLAVE_FS_IO message so that qemu can drop capability
-> > > > before WRITE. This is to make sure that any setuid bit is killed
-> > > > on fd (if there is one set).
-> > > > 
-> > > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > > 
-> > > I'm not sure if the QEMU FSETID patches make sense. QEMU shouldn't be
-> > > running with FSETID because QEMU is untrusted. FSETGID would allow QEMU
-> > > to create setgid files, thereby potentially allowing an attacker to gain
-> > > any GID.
-> > 
-> > Sure, its not recommended to run QEMU as root, but we don't block that
-> > either and I do regularly test with qemu running as root.
-> > 
-> > > 
-> > > I think it's better not to implement QEMU FSETID functionality at all
-> > > and to handle it another way.
-> > 
-> > One way could be that virtiofsd tries to clear setuid bit after I/O
-> > has finished. But that will be non-atomic operation and it is filled
-> > with perils as it requires virtiofsd to know what all kernel will
-> > do if this write has been done with CAP_FSETID dropped.
-> > 
-> > > In the worst case I/O requests should just
-> > > fail, it seems like a rare case anyway:
-> > 
-> > Is there a way for virtiofsd to know if qemu is running with CAP_FSETID
-> > or not. If there is one, it might be reasonable to error out. If we
-> > don't know, then we can't fail all the operations.
-> > 
-> > > I/O to a setuid/setgid file with
-> > > a memory buffer that is not mapped in virtiofsd.
-> > 
-> > With DAX it is easily triggerable. User has to append to a setuid file
-> > in virtiofs and this path will trigger.
-> > 
-> > I am fine with not supporting this patch but will also need a reaosonable
-> > alternative solution.
-> 
-> One way to avoid this problem is by introducing DMA read/write functions
-> into the vhost-user protocol that can be used by all device types, not
-> just virtio-fs.
-> 
-> Today virtio-fs uses the IO slave request when it cannot access a region
-> of guest memory. It sends the file descriptor to QEMU and QEMU performs
-> the pread(2)/pwrite(2) on behalf of virtiofsd.
-> 
-> I mentioned in the past that this solution is over-specialized. It
-> doesn't solve the larger problem that vhost-user processes do not have
-> full access to the guest memory space (e.g. DAX window).
-> 
-> Instead of sending file I/O requests over to QEMU, the vhost-user
-> protocol should offer DMA read/write requests so any vhost-user process
-> can access the guest memory space where vhost's shared memory mechanism
-> is insufficient.
-> 
-> Here is how it would work:
-> 
-> 1. Drop the IO slave request, replace it with DMA read/write slave
->    requests.
-> 
->    Note that these new requests can also be used in environments where
->    maximum vIOMMU isolation is needed for security reasons and sharing
->    all of guest RAM with the vhost-user process is considered
->    unacceptable.
-> 
-> 2. When virtqueue buffer mapping fails, send DMA read/write slave
->    requests to transfer the data from/to QEMU. virtiofsd calls
->    pread(2)/pwrite(2) itself with virtiofsd's Linux capabilities.
+On Fri, May 07, 2021 at 03:15:27PM -0700, Connor Kuehl wrote:
+> Distribute requests across the multiqueue complex automatically based
+> on the IRQ affinity.
 
-Can you elaborate a bit more how will this new DMA read/write vhost-user
-commands can be implemented. I am assuming its not a real DMA and just
-sort of emulation of DMA. Effectively we have two processes and one
-process needs to read/write to/from address space of other process.
+Hi Connor,
 
-We were also wondering if we can make use of process_vm_readv()
-and process_vm_write() syscalls to achieve this. But this atleast
-requires virtiofsd to be more priviliged than qemu and also virtiofsd
-needs to know where DAX mapping window is. We briefly discussed this here.
+Thanks for the patch. I will look into it and also test it.
 
-https://lore.kernel.org/qemu-devel/20210421200746.GH1579961@redhat.com/
+How did you test it? Did you modify vitiofsd to support multiqueue. Did
+you also run some performance numbers. Does it provide better/worse
+performance as compared to single queue.
 
+Thanks
 Vivek
+
+> 
+> Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
+> Signed-off-by: Connor Kuehl <ckuehl@redhat.com>
+> ---
+>  fs/fuse/virtio_fs.c | 30 ++++++++++++++++++++++++------
+>  1 file changed, 24 insertions(+), 6 deletions(-)
+> 
+> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> index bcb8a02e2d8b..dcdc8b7b1ad5 100644
+> --- a/fs/fuse/virtio_fs.c
+> +++ b/fs/fuse/virtio_fs.c
+> @@ -30,6 +30,10 @@
+>  static DEFINE_MUTEX(virtio_fs_mutex);
+>  static LIST_HEAD(virtio_fs_instances);
+>  
+> +struct virtio_fs_vq;
+> +
+> +DEFINE_PER_CPU(struct virtio_fs_vq *, this_cpu_fsvq);
+> +
+>  enum {
+>  	VQ_HIPRIO,
+>  	VQ_REQUEST
+> @@ -673,6 +677,7 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+>  	struct virtqueue **vqs;
+>  	vq_callback_t **callbacks;
+>  	const char **names;
+> +	struct irq_affinity desc = { .pre_vectors = 1, .nr_sets = 1, };
+>  	unsigned int i;
+>  	int ret = 0;
+>  
+> @@ -681,6 +686,9 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+>  	if (fs->num_request_queues == 0)
+>  		return -EINVAL;
+>  
+> +	fs->num_request_queues = min_t(unsigned int, nr_cpu_ids,
+> +				       fs->num_request_queues);
+> +
+>  	fs->nvqs = VQ_REQUEST + fs->num_request_queues;
+>  	fs->vqs = kcalloc(fs->nvqs, sizeof(fs->vqs[VQ_HIPRIO]), GFP_KERNEL);
+>  	if (!fs->vqs)
+> @@ -710,12 +718,24 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+>  		names[i] = fs->vqs[i].name;
+>  	}
+>  
+> -	ret = virtio_find_vqs(vdev, fs->nvqs, vqs, callbacks, names, NULL);
+> +	ret = virtio_find_vqs(vdev, fs->nvqs, vqs, callbacks, names, &desc);
+>  	if (ret < 0)
+>  		goto out;
+>  
+> -	for (i = 0; i < fs->nvqs; i++)
+> +	for (i = 0; i < fs->nvqs; i++) {
+> +		const struct cpumask *mask;
+> +		unsigned int cpu;
+> +
+>  		fs->vqs[i].vq = vqs[i];
+> +		if (i == VQ_HIPRIO)
+> +			continue;
+> +
+> +		mask = vdev->config->get_vq_affinity(vdev, i);
+> +		for_each_cpu(cpu, mask) {
+> +			struct virtio_fs_vq **cpu_vq = per_cpu_ptr(&this_cpu_fsvq, cpu);
+> +			*cpu_vq = &fs->vqs[i];
+> +		}
+> +	}
+>  
+>  	virtio_fs_start_all_queues(fs);
+>  out:
+> @@ -877,8 +897,6 @@ static int virtio_fs_probe(struct virtio_device *vdev)
+>  	if (ret < 0)
+>  		goto out;
+>  
+> -	/* TODO vq affinity */
+> -
+>  	ret = virtio_fs_setup_dax(vdev, fs);
+>  	if (ret < 0)
+>  		goto out_vqs;
+> @@ -1225,7 +1243,6 @@ static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
+>  static void virtio_fs_wake_pending_and_unlock(struct fuse_iqueue *fiq)
+>  __releases(fiq->lock)
+>  {
+> -	unsigned int queue_id = VQ_REQUEST; /* TODO multiqueue */
+>  	struct virtio_fs *fs;
+>  	struct fuse_req *req;
+>  	struct virtio_fs_vq *fsvq;
+> @@ -1245,7 +1262,8 @@ __releases(fiq->lock)
+>  		 req->in.h.nodeid, req->in.h.len,
+>  		 fuse_len_args(req->args->out_numargs, req->args->out_args));
+>  
+> -	fsvq = &fs->vqs[queue_id];
+> +	fsvq = this_cpu_read(this_cpu_fsvq);
+> +
+>  	ret = virtio_fs_enqueue_req(fsvq, req, false);
+>  	if (ret < 0) {
+>  		if (ret == -ENOMEM || ret == -ENOSPC) {
+> -- 
+> 2.30.2
+> 
 

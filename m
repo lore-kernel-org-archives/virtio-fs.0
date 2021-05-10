@@ -1,13 +1,14 @@
-Date: Mon, 10 May 2021 17:58:35 +0200
-From: Greg Kurz <groug@kaod.org>
-Message-ID: <20210510175835.3ee2d4cf@bahia.lan>
-In-Reply-To: <20210510155539.998747-1-groug@kaod.org>
-References: <20210510155539.998747-1-groug@kaod.org>
+References: <20210507221527.699516-1-ckuehl@redhat.com>
+	<20210510152506.GC150402@horse>
+From: Connor Kuehl <ckuehl@redhat.com>
+Message-ID: <ddbc96c7-655c-e563-e26e-6550a0cdd7c1@redhat.com>
+Date: Mon, 10 May 2021 11:15:21 -0500
 MIME-Version: 1.0
-Content-Type: text/plain; charset=US-ASCII
+In-Reply-To: <20210510152506.GC150402@horse>
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
 Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [for-6.1 v3 0/3] virtiofsd: Add support for
-	FUSE_SYNCFS request
+Subject: Re: [Virtio-fs] [PATCH] virtiofs: Enable multiple request queues
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,61 +17,172 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: kvm@vger.kernel.org, "Michael S.
-	Tsirkin" <mst@redhat.com>, Cornelia Huck <cohuck@redhat.com>, virtio-fs@redhat.com, Szeredi <miklos@szeredi.hu>, Miklos, Paolo Bonzini <pbonzini@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org
 
-Of course, I forgot to drop the for-6.1 prefix in git publish...
+On 5/10/21 10:25 AM, Vivek Goyal wrote:
+> On Fri, May 07, 2021 at 03:15:27PM -0700, Connor Kuehl wrote:
+>> Distribute requests across the multiqueue complex automatically based
+>> on the IRQ affinity.
+> 
+> Hi Connor,
+> 
+> Thanks for the patch. I will look into it and also test it.
+> 
+> How did you test it? Did you modify vitiofsd to support multiqueue. Did
+> you also run some performance numbers. Does it provide better/worse
+> performance as compared to single queue.
 
-On Mon, 10 May 2021 17:55:36 +0200
-Greg Kurz <groug@kaod.org> wrote:
+Thanks, Vivek! I need to NACK this version of the patch for inclusion
+though since I think the way I did per-CPU state will not work for
+multiple virtio-fs mounts because it will be overwritten with each new
+mount, but for testing purposes this should be OK with just one mount.
 
-> FUSE_SYNCFS allows the client to flush the host page cache.
-> This isn't available in upstream linux yet, but the following
-> tree can be used to test:
-> 
-> https://gitlab.com/gkurz/linux/-/tree/virtio-fs-sync
-> 
-> v3: - track submounts and do per-submount syncfs() (Vivek)
->     - based on new version of FUSE_SYNCFS (still not upstream)
->       https://listman.redhat.com/archives/virtio-fs/2021-May/msg00025.html
-> 
-> v2: - based on new version of FUSE_SYNCFS
->       https://listman.redhat.com/archives/virtio-fs/2021-April/msg00166.html
->     - propagate syncfs() errors to client (Vivek)
-> 
-> Greg Kurz (3):
->   Update linux headers to 5.13-rc1 + FUSE_SYNCFS
->   virtiofsd: Track mounts
->   virtiofsd: Add support for FUSE_SYNCFS request
-> 
->  .../infiniband/hw/vmw_pvrdma/pvrdma_verbs.h   |  35 -
->  include/standard-headers/drm/drm_fourcc.h     |  23 +-
->  include/standard-headers/linux/ethtool.h      | 109 ++-
->  include/standard-headers/linux/fuse.h         |  27 +-
->  include/standard-headers/linux/input.h        |   2 +-
->  include/standard-headers/linux/virtio_ids.h   |   2 +
->  .../standard-headers/rdma/vmw_pvrdma-abi.h    |   7 +
->  linux-headers/asm-generic/unistd.h            |  13 +-
->  linux-headers/asm-mips/unistd_n32.h           | 752 +++++++--------
->  linux-headers/asm-mips/unistd_n64.h           | 704 +++++++-------
->  linux-headers/asm-mips/unistd_o32.h           | 844 ++++++++---------
->  linux-headers/asm-powerpc/kvm.h               |   2 +
->  linux-headers/asm-powerpc/unistd_32.h         | 857 +++++++++---------
->  linux-headers/asm-powerpc/unistd_64.h         | 801 ++++++++--------
->  linux-headers/asm-s390/unistd_32.h            |   5 +
->  linux-headers/asm-s390/unistd_64.h            |   5 +
->  linux-headers/asm-x86/kvm.h                   |   1 +
->  linux-headers/asm-x86/unistd_32.h             |   5 +
->  linux-headers/asm-x86/unistd_64.h             |   5 +
->  linux-headers/asm-x86/unistd_x32.h            |   5 +
->  linux-headers/linux/kvm.h                     | 134 +++
->  linux-headers/linux/userfaultfd.h             |  36 +-
->  linux-headers/linux/vfio.h                    |  35 +
->  tools/virtiofsd/fuse_lowlevel.c               |  11 +
->  tools/virtiofsd/fuse_lowlevel.h               |  12 +
->  tools/virtiofsd/passthrough_ll.c              |  80 +-
->  tools/virtiofsd/passthrough_seccomp.c         |   1 +
->  27 files changed, 2465 insertions(+), 2048 deletions(-)
-> 
+I need to do more benchmarking on this.
+
+I had to hack multiqueue support into virtiofsd, which runs against the
+warning in the virtiofsd source code that instructs people to *not*
+enable multiqueue due to thread-safety concerns. I didn't audit
+virtiofsd for correctness, so I also worry this has the potential of
+affecting benchmarks if there are races.
+
+For testing, QEMU needs to be invoked with `num-request-queues` like
+this:
+
+	-device vhost-user-fs-pci,chardev=char0,tag=myfs,num-request-queues=2 
+
+And obviously you can choose any value >= 1 for num-request-queues.
+
+and I also made a quick-and-dirty hack to let me pass in the number of
+total queues to virtiofsd on the command line:
+
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index 58e32fc963..cf8f132efd 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -2565,9 +2565,9 @@ out1:
+     return NULL;
+ }
+ 
+-int fuse_session_mount(struct fuse_session *se)
++int fuse_session_mount(struct fuse_session *se, unsigned int num_queues)
+ {
+-    return virtio_session_mount(se);
++    return virtio_session_mount(se, num_queues);
+ }
+ 
+ int fuse_session_fd(struct fuse_session *se)
+diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
+index 3bf786b034..50bf86113d 100644
+--- a/tools/virtiofsd/fuse_lowlevel.h
++++ b/tools/virtiofsd/fuse_lowlevel.h
+@@ -1842,7 +1842,7 @@ struct fuse_session *fuse_session_new(struct fuse_args *args,
+  *
+  * @return 0 on success, -1 on failure.
+  **/
+-int fuse_session_mount(struct fuse_session *se);
++int fuse_session_mount(struct fuse_session *se, unsigned int num_queues);
+ 
+ /**
+  * Enter a single threaded, blocking event loop.
+diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+index 3e13997406..8622c3dce6 100644
+--- a/tools/virtiofsd/fuse_virtio.c
++++ b/tools/virtiofsd/fuse_virtio.c
+@@ -747,20 +747,6 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
+              started);
+     assert(qidx >= 0);
+ 
+-    /*
+-     * Ignore additional request queues for now.  passthrough_ll.c must be
+-     * audited for thread-safety issues first.  It was written with a
+-     * well-behaved client in mind and may not protect against all types of
+-     * races yet.
+-     */
+-    if (qidx > 1) {
+-        fuse_log(FUSE_LOG_ERR,
+-                 "%s: multiple request queues not yet implemented, please only "
+-                 "configure 1 request queue\n",
+-                 __func__);
+-        exit(EXIT_FAILURE);
+-    }
+-
+     if (started) {
+         /* Fire up a thread to watch this queue */
+         if (qidx >= vud->nqueues) {
+@@ -997,7 +983,7 @@ static int fv_create_listen_socket(struct fuse_session *se)
+     return 0;
+ }
+ 
+-int virtio_session_mount(struct fuse_session *se)
++int virtio_session_mount(struct fuse_session *se, unsigned int num_queues)
+ {
+     int ret;
+ 
+@@ -1048,8 +1034,8 @@ int virtio_session_mount(struct fuse_session *se)
+     se->vu_socketfd = data_sock;
+     se->virtio_dev->se = se;
+     pthread_rwlock_init(&se->virtio_dev->vu_dispatch_rwlock, NULL);
+-    if (!vu_init(&se->virtio_dev->dev, 2, se->vu_socketfd, fv_panic, NULL,
+-                 fv_set_watch, fv_remove_watch, &fv_iface)) {
++    if (!vu_init(&se->virtio_dev->dev, num_queues, se->vu_socketfd,
++		 fv_panic, NULL, fv_set_watch, fv_remove_watch, &fv_iface)) {
+         fuse_log(FUSE_LOG_ERR, "%s: vu_init failed\n", __func__);
+         return -1;
+     }
+diff --git a/tools/virtiofsd/fuse_virtio.h b/tools/virtiofsd/fuse_virtio.h
+index 111684032c..a0e78b9b84 100644
+--- a/tools/virtiofsd/fuse_virtio.h
++++ b/tools/virtiofsd/fuse_virtio.h
+@@ -18,7 +18,7 @@
+ 
+ struct fuse_session;
+ 
+-int virtio_session_mount(struct fuse_session *se);
++int virtio_session_mount(struct fuse_session *se, unsigned int num_queues);
+ void virtio_session_close(struct fuse_session *se);
+ int virtio_loop(struct fuse_session *se);
+ 
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 1553d2ef45..9fd4e34980 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -161,6 +161,7 @@ struct lo_data {
+     int allow_direct_io;
+     int announce_submounts;
+     bool use_statx;
++    int num_vqs;
+     struct lo_inode root;
+     GHashTable *inodes; /* protected by lo->mutex */
+     struct lo_map ino_map; /* protected by lo->mutex */
+@@ -204,6 +205,7 @@ static const struct fuse_opt lo_opts[] = {
+     { "announce_submounts", offsetof(struct lo_data, announce_submounts), 1 },
+     { "killpriv_v2", offsetof(struct lo_data, user_killpriv_v2), 1 },
+     { "no_killpriv_v2", offsetof(struct lo_data, user_killpriv_v2), 0 },
++    { "num_queues=%d", offsetof(struct lo_data, num_vqs), 2 },
+     FUSE_OPT_END
+ };
+ static bool use_syslog = false;
+@@ -3848,6 +3850,12 @@ int main(int argc, char *argv[])
+         exit(1);
+     }
+ 
++    if (lo.num_vqs < 2) {
++        fuse_log(FUSE_LOG_ERR, "num_queues must be at least 2 (got %d)\n",
++                 lo.num_vqs);
++        exit(1);
++    }
++
+     lo.use_statx = true;
+ 
+     se = fuse_session_new(&args, &lo_oper, sizeof(lo_oper), &lo);
+@@ -3859,7 +3867,7 @@ int main(int argc, char *argv[])
+         goto err_out2;
+     }
+ 
+-    if (fuse_session_mount(se) != 0) {
++    if (fuse_session_mount(se, lo.num_vqs) != 0) {
+         goto err_out3;
+     }
+ 
 

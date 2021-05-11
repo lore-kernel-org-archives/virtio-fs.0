@@ -1,13 +1,13 @@
-From: =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>
-Date: Wed,  5 May 2021 11:36:59 +0100
-Message-Id: <20210505103702.521457-5-berrange@redhat.com>
-In-Reply-To: <20210505103702.521457-1-berrange@redhat.com>
-References: <20210505103702.521457-1-berrange@redhat.com>
+Date: Tue, 11 May 2021 11:23:12 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <YJpbEMePhQ88EWWR@stefanha-x1.localdomain>
+References: <20210507221527.699516-1-ckuehl@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 4/7] usb/dev-mtp: use GDateTime for formatting
-	timestamp for objects
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="A7V9ozvfxmSnLtjw"
+Content-Disposition: inline
+In-Reply-To: <20210507221527.699516-1-ckuehl@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofs: Enable multiple request queues
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,39 +16,43 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: Kevin Wolf <kwolf@redhat.com>, Jiri Pirko <jiri@resnulli.us>, qemu-block@nongnu.org, Juan Quintela <quintela@redhat.com>, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowang@redhat.com>, Laurent Vivier <laurent@vivier.eu>, Max Reitz <mreitz@redhat.com>, virtio-fs@redhat.com, Gerd Hoffmann <kraxel@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Brad Smith <brad@comstyle.com>
+To: Connor Kuehl <ckuehl@redhat.com>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
 
-The GDateTime APIs provided by GLib avoid portability pitfalls, such
-as some platforms where 'struct timeval.tv_sec' field is still 'long'
-instead of 'time_t'. When combined with automatic cleanup, GDateTime
-often results in simpler code too.
 
-Signed-off-by: Daniel P. Berrangé <berrange@redhat.com>
----
- hw/usb/dev-mtp.c | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+--A7V9ozvfxmSnLtjw
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-diff --git a/hw/usb/dev-mtp.c b/hw/usb/dev-mtp.c
-index bbb8274344..a71fcc326d 100644
---- a/hw/usb/dev-mtp.c
-+++ b/hw/usb/dev-mtp.c
-@@ -772,12 +772,9 @@ static void usb_mtp_add_str(MTPData *data, const char *str)
- 
- static void usb_mtp_add_time(MTPData *data, time_t time)
- {
--    char buf[16];
--    struct tm tm;
--
--    gmtime_r(&time, &tm);
--    strftime(buf, sizeof(buf), "%Y%m%dT%H%M%S", &tm);
--    usb_mtp_add_str(data, buf);
-+    g_autoptr(GDateTime) then = g_date_time_new_from_unix_utc(time);
-+    g_autofree char *thenstr = g_date_time_format(then, "%Y%m%dT%H%M%S");
-+    usb_mtp_add_str(data, thenstr);
- }
- 
- /* ----------------------------------------------------------------------- */
--- 
-2.31.1
+On Fri, May 07, 2021 at 05:15:27PM -0500, Connor Kuehl wrote:
+> @@ -1245,7 +1262,8 @@ __releases(fiq->lock)
+>  		 req->in.h.nodeid, req->in.h.len,
+>  		 fuse_len_args(req->args->out_numargs, req->args->out_args));
+> =20
+> -	fsvq =3D &fs->vqs[queue_id];
+> +	fsvq =3D this_cpu_read(this_cpu_fsvq);
+
+Please check how CPU hotplug affects this patch. If the current CPU
+doesn't have a vq because it was hotplugged, then it may be necessary to
+pick another vq.
+
+Stefan
+
+--A7V9ozvfxmSnLtjw
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmCaWxAACgkQnKSrs4Gr
+c8gaYQf/ZbGTh/PBCw1PB2OJDsg9sJ/qLNSeJAXsrq1soajsgMZNL5qaCxFxca96
+7Ct1XtEelrvOEivymGbnjYFnL3kDuTeYhPzlyPBwG9heVxBReVxmKaC18hm5GwKk
+Qd481XSuaAF2gVk1B55pgfK4NwX/smvCgHpWvkP8vakZttXFUgMYcXM7Mi7V9XcJ
+4f3EWA0m0iaWAkVJY2R+luPJtvc403igrv4QpUrw0kgn7iYw424W9O819g+Na4dO
+8QdFtUmFHQsgwNVy6hKMnbhc7V0m3Hdwr2JVNXb2cd+yXqwVX+8xP3KeZOvBb5gX
+hUibZHl+yf0GfluxoJUfjT8JXVtBDg==
+=VnK4
+-----END PGP SIGNATURE-----
+
+--A7V9ozvfxmSnLtjw--
 

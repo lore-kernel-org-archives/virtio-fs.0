@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue, 11 May 2021 17:37:31 -0400
-Message-Id: <20210511213736.281016-3-vgoyal@redhat.com>
+Date: Tue, 11 May 2021 17:37:32 -0400
+Message-Id: <20210511213736.281016-4-vgoyal@redhat.com>
 In-Reply-To: <20210511213736.281016-1-vgoyal@redhat.com>
 References: <20210511213736.281016-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 2/7] virtiofsd: Get rid of unreachable code in
-	read
+Subject: [Virtio-fs] [PATCH 3/7] virtiofsd: Use iov_discard_front() to skip
+	bytes
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,37 +18,46 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: vgoyal@redhat.com
 
-pvreadv() can return following.
-
-- error
-- 0 in case of EOF
-- short read
-
-We seem to handle all the cases already. We are retrying read in case
-of short read. So another check for short read seems like dead code.
-Get rid of it.
+There are places where we need to skip few bytes from front of the iovec
+array. We have our own custom code for that. Looks like iov_discard_front()
+can do same thing. So use that helper instead.
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- tools/virtiofsd/fuse_virtio.c | 5 -----
- 1 file changed, 5 deletions(-)
+ tools/virtiofsd/fuse_virtio.c | 14 +++-----------
+ 1 file changed, 3 insertions(+), 11 deletions(-)
 
 diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-index 32914f7e95..5dcd08fccb 100644
+index 5dcd08fccb..d56b225800 100644
 --- a/tools/virtiofsd/fuse_virtio.c
 +++ b/tools/virtiofsd/fuse_virtio.c
-@@ -446,11 +446,6 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
-                      in_sg_left);
-             break;
+@@ -389,23 +389,15 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+     memcpy(in_sg_cpy, in_sg, sizeof(struct iovec) * in_num);
+     /* These get updated as we skip */
+     struct iovec *in_sg_ptr = in_sg_cpy;
+-    int in_sg_cpy_count = in_num;
++    unsigned int in_sg_cpy_count = in_num;
+ 
+     /* skip over parts of in_sg that contained the header iov */
+     size_t skip_size = iov_len;
+ 
+     size_t in_sg_left = 0;
+     do {
+-        while (skip_size != 0 && in_sg_cpy_count) {
+-            if (skip_size >= in_sg_ptr[0].iov_len) {
+-                skip_size -= in_sg_ptr[0].iov_len;
+-                in_sg_ptr++;
+-                in_sg_cpy_count--;
+-            } else {
+-                in_sg_ptr[0].iov_len -= skip_size;
+-                in_sg_ptr[0].iov_base += skip_size;
+-                break;
+-            }
++        if (skip_size != 0) {
++	    iov_discard_front(&in_sg_ptr, &in_sg_cpy_count, skip_size);
          }
--        if (ret != len) {
--            fuse_log(FUSE_LOG_DEBUG, "%s: ret!=len\n", __func__);
--            ret = EIO;
--            goto err;
--        }
-         in_sg_left -= ret;
-         len -= ret;
-     } while (in_sg_left);
+ 
+         int i;
 -- 
 2.25.4
 

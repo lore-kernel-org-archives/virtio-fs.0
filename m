@@ -1,13 +1,13 @@
-Date: Tue, 11 May 2021 11:23:12 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YJpbEMePhQ88EWWR@stefanha-x1.localdomain>
-References: <20210507221527.699516-1-ckuehl@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="A7V9ozvfxmSnLtjw"
-Content-Disposition: inline
-In-Reply-To: <20210507221527.699516-1-ckuehl@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofs: Enable multiple request queues
+References: <20210510155539.998747-1-groug@kaod.org>
+	<20210510155539.998747-4-groug@kaod.org>
+In-Reply-To: <20210510155539.998747-4-groug@kaod.org>
+From: Miklos Szeredi <mszeredi@redhat.com>
+Date: Tue, 11 May 2021 14:31:14 +0200
+Message-ID: <CAOssrKfbzCnpHma-=tTRvwUecy_9RtJADzMb_uQ1yzzJStz1PA@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [for-6.1 v3 3/3] virtiofsd: Add support for
+ FUSE_SYNCFS request
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,43 +16,22 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Connor Kuehl <ckuehl@redhat.com>
-Cc: Miklos Szeredi <miklos@szeredi.hu>, linux-kernel@vger.kernel.org, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
+To: Greg Kurz <groug@kaod.org>
+Cc: kvm@vger.kernel.org, Miklos Szeredi <miklos@szeredi.hu>, Cornelia Huck <cohuck@redhat.com>, QEMU Developers <qemu-devel@nongnu.org>, virtio-fs-list <virtio-fs@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
+On Mon, May 10, 2021 at 5:55 PM Greg Kurz <groug@kaod.org> wrote:
+>
+> Honor the expected behavior of syncfs() to synchronously flush all data
+> and metadata on linux systems. Simply loop on all known submounts and
+> call syncfs() on them.
 
---A7V9ozvfxmSnLtjw
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Why not pass the submount's root to the server, so it can do just one
+targeted syncfs?
 
-On Fri, May 07, 2021 at 05:15:27PM -0500, Connor Kuehl wrote:
-> @@ -1245,7 +1262,8 @@ __releases(fiq->lock)
->  		 req->in.h.nodeid, req->in.h.len,
->  		 fuse_len_args(req->args->out_numargs, req->args->out_args));
-> =20
-> -	fsvq =3D &fs->vqs[queue_id];
-> +	fsvq =3D this_cpu_read(this_cpu_fsvq);
+E.g. somehting like this in fuse_sync_fs():
 
-Please check how CPU hotplug affects this patch. If the current CPU
-doesn't have a vq because it was hotplugged, then it may be necessary to
-pick another vq.
+args.nodeid = get_node_id(sb->s_root->d_inode);
 
-Stefan
-
---A7V9ozvfxmSnLtjw
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmCaWxAACgkQnKSrs4Gr
-c8gaYQf/ZbGTh/PBCw1PB2OJDsg9sJ/qLNSeJAXsrq1soajsgMZNL5qaCxFxca96
-7Ct1XtEelrvOEivymGbnjYFnL3kDuTeYhPzlyPBwG9heVxBReVxmKaC18hm5GwKk
-Qd481XSuaAF2gVk1B55pgfK4NwX/smvCgHpWvkP8vakZttXFUgMYcXM7Mi7V9XcJ
-4f3EWA0m0iaWAkVJY2R+luPJtvc403igrv4QpUrw0kgn7iYw424W9O819g+Na4dO
-8QdFtUmFHQsgwNVy6hKMnbhc7V0m3Hdwr2JVNXb2cd+yXqwVX+8xP3KeZOvBb5gX
-hUibZHl+yf0GfluxoJUfjT8JXVtBDg==
-=VnK4
------END PGP SIGNATURE-----
-
---A7V9ozvfxmSnLtjw--
+Thanks,
+Miklos
 

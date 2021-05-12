@@ -1,14 +1,15 @@
-References: <20210512125544.9536-1-mreitz@redhat.com>
-From: Max Reitz <mreitz@redhat.com>
-Message-ID: <f8e15bb3-acf4-5260-f8c5-6425c4d21bba@redhat.com>
-Date: Wed, 12 May 2021 16:37:49 +0200
+Date: Thu, 13 May 2021 06:36:37 +0800
+From: Liu Bo <bo.liu@linux.alibaba.com>
+Message-ID: <20210512223637.GA6241@rsjd01523.et2sqa>
+References: <20210215095410.85607-1-stefanha@redhat.com>
+	<YJo+wCSffIZAx9aM@stefanha-x1.localdomain>
 MIME-Version: 1.0
-In-Reply-To: <20210512125544.9536-1-mreitz@redhat.com>
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Language: en-US
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] Fwd: [PATCH 0/3] virtiofsd: Find original inode ID of
-	mount points
+In-Reply-To: <YJo+wCSffIZAx9aM@stefanha-x1.localdomain>
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: Re: [Virtio-fs] [virtio-dev] [PATCH v2 0/2] virtio-fs:
+	add	notification queue
+Reply-To: bo.liu@linux.alibaba.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,82 +18,61 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs-list <virtio-fs@redhat.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, virtio-dev@lists.oasis-open.org, vgoyal@redhat.com
 
-Sorry, forgot to CC the virtio-fs list.  I hope forwarding the cover 
-letter is enough...
+Hi Stefan,
 
-Here’s the link to the qemu-devel archive:
-https://lists.nongnu.org/archive/html/qemu-devel/2021-05/msg03366.html
+On Tue, May 11, 2021 at 09:22:24AM +0100, Stefan Hajnoczi wrote:
+> On Mon, Feb 15, 2021 at 09:54:08AM +0000, Stefan Hajnoczi wrote:
+> > v2:
+> >  * Document empty virtqueue behavior for FUSE_NOTIFY_LOCK messages
+> > 
+> > This patch series adds the notification queue to the VIRTIO specification.
+> > This new virtqueue carries device->driver FUSE notify messages.  They are
+> > currently unused but will be necessary for file locking, which can block for an
+> > unbounded amount of time and therefore needs a asynchronous completion event
+> > instead of a request/response buffer that consumes space in the request
+> > virtqueue until the operation completes.
+> > 
+> > Patch 1 corrects an oversight I noticed: the file system device was not added
+> > to the Conformance chapter.
+> > 
+> > Stefan Hajnoczi (2):
+> >   virtio-fs: add file system device to Conformance chapter
+> >   virtio-fs: add notification queue
+> > 
+> >  conformance.tex | 23 ++++++++++++++++
+> >  virtio-fs.tex   | 71 ++++++++++++++++++++++++++++++++++++++++++-------
+> >  2 files changed, 84 insertions(+), 10 deletions(-)
+> 
+> Reminder to anyone who needs the virtio-fs notification queue: please
+> review this series.
+>
 
+Besides using notification queue to provide posix lock support, I've
+also managed to invalidate dentry/inode's cache with notification
+queue, it worked well.
 
--------- Forwarded Message --------
-Subject: [PATCH 0/3] virtiofsd: Find original inode ID of mount points
-Date: Wed, 12 May 2021 14:55:41 +0200
-From: Max Reitz <mreitz@redhat.com>
-To: qemu-devel@nongnu.org
-Copy (CC): Max Reitz <mreitz@redhat.com>, Dr . David Alan Gilbert 
-<dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>
+I've read the patches and it looks good to me, so
 
-Hi,
+Reviewed-by: Liu Bo <bo.liu@linux.alibaba.com>
 
-Not announcing submounts to the guest may lead to duplicated
-st_dev/st_ino combinations, because inodes on different filesystems
-(different st_dev) may share the same inode ID (st_ino).  If the guest
-only sees a single st_dev, those inodes will appear to have the same
-st_dev/st_ino combination.
+(Somehow I couldn't find the original patches in my mailbox, but I've
+read both at
+https://www.mail-archive.com/virtio-dev@lists.oasis-open.org/msg07062.html
+https://www.mail-archive.com/virtio-dev@lists.oasis-open.org/msg07222.html
+)
 
-Announcing submounts is supposed to solve this problem by making the
-guest report different st_dev IDs for different filesystems.
+thanks,
+liubo
 
-However, there is one loop hole: Submounts are implemented as
-auto-mounts, meaning when the virtio-fs filesystem is mounted, the
-submounts will not be mounted immediately.  In the guest, it is possible
-to stat() these mount points with AT_NO_AUTOMOUNT to receive information
-without mounting them, so they will then show whatever st_ino virtiofsd
-passes, and the st_dev of the parent filesystem.
-
-Unfortunately, as far as we understood, the only st_ino that virtiofsd
-could inquire was the one on the submounted filesystem, i.e. the st_ino
-of that FS’s root node.
-
-Thus, we again got a collision: In said case, the guest would see st_dev
-of the parent FS, but st_ino of the submounted FS.  This is very likely
-to be the same st_dev/st_ino combination as the root node of the parent
-FS.
-
-For nested mount structures, this can be reproduced with `find`:
-Mounting several filesystems under each other, passing everything into a
-guest, mounting the root virtio-fs FS there, and then invoking `find`
-would likely result in it complaining about filesystem loops and
-refusing to visit the submount points.  (These loops are reported
-because it takes notes of st_dev/st_ino combinations, and then reports a
-loop when some combination reappears.)  This can only be fixed by
-forcing all submounts to be (auto-)mounted.
-
-What we’d need to do is report the inode ID of the mount point directory
-that it has on the parent filesystem to the guest, until the submount is
-auto-mounted there.  It’s just that we thought there was no way to
-inquire this parent FS st_ino.
-
-It turns out that our understand was wrong, though: There is a way,
-namely readdir().  The dirent.d_ino field represents (in practice) the
-st_ino of some directory entry on the directory’s filesystem, and so is
-exactly the value we want to give to the guest.
-
-Let’s do that.
+> Stefan
 
 
-Max Reitz (3):
-   virtiofsd: Find original inode ID of mount points
-   virtiofs_submounts.py: Do not generate ssh key
-   virtiofs_submounts.py: Check `find`
 
-  tools/virtiofsd/passthrough_ll.c              | 104 +++++++++++++++++-
-  tests/acceptance/virtiofs_submounts.py        |  10 +-
-  .../virtiofs_submounts.py.data/guest.sh       |  56 ++++------
-  3 files changed, 122 insertions(+), 48 deletions(-)
-
--- 
-2.31.1
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
 

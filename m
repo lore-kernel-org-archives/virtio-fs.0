@@ -1,14 +1,14 @@
-Resent-Message-Id: <202105112149.14BLn1qv007368@lists01.pubmisc.prod.ext.phx2.redhat.com>
-In-Reply-To: <20210511213736.281016-1-vgoyal@redhat.com>
-Message-ID: <162076972559.29161.8308372976372965130@d887ba82c771>
+References: <20210512125544.9536-1-mreitz@redhat.com>
+From: Max Reitz <mreitz@redhat.com>
+Message-ID: <f8e15bb3-acf4-5260-f8c5-6425c4d21bba@redhat.com>
+Date: Wed, 12 May 2021 16:37:49 +0200
 MIME-Version: 1.0
-From: no-reply@patchew.org
-Date: Tue, 11 May 2021 14:48:46 -0700 (PDT)
-Content-Type: text/plain; charset="utf-8"
+In-Reply-To: <20210512125544.9536-1-mreitz@redhat.com>
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Language: en-US
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 0/7] virtiofsd: Few cleanups in
-	virtio_send_data_iov()
-Reply-To: qemu-devel@nongnu.org
+Subject: [Virtio-fs] Fwd: [PATCH 0/3] virtiofsd: Find original inode ID of
+	mount points
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,70 +17,82 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: vgoyal@redhat.com
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: virtio-fs-list <virtio-fs@redhat.com>
 
-Patchew URL: https://patchew.org/QEMU/20210511213736.281016-1-vgoyal@redhat.com/
+Sorry, forgot to CC the virtio-fs list.  I hope forwarding the cover 
+letter is enough...
+
+Here’s the link to the qemu-devel archive:
+https://lists.nongnu.org/archive/html/qemu-devel/2021-05/msg03366.html
 
 
+-------- Forwarded Message --------
+Subject: [PATCH 0/3] virtiofsd: Find original inode ID of mount points
+Date: Wed, 12 May 2021 14:55:41 +0200
+From: Max Reitz <mreitz@redhat.com>
+To: qemu-devel@nongnu.org
+Copy (CC): Max Reitz <mreitz@redhat.com>, Dr . David Alan Gilbert 
+<dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>
 
 Hi,
 
-This series seems to have some coding style problems. See output below for
-more information:
+Not announcing submounts to the guest may lead to duplicated
+st_dev/st_ino combinations, because inodes on different filesystems
+(different st_dev) may share the same inode ID (st_ino).  If the guest
+only sees a single st_dev, those inodes will appear to have the same
+st_dev/st_ino combination.
 
-Type: series
-Message-id: 20210511213736.281016-1-vgoyal@redhat.com
-Subject: [PATCH 0/7] virtiofsd: Few cleanups in virtio_send_data_iov()
+Announcing submounts is supposed to solve this problem by making the
+guest report different st_dev IDs for different filesystems.
 
-=== TEST SCRIPT BEGIN ===
-#!/bin/bash
-git rev-parse base > /dev/null || exit 0
-git config --local diff.renamelimit 0
-git config --local diff.renames True
-git config --local diff.algorithm histogram
-./scripts/checkpatch.pl --mailback base..
-=== TEST SCRIPT END ===
+However, there is one loop hole: Submounts are implemented as
+auto-mounts, meaning when the virtio-fs filesystem is mounted, the
+submounts will not be mounted immediately.  In the guest, it is possible
+to stat() these mount points with AT_NO_AUTOMOUNT to receive information
+without mounting them, so they will then show whatever st_ino virtiofsd
+passes, and the st_dev of the parent filesystem.
 
-Updating 3c8cf5a9c21ff8782164d1def7f44bd888713384
->From https://github.com/patchew-project/qemu
- - [tag update]      patchew/20210511132641.1022161-1-berrange@redhat.com -> patchew/20210511132641.1022161-1-berrange@redhat.com
- * [new tag]         patchew/20210511213736.281016-1-vgoyal@redhat.com -> patchew/20210511213736.281016-1-vgoyal@redhat.com
-Switched to a new branch 'test'
-b6ced9e virtiofsd: Set req->reply_sent right after sending reply
-c866cc2 virtiofsd: Check EOF before short read
-8d45f07 virtiofsd: Simplify skip byte logic
-b7afa17 virtiofsd: get rid of in_sg_left variable
-37ba755 virtiofsd: Use iov_discard_front() to skip bytes
-f87fbd3 virtiofsd: Get rid of unreachable code in read
-cc6fb4a virtiofsd: Check for EINTR in preadv() and retry
+Unfortunately, as far as we understood, the only st_ino that virtiofsd
+could inquire was the one on the submounted filesystem, i.e. the st_ino
+of that FS’s root node.
 
-=== OUTPUT BEGIN ===
-1/7 Checking commit cc6fb4a9cf99 (virtiofsd: Check for EINTR in preadv() and retry)
-2/7 Checking commit f87fbd364bcd (virtiofsd: Get rid of unreachable code in read)
-3/7 Checking commit 37ba755df99d (virtiofsd: Use iov_discard_front() to skip bytes)
-ERROR: code indent should never use tabs
-#44: FILE: tools/virtiofsd/fuse_virtio.c:400:
-+^I    iov_discard_front(&in_sg_ptr, &in_sg_cpy_count, skip_size);$
+Thus, we again got a collision: In said case, the guest would see st_dev
+of the parent FS, but st_ino of the submounted FS.  This is very likely
+to be the same st_dev/st_ino combination as the root node of the parent
+FS.
 
-total: 1 errors, 0 warnings, 26 lines checked
+For nested mount structures, this can be reproduced with `find`:
+Mounting several filesystems under each other, passing everything into a
+guest, mounting the root virtio-fs FS there, and then invoking `find`
+would likely result in it complaining about filesystem loops and
+refusing to visit the submount points.  (These loops are reported
+because it takes notes of st_dev/st_ino combinations, and then reports a
+loop when some combination reappears.)  This can only be fixed by
+forcing all submounts to be (auto-)mounted.
 
-Patch 3/7 has style problems, please review.  If any of these errors
-are false positives report them to the maintainer, see
-CHECKPATCH in MAINTAINERS.
+What we’d need to do is report the inode ID of the mount point directory
+that it has on the parent filesystem to the guest, until the submount is
+auto-mounted there.  It’s just that we thought there was no way to
+inquire this parent FS st_ino.
 
-4/7 Checking commit b7afa17acdc2 (virtiofsd: get rid of in_sg_left variable)
-5/7 Checking commit 8d45f07e917d (virtiofsd: Simplify skip byte logic)
-6/7 Checking commit c866cc21d91c (virtiofsd: Check EOF before short read)
-7/7 Checking commit b6ced9e49587 (virtiofsd: Set req->reply_sent right after sending reply)
-=== OUTPUT END ===
+It turns out that our understand was wrong, though: There is a way,
+namely readdir().  The dirent.d_ino field represents (in practice) the
+st_ino of some directory entry on the directory’s filesystem, and so is
+exactly the value we want to give to the guest.
 
-Test command exited with code: 1
+Let’s do that.
 
 
-The full log is available at
-http://patchew.org/logs/20210511213736.281016-1-vgoyal@redhat.com/testing.checkpatch/?type=message.
----
-Email generated automatically by Patchew [https://patchew.org/].
-Please send your feedback to patchew-devel@redhat.com
+Max Reitz (3):
+   virtiofsd: Find original inode ID of mount points
+   virtiofs_submounts.py: Do not generate ssh key
+   virtiofs_submounts.py: Check `find`
+
+  tools/virtiofsd/passthrough_ll.c              | 104 +++++++++++++++++-
+  tests/acceptance/virtiofs_submounts.py        |  10 +-
+  .../virtiofs_submounts.py.data/guest.sh       |  56 ++++------
+  3 files changed, 122 insertions(+), 48 deletions(-)
+
+-- 
+2.31.1
 

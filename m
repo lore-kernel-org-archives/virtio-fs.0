@@ -1,13 +1,14 @@
-Date: Tue, 4 May 2021 13:49:28 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210504174928.GG135914@redhat.com>
-References: <20210225185225.GC53072@redhat.com>
+References: <20210511213736.281016-1-vgoyal@redhat.com>
+From: Connor Kuehl <ckuehl@redhat.com>
+Message-ID: <34daab90-0e71-20c1-139d-ac0e084f8ed0@redhat.com>
+Date: Thu, 13 May 2021 15:50:33 -0500
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210225185225.GC53072@redhat.com>
-Subject: Re: [Virtio-fs] [ANNOUNCE] Bi-weekly community calls for virtiofs
- discussions
+In-Reply-To: <20210511213736.281016-1-vgoyal@redhat.com>
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH 0/7] virtiofsd: Few cleanups in
+ virtio_send_data_iov()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,52 +17,34 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs-list <virtio-fs@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com
 
-Hi All,
-
-A gentle reminder of the call tomorrow at 15:00 UTC.
-
-Please note that time of meeting has changed. Previously it was at 14:00 UTC.
-Few folks said they have a conflict so I had to change the time to 15:00 UTC.
-
-https://etherpad.opendev.org/p/virtiofs-external-meeting
-
-Thanks
-Vivek
-
-On Thu, Feb 25, 2021 at 01:52:25PM -0500, Vivek Goyal wrote:
-> Hi All,
+On 5/11/21 4:37 PM, Vivek Goyal wrote:
+> Hi,
 > 
-> We are planning to host bi-weekly 1 hour call to discuss virtiofs
-> development and issues. We already have folks sending patches on 
-> email list and asking questions privately. We thought it probably
-> is a good idea to do a face to face call once in a while to discuss
-> issues, current state, what are the shortcomings and how to improve
-> virtiofs further.
-> 
-> Lets give it a try and hopefully it helps. If it does not, we can stop
-> these meetings. :-)
-> 
-> I have setup a public etherpad which has details of meetings and
-> also a section for agenda for the next meeting on March 10, 2021,
-> 14:00UTC.
-> 
-> https://etherpad.opendev.org/p/virtiofs-external-meeting
-> 
-> Feel free to join us for the call and also feel free to add items
-> to the agenda list.
-> 
-> Stefan has also updated the https://virtio-fs.gitlab.io/ webpage with
-> details of community call.
-> 
-> Looking forward to see you on these calls.
+> Code in virtio_send_data_iov() little twisted and complicated. This
+> patch series just tries to simplify it a bit to make it little easier
+> to read this piece of code.
 > 
 > Thanks
 > Vivek
 > 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
+> Vivek Goyal (7):
+>   virtiofsd: Check for EINTR in preadv() and retry
+>   virtiofsd: Get rid of unreachable code in read
+>   virtiofsd: Use iov_discard_front() to skip bytes
+>   virtiofsd: get rid of in_sg_left variable
+>   virtiofsd: Simplify skip byte logic
+>   virtiofsd: Check EOF before short read
+>   virtiofsd: Set req->reply_sent right after sending reply
+> 
+>  tools/virtiofsd/fuse_virtio.c | 67 +++++++++++------------------------
+>  1 file changed, 21 insertions(+), 46 deletions(-)
+> 
+
+With the codestyle fix to appease the bot:
+
+Reviewed-by: Connor Kuehl <ckuehl@redhat.com>
+
+(For the series)
 

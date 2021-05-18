@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue, 18 May 2021 17:35:32 -0400
-Message-Id: <20210518213538.693422-2-vgoyal@redhat.com>
+Date: Tue, 18 May 2021 17:35:34 -0400
+Message-Id: <20210518213538.693422-4-vgoyal@redhat.com>
 In-Reply-To: <20210518213538.693422-1-vgoyal@redhat.com>
 References: <20210518213538.693422-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 1/7] virtiofsd: Check for EINTR in preadv()
-	and retry
+Subject: [Virtio-fs] [PATCH v2 3/7] virtiofsd: Use iov_discard_front() to
+	skip bytes
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,30 +18,48 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: vgoyal@redhat.com
 
-We don't seem to check for EINTR and retry. There are other places
-in code where we check for EINTR. So lets add a check.
+There are places where we need to skip few bytes from front of the iovec
+array. We have our own custom code for that. Looks like iov_discard_front()
+can do same thing. So use that helper instead.
 
 Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 Reviewed-by: Connor Kuehl <ckuehl@redhat.com>
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- tools/virtiofsd/fuse_virtio.c | 3 +++
- 1 file changed, 3 insertions(+)
+ tools/virtiofsd/fuse_virtio.c | 14 +++-----------
+ 1 file changed, 3 insertions(+), 11 deletions(-)
 
 diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-index 9efdbd8ffd..755d7fb25c 100644
+index 28e2974d1a..09674f2e90 100644
 --- a/tools/virtiofsd/fuse_virtio.c
 +++ b/tools/virtiofsd/fuse_virtio.c
-@@ -421,6 +421,9 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+@@ -389,23 +389,15 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+     memcpy(in_sg_cpy, in_sg, sizeof(struct iovec) * in_num);
+     /* These get updated as we skip */
+     struct iovec *in_sg_ptr = in_sg_cpy;
+-    int in_sg_cpy_count = in_num;
++    unsigned int in_sg_cpy_count = in_num;
  
-         if (ret == -1) {
-             ret = errno;
-+            if (ret == EINTR) {
-+                continue;
-+            }
-             fuse_log(FUSE_LOG_DEBUG, "%s: preadv failed (%m) len=%zd\n",
-                      __func__, len);
-             goto err;
+     /* skip over parts of in_sg that contained the header iov */
+     size_t skip_size = iov_len;
+ 
+     size_t in_sg_left = 0;
+     do {
+-        while (skip_size != 0 && in_sg_cpy_count) {
+-            if (skip_size >= in_sg_ptr[0].iov_len) {
+-                skip_size -= in_sg_ptr[0].iov_len;
+-                in_sg_ptr++;
+-                in_sg_cpy_count--;
+-            } else {
+-                in_sg_ptr[0].iov_len -= skip_size;
+-                in_sg_ptr[0].iov_base += skip_size;
+-                break;
+-            }
++        if (skip_size != 0) {
++            iov_discard_front(&in_sg_ptr, &in_sg_cpy_count, skip_size);
+         }
+ 
+         int i;
 -- 
 2.25.4
 

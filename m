@@ -1,14 +1,14 @@
-Date: Tue, 18 May 2021 12:59:31 +0100
+Date: Tue, 18 May 2021 13:01:24 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YKOsI4PH3xdza8gZ@work-vm>
+Message-ID: <YKOslFEjMAZko6QL@work-vm>
 References: <20210511213736.281016-1-vgoyal@redhat.com>
-	<20210511213736.281016-2-vgoyal@redhat.com>
+	<20210511213736.281016-3-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210511213736.281016-2-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 1/7] virtiofsd: Check for EINTR in preadv()
-	and retry
+In-Reply-To: <20210511213736.281016-3-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 2/7] virtiofsd: Get rid of unreachable code
+	in read
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,31 +21,40 @@ To: Vivek Goyal <vgoyal@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
 * Vivek Goyal (vgoyal@redhat.com) wrote:
-> We don't seem to check for EINTR and retry. There are other places
-> in code where we check for EINTR. So lets add a check.
+> pvreadv() can return following.
+> 
+> - error
+> - 0 in case of EOF
+> - short read
+> 
+> We seem to handle all the cases already. We are retrying read in case
+> of short read. So another check for short read seems like dead code.
+> Get rid of it.
 > 
 > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 
 Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 
 > ---
->  tools/virtiofsd/fuse_virtio.c | 3 +++
->  1 file changed, 3 insertions(+)
+>  tools/virtiofsd/fuse_virtio.c | 5 -----
+>  1 file changed, 5 deletions(-)
 > 
 > diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-> index 1170f375a5..32914f7e95 100644
+> index 32914f7e95..5dcd08fccb 100644
 > --- a/tools/virtiofsd/fuse_virtio.c
 > +++ b/tools/virtiofsd/fuse_virtio.c
-> @@ -421,6 +421,9 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
->  
->          if (ret == -1) {
->              ret = errno;
-> +            if (ret == EINTR) {
-> +                continue;
-> +            }
->              fuse_log(FUSE_LOG_DEBUG, "%s: preadv failed (%m) len=%zd\n",
->                       __func__, len);
->              goto err;
+> @@ -446,11 +446,6 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+>                       in_sg_left);
+>              break;
+>          }
+> -        if (ret != len) {
+> -            fuse_log(FUSE_LOG_DEBUG, "%s: ret!=len\n", __func__);
+> -            ret = EIO;
+> -            goto err;
+> -        }
+>          in_sg_left -= ret;
+>          len -= ret;
+>      } while (in_sg_left);
 > -- 
 > 2.25.4
 > 

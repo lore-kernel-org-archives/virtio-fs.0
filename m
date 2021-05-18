@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue, 18 May 2021 17:35:34 -0400
-Message-Id: <20210518213538.693422-4-vgoyal@redhat.com>
+Date: Tue, 18 May 2021 17:35:38 -0400
+Message-Id: <20210518213538.693422-8-vgoyal@redhat.com>
 In-Reply-To: <20210518213538.693422-1-vgoyal@redhat.com>
 References: <20210518213538.693422-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 3/7] virtiofsd: Use iov_discard_front() to
-	skip bytes
+Subject: [Virtio-fs] [PATCH v2 7/7] virtiofsd: Set req->reply_sent right
+	after sending reply
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,48 +18,74 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: vgoyal@redhat.com
 
-There are places where we need to skip few bytes from front of the iovec
-array. We have our own custom code for that. Looks like iov_discard_front()
-can do same thing. So use that helper instead.
+There is no reason to set it in label "err". We should be able to set
+it right after sending reply. It is easier to read.
+
+Also got rid of label "err" because now only thing it was doing was
+return a code. We can return from the error location itself and no
+need to first jump to label "err".
 
 Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 Reviewed-by: Connor Kuehl <ckuehl@redhat.com>
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- tools/virtiofsd/fuse_virtio.c | 14 +++-----------
- 1 file changed, 3 insertions(+), 11 deletions(-)
+ tools/virtiofsd/fuse_virtio.c | 19 +++++--------------
+ 1 file changed, 5 insertions(+), 14 deletions(-)
 
 diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-index 28e2974d1a..09674f2e90 100644
+index 99f91c9d87..fa4aff9b0e 100644
 --- a/tools/virtiofsd/fuse_virtio.c
 +++ b/tools/virtiofsd/fuse_virtio.c
-@@ -389,23 +389,15 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
-     memcpy(in_sg_cpy, in_sg, sizeof(struct iovec) * in_num);
-     /* These get updated as we skip */
-     struct iovec *in_sg_ptr = in_sg_cpy;
--    int in_sg_cpy_count = in_num;
-+    unsigned int in_sg_cpy_count = in_num;
+@@ -366,14 +366,12 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+     if (in_len < sizeof(struct fuse_out_header)) {
+         fuse_log(FUSE_LOG_ERR, "%s: elem %d too short for out_header\n",
+                  __func__, elem->index);
+-        ret = E2BIG;
+-        goto err;
++        return E2BIG;
+     }
+     if (in_len < tosend_len) {
+         fuse_log(FUSE_LOG_ERR, "%s: elem %d too small for data len %zd\n",
+                  __func__, elem->index, tosend_len);
+-        ret = E2BIG;
+-        goto err;
++        return E2BIG;
+     }
  
-     /* skip over parts of in_sg that contained the header iov */
-     size_t skip_size = iov_len;
- 
-     size_t in_sg_left = 0;
-     do {
--        while (skip_size != 0 && in_sg_cpy_count) {
--            if (skip_size >= in_sg_ptr[0].iov_len) {
--                skip_size -= in_sg_ptr[0].iov_len;
--                in_sg_ptr++;
--                in_sg_cpy_count--;
--            } else {
--                in_sg_ptr[0].iov_len -= skip_size;
--                in_sg_ptr[0].iov_base += skip_size;
--                break;
--            }
-+        if (skip_size != 0) {
-+            iov_discard_front(&in_sg_ptr, &in_sg_cpy_count, skip_size);
+     /* TODO: Limit to 'len' */
+@@ -408,7 +406,7 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+             }
+             fuse_log(FUSE_LOG_DEBUG, "%s: preadv failed (%m) len=%zd\n",
+                      __func__, len);
+-            goto err;
++            return ret;
          }
  
-         int i;
+         if (!ret) {
+@@ -438,21 +436,14 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+         out_sg->len = tosend_len;
+     }
+ 
+-    ret = 0;
+-
+     vu_dispatch_rdlock(qi->virtio_dev);
+     pthread_mutex_lock(&qi->vq_lock);
+     vu_queue_push(dev, q, elem, tosend_len);
+     vu_queue_notify(dev, q);
+     pthread_mutex_unlock(&qi->vq_lock);
+     vu_dispatch_unlock(qi->virtio_dev);
+-
+-err:
+-    if (ret == 0) {
+-        req->reply_sent = true;
+-    }
+-
+-    return ret;
++    req->reply_sent = true;
++    return 0;
+ }
+ 
+ static __thread bool clone_fs_called;
 -- 
 2.25.4
 

@@ -1,16 +1,18 @@
-Date: Tue, 18 May 2021 13:34:06 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YKO0PnCCO7jMBmBB@work-vm>
-References: <20210511213736.281016-1-vgoyal@redhat.com>
-	<20210511213736.281016-8-vgoyal@redhat.com>
-	<5ad6f5e9-0a12-54ce-163a-532f916cc8e8@redhat.com>
-	<20210517130816.GC546943@horse.lan>
+Date: Wed, 19 May 2021 02:46:14 +0800
+From: Liu Bo <bo.liu@linux.alibaba.com>
+Message-ID: <20210518184613.GA118510@rsjd01523.et2sqa>
+References: <20210215095410.85607-1-stefanha@redhat.com>
+	<YJo+wCSffIZAx9aM@stefanha-x1.localdomain>
+	<20210512223637.GA6241@rsjd01523.et2sqa>
+	<YJ0tSmwRulBHGrIG@stefanha-x1.localdomain>
+	<20210517124829.GA546943@horse.lan>
 MIME-Version: 1.0
+In-Reply-To: <20210517124829.GA546943@horse.lan>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210517130816.GC546943@horse.lan>
-Subject: Re: [Virtio-fs] [PATCH 7/7] virtiofsd: Set req->reply_sent right
- after sending reply
+Subject: Re: [Virtio-fs] [virtio-dev] [PATCH v2 0/2] virtio-fs: add
+ notification queue
+Reply-To: bo.liu@linux.alibaba.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,60 +22,64 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, virtio-dev@lists.oasis-open.org
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> On Thu, May 13, 2021 at 03:50:13PM -0500, Connor Kuehl wrote:
-> > On 5/11/21 4:37 PM, Vivek Goyal wrote:
-> > > There is no reason to set it in label "err". We should be able to set
-> > > it right after sending reply. It is easier to read.
+On Mon, May 17, 2021 at 08:48:29AM -0400, Vivek Goyal wrote:
+> On Thu, May 13, 2021 at 02:44:42PM +0100, Stefan Hajnoczi wrote:
+> > On Thu, May 13, 2021 at 06:36:37AM +0800, Liu Bo wrote:
+> > > Hi Stefan,
 > > > 
-> > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > > ---
-> > >  tools/virtiofsd/fuse_virtio.c | 5 +----
-> > >  1 file changed, 1 insertion(+), 4 deletions(-)
+> > > On Tue, May 11, 2021 at 09:22:24AM +0100, Stefan Hajnoczi wrote:
+> > > > On Mon, Feb 15, 2021 at 09:54:08AM +0000, Stefan Hajnoczi wrote:
+> > > > > v2:
+> > > > >  * Document empty virtqueue behavior for FUSE_NOTIFY_LOCK messages
+> > > > > 
+> > > > > This patch series adds the notification queue to the VIRTIO specification.
+> > > > > This new virtqueue carries device->driver FUSE notify messages.  They are
+> > > > > currently unused but will be necessary for file locking, which can block for an
+> > > > > unbounded amount of time and therefore needs a asynchronous completion event
+> > > > > instead of a request/response buffer that consumes space in the request
+> > > > > virtqueue until the operation completes.
+> > > > > 
+> > > > > Patch 1 corrects an oversight I noticed: the file system device was not added
+> > > > > to the Conformance chapter.
+> > > > > 
+> > > > > Stefan Hajnoczi (2):
+> > > > >   virtio-fs: add file system device to Conformance chapter
+> > > > >   virtio-fs: add notification queue
+> > > > > 
+> > > > >  conformance.tex | 23 ++++++++++++++++
+> > > > >  virtio-fs.tex   | 71 ++++++++++++++++++++++++++++++++++++++++++-------
+> > > > >  2 files changed, 84 insertions(+), 10 deletions(-)
+> > > > 
+> > > > Reminder to anyone who needs the virtio-fs notification queue: please
+> > > > review this series.
+> > > >
 > > > 
-> > > diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-> > > index aa53808ef9..b1767dd5b9 100644
-> > > --- a/tools/virtiofsd/fuse_virtio.c
-> > > +++ b/tools/virtiofsd/fuse_virtio.c
-> > > @@ -446,12 +446,9 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
-> > >      vu_queue_notify(dev, q);
-> > >      pthread_mutex_unlock(&qi->vq_lock);
-> > >      vu_dispatch_unlock(qi->virtio_dev);
-> > > +    req->reply_sent = true;
-> > >  
-> > >  err:
+> > > Besides using notification queue to provide posix lock support, I've
+> > > also managed to invalidate dentry/inode's cache with notification
+> > > queue, it worked well.
 > > 
-> > Just a really minor comment: after all these changes, I would venture
-> > that "out" is a more appropriate label name than "err" at this point.
+> > Thank you!
+> > 
+> > Are you using dentry/inode cache invalidation to reduce the number of
+> > file descriptors that virtiofsd needs to hold open,
 > 
-> May be. This path is used both by error path as well as success path. Just
-> that value of "ret" changes. I am not particular about it. So I will
-> change this to "out".
+> Using notifications to invalidate client's dentry/inode cache sounds
+> interesting. Will like to see an actual implementation though. Various
+> races w.r.t opening the same file for which server is trying to invalidate
+> the dentry/inode might be little tricky.
+>
 
-Well, if it only does 'return ret' we can get rid of the
-label and just do return's at the places that did the goto's.
+Right, to avoid the race, the invalidation should only be done when
+both host and guest are under control.
 
-Dave
+IIRC, on virtiofsd, I did it in a very hacky/experimental way,
+firstly, I defined a unlinked file that one can only access it by
+looking up /proc/{virtiofsd's pid}/fd and write the relative file path
+to it, and then I made use of signal SIGUSR2 to read the path from it
+and send an invalidation request over notification queue.
 
 > Thanks
 > Vivek
-> > 
-> > > -    if (ret == 0) {
-> > > -        req->reply_sent = true;
-> > > -    }
-> > > -
-> > >      return ret;
-> > >  }
-> > >  
-> > > 
-> > 
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

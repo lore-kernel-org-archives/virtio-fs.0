@@ -1,10 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue, 18 May 2021 17:35:31 -0400
-Message-Id: <20210518213538.693422-1-vgoyal@redhat.com>
+Date: Tue, 18 May 2021 17:35:33 -0400
+Message-Id: <20210518213538.693422-3-vgoyal@redhat.com>
+In-Reply-To: <20210518213538.693422-1-vgoyal@redhat.com>
+References: <20210518213538.693422-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 0/7] virtiofsd: Few cleanups in
-	virtio_send_data_iov()
+Subject: [Virtio-fs] [PATCH v2 2/7] virtiofsd: Get rid of unreachable code
+	in read
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,34 +18,39 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: vgoyal@redhat.com
 
-Hi,
+pvreadv() can return following.
 
-This is V2 of the patches. Changes since V1 are.
+- error
+- 0 in case of EOF
+- short read
 
-- Took care of coding style issue.
-- Got rid of label "err" completely in last patch. (Dave, Connor). 
-- Captured Reviewed-by tags from Connor and David.
+We seem to handle all the cases already. We are retrying read in case
+of short read. So another check for short read seems like dead code.
+Get rid of it.
 
-Code in virtio_send_data_iov() little twisted and complicated. This
-patch series just tries to simplify it a bit to make it little easier
-to read this piece of code.
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Reviewed-by: Connor Kuehl <ckuehl@redhat.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ tools/virtiofsd/fuse_virtio.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-Thanks
-Vivek
-
-
-Vivek Goyal (7):
-  virtiofsd: Check for EINTR in preadv() and retry
-  virtiofsd: Get rid of unreachable code in read
-  virtiofsd: Use iov_discard_front() to skip bytes
-  virtiofsd: get rid of in_sg_left variable
-  virtiofsd: Simplify skip byte logic
-  virtiofsd: Check EOF before short read
-  virtiofsd: Set req->reply_sent right after sending reply
-
- tools/virtiofsd/fuse_virtio.c | 81 +++++++++++------------------------
- 1 file changed, 25 insertions(+), 56 deletions(-)
-
+diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+index 755d7fb25c..28e2974d1a 100644
+--- a/tools/virtiofsd/fuse_virtio.c
++++ b/tools/virtiofsd/fuse_virtio.c
+@@ -446,11 +446,6 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
+                      in_sg_left);
+             break;
+         }
+-        if (ret != len) {
+-            fuse_log(FUSE_LOG_DEBUG, "%s: ret!=len\n", __func__);
+-            ret = EIO;
+-            goto err;
+-        }
+         in_sg_left -= ret;
+         len -= ret;
+     } while (in_sg_left);
 -- 
 2.25.4
 

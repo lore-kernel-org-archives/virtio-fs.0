@@ -1,11 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue, 18 May 2021 17:35:35 -0400
-Message-Id: <20210518213538.693422-5-vgoyal@redhat.com>
+Date: Tue, 18 May 2021 17:35:32 -0400
+Message-Id: <20210518213538.693422-2-vgoyal@redhat.com>
 In-Reply-To: <20210518213538.693422-1-vgoyal@redhat.com>
 References: <20210518213538.693422-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 4/7] virtiofsd: get rid of in_sg_left variable
+Subject: [Virtio-fs] [PATCH v2 1/7] virtiofsd: Check for EINTR in preadv()
+	and retry
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,77 +18,30 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: vgoyal@redhat.com
 
-in_sg_left seems to be being used primarly for debugging purpose. It is
-keeping track of how many bytes are left in the scatter list we are
-reading into.
-
-We already have another variable "len" which keeps track how many bytes
-are left to be read. And in_sg_left is greater than or equal to len. We
-have already ensured that in the beginning of function.
-
-    if (in_len < tosend_len) {
-        fuse_log(FUSE_LOG_ERR, "%s: elem %d too small for data len %zd\n",
-                 __func__, elem->index, tosend_len);
-        ret = E2BIG;
-        goto err;
-    }
-
-So in_sg_left seems like a redundant variable. It probably was useful for
-debugging when code was being developed. Get rid of it. It helps simplify
-this function.
+We don't seem to check for EINTR and retry. There are other places
+in code where we check for EINTR. So lets add a check.
 
 Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 Reviewed-by: Connor Kuehl <ckuehl@redhat.com>
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- tools/virtiofsd/fuse_virtio.c | 17 ++++++-----------
- 1 file changed, 6 insertions(+), 11 deletions(-)
+ tools/virtiofsd/fuse_virtio.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-index 09674f2e90..ed5146d7a6 100644
+index 9efdbd8ffd..755d7fb25c 100644
 --- a/tools/virtiofsd/fuse_virtio.c
 +++ b/tools/virtiofsd/fuse_virtio.c
-@@ -394,20 +394,16 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
-     /* skip over parts of in_sg that contained the header iov */
-     size_t skip_size = iov_len;
+@@ -421,6 +421,9 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
  
--    size_t in_sg_left = 0;
-     do {
-         if (skip_size != 0) {
-             iov_discard_front(&in_sg_ptr, &in_sg_cpy_count, skip_size);
-         }
- 
--        int i;
--        for (i = 0, in_sg_left = 0; i < in_sg_cpy_count; i++) {
--            in_sg_left += in_sg_ptr[i].iov_len;
--        }
-         fuse_log(FUSE_LOG_DEBUG,
-                  "%s: after skip skip_size=%zd in_sg_cpy_count=%d "
--                 "in_sg_left=%zd\n",
--                 __func__, skip_size, in_sg_cpy_count, in_sg_left);
-+                 "len remaining=%zd\n", __func__, skip_size, in_sg_cpy_count,
-+                 len);
-+
-         ret = preadv(buf->buf[0].fd, in_sg_ptr, in_sg_cpy_count,
-                      buf->buf[0].pos);
- 
-@@ -434,13 +430,12 @@ int virtio_send_data_iov(struct fuse_session *se, struct fuse_chan *ch,
-         }
-         if (!ret) {
-             /* EOF case? */
--            fuse_log(FUSE_LOG_DEBUG, "%s: !ret in_sg_left=%zd\n", __func__,
--                     in_sg_left);
-+            fuse_log(FUSE_LOG_DEBUG, "%s: !ret len remaining=%zd\n", __func__,
-+                     len);
-             break;
-         }
--        in_sg_left -= ret;
-         len -= ret;
--    } while (in_sg_left);
-+    } while (len);
- 
-     /* Need to fix out->len on EOF */
-     if (len) {
+         if (ret == -1) {
+             ret = errno;
++            if (ret == EINTR) {
++                continue;
++            }
+             fuse_log(FUSE_LOG_DEBUG, "%s: preadv failed (%m) len=%zd\n",
+                      __func__, len);
+             goto err;
 -- 
 2.25.4
 

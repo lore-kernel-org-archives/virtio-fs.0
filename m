@@ -1,24 +1,15 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
-	h=to:references:from:subject:message-id:date:user-agent:mime-version
-	:in-reply-to:content-transfer-encoding:content-language;
-	bh=eefl09P8pUigFguPoWrKUt7OifoRvda7zdyJ0gKjq3Q=;
-	b=Jw3REk74U62IJYFRLWXYCIb4KrC4iobMMprHg63tSVLbbQwtGEH96SskSOBDMSKeqk
-	hzYEbUAeHnSVwiXuIp2o5gTMeUP+ZSx3NFDg/z5+fT30EY+MdsWqOC1/cPtz3xrxRoVv
-	i3RBA04cL7f0OO7yAd82xk283f+YT0SfkS0tdPwr1gD391Uxqov5mJmMvFdEyMmu0Vt6
-	pRJjviUO3/ryjS4kSTbx9iPHK+a6FPrX6oKrLEQwOC1+iAoVHLCGDg6O5DIQQicNrGa6
-	SJ9iO1f6ywKcbqpH6jNRQp/8X+TaTGYVyOnRdpcap+/Gqzt0fo7sEe18wj/2ACQX8vOX
-	hz2g==
+Date: Wed, 19 May 2021 12:17:22 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210519161722.GA738981@horse>
 References: <20210518213538.693422-1-vgoyal@redhat.com>
 	<20210518213538.693422-8-vgoyal@redhat.com>
-From: "Harry G. Coin" <hgcoin@gmail.com>
-Message-ID: <41df4f6a-6d40-745d-aacd-9c4b66a31f3e@gmail.com>
-Date: Wed, 19 May 2021 08:35:59 -0500
+	<41df4f6a-6d40-745d-aacd-9c4b66a31f3e@gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <20210518213538.693422-8-vgoyal@redhat.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Language: en-US
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] Regression: Docker in vms broken.
+In-Reply-To: <41df4f6a-6d40-745d-aacd-9c4b66a31f3e@gmail.com>
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] Regression: Docker in vms broken.
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,154 +18,203 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: "Harry G. Coin" <hgcoin@gmail.com>
+Cc: virtio-fs@redhat.com
 
-Something changed in virtiofs, likely to do with overlay support? 
+On Wed, May 19, 2021 at 08:35:59AM -0500, Harry G. Coin wrote:
+> Something changed in virtiofs, likely to do with overlay support?=A0
 
-Docker in a vm with virtiofs as root running with kernel 
-5.8.0-53-generic works normally.  However, later 5.8 versions and also
-5.11 versions fail with:
+I am not aware of any change in virtiofs w.r.t overlay. Are there any
+messages on VM serail console from guest kernel?=20
 
+Vivek
 
-May 18 22:00:07 nocsupport4 systemd[1]: docker.service: Scheduled
-restart job, restart counter is at 2.
-May 18 22:00:10 nocsupport4 dockerd[1104]:
-time="2021-05-18T22:00:10.061661124-05:00" level=info msg="Starting up"
-May 18 22:00:10 nocsupport4 dockerd[1104]:
-time="2021-05-18T22:00:10.109655841-05:00" level=info msg="detected
-127.0.0.53 nameserver, assuming systemd-resolved, so using resolv.conf:
-/run/systemd/resolve/resolv.conf"
-May 18 22:00:10 nocsupport4 dockerd[1104]:
-time="2021-05-18T22:00:10.253580688-05:00" level=info msg="parsed
-scheme: \"unix\"" module=grpc
-May 18 22:00:10 nocsupport4 dockerd[1104]:
-time="2021-05-18T22:00:10.253663917-05:00" level=info msg="scheme
-\"unix\" not registered, fallback to default scheme" module=grpc
-May 18 22:00:10 nocsupport4 dockerd[1104]:
-time="2021-05-18T22:00:10.253737208-05:00" level=info
-msg="ccResolverWrapper: sending update to cc:
-{[{unix:///run/containerd/containerd.sock  <nil> 0 <nil>}] <nil> <nil>}"
-module=grpc
-May 18 22:00:10 nocsupport4 dockerd[1104]:
-time="2021-05-18T22:00:10.253777767-05:00" level=info msg="ClientConn
-switching balancer to \"pick_first\"" module=grpc
-May 18 22:00:10 nocsupport4 dockerd[1104]:
-time="2021-05-18T22:00:10.272602278-05:00" level=info msg="parsed
-scheme: \"unix\"" module=grpc
-May 18 22:00:10 nocsupport4 dockerd[1104]:
-time="2021-05-18T22:00:10.272713227-05:00" level=info msg="scheme
-\"unix\" not registered, fallback to default scheme" module=grpc
-May 18 22:00:10 nocsupport4 dockerd[1104]:
-time="2021-05-18T22:00:10.272778900-05:00" level=info
-msg="ccResolverWrapper: sending update to cc:
-{[{unix:///run/containerd/containerd.sock  <nil> 0 <nil>}] <nil> <nil>}"
-module=grpc
-May 18 22:00:10 nocsupport4 dockerd[1104]:
-time="2021-05-18T22:00:10.272816740-05:00" level=info msg="ClientConn
-switching balancer to \"pick_first\"" module=grpc
-May 18 22:00:10 nocsupport4 dockerd[1104]:
-time="2021-05-18T22:00:10.367601799-05:00" level=error msg="failed to
-mount overlay: invalid argument" storage-driver=overlay2
-May 18 22:00:10 nocsupport4 dockerd[1104]:
-time="2021-05-18T22:00:10.367792469-05:00" level=error
-msg="[graphdriver] prior storage driver overlay2 failed: driver not
-supported"
-May 18 22:00:10 nocsupport4 dockerd[1104]:
-time="2021-05-18T22:00:10.370914131-05:00" level=info msg="stopping
-event stream following graceful shutdown" error="context canceled"
-module=libcontainerd namespace=plugins.moby
-May 18 22:00:10 nocsupport4 dockerd[1104]: failed to start daemon: error
-initializing graphdriver: driver not supported
-May 18 22:00:10 nocsupport4 systemd[1]: docker.service: Main process
-exited, code=exited, status=1/FAILURE
-May 18 22:00:10 nocsupport4 systemd[1]: docker.service: Failed with
-result 'exit-code'.
-
-root@nocsupport4:~# cat /etc/fstab
-myfs / virtiofs defaults 0 0
-
-On the host:
-
-root@noc4:/vmsystems# uname -a
-Linux noc4.xxxx 5.11.0-17-generic
-
-root      225434  0.0  0.0  80068  3544 ?        Sl   21:32   0:00
-/usr/lib/qemu/virtiofsd --fd=32 -o
-source=/vmsystems/nocsupport4,xattr,flock,no_posix_lock -o writeback
-libvirt+  225458 85.5  0.7 4366196 236724 ?      Sl   21:32   7:34
-/usr/bin/qemu-system-x86_64 -name guest=nocsupport4,debug-threads=on -S
--object
-secret,id=masterKey0,format=raw,file=/var/lib/libvirt/qemu/domain-6-nocsupport4/master-key.aes
--machine pc-q35-5.0,accel=kvm,usb=off,vmport=off,dump-guest-core=off
--cpu
-Conroe,vme=on,vmx=on,cx16=on,pdcm=on,x2apic=on,tsc-deadline=on,hypervisor=on,arat=on,tsc-adjust=on,arch-capabilities=on,pdpe1gb=on,skip-l1dfl-vmentry=on,pschange-mc-no=on
--m 3584 -overcommit mem-lock=off -smp 2,sockets=2,cores=1,threads=1
--object
-memory-backend-file,id=ram-node0,mem-path=/dev/hugepages/libvirt/qemu/6-nocsupport4,share=yes,prealloc=yes,size=3758096384
--numa node,nodeid=0,cpus=0-1,memdev=ram-node0 -uuid
-c7b055aa-1874-4ba9-9302-26fad866e749 -no-user-config -nodefaults
--chardev socket,id=charmonitor,fd=32,server,nowait -mon
-chardev=charmonitor,id=monitor,mode=control -rtc base=utc,driftfix=slew
--global kvm-pit.lost_tick_policy=delay -no-hpet -no-shutdown -global
-ICH9-LPC.disable_s3=1 -global ICH9-LPC.disable_s4=1 -boot strict=on
--kernel /vmsystems/nocsupport4/boot/vmlinuz -initrd
-/vmsystems/nocsupport4/boot/initrd.img -append rootfstype=virtiofs
-root=myfs  rw -device
-pcie-root-port,port=0x10,chassis=1,id=pci.1,bus=pcie.0,multifunction=on,addr=0x2
--device
-pcie-root-port,port=0x11,chassis=2,id=pci.2,bus=pcie.0,addr=0x2.0x1
--device
-pcie-root-port,port=0x12,chassis=3,id=pci.3,bus=pcie.0,addr=0x2.0x2
--device
-pcie-root-port,port=0x13,chassis=4,id=pci.4,bus=pcie.0,addr=0x2.0x3
--device
-pcie-root-port,port=0x14,chassis=5,id=pci.5,bus=pcie.0,addr=0x2.0x4
--device
-pcie-root-port,port=0x15,chassis=6,id=pci.6,bus=pcie.0,addr=0x2.0x5
--device
-pcie-root-port,port=0x16,chassis=7,id=pci.7,bus=pcie.0,addr=0x2.0x6
--device
-pcie-root-port,port=0x17,chassis=8,id=pci.8,bus=pcie.0,addr=0x2.0x7
--device pcie-pci-bridge,id=pci.9,bus=pci.4,addr=0x0 -device
-ich9-usb-ehci1,id=usb,bus=pcie.0,addr=0x1d.0x7 -device
-ich9-usb-uhci1,masterbus=usb.0,firstport=0,bus=pcie.0,multifunction=on,addr=0x1d
--device
-ich9-usb-uhci2,masterbus=usb.0,firstport=2,bus=pcie.0,addr=0x1d.0x1
--device
-ich9-usb-uhci3,masterbus=usb.0,firstport=4,bus=pcie.0,addr=0x1d.0x2
--device virtio-serial-pci,id=virtio-serial0,bus=pci.3,addr=0x0 -chardev
-socket,id=chr-vu-fs0,path=/var/lib/libvirt/qemu/domain-6-nocsupport4/fs0-fs.sock
--device
-vhost-user-fs-pci,chardev=chr-vu-fs0,queue-size=1024,tag=myfs,bus=pci.1,addr=0x0
--netdev tap,fd=46,id=hostnet0,vhost=on,vhostfd=47 -device
-virtio-net-pci,netdev=hostnet0,id=net0,mac=52:54:00:30:4d:ca,bus=pci.2,addr=0x0
--chardev pty,id=charserial0 -device
-isa-serial,chardev=charserial0,id=serial0 -chardev
-socket,id=charchannel0,fd=48,server,nowait -device
-virtserialport,bus=virtio-serial0.0,nr=1,chardev=charchannel0,id=channel0,name=org.qemu.guest_agent.0
--chardev spicevmc,id=charchannel1,name=vdagent -device
-virtserialport,bus=virtio-serial0.0,nr=2,chardev=charchannel1,id=channel1,name=com.redhat.spice.0
--device usb-tablet,id=input0,bus=usb.0,port=1 -spice
-port=5900,addr=127.0.0.1,disable-ticketing,seamless-migration=on -device
-qxl-vga,id=video0,ram_size=67108864,vram_size=67108864,vram64_size_mb=0,vgamem_mb=16,max_outputs=1,bus=pcie.0,addr=0x1
--device ich9-intel-hda,id=sound0,bus=pcie.0,addr=0x1b -device
-hda-duplex,id=sound0-codec0,bus=sound0.0,cad=0 -device
-i6300esb,id=watchdog0,bus=pci.9,addr=0x1 -watchdog-action reset -chardev
-spicevmc,id=charredir0,name=usbredir -device
-usb-redir,chardev=charredir0,id=redir0,bus=usb.0,port=2 -chardev
-spicevmc,id=charredir1,name=usbredir -device
-usb-redir,chardev=charredir1,id=redir1,bus=usb.0,port=3 -device
-virtio-balloon-pci,id=balloon0,bus=pci.5,addr=0x0 -object
-rng-random,id=objrng0,filename=/dev/urandom -device
-virtio-rng-pci,rng=objrng0,id=rng0,bus=pci.6,addr=0x0 -sandbox
-on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny
--msg timestamp=on
-root      225472 11.0  0.0 6889960 10848 ?       Sl   21:32   0:58
-/usr/lib/qemu/virtiofsd --fd=32 -o
-source=/vmsystems/nocsupport4,xattr,flock,no_posix_lock -o writeback
-
-
-
-
-
+>=20
+> Docker in a vm with virtiofs as root running with kernel=A0
+> 5.8.0-53-generic works normally.=A0 However, later 5.8 versions and also
+> 5.11 versions fail with:
+>=20
+>=20
+> May 18 22:00:07 nocsupport4 systemd[1]: docker.service: Scheduled
+> restart job, restart counter is at 2.
+> May 18 22:00:10 nocsupport4 dockerd[1104]:
+> time=3D"2021-05-18T22:00:10.061661124-05:00" level=3Dinfo msg=3D"Starting=
+ up"
+> May 18 22:00:10 nocsupport4 dockerd[1104]:
+> time=3D"2021-05-18T22:00:10.109655841-05:00" level=3Dinfo msg=3D"detected
+> 127.0.0.53 nameserver, assuming systemd-resolved, so using resolv.conf:
+> /run/systemd/resolve/resolv.conf"
+> May 18 22:00:10 nocsupport4 dockerd[1104]:
+> time=3D"2021-05-18T22:00:10.253580688-05:00" level=3Dinfo msg=3D"parsed
+> scheme: \"unix\"" module=3Dgrpc
+> May 18 22:00:10 nocsupport4 dockerd[1104]:
+> time=3D"2021-05-18T22:00:10.253663917-05:00" level=3Dinfo msg=3D"scheme
+> \"unix\" not registered, fallback to default scheme" module=3Dgrpc
+> May 18 22:00:10 nocsupport4 dockerd[1104]:
+> time=3D"2021-05-18T22:00:10.253737208-05:00" level=3Dinfo
+> msg=3D"ccResolverWrapper: sending update to cc:
+> {[{unix:///run/containerd/containerd.sock=A0 <nil> 0 <nil>}] <nil> <nil>}"
+> module=3Dgrpc
+> May 18 22:00:10 nocsupport4 dockerd[1104]:
+> time=3D"2021-05-18T22:00:10.253777767-05:00" level=3Dinfo msg=3D"ClientCo=
+nn
+> switching balancer to \"pick_first\"" module=3Dgrpc
+> May 18 22:00:10 nocsupport4 dockerd[1104]:
+> time=3D"2021-05-18T22:00:10.272602278-05:00" level=3Dinfo msg=3D"parsed
+> scheme: \"unix\"" module=3Dgrpc
+> May 18 22:00:10 nocsupport4 dockerd[1104]:
+> time=3D"2021-05-18T22:00:10.272713227-05:00" level=3Dinfo msg=3D"scheme
+> \"unix\" not registered, fallback to default scheme" module=3Dgrpc
+> May 18 22:00:10 nocsupport4 dockerd[1104]:
+> time=3D"2021-05-18T22:00:10.272778900-05:00" level=3Dinfo
+> msg=3D"ccResolverWrapper: sending update to cc:
+> {[{unix:///run/containerd/containerd.sock=A0 <nil> 0 <nil>}] <nil> <nil>}"
+> module=3Dgrpc
+> May 18 22:00:10 nocsupport4 dockerd[1104]:
+> time=3D"2021-05-18T22:00:10.272816740-05:00" level=3Dinfo msg=3D"ClientCo=
+nn
+> switching balancer to \"pick_first\"" module=3Dgrpc
+> May 18 22:00:10 nocsupport4 dockerd[1104]:
+> time=3D"2021-05-18T22:00:10.367601799-05:00" level=3Derror msg=3D"failed =
+to
+> mount overlay: invalid argument" storage-driver=3Doverlay2
+> May 18 22:00:10 nocsupport4 dockerd[1104]:
+> time=3D"2021-05-18T22:00:10.367792469-05:00" level=3Derror
+> msg=3D"[graphdriver] prior storage driver overlay2 failed: driver not
+> supported"
+> May 18 22:00:10 nocsupport4 dockerd[1104]:
+> time=3D"2021-05-18T22:00:10.370914131-05:00" level=3Dinfo msg=3D"stopping
+> event stream following graceful shutdown" error=3D"context canceled"
+> module=3Dlibcontainerd namespace=3Dplugins.moby
+> May 18 22:00:10 nocsupport4 dockerd[1104]: failed to start daemon: error
+> initializing graphdriver: driver not supported
+> May 18 22:00:10 nocsupport4 systemd[1]: docker.service: Main process
+> exited, code=3Dexited, status=3D1/FAILURE
+> May 18 22:00:10 nocsupport4 systemd[1]: docker.service: Failed with
+> result 'exit-code'.
+>=20
+> root@nocsupport4:~# cat /etc/fstab
+> myfs / virtiofs defaults 0 0
+>=20
+> On the host:
+>=20
+> root@noc4:/vmsystems# uname -a
+> Linux noc4.xxxx 5.11.0-17-generic
+>=20
+> root=A0=A0=A0=A0=A0 225434=A0 0.0=A0 0.0=A0 80068=A0 3544 ?=A0=A0=A0=A0=
+=A0=A0=A0 Sl=A0=A0 21:32=A0=A0 0:00
+> /usr/lib/qemu/virtiofsd --fd=3D32 -o
+> source=3D/vmsystems/nocsupport4,xattr,flock,no_posix_lock -o writeback
+> libvirt+=A0 225458 85.5=A0 0.7 4366196 236724 ?=A0=A0=A0=A0=A0 Sl=A0=A0 2=
+1:32=A0=A0 7:34
+> /usr/bin/qemu-system-x86_64 -name guest=3Dnocsupport4,debug-threads=3Don =
+-S
+> -object
+> secret,id=3DmasterKey0,format=3Draw,file=3D/var/lib/libvirt/qemu/domain-6=
+-nocsupport4/master-key.aes
+> -machine pc-q35-5.0,accel=3Dkvm,usb=3Doff,vmport=3Doff,dump-guest-core=3D=
+off
+> -cpu
+> Conroe,vme=3Don,vmx=3Don,cx16=3Don,pdcm=3Don,x2apic=3Don,tsc-deadline=3Do=
+n,hypervisor=3Don,arat=3Don,tsc-adjust=3Don,arch-capabilities=3Don,pdpe1gb=
+=3Don,skip-l1dfl-vmentry=3Don,pschange-mc-no=3Don
+> -m 3584 -overcommit mem-lock=3Doff -smp 2,sockets=3D2,cores=3D1,threads=
+=3D1
+> -object
+> memory-backend-file,id=3Dram-node0,mem-path=3D/dev/hugepages/libvirt/qemu=
+/6-nocsupport4,share=3Dyes,prealloc=3Dyes,size=3D3758096384
+> -numa node,nodeid=3D0,cpus=3D0-1,memdev=3Dram-node0 -uuid
+> c7b055aa-1874-4ba9-9302-26fad866e749 -no-user-config -nodefaults
+> -chardev socket,id=3Dcharmonitor,fd=3D32,server,nowait -mon
+> chardev=3Dcharmonitor,id=3Dmonitor,mode=3Dcontrol -rtc base=3Dutc,driftfi=
+x=3Dslew
+> -global kvm-pit.lost_tick_policy=3Ddelay -no-hpet -no-shutdown -global
+> ICH9-LPC.disable_s3=3D1 -global ICH9-LPC.disable_s4=3D1 -boot strict=3Don
+> -kernel /vmsystems/nocsupport4/boot/vmlinuz -initrd
+> /vmsystems/nocsupport4/boot/initrd.img -append rootfstype=3Dvirtiofs
+> root=3Dmyfs=A0 rw -device
+> pcie-root-port,port=3D0x10,chassis=3D1,id=3Dpci.1,bus=3Dpcie.0,multifunct=
+ion=3Don,addr=3D0x2
+> -device
+> pcie-root-port,port=3D0x11,chassis=3D2,id=3Dpci.2,bus=3Dpcie.0,addr=3D0x2=
+.0x1
+> -device
+> pcie-root-port,port=3D0x12,chassis=3D3,id=3Dpci.3,bus=3Dpcie.0,addr=3D0x2=
+.0x2
+> -device
+> pcie-root-port,port=3D0x13,chassis=3D4,id=3Dpci.4,bus=3Dpcie.0,addr=3D0x2=
+.0x3
+> -device
+> pcie-root-port,port=3D0x14,chassis=3D5,id=3Dpci.5,bus=3Dpcie.0,addr=3D0x2=
+.0x4
+> -device
+> pcie-root-port,port=3D0x15,chassis=3D6,id=3Dpci.6,bus=3Dpcie.0,addr=3D0x2=
+.0x5
+> -device
+> pcie-root-port,port=3D0x16,chassis=3D7,id=3Dpci.7,bus=3Dpcie.0,addr=3D0x2=
+.0x6
+> -device
+> pcie-root-port,port=3D0x17,chassis=3D8,id=3Dpci.8,bus=3Dpcie.0,addr=3D0x2=
+.0x7
+> -device pcie-pci-bridge,id=3Dpci.9,bus=3Dpci.4,addr=3D0x0 -device
+> ich9-usb-ehci1,id=3Dusb,bus=3Dpcie.0,addr=3D0x1d.0x7 -device
+> ich9-usb-uhci1,masterbus=3Dusb.0,firstport=3D0,bus=3Dpcie.0,multifunction=
+=3Don,addr=3D0x1d
+> -device
+> ich9-usb-uhci2,masterbus=3Dusb.0,firstport=3D2,bus=3Dpcie.0,addr=3D0x1d.0=
+x1
+> -device
+> ich9-usb-uhci3,masterbus=3Dusb.0,firstport=3D4,bus=3Dpcie.0,addr=3D0x1d.0=
+x2
+> -device virtio-serial-pci,id=3Dvirtio-serial0,bus=3Dpci.3,addr=3D0x0 -cha=
+rdev
+> socket,id=3Dchr-vu-fs0,path=3D/var/lib/libvirt/qemu/domain-6-nocsupport4/=
+fs0-fs.sock
+> -device
+> vhost-user-fs-pci,chardev=3Dchr-vu-fs0,queue-size=3D1024,tag=3Dmyfs,bus=
+=3Dpci.1,addr=3D0x0
+> -netdev tap,fd=3D46,id=3Dhostnet0,vhost=3Don,vhostfd=3D47 -device
+> virtio-net-pci,netdev=3Dhostnet0,id=3Dnet0,mac=3D52:54:00:30:4d:ca,bus=3D=
+pci.2,addr=3D0x0
+> -chardev pty,id=3Dcharserial0 -device
+> isa-serial,chardev=3Dcharserial0,id=3Dserial0 -chardev
+> socket,id=3Dcharchannel0,fd=3D48,server,nowait -device
+> virtserialport,bus=3Dvirtio-serial0.0,nr=3D1,chardev=3Dcharchannel0,id=3D=
+channel0,name=3Dorg.qemu.guest_agent.0
+> -chardev spicevmc,id=3Dcharchannel1,name=3Dvdagent -device
+> virtserialport,bus=3Dvirtio-serial0.0,nr=3D2,chardev=3Dcharchannel1,id=3D=
+channel1,name=3Dcom.redhat.spice.0
+> -device usb-tablet,id=3Dinput0,bus=3Dusb.0,port=3D1 -spice
+> port=3D5900,addr=3D127.0.0.1,disable-ticketing,seamless-migration=3Don -d=
+evice
+> qxl-vga,id=3Dvideo0,ram_size=3D67108864,vram_size=3D67108864,vram64_size_=
+mb=3D0,vgamem_mb=3D16,max_outputs=3D1,bus=3Dpcie.0,addr=3D0x1
+> -device ich9-intel-hda,id=3Dsound0,bus=3Dpcie.0,addr=3D0x1b -device
+> hda-duplex,id=3Dsound0-codec0,bus=3Dsound0.0,cad=3D0 -device
+> i6300esb,id=3Dwatchdog0,bus=3Dpci.9,addr=3D0x1 -watchdog-action reset -ch=
+ardev
+> spicevmc,id=3Dcharredir0,name=3Dusbredir -device
+> usb-redir,chardev=3Dcharredir0,id=3Dredir0,bus=3Dusb.0,port=3D2 -chardev
+> spicevmc,id=3Dcharredir1,name=3Dusbredir -device
+> usb-redir,chardev=3Dcharredir1,id=3Dredir1,bus=3Dusb.0,port=3D3 -device
+> virtio-balloon-pci,id=3Dballoon0,bus=3Dpci.5,addr=3D0x0 -object
+> rng-random,id=3Dobjrng0,filename=3D/dev/urandom -device
+> virtio-rng-pci,rng=3Dobjrng0,id=3Drng0,bus=3Dpci.6,addr=3D0x0 -sandbox
+> on,obsolete=3Ddeny,elevateprivileges=3Ddeny,spawn=3Ddeny,resourcecontrol=
+=3Ddeny
+> -msg timestamp=3Don
+> root=A0=A0=A0=A0=A0 225472 11.0=A0 0.0 6889960 10848 ?=A0=A0=A0=A0=A0=A0 =
+Sl=A0=A0 21:32=A0=A0 0:58
+> /usr/lib/qemu/virtiofsd --fd=3D32 -o
+> source=3D/vmsystems/nocsupport4,xattr,flock,no_posix_lock -o writeback
+>=20
+>=20
+>=20
+>=20
+>=20
+>=20
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
 

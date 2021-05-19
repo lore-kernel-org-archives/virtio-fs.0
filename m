@@ -1,14 +1,14 @@
-Date: Wed, 19 May 2021 12:17:22 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210519161722.GA738981@horse>
+Date: Wed, 19 May 2021 17:39:44 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YKU/UD9SycU62WSn@work-vm>
 References: <20210518213538.693422-1-vgoyal@redhat.com>
 	<20210518213538.693422-8-vgoyal@redhat.com>
 	<41df4f6a-6d40-745d-aacd-9c4b66a31f3e@gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <41df4f6a-6d40-745d-aacd-9c4b66a31f3e@gmail.com>
 Content-Type: text/plain; charset="iso-8859-1"
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
+In-Reply-To: <41df4f6a-6d40-745d-aacd-9c4b66a31f3e@gmail.com>
 Subject: Re: [Virtio-fs] Regression: Docker in vms broken.
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -21,19 +21,19 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: "Harry G. Coin" <hgcoin@gmail.com>
 Cc: virtio-fs@redhat.com
 
-On Wed, May 19, 2021 at 08:35:59AM -0500, Harry G. Coin wrote:
+* Harry G. Coin (hgcoin@gmail.com) wrote:
 > Something changed in virtiofs, likely to do with overlay support?=A0
 
-I am not aware of any change in virtiofs w.r.t overlay. Are there any
-messages on VM serail console from guest kernel?=20
+Hmm I don't think we have any explicit support in for overlayfs though.
 
-Vivek
-
->=20
 > Docker in a vm with virtiofs as root running with kernel=A0
 > 5.8.0-53-generic works normally.=A0 However, later 5.8 versions and also
 > 5.11 versions fail with:
->=20
+
+Hmm, so what's your last working & first failing version of 5.8 ?
+
+Dave
+
 >=20
 > May 18 22:00:07 nocsupport4 systemd[1]: docker.service: Scheduled
 > restart job, restart counter is at 2.
@@ -217,4 +217,6 @@ Sl=A0=A0 21:32=A0=A0 0:58
 > Virtio-fs mailing list
 > Virtio-fs@redhat.com
 > https://listman.redhat.com/mailman/listinfo/virtio-fs
+--=20
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

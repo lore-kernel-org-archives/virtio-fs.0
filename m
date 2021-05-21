@@ -1,18 +1,15 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=dIarhh7kQdoMISCJccKY5DYZHHV1dh+rcFxZJNgKlb4=;
-	b=A9wFJYohjkcV8tugshuuRX02q6IEX2iLWvkXjHmZ+HMZYQ5ZjqsxHKSGZ0NQtW/HO0
-	/aJ1C6CAxtiLU0C/FihkgYxwvey7608acACMtPrx2wuCh5EiBhdfGfMhSni50J/fl/7M
-	+ukT3crol2UW/Q6v9bF4TfORWQmK0DAQ4OAbU=
-MIME-Version: 1.0
+Date: Fri, 21 May 2021 10:28:33 +0200
+From: Greg Kurz <groug@kaod.org>
+Message-ID: <20210521102833.4a7595b7@bahia.lan>
+In-Reply-To: <YKdtJCo/06q594pM@miu.piliscsaba.redhat.com>
 References: <20210520154654.1791183-1-groug@kaod.org>
-	<20210520154654.1791183-5-groug@kaod.org>
-In-Reply-To: <20210520154654.1791183-5-groug@kaod.org>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Fri, 21 May 2021 10:26:27 +0200
-Message-ID: <CAJfpegugQM-ChaGiLyfPkbFr9c=_BiOBQkJTeEz5yN0ujO_O4A@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH v4 4/5] virtiofs: Skip submounts in sget_fc()
+	<20210520154654.1791183-3-groug@kaod.org>
+	<YKdtJCo/06q594pM@miu.piliscsaba.redhat.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=US-ASCII
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH v4 2/5] fuse: Call vfs_get_tree() for
+	submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,52 +18,64 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
-Cc: linux-kernel@vger.kernel.org, Max Reitz <mreitz@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org, Vivek Goyal <vgoyal@redhat.com>
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: linux-kernel@vger.kernel.org, Max Reitz <mreitz@redhat.com>, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org, Vivek Goyal <vgoyal@redhat.com>
 
-On Thu, 20 May 2021 at 17:47, Greg Kurz <groug@kaod.org> wrote:
->
-> All submounts share the same virtio-fs device instance as the root
-> mount. If the same virtiofs filesystem is mounted again, sget_fc()
-> is likely to pick up any of these submounts and reuse it instead of
-> the root mount.
->
-> On the server side:
->
-> # mkdir ${some_dir}
-> # mkdir ${some_dir}/mnt1
-> # mount -t tmpfs none ${some_dir}/mnt1
-> # touch ${some_dir}/mnt1/THIS_IS_MNT1
-> # mkdir ${some_dir}/mnt2
-> # mount -t tmpfs none ${some_dir}/mnt2
-> # touch ${some_dir}/mnt2/THIS_IS_MNT2
->
-> On the client side:
->
-> # mkdir /mnt/virtiofs1
-> # mount -t virtiofs myfs /mnt/virtiofs1
-> # ls /mnt/virtiofs1
-> mnt1 mnt2
-> # grep virtiofs /proc/mounts
-> myfs /mnt/virtiofs1 virtiofs rw,seclabel,relatime 0 0
-> none on /mnt/mnt1 type virtiofs (rw,relatime,seclabel)
-> none on /mnt/mnt2 type virtiofs (rw,relatime,seclabel)
->
-> And now remount it again:
->
-> # mount -t virtiofs myfs /mnt/virtiofs2
-> # grep virtiofs /proc/mounts
-> myfs /mnt/virtiofs1 virtiofs rw,seclabel,relatime 0 0
-> none on /mnt/mnt1 type virtiofs (rw,relatime,seclabel)
-> none on /mnt/mnt2 type virtiofs (rw,relatime,seclabel)
-> myfs /mnt/virtiofs2 virtiofs rw,seclabel,relatime 0 0
-> # ls /mnt/virtiofs2
-> THIS_IS_MNT2
->
-> Submount mnt2 was picked-up instead of the root mount.
+On Fri, 21 May 2021 10:19:48 +0200
+Miklos Szeredi <miklos@szeredi.hu> wrote:
 
-Why is this a problem?
+> On Thu, May 20, 2021 at 05:46:51PM +0200, Greg Kurz wrote:
+> > We don't set the SB_BORN flag on submounts superblocks. This is wrong
+> > as these superblocks are then considered as partially constructed or
+> > dying in the rest of the code and can break some assumptions.
+> > 
+> > One such case is when you have a virtiofs filesystem and you try to
+> > mount it again : virtio_fs_get_tree() tries to obtain a superblock
+> > with sget_fc(). The matching criteria in virtio_fs_test_super() is
+> > the pointer of the underlying virtiofs device, which is shared by
+> > the root mount and its submounts. This means that any submount can
+> > be picked up instead of the root mount. This is itself a bug :
+> > submounts should be ignored in this case. But, most importantly, it
+> > then triggers an infinite loop in sget_fc() because it fails to grab
+> > the superblock (very easy to reproduce).
+> > 
+> > The only viable solution is to set SB_BORN at some point. This
+> > must be done with vfs_get_tree() because setting SB_BORN requires
+> > special care, i.e. a memory barrier for super_cache_count() which
+> > can check SB_BORN without taking any lock.
+> 
+> Looks correct, but...
+> 
+> as an easily backportable and verifiable bugfix I'd still go with the
+> simple two liner:
+> 
+> --- a/fs/fuse/dir.c
+> +++ b/fs/fuse/dir.c
+> @@ -351,6 +351,9 @@ static struct vfsmount *fuse_dentry_automount(struct path *path)
+>  	list_add_tail(&fm->fc_entry, &fc->mounts);
+>  	up_write(&fc->killsb);
+>  
+> +	smp_wmb();
+> +	sb->s_flags |= SB_BORN;
+> +
 
-Thanks,
-Miklos
+plus the mandatory comment one must put to justify the
+need for a memory barrier.
+
+>  	/* Create the submount */
+>  	mnt = vfs_create_mount(fsc);
+>  	if (IS_ERR(mnt)) {
+> 
+> And have this patch be the cleanup.
+> 
+
+Fair enough.
+
+> Also we need Fixes: and a Cc: stable@... tags on that one.
+> 
+
+Oops, I'll add these in the next round.
+
+> Thanks,
+> Miklos
 

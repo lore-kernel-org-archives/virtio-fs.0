@@ -1,20 +1,18 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=I0bcwMa3PXE6BxBVKmr7yJhO3MpudMurDafu1kpNh8o=;
-	b=egbbFhgbpZilJQP2aMecSiEeWjHfKV1nE/juvi4hnZl1Si+xJsytEUN8Vq0BBuhhQl
-	mPJ9wt6fa38LLItKxFiLWEVBxPGc5+81u3RLfBZ3Tb3/kj6NTcAuaHcgJFk/f+Ha97wR
-	K7P6QP+r2fsm8Jtw76LQ5gTjF+elCuvYTal0Y=
-MIME-Version: 1.0
+Date: Fri, 21 May 2021 15:36:14 +0200
+From: Greg Kurz <groug@kaod.org>
+Message-ID: <20210521153614.061b0005@bahia.lan>
+In-Reply-To: <CAJfpegvBB-zRuZAM0m7fxMFCfw=CzN3uT3CqoQrRgizaTH4sOw@mail.gmail.com>
 References: <20210520154654.1791183-1-groug@kaod.org>
-	<20210520154654.1791183-6-groug@kaod.org>
-	<20210521120840.4658d42c@bahia.lan>
-In-Reply-To: <20210521120840.4658d42c@bahia.lan>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Fri, 21 May 2021 14:51:56 +0200
-Message-ID: <CAJfpegtgPMw-MwWEJVt_=jc76032FShFon0xXUNyWb=zJBypbg@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH v4 5/5] virtiofs: propagate sync() to file
-	server
+	<20210520154654.1791183-5-groug@kaod.org>
+	<CAJfpegugQM-ChaGiLyfPkbFr9c=_BiOBQkJTeEz5yN0ujO_O4A@mail.gmail.com>
+	<20210521103921.153a243d@bahia.lan>
+	<CAJfpegsNBCX+2k4S_yqdTS15TTu=pbiRgw6SbvdVYoUSmGboGA@mail.gmail.com>
+	<20210521120616.49d52565@bahia.lan>
+	<CAJfpegvBB-zRuZAM0m7fxMFCfw=CzN3uT3CqoQrRgizaTH4sOw@mail.gmail.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=US-ASCII
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH v4 4/5] virtiofs: Skip submounts in sget_fc()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,16 +21,125 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
-Cc: linux-kernel@vger.kernel.org, Max Reitz <mreitz@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org, Robert Krawitz <rlk@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: linux-kernel@vger.kernel.org, Max Reitz <mreitz@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org, Vivek Goyal <vgoyal@redhat.com>
 
-On Fri, 21 May 2021 at 12:09, Greg Kurz <groug@kaod.org> wrote:
+On Fri, 21 May 2021 14:37:25 +0200
+Miklos Szeredi <miklos@szeredi.hu> wrote:
 
-> If it looks good to you, maybe you can just merge it and
-> I'll re-post the fixes separately ?
+> On Fri, 21 May 2021 at 12:06, Greg Kurz <groug@kaod.org> wrote:
+> >
+> > On Fri, 21 May 2021 10:50:34 +0200
+> > Miklos Szeredi <miklos@szeredi.hu> wrote:
+> >
+> > > On Fri, 21 May 2021 at 10:39, Greg Kurz <groug@kaod.org> wrote:
+> > > >
+> > > > On Fri, 21 May 2021 10:26:27 +0200
+> > > > Miklos Szeredi <miklos@szeredi.hu> wrote:
+> > > >
+> > > > > On Thu, 20 May 2021 at 17:47, Greg Kurz <groug@kaod.org> wrote:
+> > > > > >
+> > > > > > All submounts share the same virtio-fs device instance as the root
+> > > > > > mount. If the same virtiofs filesystem is mounted again, sget_fc()
+> > > > > > is likely to pick up any of these submounts and reuse it instead of
+> > > > > > the root mount.
+> > > > > >
+> > > > > > On the server side:
+> > > > > >
+> > > > > > # mkdir ${some_dir}
+> > > > > > # mkdir ${some_dir}/mnt1
+> > > > > > # mount -t tmpfs none ${some_dir}/mnt1
+> > > > > > # touch ${some_dir}/mnt1/THIS_IS_MNT1
+> > > > > > # mkdir ${some_dir}/mnt2
+> > > > > > # mount -t tmpfs none ${some_dir}/mnt2
+> > > > > > # touch ${some_dir}/mnt2/THIS_IS_MNT2
+> > > > > >
+> > > > > > On the client side:
+> > > > > >
+> > > > > > # mkdir /mnt/virtiofs1
+> > > > > > # mount -t virtiofs myfs /mnt/virtiofs1
+> > > > > > # ls /mnt/virtiofs1
+> > > > > > mnt1 mnt2
+> > > > > > # grep virtiofs /proc/mounts
+> > > > > > myfs /mnt/virtiofs1 virtiofs rw,seclabel,relatime 0 0
+> > > > > > none on /mnt/mnt1 type virtiofs (rw,relatime,seclabel)
+> > > > > > none on /mnt/mnt2 type virtiofs (rw,relatime,seclabel)
+> > > > > >
+> > > > > > And now remount it again:
+> > > > > >
+> > > > > > # mount -t virtiofs myfs /mnt/virtiofs2
+> > > > > > # grep virtiofs /proc/mounts
+> > > > > > myfs /mnt/virtiofs1 virtiofs rw,seclabel,relatime 0 0
+> > > > > > none on /mnt/mnt1 type virtiofs (rw,relatime,seclabel)
+> > > > > > none on /mnt/mnt2 type virtiofs (rw,relatime,seclabel)
+> > > > > > myfs /mnt/virtiofs2 virtiofs rw,seclabel,relatime 0 0
+> > > > > > # ls /mnt/virtiofs2
+> > > > > > THIS_IS_MNT2
+> > > > > >
+> > > > > > Submount mnt2 was picked-up instead of the root mount.
+> > > > >
+> > > >
+> > > > > Why is this a problem?
+> > > > >
+> > > >
+> > > > It seems very weird to mount the same filesystem again
+> > > > and to end up in one of its submounts. We should have:
+> > > >
+> > > > # ls /mnt/virtiofs2
+> > > > mnt1 mnt2
+> > >
+> > > Okay, sorry, I understand the problem.  The solution is wrong,
+> > > however: the position of the submount on that list is no indication
+> > > that it's the right one (it's possible that the root sb will go away
+> > > and only a sub-sb will remain).
+> > >
+> >
+> > Ah... I had myself convinced this could not happen, i.e. you can't
+> > unmount a parent sb with a sub-sb still mounted.
+> 
+> No, but it's possible for sub-sb to continue existing after it's no
+> longer a submount of original mount.
+> >
+> > How can this happen ?
+> 
+> E.g. move the submount out of the way, then unmount the parent, or
+> detach submount (umount -l) while keeping something open in there and
+> umount the parent.
+> 
 
-Looks good, applied.
+Ok, I get it now. Thanks for the clarification.
 
-Thanks,
-Miklos
+> > > Even just setting a flag in the root, indicating that it's the root
+> > > isn't fully going to solve the problem.
+> > >
+> > > Here's issue in full:
+> > >
+> > > case 1:  no connection for "myfs" exists
+> > >     - need to create fuse_conn, sb
+> > >
+> > > case 2: connection for "myfs" exists but only sb for submount
+> >
+> > How would we know this sb isn't a root sb ?
+> >
+> > >     - only create sb for root, reuse fuse_conn
+> > >
+> > > case 3: connection for "myfs" as well as root sb exists
+> > >    - reuse sb
+> > >
+> > > I'll think about how to fix this properly, it's probably going to be
+> > > rather more involved...
+> > >
+> >
+> > Sure. BTW I'm wondering why we never reuse sbs for submounts ?
+> 
+> Right, same general issue.
+> 
+> An sb can be identified by its root nodeid, so I guess the proper fix
+> to make the root nodeid be the key for virtio_fs_test_super().
+> 
+
+Cool, I was thinking about doing this exactly. :)
+
+> Thanks,
+> Miklos
 

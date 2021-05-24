@@ -1,12 +1,12 @@
-From: Greg Kurz <groug@kaod.org>
-Date: Fri,  4 Jun 2021 18:11:53 +0200
-Message-Id: <20210604161156.408496-5-groug@kaod.org>
-In-Reply-To: <20210604161156.408496-1-groug@kaod.org>
-References: <20210604161156.408496-1-groug@kaod.org>
+Date: Mon, 24 May 2021 09:10:29 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YKtfdQBLLqUt7Ycx@work-vm>
+References: <489d6710-2e39-8058-a7db-80166c603ce4@linux.vnet.ibm.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 4/7] fuse: Add dedicated filesystem context
-	ops for submounts
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <489d6710-2e39-8058-a7db-80166c603ce4@linux.vnet.ibm.com>
+Subject: Re: [Virtio-fs] virtiofs: Support for SEV encrypted guests
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,94 +15,57 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Max Reitz <mreitz@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
+To: Jim Cadden <jcadden@linux.vnet.ibm.com>
+Cc: virtio-fs@redhat.com
 
-The creation of a submount is open-coded in fuse_dentry_automount().
-This brings a lot of complexity and we recently had to fix bugs
-because we weren't setting SB_BORN or because we were unlocking
-sb->s_umount before sb was fully configured. Most of these could
-have been avoided by using the mount API instead of open-coding.
+* Jim Cadden (jcadden@linux.vnet.ibm.com) wrote:
+> Do you know if virtio-fs can support SEV encrypted guests?
+> 
+> I work on a project adding SEV support into kata containers. So far, we've
+> been unable to boot SEV guests
+> with kata's virtio-fs option (and use virtio-9p instead):
+> 
+> May 19 16:52:05 sev1 virtiofsd[74904]: [ID: 00074904] virtio_session_mount:
+> Received vhost-user socket connection
+> May 19 16:52:05 sev1 virtiofsd[74914]: [ID: 00000001] virtio_loop: Entry
+> ...
+> May 19 16:52:07 sev1 virtiofsd[74914]: [ID: 00000001] virtio_loop: Got VU
+> event
+> May 19 16:52:07 sev1 virtiofsd[74914]: [ID: 00000001] fv_panic:
+> libvhost-user: Invalid vring_addr message
+> 
+> I know that other virtio devices use iommu and DMA apis to share
+> non-encrypted pages between the host
+> and encrypted guest. Could something similar be done with virtiofsd andthe
+> virtio-fs virtio device?
 
-Basically, this means coming up with a proper ->get_tree()
-implementation for submounts and call vfs_get_tree(), or better
-fc_mount().
+I guess if you can guarantee that everything is going through
+non-encrypted pages with the iommu, there shouldn't be a difference?
+My only other worry is whether SEV works with a shared-memory backing
+(e.g. /dev/shm or memfd with mmap shared).
 
-The creation of the superblock for submounts is quite different from
-the root mount. Especially, it doesn't require to allocate a FUSE
-filesystem context, nor to parse parameters.
+I know there's an existing bug saying that virtio-fs doesn't work with
+viommu:
+https://bugzilla.redhat.com/show_bug.cgi?id=1812886
 
-Introduce a dedicated context ops for submounts to make this clear.
-This is just a placeholder for now, fuse_get_tree_submount() will
-be populated in a subsequent patch.
+so I suspect it's fall out from that;  I think we just haven't
+implemented the iommu compat code in the daemon.
 
-Only visible change is that we stop allocating/freeing a useless FUSE
-filesystem context with submounts.
+> There are reported problems with vhost-user and SEV:
+> https://bugzilla.redhat.com/show_bug.cgi?id=1797058
 
-Signed-off-by: Greg Kurz <groug@kaod.org>
----
- fs/fuse/fuse_i.h    |  5 +++++
- fs/fuse/inode.c     | 16 ++++++++++++++++
- fs/fuse/virtio_fs.c |  3 +++
- 3 files changed, 24 insertions(+)
+Yes, although it wasn't clear if that was just a performance problem or
+not.
 
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 7e463e220053..862ad317bc89 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -1097,6 +1097,11 @@ int fuse_fill_super_submount(struct super_block *sb,
-  */
- bool fuse_mount_remove(struct fuse_mount *fm);
- 
-+/*
-+ * Setup context ops for submounts
-+ */
-+int fuse_init_fs_context_submount(struct fs_context *fsc);
-+
- /*
-  * Shut down the connection (possibly sending DESTROY request).
-  */
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index 393e36b74dc4..fa96a3762ea2 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -1313,6 +1313,22 @@ int fuse_fill_super_submount(struct super_block *sb,
- 	return 0;
- }
- 
-+static int fuse_get_tree_submount(struct fs_context *fsc)
-+{
-+	return 0;
-+}
-+
-+static const struct fs_context_operations fuse_context_submount_ops = {
-+	.get_tree	= fuse_get_tree_submount,
-+};
-+
-+int fuse_init_fs_context_submount(struct fs_context *fsc)
-+{
-+	fsc->ops = &fuse_context_submount_ops;
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(fuse_init_fs_context_submount);
-+
- int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
- {
- 	struct fuse_dev *fud = NULL;
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index bcb8a02e2d8b..e68467cc765c 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -1496,6 +1496,9 @@ static int virtio_fs_init_fs_context(struct fs_context *fsc)
- {
- 	struct fuse_fs_context *ctx;
- 
-+	if (fsc->purpose == FS_CONTEXT_FOR_SUBMOUNT)
-+		return fuse_init_fs_context_submount(fsc);
-+
- 	ctx = kzalloc(sizeof(struct fuse_fs_context), GFP_KERNEL);
- 	if (!ctx)
- 		return -ENOMEM;
+Dave
+
+> Thanks for any insight,
+> Jim
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
 -- 
-2.31.1
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

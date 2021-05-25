@@ -1,17 +1,13 @@
-Date: Thu, 10 Jun 2021 16:53:26 -0400
-From: virtiofs-bot@sinrega.org
-Message-Id: <78958.121061016532004215@us-mta-44.us.mimecast.lan>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm3; bh=vRdTomjeXo8vecvuc
-	H40a30bCvEo7B9E9upzoXOT4Cc=; b=g2M2mghihBAfpjWV0JNYL6paXIJEWdX+r
-	9MhDrjW7hfA1ePeSgWqv3O66PZzyFXB3pAPVjav+Ui/4J5rSswOZRhZ5bvc3iA+e
-	KnYTmm65n+krrfdCm0OypZ/mgPSoHSdF+Q8AkCFrvHIu9b9xdnzNM1X2F1w28iln
-	mFInL8ZeaPAX9wazCnLK6UN36bri2c4DrPbcR3lmmLymEkXZdBo9mIwQGU0yYohL
-	pWld49mbZ1Ons9/AGNETgOMF/n//bM1IoEcvnFhPxQ0EaL3KmbfeXzGbC6HrZD6P
-	lg6ve/q0rzGbLXftcIaMKSTapcs9vyU7MBoRCbMC6ctb8nGIj1Q2Q==
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] MR opened: Enable killpriv v2 support
+Date: Tue, 25 May 2021 19:49:15 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YK1Gq663KZxQPlVI@work-vm>
+References: <20210518213538.693422-1-vgoyal@redhat.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20210518213538.693422-1-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v2 0/7] virtiofsd: Few cleanups in
+	virtio_send_data_iov()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,13 +16,44 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-Most of this series is just setup, introducing the relevant FUSE flags needed to our FUSE types.
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> Hi,
+> 
+> This is V2 of the patches. Changes since V1 are.
+> 
+> - Took care of coding style issue.
+> - Got rid of label "err" completely in last patch. (Dave, Connor). 
+> - Captured Reviewed-by tags from Connor and David.
+> 
+> Code in virtio_send_data_iov() little twisted and complicated. This
+> patch series just tries to simplify it a bit to make it little easier
+> to read this piece of code.
 
-When applied, the pjdfstests suite now passes without any failures since the killpriv v2 semantics are upheld by the server.
+Queued
 
-Signed-off-by: Connor Kuehl <ckuehl@redhat.com>
----
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/31
+> Thanks
+> Vivek
+> 
+> 
+> Vivek Goyal (7):
+>   virtiofsd: Check for EINTR in preadv() and retry
+>   virtiofsd: Get rid of unreachable code in read
+>   virtiofsd: Use iov_discard_front() to skip bytes
+>   virtiofsd: get rid of in_sg_left variable
+>   virtiofsd: Simplify skip byte logic
+>   virtiofsd: Check EOF before short read
+>   virtiofsd: Set req->reply_sent right after sending reply
+> 
+>  tools/virtiofsd/fuse_virtio.c | 81 +++++++++++------------------------
+>  1 file changed, 25 insertions(+), 56 deletions(-)
+> 
+> -- 
+> 2.25.4
+> 
+> 
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

@@ -1,14 +1,11 @@
-Date: Wed, 9 Jun 2021 11:45:43 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210609154543.GA579806@redhat.com>
-References: <20210608153524.GB504497@redhat.com>
-	<YMCPPCbjbRoPAEcL@stefanha-x1.localdomain>
+From: Greg Kurz <groug@kaod.org>
+Date: Tue, 25 May 2021 17:02:29 +0200
+Message-Id: <20210525150230.157586-4-groug@kaod.org>
+In-Reply-To: <20210525150230.157586-1-groug@kaod.org>
+References: <20210525150230.157586-1-groug@kaod.org>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <YMCPPCbjbRoPAEcL@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH] init/do_mounts.c: Add root="fstag:<tag>"
- syntax for root device
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 3/4] fuse: Call vfs_get_tree() for submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,228 +14,204 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: David Howells <dhowells@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, Richard Weinberger <richard.weinberger@gmail.com>, Dominique Martinet <asmadeus@codewreck.org>, linux kernel mailing list <linux-kernel@vger.kernel.org>, virtio-fs@redhat.com, viro@zeniv.linux.org.uk, Christoph Hellwig <hch@infradead.org>, linux-fsdevel@vger.kernel.org, v9fs-developer@lists.sourceforge.net
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, linux-kernel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
 
-On Wed, Jun 09, 2021 at 10:51:56AM +0100, Stefan Hajnoczi wrote:
-> On Tue, Jun 08, 2021 at 11:35:24AM -0400, Vivek Goyal wrote:
-> > We want to be able to mount virtiofs as rootfs and pass appropriate
-> > kernel command line. Right now there does not seem to be a good way
-> > to do that. If I specify "root=myfs rootfstype=virtiofs", system
-> > panics.
-> > 
-> > virtio-fs: tag </dev/root> not found
-> > ..
-> > ..
-> > [ end Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0) ]
-> > 
-> > Basic problem here is that kernel assumes that device identifier
-> > passed in "root=" is a block device. But there are few execptions
-> > to this rule to take care of the needs of mtd, ubi, NFS and CIFS.
-> > 
-> > For example, mtd and ubi prefix "mtd:" or "ubi:" respectively.
-> > 
-> > "root=mtd:<identifier>" or "root=ubi:<identifier>"
-> > 
-> > NFS and CIFS use "root=/dev/nfs" and CIFS passes "root=/dev/cifs" and
-> > actual root device details come from filesystem specific kernel
-> > command line options.
-> > 
-> > virtiofs does not seem to fit in any of the above categories. In fact
-> > we have 9pfs which can be used to boot from but it also does not
-> > have a proper syntax to specify rootfs and does not fit into any of
-> > the existing syntax. They both expect a device "tag" to be passed
-> > in a device to be mounted. And filesystem knows how to parse and
-> > use "tag".
-> > 
-> > So this patch proposes that we add a new prefix "fstag:" which specifies
-> > that identifier which follows is filesystem specific tag and its not
-> > a block device. Just pass this tag to filesystem and filesystem will
-> > figure out how to mount it.
-> > 
-> > For example, "root=fstag:<tag>".
-> > 
-> > In case of virtiofs, I can specify "root=fstag:myfs rootfstype=virtiofs"
-> > and it works.
-> > 
-> > I think this should work for 9p as well. "root=fstag:myfs rootfstype=9p".
-> > Though I have yet to test it.
-> > 
-> > This kind of syntax should be able to address wide variety of use cases
-> > where root device is not a block device and is simply some kind of
-> > tag/label understood by filesystem.
-> 
-> "fstag" is kind of virtio-9p/fs specific. The intended effect is really
-> to specify the file system source (like in mount(2)) without it being
-> interpreted as a block device.
+We recently fixed an infinite loop by setting the SB_BORN flag on
+submounts along with the write barrier needed by super_cache_count().
+This is the job of vfs_get_tree() and FUSE shouldn't have to care
+about the barrier at all.
 
-[ CC christoph ]
+Split out some code from fuse_dentry_automount() to a new dedicated
+fuse_get_tree_submount() handler for submounts and call vfs_get_tree().
 
-I think mount(2) has little different requirements. It more or less
-passes the source to filesystem. But during early boot, we do so
-much more with source, that is parse it and determine device major
-and minor and create blockdevice and then call into filesystem.
+The fs_private field of the filesystem context isn't used with
+submounts : hijack it to pass the FUSE inode of the mount point
+down to fuse_get_tree_submount().
 
-> 
-> In a previous discussion David Gilbert suggested detecting file systems
-> that do not need a block device:
-> https://patchwork.kernel.org/project/linux-fsdevel/patch/20190906100324.8492-1-stefanha@redhat.com/
-> 
-> I never got around to doing it, but can do_mounts.c just look at struct
-> file_system_type::fs_flags FS_REQUIRES_DEV to detect non-block device
-> file systems?
+Finally, adapt virtiofs to use this.
 
-I guess we can use FS_REQUIRES_DEV. We probably will need to add a helper
-to determine if filesystem passed in "rootfstype=" has FS_REQUIRES_DEV
-set or not.
-
-For now, I have written a patch which does not rely on FS_REQUIRES_DEV.
-Instead I have created an array of filesystems which do not want
-root=<source> to be treated as block device and expect that "source"
-will be directly passed to filesytem to be mounted.
-
-Reason I am not parsing FS_REQUIRES_DEV yet is that I am afraid that
-this can change behavior and introduce regression. Some filesystem
-which does not have FS_REQUIRES_DEV set but still somehow is going
-through block device path (or some path which I can't see yet).
-
-So for now I am playing safe and explicitly creating a list of
-filesystems which will opt-in into this behavior. But if folks think
-that my fears of regression are misplaced and I should parse
-FS_REQUIRES_DEV and that way any filesystem which does not have
-FS_REQUIRES_DEV set automatically gets opted in, I can do that.
-
-> 
-> That way it would know to just mount with root= as the source instead of
-> treating it as a block device. No root= prefix would be required and it
-> would handle NFS, virtiofs, virtio-9p, etc without introducing the
-> concept of a "tag".
-> 
->   root=myfs rootfstype=virtiofs rootflags=...
-> 
-> I wrote this up quickly after not thinking about the topic for 2 years,
-> so the idea may not work at all :).
-
-Now with this patch "root=myfs, rootfstype=virtiofs, rootflags=..." syntax
-works for virtiofs.
-
-Please have a look.
-
-Thanks
-Vivek
-
-
-Subject: [PATCH] init/do_mounts.c: Add a path to boot from non blockdev filesystems
-
-We want to be able to mount virtiofs as rootfs and pass appropriate
-kernel command line. Right now there does not seem to be a good way
-to do that. If I specify "root=myfs rootfstype=virtiofs", system
-panics.
-
-virtio-fs: tag </dev/root> not found
-..
-..
-[ end Kernel panic - not syncing: VFS: Unable to mount root fs on
-+unknown-block(0,0) ]
-
-Basic problem here is that kernel assumes that device identifier
-passed in "root=" is a block device. But there are few execptions
-to this rule to take care of the needs of mtd, ubi, NFS and CIFS.
-
-For example, mtd and ubi prefix "mtd:" or "ubi:" respectively.
-
-"root=mtd:<identifier>" or "root=ubi:<identifier>"
-
-NFS and CIFS use "root=/dev/nfs" and CIFS passes "root=/dev/cifs" and
-actual root device details come from filesystem specific kernel
-command line options.
-
-virtiofs does not seem to fit in any of the above categories. In fact
-we have 9pfs which can be used to boot from but it also does not
-have a proper syntax to specify rootfs and does not fit into any of
-the existing syntax. They both expect a device "tag" to be passed
-in a device to be mounted. And filesystem knows how to parse and
-use "tag".
-
-So this patch proposes that we internally create a list of filesystems
-which don't expect a block device and whatever "source" has been
-passed in "root=<source>" option, should be passed to filesystem and
-filesystem should be able to figure out how to use "source" to
-mount filesystem.
-
-As of now I have only added "virtiofs" in the list of such filesystems.
-To enable it on 9p, it should be a simple change. Just add "9p" to
-the nobdev_filesystems[] array.
-
-And any other file system which is fine with these semantics, that
-is pass "source" to filesystem directo to mount, should be able
-to work with it easily. 
-
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Signed-off-by: Greg Kurz <groug@kaod.org>
 ---
- init/do_mounts.c |   30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ fs/fuse/dir.c       | 58 +++++++--------------------------------------
+ fs/fuse/fuse_i.h    |  6 +++++
+ fs/fuse/inode.c     | 44 ++++++++++++++++++++++++++++++++++
+ fs/fuse/virtio_fs.c |  3 +++
+ 4 files changed, 62 insertions(+), 49 deletions(-)
 
-Index: redhat-linux/init/do_mounts.c
-===================================================================
---- redhat-linux.orig/init/do_mounts.c	2021-06-09 11:12:58.839309965 -0400
-+++ redhat-linux/init/do_mounts.c	2021-06-09 11:41:56.642982703 -0400
-@@ -31,6 +31,8 @@
- int root_mountflags = MS_RDONLY | MS_SILENT;
- static char * __initdata root_device_name;
- static char __initdata saved_root_name[64];
-+static char *__initdata nobdev_filesystems[] = {"virtiofs"};
-+static bool __initdata nobdev_root = false;
- static int root_wait;
+diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
+index 3b0482738741..97649dcfeccd 100644
+--- a/fs/fuse/dir.c
++++ b/fs/fuse/dir.c
+@@ -309,12 +309,8 @@ static int fuse_dentry_delete(const struct dentry *dentry)
+ static struct vfsmount *fuse_dentry_automount(struct path *path)
+ {
+ 	struct fs_context *fsc;
+-	struct fuse_mount *parent_fm = get_fuse_mount_super(path->mnt->mnt_sb);
+-	struct fuse_conn *fc = parent_fm->fc;
+-	struct fuse_mount *fm;
+ 	struct vfsmount *mnt;
+ 	struct fuse_inode *mp_fi = get_fuse_inode(d_inode(path->dentry));
+-	struct super_block *sb;
+ 	int err;
  
- dev_t ROOT_DEV;
-@@ -552,6 +554,14 @@ void __init mount_root(void)
- 		return;
+ 	fsc = fs_context_for_submount(path->mnt->mnt_sb->s_type, path->dentry);
+@@ -323,47 +319,17 @@ static struct vfsmount *fuse_dentry_automount(struct path *path)
+ 		goto out;
  	}
- #endif
-+	if (nobdev_root) {
-+		if (!do_mount_root(root_device_name, root_fs_names,
-+				   root_mountflags, root_mount_data))
-+			return;
-+		panic("VFS: Unable to mount root \"%s\" via \"%s\"\n",
-+		      root_device_name, root_fs_names);
-+	}
-+
- #ifdef CONFIG_BLOCK
- 	{
- 		int err = create_dev("/dev/root", ROOT_DEV);
-@@ -563,6 +573,22 @@ void __init mount_root(void)
- #endif
- }
  
-+static bool nobdev_rootfs(char *name)
-+{
-+	int i, len;
-+
-+	len = sizeof(nobdev_filesystems)/sizeof(nobdev_filesystems[0]);
-+
-+	for (i = 0; i < len; i++) {
-+		int name_len = strlen(nobdev_filesystems[i]) + 1;
-+
-+               if (!strncmp(nobdev_filesystems[i], name, name_len))
-+                       return true;
-+       }
-+
-+       return false;
-+}
+-	err = -ENOMEM;
+-	fm = kzalloc(sizeof(struct fuse_mount), GFP_KERNEL);
+-	if (!fm)
+-		goto out_put_fsc;
+-
+-	fsc->s_fs_info = fm;
+-	sb = sget_fc(fsc, NULL, set_anon_super_fc);
+-	if (IS_ERR(sb)) {
+-		err = PTR_ERR(sb);
+-		kfree(fm);
+-		goto out_put_fsc;
+-	}
+-	fm->fc = fuse_conn_get(fc);
+-
+-	/* Initialize superblock, making @mp_fi its root */
+-	err = fuse_fill_super_submount(sb, mp_fi);
+-	if (err) {
+-		fuse_conn_put(fc);
+-		kfree(fm);
+-		sb->s_fs_info = NULL;
+-		goto out_put_sb;
+-	}
+-
+ 	/*
+-	 * FIXME: setting SB_BORN requires a write barrier for
+-	 *        super_cache_count(). We should actually come
+-	 *        up with a proper ->get_tree() implementation
+-	 *        for submounts and call vfs_get_tree() to take
+-	 *        care of the write barrier.
++	 * Hijack fsc->fs_private to pass the mount point inode to
++	 * fuse_get_tree_submount(). It *must* be NULLified afterwards
++	 * to avoid the inode pointer to be passed to kfree() when
++	 * the context gets freed.
+ 	 */
+-	smp_wmb();
+-	sb->s_flags |= SB_BORN;
+-
+-	sb->s_flags |= SB_ACTIVE;
+-	fsc->root = dget(sb->s_root);
+-	/* We are done configuring the superblock, so unlock it */
+-	up_write(&sb->s_umount);
+-
+-	down_write(&fc->killsb);
+-	list_add_tail(&fm->fc_entry, &fc->mounts);
+-	up_write(&fc->killsb);
++	fsc->fs_private = mp_fi;
++	err = vfs_get_tree(fsc);
++	fsc->fs_private = NULL;
++	if (err)
++		goto out_put_fsc;
+ 
+ 	/* Create the submount */
+ 	mnt = vfs_create_mount(fsc);
+@@ -375,12 +341,6 @@ static struct vfsmount *fuse_dentry_automount(struct path *path)
+ 	put_fs_context(fsc);
+ 	return mnt;
+ 
+-out_put_sb:
+-	/*
+-	 * Only jump here when fsc->root is NULL and sb is still locked
+-	 * (otherwise put_fs_context() will put the superblock)
+-	 */
+-	deactivate_locked_super(sb);
+ out_put_fsc:
+ 	put_fs_context(fsc);
+ out:
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index 7e463e220053..d7fcf59a6a0e 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -1090,6 +1090,12 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx);
+ int fuse_fill_super_submount(struct super_block *sb,
+ 			     struct fuse_inode *parent_fi);
+ 
++/*
++ * Get the mountable root for the submount
++ * @fsc: superblock configuration context
++ */
++int fuse_get_tree_submount(struct fs_context *fsc);
 +
  /*
-  * Prepare the namespace - decide what/where to mount, load ramdisks, etc.
-  */
-@@ -593,6 +619,10 @@ void __init prepare_namespace(void)
- 			goto out;
- 		}
- 		ROOT_DEV = name_to_dev_t(root_device_name);
-+		if (ROOT_DEV == 0 && root_fs_names) {
-+			if (nobdev_rootfs(root_fs_names))
-+				nobdev_root = true;
-+		}
- 		if (strncmp(root_device_name, "/dev/", 5) == 0)
- 			root_device_name += 5;
- 	}
+  * Remove the mount from the connection
+  *
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index 393e36b74dc4..433ca2b13046 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -1313,6 +1313,50 @@ int fuse_fill_super_submount(struct super_block *sb,
+ 	return 0;
+ }
+ 
++/* Filesystem context private data holds the FUSE inode of the mount point */
++int fuse_get_tree_submount(struct fs_context *fsc)
++{
++	struct fuse_mount *fm;
++	struct fuse_inode *mp_fi = fsc->fs_private;
++	struct fuse_conn *fc = get_fuse_conn(&mp_fi->inode);
++	struct super_block *sb;
++	int err;
++
++	fm = kzalloc(sizeof(struct fuse_mount), GFP_KERNEL);
++	if (!fm)
++		return -ENOMEM;
++
++	fsc->s_fs_info = fm;
++	sb = sget_fc(fsc, NULL, set_anon_super_fc);
++	if (IS_ERR(sb)) {
++		kfree(fm);
++		return PTR_ERR(sb);
++	}
++	fm->fc = fuse_conn_get(fc);
++
++	/* Initialize superblock, making @mp_fi its root */
++	err = fuse_fill_super_submount(sb, mp_fi);
++	if (err) {
++		fuse_conn_put(fc);
++		kfree(fm);
++		sb->s_fs_info = NULL;
++		deactivate_locked_super(sb);
++		return err;
++	}
++
++	sb->s_flags |= SB_ACTIVE;
++	fsc->root = dget(sb->s_root);
++	/* We are done configuring the superblock, so unlock it */
++	up_write(&sb->s_umount);
++
++	down_write(&fc->killsb);
++	list_add_tail(&fm->fc_entry, &fc->mounts);
++	up_write(&fc->killsb);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(fuse_get_tree_submount);
++
+ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
+ {
+ 	struct fuse_dev *fud = NULL;
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index bcb8a02e2d8b..e12e5190352c 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -1420,6 +1420,9 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
+ 	unsigned int virtqueue_size;
+ 	int err = -EIO;
+ 
++	if (fsc->purpose == FS_CONTEXT_FOR_SUBMOUNT)
++		return fuse_get_tree_submount(fsc);
++
+ 	/* This gets a reference on virtio_fs object. This ptr gets installed
+ 	 * in fc->iq->priv. Once fuse_conn is going away, it calls ->put()
+ 	 * to drop the reference to this object.
+-- 
+2.31.1
 

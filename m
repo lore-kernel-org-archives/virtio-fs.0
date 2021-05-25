@@ -1,18 +1,10 @@
-References: <2234280.ElGaqSPkdT@subpop>
-	<ebd44751-333c-cb7a-5776-c63501558af6@redhat.com>
-	<9W25UQ.OHKWX78P32DI3@sub-pop.net> <YLksUpVCCovgUAtq@work-vm>
-	<MYJ5UQ.562L1XU7LNSJ3@sub-pop.net> <0KN5UQ.JVDR5LJRMJIQ3@sub-pop.net>
-	<20210604134439.GB269481@redhat.com> <YLoxwQIyqAazPHqf@redhat.com>
-From: Daniel Walsh <dwalsh@redhat.com>
-Message-ID: <15e860ba-5ea3-90d6-eccf-6003f6874bc7@redhat.com>
-Date: Mon, 7 Jun 2021 09:01:08 -0400
+From: Greg Kurz <groug@kaod.org>
+Date: Tue, 25 May 2021 17:02:26 +0200
+Message-Id: <20210525150230.157586-1-groug@kaod.org>
+Content-Type: text/plain; charset="utf-8"
 MIME-Version: 1.0
-In-Reply-To: <YLoxwQIyqAazPHqf@redhat.com>
-Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Transfer-Encoding: 8bit
-Content-Language: en-US
-Subject: Re: [Virtio-fs] virtiofs mounted filesystems & SELinux
-Reply-To: dwalsh@redhat.com
+Subject: [Virtio-fs] [PATCH 0/4] fuse: Some fixes for submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,137 +13,28 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: =?UTF-8?Q?Daniel_P=2e_Berrang=c3=a9?= <berrange@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, libvirt-users@redhat.com, Link Dupont <link@sub-pop.net>
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, linux-kernel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
 
-On 6/4/21 09:59, Daniel P. Berrangé wrote:
-> On Fri, Jun 04, 2021 at 09:44:39AM -0400, Vivek Goyal wrote:
->> On Thu, Jun 03, 2021 at 10:14:24PM -0400, Link Dupont wrote:
->>> On Thu, Jun 3 2021 at 08:56:46 PM -0400, Link Dupont <link@sub-pop.net>
->>> wrote:
->>>>   reproducible scenarios
->>> Alright. I reran my tests with a CentOS 8 guest. On CentOS 8 (with a
->>> virtiofs filesystem and with xattr on), the type of files in the mounted
->>> hierarchy are unlabeled_t. I can work around that by switching SELinux in
->>> the guest to permissive or disabled.
->> cc Dan Walsh. I was discussing this with Dan Walsh yesterday in general.
->>
->> In general, if we want to enable SELinux both on host and guest, then
->> both host and guest should have same SELinux policy. Otherwise there
->> will be lot of different kind of conflicts because both host and
->> guest will try to work with same selinux label. I guess that in
->> practice this will be very hard to achieve as people will run
->> different host and guest flavors and these might have different
->> policies.
-> Yeah, I think there's little to no chance of people keeping the
-> same SELinux policy in host/guest, except in very tightly controlled
-> narrow use cases where the host admin exerts direct control over
-> the precise guest config.
->
->
->> So another option is to rename selinux xattr in virtiofs so that
->> any selinux xattr coming from guest is saved as
->> user.virtiofs.security.selinux xattr on host. That way host and guest
->> can have their separate labels without interfering with each other.
->> David Gilbert already has added support for this. I can't remember
->> the exact syntax but you can figure it out from documentation here
->> in xattr remappig section.
-> For general purpose virt usage, I think remapping in some way is
-> likely to be needed as the default strategy.
->
->> https://github.com/qemu/qemu/blob/master/docs/tools/virtiofsd.rst
->>
->> But I have question with selinux xattr remapping. What will happen
->> to initial labels when fs is exported. I mean until and unless
->> some process in guest labels all the exported files, they all
->> with either be unlabeled or pick some generic label for all the
->> files.
-> I'd say you need some mechanism to force a re-label inside the
-> guest. Normally a relabel will be done in /.autorelabel file
-> is present, or in certain other scenarios like selinux policy
-> RPM updates.
->
-> We wouldn't want to force a relabel neccesarily for the entire
-> FS if we're just hotplugging a new virtiofs export though. So
-> perhaps there's scope for supporting usage of a per-mount
-> point relabel trigger. eg Host creates $VIRTIOFS-ROOT/.autorelabel
-> and whenever the guest sees a new virtiofs export arriving, it
-> can look for $VIRTIOFS-MOUNT-POINT/.autorelabel
->
->> Another option is, can we use a single label for whole of the
->> virtiofs (using context=<label>) option in guest. That way nothing
->> is saved in files as such. But this means that processes in guest
->> can't have different selinux labels on different virtiofs dir/files.
-> Forcing a single label for the entire export is passable as a
-> fallback plan. This is what people have done for years with
-> NFS v3 mounts. It has annoying usage limitations though, so
-> if at all possible remapping is a preferrable approach.
->
->> Dan, what do you think?
->>
->> Thanks
->> Vivek
->>
->>
->>> With a CentOS 7 guest, things get less usable. I digested this to a
->>> reproducible scenario.
->>>
->>> Build a disk image with `virt-builder`, configuring the CentOS Plus kernel
->>> to get 9p support.
->>>
->>> virt-builder centos-7.8 \
->>> --root-password password:centos \
->>> --output centos-7.8.qcow2 \
->>> --install yum-utils \
->>> --run-command 'yum-config-manager --enable centosplus' \
->>> --run-command 'sed -ie "s/DEFAULTKERNEL=kernel/DEFAULTKERNEL=kernel-plus/"
->>> /etc/sysconfig/kernel' \
->>> --append-line '/etc/dracut.conf.d/virtio.conf:add_drivers+="virtio_scsi
->>> virtio_pci virtio_console"' \
->>> --append-line '/etc/modules-load.d/9pnet_virtio.conf:9pnet_virtio' \
->>> --install kernel-plus \
->>> --append-line '/etc/fstab:home /home 9p trans=virtio,version=9p2000.L 0 0'
->>>
->>> Install the volume into the `default` pool.
->>>
->>> sudo install -m644 centos-7.8.qcow2 /var/lib/libvirt/images
->>>
->>> Next, define a domain using the disk image (using `virt-install` here for
->>> "easy mode").
->>>
->>> virt-install \
->>> --import \
->>> --os-variant centos7.0 \
->>> --name centos \
->>> --ram 2048 \
->>> --disk path=/var/lib/libvirt/images/centos-7.8.qcow2 \
->>> --memorybacking access.mode=shared \
->>> --filesystem source=/home,target=home,accessmode=passthrough \
->>> --autoconsole none
->>>
->>> Now with SELinux enforcing, I cannot list the contents of the directories in
->>> the mounted hierarchy.
->>>
->>> [root@localhost ~]# ls -lZ /home/link
->>> ls: cannot open directory /home/link: Permission denied
->>>
->>>
->>>
->>> _______________________________________________
->>> Virtio-fs mailing list
->>> Virtio-fs@redhat.com
->>> https://listman.redhat.com/mailman/listinfo/virtio-fs
->>>
-> Regards,
-> Daniel
+While working on adding syncfs() support in FUSE, I've hit some severe
+bugs with submounts (a crash and an infinite loop). The fix for the
+crash is straightforward (patch 1), but the fix for the infinite loop
+is more invasive : as suggested by Miklos, a simple bug fix is applied
+first (patch 2) and the final fix (patch 3) is applied on top.
 
-The separate XAttr support would also allow virtiofsd to work with 
-labels inside of the container when the virtiofsd is confined on the host.
+Greg Kurz (4):
+  fuse: Fix crash in fuse_dentry_automount() error path
+  fuse: Fix infinite loop in sget_fc()
+  fuse: Call vfs_get_tree() for submounts
+  fuse: Make fuse_fill_super_submount() static
 
+ fs/fuse/dir.c       | 46 ++++++++++---------------------------------
+ fs/fuse/fuse_i.h    |  9 +++------
+ fs/fuse/inode.c     | 48 +++++++++++++++++++++++++++++++++++++++++++--
+ fs/fuse/virtio_fs.c |  3 +++
+ 4 files changed, 62 insertions(+), 44 deletions(-)
 
-I would guess/hope virtiofsd on the host will be confined and only able 
-to write certain labels like container_file_t or svirt_image_t.  If you 
-want to allow virt file systems within the "VM" to be able to set 
-labels, these labels will have to be something other then SELinux labels 
-on the host, or SELinux will prevent them from being set.
+-- 
+2.31.1
+
 

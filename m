@@ -1,14 +1,17 @@
-Date: Fri, 11 Jun 2021 15:19:25 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210611191925.GA767764@redhat.com>
-References: <20210609155551.44437-1-mreitz@redhat.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <20210609155551.44437-1-mreitz@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v2 0/9] virtiofsd: Allow using file handles
- instead of O_PATH FDs
+Date: Wed, 26 May 2021 11:16:05 -0400
+From: virtiofs-bot@sinrega.org
+Message-Id: <83124.121052611160004043@us-mta-542.us.mimecast.lan>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=subject:to:x-me-proxy:x-me-proxy
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm2; bh=PmUzP8GmchLKVELVi
+	AMDrb77DBTWkxpBWf/zg/LRoJE=; b=O637PcjBtdCyKVdCjGGQsD5f81nKzREY6
+	LbskQhO9n/4xh3gimiFVH13in87JqjkQIjazzoL/Lz2rQEo6j0wqNWRAaMTY58cK
+	Q9BydmfE9ymUE8YGtL8gDC5Thg178dNV8VgqtRcGxacfSNlfw+arKF1glIySeU9A
+	45E94aqKIPmXCXQb5JF1jorLcBzRtN8SOyNTc0Vqu9FD6Or/SYtPHUyD8q2snOEB
+	BwDpbtWLI5t9WEqxz9AYOllq33Yfim1COdVjJZYFxajUdWDPSwNru0lT+0eHbN+f
+	T+q0K57EG4sBtO102/ud3aUuM9I/njULRF7agHSCFEhDhgEbQlH1A==
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd-rs] Issue closed: Build fails on aarch64
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,76 +20,44 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: virtio-fs@redhat.com
 
-On Wed, Jun 09, 2021 at 05:55:42PM +0200, Max Reitz wrote:
-> Hi,
-> 
-> v1 cover letter for an overview:
-> https://listman.redhat.com/archives/virtio-fs/2021-June/msg00033.html
+Building `virtiofsd-rs` fails when on `aarch64` architecture.
+Here is the error:
+```
+error[E0308]: mismatched types
 
-Hi Max,
+  --> src/passthrough/stat.rs:80:27
 
-What's the impact of these patches on performance? Just trying to 
-get some idea what to expect. Performance remains more or less
-same or we expect a hit.
+   |
 
-Thanks
-Vivek
+80 |             st.st_nlink = self.stx_nlink as u64;
 
-> 
-> In v2, I (tried to) fix the bug Dave found, which is that
-> get_file_handle() indiscriminately opened the given dirfd/name
-> combination to get an O_RDONLY fd without checking whether we’re
-> actually allowed to open dirfd/name; namely, we don’t allow ourselves to
-> open files that aren’t regular files or directories.
-> 
-> So that openat(.., O_RDONLY) is changed to an openat(..., O_PATH), and
-> then check the file type with the statx() we’re doing anyway.  If the
-> file is OK to open, we reopen it O_RDONLY with the help of
-> /proc/self/fd, like we always do.
-> 
-> (This only affects patch 8.)
-> 
-> 
-> git-backport-diff against v1:
-> 
-> Key:
-> [----] : patches are identical
-> [####] : number of functional differences between upstream/downstream patch
-> [down] : patch is downstream-only
-> The flags [FC] indicate (F)unctional and (C)ontextual differences, respectively
-> 
-> 001/9:[----] [--] 'virtiofsd: Add TempFd structure'
-> 002/9:[----] [--] 'virtiofsd: Use lo_inode_open() instead of openat()'
-> 003/9:[----] [--] 'virtiofsd: Add lo_inode_fd() helper'
-> 004/9:[----] [--] 'virtiofsd: Let lo_fd() return a TempFd'
-> 005/9:[----] [--] 'virtiofsd: Let lo_inode_open() return a TempFd'
-> 006/9:[----] [--] 'virtiofsd: Add lo_inode.fhandle'
-> 007/9:[----] [--] 'virtiofsd: Add inodes_by_handle hash table'
-> 008/9:[0045] [FC] 'virtiofsd: Optionally fill lo_inode.fhandle'
-> 009/9:[----] [--] 'virtiofsd: Add lazy lo_do_find()'
-> 
-> 
-> Max Reitz (9):
->   virtiofsd: Add TempFd structure
->   virtiofsd: Use lo_inode_open() instead of openat()
->   virtiofsd: Add lo_inode_fd() helper
->   virtiofsd: Let lo_fd() return a TempFd
->   virtiofsd: Let lo_inode_open() return a TempFd
->   virtiofsd: Add lo_inode.fhandle
->   virtiofsd: Add inodes_by_handle hash table
->   virtiofsd: Optionally fill lo_inode.fhandle
->   virtiofsd: Add lazy lo_do_find()
-> 
->  tools/virtiofsd/helper.c              |   3 +
->  tools/virtiofsd/passthrough_ll.c      | 836 +++++++++++++++++++++-----
->  tools/virtiofsd/passthrough_seccomp.c |   2 +
->  3 files changed, 694 insertions(+), 147 deletions(-)
-> 
-> -- 
-> 2.31.1
-> 
-> 
+   |                           ^^^^^^^^^^^^^^^^^^^^^ expected `u32`, found `u64`
+
+
+error[E0308]: mismatched types
+
+  --> src/passthrough/stat.rs:85:29
+
+   |
+
+85 |             st.st_blksize = self.stx_blksize as i64;
+
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^ expected `i32`, found `i64`
+
+
+error: aborting due to 2 previous errors
+
+
+For more information about this error, try `rustc --explain E0308`.
+
+error: could not compile `virtiofsd-rs`
+
+
+To learn more, run the command again with --verbose.
+
+```
+---
+https://gitlab.com/virtio-fs/virtiofsd-rs/-/issues/13
 

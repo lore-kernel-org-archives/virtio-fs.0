@@ -1,15 +1,15 @@
-Date: Thu, 27 May 2021 16:59:29 +0100
+Date: Thu, 27 May 2021 17:57:21 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YK/B4TX7L/NHfNCQ@work-vm>
+Message-ID: <YK/PcSYNVKhomZak@work-vm>
 References: <20210428110100.27757-1-dgilbert@redhat.com>
-	<20210428110100.27757-4-dgilbert@redhat.com>
-	<YJFm+hocgArYnWAB@stefanha-x1.localdomain>
+	<20210428110100.27757-10-dgilbert@redhat.com>
+	<YJKomatE4qqje5cY@stefanha-x1.localdomain>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <YJFm+hocgArYnWAB@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH v3 03/26] DAX: vhost-user: Rework slave
-	return values
+In-Reply-To: <YJKomatE4qqje5cY@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH v3 09/26] DAX: virtio-fs: Add vhost-user
+ slave commands for mapping
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,97 +22,74 @@ To: Stefan Hajnoczi <stefanha@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
 
 * Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> On Wed, Apr 28, 2021 at 12:00:37PM +0100, Dr. David Alan Gilbert (git) wrote:
-> > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-> > 
-> > All the current slave handlers on the qemu side generate an 'int'
-> > return value that's squashed down to a bool (!!ret) and stuffed into
-> > a uint64_t (field of a union) to be returned.
-> > 
-> > Move the uint64_t type back up through the individual handlers so
-> > that we can make one actually return a full uint64_t.
-> > 
-> > Note that the definition in the interop spec says most of these
-> > cases are defined as returning 0 on success and non-0 for failure,
-> > so it's OK to change from a bool to another non-0.
-> > 
-> > Vivek:
-> > This is needed because upcoming patches in series will add new functions
-> > which want to return full error code. Existing functions continue to
-> > return true/false so, it should not lead to change of behavior for
-> > existing users.
-> > 
-> > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> > Reviewed-by: Greg Kurz <groug@kaod.org>
-> > ---
-> >  hw/virtio/vhost-backend.c         |  6 +++---
-> >  hw/virtio/vhost-user.c            | 31 ++++++++++++++++---------------
-> >  include/hw/virtio/vhost-backend.h |  2 +-
-> >  3 files changed, 20 insertions(+), 19 deletions(-)
-> > 
-> > diff --git a/hw/virtio/vhost-backend.c b/hw/virtio/vhost-backend.c
-> > index 31b33bde37..1686c94767 100644
-> > --- a/hw/virtio/vhost-backend.c
-> > +++ b/hw/virtio/vhost-backend.c
-> > @@ -401,8 +401,8 @@ int vhost_backend_invalidate_device_iotlb(struct vhost_dev *dev,
-> >      return -ENODEV;
-> >  }
+> On Wed, Apr 28, 2021 at 12:00:43PM +0100, Dr. David Alan Gilbert (git) wrote:
+> > diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+> > index dd0a02aa99..169a146e72 100644
+> > --- a/hw/virtio/vhost-user-fs.c
+> > +++ b/hw/virtio/vhost-user-fs.c
+> > @@ -45,6 +45,72 @@ static const int user_feature_bits[] = {
+> >  #define DAX_WINDOW_PROT PROT_NONE
+> >  #endif
 > >  
-> > -int vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
-> > -                                          struct vhost_iotlb_msg *imsg)
-> > +uint64_t vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
-> > +                                        struct vhost_iotlb_msg *imsg)
-> >  {
-> >      int ret = 0;
+> > +/*
+> > + * The message apparently had 'received_size' bytes, check this
+> > + * matches the count in the message.
+> > + *
+> > + * Returns true if the size matches.
+> > + */
+> > +static bool check_slave_message_entries(const VhostUserFSSlaveMsg *sm,
+> > +                                        int received_size)
+> > +{
+> > +    int tmp;
+> > +
+> > +    /*
+> > +     * VhostUserFSSlaveMsg consists of a body followed by 'n' entries,
+> > +     * (each VhostUserFSSlaveMsgEntry).  There's a maximum of
+> > +     * VHOST_USER_FS_SLAVE_MAX_ENTRIES of these.
+> > +     */
+> > +    if (received_size <= sizeof(VhostUserFSSlaveMsg)) {
 > 
-> This patch is messy. We want uint64_t but these functions use int ret
-> internally. The actual return values are true/false instead of int 0 and
-> 1.
+> received_size is an int and we risk hitting checking against the coerced
+> size_t value but then using the signed int received_size later. It's
+> safer to convert to size_t once and then use that size_t value
+> everywhere later.
 
-Yeh.
+Done.
 
-> Please use uint64_t everywhere: return 0 for success and 1 for failure
-> instead of bool literals and change the type of the local ret variables
-> to uint64_t.
+> > +typedef struct {
+> > +    /* Offsets within the file being mapped */
+> > +    uint64_t fd_offset;
+> > +    /* Offsets within the cache */
+> > +    uint64_t c_offset;
+> > +    /* Lengths of sections */
+> > +    uint64_t len;
+> > +    /* Flags, from VHOST_USER_FS_FLAG_* */
+> > +    uint64_t flags;
+> > +} VhostUserFSSlaveMsgEntry;
+> > +
+> > +typedef struct {
+> > +    /* Number of entries */
+> > +    uint16_t count;
+> > +    /* Spare */
+> > +    uint16_t align;
+> 
+> VhostUserFSSlaveMsgEntry is aligned to 64 bits, so the 16-bit align
+> field is not sufficient for full alignment.
 
+Ah, interesting; fixed to:
 
-OK, reworked, this part of it now looks like :
+typedef struct {
+    /* Generic flags for the overall message */
+    uint32_t flags;
+    /* Number of entries */
+    uint16_t count;
+    /* Spare */
+    uint16_t align;
+} VhostUserFSSlaveMsgHdr;
 
-int vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
--                                          struct vhost_iotlb_msg *imsg)
-+uint64_t vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
-+                                        struct vhost_iotlb_msg *imsg)
- {
--    int ret = 0;
-+    uint64_t ret = 0;
- 
-     if (unlikely(!dev->vdev)) {
-         error_report("Unexpected IOTLB message when virtio device is stopped");
--        return -EINVAL;
-+        return EINVAL;
-     }
- 
-     switch (imsg->type) {
-     case VHOST_IOTLB_MISS:
--        ret = vhost_device_iotlb_miss(dev, imsg->iova,
--                                      imsg->perm != VHOST_ACCESS_RO);
-+        ret = -vhost_device_iotlb_miss(dev, imsg->iova,
-+                                       imsg->perm != VHOST_ACCESS_RO);
-         break;
-     case VHOST_IOTLB_ACCESS_FAIL:
-         /* FIXME: report device iotlb error */
-         error_report("Access failure IOTLB message type not supported");
--        ret = -ENOTSUP;
-+        ret = ENOTSUP;
-         break;
-     case VHOST_IOTLB_UPDATE:
-     case VHOST_IOTLB_INVALIDATE:
-     default:
-         error_report("Unexpected IOTLB message type");
--        ret = -EINVAL;
-+        ret = EINVAL;
-         break;
-     }
+or do I actually need to have a uint64_t in there?
+
+Dave
 
 
 -- 

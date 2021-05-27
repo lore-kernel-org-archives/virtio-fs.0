@@ -1,16 +1,15 @@
-References: <20210512125544.9536-1-mreitz@redhat.com>
-	<20210512125544.9536-2-mreitz@redhat.com>
-	<20210526181324.GA1222711@redhat.com> <20210526185017.GB1225492@horse>
-From: Max Reitz <mreitz@redhat.com>
-Message-ID: <b066027e-1733-8ca3-00e2-68e58aa8e563@redhat.com>
-Date: Thu, 27 May 2021 17:00:31 +0200
+Date: Thu, 27 May 2021 16:59:29 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YK/B4TX7L/NHfNCQ@work-vm>
+References: <20210428110100.27757-1-dgilbert@redhat.com>
+	<20210428110100.27757-4-dgilbert@redhat.com>
+	<YJFm+hocgArYnWAB@stefanha-x1.localdomain>
 MIME-Version: 1.0
-In-Reply-To: <20210526185017.GB1225492@horse>
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Language: en-US
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 1/3] virtiofsd: Find original inode ID of
- mount points
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <YJFm+hocgArYnWAB@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH v3 03/26] DAX: vhost-user: Rework slave
+	return values
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,127 +18,103 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
 
-On 26.05.21 20:50, Vivek Goyal wrote:
-> On Wed, May 26, 2021 at 02:13:24PM -0400, Vivek Goyal wrote:
->> On Wed, May 12, 2021 at 02:55:42PM +0200, Max Reitz wrote:
->>> Mount point directories represent two inodes: On one hand, they are a
->>> normal directory on their parent filesystem.  On the other, they are the
->>> root node of the filesystem mounted there.  Thus, they have two inode
->>> IDs.
->>>
->>> Right now, we only report the latter inode ID (i.e. the inode ID of the
->>> mounted filesystem's root node).  This is fine once the guest has
->>> auto-mounted a submount there (so this inode ID goes with a device ID
->>> that is distinct from the parent filesystem), but before the auto-mount,
->>> they have the device ID of the parent and the inode ID for the submount.
->>> This is problematic because this is likely exactly the same
->>> st_dev/st_ino combination as the parent filesystem's root node.  This
->>> leads to problems for example with `find`, which will thus complain
->>> about a filesystem loop if it has visited the parent filesystem's root
->>> node before, and then refuse to descend into the submount.
->>>
->>> There is a way to find the mount directory's original inode ID, and that
->>> is to readdir(3) the parent directory, look for the mount directory, and
->>> read the dirent.d_ino field.  Using this, we can let lookup and
->>> readdirplus return that original inode ID, which the guest will thus
->>> show until the submount is auto-mounted.
->>
->>> (Then, it will invoke getattr
->>> and that stat(2) call will return the inode ID for the submount.)
->>
->> Hi Max,
->>
->> How are we sure that GETATTR() will always be called and that will
->> allow us to return inode number in mounted filesystem (instead of
->> parent filesystem). I thought GETATTR will be called only if cached
->> attrs have expired. (1 second default for cache=auto). Otherwise
->> stat() will fill inode->i_no from cache and return. And I am afraid
->> that in that case we will return inode number from parent fs,
->> instead of mounted fs.
->>
->> Say following sequence of events happens pretty fast one after the
->> other. Say /mnt/virtiofs/foo is a mount point in server but client
->> has not created submount yet.
->>
->> A. stat(/mnt/virtiofs/foo, AT_NO_AUTOMOUNT)
->>     -> This should get inode number in parent filesystem on host and
->>        store in guest inode->i_no and return to user space. Say inode
->>        in guest is called a_ino.
->> B. stat(/mnt/virtiofs/foo)
->>     -> This should create submount and create new inode (say b_ino), using
->>        properties from a_ino. IOW, this should copy a_ino->i_no to
->>        b_ino->b_ino given current code, IIUC.
->>
->>     -> Assume timeout has not happened and cached attrs have not expired.
->>
->>     -> And now b_ino->i_no (or ->orig_ino) will be returned to user space.
-
-Well, I mean, this sounds easy enough to test.  For example, this passes 
-for me:
-
-count=1000
-root_st_ino=128
-tag=host
-mountpoint=/mnt
-submount_path=submount
-
-for i in $(seq $count)
-do
-     mount -t virtiofs $tag $mountpoint || break
-     if [ $(stat -c '%i' $mountpoint/$submount_path) -eq $root_st_ino ]
-     then
-         echo 'fail 0'
-         break
-     fi
-     ls $mountpoint/$submount_path > /dev/null
-     if [ $(stat -c '%i' $mountpoint/$submount_path) -ne $root_st_ino ]
-     then
-         echo 'fail 1'
-         break
-     fi
-     umount $mountpoint || break
-done
-if [ $i -ne $count ]
-then
-     echo 'Something failed'
-else
-     echo 'OK'
-fi
-
->> Am I missing something. Do we need to always expire inode attrs when
->> we create submount so that client is forced to issue GETATTR.
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> On Wed, Apr 28, 2021 at 12:00:37PM +0100, Dr. David Alan Gilbert (git) wrote:
+> > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+> > 
+> > All the current slave handlers on the qemu side generate an 'int'
+> > return value that's squashed down to a bool (!!ret) and stuffed into
+> > a uint64_t (field of a union) to be returned.
+> > 
+> > Move the uint64_t type back up through the individual handlers so
+> > that we can make one actually return a full uint64_t.
+> > 
+> > Note that the definition in the interop spec says most of these
+> > cases are defined as returning 0 on success and non-0 for failure,
+> > so it's OK to change from a bool to another non-0.
+> > 
+> > Vivek:
+> > This is needed because upcoming patches in series will add new functions
+> > which want to return full error code. Existing functions continue to
+> > return true/false so, it should not lead to change of behavior for
+> > existing users.
+> > 
+> > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> > Reviewed-by: Greg Kurz <groug@kaod.org>
+> > ---
+> >  hw/virtio/vhost-backend.c         |  6 +++---
+> >  hw/virtio/vhost-user.c            | 31 ++++++++++++++++---------------
+> >  include/hw/virtio/vhost-backend.h |  2 +-
+> >  3 files changed, 20 insertions(+), 19 deletions(-)
+> > 
+> > diff --git a/hw/virtio/vhost-backend.c b/hw/virtio/vhost-backend.c
+> > index 31b33bde37..1686c94767 100644
+> > --- a/hw/virtio/vhost-backend.c
+> > +++ b/hw/virtio/vhost-backend.c
+> > @@ -401,8 +401,8 @@ int vhost_backend_invalidate_device_iotlb(struct vhost_dev *dev,
+> >      return -ENODEV;
+> >  }
+> >  
+> > -int vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
+> > -                                          struct vhost_iotlb_msg *imsg)
+> > +uint64_t vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
+> > +                                        struct vhost_iotlb_msg *imsg)
+> >  {
+> >      int ret = 0;
 > 
-> Looks like while initialzing b_ino, we are setting attr_valid=0, which
-> should set fi->i_time=0 and force issuing GETATTR later.
-> 
-> fuse_fill_super_submount()
->    root = fuse_iget(sb, parent_fi->nodeid, 0, &root_attr, 0, 0);
->                                                           ^
->      fuse_iget(attr_valid=0)
->         fuse_change_attributes(attr_valid=0)
-> 	  fuse_change_attributes_common(attr_valid=0)
->              fi->i_time = attr_valid;
-> 
-> So may be this will force GETATTR and fetch new inode id when second
-> stat() is called.
+> This patch is messy. We want uint64_t but these functions use int ret
+> internally. The actual return values are true/false instead of int 0 and
+> 1.
 
-i_time is at least what fuse_update_get_attr() uses to decide whether to 
-invoke GETATTR or not – although AT_STATX_DONT_SYNC can override that, 
-but I don’t think that’s a problem.  If i_time is 0, that function will 
-always invoke GETATTR (unless AT_STATX_DONT_SYNC).
+Yeh.
 
-So I think it works in practice.  When the inode ID is looked up through 
-some stat-y function, this should go through fuse_update_get_attr(), 
-which will fetch the st_ino on the submount.  There is still i_ino, 
-though...
+> Please use uint64_t everywhere: return 0 for success and 1 for failure
+> instead of bool literals and change the type of the local ret variables
+> to uint64_t.
 
-To be absolutely certain, we could invoke fuse_update_attributes() in 
-fuse_fill_super_submount(), but then again, fuse_fill_super_common() 
-doesn’t do that either for its root node.  It just initializes i_ino to 
-FUSE_ROOT_ID, i.e. 1.
 
-Max
+OK, reworked, this part of it now looks like :
+
+int vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
+-                                          struct vhost_iotlb_msg *imsg)
++uint64_t vhost_backend_handle_iotlb_msg(struct vhost_dev *dev,
++                                        struct vhost_iotlb_msg *imsg)
+ {
+-    int ret = 0;
++    uint64_t ret = 0;
+ 
+     if (unlikely(!dev->vdev)) {
+         error_report("Unexpected IOTLB message when virtio device is stopped");
+-        return -EINVAL;
++        return EINVAL;
+     }
+ 
+     switch (imsg->type) {
+     case VHOST_IOTLB_MISS:
+-        ret = vhost_device_iotlb_miss(dev, imsg->iova,
+-                                      imsg->perm != VHOST_ACCESS_RO);
++        ret = -vhost_device_iotlb_miss(dev, imsg->iova,
++                                       imsg->perm != VHOST_ACCESS_RO);
+         break;
+     case VHOST_IOTLB_ACCESS_FAIL:
+         /* FIXME: report device iotlb error */
+         error_report("Access failure IOTLB message type not supported");
+-        ret = -ENOTSUP;
++        ret = ENOTSUP;
+         break;
+     case VHOST_IOTLB_UPDATE:
+     case VHOST_IOTLB_INVALIDATE:
+     default:
+         error_report("Unexpected IOTLB message type");
+-        ret = -EINVAL;
++        ret = EINVAL;
+         break;
+     }
+
+
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

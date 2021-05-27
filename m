@@ -1,21 +1,14 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ibm.com;
-	h=to : from : subject :
-	message-id : date : content-type : content-transfer-encoding :
-	mime-version; s=pp1; bh=ycN6zKGnEEqWF3qXm/CcNHvGvjoNJWxGBynYHFRGucw=;
-	b=bKtJ1SxJ1R/FEIr7rfwG6Opu5prAz7FQfn3qLbRVvPTJRnf3ri8r5KyIV9UqwBur3xsB
-	jI4xB7rZwEh/gvhA6i7GYFd71xlGndkAvnrQqhMoglEJUofD/ZIgRQAcaorXnMk0nd4Q
-	MpxAYasERSr3uWfPnU6zwlul6TKDN12ei3xwVv4oE9H4CpVnLhjc0F48BTwk7ETK+iuW
-	/5d0sg1JAwMWFPVzB/k6AWE8lkCesGjpOcWl6y+1V1XQWGo3ZoOJ3QgssmHLE0vml+yw
-	n9fe8oIS7uo9OlC91sYsP33I6EV8pKkLRlLEDZFuUgJyYjCXnvnf+jchYZxgsnKrrh+7
-	sg==
-From: Jim Cadden <jcadden@linux.vnet.ibm.com>
-Message-ID: <489d6710-2e39-8058-a7db-80166c603ce4@linux.vnet.ibm.com>
-Date: Fri, 21 May 2021 11:34:24 -0400
+References: <20210525150230.157586-1-groug@kaod.org>
+	<20210525150230.157586-4-groug@kaod.org>
+From: Max Reitz <mreitz@redhat.com>
+Message-ID: <7b4a3379-3004-98f2-841c-386ce62c888a@redhat.com>
+Date: Thu, 27 May 2021 15:24:40 +0200
 MIME-Version: 1.0
-Content-Type: text/plain; charset=windows-1252; format=flowed
+In-Reply-To: <20210525150230.157586-4-groug@kaod.org>
+Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: [Virtio-fs] virtiofs: Support for SEV encrypted guests
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH 3/4] fuse: Call vfs_get_tree() for submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,31 +17,43 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Greg Kurz <groug@kaod.org>, Miklos Szeredi <miklos@szeredi.hu>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, linux-kernel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
 
-Do you know if virtio-fs can support SEV encrypted guests?
+On 25.05.21 17:02, Greg Kurz wrote:
+> We recently fixed an infinite loop by setting the SB_BORN flag on
+> submounts along with the write barrier needed by super_cache_count().
+> This is the job of vfs_get_tree() and FUSE shouldn't have to care
+> about the barrier at all.
+> 
+> Split out some code from fuse_dentry_automount() to a new dedicated
+> fuse_get_tree_submount() handler for submounts and call vfs_get_tree().
+> 
+> The fs_private field of the filesystem context isn't used with
+> submounts : hijack it to pass the FUSE inode of the mount point
+> down to fuse_get_tree_submount().
 
-I work on a project adding SEV support into kata containers. So far, 
-we've been unable to boot SEV guests
-with kata's virtio-fs option (and use virtio-9p instead):
+What exactly do you mean by “isn’t used”?  virtio_fs_init_fs_context() 
+still sets it (it is non-NULL in fuse_dentry_automount() after 
+fs_context_for_submount()).  It does appear like it is never read, but 
+one thing that definitely would need to be done is for it to be freed 
+before putting mp_fi there.
 
-May 19 16:52:05 sev1 virtiofsd[74904]: [ID: 00074904] 
-virtio_session_mount: Received vhost-user socket connection
-May 19 16:52:05 sev1 virtiofsd[74914]: [ID: 00000001] virtio_loop: Entry
-...
-May 19 16:52:07 sev1 virtiofsd[74914]: [ID: 00000001] virtio_loop: Got 
-VU event
-May 19 16:52:07 sev1 virtiofsd[74914]: [ID: 00000001] fv_panic: 
-libvhost-user: Invalid vring_addr message
+So I think it may technically be fine to use this field, but then 
+virtio_fs_init_fs_context() shouldn’t set it for submounts (should be 
+discernible with fsc->purpose), and perhaps that should be a separate patch.
 
-I know that other virtio devices use iommu and DMA apis to share 
-non-encrypted pages between the host
-and encrypted guest. Could something similar be done with virtiofsd 
-andthe virtio-fs virtio device?
+(Apart from that, this patch looks good to me, though.)
 
-There are reported problems with vhost-user and SEV: 
-https://bugzilla.redhat.com/show_bug.cgi?id=1797058
+Max
 
-Thanks for any insight,
-Jim
+> Finally, adapt virtiofs to use this.
+> 
+> Signed-off-by: Greg Kurz <groug@kaod.org>
+> ---
+>   fs/fuse/dir.c       | 58 +++++++--------------------------------------
+>   fs/fuse/fuse_i.h    |  6 +++++
+>   fs/fuse/inode.c     | 44 ++++++++++++++++++++++++++++++++++
+>   fs/fuse/virtio_fs.c |  3 +++
+>   4 files changed, 62 insertions(+), 49 deletions(-)
 

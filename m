@@ -1,13 +1,14 @@
-Date: Thu, 17 Jun 2021 15:29:12 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YMtcOMVdVJAjCg8I@work-vm>
-References: <20210617141518.304659-1-groug@kaod.org>
+References: <20210525150230.157586-1-groug@kaod.org>
+	<20210525150230.157586-3-groug@kaod.org>
+From: Max Reitz <mreitz@redhat.com>
+Message-ID: <58c70352-2df5-0cb9-9ca6-bb4bf2edd1c2@redhat.com>
+Date: Thu, 27 May 2021 12:08:36 +0200
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210617141518.304659-1-groug@kaod.org>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Don't allow file creation with
-	FUSE_OPEN
+In-Reply-To: <20210525150230.157586-3-groug@kaod.org>
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Language: en-US
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH 2/4] fuse: Fix infinite loop in sget_fc()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,84 +17,68 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>
+To: Greg Kurz <groug@kaod.org>, Miklos Szeredi <miklos@szeredi.hu>
+Cc: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, stable@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
 
-* Greg Kurz (groug@kaod.org) wrote:
-> A well behaved FUSE client uses FUSE_CREATE to create files. It isn't
-> supposed to pass O_CREAT along a FUSE_OPEN request, as documented in
-> the "fuse_lowlevel.h" header :
+On 25.05.21 17:02, Greg Kurz wrote:
+> We don't set the SB_BORN flag on submounts. This is wrong as these
+> superblocks are then considered as partially constructed or dying
+> in the rest of the code and can break some assumptions.
 > 
->     /**
->      * Open a file
->      *
->      * Open flags are available in fi->flags. The following rules
->      * apply.
->      *
->      *  - Creation (O_CREAT, O_EXCL, O_NOCTTY) flags will be
->      *    filtered out / handled by the kernel.
+> One such case is when you have a virtiofs filesystem with submounts
+> and you try to mount it again : virtio_fs_get_tree() tries to obtain
+> a superblock with sget_fc(). The logic in sget_fc() is to loop until
+> it has either found an existing matching superblock with SB_BORN set
+> or to create a brand new one. It is assumed that a superblock without
+> SB_BORN is transient and should go away. Forgetting to set SB_BORN on
+> submounts hence causes sget_fc() to retry forever.
 > 
-> But if it does anyway, virtiofsd crashes with:
+> Setting SB_BORN requires special care, i.e. a write barrier for
+> super_cache_count() which can check SB_BORN without taking any lock.
+> We should call vfs_get_tree() to deal with that but this requires
+> to have a proper ->get_tree() implementation for submounts, which
+> is a bigger piece of work. Go for a simple bug fix in the meatime.
 > 
-> *** invalid openat64 call: O_CREAT or O_TMPFILE without mode ***: terminated
-> 
-> This is because virtiofsd ends up passing this flag to openat() without
-> passing a mode_t 4th argument which is mandatory with O_CREAT, and glibc
-> aborts.
-> 
-> The offending path is:
-> 
-> lo_open()
->     lo_do_open()
->         lo_inode_open()
-> 
-> Other callers of lo_inode_open() only pass O_RDWR and lo_create()
-> passes a valid fd to lo_do_open() which thus doesn't even call
-> lo_inode_open() in this case.
-> 
-> Specifying O_CREAT with FUSE_OPEN is a protocol violation. Check this
-> in lo_open() and return an error to the client : EINVAL since this is
-> already what glibc returns with other illegal flag combinations.
-> 
-> The FUSE filesystem doesn't currently support O_TMPFILE, but the very
-> same would happen if O_TMPFILE was passed in a FUSE_OPEN request. Check
-> that as well.
-> 
+> Fixes: bf109c64040f ("fuse: implement crossmounts")
+> Cc: mreitz@redhat.com
+> Cc: stable@vger.kernel.org # v5.10+
 > Signed-off-by: Greg Kurz <groug@kaod.org>
-
-That seems reasonable, so
-
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-
-should you also send a corresponding patch for libfuse's example code
-we're based on?
-
-Dave
-
 > ---
->  tools/virtiofsd/passthrough_ll.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+>   fs/fuse/dir.c | 10 ++++++++++
+>   1 file changed, 10 insertions(+)
 > 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 49c21fd85570..14f62133131c 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2145,6 +2145,12 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
->          return;
->      }
->  
-> +    /* File creation is handled by lo_create() */
-> +    if (fi->flags & (O_CREAT | O_TMPFILE)) {
-> +        fuse_reply_err(req, EINVAL);
-> +        return;
-> +    }
+> diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
+> index 01559061cbfb..3b0482738741 100644
+> --- a/fs/fuse/dir.c
+> +++ b/fs/fuse/dir.c
+> @@ -346,6 +346,16 @@ static struct vfsmount *fuse_dentry_automount(struct path *path)
+>   		goto out_put_sb;
+>   	}
+>   
+> +	/*
+> +	 * FIXME: setting SB_BORN requires a write barrier for
+> +	 *        super_cache_count(). We should actually come
+> +	 *        up with a proper ->get_tree() implementation
+> +	 *        for submounts and call vfs_get_tree() to take
+> +	 *        care of the write barrier.
+> +	 */
+> +	smp_wmb();
+> +	sb->s_flags |= SB_BORN;
 > +
->      err = lo_do_open(lo, inode, -1, fi);
->      lo_inode_put(lo, &inode);
->      if (err) {
-> -- 
-> 2.31.1
+
+I’m not sure whether we should have the order be exactly the same as in 
+vfs_get_tree(), i.e. whether this should be put after fsc->root has been 
+set.  Or maybe even after fm has been added to fc->mounts, because that 
+too was part of the fuse_get_tree_submount() function of your “fuse: 
+Call vfs_get_tree() for submounts” patch.
+
+ From a quick look at SB_BORN users, it doesn’t seem to make a 
+difference to me, though, so:
+
+Reviewed-by: Max Reitz <mreitz@redhat.com>
+
+>   	sb->s_flags |= SB_ACTIVE;
+>   	fsc->root = dget(sb->s_root);
+>   	/* We are done configuring the superblock, so unlock it */
 > 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

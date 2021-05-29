@@ -1,19 +1,22 @@
-Date: Thu, 27 May 2021 20:09:05 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YK/uUUZI3zy9k8Vk@work-vm>
-References: <20210428110100.27757-1-dgilbert@redhat.com>
-	<20210428110100.27757-27-dgilbert@redhat.com>
-	<YJQNIPaFCJlG7ZKc@stefanha-x1.localdomain>
-	<20210506160223.GA277745@redhat.com>
-	<YJj3RSxXKZHxmiKu@stefanha-x1.localdomain>
-	<20210510152324.GB150402@horse>
-	<YJlSHZ0vzNtCAjkJ@stefanha-x1.localdomain>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=from:to:subject:message-id:date:user-agent:mime-version
+	:content-transfer-encoding:content-language;
+	bh=39tTKc/uIbQLpVlgFj3OtnE3sgSzhw3SNEKpUGPRdSE=;
+	b=Vm2y/gAOSHz2K4Rm1tyrGeJcpDFhYF56jmTb96xwUsQ4IxsV4W8scXHz58l9uoO+AY
+	HiLUCqE8OXT6vS+5PYuPOY9/NE4bWxfWyRvk7rffKaB5KjxvM5/7vvSZWpu7nvrTnB9V
+	5iKCzVFDv25Oq4RCfxqjRgbq1zrczjF8E/PF7Dd9j9EhNgzvM2q2Ox20ppRY+TNlHmFd
+	x+RfdniNMRiVfyINidSFn3s2rsAw4dbfZxaQY61aJmoZj3sjZ92yGt2NhJA6w6wjOlmx
+	0tiBH37ZCSj3Gq10eqRNZvqS1TBJx3qi9Q2sVKK9BnBHDb7kkvpE+WxqcG3PUiFm53Qq
+	W5kQ==
+From: "Harry G. Coin" <hgcoin@gmail.com>
+Message-ID: <e1437314-4870-a3a3-e866-8be50282ce3c@gmail.com>
+Date: Sat, 29 May 2021 13:42:50 -0500
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <YJlSHZ0vzNtCAjkJ@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH v3 26/26] virtiofsd: Ask qemu to drop
- CAP_FSETID if client asked for it
+Content-Type: text/plain; charset="utf-8"
+Content-Language: en-US
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] regression: lsetfilecon fails, breaks rpm, dpkg,
+ dnf in virtiofs guests.
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,131 +25,47 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
+To: virtio-fs-list <virtio-fs@redhat.com>
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> On Mon, May 10, 2021 at 11:23:24AM -0400, Vivek Goyal wrote:
-> > On Mon, May 10, 2021 at 10:05:09AM +0100, Stefan Hajnoczi wrote:
-> > > On Thu, May 06, 2021 at 12:02:23PM -0400, Vivek Goyal wrote:
-> > > > On Thu, May 06, 2021 at 04:37:04PM +0100, Stefan Hajnoczi wrote:
-> > > > > On Wed, Apr 28, 2021 at 12:01:00PM +0100, Dr. David Alan Gilbert (git) wrote:
-> > > > > > From: Vivek Goyal <vgoyal@redhat.com>
-> > > > > > 
-> > > > > > If qemu guest asked to drop CAP_FSETID upon write, send that info
-> > > > > > to qemu in SLAVE_FS_IO message so that qemu can drop capability
-> > > > > > before WRITE. This is to make sure that any setuid bit is killed
-> > > > > > on fd (if there is one set).
-> > > > > > 
-> > > > > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > > > > 
-> > > > > I'm not sure if the QEMU FSETID patches make sense. QEMU shouldn't be
-> > > > > running with FSETID because QEMU is untrusted. FSETGID would allow QEMU
-> > > > > to create setgid files, thereby potentially allowing an attacker to gain
-> > > > > any GID.
-> > > > 
-> > > > Sure, its not recommended to run QEMU as root, but we don't block that
-> > > > either and I do regularly test with qemu running as root.
-> > > > 
-> > > > > 
-> > > > > I think it's better not to implement QEMU FSETID functionality at all
-> > > > > and to handle it another way.
-> > > > 
-> > > > One way could be that virtiofsd tries to clear setuid bit after I/O
-> > > > has finished. But that will be non-atomic operation and it is filled
-> > > > with perils as it requires virtiofsd to know what all kernel will
-> > > > do if this write has been done with CAP_FSETID dropped.
-> > > > 
-> > > > > In the worst case I/O requests should just
-> > > > > fail, it seems like a rare case anyway:
-> > > > 
-> > > > Is there a way for virtiofsd to know if qemu is running with CAP_FSETID
-> > > > or not. If there is one, it might be reasonable to error out. If we
-> > > > don't know, then we can't fail all the operations.
-> > > > 
-> > > > > I/O to a setuid/setgid file with
-> > > > > a memory buffer that is not mapped in virtiofsd.
-> > > > 
-> > > > With DAX it is easily triggerable. User has to append to a setuid file
-> > > > in virtiofs and this path will trigger.
-> > > > 
-> > > > I am fine with not supporting this patch but will also need a reaosonable
-> > > > alternative solution.
-> > > 
-> > > One way to avoid this problem is by introducing DMA read/write functions
-> > > into the vhost-user protocol that can be used by all device types, not
-> > > just virtio-fs.
-> > > 
-> > > Today virtio-fs uses the IO slave request when it cannot access a region
-> > > of guest memory. It sends the file descriptor to QEMU and QEMU performs
-> > > the pread(2)/pwrite(2) on behalf of virtiofsd.
-> > > 
-> > > I mentioned in the past that this solution is over-specialized. It
-> > > doesn't solve the larger problem that vhost-user processes do not have
-> > > full access to the guest memory space (e.g. DAX window).
-> > > 
-> > > Instead of sending file I/O requests over to QEMU, the vhost-user
-> > > protocol should offer DMA read/write requests so any vhost-user process
-> > > can access the guest memory space where vhost's shared memory mechanism
-> > > is insufficient.
-> > > 
-> > > Here is how it would work:
-> > > 
-> > > 1. Drop the IO slave request, replace it with DMA read/write slave
-> > >    requests.
-> > > 
-> > >    Note that these new requests can also be used in environments where
-> > >    maximum vIOMMU isolation is needed for security reasons and sharing
-> > >    all of guest RAM with the vhost-user process is considered
-> > >    unacceptable.
-> > > 
-> > > 2. When virtqueue buffer mapping fails, send DMA read/write slave
-> > >    requests to transfer the data from/to QEMU. virtiofsd calls
-> > >    pread(2)/pwrite(2) itself with virtiofsd's Linux capabilities.
-> > 
-> > Can you elaborate a bit more how will this new DMA read/write vhost-user
-> > commands can be implemented. I am assuming its not a real DMA and just
-> > sort of emulation of DMA. Effectively we have two processes and one
-> > process needs to read/write to/from address space of other process.
-> > 
-> > We were also wondering if we can make use of process_vm_readv()
-> > and process_vm_write() syscalls to achieve this. But this atleast
-> > requires virtiofsd to be more priviliged than qemu and also virtiofsd
-> > needs to know where DAX mapping window is. We briefly discussed this here.
-> > 
-> > https://lore.kernel.org/qemu-devel/20210421200746.GH1579961@redhat.com/
-> 
-> I wasn't thinking of directly allowing QEMU virtual memory access via
-> process_vm_readv/writev(). That would be more efficient but requires
-> privileges and also exposes internals of QEMU's virtual memory layout
-> and vIOMMU translation to the vhost-user process.
-> 
-> Instead I was thinking about VHOST_USER_DMA_READ/WRITE messages
-> containing the address (a device IOVA, it could just be a guest physical
-> memory address in most cases) and the length. The WRITE message would
-> also contain the data that the vhost-user device wishes to write. The
-> READ message reply would contain the data that the device read from
-> QEMU.
-> 
-> QEMU would implement this using QEMU's address_space_read/write() APIs.
-> 
-> So basically just a new vhost-user protocol message to do a memcpy(),
-> but with guest addresses and vIOMMU support :).
+Some regression in virtio-fs has led to rpm/dnf/yum failing  in the same
+guest it previously worked.
 
-This doesn't actually feel that hard - ignoring vIOMMU for a minute
-which I know very little about - I'd have to think where the data
-actually flows, probably the slave fd.
+linux 5.11.19-300.fc34.x86_64
 
-> The vhost-user device will need to do bounce buffering so using these
-> new messages is slower than zero-copy I/O to shared guest RAM.
+Specifically, all attempts to use dnf/yum lead to examples similar to this:
 
-I guess the theory is it's only in the weird corner cases anyway.
+Error unpacking rpm package dnf-4.7.0-1.fc34.noarch
+  Upgrading        :
+python3-dnf-plugins-core-4.0.21-1.fc34.noarch                                                                                                                                                     
+8/20
+error: unpacking of archive failed on file /usr/bin/dnf;60b1b277: cpio:
+(error 0x2)
+error: dnf-4.7.0-1.fc34.noarch: install failed
+error: lsetfilecon: (/etc/dnf/plugins/copr.conf,
+system_u:object_r:etc_t:s0) Operation not permitted
+error: Plugin selinux: hook fsm_file_prepare failed
 
-Dave
+(
 
-> Stefan
+For all packages.  No updates are possible.  Possibly related to:
+https://github.com/fedora-selinux/selinux-policy/pull/478/files/21a2df26cd605c55de7edc80e16907fcb76ccf08 
+?  What really gets me, is this error exists even though
+
+# getenforce
+Permissive
+
+)
+
+The host is running btrfs.  ... virtiofsd --fd=50 -o
+source=/vmsystems/fedora_generic,xattr,flock,posix_lock
+
+same effect with  .... virtiofsd --fd=36 -o
+source=/vmsystems/dbl1,xattr,flock,no_posix_lock
+
+/etc/fstab:
+
+myfs / virtiofs seclabel 0 0
 
 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+
 

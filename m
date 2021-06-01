@@ -1,14 +1,21 @@
-Date: Tue, 1 Jun 2021 09:02:45 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210601130245.GA24846@redhat.com>
-References: <e1437314-4870-a3a3-e866-8be50282ce3c@gmail.com>
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; t=1622562911; 
+	s=s1; d=tutanota.com;
+	h=From:From:To:To:Subject:Subject:Content-Description:Content-ID:Content-Type:Content-Type:Content-Transfer-Encoding:Cc:Date:Date:In-Reply-To:MIME-Version:MIME-Version:Message-ID:Message-ID:Reply-To:References:Sender;
+	bh=F88dnfMxPkGPG7lAkzBxukhjXe+D8K+AEt/pFkBDNHI=;
+	b=OqB3+d9nytZjeqZhk+8fxP4+q2kUzStyrkplJR2MPCxRjzIEPWanp/+5VhfCbivn
+	00ihRGWk43FgYMohfXRvh7kXtTeOUN+UW2kEYNPdQX3lpufFMDJrcCPDyx5xq0itPik
+	ucHyQ9WRsd0BAfSOG3vbJD2P7vAn1egOe3hFmfiu73SzXM5MpwfUDweFdmVTsXfhyNU
+	CORPS57QNMBgyeBvS7pUM+OJSOUuKxztCTdeW/z6PtFfvFsHugta2vpbWUzmgTiP2C3
+	ziuU4bFYUBRHXyHRQmGJOsgNB5D0NjcwUY865DKCUJaPjZpPMPa5d6me83r7l6JmDxz
+	087Ve9ZzJg==
+Date: Tue, 1 Jun 2021 17:55:11 +0200 (CEST)
+From: tecufanujacu@tutanota.com
+Message-ID: <Mb7HI6c--3-2@tutanota.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <e1437314-4870-a3a3-e866-8be50282ce3c@gmail.com>
-Subject: Re: [Virtio-fs] regression: lsetfilecon fails, breaks rpm, dpkg,
- dnf in virtiofs guests.
+Content-Type: multipart/alternative; 
+	boundary="----=_Part_274944_1812962147.1622562911486"
+Subject: [Virtio-fs] virtiofsd: doesn't garant write access at users allowed
+ by group permission
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,68 +24,94 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Harry G. Coin" <hgcoin@gmail.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Ondrej Mosnacek <omosnace@redhat.com>
+To: virtio-fs@redhat.com
 
-On Sat, May 29, 2021 at 01:42:50PM -0500, Harry G. Coin wrote:
-> Some regression in virtio-fs has led to rpm/dnf/yum failing=A0 in the same
-> guest it previously worked.
->=20
-> linux 5.11.19-300.fc34.x86_64
->=20
-> Specifically, all attempts to use dnf/yum lead to examples similar to thi=
-s:
->=20
-> Error unpacking rpm package dnf-4.7.0-1.fc34.noarch
-> =A0 Upgrading=A0=A0=A0=A0=A0=A0=A0 :
-> python3-dnf-plugins-core-4.0.21-1.fc34.noarch=A0=A0=A0=A0=A0=A0=A0=A0=A0=
-=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=
-=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=
-=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=
-=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=
-=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=
-=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0
-> 8/20
-> error: unpacking of archive failed on file /usr/bin/dnf;60b1b277: cpio:
-> (error 0x2)
-> error: dnf-4.7.0-1.fc34.noarch: install failed
-> error: lsetfilecon: (/etc/dnf/plugins/copr.conf,
-> system_u:object_r:etc_t:s0) Operation not permitted
-> error: Plugin selinux: hook fsm_file_prepare failed
+------=_Part_274944_1812962147.1622562911486
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 7bit
 
-CCing Dan Walsh and Ondrej. They might have an idea.
+Hello to everyone,
 
-Thanks
-Vivek
+I'm trying virtiofsd with proxmox from few weeks and I noticed a problem, virtiofsd doesn't garant write access at users allowed by group permission.
 
->=20
-> (
->=20
-> For all packages.=A0 No updates are possible.=A0 Possibly related to:
-> https://github.com/fedora-selinux/selinux-policy/pull/478/files/21a2df26c=
-d605c55de7edc80e16907fcb76ccf08=A0
-> ?=A0 What really gets me, is this error exists even though
->=20
-> # getenforce
-> Permissive
->=20
-> )
->=20
-> The host is running btrfs.=A0 ... virtiofsd --fd=3D50 -o
-> source=3D/vmsystems/fedora_generic,xattr,flock,posix_lock
->=20
-> same effect with=A0 .... virtiofsd --fd=3D36 -o
-> source=3D/vmsystems/dbl1,xattr,flock,no_posix_lock
->=20
-> /etc/fstab:
->=20
-> myfs / virtiofs seclabel 0 0
->=20
->=20
->=20
->=20
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
+The virtiofsd bin included in proxmox is v 7.32, but I have also tested the bins compiled from source from stable branch (v7.27) and dev branch (v7.33), and I also have tested the bin virtiofsd-rs. Always same problem.
+
+I opened an issue on gitlab and I asked in the proxmox forum but with almost zero interaction. Seems to me that virtiofsd isn't a lot used. Someone suggested me to write in the mailinglist for these technical things and here I am.
+
+To better make understand what problem I'm noticing I link the issue opened in the gitlab in which I have reported a lot of useful info and logs with a good formatting:
+https://gitlab.com/qemu-project/qemu/-/issues/368
+
+To me seems really strange what is happening, am I doing some error or this really is a virtiofsd bug?
+
+------=_Part_274944_1812962147.1622562911486
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+
+<html>
+  <head>
+    <meta http-equiv=3D"content-type" content=3D"text/html; charset=3DUTF-8=
+">
+  </head>
+  <body>
+<div style=3D"color: rgb(0, 0, 0); font-family: Cantarell; font-size: 14.66=
+6666984558105px; font-style: normal; font-variant-caps: normal; font-weight=
+: normal; letter-spacing: normal; orphans: auto; text-align: start; text-in=
+dent: 0px; text-transform: none; white-space: normal; widows: auto; word-sp=
+acing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-s=
+troke-width: 0px;">Hello to everyone,<br></div><div style=3D"color: rgb(0, =
+0, 0); font-family: Cantarell; font-size: 14.666666984558105px; font-style:=
+ normal; font-variant-caps: normal; font-weight: normal; letter-spacing: no=
+rmal; orphans: auto; text-align: start; text-indent: 0px; text-transform: n=
+one; white-space: normal; widows: auto; word-spacing: 0px; -webkit-tap-high=
+light-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px;"><br></div=
+><div style=3D"color: rgb(0, 0, 0); font-family: Cantarell; font-size: 14.6=
+66666984558105px; font-style: normal; font-variant-caps: normal; font-weigh=
+t: normal; letter-spacing: normal; orphans: auto; text-align: start; text-i=
+ndent: 0px; text-transform: none; white-space: normal; widows: auto; word-s=
+pacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-=
+stroke-width: 0px;">I'm trying virtiofsd with proxmox from few weeks and I =
+noticed a problem, virtiofsd doesn't garant write access at users allowed b=
+y group permission.<br><br>The virtiofsd bin included in proxmox is v 7.32,=
+ but I have also tested the bins compiled from source from stable branch (v=
+7.27) and dev branch (v7.33), and I also have tested the bin virtiofsd-rs. =
+Always same problem.<br></div><div style=3D"color: rgb(0, 0, 0); font-famil=
+y: Cantarell; font-size: 14.666666984558105px; font-style: normal; font-var=
+iant-caps: normal; font-weight: normal; letter-spacing: normal; orphans: au=
+to; text-align: start; text-indent: 0px; text-transform: none; white-space:=
+ normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba=
+(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px;"><br></div><div style=3D"co=
+lor: rgb(0, 0, 0); font-family: Cantarell; font-size: 14.666666984558105px;=
+ font-style: normal; font-variant-caps: normal; font-weight: normal; letter=
+-spacing: normal; orphans: auto; text-align: start; text-indent: 0px; text-=
+transform: none; white-space: normal; widows: auto; word-spacing: 0px; -web=
+kit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px=
+;">I opened an issue on gitlab and I asked in the proxmox forum but with al=
+most zero interaction. Seems to me that virtiofsd isn't a lot used. Someone=
+ suggested me to write in the mailinglist for these technical things and he=
+re I am.<br></div><div style=3D"color: rgb(0, 0, 0); font-family: Cantarell=
+; font-size: 14.666666984558105px; font-style: normal; font-variant-caps: n=
+ormal; font-weight: normal; letter-spacing: normal; orphans: auto; text-ali=
+gn: start; text-indent: 0px; text-transform: none; white-space: normal; wid=
+ows: auto; word-spacing: 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.=
+4); -webkit-text-stroke-width: 0px;"><br>To better make understand what pro=
+blem I'm noticing I link the issue opened in the gitlab in which I have rep=
+orted a lot of useful info and logs with a good formatting:<br></div><div s=
+tyle=3D"color: rgb(0, 0, 0); font-family: Cantarell; font-size: 14.66666698=
+4558105px; font-style: normal; font-variant-caps: normal; font-weight: norm=
+al; letter-spacing: normal; orphans: auto; text-align: start; text-indent: =
+0px; text-transform: none; white-space: normal; widows: auto; word-spacing:=
+ 0px; -webkit-tap-highlight-color: rgba(0, 0, 0, 0.4); -webkit-text-stroke-=
+width: 0px;"><a target=3D"_blank" rel=3D"noopener noreferrer" href=3D"https=
+://gitlab.com/qemu-project/qemu/-/issues/368">https://gitlab.com/qemu-proje=
+ct/qemu/-/issues/368</a><br></div><div style=3D"color: rgb(0, 0, 0); font-f=
+amily: Cantarell; font-size: 14.666666984558105px; font-style: normal; font=
+-variant-caps: normal; font-weight: normal; letter-spacing: normal; orphans=
+: auto; text-align: start; text-indent: 0px; text-transform: none; white-sp=
+ace: normal; widows: auto; word-spacing: 0px; -webkit-tap-highlight-color: =
+rgba(0, 0, 0, 0.4); -webkit-text-stroke-width: 0px;"><br>To me seems really=
+ strange what is happening, am I doing some error or this really is a virti=
+ofsd bug?<br></div>  </body>
+</html>
+
+------=_Part_274944_1812962147.1622562911486--
 

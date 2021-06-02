@@ -1,18 +1,18 @@
-Date: Wed, 2 Jun 2021 02:08:48 -0400
-From: virtiofs-bot@sinrega.org
-Message-Id: <05275.121060202084202111@us-mta-228.us.mimecast.lan>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm2; bh=/WTd2Xkb25tn3uJbc
-	DixJZR1MujxgTcqdJyDb4iGl8k=; b=v0YKNdB+S35HpRnFLBnsynAOJcy2AUNt1
-	CIaF5dFIeTENSy066G3c7F/RP8l8tMADAZqO7ftJUEDmAKgfMHOC8nqHbdTdgyLw
-	bJ702FM4XC7Xu5fiInST8KlR6icee3kNm/HZ3/bSWuwEqlz1ftK2up+TlcOYAyOI
-	sDvt5O5J95IoAZNmocrlCxvw5U4XRP1yHHY4+Rw/53qHcGDBLgfhLS661iGBpt9o
-	kpAivydWK7EvCZiIPnv9m7u7YoBlhhhOySn4kcAlFxW12wF332RefoHUPmPOV/ql
-	nwNx3sZjQGiaXjzhhdCIDgDVAFyb3UjvQvZXLHTj8JmYQiwhSBmEQ==
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] MR merged: Allow using file handles
-	instead of O_PATH FDs to reference inodes
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=frAwjb2gnVBBojPAhIW/AS93JJS0sD6BIigNXpxqlOI=;
+	b=BZ2pBr1J29AKJ3gZXfaEuVrgWKJiWC48uThOR4/m/FD6C1ENQL9/2kS7O+sbp9hKee
+	vIwB/IgkYVF9mnViikIo6+qVYWqjvyvCcadO/IEjXUGWFSP8E8Em18WQA6ADrrM/kfRO
+	J78BwwIhs6660X8WL+DHjDcV8b0jGIy/AivVM=
+MIME-Version: 1.0
+References: <Mb7HI6c--3-2@tutanota.com>
+In-Reply-To: <Mb7HI6c--3-2@tutanota.com>
+From: Chirantan Ekbote <chirantan@chromium.org>
+Date: Wed, 2 Jun 2021 17:32:49 +0900
+Message-ID: <CAJFHJrpEKH_gDz=CpEG=Sy2v-pXe_VoHsX3AJ2FFM7Njh0w0DA@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] virtiofsd: doesn't garant write access at users
+ allowed by group permission
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,9 +21,82 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: tecufanujacu@tutanota.com
+Cc: virtio-fs-list <virtio-fs@redhat.com>
 
-Storing an `O_PATH` file descriptor in every `InodeData` means we have a lot of FDs open, which is sometimes bad.  This series adds an option (`--inode-file-handles`) that will make virtiofsd-rs attempt to generate a file handle for new inodes and store that instead of an FD.  When an FD is needed for a given inode, we open the handle.
----
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/26
+On Wed, Jun 2, 2021 at 1:01 AM <tecufanujacu@tutanota.com> wrote:
+>
+> Hello to everyone,
+>
+> I'm trying virtiofsd with proxmox from few weeks and I noticed a problem, virtiofsd doesn't garant write access at users allowed by group permission.
+>
+> The virtiofsd bin included in proxmox is v 7.32, but I have also tested the bins compiled from source from stable branch (v7.27) and dev branch (v7.33), and I also have tested the bin virtiofsd-rs. Always same problem.
+>
+> I opened an issue on gitlab and I asked in the proxmox forum but with almost zero interaction. Seems to me that virtiofsd isn't a lot used. Someone suggested me to write in the mailinglist for these technical things and here I am.
+>
+> To better make understand what problem I'm noticing I link the issue opened in the gitlab in which I have reported a lot of useful info and logs with a good formatting:
+> https://gitlab.com/qemu-project/qemu/-/issues/368
+>
+> To me seems really strange what is happening, am I doing some error or this really is a virtiofsd bug?
+
+I'm pretty sure this is a virtiofsd issue because we ran into the same
+problem on crosvm.  The issue is that the server changes its uid/gid
+to the uid/gid in the fuse context before making the syscall.  This
+ensures that the file/directory appears atomically with the correct
+metadata.  However, this causes an EACCES error when the following
+conditions are
+met:
+
+* The parent directory has g+rw permissions with gid A
+* The process has gid B but has A in its list of supplementary groups
+
+In this case the fuse context only contains gid B, which doesn't have
+permission to modify the parent directory.
+
+There are a couple of ways to fix this problem:
+
+The first one we tried was to split file/directory creation into 2
+stages [1].  Basically for files we first create a temporary with
+O_TMPFILE and then initialize the metadata before linking it into the
+directory tree.  The main issue with this is that we're duplicating
+the work that kernel already does on open and turning a single syscall
+in the VM into several syscalls on the host, which adds a significant
+amount of latency.  You also have to deal with a bunch of esoteric
+corner cases for file systems that the kernel would normally just
+handle automatically [2][3].  For directories, there is no O_TMPFILE
+equivalent so we had to do a gross hack of creating a directory with a
+random name and then renaming it to the correct one once all the
+metadata was properly initialized.  In theory you could create the
+directory in a separate "work dir" first but you have to be careful if
+the original directory uses selinux.  From what I understand, rename
+preserves the security context so to ensure the security context is
+properly inherited from the parent directory you need to create a new
+directory anyway.  Or figure out what the correct context should be
+and set it in the work dir before the rename.
+
+The second solution, which is also what we're using now, is to set the
+SECBIT_NO_SETUID_FIXUP flag.  This flag prevents the kernel from
+dropping caps when the process changes its uid/gid so the permission
+checks are skipped as long as the server has the appropriate
+capabilities (CAP_DAC_OVERRIDE, I think?).  Doing this lets us drop
+all the special handling code and just go back to making a single
+syscall and letting the kernel figure out the rest [4].  The crosvm fs
+device always runs as root in a user namespace with the proper caps so
+this works for us but obviously will not work if virtiofsd doesn't
+have the caps to begin with.  At that point the first option may be
+the only choice.
+
+I guess a third option is to change the fuse protocol so that it also
+includes the supplementary groups of the calling process.  Then the
+server can also set its supplementary groups the same way before
+making the syscall.  Merging the necessary changes into the kernel is
+left as an exercise for the reader ;-)
+
+
+Chirantan
+
+[1]: https://chromium-review.googlesource.com/c/chromiumos/platform/crosvm/+/2217534
+[2]: https://chromium-review.googlesource.com/c/chromiumos/platform/crosvm/+/2253493
+[3]: https://chromium-review.googlesource.com/c/chromiumos/platform/crosvm/+/2260253
+[4]: https://chromium-review.googlesource.com/c/chromiumos/platform/crosvm/+/2684067
 

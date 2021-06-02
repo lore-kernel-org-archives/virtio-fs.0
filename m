@@ -1,14 +1,14 @@
-Date: Wed, 2 Jun 2021 14:17:05 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YLeE0TIKskbUgWVt@work-vm>
-References: <Mb7HI6c--3-2@tutanota.com>
-	<CAJFHJrpEKH_gDz=CpEG=Sy2v-pXe_VoHsX3AJ2FFM7Njh0w0DA@mail.gmail.com>
+Date: Wed, 2 Jun 2021 14:19:58 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210602181958.GC115492@redhat.com>
+References: <20210512125544.9536-1-mreitz@redhat.com>
+	<20210512125544.9536-2-mreitz@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <CAJFHJrpEKH_gDz=CpEG=Sy2v-pXe_VoHsX3AJ2FFM7Njh0w0DA@mail.gmail.com>
-Subject: Re: [Virtio-fs] virtiofsd: doesn't garant write access at users
- allowed by group permission
+In-Reply-To: <20210512125544.9536-2-mreitz@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 1/3] virtiofsd: Find original inode ID of
+	mount points
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,95 +17,260 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Chirantan Ekbote <chirantan@chromium.org>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: Max Reitz <mreitz@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, qemu-devel@nongnu.org
 
-* Chirantan Ekbote (chirantan@chromium.org) wrote:
-> On Wed, Jun 2, 2021 at 1:01 AM <tecufanujacu@tutanota.com> wrote:
-> >
-> > Hello to everyone,
-> >
-> > I'm trying virtiofsd with proxmox from few weeks and I noticed a problem, virtiofsd doesn't garant write access at users allowed by group permission.
-> >
-> > The virtiofsd bin included in proxmox is v 7.32, but I have also tested the bins compiled from source from stable branch (v7.27) and dev branch (v7.33), and I also have tested the bin virtiofsd-rs. Always same problem.
-> >
-> > I opened an issue on gitlab and I asked in the proxmox forum but with almost zero interaction. Seems to me that virtiofsd isn't a lot used. Someone suggested me to write in the mailinglist for these technical things and here I am.
-> >
-> > To better make understand what problem I'm noticing I link the issue opened in the gitlab in which I have reported a lot of useful info and logs with a good formatting:
-> > https://gitlab.com/qemu-project/qemu/-/issues/368
-> >
-> > To me seems really strange what is happening, am I doing some error or this really is a virtiofsd bug?
+On Wed, May 12, 2021 at 02:55:42PM +0200, Max Reitz wrote:
+> Mount point directories represent two inodes: On one hand, they are a
+> normal directory on their parent filesystem.  On the other, they are the
+> root node of the filesystem mounted there.  Thus, they have two inode
+> IDs.
 > 
-> I'm pretty sure this is a virtiofsd issue because we ran into the same
-> problem on crosvm.  The issue is that the server changes its uid/gid
-> to the uid/gid in the fuse context before making the syscall.  This
-> ensures that the file/directory appears atomically with the correct
-> metadata.  However, this causes an EACCES error when the following
-> conditions are
-> met:
+> Right now, we only report the latter inode ID (i.e. the inode ID of the
+> mounted filesystem's root node).  This is fine once the guest has
+> auto-mounted a submount there (so this inode ID goes with a device ID
+> that is distinct from the parent filesystem), but before the auto-mount,
+> they have the device ID of the parent and the inode ID for the submount.
+> This is problematic because this is likely exactly the same
+> st_dev/st_ino combination as the parent filesystem's root node.  This
+> leads to problems for example with `find`, which will thus complain
+> about a filesystem loop if it has visited the parent filesystem's root
+> node before, and then refuse to descend into the submount.
 > 
-> * The parent directory has g+rw permissions with gid A
-> * The process has gid B but has A in its list of supplementary groups
-> 
-> In this case the fuse context only contains gid B, which doesn't have
-> permission to modify the parent directory.
+> There is a way to find the mount directory's original inode ID, and that
+> is to readdir(3) the parent directory, look for the mount directory, and
+> read the dirent.d_ino field.  Using this, we can let lookup and
+> readdirplus return that original inode ID, which the guest will thus
+> show until the submount is auto-mounted.  (Then, it will invoke getattr
+> and that stat(2) call will return the inode ID for the submount.)
 
-Ewww; thanks for that description.
-Could you add that to that gitlab issue please?
+[ CC miklos ]
 
-Dave
+Hi Max,
 
-> There are a couple of ways to fix this problem:
+Though we discussed this in chat room, I am still responding to this
+email with the concern I have, so that there is a record of it.
+
+So with this patch for FUSE_LOOKUP  we always return submount's parentinode
+id and with GETATTR request we return actual inode id of submount. That
+kind of bothers me a bit as we are assuming that there is always going
+to be a GETATTR request after FUSE_LOOKUP. FUSE_LOOKUP itself has attrs
+returned with it and it might happen that after FUSE_LOOKUP, FUSE_GETATTR
+might not be called at all because FUSE_LOOKUP itself got the latest
+updated attrs with certain timeout.
+
+For example, if I call stat on a normal file (not submount), I see that
+after FUSE_LOOKUP, no FUSE_GETATTR request is going and
+fuse_update_get_attr() is using attrs from locally cached inode attrs.
+
+But same thing does not seem to be happening in case of submount. Once
+submount is created in guest, I see that we never seem to be calling
+->revalidate() on newly created dentry of submount root. I am not sure
+why. And that means we don't do FUSE_LOOKUP and that means FUSE_GETATTR
+always gets called.
+
+I am not sure if this is a bug or expected behavior. I am not confident
+that we can rely on this behavior of submount dentries. 
+
+Ccing Miklos. He might have thoughts on this.
+
+As we discussed, may be it is a better idea to create two inodes in
+virtiofsd (like we do in guest). One for submount parent and one for
+actual submount.
+
+Thanks
+Vivek
+
+
 > 
-> The first one we tried was to split file/directory creation into 2
-> stages [1].  Basically for files we first create a temporary with
-> O_TMPFILE and then initialize the metadata before linking it into the
-> directory tree.  The main issue with this is that we're duplicating
-> the work that kernel already does on open and turning a single syscall
-> in the VM into several syscalls on the host, which adds a significant
-> amount of latency.  You also have to deal with a bunch of esoteric
-> corner cases for file systems that the kernel would normally just
-> handle automatically [2][3].  For directories, there is no O_TMPFILE
-> equivalent so we had to do a gross hack of creating a directory with a
-> random name and then renaming it to the correct one once all the
-> metadata was properly initialized.  In theory you could create the
-> directory in a separate "work dir" first but you have to be careful if
-> the original directory uses selinux.  From what I understand, rename
-> preserves the security context so to ensure the security context is
-> properly inherited from the parent directory you need to create a new
-> directory anyway.  Or figure out what the correct context should be
-> and set it in the work dir before the rename.
+> Signed-off-by: Max Reitz <mreitz@redhat.com>
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 104 +++++++++++++++++++++++++++++--
+>  1 file changed, 99 insertions(+), 5 deletions(-)
 > 
-> The second solution, which is also what we're using now, is to set the
-> SECBIT_NO_SETUID_FIXUP flag.  This flag prevents the kernel from
-> dropping caps when the process changes its uid/gid so the permission
-> checks are skipped as long as the server has the appropriate
-> capabilities (CAP_DAC_OVERRIDE, I think?).  Doing this lets us drop
-> all the special handling code and just go back to making a single
-> syscall and letting the kernel figure out the rest [4].  The crosvm fs
-> device always runs as root in a user namespace with the proper caps so
-> this works for us but obviously will not work if virtiofsd doesn't
-> have the caps to begin with.  At that point the first option may be
-> the only choice.
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 1553d2ef45..110b6e7e5b 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -968,14 +968,87 @@ static int do_statx(struct lo_data *lo, int dirfd, const char *pathname,
+>      return 0;
+>  }
+>  
+> +/*
+> + * Use readdir() to find mp_name's inode ID on the parent's filesystem.
+> + * (For mount points, stat() will only return the inode ID on the
+> + * filesystem mounted there, i.e. the root directory's inode ID.  The
+> + * mount point originally was a directory on the parent filesystem,
+> + * though, and so has a different inode ID there.  When passing
+> + * submount information to the guest, we need to pass this other ID,
+> + * so the guest can use it as the inode ID until the submount is
+> + * auto-mounted.  (At which point the guest will invoke getattr and
+> + * find the inode ID on the submount.))
+> + *
+> + * Return 0 on success, and -errno otherwise.  *pino is set only in
+> + * case of success.
+> + */
+> +static int get_mp_ino_on_parent(const struct lo_inode *dir, const char *mp_name,
+> +                                ino_t *pino)
+> +{
+> +    int dirfd = -1;
+> +    int ret;
+> +    DIR *dp = NULL;
+> +
+> +    dirfd = openat(dir->fd, ".", O_RDONLY);
+> +    if (dirfd < 0) {
+> +        ret = -errno;
+> +        goto out;
+> +    }
+> +
+> +    dp = fdopendir(dirfd);
+> +    if (!dp) {
+> +        ret = -errno;
+> +        goto out;
+> +    }
+> +    /* Owned by dp now */
+> +    dirfd = -1;
+> +
+> +    while (true) {
+> +        struct dirent *de;
+> +
+> +        errno = 0;
+> +        de = readdir(dp);
+> +        if (!de) {
+> +            ret = errno ? -errno : -ENOENT;
+> +            goto out;
+> +        }
+> +
+> +        if (!strcmp(de->d_name, mp_name)) {
+> +            *pino = de->d_ino;
+> +            ret = 0;
+> +            goto out;
+> +        }
+> +    }
+> +
+> +out:
+> +    if (dp) {
+> +        closedir(dp);
+> +    }
+> +    if (dirfd >= 0) {
+> +        close(dirfd);
+> +    }
+> +    return ret;
+> +}
+> +
+>  /*
+>   * Increments nlookup on the inode on success. unref_inode_lolocked() must be
+>   * called eventually to decrement nlookup again. If inodep is non-NULL, the
+>   * inode pointer is stored and the caller must call lo_inode_put().
+> + *
+> + * If parent_fs_st_ino is true, the entry is a mount point, and submounts are
+> + * announced to the guest, set e->attr.st_ino to the entry's inode ID on its
+> + * parent filesystem instead of its inode ID on the filesystem mounted on it.
+> + * (For mount points, the entry encompasses two inodes: One on the parent FS,
+> + * and one on the mounted FS (where it is the root node), so it has two inode
+> + * IDs.  When looking up entries, we should show the guest the parent FS's inode
+> + * ID, because as long as the guest has not auto-mounted the submount, it should
+> + * see that original ID.  Once it does perform the auto-mount, it will invoke
+> + * getattr and see the root node's inode ID.)
+>   */
+>  static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+>                          struct fuse_entry_param *e,
+> -                        struct lo_inode **inodep)
+> +                        struct lo_inode **inodep,
+> +                        bool parent_fs_st_ino)
+>  {
+>      int newfd;
+>      int res;
+> @@ -984,6 +1057,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+>      struct lo_data *lo = lo_data(req);
+>      struct lo_inode *inode = NULL;
+>      struct lo_inode *dir = lo_inode(req, parent);
+> +    ino_t ino_id_for_guest;
+>  
+>      if (inodep) {
+>          *inodep = NULL; /* in case there is an error */
+> @@ -1018,9 +1092,22 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+>          goto out_err;
+>      }
+>  
+> +    ino_id_for_guest = e->attr.st_ino;
+> +
+>      if (S_ISDIR(e->attr.st_mode) && lo->announce_submounts &&
+>          (e->attr.st_dev != dir->key.dev || mnt_id != dir->key.mnt_id)) {
+>          e->attr_flags |= FUSE_ATTR_SUBMOUNT;
+> +
+> +        if (parent_fs_st_ino) {
+> +            /*
+> +             * Best effort, so ignore errors.
+> +             * Also note that using readdir() means there may be races:
+> +             * The directory entry we find (if any) may be different
+> +             * from newfd.  Again, this is a best effort.  Reporting
+> +             * the wrong inode ID to the guest is not catastrophic.
+> +             */
+> +            get_mp_ino_on_parent(dir, name, &ino_id_for_guest);
+> +        }
+>      }
+>  
+>      inode = lo_find(lo, &e->attr, mnt_id);
+> @@ -1043,6 +1130,10 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+>  
+>          inode->nlookup = 1;
+>          inode->fd = newfd;
+> +        /*
+> +         * For the inode key, use the dev/ino/mnt ID as reported by stat()
+> +         * (i.e. not ino_id_for_guest)
+> +         */
+>          inode->key.ino = e->attr.st_ino;
+>          inode->key.dev = e->attr.st_dev;
+>          inode->key.mnt_id = mnt_id;
+> @@ -1058,6 +1149,9 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+>      }
+>      e->ino = inode->fuse_ino;
+>  
+> +    /* Report ino_id_for_guest to the guest */
+> +    e->attr.st_ino = ino_id_for_guest;
+> +
+>      /* Transfer ownership of inode pointer to caller or drop it */
+>      if (inodep) {
+>          *inodep = inode;
+> @@ -1104,7 +1198,7 @@ static void lo_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
+>          return;
+>      }
+>  
+> -    err = lo_do_lookup(req, parent, name, &e, NULL);
+> +    err = lo_do_lookup(req, parent, name, &e, NULL, true);
+>      if (err) {
+>          fuse_reply_err(req, err);
+>      } else {
+> @@ -1217,7 +1311,7 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
+>          goto out;
+>      }
+>  
+> -    saverr = lo_do_lookup(req, parent, name, &e, NULL);
+> +    saverr = lo_do_lookup(req, parent, name, &e, NULL, false);
+>      if (saverr) {
+>          goto out;
+>      }
+> @@ -1714,7 +1808,7 @@ static void lo_do_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
+>  
+>          if (plus) {
+>              if (!is_dot_or_dotdot(name)) {
+> -                err = lo_do_lookup(req, ino, name, &e, NULL);
+> +                err = lo_do_lookup(req, ino, name, &e, NULL, true);
+>                  if (err) {
+>                      goto error;
+>                  }
+> @@ -1936,7 +2030,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+>          goto out;
+>      }
+>  
+> -    err = lo_do_lookup(req, parent, name, &e, &inode);
+> +    err = lo_do_lookup(req, parent, name, &e, &inode, false);
+>      if (err) {
+>          goto out;
+>      }
+> -- 
+> 2.31.1
 > 
-> I guess a third option is to change the fuse protocol so that it also
-> includes the supplementary groups of the calling process.  Then the
-> server can also set its supplementary groups the same way before
-> making the syscall.  Merging the necessary changes into the kernel is
-> left as an exercise for the reader ;-)
 > 
-> 
-> Chirantan
-> 
-> [1]: https://chromium-review.googlesource.com/c/chromiumos/platform/crosvm/+/2217534
-> [2]: https://chromium-review.googlesource.com/c/chromiumos/platform/crosvm/+/2253493
-> [3]: https://chromium-review.googlesource.com/c/chromiumos/platform/crosvm/+/2260253
-> [4]: https://chromium-review.googlesource.com/c/chromiumos/platform/crosvm/+/2684067
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

@@ -1,25 +1,21 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
-	h=subject:to:cc:references:from:message-id:date:user-agent
-	:mime-version:in-reply-to:content-transfer-encoding:content-language;
-	bh=fcPPrXjWwpiVtspPJ6xD6pkPja3x8jzHZWjndhWNiGg=;
-	b=mpsawx8rZY2qiw7bPTHySj/8a36nGOLSQQrfynYGudBmgKhcnMik79Mgz+n+hzXKEj
-	J/XlFEMIlG6n7VgeDuENiXyFlG/8His1Dw/LnfOCkJ0r4eM+X1U5DCEBEmOtclpyjgY7
-	7SgPer8y/qDfKRbnpTeEciqQREmReqI6FNi76jgHNfQksgztz+QfPYnHVvRcBqDnwthg
-	zS1+vKqSVw2SxGZczT33VyzFO/dEg/bi3d+29R5t5KHCCIDONrMN0mWnA4gAEBzKKztd
-	5CBjPlXHfY6Q6x4gQ4gyLcmstn5HzY0RyWroXTph90i3rngbnuFwXetHNk3EEx5x/RsW
-	+dzw==
-References: <e1437314-4870-a3a3-e866-8be50282ce3c@gmail.com>
-	<20210601130245.GA24846@redhat.com>
-From: "Harry G. Coin" <hgcoin@gmail.com>
-Message-ID: <ad7ecf43-9b3b-d64e-8bab-c5a82a73ae76@gmail.com>
-Date: Thu, 3 Jun 2021 12:58:37 -0500
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=sub-pop.net
+	; s=mythic-beasts-k1; h=To:Subject:From:Date;
+	bh=Qahk0etpqj+kBvaOZ4rWM9oqO6gtxYUQ5tgB/6kdOs0=;
+	b=pzKUIOEUCf1Nx5ML0G9Tv0qT/R
+	Bq6oxd04rMVkk0MUgwRDsmQJ4TwpHN/lQT0z/uE1QHRvgEwipfmbG46L+I4JG38nfXtXsxQmRkN/I
+	0VyCyh4BWnKzXxhjagOOodVIGFCST2ZQO4fgxhnlQKtZDMOlJxWXffppqmoPw7TVqsqEBdzu34Djy
+	staXjny3wS3qXtd0tzme+vfXB7hdHJFZkfI2l69iEPJkjC08BNlhJ47MpVpSOxfMhfJo0dDQyysT0
+	6Q98DieuxEuscJSpLx8iUHpXCiXBmMcovMoKlw38U+P0pPcmeFNdZ7yXcOzaxMETTF8QqVwb4xRkA
+	c8z23iRA==
+Date: Thu, 03 Jun 2021 14:48:09 -0400
+From: Link Dupont <link@sub-pop.net>
+Message-Id: <9W25UQ.OHKWX78P32DI3@sub-pop.net>
+In-Reply-To: <ebd44751-333c-cb7a-5776-c63501558af6@redhat.com>
+References: <2234280.ElGaqSPkdT@subpop>
+	<ebd44751-333c-cb7a-5776-c63501558af6@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20210601130245.GA24846@redhat.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Content-Language: en-US
-Subject: Re: [Virtio-fs] regression: lsetfilecon fails, breaks rpm, dpkg,
- dnf in virtiofs guests.
+Content-Type: text/plain; charset=us-ascii; format=flowed
+Subject: Re: [Virtio-fs] virtiofs mounted filesystems & SELinux
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -28,98 +24,77 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Ondrej Mosnacek <omosnace@redhat.com>
+To: Connor Kuehl <ckuehl@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, libvirt-users@redhat.com
 
+Adding the <binary xattr='on'> element to the <filesystem> device does 
+seem to spawn virtiofsd with the option string "source=/home,xattr". My 
+guest can no longer mount the device though.
 
-On 6/1/21 8:02 AM, Vivek Goyal wrote:
-> On Sat, May 29, 2021 at 01:42:50PM -0500, Harry G. Coin wrote:
->> Some regression in virtio-fs has led to rpm/dnf/yum failing  in the same
->> guest it previously worked.
->>
->> linux 5.11.19-300.fc34.x86_64
->>
->> Specifically, all attempts to use dnf/yum lead to examples similar to this:
->>
->> Error unpacking rpm package dnf-4.7.0-1.fc34.noarch
->>   Upgrading        :
->> python3-dnf-plugins-core-4.0.21-1.fc34.noarch                                                                                                                                                     
->> 8/20
->> error: unpacking of archive failed on file /usr/bin/dnf;60b1b277: cpio:
->> (error 0x2)
->> error: dnf-4.7.0-1.fc34.noarch: install failed
->> error: lsetfilecon: (/etc/dnf/plugins/copr.conf,
->> system_u:object_r:etc_t:s0) Operation not permitted
->> error: Plugin selinux: hook fsm_file_prepare failed
-> CCing Dan Walsh and Ondrej. They might have an idea.
->
-> Thanks
-> Vivek
->
->> (
->>
->> For all packages.  No updates are possible.  Possibly related to:
->> https://github.com/fedora-selinux/selinux-policy/pull/478/files/21a2df26cd605c55de7edc80e16907fcb76ccf08 
->> ?  What really gets me, is this error exists even though
->>
->> # getenforce
->> Permissive
->>
->> )
->>
->> The host is running btrfs.  ... virtiofsd --fd=50 -o
->> source=/vmsystems/fedora_generic,xattr,flock,posix_lock
->>
->> same effect with  .... virtiofsd --fd=36 -o
->> source=/vmsystems/dbl1,xattr,flock,no_posix_lock
->>
->> /etc/fstab:
->>
->> myfs / virtiofs seclabel 0 0
+It errors with:
 
+[ 170.225553] 9pnet_virtio: no channels available
+mount: mount(2) failed: No such file or directory
 
+I think what this is doing is causing libvirt to create the device as a 
+virtiofs device instead of a 9p device. The EL7 kernel doesn't have a 
+virtiofs driver, so it can't mount virtiofs devices.
 
-Here's a reproducer:
+My knowledge is unfortunately limited about the nuances between 9p and 
+virtiofs. So I'm mostly experimenting by trial-and-error here.
 
-[root@registry1 ~]# getenforce
-
-Permissive
-[root@registry1 ~]# cat lsetfilecon.c
-#include <selinux/selinux.h>
-#include <stdio.h>
-#include <errno.h>
- void perror(const char *s);
-
-int main(int argc,char *argv[]){
-  int i;
-  i= lsetfilecon("/usr/bin/rngtest","system_u:object_r:bin_t:s0");
-  //i=
-lsetfilecon("/usr/bin/rngtest;60b9120b","system_u:object_r:bin_t:s0");
-  printf("ret %lx\n",i);
-  perror("\n");
-  return 0;
-}
-
-[root@registry1 ~]# gcc lsetfilecon.c -lselinux -o lsetfilecon
-[root@registry1 ~]# ./lsetfilecon
-ret ffffffff
-
-: Operation not permitted
-[root@registry1 ~]# ls -l /usr/bin/rngtest
--rwxr-xr-x. 1 root root 21176 Apr 27 18:26 /usr/bin/rngtest
-
-[root@registry1 ~]# uname -a
-Linux registry1.xxxx 5.11.19-300.fc34.x86_64 #1 SMP Fri May 7 14:17:15
-UTC 2021 x86_64 x86_64 x86_64 GNU/Linux
-
-On the host:
-
-
-root@noc1:/vmsystems/registry1/usr/bin# getfattr -m - -d rngtest
-# file: rngtest
-security.selinux="system_u:object_r:bin_t:s0"
-
-ls -l rngtest
--rwxr-xr-x. 1 root root 21176 Apr 27 18:26 rngtest
+On Wed, Jun 2 2021 at 03:55:40 PM -0500, Connor Kuehl 
+<ckuehl@redhat.com> wrote:
+> On 5/21/21 11:59 AM, Link Dupont wrote:
+> 
+> Adding the virtio-fs mailing list.
+> 
+>>  I am mounting a filesystem into a domain using the virtiofs driver.
+>> 
+>>  <filesystem accessmode="passthrough" type="mount">
+>>        <source dir="/home"/>
+>>        <target dir="/home"/>
+>>        <driver type="virtiofs"/>
+>>  </filesystem>
+>> 
+>>  Both my host (Fedora 34) and guest (CentOS 8.4) are running with 
+>> SELinux
+>>  enforcing. From my host, I can see that the SELinux context type is 
+>> set to
+>>  user_home_dir_t.
+>> 
+>>  $ ls -ldZ /home/link
+>>  drwxr-xr-x. 61 link link system_u:object_r:user_home_dir_t:s0 8192 
+>> May 21
+>>  12:41 /home/link
+>> 
+>>> From within the guest however, the volume is unlabeled_t
+>> 
+>>  $ ls -lZd /home/link
+>>  drwxr-xr-x. 61 link link system_u:object_r:unlabeled_t:s0 8192 May 
+>> 21 12:53 /
+>>  home/link
+>> 
+>>  Is there a way to pass the SELinux context through to the guest? Or 
+>> mount the
+>>  volume with the correct options to map SELinux contexts?
+>> 
+>> 
+> 
+> Hi,
+> 
+> I'm afraid I actually don't know that much about SELinux but I read
+> that it relies on using extended attributes in the file system to
+> accomplish its labeling.
+> 
+> Do you still experience this issue when you enable extended attribute
+> support[1] in virtiofsd? The example in the optional parameters 
+> snippet
+> enables extended attributes with the xattr='on' element.
+> 
+> Connor
+> 
+> [1] https://libvirt.org/kbase/virtiofs.html#optional-parameters
+> 
 
 

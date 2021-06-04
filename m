@@ -1,10 +1,12 @@
 From: Greg Kurz <groug@kaod.org>
-Date: Fri,  4 Jun 2021 18:11:49 +0200
-Message-Id: <20210604161156.408496-1-groug@kaod.org>
-Content-Type: text/plain; charset="utf-8"
+Date: Fri,  4 Jun 2021 18:11:50 +0200
+Message-Id: <20210604161156.408496-2-groug@kaod.org>
+In-Reply-To: <20210604161156.408496-1-groug@kaod.org>
+References: <20210604161156.408496-1-groug@kaod.org>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 0/7] fuse: Some fixes for submounts
+Subject: [Virtio-fs] [PATCH v2 1/7] fuse: Fix crash in
+	fuse_dentry_automount() error path
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,42 +16,58 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Max Reitz <mreitz@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
+Cc: stable@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Max Reitz <mreitz@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
-v2:
+If fuse_fill_super_submount() returns an error, the error path
+triggers a crash:
 
-- add an extra fix (patch 2) : mount is now added to the list before
-  unlocking sb->s_umount
-- set SB_BORN just before unlocking sb->s_umount, just like it would
-  happen when using fc_mount() (Max)
-- don't allocate a FUSE context for the submounts (Max)
-- introduce a dedicated context ops for submounts
-- add a extra cleanup : simplify the code even more with fc_mount()
+[   26.206673] BUG: kernel NULL pointer dereference, address: 0000000000000000
+[...]
+[   26.226362] RIP: 0010:__list_del_entry_valid+0x25/0x90
+[...]
+[   26.247938] Call Trace:
+[   26.248300]  fuse_mount_remove+0x2c/0x70 [fuse]
+[   26.248892]  virtio_kill_sb+0x22/0x160 [virtiofs]
+[   26.249487]  deactivate_locked_super+0x36/0xa0
+[   26.250077]  fuse_dentry_automount+0x178/0x1a0 [fuse]
 
-v1:
+The crash happens because fuse_mount_remove() assumes that the FUSE
+mount was already added to list under the FUSE connection, but this
+only done after fuse_fill_super_submount() has returned success.
 
-While working on adding syncfs() support in FUSE, I've hit some severe
-bugs with submounts (a crash and an infinite loop). The fix for the
-crash is straightforward (patch 1), but the fix for the infinite loop
-is more invasive : as suggested by Miklos, a simple bug fix is applied
-first (patch 2) and the final fix (patch 3) is applied on top.
+This means that until fuse_fill_super_submount() has returned success,
+the FUSE mount isn't actually owned by the superblock. We should thus
+reclaim ownership by clearing sb->s_fs_info, which will skip the call
+to fuse_mount_remove(), and perform rollback, like virtio_fs_get_tree()
+already does for the root sb.
 
-Greg Kurz (7):
-  fuse: Fix crash in fuse_dentry_automount() error path
-  fuse: Fix crash if superblock of submount gets killed early
-  fuse: Fix infinite loop in sget_fc()
-  fuse: Add dedicated filesystem context ops for submounts
-  fuse: Call vfs_get_tree() for submounts
-  fuse: Switch to fc_mount() for submounts
-  fuse: Make fuse_fill_super_submount() static
+Fixes: bf109c64040f ("fuse: implement crossmounts")
+Cc: mreitz@redhat.com
+Cc: stable@vger.kernel.org # v5.10+
+Signed-off-by: Greg Kurz <groug@kaod.org>
+Reviewed-by: Max Reitz <mreitz@redhat.com>
+---
+ fs/fuse/dir.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
- fs/fuse/dir.c       | 58 ++++++---------------------------------------
- fs/fuse/fuse_i.h    | 14 ++++-------
- fs/fuse/inode.c     | 56 +++++++++++++++++++++++++++++++++++++++++--
- fs/fuse/virtio_fs.c |  3 +++
- 4 files changed, 69 insertions(+), 62 deletions(-)
-
+diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
+index 1b6c001a7dd1..01559061cbfb 100644
+--- a/fs/fuse/dir.c
++++ b/fs/fuse/dir.c
+@@ -339,8 +339,12 @@ static struct vfsmount *fuse_dentry_automount(struct path *path)
+ 
+ 	/* Initialize superblock, making @mp_fi its root */
+ 	err = fuse_fill_super_submount(sb, mp_fi);
+-	if (err)
++	if (err) {
++		fuse_conn_put(fc);
++		kfree(fm);
++		sb->s_fs_info = NULL;
+ 		goto out_put_sb;
++	}
+ 
+ 	sb->s_flags |= SB_ACTIVE;
+ 	fsc->root = dget(sb->s_root);
 -- 
 2.31.1
-
 

@@ -1,12 +1,14 @@
-Date: Fri, 4 Jun 2021 16:58:17 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210604205817.GA323260@redhat.com>
-References: <756d5044-e567-b403-b4b2-784b3c284ed6@gmail.com>
+References: <20210604161337.16048-1-mreitz@redhat.com>
+From: Connor Kuehl <ckuehl@redhat.com>
+Message-ID: <1ee5dea9-64d9-dc33-bc29-9caea1d59f07@redhat.com>
+Date: Fri, 4 Jun 2021 16:17:49 -0500
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <756d5044-e567-b403-b4b2-784b3c284ed6@gmail.com>
-Subject: Re: [Virtio-fs] Virtiofs Kernel Boot howto
+In-Reply-To: <20210604161337.16048-1-mreitz@redhat.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Language: en-US
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH 0/9] virtiofsd: Allow using file handles
+ instead of O_PATH FDs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,54 +17,57 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Harry G. Coin" <hgcoin@gmail.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>
+To: Max Reitz <mreitz@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com
 
-On Fri, Jun 04, 2021 at 11:28:42AM -0500, Harry G. Coin wrote:
-> Mentioned up-list, here's a further little helper to allow virtio-fs root.
-
-Hi Harry,
-
-Thanks for posting instructions on how to boot with virtiofs as rootfs.
-
-[..]
-> and as 'kernel args' (presuming you've built dracut with the added conf
-> files I published on this list previously):
+On 6/4/21 11:13 AM, Max Reitz wrote:
+> Hi,
 > 
-> root=virtiofs:myfs rd.shell rd.fstab
+> This is the C virtiofsd equivalent to
+> https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/26.  As such,
+> the summary is pretty much the same:
+> 
+> Storing an O_PATH file descriptor in every lo_inode object means we have
+> a lot of FDs open, which is sometimes bad.  This series adds an option
+> (-o inode_file_handles) that will make virtiofsd attempt to generate a
+> file handle for new inodes and store that instead of an FD.  When an FD
+> is needed for a given inode, we open the handle.
+> 
+> To accomplish this, lo_inode.fd is should not be accessed directly
+> anymore, but only through helper functions (mainly lo_inode_fd() and
+> lo_inode_open()).  A TempFd object is added to hide the difference
+> between FDs that are bound to the lo_inode object (and so need not be
+> closed after use) and temporary FDs from open_by_handle_at() (which do
+> need to be closed after use).
+> 
+> To prevent the problem I spent a long time talking about (if we don’t
+> have an FD open for every inode, the inode can be deleted, its ID
+> reused, and then the lookup in lo_data.inodes will find the old deleted
+> inode), patch 7 adds a second hash table lo_data.inodes_by_handle that
+> maps file handles to lo_inode objects.  (Because file handles include a
+> generation ID, so we can discern between the old and the new inode.)
+> 
+> Patch 9 is completely optional, but I just really felt compelled to
+> write it.
+> 
+> 
+> Max Reitz (9):
+>   virtiofsd: Add TempFd structure
+>   virtiofsd: Use lo_inode_open() instead of openat()
+>   virtiofsd: Add lo_inode_fd() helper
+>   virtiofsd: Let lo_fd() return a TempFd
+>   virtiofsd: Let lo_inode_open() return a TempFd
+>   virtiofsd: Add lo_inode.fhandle
+>   virtiofsd: Add inodes_by_handle hash table
+>   virtiofsd: Optionally fill lo_inode.fhandle
+>   virtiofsd: Add lazy lo_do_find()
+> 
+>  tools/virtiofsd/helper.c              |   3 +
+>  tools/virtiofsd/passthrough_ll.c      | 809 +++++++++++++++++++++-----
+>  tools/virtiofsd/passthrough_seccomp.c |   2 +
+>  3 files changed, 667 insertions(+), 147 deletions(-)
+> 
 
-Ok, this is interesting bit that how virtiofs root should be specified
-so that it can be parsed both by kernel as well as initramfs module.
+For the series:
 
-I don't think "root=virtiofs:myfs" is recognized by kernel. So you must
-have coded dracut module to parse it appropriately.
-
-I just want to make sure that we have a common agreed upon format
-to specify virtiofs as root device. Stefan had posted some pathces
-to kernel in the past but I think review suggested more work and
-things did not progress after that.
-
-https://lore.kernel.org/linux-fsdevel/20190906100324.8492-1-stefanha@redhat.com/
-
-Stefan had suggested syntax "rootfstype=virtiofs root=myfs rw".
-
-Now various kind of hacks are being used. Atleast I am aware of two.
-
-- For vhost-user-fs-pci device use "tag=mtdmyfs" and pass following in
-  kernel command line. This hack was proposed by stefan.
-
-  "root=mtdmyfs rootfstype=virtiofs rw"
-
-- For vhost-user-fs-pci device use "tag=/dev/root" and pass following in
-  kernel command line.
-
-  "rootfstype=virtiofs rw"
-
-Anyway, point being that instead of using hacks, will be good if we
-can fix kernel to accept an option for virtiofs and then fix
-dracut accordingly. Don't want two different ways of doing things
-for dracut and kernel.
-
-Thanks
-Vivek
+Reviewed-by: Connor Kuehl <ckuehl@redhat.com>
 

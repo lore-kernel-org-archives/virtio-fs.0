@@ -1,11 +1,12 @@
 From: Max Reitz <mreitz@redhat.com>
-Date: Fri,  4 Jun 2021 18:13:29 +0200
-Message-Id: <20210604161337.16048-2-mreitz@redhat.com>
+Date: Fri,  4 Jun 2021 18:13:30 +0200
+Message-Id: <20210604161337.16048-3-mreitz@redhat.com>
 In-Reply-To: <20210604161337.16048-1-mreitz@redhat.com>
 References: <20210604161337.16048-1-mreitz@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 1/9] virtiofsd: Add TempFd structure
+Subject: [Virtio-fs] [PATCH 2/9] virtiofsd: Use lo_inode_open() instead of
+	openat()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,94 +18,157 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: Max Reitz <mreitz@redhat.com>
 
-We are planning to add file handles to lo_inode objects as an
-alternative to lo_inode.fd.  That means that everywhere where we
-currently reference lo_inode.fd, we will have to open a temporary file
-descriptor that needs to be closed after use.
+The xattr functions want a non-O_PATH FD, so they reopen the lo_inode.fd
+with the flags they need through /proc/self/fd.
 
-So instead of directly accessing lo_inode.fd, there will be a helper
-function (lo_inode_fd()) that either returns lo_inode.fd, or opens a new
-file descriptor with open_by_handle_at().  It encapsulates this result
-in a TempFd structure to let the caller know whether the FD needs to be
-closed after use (opened from the handle) or not (copied from
-lo_inode.fd).
+Similarly, lo_opendir() needs an O_RDONLY FD.  Instead of the
+/proc/self/fd trick, it just uses openat(fd, "."), because the FD is
+guaranteed to be a directory, so this works.
 
-By using g_auto(TempFd) to store this result, callers will not even have
-to care about closing a temporary FD after use.  It will be done
-automatically once the object goes out of scope.
+All cases have one problem in common, though: In the future, when we may
+have a file handle in the lo_inode instead of an FD, querying an
+lo_inode FD may incur an open_by_handle_at() call.  It does not make
+sense to then reopen that FD with custom flags, those should have been
+passed to open_by_handle_at() instead.
+
+Use lo_inode_open() instead of openat().  As part of the file handle
+change, lo_inode_open() will be made to invoke openat() only if
+lo_inode.fd is valid.  Otherwise, it will invoke open_by_handle_at()
+with the right flags from the start.
+
+Consequently, after this patch, lo_inode_open() is the only place to
+invoke openat() to reopen an existing FD with different flags.
 
 Signed-off-by: Max Reitz <mreitz@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 49 ++++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+ tools/virtiofsd/passthrough_ll.c | 43 ++++++++++++++++++++------------
+ 1 file changed, 27 insertions(+), 16 deletions(-)
 
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 49c21fd855..a4674aba80 100644
+index a4674aba80..436f771d2a 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -174,6 +174,28 @@ struct lo_data {
-     int user_killpriv_v2, killpriv_v2;
- };
+@@ -1645,18 +1645,26 @@ static void lo_opendir(fuse_req_t req, fuse_ino_t ino,
+ {
+     int error = ENOMEM;
+     struct lo_data *lo = lo_data(req);
+-    struct lo_dirp *d;
++    struct lo_inode *inode;
++    struct lo_dirp *d = NULL;
+     int fd;
+     ssize_t fh;
  
-+/**
-+ * Represents a file descriptor that may either be owned by this
-+ * TempFd, or only referenced (i.e. the ownership belongs to some
-+ * other object, and the value has just been copied into this TempFd).
-+ *
-+ * The purpose of this encapsulation is to be used as g_auto(TempFd)
-+ * to automatically clean up owned file descriptors when this object
-+ * goes out of scope.
-+ *
-+ * Use temp_fd_steal() to get an owned file descriptor that will not
-+ * be closed when the TempFd goes out of scope.
-+ */
-+typedef struct {
-+    int fd;
-+    bool owned; /* fd owned by this object? */
-+} TempFd;
++    inode = lo_inode(req, ino);
++    if (!inode) {
++        error = EBADF;
++        goto out_err;
++    }
 +
-+#define TEMP_FD_INIT ((TempFd) { .fd = -1, .owned = false })
-+
-+static void temp_fd_clear(TempFd *temp_fd);
-+G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC(TempFd, temp_fd_clear);
-+
- static const struct fuse_opt lo_opts[] = {
-     { "sandbox=namespace",
-       offsetof(struct lo_data, sandbox),
-@@ -249,6 +271,33 @@ static struct lo_data *lo_data(fuse_req_t req)
-     return (struct lo_data *)fuse_req_userdata(req);
- }
+     d = calloc(1, sizeof(struct lo_dirp));
+     if (d == NULL) {
+         goto out_err;
+     }
  
-+/**
-+ * Clean-up function for TempFds
-+ */
-+static void temp_fd_clear(TempFd *temp_fd)
-+{
-+    if (temp_fd->owned) {
-+        close(temp_fd->fd);
-+        *temp_fd = TEMP_FD_INIT;
-+    }
-+}
-+
-+/**
-+ * Return an owned fd from *temp_fd that will not be closed when
-+ * *temp_fd goes out of scope.
-+ *
-+ * (TODO: Remove __attribute__ once this is used.)
-+ */
-+static __attribute__((unused)) int temp_fd_steal(TempFd *temp_fd)
-+{
-+    if (temp_fd->owned) {
-+        temp_fd->owned = false;
-+        return temp_fd->fd;
-+    } else {
-+        return dup(temp_fd->fd);
-+    }
-+}
-+
- /*
-  * Load capng's state from our saved state if the current thread
-  * hadn't previously been loaded.
+-    fd = openat(lo_fd(req, ino), ".", O_RDONLY);
+-    if (fd == -1) {
+-        goto out_errno;
++    fd = lo_inode_open(lo, inode, O_RDONLY);
++    if (fd < 0) {
++        error = -fd;
++        goto out_err;
+     }
+ 
+     d->dp = fdopendir(fd);
+@@ -1685,6 +1693,7 @@ static void lo_opendir(fuse_req_t req, fuse_ino_t ino,
+ out_errno:
+     error = errno;
+ out_err:
++    lo_inode_put(lo, &inode);
+     if (d) {
+         if (d->dp) {
+             closedir(d->dp);
+@@ -2827,7 +2836,6 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+         }
+     }
+ 
+-    sprintf(procname, "%i", inode->fd);
+     /*
+      * It is not safe to open() non-regular/non-dir files in file server
+      * unless O_PATH is used, so use that method for regular files/dir
+@@ -2835,12 +2843,14 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+      * Otherwise, call fchdir() to avoid open().
+      */
+     if (S_ISREG(inode->filetype) || S_ISDIR(inode->filetype)) {
+-        fd = openat(lo->proc_self_fd, procname, O_RDONLY);
++        fd = lo_inode_open(lo, inode, O_RDONLY);
+         if (fd < 0) {
+-            goto out_err;
++            saverr = -fd;
++            goto out;
+         }
+         ret = fgetxattr(fd, name, value, size);
+     } else {
++        sprintf(procname, "%i", inode->fd);
+         /* fchdir should not fail here */
+         FCHDIR_NOFAIL(lo->proc_self_fd);
+         ret = getxattr(procname, name, value, size);
+@@ -2906,14 +2916,15 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
+         }
+     }
+ 
+-    sprintf(procname, "%i", inode->fd);
+     if (S_ISREG(inode->filetype) || S_ISDIR(inode->filetype)) {
+-        fd = openat(lo->proc_self_fd, procname, O_RDONLY);
++        fd = lo_inode_open(lo, inode, O_RDONLY);
+         if (fd < 0) {
+-            goto out_err;
++            saverr = -fd;
++            goto out;
+         }
+         ret = flistxattr(fd, value, size);
+     } else {
++        sprintf(procname, "%i", inode->fd);
+         /* fchdir should not fail here */
+         FCHDIR_NOFAIL(lo->proc_self_fd);
+         ret = listxattr(procname, value, size);
+@@ -3039,15 +3050,15 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+     fuse_log(FUSE_LOG_DEBUG, "lo_setxattr(ino=%" PRIu64
+              ", name=%s value=%s size=%zd)\n", ino, name, value, size);
+ 
+-    sprintf(procname, "%i", inode->fd);
+     if (S_ISREG(inode->filetype) || S_ISDIR(inode->filetype)) {
+-        fd = openat(lo->proc_self_fd, procname, O_RDONLY);
++        fd = lo_inode_open(lo, inode, O_RDONLY);
+         if (fd < 0) {
+-            saverr = errno;
++            saverr = -fd;
+             goto out;
+         }
+         ret = fsetxattr(fd, name, value, size, flags);
+     } else {
++        sprintf(procname, "%i", inode->fd);
+         /* fchdir should not fail here */
+         FCHDIR_NOFAIL(lo->proc_self_fd);
+         ret = setxattr(procname, name, value, size, flags);
+@@ -3105,15 +3116,15 @@ static void lo_removexattr(fuse_req_t req, fuse_ino_t ino, const char *in_name)
+     fuse_log(FUSE_LOG_DEBUG, "lo_removexattr(ino=%" PRIu64 ", name=%s)\n", ino,
+              name);
+ 
+-    sprintf(procname, "%i", inode->fd);
+     if (S_ISREG(inode->filetype) || S_ISDIR(inode->filetype)) {
+-        fd = openat(lo->proc_self_fd, procname, O_RDONLY);
++        fd = lo_inode_open(lo, inode, O_RDONLY);
+         if (fd < 0) {
+-            saverr = errno;
++            saverr = -fd;
+             goto out;
+         }
+         ret = fremovexattr(fd, name);
+     } else {
++        sprintf(procname, "%i", inode->fd);
+         /* fchdir should not fail here */
+         FCHDIR_NOFAIL(lo->proc_self_fd);
+         ret = removexattr(procname, name);
 -- 
 2.31.1
 

@@ -1,11 +1,12 @@
 From: Greg Kurz <groug@kaod.org>
-Date: Fri,  4 Jun 2021 18:11:52 +0200
-Message-Id: <20210604161156.408496-4-groug@kaod.org>
+Date: Fri,  4 Jun 2021 18:11:53 +0200
+Message-Id: <20210604161156.408496-5-groug@kaod.org>
 In-Reply-To: <20210604161156.408496-1-groug@kaod.org>
 References: <20210604161156.408496-1-groug@kaod.org>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 3/7] fuse: Fix infinite loop in sget_fc()
+Subject: [Virtio-fs] [PATCH v2 4/7] fuse: Add dedicated filesystem context
+	ops for submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,56 +16,93 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: stable@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Max Reitz <mreitz@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
+Cc: linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Max Reitz <mreitz@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
-We don't set the SB_BORN flag on submounts. This is wrong as these
-superblocks are then considered as partially constructed or dying
-in the rest of the code and can break some assumptions.
+The creation of a submount is open-coded in fuse_dentry_automount().
+This brings a lot of complexity and we recently had to fix bugs
+because we weren't setting SB_BORN or because we were unlocking
+sb->s_umount before sb was fully configured. Most of these could
+have been avoided by using the mount API instead of open-coding.
 
-One such case is when you have a virtiofs filesystem with submounts
-and you try to mount it again : virtio_fs_get_tree() tries to obtain
-a superblock with sget_fc(). The logic in sget_fc() is to loop until
-it has either found an existing matching superblock with SB_BORN set
-or to create a brand new one. It is assumed that a superblock without
-SB_BORN is transient and the loop is restarted. Forgetting to set
-SB_BORN on submounts hence causes sget_fc() to retry forever.
+Basically, this means coming up with a proper ->get_tree()
+implementation for submounts and call vfs_get_tree(), or better
+fc_mount().
 
-Setting SB_BORN requires special care, i.e. a write barrier for
-super_cache_count() which can check SB_BORN without taking any lock.
-We should call vfs_get_tree() to deal with that but this requires
-to have a proper ->get_tree() implementation for submounts, which
-is a bigger piece of work. Go for a simple bug fix in the meatime.
+The creation of the superblock for submounts is quite different from
+the root mount. Especially, it doesn't require to allocate a FUSE
+filesystem context, nor to parse parameters.
 
-Fixes: bf109c64040f ("fuse: implement crossmounts")
-Cc: mreitz@redhat.com
-Cc: stable@vger.kernel.org # v5.10+
+Introduce a dedicated context ops for submounts to make this clear.
+This is just a placeholder for now, fuse_get_tree_submount() will
+be populated in a subsequent patch.
+
+Only visible change is that we stop allocating/freeing a useless FUSE
+filesystem context with submounts.
+
 Signed-off-by: Greg Kurz <groug@kaod.org>
 ---
- fs/fuse/dir.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ fs/fuse/fuse_i.h    |  5 +++++
+ fs/fuse/inode.c     | 16 ++++++++++++++++
+ fs/fuse/virtio_fs.c |  3 +++
+ 3 files changed, 24 insertions(+)
 
-diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
-index 3fd1b71e546b..3fa8604c21d5 100644
---- a/fs/fuse/dir.c
-+++ b/fs/fuse/dir.c
-@@ -352,6 +352,17 @@ static struct vfsmount *fuse_dentry_automount(struct path *path)
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index 7e463e220053..862ad317bc89 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -1097,6 +1097,11 @@ int fuse_fill_super_submount(struct super_block *sb,
+  */
+ bool fuse_mount_remove(struct fuse_mount *fm);
  
- 	sb->s_flags |= SB_ACTIVE;
- 	fsc->root = dget(sb->s_root);
++/*
++ * Setup context ops for submounts
++ */
++int fuse_init_fs_context_submount(struct fs_context *fsc);
 +
-+	/*
-+	 * FIXME: setting SB_BORN requires a write barrier for
-+	 *        super_cache_count(). We should actually come
-+	 *        up with a proper ->get_tree() implementation
-+	 *        for submounts and call vfs_get_tree() to take
-+	 *        care of the write barrier.
-+	 */
-+	smp_wmb();
-+	sb->s_flags |= SB_BORN;
-+
- 	/* We are done configuring the superblock, so unlock it */
- 	up_write(&sb->s_umount);
+ /*
+  * Shut down the connection (possibly sending DESTROY request).
+  */
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index 393e36b74dc4..fa96a3762ea2 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -1313,6 +1313,22 @@ int fuse_fill_super_submount(struct super_block *sb,
+ 	return 0;
+ }
  
++static int fuse_get_tree_submount(struct fs_context *fsc)
++{
++	return 0;
++}
++
++static const struct fs_context_operations fuse_context_submount_ops = {
++	.get_tree	= fuse_get_tree_submount,
++};
++
++int fuse_init_fs_context_submount(struct fs_context *fsc)
++{
++	fsc->ops = &fuse_context_submount_ops;
++	return 0;
++}
++EXPORT_SYMBOL_GPL(fuse_init_fs_context_submount);
++
+ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
+ {
+ 	struct fuse_dev *fud = NULL;
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index bcb8a02e2d8b..e68467cc765c 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -1496,6 +1496,9 @@ static int virtio_fs_init_fs_context(struct fs_context *fsc)
+ {
+ 	struct fuse_fs_context *ctx;
+ 
++	if (fsc->purpose == FS_CONTEXT_FOR_SUBMOUNT)
++		return fuse_init_fs_context_submount(fsc);
++
+ 	ctx = kzalloc(sizeof(struct fuse_fs_context), GFP_KERNEL);
+ 	if (!ctx)
+ 		return -ENOMEM;
 -- 
 2.31.1
 

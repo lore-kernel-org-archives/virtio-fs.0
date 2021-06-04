@@ -1,17 +1,27 @@
-Date: Fri, 4 Jun 2021 10:43:13 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210604144313.GE269481@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=to:cc:references:from:subject:message-id:date:user-agent
+	:mime-version:in-reply-to:content-transfer-encoding:content-language;
+	bh=hbCJyKP1FPKCyDBbNQYa2nJPG1jKSTDt+YXNkf9fbIs=;
+	b=tUYFmiMMn+ak9oy8wP6oNbidgkYp+oSi4ilJQYm8CPPJ6yhH1hUV9I67gz545bJNSZ
+	f8TsC3DqeXe0uw80pwKSDtpNXzhfr/vVedQvh8nTpeC1u4HvYVi+pwzxw3c5JxpSbjQe
+	+NqFnEd6/N+xS206c0RDnoIgKlK2Rhz8qTOxXdansUc2+3W2/DBEcIyIukkC1Y6EpfE4
+	Ev0HuxhPCAtkCWtWg5YpnHLlXVuTZ3RWbh6TsG6ObCe1PjB1TMceSoVUu0X+frV3lKGY
+	a1quVppM7sqj59+Xf3ASDhGgavN3+Ks95u8HxOJGgkBDBIj4HC94oSI68FzMCHKfVf4S
+	ZMQg==
 References: <2234280.ElGaqSPkdT@subpop>
 	<ebd44751-333c-cb7a-5776-c63501558af6@redhat.com>
 	<9W25UQ.OHKWX78P32DI3@sub-pop.net> <YLksUpVCCovgUAtq@work-vm>
-	<MYJ5UQ.562L1XU7LNSJ3@sub-pop.net>
-	<0KN5UQ.JVDR5LJRMJIQ3@sub-pop.net>
-	<20210604134439.GB269481@redhat.com> <YLoxwQIyqAazPHqf@redhat.com>
+	<MYJ5UQ.562L1XU7LNSJ3@sub-pop.net> <0KN5UQ.JVDR5LJRMJIQ3@sub-pop.net>
+	<8440ac8b-e72d-b9c4-9b43-1d788b9041b1@gmail.com>
+	<20210604141147.GD269481@redhat.com>
+From: "Harry G. Coin" <hgcoin@gmail.com>
+Message-ID: <fd336c79-b715-5548-ce3c-f357c44f14ed@gmail.com>
+Date: Fri, 4 Jun 2021 09:50:34 -0500
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <YLoxwQIyqAazPHqf@redhat.com>
+In-Reply-To: <20210604141147.GD269481@redhat.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Language: en-US
+Content-Transfer-Encoding: 8bit
 Subject: Re: [Virtio-fs] virtiofs mounted filesystems & SELinux
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -21,176 +31,93 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, libvirt-users@redhat.com, Link Dupont <link@sub-pop.net>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com
 
-On Fri, Jun 04, 2021 at 02:59:29PM +0100, Daniel P. Berrang=E9 wrote:
-> On Fri, Jun 04, 2021 at 09:44:39AM -0400, Vivek Goyal wrote:
-> > On Thu, Jun 03, 2021 at 10:14:24PM -0400, Link Dupont wrote:
-> > > On Thu, Jun 3 2021 at 08:56:46 PM -0400, Link Dupont <link@sub-pop.ne=
-t>
-> > > wrote:
-> > > >  reproducible scenarios
-> > >=20
-> > > Alright. I reran my tests with a CentOS 8 guest. On CentOS 8 (with a
-> > > virtiofs filesystem and with xattr on), the type of files in the moun=
-ted
-> > > hierarchy are unlabeled_t. I can work around that by switching SELinu=
-x in
-> > > the guest to permissive or disabled.
-> >=20
-> > cc Dan Walsh. I was discussing this with Dan Walsh yesterday in general.
-> >=20
-> > In general, if we want to enable SELinux both on host and guest, then
-> > both host and guest should have same SELinux policy. Otherwise there
-> > will be lot of different kind of conflicts because both host and
-> > guest will try to work with same selinux label. I guess that in
-> > practice this will be very hard to achieve as people will run
-> > different host and guest flavors and these might have different
-> > policies.
->=20
-> Yeah, I think there's little to no chance of people keeping the
-> same SELinux policy in host/guest, except in very tightly controlled
-> narrow use cases where the host admin exerts direct control over
-> the precise guest config.
->=20
->=20
-> > So another option is to rename selinux xattr in virtiofs so that
-> > any selinux xattr coming from guest is saved as
-> > user.virtiofs.security.selinux xattr on host. That way host and guest
-> > can have their separate labels without interfering with each other.
-> > David Gilbert already has added support for this. I can't remember
-> > the exact syntax but you can figure it out from documentation here
-> > in xattr remappig section.
->=20
-> For general purpose virt usage, I think remapping in some way is
-> likely to be needed as the default strategy.
->=20
-> > https://github.com/qemu/qemu/blob/master/docs/tools/virtiofsd.rst
-> >=20
-> > But I have question with selinux xattr remapping. What will happen
-> > to initial labels when fs is exported. I mean until and unless
-> > some process in guest labels all the exported files, they all
-> > with either be unlabeled or pick some generic label for all the
-> > files.
->=20
-> I'd say you need some mechanism to force a re-label inside the
-> guest. Normally a relabel will be done in /.autorelabel file
-> is present, or in certain other scenarios like selinux policy
-> RPM updates.
->=20
-> We wouldn't want to force a relabel neccesarily for the entire
-> FS if we're just hotplugging a new virtiofs export though. So
-> perhaps there's scope for supporting usage of a per-mount
-> point relabel trigger. eg Host creates $VIRTIOFS-ROOT/.autorelabel
-> and whenever the guest sees a new virtiofs export arriving, it
-> can look for $VIRTIOFS-MOUNT-POINT/.autorelabel
+Hi Vivek,
 
-Per mount point auto relabel seems interesting. Will it relabel
-everytime virtiofs export shows up. Or it will intelligence to
-figure out exported fs is already labeled (say from previous boot)
-and no need to relabel again.
+I've cut the o.p.'s text as your questions and my answers are off-topic
+to his interest.
 
->=20
-> > Another option is, can we use a single label for whole of the
-> > virtiofs (using context=3D<label>) option in guest. That way nothing
-> > is saved in files as such. But this means that processes in guest
-> > can't have different selinux labels on different virtiofs dir/files.
->=20
-> Forcing a single label for the entire export is passable as a
-> fallback plan. This is what people have done for years with
-> NFS v3 mounts.
+On 6/4/21 9:11 AM, Vivek Goyal wrote:
 
-Aha, good to know.
+> You are using virtiofs as rootfs and upgrade breaks? If virtiofs is
+> being used only as volumes, then its outside the upgrade path. Will
+> like to know what broke for you. Was it all SELinux related or something
+> else.
 
-> It has annoying usage limitations though, so
-> if at all possible remapping is a preferrable approach.
+Seems 100% selinux related -- even in permissive mode on the guest. 
+Here's your short-and-sweet 100% reproducer:  
+https://bugs.launchpad.net/ubuntu/+source/qemu/+bug/1930756  There's a
+similar bug report on redhat.
 
-Agreed that this appraoch will have more limitations as comapred to
-selinux xattr remapping + autorelabel. At the same time, this is the
-simplest approach to begin with. And one does not pay the penalty
-of relabeling files.
+Even with selinux set to permissive in the guest, no selinux installed
+in the host, but with xattrs on, no and no xattr mapping, lsetfilecon
+returns with a permission error.  The files on the host are entirely
+dedicated to the guest -- no use of those files is made on the host. 
+Underlying fs on the host is btrfs.
+>> You'll have to learn a fair few quite obscure selinux
+>> commands to get it to comprehend virtiofs is a filesystem and not flood
+>> your logs, use the 'xml' features of virtual machine manager to get the
+>> bits of virtiofs you want enabled properly (like 'numa',
+> I am assumig libvirt takes care of specifying "numa" stuff? Is that
+> not the case?
 
-Maybe this can be the default and we document that how to enable
-proper selinux support by using xattr remapping + autorelabel.
+Not outside the lab.  There is no virt-manager GUI way to coordinate
+memory allocation with hugepages/numa.  Hand-editing the xml is required
+to manually match the numa set-aside with the memory allocation.  If
+reliability is important, unless you use systctl.d to set aside the
+hugepages the system can randomly not launch the guests owing to lack of
+sufficient contiguous memory at guest launch time.
 
-Thanks
-Vivek
+>> learn what
+>> 'hugepages' are and do the math on each host to set enough of those
+>> aside with in sysctl.d (e.g. vm.nr_hugepages = 11776) ,
+> What's the virtiofs dependency on vm.nr_hugepages? I think I am not
+> aware of this aspect.
 
->=20
-> >=20
-> > Dan, what do you think?
-> >=20
-> > Thanks
-> > Vivek
-> >=20
-> >=20
-> > >=20
-> > > With a CentOS 7 guest, things get less usable. I digested this to a
-> > > reproducible scenario.
-> > >=20
-> > > Build a disk image with `virt-builder`, configuring the CentOS Plus k=
-ernel
-> > > to get 9p support.
-> > >=20
-> > > virt-builder centos-7.8 \
-> > > --root-password password:centos \
-> > > --output centos-7.8.qcow2 \
-> > > --install yum-utils \
-> > > --run-command 'yum-config-manager --enable centosplus' \
-> > > --run-command 'sed -ie "s/DEFAULTKERNEL=3Dkernel/DEFAULTKERNEL=3Dkern=
-el-plus/"
-> > > /etc/sysconfig/kernel' \
-> > > --append-line '/etc/dracut.conf.d/virtio.conf:add_drivers+=3D"virtio_=
-scsi
-> > > virtio_pci virtio_console"' \
-> > > --append-line '/etc/modules-load.d/9pnet_virtio.conf:9pnet_virtio' \
-> > > --install kernel-plus \
-> > > --append-line '/etc/fstab:home /home 9p trans=3Dvirtio,version=3D9p20=
-00.L 0 0'
-> > >=20
-> > > Install the volume into the `default` pool.
-> > >=20
-> > > sudo install -m644 centos-7.8.qcow2 /var/lib/libvirt/images
-> > >=20
-> > > Next, define a domain using the disk image (using `virt-install` here=
- for
-> > > "easy mode").
-> > >=20
-> > > virt-install \
-> > > --import \
-> > > --os-variant centos7.0 \
-> > > --name centos \
-> > > --ram 2048 \
-> > > --disk path=3D/var/lib/libvirt/images/centos-7.8.qcow2 \
-> > > --memorybacking access.mode=3Dshared \
-> > > --filesystem source=3D/home,target=3Dhome,accessmode=3Dpassthrough \
-> > > --autoconsole none
-> > >=20
-> > > Now with SELinux enforcing, I cannot list the contents of the directo=
-ries in
-> > > the mounted hierarchy.
-> > >=20
-> > > [root@localhost ~]# ls -lZ /home/link
-> > > ls: cannot open directory /home/link: Permission denied
-> > >=20
-> > >=20
-> > >=20
-> > > _______________________________________________
-> > > Virtio-fs mailing list
-> > > Virtio-fs@redhat.com
-> > > https://listman.redhat.com/mailman/listinfo/virtio-fs
-> > >=20
-> >=20
->=20
-> Regards,
-> Daniel
-> --=20
-> |: https://berrange.com      -o-    https://www.flickr.com/photos/dberran=
-ge :|
-> |: https://libvirt.org         -o-            https://fstop138.berrange.c=
-om :|
-> |: https://entangle-photo.org    -o-    https://www.instagram.com/dberran=
-ge :|
->=20
+Detailed here https://libvirt.org/kbase/virtiofs.html
+
+
+>
+>> and also accept
+>> some versions of hosts and guests will develop incompatibilities so
+>> severe you'll have to restore to backups and downgrades from time to
+>> time.  And you won't be able to use virtiofs as a root filesystem
+>> without patching dracut config directories (search this list) or
+>> compiling your own custom kernel.  But you will learn a whole lot.
+> Agreed that dracut does not seem to have support to mount virtiofs
+> as rootfs. That's one TODO item. 
+
+I've done it. It's been working for months, automatically maintained and
+updated through both host and guest kernel upgrades.  I haven't posted
+the bit that updates the kernel / initrd links for direct kernel launch
+(using initrds) but I have posted what's needed for dracut to make
+rootfs virtiofs work.
+
+All that's required for stability -- for now -- is for the host to treat
+the files shared on the guest as 'unusable' while the guest is running
+-- or at least 'read only'.
+
+> I am assuming you prefer using virtiofs as rootfs for your VMs and
+> that's why running into these dracut related issues.
+
+Let me restate -- I am NOT having a dracut issue.  I solved that long
+ago and it works very well.   In fact the whole virtiofs thing was
+working very well (without dax as main-distro kernels still lack the pci
+bar in the host) -- until a regression in the last few weeks that broke
+rpm / dnf / yum (noted above, even with permissive on the guest
+lsetfilecon returns a permission error blocking all dnf operations). 
+The only 'maintainable' way forward I can see is to reduce the number of
+core packages involved.  The disk space required for a basic workstation
+or server image is 'small' by today's storage standards.  I see no
+reason multiply complexities by implementing one host-guest relationship
+for 'booting' a guest and another for 'the files on the guest'.  Making
+it possible to just snapshot one directory tree on the host and know
+everything important to the guest is there -- that's a big win.
+
+Harry
+
+
+
 

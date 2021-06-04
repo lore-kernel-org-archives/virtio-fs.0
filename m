@@ -1,11 +1,11 @@
 From: Max Reitz <mreitz@redhat.com>
-Date: Fri,  4 Jun 2021 18:13:28 +0200
-Message-Id: <20210604161337.16048-1-mreitz@redhat.com>
+Date: Fri,  4 Jun 2021 18:13:29 +0200
+Message-Id: <20210604161337.16048-2-mreitz@redhat.com>
+In-Reply-To: <20210604161337.16048-1-mreitz@redhat.com>
+References: <20210604161337.16048-1-mreitz@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 0/9] virtiofsd: Allow using file handles instead
-	of O_PATH FDs
+Subject: [Virtio-fs] [PATCH 1/9] virtiofsd: Add TempFd structure
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,52 +17,94 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: Max Reitz <mreitz@redhat.com>
 
-Hi,
+We are planning to add file handles to lo_inode objects as an
+alternative to lo_inode.fd.  That means that everywhere where we
+currently reference lo_inode.fd, we will have to open a temporary file
+descriptor that needs to be closed after use.
 
-This is the C virtiofsd equivalent to
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/26.  As such,
-the summary is pretty much the same:
+So instead of directly accessing lo_inode.fd, there will be a helper
+function (lo_inode_fd()) that either returns lo_inode.fd, or opens a new
+file descriptor with open_by_handle_at().  It encapsulates this result
+in a TempFd structure to let the caller know whether the FD needs to be
+closed after use (opened from the handle) or not (copied from
+lo_inode.fd).
 
-Storing an O_PATH file descriptor in every lo_inode object means we have
-a lot of FDs open, which is sometimes bad.  This series adds an option
-(-o inode_file_handles) that will make virtiofsd attempt to generate a
-file handle for new inodes and store that instead of an FD.  When an FD
-is needed for a given inode, we open the handle.
+By using g_auto(TempFd) to store this result, callers will not even have
+to care about closing a temporary FD after use.  It will be done
+automatically once the object goes out of scope.
 
-To accomplish this, lo_inode.fd is should not be accessed directly
-anymore, but only through helper functions (mainly lo_inode_fd() and
-lo_inode_open()).  A TempFd object is added to hide the difference
-between FDs that are bound to the lo_inode object (and so need not be
-closed after use) and temporary FDs from open_by_handle_at() (which do
-need to be closed after use).
+Signed-off-by: Max Reitz <mreitz@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c | 49 ++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
-To prevent the problem I spent a long time talking about (if we don’t
-have an FD open for every inode, the inode can be deleted, its ID
-reused, and then the lookup in lo_data.inodes will find the old deleted
-inode), patch 7 adds a second hash table lo_data.inodes_by_handle that
-maps file handles to lo_inode objects.  (Because file handles include a
-generation ID, so we can discern between the old and the new inode.)
-
-Patch 9 is completely optional, but I just really felt compelled to
-write it.
-
-
-Max Reitz (9):
-  virtiofsd: Add TempFd structure
-  virtiofsd: Use lo_inode_open() instead of openat()
-  virtiofsd: Add lo_inode_fd() helper
-  virtiofsd: Let lo_fd() return a TempFd
-  virtiofsd: Let lo_inode_open() return a TempFd
-  virtiofsd: Add lo_inode.fhandle
-  virtiofsd: Add inodes_by_handle hash table
-  virtiofsd: Optionally fill lo_inode.fhandle
-  virtiofsd: Add lazy lo_do_find()
-
- tools/virtiofsd/helper.c              |   3 +
- tools/virtiofsd/passthrough_ll.c      | 809 +++++++++++++++++++++-----
- tools/virtiofsd/passthrough_seccomp.c |   2 +
- 3 files changed, 667 insertions(+), 147 deletions(-)
-
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 49c21fd855..a4674aba80 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -174,6 +174,28 @@ struct lo_data {
+     int user_killpriv_v2, killpriv_v2;
+ };
+ 
++/**
++ * Represents a file descriptor that may either be owned by this
++ * TempFd, or only referenced (i.e. the ownership belongs to some
++ * other object, and the value has just been copied into this TempFd).
++ *
++ * The purpose of this encapsulation is to be used as g_auto(TempFd)
++ * to automatically clean up owned file descriptors when this object
++ * goes out of scope.
++ *
++ * Use temp_fd_steal() to get an owned file descriptor that will not
++ * be closed when the TempFd goes out of scope.
++ */
++typedef struct {
++    int fd;
++    bool owned; /* fd owned by this object? */
++} TempFd;
++
++#define TEMP_FD_INIT ((TempFd) { .fd = -1, .owned = false })
++
++static void temp_fd_clear(TempFd *temp_fd);
++G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC(TempFd, temp_fd_clear);
++
+ static const struct fuse_opt lo_opts[] = {
+     { "sandbox=namespace",
+       offsetof(struct lo_data, sandbox),
+@@ -249,6 +271,33 @@ static struct lo_data *lo_data(fuse_req_t req)
+     return (struct lo_data *)fuse_req_userdata(req);
+ }
+ 
++/**
++ * Clean-up function for TempFds
++ */
++static void temp_fd_clear(TempFd *temp_fd)
++{
++    if (temp_fd->owned) {
++        close(temp_fd->fd);
++        *temp_fd = TEMP_FD_INIT;
++    }
++}
++
++/**
++ * Return an owned fd from *temp_fd that will not be closed when
++ * *temp_fd goes out of scope.
++ *
++ * (TODO: Remove __attribute__ once this is used.)
++ */
++static __attribute__((unused)) int temp_fd_steal(TempFd *temp_fd)
++{
++    if (temp_fd->owned) {
++        temp_fd->owned = false;
++        return temp_fd->fd;
++    } else {
++        return dup(temp_fd->fd);
++    }
++}
++
+ /*
+  * Load capng's state from our saved state if the current thread
+  * hadn't previously been loaded.
 -- 
 2.31.1
 

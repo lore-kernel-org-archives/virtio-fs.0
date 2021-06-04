@@ -1,12 +1,11 @@
-Date: Mon, 24 May 2021 09:10:29 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YKtfdQBLLqUt7Ycx@work-vm>
-References: <489d6710-2e39-8058-a7db-80166c603ce4@linux.vnet.ibm.com>
+From: Greg Kurz <groug@kaod.org>
+Date: Fri,  4 Jun 2021 18:11:54 +0200
+Message-Id: <20210604161156.408496-6-groug@kaod.org>
+In-Reply-To: <20210604161156.408496-1-groug@kaod.org>
+References: <20210604161156.408496-1-groug@kaod.org>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <489d6710-2e39-8058-a7db-80166c603ce4@linux.vnet.ibm.com>
-Subject: Re: [Virtio-fs] virtiofs: Support for SEV encrypted guests
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2 5/7] fuse: Call vfs_get_tree() for submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,57 +14,156 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Jim Cadden <jcadden@linux.vnet.ibm.com>
-Cc: virtio-fs@redhat.com
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Max Reitz <mreitz@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
-* Jim Cadden (jcadden@linux.vnet.ibm.com) wrote:
-> Do you know if virtio-fs can support SEV encrypted guests?
-> 
-> I work on a project adding SEV support into kata containers. So far, we've
-> been unable to boot SEV guests
-> with kata's virtio-fs option (and use virtio-9p instead):
-> 
-> May 19 16:52:05 sev1 virtiofsd[74904]: [ID: 00074904] virtio_session_mount:
-> Received vhost-user socket connection
-> May 19 16:52:05 sev1 virtiofsd[74914]: [ID: 00000001] virtio_loop: Entry
-> ...
-> May 19 16:52:07 sev1 virtiofsd[74914]: [ID: 00000001] virtio_loop: Got VU
-> event
-> May 19 16:52:07 sev1 virtiofsd[74914]: [ID: 00000001] fv_panic:
-> libvhost-user: Invalid vring_addr message
-> 
-> I know that other virtio devices use iommu and DMA apis to share
-> non-encrypted pages between the host
-> and encrypted guest. Could something similar be done with virtiofsd andthe
-> virtio-fs virtio device?
+We recently fixed an infinite loop by setting the SB_BORN flag on
+submounts along with the write barrier needed by super_cache_count().
+This is the job of vfs_get_tree() and FUSE shouldn't have to care
+about the barrier at all.
 
-I guess if you can guarantee that everything is going through
-non-encrypted pages with the iommu, there shouldn't be a difference?
-My only other worry is whether SEV works with a shared-memory backing
-(e.g. /dev/shm or memfd with mmap shared).
+Split out some code from fuse_dentry_automount() to the dedicated
+fuse_get_tree_submount() handler for submounts and call vfs_get_tree().
 
-I know there's an existing bug saying that virtio-fs doesn't work with
-viommu:
-https://bugzilla.redhat.com/show_bug.cgi?id=1812886
+Signed-off-by: Greg Kurz <groug@kaod.org>
+---
+ fs/fuse/dir.c   | 53 +++++--------------------------------------------
+ fs/fuse/inode.c | 36 +++++++++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+), 48 deletions(-)
 
-so I suspect it's fall out from that;  I think we just haven't
-implemented the iommu compat code in the daemon.
-
-> There are reported problems with vhost-user and SEV:
-> https://bugzilla.redhat.com/show_bug.cgi?id=1797058
-
-Yes, although it wasn't clear if that was just a performance problem or
-not.
-
-Dave
-
-> Thanks for any insight,
-> Jim
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
+diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
+index 3fa8604c21d5..b88e5785a3dd 100644
+--- a/fs/fuse/dir.c
++++ b/fs/fuse/dir.c
+@@ -309,12 +309,8 @@ static int fuse_dentry_delete(const struct dentry *dentry)
+ static struct vfsmount *fuse_dentry_automount(struct path *path)
+ {
+ 	struct fs_context *fsc;
+-	struct fuse_mount *parent_fm = get_fuse_mount_super(path->mnt->mnt_sb);
+-	struct fuse_conn *fc = parent_fm->fc;
+-	struct fuse_mount *fm;
+ 	struct vfsmount *mnt;
+ 	struct fuse_inode *mp_fi = get_fuse_inode(d_inode(path->dentry));
+-	struct super_block *sb;
+ 	int err;
+ 
+ 	fsc = fs_context_for_submount(path->mnt->mnt_sb->s_type, path->dentry);
+@@ -323,48 +319,15 @@ static struct vfsmount *fuse_dentry_automount(struct path *path)
+ 		goto out;
+ 	}
+ 
+-	err = -ENOMEM;
+-	fm = kzalloc(sizeof(struct fuse_mount), GFP_KERNEL);
+-	if (!fm)
+-		goto out_put_fsc;
++	/* Pass the FUSE inode of the mount for fuse_get_tree_submount() */
++	fsc->fs_private = mp_fi;
+ 
+-	fsc->s_fs_info = fm;
+-	sb = sget_fc(fsc, NULL, set_anon_super_fc);
+-	if (IS_ERR(sb)) {
+-		err = PTR_ERR(sb);
+-		kfree(fm);
++	err = vfs_get_tree(fsc);
++	if (err)
+ 		goto out_put_fsc;
+-	}
+-	fm->fc = fuse_conn_get(fc);
+-
+-	/* Initialize superblock, making @mp_fi its root */
+-	err = fuse_fill_super_submount(sb, mp_fi);
+-	if (err) {
+-		fuse_conn_put(fc);
+-		kfree(fm);
+-		sb->s_fs_info = NULL;
+-		goto out_put_sb;
+-	}
+-
+-	down_write(&fc->killsb);
+-	list_add_tail(&fm->fc_entry, &fc->mounts);
+-	up_write(&fc->killsb);
+-
+-	sb->s_flags |= SB_ACTIVE;
+-	fsc->root = dget(sb->s_root);
+-
+-	/*
+-	 * FIXME: setting SB_BORN requires a write barrier for
+-	 *        super_cache_count(). We should actually come
+-	 *        up with a proper ->get_tree() implementation
+-	 *        for submounts and call vfs_get_tree() to take
+-	 *        care of the write barrier.
+-	 */
+-	smp_wmb();
+-	sb->s_flags |= SB_BORN;
+ 
+ 	/* We are done configuring the superblock, so unlock it */
+-	up_write(&sb->s_umount);
++	up_write(&fsc->root->d_sb->s_umount);
+ 
+ 	/* Create the submount */
+ 	mnt = vfs_create_mount(fsc);
+@@ -376,12 +339,6 @@ static struct vfsmount *fuse_dentry_automount(struct path *path)
+ 	put_fs_context(fsc);
+ 	return mnt;
+ 
+-out_put_sb:
+-	/*
+-	 * Only jump here when fsc->root is NULL and sb is still locked
+-	 * (otherwise put_fs_context() will put the superblock)
+-	 */
+-	deactivate_locked_super(sb);
+ out_put_fsc:
+ 	put_fs_context(fsc);
+ out:
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index fa96a3762ea2..bec1676811d4 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -1313,8 +1313,44 @@ int fuse_fill_super_submount(struct super_block *sb,
+ 	return 0;
+ }
+ 
++/* Filesystem context private data holds the FUSE inode of the mount point */
+ static int fuse_get_tree_submount(struct fs_context *fsc)
+ {
++	struct fuse_mount *fm;
++	struct fuse_inode *mp_fi = fsc->fs_private;
++	struct fuse_conn *fc = get_fuse_conn(&mp_fi->inode);
++	struct super_block *sb;
++	int err;
++
++	fm = kzalloc(sizeof(struct fuse_mount), GFP_KERNEL);
++	if (!fm)
++		return -ENOMEM;
++
++	fsc->s_fs_info = fm;
++	sb = sget_fc(fsc, NULL, set_anon_super_fc);
++	if (IS_ERR(sb)) {
++		kfree(fm);
++		return PTR_ERR(sb);
++	}
++	fm->fc = fuse_conn_get(fc);
++
++	/* Initialize superblock, making @mp_fi its root */
++	err = fuse_fill_super_submount(sb, mp_fi);
++	if (err) {
++		fuse_conn_put(fc);
++		kfree(fm);
++		sb->s_fs_info = NULL;
++		deactivate_locked_super(sb);
++		return err;
++	}
++
++	down_write(&fc->killsb);
++	list_add_tail(&fm->fc_entry, &fc->mounts);
++	up_write(&fc->killsb);
++
++	sb->s_flags |= SB_ACTIVE;
++	fsc->root = dget(sb->s_root);
++
+ 	return 0;
+ }
+ 
 -- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+2.31.1
 

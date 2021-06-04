@@ -1,12 +1,11 @@
-From: Greg Kurz <groug@kaod.org>
-Date: Fri,  4 Jun 2021 18:11:56 +0200
-Message-Id: <20210604161156.408496-8-groug@kaod.org>
-In-Reply-To: <20210604161156.408496-1-groug@kaod.org>
-References: <20210604161156.408496-1-groug@kaod.org>
+From: Max Reitz <mreitz@redhat.com>
+Date: Fri,  4 Jun 2021 18:13:28 +0200
+Message-Id: <20210604161337.16048-1-mreitz@redhat.com>
 MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 7/7] fuse: Make fuse_fill_super_submount()
-	static
+Subject: [Virtio-fs] [PATCH 0/9] virtiofsd: Allow using file handles instead
+	of O_PATH FDs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,56 +14,55 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Max Reitz <mreitz@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com
+Cc: Max Reitz <mreitz@redhat.com>
 
-This function used to be called from fuse_dentry_automount(). This code
-was moved to fuse_get_tree_submount() in the same file since then. It
-is unlikely there will ever be another user. No need to be extern in
-this case.
+Hi,
 
-Signed-off-by: Greg Kurz <groug@kaod.org>
-Reviewed-by: Max Reitz <mreitz@redhat.com>
----
- fs/fuse/fuse_i.h | 9 ---------
- fs/fuse/inode.c  | 4 ++--
- 2 files changed, 2 insertions(+), 11 deletions(-)
+This is the C virtiofsd equivalent to
+https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/26.  As such,
+the summary is pretty much the same:
 
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 862ad317bc89..1d32251a439a 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -1081,15 +1081,6 @@ void fuse_send_init(struct fuse_mount *fm);
-  */
- int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx);
- 
--/*
-- * Fill in superblock for submounts
-- * @sb: partially-initialized superblock to fill in
-- * @parent_fi: The fuse_inode of the parent filesystem where this submount is
-- * 	       mounted
-- */
--int fuse_fill_super_submount(struct super_block *sb,
--			     struct fuse_inode *parent_fi);
--
- /*
-  * Remove the mount from the connection
-  *
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index bec1676811d4..72d44121ea38 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -1275,8 +1275,8 @@ static void fuse_sb_defaults(struct super_block *sb)
- 		sb->s_xattr = fuse_no_acl_xattr_handlers;
- }
- 
--int fuse_fill_super_submount(struct super_block *sb,
--			     struct fuse_inode *parent_fi)
-+static int fuse_fill_super_submount(struct super_block *sb,
-+				    struct fuse_inode *parent_fi)
- {
- 	struct fuse_mount *fm = get_fuse_mount_super(sb);
- 	struct super_block *parent_sb = parent_fi->inode.i_sb;
+Storing an O_PATH file descriptor in every lo_inode object means we have
+a lot of FDs open, which is sometimes bad.  This series adds an option
+(-o inode_file_handles) that will make virtiofsd attempt to generate a
+file handle for new inodes and store that instead of an FD.  When an FD
+is needed for a given inode, we open the handle.
+
+To accomplish this, lo_inode.fd is should not be accessed directly
+anymore, but only through helper functions (mainly lo_inode_fd() and
+lo_inode_open()).  A TempFd object is added to hide the difference
+between FDs that are bound to the lo_inode object (and so need not be
+closed after use) and temporary FDs from open_by_handle_at() (which do
+need to be closed after use).
+
+To prevent the problem I spent a long time talking about (if we don’t
+have an FD open for every inode, the inode can be deleted, its ID
+reused, and then the lookup in lo_data.inodes will find the old deleted
+inode), patch 7 adds a second hash table lo_data.inodes_by_handle that
+maps file handles to lo_inode objects.  (Because file handles include a
+generation ID, so we can discern between the old and the new inode.)
+
+Patch 9 is completely optional, but I just really felt compelled to
+write it.
+
+
+Max Reitz (9):
+  virtiofsd: Add TempFd structure
+  virtiofsd: Use lo_inode_open() instead of openat()
+  virtiofsd: Add lo_inode_fd() helper
+  virtiofsd: Let lo_fd() return a TempFd
+  virtiofsd: Let lo_inode_open() return a TempFd
+  virtiofsd: Add lo_inode.fhandle
+  virtiofsd: Add inodes_by_handle hash table
+  virtiofsd: Optionally fill lo_inode.fhandle
+  virtiofsd: Add lazy lo_do_find()
+
+ tools/virtiofsd/helper.c              |   3 +
+ tools/virtiofsd/passthrough_ll.c      | 809 +++++++++++++++++++++-----
+ tools/virtiofsd/passthrough_seccomp.c |   2 +
+ 3 files changed, 667 insertions(+), 147 deletions(-)
+
 -- 
 2.31.1
 

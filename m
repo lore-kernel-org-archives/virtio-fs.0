@@ -1,17 +1,21 @@
-References: <20210512125544.9536-1-mreitz@redhat.com>
-	<20210512125544.9536-2-mreitz@redhat.com>
-	<20210602181958.GC115492@redhat.com>
-	<CAJfpegtKjx7y8+bMQUivjxHuF0iiLYxKCtd0H3AisVymHHjtTA@mail.gmail.com>
-From: Max Reitz <mreitz@redhat.com>
-Message-ID: <497d1ed1-fbd4-0aad-1349-826be8b49834@redhat.com>
-Date: Fri, 4 Jun 2021 18:22:28 +0200
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=to:from:subject:message-id:date:user-agent:mime-version
+	:content-transfer-encoding:content-language;
+	bh=datSRoS4F3Ncq8d+fQ5ao0NRMN2iiWIm0aYclWTVmxs=;
+	b=lJ68xmCnJrtMzen42LESd7kdYxH2L7h47mE+Qpy/GI3eEpVOKzZukmE81LMWSjxjYx
+	k6gAZr8Y8cFZHKPcBWHulqPLJLvRsaf/1KZy629Orwv8vBdcrOMRPCwIR+LIJ25UCoAC
+	E4hTs+ty5c5mHET1fJ94ULcqB0s22bcfcmoExunyPFk/PzorSQXcMZeOHv05gI3+1MeG
+	9vIBZkl8MRcPOzKHj29cf9HBPrJvQnUni5w7zJjeYg6eg0aqjBOzclLADbuJCY6q1whL
+	XO5A5fe9YkkgM1+OC2ZL/Uv/uzaVMpRAnM6hyLjKuA1Ve6edP2OZTVaeinmnb6XQZPBS
+	d19A==
+From: "Harry G. Coin" <hgcoin@gmail.com>
+Message-ID: <756d5044-e567-b403-b4b2-784b3c284ed6@gmail.com>
+Date: Fri, 4 Jun 2021 11:28:42 -0500
 MIME-Version: 1.0
-In-Reply-To: <CAJfpegtKjx7y8+bMQUivjxHuF0iiLYxKCtd0H3AisVymHHjtTA@mail.gmail.com>
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset="utf-8"
 Content-Language: en-US
-Subject: Re: [Virtio-fs] [PATCH 1/3] virtiofsd: Find original inode ID of
-	mount points
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] Virtiofs Kernel Boot howto
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,119 +24,283 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>, Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
+To: virtio-fs-list <virtio-fs@redhat.com>
 
-On 02.06.21 20:59, Miklos Szeredi wrote:
-> On Wed, 2 Jun 2021 at 20:20, Vivek Goyal <vgoyal@redhat.com> wrote:
->> On Wed, May 12, 2021 at 02:55:42PM +0200, Max Reitz wrote:
->>> Mount point directories represent two inodes: On one hand, they are a
->>> normal directory on their parent filesystem.  On the other, they are the
->>> root node of the filesystem mounted there.  Thus, they have two inode
->>> IDs.
->>>
->>> Right now, we only report the latter inode ID (i.e. the inode ID of the
->>> mounted filesystem's root node).  This is fine once the guest has
->>> auto-mounted a submount there (so this inode ID goes with a device ID
->>> that is distinct from the parent filesystem), but before the auto-mount,
->>> they have the device ID of the parent and the inode ID for the submount.
->>> This is problematic because this is likely exactly the same
->>> st_dev/st_ino combination as the parent filesystem's root node.  This
->>> leads to problems for example with `find`, which will thus complain
->>> about a filesystem loop if it has visited the parent filesystem's root
->>> node before, and then refuse to descend into the submount.
->>>
->>> There is a way to find the mount directory's original inode ID, and that
->>> is to readdir(3) the parent directory, look for the mount directory, and
->>> read the dirent.d_ino field.  Using this, we can let lookup and
->>> readdirplus return that original inode ID, which the guest will thus
->>> show until the submount is auto-mounted.  (Then, it will invoke getattr
->>> and that stat(2) call will return the inode ID for the submount.)
->> [ CC miklos ]
->>
->> Hi Max,
->>
->> Though we discussed this in chat room, I am still responding to this
->> email with the concern I have, so that there is a record of it.
+Mentioned up-list, here's a further little helper to allow virtio-fs root.
 
-That sounds scary :)
+The instructions here lead to a known bootable guest as of this writing.
 
->> So with this patch for FUSE_LOOKUP  we always return submount's parentinode
->> id and with GETATTR request we return actual inode id of submount. That
->> kind of bothers me a bit as we are assuming that there is always going
->> to be a GETATTR request after FUSE_LOOKUP. FUSE_LOOKUP itself has attrs
->> returned with it and it might happen that after FUSE_LOOKUP, FUSE_GETATTR
->> might not be called at all because FUSE_LOOKUP itself got the latest
->> updated attrs with certain timeout.
->>
->> For example, if I call stat on a normal file (not submount), I see that
->> after FUSE_LOOKUP, no FUSE_GETATTR request is going and
->> fuse_update_get_attr() is using attrs from locally cached inode attrs.
->>
->> But same thing does not seem to be happening in case of submount. Once
->> submount is created in guest, I see that we never seem to be calling
->> ->revalidate() on newly created dentry of submount root. I am not sure
->> why. And that means we don't do FUSE_LOOKUP and that means FUSE_GETATTR
->> always gets called.
+The best way to launch virtio-fs root in the guest is via
+qemu/libvirt/virt-manager's "Direct Kernel Boot" facility under "Boot
+Options".
 
-Even if it worked reliably, I have to admit it’s kind of relying on at 
-most implementation-defined behavior.  Having two inodes would 
-definitely be the right solution.
+That requires the user provide a kernel path, and initrd path, and
+kernel args.
 
-> Yes, this sounds normal.
->
-> The lookup sequence for "/mnt/virtiofs/dir1/submount/file" will be:
->
-> LOOKUP(1, "dir")
->      create inode I1 in sb1
->      create dentry "dir" with inode I1 in sb1
-> LOOKUP(I1, "submount")
->      create inode I2 in sb1, set S_AUTOMOUNT
->      create dentry "submount" with inode I2 in sb1
->      automount triggered:
->      create sb2
->      create inode I2 in sb2
->      create dentry "/" with inode I2 in sb2
-> GETATTR(I2)
->       fill inode I2
-> LOOKUP(I2, "file")
->       create inode I3
->       create dentry "file" with inode I3 in sb2
->
-> Notice how there's two inodes numbered I2, but in separate sb's.
-> However the server has only the notion of a single I2 inode which is
-> the root of the submount, since the mountpoint is not visible (except
-> for d_ino in readdir()).
->
-> Now AFAICS what this patch does is set the inode number in the
-> attributes returned by LOOKUP(I1, "submount") to the covered inode, so
-> that AT_NO_AUTOMOUNT stat will return the correct value.   While this
-> seems to work, it's not a fundamental fix to the problem, since the
-> attributes on sb1/I2 will time out and the next stat(...,
-> AT_NO_AUTOMOUNT) will trigger a GETATTR request, which will return the
-> inode number of the submount root.
+There are two challenges to overcome.  First, to avoid forcing the user
+to update the entries to boot the host every time the guest upgrades the
+kernel via normal use of 'dnf upgrade'.   The second is to make sure
+dracut/initramfs includes the modules necessary for virtiofs to boot.
 
-Ah, yeah.
+Notice: The virtio-fs developers 'roll their own' custom kernels and as
+such avoid the need for initrd's.  Which is fine in the lab, but limits
+the diverse needs of production.
 
-> Solving this properly would mean that the server would have to
-> generate separate nodeid's for the mountpoint and the submount root
-> and the protocol would have to be extended so that this information
-> could be transferred to the client.
+If you create this file: /etc/kernel/postinst.d/update_vmlinuz_initrd_links
 
-Yes, we’d somehow need to do a separate lookup for the root inode of the 
-submount...
+#!/bin/bash
+#Used by vm host to boot latest kernel without having to update kernel
+spec in the host.
+KERNEL_VERSION="$1"
+#KERNEL_IMAGE="$2"
 
-> Not sure whether this is worth it or not.
+cd /boot
+ln -sf vmlinuz-$KERNEL_VERSION /boot/vmlinuz
+ln -sf initramfs-$KERNEL_VERSION.img /boot/initrd.img
 
-I’m wondering the same.  This series was mostly the result of an 
-incidental finding and seeing that getting it to work and do what I want 
-seemed to be pretty easy.  Turns out doing something right can never 
-really be easy...
+---
 
-But we have already decided that we don’t deem the inode ID problem too 
-important (not least considering NFS has the same issue), so fixing it 
-is not really top priority.  Maybe I’ll get back to it, but I think for 
-now I consider it on the backlog.
+Then as the kernel path in libvirt's xml or 'virt manager':
 
-Max
+<path to guest root on host>/boot/vmlinuz
+
+and as the initrd path:
+
+<path to guest root on host>/boot/initrd.img
+
+and as 'kernel args' (presuming you've built dracut with the added conf
+files I published on this list previously):
+
+root=virtiofs:myfs rd.shell rd.fstab
+
+and in the 'filesystem' entry in 'virt-manager' or by hand in the xml
+something like:
+
+<filesystem type="mount" accessmode="passthrough">
+  <driver type="virtiofs" queue="1024"/>
+  <binary path="/vmsystems/custom_virtiofsd" xattr="on">
+    <lock posix="off" flock="on"/>
+  </binary>
+  <source dir="<path to guest root on the host"/>
+  <target dir="myfs"/>
+</filesystem>
+
+----
+
+Notice, the 'path=...' is optional, but without it the libvirt xml
+rejects as parse errors many of the current virtiofsd options necessary
+for success.
+
+My custom_virtiofsd looks like this:
+
+#!/bin/bash
+#Provide a way to add arguments libvirt doesn't know about.
+set -o allexport
+/usr/lib/qemu/virtiofsd $@
+#/usr/lib/qemu/virtiofsd $@,xattrmap=":ok:all:::",log_level=debug -d
+--syslog
+
+and something like this in the guest /etc/fstab
+
+myfs / virtiofs seclabel 0 0
+
+
+Then your guest will boot with virtio-fs as the root file system, and
+will need no other filesystem.
+
+To put everything in one place, here are the dracut.conf additions
+necessary for virtiofs root.  These are all in the guest image:
+
+
+/etc/dracut.conf.d/addvirtiofs.conf:
+
+add_dracutmodules+=" virtiofs "
+filesystems+=" virtiofs "
+
+---
+
+/usr/lib/dracut/modules.d/95virtiofs/module-setup.sh :
+
+#!/usr/bin/bash
+
+# called by dracut
+check() {
+    [[ $hostonly ]] || [[ $mount_needs ]] && {
+        for fs in "${host_fs_types[@]}"; do
+            [[ "$fs" == "virtiofs" ]] && return 0
+        done
+        return 255
+    }
+
+    is_qemu_virtualized && return 0
+
+    return 255
+}
+
+# called by dracut
+depends() {
+    return 0
+}
+
+# called by dracut
+installkernel() {
+    instmods virtiofs
+}
+
+# called by dracut
+install() {
+    inst_hook cmdline 95 "$moddir/parse-virtiofs.sh"
+    inst_hook pre-mount 99 "$moddir/mount-virtiofs.sh"
+}
+
+---
+
+/usr/lib/dracut/modules.d/95virtiofs/mount-virtiofs.sh:
+
+#!/usr/bin/sh
+
+type getarg >/dev/null 2>&1 || . /lib/dracut-lib.sh
+
+filter_rootopts() {
+    rootopts=$1
+    # strip ro and rw options
+    local OLDIFS="$IFS"
+    IFS=,
+    set -- $rootopts
+    IFS="$OLDIFS"
+    local v
+    while [ $# -gt 0 ]; do
+        case $1 in
+            rw|ro);;
+            defaults);;
+            *)
+                v="$v,${1}";;
+        esac
+        shift
+    done
+    rootopts=${v#,}
+    echo $rootopts
+}
+
+mount_root() {
+    local _ret
+
+    rootfs="virtiofs"
+    rflags="rw"
+
+    modprobe virtiofs
+
+    mount -t ${rootfs} -o "$rflags",ro "${root#virtiofs:}" "$NEWROOT"
+
+    rootopts=
+    if getargbool 1 rd.fstab -n rd_NO_FSTAB \
+        && ! getarg rootflags \
+        && [ -f "$NEWROOT/etc/fstab" ] \
+        && ! [ -L "$NEWROOT/etc/fstab" ]; then
+        # if $NEWROOT/etc/fstab contains special mount options for
+        # the root filesystem,
+        # remount it with the proper options
+        rootopts="defaults"
+        while read dev mp fs opts rest || [ -n "$dev" ]; do
+            # skip comments
+            [ "${dev%%#*}" != "$dev" ] && continue
+
+            if [ "$mp" = "/" ]; then
+                rootopts=$opts
+                break
+            fi
+        done < "$NEWROOT/etc/fstab"
+
+        rootopts=$(filter_rootopts $rootopts)
+    fi
+
+    # we want rootflags (rflags) to take precedence so prepend rootopts to
+    # them; rflags is guaranteed to not be empty
+    rflags="${rootopts:+${rootopts},}${rflags}"
+
+    umount "$NEWROOT"
+
+    info "Remounting ${root#virtiofs:} with -o ${rflags}"
+    mount -t ${rootfs} -o "$rflags" "${root#virtiofs:}" "$NEWROOT" 2>&1
+| vinfo
+
+    [ -f "$NEWROOT"/forcefsck ] && rm -f -- "$NEWROOT"/forcefsck 2>/dev/null
+    [ -f "$NEWROOT"/.autofsck ] && rm -f -- "$NEWROOT"/.autofsck 2>/dev/null
+}
+
+if [ -n "$root" -a -z "${root%%virtiofs:*}" ]; then
+    mount_root
+fi
+:
+
+----
+
+And finally /usr/lib/dracut/modules.d/95virtiofs/parse-virtiofs.sh :
+
+#!/usr/bin/sh
+
+if [ "${root%%:*}" = "virtiofs" ] ; then
+    modprobe virtiofs
+
+    rootok=1
+fi
+
+---
+
+chmod this as 0750: /usr/local/bin/chinto_virtiofs_guest :
+
+#!/bin/bash
+cd $1
+mount --bind /proc proc
+mount --bind /sys sys
+mount --bind /dev dev
+mount --bind /dev/pts dev/pts
+mount --bind /run run
+chroot .
+umount dev/pts
+umount dev
+umount proc
+umount sys
+umount run
+
+---
+
+Once those are in place, one time, on the host run
+
+
+chinto_virtiofs_guest <path to guest root on host>
+
+dracut -f
+
+exit
+
+===
+
+And from then on, even with dnf upgrades, your guest vm will have a
+virtiofs root.
+
+Which, of course, won't allow dnf upgrades at the moment until a
+regression brought about in the last few weeks gets fixed.  But
+otherwise has been working well for many months.  You'll want to edit
+custom_virtiofsd to add dax, do debugging and so on as a 'crutch' until
+libvirt/virt-manager xml parsing catches up to virtiofsd command line
+options.
+
+
+Or, you know, wait a year and all the above (more or less) will be
+'standard' in various distros and you won't have to edit it in.
+
+Thanks for all the virtiofs work, this is my little contribution.
+
+Best to all
+
+Harry Coin
+
+Bettendorf, Iowa
+
+
+
+
+
+
 

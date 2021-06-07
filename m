@@ -1,28 +1,26 @@
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
-	h=to:references:from:subject:message-id:date:user-agent:mime-version
+	h=subject:to:references:from:message-id:date:user-agent:mime-version
 	:in-reply-to:content-transfer-encoding:content-language;
-	bh=JzzUHiTMxm0ZNfihxxXdBiNsnYm4eMciVL+KVVEGWIE=;
-	b=ZzeQvLfZ3tPP6pJbUBftSjpQP9UDskFXOrxbp6QHSxRaeF0cVMZNat2xUQD/LJkHrU
-	8WH1KoG8WfmNwzhysbVFLHpfwPykhhFvnQC6ZYcbKpKySFaRjupDUfeszyKfL6UE/JYB
-	XAk/YlYmPjS8NikRqDEUbRTuBHvuDiEVo2jQNYU8UPfsYIx3AQIgwo3XV5cd5+vejR83
-	cnEEHLxXH95OVceEMLDS3SxgtSkW2PKo2MD4LyHEhV3W30jbRGfYdCe5H4FP+UkbYkR8
-	VIRoGXodf4XdYzRENBWAWgxSfpSL6IhXX0pLLP2WnvldH+vd8SuVL52FN4+Pzqw1VktL
-	0vTQ==
-References: <2234280.ElGaqSPkdT@subpop>
-	<ebd44751-333c-cb7a-5776-c63501558af6@redhat.com>
-	<9W25UQ.OHKWX78P32DI3@sub-pop.net> <YLksUpVCCovgUAtq@work-vm>
-	<MYJ5UQ.562L1XU7LNSJ3@sub-pop.net> <0KN5UQ.JVDR5LJRMJIQ3@sub-pop.net>
-	<20210604134439.GB269481@redhat.com> <YLoxwQIyqAazPHqf@redhat.com>
-	<YL4p62JFkItB9l9K@redhat.com>
+	bh=xnqm+rvQmV+vPU+vUrCBaF2Hlx/OFm/6GHwTX/hk6Es=;
+	b=TLccTISBRM42fFsCfo/Gal4i7f7HE13u1fFFf2RioAjWmgDNsvM6gYGpBOSSwGL6IY
+	LMQzV5OFDfXJ+L+fhL1h9MWvTPeAIUBmlt8kEWQVaTRNQIfJf4usK5qSa8ICESFokMwA
+	+k4wF8c8NdiyK/ZnNot1bC7i7ggzFetMIbbGtocGCaNZyrpjdZCBs+ONo+hM4amki1g+
+	0tOfKusULcPOmCTAfwKtFdKd2g66FOg9dDRLXO/6bGzBSKEmNJudB+NAYJ3qQ/R5kL02
+	HqPdCzKJDiB6IEsQEjIsRqdYTWpqVl9Aag3TA3khGUx7o1QnlIbJSZhoM1eS7hgwtY4K
+	9BNQ==
+References: <Mb7HI6c--3-2@tutanota.com>
+	<CAJFHJrpEKH_gDz=CpEG=Sy2v-pXe_VoHsX3AJ2FFM7Njh0w0DA@mail.gmail.com>
+	<MbNHbdZ--3-2@tutanota.com>
 From: "Harry G. Coin" <hgcoin@gmail.com>
-Message-ID: <50f271ef-cc5e-e016-e9b6-8bb8ed5055dd@gmail.com>
-Date: Mon, 7 Jun 2021 09:37:03 -0500
+Message-ID: <b6760207-bd13-20c4-0bfa-fe8ca5f2ea83@gmail.com>
+Date: Mon, 7 Jun 2021 10:51:09 -0500
 MIME-Version: 1.0
-In-Reply-To: <YL4p62JFkItB9l9K@redhat.com>
-Content-Type: text/plain; charset="utf-8"
+In-Reply-To: <MbNHbdZ--3-2@tutanota.com>
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
 Content-Language: en-US
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] virtiofs mounted filesystems & SELinux
+Subject: Re: [Virtio-fs] virtiofsd: doesn't garant write access at users
+ allowed by group permission
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -34,95 +32,14 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: virtio-fs@redhat.com
 
 
-On 6/7/21 9:15 AM, Daniel P. Berrangé wrote:
-> On Fri, Jun 04, 2021 at 02:59:29PM +0100, Daniel P. Berrangé wrote:
->> On Fri, Jun 04, 2021 at 09:44:39AM -0400, Vivek Goyal wrote:
->>> On Thu, Jun 03, 2021 at 10:14:24PM -0400, Link Dupont wrote:
->>>> On Thu, Jun 3 2021 at 08:56:46 PM -0400, Link Dupont <link@sub-pop.net>
->>>> wrote:
->>>>>  reproducible scenarios
->>>> Alright. I reran my tests with a CentOS 8 guest. On CentOS 8 (with a
->>>> virtiofs filesystem and with xattr on), the type of files in the mounted
->>>> hierarchy are unlabeled_t. I can work around that by switching SELinux in
->>>> the guest to permissive or disabled.
->>> cc Dan Walsh. I was discussing this with Dan Walsh yesterday in general.
->>>
->>> In general, if we want to enable SELinux both on host and guest, then
->>> both host and guest should have same SELinux policy. Otherwise there
->>> will be lot of different kind of conflicts because both host and
->>> guest will try to work with same selinux label. I guess that in
->>> practice this will be very hard to achieve as people will run
->>> different host and guest flavors and these might have different
->>> policies.
->> Yeah, I think there's little to no chance of people keeping the
->> same SELinux policy in host/guest, except in very tightly controlled
->> narrow use cases where the host admin exerts direct control over
->> the precise guest config.
->>
->>
->>> So another option is to rename selinux xattr in virtiofs so that
->>> any selinux xattr coming from guest is saved as
->>> user.virtiofs.security.selinux xattr on host. That way host and guest
->>> can have their separate labels without interfering with each other.
->>> David Gilbert already has added support for this. I can't remember
->>> the exact syntax but you can figure it out from documentation here
->>> in xattr remappig section.
->> For general purpose virt usage, I think remapping in some way is
->> likely to be needed as the default strategy.
->>
->>> https://github.com/qemu/qemu/blob/master/docs/tools/virtiofsd.rst
->>>
->>> But I have question with selinux xattr remapping. What will happen
->>> to initial labels when fs is exported. I mean until and unless
->>> some process in guest labels all the exported files, they all
->>> with either be unlabeled or pick some generic label for all the
->>> files.
->> I'd say you need some mechanism to force a re-label inside the
->> guest. Normally a relabel will be done in /.autorelabel file
->> is present, or in certain other scenarios like selinux policy
->> RPM updates.
->>
->> We wouldn't want to force a relabel neccesarily for the entire
->> FS if we're just hotplugging a new virtiofs export though. So
->> perhaps there's scope for supporting usage of a per-mount
->> point relabel trigger. eg Host creates $VIRTIOFS-ROOT/.autorelabel
->> and whenever the guest sees a new virtiofs export arriving, it
->> can look for $VIRTIOFS-MOUNT-POINT/.autorelabel
->>
->>> Another option is, can we use a single label for whole of the
->>> virtiofs (using context=<label>) option in guest. That way nothing
->>> is saved in files as such. But this means that processes in guest
->>> can't have different selinux labels on different virtiofs dir/files.
->> Forcing a single label for the entire export is passable as a
->> fallback plan. This is what people have done for years with
->> NFS v3 mounts. It has annoying usage limitations though, so
->> if at all possible remapping is a preferrable approach.
-> Another thing we should bear in mind is that it is entirely plausible for
-> users to want SELinux in their guest, wihle the host is not using SELinux
-> at all. eg running a RHEL guest, on a cloud running Ubuntu hosts.
->
-> In such a case SELinux essentially won't exist from the POV of the
-> host OS / admin using. Anything related to labelling will have to be
-> exclusively done by the guest. If we provide a general purpose way
-> to remap XAttrs, then this ought to be viable by having a generic
-> remap rule for anything the guest does.
->
-> Regards,
-> Daniel
+On 6/4/21 1:30 PM, tecufanujacu@tutanota.com wrote:
+> I guess a third option is to change the fuse protocol so that it also
+> includes the supplementary groups of the calling process.
 
-Three cheers -- As someone who has to deal with various host/guest
-distros, including specifically rhel/centos/fedora guests on
-debian/ubuntu/etc hosts:  Notice I think all concerned want a 'host
-snapshot' of a rhel running guest directory tree to do the right thing
-if 'sent' to another server which is selinux enabled.  The ability
-virtiofsd has to map xattrs is pretty good, and the virtiofs team should
-make sure that mapping system works on both selinux and non-selinux
-hosts.  Whether the host enforces those can be left to the host.
+I suspect that option will, over time, require the fewest
+developer/maintainer hours.
 
-Regards,
-
-Harry
-
+But not in the short term....
 
 
 

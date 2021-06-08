@@ -1,20 +1,24 @@
-Date: Tue, 8 Jun 2021 16:55:03 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YL+S13wU+C4cmNZu@work-vm>
-References: <2234280.ElGaqSPkdT@subpop>
-	<ebd44751-333c-cb7a-5776-c63501558af6@redhat.com>
-	<9W25UQ.OHKWX78P32DI3@sub-pop.net> <YLksUpVCCovgUAtq@work-vm>
-	<MYJ5UQ.562L1XU7LNSJ3@sub-pop.net>
-	<0KN5UQ.JVDR5LJRMJIQ3@sub-pop.net>
-	<20210604134439.GB269481@redhat.com> <YLoxwQIyqAazPHqf@redhat.com>
-	<YL4p62JFkItB9l9K@redhat.com>
-	<50f271ef-cc5e-e016-e9b6-8bb8ed5055dd@gmail.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=to:cc:references:from:subject:message-id:date:user-agent
+	:mime-version:in-reply-to:content-transfer-encoding:content-language;
+	bh=Haq0YPA4rRTEboTMq/srqauEYHmbuV8PWUShNR4iohk=;
+	b=PVKsbw60mkC8RpXyNr0BZLkqvkHsBxGq8GBSWhSy+ExzMC+eOXN7KBfCUcSELnIyxo
+	bxhjS54o6cTRBHg+QJDLBFQA1rWktVKtbWGTtSoZ5DfMbblpggDcT1KqA8M1+j11D0iS
+	AGrTcueRm3xLrQrA1OXFKFnay53nSIVzda4PDjGhZcSSY9cLcWllfmF4u1abhdhaFUZQ
+	C9sUfuy8NA4YsZ2Dmi1XFJ7qCWiXimhiav7dTAj82/ebNM/VZc8C/sYLUjCwx1/cBx7x
+	3MNwPs/BMRSreLBPMQnbqYGxaBoeFNAC8nI2dt0KLZccr6FnU7kmuxWE0iDB4Y2S5DXt
+	dyxA==
+References: <20210608153524.GB504497@redhat.com>
+From: "Harry G. Coin" <hgcoin@gmail.com>
+Message-ID: <8929c252-3d99-8cdb-1c56-5fdb1fd29fc2@gmail.com>
+Date: Tue, 8 Jun 2021 13:38:56 -0500
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <50f271ef-cc5e-e016-e9b6-8bb8ed5055dd@gmail.com>
-Subject: Re: [Virtio-fs] virtiofs mounted filesystems & SELinux
+In-Reply-To: <20210608153524.GB504497@redhat.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Language: en-US
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH] init/do_mounts.c: Add root="fstag:<tag>"
+ syntax for root device
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,127 +27,63 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Harry G. Coin" <hgcoin@gmail.com>
-Cc: virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>, linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, linux kernel mailing list <linux-kernel@vger.kernel.org>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, Richard Weinberger <richard.weinberger@gmail.com>, Dominique Martinet <asmadeus@codewreck.org>, David Howells <dhowells@redhat.com>, viro@zeniv.linux.org.uk, v9fs-developer@lists.sourceforge.net
 
-* Harry G. Coin (hgcoin@gmail.com) wrote:
->=20
-> On 6/7/21 9:15 AM, Daniel P. Berrang=E9 wrote:
-> > On Fri, Jun 04, 2021 at 02:59:29PM +0100, Daniel P. Berrang=E9 wrote:
-> >> On Fri, Jun 04, 2021 at 09:44:39AM -0400, Vivek Goyal wrote:
-> >>> On Thu, Jun 03, 2021 at 10:14:24PM -0400, Link Dupont wrote:
-> >>>> On Thu, Jun 3 2021 at 08:56:46 PM -0400, Link Dupont <link@sub-pop.n=
-et>
-> >>>> wrote:
-> >>>>>  reproducible scenarios
-> >>>> Alright. I reran my tests with a CentOS 8 guest. On CentOS 8 (with a
-> >>>> virtiofs filesystem and with xattr on), the type of files in the mou=
-nted
-> >>>> hierarchy are unlabeled_t. I can work around that by switching SELin=
-ux in
-> >>>> the guest to permissive or disabled.
-> >>> cc Dan Walsh. I was discussing this with Dan Walsh yesterday in gener=
-al.
-> >>>
-> >>> In general, if we want to enable SELinux both on host and guest, then
-> >>> both host and guest should have same SELinux policy. Otherwise there
-> >>> will be lot of different kind of conflicts because both host and
-> >>> guest will try to work with same selinux label. I guess that in
-> >>> practice this will be very hard to achieve as people will run
-> >>> different host and guest flavors and these might have different
-> >>> policies.
-> >> Yeah, I think there's little to no chance of people keeping the
-> >> same SELinux policy in host/guest, except in very tightly controlled
-> >> narrow use cases where the host admin exerts direct control over
-> >> the precise guest config.
-> >>
-> >>
-> >>> So another option is to rename selinux xattr in virtiofs so that
-> >>> any selinux xattr coming from guest is saved as
-> >>> user.virtiofs.security.selinux xattr on host. That way host and guest
-> >>> can have their separate labels without interfering with each other.
-> >>> David Gilbert already has added support for this. I can't remember
-> >>> the exact syntax but you can figure it out from documentation here
-> >>> in xattr remappig section.
-> >> For general purpose virt usage, I think remapping in some way is
-> >> likely to be needed as the default strategy.
-> >>
-> >>> https://github.com/qemu/qemu/blob/master/docs/tools/virtiofsd.rst
-> >>>
-> >>> But I have question with selinux xattr remapping. What will happen
-> >>> to initial labels when fs is exported. I mean until and unless
-> >>> some process in guest labels all the exported files, they all
-> >>> with either be unlabeled or pick some generic label for all the
-> >>> files.
-> >> I'd say you need some mechanism to force a re-label inside the
-> >> guest. Normally a relabel will be done in /.autorelabel file
-> >> is present, or in certain other scenarios like selinux policy
-> >> RPM updates.
-> >>
-> >> We wouldn't want to force a relabel neccesarily for the entire
-> >> FS if we're just hotplugging a new virtiofs export though. So
-> >> perhaps there's scope for supporting usage of a per-mount
-> >> point relabel trigger. eg Host creates $VIRTIOFS-ROOT/.autorelabel
-> >> and whenever the guest sees a new virtiofs export arriving, it
-> >> can look for $VIRTIOFS-MOUNT-POINT/.autorelabel
-> >>
-> >>> Another option is, can we use a single label for whole of the
-> >>> virtiofs (using context=3D<label>) option in guest. That way nothing
-> >>> is saved in files as such. But this means that processes in guest
-> >>> can't have different selinux labels on different virtiofs dir/files.
-> >> Forcing a single label for the entire export is passable as a
-> >> fallback plan. This is what people have done for years with
-> >> NFS v3 mounts. It has annoying usage limitations though, so
-> >> if at all possible remapping is a preferrable approach.
-> > Another thing we should bear in mind is that it is entirely plausible f=
-or
-> > users to want SELinux in their guest, wihle the host is not using SELin=
-ux
-> > at all. eg running a RHEL guest, on a cloud running Ubuntu hosts.
-> >
-> > In such a case SELinux essentially won't exist from the POV of the
-> > host OS / admin using. Anything related to labelling will have to be
-> > exclusively done by the guest. If we provide a general purpose way
-> > to remap XAttrs, then this ought to be viable by having a generic
-> > remap rule for anything the guest does.
-> >
-> > Regards,
-> > Daniel
->=20
-> Three cheers -- As someone who has to deal with various host/guest
-> distros, including specifically rhel/centos/fedora guests on
-> debian/ubuntu/etc hosts:=A0 Notice I think all concerned want a 'host
-> snapshot' of a rhel running guest directory tree to do the right thing
-> if 'sent' to another server which is selinux enabled.=A0 The ability
-> virtiofsd has to map xattrs is pretty good, and the virtiofs team should
-> make sure that mapping system works on both selinux and non-selinux
-> hosts.=A0 Whether the host enforces those can be left to the host.
+On 6/8/21 10:35 AM, Vivek Goyal wrote:
+> We want to be able to mount virtiofs as rootfs and pass appropriate
+> kernel command line. Right now there does not seem to be a good way
+> to do that. If I specify "root=myfs rootfstype=virtiofs", system
+> panics.
+>
+> virtio-fs: tag </dev/root> not found
+> ..
+> ..
+> [ end Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0) ]
 
-As long as they map to user.something (e.g. user.virtiofsd.) then
-my understanding is the host should allow the virtiofsd to do what it
-likes with those; it wouldn't be able to see the host labels though.
+Whatever the best direction forward might be for kernel patches
+regarding 'not block device as root', it would ease learning curves if
+'the patterns that set config issue X' were the same across root 'not
+block device options' whether cephfs, nfs, 9p, virtiofs.  All of them
+will have to handle the selinux xattr/issue, posix and flock issues,
+caching etc.  While by definition virtiofs has to exist only in a vm
+guest, the others could be baremetal or vm guest roots.  (How much 9p's
+other-than-guest transports are used I don't know).
 
-Note that there are weird mappings I'd probably caution against; for
-example you can probably get the mapping engine to write any
-security.something as user.virtiofsd.security.something but then
-to see the visibility of both an original and a remapped name
-as security.something inside the guest;  that might let you see
-both host's labels and your own - which could be both convenient and
-also very confusing.
+FYI (though patching the kernel may be the best option)  there is a case
+that does not have those kernel panics for virtiofs-root and 9p root
+using stock fc34.  As 9p, the virtiofs method uses the initrd creation
+mechanisms provided by 'dracut' or 'initramfs' to provide the 'sysroot
+pivot glue'.
 
-Dave
+On the fc34 guest a successful 'direct kernel boot' today looks like:
 
-> Regards,
->=20
-> Harry
->=20
->=20
->=20
->=20
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
---=20
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+kernel path: /vmsystems/fedora_generic/boot/vmlinuz
+
+initrd path: /vmsystems/fedora_generic/boot/initrd.img
+
+Kernel args: root=virtiofs:myfs rd.shell rd.fstab
+
+
+The xml to pass through virtio-fs is:
+
+<filesystem type="mount" accessmode="passthrough">
+  <driver type="virtiofs" queue="1024"/>
+  <binary xattr="on">
+    <lock posix="on" flock="on"/>
+  </binary>
+  <source dir="/vmsystems/fedora_generic"/>
+  <target dir="myfs"/>
+</filesystem>
+
+The guest fstab is:
+
+myfs / virtiofs defaults 0 0
+
+HTH
+
+Harry Coin
+
+
+
 

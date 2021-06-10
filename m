@@ -1,22 +1,21 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-	d=bytedance-com.20150623.gappssmtp.com; s=20150623;
-	h=from:to:cc:subject:date:message-id:mime-version
-	:content-transfer-encoding;
-	bh=di2Bc1dMXaIWwytWrNJ6VH6k4Sm+c/u0WhK1IYB5KBI=;
-	b=g/b4dJnjmu45IB3EwVUgsTx/PEueA4JduRxDAXsPu2qYNwY9gc4AGIxGobiZJXtw9y
-	oNd3ZKKNhsW5ZVFqUGShGgisUrxVL25jWSFQMHq0UFaF0IQonpaW8iNqnKcO/EqhWPFa
-	2y/RJPMDU1uHUpL6hoF0pDqIqtAa6xvfkJ/WxNOVcQaTx3qoi6AeJAAOUYJncyw+hRRC
-	MFWZ1auGOumdbiCAzx2/8g1TdzYeg3sLCxnX2E9iPLVWMXg7iAQ26bP0WX9/RVsYzx08
-	02x0e6Ixr+/jH0KnDQGq25MwTI6IgCglyWMD/obf+Ze3ov/5yAitQCV9b9wKVMhoO7J2
-	OxAQ==
-From: Jiachen Zhang <zhangjiachen.jaycee@bytedance.com>
-Date: Thu, 10 Jun 2021 22:25:49 +0800
-Message-Id: <20210610142549.33220-1-zhangjiachen.jaycee@bytedance.com>
+Date: Thu, 10 Jun 2021 16:29:42 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YMIv5odJWdkbJzWL@work-vm>
+References: <20210428110100.27757-1-dgilbert@redhat.com>
+	<20210428110100.27757-27-dgilbert@redhat.com>
+	<YJQNIPaFCJlG7ZKc@stefanha-x1.localdomain>
+	<20210506160223.GA277745@redhat.com>
+	<YJj3RSxXKZHxmiKu@stefanha-x1.localdomain>
+	<20210510152324.GB150402@horse>
+	<YJlSHZ0vzNtCAjkJ@stefanha-x1.localdomain>
+	<YK/uUUZI3zy9k8Vk@work-vm>
 MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <YK/uUUZI3zy9k8Vk@work-vm>
 Content-Transfer-Encoding: 8bit
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH] virtiofsd: Avoid increasing nlookup when
-	calling lookup_name
+Subject: Re: [Virtio-fs] [PATCH v3 26/26] virtiofsd: Ask qemu to drop
+ CAP_FSETID if client asked for it
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,112 +24,191 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, virtio-fs@redhat.com
-Cc: qemu-devel@nongnu.org
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
 
-Commit 9257e514d861afa7 introduced lookup_name(), which will calls
-lo_find(), to increase the refcount of the inodes used in lo_rename,
-lo_rmdir, and lo_unlink.
+* Dr. David Alan Gilbert (dgilbert@redhat.com) wrote:
+> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
 
-However, as lo_find() increases both refcount and nlookup, and the
-three functions do not need to increase nlookup, unref_inode_lolocked()
-is called later in the three function to decrease nlookup by one.
+<snip>
 
-This commit adds a increase_nlookup flag to lo_find(), it is set to
-false when called from lookup_name(). This way we can make the behavior
-more clear, and also makes it easier to maintain nlookup crash consistency
-if we are introducing crash recovery feature in the future.
+> > Instead I was thinking about VHOST_USER_DMA_READ/WRITE messages
+> > containing the address (a device IOVA, it could just be a guest physical
+> > memory address in most cases) and the length. The WRITE message would
+> > also contain the data that the vhost-user device wishes to write. The
+> > READ message reply would contain the data that the device read from
+> > QEMU.
+> > 
+> > QEMU would implement this using QEMU's address_space_read/write() APIs.
+> > 
+> > So basically just a new vhost-user protocol message to do a memcpy(),
+> > but with guest addresses and vIOMMU support :).
+> 
+> This doesn't actually feel that hard - ignoring vIOMMU for a minute
+> which I know very little about - I'd have to think where the data
+> actually flows, probably the slave fd.
+> 
+> > The vhost-user device will need to do bounce buffering so using these
+> > new messages is slower than zero-copy I/O to shared guest RAM.
+> 
+> I guess the theory is it's only in the weird corner cases anyway.
 
-Signed-off-by: Jiachen Zhang <zhangjiachen.jaycee@bytedance.com>
+The direction I'm going is something like the following;
+the idea is that the master will have to handle the requests on a
+separate thread, to avoid any problems with side effects from the memory
+accesses; the slave will then have to parkt he requests somewhere and
+handle them later.
+
+
+>From 07aacff77c50c8a2b588b2513f2dfcfb8f5aa9df Mon Sep 17 00:00:00 2001
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Date: Thu, 10 Jun 2021 15:34:04 +0100
+Subject: [PATCH] WIP: vhost-user: DMA type interface
+
+A DMA type interface where the slave can ask for a stream of bytes
+to be read/written to the guests memory by the master.
+The interface is asynchronous, since a request may have side effects
+inside the guest.
+
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 18 ++++++++----------
- 1 file changed, 8 insertions(+), 10 deletions(-)
+ docs/interop/vhost-user.rst               | 33 +++++++++++++++++++++++
+ hw/virtio/vhost-user.c                    |  4 +++
+ subprojects/libvhost-user/libvhost-user.h | 24 +++++++++++++++++
+ 3 files changed, 61 insertions(+)
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 49c21fd855..3e7c2f6b9d 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -219,7 +219,7 @@ static struct {
- static __thread bool cap_loaded = 0;
+diff --git a/docs/interop/vhost-user.rst b/docs/interop/vhost-user.rst
+index 9ebd05e2bf..b9b5322147 100644
+--- a/docs/interop/vhost-user.rst
++++ b/docs/interop/vhost-user.rst
+@@ -1347,6 +1347,15 @@ Master message types
+   query the backend for its device status as defined in the Virtio
+   specification.
  
- static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
--                                uint64_t mnt_id);
-+                                uint64_t mnt_id, bool increase_nlookup);
- static int xattr_map_client(const struct lo_data *lo, const char *client_name,
-                             char **out_name);
++``VHOST_USER_MEM_DATA``
++  :id: 41
++  :equivalent ioctl: N/A
++  :slave payload: N/A
++  :master payload: ``struct VhostUserMemReply``
++
++  This message is an asynchronous response to a ``VHOST_USER_SLAVE_MEM_ACCESS``
++  message.  Where the request was for the master to read data, this
++  message will be followed by the data that was read.
  
-@@ -880,7 +880,7 @@ out_err:
- }
+ Slave message types
+ -------------------
+@@ -1469,6 +1478,30 @@ Slave message types
+   The ``VHOST_USER_FS_FLAG_MAP_W`` flag must be set in the ``flags`` field to
+   write to the file from RAM.
  
- static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
--                                uint64_t mnt_id)
-+                                uint64_t mnt_id, bool increase_nlookup)
- {
-     struct lo_inode *p;
-     struct lo_key key = {
-@@ -893,7 +893,9 @@ static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
-     p = g_hash_table_lookup(lo->inodes, &key);
-     if (p) {
-         assert(p->nlookup > 0);
--        p->nlookup++;
-+        if (increase_nlookup) {
-+            p->nlookup++;
-+        }
-         g_atomic_int_inc(&p->refcount);
-     }
-     pthread_mutex_unlock(&lo->mutex);
-@@ -1023,7 +1025,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-         e->attr_flags |= FUSE_ATTR_SUBMOUNT;
-     }
++``VHOST_USER_SLAVE_MEM_ACCESS``
++  :id: 9
++  :equivalent ioctl: N/A
++  :slave payload: ``struct VhostUserMemAccess``
++  :master payload: N/A
++
++  Requests that the master perform a range of memory accesses on behalf
++  of the slave that the slave can't perform itself.
++
++  The ``VHOST_USER_MEM_FLAG_TO_MASTER`` flag must be set in the ``flags``
++  field for the slave to write data into the RAM of the master.   In this
++  case the data to write follows the ``VhostUserMemAccess`` on the fd.
++  The ``VHOST_USER_MEM_FLAG_FROM_MASTER`` flag must be set in the ``flags``
++  field for the slave to read data from the RAM of the master.
++
++  When the master has completed the access it replies on the main fd with
++  a ``VHOST_USER_MEM_DATA`` message.
++
++  The master is allowed to complete part of the request and reply stating
++  the amount completed, leaving it to the slave to resend further components.
++  This may happen to limit memory allocations in the master or to simplify
++  the implementation.
++
++
+ .. _reply_ack:
  
--    inode = lo_find(lo, &e->attr, mnt_id);
-+    inode = lo_find(lo, &e->attr, mnt_id, true);
-     if (inode) {
-         close(newfd);
-     } else {
-@@ -1316,7 +1318,7 @@ out_err:
-     fuse_reply_err(req, saverr);
- }
+ VHOST_USER_PROTOCOL_F_REPLY_ACK
+diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
+index 39a0e55cca..a3fefc4c1d 100644
+--- a/hw/virtio/vhost-user.c
++++ b/hw/virtio/vhost-user.c
+@@ -126,6 +126,9 @@ typedef enum VhostUserRequest {
+     VHOST_USER_GET_MAX_MEM_SLOTS = 36,
+     VHOST_USER_ADD_MEM_REG = 37,
+     VHOST_USER_REM_MEM_REG = 38,
++    VHOST_USER_SET_STATUS = 39,
++    VHOST_USER_GET_STATUS = 40,
++    VHOST_USER_MEM_DATA = 41,
+     VHOST_USER_MAX
+ } VhostUserRequest;
  
--/* Increments nlookup and caller must release refcount using lo_inode_put() */
-+/* Caller must release refcount using lo_inode_put() */
- static struct lo_inode *lookup_name(fuse_req_t req, fuse_ino_t parent,
-                                     const char *name)
- {
-@@ -1336,7 +1338,7 @@ static struct lo_inode *lookup_name(fuse_req_t req, fuse_ino_t parent,
-         return NULL;
-     }
+@@ -139,6 +142,7 @@ typedef enum VhostUserSlaveRequest {
+     VHOST_USER_SLAVE_FS_MAP = 6,
+     VHOST_USER_SLAVE_FS_UNMAP = 7,
+     VHOST_USER_SLAVE_FS_IO = 8,
++    VHOST_USER_SLAVE_MEM_ACCESS = 9,
+     VHOST_USER_SLAVE_MAX
+ }  VhostUserSlaveRequest;
  
--    return lo_find(lo, &attr, mnt_id);
-+    return lo_find(lo, &attr, mnt_id, false);
- }
+diff --git a/subprojects/libvhost-user/libvhost-user.h b/subprojects/libvhost-user/libvhost-user.h
+index eee611a2f6..b5444f4f6f 100644
+--- a/subprojects/libvhost-user/libvhost-user.h
++++ b/subprojects/libvhost-user/libvhost-user.h
+@@ -109,6 +109,9 @@ typedef enum VhostUserRequest {
+     VHOST_USER_GET_MAX_MEM_SLOTS = 36,
+     VHOST_USER_ADD_MEM_REG = 37,
+     VHOST_USER_REM_MEM_REG = 38,
++    VHOST_USER_SET_STATUS = 39,
++    VHOST_USER_GET_STATUS = 40,
++    VHOST_USER_MEM_DATA = 41,
+     VHOST_USER_MAX
+ } VhostUserRequest;
  
- static void lo_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name)
-@@ -1364,7 +1366,6 @@ static void lo_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name)
-     res = unlinkat(lo_fd(req, parent), name, AT_REMOVEDIR);
+@@ -122,6 +125,7 @@ typedef enum VhostUserSlaveRequest {
+     VHOST_USER_SLAVE_FS_MAP = 6,
+     VHOST_USER_SLAVE_FS_UNMAP = 7,
+     VHOST_USER_SLAVE_FS_IO = 8,
++    VHOST_USER_SLAVE_MEM_ACCESS = 9,
+     VHOST_USER_SLAVE_MAX
+ }  VhostUserSlaveRequest;
  
-     fuse_reply_err(req, res == -1 ? errno : 0);
--    unref_inode_lolocked(lo, inode, 1);
-     lo_inode_put(lo, &inode);
- }
+@@ -220,6 +224,24 @@ typedef struct VhostUserInflight {
+     uint16_t queue_size;
+ } VhostUserInflight;
  
-@@ -1423,8 +1424,6 @@ static void lo_rename(fuse_req_t req, fuse_ino_t parent, const char *name,
++/* For the flags field of VhostUserMemAccess and VhostUserMemReply */
++#define VHOST_USER_MEM_FLAG_TO_MASTER (1u << 0)
++#define VHOST_USER_MEM_FLAG_FROM_MASTER (1u << 1)
++typedef struct VhostUserMemAccess {
++    uint32_t id; /* Included in the reply */
++    uint32_t flags;
++    uint64_t addr; /* In the bus address of the device */
++    uint64_t len;  /* In bytes */
++} VhostUserMemAccess;
++
++typedef struct VhostUserMemReply {
++    uint32_t id; /* From the request */
++    uint32_t flags;
++    uint32_t err; /* 0 on success */
++    uint32_t align;
++    uint64_t len;
++} VhostUserMemReply;
++
+ #if defined(_WIN32) && (defined(__x86_64__) || defined(__i386__))
+ # define VU_PACKED __attribute__((gcc_struct, packed))
+ #else
+@@ -248,6 +270,8 @@ typedef struct VhostUserMsg {
+         VhostUserVringArea area;
+         VhostUserInflight inflight;
+         VhostUserFSSlaveMsgMax fs_max;
++        VhostUserMemAccess memaccess;
++        VhostUserMemReply  memreply;
+     } payload;
  
-     fuse_reply_err(req, res == -1 ? errno : 0);
- out:
--    unref_inode_lolocked(lo, oldinode, 1);
--    unref_inode_lolocked(lo, newinode, 1);
-     lo_inode_put(lo, &oldinode);
-     lo_inode_put(lo, &newinode);
-     lo_inode_put(lo, &parent_inode);
-@@ -1456,7 +1455,6 @@ static void lo_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
-     res = unlinkat(lo_fd(req, parent), name, 0);
- 
-     fuse_reply_err(req, res == -1 ? errno : 0);
--    unref_inode_lolocked(lo, inode, 1);
-     lo_inode_put(lo, &inode);
- }
- 
+     int fds[VHOST_MEMORY_BASELINE_NREGIONS];
 -- 
-2.20.1
+2.31.1
+
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

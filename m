@@ -1,11 +1,16 @@
-From: Max Reitz <mreitz@redhat.com>
-Date: Wed,  9 Jun 2021 17:55:51 +0200
-Message-Id: <20210609155551.44437-10-mreitz@redhat.com>
-In-Reply-To: <20210609155551.44437-1-mreitz@redhat.com>
-References: <20210609155551.44437-1-mreitz@redhat.com>
+Date: Thu, 10 Jun 2021 09:16:38 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <YMHKZhfT0CUgeLno@stefanha-x1.localdomain>
+References: <20210608153524.GB504497@redhat.com>
+	<YMCPPCbjbRoPAEcL@stefanha-x1.localdomain>
+	<20210609154543.GA579806@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 9/9] virtiofsd: Add lazy lo_do_find()
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="O6p7GxVMoApyVHjK"
+Content-Disposition: inline
+In-Reply-To: <20210609154543.GA579806@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] init/do_mounts.c: Add root="fstag:<tag>"
+ syntax for root device
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,178 +19,194 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com
-Cc: Max Reitz <mreitz@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: David Howells <dhowells@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, Richard Weinberger <richard.weinberger@gmail.com>, Dominique Martinet <asmadeus@codewreck.org>, linux kernel mailing list <linux-kernel@vger.kernel.org>, virtio-fs@redhat.com, viro@zeniv.linux.org.uk, Christoph Hellwig <hch@infradead.org>, linux-fsdevel@vger.kernel.org, v9fs-developer@lists.sourceforge.net
 
-lo_find() right now takes two lookup keys for two maps, namely the file
-handle for inodes_by_handle and the statx information for inodes_by_ids.
-However, we only need the statx information if looking up the inode by
-the file handle failed.
 
-There are two callers of lo_find(): The first one, lo_do_lookup(), has
-both keys anyway, so passing them does not incur any additional cost.
-The second one, lookup_name(), though, needs to explicitly invoke
-name_to_handle_at() (through get_file_handle()) and statx() (through
-do_statx()).  We need to try to get a file handle as the primary key, so
-we cannot get rid of get_file_handle(), but we only need the statx
-information if looking up an inode by handle failed; so we can defer
-that until the lookup has indeed failed.
+--O6p7GxVMoApyVHjK
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-To this end, replace lo_find()'s st/mnt_id parameters by a get_ids()
-closure that is invoked to fill the lo_key struct if necessary.
+On Wed, Jun 09, 2021 at 11:45:43AM -0400, Vivek Goyal wrote:
+> On Wed, Jun 09, 2021 at 10:51:56AM +0100, Stefan Hajnoczi wrote:
+> > On Tue, Jun 08, 2021 at 11:35:24AM -0400, Vivek Goyal wrote:
+> > > We want to be able to mount virtiofs as rootfs and pass appropriate
+> > > kernel command line. Right now there does not seem to be a good way
+> > > to do that. If I specify "root=3Dmyfs rootfstype=3Dvirtiofs", system
+> > > panics.
+> > >=20
+> > > virtio-fs: tag </dev/root> not found
+> > > ..
+> > > ..
+> > > [ end Kernel panic - not syncing: VFS: Unable to mount root fs on unk=
+nown-block(0,0) ]
+> > >=20
+> > > Basic problem here is that kernel assumes that device identifier
+> > > passed in "root=3D" is a block device. But there are few execptions
+> > > to this rule to take care of the needs of mtd, ubi, NFS and CIFS.
+> > >=20
+> > > For example, mtd and ubi prefix "mtd:" or "ubi:" respectively.
+> > >=20
+> > > "root=3Dmtd:<identifier>" or "root=3Dubi:<identifier>"
+> > >=20
+> > > NFS and CIFS use "root=3D/dev/nfs" and CIFS passes "root=3D/dev/cifs"=
+ and
+> > > actual root device details come from filesystem specific kernel
+> > > command line options.
+> > >=20
+> > > virtiofs does not seem to fit in any of the above categories. In fact
+> > > we have 9pfs which can be used to boot from but it also does not
+> > > have a proper syntax to specify rootfs and does not fit into any of
+> > > the existing syntax. They both expect a device "tag" to be passed
+> > > in a device to be mounted. And filesystem knows how to parse and
+> > > use "tag".
+> > >=20
+> > > So this patch proposes that we add a new prefix "fstag:" which specif=
+ies
+> > > that identifier which follows is filesystem specific tag and its not
+> > > a block device. Just pass this tag to filesystem and filesystem will
+> > > figure out how to mount it.
+> > >=20
+> > > For example, "root=3Dfstag:<tag>".
+> > >=20
+> > > In case of virtiofs, I can specify "root=3Dfstag:myfs rootfstype=3Dvi=
+rtiofs"
+> > > and it works.
+> > >=20
+> > > I think this should work for 9p as well. "root=3Dfstag:myfs rootfstyp=
+e=3D9p".
+> > > Though I have yet to test it.
+> > >=20
+> > > This kind of syntax should be able to address wide variety of use cas=
+es
+> > > where root device is not a block device and is simply some kind of
+> > > tag/label understood by filesystem.
+> >=20
+> > "fstag" is kind of virtio-9p/fs specific. The intended effect is really
+> > to specify the file system source (like in mount(2)) without it being
+> > interpreted as a block device.
+>=20
+> [ CC christoph ]
+>=20
+> I think mount(2) has little different requirements. It more or less
+> passes the source to filesystem. But during early boot, we do so
+> much more with source, that is parse it and determine device major
+> and minor and create blockdevice and then call into filesystem.
+>=20
+> >=20
+> > In a previous discussion David Gilbert suggested detecting file systems
+> > that do not need a block device:
+> > https://patchwork.kernel.org/project/linux-fsdevel/patch/20190906100324=
+=2E8492-1-stefanha@redhat.com/
+> >=20
+> > I never got around to doing it, but can do_mounts.c just look at struct
+> > file_system_type::fs_flags FS_REQUIRES_DEV to detect non-block device
+> > file systems?
+>=20
+> I guess we can use FS_REQUIRES_DEV. We probably will need to add a helper
+> to determine if filesystem passed in "rootfstype=3D" has FS_REQUIRES_DEV
+> set or not.
+>=20
+> For now, I have written a patch which does not rely on FS_REQUIRES_DEV.
+> Instead I have created an array of filesystems which do not want
+> root=3D<source> to be treated as block device and expect that "source"
+> will be directly passed to filesytem to be mounted.
+>=20
+> Reason I am not parsing FS_REQUIRES_DEV yet is that I am afraid that
+> this can change behavior and introduce regression. Some filesystem
+> which does not have FS_REQUIRES_DEV set but still somehow is going
+> through block device path (or some path which I can't see yet).
+>=20
+> So for now I am playing safe and explicitly creating a list of
+> filesystems which will opt-in into this behavior. But if folks think
+> that my fears of regression are misplaced and I should parse
+> FS_REQUIRES_DEV and that way any filesystem which does not have
+> FS_REQUIRES_DEV set automatically gets opted in, I can do that.
+>=20
+> >=20
+> > That way it would know to just mount with root=3D as the source instead=
+ of
+> > treating it as a block device. No root=3D prefix would be required and =
+it
+> > would handle NFS, virtiofs, virtio-9p, etc without introducing the
+> > concept of a "tag".
+> >=20
+> >   root=3Dmyfs rootfstype=3Dvirtiofs rootflags=3D...
+> >=20
+> > I wrote this up quickly after not thinking about the topic for 2 years,
+> > so the idea may not work at all :).
+>=20
+> Now with this patch "root=3Dmyfs, rootfstype=3Dvirtiofs, rootflags=3D..."=
+ syntax
+> works for virtiofs.
+>=20
+> Please have a look.
 
-Also, lo_find() is renamed to lo_do_find(), so we can add a new
-lo_find() wrapper whose closure just initializes the lo_key from the
-st/mnt_id parameters, just like the old lo_find() did.
+Looks good from a user perspective.
 
-lookup_name() directly calls lo_do_find() now and passes its own
-closure, which performs the do_statx() call.
+> Subject: [PATCH] init/do_mounts.c: Add a path to boot from non blockdev f=
+ilesystems
+>=20
+> We want to be able to mount virtiofs as rootfs and pass appropriate
+> kernel command line. Right now there does not seem to be a good way
+> to do that. If I specify "root=3Dmyfs rootfstype=3Dvirtiofs", system
+> panics.
+>=20
+> virtio-fs: tag </dev/root> not found
+> ..
+> ..
+> [ end Kernel panic - not syncing: VFS: Unable to mount root fs on
+> +unknown-block(0,0) ]
+>=20
+> Basic problem here is that kernel assumes that device identifier
+> passed in "root=3D" is a block device. But there are few execptions
+> to this rule to take care of the needs of mtd, ubi, NFS and CIFS.
+>=20
+> For example, mtd and ubi prefix "mtd:" or "ubi:" respectively.
+>=20
+> "root=3Dmtd:<identifier>" or "root=3Dubi:<identifier>"
+>=20
+> NFS and CIFS use "root=3D/dev/nfs" and CIFS passes "root=3D/dev/cifs" and
+> actual root device details come from filesystem specific kernel
+> command line options.
+>=20
+> virtiofs does not seem to fit in any of the above categories. In fact
+> we have 9pfs which can be used to boot from but it also does not
+> have a proper syntax to specify rootfs and does not fit into any of
+> the existing syntax. They both expect a device "tag" to be passed
+> in a device to be mounted. And filesystem knows how to parse and
+> use "tag".
+>=20
+> So this patch proposes that we internally create a list of filesystems
+> which don't expect a block device and whatever "source" has been
+> passed in "root=3D<source>" option, should be passed to filesystem and
+> filesystem should be able to figure out how to use "source" to
+> mount filesystem.
+>=20
+> As of now I have only added "virtiofs" in the list of such filesystems.
+> To enable it on 9p, it should be a simple change. Just add "9p" to
+> the nobdev_filesystems[] array.
 
-Signed-off-by: Max Reitz <mreitz@redhat.com>
-Reviewed-by: Connor Kuehl <ckuehl@redhat.com>
----
- tools/virtiofsd/passthrough_ll.c | 93 ++++++++++++++++++++++++++------
- 1 file changed, 76 insertions(+), 17 deletions(-)
+virtio-9p should be simple. I'm not sure how much additional setup the
+other 9p transports require. TCP and RDMA seem doable if there are
+kernel parameters to configure things before the root file system is
+mounted.
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 2e56c40b2f..8990fd5bd2 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -1168,22 +1168,23 @@ out_err:
-     fuse_reply_err(req, saverr);
- }
- 
--static struct lo_inode *lo_find(struct lo_data *lo,
--                                const struct lo_fhandle *fhandle,
--                                struct stat *st, uint64_t mnt_id)
-+/*
-+ * get_ids() will be called to get the key for lo->inodes_by_ids if
-+ * the lookup by file handle has failed.
-+ */
-+static struct lo_inode *lo_do_find(struct lo_data *lo,
-+    const struct lo_fhandle *fhandle,
-+    int (*get_ids)(struct lo_key *, const void *),
-+    const void *get_ids_opaque)
- {
-     struct lo_inode *p = NULL;
--    struct lo_key ids_key = {
--        .ino = st->st_ino,
--        .dev = st->st_dev,
--        .mnt_id = mnt_id,
--    };
-+    struct lo_key ids_key;
- 
-     pthread_mutex_lock(&lo->mutex);
-     if (fhandle) {
-         p = g_hash_table_lookup(lo->inodes_by_handle, fhandle);
-     }
--    if (!p) {
-+    if (!p && get_ids(&ids_key, get_ids_opaque) == 0) {
-         p = g_hash_table_lookup(lo->inodes_by_ids, &ids_key);
-         /*
-          * When we had to fall back to looking up an inode by its IDs,
-@@ -1211,6 +1212,36 @@ static struct lo_inode *lo_find(struct lo_data *lo,
-     return p;
- }
- 
-+struct lo_find_get_ids_key_opaque {
-+    const struct stat *st;
-+    uint64_t mnt_id;
-+};
-+
-+static int lo_find_get_ids_key(struct lo_key *ids_key, const void *opaque)
-+{
-+    const struct lo_find_get_ids_key_opaque *stat_info = opaque;
-+
-+    *ids_key = (struct lo_key){
-+        .ino = stat_info->st->st_ino,
-+        .dev = stat_info->st->st_dev,
-+        .mnt_id = stat_info->mnt_id,
-+    };
-+
-+    return 0;
-+}
-+
-+static struct lo_inode *lo_find(struct lo_data *lo,
-+                                const struct lo_fhandle *fhandle,
-+                                struct stat *st, uint64_t mnt_id)
-+{
-+    const struct lo_find_get_ids_key_opaque stat_info = {
-+        .st = st,
-+        .mnt_id = mnt_id,
-+    };
-+
-+    return lo_do_find(lo, fhandle, lo_find_get_ids_key, &stat_info);
-+}
-+
- /* value_destroy_func for posix_locks GHashTable */
- static void posix_locks_value_destroy(gpointer data)
- {
-@@ -1682,14 +1713,41 @@ out_err:
-     fuse_reply_err(req, saverr);
- }
- 
-+struct lookup_name_get_ids_key_opaque {
-+    struct lo_data *lo;
-+    int parent_fd;
-+    const char *name;
-+};
-+
-+static int lookup_name_get_ids_key(struct lo_key *ids_key, const void *opaque)
-+{
-+    const struct lookup_name_get_ids_key_opaque *stat_params = opaque;
-+    uint64_t mnt_id;
-+    struct stat attr;
-+    int res;
-+
-+    res = do_statx(stat_params->lo, stat_params->parent_fd, stat_params->name,
-+                   &attr, AT_SYMLINK_NOFOLLOW, &mnt_id);
-+    if (res < 0) {
-+        return -errno;
-+    }
-+
-+    *ids_key = (struct lo_key){
-+        .ino = attr.st_ino,
-+        .dev = attr.st_dev,
-+        .mnt_id = mnt_id,
-+    };
-+
-+    return 0;
-+}
-+
- /* Increments nlookup and caller must release refcount using lo_inode_put() */
- static struct lo_inode *lookup_name(fuse_req_t req, fuse_ino_t parent,
-                                     const char *name)
- {
-     g_auto(TempFd) dir_fd = TEMP_FD_INIT;
-     int res;
--    uint64_t mnt_id;
--    struct stat attr;
-+    struct lookup_name_get_ids_key_opaque stat_params;
-     struct lo_fhandle *fh;
-     struct lo_data *lo = lo_data(req);
-     struct lo_inode *dir = lo_inode(req, parent);
-@@ -1707,13 +1765,14 @@ static struct lo_inode *lookup_name(fuse_req_t req, fuse_ino_t parent,
-     fh = get_file_handle(lo, dir_fd.fd, name);
-     /* Ignore errors, this is just an optional key for the lookup */
- 
--    res = do_statx(lo, dir_fd.fd, name, &attr, AT_SYMLINK_NOFOLLOW, &mnt_id);
--    lo_inode_put(lo, &dir);
--    if (res == -1) {
--        return NULL;
--    }
-+    stat_params = (struct lookup_name_get_ids_key_opaque){
-+        .lo = lo,
-+        .parent_fd = dir_fd.fd,
-+        .name = name,
-+    };
- 
--    inode = lo_find(lo, fh, &attr, mnt_id);
-+    inode = lo_do_find(lo, fh, lookup_name_get_ids_key, &stat_params);
-+    lo_inode_put(lo, &dir);
-     g_free(fh);
- 
-     return inode;
--- 
-2.31.1
+--O6p7GxVMoApyVHjK
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmDBymUACgkQnKSrs4Gr
+c8id6wf/TbGvf38QDqOv/N1pdoZjKJPsUHSPKx7lZaw+DYZdZ8G4smREHi/OyOQy
+63iBc3TOLWD2VghQPbnPL8aS2cWlu3vVk7LxOmF9ejN7rUePgaetKg7LSdRpNp6V
+aVVRpaG006D+XS7r8+cmnEbOG1hYgLBbLiGGdHKn3Ml86/OhzEM/dTgSjr3DXDf4
+53NHvG6fp1YYhlPO9SttzPDhfZzW33WNdqdA7d4toakxPzKG/Dbsx3DuGT4WewEP
+AMkOsiWRHr/X5vLDffxMYrhgSnfP6dUf6Tk45YZdhBEB7YX2FovRFrzKmIVnANx/
+FWpEyaBADv2+5osY2A4hBCr9RXyXuA==
+=1fWD
+-----END PGP SIGNATURE-----
+
+--O6p7GxVMoApyVHjK--
 

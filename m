@@ -1,13 +1,18 @@
-Date: Tue, 25 May 2021 19:49:15 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YK1Gq663KZxQPlVI@work-vm>
-References: <20210518213538.693422-1-vgoyal@redhat.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210518213538.693422-1-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v2 0/7] virtiofsd: Few cleanups in
-	virtio_send_data_iov()
+Date: Fri, 11 Jun 2021 04:52:17 -0400
+From: virtiofs-bot@sinrega.org
+Message-Id: <09353.121061104521200337@us-mta-203.us.mimecast.lan>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=subject:to:x-me-proxy:x-me-proxy
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm3; bh=Pulw44miDH2wbc4hA
+	tFNDlSSnXbRl3VdtKeQdBfkMdk=; b=mf0lBwWjm+TOKXkgH6s+kZC0KAOBwRaGO
+	DB2HIPWz22lUvFwz9PuXPipsbygyoedTJdSydZGcSFFFdCIU2VBeJ+STzBvksXAD
+	odMS2G9+BLKwm1ixfwlzOyF/G4sUMcDJSo7WhqtG3/M+JB9jkfnDfkNKTNrqZqJ7
+	wzVGI49rckZ1CWkNu1pcwdwyssrZhn4NbhDNAxKMkw34+2SaYFBfMWht7ji65zkR
+	7rS03bERTzq+eDLZ7AHb5Y9dYXeYMIyGwMDUpMpc5pZ1IWx+9ym/6b3Mq/u7Zrlg
+	9H6fhFkd7rTtE+qTouH40Ry8oFkp/fF6hfgr2flq+bl+DhSjBSHpQ==
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd-rs] MR merged: Fix file type check for
+	submount points
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,44 +21,21 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: virtio-fs@redhat.com
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> Hi,
-> 
-> This is V2 of the patches. Changes since V1 are.
-> 
-> - Took care of coding style issue.
-> - Got rid of label "err" completely in last patch. (Dave, Connor). 
-> - Captured Reviewed-by tags from Connor and David.
-> 
-> Code in virtio_send_data_iov() little twisted and complicated. This
-> patch series just tries to simplify it a bit to make it little easier
-> to read this piece of code.
+The current check (`mode & IFDIR != 0`) only kind of works accidentally.
+It should be `mode & IFMT == IFDIR`.
 
-Queued
+Judging from my bits/stat.h, block devices and sockets would also pass
+the `mode & IFDIR != 0` condition.  That is not exactly catastrophic, we
+just never tested what happens what happens if we were to mark something
+that is not a directory a submount, and so we only allow directories to
+be submount points until someone needs guest submounts for mount points
+that are not directories.
 
-> Thanks
-> Vivek
-> 
-> 
-> Vivek Goyal (7):
->   virtiofsd: Check for EINTR in preadv() and retry
->   virtiofsd: Get rid of unreachable code in read
->   virtiofsd: Use iov_discard_front() to skip bytes
->   virtiofsd: get rid of in_sg_left variable
->   virtiofsd: Simplify skip byte logic
->   virtiofsd: Check EOF before short read
->   virtiofsd: Set req->reply_sent right after sending reply
-> 
->  tools/virtiofsd/fuse_virtio.c | 81 +++++++++++------------------------
->  1 file changed, 25 insertions(+), 56 deletions(-)
-> 
-> -- 
-> 2.25.4
-> 
-> 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+Note that the kernel also has a guard to only allow submounts on
+directory nodes, so in practice this patch should not change any
+user-visible behavior.
+---
+https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/30
 

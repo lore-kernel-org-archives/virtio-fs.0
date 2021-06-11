@@ -1,15 +1,15 @@
-Date: Fri, 11 Jun 2021 17:28:35 +0100
+Date: Fri, 11 Jun 2021 17:29:22 +0100
 From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
-Message-ID: <YMOPM87ZdWWQOUsR@redhat.com>
+Message-ID: <YMOPYkWmobHrapn6@redhat.com>
 References: <20210505103702.521457-1-berrange@redhat.com>
-	<20210505103702.521457-4-berrange@redhat.com>
+	<20210505103702.521457-6-berrange@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-In-Reply-To: <20210505103702.521457-4-berrange@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 3/7] net/rocker: use GDateTime for
- formatting timestamp in debug messages
+In-Reply-To: <20210505103702.521457-6-berrange@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 5/7] io: use GDateTime for formatting
+ timestamp for websock headers
 Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -22,9 +22,9 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org
 Cc: Kevin Wolf <kwolf@redhat.com>, Jiri Pirko <jiri@resnulli.us>, qemu-block@nongnu.org, Juan Quintela <quintela@redhat.com>, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowang@redhat.com>, Laurent Vivier <laurent@vivier.eu>, Max Reitz <mreitz@redhat.com>, virtio-fs@redhat.com, Gerd Hoffmann <kraxel@redhat.com>, Brad Smith <brad@comstyle.com>
 
-ping: anyone willing to give a review of this one
+ping: anyone willing to review this
 
-On Wed, May 05, 2021 at 11:36:58AM +0100, Daniel P. Berrangé wrote:
+On Wed, May 05, 2021 at 11:37:00AM +0100, Daniel P. Berrangé wrote:
 > The GDateTime APIs provided by GLib avoid portability pitfalls, such
 > as some platforms where 'struct timeval.tv_sec' field is still 'long'
 > instead of 'time_t'. When combined with automatic cleanup, GDateTime
@@ -32,31 +32,31 @@ On Wed, May 05, 2021 at 11:36:58AM +0100, Daniel P. Berrangé wrote:
 > 
 > Signed-off-by: Daniel P. Berrangé <berrange@redhat.com>
 > ---
->  hw/net/rocker/rocker.h | 11 +++--------
->  1 file changed, 3 insertions(+), 8 deletions(-)
+>  io/channel-websock.c | 10 ++--------
+>  1 file changed, 2 insertions(+), 8 deletions(-)
 > 
-> diff --git a/hw/net/rocker/rocker.h b/hw/net/rocker/rocker.h
-> index 941c932265..412fa44d01 100644
-> --- a/hw/net/rocker/rocker.h
-> +++ b/hw/net/rocker/rocker.h
-> @@ -25,14 +25,9 @@
->  #if defined(DEBUG_ROCKER)
->  #  define DPRINTF(fmt, ...) \
->      do {                                                           \
-> -        struct timeval tv;                                         \
-> -        char timestr[64];                                          \
-> -        time_t now;                                                \
-> -        gettimeofday(&tv, NULL);                                   \
-> -        now = tv.tv_sec;                                           \
-> -        strftime(timestr, sizeof(timestr), "%T", localtime(&now)); \
-> -        fprintf(stderr, "%s.%06ld ", timestr, tv.tv_usec);         \
-> -        fprintf(stderr, "ROCKER: " fmt, ## __VA_ARGS__);           \
-> +        g_autoptr(GDateTime) now = g_date_time_new_now_local();    \
-> +        g_autofree char *nowstr = g_date_time_format(now, "%T.%f");\
-> +        fprintf(stderr, "%s ROCKER: " fmt, nowstr, ## __VA_ARGS__);\
->      } while (0)
->  #else
->  static inline GCC_FMT_ATTR(1, 2) int DPRINTF(const char *fmt, ...)
+> diff --git a/io/channel-websock.c b/io/channel-websock.c
+> index 03c1f7cb62..70889bb54d 100644
+> --- a/io/channel-websock.c
+> +++ b/io/channel-websock.c
+> @@ -177,15 +177,9 @@ qio_channel_websock_handshake_send_res(QIOChannelWebsock *ioc,
+>  
+>  static gchar *qio_channel_websock_date_str(void)
+>  {
+> -    struct tm tm;
+> -    time_t now = time(NULL);
+> -    char datebuf[128];
+> +    g_autoptr(GDateTime) now = g_date_time_new_now_utc();
+>  
+> -    gmtime_r(&now, &tm);
+> -
+> -    strftime(datebuf, sizeof(datebuf), "%a, %d %b %Y %H:%M:%S GMT", &tm);
+> -
+> -    return g_strdup(datebuf);
+> +    return g_date_time_format(now, "%a, %d %b %Y %H:%M:%S GMT");
+>  }
+>  
+>  static void qio_channel_websock_handshake_send_res_err(QIOChannelWebsock *ioc,
 > -- 
 > 2.31.1
 > 

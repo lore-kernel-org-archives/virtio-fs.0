@@ -1,14 +1,16 @@
-Date: Fri, 11 Jun 2021 11:42:22 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210611154222.GA761698@redhat.com>
-References: <20210611120427.49736-1-berrange@redhat.com>
+Date: Fri, 11 Jun 2021 17:28:35 +0100
+From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+Message-ID: <YMOPM87ZdWWQOUsR@redhat.com>
+References: <20210505103702.521457-1-berrange@redhat.com>
+	<20210505103702.521457-4-berrange@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
+Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <20210611120427.49736-1-berrange@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] docs: describe the security considerations
- with virtiofsd xattr mapping
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <20210505103702.521457-4-berrange@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 3/7] net/rocker: use GDateTime for
+ formatting timestamp in debug messages
+Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,154 +19,52 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: qemu-devel@nongnu.org
+Cc: Kevin Wolf <kwolf@redhat.com>, Jiri Pirko <jiri@resnulli.us>, qemu-block@nongnu.org, Juan Quintela <quintela@redhat.com>, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowang@redhat.com>, Laurent Vivier <laurent@vivier.eu>, Max Reitz <mreitz@redhat.com>, virtio-fs@redhat.com, Gerd Hoffmann <kraxel@redhat.com>, Brad Smith <brad@comstyle.com>
 
-On Fri, Jun 11, 2021 at 01:04:27PM +0100, Daniel P. Berrang=E9 wrote:
-> Different guest xattr prefixes have distinct access control rules applied
-> by the guest. When remapping a guest xattr care must be taken that the
-> remapping does not allow the a guest user to bypass guest kernel access
-> control rules.
->=20
-> For example if 'trusted.*' which requires CAP_SYS_ADMIN is remapped
-> to 'user.virtiofs.trusted.*', an unprivileged guest user which can
-> write to 'user.*' can bypass the CAP_SYS_ADMIN control. Thus the
-> target of any remapping must be explicitly blocked from read/writes
-> by the guest, to prevent access control bypass.
->=20
-> The examples shown in the virtiofsd man page already do the right
-> thing and ensure safety, but the security implications of getting
-> this wrong were not made explicit. This could lead to host admins
-> and apps unwittingly creating insecure configurations.
->=20
-> Signed-off-by: Daniel P. Berrang=E9 <berrange@redhat.com>
+ping: anyone willing to give a review of this one
+
+On Wed, May 05, 2021 at 11:36:58AM +0100, Daniel P. Berrangé wrote:
+> The GDateTime APIs provided by GLib avoid portability pitfalls, such
+> as some platforms where 'struct timeval.tv_sec' field is still 'long'
+> instead of 'time_t'. When combined with automatic cleanup, GDateTime
+> often results in simpler code too.
+> 
+> Signed-off-by: Daniel P. Berrangé <berrange@redhat.com>
 > ---
->  docs/tools/virtiofsd.rst | 55 ++++++++++++++++++++++++++++++++++++----
->  1 file changed, 50 insertions(+), 5 deletions(-)
->=20
-> diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-> index 00554c75bd..6370ab927c 100644
-> --- a/docs/tools/virtiofsd.rst
-> +++ b/docs/tools/virtiofsd.rst
-> @@ -127,8 +127,8 @@ Options
->    timeout.  ``always`` sets a long cache lifetime at the expense of cohe=
-rency.
->    The default is ``auto``.
-> =20
-> -xattr-mapping
-> --------------
-> +Extended attribute (xattr) mapping
-> +----------------------------------
-> =20
->  By default the name of xattr's used by the client are passed through to =
-the server
->  file system.  This can be a problem where either those xattr names are u=
-sed
-> @@ -136,6 +136,9 @@ by something on the server (e.g. selinux client/serve=
-r confusion) or if the
->  virtiofsd is running in a container with restricted privileges where it =
-cannot
->  access some attributes.
-> =20
-> +Mapping syntax
-> +~~~~~~~~~~~~~~
-> +
->  A mapping of xattr names can be made using -o xattrmap=3Dmapping where t=
-he ``mapping``
->  string consists of a series of rules.
-> =20
-> @@ -232,8 +235,48 @@ Note: When the 'security.capability' xattr is remapp=
-ed, the daemon has to do
->  extra work to remove it during many operations, which the host kernel no=
-rmally
->  does itself.
-> =20
-> -xattr-mapping Examples
-> -----------------------
-> +Security considerations
-> +~~~~~~~~~~~~~~~~~~~~~~~
-> +
-> +Operating systems typically partition the xattr namespace using
-> +well defined name prefixes. Each partition may have different
-> +access controls applied. For example, on Linux there are multiple
-> +partitions
-> +
-> + * ``system.*`` - access varies depending on attribute & filesystem
-> + * ``security.*`` - only processes with CAP_SYS_ADMIN
-> + * ``trusted.*`` - only processes with CAP_SYS_ADMIN
-> + * ``user.*`` - any process granted by file permissions / ownership
-> +
-> +While other OS such as FreeBSD have different name prefixes
-> +and access control rules.
-> +
-> +When remapping attributes on the host, it is important to
-> +ensure that the remapping does not allow a guest user to
-> +evade the guest access control rules.
-> +
-> +Consider if ``trusted.*`` from the guest was remapped to
-> +``user.virtiofs.trusted*`` in the host. An unprivileged
-> +user in a Linux guest has the ability to write to xattrs
-> +under ``user.*``. Thus the user can evade the access
-> +control restriction on ``trusted.*`` by instead writing
-> +to ``user.virtiofs.trusted.*``.
-> +
-> +As noted above, the partitions used and access controls
-> +applied, will vary across guest OS, so it is not wise to
-> +try to predict what the guest OS will use.
-> +
-> +The simplest way to avoid an insecure configuration is
-> +to remap all xattrs at once, to a given fixed prefix.
-
-Remapping all xattrs seem to make sense. It probably will lead
-to less confusion. Nested guests add another level of redirection.
-
-BTW, remapping xattr has limitation that it does not work on
-symlinks. So "user.*" can't be set on symlink. And that means
-selinux relabeling of symlinks fails with remapped xattrs.
-
-Not sure how to address this limitation. Host kernel imposes
-this limit. (man xattr).
-
-> +This is shown in example (1) below.
-> +
-> +If selectively mapping only a subset of xattr prefixes,
-> +then rules must be added to explicitly block direct
-> +access to the target of the remapping. This is shown
-> +in example (2) below.
-
-Example (2) seems to block all the xattrs with prefix even
-if only one xattr has been remapped.
-
-So if we remapped "trusted." to "user.virtiofs.trusted.", then
-client can't set any xattr starting with "user.virtiofs". I am
-wondering should it be limted to only blocking only
-"user.virtiofs.trusted.".
-
-Thanks
-Vivek
-
-> +
-> +Mapping examples
-> +~~~~~~~~~~~~~~~~
-> =20
->  1) Prefix all attributes with 'user.virtiofs.'
-> =20
-> @@ -270,7 +313,9 @@ stripping of 'user.virtiofs.'.
->  The second rule hides unprefixed 'trusted.' attributes
->  on the host.
->  The third rule stops a guest from explicitly setting
-> -the 'user.virtiofs.' path directly.
-> +the 'user.virtiofs.' path directly to prevent access
-> +control bypass on the target of the earlier prefix
-> +remapping.
->  Finally, the fourth rule lets all remaining attributes
->  through.
-> =20
-> --=20
+>  hw/net/rocker/rocker.h | 11 +++--------
+>  1 file changed, 3 insertions(+), 8 deletions(-)
+> 
+> diff --git a/hw/net/rocker/rocker.h b/hw/net/rocker/rocker.h
+> index 941c932265..412fa44d01 100644
+> --- a/hw/net/rocker/rocker.h
+> +++ b/hw/net/rocker/rocker.h
+> @@ -25,14 +25,9 @@
+>  #if defined(DEBUG_ROCKER)
+>  #  define DPRINTF(fmt, ...) \
+>      do {                                                           \
+> -        struct timeval tv;                                         \
+> -        char timestr[64];                                          \
+> -        time_t now;                                                \
+> -        gettimeofday(&tv, NULL);                                   \
+> -        now = tv.tv_sec;                                           \
+> -        strftime(timestr, sizeof(timestr), "%T", localtime(&now)); \
+> -        fprintf(stderr, "%s.%06ld ", timestr, tv.tv_usec);         \
+> -        fprintf(stderr, "ROCKER: " fmt, ## __VA_ARGS__);           \
+> +        g_autoptr(GDateTime) now = g_date_time_new_now_local();    \
+> +        g_autofree char *nowstr = g_date_time_format(now, "%T.%f");\
+> +        fprintf(stderr, "%s ROCKER: " fmt, nowstr, ## __VA_ARGS__);\
+>      } while (0)
+>  #else
+>  static inline GCC_FMT_ATTR(1, 2) int DPRINTF(const char *fmt, ...)
+> -- 
 > 2.31.1
->=20
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
+> 
+
+Regards,
+Daniel
+-- 
+|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
+|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
+|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
 

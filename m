@@ -1,14 +1,35 @@
-Date: Fri, 11 Jun 2021 16:04:59 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210611200459.GB767764@redhat.com>
-References: <20210609155551.44437-1-mreitz@redhat.com>
-	<20210609155551.44437-8-mreitz@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=codewreck.org; s=2;
+	t=1623585397; bh=F3BhzyU8+ZAUVp/ArSoFhHPVCMPYqmG5jjoHGqzU654=;
+	h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+	b=hsHcteU+yTXCmagMp/ZvaR7MOtzeoY42MPWlWePrHFwMvVxzj+NBguPOX3j5IRl0v
+	PvpIbNVbC0qb2P0ISXKZ8vLiepehmhB/q9m14RHid7zqvMPTVtMS0yAN1q2k5xFJNx
+	Mo37imLm7D0oxfmI16wxi1S4hdd06ixKzstZoUW1yZuNvX8FFQ6EWCMJVMGaV9I5wV
+	wBrW/OMwDFpOjGJPaIUj61SeyFJ7PgQprTrD1JW/gP9MeiqJ/0csXBSItWU044vB0C
+	VF61k/p0qiIL4E7GRXDcvwPIoBo254UWXyaVqduzeag4rbZ5I/aZsnhfkkyTA6K62o
+	KnvPCWRqvxQFQ==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=codewreck.org; s=2;
+	t=1623585396; bh=F3BhzyU8+ZAUVp/ArSoFhHPVCMPYqmG5jjoHGqzU654=;
+	h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+	b=fS20xlzkSeVSvCIjVgE/luNDX2wo7pgI9R105WOsr5EC+9UCz5uzqxuT0u+mkfQyf
+	UCasP35f8tv9p2dQQDHpzA18y8soqL1LGJxQ77DYVFtrvDlmNqj1sfKAer55nKuCV7
+	VV/7eeZA2ZIT6Failx+p3OItQycI26GEBWf4HJ5rekyNaS3iGlIlfSwSg4X/LXRuMk
+	QzQQe4nuyf/TWhdI75gmZZuGSbgDsufQXtDHQORL7IX3XPZ4B+OwO1mkFSJLsapxpl
+	7tNrBah4+fP4ZBdPDWKlj1LRnswpTxGoLuTnfPiltmWZYTkfKAIBWH2GSbY7TNWzUX
+	6EHSJWw7gfzKg==
+Date: Sun, 13 Jun 2021 20:56:11 +0900
+From: Dominique Martinet <asmadeus@codewreck.org>
+Message-ID: <YMXyW0KXc3HqdUAj@codewreck.org>
+References: <20210608153524.GB504497@redhat.com>
+	<YMCPPCbjbRoPAEcL@stefanha-x1.localdomain>
+	<20210609154543.GA579806@redhat.com>
+	<YMHKZhfT0CUgeLno@stefanha-x1.localdomain>
+	<YMHOXn2cpGh1T9vz@codewreck.org>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+In-Reply-To: <YMHOXn2cpGh1T9vz@codewreck.org>
+Content-Type: text/plain; charset=utf-8
 Content-Disposition: inline
-In-Reply-To: <20210609155551.44437-8-mreitz@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v2 7/9] virtiofsd: Add inodes_by_handle hash
- table
+Subject: Re: [Virtio-fs] [PATCH] init/do_mounts.c: Add root="fstag:<tag>"
+ syntax for root device
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,245 +38,90 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: David Howells <dhowells@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, Richard Weinberger <richard.weinberger@gmail.com>, linux kernel mailing list <linux-kernel@vger.kernel.org>, virtio-fs@redhat.com, viro@zeniv.linux.org.uk, Christoph Hellwig <hch@infradead.org>, linux-fsdevel@vger.kernel.org, v9fs-developer@lists.sourceforge.net, Vivek Goyal <vgoyal@redhat.com>
 
-On Wed, Jun 09, 2021 at 05:55:49PM +0200, Max Reitz wrote:
-> Currently, lo_inode.fhandle is always NULL and so always keep an O_PATH
-> FD in lo_inode.fd.  Therefore, when the respective inode is unlinked,
-> its inode ID will remain in use until we drop our lo_inode (and
-> lo_inode_put() thus closes the FD).  Therefore, lo_find() can safely use
-> the inode ID as an lo_inode key, because any inode with an inode ID we
-> find in lo_data.inodes (on the same filesystem) must be the exact same
-> file.
+Dominique Martinet wrote on Thu, Jun 10, 2021 at 05:33:34PM +0900:
+> Stefan Hajnoczi wrote on Thu, Jun 10, 2021 at 09:16:38AM +0100:
+> > virtio-9p should be simple. I'm not sure how much additional setup the
+> > other 9p transports require. TCP and RDMA seem doable if there are
+> > kernel parameters to configure things before the root file system is
+> > mounted.
 > 
-> This will change when we start setting lo_inode.fhandle so we do not
-> have to keep an O_PATH FD open.  Then, unlinking such an inode will
-> immediately remove it, so its ID can then be reused by newly created
-> files, even while the lo_inode object is still there[1].
-> 
-> So creating a new file can then reuse the old file's inode ID, and
-> looking up the new file would lead to us finding the old file's
-> lo_inode, which is not ideal.
-> 
-> Luckily, just as file handles cause this problem, they also solve it:  A
-> file handle contains a generation ID, which changes when an inode ID is
-> reused, so the new file can be distinguished from the old one.  So all
-> we need to do is to add a second map besides lo_data.inodes that maps
-> file handles to lo_inodes, namely lo_data.inodes_by_handle.  For
-> clarity, lo_data.inodes is renamed to lo_data.inodes_by_ids.
-> 
-> Unfortunately, we cannot rely on being able to generate file handles
-> every time.
+> For TCP, we can probably piggyback on what nfs does for this, see the
+> ip= parameter in Documentation/admin-guide/nfs/nfsroot.rst -- it lives
+> in net/ipv4/ipconfig.c so should just work out of the box
 
-Hi Max, 
+Hm, just tried and it doesn't quite work for some reason -- in this
+stack trace:
+ kthread_should_stop+0x71/0xb0
+ wait_woken+0x182/0x1c0
+ __inet_stream_connect+0x48a/0xc00
+ inet_stream_connect+0x53/0xa0
+ p9_fd_create_tcp+0x2d6/0x420
+ p9_client_create+0x7bc/0x11d0
+ v9fs_session_init+0x1cd/0x1220
+ v9fs_mount+0x8c/0x870
+ legacy_get_tree+0xef/0x1d0
+ vfs_get_tree+0x83/0x240
+ path_mount+0xda3/0x1800
+ init_mount+0x98/0xdd
+ do_mount_root+0xe0/0x255
+ mount_root+0x47/0xd7
+ prepare_namespace+0x136/0x165
+ kernel_init+0xd/0x123
+ ret_from_fork+0x22/0x30
 
-What are the cases where we can not rely being able to generate file
-handles?
+current->set_child_tid is null, causing a null deref when checking
+&to_kthread(current)->flags
 
-> Therefore, we still enter every lo_inode object into
-> inodes_by_ids, but having an entry in inodes_by_handle is optional.  A
-> potential inodes_by_handle entry then has precedence, the inodes_by_ids
-> entry is just a fallback.
+It does work with nfsroot though so even if this doesn't look 9p
+specific I guess I'll need to debug that eventually, but this can
+be done later... I'm guessing they don't use the same connect() function
+as 9p's is ipv4-specific (ugh) and that needs fixing eventually anyway.
 
-If we have to keep inodes_by_ids around, then can we just add fhandle
-to the lo_key. That way we can manage with single hash table and still
-be able to detect if inode ID has been reused.
+For reference this is relevant part of kernel command line I used for
+tcp:
+root=fstag:x.y.z.t rootflags=trans=tcp,aname=rootfs rootfstype=9p ip=dhcp
 
-Thanks
-Vivek
+(and ip=dhcp requires CONFIG_IP_PNP_DHCP=y)
 
-> 
-> Note that we do not generate lo_fhandle objects yet, and so we also do
-> not enter anything into the inodes_by_handle map yet.  Also, all lookups
-> skip that map.  We might manually create file handles with some code
-> that is immediately removed by the next patch again, but that would
-> break the assumption in lo_find() that every lo_inode with a non-NULL
-> .fhandle must have an entry in inodes_by_handle and vice versa.  So we
-> leave actually using the inodes_by_handle map for the next patch.
-> 
-> [1] If some application in the guest still has the file open, there is
-> going to be a corresponding FD mapping in lo_data.fd_map.  In such a
-> case, the inode will only go away once every application in the guest
-> has closed it.  The problem described only applies to cases where the
-> guest does not have the file open, and it is just in the dentry cache,
-> basically.
-> 
-> Signed-off-by: Max Reitz <mreitz@redhat.com>
-> Reviewed-by: Connor Kuehl <ckuehl@redhat.com>
-> ---
->  tools/virtiofsd/passthrough_ll.c | 80 +++++++++++++++++++++++++-------
->  1 file changed, 64 insertions(+), 16 deletions(-)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index e665575401..793d2c333e 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -179,7 +179,8 @@ struct lo_data {
->      int announce_submounts;
->      bool use_statx;
->      struct lo_inode root;
-> -    GHashTable *inodes; /* protected by lo->mutex */
-> +    GHashTable *inodes_by_ids; /* protected by lo->mutex */
-> +    GHashTable *inodes_by_handle; /* protected by lo->mutex */
->      struct lo_map ino_map; /* protected by lo->mutex */
->      struct lo_map dirp_map; /* protected by lo->mutex */
->      struct lo_map fd_map; /* protected by lo->mutex */
-> @@ -257,8 +258,9 @@ static struct {
->  /* That we loaded cap-ng in the current thread from the saved */
->  static __thread bool cap_loaded = 0;
->  
-> -static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
-> -                                uint64_t mnt_id);
-> +static struct lo_inode *lo_find(struct lo_data *lo,
-> +                                const struct lo_fhandle *fhandle,
-> +                                struct stat *st, uint64_t mnt_id);
->  static int xattr_map_client(const struct lo_data *lo, const char *client_name,
->                              char **out_name);
->  
-> @@ -1032,18 +1034,39 @@ out_err:
->      fuse_reply_err(req, saverr);
->  }
->  
-> -static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
-> -                                uint64_t mnt_id)
-> +static struct lo_inode *lo_find(struct lo_data *lo,
-> +                                const struct lo_fhandle *fhandle,
-> +                                struct stat *st, uint64_t mnt_id)
->  {
-> -    struct lo_inode *p;
-> -    struct lo_key key = {
-> +    struct lo_inode *p = NULL;
-> +    struct lo_key ids_key = {
->          .ino = st->st_ino,
->          .dev = st->st_dev,
->          .mnt_id = mnt_id,
->      };
->  
->      pthread_mutex_lock(&lo->mutex);
-> -    p = g_hash_table_lookup(lo->inodes, &key);
-> +    if (fhandle) {
-> +        p = g_hash_table_lookup(lo->inodes_by_handle, fhandle);
-> +    }
-> +    if (!p) {
-> +        p = g_hash_table_lookup(lo->inodes_by_ids, &ids_key);
-> +        /*
-> +         * When we had to fall back to looking up an inode by its IDs,
-> +         * ensure that we hit an entry that does not have a file
-> +         * handle.  Entries with file handles must also have a handle
-> +         * alt key, so if we have not found it by that handle alt key,
-> +         * we must have found an entry with a mismatching handle; i.e.
-> +         * an entry for a different file, even though it has the same
-> +         * inode ID.
-> +         * (This can happen when we look up a new file that has reused
-> +         * the inode ID of some previously unlinked inode for which we
-> +         * still have an lo_inode object.)
-> +         */
-> +        if (p && fhandle != NULL && p->fhandle != NULL) {
-> +            p = NULL;
-> +        }
-> +    }
->      if (p) {
->          assert(p->nlookup > 0);
->          p->nlookup++;
-> @@ -1183,7 +1206,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
->          e->attr_flags |= FUSE_ATTR_SUBMOUNT;
->      }
->  
-> -    inode = lo_find(lo, &e->attr, mnt_id);
-> +    inode = lo_find(lo, NULL, &e->attr, mnt_id);
->      if (inode) {
->          close(newfd);
->      } else {
-> @@ -1213,7 +1236,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
->          }
->          pthread_mutex_lock(&lo->mutex);
->          inode->fuse_ino = lo_add_inode_mapping(req, inode);
-> -        g_hash_table_insert(lo->inodes, &inode->key, inode);
-> +        g_hash_table_insert(lo->inodes_by_ids, &inode->key, inode);
->          pthread_mutex_unlock(&lo->mutex);
->      }
->      e->ino = inode->fuse_ino;
-> @@ -1525,7 +1548,7 @@ static struct lo_inode *lookup_name(fuse_req_t req, fuse_ino_t parent,
->          return NULL;
->      }
->  
-> -    return lo_find(lo, &attr, mnt_id);
-> +    return lo_find(lo, NULL, &attr, mnt_id);
->  }
->  
->  static void lo_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name)
-> @@ -1688,7 +1711,7 @@ static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
->      inode->nlookup -= n;
->      if (!inode->nlookup) {
->          lo_map_remove(&lo->ino_map, inode->fuse_ino);
-> -        g_hash_table_remove(lo->inodes, &inode->key);
-> +        g_hash_table_remove(lo->inodes_by_ids, &inode->key);
->          if (lo->posix_lock) {
->              if (g_hash_table_size(inode->posix_locks)) {
->                  fuse_log(FUSE_LOG_WARNING, "Hash table is not empty\n");
-> @@ -3388,7 +3411,7 @@ static void lo_destroy(void *userdata)
->          GHashTableIter iter;
->          gpointer key, value;
->  
-> -        g_hash_table_iter_init(&iter, lo->inodes);
-> +        g_hash_table_iter_init(&iter, lo->inodes_by_ids);
->          if (!g_hash_table_iter_next(&iter, &key, &value)) {
->              break;
->          }
-> @@ -3931,10 +3954,34 @@ static gboolean lo_key_equal(gconstpointer a, gconstpointer b)
->      return la->ino == lb->ino && la->dev == lb->dev && la->mnt_id == lb->mnt_id;
->  }
->  
-> +static guint lo_fhandle_hash(gconstpointer key)
-> +{
-> +    const struct lo_fhandle *fh = key;
-> +    guint hash;
-> +    size_t i;
-> +
-> +    /* Basically g_str_hash() */
-> +    hash = 5381;
-> +    for (i = 0; i < sizeof(fh->padding); i++) {
-> +        hash += hash * 33 + (unsigned char)fh->padding[i];
-> +    }
-> +    hash += hash * 33 + fh->mount_id;
-> +
-> +    return hash;
-> +}
-> +
-> +static gboolean lo_fhandle_equal(gconstpointer a, gconstpointer b)
-> +{
-> +    return !memcmp(a, b, sizeof(struct lo_fhandle));
-> +}
-> +
->  static void fuse_lo_data_cleanup(struct lo_data *lo)
->  {
-> -    if (lo->inodes) {
-> -        g_hash_table_destroy(lo->inodes);
-> +    if (lo->inodes_by_ids) {
-> +        g_hash_table_destroy(lo->inodes_by_ids);
-> +    }
-> +    if (lo->inodes_by_ids) {
-> +        g_hash_table_destroy(lo->inodes_by_handle);
->      }
->  
->      if (lo->root.posix_locks) {
-> @@ -3990,7 +4037,8 @@ int main(int argc, char *argv[])
->      qemu_init_exec_dir(argv[0]);
->  
->      pthread_mutex_init(&lo.mutex, NULL);
-> -    lo.inodes = g_hash_table_new(lo_key_hash, lo_key_equal);
-> +    lo.inodes_by_ids = g_hash_table_new(lo_key_hash, lo_key_equal);
-> +    lo.inodes_by_handle = g_hash_table_new(lo_fhandle_hash, lo_fhandle_equal);
->      lo.root.fd = -1;
->      lo.root.fuse_ino = FUSE_ROOT_ID;
->      lo.cache = CACHE_AUTO;
-> -- 
-> 2.31.1
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
-> 
+
+
+Virtio does work quite well though and that's good enough for me -- I
+was going to suggest also documenting increasing the msize (setting
+e.g. rootflags=msize=262144) but we really ought to increase the
+default, that came up recently and since no patch was sent I kind of
+forgot... Will do that now.
+
+
+
+@Vivek - I personally don't really care much, but would tend to prefer
+your v2 (without fstag:) from a user perspective the later is definitely
+better but I don't really like the static nobdev_filesystems array --
+I'd bite the bullet and use FS_REQUIRES_DEV (and move this part of the
+code just a bit below after the root_wait check just in case it matters,
+but at that point if something would mount with /dev/root but not with
+the raw root=argument then they probably do require a device!)
+
+It could also be gated by a config option like e.g. CONFIG_ROOT_NFS and
+others all are to make sure it doesn't impact anyone who doesn't want to
+be impacted - I'm sure some people want to make sure their device
+doesn't boot off a weird root if someone manages to change kernel params
+so would want a way of disabling the option...
+
+
+Well, if you keep the array, please add 9p to the list and resend as a
+proper patch so I can reply with tested-by/reviewed-by tags on something
+more final.
+
+
+Also, matter-of-factedly, how is this going to be picked up?
+Is the plan to send it directly to Linus as part of the next virtiofs
+PR? Going through Al Viro?
+
+
+Thanks,
+-- 
+Dominique
 

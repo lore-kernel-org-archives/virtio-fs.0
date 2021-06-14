@@ -1,18 +1,10 @@
-From: Juan Quintela <quintela@redhat.com>
-In-Reply-To: <YMOPM87ZdWWQOUsR@redhat.com> ("Daniel P. =?utf-8?Q?Berrang?=
-	=?utf-8?Q?=C3=A9=22's?= message of
-	"Fri, 11 Jun 2021 17:28:35 +0100")
-References: <20210505103702.521457-1-berrange@redhat.com>
-	<20210505103702.521457-4-berrange@redhat.com>
-	<YMOPM87ZdWWQOUsR@redhat.com>
-Date: Mon, 14 Jun 2021 18:43:00 +0200
-Message-ID: <87a6nsgzxn.fsf@secure.mitica>
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Mon, 14 Jun 2021 13:44:52 -0400
+Message-Id: <20210614174454.903555-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 3/7] net/rocker: use GDateTime for
- formatting timestamp in debug messages
-Reply-To: quintela@redhat.com
+Subject: [Virtio-fs] [PATCH v2 0/2] Add support to boot virtiofs and 9pfs as
+	rootfs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,46 +13,39 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Daniel P. =?utf-8?Q?Berrang=C3=A9?=" <berrange@redhat.com>
-Cc: Kevin Wolf <kwolf@redhat.com>, Jiri Pirko <jiri@resnulli.us>, qemu-block@nongnu.org, Markus Armbruster <armbru@redhat.com>, Jason Wang <jasowang@redhat.com>, qemu-devel@nongnu.org, Laurent Vivier <laurent@vivier.eu>, virtio-fs@redhat.com, Gerd Hoffmann <kraxel@redhat.com>, Max Reitz <mreitz@redhat.com>, Brad Smith <brad@comstyle.com>
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com
+Cc: hch@infradead.org, miklos@szeredi.hu, richard.weinberger@gmail.com, asmadeus@codewreck.org, dhowells@redhat.com, viro@zeniv.linux.org.uk, v9fs-developer@lists.sourceforge.net, vgoyal@redhat.com
 
-Daniel P. Berrangé <berrange@redhat.com> wrote:
-> ping: anyone willing to give a review of this one
->
-> On Wed, May 05, 2021 at 11:36:58AM +0100, Daniel P. Berrangé wrote:
->> The GDateTime APIs provided by GLib avoid portability pitfalls, such
->> as some platforms where 'struct timeval.tv_sec' field is still 'long'
->> instead of 'time_t'. When combined with automatic cleanup, GDateTime
->> often results in simpler code too.
->> 
->> Signed-off-by: Daniel P. Berrangé <berrange@redhat.com>
->> ---
->>  hw/net/rocker/rocker.h | 11 +++--------
->>  1 file changed, 3 insertions(+), 8 deletions(-)
->> 
->> diff --git a/hw/net/rocker/rocker.h b/hw/net/rocker/rocker.h
->> index 941c932265..412fa44d01 100644
->> --- a/hw/net/rocker/rocker.h
->> +++ b/hw/net/rocker/rocker.h
->> @@ -25,14 +25,9 @@
->>  #if defined(DEBUG_ROCKER)
->>  #  define DPRINTF(fmt, ...) \
->>      do {                                                           \
->> -        struct timeval tv;                                         \
->> -        char timestr[64];                                          \
->> -        time_t now;                                                \
->> -        gettimeofday(&tv, NULL);                                   \
->> -        now = tv.tv_sec;                                           \
->> -        strftime(timestr, sizeof(timestr), "%T", localtime(&now)); \
->> -        fprintf(stderr, "%s.%06ld ", timestr, tv.tv_usec);         \
->> -        fprintf(stderr, "ROCKER: " fmt, ## __VA_ARGS__);           \
->> +        g_autoptr(GDateTime) now = g_date_time_new_now_local();    \
->> +        g_autofree char *nowstr = g_date_time_format(now, "%T.%f");\
->> +        fprintf(stderr, "%s ROCKER: " fmt, nowstr, ## __VA_ARGS__);\
->>      } while (0)
->>  #else
->>  static inline GCC_FMT_ATTR(1, 2) int DPRINTF(const char *fmt, ...)
+Hi,
 
-Reviewed-by: Juan Quintela <quintela@redhat.com>
+We want to be able to compile in virtiofs/9pfs in kernel and then
+boot kernel and mount virtiofs/9pfs as root filesystem.
 
+Currently there does not seem to be any good way to be able to do
+that. There seem to be some hacky ways like prefixing filesystem
+tag with "mtd" or naming the filesystem tag as "/dev/root" to
+mount viritofs.
+
+Both viritofs and 9pfs have the notion of a "tag" to mount a filesystem
+and they take this "tag" as a source argument of the mount. Filesystem
+understands how to handle the tag.
+
+Current code already has hooks to mount mtd/ubi/cifs/nfs root
+filesystems (apart of regular block based filesystems). So intead
+of creating two separate hooks for two filesystems, I have tried
+creating a hook for tag based filesystems. And now both the filesystems
+benefit from it.
+
+This is generic enough that I think many more use cases might be
+able to take advantage of it down the line.
+
+Vivek Goyal (2):
+  init/do_mounts.c: Add a path to boot from tag based filesystems
+  init/do_mounts.c: Add 9pfs to the list of tag based filesystems
+
+ init/do_mounts.c | 35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+
+-- 
+2.25.4
 

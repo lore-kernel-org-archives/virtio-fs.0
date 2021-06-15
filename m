@@ -1,14 +1,15 @@
-Date: Wed, 26 May 2021 14:13:24 -0400
+Date: Tue, 15 Jun 2021 15:57:40 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210526181324.GA1222711@redhat.com>
-References: <20210512125544.9536-1-mreitz@redhat.com>
-	<20210512125544.9536-2-mreitz@redhat.com>
+Message-ID: <20210615195740.GC965196@redhat.com>
+References: <20210611120427.49736-1-berrange@redhat.com>
+	<20210611154222.GA761698@redhat.com> <YMjLZUqZ5nhihJ1X@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: text/plain; charset="iso-8859-1"
 Content-Disposition: inline
-In-Reply-To: <20210512125544.9536-2-mreitz@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 1/3] virtiofsd: Find original inode ID of
-	mount points
+Content-Transfer-Encoding: quoted-printable
+In-Reply-To: <YMjLZUqZ5nhihJ1X@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] docs: describe the security considerations
+ with virtiofsd xattr mapping
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,257 +18,155 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
+To: Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Wed, May 12, 2021 at 02:55:42PM +0200, Max Reitz wrote:
-> Mount point directories represent two inodes: On one hand, they are a
-> normal directory on their parent filesystem.  On the other, they are the
-> root node of the filesystem mounted there.  Thus, they have two inode
-> IDs.
-> 
-> Right now, we only report the latter inode ID (i.e. the inode ID of the
-> mounted filesystem's root node).  This is fine once the guest has
-> auto-mounted a submount there (so this inode ID goes with a device ID
-> that is distinct from the parent filesystem), but before the auto-mount,
-> they have the device ID of the parent and the inode ID for the submount.
-> This is problematic because this is likely exactly the same
-> st_dev/st_ino combination as the parent filesystem's root node.  This
-> leads to problems for example with `find`, which will thus complain
-> about a filesystem loop if it has visited the parent filesystem's root
-> node before, and then refuse to descend into the submount.
-> 
-> There is a way to find the mount directory's original inode ID, and that
-> is to readdir(3) the parent directory, look for the mount directory, and
-> read the dirent.d_ino field.  Using this, we can let lookup and
-> readdirplus return that original inode ID, which the guest will thus
-> show until the submount is auto-mounted.
+On Tue, Jun 15, 2021 at 04:46:45PM +0100, Daniel P. Berrang=E9 wrote:
+> On Fri, Jun 11, 2021 at 11:42:22AM -0400, Vivek Goyal wrote:
+> > On Fri, Jun 11, 2021 at 01:04:27PM +0100, Daniel P. Berrang=E9 wrote:
+> > > Different guest xattr prefixes have distinct access control rules app=
+lied
+> > > by the guest. When remapping a guest xattr care must be taken that the
+> > > remapping does not allow the a guest user to bypass guest kernel acce=
+ss
+> > > control rules.
+> > >=20
+> > > For example if 'trusted.*' which requires CAP_SYS_ADMIN is remapped
+> > > to 'user.virtiofs.trusted.*', an unprivileged guest user which can
+> > > write to 'user.*' can bypass the CAP_SYS_ADMIN control. Thus the
+> > > target of any remapping must be explicitly blocked from read/writes
+> > > by the guest, to prevent access control bypass.
+> > >=20
+> > > The examples shown in the virtiofsd man page already do the right
+> > > thing and ensure safety, but the security implications of getting
+> > > this wrong were not made explicit. This could lead to host admins
+> > > and apps unwittingly creating insecure configurations.
+> > >=20
+> > > Signed-off-by: Daniel P. Berrang=E9 <berrange@redhat.com>
+> > > ---
+> > >  docs/tools/virtiofsd.rst | 55 ++++++++++++++++++++++++++++++++++++--=
+--
+> > >  1 file changed, 50 insertions(+), 5 deletions(-)
+> > >=20
+> > > diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
+> > > index 00554c75bd..6370ab927c 100644
+> > > --- a/docs/tools/virtiofsd.rst
+> > > +++ b/docs/tools/virtiofsd.rst
+> > > @@ -127,8 +127,8 @@ Options
+> > >    timeout.  ``always`` sets a long cache lifetime at the expense of =
+coherency.
+> > >    The default is ``auto``.
+> > > =20
+> > > -xattr-mapping
+> > > --------------
+> > > +Extended attribute (xattr) mapping
+> > > +----------------------------------
+> > > =20
+> > >  By default the name of xattr's used by the client are passed through=
+ to the server
+> > >  file system.  This can be a problem where either those xattr names a=
+re used
+> > > @@ -136,6 +136,9 @@ by something on the server (e.g. selinux client/s=
+erver confusion) or if the
+> > >  virtiofsd is running in a container with restricted privileges where=
+ it cannot
+> > >  access some attributes.
+> > > =20
+> > > +Mapping syntax
+> > > +~~~~~~~~~~~~~~
+> > > +
+> > >  A mapping of xattr names can be made using -o xattrmap=3Dmapping whe=
+re the ``mapping``
+> > >  string consists of a series of rules.
+> > > =20
+> > > @@ -232,8 +235,48 @@ Note: When the 'security.capability' xattr is re=
+mapped, the daemon has to do
+> > >  extra work to remove it during many operations, which the host kerne=
+l normally
+> > >  does itself.
+> > > =20
+> > > -xattr-mapping Examples
+> > > -----------------------
+> > > +Security considerations
+> > > +~~~~~~~~~~~~~~~~~~~~~~~
+> > > +
+> > > +Operating systems typically partition the xattr namespace using
+> > > +well defined name prefixes. Each partition may have different
+> > > +access controls applied. For example, on Linux there are multiple
+> > > +partitions
+> > > +
+> > > + * ``system.*`` - access varies depending on attribute & filesystem
+> > > + * ``security.*`` - only processes with CAP_SYS_ADMIN
+> > > + * ``trusted.*`` - only processes with CAP_SYS_ADMIN
+> > > + * ``user.*`` - any process granted by file permissions / ownership
+> > > +
+> > > +While other OS such as FreeBSD have different name prefixes
+> > > +and access control rules.
+> > > +
+> > > +When remapping attributes on the host, it is important to
+> > > +ensure that the remapping does not allow a guest user to
+> > > +evade the guest access control rules.
+> > > +
+> > > +Consider if ``trusted.*`` from the guest was remapped to
+> > > +``user.virtiofs.trusted*`` in the host. An unprivileged
+> > > +user in a Linux guest has the ability to write to xattrs
+> > > +under ``user.*``. Thus the user can evade the access
+> > > +control restriction on ``trusted.*`` by instead writing
+> > > +to ``user.virtiofs.trusted.*``.
+> > > +
+> > > +As noted above, the partitions used and access controls
+> > > +applied, will vary across guest OS, so it is not wise to
+> > > +try to predict what the guest OS will use.
+> > > +
+> > > +The simplest way to avoid an insecure configuration is
+> > > +to remap all xattrs at once, to a given fixed prefix.
+> >=20
+> > Remapping all xattrs seem to make sense. It probably will lead
+> > to less confusion. Nested guests add another level of redirection.
+> >=20
+> > BTW, remapping xattr has limitation that it does not work on
+> > symlinks. So "user.*" can't be set on symlink. And that means
+> > selinux relabeling of symlinks fails with remapped xattrs.
+> >=20
+> > Not sure how to address this limitation. Host kernel imposes
+> > this limit. (man xattr).
+>=20
+> Oh fun, I had not noticed this limitation before :-(
+>=20
+> Here are some ideas I had, none especially nice
+>=20
+>  - Use 'trusted.*' namespace for remapping instead of 'user.'
+> =20
+>    virtiofsd needs to have CAP_SYS_ADMIN though which is
+>    quite horrible if your goal is to confine its privileges
+>    in any meaningful way
+>=20
+>  - Store a symlinks' xattr on the target of the symlink
+>=20
+>    if the symlink has dev:inode  54:224, and points to
+>    a file 'foo', then on 'foo' create an xattr
+>    "user.virtiofs.link:54:224.<original xattrpath>"
+>=20
+>    This gets quite horrendous when you have symlinks
+>    pointing to symlinks pointing to symlinks. Does
+>    not work too well if the 'st_dev' value is
+>    not stable across reboots either.
+>=20
+>  - Don't use xattrs at all for remapping, instead use
+>    hidden files.
+>=20
+>    eg for a file 'foo', if an xattr is set then create
+>    a file '.foo.xattr' in the same directory and store
+>    the xattrs in that file in some format. Need to hide
+>    this lookaside files from the guest of course.
 
-> (Then, it will invoke getattr
-> and that stat(2) call will return the inode ID for the submount.)
+I kind of like this idea of creating a regular file, say
+.user.virtiofs.foo.xattr. So any file prefixed by ".user.virtiofs" will
+be hidden from guest.
 
-Hi Max,
-
-How are we sure that GETATTR() will always be called and that will
-allow us to return inode number in mounted filesystem (instead of
-parent filesystem). I thought GETATTR will be called only if cached
-attrs have expired. (1 second default for cache=auto). Otherwise
-stat() will fill inode->i_no from cache and return. And I am afraid
-that in that case we will return inode number from parent fs,
-instead of mounted fs.
-
-Say following sequence of events happens pretty fast one after the
-other. Say /mnt/virtiofs/foo is a mount point in server but client
-has not created submount yet.
-
-A. stat(/mnt/virtiofs/foo, AT_NO_AUTOMOUNT)
-   -> This should get inode number in parent filesystem on host and 
-      store in guest inode->i_no and return to user space. Say inode
-      in guest is called a_ino.
-B. stat(/mnt/virtiofs/foo)
-   -> This should create submount and create new inode (say b_ino), using
-      properties from a_ino. IOW, this should copy a_ino->i_no to
-      b_ino->b_ino given current code, IIUC.
-
-   -> Assume timeout has not happened and cached attrs have not expired.
-
-   -> And now b_ino->i_no (or ->orig_ino) will be returned to user space.
-
-Am I missing something. Do we need to always expire inode attrs when
-we create submount so that client is forced to issue GETATTR.
+And probably same can be done for selinux labels for special files (device
+nodes, pipes, sockets etc).=20
 
 Thanks
 Vivek
-
-> 
-> Signed-off-by: Max Reitz <mreitz@redhat.com>
-> ---
->  tools/virtiofsd/passthrough_ll.c | 104 +++++++++++++++++++++++++++++--
->  1 file changed, 99 insertions(+), 5 deletions(-)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 1553d2ef45..110b6e7e5b 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -968,14 +968,87 @@ static int do_statx(struct lo_data *lo, int dirfd, const char *pathname,
->      return 0;
->  }
->  
-> +/*
-> + * Use readdir() to find mp_name's inode ID on the parent's filesystem.
-> + * (For mount points, stat() will only return the inode ID on the
-> + * filesystem mounted there, i.e. the root directory's inode ID.  The
-> + * mount point originally was a directory on the parent filesystem,
-> + * though, and so has a different inode ID there.  When passing
-> + * submount information to the guest, we need to pass this other ID,
-> + * so the guest can use it as the inode ID until the submount is
-> + * auto-mounted.  (At which point the guest will invoke getattr and
-> + * find the inode ID on the submount.))
-> + *
-> + * Return 0 on success, and -errno otherwise.  *pino is set only in
-> + * case of success.
-> + */
-> +static int get_mp_ino_on_parent(const struct lo_inode *dir, const char *mp_name,
-> +                                ino_t *pino)
-> +{
-> +    int dirfd = -1;
-> +    int ret;
-> +    DIR *dp = NULL;
-> +
-> +    dirfd = openat(dir->fd, ".", O_RDONLY);
-> +    if (dirfd < 0) {
-> +        ret = -errno;
-> +        goto out;
-> +    }
-> +
-> +    dp = fdopendir(dirfd);
-> +    if (!dp) {
-> +        ret = -errno;
-> +        goto out;
-> +    }
-> +    /* Owned by dp now */
-> +    dirfd = -1;
-> +
-> +    while (true) {
-> +        struct dirent *de;
-> +
-> +        errno = 0;
-> +        de = readdir(dp);
-> +        if (!de) {
-> +            ret = errno ? -errno : -ENOENT;
-> +            goto out;
-> +        }
-> +
-> +        if (!strcmp(de->d_name, mp_name)) {
-> +            *pino = de->d_ino;
-> +            ret = 0;
-> +            goto out;
-> +        }
-> +    }
-> +
-> +out:
-> +    if (dp) {
-> +        closedir(dp);
-> +    }
-> +    if (dirfd >= 0) {
-> +        close(dirfd);
-> +    }
-> +    return ret;
-> +}
-> +
->  /*
->   * Increments nlookup on the inode on success. unref_inode_lolocked() must be
->   * called eventually to decrement nlookup again. If inodep is non-NULL, the
->   * inode pointer is stored and the caller must call lo_inode_put().
-> + *
-> + * If parent_fs_st_ino is true, the entry is a mount point, and submounts are
-> + * announced to the guest, set e->attr.st_ino to the entry's inode ID on its
-> + * parent filesystem instead of its inode ID on the filesystem mounted on it.
-> + * (For mount points, the entry encompasses two inodes: One on the parent FS,
-> + * and one on the mounted FS (where it is the root node), so it has two inode
-> + * IDs.  When looking up entries, we should show the guest the parent FS's inode
-> + * ID, because as long as the guest has not auto-mounted the submount, it should
-> + * see that original ID.  Once it does perform the auto-mount, it will invoke
-> + * getattr and see the root node's inode ID.)
->   */
->  static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
->                          struct fuse_entry_param *e,
-> -                        struct lo_inode **inodep)
-> +                        struct lo_inode **inodep,
-> +                        bool parent_fs_st_ino)
->  {
->      int newfd;
->      int res;
-> @@ -984,6 +1057,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
->      struct lo_data *lo = lo_data(req);
->      struct lo_inode *inode = NULL;
->      struct lo_inode *dir = lo_inode(req, parent);
-> +    ino_t ino_id_for_guest;
->  
->      if (inodep) {
->          *inodep = NULL; /* in case there is an error */
-> @@ -1018,9 +1092,22 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
->          goto out_err;
->      }
->  
-> +    ino_id_for_guest = e->attr.st_ino;
-> +
->      if (S_ISDIR(e->attr.st_mode) && lo->announce_submounts &&
->          (e->attr.st_dev != dir->key.dev || mnt_id != dir->key.mnt_id)) {
->          e->attr_flags |= FUSE_ATTR_SUBMOUNT;
-> +
-> +        if (parent_fs_st_ino) {
-> +            /*
-> +             * Best effort, so ignore errors.
-> +             * Also note that using readdir() means there may be races:
-> +             * The directory entry we find (if any) may be different
-> +             * from newfd.  Again, this is a best effort.  Reporting
-> +             * the wrong inode ID to the guest is not catastrophic.
-> +             */
-> +            get_mp_ino_on_parent(dir, name, &ino_id_for_guest);
-> +        }
->      }
->  
->      inode = lo_find(lo, &e->attr, mnt_id);
-> @@ -1043,6 +1130,10 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
->  
->          inode->nlookup = 1;
->          inode->fd = newfd;
-> +        /*
-> +         * For the inode key, use the dev/ino/mnt ID as reported by stat()
-> +         * (i.e. not ino_id_for_guest)
-> +         */
->          inode->key.ino = e->attr.st_ino;
->          inode->key.dev = e->attr.st_dev;
->          inode->key.mnt_id = mnt_id;
-> @@ -1058,6 +1149,9 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
->      }
->      e->ino = inode->fuse_ino;
->  
-> +    /* Report ino_id_for_guest to the guest */
-> +    e->attr.st_ino = ino_id_for_guest;
-> +
->      /* Transfer ownership of inode pointer to caller or drop it */
->      if (inodep) {
->          *inodep = inode;
-> @@ -1104,7 +1198,7 @@ static void lo_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
->          return;
->      }
->  
-> -    err = lo_do_lookup(req, parent, name, &e, NULL);
-> +    err = lo_do_lookup(req, parent, name, &e, NULL, true);
->      if (err) {
->          fuse_reply_err(req, err);
->      } else {
-> @@ -1217,7 +1311,7 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
->          goto out;
->      }
->  
-> -    saverr = lo_do_lookup(req, parent, name, &e, NULL);
-> +    saverr = lo_do_lookup(req, parent, name, &e, NULL, false);
->      if (saverr) {
->          goto out;
->      }
-> @@ -1714,7 +1808,7 @@ static void lo_do_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
->  
->          if (plus) {
->              if (!is_dot_or_dotdot(name)) {
-> -                err = lo_do_lookup(req, ino, name, &e, NULL);
-> +                err = lo_do_lookup(req, ino, name, &e, NULL, true);
->                  if (err) {
->                      goto error;
->                  }
-> @@ -1936,7 +2030,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
->          goto out;
->      }
->  
-> -    err = lo_do_lookup(req, parent, name, &e, &inode);
-> +    err = lo_do_lookup(req, parent, name, &e, &inode, false);
->      if (err) {
->          goto out;
->      }
-> -- 
-> 2.31.1
-> 
-> 
 

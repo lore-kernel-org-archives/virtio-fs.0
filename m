@@ -1,19 +1,16 @@
-Date: Tue, 15 Jun 2021 09:50:57 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210615135057.GB965196@redhat.com>
-References: <20210608153524.GB504497@redhat.com>
-	<YMCPPCbjbRoPAEcL@stefanha-x1.localdomain>
-	<20210609154543.GA579806@redhat.com>
-	<YMHKZhfT0CUgeLno@stefanha-x1.localdomain>
-	<YMHOXn2cpGh1T9vz@codewreck.org> <YMXyW0KXc3HqdUAj@codewreck.org>
-	<20210614142804.GA869400@redhat.com>
-	<YMfi3Q50b1wV+lDW@codewreck.org>
+Date: Tue, 15 Jun 2021 16:46:45 +0100
+From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+Message-ID: <YMjLZUqZ5nhihJ1X@redhat.com>
+References: <20210611120427.49736-1-berrange@redhat.com>
+	<20210611154222.GA761698@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
-In-Reply-To: <YMfi3Q50b1wV+lDW@codewreck.org>
-Subject: Re: [Virtio-fs] [PATCH] init/do_mounts.c: Add root="fstag:<tag>"
- syntax for root device
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <20210611154222.GA761698@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] docs: describe the security considerations
+ with virtiofsd xattr mapping
+Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,137 +19,158 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Dominique Martinet <asmadeus@codewreck.org>
-Cc: David Howells <dhowells@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, Richard Weinberger <richard.weinberger@gmail.com>, linux kernel mailing list <linux-kernel@vger.kernel.org>, virtio-fs@redhat.com, viro@zeniv.linux.org.uk, Christoph Hellwig <hch@infradead.org>, linux-fsdevel@vger.kernel.org, v9fs-developer@lists.sourceforge.net
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Tue, Jun 15, 2021 at 08:14:37AM +0900, Dominique Martinet wrote:
-> Vivek Goyal wrote on Mon, Jun 14, 2021 at 10:28:04AM -0400:
-> > I am not a big fan of nobdev_filesystems array but I really don't feel
-> > comfortable opening up this code by default to all filesystems having
-> > flag FS_REQUIRES_DEV. Use cases of this code path are not well documented
-> > and something somewhere will be broken and called regression.
+On Fri, Jun 11, 2021 at 11:42:22AM -0400, Vivek Goyal wrote:
+> On Fri, Jun 11, 2021 at 01:04:27PM +0100, Daniel P. Berrangé wrote:
+> > Different guest xattr prefixes have distinct access control rules applied
+> > by the guest. When remapping a guest xattr care must be taken that the
+> > remapping does not allow the a guest user to bypass guest kernel access
+> > control rules.
 > > 
-> > I think nobdev_filesystems is sort of a misfit. Even mtd, ubi, cifs
-> > and nfs are nobdev filesystems but they are not covered by this.
-> 
-> I think it's fine being able to have these root mounted both ways, then
-> eventually removing the old fs-specific options after a period of
-> deprecation to have a unique and simple interface.
-
-Sure. And I think v2 of patches where I propose a whitelist of filesystems
-should be able to achieve that. Right now I call that tag based
-filesystems where tag is directly passed to filesystem. I think
-mtd/ubi/cifs/nfs should be able to use that as well and be added to
-that whitelist down the line.
-
-> 
-> Maybe it's just a bit of a dream big attitude :-)
-
-> 
-> > > I'd bite the bullet and use FS_REQUIRES_DEV (and move this part of the
-> > > code just a bit below after the root_wait check just in case it matters,
+> > For example if 'trusted.*' which requires CAP_SYS_ADMIN is remapped
+> > to 'user.virtiofs.trusted.*', an unprivileged guest user which can
+> > write to 'user.*' can bypass the CAP_SYS_ADMIN control. Thus the
+> > target of any remapping must be explicitly blocked from read/writes
+> > by the guest, to prevent access control bypass.
 > > 
-> > Problem with moving this below root_wait check is that if user boots
-> > with root_wait option for virtiofs/9p, it will loop infitely. Reason
-> > being that ROOT_DEV=0 and device will never show up.
-> 
-> Hm, well, then don't use root_wait?! would be my first reaction.
-> 
-> The reason I suggested to move below would be that there might be
-> filesystems which handle both a block device and no block device, and
-> for these we wouldn't want to break root_wait which would become kind of
-> a switch saying "this really is a block device usecase even if the fs
-> doesn't require dev" -- that's also the reason I was mostly optimistic
-> even if we make it generic for all filesystems, there'd be this way out
-> even if the thing is compiled in.
-> 
-> 
-> Ultimately if we go through the explicit whitelist that's not required
-> anyway, and in that case it's probably better to check before as you've
-> said.
-
-Yes, current whitelist based approach will not allow to have both
-block devices as well as tag/non-block based root devices. Are there
-any examples where we current filesystems support such things. And
-can filesystem deal with it instead?
-
-If this becomes a requirement, then we will have to go back to my
-previous proposal of "root=fstag=<tag>" instead. That way "root=<foo>"
-will be interpreted as block device while "root=fstag=<foo>" explicitly
-says its some kind of tag (and not a block device).
-
-> 
-> 
-> > I am assuming that for out use cases, device will need to be present
-> > at the time of boot. We can't have a notion of waiting for device to
-> > show up.
+> > The examples shown in the virtiofsd man page already do the right
+> > thing and ensure safety, but the security implications of getting
+> > this wrong were not made explicit. This could lead to host admins
+> > and apps unwittingly creating insecure configurations.
 > > 
-> > > but at that point if something would mount with /dev/root but not with
-> > > the raw root=argument then they probably do require a device!)
-> > > 
-> > > It could also be gated by a config option like e.g. CONFIG_ROOT_NFS and
-> > > others all are to make sure it doesn't impact anyone who doesn't want to
-> > > be impacted - I'm sure some people want to make sure their device
-> > > doesn't boot off a weird root if someone manages to change kernel params
-> > > so would want a way of disabling the option...
+> > Signed-off-by: Daniel P. Berrangé <berrange@redhat.com>
+> > ---
+> >  docs/tools/virtiofsd.rst | 55 ++++++++++++++++++++++++++++++++++++----
+> >  1 file changed, 50 insertions(+), 5 deletions(-)
 > > 
-> > I guess I could do that. Given more than one filesystem will use this
-> > option (virtiofs and 9p to begin with), so we will have to have a 
-> > config option name which is little more generic and not filesystem
-> > specific like CONFIG_ROOT_NFS or CONFIG_ROOT_CIFS.
+> > diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
+> > index 00554c75bd..6370ab927c 100644
+> > --- a/docs/tools/virtiofsd.rst
+> > +++ b/docs/tools/virtiofsd.rst
+> > @@ -127,8 +127,8 @@ Options
+> >    timeout.  ``always`` sets a long cache lifetime at the expense of coherency.
+> >    The default is ``auto``.
+> >  
+> > -xattr-mapping
+> > --------------
+> > +Extended attribute (xattr) mapping
+> > +----------------------------------
+> >  
+> >  By default the name of xattr's used by the client are passed through to the server
+> >  file system.  This can be a problem where either those xattr names are used
+> > @@ -136,6 +136,9 @@ by something on the server (e.g. selinux client/server confusion) or if the
+> >  virtiofsd is running in a container with restricted privileges where it cannot
+> >  access some attributes.
+> >  
+> > +Mapping syntax
+> > +~~~~~~~~~~~~~~
+> > +
+> >  A mapping of xattr names can be made using -o xattrmap=mapping where the ``mapping``
+> >  string consists of a series of rules.
+> >  
+> > @@ -232,8 +235,48 @@ Note: When the 'security.capability' xattr is remapped, the daemon has to do
+> >  extra work to remove it during many operations, which the host kernel normally
+> >  does itself.
+> >  
+> > -xattr-mapping Examples
+> > -----------------------
+> > +Security considerations
+> > +~~~~~~~~~~~~~~~~~~~~~~~
+> > +
+> > +Operating systems typically partition the xattr namespace using
+> > +well defined name prefixes. Each partition may have different
+> > +access controls applied. For example, on Linux there are multiple
+> > +partitions
+> > +
+> > + * ``system.*`` - access varies depending on attribute & filesystem
+> > + * ``security.*`` - only processes with CAP_SYS_ADMIN
+> > + * ``trusted.*`` - only processes with CAP_SYS_ADMIN
+> > + * ``user.*`` - any process granted by file permissions / ownership
+> > +
+> > +While other OS such as FreeBSD have different name prefixes
+> > +and access control rules.
+> > +
+> > +When remapping attributes on the host, it is important to
+> > +ensure that the remapping does not allow a guest user to
+> > +evade the guest access control rules.
+> > +
+> > +Consider if ``trusted.*`` from the guest was remapped to
+> > +``user.virtiofs.trusted*`` in the host. An unprivileged
+> > +user in a Linux guest has the ability to write to xattrs
+> > +under ``user.*``. Thus the user can evade the access
+> > +control restriction on ``trusted.*`` by instead writing
+> > +to ``user.virtiofs.trusted.*``.
+> > +
+> > +As noted above, the partitions used and access controls
+> > +applied, will vary across guest OS, so it is not wise to
+> > +try to predict what the guest OS will use.
+> > +
+> > +The simplest way to avoid an insecure configuration is
+> > +to remap all xattrs at once, to a given fixed prefix.
 > 
-> Well there's the builtin check you added, and there's the ability to
-> root boot from it that's historically always been separated.
+> Remapping all xattrs seem to make sense. It probably will lead
+> to less confusion. Nested guests add another level of redirection.
 > 
-> The builtin checks you added actually doesn't matter all that much to
-> me. I mean, it'll pass this step, but fail as it cannot mount later
-> anyway, and it was an explicit request to have this filesystem in the
-> command line: you've changed an error that says "I cannot mount 9p!" to
-> "I cannot find root-device!" so it's not really a big deal.
+> BTW, remapping xattr has limitation that it does not work on
+> symlinks. So "user.*" can't be set on symlink. And that means
+> selinux relabeling of symlinks fails with remapped xattrs.
 > 
-> 
-> What I was advocating for is the whole feature being gated by some
-> option - my example with an embdedded device having 9p builtin (because
-> for some reason they have everything builtin) but not wanting to boot on
-> a tcp 9p rootfs still stands even if we're limiting this to a few
-> filesystems.
-> 
-> If you're keeping the idea of tags CONFIG_ROOT_TAGS ?
+> Not sure how to address this limitation. Host kernel imposes
+> this limit. (man xattr).
 
-I thought about it and CONFIG_ROOT_TAGS made less sense because it will
-disable all filesystem roots. So say you don't want to boot from 9p
-rootfs but are ok booting from virtiofs rootfs, then disablig whole
-feature does not allow that.
+Oh fun, I had not noticed this limitation before :-(
 
-We probably need to have per filesystem option. Something like CONFIG_ROOT_NFS
-and CONFIG_CIFS_ROOT. So may be we need to add CONFIG_ROOT_VIRTIOFS
-and COFIG_ROOT_9P_FS to decide wither to include filesystem in whitelist
-or not and that will enable/disable boot from root functionality.
+Here are some ideas I had, none especially nice
 
-I feel that these kind of patches can go in later. Because a user
-can boot from 9p or virtiofs rootfs anyway using mtd prefix hack
-or using /dev/root as tag hack and adding these options does not
-close those paths. So I thought that adding these config
-options should not be a strict requirement for this patch series and
-these options can be added separately in respective filesystems. WDYT?
+ - Use 'trusted.*' namespace for remapping instead of 'user.'
+ 
+   virtiofsd needs to have CAP_SYS_ADMIN though which is
+   quite horrible if your goal is to confine its privileges
+   in any meaningful way
 
-Thanks
-Vivek
+ - Store a symlinks' xattr on the target of the symlink
 
+   if the symlink has dev:inode  54:224, and points to
+   a file 'foo', then on 'foo' create an xattr
+   "user.virtiofs.link:54:224.<original xattrpath>"
+
+   This gets quite horrendous when you have symlinks
+   pointing to symlinks pointing to symlinks. Does
+   not work too well if the 'st_dev' value is
+   not stable across reboots either.
+
+ - Don't use xattrs at all for remapping, instead use
+   hidden files.
+
+   eg for a file 'foo', if an xattr is set then create
+   a file '.foo.xattr' in the same directory and store
+   the xattrs in that file in some format. Need to hide
+   this lookaside files from the guest of course.
+
+> > +This is shown in example (1) below.
+> > +
+> > +If selectively mapping only a subset of xattr prefixes,
+> > +then rules must be added to explicitly block direct
+> > +access to the target of the remapping. This is shown
+> > +in example (2) below.
 > 
+> Example (2) seems to block all the xattrs with prefix even
+> if only one xattr has been remapped.
 > 
-> > > Also, matter-of-factedly, how is this going to be picked up?
-> > > Is the plan to send it directly to Linus as part of the next virtiofs
-> > > PR? Going through Al Viro?
-> > 
-> > I was hoping that this patch can be routed through Al Viro.
-> 
-> Sounds good to me as well - I've upgraded him to To: to get his
-> attention.
-> (v2 has been sent as "[PATCH v2 0/2] Add support to boot virtiofs and
-> 9pfs as rootfs"; I'll review/retest in the next few days)
-> 
-> -- 
-> Dominique
-> 
+> So if we remapped "trusted." to "user.virtiofs.trusted.", then
+> client can't set any xattr starting with "user.virtiofs". I am
+> wondering should it be limted to only blocking only
+> "user.virtiofs.trusted.".
+
+Or maybe illustrate with two mappings, so we can show how blocking
+the parent xattr covers both
+
+Regards,
+Daniel
+-- 
+|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
+|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
+|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
 

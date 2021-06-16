@@ -1,15 +1,16 @@
-Date: Wed, 26 May 2021 14:50:17 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210526185017.GB1225492@horse>
-References: <20210512125544.9536-1-mreitz@redhat.com>
-	<20210512125544.9536-2-mreitz@redhat.com>
-	<20210526181324.GA1222711@redhat.com>
+References: <20210609155551.44437-1-mreitz@redhat.com>
+	<20210609155551.44437-8-mreitz@redhat.com>
+	<20210611200459.GB767764@redhat.com>
+From: Max Reitz <mreitz@redhat.com>
+Message-ID: <9cea5642-e5ea-961f-d816-0998e52aad9f@redhat.com>
+Date: Wed, 16 Jun 2021 15:38:13 +0200
 MIME-Version: 1.0
-In-Reply-To: <20210526181324.GA1222711@redhat.com>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH 1/3] virtiofsd: Find original inode ID of
- mount points
+In-Reply-To: <20210611200459.GB767764@redhat.com>
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Transfer-Encoding: 8bit
+Content-Language: en-US
+Subject: Re: [Virtio-fs] [PATCH v2 7/9] virtiofsd: Add inodes_by_handle hash
+ table
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,277 +19,256 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Wed, May 26, 2021 at 02:13:24PM -0400, Vivek Goyal wrote:
-> On Wed, May 12, 2021 at 02:55:42PM +0200, Max Reitz wrote:
-> > Mount point directories represent two inodes: On one hand, they are a
-> > normal directory on their parent filesystem.  On the other, they are the
-> > root node of the filesystem mounted there.  Thus, they have two inode
-> > IDs.
-> > 
-> > Right now, we only report the latter inode ID (i.e. the inode ID of the
-> > mounted filesystem's root node).  This is fine once the guest has
-> > auto-mounted a submount there (so this inode ID goes with a device ID
-> > that is distinct from the parent filesystem), but before the auto-mount,
-> > they have the device ID of the parent and the inode ID for the submount.
-> > This is problematic because this is likely exactly the same
-> > st_dev/st_ino combination as the parent filesystem's root node.  This
-> > leads to problems for example with `find`, which will thus complain
-> > about a filesystem loop if it has visited the parent filesystem's root
-> > node before, and then refuse to descend into the submount.
-> > 
-> > There is a way to find the mount directory's original inode ID, and that
-> > is to readdir(3) the parent directory, look for the mount directory, and
-> > read the dirent.d_ino field.  Using this, we can let lookup and
-> > readdirplus return that original inode ID, which the guest will thus
-> > show until the submount is auto-mounted.
-> 
-> > (Then, it will invoke getattr
-> > and that stat(2) call will return the inode ID for the submount.)
-> 
+On 11.06.21 22:04, Vivek Goyal wrote:
+> On Wed, Jun 09, 2021 at 05:55:49PM +0200, Max Reitz wrote:
+>> Currently, lo_inode.fhandle is always NULL and so always keep an O_PATH
+>> FD in lo_inode.fd.  Therefore, when the respective inode is unlinked,
+>> its inode ID will remain in use until we drop our lo_inode (and
+>> lo_inode_put() thus closes the FD).  Therefore, lo_find() can safely use
+>> the inode ID as an lo_inode key, because any inode with an inode ID we
+>> find in lo_data.inodes (on the same filesystem) must be the exact same
+>> file.
+>>
+>> This will change when we start setting lo_inode.fhandle so we do not
+>> have to keep an O_PATH FD open.  Then, unlinking such an inode will
+>> immediately remove it, so its ID can then be reused by newly created
+>> files, even while the lo_inode object is still there[1].
+>>
+>> So creating a new file can then reuse the old file's inode ID, and
+>> looking up the new file would lead to us finding the old file's
+>> lo_inode, which is not ideal.
+>>
+>> Luckily, just as file handles cause this problem, they also solve it:  A
+>> file handle contains a generation ID, which changes when an inode ID is
+>> reused, so the new file can be distinguished from the old one.  So all
+>> we need to do is to add a second map besides lo_data.inodes that maps
+>> file handles to lo_inodes, namely lo_data.inodes_by_handle.  For
+>> clarity, lo_data.inodes is renamed to lo_data.inodes_by_ids.
+>>
+>> Unfortunately, we cannot rely on being able to generate file handles
+>> every time.
 > Hi Max,
-> 
-> How are we sure that GETATTR() will always be called and that will
-> allow us to return inode number in mounted filesystem (instead of
-> parent filesystem). I thought GETATTR will be called only if cached
-> attrs have expired. (1 second default for cache=auto). Otherwise
-> stat() will fill inode->i_no from cache and return. And I am afraid
-> that in that case we will return inode number from parent fs,
-> instead of mounted fs.
-> 
-> Say following sequence of events happens pretty fast one after the
-> other. Say /mnt/virtiofs/foo is a mount point in server but client
-> has not created submount yet.
-> 
-> A. stat(/mnt/virtiofs/foo, AT_NO_AUTOMOUNT)
->    -> This should get inode number in parent filesystem on host and 
->       store in guest inode->i_no and return to user space. Say inode
->       in guest is called a_ino.
-> B. stat(/mnt/virtiofs/foo)
->    -> This should create submount and create new inode (say b_ino), using
->       properties from a_ino. IOW, this should copy a_ino->i_no to
->       b_ino->b_ino given current code, IIUC.
-> 
->    -> Assume timeout has not happened and cached attrs have not expired.
-> 
->    -> And now b_ino->i_no (or ->orig_ino) will be returned to user space.
-> 
-> Am I missing something. Do we need to always expire inode attrs when
-> we create submount so that client is forced to issue GETATTR.
+>
+> What are the cases where we can not rely being able to generate file
+> handles?
 
-Looks like while initialzing b_ino, we are setting attr_valid=0, which
-should set fi->i_time=0 and force issuing GETATTR later.
+I have no idea, but it’s much easier to claim we can’t than to prove 
+that we can. I’d rather be resilient.
 
-fuse_fill_super_submount()
-  root = fuse_iget(sb, parent_fi->nodeid, 0, &root_attr, 0, 0);
-                                                         ^
-    fuse_iget(attr_valid=0)
-       fuse_change_attributes(attr_valid=0)
-	  fuse_change_attributes_common(attr_valid=0)
-            fi->i_time = attr_valid;
+>> Therefore, we still enter every lo_inode object into
+>> inodes_by_ids, but having an entry in inodes_by_handle is optional.  A
+>> potential inodes_by_handle entry then has precedence, the inodes_by_ids
+>> entry is just a fallback.
+> If we have to keep inodes_by_ids around, then can we just add fhandle
+> to the lo_key. That way we can manage with single hash table and still
+> be able to detect if inode ID has been reused.
 
-So may be this will force GETATTR and fetch new inode id when second
-stat() is called.
+We cannot, because I assume we cannot rely on name_to_handle_at() 
+working every time. Therefore, maybe at one point we can generate a file 
+handle, and at another, we cannot – we should still be able to look up 
+the inode regardless.
 
-Thanks
-Vivek
+If the file handle were part of inodes_by_ids, then we can look up 
+inodes only if we can generate a file handle either every time (for a 
+given inode) or never. Or, well, I suppose we could always create two 
+entries, one with the file handles zeroed out, and one with the file 
+handle specified, but I wouldn’t find that very beautiful.
 
-> > Signed-off-by: Max Reitz <mreitz@redhat.com>
-> > ---
-> >  tools/virtiofsd/passthrough_ll.c | 104 +++++++++++++++++++++++++++++--
-> >  1 file changed, 99 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> > index 1553d2ef45..110b6e7e5b 100644
-> > --- a/tools/virtiofsd/passthrough_ll.c
-> > +++ b/tools/virtiofsd/passthrough_ll.c
-> > @@ -968,14 +968,87 @@ static int do_statx(struct lo_data *lo, int dirfd, const char *pathname,
-> >      return 0;
-> >  }
-> >  
-> > +/*
-> > + * Use readdir() to find mp_name's inode ID on the parent's filesystem.
-> > + * (For mount points, stat() will only return the inode ID on the
-> > + * filesystem mounted there, i.e. the root directory's inode ID.  The
-> > + * mount point originally was a directory on the parent filesystem,
-> > + * though, and so has a different inode ID there.  When passing
-> > + * submount information to the guest, we need to pass this other ID,
-> > + * so the guest can use it as the inode ID until the submount is
-> > + * auto-mounted.  (At which point the guest will invoke getattr and
-> > + * find the inode ID on the submount.))
-> > + *
-> > + * Return 0 on success, and -errno otherwise.  *pino is set only in
-> > + * case of success.
-> > + */
-> > +static int get_mp_ino_on_parent(const struct lo_inode *dir, const char *mp_name,
-> > +                                ino_t *pino)
-> > +{
-> > +    int dirfd = -1;
-> > +    int ret;
-> > +    DIR *dp = NULL;
-> > +
-> > +    dirfd = openat(dir->fd, ".", O_RDONLY);
-> > +    if (dirfd < 0) {
-> > +        ret = -errno;
-> > +        goto out;
-> > +    }
-> > +
-> > +    dp = fdopendir(dirfd);
-> > +    if (!dp) {
-> > +        ret = -errno;
-> > +        goto out;
-> > +    }
-> > +    /* Owned by dp now */
-> > +    dirfd = -1;
-> > +
-> > +    while (true) {
-> > +        struct dirent *de;
-> > +
-> > +        errno = 0;
-> > +        de = readdir(dp);
-> > +        if (!de) {
-> > +            ret = errno ? -errno : -ENOENT;
-> > +            goto out;
-> > +        }
-> > +
-> > +        if (!strcmp(de->d_name, mp_name)) {
-> > +            *pino = de->d_ino;
-> > +            ret = 0;
-> > +            goto out;
-> > +        }
-> > +    }
-> > +
-> > +out:
-> > +    if (dp) {
-> > +        closedir(dp);
-> > +    }
-> > +    if (dirfd >= 0) {
-> > +        close(dirfd);
-> > +    }
-> > +    return ret;
-> > +}
-> > +
-> >  /*
-> >   * Increments nlookup on the inode on success. unref_inode_lolocked() must be
-> >   * called eventually to decrement nlookup again. If inodep is non-NULL, the
-> >   * inode pointer is stored and the caller must call lo_inode_put().
-> > + *
-> > + * If parent_fs_st_ino is true, the entry is a mount point, and submounts are
-> > + * announced to the guest, set e->attr.st_ino to the entry's inode ID on its
-> > + * parent filesystem instead of its inode ID on the filesystem mounted on it.
-> > + * (For mount points, the entry encompasses two inodes: One on the parent FS,
-> > + * and one on the mounted FS (where it is the root node), so it has two inode
-> > + * IDs.  When looking up entries, we should show the guest the parent FS's inode
-> > + * ID, because as long as the guest has not auto-mounted the submount, it should
-> > + * see that original ID.  Once it does perform the auto-mount, it will invoke
-> > + * getattr and see the root node's inode ID.)
-> >   */
-> >  static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-> >                          struct fuse_entry_param *e,
-> > -                        struct lo_inode **inodep)
-> > +                        struct lo_inode **inodep,
-> > +                        bool parent_fs_st_ino)
-> >  {
-> >      int newfd;
-> >      int res;
-> > @@ -984,6 +1057,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-> >      struct lo_data *lo = lo_data(req);
-> >      struct lo_inode *inode = NULL;
-> >      struct lo_inode *dir = lo_inode(req, parent);
-> > +    ino_t ino_id_for_guest;
-> >  
-> >      if (inodep) {
-> >          *inodep = NULL; /* in case there is an error */
-> > @@ -1018,9 +1092,22 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-> >          goto out_err;
-> >      }
-> >  
-> > +    ino_id_for_guest = e->attr.st_ino;
-> > +
-> >      if (S_ISDIR(e->attr.st_mode) && lo->announce_submounts &&
-> >          (e->attr.st_dev != dir->key.dev || mnt_id != dir->key.mnt_id)) {
-> >          e->attr_flags |= FUSE_ATTR_SUBMOUNT;
-> > +
-> > +        if (parent_fs_st_ino) {
-> > +            /*
-> > +             * Best effort, so ignore errors.
-> > +             * Also note that using readdir() means there may be races:
-> > +             * The directory entry we find (if any) may be different
-> > +             * from newfd.  Again, this is a best effort.  Reporting
-> > +             * the wrong inode ID to the guest is not catastrophic.
-> > +             */
-> > +            get_mp_ino_on_parent(dir, name, &ino_id_for_guest);
-> > +        }
-> >      }
-> >  
-> >      inode = lo_find(lo, &e->attr, mnt_id);
-> > @@ -1043,6 +1130,10 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-> >  
-> >          inode->nlookup = 1;
-> >          inode->fd = newfd;
-> > +        /*
-> > +         * For the inode key, use the dev/ino/mnt ID as reported by stat()
-> > +         * (i.e. not ino_id_for_guest)
-> > +         */
-> >          inode->key.ino = e->attr.st_ino;
-> >          inode->key.dev = e->attr.st_dev;
-> >          inode->key.mnt_id = mnt_id;
-> > @@ -1058,6 +1149,9 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-> >      }
-> >      e->ino = inode->fuse_ino;
-> >  
-> > +    /* Report ino_id_for_guest to the guest */
-> > +    e->attr.st_ino = ino_id_for_guest;
-> > +
-> >      /* Transfer ownership of inode pointer to caller or drop it */
-> >      if (inodep) {
-> >          *inodep = inode;
-> > @@ -1104,7 +1198,7 @@ static void lo_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
-> >          return;
-> >      }
-> >  
-> > -    err = lo_do_lookup(req, parent, name, &e, NULL);
-> > +    err = lo_do_lookup(req, parent, name, &e, NULL, true);
-> >      if (err) {
-> >          fuse_reply_err(req, err);
-> >      } else {
-> > @@ -1217,7 +1311,7 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
-> >          goto out;
-> >      }
-> >  
-> > -    saverr = lo_do_lookup(req, parent, name, &e, NULL);
-> > +    saverr = lo_do_lookup(req, parent, name, &e, NULL, false);
-> >      if (saverr) {
-> >          goto out;
-> >      }
-> > @@ -1714,7 +1808,7 @@ static void lo_do_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
-> >  
-> >          if (plus) {
-> >              if (!is_dot_or_dotdot(name)) {
-> > -                err = lo_do_lookup(req, ino, name, &e, NULL);
-> > +                err = lo_do_lookup(req, ino, name, &e, NULL, true);
-> >                  if (err) {
-> >                      goto error;
-> >                  }
-> > @@ -1936,7 +2030,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
-> >          goto out;
-> >      }
-> >  
-> > -    err = lo_do_lookup(req, parent, name, &e, &inode);
-> > +    err = lo_do_lookup(req, parent, name, &e, &inode, false);
-> >      if (err) {
-> >          goto out;
-> >      }
-> > -- 
-> > 2.31.1
-> > 
-> > 
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
-> 
+Max
+
+>> Note that we do not generate lo_fhandle objects yet, and so we also do
+>> not enter anything into the inodes_by_handle map yet.  Also, all lookups
+>> skip that map.  We might manually create file handles with some code
+>> that is immediately removed by the next patch again, but that would
+>> break the assumption in lo_find() that every lo_inode with a non-NULL
+>> .fhandle must have an entry in inodes_by_handle and vice versa.  So we
+>> leave actually using the inodes_by_handle map for the next patch.
+>>
+>> [1] If some application in the guest still has the file open, there is
+>> going to be a corresponding FD mapping in lo_data.fd_map.  In such a
+>> case, the inode will only go away once every application in the guest
+>> has closed it.  The problem described only applies to cases where the
+>> guest does not have the file open, and it is just in the dentry cache,
+>> basically.
+>>
+>> Signed-off-by: Max Reitz <mreitz@redhat.com>
+>> Reviewed-by: Connor Kuehl <ckuehl@redhat.com>
+>> ---
+>>   tools/virtiofsd/passthrough_ll.c | 80 +++++++++++++++++++++++++-------
+>>   1 file changed, 64 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+>> index e665575401..793d2c333e 100644
+>> --- a/tools/virtiofsd/passthrough_ll.c
+>> +++ b/tools/virtiofsd/passthrough_ll.c
+>> @@ -179,7 +179,8 @@ struct lo_data {
+>>       int announce_submounts;
+>>       bool use_statx;
+>>       struct lo_inode root;
+>> -    GHashTable *inodes; /* protected by lo->mutex */
+>> +    GHashTable *inodes_by_ids; /* protected by lo->mutex */
+>> +    GHashTable *inodes_by_handle; /* protected by lo->mutex */
+>>       struct lo_map ino_map; /* protected by lo->mutex */
+>>       struct lo_map dirp_map; /* protected by lo->mutex */
+>>       struct lo_map fd_map; /* protected by lo->mutex */
+>> @@ -257,8 +258,9 @@ static struct {
+>>   /* That we loaded cap-ng in the current thread from the saved */
+>>   static __thread bool cap_loaded = 0;
+>>   
+>> -static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
+>> -                                uint64_t mnt_id);
+>> +static struct lo_inode *lo_find(struct lo_data *lo,
+>> +                                const struct lo_fhandle *fhandle,
+>> +                                struct stat *st, uint64_t mnt_id);
+>>   static int xattr_map_client(const struct lo_data *lo, const char *client_name,
+>>                               char **out_name);
+>>   
+>> @@ -1032,18 +1034,39 @@ out_err:
+>>       fuse_reply_err(req, saverr);
+>>   }
+>>   
+>> -static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
+>> -                                uint64_t mnt_id)
+>> +static struct lo_inode *lo_find(struct lo_data *lo,
+>> +                                const struct lo_fhandle *fhandle,
+>> +                                struct stat *st, uint64_t mnt_id)
+>>   {
+>> -    struct lo_inode *p;
+>> -    struct lo_key key = {
+>> +    struct lo_inode *p = NULL;
+>> +    struct lo_key ids_key = {
+>>           .ino = st->st_ino,
+>>           .dev = st->st_dev,
+>>           .mnt_id = mnt_id,
+>>       };
+>>   
+>>       pthread_mutex_lock(&lo->mutex);
+>> -    p = g_hash_table_lookup(lo->inodes, &key);
+>> +    if (fhandle) {
+>> +        p = g_hash_table_lookup(lo->inodes_by_handle, fhandle);
+>> +    }
+>> +    if (!p) {
+>> +        p = g_hash_table_lookup(lo->inodes_by_ids, &ids_key);
+>> +        /*
+>> +         * When we had to fall back to looking up an inode by its IDs,
+>> +         * ensure that we hit an entry that does not have a file
+>> +         * handle.  Entries with file handles must also have a handle
+>> +         * alt key, so if we have not found it by that handle alt key,
+>> +         * we must have found an entry with a mismatching handle; i.e.
+>> +         * an entry for a different file, even though it has the same
+>> +         * inode ID.
+>> +         * (This can happen when we look up a new file that has reused
+>> +         * the inode ID of some previously unlinked inode for which we
+>> +         * still have an lo_inode object.)
+>> +         */
+>> +        if (p && fhandle != NULL && p->fhandle != NULL) {
+>> +            p = NULL;
+>> +        }
+>> +    }
+>>       if (p) {
+>>           assert(p->nlookup > 0);
+>>           p->nlookup++;
+>> @@ -1183,7 +1206,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+>>           e->attr_flags |= FUSE_ATTR_SUBMOUNT;
+>>       }
+>>   
+>> -    inode = lo_find(lo, &e->attr, mnt_id);
+>> +    inode = lo_find(lo, NULL, &e->attr, mnt_id);
+>>       if (inode) {
+>>           close(newfd);
+>>       } else {
+>> @@ -1213,7 +1236,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+>>           }
+>>           pthread_mutex_lock(&lo->mutex);
+>>           inode->fuse_ino = lo_add_inode_mapping(req, inode);
+>> -        g_hash_table_insert(lo->inodes, &inode->key, inode);
+>> +        g_hash_table_insert(lo->inodes_by_ids, &inode->key, inode);
+>>           pthread_mutex_unlock(&lo->mutex);
+>>       }
+>>       e->ino = inode->fuse_ino;
+>> @@ -1525,7 +1548,7 @@ static struct lo_inode *lookup_name(fuse_req_t req, fuse_ino_t parent,
+>>           return NULL;
+>>       }
+>>   
+>> -    return lo_find(lo, &attr, mnt_id);
+>> +    return lo_find(lo, NULL, &attr, mnt_id);
+>>   }
+>>   
+>>   static void lo_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name)
+>> @@ -1688,7 +1711,7 @@ static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
+>>       inode->nlookup -= n;
+>>       if (!inode->nlookup) {
+>>           lo_map_remove(&lo->ino_map, inode->fuse_ino);
+>> -        g_hash_table_remove(lo->inodes, &inode->key);
+>> +        g_hash_table_remove(lo->inodes_by_ids, &inode->key);
+>>           if (lo->posix_lock) {
+>>               if (g_hash_table_size(inode->posix_locks)) {
+>>                   fuse_log(FUSE_LOG_WARNING, "Hash table is not empty\n");
+>> @@ -3388,7 +3411,7 @@ static void lo_destroy(void *userdata)
+>>           GHashTableIter iter;
+>>           gpointer key, value;
+>>   
+>> -        g_hash_table_iter_init(&iter, lo->inodes);
+>> +        g_hash_table_iter_init(&iter, lo->inodes_by_ids);
+>>           if (!g_hash_table_iter_next(&iter, &key, &value)) {
+>>               break;
+>>           }
+>> @@ -3931,10 +3954,34 @@ static gboolean lo_key_equal(gconstpointer a, gconstpointer b)
+>>       return la->ino == lb->ino && la->dev == lb->dev && la->mnt_id == lb->mnt_id;
+>>   }
+>>   
+>> +static guint lo_fhandle_hash(gconstpointer key)
+>> +{
+>> +    const struct lo_fhandle *fh = key;
+>> +    guint hash;
+>> +    size_t i;
+>> +
+>> +    /* Basically g_str_hash() */
+>> +    hash = 5381;
+>> +    for (i = 0; i < sizeof(fh->padding); i++) {
+>> +        hash += hash * 33 + (unsigned char)fh->padding[i];
+>> +    }
+>> +    hash += hash * 33 + fh->mount_id;
+>> +
+>> +    return hash;
+>> +}
+>> +
+>> +static gboolean lo_fhandle_equal(gconstpointer a, gconstpointer b)
+>> +{
+>> +    return !memcmp(a, b, sizeof(struct lo_fhandle));
+>> +}
+>> +
+>>   static void fuse_lo_data_cleanup(struct lo_data *lo)
+>>   {
+>> -    if (lo->inodes) {
+>> -        g_hash_table_destroy(lo->inodes);
+>> +    if (lo->inodes_by_ids) {
+>> +        g_hash_table_destroy(lo->inodes_by_ids);
+>> +    }
+>> +    if (lo->inodes_by_ids) {
+>> +        g_hash_table_destroy(lo->inodes_by_handle);
+>>       }
+>>   
+>>       if (lo->root.posix_locks) {
+>> @@ -3990,7 +4037,8 @@ int main(int argc, char *argv[])
+>>       qemu_init_exec_dir(argv[0]);
+>>   
+>>       pthread_mutex_init(&lo.mutex, NULL);
+>> -    lo.inodes = g_hash_table_new(lo_key_hash, lo_key_equal);
+>> +    lo.inodes_by_ids = g_hash_table_new(lo_key_hash, lo_key_equal);
+>> +    lo.inodes_by_handle = g_hash_table_new(lo_fhandle_hash, lo_fhandle_equal);
+>>       lo.root.fd = -1;
+>>       lo.root.fuse_ino = FUSE_ROOT_ID;
+>>       lo.cache = CACHE_AUTO;
+>> -- 
+>> 2.31.1
+>>
+>> _______________________________________________
+>> Virtio-fs mailing list
+>> Virtio-fs@redhat.com
+>> https://listman.redhat.com/mailman/listinfo/virtio-fs
+>>
 

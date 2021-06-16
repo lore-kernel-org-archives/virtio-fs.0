@@ -1,14 +1,21 @@
-Date: Wed, 16 Jun 2021 11:16:10 +0100
+Date: Wed, 16 Jun 2021 13:36:10 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YMnPagK2lpcfCqMV@work-vm>
-References: <20210611120427.49736-1-berrange@redhat.com>
+Message-ID: <YMnwOs9bxKLB8wSL@work-vm>
+References: <20210428110100.27757-1-dgilbert@redhat.com>
+	<20210428110100.27757-27-dgilbert@redhat.com>
+	<YJQNIPaFCJlG7ZKc@stefanha-x1.localdomain>
+	<20210506160223.GA277745@redhat.com>
+	<YJj3RSxXKZHxmiKu@stefanha-x1.localdomain>
+	<20210510152324.GB150402@horse>
+	<YJlSHZ0vzNtCAjkJ@stefanha-x1.localdomain>
+	<YK/uUUZI3zy9k8Vk@work-vm> <YMIv5odJWdkbJzWL@work-vm>
+	<YMI8fS6m8CjtUtmE@stefanha-x1.localdomain>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <20210611120427.49736-1-berrange@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] docs: describe the security considerations
- with virtiofsd xattr mapping
+In-Reply-To: <YMI8fS6m8CjtUtmE@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH v3 26/26] virtiofsd: Ask qemu to drop
+ CAP_FSETID if client asked for it
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,138 +24,255 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
 
-* Daniel P. Berrang=E9 (berrange@redhat.com) wrote:
-> Different guest xattr prefixes have distinct access control rules applied
-> by the guest. When remapping a guest xattr care must be taken that the
-> remapping does not allow the a guest user to bypass guest kernel access
-> control rules.
->=20
-> For example if 'trusted.*' which requires CAP_SYS_ADMIN is remapped
-> to 'user.virtiofs.trusted.*', an unprivileged guest user which can
-> write to 'user.*' can bypass the CAP_SYS_ADMIN control. Thus the
-> target of any remapping must be explicitly blocked from read/writes
-> by the guest, to prevent access control bypass.
->=20
-> The examples shown in the virtiofsd man page already do the right
-> thing and ensure safety, but the security implications of getting
-> this wrong were not made explicit. This could lead to host admins
-> and apps unwittingly creating insecure configurations.
->=20
-> Signed-off-by: Daniel P. Berrang=E9 <berrange@redhat.com>
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> On Thu, Jun 10, 2021 at 04:29:42PM +0100, Dr. David Alan Gilbert wrote:
+> > * Dr. David Alan Gilbert (dgilbert@redhat.com) wrote:
+> > > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > 
+> > <snip>
+> > 
+> > > > Instead I was thinking about VHOST_USER_DMA_READ/WRITE messages
+> > > > containing the address (a device IOVA, it could just be a guest physical
+> > > > memory address in most cases) and the length. The WRITE message would
+> > > > also contain the data that the vhost-user device wishes to write. The
+> > > > READ message reply would contain the data that the device read from
+> > > > QEMU.
+> > > > 
+> > > > QEMU would implement this using QEMU's address_space_read/write() APIs.
+> > > > 
+> > > > So basically just a new vhost-user protocol message to do a memcpy(),
+> > > > but with guest addresses and vIOMMU support :).
+> > > 
+> > > This doesn't actually feel that hard - ignoring vIOMMU for a minute
+> > > which I know very little about - I'd have to think where the data
+> > > actually flows, probably the slave fd.
+> > > 
+> > > > The vhost-user device will need to do bounce buffering so using these
+> > > > new messages is slower than zero-copy I/O to shared guest RAM.
+> > > 
+> > > I guess the theory is it's only in the weird corner cases anyway.
+> 
+> The feature is also useful if DMA isolation is desirable (i.e.
+> security/reliability are more important than performance). Once this new
+> vhost-user protocol feature is available it will be possible to run
+> vhost-user devices without shared memory or with limited shared memory
+> (e.g. just the vring).
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+I don't see it ever being efficient, so that case is going to be pretty
+limited.
 
+> > The direction I'm going is something like the following;
+> > the idea is that the master will have to handle the requests on a
+> > separate thread, to avoid any problems with side effects from the memory
+> > accesses; the slave will then have to parkt he requests somewhere and
+> > handle them later.
+> > 
+> > 
+> > From 07aacff77c50c8a2b588b2513f2dfcfb8f5aa9df Mon Sep 17 00:00:00 2001
+> > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+> > Date: Thu, 10 Jun 2021 15:34:04 +0100
+> > Subject: [PATCH] WIP: vhost-user: DMA type interface
+> > 
+> > A DMA type interface where the slave can ask for a stream of bytes
+> > to be read/written to the guests memory by the master.
+> > The interface is asynchronous, since a request may have side effects
+> > inside the guest.
+> > 
+> > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> > ---
+> >  docs/interop/vhost-user.rst               | 33 +++++++++++++++++++++++
+> >  hw/virtio/vhost-user.c                    |  4 +++
+> >  subprojects/libvhost-user/libvhost-user.h | 24 +++++++++++++++++
+> >  3 files changed, 61 insertions(+)
+> 
+> Use of the word "RAM" in this patch is a little unclear since we need
+> these new messages precisely when it's not ordinary guest RAM :-). Maybe
+> referring to the address space is more general.
 
-Vivek's point about symlinks is something we should add but that's kind
-of separate to the clarification you've explained here.
+Yeh, I'll try and spot those.
+
+> > diff --git a/docs/interop/vhost-user.rst b/docs/interop/vhost-user.rst
+> > index 9ebd05e2bf..b9b5322147 100644
+> > --- a/docs/interop/vhost-user.rst
+> > +++ b/docs/interop/vhost-user.rst
+> > @@ -1347,6 +1347,15 @@ Master message types
+> >    query the backend for its device status as defined in the Virtio
+> >    specification.
+> >  
+> > +``VHOST_USER_MEM_DATA``
+> > +  :id: 41
+> > +  :equivalent ioctl: N/A
+> > +  :slave payload: N/A
+> > +  :master payload: ``struct VhostUserMemReply``
+> > +
+> > +  This message is an asynchronous response to a ``VHOST_USER_SLAVE_MEM_ACCESS``
+> > +  message.  Where the request was for the master to read data, this
+> > +  message will be followed by the data that was read.
+> 
+> Please explain why this message is asynchronous. Implementors will need
+> to understand the gotchas around deadlocks, etc.
+
+I've added:
+  Making this a separate asynchronous response message (rather than just a reply
+  to the ``VHOST_USER_SLAVE_MEM_ACCESS``) makes it much easier for the master
+  to deal with any side effects the access may have, and in particular avoid
+  deadlocks they might cause if an access triggers another vhost_user message.
+
+> >  
+> >  Slave message types
+> >  -------------------
+> > @@ -1469,6 +1478,30 @@ Slave message types
+> >    The ``VHOST_USER_FS_FLAG_MAP_W`` flag must be set in the ``flags`` field to
+> >    write to the file from RAM.
+> >  
+> > +``VHOST_USER_SLAVE_MEM_ACCESS``
+> > +  :id: 9
+> > +  :equivalent ioctl: N/A
+> > +  :slave payload: ``struct VhostUserMemAccess``
+> > +  :master payload: N/A
+> > +
+> > +  Requests that the master perform a range of memory accesses on behalf
+> > +  of the slave that the slave can't perform itself.
+> > +
+> > +  The ``VHOST_USER_MEM_FLAG_TO_MASTER`` flag must be set in the ``flags``
+> > +  field for the slave to write data into the RAM of the master.   In this
+> > +  case the data to write follows the ``VhostUserMemAccess`` on the fd.
+> > +  The ``VHOST_USER_MEM_FLAG_FROM_MASTER`` flag must be set in the ``flags``
+> > +  field for the slave to read data from the RAM of the master.
+> > +
+> > +  When the master has completed the access it replies on the main fd with
+> > +  a ``VHOST_USER_MEM_DATA`` message.
+> > +
+> > +  The master is allowed to complete part of the request and reply stating
+> > +  the amount completed, leaving it to the slave to resend further components.
+> > +  This may happen to limit memory allocations in the master or to simplify
+> > +  the implementation.
+> > +
+> > +
+> >  .. _reply_ack:
+> >  
+> >  VHOST_USER_PROTOCOL_F_REPLY_ACK
+> > diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
+> > index 39a0e55cca..a3fefc4c1d 100644
+> > --- a/hw/virtio/vhost-user.c
+> > +++ b/hw/virtio/vhost-user.c
+> > @@ -126,6 +126,9 @@ typedef enum VhostUserRequest {
+> >      VHOST_USER_GET_MAX_MEM_SLOTS = 36,
+> >      VHOST_USER_ADD_MEM_REG = 37,
+> >      VHOST_USER_REM_MEM_REG = 38,
+> > +    VHOST_USER_SET_STATUS = 39,
+> > +    VHOST_USER_GET_STATUS = 40,
+> > +    VHOST_USER_MEM_DATA = 41,
+> >      VHOST_USER_MAX
+> >  } VhostUserRequest;
+> >  
+> > @@ -139,6 +142,7 @@ typedef enum VhostUserSlaveRequest {
+> >      VHOST_USER_SLAVE_FS_MAP = 6,
+> >      VHOST_USER_SLAVE_FS_UNMAP = 7,
+> >      VHOST_USER_SLAVE_FS_IO = 8,
+> > +    VHOST_USER_SLAVE_MEM_ACCESS = 9,
+> >      VHOST_USER_SLAVE_MAX
+> >  }  VhostUserSlaveRequest;
+> >  
+> > diff --git a/subprojects/libvhost-user/libvhost-user.h b/subprojects/libvhost-user/libvhost-user.h
+> > index eee611a2f6..b5444f4f6f 100644
+> > --- a/subprojects/libvhost-user/libvhost-user.h
+> > +++ b/subprojects/libvhost-user/libvhost-user.h
+> > @@ -109,6 +109,9 @@ typedef enum VhostUserRequest {
+> >      VHOST_USER_GET_MAX_MEM_SLOTS = 36,
+> >      VHOST_USER_ADD_MEM_REG = 37,
+> >      VHOST_USER_REM_MEM_REG = 38,
+> > +    VHOST_USER_SET_STATUS = 39,
+> > +    VHOST_USER_GET_STATUS = 40,
+> > +    VHOST_USER_MEM_DATA = 41,
+> >      VHOST_USER_MAX
+> >  } VhostUserRequest;
+> >  
+> > @@ -122,6 +125,7 @@ typedef enum VhostUserSlaveRequest {
+> >      VHOST_USER_SLAVE_FS_MAP = 6,
+> >      VHOST_USER_SLAVE_FS_UNMAP = 7,
+> >      VHOST_USER_SLAVE_FS_IO = 8,
+> > +    VHOST_USER_SLAVE_MEM_ACCESS = 9,
+> >      VHOST_USER_SLAVE_MAX
+> >  }  VhostUserSlaveRequest;
+> >  
+> > @@ -220,6 +224,24 @@ typedef struct VhostUserInflight {
+> >      uint16_t queue_size;
+> >  } VhostUserInflight;
+> >  
+> > +/* For the flags field of VhostUserMemAccess and VhostUserMemReply */
+> > +#define VHOST_USER_MEM_FLAG_TO_MASTER (1u << 0)
+> > +#define VHOST_USER_MEM_FLAG_FROM_MASTER (1u << 1)
+> > +typedef struct VhostUserMemAccess {
+> > +    uint32_t id; /* Included in the reply */
+> > +    uint32_t flags;
+> 
+> Is VHOST_USER_MEM_FLAG_TO_MASTER | VHOST_USER_MEM_FLAG_FROM_MASTER
+> valid?
+
+No; I've changed the docs to state:
+  One (and only one) of the ``VHOST_USER_MEM_FLAG_TO_MASTER`` and
+  ``VHOST_USER_MEM_FLAG_FROM_MASTER`` flags must be set in the ``flags`` field.
+
+> > +    uint64_t addr; /* In the bus address of the device */
+> 
+> Please check the spec for preferred terminology. "bus address" isn't
+> used in the spec, so there's probably another term for it.
+
+I'm not seeing anything useful in the virtio spec; it mostly talks about
+guest physical addresses; it does say 'bus addresses' in the definition
+of 'VIRTIO_F_ACCESS_PLATFORM' .
+
+> > +    uint64_t len;  /* In bytes */
+> > +} VhostUserMemAccess;
+> > +
+> > +typedef struct VhostUserMemReply {
+> > +    uint32_t id; /* From the request */
+> > +    uint32_t flags;
+> 
+> Are any flags defined?
+
+Currently they're a copy of the TO/FROM _MASTER flags that were in the
+request; which are useful to the device to make it easy to know whether
+there's data following on the stream.
+
+> > +    uint32_t err; /* 0 on success */
+> > +    uint32_t align;
+> 
+> Is this a reserved padding field? "align" is confusing because it could
+> refer to some kind of memory alignment value. "reserved" or "padding" is
+> clearer.
+
+Changed to 'padding'
 
 Dave
 
-> ---
->  docs/tools/virtiofsd.rst | 55 ++++++++++++++++++++++++++++++++++++----
->  1 file changed, 50 insertions(+), 5 deletions(-)
->=20
-> diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-> index 00554c75bd..6370ab927c 100644
-> --- a/docs/tools/virtiofsd.rst
-> +++ b/docs/tools/virtiofsd.rst
-> @@ -127,8 +127,8 @@ Options
->    timeout.  ``always`` sets a long cache lifetime at the expense of cohe=
-rency.
->    The default is ``auto``.
-> =20
-> -xattr-mapping
-> --------------
-> +Extended attribute (xattr) mapping
-> +----------------------------------
-> =20
->  By default the name of xattr's used by the client are passed through to =
-the server
->  file system.  This can be a problem where either those xattr names are u=
-sed
-> @@ -136,6 +136,9 @@ by something on the server (e.g. selinux client/serve=
-r confusion) or if the
->  virtiofsd is running in a container with restricted privileges where it =
-cannot
->  access some attributes.
-> =20
-> +Mapping syntax
-> +~~~~~~~~~~~~~~
-> +
->  A mapping of xattr names can be made using -o xattrmap=3Dmapping where t=
-he ``mapping``
->  string consists of a series of rules.
-> =20
-> @@ -232,8 +235,48 @@ Note: When the 'security.capability' xattr is remapp=
-ed, the daemon has to do
->  extra work to remove it during many operations, which the host kernel no=
-rmally
->  does itself.
-> =20
-> -xattr-mapping Examples
-> -----------------------
-> +Security considerations
-> +~~~~~~~~~~~~~~~~~~~~~~~
-> +
-> +Operating systems typically partition the xattr namespace using
-> +well defined name prefixes. Each partition may have different
-> +access controls applied. For example, on Linux there are multiple
-> +partitions
-> +
-> + * ``system.*`` - access varies depending on attribute & filesystem
-> + * ``security.*`` - only processes with CAP_SYS_ADMIN
-> + * ``trusted.*`` - only processes with CAP_SYS_ADMIN
-> + * ``user.*`` - any process granted by file permissions / ownership
-> +
-> +While other OS such as FreeBSD have different name prefixes
-> +and access control rules.
-> +
-> +When remapping attributes on the host, it is important to
-> +ensure that the remapping does not allow a guest user to
-> +evade the guest access control rules.
-> +
-> +Consider if ``trusted.*`` from the guest was remapped to
-> +``user.virtiofs.trusted*`` in the host. An unprivileged
-> +user in a Linux guest has the ability to write to xattrs
-> +under ``user.*``. Thus the user can evade the access
-> +control restriction on ``trusted.*`` by instead writing
-> +to ``user.virtiofs.trusted.*``.
-> +
-> +As noted above, the partitions used and access controls
-> +applied, will vary across guest OS, so it is not wise to
-> +try to predict what the guest OS will use.
-> +
-> +The simplest way to avoid an insecure configuration is
-> +to remap all xattrs at once, to a given fixed prefix.
-> +This is shown in example (1) below.
-> +
-> +If selectively mapping only a subset of xattr prefixes,
-> +then rules must be added to explicitly block direct
-> +access to the target of the remapping. This is shown
-> +in example (2) below.
-> +
-> +Mapping examples
-> +~~~~~~~~~~~~~~~~
-> =20
->  1) Prefix all attributes with 'user.virtiofs.'
-> =20
-> @@ -270,7 +313,9 @@ stripping of 'user.virtiofs.'.
->  The second rule hides unprefixed 'trusted.' attributes
->  on the host.
->  The third rule stops a guest from explicitly setting
-> -the 'user.virtiofs.' path directly.
-> +the 'user.virtiofs.' path directly to prevent access
-> +control bypass on the target of the earlier prefix
-> +remapping.
->  Finally, the fourth rule lets all remaining attributes
->  through.
-> =20
-> --=20
-> 2.31.1
->=20
---=20
+> > +    uint64_t len;
+> > +} VhostUserMemReply;
+> > +
+> >  #if defined(_WIN32) && (defined(__x86_64__) || defined(__i386__))
+> >  # define VU_PACKED __attribute__((gcc_struct, packed))
+> >  #else
+> > @@ -248,6 +270,8 @@ typedef struct VhostUserMsg {
+> >          VhostUserVringArea area;
+> >          VhostUserInflight inflight;
+> >          VhostUserFSSlaveMsgMax fs_max;
+> > +        VhostUserMemAccess memaccess;
+> > +        VhostUserMemReply  memreply;
+> >      } payload;
+> >  
+> >      int fds[VHOST_MEMORY_BASELINE_NREGIONS];
+> > -- 
+> > 2.31.1
+> > 
+> > -- 
+> > Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> > 
+
+
+-- 
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

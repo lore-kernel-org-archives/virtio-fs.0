@@ -1,21 +1,16 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-	d=digiwebfirm-com.20150623.gappssmtp.com; s=20150623;
-	h=mime-version:sender:from:date:message-id:subject:to;
-	bh=Gbd+j4DwXiJ38xttklbuSai8zPopYHi1T/HMusdA/zw=;
-	b=hcikgN0L0nm8LC6ynlLJ7brTRKYyl3g8mNNhCN3nZZKlWPJUf4T/sxYCLjKUsWsP7S
-	W1p3oxPRJ0UbiR6T1wsjGEhPk6TN32H1agoAcS3rUXNI7dmj1HuiLgZM00cQbCREu6tj
-	5kKcGsURF+lXtmgj17dhsgqOUHWX7bYquuX8Zdk1jMeNWZv8emYSUJZfYDcrnB9hSLnx
-	Ts70sYqoJlGlaMnPQ7gkMBDbjfasX7KjbyddBcYjbnnj5qgxgUT3Oonje6aYthl6pIKI
-	MokJLKXTcZ/lAkigWQi0P/hu9t1MB0I1JzpZ0+QKrWYu1EovlcyxQPIpAmAlUc/pSCgm
-	BmuA==
+Date: Wed, 16 Jun 2021 10:50:44 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YMnJdM99KWHkkqiU@work-vm>
+References: <20210611120427.49736-1-berrange@redhat.com>
+	<20210611154222.GA761698@redhat.com> <YMjLZUqZ5nhihJ1X@redhat.com>
+	<20210615195740.GC965196@redhat.com>
 MIME-Version: 1.0
-Sender: Clara Wood <clarawood@digiwebfirm.com>
-From: Clara Wood <clarawood@digiwebfirm.com>
-Date: Wed, 16 Jun 2021 05:27:16 -0400
-Message-ID: <CA+6wEQLr-89BQZnVmBJTCvM8o8Fry2MdRnu7UYQXthR9oANuOw@mail.gmail.com>
-Content-Type: multipart/alternative; boundary="00000000000054272405c4deb26b"
-Subject: Re: [Virtio-fs] agence90.fr: Strategies to improve your website
-	ranking!
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+In-Reply-To: <20210615195740.GC965196@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] docs: describe the security considerations
+ with virtiofsd xattr mapping
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,102 +19,165 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Virtio-Fs <virtio-fs@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>, qemu-devel@nongnu.org
 
---00000000000054272405c4deb26b
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> On Tue, Jun 15, 2021 at 04:46:45PM +0100, Daniel P. Berrang=E9 wrote:
+> > On Fri, Jun 11, 2021 at 11:42:22AM -0400, Vivek Goyal wrote:
+> > > On Fri, Jun 11, 2021 at 01:04:27PM +0100, Daniel P. Berrang=E9 wrote:
+> > > > Different guest xattr prefixes have distinct access control rules a=
+pplied
+> > > > by the guest. When remapping a guest xattr care must be taken that =
+the
+> > > > remapping does not allow the a guest user to bypass guest kernel ac=
+cess
+> > > > control rules.
+> > > >=20
+> > > > For example if 'trusted.*' which requires CAP_SYS_ADMIN is remapped
+> > > > to 'user.virtiofs.trusted.*', an unprivileged guest user which can
+> > > > write to 'user.*' can bypass the CAP_SYS_ADMIN control. Thus the
+> > > > target of any remapping must be explicitly blocked from read/writes
+> > > > by the guest, to prevent access control bypass.
+> > > >=20
+> > > > The examples shown in the virtiofsd man page already do the right
+> > > > thing and ensure safety, but the security implications of getting
+> > > > this wrong were not made explicit. This could lead to host admins
+> > > > and apps unwittingly creating insecure configurations.
+> > > >=20
+> > > > Signed-off-by: Daniel P. Berrang=E9 <berrange@redhat.com>
+> > > > ---
+> > > >  docs/tools/virtiofsd.rst | 55 ++++++++++++++++++++++++++++++++++++=
+----
+> > > >  1 file changed, 50 insertions(+), 5 deletions(-)
+> > > >=20
+> > > > diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
+> > > > index 00554c75bd..6370ab927c 100644
+> > > > --- a/docs/tools/virtiofsd.rst
+> > > > +++ b/docs/tools/virtiofsd.rst
+> > > > @@ -127,8 +127,8 @@ Options
+> > > >    timeout.  ``always`` sets a long cache lifetime at the expense o=
+f coherency.
+> > > >    The default is ``auto``.
+> > > > =20
+> > > > -xattr-mapping
+> > > > --------------
+> > > > +Extended attribute (xattr) mapping
+> > > > +----------------------------------
+> > > > =20
+> > > >  By default the name of xattr's used by the client are passed throu=
+gh to the server
+> > > >  file system.  This can be a problem where either those xattr names=
+ are used
+> > > > @@ -136,6 +136,9 @@ by something on the server (e.g. selinux client=
+/server confusion) or if the
+> > > >  virtiofsd is running in a container with restricted privileges whe=
+re it cannot
+> > > >  access some attributes.
+> > > > =20
+> > > > +Mapping syntax
+> > > > +~~~~~~~~~~~~~~
+> > > > +
+> > > >  A mapping of xattr names can be made using -o xattrmap=3Dmapping w=
+here the ``mapping``
+> > > >  string consists of a series of rules.
+> > > > =20
+> > > > @@ -232,8 +235,48 @@ Note: When the 'security.capability' xattr is =
+remapped, the daemon has to do
+> > > >  extra work to remove it during many operations, which the host ker=
+nel normally
+> > > >  does itself.
+> > > > =20
+> > > > -xattr-mapping Examples
+> > > > -----------------------
+> > > > +Security considerations
+> > > > +~~~~~~~~~~~~~~~~~~~~~~~
+> > > > +
+> > > > +Operating systems typically partition the xattr namespace using
+> > > > +well defined name prefixes. Each partition may have different
+> > > > +access controls applied. For example, on Linux there are multiple
+> > > > +partitions
+> > > > +
+> > > > + * ``system.*`` - access varies depending on attribute & filesystem
+> > > > + * ``security.*`` - only processes with CAP_SYS_ADMIN
+> > > > + * ``trusted.*`` - only processes with CAP_SYS_ADMIN
+> > > > + * ``user.*`` - any process granted by file permissions / ownership
+> > > > +
+> > > > +While other OS such as FreeBSD have different name prefixes
+> > > > +and access control rules.
+> > > > +
+> > > > +When remapping attributes on the host, it is important to
+> > > > +ensure that the remapping does not allow a guest user to
+> > > > +evade the guest access control rules.
+> > > > +
+> > > > +Consider if ``trusted.*`` from the guest was remapped to
+> > > > +``user.virtiofs.trusted*`` in the host. An unprivileged
+> > > > +user in a Linux guest has the ability to write to xattrs
+> > > > +under ``user.*``. Thus the user can evade the access
+> > > > +control restriction on ``trusted.*`` by instead writing
+> > > > +to ``user.virtiofs.trusted.*``.
+> > > > +
+> > > > +As noted above, the partitions used and access controls
+> > > > +applied, will vary across guest OS, so it is not wise to
+> > > > +try to predict what the guest OS will use.
+> > > > +
+> > > > +The simplest way to avoid an insecure configuration is
+> > > > +to remap all xattrs at once, to a given fixed prefix.
+> > >=20
+> > > Remapping all xattrs seem to make sense. It probably will lead
+> > > to less confusion. Nested guests add another level of redirection.
+> > >=20
+> > > BTW, remapping xattr has limitation that it does not work on
+> > > symlinks. So "user.*" can't be set on symlink. And that means
+> > > selinux relabeling of symlinks fails with remapped xattrs.
+> > >=20
+> > > Not sure how to address this limitation. Host kernel imposes
+> > > this limit. (man xattr).
+> >=20
+> > Oh fun, I had not noticed this limitation before :-(
+> >=20
+> > Here are some ideas I had, none especially nice
+> >=20
+> >  - Use 'trusted.*' namespace for remapping instead of 'user.'
+> > =20
+> >    virtiofsd needs to have CAP_SYS_ADMIN though which is
+> >    quite horrible if your goal is to confine its privileges
+> >    in any meaningful way
+> >=20
+> >  - Store a symlinks' xattr on the target of the symlink
+> >=20
+> >    if the symlink has dev:inode  54:224, and points to
+> >    a file 'foo', then on 'foo' create an xattr
+> >    "user.virtiofs.link:54:224.<original xattrpath>"
+> >=20
+> >    This gets quite horrendous when you have symlinks
+> >    pointing to symlinks pointing to symlinks. Does
+> >    not work too well if the 'st_dev' value is
+> >    not stable across reboots either.
+> >=20
+> >  - Don't use xattrs at all for remapping, instead use
+> >    hidden files.
+> >=20
+> >    eg for a file 'foo', if an xattr is set then create
+> >    a file '.foo.xattr' in the same directory and store
+> >    the xattrs in that file in some format. Need to hide
+> >    this lookaside files from the guest of course.
+>=20
+> I kind of like this idea of creating a regular file, say
+> .user.virtiofs.foo.xattr. So any file prefixed by ".user.virtiofs" will
+> be hidden from guest.
+>=20
+> And probably same can be done for selinux labels for special files (device
+> nodes, pipes, sockets etc).=20
 
-Hello *agence90.fr <http://agence90.fr>,*
+Except that splitting the attrs from the file makes it a nightmare to
+deal with renames and anything else that might be expected to happen
+atomically.
 
-I was going through your website and I found it impressive!!! However, when
-I search for your business keywords I see your competitors ranked on the
-1st page whereas I am unable to see your website anywhere on the first page
-of search engine results.
+Dave
 
-Your website is great in terms of design and content. However, it doesn=E2=
-=80=99t
-follow Search Engine Guidelines. So, it has a very low visibility in search
-results.
-
-If you are interested then I will send you an *SEO package* and *price list=
-*
-.
-
-
-
-Kind Regards
-
-
-* Clara Wood! Business Development Manager*
-
---------------------------------------------------------
-
-*Note:* - Our next conversation will be on my corporate Email ID. If this
-is something you are interested, please respond to this email. If this is
-not your interest, don't worry, we will not email you again.
-
---00000000000054272405c4deb26b
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr"><p class=3D"MsoNormal" style=3D"margin:0in 0in 12pt;line-h=
-eight:normal;font-size:11pt;font-family:Calibri,sans-serif"><span style=3D"=
-font-size:12pt;font-family:Verdana,sans-serif">Hello <b><a href=3D"http://a=
-gence90.fr">agence90.fr</a>,</b></span></p><p class=3D"MsoNormal" style=3D"=
-margin:0in 0in 12pt;line-height:normal;font-size:11pt;font-family:Calibri,s=
-ans-serif"><span style=3D"font-family:Verdana,sans-serif;font-size:12pt;tex=
-t-align:justify">I
-was going through your website and I found it impressive!!! However, when I
-search for your business keywords I see your competitors ranked on the 1st =
-page
-whereas I am unable to see your website anywhere on the first page of searc=
-h
-engine results.</span></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in 0in 8pt;text-align:justify;line-=
-height:normal;font-size:11pt;font-family:Calibri,sans-serif"><span style=3D=
-"font-size:12pt;font-family:Verdana,sans-serif">Your
-website is great in terms of design and content. However, it doesn=E2=80=99=
-t follow
-Search Engine Guidelines. So, it has a very low visibility in search result=
-s.</span></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in 0in 8pt;text-align:justify;line-=
-height:normal;font-size:11pt;font-family:Calibri,sans-serif"><span style=3D=
-"font-size:12pt;font-family:Verdana,sans-serif">If
-you are interested then I will send you an <b>SEO package</b> and <b>price =
-list</b>.</span></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in 0in 8pt;text-align:justify;line-=
-height:normal;font-size:11pt;font-family:Calibri,sans-serif"><span style=3D=
-"font-size:12pt;font-family:Verdana,sans-serif">=C2=A0</span></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in 0in 0.0001pt;text-align:justify;=
-line-height:normal;font-size:11pt;font-family:Calibri,sans-serif"><span sty=
-le=3D"font-size:12pt;font-family:Verdana,sans-serif">Kind
-Regards</span></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in 0in 0.0001pt;text-align:justify;=
-line-height:normal;font-size:11pt;font-family:Calibri,sans-serif"><b><span =
-style=3D"font-size:12pt;font-family:Verdana,sans-serif"><br>
-Clara Wood! Business Development Manager</span></b></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in 0in 8pt;text-align:justify;line-=
-height:normal;font-size:11pt;font-family:Calibri,sans-serif"><span style=3D=
-"font-size:12pt;font-family:Verdana,sans-serif">---------------------------=
------------------------------</span></p>
-
-<p class=3D"MsoNormal" style=3D"text-align:justify;margin:0in 0in 10pt;line=
--height:115%;font-size:11pt;font-family:Calibri,sans-serif"><b><span style=
-=3D"font-size:10.5pt;line-height:115%;font-family:Verdana,sans-serif;color:=
-black">Note:</span></b><span style=3D"font-size:10.5pt;line-height:115%;fon=
-t-family:Verdana,sans-serif;color:black">=C2=A0- Our next conversation will=
- be on my corporate Email ID. If
-this is something you are interested, please respond to this email. If this=
- is
-not your interest, don&#39;t worry, we will not email you again.</span></p>=
-</div>
-
---00000000000054272405c4deb26b--
+> Thanks
+> Vivek
+--=20
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

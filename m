@@ -1,14 +1,12 @@
-Date: Wed, 16 Jun 2021 10:50:44 +0100
+Date: Wed, 16 Jun 2021 11:16:10 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YMnJdM99KWHkkqiU@work-vm>
+Message-ID: <YMnPagK2lpcfCqMV@work-vm>
 References: <20210611120427.49736-1-berrange@redhat.com>
-	<20210611154222.GA761698@redhat.com> <YMjLZUqZ5nhihJ1X@redhat.com>
-	<20210615195740.GC965196@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="iso-8859-1"
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <20210615195740.GC965196@redhat.com>
+In-Reply-To: <20210611120427.49736-1-berrange@redhat.com>
 Subject: Re: [Virtio-fs] [PATCH] docs: describe the security considerations
  with virtiofsd xattr mapping
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -19,165 +17,138 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>, qemu-devel@nongnu.org
+To: Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> On Tue, Jun 15, 2021 at 04:46:45PM +0100, Daniel P. Berrang=E9 wrote:
-> > On Fri, Jun 11, 2021 at 11:42:22AM -0400, Vivek Goyal wrote:
-> > > On Fri, Jun 11, 2021 at 01:04:27PM +0100, Daniel P. Berrang=E9 wrote:
-> > > > Different guest xattr prefixes have distinct access control rules a=
-pplied
-> > > > by the guest. When remapping a guest xattr care must be taken that =
-the
-> > > > remapping does not allow the a guest user to bypass guest kernel ac=
-cess
-> > > > control rules.
-> > > >=20
-> > > > For example if 'trusted.*' which requires CAP_SYS_ADMIN is remapped
-> > > > to 'user.virtiofs.trusted.*', an unprivileged guest user which can
-> > > > write to 'user.*' can bypass the CAP_SYS_ADMIN control. Thus the
-> > > > target of any remapping must be explicitly blocked from read/writes
-> > > > by the guest, to prevent access control bypass.
-> > > >=20
-> > > > The examples shown in the virtiofsd man page already do the right
-> > > > thing and ensure safety, but the security implications of getting
-> > > > this wrong were not made explicit. This could lead to host admins
-> > > > and apps unwittingly creating insecure configurations.
-> > > >=20
-> > > > Signed-off-by: Daniel P. Berrang=E9 <berrange@redhat.com>
-> > > > ---
-> > > >  docs/tools/virtiofsd.rst | 55 ++++++++++++++++++++++++++++++++++++=
-----
-> > > >  1 file changed, 50 insertions(+), 5 deletions(-)
-> > > >=20
-> > > > diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-> > > > index 00554c75bd..6370ab927c 100644
-> > > > --- a/docs/tools/virtiofsd.rst
-> > > > +++ b/docs/tools/virtiofsd.rst
-> > > > @@ -127,8 +127,8 @@ Options
-> > > >    timeout.  ``always`` sets a long cache lifetime at the expense o=
-f coherency.
-> > > >    The default is ``auto``.
-> > > > =20
-> > > > -xattr-mapping
-> > > > --------------
-> > > > +Extended attribute (xattr) mapping
-> > > > +----------------------------------
-> > > > =20
-> > > >  By default the name of xattr's used by the client are passed throu=
-gh to the server
-> > > >  file system.  This can be a problem where either those xattr names=
- are used
-> > > > @@ -136,6 +136,9 @@ by something on the server (e.g. selinux client=
-/server confusion) or if the
-> > > >  virtiofsd is running in a container with restricted privileges whe=
-re it cannot
-> > > >  access some attributes.
-> > > > =20
-> > > > +Mapping syntax
-> > > > +~~~~~~~~~~~~~~
-> > > > +
-> > > >  A mapping of xattr names can be made using -o xattrmap=3Dmapping w=
-here the ``mapping``
-> > > >  string consists of a series of rules.
-> > > > =20
-> > > > @@ -232,8 +235,48 @@ Note: When the 'security.capability' xattr is =
-remapped, the daemon has to do
-> > > >  extra work to remove it during many operations, which the host ker=
-nel normally
-> > > >  does itself.
-> > > > =20
-> > > > -xattr-mapping Examples
-> > > > -----------------------
-> > > > +Security considerations
-> > > > +~~~~~~~~~~~~~~~~~~~~~~~
-> > > > +
-> > > > +Operating systems typically partition the xattr namespace using
-> > > > +well defined name prefixes. Each partition may have different
-> > > > +access controls applied. For example, on Linux there are multiple
-> > > > +partitions
-> > > > +
-> > > > + * ``system.*`` - access varies depending on attribute & filesystem
-> > > > + * ``security.*`` - only processes with CAP_SYS_ADMIN
-> > > > + * ``trusted.*`` - only processes with CAP_SYS_ADMIN
-> > > > + * ``user.*`` - any process granted by file permissions / ownership
-> > > > +
-> > > > +While other OS such as FreeBSD have different name prefixes
-> > > > +and access control rules.
-> > > > +
-> > > > +When remapping attributes on the host, it is important to
-> > > > +ensure that the remapping does not allow a guest user to
-> > > > +evade the guest access control rules.
-> > > > +
-> > > > +Consider if ``trusted.*`` from the guest was remapped to
-> > > > +``user.virtiofs.trusted*`` in the host. An unprivileged
-> > > > +user in a Linux guest has the ability to write to xattrs
-> > > > +under ``user.*``. Thus the user can evade the access
-> > > > +control restriction on ``trusted.*`` by instead writing
-> > > > +to ``user.virtiofs.trusted.*``.
-> > > > +
-> > > > +As noted above, the partitions used and access controls
-> > > > +applied, will vary across guest OS, so it is not wise to
-> > > > +try to predict what the guest OS will use.
-> > > > +
-> > > > +The simplest way to avoid an insecure configuration is
-> > > > +to remap all xattrs at once, to a given fixed prefix.
-> > >=20
-> > > Remapping all xattrs seem to make sense. It probably will lead
-> > > to less confusion. Nested guests add another level of redirection.
-> > >=20
-> > > BTW, remapping xattr has limitation that it does not work on
-> > > symlinks. So "user.*" can't be set on symlink. And that means
-> > > selinux relabeling of symlinks fails with remapped xattrs.
-> > >=20
-> > > Not sure how to address this limitation. Host kernel imposes
-> > > this limit. (man xattr).
-> >=20
-> > Oh fun, I had not noticed this limitation before :-(
-> >=20
-> > Here are some ideas I had, none especially nice
-> >=20
-> >  - Use 'trusted.*' namespace for remapping instead of 'user.'
-> > =20
-> >    virtiofsd needs to have CAP_SYS_ADMIN though which is
-> >    quite horrible if your goal is to confine its privileges
-> >    in any meaningful way
-> >=20
-> >  - Store a symlinks' xattr on the target of the symlink
-> >=20
-> >    if the symlink has dev:inode  54:224, and points to
-> >    a file 'foo', then on 'foo' create an xattr
-> >    "user.virtiofs.link:54:224.<original xattrpath>"
-> >=20
-> >    This gets quite horrendous when you have symlinks
-> >    pointing to symlinks pointing to symlinks. Does
-> >    not work too well if the 'st_dev' value is
-> >    not stable across reboots either.
-> >=20
-> >  - Don't use xattrs at all for remapping, instead use
-> >    hidden files.
-> >=20
-> >    eg for a file 'foo', if an xattr is set then create
-> >    a file '.foo.xattr' in the same directory and store
-> >    the xattrs in that file in some format. Need to hide
-> >    this lookaside files from the guest of course.
+* Daniel P. Berrang=E9 (berrange@redhat.com) wrote:
+> Different guest xattr prefixes have distinct access control rules applied
+> by the guest. When remapping a guest xattr care must be taken that the
+> remapping does not allow the a guest user to bypass guest kernel access
+> control rules.
 >=20
-> I kind of like this idea of creating a regular file, say
-> .user.virtiofs.foo.xattr. So any file prefixed by ".user.virtiofs" will
-> be hidden from guest.
+> For example if 'trusted.*' which requires CAP_SYS_ADMIN is remapped
+> to 'user.virtiofs.trusted.*', an unprivileged guest user which can
+> write to 'user.*' can bypass the CAP_SYS_ADMIN control. Thus the
+> target of any remapping must be explicitly blocked from read/writes
+> by the guest, to prevent access control bypass.
 >=20
-> And probably same can be done for selinux labels for special files (device
-> nodes, pipes, sockets etc).=20
+> The examples shown in the virtiofsd man page already do the right
+> thing and ensure safety, but the security implications of getting
+> this wrong were not made explicit. This could lead to host admins
+> and apps unwittingly creating insecure configurations.
+>=20
+> Signed-off-by: Daniel P. Berrang=E9 <berrange@redhat.com>
 
-Except that splitting the attrs from the file makes it a nightmare to
-deal with renames and anything else that might be expected to happen
-atomically.
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+
+
+Vivek's point about symlinks is something we should add but that's kind
+of separate to the clarification you've explained here.
 
 Dave
 
-> Thanks
-> Vivek
+> ---
+>  docs/tools/virtiofsd.rst | 55 ++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 50 insertions(+), 5 deletions(-)
+>=20
+> diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
+> index 00554c75bd..6370ab927c 100644
+> --- a/docs/tools/virtiofsd.rst
+> +++ b/docs/tools/virtiofsd.rst
+> @@ -127,8 +127,8 @@ Options
+>    timeout.  ``always`` sets a long cache lifetime at the expense of cohe=
+rency.
+>    The default is ``auto``.
+> =20
+> -xattr-mapping
+> --------------
+> +Extended attribute (xattr) mapping
+> +----------------------------------
+> =20
+>  By default the name of xattr's used by the client are passed through to =
+the server
+>  file system.  This can be a problem where either those xattr names are u=
+sed
+> @@ -136,6 +136,9 @@ by something on the server (e.g. selinux client/serve=
+r confusion) or if the
+>  virtiofsd is running in a container with restricted privileges where it =
+cannot
+>  access some attributes.
+> =20
+> +Mapping syntax
+> +~~~~~~~~~~~~~~
+> +
+>  A mapping of xattr names can be made using -o xattrmap=3Dmapping where t=
+he ``mapping``
+>  string consists of a series of rules.
+> =20
+> @@ -232,8 +235,48 @@ Note: When the 'security.capability' xattr is remapp=
+ed, the daemon has to do
+>  extra work to remove it during many operations, which the host kernel no=
+rmally
+>  does itself.
+> =20
+> -xattr-mapping Examples
+> -----------------------
+> +Security considerations
+> +~~~~~~~~~~~~~~~~~~~~~~~
+> +
+> +Operating systems typically partition the xattr namespace using
+> +well defined name prefixes. Each partition may have different
+> +access controls applied. For example, on Linux there are multiple
+> +partitions
+> +
+> + * ``system.*`` - access varies depending on attribute & filesystem
+> + * ``security.*`` - only processes with CAP_SYS_ADMIN
+> + * ``trusted.*`` - only processes with CAP_SYS_ADMIN
+> + * ``user.*`` - any process granted by file permissions / ownership
+> +
+> +While other OS such as FreeBSD have different name prefixes
+> +and access control rules.
+> +
+> +When remapping attributes on the host, it is important to
+> +ensure that the remapping does not allow a guest user to
+> +evade the guest access control rules.
+> +
+> +Consider if ``trusted.*`` from the guest was remapped to
+> +``user.virtiofs.trusted*`` in the host. An unprivileged
+> +user in a Linux guest has the ability to write to xattrs
+> +under ``user.*``. Thus the user can evade the access
+> +control restriction on ``trusted.*`` by instead writing
+> +to ``user.virtiofs.trusted.*``.
+> +
+> +As noted above, the partitions used and access controls
+> +applied, will vary across guest OS, so it is not wise to
+> +try to predict what the guest OS will use.
+> +
+> +The simplest way to avoid an insecure configuration is
+> +to remap all xattrs at once, to a given fixed prefix.
+> +This is shown in example (1) below.
+> +
+> +If selectively mapping only a subset of xattr prefixes,
+> +then rules must be added to explicitly block direct
+> +access to the target of the remapping. This is shown
+> +in example (2) below.
+> +
+> +Mapping examples
+> +~~~~~~~~~~~~~~~~
+> =20
+>  1) Prefix all attributes with 'user.virtiofs.'
+> =20
+> @@ -270,7 +313,9 @@ stripping of 'user.virtiofs.'.
+>  The second rule hides unprefixed 'trusted.' attributes
+>  on the host.
+>  The third rule stops a guest from explicitly setting
+> -the 'user.virtiofs.' path directly.
+> +the 'user.virtiofs.' path directly to prevent access
+> +control bypass on the target of the earlier prefix
+> +remapping.
+>  Finally, the fourth rule lets all remaining attributes
+>  through.
+> =20
+> --=20
+> 2.31.1
+>=20
 --=20
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

@@ -1,15 +1,22 @@
-References: <20210609155551.44437-1-mreitz@redhat.com>
-	<20210611191925.GA767764@redhat.com>
-From: Max Reitz <mreitz@redhat.com>
-Message-ID: <ddc46d6a-70c0-5d5e-c704-514be7a3c014@redhat.com>
-Date: Wed, 16 Jun 2021 15:41:36 +0200
+Date: Wed, 16 Jun 2021 16:29:31 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <YMoY27s0zoFzE5wg@stefanha-x1.localdomain>
+References: <20210428110100.27757-27-dgilbert@redhat.com>
+	<YJQNIPaFCJlG7ZKc@stefanha-x1.localdomain>
+	<20210506160223.GA277745@redhat.com>
+	<YJj3RSxXKZHxmiKu@stefanha-x1.localdomain>
+	<20210510152324.GB150402@horse>
+	<YJlSHZ0vzNtCAjkJ@stefanha-x1.localdomain>
+	<YK/uUUZI3zy9k8Vk@work-vm> <YMIv5odJWdkbJzWL@work-vm>
+	<YMI8fS6m8CjtUtmE@stefanha-x1.localdomain>
+	<YMnwOs9bxKLB8wSL@work-vm>
 MIME-Version: 1.0
-In-Reply-To: <20210611191925.GA767764@redhat.com>
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Transfer-Encoding: 8bit
-Content-Language: en-US
-Subject: Re: [Virtio-fs] [PATCH v2 0/9] virtiofsd: Allow using file handles
- instead of O_PATH FDs
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="vCVPAPq/bsUMZ+fR"
+Content-Disposition: inline
+In-Reply-To: <YMnwOs9bxKLB8wSL@work-vm>
+Subject: Re: [Virtio-fs] [PATCH v3 26/26] virtiofsd: Ask qemu to drop
+ CAP_FSETID if client asked for it
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,30 +25,47 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
 
-On 11.06.21 21:19, Vivek Goyal wrote:
-> On Wed, Jun 09, 2021 at 05:55:42PM +0200, Max Reitz wrote:
->> Hi,
->>
->> v1 cover letter for an overview:
->> https://listman.redhat.com/archives/virtio-fs/2021-June/msg00033.html
-> Hi Max,
->
-> What's the impact of these patches on performance? Just trying to
-> get some idea what to expect. Performance remains more or less
-> same or we expect a hit.
-I definitely expect a hit if you just benchmark the right way. Having to 
-open FDs all the time (for metadata operations) will have an impact 
-(when you do lookups all the time, or open files and close them 
-immediately). How much of an impact, that’s completely up to the 
-filesystem’s open_by_handle_at() implementation, I presume.
 
-I don’t expect it to be significant for real-world use cases, though. 
-When really doing I/O, there should be absolutely no difference, because 
-then we’re operating with these FUSE handles that have actual (non-path) 
-FDs attached to them.
+--vCVPAPq/bsUMZ+fR
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Max
+On Wed, Jun 16, 2021 at 01:36:10PM +0100, Dr. David Alan Gilbert wrote:
+> * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > On Thu, Jun 10, 2021 at 04:29:42PM +0100, Dr. David Alan Gilbert wrote:
+> > > * Dr. David Alan Gilbert (dgilbert@redhat.com) wrote:
+> > > > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > > +    uint64_t addr; /* In the bus address of the device */
+> >=20
+> > Please check the spec for preferred terminology. "bus address" isn't
+> > used in the spec, so there's probably another term for it.
+>=20
+> I'm not seeing anything useful in the virtio spec; it mostly talks about
+> guest physical addresses; it does say 'bus addresses' in the definition
+> of 'VIRTIO_F_ACCESS_PLATFORM' .
+
+I meant the docs/interop/vhost-user.rst spec.
+
+Stefan
+
+--vCVPAPq/bsUMZ+fR
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmDKGNQACgkQnKSrs4Gr
+c8gLiwgAn8wLJm2ypupTK9cxtNCYleDFZ+gqwPLMEnxXNbLdRvTZhB+leOAkqV1w
+bX36vWqDcXAk+gxk6Ld3ocZcnEl8/0YLeMjI9cj1dSSnPt6FxaaD/wLsthJPdk5h
+TajFVUX9b1b7PhCWYnYrGxntCsjtbhE3C81/A4iyWWGIutoBwVViZgKO28wUJD0p
+Yeu/s5YAdNs+U+Ge6Q9MbqOZRGXa1ftDwLq5u8aDFU+730JO0nW77njMLej2rhlz
+IF/H9qAByNg5mmc18zUmc/xyJAEg7gv7Xs3vbsN7eqBoKvDPZuqkGqudYRCigX2U
+DvasdqGwBmq6azWna46Bo4FJVLkOJA==
+=RR56
+-----END PGP SIGNATURE-----
+
+--vCVPAPq/bsUMZ+fR--
 

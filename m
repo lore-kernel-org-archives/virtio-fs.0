@@ -1,15 +1,21 @@
-References: <20210525150230.157586-1-groug@kaod.org>
-	<20210525150230.157586-2-groug@kaod.org>
-From: Max Reitz <mreitz@redhat.com>
-Message-ID: <cef80ba1-b0c1-a8bd-387a-9c7d2730a766@redhat.com>
-Date: Thu, 27 May 2021 11:51:37 +0200
+Date: Wed, 16 Jun 2021 19:35:26 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YMpEbqEhCz9kMM8G@work-vm>
+References: <YJQNIPaFCJlG7ZKc@stefanha-x1.localdomain>
+	<20210506160223.GA277745@redhat.com>
+	<YJj3RSxXKZHxmiKu@stefanha-x1.localdomain>
+	<20210510152324.GB150402@horse>
+	<YJlSHZ0vzNtCAjkJ@stefanha-x1.localdomain>
+	<YK/uUUZI3zy9k8Vk@work-vm> <YMIv5odJWdkbJzWL@work-vm>
+	<YMI8fS6m8CjtUtmE@stefanha-x1.localdomain>
+	<YMnwOs9bxKLB8wSL@work-vm>
+	<YMoY27s0zoFzE5wg@stefanha-x1.localdomain>
 MIME-Version: 1.0
-In-Reply-To: <20210525150230.157586-2-groug@kaod.org>
-Content-Type: text/plain; charset=utf-8; format=flowed
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH 1/4] fuse: Fix crash in
- fuse_dentry_automount() error path
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <YMoY27s0zoFzE5wg@stefanha-x1.localdomain>
+Subject: Re: [Virtio-fs] [PATCH v3 26/26] virtiofsd: Ask qemu to drop
+ CAP_FSETID if client asked for it
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,40 +24,45 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>, Miklos Szeredi <miklos@szeredi.hu>
-Cc: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, stable@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
 
-On 25.05.21 17:02, Greg Kurz wrote:
-> If fuse_fill_super_submount() returns an error, the error path
-> triggers a crash:
+* Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> On Wed, Jun 16, 2021 at 01:36:10PM +0100, Dr. David Alan Gilbert wrote:
+> > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > > On Thu, Jun 10, 2021 at 04:29:42PM +0100, Dr. David Alan Gilbert wrote:
+> > > > * Dr. David Alan Gilbert (dgilbert@redhat.com) wrote:
+> > > > > * Stefan Hajnoczi (stefanha@redhat.com) wrote:
+> > > > +    uint64_t addr; /* In the bus address of the device */
+> > > 
+> > > Please check the spec for preferred terminology. "bus address" isn't
+> > > used in the spec, so there's probably another term for it.
+> > 
+> > I'm not seeing anything useful in the virtio spec; it mostly talks about
+> > guest physical addresses; it does say 'bus addresses' in the definition
+> > of 'VIRTIO_F_ACCESS_PLATFORM' .
 > 
-> [   26.206673] BUG: kernel NULL pointer dereference, address: 0000000000000000
-> [...]
-> [   26.226362] RIP: 0010:__list_del_entry_valid+0x25/0x90
-> [...]
-> [   26.247938] Call Trace:
-> [   26.248300]  fuse_mount_remove+0x2c/0x70 [fuse]
-> [   26.248892]  virtio_kill_sb+0x22/0x160 [virtiofs]
-> [   26.249487]  deactivate_locked_super+0x36/0xa0
-> [   26.250077]  fuse_dentry_automount+0x178/0x1a0 [fuse]
-> 
-> The crash happens because fuse_mount_remove() assumes that the FUSE
-> mount was already added to list under the FUSE connection, but this
-> only done after fuse_fill_super_submount() has returned success.
-> 
-> This means that until fuse_fill_super_submount() has returned success,
-> the FUSE mount isn't actually owned by the superblock. We should thus
-> reclaim ownership by clearing sb->s_fs_info, which will skip the call
-> to fuse_mount_remove(), and perform rollback, like virtio_fs_get_tree()
-> already does for the root sb.
-> 
-> Fixes: bf109c64040f ("fuse: implement crossmounts")
-> Cc: mreitz@redhat.com
-> Cc: stable@vger.kernel.org # v5.10+
-> Signed-off-by: Greg Kurz <groug@kaod.org>
-> ---
->   fs/fuse/dir.c | 6 +++++-
->   1 file changed, 5 insertions(+), 1 deletion(-)
+> I meant the docs/interop/vhost-user.rst spec.
 
-Reviewed-by: Max Reitz <mreitz@redhat.com>
+I think they use the phrase 'guest address' so I've changed that to:
+
+    uint64_t guest_addr; 
+
+   Elsewhere in the vhost-user.rst it says:
+   
+   When the ``VIRTIO_F_IOMMU_PLATFORM`` feature has not been negotiated:
+    
+   * Guest addresses map to the vhost memory region containing that guest
+     address.
+    
+   When the ``VIRTIO_F_IOMMU_PLATFORM`` feature has been negotiated:
+    
+   * Guest addresses are also called I/O virtual addresses (IOVAs).  They are
+     translated to user addresses via the IOTLB.
+   
+> Stefan
+
+
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

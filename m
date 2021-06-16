@@ -1,11 +1,12 @@
 From: Ioannis Angelakopoulos <iangelak@redhat.com>
-Date: Wed, 16 Jun 2021 15:39:19 -0400
-Message-Id: <20210616193921.608720-5-iangelak@redhat.com>
+Date: Wed, 16 Jun 2021 15:39:20 -0400
+Message-Id: <20210616193921.608720-6-iangelak@redhat.com>
 In-Reply-To: <20210616193921.608720-1-iangelak@redhat.com>
 References: <20210616193921.608720-1-iangelak@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 4/6] virtiofsd: Implement blocking posix locks
+Subject: [Virtio-fs] [PATCH 5/6] virtiofsd: Thread state cleanup when
+	blocking posix locks are used
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,395 +18,142 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: vgoyal@redhat.com
 
-From: Vivek Goyal <vgoyal@redhat.com>
+Stop virtiofsd thread from sending any notifications/messages through
+the virtqueue while the guest hard-reboots.
 
-As of now we don't support fcntl(F_SETLKW) and if we see one, we return
--EOPNOTSUPP.
+If a guest attempts to hard reboot while a virtiofsd thread blocks
+waiting for a lock held by another guest's virtiofsd process, then
+QEMU will block the guest from rebooting until the lock is released.
 
-Change that by accepting these requests and returning a reply
-immediately asking caller to wait. Once lock is available, send a
-notification to the waiter indicating lock is available.
+When the virtiofsd thread acquires the lock it will not attempt to
+send a message to the notification virtqueue since the queue is
+now destroyed, due to the hard-reboot attempt of the guest. The thread
+will only release the lock, without sending any notifications through the
+virtqueue.
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Then the cleanup process can proceed normally.
+
 Signed-off-by: Ioannis Angelakopoulos <iangelak@redhat.com>
 ---
- include/standard-headers/linux/fuse.h |   8 ++
- tools/virtiofsd/fuse_lowlevel.c       |  38 +++++++++-
- tools/virtiofsd/fuse_lowlevel.h       |  26 +++++++
- tools/virtiofsd/fuse_virtio.c         | 101 ++++++++++++++++++++++++--
- tools/virtiofsd/passthrough_ll.c      |  59 ++++++++++-----
- 5 files changed, 207 insertions(+), 25 deletions(-)
+ tools/virtiofsd/fuse_i.h         |  1 +
+ tools/virtiofsd/fuse_lowlevel.c  |  2 ++
+ tools/virtiofsd/fuse_virtio.c    | 10 ++++++++++
+ tools/virtiofsd/passthrough_ll.c | 23 +++++++++++++++++++----
+ 4 files changed, 32 insertions(+), 4 deletions(-)
 
-diff --git a/include/standard-headers/linux/fuse.h b/include/standard-headers/linux/fuse.h
-index 950d7edb7e..4680efc531 100644
---- a/include/standard-headers/linux/fuse.h
-+++ b/include/standard-headers/linux/fuse.h
-@@ -511,6 +511,7 @@ enum fuse_notify_code {
- 	FUSE_NOTIFY_STORE = 4,
- 	FUSE_NOTIFY_RETRIEVE = 5,
- 	FUSE_NOTIFY_DELETE = 6,
-+        FUSE_NOTIFY_LOCK = 7,
- 	FUSE_NOTIFY_CODE_MAX,
- };
- 
-@@ -898,6 +899,13 @@ struct fuse_notify_retrieve_in {
- 	uint64_t	dummy4;
- };
- 
-+struct fuse_notify_lock_out {
-+	uint64_t	unique;
-+	int32_t		error;
-+	int32_t		padding;
-+};
-+
-+
- /* Device ioctls: */
- #define FUSE_DEV_IOC_CLONE	_IOR(229, 0, uint32_t)
- 
+diff --git a/tools/virtiofsd/fuse_i.h b/tools/virtiofsd/fuse_i.h
+index 4942d080da..269fd5e77b 100644
+--- a/tools/virtiofsd/fuse_i.h
++++ b/tools/virtiofsd/fuse_i.h
+@@ -62,6 +62,7 @@ struct fuse_session {
+     pthread_mutex_t lock;
+     pthread_rwlock_t init_rwlock;
+     int got_destroy;
++    int in_cleanup;
+     int broken_splice_nonblock;
+     uint64_t notify_ctr;
+     struct fuse_notify_req notify_list;
 diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index 7fe2cef1eb..4b03ec2f9f 100644
+index 4b03ec2f9f..a9f6ea61dc 100644
 --- a/tools/virtiofsd/fuse_lowlevel.c
 +++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -179,8 +179,8 @@ int fuse_send_reply_iov_nofree(fuse_req_t req, int error, struct iovec *iov,
-         .unique = req->unique,
-         .error = error,
-     };
--
--    if (error <= -1000 || error > 0) {
-+    /* error = 1 has been used to signal client to wait for notificaiton */
-+    if (error <= -1000 || error > 1) {
-         fuse_log(FUSE_LOG_ERR, "fuse: bad error value: %i\n", error);
-         out.error = -ERANGE;
-     }
-@@ -290,6 +290,12 @@ int fuse_reply_err(fuse_req_t req, int err)
-     return send_reply(req, -err, NULL, 0);
- }
+@@ -1905,6 +1905,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+     se->conn.proto_minor = arg->minor;
+     se->conn.capable = 0;
+     se->conn.want = 0;
++    se->in_cleanup = 0;
  
-+int fuse_reply_wait(fuse_req_t req)
-+{
-+    /* TODO: This is a hack. Fix it */
-+    return send_reply(req, 1, NULL, 0);
-+}
-+
- void fuse_reply_none(fuse_req_t req)
- {
-     fuse_free_req(req);
-@@ -2145,6 +2151,34 @@ static void do_destroy(fuse_req_t req, fuse_ino_t nodeid,
-     send_reply_ok(req, NULL, 0);
- }
- 
-+static int send_notify_iov(struct fuse_session *se, int notify_code,
-+                           struct iovec *iov, int count)
-+{
-+    struct fuse_out_header out;
-+    if (!se->got_init) {
-+        return -ENOTCONN;
-+    }
-+    out.unique = 0;
-+    out.error = notify_code;
-+    iov[0].iov_base = &out;
-+    iov[0].iov_len = sizeof(struct fuse_out_header);
-+    return fuse_send_msg(se, NULL, iov, count);
-+}
-+
-+int fuse_lowlevel_notify_lock(struct fuse_session *se, uint64_t unique,
-+                  int32_t error)
-+{
-+    struct fuse_notify_lock_out outarg = {0};
-+    struct iovec iov[2];
-+
-+    outarg.unique = unique;
-+    outarg.error = -error;
-+
-+    iov[1].iov_base = &outarg;
-+    iov[1].iov_len = sizeof(outarg);
-+    return send_notify_iov(se, FUSE_NOTIFY_LOCK, iov, 2);
-+}
-+
- int fuse_lowlevel_notify_store(struct fuse_session *se, fuse_ino_t ino,
-                                off_t offset, struct fuse_bufvec *bufv)
- {
-diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
-index 3bf786b034..1e8b3d2c35 100644
---- a/tools/virtiofsd/fuse_lowlevel.h
-+++ b/tools/virtiofsd/fuse_lowlevel.h
-@@ -1250,6 +1250,22 @@ struct fuse_lowlevel_ops {
-  */
- int fuse_reply_err(fuse_req_t req, int err);
- 
-+/**
-+ * Ask caller to wait for lock.
-+ *
-+ * Possible requests:
-+ *   setlkw
-+ *
-+ * If caller sends a blocking lock request (setlkw), then reply to caller
-+ * that wait for lock to be available. Once lock is available caller will
-+ * receive a notification with request's unique id. Notification will
-+ * carry info whether lock was successfully obtained or not.
-+ *
-+ * @param req request handle
-+ * @return zero for success, -errno for failure to send reply
-+ */
-+int fuse_reply_wait(fuse_req_t req);
-+
- /**
-  * Don't send reply
-  *
-@@ -1684,6 +1700,16 @@ int fuse_lowlevel_notify_delete(struct fuse_session *se, fuse_ino_t parent,
- int fuse_lowlevel_notify_store(struct fuse_session *se, fuse_ino_t ino,
-                                off_t offset, struct fuse_bufvec *bufv);
- 
-+/**
-+ * Notify event related to previous lock request
-+ *
-+ * @param se the session object
-+ * @param unique the unique id of the request which requested setlkw
-+ * @param error zero for success, -errno for the failure
-+ */
-+int fuse_lowlevel_notify_lock(struct fuse_session *se, uint64_t unique,
-+                              int32_t error);
-+
- /*
-  * Utility functions
-  */
+     memset(&outarg, 0, sizeof(outarg));
+     outarg.major = FUSE_KERNEL_VERSION;
+@@ -2397,6 +2398,7 @@ void fuse_session_process_buf_int(struct fuse_session *se,
+             fuse_log(FUSE_LOG_DEBUG, "%s: reinit\n", __func__);
+             se->got_destroy = 1;
+             se->got_init = 0;
++            se->in_cleanup = 0;
+             if (se->op.destroy) {
+                 se->op.destroy(se->userdata);
+             }
 diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-index f16801bbee..cb4dbafd91 100644
+index cb4dbafd91..7efaf9ae68 100644
 --- a/tools/virtiofsd/fuse_virtio.c
 +++ b/tools/virtiofsd/fuse_virtio.c
-@@ -233,6 +233,86 @@ static void copy_iov(struct iovec *src_iov, int src_count,
+@@ -839,11 +839,14 @@ static void fv_queue_cleanup_thread(struct fv_VuDev *vud, int qidx)
+         if (eventfd_write(ourqi->kill_fd, 1)) {
+             fuse_log(FUSE_LOG_ERR, "Eventfd_read for queue: %m\n");
+         }
++
+         ret = pthread_join(ourqi->thread, NULL);
++
+         if (ret) {
+             fuse_log(FUSE_LOG_ERR, "%s: Failed to join thread idx %d err"
+                      " %d\n", __func__, qidx, ret);
+         }
++
+         close(ourqi->kill_fd);
      }
- }
- 
-+static int virtio_send_notify_msg(struct fuse_session *se, struct iovec *iov,
-+                                  int count)
-+{
-+    struct fv_QueueInfo *qi;
-+    VuDev *dev = &se->virtio_dev->dev;
-+    VuVirtq *q;
-+    FVRequest *req;
-+    VuVirtqElement *elem;
-+    unsigned int in_num;
-+    struct fuse_out_header *out = iov[0].iov_base;
-+    size_t in_len, tosend_len = iov_size(iov, count);
-+    struct iovec *in_sg;
-+    int ret = 0;
-+
-+    /* Notifications have unique == 0 */
-+    assert(!out->unique);
-+
-+    if (!se->notify_enabled) {
-+        return -EOPNOTSUPP;
-+    }
-+
-+    /* If notifications are enabled, queue index 1 is notification queue */
-+    qi = se->virtio_dev->qi[1];
-+    q = vu_get_queue(dev, qi->qidx);
-+
-+    pthread_rwlock_rdlock(&qi->virtio_dev->vu_dispatch_rwlock);
-+    pthread_mutex_lock(&qi->vq_lock);
-+    /* Pop an element from queue */
-+    req = vu_queue_pop(dev, q, sizeof(FVRequest));
-+    if (!req) {
+     pthread_mutex_destroy(&ourqi->vq_lock);
+@@ -929,6 +932,13 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
+          * the queue thread doesn't block in virtio_send_msg().
+          */
+         vu_dispatch_unlock(vud);
 +        /*
-+         * TODO: Implement some sort of ring buffer and queue notifications
-+         * on that and send these later when notification queue has space
-+         * available.
++         * Indicate to any thread that was blocked and wakes up
++         * that we are in the thread cleanup process
 +         */
-+        ret = -ENOSPC;
-+    }
-+    pthread_mutex_unlock(&qi->vq_lock);
-+    pthread_rwlock_unlock(&qi->virtio_dev->vu_dispatch_rwlock);
-+
-+    if (ret) {
-+        return ret;
-+    }
-+
-+    out->len = tosend_len;
-+    elem = &req->elem;
-+    in_num = elem->in_num;
-+    in_sg = elem->in_sg;
-+    in_len = iov_size(in_sg, in_num);
-+    fuse_log(FUSE_LOG_DEBUG, "%s: elem %d: with %d in desc of length %zd\n",
-+             __func__, elem->index, in_num,  in_len);
-+
-+    if (in_len < sizeof(struct fuse_out_header)) {
-+        fuse_log(FUSE_LOG_ERR, "%s: elem %d too short for out_header\n",
-+                 __func__, elem->index);
-+        ret = -E2BIG;
-+        goto out;
-+    }
-+
-+    if (in_len < tosend_len) {
-+        fuse_log(FUSE_LOG_ERR, "%s: elem %d too small for data len"
-+                 " %zd\n", __func__, elem->index, tosend_len);
-+        ret = -E2BIG;
-+        goto out;
-+    }
-+
-+    /* First copy the header data from iov->in_sg */
-+    copy_iov(iov, count, in_sg, in_num, tosend_len);
-+
-+    pthread_rwlock_rdlock(&qi->virtio_dev->vu_dispatch_rwlock);
-+    pthread_mutex_lock(&qi->vq_lock);
-+    vu_queue_push(dev, q, elem, tosend_len);
-+    vu_queue_notify(dev, q);
-+    pthread_mutex_unlock(&qi->vq_lock);
-+    pthread_rwlock_unlock(&qi->virtio_dev->vu_dispatch_rwlock);
-+out:
-+    free(req);
-+    return ret;
-+}
-+
- /*
-  * pthread_rwlock_rdlock() and pthread_rwlock_wrlock can fail if
-  * a deadlock condition is detected or the current thread already
-@@ -266,11 +346,11 @@ static void vu_dispatch_unlock(struct fv_VuDev *vud)
- int virtio_send_msg(struct fuse_session *se, struct fuse_chan *ch,
-                     struct iovec *iov, int count)
- {
--    FVRequest *req = container_of(ch, FVRequest, ch);
--    struct fv_QueueInfo *qi = ch->qi;
-+    FVRequest *req;
-+    struct fv_QueueInfo *qi;
-     VuDev *dev = &se->virtio_dev->dev;
--    VuVirtq *q = vu_get_queue(dev, qi->qidx);
--    VuVirtqElement *elem = &req->elem;
-+    VuVirtq *q;
-+    VuVirtqElement *elem;
-     int ret = 0;
- 
-     assert(count >= 1);
-@@ -281,8 +361,16 @@ int virtio_send_msg(struct fuse_session *se, struct fuse_chan *ch,
- 
-     size_t tosend_len = iov_size(iov, count);
- 
--    /* unique == 0 is notification, which we don't support */
--    assert(out->unique);
-+    /* unique == 0 is notification */
-+    if (!out->unique) {
-+        return virtio_send_notify_msg(se, iov, count);
-+    }
-+
-+    assert(ch);
-+    req = container_of(ch, FVRequest, ch);
-+    elem = &req->elem;
-+    qi = ch->qi;
-+    q = vu_get_queue(dev, qi->qidx);
-     assert(!req->reply_sent);
- 
-     /* The 'in' part of the elem is to qemu */
-@@ -867,6 +955,7 @@ static int fv_get_config(VuDev *dev, uint8_t *config, uint32_t len)
-         struct fuse_notify_delete_out       delete_out;
-         struct fuse_notify_store_out        store_out;
-         struct fuse_notify_retrieve_out     retrieve_out;
-+        struct fuse_notify_lock_out         lock_out;
-     };
- 
-     notify_size = sizeof(struct fuse_out_header) +
++        if (!vud->se->in_cleanup) {
++            vud->se->in_cleanup = 1;
++        }
+         fv_queue_cleanup_thread(vud, qidx);
+         vu_dispatch_wrlock(vud);
+     }
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index f2fa9d95bb..8f24954a00 100644
+index 8f24954a00..8a2aa10b9c 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -968,14 +968,6 @@ static int do_statx(struct lo_data *lo, int dirfd, const char *pathname,
-     return 0;
+@@ -1971,9 +1971,6 @@ static struct lo_inode_plock *lookup_create_plock_ctx(struct lo_data *lo,
+     plock =
+         g_hash_table_lookup(inode->posix_locks, GUINT_TO_POINTER(lock_owner));
+ 
+-    fuse_log(FUSE_LOG_DEBUG, "lookup_create_plock_ctx():"
+-             " Inserted element in posix_locks hash table"
+-             " with value pointer %p\n", plock);
+     if (plock) {
+         return plock;
+     }
+@@ -1997,6 +1994,10 @@ static struct lo_inode_plock *lookup_create_plock_ctx(struct lo_data *lo,
+     plock->fd = fd;
+     g_hash_table_insert(inode->posix_locks, GUINT_TO_POINTER(plock->lock_owner),
+                         plock);
++    fuse_log(FUSE_LOG_DEBUG, "lookup_create_plock_ctx():"
++             " Inserted element in posix_locks hash table"
++             " with value pointer %p\n", plock);
++
+     return plock;
  }
  
--static void posix_locks_value_destroy(gpointer data)
--{
--    struct lo_inode_plock *plock = data;
--
--    close(plock->fd);
--    free(plock);
--}
--
- /*
-  * Increments nlookup on the inode on success. unref_inode_lolocked() must be
-  * called eventually to decrement nlookup again. If inodep is non-NULL, the
-@@ -2064,7 +2056,10 @@ static void lo_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
-     struct lo_data *lo = lo_data(req);
-     struct lo_inode *inode;
-     struct lo_inode_plock *plock;
--    int ret, saverr = 0;
-+    int ret, saverr = 0, ofd;
-+    uint64_t unique;
-+    struct fuse_session *se = req->se;
-+    bool async_lock = false;
- 
-     fuse_log(FUSE_LOG_DEBUG,
-              "lo_setlk(ino=%" PRIu64 ", flags=%d)"
-@@ -2078,11 +2073,6 @@ static void lo_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
-         return;
-     }
- 
--    if (sleep) {
--        fuse_reply_err(req, EOPNOTSUPP);
--        return;
--    }
--
-     inode = lo_inode(req, ino);
-     if (!inode) {
-         fuse_reply_err(req, EBADF);
-@@ -2095,21 +2085,56 @@ static void lo_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
- 
-     if (!plock) {
-         saverr = ret;
-+        pthread_mutex_unlock(&inode->plock_mutex);
-         goto out;
-     }
- 
-+    /*
-+     * plock is now released when inode is going away. We already have
-+     * a reference on inode, so it is guaranteed that plock->fd is
-+     * still around even after dropping inode->plock_mutex lock
-+     */
-+    ofd = plock->fd;
-+    pthread_mutex_unlock(&inode->plock_mutex);
-+
-+    /*
-+     * If this lock request can block, request caller to wait for
-+     * notification. Do not access req after this. Once lock is
-+     * available, send a notification instead.
-+     */
-+    if (sleep && lock->l_type != F_UNLCK) {
+@@ -2133,7 +2134,21 @@ out:
+     if (!async_lock) {
+         fuse_reply_err(req, saverr);
+     } else {
+-        fuse_lowlevel_notify_lock(se, unique, saverr);
 +        /*
-+         * If notification queue is not enabled, can't support async
-+         * locks.
++         * Before attempting to send any message through
++         * the thread should check if the queue actually
++         * exists
 +         */
-+        if (!se->notify_enabled) {
-+            saverr = EOPNOTSUPP;
-+            goto out;
++        if (!se->in_cleanup) {
++            fuse_lowlevel_notify_lock(se, unique, saverr);
++        } else {
++            /* Release the locks */
++            lock->l_type = F_UNLCK;
++            lock->l_whence = SEEK_SET;
++            /* Unlock whole file */
++            lock->l_start = lock->l_len = 0;
++            fcntl(ofd, F_OFD_SETLKW, lock);
 +        }
-+        async_lock = true;
-+        unique = req->unique;
-+        fuse_reply_wait(req);
-+    }
-+
-     /* TODO: Is it alright to modify flock? */
-     lock->l_pid = 0;
--    ret = fcntl(plock->fd, F_OFD_SETLK, lock);
-+    if (async_lock) {
-+        ret = fcntl(ofd, F_OFD_SETLKW, lock);
-+    } else {
-+        ret = fcntl(ofd, F_OFD_SETLK, lock);
-+    }
-     if (ret == -1) {
-         saverr = errno;
      }
- 
- out:
--    pthread_mutex_unlock(&inode->plock_mutex);
-     lo_inode_put(lo, &inode);
- 
--    fuse_reply_err(req, saverr);
-+    if (!async_lock) {
-+        fuse_reply_err(req, saverr);
-+    } else {
-+        fuse_lowlevel_notify_lock(se, unique, saverr);
-+    }
  }
  
- static void lo_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
 -- 
 2.27.0
 

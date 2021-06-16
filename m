@@ -1,10 +1,12 @@
 From: Ioannis Angelakopoulos <iangelak@redhat.com>
-Date: Wed, 16 Jun 2021 12:08:33 -0400
-Message-Id: <20210616160836.590206-1-iangelak@redhat.com>
+Date: Wed, 16 Jun 2021 12:08:34 -0400
+Message-Id: <20210616160836.590206-2-iangelak@redhat.com>
+In-Reply-To: <20210616160836.590206-1-iangelak@redhat.com>
+References: <20210616160836.590206-1-iangelak@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 0/3] Virtiofs: Support for remote blocking posix
-	locks
+Subject: [Virtio-fs] [PATCH 1/3] virtiofs: Add an index to keep track of
+	first request queue
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,25 +18,113 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com
 Cc: vgoyal@redhat.com, miklos@szeredi.hu
 
-Adding support for remote blocking locks in virtiofs. Initially linux
-only supported the fcntl(SETLK) option. Now the fcntl(SETLKW) option
-is also supported.
+From: Vivek Goyal <vgoyal@redhat.com>
 
-A guest issuing a fcntl(SETLKW) system call will block if another guest
-has already acquired the lock. Once the lock is available then the
-blocking guest will receive a notification, through the notification
-queue. Then the guest will unblock and acquire the lock.
+We have many virtqueues and first queue which carries fuse normal requests
+(except forget requests) has index pointed to by enum VQ_REQUEST. This
+works fine as long as number of queues are not dynamic.
 
-Vivek Goyal (3):
-  virtiofs: Add an index to keep track of first request queue
-  virtiofs: Add a virtqueue for notifications
-  virtiofs: Support blocking posix locks (fcntl(F_SETLKW))
+I am about to introduce one more virtqueue, called notification queue,
+which will be present only if device on host supports it. That means index
+of request queue will change depending on if notification queue is present
+or not.
 
- fs/fuse/virtio_fs.c            | 290 +++++++++++++++++++++++++++++++--
- include/uapi/linux/fuse.h      |   7 +
- include/uapi/linux/virtio_fs.h |   5 +
- 3 files changed, 288 insertions(+), 14 deletions(-)
+So, add a variable to keep track of that index and this will help when
+notification queue is added in next patch.
 
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Signed-off-by: Ioannis Angelakopoulos <iangelak@redhat.com>
+---
+ fs/fuse/virtio_fs.c | 22 ++++++++++++++++------
+ 1 file changed, 16 insertions(+), 6 deletions(-)
+
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index bcb8a02e2d8b..a545e31cf1ae 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -61,6 +61,7 @@ struct virtio_fs {
+ 	unsigned int nvqs;               /* number of virtqueues */
+ 	unsigned int num_request_queues; /* number of request queues */
+ 	struct dax_device *dax_dev;
++	unsigned int first_reqq_idx;     /* First request queue idx */
+ 
+ 	/* DAX memory window where file contents are mapped */
+ 	void *window_kaddr;
+@@ -681,7 +682,9 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 	if (fs->num_request_queues == 0)
+ 		return -EINVAL;
+ 
+-	fs->nvqs = VQ_REQUEST + fs->num_request_queues;
++	/* One hiprio queue and rest are request queues */
++	fs->nvqs = 1 + fs->num_request_queues;
++	fs->first_reqq_idx = 1;
+ 	fs->vqs = kcalloc(fs->nvqs, sizeof(fs->vqs[VQ_HIPRIO]), GFP_KERNEL);
+ 	if (!fs->vqs)
+ 		return -ENOMEM;
+@@ -701,10 +704,11 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 	names[VQ_HIPRIO] = fs->vqs[VQ_HIPRIO].name;
+ 
+ 	/* Initialize the requests virtqueues */
+-	for (i = VQ_REQUEST; i < fs->nvqs; i++) {
++	for (i = fs->first_reqq_idx; i < fs->nvqs; i++) {
+ 		char vq_name[VQ_NAME_LEN];
+ 
+-		snprintf(vq_name, VQ_NAME_LEN, "requests.%u", i - VQ_REQUEST);
++		snprintf(vq_name, VQ_NAME_LEN, "requests.%u",
++			 i - fs->first_reqq_idx);
+ 		virtio_fs_init_vq(&fs->vqs[i], vq_name, VQ_REQUEST);
+ 		callbacks[i] = virtio_fs_vq_done;
+ 		names[i] = fs->vqs[i].name;
+@@ -1225,7 +1229,7 @@ static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
+ static void virtio_fs_wake_pending_and_unlock(struct fuse_iqueue *fiq)
+ __releases(fiq->lock)
+ {
+-	unsigned int queue_id = VQ_REQUEST; /* TODO multiqueue */
++	unsigned int queue_id;
+ 	struct virtio_fs *fs;
+ 	struct fuse_req *req;
+ 	struct virtio_fs_vq *fsvq;
+@@ -1239,6 +1243,7 @@ __releases(fiq->lock)
+ 	spin_unlock(&fiq->lock);
+ 
+ 	fs = fiq->priv;
++	queue_id = fs->first_reqq_idx;
+ 
+ 	pr_debug("%s: opcode %u unique %#llx nodeid %#llx in.len %u out.len %u\n",
+ 		  __func__, req->in.h.opcode, req->in.h.unique,
+@@ -1316,7 +1321,7 @@ static int virtio_fs_fill_super(struct super_block *sb, struct fs_context *fsc)
+ 
+ 	err = -ENOMEM;
+ 	/* Allocate fuse_dev for hiprio and notification queues */
+-	for (i = 0; i < fs->nvqs; i++) {
++	for (i = 0; i < fs->first_reqq_idx; i++) {
+ 		struct virtio_fs_vq *fsvq = &fs->vqs[i];
+ 
+ 		fsvq->fud = fuse_dev_alloc();
+@@ -1325,7 +1330,7 @@ static int virtio_fs_fill_super(struct super_block *sb, struct fs_context *fsc)
+ 	}
+ 
+ 	/* virtiofs allocates and installs its own fuse devices */
+-	ctx->fudptr = NULL;
++	ctx->fudptr = (void **)&fs->vqs[fs->first_reqq_idx].fud;
+ 	if (ctx->dax) {
+ 		if (!fs->dax_dev) {
+ 			err = -EINVAL;
+@@ -1339,9 +1344,14 @@ static int virtio_fs_fill_super(struct super_block *sb, struct fs_context *fsc)
+ 	if (err < 0)
+ 		goto err_free_fuse_devs;
+ 
++	fc = fs->vqs[fs->first_reqq_idx].fud->fc;
++
+ 	for (i = 0; i < fs->nvqs; i++) {
+ 		struct virtio_fs_vq *fsvq = &fs->vqs[i];
+ 
++		if (i == fs->first_reqq_idx)
++			continue;
++
+ 		fuse_dev_install(fsvq->fud, fc);
+ 	}
+ 
 -- 
 2.27.0
 

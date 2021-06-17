@@ -1,14 +1,14 @@
-References: <20210525150230.157586-1-groug@kaod.org>
-	<20210525150230.157586-3-groug@kaod.org>
-From: Max Reitz <mreitz@redhat.com>
-Message-ID: <58c70352-2df5-0cb9-9ca6-bb4bf2edd1c2@redhat.com>
-Date: Thu, 27 May 2021 12:08:36 +0200
+Date: Thu, 17 Jun 2021 10:35:31 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210617143531.GB1142820@redhat.com>
+References: <20210325151823.572089-1-vgoyal@redhat.com>
+	<CAJfpegvU9zjT7qV=Rj4ok4kfYz-9BPhjp+xKz9odfSWaFxshyA@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <20210525150230.157586-3-groug@kaod.org>
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Language: en-US
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 2/4] fuse: Fix infinite loop in sget_fc()
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAJfpegvU9zjT7qV=Rj4ok4kfYz-9BPhjp+xKz9odfSWaFxshyA@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH v2 0/2] fuse: Fix clearing SGID when access
+	ACL is set
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,68 +17,103 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>, Miklos Szeredi <miklos@szeredi.hu>
-Cc: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, stable@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: linux-kernel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>, Seth Forshee <seth.forshee@canonical.com>, linux-fsdevel@vger.kernel.org
 
-On 25.05.21 17:02, Greg Kurz wrote:
-> We don't set the SB_BORN flag on submounts. This is wrong as these
-> superblocks are then considered as partially constructed or dying
-> in the rest of the code and can break some assumptions.
+On Wed, Apr 14, 2021 at 01:57:01PM +0200, Miklos Szeredi wrote:
+> On Thu, Mar 25, 2021 at 4:19 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> >
+> >
+> > Hi,
+> >
+> > This is V2 of the patchset. Posted V1 here.
+> >
+> > https://lore.kernel.org/linux-fsdevel/20210319195547.427371-1-vgoyal@redhat.com/
+> >
+> > Changes since V1:
+> >
+> > - Dropped the helper to determine if SGID should be cleared and open
+> >   coded it instead. I will follow up on helper separately in a different
+> >   patch series. There are few places already which open code this, so
+> >   for now fuse can do the same. Atleast I can make progress on this
+> >   and virtiofs can enable ACL support.
+> >
+> > Luis reported that xfstests generic/375 fails with virtiofs. Little
+> > debugging showed that when posix access acl is set that in some
+> > cases SGID needs to be cleared and that does not happen with virtiofs.
+> >
+> > Setting posix access acl can lead to mode change and it can also lead
+> > to clear of SGID. fuse relies on file server taking care of all
+> > the mode changes. But file server does not have enough information to
+> > determine whether SGID should be cleared or not.
+> >
+> > Hence this patch series add support to send a flag in SETXATTR message
+> > to tell server to clear SGID.
 > 
-> One such case is when you have a virtiofs filesystem with submounts
-> and you try to mount it again : virtio_fs_get_tree() tries to obtain
-> a superblock with sget_fc(). The logic in sget_fc() is to loop until
-> it has either found an existing matching superblock with SB_BORN set
-> or to create a brand new one. It is assumed that a superblock without
-> SB_BORN is transient and should go away. Forgetting to set SB_BORN on
-> submounts hence causes sget_fc() to retry forever.
+> Changed it to have a single extended structure for the request, which
+> is how this has always been handled in the fuse API.
 > 
-> Setting SB_BORN requires special care, i.e. a write barrier for
-> super_cache_count() which can check SB_BORN without taking any lock.
-> We should call vfs_get_tree() to deal with that but this requires
-> to have a proper ->get_tree() implementation for submounts, which
-> is a bigger piece of work. Go for a simple bug fix in the meatime.
-> 
-> Fixes: bf109c64040f ("fuse: implement crossmounts")
-> Cc: mreitz@redhat.com
-> Cc: stable@vger.kernel.org # v5.10+
-> Signed-off-by: Greg Kurz <groug@kaod.org>
-> ---
->   fs/fuse/dir.c | 10 ++++++++++
->   1 file changed, 10 insertions(+)
-> 
-> diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
-> index 01559061cbfb..3b0482738741 100644
-> --- a/fs/fuse/dir.c
-> +++ b/fs/fuse/dir.c
-> @@ -346,6 +346,16 @@ static struct vfsmount *fuse_dentry_automount(struct path *path)
->   		goto out_put_sb;
->   	}
->   
-> +	/*
-> +	 * FIXME: setting SB_BORN requires a write barrier for
-> +	 *        super_cache_count(). We should actually come
-> +	 *        up with a proper ->get_tree() implementation
-> +	 *        for submounts and call vfs_get_tree() to take
-> +	 *        care of the write barrier.
-> +	 */
-> +	smp_wmb();
-> +	sb->s_flags |= SB_BORN;
-> +
+> The ABI is unchanged, but you'll need to update the userspace part
+> according to the API change.  Otherwise looks good.
 
-I’m not sure whether we should have the order be exactly the same as in 
-vfs_get_tree(), i.e. whether this should be put after fsc->root has been 
-set.  Or maybe even after fm has been added to fc->mounts, because that 
-too was part of the fuse_get_tree_submount() function of your “fuse: 
-Call vfs_get_tree() for submounts” patch.
+Hi Miklos,
 
- From a quick look at SB_BORN users, it doesn’t seem to make a 
-difference to me, though, so:
+I started looking at ACL patches for virtiofsd again. And realized
+that this SETXATTR_EXT patch, changes API. So if I update kernel
+headers and recompile virtiofsd, setxattr is broken.
 
-Reviewed-by: Max Reitz <mreitz@redhat.com>
+# setfattr -n "user.foo" -v "bar" foo.txt
+setfattr: foo.txt: Numerical result out of range
 
->   	sb->s_flags |= SB_ACTIVE;
->   	fsc->root = dget(sb->s_root);
->   	/* We are done configuring the superblock, so unlock it */
-> 
+I can fix it using following patch. But I am little concerned that
+all the users of fuse will have to apply similar patch if they update
+kernel headers (including libfuse) and recompile their app.
+
+Is that a concern, or should we rework this so that kernel header
+update does not break users.
+
+Thanks
+Vivek
+
+
+---
+ tools/virtiofsd/fuse_common.h   |    5 +++++
+ tools/virtiofsd/fuse_lowlevel.c |    7 ++++++-
+ 2 files changed, 11 insertions(+), 1 deletion(-)
+
+Index: rhvgoyal-qemu/tools/virtiofsd/fuse_lowlevel.c
+===================================================================
+--- rhvgoyal-qemu.orig/tools/virtiofsd/fuse_lowlevel.c	2021-06-16 17:39:16.387405071 -0400
++++ rhvgoyal-qemu/tools/virtiofsd/fuse_lowlevel.c	2021-06-17 10:22:04.879150980 -0400
+@@ -1419,8 +1419,13 @@ static void do_setxattr(fuse_req_t req,
+     struct fuse_setxattr_in *arg;
+     const char *name;
+     const char *value;
++    bool setxattr_ext = req->se->conn.want & FUSE_CAP_SETXATTR_EXT;
++
++    if (setxattr_ext)
++        arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
++    else
++        arg = fuse_mbuf_iter_advance(iter, FUSE_COMPAT_SETXATTR_IN_SIZE);
+ 
+-    arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
+     name = fuse_mbuf_iter_advance_str(iter);
+     if (!arg || !name) {
+         fuse_reply_err(req, EINVAL);
+Index: rhvgoyal-qemu/tools/virtiofsd/fuse_common.h
+===================================================================
+--- rhvgoyal-qemu.orig/tools/virtiofsd/fuse_common.h	2021-06-16 17:39:16.387405071 -0400
++++ rhvgoyal-qemu/tools/virtiofsd/fuse_common.h	2021-06-17 10:24:20.905937326 -0400
+@@ -373,6 +373,11 @@ struct fuse_file_info {
+ #define FUSE_CAP_HANDLE_KILLPRIV_V2 (1 << 28)
+ 
+ /**
++ * Indicates that file server supports extended struct fuse_setxattr_in
++ */
++#define FUSE_CAP_SETXATTR_EXT (1 << 29)
++
++/**
+  * Ioctl flags
+  *
+  * FUSE_IOCTL_COMPAT: 32bit compat ioctl on 64bit machine
 

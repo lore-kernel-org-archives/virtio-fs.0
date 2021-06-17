@@ -1,15 +1,12 @@
-Date: Tue, 22 Jun 2021 09:36:33 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YNGhERcnLuzjn8j9@stefanha-x1.localdomain>
-References: <20210621062657.3641879-1-hch@lst.de>
-	<20210622081217.GA2975@lst.de>
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Thu, 17 Jun 2021 14:12:11 -0400
+Message-Id: <20210617181213.1177835-7-vgoyal@redhat.com>
+In-Reply-To: <20210617181213.1177835-1-vgoyal@redhat.com>
+References: <20210617181213.1177835-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="Y+sWrBBljVlHm2Wk"
-Content-Disposition: inline
-In-Reply-To: <20210622081217.GA2975@lst.de>
-Subject: Re: [Virtio-fs] [PATCH 3/2] fs: simplify get_filesystem_list /
- get_all_fs_names
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v6 6/8] virtiofsd: Add capability to
+	change/restore umask
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,86 +15,137 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Christoph Hellwig <hch@lst.de>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, viro@zeniv.linux.org.uk, Vivek Goyal <vgoyal@redhat.com>, linux-kernel@vger.kernel.org
+To: qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com, miklos@szeredi.hu
 
+When parent directory has default acl and a file is created in that
+directory, then umask is ignored and final file permissions are
+determined using default acl instead. (man 2 umask).
 
---Y+sWrBBljVlHm2Wk
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Currently, fuse applies the umask and sends modified mode in create
+request accordingly. fuse server can set FUSE_DONT_MASK and tell
+fuse client to not apply umask and fuse server will take care of
+it as needed.
 
-On Tue, Jun 22, 2021 at 10:12:17AM +0200, Christoph Hellwig wrote:
-> Just output the '\0' separate list of supported file systems for block
-> devices directly rather than going through a pointless round of string
-> manipulation.
->=20
-> Based on an earlier patch from Al Viro <viro@zeniv.linux.org.uk>.
->=20
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->  fs/filesystems.c   | 24 ++++++++++++++----------
->  include/linux/fs.h |  2 +-
->  init/do_mounts.c   | 20 +-------------------
->  3 files changed, 16 insertions(+), 30 deletions(-)
->=20
-> diff --git a/fs/filesystems.c b/fs/filesystems.c
-> index 90b8d879fbaf..7c136251607a 100644
-> --- a/fs/filesystems.c
-> +++ b/fs/filesystems.c
-> @@ -209,21 +209,25 @@ SYSCALL_DEFINE3(sysfs, int, option, unsigned long, =
-arg1, unsigned long, arg2)
->  }
->  #endif
-> =20
-> -int __init get_filesystem_list(char *buf)
-> +void __init list_bdev_fs_names(char *buf, size_t size)
->  {
-> -	int len =3D 0;
-> -	struct file_system_type * tmp;
-> +	struct file_system_type *p;
-> +	size_t len;
-> =20
->  	read_lock(&file_systems_lock);
-> -	tmp =3D file_systems;
-> -	while (tmp && len < PAGE_SIZE - 80) {
-> -		len +=3D sprintf(buf+len, "%s\t%s\n",
-> -			(tmp->fs_flags & FS_REQUIRES_DEV) ? "" : "nodev",
-> -			tmp->name);
-> -		tmp =3D tmp->next;
-> +	for (p =3D file_systems; p; p =3D p->next) {
-> +		if (!(p->fs_flags & FS_REQUIRES_DEV))
-> +			continue;
-> +		len =3D strlen(p->name) + 1;
-> +		if (len > size) {
-> +			pr_warn("%s: truncating file system list\n", __func__);
-> +			break;
-> +		}
-> +		memcpy(buf, p->name, len);
-> +		buf +=3D len;
-> +		size -=3D len;
->  	}
->  	read_unlock(&file_systems_lock);
-> -	return len;
->  }
+With posix acls enabled, requirement will be that we want umask
+to determine final file mode if parent directory does not have
+default acl.
 
-I don't see the extra NUL terminator byte being added that's required by
-the loop in mount_block_root()?
+So if posix acls are enabled, opt in for FUSE_DONT_MASK. virtiofsd
+will set umask of the thread doing file creation. And host kernel
+should use that umask if parent directory does not have default
+acls, otherwise umask does not take affect.
 
---Y+sWrBBljVlHm2Wk
-Content-Type: application/pgp-signature; name="signature.asc"
+Miklos mentioned that we already call unshare(CLONE_FS) for
+every thread. That means umask has now become property of per
+thread and it should be ok to manipulate it in file creation path.
 
------BEGIN PGP SIGNATURE-----
+This patch only adds capability to change umask and restore it. It
+does not enable it yet. Next few patches will add capability to enable it
+based on if user enabled posix_acl or not.
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmDRoREACgkQnKSrs4Gr
-c8g8mgf+PDTW/0OS88/JmQ5E27ZXpLlNGUJkTSdpn4jhWZpdPhbG/+yiPRoTpPv8
-NmvfbL7yomhRXntd+pA/WUlyF6Eb2SDv8Wfo0/qU+fTIsaHA7mz/d9300ucC1Thw
-ZuDl7uadlf2KbJRlhLZHzl9Q2Q9+PsscEql0TSsIJU0X2qO1qxm4tvncbyyXY/lc
-nLLkGJVf9205rvJf2TcuBFF1UYUThOB7+VjIzn2CBfKahLyTOGSePy5GyvcdFp2s
-0EGWvIFHcsWuHxkDRdGVLt51bsOiEHRBsjZ7LHiIruzo0Y9tqYNJDTvhphtE+fMw
-jDjcU52ufud1nFXZcKVeYswxfIp8vg==
-=08W1
------END PGP SIGNATURE-----
+This should fix fstest generic/099.
 
---Y+sWrBBljVlHm2Wk--
+Reported-by: Luis Henriques <lhenriques@suse.de>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c | 22 ++++++++++++++++------
+ 1 file changed, 16 insertions(+), 6 deletions(-)
+
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 9f5cd98fb5..0c9084ea15 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -122,6 +122,7 @@ struct lo_inode {
+ struct lo_cred {
+     uid_t euid;
+     gid_t egid;
++    mode_t umask;
+ };
+ 
+ enum {
+@@ -172,6 +173,8 @@ struct lo_data {
+     /* An O_PATH file descriptor to /proc/self/fd/ */
+     int proc_self_fd;
+     int user_killpriv_v2, killpriv_v2;
++    /* If set, virtiofsd is responsible for setting umask during creation */
++    bool change_umask;
+ };
+ 
+ static const struct fuse_opt lo_opts[] = {
+@@ -1134,7 +1137,8 @@ static void lo_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
+  * ownership of caller.
+  * TODO: What about selinux context?
+  */
+-static int lo_change_cred(fuse_req_t req, struct lo_cred *old)
++static int lo_change_cred(fuse_req_t req, struct lo_cred *old,
++                          bool change_umask)
+ {
+     int res;
+ 
+@@ -1154,11 +1158,14 @@ static int lo_change_cred(fuse_req_t req, struct lo_cred *old)
+         return errno_save;
+     }
+ 
++    if (change_umask) {
++        old->umask = umask(req->ctx.umask);
++    }
+     return 0;
+ }
+ 
+ /* Regain Privileges */
+-static void lo_restore_cred(struct lo_cred *old)
++static void lo_restore_cred(struct lo_cred *old, bool restore_umask)
+ {
+     int res;
+ 
+@@ -1173,6 +1180,9 @@ static void lo_restore_cred(struct lo_cred *old)
+         fuse_log(FUSE_LOG_ERR, "setegid(%u): %m\n", old->egid);
+         exit(1);
+     }
++
++    if (restore_umask)
++        umask(old->umask);
+ }
+ 
+ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
+@@ -1202,7 +1212,7 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
+         return;
+     }
+ 
+-    saverr = lo_change_cred(req, &old);
++    saverr = lo_change_cred(req, &old, lo->change_umask && !S_ISLNK(mode));
+     if (saverr) {
+         goto out;
+     }
+@@ -1211,7 +1221,7 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
+ 
+     saverr = errno;
+ 
+-    lo_restore_cred(&old);
++    lo_restore_cred(&old, lo->change_umask && !S_ISLNK(mode));
+ 
+     if (res == -1) {
+         goto out;
+@@ -1917,7 +1927,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+         return;
+     }
+ 
+-    err = lo_change_cred(req, &old);
++    err = lo_change_cred(req, &old, lo->change_umask);
+     if (err) {
+         goto out;
+     }
+@@ -1928,7 +1938,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+     fd = openat(parent_inode->fd, name, fi->flags | O_CREAT | O_EXCL, mode);
+     err = fd == -1 ? errno : 0;
+ 
+-    lo_restore_cred(&old);
++    lo_restore_cred(&old, lo->change_umask);
+ 
+     /* Ignore the error if file exists and O_EXCL was not given */
+     if (err && (err != EEXIST || (fi->flags & O_EXCL))) {
+-- 
+2.25.4
 

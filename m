@@ -3,22 +3,23 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	h=Content-Transfer-Encoding:MIME-Version:
 	References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
 	Content-Type:Content-ID:Content-Description;
-	bh=DKovqRXh4dqmrxQdIruB25dwODhSqd/6TFIr0rlw624=;
-	b=HE4fGjXpjdiOpUEO+Lsb/kA+Ub
-	gFpQLwjrVHkgeo3k8zqyi4bwBHPr3uk2aS4pFRvF6mG0+ctn8ZOEFR0Qx2pKSSfjkV2ofRKpfn3BA
-	37Y+WbhVovxtZVFjBAKyA+/8F0L7PcLNJ4I92wsM6fKdhOA23wCk7XqC3VpHXVjumkaZ97/JegO3m
-	2Nv0cJ3WjhlrT4ll89FaklooveTz8OlTjDyFrFEdSA0RS6BCRmQjCZOHldiITBvHP3a0URB80QqPK
-	m+nND6v0qqlzJ8mkW7uPnwSW70BkEnPJmN9dVV6dCGeDrfUwEHnD+SoQQpXnjb8W0AVf/pSBguQuk
-	OivMdIxQ==
+	bh=UJ6ZxhI7pFym7PlR0u1lnYbOiSY2JPtqMcPqBO8j2q0=;
+	b=BK05KsYHCXpeyI0F6JM/YUplQU
+	wVe/HymRx2z4x4OxmQIUe+oHOroCwZcyqh5Mx/szwWxJAwZ6D7TMoGzyEAB9NFiDg5xFb8Xi2jzH/
+	7RkPuGbZUIlRJeQJnowTEqkl3PWASCqw/eHsf519z9DHnHIG0FT+XiBAz6IQnoSXizvPR5KqvUAY9
+	fzca3YiGLU/ELLa0NRSfV3t5JX5HQWQkmZxNTR/LUDu1jaHOKKpP/TgvYoTJP0vtv+uGnaT6MDqnA
+	DjPUSREvFVqZycTWJW515GpydyhNnidvEUisHBlPV4IXjasREJaxVpOfnh0qPjtr3SE3yYTvsCixX
+	fcyXeAnA==
 From: Christoph Hellwig <hch@lst.de>
-Date: Thu, 17 Jun 2021 17:36:48 +0200
-Message-Id: <20210617153649.1886693-2-hch@lst.de>
+Date: Thu, 17 Jun 2021 17:36:49 +0200
+Message-Id: <20210617153649.1886693-3-hch@lst.de>
 In-Reply-To: <20210617153649.1886693-1-hch@lst.de>
 References: <20210617153649.1886693-1-hch@lst.de>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH 1/2] init: split get_fs_names
+Subject: [Virtio-fs] [PATCH 2/2] init: allow mounting arbitrary
+	non-blockdevice filesystems as root
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -30,83 +31,86 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: viro@zeniv.linux.org.uk
 Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, linux-kernel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
 
-Split get_fs_names into one function that splits up the command line
-argument, and one that gets the list of all registered file systems.
+Currently the only non-blockdevice filesystems that can be used as the
+initial root filesystem are NFS and CIFS, which use the magic
+"root=/dev/nfs" and "root=/dev/cifs" syntax that requires the root
+device file system details to come from filesystem specific kernel
+command line options.
+
+Add a little bit of new code that allows to just pass arbitrary
+string mount options to any non-blockdevice filesystems so that it can
+be mounted as the root file system.
+
+For example a virtiofs root file system can be mounted using the
+following syntax:
+
+"root=myfs rootfstype=virtiofs rw"
+
+Based on an earlier patch from Vivek Goyal <vgoyal@redhat.com>.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- init/do_mounts.c | 48 ++++++++++++++++++++++++++----------------------
- 1 file changed, 26 insertions(+), 22 deletions(-)
+ init/do_mounts.c | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
 diff --git a/init/do_mounts.c b/init/do_mounts.c
-index 74aede860de7..ec32de3ad52b 100644
+index ec32de3ad52b..64c60cb72ecb 100644
 --- a/init/do_mounts.c
 +++ b/init/do_mounts.c
-@@ -338,30 +338,31 @@ __setup("rootflags=", root_data_setup);
- __setup("rootfstype=", fs_names_setup);
- __setup("rootdelay=", root_delay_setup);
- 
--static void __init get_fs_names(char *page)
-+static void __init split_fs_names(char *page, char *names)
- {
--	char *s = page;
--
--	if (root_fs_names) {
--		strcpy(page, root_fs_names);
--		while (*s++) {
--			if (s[-1] == ',')
--				s[-1] = '\0';
--		}
--	} else {
--		int len = get_filesystem_list(page);
--		char *p, *next;
-+	strcpy(page, root_fs_names);
-+	while (*page++) {
-+		if (page[-1] == ',')
-+			page[-1] = '\0';
-+	}
-+	*page = '\0';
-+}
- 
--		page[len] = '\0';
--		for (p = page-1; p; p = next) {
--			next = strchr(++p, '\n');
--			if (*p++ != '\t')
--				continue;
--			while ((*s++ = *p++) != '\n')
--				;
--			s[-1] = '\0';
--		}
-+static void __init get_all_fs_names(char *page)
-+{
-+	int len = get_filesystem_list(page);
-+	char *s = page, *p, *next;
-+
-+	page[len] = '\0';
-+	for (p = page - 1; p; p = next) {
-+		next = strchr(++p, '\n');
-+		if (*p++ != '\t')
-+			continue;
-+		while ((*s++ = *p++) != '\n')
-+			;
-+		s[-1] = '\0';
- 	}
-+
- 	*s = '\0';
+@@ -534,6 +534,44 @@ static int __init mount_cifs_root(void)
  }
+ #endif
  
-@@ -411,7 +412,10 @@ void __init mount_block_root(char *name, int flags)
- 
- 	scnprintf(b, BDEVNAME_SIZE, "unknown-block(%u,%u)",
- 		  MAJOR(ROOT_DEV), MINOR(ROOT_DEV));
--	get_fs_names(fs_names);
-+	if (root_fs_names)
-+		split_fs_names(fs_names, root_fs_names);
-+	else
-+		get_all_fs_names(fs_names);
- retry:
- 	for (p = fs_names; *p; p += strlen(p)+1) {
- 		int err = do_mount_root(name, p, flags, root_mount_data);
++static int __init try_mount_nodev(char *fstype)
++{
++	struct file_system_type *fs = get_fs_type(fstype);
++	int err = -EINVAL;
++
++	if (!fs)
++		return -EINVAL;
++	if (!(fs->fs_flags & (FS_REQUIRES_DEV | FS_BINARY_MOUNTDATA)))
++		err = do_mount_root(root_device_name, fstype, root_mountflags,
++					root_mount_data);
++	put_filesystem(fs);
++
++	if (err != -EACCES && err != -EINVAL)
++		panic("VFS: Unable to mount root \"%s\" (%s), err=%d\n",
++			      root_device_name, fstype, err);
++	return err;
++}
++
++static int __init mount_nodev_root(void)
++{
++	char *fs_names, *p;
++	int err = -EINVAL;
++
++	fs_names = (void *)__get_free_page(GFP_KERNEL);
++	if (!fs_names)
++		return -EINVAL;
++	split_fs_names(fs_names, root_fs_names);
++
++	for (p = fs_names; *p; p += strlen(p) + 1) {
++		err = try_mount_nodev(p);
++		if (!err)
++			break;
++	}
++
++	free_page((unsigned long)fs_names);
++	return err;
++}
++
+ void __init mount_root(void)
+ {
+ #ifdef CONFIG_ROOT_NFS
+@@ -550,6 +588,8 @@ void __init mount_root(void)
+ 		return;
+ 	}
+ #endif
++	if (ROOT_DEV == 0 && mount_nodev_root() == 0)
++		return;
+ #ifdef CONFIG_BLOCK
+ 	{
+ 		int err = create_dev("/dev/root", ROOT_DEV);
 -- 
 2.30.2
 

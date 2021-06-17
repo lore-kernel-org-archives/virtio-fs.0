@@ -1,14 +1,12 @@
-Date: Thu, 17 Jun 2021 12:26:10 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210617162610.GC1142820@redhat.com>
-References: <20210617153649.1886693-1-hch@lst.de>
-	<20210617153649.1886693-3-hch@lst.de>
+Date: Thu, 17 Jun 2021 14:12:07 -0400
+Message-Id: <20210617181213.1177835-3-vgoyal@redhat.com>
+In-Reply-To: <20210617181213.1177835-1-vgoyal@redhat.com>
+References: <20210617181213.1177835-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210617153649.1886693-3-hch@lst.de>
-Subject: Re: [Virtio-fs] [PATCH 2/2] init: allow mounting arbitrary
- non-blockdevice filesystems as root
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v6 2/8] virtiofsd: Fix fuse setxattr() API
+	change issue
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,77 +15,60 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Christoph Hellwig <hch@lst.de>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, viro@zeniv.linux.org.uk, linux-kernel@vger.kernel.org
+To: qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, vgoyal@redhat.com, miklos@szeredi.hu
 
-On Thu, Jun 17, 2021 at 05:36:49PM +0200, Christoph Hellwig wrote:
+With kernel header updates fuse_setxattr_in struct has grown in size.
+But this new struct size only takes affect if user has opted in
+for fuse feature FUSE_SETXATTR_EXT otherwise fuse continues to
+send "fuse_setxattr_in" of older size. Older size is determined
+by FUSE_COMPAT_SETXATTR_IN_SIZE.
 
-[..]
-> +static int __init try_mount_nodev(char *fstype)
-> +{
-> +	struct file_system_type *fs = get_fs_type(fstype);
-> +	int err = -EINVAL;
-> +
-> +	if (!fs)
-> +		return -EINVAL;
-> +	if (!(fs->fs_flags & (FS_REQUIRES_DEV | FS_BINARY_MOUNTDATA)))
+Fix this. If we have not opted in for FUSE_SETXATTR_EXT, then
+expect that we will get fuse_setxattr_in of size FUSE_COMPAT_SETXATTR_IN_SIZE
+and not sizeof(struct fuse_sexattr_in).
 
-Not sure what FS_BINARY_MOUNTDATA is why fs should not have that set. nfs
-seems to set it too. So that means they can't use try_mount_nodev().
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ tools/virtiofsd/fuse_common.h   | 5 +++++
+ tools/virtiofsd/fuse_lowlevel.c | 7 ++++++-
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
-> +		err = do_mount_root(root_device_name, fstype, root_mountflags,
-> +					root_mount_data);
-> +	put_filesystem(fs);
-> +
-> +	if (err != -EACCES && err != -EINVAL)
-
-In case of success err == 0, but we still panic(). We will need to
-check for success as well.
-	if (err && err != -EACCES && err != -EINVAL)
-
-> +		panic("VFS: Unable to mount root \"%s\" (%s), err=%d\n",
-> +			      root_device_name, fstype, err);
-> +	return err;
-> +}
-> +
-> +static int __init mount_nodev_root(void)
-> +{
-> +	char *fs_names, *p;
-> +	int err = -EINVAL;
-> +
-> +	fs_names = (void *)__get_free_page(GFP_KERNEL);
-> +	if (!fs_names)
-> +		return -EINVAL;
-> +	split_fs_names(fs_names, root_fs_names);
-
-root_fs_names can be NULL and it crashes with NULL pointer dereference.
-
-Vivek
-
-> +
-> +	for (p = fs_names; *p; p += strlen(p) + 1) {
-> +		err = try_mount_nodev(p);
-> +		if (!err)
-> +			break;
-> +	}
-> +
-> +	free_page((unsigned long)fs_names);
-> +	return err;
-> +}
-> +
->  void __init mount_root(void)
->  {
->  #ifdef CONFIG_ROOT_NFS
-> @@ -550,6 +588,8 @@ void __init mount_root(void)
->  		return;
->  	}
->  #endif
-> +	if (ROOT_DEV == 0 && mount_nodev_root() == 0)
-> +		return;
->  #ifdef CONFIG_BLOCK
->  	{
->  		int err = create_dev("/dev/root", ROOT_DEV);
-> -- 
-> 2.30.2
-> 
+diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
+index fa9671872e..0c2665b977 100644
+--- a/tools/virtiofsd/fuse_common.h
++++ b/tools/virtiofsd/fuse_common.h
+@@ -372,6 +372,11 @@ struct fuse_file_info {
+  */
+ #define FUSE_CAP_HANDLE_KILLPRIV_V2 (1 << 28)
+ 
++/**
++ * Indicates that file server supports extended struct fuse_setxattr_in
++ */
++#define FUSE_CAP_SETXATTR_EXT (1 << 29)
++
+ /**
+  * Ioctl flags
+  *
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index 7fe2cef1eb..156f1494f5 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -1419,8 +1419,13 @@ static void do_setxattr(fuse_req_t req, fuse_ino_t nodeid,
+     struct fuse_setxattr_in *arg;
+     const char *name;
+     const char *value;
++    bool setxattr_ext = req->se->conn.want & FUSE_CAP_SETXATTR_EXT;
++
++    if (setxattr_ext)
++        arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
++    else
++        arg = fuse_mbuf_iter_advance(iter, FUSE_COMPAT_SETXATTR_IN_SIZE);
+ 
+-    arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
+     name = fuse_mbuf_iter_advance_str(iter);
+     if (!arg || !name) {
+         fuse_reply_err(req, EINVAL);
+-- 
+2.25.4
 

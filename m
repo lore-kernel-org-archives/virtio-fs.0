@@ -1,23 +1,12 @@
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=infradead.org; s=casper.20170209;
-	h=In-Reply-To:Content-Type:MIME-Version:
-	References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description;
-	bh=1rcaBiYMmxbTIzBSP4Lkyvlkc2KdB5uGKfAUxQ6B2a4=;
-	b=nTtzOYyH5nOB+rP0PzOPnj6I+b
-	Kznx/IAocBctaMmCDpRBXcNsJOFm5Rx3yGsLm+PWWxWHDhmzH2k4knlIjyqz0MxafD79FV3ZF6Dp1
-	Vx2s7YvaIQb+zKW4icpwpqz9MhyVR/6AWFOkICqel2DCojYafEI3tTZadCaGq8y08Kl9ybex3TajK
-	qBTiX7TxTBkTKx5ClUNwC+i5dm/NVFXzhWnmUauAfJR3DgZy4hWMn3tOFJiL/w0rLP5boCXZN9vB8
-	CTEExFY0i1HAry95jafbWjRvtbwQn/snQQYYccuM4Y3dngmmwxqibc25LV8ViDP1qTT+6XSdSVZ+f
-	vdNdIovw==
-Date: Thu, 17 Jun 2021 11:14:00 +0100
-From: Christoph Hellwig <hch@infradead.org>
-Message-ID: <YMsgaPS90iKIqSvi@infradead.org>
+Date: Thu, 17 Jun 2021 09:30:52 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210617133052.GA1142820@redhat.com>
 References: <20210614174454.903555-1-vgoyal@redhat.com>
+	<YMsgaPS90iKIqSvi@infradead.org>
 MIME-Version: 1.0
-In-Reply-To: <20210614174454.903555-1-vgoyal@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
+In-Reply-To: <YMsgaPS90iKIqSvi@infradead.org>
 Subject: Re: [Virtio-fs] [PATCH v2 0/2] Add support to boot virtiofs and
 	9pfs as rootfs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -28,63 +17,107 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: dhowells@redhat.com, miklos@szeredi.hu, richard.weinberger@gmail.com, asmadeus@codewreck.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, viro@zeniv.linux.org.uk, hch@infradead.org, linux-fsdevel@vger.kernel.org, v9fs-developer@lists.sourceforge.net
+To: Christoph Hellwig <hch@infradead.org>
+Cc: dhowells@redhat.com, miklos@szeredi.hu, richard.weinberger@gmail.com, asmadeus@codewreck.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, viro@zeniv.linux.org.uk, linux-fsdevel@vger.kernel.org, v9fs-developer@lists.sourceforge.net
 
-Why not something like the version below that should work for all nodev
-file systems?
+On Thu, Jun 17, 2021 at 11:14:00AM +0100, Christoph Hellwig wrote:
+> Why not something like the version below that should work for all nodev
+> file systems?
 
-diff --git a/init/do_mounts.c b/init/do_mounts.c
-index 74aede860de7..3c5676603fef 100644
---- a/init/do_mounts.c
-+++ b/init/do_mounts.c
-@@ -530,6 +530,39 @@ static int __init mount_cifs_root(void)
- }
- #endif
- 
-+static int __init mount_nodev_root(void)
-+{
-+	struct file_system_type *fs = get_fs_type(root_fs_names);
-+	char *fs_names, *p;
-+	int err = -ENODEV;
-+
-+	if (!fs)
-+		goto out;
-+	if (fs->fs_flags & FS_REQUIRES_DEV)
-+		goto out_put_filesystem;
-+
-+	fs_names = (void *)__get_free_page(GFP_KERNEL);
-+	if (!fs_names)
-+		goto out_put_filesystem;
-+	get_fs_names(fs_names);
-+
-+	for (p = fs_names; *p; p += strlen(p) + 1) {
-+		err = do_mount_root(root_device_name, p, root_mountflags,
-+					root_mount_data);
-+		if (!err)
-+			break;
-+		if (err != -EACCES && err != -EINVAL)
-+			panic("VFS: Unable to mount root \"%s\" (%s), err=%d\n",
-+				      root_device_name, p, err);
-+	}
-+
-+	free_page((unsigned long)fs_names);
-+out_put_filesystem:
-+	put_filesystem(fs);
-+out:
-+	return err;
-+}
-+
- void __init mount_root(void)
- {
- #ifdef CONFIG_ROOT_NFS
-@@ -546,6 +579,8 @@ void __init mount_root(void)
- 		return;
- 	}
- #endif
-+	if (ROOT_DEV == 0 && mount_nodev_root() == 0)
-+		return;
- #ifdef CONFIG_BLOCK
- 	{
- 		int err = create_dev("/dev/root", ROOT_DEV);
+Hi Christoph,
+
+Thanks for this patch. It definitely looks much better. I had a fear
+of breaking something if I were to go through this path of using
+FS_REQUIRES_DEV.
+
+This patch works for me with "root=myfs rootfstype=virtiofs rw". Have
+few thoughts inline.
+> 
+> diff --git a/init/do_mounts.c b/init/do_mounts.c
+> index 74aede860de7..3c5676603fef 100644
+> --- a/init/do_mounts.c
+> +++ b/init/do_mounts.c
+> @@ -530,6 +530,39 @@ static int __init mount_cifs_root(void)
+>  }
+>  #endif
+>  
+> +static int __init mount_nodev_root(void)
+> +{
+> +	struct file_system_type *fs = get_fs_type(root_fs_names);
+
+get_fs_type() assumes root_fs_names is not null. So if I pass
+"root=myfs rw", it crashes with null pointer dereference.
+
+
+> +	char *fs_names, *p;
+> +	int err = -ENODEV;
+> +
+> +	if (!fs)
+> +		goto out;
+> +	if (fs->fs_flags & FS_REQUIRES_DEV)
+> +		goto out_put_filesystem;
+> +
+> +	fs_names = (void *)__get_free_page(GFP_KERNEL);
+> +	if (!fs_names)
+> +		goto out_put_filesystem;
+> +	get_fs_names(fs_names);
+
+I am wondering what use case we are trying to address by calling
+get_fs_names() and trying do_mount_root() on all filesystems
+returned by get_fs_names(). I am assuming following use cases
+you have in mind.
+
+A. User passes a single filesystem in rootfstype.
+   
+   root=myfs rootfstype=virtiofs rw
+
+B. User passes multiple filesystems in rootfstype and kernel tries all
+   of them one after the other
+
+   root=myfs, rootfstype=9p,virtiofs rw
+
+C. User does not pass a filesystem type at all. And kernel will get a
+   list of in-built filesystems and will try these one after the other.
+
+   root=myfs rw
+
+If that's the thought, will it make sense to call get_fs_names() first
+and then inside the for loop call get_fs_type() and try mounting
+only if FS_REQUIRES_DEV is not set, otherwise skip and move onto th
+next filesystem in the list (fs_names).
+
+Thanks
+Vivek
+
+> +
+> +	for (p = fs_names; *p; p += strlen(p) + 1) {
+> +		err = do_mount_root(root_device_name, p, root_mountflags,
+> +					root_mount_data);
+> +		if (!err)
+> +			break;
+> +		if (err != -EACCES && err != -EINVAL)
+> +			panic("VFS: Unable to mount root \"%s\" (%s), err=%d\n",
+> +				      root_device_name, p, err);
+> +	}
+> +
+> +	free_page((unsigned long)fs_names);
+> +out_put_filesystem:
+> +	put_filesystem(fs);
+> +out:
+> +	return err;
+> +}
+> +
+>  void __init mount_root(void)
+>  {
+>  #ifdef CONFIG_ROOT_NFS
+> @@ -546,6 +579,8 @@ void __init mount_root(void)
+>  		return;
+>  	}
+>  #endif
+> +	if (ROOT_DEV == 0 && mount_nodev_root() == 0)
+> +		return;
+>  #ifdef CONFIG_BLOCK
+>  	{
+>  		int err = create_dev("/dev/root", ROOT_DEV);
+> 
 

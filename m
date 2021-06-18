@@ -1,13 +1,20 @@
-Date: Wed, 30 Jun 2021 19:53:28 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YNy9qKOnEzi3up+R@work-vm>
-References: <20210622150852.1507204-1-vgoyal@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=ihY+Jish0l99qrEM7OyS4KVbnl0KDxrEDp3Kl2ai2bo=;
+	b=OCrOT0LPX/pI5V9awJJfTwT1xTE8MHtRDvpC0vtBSUtTbHz6JIoX162e+RtgKJi6mF
+	zeMNORG7TSFbankY2QFB4X8Xxw95WfIM5bCICpoWGURa4ndb65WOOclnwtGyNHArOnhh
+	GrmTD2XjWoDOKLLAul9KpsJ88i1X3ADIWRV9s=
 MIME-Version: 1.0
-In-Reply-To: <20210622150852.1507204-1-vgoyal@redhat.com>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH v7 0/7] virtiofsd: Add support to
- enable/disable posix acls
+References: <20210617141518.304659-1-groug@kaod.org>
+	<CAJfpegtpvU6Z6hQ-NKh-shN+Pux7+XzXwNK_Ro8YpfA-3tCOkg@mail.gmail.com>
+	<20210618112131.46ce0b2a@bahia.lan>
+In-Reply-To: <20210618112131.46ce0b2a@bahia.lan>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Fri, 18 Jun 2021 11:34:15 +0200
+Message-ID: <CAJfpegv30i7OnTO5mdNsVSDDoC9D_d06ni1sRrdrmGOgRsdS8w@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Don't allow file creation with
+	FUSE_OPEN
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,58 +23,130 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, miklos@szeredi.hu, qemu-devel@nongnu.org
+To: Greg Kurz <groug@kaod.org>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> Hi,
-> 
-> This is V7 of the patches.
-> 
-> Changes since V6.
-> 
-> - Dropped kernel header update patch as somebody else did it.
-> - Fixed coding style issues.
-> 
-> Currently posix ACL support does not work well with virtiofs and bunch
-> of tests fail when I run xfstests "./check -g acl".
-> 
-> This patches series fixes the issues with virtiofs posix acl support
-> and provides options to enable/disable posix acl (-o posix_acl/no_posix_acl).
-> By default posix_acls are disabled.
-> 
-> With this patch series applied and virtiofsd running with "-o posix_acl",
-> xfstests "./check -g acl" passes.
-> 
-> Thanks
-> Vivek
+On Fri, 18 Jun 2021 at 11:21, Greg Kurz <groug@kaod.org> wrote:
+>
+> On Fri, 18 Jun 2021 10:58:33 +0200
+> Miklos Szeredi <miklos@szeredi.hu> wrote:
+>
+> > On Thu, 17 Jun 2021 at 16:15, Greg Kurz <groug@kaod.org> wrote:
+> > >
+> > > A well behaved FUSE client uses FUSE_CREATE to create files. It isn't
+> > > supposed to pass O_CREAT along a FUSE_OPEN request, as documented in
+> > > the "fuse_lowlevel.h" header :
+> > >
+> > >     /**
+> > >      * Open a file
+> > >      *
+> > >      * Open flags are available in fi->flags. The following rules
+> > >      * apply.
+> > >      *
+> > >      *  - Creation (O_CREAT, O_EXCL, O_NOCTTY) flags will be
+> > >      *    filtered out / handled by the kernel.
+> > >
+> > > But if it does anyway, virtiofsd crashes with:
+> > >
+> > > *** invalid openat64 call: O_CREAT or O_TMPFILE without mode ***: terminated
+> > >
+> > > This is because virtiofsd ends up passing this flag to openat() without
+> > > passing a mode_t 4th argument which is mandatory with O_CREAT, and glibc
+> > > aborts.
+> > >
+> > > The offending path is:
+> > >
+> > > lo_open()
+> > >     lo_do_open()
+> > >         lo_inode_open()
+> > >
+> > > Other callers of lo_inode_open() only pass O_RDWR and lo_create()
+> > > passes a valid fd to lo_do_open() which thus doesn't even call
+> > > lo_inode_open() in this case.
+> > >
+> > > Specifying O_CREAT with FUSE_OPEN is a protocol violation. Check this
+> > > in lo_open() and return an error to the client : EINVAL since this is
+> > > already what glibc returns with other illegal flag combinations.
+> > >
+> > > The FUSE filesystem doesn't currently support O_TMPFILE, but the very
+> > > same would happen if O_TMPFILE was passed in a FUSE_OPEN request. Check
+> > > that as well.
+> > >
+> > > Signed-off-by: Greg Kurz <groug@kaod.org>
+> > > ---
+> > >  tools/virtiofsd/passthrough_ll.c | 6 ++++++
+> > >  1 file changed, 6 insertions(+)
+> > >
+> > > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> > > index 49c21fd85570..14f62133131c 100644
+> > > --- a/tools/virtiofsd/passthrough_ll.c
+> > > +++ b/tools/virtiofsd/passthrough_ll.c
+> > > @@ -2145,6 +2145,12 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+> > >          return;
+> > >      }
+> > >
+> > > +    /* File creation is handled by lo_create() */
+> > > +    if (fi->flags & (O_CREAT | O_TMPFILE)) {
+> > > +        fuse_reply_err(req, EINVAL);
+> > > +        return;
+> > > +    }
+> > > +
+> >
+> > Okay.  Question comes to mind whether the check should be even more
+> > strict, possibly allowing just a specific set of flags, and erroring
+> > out on everything else?
+> >
+>
+> I've focused on O_CREAT and O_TMPFILE because they cause an explicit abort()
+> in glibc when the code is compiled with -D_FORTIFY_SOURCE=2, but yes,
+> maybe it could make sense to check more of them.
+>
+> > AFAICS linux kernel should never pass anything to FUSE_OPEN outside of this set:
+> >
+> > O_RDONLY
+> > O_WRONLY
+> > O_RDWR
+> > O_APPEND
+> > O_NDELAY
+> > O_NONBLOCK
+> > __O_SYNC
+> > O_DSYNC
+> > FASYNC
+> > O_DIRECT
+> > O_LARGEFILE
+> > O_NOFOLLOW
+> > O_NOATIME
+> >
+> > A separate question is whether virtiofsd should also be silently
+> > ignoring some of the above flags.
+> >
+>
+> Dunno on the top of my head...
 
-Queued
+Let's discuss this separately as this is mostly unrelated.  Added an
+item to the virtiofs-todo etherpad.
 
-> 
-> 
-> Vivek Goyal (7):
->   virtiofsd: Fix fuse setxattr() API change issue
->   virtiofsd: Fix xattr operations overwriting errno
->   virtiofsd: Add support for extended setxattr
->   virtiofsd: Add umask to seccom allow list
->   virtiofsd: Add capability to change/restore umask
->   virtiofsd: Switch creds, drop FSETID for system.posix_acl_access xattr
->   virtiofsd: Add an option to enable/disable posix acls
-> 
->  docs/tools/virtiofsd.rst              |   3 +
->  tools/virtiofsd/fuse_common.h         |  10 ++
->  tools/virtiofsd/fuse_lowlevel.c       |  18 +-
->  tools/virtiofsd/fuse_lowlevel.h       |   3 +-
->  tools/virtiofsd/helper.c              |   1 +
->  tools/virtiofsd/passthrough_ll.c      | 229 ++++++++++++++++++++++++--
->  tools/virtiofsd/passthrough_seccomp.c |   1 +
->  7 files changed, 249 insertions(+), 16 deletions(-)
-> 
-> -- 
-> 2.25.4
-> 
-> 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+>
+> BTW, as suggested by Dave, I've submitted a similar patch to upstream
+> libfuse:
+>
+> https://github.com/libfuse/libfuse/pull/615
+>
+> And I got interesting suggestions:
+> 1) do it in core FUSE, i.e. fuse_lowlevel.c, since this isn't specific to
+>    passthrough_ll AFAICT
+> 2) print out an error
+> 3) exit
+>
+> 1 makes a lot of sense. I guess 2 is fine this cannot be used by a
+> buggy guest to flood some log file on the host. 3 doesn't seems
+> to be an acceptable solution, and it wouldn't change much the
+> outcome compared to what we have now.
+>
+> So I will go for 1 and 2.
+
+Okay, good.
+
+Thanks,
+Miklos
 

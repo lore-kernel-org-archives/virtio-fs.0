@@ -1,14 +1,14 @@
-Date: Mon, 28 Jun 2021 16:31:27 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YNnrT/mCw3w26/lT@work-vm>
-References: <20210622150852.1507204-1-vgoyal@redhat.com>
-	<20210622150852.1507204-3-vgoyal@redhat.com>
+Date: Fri, 18 Jun 2021 10:20:57 +0200
+From: Greg Kurz <groug@kaod.org>
+Message-ID: <20210618102057.21e901fa@bahia.lan>
+In-Reply-To: <20210618014007.GA1219970@redhat.com>
+References: <20210617141518.304659-1-groug@kaod.org>
+	<20210618014007.GA1219970@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20210622150852.1507204-3-vgoyal@redhat.com>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH v7 2/7] virtiofsd: Fix xattr operations
-	overwriting errno
+Content-Type: text/plain; charset=US-ASCII
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Don't allow file creation with
+	FUSE_OPEN
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,125 +18,115 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, miklos@szeredi.hu, qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, Miklos Szeredi <miklos@szeredi.hu>, qemu-devel@nongnu.org
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> getxattr/setxattr/removexattr/listxattr operations handle regualar
-> and non-regular files differently. For the case of non-regular files
-> we do fchdir(/proc/self/fd) and the xattr operation and then revert
-> back to original working directory. After this we are saving errno
-> and that's buggy because fchdir() will overwrite the errno.
-> 
-> FCHDIR_NOFAIL(lo->proc_self_fd);
-> ret = getxattr(procname, name, value, size);
-> FCHDIR_NOFAIL(lo->root.fd);
-> 
-> if (ret == -1)
->     saverr = errno
-> 
-> In above example, if getxattr() failed, we will still return 0 to caller
-> as errno must have been written by FCHDIR_NOFAIL(lo->root.fd) call.
-> Fix all such instances and capture "errno" early and save in "saverr"
-> variable.
-> 
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+On Thu, 17 Jun 2021 21:40:07 -0400
+Vivek Goyal <vgoyal@redhat.com> wrote:
 
-I think the existing code is actually safe; I don't think fchdir
-will/should set errno unless there's an error, and we're explictly
-asserting there isn't one.
-
-However, I do prefer doing this save since we already have the save
-variables and it makes the chance of screwing it up from any other
-forgotten syscall less likely, so
-
-
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-
-> ---
->  tools/virtiofsd/passthrough_ll.c | 16 ++++++++++------
->  1 file changed, 10 insertions(+), 6 deletions(-)
+> On Thu, Jun 17, 2021 at 04:15:18PM +0200, Greg Kurz wrote:
+> > A well behaved FUSE client uses FUSE_CREATE to create files. It isn't
+> > supposed to pass O_CREAT along a FUSE_OPEN request, as documented in
+> > the "fuse_lowlevel.h" header :
+> > 
+> >     /**
+> >      * Open a file
+> >      *
+> >      * Open flags are available in fi->flags. The following rules
+> >      * apply.
+> >      *
+> >      *  - Creation (O_CREAT, O_EXCL, O_NOCTTY) flags will be
+> >      *    filtered out / handled by the kernel.
+> > 
+> > But if it does anyway, virtiofsd crashes with:
+> > 
+> > *** invalid openat64 call: O_CREAT or O_TMPFILE without mode ***: terminated
 > 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 49c21fd855..ec91b3c133 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2791,15 +2791,17 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
->              goto out_err;
->          }
->          ret = fgetxattr(fd, name, value, size);
-> +        saverr = ret == -1 ? errno : 0;
->      } else {
->          /* fchdir should not fail here */
->          FCHDIR_NOFAIL(lo->proc_self_fd);
->          ret = getxattr(procname, name, value, size);
-> +        saverr = ret == -1 ? errno : 0;
->          FCHDIR_NOFAIL(lo->root.fd);
->      }
->  
->      if (ret == -1) {
-> -        goto out_err;
-> +        goto out;
->      }
->      if (size) {
->          saverr = 0;
-> @@ -2864,15 +2866,17 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
->              goto out_err;
->          }
->          ret = flistxattr(fd, value, size);
-> +        saverr = ret == -1 ? errno : 0;
->      } else {
->          /* fchdir should not fail here */
->          FCHDIR_NOFAIL(lo->proc_self_fd);
->          ret = listxattr(procname, value, size);
-> +        saverr = ret == -1 ? errno : 0;
->          FCHDIR_NOFAIL(lo->root.fd);
->      }
->  
->      if (ret == -1) {
-> -        goto out_err;
-> +        goto out;
->      }
->      if (size) {
->          saverr = 0;
-> @@ -2998,15 +3002,15 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
->              goto out;
->          }
->          ret = fsetxattr(fd, name, value, size, flags);
-> +        saverr = ret == -1 ? errno : 0;
->      } else {
->          /* fchdir should not fail here */
->          FCHDIR_NOFAIL(lo->proc_self_fd);
->          ret = setxattr(procname, name, value, size, flags);
-> +        saverr = ret == -1 ? errno : 0;
->          FCHDIR_NOFAIL(lo->root.fd);
->      }
->  
-> -    saverr = ret == -1 ? errno : 0;
-> -
->  out:
->      if (fd >= 0) {
->          close(fd);
-> @@ -3064,15 +3068,15 @@ static void lo_removexattr(fuse_req_t req, fuse_ino_t ino, const char *in_name)
->              goto out;
->          }
->          ret = fremovexattr(fd, name);
-> +        saverr = ret == -1 ? errno : 0;
->      } else {
->          /* fchdir should not fail here */
->          FCHDIR_NOFAIL(lo->proc_self_fd);
->          ret = removexattr(procname, name);
-> +        saverr = ret == -1 ? errno : 0;
->          FCHDIR_NOFAIL(lo->root.fd);
->      }
->  
-> -    saverr = ret == -1 ? errno : 0;
-> -
->  out:
->      if (fd >= 0) {
->          close(fd);
-> -- 
-> 2.25.4
+
+This is also the consequence of virtiofsd being compiled with
+-D_FORTIFY_SOURCE=2. Without that, no abort but arbitrary data
+is passed as mode_t argument to the openat() syscall instead.
+
+> So did you hit this error with current fuse client. If yes, that means
+> client needs fixing as well?
 > 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+
+I've patched the client to cause this:
+
+--- a/fs/fuse/file.c
++++ b/fs/fuse/file.c
+@@ -28,6 +28,7 @@ static int fuse_send_open(struct fuse_mount *fm, u64 nodeid,
+ 
+        memset(&inarg, 0, sizeof(inarg));
+        inarg.flags = open_flags & ~(O_CREAT | O_EXCL | O_NOCTTY);
++       if (opcode == FUSE_OPEN) inarg.flags |= O_TMPFILE;
+        if (!fm->fc->atomic_o_trunc)
+                inarg.flags &= ~O_TRUNC;
+
+
+> Or you are doing this fix based on comment in fuse_lowlevel.h.
+> 
+> I am wondering why this protocl restriction is there that open()
+> path should not be able to honor O_CREAT.
+> 
+
+It isn't a protocol restriction IMHO. The distinction between file
+creation and file opening has always been there since the start.
+Older versions of the protocol would send FUSE_MKNOD to create a
+file and then send FUSE_OPEN to open it. Because this was racy,
+FUSE_CREATE was introduced at some point to do both operations
+atomically.
+
+Question is : what would be the semantics of O_CREAT in FUSE_OPEN ?
+
+> Vivek
+> 
+> > 
+> > This is because virtiofsd ends up passing this flag to openat() without
+> > passing a mode_t 4th argument which is mandatory with O_CREAT, and glibc
+> > aborts.
+> > 
+> > The offending path is:
+> > 
+> > lo_open()
+> >     lo_do_open()
+> >         lo_inode_open()
+> > 
+> > Other callers of lo_inode_open() only pass O_RDWR and lo_create()
+> > passes a valid fd to lo_do_open() which thus doesn't even call
+> > lo_inode_open() in this case.
+> > 
+> > Specifying O_CREAT with FUSE_OPEN is a protocol violation. Check this
+> > in lo_open() and return an error to the client : EINVAL since this is
+> > already what glibc returns with other illegal flag combinations.
+> > 
+> > The FUSE filesystem doesn't currently support O_TMPFILE, but the very
+> > same would happen if O_TMPFILE was passed in a FUSE_OPEN request. Check
+> > that as well.
+> > 
+> > Signed-off-by: Greg Kurz <groug@kaod.org>
+> > ---
+> >  tools/virtiofsd/passthrough_ll.c | 6 ++++++
+> >  1 file changed, 6 insertions(+)
+> > 
+> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> > index 49c21fd85570..14f62133131c 100644
+> > --- a/tools/virtiofsd/passthrough_ll.c
+> > +++ b/tools/virtiofsd/passthrough_ll.c
+> > @@ -2145,6 +2145,12 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+> >          return;
+> >      }
+> >  
+> > +    /* File creation is handled by lo_create() */
+> > +    if (fi->flags & (O_CREAT | O_TMPFILE)) {
+> > +        fuse_reply_err(req, EINVAL);
+> > +        return;
+> > +    }
+> > +
+> >      err = lo_do_open(lo, inode, -1, fi);
+> >      lo_inode_put(lo, &inode);
+> >      if (err) {
+> > -- 
+> > 2.31.1
+> > 
+> 
 

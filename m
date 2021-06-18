@@ -1,12 +1,19 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue, 22 Jun 2021 11:08:51 -0400
-Message-Id: <20210622150852.1507204-7-vgoyal@redhat.com>
-In-Reply-To: <20210622150852.1507204-1-vgoyal@redhat.com>
-References: <20210622150852.1507204-1-vgoyal@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=tlodzRLKjYsmSIvJvfyHmyRZLG20ROka1PyN+VfwfnY=;
+	b=mdFl213r1n1uA6uKofvIKHWo5sizoJZyxajbWz27X3DF1VPnIRBBR8iCB7pGgabrWv
+	0JKDQLz2F+SRodYFTB4NF/9URm8CCY9XPrzZ1jV7oFeOJOBt9hKPZOhLFvkyBXgOXhd8
+	hA8SqcnfTAKYGkMOMHfAzHP2bOY32bYG7Hw8g=
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v7 6/7] virtiofsd: Switch creds,
-	drop FSETID for system.posix_acl_access xattr
+References: <20210614174454.903555-1-vgoyal@redhat.com>
+	<20210614174454.903555-2-vgoyal@redhat.com>
+In-Reply-To: <20210614174454.903555-2-vgoyal@redhat.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Fri, 18 Jun 2021 09:07:14 +0200
+Message-ID: <CAJfpeguD+F3Ai01=-JYNTKS4LP4d879=+8T7eOBewZpevTRbJg@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PATCH v2 1/2] init/do_mounts.c: Add a path to boot
+ from tag based filesystems
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,163 +22,54 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com
-Cc: miklos@szeredi.hu, vgoyal@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: David Howells <dhowells@redhat.com>, Christoph Hellwig <hch@infradead.org>, Richard Weinberger <richard.weinberger@gmail.com>, Dominique Martinet <asmadeus@codewreck.org>, linux-kernel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel@vger.kernel.org, v9fs-developer@lists.sourceforge.net
 
-When posix access acls are set on a file, it can lead to adjusting file
-permissions (mode) as well. If caller does not have CAP_FSETID and it
-also does not have membership of owner group, this will lead to clearing
-SGID bit in mode.
+On Mon, 14 Jun 2021 at 19:45, Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> We want to be able to mount virtiofs as rootfs and pass appropriate
+> kernel command line. Right now there does not seem to be a good way
+> to do that. If I specify "root=myfs rootfstype=virtiofs", system
+> panics.
+>
+> virtio-fs: tag </dev/root> not found
+> ..
+> ..
+> [ end Kernel panic - not syncing: VFS: Unable to mount root fs on
+> +unknown-block(0,0) ]
+>
+> Basic problem here is that kernel assumes that device identifier
+> passed in "root=" is a block device. But there are few execptions
+> to this rule to take care of the needs of mtd, ubi, NFS and CIFS.
+>
+> For example, mtd and ubi prefix "mtd:" or "ubi:" respectively.
+>
+> "root=mtd:<identifier>" or "root=ubi:<identifier>"
+>
+> NFS and CIFS use "root=/dev/nfs" and CIFS passes "root=/dev/cifs" and
+> actual root device details come from filesystem specific kernel
+> command line options.
+>
+> virtiofs does not seem to fit in any of the above categories. In fact
+> we have 9pfs which can be used to boot from but it also does not
+> have a proper syntax to specify rootfs and does not fit into any of
+> the existing syntax. They both expect a device "tag" to be passed
+> in a device to be mounted. And filesystem knows how to parse and
+> use "tag".
+>
+> So there seem to be a class of filesystems which specify root device
+> using a "tag" which is understood by the filesystem. And filesystem
+> simply expects that "tag" to be passed as "source" of mount and
+> how to mount filesystem using that "tag" is responsibility of filesystem.
+>
+> This patch proposes that we internally create a list of filesystems
+> which pass a "tag" in "root=<tag>" and expect that tag to be passed
+> as "source" of mount. With this patch I can boot into virtiofs rootfs
+> with following syntax.
+>
+> "root=myfs rootfstype=virtiofs rw"
 
-Current fuse code is written in such a way that it expects file server
-to take care of chaning file mode (permission), if there is a need.
-Right now, host kernel does not clear SGID bit because virtiofsd is
-running as root and has CAP_FSETID. For host kernel to clear SGID,
-virtiofsd need to switch to gid of caller in guest and also drop
-CAP_FSETID (if caller did not have it to begin with).
+The syntax and the implementation looks good.
 
-If SGID needs to be cleared, client will set the flag
-FUSE_SETXATTR_ACL_KILL_SGID in setxattr request. In that case server
-should kill sgid.
-
-Currently just switch to uid/gid of the caller and drop CAP_FSETID
-and that should do it.
-
-This should fix the xfstest generic/375 test case.
-
-We don't have to switch uid for this to work. That could be one optimization
-that pass a parameter to lo_change_cred() to only switch gid and not uid.
-
-Also this will not work whenever (if ever) we support idmapped mounts. In
-that case it is possible that uid/gid in request are 0/0 but still we
-need to clear SGID. So we will have to pick a non-root sgid and switch
-to that instead. That's an TODO item for future when idmapped mount
-support is introduced.
-
-This patch only adds the capability to switch creds and drop FSETID
-when acl xattr is set. This does not take affect yet. It can take
-affect when next patch adds the capability to enable posix_acl.
-
-Reported-by: Luis Henriques <lhenriques@suse.de>
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- tools/virtiofsd/passthrough_ll.c | 75 ++++++++++++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
-
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 0c9084ea15..113c725def 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -175,6 +175,7 @@ struct lo_data {
-     int user_killpriv_v2, killpriv_v2;
-     /* If set, virtiofsd is responsible for setting umask during creation */
-     bool change_umask;
-+    int posix_acl;
- };
- 
- static const struct fuse_opt lo_opts[] = {
-@@ -1185,6 +1186,51 @@ static void lo_restore_cred(struct lo_cred *old, bool restore_umask)
-         umask(old->umask);
- }
- 
-+/*
-+ * A helper to change cred and drop capability. Returns 0 on success and
-+ * errno on error
-+ */
-+static int lo_drop_cap_change_cred(fuse_req_t req, struct lo_cred *old,
-+                                   bool change_umask, const char *cap_name,
-+                                   bool *cap_dropped)
-+{
-+    int ret;
-+    bool __cap_dropped;
-+
-+    assert(cap_name);
-+
-+    ret = drop_effective_cap(cap_name, &__cap_dropped);
-+    if (ret) {
-+        return ret;
-+    }
-+
-+    ret = lo_change_cred(req, old, change_umask);
-+    if (ret) {
-+        if (__cap_dropped) {
-+            if (gain_effective_cap(cap_name)) {
-+                fuse_log(FUSE_LOG_ERR, "Failed to gain CAP_%s\n", cap_name);
-+            }
-+        }
-+    }
-+
-+    if (cap_dropped) {
-+        *cap_dropped = __cap_dropped;
-+    }
-+    return ret;
-+}
-+
-+static void lo_restore_cred_gain_cap(struct lo_cred *old, bool restore_umask,
-+                                     const char *cap_name)
-+{
-+    assert(cap_name);
-+
-+    lo_restore_cred(old, restore_umask);
-+
-+    if (gain_effective_cap(cap_name)) {
-+        fuse_log(FUSE_LOG_ERR, "Failed to gain CAP_%s\n", cap_name);
-+    }
-+}
-+
- static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
-                              const char *name, mode_t mode, dev_t rdev,
-                              const char *link)
-@@ -2976,6 +3022,9 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
-     ssize_t ret;
-     int saverr;
-     int fd = -1;
-+    bool switched_creds = false;
-+    bool cap_fsetid_dropped = false;
-+    struct lo_cred old = {};
- 
-     mapped_name = NULL;
-     name = in_name;
-@@ -3006,6 +3055,26 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
-              ", name=%s value=%s size=%zd)\n", ino, name, value, size);
- 
-     sprintf(procname, "%i", inode->fd);
-+    /*
-+     * If we are setting posix access acl and if SGID needs to be
-+     * cleared, then switch to caller's gid and drop CAP_FSETID
-+     * and that should make sure host kernel clears SGID.
-+     *
-+     * This probably will not work when we support idmapped mounts.
-+     * In that case we will need to find a non-root gid and switch
-+     * to it. (Instead of gid in request). Fix it when we support
-+     * idmapped mounts.
-+     */
-+    if (lo->posix_acl && !strcmp(name, "system.posix_acl_access")
-+        && (extra_flags & FUSE_SETXATTR_ACL_KILL_SGID)) {
-+        ret = lo_drop_cap_change_cred(req, &old, false, "FSETID",
-+                                      &cap_fsetid_dropped);
-+        if (ret) {
-+            saverr = ret;
-+            goto out;
-+        }
-+        switched_creds = true;
-+    }
-     if (S_ISREG(inode->filetype) || S_ISDIR(inode->filetype)) {
-         fd = openat(lo->proc_self_fd, procname, O_RDONLY);
-         if (fd < 0) {
-@@ -3021,6 +3090,12 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
-         saverr = ret == -1 ? errno : 0;
-         FCHDIR_NOFAIL(lo->root.fd);
-     }
-+    if (switched_creds) {
-+        if (cap_fsetid_dropped)
-+            lo_restore_cred_gain_cap(&old, false, "FSETID");
-+        else
-+            lo_restore_cred(&old, false);
-+    }
- 
- out:
-     if (fd >= 0) {
--- 
-2.25.4
+Acked-by: Miklos Szeredi <mszeredi@redhat.com>
 

@@ -1,21 +1,14 @@
-Date: Wed, 30 Jun 2021 10:47:39 -0400
-From: "Theodore Ts'o" <tytso@mit.edu>
-Message-ID: <YNyECw/1FzDCW3G8@mit.edu>
-References: <YNn4p+Zn444Sc4V+@work-vm>
-	<a13f2861-7786-09f4-99a8-f0a5216d0fb1@schaufler-ca.com>
-	<YNrhQ9XfcHTtM6QA@work-vm>
-	<e6f9ed0d-c101-01df-3dff-85c1b38f9714@schaufler-ca.com>
-	<20210629152007.GC5231@redhat.com>
-	<78663f5c-d2fd-747a-48e3-0c5fd8b40332@schaufler-ca.com>
-	<20210629173530.GD5231@redhat.com>
-	<f4992b3a-a939-5bc4-a5da-0ce8913bd569@redhat.com>
-	<YNvvLIv16jY8mfP8@mit.edu> <YNwmXOqT7LgbeVPn@work-vm>
+Date: Fri, 18 Jun 2021 11:21:31 +0200
+From: Greg Kurz <groug@kaod.org>
+Message-ID: <20210618112131.46ce0b2a@bahia.lan>
+In-Reply-To: <CAJfpegtpvU6Z6hQ-NKh-shN+Pux7+XzXwNK_Ro8YpfA-3tCOkg@mail.gmail.com>
+References: <20210617141518.304659-1-groug@kaod.org>
+	<CAJfpegtpvU6Z6hQ-NKh-shN+Pux7+XzXwNK_Ro8YpfA-3tCOkg@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <YNwmXOqT7LgbeVPn@work-vm>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: Re: [Virtio-fs] [RFC PATCH 0/1] xattr: Allow user.* xattr on
- symlink/special files if caller has CAP_SYS_RESOURCE
+Content-Type: text/plain; charset=US-ASCII
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Don't allow file creation with
+	FUSE_OPEN
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,70 +17,136 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: "berrange@redhat.com" <berrange@redhat.com>, "selinux@vger.kernel.org" <selinux@vger.kernel.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "Schaufler,
-	Casey" <casey.schaufler@intel.com>, linux-security-module <linux-security-module@vger.kernel.org>, "viro@zeniv.linux.org.uk" <viro@zeniv.linux.org.uk>, Casey Schaufler <casey@schaufler-ca.com>, "linux-fsdevel@vger.kernel.org" <linux-fsdevel@vger.kernel.org>, Vivek Goyal <vgoyal@redhat.com>
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
 
-On Wed, Jun 30, 2021 at 09:07:56AM +0100, Dr. David Alan Gilbert wrote:
-> * Theodore Ts'o (tytso@mit.edu) wrote:
-> > On Tue, Jun 29, 2021 at 04:28:24PM -0400, Daniel Walsh wrote:
-> > > All this conversation is great, and I look forward to a better solution, but
-> > > if we go back to the patch, it was to fix an issue where the kernel is
-> > > requiring CAP_SYS_ADMIN for writing user Xattrs on link files and other
-> > > special files.
-> > > 
-> > > The documented reason for this is to prevent the users from using XATTRS to
-> > > avoid quota.
-> > 
-> > Huh?  Where is it so documented?
+On Fri, 18 Jun 2021 10:58:33 +0200
+Miklos Szeredi <miklos@szeredi.hu> wrote:
+
+> On Thu, 17 Jun 2021 at 16:15, Greg Kurz <groug@kaod.org> wrote:
+> >
+> > A well behaved FUSE client uses FUSE_CREATE to create files. It isn't
+> > supposed to pass O_CREAT along a FUSE_OPEN request, as documented in
+> > the "fuse_lowlevel.h" header :
+> >
+> >     /**
+> >      * Open a file
+> >      *
+> >      * Open flags are available in fi->flags. The following rules
+> >      * apply.
+> >      *
+> >      *  - Creation (O_CREAT, O_EXCL, O_NOCTTY) flags will be
+> >      *    filtered out / handled by the kernel.
+> >
+> > But if it does anyway, virtiofsd crashes with:
+> >
+> > *** invalid openat64 call: O_CREAT or O_TMPFILE without mode ***: terminated
+> >
+> > This is because virtiofsd ends up passing this flag to openat() without
+> > passing a mode_t 4th argument which is mandatory with O_CREAT, and glibc
+> > aborts.
+> >
+> > The offending path is:
+> >
+> > lo_open()
+> >     lo_do_open()
+> >         lo_inode_open()
+> >
+> > Other callers of lo_inode_open() only pass O_RDWR and lo_create()
+> > passes a valid fd to lo_do_open() which thus doesn't even call
+> > lo_inode_open() in this case.
+> >
+> > Specifying O_CREAT with FUSE_OPEN is a protocol violation. Check this
+> > in lo_open() and return an error to the client : EINVAL since this is
+> > already what glibc returns with other illegal flag combinations.
+> >
+> > The FUSE filesystem doesn't currently support O_TMPFILE, but the very
+> > same would happen if O_TMPFILE was passed in a FUSE_OPEN request. Check
+> > that as well.
+> >
+> > Signed-off-by: Greg Kurz <groug@kaod.org>
+> > ---
+> >  tools/virtiofsd/passthrough_ll.c | 6 ++++++
+> >  1 file changed, 6 insertions(+)
+> >
+> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> > index 49c21fd85570..14f62133131c 100644
+> > --- a/tools/virtiofsd/passthrough_ll.c
+> > +++ b/tools/virtiofsd/passthrough_ll.c
+> > @@ -2145,6 +2145,12 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+> >          return;
+> >      }
+> >
+> > +    /* File creation is handled by lo_create() */
+> > +    if (fi->flags & (O_CREAT | O_TMPFILE)) {
+> > +        fuse_reply_err(req, EINVAL);
+> > +        return;
+> > +    }
+> > +
 > 
-> man xattr(7):
->        The  file permission bits of regular files and directories are
->        interpreted differently from the file permission bits of special
->        files and symbolic links.  For regular files and directories the
->        file permission bits define access to the file's contents,
->        while for device special files they define access to the device
->        described by the special file.  The file permissions of symbolic
->        links are not used in access checks.
+> Okay.  Question comes to mind whether the check should be even more
+> strict, possibly allowing just a specific set of flags, and erroring
+> out on everything else?
+> 
 
-All of this is true...
+I've focused on O_CREAT and O_TMPFILE because they cause an explicit abort()
+in glibc when the code is compiled with -D_FORTIFY_SOURCE=2, but yes,
+maybe it could make sense to check more of them.
 
->         *** These differences would
->        allow users to consume filesystem resources in a way not
->        controllable by disk quotas for group or world writable special
->        files and directories.****
+> AFAICS linux kernel should never pass anything to FUSE_OPEN outside of this set:
+> 
+> O_RDONLY
+> O_WRONLY
+> O_RDWR
+> O_APPEND
+> O_NDELAY
+> O_NONBLOCK
+> __O_SYNC
+> O_DSYNC
+> FASYNC
+> O_DIRECT
+> O_LARGEFILE
+> O_NOFOLLOW
+> O_NOATIME
+> 
+> A separate question is whether virtiofsd should also be silently
+> ignoring some of the above flags.
+> 
 
-Anyone with group write access to a regular file can append to the
-file, and the blocks written will be charged the owner of the file.
-So it's perfectly "controllable" by the quota system; if you have
-group write access to a file, you can charge against the user's quota.
-This is Working As Intended.
+Dunno on the top of my head...
 
-And the creation of device special files take the umask into account,
-just like regular files, so if you have a umask that allows newly
-created files to be group writeable, the same issue would occur for
-regular files as device files.  Given that most users have a umask of
-0077 or 0022, this is generally Not A Problem.
+BTW, as suggested by Dave, I've submitted a similar patch to upstream
+libfuse:
 
-I think I see the issue which drove the above text, though, which is
-that Linux's syscall(2) is creating symlinks which do not take umask
-into account; that is, the permissions are always mode ST_IFLNK|0777.
+https://github.com/libfuse/libfuse/pull/615
 
-Hence, it might be that the right answer is to remove this fairly
-arbitrary restriction entirely, and change symlink(2) so that it
-creates files which respects the umask.  Posix and SUS doesn't specify
-what the permissions are that are used, and historically (before the
-advent of xattrs) I suspect since it didn't matter, no one cared about
-whether or not umask was applied.
+And I got interesting suggestions:
+1) do it in core FUSE, i.e. fuse_lowlevel.c, since this isn't specific to
+   passthrough_ll AFAICT
+2) print out an error
+3) exit
 
-Some people might object to such a change arguing that with
-pre-existing file systems where there are symlinks which
-world-writeable, this might cause people to be able to charge up to
-32k (or whatever the maximum size of the xattr supported by the file
-system) for each symlink.  However, (a) very few people actually use
-quotas, and this would only be an issue for those users, and (b) the
-amount of quota "abuse" that could be carried out this way is small
-enough that I'm not sure it matters.
+1 makes a lot of sense. I guess 2 is fine this cannot be used by a
+buggy guest to flood some log file on the host. 3 doesn't seems
+to be an acceptable solution, and it wouldn't change much the
+outcome compared to what we have now.
 
-     	    	  	      	  - Ted
+So I will go for 1 and 2.
+
+Cheers,
+
+--
+Greg
+
+> Thanks,
+> Miklos
+> 
+> 
+> 
+> >      err = lo_do_open(lo, inode, -1, fi);
+> >      lo_inode_put(lo, &inode);
+> >      if (err) {
+> > --
+> > 2.31.1
+> >
 

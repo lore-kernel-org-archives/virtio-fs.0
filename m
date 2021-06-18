@@ -1,12 +1,14 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 14 Jul 2021 16:23:20 -0400
-Message-Id: <20210714202321.59729-3-vgoyal@redhat.com>
-In-Reply-To: <20210714202321.59729-1-vgoyal@redhat.com>
-References: <20210714202321.59729-1-vgoyal@redhat.com>
+Date: Fri, 18 Jun 2021 19:03:27 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <YMzf72yCJqnDTYYo@stefanha-x1.localdomain>
+References: <20210617153649.1886693-1-hch@lst.de>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 2/3] init: allow mounting arbitrary
-	non-blockdevice filesystems as root
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="BJ2t6DUwu2C54aee"
+Content-Disposition: inline
+In-Reply-To: <20210617153649.1886693-1-hch@lst.de>
+Subject: Re: [Virtio-fs] support booting of arbitrary non-blockdevice file
+ systems
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,94 +17,37 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: viro@zeniv.linux.org.uk
-Cc: miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, v9fs-developer@lists.sourceforge.net, hch@lst.de
+To: Christoph Hellwig <hch@lst.de>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, viro@zeniv.linux.org.uk, Vivek Goyal <vgoyal@redhat.com>, linux-kernel@vger.kernel.org
 
-From: Christoph Hellwig <hch@lst.de>
 
-Currently the only non-blockdevice filesystems that can be used as the
-initial root filesystem are NFS and CIFS, which use the magic
-"root=/dev/nfs" and "root=/dev/cifs" syntax that requires the root
-device file system details to come from filesystem specific kernel
-command line options.
+--BJ2t6DUwu2C54aee
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
 
-Add a little bit of new code that allows to just pass arbitrary
-string mount options to any non-blockdevice filesystems so that it can
-be mounted as the root file system.
+On Thu, Jun 17, 2021 at 05:36:47PM +0200, Christoph Hellwig wrote:
+> this series adds support to boot off arbitrary non-blockdevice root file
+> systems, based off an earlier patch from Vivek.
 
-For example a virtiofs root file system can be mounted using the
-following syntax:
+Cool, thanks for working on generic syntax for mounting non-blockdevice
+file systems. Looks good modulo the comments Vivek had.
 
-"root=myfs rootfstype=virtiofs rw"
+Stefan
 
-Based on an earlier patch from Vivek Goyal <vgoyal@redhat.com>.
+--BJ2t6DUwu2C54aee
+Content-Type: application/pgp-signature; name="signature.asc"
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- init/do_mounts.c | 43 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+-----BEGIN PGP SIGNATURE-----
 
-diff --git a/init/do_mounts.c b/init/do_mounts.c
-index ec32de3ad52b..bdeb90b8d669 100644
---- a/init/do_mounts.c
-+++ b/init/do_mounts.c
-@@ -534,6 +534,45 @@ static int __init mount_cifs_root(void)
- }
- #endif
- 
-+static bool __init fs_is_nodev(char *fstype)
-+{
-+	struct file_system_type *fs = get_fs_type(fstype);
-+	bool ret = false;
-+
-+	if (fs) {
-+		ret = !(fs->fs_flags & FS_REQUIRES_DEV);
-+		put_filesystem(fs);
-+	}
-+
-+	return ret;
-+}
-+
-+static int __init mount_nodev_root(void)
-+{
-+	char *fs_names, *fstype;
-+	int err = -EINVAL;
-+
-+	fs_names = (void *)__get_free_page(GFP_KERNEL);
-+	if (!fs_names)
-+		return -EINVAL;
-+	split_fs_names(fs_names, root_fs_names);
-+
-+	for (fstype = fs_names; *fstype; fstype += strlen(fstype) + 1) {
-+		if (!fs_is_nodev(fstype))
-+			continue;
-+		err = do_mount_root(root_device_name, fstype, root_mountflags,
-+				    root_mount_data);
-+		if (!err)
-+			break;
-+		if (err != -EACCES && err != -EINVAL)
-+			panic("VFS: Unable to mount root \"%s\" (%s), err=%d\n",
-+			      root_device_name, fstype, err);
-+	}
-+
-+	free_page((unsigned long)fs_names);
-+	return err;
-+}
-+
- void __init mount_root(void)
- {
- #ifdef CONFIG_ROOT_NFS
-@@ -550,6 +589,10 @@ void __init mount_root(void)
- 		return;
- 	}
- #endif
-+	if (ROOT_DEV == 0 && root_device_name && root_fs_names) {
-+		if (mount_nodev_root() == 0)
-+			return;
-+	}
- #ifdef CONFIG_BLOCK
- 	{
- 		int err = create_dev("/dev/root", ROOT_DEV);
--- 
-2.31.1
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmDM3+8ACgkQnKSrs4Gr
+c8iYRQf7BnTsXpltlcUc1ZB0ZEVw8116KM4IDmMLTrZI2+DB6dQUUDoVFGhDQ8Js
+8H+kO2B6gCyRK1kem+d6JF0B9YkWkGmot4c0LljqJs55aAmRRFNFqga3fuGu7/h8
+amS/Hm+QKgmCLIj+U/+nLkUqbxI/vSdmGMLOVgHC05Qw6m/3IRlJlXKjss2jOIzP
+NhaVbWL1WIaDjpgLFFZunGqNQ0jLN7o3SRUhtiJPwZ/9xXJcGem9X7/cFZQ12/Nd
+qP1ATC/vjVnwIZoHFjgn4O0wk3bv8zUMBLZqnnT9PYC5IbAW9oX8LWEine+T58X0
+yQNil38SKTfuWw2ZIRdiX2W7CfuZ3w==
+=zBxt
+-----END PGP SIGNATURE-----
+
+--BJ2t6DUwu2C54aee--
 

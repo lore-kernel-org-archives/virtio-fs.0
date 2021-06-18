@@ -1,15 +1,16 @@
-References: <20210708175738.360757-1-vgoyal@redhat.com>
-From: Daniel Walsh <dwalsh@redhat.com>
-Message-ID: <76d4a0ed-7582-cc73-a447-5f2d133c3c24@redhat.com>
-Date: Fri, 9 Jul 2021 12:00:07 -0400
+Date: Fri, 18 Jun 2021 10:10:31 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210618141031.GC1234055@redhat.com>
+References: <20210617153649.1886693-1-hch@lst.de>
+	<20210617153649.1886693-3-hch@lst.de>
+	<20210617162610.GC1142820@redhat.com>
+	<20210618132038.GA13406@lst.de>
 MIME-Version: 1.0
-In-Reply-To: <20210708175738.360757-1-vgoyal@redhat.com>
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Transfer-Encoding: 8bit
-Content-Language: en-US
-Subject: Re: [Virtio-fs] [RFC PATCH v2 0/1] Relax restrictions on user.*
-	xattr
-Reply-To: dwalsh@redhat.com
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20210618132038.GA13406@lst.de>
+Subject: Re: [Virtio-fs] [PATCH 2/2] init: allow mounting arbitrary
+ non-blockdevice filesystems as root
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,88 +19,150 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>, linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, viro@zeniv.linux.org.uk
-Cc: gscrivan@redhat.com, tytso@mit.edu, miklos@szeredi.hu, selinux@vger.kernel.org, virtio-fs@redhat.com, linux-security-module@vger.kernel.org, casey.schaufler@intel.com, jack@suse.cz, christian.brauner@ubuntu.com
+To: Christoph Hellwig <hch@lst.de>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, Dominique Martinet <asmadeus@codewreck.org>, viro@zeniv.linux.org.uk, linux-kernel@vger.kernel.org
 
-On 7/8/21 13:57, Vivek Goyal wrote:
-> Hi,
->
-> This is V2 of the patch. Posted V1 here.
->
-> https://lore.kernel.org/linux-fsdevel/20210625191229.1752531-1-vgoyal@redhat.com/
->
-> Right now we don't allow setting user.* xattrs on symlinks and special
-> files at all. Initially I thought that real reason behind this
-> restriction is quota limitations but from last conversation it seemed
-> that real reason is that permission bits on symlink and special files
-> are special and different from regular files and directories, hence
-> this restriction is in place.
->
-> Given it probably is not a quota issue (I tested with xfs user quota
-> enabled and quota restrictions kicked in on symlink), I dropped the
-> idea of allowing user.* xattr if process has CAP_SYS_RESOURCE.
->
-> Instead this version of patch allows reading/writing user.* xattr
-> on symlink and special files if caller is owner or priviliged (has
-> CAP_FOWNER) w.r.t inode.
->
-> We need this for virtiofs daemon. I also found one more user. Giuseppe,
-> seems to set user.* xattr attrs on unpriviliged fuse-overlay as well
-> and he ran into similar issue. So fuse-overlay should benefit from
-> this change as well.
->
-> Who wants to set user.* xattr on symlink/special files
-> -----------------------------------------------------
->
-> In virtiofs, actual file server is virtiosd daemon running on host.
-> There we have a mode where xattrs can be remapped to something else.
-> For example security.selinux can be remapped to
-> user.virtiofsd.securit.selinux on the host.
->
-> This remapping is useful when SELinux is enabled in guest and virtiofs
-> as being used as rootfs. Guest and host SELinux policy might not match
-> and host policy might deny security.selinux xattr setting by guest
-> onto host. Or host might have SELinux disabled and in that case to
-> be able to set security.selinux xattr, virtiofsd will need to have
-> CAP_SYS_ADMIN (which we are trying to avoid). Being able to remap
-> guest security.selinux (or other xattrs) on host to something else
-> is also better from security point of view.
->
-> But when we try this, we noticed that SELinux relabeling in guest
-> is failing on some symlinks. When I debugged a little more, I
-> came to know that "user.*" xattrs are not allowed on symlinks
-> or special files.
->
-> So if we allow owner (or CAP_FOWNER) to set user.* xattr, it will
-> allow virtiofs to arbitrarily remap guests's xattrs to something
-> else on host and that solves this SELinux issue nicely and provides
-> two SELinux policies (host and guest) to co-exist nicely without
-> interfering with each other.
->
-> Thanks
-> Vivek
->
->
-> Vivek Goyal (1):
->    xattr: Allow user.* xattr on symlink and special files
->
->   fs/xattr.c | 10 ++++++----
->   1 file changed, 6 insertions(+), 4 deletions(-)
->
-I just wanted to point out that the work Giuseppe is doing is to support 
-nfs homedirs with container runtimes like Rootless Podman.
+On Fri, Jun 18, 2021 at 03:20:38PM +0200, Christoph Hellwig wrote:
+> On Thu, Jun 17, 2021 at 12:26:10PM -0400, Vivek Goyal wrote:
+> > Not sure what FS_BINARY_MOUNTDATA is why fs should not have that set. nfs
+> > seems to set it too. So that means they can't use try_mount_nodev().
+> 
+> We can't really pass actual binary mountdata using the string separation
+> scheme used by the rootfstype= option.  But given that NFS only uses
+> binary mountdata for legacy reasons and people get what they ask for
+> using the option I think we can drop the check.
+> 
+> > In case of success err == 0, but we still panic(). We will need to
+> > check for success as well.
+> 
+> Indeed.
+> 
+> > root_fs_names can be NULL and it crashes with NULL pointer dereference.
+> 
+> True.
+> 
+> What do you think of this version?
 
+[ Cc Dominique Martinet ]
 
-Basically fuse-overlayfs on top of NFS homedir needs to be able to use 
-user xattrs to set file permissions and ownership fields to be 
-represented to containers.
+Hi Christoph,
 
-Currently NFS Servers do not understand User Namespace and seeing a 
-client user attempting to chown to a different user, is blocked on the 
-server, even though user namespace on the client allows it.  
-fuse-overlay intercepts the chown from the container and writes out the 
-user.Xattr the permissions and owner/group as user.Xattrs.  And all the 
-server sees is the user modifying the xattrs now chowning the real UID 
-of the file.
+This one works well for me. Just one minor nit. root_device_name, can
+be NULL as well if user passes following.
 
+"rootfstype=virtiofs rw".
+
+And currently mount_nodev_root() is assuming root_device_name is not NULL
+and we crash with null pointer dereference.
+
+May be something like this.
+
+        if (ROOT_DEV == 0 && root_device_name && root_fs_names) {
+                if (mount_nodev_root() == 0)
+                        return;
+        }
+
+Strangely people are using "rootfstype=virtiofs rw" to mount virtiofs
+as rootfs. They give their filesystem a tag named "/dev/root". And
+currently it works and they can mount virtiofs as rootfs.
+
+With above change, current hackish way will also continue to work and
+not break existing setups.
+
+Thanks
+Vivek
+
+> 
+> ---
+> From 141caa79a619b5f5d100eeb8e94ecf8b3b1c9af7 Mon Sep 17 00:00:00 2001
+> From: Christoph Hellwig <hch@lst.de>
+> Date: Fri, 18 Jun 2021 15:10:39 +0200
+> Subject: init: allow mounting arbitrary non-blockdevice filesystems as root
+> 
+> Currently the only non-blockdevice filesystems that can be used as the
+> initial root filesystem are NFS and CIFS, which use the magic
+> "root=/dev/nfs" and "root=/dev/cifs" syntax that requires the root
+> device file system details to come from filesystem specific kernel
+> command line options.
+> 
+> Add a little bit of new code that allows to just pass arbitrary
+> string mount options to any non-blockdevice filesystems so that it can
+> be mounted as the root file system.
+> 
+> For example a virtiofs root file system can be mounted using the
+> following syntax:
+> 
+> "root=myfs rootfstype=virtiofs rw"
+> 
+> Based on an earlier patch from Vivek Goyal <vgoyal@redhat.com>.
+> 
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  init/do_mounts.c | 43 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+> 
+> diff --git a/init/do_mounts.c b/init/do_mounts.c
+> index ec32de3ad52b..66c47193e9ee 100644
+> --- a/init/do_mounts.c
+> +++ b/init/do_mounts.c
+> @@ -534,6 +534,45 @@ static int __init mount_cifs_root(void)
+>  }
+>  #endif
+>  
+> +static bool __init fs_is_nodev(char *fstype)
+> +{
+> +	struct file_system_type *fs = get_fs_type(fstype);
+> +	bool ret = false;
+> +
+> +	if (fs) {
+> +		ret = !(fs->fs_flags & FS_REQUIRES_DEV);
+> +		put_filesystem(fs);
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static int __init mount_nodev_root(void)
+> +{
+> +	char *fs_names, *fstype;
+> +	int err = -EINVAL;
+> +
+> +	fs_names = (void *)__get_free_page(GFP_KERNEL);
+> +	if (!fs_names)
+> +		return -EINVAL;
+> +	split_fs_names(fs_names, root_fs_names);
+> +
+> +	for (fstype = fs_names; *fstype; fstype += strlen(fstype) + 1) {
+> +		if (!fs_is_nodev(fstype))
+> +			continue;
+> +		err = do_mount_root(root_device_name, fstype, root_mountflags,
+> +				    root_mount_data);
+> +		if (!err)
+> +			break;
+> +		if (err != -EACCES && err != -EINVAL)
+> +			panic("VFS: Unable to mount root \"%s\" (%s), err=%d\n",
+> +			      root_device_name, fstype, err);
+> +	}
+> +
+> +	free_page((unsigned long)fs_names);
+> +	return err;
+> +}
+> +
+>  void __init mount_root(void)
+>  {
+>  #ifdef CONFIG_ROOT_NFS
+> @@ -550,6 +589,10 @@ void __init mount_root(void)
+>  		return;
+>  	}
+>  #endif
+> +	if (ROOT_DEV == 0 && root_fs_names) {
+> +		if (mount_nodev_root() == 0)
+> +			return;
+> +	}
+>  #ifdef CONFIG_BLOCK
+>  	{
+>  		int err = create_dev("/dev/root", ROOT_DEV);
+> -- 
+> 2.30.2
+> 
 

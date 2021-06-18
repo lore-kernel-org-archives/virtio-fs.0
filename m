@@ -1,30 +1,15 @@
-DKIM-Filter: OpenDKIM Filter v2.11.0 fieldses.org 485F269D6
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fieldses.org;
-	s=default; t=1626118299;
-	bh=Zn3SvcMF3FFO49+WTI8pt7ML3V5uhGmeYXXeqsXQrcY=;
-	h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
-	b=v8DlyIayyg8yDjwJfuxsFYTJvh+t9cDW+Uz+VYzSDSXEbEke0mosrcMLlzmpjVmDX
-	06wu4GYGB/ZF34UAZkd7LRQK1LLMfmlqQkWptRk7aDVwFxxNO8dF2uGtyK7jm+7Tbu
-	RIR8atVX3reEl7AA0HxjsvEmxSoIIB5kZMNxDEwg=
-Date: Mon, 12 Jul 2021 15:31:39 -0400
-From: "J. Bruce Fields" <bfields@fieldses.org>
-Message-ID: <20210712193139.GA22997@fieldses.org>
-References: <20210708175738.360757-1-vgoyal@redhat.com>
-	<20210708175738.360757-2-vgoyal@redhat.com>
-	<20210709091915.2bd4snyfjndexw2b@wittgenstein>
-	<20210709152737.GA398382@redhat.com>
-	<710d1c6f-d477-384f-0cc1-8914258f1fb1@schaufler-ca.com>
-	<20210709175947.GB398382@redhat.com>
-	<CAPL3RVGKg4G5qiiHo7KYPcsWWgeoW=qNPOSQpd3Sv329jrWrLQ@mail.gmail.com>
-	<20210712140247.GA486376@redhat.com>
-	<20210712154106.GB18679@fieldses.org>
-	<20210712174759.GA502004@redhat.com>
+Date: Fri, 18 Jun 2021 11:52:05 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210618155205.GA1252241@redhat.com>
+References: <20210616160836.590206-1-iangelak@redhat.com>
+	<20210616160836.590206-2-iangelak@redhat.com>
+	<CAJfpeguiZX5zk_JP+h3f_00f5mF0nPqg9QVvmNvQ0TTV__LS-w@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <20210712174759.GA502004@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH v2 1/1] xattr: Allow user.* xattr on symlink
- and special files
+In-Reply-To: <CAJfpeguiZX5zk_JP+h3f_00f5mF0nPqg9QVvmNvQ0TTV__LS-w@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 1/3] virtiofs: Add an index to keep track of
+ first request queue
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,44 +18,174 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: gscrivan@redhat.com, Bruce Fields <bfields@redhat.com>, miklos@szeredi.hu, selinux@vger.kernel.org, jack@suse.cz, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, linux-security-module@vger.kernel.org, viro@zeniv.linux.org.uk, Christoph Hellwig <hch@infradead.org>, Casey Schaufler <casey@schaufler-ca.com>, tytso@mit.edu, Christian Brauner <christian.brauner@ubuntu.com>, casey.schaufler@intel.com
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>
 
-On Mon, Jul 12, 2021 at 01:47:59PM -0400, Vivek Goyal wrote:
-> On Mon, Jul 12, 2021 at 11:41:06AM -0400, J. Bruce Fields wrote:
-> > Looks like 0xd is what the server returns to access on a device node
-> > with mode bits rw- for the caller.
-> > 
-> > Commit c11d7fd1b317 "nfsd: take xattr bits into account for permission
-> > checks" added the ACCESS_X* bits for regular files and directories but
-> > not others.
-> > 
-> > But you don't want to determine permission from the mode bits anyway,
-> > you want it to depend on the owner,
+On Fri, Jun 18, 2021 at 09:43:36AM +0200, Miklos Szeredi wrote:
+> On Wed, 16 Jun 2021 at 18:09, Ioannis Angelakopoulos
+> <iangelak@redhat.com> wrote:
+> >
+> > From: Vivek Goyal <vgoyal@redhat.com>
+> >
+> > We have many virtqueues and first queue which carries fuse normal requests
+> > (except forget requests) has index pointed to by enum VQ_REQUEST. This
+> > works fine as long as number of queues are not dynamic.
+> >
+> > I am about to introduce one more virtqueue, called notification queue,
+> > which will be present only if device on host supports it. That means index
+> > of request queue will change depending on if notification queue is present
+> > or not.
+> >
+> > So, add a variable to keep track of that index and this will help when
+> > notification queue is added in next patch.
+> >
+> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > Signed-off-by: Ioannis Angelakopoulos <iangelak@redhat.com>
+> > ---
+> >  fs/fuse/virtio_fs.c | 22 ++++++++++++++++------
+> >  1 file changed, 16 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> > index bcb8a02e2d8b..a545e31cf1ae 100644
+> > --- a/fs/fuse/virtio_fs.c
+> > +++ b/fs/fuse/virtio_fs.c
+> > @@ -61,6 +61,7 @@ struct virtio_fs {
+> >         unsigned int nvqs;               /* number of virtqueues */
+> >         unsigned int num_request_queues; /* number of request queues */
+> >         struct dax_device *dax_dev;
+> > +       unsigned int first_reqq_idx;     /* First request queue idx */
+> >
+> >         /* DAX memory window where file contents are mapped */
+> >         void *window_kaddr;
+> > @@ -681,7 +682,9 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+> >         if (fs->num_request_queues == 0)
+> >                 return -EINVAL;
+> >
+> > -       fs->nvqs = VQ_REQUEST + fs->num_request_queues;
 > 
-> Thinking more about this part. Current implementation of my patch is
-> effectively doing both the checks. It checks that you are owner or
-> have CAP_FOWNER in xattr_permission() and then goes on to call
-> inode_permission(). And that means file mode bits will also play a
-> role. If caller does not have write permission on the file, it will
-> be denied setxattr().
+> Okay, so VQ_REQUEST now completely lost it's meaning as an index into
+> fs->vqs[] array, but VQ_HIPRIO is still used that way.  This looks
+> confusing.  Let's just get rid of VQ_REQUEST/VQ_HIPRIO completely, and
+> add "#define VQ_HIPRIO_IDX 0".
+
+Hi Miklos,
+
+Will do.
+
 > 
-> If I don't call inode_permission(), and just return 0 right away for
-> file owner (for symlinks and special files), then just being owner
-> is enough to write user.* xattr. And then even security modules will
-> not get a chance to block that operation. IOW, if you are owner of
-> a symlink or special file, you can write as many user.* xattr as you
-> like and except quota does not look like anything else can block
-> it. I am wondering if this approach is ok?
+> > +       /* One hiprio queue and rest are request queues */
+> > +       fs->nvqs = 1 + fs->num_request_queues;
+> > +       fs->first_reqq_idx = 1;
+> >         fs->vqs = kcalloc(fs->nvqs, sizeof(fs->vqs[VQ_HIPRIO]), GFP_KERNEL);
+> >         if (!fs->vqs)
+> >                 return -ENOMEM;
+> > @@ -701,10 +704,11 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+> >         names[VQ_HIPRIO] = fs->vqs[VQ_HIPRIO].name;
+> >
+> >         /* Initialize the requests virtqueues */
+> > -       for (i = VQ_REQUEST; i < fs->nvqs; i++) {
+> > +       for (i = fs->first_reqq_idx; i < fs->nvqs; i++) {
+> >                 char vq_name[VQ_NAME_LEN];
+> >
+> > -               snprintf(vq_name, VQ_NAME_LEN, "requests.%u", i - VQ_REQUEST);
+> > +               snprintf(vq_name, VQ_NAME_LEN, "requests.%u",
+> > +                        i - fs->first_reqq_idx);
+> >                 virtio_fs_init_vq(&fs->vqs[i], vq_name, VQ_REQUEST);
+> >                 callbacks[i] = virtio_fs_vq_done;
+> >                 names[i] = fs->vqs[i].name;
+> > @@ -1225,7 +1229,7 @@ static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
+> >  static void virtio_fs_wake_pending_and_unlock(struct fuse_iqueue *fiq)
+> >  __releases(fiq->lock)
+> >  {
+> > -       unsigned int queue_id = VQ_REQUEST; /* TODO multiqueue */
+> > +       unsigned int queue_id;
+> >         struct virtio_fs *fs;
+> >         struct fuse_req *req;
+> >         struct virtio_fs_vq *fsvq;
+> > @@ -1239,6 +1243,7 @@ __releases(fiq->lock)
+> >         spin_unlock(&fiq->lock);
+> >
+> >         fs = fiq->priv;
+> > +       queue_id = fs->first_reqq_idx;
+> >
+> >         pr_debug("%s: opcode %u unique %#llx nodeid %#llx in.len %u out.len %u\n",
+> >                   __func__, req->in.h.opcode, req->in.h.unique,
+> > @@ -1316,7 +1321,7 @@ static int virtio_fs_fill_super(struct super_block *sb, struct fs_context *fsc)
+> >
+> >         err = -ENOMEM;
+> >         /* Allocate fuse_dev for hiprio and notification queues */
+> > -       for (i = 0; i < fs->nvqs; i++) {
+> > +       for (i = 0; i < fs->first_reqq_idx; i++) {
+> 
+> Previous code didn't seem to do what comment said, while new code
+> does.  So while the change seems correct, it should go into a separate
+> patch with explanation.
 
-Yeah, I'd expect security modules to get a say, and I wouldn't expect
-mode bits on device nodes to be useful for deciding whether it makes
-sense for xattrs to be readable or writeable.
+I think this patch needs to be updated. It was correct when I had posted
+it back then. But since then we have changed virtiofs code.
 
-But, I don't really know.
+Initially we used to allocate fuse device only for hiprio queue and
+for request queue fuse_fill_super_common() used to allocate the device.
 
-Do we have any other use cases besides this case of storing security
-labels in user xattrs?
+It was confusing, so I added one patch so that for all virtiofs queues,
+virtiofs will allocate fuse device and fuse common code will not allocate
+fuse device.
 
---b.
+commit 7fd3abfa8dd7c08ecacd25b2f9f9e1d3fb642440
+Author: Vivek Goyal <vgoyal@redhat.com>
+Date:   Mon May 4 14:33:15 2020 -0400
+
+    virtiofs: do not use fuse_fill_super_common() for device installation
+
+So this patch now needs to be udpated so that it works with current
+code. I will fix it.
+
+> 
+> >                 struct virtio_fs_vq *fsvq = &fs->vqs[i];
+> >
+> >                 fsvq->fud = fuse_dev_alloc();
+> > @@ -1325,7 +1330,7 @@ static int virtio_fs_fill_super(struct super_block *sb, struct fs_context *fsc)
+> >         }
+> >
+> >         /* virtiofs allocates and installs its own fuse devices */
+> > -       ctx->fudptr = NULL;
+> > +       ctx->fudptr = (void **)&fs->vqs[fs->first_reqq_idx].fud;
+> 
+> I don't understand this.
+
+This is also vestige of old code. We used to pass pointer to the location
+where fuse common code should install fuse device.
+
+ctx.fudptr = (void **)&fs->vqs[VQ_REQUEST].fud;
+
+Now this code should not be needed. I will clean this up.
+
+> 
+> >         if (ctx->dax) {
+> >                 if (!fs->dax_dev) {
+> >                         err = -EINVAL;
+> > @@ -1339,9 +1344,14 @@ static int virtio_fs_fill_super(struct super_block *sb, struct fs_context *fsc)
+> >         if (err < 0)
+> >                 goto err_free_fuse_devs;
+> >
+> > +       fc = fs->vqs[fs->first_reqq_idx].fud->fc;
+> > +
+> 
+> Nor this.
+> 
+> >         for (i = 0; i < fs->nvqs; i++) {
+> >                 struct virtio_fs_vq *fsvq = &fs->vqs[i];
+> >
+> > +               if (i == fs->first_reqq_idx)
+> > +                       continue;
+> > +
+> 
+> Nor this.    There's something subtle going on here, that's not
+> mentioned in the patch header.
+
+Will fix all this. I think all this is due to old code we had about
+fuse device handling.
+
+Thanks
+Vivek
 

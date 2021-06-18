@@ -1,28 +1,18 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yahoo.com; s=s2048;
-	t=1624985514; bh=CdVaAyKCUH7a5+INbjm8wM+T+DCBoLIHH2QYKaF4BCY=;
-	h=Subject:To:Cc:References:From:Date:In-Reply-To:From:Subject:Reply-To;
-	b=ST4SpWv5vXqMXmPQtWevZKBoXfK5o21HELWE0k/iFc769czhS3zknNIdeDL0/6X4CUAQDNFwrcd4Rc2x3b9mbcIFG6dB7z+p6Gs1IjxK94TaVGxYehaCjRf0JY0Fex92rCxmCtySasREz8M+da+Oh2vAf4wFQEwpGXeE/CjTrbny89Hj43ywoYnm92qcSr/c5pcAXLOVXK0vZ1te9Bd+roSG0JKzZb0QbN5NK6M9jduZ25jpGOKvAK90I4r/VMd92RIxbpFBzr7X4/pMRxhx660p5KMmW4Q1F9k+WEZTbIUeYc/0Zxk5/z6HTWDWs6/QuWpnQhHAHrwbMPd76sKELQ==
-References: <BN0PR11MB57275823CE05DED7BC755460FD069@BN0PR11MB5727.namprd11.prod.outlook.com>
-	<20210628131708.GA1803896@redhat.com>
-	<1b446468-dcf8-9e21-58d3-c032686eeee5@redhat.com>
-	<5d8f033c-eba2-7a8b-f19a-1005bbb615ea@schaufler-ca.com>
-	<YNn4p+Zn444Sc4V+@work-vm>
-	<a13f2861-7786-09f4-99a8-f0a5216d0fb1@schaufler-ca.com>
-	<YNrhQ9XfcHTtM6QA@work-vm>
-	<e6f9ed0d-c101-01df-3dff-85c1b38f9714@schaufler-ca.com>
-	<20210629152007.GC5231@redhat.com>
-	<78663f5c-d2fd-747a-48e3-0c5fd8b40332@schaufler-ca.com>
-	<YNtLtkkDMWye485A@work-vm>
-From: Casey Schaufler <casey@schaufler-ca.com>
-Message-ID: <93e87539-29d1-2bed-9a79-ec378f6869b9@schaufler-ca.com>
-Date: Tue, 29 Jun 2021 09:51:47 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=gsf/bfPHFa0nxrG88lLbzUlXVP06mycj+u9DZUUwd9c=;
+	b=SuzeIOnZn4xAykXuJTdnLum22ItvjPl1rfGk40MJlo/kFmxh0DCyOQK+Z7zpH1r0Kg
+	AyRn/RvEFu1/rHAMH1SyjyqZENen+63lBnZBCaDNUuPmXNpeh6AeYVgN9C+D/s1lNTxm
+	iGm/5xtNHCEIvtRXafYATtur1vCqDKk11KTno=
 MIME-Version: 1.0
-In-Reply-To: <YNtLtkkDMWye485A@work-vm>
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [RFC PATCH 0/1] xattr: Allow user.* xattr on
- symlink/special files if caller has CAP_SYS_RESOURCE
+References: <20210617141518.304659-1-groug@kaod.org>
+In-Reply-To: <20210617141518.304659-1-groug@kaod.org>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Fri, 18 Jun 2021 10:58:33 +0200
+Message-ID: <CAJfpegtpvU6Z6hQ-NKh-shN+Pux7+XzXwNK_Ro8YpfA-3tCOkg@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Don't allow file creation with
+	FUSE_OPEN
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,69 +21,102 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: "berrange@redhat.com" <berrange@redhat.com>, "selinux@vger.kernel.org" <selinux@vger.kernel.org>, Casey Schaufler <casey@schaufler-ca.com>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "linux-fsdevel@vger.kernel.org" <linux-fsdevel@vger.kernel.org>, linux-security-module <linux-security-module@vger.kernel.org>, "viro@zeniv.linux.org.uk" <viro@zeniv.linux.org.uk>, "Schaufler,
-	Casey" <casey.schaufler@intel.com>, Vivek Goyal <vgoyal@redhat.com>
+To: Greg Kurz <groug@kaod.org>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
 
-On 6/29/2021 9:35 AM, Dr. David Alan Gilbert wrote:
-> * Casey Schaufler (casey@schaufler-ca.com) wrote:
->> On 6/29/2021 8:20 AM, Vivek Goyal wrote:
->>> On Tue, Jun 29, 2021 at 07:38:15AM -0700, Casey Schaufler wrote:
->>>
->>> [..]
->>>>>>>> User xattrs are less protected than security xattrs. You are exposing the
->>>>>>>> security xattrs on the guest to the possible whims of a malicious, unprivileged
->>>>>>>> actor on the host. All it needs is the right UID.
->>>>>>> Yep, we realise that; but when you're mainly interested in making sure
->>>>>>> the guest can't attack the host, that's less worrying.
->>>>>> That's uncomfortable.
->>>>> Why exactly?
->>>> If a mechanism is designed with a known vulnerability you
->>>> fail your validation/evaluation efforts.
->>> We are working with the constraint that shared directory should not be
->>> accessible to unpriviliged users on host. And with that constraint, what
->>> you are referring to is not a vulnerability.
->> Sure, that's quite reasonable for your use case. It doesn't mean
->> that the vulnerability doesn't exist, it means you've mitigated it. 
->>
->>
->>>> Your mechanism is
->>>> less general because other potential use cases may not be
->>>> as cavalier about the vulnerability.
->>> Prefixing xattrs with "user.virtiofsd" is just one of the options.
->>> virtiofsd has the capability to prefix "trusted.virtiofsd" as well.
->>> We have not chosen that because we don't want to give it CAP_SYS_ADMIN.
->>>
->>> So other use cases which don't like prefixing "user.virtiofsd", can
->>> give CAP_SYS_ADMIN and work with it.
->>>
->>>> I think that you can
->>>> approach this differently, get a solution that does everything
->>>> you want, and avoid the known problem.
->>> What's the solution? Are you referring to using "trusted.*" instead? But
->>> that has its own problem of giving CAP_SYS_ADMIN to virtiofsd.
->> I'm coming to the conclusion that xattr namespaces, analogous
->> to user namespaces, are the correct solution. They generalize
->> for multiple filesystem and LSM use cases. The use of namespaces
->> is well understood, especially in the container community. It
->> looks to me as if it would address your use case swimmingly.
-> Yeh; although the details of getting the semantics right is tricky;
-> in particular, the stuff which clears capabilitiies/setuid/etc on writes
-> - should it clear xattrs that represent capabilities?  If the host
->   performs a write, should it clear mapped xattrs capabilities?  If the
-> namespace performs a write should it clear just the mapped ones or the
-> host ones as well?  Our virtiofsd code performs acrobatics to make
-> sure they get cleared on write that are painful.
-
-Dealing with tricky semantics is the difference between a feature
-and a hack. Doing so in a way that other people can take advantage
-of the feature is the hallmark of a feature well done.
-
+On Thu, 17 Jun 2021 at 16:15, Greg Kurz <groug@kaod.org> wrote:
 >
-> Dave
+> A well behaved FUSE client uses FUSE_CREATE to create files. It isn't
+> supposed to pass O_CREAT along a FUSE_OPEN request, as documented in
+> the "fuse_lowlevel.h" header :
 >
->>> Thanks
->>> Vivek
->>>
+>     /**
+>      * Open a file
+>      *
+>      * Open flags are available in fi->flags. The following rules
+>      * apply.
+>      *
+>      *  - Creation (O_CREAT, O_EXCL, O_NOCTTY) flags will be
+>      *    filtered out / handled by the kernel.
+>
+> But if it does anyway, virtiofsd crashes with:
+>
+> *** invalid openat64 call: O_CREAT or O_TMPFILE without mode ***: terminated
+>
+> This is because virtiofsd ends up passing this flag to openat() without
+> passing a mode_t 4th argument which is mandatory with O_CREAT, and glibc
+> aborts.
+>
+> The offending path is:
+>
+> lo_open()
+>     lo_do_open()
+>         lo_inode_open()
+>
+> Other callers of lo_inode_open() only pass O_RDWR and lo_create()
+> passes a valid fd to lo_do_open() which thus doesn't even call
+> lo_inode_open() in this case.
+>
+> Specifying O_CREAT with FUSE_OPEN is a protocol violation. Check this
+> in lo_open() and return an error to the client : EINVAL since this is
+> already what glibc returns with other illegal flag combinations.
+>
+> The FUSE filesystem doesn't currently support O_TMPFILE, but the very
+> same would happen if O_TMPFILE was passed in a FUSE_OPEN request. Check
+> that as well.
+>
+> Signed-off-by: Greg Kurz <groug@kaod.org>
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+>
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 49c21fd85570..14f62133131c 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -2145,6 +2145,12 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
+>          return;
+>      }
+>
+> +    /* File creation is handled by lo_create() */
+> +    if (fi->flags & (O_CREAT | O_TMPFILE)) {
+> +        fuse_reply_err(req, EINVAL);
+> +        return;
+> +    }
+> +
 
+Okay.  Question comes to mind whether the check should be even more
+strict, possibly allowing just a specific set of flags, and erroring
+out on everything else?
+
+AFAICS linux kernel should never pass anything to FUSE_OPEN outside of this set:
+
+O_RDONLY
+O_WRONLY
+O_RDWR
+O_APPEND
+O_NDELAY
+O_NONBLOCK
+__O_SYNC
+O_DSYNC
+FASYNC
+O_DIRECT
+O_LARGEFILE
+O_NOFOLLOW
+O_NOATIME
+
+A separate question is whether virtiofsd should also be silently
+ignoring some of the above flags.
+
+Thanks,
+Miklos
+
+
+
+>      err = lo_do_open(lo, inode, -1, fi);
+>      lo_inode_put(lo, &inode);
+>      if (err) {
+> --
+> 2.31.1
+>
 

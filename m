@@ -1,25 +1,15 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
-	h=to:cc:references:from:subject:message-id:date:user-agent
-	:mime-version:in-reply-to:content-transfer-encoding:content-language;
-	bh=KMzRFLn342aRAs5Y7mXjGWoHLdf+TBmPiPg7MEqy6gg=;
-	b=sogbVjzhmB6pLWUqbNKwMi3ZF5uOTZ39mCSc/fgaKMd334tB9ck3W0muPQiS7l4vif
-	KK4DMdK3KdW0pQ+Wh9zbVFoib0S17/Ad/JJTgbMnG4hgK0ctb9GWY21UI49EE6wl23EH
-	NnrTm85ggvht5UgzesRuc6sXnqcP+bp2kRvWxvTmE+dDNZferlPSTG0R5X8bC7HMUL5k
-	q0j8v+XC2uxFizTNWX8OJJ/xI/NPiPLpX4jd4C+VREdsB5r2WQ8vRpLdphr3YRqDZq90
-	JeRCAe+IWK1PMEm82A5+uJxybt6Ai6u7q4cfgj5LC01UcQk93/+Etg84p/nEwX92yCDi
-	WQSQ==
-References: <492294b2-b305-86f4-2c91-a2faa766d2ee@gmail.com>
-	<YN195pPX2s0PRDqK@work-vm>
-From: "Harry G. Coin" <hgcoin@gmail.com>
-Message-ID: <14273048-d01f-6b7b-3094-787b79cb4a96@gmail.com>
-Date: Thu, 1 Jul 2021 10:02:27 -0500
+Date: Fri, 18 Jun 2021 08:53:08 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210618125308.GB1234055@redhat.com>
+References: <20210614174454.903555-1-vgoyal@redhat.com>
+	<20210614174454.903555-2-vgoyal@redhat.com>
+	<CAJfpeguD+F3Ai01=-JYNTKS4LP4d879=+8T7eOBewZpevTRbJg@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <YN195pPX2s0PRDqK@work-vm>
-Content-Type: text/plain; charset="utf-8"
-Content-Language: en-US
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] multiple virtiofsd's + overlapping shared subtree
- -> enforced compatible xattr maps?
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAJfpeguD+F3Ai01=-JYNTKS4LP4d879=+8T7eOBewZpevTRbJg@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH v2 1/2] init/do_mounts.c: Add a path to boot
+ from tag based filesystems
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -28,35 +18,66 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: David Howells <dhowells@redhat.com>, Christoph Hellwig <hch@infradead.org>, Richard Weinberger <richard.weinberger@gmail.com>, Dominique Martinet <asmadeus@codewreck.org>, linux-kernel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel@vger.kernel.org, v9fs-developer@lists.sourceforge.net
 
+On Fri, Jun 18, 2021 at 09:07:14AM +0200, Miklos Szeredi wrote:
+> On Mon, 14 Jun 2021 at 19:45, Vivek Goyal <vgoyal@redhat.com> wrote:
+> >
+> > We want to be able to mount virtiofs as rootfs and pass appropriate
+> > kernel command line. Right now there does not seem to be a good way
+> > to do that. If I specify "root=myfs rootfstype=virtiofs", system
+> > panics.
+> >
+> > virtio-fs: tag </dev/root> not found
+> > ..
+> > ..
+> > [ end Kernel panic - not syncing: VFS: Unable to mount root fs on
+> > +unknown-block(0,0) ]
+> >
+> > Basic problem here is that kernel assumes that device identifier
+> > passed in "root=" is a block device. But there are few execptions
+> > to this rule to take care of the needs of mtd, ubi, NFS and CIFS.
+> >
+> > For example, mtd and ubi prefix "mtd:" or "ubi:" respectively.
+> >
+> > "root=mtd:<identifier>" or "root=ubi:<identifier>"
+> >
+> > NFS and CIFS use "root=/dev/nfs" and CIFS passes "root=/dev/cifs" and
+> > actual root device details come from filesystem specific kernel
+> > command line options.
+> >
+> > virtiofs does not seem to fit in any of the above categories. In fact
+> > we have 9pfs which can be used to boot from but it also does not
+> > have a proper syntax to specify rootfs and does not fit into any of
+> > the existing syntax. They both expect a device "tag" to be passed
+> > in a device to be mounted. And filesystem knows how to parse and
+> > use "tag".
+> >
+> > So there seem to be a class of filesystems which specify root device
+> > using a "tag" which is understood by the filesystem. And filesystem
+> > simply expects that "tag" to be passed as "source" of mount and
+> > how to mount filesystem using that "tag" is responsibility of filesystem.
+> >
+> > This patch proposes that we internally create a list of filesystems
+> > which pass a "tag" in "root=<tag>" and expect that tag to be passed
+> > as "source" of mount. With this patch I can boot into virtiofs rootfs
+> > with following syntax.
+> >
+> > "root=myfs rootfstype=virtiofs rw"
+> 
+> The syntax and the implementation looks good.
+> 
+> Acked-by: Miklos Szeredi <mszeredi@redhat.com>
 
-On 7/1/21 3:33 AM, Dr. David Alan Gilbert wrote:
-> * Harry G. Coin (hgcoin@gmail.com) wrote:
->> If two or more instances of virtiofsd have a common full or partially
->> shared directory tree path -- how will those instances 'enforce' a
->> 'compatible' xattr map lest the host+guest(s) have quite the selinux
->> attribute salad?
-> Virtiofsd instances are independent; it's upto whatever runs the daemons
-> to pick the options in a sane way.
+Thanks Miklos. Now Christoph has come up with another patch series to
+achieve the same. And that patches series looks better than my patches.
 
-While that's the current case, because the intention was to rely on the
-underlying fs to manage contention among virtiofsds: the moment
-xattrmaps happened virtiofsd entered the layer all network file system
-daemons face.  Roughly speaking: a shift from one process per client to
-some IPC or threaded approach with a 'manager' process/thread that
-coordinates 'compatible' xattrmaps, acl maps, 'root squashing' etc. etc..
+https://lore.kernel.org/linux-fsdevel/20210617153649.1886693-1-hch@lst.de/
 
->>   How much does virtiofsd need to feel like nfsd...?
-> What does nfsd do for this?
+There are couple of minor issues to be taken care of. I am hoping after
+that these patches can be merged.
 
-A couple attempts over the last decade, the most landed in 5.9: 
-https://www.phoronix.com/scan.php?page=news_item&px=Linux-5.9-NFS-Server-User-Xattr
-
-
-
-
-
-
+Thanks
+Vivek
 

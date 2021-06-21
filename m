@@ -1,13 +1,11 @@
-Date: Mon, 21 Jun 2021 14:59:05 +0000
-From: Al Viro <viro@zeniv.linux.org.uk>
-Message-ID: <YNCpOaNHRA9jEOpM@zeniv-ca.linux.org.uk>
+Date: Mon, 21 Jun 2021 17:22:43 +0200
+From: Christoph Hellwig <hch@lst.de>
+Message-ID: <20210621152243.GA6392@lst.de>
 References: <20210621062657.3641879-1-hch@lst.de>
 	<20210621062657.3641879-2-hch@lst.de>
-	<YNCmTSTcubslmj7k@zeniv-ca.linux.org.uk>
-	<20210621145309.GA4995@lst.de>
+	<YNCrnCvtlOuZO9jV@casper.infradead.org>
 MIME-Version: 1.0
-In-Reply-To: <20210621145309.GA4995@lst.de>
-Sender: Al Viro <viro@ftp.linux.org.uk>
+In-Reply-To: <YNCrnCvtlOuZO9jV@casper.infradead.org>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Subject: Re: [Virtio-fs] [PATCH 1/2] init: split get_fs_names
@@ -19,34 +17,51 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Christoph Hellwig <hch@lst.de>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, linux-kernel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
+To: Matthew Wilcox <willy@infradead.org>
+Cc: linux-kernel@vger.kernel.org, virtio-fs@redhat.com, viro@zeniv.linux.org.uk, linux-fsdevel@vger.kernel.org, Christoph Hellwig <hch@lst.de>, Vivek Goyal <vgoyal@redhat.com>
 
-On Mon, Jun 21, 2021 at 04:53:09PM +0200, Christoph Hellwig wrote:
-> On Mon, Jun 21, 2021 at 02:46:37PM +0000, Al Viro wrote:
-> > TBH, I would rather take that one into fs/filesystems.c.  Rationale:
-> > get_filesystem_list(), for all its resemblance to /proc/filesystems
-> > contents, is used only by init/*.c and it's not a big deal to make
-> > it
+On Mon, Jun 21, 2021 at 04:09:16PM +0100, Matthew Wilcox wrote:
+> On Mon, Jun 21, 2021 at 08:26:56AM +0200, Christoph Hellwig wrote:
+> > -static void __init get_fs_names(char *page)
+> > +static void __init split_fs_names(char *page, char *names)
 > 
-> Yeah, unwinding this mess actually is a good idea.  I didn't really
-> look outside of do_mounts.c, but once doing that it becomes completely
-> obvious.
+> If you're going to respin it anyway, can you rename 'page' to 'buf'
+> or something?  Kind of confusing to have a char * called 'page'.
+
+I was hoping that we did not need a respin.  While Al's suggestion is
+nice, and I've added a variant of it to my local tree it really
+is just incremental improvements.
+
+I actually thing that page name is not too bad, as it implements the
+implicit assumptions that it is a PAGE_SIZE allocation (which is a bad
+idea to start with, but we're digging a deeper and deeper hole here..)
+
+> is it really worth doing a strcpy() followed by a custom strtok()?
+> would this work better?
 > 
-> > int __init get_filesystem_list(char *buf, bool is_dev)
+> 	char c;
 > 
-> As-is we don't even really need the is_dev argument, as the only
-> callers wants block device file systems anyway.
+> 	do {
+> 		c =  *root_fs_names++;
+> 		*buf++ = c;
+> 		if (c == ',')
+> 			buf[-1] = '\0';
+> 	} while (c);
 
-*nod*
+Maybe.  Then again all this is age old rarely used code, so it might be
+better to not stirr it too much..
 
-> In fact it would
-> much rather have a cursor based iteration so that we can skip the
-> allocation, but that is probaby overengineering the problem.
+> > +static void __init get_all_fs_names(char *page)
+> > +{
+> > +	int len = get_filesystem_list(page);
+> 
+> it occurs to me that get_filesystem_list() fails silently.  if you build
+> every linux filesystem in, and want your root on zonefs (assuming
+> they're alphabetical), we'll fail to find it without a message
+> indicating that we overflowed the buffer.
 
-Very much so.
-
-Sigh...  I really wish we had more uniform syntax, though -
-e.g.  root=nfs(<options>) or root=xfs(sdb11,noatime), etc.
-Oh, well...
+Yes.  The only sensible way to fix this would be some kind of cursor.
+We could use an xarray for the file_systems list, but unless we want
+to assume file systems can't go away at init type (which might be an
+ok assumption) we'd then need to get into refcount, and and and..
 

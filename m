@@ -1,12 +1,11 @@
-Date: Mon, 21 Jun 2021 14:51:24 +0000
-From: Al Viro <viro@zeniv.linux.org.uk>
-Message-ID: <YNCnbIpKeprhPfRO@zeniv-ca.linux.org.uk>
+Date: Mon, 21 Jun 2021 16:53:09 +0200
+From: Christoph Hellwig <hch@lst.de>
+Message-ID: <20210621145309.GA4995@lst.de>
 References: <20210621062657.3641879-1-hch@lst.de>
 	<20210621062657.3641879-2-hch@lst.de>
 	<YNCmTSTcubslmj7k@zeniv-ca.linux.org.uk>
 MIME-Version: 1.0
 In-Reply-To: <YNCmTSTcubslmj7k@zeniv-ca.linux.org.uk>
-Sender: Al Viro <viro@ftp.linux.org.uk>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Subject: Re: [Virtio-fs] [PATCH 1/2] init: split get_fs_names
@@ -18,36 +17,23 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Christoph Hellwig <hch@lst.de>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, linux-kernel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
+To: Al Viro <viro@zeniv.linux.org.uk>
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, Christoph Hellwig <hch@lst.de>, Vivek Goyal <vgoyal@redhat.com>, linux-kernel@vger.kernel.org
 
 On Mon, Jun 21, 2021 at 02:46:37PM +0000, Al Viro wrote:
+> TBH, I would rather take that one into fs/filesystems.c.  Rationale:
+> get_filesystem_list(), for all its resemblance to /proc/filesystems
+> contents, is used only by init/*.c and it's not a big deal to make
+> it
+
+Yeah, unwinding this mess actually is a good idea.  I didn't really
+look outside of do_mounts.c, but once doing that it becomes completely
+obvious.
 
 > int __init get_filesystem_list(char *buf, bool is_dev)
-> {
-> 	int f = is_dev ? FS_REQUIRES_DEV : 0;
->         int left = PAGE_SIZE, count = 0;
->         struct file_system_type *p;
-> 
->         read_lock(&file_systems_lock);
-> 	for (p = file_systems; p; p = p->next) {
-> 		if ((p->fs_flags & FS_REQUIRES_DEV) == f) {
-> 			size_t len = strlen(p->name) + 1;
-> 			if (len > left)
-> 				break;
-> 			memcpy(buf, p->name, len);
-> 			buf += len;
-> 			left -= len;
-> 			count++;
-> 		}
-> 	}
->         read_unlock(&file_systems_lock);
-> 	return count;
-> }
-> 
-> Generates NUL-separated list, returns the number of list elements,
-> the second argument is "what kind do you want"...
 
-Actually, looking at the rest of the queue, that's only used for
-!nodev ones, so might as well drop the flag here...
+As-is we don't even really need the is_dev argument, as the only
+callers wants block device file systems anyway.  In fact it would
+much rather have a cursor based iteration so that we can skip the
+allocation, but that is probaby overengineering the problem.
 

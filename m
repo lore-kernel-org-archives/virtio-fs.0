@@ -1,17 +1,13 @@
-Date: Tue, 22 Jun 2021 03:51:53 -0400
-From: virtiofs-bot@sinrega.org
-Message-Id: <10633.121062203514800273@us-mta-346.us.mimecast.lan>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm3; bh=ZZsTBsa8QX2wCNSCh
-	2Wy/1b68Wxn/B2YSUqsS3F3O20=; b=F0uov1ObvPe+dmFeb1IwnO/1L7rnXRBt+
-	xGlhC4txnPHCa0+6bOm54LS+/C6yH+2Au6aO1Dd08s2rmLLNmigWmwMJefWVrewG
-	j7o5pvvt1bhphSqXD9uleYru1qvQlW0wZ8PEzZDGrv6kJvG6VhojECzuaXfUSp6R
-	//hkLMyIXC7SpqJGVncwpVNXKYvh2Zkd5n6yTx6TIdvheYoA4EfT0QsKIbnKYHwt
-	uRSn3g37s4Qs4R08glI+6rBynla+RioOQFMtbGg5RayG+duOn0IKCHpfV8SuZUQX
-	CH0Jqj+Qqy8+eXjwKJ/fbLsQKVeLu5XCiKvJHTQJKpZ4aGOQAVOBQ==
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] MR opened: Drop dependency on strum
+Date: Tue, 22 Jun 2021 10:12:17 +0200
+From: Christoph Hellwig <hch@lst.de>
+Message-ID: <20210622081217.GA2975@lst.de>
+References: <20210621062657.3641879-1-hch@lst.de>
+MIME-Version: 1.0
+In-Reply-To: <20210621062657.3641879-1-hch@lst.de>
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: [Virtio-fs] [PATCH 3/2] fs: simplify get_filesystem_list /
+	get_all_fs_names
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,12 +16,113 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: viro@zeniv.linux.org.uk
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, linux-kernel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
 
-We're only using it to avoid manually implementing FromStr for
-SandboxMode.
+Just output the '\0' separate list of supported file systems for block
+devices directly rather than going through a pointless round of string
+manipulation.
 
-Signed-off-by: Sergio Lopez <slp@redhat.com>
+Based on an earlier patch from Al Viro <viro@zeniv.linux.org.uk>.
+
+Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/33
+ fs/filesystems.c   | 24 ++++++++++++++----------
+ include/linux/fs.h |  2 +-
+ init/do_mounts.c   | 20 +-------------------
+ 3 files changed, 16 insertions(+), 30 deletions(-)
+
+diff --git a/fs/filesystems.c b/fs/filesystems.c
+index 90b8d879fbaf..7c136251607a 100644
+--- a/fs/filesystems.c
++++ b/fs/filesystems.c
+@@ -209,21 +209,25 @@ SYSCALL_DEFINE3(sysfs, int, option, unsigned long, arg1, unsigned long, arg2)
+ }
+ #endif
+ 
+-int __init get_filesystem_list(char *buf)
++void __init list_bdev_fs_names(char *buf, size_t size)
+ {
+-	int len = 0;
+-	struct file_system_type * tmp;
++	struct file_system_type *p;
++	size_t len;
+ 
+ 	read_lock(&file_systems_lock);
+-	tmp = file_systems;
+-	while (tmp && len < PAGE_SIZE - 80) {
+-		len += sprintf(buf+len, "%s\t%s\n",
+-			(tmp->fs_flags & FS_REQUIRES_DEV) ? "" : "nodev",
+-			tmp->name);
+-		tmp = tmp->next;
++	for (p = file_systems; p; p = p->next) {
++		if (!(p->fs_flags & FS_REQUIRES_DEV))
++			continue;
++		len = strlen(p->name) + 1;
++		if (len > size) {
++			pr_warn("%s: truncating file system list\n", __func__);
++			break;
++		}
++		memcpy(buf, p->name, len);
++		buf += len;
++		size -= len;
+ 	}
+ 	read_unlock(&file_systems_lock);
+-	return len;
+ }
+ 
+ #ifdef CONFIG_PROC_FS
+diff --git a/include/linux/fs.h b/include/linux/fs.h
+index f4ed7bf1130d..cdcd7f2a2c3f 100644
+--- a/include/linux/fs.h
++++ b/include/linux/fs.h
+@@ -3624,7 +3624,7 @@ int proc_nr_dentry(struct ctl_table *table, int write,
+ 		  void *buffer, size_t *lenp, loff_t *ppos);
+ int proc_nr_inodes(struct ctl_table *table, int write,
+ 		   void *buffer, size_t *lenp, loff_t *ppos);
+-int __init get_filesystem_list(char *buf);
++void __init list_bdev_fs_names(char *buf, size_t size);
+ 
+ #define __FMODE_EXEC		((__force int) FMODE_EXEC)
+ #define __FMODE_NONOTIFY	((__force int) FMODE_NONOTIFY)
+diff --git a/init/do_mounts.c b/init/do_mounts.c
+index bdeb90b8d669..ffbe4deeb274 100644
+--- a/init/do_mounts.c
++++ b/init/do_mounts.c
+@@ -348,24 +348,6 @@ static void __init split_fs_names(char *page, char *names)
+ 	*page = '\0';
+ }
+ 
+-static void __init get_all_fs_names(char *page)
+-{
+-	int len = get_filesystem_list(page);
+-	char *s = page, *p, *next;
+-
+-	page[len] = '\0';
+-	for (p = page - 1; p; p = next) {
+-		next = strchr(++p, '\n');
+-		if (*p++ != '\t')
+-			continue;
+-		while ((*s++ = *p++) != '\n')
+-			;
+-		s[-1] = '\0';
+-	}
+-
+-	*s = '\0';
+-}
+-
+ static int __init do_mount_root(const char *name, const char *fs,
+ 				 const int flags, const void *data)
+ {
+@@ -415,7 +397,7 @@ void __init mount_block_root(char *name, int flags)
+ 	if (root_fs_names)
+ 		split_fs_names(fs_names, root_fs_names);
+ 	else
+-		get_all_fs_names(fs_names);
++		list_bdev_fs_names(fs_names, PAGE_SIZE);
+ retry:
+ 	for (p = fs_names; *p; p += strlen(p)+1) {
+ 		int err = do_mount_root(name, p, flags, root_mount_data);
+-- 
+2.30.2
 

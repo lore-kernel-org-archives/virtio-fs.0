@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue, 22 Jun 2021 11:08:48 -0400
-Message-Id: <20210622150852.1507204-4-vgoyal@redhat.com>
+Date: Tue, 22 Jun 2021 11:08:51 -0400
+Message-Id: <20210622150852.1507204-7-vgoyal@redhat.com>
 In-Reply-To: <20210622150852.1507204-1-vgoyal@redhat.com>
 References: <20210622150852.1507204-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v7 3/7] virtiofsd: Add support for extended
-	setxattr
+Subject: [Virtio-fs] [PATCH v7 6/7] virtiofsd: Switch creds,
+	drop FSETID for system.posix_acl_access xattr
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,99 +18,160 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: miklos@szeredi.hu, vgoyal@redhat.com
 
-Add the bits to enable support for setxattr_ext if fuse offers it. Do not
-enable it by default yet. Let passthrough_ll opt-in. Enabling it by deafult
-kind of automatically means that you are taking responsibility of clearing
-SGID if ACL is set.
+When posix access acls are set on a file, it can lead to adjusting file
+permissions (mode) as well. If caller does not have CAP_FSETID and it
+also does not have membership of owner group, this will lead to clearing
+SGID bit in mode.
 
+Current fuse code is written in such a way that it expects file server
+to take care of chaning file mode (permission), if there is a need.
+Right now, host kernel does not clear SGID bit because virtiofsd is
+running as root and has CAP_FSETID. For host kernel to clear SGID,
+virtiofsd need to switch to gid of caller in guest and also drop
+CAP_FSETID (if caller did not have it to begin with).
+
+If SGID needs to be cleared, client will set the flag
+FUSE_SETXATTR_ACL_KILL_SGID in setxattr request. In that case server
+should kill sgid.
+
+Currently just switch to uid/gid of the caller and drop CAP_FSETID
+and that should do it.
+
+This should fix the xfstest generic/375 test case.
+
+We don't have to switch uid for this to work. That could be one optimization
+that pass a parameter to lo_change_cred() to only switch gid and not uid.
+
+Also this will not work whenever (if ever) we support idmapped mounts. In
+that case it is possible that uid/gid in request are 0/0 but still we
+need to clear SGID. So we will have to pick a non-root sgid and switch
+to that instead. That's an TODO item for future when idmapped mount
+support is introduced.
+
+This patch only adds the capability to switch creds and drop FSETID
+when acl xattr is set. This does not take affect yet. It can take
+affect when next patch adds the capability to enable posix_acl.
+
+Reported-by: Luis Henriques <lhenriques@suse.de>
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- tools/virtiofsd/fuse_common.h    |  5 +++++
- tools/virtiofsd/fuse_lowlevel.c  | 11 ++++++++++-
- tools/virtiofsd/fuse_lowlevel.h  |  3 ++-
- tools/virtiofsd/passthrough_ll.c |  3 ++-
- 4 files changed, 19 insertions(+), 3 deletions(-)
+ tools/virtiofsd/passthrough_ll.c | 75 ++++++++++++++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
 
-diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
-index 0c2665b977..8abac80098 100644
---- a/tools/virtiofsd/fuse_common.h
-+++ b/tools/virtiofsd/fuse_common.h
-@@ -377,6 +377,11 @@ struct fuse_file_info {
-  */
- #define FUSE_CAP_SETXATTR_EXT (1 << 29)
- 
-+/**
-+ * Indicates that file server supports extended struct fuse_setxattr_in
-+ */
-+#define FUSE_CAP_SETXATTR_EXT (1 << 29)
-+
- /**
-  * Ioctl flags
-  *
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index c2b6ff1686..d1e24c013f 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -1439,7 +1439,9 @@ static void do_setxattr(fuse_req_t req, fuse_ino_t nodeid,
-     }
- 
-     if (req->se->op.setxattr) {
--        req->se->op.setxattr(req, nodeid, name, value, arg->size, arg->flags);
-+        uint32_t setxattr_flags = setxattr_ext ? arg->setxattr_flags : 0;
-+        req->se->op.setxattr(req, nodeid, name, value, arg->size, arg->flags,
-+                             setxattr_flags);
-     } else {
-         fuse_reply_err(req, ENOSYS);
-     }
-@@ -1986,6 +1988,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-     if (arg->flags & FUSE_HANDLE_KILLPRIV_V2) {
-         se->conn.capable |= FUSE_CAP_HANDLE_KILLPRIV_V2;
-     }
-+    if (arg->flags & FUSE_SETXATTR_EXT) {
-+        se->conn.capable |= FUSE_CAP_SETXATTR_EXT;
-+    }
- #ifdef HAVE_SPLICE
- #ifdef HAVE_VMSPLICE
-     se->conn.capable |= FUSE_CAP_SPLICE_WRITE | FUSE_CAP_SPLICE_MOVE;
-@@ -2121,6 +2126,10 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-         outarg.flags |= FUSE_HANDLE_KILLPRIV_V2;
-     }
- 
-+    if (se->conn.want & FUSE_CAP_SETXATTR_EXT) {
-+        outarg.flags |= FUSE_SETXATTR_EXT;
-+    }
-+
-     fuse_log(FUSE_LOG_DEBUG, "   INIT: %u.%u\n", outarg.major, outarg.minor);
-     fuse_log(FUSE_LOG_DEBUG, "   flags=0x%08x\n", outarg.flags);
-     fuse_log(FUSE_LOG_DEBUG, "   max_readahead=0x%08x\n", outarg.max_readahead);
-diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
-index 3bf786b034..4b4e8c9724 100644
---- a/tools/virtiofsd/fuse_lowlevel.h
-+++ b/tools/virtiofsd/fuse_lowlevel.h
-@@ -798,7 +798,8 @@ struct fuse_lowlevel_ops {
-      *   fuse_reply_err
-      */
-     void (*setxattr)(fuse_req_t req, fuse_ino_t ino, const char *name,
--                     const char *value, size_t size, int flags);
-+                     const char *value, size_t size, int flags,
-+                     uint32_t setxattr_flags);
- 
-     /**
-      * Get an extended attribute
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index ec91b3c133..9f5cd98fb5 100644
+index 0c9084ea15..113c725def 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -2955,7 +2955,8 @@ out:
+@@ -175,6 +175,7 @@ struct lo_data {
+     int user_killpriv_v2, killpriv_v2;
+     /* If set, virtiofsd is responsible for setting umask during creation */
+     bool change_umask;
++    int posix_acl;
+ };
+ 
+ static const struct fuse_opt lo_opts[] = {
+@@ -1185,6 +1186,51 @@ static void lo_restore_cred(struct lo_cred *old, bool restore_umask)
+         umask(old->umask);
  }
  
- static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
--                        const char *value, size_t size, int flags)
-+                        const char *value, size_t size, int flags,
-+                        uint32_t extra_flags)
- {
-     char procname[64];
-     const char *name;
++/*
++ * A helper to change cred and drop capability. Returns 0 on success and
++ * errno on error
++ */
++static int lo_drop_cap_change_cred(fuse_req_t req, struct lo_cred *old,
++                                   bool change_umask, const char *cap_name,
++                                   bool *cap_dropped)
++{
++    int ret;
++    bool __cap_dropped;
++
++    assert(cap_name);
++
++    ret = drop_effective_cap(cap_name, &__cap_dropped);
++    if (ret) {
++        return ret;
++    }
++
++    ret = lo_change_cred(req, old, change_umask);
++    if (ret) {
++        if (__cap_dropped) {
++            if (gain_effective_cap(cap_name)) {
++                fuse_log(FUSE_LOG_ERR, "Failed to gain CAP_%s\n", cap_name);
++            }
++        }
++    }
++
++    if (cap_dropped) {
++        *cap_dropped = __cap_dropped;
++    }
++    return ret;
++}
++
++static void lo_restore_cred_gain_cap(struct lo_cred *old, bool restore_umask,
++                                     const char *cap_name)
++{
++    assert(cap_name);
++
++    lo_restore_cred(old, restore_umask);
++
++    if (gain_effective_cap(cap_name)) {
++        fuse_log(FUSE_LOG_ERR, "Failed to gain CAP_%s\n", cap_name);
++    }
++}
++
+ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
+                              const char *name, mode_t mode, dev_t rdev,
+                              const char *link)
+@@ -2976,6 +3022,9 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+     ssize_t ret;
+     int saverr;
+     int fd = -1;
++    bool switched_creds = false;
++    bool cap_fsetid_dropped = false;
++    struct lo_cred old = {};
+ 
+     mapped_name = NULL;
+     name = in_name;
+@@ -3006,6 +3055,26 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+              ", name=%s value=%s size=%zd)\n", ino, name, value, size);
+ 
+     sprintf(procname, "%i", inode->fd);
++    /*
++     * If we are setting posix access acl and if SGID needs to be
++     * cleared, then switch to caller's gid and drop CAP_FSETID
++     * and that should make sure host kernel clears SGID.
++     *
++     * This probably will not work when we support idmapped mounts.
++     * In that case we will need to find a non-root gid and switch
++     * to it. (Instead of gid in request). Fix it when we support
++     * idmapped mounts.
++     */
++    if (lo->posix_acl && !strcmp(name, "system.posix_acl_access")
++        && (extra_flags & FUSE_SETXATTR_ACL_KILL_SGID)) {
++        ret = lo_drop_cap_change_cred(req, &old, false, "FSETID",
++                                      &cap_fsetid_dropped);
++        if (ret) {
++            saverr = ret;
++            goto out;
++        }
++        switched_creds = true;
++    }
+     if (S_ISREG(inode->filetype) || S_ISDIR(inode->filetype)) {
+         fd = openat(lo->proc_self_fd, procname, O_RDONLY);
+         if (fd < 0) {
+@@ -3021,6 +3090,12 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+         saverr = ret == -1 ? errno : 0;
+         FCHDIR_NOFAIL(lo->root.fd);
+     }
++    if (switched_creds) {
++        if (cap_fsetid_dropped)
++            lo_restore_cred_gain_cap(&old, false, "FSETID");
++        else
++            lo_restore_cred(&old, false);
++    }
+ 
+ out:
+     if (fd >= 0) {
 -- 
 2.25.4
 

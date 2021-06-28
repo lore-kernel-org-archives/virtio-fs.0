@@ -1,14 +1,14 @@
-Date: Mon, 28 Jun 2021 16:49:02 +0100
+Date: Mon, 28 Jun 2021 17:12:13 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YNnvbneBCm4GYRP9@work-vm>
+Message-ID: <YNn03dfqpGnTTIne@work-vm>
 References: <20210622150852.1507204-1-vgoyal@redhat.com>
-	<20210622150852.1507204-4-vgoyal@redhat.com>
+	<20210622150852.1507204-6-vgoyal@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20210622150852.1507204-4-vgoyal@redhat.com>
+In-Reply-To: <20210622150852.1507204-6-vgoyal@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH v7 3/7] virtiofsd: Add support for extended
-	setxattr
+Subject: Re: [Virtio-fs] [PATCH v7 5/7] virtiofsd: Add capability to
+	change/restore umask
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,105 +21,140 @@ To: Vivek Goyal <vgoyal@redhat.com>
 Cc: virtio-fs@redhat.com, miklos@szeredi.hu, qemu-devel@nongnu.org
 
 * Vivek Goyal (vgoyal@redhat.com) wrote:
-> Add the bits to enable support for setxattr_ext if fuse offers it. Do not
-> enable it by default yet. Let passthrough_ll opt-in. Enabling it by deafult
-> kind of automatically means that you are taking responsibility of clearing
-> SGID if ACL is set.
+> When parent directory has default acl and a file is created in that
+> directory, then umask is ignored and final file permissions are
+> determined using default acl instead. (man 2 umask).
 > 
+> Currently, fuse applies the umask and sends modified mode in create
+> request accordingly. fuse server can set FUSE_DONT_MASK and tell
+> fuse client to not apply umask and fuse server will take care of
+> it as needed.
+> 
+> With posix acls enabled, requirement will be that we want umask
+> to determine final file mode if parent directory does not have
+> default acl.
+> 
+> So if posix acls are enabled, opt in for FUSE_DONT_MASK. virtiofsd
+> will set umask of the thread doing file creation. And host kernel
+> should use that umask if parent directory does not have default
+> acls, otherwise umask does not take affect.
+> 
+> Miklos mentioned that we already call unshare(CLONE_FS) for
+> every thread. That means umask has now become property of per
+> thread and it should be ok to manipulate it in file creation path.
+> 
+> This patch only adds capability to change umask and restore it. It
+> does not enable it yet. Next few patches will add capability to enable it
+> based on if user enabled posix_acl or not.
+> 
+> This should fix fstest generic/099.
+> 
+> Reported-by: Luis Henriques <lhenriques@suse.de>
 > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 > ---
->  tools/virtiofsd/fuse_common.h    |  5 +++++
->  tools/virtiofsd/fuse_lowlevel.c  | 11 ++++++++++-
->  tools/virtiofsd/fuse_lowlevel.h  |  3 ++-
->  tools/virtiofsd/passthrough_ll.c |  3 ++-
->  4 files changed, 19 insertions(+), 3 deletions(-)
+>  tools/virtiofsd/passthrough_ll.c | 22 ++++++++++++++++------
+>  1 file changed, 16 insertions(+), 6 deletions(-)
 > 
-> diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
-> index 0c2665b977..8abac80098 100644
-> --- a/tools/virtiofsd/fuse_common.h
-> +++ b/tools/virtiofsd/fuse_common.h
-> @@ -377,6 +377,11 @@ struct fuse_file_info {
->   */
->  #define FUSE_CAP_SETXATTR_EXT (1 << 29)
->  
-> +/**
-> + * Indicates that file server supports extended struct fuse_setxattr_in
-> + */
-> +#define FUSE_CAP_SETXATTR_EXT (1 << 29)
-> +
-
-You already added that in 1/7 - but other than that, 
-
-
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-
->  /**
->   * Ioctl flags
->   *
-> diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-> index c2b6ff1686..d1e24c013f 100644
-> --- a/tools/virtiofsd/fuse_lowlevel.c
-> +++ b/tools/virtiofsd/fuse_lowlevel.c
-> @@ -1439,7 +1439,9 @@ static void do_setxattr(fuse_req_t req, fuse_ino_t nodeid,
->      }
->  
->      if (req->se->op.setxattr) {
-> -        req->se->op.setxattr(req, nodeid, name, value, arg->size, arg->flags);
-> +        uint32_t setxattr_flags = setxattr_ext ? arg->setxattr_flags : 0;
-> +        req->se->op.setxattr(req, nodeid, name, value, arg->size, arg->flags,
-> +                             setxattr_flags);
->      } else {
->          fuse_reply_err(req, ENOSYS);
->      }
-> @@ -1986,6 +1988,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
->      if (arg->flags & FUSE_HANDLE_KILLPRIV_V2) {
->          se->conn.capable |= FUSE_CAP_HANDLE_KILLPRIV_V2;
->      }
-> +    if (arg->flags & FUSE_SETXATTR_EXT) {
-> +        se->conn.capable |= FUSE_CAP_SETXATTR_EXT;
-> +    }
->  #ifdef HAVE_SPLICE
->  #ifdef HAVE_VMSPLICE
->      se->conn.capable |= FUSE_CAP_SPLICE_WRITE | FUSE_CAP_SPLICE_MOVE;
-> @@ -2121,6 +2126,10 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
->          outarg.flags |= FUSE_HANDLE_KILLPRIV_V2;
->      }
->  
-> +    if (se->conn.want & FUSE_CAP_SETXATTR_EXT) {
-> +        outarg.flags |= FUSE_SETXATTR_EXT;
-> +    }
-> +
->      fuse_log(FUSE_LOG_DEBUG, "   INIT: %u.%u\n", outarg.major, outarg.minor);
->      fuse_log(FUSE_LOG_DEBUG, "   flags=0x%08x\n", outarg.flags);
->      fuse_log(FUSE_LOG_DEBUG, "   max_readahead=0x%08x\n", outarg.max_readahead);
-> diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
-> index 3bf786b034..4b4e8c9724 100644
-> --- a/tools/virtiofsd/fuse_lowlevel.h
-> +++ b/tools/virtiofsd/fuse_lowlevel.h
-> @@ -798,7 +798,8 @@ struct fuse_lowlevel_ops {
->       *   fuse_reply_err
->       */
->      void (*setxattr)(fuse_req_t req, fuse_ino_t ino, const char *name,
-> -                     const char *value, size_t size, int flags);
-> +                     const char *value, size_t size, int flags,
-> +                     uint32_t setxattr_flags);
->  
->      /**
->       * Get an extended attribute
 > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index ec91b3c133..9f5cd98fb5 100644
+> index 9f5cd98fb5..0c9084ea15 100644
 > --- a/tools/virtiofsd/passthrough_ll.c
 > +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2955,7 +2955,8 @@ out:
+> @@ -122,6 +122,7 @@ struct lo_inode {
+>  struct lo_cred {
+>      uid_t euid;
+>      gid_t egid;
+> +    mode_t umask;
+>  };
+>  
+>  enum {
+> @@ -172,6 +173,8 @@ struct lo_data {
+>      /* An O_PATH file descriptor to /proc/self/fd/ */
+>      int proc_self_fd;
+>      int user_killpriv_v2, killpriv_v2;
+> +    /* If set, virtiofsd is responsible for setting umask during creation */
+> +    bool change_umask;
+>  };
+>  
+>  static const struct fuse_opt lo_opts[] = {
+> @@ -1134,7 +1137,8 @@ static void lo_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
+>   * ownership of caller.
+>   * TODO: What about selinux context?
+>   */
+> -static int lo_change_cred(fuse_req_t req, struct lo_cred *old)
+> +static int lo_change_cred(fuse_req_t req, struct lo_cred *old,
+> +                          bool change_umask)
+>  {
+>      int res;
+>  
+> @@ -1154,11 +1158,14 @@ static int lo_change_cred(fuse_req_t req, struct lo_cred *old)
+>          return errno_save;
+>      }
+>  
+> +    if (change_umask) {
+> +        old->umask = umask(req->ctx.umask);
+> +    }
+>      return 0;
 >  }
 >  
->  static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
-> -                        const char *value, size_t size, int flags)
-> +                        const char *value, size_t size, int flags,
-> +                        uint32_t extra_flags)
+>  /* Regain Privileges */
+> -static void lo_restore_cred(struct lo_cred *old)
+> +static void lo_restore_cred(struct lo_cred *old, bool restore_umask)
 >  {
->      char procname[64];
->      const char *name;
+>      int res;
+>  
+> @@ -1173,6 +1180,9 @@ static void lo_restore_cred(struct lo_cred *old)
+>          fuse_log(FUSE_LOG_ERR, "setegid(%u): %m\n", old->egid);
+>          exit(1);
+>      }
+> +
+> +    if (restore_umask)
+> +        umask(old->umask);
+>  }
+>  
+>  static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
+> @@ -1202,7 +1212,7 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
+>          return;
+>      }
+>  
+> -    saverr = lo_change_cred(req, &old);
+> +    saverr = lo_change_cred(req, &old, lo->change_umask && !S_ISLNK(mode));
+
+Can you explain what these ISLNK checks are for (insid mknod_symlink, so
+is that always true or irrelevant?)
+
+Dave
+
+>      if (saverr) {
+>          goto out;
+>      }
+> @@ -1211,7 +1221,7 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
+>  
+>      saverr = errno;
+>  
+> -    lo_restore_cred(&old);
+> +    lo_restore_cred(&old, lo->change_umask && !S_ISLNK(mode));
+>  
+>      if (res == -1) {
+>          goto out;
+> @@ -1917,7 +1927,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+>          return;
+>      }
+>  
+> -    err = lo_change_cred(req, &old);
+> +    err = lo_change_cred(req, &old, lo->change_umask);
+>      if (err) {
+>          goto out;
+>      }
+> @@ -1928,7 +1938,7 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+>      fd = openat(parent_inode->fd, name, fi->flags | O_CREAT | O_EXCL, mode);
+>      err = fd == -1 ? errno : 0;
+>  
+> -    lo_restore_cred(&old);
+> +    lo_restore_cred(&old, lo->change_umask);
+>  
+>      /* Ignore the error if file exists and O_EXCL was not given */
+>      if (err && (err != EEXIST || (fi->flags & O_EXCL))) {
 > -- 
 > 2.25.4
 > 

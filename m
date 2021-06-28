@@ -1,17 +1,13 @@
-References: <20210625191229.1752531-1-vgoyal@redhat.com>
-	<BN0PR11MB57275823CE05DED7BC755460FD069@BN0PR11MB5727.namprd11.prod.outlook.com>
-	<20210628131708.GA1803896@redhat.com>
-From: Daniel Walsh <dwalsh@redhat.com>
-Message-ID: <1b446468-dcf8-9e21-58d3-c032686eeee5@redhat.com>
-Date: Mon, 28 Jun 2021 09:36:27 -0400
+Date: Mon, 28 Jun 2021 10:27:23 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210628142723.GB1803896@redhat.com>
+References: <1622792602-40459-1-git-send-email-mlin@kernel.org>
+	<1622792602-40459-3-git-send-email-mlin@kernel.org>
 MIME-Version: 1.0
-In-Reply-To: <20210628131708.GA1803896@redhat.com>
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Transfer-Encoding: 8bit
-Content-Language: en-US
-Subject: Re: [Virtio-fs] [RFC PATCH 0/1] xattr: Allow user.* xattr on
- symlink/special files if caller has CAP_SYS_RESOURCE
-Reply-To: dwalsh@redhat.com
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <1622792602-40459-3-git-send-email-mlin@kernel.org>
+Subject: Re: [Virtio-fs] [PATCH v2 2/2] mm: adds NOSIGBUS extension to mmap()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,136 +16,159 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>, "Schaufler, Casey" <casey.schaufler@intel.com>
-Cc: "berrange@redhat.com" <berrange@redhat.com>, "selinux@vger.kernel.org" <selinux@vger.kernel.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "casey@schaufler-ca.com" <casey@schaufler-ca.com>, linux-security-module <linux-security-module@vger.kernel.org>, "viro@zeniv.linux.org.uk" <viro@zeniv.linux.org.uk>, "linux-fsdevel@vger.kernel.org" <linux-fsdevel@vger.kernel.org>
+To: Ming Lin <mlin@kernel.org>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, Simon Ser <contact@emersion.fr>, Hugh Dickins <hughd@google.com>, linux-kernel@vger.kernel.org, Matthew Wilcox <willy@infradead.org>, virtio-fs-list <virtio-fs@redhat.com>, linux-mm@kvack.org, linux-api@vger.kernel.org, linux-fsdevel@vger.kernel.org, Linus Torvalds <torvalds@linux-foundation.org>
 
-On 6/28/21 09:17, Vivek Goyal wrote:
-> On Fri, Jun 25, 2021 at 09:49:51PM +0000, Schaufler, Casey wrote:
->>> -----Original Message-----
->>> From: Vivek Goyal <vgoyal@redhat.com>
->>> Sent: Friday, June 25, 2021 12:12 PM
->>> To: linux-fsdevel@vger.kernel.org; linux-kernel@vger.kernel.org;
->>> viro@zeniv.linux.org.uk
->>> Cc: virtio-fs@redhat.com; dwalsh@redhat.com; dgilbert@redhat.com;
->>> berrange@redhat.com; vgoyal@redhat.com
->> Please include Linux Security Module list <linux-security-module@vger.kernel.org>
->> and selinux@vger.kernel.org on this topic.
->>
->>> Subject: [RFC PATCH 0/1] xattr: Allow user.* xattr on symlink/special files if
->>> caller has CAP_SYS_RESOURCE
->>>
->>> Hi,
->>>
->>> In virtiofs, actual file server is virtiosd daemon running on host.
->>> There we have a mode where xattrs can be remapped to something else.
->>> For example security.selinux can be remapped to
->>> user.virtiofsd.securit.selinux on the host.
->> This would seem to provide mechanism whereby a user can violate
->> SELinux policy quite easily.
-> Hi Casey,
->
-> As david already replied, we are not bypassing host's SELinux policy (if
-> there is one). We are just trying to provide a mode where host and
-> guest's SELinux policies could co-exist without interefering
-> with each other.
->
-> By remappming guests SELinux xattrs (and not host's SELinux xattrs),
-> a file probably will have two xattrs
->
-> "security.selinux" and "user.virtiofsd.security.selinux". Host will
-> enforce SELinux policy based on security.selinux xattr and guest
-> will see the SELinux info stored in "user.virtiofsd.security.selinux"
-> and guest SELinux policy will enforce rules based on that.
-> (user.virtiofsd.security.selinux will be remapped to "security.selinux"
-> when guest does getxattr()).
->
-> IOW, this mode is allowing both host and guest SELinux policies to
-> co-exist and not interefere with each other. (Remapping guests's
-> SELinux xattr is not changing hosts's SELinux label and is not
-> bypassing host's SELinux policy).
->
-> virtiofsd also provides for the mode where if guest process sets
-> SELinux xattr it shows up as security.selinux on host. But now we
-> have multiple issues. There are two SELinux policies (host and guest)
-> which are operating on same lable. And there is a very good chance
-> that two have not been written in such a way that they work with
-> each other. In fact there does not seem to exist a notion where
-> two different SELinux policies are operating on same label.
->
-> At high level, this is in a way similar to files created on
-> virtio-blk devices. Say this device is backed by a foo.img file
-> on host. Now host selinux policy will set its own label on
-> foo.img and provide access control while labels created by guest
-> are not seen or controlled by host's SELinux policy. Only guest
-> SELinux policy works with those labels.
->
-> So this is similar kind of attempt. Provide isolation between
-> host and guests's SELinux labels so that two policies can
-> co-exist and not interfere with each other.
->
->>> This remapping is useful when SELinux is enabled in guest and virtiofs
->>> as being used as rootfs. Guest and host SELinux policy might not match
->>> and host policy might deny security.selinux xattr setting by guest
->>> onto host. Or host might have SELinux disabled and in that case to
->>> be able to set security.selinux xattr, virtiofsd will need to have
->>> CAP_SYS_ADMIN (which we are trying to avoid). Being able to remap
->>> guest security.selinux (or other xattrs) on host to something else
->>> is also better from security point of view.
->> Can you please provide some rationale for this assertion?
->> I have been working with security xattrs longer than anyone
->> and have trouble accepting the statement.
-> If guest is not able to interfere or change host's SELinux labels
-> directly, it sounded better.
->
-> Irrespective of this, my primary concern is that to allow guest
-> VM to be able to use SELinux seamlessly in diverse host OS
-> environments (typical of cloud deployments). And being able to
-> provide a mode where host and guest's security labels can
-> co-exist and policies can work independently, should be able
-> to achieve that goal.
->
->>> But when we try this, we noticed that SELinux relabeling in guest
->>> is failing on some symlinks. When I debugged a little more, I
->>> came to know that "user.*" xattrs are not allowed on symlinks
->>> or special files.
->>>
->>> "man xattr" seems to suggest that primary reason to disallow is
->>> that arbitrary users can set unlimited amount of "user.*" xattrs
->>> on these files and bypass quota check.
->>>
->>> If that's the primary reason, I am wondering is it possible to relax
->>> the restrictions if caller has CAP_SYS_RESOURCE. This capability
->>> allows caller to bypass quota checks. So it should not be
->>> a problem atleast from quota perpective.
->>>
->>> That will allow me to give CAP_SYS_RESOURCE to virtiofs deamon
->>> and remap xattrs arbitrarily.
->> On a Smack system you should require CAP_MAC_ADMIN to remap
->> security. xattrs. I sounds like you're in serious danger of running afoul
->> of LSM attribute policy on a reasonable general level.
-> I think I did not explain xattr remapping properly and that's why this
-> confusion is there. Only guests's xattrs will be remapped and not
-> hosts's xattr. So one can not bypass any access control implemented
-> by any of the LSM on host.
->
-> Thanks
-> Vivek
->
-I want to point out that this solves a  couple of other problems also.  
-Currently virtiofsd attempts to write security attributes on the host, 
-which is denied by default on systems without SELinux and no 
-CAP_SYS_ADMIN.  This means if you want to run a container or VM on a 
-host without SELinux support but the VM has SELinux enabled, then 
-virtiofsd needs CAP_SYS_ADMIN.  It would be much more secure if it only 
-needed CAP_SYS_RESOURCE.  If the host has SELinux enabled then it can 
-run without CAP_SYS_ADMIN or CAP_SYS_RESOURCE, but it will only be 
-allowed to write labels that the host system understands, any label not 
-understood will be blocked. Not only this, but the label that is running 
-virtiofsd pretty much has to run as unconfined, since it could be 
-writing any SELinux label.
+On Fri, Jun 04, 2021 at 12:43:22AM -0700, Ming Lin wrote:
+> Adds new flag MAP_NOSIGBUS of mmap() to specify the behavior of
+> "don't SIGBUS on fault". Right now, this flag is only allowed
+> for private mapping.
+> 
+> For MAP_NOSIGBUS mapping, map in the zero page on read fault
+> or fill a freshly allocated page with zeroes on write fault.
 
-If virtiofsd is writing Userxattrs with CAP_SYS_RESOURCE, then we can 
-run with a confined SELinux label only allowing it to sexattr on the 
-content in the designated directory, make the container/vm much more secure.
+I am wondering if this could be of limited use for me if MAP_NOSIGBUS
+were to be supported for shared mappings as well.
 
+When virtiofs is run with dax enabled, then it is possible that if
+a file is shared between two guests, then one guest truncates the
+file and second guest tries to do load/store operation. Given current
+kvm architecture, there is no mechanism to propagate SIGBUS to guest
+process, instead KVM retries page fault infinitely and guest cpu/process
+hangs.
+
+Ideally we want this error to propagate all the way back into the
+guest and to the guest process but that solution is not in place yet.
+
+https://lore.kernel.org/kvm/20200406190951.GA19259@redhat.com/
+
+In the absense of a proper solution, one could think of mapping
+shared file on host with MAP_NOSIGBUS, and hopefully that means
+kvm will be able to resolve fault to a zero filled page and guest
+will not hang. But this means that data sharing between two processes
+is now broken. Writes by process A will not be visible to process B
+in another once this situation happens, IIUC.
+
+So if we were to MAP_NOSIGBUS, guest will not hang but failures resulting
+from ftruncate will be silent and will be noticed sometime later. I guess
+not exactly a very pleasant scenario...
+
+Thanks
+Vivek
+
+
+
+> 
+> Signed-off-by: Ming Lin <mlin@kernel.org>
+> ---
+>  arch/parisc/include/uapi/asm/mman.h          |  1 +
+>  include/linux/mm.h                           |  2 ++
+>  include/linux/mman.h                         |  1 +
+>  include/uapi/asm-generic/mman-common.h       |  1 +
+>  mm/memory.c                                  | 11 +++++++++++
+>  mm/mmap.c                                    |  4 ++++
+>  tools/include/uapi/asm-generic/mman-common.h |  1 +
+>  7 files changed, 21 insertions(+)
+> 
+> diff --git a/arch/parisc/include/uapi/asm/mman.h b/arch/parisc/include/uapi/asm/mman.h
+> index ab78cba..eecf9af 100644
+> --- a/arch/parisc/include/uapi/asm/mman.h
+> +++ b/arch/parisc/include/uapi/asm/mman.h
+> @@ -25,6 +25,7 @@
+>  #define MAP_STACK	0x40000		/* give out an address that is best suited for process/thread stacks */
+>  #define MAP_HUGETLB	0x80000		/* create a huge page mapping */
+>  #define MAP_FIXED_NOREPLACE 0x100000	/* MAP_FIXED which doesn't unmap underlying mapping */
+> +#define MAP_NOSIGBUS	0x200000	/* do not SIGBUS on fault */
+>  #define MAP_UNINITIALIZED 0		/* uninitialized anonymous mmap */
+>  
+>  #define MS_SYNC		1		/* synchronous memory sync */
+> diff --git a/include/linux/mm.h b/include/linux/mm.h
+> index 9e86ca1..100d122 100644
+> --- a/include/linux/mm.h
+> +++ b/include/linux/mm.h
+> @@ -373,6 +373,8 @@ int __add_to_page_cache_locked(struct page *page, struct address_space *mapping,
+>  # define VM_UFFD_MINOR		VM_NONE
+>  #endif /* CONFIG_HAVE_ARCH_USERFAULTFD_MINOR */
+>  
+> +#define VM_NOSIGBUS		VM_FLAGS_BIT(38)	/* Do not SIGBUS on fault */
+> +
+>  /* Bits set in the VMA until the stack is in its final location */
+>  #define VM_STACK_INCOMPLETE_SETUP	(VM_RAND_READ | VM_SEQ_READ)
+>  
+> diff --git a/include/linux/mman.h b/include/linux/mman.h
+> index b2cbae9..c966b08 100644
+> --- a/include/linux/mman.h
+> +++ b/include/linux/mman.h
+> @@ -154,6 +154,7 @@ static inline bool arch_validate_flags(unsigned long flags)
+>  	       _calc_vm_trans(flags, MAP_DENYWRITE,  VM_DENYWRITE ) |
+>  	       _calc_vm_trans(flags, MAP_LOCKED,     VM_LOCKED    ) |
+>  	       _calc_vm_trans(flags, MAP_SYNC,	     VM_SYNC      ) |
+> +	       _calc_vm_trans(flags, MAP_NOSIGBUS,   VM_NOSIGBUS  ) |
+>  	       arch_calc_vm_flag_bits(flags);
+>  }
+>  
+> diff --git a/include/uapi/asm-generic/mman-common.h b/include/uapi/asm-generic/mman-common.h
+> index f94f65d..a2a5333 100644
+> --- a/include/uapi/asm-generic/mman-common.h
+> +++ b/include/uapi/asm-generic/mman-common.h
+> @@ -29,6 +29,7 @@
+>  #define MAP_HUGETLB		0x040000	/* create a huge page mapping */
+>  #define MAP_SYNC		0x080000 /* perform synchronous page faults for the mapping */
+>  #define MAP_FIXED_NOREPLACE	0x100000	/* MAP_FIXED which doesn't unmap underlying mapping */
+> +#define MAP_NOSIGBUS		0x200000	/* do not SIGBUS on fault */
+>  
+>  #define MAP_UNINITIALIZED 0x4000000	/* For anonymous mmap, memory could be
+>  					 * uninitialized */
+> diff --git a/mm/memory.c b/mm/memory.c
+> index 8d5e583..6b5a897 100644
+> --- a/mm/memory.c
+> +++ b/mm/memory.c
+> @@ -3676,6 +3676,17 @@ static vm_fault_t __do_fault(struct vm_fault *vmf)
+>  	}
+>  
+>  	ret = vma->vm_ops->fault(vmf);
+> +	if (unlikely(ret & VM_FAULT_SIGBUS) && (vma->vm_flags & VM_NOSIGBUS)) {
+> +		/*
+> +		 * For MAP_NOSIGBUS mapping, map in the zero page on read fault
+> +		 * or fill a freshly allocated page with zeroes on write fault
+> +		 */
+> +		ret = do_anonymous_page(vmf);
+> +		if (!ret)
+> +			ret = VM_FAULT_NOPAGE;
+> +		return ret;
+> +	}
+> +
+>  	if (unlikely(ret & (VM_FAULT_ERROR | VM_FAULT_NOPAGE | VM_FAULT_RETRY |
+>  			    VM_FAULT_DONE_COW)))
+>  		return ret;
+> diff --git a/mm/mmap.c b/mm/mmap.c
+> index 8bed547..d5c9fb5 100644
+> --- a/mm/mmap.c
+> +++ b/mm/mmap.c
+> @@ -1419,6 +1419,10 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
+>  	if (!len)
+>  		return -EINVAL;
+>  
+> +	/* Restrict MAP_NOSIGBUS to MAP_PRIVATE mapping */
+> +	if ((flags & MAP_NOSIGBUS) && !(flags & MAP_PRIVATE))
+> +		return -EINVAL;
+> +
+>  	/*
+>  	 * Does the application expect PROT_READ to imply PROT_EXEC?
+>  	 *
+> diff --git a/tools/include/uapi/asm-generic/mman-common.h b/tools/include/uapi/asm-generic/mman-common.h
+> index f94f65d..a2a5333 100644
+> --- a/tools/include/uapi/asm-generic/mman-common.h
+> +++ b/tools/include/uapi/asm-generic/mman-common.h
+> @@ -29,6 +29,7 @@
+>  #define MAP_HUGETLB		0x040000	/* create a huge page mapping */
+>  #define MAP_SYNC		0x080000 /* perform synchronous page faults for the mapping */
+>  #define MAP_FIXED_NOREPLACE	0x100000	/* MAP_FIXED which doesn't unmap underlying mapping */
+> +#define MAP_NOSIGBUS		0x200000	/* do not SIGBUS on fault */
+>  
+>  #define MAP_UNINITIALIZED 0x4000000	/* For anonymous mmap, memory could be
+>  					 * uninitialized */
+> -- 
+> 1.8.3.1
+> 
 

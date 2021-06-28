@@ -1,14 +1,14 @@
-Date: Fri, 18 Jun 2021 10:20:57 +0200
-From: Greg Kurz <groug@kaod.org>
-Message-ID: <20210618102057.21e901fa@bahia.lan>
-In-Reply-To: <20210618014007.GA1219970@redhat.com>
-References: <20210617141518.304659-1-groug@kaod.org>
-	<20210618014007.GA1219970@redhat.com>
+Date: Mon, 28 Jun 2021 16:49:02 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YNnvbneBCm4GYRP9@work-vm>
+References: <20210622150852.1507204-1-vgoyal@redhat.com>
+	<20210622150852.1507204-4-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=US-ASCII
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Don't allow file creation with
-	FUSE_OPEN
+In-Reply-To: <20210622150852.1507204-4-vgoyal@redhat.com>
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: Re: [Virtio-fs] [PATCH v7 3/7] virtiofsd: Add support for extended
+	setxattr
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,115 +18,111 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, Miklos Szeredi <miklos@szeredi.hu>, qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, miklos@szeredi.hu, qemu-devel@nongnu.org
 
-On Thu, 17 Jun 2021 21:40:07 -0400
-Vivek Goyal <vgoyal@redhat.com> wrote:
-
-> On Thu, Jun 17, 2021 at 04:15:18PM +0200, Greg Kurz wrote:
-> > A well behaved FUSE client uses FUSE_CREATE to create files. It isn't
-> > supposed to pass O_CREAT along a FUSE_OPEN request, as documented in
-> > the "fuse_lowlevel.h" header :
-> > 
-> >     /**
-> >      * Open a file
-> >      *
-> >      * Open flags are available in fi->flags. The following rules
-> >      * apply.
-> >      *
-> >      *  - Creation (O_CREAT, O_EXCL, O_NOCTTY) flags will be
-> >      *    filtered out / handled by the kernel.
-> > 
-> > But if it does anyway, virtiofsd crashes with:
-> > 
-> > *** invalid openat64 call: O_CREAT or O_TMPFILE without mode ***: terminated
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> Add the bits to enable support for setxattr_ext if fuse offers it. Do not
+> enable it by default yet. Let passthrough_ll opt-in. Enabling it by deafult
+> kind of automatically means that you are taking responsibility of clearing
+> SGID if ACL is set.
 > 
-
-This is also the consequence of virtiofsd being compiled with
--D_FORTIFY_SOURCE=2. Without that, no abort but arbitrary data
-is passed as mode_t argument to the openat() syscall instead.
-
-> So did you hit this error with current fuse client. If yes, that means
-> client needs fixing as well?
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  tools/virtiofsd/fuse_common.h    |  5 +++++
+>  tools/virtiofsd/fuse_lowlevel.c  | 11 ++++++++++-
+>  tools/virtiofsd/fuse_lowlevel.h  |  3 ++-
+>  tools/virtiofsd/passthrough_ll.c |  3 ++-
+>  4 files changed, 19 insertions(+), 3 deletions(-)
 > 
+> diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
+> index 0c2665b977..8abac80098 100644
+> --- a/tools/virtiofsd/fuse_common.h
+> +++ b/tools/virtiofsd/fuse_common.h
+> @@ -377,6 +377,11 @@ struct fuse_file_info {
+>   */
+>  #define FUSE_CAP_SETXATTR_EXT (1 << 29)
+>  
+> +/**
+> + * Indicates that file server supports extended struct fuse_setxattr_in
+> + */
+> +#define FUSE_CAP_SETXATTR_EXT (1 << 29)
+> +
 
-I've patched the client to cause this:
-
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -28,6 +28,7 @@ static int fuse_send_open(struct fuse_mount *fm, u64 nodeid,
- 
-        memset(&inarg, 0, sizeof(inarg));
-        inarg.flags = open_flags & ~(O_CREAT | O_EXCL | O_NOCTTY);
-+       if (opcode == FUSE_OPEN) inarg.flags |= O_TMPFILE;
-        if (!fm->fc->atomic_o_trunc)
-                inarg.flags &= ~O_TRUNC;
+You already added that in 1/7 - but other than that, 
 
 
-> Or you are doing this fix based on comment in fuse_lowlevel.h.
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+
+>  /**
+>   * Ioctl flags
+>   *
+> diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+> index c2b6ff1686..d1e24c013f 100644
+> --- a/tools/virtiofsd/fuse_lowlevel.c
+> +++ b/tools/virtiofsd/fuse_lowlevel.c
+> @@ -1439,7 +1439,9 @@ static void do_setxattr(fuse_req_t req, fuse_ino_t nodeid,
+>      }
+>  
+>      if (req->se->op.setxattr) {
+> -        req->se->op.setxattr(req, nodeid, name, value, arg->size, arg->flags);
+> +        uint32_t setxattr_flags = setxattr_ext ? arg->setxattr_flags : 0;
+> +        req->se->op.setxattr(req, nodeid, name, value, arg->size, arg->flags,
+> +                             setxattr_flags);
+>      } else {
+>          fuse_reply_err(req, ENOSYS);
+>      }
+> @@ -1986,6 +1988,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+>      if (arg->flags & FUSE_HANDLE_KILLPRIV_V2) {
+>          se->conn.capable |= FUSE_CAP_HANDLE_KILLPRIV_V2;
+>      }
+> +    if (arg->flags & FUSE_SETXATTR_EXT) {
+> +        se->conn.capable |= FUSE_CAP_SETXATTR_EXT;
+> +    }
+>  #ifdef HAVE_SPLICE
+>  #ifdef HAVE_VMSPLICE
+>      se->conn.capable |= FUSE_CAP_SPLICE_WRITE | FUSE_CAP_SPLICE_MOVE;
+> @@ -2121,6 +2126,10 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+>          outarg.flags |= FUSE_HANDLE_KILLPRIV_V2;
+>      }
+>  
+> +    if (se->conn.want & FUSE_CAP_SETXATTR_EXT) {
+> +        outarg.flags |= FUSE_SETXATTR_EXT;
+> +    }
+> +
+>      fuse_log(FUSE_LOG_DEBUG, "   INIT: %u.%u\n", outarg.major, outarg.minor);
+>      fuse_log(FUSE_LOG_DEBUG, "   flags=0x%08x\n", outarg.flags);
+>      fuse_log(FUSE_LOG_DEBUG, "   max_readahead=0x%08x\n", outarg.max_readahead);
+> diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
+> index 3bf786b034..4b4e8c9724 100644
+> --- a/tools/virtiofsd/fuse_lowlevel.h
+> +++ b/tools/virtiofsd/fuse_lowlevel.h
+> @@ -798,7 +798,8 @@ struct fuse_lowlevel_ops {
+>       *   fuse_reply_err
+>       */
+>      void (*setxattr)(fuse_req_t req, fuse_ino_t ino, const char *name,
+> -                     const char *value, size_t size, int flags);
+> +                     const char *value, size_t size, int flags,
+> +                     uint32_t setxattr_flags);
+>  
+>      /**
+>       * Get an extended attribute
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index ec91b3c133..9f5cd98fb5 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -2955,7 +2955,8 @@ out:
+>  }
+>  
+>  static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
+> -                        const char *value, size_t size, int flags)
+> +                        const char *value, size_t size, int flags,
+> +                        uint32_t extra_flags)
+>  {
+>      char procname[64];
+>      const char *name;
+> -- 
+> 2.25.4
 > 
-> I am wondering why this protocl restriction is there that open()
-> path should not be able to honor O_CREAT.
-> 
-
-It isn't a protocol restriction IMHO. The distinction between file
-creation and file opening has always been there since the start.
-Older versions of the protocol would send FUSE_MKNOD to create a
-file and then send FUSE_OPEN to open it. Because this was racy,
-FUSE_CREATE was introduced at some point to do both operations
-atomically.
-
-Question is : what would be the semantics of O_CREAT in FUSE_OPEN ?
-
-> Vivek
-> 
-> > 
-> > This is because virtiofsd ends up passing this flag to openat() without
-> > passing a mode_t 4th argument which is mandatory with O_CREAT, and glibc
-> > aborts.
-> > 
-> > The offending path is:
-> > 
-> > lo_open()
-> >     lo_do_open()
-> >         lo_inode_open()
-> > 
-> > Other callers of lo_inode_open() only pass O_RDWR and lo_create()
-> > passes a valid fd to lo_do_open() which thus doesn't even call
-> > lo_inode_open() in this case.
-> > 
-> > Specifying O_CREAT with FUSE_OPEN is a protocol violation. Check this
-> > in lo_open() and return an error to the client : EINVAL since this is
-> > already what glibc returns with other illegal flag combinations.
-> > 
-> > The FUSE filesystem doesn't currently support O_TMPFILE, but the very
-> > same would happen if O_TMPFILE was passed in a FUSE_OPEN request. Check
-> > that as well.
-> > 
-> > Signed-off-by: Greg Kurz <groug@kaod.org>
-> > ---
-> >  tools/virtiofsd/passthrough_ll.c | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> > index 49c21fd85570..14f62133131c 100644
-> > --- a/tools/virtiofsd/passthrough_ll.c
-> > +++ b/tools/virtiofsd/passthrough_ll.c
-> > @@ -2145,6 +2145,12 @@ static void lo_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
-> >          return;
-> >      }
-> >  
-> > +    /* File creation is handled by lo_create() */
-> > +    if (fi->flags & (O_CREAT | O_TMPFILE)) {
-> > +        fuse_reply_err(req, EINVAL);
-> > +        return;
-> > +    }
-> > +
-> >      err = lo_do_open(lo, inode, -1, fi);
-> >      lo_inode_put(lo, &inode);
-> >      if (err) {
-> > -- 
-> > 2.31.1
-> > 
-> 
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

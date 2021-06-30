@@ -1,13 +1,13 @@
-Date: Wed, 30 Jun 2021 19:42:55 +0100
+Date: Wed, 30 Jun 2021 19:53:28 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YNy7L/9ofbz6QoBB@work-vm>
-References: <20210624101809.48032-1-groug@kaod.org>
+Message-ID: <YNy9qKOnEzi3up+R@work-vm>
+References: <20210622150852.1507204-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20210624101809.48032-1-groug@kaod.org>
+In-Reply-To: <20210622150852.1507204-1-vgoyal@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: Don't allow file creation
-	with FUSE_OPEN
+Subject: Re: [Virtio-fs] [PATCH v7 0/7] virtiofsd: Add support to
+ enable/disable posix acls
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,71 +16,56 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
-Cc: virtio-fs@redhat.com, Miklos Szeredi <miklos@szeredi.hu>, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, miklos@szeredi.hu, qemu-devel@nongnu.org
 
-* Greg Kurz (groug@kaod.org) wrote:
-> A well behaved FUSE client uses FUSE_CREATE to create files. It isn't
-> supposed to pass O_CREAT along a FUSE_OPEN request, as documented in
-> the "fuse_lowlevel.h" header :
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> Hi,
 > 
->     /**
->      * Open a file
->      *
->      * Open flags are available in fi->flags. The following rules
->      * apply.
->      *
->      *  - Creation (O_CREAT, O_EXCL, O_NOCTTY) flags will be
->      *    filtered out / handled by the kernel.
+> This is V7 of the patches.
 > 
-> But if the client happens to do it anyway, the server ends up passing
-> this flag to open() without the mandatory mode_t 4th argument. Since
-> open() is a variadic function, glibc will happily pass whatever it
-> finds on the stack to the syscall. If this file is compiled with
-> -D_FORTIFY_SOURCE=2, glibc will even detect that and abort:
+> Changes since V6.
 > 
-> *** invalid openat64 call: O_CREAT or O_TMPFILE without mode ***: terminated
+> - Dropped kernel header update patch as somebody else did it.
+> - Fixed coding style issues.
 > 
-> Specifying O_CREAT with FUSE_OPEN is a protocol violation. Check this
-> in do_open(), print out a message and return an error to the client,
-> EINVAL like we already do when fuse_mbuf_iter_advance() fails.
+> Currently posix ACL support does not work well with virtiofs and bunch
+> of tests fail when I run xfstests "./check -g acl".
 > 
-> The FUSE filesystem doesn't currently support O_TMPFILE, but the very
-> same would happen if O_TMPFILE was passed in a FUSE_OPEN request. Check
-> that as well.
+> This patches series fixes the issues with virtiofs posix acl support
+> and provides options to enable/disable posix acl (-o posix_acl/no_posix_acl).
+> By default posix_acls are disabled.
 > 
-> Signed-off-by: Greg Kurz <groug@kaod.org>
+> With this patch series applied and virtiofsd running with "-o posix_acl",
+> xfstests "./check -g acl" passes.
+> 
+> Thanks
+> Vivek
 
 Queued
 
-> ---
-> 
-> v2:
->  - do the check in core FUSE code instead of passthrough_ll (libfuse folks)
 > 
 > 
->  tools/virtiofsd/fuse_lowlevel.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+> Vivek Goyal (7):
+>   virtiofsd: Fix fuse setxattr() API change issue
+>   virtiofsd: Fix xattr operations overwriting errno
+>   virtiofsd: Add support for extended setxattr
+>   virtiofsd: Add umask to seccom allow list
+>   virtiofsd: Add capability to change/restore umask
+>   virtiofsd: Switch creds, drop FSETID for system.posix_acl_access xattr
+>   virtiofsd: Add an option to enable/disable posix acls
 > 
-> diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-> index 7fe2cef1eb3b..3d725bcba2ca 100644
-> --- a/tools/virtiofsd/fuse_lowlevel.c
-> +++ b/tools/virtiofsd/fuse_lowlevel.c
-> @@ -1084,6 +1084,12 @@ static void do_open(fuse_req_t req, fuse_ino_t nodeid,
->          return;
->      }
->  
-> +    /* File creation is handled by do_create() or do_mknod() */
-> +    if (arg->flags & (O_CREAT | O_TMPFILE)) {
-> +        fuse_reply_err(req, EINVAL);
-> +        return;
-> +    }
-> +
->      memset(&fi, 0, sizeof(fi));
->      fi.flags = arg->flags;
->      fi.kill_priv = arg->open_flags & FUSE_OPEN_KILL_SUIDGID;
+>  docs/tools/virtiofsd.rst              |   3 +
+>  tools/virtiofsd/fuse_common.h         |  10 ++
+>  tools/virtiofsd/fuse_lowlevel.c       |  18 +-
+>  tools/virtiofsd/fuse_lowlevel.h       |   3 +-
+>  tools/virtiofsd/helper.c              |   1 +
+>  tools/virtiofsd/passthrough_ll.c      | 229 ++++++++++++++++++++++++--
+>  tools/virtiofsd/passthrough_seccomp.c |   1 +
+>  7 files changed, 249 insertions(+), 16 deletions(-)
+> 
 > -- 
-> 2.31.1
+> 2.25.4
 > 
 > 
 -- 

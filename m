@@ -1,14 +1,13 @@
-Date: Wed, 30 Jun 2021 19:38:14 +0100
+Date: Wed, 30 Jun 2021 19:42:55 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YNy6FuN4GWRtlXFf@work-vm>
-References: <20210611120427.49736-1-berrange@redhat.com>
+Message-ID: <YNy7L/9ofbz6QoBB@work-vm>
+References: <20210624101809.48032-1-groug@kaod.org>
 MIME-Version: 1.0
-In-Reply-To: <20210611120427.49736-1-berrange@redhat.com>
-Content-Type: text/plain; charset="iso-8859-1"
+In-Reply-To: <20210624101809.48032-1-groug@kaod.org>
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [PATCH] docs: describe the security considerations
- with virtiofsd xattr mapping
+Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: Don't allow file creation
+	with FUSE_OPEN
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,133 +16,73 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Greg Kurz <groug@kaod.org>
+Cc: virtio-fs@redhat.com, Miklos Szeredi <miklos@szeredi.hu>, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
 
-* Daniel P. Berrang=E9 (berrange@redhat.com) wrote:
-> Different guest xattr prefixes have distinct access control rules applied
-> by the guest. When remapping a guest xattr care must be taken that the
-> remapping does not allow the a guest user to bypass guest kernel access
-> control rules.
->=20
-> For example if 'trusted.*' which requires CAP_SYS_ADMIN is remapped
-> to 'user.virtiofs.trusted.*', an unprivileged guest user which can
-> write to 'user.*' can bypass the CAP_SYS_ADMIN control. Thus the
-> target of any remapping must be explicitly blocked from read/writes
-> by the guest, to prevent access control bypass.
->=20
-> The examples shown in the virtiofsd man page already do the right
-> thing and ensure safety, but the security implications of getting
-> this wrong were not made explicit. This could lead to host admins
-> and apps unwittingly creating insecure configurations.
->=20
-> Signed-off-by: Daniel P. Berrang=E9 <berrange@redhat.com>
+* Greg Kurz (groug@kaod.org) wrote:
+> A well behaved FUSE client uses FUSE_CREATE to create files. It isn't
+> supposed to pass O_CREAT along a FUSE_OPEN request, as documented in
+> the "fuse_lowlevel.h" header :
+> 
+>     /**
+>      * Open a file
+>      *
+>      * Open flags are available in fi->flags. The following rules
+>      * apply.
+>      *
+>      *  - Creation (O_CREAT, O_EXCL, O_NOCTTY) flags will be
+>      *    filtered out / handled by the kernel.
+> 
+> But if the client happens to do it anyway, the server ends up passing
+> this flag to open() without the mandatory mode_t 4th argument. Since
+> open() is a variadic function, glibc will happily pass whatever it
+> finds on the stack to the syscall. If this file is compiled with
+> -D_FORTIFY_SOURCE=2, glibc will even detect that and abort:
+> 
+> *** invalid openat64 call: O_CREAT or O_TMPFILE without mode ***: terminated
+> 
+> Specifying O_CREAT with FUSE_OPEN is a protocol violation. Check this
+> in do_open(), print out a message and return an error to the client,
+> EINVAL like we already do when fuse_mbuf_iter_advance() fails.
+> 
+> The FUSE filesystem doesn't currently support O_TMPFILE, but the very
+> same would happen if O_TMPFILE was passed in a FUSE_OPEN request. Check
+> that as well.
+> 
+> Signed-off-by: Greg Kurz <groug@kaod.org>
 
 Queued
 
 > ---
->  docs/tools/virtiofsd.rst | 55 ++++++++++++++++++++++++++++++++++++----
->  1 file changed, 50 insertions(+), 5 deletions(-)
->=20
-> diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-> index 00554c75bd..6370ab927c 100644
-> --- a/docs/tools/virtiofsd.rst
-> +++ b/docs/tools/virtiofsd.rst
-> @@ -127,8 +127,8 @@ Options
->    timeout.  ``always`` sets a long cache lifetime at the expense of cohe=
-rency.
->    The default is ``auto``.
-> =20
-> -xattr-mapping
-> --------------
-> +Extended attribute (xattr) mapping
-> +----------------------------------
-> =20
->  By default the name of xattr's used by the client are passed through to =
-the server
->  file system.  This can be a problem where either those xattr names are u=
-sed
-> @@ -136,6 +136,9 @@ by something on the server (e.g. selinux client/serve=
-r confusion) or if the
->  virtiofsd is running in a container with restricted privileges where it =
-cannot
->  access some attributes.
-> =20
-> +Mapping syntax
-> +~~~~~~~~~~~~~~
+> 
+> v2:
+>  - do the check in core FUSE code instead of passthrough_ll (libfuse folks)
+> 
+> 
+>  tools/virtiofsd/fuse_lowlevel.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+> index 7fe2cef1eb3b..3d725bcba2ca 100644
+> --- a/tools/virtiofsd/fuse_lowlevel.c
+> +++ b/tools/virtiofsd/fuse_lowlevel.c
+> @@ -1084,6 +1084,12 @@ static void do_open(fuse_req_t req, fuse_ino_t nodeid,
+>          return;
+>      }
+>  
+> +    /* File creation is handled by do_create() or do_mknod() */
+> +    if (arg->flags & (O_CREAT | O_TMPFILE)) {
+> +        fuse_reply_err(req, EINVAL);
+> +        return;
+> +    }
 > +
->  A mapping of xattr names can be made using -o xattrmap=3Dmapping where t=
-he ``mapping``
->  string consists of a series of rules.
-> =20
-> @@ -232,8 +235,48 @@ Note: When the 'security.capability' xattr is remapp=
-ed, the daemon has to do
->  extra work to remove it during many operations, which the host kernel no=
-rmally
->  does itself.
-> =20
-> -xattr-mapping Examples
-> -----------------------
-> +Security considerations
-> +~~~~~~~~~~~~~~~~~~~~~~~
-> +
-> +Operating systems typically partition the xattr namespace using
-> +well defined name prefixes. Each partition may have different
-> +access controls applied. For example, on Linux there are multiple
-> +partitions
-> +
-> + * ``system.*`` - access varies depending on attribute & filesystem
-> + * ``security.*`` - only processes with CAP_SYS_ADMIN
-> + * ``trusted.*`` - only processes with CAP_SYS_ADMIN
-> + * ``user.*`` - any process granted by file permissions / ownership
-> +
-> +While other OS such as FreeBSD have different name prefixes
-> +and access control rules.
-> +
-> +When remapping attributes on the host, it is important to
-> +ensure that the remapping does not allow a guest user to
-> +evade the guest access control rules.
-> +
-> +Consider if ``trusted.*`` from the guest was remapped to
-> +``user.virtiofs.trusted*`` in the host. An unprivileged
-> +user in a Linux guest has the ability to write to xattrs
-> +under ``user.*``. Thus the user can evade the access
-> +control restriction on ``trusted.*`` by instead writing
-> +to ``user.virtiofs.trusted.*``.
-> +
-> +As noted above, the partitions used and access controls
-> +applied, will vary across guest OS, so it is not wise to
-> +try to predict what the guest OS will use.
-> +
-> +The simplest way to avoid an insecure configuration is
-> +to remap all xattrs at once, to a given fixed prefix.
-> +This is shown in example (1) below.
-> +
-> +If selectively mapping only a subset of xattr prefixes,
-> +then rules must be added to explicitly block direct
-> +access to the target of the remapping. This is shown
-> +in example (2) below.
-> +
-> +Mapping examples
-> +~~~~~~~~~~~~~~~~
-> =20
->  1) Prefix all attributes with 'user.virtiofs.'
-> =20
-> @@ -270,7 +313,9 @@ stripping of 'user.virtiofs.'.
->  The second rule hides unprefixed 'trusted.' attributes
->  on the host.
->  The third rule stops a guest from explicitly setting
-> -the 'user.virtiofs.' path directly.
-> +the 'user.virtiofs.' path directly to prevent access
-> +control bypass on the target of the earlier prefix
-> +remapping.
->  Finally, the fourth rule lets all remaining attributes
->  through.
-> =20
-> --=20
+>      memset(&fi, 0, sizeof(fi));
+>      fi.flags = arg->flags;
+>      fi.kill_priv = arg->open_flags & FUSE_OPEN_KILL_SUIDGID;
+> -- 
 > 2.31.1
->=20
->=20
---=20
+> 
+> 
+-- 
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

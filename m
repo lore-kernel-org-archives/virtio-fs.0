@@ -1,6 +1,6 @@
-Date: Wed, 30 Jun 2021 16:01:42 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YNyHVhGPe1bFAt+C@work-vm>
+Date: Wed, 30 Jun 2021 12:09:33 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210630160933.GC75386@redhat.com>
 References: <a13f2861-7786-09f4-99a8-f0a5216d0fb1@schaufler-ca.com>
 	<YNrhQ9XfcHTtM6QA@work-vm>
 	<e6f9ed0d-c101-01df-3dff-85c1b38f9714@schaufler-ca.com>
@@ -11,9 +11,9 @@ References: <a13f2861-7786-09f4-99a8-f0a5216d0fb1@schaufler-ca.com>
 	<YNvvLIv16jY8mfP8@mit.edu> <YNwmXOqT7LgbeVPn@work-vm>
 	<YNyECw/1FzDCW3G8@mit.edu>
 MIME-Version: 1.0
-In-Reply-To: <YNyECw/1FzDCW3G8@mit.edu>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
+In-Reply-To: <YNyECw/1FzDCW3G8@mit.edu>
 Subject: Re: [Virtio-fs] [RFC PATCH 0/1] xattr: Allow user.* xattr on
  symlink/special files if caller has CAP_SYS_RESOURCE
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -26,9 +26,9 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Theodore Ts'o <tytso@mit.edu>
 Cc: "berrange@redhat.com" <berrange@redhat.com>, "selinux@vger.kernel.org" <selinux@vger.kernel.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "Schaufler,
-	Casey" <casey.schaufler@intel.com>, linux-security-module <linux-security-module@vger.kernel.org>, "viro@zeniv.linux.org.uk" <viro@zeniv.linux.org.uk>, Casey Schaufler <casey@schaufler-ca.com>, "linux-fsdevel@vger.kernel.org" <linux-fsdevel@vger.kernel.org>, Vivek Goyal <vgoyal@redhat.com>
+	Casey" <casey.schaufler@intel.com>, linux-security-module <linux-security-module@vger.kernel.org>, "viro@zeniv.linux.org.uk" <viro@zeniv.linux.org.uk>, Casey Schaufler <casey@schaufler-ca.com>, "linux-fsdevel@vger.kernel.org" <linux-fsdevel@vger.kernel.org>
 
-* Theodore Ts'o (tytso@mit.edu) wrote:
+On Wed, Jun 30, 2021 at 10:47:39AM -0400, Theodore Ts'o wrote:
 > On Wed, Jun 30, 2021 at 09:07:56AM +0100, Dr. David Alan Gilbert wrote:
 > > * Theodore Ts'o (tytso@mit.edu) wrote:
 > > > On Tue, Jun 29, 2021 at 04:28:24PM -0400, Daniel Walsh wrote:
@@ -73,6 +73,15 @@ Cc: "berrange@redhat.com" <berrange@redhat.com>, "selinux@vger.kernel.org" <seli
 > I think I see the issue which drove the above text, though, which is
 > that Linux's syscall(2) is creating symlinks which do not take umask
 > into account; that is, the permissions are always mode ST_IFLNK|0777.
+
+IIUC, idea is to use permission bits on symlink to decide whether caller
+can read/write user.* xattrs (like regular file). Hence create symlinks
+while honoring umask (or default posix acl on dir) and modify relevant
+code for file creation. Also that possibly will require changing chmod
+to allow chaging mode on chmod. 
+
+Vivek
+
 > 
 > Hence, it might be that the right answer is to remove this fairly
 > arbitrary restriction entirely, and change symlink(2) so that it
@@ -89,15 +98,7 @@ Cc: "berrange@redhat.com" <berrange@redhat.com>, "selinux@vger.kernel.org" <seli
 > quotas, and this would only be an issue for those users, and (b) the
 > amount of quota "abuse" that could be carried out this way is small
 > enough that I'm not sure it matters.
-
-Even if you fix symlinks, I don't think it fixes device nodes or
-anything else where the permissions bitmap isn't purely used as the
-permissions on the inode.
-
-Dave
-
+> 
 >      	    	  	      	  - Ted
 > 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

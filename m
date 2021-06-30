@@ -1,22 +1,20 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
-	h=to:from:subject:message-id:date:user-agent:mime-version
-	:content-transfer-encoding:content-language;
-	bh=ZKDagw1NBf9UT1xvBV68IXKIQnx3WknZu/hNz3E9pgI=;
-	b=Uclvpoq4t97uBrJoH00Uw9JA98Iwqu5eRHxbQdTodk4CKMqSPc5v4uP3ihRLFX5J2l
-	OJj6ui0yEdTeY/3eEKU3Ieztd+18CWD69kvCPiXK8+zBsvMT0u8zCoSQPhUzFp7cvdMq
-	wPgKV3xyDwrDOBOGTm2f0CuiuOJ1AUkw4Z5C6EywFvphYdWnPTRGZ2e79E6x7pIvw8pK
-	q7M95F5do3jv8iwRRH+PO0hoyiyyoyvNPaVcvI0FJ7wmab21ntlxXQh3zIo7fiIxbh2h
-	69dPOko103/ZV1ofniJX0Vn1PAoijSsnGWu6+hH53SMrfodUNpLHFsvAdNlro+8na/gw
-	HGsQ==
-From: "Harry G. Coin" <hgcoin@gmail.com>
-Message-ID: <492294b2-b305-86f4-2c91-a2faa766d2ee@gmail.com>
-Date: Wed, 30 Jun 2021 14:58:46 -0500
+Date: Wed, 30 Jun 2021 15:59:41 -0400
+From: "Theodore Ts'o" <tytso@mit.edu>
+Message-ID: <YNzNLTxflKbDi8W2@mit.edu>
+References: <YNrhQ9XfcHTtM6QA@work-vm>
+	<e6f9ed0d-c101-01df-3dff-85c1b38f9714@schaufler-ca.com>
+	<20210629152007.GC5231@redhat.com>
+	<78663f5c-d2fd-747a-48e3-0c5fd8b40332@schaufler-ca.com>
+	<20210629173530.GD5231@redhat.com>
+	<f4992b3a-a939-5bc4-a5da-0ce8913bd569@redhat.com>
+	<YNvvLIv16jY8mfP8@mit.edu> <YNwmXOqT7LgbeVPn@work-vm>
+	<YNyECw/1FzDCW3G8@mit.edu> <YNyHVhGPe1bFAt+C@work-vm>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Language: en-US
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] multiple virtiofsd's + overlapping shared subtree ->
- enforced compatible xattr maps?
+In-Reply-To: <YNyHVhGPe1bFAt+C@work-vm>
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: Re: [Virtio-fs] [RFC PATCH 0/1] xattr: Allow user.* xattr on
+ symlink/special files if caller has CAP_SYS_RESOURCE
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,16 +23,37 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: "berrange@redhat.com" <berrange@redhat.com>, "selinux@vger.kernel.org" <selinux@vger.kernel.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "Schaufler,
+	Casey" <casey.schaufler@intel.com>, linux-security-module <linux-security-module@vger.kernel.org>, "viro@zeniv.linux.org.uk" <viro@zeniv.linux.org.uk>, Casey Schaufler <casey@schaufler-ca.com>, "linux-fsdevel@vger.kernel.org" <linux-fsdevel@vger.kernel.org>, Vivek Goyal <vgoyal@redhat.com>
 
-If two or more instances of virtiofsd have a common full or partially
-shared directory tree path -- how will those instances 'enforce' a
-'compatible' xattr map lest the host+guest(s) have quite the selinux
-attribute salad?   How much does virtiofsd need to feel like nfsd...?
+On Wed, Jun 30, 2021 at 04:01:42PM +0100, Dr. David Alan Gilbert wrote:
+> 
+> Even if you fix symlinks, I don't think it fixes device nodes or
+> anything else where the permissions bitmap isn't purely used as the
+> permissions on the inode.
 
+I think we're making a mountain out of a molehill.  Again, very few
+people are using quota these days.  And if you give someone write
+access to a 8TB disk, do you really care if they can "steal" 32k worth
+of space (which is the maximum size of an xattr, enforced by the VFS).
 
+OK, but what about character mode devices?  First of all, most users
+don't have access to huge number of devices, but let's assume
+something absurd.  Let's say that a user has write access to *1024*
+devices.  (My /dev has 233 character mode devices, and I have write
+access to well under a dozen.)
 
+An 8TB disk costs about $200.  So how much of the "stolen" quota space
+are we talking about, assuming the user has access to 1024 devices,
+and the file system actually supports a 32k xattr.
 
+    32k * 1024 * $200 / 8TB / (1024*1024*1024) = $0.000763 = 0.0763 cents
 
+A 2TB SSD is less around $180, so even if we calculate the prices
+based on SSD space, we're still talking about a quarter of a penny.
 
+Why are we worrying about this?
+
+						- Ted
 

@@ -1,13 +1,22 @@
-Date: Wed, 30 Jun 2021 08:36:24 -0400
+Date: Wed, 30 Jun 2021 10:27:15 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210630123624.GA75386@redhat.com>
-References: <20210225185225.GC53072@redhat.com>
+Message-ID: <20210630142715.GB75386@redhat.com>
+References: <5d8f033c-eba2-7a8b-f19a-1005bbb615ea@schaufler-ca.com>
+	<YNn4p+Zn444Sc4V+@work-vm>
+	<a13f2861-7786-09f4-99a8-f0a5216d0fb1@schaufler-ca.com>
+	<YNrhQ9XfcHTtM6QA@work-vm>
+	<e6f9ed0d-c101-01df-3dff-85c1b38f9714@schaufler-ca.com>
+	<20210629152007.GC5231@redhat.com>
+	<78663f5c-d2fd-747a-48e3-0c5fd8b40332@schaufler-ca.com>
+	<20210629173530.GD5231@redhat.com>
+	<f4992b3a-a939-5bc4-a5da-0ce8913bd569@redhat.com>
+	<YNvvLIv16jY8mfP8@mit.edu>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210225185225.GC53072@redhat.com>
-Subject: Re: [Virtio-fs] [ANNOUNCE] Bi-weekly community calls for
-	virtiofs	discussions
+In-Reply-To: <YNvvLIv16jY8mfP8@mit.edu>
+Subject: Re: [Virtio-fs] [RFC PATCH 0/1] xattr: Allow user.* xattr on
+ symlink/special files if caller has CAP_SYS_RESOURCE
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,47 +25,59 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs-list <virtio-fs@redhat.com>
+To: Theodore Ts'o <tytso@mit.edu>
+Cc: "berrange@redhat.com" <berrange@redhat.com>, "selinux@vger.kernel.org" <selinux@vger.kernel.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "Schaufler,
+	Casey" <casey.schaufler@intel.com>, linux-security-module <linux-security-module@vger.kernel.org>, "viro@zeniv.linux.org.uk" <viro@zeniv.linux.org.uk>, Casey Schaufler <casey@schaufler-ca.com>, "linux-fsdevel@vger.kernel.org" <linux-fsdevel@vger.kernel.org>
 
-On Thu, Feb 25, 2021 at 01:52:25PM -0500, Vivek Goyal wrote:
+On Wed, Jun 30, 2021 at 12:12:28AM -0400, Theodore Ts'o wrote:
+> On Tue, Jun 29, 2021 at 04:28:24PM -0400, Daniel Walsh wrote:
+> > All this conversation is great, and I look forward to a better solution, but
+> > if we go back to the patch, it was to fix an issue where the kernel is
+> > requiring CAP_SYS_ADMIN for writing user Xattrs on link files and other
+> > special files.
+> > 
+> > The documented reason for this is to prevent the users from using XATTRS to
+> > avoid quota.
+> 
+> Huh?  Where is it so documented?
 
-Hi All,
+Its in "man xattr". David already copied pasted the relevant section in
+another email, so I am not doing it.
 
-Community call starting in next 25 minutes.
+> How file systems store and account
+> for space used by extended attributes is a file-system specific
+> question,
 
+> but presumably any way that xattr's on regular files are
+> accounted could also be used for xattr's on special files.
+
+That will be nice. I don't know enough about quota, but I am wondering
+why quota limits can't be enforced (if needed) for symlinks and special
+file xattrs.
+
+Thanks
 Vivek
-
-> Hi All,
 > 
-> We are planning to host bi-weekly 1 hour call to discuss virtiofs
-> development and issues. We already have folks sending patches on 
-> email list and asking questions privately. We thought it probably
-> is a good idea to do a face to face call once in a while to discuss
-> issues, current state, what are the shortcomings and how to improve
-> virtiofs further.
+> Also, xattr's are limited to 32k, so it's not like users can evade
+> _that_ much quota space, at least not without it being pretty painful.
+> (Assuming that quota is even enabled, which most of the time, it
+> isn't.)
 > 
-> Lets give it a try and hopefully it helps. If it does not, we can stop
-> these meetings. :-)
+> 						- Ted
 > 
-> I have setup a public etherpad which has details of meetings and
-> also a section for agenda for the next meeting on March 10, 2021,
-> 14:00UTC.
+> P.S.  I'll note that if ext4's ea_in_inode is enabled, for large
+> xattr's, if you have 2 million files that all have the same 12k
+> windows SID stored as an xattr, ext4 will store that xattr only once.
+> Those two million files might be owned by different uids, so we made
+> an explicit design choice not to worry about accounting for the quota
+> for said 12k xattr value.  After all, if you can save the space and
+> access cost of 2M * 12k if each file had to store its own copy of that
+> xattr, perhaps not including it in the quota calculation isn't that
+> bad.  :-)
 > 
-> https://etherpad.opendev.org/p/virtiofs-external-meeting
+> We also don't account for the disk space used by symbolic links (since
+> sometimes they can be stored in the inode as fast symlinks, and
+> sometimes they might consume a data block).  But again, that's a file
+> system specific implementation question.
 > 
-> Feel free to join us for the call and also feel free to add items
-> to the agenda list.
-> 
-> Stefan has also updated the https://virtio-fs.gitlab.io/ webpage with
-> details of community call.
-> 
-> Looking forward to see you on these calls.
-> 
-> Thanks
-> Vivek
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
 

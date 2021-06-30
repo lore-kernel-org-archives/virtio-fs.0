@@ -1,15 +1,22 @@
-Date: Tue, 29 Jun 2021 16:50:48 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210629205048.GE5231@redhat.com>
-References: <20210621062657.3641879-1-hch@lst.de>
-	<20210622081217.GA2975@lst.de>
-	<YNGhERcnLuzjn8j9@stefanha-x1.localdomain>
+Date: Wed, 30 Jun 2021 00:12:28 -0400
+From: "Theodore Ts'o" <tytso@mit.edu>
+Message-ID: <YNvvLIv16jY8mfP8@mit.edu>
+References: <1b446468-dcf8-9e21-58d3-c032686eeee5@redhat.com>
+	<5d8f033c-eba2-7a8b-f19a-1005bbb615ea@schaufler-ca.com>
+	<YNn4p+Zn444Sc4V+@work-vm>
+	<a13f2861-7786-09f4-99a8-f0a5216d0fb1@schaufler-ca.com>
+	<YNrhQ9XfcHTtM6QA@work-vm>
+	<e6f9ed0d-c101-01df-3dff-85c1b38f9714@schaufler-ca.com>
+	<20210629152007.GC5231@redhat.com>
+	<78663f5c-d2fd-747a-48e3-0c5fd8b40332@schaufler-ca.com>
+	<20210629173530.GD5231@redhat.com>
+	<f4992b3a-a939-5bc4-a5da-0ce8913bd569@redhat.com>
 MIME-Version: 1.0
+In-Reply-To: <f4992b3a-a939-5bc4-a5da-0ce8913bd569@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <YNGhERcnLuzjn8j9@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH 3/2] fs: simplify get_filesystem_list /
- get_all_fs_names
+Subject: Re: [Virtio-fs] [RFC PATCH 0/1] xattr: Allow user.* xattr on
+ symlink/special files if caller has CAP_SYS_RESOURCE
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,83 +25,43 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, Christoph Hellwig <hch@lst.de>, linux-kernel@vger.kernel.org, viro@zeniv.linux.org.uk
+To: Daniel Walsh <dwalsh@redhat.com>
+Cc: "berrange@redhat.com" <berrange@redhat.com>, "selinux@vger.kernel.org" <selinux@vger.kernel.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "Schaufler,
+	Casey" <casey.schaufler@intel.com>, linux-security-module <linux-security-module@vger.kernel.org>, "viro@zeniv.linux.org.uk" <viro@zeniv.linux.org.uk>, Casey Schaufler <casey@schaufler-ca.com>, "linux-fsdevel@vger.kernel.org" <linux-fsdevel@vger.kernel.org>, Vivek Goyal <vgoyal@redhat.com>
 
-On Tue, Jun 22, 2021 at 09:36:33AM +0100, Stefan Hajnoczi wrote:
-> On Tue, Jun 22, 2021 at 10:12:17AM +0200, Christoph Hellwig wrote:
-> > Just output the '\0' separate list of supported file systems for block
-> > devices directly rather than going through a pointless round of string
-> > manipulation.
-> > 
-> > Based on an earlier patch from Al Viro <viro@zeniv.linux.org.uk>.
-> > 
-> > Signed-off-by: Christoph Hellwig <hch@lst.de>
-> > ---
-> >  fs/filesystems.c   | 24 ++++++++++++++----------
-> >  include/linux/fs.h |  2 +-
-> >  init/do_mounts.c   | 20 +-------------------
-> >  3 files changed, 16 insertions(+), 30 deletions(-)
-> > 
-> > diff --git a/fs/filesystems.c b/fs/filesystems.c
-> > index 90b8d879fbaf..7c136251607a 100644
-> > --- a/fs/filesystems.c
-> > +++ b/fs/filesystems.c
-> > @@ -209,21 +209,25 @@ SYSCALL_DEFINE3(sysfs, int, option, unsigned long, arg1, unsigned long, arg2)
-> >  }
-> >  #endif
-> >  
-> > -int __init get_filesystem_list(char *buf)
-> > +void __init list_bdev_fs_names(char *buf, size_t size)
-> >  {
-> > -	int len = 0;
-> > -	struct file_system_type * tmp;
-> > +	struct file_system_type *p;
-> > +	size_t len;
-> >  
-> >  	read_lock(&file_systems_lock);
-> > -	tmp = file_systems;
-> > -	while (tmp && len < PAGE_SIZE - 80) {
-> > -		len += sprintf(buf+len, "%s\t%s\n",
-> > -			(tmp->fs_flags & FS_REQUIRES_DEV) ? "" : "nodev",
-> > -			tmp->name);
-> > -		tmp = tmp->next;
-> > +	for (p = file_systems; p; p = p->next) {
-> > +		if (!(p->fs_flags & FS_REQUIRES_DEV))
-> > +			continue;
-> > +		len = strlen(p->name) + 1;
-> > +		if (len > size) {
-> > +			pr_warn("%s: truncating file system list\n", __func__);
-> > +			break;
-> > +		}
-> > +		memcpy(buf, p->name, len);
-> > +		buf += len;
-> > +		size -= len;
-> >  	}
-> >  	read_unlock(&file_systems_lock);
-> > -	return len;
-> >  }
+On Tue, Jun 29, 2021 at 04:28:24PM -0400, Daniel Walsh wrote:
+> All this conversation is great, and I look forward to a better solution, but
+> if we go back to the patch, it was to fix an issue where the kernel is
+> requiring CAP_SYS_ADMIN for writing user Xattrs on link files and other
+> special files.
 > 
-> I don't see the extra NUL terminator byte being added that's required by
-> the loop in mount_block_root()?
+> The documented reason for this is to prevent the users from using XATTRS to
+> avoid quota.
 
-May be we should modify mount_block_root() code so that it does not
-require that extra "\0". Possibly zero initialize page and that should
-make sure list_bdev_fs_names() does not have to worry about it.
+Huh?  Where is it so documented?  How file systems store and account
+for space used by extended attributes is a file-system specific
+question, but presumably any way that xattr's on regular files are
+accounted could also be used for xattr's on special files.
 
-It is possible that a page gets full from the list of filesystems, and
-last byte on page is terminating null. In that case just zeroing page
-will not help. We can keep track of some sort of end pointer and make
-sure we are not searching beyond that for valid filesystem types.
+Also, xattr's are limited to 32k, so it's not like users can evade
+_that_ much quota space, at least not without it being pretty painful.
+(Assuming that quota is even enabled, which most of the time, it
+isn't.)
 
-end = page + PAGE_SIZE - 1;
+						- Ted
 
-mount_block_root()
-{
-	for (p = fs_names; p < end && *p; p += strlen(p)+1) {
-	}
-}
+P.S.  I'll note that if ext4's ea_in_inode is enabled, for large
+xattr's, if you have 2 million files that all have the same 12k
+windows SID stored as an xattr, ext4 will store that xattr only once.
+Those two million files might be owned by different uids, so we made
+an explicit design choice not to worry about accounting for the quota
+for said 12k xattr value.  After all, if you can save the space and
+access cost of 2M * 12k if each file had to store its own copy of that
+xattr, perhaps not including it in the quota calculation isn't that
+bad.  :-)
 
-Thanks
-Vivek
+We also don't account for the disk space used by symbolic links (since
+sometimes they can be stored in the inode as fast symlinks, and
+sometimes they might consume a data block).  But again, that's a file
+system specific implementation question.
 

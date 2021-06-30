@@ -1,13 +1,15 @@
-Date: Wed, 30 Jun 2021 10:40:46 +0100
+Date: Wed, 30 Jun 2021 11:17:15 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YNw8HnJbDii9YuVJ@work-vm>
-References: <20210624101809.48032-1-groug@kaod.org>
+Message-ID: <YNxEq0GfQJ+0tEl1@work-vm>
+References: <20210622150852.1507204-1-vgoyal@redhat.com>
+	<20210622150852.1507204-2-vgoyal@redhat.com>
+	<YNng0CPIFHxDIE3a@work-vm> <20210629144431.02e2ce0c@bahia.lan>
 MIME-Version: 1.0
-In-Reply-To: <20210624101809.48032-1-groug@kaod.org>
+In-Reply-To: <20210629144431.02e2ce0c@bahia.lan>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: Don't allow file creation
-	with FUSE_OPEN
+Subject: Re: [Virtio-fs] [PATCH v7 1/7] virtiofsd: Fix fuse setxattr() API
+ change issue
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,70 +19,113 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Greg Kurz <groug@kaod.org>
-Cc: virtio-fs@redhat.com, Miklos Szeredi <miklos@szeredi.hu>, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>, miklos@szeredi.hu
 
 * Greg Kurz (groug@kaod.org) wrote:
-> A well behaved FUSE client uses FUSE_CREATE to create files. It isn't
-> supposed to pass O_CREAT along a FUSE_OPEN request, as documented in
-> the "fuse_lowlevel.h" header :
+> On Mon, 28 Jun 2021 15:46:40 +0100
+> "Dr. David Alan Gilbert" <dgilbert@redhat.com> wrote:
 > 
->     /**
->      * Open a file
->      *
->      * Open flags are available in fi->flags. The following rules
->      * apply.
->      *
->      *  - Creation (O_CREAT, O_EXCL, O_NOCTTY) flags will be
->      *    filtered out / handled by the kernel.
+> > * Vivek Goyal (vgoyal@redhat.com) wrote:
+> > > With kernel header updates fuse_setxattr_in struct has grown in size.
+> > > But this new struct size only takes affect if user has opted in
+> > > for fuse feature FUSE_SETXATTR_EXT otherwise fuse continues to
+> > > send "fuse_setxattr_in" of older size. Older size is determined
+> > > by FUSE_COMPAT_SETXATTR_IN_SIZE.
+> > > 
+> > > Fix this. If we have not opted in for FUSE_SETXATTR_EXT, then
+> > > expect that we will get fuse_setxattr_in of size FUSE_COMPAT_SETXATTR_IN_SIZE
+> > > and not sizeof(struct fuse_sexattr_in).
+> > > 
+> > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > 
+> > Yeh it's a bit of a grim fix, but I think it's the best we can do, and
+> > we need to get it in since the headers have already been merged.
 > 
-> But if the client happens to do it anyway, the server ends up passing
-> this flag to open() without the mandatory mode_t 4th argument. Since
-> open() is a variadic function, glibc will happily pass whatever it
-> finds on the stack to the syscall. If this file is compiled with
-> -D_FORTIFY_SOURCE=2, glibc will even detect that and abort:
+> You can also add:
 > 
-> *** invalid openat64 call: O_CREAT or O_TMPFILE without mode ***: terminated
+> Fixes: 278f064e4524 ("Update Linux headers to 5.13-rc4")
 > 
-> Specifying O_CREAT with FUSE_OPEN is a protocol violation. Check this
-> in do_open(), print out a message and return an error to the client,
-> EINVAL like we already do when fuse_mbuf_iter_advance() fails.
+> because this is basically what happened : this commit exposes the API
+> breakage.
 > 
-> The FUSE filesystem doesn't currently support O_TMPFILE, but the very
-> same would happen if O_TMPFILE was passed in a FUSE_OPEN request. Check
-> that as well.
+> This is kinda problematic : linux kernel headers are updated globally,
+> i.e. an header update merged by some other subsystem will unknowingly
+> break virtiofsd each time we face a similar situation.
 > 
-> Signed-off-by: Greg Kurz <groug@kaod.org>
+> We could cope with it if the code was adapted to API changes when
+> needed, e.g. this patch squashed into 278f064e4524 . It doesn't
+> seem that can be achievable without some automation to detect
+> buggy situations (e.g. code depends on the size of a structure).
+> And even with that, it would still cause the subsystem that
+> needs the header update to depend on other subsystems to
+> fix the breakage.
+> 
+> Another possibility could maybe to stop doing global updates and
+> let each subsystem handle the kernel headers it needs.
+> 
+> OR we could avoid breaking the API in the kernel in the first
+> place.
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+That would be my preference!
 
-> ---
+Dave
+
+> Thoughts ?
 > 
-> v2:
->  - do the check in core FUSE code instead of passthrough_ll (libfuse folks)
+> Anyway, the fix is good:
 > 
+> Reviewed-by: Greg Kurz <groug@kaod.org>
 > 
->  tools/virtiofsd/fuse_lowlevel.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-> index 7fe2cef1eb3b..3d725bcba2ca 100644
-> --- a/tools/virtiofsd/fuse_lowlevel.c
-> +++ b/tools/virtiofsd/fuse_lowlevel.c
-> @@ -1084,6 +1084,12 @@ static void do_open(fuse_req_t req, fuse_ino_t nodeid,
->          return;
->      }
->  
-> +    /* File creation is handled by do_create() or do_mknod() */
-> +    if (arg->flags & (O_CREAT | O_TMPFILE)) {
-> +        fuse_reply_err(req, EINVAL);
-> +        return;
-> +    }
-> +
->      memset(&fi, 0, sizeof(fi));
->      fi.flags = arg->flags;
->      fi.kill_priv = arg->open_flags & FUSE_OPEN_KILL_SUIDGID;
-> -- 
-> 2.31.1
+> > (I don't think libfuse has a fix for this in yet itself, but it might
+> > survive because it doesn't bother copying the data like we do with
+> > mbuf).
+> > 
+> > 
+> > Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> > 
+> > > ---
+> > >  tools/virtiofsd/fuse_common.h   | 5 +++++
+> > >  tools/virtiofsd/fuse_lowlevel.c | 7 ++++++-
+> > >  2 files changed, 11 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
+> > > index fa9671872e..0c2665b977 100644
+> > > --- a/tools/virtiofsd/fuse_common.h
+> > > +++ b/tools/virtiofsd/fuse_common.h
+> > > @@ -372,6 +372,11 @@ struct fuse_file_info {
+> > >   */
+> > >  #define FUSE_CAP_HANDLE_KILLPRIV_V2 (1 << 28)
+> > >  
+> > > +/**
+> > > + * Indicates that file server supports extended struct fuse_setxattr_in
+> > > + */
+> > > +#define FUSE_CAP_SETXATTR_EXT (1 << 29)
+> > > +
+> > >  /**
+> > >   * Ioctl flags
+> > >   *
+> > > diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+> > > index 7fe2cef1eb..c2b6ff1686 100644
+> > > --- a/tools/virtiofsd/fuse_lowlevel.c
+> > > +++ b/tools/virtiofsd/fuse_lowlevel.c
+> > > @@ -1419,8 +1419,13 @@ static void do_setxattr(fuse_req_t req, fuse_ino_t nodeid,
+> > >      struct fuse_setxattr_in *arg;
+> > >      const char *name;
+> > >      const char *value;
+> > > +    bool setxattr_ext = req->se->conn.want & FUSE_CAP_SETXATTR_EXT;
+> > >  
+> > > -    arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
+> > > +    if (setxattr_ext) {
+> > > +        arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
+> > > +    } else {
+> > > +        arg = fuse_mbuf_iter_advance(iter, FUSE_COMPAT_SETXATTR_IN_SIZE);
+> > > +    }
+> > >      name = fuse_mbuf_iter_advance_str(iter);
+> > >      if (!arg || !name) {
+> > >          fuse_reply_err(req, EINVAL);
+> > > -- 
+> > > 2.25.4
+> > > 
 > 
 -- 
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK

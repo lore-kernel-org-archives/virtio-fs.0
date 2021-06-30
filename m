@@ -1,15 +1,13 @@
-Date: Wed, 30 Jun 2021 11:17:15 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YNxEq0GfQJ+0tEl1@work-vm>
-References: <20210622150852.1507204-1-vgoyal@redhat.com>
-	<20210622150852.1507204-2-vgoyal@redhat.com>
-	<YNng0CPIFHxDIE3a@work-vm> <20210629144431.02e2ce0c@bahia.lan>
+Date: Wed, 30 Jun 2021 08:36:24 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <20210630123624.GA75386@redhat.com>
+References: <20210225185225.GC53072@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20210629144431.02e2ce0c@bahia.lan>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH v7 1/7] virtiofsd: Fix fuse setxattr() API
- change issue
+In-Reply-To: <20210225185225.GC53072@redhat.com>
+Subject: Re: [Virtio-fs] [ANNOUNCE] Bi-weekly community calls for
+	virtiofs	discussions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,115 +16,47 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>, miklos@szeredi.hu
+To: virtio-fs-list <virtio-fs@redhat.com>
 
-* Greg Kurz (groug@kaod.org) wrote:
-> On Mon, 28 Jun 2021 15:46:40 +0100
-> "Dr. David Alan Gilbert" <dgilbert@redhat.com> wrote:
-> 
-> > * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > > With kernel header updates fuse_setxattr_in struct has grown in size.
-> > > But this new struct size only takes affect if user has opted in
-> > > for fuse feature FUSE_SETXATTR_EXT otherwise fuse continues to
-> > > send "fuse_setxattr_in" of older size. Older size is determined
-> > > by FUSE_COMPAT_SETXATTR_IN_SIZE.
-> > > 
-> > > Fix this. If we have not opted in for FUSE_SETXATTR_EXT, then
-> > > expect that we will get fuse_setxattr_in of size FUSE_COMPAT_SETXATTR_IN_SIZE
-> > > and not sizeof(struct fuse_sexattr_in).
-> > > 
-> > > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > 
-> > Yeh it's a bit of a grim fix, but I think it's the best we can do, and
-> > we need to get it in since the headers have already been merged.
-> 
-> You can also add:
-> 
-> Fixes: 278f064e4524 ("Update Linux headers to 5.13-rc4")
-> 
-> because this is basically what happened : this commit exposes the API
-> breakage.
-> 
-> This is kinda problematic : linux kernel headers are updated globally,
-> i.e. an header update merged by some other subsystem will unknowingly
-> break virtiofsd each time we face a similar situation.
-> 
-> We could cope with it if the code was adapted to API changes when
-> needed, e.g. this patch squashed into 278f064e4524 . It doesn't
-> seem that can be achievable without some automation to detect
-> buggy situations (e.g. code depends on the size of a structure).
-> And even with that, it would still cause the subsystem that
-> needs the header update to depend on other subsystems to
-> fix the breakage.
-> 
-> Another possibility could maybe to stop doing global updates and
-> let each subsystem handle the kernel headers it needs.
-> 
-> OR we could avoid breaking the API in the kernel in the first
-> place.
+On Thu, Feb 25, 2021 at 01:52:25PM -0500, Vivek Goyal wrote:
 
-That would be my preference!
+Hi All,
 
-Dave
+Community call starting in next 25 minutes.
 
-> Thoughts ?
+Vivek
+
+> Hi All,
 > 
-> Anyway, the fix is good:
+> We are planning to host bi-weekly 1 hour call to discuss virtiofs
+> development and issues. We already have folks sending patches on 
+> email list and asking questions privately. We thought it probably
+> is a good idea to do a face to face call once in a while to discuss
+> issues, current state, what are the shortcomings and how to improve
+> virtiofs further.
 > 
-> Reviewed-by: Greg Kurz <groug@kaod.org>
+> Lets give it a try and hopefully it helps. If it does not, we can stop
+> these meetings. :-)
 > 
-> > (I don't think libfuse has a fix for this in yet itself, but it might
-> > survive because it doesn't bother copying the data like we do with
-> > mbuf).
-> > 
-> > 
-> > Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> > 
-> > > ---
-> > >  tools/virtiofsd/fuse_common.h   | 5 +++++
-> > >  tools/virtiofsd/fuse_lowlevel.c | 7 ++++++-
-> > >  2 files changed, 11 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
-> > > index fa9671872e..0c2665b977 100644
-> > > --- a/tools/virtiofsd/fuse_common.h
-> > > +++ b/tools/virtiofsd/fuse_common.h
-> > > @@ -372,6 +372,11 @@ struct fuse_file_info {
-> > >   */
-> > >  #define FUSE_CAP_HANDLE_KILLPRIV_V2 (1 << 28)
-> > >  
-> > > +/**
-> > > + * Indicates that file server supports extended struct fuse_setxattr_in
-> > > + */
-> > > +#define FUSE_CAP_SETXATTR_EXT (1 << 29)
-> > > +
-> > >  /**
-> > >   * Ioctl flags
-> > >   *
-> > > diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-> > > index 7fe2cef1eb..c2b6ff1686 100644
-> > > --- a/tools/virtiofsd/fuse_lowlevel.c
-> > > +++ b/tools/virtiofsd/fuse_lowlevel.c
-> > > @@ -1419,8 +1419,13 @@ static void do_setxattr(fuse_req_t req, fuse_ino_t nodeid,
-> > >      struct fuse_setxattr_in *arg;
-> > >      const char *name;
-> > >      const char *value;
-> > > +    bool setxattr_ext = req->se->conn.want & FUSE_CAP_SETXATTR_EXT;
-> > >  
-> > > -    arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
-> > > +    if (setxattr_ext) {
-> > > +        arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
-> > > +    } else {
-> > > +        arg = fuse_mbuf_iter_advance(iter, FUSE_COMPAT_SETXATTR_IN_SIZE);
-> > > +    }
-> > >      name = fuse_mbuf_iter_advance_str(iter);
-> > >      if (!arg || !name) {
-> > >          fuse_reply_err(req, EINVAL);
-> > > -- 
-> > > 2.25.4
-> > > 
+> I have setup a public etherpad which has details of meetings and
+> also a section for agenda for the next meeting on March 10, 2021,
+> 14:00UTC.
 > 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> https://etherpad.opendev.org/p/virtiofs-external-meeting
+> 
+> Feel free to join us for the call and also feel free to add items
+> to the agenda list.
+> 
+> Stefan has also updated the https://virtio-fs.gitlab.io/ webpage with
+> details of community call.
+> 
+> Looking forward to see you on these calls.
+> 
+> Thanks
+> Vivek
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
 

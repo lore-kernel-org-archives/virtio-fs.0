@@ -1,6 +1,6 @@
-Date: Thu, 1 Jul 2021 08:21:36 -0400
+Date: Thu, 1 Jul 2021 09:10:30 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210701122136.GA159380@redhat.com>
+Message-ID: <20210701131030.GB159380@redhat.com>
 References: <20210629152007.GC5231@redhat.com>
 	<78663f5c-d2fd-747a-48e3-0c5fd8b40332@schaufler-ca.com>
 	<20210629173530.GD5231@redhat.com>
@@ -60,27 +60,26 @@ On Thu, Jul 01, 2021 at 09:48:33AM +0100, Dr. David Alan Gilbert wrote:
 > the rules are on who can write and change a user.* xattr on a device
 > node.  It doesn't feel sane to make it anyone who can write to the
 > device; then everyone can start leaving droppings on /dev/null.
-
-Looks like tmpfs/devtmpfs might not support setting user.* xattrs. So
-devices nodes there should not be a problem.
-
-# touch /dev/foo.txt
-# setfattr -n "user.foo" -v "bar" /dev/foo.txt
-setfattr: /dev/foo.txt: Operation not supported
-
-Vivek
-
 > 
 > The other evilness I can imagine, is if there's a 32k limit on xattrs on
 > a node, an evil user could write almost 32k of junk to the node
 > and then break the next login that tries to add an acl or breaks the
 > next relabel.
-> 
-> Dave
-> 
-> > 						- Ted
-> > 
-> -- 
-> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
-> 
+
+I guess 64k is per xattr VFS size limit.
+
+#define XATTR_SIZE_MAX 65536
+
+I just wrote a simple program to write "user.<N>" xattrs of size 1K
+each and could easily write 1M xattrs. So that 1G worth data right
+there. I did not try to push it further.
+
+So a user can write lot of data in the form of user.* xattrs on
+symlinks and device nodes if were to open it unconditionally. Hence
+permission semantics will probably will have to defined properly.
+
+I am wondering will it be alright if owner of the file (or CAP_FOWNER),
+is allowed to write user.* xattrs on symlinks and special files.
+
+Vivek
 

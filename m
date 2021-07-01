@@ -1,19 +1,25 @@
-Date: Thu, 1 Jul 2021 09:10:30 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210701131030.GB159380@redhat.com>
-References: <20210629152007.GC5231@redhat.com>
-	<78663f5c-d2fd-747a-48e3-0c5fd8b40332@schaufler-ca.com>
-	<20210629173530.GD5231@redhat.com>
-	<f4992b3a-a939-5bc4-a5da-0ce8913bd569@redhat.com>
-	<YNvvLIv16jY8mfP8@mit.edu> <YNwmXOqT7LgbeVPn@work-vm>
-	<YNyECw/1FzDCW3G8@mit.edu> <YNyHVhGPe1bFAt+C@work-vm>
-	<YNzNLTxflKbDi8W2@mit.edu> <YN2BYXv79PswrN2E@work-vm>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=to:cc:references:from:subject:message-id:date:user-agent
+	:mime-version:in-reply-to:content-transfer-encoding:content-language;
+	bh=KMzRFLn342aRAs5Y7mXjGWoHLdf+TBmPiPg7MEqy6gg=;
+	b=sogbVjzhmB6pLWUqbNKwMi3ZF5uOTZ39mCSc/fgaKMd334tB9ck3W0muPQiS7l4vif
+	KK4DMdK3KdW0pQ+Wh9zbVFoib0S17/Ad/JJTgbMnG4hgK0ctb9GWY21UI49EE6wl23EH
+	NnrTm85ggvht5UgzesRuc6sXnqcP+bp2kRvWxvTmE+dDNZferlPSTG0R5X8bC7HMUL5k
+	q0j8v+XC2uxFizTNWX8OJJ/xI/NPiPLpX4jd4C+VREdsB5r2WQ8vRpLdphr3YRqDZq90
+	JeRCAe+IWK1PMEm82A5+uJxybt6Ai6u7q4cfgj5LC01UcQk93/+Etg84p/nEwX92yCDi
+	WQSQ==
+References: <492294b2-b305-86f4-2c91-a2faa766d2ee@gmail.com>
+	<YN195pPX2s0PRDqK@work-vm>
+From: "Harry G. Coin" <hgcoin@gmail.com>
+Message-ID: <14273048-d01f-6b7b-3094-787b79cb4a96@gmail.com>
+Date: Thu, 1 Jul 2021 10:02:27 -0500
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <YN2BYXv79PswrN2E@work-vm>
-Subject: Re: [Virtio-fs] [RFC PATCH 0/1] xattr: Allow user.* xattr on
- symlink/special files if caller has CAP_SYS_RESOURCE
+In-Reply-To: <YN195pPX2s0PRDqK@work-vm>
+Content-Type: text/plain; charset="utf-8"
+Content-Language: en-US
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] multiple virtiofsd's + overlapping shared subtree
+ -> enforced compatible xattr maps?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,63 +29,34 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: "berrange@redhat.com" <berrange@redhat.com>, Theodore Ts'o <tytso@mit.edu>, "selinux@vger.kernel.org" <selinux@vger.kernel.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "Schaufler,
-	Casey" <casey.schaufler@intel.com>, linux-security-module <linux-security-module@vger.kernel.org>, "viro@zeniv.linux.org.uk" <viro@zeniv.linux.org.uk>, Casey Schaufler <casey@schaufler-ca.com>, "linux-fsdevel@vger.kernel.org" <linux-fsdevel@vger.kernel.org>
+Cc: virtio-fs@redhat.com
 
-On Thu, Jul 01, 2021 at 09:48:33AM +0100, Dr. David Alan Gilbert wrote:
-> * Theodore Ts'o (tytso@mit.edu) wrote:
-> > On Wed, Jun 30, 2021 at 04:01:42PM +0100, Dr. David Alan Gilbert wrote:
-> > > 
-> > > Even if you fix symlinks, I don't think it fixes device nodes or
-> > > anything else where the permissions bitmap isn't purely used as the
-> > > permissions on the inode.
-> > 
-> > I think we're making a mountain out of a molehill.  Again, very few
-> > people are using quota these days.  And if you give someone write
-> > access to a 8TB disk, do you really care if they can "steal" 32k worth
-> > of space (which is the maximum size of an xattr, enforced by the VFS).
-> > 
-> > OK, but what about character mode devices?  First of all, most users
-> > don't have access to huge number of devices, but let's assume
-> > something absurd.  Let's say that a user has write access to *1024*
-> > devices.  (My /dev has 233 character mode devices, and I have write
-> > access to well under a dozen.)
-> > 
-> > An 8TB disk costs about $200.  So how much of the "stolen" quota space
-> > are we talking about, assuming the user has access to 1024 devices,
-> > and the file system actually supports a 32k xattr.
-> > 
-> >     32k * 1024 * $200 / 8TB / (1024*1024*1024) = $0.000763 = 0.0763 cents
-> > 
-> > A 2TB SSD is less around $180, so even if we calculate the prices
-> > based on SSD space, we're still talking about a quarter of a penny.
-> > 
-> > Why are we worrying about this?
-> 
-> I'm not worrying about storage cost, but we would need to define what
-> the rules are on who can write and change a user.* xattr on a device
-> node.  It doesn't feel sane to make it anyone who can write to the
-> device; then everyone can start leaving droppings on /dev/null.
-> 
-> The other evilness I can imagine, is if there's a 32k limit on xattrs on
-> a node, an evil user could write almost 32k of junk to the node
-> and then break the next login that tries to add an acl or breaks the
-> next relabel.
 
-I guess 64k is per xattr VFS size limit.
+On 7/1/21 3:33 AM, Dr. David Alan Gilbert wrote:
+> * Harry G. Coin (hgcoin@gmail.com) wrote:
+>> If two or more instances of virtiofsd have a common full or partially
+>> shared directory tree path -- how will those instances 'enforce' a
+>> 'compatible' xattr map lest the host+guest(s) have quite the selinux
+>> attribute salad?
+> Virtiofsd instances are independent; it's upto whatever runs the daemons
+> to pick the options in a sane way.
 
-#define XATTR_SIZE_MAX 65536
+While that's the current case, because the intention was to rely on the
+underlying fs to manage contention among virtiofsds: the moment
+xattrmaps happened virtiofsd entered the layer all network file system
+daemons face.  Roughly speaking: a shift from one process per client to
+some IPC or threaded approach with a 'manager' process/thread that
+coordinates 'compatible' xattrmaps, acl maps, 'root squashing' etc. etc..
 
-I just wrote a simple program to write "user.<N>" xattrs of size 1K
-each and could easily write 1M xattrs. So that 1G worth data right
-there. I did not try to push it further.
+>>   How much does virtiofsd need to feel like nfsd...?
+> What does nfsd do for this?
 
-So a user can write lot of data in the form of user.* xattrs on
-symlinks and device nodes if were to open it unconditionally. Hence
-permission semantics will probably will have to defined properly.
+A couple attempts over the last decade, the most landed in 5.9: 
+https://www.phoronix.com/scan.php?page=news_item&px=Linux-5.9-NFS-Server-User-Xattr
 
-I am wondering will it be alright if owner of the file (or CAP_FOWNER),
-is allowed to write user.* xattrs on symlinks and special files.
 
-Vivek
+
+
+
+
 

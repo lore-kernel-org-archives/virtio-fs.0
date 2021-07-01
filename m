@@ -1,25 +1,20 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yahoo.com; s=s2048;
-	t=1625158717; bh=pTBo3a6qeTWyFtKHPmiArodQR9K+DzXWOak/CS0qlaQ=;
-	h=Subject:To:Cc:References:From:Date:In-Reply-To:From:Subject:Reply-To;
-	b=N+ri7YF3REupwg6iXCESHBs6cnsLPkru2W5JzKbNiKaQSYn93Da3FJfl8a5sxwhcm1Gb6gzIFlT/g3f4YcBG1OH6TUZzi85MMGqMtLqA7cIyg7Jg04JTlVVMS356Iq6wln+U4xq/ANM+k1IuG57YPb5LSX5SLAbMN0hQPTAoYr6iiw2HKR/Sq/XPtrAGISGTcv6pyao+ta5kEb+4ENXZiyUreNbFaqoq9EJJ/rEtF86ULQDzyLeWKPsNm60w9NztXDrL2MYwa44Crn3oqsZ2ttM24UqdeobA/RoM363hWX7rl3/TCuJ6vEVsdeT9jebPdfRbKjdIeU/4CB2s0ZtRMA==
-References: <20210629152007.GC5231@redhat.com>
-	<78663f5c-d2fd-747a-48e3-0c5fd8b40332@schaufler-ca.com>
-	<20210629173530.GD5231@redhat.com>
-	<f4992b3a-a939-5bc4-a5da-0ce8913bd569@redhat.com>
-	<YNvvLIv16jY8mfP8@mit.edu>
-	<YNwmXOqT7LgbeVPn@work-vm> <YNyECw/1FzDCW3G8@mit.edu>
-	<YNyHVhGPe1bFAt+C@work-vm> <YNzNLTxflKbDi8W2@mit.edu>
-	<YN2BYXv79PswrN2E@work-vm> <20210701131030.GB159380@redhat.com>
-From: Casey Schaufler <casey@schaufler-ca.com>
-Message-ID: <318ec3fd-187e-23cb-b30b-3cb9bb37ca54@schaufler-ca.com>
-Date: Thu, 1 Jul 2021 09:58:34 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+	h=from:to:cc:subject:date:message-id:mime-version
+	:content-transfer-encoding;
+	bh=A84c4hgUdxFtBSsh1SRChmmQpU42+UpUG3Lp/hwIx5E=;
+	b=k3ZCQUYOgpJ5uH/BFTWwjS7d9lvAClhJ1uyX7l+I1QnoM7UTMbkTAJQaV7ibVKt5h/
+	YXlWJ3UejJKkHUF2UXEvK/p3ncr98/68R23tKkrz0ooVd1dAt7epqGj+BeFvUKrhYWbx
+	iP5yAU/yO6VyCcApluJT449/+wmyrWqWphpU8GKi8Sh+Gj5sGo6mYXLZo1aY7xfbIZn1
+	UhPQb1MDfchJxSOx5dn3sl2+l1VZ61Gvs5t6lDxegIte1KjT7lPR+26hrGhWPc6YuTH/
+	GG/ZLV+UBPX9Jkk9A89vq0gqkWm9sg79dm4A+DMqbXHcZQ8dr4v89zHDENXYSf1Rz+HR
+	FJQw==
+From: Hubert Jasudowicz <hubert.jasudowicz@gmail.com>
+Date: Thu,  1 Jul 2021 23:11:48 +0200
+Message-Id: <e5914ad202a13e9c1bc2a5efa267ff3bd4f48db6.1625173475.git.hubert.jasudowicz@gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <20210701131030.GB159380@redhat.com>
-Content-Type: text/plain; charset=utf-8
-Content-Transfer-Encoding: 7bit
-Content-Language: en-US
-Subject: Re: [Virtio-fs] [RFC PATCH 0/1] xattr: Allow user.* xattr on
- symlink/special files if caller has CAP_SYS_RESOURCE
+Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [PATCH] virtiofsd: Add missing newline in error message
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -28,66 +23,29 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: Theodore Ts'o <tytso@mit.edu>, "selinux@vger.kernel.org" <selinux@vger.kernel.org>, Casey Schaufler <casey@schaufler-ca.com>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "linux-fsdevel@vger.kernel.org" <linux-fsdevel@vger.kernel.org>, linux-security-module <linux-security-module@vger.kernel.org>, "viro@zeniv.linux.org.uk" <viro@zeniv.linux.org.uk>, "Schaufler,
-	Casey" <casey.schaufler@intel.com>, "berrange@redhat.com" <berrange@redhat.com>
+To: qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, Hubert Jasudowicz <hubert.jasudowicz@gmail.com>, qemu-trivial@nongnu.org
 
-On 7/1/2021 6:10 AM, Vivek Goyal wrote:
-> On Thu, Jul 01, 2021 at 09:48:33AM +0100, Dr. David Alan Gilbert wrote:
->> * Theodore Ts'o (tytso@mit.edu) wrote:
->>> On Wed, Jun 30, 2021 at 04:01:42PM +0100, Dr. David Alan Gilbert wrote:
->>>> Even if you fix symlinks, I don't think it fixes device nodes or
->>>> anything else where the permissions bitmap isn't purely used as the
->>>> permissions on the inode.
->>> I think we're making a mountain out of a molehill.  Again, very few
->>> people are using quota these days.  And if you give someone write
->>> access to a 8TB disk, do you really care if they can "steal" 32k worth
->>> of space (which is the maximum size of an xattr, enforced by the VFS).
->>>
->>> OK, but what about character mode devices?  First of all, most users
->>> don't have access to huge number of devices, but let's assume
->>> something absurd.  Let's say that a user has write access to *1024*
->>> devices.  (My /dev has 233 character mode devices, and I have write
->>> access to well under a dozen.)
->>>
->>> An 8TB disk costs about $200.  So how much of the "stolen" quota space
->>> are we talking about, assuming the user has access to 1024 devices,
->>> and the file system actually supports a 32k xattr.
->>>
->>>     32k * 1024 * $200 / 8TB / (1024*1024*1024) = $0.000763 = 0.0763 cents
->>>
->>> A 2TB SSD is less around $180, so even if we calculate the prices
->>> based on SSD space, we're still talking about a quarter of a penny.
->>>
->>> Why are we worrying about this?
->> I'm not worrying about storage cost, but we would need to define what
->> the rules are on who can write and change a user.* xattr on a device
->> node.  It doesn't feel sane to make it anyone who can write to the
->> device; then everyone can start leaving droppings on /dev/null.
->>
->> The other evilness I can imagine, is if there's a 32k limit on xattrs on
->> a node, an evil user could write almost 32k of junk to the node
->> and then break the next login that tries to add an acl or breaks the
->> next relabel.
-> I guess 64k is per xattr VFS size limit.
->
-> #define XATTR_SIZE_MAX 65536
->
-> I just wrote a simple program to write "user.<N>" xattrs of size 1K
-> each and could easily write 1M xattrs. So that 1G worth data right
-> there. I did not try to push it further.
->
-> So a user can write lot of data in the form of user.* xattrs on
-> symlinks and device nodes if were to open it unconditionally. Hence
-> permission semantics will probably will have to defined properly.
->
-> I am wondering will it be alright if owner of the file (or CAP_FOWNER),
-> is allowed to write user.* xattrs on symlinks and special files.
+From: Hubert Jasudowicz <hubert.jasudowicz@gmail.com>
 
-That would be sensible.
-That's independent of your xattr mapping scheme.
+Signed-off-by: Hubert Jasudowicz <hubert.jasudowicz@gmail.com>
+---
+ tools/virtiofsd/fuse_virtio.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
->
-> Vivek
->
+diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+index fa4aff9b0e..fc2564a603 100644
+--- a/tools/virtiofsd/fuse_virtio.c
++++ b/tools/virtiofsd/fuse_virtio.c
+@@ -917,7 +917,7 @@ static bool fv_socket_lock(struct fuse_session *se)
+     dir = qemu_get_local_state_pathname("run/virtiofsd");
+ 
+     if (g_mkdir_with_parents(dir, S_IRWXU) < 0) {
+-        fuse_log(FUSE_LOG_ERR, "%s: Failed to create directory %s: %s",
++        fuse_log(FUSE_LOG_ERR, "%s: Failed to create directory %s: %s\n",
+                  __func__, dir, strerror(errno));
+         return false;
+     }
+-- 
+2.32.0
 

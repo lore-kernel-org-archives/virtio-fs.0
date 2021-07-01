@@ -1,15 +1,16 @@
-Date: Fri, 18 Jun 2021 08:53:08 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210618125308.GB1234055@redhat.com>
-References: <20210614174454.903555-1-vgoyal@redhat.com>
-	<20210614174454.903555-2-vgoyal@redhat.com>
-	<CAJfpeguD+F3Ai01=-JYNTKS4LP4d879=+8T7eOBewZpevTRbJg@mail.gmail.com>
+Date: Thu, 1 Jul 2021 16:31:44 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YN3f4MqoiyvORI71@work-vm>
+References: <492294b2-b305-86f4-2c91-a2faa766d2ee@gmail.com>
+	<YN195pPX2s0PRDqK@work-vm>
+	<14273048-d01f-6b7b-3094-787b79cb4a96@gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+In-Reply-To: <14273048-d01f-6b7b-3094-787b79cb4a96@gmail.com>
+Content-Type: text/plain; charset="iso-8859-1"
 Content-Disposition: inline
-In-Reply-To: <CAJfpeguD+F3Ai01=-JYNTKS4LP4d879=+8T7eOBewZpevTRbJg@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH v2 1/2] init/do_mounts.c: Add a path to boot
- from tag based filesystems
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] multiple virtiofsd's + overlapping shared subtree
+ -> enforced compatible xattr maps?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,66 +19,52 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: David Howells <dhowells@redhat.com>, Christoph Hellwig <hch@infradead.org>, Richard Weinberger <richard.weinberger@gmail.com>, Dominique Martinet <asmadeus@codewreck.org>, linux-kernel@vger.kernel.org, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel@vger.kernel.org, v9fs-developer@lists.sourceforge.net
+To: "Harry G. Coin" <hgcoin@gmail.com>
+Cc: virtio-fs@redhat.com
 
-On Fri, Jun 18, 2021 at 09:07:14AM +0200, Miklos Szeredi wrote:
-> On Mon, 14 Jun 2021 at 19:45, Vivek Goyal <vgoyal@redhat.com> wrote:
-> >
-> > We want to be able to mount virtiofs as rootfs and pass appropriate
-> > kernel command line. Right now there does not seem to be a good way
-> > to do that. If I specify "root=myfs rootfstype=virtiofs", system
-> > panics.
-> >
-> > virtio-fs: tag </dev/root> not found
-> > ..
-> > ..
-> > [ end Kernel panic - not syncing: VFS: Unable to mount root fs on
-> > +unknown-block(0,0) ]
-> >
-> > Basic problem here is that kernel assumes that device identifier
-> > passed in "root=" is a block device. But there are few execptions
-> > to this rule to take care of the needs of mtd, ubi, NFS and CIFS.
-> >
-> > For example, mtd and ubi prefix "mtd:" or "ubi:" respectively.
-> >
-> > "root=mtd:<identifier>" or "root=ubi:<identifier>"
-> >
-> > NFS and CIFS use "root=/dev/nfs" and CIFS passes "root=/dev/cifs" and
-> > actual root device details come from filesystem specific kernel
-> > command line options.
-> >
-> > virtiofs does not seem to fit in any of the above categories. In fact
-> > we have 9pfs which can be used to boot from but it also does not
-> > have a proper syntax to specify rootfs and does not fit into any of
-> > the existing syntax. They both expect a device "tag" to be passed
-> > in a device to be mounted. And filesystem knows how to parse and
-> > use "tag".
-> >
-> > So there seem to be a class of filesystems which specify root device
-> > using a "tag" which is understood by the filesystem. And filesystem
-> > simply expects that "tag" to be passed as "source" of mount and
-> > how to mount filesystem using that "tag" is responsibility of filesystem.
-> >
-> > This patch proposes that we internally create a list of filesystems
-> > which pass a "tag" in "root=<tag>" and expect that tag to be passed
-> > as "source" of mount. With this patch I can boot into virtiofs rootfs
-> > with following syntax.
-> >
-> > "root=myfs rootfstype=virtiofs rw"
-> 
-> The syntax and the implementation looks good.
-> 
-> Acked-by: Miklos Szeredi <mszeredi@redhat.com>
+* Harry G. Coin (hgcoin@gmail.com) wrote:
+>=20
+> On 7/1/21 3:33 AM, Dr. David Alan Gilbert wrote:
+> > * Harry G. Coin (hgcoin@gmail.com) wrote:
+> >> If two or more instances of virtiofsd have a common full or partially
+> >> shared directory tree path -- how will those instances 'enforce' a
+> >> 'compatible' xattr map lest the host+guest(s) have quite the selinux
+> >> attribute salad?
+> > Virtiofsd instances are independent; it's upto whatever runs the daemons
+> > to pick the options in a sane way.
+>=20
+> While that's the current case, because the intention was to rely on the
+> underlying fs to manage contention among virtiofsds: the moment
+> xattrmaps happened virtiofsd entered the layer all network file system
+> daemons face.=A0 Roughly speaking: a shift from one process per client to
+> some IPC or threaded approach with a 'manager' process/thread that
+> coordinates 'compatible' xattrmaps, acl maps, 'root squashing' etc. etc..
 
-Thanks Miklos. Now Christoph has come up with another patch series to
-achieve the same. And that patches series looks better than my patches.
+I really want to stick with one process per client; it makes the
+security a lot easier; you never have to worry about accidentally
+leaking data between clients within the process.
+Now, that doesn't mean you can't have some coordination up a layer -
+i.e. something that starts all the qemu's and virtiofsd's (like libvirt
+etc) but that chose sane mappings.
 
-https://lore.kernel.org/linux-fsdevel/20210617153649.1886693-1-hch@lst.de/
+> >> =A0 How much does virtiofsd need to feel like nfsd...?
+> > What does nfsd do for this?
+>=20
+> A couple attempts over the last decade, the most landed in 5.9:=A0
+> https://www.phoronix.com/scan.php?page=3Dnews_item&px=3DLinux-5.9-NFS-Ser=
+ver-User-Xattr
 
-There are couple of minor issues to be taken care of. I am hoping after
-that these patches can be merged.
+So I saw that; but what I didn't see was a descriptionof what they
+actually do with their xattr's; do the NFS servers just pass them
+through or do they map?
 
-Thanks
-Vivek
+Dave
+
+>=20
+>=20
+>=20
+>=20
+>=20
+--=20
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

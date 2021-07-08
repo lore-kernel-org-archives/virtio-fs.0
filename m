@@ -1,18 +1,9 @@
-Date: Thu, 8 Jul 2021 08:59:36 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210708125936.GA319010@redhat.com>
-References: <20210621062657.3641879-1-hch@lst.de>
-	<20210622081217.GA2975@lst.de>
-	<YNGhERcnLuzjn8j9@stefanha-x1.localdomain>
-	<20210629205048.GE5231@redhat.com> <20210630053601.GA29241@lst.de>
-	<20210707210404.GB244500@redhat.com>
-	<20210707210636.GC244500@redhat.com>
+Date: Thu,  8 Jul 2021 13:57:37 -0400
+Message-Id: <20210708175738.360757-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210707210636.GC244500@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 3/2] fs: simplify get_filesystem_list /
- get_all_fs_names
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [RFC PATCH v2 0/1] Relax restrictions on user.* xattr
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,187 +12,73 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Christoph Hellwig <hch@lst.de>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, viro@zeniv.linux.org.uk, linux-kernel@vger.kernel.org
+To: linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, viro@zeniv.linux.org.uk
+Cc: gscrivan@redhat.com, tytso@mit.edu, miklos@szeredi.hu, selinux@vger.kernel.org, virtio-fs@redhat.com, linux-security-module@vger.kernel.org, casey.schaufler@intel.com, jack@suse.cz, christian.brauner@ubuntu.com, vgoyal@redhat.com
 
-On Wed, Jul 07, 2021 at 05:06:36PM -0400, Vivek Goyal wrote:
-> On Wed, Jul 07, 2021 at 05:04:04PM -0400, Vivek Goyal wrote:
-> > On Wed, Jun 30, 2021 at 07:36:01AM +0200, Christoph Hellwig wrote:
-> > > On Tue, Jun 29, 2021 at 04:50:48PM -0400, Vivek Goyal wrote:
-> > > > May be we should modify mount_block_root() code so that it does not
-> > > > require that extra "\0". Possibly zero initialize page and that should
-> > > > make sure list_bdev_fs_names() does not have to worry about it.
-> > > > 
-> > > > It is possible that a page gets full from the list of filesystems, and
-> > > > last byte on page is terminating null. In that case just zeroing page
-> > > > will not help. We can keep track of some sort of end pointer and make
-> > > > sure we are not searching beyond that for valid filesystem types.
-> > > > 
-> > > > end = page + PAGE_SIZE - 1;
-> > > > 
-> > > > mount_block_root()
-> > > > {
-> > > > 	for (p = fs_names; p < end && *p; p += strlen(p)+1) {
-> > > > 	}
-> > > > }
-> > > 
-> > > Maybe.  To honest I'd prefer to not even touch this unrelated code given
-> > > how full of landmines it is :)
-> > 
-> > Hi Christoph,
-> > 
-> > How about following patch. This applies on top of your patches. I noticed
-> > that Al had suggested to return number of filesystems from helper
-> > functions. I just did that and used that to iterate in the loop.
-> > 
-> > I tested it with a virtual block device (root=/dev/vda1) and it works.
-> > I also filled page with garbage after allocation to make sure natually
-> > occurring null is not there in the middle of page to terminate string.
-> > 
-> > If you like it, can you please incorporate it in your patches.
-> 
-> I noticed this will break with "root_fs_names=". Sorry, will have to
-> fix split_fs_names() as well. Will do.
+Hi,
 
-Hi Christoph,
+This is V2 of the patch. Posted V1 here.
 
-I fixed it. Now both split_fs_names() and list_bdev_fs_names() return
-count of fstype strings it placed in the buffer. And callers now
-use that count to loop (instead of relying on extra null byte at the
-end of the buffer).
+https://lore.kernel.org/linux-fsdevel/20210625191229.1752531-1-vgoyal@redhat.com/
 
-I tested both nodev (virtiofs, 9p) and block dev rootfs (ext4) and
-it works for me. Please have a look.
+Right now we don't allow setting user.* xattrs on symlinks and special
+files at all. Initially I thought that real reason behind this
+restriction is quota limitations but from last conversation it seemed
+that real reason is that permission bits on symlink and special files
+are special and different from regular files and directories, hence
+this restriction is in place.
+
+Given it probably is not a quota issue (I tested with xfs user quota
+enabled and quota restrictions kicked in on symlink), I dropped the
+idea of allowing user.* xattr if process has CAP_SYS_RESOURCE.
+
+Instead this version of patch allows reading/writing user.* xattr
+on symlink and special files if caller is owner or priviliged (has
+CAP_FOWNER) w.r.t inode.
+
+We need this for virtiofs daemon. I also found one more user. Giuseppe,
+seems to set user.* xattr attrs on unpriviliged fuse-overlay as well
+and he ran into similar issue. So fuse-overlay should benefit from
+this change as well.
+
+Who wants to set user.* xattr on symlink/special files
+-----------------------------------------------------
+
+In virtiofs, actual file server is virtiosd daemon running on host.
+There we have a mode where xattrs can be remapped to something else.
+For example security.selinux can be remapped to
+user.virtiofsd.securit.selinux on the host.
+
+This remapping is useful when SELinux is enabled in guest and virtiofs
+as being used as rootfs. Guest and host SELinux policy might not match
+and host policy might deny security.selinux xattr setting by guest
+onto host. Or host might have SELinux disabled and in that case to
+be able to set security.selinux xattr, virtiofsd will need to have
+CAP_SYS_ADMIN (which we are trying to avoid). Being able to remap
+guest security.selinux (or other xattrs) on host to something else
+is also better from security point of view.
+
+But when we try this, we noticed that SELinux relabeling in guest
+is failing on some symlinks. When I debugged a little more, I 
+came to know that "user.*" xattrs are not allowed on symlinks
+or special files.
+
+So if we allow owner (or CAP_FOWNER) to set user.* xattr, it will
+allow virtiofs to arbitrarily remap guests's xattrs to something
+else on host and that solves this SELinux issue nicely and provides
+two SELinux policies (host and guest) to co-exist nicely without
+interfering with each other.
 
 Thanks
 Vivek
 
 
----
- fs/filesystems.c   |    5 ++++-
- include/linux/fs.h |    2 +-
- init/do_mounts.c   |   35 +++++++++++++++++++++++------------
- 3 files changed, 28 insertions(+), 14 deletions(-)
+Vivek Goyal (1):
+  xattr: Allow user.* xattr on symlink and special files
 
-Index: redhat-linux/fs/filesystems.c
-===================================================================
---- redhat-linux.orig/fs/filesystems.c	2021-07-08 08:02:09.772766786 -0400
-+++ redhat-linux/fs/filesystems.c	2021-07-08 08:02:12.044860918 -0400
-@@ -209,10 +209,11 @@ SYSCALL_DEFINE3(sysfs, int, option, unsi
- }
- #endif
- 
--void __init list_bdev_fs_names(char *buf, size_t size)
-+int __init list_bdev_fs_names(char *buf, size_t size)
- {
- 	struct file_system_type *p;
- 	size_t len;
-+	int count = 0;
- 
- 	read_lock(&file_systems_lock);
- 	for (p = file_systems; p; p = p->next) {
-@@ -226,8 +227,10 @@ void __init list_bdev_fs_names(char *buf
- 		memcpy(buf, p->name, len);
- 		buf += len;
- 		size -= len;
-+		count++;
- 	}
- 	read_unlock(&file_systems_lock);
-+	return count;
- }
- 
- #ifdef CONFIG_PROC_FS
-Index: redhat-linux/include/linux/fs.h
-===================================================================
---- redhat-linux.orig/include/linux/fs.h	2021-07-08 08:02:09.774766869 -0400
-+++ redhat-linux/include/linux/fs.h	2021-07-08 08:02:12.046861001 -0400
-@@ -3622,7 +3622,7 @@ int proc_nr_dentry(struct ctl_table *tab
- 		  void *buffer, size_t *lenp, loff_t *ppos);
- int proc_nr_inodes(struct ctl_table *table, int write,
- 		   void *buffer, size_t *lenp, loff_t *ppos);
--void __init list_bdev_fs_names(char *buf, size_t size);
-+int __init list_bdev_fs_names(char *buf, size_t size);
- 
- #define __FMODE_EXEC		((__force int) FMODE_EXEC)
- #define __FMODE_NONOTIFY	((__force int) FMODE_NONOTIFY)
-Index: redhat-linux/init/do_mounts.c
-===================================================================
---- redhat-linux.orig/init/do_mounts.c	2021-07-08 08:02:09.774766869 -0400
-+++ redhat-linux/init/do_mounts.c	2021-07-08 08:02:12.046861001 -0400
-@@ -338,14 +338,22 @@ __setup("rootflags=", root_data_setup);
- __setup("rootfstype=", fs_names_setup);
- __setup("rootdelay=", root_delay_setup);
- 
--static void __init split_fs_names(char *page, char *names)
-+static int __init split_fs_names(char *page, char *names)
- {
--	strcpy(page, root_fs_names);
--	while (*page++) {
--		if (page[-1] == ',')
--			page[-1] = '\0';
-+	int count = 0;
-+	char *p = page;
-+
-+	strcpy(p, root_fs_names);
-+	while (*p++) {
-+		if (p[-1] == ',')
-+			p[-1] = '\0';
- 	}
--	*page = '\0';
-+	*p = '\0';
-+
-+	for (p = page; *p; p += strlen(p)+1)
-+		count++;
-+
-+	return count;
- }
- 
- static int __init do_mount_root(const char *name, const char *fs,
-@@ -391,15 +399,16 @@ void __init mount_block_root(char *name,
- 	char *fs_names = page_address(page);
- 	char *p;
- 	char b[BDEVNAME_SIZE];
-+	int num_fs, i;
- 
- 	scnprintf(b, BDEVNAME_SIZE, "unknown-block(%u,%u)",
- 		  MAJOR(ROOT_DEV), MINOR(ROOT_DEV));
- 	if (root_fs_names)
--		split_fs_names(fs_names, root_fs_names);
-+		num_fs = split_fs_names(fs_names, root_fs_names);
- 	else
--		list_bdev_fs_names(fs_names, PAGE_SIZE);
-+		num_fs = list_bdev_fs_names(fs_names, PAGE_SIZE);
- retry:
--	for (p = fs_names; *p; p += strlen(p)+1) {
-+	for (p = fs_names, i = 0; i < num_fs; p += strlen(p)+1, i++) {
- 		int err = do_mount_root(name, p, flags, root_mount_data);
- 		switch (err) {
- 			case 0:
-@@ -432,7 +441,7 @@ retry:
- 	printk("List of all partitions:\n");
- 	printk_all_partitions();
- 	printk("No filesystem could mount root, tried: ");
--	for (p = fs_names; *p; p += strlen(p)+1)
-+	for (p = fs_names, i = 0; i < num_fs; p += strlen(p)+1, i++)
- 		printk(" %s", p);
- 	printk("\n");
- 	panic("VFS: Unable to mount root fs on %s", b);
-@@ -533,13 +542,15 @@ static int __init mount_nodev_root(void)
- {
- 	char *fs_names, *fstype;
- 	int err = -EINVAL;
-+	int num_fs, i;
- 
- 	fs_names = (void *)__get_free_page(GFP_KERNEL);
- 	if (!fs_names)
- 		return -EINVAL;
--	split_fs_names(fs_names, root_fs_names);
-+	num_fs = split_fs_names(fs_names, root_fs_names);
- 
--	for (fstype = fs_names; *fstype; fstype += strlen(fstype) + 1) {
-+	for (fstype = fs_names, i = 0; i < num_fs;
-+	     fstype += strlen(fstype) + 1, i++) {
- 		if (!fs_is_nodev(fstype))
- 			continue;
- 		err = do_mount_root(root_device_name, fstype, root_mountflags,
+ fs/xattr.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+-- 
+2.25.4
 

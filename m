@@ -1,16 +1,17 @@
-Date: Fri, 18 Jun 2021 10:10:31 -0400
+Date: Fri, 9 Jul 2021 13:59:47 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <20210618141031.GC1234055@redhat.com>
-References: <20210617153649.1886693-1-hch@lst.de>
-	<20210617153649.1886693-3-hch@lst.de>
-	<20210617162610.GC1142820@redhat.com>
-	<20210618132038.GA13406@lst.de>
+Message-ID: <20210709175947.GB398382@redhat.com>
+References: <20210708175738.360757-1-vgoyal@redhat.com>
+	<20210708175738.360757-2-vgoyal@redhat.com>
+	<20210709091915.2bd4snyfjndexw2b@wittgenstein>
+	<20210709152737.GA398382@redhat.com>
+	<710d1c6f-d477-384f-0cc1-8914258f1fb1@schaufler-ca.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20210618132038.GA13406@lst.de>
-Subject: Re: [Virtio-fs] [PATCH 2/2] init: allow mounting arbitrary
- non-blockdevice filesystems as root
+In-Reply-To: <710d1c6f-d477-384f-0cc1-8914258f1fb1@schaufler-ca.com>
+Subject: Re: [Virtio-fs] [PATCH v2 1/1] xattr: Allow user.* xattr on symlink
+ and special files
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,150 +20,112 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Christoph Hellwig <hch@lst.de>
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, Dominique Martinet <asmadeus@codewreck.org>, viro@zeniv.linux.org.uk, linux-kernel@vger.kernel.org
+To: Casey Schaufler <casey@schaufler-ca.com>
+Cc: gscrivan@redhat.com, tytso@mit.edu, miklos@szeredi.hu, selinux@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, casey.schaufler@intel.com, linux-security-module@vger.kernel.org, viro@zeniv.linux.org.uk, Christoph Hellwig <hch@infradead.org>, linux-fsdevel@vger.kernel.org, jack@suse.cz, Christian Brauner <christian.brauner@ubuntu.com>, bfields@redhat.com
 
-On Fri, Jun 18, 2021 at 03:20:38PM +0200, Christoph Hellwig wrote:
-> On Thu, Jun 17, 2021 at 12:26:10PM -0400, Vivek Goyal wrote:
-> > Not sure what FS_BINARY_MOUNTDATA is why fs should not have that set. nfs
-> > seems to set it too. So that means they can't use try_mount_nodev().
+On Fri, Jul 09, 2021 at 08:34:41AM -0700, Casey Schaufler wrote:
+> On 7/9/2021 8:27 AM, Vivek Goyal wrote:
+> > On Fri, Jul 09, 2021 at 11:19:15AM +0200, Christian Brauner wrote:
+> >> On Thu, Jul 08, 2021 at 01:57:38PM -0400, Vivek Goyal wrote:
+> >>> Currently user.* xattr are not allowed on symlink and special files.
+> >>>
+> >>> man xattr and recent discussion suggested that primary reason for this
+> >>> restriction is how file permissions for symlinks and special files
+> >>> are little different from regular files and directories.
+> >>>
+> >>> For symlinks, they are world readable/writable and if user xattr were
+> >>> to be permitted, it will allow unpriviliged users to dump a huge amount
+> >>> of user.* xattrs on symlinks without any control.
+> >>>
+> >>> For special files, permissions typically control capability to read/write
+> >>> from devices (and not necessarily from filesystem). So if a user can
+> >>> write to device (/dev/null), does not necessarily mean it should be allowed
+> >>> to write large number of user.* xattrs on the filesystem device node is
+> >>> residing in.
+> >>>
+> >>> This patch proposes to relax the restrictions a bit and allow file owner
+> >>> or priviliged user (CAP_FOWNER), to be able to read/write user.* xattrs
+> >>> on symlink and special files.
+> >>>
+> >>> virtiofs daemon has a need to store user.* xatrrs on all the files
+> >>> (including symlinks and special files), and currently that fails. This
+> >>> patch should help.
+> >>>
+> >>> Link: https://lore.kernel.org/linux-fsdevel/20210625191229.1752531-1-vgoyal@redhat.com/
+> >>> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> >>> ---
+> >> Seems reasonable and useful.
+> >> Acked-by: Christian Brauner <christian.brauner@ubuntu.com>
+> >>
+> >> One question, do all filesystem supporting xattrs deal with setting them
+> >> on symlinks/device files correctly?
+> > Wrote a simple bash script to do setfattr/getfattr user.foo xattr on
+> > symlink and device node on ext4, xfs and btrfs and it works fine.
 > 
-> We can't really pass actual binary mountdata using the string separation
-> scheme used by the rootfstype= option.  But given that NFS only uses
-> binary mountdata for legacy reasons and people get what they ask for
-> using the option I think we can drop the check.
-> 
-> > In case of success err == 0, but we still panic(). We will need to
-> > check for success as well.
-> 
-> Indeed.
-> 
-> > root_fs_names can be NULL and it crashes with NULL pointer dereference.
-> 
-> True.
-> 
-> What do you think of this version?
+> How about nfs, tmpfs, overlayfs and/or some of the other less conventional
+> filesystems?
 
-[ Cc Dominique Martinet ]
+tmpfs does not support user.* xattr at all on any kind of files.
 
-Hi Christoph,
+overlayfs works fine. I updated my test too.
 
-This one works well for me. Just one minor nit. root_device_name, can
-be NULL as well if user passes following.
+nfs seems to have some issues. 
 
-"rootfstype=virtiofs rw".
+- I can set user.foo xattr on symlink and query it back using xattr name.
 
-And currently mount_nodev_root() is assuming root_device_name is not NULL
-and we crash with null pointer dereference.
+  getfattr -h -n user.foo foo-link.txt
 
-May be something like this.
+  But when I try to dump all xattrs on this file, user.foo is being
+  filtered out it looks like. Not sure why.
 
-        if (ROOT_DEV == 0 && root_device_name && root_fs_names) {
-                if (mount_nodev_root() == 0)
-                        return;
-        }
+- I can't set "user.foo" xattr on a device node on nfs and I get
+  "Permission denied". I am assuming nfs server is returning this.
+  I am using knfsd with following in /etc/exports.
 
-Strangely people are using "rootfstype=virtiofs rw" to mount virtiofs
-as rootfs. They give their filesystem a tag named "/dev/root". And
-currently it works and they can mount virtiofs as rootfs.
+  /mnt/test/nfs-server 127.0.0.1(insecure,no_root_squash,rw,async)
 
-With above change, current hackish way will also continue to work and
-not break existing setups.
+Copying Bruce. He might have an idea.
 
 Thanks
 Vivek
 
 > 
-> ---
-> From 141caa79a619b5f5d100eeb8e94ecf8b3b1c9af7 Mon Sep 17 00:00:00 2001
-> From: Christoph Hellwig <hch@lst.de>
-> Date: Fri, 18 Jun 2021 15:10:39 +0200
-> Subject: init: allow mounting arbitrary non-blockdevice filesystems as root
-> 
-> Currently the only non-blockdevice filesystems that can be used as the
-> initial root filesystem are NFS and CIFS, which use the magic
-> "root=/dev/nfs" and "root=/dev/cifs" syntax that requires the root
-> device file system details to come from filesystem specific kernel
-> command line options.
-> 
-> Add a little bit of new code that allows to just pass arbitrary
-> string mount options to any non-blockdevice filesystems so that it can
-> be mounted as the root file system.
-> 
-> For example a virtiofs root file system can be mounted using the
-> following syntax:
-> 
-> "root=myfs rootfstype=virtiofs rw"
-> 
-> Based on an earlier patch from Vivek Goyal <vgoyal@redhat.com>.
-> 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->  init/do_mounts.c | 43 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 43 insertions(+)
-> 
-> diff --git a/init/do_mounts.c b/init/do_mounts.c
-> index ec32de3ad52b..66c47193e9ee 100644
-> --- a/init/do_mounts.c
-> +++ b/init/do_mounts.c
-> @@ -534,6 +534,45 @@ static int __init mount_cifs_root(void)
->  }
->  #endif
->  
-> +static bool __init fs_is_nodev(char *fstype)
-> +{
-> +	struct file_system_type *fs = get_fs_type(fstype);
-> +	bool ret = false;
-> +
-> +	if (fs) {
-> +		ret = !(fs->fs_flags & FS_REQUIRES_DEV);
-> +		put_filesystem(fs);
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static int __init mount_nodev_root(void)
-> +{
-> +	char *fs_names, *fstype;
-> +	int err = -EINVAL;
-> +
-> +	fs_names = (void *)__get_free_page(GFP_KERNEL);
-> +	if (!fs_names)
-> +		return -EINVAL;
-> +	split_fs_names(fs_names, root_fs_names);
-> +
-> +	for (fstype = fs_names; *fstype; fstype += strlen(fstype) + 1) {
-> +		if (!fs_is_nodev(fstype))
-> +			continue;
-> +		err = do_mount_root(root_device_name, fstype, root_mountflags,
-> +				    root_mount_data);
-> +		if (!err)
-> +			break;
-> +		if (err != -EACCES && err != -EINVAL)
-> +			panic("VFS: Unable to mount root \"%s\" (%s), err=%d\n",
-> +			      root_device_name, fstype, err);
-> +	}
-> +
-> +	free_page((unsigned long)fs_names);
-> +	return err;
-> +}
-> +
->  void __init mount_root(void)
->  {
->  #ifdef CONFIG_ROOT_NFS
-> @@ -550,6 +589,10 @@ void __init mount_root(void)
->  		return;
->  	}
->  #endif
-> +	if (ROOT_DEV == 0 && root_fs_names) {
-> +		if (mount_nodev_root() == 0)
-> +			return;
-> +	}
->  #ifdef CONFIG_BLOCK
->  	{
->  		int err = create_dev("/dev/root", ROOT_DEV);
-> -- 
-> 2.30.2
+> >
+> > https://github.com/rhvgoyal/misc/blob/master/generic-programs/user-xattr-special-files.sh
+> >
+> > I probably can add some more filesystems to test.
+> >
+> > Thanks
+> > Vivek
+> >
+> >>>  fs/xattr.c | 10 ++++++----
+> >>>  1 file changed, 6 insertions(+), 4 deletions(-)
+> >>>
+> >>> diff --git a/fs/xattr.c b/fs/xattr.c
+> >>> index 5c8c5175b385..2f1855c8b620 100644
+> >>> --- a/fs/xattr.c
+> >>> +++ b/fs/xattr.c
+> >>> @@ -120,12 +120,14 @@ xattr_permission(struct user_namespace *mnt_userns, struct inode *inode,
+> >>>  	}
+> >>>  
+> >>>  	/*
+> >>> -	 * In the user.* namespace, only regular files and directories can have
+> >>> -	 * extended attributes. For sticky directories, only the owner and
+> >>> -	 * privileged users can write attributes.
+> >>> +	 * In the user.* namespace, for symlinks and special files, only
+> >>> +	 * the owner and priviliged users can read/write attributes.
+> >>> +	 * For sticky directories, only the owner and privileged users can
+> >>> +	 * write attributes.
+> >>>  	 */
+> >>>  	if (!strncmp(name, XATTR_USER_PREFIX, XATTR_USER_PREFIX_LEN)) {
+> >>> -		if (!S_ISREG(inode->i_mode) && !S_ISDIR(inode->i_mode))
+> >>> +		if (!S_ISREG(inode->i_mode) && !S_ISDIR(inode->i_mode) &&
+> >>> +		    !inode_owner_or_capable(mnt_userns, inode))
+> >>>  			return (mask & MAY_WRITE) ? -EPERM : -ENODATA;
+> >>>  		if (S_ISDIR(inode->i_mode) && (inode->i_mode & S_ISVTX) &&
+> >>>  		    (mask & MAY_WRITE) &&
+> >>> -- 
+> >>> 2.25.4
+> >>>
 > 
 

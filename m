@@ -1,14 +1,14 @@
-Resent-Message-Id: <202106171840.15HIeRRH003780@lists01.pubmisc.prod.ext.phx2.redhat.com>
-In-Reply-To: <20210617181213.1177835-1-vgoyal@redhat.com>
-Message-ID: <162395428716.2536.16283139617440086783@7c66fb7bc3ab>
+Date: Fri, 9 Jul 2021 11:19:15 +0200
+From: Christian Brauner <christian.brauner@ubuntu.com>
+Message-ID: <20210709091915.2bd4snyfjndexw2b@wittgenstein>
+References: <20210708175738.360757-1-vgoyal@redhat.com>
+	<20210708175738.360757-2-vgoyal@redhat.com>
 MIME-Version: 1.0
-From: no-reply@patchew.org
-Date: Thu, 17 Jun 2021 11:24:48 -0700 (PDT)
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH v6 0/8] virtiofsd: Add support to
-	enable/disable posix acls
-Reply-To: qemu-devel@nongnu.org
+In-Reply-To: <20210708175738.360757-2-vgoyal@redhat.com>
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Subject: Re: [Virtio-fs] [PATCH v2 1/1] xattr: Allow user.* xattr on symlink
+ and special files
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,100 +17,71 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: vgoyal@redhat.com
-Cc: miklos@szeredi.hu, qemu-devel@nongnu.org, virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: gscrivan@redhat.com, tytso@mit.edu, miklos@szeredi.hu, selinux@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, casey.schaufler@intel.com, linux-security-module@vger.kernel.org, viro@zeniv.linux.org.uk, Christoph Hellwig <hch@infradead.org>, linux-fsdevel@vger.kernel.org, jack@suse.cz
 
-Patchew URL: https://patchew.org/QEMU/20210617181213.1177835-1-vgoyal@redhat.com/
+On Thu, Jul 08, 2021 at 01:57:38PM -0400, Vivek Goyal wrote:
+> Currently user.* xattr are not allowed on symlink and special files.
+> 
+> man xattr and recent discussion suggested that primary reason for this
+> restriction is how file permissions for symlinks and special files
+> are little different from regular files and directories.
+> 
+> For symlinks, they are world readable/writable and if user xattr were
+> to be permitted, it will allow unpriviliged users to dump a huge amount
+> of user.* xattrs on symlinks without any control.
+> 
+> For special files, permissions typically control capability to read/write
+> from devices (and not necessarily from filesystem). So if a user can
+> write to device (/dev/null), does not necessarily mean it should be allowed
+> to write large number of user.* xattrs on the filesystem device node is
+> residing in.
+> 
+> This patch proposes to relax the restrictions a bit and allow file owner
+> or priviliged user (CAP_FOWNER), to be able to read/write user.* xattrs
+> on symlink and special files.
+> 
+> virtiofs daemon has a need to store user.* xatrrs on all the files
+> (including symlinks and special files), and currently that fails. This
+> patch should help.
+> 
+> Link: https://lore.kernel.org/linux-fsdevel/20210625191229.1752531-1-vgoyal@redhat.com/
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
 
+Seems reasonable and useful.
+Acked-by: Christian Brauner <christian.brauner@ubuntu.com>
 
+One question, do all filesystem supporting xattrs deal with setting them
+on symlinks/device files correctly?
 
-Hi,
-
-This series seems to have some coding style problems. See output below for
-more information:
-
-Type: series
-Message-id: 20210617181213.1177835-1-vgoyal@redhat.com
-Subject: [PATCH v6 0/8] virtiofsd: Add support to enable/disable posix acls
-
-=== TEST SCRIPT BEGIN ===
-#!/bin/bash
-git rev-parse base > /dev/null || exit 0
-git config --local diff.renamelimit 0
-git config --local diff.renames True
-git config --local diff.algorithm histogram
-./scripts/checkpatch.pl --mailback base..
-=== TEST SCRIPT END ===
-
-Updating 3c8cf5a9c21ff8782164d1def7f44bd888713384
->From https://github.com/patchew-project/qemu
- * [new tag]         patchew/20210617181213.1177835-1-vgoyal@redhat.com -> patchew/20210617181213.1177835-1-vgoyal@redhat.com
-Switched to a new branch 'test'
-c812c39 virtiofsd: Add an option to enable/disable posix acls
-62af00e virtiofsd: Switch creds, drop FSETID for system.posix_acl_access xattr
-e93c53d virtiofsd: Add capability to change/restore umask
-5588053 virtiofsd: Add umask to seccom allow list
-dc2337e virtiofsd: Add support for extended setxattr
-65fc720 virtiofsd: Fix xattr operations overwriting errno
-967e28d virtiofsd: Fix fuse setxattr() API change issue
-6c3d050 linux-headers: Update linux headers to 5.13.0-rc6
-
-=== OUTPUT BEGIN ===
-1/8 Checking commit 6c3d050bd70f (linux-headers: Update linux headers to 5.13.0-rc6)
-2/8 Checking commit 967e28d2e22d (virtiofsd: Fix fuse setxattr() API change issue)
-ERROR: braces {} are necessary for all arms of this statement
-#50: FILE: tools/virtiofsd/fuse_lowlevel.c:1424:
-+    if (setxattr_ext)
-[...]
-+    else
-[...]
-
-total: 1 errors, 0 warnings, 25 lines checked
-
-Patch 2/8 has style problems, please review.  If any of these errors
-are false positives report them to the maintainer, see
-CHECKPATCH in MAINTAINERS.
-
-3/8 Checking commit 65fc720e49ac (virtiofsd: Fix xattr operations overwriting errno)
-4/8 Checking commit dc2337e643fc (virtiofsd: Add support for extended setxattr)
-5/8 Checking commit 5588053fd40b (virtiofsd: Add umask to seccom allow list)
-6/8 Checking commit e93c53dabdb7 (virtiofsd: Add capability to change/restore umask)
-7/8 Checking commit 62af00ed759e (virtiofsd: Switch creds, drop FSETID for system.posix_acl_access xattr)
-ERROR: suspect code indent for conditional statements (4, 7)
-#83: FILE: tools/virtiofsd/passthrough_ll.c:1208:
-+    if (ret) {
-+       if (__cap_dropped) {
-
-ERROR: suspect code indent for conditional statements (7, 10)
-#84: FILE: tools/virtiofsd/passthrough_ll.c:1209:
-+       if (__cap_dropped) {
-+          if (gain_effective_cap(cap_name)) {
-
-ERROR: suspect code indent for conditional statements (10, 14)
-#85: FILE: tools/virtiofsd/passthrough_ll.c:1210:
-+          if (gain_effective_cap(cap_name)) {
-+              fuse_log(FUSE_LOG_ERR, "Failed to gain CAP_%s\n", cap_name);
-
-ERROR: braces {} are necessary for all arms of this statement
-#91: FILE: tools/virtiofsd/passthrough_ll.c:1216:
-+    if (cap_dropped)
-[...]
-
-total: 4 errors, 0 warnings, 105 lines checked
-
-Patch 7/8 has style problems, please review.  If any of these errors
-are false positives report them to the maintainer, see
-CHECKPATCH in MAINTAINERS.
-
-8/8 Checking commit c812c393f36a (virtiofsd: Add an option to enable/disable posix acls)
-=== OUTPUT END ===
-
-Test command exited with code: 1
-
-
-The full log is available at
-http://patchew.org/logs/20210617181213.1177835-1-vgoyal@redhat.com/testing.checkpatch/?type=message.
----
-Email generated automatically by Patchew [https://patchew.org/].
-Please send your feedback to patchew-devel@redhat.com
+>  fs/xattr.c | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/fs/xattr.c b/fs/xattr.c
+> index 5c8c5175b385..2f1855c8b620 100644
+> --- a/fs/xattr.c
+> +++ b/fs/xattr.c
+> @@ -120,12 +120,14 @@ xattr_permission(struct user_namespace *mnt_userns, struct inode *inode,
+>  	}
+>  
+>  	/*
+> -	 * In the user.* namespace, only regular files and directories can have
+> -	 * extended attributes. For sticky directories, only the owner and
+> -	 * privileged users can write attributes.
+> +	 * In the user.* namespace, for symlinks and special files, only
+> +	 * the owner and priviliged users can read/write attributes.
+> +	 * For sticky directories, only the owner and privileged users can
+> +	 * write attributes.
+>  	 */
+>  	if (!strncmp(name, XATTR_USER_PREFIX, XATTR_USER_PREFIX_LEN)) {
+> -		if (!S_ISREG(inode->i_mode) && !S_ISDIR(inode->i_mode))
+> +		if (!S_ISREG(inode->i_mode) && !S_ISDIR(inode->i_mode) &&
+> +		    !inode_owner_or_capable(mnt_userns, inode))
+>  			return (mask & MAY_WRITE) ? -EPERM : -ENODATA;
+>  		if (S_ISDIR(inode->i_mode) && (inode->i_mode & S_ISVTX) &&
+>  		    (mask & MAY_WRITE) &&
+> -- 
+> 2.25.4
+> 
 

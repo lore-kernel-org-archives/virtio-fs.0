@@ -1,21 +1,15 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yahoo.com; s=s2048;
-	t=1625844886; bh=SieMPENr+iK+KcL0G0K1VanNrw7E+LW+qUB6eyubrdo=;
-	h=Subject:To:Cc:References:From:Date:In-Reply-To:From:Subject:Reply-To;
-	b=UuX+QspsKgTMINOVauXpYiuLxilbJf32GPqpPVnR7OqR1p3SrmlqPhtqPwwDcigK80r3nYqlR1cD7Y5DDkt+rUuI6rmzrGhymE3hcpneYHawyt3ftny+vLj18NfKzfxipH+JBRCtASckJVjGLU1YOaQuhrs/alOLtkSh5vbs0le+YSBoX2eeXD7aYqaLfYI3EgCOlc5DztXLfUggLSfbDe+o+LozlXmXaa5d9THTB5mIH5lnKlfsudbm9bxmy3L9PKlyPaHqzM6mizXHeLDCqYNlWT8+y7YwzamoPF+WPw9BxxJH5vijrLRa3vJVkWMWxOAtaGODSNFr0hFs/1Rldg==
 References: <20210708175738.360757-1-vgoyal@redhat.com>
-	<20210708175738.360757-2-vgoyal@redhat.com>
-	<20210709091915.2bd4snyfjndexw2b@wittgenstein>
-	<20210709152737.GA398382@redhat.com>
-From: Casey Schaufler <casey@schaufler-ca.com>
-Message-ID: <710d1c6f-d477-384f-0cc1-8914258f1fb1@schaufler-ca.com>
-Date: Fri, 9 Jul 2021 08:34:41 -0700
+From: Daniel Walsh <dwalsh@redhat.com>
+Message-ID: <76d4a0ed-7582-cc73-a447-5f2d133c3c24@redhat.com>
+Date: Fri, 9 Jul 2021 12:00:07 -0400
 MIME-Version: 1.0
-In-Reply-To: <20210709152737.GA398382@redhat.com>
-Content-Type: text/plain; charset=utf-8
-Content-Transfer-Encoding: 7bit
+In-Reply-To: <20210708175738.360757-1-vgoyal@redhat.com>
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Transfer-Encoding: 8bit
 Content-Language: en-US
-Subject: Re: [Virtio-fs] [PATCH v2 1/1] xattr: Allow user.* xattr on symlink
- and special files
+Subject: Re: [Virtio-fs] [RFC PATCH v2 0/1] Relax restrictions on user.*
+	xattr
+Reply-To: dwalsh@redhat.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,85 +18,88 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>, Christian Brauner <christian.brauner@ubuntu.com>
-Cc: gscrivan@redhat.com, tytso@mit.edu, miklos@szeredi.hu, selinux@vger.kernel.org, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, casey.schaufler@intel.com, linux-security-module@vger.kernel.org, viro@zeniv.linux.org.uk, Christoph Hellwig <hch@infradead.org>, linux-fsdevel@vger.kernel.org, jack@suse.cz
+To: Vivek Goyal <vgoyal@redhat.com>, linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, viro@zeniv.linux.org.uk
+Cc: gscrivan@redhat.com, tytso@mit.edu, miklos@szeredi.hu, selinux@vger.kernel.org, virtio-fs@redhat.com, linux-security-module@vger.kernel.org, casey.schaufler@intel.com, jack@suse.cz, christian.brauner@ubuntu.com
 
-On 7/9/2021 8:27 AM, Vivek Goyal wrote:
-> On Fri, Jul 09, 2021 at 11:19:15AM +0200, Christian Brauner wrote:
->> On Thu, Jul 08, 2021 at 01:57:38PM -0400, Vivek Goyal wrote:
->>> Currently user.* xattr are not allowed on symlink and special files.
->>>
->>> man xattr and recent discussion suggested that primary reason for this
->>> restriction is how file permissions for symlinks and special files
->>> are little different from regular files and directories.
->>>
->>> For symlinks, they are world readable/writable and if user xattr were
->>> to be permitted, it will allow unpriviliged users to dump a huge amount
->>> of user.* xattrs on symlinks without any control.
->>>
->>> For special files, permissions typically control capability to read/write
->>> from devices (and not necessarily from filesystem). So if a user can
->>> write to device (/dev/null), does not necessarily mean it should be allowed
->>> to write large number of user.* xattrs on the filesystem device node is
->>> residing in.
->>>
->>> This patch proposes to relax the restrictions a bit and allow file owner
->>> or priviliged user (CAP_FOWNER), to be able to read/write user.* xattrs
->>> on symlink and special files.
->>>
->>> virtiofs daemon has a need to store user.* xatrrs on all the files
->>> (including symlinks and special files), and currently that fails. This
->>> patch should help.
->>>
->>> Link: https://lore.kernel.org/linux-fsdevel/20210625191229.1752531-1-vgoyal@redhat.com/
->>> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
->>> ---
->> Seems reasonable and useful.
->> Acked-by: Christian Brauner <christian.brauner@ubuntu.com>
->>
->> One question, do all filesystem supporting xattrs deal with setting them
->> on symlinks/device files correctly?
-> Wrote a simple bash script to do setfattr/getfattr user.foo xattr on
-> symlink and device node on ext4, xfs and btrfs and it works fine.
-
-How about nfs, tmpfs, overlayfs and/or some of the other less conventional
-filesystems?
-
+On 7/8/21 13:57, Vivek Goyal wrote:
+> Hi,
 >
-> https://github.com/rhvgoyal/misc/blob/master/generic-programs/user-xattr-special-files.sh
+> This is V2 of the patch. Posted V1 here.
 >
-> I probably can add some more filesystems to test.
+> https://lore.kernel.org/linux-fsdevel/20210625191229.1752531-1-vgoyal@redhat.com/
+>
+> Right now we don't allow setting user.* xattrs on symlinks and special
+> files at all. Initially I thought that real reason behind this
+> restriction is quota limitations but from last conversation it seemed
+> that real reason is that permission bits on symlink and special files
+> are special and different from regular files and directories, hence
+> this restriction is in place.
+>
+> Given it probably is not a quota issue (I tested with xfs user quota
+> enabled and quota restrictions kicked in on symlink), I dropped the
+> idea of allowing user.* xattr if process has CAP_SYS_RESOURCE.
+>
+> Instead this version of patch allows reading/writing user.* xattr
+> on symlink and special files if caller is owner or priviliged (has
+> CAP_FOWNER) w.r.t inode.
+>
+> We need this for virtiofs daemon. I also found one more user. Giuseppe,
+> seems to set user.* xattr attrs on unpriviliged fuse-overlay as well
+> and he ran into similar issue. So fuse-overlay should benefit from
+> this change as well.
+>
+> Who wants to set user.* xattr on symlink/special files
+> -----------------------------------------------------
+>
+> In virtiofs, actual file server is virtiosd daemon running on host.
+> There we have a mode where xattrs can be remapped to something else.
+> For example security.selinux can be remapped to
+> user.virtiofsd.securit.selinux on the host.
+>
+> This remapping is useful when SELinux is enabled in guest and virtiofs
+> as being used as rootfs. Guest and host SELinux policy might not match
+> and host policy might deny security.selinux xattr setting by guest
+> onto host. Or host might have SELinux disabled and in that case to
+> be able to set security.selinux xattr, virtiofsd will need to have
+> CAP_SYS_ADMIN (which we are trying to avoid). Being able to remap
+> guest security.selinux (or other xattrs) on host to something else
+> is also better from security point of view.
+>
+> But when we try this, we noticed that SELinux relabeling in guest
+> is failing on some symlinks. When I debugged a little more, I
+> came to know that "user.*" xattrs are not allowed on symlinks
+> or special files.
+>
+> So if we allow owner (or CAP_FOWNER) to set user.* xattr, it will
+> allow virtiofs to arbitrarily remap guests's xattrs to something
+> else on host and that solves this SELinux issue nicely and provides
+> two SELinux policies (host and guest) to co-exist nicely without
+> interfering with each other.
 >
 > Thanks
 > Vivek
 >
->>>  fs/xattr.c | 10 ++++++----
->>>  1 file changed, 6 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/fs/xattr.c b/fs/xattr.c
->>> index 5c8c5175b385..2f1855c8b620 100644
->>> --- a/fs/xattr.c
->>> +++ b/fs/xattr.c
->>> @@ -120,12 +120,14 @@ xattr_permission(struct user_namespace *mnt_userns, struct inode *inode,
->>>  	}
->>>  
->>>  	/*
->>> -	 * In the user.* namespace, only regular files and directories can have
->>> -	 * extended attributes. For sticky directories, only the owner and
->>> -	 * privileged users can write attributes.
->>> +	 * In the user.* namespace, for symlinks and special files, only
->>> +	 * the owner and priviliged users can read/write attributes.
->>> +	 * For sticky directories, only the owner and privileged users can
->>> +	 * write attributes.
->>>  	 */
->>>  	if (!strncmp(name, XATTR_USER_PREFIX, XATTR_USER_PREFIX_LEN)) {
->>> -		if (!S_ISREG(inode->i_mode) && !S_ISDIR(inode->i_mode))
->>> +		if (!S_ISREG(inode->i_mode) && !S_ISDIR(inode->i_mode) &&
->>> +		    !inode_owner_or_capable(mnt_userns, inode))
->>>  			return (mask & MAY_WRITE) ? -EPERM : -ENODATA;
->>>  		if (S_ISDIR(inode->i_mode) && (inode->i_mode & S_ISVTX) &&
->>>  		    (mask & MAY_WRITE) &&
->>> -- 
->>> 2.25.4
->>>
+>
+> Vivek Goyal (1):
+>    xattr: Allow user.* xattr on symlink and special files
+>
+>   fs/xattr.c | 10 ++++++----
+>   1 file changed, 6 insertions(+), 4 deletions(-)
+>
+I just wanted to point out that the work Giuseppe is doing is to support 
+nfs homedirs with container runtimes like Rootless Podman.
+
+
+Basically fuse-overlayfs on top of NFS homedir needs to be able to use 
+user xattrs to set file permissions and ownership fields to be 
+represented to containers.
+
+Currently NFS Servers do not understand User Namespace and seeing a 
+client user attempting to chown to a different user, is blocked on the 
+server, even though user namespace on the client allows it.  
+fuse-overlay intercepts the chown from the container and writes out the 
+user.Xattr the permissions and owner/group as user.Xattrs.  And all the 
+server sees is the user modifying the xattrs now chowning the real UID 
+of the file.
+
 

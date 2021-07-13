@@ -1,20 +1,27 @@
-Date: Tue, 13 Jul 2021 07:40:08 +0200
-From: Christoph Hellwig <hch@lst.de>
-Message-ID: <20210713054008.GA5825@lst.de>
-References: <20210621062657.3641879-1-hch@lst.de>
-	<20210622081217.GA2975@lst.de>
-	<YNGhERcnLuzjn8j9@stefanha-x1.localdomain>
-	<20210629205048.GE5231@redhat.com> <20210630053601.GA29241@lst.de>
-	<20210707210404.GB244500@redhat.com>
-	<20210707210636.GC244500@redhat.com>
-	<20210708125936.GA319010@redhat.com>
-	<20210712182130.GC502004@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yahoo.com; s=s2048;
+	t=1626185824; bh=qSmib3x1dLQWlJoX90dq7cHQ8qcLZnxM2n0EuG5rzmQ=;
+	h=Subject:To:Cc:References:From:Date:In-Reply-To:From:Subject:Reply-To;
+	b=FFkKSsZe+cCb42thO5qAALp49q8v9dvIE2/84zyvZfFFJwACSvuAXaUPj9m04/zYOGIvAQw1XIwYBLfXWvFXy8az7vOcRZIRlBChNHNo3qXIC+aqiodRmnuVVFEBS7ovTHo5YjQ1HRbTnVBb6Ggt2M794VoVghWDY89yawjeVCsx6kdRYJyx5GSnBS7KMpRS3jjfty43ViA7ktcK6wEqoh3uzeT0rcvFa1S82HbGWRvsYRbTGrk3Oyz2YMKA0Ahu19Qf2CFSJck5jmQk7Pk8NxdhE7C1RHKBbG1SnonKj2L3e/zZQMgchDcJFSNj9t4pRAPrQUEhO/hR9w+ilJCiDw==
+References: <20210708175738.360757-1-vgoyal@redhat.com>
+	<20210708175738.360757-2-vgoyal@redhat.com>
+	<20210709091915.2bd4snyfjndexw2b@wittgenstein>
+	<20210709152737.GA398382@redhat.com>
+	<710d1c6f-d477-384f-0cc1-8914258f1fb1@schaufler-ca.com>
+	<20210709175947.GB398382@redhat.com>
+	<CAPL3RVGKg4G5qiiHo7KYPcsWWgeoW=qNPOSQpd3Sv329jrWrLQ@mail.gmail.com>
+	<20210712140247.GA486376@redhat.com>
+	<20210712154106.GB18679@fieldses.org>
+	<20210712174759.GA502004@redhat.com>
+From: Casey Schaufler <casey@schaufler-ca.com>
+Message-ID: <3d55ff30-c6cf-46c4-0e32-3b578099343d@schaufler-ca.com>
+Date: Tue, 13 Jul 2021 07:17:00 -0700
 MIME-Version: 1.0
-In-Reply-To: <20210712182130.GC502004@redhat.com>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH 3/2] fs: simplify get_filesystem_list /
- get_all_fs_names
+In-Reply-To: <20210712174759.GA502004@redhat.com>
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+Content-Language: en-US
+Subject: Re: [Virtio-fs] [PATCH v2 1/1] xattr: Allow user.* xattr on symlink
+ and special files
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,12 +30,114 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: linux-kernel@vger.kernel.org, virtio-fs@redhat.com, viro@zeniv.linux.org.uk, linux-fsdevel@vger.kernel.org, Christoph Hellwig <hch@lst.de>
+To: Vivek Goyal <vgoyal@redhat.com>, "J. Bruce Fields" <bfields@fieldses.org>
+Cc: gscrivan@redhat.com, Bruce Fields <bfields@redhat.com>, miklos@szeredi.hu, selinux@vger.kernel.org, Casey Schaufler <casey@schaufler-ca.com>, jack@suse.cz, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, casey.schaufler@intel.com, linux-security-module@vger.kernel.org, viro@zeniv.linux.org.uk, Christoph Hellwig <hch@infradead.org>, linux-fsdevel@vger.kernel.org, tytso@mit.edu, Christian Brauner <christian.brauner@ubuntu.com>
 
-On Mon, Jul 12, 2021 at 02:21:30PM -0400, Vivek Goyal wrote:
-> In case you are finding it hard to spend some time on these patches, I 
-> can take those patches, merge my changes and repost them.
+On 7/12/2021 10:47 AM, Vivek Goyal wrote:
+> On Mon, Jul 12, 2021 at 11:41:06AM -0400, J. Bruce Fields wrote:
+>> On Mon, Jul 12, 2021 at 10:02:47AM -0400, Vivek Goyal wrote:
+>>> On Fri, Jul 09, 2021 at 04:10:16PM -0400, Bruce Fields wrote:
+>>>> On Fri, Jul 9, 2021 at 1:59 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+>>>>> nfs seems to have some issues.
+>>>> I'm not sure what the expected behavior is for nfs.  All I have for
+>>>> now is some generic troubleshooting ideas, sorry:
+>>>>
+>>>>> - I can set user.foo xattr on symlink and query it back using xattr name.
+>>>>>
+>>>>>   getfattr -h -n user.foo foo-link.txt
+>>>>>
+>>>>>   But when I try to dump all xattrs on this file, user.foo is being
+>>>>>   filtered out it looks like. Not sure why.
+>>>> Logging into the server and seeing what's set there could help confirm
+>>>> whether it's the client or server that's at fault.  (Or watching the
+>>>> traffic in wireshark; there are GET/SET/LISTXATTR ops that should be
+>>>> easy to spot.)
+>>>>
+>>>>> - I can't set "user.foo" xattr on a device node on nfs and I get
+>>>>>   "Permission denied". I am assuming nfs server is returning this.
+>>>> Wireshark should tell you whether it's the server or client doing that.
+>>>>
+>>>> The RFC is https://datatracker.ietf.org/doc/html/rfc8276, and I don't
+>>>> see any explicit statement about what the server should do in the case
+>>>> of symlinks or device nodes, but I do see "Any regular file or
+>>>> directory may have a set of extended attributes", so that was clearly
+>>>> the assumption.  Also, NFS4ERR_WRONG_TYPE is listed as a possible
+>>>> error return for the xattr ops.  But on a quick skim I don't see any
+>>>> explicit checks in the nfsd code, so I *think* it's just relying on
+>>>> the vfs for any file type checks.
+>>> Hi Bruce,
+>>>
+>>> Thanks for the response. I am just trying to do set a user.foo xattr on
+>>> a device node on nfs.
+>>>
+>>> setfattr -n "user.foo" -v "bar" /mnt/nfs/test-dev
+>>>
+>>> and I get -EACCESS.
+>>>
+>>> I put some printk() statements and EACCESS is being returned from here.
+>>>
+>>> nfs4_xattr_set_nfs4_user() {
+>>>         if (!nfs_access_get_cached(inode, current_cred(), &cache, true)) {
+>>>                 if (!(cache.mask & NFS_ACCESS_XAWRITE)) {
+>>>                         return -EACCES;
+>>>                 }
+>>>         }
+>>> }
+>>>
+>>> Value of cache.mask=0xd at the time of error.
+>> Looks like 0xd is what the server returns to access on a device node
+>> with mode bits rw- for the caller.
+>>
+>> Commit c11d7fd1b317 "nfsd: take xattr bits into account for permission
+>> checks" added the ACCESS_X* bits for regular files and directories but
+>> not others.
+>>
+>> But you don't want to determine permission from the mode bits anyway,
+>> you want it to depend on the owner,
+> Thinking more about this part. Current implementation of my patch is
+> effectively doing both the checks. It checks that you are owner or
+> have CAP_FOWNER in xattr_permission() and then goes on to call
+> inode_permission(). And that means file mode bits will also play a
+> role. If caller does not have write permission on the file, it will
+> be denied setxattr().
+>
+> If I don't call inode_permission(), and just return 0 right away for
+> file owner (for symlinks and special files), then just being owner
+> is enough to write user.* xattr. And then even security modules will
+> not get a chance to block that operation.
 
-Yes, please do.  Thanks a lot!
+That isn't going to fly. SELinux and Smack don't rely on ownership
+as a criteria for access. Being the owner of a symlink conveys no
+special privilege. The LSM must be consulted to determine if the
+module's policy allows the access.
+
+>  IOW, if you are owner of
+> a symlink or special file, you can write as many user.* xattr as you
+> like and except quota does not look like anything else can block
+> it. I am wondering if this approach is ok?
+>
+>
+>
+>> so I guess we should be calling
+>> xattr_permission somewhere if we want that behavior.
+>> The RFC assumes user xattrs are for regular files and directories,
+>> without, as far as I can tell, actually explicitly forbidding them on
+>> other objects.  We should also raise this with the working group if we
+>> want to increase the chances that you'll get the behavior you want on
+>> non-Linux servers.
+> Ok. I am hoping once this patch merges in some form, then I can
+> follow it up with relevant working group.
+>
+>> The "User extended attributes" section of the xattr(7) man page will
+>> need updating.
+> Agreed. I will take care of that in a separate patch.
+>
+> Right now, I am not too sure if being owner should be the only check
+> and I should skip calling inode_permission() entirely or not.
+>
+> Thanks
+> Vivek
+>
+>> --b.
+>>
 

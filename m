@@ -1,17 +1,11 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-	d=kldigitalweb.com; s=google;
-	h=mime-version:sender:from:date:message-id:subject:to;
-	bh=zA+iMCVPPqh3WIzZebxv2e6gDouev/RwEEZuSsPLL3I=;
-	b=fG00GDbvdPT1QV9b7N1wR0ZIPwyiyByae+1Sc1oivPaa6/wfajZb98wirZfGW6aVfw
-	/rI29uSoLFqugVEJqi3oc31uff3YQVtRlYs6/7Q/GFm2/HfAVsjZkTMKzfRX+CAquq5p
-	wX1m7etF3Hlk384RJyBmqNVTw2BePqx29yolc=
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Wed, 14 Jul 2021 16:23:19 -0400
+Message-Id: <20210714202321.59729-2-vgoyal@redhat.com>
+In-Reply-To: <20210714202321.59729-1-vgoyal@redhat.com>
+References: <20210714202321.59729-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Sender: luisjennifer@kldigitalweb.com
-From: luisjennifer@kldigitalweb.com
-Date: Wed, 14 Jul 2021 03:26:05 -0700
-Message-ID: <CAA8ha74HdPdd4ZsUxh6KxeHRStssE5DuQn+6ZUEqMhhYnhNc3A@mail.gmail.com>
-Content-Type: multipart/alternative; boundary="000000000000378dc805c712c833"
-Subject: Re: [Virtio-fs] virtio-fs.gitlab.io: We should discuss this!!
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v3 1/3] init: split get_fs_names
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,104 +14,88 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Virtio-Fs <virtio-fs@redhat.com>
+To: viro@zeniv.linux.org.uk
+Cc: miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, v9fs-developer@lists.sourceforge.net, hch@lst.de
 
---000000000000378dc805c712c833
-Content-Type: text/plain; charset="UTF-8"
+From: Christoph Hellwig <hch@lst.de>
 
-Hello *virtio-fs.gitlab.io <http://virtio-fs.gitlab.io>*,
+Split get_fs_names into one function that splits up the command line
+argument, and one that gets the list of all registered file systems.
 
-Hope you are doing well.
+Signed-off-by: Christoph Hellwig <hch@lst.de>
+---
+ init/do_mounts.c | 48 ++++++++++++++++++++++++++----------------------
+ 1 file changed, 26 insertions(+), 22 deletions(-)
 
-I was looking for Keywords and found your website on page 3-4 of Google. If
-you were on page #1, you'd get so many prospects/new clients every day.
-Most of your targeted keywords on page #3-5. You're so close! Do you mind
-if I sent a FREE SEO Audit of your site to see why you're not on page #1?
-
-It's totally free. I can send the audit report in a couple hours. If you
-have any questions, feel free to ask me. I have more than 10 years of
-experience in digital marketing.
-
-Can I send it over?
-
-Look forward to your reply.
-
-Kind Regards
-
-*Jennifer Luis**! Business Development Manager*
-
---------------------------------------------------------
-
-*Note:* - Our next conversation will be on my corporate Email ID. If this
-is something you are interested, please respond to this email. If this is
-not your interest, don't worry, we will not email you again.
-
---000000000000378dc805c712c833
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr"><p class=3D"MsoNormal" style=3D"margin:0in 0in 10pt;line-h=
-eight:115%;font-size:11pt;font-family:Calibri,sans-serif"><span style=3D"fo=
-nt-size:13.5pt;line-height:115%">Hello <b><a href=3D"http://virtio-fs.gitla=
-b.io">virtio-fs.gitlab.io</a></b>,=C2=A0</span></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in 0in 10pt;line-height:115%;font-s=
-ize:11pt;font-family:Calibri,sans-serif"><span style=3D"font-size:13.5pt;li=
-ne-height:115%">Hope you are doing well.=C2=A0</span></p>
-
-<p class=3D"MsoNormal" style=3D"line-height:normal;margin:0in 0in 10pt;font=
--size:11pt;font-family:Calibri,sans-serif"><span style=3D"font-size:13.5pt"=
->I was
-looking for=C2=A0Keywords=C2=A0and found your website on page 3-4 of Google=
-. If
-you were on page #1, you&#39;d get so many prospects/new clients every day.=
-=C2=A0
-Most of your targeted keywords on page #3-5. You&#39;re so close! Do you mi=
-nd if I sent
-a <span style=3D"background:yellow">FREE SEO Audit</span> of
-your site to see why you&#39;re not on page #1?</span></p>
-
-<p class=3D"MsoNormal" style=3D"line-height:normal;margin:0in 0in 10pt;font=
--size:11pt;font-family:Calibri,sans-serif"><span style=3D"font-size:13.5pt"=
->It&#39;s
-totally free. I can send the audit report in a couple hours. If you have an=
-y
-questions, feel free to ask me. I have more than 10 years of experience in
-digital=C2=A0marketing.</span></p>
-
-<p class=3D"MsoNormal" style=3D"line-height:normal;margin:0in 0in 10pt;font=
--size:11pt;font-family:Calibri,sans-serif"><span style=3D"font-size:13.5pt"=
->Can I
-send it over?</span></p>
-
-<p class=3D"MsoNormal" style=3D"line-height:normal;margin:0in 0in 10pt;font=
--size:11pt;font-family:Calibri,sans-serif"><span style=3D"font-size:13.5pt"=
->Look
-forward to your reply.</span></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in 0in 0.0001pt;line-height:normal;=
-font-size:11pt;font-family:Calibri,sans-serif"><span style=3D"font-size:13.=
-5pt">Kind
-Regards</span></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in 0in 0.0001pt;line-height:normal;=
-font-size:11pt;font-family:Calibri,sans-serif"><b><span style=3D"font-size:=
-13.5pt">Jennifer Luis</span></b><b><span style=3D"font-size:13.5pt">! Busin=
-ess Development Manager</span></b></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in 0in 0.0001pt;line-height:normal;=
-font-size:11pt;font-family:Calibri,sans-serif"><span style=3D"font-size:13.=
-5pt">--------------------------------------------------------</span></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in 0in 10pt;line-height:115%;font-s=
-ize:11pt;font-family:Calibri,sans-serif"><b><span style=3D"font-size:13.5pt=
-;line-height:115%">Note:</span></b><span style=3D"font-size:13.5pt;line-hei=
-ght:115%">=C2=A0-
-Our next conversation will be on my corporate Email ID. If this is somethin=
-g
-you are interested, please respond to this email. If this is not your inter=
-est,
-don&#39;t worry, we will not email you again.=C2=A0 =C2=A0</span></p></div>
-
---000000000000378dc805c712c833--
+diff --git a/init/do_mounts.c b/init/do_mounts.c
+index 74aede860de7..ec32de3ad52b 100644
+--- a/init/do_mounts.c
++++ b/init/do_mounts.c
+@@ -338,30 +338,31 @@ __setup("rootflags=", root_data_setup);
+ __setup("rootfstype=", fs_names_setup);
+ __setup("rootdelay=", root_delay_setup);
+ 
+-static void __init get_fs_names(char *page)
++static void __init split_fs_names(char *page, char *names)
+ {
+-	char *s = page;
+-
+-	if (root_fs_names) {
+-		strcpy(page, root_fs_names);
+-		while (*s++) {
+-			if (s[-1] == ',')
+-				s[-1] = '\0';
+-		}
+-	} else {
+-		int len = get_filesystem_list(page);
+-		char *p, *next;
++	strcpy(page, root_fs_names);
++	while (*page++) {
++		if (page[-1] == ',')
++			page[-1] = '\0';
++	}
++	*page = '\0';
++}
+ 
+-		page[len] = '\0';
+-		for (p = page-1; p; p = next) {
+-			next = strchr(++p, '\n');
+-			if (*p++ != '\t')
+-				continue;
+-			while ((*s++ = *p++) != '\n')
+-				;
+-			s[-1] = '\0';
+-		}
++static void __init get_all_fs_names(char *page)
++{
++	int len = get_filesystem_list(page);
++	char *s = page, *p, *next;
++
++	page[len] = '\0';
++	for (p = page - 1; p; p = next) {
++		next = strchr(++p, '\n');
++		if (*p++ != '\t')
++			continue;
++		while ((*s++ = *p++) != '\n')
++			;
++		s[-1] = '\0';
+ 	}
++
+ 	*s = '\0';
+ }
+ 
+@@ -411,7 +412,10 @@ void __init mount_block_root(char *name, int flags)
+ 
+ 	scnprintf(b, BDEVNAME_SIZE, "unknown-block(%u,%u)",
+ 		  MAJOR(ROOT_DEV), MINOR(ROOT_DEV));
+-	get_fs_names(fs_names);
++	if (root_fs_names)
++		split_fs_names(fs_names, root_fs_names);
++	else
++		get_all_fs_names(fs_names);
+ retry:
+ 	for (p = fs_names; *p; p += strlen(p)+1) {
+ 		int err = do_mount_root(name, p, flags, root_mount_data);
+-- 
+2.31.1
 

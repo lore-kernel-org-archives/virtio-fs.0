@@ -1,11 +1,11 @@
-Date: Tue, 27 Jul 2021 14:29:33 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YQBQje2SBNw9hqO0@redhat.com>
+Date: Thu, 29 Jul 2021 17:08:16 +0200
+From: Christian Brauner <christian.brauner@ubuntu.com>
+Message-ID: <20210729150816.jg5brzgt7nndhtdi@wittgenstein>
 References: <20210714202321.59729-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
 In-Reply-To: <20210714202321.59729-1-vgoyal@redhat.com>
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
 Subject: Re: [Virtio-fs] [PATCH v3 0/3] support booting of arbitrary
  non-blockdevice file systems
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -16,20 +16,13 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: viro@zeniv.linux.org.uk
-Cc: miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, v9fs-developer@lists.sourceforge.net, hch@lst.de
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: miklos@szeredi.hu, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, viro@zeniv.linux.org.uk, linux-fsdevel@vger.kernel.org, v9fs-developer@lists.sourceforge.net, hch@lst.de
 
 On Wed, Jul 14, 2021 at 04:23:18PM -0400, Vivek Goyal wrote:
 > Hi,
 > 
 > This is V3 of patches. Christoph had posted V2 here.
-
-Hi,
-
-Ping?
-
-Vivek
-
 > 
 > https://lore.kernel.org/linux-fsdevel/20210621062657.3641879-1-hch@lst.de/
 > 
@@ -46,21 +39,7 @@ Vivek
 > 
 > I have tested it with 9p, virtiofs and ext4 filesystems as rootfs
 > and it works for me.
-> 
-> Thanks
-> Vivek
-> 
-> Christoph Hellwig (3):
->   init: split get_fs_names
->   init: allow mounting arbitrary non-blockdevice filesystems as root
->   fs: simplify get_filesystem_list / get_all_fs_names
-> 
->  fs/filesystems.c   | 27 ++++++++------
->  include/linux/fs.h |  2 +-
->  init/do_mounts.c   | 90 +++++++++++++++++++++++++++++++++-------------
->  3 files changed, 83 insertions(+), 36 deletions(-)
-> 
-> -- 
-> 2.31.1
-> 
+
+lgtm,
+Acked-by: Christian Brauner <christian.brauner@ubuntu.com>
 

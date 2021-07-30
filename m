@@ -1,12 +1,11 @@
 From: Max Reitz <mreitz@redhat.com>
-Date: Fri, 30 Jul 2021 17:01:25 +0200
-Message-Id: <20210730150134.216126-2-mreitz@redhat.com>
+Date: Fri, 30 Jul 2021 17:01:26 +0200
+Message-Id: <20210730150134.216126-3-mreitz@redhat.com>
 In-Reply-To: <20210730150134.216126-1-mreitz@redhat.com>
 References: <20210730150134.216126-1-mreitz@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 01/10] virtiofsd: Limit setxattr()'s
-	creds-dropped region
+Subject: [Virtio-fs] [PATCH v3 02/10] virtiofsd: Add TempFd structure
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,91 +17,95 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: Vivek Goyal <vgoyal@redhat.com>, Max Reitz <mreitz@redhat.com>
 
-We only need to drop/switch our credentials for the (f)setxattr() call
-alone, not for the openat() or fchdir() around it.
+We are planning to add file handles to lo_inode objects as an
+alternative to lo_inode.fd.  That means that everywhere where we
+currently reference lo_inode.fd, we will have to open a temporary file
+descriptor that needs to be closed after use.
 
-(Right now, this may not be that big of a problem, but with inodes being
-identified by file handles instead of an O_PATH fd, we will need
-open_by_handle_at() calls here, which is really fickle when it comes to
-credentials being dropped.)
+So instead of directly accessing lo_inode.fd, there will be a helper
+function (lo_inode_fd()) that either returns lo_inode.fd, or opens a new
+file descriptor with open_by_handle_at().  It encapsulates this result
+in a TempFd structure to let the caller know whether the FD needs to be
+closed after use (opened from the handle) or not (copied from
+lo_inode.fd).
+
+By using g_auto(TempFd) to store this result, callers will not even have
+to care about closing a temporary FD after use.  It will be done
+automatically once the object goes out of scope.
 
 Signed-off-by: Max Reitz <mreitz@redhat.com>
+Reviewed-by: Connor Kuehl <ckuehl@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 34 +++++++++++++++++++++++---------
- 1 file changed, 25 insertions(+), 9 deletions(-)
+ tools/virtiofsd/passthrough_ll.c | 49 ++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 38b2af8599..1f27eeabc5 100644
+index 1f27eeabc5..fb5e073e6a 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -3121,6 +3121,7 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
-     bool switched_creds = false;
-     bool cap_fsetid_dropped = false;
-     struct lo_cred old = {};
-+    bool open_inode;
+@@ -178,6 +178,28 @@ struct lo_data {
+     int user_posix_acl, posix_acl;
+ };
  
-     if (block_xattr(lo, in_name)) {
-         fuse_reply_err(req, EOPNOTSUPP);
-@@ -3155,7 +3156,24 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
-     fuse_log(FUSE_LOG_DEBUG, "lo_setxattr(ino=%" PRIu64
-              ", name=%s value=%s size=%zd)\n", ino, name, value, size);
++/**
++ * Represents a file descriptor that may either be owned by this
++ * TempFd, or only referenced (i.e. the ownership belongs to some
++ * other object, and the value has just been copied into this TempFd).
++ *
++ * The purpose of this encapsulation is to be used as g_auto(TempFd)
++ * to automatically clean up owned file descriptors when this object
++ * goes out of scope.
++ *
++ * Use temp_fd_steal() to get an owned file descriptor that will not
++ * be closed when the TempFd goes out of scope.
++ */
++typedef struct {
++    int fd;
++    bool owned; /* fd owned by this object? */
++} TempFd;
++
++#define TEMP_FD_INIT ((TempFd) { .fd = -1, .owned = false })
++
++static void temp_fd_clear(TempFd *temp_fd);
++G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC(TempFd, temp_fd_clear);
++
+ static const struct fuse_opt lo_opts[] = {
+     { "sandbox=namespace",
+       offsetof(struct lo_data, sandbox),
+@@ -255,6 +277,33 @@ static struct lo_data *lo_data(fuse_req_t req)
+     return (struct lo_data *)fuse_req_userdata(req);
+ }
  
-+    /*
-+     * We can only open regular files or directories.  If the inode is
-+     * something else, we have to enter /proc/self/fd and use
-+     * setxattr() on the link's filename there.
-+     */
-+    open_inode = S_ISREG(inode->filetype) || S_ISDIR(inode->filetype);
-     sprintf(procname, "%i", inode->fd);
-+    if (open_inode) {
-+        fd = openat(lo->proc_self_fd, procname, O_RDONLY);
-+        if (fd < 0) {
-+            saverr = errno;
-+            goto out;
-+        }
++/**
++ * Clean-up function for TempFds
++ */
++static void temp_fd_clear(TempFd *temp_fd)
++{
++    if (temp_fd->owned) {
++        close(temp_fd->fd);
++        *temp_fd = TEMP_FD_INIT;
++    }
++}
++
++/**
++ * Return an owned fd from *temp_fd that will not be closed when
++ * *temp_fd goes out of scope.
++ *
++ * (TODO: Remove __attribute__ once this is used.)
++ */
++static __attribute__((unused)) int temp_fd_steal(TempFd *temp_fd)
++{
++    if (temp_fd->owned) {
++        temp_fd->owned = false;
++        return temp_fd->fd;
 +    } else {
-+        /* fchdir should not fail here */
-+        FCHDIR_NOFAIL(lo->proc_self_fd);
++        return dup(temp_fd->fd);
 +    }
++}
 +
-     /*
-      * If we are setting posix access acl and if SGID needs to be
-      * cleared, then switch to caller's gid and drop CAP_FSETID
-@@ -3176,20 +3194,13 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
-         }
-         switched_creds = true;
-     }
--    if (S_ISREG(inode->filetype) || S_ISDIR(inode->filetype)) {
--        fd = openat(lo->proc_self_fd, procname, O_RDONLY);
--        if (fd < 0) {
--            saverr = errno;
--            goto out;
--        }
-+    if (open_inode) {
-+        assert(fd >= 0);
-         ret = fsetxattr(fd, name, value, size, flags);
-         saverr = ret == -1 ? errno : 0;
-     } else {
--        /* fchdir should not fail here */
--        FCHDIR_NOFAIL(lo->proc_self_fd);
-         ret = setxattr(procname, name, value, size, flags);
-         saverr = ret == -1 ? errno : 0;
--        FCHDIR_NOFAIL(lo->root.fd);
-     }
-     if (switched_creds) {
-         if (cap_fsetid_dropped)
-@@ -3198,6 +3209,11 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
-             lo_restore_cred(&old, false);
-     }
- 
-+    if (!open_inode) {
-+        /* Change CWD back, fchdir should not fail here */
-+        FCHDIR_NOFAIL(lo->root.fd);
-+    }
-+
- out:
-     if (fd >= 0) {
-         close(fd);
+ /*
+  * Load capng's state from our saved state if the current thread
+  * hadn't previously been loaded.
 -- 
 2.31.1
 

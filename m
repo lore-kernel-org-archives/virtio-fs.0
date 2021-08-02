@@ -1,23 +1,18 @@
-Date: Tue, 17 Aug 2021 20:14:46 -0400
+Date: Mon, 2 Aug 2021 17:15:41 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YRxQ9rClxWux/UHs@redhat.com>
-References: <20210730150134.216126-10-mreitz@redhat.com>
-	<YRF2xjwSKOiqB/Al@redhat.com>
-	<df64553c-c03d-076a-bcef-bec8554977a4@redhat.com>
-	<YRKZ415xrDtcYaQR@redhat.com>
-	<4a74bbbd-92f6-a7d1-0c8d-fa8b121b9643@redhat.com>
-	<YRKh/fbBntF+GfS8@redhat.com>
-	<6e943ee0-dcb3-6812-3a0b-eb2b72b503ad@redhat.com>
-	<YRrALRGy2cROwsP9@redhat.com>
-	<89b416e7-c0ca-7831-da13-683e8a74b7ae@redhat.com>
-	<YRwRz8aZGq6QLpx/@redhat.com>
+Message-ID: <YQhgfZNfgANlrExk@redhat.com>
+References: <CAA2ifQwwtNQwChMKUSM=6B+XEtdcf+Y--a0OxSwE2pmnd+6TAg@mail.gmail.com>
+	<YQfKtddIodKSx7NZ@work-vm>
+	<CAA2ifQxv5VE-w5SUBmKeggAhx7VuCH5MEMttJRrF2ej0_6r8Xw@mail.gmail.com>
+	<ee1653e6-dac1-916d-dfd8-3a5271aac79f@redhat.com>
+	<CAA2ifQxiTa5nuGc=u00qaeOyXsqpro_gFpjLxpbbHdaoGXYJ-w@mail.gmail.com>
+	<854b3e0c-9140-4f9f-93f8-1fe93d061be7@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-In-Reply-To: <YRwRz8aZGq6QLpx/@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 09/10] virtiofsd: Optionally fill
-	lo_inode.fhandle
+In-Reply-To: <854b3e0c-9140-4f9f-93f8-1fe93d061be7@redhat.com>
+Subject: Re: [Virtio-fs] Deleting files when using NFS as a shared folder
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -26,67 +21,133 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Hanna Reitz <hreitz@redhat.com>
-Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, Max Reitz <mreitz@redhat.com>
+To: Max Reitz <mreitz@redhat.com>
+Cc: Gal Hammer <ghammer@redhat.com>, virtio-fs@redhat.com
 
-On Tue, Aug 17, 2021 at 03:45:19PM -0400, Vivek Goyal wrote:
-> On Tue, Aug 17, 2021 at 10:27:16AM +0200, Hanna Reitz wrote:
-> > On 16.08.21 21:44, Vivek Goyal wrote:
-> > > On Wed, Aug 11, 2021 at 08:41:18AM +0200, Hanna Reitz wrote:
-> > > 
-> > > [..]
-> > > > > > But given the inotify complications, there’s really a good reason we should
-> > > > > > use mountinfo.
-> > > > > > 
-> > > > > > > > It’s a bit tricky because our sandboxing prevents easy access to mountinfo,
-> > > > > > > > but if that’s the only way...
-> > > > > > > yes. We already have lo->proc_self_fd. Maybe we need to keep
-> > > > > > > /proc/self/mountinfo open in lo->proc_self_mountinfo. I am assuming
-> > > > > > > that any mount table changes will still be visible despite the fact
-> > > > > > > I have fd open (and don't have to open new fd to notice new mount/unmount
-> > > > > > > changes).
-> > > > > > Well, yes, that was my idea.  Unfortunately, I wasn’t quite successful yet;
-> > > > > > when I tried keeping the fd open, reading from it would just return 0
-> > > > > > bytes.  Perhaps that’s because we bind-mount /proc/self/fd to /proc so that
-> > > > > > nothing else in /proc is visible. Perhaps we need to bind-mount
-> > > > > > /proc/self/mountinfo into /proc/self/fd before that...
-> > > > > Or perhaps open /proc/self/mountinfo and save fd in lo->proc_mountinfo
-> > > > > before /proc/self/fd is bind mounted on /proc?
-> > > > Yes, I tried that, and then reading would just return 0 bytes.
-> > > Hi Hanna,
-> > > 
-> > > I tried this simple patch and I can read /proc/self/mountinfo before
-> > > bind mounting /proc/self/fd and after bind mounting /proc/self/fd. Am
-> > > I missing something.
+On Mon, Aug 02, 2021 at 06:34:17PM +0200, Max Reitz wrote:
+> On 02.08.21 13:30, Gal Hammer wrote:
 > > 
-> > Yes, but I tried reading it in the main loop (where we’d actually need it). 
-> > It looks like the umount2(".", MNT_DETACH) in setup_mounts() breaks it.
+> > 
+> > On Mon, 2 Aug 2021 at 13:49, Max Reitz <mreitz@redhat.com
+> > <mailto:mreitz@redhat.com>> wrote:
+> > 
+> >     On 02.08.21 12:44, Gal Hammer wrote:
+> >     >
+> >     >
+> >     > On Mon, 2 Aug 2021 at 13:36, Dr. David Alan Gilbert
+> >     > <dgilbert@redhat.com <mailto:dgilbert@redhat.com>
+> >     <mailto:dgilbert@redhat.com <mailto:dgilbert@redhat.com>>> wrote:
+> >     >
+> >     >     * Gal Hammer (ghammer@redhat.com <mailto:ghammer@redhat.com>
+> >     <mailto:ghammer@redhat.com <mailto:ghammer@redhat.com>>) wrote:
+> >     >     > Hello,
+> >     >     >
+> >     >     > When using NFS as a shared folder (mount type nfs4) with a
+> >     Linux
+> >     >     guest I
+> >     >     > have the following issue:
+> >     >     >
+> >     >     > Guest:
+> >     >     > $ ls -la /mnt/shared
+> >     >     > total 8
+> >     >     > drwxr-xrwx.  2  135  135 4096 Aug  2 13:08 .
+> >     >     > dr-xr-xr-x. 17 root   root    224 May 23 10:58 ..
+> >     >     > -rw-r--rw-.  1  135  135   27 Aug  2 13:07 readme.txt
+> >     >     >
+> >     >     > Host:
+> >     >     > $ rm readme.txt
+> >     >     >
+> >     >     > Guest:
+> >     >     > $ ls -la /mnt/shared
+> >     >     > total 8
+> >     >     > drwxr-xrwx.  2  135  135 4096 Aug  2 13:10 .
+> >     >     > dr-xr-xr-x. 17 root   root    224 May 23 10:58 ..
+> >     >     > -rw-r--rw-.  1  135  135   27 Aug  2 13:07
+> >     >     .nfs0000000001b600d000000005
+> >     >     >
+> >     >     > Guest:
+> >     >     > $ cat /mnt/shared/readme.txt
+> >     >     > This is a readme.txt file.
+> >     >     >
+> >     >     > So it seems that the virtiofsd has a reference to the file
+> >     which
+> >     >     the guest
+> >     >     > is not aware of and is unable to send a FUSE_FORGET message.
+> >     >     This results
+> >     >     > in a file not actually deleted (renamed to .nfsXXX) and is
+> >     still
+> >     >     accessible
+> >     >     > by the guest.
+> >     >     >
+> >     >     > I have a similar problem when deleting a file from a Windows
+> >     >     guest side.
+> >     >     > The FUSE_READDIR(PLUS) commands add a reference count to files
+> >     >     which the OS
+> >     >     > doesn't have a file context for. However I was able to
+> >     solve it
+> >     >     (for now?)
+> >     >     > by keeping track of returned files' inodes.
+> >     >     >
+> >     >     > Is this behaviour current and by design?
+> >     >
+> >     >     Current problem, not really by design; the problem is the
+> >     O_PATH files
+> >     >     that we have open for the inodes.  I thought if the guest
+> >     sent the
+> >     >     forget for the file then it got closed.
+> >     >
+> >     >
+> >     > So if I understand then sending forget message for each inode
+> >     returned
+> >     > by readdir won't solve the problem because you need the open
+> >     files for
+> >     > inodes?
+> > 
+> >     virtiofsd internally keeps an lo_inode object for every inode that
+> >     has
+> >     been looked up at some point, and every such lo_inode contains an
+> >     O_PATH
+> >     fd referencing that inode.  I don’t know by heart what the conditions
+> >     for dropping those lo_inode objects are.
+> > 
+> > 
+> > I think it depends on the guest's forget message.
 > 
-> Good point. I modified my code and notice too that after umoutn2() it
-> always reads 0 bytes. I can understand that all the other mount points
-> could go away but new rootfs mount point of virtiofsd should still be
-> visible, IIUC. I don't understand why.
+> Yes, it looks like it.
 > 
-> Anyway, I tried re-opening /proc/self/mountinfo file after umount2(".",
-> MNT_DETACH), and that seems to work and it shows root mount point. I 
-> created a bind mount and it shows that too.
+> >     However, once it’s possible to use file handles to reference inodes
+> >     instead of O_PATH fds (already in virtiofsd-rs, for virtiofsd there’s
+> >     this series:
+> >     https://listman.redhat.com/archives/virtio-fs/2021-July/msg00050.html
+> >     <https://listman.redhat.com/archives/virtio-fs/2021-July/msg00050.html>),
+> > 
+> >     then giving the appropriate options (-o inode_file_handles -o
+> >     modcaps=+dac_read_search) should result in no O_PATH fds being kept
+> >     around anymore, so that deleting an inode on the host will result
+> >     in the
+> >     inode being truly deleted (unless the guest still has it open).
+> > 
+> > 
+> > Will the guest will still need to send forget messages with this new
+> > feature?
 > 
-> So looks like quick fix can be that we re-open /proc/self/mountinfo. But
-> that means we can't bind /proc/self/fd on /proc/. We could bind mount
-> /proc/self on /proc. Not sure is it safe enough.
+> I don’t think so.  With file handles, FDs should only be opened (and kept
+> open) when the guest actually opens some file.  (Aside from temporary O_PATH
+> FDs e.g. during a lookup.)
 
-Or may be I can do this.
+I guess FORGET messages will still have to be sent so that virtiofsd can
+free lo_inode() and associated data structrues when reference count
+reaches zero. So FORGET message is more like a dropping guest's reference
+count on lo_inode.
 
-- Open O_PATH fd for /proc/self
-  proc_self = open("/proc/self");
-- Bind mount /proc/self/fd on /proc
-- pivot_root() and umount() stuff
-- Openat(proc_self, "mountinfo")
-- close(proc_self)
+Gal, I think we had discussed this nfs issue in the past. And problem
+probably is that dentry/inode is cached in guest. And that's why
+lo_inode is around hence O_PATH fd is around. If you do drop caches
+in guest, that might lead to removal of this temp file (sync; echo 3 >
+/proc/sys/vm/drop_caches).
 
-If this works, then we don't have the security issue and we managed
-to open mountinfo after pivot_root() and umount(). Will give it a
-try and see if it works tomorrow.
+Max, interesting point that using file handles should help with this
+situation.
 
 Vivek
 

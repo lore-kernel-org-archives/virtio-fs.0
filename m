@@ -1,16 +1,12 @@
-Date: Tue, 10 Aug 2021 10:12:56 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YRKJaKvnmYjp+4/j@redhat.com>
-References: <20210730150134.216126-1-mreitz@redhat.com>
-	<20210730150134.216126-11-mreitz@redhat.com>
-	<YRF9Q+MSjrbeybd2@redhat.com>
-	<dfebe39a-35d4-1e1c-c63f-2312586aa97d@redhat.com>
+Date: Mon, 2 Aug 2021 11:36:37 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YQfKtddIodKSx7NZ@work-vm>
+References: <CAA2ifQwwtNQwChMKUSM=6B+XEtdcf+Y--a0OxSwE2pmnd+6TAg@mail.gmail.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
+In-Reply-To: <CAA2ifQwwtNQwChMKUSM=6B+XEtdcf+Y--a0OxSwE2pmnd+6TAg@mail.gmail.com>
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <dfebe39a-35d4-1e1c-c63f-2312586aa97d@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 10/10] virtiofsd: Add lazy lo_do_find()
+Subject: Re: [Virtio-fs] Deleting files when using NFS as a shared folder
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,47 +15,64 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Hanna Reitz <hreitz@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Max Reitz <mreitz@redhat.com>
+To: Gal Hammer <ghammer@redhat.com>
+Cc: virtio-fs@redhat.com
 
-On Tue, Aug 10, 2021 at 10:38:32AM +0200, Hanna Reitz wrote:
-> On 09.08.21 21:08, Vivek Goyal wrote:
-> > On Fri, Jul 30, 2021 at 05:01:34PM +0200, Max Reitz wrote:
-> > > lo_find() right now takes two lookup keys for two maps, namely the file
-> > > handle for inodes_by_handle and the statx information for inodes_by_ids.
-> > > However, we only need the statx information if looking up the inode by
-> > > the file handle failed.
-> > > 
-> > > There are two callers of lo_find(): The first one, lo_do_lookup(), has
-> > > both keys anyway, so passing them does not incur any additional cost.
-> > > The second one, lookup_name(), though, needs to explicitly invoke
-> > > name_to_handle_at() (through get_file_handle()) and statx() (through
-> > > do_statx()).  We need to try to get a file handle as the primary key, so
-> > > we cannot get rid of get_file_handle(), but we only need the statx
-> > > information if looking up an inode by handle failed; so we can defer
-> > > that until the lookup has indeed failed.
-> > So IIUC, this patch seems to be all about avoiding do_statx()
-> > call in lookup_name() if file handle could be successfully
-> > generated.
-> > 
-> > So can't we just not modify lookup_name() to not call statx()
-> > if file handle could be generated. And also modfiy lo_find()
-> > to use st/mnt_id only if fhandle==NULL.
-> > 
-> > That probably is much simpler change as compared to passing function
-> > pointers around.
+* Gal Hammer (ghammer@redhat.com) wrote:
+> Hello,
 > 
-> Definitely, but I don’t know whether it’s correct.
-
-What problem do you see from correctness point of view.
+> When using NFS as a shared folder (mount type nfs4) with a Linux guest I
+> have the following issue:
 > 
-> Or, we can just drop this patch and say that we don’t need to over-optimize
-> C virtiofsd.
+> Guest:
+> $ ls -la /mnt/shared
+> total 8
+> drwxr-xrwx.  2  135  135 4096 Aug  2 13:08 .
+> dr-xr-xr-x. 17 root   root    224 May 23 10:58 ..
+> -rw-r--rw-.  1  135  135   27 Aug  2 13:07 readme.txt
+> 
+> Host:
+> $ rm readme.txt
+> 
+> Guest:
+> $ ls -la /mnt/shared
+> total 8
+> drwxr-xrwx.  2  135  135 4096 Aug  2 13:10 .
+> dr-xr-xr-x. 17 root   root    224 May 23 10:58 ..
+> -rw-r--rw-.  1  135  135   27 Aug  2 13:07 .nfs0000000001b600d000000005
+> 
+> Guest:
+> $ cat /mnt/shared/readme.txt
+> This is a readme.txt file.
+> 
+> So it seems that the virtiofsd has a reference to the file which the guest
+> is not aware of and is unable to send a FUSE_FORGET message. This results
+> in a file not actually deleted (renamed to .nfsXXX) and is still accessible
+> by the guest.
+> 
+> I have a similar problem when deleting a file from a Windows guest side.
+> The FUSE_READDIR(PLUS) commands add a reference count to files which the OS
+> doesn't have a file context for. However I was able to solve it (for now?)
+> by keeping track of returned files' inodes.
+> 
+> Is this behaviour current and by design?
 
-Rust version is used by very few people, while C version is in production.
-So I will definitely optimize C version. Once rust version is widely
-available and available in product, then we can start paying less
-attention to C version, IMHO.
+Current problem, not really by design; the problem is the O_PATH files
+that we have open for the inodes.  I thought if the guest sent the
+forget for the file then it got closed.
 
-Vivek
+Dave
+
+
+> Thanks,
+> 
+>     Gal.
+
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
+
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

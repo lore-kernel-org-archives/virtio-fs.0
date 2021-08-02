@@ -1,13 +1,12 @@
-From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Wed, 11 Aug 2021 14:56:18 +0800
-Message-Id: <20210811065621.12737-2-jefflexu@linux.alibaba.com>
-In-Reply-To: <20210811065621.12737-1-jefflexu@linux.alibaba.com>
-References: <20210804070653.118123-1-jefflexu@linux.alibaba.com>
-	<20210811065621.12737-1-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd PATCH v2 1/4] virtiofsd: add .ioctl() support
+References: <CAA2ifQwwtNQwChMKUSM=6B+XEtdcf+Y--a0OxSwE2pmnd+6TAg@mail.gmail.com>
+	<YQfKtddIodKSx7NZ@work-vm>
+In-Reply-To: <YQfKtddIodKSx7NZ@work-vm>
+From: Gal Hammer <ghammer@redhat.com>
+Date: Mon, 2 Aug 2021 13:44:19 +0300
+Message-ID: <CAA2ifQxv5VE-w5SUBmKeggAhx7VuCH5MEMttJRrF2ej0_6r8Xw@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="00000000000009d7fe05c89141ac"
+Subject: Re: [Virtio-fs] Deleting files when using NFS as a shared folder
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,120 +15,182 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, virtualization@lists.linux-foundation.org
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com
 
-Add .ioctl() support for passthrough, in prep for the following support
-for following per-file DAX feature.
+--00000000000009d7fe05c89141ac
+Content-Type: text/plain; charset="UTF-8"
 
-Once advertising support for per-file DAX feature, virtiofsd should
-support storing FS_DAX_FL flag persistently passed by
-FS_IOC_SETFLAGS/FS_IOC_FSSETXATTR ioctl, and set FUSE_ATTR_DAX in
-FUSE_LOOKUP accordingly if the file is capable of per-file DAX.
+On Mon, 2 Aug 2021 at 13:36, Dr. David Alan Gilbert <dgilbert@redhat.com>
+wrote:
 
-When it comes to passthrough, it passes corresponding ioctls to host
-directly. Currently only these ioctls that are needed for per-file DAX
-feature, i.e., FS_IOC_GETFLAGS/FS_IOC_SETFLAGS and
-FS_IOC_FSGETXATTR/FS_IOC_FSSETXATTR are supported. Later we can restrict
-the flags/attributes allowed to be set to reinforce the security, or
-extend the scope of allowed ioctls if it is really needed later.
+> * Gal Hammer (ghammer@redhat.com) wrote:
+> > Hello,
+> >
+> > When using NFS as a shared folder (mount type nfs4) with a Linux guest I
+> > have the following issue:
+> >
+> > Guest:
+> > $ ls -la /mnt/shared
+> > total 8
+> > drwxr-xrwx.  2  135  135 4096 Aug  2 13:08 .
+> > dr-xr-xr-x. 17 root   root    224 May 23 10:58 ..
+> > -rw-r--rw-.  1  135  135   27 Aug  2 13:07 readme.txt
+> >
+> > Host:
+> > $ rm readme.txt
+> >
+> > Guest:
+> > $ ls -la /mnt/shared
+> > total 8
+> > drwxr-xrwx.  2  135  135 4096 Aug  2 13:10 .
+> > dr-xr-xr-x. 17 root   root    224 May 23 10:58 ..
+> > -rw-r--rw-.  1  135  135   27 Aug  2 13:07 .nfs0000000001b600d000000005
+> >
+> > Guest:
+> > $ cat /mnt/shared/readme.txt
+> > This is a readme.txt file.
+> >
+> > So it seems that the virtiofsd has a reference to the file which the
+> guest
+> > is not aware of and is unable to send a FUSE_FORGET message. This results
+> > in a file not actually deleted (renamed to .nfsXXX) and is still
+> accessible
+> > by the guest.
+> >
+> > I have a similar problem when deleting a file from a Windows guest side.
+> > The FUSE_READDIR(PLUS) commands add a reference count to files which the
+> OS
+> > doesn't have a file context for. However I was able to solve it (for
+> now?)
+> > by keeping track of returned files' inodes.
+> >
+> > Is this behaviour current and by design?
+>
+> Current problem, not really by design; the problem is the O_PATH files
+> that we have open for the inodes.  I thought if the guest sent the
+> forget for the file then it got closed.
+>
 
-Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
----
- tools/virtiofsd/passthrough_ll.c      | 53 +++++++++++++++++++++++++++
- tools/virtiofsd/passthrough_seccomp.c |  1 +
- 2 files changed, 54 insertions(+)
+So if I understand then sending forget message for each inode returned by
+readdir won't solve the problem because you need the open files for inodes?
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index b76d878509..e170b17adb 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -54,6 +54,7 @@
- #include <sys/wait.h>
- #include <sys/xattr.h>
- #include <syslog.h>
-+#include <linux/fs.h>
- 
- #include "qemu/cutils.h"
- #include "passthrough_helpers.h"
-@@ -2105,6 +2106,57 @@ out:
-     fuse_reply_err(req, saverr);
- }
- 
-+static void lo_ioctl(fuse_req_t req, fuse_ino_t ino, unsigned int cmd, void *arg,
-+                  struct fuse_file_info *fi, unsigned flags, const void *in_buf,
-+                  size_t in_bufsz, size_t out_bufsz)
-+{
-+    int fd = lo_fi_fd(req, fi);
-+    int res;
-+    int saverr = ENOSYS;
-+
-+    fuse_log(FUSE_LOG_DEBUG, "lo_ioctl(ino=%" PRIu64 ", cmd=0x%x, flags=0x%x, "
-+	     "in_bufsz = %lu, out_bufsz = %lu)\n",
-+	     ino, cmd, flags, in_bufsz, out_bufsz);
-+
-+    /* unrestricted ioctl is not supported yet */
-+    if (flags & FUSE_IOCTL_UNRESTRICTED)
-+        goto out;
-+
-+    /*
-+     * Currently only those ioctls needed to support per-file DAX feature,
-+     * i.e., FS_IOC_GETFLAGS/FS_IOC_SETFLAGS and
-+     * FS_IOC_FSGETXATTR/FS_IOC_FSSETXATTR are supported.
-+     */
-+    if (cmd == FS_IOC_SETFLAGS || cmd == FS_IOC_FSSETXATTR) {
-+        res = ioctl(fd, cmd, in_buf);
-+        if (res < 0)
-+            goto out_err;
-+
-+	fuse_reply_ioctl(req, 0, NULL, 0);
-+    }
-+    else if (cmd == FS_IOC_GETFLAGS || cmd == FS_IOC_FSGETXATTR) {
-+	/* reused for 'unsigned int' for FS_IOC_GETFLAGS */
-+	struct fsxattr attr;
-+
-+        res = ioctl(fd, cmd, &attr);
-+        if (res < 0)
-+            goto out_err;
-+
-+        fuse_reply_ioctl(req, 0, &attr, out_bufsz);
-+    }
-+    else {
-+	fuse_log(FUSE_LOG_DEBUG, "Unsupported ioctl 0x%x\n", cmd);
-+	goto out;
-+    }
-+
-+    return;
-+
-+out_err:
-+	saverr = errno;
-+out:
-+	fuse_reply_err(req, saverr);
-+}
-+
- static void lo_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
-                         struct fuse_file_info *fi)
- {
-@@ -3279,6 +3331,7 @@ static struct fuse_lowlevel_ops lo_oper = {
-     .create = lo_create,
-     .getlk = lo_getlk,
-     .setlk = lo_setlk,
-+    .ioctl = lo_ioctl,
-     .open = lo_open,
-     .release = lo_release,
-     .flush = lo_flush,
-diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
-index 62441cfcdb..2a5f7614fc 100644
---- a/tools/virtiofsd/passthrough_seccomp.c
-+++ b/tools/virtiofsd/passthrough_seccomp.c
-@@ -62,6 +62,7 @@ static const int syscall_allowlist[] = {
-     SCMP_SYS(gettid),
-     SCMP_SYS(gettimeofday),
-     SCMP_SYS(getxattr),
-+    SCMP_SYS(ioctl),
-     SCMP_SYS(linkat),
-     SCMP_SYS(listxattr),
-     SCMP_SYS(lseek),
--- 
-2.27.0
+Thanks,
+
+    Gal.
+
+
+>
+> Dave
+>
+>
+> > Thanks,
+> >
+> >     Gal.
+>
+> > _______________________________________________
+> > Virtio-fs mailing list
+> > Virtio-fs@redhat.com
+> > https://listman.redhat.com/mailman/listinfo/virtio-fs
+>
+> --
+> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+>
+>
+
+--00000000000009d7fe05c89141ac
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><div dir=3D"ltr"><div class=3D"gmail_default" style=3D"fon=
+t-family:verdana,sans-serif"><br></div></div><br><div class=3D"gmail_quote"=
+><div dir=3D"ltr" class=3D"gmail_attr">On Mon, 2 Aug 2021 at 13:36, Dr. Dav=
+id Alan Gilbert &lt;<a href=3D"mailto:dgilbert@redhat.com">dgilbert@redhat.=
+com</a>&gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"marg=
+in:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1e=
+x">* Gal Hammer (<a href=3D"mailto:ghammer@redhat.com" target=3D"_blank">gh=
+ammer@redhat.com</a>) wrote:<br>
+&gt; Hello,<br>
+&gt; <br>
+&gt; When using NFS as a shared folder (mount type nfs4) with a Linux guest=
+ I<br>
+&gt; have the following issue:<br>
+&gt; <br>
+&gt; Guest:<br>
+&gt; $ ls -la /mnt/shared<br>
+&gt; total 8<br>
+&gt; drwxr-xrwx.=C2=A0 2=C2=A0 135=C2=A0 135 4096 Aug=C2=A0 2 13:08 .<br>
+&gt; dr-xr-xr-x. 17 root=C2=A0 =C2=A0root=C2=A0 =C2=A0 224 May 23 10:58 ..<=
+br>
+&gt; -rw-r--rw-.=C2=A0 1=C2=A0 135=C2=A0 135=C2=A0 =C2=A027 Aug=C2=A0 2 13:=
+07 readme.txt<br>
+&gt; <br>
+&gt; Host:<br>
+&gt; $ rm readme.txt<br>
+&gt; <br>
+&gt; Guest:<br>
+&gt; $ ls -la /mnt/shared<br>
+&gt; total 8<br>
+&gt; drwxr-xrwx.=C2=A0 2=C2=A0 135=C2=A0 135 4096 Aug=C2=A0 2 13:10 .<br>
+&gt; dr-xr-xr-x. 17 root=C2=A0 =C2=A0root=C2=A0 =C2=A0 224 May 23 10:58 ..<=
+br>
+&gt; -rw-r--rw-.=C2=A0 1=C2=A0 135=C2=A0 135=C2=A0 =C2=A027 Aug=C2=A0 2 13:=
+07 .nfs0000000001b600d000000005<br>
+&gt; <br>
+&gt; Guest:<br>
+&gt; $ cat /mnt/shared/readme.txt<br>
+&gt; This is a readme.txt file.<br>
+&gt; <br>
+&gt; So it seems that the virtiofsd has a reference to the file which the g=
+uest<br>
+&gt; is not aware of and is unable to send a FUSE_FORGET message. This resu=
+lts<br>
+&gt; in a file not actually deleted (renamed to .nfsXXX) and is still acces=
+sible<br>
+&gt; by the guest.<br>
+&gt; <br>
+&gt; I have a similar problem when deleting a file from a Windows guest sid=
+e.<br>
+&gt; The FUSE_READDIR(PLUS) commands add a reference count to files which t=
+he OS<br>
+&gt; doesn&#39;t have a file context for. However I was able to solve it (f=
+or now?)<br>
+&gt; by keeping track of returned files&#39; inodes.<br>
+&gt; <br>
+&gt; Is this behaviour current and by design?<br>
+<br>
+Current problem, not really by design; the problem is the O_PATH files<br>
+that we have open for the inodes.=C2=A0 I thought if the guest sent the<br>
+forget for the file then it got closed.<br></blockquote><div><br></div><div=
+><div style=3D"font-family:verdana,sans-serif" class=3D"gmail_default">So i=
+f I understand then sending forget message for each inode returned by readd=
+ir won&#39;t solve the problem because you need the open files for inodes?<=
+/div></div><div><br></div><div><div style=3D"font-family:verdana,sans-serif=
+" class=3D"gmail_default">Thanks,</div><br></div><div><div style=3D"font-fa=
+mily:verdana,sans-serif" class=3D"gmail_default">=C2=A0=C2=A0=C2=A0 Gal.</d=
+iv>=C2=A0</div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0p=
+x 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex">
+<br>
+Dave<br>
+<br>
+<br>
+&gt; Thanks,<br>
+&gt; <br>
+&gt;=C2=A0 =C2=A0 =C2=A0Gal.<br>
+<br>
+&gt; _______________________________________________<br>
+&gt; Virtio-fs mailing list<br>
+&gt; <a href=3D"mailto:Virtio-fs@redhat.com" target=3D"_blank">Virtio-fs@re=
+dhat.com</a><br>
+&gt; <a href=3D"https://listman.redhat.com/mailman/listinfo/virtio-fs" rel=
+=3D"noreferrer" target=3D"_blank">https://listman.redhat.com/mailman/listin=
+fo/virtio-fs</a><br>
+<br>
+-- <br>
+Dr. David Alan Gilbert / <a href=3D"mailto:dgilbert@redhat.com" target=3D"_=
+blank">dgilbert@redhat.com</a> / Manchester, UK<br>
+<br>
+</blockquote></div></div>
+
+--00000000000009d7fe05c89141ac--
 

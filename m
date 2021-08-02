@@ -1,15 +1,9 @@
-References: <20210730150134.216126-1-mreitz@redhat.com>
-	<20210730150134.216126-8-mreitz@redhat.com>
-	<YRFH+vE30fwgGmu8@redhat.com>
-From: Hanna Reitz <hreitz@redhat.com>
-Message-ID: <cbf910d8-47cd-f9b1-c9ac-6e0e2036c04a@redhat.com>
-Date: Mon, 9 Aug 2021 18:41:59 +0200
 MIME-Version: 1.0
-In-Reply-To: <YRFH+vE30fwgGmu8@redhat.com>
-Content-Type: text/plain; charset=utf-8; format=flowed
-Content-Transfer-Encoding: 7bit
-Content-Language: en-US
-Subject: Re: [Virtio-fs] [PATCH v3 07/10] virtiofsd: Add lo_inode.fhandle
+From: Gal Hammer <ghammer@redhat.com>
+Date: Mon, 2 Aug 2021 13:18:13 +0300
+Message-ID: <CAA2ifQwwtNQwChMKUSM=6B+XEtdcf+Y--a0OxSwE2pmnd+6TAg@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="000000000000b589e305c890e368"
+Subject: [Virtio-fs] Deleting files when using NFS as a shared folder
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,59 +12,108 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: virtio-fs@redhat.com
 
-On 09.08.21 17:21, Vivek Goyal wrote:
-> On Fri, Jul 30, 2021 at 05:01:31PM +0200, Max Reitz wrote:
->> This new field is an alternative to lo_inode.fd: Either of the two must
->> be set.  In case an O_PATH FD is needed for some lo_inode, it is either
->> taken from lo_inode.fd, if valid, or a temporary FD is opened with
->> open_by_handle_at().
->>
->> Using a file handle instead of an FD has the advantage of keeping the
->> number of open file descriptors low.
->>
->> Because open_by_handle_at() requires a mount FD (i.e. a non-O_PATH FD
->> opened on the filesystem to which the file handle refers), but every
->> lo_fhandle only has a mount ID (as returned by name_to_handle_at()), we
->> keep a hash map of such FDs in mount_fds (mapping ID to FD).
->> get_file_handle(), which is added by a later patch, will ensure that
->> every mount ID for which we have generated a handle has a corresponding
->> entry in mount_fds.
->>
->> Signed-off-by: Max Reitz <mreitz@redhat.com>
->> Reviewed-by: Connor Kuehl <ckuehl@redhat.com>
->> ---
->>   tools/virtiofsd/passthrough_ll.c      | 116 ++++++++++++++++++++++----
->>   tools/virtiofsd/passthrough_seccomp.c |   1 +
->>   2 files changed, 102 insertions(+), 15 deletions(-)
->>
->> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
->> index 292b7f7e27..487448d666 100644
->> --- a/tools/virtiofsd/passthrough_ll.c
->> +++ b/tools/virtiofsd/passthrough_ll.c
->> @@ -88,8 +88,25 @@ struct lo_key {
->>       uint64_t mnt_id;
->>   };
->>   
->> +struct lo_fhandle {
->> +    union {
->> +        struct file_handle handle;
->> +        char padding[sizeof(struct file_handle) + MAX_HANDLE_SZ];
->> +    };
->> +    int mount_id;
->> +};
->> +
->> +/* Maps mount IDs to an FD that we can pass to open_by_handle_at() */
->> +static GHashTable *mount_fds;
->> +pthread_rwlock_t mount_fds_lock = PTHREAD_RWLOCK_INITIALIZER;
->> +
-> How about if we move this hash table inside "struct lo_data". That seems to
-> be one global data structure keeping all the info. Also it can be
-> cleaned up during lo_destroy().
+--000000000000b589e305c890e368
+Content-Type: text/plain; charset="UTF-8"
 
-Yes, sounds good and right, will do.
+Hello,
 
-Hanna
+When using NFS as a shared folder (mount type nfs4) with a Linux guest I
+have the following issue:
+
+Guest:
+$ ls -la /mnt/shared
+total 8
+drwxr-xrwx.  2  135  135 4096 Aug  2 13:08 .
+dr-xr-xr-x. 17 root   root    224 May 23 10:58 ..
+-rw-r--rw-.  1  135  135   27 Aug  2 13:07 readme.txt
+
+Host:
+$ rm readme.txt
+
+Guest:
+$ ls -la /mnt/shared
+total 8
+drwxr-xrwx.  2  135  135 4096 Aug  2 13:10 .
+dr-xr-xr-x. 17 root   root    224 May 23 10:58 ..
+-rw-r--rw-.  1  135  135   27 Aug  2 13:07 .nfs0000000001b600d000000005
+
+Guest:
+$ cat /mnt/shared/readme.txt
+This is a readme.txt file.
+
+So it seems that the virtiofsd has a reference to the file which the guest
+is not aware of and is unable to send a FUSE_FORGET message. This results
+in a file not actually deleted (renamed to .nfsXXX) and is still accessible
+by the guest.
+
+I have a similar problem when deleting a file from a Windows guest side.
+The FUSE_READDIR(PLUS) commands add a reference count to files which the OS
+doesn't have a file context for. However I was able to solve it (for now?)
+by keeping track of returned files' inodes.
+
+Is this behaviour current and by design?
+
+Thanks,
+
+    Gal.
+
+--000000000000b589e305c890e368
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><div class=3D"gmail_default" style=3D"font-family:verdana,=
+sans-serif">Hello,</div><div class=3D"gmail_default" style=3D"font-family:v=
+erdana,sans-serif"><br></div><div class=3D"gmail_default" style=3D"font-fam=
+ily:verdana,sans-serif">When using NFS as a shared folder (mount type nfs4)=
+ with a Linux guest I have the following issue:</div><div class=3D"gmail_de=
+fault" style=3D"font-family:verdana,sans-serif"><br></div><div class=3D"gma=
+il_default" style=3D"font-family:verdana,sans-serif">Guest:</div><div class=
+=3D"gmail_default" style=3D"font-family:verdana,sans-serif">$ ls -la /mnt/s=
+hared</div><div class=3D"gmail_default" style=3D"font-family:verdana,sans-s=
+erif">total 8<br>drwxr-xrwx. =C2=A02 =C2=A0135=C2=A0 135 4096 Aug =C2=A02 1=
+3:08 .<br>dr-xr-xr-x. 17 root =C2=A0 root =C2=A0 =C2=A0224 May 23 10:58 ..<=
+br>-rw-r--rw-. =C2=A01 =C2=A0135=C2=A0 135 =C2=A0 27 Aug =C2=A02 13:07 read=
+me.txt</div><div class=3D"gmail_default" style=3D"font-family:verdana,sans-=
+serif"><br></div><div class=3D"gmail_default" style=3D"font-family:verdana,=
+sans-serif">Host:</div><div class=3D"gmail_default" style=3D"font-family:ve=
+rdana,sans-serif">$ rm readme.txt</div><div class=3D"gmail_default" style=
+=3D"font-family:verdana,sans-serif"><br></div><div class=3D"gmail_default" =
+style=3D"font-family:verdana,sans-serif">Guest: <br></div><div class=3D"gma=
+il_default" style=3D"font-family:verdana,sans-serif"></div><div class=3D"gm=
+ail_default" style=3D"font-family:verdana,sans-serif"></div><div class=3D"g=
+mail_default" style=3D"font-family:verdana,sans-serif">$ ls -la /mnt/shared=
+</div><div class=3D"gmail_default" style=3D"font-family:verdana,sans-serif"=
+>total 8<br></div><div class=3D"gmail_default" style=3D"font-family:verdana=
+,sans-serif">drwxr-xrwx. =C2=A02 =C2=A0135=C2=A0 135 4096 Aug =C2=A02 13:10=
+ .<br>dr-xr-xr-x. 17 root =C2=A0 root =C2=A0 =C2=A0224 May 23 10:58 ..<br>-=
+rw-r--rw-. =C2=A01 =C2=A0135=C2=A0 135 =C2=A0 27 Aug =C2=A02 13:07 .nfs0000=
+000001b600d000000005<br></div><div class=3D"gmail_default" style=3D"font-fa=
+mily:verdana,sans-serif"><br></div><div class=3D"gmail_default" style=3D"fo=
+nt-family:verdana,sans-serif">Guest:</div><div class=3D"gmail_default" styl=
+e=3D"font-family:verdana,sans-serif">$ cat /mnt/shared/readme.txt</div><div=
+ class=3D"gmail_default" style=3D"font-family:verdana,sans-serif">This is a=
+ readme.txt file.</div><div class=3D"gmail_default" style=3D"font-family:ve=
+rdana,sans-serif"><br></div><div class=3D"gmail_default" style=3D"font-fami=
+ly:verdana,sans-serif">So it seems that the virtiofsd has a reference to th=
+e file which the guest is not aware of and is unable to send a FUSE_FORGET =
+message. This results in a file not actually deleted (renamed to .nfsXXX) a=
+nd is still accessible by the guest.</div><div class=3D"gmail_default" styl=
+e=3D"font-family:verdana,sans-serif"><br></div><div class=3D"gmail_default"=
+ style=3D"font-family:verdana,sans-serif">I have a similar problem when del=
+eting a file from a Windows guest side. The FUSE_READDIR(PLUS) commands add=
+ a reference count to files which the OS doesn&#39;t have a file context fo=
+r. However I was able to solve it (for now?) by keeping track of returned f=
+iles&#39; inodes.</div><div class=3D"gmail_default" style=3D"font-family:ve=
+rdana,sans-serif"><br></div><div class=3D"gmail_default" style=3D"font-fami=
+ly:verdana,sans-serif">Is this behaviour current and by design?</div><div c=
+lass=3D"gmail_default" style=3D"font-family:verdana,sans-serif"><br></div><=
+div class=3D"gmail_default" style=3D"font-family:verdana,sans-serif">Thanks=
+,</div><div class=3D"gmail_default" style=3D"font-family:verdana,sans-serif=
+"><br></div><div class=3D"gmail_default" style=3D"font-family:verdana,sans-=
+serif">=C2=A0=C2=A0=C2=A0 Gal.</div><div class=3D"gmail_default" style=3D"f=
+ont-family:verdana,sans-serif"><br></div></div>
+
+--000000000000b589e305c890e368--
 

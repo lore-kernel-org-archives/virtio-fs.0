@@ -1,10 +1,15 @@
-From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Tue, 17 Aug 2021 10:22:12 +0800
-Message-Id: <20210817022220.17574-1-jefflexu@linux.alibaba.com>
+References: <CAA2ifQwwtNQwChMKUSM=6B+XEtdcf+Y--a0OxSwE2pmnd+6TAg@mail.gmail.com>
+	<YQfKtddIodKSx7NZ@work-vm>
+	<CAA2ifQxv5VE-w5SUBmKeggAhx7VuCH5MEMttJRrF2ej0_6r8Xw@mail.gmail.com>
+From: Max Reitz <mreitz@redhat.com>
+Message-ID: <ee1653e6-dac1-916d-dfd8-3a5271aac79f@redhat.com>
+Date: Mon, 2 Aug 2021 12:49:49 +0200
 MIME-Version: 1.0
+In-Reply-To: <CAA2ifQxv5VE-w5SUBmKeggAhx7VuCH5MEMttJRrF2ej0_6r8Xw@mail.gmail.com>
+Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Transfer-Encoding: 8bit
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v4 0/8] fuse,virtiofs: support per-file DAX
+Content-Language: en-US
+Subject: Re: [Virtio-fs] Deleting files when using NFS as a shared folder
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,54 +18,86 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, virtualization@lists.linux-foundation.org
+To: Gal Hammer <ghammer@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com
 
-This patchset adds support of per-file DAX for virtiofs, which is
-inspired by Ira Weiny's work on ext4[1] and xfs[2].
+On 02.08.21 12:44, Gal Hammer wrote:
+>
+>
+> On Mon, 2 Aug 2021 at 13:36, Dr. David Alan Gilbert 
+> <dgilbert@redhat.com <mailto:dgilbert@redhat.com>> wrote:
+>
+>     * Gal Hammer (ghammer@redhat.com <mailto:ghammer@redhat.com>) wrote:
+>     > Hello,
+>     >
+>     > When using NFS as a shared folder (mount type nfs4) with a Linux
+>     guest I
+>     > have the following issue:
+>     >
+>     > Guest:
+>     > $ ls -la /mnt/shared
+>     > total 8
+>     > drwxr-xrwx.  2  135  135 4096 Aug  2 13:08 .
+>     > dr-xr-xr-x. 17 root   root    224 May 23 10:58 ..
+>     > -rw-r--rw-.  1  135  135   27 Aug  2 13:07 readme.txt
+>     >
+>     > Host:
+>     > $ rm readme.txt
+>     >
+>     > Guest:
+>     > $ ls -la /mnt/shared
+>     > total 8
+>     > drwxr-xrwx.  2  135  135 4096 Aug  2 13:10 .
+>     > dr-xr-xr-x. 17 root   root    224 May 23 10:58 ..
+>     > -rw-r--rw-.  1  135  135   27 Aug  2 13:07
+>     .nfs0000000001b600d000000005
+>     >
+>     > Guest:
+>     > $ cat /mnt/shared/readme.txt
+>     > This is a readme.txt file.
+>     >
+>     > So it seems that the virtiofsd has a reference to the file which
+>     the guest
+>     > is not aware of and is unable to send a FUSE_FORGET message.
+>     This results
+>     > in a file not actually deleted (renamed to .nfsXXX) and is still
+>     accessible
+>     > by the guest.
+>     >
+>     > I have a similar problem when deleting a file from a Windows
+>     guest side.
+>     > The FUSE_READDIR(PLUS) commands add a reference count to files
+>     which the OS
+>     > doesn't have a file context for. However I was able to solve it
+>     (for now?)
+>     > by keeping track of returned files' inodes.
+>     >
+>     > Is this behaviour current and by design?
+>
+>     Current problem, not really by design; the problem is the O_PATH files
+>     that we have open for the inodes.  I thought if the guest sent the
+>     forget for the file then it got closed.
+>
+>
+> So if I understand then sending forget message for each inode returned 
+> by readdir won't solve the problem because you need the open files for 
+> inodes?
 
-Any comment is welcome.
+virtiofsd internally keeps an lo_inode object for every inode that has 
+been looked up at some point, and every such lo_inode contains an O_PATH 
+fd referencing that inode.  I don’t know by heart what the conditions 
+for dropping those lo_inode objects are.
 
-[1] commit 9cb20f94afcd ("fs/ext4: Make DAX mount option a tri-state")
-[2] commit 02beb2686ff9 ("fs/xfs: Make DAX mount option a tri-state")
+However, once it’s possible to use file handles to reference inodes 
+instead of O_PATH fds (already in virtiofsd-rs, for virtiofsd there’s 
+this series: 
+https://listman.redhat.com/archives/virtio-fs/2021-July/msg00050.html), 
+then giving the appropriate options (-o inode_file_handles -o 
+modcaps=+dac_read_search) should result in no O_PATH fds being kept 
+around anymore, so that deleting an inode on the host will result in the 
+inode being truly deleted (unless the guest still has it open).
 
+But with O_PATH fds, it’s kind of by design, I would say.
 
-changes since v3:
-- bug fix (patch 6): s/"IS_DAX(inode) != newdax"/"!!IS_DAX(inode) != newdax"
-- during FUSE_INIT, advertise capability for per-file DAX only when
-  mounted as "-o dax=inode" (patch 4)
-
-changes since v2:
-- modify fuse_show_options() accordingly to make it compatible with
-  new tri-state mount option (patch 2)
-- extract FUSE protocol changes into one seperate patch (patch 3)
-- FUSE server/client need to negotiate if they support per-file DAX
-  (patch 4)
-- extract DONT_CACHE logic into patch 6/7
-
-v3: https://www.spinics.net/lists/linux-fsdevel/msg200852.html
-v2: https://www.spinics.net/lists/linux-fsdevel/msg199584.html
-v1: https://www.spinics.net/lists/linux-virtualization/msg51008.html
-
-Jeffle Xu (8):
-  fuse: add fuse_should_enable_dax() helper
-  fuse: Make DAX mount option a tri-state
-  fuse: support per-file DAX
-  fuse: negotiate if server/client supports per-file DAX
-  fuse: enable per-file DAX
-  fuse: mark inode DONT_CACHE when per-file DAX indication changes
-  fuse: support changing per-file DAX flag inside guest
-  fuse: show '-o dax=inode' option only when FUSE server supports
-
- fs/fuse/dax.c             | 32 +++++++++++++++++++++++++++++---
- fs/fuse/file.c            |  4 ++--
- fs/fuse/fuse_i.h          | 22 ++++++++++++++++++----
- fs/fuse/inode.c           | 27 +++++++++++++++++++--------
- fs/fuse/ioctl.c           | 15 +++++++++++++--
- fs/fuse/virtio_fs.c       | 16 ++++++++++++++--
- include/uapi/linux/fuse.h |  9 ++++++++-
- 7 files changed, 103 insertions(+), 22 deletions(-)
-
--- 
-2.27.0
+Max
 

@@ -1,19 +1,13 @@
-Date: Fri, 3 Sep 2021 12:03:57 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YTJHbaFGJOn4TNj8@redhat.com>
-References: <20210902152228.665959-1-vgoyal@redhat.com>
-	<YTDyE9wVQQBxS77r@redhat.com>
-	<CAHc6FU4ytU5eo4bmJcL6MW+qJZAtYTX0=wTZnv4myhDBv-qZHQ@mail.gmail.com>
-	<CAHc6FU5quZWQtZ3fRfM_ZseUsweEbJA0aAkZvQEF5u9MJhrqdQ@mail.gmail.com>
-	<CAPL3RVH9MDoDAdiZ-nm3a4BgmRyZJUc_PV_MpsEWiuh6QPi+pA@mail.gmail.com>
-	<YTJCjGH0V5yzMnQB@redhat.com>
-	<CAPL3RVFB67-AqZrjjfxueQF1Jw=LmKWzCk3Ur94EjUotYMw0AA@mail.gmail.com>
+From: Jeffle Xu <jefflexu@linux.alibaba.com>
+Date: Wed,  4 Aug 2021 15:06:49 +0800
+Message-Id: <20210804070653.118123-5-jefflexu@linux.alibaba.com>
+In-Reply-To: <20210804070653.118123-1-jefflexu@linux.alibaba.com>
+References: <20210804070653.118123-1-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <CAPL3RVFB67-AqZrjjfxueQF1Jw=LmKWzCk3Ur94EjUotYMw0AA@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH 3/1] xfstests: generic/062: Do not run on
-	newer kernels
+Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [PATCH v3 4/8] fuse: negotiate if server/client
+	supports per-file DAX
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,24 +16,71 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Bruce Fields <bfields@redhat.com>
-Cc: Giuseppe Scrivano <gscrivan@redhat.com>, Theodore Ts'o <tytso@mit.edu>, Andreas Gruenbacher <agruenba@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, selinux@vger.kernel.org, stephen.smalley.work@gmail.com, Dave Chinner <david@fromorbit.com>, LKML <linux-kernel@vger.kernel.org>, fstests <fstests@vger.kernel.org>, virtio-fs@redhat.com, Casey Schaufler <casey.schaufler@intel.com>, LSM <linux-security-module@vger.kernel.org>, Alexander Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Christian Brauner <christian.brauner@ubuntu.com>
+To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, virtualization@lists.linux-foundation.org
 
-On Fri, Sep 03, 2021 at 11:50:43AM -0400, Bruce Fields wrote:
-> On Fri, Sep 3, 2021 at 11:43 AM Vivek Goyal <vgoyal@redhat.com> wrote:
-> > On Fri, Sep 03, 2021 at 10:42:34AM -0400, Bruce Fields wrote:
-> > > Well, we could also look at supporting trusted.* xattrs over NFS.  I
-> > > don't know much about them, but it looks like it wouldn't be a lot of
-> > > work to specify, especially now that we've already got user xattrs?
-> > > We'd just write a new internet draft that refers to the existing
-> > > user.* xattr draft for most of the details.
-> >
-> > Will be nice if we can support trusted.* xattrs on NFS.
-> 
-> Maybe I should start a separate thread for that.  Who would need to be
-> on it to be sure we get this right?
+Among the FUSE_INIT phase, server/client shall negotiate if supporting
+per-file DAX.
 
-I will like to be on cc list.
+Requirements for server:
+- capable of handling SETFLAGS/FSSETXATTR ioctl and storing
+  FS_DAX_FL/FS_XFLAG_DAX persistently.
+- set FUSE_ATTR_DAX if the file capable of per-file DAX when replying
+  FUSE_LOOKUP request accordingly.
 
-Vivek
+Requirements for client:
+- capable of handling per-file DAX when receiving FUSE_ATTR_DAX.
+
+Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
+---
+ fs/fuse/fuse_i.h |  3 +++
+ fs/fuse/inode.c  | 12 +++++++-----
+ 2 files changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index a23dd8d0c181..0b21e76a379a 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -770,6 +770,9 @@ struct fuse_conn {
+ 	/* Propagate syncfs() to server */
+ 	unsigned int sync_fs:1;
+ 
++	/* Does the filesystem support per-file DAX? */
++	unsigned int perfile_dax:1;
++
+ 	/** The number of requests waiting for completion */
+ 	atomic_t num_waiting;
+ 
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index 0bc0d8af81e1..d59aea41d70d 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -1087,10 +1087,12 @@ static void process_init_reply(struct fuse_mount *fm, struct fuse_args *args,
+ 					min_t(unsigned int, fc->max_pages_limit,
+ 					max_t(unsigned int, arg->max_pages, 1));
+ 			}
+-			if (IS_ENABLED(CONFIG_FUSE_DAX) &&
+-			    arg->flags & FUSE_MAP_ALIGNMENT &&
+-			    !fuse_dax_check_alignment(fc, arg->map_alignment)) {
+-				ok = false;
++			if (IS_ENABLED(CONFIG_FUSE_DAX)) {
++				if (arg->flags & FUSE_MAP_ALIGNMENT &&
++				    !fuse_dax_check_alignment(fc, arg->map_alignment))
++					ok = false;
++				if (arg->flags & FUSE_PERFILE_DAX)
++					fc->perfile_dax = 1;
+ 			}
+ 			if (arg->flags & FUSE_HANDLE_KILLPRIV_V2) {
+ 				fc->handle_killpriv_v2 = 1;
+@@ -1144,7 +1146,7 @@ void fuse_send_init(struct fuse_mount *fm)
+ 		FUSE_HANDLE_KILLPRIV_V2 | FUSE_SETXATTR_EXT;
+ #ifdef CONFIG_FUSE_DAX
+ 	if (fm->fc->dax)
+-		ia->in.flags |= FUSE_MAP_ALIGNMENT;
++		ia->in.flags |= FUSE_MAP_ALIGNMENT | FUSE_PERFILE_DAX;
+ #endif
+ 	if (fm->fc->auto_submounts)
+ 		ia->in.flags |= FUSE_SUBMOUNTS;
+-- 
+2.27.0
 

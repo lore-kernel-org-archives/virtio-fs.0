@@ -1,26 +1,12 @@
-Date: Thu, 2 Sep 2021 08:32:05 -0400
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	from:to:subject; s=fm1; bh=tAgdBDm7i0nCEdummYKQAHg4VW0V9Go73aJgw
-	ZImz68=; b=l2a5ECigLosQ6qGQJA44XXk9NccgvBsTmSos8285bGm4PZkmXgchX
-	d07SL/lkBZszeJ7AAZdHDcH9tgY52Cy2sxGGzruJhmUAMN8ifEUBb0fwkbR9smYl
-	EwedqDGJNO0iV47fuhgCjLfURlYhARSTpbZWeDLlWMMpcp2nGgw1kvMsDHUaLQXn
-	BPPDxPMFvIbPp4gXm1GcECFlvnSkJCjB1RJSoqorUPz8GdeuSiIkZA+TnsTjOGkH
-	jeh19qD2XlDQt3s+NQiITud5R0prTJ/nCqcwzpaxZfg1lQizLZPRAonXD7kWz5Qh
-	/SEzkMxNIJDQ4apBT6axKjDdbyBCTBdKQ==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm3; bh=tAgdBDm7i0nCEdumm
-	YKQAHg4VW0V9Go73aJgwZImz68=; b=makS/PtgMVKF8kmq3NASYGSUo+78p+uUX
-	mr/WwGX3SqCPDUDoEqRsIRN+NxZ5x8pDQb70gQfyOMPLRnPBJtGOsbCwOPDY5Y8T
-	+Mz15lnBR4A9IgDVvYLjPq7tPvrMVuNq4J66c6lKfUVvt3TGvgNX//6YgEABnEV3
-	yA8X01Ox3E7gTpuM45/f3pm5etNDIG41nAhPVRi7mF+z88psVzLkXXAPmjcls/Jx
-	zv1cw/6SwiDNP5PjRBNVlKOH7p58+X7fxMlqtTFlzFYzba3wKjfwd/LZq+wCv9BR
-	pPDneSXxzm5+SL9aEuLYYQtPa7tTgdseI04zxSX79tNUIKERxuUQw==
-From: virtiofs-bot@sinrega.org
-Message-Id: <28448.121090208314601295@us-mta-154.us.mimecast.lan>
+From: Jeffle Xu <jefflexu@linux.alibaba.com>
+Date: Wed,  4 Aug 2021 15:06:48 +0800
+Message-Id: <20210804070653.118123-4-jefflexu@linux.alibaba.com>
+In-Reply-To: <20210804070653.118123-1-jefflexu@linux.alibaba.com>
+References: <20210804070653.118123-1-jefflexu@linux.alibaba.com>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] MR merged: Do not filter out the
-	RENAME_WHITEOUT flag of rename2
+Subject: [Virtio-fs] [PATCH v3 3/8] fuse: support per-file DAX
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -29,14 +15,72 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, virtualization@lists.linux-foundation.org
 
-To use virtio-fs directories as the upperdir of overlayfs in VMs, we need
-to passthrough the RENAME_WHITEOUT flag. The Linux kernel commit
-519525fa47b5a8155f0b203e49a3a6a2319f75ae already enabled the passthrough of
-the flag. Therefore, let's avoid filtering out it for rename2.
+Expand the fuse protocol to support per-file DAX.
 
-Signed-off-by: Jiachen Zhang <zhangjiachen.jaycee@bytedance.com>
+FUSE_PERFILE_DAX flag is added indicating if fuse server/client
+supporting per-file DAX when sending or replying FUSE_INIT request.
+
+Besides, FUSE_ATTR_DAX flag is added indicating if DAX shall be enabled
+for corresponding file when replying FUSE_LOOKUP request.
+
+Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
 ---
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/34
+ include/uapi/linux/fuse.h | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
+index 36ed092227fa..15a1f5fc0797 100644
+--- a/include/uapi/linux/fuse.h
++++ b/include/uapi/linux/fuse.h
+@@ -184,6 +184,9 @@
+  *
+  *  7.34
+  *  - add FUSE_SYNCFS
++ *
++ *  7.35
++ *  - add FUSE_PERFILE_DAX, FUSE_ATTR_DAX
+  */
+ 
+ #ifndef _LINUX_FUSE_H
+@@ -219,7 +222,7 @@
+ #define FUSE_KERNEL_VERSION 7
+ 
+ /** Minor version number of this interface */
+-#define FUSE_KERNEL_MINOR_VERSION 34
++#define FUSE_KERNEL_MINOR_VERSION 35
+ 
+ /** The node ID of the root inode */
+ #define FUSE_ROOT_ID 1
+@@ -336,6 +339,7 @@ struct fuse_file_lock {
+  *			write/truncate sgid is killed only if file has group
+  *			execute permission. (Same as Linux VFS behavior).
+  * FUSE_SETXATTR_EXT:	Server supports extended struct fuse_setxattr_in
++ * FUSE_PERFILE_DAX:	kernel supports per-file DAX
+  */
+ #define FUSE_ASYNC_READ		(1 << 0)
+ #define FUSE_POSIX_LOCKS	(1 << 1)
+@@ -367,6 +371,7 @@ struct fuse_file_lock {
+ #define FUSE_SUBMOUNTS		(1 << 27)
+ #define FUSE_HANDLE_KILLPRIV_V2	(1 << 28)
+ #define FUSE_SETXATTR_EXT	(1 << 29)
++#define FUSE_PERFILE_DAX	(1 << 30)
+ 
+ /**
+  * CUSE INIT request/reply flags
+@@ -449,8 +454,10 @@ struct fuse_file_lock {
+  * fuse_attr flags
+  *
+  * FUSE_ATTR_SUBMOUNT: Object is a submount root
++ * FUSE_ATTR_DAX: Enable DAX for this file in per-file DAX mode
+  */
+ #define FUSE_ATTR_SUBMOUNT      (1 << 0)
++#define FUSE_ATTR_DAX		(1 << 1)
+ 
+ /**
+  * Open flags
+-- 
+2.27.0
 

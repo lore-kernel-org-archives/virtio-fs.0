@@ -1,15 +1,15 @@
 References: <20210730150134.216126-1-mreitz@redhat.com>
-	<20210730150134.216126-3-mreitz@redhat.com>
-	<YQ1KCya+NHd96kvv@redhat.com>
+	<20210730150134.216126-5-mreitz@redhat.com>
+	<YQ1+qPISUq5AhBtT@redhat.com>
 From: Max Reitz <mreitz@redhat.com>
-Message-ID: <a9b09a33-b8b6-2e9f-42e9-edefb2459653@redhat.com>
-Date: Mon, 9 Aug 2021 12:44:00 +0200
+Message-ID: <ae8eb346-bdc9-1fb9-5dc3-7f8deb6ba7a9@redhat.com>
+Date: Mon, 9 Aug 2021 12:48:41 +0200
 MIME-Version: 1.0
-In-Reply-To: <YQ1KCya+NHd96kvv@redhat.com>
+In-Reply-To: <YQ1+qPISUq5AhBtT@redhat.com>
 Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Transfer-Encoding: 8bit
 Content-Language: en-US
-Subject: Re: [Virtio-fs] [PATCH v3 02/10] virtiofsd: Add TempFd structure
+Subject: Re: [Virtio-fs] [PATCH v3 04/10] virtiofsd: Add lo_inode_fd() helper
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,117 +21,140 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: Vivek Goyal <vgoyal@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On 06.08.21 16:41, Vivek Goyal wrote:
-> On Fri, Jul 30, 2021 at 05:01:26PM +0200, Max Reitz wrote:
->> We are planning to add file handles to lo_inode objects as an
->> alternative to lo_inode.fd.  That means that everywhere where we
->> currently reference lo_inode.fd, we will have to open a temporary file
->> descriptor that needs to be closed after use.
->>
->> So instead of directly accessing lo_inode.fd, there will be a helper
->> function (lo_inode_fd()) that either returns lo_inode.fd, or opens a new
->> file descriptor with open_by_handle_at().  It encapsulates this result
->> in a TempFd structure to let the caller know whether the FD needs to be
->> closed after use (opened from the handle) or not (copied from
->> lo_inode.fd).
-> I am wondering why this notion of "owned". Why not have this requirement
-> of always closing "fd". If we copied it from lo_inode.fd, then we will
-> need to dup() it. Otherwise we opened it from file handle and we will
-> need to close it anyway.
+On 06.08.21 20:25, Vivek Goyal wrote:
+> On Fri, Jul 30, 2021 at 05:01:28PM +0200, Max Reitz wrote:
 >
-> I guess you are trying to avoid having to call dup() and that's why
-> this notion of "owned" fd.
-
-Yes, I don’t want to dup() it.  One reason is that I’d rather just not.  
-It’s something that we can avoid, and dup-ing every time wouldn’t make 
-the code that much simpler (I think, without having tried).
-
-One other is because this affects the current behavior (with O_PATH 
-FDs), which I don’t want to alter.
-
-Well, and finally, as a pragmatic reason, virtiofsd-rs uses the same 
-structure and I don’t really want C virtiofsd and virtiofsd-rs to differ 
-too much.
-
->> By using g_auto(TempFd) to store this result, callers will not even have
->> to care about closing a temporary FD after use.  It will be done
->> automatically once the object goes out of scope.
->>
->> Signed-off-by: Max Reitz <mreitz@redhat.com>
->> Reviewed-by: Connor Kuehl <ckuehl@redhat.com>
->> ---
->>   tools/virtiofsd/passthrough_ll.c | 49 ++++++++++++++++++++++++++++++++
->>   1 file changed, 49 insertions(+)
->>
->> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
->> index 1f27eeabc5..fb5e073e6a 100644
->> --- a/tools/virtiofsd/passthrough_ll.c
->> +++ b/tools/virtiofsd/passthrough_ll.c
->> @@ -178,6 +178,28 @@ struct lo_data {
->>       int user_posix_acl, posix_acl;
->>   };
+> [..]
+>> @@ -1335,12 +1359,18 @@ static void lo_mknod_symlink(fuse_req_t req, fuse_ino_t parent,
+>>           return;
+>>       }
 >>   
->> +/**
->> + * Represents a file descriptor that may either be owned by this
->> + * TempFd, or only referenced (i.e. the ownership belongs to some
->> + * other object, and the value has just been copied into this TempFd).
->> + *
->> + * The purpose of this encapsulation is to be used as g_auto(TempFd)
->> + * to automatically clean up owned file descriptors when this object
->> + * goes out of scope.
->> + *
->> + * Use temp_fd_steal() to get an owned file descriptor that will not
->> + * be closed when the TempFd goes out of scope.
->> + */
->> +typedef struct {
->> +    int fd;
->> +    bool owned; /* fd owned by this object? */
->> +} TempFd;
+>> +    res = lo_inode_fd(dir, &dir_fd);
+>> +    if (res < 0) {
+>> +        saverr = -res;
+>> +        goto out;
+>> +    }
 >> +
->> +#define TEMP_FD_INIT ((TempFd) { .fd = -1, .owned = false })
+>>       saverr = lo_change_cred(req, &old, lo->change_umask && !S_ISLNK(mode));
+>>       if (saverr) {
+>>           goto out;
+>>       }
+>>   
+>> -    res = mknod_wrapper(dir->fd, name, link, mode, rdev);
+>> +    res = mknod_wrapper(dir_fd.fd, name, link, mode, rdev);
+>>   
+>>       saverr = errno;
+>>   
+>> @@ -1388,6 +1418,8 @@ static void lo_symlink(fuse_req_t req, const char *link, fuse_ino_t parent,
+>>   static void lo_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t parent,
+>>                       const char *name)
+>>   {
+>> +    g_auto(TempFd) inode_fd = TEMP_FD_INIT;
+>> +    g_auto(TempFd) parent_fd = TEMP_FD_INIT;
+>>       int res;
+>>       struct lo_data *lo = lo_data(req);
+>>       struct lo_inode *parent_inode;
+>> @@ -1413,18 +1445,31 @@ static void lo_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t parent,
+>>           goto out_err;
+>>       }
+>>   
+>> +    res = lo_inode_fd(inode, &inode_fd);
+>> +    if (res < 0) {
+>> +        errno = -res;
+> In previous function, we saved error to "saverr" and jumped to "out"
+> label, instead of overwriting to errno.
+>
+> I would think that it will be good to use a single pattern. Either
+> save error in saverr or overwrite errno. I personally prefer saving
+> error into "saverr".
+
+Absolutely, will do.
+
+>> +        goto out_err;
+>> +    }
 >> +
->> +static void temp_fd_clear(TempFd *temp_fd);
->> +G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC(TempFd, temp_fd_clear);
+>> +    res = lo_inode_fd(parent_inode, &parent_fd);
+>> +    if (res < 0) {
+>> +        errno = -res;
+>> +        goto out_err;
+>> +    }
 >> +
->>   static const struct fuse_opt lo_opts[] = {
->>       { "sandbox=namespace",
->>         offsetof(struct lo_data, sandbox),
->> @@ -255,6 +277,33 @@ static struct lo_data *lo_data(fuse_req_t req)
->>       return (struct lo_data *)fuse_req_userdata(req);
+>>       memset(&e, 0, sizeof(struct fuse_entry_param));
+>>       e.attr_timeout = lo->timeout;
+>>       e.entry_timeout = lo->timeout;
+>>   
+>> -    sprintf(procname, "%i", inode->fd);
+>> -    res = linkat(lo->proc_self_fd, procname, parent_inode->fd, name,
+>> +    sprintf(procname, "%i", inode_fd.fd);
+>> +    res = linkat(lo->proc_self_fd, procname, parent_fd.fd, name,
+>>                    AT_SYMLINK_FOLLOW);
+>>       if (res == -1) {
+>>           goto out_err;
+>>       }
+>>   
+>> -    res = fstatat(inode->fd, "", &e.attr, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
+>> +    res = fstatat(inode_fd.fd, "", &e.attr,
+>> +                  AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW);
+>>       if (res == -1) {
+>>           goto out_err;
+>>       }
+>> @@ -1453,23 +1498,33 @@ out_err:
+>>   static struct lo_inode *lookup_name(fuse_req_t req, fuse_ino_t parent,
+>>                                       const char *name)
+>>   {
+>> +    g_auto(TempFd) dir_fd = TEMP_FD_INIT;
+>>       int res;
+>>       uint64_t mnt_id;
+>>       struct stat attr;
+>>       struct lo_data *lo = lo_data(req);
+>>       struct lo_inode *dir = lo_inode(req, parent);
+>> +    struct lo_inode *inode = NULL;
+>>   
+>>       if (!dir) {
+>> -        return NULL;
+>> +        goto out;
+> Should we continue to just call "return NULL". dir is NULL. That means
+> lo_inode() failed. That means we never got the reference. So we don't
+> have to put the reference. If we do "goto out", it will call
+> lo_inode_put() which is not needed.
+
+Yes, but lo_inode_put() will handle this gracefully, so it isn’t wrong. 
+My personal preference is that if there is an clean-up path, it should 
+be used everywhere instead of having pure returns at the beginning of a 
+function (where not many resources have been initialized yet), so that 
+no clean-up will be forgotten.  Like, if we were to add some resource 
+acquisition in the declarations above (and clean-up code in the clean-up 
+path), we would need to change the return to a goto here.  Or maybe we’d 
+forget that, and then we’d leak something.
+
+So I prefer having clean-up sections be generic enough that they can be 
+used from anywhere within the function, and then also use it from 
+anywhere within the function, even if they end up being no-ops.
+
+>>       }
+>>   
+>> -    res = do_statx(lo, dir->fd, name, &attr, AT_SYMLINK_NOFOLLOW, &mnt_id);
+>> -    lo_inode_put(lo, &dir);
+>> +    res = lo_inode_fd(dir, &dir_fd);
+>> +    if (res < 0) {
+>> +        goto out;
+>> +    }
+>> +
+>> +    res = do_statx(lo, dir_fd.fd, name, &attr, AT_SYMLINK_NOFOLLOW, &mnt_id);
+>>       if (res == -1) {
+>> -        return NULL;
+>> +        goto out;
+>>       }
+>>   
+>> -    return lo_find(lo, &attr, mnt_id);
+>> +    inode = lo_find(lo, &attr, mnt_id);
+>> +
+>> +out:
+>> +    lo_inode_put(lo, &dir);
+>> +    return inode;
 >>   }
->>   
->> +/**
->> + * Clean-up function for TempFds
->> + */
->> +static void temp_fd_clear(TempFd *temp_fd)
->> +{
->> +    if (temp_fd->owned) {
->> +        close(temp_fd->fd);
->> +        *temp_fd = TEMP_FD_INIT;
->> +    }
->> +}
->> +
->> +/**
->> + * Return an owned fd from *temp_fd that will not be closed when
->> + * *temp_fd goes out of scope.
->> + *
->> + * (TODO: Remove __attribute__ once this is used.)
->> + */
->> +static __attribute__((unused)) int temp_fd_steal(TempFd *temp_fd)
->> +{
->> +    if (temp_fd->owned) {
->> +        temp_fd->owned = false;
->> +        return temp_fd->fd;
->> +    } else {
->> +        return dup(temp_fd->fd);
->> +    }
->> +}
-> This also will be simpler if we always called dup() and every caller
-> will close() fd.
 >
-> I think only downside is having to call dup()/close(). Not sure if this
-> is an expensive operation or not.
->
+> Thanks
 > Vivek
 >
 

@@ -1,14 +1,16 @@
-Date: Fri, 6 Aug 2021 15:55:01 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YQ2TleuDejJY4O4V@redhat.com>
-References: <20210730150134.216126-1-mreitz@redhat.com>
-	<20210730150134.216126-7-mreitz@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yahoo.com; s=s2048;
+	t=1628490120; bh=vwY61WQQyYSjctFY0N1Mi9Iq8DPt9vQKN9sdQAYEOLg=;
+	h=From:To:Subject:Date:References:From:Subject:Reply-To;
+	b=tN6rJkxkZHiYKJSxk+xJfkuPxBLjcxpyOOtCKyBl0TXcjbj/9474VwfNRQ90xxFB+NDsAXCbszKu+xJEMPmXk7WSqmIm0fUAum88OeEaHbNvl9KUwTy9hajr3V1GHs70cQLndhfxyNAH0i/vGuKU8cIbVZ3dLjffPRqpG/OyEPCPvNC/GSqy4puo50mHtCiX+kmhnDyJb64/SKf3+Rxdf9smqchIYSAZuWM0MiG3gq3JEkdMo5G/HjYNzWAsaiJHgRm7aQVkQ4GPsyTBYys/NXWVW1ABpmsweoYZuyXZ1OFYucTMuCxVIS/RODN9GnuV3PGfI+tDu41ELaIL+Du4iw==
+From: "Maria" <maria@technologyuserlist.com>
+Date: Mon, 9 Aug 2021 02:21:48 -0400
+Message-ID: <0b7a01d78ce6$d79bd600$86d38200$@technologyuserlist.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210730150134.216126-7-mreitz@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 06/10] virtiofsd: Let lo_inode_open()
-	return a TempFd
+References: <0b7a01d78ce6$d79bd600$86d38200$.ref@technologyuserlist.com>
+Content-Type: multipart/alternative;
+	boundary="----=_NextPart_000_0B7B_01D78CC5.508B4770"
+Content-Language: en-us
+Subject: [Virtio-fs] RE :  JITTERBIT Users List
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,208 +19,273 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Max Reitz <mreitz@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: virtio-fs@redhat.com
 
-On Fri, Jul 30, 2021 at 05:01:30PM +0200, Max Reitz wrote:
-> Strictly speaking, this is not necessary, because lo_inode_open() will
-> always return a new FD owned by the caller, so TempFd.owned will always
-> be true.
-> 
-> However, auto-cleanup is nice, and in some cases this plays nicely with
-> an lo_inode_fd() call in another conditional branch (see lo_setattr()).
-> 
-> Signed-off-by: Max Reitz <mreitz@redhat.com>
-> ---
->  tools/virtiofsd/passthrough_ll.c | 138 +++++++++++++------------------
->  1 file changed, 59 insertions(+), 79 deletions(-)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 9e1bc37af8..292b7f7e27 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -291,10 +291,8 @@ static void temp_fd_clear(TempFd *temp_fd)
->  /**
->   * Return an owned fd from *temp_fd that will not be closed when
->   * *temp_fd goes out of scope.
-> - *
-> - * (TODO: Remove __attribute__ once this is used.)
->   */
-> -static __attribute__((unused)) int temp_fd_steal(TempFd *temp_fd)
-> +static int temp_fd_steal(TempFd *temp_fd)
->  {
->      if (temp_fd->owned) {
->          temp_fd->owned = false;
-> @@ -673,9 +671,12 @@ static int lo_fd(fuse_req_t req, fuse_ino_t ino, TempFd *tfd)
->   * when a malicious client opens special files such as block device nodes.
->   * Symlink inodes are also rejected since symlinks must already have been
->   * traversed on the client side.
-> + *
-> + * The fd is returned in tfd->fd.  The return value is 0 on success and -errno
-> + * otherwise.
->   */
-> -static int lo_inode_open(struct lo_data *lo, struct lo_inode *inode,
-> -                         int open_flags)
-> +static int lo_inode_open(const struct lo_data *lo, const struct lo_inode *inode,
-> +                         int open_flags, TempFd *tfd)
->  {
->      g_autofree char *fd_str = g_strdup_printf("%d", inode->fd);
->      int fd;
-> @@ -694,7 +695,13 @@ static int lo_inode_open(struct lo_data *lo, struct lo_inode *inode,
->      if (fd < 0) {
->          return -errno;
->      }
-> -    return fd;
-> +
-> +    *tfd = (TempFd) {
-> +        .fd = fd,
-> +        .owned = true,
-> +    };
-> +
-> +    return 0;
->  }
->  
->  static void lo_init(void *userdata, struct fuse_conn_info *conn)
-> @@ -852,7 +859,12 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
->          return;
->      }
->  
-> -    res = lo_inode_fd(inode, &inode_fd);
-> +    if (!fi && (valid & FUSE_SET_ATTR_SIZE)) {
-> +        /* We need an O_RDWR FD for ftruncate() */
-> +        res = lo_inode_open(lo, inode, O_RDWR, &inode_fd);
-> +    } else {
-> +        res = lo_inode_fd(inode, &inode_fd);
-> +    }
+This is a multipart message in MIME format.
+------=_NextPart_000_0B7B_01D78CC5.508B4770
+Content-Type: text/plain;
+	charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 
-A minor nit.
+ 
 
-So inode_fd could hold either an O_PATH fd returned by lo_inode_fd()
-or a O_RDWR fd returned by lo_inode_open().
+ 
 
-Previous code held these fds in two different variables, inode_fd and
-truncfd respectively. I kind of found that easier to read because looking
-at variable name, I knew whether I am dealing with O_PATH fd or an
-O_RDWR fd I just opened. 
+Hi,                                                                     
 
-So a minor nit. We could continue to have two variables, say
-inode_fd and trunc_fd. Just that type of trunc_fd will now be TempFd.
+                        
 
-Also I liked previous style easier to read where I always got hold
-of O_PATH fd first. And later opened a O_RDWR fd if operation
-is FUSE_ATTR_SIZE. So "valid & FUSE_SET_ATTR_SIZE" check was not
-at two places.
+I hope all going well over there. 
 
-Anyway, this is a minor nit. If you don't like the idea of using
-two separate variables to hold O_PATH fd and O_RDWR fd, that's ok.
+ 
+
+I was just wondering if you had a chance to take a look at our email that I
+sent you on Aug 06th 2021. It would be really great if you could review the
+email and share your thoughts, so that we can proceed further. 
+
+                  
+
+Please share your thoughts. 
+
+                          
+
+Warm Regards,
+
+Maria
+
+ 
+
+ 
+
+Hi,
+
+ 
+
+Would you be interested to acquire an email list of  JITTERBIT Users List
+across the globe?
+
+Data Fields: - Company Name, Website, Contact Name, First Name, Last Name,
+Job Title, Email Address, Phone Number, Fax Number, Physical Address, City,
+State, Zip Code, Country, Revenue Size, Employee Size, SIC Code, Industry
+Type, Specialty, Technology Type, etc..
+
+ 
+
+Let me know the Geographic Location / Technology Name you would like to
+reach, so that I can assist you with the same.
+
+ 
+
+Note : We can assist you all industry decision makers, technology users list
+and Consumer contacts from any location.
+
+ 
+
+Regards,
+
+Maria| Lead Generation |
+
+ 
+
+"If you're not interested in our service reply with Remove, you will not
+receive further emails"
+
+ 
 
 
->      if (res < 0) {
->          saverr = -res;
->          goto out_err;
-> @@ -900,18 +912,11 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
->          if (fi) {
->              truncfd = fd;
->          } else {
-> -            truncfd = lo_inode_open(lo, inode, O_RDWR);
-> -            if (truncfd < 0) {
-> -                saverr = -truncfd;
-> -                goto out_err;
-> -            }
-> +            truncfd = inode_fd.fd;
->          }
->  
->          saverr = drop_security_capability(lo, truncfd);
->          if (saverr) {
-> -            if (!fi) {
-> -                close(truncfd);
-> -            }
->              goto out_err;
->          }
->  
-> @@ -919,9 +924,6 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
->              res = drop_effective_cap("FSETID", &cap_fsetid_dropped);
->              if (res != 0) {
->                  saverr = res;
-> -                if (!fi) {
-> -                    close(truncfd);
-> -                }
->                  goto out_err;
->              }
->          }
-> @@ -934,9 +936,6 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
->                  fuse_log(FUSE_LOG_ERR, "Failed to gain CAP_FSETID\n");
->              }
->          }
-> -        if (!fi) {
-> -            close(truncfd);
-> -        }
->          if (res == -1) {
->              goto out_err;
->          }
-> @@ -1822,11 +1821,12 @@ static struct lo_dirp *lo_dirp(fuse_req_t req, struct fuse_file_info *fi)
->  static void lo_opendir(fuse_req_t req, fuse_ino_t ino,
->                         struct fuse_file_info *fi)
->  {
-> +    g_auto(TempFd) inode_fd = TEMP_FD_INIT;
->      int error = ENOMEM;
->      struct lo_data *lo = lo_data(req);
->      struct lo_inode *inode;
->      struct lo_dirp *d = NULL;
-> -    int fd;
-> +    int res;
->      ssize_t fh;
->  
->      inode = lo_inode(req, ino);
-> @@ -1840,13 +1840,13 @@ static void lo_opendir(fuse_req_t req, fuse_ino_t ino,
->          goto out_err;
->      }
->  
-> -    fd = lo_inode_open(lo, inode, O_RDONLY);
-> -    if (fd < 0) {
-> -        error = -fd;
-> +    res = lo_inode_open(lo, inode, O_RDONLY, &inode_fd);
-> +    if (res < 0) {
-> +        error = -res;
->          goto out_err;
->      }
->  
-> -    d->dp = fdopendir(fd);
-> +    d->dp = fdopendir(temp_fd_steal(&inode_fd));
+------=_NextPart_000_0B7B_01D78CC5.508B4770
+Content-Type: text/html;
+	charset="us-ascii"
+Content-Transfer-Encoding: quoted-printable
 
-So we are using temp_fd_steal(), because if fdopendir() is succesful,
-we don't want to close fd instead it will be closed during closedir()
-call. inode_fd will be closed once lo_opendir(), so we get fd ownership
-which will need to close explicitly, when appropriate.
-
-Who closes the stolen fd returned by temp_fd_steal() if fdopendir() fails?
-
->      if (d->dp == NULL) {
->          goto out_errno;
->      }
-> @@ -1876,8 +1876,6 @@ out_err:
->      if (d) {
->          if (d->dp) {
->              closedir(d->dp);
-> -        } else if (fd != -1) {
-> -            close(fd);
->          }
->          free(d);
->      }
-> @@ -2077,6 +2075,7 @@ static void update_open_flags(int writeback, int allow_direct_io,
->  static int lo_do_open(struct lo_data *lo, struct lo_inode *inode,
->                        int existing_fd, struct fuse_file_info *fi)
->  {
-> +    g_auto(TempFd) inode_fd = TEMP_FD_INIT;
-
-It bothers me that we are using variable inode_fd both to hold O_PATH
-fd as well as regular fd. Will be nice if just by looking at variable
-name I could figure out which type of fd it is.
-
-Will it make sense to use path_fd, or ipath_fd, or inode_path_fd to
-represent where we are using O_PATH fd.
-
-
-Thanks
-Vivek
+<html xmlns:v=3D"urn:schemas-microsoft-com:vml" xmlns:o=3D"urn:schemas-micr=
+osoft-com:office:office" xmlns:w=3D"urn:schemas-microsoft-com:office:word" =
+xmlns:m=3D"http://schemas.microsoft.com/office/2004/12/omml" xmlns=3D"http:=
+//www.w3.org/TR/REC-html40"><head><META HTTP-EQUIV=3D"Content-Type" CONTENT=
+=3D"text/html; charset=3Dus-ascii"><meta name=3DGenerator content=3D"Micros=
+oft Word 15 (filtered medium)"><style><!--
+/* Font Definitions */
+@font-face
+=09{font-family:"Cambria Math";
+=09panose-1:2 4 5 3 5 4 6 3 2 4;}
+@font-face
+=09{font-family:Calibri;
+=09panose-1:2 15 5 2 2 2 4 3 2 4;}
+@font-face
+=09{font-family:Verdana;
+=09panose-1:2 11 6 4 3 5 4 4 2 4;}
+/* Style Definitions */
+p.MsoNormal, li.MsoNormal, div.MsoNormal
+=09{margin:0in;
+=09margin-bottom:.0001pt;
+=09font-size:11.0pt;
+=09font-family:"Calibri","sans-serif";}
+a:link, span.MsoHyperlink
+=09{mso-style-priority:99;
+=09color:#0563C1;
+=09text-decoration:underline;}
+a:visited, span.MsoHyperlinkFollowed
+=09{mso-style-priority:99;
+=09color:#954F72;
+=09text-decoration:underline;}
+span.EmailStyle17
+=09{mso-style-type:personal-compose;
+=09font-family:"Calibri","sans-serif";
+=09color:windowtext;}
+.MsoChpDefault
+=09{mso-style-type:export-only;
+=09font-family:"Calibri","sans-serif";}
+@page WordSection1
+=09{size:8.5in 11.0in;
+=09margin:1.0in 1.0in 1.0in 1.0in;}
+div.WordSection1
+=09{page:WordSection1;}
+/* List Definitions */
+@list l0
+=09{mso-list-id:1603687125;
+=09mso-list-template-ids:379609338;}
+@list l0:level1
+=09{mso-level-number-format:bullet;
+=09mso-level-text:\F0B7;
+=09mso-level-tab-stop:.5in;
+=09mso-level-number-position:left;
+=09text-indent:-.25in;
+=09mso-ansi-font-size:10.0pt;
+=09font-family:Symbol;}
+@list l0:level2
+=09{mso-level-number-format:bullet;
+=09mso-level-text:\F0B7;
+=09mso-level-tab-stop:1.0in;
+=09mso-level-number-position:left;
+=09text-indent:-.25in;
+=09mso-ansi-font-size:10.0pt;
+=09font-family:Symbol;}
+@list l0:level3
+=09{mso-level-number-format:bullet;
+=09mso-level-text:\F0B7;
+=09mso-level-tab-stop:1.5in;
+=09mso-level-number-position:left;
+=09text-indent:-.25in;
+=09mso-ansi-font-size:10.0pt;
+=09font-family:Symbol;}
+@list l0:level4
+=09{mso-level-number-format:bullet;
+=09mso-level-text:\F0B7;
+=09mso-level-tab-stop:2.0in;
+=09mso-level-number-position:left;
+=09text-indent:-.25in;
+=09mso-ansi-font-size:10.0pt;
+=09font-family:Symbol;}
+@list l0:level5
+=09{mso-level-number-format:bullet;
+=09mso-level-text:\F0B7;
+=09mso-level-tab-stop:2.5in;
+=09mso-level-number-position:left;
+=09text-indent:-.25in;
+=09mso-ansi-font-size:10.0pt;
+=09font-family:Symbol;}
+@list l0:level6
+=09{mso-level-number-format:bullet;
+=09mso-level-text:\F0B7;
+=09mso-level-tab-stop:3.0in;
+=09mso-level-number-position:left;
+=09text-indent:-.25in;
+=09mso-ansi-font-size:10.0pt;
+=09font-family:Symbol;}
+@list l0:level7
+=09{mso-level-number-format:bullet;
+=09mso-level-text:\F0B7;
+=09mso-level-tab-stop:3.5in;
+=09mso-level-number-position:left;
+=09text-indent:-.25in;
+=09mso-ansi-font-size:10.0pt;
+=09font-family:Symbol;}
+@list l0:level8
+=09{mso-level-number-format:bullet;
+=09mso-level-text:\F0B7;
+=09mso-level-tab-stop:4.0in;
+=09mso-level-number-position:left;
+=09text-indent:-.25in;
+=09mso-ansi-font-size:10.0pt;
+=09font-family:Symbol;}
+@list l0:level9
+=09{mso-level-number-format:bullet;
+=09mso-level-text:\F0B7;
+=09mso-level-tab-stop:4.5in;
+=09mso-level-number-position:left;
+=09text-indent:-.25in;
+=09mso-ansi-font-size:10.0pt;
+=09font-family:Symbol;}
+ol
+=09{margin-bottom:0in;}
+ul
+=09{margin-bottom:0in;}
+--></style><!--[if gte mso 9]><xml>
+<o:shapedefaults v:ext=3D"edit" spidmax=3D"1026" />
+</xml><![endif]--><!--[if gte mso 9]><xml>
+<o:shapelayout v:ext=3D"edit">
+<o:idmap v:ext=3D"edit" data=3D"1" />
+</o:shapelayout></xml><![endif]--></head><body lang=3DEN-US link=3D"#0563C1=
+" vlink=3D"#954F72"><div class=3DWordSection1><p class=3DMsoNormal><o:p>&nb=
+sp;</o:p></p><p class=3DMsoNormal><o:p>&nbsp;</o:p></p><p class=3DMsoNormal=
+><span style=3D'color:#1F4E79'>Hi, &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbs=
+p;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&=
+nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbs=
+p;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&=
+nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbs=
+p;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><o:p>=
+</o:p></p><p class=3DMsoNormal><span style=3D'color:#1F4E79'>&nbsp;&nbsp;&n=
+bsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp=
+;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><o:p></o:p></p><p =
+class=3DMsoNormal><span style=3D'color:#1F4E79'>I hope all going well over =
+there. </span><o:p></o:p></p><p class=3DMsoNormal style=3D'text-indent:.5in=
+'><span style=3D'color:#1F4E79'>&nbsp;</span><o:p></o:p></p><p class=3DMsoN=
+ormal><span style=3D'color:#1F4E79'>I was just wondering if you had a chanc=
+e to take a look at our email that I sent you on Aug 06<sup>th </sup>2021. =
+It would be really great if you could review the email and share your thoug=
+hts, so that we can proceed further. </span><o:p></o:p></p><p class=3DMsoNo=
+rmal><span style=3D'color:#1F4E79'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbs=
+p;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><o:p>=
+</o:p></p><p class=3DMsoNormal><span style=3D'color:#1F4E79'>Please share y=
+our thoughts. </span><o:p></o:p></p><p class=3DMsoNormal><span style=3D'col=
+or:#1F4E79'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nb=
+sp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=
+&nbsp;&nbsp; </span><o:p></o:p></p><p class=3DMsoNormal><span style=3D'colo=
+r:#1F4E79'>Warm Regards,</span><o:p></o:p></p><div style=3D'mso-element:par=
+a-border-div;border:none;border-bottom:solid windowtext 1.5pt;padding:0in 0=
+in 1.0pt 0in'><p class=3DMsoNormal style=3D'border:none;padding:0in'><span =
+style=3D'color:#1F4E79'>Maria</span><span style=3D'color:#1F4E79'><o:p></o:=
+p></span></p></div><p class=3DMsoNormal><i><span style=3D'color:#222A35'><o=
+:p>&nbsp;</o:p></span></i></p><p class=3DMsoNormal><span style=3D'color:#22=
+2A35'><o:p>&nbsp;</o:p></span></p><p class=3DMsoNormal><span style=3D'color=
+:#222A35'>Hi,</span><span style=3D'color:#222A35'><o:p></o:p></span></p><p =
+class=3DMsoNormal><span style=3D'color:#222A35'>&nbsp;</span><span style=3D=
+'color:#222A35'><o:p></o:p></span></p><p class=3DMsoNormal><span style=3D'c=
+olor:#222A35'>Would you be interested to acquire an email list of<b> </b></=
+span>&nbsp;<b><span style=3D'color:#222A35'>JITTERBIT Users List </span></b=
+><span style=3D'color:#222A35'>across the globe?<br><br><b><u>Data Fields: =
+-</u></b> Company Name, Website, Contact Name, First Name, Last Name, Job T=
+itle, Email Address, Phone Number, Fax Number, Physical Address, City, Stat=
+e, Zip Code, Country, Revenue Size, Employee Size, SIC Code, Industry Type,=
+ Specialty, Technology Type, etc..</span><span style=3D'color:#222A35'><o:p=
+></o:p></span></p><p class=3DMsoNormal><span style=3D'color:#222A35'>&nbsp;=
+</span><span style=3D'color:#222A35'><o:p></o:p></span></p><p class=3DMsoNo=
+rmal><span style=3D'color:#222A35'>Let me know the <b>Geographic Location /=
+ Technology</b> Name you would like to reach, so that I can assist you with=
+ the same.</span><span style=3D'color:#222A35'><o:p></o:p></span></p><p cla=
+ss=3DMsoNormal><span style=3D'color:#222A35'><o:p>&nbsp;</o:p></span></p><p=
+ class=3DMsoNormal><b><u><span style=3D'color:#222A35'>Note</span></u></b><=
+span style=3D'color:#222A35'> : We can assist you all industry decision mak=
+ers, technology users list and Consumer contacts from any location.</span><=
+span style=3D'color:#222A35'><o:p></o:p></span></p><p class=3DMsoNormal><o:=
+p>&nbsp;</o:p></p><p class=3DMsoNormal><span style=3D'color:#0F243E'>Regard=
+s,</span><o:p></o:p></p><p class=3DMsoNormal style=3D'text-autospace:none'>=
+<b><span style=3D'color:#4F81BD'>Maria|&nbsp;Lead Generation |</span></b><o=
+:p></o:p></p><p class=3DMsoNormal style=3D'text-autospace:none'><span style=
+=3D'font-size:9.0pt;font-family:"Verdana","sans-serif";color:#4F81BD'>&nbsp=
+;</span><o:p></o:p></p><p class=3DMsoNormal><b><span style=3D'color:#A6A6A6=
+'>&#8220;If you&#8217;re not interested in our service reply with Remove, y=
+ou will not receive further emails&#8220;</span></b><o:p></o:p></p><p class=
+=3DMsoNormal><o:p>&nbsp;</o:p></p></div></body></html>
+------=_NextPart_000_0B7B_01D78CC5.508B4770--
 

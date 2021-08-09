@@ -1,9 +1,16 @@
+References: <20210730150134.216126-1-mreitz@redhat.com>
+	<20210730150134.216126-9-mreitz@redhat.com>
+	<YRFTWVC1vXwjky5v@redhat.com>
+From: Hanna Reitz <hreitz@redhat.com>
+Message-ID: <467c019d-42b9-1290-72f3-bd96bf44ddcf@redhat.com>
+Date: Mon, 9 Aug 2021 18:47:18 +0200
 MIME-Version: 1.0
-From: Gal Hammer <ghammer@redhat.com>
-Date: Mon, 2 Aug 2021 13:18:13 +0300
-Message-ID: <CAA2ifQwwtNQwChMKUSM=6B+XEtdcf+Y--a0OxSwE2pmnd+6TAg@mail.gmail.com>
-Content-Type: multipart/alternative; boundary="000000000000b589e305c890e368"
-Subject: [Virtio-fs] Deleting files when using NFS as a shared folder
+In-Reply-To: <YRFTWVC1vXwjky5v@redhat.com>
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Transfer-Encoding: 8bit
+Content-Language: en-US
+Subject: Re: [Virtio-fs] [PATCH v3 08/10] virtiofsd: Add inodes_by_handle
+	hash table
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -12,108 +19,181 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>, Max Reitz <mreitz@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
---000000000000b589e305c890e368
-Content-Type: text/plain; charset="UTF-8"
+On 09.08.21 18:10, Vivek Goyal wrote:
+> On Fri, Jul 30, 2021 at 05:01:32PM +0200, Max Reitz wrote:
+>> Currently, lo_inode.fhandle is always NULL and so always keep an O_PATH
+>> FD in lo_inode.fd.  Therefore, when the respective inode is unlinked,
+>> its inode ID will remain in use until we drop our lo_inode (and
+>> lo_inode_put() thus closes the FD).  Therefore, lo_find() can safely use
+>> the inode ID as an lo_inode key, because any inode with an inode ID we
+>> find in lo_data.inodes (on the same filesystem) must be the exact same
+>> file.
+>>
+>> This will change when we start setting lo_inode.fhandle so we do not
+>> have to keep an O_PATH FD open.  Then, unlinking such an inode will
+>> immediately remove it, so its ID can then be reused by newly created
+>> files, even while the lo_inode object is still there[1].
+>>
+>> So creating a new file can then reuse the old file's inode ID, and
+>> looking up the new file would lead to us finding the old file's
+>> lo_inode, which is not ideal.
+>>
+>> Luckily, just as file handles cause this problem, they also solve it:  A
+>> file handle contains a generation ID, which changes when an inode ID is
+>> reused, so the new file can be distinguished from the old one.  So all
+>> we need to do is to add a second map besides lo_data.inodes that maps
+>> file handles to lo_inodes, namely lo_data.inodes_by_handle.  For
+>> clarity, lo_data.inodes is renamed to lo_data.inodes_by_ids.
+>>
+>> Unfortunately, we cannot rely on being able to generate file handles
+>> every time.  Therefore, we still enter every lo_inode object into
+>> inodes_by_ids, but having an entry in inodes_by_handle is optional.  A
+>> potential inodes_by_handle entry then has precedence, the inodes_by_ids
+>> entry is just a fallback.
+>>
+>> Note that we do not generate lo_fhandle objects yet, and so we also do
+>> not enter anything into the inodes_by_handle map yet.  Also, all lookups
+>> skip that map.  We might manually create file handles with some code
+>> that is immediately removed by the next patch again, but that would
+>> break the assumption in lo_find() that every lo_inode with a non-NULL
+>> .fhandle must have an entry in inodes_by_handle and vice versa.  So we
+>> leave actually using the inodes_by_handle map for the next patch.
+>>
+>> [1] If some application in the guest still has the file open, there is
+>> going to be a corresponding FD mapping in lo_data.fd_map.  In such a
+>> case, the inode will only go away once every application in the guest
+>> has closed it.  The problem described only applies to cases where the
+>> guest does not have the file open, and it is just in the dentry cache,
+>> basically.
+>>
+>> Signed-off-by: Max Reitz <mreitz@redhat.com>
+>> ---
+>>   tools/virtiofsd/passthrough_ll.c | 81 +++++++++++++++++++++++++-------
+>>   1 file changed, 65 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+>> index 487448d666..f9d8b2f134 100644
+>> --- a/tools/virtiofsd/passthrough_ll.c
+>> +++ b/tools/virtiofsd/passthrough_ll.c
+>> @@ -180,7 +180,8 @@ struct lo_data {
+>>       int announce_submounts;
+>>       bool use_statx;
+>>       struct lo_inode root;
+>> -    GHashTable *inodes; /* protected by lo->mutex */
+>> +    GHashTable *inodes_by_ids; /* protected by lo->mutex */
+>> +    GHashTable *inodes_by_handle; /* protected by lo->mutex */
+>>       struct lo_map ino_map; /* protected by lo->mutex */
+>>       struct lo_map dirp_map; /* protected by lo->mutex */
+>>       struct lo_map fd_map; /* protected by lo->mutex */
+>> @@ -263,8 +264,9 @@ static struct {
+>>   /* That we loaded cap-ng in the current thread from the saved */
+>>   static __thread bool cap_loaded = 0;
+>>   
+>> -static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
+>> -                                uint64_t mnt_id);
+>> +static struct lo_inode *lo_find(struct lo_data *lo,
+>> +                                const struct lo_fhandle *fhandle,
+>> +                                struct stat *st, uint64_t mnt_id);
+>>   static int xattr_map_client(const struct lo_data *lo, const char *client_name,
+>>                               char **out_name);
+>>   
+>> @@ -1064,18 +1066,40 @@ out_err:
+>>       fuse_reply_err(req, saverr);
+>>   }
+>>   
+>> -static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
+>> -                                uint64_t mnt_id)
+>> +static struct lo_inode *lo_find(struct lo_data *lo,
+>> +                                const struct lo_fhandle *fhandle,
+>> +                                struct stat *st, uint64_t mnt_id)
+>>   {
+>> -    struct lo_inode *p;
+>> -    struct lo_key key = {
+>> +    struct lo_inode *p = NULL;
+>> +    struct lo_key ids_key = {
+>>           .ino = st->st_ino,
+>>           .dev = st->st_dev,
+>>           .mnt_id = mnt_id,
+>>       };
+>>   
+>>       pthread_mutex_lock(&lo->mutex);
+>> -    p = g_hash_table_lookup(lo->inodes, &key);
+>> +    if (fhandle) {
+>> +        p = g_hash_table_lookup(lo->inodes_by_handle, fhandle);
+>> +    }
+>> +    if (!p) {
+>> +        p = g_hash_table_lookup(lo->inodes_by_ids, &ids_key);
+> So even if fhandle is not NULL, we will still lookup the inode
+> object in lo->inodes_by_ids? I thought fallback was only required
+> if we could not generate file handle to begin with and in that case
+> fhandle will be NULL?
 
-Hello,
+Well.  I think it depends again on when file handle generation can fail 
+and when it cannot.  If we assume it can randomly fail at any time, then 
+it’s possible we create an lo_inode with an O_PATH fd, but later we are 
+able to generate a file handle for it.  So we first try a lookup by file 
+handle here, which would fail, but we’d still have to try a lookup by 
+IDs, so we can find the O_PATH lo_inode.
 
-When using NFS as a shared folder (mount type nfs4) with a Linux guest I
-have the following issue:
+An example case would be if at first we weren’t able to open a mount fd 
+(because this file is a device node and the first lo_inode looked up on 
+its filesystem), and so we couldn’t generate a file handle that we would 
+be sure would work; but later for the lookup we can generate a file 
+handle (because some other node on that filesystem has been opened by 
+then, so we have a mount fd).
 
-Guest:
-$ ls -la /mnt/shared
-total 8
-drwxr-xrwx.  2  135  135 4096 Aug  2 13:08 .
-dr-xr-xr-x. 17 root   root    224 May 23 10:58 ..
--rw-r--rw-.  1  135  135   27 Aug  2 13:07 readme.txt
+> IOW, should this code instead look like.
+>
+> if (fhandle) {
+>      lookup_in_lo_inodes_by_handle
+> } else {
+>      lookup_in_lo_inodes_by_ids;
+>      if_found_verify_valid_o_path_fd;
+> }
+>
+>
+>> +        /*
+>> +         * When we had to fall back to looking up an inode by its
+>> +         * inode ID, ensure that we hit an entry that has a valid file
+>> +         * descriptor.  Having an FD open means that the inode cannot
+>> +         * really be deleted until the FD is closed, so that the inode
+>> +         * ID remains valid until we evict our lo_inode.
+>> +         * With no FD open (and just a file handle), the inode can be
+>> +         * deleted while we still have our lo_inode, and so the inode
+>> +         * ID may be reused by a completely different new inode.  We
+>> +         * then must look up the lo_inode by file handle, because this
+>> +         * handle contains a generation ID to differentiate between
+>> +         * the old and the new inode.
+>> +         */
+>> +        if (p && p->fd == -1) {
+>> +            p = NULL;
+>> +        }
+>> +    }
+>>       if (p) {
+>>           assert(p->nlookup > 0);
+>>           p->nlookup++;
+>
+> [..]
+>>   static void fuse_lo_data_cleanup(struct lo_data *lo)
+>>   {
+>> -    if (lo->inodes) {
+>> -        g_hash_table_destroy(lo->inodes);
+>> +    if (lo->inodes_by_ids) {
+>> +        g_hash_table_destroy(lo->inodes_by_ids);
+>> +    }
+>> +    if (lo->inodes_by_ids) {
+>              ^^^^^
+> Should this be lo->inodes_by_handle instead?
 
-Host:
-$ rm readme.txt
+Oh, crap, yes, absolutely.
 
-Guest:
-$ ls -la /mnt/shared
-total 8
-drwxr-xrwx.  2  135  135 4096 Aug  2 13:10 .
-dr-xr-xr-x. 17 root   root    224 May 23 10:58 ..
--rw-r--rw-.  1  135  135   27 Aug  2 13:07 .nfs0000000001b600d000000005
+Hanna
 
-Guest:
-$ cat /mnt/shared/readme.txt
-This is a readme.txt file.
-
-So it seems that the virtiofsd has a reference to the file which the guest
-is not aware of and is unable to send a FUSE_FORGET message. This results
-in a file not actually deleted (renamed to .nfsXXX) and is still accessible
-by the guest.
-
-I have a similar problem when deleting a file from a Windows guest side.
-The FUSE_READDIR(PLUS) commands add a reference count to files which the OS
-doesn't have a file context for. However I was able to solve it (for now?)
-by keeping track of returned files' inodes.
-
-Is this behaviour current and by design?
-
-Thanks,
-
-    Gal.
-
---000000000000b589e305c890e368
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr"><div class=3D"gmail_default" style=3D"font-family:verdana,=
-sans-serif">Hello,</div><div class=3D"gmail_default" style=3D"font-family:v=
-erdana,sans-serif"><br></div><div class=3D"gmail_default" style=3D"font-fam=
-ily:verdana,sans-serif">When using NFS as a shared folder (mount type nfs4)=
- with a Linux guest I have the following issue:</div><div class=3D"gmail_de=
-fault" style=3D"font-family:verdana,sans-serif"><br></div><div class=3D"gma=
-il_default" style=3D"font-family:verdana,sans-serif">Guest:</div><div class=
-=3D"gmail_default" style=3D"font-family:verdana,sans-serif">$ ls -la /mnt/s=
-hared</div><div class=3D"gmail_default" style=3D"font-family:verdana,sans-s=
-erif">total 8<br>drwxr-xrwx. =C2=A02 =C2=A0135=C2=A0 135 4096 Aug =C2=A02 1=
-3:08 .<br>dr-xr-xr-x. 17 root =C2=A0 root =C2=A0 =C2=A0224 May 23 10:58 ..<=
-br>-rw-r--rw-. =C2=A01 =C2=A0135=C2=A0 135 =C2=A0 27 Aug =C2=A02 13:07 read=
-me.txt</div><div class=3D"gmail_default" style=3D"font-family:verdana,sans-=
-serif"><br></div><div class=3D"gmail_default" style=3D"font-family:verdana,=
-sans-serif">Host:</div><div class=3D"gmail_default" style=3D"font-family:ve=
-rdana,sans-serif">$ rm readme.txt</div><div class=3D"gmail_default" style=
-=3D"font-family:verdana,sans-serif"><br></div><div class=3D"gmail_default" =
-style=3D"font-family:verdana,sans-serif">Guest: <br></div><div class=3D"gma=
-il_default" style=3D"font-family:verdana,sans-serif"></div><div class=3D"gm=
-ail_default" style=3D"font-family:verdana,sans-serif"></div><div class=3D"g=
-mail_default" style=3D"font-family:verdana,sans-serif">$ ls -la /mnt/shared=
-</div><div class=3D"gmail_default" style=3D"font-family:verdana,sans-serif"=
->total 8<br></div><div class=3D"gmail_default" style=3D"font-family:verdana=
-,sans-serif">drwxr-xrwx. =C2=A02 =C2=A0135=C2=A0 135 4096 Aug =C2=A02 13:10=
- .<br>dr-xr-xr-x. 17 root =C2=A0 root =C2=A0 =C2=A0224 May 23 10:58 ..<br>-=
-rw-r--rw-. =C2=A01 =C2=A0135=C2=A0 135 =C2=A0 27 Aug =C2=A02 13:07 .nfs0000=
-000001b600d000000005<br></div><div class=3D"gmail_default" style=3D"font-fa=
-mily:verdana,sans-serif"><br></div><div class=3D"gmail_default" style=3D"fo=
-nt-family:verdana,sans-serif">Guest:</div><div class=3D"gmail_default" styl=
-e=3D"font-family:verdana,sans-serif">$ cat /mnt/shared/readme.txt</div><div=
- class=3D"gmail_default" style=3D"font-family:verdana,sans-serif">This is a=
- readme.txt file.</div><div class=3D"gmail_default" style=3D"font-family:ve=
-rdana,sans-serif"><br></div><div class=3D"gmail_default" style=3D"font-fami=
-ly:verdana,sans-serif">So it seems that the virtiofsd has a reference to th=
-e file which the guest is not aware of and is unable to send a FUSE_FORGET =
-message. This results in a file not actually deleted (renamed to .nfsXXX) a=
-nd is still accessible by the guest.</div><div class=3D"gmail_default" styl=
-e=3D"font-family:verdana,sans-serif"><br></div><div class=3D"gmail_default"=
- style=3D"font-family:verdana,sans-serif">I have a similar problem when del=
-eting a file from a Windows guest side. The FUSE_READDIR(PLUS) commands add=
- a reference count to files which the OS doesn&#39;t have a file context fo=
-r. However I was able to solve it (for now?) by keeping track of returned f=
-iles&#39; inodes.</div><div class=3D"gmail_default" style=3D"font-family:ve=
-rdana,sans-serif"><br></div><div class=3D"gmail_default" style=3D"font-fami=
-ly:verdana,sans-serif">Is this behaviour current and by design?</div><div c=
-lass=3D"gmail_default" style=3D"font-family:verdana,sans-serif"><br></div><=
-div class=3D"gmail_default" style=3D"font-family:verdana,sans-serif">Thanks=
-,</div><div class=3D"gmail_default" style=3D"font-family:verdana,sans-serif=
-"><br></div><div class=3D"gmail_default" style=3D"font-family:verdana,sans-=
-serif">=C2=A0=C2=A0=C2=A0 Gal.</div><div class=3D"gmail_default" style=3D"f=
-ont-family:verdana,sans-serif"><br></div></div>
-
---000000000000b589e305c890e368--
+>> +        g_hash_table_destroy(lo->inodes_by_handle);
+> Thanks
+> Vivek
+>
 

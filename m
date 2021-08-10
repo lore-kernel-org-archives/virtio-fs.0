@@ -1,16 +1,15 @@
 References: <20210730150134.216126-1-mreitz@redhat.com>
-	<20210730150134.216126-10-mreitz@redhat.com>
-	<YRF2xjwSKOiqB/Al@redhat.com>
+	<20210730150134.216126-11-mreitz@redhat.com>
+	<YRF9Q+MSjrbeybd2@redhat.com>
 From: Hanna Reitz <hreitz@redhat.com>
-Message-ID: <df64553c-c03d-076a-bcef-bec8554977a4@redhat.com>
-Date: Tue, 10 Aug 2021 10:32:55 +0200
+Message-ID: <dfebe39a-35d4-1e1c-c63f-2312586aa97d@redhat.com>
+Date: Tue, 10 Aug 2021 10:38:32 +0200
 MIME-Version: 1.0
-In-Reply-To: <YRF2xjwSKOiqB/Al@redhat.com>
+In-Reply-To: <YRF9Q+MSjrbeybd2@redhat.com>
 Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Transfer-Encoding: 8bit
 Content-Language: en-US
-Subject: Re: [Virtio-fs] [PATCH v3 09/10] virtiofsd: Optionally fill
-	lo_inode.fhandle
+Subject: Re: [Virtio-fs] [PATCH v3 10/10] virtiofsd: Add lazy lo_do_find()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,63 +21,36 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: Vivek Goyal <vgoyal@redhat.com>, Max Reitz <mreitz@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On 09.08.21 20:41, Vivek Goyal wrote:
-> On Fri, Jul 30, 2021 at 05:01:33PM +0200, Max Reitz wrote:
->> When the inode_file_handles option is set, try to generate a file handle
->> for new inodes instead of opening an O_PATH FD.
+On 09.08.21 21:08, Vivek Goyal wrote:
+> On Fri, Jul 30, 2021 at 05:01:34PM +0200, Max Reitz wrote:
+>> lo_find() right now takes two lookup keys for two maps, namely the file
+>> handle for inodes_by_handle and the statx information for inodes_by_ids.
+>> However, we only need the statx information if looking up the inode by
+>> the file handle failed.
 >>
->> Being able to open these again will require CAP_DAC_READ_SEARCH, so the
->> description text tells the user they will also need to specify
->> -o modcaps=+dac_read_search.
->>
->> Generating a file handle returns the mount ID it is valid for.  Opening
->> it will require an FD instead.  We have mount_fds to map an ID to an FD.
->> get_file_handle() fills the hash map by opening the file we have
->> generated a handle for.  To verify that the resulting FD indeed
->> represents the handle's mount ID, we use statx().  Therefore, using file
->> handles requires statx() support.
-> So opening the file and storing that fd in mount_fds table might be
-> a potential problem with inotify work Ioannis is doing.
+>> There are two callers of lo_find(): The first one, lo_do_lookup(), has
+>> both keys anyway, so passing them does not incur any additional cost.
+>> The second one, lookup_name(), though, needs to explicitly invoke
+>> name_to_handle_at() (through get_file_handle()) and statx() (through
+>> do_statx()).  We need to try to get a file handle as the primary key, so
+>> we cannot get rid of get_file_handle(), but we only need the statx
+>> information if looking up an inode by handle failed; so we can defer
+>> that until the lookup has indeed failed.
+> So IIUC, this patch seems to be all about avoiding do_statx()
+> call in lookup_name() if file handle could be successfully
+> generated.
 >
-> So say a file foo.txt was opened O_RDONLY and fd stored in mount_fs. Now
-> say user unlinks foo.txt. If notifications are enabled, final notification
-> will not be generated till this mount_fds fd is closed.
+> So can't we just not modify lookup_name() to not call statx()
+> if file handle could be generated. And also modfiy lo_find()
+> to use st/mnt_id only if fhandle==NULL.
 >
-> Now question is when will this fd be closed? If it closed at some
-> later point and then notification is generated, that will break
-> notificaitons.
+> That probably is much simpler change as compared to passing function
+> pointers around.
 
-Currently, it is never closed.
+Definitely, but I don’t know whether it’s correct.
 
-> In fact even O_PATH fd is delaying notifications due to same reason.
-> But its not too bad as we close O_PATH fd pretty quickly after
-> unlinking. And we were hoping that file handle support will get rid
-> of this problem because we will not keep O_PATH fd open.
->
-> But, IIUC, mount_fds stuff will make it even worse. I did not see
-> the code which removes this fd from mount_fds. So I am not sure what's
-> the life time of this fd.
-
-The lifetime is forever.  If we wanted to remove it at some point, we’d 
-need to track how many file handles we have open for the given mount fd 
-and then remove it from the table once the count reaches 0, so it would 
-still be delayed.
-
-I think in practice the first thing that is looked up from some mount 
-will probably be the root directory, which cannot be deleted before 
-everything else on the mount is gone, so that would work.  We track how 
-many handles are there, if the whole mount were to be deleted, I hope 
-all lo_inodes are evicted, the count goes to 0, and we can drop the 
-mount fd.
-
-I think we can make the assumption that the mount fd is the root 
-directory certain by, well, looking into mountinfo...  That would result 
-in us always opening the root node of the filesystem, so that first the 
-whole filesystem needs to disappear before it can be deleted (and our 
-mount fd closed) – which should work, I guess?
-
-It’s a bit tricky because our sandboxing prevents easy access to 
-mountinfo, but if that’s the only way...
+Or, we can just drop this patch and say that we don’t need to 
+over-optimize C virtiofsd.
 
 Hanna
 

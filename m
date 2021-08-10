@@ -1,17 +1,17 @@
+Date: Tue, 10 Aug 2021 11:23:15 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YRKZ415xrDtcYaQR@redhat.com>
 References: <20210730150134.216126-1-mreitz@redhat.com>
-	<20210730150134.216126-11-mreitz@redhat.com>
-	<YRF9Q+MSjrbeybd2@redhat.com>
-	<dfebe39a-35d4-1e1c-c63f-2312586aa97d@redhat.com>
-	<YRKJaKvnmYjp+4/j@redhat.com>
-From: Hanna Reitz <hreitz@redhat.com>
-Message-ID: <93c22e7f-1aa3-1419-f702-4e02f326341f@redhat.com>
-Date: Tue, 10 Aug 2021 16:17:25 +0200
+	<20210730150134.216126-10-mreitz@redhat.com>
+	<YRF2xjwSKOiqB/Al@redhat.com>
+	<df64553c-c03d-076a-bcef-bec8554977a4@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <YRKJaKvnmYjp+4/j@redhat.com>
-Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Type: text/plain; charset="utf-8"
+Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-Content-Language: en-US
-Subject: Re: [Virtio-fs] [PATCH v3 10/10] virtiofsd: Add lazy lo_do_find()
+In-Reply-To: <df64553c-c03d-076a-bcef-bec8554977a4@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v3 09/10] virtiofsd: Optionally fill
+	lo_inode.fhandle
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,54 +20,101 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Max Reitz <mreitz@redhat.com>
+To: Hanna Reitz <hreitz@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, Max Reitz <mreitz@redhat.com>
 
-On 10.08.21 16:12, Vivek Goyal wrote:
-> On Tue, Aug 10, 2021 at 10:38:32AM +0200, Hanna Reitz wrote:
->> On 09.08.21 21:08, Vivek Goyal wrote:
->>> On Fri, Jul 30, 2021 at 05:01:34PM +0200, Max Reitz wrote:
->>>> lo_find() right now takes two lookup keys for two maps, namely the file
->>>> handle for inodes_by_handle and the statx information for inodes_by_ids.
->>>> However, we only need the statx information if looking up the inode by
->>>> the file handle failed.
->>>>
->>>> There are two callers of lo_find(): The first one, lo_do_lookup(), has
->>>> both keys anyway, so passing them does not incur any additional cost.
->>>> The second one, lookup_name(), though, needs to explicitly invoke
->>>> name_to_handle_at() (through get_file_handle()) and statx() (through
->>>> do_statx()).  We need to try to get a file handle as the primary key, so
->>>> we cannot get rid of get_file_handle(), but we only need the statx
->>>> information if looking up an inode by handle failed; so we can defer
->>>> that until the lookup has indeed failed.
->>> So IIUC, this patch seems to be all about avoiding do_statx()
->>> call in lookup_name() if file handle could be successfully
->>> generated.
->>>
->>> So can't we just not modify lookup_name() to not call statx()
->>> if file handle could be generated. And also modfiy lo_find()
->>> to use st/mnt_id only if fhandle==NULL.
->>>
->>> That probably is much simpler change as compared to passing function
->>> pointers around.
->> Definitely, but I don’t know whether it’s correct.
-> What problem do you see from correctness point of view.
+On Tue, Aug 10, 2021 at 10:32:55AM +0200, Hanna Reitz wrote:
+> On 09.08.21 20:41, Vivek Goyal wrote:
+> > On Fri, Jul 30, 2021 at 05:01:33PM +0200, Max Reitz wrote:
+> > > When the inode_file_handles option is set, try to generate a file handle
+> > > for new inodes instead of opening an O_PATH FD.
+> > > 
+> > > Being able to open these again will require CAP_DAC_READ_SEARCH, so the
+> > > description text tells the user they will also need to specify
+> > > -o modcaps=+dac_read_search.
+> > > 
+> > > Generating a file handle returns the mount ID it is valid for.  Opening
+> > > it will require an FD instead.  We have mount_fds to map an ID to an FD.
+> > > get_file_handle() fills the hash map by opening the file we have
+> > > generated a handle for.  To verify that the resulting FD indeed
+> > > represents the handle's mount ID, we use statx().  Therefore, using file
+> > > handles requires statx() support.
+> > So opening the file and storing that fd in mount_fds table might be
+> > a potential problem with inotify work Ioannis is doing.
+> > 
+> > So say a file foo.txt was opened O_RDONLY and fd stored in mount_fs. Now
+> > say user unlinks foo.txt. If notifications are enabled, final notification
+> > will not be generated till this mount_fds fd is closed.
+> > 
+> > Now question is when will this fd be closed? If it closed at some
+> > later point and then notification is generated, that will break
+> > notificaitons.
+> 
+> Currently, it is never closed.
+> 
+> > In fact even O_PATH fd is delaying notifications due to same reason.
+> > But its not too bad as we close O_PATH fd pretty quickly after
+> > unlinking. And we were hoping that file handle support will get rid
+> > of this problem because we will not keep O_PATH fd open.
+> > 
+> > But, IIUC, mount_fds stuff will make it even worse. I did not see
+> > the code which removes this fd from mount_fds. So I am not sure what's
+> > the life time of this fd.
+> 
+> The lifetime is forever.  If we wanted to remove it at some point, we’d need
+> to track how many file handles we have open for the given mount fd and then
+> remove it from the table once the count reaches 0, so it would still be
+> delayed.
+> 
+> I think in practice the first thing that is looked up from some mount will
+> probably be the root directory, which cannot be deleted before everything
+> else on the mount is gone, so that would work.  We track how many handles
+> are there, if the whole mount were to be deleted, I hope all lo_inodes are
+> evicted, the count goes to 0, and we can drop the mount fd.
 
-Again assuming that file handle generation can randomly fail (this time 
-assuming it failed the first time, and later may succeed), it’s possible 
-we have an lo_inode that we want to look up that does not have a file 
-handle, but for the lookup we were able to generate a file handle for 
-it.  In such a case, we need to call statx() to get st_ino/st_dev/mnt_id.
+Keeping a reference count on mount_fd object make sense. So we probably
+maintain this hash table and lookup using mount_id (as you are already
+doing). All subsequent inodes from same filesystem will use same
+object. Once all inodes have been flushed out, then mount_fd object
+should go away as well (allowing for unmount on host).
 
->> Or, we can just drop this patch and say that we don’t need to over-optimize
->> C virtiofsd.
-> Rust version is used by very few people, while C version is in production.
-> So I will definitely optimize C version. Once rust version is widely
-> available and available in product, then we can start paying less
-> attention to C version, IMHO.
+> 
+> I think we can make the assumption that the mount fd is the root directory
+> certain by, well, looking into mountinfo...  That would result in us always
+> opening the root node of the filesystem, so that first the whole filesystem
+> needs to disappear before it can be deleted (and our mount fd closed) –
+> which should work, I guess?
 
-OK, it was just an offer.  I mean, I myself wrote this patch as an 
-optimization after all. :)
+This seems more reasonable. And I think that's what man page seems to 
+suggest.
 
-Hanna
+       The  mount_id  argument  returns an identifier for the filesystem mount
+       that corresponds to pathname.  This corresponds to the first  field  in
+       one  of  the  records in /proc/self/mountinfo.  Opening the pathname in
+       the fifth field of that record yields a file descriptor for  the  mount
+       point;  that  file  descriptor  can  be  used  in  a subsequent call to
+       open_by_handle_at().
+
+Fifth field seems to be the mount point. man proc says.
+
+              (5)  mount  point:  the  pathname of the mount point relative to
+                   the process's root directory.
+
+So opening mount point and saving as mount_fd (if it is not already
+in hash table) and then take a per inode reference count on mount_fd
+object looks like will solve the life time issue of mount_fd as
+well as the issue of temporary failures arising because we can't
+open a device special file.
+
+> 
+> It’s a bit tricky because our sandboxing prevents easy access to mountinfo,
+> but if that’s the only way...
+
+yes. We already have lo->proc_self_fd. Maybe we need to keep
+/proc/self/mountinfo open in lo->proc_self_mountinfo. I am assuming
+that any mount table changes will still be visible despite the fact
+I have fd open (and don't have to open new fd to notice new mount/unmount
+changes).
+
+Vivek
 

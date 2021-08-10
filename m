@@ -1,11 +1,19 @@
-From: Max Reitz <mreitz@redhat.com>
-Date: Fri, 30 Jul 2021 17:01:31 +0200
-Message-Id: <20210730150134.216126-8-mreitz@redhat.com>
-In-Reply-To: <20210730150134.216126-1-mreitz@redhat.com>
+Date: Tue, 10 Aug 2021 11:57:49 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YRKh/fbBntF+GfS8@redhat.com>
 References: <20210730150134.216126-1-mreitz@redhat.com>
+	<20210730150134.216126-10-mreitz@redhat.com>
+	<YRF2xjwSKOiqB/Al@redhat.com>
+	<df64553c-c03d-076a-bcef-bec8554977a4@redhat.com>
+	<YRKZ415xrDtcYaQR@redhat.com>
+	<4a74bbbd-92f6-a7d1-0c8d-fa8b121b9643@redhat.com>
 MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 07/10] virtiofsd: Add lo_inode.fhandle
+In-Reply-To: <4a74bbbd-92f6-a7d1-0c8d-fa8b121b9643@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v3 09/10] virtiofsd: Optionally fill
+	lo_inode.fhandle
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,214 +22,118 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com
-Cc: Vivek Goyal <vgoyal@redhat.com>, Max Reitz <mreitz@redhat.com>
+To: Hanna Reitz <hreitz@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, Max Reitz <mreitz@redhat.com>
 
-This new field is an alternative to lo_inode.fd: Either of the two must
-be set.  In case an O_PATH FD is needed for some lo_inode, it is either
-taken from lo_inode.fd, if valid, or a temporary FD is opened with
-open_by_handle_at().
+On Tue, Aug 10, 2021 at 05:26:15PM +0200, Hanna Reitz wrote:
+> On 10.08.21 17:23, Vivek Goyal wrote:
+> > On Tue, Aug 10, 2021 at 10:32:55AM +0200, Hanna Reitz wrote:
+> > > On 09.08.21 20:41, Vivek Goyal wrote:
+> > > > On Fri, Jul 30, 2021 at 05:01:33PM +0200, Max Reitz wrote:
+> > > > > When the inode_file_handles option is set, try to generate a file handle
+> > > > > for new inodes instead of opening an O_PATH FD.
+> > > > > 
+> > > > > Being able to open these again will require CAP_DAC_READ_SEARCH, so the
+> > > > > description text tells the user they will also need to specify
+> > > > > -o modcaps=+dac_read_search.
+> > > > > 
+> > > > > Generating a file handle returns the mount ID it is valid for.  Opening
+> > > > > it will require an FD instead.  We have mount_fds to map an ID to an FD.
+> > > > > get_file_handle() fills the hash map by opening the file we have
+> > > > > generated a handle for.  To verify that the resulting FD indeed
+> > > > > represents the handle's mount ID, we use statx().  Therefore, using file
+> > > > > handles requires statx() support.
+> > > > So opening the file and storing that fd in mount_fds table might be
+> > > > a potential problem with inotify work Ioannis is doing.
+> > > > 
+> > > > So say a file foo.txt was opened O_RDONLY and fd stored in mount_fs. Now
+> > > > say user unlinks foo.txt. If notifications are enabled, final notification
+> > > > will not be generated till this mount_fds fd is closed.
+> > > > 
+> > > > Now question is when will this fd be closed? If it closed at some
+> > > > later point and then notification is generated, that will break
+> > > > notificaitons.
+> > > Currently, it is never closed.
+> > > 
+> > > > In fact even O_PATH fd is delaying notifications due to same reason.
+> > > > But its not too bad as we close O_PATH fd pretty quickly after
+> > > > unlinking. And we were hoping that file handle support will get rid
+> > > > of this problem because we will not keep O_PATH fd open.
+> > > > 
+> > > > But, IIUC, mount_fds stuff will make it even worse. I did not see
+> > > > the code which removes this fd from mount_fds. So I am not sure what's
+> > > > the life time of this fd.
+> > > The lifetime is forever.  If we wanted to remove it at some point, we’d need
+> > > to track how many file handles we have open for the given mount fd and then
+> > > remove it from the table once the count reaches 0, so it would still be
+> > > delayed.
+> > > 
+> > > I think in practice the first thing that is looked up from some mount will
+> > > probably be the root directory, which cannot be deleted before everything
+> > > else on the mount is gone, so that would work.  We track how many handles
+> > > are there, if the whole mount were to be deleted, I hope all lo_inodes are
+> > > evicted, the count goes to 0, and we can drop the mount fd.
+> > Keeping a reference count on mount_fd object make sense. So we probably
+> > maintain this hash table and lookup using mount_id (as you are already
+> > doing). All subsequent inodes from same filesystem will use same
+> > object. Once all inodes have been flushed out, then mount_fd object
+> > should go away as well (allowing for unmount on host).
+> > 
+> > > I think we can make the assumption that the mount fd is the root directory
+> > > certain by, well, looking into mountinfo...  That would result in us always
+> > > opening the root node of the filesystem, so that first the whole filesystem
+> > > needs to disappear before it can be deleted (and our mount fd closed) –
+> > > which should work, I guess?
+> > This seems more reasonable. And I think that's what man page seems to
+> > suggest.
+> > 
+> >         The  mount_id  argument  returns an identifier for the filesystem mount
+> >         that corresponds to pathname.  This corresponds to the first  field  in
+> >         one  of  the  records in /proc/self/mountinfo.  Opening the pathname in
+> >         the fifth field of that record yields a file descriptor for  the  mount
+> >         point;  that  file  descriptor  can  be  used  in  a subsequent call to
+> >         open_by_handle_at().
+> > 
+> > Fifth field seems to be the mount point. man proc says.
+> > 
+> >                (5)  mount  point:  the  pathname of the mount point relative to
+> >                     the process's root directory.
+> > 
+> > So opening mount point and saving as mount_fd (if it is not already
+> > in hash table) and then take a per inode reference count on mount_fd
+> > object looks like will solve the life time issue of mount_fd as
+> > well as the issue of temporary failures arising because we can't
+> > open a device special file.
+> 
+> Well, we’ve had this discussion before, and it’s possible that a filesystem
+> has a device file as its mount point.
 
-Using a file handle instead of an FD has the advantage of keeping the
-number of open file descriptors low.
+Yes. I think you did modified fuse to do some special trickery. Not sure
+where should that be fixed. 
 
-Because open_by_handle_at() requires a mount FD (i.e. a non-O_PATH FD
-opened on the filesystem to which the file handle refers), but every
-lo_fhandle only has a mount ID (as returned by name_to_handle_at()), we
-keep a hash map of such FDs in mount_fds (mapping ID to FD).
-get_file_handle(), which is added by a later patch, will ensure that
-every mount ID for which we have generated a handle has a corresponding
-entry in mount_fds.
+If filesystem is faking, then it can fake a device node as regular
+file and fool us into opening it as well?
 
-Signed-off-by: Max Reitz <mreitz@redhat.com>
-Reviewed-by: Connor Kuehl <ckuehl@redhat.com>
----
- tools/virtiofsd/passthrough_ll.c      | 116 ++++++++++++++++++++++----
- tools/virtiofsd/passthrough_seccomp.c |   1 +
- 2 files changed, 102 insertions(+), 15 deletions(-)
+> 
+> But given the inotify complications, there’s really a good reason we should
+> use mountinfo.
+> 
+> > > It’s a bit tricky because our sandboxing prevents easy access to mountinfo,
+> > > but if that’s the only way...
+> > yes. We already have lo->proc_self_fd. Maybe we need to keep
+> > /proc/self/mountinfo open in lo->proc_self_mountinfo. I am assuming
+> > that any mount table changes will still be visible despite the fact
+> > I have fd open (and don't have to open new fd to notice new mount/unmount
+> > changes).
+> 
+> Well, yes, that was my idea.  Unfortunately, I wasn’t quite successful yet;
+> when I tried keeping the fd open, reading from it would just return 0
+> bytes.  Perhaps that’s because we bind-mount /proc/self/fd to /proc so that
+> nothing else in /proc is visible. Perhaps we need to bind-mount
+> /proc/self/mountinfo into /proc/self/fd before that...
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 292b7f7e27..487448d666 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -88,8 +88,25 @@ struct lo_key {
-     uint64_t mnt_id;
- };
- 
-+struct lo_fhandle {
-+    union {
-+        struct file_handle handle;
-+        char padding[sizeof(struct file_handle) + MAX_HANDLE_SZ];
-+    };
-+    int mount_id;
-+};
-+
-+/* Maps mount IDs to an FD that we can pass to open_by_handle_at() */
-+static GHashTable *mount_fds;
-+pthread_rwlock_t mount_fds_lock = PTHREAD_RWLOCK_INITIALIZER;
-+
- struct lo_inode {
-+    /*
-+     * Either of fd or fhandle must be set (i.e. >= 0 or non-NULL,
-+     * respectively).
-+     */
-     int fd;
-+    struct lo_fhandle *fhandle;
- 
-     /*
-      * Atomic reference count for this object.  The nlookup field holds a
-@@ -302,6 +319,44 @@ static int temp_fd_steal(TempFd *temp_fd)
-     }
- }
- 
-+/**
-+ * Open the given file handle with the given flags.
-+ *
-+ * The mount FD to pass to open_by_handle_at() is taken from the
-+ * mount_fds hash map.
-+ *
-+ * On error, return -errno.
-+ */
-+static int open_file_handle(const struct lo_fhandle *fh, int flags)
-+{
-+    gpointer mount_fd_ptr;
-+    int mount_fd;
-+    bool found;
-+    int ret;
-+
-+    ret = pthread_rwlock_rdlock(&mount_fds_lock);
-+    if (ret) {
-+        return -ret;
-+    }
-+
-+    /* mount_fd == 0 is valid, so we need lookup_extended */
-+    found = g_hash_table_lookup_extended(mount_fds,
-+                                         GINT_TO_POINTER(fh->mount_id),
-+                                         NULL, &mount_fd_ptr);
-+    pthread_rwlock_unlock(&mount_fds_lock);
-+    if (!found) {
-+        return -EINVAL;
-+    }
-+    mount_fd = GPOINTER_TO_INT(mount_fd_ptr);
-+
-+    ret = open_by_handle_at(mount_fd, (struct file_handle *)&fh->handle, flags);
-+    if (ret < 0) {
-+        return -errno;
-+    }
-+
-+    return ret;
-+}
-+
- /*
-  * Load capng's state from our saved state if the current thread
-  * hadn't previously been loaded.
-@@ -608,7 +663,11 @@ static void lo_inode_put(struct lo_data *lo, struct lo_inode **inodep)
-     *inodep = NULL;
- 
-     if (g_atomic_int_dec_and_test(&inode->refcount)) {
--        close(inode->fd);
-+        if (inode->fd >= 0) {
-+            close(inode->fd);
-+        } else {
-+            g_free(inode->fhandle);
-+        }
-         free(inode);
-     }
- }
-@@ -635,10 +694,25 @@ static struct lo_inode *lo_inode(fuse_req_t req, fuse_ino_t ino)
- 
- static int lo_inode_fd(const struct lo_inode *inode, TempFd *tfd)
- {
--    *tfd = (TempFd) {
--        .fd = inode->fd,
--        .owned = false,
--    };
-+    if (inode->fd >= 0) {
-+        *tfd = (TempFd) {
-+            .fd = inode->fd,
-+            .owned = false,
-+        };
-+    } else {
-+        int fd;
-+
-+        assert(inode->fhandle != NULL);
-+        fd = open_file_handle(inode->fhandle, O_PATH);
-+        if (fd < 0) {
-+            return -errno;
-+        }
-+
-+        *tfd = (TempFd) {
-+            .fd = fd,
-+            .owned = true,
-+        };
-+    }
- 
-     return 0;
- }
-@@ -678,22 +752,32 @@ static int lo_fd(fuse_req_t req, fuse_ino_t ino, TempFd *tfd)
- static int lo_inode_open(const struct lo_data *lo, const struct lo_inode *inode,
-                          int open_flags, TempFd *tfd)
- {
--    g_autofree char *fd_str = g_strdup_printf("%d", inode->fd);
-+    g_autofree char *fd_str = NULL;
-     int fd;
- 
-     if (!S_ISREG(inode->filetype) && !S_ISDIR(inode->filetype)) {
-         return -EBADF;
-     }
- 
--    /*
--     * The file is a symlink so O_NOFOLLOW must be ignored. We checked earlier
--     * that the inode is not a special file but if an external process races
--     * with us then symlinks are traversed here. It is not possible to escape
--     * the shared directory since it is mounted as "/" though.
--     */
--    fd = openat(lo->proc_self_fd, fd_str, open_flags & ~O_NOFOLLOW);
--    if (fd < 0) {
--        return -errno;
-+    if (inode->fd >= 0) {
-+        /*
-+         * The file is a symlink so O_NOFOLLOW must be ignored. We checked
-+         * earlier that the inode is not a special file but if an external
-+         * process races with us then symlinks are traversed here. It is not
-+         * possible to escape the shared directory since it is mounted as "/"
-+         * though.
-+         */
-+        fd_str = g_strdup_printf("%d", inode->fd);
-+        fd = openat(lo->proc_self_fd, fd_str, open_flags & ~O_NOFOLLOW);
-+        if (fd < 0) {
-+            return -errno;
-+        }
-+    } else {
-+        assert(inode->fhandle != NULL);
-+        fd = open_file_handle(inode->fhandle, open_flags);
-+        if (fd < 0) {
-+            return fd;
-+        }
-     }
- 
-     *tfd = (TempFd) {
-@@ -4110,6 +4194,8 @@ int main(int argc, char *argv[])
-     lo.root.fuse_ino = FUSE_ROOT_ID;
-     lo.cache = CACHE_AUTO;
- 
-+    mount_fds = g_hash_table_new(NULL, NULL);
-+
-     /*
-      * Set up the ino map like this:
-      * [0] Reserved (will not be used)
-diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
-index f49ed94b5e..af04c638cb 100644
---- a/tools/virtiofsd/passthrough_seccomp.c
-+++ b/tools/virtiofsd/passthrough_seccomp.c
-@@ -77,6 +77,7 @@ static const int syscall_allowlist[] = {
-     SCMP_SYS(statx),
-     SCMP_SYS(open),
-     SCMP_SYS(openat),
-+    SCMP_SYS(open_by_handle_at),
-     SCMP_SYS(ppoll),
-     SCMP_SYS(prctl), /* TODO restrict to just PR_SET_NAME? */
-     SCMP_SYS(preadv),
--- 
-2.31.1
+Or perhaps open /proc/self/mountinfo and save fd in lo->proc_mountinfo
+before /proc/self/fd is bind mounted on /proc?
+
+Vivek
 

@@ -1,19 +1,20 @@
-Date: Tue, 10 Aug 2021 13:51:18 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YRK8lmDlRVV2dDih@redhat.com>
 References: <20210730150134.216126-1-mreitz@redhat.com>
-	<20210730150134.216126-9-mreitz@redhat.com>
-	<YRFTWVC1vXwjky5v@redhat.com>
-	<467c019d-42b9-1290-72f3-bd96bf44ddcf@redhat.com>
-	<YRKIIpOQzXgl4Jax@redhat.com>
-	<915cd307-e3db-1f62-22ac-8caeffd35ca1@redhat.com>
+	<20210730150134.216126-10-mreitz@redhat.com>
+	<YRF2xjwSKOiqB/Al@redhat.com>
+	<df64553c-c03d-076a-bcef-bec8554977a4@redhat.com>
+	<YRKZ415xrDtcYaQR@redhat.com>
+	<4a74bbbd-92f6-a7d1-0c8d-fa8b121b9643@redhat.com>
+	<YRKh/fbBntF+GfS8@redhat.com>
+From: Hanna Reitz <hreitz@redhat.com>
+Message-ID: <6e943ee0-dcb3-6812-3a0b-eb2b72b503ad@redhat.com>
+Date: Wed, 11 Aug 2021 08:41:18 +0200
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Disposition: inline
+In-Reply-To: <YRKh/fbBntF+GfS8@redhat.com>
+Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Transfer-Encoding: 8bit
-In-Reply-To: <915cd307-e3db-1f62-22ac-8caeffd35ca1@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 08/10] virtiofsd: Add inodes_by_handle
-	hash table
+Content-Language: en-US
+Subject: Re: [Virtio-fs] [PATCH v3 09/10] virtiofsd: Optionally fill
+	lo_inode.fhandle
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,183 +23,124 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Hanna Reitz <hreitz@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, Max Reitz <mreitz@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, Max Reitz <mreitz@redhat.com>
 
-On Tue, Aug 10, 2021 at 04:13:44PM +0200, Hanna Reitz wrote:
-> On 10.08.21 16:07, Vivek Goyal wrote:
-> > On Mon, Aug 09, 2021 at 06:47:18PM +0200, Hanna Reitz wrote:
-> > > On 09.08.21 18:10, Vivek Goyal wrote:
-> > > > On Fri, Jul 30, 2021 at 05:01:32PM +0200, Max Reitz wrote:
-> > > > > Currently, lo_inode.fhandle is always NULL and so always keep an O_PATH
-> > > > > FD in lo_inode.fd.  Therefore, when the respective inode is unlinked,
-> > > > > its inode ID will remain in use until we drop our lo_inode (and
-> > > > > lo_inode_put() thus closes the FD).  Therefore, lo_find() can safely use
-> > > > > the inode ID as an lo_inode key, because any inode with an inode ID we
-> > > > > find in lo_data.inodes (on the same filesystem) must be the exact same
-> > > > > file.
-> > > > > 
-> > > > > This will change when we start setting lo_inode.fhandle so we do not
-> > > > > have to keep an O_PATH FD open.  Then, unlinking such an inode will
-> > > > > immediately remove it, so its ID can then be reused by newly created
-> > > > > files, even while the lo_inode object is still there[1].
-> > > > > 
-> > > > > So creating a new file can then reuse the old file's inode ID, and
-> > > > > looking up the new file would lead to us finding the old file's
-> > > > > lo_inode, which is not ideal.
-> > > > > 
-> > > > > Luckily, just as file handles cause this problem, they also solve it:  A
-> > > > > file handle contains a generation ID, which changes when an inode ID is
-> > > > > reused, so the new file can be distinguished from the old one.  So all
-> > > > > we need to do is to add a second map besides lo_data.inodes that maps
-> > > > > file handles to lo_inodes, namely lo_data.inodes_by_handle.  For
-> > > > > clarity, lo_data.inodes is renamed to lo_data.inodes_by_ids.
-> > > > > 
-> > > > > Unfortunately, we cannot rely on being able to generate file handles
-> > > > > every time.  Therefore, we still enter every lo_inode object into
-> > > > > inodes_by_ids, but having an entry in inodes_by_handle is optional.  A
-> > > > > potential inodes_by_handle entry then has precedence, the inodes_by_ids
-> > > > > entry is just a fallback.
-> > > > > 
-> > > > > Note that we do not generate lo_fhandle objects yet, and so we also do
-> > > > > not enter anything into the inodes_by_handle map yet.  Also, all lookups
-> > > > > skip that map.  We might manually create file handles with some code
-> > > > > that is immediately removed by the next patch again, but that would
-> > > > > break the assumption in lo_find() that every lo_inode with a non-NULL
-> > > > > .fhandle must have an entry in inodes_by_handle and vice versa.  So we
-> > > > > leave actually using the inodes_by_handle map for the next patch.
-> > > > > 
-> > > > > [1] If some application in the guest still has the file open, there is
-> > > > > going to be a corresponding FD mapping in lo_data.fd_map.  In such a
-> > > > > case, the inode will only go away once every application in the guest
-> > > > > has closed it.  The problem described only applies to cases where the
-> > > > > guest does not have the file open, and it is just in the dentry cache,
-> > > > > basically.
-> > > > > 
-> > > > > Signed-off-by: Max Reitz <mreitz@redhat.com>
-> > > > > ---
-> > > > >    tools/virtiofsd/passthrough_ll.c | 81 +++++++++++++++++++++++++-------
-> > > > >    1 file changed, 65 insertions(+), 16 deletions(-)
-> > > > > 
-> > > > > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> > > > > index 487448d666..f9d8b2f134 100644
-> > > > > --- a/tools/virtiofsd/passthrough_ll.c
-> > > > > +++ b/tools/virtiofsd/passthrough_ll.c
-> > > > > @@ -180,7 +180,8 @@ struct lo_data {
-> > > > >        int announce_submounts;
-> > > > >        bool use_statx;
-> > > > >        struct lo_inode root;
-> > > > > -    GHashTable *inodes; /* protected by lo->mutex */
-> > > > > +    GHashTable *inodes_by_ids; /* protected by lo->mutex */
-> > > > > +    GHashTable *inodes_by_handle; /* protected by lo->mutex */
-> > > > >        struct lo_map ino_map; /* protected by lo->mutex */
-> > > > >        struct lo_map dirp_map; /* protected by lo->mutex */
-> > > > >        struct lo_map fd_map; /* protected by lo->mutex */
-> > > > > @@ -263,8 +264,9 @@ static struct {
-> > > > >    /* That we loaded cap-ng in the current thread from the saved */
-> > > > >    static __thread bool cap_loaded = 0;
-> > > > > -static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
-> > > > > -                                uint64_t mnt_id);
-> > > > > +static struct lo_inode *lo_find(struct lo_data *lo,
-> > > > > +                                const struct lo_fhandle *fhandle,
-> > > > > +                                struct stat *st, uint64_t mnt_id);
-> > > > >    static int xattr_map_client(const struct lo_data *lo, const char *client_name,
-> > > > >                                char **out_name);
-> > > > > @@ -1064,18 +1066,40 @@ out_err:
-> > > > >        fuse_reply_err(req, saverr);
-> > > > >    }
-> > > > > -static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
-> > > > > -                                uint64_t mnt_id)
-> > > > > +static struct lo_inode *lo_find(struct lo_data *lo,
-> > > > > +                                const struct lo_fhandle *fhandle,
-> > > > > +                                struct stat *st, uint64_t mnt_id)
-> > > > >    {
-> > > > > -    struct lo_inode *p;
-> > > > > -    struct lo_key key = {
-> > > > > +    struct lo_inode *p = NULL;
-> > > > > +    struct lo_key ids_key = {
-> > > > >            .ino = st->st_ino,
-> > > > >            .dev = st->st_dev,
-> > > > >            .mnt_id = mnt_id,
-> > > > >        };
-> > > > >        pthread_mutex_lock(&lo->mutex);
-> > > > > -    p = g_hash_table_lookup(lo->inodes, &key);
-> > > > > +    if (fhandle) {
-> > > > > +        p = g_hash_table_lookup(lo->inodes_by_handle, fhandle);
-> > > > > +    }
-> > > > > +    if (!p) {
-> > > > > +        p = g_hash_table_lookup(lo->inodes_by_ids, &ids_key);
-> > > > So even if fhandle is not NULL, we will still lookup the inode
-> > > > object in lo->inodes_by_ids? I thought fallback was only required
-> > > > if we could not generate file handle to begin with and in that case
-> > > > fhandle will be NULL?
-> > > Well.  I think it depends again on when file handle generation can fail and
-> > > when it cannot.  If we assume it can randomly fail at any time, then it’s
-> > > possible we create an lo_inode with an O_PATH fd, but later we are able to
-> > > generate a file handle for it.  So we first try a lookup by file handle
-> > > here, which would fail, but we’d still have to try a lookup by IDs, so we
-> > > can find the O_PATH lo_inode.
-> > > 
-> > > An example case would be if at first we weren’t able to open a mount fd
-> > > (because this file is a device node and the first lo_inode looked up on its
-> > > filesystem), and so we couldn’t generate a file handle that we would be sure
-> > > would work; but later for the lookup we can generate a file handle (because
-> > > some other node on that filesystem has been opened by then, so we have a
-> > > mount fd).
-> > Ok, got it. If we are assuming that file handle generation can fail
-> > randomly, then what will happen in following scenario.
-> > 
-> > - lookup, file handle generated, inode added to both hash tables.
-> > 
-> > - another lookup, handle generation failed. We call lo_find(), it
-> >    finds inode in lo->inodes_by_ids but rejects it because p->fd == -1.
-> > 
-> > - Now lo_find() will return NULL and caller will assume inode could
-> >    not be found (despite the fact it is in there) and caller lo_do_lookup()
-> >    will try to add new inode to hash tables. So we will have two inode
-> >    instances in hash table with same st_dev, st_ino, mnt_id. One will
-> >    have file handle while other will have O_PATH fd.
-> > 
-> > So we have two inodes in cache representing same file. One using file
-> > handle while other using O_PATH fd.
-> > 
-> > One side affect of this is says guest has looked up a file (and got
-> > node id 1, fhandle based inode). And later guest is revalidating
-> > that inode, this time it could get inode 2 (O_PATH fd). Guest will
-> > think inode has changed and discard previous inode and trigger
-> > another lookup. This typically happens only if file has gone away.
-> > But now it will happen because we have two inodes in cache representing
-> > same file.
-> > 
-> > There might be other cases where this is bad. I can't think of any
-> > at this point of time.
-> > 
-> > If could solve the issue of mount_fd, then we have to use fallback
-> > path probably only for EOPNOTSUPP case. And then we can be sure
-> > that cache will always have one inode either fhandle based or
-> > O_PATH based (and not both).
-> 
-> OK, but can we truly solve the mount_fd issue?
-> 
-> What I think we could do is have two variants of the file handle generation
-> function, one which is supposed to create a usable file handle (so this
-> version will ensure mount_fds contains a valid fd for the mount ID), and one
-> that just generates a file handle for lookup (i.e. it doesn’t look into
-> mount_fds at all).  The latter version would practically only fail in the
-> EOPNOTSUPP case.
-> 
-> Would that get around the issue?
+On 10.08.21 17:57, Vivek Goyal wrote:
+> On Tue, Aug 10, 2021 at 05:26:15PM +0200, Hanna Reitz wrote:
+>> On 10.08.21 17:23, Vivek Goyal wrote:
+>>> On Tue, Aug 10, 2021 at 10:32:55AM +0200, Hanna Reitz wrote:
+>>>> On 09.08.21 20:41, Vivek Goyal wrote:
+>>>>> On Fri, Jul 30, 2021 at 05:01:33PM +0200, Max Reitz wrote:
+>>>>>> When the inode_file_handles option is set, try to generate a file handle
+>>>>>> for new inodes instead of opening an O_PATH FD.
+>>>>>>
+>>>>>> Being able to open these again will require CAP_DAC_READ_SEARCH, so the
+>>>>>> description text tells the user they will also need to specify
+>>>>>> -o modcaps=+dac_read_search.
+>>>>>>
+>>>>>> Generating a file handle returns the mount ID it is valid for.  Opening
+>>>>>> it will require an FD instead.  We have mount_fds to map an ID to an FD.
+>>>>>> get_file_handle() fills the hash map by opening the file we have
+>>>>>> generated a handle for.  To verify that the resulting FD indeed
+>>>>>> represents the handle's mount ID, we use statx().  Therefore, using file
+>>>>>> handles requires statx() support.
+>>>>> So opening the file and storing that fd in mount_fds table might be
+>>>>> a potential problem with inotify work Ioannis is doing.
+>>>>>
+>>>>> So say a file foo.txt was opened O_RDONLY and fd stored in mount_fs. Now
+>>>>> say user unlinks foo.txt. If notifications are enabled, final notification
+>>>>> will not be generated till this mount_fds fd is closed.
+>>>>>
+>>>>> Now question is when will this fd be closed? If it closed at some
+>>>>> later point and then notification is generated, that will break
+>>>>> notificaitons.
+>>>> Currently, it is never closed.
+>>>>
+>>>>> In fact even O_PATH fd is delaying notifications due to same reason.
+>>>>> But its not too bad as we close O_PATH fd pretty quickly after
+>>>>> unlinking. And we were hoping that file handle support will get rid
+>>>>> of this problem because we will not keep O_PATH fd open.
+>>>>>
+>>>>> But, IIUC, mount_fds stuff will make it even worse. I did not see
+>>>>> the code which removes this fd from mount_fds. So I am not sure what's
+>>>>> the life time of this fd.
+>>>> The lifetime is forever.  If we wanted to remove it at some point, we’d need
+>>>> to track how many file handles we have open for the given mount fd and then
+>>>> remove it from the table once the count reaches 0, so it would still be
+>>>> delayed.
+>>>>
+>>>> I think in practice the first thing that is looked up from some mount will
+>>>> probably be the root directory, which cannot be deleted before everything
+>>>> else on the mount is gone, so that would work.  We track how many handles
+>>>> are there, if the whole mount were to be deleted, I hope all lo_inodes are
+>>>> evicted, the count goes to 0, and we can drop the mount fd.
+>>> Keeping a reference count on mount_fd object make sense. So we probably
+>>> maintain this hash table and lookup using mount_id (as you are already
+>>> doing). All subsequent inodes from same filesystem will use same
+>>> object. Once all inodes have been flushed out, then mount_fd object
+>>> should go away as well (allowing for unmount on host).
+>>>
+>>>> I think we can make the assumption that the mount fd is the root directory
+>>>> certain by, well, looking into mountinfo...  That would result in us always
+>>>> opening the root node of the filesystem, so that first the whole filesystem
+>>>> needs to disappear before it can be deleted (and our mount fd closed) –
+>>>> which should work, I guess?
+>>> This seems more reasonable. And I think that's what man page seems to
+>>> suggest.
+>>>
+>>>          The  mount_id  argument  returns an identifier for the filesystem mount
+>>>          that corresponds to pathname.  This corresponds to the first  field  in
+>>>          one  of  the  records in /proc/self/mountinfo.  Opening the pathname in
+>>>          the fifth field of that record yields a file descriptor for  the  mount
+>>>          point;  that  file  descriptor  can  be  used  in  a subsequent call to
+>>>          open_by_handle_at().
+>>>
+>>> Fifth field seems to be the mount point. man proc says.
+>>>
+>>>                 (5)  mount  point:  the  pathname of the mount point relative to
+>>>                      the process's root directory.
+>>>
+>>> So opening mount point and saving as mount_fd (if it is not already
+>>> in hash table) and then take a per inode reference count on mount_fd
+>>> object looks like will solve the life time issue of mount_fd as
+>>> well as the issue of temporary failures arising because we can't
+>>> open a device special file.
+>> Well, we’ve had this discussion before, and it’s possible that a filesystem
+>> has a device file as its mount point.
+> Yes. I think you did modified fuse to do some special trickery. Not sure
+> where should that be fixed.
 
-IIUC, suggestion is that in lo_do_lookup() we will use first variant
-and in lookup_rename() we will use second variant. If yes, that does not
-solve the issue of having two inodes representing same file.
-lo_do_lookup() might be successful first time and add inode with fhandle
-and fail next time and add a new inode with O_PATH fd. 
+I used fuse, but I’m sure a non-fuse filesystem can do the same.  (I 
+mean, fuse effectively is a non-fuse filesystem, too.)
 
-Maybe this will not happen easily because first operation will add
-mount_fd and then second operation will find existing mount_fd and
-will not fail atleast due to mount_fd. Might fail due to some other
-temporary resource failure etc.
+I don’t think it needs to be fixed, it just means we need to continue to 
+stat the mount point to verify it’s a regular file or directory.
 
-Vivek
+> If filesystem is faking, then it can fake a device node as regular
+> file and fool us into opening it as well?
+
+Well, of course opening any file can have side effects, on any filesystem.
+
+>> But given the inotify complications, there’s really a good reason we should
+>> use mountinfo.
+>>
+>>>> It’s a bit tricky because our sandboxing prevents easy access to mountinfo,
+>>>> but if that’s the only way...
+>>> yes. We already have lo->proc_self_fd. Maybe we need to keep
+>>> /proc/self/mountinfo open in lo->proc_self_mountinfo. I am assuming
+>>> that any mount table changes will still be visible despite the fact
+>>> I have fd open (and don't have to open new fd to notice new mount/unmount
+>>> changes).
+>> Well, yes, that was my idea.  Unfortunately, I wasn’t quite successful yet;
+>> when I tried keeping the fd open, reading from it would just return 0
+>> bytes.  Perhaps that’s because we bind-mount /proc/self/fd to /proc so that
+>> nothing else in /proc is visible. Perhaps we need to bind-mount
+>> /proc/self/mountinfo into /proc/self/fd before that...
+> Or perhaps open /proc/self/mountinfo and save fd in lo->proc_mountinfo
+> before /proc/self/fd is bind mounted on /proc?
+
+Yes, I tried that, and then reading would just return 0 bytes.
+
+Hanna
 

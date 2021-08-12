@@ -1,13 +1,13 @@
-From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Wed, 11 Aug 2021 17:10:17 +0800
-Message-Id: <20210811091017.54768-1-jefflexu@linux.alibaba.com>
-In-Reply-To: <20210811065621.12737-5-jefflexu@linux.alibaba.com>
-References: <20210811065621.12737-5-jefflexu@linux.alibaba.com>
+From: JeffleXu <jefflexu@linux.alibaba.com>
+References: <20210804070653.118123-1-jefflexu@linux.alibaba.com>
+Message-ID: <db04d1c4-2801-1182-f246-90692e796660@linux.alibaba.com>
+Date: Thu, 12 Aug 2021 10:52:53 +0800
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd PATCH v3 4/4] virtiofsd: support per-file
-	DAX in FUSE_LOOKUP
+In-Reply-To: <20210804070653.118123-1-jefflexu@linux.alibaba.com>
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH v3 0/8] fuse,virtiofs: support per-file DAX
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,95 +19,51 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
 Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, virtualization@lists.linux-foundation.org
 
-For passthrough, when the corresponding virtiofs in guest is mounted
-with '-o dax=inode', advertise that the file is capable of per-file
-DAX if the inode in the backend fs is marked with FS_DAX_FL flag.
+ping? Corresponding patches for virtiofsd are also included in this
+patch set.
 
-Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
----
+On 8/4/21 3:06 PM, Jeffle Xu wrote:
+> changes since v2:
+> - modify fuse_show_options() accordingly to make it compatible with
+>   new tri-state mount option (patch 2)
+> - extract FUSE protocol changes into one seperate patch (patch 3)
+> - FUSE server/client need to negotiate if they support per-file DAX
+>   (patch 4)
+> - extract DONT_CACHE logic into patch 6/7
+> 
+> 
+> This patchset adds support of per-file DAX for virtiofs, which is
+> inspired by Ira Weiny's work on ext4[1] and xfs[2].
+> 
+> Any comment is welcome.
+> 
+> [1] commit 9cb20f94afcd ("fs/ext4: Make DAX mount option a tri-state")
+> [2] commit 02beb2686ff9 ("fs/xfs: Make DAX mount option a tri-state")
+> 
+> v2: https://www.spinics.net/lists/linux-fsdevel/msg199584.html
+> v1: https://www.spinics.net/lists/linux-virtualization/msg51008.html
+> 
+> Jeffle Xu (8):
+>   fuse: add fuse_should_enable_dax() helper
+>   fuse: Make DAX mount option a tri-state
+>   fuse: support per-file DAX
+>   fuse: negotiate if server/client supports per-file DAX
+>   fuse: enable per-file DAX
+>   fuse: mark inode DONT_CACHE when per-file DAX indication changes
+>   fuse: support changing per-file DAX flag inside guest
+>   fuse: show '-o dax=inode' option only when FUSE server supports
+> 
+>  fs/fuse/dax.c             | 32 ++++++++++++++++++++++++++++++--
+>  fs/fuse/file.c            |  4 ++--
+>  fs/fuse/fuse_i.h          | 22 ++++++++++++++++++----
+>  fs/fuse/inode.c           | 27 ++++++++++++++++++---------
+>  fs/fuse/ioctl.c           | 15 +++++++++++++--
+>  fs/fuse/virtio_fs.c       | 16 ++++++++++++++--
+>  include/uapi/linux/fuse.h |  9 ++++++++-
+>  7 files changed, 103 insertions(+), 22 deletions(-)
+> 
 
-Sorry I forget to add staged changes to the latest commit. Please use
-this patch when testing.
-
----
- tools/virtiofsd/passthrough_ll.c | 43 ++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
-
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 5b6228210f..4cbd904248 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -171,6 +171,7 @@ struct lo_data {
-     int allow_direct_io;
-     int announce_submounts;
-     int perfile_dax_cap; /* capability of backend fs */
-+    bool perfile_dax; /* enable per-file DAX or not */
-     bool use_statx;
-     struct lo_inode root;
-     GHashTable *inodes; /* protected by lo->mutex */
-@@ -716,6 +717,10 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
- 
-     if (conn->capable & FUSE_CAP_PERFILE_DAX && lo->perfile_dax_cap ) {
-         conn->want |= FUSE_CAP_PERFILE_DAX;
-+	lo->perfile_dax = 1;
-+    }
-+    else {
-+	lo->perfile_dax = 0;
-     }
- }
- 
-@@ -983,6 +988,41 @@ static int do_statx(struct lo_data *lo, int dirfd, const char *pathname,
-     return 0;
- }
- 
-+/*
-+ * If the file is marked with FS_DAX_FL or FS_XFLAG_DAX, then DAX should be
-+ * enabled for this file.
-+ */
-+static bool lo_should_enable_dax(struct lo_data *lo, struct lo_inode *dir,
-+				 const char *name)
-+{
-+    int res, fd;
-+    int ret = false;;
-+    unsigned int attr;
-+    struct fsxattr xattr;
-+
-+    if (!lo->perfile_dax)
-+	return false;
-+
-+    /* Open file without O_PATH, so that ioctl can be called. */
-+    fd = openat(dir->fd, name, O_NOFOLLOW);
-+    if (fd == -1)
-+        return false;
-+
-+    if (lo->perfile_dax_cap == DAX_CAP_FLAGS) {
-+        res = ioctl(fd, FS_IOC_GETFLAGS, &attr);
-+        if (!res && (attr & FS_DAX_FL))
-+	    ret = true;
-+    }
-+    else if (lo->perfile_dax_cap == DAX_CAP_XATTR) {
-+	res = ioctl(fd, FS_IOC_FSGETXATTR, &xattr);
-+	if (!res && (xattr.fsx_xflags & FS_XFLAG_DAX))
-+	    ret = true;
-+    }
-+
-+    close(fd);
-+    return ret;
-+}
-+
- /*
-  * Increments nlookup on the inode on success. unref_inode_lolocked() must be
-  * called eventually to decrement nlookup again. If inodep is non-NULL, the
-@@ -1038,6 +1078,9 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-         e->attr_flags |= FUSE_ATTR_SUBMOUNT;
-     }
- 
-+    if (lo_should_enable_dax(lo, dir, name))
-+	e->attr_flags |= FUSE_ATTR_DAX;
-+
-     inode = lo_find(lo, &e->attr, mnt_id);
-     if (inode) {
-         close(newfd);
 -- 
-2.27.0
+Thanks,
+Jeffle
 

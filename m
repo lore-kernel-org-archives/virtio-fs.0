@@ -1,17 +1,21 @@
-Date: Mon, 16 Aug 2021 15:11:23 -0400
+Date: Mon, 16 Aug 2021 15:44:45 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YRq4W1zcsAZh3FLX@redhat.com>
-References: <20210520154654.1791183-1-groug@kaod.org>
-	<20210520154654.1791183-6-groug@kaod.org>
-	<CAOQ4uxh69ii5Yk-DgFAq+TrrvJ6xCv9s8sKLfo3aBCSWjJvp9Q@mail.gmail.com>
-	<YRqEPjzHg9IlifBo@redhat.com>
-	<CAOQ4uxg+UX6MWRv9JTQDmf6Yf_NyD+pJ438Ds270vGr9YSSPZw@mail.gmail.com>
+Message-ID: <YRrALRGy2cROwsP9@redhat.com>
+References: <20210730150134.216126-1-mreitz@redhat.com>
+	<20210730150134.216126-10-mreitz@redhat.com>
+	<YRF2xjwSKOiqB/Al@redhat.com>
+	<df64553c-c03d-076a-bcef-bec8554977a4@redhat.com>
+	<YRKZ415xrDtcYaQR@redhat.com>
+	<4a74bbbd-92f6-a7d1-0c8d-fa8b121b9643@redhat.com>
+	<YRKh/fbBntF+GfS8@redhat.com>
+	<6e943ee0-dcb3-6812-3a0b-eb2b72b503ad@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
-In-Reply-To: <CAOQ4uxg+UX6MWRv9JTQDmf6Yf_NyD+pJ438Ds270vGr9YSSPZw@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH v4 5/5] virtiofs: propagate sync() to file
-	server
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <6e943ee0-dcb3-6812-3a0b-eb2b72b503ad@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v3 09/10] virtiofsd: Optionally fill
+	lo_inode.fhandle
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,124 +24,106 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Amir Goldstein <amir73il@gmail.com>
-Cc: Miklos Szeredi <miklos@szeredi.hu>, linux-kernel <linux-kernel@vger.kernel.org>, virtualization@lists.linux-foundation.org, virtio-fs-list <virtio-fs@redhat.com>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Max Reitz <mreitz@redhat.com>, Robert Krawitz <rlk@redhat.com>
+To: Hanna Reitz <hreitz@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, Max Reitz <mreitz@redhat.com>
 
-On Mon, Aug 16, 2021 at 09:57:08PM +0300, Amir Goldstein wrote:
-> On Mon, Aug 16, 2021 at 6:29 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> >
-> > On Sun, Aug 15, 2021 at 05:14:06PM +0300, Amir Goldstein wrote:
-> > > Hi Greg,
-> > >
-> > > Sorry for the late reply, I have some questions about this change...
-> > >
-> > > On Fri, May 21, 2021 at 9:12 AM Greg Kurz <groug@kaod.org> wrote:
-> > > >
-> > > > Even if POSIX doesn't mandate it, linux users legitimately expect
-> > > > sync() to flush all data and metadata to physical storage when it
-> > > > is located on the same system. This isn't happening with virtiofs
-> > > > though : sync() inside the guest returns right away even though
-> > > > data still needs to be flushed from the host page cache.
-> > > >
-> > > > This is easily demonstrated by doing the following in the guest:
-> > > >
-> > > > $ dd if=/dev/zero of=/mnt/foo bs=1M count=5K ; strace -T -e sync sync
-> > > > 5120+0 records in
-> > > > 5120+0 records out
-> > > > 5368709120 bytes (5.4 GB, 5.0 GiB) copied, 5.22224 s, 1.0 GB/s
-> > > > sync()                                  = 0 <0.024068>
-> > > > +++ exited with 0 +++
-> > > >
-> > > > and start the following in the host when the 'dd' command completes
-> > > > in the guest:
-> > > >
-> > > > $ strace -T -e fsync /usr/bin/sync virtiofs/foo
-> > > > fsync(3)                                = 0 <10.371640>
-> > > > +++ exited with 0 +++
-> > > >
-> > > > There are no good reasons not to honor the expected behavior of
-> > > > sync() actually : it gives an unrealistic impression that virtiofs
-> > > > is super fast and that data has safely landed on HW, which isn't
-> > > > the case obviously.
-> > > >
-> > > > Implement a ->sync_fs() superblock operation that sends a new
-> > > > FUSE_SYNCFS request type for this purpose. Provision a 64-bit
-> > > > placeholder for possible future extensions. Since the file
-> > > > server cannot handle the wait == 0 case, we skip it to avoid a
-> > > > gratuitous roundtrip. Note that this is per-superblock : a
-> > > > FUSE_SYNCFS is send for the root mount and for each submount.
-> > > >
-> > > > Like with FUSE_FSYNC and FUSE_FSYNCDIR, lack of support for
-> > > > FUSE_SYNCFS in the file server is treated as permanent success.
-> > > > This ensures compatibility with older file servers : the client
-> > > > will get the current behavior of sync() not being propagated to
-> > > > the file server.
-> > >
-> > > I wonder - even if the server does not support SYNCFS or if the kernel
-> > > does not trust the server with SYNCFS, fuse_sync_fs() can wait
-> > > until all pending requests up to this call have been completed, either
-> > > before or after submitting the SYNCFS request. No?
-> >
-> > >
-> > > Does virtiofsd track all requests prior to SYNCFS request to make
-> > > sure that they were executed on the host filesystem before calling
-> > > syncfs() on the host filesystem?
-> >
-> > Hi Amir,
-> >
-> > I don't think virtiofsd has any such notion. I would think, that
-> > client should make sure all pending writes have completed and
-> > then send SYNCFS request.
-> >
-> > Looking at the sync_filesystem(), I am assuming vfs will take care
-> > of flushing out all dirty pages and then call ->sync_fs.
-> >
-> > Having said that, I think fuse queues the writeback request internally
-> > and signals completion of writeback to mm(end_page_writeback()). And
-> > that's why fuse_fsync() has notion of waiting for all pending
-> > writes to finish on an inode (fuse_sync_writes()).
-> >
-> > So I think you have raised a good point. That is if there are pending
-> > writes at the time of syncfs(), we don't seem to have a notion of
-> > first waiting for all these writes to finish before we send
-> > FUSE_SYNCFS request to server.
+On Wed, Aug 11, 2021 at 08:41:18AM +0200, Hanna Reitz wrote:
+
+[..]
+> > > But given the inotify complications, there’s really a good reason we should
+> > > use mountinfo.
+> > > 
+> > > > > It’s a bit tricky because our sandboxing prevents easy access to mountinfo,
+> > > > > but if that’s the only way...
+> > > > yes. We already have lo->proc_self_fd. Maybe we need to keep
+> > > > /proc/self/mountinfo open in lo->proc_self_mountinfo. I am assuming
+> > > > that any mount table changes will still be visible despite the fact
+> > > > I have fd open (and don't have to open new fd to notice new mount/unmount
+> > > > changes).
+> > > Well, yes, that was my idea.  Unfortunately, I wasn’t quite successful yet;
+> > > when I tried keeping the fd open, reading from it would just return 0
+> > > bytes.  Perhaps that’s because we bind-mount /proc/self/fd to /proc so that
+> > > nothing else in /proc is visible. Perhaps we need to bind-mount
+> > > /proc/self/mountinfo into /proc/self/fd before that...
+> > Or perhaps open /proc/self/mountinfo and save fd in lo->proc_mountinfo
+> > before /proc/self/fd is bind mounted on /proc?
 > 
-> Maybe, but I was not referring to inode writeback requests.
-> I had assumed that those were handled correctly.
-> I was referring to pending metadata requests.
-> 
-> ->sync_fs() in local fs also takes care of flushing metadata
-> (e.g. journal). I assumed that virtiofsd implements FUSE_SYNCFS
-> request by calling syncfs() on host fs,
+> Yes, I tried that, and then reading would just return 0 bytes.
 
-Yes virtiofsd calls syncfs() on host fs.
+Hi Hanna,
 
-> but it is does that than
-> there is no guarantee that all metadata requests have reached the
-> host fs from virtiofs unless client or server take care of waiting
-> for all pending metadata requests before issuing FUSE_SYNCFS.
+I tried this simple patch and I can read /proc/self/mountinfo before
+bind mounting /proc/self/fd and after bind mounting /proc/self/fd. Am
+I missing something.
 
-We don't have any journal in virtiofs. In fact we don't seem to
-cache any metadta. Except probably the case when "-o writeback" 
-where we can trust local time stamps.
-
-If "-o writeback" is not enabled, i am not sure what metadata
-we will be caching that we will need to worry about. Do you have
-something specific in mind. (Atleast from virtiofs point of view,
-I can't seem to think what metadata we are caching which we need
-to worry about).
-
-Thanks
 Vivek
 
-> 
-> But maybe I am missing something.
-> 
-> It might be worth mentioning that I did not find any sync_fs()
-> commands that request to flush metadata caches on the server in
-> NFS or SMB protocols either.
-> 
-> Thanks,
-> Amir.
-> 
+---
+ tools/virtiofsd/passthrough_ll.c |   32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
+===================================================================
+--- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2021-08-16 15:29:27.712223551 -0400
++++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2021-08-16 15:41:29.500032032 -0400
+@@ -172,6 +172,7 @@ struct lo_data {
+ 
+     /* An O_PATH file descriptor to /proc/self/fd/ */
+     int proc_self_fd;
++    int proc_mountinfo;
+     int user_killpriv_v2, killpriv_v2;
+     /* If set, virtiofsd is responsible for setting umask during creation */
+     bool change_umask;
+@@ -3409,6 +3410,9 @@ static void setup_wait_parent_capabiliti
+ static void setup_namespaces(struct lo_data *lo, struct fuse_session *se)
+ {
+     pid_t child;
++    int fd;
++    char buf[128];
++    ssize_t count;
+ 
+     /*
+      * Create a new pid namespace for *child* processes.  We'll have to
+@@ -3472,6 +3476,24 @@ static void setup_namespaces(struct lo_d
+         exit(1);
+     }
+ 
++    fd = open("/proc/self/mountinfo", O_RDONLY);
++    if (fd == -1) {
++        fuse_log(FUSE_LOG_ERR, "open(/proc/self/mountinfo, O_RDONLY): %m\n");
++        exit(1);
++    }
++
++    lo->proc_mountinfo = fd;
++
++    count = read(lo->proc_mountinfo, buf, 127);
++    if (count == -1) {
++        fuse_log(FUSE_LOG_ERR, "read(/proc/self/mountinfo): %m\n");
++        exit(1);
++    }
++
++    fuse_log(FUSE_LOG_INFO, "read(%d) bytes\n", count);
++    buf[count] = '\0';
++    fuse_log(FUSE_LOG_INFO, "%s\n", buf);
++
+     /*
+      * We only need /proc/self/fd. Prevent ".." from accessing parent
+      * directories of /proc/self/fd by bind-mounting it over /proc. Since / was
+@@ -3489,6 +3511,16 @@ static void setup_namespaces(struct lo_d
+         fuse_log(FUSE_LOG_ERR, "open(/proc, O_PATH): %m\n");
+         exit(1);
+     }
++
++    count = read(lo->proc_mountinfo, buf, 127);
++    if (count == -1) {
++        fuse_log(FUSE_LOG_ERR, "read(/proc/self/mountinfo): %m\n");
++        exit(1);
++    }
++
++    fuse_log(FUSE_LOG_INFO, "read(%d) bytes\n", count);
++    buf[count] = '\0';
++    fuse_log(FUSE_LOG_INFO, "%s\n", buf);
+ }
+ 
+ /*
 

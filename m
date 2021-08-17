@@ -1,13 +1,13 @@
 From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Tue, 17 Aug 2021 10:22:18 +0800
-Message-Id: <20210817022220.17574-7-jefflexu@linux.alibaba.com>
+Date: Tue, 17 Aug 2021 10:22:19 +0800
+Message-Id: <20210817022220.17574-8-jefflexu@linux.alibaba.com>
 In-Reply-To: <20210817022220.17574-1-jefflexu@linux.alibaba.com>
 References: <20210817022220.17574-1-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v4 6/8] fuse: mark inode DONT_CACHE when
-	per-file DAX indication changes
+Subject: [Virtio-fs] [PATCH v4 7/8] fuse: support changing per-file DAX flag
+	inside guest
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,73 +19,48 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
 Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, virtualization@lists.linux-foundation.org
 
-When the per-file DAX indication changes while the file is still
-*opened*, it is quite complicated and maybe fragile to dynamically
-change the DAX state.
-
-Hence mark the inode and corresponding dentries as DONE_CACHE once the
-per-file DAX indication changes, so that the inode instance will be
-evicted and freed as soon as possible once the file is closed and the
-last reference to the inode is put. And then when the file gets reopened
-next time, the inode will reflect the new DAX state.
-
-In summary, when the per-file DAX indication changes for an *opened*
-file, the state of the file won't be updated until this file is closed
-and reopened later.
+Fuse client can enable or disable per-file DAX inside kernel/guest by
+chattr(1). Similarly the new state won't be updated until the file is
+closed and reopened later.
 
 Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
 ---
- fs/fuse/dax.c    | 9 +++++++++
- fs/fuse/fuse_i.h | 1 +
- fs/fuse/inode.c  | 3 +++
- 3 files changed, 13 insertions(+)
+ fs/fuse/ioctl.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/fs/fuse/dax.c b/fs/fuse/dax.c
-index 30833f8d37dd..f7ede0be4e00 100644
---- a/fs/fuse/dax.c
-+++ b/fs/fuse/dax.c
-@@ -1364,6 +1364,15 @@ void fuse_dax_inode_init(struct inode *inode, unsigned int flags)
- 	inode->i_data.a_ops = &fuse_dax_file_aops;
- }
- 
-+void fuse_dax_dontcache(struct inode *inode, bool newdax)
-+{
-+	struct fuse_conn *fc = get_fuse_conn(inode);
-+
-+	if (fc->dax_mode == FUSE_DAX_INODE &&
-+	    fc->perfile_dax && (!!IS_DAX(inode) != newdax))
-+		d_mark_dontcache(inode);
-+}
-+
- bool fuse_dax_check_alignment(struct fuse_conn *fc, unsigned int map_alignment)
- {
- 	if (fc->dax && (map_alignment > FUSE_DAX_SHIFT)) {
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 7b7b4c208af2..56fe1c4d2136 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -1260,6 +1260,7 @@ void fuse_dax_conn_free(struct fuse_conn *fc);
- bool fuse_dax_inode_alloc(struct super_block *sb, struct fuse_inode *fi);
- void fuse_dax_inode_init(struct inode *inode, unsigned int flags);
- void fuse_dax_inode_cleanup(struct inode *inode);
-+void fuse_dax_dontcache(struct inode *inode, bool newdax);
- bool fuse_dax_check_alignment(struct fuse_conn *fc, unsigned int map_alignment);
- void fuse_dax_cancel_work(struct fuse_conn *fc);
- 
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index 8080f78befed..8c9774c6a210 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -269,6 +269,9 @@ void fuse_change_attributes(struct inode *inode, struct fuse_attr *attr,
- 		if (inval)
- 			invalidate_inode_pages2(inode->i_mapping);
+diff --git a/fs/fuse/ioctl.c b/fs/fuse/ioctl.c
+index 546ea3d58fb4..a9ed53c5dbd1 100644
+--- a/fs/fuse/ioctl.c
++++ b/fs/fuse/ioctl.c
+@@ -469,8 +469,6 @@ int fuse_fileattr_set(struct user_namespace *mnt_userns,
+ 	if (fa->flags_valid) {
+ 		err = fuse_priv_ioctl(inode, ff, FS_IOC_SETFLAGS,
+ 				      &flags, sizeof(flags));
+-		if (err)
+-			goto cleanup;
+ 	} else {
+ 		memset(&xfa, 0, sizeof(xfa));
+ 		xfa.fsx_xflags = fa->fsx_xflags;
+@@ -483,6 +481,19 @@ int fuse_fileattr_set(struct user_namespace *mnt_userns,
+ 				      &xfa, sizeof(xfa));
  	}
-+
-+	if (IS_ENABLED(CONFIG_FUSE_DAX))
-+		fuse_dax_dontcache(inode, attr->flags & FUSE_ATTR_DAX);
- }
  
- static void fuse_init_inode(struct inode *inode, struct fuse_attr *attr)
++	if (err)
++		goto cleanup;
++
++	if (IS_ENABLED(CONFIG_FUSE_DAX)) {
++		bool newdax;
++
++		if (fa->flags_valid)
++			newdax = flags & FS_DAX_FL;
++		else
++			newdax = fa->fsx_xflags & FS_XFLAG_DAX;
++		fuse_dax_dontcache(inode, newdax);
++	}
++
+ cleanup:
+ 	fuse_priv_ioctl_cleanup(inode, ff);
+ 
 -- 
 2.27.0
 

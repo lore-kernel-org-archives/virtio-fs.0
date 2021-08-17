@@ -1,12 +1,11 @@
 References: <20210817022220.17574-1-jefflexu@linux.alibaba.com>
 	<CAJfpeguw1hMOaxpDmjmijhf=-JEW95aEjxfVo_=D_LyWx8LDgw@mail.gmail.com>
-	<YRuCHvhICtTzMK04@work-vm>
-	<CAJfpegvM+S5Xru3Yfc88C64mecvco=f99y-TajQBDfkLD-S8zQ@mail.gmail.com>
+	<YRut5sioYfc2M1p7@redhat.com>
 From: JeffleXu <jefflexu@linux.alibaba.com>
-Message-ID: <0896b1f6-c8c4-6071-c05b-a333c6cccacd@linux.alibaba.com>
-Date: Tue, 17 Aug 2021 21:08:35 +0800
+Message-ID: <6043c0b8-0ff1-2e11-0dd0-e23f9ff6b952@linux.alibaba.com>
+Date: Tue, 17 Aug 2021 21:22:53 +0800
 MIME-Version: 1.0
-In-Reply-To: <CAJfpegvM+S5Xru3Yfc88C64mecvco=f99y-TajQBDfkLD-S8zQ@mail.gmail.com>
+In-Reply-To: <YRut5sioYfc2M1p7@redhat.com>
 Content-Type: text/plain; charset=utf-8
 Content-Language: en-US
 Content-Transfer-Encoding: 7bit
@@ -19,65 +18,52 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Joseph Qi <joseph.qi@linux.alibaba.com>, linux-fsdevel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>, virtualization@lists.linux-foundation.org
+To: Vivek Goyal <vgoyal@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>
+Cc: virtualization@lists.linux-foundation.org, virtio-fs-list <virtio-fs@redhat.com>, Joseph Qi <joseph.qi@linux.alibaba.com>, linux-fsdevel@vger.kernel.org
 
 
 
-On 8/17/21 6:09 PM, Miklos Szeredi wrote:
-> On Tue, 17 Aug 2021 at 11:32, Dr. David Alan Gilbert
-> <dgilbert@redhat.com> wrote:
->>
->> * Miklos Szeredi (miklos@szeredi.hu) wrote:
->>> On Tue, 17 Aug 2021 at 04:22, Jeffle Xu <jefflexu@linux.alibaba.com> wrote:
->>>>
->>>> This patchset adds support of per-file DAX for virtiofs, which is
->>>> inspired by Ira Weiny's work on ext4[1] and xfs[2].
+On 8/17/21 8:39 PM, Vivek Goyal wrote:
+> On Tue, Aug 17, 2021 at 10:06:53AM +0200, Miklos Szeredi wrote:
+>> On Tue, 17 Aug 2021 at 04:22, Jeffle Xu <jefflexu@linux.alibaba.com> wrote:
 >>>
->>> Can you please explain the background of this change in detail?
->>>
->>> Why would an admin want to enable DAX for a particular virtiofs file
->>> and not for others?
+>>> This patchset adds support of per-file DAX for virtiofs, which is
+>>> inspired by Ira Weiny's work on ext4[1] and xfs[2].
 >>
->> Where we're contending on virtiofs dax cache size it makes a lot of
->> sense; it's quite expensive for us to map something into the cache
->> (especially if we push something else out), so selectively DAXing files
->> that are expected to be hot could help reduce cache churn.
+>> Can you please explain the background of this change in detail?
+>>
+>> Why would an admin want to enable DAX for a particular virtiofs file
+>> and not for others?
 > 
-> If this is a performance issue, it should be fixed in a way that
-> doesn't require hand tuning like you suggest, I think.
+> Initially I thought that they needed it because they are downloading
+> files on the fly from server. So they don't want to enable dax on the file
+> till file is completely downloaded. 
+
+Right, it's our initial requirement.
+
+
+> But later I realized that they should
+> be able to block in FUSE_SETUPMAPPING call and make sure associated
+> file section has been downloaded before returning and solve the problem.
+> So that can't be the primary reason.
+
+Saying we want to access 4KB of one file inside guest, if it goes
+through FUSE request routine, then the fuse daemon only need to download
+this 4KB from remote server. But if it goes through DAX, then the fuse
+daemon need to download the whole DAX window (e.g., 2MB) from remote
+server, so called amplification. Maybe we could decrease the DAX window
+size, but it's a trade off.
+
 > 
-> I'm not sure what the  ext4/xfs case for per-file DAX is.  Maybe that
-> can help understand the virtiofs case as well.
+> Other reason mentioned I think was that only certain files benefit
+> from DAX. But not much details are there after that. It will be nice
+> to hear a more concrete use case and more details about this usage.
 > 
 
-Some hints why ext4/xfs support per-file DAX can be found [1] and [2].
+Apart from our internal requirement, more fine grained control for DAX
+shall be general and more flexible. Glad to hear more discussion from
+community.
 
-"Boaz Harrosh wondered why someone might want to turn DAX off for a
-persistent memory device. Hellwig said that the performance "could
-suck"; Williams noted that the page cache could be useful for some
-applications as well. Jan Kara pointed out that reads from persistent
-memory are close to DRAM speed, but that writes are not; the page cache
-could be helpful for frequent writes. Applications need to change to
-fully take advantage of DAX, Williams said; part of the promise of
-adding a flag is that users can do DAX on smaller granularities than a
-full filesystem."
-
-In summary, page cache is preferable in some cases, and thus more fine
-grained way of DAX control is needed.
-
-
-As for virtiofs, Dr. David Alan Gilbert has mentioned that various files
-may compete for limited DAX window resource.
-
-Besides, supporting DAX for small files can be expensive. Small files
-can consume DAX window resource rapidly, and if small files are accessed
-only once, the cost of mmap/munmap on host can not be ignored.
-
-
-[1]
-https://lore.kernel.org/lkml/20200428002142.404144-1-ira.weiny@intel.com/
-[2] https://lwn.net/Articles/787973/
 
 -- 
 Thanks,

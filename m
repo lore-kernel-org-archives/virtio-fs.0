@@ -1,21 +1,17 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=UnXThZRC3fAssEX0f0mLCZ6Q9w2tlCC2Smhk9kY/6CA=;
-	b=gCuCVqPtp3VcrqtAtdQ9/T1hLISv/SoLG3FxW0WozJv9qF+VkP6lJy5+8o4RK3PHGe
-	B/zhH0L3cY3+1C7tiCUx+apwtps1Hr63DN6B7vtkdtGE4R8dIUDR/DOrbruYk3WODqTS
-	rS+LP7odFUxNB+5/Y04KwmguxE/ql3g3O/SRA=
-MIME-Version: 1.0
 References: <20210817022220.17574-1-jefflexu@linux.alibaba.com>
 	<CAJfpeguw1hMOaxpDmjmijhf=-JEW95aEjxfVo_=D_LyWx8LDgw@mail.gmail.com>
-	<YRut5sioYfc2M1p7@redhat.com>
-	<6043c0b8-0ff1-2e11-0dd0-e23f9ff6b952@linux.alibaba.com>
-	<CAJfpegv01k5hEyJ3LPDWJoqB+vL8hwTan9dLu1pkkD0xoRuFzw@mail.gmail.com>
-	<1100b711-012d-d68b-7078-20eea6fa4bab@linux.alibaba.com>
-In-Reply-To: <1100b711-012d-d68b-7078-20eea6fa4bab@linux.alibaba.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Wed, 18 Aug 2021 07:08:24 +0200
-Message-ID: <CAJfpegsdX1H_=ZMORA-9YiBGdszG0WVmAjFY2QSZPa0iLUEjXw@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
+	<YRuCHvhICtTzMK04@work-vm>
+	<CAJfpegvM+S5Xru3Yfc88C64mecvco=f99y-TajQBDfkLD-S8zQ@mail.gmail.com>
+	<0896b1f6-c8c4-6071-c05b-a333c6cccacd@linux.alibaba.com>
+	<YRvNnmy5Mra/AUix@redhat.com>
+From: JeffleXu <jefflexu@linux.alibaba.com>
+Message-ID: <509ea06b-27db-63f9-d32f-563f2f6c2290@linux.alibaba.com>
+Date: Wed, 18 Aug 2021 13:10:57 +0800
+MIME-Version: 1.0
+In-Reply-To: <YRvNnmy5Mra/AUix@redhat.com>
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
 Subject: Re: [Virtio-fs] [PATCH v4 0/8] fuse,virtiofs: support per-file DAX
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -25,20 +21,97 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: JeffleXu <jefflexu@linux.alibaba.com>
-Cc: virtualization@lists.linux-foundation.org, virtio-fs-list <virtio-fs@redhat.com>, Joseph Qi <joseph.qi@linux.alibaba.com>, linux-fsdevel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, virtualization@lists.linux-foundation.org, virtio-fs-list <virtio-fs@redhat.com>, Joseph Qi <joseph.qi@linux.alibaba.com>, linux-fsdevel@vger.kernel.org
 
-On Wed, 18 Aug 2021 at 05:40, JeffleXu <jefflexu@linux.alibaba.com> wrote:
 
-> I'm not sure if I fully understand your idea. Then in this case, host
-> daemon only prepares 4KB while guest thinks that the whole DAX window
-> (e.g., 2MB) has been fully mapped. Then when guest really accesses the
-> remained part (2MB - 4KB), page fault is triggered, and now host daemon
-> is responsible for downloading the remained part?
 
-Yes.  Mapping an area just means setting up the page tables, it does
-not result in actual data transfer.
+On 8/17/21 10:54 PM, Vivek Goyal wrote:
+> On Tue, Aug 17, 2021 at 09:08:35PM +0800, JeffleXu wrote:
+>>
+>>
+>> On 8/17/21 6:09 PM, Miklos Szeredi wrote:
+>>> On Tue, 17 Aug 2021 at 11:32, Dr. David Alan Gilbert
+>>> <dgilbert@redhat.com> wrote:
+>>>>
+>>>> * Miklos Szeredi (miklos@szeredi.hu) wrote:
+>>>>> On Tue, 17 Aug 2021 at 04:22, Jeffle Xu <jefflexu@linux.alibaba.com> wrote:
+>>>>>>
+>>>>>> This patchset adds support of per-file DAX for virtiofs, which is
+>>>>>> inspired by Ira Weiny's work on ext4[1] and xfs[2].
+>>>>>
+>>>>> Can you please explain the background of this change in detail?
+>>>>>
+>>>>> Why would an admin want to enable DAX for a particular virtiofs file
+>>>>> and not for others?
+>>>>
+>>>> Where we're contending on virtiofs dax cache size it makes a lot of
+>>>> sense; it's quite expensive for us to map something into the cache
+>>>> (especially if we push something else out), so selectively DAXing files
+>>>> that are expected to be hot could help reduce cache churn.
+>>>
+>>> If this is a performance issue, it should be fixed in a way that
+>>> doesn't require hand tuning like you suggest, I think.
+>>>
+>>> I'm not sure what the  ext4/xfs case for per-file DAX is.  Maybe that
+>>> can help understand the virtiofs case as well.
+>>>
+>>
+>> Some hints why ext4/xfs support per-file DAX can be found [1] and [2].
+>>
+>> "Boaz Harrosh wondered why someone might want to turn DAX off for a
+>> persistent memory device. Hellwig said that the performance "could
+>> suck"; Williams noted that the page cache could be useful for some
+>> applications as well. Jan Kara pointed out that reads from persistent
+>> memory are close to DRAM speed, but that writes are not; the page cache
+>> could be helpful for frequent writes. Applications need to change to
+>> fully take advantage of DAX, Williams said; part of the promise of
+>> adding a flag is that users can do DAX on smaller granularities than a
+>> full filesystem."
+>>
+>> In summary, page cache is preferable in some cases, and thus more fine
+>> grained way of DAX control is needed.
+> 
+> In case of virtiofs, we are using page cache on host. So this probably
+> is not a factor for us. Writes will go in page cache of host.
+> 
+>>
+>>
+>> As for virtiofs, Dr. David Alan Gilbert has mentioned that various files
+>> may compete for limited DAX window resource.
+>>
+>> Besides, supporting DAX for small files can be expensive. Small files
+>> can consume DAX window resource rapidly, and if small files are accessed
+>> only once, the cost of mmap/munmap on host can not be ignored.
+> 
+> W.r.r access pattern, same applies to large files also. So if a section
+> of large file is accessed only once, it will consume dax window as well
+> and will have to be reclaimed.
+> 
+> Dax in virtiofs provides speed gain only if map file once and access
+> it multiple times. If that pattern does not hold true, then dax does
+> not seem to provide speed gains and in fact might be slower than
+> non-dax.
+> 
+> So if there is a pattern where we know some files are accessed repeatedly
+> while others are not, then enabling/disabling dax selectively will make
+> sense. Question is how many workloads really know that and how will
+> you make that decision. Do you have any data to back that up.
 
+There's no precise performance data yet. Empirically, small files used
+to have worse performance with dax, while frequently accessed files
+(such as .so libraries) behave better with dax.
+
+> 
+> W.r.t small file, is that a real concern. If that file is being accessed
+> mutliple times, then we will still see the speed gain. Only down side
+> is that there is little wastage of resources because our minimum dax
+> mapping granularity is 2MB. I am wondering can we handle that by
+> supporting other dax mapping granularities as well. say 256K and let
+> users choose it.
+
+
+-- 
 Thanks,
-Miklos
+Jeffle
 

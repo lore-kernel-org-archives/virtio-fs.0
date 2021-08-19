@@ -1,15 +1,18 @@
-Date: Wed, 18 Aug 2021 13:33:45 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YR1EeX/yD4V2cSOq@redhat.com>
 References: <20210817022220.17574-1-jefflexu@linux.alibaba.com>
-	<20210817022347.18098-1-jefflexu@linux.alibaba.com>
-	<20210817022347.18098-2-jefflexu@linux.alibaba.com>
+	<CAJfpeguw1hMOaxpDmjmijhf=-JEW95aEjxfVo_=D_LyWx8LDgw@mail.gmail.com>
+	<YRuCHvhICtTzMK04@work-vm>
+	<CAJfpegvM+S5Xru3Yfc88C64mecvco=f99y-TajQBDfkLD-S8zQ@mail.gmail.com>
+	<0896b1f6-c8c4-6071-c05b-a333c6cccacd@linux.alibaba.com>
+	<YRvNnmy5Mra/AUix@redhat.com>
+From: JeffleXu <jefflexu@linux.alibaba.com>
+Message-ID: <b36a4258-cba1-8185-3e23-78a7e4856fc1@linux.alibaba.com>
+Date: Thu, 19 Aug 2021 14:14:02 +0800
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210817022347.18098-2-jefflexu@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [virtiofsd PATCH v4 1/4] virtiofsd: add .ioctl()
-	support
+In-Reply-To: <YRvNnmy5Mra/AUix@redhat.com>
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH v4 0/8] fuse,virtiofs: support per-file DAX
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,132 +21,59 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Jeffle Xu <jefflexu@linux.alibaba.com>
-Cc: miklos@szeredi.hu, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, linux-fsdevel@vger.kernel.org
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, virtualization@lists.linux-foundation.org, virtio-fs-list <virtio-fs@redhat.com>, Joseph Qi <joseph.qi@linux.alibaba.com>, linux-fsdevel@vger.kernel.org
 
-On Tue, Aug 17, 2021 at 10:23:44AM +0800, Jeffle Xu wrote:
-> Add .ioctl() support for passthrough, in prep for the following support
-> for following per-file DAX feature.
-> 
-> Once advertising support for per-file DAX feature, virtiofsd should
-> support storing FS_DAX_FL flag persistently passed by
-> FS_IOC_SETFLAGS/FS_IOC_FSSETXATTR ioctl, and set FUSE_ATTR_DAX in
-> FUSE_LOOKUP accordingly if the file is capable of per-file DAX.
-> 
-> When it comes to passthrough, it passes corresponding ioctls to host
-> directly. Currently only these ioctls that are needed for per-file DAX
-> feature, i.e., FS_IOC_GETFLAGS/FS_IOC_SETFLAGS and
-> FS_IOC_FSGETXATTR/FS_IOC_FSSETXATTR are supported. Later we can restrict
-> the flags/attributes allowed to be set to reinforce the security, or
-> extend the scope of allowed ioctls if it is really needed later.
 
-Dave had concerns about which attrs should be allowed to be set by
-guest. And we were also wondering why virtiofs is not supporting
-ioctl yet.
 
-It think that it probably will make sense that supporting ioctls,
-is a separate patch series for virtiofs. Anyway, we probably will
-need to add it. 
+On 8/17/21 10:54 PM, Vivek Goyal wrote:
+[...]
+>>
+>> As for virtiofs, Dr. David Alan Gilbert has mentioned that various files
+>> may compete for limited DAX window resource.
+>>
+>> Besides, supporting DAX for small files can be expensive. Small files
+>> can consume DAX window resource rapidly, and if small files are accessed
+>> only once, the cost of mmap/munmap on host can not be ignored.
+> 
+> W.r.r access pattern, same applies to large files also. So if a section
+> of large file is accessed only once, it will consume dax window as well
+> and will have to be reclaimed.
+> 
+> Dax in virtiofs provides speed gain only if map file once and access
+> it multiple times. If that pattern does not hold true, then dax does
+> not seem to provide speed gains and in fact might be slower than
+> non-dax.
+> 
+> So if there is a pattern where we know some files are accessed repeatedly
+> while others are not, then enabling/disabling dax selectively will make
+> sense. Question is how many workloads really know that and how will
+> you make that decision. Do you have any data to back that up.
 
-Vivek
+Empirically, some files are naturally accessed only once, such as
+configuration files under /etc/ directory, .py, .js files, etc. It's the
+real case that we have met in real world. While some others are most
+likely accessed multiple times, such as .so libraries. With per-file DAX
+feature, administrator can decide on their own which files shall be dax
+enabled and thus gain most benefit from dax, while others not.
+
+As for how we can distinguish the file access mode, besides the
+intuitive insights described previously, we can develop more advanced
+method distinguishing it, e.g., scanning the DAX window map and finding
+the hot files. With the mechanism offered by kernel, more advanced
+strategy can be developed then.
+
 > 
-> Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
-> ---
->  tools/virtiofsd/passthrough_ll.c      | 53 +++++++++++++++++++++++++++
->  tools/virtiofsd/passthrough_seccomp.c |  1 +
->  2 files changed, 54 insertions(+)
+> W.r.t small file, is that a real concern. If that file is being accessed
+> mutliple times, then we will still see the speed gain. Only down side
+> is that there is little wastage of resources because our minimum dax
+> mapping granularity is 2MB. I am wondering can we handle that by
+> supporting other dax mapping granularities as well. say 256K and let
+> users choose it.
 > 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index b76d878509..e170b17adb 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -54,6 +54,7 @@
->  #include <sys/wait.h>
->  #include <sys/xattr.h>
->  #include <syslog.h>
-> +#include <linux/fs.h>
->  
->  #include "qemu/cutils.h"
->  #include "passthrough_helpers.h"
-> @@ -2105,6 +2106,57 @@ out:
->      fuse_reply_err(req, saverr);
->  }
->  
-> +static void lo_ioctl(fuse_req_t req, fuse_ino_t ino, unsigned int cmd, void *arg,
-> +                  struct fuse_file_info *fi, unsigned flags, const void *in_buf,
-> +                  size_t in_bufsz, size_t out_bufsz)
-> +{
-> +    int fd = lo_fi_fd(req, fi);
-> +    int res;
-> +    int saverr = ENOSYS;
-> +
-> +    fuse_log(FUSE_LOG_DEBUG, "lo_ioctl(ino=%" PRIu64 ", cmd=0x%x, flags=0x%x, "
-> +	     "in_bufsz = %lu, out_bufsz = %lu)\n",
-> +	     ino, cmd, flags, in_bufsz, out_bufsz);
-> +
-> +    /* unrestricted ioctl is not supported yet */
-> +    if (flags & FUSE_IOCTL_UNRESTRICTED)
-> +        goto out;
-> +
-> +    /*
-> +     * Currently only those ioctls needed to support per-file DAX feature,
-> +     * i.e., FS_IOC_GETFLAGS/FS_IOC_SETFLAGS and
-> +     * FS_IOC_FSGETXATTR/FS_IOC_FSSETXATTR are supported.
-> +     */
-> +    if (cmd == FS_IOC_SETFLAGS || cmd == FS_IOC_FSSETXATTR) {
-> +        res = ioctl(fd, cmd, in_buf);
-> +        if (res < 0)
-> +            goto out_err;
-> +
-> +	fuse_reply_ioctl(req, 0, NULL, 0);
-> +    }
-> +    else if (cmd == FS_IOC_GETFLAGS || cmd == FS_IOC_FSGETXATTR) {
-> +	/* reused for 'unsigned int' for FS_IOC_GETFLAGS */
-> +	struct fsxattr attr;
-> +
-> +        res = ioctl(fd, cmd, &attr);
-> +        if (res < 0)
-> +            goto out_err;
-> +
-> +        fuse_reply_ioctl(req, 0, &attr, out_bufsz);
-> +    }
-> +    else {
-> +	fuse_log(FUSE_LOG_DEBUG, "Unsupported ioctl 0x%x\n", cmd);
-> +	goto out;
-> +    }
-> +
-> +    return;
-> +
-> +out_err:
-> +	saverr = errno;
-> +out:
-> +	fuse_reply_err(req, saverr);
-> +}
-> +
->  static void lo_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
->                          struct fuse_file_info *fi)
->  {
-> @@ -3279,6 +3331,7 @@ static struct fuse_lowlevel_ops lo_oper = {
->      .create = lo_create,
->      .getlk = lo_getlk,
->      .setlk = lo_setlk,
-> +    .ioctl = lo_ioctl,
->      .open = lo_open,
->      .release = lo_release,
->      .flush = lo_flush,
-> diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
-> index 62441cfcdb..2a5f7614fc 100644
-> --- a/tools/virtiofsd/passthrough_seccomp.c
-> +++ b/tools/virtiofsd/passthrough_seccomp.c
-> @@ -62,6 +62,7 @@ static const int syscall_allowlist[] = {
->      SCMP_SYS(gettid),
->      SCMP_SYS(gettimeofday),
->      SCMP_SYS(getxattr),
-> +    SCMP_SYS(ioctl),
->      SCMP_SYS(linkat),
->      SCMP_SYS(listxattr),
->      SCMP_SYS(lseek),
-> -- 
-> 2.27.0
-> 
+
+
+-- 
+Thanks,
+Jeffle
 

@@ -1,17 +1,17 @@
-Date: Thu, 19 Aug 2021 14:08:31 +0100
+Date: Thu, 19 Aug 2021 14:57:27 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YR5Xzw02IuVAN94b@work-vm>
+Message-ID: <YR5jRwVNeZfZVLh3@work-vm>
 References: <20210817022220.17574-1-jefflexu@linux.alibaba.com>
 	<20210817022347.18098-1-jefflexu@linux.alibaba.com>
-	<20210817022347.18098-5-jefflexu@linux.alibaba.com>
-	<YRwHRmL/jUSqgkIU@work-vm>
-	<29627110-e4bf-836f-2343-1faeb36ad4d3@linux.alibaba.com>
+	<20210817022347.18098-4-jefflexu@linux.alibaba.com>
+	<YRvuzrRo2t2SyQk/@work-vm>
+	<e6426e51-7a2c-57a1-8d7b-3cb0cff89fb9@linux.alibaba.com>
 MIME-Version: 1.0
-In-Reply-To: <29627110-e4bf-836f-2343-1faeb36ad4d3@linux.alibaba.com>
+In-Reply-To: <e6426e51-7a2c-57a1-8d7b-3cb0cff89fb9@linux.alibaba.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: Re: [Virtio-fs] [virtiofsd PATCH v4 4/4] virtiofsd: support
- per-file DAX in FUSE_LOOKUP
+Subject: Re: [Virtio-fs] [virtiofsd PATCH v4 3/4] virtiofsd: support
+ per-file DAX negotiation in FUSE_INIT
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -26,103 +26,184 @@ Cc: miklos@szeredi.hu, virtualization@lists.linux-foundation.org, virtio-fs@redh
 * JeffleXu (jefflexu@linux.alibaba.com) wrote:
 > 
 > 
-> On 8/18/21 3:00 AM, Dr. David Alan Gilbert wrote:
+> On 8/18/21 1:15 AM, Dr. David Alan Gilbert wrote:
 > > * Jeffle Xu (jefflexu@linux.alibaba.com) wrote:
-> >> For passthrough, when the corresponding virtiofs in guest is mounted
-> >> with '-o dax=inode', advertise that the file is capable of per-file
-> >> DAX if the inode in the backend fs is marked with FS_DAX_FL flag.
+> >> In FUSE_INIT negotiating phase, server/client should advertise if it
+> >> supports per-file DAX.
 > >>
-> >> Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
-> >> ---
-> >>  tools/virtiofsd/passthrough_ll.c | 43 ++++++++++++++++++++++++++++++++
-> >>  1 file changed, 43 insertions(+)
+> >> Once advertising support for per-file DAX feature, virtiofsd should
+> >> support storing FS_DAX_FL flag persistently passed by
+> >> FS_IOC_SETFLAGS/FS_IOC_FSSETXATTR ioctl, and set FUSE_ATTR_DAX in
+> >> FUSE_LOOKUP accordingly if the file is capable of per-file DAX.
 > >>
-> >> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> >> index 5b6228210f..4cbd904248 100644
-> >> --- a/tools/virtiofsd/passthrough_ll.c
-> >> +++ b/tools/virtiofsd/passthrough_ll.c
-> >> @@ -171,6 +171,7 @@ struct lo_data {
-> >>      int allow_direct_io;
-> >>      int announce_submounts;
-> >>      int perfile_dax_cap; /* capability of backend fs */
-> >> +    bool perfile_dax; /* enable per-file DAX or not */
-> >>      bool use_statx;
-> >>      struct lo_inode root;
-> >>      GHashTable *inodes; /* protected by lo->mutex */
-> >> @@ -716,6 +717,10 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
-> >>  
-> >>      if (conn->capable & FUSE_CAP_PERFILE_DAX && lo->perfile_dax_cap ) {
-> >>          conn->want |= FUSE_CAP_PERFILE_DAX;
-> >> +	lo->perfile_dax = 1;
-> >> +    }
-> >> +    else {
-> >> +	lo->perfile_dax = 0;
-> >>      }
-> >>  }
-> >>  
-> >> @@ -983,6 +988,41 @@ static int do_statx(struct lo_data *lo, int dirfd, const char *pathname,
-> >>      return 0;
-> >>  }
-> >>  
-> >> +/*
-> >> + * If the file is marked with FS_DAX_FL or FS_XFLAG_DAX, then DAX should be
-> >> + * enabled for this file.
-> >> + */
-> >> +static bool lo_should_enable_dax(struct lo_data *lo, struct lo_inode *dir,
-> >> +				 const char *name)
-> >> +{
-> >> +    int res, fd;
-> >> +    int ret = false;;
-> >> +    unsigned int attr;
-> >> +    struct fsxattr xattr;
-> >> +
-> >> +    if (!lo->perfile_dax)
-> >> +	return false;
-> >> +
-> >> +    /* Open file without O_PATH, so that ioctl can be called. */
-> >> +    fd = openat(dir->fd, name, O_NOFOLLOW);
-> >> +    if (fd == -1)
-> >> +        return false;
+> >> Currently only ext4/xfs since linux kernel v5.8 support storing
+> >> FS_DAX_FL flag persistently, and thus advertise support for per-file
+> >> DAX feature only when the backend fs type is ext4 and xfs.
 > > 
-> > Doesn't that defeat the whole benefit of using O_PATH - i.e. that we
-> > might stumble into a /dev node or something else we're not allowed to
-> > open?
+> > I'm a little worried about the meaning of the flags we're storing and
+> > the fact we're storing them in the normal host DAX flags.
+> > 
+> > Doesn't this mean that we're using a single host flag to mean:
+> >   a) It can be mapped as DAX on the host if it was a real DAX device
+> >   b) We can map it as DAX inside the guest with virtiofs?
 > 
-> As far as I know, virtiofsd will pivot_root/chroot to the source
-> directory, and can only access files inside the source directory
-> specified by "-o source=". Then where do these unexpected files come
-> from? Besides, fd opened without O_PATH here is temporary and used for
-> FS_IOC_GETFLAGS/FS_IOC_FSGETXATTR ioctl only. It's closed when the
-> function returns.
-
-The guest is still allowed to mknod.
-See:
-   https://lists.gnu.org/archive/html/qemu-devel/2021-01/msg05461.html
-
-also it's legal to expose a root filesystem for a guest; the virtiofsd
-should *never* open a device other than O_PATH - and it's really tricky
-to do a check to see if it is a device in a race-free way.
-
-
-> > 
-> >> +    if (lo->perfile_dax_cap == DAX_CAP_FLAGS) {
-> >> +        res = ioctl(fd, FS_IOC_GETFLAGS, &attr);
-> >> +        if (!res && (attr & FS_DAX_FL))
-> >> +	    ret = true;
-> >> +    }
-> >> +    else if (lo->perfile_dax_cap == DAX_CAP_XATTR) {
-> >> +	res = ioctl(fd, FS_IOC_FSGETXATTR, &xattr);
-> >> +	if (!res && (xattr.fsx_xflags & FS_XFLAG_DAX))
-> >> +	    ret = true;
-> >> +    }
-> > 
-> > This all looks pretty expensive for each lookup.
+> Yes the side effect is that the host file is also dax enabled if the
+> backend fs is built upon real nvdimm device.
 > 
-> Yes. it can be somehow optimized if we can agree on the way of storing
-> the dax flag persistently.
+> The rationale here is that, fuse daemon shall be capable of *marking*
+> the file as dax capable *persistently*, so that it can be informed that
+> this file is capable of dax later.
+
+Right, so my worry here is that the untrusted guest changes both it's
+own behaviour (fine) and also the behaviour of the host (less fine).
+
+> I'm not sure if xattr (extent attribute) is a better option for this?
+
+Well, if you used an xattr for it, it wouldn't clash with whatever the
+host did (especially if it used the xattr mapping).
 
 Dave
 
+> 
+> > 
+> > what happens when we're using usernamespaces for the guest?
+> > 
+> > Dave
+> > 
+> > 
+> >> Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
+> >> ---
+> >>  tools/virtiofsd/fuse_common.h    |  5 +++++
+> >>  tools/virtiofsd/fuse_lowlevel.c  |  6 ++++++
+> >>  tools/virtiofsd/passthrough_ll.c | 29 +++++++++++++++++++++++++++++
+> >>  3 files changed, 40 insertions(+)
+> >>
+> >> diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
+> >> index 8a75729be9..ee6fc64c23 100644
+> >> --- a/tools/virtiofsd/fuse_common.h
+> >> +++ b/tools/virtiofsd/fuse_common.h
+> >> @@ -372,6 +372,11 @@ struct fuse_file_info {
+> >>   */
+> >>  #define FUSE_CAP_HANDLE_KILLPRIV_V2 (1 << 28)
+> >>  
+> >> +/**
+> >> + * Indicates support for per-file DAX.
+> >> + */
+> >> +#define FUSE_CAP_PERFILE_DAX (1 << 29)
+> >> +
+> >>  /**
+> >>   * Ioctl flags
+> >>   *
+> >> diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+> >> index 50fc5c8d5a..04a4f17423 100644
+> >> --- a/tools/virtiofsd/fuse_lowlevel.c
+> >> +++ b/tools/virtiofsd/fuse_lowlevel.c
+> >> @@ -2065,6 +2065,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+> >>      if (arg->flags & FUSE_HANDLE_KILLPRIV_V2) {
+> >>          se->conn.capable |= FUSE_CAP_HANDLE_KILLPRIV_V2;
+> >>      }
+> >> +    if (arg->flags & FUSE_PERFILE_DAX) {
+> >> +        se->conn.capable |= FUSE_CAP_PERFILE_DAX;
+> >> +    }
+> >>  #ifdef HAVE_SPLICE
+> >>  #ifdef HAVE_VMSPLICE
+> >>      se->conn.capable |= FUSE_CAP_SPLICE_WRITE | FUSE_CAP_SPLICE_MOVE;
+> >> @@ -2180,6 +2183,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+> >>      if (se->conn.want & FUSE_CAP_POSIX_ACL) {
+> >>          outarg.flags |= FUSE_POSIX_ACL;
+> >>      }
+> >> +    if (se->op.ioctl && (se->conn.want & FUSE_CAP_PERFILE_DAX)) {
+> >> +        outarg.flags |= FUSE_PERFILE_DAX;
+> >> +    }
+> >>      outarg.max_readahead = se->conn.max_readahead;
+> >>      outarg.max_write = se->conn.max_write;
+> >>      if (se->conn.max_background >= (1 << 16)) {
+> >> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> >> index e170b17adb..5b6228210f 100644
+> >> --- a/tools/virtiofsd/passthrough_ll.c
+> >> +++ b/tools/virtiofsd/passthrough_ll.c
+> >> @@ -53,8 +53,10 @@
+> >>  #include <sys/syscall.h>
+> >>  #include <sys/wait.h>
+> >>  #include <sys/xattr.h>
+> >> +#include <sys/vfs.h>
+> >>  #include <syslog.h>
+> >>  #include <linux/fs.h>
+> >> +#include <linux/magic.h>
+> >>  
+> >>  #include "qemu/cutils.h"
+> >>  #include "passthrough_helpers.h"
+> >> @@ -136,6 +138,13 @@ enum {
+> >>      SANDBOX_CHROOT,
+> >>  };
+> >>  
+> >> +/* capability of storing DAX flag persistently */
+> >> +enum {
+> >> +    DAX_CAP_NONE,  /* not supported */
+> >> +    DAX_CAP_FLAGS, /* stored in flags (FS_IOC_GETFLAGS/FS_IOC_SETFLAGS) */
+> >> +    DAX_CAP_XATTR, /* stored in xflags (FS_IOC_FSGETXATTR/FS_IOC_FSSETXATTR) */
+> >> +};
+> >> +
+> >>  typedef struct xattr_map_entry {
+> >>      char *key;
+> >>      char *prepend;
+> >> @@ -161,6 +170,7 @@ struct lo_data {
+> >>      int readdirplus_clear;
+> >>      int allow_direct_io;
+> >>      int announce_submounts;
+> >> +    int perfile_dax_cap; /* capability of backend fs */
+> >>      bool use_statx;
+> >>      struct lo_inode root;
+> >>      GHashTable *inodes; /* protected by lo->mutex */
+> >> @@ -703,6 +713,10 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
+> >>          conn->want &= ~FUSE_CAP_HANDLE_KILLPRIV_V2;
+> >>          lo->killpriv_v2 = 0;
+> >>      }
+> >> +
+> >> +    if (conn->capable & FUSE_CAP_PERFILE_DAX && lo->perfile_dax_cap ) {
+> >> +        conn->want |= FUSE_CAP_PERFILE_DAX;
+> >> +    }
+> >>  }
+> >>  
+> >>  static void lo_getattr(fuse_req_t req, fuse_ino_t ino,
+> >> @@ -3800,6 +3814,7 @@ static void setup_root(struct lo_data *lo, struct lo_inode *root)
+> >>      int fd, res;
+> >>      struct stat stat;
+> >>      uint64_t mnt_id;
+> >> +    struct statfs statfs;
+> >>  
+> >>      fd = open("/", O_PATH);
+> >>      if (fd == -1) {
+> >> @@ -3826,6 +3841,20 @@ static void setup_root(struct lo_data *lo, struct lo_inode *root)
+> >>          root->posix_locks = g_hash_table_new_full(
+> >>              g_direct_hash, g_direct_equal, NULL, posix_locks_value_destroy);
+> >>      }
+> >> +
+> >> +    /*
+> >> +     * Currently only ext4/xfs since linux kernel v5.8 support storing
+> >> +     * FS_DAX_FL flag persistently. Ext4 accesses this flag through
+> >> +     * FS_IOC_G[S]ETFLAGS ioctl, while xfs accesses this flag through
+> >> +     * FS_IOC_FSG[S]ETXATTR ioctl.
+> >> +     */
+> >> +    res = fstatfs(fd, &statfs);
+> >> +    if (!res) {
+> >> +	if (statfs.f_type == EXT4_SUPER_MAGIC)
+> >> +	    lo->perfile_dax_cap = DAX_CAP_FLAGS;
+> >> +	else if (statfs.f_type == XFS_SUPER_MAGIC)
+> >> +	    lo->perfile_dax_cap = DAX_CAP_XATTR;
+> >> +    }
+> >>  }
+> >>  
+> >>  static guint lo_key_hash(gconstpointer key)
+> >> -- 
+> >> 2.27.0
+> >>
+> >> _______________________________________________
+> >> Virtio-fs mailing list
+> >> Virtio-fs@redhat.com
+> >> https://listman.redhat.com/mailman/listinfo/virtio-fs
+> >>
+> 
 > -- 
 > Thanks,
 > Jeffle

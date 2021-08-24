@@ -1,12 +1,18 @@
-Date: Mon, 23 Aug 2021 11:31:07 +0200
-From: Sergio Lopez <slp@redhat.com>
-Message-ID: <20210823093107.okqkowakgwwwvvzv@mhamilton>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=RPkgOjtgP3nI+LTyjK4xg2YWRT4LL2DYjNR7eYJgMGM=;
+	b=Zjo46vQu4jZi8G7xsroS0mCbebLwFiIQXggd+CqTvEBEAzpyef/pRHSTtrPboEX4Yr
+	q4rU7N2uqCV6fjfkF3noJd6q1WeBm/ZyarZUSaMg93B7aVLU/UUrqSVaVb719kB8+L2l
+	kxIkggJ1jq4eyMaQmosYuv6AO+Z+6vQD/hd0o=
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="wr3l5qy55srmglkq"
-Content-Disposition: inline
-Subject: [Virtio-fs] Problem using gdb/lldb on a binary residing on a
-	DAX-enabled volume
+References: <20210823093107.okqkowakgwwwvvzv@mhamilton>
+In-Reply-To: <20210823093107.okqkowakgwwwvvzv@mhamilton>
+From: Chirantan Ekbote <chirantan@chromium.org>
+Date: Tue, 24 Aug 2021 14:04:45 +0900
+Message-ID: <CAJFHJroOBS=H+YkYNkvhgS3wz1N5juYRESBPzaJMGYQ1_e0QHg@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] Problem using gdb/lldb on a binary residing on a
+ DAX-enabled volume
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,145 +21,87 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs-list <virtio-fs@redhat.com>
+To: Sergio Lopez <slp@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, David Riley <davidriley@google.com>, Sergey Senozhatsky <senozhatsky@google.com>, Yu Zhao <yuzhao@google.com>
 
+Hi Sergio,
 
---wr3l5qy55srmglkq
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+On Mon, Aug 23, 2021 at 6:31 PM Sergio Lopez <slp@redhat.com> wrote:
+>
+> Hi,
+>
+> I've noticed that trying to use gdb/lldb on any binary residing on a
+> DAX-enabled virtio-fs volume leads to a SIGSEGV in userspace...
+>
+> Seems like DAX breaks something in the ptrace_access_vm path. On a
+> volume without DAX works fine.
+>
 
-Hi,
+We've seen this as well and unfortunately it doesn't appear to be
+limited to virtio-fs.  Using DAX on a ext4 formatted virtio-pmem disk
+image has the same problem.  We've actually disabled DAX everywhere
+because of this.
 
-I've noticed that trying to use gdb/lldb on any binary residing on a
-DAX-enabled virtio-fs volume leads to a SIGSEGV in userspace...
+Unfortunately most of the details are in an internal bug report but
+I'll try to extract the relevant bits here.  This is well outside my
+depth so I've CC'd some of the people who have looked at this.  The
+initial bug report was for virtio-pmem+ext4 so some of the details are
+specific to pmem but I suspect something similar is happening for
+virtio-fs as well.
 
-[root@fedora ~]# mount -t virtiofs -o dax,context=3Dsystem_u:object_r:root_=
-t:s0 /dev/root /mnt/virtio-fs
-[root@fedora ~]# gdb /mnt/virtio-fs/true=20
-GNU gdb (GDB) Fedora 10.2-3.fc34
-Copyright (C) 2021 Free Software Foundation, Inc.
-License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.htm=
-l>
-This is free software: you are free to change and redistribute it.
-There is NO WARRANTY, to the extent permitted by law.
-Type "show copying" and "show warranty" for details.
-This GDB was configured as "x86_64-redhat-linux-gnu".
-Type "show configuration" for configuration details.
-For bug reporting instructions, please see:
-<https://www.gnu.org/software/gdb/bugs/>.
-Find the GDB manual and other documentation resources online at:
-    <http://www.gnu.org/software/gdb/documentation/>.
+The issue is that process_vm_readv() corrupts the memory of files that
+are mmap()'d when DAX is enabled.
 
-For help, type "help".
-Type "apropos word" to search for commands related to "word"...
-Reading symbols from /mnt/virtio-fs/true...
-Missing separate debuginfo for /mnt/virtio-fs/true
-Try: dnf --enablerepo=3D'*debug*' install /usr/lib/debug/.build-id/25/47d5e=
-7307ccc0f5a75e5990afdc5e15293ccc1.debug
-Reading symbols from .gnu_debugdata for /mnt/virtio-fs/true...
-(No debugging symbols found in .gnu_debugdata for /mnt/virtio-fs/true)
-(gdb) break main
-Breakpoint 1 at 0x14c0
-(gdb) r
-Starting program: /mnt/virtio-fs/true=20
-Missing separate debuginfos, use: dnf debuginfo-install glibc-2.33-5.fc34.x=
-86_64
+1. A filesystem is mounted with DAX enabled.  pmem_attach_disk() sets
+pfn_flags to PFN_DEV|PFN_MAP.  In the fuse case, this appears to
+happen here [1].
+2. When the (strace/gdb/etc) process does its initial read of the
+mmap()'d region, the pfn flags for the page are inherited from the
+pmem structure set to PFN_DEV|PFN_MAP in step 1.  During a call to
+insert_pfn(), pte_mkdevmap is called to mark the pte as devmap.
+3. If you follow the ftrace of the process_vm_readv(), it eventually
+reaches do_wp_page(). If the target process had not previously read
+the page in, this would not call do_wp_page() and instead just fault
+in the page normally through the ext4/dax logic.
+4. do_wp_page() calls vm_normal_page() which returns NULL due to the
+remote pte being marked special and devmap (from above).  If we just
+ignore the devmap check and return the page that has been found and
+allow the normal copy to occur, then no problem occurs.  However, that
+can't be safely done in normal dax cases.  Due to vm_normal_page()
+returning NULL, wp_page_copy() is called (first call site) with a null
+vmf->address.  If the mmap()d file is originally from a non-dax
+filesystem (eg tmpfs), the second wp_page_copy() ends up being called
+with a valid vmf->address.
+5. cow_user_page() ends up in this unexpected case since
+src==vmf->address is NULL, delimited with the following comment:
 
-Program received signal SIGSEGV, Segmentation fault.
-0x0000555555555960 in _start ()
+        /*
+         * If the source page was a PFN mapping, we don't have
+         * a "struct page" for it. We do a best-effort copy by
+         * just copying from the original user address. If that
+         * fails, we just zero-fill it. Live with it.
+         */
 
+The end effect of this is that there is the
+__copy_from_user_inatomic() call with an invalid uaddr because the
+uaddr is from the remote address space.   This results in another page
+fault because that remote address isn't valid in the process calling
+process_vm_readv().  It seems that there's a few issues here, a) that
+it's trying to read from the remote address space as if it were local,
+and b) that the failure here is corrupting the remote processes memory
+and not just returning an empty page which would be less broken.
 
-=2E.. while the kernel drops a warning:
+In the good case of the mmap()d file being from tmpfs,
+src==vmf->address is non-NULL and copy_user_highpage can properly do
+the copy of the page.  At that point, the caller is able to copy data
+from that page to its own local buffer and return data successfully,
+as well as avoid corrupting the remote process.
 
+We've also found that reverting "17839856fd58: gup: document and work
+around "COW can break either way" issue" seems to make the problem go
+away.
 
-[   39.962629] ------------[ cut here ]------------
-[   39.963854] WARNING: CPU: 1 PID: 718 at mm/memory.c:2666 wp_page_copy+0x=
-565/0x5d0
-[   39.965736] Modules linked in: virtio_net net_failover i2c_i801 failover=
- i2c_smbus joydev drm ip_tablew
-[   39.969040] CPU: 1 PID: 718 Comm: gdb Not tainted 5.11.12-300.fc34.x86_6=
-4 #1
-[   39.970800] Hardware name: QEMU Standard PC (Q35 + ICH9, 2009), BIOS rel=
--1.13.0-0-gf21b5a4aeb02-prebui4
-[   39.973535] RIP: 0010:wp_page_copy+0x565/0x5d0
-[   39.974675] Code: 89 7b 48 48 8b 43 30 49 39 07 75 76 48 8b 7c 24 08 48 =
-8b 74 24 10 ba 00 10 00 00 e8 5
-[   39.979165] RSP: 0018:ffffa3aa40cb7bc0 EFLAGS: 00010206
-[   39.980483] RAX: 0000000000001000 RBX: ffffa3aa40cb7c60 RCX: 00000000000=
-01000
-[   39.982244] RDX: 0000000000001000 RSI: 0000555555555000 RDI: ffff898117a=
-9f000
-[   39.984015] RBP: ffffe934045ea7c0 R08: ffffe934041c7f68 R09: 00000000000=
-00001
-[   39.985780] R10: 0000000000117a9f R11: ffff89810825dd20 R12: ffff8981058=
-29770
-[   39.987552] R13: 0000000000000000 R14: ffff898106c11dc0 R15: 00000000000=
-00001
-[   39.989324] FS:  00007f9691a91080(0000) GS:ffff898763a40000(0000) knlGS:=
-0000000000000000
-[   39.991319] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
-[   39.992760] CR2: 0000555555555000 CR3: 000000010422a000 CR4: 00000000000=
-006e0
-[   39.994535] DR0: 0000000000000000 DR1: 0000000000000000 DR2: 00000000000=
-00000
-[   39.996312] DR3: 0000000000000000 DR6: 00000000fffe0ff0 DR7: 00000000000=
-00400
-[   39.998086] Call Trace:
-[   39.998766]  handle_mm_fault+0x113f/0x1970
-[   39.999828]  __get_user_pages+0x28c/0x7f0
-[   40.000868]  __get_user_pages_remote+0xd4/0x320
-[   40.002028]  __access_remote_vm+0x106/0x370
-[   40.003099]  ptrace_access_vm+0x9d/0xd0
-[   40.004100]  ptrace_request+0x560/0x620
-[   40.005097]  arch_ptrace+0x13d/0x3b0
-[   40.006039]  __x64_sys_ptrace+0x82/0x120
-[   40.007050]  do_syscall_64+0x33/0x40
-[   40.008002]  entry_SYSCALL_64_after_hwframe+0x44/0xa9
-[   40.009283] RIP: 0033:0x7f9694ce2aae
-[   40.010220] Code: 70 41 83 f8 03 c7 44 24 10 08 00 00 00 48 89 44 24 18 =
-48 8d 44 24 30 8b 70 08 4c 0f 4
-[   40.014714] RSP: 002b:00007ffe0cffb4e0 EFLAGS: 00000202 ORIG_RAX: 000000=
-0000000065
-[   40.016577] RAX: ffffffffffffffda RBX: 00005555555554c0 RCX: 00007f9694c=
-e2aae
-[   40.018331] RDX: 00005555555554c0 RSI: 00000000000002ef RDI: 00000000000=
-00005
-[   40.020092] RBP: 0000000000000001 R08: 0000000000000004 R09: 00005555555=
-554c0
-[   40.021855] R10: 55415641fa1e0fcc R11: 0000000000000202 R12: 00000000000=
-00001
-[   40.023612] R13: 00007f9691a90848 R14: 00000000000002ef R15: 00000000000=
-00000
-[   40.025364] ---[ end trace 2273d62ee1978eb4 ]---
+Chirantan
 
-
-Seems like DAX breaks something in the ptrace_access_vm path. On a
-volume without DAX works fine.
-
-The guest is a Fedora with a 5.11.12-300.fc34.x86_64 kernel.
-
-Sergio.
-
---wr3l5qy55srmglkq
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAABCAAdFiEEvtX891EthoCRQuii9GknjS8MAjUFAmEjatsACgkQ9GknjS8M
-AjUWRA//cZEieBDXObnhl5dl3D2i/lja4EWMsVMPKbJvC7+gOMcVIyvv7LXOc8TS
-UPgGz1z0LGAG4fSXmIO7ibaUDklTZnpi2Pz31OO/r6p6idqiMNj9curLn5e/dGZH
-PlZBsV9ukbp+T//Y4TFlcKolx6aG1abEMxaqm8GOoSQWfGczWVJbCpXB0caqxqNA
-TaQuTmUIwC69iiu6ebN2T0Vb2Pe3Bibfj3ZF5J7OwZkwzClAlQup9LiJbzBZZdqt
-iZZvmxf6+JDut6xTdx1QRqoZQqvJmWwDMLr5Bmr/eF+4q7DmA3+J35QwIzQrux0P
-WyqgrELchG8ASENwySSrukqZIEa7tNOUL3PJbG+Q8qhbztFnGa7VDlpmM4zzEsge
-I2Eg0xWFiQOuRVDqgGnoPGZi6Vwz7ugHYvl9OMigM18GJYgsHBByxmQ+aUh0FDPo
-Msrzci+SPIaO5/IKspF5ArlrktP6/yiViGZA14ibulGPliYatgjAMdeeAgE/x9YD
-rtFjhn+ql3OiZqef5DhZsEW1dhpQxkCHOgr9eI7DpJQxL3zHKyNAPNP2EMUEJTqq
-cMrBVhkkiy7ji3fwIJAZiLmRzGk/Xn4KRbXLYw40h1NVVm2BlS95UphcXiV/wVSV
-VA01d13OHqewsDoCBdJZlIf1jevhqlrv4+Ru8TViGAGBazpAcr4=
-=z0RH
------END PGP SIGNATURE-----
-
---wr3l5qy55srmglkq--
+[1]: https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux/+/d5ae8d7f85b7f6f6e60f1af8ff4be52b0926fde1/fs/fuse/virtio_fs.c#741
 

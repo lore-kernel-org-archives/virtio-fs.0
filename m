@@ -1,22 +1,17 @@
-Date: Mon, 30 Aug 2021 14:45:25 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YS0nRQeuxEFppDxG@redhat.com>
-References: <20210708175738.360757-2-vgoyal@redhat.com>
-	<20210709091915.2bd4snyfjndexw2b@wittgenstein>
-	<20210709152737.GA398382@redhat.com>
-	<710d1c6f-d477-384f-0cc1-8914258f1fb1@schaufler-ca.com>
-	<20210709175947.GB398382@redhat.com>
-	<CAPL3RVGKg4G5qiiHo7KYPcsWWgeoW=qNPOSQpd3Sv329jrWrLQ@mail.gmail.com>
-	<20210712140247.GA486376@redhat.com>
-	<20210712154106.GB18679@fieldses.org>
-	<20210712174759.GA502004@redhat.com>
-	<3d55ff30-c6cf-46c4-0e32-3b578099343d@schaufler-ca.com>
+Date: Tue, 31 Aug 2021 07:31:56 +0800
+From: Liu Bo <bo.liu@linux.alibaba.com>
+Message-ID: <20210830233149.GA118114@rsjd01523.et2sqa>
+References: <20210817022220.17574-1-jefflexu@linux.alibaba.com>
+	<CAJfpeguw1hMOaxpDmjmijhf=-JEW95aEjxfVo_=D_LyWx8LDgw@mail.gmail.com>
+	<YRut5sioYfc2M1p7@redhat.com>
+	<6043c0b8-0ff1-2e11-0dd0-e23f9ff6b952@linux.alibaba.com>
+	<YRvOZI3CvLsF96JA@redhat.com>
 MIME-Version: 1.0
+In-Reply-To: <YRvOZI3CvLsF96JA@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <3d55ff30-c6cf-46c4-0e32-3b578099343d@schaufler-ca.com>
-Subject: Re: [Virtio-fs] [PATCH v2 1/1] xattr: Allow user.* xattr on symlink
- and special files
+Subject: Re: [Virtio-fs] [PATCH v4 0/8] fuse,virtiofs: support per-file DAX
+Reply-To: bo.liu@linux.alibaba.com
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,106 +20,91 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Casey Schaufler <casey@schaufler-ca.com>
-Cc: virtio-fs@redhat.com, Bruce Fields <bfields@redhat.com>, miklos@szeredi.hu, selinux@vger.kernel.org, jack@suse.cz, linux-kernel@vger.kernel.org, "J. Bruce Fields" <bfields@fieldses.org>, casey.schaufler@intel.com, linux-security-module@vger.kernel.org, viro@zeniv.linux.org.uk, gscrivan@redhat.com, Christoph Hellwig <hch@infradead.org>, linux-fsdevel@vger.kernel.org, tytso@mit.edu, Christian Brauner <christian.brauner@ubuntu.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: Miklos Szeredi <miklos@szeredi.hu>, virtio-fs-list <virtio-fs@redhat.com>, Joseph Qi <joseph.qi@linux.alibaba.com>, JeffleXu <jefflexu@linux.alibaba.com>
 
-On Tue, Jul 13, 2021 at 07:17:00AM -0700, Casey Schaufler wrote:
-> On 7/12/2021 10:47 AM, Vivek Goyal wrote:
-> > On Mon, Jul 12, 2021 at 11:41:06AM -0400, J. Bruce Fields wrote:
-> >> On Mon, Jul 12, 2021 at 10:02:47AM -0400, Vivek Goyal wrote:
-> >>> On Fri, Jul 09, 2021 at 04:10:16PM -0400, Bruce Fields wrote:
-> >>>> On Fri, Jul 9, 2021 at 1:59 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> >>>>> nfs seems to have some issues.
-> >>>> I'm not sure what the expected behavior is for nfs.  All I have for
-> >>>> now is some generic troubleshooting ideas, sorry:
-> >>>>
-> >>>>> - I can set user.foo xattr on symlink and query it back using xattr name.
-> >>>>>
-> >>>>>   getfattr -h -n user.foo foo-link.txt
-> >>>>>
-> >>>>>   But when I try to dump all xattrs on this file, user.foo is being
-> >>>>>   filtered out it looks like. Not sure why.
-> >>>> Logging into the server and seeing what's set there could help confirm
-> >>>> whether it's the client or server that's at fault.  (Or watching the
-> >>>> traffic in wireshark; there are GET/SET/LISTXATTR ops that should be
-> >>>> easy to spot.)
-> >>>>
-> >>>>> - I can't set "user.foo" xattr on a device node on nfs and I get
-> >>>>>   "Permission denied". I am assuming nfs server is returning this.
-> >>>> Wireshark should tell you whether it's the server or client doing that.
-> >>>>
-> >>>> The RFC is https://datatracker.ietf.org/doc/html/rfc8276, and I don't
-> >>>> see any explicit statement about what the server should do in the case
-> >>>> of symlinks or device nodes, but I do see "Any regular file or
-> >>>> directory may have a set of extended attributes", so that was clearly
-> >>>> the assumption.  Also, NFS4ERR_WRONG_TYPE is listed as a possible
-> >>>> error return for the xattr ops.  But on a quick skim I don't see any
-> >>>> explicit checks in the nfsd code, so I *think* it's just relying on
-> >>>> the vfs for any file type checks.
-> >>> Hi Bruce,
-> >>>
-> >>> Thanks for the response. I am just trying to do set a user.foo xattr on
-> >>> a device node on nfs.
-> >>>
-> >>> setfattr -n "user.foo" -v "bar" /mnt/nfs/test-dev
-> >>>
-> >>> and I get -EACCESS.
-> >>>
-> >>> I put some printk() statements and EACCESS is being returned from here.
-> >>>
-> >>> nfs4_xattr_set_nfs4_user() {
-> >>>         if (!nfs_access_get_cached(inode, current_cred(), &cache, true)) {
-> >>>                 if (!(cache.mask & NFS_ACCESS_XAWRITE)) {
-> >>>                         return -EACCES;
-> >>>                 }
-> >>>         }
-> >>> }
-> >>>
-> >>> Value of cache.mask=0xd at the time of error.
-> >> Looks like 0xd is what the server returns to access on a device node
-> >> with mode bits rw- for the caller.
-> >>
-> >> Commit c11d7fd1b317 "nfsd: take xattr bits into account for permission
-> >> checks" added the ACCESS_X* bits for regular files and directories but
-> >> not others.
-> >>
-> >> But you don't want to determine permission from the mode bits anyway,
-> >> you want it to depend on the owner,
-> > Thinking more about this part. Current implementation of my patch is
-> > effectively doing both the checks. It checks that you are owner or
-> > have CAP_FOWNER in xattr_permission() and then goes on to call
-> > inode_permission(). And that means file mode bits will also play a
-> > role. If caller does not have write permission on the file, it will
-> > be denied setxattr().
-> >
-> > If I don't call inode_permission(), and just return 0 right away for
-> > file owner (for symlinks and special files), then just being owner
-> > is enough to write user.* xattr. And then even security modules will
-> > not get a chance to block that operation.
+On Tue, Aug 17, 2021 at 10:57:40AM -0400, Vivek Goyal wrote:
+> On Tue, Aug 17, 2021 at 09:22:53PM +0800, JeffleXu wrote:
+> > 
+> > 
+> > On 8/17/21 8:39 PM, Vivek Goyal wrote:
+> > > On Tue, Aug 17, 2021 at 10:06:53AM +0200, Miklos Szeredi wrote:
+> > >> On Tue, 17 Aug 2021 at 04:22, Jeffle Xu <jefflexu@linux.alibaba.com> wrote:
+> > >>>
+> > >>> This patchset adds support of per-file DAX for virtiofs, which is
+> > >>> inspired by Ira Weiny's work on ext4[1] and xfs[2].
+> > >>
+> > >> Can you please explain the background of this change in detail?
+> > >>
+> > >> Why would an admin want to enable DAX for a particular virtiofs file
+> > >> and not for others?
+> > > 
+> > > Initially I thought that they needed it because they are downloading
+> > > files on the fly from server. So they don't want to enable dax on the file
+> > > till file is completely downloaded. 
+> > 
+> > Right, it's our initial requirement.
+> > 
+> > 
+> > > But later I realized that they should
+> > > be able to block in FUSE_SETUPMAPPING call and make sure associated
+> > > file section has been downloaded before returning and solve the problem.
+> > > So that can't be the primary reason.
+> > 
+> > Saying we want to access 4KB of one file inside guest, if it goes
+> > through FUSE request routine, then the fuse daemon only need to download
+> > this 4KB from remote server. But if it goes through DAX, then the fuse
+> > daemon need to download the whole DAX window (e.g., 2MB) from remote
+> > server, so called amplification. Maybe we could decrease the DAX window
+> > size, but it's a trade off.
 > 
-> That isn't going to fly. SELinux and Smack don't rely on ownership
-> as a criteria for access. Being the owner of a symlink conveys no
-> special privilege. The LSM must be consulted to determine if the
-> module's policy allows the access.
+> Downloading 2MB chunk should not be a big issue (IMHO). And if this
+> turns out to be real concern, we could experiment with a smaller
+> mapping granularity.
+> 
+> > 
+> > > 
+> > > Other reason mentioned I think was that only certain files benefit
+> > > from DAX. But not much details are there after that. It will be nice
+> > > to hear a more concrete use case and more details about this usage.
+> > > 
+> > 
+> > Apart from our internal requirement, more fine grained control for DAX
+> > shall be general and more flexible. Glad to hear more discussion from
+> > community.
+> 
+> Sure it will be more general and flexible. But there needs to be 1-2
+> good concrete use cases to justify additional complexity. And I don't
+> think that so far a good use case has come forward.
+>
 
-Getting back to this thread after a while. Sorry got busy in other
-things.
+Hi Vivek,
 
-I noticed that if we skip calling inode_permission() for special files,
-then we will skip calling security_inode_permission() but we will
-still call security hooks for setxattr/getxattr/removexattr etc.
+Our use case can be summarized like this, we need to share a readonly
+fs image with _multiple_ guests while keeping the memory overhead as
+low as possible.  More specifically, we have a userspace fs and a
+tool[1] to split a ext4 directory into to metadata part and data part
+in two individual files respectively, given the fact these two files
+are supposed to be accessed multiple times and their sizes are
+ususally larger than 2MB, it indeed matches what dax's best practice
+hopes.
 
-security_inode_setxattr()
-security_inode_getxattr()
-security_inode_removexattr()
+However, since these two files are sharing the same virtiofs mnt point
+with non-fs-image files, we'd like to have a more fine-grained control
+on the dax flag.
 
-So LSMs will still get a chance whether to allow/disallow this operation
-or not.
+And please note that how guests would mount dax and use dax is under
+our control, so it's server who will decide the dax flag.
 
-And skipping security_inode_permission() kind of makes sense that for
-special files, I am not writing to device. So taking permission from
-LSMs, will not make much sense.
+AFAICS this patch set can let either server or guest make the
+decision, but if most of us have concerns about the complexity brought
+by mixing the two cases, I think we can go with only letting server
+decide it by setting attr.flags.
 
-Thanks
-Vivek
+
+[1]: https://github.com/dragonflyoss/image-service/blob/master/docs/nydus-design.md
+
+
+> Thanks
+> Vivek
 

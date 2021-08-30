@@ -1,23 +1,22 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=2YdUdeUKZfBFzMR1jBM9RNC90FnM3wxYhfPH5nEI0FQ=;
-	b=LX9ib2ZyUcSD/ZaFz+8eAUshfQOAn/4woZAxZhLaESc5RNlCL/7SNuGmtjHlB8Ra8a
-	LYkHAy0oqhLyoAHQ/kFNQirR9PaGmx5S2gMPptsrRfGHJFRy0XPIcFTJMwD7Ebf4zMkp
-	+ICtUsKogy/NDpufwRoIImN521zHSHcy6j20E=
+Date: Mon, 30 Aug 2021 14:45:25 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YS0nRQeuxEFppDxG@redhat.com>
+References: <20210708175738.360757-2-vgoyal@redhat.com>
+	<20210709091915.2bd4snyfjndexw2b@wittgenstein>
+	<20210709152737.GA398382@redhat.com>
+	<710d1c6f-d477-384f-0cc1-8914258f1fb1@schaufler-ca.com>
+	<20210709175947.GB398382@redhat.com>
+	<CAPL3RVGKg4G5qiiHo7KYPcsWWgeoW=qNPOSQpd3Sv329jrWrLQ@mail.gmail.com>
+	<20210712140247.GA486376@redhat.com>
+	<20210712154106.GB18679@fieldses.org>
+	<20210712174759.GA502004@redhat.com>
+	<3d55ff30-c6cf-46c4-0e32-3b578099343d@schaufler-ca.com>
 MIME-Version: 1.0
-References: <20210520154654.1791183-1-groug@kaod.org>
-	<20210520154654.1791183-6-groug@kaod.org>
-	<CAOQ4uxh69ii5Yk-DgFAq+TrrvJ6xCv9s8sKLfo3aBCSWjJvp9Q@mail.gmail.com>
-	<YRqEPjzHg9IlifBo@redhat.com>
-	<YSpUgzG8rM5LeFDy@miu.piliscsaba.redhat.com>
-	<YS0O2MlR2G2LJH/0@redhat.com>
-In-Reply-To: <YS0O2MlR2G2LJH/0@redhat.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Mon, 30 Aug 2021 19:36:17 +0200
-Message-ID: <CAJfpeguyBU3r+rUa9NvvNjaBwUno9O5PszAoriABStf5Fm3xfg@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH v4 5/5] virtiofs: propagate sync() to file
-	server
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <3d55ff30-c6cf-46c4-0e32-3b578099343d@schaufler-ca.com>
+Subject: Re: [Virtio-fs] [PATCH v2 1/1] xattr: Allow user.* xattr on symlink
+ and special files
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -26,94 +25,106 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: Amir Goldstein <amir73il@gmail.com>, linux-kernel <linux-kernel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, Max Reitz <mreitz@redhat.com>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, virtualization@lists.linux-foundation.org, Robert Krawitz <rlk@redhat.com>
+To: Casey Schaufler <casey@schaufler-ca.com>
+Cc: virtio-fs@redhat.com, Bruce Fields <bfields@redhat.com>, miklos@szeredi.hu, selinux@vger.kernel.org, jack@suse.cz, linux-kernel@vger.kernel.org, "J. Bruce Fields" <bfields@fieldses.org>, casey.schaufler@intel.com, linux-security-module@vger.kernel.org, viro@zeniv.linux.org.uk, gscrivan@redhat.com, Christoph Hellwig <hch@infradead.org>, linux-fsdevel@vger.kernel.org, tytso@mit.edu, Christian Brauner <christian.brauner@ubuntu.com>
 
-On Mon, 30 Aug 2021 at 19:01, Vivek Goyal <vgoyal@redhat.com> wrote:
-
-> >  static struct fuse_writepage_args *fuse_find_writeback(struct fuse_inode *fi,
-> > @@ -1608,6 +1609,9 @@ static void fuse_writepage_free(struct fuse_writepage_args *wpa)
-> >       struct fuse_args_pages *ap = &wpa->ia.ap;
-> >       int i;
+On Tue, Jul 13, 2021 at 07:17:00AM -0700, Casey Schaufler wrote:
+> On 7/12/2021 10:47 AM, Vivek Goyal wrote:
+> > On Mon, Jul 12, 2021 at 11:41:06AM -0400, J. Bruce Fields wrote:
+> >> On Mon, Jul 12, 2021 at 10:02:47AM -0400, Vivek Goyal wrote:
+> >>> On Fri, Jul 09, 2021 at 04:10:16PM -0400, Bruce Fields wrote:
+> >>>> On Fri, Jul 9, 2021 at 1:59 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> >>>>> nfs seems to have some issues.
+> >>>> I'm not sure what the expected behavior is for nfs.  All I have for
+> >>>> now is some generic troubleshooting ideas, sorry:
+> >>>>
+> >>>>> - I can set user.foo xattr on symlink and query it back using xattr name.
+> >>>>>
+> >>>>>   getfattr -h -n user.foo foo-link.txt
+> >>>>>
+> >>>>>   But when I try to dump all xattrs on this file, user.foo is being
+> >>>>>   filtered out it looks like. Not sure why.
+> >>>> Logging into the server and seeing what's set there could help confirm
+> >>>> whether it's the client or server that's at fault.  (Or watching the
+> >>>> traffic in wireshark; there are GET/SET/LISTXATTR ops that should be
+> >>>> easy to spot.)
+> >>>>
+> >>>>> - I can't set "user.foo" xattr on a device node on nfs and I get
+> >>>>>   "Permission denied". I am assuming nfs server is returning this.
+> >>>> Wireshark should tell you whether it's the server or client doing that.
+> >>>>
+> >>>> The RFC is https://datatracker.ietf.org/doc/html/rfc8276, and I don't
+> >>>> see any explicit statement about what the server should do in the case
+> >>>> of symlinks or device nodes, but I do see "Any regular file or
+> >>>> directory may have a set of extended attributes", so that was clearly
+> >>>> the assumption.  Also, NFS4ERR_WRONG_TYPE is listed as a possible
+> >>>> error return for the xattr ops.  But on a quick skim I don't see any
+> >>>> explicit checks in the nfsd code, so I *think* it's just relying on
+> >>>> the vfs for any file type checks.
+> >>> Hi Bruce,
+> >>>
+> >>> Thanks for the response. I am just trying to do set a user.foo xattr on
+> >>> a device node on nfs.
+> >>>
+> >>> setfattr -n "user.foo" -v "bar" /mnt/nfs/test-dev
+> >>>
+> >>> and I get -EACCESS.
+> >>>
+> >>> I put some printk() statements and EACCESS is being returned from here.
+> >>>
+> >>> nfs4_xattr_set_nfs4_user() {
+> >>>         if (!nfs_access_get_cached(inode, current_cred(), &cache, true)) {
+> >>>                 if (!(cache.mask & NFS_ACCESS_XAWRITE)) {
+> >>>                         return -EACCES;
+> >>>                 }
+> >>>         }
+> >>> }
+> >>>
+> >>> Value of cache.mask=0xd at the time of error.
+> >> Looks like 0xd is what the server returns to access on a device node
+> >> with mode bits rw- for the caller.
+> >>
+> >> Commit c11d7fd1b317 "nfsd: take xattr bits into account for permission
+> >> checks" added the ACCESS_X* bits for regular files and directories but
+> >> not others.
+> >>
+> >> But you don't want to determine permission from the mode bits anyway,
+> >> you want it to depend on the owner,
+> > Thinking more about this part. Current implementation of my patch is
+> > effectively doing both the checks. It checks that you are owner or
+> > have CAP_FOWNER in xattr_permission() and then goes on to call
+> > inode_permission(). And that means file mode bits will also play a
+> > role. If caller does not have write permission on the file, it will
+> > be denied setxattr().
 > >
-> > +     if (wpa->bucket && atomic_dec_and_test(&wpa->bucket->num_writepages))
->
-> Hi Miklos,
->
-> Wondering why this wpa->bucket check is there. Isn't every wpa is associated
-> bucket.  So when do we run into situation when wpa->bucket = NULL.
+> > If I don't call inode_permission(), and just return 0 right away for
+> > file owner (for symlinks and special files), then just being owner
+> > is enough to write user.* xattr. And then even security modules will
+> > not get a chance to block that operation.
+> 
+> That isn't going to fly. SELinux and Smack don't rely on ownership
+> as a criteria for access. Being the owner of a symlink conveys no
+> special privilege. The LSM must be consulted to determine if the
+> module's policy allows the access.
 
-In case fc->sync_fs is false.
+Getting back to this thread after a while. Sorry got busy in other
+things.
 
-> > @@ -1871,6 +1875,19 @@ static struct fuse_writepage_args *fuse_writepage_args_alloc(void)
-> >
-> >  }
-> >
-> > +static void fuse_writepage_add_to_bucket(struct fuse_conn *fc,
-> > +                                      struct fuse_writepage_args *wpa)
-> > +{
-> > +     if (!fc->sync_fs)
-> > +             return;
-> > +
-> > +     rcu_read_lock();
-> > +     do {
-> > +             wpa->bucket = rcu_dereference(fc->curr_bucket);
-> > +     } while (unlikely(!atomic_inc_not_zero(&wpa->bucket->num_writepages)));
->
-> So this loop is there because fuse_sync_fs() might be replacing
-> fc->curr_bucket. And we are fetching this pointer under rcu. So it is
-> possible that fuse_fs_sync() dropped its reference and that led to
-> ->num_writepages 0 and we don't want to use this bucket.
->
-> What if fuse_sync_fs() dropped its reference but still there is another
-> wpa in progress and hence ->num_writepages is not zero. We still don't
-> want to use this bucket for new wpa, right?
+I noticed that if we skip calling inode_permission() for special files,
+then we will skip calling security_inode_permission() but we will
+still call security hooks for setxattr/getxattr/removexattr etc.
 
-It's an unlikely race in which case the the write will go into the old
-bucket, and will be waited for, but that definitely should not be a
-problem.
+security_inode_setxattr()
+security_inode_getxattr()
+security_inode_removexattr()
 
-> > @@ -528,6 +542,31 @@ static int fuse_sync_fs(struct super_block *sb, int wait)
-> >       if (!fc->sync_fs)
-> >               return 0;
-> >
-> > +     new_bucket = fuse_sync_bucket_alloc();
-> > +     spin_lock(&fc->lock);
-> > +     bucket = fc->curr_bucket;
-> > +     if (atomic_read(&bucket->num_writepages) != 0) {
-> > +             /* One more for count completion of old bucket */
-> > +             atomic_inc(&new_bucket->num_writepages);
-> > +             rcu_assign_pointer(fc->curr_bucket, new_bucket);
-> > +             /* Drop initially added active count */
-> > +             atomic_dec(&bucket->num_writepages);
-> > +             spin_unlock(&fc->lock);
-> > +
-> > +             wait_event(bucket->waitq, atomic_read(&bucket->num_writepages) == 0);
-> > +             /*
-> > +              * Drop count on new bucket, possibly resulting in a completion
-> > +              * if more than one syncfs is going on
-> > +              */
-> > +             if (atomic_dec_and_test(&new_bucket->num_writepages))
-> > +                     wake_up(&new_bucket->waitq);
-> > +             kfree_rcu(bucket, rcu);
-> > +     } else {
-> > +             spin_unlock(&fc->lock);
-> > +             /* Free unused */
-> > +             kfree(new_bucket);
-> When can we run into the situation when fc->curr_bucket is num_writepages
-> == 0. When install a bucket it has count 1. And only time it can go to
-> 0 is when we have dropped the initial reference. And initial reference
-> can be dropped only after removing bucket from fc->curr_bucket.
->
-> IOW, we don't drop initial reference on a bucket if it is in
-> fc->curr_bucket. And that mean anything installed fc->curr_bucket should
-> not ever have a reference count of 0. What am I missing.
+So LSMs will still get a chance whether to allow/disallow this operation
+or not.
 
-You are correct.  I fixed it by warning on zero count and checking for
-count != 1.
+And skipping security_inode_permission() kind of makes sense that for
+special files, I am not writing to device. So taking permission from
+LSMs, will not make much sense.
 
-I have other fixes as well, will send v2.
-
-Thanks,
-Miklos
+Thanks
+Vivek
 

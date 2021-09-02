@@ -1,13 +1,13 @@
-From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Wed,  4 Aug 2021 15:06:51 +0800
-Message-Id: <20210804070653.118123-7-jefflexu@linux.alibaba.com>
-In-Reply-To: <20210804070653.118123-1-jefflexu@linux.alibaba.com>
-References: <20210804070653.118123-1-jefflexu@linux.alibaba.com>
+Date: Thu, 2 Sep 2021 11:38:48 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YTDwCFbO9Jl6a7vP@redhat.com>
+References: <20210902152228.665959-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v3 6/8] fuse: mark inode DONT_CACHE when
-	per-file DAX indication changes
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20210902152228.665959-1-vgoyal@redhat.com>
+Subject: [Virtio-fs] [PATCH 2/1] man-pages: xattr.7: Update text for user
+ extended xattr behavior change
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,76 +16,36 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, virtualization@lists.linux-foundation.org
+To: linux-api@vger.kernel.org, mtk.manpages@gmail.com
+Cc: gscrivan@redhat.com, tytso@mit.edu, agruenba@redhat.com, miklos@szeredi.hu, selinux@vger.kernel.org, stephen.smalley.work@gmail.com, david@fromorbit.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, casey.schaufler@intel.com, linux-security-module@vger.kernel.org, viro@zeniv.linux.org.uk, linux-fsdevel@vger.kernel.org, bfields@redhat.com, christian.brauner@ubuntu.com
 
-When the per-file DAX indication changes while the file is still
-*opened*, it is quite complicated and maybe fragile to dynamically
-change the DAX state.
+I have proposed a patch to relax restrictions on user extended xattrs and
+allow file owner (or CAP_FOWNER) to get/set user extended xattrs on symlink
+and device files.
 
-Hence mark the inode and corresponding dentries as DONE_CACHE once the
-per-file DAX indication changes, so that the inode instance will be
-evicted and freed as soon as possible once the file is closed and the
-last reference to the inode is put. And then when the file gets reopened
-next time, the inode will reflect the new DAX state.
-
-In summary, when the per-file DAX indication changes for an *opened*
-file, the state of the file won't be updated until this file is closed
-and reopened later.
-
-Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- fs/fuse/dax.c    | 9 +++++++++
- fs/fuse/fuse_i.h | 1 +
- fs/fuse/inode.c  | 3 +++
- 3 files changed, 13 insertions(+)
+ man7/xattr.7 |    9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/fs/fuse/dax.c b/fs/fuse/dax.c
-index 30833f8d37dd..14bc5b9a0576 100644
---- a/fs/fuse/dax.c
-+++ b/fs/fuse/dax.c
-@@ -1364,6 +1364,15 @@ void fuse_dax_inode_init(struct inode *inode, unsigned int flags)
- 	inode->i_data.a_ops = &fuse_dax_file_aops;
- }
- 
-+void fuse_dax_dontcache(struct inode *inode, bool newdax)
-+{
-+	struct fuse_conn *fc = get_fuse_conn(inode);
+Index: man-pages/man7/xattr.7
+===================================================================
+--- man-pages.orig/man7/xattr.7	2021-09-01 13:46:16.165016463 -0400
++++ man-pages/man7/xattr.7	2021-09-01 16:31:51.038016463 -0400
+@@ -129,8 +129,13 @@ a way not controllable by disk quotas fo
+ special files and directories.
+ .PP
+ For this reason,
+-user extended attributes are allowed only for regular files and directories,
+-and access to user extended attributes is restricted to the
++user extended attributes are allowed only for regular files and directories
++till kernel 5.14. In newer kernel (5.15 onwards), restrictions have been
++relaxed a bit and user extended attributes are also allowed on symlinks
++and special files as long as caller is either owner of the file or is
++privileged (CAP_FOWNER).
 +
-+	if (fc->dax_mode == FUSE_DAX_INODE &&
-+	    fc->perfile_dax && IS_DAX(inode) != newdax)
-+		d_mark_dontcache(inode);
-+}
-+
- bool fuse_dax_check_alignment(struct fuse_conn *fc, unsigned int map_alignment)
- {
- 	if (fc->dax && (map_alignment > FUSE_DAX_SHIFT)) {
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 7b7b4c208af2..56fe1c4d2136 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -1260,6 +1260,7 @@ void fuse_dax_conn_free(struct fuse_conn *fc);
- bool fuse_dax_inode_alloc(struct super_block *sb, struct fuse_inode *fi);
- void fuse_dax_inode_init(struct inode *inode, unsigned int flags);
- void fuse_dax_inode_cleanup(struct inode *inode);
-+void fuse_dax_dontcache(struct inode *inode, bool newdax);
- bool fuse_dax_check_alignment(struct fuse_conn *fc, unsigned int map_alignment);
- void fuse_dax_cancel_work(struct fuse_conn *fc);
- 
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index 882c376f188b..9108d8ab39bc 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -269,6 +269,9 @@ void fuse_change_attributes(struct inode *inode, struct fuse_attr *attr,
- 		if (inval)
- 			invalidate_inode_pages2(inode->i_mapping);
- 	}
-+
-+	if (IS_ENABLED(CONFIG_FUSE_DAX))
-+		fuse_dax_dontcache(inode, attr->flags & FUSE_ATTR_DAX);
- }
- 
- static void fuse_init_inode(struct inode *inode, struct fuse_attr *attr)
--- 
-2.27.0
++Access to user extended attributes is restricted to the
+ owner and to users with appropriate capabilities for directories with the
+ sticky bit set (see the
+ .BR chmod (1)
 

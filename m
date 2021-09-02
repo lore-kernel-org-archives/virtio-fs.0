@@ -1,12 +1,13 @@
-From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Wed,  4 Aug 2021 15:06:50 +0800
-Message-Id: <20210804070653.118123-6-jefflexu@linux.alibaba.com>
-In-Reply-To: <20210804070653.118123-1-jefflexu@linux.alibaba.com>
-References: <20210804070653.118123-1-jefflexu@linux.alibaba.com>
+Date: Thu, 2 Sep 2021 13:05:01 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YTEEPZJ3kxWkcM9x@redhat.com>
+References: <20210902152228.665959-1-vgoyal@redhat.com>
+	<79dcd300-a441-cdba-e523-324733f892ca@schaufler-ca.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v3 5/8] fuse: enable per-file DAX
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <79dcd300-a441-cdba-e523-324733f892ca@schaufler-ca.com>
+Subject: Re: [Virtio-fs] [PATCH v3 0/1] Relax restrictions on user.* xattr
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,111 +16,161 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, virtualization@lists.linux-foundation.org
+To: Casey Schaufler <casey@schaufler-ca.com>
+Cc: gscrivan@redhat.com, tytso@mit.edu, agruenba@redhat.com, miklos@szeredi.hu, selinux@vger.kernel.org, stephen.smalley.work@gmail.com, david@fromorbit.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, casey.schaufler@intel.com, linux-security-module@vger.kernel.org, viro@zeniv.linux.org.uk, linux-fsdevel@vger.kernel.org, bfields@redhat.com, christian.brauner@ubuntu.com
 
-Enable per-file DAX if fuse server advertises that the file supports
-that.
+On Thu, Sep 02, 2021 at 08:43:50AM -0700, Casey Schaufler wrote:
+> On 9/2/2021 8:22 AM, Vivek Goyal wrote:
+> > Hi,
+> >
+> > This is V3 of the patch. Previous versions were posted here.
+> >
+> > v2:
+> > https://lore.kernel.org/linux-fsdevel/20210708175738.360757-1-vgoyal@redhat.com/
+> > v1:
+> > https://lore.kernel.org/linux-fsdevel/20210625191229.1752531-1-vgoyal@redhat.co
+> > +m/
+> >
+> > Changes since v2
+> > ----------------
+> > - Do not call inode_permission() for special files as file mode bits
+> >   on these files represent permissions to read/write from/to device
+> >   and not necessarily permission to read/write xattrs. In this case
+> >   now user.* extended xattrs can be read/written on special files
+> >   as long as caller is owner of file or has CAP_FOWNER.
+> >  
+> > - Fixed "man xattr". Will post a patch in same thread little later. (J.
+> >   Bruce Fields)
+> >
+> > - Fixed xfstest 062. Changed it to run only on older kernels where
+> >   user extended xattrs are not allowed on symlinks/special files. Added
+> >   a new replacement test 648 which does exactly what 062. Just that
+> >   it is supposed to run on newer kernels where user extended xattrs
+> >   are allowed on symlinks and special files. Will post patch in 
+> >   same thread (Ted Ts'o).
+> >
+> > Testing
+> > -------
+> > - Ran xfstest "./check -g auto" with and without patches and did not
+> >   notice any new failures.
+> >
+> > - Tested setting "user.*" xattr with ext4/xfs/btrfs/overlay/nfs
+> >   filesystems and it works.
+> >  
+> > Description
+> > ===========
+> >
+> > Right now we don't allow setting user.* xattrs on symlinks and special
+> > files at all. Initially I thought that real reason behind this
+> > restriction is quota limitations but from last conversation it seemed
+> > that real reason is that permission bits on symlink and special files
+> > are special and different from regular files and directories, hence
+> > this restriction is in place. (I tested with xfs user quota enabled and
+> > quota restrictions kicked in on symlink).
+> >
+> > This version of patch allows reading/writing user.* xattr on symlink and
+> > special files if caller is owner or priviliged (has CAP_FOWNER) w.r.t inode.
+> 
+> This part of your project makes perfect sense. There's no good
+> security reason that you shouldn't set user.* xattrs on symlinks
+> and/or special files.
+> 
+> However, your virtiofs use case is unreasonable.
 
-Currently the state whether the file enables DAX or not is initialized
-only when inode is instantiated.
+Ok. So we can merge this patch irrespective of the fact whether virtiofs
+should make use of this mechanism or not, right?
 
-Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
----
- fs/fuse/dax.c    | 12 ++++++++----
- fs/fuse/file.c   |  4 ++--
- fs/fuse/fuse_i.h |  4 ++--
- fs/fuse/inode.c  |  2 +-
- 4 files changed, 13 insertions(+), 9 deletions(-)
+> 
+> > Who wants to set user.* xattr on symlink/special files
+> > -----------------------------------------------------
+> > I have primarily two users at this point of time.
+> >
+> > - virtiofs daemon.
+> >
+> > - fuse-overlay. Giuseppe, seems to set user.* xattr attrs on unpriviliged
+> >   fuse-overlay as well and he ran into similar issue. So fuse-overlay
+> >   should benefit from this change as well.
+> >
+> > Why virtiofsd wants to set user.* xattr on symlink/special files
+> > ----------------------------------------------------------------
+> > In virtiofs, actual file server is virtiosd daemon running on host.
+> > There we have a mode where xattrs can be remapped to something else.
+> > For example security.selinux can be remapped to
+> > user.virtiofsd.securit.selinux on the host.
+> 
+> As I have stated before, this introduces a breach in security.
+> It allows an unprivileged process on the host to manipulate the
+> security state of the guest. This is horribly wrong. It is not
+> sufficient to claim that the breach requires misconfiguration
+> to exploit. Don't do this.
 
-diff --git a/fs/fuse/dax.c b/fs/fuse/dax.c
-index fe4e9593a590..30833f8d37dd 100644
---- a/fs/fuse/dax.c
-+++ b/fs/fuse/dax.c
-@@ -1339,7 +1339,7 @@ static const struct address_space_operations fuse_dax_file_aops  = {
- 	.invalidatepage	= noop_invalidatepage,
- };
- 
--static bool fuse_should_enable_dax(struct inode *inode)
-+static bool fuse_should_enable_dax(struct inode *inode, unsigned int flags)
- {
- 	struct fuse_conn *fc = get_fuse_conn(inode);
- 	unsigned int dax_mode = fc->dax_mode;
-@@ -1348,12 +1348,16 @@ static bool fuse_should_enable_dax(struct inode *inode)
- 	if (dax_mode == FUSE_DAX_NEVER)
- 		return false;
- 
--	return true;
-+	if (dax_mode == FUSE_DAX_ALWAYS)
-+		return true;
-+
-+	WARN_ON_ONCE(dax_mode != FUSE_DAX_INODE);
-+	return fc->perfile_dax && (flags & FUSE_ATTR_DAX);
- }
- 
--void fuse_dax_inode_init(struct inode *inode)
-+void fuse_dax_inode_init(struct inode *inode, unsigned int flags)
- {
--	if (!fuse_should_enable_dax(inode))
-+	if (!fuse_should_enable_dax(inode, flags))
- 		return;
- 
- 	inode->i_flags |= S_DAX;
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index 97f860cfc195..b494ff08f08c 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -3142,7 +3142,7 @@ static const struct address_space_operations fuse_file_aops  = {
- 	.write_end	= fuse_write_end,
- };
- 
--void fuse_init_file_inode(struct inode *inode)
-+void fuse_init_file_inode(struct inode *inode, unsigned int flags)
- {
- 	struct fuse_inode *fi = get_fuse_inode(inode);
- 
-@@ -3156,5 +3156,5 @@ void fuse_init_file_inode(struct inode *inode)
- 	fi->writepages = RB_ROOT;
- 
- 	if (IS_ENABLED(CONFIG_FUSE_DAX))
--		fuse_dax_inode_init(inode);
-+		fuse_dax_inode_init(inode, flags);
- }
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 0b21e76a379a..7b7b4c208af2 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -1006,7 +1006,7 @@ int fuse_notify_poll_wakeup(struct fuse_conn *fc,
- /**
-  * Initialize file operations on a regular file
-  */
--void fuse_init_file_inode(struct inode *inode);
-+void fuse_init_file_inode(struct inode *inode, unsigned int flags);
- 
- /**
-  * Initialize inode operations on regular files and special files
-@@ -1258,7 +1258,7 @@ int fuse_dax_conn_alloc(struct fuse_conn *fc, enum fuse_dax_mode mode,
- 			struct dax_device *dax_dev);
- void fuse_dax_conn_free(struct fuse_conn *fc);
- bool fuse_dax_inode_alloc(struct super_block *sb, struct fuse_inode *fi);
--void fuse_dax_inode_init(struct inode *inode);
-+void fuse_dax_inode_init(struct inode *inode, unsigned int flags);
- void fuse_dax_inode_cleanup(struct inode *inode);
- bool fuse_dax_check_alignment(struct fuse_conn *fc, unsigned int map_alignment);
- void fuse_dax_cancel_work(struct fuse_conn *fc);
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index d59aea41d70d..882c376f188b 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -281,7 +281,7 @@ static void fuse_init_inode(struct inode *inode, struct fuse_attr *attr)
- 	inode->i_ctime.tv_nsec = attr->ctimensec;
- 	if (S_ISREG(inode->i_mode)) {
- 		fuse_init_common(inode);
--		fuse_init_file_inode(inode);
-+		fuse_init_file_inode(inode, attr->flags);
- 	} else if (S_ISDIR(inode->i_mode))
- 		fuse_init_dir(inode);
- 	else if (S_ISLNK(inode->i_mode))
--- 
-2.27.0
+So couple of things.
+
+- Right now whole virtiofs model is relying on the fact that host
+  unpriviliged users don't have access to shared directory. Otherwise
+  guest process can simply drop a setuid root binary in shared directory
+  and unpriviliged process can execute it and take over host system.
+
+  So if virtiofs makes use of this mechanism, we are well with-in
+  the existing constraints. If users don't follow the constraints,
+  bad things can happen.
+
+- I think Smalley provided a solution for your concern in other thread
+  we discussed this issue.
+
+  https://lore.kernel.org/selinux/CAEjxPJ4411vL3+Ab-J0yrRTmXoEf8pVR3x3CSRgPjfzwiUcDtw@mail.gmail.com/T/#mddea4cec7a68c3ee5e8826d650020361030209d6
+
+
+  "So for example if the host policy says that only virtiofsd can set
+attributes on those files, then the guest MAC labels along with all
+the other attributes are protected against tampering by any other
+process on the host."
+
+ Apart from hiding the shared directory from unpriviliged processes,
+ we could design selinux policy in such a way that only virtiofsd
+ is allowed "setattr". That should make sure even in case of
+ misconfiguration, unprivileged process is not able to change
+ guest security xattrs stored in "user.virtiofs.security.selinux".
+
+ I think that sounds like a very reasonable proposition.
+
+> 
+> > This remapping is useful when SELinux is enabled in guest and virtiofs
+> > as being used as rootfs. Guest and host SELinux policy might not match
+> > and host policy might deny security.selinux xattr setting by guest
+> > onto host. Or host might have SELinux disabled and in that case to
+> > be able to set security.selinux xattr, virtiofsd will need to have
+> > CAP_SYS_ADMIN (which we are trying to avoid).
+> 
+> Adding this mapping to virtiofs provides the breach for any
+> LSM using xattrs.
+
+I think both the points above answer this as well.
+
+> 
+> >  Being able to remap
+> > guest security.selinux (or other xattrs) on host to something else
+> > is also better from security point of view.
+> >
+> > But when we try this, we noticed that SELinux relabeling in guest
+> > is failing on some symlinks. When I debugged a little more, I
+> > came to know that "user.*" xattrs are not allowed on symlinks
+> > or special files.
+> >
+> > So if we allow owner (or CAP_FOWNER) to set user.* xattr, it will
+> > allow virtiofs to arbitrarily remap guests's xattrs to something
+> > else on host and that solves this SELinux issue nicely and provides
+> > two SELinux policies (host and guest) to co-exist nicely without
+> > interfering with each other.
+> 
+> virtiofs could use security.* or system.* xattrs instead of user.*
+> xattrs. Don't use user.* xattrs.
+
+So requirement is that every layer (host, guest and nested guest), will
+have a separate security.selinux label and virtiofsd should be able
+to retrieve/set any of the labels depending on access.
+
+How do we achieve that with single security.selinux label per inode on host.
+
+Vivek
 

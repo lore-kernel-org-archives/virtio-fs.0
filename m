@@ -1,12 +1,26 @@
-From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Wed,  4 Aug 2021 15:06:48 +0800
-Message-Id: <20210804070653.118123-4-jefflexu@linux.alibaba.com>
-In-Reply-To: <20210804070653.118123-1-jefflexu@linux.alibaba.com>
-References: <20210804070653.118123-1-jefflexu@linux.alibaba.com>
-MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
+Date: Thu, 2 Sep 2021 08:32:29 -0400
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	from:to:subject; s=fm1; bh=oRNwCLPOIU8iwobY16i0gFrsbnk2Ie2KroePG
+	T6aaWI=; b=Jw9/J2WN1tJTihnJR3mneuSe+JuEyIkFMVKkg6UNCJgtQ2wEDk+Jr
+	CCpsjWIZPTbSJDlh6KDpkSJgYL3d02sIJYuB/doNhTo/+22urTtQJVT025LgmYo1
+	UdqyOHxh2OUhB0D+U4yae9Ec/dSHA2QAeO0PTNbSfsLxe8UJ0JiPNfnZ1HqcjBZm
+	g70vWADr3uD9y9K64TVDDtqW4XIAVkYzqbtb/LFDJAxj5GqPVWHmFuEyfnD4pUbK
+	ScCJ9PTpQTFCRIFJrVwjncsnBLo/l5DH/z83Rj9YzjARe0MFK06eu3hpWruRxwGP
+	/v/AS1oMO3DARSLW1WzYs/lYsaY7bRQ5w==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm3; bh=oRNwCLPOIU8iwobY1
+	6i0gFrsbnk2Ie2KroePGT6aaWI=; b=Q2/f8mn6Nu031VBbN+/WdjTh2wMNRj9Sa
+	cewuZ9QEBTUJ7B+i2mldAgA8p8a8XVXW6xDbwf3/bIjLbbb97PIQVS5svaPB6dYI
+	eMhgBn2ZbOw/uwl3Mx7DIksf/1D0Wrdax8JGfDb316xrA7AMQ4ZDimG/is/SZU+m
+	cibGlO21Gn3q8syG/zTQpaKQT8LbRxQKtE70E63Kbt+n366WMgWpZopmctds+S7W
+	UmDXGEN+eJ58d3tJ3dxVsw5FWhxLO0hLAtZMUzxk7ZNPJe9l4Y3bKlZAuwBiEOsP
+	KmgtSJnfV6zIt1XXZDg93vMqFDKem+6qOlUiUHCmfK8LKpqKVKwVg==
+From: virtiofs-bot@sinrega.org
+Message-Id: <05754.121090208321400165@us-mta-242.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v3 3/8] fuse: support per-file DAX
+Subject: [Virtio-fs] [virtiofsd-rs] MR merged: Add flags and options to be
+	compatible with the C implementation (Part 1)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,72 +29,11 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, virtualization@lists.linux-foundation.org
+To: virtio-fs@redhat.com
 
-Expand the fuse protocol to support per-file DAX.
+This patch series adds a number of command line flags and options to be compatible with the C implementation.
 
-FUSE_PERFILE_DAX flag is added indicating if fuse server/client
-supporting per-file DAX when sending or replying FUSE_INIT request.
-
-Besides, FUSE_ATTR_DAX flag is added indicating if DAX shall be enabled
-for corresponding file when replying FUSE_LOOKUP request.
-
-Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
+Those flags and options are added relying on `Clap/StructOpt`, so they are passed in a different way through the command line. After this MR and https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/4 are merged, they'll be a second part that adds a  `-o` option that's parsed manually and brings full command line compatibility with the C implementation.
 ---
- include/uapi/linux/fuse.h | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
-
-diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-index 36ed092227fa..15a1f5fc0797 100644
---- a/include/uapi/linux/fuse.h
-+++ b/include/uapi/linux/fuse.h
-@@ -184,6 +184,9 @@
-  *
-  *  7.34
-  *  - add FUSE_SYNCFS
-+ *
-+ *  7.35
-+ *  - add FUSE_PERFILE_DAX, FUSE_ATTR_DAX
-  */
- 
- #ifndef _LINUX_FUSE_H
-@@ -219,7 +222,7 @@
- #define FUSE_KERNEL_VERSION 7
- 
- /** Minor version number of this interface */
--#define FUSE_KERNEL_MINOR_VERSION 34
-+#define FUSE_KERNEL_MINOR_VERSION 35
- 
- /** The node ID of the root inode */
- #define FUSE_ROOT_ID 1
-@@ -336,6 +339,7 @@ struct fuse_file_lock {
-  *			write/truncate sgid is killed only if file has group
-  *			execute permission. (Same as Linux VFS behavior).
-  * FUSE_SETXATTR_EXT:	Server supports extended struct fuse_setxattr_in
-+ * FUSE_PERFILE_DAX:	kernel supports per-file DAX
-  */
- #define FUSE_ASYNC_READ		(1 << 0)
- #define FUSE_POSIX_LOCKS	(1 << 1)
-@@ -367,6 +371,7 @@ struct fuse_file_lock {
- #define FUSE_SUBMOUNTS		(1 << 27)
- #define FUSE_HANDLE_KILLPRIV_V2	(1 << 28)
- #define FUSE_SETXATTR_EXT	(1 << 29)
-+#define FUSE_PERFILE_DAX	(1 << 30)
- 
- /**
-  * CUSE INIT request/reply flags
-@@ -449,8 +454,10 @@ struct fuse_file_lock {
-  * fuse_attr flags
-  *
-  * FUSE_ATTR_SUBMOUNT: Object is a submount root
-+ * FUSE_ATTR_DAX: Enable DAX for this file in per-file DAX mode
-  */
- #define FUSE_ATTR_SUBMOUNT      (1 << 0)
-+#define FUSE_ATTR_DAX		(1 << 1)
- 
- /**
-  * Open flags
--- 
-2.27.0
+https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/37
 

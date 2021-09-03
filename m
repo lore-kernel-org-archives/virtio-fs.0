@@ -1,12 +1,17 @@
-From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Wed,  4 Aug 2021 15:06:46 +0800
-Message-Id: <20210804070653.118123-2-jefflexu@linux.alibaba.com>
-In-Reply-To: <20210804070653.118123-1-jefflexu@linux.alibaba.com>
-References: <20210804070653.118123-1-jefflexu@linux.alibaba.com>
+References: <20210817022220.17574-1-jefflexu@linux.alibaba.com>
+	<CAJfpeguw1hMOaxpDmjmijhf=-JEW95aEjxfVo_=D_LyWx8LDgw@mail.gmail.com>
+	<YRut5sioYfc2M1p7@redhat.com>
+	<6043c0b8-0ff1-2e11-0dd0-e23f9ff6b952@linux.alibaba.com>
+	<CAJfpegv01k5hEyJ3LPDWJoqB+vL8hwTan9dLu1pkkD0xoRuFzw@mail.gmail.com>
+From: JeffleXu <jefflexu@linux.alibaba.com>
+Message-ID: <a1d891b5-f8ef-b5fe-c20c-e3e01203b368@linux.alibaba.com>
+Date: Fri, 3 Sep 2021 13:30:58 +0800
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v3 1/8] fuse: add fuse_should_enable_dax() helper
+In-Reply-To: <CAJfpegv01k5hEyJ3LPDWJoqB+vL8hwTan9dLu1pkkD0xoRuFzw@mail.gmail.com>
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH v4 0/8] fuse,virtiofs: support per-file DAX
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,41 +20,69 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, virtualization@lists.linux-foundation.org
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: virtualization@lists.linux-foundation.org, virtio-fs-list <virtio-fs@redhat.com>, Joseph Qi <joseph.qi@linux.alibaba.com>, linux-fsdevel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
 
-This is in prep for following per-file DAX checking.
 
-Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
----
- fs/fuse/dax.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/fs/fuse/dax.c b/fs/fuse/dax.c
-index 0e5407f48e6a..c6f4e82e65f3 100644
---- a/fs/fuse/dax.c
-+++ b/fs/fuse/dax.c
-@@ -1336,11 +1336,19 @@ static const struct address_space_operations fuse_dax_file_aops  = {
- 	.invalidatepage	= noop_invalidatepage,
- };
- 
--void fuse_dax_inode_init(struct inode *inode)
-+static bool fuse_should_enable_dax(struct inode *inode)
- {
- 	struct fuse_conn *fc = get_fuse_conn(inode);
- 
- 	if (!fc->dax)
-+		return false;
-+
-+	return true;
-+}
-+
-+void fuse_dax_inode_init(struct inode *inode)
-+{
-+	if (!fuse_should_enable_dax(inode))
- 		return;
- 
- 	inode->i_flags |= S_DAX;
+On 8/17/21 10:08 PM, Miklos Szeredi wrote:
+> On Tue, 17 Aug 2021 at 15:22, JeffleXu <jefflexu@linux.alibaba.com> wrote:
+>>
+>>
+>>
+>> On 8/17/21 8:39 PM, Vivek Goyal wrote:
+>>> On Tue, Aug 17, 2021 at 10:06:53AM +0200, Miklos Szeredi wrote:
+>>>> On Tue, 17 Aug 2021 at 04:22, Jeffle Xu <jefflexu@linux.alibaba.com> wrote:
+>>>>>
+>>>>> This patchset adds support of per-file DAX for virtiofs, which is
+>>>>> inspired by Ira Weiny's work on ext4[1] and xfs[2].
+>>>>
+>>>> Can you please explain the background of this change in detail?
+>>>>
+>>>> Why would an admin want to enable DAX for a particular virtiofs file
+>>>> and not for others?
+>>>
+>>> Initially I thought that they needed it because they are downloading
+>>> files on the fly from server. So they don't want to enable dax on the file
+>>> till file is completely downloaded.
+>>
+>> Right, it's our initial requirement.
+>>
+>>
+>>> But later I realized that they should
+>>> be able to block in FUSE_SETUPMAPPING call and make sure associated
+>>> file section has been downloaded before returning and solve the problem.
+>>> So that can't be the primary reason.
+>>
+>> Saying we want to access 4KB of one file inside guest, if it goes
+>> through FUSE request routine, then the fuse daemon only need to download
+>> this 4KB from remote server. But if it goes through DAX, then the fuse
+>> daemon need to download the whole DAX window (e.g., 2MB) from remote
+>> server, so called amplification. Maybe we could decrease the DAX window
+>> size, but it's a trade off.
+> 
+> That could be achieved with a plain fuse filesystem on the host (which
+> will get 4k READ requests for accesses to mapped area inside guest).
+> Since this can be done selectively for files which are not yet
+> downloaded, the extra layer wouldn't be a performance problem.
+> 
+> Is there a reason why that wouldn't work?
+
+I didn't realize this mechanism (working around from user space) before
+sending this patch set.
+
+After learning the virtualization and KVM stuffs, I find that, as Vivek
+Goyal replied in [1], virtiofsd/qemu need to somehow hook the user page
+fault and then download the remained part.
+
+IMHO, this mechanism (as you proposed by implementing a plain fuse
+filesystem on the host) seems a little bit sophisticated so far.
+
+
+[1] https://lore.kernel.org/linux-fsdevel/YR08KnP8cO8LjKY7@redhat.com/
+
+
 -- 
-2.27.0
+Thanks,
+Jeffle
 

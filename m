@@ -1,15 +1,13 @@
-Date: Tue, 5 Oct 2021 11:38:47 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YVxxh/9fKIGnjK/W@redhat.com>
-References: <20210930153037.1194279-1-vgoyal@redhat.com>
-	<20210930153037.1194279-8-vgoyal@redhat.com>
-	<lytuhv617w.fsf@redhat.com>
+Date: Mon, 6 Sep 2021 15:39:12 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YTYoEDT+YOtCHXW0@work-vm>
+References: <20210902152228.665959-1-vgoyal@redhat.com>
+	<CAHc6FU4foW+9ZwTRis3DXSJSMAvdb4jXcq7EFFArYgX7FQ1QYg@mail.gmail.com>
 MIME-Version: 1.0
+In-Reply-To: <CAHc6FU4foW+9ZwTRis3DXSJSMAvdb4jXcq7EFFArYgX7FQ1QYg@mail.gmail.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <lytuhv617w.fsf@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 07/13] virtiofsd: Release file locks using
- F_UNLCK
+Subject: Re: [Virtio-fs] [PATCH v3 0/1] Relax restrictions on user.* xattr
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,109 +16,156 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Christophe de Dinechin <dinechin@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, miklos@szeredi.hu
+To: Andreas Gruenbacher <agruenba@redhat.com>
+Cc: gscrivan@redhat.com, Theodore Ts'o <tytso@mit.edu>, Miklos Szeredi <miklos@szeredi.hu>, selinux@vger.kernel.org, stephen.smalley.work@gmail.com, Dave Chinner <david@fromorbit.com>, LKML <linux-kernel@vger.kernel.org>, virtio-fs@redhat.com, casey.schaufler@intel.com, LSM <linux-security-module@vger.kernel.org>, Alexander Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, "Fields,
+	Bruce" <bfields@redhat.com>, christian.brauner@ubuntu.com, Vivek Goyal <vgoyal@redhat.com>
 
-On Tue, Oct 05, 2021 at 03:37:17PM +0200, Christophe de Dinechin wrote:
+* Andreas Gruenbacher (agruenba@redhat.com) wrote:
+> Hi,
 > 
-> On 2021-09-30 at 11:30 -04, Vivek Goyal <vgoyal@redhat.com> wrote...
-> > We are emulating posix locks for guest using open file description locks
-> > in virtiofsd. When any of the fd is closed in guest, we find associated
-> > OFD lock fd (if there is one) and close it to release all the locks.
+> On Thu, Sep 2, 2021 at 5:22 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+> > This is V3 of the patch. Previous versions were posted here.
 > >
-> > Assumption here is that there is no other thread using lo_inode_plock
-> > structure or plock->fd, hence it is safe to do so.
+> > v2: https://lore.kernel.org/linux-fsdevel/20210708175738.360757-1-vgoyal@redhat.com/
+> > v1: https://lore.kernel.org/linux-fsdevel/20210625191229.1752531-1-vgoyal@redhat.com/
 > >
-> > But now we are about to introduce blocking variant of locks (SETLKW),
-> > and that means we might be waiting to a lock to be available and
-> > using plock->fd. And that means there are still users of plock
-> > structure.
+> > Changes since v2
+> > ----------------
+> > - Do not call inode_permission() for special files as file mode bits
+> >   on these files represent permissions to read/write from/to device
+> >   and not necessarily permission to read/write xattrs. In this case
+> >   now user.* extended xattrs can be read/written on special files
+> >   as long as caller is owner of file or has CAP_FOWNER.
 > >
-> > So release locks using fcntl(SETLK, F_UNLCK) instead of closing fd
-> > and plock will be freed later when lo_inode is being freed.
+> > - Fixed "man xattr". Will post a patch in same thread little later. (J.
+> >   Bruce Fields)
 > >
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > Signed-off-by: Ioannis Angelakopoulos <iangelak@redhat.com>
-> > ---
-> >  tools/virtiofsd/passthrough_ll.c | 21 +++++++++++++++++----
-> >  1 file changed, 17 insertions(+), 4 deletions(-)
+> > - Fixed xfstest 062. Changed it to run only on older kernels where
+> >   user extended xattrs are not allowed on symlinks/special files. Added
+> >   a new replacement test 648 which does exactly what 062. Just that
+> >   it is supposed to run on newer kernels where user extended xattrs
+> >   are allowed on symlinks and special files. Will post patch in
+> >   same thread (Ted Ts'o).
 > >
-> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> > index 38b2af8599..6928662e22 100644
-> > --- a/tools/virtiofsd/passthrough_ll.c
-> > +++ b/tools/virtiofsd/passthrough_ll.c
-> > @@ -1557,9 +1557,6 @@ static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
-> >          lo_map_remove(&lo->ino_map, inode->fuse_ino);
-> >          g_hash_table_remove(lo->inodes, &inode->key);
-> >          if (lo->posix_lock) {
-> > -            if (g_hash_table_size(inode->posix_locks)) {
-> > -                fuse_log(FUSE_LOG_WARNING, "Hash table is not empty\n");
-> > -            }
-> >              g_hash_table_destroy(inode->posix_locks);
-> >              pthread_mutex_destroy(&inode->plock_mutex);
-> >          }
-> > @@ -2266,6 +2263,8 @@ static void lo_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
-> >      (void)ino;
-> >      struct lo_inode *inode;
-> >      struct lo_data *lo = lo_data(req);
-> > +    struct lo_inode_plock *plock;
-> > +    struct flock flock;
+> > Testing
+> > -------
+> > - Ran xfstest "./check -g auto" with and without patches and did not
+> >   notice any new failures.
 > >
-> >      inode = lo_inode(req, ino);
-> >      if (!inode) {
-> > @@ -2282,8 +2281,22 @@ static void lo_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
-> >      /* An fd is going away. Cleanup associated posix locks */
-> >      if (lo->posix_lock) {
-> >          pthread_mutex_lock(&inode->plock_mutex);
-> > -        g_hash_table_remove(inode->posix_locks,
+> > - Tested setting "user.*" xattr with ext4/xfs/btrfs/overlay/nfs
+> >   filesystems and it works.
+> >
+> > Description
+> > ===========
+> >
+> > Right now we don't allow setting user.* xattrs on symlinks and special
+> > files at all. Initially I thought that real reason behind this
+> > restriction is quota limitations but from last conversation it seemed
+> > that real reason is that permission bits on symlink and special files
+> > are special and different from regular files and directories, hence
+> > this restriction is in place. (I tested with xfs user quota enabled and
+> > quota restrictions kicked in on symlink).
+> >
+> > This version of patch allows reading/writing user.* xattr on symlink and
+> > special files if caller is owner or priviliged (has CAP_FOWNER) w.r.t inode.
 > 
-> I'm curious why the g_hash_table_remove above is not in the 'if' below?
-
-Because now we are not removing plock from hash table when file is
-closed. We leave it in place and it will be cleaned up when inode
-is going away.
-
-unref_inode() {
-    g_hash_table_destroy(inode->posix_locks)
-}
-
-Now it is possible that some thread is waiting for a lock and
-using plock->fd. So it probably is not a good idea to close(plock->fd)
-and cleanup plock yet. It could be racy too.
-
-So instead cleanup it up when inode is going away and that time we
-are sure that no thread could be waiting on a lock on this file/inode.
-
-IOW, previously we were cleaning up plock and plock->fd in lo_flush()
-and now that has been delayed to unref_inode().
-
-Thanks
-Vivek
-
+> the idea behind user.* xattrs is that they behave similar to file
+> contents as far as permissions go. It follows from that that symlinks
+> and special files cannot have user.* xattrs. This has been the model
+> for many years now and applications may be expecting these semantics,
+> so we cannot simply change the behavior. So NACK from me.
 > 
-> > +        plock = g_hash_table_lookup(inode->posix_locks,
-> >              GUINT_TO_POINTER(fi->lock_owner));
-> > +
-> > +        if (plock) {
-> > +            /*
-> > +             * An fd is being closed. For posix locks, this means
-> > +             * drop all the associated locks.
-> > +             */
-> > +            memset(&flock, 0, sizeof(struct flock));
-> > +            flock.l_type = F_UNLCK;
-> > +            flock.l_whence = SEEK_SET;
-> > +            /* Unlock whole file */
-> > +            flock.l_start = flock.l_len = 0;
-> > +            fcntl(plock->fd, F_OFD_SETLK, &flock);
-> > +        }
-> > +
-> >          pthread_mutex_unlock(&inode->plock_mutex);
-> >      }
-> >      res = close(dup(lo_fi_fd(req, fi)));
+> > Who wants to set user.* xattr on symlink/special files
+> > -----------------------------------------------------
+> > I have primarily two users at this point of time.
+> >
+> > - virtiofs daemon.
+> >
+> > - fuse-overlay. Giuseppe, seems to set user.* xattr attrs on unpriviliged
+> >   fuse-overlay as well and he ran into similar issue. So fuse-overlay
+> >   should benefit from this change as well.
+> >
+> > Why virtiofsd wants to set user.* xattr on symlink/special files
+> > ----------------------------------------------------------------
+> > In virtiofs, actual file server is virtiosd daemon running on host.
+> > There we have a mode where xattrs can be remapped to something else.
+> > For example security.selinux can be remapped to
+> > user.virtiofsd.securit.selinux on the host.
+> >
+> > This remapping is useful when SELinux is enabled in guest and virtiofs
+> > as being used as rootfs. Guest and host SELinux policy might not match
+> > and host policy might deny security.selinux xattr setting by guest
+> > onto host. Or host might have SELinux disabled and in that case to
+> > be able to set security.selinux xattr, virtiofsd will need to have
+> > CAP_SYS_ADMIN (which we are trying to avoid). Being able to remap
+> > guest security.selinux (or other xattrs) on host to something else
+> > is also better from security point of view.
+> >
+> > But when we try this, we noticed that SELinux relabeling in guest
+> > is failing on some symlinks. When I debugged a little more, I
+> > came to know that "user.*" xattrs are not allowed on symlinks
+> > or special files.
+> >
+> > So if we allow owner (or CAP_FOWNER) to set user.* xattr, it will
+> > allow virtiofs to arbitrarily remap guests's xattrs to something
+> > else on host and that solves this SELinux issue nicely and provides
+> > two SELinux policies (host and guest) to co-exist nicely without
+> > interfering with each other.
 > 
+> The fact that user.* xattrs don't work in this remapping scenario
+> should have told you that you're doing things wrong; the user.*
+> namespace seriously was never meant to be abused in this way.
 > 
-> --
-> Cheers,
-> Christophe de Dinechin (IRC c3d)
+> You may be able to get away with using trusted.* xattrs which support
+> roughly the kind of daemon use I think you're talking about here, but
+> I'm not sure selinux will be happy with labels that aren't fully under
+> its own control. I really wonder why this wasn't obvious enough.
+
+It was; however in our use case it wasn't an issue in general, because
+the selinux instance that was setting the labels was inside an untrusted
+guest, as such it's labels on the host are themselves untrusted, and
+hence user. made some sense to the host - until we found out the
+restrictons on user. the hard way.
+
+The mapping code we have doesn't explicitly set user. - it's an
+arbitrary remapper that can map to anything you like, trusted. whatever,
+but user. feels (to us) like it's right for an untrusted guest.
+
+IMHO the real problem here is that the user/trusted/system/security
+'namespaces' are arbitrary hacks rather than a proper namespacing
+mechanism that allows you to create new (nested) namespaces and associate
+permissions with each one.
+
+Each one carries with it some arbitrary baggage (trusted not working on
+NFS, user. having the special rules on symlinks etc).
+
+Then every fs or application that trips over these arbitrary limits adds
+some hack to work around them in a different way to every other fs or
+app that's doing the same thing; (see 9p, overlayfs, fuse-overlayfs,
+crosvm etc etc all that do some level of renaming)
+
+What we really need is a namespace where you can do anything you like,
+but it's then limited by the security modules, so that I could allow
+user.virtiofsd.guest1 to be able to set labels on symlinks for example.
+
+Dave
+
+> Thanks,
+> Andreas
 > 
+> > Thanks
+> > Vivek
+> >
+> > Vivek Goyal (1):
+> >   xattr: Allow user.* xattr on symlink and special files
+> >
+> >  fs/xattr.c | 23 ++++++++++++++++++-----
+> >  1 file changed, 18 insertions(+), 5 deletions(-)
+> >
+> > --
+> > 2.31.1
+> >
+> 
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

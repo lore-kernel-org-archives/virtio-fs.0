@@ -1,21 +1,18 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yahoo.com; s=s2048;
-	t=1632516863; bh=2woFotEMHv71j98qenWpmkaWqy+/WTwbJyQZJQVd9Rs=;
-	h=Subject:To:Cc:References:From:Date:In-Reply-To:From:Subject:Reply-To;
-	b=RivMJnhQjrMDiW51z2FlNpwoTd9pfCexAmkldGpJ8l9CVXSdfQ2hKZQVxpRFgI1V87tFEQpGswY+BgN+BAactx4zZ7wE+E6Fh34oW45Xjb0wrryRtfIeLHFlegvZqTfqEFHfUf/BsVy7jDW8NFqbHzf6E8FsCueY6MzEeZzkK99sGCQQy75T2FoktwhRp9j6P2rKs/EEHCaCMwCi6/mRm+glCdj5wwCSw1xD8BptdWrzYpLj5cN8bD5H2L9hX7RHCCy5Ik5qhOaB7bTDC7YbMLewLt9Z0Mh7xL0c7JNLGM4umGt3JDPkWCPPgpjIfeygmsAnb3W9luNrkXMKPElTPA==
-References: <20210924192442.916927-1-vgoyal@redhat.com>
-	<20210924192442.916927-3-vgoyal@redhat.com>
-	<a843a6d9-2e7a-768c-b742-fc190880b439@schaufler-ca.com>
-	<YU4ypwtADWRn/A0p@redhat.com>
-From: Casey Schaufler <casey@schaufler-ca.com>
-Message-ID: <f92a082e-c329-f079-6765-ac8b44e45ee4@schaufler-ca.com>
-Date: Fri, 24 Sep 2021 13:54:20 -0700
+Date: Mon, 6 Sep 2021 09:45:04 +0200
+From: Sergio Lopez <slp@redhat.com>
+Message-ID: <20210906074504.2c6ytuw42qyedals@mhamilton>
+References: <20210902152228.665959-1-vgoyal@redhat.com>
+	<79dcd300-a441-cdba-e523-324733f892ca@schaufler-ca.com>
+	<YTEEPZJ3kxWkcM9x@redhat.com> <YTENEAv6dw9QoYcY@redhat.com>
+	<3bca47d0-747d-dd49-a03f-e0fa98eaa2f7@schaufler-ca.com>
+	<YTEur7h6fe4xBJRb@redhat.com>
+	<1f33e6ef-e896-09ef-43b1-6c5fac40ba5f@schaufler-ca.com>
 MIME-Version: 1.0
-In-Reply-To: <YU4ypwtADWRn/A0p@redhat.com>
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 2/2] fuse: Send security context of inode on
-	file creation
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="5kiechtdhojtrqxg"
+Content-Disposition: inline
+In-Reply-To: <1f33e6ef-e896-09ef-43b1-6c5fac40ba5f@schaufler-ca.com>
+Subject: Re: [Virtio-fs] [PATCH v3 0/1] Relax restrictions on user.* xattr
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,361 +21,219 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: miklos@szeredi.hu, selinux@vger.kernel.org, Casey Schaufler <casey@schaufler-ca.com>, stephen.smalley.work@gmail.com, virtio-fs@redhat.com, linux-security-module@vger.kernel.org, linux-fsdevel@vger.kernel.org
+To: Casey Schaufler <casey@schaufler-ca.com>
+Cc: gscrivan@redhat.com, tytso@mit.edu, agruenba@redhat.com, miklos@szeredi.hu, selinux@vger.kernel.org, stephen.smalley.work@gmail.com, david@fromorbit.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, linux-security-module@vger.kernel.org, viro@zeniv.linux.org.uk, casey.schaufler@intel.com, bfields@redhat.com, christian.brauner@ubuntu.com, Vivek Goyal <vgoyal@redhat.com>
 
-On 9/24/2021 1:18 PM, Vivek Goyal wrote:
-> On Fri, Sep 24, 2021 at 12:58:28PM -0700, Casey Schaufler wrote:
->> On 9/24/2021 12:24 PM, Vivek Goyal wrote:
->>> When a new inode is created, send its security context to server along
->>> with creation request (FUSE_CREAT, FUSE_MKNOD, FUSE_MKDIR and FUSE_SYMLINK).
->>> This gives server an opportunity to create new file and set security
->>> context (possibly atomically). In all the configurations it might not
->>> be possible to set context atomically.
->>>
->>> Like nfs and ceph, use security_dentry_init_security() to dermine security
->>> context of inode and send it with create, mkdir, mknod, and symlink requests.
->>>
->>> Following is the information sent to server.
->>>
->>> - struct fuse_secctx.
->>>   This contains total size of security context which follows this structure.
->>>
->>> - xattr name string.
->>>   This string represents name of xattr which should be used while setting
->>>   security context. As of now it is hardcoded to "security.selinux".
->> Why? It's not like "security.SMACK64' is a secret.
-> Sorry, I don't understand what's the concern. Can you elaborate a bit
-> more.
 
-Sure. Interfaces that are designed as special case solutions for
-SELinux tend to make my life miserable as the Smack maintainer and
-for the efforts to complete LSM stacking. You make the change for
-SELinux and leave the generalization as an exercise for some poor
-sod like me to deal with later.
+--5kiechtdhojtrqxg
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-> I am hardcoding name to "security.selinux" because as of now only
-> SELinux implements this hook.
+On Thu, Sep 02, 2021 at 03:34:17PM -0700, Casey Schaufler wrote:
+> On 9/2/2021 1:06 PM, Vivek Goyal wrote:
+> > On Thu, Sep 02, 2021 at 11:55:11AM -0700, Casey Schaufler wrote:
+> >> On 9/2/2021 10:42 AM, Vivek Goyal wrote:
+> >>> On Thu, Sep 02, 2021 at 01:05:01PM -0400, Vivek Goyal wrote:
+> >>>> On Thu, Sep 02, 2021 at 08:43:50AM -0700, Casey Schaufler wrote:
+> >>>>> On 9/2/2021 8:22 AM, Vivek Goyal wrote:
+> >>>>>> Hi,
+> >>>>>>
+> >>>>>> This is V3 of the patch. Previous versions were posted here.
+> >>>>>>
+> >>>>>> v2:
+> >>>>>> https://lore.kernel.org/linux-fsdevel/20210708175738.360757-1-vgoy=
+al@redhat.com/
+> >>>>>> v1:
+> >>>>>> https://lore.kernel.org/linux-fsdevel/20210625191229.1752531-1-vgo=
+yal@redhat.co
+> >>>>>> +m/
+> >>>>>>
+> >>>>>> Changes since v2
+> >>>>>> ----------------
+> >>>>>> - Do not call inode_permission() for special files as file mode bi=
+ts
+> >>>>>>   on these files represent permissions to read/write from/to device
+> >>>>>>   and not necessarily permission to read/write xattrs. In this case
+> >>>>>>   now user.* extended xattrs can be read/written on special files
+> >>>>>>   as long as caller is owner of file or has CAP_FOWNER.
+> >>>>>> =20
+> >>>>>> - Fixed "man xattr". Will post a patch in same thread little later=
+=2E (J.
+> >>>>>>   Bruce Fields)
+> >>>>>>
+> >>>>>> - Fixed xfstest 062. Changed it to run only on older kernels where
+> >>>>>>   user extended xattrs are not allowed on symlinks/special files. =
+Added
+> >>>>>>   a new replacement test 648 which does exactly what 062. Just that
+> >>>>>>   it is supposed to run on newer kernels where user extended xattrs
+> >>>>>>   are allowed on symlinks and special files. Will post patch in=20
+> >>>>>>   same thread (Ted Ts'o).
+> >>>>>>
+> >>>>>> Testing
+> >>>>>> -------
+> >>>>>> - Ran xfstest "./check -g auto" with and without patches and did n=
+ot
+> >>>>>>   notice any new failures.
+> >>>>>>
+> >>>>>> - Tested setting "user.*" xattr with ext4/xfs/btrfs/overlay/nfs
+> >>>>>>   filesystems and it works.
+> >>>>>> =20
+> >>>>>> Description
+> >>>>>> =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+> >>>>>>
+> >>>>>> Right now we don't allow setting user.* xattrs on symlinks and spe=
+cial
+> >>>>>> files at all. Initially I thought that real reason behind this
+> >>>>>> restriction is quota limitations but from last conversation it see=
+med
+> >>>>>> that real reason is that permission bits on symlink and special fi=
+les
+> >>>>>> are special and different from regular files and directories, hence
+> >>>>>> this restriction is in place. (I tested with xfs user quota enable=
+d and
+> >>>>>> quota restrictions kicked in on symlink).
+> >>>>>>
+> >>>>>> This version of patch allows reading/writing user.* xattr on symli=
+nk and
+> >>>>>> special files if caller is owner or priviliged (has CAP_FOWNER) w.=
+r.t inode.
+> >>>>> This part of your project makes perfect sense. There's no good
+> >>>>> security reason that you shouldn't set user.* xattrs on symlinks
+> >>>>> and/or special files.
+> >>>>>
+> >>>>> However, your virtiofs use case is unreasonable.
+> >>>> Ok. So we can merge this patch irrespective of the fact whether virt=
+iofs
+> >>>> should make use of this mechanism or not, right?
+> >> I don't see a security objection. I did see that Andreas Gruenbacher
+> >> <agruenba@redhat.com> has objections to the behavior.
+> >>
+> >>
+> >>>>>> Who wants to set user.* xattr on symlink/special files
+> >>>>>> -----------------------------------------------------
+> >>>>>> I have primarily two users at this point of time.
+> >>>>>>
+> >>>>>> - virtiofs daemon.
+> >>>>>>
+> >>>>>> - fuse-overlay. Giuseppe, seems to set user.* xattr attrs on unpri=
+viliged
+> >>>>>>   fuse-overlay as well and he ran into similar issue. So fuse-over=
+lay
+> >>>>>>   should benefit from this change as well.
+> >>>>>>
+> >>>>>> Why virtiofsd wants to set user.* xattr on symlink/special files
+> >>>>>> ----------------------------------------------------------------
+> >>>>>> In virtiofs, actual file server is virtiosd daemon running on host.
+> >>>>>> There we have a mode where xattrs can be remapped to something els=
+e.
+> >>>>>> For example security.selinux can be remapped to
+> >>>>>> user.virtiofsd.securit.selinux on the host.
+> >>>>> As I have stated before, this introduces a breach in security.
+> >>>>> It allows an unprivileged process on the host to manipulate the
+> >>>>> security state of the guest. This is horribly wrong. It is not
+> >>>>> sufficient to claim that the breach requires misconfiguration
+> >>>>> to exploit. Don't do this.
+> >>>> So couple of things.
+> >>>>
+> >>>> - Right now whole virtiofs model is relying on the fact that host
+> >>>>   unpriviliged users don't have access to shared directory. Otherwise
+> >>>>   guest process can simply drop a setuid root binary in shared direc=
+tory
+> >>>>   and unpriviliged process can execute it and take over host system.
+> >>>>
+> >>>>   So if virtiofs makes use of this mechanism, we are well with-in
+> >>>>   the existing constraints. If users don't follow the constraints,
+> >>>>   bad things can happen.
+> >>>>
+> >>>> - I think Smalley provided a solution for your concern in other thre=
+ad
+> >>>>   we discussed this issue.
+> >>>>
+> >>>>   https://lore.kernel.org/selinux/CAEjxPJ4411vL3+Ab-J0yrRTmXoEf8pVR3=
+x3CSRgPjfzwiUcDtw@mail.gmail.com/T/#mddea4cec7a68c3ee5e8826d650020361030209=
+d6
+> >>>>
+> >>>>
+> >>>>   "So for example if the host policy says that only virtiofsd can set
+> >>>> attributes on those files, then the guest MAC labels along with all
+> >>>> the other attributes are protected against tampering by any other
+> >>>> process on the host."
+> >> You can't count on SELinux policy to address the issue on a
+> >> system running Smack.
+> >> Or any other user of system.* xattrs,
+> >> be they in the kernel or user space. You can't even count on
+> >> SELinux policy to be correct. virtiofs has to present a "safe"
+> >> situation regardless of how security.* xattrs are used and
+> >> regardless of which, if any, LSMs are configured. You can't
+> >> do that with user.* attributes.
+> > Lets take a step back. Your primary concern with using user.* xattrs
+> > by virtiofsd is that it can be modified by unprivileged users on host.
+> > And our solution to that problem is hide shared directory from
+> > unprivileged users.
+>=20
+> You really don't see how fragile that is, do you? How a single
+> errant call to rename(), chmod() or chown() on the host can expose
+> the entire guest to exploitation. That's not even getting into
+> the bag of mount() tricks.
+>=20
+>=20
+> > In addition to that, LSMs on host can block setting "user.*" xattrs by
+> > virtiofsd domain only for additional protection.
+>=20
+> Try thinking outside the SELinux box briefly, if you possibly can.
+> An LSM that implements just Bell & LaPadula isn't going to have a
+> "virtiofs domain". Neither is a Smack "3 domain" system. Smack doesn't
+> distinguish writing user xattrs from writing other file attributes
+> in policy. Your argument requires a fine grained policy a'la SELinux.
+> And an application specific SELinux policy at that.
+>=20
+> >  If LSMs are not configured,
+> > then hiding the directory is the solution.
+>=20
+> It's not a solution at all. It's wishful thinking that
+> some admin is going to do absolutely everything right, will
+> never make a mistake and will never, ever, read the mount(2)
+> man page.
 
-Yes. A Smack hook implementation is on the todo list. If you hard code
-this in fuse you're adding another thing that has to be done for
-Smack support.
+It's not worse than hoping that every admin is going to set up the
+right permissions on a file backing the disk image of a Virtual
+Machine.
 
->  And there is no way to know the name
-> of xattr, so I have had to hardcode it. But tomorrow if interface
-> changes so that name of xattr is also returned, we can easily get
-> rid of hardcoding.
+And I'm no simply justifying one bad thing with another thing that's
+even worse, I'm just trying to realign our expectations with the
+current threat model of Virtualization in Linux. The host is protected
+against the guest, but the guest is *not* implicitly protected against
+the host. Everything depends on the host's admin good faith and even
+better security practices.
 
-So why not make the interface do that now?
+This is the very reason why Virtualization-based Confidential
+Computing technologies such as AMD SEV and Intel TDX are attracting so
+much attention lately, as they aim to close the gap and also protect
+guest against the host (as a necessary step to build trust on its
+contents and behavior). But this is outside virtio-fs's scope.
 
-> If another LSM decides to implement this hook, then we can send
-> that name as well. Say "security.SMACK64".
+Sergio.
 
-Again, why not make it work that way now, and avoid having
-to change the protocol later? Changing protocols and interfaces
-is much harder than doing them generally in the first place.
+--5kiechtdhojtrqxg
+Content-Type: application/pgp-signature; name="signature.asc"
 
->>> - security context.
->>>   This is the actual security context whose size is specified in fuse_secctx
->>>   struct.
->> The possibility of multiple security contexts on a file is real
->> in the not too distant future. Also, a file can have multiple relevant
->> security attributes at creation. Smack, for example, may assign a
->> security.SMACK64 and a security.SMACK64TRANSMUTE attribute. Your
->> interface cannot support either of these cases.
-> Right. As of now it does not support capability to support multiple
-> security context. But we should be easily able to extend the protocol
-> whenever that supports lands in kernel.
+-----BEGIN PGP SIGNATURE-----
 
-No. Extending single data item protocols to support multiple
-data items *hurts* most of the time. If it wasn't so much more
-complicated you'd be doing it up front without fussing about it.
+iQIzBAABCAAdFiEEvtX891EthoCRQuii9GknjS8MAjUFAmE1xvgACgkQ9GknjS8M
+AjVbUA/9H9sr+WNhWi7imDYQtklzsAHSxBa8w79uML7k/ClaoFmIGpyVTjuongsV
+goXou73G5l23oo4NOXqdv3tBqv5kK37FBQvT/FE8+IAuZhfMLvh1Olnl6V62GAv4
+SyhkTS9Sgj/G7+5KgYgC1cAsawkIlB8j5YpbyLVrQfbGekzJTWu4KZGOpwyHZpvY
+LJAhO59oO88K71WLzNi+PmKQZQaYDhJgsWsCQpYLTQiHZnHK1JK5pq7gzpsZ6D9X
+4YCe20Eu+GvYd3LND8dHMdZfva3QXnX7UrFpclGI0+E/mBkYwVMa8X4d0YLOZsl+
+0DDldJq73Yo9Jv6o9lK5ksOo2FyaR+G3LveitXAIcCIm+FH5wTPMa29e2jT1DWH/
+T4cBSGAVl+oHSIvAZMPU9zXo80oc24Wgad8zLC6YSzeXMCbvIoE+syr/6AzvS8uf
+uQIIrUO5jUCslLe8iuO3hMG30Fi+M237df1eKnmWfLGmfaGXzzyk6yzesgoEjl2m
+GVI9vQKGsVdgNOmpl7VIGM1SJ257IKj2UIwlSmQ5oYnnbOlx88YKLZS1AzU+Yw30
+CelIOkThUNUqIRKzWj/vOU8KNwE2imJWA9HLE3dHshHqE/kmaWoczU3lQvwaG5TQ
+6UYEosEbW8gWvaJbNATyZadkFsBsIihj6mgyjrr0q1mZQNhaDiI=
+=AxOB
+-----END PGP SIGNATURE-----
 
->  Say a new option
-> FUSE_SECURITY_CTX_EXT which will allow sending multiple security
-> context labels (along with associated xattr names).
->
-> As of now there is no need to increase the complexity of current
-> implementation both in fuse as well as virtiofsd when kernel
-> does not even support multiple lables using security_dentry_init_security()
-> hook.
-
-You're 100% correct. For your purpose today there's no reason to
-do anything else. It would be really handy if I didn't have yet
-another thing that I don't have the time to rewrite.
-
->
-> Thanks
-> Vivek
->
->>> This patch is modified version of patch from
->>> Chirantan Ekbote <chirantan@chromium.org>
->>>
->>> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
->>> ---
->>>  fs/fuse/dir.c             | 114 ++++++++++++++++++++++++++++++++++++--
->>>  fs/fuse/fuse_i.h          |   3 +
->>>  fs/fuse/inode.c           |   4 +-
->>>  include/uapi/linux/fuse.h |  11 ++++
->>>  4 files changed, 126 insertions(+), 6 deletions(-)
->>>
->>> diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
->>> index d9b977c0f38d..439bde1ea329 100644
->>> --- a/fs/fuse/dir.c
->>> +++ b/fs/fuse/dir.c
->>> @@ -17,6 +17,9 @@
->>>  #include <linux/xattr.h>
->>>  #include <linux/iversion.h>
->>>  #include <linux/posix_acl.h>
->>> +#include <linux/security.h>
->>> +#include <linux/types.h>
->>> +#include <linux/kernel.h>
->>>  
->>>  static void fuse_advise_use_readdirplus(struct inode *dir)
->>>  {
->>> @@ -456,6 +459,65 @@ static struct dentry *fuse_lookup(struct inode *dir, struct dentry *entry,
->>>  	return ERR_PTR(err);
->>>  }
->>>  
->>> +static int get_security_context(struct dentry *entry, umode_t mode,
->>> +				void **security_ctx, u32 *security_ctxlen)
->>> +{
->>> +	struct fuse_secctx *fsecctx;
->>> +	void *ctx, *full_ctx;
->>> +	u32 ctxlen, full_ctxlen;
->>> +	int err = 0;
->>> +
->>> +	err = security_dentry_init_security(entry, mode, &entry->d_name, &ctx,
->>> +					    &ctxlen);
->>> +	if (err) {
->>> +		if (err != -EOPNOTSUPP)
->>> +			goto out_err;
->>> +		/* No LSM is supporting this security hook. Ignore error */
->>> +		err = 0;
->>> +		ctxlen = 0;
->>> +	}
->>> +
->>> +	if (ctxlen > 0) {
->>> +		/*
->>> +		 * security_dentry_init_security() does not return the name
->>> +		 * of lsm or xattr to which label belongs. As of now only
->>> +		 * selinux implements this. Hence, hardcoding the name to
->>> +		 * security.selinux.
->>> +		 */
->>> +		char *name = "security.selinux";
->>> +		void *ptr;
->>> +
->>> +		full_ctxlen = sizeof(*fsecctx) + strlen(name) + ctxlen + 1;
->>> +		full_ctx = kzalloc(full_ctxlen, GFP_KERNEL);
->>> +		if (!full_ctx) {
->>> +			err = -ENOMEM;
->>> +			kfree(ctx);
->>> +			goto out_err;
->>> +		}
->>> +
->>> +		ptr = full_ctx;
->>> +		fsecctx = (struct fuse_secctx*) ptr;
->>> +		fsecctx->size = ctxlen;
->>> +		ptr += sizeof(*fsecctx);
->>> +		strcpy(ptr, name);
->>> +		ptr += strlen(name) + 1;
->>> +		memcpy(ptr, ctx, ctxlen);
->>> +		kfree(ctx);
->>> +	} else {
->>> +		full_ctxlen = sizeof(*fsecctx);
->>> +		full_ctx = kzalloc(full_ctxlen, GFP_KERNEL);
->>> +		if (!full_ctx) {
->>> +			err = -ENOMEM;
->>> +			goto out_err;
->>> +		}
->>> +	}
->>> +
->>> +	*security_ctxlen = full_ctxlen;
->>> +	*security_ctx = full_ctx;
->>> +out_err:
->>> +	return err;
->>> +}
->>> +
->>>  /*
->>>   * Atomic create+open operation
->>>   *
->>> @@ -476,6 +538,8 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
->>>  	struct fuse_entry_out outentry;
->>>  	struct fuse_inode *fi;
->>>  	struct fuse_file *ff;
->>> +	void *security_ctx = NULL;
->>> +	u32 security_ctxlen;
->>>  
->>>  	/* Userspace expects S_IFREG in create mode */
->>>  	BUG_ON((mode & S_IFMT) != S_IFREG);
->>> @@ -517,6 +581,18 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
->>>  	args.out_args[0].value = &outentry;
->>>  	args.out_args[1].size = sizeof(outopen);
->>>  	args.out_args[1].value = &outopen;
->>> +
->>> +	if (fm->fc->init_security) {
->>> +		err = get_security_context(entry, mode, &security_ctx,
->>> +					   &security_ctxlen);
->>> +		if (err)
->>> +			goto out_put_forget_req;
->>> +
->>> +		args.in_numargs = 3;
->>> +		args.in_args[2].size = security_ctxlen;
->>> +		args.in_args[2].value = security_ctx;
->>> +	}
->>> +
->>>  	err = fuse_simple_request(fm, &args);
->>>  	if (err)
->>>  		goto out_free_ff;
->>> @@ -554,6 +630,7 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
->>>  
->>>  out_free_ff:
->>>  	fuse_file_free(ff);
->>> +	kfree(security_ctx);
->>>  out_put_forget_req:
->>>  	kfree(forget);
->>>  out_err:
->>> @@ -613,13 +690,15 @@ static int fuse_atomic_open(struct inode *dir, struct dentry *entry,
->>>   */
->>>  static int create_new_entry(struct fuse_mount *fm, struct fuse_args *args,
->>>  			    struct inode *dir, struct dentry *entry,
->>> -			    umode_t mode)
->>> +			    umode_t mode, bool init_security)
->>>  {
->>>  	struct fuse_entry_out outarg;
->>>  	struct inode *inode;
->>>  	struct dentry *d;
->>>  	int err;
->>>  	struct fuse_forget_link *forget;
->>> +	void *security_ctx = NULL;
->>> +	u32 security_ctxlen = 0;
->>>  
->>>  	if (fuse_is_bad(dir))
->>>  		return -EIO;
->>> @@ -633,7 +712,29 @@ static int create_new_entry(struct fuse_mount *fm, struct fuse_args *args,
->>>  	args->out_numargs = 1;
->>>  	args->out_args[0].size = sizeof(outarg);
->>>  	args->out_args[0].value = &outarg;
->>> +
->>> +	if (init_security) {
->>> +		unsigned short idx = args->in_numargs;
->>> +
->>> +		if ((size_t)idx >= ARRAY_SIZE(args->in_args)) {
->>> +			err = -ENOMEM;
->>> +			goto out_put_forget_req;
->>> +		}
->>> +
->>> +		err = get_security_context(entry, mode, &security_ctx,
->>> +					   &security_ctxlen);
->>> +		if (err)
->>> +			goto out_put_forget_req;
->>> +
->>> +		if (security_ctxlen > 0) {
->>> +			args->in_args[idx].size = security_ctxlen;
->>> +			args->in_args[idx].value = security_ctx;
->>> +			args->in_numargs++;
->>> +		}
->>> +	}
->>> +
->>>  	err = fuse_simple_request(fm, args);
->>> +	kfree(security_ctx);
->>>  	if (err)
->>>  		goto out_put_forget_req;
->>>  
->>> @@ -691,7 +792,7 @@ static int fuse_mknod(struct user_namespace *mnt_userns, struct inode *dir,
->>>  	args.in_args[0].value = &inarg;
->>>  	args.in_args[1].size = entry->d_name.len + 1;
->>>  	args.in_args[1].value = entry->d_name.name;
->>> -	return create_new_entry(fm, &args, dir, entry, mode);
->>> +	return create_new_entry(fm, &args, dir, entry, mode, fm->fc->init_security);
->>>  }
->>>  
->>>  static int fuse_create(struct user_namespace *mnt_userns, struct inode *dir,
->>> @@ -719,7 +820,8 @@ static int fuse_mkdir(struct user_namespace *mnt_userns, struct inode *dir,
->>>  	args.in_args[0].value = &inarg;
->>>  	args.in_args[1].size = entry->d_name.len + 1;
->>>  	args.in_args[1].value = entry->d_name.name;
->>> -	return create_new_entry(fm, &args, dir, entry, S_IFDIR);
->>> +	return create_new_entry(fm, &args, dir, entry, S_IFDIR,
->>> +				fm->fc->init_security);
->>>  }
->>>  
->>>  static int fuse_symlink(struct user_namespace *mnt_userns, struct inode *dir,
->>> @@ -735,7 +837,8 @@ static int fuse_symlink(struct user_namespace *mnt_userns, struct inode *dir,
->>>  	args.in_args[0].value = entry->d_name.name;
->>>  	args.in_args[1].size = len;
->>>  	args.in_args[1].value = link;
->>> -	return create_new_entry(fm, &args, dir, entry, S_IFLNK);
->>> +	return create_new_entry(fm, &args, dir, entry, S_IFLNK,
->>> +				fm->fc->init_security);
->>>  }
->>>  
->>>  void fuse_update_ctime(struct inode *inode)
->>> @@ -915,7 +1018,8 @@ static int fuse_link(struct dentry *entry, struct inode *newdir,
->>>  	args.in_args[0].value = &inarg;
->>>  	args.in_args[1].size = newent->d_name.len + 1;
->>>  	args.in_args[1].value = newent->d_name.name;
->>> -	err = create_new_entry(fm, &args, newdir, newent, inode->i_mode);
->>> +	err = create_new_entry(fm, &args, newdir, newent, inode->i_mode,
->>> +			       false);
->>>  	/* Contrary to "normal" filesystems it can happen that link
->>>  	   makes two "logical" inodes point to the same "physical"
->>>  	   inode.  We invalidate the attributes of the old one, so it
->>> diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
->>> index 319596df5dc6..885f34f9967f 100644
->>> --- a/fs/fuse/fuse_i.h
->>> +++ b/fs/fuse/fuse_i.h
->>> @@ -765,6 +765,9 @@ struct fuse_conn {
->>>  	/* Propagate syncfs() to server */
->>>  	unsigned int sync_fs:1;
->>>  
->>> +	/* Initialize security xattrs when creating a new inode */
->>> +	unsigned int init_security:1;
->>> +
->>>  	/** The number of requests waiting for completion */
->>>  	atomic_t num_waiting;
->>>  
->>> diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
->>> index 36cd03114b6d..343bc9cfbd92 100644
->>> --- a/fs/fuse/inode.c
->>> +++ b/fs/fuse/inode.c
->>> @@ -1152,6 +1152,8 @@ static void process_init_reply(struct fuse_mount *fm, struct fuse_args *args,
->>>  			}
->>>  			if (arg->flags & FUSE_SETXATTR_EXT)
->>>  				fc->setxattr_ext = 1;
->>> +			if (arg->flags & FUSE_SECURITY_CTX)
->>> +				fc->init_security = 1;
->>>  		} else {
->>>  			ra_pages = fc->max_read / PAGE_SIZE;
->>>  			fc->no_lock = 1;
->>> @@ -1195,7 +1197,7 @@ void fuse_send_init(struct fuse_mount *fm)
->>>  		FUSE_PARALLEL_DIROPS | FUSE_HANDLE_KILLPRIV | FUSE_POSIX_ACL |
->>>  		FUSE_ABORT_ERROR | FUSE_MAX_PAGES | FUSE_CACHE_SYMLINKS |
->>>  		FUSE_NO_OPENDIR_SUPPORT | FUSE_EXPLICIT_INVAL_DATA |
->>> -		FUSE_HANDLE_KILLPRIV_V2 | FUSE_SETXATTR_EXT;
->>> +		FUSE_HANDLE_KILLPRIV_V2 | FUSE_SETXATTR_EXT | FUSE_SECURITY_CTX;
->>>  #ifdef CONFIG_FUSE_DAX
->>>  	if (fm->fc->dax)
->>>  		ia->in.flags |= FUSE_MAP_ALIGNMENT;
->>> diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
->>> index 2fe54c80051a..777c773e143e 100644
->>> --- a/include/uapi/linux/fuse.h
->>> +++ b/include/uapi/linux/fuse.h
->>> @@ -986,4 +986,15 @@ struct fuse_syncfs_in {
->>>  	uint64_t	padding;
->>>  };
->>>  
->>> +/*
->>> + * For each security context, send fuse_secctx with size of security context
->>> + * fuse_secctx will be followed by security context name and this in turn
->>> + * will be followed by actual context label.
->>> + * fuse_secctx, name, context
->>> + * */
->>> +struct fuse_secctx {
->>> +	uint32_t	size;
->>> +	uint32_t	padding;
->>> +};
->>> +
->>>  #endif /* _LINUX_FUSE_H */
-
+--5kiechtdhojtrqxg--
 

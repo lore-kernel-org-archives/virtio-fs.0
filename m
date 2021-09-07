@@ -1,17 +1,15 @@
-Date: Mon, 27 Sep 2021 10:05:57 -0400
+Date: Tue, 7 Sep 2021 14:10:47 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YVHPxYRnZvs/dH7N@redhat.com>
-References: <20210924192442.916927-1-vgoyal@redhat.com>
-	<20210924192442.916927-3-vgoyal@redhat.com>
-	<a02d3e08-3abc-448a-be32-2640d8a991e0@www.fastmail.com>
-	<YU5gF9xDhj4g+0Oe@redhat.com>
-	<8a46efbf-354c-db20-c24a-ee73d9bbe9d6@schaufler-ca.com>
+Message-ID: <YTerJ1bvGSfOYjBY@redhat.com>
+References: <20210812054618.26057-1-jefflexu@linux.alibaba.com>
+	<20210812054618.26057-3-jefflexu@linux.alibaba.com>
+	<CAJfpegt48RM_y7mOj5EBcohF0zEmE4D6D7sHNgYgKNgGqDgTsA@mail.gmail.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <8a46efbf-354c-db20-c24a-ee73d9bbe9d6@schaufler-ca.com>
-Subject: Re: [Virtio-fs] [PATCH 2/2] fuse: Send security context of inode on
-	file creation
+In-Reply-To: <CAJfpegt48RM_y7mOj5EBcohF0zEmE4D6D7sHNgYgKNgGqDgTsA@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 2/2] virtiofs: reduce lock contention on
+	fpq->lock
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,87 +18,41 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Casey Schaufler <casey@schaufler-ca.com>
-Cc: Colin Walters <walters@verbum.org>, stephen.smalley.work@gmail.com, Miklos Szeredi <miklos@szeredi.hu>, virtio-fs@redhat.com, selinux@vger.kernel.org, LSM List <linux-security-module@vger.kernel.org>, linux-fsdevel@vger.kernel.org
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: Joseph Qi <joseph.qi@linux.alibaba.com>, virtualization@lists.linux-foundation.org, virtio-fs-list <virtio-fs@redhat.com>, linux-fsdevel@vger.kernel.org, Jeffle Xu <jefflexu@linux.alibaba.com>
 
-On Sun, Sep 26, 2021 at 05:53:11PM -0700, Casey Schaufler wrote:
-> On 9/24/2021 4:32 PM, Vivek Goyal wrote:
-> > On Fri, Sep 24, 2021 at 06:00:10PM -0400, Colin Walters wrote:
-> >>
-> >> On Fri, Sep 24, 2021, at 3:24 PM, Vivek Goyal wrote:
-> >>> When a new inode is created, send its security context to server along
-> >>> with creation request (FUSE_CREAT, FUSE_MKNOD, FUSE_MKDIR and FUSE_SYMLINK).
-> >>> This gives server an opportunity to create new file and set security
-> >>> context (possibly atomically). In all the configurations it might not
-> >>> be possible to set context atomically.
-> >>>
-> >>> Like nfs and ceph, use security_dentry_init_security() to dermine security
-> >>> context of inode and send it with create, mkdir, mknod, and symlink requests.
-> >>>
-> >>> Following is the information sent to server.
-> >>>
-> >>> - struct fuse_secctx.
-> >>>   This contains total size of security context which follows this structure.
-> >>>
-> >>> - xattr name string.
-> >>>   This string represents name of xattr which should be used while setting
-> >>>   security context. As of now it is hardcoded to "security.selinux".
-> >> Any reason not to just send all `security.*` xattrs found on the inode? 
-> >>
-> >> (I'm not super familiar with this code, it looks like we're going from the LSM-cached version attached to the inode, but presumably since we're sending bytes we can just ask the filesytem for the raw data instead)
-> > So this inode is about to be created. There are no xattrs yet. And
-> > filesystem is asking LSMs, what security labels should be set on this
-> > inode before it is published. 
+On Tue, Sep 07, 2021 at 10:57:07AM +0200, Miklos Szeredi wrote:
+> On Thu, 12 Aug 2021 at 07:46, Jeffle Xu <jefflexu@linux.alibaba.com> wrote:
+> >
+> > From: Liu Bo <bo.liu@linux.alibaba.com>
+> >
+> > Since %req has been removed from fpq->processing_list, no one except
+> > request_wait_answer() is looking at this %req and request_wait_answer()
+> > waits only on FINISH flag, it's OK to remove fpq->lock after %req is
+> > dropped from the list.
 > 
-> No. That's imprecise. It's what SELinux does. An LSM can add any
-> number of attributes on inode creation, or none. These attributes
-> may or may not be "security labels". Assuming that they are is the
-> kind of thinking that leads people like Linus to conclude that the
-> LSM community is clueless.
+> I'll accept a patch to remove FR_SENT completely from virtiofs.
 > 
-> 
-> >
-> > For local filesystems it is somewhat easy. They are the one creating
-> > inode and can set all xattrs/labels before inode is added to inode
-> > cache.
-> >
-> > But for remote like filesystems, it is more tricky. Actual inode
-> > creation first will happen on server and then client will instantiate
-> > an inode based on information returned by server (Atleast that's
-> > what fuse does).
-> >
-> > So security_dentry_init_security() was created (I think by NFS folks)
-> > so that they can query the label and send it along with create
-> > request and server can take care of setting label (along with file
-> > creation).
-> >
-> > One limitation of security_dentry_init_security() is that it practically
-> > supports only one label. And only SELinux has implemented. So for
-> > all practical purposes this is a hook to obtain selinux label. NFS
-> > and ceph already use it in that way.
-> >
-> > Now there is a desire to be able to return more than one security
-> > labels and support smack and possibly other LSMs. Sure, that great.
-> > But I think for that we will have to implement a new hook which
-> > can return multiple labels and filesystems like nfs, ceph and fuse
-> > will have to be modified to cope with this new hook to support
-> > multiple lables. 
-> >
-> > And I am arguing that we can modify fuse when that hook has been
-> > implemented. There is no point in adding that complexity in fuse
-> > code as well all fuse-server implementations when there is nobody
-> > generating multiple labels. We can't even test it.
-> 
-> There's a little bit of chicken-and-egg going on here.
-> There's no point in accommodating multiple labels in
-> this code because you can't have multiple labels. There's
-> no point in trying to support multiple labels because
-> you can't use them in virtiofs and a bunch of other
-> places.
 
-Once security subsystem provides a hook to support multiple lables, then
-atleast one filesystem will have to be converted to make use of this new
-hook at the same time and rest of the filesystems can catch up later.
+Recently I was also looking at FR_SENT flag and was wondering if it
+is atomic bit flag, then why do we need to take spin lock around it.
+Probably we need just some barrier if code needs it but not necessarily
+any lock.
 
+But I agree that FR_SENT seems not usable from virtiofs point of view
+as we don't have support for interrupt request.
+
+> This flag is used for queuing interrupts but interrupts are not yet
+> implemented in virtiofs.    When blocking lock support is added the
+> interrupt handling needs to be properly designed.
+
+Hmm.., I did not think about this. I was getting ready to post patches
+for blocking posix locks but it does not have any support for interrupting
+the locking request (either blocked or queued).
+
+Is implementing interrupt support a requirement for getting blocking
+posix lock patches in?
+
+Thanks
 Vivek
 

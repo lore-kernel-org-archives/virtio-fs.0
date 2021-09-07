@@ -1,17 +1,22 @@
-Date: Fri, 24 Sep 2021 17:16:48 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YU5AQB/owpnC/yeZ@redhat.com>
-References: <20210924192442.916927-1-vgoyal@redhat.com>
-	<20210924192442.916927-3-vgoyal@redhat.com>
-	<a843a6d9-2e7a-768c-b742-fc190880b439@schaufler-ca.com>
-	<YU4ypwtADWRn/A0p@redhat.com>
-	<f92a082e-c329-f079-6765-ac8b44e45ee4@schaufler-ca.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=zOc8feQK3rpyOFx/qVU1OaRHVboeJHglZGHZH01zit4=;
+	b=pa6WvdVTw0CWZA3iqWodJt9w6Nzl3iAoUmZrUChVnVRDNTmiwbCP8BX1VLcx63E3Ly
+	KLTRcueFAc7JPNUi0Qq47jxf3w3terrhI/R/A9uNLHYYaynOsfaxtAPrF7BuCERCyUmf
+	acITq84sNSoZJ9eL8UN3jj6RFOlekEpTqW7/E=
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <f92a082e-c329-f079-6765-ac8b44e45ee4@schaufler-ca.com>
-Subject: Re: [Virtio-fs] [PATCH 2/2] fuse: Send security context of inode on
-	file creation
+References: <20210817022220.17574-1-jefflexu@linux.alibaba.com>
+	<CAJfpeguw1hMOaxpDmjmijhf=-JEW95aEjxfVo_=D_LyWx8LDgw@mail.gmail.com>
+	<YRut5sioYfc2M1p7@redhat.com>
+	<6043c0b8-0ff1-2e11-0dd0-e23f9ff6b952@linux.alibaba.com>
+	<CAJfpegv01k5hEyJ3LPDWJoqB+vL8hwTan9dLu1pkkD0xoRuFzw@mail.gmail.com>
+	<a1d891b5-f8ef-b5fe-c20c-e3e01203b368@linux.alibaba.com>
+In-Reply-To: <a1d891b5-f8ef-b5fe-c20c-e3e01203b368@linux.alibaba.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Tue, 7 Sep 2021 16:51:06 +0200
+Message-ID: <CAJfpegsZpj98Duo6AsO-bsJi0BqAbCkBNhi_K=7Jv4a+Y8TCuw@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PATCH v4 0/8] fuse,virtiofs: support per-file DAX
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,117 +25,70 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Casey Schaufler <casey@schaufler-ca.com>
-Cc: miklos@szeredi.hu, selinux@vger.kernel.org, stephen.smalley.work@gmail.com, virtio-fs@redhat.com, linux-security-module@vger.kernel.org, linux-fsdevel@vger.kernel.org
+To: JeffleXu <jefflexu@linux.alibaba.com>
+Cc: virtualization@lists.linux-foundation.org, virtio-fs-list <virtio-fs@redhat.com>, Joseph Qi <joseph.qi@linux.alibaba.com>, linux-fsdevel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
 
-On Fri, Sep 24, 2021 at 01:54:20PM -0700, Casey Schaufler wrote:
-> On 9/24/2021 1:18 PM, Vivek Goyal wrote:
-> > On Fri, Sep 24, 2021 at 12:58:28PM -0700, Casey Schaufler wrote:
-> >> On 9/24/2021 12:24 PM, Vivek Goyal wrote:
-> >>> When a new inode is created, send its security context to server along
-> >>> with creation request (FUSE_CREAT, FUSE_MKNOD, FUSE_MKDIR and FUSE_SYMLINK).
-> >>> This gives server an opportunity to create new file and set security
-> >>> context (possibly atomically). In all the configurations it might not
-> >>> be possible to set context atomically.
+On Fri, 3 Sept 2021 at 07:31, JeffleXu <jefflexu@linux.alibaba.com> wrote:
+>
+>
+>
+> On 8/17/21 10:08 PM, Miklos Szeredi wrote:
+> > On Tue, 17 Aug 2021 at 15:22, JeffleXu <jefflexu@linux.alibaba.com> wrote:
+> >>
+> >>
+> >>
+> >> On 8/17/21 8:39 PM, Vivek Goyal wrote:
+> >>> On Tue, Aug 17, 2021 at 10:06:53AM +0200, Miklos Szeredi wrote:
+> >>>> On Tue, 17 Aug 2021 at 04:22, Jeffle Xu <jefflexu@linux.alibaba.com> wrote:
+> >>>>>
+> >>>>> This patchset adds support of per-file DAX for virtiofs, which is
+> >>>>> inspired by Ira Weiny's work on ext4[1] and xfs[2].
+> >>>>
+> >>>> Can you please explain the background of this change in detail?
+> >>>>
+> >>>> Why would an admin want to enable DAX for a particular virtiofs file
+> >>>> and not for others?
 > >>>
-> >>> Like nfs and ceph, use security_dentry_init_security() to dermine security
-> >>> context of inode and send it with create, mkdir, mknod, and symlink requests.
-> >>>
-> >>> Following is the information sent to server.
-> >>>
-> >>> - struct fuse_secctx.
-> >>>   This contains total size of security context which follows this structure.
-> >>>
-> >>> - xattr name string.
-> >>>   This string represents name of xattr which should be used while setting
-> >>>   security context. As of now it is hardcoded to "security.selinux".
-> >> Why? It's not like "security.SMACK64' is a secret.
-> > Sorry, I don't understand what's the concern. Can you elaborate a bit
-> > more.
-> 
-> Sure. Interfaces that are designed as special case solutions for
-> SELinux tend to make my life miserable as the Smack maintainer and
-> for the efforts to complete LSM stacking. You make the change for
-> SELinux and leave the generalization as an exercise for some poor
-> sod like me to deal with later.
-
-I am not expecting you do to fuse work. Once you add the new security
-hook which can return multiple labels, I will gladly do fuse work
-to send multiple labels.
-
-> 
-> > I am hardcoding name to "security.selinux" because as of now only
-> > SELinux implements this hook.
-> 
-> Yes. A Smack hook implementation is on the todo list. If you hard code
-> this in fuse you're adding another thing that has to be done for
-> Smack support.
-> 
-> >  And there is no way to know the name
-> > of xattr, so I have had to hardcode it. But tomorrow if interface
-> > changes so that name of xattr is also returned, we can easily get
-> > rid of hardcoding.
-> 
-> So why not make the interface do that now?
-
-Because its unnecessary complexity for me. When multiple label support
-is not even there, I need to write and test code to support multiple
-labels when support is not even there.
-
-> 
-> > If another LSM decides to implement this hook, then we can send
-> > that name as well. Say "security.SMACK64".
-> 
-> Again, why not make it work that way now, and avoid having
-> to change the protocol later? Changing protocols and interfaces
-> is much harder than doing them generally in the first place.
-
-In case of fuse, it is not that complicated to change protocol and
-add new options. Once you add support for smack and multiple labels,
-I will gladly change fuse to be able to accomodate that.
-
-> 
-> >>> - security context.
-> >>>   This is the actual security context whose size is specified in fuse_secctx
-> >>>   struct.
-> >> The possibility of multiple security contexts on a file is real
-> >> in the not too distant future. Also, a file can have multiple relevant
-> >> security attributes at creation. Smack, for example, may assign a
-> >> security.SMACK64 and a security.SMACK64TRANSMUTE attribute. Your
-> >> interface cannot support either of these cases.
-> > Right. As of now it does not support capability to support multiple
-> > security context. But we should be easily able to extend the protocol
-> > whenever that supports lands in kernel.
-> 
-> No. Extending single data item protocols to support multiple
-> data items *hurts* most of the time. If it wasn't so much more
-> complicated you'd be doing it up front without fussing about it.
-
-Its unnecessary work at this point of time. Once multiple labels
-are supported, I can do this work.
-
-I think we will need to send extra structure which tells how many
-labels are going to follow. And then all the labels will follow
-with same format I am using for single label.
-
-struct fuse_secctx; xattr name string; actual label
-
-> 
-> >  Say a new option
-> > FUSE_SECURITY_CTX_EXT which will allow sending multiple security
-> > context labels (along with associated xattr names).
+> >>> Initially I thought that they needed it because they are downloading
+> >>> files on the fly from server. So they don't want to enable dax on the file
+> >>> till file is completely downloaded.
+> >>
+> >> Right, it's our initial requirement.
+> >>
+> >>
+> >>> But later I realized that they should
+> >>> be able to block in FUSE_SETUPMAPPING call and make sure associated
+> >>> file section has been downloaded before returning and solve the problem.
+> >>> So that can't be the primary reason.
+> >>
+> >> Saying we want to access 4KB of one file inside guest, if it goes
+> >> through FUSE request routine, then the fuse daemon only need to download
+> >> this 4KB from remote server. But if it goes through DAX, then the fuse
+> >> daemon need to download the whole DAX window (e.g., 2MB) from remote
+> >> server, so called amplification. Maybe we could decrease the DAX window
+> >> size, but it's a trade off.
 > >
-> > As of now there is no need to increase the complexity of current
-> > implementation both in fuse as well as virtiofsd when kernel
-> > does not even support multiple lables using security_dentry_init_security()
-> > hook.
-> 
-> You're 100% correct. For your purpose today there's no reason to
-> do anything else. It would be really handy if I didn't have yet
-> another thing that I don't have the time to rewrite.
+> > That could be achieved with a plain fuse filesystem on the host (which
+> > will get 4k READ requests for accesses to mapped area inside guest).
+> > Since this can be done selectively for files which are not yet
+> > downloaded, the extra layer wouldn't be a performance problem.
+> >
+> > Is there a reason why that wouldn't work?
+>
+> I didn't realize this mechanism (working around from user space) before
+> sending this patch set.
+>
+> After learning the virtualization and KVM stuffs, I find that, as Vivek
+> Goyal replied in [1], virtiofsd/qemu need to somehow hook the user page
+> fault and then download the remained part.
+>
+> IMHO, this mechanism (as you proposed by implementing a plain fuse
+> filesystem on the host) seems a little bit sophisticated so far.
 
-I can help with adding fuse support once smack supports it. Right now
-I can't even test it even if I sign up for extra complexity.
 
-Vivek
+Agree.  Let's start with the simplest variant, which is the server
+selectively enabling dax.
+
+Thanks,
+Miklos
 

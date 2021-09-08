@@ -1,15 +1,17 @@
-Date: Mon, 4 Oct 2021 10:01:24 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YVsJNDJxsy1NAhHE@redhat.com>
-References: <20210930153037.1194279-1-vgoyal@redhat.com>
-	<20210930153037.1194279-3-vgoyal@redhat.com>
-	<YVr+oqwYRx11MBug@stefanha-x1.localdomain>
+From: ebiederm@xmission.com (Eric W. Biederman)
+References: <20210902152228.665959-1-vgoyal@redhat.com>
+	<CAHc6FU4foW+9ZwTRis3DXSJSMAvdb4jXcq7EFFArYgX7FQ1QYg@mail.gmail.com>
+	<YTYoEDT+YOtCHXW0@work-vm>
+	<CAJfpegvbkmdneMxMjYMuNM4+RmWT8S7gaTiDzaq+TCzb0UrQrw@mail.gmail.com>
+	<YTfcT1JUactPhwSA@redhat.com>
+	<CAJfpegumUMsQ1Zk4MjnSXhrcnX_RJfM5LJ2oL6W3Um_wFNPRFQ@mail.gmail.com>
+Date: Wed, 08 Sep 2021 09:20:32 -0500
+In-Reply-To: <CAJfpegumUMsQ1Zk4MjnSXhrcnX_RJfM5LJ2oL6W3Um_wFNPRFQ@mail.gmail.com>
+	(Miklos Szeredi's message of "Wed, 8 Sep 2021 09:37:17 +0200")
+Message-ID: <87lf47tahb.fsf@disp2133>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <YVr+oqwYRx11MBug@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH 02/13] virtiofsd: fuse.h header file changes
- for lock notification
+Content-Type: text/plain
+Subject: Re: [Virtio-fs] [PATCH v3 0/1] Relax restrictions on user.* xattr
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,84 +20,57 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: miklos@szeredi.hu, qemu-devel@nongnu.org, virtio-fs@redhat.com
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: Giuseppe Scrivano <gscrivan@redhat.com>, Theodore Ts'o <tytso@mit.edu>, Andreas Gruenbacher <agruenba@redhat.com>, SElinux list <selinux@vger.kernel.org>, Stephen Smalley <stephen.smalley.work@gmail.com>, Dave Chinner <david@fromorbit.com>, LKML <linux-kernel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, Casey Schaufler <casey.schaufler@intel.com>, LSM <linux-security-module@vger.kernel.org>, Alexander Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, "Fields, 
+	Bruce" <bfields@redhat.com>, Christian Brauner <christian.brauner@ubuntu.com>, Vivek Goyal <vgoyal@redhat.com>, "Serge E. Hallyn" <serge@hallyn.com>
 
-On Mon, Oct 04, 2021 at 02:16:18PM +0100, Stefan Hajnoczi wrote:
-> On Thu, Sep 30, 2021 at 11:30:26AM -0400, Vivek Goyal wrote:
-> > This change comes from fuse.h kernel header file udpate. Hence keeping
-> > it in a separate patch.
-> 
-> QEMU syncs include/standard-headers/linux/ from linux.git. Please
-> indicate the status of this fuse.h change:
-> - Is it already in a Linux release?
-> - Or is it already in linux.git?
-> - Or is it awaiting review from the kernel FUSE maintainer?
+Miklos Szeredi <miklos@szeredi.hu> writes:
 
-This is awaiting review from kernel FUSE maintainer.
+> On Tue, 7 Sept 2021 at 23:40, Vivek Goyal <vgoyal@redhat.com> wrote:
+>>
+>> On Mon, Sep 06, 2021 at 04:56:44PM +0200, Miklos Szeredi wrote:
+>> > On Mon, 6 Sept 2021 at 16:39, Dr. David Alan Gilbert
+>> > <dgilbert@redhat.com> wrote:
+>> >
+>> > > IMHO the real problem here is that the user/trusted/system/security
+>> > > 'namespaces' are arbitrary hacks rather than a proper namespacing
+>> > > mechanism that allows you to create new (nested) namespaces and associate
+>> > > permissions with each one.
+>> >
+>> > Indeed.
+>> >
+>> > This is what Eric Biederman suggested at some point for supporting
+>> > trusted xattrs within a user namespace:
+>> >
+>> > | For trusted xattrs I think it makes sense in principle.   The namespace
+>> > | would probably become something like "trusted<ns-root-uid>.".
+>> >
+>> > Theory sounds simple enough.  Anyone interested in looking at the details?
+>>
+>> So this namespaced trusted.* xattr domain will basically avoid the need
+>> to have CAP_SYS_ADMIN in init_user_ns, IIUC.  I guess this is better
+>> than giving CAP_SYS_ADMIN in init_user_ns.
+>
+> That's the objective, yes.  I think the trick is getting filesystems
+> to store yet another xattr type.
 
-I have posted kernel patches here.
+Using the uid of the root user of a user namespace is probably the best
+idea we have so far for identifying a user namespace in persistent
+on-disk meta-data.  We ran into a little trouble using that idea
+for file capabilities.
 
-https://lore.kernel.org/linux-fsdevel/20210930143850.1188628-1-vgoyal@redhat.com/
+The key problem was there are corner cases where some nested user
+namespaces have the same root user id as their parent namespaces.  This
+has the potential to allow privilege escalation if the creator of the
+user namespace does not have sufficient capabilities.
 
-Vivek
+The solution we adopted can be seen in db2e718a4798 ("capabilities:
+require CAP_SETFCAP to map uid 0").
 
-> 
-> We need to wait for the kernel change to get into linux.git before
-> merging this patch in QEMU. This ensures that QEMU uses actual released
-> kernel interfaces that are guaranteed to be stable.
-> 
-> > 
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > ---
-> >  include/standard-headers/linux/fuse.h | 11 ++++++++++-
-> >  1 file changed, 10 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/include/standard-headers/linux/fuse.h b/include/standard-headers/linux/fuse.h
-> > index cce105bfba..0b6218d569 100644
-> > --- a/include/standard-headers/linux/fuse.h
-> > +++ b/include/standard-headers/linux/fuse.h
-> > @@ -181,6 +181,8 @@
-> >   *  - add FUSE_OPEN_KILL_SUIDGID
-> >   *  - extend fuse_setxattr_in, add FUSE_SETXATTR_EXT
-> >   *  - add FUSE_SETXATTR_ACL_KILL_SGID
-> > + *  7.35
-> > + *  - add FUSE_NOTIFY_LOCK
-> >   */
-> >  
-> >  #ifndef _LINUX_FUSE_H
-> > @@ -212,7 +214,7 @@
-> >  #define FUSE_KERNEL_VERSION 7
-> >  
-> >  /** Minor version number of this interface */
-> > -#define FUSE_KERNEL_MINOR_VERSION 33
-> > +#define FUSE_KERNEL_MINOR_VERSION 35
-> >  
-> >  /** The node ID of the root inode */
-> >  #define FUSE_ROOT_ID 1
-> > @@ -521,6 +523,7 @@ enum fuse_notify_code {
-> >  	FUSE_NOTIFY_STORE = 4,
-> >  	FUSE_NOTIFY_RETRIEVE = 5,
-> >  	FUSE_NOTIFY_DELETE = 6,
-> > +	FUSE_NOTIFY_LOCK = 7,
-> >  	FUSE_NOTIFY_CODE_MAX,
-> >  };
-> >  
-> > @@ -912,6 +915,12 @@ struct fuse_notify_retrieve_in {
-> >  	uint64_t	dummy4;
-> >  };
-> >  
-> > +struct fuse_notify_lock_out {
-> > +	uint64_t	unique;
-> > +	int32_t		error;
-> > +	int32_t		padding;
-> > +};
-> > +
-> >  /* Device ioctls: */
-> >  #define FUSE_DEV_IOC_MAGIC		229
-> >  #define FUSE_DEV_IOC_CLONE		_IOR(FUSE_DEV_IOC_MAGIC, 0, uint32_t)
-> > -- 
-> > 2.31.1
-> > 
+That solution is basically not allowing the creation of user namespaces
+that could have problems.  I think use trusted xattrs this way the code
+would need to treat CAP_SYS_ADMIN the same way it currently treats
+CAP_SETFCAP.
 
+Eric
 

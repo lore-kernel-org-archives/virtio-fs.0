@@ -1,15 +1,23 @@
-Date: Mon, 4 Oct 2021 17:10:59 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YVtt49qZAy+AYMf5@redhat.com>
-References: <20210930153037.1194279-1-vgoyal@redhat.com>
-	<20210930153037.1194279-10-vgoyal@redhat.com>
-	<YVsQyxaPHyChcOel@stefanha-x1.localdomain>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yahoo.com; s=s2048;
+	t=1631559916; bh=ILECwW5ren/MGKfqCoYL9+k73hXJyn37sJEe2dYHUCQ=;
+	h=Subject:To:Cc:References:From:Date:In-Reply-To:From:Subject:Reply-To;
+	b=ZG/CVg9gJvs5sSYmG/734Sd7kFZOCifpIP1rmDRnoI8VJ9agvYNz3gEnqDQPiofRrNWifuEt0GHXcDbO31AO9HjAJyqPkYTh83a48k2OPE2PNtlQ+DO256IIRbHQZp6bBBxjVF6jP7MG0TAI24rn0aDIFHx/QycrzTeutux7RmuC2zwqnmdSJ+rIofrvPc2cg5QXnecKaW0jyKChbYXMW9Z6asNd2AcOwYxIEqnnKdF43R/XiJpBmWkiQblLjXsqKzHp9UqpNct6DWO0qadEu5CxK7MbianNw7tGbHagwu711jBTbHh0djrQ/A8nq4DywalWan4PIbNw8uZpwDqpGA==
+References: <20210902152228.665959-1-vgoyal@redhat.com>
+	<79dcd300-a441-cdba-e523-324733f892ca@schaufler-ca.com>
+	<YTEEPZJ3kxWkcM9x@redhat.com> <YTENEAv6dw9QoYcY@redhat.com>
+	<3bca47d0-747d-dd49-a03f-e0fa98eaa2f7@schaufler-ca.com>
+	<YTEur7h6fe4xBJRb@redhat.com>
+	<1f33e6ef-e896-09ef-43b1-6c5fac40ba5f@schaufler-ca.com>
+	<YTYr4MgWnOgf/SWY@work-vm>
+From: Casey Schaufler <casey@schaufler-ca.com>
+Message-ID: <496e92bf-bf9e-a56b-bd73-3c1d0994a064@schaufler-ca.com>
+Date: Mon, 13 Sep 2021 12:05:07 -0700
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <YVsQyxaPHyChcOel@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH 09/13] virtiofsd: Specify size of
- notification buffer using config space
+In-Reply-To: <YTYr4MgWnOgf/SWY@work-vm>
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH v3 0/1] Relax restrictions on user.* xattr
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,160 +26,134 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: miklos@szeredi.hu, qemu-devel@nongnu.org, virtio-fs@redhat.com
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: gscrivan@redhat.com, tytso@mit.edu, agruenba@redhat.com, miklos@szeredi.hu, selinux@vger.kernel.org, Casey Schaufler <casey@schaufler-ca.com>, stephen.smalley.work@gmail.com, david@fromorbit.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, casey.schaufler@intel.com, linux-security-module@vger.kernel.org, viro@zeniv.linux.org.uk, linux-fsdevel@vger.kernel.org, bfields@redhat.com, christian.brauner@ubuntu.com, Vivek Goyal <vgoyal@redhat.com>
 
-On Mon, Oct 04, 2021 at 03:33:47PM +0100, Stefan Hajnoczi wrote:
-> On Thu, Sep 30, 2021 at 11:30:33AM -0400, Vivek Goyal wrote:
-> > Daemon specifies size of notification buffer needed and that should be
-> > done using config space.
-> > 
-> > Only ->notify_buf_size value of config space comes from daemon. Rest of
-> > it is filled by qemu device emulation code.
-> > 
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > Signed-off-by: Ioannis Angelakopoulos <iangelak@redhat.com>
-> > ---
-> >  hw/virtio/vhost-user-fs.c                  | 27 +++++++++++++++++++
-> >  include/hw/virtio/vhost-user-fs.h          |  2 ++
-> >  include/standard-headers/linux/virtio_fs.h |  2 ++
-> >  tools/virtiofsd/fuse_virtio.c              | 31 ++++++++++++++++++++++
-> >  4 files changed, 62 insertions(+)
-> > 
-> > diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-> > index 6bafcf0243..68a94708b4 100644
-> > --- a/hw/virtio/vhost-user-fs.c
-> > +++ b/hw/virtio/vhost-user-fs.c
-> > @@ -36,15 +36,41 @@ static const int user_feature_bits[] = {
-> >      VHOST_INVALID_FEATURE_BIT
-> >  };
-> >  
-> > +static int vhost_user_fs_handle_config_change(struct vhost_dev *dev)
-> > +{
-> > +    return 0;
-> > +}
-> > +
-> > +const VhostDevConfigOps fs_ops = {
-> > +    .vhost_dev_config_notifier = vhost_user_fs_handle_config_change,
-> > +};
-> > +
-> >  static void vuf_get_config(VirtIODevice *vdev, uint8_t *config)
-> >  {
-> >      VHostUserFS *fs = VHOST_USER_FS(vdev);
-> >      struct virtio_fs_config fscfg = {};
-> > +    Error *local_err = NULL;
-> > +    int ret;
-> > +
-> > +    /*
-> > +     * As of now we only get notification buffer size from device. And that's
-> > +     * needed only if notification queue is enabled.
-> > +     */
-> > +    if (fs->notify_enabled) {
-> > +        ret = vhost_dev_get_config(&fs->vhost_dev, (uint8_t *)&fs->fscfg,
-> > +                                   sizeof(struct virtio_fs_config),
-> > +                                   &local_err);
-> > +        if (ret) {
-> > +            error_report_err(local_err);
-> > +            return;
-> > +        }
-> > +    }
-> >  
-> >      memcpy((char *)fscfg.tag, fs->conf.tag,
-> >             MIN(strlen(fs->conf.tag) + 1, sizeof(fscfg.tag)));
-> >  
-> >      virtio_stl_p(vdev, &fscfg.num_request_queues, fs->conf.num_request_queues);
-> > +    virtio_stl_p(vdev, &fscfg.notify_buf_size, fs->fscfg.notify_buf_size);
-> >  
-> >      memcpy(config, &fscfg, sizeof(fscfg));
-> >  }
-> > @@ -316,6 +342,7 @@ static void vuf_device_realize(DeviceState *dev, Error **errp)
-> >                  sizeof(struct virtio_fs_config));
-> >  
-> >      vuf_create_vqs(vdev, true);
-> > +    vhost_dev_set_config_notifier(&fs->vhost_dev, &fs_ops);
-> >      ret = vhost_dev_init(&fs->vhost_dev, &fs->vhost_user,
-> >                           VHOST_BACKEND_TYPE_USER, 0, errp);
-> >      if (ret < 0) {
-> > diff --git a/include/hw/virtio/vhost-user-fs.h b/include/hw/virtio/vhost-user-fs.h
-> > index 95dc0dd402..3b114ee260 100644
-> > --- a/include/hw/virtio/vhost-user-fs.h
-> > +++ b/include/hw/virtio/vhost-user-fs.h
-> > @@ -14,6 +14,7 @@
-> >  #ifndef _QEMU_VHOST_USER_FS_H
-> >  #define _QEMU_VHOST_USER_FS_H
-> >  
-> > +#include "standard-headers/linux/virtio_fs.h"
-> >  #include "hw/virtio/virtio.h"
-> >  #include "hw/virtio/vhost.h"
-> >  #include "hw/virtio/vhost-user.h"
-> > @@ -37,6 +38,7 @@ struct VHostUserFS {
-> >      struct vhost_virtqueue *vhost_vqs;
-> >      struct vhost_dev vhost_dev;
-> >      VhostUserState vhost_user;
-> > +    struct virtio_fs_config fscfg;
-> >      VirtQueue **req_vqs;
-> >      VirtQueue *hiprio_vq;
-> >      VirtQueue *notification_vq;
-> > diff --git a/include/standard-headers/linux/virtio_fs.h b/include/standard-headers/linux/virtio_fs.h
-> > index b7f015186e..867d18acf6 100644
-> > --- a/include/standard-headers/linux/virtio_fs.h
-> > +++ b/include/standard-headers/linux/virtio_fs.h
-> > @@ -17,6 +17,8 @@ struct virtio_fs_config {
-> >  
-> >  	/* Number of request queues */
-> >  	uint32_t num_request_queues;
-> > +	/* Size of notification buffer */
-> > +	uint32_t notify_buf_size;
-> >  } QEMU_PACKED;
-> >  
-> >  /* For the id field in virtio_pci_shm_cap */
-> 
-> Please put all the include/standard-headers/linux/ changes into a single
-> commit that imports these changes from linux.git. Changes to this header
-> shouldn't be hand-written, use scripts/update-linux-headers.sh instead.
+On 9/6/2021 7:55 AM, Dr. David Alan Gilbert wrote:
+> * Casey Schaufler (casey@schaufler-ca.com) wrote:
+>> On 9/2/2021 1:06 PM, Vivek Goyal wrote:
+>>>  If LSMs are not configured,
+>>> then hiding the directory is the solution.
+>> It's not a solution at all. It's wishful thinking that
+>> some admin is going to do absolutely everything right, will
+>> never make a mistake and will never, ever, read the mount(2)
+>> man page.
+> That is why we run our virtiofsd with a sandbox setup and seccomp; and
+> frankly anything we can or could turn on we would.
 
-Will do. These changes are not in kernel yet. So will use
-update-linux-headers.sh when changes are upstreamed. But agreed,
-that this change should be in separate patch even for review
-purpose (before it is merged in kernel).
+That doesn't address my concern at all. Being able to create an
+environment in which a feature can be used safely does not make
+the feature safe.
 
-> 
-> > diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-> > index f5b87a508a..3b720c5d4a 100644
-> > --- a/tools/virtiofsd/fuse_virtio.c
-> > +++ b/tools/virtiofsd/fuse_virtio.c
-> > @@ -856,6 +856,35 @@ static bool fv_queue_order(VuDev *dev, int qidx)
-> >      return false;
-> >  }
-> >  
-> > +static uint64_t fv_get_protocol_features(VuDev *dev)
-> > +{
-> > +    return 1ull << VHOST_USER_PROTOCOL_F_CONFIG;
-> > +}
-> > +
-> > +static int fv_get_config(VuDev *dev, uint8_t *config, uint32_t len)
-> > +{
-> > +    struct virtio_fs_config fscfg = {};
-> > +    unsigned notify_size, roundto = 64;
-> > +    union fuse_notify_union {
-> > +        struct fuse_notify_poll_wakeup_out  wakeup_out;
-> > +        struct fuse_notify_inval_inode_out  inode_out;
-> > +        struct fuse_notify_inval_entry_out  entry_out;
-> > +        struct fuse_notify_delete_out       delete_out;
-> > +        struct fuse_notify_store_out        store_out;
-> > +        struct fuse_notify_retrieve_out     retrieve_out;
-> > +    };
-> > +
-> > +    notify_size = sizeof(struct fuse_out_header) +
-> > +              sizeof(union fuse_notify_union);
-> > +    notify_size = ((notify_size + roundto) / roundto) * roundto;
-> 
-> Why is the size rounded to 64 bytes?
 
-Hmm.., I really can't remember why did I do that. Maybe I thought it
-is just nice to round it to 64 bytes. I can get rid of this rounding
-if it s not making sense.
+> So why that's not a solution and only relying on CAP_SYS_ADMIN is the
+> solution. I don't understand that part.
 
-Vivek
+Sure you do. If you didn't, you wouldn't be so concerned about
+requiring CAP_SYS_ADMIN. You're trying hard to avoid taking the
+level of responsibility that running with privilege requires.
+To do that, you're introducing a massive security hole, a backdoor
+into the file system security attributes.
+
+>> It comes back to your design, which is fundamentally flawed. You
+>> can't store system security information in an attribute that can
+>> be manipulated by untrusted entities. That's why we have system.*
+>> xattrs. You want to have an attribute on the host that maps to a
+>> security attribute on the guest. The host has to protect the attribute
+>> on the guest with mechanisms of comparable strength as the guest's
+>> mechanisms.
+> Can you just explain this line to me a bit more: 
+>> Otherwise you can't trust the guest with host data.
+> Note we're not trying to trust the guest with the host data here;
+> we're trying to allow the guest to store the data on the host, while
+> trusting the host.
+
+But you can't trust the host! You're allowing unprivileged processes
+on the host to modify security state of the guest.
+
+>> It's a real shame that CAP_SYS_ADMIN is so scary. The capability
+>> mechanism as implemented today won't scale to the hundreds of individual
+>> capabilities it would need to break CAP_SYS_ADMIN up. Maybe someday.
+>> I'm not convinced that there isn't a way to accomplish what you're
+>> trying to do without privilege, but this isn't it, and I don't know
+>> what is. Sorry.
+>>
+>>> Also if directory is not hidden, unprivileged users can change file
+>>> data and other metadata.
+>> I assumed that you've taken that into account. Are you saying that
+>> isn't going to be done correctly either?
+>>
+>>>  Why that's not a concern and why there is
+>>> so much of focus only security xattr.
+>> As with an NFS mount, the assumption is that UID 567 (or its magically
+>> mapped equivalent) has the same access rights on both the server/host
+>> and client/guest. I'm not worried about the mode bits because they are
+>> presented consistently on both machines. If, on the other hand, an
+>> attribute used to determine access is security.esprit on the guest and
+>> user.security.esprit on the host, the unprivileged user on the host
+>> can defeat the privilege requirements on the guest. That's why.
+> We're OK with that;
+
+I understand that. I  am  not  OK  with  that.
+
+>  remember that the host can do wth it likes to the
+> guest anyway
+
+We're not talking about "the host", we're talking about an
+unprivileged user on the host.
+
+>  - it can just go in and poke at the guests RAM if it wants
+> to do something evil to the guest.
+> We wouldn't suggest using a scheme like this once you have
+> encrypted/protected guest RAM for example (SEV/TDX etc)
+>
+>>>  If you were to block modification
+>>> of file then you will have rely on LSMs.
+>> No. We're talking about the semantics of the xattr namespaces.
+>> LSMs can further constrain access to xattrs, but the basic rules
+>> of access to the user.* and security.* attributes are different
+>> in any case. This is by design.
+> I'm happy if you can suggest somewhere else to store the guests xattr
+> data other than in one of the hosts xattr's - the challenge is doing
+> that in a non-racy way, and making sure that the xattr's never get
+> associated with the wrong file as seen by a guest.
+
+I'm sorry, but I've got a bunch of other stuff on my plate.
+I've already suggested implementing xattr namespaces a'la user
+namespaces, but I understand that is beyond the scope of your
+current needs, and has its own set of dragons.
+
+>>>  And if LSMs are not configured,
+>>> then we will rely on shared directory not being visible.
+>> LSMs are not the problem. LSMs use security.* xattrs, which is why
+>> they come up in the discussion.
+>>
+>>> Can you please help me understand why hiding shared directory from
+>>> unprivileged users is not a solution
+>> Maybe you can describe the mechanism you use to "hide" a shared directory
+>> on the host. If the filesystem is mounted on the host it seems unlikely
+>> that you can provide a convincing argument for sufficient protection.
+> Why?
+
+Because 99-44/100% of admins out there aren't as skilled at "hiding"
+data as you are. Many (I almost said "most". I'm still not sure which.)
+of them don't even know how to use mode bits correctly.
+
+>  What can a guests fs mounted on the host, under one of the
+> directories that's already typically used for container fs's do - it's
+> already what fileservers, and existing container systems do.
+>
+> Dave
+>
+>
+>
+>>>  (With both LSMs configured or
+>>> not configured on host). That's a requirement for virtiofs anyway. 
+>>> And if we agree on that, then I don't see why using "user.*" xattrs
+>>> for storing guest sercurity attributes is a problem.
+>>>
+>>> Thanks
+>>> Vivek
+>>>
 
 

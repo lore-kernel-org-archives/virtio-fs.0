@@ -1,30 +1,19 @@
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=crudebyte.com; s=kylie; h=Content-Type:Content-Transfer-Encoding:
-	MIME-Version:References:In-Reply-To:Message-ID:Date:Subject:Cc:To:From:
-	Content-ID:Content-Description;
-	bh=raFlPqOXr5gfQYPl4l0uonFA7Ywzt3rKj6cQmkfyCPw=;
-	b=C6vOI2e9AOmtRvBfdiXKhKevgG
-	urC1mBIvP2ydKKQjySWrE2n+usxXILQv/PHe9XvhAYUVV7B9fATRZ0Rl8RLVs3PZAya89zRZOvwUA
-	L7XdCOWWolKPS3xrgJcSy1HPi5wY8CgMxUh7lq0moMQq0AnpMxbd/GFBT5hE8Frs21g2hd3TnSgCE
-	VJ6ins0RiBZNzTkfUVxM1DPq7YD6v21q417A/lwwl5g0EVLjL7A31driKMRnvxDXv1SeCaLtBTHxF
-	ixrt2cFMsmDARBEbFIEL8UUHXnLdxO/Eedrmn7fpgz0yvZYQmsQCPlVXui4VA3qh02osPirWqTXZC
-	AVewYvn/SKuftbaVrJwRUsUfXLjJuMDbDf+8j609fvb0xZIBXEUGdBXqleoGyqGTlopAAoX58Y/Kr
-	tXcR1ObcHoPwGuLau9TjwHQ2ZK9B0Xc3BX59/5R5H2k8Uy/j7sty2kQqq9+SYLPwRAGFcZTLpaBm4
-	NSi/i1pFjynrjUJOk+7A6Lnk7uh2Dr3FILSq2y5C9vBPQYxb7EyAxGjtI5tL1NDTc6lErHfNX/nRb
-	0GDIQacEEwdmjMFHU1nbrkx1iDNOX+9y5I1oRzSzsQPiJ1SEGYFN7Xxv/PIXNb2l9YiILn+ixBSPk
-	HQn3SvBT3eAf9vwllyflO5DSWzAR26TuDY84n3LHM=
-From: Christian Schoenebeck <qemu_oss@crudebyte.com>
-Date: Tue, 05 Oct 2021 13:43:14 +0200
-Message-ID: <1754360.17xrOKl2ua@silver>
-In-Reply-To: <20211005071300-mutt-send-email-mst@kernel.org>
-References: <cover.1633376313.git.qemu_oss@crudebyte.com>
-	<3198289.vhBqKWSW6W@silver>
-	<20211005071300-mutt-send-email-mst@kernel.org>
+Date: Tue, 14 Sep 2021 08:51:54 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YUCa6pWpr5cjCNrU@redhat.com>
+References: <20210902152228.665959-1-vgoyal@redhat.com>
+	<79dcd300-a441-cdba-e523-324733f892ca@schaufler-ca.com>
+	<YTEEPZJ3kxWkcM9x@redhat.com> <YTENEAv6dw9QoYcY@redhat.com>
+	<3bca47d0-747d-dd49-a03f-e0fa98eaa2f7@schaufler-ca.com>
+	<YTEur7h6fe4xBJRb@redhat.com>
+	<1f33e6ef-e896-09ef-43b1-6c5fac40ba5f@schaufler-ca.com>
+	<YTYr4MgWnOgf/SWY@work-vm>
+	<496e92bf-bf9e-a56b-bd73-3c1d0994a064@schaufler-ca.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 7Bit
-Content-Type: text/plain; charset="us-ascii"
-Subject: Re: [Virtio-fs] [PATCH v2 0/3] virtio: increase VIRTQUEUE_MAX_SIZE
-	to 32k
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <496e92bf-bf9e-a56b-bd73-3c1d0994a064@schaufler-ca.com>
+Subject: Re: [Virtio-fs] [PATCH v3 0/1] Relax restrictions on user.* xattr
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,81 +22,184 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: Kevin Wolf <kwolf@redhat.com>, Laurent Vivier <lvivier@redhat.com>, qemu-block@nongnu.org, David Hildenbrand <david@redhat.com>, Jason Wang <jasowang@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Amit Shah <amit@kernel.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, virtio-fs@redhat.com, Eric Auger <eric.auger@redhat.com>, Hanna Reitz <hreitz@redhat.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Gerd Hoffmann <kraxel@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, =?ISO-8859-1?Q?Marc=2DAndr=E9?= Lureau <marcandre.lureau@redhat.com>, Fam Zheng <fam@euphon.net>
+To: Casey Schaufler <casey@schaufler-ca.com>
+Cc: gscrivan@redhat.com, tytso@mit.edu, agruenba@redhat.com, miklos@szeredi.hu, selinux@vger.kernel.org, stephen.smalley.work@gmail.com, david@fromorbit.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, casey.schaufler@intel.com, linux-security-module@vger.kernel.org, viro@zeniv.linux.org.uk, linux-fsdevel@vger.kernel.org, bfields@redhat.com, christian.brauner@ubuntu.com
 
-On Dienstag, 5. Oktober 2021 13:19:43 CEST Michael S. Tsirkin wrote:
-> On Tue, Oct 05, 2021 at 01:10:56PM +0200, Christian Schoenebeck wrote:
-> > On Dienstag, 5. Oktober 2021 09:38:53 CEST David Hildenbrand wrote:
-> > > On 04.10.21 21:38, Christian Schoenebeck wrote:
-> > > > At the moment the maximum transfer size with virtio is limited to 4M
-> > > > (1024 * PAGE_SIZE). This series raises this limit to its maximum
-> > > > theoretical possible transfer size of 128M (32k pages) according to
-> > > > the
-> > > > virtio specs:
-> > > > 
-> > > > https://docs.oasis-open.org/virtio/virtio/v1.1/cs01/virtio-v1.1-cs01.h
-> > > > tml#
-> > > > x1-240006
-> > > 
-> > > I'm missing the "why do we care". Can you comment on that?
-> > 
-> > Primary motivation is the possibility of improved performance, e.g. in
-> > case of 9pfs, people can raise the maximum transfer size with the Linux
-> > 9p client's 'msize' option on guest side (and only on guest side
-> > actually). If guest performs large chunk I/O, e.g. consider something
-> > "useful" like this one on> 
-> > guest side:
-> >   time cat large_file_on_9pfs.dat > /dev/null
-> > 
-> > Then there is a noticable performance increase with higher transfer size
-> > values. That performance gain is continuous with rising transfer size
-> > values, but the performance increase obviously shrinks with rising
-> > transfer sizes as well, as with similar concepts in general like cache
-> > sizes, etc.
-> > 
-> > Then a secondary motivation is described in reason (2) of patch 2: if the
-> > transfer size is configurable on guest side (like it is the case with the
-> > 9pfs 'msize' option), then there is the unpleasant side effect that the
-> > current virtio limit of 4M is invisible to guest; as this value of 4M is
-> > simply an arbitrarily limit set on QEMU side in the past (probably just
-> > implementation motivated on QEMU side at that point), i.e. it is not a
-> > limit specified by the virtio protocol,
+On Mon, Sep 13, 2021 at 12:05:07PM -0700, Casey Schaufler wrote:
+> On 9/6/2021 7:55 AM, Dr. David Alan Gilbert wrote:
+> > * Casey Schaufler (casey@schaufler-ca.com) wrote:
+> >> On 9/2/2021 1:06 PM, Vivek Goyal wrote:
+> >>>  If LSMs are not configured,
+> >>> then hiding the directory is the solution.
+> >> It's not a solution at all. It's wishful thinking that
+> >> some admin is going to do absolutely everything right, will
+> >> never make a mistake and will never, ever, read the mount(2)
+> >> man page.
+> > That is why we run our virtiofsd with a sandbox setup and seccomp; and
+> > frankly anything we can or could turn on we would.
 > 
-> According to the spec it's specified, sure enough: vq size limits the
-> size of indirect descriptors too.
+> That doesn't address my concern at all. Being able to create an
+> environment in which a feature can be used safely does not make
+> the feature safe.
 
-In the virtio specs the only hard limit that I see is the aforementioned 32k:
+That's the requirement of virtiofs shared directory. It is a shared
+directory, potentially being used by untrusted guest. So it should
+not be accessible to unprivileged entities on host.
 
-"Queue Size corresponds to the maximum number of buffers in the virtqueue. 
-Queue Size value is always a power of 2. The maximum Queue Size value is 
-32768. This value is specified in a bus-specific way."
+Same is the requirement for regular containers and that's why
+podman (and possibly other container managers), make top level
+storage directory only readable and searchable by root, so that
+unpriveleged entities on host can not access container root filesystem
+data.
 
-> However, ever since commit 44ed8089e991a60d614abe0ee4b9057a28b364e4 we
-> do not enforce it in the driver ...
+I think similar requirements are there for idmapped mounts. One
+will shift container images into user namespaces. And that means,
+through idmapped mounts one can write files which will actually
+show up as owned by root in original directory. And that original
+directory should not be accessible to unprivileged users otherwise
+user found an easy way to drop root owned files on system and
+exectute these.
 
-Then there is the current queue size (that you probably mean) which is 
-transmitted to guest with whatever virtio was initialized with.
+So more and more use cases are there which are relying on directory
+not being accessible to unprivileged users.
 
-In case of 9p client however the virtio queue size is first initialized with 
-some initial hard coded value when the 9p driver is loaded on Linux kernel 
-guest side, then when some 9pfs is mounted later on by guest, it may include 
-the 'msize' mount option to raise the transfer size, and that's the problem. I 
-don't see any way for guest to see that it cannot go above that 4M transfer 
-size now.
+I understand it is not going to be easy to get the configurations
+right all the time. But orchestration tools can be helpful. container
+managers can make sure kata container rootfs are not accessible.
+libvirt can probably warn if shared directory is accessible to
+unprivileged users. And all that will help in getting configuration
+right.
 
-> > nor is this limit be made aware to guest via virtio protocol
-> > at all. The consequence with 9pfs would be if user tries to go higher than
-> > 4M,> 
-> > then the system would simply hang with this QEMU error:
-> >   virtio: too many write descriptors in indirect table
-> > 
-> > Now whether this is an issue or not for individual virtio users, depends
-> > on
-> > whether the individual virtio user already had its own limitation <= 4M
-> > enforced on its side.
-> > 
-> > Best regards,
-> > Christian Schoenebeck
+> 
+> 
+> > So why that's not a solution and only relying on CAP_SYS_ADMIN is the
+> > solution. I don't understand that part.
+> 
+> Sure you do. If you didn't, you wouldn't be so concerned about
+> requiring CAP_SYS_ADMIN. You're trying hard to avoid taking the
+> level of responsibility that running with privilege requires.
 
+Running with minimal capabilities is always desired. So we want
+to do away with CAP_SYS_ADMIN. And this reduces our risk in
+case virtiofsd gets compromised.
+
+I thought we had similar reasons that we did not want setuid
+root binaries and wanted to give them limited set of capabilites
+depending on what they are doing.
+
+> To do that, you're introducing a massive security hole, a backdoor
+> into the file system security attributes.
+
+Shared directory is not accessible to unprivileged entities. If
+configuration is not right, then it is user's problem and we
+need to fix that.
+
+> 
+> >> It comes back to your design, which is fundamentally flawed. You
+> >> can't store system security information in an attribute that can
+> >> be manipulated by untrusted entities. That's why we have system.*
+> >> xattrs. You want to have an attribute on the host that maps to a
+> >> security attribute on the guest. The host has to protect the attribute
+> >> on the guest with mechanisms of comparable strength as the guest's
+> >> mechanisms.
+> > Can you just explain this line to me a bit more: 
+> >> Otherwise you can't trust the guest with host data.
+> > Note we're not trying to trust the guest with the host data here;
+> > we're trying to allow the guest to store the data on the host, while
+> > trusting the host.
+> 
+> But you can't trust the host! You're allowing unprivileged processes
+> on the host to modify security state of the guest.
+
+No we are not. Shared directory should not be accessible to
+unpriviliged entities on host.
+
+> 
+> >> It's a real shame that CAP_SYS_ADMIN is so scary. The capability
+> >> mechanism as implemented today won't scale to the hundreds of individual
+> >> capabilities it would need to break CAP_SYS_ADMIN up. Maybe someday.
+> >> I'm not convinced that there isn't a way to accomplish what you're
+> >> trying to do without privilege, but this isn't it, and I don't know
+> >> what is. Sorry.
+> >>
+> >>> Also if directory is not hidden, unprivileged users can change file
+> >>> data and other metadata.
+> >> I assumed that you've taken that into account. Are you saying that
+> >> isn't going to be done correctly either?
+> >>
+> >>>  Why that's not a concern and why there is
+> >>> so much of focus only security xattr.
+> >> As with an NFS mount, the assumption is that UID 567 (or its magically
+> >> mapped equivalent) has the same access rights on both the server/host
+> >> and client/guest. I'm not worried about the mode bits because they are
+> >> presented consistently on both machines. If, on the other hand, an
+> >> attribute used to determine access is security.esprit on the guest and
+> >> user.security.esprit on the host, the unprivileged user on the host
+> >> can defeat the privilege requirements on the guest. That's why.
+> > We're OK with that;
+> 
+> I understand that. I  am  not  OK  with  that.
+
+Unprivileged entities can't modify "user.viritiofs.security.selinux"
+as shared directory is not accessible to them.
+
+Sorry, I have to repeat this so many times because you are 
+completely ignoring this requirement saying users will get it
+wrong. Sure if they do get it wrong, they need to fix it.  But
+that does not mean we start giving CAP_SYS_ADMIN to daemon. 
+
+If shared direcotry is accessible to unprivileged entities, game
+is already over (setuid root binaries). Being able to modify
+security attributes of a file seems like such a minor concern
+in comparison.
+
+> 
+> >  remember that the host can do wth it likes to the
+> > guest anyway
+> 
+> We're not talking about "the host", we're talking about an
+> unprivileged user on the host.
+> 
+> >  - it can just go in and poke at the guests RAM if it wants
+> > to do something evil to the guest.
+> > We wouldn't suggest using a scheme like this once you have
+> > encrypted/protected guest RAM for example (SEV/TDX etc)
+> >
+> >>>  If you were to block modification
+> >>> of file then you will have rely on LSMs.
+> >> No. We're talking about the semantics of the xattr namespaces.
+> >> LSMs can further constrain access to xattrs, but the basic rules
+> >> of access to the user.* and security.* attributes are different
+> >> in any case. This is by design.
+> > I'm happy if you can suggest somewhere else to store the guests xattr
+> > data other than in one of the hosts xattr's - the challenge is doing
+> > that in a non-racy way, and making sure that the xattr's never get
+> > associated with the wrong file as seen by a guest.
+> 
+> I'm sorry, but I've got a bunch of other stuff on my plate.
+> I've already suggested implementing xattr namespaces a'la user
+> namespaces, but I understand that is beyond the scope of your
+> current needs, and has its own set of dragons.
+> 
+> >>>  And if LSMs are not configured,
+> >>> then we will rely on shared directory not being visible.
+> >> LSMs are not the problem. LSMs use security.* xattrs, which is why
+> >> they come up in the discussion.
+> >>
+> >>> Can you please help me understand why hiding shared directory from
+> >>> unprivileged users is not a solution
+> >> Maybe you can describe the mechanism you use to "hide" a shared directory
+> >> on the host. If the filesystem is mounted on the host it seems unlikely
+> >> that you can provide a convincing argument for sufficient protection.
+> > Why?
+> 
+> Because 99-44/100% of admins out there aren't as skilled at "hiding"
+> data as you are. Many (I almost said "most". I'm still not sure which.)
+> of them don't even know how to use mode bits correctly.
+
+We need to rely on orchestration tools to this by default.
+podman already does that for containers. We probably need to
+add something to libvirt too and warn users.
+
+Vivek
 

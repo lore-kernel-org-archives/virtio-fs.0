@@ -1,20 +1,14 @@
+Date: Wed, 15 Sep 2021 15:45:18 +0100
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <YUIG/s7hrJLtGiXZ@stefanha-x1.localdomain>
+References: <20210914123214.181885-1-thuth@redhat.com>
 MIME-Version: 1.0
-References: <79dcd300-a441-cdba-e523-324733f892ca@schaufler-ca.com>
-	<YTEEPZJ3kxWkcM9x@redhat.com> <YTENEAv6dw9QoYcY@redhat.com>
-	<3bca47d0-747d-dd49-a03f-e0fa98eaa2f7@schaufler-ca.com>
-	<YTEur7h6fe4xBJRb@redhat.com>
-	<1f33e6ef-e896-09ef-43b1-6c5fac40ba5f@schaufler-ca.com>
-	<YTYr4MgWnOgf/SWY@work-vm>
-	<496e92bf-bf9e-a56b-bd73-3c1d0994a064@schaufler-ca.com>
-	<YUCa6pWpr5cjCNrU@redhat.com>
-	<CAPL3RVHB=E_s1AW1sQMEgrLYJ8ADCdr=qaKsDrpYjVzW-Apq8w@mail.gmail.com>
-	<YUCybaYK/0RLvY9J@redhat.com>
-In-Reply-To: <YUCybaYK/0RLvY9J@redhat.com>
-From: Bruce Fields <bfields@redhat.com>
-Date: Tue, 14 Sep 2021 11:01:00 -0400
-Message-ID: <CAPL3RVGXWtakCS9bvE60gWp0tcsduJFKfoU4aoqANRgp7HvFow@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH v3 0/1] Relax restrictions on user.* xattr
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="JyxRkJI0/G7zwlE3"
+Content-Disposition: inline
+In-Reply-To: <20210914123214.181885-1-thuth@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] tools/virtiofsd: Add fstatfs64 syscall to
+ the seccomp allowlist
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,30 +17,51 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: Giuseppe Scrivano <gscrivan@redhat.com>, Theodore Ts'o <tytso@mit.edu>, Andreas Gruenbacher <agruenba@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, selinux@vger.kernel.org, stephen.smalley.work@gmail.com, Dave Chinner <david@fromorbit.com>, LKML <linux-kernel@vger.kernel.org>, virtio-fs@redhat.com, linux-fsdevel <linux-fsdevel@vger.kernel.org>, LSM <linux-security-module@vger.kernel.org>, Alexander Viro <viro@zeniv.linux.org.uk>, Casey Schaufler <casey@schaufler-ca.com>, Christian Brauner <christian.brauner@ubuntu.com>, Casey Schaufler <casey.schaufler@intel.com>
+To: Thomas Huth <thuth@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-s390x@nongnu.org, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
 
-On Tue, Sep 14, 2021 at 10:32 AM Vivek Goyal <vgoyal@redhat.com> wrote:
-> open_by_handle_at() requires CAP_DAC_READ_SEARCH.
 
-Or some sort of access to the network.  If you can send rpc requests
-to the nfs server that appear to be from someone with access to the
-export, you can guess filehandles that allow access to objects under
-that directory.  You'll need access to particular objects, but you
-won't need read or lookup access to the directory.
+--JyxRkJI0/G7zwlE3
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-You can prevent that if you set things up right, but these
-filehandle-issues are poorly understood, and people often forget to
-take them into account.
+On Tue, Sep 14, 2021 at 02:32:14PM +0200, Thomas Huth wrote:
+> The virtiofsd currently crashes on s390x when doing something like
+> this in the guest:
+>=20
+>  mkdir -p /mnt/myfs
+>  mount -t virtiofs myfs /mnt/myfs
+>  touch /mnt/myfs/foo.txt
+>  stat -f /mnt/myfs/foo.txt
+>=20
+> The problem is that the fstatfs64 syscall is called in this case
+> from the virtiofsd. We have to put it on the seccomp allowlist to
+> avoid that the daemon gets killed in this case.
+>=20
+> Buglink: https://bugzilla.redhat.com/show_bug.cgi?id=3D2001728
+> Suggested-by: Vivek Goyal <vgoyal@redhat.com>
+> Signed-off-by: Thomas Huth <thuth@redhat.com>
+> ---
+>  tools/virtiofsd/passthrough_seccomp.c | 1 +
+>  1 file changed, 1 insertion(+)
 
---b.
+Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
-> And if you have
-> CAP_DAC_READ_SEARCH, you don't need to even guess file handles. You
-> should be able to read/search through all directories, IIUC.
->
-> So how does one make sure that shared directory on host is not
-> accessible to unprivileged entities. If making directory accessible
-> to root only is weaker security, what are the options for stronger
-> security.
+--JyxRkJI0/G7zwlE3
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmFCBv4ACgkQnKSrs4Gr
+c8isvwf/TinaF8f4yLc4IqxLf6wS4JtXdLaxXpZLZHHlU1NURkxIXD8a7XncQvHp
+51IILqi4LgHPNHDdTBNFupE7tDwPjRzhueuMaOxo+aQJg+NI0j0kYaeR05jocoEL
+AERlNu66XVR10DPaja9O1blOxxF2sou+C2MYDSV7lHYWs2g8iS9t9hEO77zF+VHB
+VhL0jCt5GCdfQyME1wljLcXoHQWgBTArF7s/STjWWFaha+QoP6Ns/HyXqY7EbxIM
+3uMxAPyypTCcrsi/2CNIOVyXmbUSzXPfG/Q+bbp6PNJDJ05UAfAxmavX3mqmCelh
+SlGhr+pwvaAPRkVDAUeXZ3+tVqzAaA==
+=jpo1
+-----END PGP SIGNATURE-----
+
+--JyxRkJI0/G7zwlE3--
 

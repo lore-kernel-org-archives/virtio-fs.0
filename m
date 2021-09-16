@@ -1,17 +1,12 @@
-Date: Mon, 6 Sep 2021 15:55:28 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YTYr4MgWnOgf/SWY@work-vm>
-References: <20210902152228.665959-1-vgoyal@redhat.com>
-	<79dcd300-a441-cdba-e523-324733f892ca@schaufler-ca.com>
-	<YTEEPZJ3kxWkcM9x@redhat.com> <YTENEAv6dw9QoYcY@redhat.com>
-	<3bca47d0-747d-dd49-a03f-e0fa98eaa2f7@schaufler-ca.com>
-	<YTEur7h6fe4xBJRb@redhat.com>
-	<1f33e6ef-e896-09ef-43b1-6c5fac40ba5f@schaufler-ca.com>
+From: Hanna Reitz <hreitz@redhat.com>
+Date: Thu, 16 Sep 2021 10:40:34 +0200
+Message-Id: <20210916084045.31684-2-hreitz@redhat.com>
+In-Reply-To: <20210916084045.31684-1-hreitz@redhat.com>
+References: <20210916084045.31684-1-hreitz@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <1f33e6ef-e896-09ef-43b1-6c5fac40ba5f@schaufler-ca.com>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH v3 0/1] Relax restrictions on user.* xattr
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v4 01/12] virtiofsd: Keep /proc/self/mountinfo
+	open
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,115 +15,103 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Casey Schaufler <casey@schaufler-ca.com>
-Cc: gscrivan@redhat.com, tytso@mit.edu, agruenba@redhat.com, miklos@szeredi.hu, selinux@vger.kernel.org, stephen.smalley.work@gmail.com, david@fromorbit.com, linux-kernel@vger.kernel.org, virtio-fs@redhat.com, casey.schaufler@intel.com, linux-security-module@vger.kernel.org, viro@zeniv.linux.org.uk, linux-fsdevel@vger.kernel.org, bfields@redhat.com, christian.brauner@ubuntu.com, Vivek Goyal <vgoyal@redhat.com>
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com
+Cc: Hanna Reitz <hreitz@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
-* Casey Schaufler (casey@schaufler-ca.com) wrote:
-> On 9/2/2021 1:06 PM, Vivek Goyal wrote:
+File handles are specific to mounts, and so name_to_handle_at() returns
+the respective mount ID.  However, open_by_handle_at() is not content
+with an ID, it wants a file descriptor for some inode on the mount,
+which we have to open.
 
-> >  If LSMs are not configured,
-> > then hiding the directory is the solution.
-> 
-> It's not a solution at all. It's wishful thinking that
-> some admin is going to do absolutely everything right, will
-> never make a mistake and will never, ever, read the mount(2)
-> man page.
+We want to use /proc/self/mountinfo to find the mounts' root directories
+so we can open them and pass the respective FDs to open_by_handle_at().
+(We need to use the root directory, because we want the inode belonging
+to every mount FD be deletable.  Before the root directory can be
+deleted, all entries within must have been closed, and so when it is
+deleted, there should not be any file handles left that need its FD as
+their mount FD.  Thus, we can then close that FD and the inode can be
+deleted.[1])
 
-That is why we run our virtiofsd with a sandbox setup and seccomp; and
-frankly anything we can or could turn on we would.
+That is why we need to open /proc/self/mountinfo so that we can use it
+to translate mount IDs into root directory paths.  We have to open it
+after setup_mounts() was called, because if we try to open it before, it
+will appear as an empty file after setup_mounts().
 
-> > So why that's not a solution and only relying on CAP_SYS_ADMIN is the
-> > solution. I don't understand that part.
-> 
-> It comes back to your design, which is fundamentally flawed. You
-> can't store system security information in an attribute that can
-> be manipulated by untrusted entities. That's why we have system.*
-> xattrs. You want to have an attribute on the host that maps to a
-> security attribute on the guest. The host has to protect the attribute
-> on the guest with mechanisms of comparable strength as the guest's
-> mechanisms.
+[1] Note that in practice, you still cannot delete the mount root
+directory.  It is a mount point on the host, after all, and mount points
+cannot be deleted.  But by using the mount point as the mount FD, we
+will at least not hog any actually deletable inodes.
 
-Can you just explain this line to me a bit more: 
-> Otherwise you can't trust the guest with host data.
+Signed-off-by: Hanna Reitz <hreitz@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c | 40 ++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-Note we're not trying to trust the guest with the host data here;
-we're trying to allow the guest to store the data on the host, while
-trusting the host.
-
-> 
-> It's a real shame that CAP_SYS_ADMIN is so scary. The capability
-> mechanism as implemented today won't scale to the hundreds of individual
-> capabilities it would need to break CAP_SYS_ADMIN up. Maybe someday.
-> I'm not convinced that there isn't a way to accomplish what you're
-> trying to do without privilege, but this isn't it, and I don't know
-> what is. Sorry.
-> 
-> > Also if directory is not hidden, unprivileged users can change file
-> > data and other metadata.
-> 
-> I assumed that you've taken that into account. Are you saying that
-> isn't going to be done correctly either?
-> 
-> >  Why that's not a concern and why there is
-> > so much of focus only security xattr.
-> 
-> As with an NFS mount, the assumption is that UID 567 (or its magically
-> mapped equivalent) has the same access rights on both the server/host
-> and client/guest. I'm not worried about the mode bits because they are
-> presented consistently on both machines. If, on the other hand, an
-> attribute used to determine access is security.esprit on the guest and
-> user.security.esprit on the host, the unprivileged user on the host
-> can defeat the privilege requirements on the guest. That's why.
-
-We're OK with that; remember that the host can do wth it likes to the
-guest anyway - it can just go in and poke at the guests RAM if it wants
-to do something evil to the guest.
-We wouldn't suggest using a scheme like this once you have
-encrypted/protected guest RAM for example (SEV/TDX etc)
-
-> >  If you were to block modification
-> > of file then you will have rely on LSMs.
-> 
-> No. We're talking about the semantics of the xattr namespaces.
-> LSMs can further constrain access to xattrs, but the basic rules
-> of access to the user.* and security.* attributes are different
-> in any case. This is by design.
-
-I'm happy if you can suggest somewhere else to store the guests xattr
-data other than in one of the hosts xattr's - the challenge is doing
-that in a non-racy way, and making sure that the xattr's never get
-associated with the wrong file as seen by a guest.
-
-> >  And if LSMs are not configured,
-> > then we will rely on shared directory not being visible.
-> 
-> LSMs are not the problem. LSMs use security.* xattrs, which is why
-> they come up in the discussion.
-> 
-> > Can you please help me understand why hiding shared directory from
-> > unprivileged users is not a solution
-> 
-> Maybe you can describe the mechanism you use to "hide" a shared directory
-> on the host. If the filesystem is mounted on the host it seems unlikely
-> that you can provide a convincing argument for sufficient protection.
-
-Why? What can a guests fs mounted on the host, under one of the
-directories that's already typically used for container fs's do - it's
-already what fileservers, and existing container systems do.
-
-Dave
-
-
-
-> >  (With both LSMs configured or
-> > not configured on host). That's a requirement for virtiofs anyway. 
-> > And if we agree on that, then I don't see why using "user.*" xattrs
-> > for storing guest sercurity attributes is a problem.
-> >
-> > Thanks
-> > Vivek
-> >
-> 
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 38b2af8599..6511a6acb4 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -172,6 +172,8 @@ struct lo_data {
+ 
+     /* An O_PATH file descriptor to /proc/self/fd/ */
+     int proc_self_fd;
++    /* A read-only FILE pointer for /proc/self/mountinfo */
++    FILE *mountinfo_fp;
+     int user_killpriv_v2, killpriv_v2;
+     /* If set, virtiofsd is responsible for setting umask during creation */
+     bool change_umask;
+@@ -3718,6 +3720,19 @@ static void setup_chroot(struct lo_data *lo)
+ static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
+                           bool enable_syslog)
+ {
++    int proc_self, mountinfo_fd;
++    int saverr;
++
++    /*
++     * Open /proc/self before we pivot to the new root so we can still
++     * open /proc/self/mountinfo afterwards
++     */
++    proc_self = open("/proc/self", O_PATH);
++    if (proc_self < 0) {
++        fuse_log(FUSE_LOG_WARNING, "Failed to open /proc/self: %m; "
++                 "will not be able to use file handles\n");
++    }
++
+     if (lo->sandbox == SANDBOX_NAMESPACE) {
+         setup_namespaces(lo, se);
+         setup_mounts(lo->source);
+@@ -3725,6 +3740,31 @@ static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
+         setup_chroot(lo);
+     }
+ 
++    /*
++     * Opening /proc/self/mountinfo before the umount2() call in
++     * setup_mounts() leads to the file appearing empty.  That is why
++     * we defer opening it until here.
++     */
++    lo->mountinfo_fp = NULL;
++    if (proc_self >= 0) {
++        mountinfo_fd = openat(proc_self, "mountinfo", O_RDONLY);
++        if (mountinfo_fd < 0) {
++            saverr = errno;
++        } else if (mountinfo_fd >= 0) {
++            lo->mountinfo_fp = fdopen(mountinfo_fd, "r");
++            if (!lo->mountinfo_fp) {
++                saverr = errno;
++                close(mountinfo_fd);
++            }
++        }
++        if (!lo->mountinfo_fp) {
++            fuse_log(FUSE_LOG_WARNING, "Failed to open /proc/self/mountinfo: "
++                     "%s; will not be able to use file handles\n",
++                     strerror(saverr));
++        }
++        close(proc_self);
++    }
++
+     setup_seccomp(enable_syslog);
+     setup_capabilities(g_strdup(lo->modcaps));
+ }
 -- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+2.31.1
 

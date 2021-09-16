@@ -1,15 +1,11 @@
-References: <20210817022220.17574-1-jefflexu@linux.alibaba.com>
-	<CAJfpeguw1hMOaxpDmjmijhf=-JEW95aEjxfVo_=D_LyWx8LDgw@mail.gmail.com>
-	<YRuCHvhICtTzMK04@work-vm> <YRuuRo8jEs5dkfw9@redhat.com>
-From: JeffleXu <jefflexu@linux.alibaba.com>
-Message-ID: <299689e9-bdeb-a715-3f31-8c70369cf0ba@linux.alibaba.com>
-Date: Thu, 16 Sep 2021 16:21:59 +0800
+From: Hanna Reitz <hreitz@redhat.com>
+Date: Thu, 16 Sep 2021 10:40:33 +0200
+Message-Id: <20210916084045.31684-1-hreitz@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <YRuuRo8jEs5dkfw9@redhat.com>
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH v4 0/8] fuse,virtiofs: support per-file DAX
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v4 00/12] virtiofsd: Allow using file handles
+	instead of O_PATH FDs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,85 +14,175 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Joseph Qi <joseph.qi@linux.alibaba.com>, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com
+Cc: Hanna Reitz <hreitz@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
-Hi, I add some performance statistics below.
+Hi,
 
+v1 cover letter for an overview:
+https://listman.redhat.com/archives/virtio-fs/2021-June/msg00033.html
 
-On 8/17/21 8:40 PM, Vivek Goyal wrote:
-> On Tue, Aug 17, 2021 at 10:32:14AM +0100, Dr. David Alan Gilbert wrote:
->> * Miklos Szeredi (miklos@szeredi.hu) wrote:
->>> On Tue, 17 Aug 2021 at 04:22, Jeffle Xu <jefflexu@linux.alibaba.com> wrote:
->>>>
->>>> This patchset adds support of per-file DAX for virtiofs, which is
->>>> inspired by Ira Weiny's work on ext4[1] and xfs[2].
->>>
->>> Can you please explain the background of this change in detail?
->>>
->>> Why would an admin want to enable DAX for a particular virtiofs file
->>> and not for others?
->>
->> Where we're contending on virtiofs dax cache size it makes a lot of
->> sense; it's quite expensive for us to map something into the cache
->> (especially if we push something else out), so selectively DAXing files
->> that are expected to be hot could help reduce cache churn.
+v2 cover letter:
+https://listman.redhat.com/archives/virtio-fs/2021-June/msg00074.html
 
-Yes, the performance of dax can be limited when the DAX window is
-limited, where dax window may be contended by multiple files.
-
-I tested kernel compiling in virtiofs, emulating the scenario where a
-lot of files contending dax window and triggering dax window reclaiming.
-
-Environment setup:
-- guest vCPU: 16
-- time make vmlinux -j128
-
-type    | cache  | cache-size | time
-------- | ------ | ---------- | ----
-non-dax | always |   --       | real 2m48.119s
-dax     | always | 64M        | real 4m49.563s
-dax     | always |   1G       | real 3m14.200s
-dax     | always |   4G       | real 2m41.141s
+v3 cover letter:
+https://listman.redhat.com/archives/virtio-fs/2021-July/msg00050.html
 
 
-It can be seen that there's performance drop, comparing to the normal
-buffered IO, when dax window resource is restricted and dax window
-relcaiming is triggered. The smaller the cache size is, the worse the
-performance is. The performance drop can be alleviated and eliminated as
-cache size increases.
+Here in v4, there are two main changes:
 
-Though we may not compile kernel in virtiofs, indeed we may access a lot
-of small files in virtiofs and suffer this performance drop.
+First, for turning a mount ID into a mount FD, we no longer use the
+first inode that’s looked up on the respective mount, but instead look
+into /proc/self/mountinfo to get the mount’s root directory and open
+that.  Wel also refcount mount FDs now.
 
+In theory, the advantage is that before the mount root directory can be
+deleted, all files on the mount must be closed (and deleted), so the
+refcounting will lead to the mount FD being closed.  Then, deleting the
+mount root would actually result in the inode being deleted, and so with
+inotify, the guest could receive a notification about it.
 
-> In that case probaly we should just make DAX window larger. I assume
+In practice, this is still a mount root (on the host), so it cannot be
+deleted (rmdir returns EBUSY).  But that’s effectively just as well,
+because this way we open a mount FD that cannot be deleted, and so, we
+won’t have to worry about missing guest notifications.
 
-Yes, as the DAX window gets larger, it is less likely that we can run
-short of dax window resource.
-
-However it doesn't come without cost. 'struct page' descriptor for dax
-window will consume guest memory at a ratio of ~1.5% (64/4096 = ~1.5%,
-page descriptor is of 64 bytes size, assuming 4K sized page). That is,
-every 1GB cache size will cost 16MB guest memory. As the cache size
-increases, the memory footprint for page descriptors also increases,
-which may offset the benefit of dax by eliminating guest page cache.
-
-In summary, per-file dax feature tries to achieve a balance between
-performance and memory overhead, by offering a finer gained control for
-dax to users.
+Note that unmounting the virtiofs mount in the guest will lead to all
+mount FDs correctly being closed, so the refcounting does work.
 
 
-> that selecting which files to turn DAX on, will itself will not be
-> a trivial. Not sure what heuristics are being deployed to determine
-> that. Will like to know more about it.
-
-Currently we enable dax for hot and large blob files, while disabling
-dax for other miscellaneous small files.
+Second, I’ve renamed the TempFd objects to reflect what kind of FDs they
+contain; i.e. they’re no longer called “inode_fd” or “dir_fd”, but
+“path_fd”, “rw_fd”, or “dir_path_fd” instead.
+p
 
 
+Minor changes:
+- -o inode_file_handles now auto-adds +dac_read_search to modcaps
+- Some fixes
+
+
+(Quick note: I’ll be on PTO from Sep 20 to Oct 3, so I’ll only be able
+to respond to potential reviews after then.)
+
+
+Exact changes per patch:
+
+Patch 1:
+- Added, we want to use the respective mount point as a mount FD, and we
+  have to read /proc/self/mountinfo to translate mount IDs to mount
+  points
+
+Patch 2:
+- Moved the FCHDIR_NOFAIL(lo->root.fd) (changing the CWD back to what it
+  was) into the cleanup path, and added a bool `changed_cwd` to keep
+  track of when we need to invoke it
+- Dropped `open_inode` (`changed_cwd` kind of makes it obsolete)
+
+Patch 3:
+- Added temp_fd_copy() to (shallow-)copy a TempFd
+
+Patch 4:
+- Forgot an lo_inode_put() in lo_opendir()’s successful return path
+- lo_setxattr(): Moved procname[] into the block where it’s used (now
+  that it’s generated and used within a single `else` block)
+
+Patch 5:
+- Give TempFds a name that reflects what kind of FDs they are, e.g.
+  `path_fd` instead of `inode_fd`
+- lo_link(): Don’t overwrite errno for the error path, but store such
+  values in saverr instead and add a new error path label below the
+  existing `saverr = errno;`
+- xattr functions: Moved TempFds into local blocks where they are
+  actually used (to generate a filename in /proc/self/fd)
+  (with the renaming of `inode_fd` to `path_fd`, we are going to need
+  distinct variables for both conditional blocks here – one with an
+  O_RDONLY FD (`rd_fd`), and one with an O_PATH FD (`path_fd`))
+
+Patch 6:
+- Like in patch 5, give TempFds a name to reflect what they are
+
+Patch 7:
+- Like in patches 5 and 6, give TempFds a name to reflect what they are
+- `lo_setattr` thus has two TempFds now, which sometimes are the same FD
+  (and we use `temp_fd_copy()` to copy one into the other)
+- lo_opendir(): Close the FD if `fdopendir()` failed
+
+Patch 8:
+- Added: We want the mount FD collection to be in lo_data instead of in
+  a static global variable, so we need to pass lo_data wherever we might
+  need a mount FD
+
+Patch 9:
+- Put mount_fds and mount_fds_lock into lo_data
+- Have mount_fds values be lo_mount_fd objects (FD + refcount) instead
+  of just pure FDs
+- Refcount mount FDs (so releasing a file handle now has to go through a
+  dedicated function)
+- Having a file handle and an O_PATH FD in an lo_inode object is no
+  longer mutually exclusive
+
+Patch 10:
+- Destroying the inodes_by_handle hash map should depend on whether
+  inodes_by_handle is non-NULL, not whether inodes_by_ids is non-NULL
+  (i.e. fixed a code typo)
+
+Patch 11:
+- Auto-add CAP_DAC_READ_SEARCH with -o inode_file_handles instead of
+  requiring the user to do so
+- get_file_handle(): Use /proc/self/mountinfo to get a mount’s root
+  point and open that as the mount FD instead of using the first inode
+  that’s looked up on that mount
+- Refcount mount FDs
+- Have get_file_handle() return a file handle even if creating a
+  corresponding mount FD failed, and so the file handle will not be
+  open-able; we can still use this file handle for lookups
+
+Patch 12:
+- Rebase conflicts
+
+
+git-backport-diff against v3:
+
+Key:
+[----] : patches are identical
+[####] : number of functional differences between upstream/downstream patch
+[down] : patch is downstream-only
+The flags [FC] indicate (F)unctional and (C)ontextual differences, respectively
+
+001/12:[down] 'virtiofsd: Keep /proc/self/mountinfo open'
+002/12:[0012] [FC] 'virtiofsd: Limit setxattr()'s creds-dropped region'
+003/12:[0014] [FC] 'virtiofsd: Add TempFd structure'
+004/12:[0004] [FC] 'virtiofsd: Use lo_inode_open() instead of openat()'
+005/12:[0109] [FC] 'virtiofsd: Add lo_inode_fd() helper'
+006/12:[0030] [FC] 'virtiofsd: Let lo_fd() return a TempFd'
+007/12:[0076] [FC] 'virtiofsd: Let lo_inode_open() return a TempFd'
+008/12:[down] 'virtiofsd: Pass lo_data to lo_inode_{fd,open}()'
+009/12:[0111] [FC] 'virtiofsd: Add lo_inode.fhandle'
+010/12:[0002] [FC] 'virtiofsd: Add inodes_by_handle hash table'
+011/12:[0235] [FC] 'virtiofsd: Optionally fill lo_inode.fhandle'
+012/12:[0006] [FC] 'virtiofsd: Add lazy lo_do_find()'
+
+
+Hanna Reitz (12):
+  virtiofsd: Keep /proc/self/mountinfo open
+  virtiofsd: Limit setxattr()'s creds-dropped region
+  virtiofsd: Add TempFd structure
+  virtiofsd: Use lo_inode_open() instead of openat()
+  virtiofsd: Add lo_inode_fd() helper
+  virtiofsd: Let lo_fd() return a TempFd
+  virtiofsd: Let lo_inode_open() return a TempFd
+  virtiofsd: Pass lo_data to lo_inode_{fd,open}()
+  virtiofsd: Add lo_inode.fhandle
+  virtiofsd: Add inodes_by_handle hash table
+  virtiofsd: Optionally fill lo_inode.fhandle
+  virtiofsd: Add lazy lo_do_find()
+
+ tools/virtiofsd/helper.c              |    3 +
+ tools/virtiofsd/passthrough_ll.c      | 1102 +++++++++++++++++++++----
+ tools/virtiofsd/passthrough_seccomp.c |    2 +
+ 3 files changed, 951 insertions(+), 156 deletions(-)
 
 -- 
-Thanks,
-Jeffle
+2.31.1
 

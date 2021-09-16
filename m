@@ -1,21 +1,15 @@
-Date: Wed, 15 Sep 2021 11:33:27 -0500
-From: "Dr. Greg" <greg@enjellic.com>
-Message-ID: <20210915163327.GA2324@wind.enjellic.com>
-References: <YTEEPZJ3kxWkcM9x@redhat.com> <YTENEAv6dw9QoYcY@redhat.com>
-	<3bca47d0-747d-dd49-a03f-e0fa98eaa2f7@schaufler-ca.com>
-	<YTEur7h6fe4xBJRb@redhat.com>
-	<1f33e6ef-e896-09ef-43b1-6c5fac40ba5f@schaufler-ca.com>
-	<YTYr4MgWnOgf/SWY@work-vm>
-	<496e92bf-bf9e-a56b-bd73-3c1d0994a064@schaufler-ca.com>
-	<YUCa6pWpr5cjCNrU@redhat.com>
-	<CAPL3RVHB=E_s1AW1sQMEgrLYJ8ADCdr=qaKsDrpYjVzW-Apq8w@mail.gmail.com>
-	<YUCybaYK/0RLvY9J@redhat.com>
-Mime-Version: 1.0
-In-Reply-To: <YUCybaYK/0RLvY9J@redhat.com>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH v3 0/1] Relax restrictions on user.* xattr
-Reply-To: "Dr. Greg" <greg@enjellic.com>
+References: <20210817022220.17574-1-jefflexu@linux.alibaba.com>
+	<CAJfpeguw1hMOaxpDmjmijhf=-JEW95aEjxfVo_=D_LyWx8LDgw@mail.gmail.com>
+	<YRuCHvhICtTzMK04@work-vm> <YRuuRo8jEs5dkfw9@redhat.com>
+From: JeffleXu <jefflexu@linux.alibaba.com>
+Message-ID: <299689e9-bdeb-a715-3f31-8c70369cf0ba@linux.alibaba.com>
+Date: Thu, 16 Sep 2021 16:21:59 +0800
+MIME-Version: 1.0
+In-Reply-To: <YRuuRo8jEs5dkfw9@redhat.com>
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH v4 0/8] fuse,virtiofs: support per-file DAX
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,93 +18,85 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: Giuseppe Scrivano <gscrivan@redhat.com>, Bruce Fields <bfields@redhat.com>, Andreas Gruenbacher <agruenba@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>, selinux@vger.kernel.org, stephen.smalley.work@gmail.com, Dave Chinner <david@fromorbit.com>, LKML <linux-kernel@vger.kernel.org>, virtio-fs@redhat.com, linux-fsdevel <linux-fsdevel@vger.kernel.org>, LSM <linux-security-module@vger.kernel.org>, Alexander Viro <viro@zeniv.linux.org.uk>, Casey Schaufler <casey@schaufler-ca.com>, Theodore Ts'o <tytso@mit.edu>, Christian Brauner <christian.brauner@ubuntu.com>, Casey Schaufler <casey.schaufler@intel.com>
+To: Vivek Goyal <vgoyal@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, Joseph Qi <joseph.qi@linux.alibaba.com>, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org
 
-On Tue, Sep 14, 2021 at 10:32:13AM -0400, Vivek Goyal wrote:
+Hi, I add some performance statistics below.
 
-Good morning, I hope the day is going well for everyone.
 
-> On Tue, Sep 14, 2021 at 09:59:19AM -0400, Bruce Fields wrote:
-> > On Tue, Sep 14, 2021 at 8:52 AM Vivek Goyal <vgoyal@redhat.com> wrote:
-> > > Same is the requirement for regular containers and that's why
-> > > podman (and possibly other container managers), make top level
-> > > storage directory only readable and searchable by root, so that
-> > > unpriveleged entities on host can not access container root filesystem
-> > > data.
-> > 
-> > Note--if that directory is on NFS, making it readable and searchable
-> > by root is very weak protection, since it's often possible for an
-> > attacker to guess filehandles and access objects without the need for
-> > directory lookups.
+On 8/17/21 8:40 PM, Vivek Goyal wrote:
+> On Tue, Aug 17, 2021 at 10:32:14AM +0100, Dr. David Alan Gilbert wrote:
+>> * Miklos Szeredi (miklos@szeredi.hu) wrote:
+>>> On Tue, 17 Aug 2021 at 04:22, Jeffle Xu <jefflexu@linux.alibaba.com> wrote:
+>>>>
+>>>> This patchset adds support of per-file DAX for virtiofs, which is
+>>>> inspired by Ira Weiny's work on ext4[1] and xfs[2].
+>>>
+>>> Can you please explain the background of this change in detail?
+>>>
+>>> Why would an admin want to enable DAX for a particular virtiofs file
+>>> and not for others?
+>>
+>> Where we're contending on virtiofs dax cache size it makes a lot of
+>> sense; it's quite expensive for us to map something into the cache
+>> (especially if we push something else out), so selectively DAXing files
+>> that are expected to be hot could help reduce cache churn.
 
-> open_by_handle_at() requires CAP_DAC_READ_SEARCH. And if you have
-> CAP_DAC_READ_SEARCH, you don't need to even guess file handles. You
-> should be able to read/search through all directories, IIUC.
->
-> So how does one make sure that shared directory on host is not
-> accessible to unprivileged entities. If making directory accessible
-> to root only is weaker security, what are the options for stronger
-> security.
+Yes, the performance of dax can be limited when the DAX window is
+limited, where dax window may be contended by multiple files.
 
-I've been watching this thread, with some interest, given what we have
-been working on with respect to providing a new security framework
-that merges IMA and LSM and external security co-processor technology.
+I tested kernel compiling in virtiofs, emulating the scenario where a
+lot of files contending dax window and triggering dax window reclaiming.
 
-Some observations based on those experiences and this thread.
+Environment setup:
+- guest vCPU: 16
+- time make vmlinux -j128
 
-Casey is an expert on MAC and capability based security systems,
-unfortunately for our industry, particularly bog standard system
-administrators, a rarefied set of skills.  It may be helpful to
-consider his concerns and position on the issues involved in the
-framework of the number of systems that have, and blog posts that
-recommend, setting 'selinux=0' on the kernel command-line.
+type    | cache  | cache-size | time
+------- | ------ | ---------- | ----
+non-dax | always |   --       | real 2m48.119s
+dax     | always | 64M        | real 4m49.563s
+dax     | always |   1G       | real 3m14.200s
+dax     | always |   4G       | real 2m41.141s
 
-I believe the best summary of his position on this issue, is the
-notion that placing security labels, even in transitive form in user
-accessible attributes, subordinates the security of the guest system,
-regardless of the MAC policy it implements, to the DAC based policy on
-the host system.
 
-Given that, there are no legitimate security guarantees that are
-inferrable based on the guest MAC policy.
+It can be seen that there's performance drop, comparing to the normal
+buffered IO, when dax window resource is restricted and dax window
+relcaiming is triggered. The smaller the cache size is, the worse the
+performance is. The performance drop can be alleviated and eliminated as
+cache size increases.
 
-A legitimate pundit, could and probably should question, in the face
-of container filesystems and virtual machine images, whether any type
-of inferrable security guarantees are possible, but that is a question
-and argument for another day.
+Though we may not compile kernel in virtiofs, indeed we may access a lot
+of small files in virtiofs and suffer this performance drop.
 
-I didn't see any mention of EVM brought up in these discussions, which
-may provide some options to improve the security integrity state of
-the guest.
 
-The 800 pound gorilla in the corner in all of this, is that inferrable
-security guarantees in guests require a certifiable chain of trust
-from the creator of the object to the kernel context that is making
-the security gating decisions on the object.  A hard to implement and
-prove concept in bare metal trusted systems, let alone the myriad of
-edge cases lurking in namespaced and virtual environments.
+> In that case probaly we should just make DAX window larger. I assume
 
-Which, in a nod to the other corner of the ring, may simply mean, with
-our current state of deployable technology, you pay your money and
-take your chances in these virtual environments.  Which would in turn
-support the notion of a minimum security, ie. DAC, based effort.
+Yes, as the DAX window gets larger, it is less likely that we can run
+short of dax window resource.
 
-> Vivek
+However it doesn't come without cost. 'struct page' descriptor for dax
+window will consume guest memory at a ratio of ~1.5% (64/4096 = ~1.5%,
+page descriptor is of 64 bytes size, assuming 4K sized page). That is,
+every 1GB cache size will cost 16MB guest memory. As the cache size
+increases, the memory footprint for page descriptors also increases,
+which may offset the benefit of dax by eliminating guest page cache.
 
-Have a good remainder of the week.
+In summary, per-file dax feature tries to achieve a balance between
+performance and memory overhead, by offering a finer gained control for
+dax to users.
 
-Dr. Greg
 
-As always,
-Dr. Greg Wettstein, Ph.D, Worker      Autonomously self-defensive
-Enjellic Systems Development, LLC     IOT platforms and edge devices.
-4206 N. 19th Ave.
-Fargo, ND  58102
-PH: 701-281-1686                      EMAIL: dg@enjellic.com
-------------------------------------------------------------------------------
-"This place is so screwed up.  It's just like the Titanic, only
- we don't even have a band playing.
-                                -- Terrance George Wieland
-                                   Resurrection.
+> that selecting which files to turn DAX on, will itself will not be
+> a trivial. Not sure what heuristics are being deployed to determine
+> that. Will like to know more about it.
+
+Currently we enable dax for hot and large blob files, while disabling
+dax for other miscellaneous small files.
+
+
+
+-- 
+Thanks,
+Jeffle
 

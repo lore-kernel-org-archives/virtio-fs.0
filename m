@@ -1,11 +1,12 @@
 From: Hanna Reitz <hreitz@redhat.com>
-Date: Thu, 16 Sep 2021 10:40:42 +0200
-Message-Id: <20210916084045.31684-10-hreitz@redhat.com>
+Date: Thu, 16 Sep 2021 10:40:43 +0200
+Message-Id: <20210916084045.31684-11-hreitz@redhat.com>
 In-Reply-To: <20210916084045.31684-1-hreitz@redhat.com>
 References: <20210916084045.31684-1-hreitz@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v4 09/12] virtiofsd: Add lo_inode.fhandle
+Subject: [Virtio-fs] [PATCH v4 10/12] virtiofsd: Add inodes_by_handle hash
+	table
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,292 +18,220 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: Hanna Reitz <hreitz@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
 
-This new field is an alternative to lo_inode.fd: Either of the two must
-be set.  In case an O_PATH FD is needed for some lo_inode, it is either
-taken from lo_inode.fd, if valid, or a temporary FD is opened with
-open_by_handle_at().
+Currently, lo_inode.fhandle is always NULL and so always keep an O_PATH
+FD in lo_inode.fd.  Therefore, when the respective inode is unlinked,
+its inode ID will remain in use until we drop our lo_inode (and
+lo_inode_put() thus closes the FD).  Therefore, lo_find() can safely use
+the inode ID as an lo_inode key, because any inode with an inode ID we
+find in lo_data.inodes (on the same filesystem) must be the exact same
+file.
 
-Using a file handle instead of an FD has the advantage of keeping the
-number of open file descriptors low.
+This will change when we start setting lo_inode.fhandle so we do not
+have to keep an O_PATH FD open.  Then, unlinking such an inode will
+immediately remove it, so its ID can then be reused by newly created
+files, even while the lo_inode object is still there[1].
 
-Because open_by_handle_at() requires a mount FD (i.e. a non-O_PATH FD
-opened on the filesystem to which the file handle refers), but every
-lo_fhandle only has a mount ID (as returned by name_to_handle_at()), we
-keep a hash map of such FDs in mount_fds (mapping ID to FD).
-get_file_handle(), which is added by a later patch, will ensure that
-every mount ID for which we have generated a handle has a corresponding
-entry in mount_fds.  Every handle holds a strong reference to its mount
-FD (lo_mount_fd.refcount) so we can clean up mount FDs when they are no
-longer needed.
+So creating a new file can then reuse the old file's inode ID, and
+looking up the new file would lead to us finding the old file's
+lo_inode, which is not ideal.
 
-release_file_handle()'s drop_mount_fd_ref parameter may look a bit
-strange at this point, because we always pass true for it, but it will
-make more sense when we start generating file handles: At that point, we
-will also use this function to clean up lo_fhandle object that do not
-yet have a strong reference to an lo_mount_fd object, and then we will
-need to be able to pass false for drop_mount_fd_ref.
+Luckily, just as file handles cause this problem, they also solve it:  A
+file handle contains a generation ID, which changes when an inode ID is
+reused, so the new file can be distinguished from the old one.  So all
+we need to do is to add a second map besides lo_data.inodes that maps
+file handles to lo_inodes, namely lo_data.inodes_by_handle.  For
+clarity, lo_data.inodes is renamed to lo_data.inodes_by_ids.
+
+Unfortunately, we cannot rely on being able to generate file handles
+every time.  Therefore, we still enter every lo_inode object into
+inodes_by_ids, but having an entry in inodes_by_handle is optional.  A
+potential inodes_by_handle entry then has precedence, the inodes_by_ids
+entry is just a fallback.
+
+Note that we do not generate lo_fhandle objects yet, and so we also do
+not enter anything into the inodes_by_handle map yet.  Also, all lookups
+skip that map.  We might manually create file handles with some code
+that is immediately removed by the next patch again, but that would
+break the assumption in lo_find() that every lo_inode with a non-NULL
+.fhandle must have an entry in inodes_by_handle and vice versa.  So we
+leave actually using the inodes_by_handle map for the next patch.
+
+[1] If some application in the guest still has the file open, there is
+going to be a corresponding FD mapping in lo_data.fd_map.  In such a
+case, the inode will only go away once every application in the guest
+has closed it.  The problem described only applies to cases where the
+guest does not have the file open, and it is just in the dentry cache,
+basically.
 
 Signed-off-by: Hanna Reitz <hreitz@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c      | 175 +++++++++++++++++++++++---
- tools/virtiofsd/passthrough_seccomp.c |   1 +
- 2 files changed, 161 insertions(+), 15 deletions(-)
+ tools/virtiofsd/passthrough_ll.c | 81 +++++++++++++++++++++++++-------
+ 1 file changed, 65 insertions(+), 16 deletions(-)
 
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index bc3b803d46..bd8fc922ea 100644
+index bd8fc922ea..b7d6aa7f9d 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -88,8 +88,18 @@ struct lo_key {
-     uint64_t mnt_id;
- };
+@@ -186,7 +186,8 @@ struct lo_data {
+     int announce_submounts;
+     bool use_statx;
+     struct lo_inode root;
+-    GHashTable *inodes; /* protected by lo->mutex */
++    GHashTable *inodes_by_ids; /* protected by lo->mutex */
++    GHashTable *inodes_by_handle; /* protected by lo->mutex */
+     struct lo_map ino_map; /* protected by lo->mutex */
+     struct lo_map dirp_map; /* protected by lo->mutex */
+     struct lo_map fd_map; /* protected by lo->mutex */
+@@ -275,8 +276,9 @@ static struct {
+ /* That we loaded cap-ng in the current thread from the saved */
+ static __thread bool cap_loaded = 0;
  
-+struct lo_fhandle {
-+    union {
-+        struct file_handle handle;
-+        char padding[sizeof(struct file_handle) + MAX_HANDLE_SZ];
-+    };
-+    int mount_id;
-+};
-+
- struct lo_inode {
-+    /* fd or fhandle must be set (i.e. >= 0 or non-NULL, respectively) */
-     int fd;
-+    struct lo_fhandle *fhandle;
+-static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
+-                                uint64_t mnt_id);
++static struct lo_inode *lo_find(struct lo_data *lo,
++                                const struct lo_fhandle *fhandle,
++                                struct stat *st, uint64_t mnt_id);
+ static int xattr_map_client(const struct lo_data *lo, const char *client_name,
+                             char **out_name);
  
-     /*
-      * Atomic reference count for this object.  The nlookup field holds a
-@@ -142,6 +152,19 @@ typedef struct xattr_map_entry {
-     unsigned int flags;
- } XattrMapEntry;
+@@ -1143,18 +1145,40 @@ out_err:
+     fuse_reply_err(req, saverr);
+ }
  
-+/*
-+ * An O_RDONLY FD representing the mount it is on.  We need this for
-+ * open_by_handle_at().
-+ *
-+ * The refcount is increased every time we store a file handle for
-+ * this mount, and it is decreased every time we release such a stored
-+ * file handle.
-+ */
-+struct lo_mount_fd {
-+    int fd;
-+    gint refcount;
-+};
-+
- struct lo_data {
-     pthread_mutex_t mutex;
-     int sandbox;
-@@ -178,6 +201,10 @@ struct lo_data {
-     /* If set, virtiofsd is responsible for setting umask during creation */
-     bool change_umask;
-     int user_posix_acl, posix_acl;
-+
-+    /* Maps (integer) mount IDs to lo_mount_fd objects */
-+    GHashTable *mount_fds;
-+    pthread_rwlock_t mount_fds_lock;
- };
- 
- /**
-@@ -316,6 +343,93 @@ static void temp_fd_copy(const TempFd *from, TempFd *to)
+-static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
+-                                uint64_t mnt_id)
++static struct lo_inode *lo_find(struct lo_data *lo,
++                                const struct lo_fhandle *fhandle,
++                                struct stat *st, uint64_t mnt_id)
+ {
+-    struct lo_inode *p;
+-    struct lo_key key = {
++    struct lo_inode *p = NULL;
++    struct lo_key ids_key = {
+         .ino = st->st_ino,
+         .dev = st->st_dev,
+         .mnt_id = mnt_id,
      };
- }
  
-+static void free_lo_mount_fd(gpointer data)
-+{
-+    struct lo_mount_fd *mfd = data;
-+
-+    close(mfd->fd);
-+    g_free(mfd);
-+}
-+
-+/**
-+ * Frees a file handle and optionally removes its reference to the
-+ * associated mount FD.  (Passing NULL as @fh is OK.)
-+ *
-+ * Pass @drop_mount_fd_ref == true if and only if this handle has a
-+ * strong reference to an lo_mount_fd object in the mount_fds hash
-+ * table.  That is always the case for file handles stored in lo_inode
-+ * objects.
-+ */
-+static void release_file_handle(struct lo_data *lo, struct lo_fhandle *fh,
-+                                bool drop_mount_fd_ref)
-+{
-+    if (!fh) {
-+        return;
+     pthread_mutex_lock(&lo->mutex);
+-    p = g_hash_table_lookup(lo->inodes, &key);
++    if (fhandle) {
++        p = g_hash_table_lookup(lo->inodes_by_handle, fhandle);
 +    }
-+
-+    if (drop_mount_fd_ref) {
-+        struct lo_mount_fd *mfd;
-+
-+        if (pthread_rwlock_rdlock(&lo->mount_fds_lock)) {
-+            fuse_log(FUSE_LOG_ERR, "%s(): Dropping mount FD reference failed "
-+                     "(mount ID: %i)\n", __func__, fh->mount_id);
-+        } else {
-+            mfd = g_hash_table_lookup(lo->mount_fds,
-+                                      GINT_TO_POINTER(fh->mount_id));
-+            assert(mfd != NULL);
-+
-+            pthread_rwlock_unlock(&lo->mount_fds_lock);
-+
-+            if (g_atomic_int_dec_and_test(&mfd->refcount)) {
-+                if (pthread_rwlock_wrlock(&lo->mount_fds_lock)) {
-+                    fuse_log(FUSE_LOG_ERR, "%s(): Dropping mount FD reference "
-+                             "failed (mount ID: %i)\n", __func__, fh->mount_id);
-+                } else {
-+                    /* Auto-closes the FD and frees mfd */
-+                    g_hash_table_remove(lo->mount_fds,
-+                                        GINT_TO_POINTER(fh->mount_id));
-+                    pthread_rwlock_unlock(&lo->mount_fds_lock);
-+                }
-+            }
-+        }
-+    }
-+
-+    g_free(fh);
-+}
-+
-+/**
-+ * Open the given file handle with the given flags.
-+ *
-+ * The mount FD to pass to open_by_handle_at() is taken from the
-+ * mount_fds hash map.
-+ *
-+ * On error, return -errno.
-+ */
-+static int open_file_handle(struct lo_data *lo, const struct lo_fhandle *fh,
-+                            int flags)
-+{
-+    struct lo_mount_fd *mfd;
-+    int ret;
-+
-+    ret = pthread_rwlock_rdlock(&lo->mount_fds_lock);
-+    if (ret) {
-+        return -ret;
-+    }
-+
-+    mfd = g_hash_table_lookup(lo->mount_fds, GINT_TO_POINTER(fh->mount_id));
-+    pthread_rwlock_unlock(&lo->mount_fds_lock);
-+    if (!mfd) {
-+        return -EINVAL;
-+    }
-+
-+    ret = open_by_handle_at(mfd->fd, (struct file_handle *)&fh->handle, flags);
-+    if (ret < 0) {
-+        return -errno;
-+    }
-+
-+    return ret;
-+}
-+
- /*
-  * Load capng's state from our saved state if the current thread
-  * hadn't previously been loaded.
-@@ -622,7 +736,10 @@ static void lo_inode_put(struct lo_data *lo, struct lo_inode **inodep)
-     *inodep = NULL;
- 
-     if (g_atomic_int_dec_and_test(&inode->refcount)) {
--        close(inode->fd);
-+        if (inode->fd >= 0) {
-+            close(inode->fd);
-+        }
-+        release_file_handle(lo, inode->fhandle, true);
-         free(inode);
-     }
- }
-@@ -650,10 +767,25 @@ static struct lo_inode *lo_inode(fuse_req_t req, fuse_ino_t ino)
- static int lo_inode_fd(struct lo_data *lo, const struct lo_inode *inode,
-                        TempFd *tfd)
- {
--    *tfd = (TempFd) {
--        .fd = inode->fd,
--        .owned = false,
--    };
-+    if (inode->fd >= 0) {
-+        *tfd = (TempFd) {
-+            .fd = inode->fd,
-+            .owned = false,
-+        };
-+    } else {
-+        int fd;
-+
-+        assert(inode->fhandle != NULL);
-+        fd = open_file_handle(lo, inode->fhandle, O_PATH);
-+        if (fd < 0) {
-+            return -errno;
-+        }
-+
-+        *tfd = (TempFd) {
-+            .fd = fd,
-+            .owned = true,
-+        };
-+    }
- 
-     return 0;
- }
-@@ -694,22 +826,32 @@ static int lo_fd(fuse_req_t req, fuse_ino_t ino, TempFd *tfd)
- static int lo_inode_open(struct lo_data *lo, struct lo_inode *inode,
-                          int open_flags, TempFd *tfd)
- {
--    g_autofree char *fd_str = g_strdup_printf("%d", inode->fd);
-+    g_autofree char *fd_str = NULL;
-     int fd;
- 
-     if (!S_ISREG(inode->filetype) && !S_ISDIR(inode->filetype)) {
-         return -EBADF;
-     }
- 
--    /*
--     * The file is a symlink so O_NOFOLLOW must be ignored. We checked earlier
--     * that the inode is not a special file but if an external process races
--     * with us then symlinks are traversed here. It is not possible to escape
--     * the shared directory since it is mounted as "/" though.
--     */
--    fd = openat(lo->proc_self_fd, fd_str, open_flags & ~O_NOFOLLOW);
--    if (fd < 0) {
--        return -errno;
-+    if (inode->fd >= 0) {
++    if (!p) {
++        p = g_hash_table_lookup(lo->inodes_by_ids, &ids_key);
 +        /*
-+         * The file is a symlink so O_NOFOLLOW must be ignored. We checked
-+         * earlier that the inode is not a special file but if an external
-+         * process races with us then symlinks are traversed here. It is not
-+         * possible to escape the shared directory since it is mounted as "/"
-+         * though.
++         * When we had to fall back to looking up an inode by its
++         * inode ID, ensure that we hit an entry that has a valid file
++         * descriptor.  Having an FD open means that the inode cannot
++         * really be deleted until the FD is closed, so that the inode
++         * ID remains valid until we evict our lo_inode.
++         * With no FD open (and just a file handle), the inode can be
++         * deleted while we still have our lo_inode, and so the inode
++         * ID may be reused by a completely different new inode.  We
++         * then must look up the lo_inode by file handle, because this
++         * handle contains a generation ID to differentiate between
++         * the old and the new inode.
 +         */
-+        fd_str = g_strdup_printf("%d", inode->fd);
-+        fd = openat(lo->proc_self_fd, fd_str, open_flags & ~O_NOFOLLOW);
-+        if (fd < 0) {
-+            return -errno;
++        if (p && p->fd == -1) {
++            p = NULL;
 +        }
-+    } else {
-+        assert(inode->fhandle != NULL);
-+        fd = open_file_handle(lo, inode->fhandle, open_flags);
-+        if (fd < 0) {
-+            return fd;
-+        }
++    }
+     if (p) {
+         assert(p->nlookup > 0);
+         p->nlookup++;
+@@ -1294,7 +1318,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+         e->attr_flags |= FUSE_ATTR_SUBMOUNT;
      }
  
-     *tfd = (TempFd) {
-@@ -4187,6 +4329,9 @@ int main(int argc, char *argv[])
+-    inode = lo_find(lo, &e->attr, mnt_id);
++    inode = lo_find(lo, NULL, &e->attr, mnt_id);
+     if (inode) {
+         close(newfd);
+     } else {
+@@ -1324,7 +1348,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+         }
+         pthread_mutex_lock(&lo->mutex);
+         inode->fuse_ino = lo_add_inode_mapping(req, inode);
+-        g_hash_table_insert(lo->inodes, &inode->key, inode);
++        g_hash_table_insert(lo->inodes_by_ids, &inode->key, inode);
+         pthread_mutex_unlock(&lo->mutex);
+     }
+     e->ino = inode->fuse_ino;
+@@ -1690,7 +1714,7 @@ static struct lo_inode *lookup_name(fuse_req_t req, fuse_ino_t parent,
+         goto out;
+     }
+ 
+-    inode = lo_find(lo, &attr, mnt_id);
++    inode = lo_find(lo, NULL, &attr, mnt_id);
+ 
+ out:
+     lo_inode_put(lo, &dir);
+@@ -1857,7 +1881,7 @@ static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
+     inode->nlookup -= n;
+     if (!inode->nlookup) {
+         lo_map_remove(&lo->ino_map, inode->fuse_ino);
+-        g_hash_table_remove(lo->inodes, &inode->key);
++        g_hash_table_remove(lo->inodes_by_ids, &inode->key);
+         if (lo->posix_lock) {
+             if (g_hash_table_size(inode->posix_locks)) {
+                 fuse_log(FUSE_LOG_WARNING, "Hash table is not empty\n");
+@@ -3700,7 +3724,7 @@ static void lo_destroy(void *userdata)
+         GHashTableIter iter;
+         gpointer key, value;
+ 
+-        g_hash_table_iter_init(&iter, lo->inodes);
++        g_hash_table_iter_init(&iter, lo->inodes_by_ids);
+         if (!g_hash_table_iter_next(&iter, &key, &value)) {
+             break;
+         }
+@@ -4264,10 +4288,34 @@ static gboolean lo_key_equal(gconstpointer a, gconstpointer b)
+     return la->ino == lb->ino && la->dev == lb->dev && la->mnt_id == lb->mnt_id;
+ }
+ 
++static guint lo_fhandle_hash(gconstpointer key)
++{
++    const struct lo_fhandle *fh = key;
++    guint hash;
++    size_t i;
++
++    /* Basically g_str_hash() */
++    hash = 5381;
++    for (i = 0; i < sizeof(fh->padding); i++) {
++        hash += hash * 33 + (unsigned char)fh->padding[i];
++    }
++    hash += hash * 33 + fh->mount_id;
++
++    return hash;
++}
++
++static gboolean lo_fhandle_equal(gconstpointer a, gconstpointer b)
++{
++    return !memcmp(a, b, sizeof(struct lo_fhandle));
++}
++
+ static void fuse_lo_data_cleanup(struct lo_data *lo)
+ {
+-    if (lo->inodes) {
+-        g_hash_table_destroy(lo->inodes);
++    if (lo->inodes_by_ids) {
++        g_hash_table_destroy(lo->inodes_by_ids);
++    }
++    if (lo->inodes_by_handle) {
++        g_hash_table_destroy(lo->inodes_by_handle);
+     }
+ 
+     if (lo->root.posix_locks) {
+@@ -4324,7 +4372,8 @@ int main(int argc, char *argv[])
+     qemu_init_exec_dir(argv[0]);
+ 
+     pthread_mutex_init(&lo.mutex, NULL);
+-    lo.inodes = g_hash_table_new(lo_key_hash, lo_key_equal);
++    lo.inodes_by_ids = g_hash_table_new(lo_key_hash, lo_key_equal);
++    lo.inodes_by_handle = g_hash_table_new(lo_fhandle_hash, lo_fhandle_equal);
+     lo.root.fd = -1;
      lo.root.fuse_ino = FUSE_ROOT_ID;
      lo.cache = CACHE_AUTO;
- 
-+    pthread_rwlock_init(&lo.mount_fds_lock, NULL);
-+    lo.mount_fds = g_hash_table_new_full(NULL, NULL, NULL, free_lo_mount_fd);
-+
-     /*
-      * Set up the ino map like this:
-      * [0] Reserved (will not be used)
-diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
-index f49ed94b5e..af04c638cb 100644
---- a/tools/virtiofsd/passthrough_seccomp.c
-+++ b/tools/virtiofsd/passthrough_seccomp.c
-@@ -77,6 +77,7 @@ static const int syscall_allowlist[] = {
-     SCMP_SYS(statx),
-     SCMP_SYS(open),
-     SCMP_SYS(openat),
-+    SCMP_SYS(open_by_handle_at),
-     SCMP_SYS(ppoll),
-     SCMP_SYS(prctl), /* TODO restrict to just PR_SET_NAME? */
-     SCMP_SYS(preadv),
 -- 
 2.31.1
 

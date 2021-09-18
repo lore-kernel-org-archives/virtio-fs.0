@@ -1,13 +1,16 @@
-Date: Thu, 16 Sep 2021 10:55:46 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YUMUonBdCHCtXA/3@work-vm>
-References: <20210824131158.39970-1-slp@redhat.com>
+From: JeffleXu <jefflexu@linux.alibaba.com>
+References: <20210817022220.17574-1-jefflexu@linux.alibaba.com>
+	<CAJfpeguw1hMOaxpDmjmijhf=-JEW95aEjxfVo_=D_LyWx8LDgw@mail.gmail.com>
+	<YRuCHvhICtTzMK04@work-vm> <YRuuRo8jEs5dkfw9@redhat.com>
+	<299689e9-bdeb-a715-3f31-8c70369cf0ba@linux.alibaba.com>
+Message-ID: <5bcf1be7-49b5-d032-3bcf-fcdf7b28b88b@linux.alibaba.com>
+Date: Sat, 18 Sep 2021 11:06:34 +0800
 MIME-Version: 1.0
-In-Reply-To: <20210824131158.39970-1-slp@redhat.com>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Reverse req_list before
-	processing it
+In-Reply-To: <299689e9-bdeb-a715-3f31-8c70369cf0ba@linux.alibaba.com>
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH v4 0/8] fuse,virtiofs: support per-file DAX
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,68 +19,91 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Sergio Lopez <slp@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Miklos Szeredi <miklos@szeredi.hu>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, Joseph Qi <joseph.qi@linux.alibaba.com>, linux-fsdevel@vger.kernel.org, virtualization@lists.linux-foundation.org
 
-* Sergio Lopez (slp@redhat.com) wrote:
-> With the thread pool disabled, we add the requests in the queue to a
-> GList, processing by iterating over there afterwards.
-> 
-> For adding them, we're using "g_list_prepend()", which is more
-> efficient but causes the requests to be processed in reverse order,
-> breaking the read-ahead and request-merging optimizations in the host
-> for sequential operations.
-> 
-> According to the documentation, if you need to process the request
-> in-order, using "g_list_prepend()" and then reversing the list with
-> "g_list_reverse()" is more efficient than using "g_list_append()", so
-> let's do it that way.
-> 
-> Testing on a spinning disk (to boost the increase of read-ahead and
-> request-merging) shows a 4x improvement on sequential write fio test:
-> 
-> Test:
-> fio --directory=/mnt/virtio-fs --filename=fio-file1 --runtime=20
-> --iodepth=16 --size=4G --direct=1 --blocksize=4K --ioengine libaio
-> --rw write --name seqwrite-libaio
-> 
-> Without "g_list_reverse()":
-> ...
-> Jobs: 1 (f=1): [W(1)][100.0%][w=22.4MiB/s][w=5735 IOPS][eta 00m:00s]
-> seqwrite-libaio: (groupid=0, jobs=1): err= 0: pid=710: Tue Aug 24 12:58:16 2021
->   write: IOPS=5709, BW=22.3MiB/s (23.4MB/s)(446MiB/20002msec); 0 zone resets
-> ...
-> 
-> With "g_list_reverse()":
-> ...
-> Jobs: 1 (f=1): [W(1)][100.0%][w=84.0MiB/s][w=21.5k IOPS][eta 00m:00s]
-> seqwrite-libaio: (groupid=0, jobs=1): err= 0: pid=716: Tue Aug 24 13:00:15 2021
->   write: IOPS=21.3k, BW=83.1MiB/s (87.2MB/s)(1663MiB/20001msec); 0 zone resets
-> ...
-> 
-> Signed-off-by: Sergio Lopez <slp@redhat.com>
+Hi Vivek, Miklos,
 
-Queued
+On 9/16/21 4:21 PM, JeffleXu wrote:
+> Hi, I add some performance statistics below.
+> 
+> 
+> On 8/17/21 8:40 PM, Vivek Goyal wrote:
+>> On Tue, Aug 17, 2021 at 10:32:14AM +0100, Dr. David Alan Gilbert wrote:
+>>> * Miklos Szeredi (miklos@szeredi.hu) wrote:
+>>>> On Tue, 17 Aug 2021 at 04:22, Jeffle Xu <jefflexu@linux.alibaba.com> wrote:
+>>>>>
+>>>>> This patchset adds support of per-file DAX for virtiofs, which is
+>>>>> inspired by Ira Weiny's work on ext4[1] and xfs[2].
+>>>>
+>>>> Can you please explain the background of this change in detail?
+>>>>
+>>>> Why would an admin want to enable DAX for a particular virtiofs file
+>>>> and not for others?
+>>>
+>>> Where we're contending on virtiofs dax cache size it makes a lot of
+>>> sense; it's quite expensive for us to map something into the cache
+>>> (especially if we push something else out), so selectively DAXing files
+>>> that are expected to be hot could help reduce cache churn.
+> 
+> Yes, the performance of dax can be limited when the DAX window is
+> limited, where dax window may be contended by multiple files.
+> 
+> I tested kernel compiling in virtiofs, emulating the scenario where a
+> lot of files contending dax window and triggering dax window reclaiming.
+> 
+> Environment setup:
+> - guest vCPU: 16
+> - time make vmlinux -j128
+> 
+> type    | cache  | cache-size | time
+> ------- | ------ | ---------- | ----
+> non-dax | always |   --       | real 2m48.119s
+> dax     | always | 64M        | real 4m49.563s
+> dax     | always |   1G       | real 3m14.200s
+> dax     | always |   4G       | real 2m41.141s
+> 
+> 
+> It can be seen that there's performance drop, comparing to the normal
+> buffered IO, when dax window resource is restricted and dax window
+> relcaiming is triggered. The smaller the cache size is, the worse the
+> performance is. The performance drop can be alleviated and eliminated as
+> cache size increases.
+> 
+> Though we may not compile kernel in virtiofs, indeed we may access a lot
+> of small files in virtiofs and suffer this performance drop.
+> 
+> 
+>> In that case probaly we should just make DAX window larger. I assume
+> 
+> Yes, as the DAX window gets larger, it is less likely that we can run
+> short of dax window resource.
+> 
+> However it doesn't come without cost. 'struct page' descriptor for dax
+> window will consume guest memory at a ratio of ~1.5% (64/4096 = ~1.5%,
+> page descriptor is of 64 bytes size, assuming 4K sized page). That is,
+> every 1GB cache size will cost 16MB guest memory. As the cache size
+> increases, the memory footprint for page descriptors also increases,
+> which may offset the benefit of dax by eliminating guest page cache.
+> 
+> In summary, per-file dax feature tries to achieve a balance between
+> performance and memory overhead, by offering a finer gained control for
+> dax to users.
+> 
 
-> ---
->  tools/virtiofsd/fuse_virtio.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-> index fc2564a603..8f4fd165b9 100644
-> --- a/tools/virtiofsd/fuse_virtio.c
-> +++ b/tools/virtiofsd/fuse_virtio.c
-> @@ -716,6 +716,7 @@ static void *fv_queue_thread(void *opaque)
->  
->          /* Process all the requests. */
->          if (!se->thread_pool_size && req_list != NULL) {
-> +            req_list = g_list_reverse(req_list);
->              g_list_foreach(req_list, fv_queue_worker, qi);
->              g_list_free(req_list);
->              req_list = NULL;
-> -- 
-> 2.26.2
-> 
+I'm not sure if this is adequate for introducing per-file dax feature to
+community? Need some feedback from the community.
+
+And if that's the case, I also want to know if setting/clearing S_DAX
+inside guest is needed, since in our internal using scenario, setting
+S_DAX from host daemon is adequate. If setting/clearing S_DAX inside
+guest can be omitted then, the negotiation during FUSE_INIT phase is not
+needed either. After all we could completely rely on the FUSE_ATTR_DAX
+flag feeded by host daemon to see if dax shall be enabled or not for
+corresponding file. The whole patch set will also be somehow simper then.
+
+
 -- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+Thanks,
+Jeffle
 

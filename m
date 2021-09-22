@@ -1,14 +1,11 @@
-Date: Wed, 22 Sep 2021 08:30:18 -0400
+Date: Wed, 22 Sep 2021 15:02:01 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YUsh2s/oJhVCLpoL@redhat.com>
-References: <20210826211937.317558-1-vgoyal@redhat.com>
-	<YUsMwfZI3sQyT/Rj@work-vm>
+Message-ID: <YUt9qbmgAfCFfg5t@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <YUsMwfZI3sQyT/Rj@work-vm>
-Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: Add capability to block
-	xattrs
+Subject: [Virtio-fs] [PATCH] virtiofsd: xattr mapping add a new type
+	"unsupported"
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,63 +14,104 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com, dgilbert@redhat.com
 
-On Wed, Sep 22, 2021 at 12:00:17PM +0100, Dr. David Alan Gilbert wrote:
-> * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > As of now we have a knob "-o xattr/no_xattr" which either enables
-> > all xattrs or disables all xattrs.
-> 
-> Hi Vivek,
->   Thanks for this.
-> 
-> > We need something more fine grained where we can selectively disable
-> > only certain xattrs (and not all).
-> > 
-> > For example, in some cases we want to disable "security.selinux"
-> > xattr. This is equivalent to virtiofs not supporting security.selinux
-> > and guest kernel will fallback to a single label for whole fs
-> > (virtiofs_t).
-> > 
-> > So add an option "-o block_xattr=<list-of-xattrs>" which will allow
-> > specifying a list of xattrs to block.
-> 
-> This is quite interesting; I'd not noticed you had the exisitng blocking
-> mechanism,
+Right now for xattr remapping, we support types of "prefix", "ok" or "bad".
+Type "bad" returns -EPERM on setxattr and hides xattr in listxattr. For
+getxattr, mapping code returns -EPERM but getxattr code converts it to -ENODATA.
 
-Yes, that's for blocking posix acl xattrs if needed. If xattr map
-support blocking, then we could probably insert an internal rule
-to block posix acl xattrs. But that's more of a cleanup exercise
-I will take up some other time.
+I need a new semantics where if an xattr is unsupported, then
+getxattr()/setxattr() return -ENOTSUP and listxattr() should hide the xattr.
+This is needed to simulate that security.selinux is not supported by
+virtiofs filesystem and in that case client falls back to some default
+label specified by policy.
 
-> however, as discussed, I think my preference is if this could
-> be done as a modification of the xattrmap it would avoid another set of
-> options.
-> 
-> The mapping code already has 'type's of:
-> 
->   prefix, ok, bad
-> 
-> I think you just need to add a 'reject' type
-> that produces the error code you need.
+So add a new type "unsupported" which returns -ENOTSUP on getxattr() and
+setxattr() and hides xattrs in listxattr().
 
-How about "unsupported" and then return -EOPNOTSUPP? 
+For example, one can use following mapping rule to not support
+security.selinux xattr and allow others.
 
-I am looking at selinux kernel code and it expect -EOPNOTSUPP to decide
-that selinux xattr is not supported and looks into fallback options.
+"-o xattrmap=/unsupported/all/security.selinux/security.selinux//ok/all///"
 
-static int sb_check_xattr_support(struct super_block *sb)
-{
-        rc = __vfs_getxattr(root, root_inode, XATTR_NAME_SELINUX, NULL, 0);
-        if (rc < 0 && rc != -ENODATA) {
-                if (rc == -EOPNOTSUPP) {
-                        pr_warn("SELinux: (dev %s, type %s) has no security xattr handler\n",
-                                sb->s_id, sb->s_type->name);
-                        goto fallback;
-...
-...
-}
+Suggested-by: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ docs/tools/virtiofsd.rst         |    6 ++++++
+ tools/virtiofsd/passthrough_ll.c |   17 ++++++++++++++---
+ 2 files changed, 20 insertions(+), 3 deletions(-)
 
-Vivek
+Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
+===================================================================
+--- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2021-09-22 08:37:16.070377732 -0400
++++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2021-09-22 14:17:09.543016250 -0400
+@@ -2465,6 +2465,11 @@ static void lo_flock(fuse_req_t req, fus
+  * Automatically reversed on read
+  */
+ #define XATTR_MAP_FLAG_PREFIX  (1 <<  2)
++/*
++ * The attribute is unsupported;
++ * ENOTSUP on write, hidden on read.
++ */
++#define XATTR_MAP_FLAG_UNSUPPORTED     (1 <<  3)
+ 
+ /* scopes */
+ /* Apply rule to get/set/remove */
+@@ -2636,6 +2641,8 @@ static void parse_xattrmap(struct lo_dat
+             tmp_entry.flags |= XATTR_MAP_FLAG_OK;
+         } else if (strstart(map, "bad", &map)) {
+             tmp_entry.flags |= XATTR_MAP_FLAG_BAD;
++        } else if (strstart(map, "unsupported", &map)) {
++            tmp_entry.flags |= XATTR_MAP_FLAG_UNSUPPORTED;
+         } else if (strstart(map, "map", &map)) {
+             /*
+              * map is sugar that adds a number of rules, and must be
+@@ -2646,8 +2653,8 @@ static void parse_xattrmap(struct lo_dat
+         } else {
+             fuse_log(FUSE_LOG_ERR,
+                      "%s: Unexpected type;"
+-                     "Expecting 'prefix', 'ok', 'bad' or 'map' in rule %zu\n",
+-                     __func__, lo->xattr_map_nentries);
++                     "Expecting 'prefix', 'ok', 'bad', 'unsupported' or 'map'"
++                     " in rule %zu\n", __func__, lo->xattr_map_nentries);
+             exit(1);
+         }
+ 
+@@ -2749,6 +2756,9 @@ static int xattr_map_client(const struct
+             if (cur_entry->flags & XATTR_MAP_FLAG_BAD) {
+                 return -EPERM;
+             }
++            if (cur_entry->flags & XATTR_MAP_FLAG_UNSUPPORTED) {
++                return -ENOTSUP;
++            }
+             if (cur_entry->flags & XATTR_MAP_FLAG_OK) {
+                 /* Unmodified name */
+                 return 0;
+@@ -2788,7 +2798,8 @@ static int xattr_map_server(const struct
+ 
+         if ((cur_entry->flags & XATTR_MAP_FLAG_SERVER) &&
+             (strstart(server_name, cur_entry->prepend, &end))) {
+-            if (cur_entry->flags & XATTR_MAP_FLAG_BAD) {
++            if (cur_entry->flags & XATTR_MAP_FLAG_BAD ||
++                cur_entry->flags & XATTR_MAP_FLAG_UNSUPPORTED) {
+                 return -ENODATA;
+             }
+             if (cur_entry->flags & XATTR_MAP_FLAG_OK) {
+Index: rhvgoyal-qemu/docs/tools/virtiofsd.rst
+===================================================================
+--- rhvgoyal-qemu.orig/docs/tools/virtiofsd.rst	2021-09-22 08:37:15.938372097 -0400
++++ rhvgoyal-qemu/docs/tools/virtiofsd.rst	2021-09-22 14:44:09.814188712 -0400
+@@ -183,6 +183,12 @@ Using ':' as the separator a rule is of
+   'ok' as either an explicit terminator or for special handling of certain
+   patterns.
+ 
++- 'unsupported' - If a client tries to use a name matching 'key' it's
++  denied using ENOTSUP; when the server passes an attribute
++  name matching 'prepend' it's hidden.  In many ways it's use is very like
++  'ok' as either an explicit terminator or for special handling of certain
++  patterns.
++
+ **key** is a string tested as a prefix on an attribute name originating
+ on the client.  It maybe empty in which case a 'client' rule
+ will always match on client names.
 

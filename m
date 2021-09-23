@@ -1,10 +1,12 @@
 From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Thu, 23 Sep 2021 17:25:21 +0800
-Message-Id: <20210923092526.72341-1-jefflexu@linux.alibaba.com>
+Date: Thu, 23 Sep 2021 17:25:23 +0800
+Message-Id: <20210923092526.72341-3-jefflexu@linux.alibaba.com>
+In-Reply-To: <20210923092526.72341-1-jefflexu@linux.alibaba.com>
+References: <20210923092526.72341-1-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v5 0/5] fuse,virtiofs: support per-file DAX
+Subject: [Virtio-fs] [PATCH v5 2/5] fuse: make DAX mount option a tri-state
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,98 +18,176 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
 Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com
 
-This patchset adds support of per-file DAX for virtiofs, which is
-inspired by Ira Weiny's work on ext4[1] and xfs[2].
+We add 'always', 'never', and 'inode' (default). '-o dax' continues to
+operate the same which is equivalent to 'always'. To be consistemt with
+ext4/xfs's tri-state mount option, when neither '-o dax' nor '-o dax='
+option is specified, the default behaviour is equal to 'inode'.
 
-Any comment is welcome.
+By the time this patch is applied, 'inode' mode is actually equal to
+'always' mode, before the per-file DAX flag is introduced in the
+following patch.
 
-[1] commit 9cb20f94afcd ("fs/ext4: Make DAX mount option a tri-state")
-[2] commit 02beb2686ff9 ("fs/xfs: Make DAX mount option a tri-state")
+Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
+---
+ fs/fuse/dax.c       |  9 +++++++--
+ fs/fuse/fuse_i.h    | 14 ++++++++++++--
+ fs/fuse/inode.c     | 10 +++++++---
+ fs/fuse/virtio_fs.c | 16 ++++++++++++++--
+ 4 files changed, 40 insertions(+), 9 deletions(-)
 
-
-[Purpose]
-DAX may be limited in some specific situation. When the number of usable
-DAX windows is under watermark, the recalim routine will be triggered to
-reclaim some DAX windows. It may have a negative impact on the
-performance, since some processes may need to wait for DAX windows to be
-recalimed and reused then. To mitigate the performance degradation, the
-overall DAX window need to be expanded larger.
-
-However, simply expanding the DAX window may not be a good deal in some
-scenario. To maintain one DAX window chunk (i.e., 2MB in size), 32KB
-(512 * 64 bytes) memory footprint will be consumed for page descriptors
-inside guest, which is greater than the memory footprint if it uses
-guest page cache when DAX disabled. Thus it'd better disable DAX for
-those files smaller than 32KB, to reduce the demand for DAX window and
-thus avoid the unworthy memory overhead.
-
-Per-file DAX feature is introduced to address this issue, by offering a
-finer grained control for dax to users, trying to achieve a balance
-between performance and memory overhead.
-
-
-[Note]
-When the per-file DAX hint changes while the file is still *opened*, it
-is quite complicated and maybe fragile to dynamically change the DAX
-state, since dynamic switching needs to switch a_ops atomiclly. Ira
-Weiny had ever implemented a so called i_aops_sem lock [3] but
-eventually gave up since the complexity of the implementation [4][5][6][7].
-
-Hence mark the inode and corresponding dentries as DONE_CACHE once the
-per-file DAX hint changes, so that the inode instance will be evicted
-and freed as soon as possible once the file is closed and the last
-reference to the inode is put. And then when the file gets reopened next
-time, the new instantiated inode will reflect the new DAX state.
-
-In summary, when the per-file DAX hint changes for an *opened* file, the
-DAX state of the file won't be updated until this file is closed and
-reopened later. This is also how ext4/xfs per-file DAX works.
-
-[3] https://lore.kernel.org/lkml/20200227052442.22524-7-ira.weiny@intel.com/
-[4] https://patchwork.kernel.org/project/xfs/cover/20200407182958.568475-1-ira.weiny@intel.com/
-[5] https://lore.kernel.org/lkml/20200305155144.GA5598@lst.de/
-[6] https://lore.kernel.org/lkml/20200401040021.GC56958@magnolia/
-[7] https://lore.kernel.org/lkml/20200403182904.GP80283@magnolia/
-
-chanegs since v4:
-- drop support for setting/clearing FS_DAX inside guest
-- and thus drop the negotiation phase during FUSE_INIT
-
-changes since v3:
-- bug fix (patch 6): s/"IS_DAX(inode) != newdax"/"!!IS_DAX(inode) !=
-  newdax"
-- during FUSE_INIT, advertise capability for per-file DAX only when
-  mounted as "-o dax=inode" (patch 4)
-
-changes since v2:
-- modify fuse_show_options() accordingly to make it compatible with
-  new tri-state mount option (patch 2)
-- extract FUSE protocol changes into one seperate patch (patch 3)
-- FUSE server/client need to negotiate if they support per-file DAX
-  (patch 4)
-- extract DONT_CACHE logic into patch 6/7
-
-v4: https://lore.kernel.org/linux-fsdevel/20210817022220.17574-1-jefflexu@linux.alibaba.com/
-v3: https://www.spinics.net/lists/linux-fsdevel/msg200852.html
-v2: https://www.spinics.net/lists/linux-fsdevel/msg199584.html
-v1: https://www.spinics.net/lists/linux-virtualization/msg51008.html
-
-
-Jeffle Xu (5):
-  fuse: add fuse_should_enable_dax() helper
-  fuse: make DAX mount option a tri-state
-  fuse: support per-file DAX
-  fuse: enable per-file DAX
-  fuse: mark inode DONT_CACHE when per-file DAX hint changes
-
- fs/fuse/dax.c             | 32 +++++++++++++++++++++++++++++---
- fs/fuse/file.c            |  4 ++--
- fs/fuse/fuse_i.h          | 19 +++++++++++++++----
- fs/fuse/inode.c           | 15 +++++++++++----
- fs/fuse/virtio_fs.c       | 16 ++++++++++++++--
- include/uapi/linux/fuse.h |  7 ++++++-
- 6 files changed, 77 insertions(+), 16 deletions(-)
-
+diff --git a/fs/fuse/dax.c b/fs/fuse/dax.c
+index 28db96ea23e2..e87ddded38c7 100644
+--- a/fs/fuse/dax.c
++++ b/fs/fuse/dax.c
+@@ -1282,11 +1282,14 @@ static int fuse_dax_mem_range_init(struct fuse_conn_dax *fcd)
+ 	return ret;
+ }
+ 
+-int fuse_dax_conn_alloc(struct fuse_conn *fc, struct dax_device *dax_dev)
++int fuse_dax_conn_alloc(struct fuse_conn *fc, enum fuse_dax_mode dax_mode,
++			struct dax_device *dax_dev)
+ {
+ 	struct fuse_conn_dax *fcd;
+ 	int err;
+ 
++	fc->dax_mode = dax_mode;
++
+ 	if (!dax_dev)
+ 		return 0;
+ 
+@@ -1333,8 +1336,10 @@ static const struct address_space_operations fuse_dax_file_aops  = {
+ static bool fuse_should_enable_dax(struct inode *inode)
+ {
+ 	struct fuse_conn *fc = get_fuse_conn(inode);
++	unsigned int dax_mode = fc->dax_mode;
+ 
+-	if (!fc->dax)
++	/* If 'dax=always/inode', fc->dax couldn't be NULL */
++	if (dax_mode == FUSE_DAX_NEVER)
+ 		return false;
+ 
+ 	return true;
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index 319596df5dc6..5abf9749923f 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -480,6 +480,12 @@ struct fuse_dev {
+ 	struct list_head entry;
+ };
+ 
++enum fuse_dax_mode {
++	FUSE_DAX_INODE,
++	FUSE_DAX_ALWAYS,
++	FUSE_DAX_NEVER,
++};
++
+ struct fuse_fs_context {
+ 	int fd;
+ 	struct file *file;
+@@ -497,7 +503,7 @@ struct fuse_fs_context {
+ 	bool no_control:1;
+ 	bool no_force_umount:1;
+ 	bool legacy_opts_show:1;
+-	bool dax:1;
++	enum fuse_dax_mode dax_mode;
+ 	unsigned int max_read;
+ 	unsigned int blksize;
+ 	const char *subtype;
+@@ -802,6 +808,9 @@ struct fuse_conn {
+ 	struct list_head devices;
+ 
+ #ifdef CONFIG_FUSE_DAX
++	/* dax mode: FUSE_DAX_* (always, never or per-file) */
++	enum fuse_dax_mode dax_mode;
++
+ 	/* Dax specific conn data, non-NULL if DAX is enabled */
+ 	struct fuse_conn_dax *dax;
+ #endif
+@@ -1255,7 +1264,8 @@ ssize_t fuse_dax_read_iter(struct kiocb *iocb, struct iov_iter *to);
+ ssize_t fuse_dax_write_iter(struct kiocb *iocb, struct iov_iter *from);
+ int fuse_dax_mmap(struct file *file, struct vm_area_struct *vma);
+ int fuse_dax_break_layouts(struct inode *inode, u64 dmap_start, u64 dmap_end);
+-int fuse_dax_conn_alloc(struct fuse_conn *fc, struct dax_device *dax_dev);
++int fuse_dax_conn_alloc(struct fuse_conn *fc, enum fuse_dax_mode mode,
++			struct dax_device *dax_dev);
+ void fuse_dax_conn_free(struct fuse_conn *fc);
+ bool fuse_dax_inode_alloc(struct super_block *sb, struct fuse_inode *fi);
+ void fuse_dax_inode_init(struct inode *inode);
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index 36cd03114b6d..b4b41683e97e 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -742,8 +742,12 @@ static int fuse_show_options(struct seq_file *m, struct dentry *root)
+ 			seq_printf(m, ",blksize=%lu", sb->s_blocksize);
+ 	}
+ #ifdef CONFIG_FUSE_DAX
+-	if (fc->dax)
+-		seq_puts(m, ",dax");
++	if (fc->dax_mode == FUSE_DAX_ALWAYS)
++		seq_puts(m, ",dax=always");
++	else if (fc->dax_mode == FUSE_DAX_NEVER)
++		seq_puts(m, ",dax=never");
++	else if (fc->dax_mode == FUSE_DAX_INODE)
++		seq_puts(m, ",dax=inode");
+ #endif
+ 
+ 	return 0;
+@@ -1493,7 +1497,7 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
+ 	sb->s_subtype = ctx->subtype;
+ 	ctx->subtype = NULL;
+ 	if (IS_ENABLED(CONFIG_FUSE_DAX)) {
+-		err = fuse_dax_conn_alloc(fc, ctx->dax_dev);
++		err = fuse_dax_conn_alloc(fc, ctx->dax_mode, ctx->dax_dev);
+ 		if (err)
+ 			goto err;
+ 	}
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index 0ad89c6629d7..58cfbaeb4a7d 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -88,12 +88,21 @@ struct virtio_fs_req_work {
+ static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
+ 				 struct fuse_req *req, bool in_flight);
+ 
++static const struct constant_table dax_param_enums[] = {
++	{"inode",	FUSE_DAX_INODE },
++	{"always",	FUSE_DAX_ALWAYS },
++	{"never",	FUSE_DAX_NEVER },
++	{}
++};
++
+ enum {
+ 	OPT_DAX,
++	OPT_DAX_ENUM,
+ };
+ 
+ static const struct fs_parameter_spec virtio_fs_parameters[] = {
+ 	fsparam_flag("dax", OPT_DAX),
++	fsparam_enum("dax", OPT_DAX_ENUM, dax_param_enums),
+ 	{}
+ };
+ 
+@@ -110,7 +119,10 @@ static int virtio_fs_parse_param(struct fs_context *fsc,
+ 
+ 	switch (opt) {
+ 	case OPT_DAX:
+-		ctx->dax = 1;
++		ctx->dax_mode = FUSE_DAX_ALWAYS;
++		break;
++	case OPT_DAX_ENUM:
++		ctx->dax_mode = result.uint_32;
+ 		break;
+ 	default:
+ 		return -EINVAL;
+@@ -1326,7 +1338,7 @@ static int virtio_fs_fill_super(struct super_block *sb, struct fs_context *fsc)
+ 
+ 	/* virtiofs allocates and installs its own fuse devices */
+ 	ctx->fudptr = NULL;
+-	if (ctx->dax) {
++	if (ctx->dax_mode != FUSE_DAX_NEVER) {
+ 		if (!fs->dax_dev) {
+ 			err = -EINVAL;
+ 			pr_err("virtio-fs: dax can't be enabled as filesystem"
 -- 
 2.27.0
 

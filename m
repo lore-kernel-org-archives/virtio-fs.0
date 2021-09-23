@@ -1,11 +1,13 @@
-Date: Wed, 22 Sep 2021 15:02:01 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YUt9qbmgAfCFfg5t@redhat.com>
+From: Jeffle Xu <jefflexu@linux.alibaba.com>
+Date: Thu, 23 Sep 2021 17:25:26 +0800
+Message-Id: <20210923092526.72341-6-jefflexu@linux.alibaba.com>
+In-Reply-To: <20210923092526.72341-1-jefflexu@linux.alibaba.com>
+References: <20210923092526.72341-1-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: [Virtio-fs] [PATCH] virtiofsd: xattr mapping add a new type
-	"unsupported"
+Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [PATCH v5 5/5] fuse: mark inode DONT_CACHE when
+	per-file DAX hint changes
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,104 +16,76 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com, dgilbert@redhat.com
+To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com
 
-Right now for xattr remapping, we support types of "prefix", "ok" or "bad".
-Type "bad" returns -EPERM on setxattr and hides xattr in listxattr. For
-getxattr, mapping code returns -EPERM but getxattr code converts it to -ENODATA.
+When the per-file DAX hint changes while the file is still *opened*, it
+is quite complicated and maybe fragile to dynamically change the DAX
+state.
 
-I need a new semantics where if an xattr is unsupported, then
-getxattr()/setxattr() return -ENOTSUP and listxattr() should hide the xattr.
-This is needed to simulate that security.selinux is not supported by
-virtiofs filesystem and in that case client falls back to some default
-label specified by policy.
+Hence mark the inode and corresponding dentries as DONE_CACHE once the
+per-file DAX hint changes, so that the inode instance will be evicted
+and freed as soon as possible once the file is closed and the last
+reference to the inode is put. And then when the file gets reopened next
+time, the new instantiated inode will reflect the new DAX state.
 
-So add a new type "unsupported" which returns -ENOTSUP on getxattr() and
-setxattr() and hides xattrs in listxattr().
+In summary, when the per-file DAX hint changes for an *opened* file, the
+DAX state of the file won't be updated until this file is closed and
+reopened later.
 
-For example, one can use following mapping rule to not support
-security.selinux xattr and allow others.
-
-"-o xattrmap=/unsupported/all/security.selinux/security.selinux//ok/all///"
-
-Suggested-by: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
 ---
- docs/tools/virtiofsd.rst         |    6 ++++++
- tools/virtiofsd/passthrough_ll.c |   17 ++++++++++++++---
- 2 files changed, 20 insertions(+), 3 deletions(-)
+ fs/fuse/dax.c    | 9 +++++++++
+ fs/fuse/fuse_i.h | 1 +
+ fs/fuse/inode.c  | 3 +++
+ 3 files changed, 13 insertions(+)
 
-Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
-===================================================================
---- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2021-09-22 08:37:16.070377732 -0400
-+++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2021-09-22 14:17:09.543016250 -0400
-@@ -2465,6 +2465,11 @@ static void lo_flock(fuse_req_t req, fus
-  * Automatically reversed on read
-  */
- #define XATTR_MAP_FLAG_PREFIX  (1 <<  2)
-+/*
-+ * The attribute is unsupported;
-+ * ENOTSUP on write, hidden on read.
-+ */
-+#define XATTR_MAP_FLAG_UNSUPPORTED     (1 <<  3)
+diff --git a/fs/fuse/dax.c b/fs/fuse/dax.c
+index b0682ddd5d77..d90eaf1c5b48 100644
+--- a/fs/fuse/dax.c
++++ b/fs/fuse/dax.c
+@@ -1358,6 +1358,15 @@ void fuse_dax_inode_init(struct inode *inode, unsigned int flags)
+ 	inode->i_data.a_ops = &fuse_dax_file_aops;
+ }
  
- /* scopes */
- /* Apply rule to get/set/remove */
-@@ -2636,6 +2641,8 @@ static void parse_xattrmap(struct lo_dat
-             tmp_entry.flags |= XATTR_MAP_FLAG_OK;
-         } else if (strstart(map, "bad", &map)) {
-             tmp_entry.flags |= XATTR_MAP_FLAG_BAD;
-+        } else if (strstart(map, "unsupported", &map)) {
-+            tmp_entry.flags |= XATTR_MAP_FLAG_UNSUPPORTED;
-         } else if (strstart(map, "map", &map)) {
-             /*
-              * map is sugar that adds a number of rules, and must be
-@@ -2646,8 +2653,8 @@ static void parse_xattrmap(struct lo_dat
-         } else {
-             fuse_log(FUSE_LOG_ERR,
-                      "%s: Unexpected type;"
--                     "Expecting 'prefix', 'ok', 'bad' or 'map' in rule %zu\n",
--                     __func__, lo->xattr_map_nentries);
-+                     "Expecting 'prefix', 'ok', 'bad', 'unsupported' or 'map'"
-+                     " in rule %zu\n", __func__, lo->xattr_map_nentries);
-             exit(1);
-         }
- 
-@@ -2749,6 +2756,9 @@ static int xattr_map_client(const struct
-             if (cur_entry->flags & XATTR_MAP_FLAG_BAD) {
-                 return -EPERM;
-             }
-+            if (cur_entry->flags & XATTR_MAP_FLAG_UNSUPPORTED) {
-+                return -ENOTSUP;
-+            }
-             if (cur_entry->flags & XATTR_MAP_FLAG_OK) {
-                 /* Unmodified name */
-                 return 0;
-@@ -2788,7 +2798,8 @@ static int xattr_map_server(const struct
- 
-         if ((cur_entry->flags & XATTR_MAP_FLAG_SERVER) &&
-             (strstart(server_name, cur_entry->prepend, &end))) {
--            if (cur_entry->flags & XATTR_MAP_FLAG_BAD) {
-+            if (cur_entry->flags & XATTR_MAP_FLAG_BAD ||
-+                cur_entry->flags & XATTR_MAP_FLAG_UNSUPPORTED) {
-                 return -ENODATA;
-             }
-             if (cur_entry->flags & XATTR_MAP_FLAG_OK) {
-Index: rhvgoyal-qemu/docs/tools/virtiofsd.rst
-===================================================================
---- rhvgoyal-qemu.orig/docs/tools/virtiofsd.rst	2021-09-22 08:37:15.938372097 -0400
-+++ rhvgoyal-qemu/docs/tools/virtiofsd.rst	2021-09-22 14:44:09.814188712 -0400
-@@ -183,6 +183,12 @@ Using ':' as the separator a rule is of
-   'ok' as either an explicit terminator or for special handling of certain
-   patterns.
- 
-+- 'unsupported' - If a client tries to use a name matching 'key' it's
-+  denied using ENOTSUP; when the server passes an attribute
-+  name matching 'prepend' it's hidden.  In many ways it's use is very like
-+  'ok' as either an explicit terminator or for special handling of certain
-+  patterns.
++void fuse_dax_dontcache(struct inode *inode, unsigned int flags)
++{
++	struct fuse_conn *fc = get_fuse_conn(inode);
 +
- **key** is a string tested as a prefix on an attribute name originating
- on the client.  It maybe empty in which case a 'client' rule
- will always match on client names.
++	if (fc->dax_mode == FUSE_DAX_INODE &&
++	    (!!IS_DAX(inode) != !!(flags & FUSE_ATTR_DAX)))
++		d_mark_dontcache(inode);
++}
++
+ bool fuse_dax_check_alignment(struct fuse_conn *fc, unsigned int map_alignment)
+ {
+ 	if (fc->dax && (map_alignment > FUSE_DAX_SHIFT)) {
+diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+index 0270a41c31d7..bb2c11e0311a 100644
+--- a/fs/fuse/fuse_i.h
++++ b/fs/fuse/fuse_i.h
+@@ -1270,6 +1270,7 @@ void fuse_dax_conn_free(struct fuse_conn *fc);
+ bool fuse_dax_inode_alloc(struct super_block *sb, struct fuse_inode *fi);
+ void fuse_dax_inode_init(struct inode *inode, unsigned int flags);
+ void fuse_dax_inode_cleanup(struct inode *inode);
++void fuse_dax_dontcache(struct inode *inode, unsigned int flags);
+ bool fuse_dax_check_alignment(struct fuse_conn *fc, unsigned int map_alignment);
+ void fuse_dax_cancel_work(struct fuse_conn *fc);
+ 
+diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+index 48f466a65b76..aee462a25231 100644
+--- a/fs/fuse/inode.c
++++ b/fs/fuse/inode.c
+@@ -268,6 +268,9 @@ void fuse_change_attributes(struct inode *inode, struct fuse_attr *attr,
+ 		if (inval)
+ 			invalidate_inode_pages2(inode->i_mapping);
+ 	}
++
++	if (IS_ENABLED(CONFIG_FUSE_DAX))
++		fuse_dax_dontcache(inode, attr->flags);
+ }
+ 
+ static void fuse_init_inode(struct inode *inode, struct fuse_attr *attr)
+-- 
+2.27.0
 

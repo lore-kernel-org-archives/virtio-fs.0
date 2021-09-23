@@ -1,12 +1,14 @@
 From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Thu, 23 Sep 2021 17:35:43 +0800
-Message-Id: <20210923093545.81512-1-jefflexu@linux.alibaba.com>
-In-Reply-To: <20210923092526.72341-1-jefflexu@linux.alibaba.com>
+Date: Thu, 23 Sep 2021 17:35:44 +0800
+Message-Id: <20210923093545.81512-2-jefflexu@linux.alibaba.com>
+In-Reply-To: <20210923093545.81512-1-jefflexu@linux.alibaba.com>
 References: <20210923092526.72341-1-jefflexu@linux.alibaba.com>
+	<20210923093545.81512-1-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd PATCH v5 0/2] virtiofsd: support per-file DAX
+Subject: [Virtio-fs] [virtiofsd PATCH v5 1/2] virtiofsd: add FUSE_ATTR_DAX
+	to fuse protocol
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,26 +20,25 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
 Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com
 
-changes since v4:
-- decide whether DAX shall be enabled or not solely depending on file
-  size (DAX is disabled for files smaller than 32KB)
-- negotiation during FUSE_INIT is droped
-- drop support for .ioctl() for passthrough
+... in prep for the following support for per-file DAX feature.
 
-changes since v2/v3:
-Patch 4 in v2 is incomplete by mistake and it will fail to be compiled.
-I had ever sent a seperate patch 4 of v3. Now I send the whole complete
-set in v4. Except for this, there's no other diferrence.
+Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
+---
+ include/standard-headers/linux/fuse.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-
-Jeffle Xu (2):
-  virtiofsd: add FUSE_ATTR_DAX to fuse protocol
-  virtiofsd: support per-file DAX
-
- include/standard-headers/linux/fuse.h |  1 +
- tools/virtiofsd/passthrough_ll.c      | 19 +++++++++++++++++++
- 2 files changed, 20 insertions(+)
-
+diff --git a/include/standard-headers/linux/fuse.h b/include/standard-headers/linux/fuse.h
+index 950d7edb7e..a2c73f1469 100644
+--- a/include/standard-headers/linux/fuse.h
++++ b/include/standard-headers/linux/fuse.h
+@@ -440,6 +440,7 @@ struct fuse_file_lock {
+  * FUSE_ATTR_SUBMOUNT: Object is a submount root
+  */
+ #define FUSE_ATTR_SUBMOUNT      (1 << 0)
++#define FUSE_ATTR_DAX		(1 << 1)
+ 
+ /**
+  * Open flags
 -- 
 2.27.0
 

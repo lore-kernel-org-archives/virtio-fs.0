@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Fri, 24 Sep 2021 15:48:54 -0400
-Message-Id: <20210924194854.919414-6-vgoyal@redhat.com>
+Date: Fri, 24 Sep 2021 15:48:50 -0400
+Message-Id: <20210924194854.919414-2-vgoyal@redhat.com>
 In-Reply-To: <20210924194854.919414-1-vgoyal@redhat.com>
 References: <20210924194854.919414-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 5/5] virtiofsd: Create new file using O_TMPFILE
-	and set security context
+Subject: [Virtio-fs] [PATCH 1/5] fuse: Header file changes for
+	FUSE_SECURITY_CTX
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,161 +18,65 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: miklos@szeredi.hu, stephen.smalley.work@gmail.com, vgoyal@redhat.com
 
-If guest and host policies can't work with each other, then guest security
-context (selinux label) needs to be set into an xattr. Say remap guest
-security.selinux xattr to trusted.virtiofs.security.selinux.
-
-That means setting "fscreate" is not going to help as that's ony useful
-for security.selinux xattr on host.
-
-So we need another method which is atomic. Use O_TMPFILE to create new
-file, set xattr and then linkat() to proper place.
-
-But this works only for regular files. So dir, symlinks will continue
-to be non-atomic.
-
-Also if host filesystem does not support O_TMPFILE, we fallback to
-non-atomic behavior.
+These are just header file changes which should show up in qemu if
+corresponding kernel changes get merged.
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 78 +++++++++++++++++++++++++++++---
- 1 file changed, 71 insertions(+), 7 deletions(-)
+ include/standard-headers/linux/fuse.h | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index d8c14d3220..f5c3746510 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -2099,14 +2099,29 @@ static int lo_do_open(struct lo_data *lo, struct lo_inode *inode,
+diff --git a/include/standard-headers/linux/fuse.h b/include/standard-headers/linux/fuse.h
+index cce105bfba..9e1672fbb2 100644
+--- a/include/standard-headers/linux/fuse.h
++++ b/include/standard-headers/linux/fuse.h
+@@ -181,6 +181,10 @@
+  *  - add FUSE_OPEN_KILL_SUIDGID
+  *  - extend fuse_setxattr_in, add FUSE_SETXATTR_EXT
+  *  - add FUSE_SETXATTR_ACL_KILL_SGID
++ *
++ *  7.35
++ *  - add FUSE_SECURITY_CTX flag for fuse_init_out
++ *  - add security context to create, mkdir, symlink, and mknod requests
+  */
  
- static int do_create_nosecctx(fuse_req_t req, struct lo_inode *parent_inode,
-                                const char *name, mode_t mode,
--                               struct fuse_file_info *fi, int *open_fd)
-+                               struct fuse_file_info *fi, int *open_fd,
-+                              bool tmpfile)
- {
-     int err, fd;
-     struct lo_cred old = {};
-     struct lo_data *lo = lo_data(req);
-     int flags;
+ #ifndef _LINUX_FUSE_H
+@@ -212,7 +216,7 @@
+ #define FUSE_KERNEL_VERSION 7
  
--    flags = fi->flags | O_CREAT | O_EXCL;
-+    if (tmpfile) {
-+        flags = fi->flags | O_TMPFILE;
-+        /*
-+         * Don't use O_EXCL as we want to link file later. Also reset O_CREAT
-+         * otherwise openat() returns -EINVAL.
-+         */
-+        flags &= ~(O_CREAT | O_EXCL);
+ /** Minor version number of this interface */
+-#define FUSE_KERNEL_MINOR_VERSION 33
++#define FUSE_KERNEL_MINOR_VERSION 35
+ 
+ /** The node ID of the root inode */
+ #define FUSE_ROOT_ID 1
+@@ -329,6 +333,8 @@ struct fuse_file_lock {
+  *			write/truncate sgid is killed only if file has group
+  *			execute permission. (Same as Linux VFS behavior).
+  * FUSE_SETXATTR_EXT:	Server supports extended struct fuse_setxattr_in
++ * FUSE_SECURITY_CTX:  add security context to create, mkdir, symlink, and
++ *                     mknod
+  */
+ #define FUSE_ASYNC_READ		(1 << 0)
+ #define FUSE_POSIX_LOCKS	(1 << 1)
+@@ -360,6 +366,7 @@ struct fuse_file_lock {
+ #define FUSE_SUBMOUNTS		(1 << 27)
+ #define FUSE_HANDLE_KILLPRIV_V2	(1 << 28)
+ #define FUSE_SETXATTR_EXT	(1 << 29)
++#define FUSE_SECURITY_CTX	(1 << 30)
+ 
+ /**
+  * CUSE INIT request/reply flags
+@@ -967,4 +974,9 @@ struct fuse_removemapping_one {
+ #define FUSE_REMOVEMAPPING_MAX_ENTRY   \
+ 		(PAGE_SIZE / sizeof(struct fuse_removemapping_one))
+ 
++struct fuse_secctx {
++	uint32_t        size;
++	uint32_t        padding;
++};
 +
-+        /* O_TMPFILE needs either O_RDWR or O_WRONLY */
-+        if ((flags & O_ACCMODE) == O_RDONLY) {
-+            flags |= O_RDWR;
-+        }
-+    } else {
-+        flags = fi->flags | O_CREAT | O_EXCL;
-+    }
- 
-     err = lo_change_cred(req, &old, lo->change_umask);
-     if (err) {
-@@ -2137,7 +2152,7 @@ static int do_create_secctx_fscreate(fuse_req_t req,
-         return err;
-     }
- 
--    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd);
-+    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd, false);
- 
-     close_reset_proc_fscreate(fscreate_fd);
-     if (!err) {
-@@ -2146,6 +2161,44 @@ static int do_create_secctx_fscreate(fuse_req_t req,
-     return err;
- }
- 
-+static int do_create_secctx_tmpfile(fuse_req_t req,
-+                                    struct lo_inode *parent_inode,
-+                                    const char *name, mode_t mode,
-+                                    struct fuse_file_info *fi,
-+                                    const char *secctx_name, int *open_fd)
-+{
-+    int err, fd = -1;
-+    struct lo_data *lo = lo_data(req);
-+    char procname[64];
-+
-+    err = do_create_nosecctx(req, parent_inode, ".", mode, fi, &fd, true);
-+    if (err) {
-+        return err;
-+    }
-+
-+    err = fsetxattr(fd, secctx_name, req->secctx.ctx, req->secctx.ctxlen, 0);
-+    if (err) {
-+        err = errno;
-+        goto out;
-+    }
-+
-+    /* Security context set on file. Link it in place */
-+    sprintf(procname, "%d", fd);
-+    FCHDIR_NOFAIL(lo->proc_self_fd);
-+    err = linkat(AT_FDCWD, procname, parent_inode->fd, name,
-+                 AT_SYMLINK_FOLLOW);
-+    err = err == -1 ? errno : 0;
-+    FCHDIR_NOFAIL(lo->root.fd);
-+
-+out:
-+    if (!err) {
-+        *open_fd = fd;
-+    } else if (fd != -1) {
-+        close(fd);
-+    }
-+    return err;
-+}
-+
- static int do_create_secctx_noatomic(fuse_req_t req,
-                                      struct lo_inode *parent_inode,
-                                      const char *name, mode_t mode,
-@@ -2154,7 +2207,7 @@ static int do_create_secctx_noatomic(fuse_req_t req,
- {
-     int err = 0, fd = -1;
- 
--    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd);
-+    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd, false);
-     if (err) {
-         goto out;
-     }
-@@ -2196,20 +2249,31 @@ static int do_lo_create(fuse_req_t req, struct lo_inode *parent_inode,
-     if (secctx_enabled) {
-         /*
-          * If security.selinux has not been remapped. Use fscreate to set
--         * context before file creation.
--         * Otherwise fallback to non-atomic method of file creation
-+         * context before file creation. Use tempfile method for regular
-+         * files. Otherwise fallback to non-atomic method of file creation
-          * and xattr settting.
-          */
-         if (!mapped_name) {
-             err = do_create_secctx_fscreate(req, parent_inode, name, mode, fi,
-                                             open_fd);
-             goto out;
-+        } else if (S_ISREG(mode)) {
-+            err = do_create_secctx_tmpfile(req, parent_inode, name, mode, fi,
-+                                           ctxname, open_fd);
-+            /*
-+             * If filesystem does not support O_TMPFILE, fallback to non-atomic
-+             * method.
-+             */
-+            if (!err || err != EOPNOTSUPP) {
-+                goto out;
-+            }
-         }
- 
-         err = do_create_secctx_noatomic(req, parent_inode, name, mode, fi,
-                                         ctxname, open_fd);
-     } else {
--        err = do_create_nosecctx(req, parent_inode, name, mode, fi, open_fd);
-+        err = do_create_nosecctx(req, parent_inode, name, mode, fi, open_fd,
-+                                 false);
-     }
- 
- out:
+ #endif /* _LINUX_FUSE_H */
 -- 
 2.31.1
 

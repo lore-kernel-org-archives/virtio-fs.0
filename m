@@ -1,15 +1,19 @@
-Date: Tue, 7 Sep 2021 17:40:31 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YTfcT1JUactPhwSA@redhat.com>
-References: <20210902152228.665959-1-vgoyal@redhat.com>
-	<CAHc6FU4foW+9ZwTRis3DXSJSMAvdb4jXcq7EFFArYgX7FQ1QYg@mail.gmail.com>
-	<YTYoEDT+YOtCHXW0@work-vm>
-	<CAJfpegvbkmdneMxMjYMuNM4+RmWT8S7gaTiDzaq+TCzb0UrQrw@mail.gmail.com>
+Date: Tue, 28 Sep 2021 13:44:53 +1000
+From: Dave Chinner <david@fromorbit.com>
+Message-ID: <20210928034453.GJ2361455@dread.disaster.area>
+References: <20210923092526.72341-1-jefflexu@linux.alibaba.com>
+	<20210923092526.72341-3-jefflexu@linux.alibaba.com>
+	<YUzPUYU8R5LL4mzU@redhat.com>
+	<20210923222618.GB2361455@dread.disaster.area>
+	<YU0jovIYv+xeinQd@redhat.com>
+	<20210927002148.GH2361455@dread.disaster.area>
+	<a8224842-7e05-c3fd-7413-5f425e099251@linux.alibaba.com>
 MIME-Version: 1.0
+In-Reply-To: <a8224842-7e05-c3fd-7413-5f425e099251@linux.alibaba.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <CAJfpegvbkmdneMxMjYMuNM4+RmWT8S7gaTiDzaq+TCzb0UrQrw@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH v3 0/1] Relax restrictions on user.* xattr
+Subject: Re: [Virtio-fs] [PATCH v5 2/5] fuse: make DAX mount option a
+	tri-state
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,32 +22,95 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: Giuseppe Scrivano <gscrivan@redhat.com>, Theodore Ts'o <tytso@mit.edu>, Andreas Gruenbacher <agruenba@redhat.com>, SElinux list <selinux@vger.kernel.org>, Stephen Smalley <stephen.smalley.work@gmail.com>, Dave Chinner <david@fromorbit.com>, LKML <linux-kernel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, casey.schaufler@intel.com, LSM <linux-security-module@vger.kernel.org>, Alexander Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, "Fields,
-	Bruce" <bfields@redhat.com>, Christian Brauner <christian.brauner@ubuntu.com>, "Eric W. Biederman" <ebiederm@xmission.com>
+To: JeffleXu <jefflexu@linux.alibaba.com>
+Cc: miklos@szeredi.hu, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, linux-fsdevel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>
 
-On Mon, Sep 06, 2021 at 04:56:44PM +0200, Miklos Szeredi wrote:
-> On Mon, 6 Sept 2021 at 16:39, Dr. David Alan Gilbert
-> <dgilbert@redhat.com> wrote:
+On Mon, Sep 27, 2021 at 10:28:34AM +0800, JeffleXu wrote:
+> On 9/27/21 8:21 AM, Dave Chinner wrote:
+> > On Thu, Sep 23, 2021 at 09:02:26PM -0400, Vivek Goyal wrote:
+> >> On Fri, Sep 24, 2021 at 08:26:18AM +1000, Dave Chinner wrote:
+> >>> On Thu, Sep 23, 2021 at 03:02:41PM -0400, Vivek Goyal wrote:
+> > In the case that the user changes FS_XFLAG_DAX, the FUSE client
+> > needs to communicate that attribute change to the server, where the
+> > server then changes the persistent state of the on-disk inode so
+> > that the next time the client requests that inode, it gets the state
+> > it previously set. Unless, of course, there are server side policy
+> > overrides (never/always).
 > 
-> > IMHO the real problem here is that the user/trusted/system/security
-> > 'namespaces' are arbitrary hacks rather than a proper namespacing
-> > mechanism that allows you to create new (nested) namespaces and associate
-> > permissions with each one.
+> One thing I'm concerned with is that, is the following behavior
+> consistent with the semantics of per-file DAX in ext4/xfs?
 > 
-> Indeed.
-> 
-> This is what Eric Biederman suggested at some point for supporting
-> trusted xattrs within a user namespace:
-> 
-> | For trusted xattrs I think it makes sense in principle.   The namespace
-> | would probably become something like "trusted<ns-root-uid>.".
-> 
-> Theory sounds simple enough.  Anyone interested in looking at the details?
+> Client changes FS_XFLAG_DAX, this change is communicated to server and
+> then server also returns **success**. Then client finds that this file
+> is not DAX enabled, since server doesn't honor the previously set state.
 
-So this namespaced trusted.* xattr domain will basically avoid the need
-to have CAP_SYS_ADMIN in init_user_ns, IIUC.  I guess this is better
-than giving CAP_SYS_ADMIN in init_user_ns.
+FS_XFLAG_DAX is advisory in nature - it does not have to be honored
+at inode instantiation.
 
-Vivek
+> IOWs, shall server always honor the persistent per-inode attribute of
+> host file (if the change of FS_XFLAG_DAX inside guest is stored as
+> persistent per-inode attribute on host file)?
+
+If the user set the flag, then queries it, the server should be
+returning the state that the user set, regardless of whether it is
+being honored at inode instantiation time.
+
+Remember, FS_XFLAG_DAX does not imply S_DAX and vice versa.
+
+> >> Not sure what do you mean by server turns of DAX flag based on client
+> >> turning off DAX. Server does not have to do anything. If client decides
+> >> to not use DAX (in guest), it will not send FUSE_SETUPMAPPING requests
+> >> to server and that's it.
+> > 
+> > Where does the client get it's per-inode DAX policy from if
+> > dax=inode is, like other DAX filesystems, the default behaviour?
+> > 
+> > Where is the persistent storage of that per-inode attribute kept?
+> 
+> In the latest patch set, it is not supported yet to change FS_XFLAG_DAX
+> (and thus setting/clearing persistent per-inode attribute) inside guest,
+> since this scenario is not urgently needed as the real using case.
+
+AFAICT the FS_IOC_FS{GS}ETXATTR ioctl is already supported by the
+fuse client and it sends the ioctl to the server. Hence the client
+should already support persistent FS_XFLAG_DAX manipulations
+regardless of where/how the attribute is stored by the server. Did
+you actually add code to the client in this patchset to stop
+FS_XFLAG_DAX from being propagated to the server?
+
+> Currently the per-inode dax attribute is completely fed from server
+> thourgh FUSE protocol, e.g. server could set/clear the per-inode dax
+> attribute depending on the file size.
+
+Yup, that's a policy dax=inode on the client side would allow.
+Indeed, this same policy could also be implemented as a client side
+policy, allowing user control instead of admin control of such
+conditional DAX behaviour... :)
+
+> The previous path set indeed had ever supported changing FS_XFLAG_DAX
+> and accordingly setting/clearing persistent per-inode attribute inside
+> guest. For "passthrough" type virtiofsd, the persistent per-inode
+> attribute is stored as XFS_DIFLAG2_DAX/EXT4_DAX_FL on host file
+> directly, since this is what "passthrough" means.
+
+Right, but that's server side storage implementation details, not a
+protocol or client side detail. What I can't find in the current
+client is where this per-inode flag is actually used in the FUSE dax
+inode init path - it just checks whether the connection has DAX
+state set up. Hence I don't see how FS_XFLAG_DAX control from the
+client currently has any influence on the client side DAX usage.
+
+Seems somewhat crazy to me explicitly want to remove that client
+side control of per-inode behaviour whilst adding the missing client
+side bits that allow for the per-inode policy control from server
+side.  Can we please just start with the common, compatible
+dax=inode behaviour on the client side, then layer the server side
+policy control options over the top of that?
+
+Cheers,
+
+Dave.
+-- 
+Dave Chinner
+david@fromorbit.com
 

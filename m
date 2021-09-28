@@ -1,28 +1,21 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yahoo.com; s=s2048;
-	t=1632839144; bh=3m+5YFeTr/P2Yd9ZVGrp4OTy/jiuyCH8wAFtywnm0k0=;
-	h=Subject:To:Cc:References:From:Date:In-Reply-To:From:Subject:Reply-To;
-	b=e1nDsMh2wotuj1b5Mf0KEpKlQTaHvLycQs/lbWL2/t4eh36JI+GOqWEfGh5qIBFuzWrLhXhAuSI5QQOj1OViN34wzXf9bXumvBIHKOnmZw+wdhSoPGa7OEyB/Vp0LaMeJG+USF7i6VWIXi+mb2S/CvbuWmgIwpabiJ3YRKJawcG4OJ0BcWbv/UMcpAeApg4n684UJhiILziVoq4Ub1MOa/Nfcvgtr2ul6Ap0LM1+fujeeG4VT190Q+McUJWR9BluyU+vtEtekOz2SifWPExhC6+H8/n9WMtobzFRu5DzjRFIsIJL+iTc6vtJa7KqdVwI8HJKEqtQ+UuVOx5LSHNZhw==
-References: <YU5gF9xDhj4g+0Oe@redhat.com>
-	<8a46efbf-354c-db20-c24a-ee73d9bbe9d6@schaufler-ca.com>
-	<YVHPxYRnZvs/dH7N@redhat.com>
-	<753b1417-3a9c-3129-1225-ca68583acc32@schaufler-ca.com>
-	<YVHpxiguEsjIHTjJ@redhat.com>
-	<67e49606-f365-fded-6572-b8c637af01c5@schaufler-ca.com>
-	<YVIZfHhS4X+5BNCS@redhat.com>
-	<2e00fbff-b868-3a4f-ecc4-e5f1945834b8@schaufler-ca.com>
-	<YVItb/GctH7PpL0f@redhat.com>
-	<5d6230dc-bba5-a5c1-2c54-da5e6ecfbf2e@schaufler-ca.com>
-	<YVMPYIKL2aUBIasK@redhat.com>
-From: Casey Schaufler <casey@schaufler-ca.com>
-Message-ID: <0e17dcc8-1d81-7a8d-b5f0-82d91cd2a572@schaufler-ca.com>
-Date: Tue, 28 Sep 2021 07:25:37 -0700
+Date: Tue, 28 Sep 2021 10:34:28 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YVMn9Ki2DjCZy2Vm@redhat.com>
+References: <20210923092526.72341-1-jefflexu@linux.alibaba.com>
+	<20210923092526.72341-3-jefflexu@linux.alibaba.com>
+	<YUzPUYU8R5LL4mzU@redhat.com>
+	<20210923222618.GB2361455@dread.disaster.area>
+	<YU0jovIYv+xeinQd@redhat.com>
+	<20210927002148.GH2361455@dread.disaster.area>
+	<a8224842-7e05-c3fd-7413-5f425e099251@linux.alibaba.com>
+	<20210928034453.GJ2361455@dread.disaster.area>
+	<93d817b2-01a4-6e83-cb0b-ca84f67f3d95@linux.alibaba.com>
 MIME-Version: 1.0
-In-Reply-To: <YVMPYIKL2aUBIasK@redhat.com>
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 2/2] fuse: Send security context of inode on
-	file creation
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <93d817b2-01a4-6e83-cb0b-ca84f67f3d95@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH v5 2/5] fuse: make DAX mount option a
+	tri-state
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,152 +24,158 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: Colin Walters <walters@verbum.org>, Casey Schaufler <casey@schaufler-ca.com>, stephen.smalley.work@gmail.com, Miklos Szeredi <miklos@szeredi.hu>, virtio-fs@redhat.com, selinux@vger.kernel.org, LSM List <linux-security-module@vger.kernel.org>, linux-fsdevel@vger.kernel.org
+To: JeffleXu <jefflexu@linux.alibaba.com>
+Cc: miklos@szeredi.hu, Dave Chinner <david@fromorbit.com>, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, linux-fsdevel@vger.kernel.org
 
-On 9/28/2021 5:49 AM, Vivek Goyal wrote:
-> On Mon, Sep 27, 2021 at 02:45:13PM -0700, Casey Schaufler wrote:
-> [..]
->>>>> I see that NFS and ceph are supporting single security label at
->>>>> the time of file creation and I added support for the same for
->>>>> fuse.
->>>> NFS took that course because the IETF refused for a very long time
->>>> to accept a name+value pair in the protocol. The implementation
->>>> was a compromise.
->>>>
->>>>> You seem to want to have capability to send multiple "name,value,len"
->>>>> tuples so that you can support multiple xattrs/labels down the
->>>>> line.
->>>> No, so I can do it now. Smack keeps multiple xattrs on filesystem objects.
->>>> 	security.SMACK64		- the "security label"
->>>> 	security.SMACK64EXEC		- the Smack label to run the program with
->>>> 	security.SMACK64TRANSMUTE	- controls labeling on files created
->>>>
->>>> There has been discussion about using additional attributes for things
->>>> like socket labeling.
->>>>
->>>> This isn't hypothetical. It's real today. 
->>> It is real from SMACK point of view but it is not real from 
->>> security_dentry_init_security() hook point of view. What's equivalent
->>> of that hook to support SMACK and multiple labels?
->> When multiple security modules support this hook they will
->> each get called. So where today security_dentry_init_security()
->> calls selinux_dentry_init_security(), in the future it will
->> also call any other <lsm>_dentry_init_security() hook that
->> is registered. No LSM infrastructure change required.
-> I don't think security_dentry_init_security() can handle multiple
-> security labels without change.
->
-> int security_dentry_init_security(struct dentry *dentry, int mode,
->                                         const struct qstr *name, void **ctx,
->                                         u32 *ctxlen)
-> {
->         return call_int_hook(dentry_init_security, -EOPNOTSUPP, dentry, mode,
->                                 name, ctx, ctxlen);
-> }
->
-> It can reutrn only one security context. So most likely you will have
-> to add another hook to return multiple security context and slowly
-> deprecate this one.
+On Tue, Sep 28, 2021 at 01:17:27PM +0800, JeffleXu wrote:
+> 
+> 
+> On 9/28/21 11:44 AM, Dave Chinner wrote:
+> > On Mon, Sep 27, 2021 at 10:28:34AM +0800, JeffleXu wrote:
+> >> On 9/27/21 8:21 AM, Dave Chinner wrote:
+> >>> On Thu, Sep 23, 2021 at 09:02:26PM -0400, Vivek Goyal wrote:
+> >>>> On Fri, Sep 24, 2021 at 08:26:18AM +1000, Dave Chinner wrote:
+> >>>>> On Thu, Sep 23, 2021 at 03:02:41PM -0400, Vivek Goyal wrote:
+> >>> In the case that the user changes FS_XFLAG_DAX, the FUSE client
+> >>> needs to communicate that attribute change to the server, where the
+> >>> server then changes the persistent state of the on-disk inode so
+> >>> that the next time the client requests that inode, it gets the state
+> >>> it previously set. Unless, of course, there are server side policy
+> >>> overrides (never/always).
+> >>
+> >> One thing I'm concerned with is that, is the following behavior
+> >> consistent with the semantics of per-file DAX in ext4/xfs?
+> >>
+> >> Client changes FS_XFLAG_DAX, this change is communicated to server and
+> >> then server also returns **success**. Then client finds that this file
+> >> is not DAX enabled, since server doesn't honor the previously set state.
+> > 
+> > FS_XFLAG_DAX is advisory in nature - it does not have to be honored
+> > at inode instantiation.
+> 
+> Fine.
+> 
+> > 
+> >> IOWs, shall server always honor the persistent per-inode attribute of
+> >> host file (if the change of FS_XFLAG_DAX inside guest is stored as
+> >> persistent per-inode attribute on host file)?
+> > 
+> > If the user set the flag, then queries it, the server should be
+> > returning the state that the user set, regardless of whether it is
+> > being honored at inode instantiation time.
+> > 
+> > Remember, FS_XFLAG_DAX does not imply S_DAX and vice versa
+> Got it.
+> 
+> > 
+> >>>> Not sure what do you mean by server turns of DAX flag based on client
+> >>>> turning off DAX. Server does not have to do anything. If client decides
+> >>>> to not use DAX (in guest), it will not send FUSE_SETUPMAPPING requests
+> >>>> to server and that's it.
+> >>>
+> >>> Where does the client get it's per-inode DAX policy from if
+> >>> dax=inode is, like other DAX filesystems, the default behaviour?
+> >>>
+> >>> Where is the persistent storage of that per-inode attribute kept?
+> >>
+> >> In the latest patch set, it is not supported yet to change FS_XFLAG_DAX
+> >> (and thus setting/clearing persistent per-inode attribute) inside guest,
+> >> since this scenario is not urgently needed as the real using case.
+> > 
+> > AFAICT the FS_IOC_FS{GS}ETXATTR ioctl is already supported by the
+> > fuse client and it sends the ioctl to the server. Hence the client
+> > should already support persistent FS_XFLAG_DAX manipulations
+> > regardless of where/how the attribute is stored by the server. Did
+> > you actually add code to the client in this patchset to stop
+> > FS_XFLAG_DAX from being propagated to the server?
+> 
+> Yes fuse client supports FS_IOC_FS{GS}ETXATTR ioctl already, but AFAIK
+> "passthrough" type virtiofsd doesn't support FUSE_IOCTL yet. My previous
+> patch had ever added support for FUSE_IOCTL to virtiofsd.
+> 
+> > 
+> >> Currently the per-inode dax attribute is completely fed from server
+> >> thourgh FUSE protocol, e.g. server could set/clear the per-inode dax
+> >> attribute depending on the file size.
+> > 
+> > Yup, that's a policy dax=inode on the client side would allow.
+> > Indeed, this same policy could also be implemented as a client side
+> > policy, allowing user control instead of admin control of such
+> > conditional DAX behaviour... :)
+> > 
+> >> The previous path set indeed had ever supported changing FS_XFLAG_DAX
+> >> and accordingly setting/clearing persistent per-inode attribute inside
+> >> guest. For "passthrough" type virtiofsd, the persistent per-inode
+> >> attribute is stored as XFS_DIFLAG2_DAX/EXT4_DAX_FL on host file
+> >> directly, since this is what "passthrough" means.
+> > 
+> > Right, but that's server side storage implementation details, not a
+> > protocol or client side detail. What I can't find in the current
+> > client is where this per-inode flag is actually used in the FUSE dax
+> > inode init path - it just checks whether the connection has DAX
+> > state set up. Hence I don't see how FS_XFLAG_DAX control from the
+> > client currently has any influence on the client side DAX usage.
+> 
+> Fuse client fetches the per-inode DAX attribute from
+> fuse_entry_out.attr.flags of FUSE_LOOKUP reply. It's implemented in
+> patch 4 of this patch set.
+> 
+> The background info is that, fuse client will send a FUSE_LOOKUP request
+> to server during inode instantiation, while FS_XFLAG_DAX flag is not
+> included in the FUSE_LOOKUP reply, and thus fuse client need to send
+> another FUSE_IOCTL if it wants to query the persistent inode flags. To
+> remove this extra fuse request during inode instantiation, this flag is
+> merged into FUSE_LOOKUP reply (fuse_entry_out.attr.flags) as
+> FUSE_ATTR_DAX. Then if FUSE_ATTR_DAX flag is set in
+> fuse_entry_out.attr.flags, then fuse client knows that this file shall
+> be DAX enabled.
+> 
+> IOWs, under this mechanism it relies on fuse server to check persistent
+> inode flags on host, and then set FUSE_ATTR_DAX flag accordingly.
+> 
+> > 
+> > Seems somewhat crazy to me explicitly want to remove that client
+> > side control of per-inode behaviour whilst adding the missing client
+> > side bits that allow for the per-inode policy control from server
+> > side.  Can we please just start with the common, compatible
+> > dax=inode behaviour on the client side, then layer the server side
+> > policy control options over the top of that?
+> 
+> 
+> Hi Vivek,
+> 
+> It seems that we shall also support setting/clearing FS_XFLAG_DAX inside
+> guest? If that's the case, then how to design virtiofsd behavior? I
+> mean, is it mandatory or optional for virtiofsd to query FS_XFLAG_DAX of
+> host files when guest is mounted with "dax=inode"? If it's optional,
+> then the performance may be better since it doesn't need to do one extra
+> FS_IOC_FSGETXATTR ioctl when handling FUSE_LOOKUP, but admin needs to
+> specify "-o policy=flag" to virtiofsd explicitly if it's really needed.
 
-That hasn't been the approach to date. Have a look at the stacking patches
-I've been posting to see how the "interface_lsm" is being used.
+Hi Jeffle,
 
-> IOW, as of today security_dentry_init_security() can't return multiple
-> security labels. In fact it does not even tell the caller what's the
-> name of the xattr. So caller has no idea if this security label came
-> from SELinux or some other LSM. So for all practical purposes this
-> is a hook for getting SELinux label and does not scale to support
-> other LSMs.
+How about first doing a patch series to just enable ioctl in virtiofsd.
+I know David Gilbert and others had security concenrs w.r.t. These
+are coming from untrusted guest and they had concerns that we should
+only allow selective operations as needed (opted-in by admin). So may
+be a daemon option which specifies which operations to allow.
 
-Yup. This is a case, like yours, where the developer from SELinux
-could have created a general interface but instead decided that
-it wasn't worth the bother. As a result I have to fix it for the
-general case. Well, SELinux/RedHat doesn't care about stacking,
-so I guess that's the way it goes.
+Once that's done, we probably will have to do a patch series, to
+make sure FS_XFLAG_DAX inherit behavior is working properly. Especially
+that behavior about inheriting FS_XFLAG_DAX flag when a new file
+is created and parent dir has FS_XFLAG_DAX set. May be we can just
+rely on host filesystem doing it? Limitation will be that it will
+only work if host fs is ext4/xfs.
 
+w.r.t virtiofsd, I think we can provide an option say "-o
+dax_policy=<option>", which controls what policy is in effect. So if
+a daemon specific policy is in effect, we can skip checking FS_XFLAG_DAX
+state. In fact, checking FS_XFLAG_DAX state also should probably be
+a policy option and not enabled by default.
 
->>>>> Even if I do that, I am not sure what to do with those xattrs at
->>>>> the other end. I am using /proc/thread-self/attr/fscreate to
->>>>> set the security attribute of file.
->>>> Either you don't realize that attr/fscreate is SELinux specific, or
->>>> you don't care, or possibly (and sadly) both.
->>> I do realize that it is SELinux specific and that's why I have raised
->>> the concern that it does not work with SMACK.
->>>
->>> What's the "fscreate" equivalent for SMACK so that I file server can
->>> set it before creation of file and get correct context file?
->> The Smack attribute will be inherited from the creating process.
->> There is no way to generally change the attribute of a file on
->> creation. The appropriateness of such a facility has been debated
->> long and loud over the years. SELinux, which implements so varied
->> a set of "security" controls opted for it. Smack, which sticks much
->> more closely to an access control model, considers it too dangerous.
->> You can change the Smack label with setxattr(1) if you have
->> CAP_MAC_ADMIN.
-> Ok, calling setxattr() after file creation will make the operation
-> non-atomic. Will be good if it continues to be atomic.
+Say, "-o dax_policy=FS_XFLAG_DAX" will enable cheking FS_XFLAG_DAX on
+inode during FUSE_LOOKUP time. Otherwise daemon can fallback to
+its own policy and set DAX flag in lookup reply accordingly.
 
-That's a known downside. If you run the daemon with a Smack label that
-is generally not accessible (easy to do) to the public you can do it
-safely.
-
-
->> If you really want the file created with a particular
->> Smack label you can change the process Smack label by writing to
->> /proc/self/attr/smack/current on newer kernels and /proc/self/attr/current
->> on older ones.
-> I guess /proc/thread-self/attr/smack/current is the way to go in this
-> context, when one wants to support SMACK.
-
-Label flipping is pretty dangerous. I prefer the run-with-safe-label,
-call setxattr() approach. It's explicit.
-
-
->>>>> https://listman.redhat.com/archives/virtio-fs/2021-September/msg00100.html
->>>>>
->>>>> How will this work with multiple labels. I think you will have to
->>>>> extend fscreate or create new interface to be able to deal with it.
->>>> Yeah. That thread didn't go to the LSM mail list. It was essentially
->>>> kept within the RedHat SELinux community. It's no wonder everyone
->>>> involved thought that your approach is swell. No one who would get
->>>> goobsmacked by it was on the thread.
->>> My goal is to support SELinux at this point of time. If you goal is
->>> to support SMACK, feel free to send patches on top to support that.
->> It helps to know what's going on before it becomes a major overhaul.
-> Fair enough.
->
->>> I sent kernel patches to LSM list to make it plenty clear that this
->>> interface only supports single label which is SELinux. So there is
->>> no hiding here. And when I am supporting only SELinux, making use
->>> of fscreate makes perfect sense to me.
->> I bet it does.
->>
->>>>> That's why I think that it seems premature that fuse interface be
->>>>> written to deal with multiple labels when rest of the infrastructure
->>>>> is not ready. It should be other way, instead. First rest of the
->>>>> infrastructure should be written and then all the users make use
->>>>> of new infra.
->>>> Today the LSM infrastructure allows a security module to use as many
->>>> xattrs as it likes. Again, Smack uses multiple security.* xattrs today.
->>> security_dentry_init_security() can handle that? If not, what's the
->>> equivalent.
->> Yes, it can.
-> How? How will security_dentry_init_security() return multiple lables?
-> It has parameters "u32 *ctxlen" and you can return only one. If you
-> try to return multiple labels and return total length in "ctxlen",
-> that does not help as you need to know length of individiual labels.
-> So you need to know the names of xattrs too. Without that its not
-> going to work.
->
-> So no, security_dentry_init_security() can not handle multiple 
-> security labels (and associated names). 
-
-As I mentioned before, this is an example of why I don't want to
-see yet another special-for-SELinux case.
-
->
-> Vivek
->
-
+Vivek
 

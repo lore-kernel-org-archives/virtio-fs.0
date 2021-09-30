@@ -1,21 +1,18 @@
-References: <20210817022220.17574-1-jefflexu@linux.alibaba.com>
-	<20210817022347.18098-1-jefflexu@linux.alibaba.com>
-	<20210817022347.18098-5-jefflexu@linux.alibaba.com>
-	<YRwHRmL/jUSqgkIU@work-vm>
-	<29627110-e4bf-836f-2343-1faeb36ad4d3@linux.alibaba.com>
-	<YR5Xzw02IuVAN94b@work-vm>
-	<4494052b-aff1-e2e3-e704-c8743168f62e@linux.alibaba.com>
-	<20210824121515.5419d6a7@bahia.lan>
-From: JeffleXu <jefflexu@linux.alibaba.com>
-Message-ID: <88041d90-d170-3ae1-903e-2fa32e51027f@linux.alibaba.com>
-Date: Wed, 8 Sep 2021 18:34:53 +0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=yahoo.com; s=s2048;
+	t=1633033224; bh=yRNS+XIAmEfLJPvZ1zdMVmZLYm7h0+Tar1TrOaXMv3s=;
+	h=Subject:To:Cc:References:From:Date:In-Reply-To:From:Subject:Reply-To;
+	b=i83nmD7rd9Pw2xebh9inLA/RW5HWgby2qt1s910GtSAVDckH/AmxmFkvw1Dm3SFR4PV/Z9XfC3aT12HLlHIqzP0rum3edzvJdH1FQh51o1SvQFf1F+ppELjb3+LCI1Ukk5SSuGa+bR4QTHy0LRy7LzCdzWZm4FUZJutpt7N9oGOM5NaXD8ysD+PgY9to7jGvktYbrnrewveCEbDW5UveTPuvXTUm4ilbYepNF0Tjy2GRcRGyI3VJpjANkscRydc/C8CoU9KLYvdDGnIxHJNWWuwMAnRfwoId+26Pi37PhyiI7/Oock67TA3wBtMhWabK+oZzc/treIVuSC6glr+EXA==
+References: <YVYI/p1ipDFiQ5OR@redhat.com>
+From: Casey Schaufler <casey@schaufler-ca.com>
+Message-ID: <a0d6e05c-6ec4-ff9b-954a-4974fb800de4@schaufler-ca.com>
+Date: Thu, 30 Sep 2021 13:20:18 -0700
 MIME-Version: 1.0
-In-Reply-To: <20210824121515.5419d6a7@bahia.lan>
-Content-Type: text/plain; charset=windows-1252
+In-Reply-To: <YVYI/p1ipDFiQ5OR@redhat.com>
+Content-Type: text/plain; charset=utf-8
 Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [virtiofsd PATCH v4 4/4] virtiofsd: support
- per-file DAX in FUSE_LOOKUP
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH] security: Return xattr name from
+ security_dentry_init_security()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,58 +21,187 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
-Cc: miklos@szeredi.hu, virtualization@lists.linux-foundation.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, linux-fsdevel@vger.kernel.org, vgoyal@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>, linux-security-module@vger.kernel.org, selinux@vger.kernel.org
+Cc: bfields@fieldses.org, linux-nfs@vger.kernel.org, Miklos Szeredi <miklos@szeredi.hu>, stephen.smalley.work@gmail.com, jlayton@kernel.org, virtio-fs@redhat.com, Casey Schaufler <casey@schaufler-ca.com>, chuck.lever@oracle.com, linux-fsdevel@vger.kernel.org, idryomov@gmail.com, ceph-devel@vger.kernel.org
 
+On 9/30/2021 11:59 AM, Vivek Goyal wrote:
+> Right now security_dentry_init_security() only supports single security
+> label and is used by SELinux only. There are two users of of this hook,
+> namely ceph and nfs.
+>
+> NFS does not care about xattr name. Ceph hardcodes the xattr name to
+> security.selinux (XATTR_NAME_SELINUX).
+>
+> I am making changes to fuse/virtiofs to send security label to virtiofsd
+> and I need to send xattr name as well. I also hardcoded the name of
+> xattr to security.selinux.
+>
+> Stephen Smalley suggested that it probably is a good idea to modify
+> security_dentry_init_security() to also return name of xattr so that
+> we can avoid this hardcoding in the callers.
+>
+> This patch adds a new parameter "const char **xattr_name" to
+> security_dentry_init_security() and LSM puts the name of xattr
+> too if caller asked for it (xattr_name != NULL).
+>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 
+This is a reasonable step. It doesn't address the possibility
+of multiple security attributes, but that's not a real issue today.
+It will prevent ceph from using the wrong attribute should a
+security module other than SELinux provide a hook.
 
-On 8/24/21 6:15 PM, Greg Kurz wrote:
-> On Fri, 20 Aug 2021 13:03:23 +0800
-> JeffleXu <jefflexu@linux.alibaba.com> wrote:
->>
->> Fine. Got it. However the returned fd (opened without O_PATH) is only
->> used for FS_IOC_GETFLAGS/FS_IOC_FSGETXATTR ioctl, while in most cases
->> for special device files, these two ioctls should return -ENOTTY.
->>
-> 
-> The actual problem is that a FIFO will cause openat() to block until
-> the other end of the FIFO is open for writing...
+> ---
+>
+> I have compile tested this patch. Don't know how to setup ceph and
+> test it. Its a very simple change. Hopefully ceph developers can
+> have a quick look at it.
+>
+> A similar attempt was made three years back.
+>
+> https://lore.kernel.org/linux-security-module/20180626080429.27304-1-zyan@redhat.com/T/
 
-Got it.
+My, but I dislike reliving my old arguments.
 
-> 
->> If it's really a security issue, then lo_inode_open() could be used to
-> 
-> ... and cause a DoS on virtiofsd. So yes, this is a security issue and
-> lo_inode_open() was introduced specifically to handle this.
-> 
->> get a temporary fd, i.e., check if it's a special file before opening.
->> After all, FUSE_OPEN also handles in this way. Besides, I can't
->> understand what "race-free way" means.
->>
-> 
-> "race-free way" means a way that guarantees that file type
-> cannot change between the time you check it and the time
-> you open it (TOCTOU error). For example, doing a plain stat(),
-> checking st_mode and proceeding to open() is wrong : nothing
-> prevents the file to be unlinked and replaced by something
-> else between stat() and open().
-> 
-> We avoid that by keeping O_PATH fds around and using
-> lo_inode_open() instead of openat().
+> ---
+>  fs/ceph/xattr.c               |    3 +--
+>  fs/nfs/nfs4proc.c             |    3 ++-
+>  include/linux/lsm_hook_defs.h |    3 ++-
+>  include/linux/lsm_hooks.h     |    1 +
+>  include/linux/security.h      |    6 ++++--
+>  security/security.c           |    7 ++++---
+>  security/selinux/hooks.c      |    6 +++++-
+>  7 files changed, 19 insertions(+), 10 deletions(-)
+>
+> Index: redhat-linux/security/selinux/hooks.c
+> ===================================================================
+> --- redhat-linux.orig/security/selinux/hooks.c	2021-09-28 11:36:03.559785943 -0400
+> +++ redhat-linux/security/selinux/hooks.c	2021-09-30 14:01:05.869195347 -0400
+> @@ -2948,7 +2948,8 @@ static void selinux_inode_free_security(
+>  }
+>  
+>  static int selinux_dentry_init_security(struct dentry *dentry, int mode,
+> -					const struct qstr *name, void **ctx,
+> +					const struct qstr *name,
+> +					const char **xattr_name, void **ctx,
+>  					u32 *ctxlen)
+>  {
+>  	u32 newsid;
+> @@ -2961,6 +2962,9 @@ static int selinux_dentry_init_security(
+>  	if (rc)
+>  		return rc;
+>  
+> +	if (xattr_name)
+> +		*xattr_name = XATTR_NAME_SELINUX;
+> +
+>  	return security_sid_to_context(&selinux_state, newsid, (char **)ctx,
+>  				       ctxlen);
+>  }
+> Index: redhat-linux/security/security.c
+> ===================================================================
+> --- redhat-linux.orig/security/security.c	2021-08-16 10:39:28.518988836 -0400
+> +++ redhat-linux/security/security.c	2021-09-30 13:54:36.367195347 -0400
+> @@ -1052,11 +1052,12 @@ void security_inode_free(struct inode *i
+>  }
+>  
+>  int security_dentry_init_security(struct dentry *dentry, int mode,
+> -					const struct qstr *name, void **ctx,
+> -					u32 *ctxlen)
+> +				  const struct qstr *name,
+> +				  const char **xattr_name, void **ctx,
+> +				  u32 *ctxlen)
+>  {
+>  	return call_int_hook(dentry_init_security, -EOPNOTSUPP, dentry, mode,
+> -				name, ctx, ctxlen);
+> +				name, xattr_name, ctx, ctxlen);
+>  }
+>  EXPORT_SYMBOL(security_dentry_init_security);
+>  
+> Index: redhat-linux/include/linux/lsm_hooks.h
+> ===================================================================
+> --- redhat-linux.orig/include/linux/lsm_hooks.h	2021-06-02 10:20:27.717485143 -0400
+> +++ redhat-linux/include/linux/lsm_hooks.h	2021-09-30 13:56:48.440195347 -0400
+> @@ -196,6 +196,7 @@
+>   *	@dentry dentry to use in calculating the context.
+>   *	@mode mode used to determine resource type.
+>   *	@name name of the last path component used to create file
+> + *	@xattr_name pointer to place the pointer to security xattr name
+>   *	@ctx pointer to place the pointer to the resulting context in.
+>   *	@ctxlen point to place the length of the resulting context.
+>   * @dentry_create_files_as:
+> Index: redhat-linux/include/linux/security.h
+> ===================================================================
+> --- redhat-linux.orig/include/linux/security.h	2021-08-16 10:39:28.484988836 -0400
+> +++ redhat-linux/include/linux/security.h	2021-09-30 13:59:00.288195347 -0400
+> @@ -317,8 +317,9 @@ int security_add_mnt_opt(const char *opt
+>  				int len, void **mnt_opts);
+>  int security_move_mount(const struct path *from_path, const struct path *to_path);
+>  int security_dentry_init_security(struct dentry *dentry, int mode,
+> -					const struct qstr *name, void **ctx,
+> -					u32 *ctxlen);
+> +				  const struct qstr *name,
+> +				  const char **xattr_name, void **ctx,
+> +				  u32 *ctxlen);
+>  int security_dentry_create_files_as(struct dentry *dentry, int mode,
+>  					struct qstr *name,
+>  					const struct cred *old,
+> @@ -739,6 +740,7 @@ static inline void security_inode_free(s
+>  static inline int security_dentry_init_security(struct dentry *dentry,
+>  						 int mode,
+>  						 const struct qstr *name,
+> +						 const char **xattr_name,
+>  						 void **ctx,
+>  						 u32 *ctxlen)
+>  {
+> Index: redhat-linux/include/linux/lsm_hook_defs.h
+> ===================================================================
+> --- redhat-linux.orig/include/linux/lsm_hook_defs.h	2021-07-07 11:54:59.673549151 -0400
+> +++ redhat-linux/include/linux/lsm_hook_defs.h	2021-09-30 14:02:13.114195347 -0400
+> @@ -83,7 +83,8 @@ LSM_HOOK(int, 0, sb_add_mnt_opt, const c
+>  LSM_HOOK(int, 0, move_mount, const struct path *from_path,
+>  	 const struct path *to_path)
+>  LSM_HOOK(int, 0, dentry_init_security, struct dentry *dentry,
+> -	 int mode, const struct qstr *name, void **ctx, u32 *ctxlen)
+> +	 int mode, const struct qstr *name, const char **xattr_name,
+> +	 void **ctx, u32 *ctxlen)
+>  LSM_HOOK(int, 0, dentry_create_files_as, struct dentry *dentry, int mode,
+>  	 struct qstr *name, const struct cred *old, struct cred *new)
+>  
+> Index: redhat-linux/fs/nfs/nfs4proc.c
+> ===================================================================
+> --- redhat-linux.orig/fs/nfs/nfs4proc.c	2021-07-14 14:47:42.732842926 -0400
+> +++ redhat-linux/fs/nfs/nfs4proc.c	2021-09-30 14:06:02.249195347 -0400
+> @@ -127,7 +127,8 @@ nfs4_label_init_security(struct inode *d
+>  		return NULL;
+>  
+>  	err = security_dentry_init_security(dentry, sattr->ia_mode,
+> -				&dentry->d_name, (void **)&label->label, &label->len);
+> +				&dentry->d_name, NULL,
+> +				(void **)&label->label, &label->len);
+>  	if (err == 0)
+>  		return label;
+>  
+> Index: redhat-linux/fs/ceph/xattr.c
+> ===================================================================
+> --- redhat-linux.orig/fs/ceph/xattr.c	2021-09-09 13:05:21.800611264 -0400
+> +++ redhat-linux/fs/ceph/xattr.c	2021-09-30 14:14:59.892195347 -0400
+> @@ -1311,7 +1311,7 @@ int ceph_security_init_secctx(struct den
+>  	int err;
+>  
+>  	err = security_dentry_init_security(dentry, mode, &dentry->d_name,
+> -					    &as_ctx->sec_ctx,
+> +					    &name, &as_ctx->sec_ctx,
+>  					    &as_ctx->sec_ctxlen);
+>  	if (err < 0) {
+>  		WARN_ON_ONCE(err != -EOPNOTSUPP);
+> @@ -1335,7 +1335,6 @@ int ceph_security_init_secctx(struct den
+>  	 * It only supports single security module and only selinux has
+>  	 * dentry_init_security hook.
+>  	 */
+> -	name = XATTR_NAME_SELINUX;
+>  	name_len = strlen(name);
+>  	err = ceph_pagelist_reserve(pagelist,
+>  				    4 * 2 + name_len + as_ctx->sec_ctxlen);
+>
 
-Thanks for the detailed explanation. Got it.
-
-> 
-> In your case, it seems that you should do the checking after
-> you have an actual lo_inode for the target file, and pass
-> that to lo_should_enable_dax() instead of the parent lo_inode
-> and target name.
-> 
-
-Yes, that will be more reasonable. Thanks.
-
--- 
-Thanks,
-Jeffle
 

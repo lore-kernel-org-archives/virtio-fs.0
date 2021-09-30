@@ -1,10 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Thu, 30 Sep 2021 10:38:42 -0400
-Message-Id: <20210930143850.1188628-1-vgoyal@redhat.com>
+Date: Thu, 30 Sep 2021 10:38:46 -0400
+Message-Id: <20210930143850.1188628-5-vgoyal@redhat.com>
+In-Reply-To: <20210930143850.1188628-1-vgoyal@redhat.com>
+References: <20210930143850.1188628-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 0/8] virtiofs: Notification queue and blocking
-	posix locks
+Subject: [Virtio-fs] [PATCH 4/8] virtiofs: Decouple queue index and queue
+	type
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,69 +18,127 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, miklos@szeredi.hu, stefanha@redhat.com
 Cc: vgoyal@redhat.com
 
-Hi,
+Right now we use a single enum {VQ_HIPRIO, VQ_REQUEST} and this seems to be
+being used to communicate both virtqueue index as well as virtqueue type.
 
-As of now we do not support blocking remote posix locks with virtiofs.
-Well fuse client does not care but server returns -EOPNOTSUPP.
+For example, virtio_fs_init_vq(..,..,..,vq_type) expects queue type in
+vq_type parameter. In rest of the code we are also using this enum as
+queue index.
 
-There are couple of reasons to not support it yet.
+This is little confusing. At the same time, queue index situation is about
+to become little complicated and dynamic with the introduction of
+notification queue. Request queue index is not going to be determined at
+compile time. It will be dynamic based on whether notification queue is
+offered by device or not.
 
-- If virtiofsd is single threaded or does not have a thread pool just
-  to handle requests which can block for a long time, virtiofsd will
-  stop processing new requests and virtiofs will come to a halt.
-  To the extent that further unlock request will not make progress
-  and deadlock will result. This can be taken care of by creating
-  a custom thread pool in virtiofsd just to hanlde lock requests.
+So do not use this enum for both the purposes. Instead use it only to
+denote virtqueue type. For queue index, use macros where queue index is
+fixed and use a variable where queue index is not fixed.
 
-- If client sends a blocking lock request and blocks, then it will
-  consume descriptors in vring. If enough processes block, it is
-  possible that vring does not have capacity to send more requests
-  till some response comes back and descriptors are free. This can
-  also lead to deadlock where an unlock request can't be sent to
-  virtiofsd now. Also this will stop virtiofs operation as well as
-  new filesystem requests can't be sent.
+In the previous patch we are already using a variable ->first_reqq_idx for
+request queue index. This patch defines VQ_HIPRIO_IDX to keep track of
+hiprio virtqueue index.
 
-To avoid this issue, idea was suggested thatn when a blocking
-lock request is sent by client, do not block it. Immediately
-send a reply saying client process should wait for a notification
-which will let it know once lock is available. This will make
-sure descriptors in virtqueue are not kept busy while we are
-waiting for lock and future unlock and other file system requests
-can continue to make progress.
+This patch also renames the enum elements to make it explicit that these
+representing virtqueue type (and not index).
 
-This first requires a notion of notification queue and virtiosfd
-being able to send notifications to client. This patch series
-implements that as well.
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ fs/fuse/virtio_fs.c | 29 ++++++++++++++++-------------
+ 1 file changed, 16 insertions(+), 13 deletions(-)
 
-As of now only one notification type has been implemented but now
-infrastructure is in place and other use cases should be easily
-add more type of notifications as need be.
-
-We don't yet have the capability to interrupt the process which
-is waiting for the posix lock. And reason for that is that virtiofs
-does not support capability to interrupt yet. That's a TODO item
-for later.
-
-Please have a look.
-
-Thanks
-Vivek
-
-Vivek Goyal (8):
-  virtiofs: Disable interrupt requests properly
-  virtiofs: Fix a comment about fuse_dev allocation
-  virtiofs: Add an index to keep track of first request queue
-  virtiofs: Decouple queue index and queue type
-  virtiofs: Add a virtqueue for notifications
-  virtiofs: Add a helper to end request and decrement inflight number
-  virtiofs: Add new notification type FUSE_NOTIFY_LOCK
-  virtiofs: Handle reordering of reply and notification event
-
- fs/fuse/virtio_fs.c            | 438 ++++++++++++++++++++++++++++++---
- include/uapi/linux/fuse.h      |  11 +-
- include/uapi/linux/virtio_fs.h |   5 +
- 3 files changed, 412 insertions(+), 42 deletions(-)
-
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index cb3c7bf8cce4..eef9591de640 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -24,6 +24,8 @@
+  */
+ #define FUSE_HEADER_OVERHEAD    4
+ 
++#define VQ_HIPRIO_IDX	0
++
+ /* List of virtio-fs device instances and a lock for the list. Also provides
+  * mutual exclusion in device removal and mounting path
+  */
+@@ -31,8 +33,8 @@ static DEFINE_MUTEX(virtio_fs_mutex);
+ static LIST_HEAD(virtio_fs_instances);
+ 
+ enum {
+-	VQ_HIPRIO,
+-	VQ_REQUEST
++	VQ_TYPE_HIPRIO,
++	VQ_TYPE_REQUEST
+ };
+ 
+ #define VQ_NAME_LEN	24
+@@ -651,7 +653,7 @@ static void virtio_fs_init_vq(struct virtio_fs_vq *fsvq, char *name,
+ 	INIT_LIST_HEAD(&fsvq->end_reqs);
+ 	init_completion(&fsvq->in_flight_zero);
+ 
+-	if (vq_type == VQ_REQUEST) {
++	if (vq_type == VQ_TYPE_REQUEST) {
+ 		INIT_WORK(&fsvq->done_work, virtio_fs_requests_done_work);
+ 		INIT_DELAYED_WORK(&fsvq->dispatch_work,
+ 				  virtio_fs_request_dispatch_work);
+@@ -680,23 +682,24 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 	/* One hiprio queue and rest are request queues */
+ 	fs->nvqs = 1 + fs->num_request_queues;
+ 	fs->first_reqq_idx = 1;
+-	fs->vqs = kcalloc(fs->nvqs, sizeof(fs->vqs[VQ_HIPRIO]), GFP_KERNEL);
++	fs->vqs = kcalloc(fs->nvqs, sizeof(fs->vqs[VQ_HIPRIO_IDX]), GFP_KERNEL);
+ 	if (!fs->vqs)
+ 		return -ENOMEM;
+ 
+-	vqs = kmalloc_array(fs->nvqs, sizeof(vqs[VQ_HIPRIO]), GFP_KERNEL);
+-	callbacks = kmalloc_array(fs->nvqs, sizeof(callbacks[VQ_HIPRIO]),
++	vqs = kmalloc_array(fs->nvqs, sizeof(vqs[VQ_HIPRIO_IDX]), GFP_KERNEL);
++	callbacks = kmalloc_array(fs->nvqs, sizeof(callbacks[VQ_HIPRIO_IDX]),
+ 					GFP_KERNEL);
+-	names = kmalloc_array(fs->nvqs, sizeof(names[VQ_HIPRIO]), GFP_KERNEL);
++	names = kmalloc_array(fs->nvqs, sizeof(names[VQ_HIPRIO_IDX]),
++			      GFP_KERNEL);
+ 	if (!vqs || !callbacks || !names) {
+ 		ret = -ENOMEM;
+ 		goto out;
+ 	}
+ 
+ 	/* Initialize the hiprio/forget request virtqueue */
+-	callbacks[VQ_HIPRIO] = virtio_fs_vq_done;
+-	virtio_fs_init_vq(&fs->vqs[VQ_HIPRIO], "hiprio", VQ_HIPRIO);
+-	names[VQ_HIPRIO] = fs->vqs[VQ_HIPRIO].name;
++	callbacks[VQ_HIPRIO_IDX] = virtio_fs_vq_done;
++	virtio_fs_init_vq(&fs->vqs[VQ_HIPRIO_IDX], "hiprio", VQ_TYPE_HIPRIO);
++	names[VQ_HIPRIO_IDX] = fs->vqs[VQ_HIPRIO_IDX].name;
+ 
+ 	/* Initialize the requests virtqueues */
+ 	for (i = fs->first_reqq_idx; i < fs->nvqs; i++) {
+@@ -704,7 +707,7 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 
+ 		snprintf(vq_name, VQ_NAME_LEN, "requests.%u",
+ 			 i - fs->first_reqq_idx);
+-		virtio_fs_init_vq(&fs->vqs[i], vq_name, VQ_REQUEST);
++		virtio_fs_init_vq(&fs->vqs[i], vq_name, VQ_TYPE_REQUEST);
+ 		callbacks[i] = virtio_fs_vq_done;
+ 		names[i] = fs->vqs[i].name;
+ 	}
+@@ -985,7 +988,7 @@ __releases(fiq->lock)
+ 	unique = fuse_get_unique(fiq);
+ 
+ 	fs = fiq->priv;
+-	fsvq = &fs->vqs[VQ_HIPRIO];
++	fsvq = &fs->vqs[VQ_HIPRIO_IDX];
+ 	spin_unlock(&fiq->lock);
+ 
+ 	/* Allocate a buffer for the request */
+@@ -1359,7 +1362,7 @@ static void virtio_fs_conn_destroy(struct fuse_mount *fm)
+ {
+ 	struct fuse_conn *fc = fm->fc;
+ 	struct virtio_fs *vfs = fc->iq.priv;
+-	struct virtio_fs_vq *fsvq = &vfs->vqs[VQ_HIPRIO];
++	struct virtio_fs_vq *fsvq = &vfs->vqs[VQ_HIPRIO_IDX];
+ 
+ 	/* Stop dax worker. Soon evict_inodes() will be called which
+ 	 * will free all memory ranges belonging to all inodes.
 -- 
 2.31.1
 

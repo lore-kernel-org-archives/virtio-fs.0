@@ -1,25 +1,12 @@
-Date: Tue, 28 Sep 2021 10:37:36 -0400
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	from:to:subject; s=fm2; bh=6JRy8VXcc3l8pE+U4+w9kSKx1GS23HS+wD5hO
-	c7/VjE=; b=Ztvjf2g2mMwbX0Grlbr37quH2hJRH+LrhwWUaNEDRFg8xfUN0Srrl
-	oaYfWYVGxJvofpbXRJDRBjkro/KO9et11xMaaY2rMI3K6J0JITXlnjYD9cDVwtq/
-	E9TMGGH5Q1eHns1C2Gi81FVkBu4VSKOhtrww+0xqrVx9+TjoxImcMQZdCrIAI9QA
-	wVx/RTl8zz1OPk3Qn7WDHoNeyf+grHQE7RJC6N1QngIO8Oc90bMeXggh9Yeq7D9z
-	g+dHbO4qcXTkEDdqnJhKIwc+2Qox3LMhl0iz+XbNPku7Lzi0XLyxWHASScrqIOBt
-	RIGeOO+1jRtVNmIk+r3nR0IPJ80VEgJeQ==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm3; bh=6JRy8VXcc3l8pE+U4
-	+w9kSKx1GS23HS+wD5hOc7/VjE=; b=RfdGpZyi7Eb+I/Joie6jUmvtSeKN/URkD
-	TpkrFsvBj15gZAhwQdQSNYgpSoIU8zuAfhPyoP0iRgULzFG8YV9lO5If22ZCiU3L
-	9sIq/PZfAtm5/RyjIPA89oOekfAJsRrD965qqh3R84D0HnKBfxkS+VuUtXYu7iE5
-	/S2awPANa1i8ykxxbi1D5fxpjkH+gX2ZEvcxQRADiOPrdWr1/2GAAsE3ggI2nkZr
-	CJn9QcWr1doRcwcb+wxFiUbku4/k6XAz3Z/lsKQh7tNkQQSihps2IZ2CqJ2Md5Qy
-	ThA67Zzvi3WMjlaXjvCV+2qN4+kkNilAz/EdevVJ0KwzU6aRp6Xaw==
-From: virtiofs-bot@sinrega.org
-Message-Id: <52242.121092810373002507@us-mta-163.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] MR opened: Implement a single thread mode
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Thu, 30 Sep 2021 10:38:45 -0400
+Message-Id: <20210930143850.1188628-4-vgoyal@redhat.com>
+In-Reply-To: <20210930143850.1188628-1-vgoyal@redhat.com>
+References: <20210930143850.1188628-1-vgoyal@redhat.com>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH 3/8] virtiofs: Add an index to keep track of
+	first request queue
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -28,28 +15,99 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, miklos@szeredi.hu, stefanha@redhat.com
+Cc: vgoyal@redhat.com
 
-Implement a mode that disables the thread pool and processes the
-requests in a single thread.
+We have many virtqueues and first queue which carries fuse normal requests
+(except forget requests) has index pointed to by enum VQ_REQUEST. This
+works fine as long as number of queues are not dynamic.
 
-By processing the requests in a single thread we lose the parallelism,
-but in exchange we can apply some optimizations, such as acquiring the
-vring mutex lock once and keeping it until all pending requests have
-been processed.
+I am about to introduce one more virtqueue, called notification queue,
+which will be present only if device on host supports it. That means index
+of request queue will change depending on if notification queue is present
+or not.
 
-The expectations are that the thread pool mode will perform better
-when the backing filesystem is on a relatively slow storage and
-there's a significant amount of I/O parallelism inside the guest,
-while the single thread mode will consume less CPU and perform better
-on pretty much every other case.
+So, add a variable to keep track of that index and this will help when
+notification queue is added in next patch.
 
-This mode can be enabled by specifying the value "0" for the
-thread-pool-size command line argument. We also make "0" (single
-thread mode) the default value, to mimic the behavior of the C
-implementation.
-
-Signed-off-by: Sergio Lopez <slp@redhat.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Signed-off-by: Ioannis Angelakopoulos <iangelak@redhat.com>
 ---
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/40
+ fs/fuse/virtio_fs.c | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+index f7c58a4b996d..cb3c7bf8cce4 100644
+--- a/fs/fuse/virtio_fs.c
++++ b/fs/fuse/virtio_fs.c
+@@ -61,6 +61,7 @@ struct virtio_fs {
+ 	unsigned int nvqs;               /* number of virtqueues */
+ 	unsigned int num_request_queues; /* number of request queues */
+ 	struct dax_device *dax_dev;
++	unsigned int first_reqq_idx;     /* First request queue idx */
+ 
+ 	/* DAX memory window where file contents are mapped */
+ 	void *window_kaddr;
+@@ -676,7 +677,9 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 	if (fs->num_request_queues == 0)
+ 		return -EINVAL;
+ 
+-	fs->nvqs = VQ_REQUEST + fs->num_request_queues;
++	/* One hiprio queue and rest are request queues */
++	fs->nvqs = 1 + fs->num_request_queues;
++	fs->first_reqq_idx = 1;
+ 	fs->vqs = kcalloc(fs->nvqs, sizeof(fs->vqs[VQ_HIPRIO]), GFP_KERNEL);
+ 	if (!fs->vqs)
+ 		return -ENOMEM;
+@@ -696,10 +699,11 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
+ 	names[VQ_HIPRIO] = fs->vqs[VQ_HIPRIO].name;
+ 
+ 	/* Initialize the requests virtqueues */
+-	for (i = VQ_REQUEST; i < fs->nvqs; i++) {
++	for (i = fs->first_reqq_idx; i < fs->nvqs; i++) {
+ 		char vq_name[VQ_NAME_LEN];
+ 
+-		snprintf(vq_name, VQ_NAME_LEN, "requests.%u", i - VQ_REQUEST);
++		snprintf(vq_name, VQ_NAME_LEN, "requests.%u",
++			 i - fs->first_reqq_idx);
+ 		virtio_fs_init_vq(&fs->vqs[i], vq_name, VQ_REQUEST);
+ 		callbacks[i] = virtio_fs_vq_done;
+ 		names[i] = fs->vqs[i].name;
+@@ -1217,7 +1221,7 @@ static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
+ static void virtio_fs_wake_pending_and_unlock(struct fuse_iqueue *fiq)
+ __releases(fiq->lock)
+ {
+-	unsigned int queue_id = VQ_REQUEST; /* TODO multiqueue */
++	unsigned int queue_id;
+ 	struct virtio_fs *fs;
+ 	struct fuse_req *req;
+ 	struct virtio_fs_vq *fsvq;
+@@ -1231,6 +1235,7 @@ __releases(fiq->lock)
+ 	spin_unlock(&fiq->lock);
+ 
+ 	fs = fiq->priv;
++	queue_id = fs->first_reqq_idx;
+ 
+ 	pr_debug("%s: opcode %u unique %#llx nodeid %#llx in.len %u out.len %u\n",
+ 		  __func__, req->in.h.opcode, req->in.h.unique,
+@@ -1411,6 +1416,7 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
+ 	struct fuse_mount *fm;
+ 	unsigned int virtqueue_size;
+ 	int err = -EIO;
++	struct virtio_fs_vq *first_req_fsvq;
+ 
+ 	/* This gets a reference on virtio_fs object. This ptr gets installed
+ 	 * in fc->iq->priv. Once fuse_conn is going away, it calls ->put()
+@@ -1422,7 +1428,8 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
+ 		return -EINVAL;
+ 	}
+ 
+-	virtqueue_size = virtqueue_get_vring_size(fs->vqs[VQ_REQUEST].vq);
++	first_req_fsvq = &fs->vqs[fs->first_reqq_idx];
++	virtqueue_size = virtqueue_get_vring_size(first_req_fsvq->vq);
+ 	if (WARN_ON(virtqueue_size <= FUSE_HEADER_OVERHEAD))
+ 		goto out_err;
+ 
+-- 
+2.31.1
 

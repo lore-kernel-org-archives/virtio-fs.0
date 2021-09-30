@@ -1,11 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Thu, 30 Sep 2021 11:30:32 -0400
-Message-Id: <20210930153037.1194279-9-vgoyal@redhat.com>
+Date: Thu, 30 Sep 2021 11:30:34 -0400
+Message-Id: <20210930153037.1194279-11-vgoyal@redhat.com>
 In-Reply-To: <20210930153037.1194279-1-vgoyal@redhat.com>
 References: <20210930153037.1194279-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 08/13] virtiofsd: Create a notification queue
+Subject: [Virtio-fs] [PATCH 10/13] virtiofsd: Custom threadpool for remote
+	blocking posix locks requests
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,323 +18,563 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com, stefanha@redhat.com
 Cc: vgoyal@redhat.com, miklos@szeredi.hu
 
-Add a notification queue which will be used to send async notifications
-for file lock availability.
+Add a new custom threadpool using posix threads that specifically
+service locking requests.
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+In the case of a fcntl(SETLKW) request, if the guest is waiting
+for a lock or locks and issues a hard-reboot through SYSRQ then virtiofsd
+unblocks the blocked threads by sending a signal to them and waking
+them up.
+
+The current threadpool (GThreadPool) is not adequate to service the
+locking requests that result in a thread blocking. That is because
+GLib does not provide an API to cancel the request while it is
+serviced by a thread. In addition, a user might be running virtiofsd
+without a threadpool (--thread-pool-size=0), thus a locking request
+that blocks, will block the main virtqueue thread that services requests
+from servicing any other requests.
+
+The only exception occurs when the lock is of type F_UNLCK. In this case
+the request is serviced by the main virtqueue thread or a GThreadPool
+thread to avoid a deadlock, when all the threads in the custom threadpool
+are blocked.
+
+Then virtiofsd proceeds to cleanup the state of the threads, release
+them back to the system and re-initialize.
+
 Signed-off-by: Ioannis Angelakopoulos <iangelak@redhat.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- hw/virtio/vhost-user-fs-pci.c     |  4 +-
- hw/virtio/vhost-user-fs.c         | 62 +++++++++++++++++++++++++--
- include/hw/virtio/vhost-user-fs.h |  2 +
- tools/virtiofsd/fuse_i.h          |  1 +
- tools/virtiofsd/fuse_virtio.c     | 70 +++++++++++++++++++++++--------
- 5 files changed, 116 insertions(+), 23 deletions(-)
+ tools/virtiofsd/fuse_virtio.c         |  90 ++++++-
+ tools/virtiofsd/meson.build           |   1 +
+ tools/virtiofsd/passthrough_seccomp.c |   1 +
+ tools/virtiofsd/tpool.c               | 331 ++++++++++++++++++++++++++
+ tools/virtiofsd/tpool.h               |  18 ++
+ 5 files changed, 440 insertions(+), 1 deletion(-)
+ create mode 100644 tools/virtiofsd/tpool.c
+ create mode 100644 tools/virtiofsd/tpool.h
 
-diff --git a/hw/virtio/vhost-user-fs-pci.c b/hw/virtio/vhost-user-fs-pci.c
-index 2ed8492b3f..cdb9471088 100644
---- a/hw/virtio/vhost-user-fs-pci.c
-+++ b/hw/virtio/vhost-user-fs-pci.c
-@@ -41,8 +41,8 @@ static void vhost_user_fs_pci_realize(VirtIOPCIProxy *vpci_dev, Error **errp)
-     DeviceState *vdev = DEVICE(&dev->vdev);
- 
-     if (vpci_dev->nvectors == DEV_NVECTORS_UNSPECIFIED) {
--        /* Also reserve config change and hiprio queue vectors */
--        vpci_dev->nvectors = dev->vdev.conf.num_request_queues + 2;
-+        /* Also reserve config change, hiprio and notification queue vectors */
-+        vpci_dev->nvectors = dev->vdev.conf.num_request_queues + 3;
-     }
- 
-     qdev_realize(vdev, BUS(&vpci_dev->bus), errp);
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index d1efbc5b18..6bafcf0243 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -31,6 +31,7 @@ static const int user_feature_bits[] = {
-     VIRTIO_F_NOTIFY_ON_EMPTY,
-     VIRTIO_F_RING_PACKED,
-     VIRTIO_F_IOMMU_PLATFORM,
-+    VIRTIO_FS_F_NOTIFICATION,
- 
-     VHOST_INVALID_FEATURE_BIT
- };
-@@ -147,7 +148,7 @@ static void vuf_handle_output(VirtIODevice *vdev, VirtQueue *vq)
-      */
- }
- 
--static void vuf_create_vqs(VirtIODevice *vdev)
-+static void vuf_create_vqs(VirtIODevice *vdev, bool notification_vq)
- {
-     VHostUserFS *fs = VHOST_USER_FS(vdev);
-     unsigned int i;
-@@ -155,6 +156,15 @@ static void vuf_create_vqs(VirtIODevice *vdev)
-     /* Hiprio queue */
-     fs->hiprio_vq = virtio_add_queue(vdev, fs->conf.queue_size,
-                                      vuf_handle_output);
-+    /*
-+     * Notification queue. Feature negotiation happens later. So at this
-+     * point of time we don't know if driver will use notification queue
-+     * or not.
-+     */
-+    if (notification_vq) {
-+        fs->notification_vq = virtio_add_queue(vdev, fs->conf.queue_size,
-+                                               vuf_handle_output);
-+    }
- 
-     /* Request queues */
-     fs->req_vqs = g_new(VirtQueue *, fs->conf.num_request_queues);
-@@ -163,8 +173,12 @@ static void vuf_create_vqs(VirtIODevice *vdev)
-                                           vuf_handle_output);
-     }
- 
--    /* 1 high prio queue, plus the number configured */
--    fs->vhost_dev.nvqs = 1 + fs->conf.num_request_queues;
-+    /* 1 high prio queue, 1 notification queue plus the number configured */
-+    if (notification_vq) {
-+        fs->vhost_dev.nvqs = 2 + fs->conf.num_request_queues;
-+    } else {
-+        fs->vhost_dev.nvqs = 1 + fs->conf.num_request_queues;
-+    }
-     fs->vhost_dev.vqs = g_new0(struct vhost_virtqueue, fs->vhost_dev.nvqs);
- }
- 
-@@ -176,6 +190,11 @@ static void vuf_cleanup_vqs(VirtIODevice *vdev)
-     virtio_delete_queue(fs->hiprio_vq);
-     fs->hiprio_vq = NULL;
- 
-+    if (fs->notification_vq) {
-+        virtio_delete_queue(fs->notification_vq);
-+    }
-+    fs->notification_vq = NULL;
-+
-     for (i = 0; i < fs->conf.num_request_queues; i++) {
-         virtio_delete_queue(fs->req_vqs[i]);
-     }
-@@ -194,9 +213,43 @@ static uint64_t vuf_get_features(VirtIODevice *vdev,
- {
-     VHostUserFS *fs = VHOST_USER_FS(vdev);
- 
-+    virtio_add_feature(&features, VIRTIO_FS_F_NOTIFICATION);
-+
-     return vhost_get_features(&fs->vhost_dev, user_feature_bits, features);
- }
- 
-+static void vuf_set_features(VirtIODevice *vdev, uint64_t features)
-+{
-+    VHostUserFS *fs = VHOST_USER_FS(vdev);
-+
-+    if (virtio_has_feature(features, VIRTIO_FS_F_NOTIFICATION)) {
-+        fs->notify_enabled = true;
-+        /*
-+         * If guest first booted with no notification queue support and
-+         * later rebooted with kernel which supports notification, we
-+         * can end up here
-+         */
-+        if (!fs->notification_vq) {
-+            vuf_cleanup_vqs(vdev);
-+            vuf_create_vqs(vdev, true);
-+        }
-+        return;
-+    }
-+
-+    fs->notify_enabled = false;
-+    if (!fs->notification_vq) {
-+        return;
-+    }
-+    /*
-+     * Driver does not support notification queue. Reconfigure queues
-+     * and do not create notification queue.
-+     */
-+    vuf_cleanup_vqs(vdev);
-+
-+    /* Create queues again */
-+    vuf_create_vqs(vdev, false);
-+}
-+
- static void vuf_guest_notifier_mask(VirtIODevice *vdev, int idx,
-                                             bool mask)
- {
-@@ -262,7 +315,7 @@ static void vuf_device_realize(DeviceState *dev, Error **errp)
-     virtio_init(vdev, "vhost-user-fs", VIRTIO_ID_FS,
-                 sizeof(struct virtio_fs_config));
- 
--    vuf_create_vqs(vdev);
-+    vuf_create_vqs(vdev, true);
-     ret = vhost_dev_init(&fs->vhost_dev, &fs->vhost_user,
-                          VHOST_BACKEND_TYPE_USER, 0, errp);
-     if (ret < 0) {
-@@ -327,6 +380,7 @@ static void vuf_class_init(ObjectClass *klass, void *data)
-     vdc->realize = vuf_device_realize;
-     vdc->unrealize = vuf_device_unrealize;
-     vdc->get_features = vuf_get_features;
-+    vdc->set_features = vuf_set_features;
-     vdc->get_config = vuf_get_config;
-     vdc->set_status = vuf_set_status;
-     vdc->guest_notifier_mask = vuf_guest_notifier_mask;
-diff --git a/include/hw/virtio/vhost-user-fs.h b/include/hw/virtio/vhost-user-fs.h
-index 0d62834c25..95dc0dd402 100644
---- a/include/hw/virtio/vhost-user-fs.h
-+++ b/include/hw/virtio/vhost-user-fs.h
-@@ -39,7 +39,9 @@ struct VHostUserFS {
-     VhostUserState vhost_user;
-     VirtQueue **req_vqs;
-     VirtQueue *hiprio_vq;
-+    VirtQueue *notification_vq;
-     int32_t bootindex;
-+    bool notify_enabled;
- 
-     /*< public >*/
- };
-diff --git a/tools/virtiofsd/fuse_i.h b/tools/virtiofsd/fuse_i.h
-index 492e002181..4942d080da 100644
---- a/tools/virtiofsd/fuse_i.h
-+++ b/tools/virtiofsd/fuse_i.h
-@@ -73,6 +73,7 @@ struct fuse_session {
-     int   vu_socketfd;
-     struct fv_VuDev *virtio_dev;
-     int thread_pool_size;
-+    bool notify_enabled;
- };
- 
- struct fuse_chan {
 diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-index baead08b28..f5b87a508a 100644
+index 3b720c5d4a..c67c2e0e7a 100644
 --- a/tools/virtiofsd/fuse_virtio.c
 +++ b/tools/virtiofsd/fuse_virtio.c
-@@ -14,6 +14,7 @@
- #include "qemu/osdep.h"
- #include "qemu/iov.h"
- #include "qapi/error.h"
-+#include "standard-headers/linux/virtio_fs.h"
- #include "fuse_i.h"
- #include "standard-headers/linux/fuse.h"
+@@ -20,6 +20,7 @@
  #include "fuse_misc.h"
-@@ -85,12 +86,25 @@ struct fv_VuDev {
- /* Callback from libvhost-user */
- static uint64_t fv_get_features(VuDev *dev)
- {
--    return 1ULL << VIRTIO_F_VERSION_1;
-+    uint64_t features;
-+
-+    features = 1ull << VIRTIO_F_VERSION_1 |
-+               1ull << VIRTIO_FS_F_NOTIFICATION;
-+
-+    return features;
+ #include "fuse_opt.h"
+ #include "fuse_virtio.h"
++#include "tpool.h"
+ 
+ #include <sys/eventfd.h>
+ #include <sys/socket.h>
+@@ -612,6 +613,60 @@ out:
+     free(req);
  }
  
- /* Callback from libvhost-user */
- static void fv_set_features(VuDev *dev, uint64_t features)
- {
-+    struct fv_VuDev *vud = container_of(dev, struct fv_VuDev, dev);
-+    struct fuse_session *se = vud->se;
++/*
++ * If the request is a locking request, use a custom locking thread pool.
++ */
++static bool use_lock_tpool(gpointer data, gpointer user_data)
++{
++    struct fv_QueueInfo *qi = user_data;
++    struct fuse_session *se = qi->virtio_dev->se;
++    FVRequest *req = data;
++    VuVirtqElement *elem = &req->elem;
++    struct fuse_buf fbuf = {};
++    struct fuse_in_header *inhp;
++    struct fuse_lk_in *lkinp;
++    size_t lk_req_len;
++    /* The 'out' part of the elem is from qemu */
++    unsigned int out_num = elem->out_num;
++    struct iovec *out_sg = elem->out_sg;
++    size_t out_len = iov_size(out_sg, out_num);
++    bool use_custom_tpool = false;
 +
-+    if ((1ull << VIRTIO_FS_F_NOTIFICATION) & features) {
-+        se->notify_enabled = true;
-+    } else {
-+        se->notify_enabled = false;
-+    }
- }
- 
- /*
-@@ -719,22 +733,25 @@ static void fv_queue_cleanup_thread(struct fv_VuDev *vud, int qidx)
- {
-     int ret;
-     struct fv_QueueInfo *ourqi;
-+    struct fuse_session *se = vud->se;
- 
-     assert(qidx < vud->nqueues);
-     ourqi = vud->qi[qidx];
- 
--    /* Kill the thread */
--    if (eventfd_write(ourqi->kill_fd, 1)) {
--        fuse_log(FUSE_LOG_ERR, "Eventfd_write for queue %d: %s\n",
--                 qidx, strerror(errno));
--    }
--    ret = pthread_join(ourqi->thread, NULL);
--    if (ret) {
--        fuse_log(FUSE_LOG_ERR, "%s: Failed to join thread idx %d err %d\n",
--                 __func__, qidx, ret);
-+    /* qidx == 1 is the notification queue if notifications are enabled */
-+    if (!se->notify_enabled || qidx != 1) {
-+        /* Kill the thread */
-+        if (eventfd_write(ourqi->kill_fd, 1)) {
-+            fuse_log(FUSE_LOG_ERR, "Eventfd_read for queue: %m\n");
-+        }
-+        ret = pthread_join(ourqi->thread, NULL);
-+        if (ret) {
-+            fuse_log(FUSE_LOG_ERR, "%s: Failed to join thread idx %d err"
-+                     " %d\n", __func__, qidx, ret);
-+        }
-+        close(ourqi->kill_fd);
-     }
-     pthread_mutex_destroy(&ourqi->vq_lock);
--    close(ourqi->kill_fd);
-     ourqi->kick_fd = -1;
-     g_free(vud->qi[qidx]);
-     vud->qi[qidx] = NULL;
-@@ -757,6 +774,9 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
- {
-     struct fv_VuDev *vud = container_of(dev, struct fv_VuDev, dev);
-     struct fv_QueueInfo *ourqi;
-+    int valid_queues = 2; /* One hiprio queue and one request queue */
-+    bool notification_q = false;
-+    struct fuse_session *se = vud->se;
- 
-     fuse_log(FUSE_LOG_INFO, "%s: qidx=%d started=%d\n", __func__, qidx,
-              started);
-@@ -768,10 +788,19 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
-      * well-behaved client in mind and may not protect against all types of
-      * races yet.
-      */
--    if (qidx > 1) {
--        fuse_log(FUSE_LOG_ERR,
--                 "%s: multiple request queues not yet implemented, please only "
--                 "configure 1 request queue\n",
-+    if (se->notify_enabled) {
-+        valid_queues++;
-+        /*
-+         * If notification queue is enabled, then qidx 1 is notificaiton queue.
-+         */
-+        if (qidx == 1) {
-+            notification_q = true;
-+        }
++    /*
++     * If notifications are not enabled, no point in using cusotm lock
++     * thread pool.
++     */
++    if (!se->notify_enabled) {
++        return false;
 +    }
 +
-+    if (qidx >= valid_queues) {
-+        fuse_log(FUSE_LOG_ERR, "%s: multiple request queues not yet"
-+                 "implemented, please only configure 1 request queue\n",
-                  __func__);
-         exit(EXIT_FAILURE);
-     }
-@@ -793,11 +822,18 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
-             assert(vud->qi[qidx]->kick_fd == -1);
++    assert(se->bufsize > sizeof(struct fuse_in_header));
++    lk_req_len = sizeof(struct fuse_in_header) + sizeof(struct fuse_lk_in);
++
++    if (out_len < lk_req_len) {
++        return false;
++    }
++
++    fbuf.mem = g_malloc(se->bufsize);
++    copy_from_iov(&fbuf, out_num, out_sg, lk_req_len);
++
++    inhp = fbuf.mem;
++    if (inhp->opcode != FUSE_SETLKW) {
++        goto out;
++    }
++
++    lkinp = fbuf.mem + sizeof(struct fuse_in_header);
++    if (lkinp->lk.type == F_UNLCK) {
++        goto out;
++    }
++
++    /* Its a blocking lock request. Use custom thread pool */
++    use_custom_tpool = true;
++out:
++    g_free(fbuf.mem);
++    return use_custom_tpool;
++}
++
+ /* Thread function for individual queues, created when a queue is 'started' */
+ static void *fv_queue_thread(void *opaque)
+ {
+@@ -619,6 +674,7 @@ static void *fv_queue_thread(void *opaque)
+     struct VuDev *dev = &qi->virtio_dev->dev;
+     struct VuVirtq *q = vu_get_queue(dev, qi->qidx);
+     struct fuse_session *se = qi->virtio_dev->se;
++    struct fv_ThreadPool *lk_tpool = NULL;
+     GThreadPool *pool = NULL;
+     GList *req_list = NULL;
+ 
+@@ -631,6 +687,24 @@ static void *fv_queue_thread(void *opaque)
+             fuse_log(FUSE_LOG_ERR, "%s: g_thread_pool_new failed\n", __func__);
+             return NULL;
          }
-         ourqi = vud->qi[qidx];
-+        pthread_mutex_init(&ourqi->vq_lock, NULL);
-+        /*
-+         * For notification queue, we don't have to start a thread yet.
-+         */
-+        if (notification_q) {
-+            return;
++
++    }
++
++    /*
++     * Create the custom thread pool to handle blocking locking requests.
++     * Do not create for hiprio queue (qidx=0).
++     */
++    if (qi->qidx) {
++        fuse_log(FUSE_LOG_DEBUG, "%s: Creating a locking thread pool for"
++                 " Queue %d with size %d\n", __func__, qi->qidx, 4);
++        lk_tpool = fv_thread_pool_init(4);
++        if (!lk_tpool) {
++            fuse_log(FUSE_LOG_ERR, "%s: fv_thread_pool failed\n", __func__);
++            if (pool) {
++                g_thread_pool_free(pool, FALSE, TRUE);
++            }
++            return NULL;
++        }
+     }
+ 
+     fuse_log(FUSE_LOG_INFO, "%s: Start for queue %d kick_fd %d\n", __func__,
+@@ -703,7 +777,17 @@ static void *fv_queue_thread(void *opaque)
+ 
+             req->reply_sent = false;
+ 
+-            if (!se->thread_pool_size) {
++            /*
++             * In every case we get the opcode of the request and check if it
++             * is a locking request. If yes, we assign the request to the
++             * custom thread pool, with the exception when the lock is of type
++             * F_UNCLK. In this case to avoid a deadlock when all the custom
++             * threads are blocked, the request is serviced by the main
++             * virtqueue thread or a thread in GThreadPool
++             */
++            if (use_lock_tpool(req, qi)) {
++                fv_thread_pool_push(lk_tpool, fv_queue_worker, req, qi);
++            } else if (!se->thread_pool_size) {
+                 req_list = g_list_prepend(req_list, req);
+             } else {
+                 g_thread_pool_push(pool, req, NULL);
+@@ -726,6 +810,10 @@ static void *fv_queue_thread(void *opaque)
+         g_thread_pool_free(pool, FALSE, TRUE);
+     }
+ 
++    if (lk_tpool) {
++        fv_thread_pool_destroy(lk_tpool);
++    }
++
+     return NULL;
+ }
+ 
+diff --git a/tools/virtiofsd/meson.build b/tools/virtiofsd/meson.build
+index c134ba633f..203cd5613a 100644
+--- a/tools/virtiofsd/meson.build
++++ b/tools/virtiofsd/meson.build
+@@ -6,6 +6,7 @@ executable('virtiofsd', files(
+   'fuse_signals.c',
+   'fuse_virtio.c',
+   'helper.c',
++  'tpool.c',
+   'passthrough_ll.c',
+   'passthrough_seccomp.c'),
+   dependencies: [seccomp, qemuutil, libcap_ng, vhost_user],
+diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
+index a3ce9f898d..cd24b40b78 100644
+--- a/tools/virtiofsd/passthrough_seccomp.c
++++ b/tools/virtiofsd/passthrough_seccomp.c
+@@ -116,6 +116,7 @@ static const int syscall_allowlist[] = {
+     SCMP_SYS(write),
+     SCMP_SYS(writev),
+     SCMP_SYS(umask),
++    SCMP_SYS(nanosleep),
+ };
+ 
+ /* Syscalls used when --syslog is enabled */
+diff --git a/tools/virtiofsd/tpool.c b/tools/virtiofsd/tpool.c
+new file mode 100644
+index 0000000000..f9aa41b0c5
+--- /dev/null
++++ b/tools/virtiofsd/tpool.c
+@@ -0,0 +1,331 @@
++/*
++ * custom threadpool for virtiofsd
++ *
++ * Copyright (C) 2021 Red Hat, Inc.
++ *
++ * Authors:
++ *     Ioannis Angelakopoulos <iangelak@redhat.com>
++ *     Vivek Goyal <vgoyal@redhat.com>
++ *
++ * SPDX-License-Identifier: GPL-2.0-or-later
++ */
++
++#include <pthread.h>
++#include <glib.h>
++#include <stdbool.h>
++#include <errno.h>
++#include "tpool.h"
++#include "fuse_log.h"
++
++struct fv_PoolReq {
++    struct fv_PoolReq *next;                        /* pointer to next task */
++    void (*worker_func)(void *arg1, void *arg2);    /* worker function */
++    void *arg1;                                     /* 1st arg: Request */
++    void *arg2;                                     /* 2nd arg: Virtqueue */
++};
++
++struct fv_PoolReqQueue {
++    pthread_mutex_t lock;
++    GQueue queue;
++    pthread_cond_t notify;                         /* Conditional variable */
++};
++
++struct fv_PoolThread {
++    pthread_t pthread;
++    int alive;
++    int id;
++    struct fv_ThreadPool *tpool;
++};
++
++struct fv_ThreadPool {
++    struct fv_PoolThread **threads;
++    struct fv_PoolReqQueue *req_queue;
++    pthread_mutex_t tp_lock;
++
++    /* Total number of threads created */
++    int num_threads;
++
++    /* Number of threads running now */
++    int nr_running;
++    int destroy_pool;
++};
++
++/* Initialize the Locking Request Queue */
++static struct fv_PoolReqQueue *fv_pool_request_queue_init(void)
++{
++    struct fv_PoolReqQueue *rq;
++
++    rq = g_new0(struct fv_PoolReqQueue, 1);
++    pthread_mutex_init(&(rq->lock), NULL);
++    pthread_cond_init(&(rq->notify), NULL);
++    g_queue_init(&rq->queue);
++    return rq;
++}
++
++/* Push a new locking request to the queue*/
++void fv_thread_pool_push(struct fv_ThreadPool *tpool,
++                         void (*worker_func)(void *, void *),
++                         void *arg1, void *arg2)
++{
++    struct fv_PoolReq *newreq;
++    struct fv_PoolReqQueue *rq = tpool->req_queue;
++
++    newreq = g_new(struct fv_PoolReq, 1);
++    newreq->worker_func = worker_func;
++    newreq->arg1 = arg1;
++    newreq->arg2 = arg2;
++    newreq->next = NULL;
++
++    /* Now add the request to the queue */
++    pthread_mutex_lock(&rq->lock);
++    g_queue_push_tail(&rq->queue, newreq);
++
++    /* Notify the threads that a request is available */
++    pthread_cond_signal(&rq->notify);
++    pthread_mutex_unlock(&rq->lock);
++
++}
++
++/* Pop a locking request from the queue*/
++static struct fv_PoolReq *fv_tpool_pop(struct fv_ThreadPool *tpool)
++{
++    struct fv_PoolReq *pool_req = NULL;
++    struct fv_PoolReqQueue *rq = tpool->req_queue;
++
++    pthread_mutex_lock(&rq->lock);
++
++    pool_req = g_queue_pop_head(&rq->queue);
++
++    if (!g_queue_is_empty(&rq->queue)) {
++        pthread_cond_signal(&rq->notify);
++    }
++    pthread_mutex_unlock(&rq->lock);
++
++    return pool_req;
++}
++
++static void fv_pool_request_queue_destroy(struct fv_ThreadPool *tpool)
++{
++    struct fv_PoolReq *pool_req;
++
++    while ((pool_req = fv_tpool_pop(tpool))) {
++        g_free(pool_req);
++    }
++
++    /* Now free the actual queue itself */
++    g_free(tpool->req_queue);
++}
++
++/*
++ * Signal handler for blcking threads that wait on a remote lock to be released
++ * Called when virtiofsd does cleanup and wants to wake up these threads
++ */
++static void fv_thread_signal_handler(int signal)
++{
++    fuse_log(FUSE_LOG_DEBUG, "Thread received a signal.\n");
++    return;
++}
++
++static bool is_pool_stopping(struct fv_ThreadPool *tpool)
++{
++    bool destroy = false;
++
++    pthread_mutex_lock(&tpool->tp_lock);
++    destroy = tpool->destroy_pool;
++    pthread_mutex_unlock(&tpool->tp_lock);
++
++    return destroy;
++}
++
++static void *fv_thread_do_work(void *thread)
++{
++    struct fv_PoolThread *worker = (struct fv_PoolThread *)thread;
++    struct fv_ThreadPool *tpool = worker->tpool;
++    struct fv_PoolReq *pool_request;
++    /* Actual worker function and arguments. Same as non locking requests */
++    void (*worker_func)(void*, void*);
++    void *arg1;
++    void *arg2;
++
++    while (1) {
++        if (is_pool_stopping(tpool)) {
++            break;
 +        }
 +
-         ourqi->kick_fd = dev->vq[qidx].kick_fd;
- 
-         ourqi->kill_fd = eventfd(0, EFD_CLOEXEC | EFD_SEMAPHORE);
-         assert(ourqi->kill_fd != -1);
--        pthread_mutex_init(&ourqi->vq_lock, NULL);
- 
-         if (pthread_create(&ourqi->thread, NULL, fv_queue_thread, ourqi)) {
-             fuse_log(FUSE_LOG_ERR, "%s: Failed to create thread for queue %d\n",
-@@ -1048,7 +1084,7 @@ int virtio_session_mount(struct fuse_session *se)
-     se->vu_socketfd = data_sock;
-     se->virtio_dev->se = se;
-     pthread_rwlock_init(&se->virtio_dev->vu_dispatch_rwlock, NULL);
--    if (!vu_init(&se->virtio_dev->dev, 2, se->vu_socketfd, fv_panic, NULL,
-+    if (!vu_init(&se->virtio_dev->dev, 3, se->vu_socketfd, fv_panic, NULL,
-                  fv_set_watch, fv_remove_watch, &fv_iface)) {
-         fuse_log(FUSE_LOG_ERR, "%s: vu_init failed\n", __func__);
-         return -1;
++        /*
++         * Get the queue lock first so that we can wait on the conditional
++         * variable afterwards
++         */
++        pthread_mutex_lock(&tpool->req_queue->lock);
++
++        /* Wait on the condition variable until it is available */
++        while (g_queue_is_empty(&tpool->req_queue->queue) &&
++               !is_pool_stopping(tpool)) {
++            pthread_cond_wait(&tpool->req_queue->notify,
++                              &tpool->req_queue->lock);
++        }
++
++        /* Unlock the queue for other threads */
++        pthread_mutex_unlock(&tpool->req_queue->lock);
++
++        if (is_pool_stopping(tpool)) {
++            break;
++        }
++
++        /* Now the request must be serviced */
++        pool_request = fv_tpool_pop(tpool);
++        if (pool_request) {
++            fuse_log(FUSE_LOG_DEBUG, "%s: Locking Thread:%d handling"
++                    " a request\n", __func__, worker->id);
++            worker_func = pool_request->worker_func;
++            arg1 = pool_request->arg1;
++            arg2 = pool_request->arg2;
++            worker_func(arg1, arg2);
++            g_free(pool_request);
++        }
++    }
++
++    /* Mark the thread as inactive */
++    pthread_mutex_lock(&tpool->tp_lock);
++    tpool->threads[worker->id]->alive = 0;
++    tpool->nr_running--;
++    pthread_mutex_unlock(&tpool->tp_lock);
++
++    return NULL;
++}
++
++/* Create a single thread that handles locking requests */
++static int fv_worker_thread_init(struct fv_ThreadPool *tpool,
++                                 struct fv_PoolThread **thread, int id)
++{
++    struct fv_PoolThread *worker;
++    int ret;
++
++    worker = g_new(struct fv_PoolThread, 1);
++    worker->tpool = tpool;
++    worker->id = id;
++    worker->alive = 1;
++
++    ret = pthread_create(&worker->pthread, NULL, fv_thread_do_work,
++                         worker);
++    if (ret) {
++        fuse_log(FUSE_LOG_ERR, "pthread_create() failed with err=%d\n", ret);
++        g_free(worker);
++        return ret;
++    }
++    pthread_detach(worker->pthread);
++    *thread = worker;
++    return 0;
++}
++
++static void send_signal_all(struct fv_ThreadPool *tpool)
++{
++    int i;
++
++    pthread_mutex_lock(&tpool->tp_lock);
++    for (i = 0; i < tpool->num_threads; i++) {
++        if (tpool->threads[i]->alive) {
++            pthread_kill(tpool->threads[i]->pthread, SIGUSR1);
++        }
++    }
++    pthread_mutex_unlock(&tpool->tp_lock);
++}
++
++static void do_pool_destroy(struct fv_ThreadPool *tpool, bool send_signal)
++{
++    int i, nr_running;
++
++    /* We want to destroy the pool */
++    pthread_mutex_lock(&tpool->tp_lock);
++    tpool->destroy_pool = 1;
++    pthread_mutex_unlock(&tpool->tp_lock);
++
++    /* Wake up threads waiting for requests */
++    pthread_mutex_lock(&tpool->req_queue->lock);
++    pthread_cond_broadcast(&tpool->req_queue->notify);
++    pthread_mutex_unlock(&tpool->req_queue->lock);
++
++    /* Send Signal and wait for all threads to exit. */
++    while (1) {
++        if (send_signal) {
++            send_signal_all(tpool);
++        }
++        pthread_mutex_lock(&tpool->tp_lock);
++        nr_running = tpool->nr_running;
++        pthread_mutex_unlock(&tpool->tp_lock);
++        if (!nr_running) {
++            break;
++        }
++        g_usleep(10000);
++    }
++
++    /* Destroy the locking request queue */
++    fv_pool_request_queue_destroy(tpool);
++    for (i = 0; i < tpool->num_threads; i++) {
++        g_free(tpool->threads[i]);
++    }
++
++    /* Now free the threadpool */
++    g_free(tpool->threads);
++    g_free(tpool);
++}
++
++void fv_thread_pool_destroy(struct fv_ThreadPool *tpool)
++{
++    if (!tpool) {
++        return;
++    }
++    do_pool_destroy(tpool, true);
++}
++
++static int register_sig_handler(void)
++{
++    struct sigaction sa;
++    sigemptyset(&sa.sa_mask);
++    sa.sa_flags = 0;
++    sa.sa_handler = fv_thread_signal_handler;
++    if (sigaction(SIGUSR1, &sa, NULL) == -1) {
++        fuse_log(FUSE_LOG_ERR, "Cannot register the signal handler:%s\n",
++                 strerror(errno));
++        return 1;
++    }
++    return 0;
++}
++
++/* Initialize the thread pool for the locking posix threads */
++struct fv_ThreadPool *fv_thread_pool_init(unsigned int thread_num)
++{
++    struct fv_ThreadPool *tpool = NULL;
++    int i, ret;
++
++    if (!thread_num) {
++        thread_num = 1;
++    }
++
++    if (register_sig_handler()) {
++        return NULL;
++    }
++    tpool = g_new0(struct fv_ThreadPool, 1);
++    pthread_mutex_init(&(tpool->tp_lock), NULL);
++
++    /* Initialize the Lock Request Queue */
++    tpool->req_queue = fv_pool_request_queue_init();
++
++    /* Create the threads in the pool */
++    tpool->threads = g_new(struct fv_PoolThread *, thread_num);
++
++    for (i = 0; i < thread_num; i++) {
++        ret = fv_worker_thread_init(tpool, &tpool->threads[i], i);
++        if (ret) {
++            goto out_err;
++        }
++        tpool->num_threads++;
++        tpool->nr_running++;
++    }
++
++    return tpool;
++out_err:
++    /* An error occurred. Cleanup and return NULL */
++    do_pool_destroy(tpool, false);
++    return NULL;
++}
+diff --git a/tools/virtiofsd/tpool.h b/tools/virtiofsd/tpool.h
+new file mode 100644
+index 0000000000..48d67e9a50
+--- /dev/null
++++ b/tools/virtiofsd/tpool.h
+@@ -0,0 +1,18 @@
++/*
++ * custom threadpool for virtiofsd
++ *
++ * Copyright (C) 2021 Red Hat, Inc.
++ *
++ * Authors:
++ *     Ioannis Angelakopoulos <iangelak@redhat.com>
++ *     Vivek Goyal <vgoyal@redhat.com>
++ *
++ * SPDX-License-Identifier: GPL-2.0-or-later
++ */
++
++struct fv_ThreadPool;
++
++struct fv_ThreadPool *fv_thread_pool_init(unsigned int thread_num);
++void fv_thread_pool_destroy(struct fv_ThreadPool *tpool);
++void fv_thread_pool_push(struct fv_ThreadPool *tpool,
++                   void (*worker_func)(void *, void *), void *arg1, void *arg2);
 -- 
 2.31.1
 

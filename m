@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Thu, 30 Sep 2021 10:38:48 -0400
-Message-Id: <20210930143850.1188628-7-vgoyal@redhat.com>
+Date: Thu, 30 Sep 2021 10:38:43 -0400
+Message-Id: <20210930143850.1188628-2-vgoyal@redhat.com>
 In-Reply-To: <20210930143850.1188628-1-vgoyal@redhat.com>
 References: <20210930143850.1188628-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 6/8] virtiofs: Add a helper to end request and
-	decrement inflight number
+Subject: [Virtio-fs] [PATCH 1/8] virtiofs: Disable interrupt requests
+	properly
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,62 +18,72 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, miklos@szeredi.hu, stefanha@redhat.com
 Cc: vgoyal@redhat.com
 
-Add a helper function to end fuse request and decrement number of
-inflight requests. This pattern is already used at two places and
-I am planning to use it two more times in later patches. Adding
-a helper reduces number of lines of code and improves readability.
+virtiofs does not support dealing with fuse INTERRUPT requests at all.
+But still we set can clear FR_SENT bit which is needed only if INTERRUPT
+requests are being handled.
+
+Also, given current code it is possible that virtiofs server is handling
+a request and in guest a signal comes, it will wake up process and
+queue existing request to fiq->interrupts and never remove it.
+
+request_wait_answer()
+{
+	if (!fc->no_interupt) {
+                if (test_bit(FR_SENT, &req->flags))
+                        queue_interrupt(req);
+	}
+}
+
+Given virtiofs does not support interrupt requests at this point of
+time, disable it (Set fc->no_interrupt = 1). This should make sure
+requests can't be queued on fiq->interrupts.
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- fs/fuse/virtio_fs.c | 19 +++++++++++--------
- 1 file changed, 11 insertions(+), 8 deletions(-)
+ fs/fuse/virtio_fs.c | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
 
 diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index b70a22a79901..8d33879d62fb 100644
+index 0ad89c6629d7..b9256b8f277f 100644
 --- a/fs/fuse/virtio_fs.c
 +++ b/fs/fuse/virtio_fs.c
-@@ -380,6 +380,15 @@ static void virtio_fs_hiprio_done_work(struct work_struct *work)
- 	spin_unlock(&fsvq->lock);
- }
- 
-+static void end_req_dec_in_flight(struct fuse_req *req,
-+				  struct virtio_fs_vq *fsvq)
-+{
-+	fuse_request_end(req);
-+	spin_lock(&fsvq->lock);
-+	dec_in_flight_req(fsvq);
-+	spin_unlock(&fsvq->lock);
-+}
-+
- static void virtio_fs_request_dispatch_work(struct work_struct *work)
+@@ -545,7 +545,6 @@ static void copy_args_from_argbuf(struct fuse_args *args, struct fuse_req *req)
+ static void virtio_fs_request_complete(struct fuse_req *req,
+ 				       struct virtio_fs_vq *fsvq)
  {
- 	struct fuse_req *req;
-@@ -425,12 +434,9 @@ static void virtio_fs_request_dispatch_work(struct work_struct *work)
- 				return;
- 			}
- 			req->out.h.error = ret;
--			spin_lock(&fsvq->lock);
--			dec_in_flight_req(fsvq);
--			spin_unlock(&fsvq->lock);
- 			pr_err("virtio-fs: virtio_fs_enqueue_req() failed %d\n",
- 			       ret);
--			fuse_request_end(req);
-+			end_req_dec_in_flight(req, fsvq);
- 		}
- 	}
- }
-@@ -709,10 +715,7 @@ static void virtio_fs_request_complete(struct fuse_req *req,
+-	struct fuse_pqueue *fpq = &fsvq->fud->pq;
+ 	struct fuse_args *args;
+ 	struct fuse_args_pages *ap;
+ 	unsigned int len, i, thislen;
+@@ -574,10 +573,6 @@ static void virtio_fs_request_complete(struct fuse_req *req,
  		}
  	}
  
--	fuse_request_end(req);
--	spin_lock(&fsvq->lock);
--	dec_in_flight_req(fsvq);
--	spin_unlock(&fsvq->lock);
-+	end_req_dec_in_flight(req, fsvq);
- }
+-	spin_lock(&fpq->lock);
+-	clear_bit(FR_SENT, &req->flags);
+-	spin_unlock(&fpq->lock);
+-
+ 	fuse_request_end(req);
+ 	spin_lock(&fsvq->lock);
+ 	dec_in_flight_req(fsvq);
+@@ -1196,9 +1191,6 @@ static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
+ 	spin_lock(&fpq->lock);
+ 	list_add_tail(&req->list, fpq->processing);
+ 	spin_unlock(&fpq->lock);
+-	set_bit(FR_SENT, &req->flags);
+-	/* matches barrier in request_wait_answer() */
+-	smp_mb__after_atomic();
  
- static void virtio_fs_complete_req_work(struct work_struct *work)
+ 	if (!in_flight)
+ 		inc_in_flight_req(fsvq);
+@@ -1448,6 +1440,7 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
+ 	fc->delete_stale = true;
+ 	fc->auto_submounts = true;
+ 	fc->sync_fs = true;
++	fc->no_interrupt = true;
+ 
+ 	/* Tell FUSE to split requests that exceed the virtqueue's size */
+ 	fc->max_pages_limit = min_t(unsigned int, fc->max_pages_limit,
 -- 
 2.31.1
 

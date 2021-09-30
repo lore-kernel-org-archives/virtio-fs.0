@@ -1,12 +1,10 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Thu, 30 Sep 2021 10:38:45 -0400
-Message-Id: <20210930143850.1188628-4-vgoyal@redhat.com>
-In-Reply-To: <20210930143850.1188628-1-vgoyal@redhat.com>
-References: <20210930143850.1188628-1-vgoyal@redhat.com>
+Date: Thu, 30 Sep 2021 10:38:42 -0400
+Message-Id: <20210930143850.1188628-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 3/8] virtiofs: Add an index to keep track of
-	first request queue
+Subject: [Virtio-fs] [PATCH 0/8] virtiofs: Notification queue and blocking
+	posix locks
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,96 +16,69 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, miklos@szeredi.hu, stefanha@redhat.com
 Cc: vgoyal@redhat.com
 
-We have many virtqueues and first queue which carries fuse normal requests
-(except forget requests) has index pointed to by enum VQ_REQUEST. This
-works fine as long as number of queues are not dynamic.
+Hi,
 
-I am about to introduce one more virtqueue, called notification queue,
-which will be present only if device on host supports it. That means index
-of request queue will change depending on if notification queue is present
-or not.
+As of now we do not support blocking remote posix locks with virtiofs.
+Well fuse client does not care but server returns -EOPNOTSUPP.
 
-So, add a variable to keep track of that index and this will help when
-notification queue is added in next patch.
+There are couple of reasons to not support it yet.
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-Signed-off-by: Ioannis Angelakopoulos <iangelak@redhat.com>
----
- fs/fuse/virtio_fs.c | 17 ++++++++++++-----
- 1 file changed, 12 insertions(+), 5 deletions(-)
+- If virtiofsd is single threaded or does not have a thread pool just
+  to handle requests which can block for a long time, virtiofsd will
+  stop processing new requests and virtiofs will come to a halt.
+  To the extent that further unlock request will not make progress
+  and deadlock will result. This can be taken care of by creating
+  a custom thread pool in virtiofsd just to hanlde lock requests.
 
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index f7c58a4b996d..cb3c7bf8cce4 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -61,6 +61,7 @@ struct virtio_fs {
- 	unsigned int nvqs;               /* number of virtqueues */
- 	unsigned int num_request_queues; /* number of request queues */
- 	struct dax_device *dax_dev;
-+	unsigned int first_reqq_idx;     /* First request queue idx */
- 
- 	/* DAX memory window where file contents are mapped */
- 	void *window_kaddr;
-@@ -676,7 +677,9 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
- 	if (fs->num_request_queues == 0)
- 		return -EINVAL;
- 
--	fs->nvqs = VQ_REQUEST + fs->num_request_queues;
-+	/* One hiprio queue and rest are request queues */
-+	fs->nvqs = 1 + fs->num_request_queues;
-+	fs->first_reqq_idx = 1;
- 	fs->vqs = kcalloc(fs->nvqs, sizeof(fs->vqs[VQ_HIPRIO]), GFP_KERNEL);
- 	if (!fs->vqs)
- 		return -ENOMEM;
-@@ -696,10 +699,11 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
- 	names[VQ_HIPRIO] = fs->vqs[VQ_HIPRIO].name;
- 
- 	/* Initialize the requests virtqueues */
--	for (i = VQ_REQUEST; i < fs->nvqs; i++) {
-+	for (i = fs->first_reqq_idx; i < fs->nvqs; i++) {
- 		char vq_name[VQ_NAME_LEN];
- 
--		snprintf(vq_name, VQ_NAME_LEN, "requests.%u", i - VQ_REQUEST);
-+		snprintf(vq_name, VQ_NAME_LEN, "requests.%u",
-+			 i - fs->first_reqq_idx);
- 		virtio_fs_init_vq(&fs->vqs[i], vq_name, VQ_REQUEST);
- 		callbacks[i] = virtio_fs_vq_done;
- 		names[i] = fs->vqs[i].name;
-@@ -1217,7 +1221,7 @@ static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
- static void virtio_fs_wake_pending_and_unlock(struct fuse_iqueue *fiq)
- __releases(fiq->lock)
- {
--	unsigned int queue_id = VQ_REQUEST; /* TODO multiqueue */
-+	unsigned int queue_id;
- 	struct virtio_fs *fs;
- 	struct fuse_req *req;
- 	struct virtio_fs_vq *fsvq;
-@@ -1231,6 +1235,7 @@ __releases(fiq->lock)
- 	spin_unlock(&fiq->lock);
- 
- 	fs = fiq->priv;
-+	queue_id = fs->first_reqq_idx;
- 
- 	pr_debug("%s: opcode %u unique %#llx nodeid %#llx in.len %u out.len %u\n",
- 		  __func__, req->in.h.opcode, req->in.h.unique,
-@@ -1411,6 +1416,7 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
- 	struct fuse_mount *fm;
- 	unsigned int virtqueue_size;
- 	int err = -EIO;
-+	struct virtio_fs_vq *first_req_fsvq;
- 
- 	/* This gets a reference on virtio_fs object. This ptr gets installed
- 	 * in fc->iq->priv. Once fuse_conn is going away, it calls ->put()
-@@ -1422,7 +1428,8 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
- 		return -EINVAL;
- 	}
- 
--	virtqueue_size = virtqueue_get_vring_size(fs->vqs[VQ_REQUEST].vq);
-+	first_req_fsvq = &fs->vqs[fs->first_reqq_idx];
-+	virtqueue_size = virtqueue_get_vring_size(first_req_fsvq->vq);
- 	if (WARN_ON(virtqueue_size <= FUSE_HEADER_OVERHEAD))
- 		goto out_err;
- 
+- If client sends a blocking lock request and blocks, then it will
+  consume descriptors in vring. If enough processes block, it is
+  possible that vring does not have capacity to send more requests
+  till some response comes back and descriptors are free. This can
+  also lead to deadlock where an unlock request can't be sent to
+  virtiofsd now. Also this will stop virtiofs operation as well as
+  new filesystem requests can't be sent.
+
+To avoid this issue, idea was suggested thatn when a blocking
+lock request is sent by client, do not block it. Immediately
+send a reply saying client process should wait for a notification
+which will let it know once lock is available. This will make
+sure descriptors in virtqueue are not kept busy while we are
+waiting for lock and future unlock and other file system requests
+can continue to make progress.
+
+This first requires a notion of notification queue and virtiosfd
+being able to send notifications to client. This patch series
+implements that as well.
+
+As of now only one notification type has been implemented but now
+infrastructure is in place and other use cases should be easily
+add more type of notifications as need be.
+
+We don't yet have the capability to interrupt the process which
+is waiting for the posix lock. And reason for that is that virtiofs
+does not support capability to interrupt yet. That's a TODO item
+for later.
+
+Please have a look.
+
+Thanks
+Vivek
+
+Vivek Goyal (8):
+  virtiofs: Disable interrupt requests properly
+  virtiofs: Fix a comment about fuse_dev allocation
+  virtiofs: Add an index to keep track of first request queue
+  virtiofs: Decouple queue index and queue type
+  virtiofs: Add a virtqueue for notifications
+  virtiofs: Add a helper to end request and decrement inflight number
+  virtiofs: Add new notification type FUSE_NOTIFY_LOCK
+  virtiofs: Handle reordering of reply and notification event
+
+ fs/fuse/virtio_fs.c            | 438 ++++++++++++++++++++++++++++++---
+ include/uapi/linux/fuse.h      |  11 +-
+ include/uapi/linux/virtio_fs.h |   5 +
+ 3 files changed, 412 insertions(+), 42 deletions(-)
+
 -- 
 2.31.1
 

@@ -1,12 +1,9 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Thu, 30 Sep 2021 11:30:31 -0400
-Message-Id: <20210930153037.1194279-8-vgoyal@redhat.com>
-In-Reply-To: <20210930153037.1194279-1-vgoyal@redhat.com>
-References: <20210930153037.1194279-1-vgoyal@redhat.com>
+Date: Thu, 30 Sep 2021 11:30:24 -0400
+Message-Id: <20210930153037.1194279-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 07/13] virtiofsd: Release file locks using
-	F_UNLCK
+Subject: [Virtio-fs] [PATCH 00/13] virtiofsd: Support notification queue and
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,74 +15,56 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com, stefanha@redhat.com
 Cc: vgoyal@redhat.com, miklos@szeredi.hu
 
-We are emulating posix locks for guest using open file description locks
-in virtiofsd. When any of the fd is closed in guest, we find associated
-OFD lock fd (if there is one) and close it to release all the locks.
+Hi,
 
-Assumption here is that there is no other thread using lo_inode_plock
-structure or plock->fd, hence it is safe to do so.
+Here are the patches to support notification queue and blocking
+posix locks. One of the biggest change since las time has been
+creation of custom thread pool for handling locking requests. 
+Thanks to Ioannis for doing most of the work on custom thread
+pool.
 
-But now we are about to introduce blocking variant of locks (SETLKW),
-and that means we might be waiting to a lock to be available and
-using plock->fd. And that means there are still users of plock
-structure.
+I have posted corresponding kernel changes here.
 
-So release locks using fcntl(SETLK, F_UNLCK) instead of closing fd
-and plock will be freed later when lo_inode is being freed.
+https://lore.kernel.org/linux-fsdevel/20210930143850.1188628-1-vgoyal@redhat.com/T/#mb2d0fbfdb580ef33b6e812d0acbd16333b11f2cf
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-Signed-off-by: Ioannis Angelakopoulos <iangelak@redhat.com>
----
- tools/virtiofsd/passthrough_ll.c | 21 +++++++++++++++++----
- 1 file changed, 17 insertions(+), 4 deletions(-)
+Any feedback is welcome.
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 38b2af8599..6928662e22 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -1557,9 +1557,6 @@ static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
-         lo_map_remove(&lo->ino_map, inode->fuse_ino);
-         g_hash_table_remove(lo->inodes, &inode->key);
-         if (lo->posix_lock) {
--            if (g_hash_table_size(inode->posix_locks)) {
--                fuse_log(FUSE_LOG_WARNING, "Hash table is not empty\n");
--            }
-             g_hash_table_destroy(inode->posix_locks);
-             pthread_mutex_destroy(&inode->plock_mutex);
-         }
-@@ -2266,6 +2263,8 @@ static void lo_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
-     (void)ino;
-     struct lo_inode *inode;
-     struct lo_data *lo = lo_data(req);
-+    struct lo_inode_plock *plock;
-+    struct flock flock;
- 
-     inode = lo_inode(req, ino);
-     if (!inode) {
-@@ -2282,8 +2281,22 @@ static void lo_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
-     /* An fd is going away. Cleanup associated posix locks */
-     if (lo->posix_lock) {
-         pthread_mutex_lock(&inode->plock_mutex);
--        g_hash_table_remove(inode->posix_locks,
-+        plock = g_hash_table_lookup(inode->posix_locks,
-             GUINT_TO_POINTER(fi->lock_owner));
-+
-+        if (plock) {
-+            /*
-+             * An fd is being closed. For posix locks, this means
-+             * drop all the associated locks.
-+             */
-+            memset(&flock, 0, sizeof(struct flock));
-+            flock.l_type = F_UNLCK;
-+            flock.l_whence = SEEK_SET;
-+            /* Unlock whole file */
-+            flock.l_start = flock.l_len = 0;
-+            fcntl(plock->fd, F_OFD_SETLK, &flock);
-+        }
-+
-         pthread_mutex_unlock(&inode->plock_mutex);
-     }
-     res = close(dup(lo_fi_fd(req, fi)));
+Thanks
+Vivek
+
+Vivek Goyal (13):
+  virtio_fs.h: Add notification queue feature bit
+  virtiofsd: fuse.h header file changes for lock notification
+  virtiofsd: Remove unused virtio_fs_config definition
+  virtiofsd: Add a helper to send element on virtqueue
+  virtiofsd: Add a helper to stop all queues
+  vhost-user-fs: Use helpers to create/cleanup virtqueue
+  virtiofsd: Release file locks using F_UNLCK
+  virtiofsd: Create a notification queue
+  virtiofsd: Specify size of notification buffer using config space
+  virtiofsd: Custom threadpool for remote blocking posix locks requests
+  virtiofsd: Shutdown notification queue in the end
+  virtiofsd: Implement blocking posix locks
+  virtiofsd, seccomp: Add clock_nanosleep() to allow list
+
+ hw/virtio/vhost-user-fs-pci.c              |   4 +-
+ hw/virtio/vhost-user-fs.c                  | 158 ++++++++--
+ include/hw/virtio/vhost-user-fs.h          |   4 +
+ include/standard-headers/linux/fuse.h      |  11 +-
+ include/standard-headers/linux/virtio_fs.h |   5 +
+ tools/virtiofsd/fuse_i.h                   |   1 +
+ tools/virtiofsd/fuse_lowlevel.c            |  37 ++-
+ tools/virtiofsd/fuse_lowlevel.h            |  26 ++
+ tools/virtiofsd/fuse_virtio.c              | 339 +++++++++++++++++----
+ tools/virtiofsd/meson.build                |   1 +
+ tools/virtiofsd/passthrough_ll.c           |  91 +++++-
+ tools/virtiofsd/passthrough_seccomp.c      |   2 +
+ tools/virtiofsd/tpool.c                    | 331 ++++++++++++++++++++
+ tools/virtiofsd/tpool.h                    |  18 ++
+ 14 files changed, 915 insertions(+), 113 deletions(-)
+ create mode 100644 tools/virtiofsd/tpool.c
+ create mode 100644 tools/virtiofsd/tpool.h
+
 -- 
 2.31.1
 

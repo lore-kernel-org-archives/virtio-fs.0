@@ -1,9 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Thu, 30 Sep 2021 11:30:24 -0400
-Message-Id: <20210930153037.1194279-1-vgoyal@redhat.com>
+Date: Thu, 30 Sep 2021 11:30:30 -0400
+Message-Id: <20210930153037.1194279-7-vgoyal@redhat.com>
+In-Reply-To: <20210930153037.1194279-1-vgoyal@redhat.com>
+References: <20210930153037.1194279-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 00/13] virtiofsd: Support notification queue and
+Subject: [Virtio-fs] [PATCH 06/13] vhost-user-fs: Use helpers to
+	create/cleanup virtqueue
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,56 +18,157 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com, stefanha@redhat.com
 Cc: vgoyal@redhat.com, miklos@szeredi.hu
 
-Hi,
+Add helpers to create/cleanup virtuqueues and use those helpers. I will
+need to reconfigure queues in later patches and using helpers will allow
+reusing the code.
 
-Here are the patches to support notification queue and blocking
-posix locks. One of the biggest change since las time has been
-creation of custom thread pool for handling locking requests. 
-Thanks to Ioannis for doing most of the work on custom thread
-pool.
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ hw/virtio/vhost-user-fs.c | 87 +++++++++++++++++++++++----------------
+ 1 file changed, 52 insertions(+), 35 deletions(-)
 
-I have posted corresponding kernel changes here.
-
-https://lore.kernel.org/linux-fsdevel/20210930143850.1188628-1-vgoyal@redhat.com/T/#mb2d0fbfdb580ef33b6e812d0acbd16333b11f2cf
-
-Any feedback is welcome.
-
-Thanks
-Vivek
-
-Vivek Goyal (13):
-  virtio_fs.h: Add notification queue feature bit
-  virtiofsd: fuse.h header file changes for lock notification
-  virtiofsd: Remove unused virtio_fs_config definition
-  virtiofsd: Add a helper to send element on virtqueue
-  virtiofsd: Add a helper to stop all queues
-  vhost-user-fs: Use helpers to create/cleanup virtqueue
-  virtiofsd: Release file locks using F_UNLCK
-  virtiofsd: Create a notification queue
-  virtiofsd: Specify size of notification buffer using config space
-  virtiofsd: Custom threadpool for remote blocking posix locks requests
-  virtiofsd: Shutdown notification queue in the end
-  virtiofsd: Implement blocking posix locks
-  virtiofsd, seccomp: Add clock_nanosleep() to allow list
-
- hw/virtio/vhost-user-fs-pci.c              |   4 +-
- hw/virtio/vhost-user-fs.c                  | 158 ++++++++--
- include/hw/virtio/vhost-user-fs.h          |   4 +
- include/standard-headers/linux/fuse.h      |  11 +-
- include/standard-headers/linux/virtio_fs.h |   5 +
- tools/virtiofsd/fuse_i.h                   |   1 +
- tools/virtiofsd/fuse_lowlevel.c            |  37 ++-
- tools/virtiofsd/fuse_lowlevel.h            |  26 ++
- tools/virtiofsd/fuse_virtio.c              | 339 +++++++++++++++++----
- tools/virtiofsd/meson.build                |   1 +
- tools/virtiofsd/passthrough_ll.c           |  91 +++++-
- tools/virtiofsd/passthrough_seccomp.c      |   2 +
- tools/virtiofsd/tpool.c                    | 331 ++++++++++++++++++++
- tools/virtiofsd/tpool.h                    |  18 ++
- 14 files changed, 915 insertions(+), 113 deletions(-)
- create mode 100644 tools/virtiofsd/tpool.c
- create mode 100644 tools/virtiofsd/tpool.h
-
+diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+index c595957983..d1efbc5b18 100644
+--- a/hw/virtio/vhost-user-fs.c
++++ b/hw/virtio/vhost-user-fs.c
+@@ -139,6 +139,55 @@ static void vuf_set_status(VirtIODevice *vdev, uint8_t status)
+     }
+ }
+ 
++static void vuf_handle_output(VirtIODevice *vdev, VirtQueue *vq)
++{
++    /*
++     * Not normally called; it's the daemon that handles the queue;
++     * however virtio's cleanup path can call this.
++     */
++}
++
++static void vuf_create_vqs(VirtIODevice *vdev)
++{
++    VHostUserFS *fs = VHOST_USER_FS(vdev);
++    unsigned int i;
++
++    /* Hiprio queue */
++    fs->hiprio_vq = virtio_add_queue(vdev, fs->conf.queue_size,
++                                     vuf_handle_output);
++
++    /* Request queues */
++    fs->req_vqs = g_new(VirtQueue *, fs->conf.num_request_queues);
++    for (i = 0; i < fs->conf.num_request_queues; i++) {
++        fs->req_vqs[i] = virtio_add_queue(vdev, fs->conf.queue_size,
++                                          vuf_handle_output);
++    }
++
++    /* 1 high prio queue, plus the number configured */
++    fs->vhost_dev.nvqs = 1 + fs->conf.num_request_queues;
++    fs->vhost_dev.vqs = g_new0(struct vhost_virtqueue, fs->vhost_dev.nvqs);
++}
++
++static void vuf_cleanup_vqs(VirtIODevice *vdev)
++{
++    VHostUserFS *fs = VHOST_USER_FS(vdev);
++    unsigned int i;
++
++    virtio_delete_queue(fs->hiprio_vq);
++    fs->hiprio_vq = NULL;
++
++    for (i = 0; i < fs->conf.num_request_queues; i++) {
++        virtio_delete_queue(fs->req_vqs[i]);
++    }
++
++    g_free(fs->req_vqs);
++    fs->req_vqs = NULL;
++
++    fs->vhost_dev.nvqs = 0;
++    g_free(fs->vhost_dev.vqs);
++    fs->vhost_dev.vqs = NULL;
++}
++
+ static uint64_t vuf_get_features(VirtIODevice *vdev,
+                                  uint64_t features,
+                                  Error **errp)
+@@ -148,14 +197,6 @@ static uint64_t vuf_get_features(VirtIODevice *vdev,
+     return vhost_get_features(&fs->vhost_dev, user_feature_bits, features);
+ }
+ 
+-static void vuf_handle_output(VirtIODevice *vdev, VirtQueue *vq)
+-{
+-    /*
+-     * Not normally called; it's the daemon that handles the queue;
+-     * however virtio's cleanup path can call this.
+-     */
+-}
+-
+ static void vuf_guest_notifier_mask(VirtIODevice *vdev, int idx,
+                                             bool mask)
+ {
+@@ -175,7 +216,6 @@ static void vuf_device_realize(DeviceState *dev, Error **errp)
+ {
+     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+     VHostUserFS *fs = VHOST_USER_FS(dev);
+-    unsigned int i;
+     size_t len;
+     int ret;
+ 
+@@ -222,18 +262,7 @@ static void vuf_device_realize(DeviceState *dev, Error **errp)
+     virtio_init(vdev, "vhost-user-fs", VIRTIO_ID_FS,
+                 sizeof(struct virtio_fs_config));
+ 
+-    /* Hiprio queue */
+-    fs->hiprio_vq = virtio_add_queue(vdev, fs->conf.queue_size, vuf_handle_output);
+-
+-    /* Request queues */
+-    fs->req_vqs = g_new(VirtQueue *, fs->conf.num_request_queues);
+-    for (i = 0; i < fs->conf.num_request_queues; i++) {
+-        fs->req_vqs[i] = virtio_add_queue(vdev, fs->conf.queue_size, vuf_handle_output);
+-    }
+-
+-    /* 1 high prio queue, plus the number configured */
+-    fs->vhost_dev.nvqs = 1 + fs->conf.num_request_queues;
+-    fs->vhost_dev.vqs = g_new0(struct vhost_virtqueue, fs->vhost_dev.nvqs);
++    vuf_create_vqs(vdev);
+     ret = vhost_dev_init(&fs->vhost_dev, &fs->vhost_user,
+                          VHOST_BACKEND_TYPE_USER, 0, errp);
+     if (ret < 0) {
+@@ -244,13 +273,8 @@ static void vuf_device_realize(DeviceState *dev, Error **errp)
+ 
+ err_virtio:
+     vhost_user_cleanup(&fs->vhost_user);
+-    virtio_delete_queue(fs->hiprio_vq);
+-    for (i = 0; i < fs->conf.num_request_queues; i++) {
+-        virtio_delete_queue(fs->req_vqs[i]);
+-    }
+-    g_free(fs->req_vqs);
++    vuf_cleanup_vqs(vdev);
+     virtio_cleanup(vdev);
+-    g_free(fs->vhost_dev.vqs);
+     return;
+ }
+ 
+@@ -258,7 +282,6 @@ static void vuf_device_unrealize(DeviceState *dev)
+ {
+     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+     VHostUserFS *fs = VHOST_USER_FS(dev);
+-    int i;
+ 
+     /* This will stop vhost backend if appropriate. */
+     vuf_set_status(vdev, 0);
+@@ -267,14 +290,8 @@ static void vuf_device_unrealize(DeviceState *dev)
+ 
+     vhost_user_cleanup(&fs->vhost_user);
+ 
+-    virtio_delete_queue(fs->hiprio_vq);
+-    for (i = 0; i < fs->conf.num_request_queues; i++) {
+-        virtio_delete_queue(fs->req_vqs[i]);
+-    }
+-    g_free(fs->req_vqs);
++    vuf_cleanup_vqs(vdev);
+     virtio_cleanup(vdev);
+-    g_free(fs->vhost_dev.vqs);
+-    fs->vhost_dev.vqs = NULL;
+ }
+ 
+ static const VMStateDescription vuf_vmstate = {
 -- 
 2.31.1
 

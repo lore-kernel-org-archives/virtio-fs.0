@@ -1,15 +1,22 @@
-Date: Mon, 4 Oct 2021 15:58:09 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YVtc0UMWQtAaCNog@redhat.com>
-References: <20210930153037.1194279-1-vgoyal@redhat.com>
-	<20210930153037.1194279-7-vgoyal@redhat.com>
-	<YVsHifrJdRtVyERb@stefanha-x1.localdomain>
-MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <YVsHifrJdRtVyERb@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH 06/13] vhost-user-fs: Use helpers to
- create/cleanup virtqueue
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+	d=crudebyte.com; s=lizzy;
+	h=Cc:To:Subject:Date:From:References:In-Reply-To:
+	Message-Id:Content-Type:Content-Transfer-Encoding:MIME-Version:Content-ID:
+	Content-Description; bh=f4VjqFwtddhhj6avEVv72Wovsfu0a2P1y6ipMsVQxmA=;
+	b=IygOj
+	m3X/nSIkD2nnaQX8vUWiOXXWCOtw0SeHxoPvSZECg4Yeg9rTx+lD1LdOdl9L7NXoCA++t8jqwI8WV
+	vyz59+yFPJTi9Dbj4279T5Lv3uaQLRs914I4tikhhrwEriiIbPIJcNYt5bVBG6HU3jSaRdweDrUQJ
+	ScW/vbDJY9QXwo6rpeVWCdoJYjuD931OoPLRhcbMVXjNvY9GES/SOpKzX2gvIcnJ9oYBElXAMjhjK
+	71en4UlA3VR/XruMdBBw7aN9yvfErHlFXIHEKYkOVaq8pEe5Ccv4DceCafHRsowEbeX0giB9vz1xb
+	OJTKFPQeBJqTP0lGDJOog/GlF8knQ==
+Message-Id: <ae0464f653ef20292e335ba3de0d62ab3ce8c72c.1633376313.git.qemu_oss@crudebyte.com>
+In-Reply-To: <cover.1633376313.git.qemu_oss@crudebyte.com>
+References: <cover.1633376313.git.qemu_oss@crudebyte.com>
+From: Christian Schoenebeck <qemu_oss@crudebyte.com>
+Date: Mon, 4 Oct 2021 21:38:12 +0200
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [PATCH v2 3/3] virtio-9p-device: switch to 32k max.
+	transfer size
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,79 +25,34 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: miklos@szeredi.hu, qemu-devel@nongnu.org, virtio-fs@redhat.com
+To: qemu-devel@nongnu.org
+Cc: Kevin Wolf <kwolf@redhat.com>, Laurent Vivier <lvivier@redhat.com>, qemu-block@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, Jason Wang <jasowang@redhat.com>, Amit Shah <amit@kernel.org>, David Hildenbrand <david@redhat.com>, Raphael Norwitz <raphael.norwitz@nutanix.com>, virtio-fs@redhat.com, Eric Auger <eric.auger@redhat.com>, Hanna Reitz <hreitz@redhat.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Gerd Hoffmann <kraxel@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, =?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>, Fam Zheng <fam@euphon.net>
 
-On Mon, Oct 04, 2021 at 02:54:17PM +0100, Stefan Hajnoczi wrote:
-> On Thu, Sep 30, 2021 at 11:30:30AM -0400, Vivek Goyal wrote:
-> > Add helpers to create/cleanup virtuqueues and use those helpers. I will
-> 
-> s/virtuqueues/virtqueues/
-> 
-> > need to reconfigure queues in later patches and using helpers will allow
-> > reusing the code.
-> > 
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > ---
-> >  hw/virtio/vhost-user-fs.c | 87 +++++++++++++++++++++++----------------
-> >  1 file changed, 52 insertions(+), 35 deletions(-)
-> > 
-> > diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-> > index c595957983..d1efbc5b18 100644
-> > --- a/hw/virtio/vhost-user-fs.c
-> > +++ b/hw/virtio/vhost-user-fs.c
-> > @@ -139,6 +139,55 @@ static void vuf_set_status(VirtIODevice *vdev, uint8_t status)
-> >      }
-> >  }
-> >  
-> > +static void vuf_handle_output(VirtIODevice *vdev, VirtQueue *vq)
-> > +{
-> > +    /*
-> > +     * Not normally called; it's the daemon that handles the queue;
-> > +     * however virtio's cleanup path can call this.
-> > +     */
-> > +}
-> > +
-> > +static void vuf_create_vqs(VirtIODevice *vdev)
-> > +{
-> > +    VHostUserFS *fs = VHOST_USER_FS(vdev);
-> > +    unsigned int i;
-> > +
-> > +    /* Hiprio queue */
-> > +    fs->hiprio_vq = virtio_add_queue(vdev, fs->conf.queue_size,
-> > +                                     vuf_handle_output);
-> > +
-> > +    /* Request queues */
-> > +    fs->req_vqs = g_new(VirtQueue *, fs->conf.num_request_queues);
-> > +    for (i = 0; i < fs->conf.num_request_queues; i++) {
-> > +        fs->req_vqs[i] = virtio_add_queue(vdev, fs->conf.queue_size,
-> > +                                          vuf_handle_output);
-> > +    }
-> > +
-> > +    /* 1 high prio queue, plus the number configured */
-> > +    fs->vhost_dev.nvqs = 1 + fs->conf.num_request_queues;
-> > +    fs->vhost_dev.vqs = g_new0(struct vhost_virtqueue, fs->vhost_dev.nvqs);
-> 
-> These two lines prepare for vhost_dev_init(), so moving them here is
-> debatable. If a caller is going to use this function again in the future
-> then they need to be sure to also call vhost_dev_init(). For now it
-> looks safe, so I guess it's okay.
+9pfs supports the new maximum virtio queue size of 32k, so let's
+switch the 9pfs virtio transport from 1k to 32k.
 
-Hmm..., I do call this function later from vuf_set_features() and
-reconfigure the queues. I see that I don't call vhost_dev_init()
-in that path. I am not even sure if I should be calling
-vhost_dev_init() from inside vuf_set_features().
+This will allow a maximum 'msize' option (maximum message size)
+by 9p client of approximately 128M (assuming 4k page size, in
+practice slightly smaller, e.g. with Linux client minus 2 pages).
 
-So core reuirement is that at the time of first creating device
-I have no idea if driver supports notification queue or not. So
-I do create device with notification queue. But later if driver
-(and possibly vhost device) does not support notifiation queue,
-then we need to reconfigure queues. What's the correct way to
-do that?
+Signed-off-by: Christian Schoenebeck <qemu_oss@crudebyte.com>
+---
+ hw/9pfs/virtio-9p-device.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks
-Vivek
-> 
-> Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-
+diff --git a/hw/9pfs/virtio-9p-device.c b/hw/9pfs/virtio-9p-device.c
+index 9013e7df6e..cd5d95dd51 100644
+--- a/hw/9pfs/virtio-9p-device.c
++++ b/hw/9pfs/virtio-9p-device.c
+@@ -217,7 +217,7 @@ static void virtio_9p_device_realize(DeviceState *dev, Error **errp)
+ 
+     v->config_size = sizeof(struct virtio_9p_config) + strlen(s->fsconf.tag);
+     virtio_init(vdev, "virtio-9p", VIRTIO_ID_9P, v->config_size,
+-                VIRTQUEUE_LEGACY_MAX_SIZE);
++                VIRTQUEUE_MAX_SIZE);
+     v->vq = virtio_add_queue(vdev, MAX_REQ, handle_9p_output);
+ }
+ 
+-- 
+2.20.1
 

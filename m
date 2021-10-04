@@ -1,15 +1,23 @@
-Date: Mon, 4 Oct 2021 16:07:04 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YVsYmHhbjPs/LEUc@stefanha-x1.localdomain>
-References: <20210930153037.1194279-1-vgoyal@redhat.com>
-	<20210930153037.1194279-13-vgoyal@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+	s=k20201202; t=1633360831;
+	bh=qW72hdqucvKkV+USBTPSC8fipJqHpXmkQz1qhZqk6Mk=;
+	h=Subject:From:To:Cc:Date:In-Reply-To:References:From;
+	b=djIIs0mXE3BWLROBHhtOQf2c8fThNM2WI3R4KrGMFSz1TRmI3e308ChvoOecmvIR+
+	nSMWFxNUb203VOOwX6teRUCgNOtpXuKQ8lc4vdgLZAxckuVd5/uCicr3naaXkS013q
+	L1PsuHdWND0bmkFp+1G6ztZ1q6a8syhdlduv5K5xnjh/faO/B2wx75upa9QyctF9Mp
+	O631oUNcHJtomEO+PhHScTwna9Mxfkg2zejjXgQFWOcbulp0bJ4zymSspwrmcDyFq0
+	ub5hNOtHaGf1CqtJW0S+E7HgDOMNwLKM1qDYJ62I9oX+X0wwCIMPMY8AkMRMmcNm4g
+	UhbNcapOrKJQg==
+Message-ID: <1583ffb057e8442fa7af40dabcb38960982211ba.camel@kernel.org>
+From: Jeff Layton <jlayton@kernel.org>
+Date: Mon, 04 Oct 2021 11:20:28 -0400
+In-Reply-To: <YVYI/p1ipDFiQ5OR@redhat.com>
+References: <YVYI/p1ipDFiQ5OR@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="9XQL1jyIUILLHsZa"
-Content-Disposition: inline
-In-Reply-To: <20210930153037.1194279-13-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 12/13] virtiofsd: Implement blocking posix
-	locks
+Content-Type: text/plain; charset="ISO-8859-15"
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH] security: Return xattr name from
+ security_dentry_init_security()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,110 +26,191 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: miklos@szeredi.hu, qemu-devel@nongnu.org, virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>, linux-security-module@vger.kernel.org, selinux@vger.kernel.org
+Cc: bfields@fieldses.org, linux-nfs@vger.kernel.org, Miklos Szeredi <miklos@szeredi.hu>, stephen.smalley.work@gmail.com, virtio-fs@redhat.com, casey@schaufler-ca.com, chuck.lever@oracle.com, linux-fsdevel@vger.kernel.org, idryomov@gmail.com, ceph-devel@vger.kernel.org
 
-
---9XQL1jyIUILLHsZa
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Thu, Sep 30, 2021 at 11:30:36AM -0400, Vivek Goyal wrote:
-> As of now we don't support fcntl(F_SETLKW) and if we see one, we return
-> -EOPNOTSUPP.
->=20
-> Change that by accepting these requests and returning a reply
-> immediately asking caller to wait. Once lock is available, send a
-> notification to the waiter indicating lock is available.
->=20
-> In response to lock request, we are returning error value as "1", which
-> signals to client to queue the lock request internally and later client
-> will get a notification which will signal lock is taken (or error). And
-> then fuse client should wake up the guest process.
->=20
+On Thu, 2021-09-30 at 14:59 -0400, Vivek Goyal wrote:
+> Right now security_dentry_init_security() only supports single security
+> label and is used by SELinux only. There are two users of of this hook,
+> namely ceph and nfs.
+> 
+> NFS does not care about xattr name. Ceph hardcodes the xattr name to
+> security.selinux (XATTR_NAME_SELINUX).
+> 
+> I am making changes to fuse/virtiofs to send security label to virtiofsd
+> and I need to send xattr name as well. I also hardcoded the name of
+> xattr to security.selinux.
+> 
+> Stephen Smalley suggested that it probably is a good idea to modify
+> security_dentry_init_security() to also return name of xattr so that
+> we can avoid this hardcoding in the callers.
+> 
+> This patch adds a new parameter "const char **xattr_name" to
+> security_dentry_init_security() and LSM puts the name of xattr
+> too if caller asked for it (xattr_name != NULL).
+> 
 > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> Signed-off-by: Ioannis Angelakopoulos <iangelak@redhat.com>
 > ---
->  tools/virtiofsd/fuse_lowlevel.c  | 37 ++++++++++++++++-
->  tools/virtiofsd/fuse_lowlevel.h  | 26 ++++++++++++
->  tools/virtiofsd/fuse_virtio.c    | 50 ++++++++++++++++++++---
->  tools/virtiofsd/passthrough_ll.c | 70 ++++++++++++++++++++++++++++----
->  4 files changed, 167 insertions(+), 16 deletions(-)
->=20
-> diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowle=
-vel.c
-> index e4679c73ab..2e7f4b786d 100644
-> --- a/tools/virtiofsd/fuse_lowlevel.c
-> +++ b/tools/virtiofsd/fuse_lowlevel.c
-> @@ -179,8 +179,8 @@ int fuse_send_reply_iov_nofree(fuse_req_t req, int er=
-ror, struct iovec *iov,
->          .unique =3D req->unique,
->          .error =3D error,
->      };
-> -
-> -    if (error <=3D -1000 || error > 0) {
-> +    /* error =3D 1 has been used to signal client to wait for notificait=
-on */
-
-s/notificaiton/notification/
-
-> +    if (error <=3D -1000 || error > 1) {
->          fuse_log(FUSE_LOG_ERR, "fuse: bad error value: %i\n", error);
->          out.error =3D -ERANGE;
->      }
-> @@ -290,6 +290,11 @@ int fuse_reply_err(fuse_req_t req, int err)
->      return send_reply(req, -err, NULL, 0);
+> 
+> I have compile tested this patch. Don't know how to setup ceph and
+> test it. Its a very simple change. Hopefully ceph developers can
+> have a quick look at it.
+> 
+> A similar attempt was made three years back.
+> 
+> https://lore.kernel.org/linux-security-module/20180626080429.27304-1-zyan@redhat.com/T/
+> ---
+>  fs/ceph/xattr.c               |    3 +--
+>  fs/nfs/nfs4proc.c             |    3 ++-
+>  include/linux/lsm_hook_defs.h |    3 ++-
+>  include/linux/lsm_hooks.h     |    1 +
+>  include/linux/security.h      |    6 ++++--
+>  security/security.c           |    7 ++++---
+>  security/selinux/hooks.c      |    6 +++++-
+>  7 files changed, 19 insertions(+), 10 deletions(-)
+> 
+> Index: redhat-linux/security/selinux/hooks.c
+> ===================================================================
+> --- redhat-linux.orig/security/selinux/hooks.c	2021-09-28 11:36:03.559785943 -0400
+> +++ redhat-linux/security/selinux/hooks.c	2021-09-30 14:01:05.869195347 -0400
+> @@ -2948,7 +2948,8 @@ static void selinux_inode_free_security(
 >  }
-> =20
-> +int fuse_reply_wait(fuse_req_t req)
-> +{
-> +    return send_reply(req, 1, NULL, 0);
-> +}
-> +
->  void fuse_reply_none(fuse_req_t req)
+>  
+
+I agree with Al that it would be cleaner to just return the string, but
+the call_*_hook stuff makes that a bit more tricky. I suppose this is a
+reasonable compromise.
+
+>  static int selinux_dentry_init_security(struct dentry *dentry, int mode,
+> -					const struct qstr *name, void **ctx,
+> +					const struct qstr *name,
+> +					const char **xattr_name, void **ctx,
+>  					u32 *ctxlen)
 >  {
->      fuse_free_req(req);
-> @@ -2165,6 +2170,34 @@ static void do_destroy(fuse_req_t req, fuse_ino_t =
-nodeid,
->      send_reply_ok(req, NULL, 0);
+>  	u32 newsid;
+> @@ -2961,6 +2962,9 @@ static int selinux_dentry_init_security(
+>  	if (rc)
+>  		return rc;
+>  
+> +	if (xattr_name)
+> +		*xattr_name = XATTR_NAME_SELINUX;
+> +
+>  	return security_sid_to_context(&selinux_state, newsid, (char **)ctx,
+>  				       ctxlen);
 >  }
-> =20
-> +static int send_notify_iov(struct fuse_session *se, int notify_code,
-> +                           struct iovec *iov, int count)
-> +{
-> +    struct fuse_out_header out;
-> +    if (!se->got_init) {
-> +        return -ENOTCONN;
-> +    }
-> +    out.unique =3D 0;
-> +    out.error =3D notify_code;
+> Index: redhat-linux/security/security.c
+> ===================================================================
+> --- redhat-linux.orig/security/security.c	2021-08-16 10:39:28.518988836 -0400
+> +++ redhat-linux/security/security.c	2021-09-30 13:54:36.367195347 -0400
+> @@ -1052,11 +1052,12 @@ void security_inode_free(struct inode *i
+>  }
+>  
+>  int security_dentry_init_security(struct dentry *dentry, int mode,
+> -					const struct qstr *name, void **ctx,
+> -					u32 *ctxlen)
+> +				  const struct qstr *name,
+> +				  const char **xattr_name, void **ctx,
+> +				  u32 *ctxlen)
+>  {
+>  	return call_int_hook(dentry_init_security, -EOPNOTSUPP, dentry, mode,
+> -				name, ctx, ctxlen);
+> +				name, xattr_name, ctx, ctxlen);
+>  }
+>  EXPORT_SYMBOL(security_dentry_init_security);
+>  
+> Index: redhat-linux/include/linux/lsm_hooks.h
+> ===================================================================
+> --- redhat-linux.orig/include/linux/lsm_hooks.h	2021-06-02 10:20:27.717485143 -0400
+> +++ redhat-linux/include/linux/lsm_hooks.h	2021-09-30 13:56:48.440195347 -0400
+> @@ -196,6 +196,7 @@
+>   *	@dentry dentry to use in calculating the context.
+>   *	@mode mode used to determine resource type.
+>   *	@name name of the last path component used to create file
+> + *	@xattr_name pointer to place the pointer to security xattr name
 
-Please fully initialize all fuse_out_header fields so it's obvious that
-there is no accidental information leak from virtiofsd to the guest:
+It might be a good idea to also document the lifetime for xattr_name
+here. In particular you're returning a pointer to a static string, and
+it would be good to note that the caller needn't free it or anything.
 
-  struct fuse_out_header out =3D {
-      .error =3D notify_code,
-  };
+>   *	@ctx pointer to place the pointer to the resulting context in.
+>   *	@ctxlen point to place the length of the resulting context.
+>   * @dentry_create_files_as:
+> Index: redhat-linux/include/linux/security.h
+> ===================================================================
+> --- redhat-linux.orig/include/linux/security.h	2021-08-16 10:39:28.484988836 -0400
+> +++ redhat-linux/include/linux/security.h	2021-09-30 13:59:00.288195347 -0400
+> @@ -317,8 +317,9 @@ int security_add_mnt_opt(const char *opt
+>  				int len, void **mnt_opts);
+>  int security_move_mount(const struct path *from_path, const struct path *to_path);
+>  int security_dentry_init_security(struct dentry *dentry, int mode,
+> -					const struct qstr *name, void **ctx,
+> -					u32 *ctxlen);
+> +				  const struct qstr *name,
+> +				  const char **xattr_name, void **ctx,
+> +				  u32 *ctxlen);
+>  int security_dentry_create_files_as(struct dentry *dentry, int mode,
+>  					struct qstr *name,
+>  					const struct cred *old,
+> @@ -739,6 +740,7 @@ static inline void security_inode_free(s
+>  static inline int security_dentry_init_security(struct dentry *dentry,
+>  						 int mode,
+>  						 const struct qstr *name,
+> +						 const char **xattr_name,
+>  						 void **ctx,
+>  						 u32 *ctxlen)
+>  {
+> Index: redhat-linux/include/linux/lsm_hook_defs.h
+> ===================================================================
+> --- redhat-linux.orig/include/linux/lsm_hook_defs.h	2021-07-07 11:54:59.673549151 -0400
+> +++ redhat-linux/include/linux/lsm_hook_defs.h	2021-09-30 14:02:13.114195347 -0400
+> @@ -83,7 +83,8 @@ LSM_HOOK(int, 0, sb_add_mnt_opt, const c
+>  LSM_HOOK(int, 0, move_mount, const struct path *from_path,
+>  	 const struct path *to_path)
+>  LSM_HOOK(int, 0, dentry_init_security, struct dentry *dentry,
+> -	 int mode, const struct qstr *name, void **ctx, u32 *ctxlen)
+> +	 int mode, const struct qstr *name, const char **xattr_name,
+> +	 void **ctx, u32 *ctxlen)
+>  LSM_HOOK(int, 0, dentry_create_files_as, struct dentry *dentry, int mode,
+>  	 struct qstr *name, const struct cred *old, struct cred *new)
+>  
+> Index: redhat-linux/fs/nfs/nfs4proc.c
+> ===================================================================
+> --- redhat-linux.orig/fs/nfs/nfs4proc.c	2021-07-14 14:47:42.732842926 -0400
+> +++ redhat-linux/fs/nfs/nfs4proc.c	2021-09-30 14:06:02.249195347 -0400
+> @@ -127,7 +127,8 @@ nfs4_label_init_security(struct inode *d
+>  		return NULL;
+>  
+>  	err = security_dentry_init_security(dentry, sattr->ia_mode,
+> -				&dentry->d_name, (void **)&label->label, &label->len);
+> +				&dentry->d_name, NULL,
+> +				(void **)&label->label, &label->len);
+>  	if (err == 0)
+>  		return label;
+>  
+> Index: redhat-linux/fs/ceph/xattr.c
+> ===================================================================
+> --- redhat-linux.orig/fs/ceph/xattr.c	2021-09-09 13:05:21.800611264 -0400
+> +++ redhat-linux/fs/ceph/xattr.c	2021-09-30 14:14:59.892195347 -0400
+> @@ -1311,7 +1311,7 @@ int ceph_security_init_secctx(struct den
+>  	int err;
+>  
+>  	err = security_dentry_init_security(dentry, mode, &dentry->d_name,
+> -					    &as_ctx->sec_ctx,
+> +					    &name, &as_ctx->sec_ctx,
+>  					    &as_ctx->sec_ctxlen);
+>  	if (err < 0) {
+>  		WARN_ON_ONCE(err != -EOPNOTSUPP);
+> @@ -1335,7 +1335,6 @@ int ceph_security_init_secctx(struct den
+>  	 * It only supports single security module and only selinux has
+>  	 * dentry_init_security hook.
+>  	 */
+> -	name = XATTR_NAME_SELINUX;
+>  	name_len = strlen(name);
+>  	err = ceph_pagelist_reserve(pagelist,
+>  				    4 * 2 + name_len + as_ctx->sec_ctxlen);
+> 
 
-The host must not expose uninitialized memory to the guest (just like
-the kernel vs userspace). fuse_send_msg() initializes out.len later, but
-to be on the safe side I think we should be explicit here.
+Looks reasonable overall.
 
---9XQL1jyIUILLHsZa
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmFbGJgACgkQnKSrs4Gr
-c8gAUAgAvKDRFORyxWItqCrupt3TuNF1j42PbZw3YAp6dd0LGK8JGi8e7JetfzWF
-3k/9hhV1KsXY9ik2b78Eh1jeiJEy6zu2NlxY4FiTHKraziQaGHk0u1QOEDZUYapb
-jmwddAVwkZne52ybbe62u2FKjIKYkUBUEdjXrlAFjmQVmDjQip6xvbQ58dorhL1n
-PYc/nO3vJAWsMx+RFfVCFlZ7t7HTHYlZlgvKfcd3c1s3/O7mMi97DUWoqhfRvuka
-fmz5QUidmg4goBBShWObBqpDnePlk6sAPB8AAdnBS6UgAKQaTAWIarjz9tHQqev6
-9Dk0Wu+MAsHLI8j7CKv0ukbGgMGWig==
-=1e2d
------END PGP SIGNATURE-----
-
---9XQL1jyIUILLHsZa--
+Reviewed-by: Jeff Layton <jlayton@kernel.org>
 

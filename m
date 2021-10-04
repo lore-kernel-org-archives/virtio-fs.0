@@ -1,15 +1,15 @@
-Date: Mon, 4 Oct 2021 14:17:59 +0100
+Date: Mon, 4 Oct 2021 14:19:46 +0100
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YVr/ByKopdRQwsy3@stefanha-x1.localdomain>
+Message-ID: <YVr/clKO1o2RoG+Z@stefanha-x1.localdomain>
 References: <20210930153037.1194279-1-vgoyal@redhat.com>
-	<20210930153037.1194279-4-vgoyal@redhat.com>
+	<20210930153037.1194279-5-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="cd8PZTVNGSp+cJAL"
+	protocol="application/pgp-signature"; boundary="gTen1rWalgkNewo3"
 Content-Disposition: inline
-In-Reply-To: <20210930153037.1194279-4-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 03/13] virtiofsd: Remove unused
- virtio_fs_config definition
+In-Reply-To: <20210930153037.1194279-5-vgoyal@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 04/13] virtiofsd: Add a helper to send
+ element on virtqueue
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,39 +22,38 @@ To: Vivek Goyal <vgoyal@redhat.com>
 Cc: miklos@szeredi.hu, qemu-devel@nongnu.org, virtio-fs@redhat.com
 
 
---cd8PZTVNGSp+cJAL
+--gTen1rWalgkNewo3
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Thu, Sep 30, 2021 at 11:30:27AM -0400, Vivek Goyal wrote:
-> "struct virtio_fs_config" definition seems to be unused in fuse_virtio.c.
-> Remove it.
+On Thu, Sep 30, 2021 at 11:30:28AM -0400, Vivek Goyal wrote:
+> We have open coded logic to take locks and push element on virtqueue at
+> three places. Add a helper and use it everywhere. Code is easier to read =
+and
+> less number of lines of code.
 >=20
 > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 > ---
->  tools/virtiofsd/fuse_virtio.c | 6 ------
->  1 file changed, 6 deletions(-)
-
-In fact, this struct is defined in
-include/standard-headers/linux/virtio_fs.h!
+>  tools/virtiofsd/fuse_virtio.c | 45 ++++++++++++++---------------------
+>  1 file changed, 18 insertions(+), 27 deletions(-)
 
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
 
---cd8PZTVNGSp+cJAL
+--gTen1rWalgkNewo3
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmFa/wcACgkQnKSrs4Gr
-c8jSRgf8D+ASkKju5k9TA7ysqEU9d7oUWZukON6366Nx212dd4d0IMHKvfPtpTDp
-18od7zCIt+sqY+TRNp/sH7eiwNpu5mvyutB+5CiY+0pSdy/kRTTAb6yoQM+8TEDe
-8wNOP121pSLYJxS9XCF0PrdxUcpzQLLpDtNzFf+VoMMaZSxJFgzJIpauQexMF85L
-OHHUz58jQF37nn4TgMjouaFallWfA3DLiIQFRP2x5RV2VYbr743qCHD89jp1pv82
-xFwib4GHE1yocO/zD5RokbR48xOI6RSl87A615WSP0kiho0SyXdEnCbDmpTl5qHK
-5FFtIvTrH448OBt8+DY1LUgvih2wGg==
-=E/mV
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmFa/3IACgkQnKSrs4Gr
+c8jC+wf+M3shDcBqsHiVzj5WsHTy+j1h/LcYjrzASnkPgCv0EzMxVffPelDUk/YR
+KGT8QvuPOmVVtu7+wWwlPPwPuKTb13dz8Yxk/cdGM/+bH7V0CAE9Nelj3tnrIwQm
+7qQwe8Rps36cD8Zb4CQBvjs86nJBjUJ1Ygdva1Wz/X3xvNGGTSaIYf8yfxYtg4qR
+7WQjROE36ipTZJx8tRplrNnoUTHHIq2tWbnYH0L+3b7X9DtJ+KVsiMmp5M/p68Mr
+6M+qz8K9+qVPFBF9GHvrkM4KJKBSJXqpme8UBw8N20+kXPdDTQFFAFiDStpKdZVg
+kkIOpOjxri9y4etRx2Fp8ttksuyOaQ==
+=IHXg
 -----END PGP SIGNATURE-----
 
---cd8PZTVNGSp+cJAL--
+--gTen1rWalgkNewo3--
 

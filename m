@@ -1,16 +1,30 @@
-Date: Tue, 5 Oct 2021 09:06:35 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YVxN21sNt4U8cO64@redhat.com>
-References: <20210930153037.1194279-1-vgoyal@redhat.com>
-	<20210930153037.1194279-11-vgoyal@redhat.com>
-	<YVsVp4rPILhz+/Eh@stefanha-x1.localdomain>
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+	d=crudebyte.com; s=kylie; h=Content-Type:Content-Transfer-Encoding:
+	MIME-Version:References:In-Reply-To:Message-ID:Date:Subject:Cc:To:From:
+	Content-ID:Content-Description;
+	bh=hdlGHdLFsTLrEs0ug5auof9JDB8L0ieyKazTitvR/18=;
+	b=UcttY6MTtY0GKOlsc8Vp2x6CqL
+	a7m4ziC3xA1qOngR8+6oGc0WQ8mMfWxCMecp8FaKvzcXuQHKq7lWoibrfQo6m7l7yLrqLIO+0ZmEm
+	3s00MAXGYOLap2vgDNfnhFSjrrdkezgUl1iktvyrwnvXEo5XhjqW0ARJ8DmzsQaTTDaTHY5N0HmHM
+	0xwZWf0Y/55cczDfEgKFZgCFZUcqob65nt/9X63HtWdyQd55tl4Wx9s81zivu31THf4E4hZ/ZUxt6
+	cdz261zIWjlZx/E4mvlOWW7rUNoz5xePQkVtJ6DisGTSGliW4m24KC6pSap3dmRiyW/3ZxvYyzdJy
+	W3THdfWDVIWght/6xwNFxpA5Suh+9W/+5fHePSyzJsv4+moCC7lzDtMCbU6603y16mqXCI1s8xCe9
+	QZUSADL0XHLX19ArIsEFNVTGtfqI+qq28BNfwNLjKvWkG20+Cnffii0bC9Q9C4ocyprEvnxFiV08L
+	4WbnCgdKBCt66cBtVLjldMWmtGtEPt6DlacYB1AeI3bW+u92XrXsa03IrZ50OlSdKpeYLfNdaOcZ7
+	wKwybLo8KyL3QgLNpNUPeo8F2dg7kMyT/vOCepGGr1NRpVyU7h5RFA0ZQJjaZGIpcx8ioZnLcZ8ma
+	8ga7EgX0MZS5PQL0X+kJ6Bjn2zK5rFsHjae/p6bck=
+From: Christian Schoenebeck <qemu_oss@crudebyte.com>
+Date: Tue, 05 Oct 2021 15:15:26 +0200
+Message-ID: <14205148.YOBg3JvQBA@silver>
+In-Reply-To: <YVxJBKqsytKlos6M@stefanha-x1.localdomain>
+References: <cover.1633376313.git.qemu_oss@crudebyte.com>
+	<c9dea2e27ae19b2b9a51e8f08687067bf3e47bd5.1633376313.git.qemu_oss@crudebyte.com>
+	<YVxJBKqsytKlos6M@stefanha-x1.localdomain>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <YVsVp4rPILhz+/Eh@stefanha-x1.localdomain>
-Subject: Re: [Virtio-fs] [PATCH 10/13] virtiofsd: Custom threadpool for
- remote blocking posix locks requests
+Content-Transfer-Encoding: 7Bit
+Content-Type: text/plain; charset="us-ascii"
+Subject: Re: [Virtio-fs] [PATCH v2 1/3] virtio: turn VIRTQUEUE_MAX_SIZE into
+	a variable
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,147 +33,97 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: miklos@szeredi.hu, qemu-devel@nongnu.org, virtio-fs@redhat.com
+To: qemu-devel@nongnu.org
+Cc: Kevin Wolf <kwolf@redhat.com>, Laurent Vivier <lvivier@redhat.com>, qemu-block@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, Jason Wang <jasowang@redhat.com>, Amit Shah <amit@kernel.org>, David Hildenbrand <david@redhat.com>, Raphael Norwitz <raphael.norwitz@nutanix.com>, virtio-fs@redhat.com, Eric Auger <eric.auger@redhat.com>, Hanna Reitz <hreitz@redhat.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Gerd Hoffmann <kraxel@redhat.com>, =?ISO-8859-1?Q?Marc=2DAndr=E9?= Lureau <marcandre.lureau@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>
 
-On Mon, Oct 04, 2021 at 03:54:31PM +0100, Stefan Hajnoczi wrote:
-> On Thu, Sep 30, 2021 at 11:30:34AM -0400, Vivek Goyal wrote:
-> > Add a new custom threadpool using posix threads that specifically
-> > service locking requests.
-> > 
-> > In the case of a fcntl(SETLKW) request, if the guest is waiting
-> > for a lock or locks and issues a hard-reboot through SYSRQ then virtiofsd
-> > unblocks the blocked threads by sending a signal to them and waking
-> > them up.
-> > 
-> > The current threadpool (GThreadPool) is not adequate to service the
-> > locking requests that result in a thread blocking. That is because
-> > GLib does not provide an API to cancel the request while it is
-> > serviced by a thread. In addition, a user might be running virtiofsd
-> > without a threadpool (--thread-pool-size=0), thus a locking request
-> > that blocks, will block the main virtqueue thread that services requests
-> > from servicing any other requests.
-> > 
-> > The only exception occurs when the lock is of type F_UNLCK. In this case
-> > the request is serviced by the main virtqueue thread or a GThreadPool
-> > thread to avoid a deadlock, when all the threads in the custom threadpool
-> > are blocked.
-> > 
-> > Then virtiofsd proceeds to cleanup the state of the threads, release
-> > them back to the system and re-initialize.
+On Dienstag, 5. Oktober 2021 14:45:56 CEST Stefan Hajnoczi wrote:
+> On Mon, Oct 04, 2021 at 09:38:04PM +0200, Christian Schoenebeck wrote:
+> > Refactor VIRTQUEUE_MAX_SIZE to effectively become a runtime
+> > variable per virtio user.
 > 
-> Is there another way to cancel SETLKW without resorting to a new thread
-> pool? Since this only matters when shutting down or restarting, can we
-> close all plock->fd file descriptors to kick the GThreadPool workers out
-> of fnctl()?
+> virtio user == virtio device model?
 
-I don't think that closing plock->fd will unblock fcntl().  
+Yes
 
-SYSCALL_DEFINE3(fcntl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
-{
-        struct fd f = fdget_raw(fd);
-}
-
-IIUC, fdget_raw() will take a reference on associated "struct file" and
-after that rest of the code will work with that "struct file".
-
-static int do_lock_file_wait(struct file *filp, unsigned int cmd,
-                             struct file_lock *fl)
-{
-..
-..
-                error = wait_event_interruptible(fl->fl_wait,
-                                        list_empty(&fl->fl_blocked_member));
-
-..
-..
-}
-
-And this shoudl break upon receiving signal. And man page says the
-same thing.
-
-       F_OFD_SETLKW (struct flock *)
-              As for F_OFD_SETLK, but if a conflicting lock  is  held  on  the
-              file,  then  wait  for that lock to be released.  If a signal is
-              caught while waiting, then the call is  interrupted  and  (after
-              the  signal  handler has returned) returns immediately (with re‐
-              turn value -1 and errno set to EINTR; see signal(7)).
-
-It would be nice if we don't have to implement our own custom threadpool
-just for locking. Would have been better if glib thread pool provided
-some facility for this.
-
-[..]
-> > diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-> > index 3b720c5d4a..c67c2e0e7a 100644
-> > --- a/tools/virtiofsd/fuse_virtio.c
-> > +++ b/tools/virtiofsd/fuse_virtio.c
-> > @@ -20,6 +20,7 @@
-> >  #include "fuse_misc.h"
-> >  #include "fuse_opt.h"
-> >  #include "fuse_virtio.h"
-> > +#include "tpool.h"
-> >  
-> >  #include <sys/eventfd.h>
-> >  #include <sys/socket.h>
-> > @@ -612,6 +613,60 @@ out:
-> >      free(req);
-> >  }
-> >  
-> > +/*
-> > + * If the request is a locking request, use a custom locking thread pool.
-> > + */
-> > +static bool use_lock_tpool(gpointer data, gpointer user_data)
-> > +{
-> > +    struct fv_QueueInfo *qi = user_data;
-> > +    struct fuse_session *se = qi->virtio_dev->se;
-> > +    FVRequest *req = data;
-> > +    VuVirtqElement *elem = &req->elem;
-> > +    struct fuse_buf fbuf = {};
-> > +    struct fuse_in_header *inhp;
-> > +    struct fuse_lk_in *lkinp;
-> > +    size_t lk_req_len;
-> > +    /* The 'out' part of the elem is from qemu */
-> > +    unsigned int out_num = elem->out_num;
-> > +    struct iovec *out_sg = elem->out_sg;
-> > +    size_t out_len = iov_size(out_sg, out_num);
-> > +    bool use_custom_tpool = false;
-> > +
-> > +    /*
-> > +     * If notifications are not enabled, no point in using cusotm lock
-> > +     * thread pool.
-> > +     */
-> > +    if (!se->notify_enabled) {
-> > +        return false;
-> > +    }
-> > +
-> > +    assert(se->bufsize > sizeof(struct fuse_in_header));
-> > +    lk_req_len = sizeof(struct fuse_in_header) + sizeof(struct fuse_lk_in);
-> > +
-> > +    if (out_len < lk_req_len) {
-> > +        return false;
-> > +    }
-> > +
-> > +    fbuf.mem = g_malloc(se->bufsize);
-> > +    copy_from_iov(&fbuf, out_num, out_sg, lk_req_len);
+> > Reasons:
+> > 
+> > (1) VIRTQUEUE_MAX_SIZE should reflect the absolute theoretical
+> > 
+> >     maximum queue size possible. Which is actually the maximum
+> >     queue size allowed by the virtio protocol. The appropriate
+> >     value for VIRTQUEUE_MAX_SIZE would therefore be 32768:
+> >     
+> >     https://docs.oasis-open.org/virtio/virtio/v1.1/cs01/virtio-v1.1-cs01.h
+> >     tml#x1-240006
+> >     
+> >     Apparently VIRTQUEUE_MAX_SIZE was instead defined with a
+> >     more or less arbitrary value of 1024 in the past, which
+> >     limits the maximum transfer size with virtio to 4M
+> >     (more precise: 1024 * PAGE_SIZE, with the latter typically
+> >     being 4k).
 > 
-> This looks inefficient: for every FUSE request we now malloc se->bufsize
-> and then copy lk_req_len bytes, only to free the memory again.
+> Being equal to IOV_MAX is a likely reason. Buffers with more iovecs than
+> that cannot be passed to host system calls (sendmsg(2), pwritev(2),
+> etc).
+
+Yes, that's use case dependent. Hence the solution to opt-in if it is desired 
+and feasible.
+
+> > (2) Additionally the current value of 1024 poses a hidden limit,
+> > 
+> >     invisible to guest, which causes a system hang with the
+> >     following QEMU error if guest tries to exceed it:
+> >     
+> >     virtio: too many write descriptors in indirect table
 > 
-> Is it possible to keep lk_req_len bytes on the stack instead?
+> I don't understand this point. 2.6.5 The Virtqueue Descriptor Table says:
+> 
+>   The number of descriptors in the table is defined by the queue size for
+> this virtqueue: this is the maximum possible descriptor chain length.
+> 
+> and 2.6.5.3.1 Driver Requirements: Indirect Descriptors says:
+> 
+>   A driver MUST NOT create a descriptor chain longer than the Queue Size of
+> the device.
+> 
+> Do you mean a broken/malicious guest driver that is violating the spec?
+> That's not a hidden limit, it's defined by the spec.
 
-I guess it should be possible. se->bufsize is variable but lk_req_len
-is known at compile time.
+https://lists.gnu.org/archive/html/qemu-devel/2021-10/msg00781.html
+https://lists.gnu.org/archive/html/qemu-devel/2021-10/msg00788.html
 
-lk_req_len = sizeof(struct fuse_in_header) + sizeof(struct fuse_lk_in);
+You can already go beyond that queue size at runtime with the indirection 
+table. The only actual limit is the currently hard coded value of 1k pages. 
+Hence the suggestion to turn that into a variable.
 
-So we should be able to allocate this much space on stack and point
-fbuf.mem to it.
+> > (3) Unfortunately not all virtio users in QEMU would currently
+> > 
+> >     work correctly with the new value of 32768.
+> > 
+> > So let's turn this hard coded global value into a runtime
+> > variable as a first step in this commit, configurable for each
+> > virtio user by passing a corresponding value with virtio_init()
+> > call.
+> 
+> virtio_add_queue() already has an int queue_size argument, why isn't
+> that enough to deal with the maximum queue size? There's probably a good
+> reason for it, but please include it in the commit description.
+[...]
+> Can you make this value per-vq instead of per-vdev since virtqueues can
+> have different queue sizes?
+> 
+> The same applies to the rest of this patch. Anything using
+> vdev->queue_max_size should probably use vq->vring.num instead.
 
-char buf[sizeof(struct fuse_in_header) + sizeof(struct fuse_lk_in)];
-fbuf.mem = buf;
+I would like to avoid that and keep it per device. The maximum size stored 
+there is the maximum size supported by virtio user (or vortio device model, 
+however you want to call it). So that's really a limit per device, not per 
+queue, as no queue of the device would ever exceed that limit.
 
-Will give it a try.
+Plus a lot more code would need to be refactored, which I think is 
+unnecessary.
 
-Vivek
+Best regards,
+Christian Schoenebeck
+
 

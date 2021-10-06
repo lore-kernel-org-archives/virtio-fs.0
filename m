@@ -1,12 +1,19 @@
-From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Mon, 11 Oct 2021 11:00:50 +0800
-Message-Id: <20211011030052.98923-6-jefflexu@linux.alibaba.com>
-In-Reply-To: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
-References: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=xexEpJdvSs8WA8ytXi5Jvt5/cU1ono4iJfJ2H9LSanI=;
+	b=XPTZYNUAGTD6PuQEs5Xnr6OTxYtUaCDBi3AEe+52RdarJKKJnE5CizERVElvjXPzKM
+	4d/gtP5lgLu4BDUhPptbBVeRvJrT8oRMEDkKjqKvP9rskHDrmLI5sBGKPAdreEiq4WCU
+	/9E9J0lxb4EB7BEUXcFWSyv/3YC8Q4ZRLXyQ0=
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v6 5/7] fuse: enable per-file DAX
+References: <20210930143850.1188628-1-vgoyal@redhat.com>
+	<20210930143850.1188628-8-vgoyal@redhat.com>
+In-Reply-To: <20210930143850.1188628-8-vgoyal@redhat.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Wed, 6 Oct 2021 15:02:36 +0200
+Message-ID: <CAJfpegtdftj7jQFu+4LBjysiAJ-hhLHkBC_KhowfJtepvZqaoQ@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PATCH 7/8] virtiofs: Add new notification type
+	FUSE_NOTIFY_LOCK
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,125 +22,19 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hub
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, linux-fsdevel@vger.kernel.org
 
-DAX may be limited in some specific situation. When the number of usable
-DAX windows is under watermark, the recalim routine will be triggered to
-reclaim some DAX windows. It may have a negative impact on the
-performance, since some processes may need to wait for DAX windows to be
-recalimed and reused then. To mitigate the performance degradation, the
-overall DAX window need to be expanded larger.
+On Thu, 30 Sept 2021 at 16:39, Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> Add a new notification type FUSE_NOTIFY_LOCK. This notification can be
+> sent by file server to signifiy that a previous locking request has
+> completed and actual caller should be woken up.
 
-However, simply expanding the DAX window may not be a good deal in some
-scenario. To maintain one DAX window chunk (i.e., 2MB in size), 32KB
-(512 * 64 bytes) memory footprint will be consumed for page descriptors
-inside guest, which is greater than the memory footprint if it uses
-guest page cache when DAX disabled. Thus it'd better disable DAX for
-those files smaller than 32KB, to reduce the demand for DAX window and
-thus avoid the unworthy memory overhead.
+Shouldn't this also be generic instead of lock specific?
 
-Per-file DAX feature is introduced to address this issue, by offering a
-finer grained control for dax to users, trying to achieve a balance
-between performance and memory overhead.
+I.e. generic header  + original outarg.
 
-The FUSE_ATTR_DAX flag in FUSE_LOOKUP reply is used to indicate whether
-DAX should be enabled or not for corresponding file. Currently the state
-whether DAX is enabled or not for the file is initialized only when
-inode is instantiated.
-
-Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
----
- fs/fuse/dax.c    | 8 ++++----
- fs/fuse/file.c   | 4 ++--
- fs/fuse/fuse_i.h | 4 ++--
- fs/fuse/inode.c  | 2 +-
- 4 files changed, 9 insertions(+), 9 deletions(-)
-
-diff --git a/fs/fuse/dax.c b/fs/fuse/dax.c
-index 4c6c64efc950..15bde36829b8 100644
---- a/fs/fuse/dax.c
-+++ b/fs/fuse/dax.c
-@@ -1335,7 +1335,7 @@ static const struct address_space_operations fuse_dax_file_aops  = {
- 	.invalidatepage	= noop_invalidatepage,
- };
- 
--static bool fuse_should_enable_dax(struct inode *inode)
-+static bool fuse_should_enable_dax(struct inode *inode, unsigned int flags)
- {
- 	struct fuse_conn *fc = get_fuse_conn(inode);
- 	unsigned int dax_mode = fc->dax_mode;
-@@ -1352,12 +1352,12 @@ static bool fuse_should_enable_dax(struct inode *inode)
- 		return true;
- 
- 	/* dax_mode == FUSE_DAX_INODE */
--	return true;
-+	return flags & FUSE_ATTR_DAX;
- }
- 
--void fuse_dax_inode_init(struct inode *inode)
-+void fuse_dax_inode_init(struct inode *inode, unsigned int flags)
- {
--	if (!fuse_should_enable_dax(inode))
-+	if (!fuse_should_enable_dax(inode, flags))
- 		return;
- 
- 	inode->i_flags |= S_DAX;
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index 11404f8c21c7..40c667a48cf6 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -3163,7 +3163,7 @@ static const struct address_space_operations fuse_file_aops  = {
- 	.write_end	= fuse_write_end,
- };
- 
--void fuse_init_file_inode(struct inode *inode)
-+void fuse_init_file_inode(struct inode *inode, unsigned int flags)
- {
- 	struct fuse_inode *fi = get_fuse_inode(inode);
- 
-@@ -3177,5 +3177,5 @@ void fuse_init_file_inode(struct inode *inode)
- 	fi->writepages = RB_ROOT;
- 
- 	if (IS_ENABLED(CONFIG_FUSE_DAX))
--		fuse_dax_inode_init(inode);
-+		fuse_dax_inode_init(inode, flags);
- }
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 5abf9749923f..0270a41c31d7 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -1016,7 +1016,7 @@ int fuse_notify_poll_wakeup(struct fuse_conn *fc,
- /**
-  * Initialize file operations on a regular file
-  */
--void fuse_init_file_inode(struct inode *inode);
-+void fuse_init_file_inode(struct inode *inode, unsigned int flags);
- 
- /**
-  * Initialize inode operations on regular files and special files
-@@ -1268,7 +1268,7 @@ int fuse_dax_conn_alloc(struct fuse_conn *fc, enum fuse_dax_mode mode,
- 			struct dax_device *dax_dev);
- void fuse_dax_conn_free(struct fuse_conn *fc);
- bool fuse_dax_inode_alloc(struct super_block *sb, struct fuse_inode *fi);
--void fuse_dax_inode_init(struct inode *inode);
-+void fuse_dax_inode_init(struct inode *inode, unsigned int flags);
- void fuse_dax_inode_cleanup(struct inode *inode);
- bool fuse_dax_check_alignment(struct fuse_conn *fc, unsigned int map_alignment);
- void fuse_dax_cancel_work(struct fuse_conn *fc);
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index f4ad99e2415b..73f19cd6e702 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -280,7 +280,7 @@ static void fuse_init_inode(struct inode *inode, struct fuse_attr *attr)
- 	inode->i_ctime.tv_nsec = attr->ctimensec;
- 	if (S_ISREG(inode->i_mode)) {
- 		fuse_init_common(inode);
--		fuse_init_file_inode(inode);
-+		fuse_init_file_inode(inode, attr->flags);
- 	} else if (S_ISDIR(inode->i_mode))
- 		fuse_init_dir(inode);
- 	else if (S_ISLNK(inode->i_mode))
--- 
-2.27.0
+Thanks,
+Miklos
 

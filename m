@@ -1,27 +1,15 @@
-Date: Wed, 20 Oct 2021 01:44:41 -0400
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	from:to:subject; s=fm2; bh=TtcG6rEzUpZZSIk/mxYhWAOX+ZuWUHRkNv5b5
-	xq3myc=; b=Xme5ZlmQZmZKY6t0Z0iWWhKo1TEhd1qL4RHeE3lLYMh1EEz+iUHy2
-	F47gdzVA8BKZb19Tl7gRASRepkZcI9J8JzwfqYMHnvXn1cZTMUpxAkfLTjGj3KOT
-	Qvy0pnzVSPXPpmUAa4Z3osfomODbV2ty8Co7ZZYmGk+f9Hj8r50t9FLlBatlBXyM
-	LiWK6uTs4A4VvEeKLRPZv6uyWxnTH/S8+1Ivk7o8/uLx7w6UCAwgcmu+lAXiof1b
-	aeJgnJZL/AQgzJJi1Ka4TCheNLKEy/H+HBGMiPsB2KP7a45Eq+2973NGgDwZjFQu
-	M3K+rQMgSRjzMeb9LnJLIJQKz50jILqSg==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=TtcG6rEzUpZZSIk/m
-	xYhWAOX+ZuWUHRkNv5b5xq3myc=; b=Sloi1yS/faJr2dvhKDAS4Q60c37fNDtN8
-	fitGBtT7dy+I2dRaBXoMHErd653qpO7l0T3cEzrj3wfjWqrPu6brppDl81BgyKjo
-	dDOqMALBaWod/oi9EfsY0XkawqKmXpJnzoO/rN3eiynjVaf84gLNJf3nUe1snwtl
-	M2cMTjL7DyRMjmsBR0sKmCKgA1BNmqVa1qhsIRCp2XB/GgCk1XP6Fxog/BBtSnU+
-	rSWcGZygT/Gfiv+g/z8spaosfXE7+CIfxhOXq9V5mmUuF8YGSye73aHj/vVsHS/q
-	jNkMu75wMTZrBoENOTNPOKe8Fmjz7CfYZx32MNVN0qiBa45yf2ifA==
-From: virtiofs-bot@sinrega.org
-Message-Id: <75471.121102001443800159@us-mta-117.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] Issue closed: [2021-10-09T13:58:55Z
-	ERROR virtiofsd_rs] Waiting for daemon failed:
-	HandleRequest(PartialMessage)
+Date: Wed, 6 Oct 2021 12:12:52 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YV3LBNM3jnGBBzwS@redhat.com>
+References: <20210930143850.1188628-1-vgoyal@redhat.com>
+	<20210930143850.1188628-8-vgoyal@redhat.com>
+	<CAJfpegtdftj7jQFu+4LBjysiAJ-hhLHkBC_KhowfJtepvZqaoQ@mail.gmail.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAJfpegtdftj7jQFu+4LBjysiAJ-hhLHkBC_KhowfJtepvZqaoQ@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 7/8] virtiofs: Add new notification type
+	FUSE_NOTIFY_LOCK
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -30,29 +18,64 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, linux-fsdevel@vger.kernel.org
 
-doesnt appear to work on arm64.
+On Wed, Oct 06, 2021 at 03:02:36PM +0200, Miklos Szeredi wrote:
+> On Thu, 30 Sept 2021 at 16:39, Vivek Goyal <vgoyal@redhat.com> wrote:
+> >
+> > Add a new notification type FUSE_NOTIFY_LOCK. This notification can be
+> > sent by file server to signifiy that a previous locking request has
+> > completed and actual caller should be woken up.
+> 
+> Shouldn't this also be generic instead of lock specific?
+> 
+> I.e. generic header  + original outarg.
 
+Hi Miklos,
 
-```
-[2021-10-09T13:58:55Z ERROR virtiofsd_rs] Waiting for daemon failed: HandleRequest(PartialMessage)
-```
+I am not sure I understand the idea. Can you please elaborate a bit more.
 
-kernel says
+IIUC, "fuse_out_header + original outarg"  is format for responding
+to regular fuse requests. If we use that it will become like responding
+to same request twice. First time we responded with ->error=1 so that
+caller can wait and second time we respond with actual outarg (if
+there is one depending on the type of request).
 
-```
-[    0.738564] virtio-fs: tag <rootfs> not found
-[    0.740972] virtio-fs: tag </dev/root> not found
-[    0.743308] List of all partitions:
-[    0.745015] No filesystem could mount root, tried: 
-[    0.745019]  virtiofs
-[    0.747413] 
-[    0.749438] Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
-[    0.753228] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 5.15.0-rc3+ #14
-[    0.756265] Hardware name: linux,dummy-virt (DT)
+IOW, this will become more like implementing blocking of request in
+client in a more generic manner.
 
-```
----
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/issues/14
+But outarg, depends on type of request (In case of locking there is
+none). And outarg memory is allocated by driver and filled by server.
+In case of notifications, driver is allocating the memory but it
+does not know what will come in notification and how much memory
+to allocate. So it relies on device telling it how much memory
+to allocate in general so that bunch of pre-defined notification
+types can fit in (fs->notify_buf_size).
+
+I modeled this on the same lines as other fuse notifications where
+server sends notifications with following format.
+
+fuse_out_header + <structure based on notification type>
+
+out_header->unique is 0 for notifications to differentiate notifications
+from request reply.
+
+out_header->error contains the code of actual notification being sent.
+ex. FUSE_NOTIFY_INVAL_INODE or FUSE_NOTIFY_LOCK or FUSE_NOTIFY_DELETE. 
+Right now virtiofs supports only one notification type. But in future
+we can introduce more types (to support inotify stuff etc).
+
+In short, I modeled this on existing notion of fuse notifications
+(and not fuse reply). And given notifications are asynchronous,
+we don't know what were original outarg. In fact they might
+be generated not necessarily in response to a request. And that's
+why this notion of defining a type of notification (FUSE_NOTIFY_LOCK)
+and then let driver decide how to handle this notification.
+
+I might have completely misunderstood your suggestion. Please help
+me understand.
+
+Thanks
+Vivek
 

@@ -1,14 +1,15 @@
-Date: Wed, 20 Oct 2021 13:55:45 -0400
+Date: Wed, 6 Oct 2021 13:58:29 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YXBYIU7lC5Hi6pog@redhat.com>
-References: <20211011030938.109206-1-jefflexu@linux.alibaba.com>
-	<20211011030938.109206-7-jefflexu@linux.alibaba.com>
+Message-ID: <YV3jxV80xchqTAo6@redhat.com>
+References: <20210930153037.1194279-1-vgoyal@redhat.com>
+	<20210930153037.1194279-12-vgoyal@redhat.com>
+	<lytuhui39c.fsf@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20211011030938.109206-7-jefflexu@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [virtiofsd PATCH v6 6/6] virtiofsd: implement
- persistent inode attribute based dax policy
+In-Reply-To: <lytuhui39c.fsf@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 11/13] virtiofsd: Shutdown notification
+ queue in the end
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,84 +18,150 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Jeffle Xu <jefflexu@linux.alibaba.com>
-Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, miklos@szeredi.hu
+To: Christophe de Dinechin <dinechin@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, miklos@szeredi.hu
 
-On Mon, Oct 11, 2021 at 11:09:38AM +0800, Jeffle Xu wrote:
-> The per-file DAX feature in ext4/xfs uses the persistent inode
-> attribute, i.e. FS_DAX_FL/FS_XFLAG_DAX, to indicate if DAX shall be
-> enable for this file or not when filesystem is mounted in per-file DAX
-> mode.
+On Wed, Oct 06, 2021 at 05:15:57PM +0200, Christophe de Dinechin wrote:
 > 
-> To keep compatible with this feature in ext4/xfs, virtiofs also supports
-> enabling DAX depending on the persistent inode attribute, which may be
-> set/cleared by users inside guest or admin on host.
+> On 2021-09-30 at 11:30 -04, Vivek Goyal <vgoyal@redhat.com> wrote...
+> > So far we did not have the notion of cross queue traffic. That is, we
+> > get request on a queue and send back response on same queue. So if a
+> > request be being processed and at the same time a stop queue request
+> > comes in, we wait for all pending requests to finish and then queue
+> > is stopped and associated data structure cleaned.
+> >
+> > But with notification queue, now it is possible that we get a locking
+> > request on request queue and send the notification back on a different
+> > queue (notificaiton queue). This means, we need to make sure that
 > 
-> This policy is used when '-o dax=attr' option is specified for
-> virtiofsd.
+> typo: notification (I just saw Stefan noticed it too)
+> 
+> > notifiation queue has not already been shutdown or is not being
+> 
+> typo: notification ;-)
+> 
+> > shutdown in parallel while we are trying to send a notification back.
+> > Otherwise bad things are bound to happen.
+> >
+> > One way to solve this problem is that stop notification queue in the
+> > end. First stop hiprio and all request queues.
+> 
+> I do not understand that sentence. Maybe you meant to write "is to stop
+> notification queue in the end", but even so I don't understand if you mean
+> "in the end" (of what) or "last" (relative to other queues)? I guess you
+> meant last.
 
-I guess keep this patch higher up in the patch series as we want to make
-sure this behavior works first. And then implement server specific policy.
-Just a minor nit. 
+I meant "is to stop notification queue last". Will fix it.
 
-Once you post new patch series with kernel changes, I will spend some time
-testing these patches.
+> 
+> > That means by the
+> > time we are trying to stop notification queue, we know no other
+> > request can be in progress which can try to send something on
+> > notification queue.
+> >
+> > But problem is that currently we don't have any control on in what
+> > order queues should be stopped. If there was a notion of whole device
+> > being stopped, then we could decide in what order queues should be
+> > stopped.
+> >
+> > Stefan mentioned that there is a command to stop whole device
+> > VHOST_USER_SET_STATUS but it is not implemented in libvhost-user
+> > yet. Also we probably could not move away from per queue stop
+> > logic we have as of now.
+> >
+> > As an alternative, he said if we stop all queue when qidx 0 is
+> > being stopped, it should be fine and we can solve the issue of
+> > notification queue shutdown order.
+> >
+> > So in this patch I am shutting down all queues when queue 0
+> > is being shutdown. And also changed shutdown order in such a
+> > way that notification queue is shutdown last.
+> 
+> For my education: I assume there is no valid case where there is no queue
+> and only the notification queue?
 
+Yes. Minimum two queues have to be there. queue 0 is hiprio requests
+and queue 1 is regular requests.
+
+> >
+> > Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
+> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > ---
+> >  tools/virtiofsd/fuse_virtio.c | 27 ++++++++++++++++++++++++++-
+> >  1 file changed, 26 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+> > index c67c2e0e7a..a87e88e286 100644
+> > --- a/tools/virtiofsd/fuse_virtio.c
+> > +++ b/tools/virtiofsd/fuse_virtio.c
+> > @@ -826,6 +826,11 @@ static void fv_queue_cleanup_thread(struct fv_VuDev *vud, int qidx)
+> >      assert(qidx < vud->nqueues);
+> >      ourqi = vud->qi[qidx];
+> >
+> > +    /* Queue is already stopped */
+> > +    if (!ourqi) {
+> > +        return;
+> > +    }
+> > +
+> >      /* qidx == 1 is the notification queue if notifications are enabled */
+> >      if (!se->notify_enabled || qidx != 1) {
+> >          /* Kill the thread */
+> > @@ -847,14 +852,25 @@ static void fv_queue_cleanup_thread(struct fv_VuDev *vud, int qidx)
+> >
+> >  static void stop_all_queues(struct fv_VuDev *vud)
+> >  {
+> > +    struct fuse_session *se = vud->se;
+> > +
+> >      for (int i = 0; i < vud->nqueues; i++) {
+> >          if (!vud->qi[i]) {
+> >              continue;
+> >          }
+> >
+> > +        /* Shutdown notification queue in the end */
+> > +        if (se->notify_enabled && i == 1) {
+> > +            continue;
+> > +        }
+> >          fuse_log(FUSE_LOG_INFO, "%s: Stopping queue %d thread\n", __func__, i);
+> >          fv_queue_cleanup_thread(vud, i);
+> >      }
+> > +
+> > +    if (se->notify_enabled) {
+> > +        fuse_log(FUSE_LOG_INFO, "%s: Stopping queue %d thread\n", __func__, 1);
+> > +        fv_queue_cleanup_thread(vud, 1);
+> > +    }
+> >  }
+> >
+> >  /* Callback from libvhost-user on start or stop of a queue */
+> > @@ -934,7 +950,16 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
+> >           * the queue thread doesn't block in virtio_send_msg().
+> >           */
+> >          vu_dispatch_unlock(vud);
+> > -        fv_queue_cleanup_thread(vud, qidx);
+> > +
+> > +        /*
+> > +         * If queue 0 is being shutdown, treat it as if device is being
+> > +         * shutdown and stop all queues.
+> > +         */
+> > +        if (qidx == 0) {
+> > +            stop_all_queues(vud);
+> > +        } else {
+> > +            fv_queue_cleanup_thread(vud, qidx);
+> > +        }
+> >          vu_dispatch_wrlock(vud);
+> >      }
+> >  }
+> 
+> For my education: given that we dropped the write lock above, what prevents
+> queue 0 from being shutdown on one thread while another cleans up another
+> queue. What makes it safe in that case? I think this is worth a comment.
+
+I think only one queue shutdown message can progress at a time. These
+are processed in virtio_loop() and that in turn calls
+fv_queue_set_started(started = false).
+
+So while one queue shutdown is in progress, virtio_loop() will go back
+to reading next message only after current queue shutdown has finished.
+
+Thanks
 Vivek
-> 
-> Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
-> ---
->  tools/virtiofsd/passthrough_ll.c | 22 ++++++++++++++++++++--
->  1 file changed, 20 insertions(+), 2 deletions(-)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index a5a5061906..6f75cd6d92 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -1000,7 +1000,7 @@ static int do_statx(struct lo_data *lo, int dirfd, const char *pathname,
->      return 0;
->  }
->  
-> -static bool lo_should_enable_dax(struct lo_data *lo,
-> +static bool lo_should_enable_dax(struct lo_data *lo, struct lo_inode *inode,
->                                   struct fuse_entry_param *e)
->  {
->      if (lo->dax == DAX_NONE || !S_ISREG(e->attr.st_mode)) {
-> @@ -1011,6 +1011,24 @@ static bool lo_should_enable_dax(struct lo_data *lo,
->          return e->attr.st_size > FUSE_PERFILE_DAX_POINT;
->      }
->  
-> +    if (lo->dax & DAX_ATTR) {
-> +        int res, fd;
-> +        int ret = false;;
-> +        unsigned int attr;
-> +
-> +        fd = lo_inode_open(lo, inode, O_RDONLY);
-> +        if (fd == -1) {
-> +            return false;
-> +        }
-> +
-> +        res = ioctl(fd, FS_IOC_GETFLAGS, &attr);
-> +        if (!res && (attr & FS_DAX_FL))
-> +            ret = true;
-> +
-> +        close(fd);
-> +        return ret;
-> +    }
-> +
->      return false;
->  }
->  
-> @@ -1104,7 +1122,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
->      }
->      e->ino = inode->fuse_ino;
->  
-> -    if (lo_should_enable_dax(lo, e)) {
-> +    if (lo_should_enable_dax(lo, inode, e)) {
->          e->attr_flags |= FUSE_ATTR_DAX;
->      }
->  
-> -- 
-> 2.27.0
-> 
 

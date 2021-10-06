@@ -1,14 +1,13 @@
-Date: Mon, 18 Oct 2021 15:18:48 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YW3ImM9WhNrZnSxN@redhat.com>
-References: <20210916084045.31684-1-hreitz@redhat.com>
-	<20210916084045.31684-8-hreitz@redhat.com>
+References: <20210930153037.1194279-1-vgoyal@redhat.com>
+	<20210930153037.1194279-12-vgoyal@redhat.com>
+From: Christophe de Dinechin <dinechin@redhat.com>
+Date: Wed, 06 Oct 2021 17:15:57 +0200
+In-reply-to: <20210930153037.1194279-12-vgoyal@redhat.com>
+Message-ID: <lytuhui39c.fsf@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210916084045.31684-8-hreitz@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v4 07/12] virtiofsd: Let lo_inode_open()
-	return a TempFd
+Content-Type: text/plain
+Subject: Re: [Virtio-fs] [PATCH 11/13] virtiofsd: Shutdown notification
+ queue in the end
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,466 +16,137 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Hanna Reitz <hreitz@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, miklos@szeredi.hu
 
-On Thu, Sep 16, 2021 at 10:40:40AM +0200, Hanna Reitz wrote:
-> Strictly speaking, this is not necessary, because lo_inode_open() will
-> always return a new FD owned by the caller, so TempFd.owned will always
-> be true.
-> 
-> The auto-cleanup is nice, though.  Also, we get a more unified interface
-> where you always get a TempFd when you need an FD for an lo_inode
-> (regardless of whether it is an O_PATH FD or a non-O_PATH FD).
-> 
-> Signed-off-by: Hanna Reitz <hreitz@redhat.com>
+
+On 2021-09-30 at 11:30 -04, Vivek Goyal <vgoyal@redhat.com> wrote...
+> So far we did not have the notion of cross queue traffic. That is, we
+> get request on a queue and send back response on same queue. So if a
+> request be being processed and at the same time a stop queue request
+> comes in, we wait for all pending requests to finish and then queue
+> is stopped and associated data structure cleaned.
+>
+> But with notification queue, now it is possible that we get a locking
+> request on request queue and send the notification back on a different
+> queue (notificaiton queue). This means, we need to make sure that
+
+typo: notification (I just saw Stefan noticed it too)
+
+> notifiation queue has not already been shutdown or is not being
+
+typo: notification ;-)
+
+> shutdown in parallel while we are trying to send a notification back.
+> Otherwise bad things are bound to happen.
+>
+> One way to solve this problem is that stop notification queue in the
+> end. First stop hiprio and all request queues.
+
+I do not understand that sentence. Maybe you meant to write "is to stop
+notification queue in the end", but even so I don't understand if you mean
+"in the end" (of what) or "last" (relative to other queues)? I guess you
+meant last.
+
+> That means by the
+> time we are trying to stop notification queue, we know no other
+> request can be in progress which can try to send something on
+> notification queue.
+>
+> But problem is that currently we don't have any control on in what
+> order queues should be stopped. If there was a notion of whole device
+> being stopped, then we could decide in what order queues should be
+> stopped.
+>
+> Stefan mentioned that there is a command to stop whole device
+> VHOST_USER_SET_STATUS but it is not implemented in libvhost-user
+> yet. Also we probably could not move away from per queue stop
+> logic we have as of now.
+>
+> As an alternative, he said if we stop all queue when qidx 0 is
+> being stopped, it should be fine and we can solve the issue of
+> notification queue shutdown order.
+>
+> So in this patch I am shutting down all queues when queue 0
+> is being shutdown. And also changed shutdown order in such a
+> way that notification queue is shutdown last.
+
+For my education: I assume there is no valid case where there is no queue
+and only the notification queue?
+
+>
+> Suggested-by: Stefan Hajnoczi <stefanha@redhat.com>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 > ---
->  tools/virtiofsd/passthrough_ll.c | 156 +++++++++++++++----------------
->  1 file changed, 75 insertions(+), 81 deletions(-)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 3bf20b8659..d257eda129 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -293,10 +293,8 @@ static void temp_fd_clear(TempFd *temp_fd)
->  /**
->   * Return an owned fd from *temp_fd that will not be closed when
->   * *temp_fd goes out of scope.
-> - *
-> - * (TODO: Remove __attribute__ once this is used.)
->   */
-> -static __attribute__((unused)) int temp_fd_steal(TempFd *temp_fd)
-> +static int temp_fd_steal(TempFd *temp_fd)
->  {
->      if (temp_fd->owned) {
->          temp_fd->owned = false;
-> @@ -309,10 +307,8 @@ static __attribute__((unused)) int temp_fd_steal(TempFd *temp_fd)
->  /**
->   * Create a borrowing copy of an existing TempFd.  Note that *to is
->   * only valid as long as *from is valid.
-> - *
-> - * (TODO: Remove __attribute__ once this is used.)
->   */
-> -static __attribute__((unused)) void temp_fd_copy(const TempFd *from, TempFd *to)
-> +static void temp_fd_copy(const TempFd *from, TempFd *to)
->  {
->      *to = (TempFd) {
->          .fd = from->fd,
-> @@ -689,9 +685,12 @@ static int lo_fd(fuse_req_t req, fuse_ino_t ino, TempFd *tfd)
->   * when a malicious client opens special files such as block device nodes.
->   * Symlink inodes are also rejected since symlinks must already have been
->   * traversed on the client side.
-> + *
-> + * The fd is returned in tfd->fd.  The return value is 0 on success and -errno
-> + * otherwise.
->   */
->  static int lo_inode_open(struct lo_data *lo, struct lo_inode *inode,
-> -                         int open_flags)
-> +                         int open_flags, TempFd *tfd)
->  {
->      g_autofree char *fd_str = g_strdup_printf("%d", inode->fd);
->      int fd;
-> @@ -710,7 +709,13 @@ static int lo_inode_open(struct lo_data *lo, struct lo_inode *inode,
->      if (fd < 0) {
->          return -errno;
->      }
-> -    return fd;
-> +
-> +    *tfd = (TempFd) {
-> +        .fd = fd,
-> +        .owned = true,
-> +    };
-> +
-> +    return 0;
->  }
->  
->  static void lo_init(void *userdata, struct fuse_conn_info *conn)
-> @@ -854,7 +859,8 @@ static int lo_fi_fd(fuse_req_t req, struct fuse_file_info *fi)
->  static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
->                         int valid, struct fuse_file_info *fi)
->  {
-> -    g_auto(TempFd) path_fd = TEMP_FD_INIT;
-> +    g_auto(TempFd) path_fd = TEMP_FD_INIT; /* at least an O_PATH fd */
-
-What does atleast O_PATH fd mean?
-
-> +    g_auto(TempFd) rw_fd = TEMP_FD_INIT; /* O_RDWR fd */
->      int saverr;
->      char procname[64];
->      struct lo_data *lo = lo_data(req);
-> @@ -868,7 +874,15 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
->          return;
->      }
->  
-> -    res = lo_inode_fd(inode, &path_fd);
-> +    if (!fi && (valid & FUSE_SET_ATTR_SIZE)) {
-> +        /* We need an O_RDWR FD for ftruncate() */
-> +        res = lo_inode_open(lo, inode, O_RDWR, &rw_fd);
-> +        if (res >= 0) {
-> +            temp_fd_copy(&rw_fd, &path_fd);
-
-I am lost here. If lo_inode_open() failed, why are we calling this
-temp_fd_copy()? path_fd is not even a valid fd yet.
-
-Still beats me that why open rw_fd now instead of down in
-FUSE_SET_ATTR_SIZE block. I think we had this discussion and you
-had some reasons to move it up.
-
-Vivek
-
-> +        }
-> +    } else {
-> +        res = lo_inode_fd(inode, &path_fd);
+>  tools/virtiofsd/fuse_virtio.c | 27 ++++++++++++++++++++++++++-
+>  1 file changed, 26 insertions(+), 1 deletion(-)
+>
+> diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+> index c67c2e0e7a..a87e88e286 100644
+> --- a/tools/virtiofsd/fuse_virtio.c
+> +++ b/tools/virtiofsd/fuse_virtio.c
+> @@ -826,6 +826,11 @@ static void fv_queue_cleanup_thread(struct fv_VuDev *vud, int qidx)
+>      assert(qidx < vud->nqueues);
+>      ourqi = vud->qi[qidx];
+>
+> +    /* Queue is already stopped */
+> +    if (!ourqi) {
+> +        return;
 > +    }
->      if (res < 0) {
->          saverr = -res;
->          goto out_err;
-> @@ -916,18 +930,12 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
->          if (fi) {
->              truncfd = fd;
->          } else {
-> -            truncfd = lo_inode_open(lo, inode, O_RDWR);
-> -            if (truncfd < 0) {
-> -                saverr = -truncfd;
-> -                goto out_err;
-> -            }
-> +            assert(rw_fd.fd >= 0);
-> +            truncfd = rw_fd.fd;
->          }
->  
->          saverr = drop_security_capability(lo, truncfd);
->          if (saverr) {
-> -            if (!fi) {
-> -                close(truncfd);
-> -            }
->              goto out_err;
->          }
->  
-> @@ -935,9 +943,6 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
->              res = drop_effective_cap("FSETID", &cap_fsetid_dropped);
->              if (res != 0) {
->                  saverr = res;
-> -                if (!fi) {
-> -                    close(truncfd);
-> -                }
->                  goto out_err;
->              }
->          }
-> @@ -950,9 +955,6 @@ static void lo_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
->                  fuse_log(FUSE_LOG_ERR, "Failed to gain CAP_FSETID\n");
->              }
->          }
-> -        if (!fi) {
-> -            close(truncfd);
-> -        }
->          if (res == -1) {
->              goto out_err;
->          }
-> @@ -1840,11 +1842,13 @@ static struct lo_dirp *lo_dirp(fuse_req_t req, struct fuse_file_info *fi)
->  static void lo_opendir(fuse_req_t req, fuse_ino_t ino,
->                         struct fuse_file_info *fi)
->  {
-> +    g_auto(TempFd) rd_fd = TEMP_FD_INIT;
->      int error = ENOMEM;
->      struct lo_data *lo = lo_data(req);
->      struct lo_inode *inode;
->      struct lo_dirp *d = NULL;
->      int fd;
-> +    int res;
->      ssize_t fh;
->  
->      inode = lo_inode(req, ino);
-> @@ -1858,14 +1862,16 @@ static void lo_opendir(fuse_req_t req, fuse_ino_t ino,
->          goto out_err;
->      }
->  
-> -    fd = lo_inode_open(lo, inode, O_RDONLY);
-> -    if (fd < 0) {
-> -        error = -fd;
-> +    res = lo_inode_open(lo, inode, O_RDONLY, &rd_fd);
-> +    if (res < 0) {
-> +        error = -res;
->          goto out_err;
->      }
->  
-> +    fd = temp_fd_steal(&rd_fd);
->      d->dp = fdopendir(fd);
->      if (d->dp == NULL) {
-> +        close(fd);
->          goto out_errno;
->      }
->  
-> @@ -1895,8 +1901,6 @@ out_err:
->      if (d) {
->          if (d->dp) {
->              closedir(d->dp);
-> -        } else if (fd != -1) {
-> -            close(fd);
->          }
->          free(d);
->      }
-> @@ -2096,6 +2100,7 @@ static void update_open_flags(int writeback, int allow_direct_io,
->  static int lo_do_open(struct lo_data *lo, struct lo_inode *inode,
->                        int existing_fd, struct fuse_file_info *fi)
->  {
-> +    g_auto(TempFd) opened_fd = TEMP_FD_INIT;
->      ssize_t fh;
->      int fd = existing_fd;
->      int err;
-> @@ -2112,16 +2117,18 @@ static int lo_do_open(struct lo_data *lo, struct lo_inode *inode,
->              }
->          }
->  
-> -        fd = lo_inode_open(lo, inode, fi->flags);
-> +        err = lo_inode_open(lo, inode, fi->flags, &opened_fd);
->  
->          if (cap_fsetid_dropped) {
->              if (gain_effective_cap("FSETID")) {
->                  fuse_log(FUSE_LOG_ERR, "Failed to gain CAP_FSETID\n");
->              }
->          }
-> -        if (fd < 0) {
-> -            return -fd;
-> +        if (err < 0) {
-> +            return -err;
->          }
-> +        fd = temp_fd_steal(&opened_fd);
 > +
->          if (fi->flags & (O_TRUNC)) {
->              int err = drop_security_capability(lo, fd);
->              if (err) {
-> @@ -2231,8 +2238,9 @@ static struct lo_inode_plock *lookup_create_plock_ctx(struct lo_data *lo,
->                                                        uint64_t lock_owner,
->                                                        pid_t pid, int *err)
+>      /* qidx == 1 is the notification queue if notifications are enabled */
+>      if (!se->notify_enabled || qidx != 1) {
+>          /* Kill the thread */
+> @@ -847,14 +852,25 @@ static void fv_queue_cleanup_thread(struct fv_VuDev *vud, int qidx)
+>
+>  static void stop_all_queues(struct fv_VuDev *vud)
 >  {
-> +    g_auto(TempFd) rw_fd = TEMP_FD_INIT;
->      struct lo_inode_plock *plock;
-> -    int fd;
-> +    int res;
->  
->      plock =
->          g_hash_table_lookup(inode->posix_locks, GUINT_TO_POINTER(lock_owner));
-> @@ -2249,15 +2257,15 @@ static struct lo_inode_plock *lookup_create_plock_ctx(struct lo_data *lo,
->  
->      /* Open another instance of file which can be used for ofd locks. */
->      /* TODO: What if file is not writable? */
-> -    fd = lo_inode_open(lo, inode, O_RDWR);
-> -    if (fd < 0) {
-> -        *err = -fd;
-> +    res = lo_inode_open(lo, inode, O_RDWR, &rw_fd);
-> +    if (res < 0) {
-> +        *err = -res;
->          free(plock);
->          return NULL;
->      }
->  
->      plock->lock_owner = lock_owner;
-> -    plock->fd = fd;
-> +    plock->fd = temp_fd_steal(&rw_fd);
->      g_hash_table_insert(inode->posix_locks, GUINT_TO_POINTER(plock->lock_owner),
->                          plock);
->      return plock;
-> @@ -2473,6 +2481,7 @@ static void lo_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
->  static void lo_fsync(fuse_req_t req, fuse_ino_t ino, int datasync,
->                       struct fuse_file_info *fi)
->  {
-> +    g_auto(TempFd) rw_fd = TEMP_FD_INIT;
->      struct lo_inode *inode = lo_inode(req, ino);
->      struct lo_data *lo = lo_data(req);
->      int res;
-> @@ -2487,11 +2496,12 @@ static void lo_fsync(fuse_req_t req, fuse_ino_t ino, int datasync,
->      }
->  
->      if (!fi) {
-> -        fd = lo_inode_open(lo, inode, O_RDWR);
-> -        if (fd < 0) {
-> -            res = -fd;
-> +        res = lo_inode_open(lo, inode, O_RDWR, &rw_fd);
-> +        if (res < 0) {
-> +            res = -res;
->              goto out;
->          }
-> +        fd = rw_fd.fd;
->      } else {
->          fd = lo_fi_fd(req, fi);
->      }
-> @@ -2501,9 +2511,6 @@ static void lo_fsync(fuse_req_t req, fuse_ino_t ino, int datasync,
->      } else {
->          res = fsync(fd) == -1 ? errno : 0;
->      }
-> -    if (!fi) {
-> -        close(fd);
-> -    }
->  out:
->      lo_inode_put(lo, &inode);
->      fuse_reply_err(req, res);
-> @@ -3065,7 +3072,6 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
->      struct lo_inode *inode;
->      ssize_t ret;
->      int saverr;
-> -    int fd = -1;
->  
->      if (block_xattr(lo, in_name)) {
->          fuse_reply_err(req, EOPNOTSUPP);
-> @@ -3117,12 +3123,14 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
->       * Otherwise, call fchdir() to avoid open().
->       */
->      if (S_ISREG(inode->filetype) || S_ISDIR(inode->filetype)) {
-> -        fd = lo_inode_open(lo, inode, O_RDONLY);
-> -        if (fd < 0) {
-> -            saverr = -fd;
-> +        g_auto(TempFd) rd_fd = TEMP_FD_INIT;
+> +    struct fuse_session *se = vud->se;
 > +
-> +        ret = lo_inode_open(lo, inode, O_RDONLY, &rd_fd);
-> +        if (ret < 0) {
-> +            saverr = -ret;
->              goto out;
+>      for (int i = 0; i < vud->nqueues; i++) {
+>          if (!vud->qi[i]) {
+>              continue;
 >          }
-> -        ret = fgetxattr(fd, name, value, size);
-> +        ret = fgetxattr(rd_fd.fd, name, value, size);
->          saverr = ret == -1 ? errno : 0;
->      } else {
->          g_auto(TempFd) path_fd = TEMP_FD_INIT;
-> @@ -3153,10 +3161,6 @@ static void lo_getxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
->          fuse_reply_xattr(req, ret);
+>
+> +        /* Shutdown notification queue in the end */
+> +        if (se->notify_enabled && i == 1) {
+> +            continue;
+> +        }
+>          fuse_log(FUSE_LOG_INFO, "%s: Stopping queue %d thread\n", __func__, i);
+>          fv_queue_cleanup_thread(vud, i);
 >      }
->  out_free:
-> -    if (fd >= 0) {
-> -        close(fd);
-> -    }
-> -
->      lo_inode_put(lo, &inode);
->      return;
->  
-> @@ -3176,7 +3180,6 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
->      struct lo_inode *inode;
->      ssize_t ret;
->      int saverr;
-> -    int fd = -1;
->  
->      inode = lo_inode(req, ino);
->      if (!inode) {
-> @@ -3200,12 +3203,14 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
->      }
->  
->      if (S_ISREG(inode->filetype) || S_ISDIR(inode->filetype)) {
-> -        fd = lo_inode_open(lo, inode, O_RDONLY);
-> -        if (fd < 0) {
-> -            saverr = -fd;
-> +        g_auto(TempFd) rd_fd = TEMP_FD_INIT;
 > +
-> +        ret = lo_inode_open(lo, inode, O_RDONLY, &rd_fd);
-> +        if (ret < 0) {
-> +            saverr = -ret;
->              goto out;
->          }
-> -        ret = flistxattr(fd, value, size);
-> +        ret = flistxattr(rd_fd.fd, value, size);
->          saverr = ret == -1 ? errno : 0;
->      } else {
->          g_auto(TempFd) path_fd = TEMP_FD_INIT;
-> @@ -3294,10 +3299,6 @@ static void lo_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
->          fuse_reply_xattr(req, ret);
->      }
->  out_free:
-> -    if (fd >= 0) {
-> -        close(fd);
-> -    }
-> -
->      lo_inode_put(lo, &inode);
->      return;
->  
-> @@ -3312,14 +3313,14 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
->                          const char *value, size_t size, int flags,
->                          uint32_t extra_flags)
->  {
-> -    g_auto(TempFd) path_fd = TEMP_FD_INIT;
-> +    g_auto(TempFd) path_fd = TEMP_FD_INIT; /* O_PATH fd */
-> +    g_auto(TempFd) rd_fd = TEMP_FD_INIT; /* O_RDONLY fd */
->      const char *name;
->      char *mapped_name;
->      struct lo_data *lo = lo_data(req);
->      struct lo_inode *inode;
->      ssize_t ret;
->      int saverr;
-> -    int fd = -1;
->      bool switched_creds = false;
->      bool cap_fsetid_dropped = false;
->      struct lo_cred old = {};
-> @@ -3364,9 +3365,9 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
->       * setxattr() on the link's filename there.
->       */
->      if (S_ISREG(inode->filetype) || S_ISDIR(inode->filetype)) {
-> -        fd = lo_inode_open(lo, inode, O_RDONLY);
-> -        if (fd < 0) {
-> -            saverr = -fd;
-> +        ret = lo_inode_open(lo, inode, O_RDONLY, &rd_fd);
-> +        if (ret < 0) {
-> +            saverr = -ret;
->              goto out;
->          }
->      } else {
-> @@ -3401,8 +3402,8 @@ static void lo_setxattr(fuse_req_t req, fuse_ino_t ino, const char *in_name,
->          }
->          switched_creds = true;
->      }
-> -    if (fd >= 0) {
-> -        ret = fsetxattr(fd, name, value, size, flags);
-> +    if (rd_fd.fd >= 0) {
-> +        ret = fsetxattr(rd_fd.fd, name, value, size, flags);
->          saverr = ret == -1 ? errno : 0;
->      } else {
->          char procname[64];
-> @@ -3424,10 +3425,6 @@ out:
->          FCHDIR_NOFAIL(lo->root.fd);
->      }
->  
-> -    if (fd >= 0) {
-> -        close(fd);
-> -    }
-> -
->      lo_inode_put(lo, &inode);
->      g_free(mapped_name);
->      fuse_reply_err(req, saverr);
-> @@ -3442,7 +3439,6 @@ static void lo_removexattr(fuse_req_t req, fuse_ino_t ino, const char *in_name)
->      struct lo_inode *inode;
->      ssize_t ret;
->      int saverr;
-> -    int fd = -1;
->  
->      if (block_xattr(lo, in_name)) {
->          fuse_reply_err(req, EOPNOTSUPP);
-> @@ -3478,12 +3474,14 @@ static void lo_removexattr(fuse_req_t req, fuse_ino_t ino, const char *in_name)
->               name);
->  
->      if (S_ISREG(inode->filetype) || S_ISDIR(inode->filetype)) {
-> -        fd = lo_inode_open(lo, inode, O_RDONLY);
-> -        if (fd < 0) {
-> -            saverr = -fd;
-> +        g_auto(TempFd) rd_fd = TEMP_FD_INIT;
+> +    if (se->notify_enabled) {
+> +        fuse_log(FUSE_LOG_INFO, "%s: Stopping queue %d thread\n", __func__, 1);
+> +        fv_queue_cleanup_thread(vud, 1);
+> +    }
+>  }
+>
+>  /* Callback from libvhost-user on start or stop of a queue */
+> @@ -934,7 +950,16 @@ static void fv_queue_set_started(VuDev *dev, int qidx, bool started)
+>           * the queue thread doesn't block in virtio_send_msg().
+>           */
+>          vu_dispatch_unlock(vud);
+> -        fv_queue_cleanup_thread(vud, qidx);
 > +
-> +        ret = lo_inode_open(lo, inode, O_RDONLY, &rd_fd);
-> +        if (ret < 0) {
-> +            saverr = -ret;
->              goto out;
->          }
-> -        ret = fremovexattr(fd, name);
-> +        ret = fremovexattr(rd_fd.fd, name);
->          saverr = ret == -1 ? errno : 0;
->      } else {
->          g_auto(TempFd) path_fd = TEMP_FD_INIT;
-> @@ -3502,10 +3500,6 @@ static void lo_removexattr(fuse_req_t req, fuse_ino_t ino, const char *in_name)
+> +        /*
+> +         * If queue 0 is being shutdown, treat it as if device is being
+> +         * shutdown and stop all queues.
+> +         */
+> +        if (qidx == 0) {
+> +            stop_all_queues(vud);
+> +        } else {
+> +            fv_queue_cleanup_thread(vud, qidx);
+> +        }
+>          vu_dispatch_wrlock(vud);
 >      }
->  
->  out:
-> -    if (fd >= 0) {
-> -        close(fd);
-> -    }
-> -
->      lo_inode_put(lo, &inode);
->      g_free(mapped_name);
->      fuse_reply_err(req, saverr);
-> -- 
-> 2.31.1
-> 
+>  }
+
+For my education: given that we dropped the write lock above, what prevents
+queue 0 from being shutdown on one thread while another cleans up another
+queue. What makes it safe in that case? I think this is worth a comment.
+
+--
+Cheers,
+Christophe de Dinechin (IRC c3d)
 

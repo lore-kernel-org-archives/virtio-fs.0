@@ -1,12 +1,15 @@
-Date: Mon, 18 Oct 2021 08:52:59 -0400
+Date: Wed, 6 Oct 2021 11:01:03 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YW1uK9J9GzNUbC6S@redhat.com>
-References: <20211014122554.34599-1-dgilbert@redhat.com>
+Message-ID: <YV26L03HvAfMd/VC@redhat.com>
+References: <20210930143850.1188628-1-vgoyal@redhat.com>
+	<20210930143850.1188628-8-vgoyal@redhat.com>
+	<CAJfpegu5Y5X_CcKS9hsoW3ao5+WPJjm-6hsMVEiGU8PjSKy2gg@mail.gmail.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20211014122554.34599-1-dgilbert@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Error on bad socket group name
+In-Reply-To: <CAJfpegu5Y5X_CcKS9hsoW3ao5+WPJjm-6hsMVEiGU8PjSKy2gg@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 7/8] virtiofs: Add new notification type
+	FUSE_NOTIFY_LOCK
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,62 +18,46 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, xiagao@redhat.com
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, linux-fsdevel@vger.kernel.org
 
-On Thu, Oct 14, 2021 at 01:25:54PM +0100, Dr. David Alan Gilbert (git) wrote:
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+On Wed, Oct 06, 2021 at 02:55:16PM +0200, Miklos Szeredi wrote:
+> On Thu, 30 Sept 2021 at 16:39, Vivek Goyal <vgoyal@redhat.com> wrote:
+> >
+> > Add a new notification type FUSE_NOTIFY_LOCK. This notification can be
+> > sent by file server to signifiy that a previous locking request has
+> > completed and actual caller should be woken up.
+> >
+> > As of now we don't support blocking variant of posix locks and daemon
+> > returns -EOPNOTSUPP. Reason being that it can lead to deadlocks.
+> > Virtqueue size is limited and it is possible we fill virtqueue with
+> > all the requests of fcntl(F_SETLKW) and wait for reply. And later a
+> > subsequent unlock request can't make progress because virtqueue is full.
+> > And that means F_SETLKW can't make progress and we are deadlocked.
+> >
+> > This problem is not limited to posix locks only. I think blocking remote
+> > flock and open file description locks should face the same issue. Right
+> > now fuse does not support open file description locks, so its not
+> > a problem. But fuse/virtiofs does support remote flock and they can use
+> > same mechanism too.
+> >
+> > Use notification queue to solve this problem. After submitting lock
+> > request device will send a reply asking requester to wait. Once lock is
+> > available, requester will get a notification saying lock is available.
+> > That way we don't keep the request virtueue busy while we are waiting for
+> > lock and further unlock requests can make progress.
+> >
+> > When we get a reply in response to lock request, we need a way to know
+> > if we need to wait for notification or not. I have overloaded the
+> > fuse_out_header->error field. If value is ->error is 1, that's a signal
+> > to caller to wait for lock notification. Overloading ->error in this way
+> > is not the best way to do it. But I am running out of ideas.
 > 
-> Make the '--socket-group=' option fail if the group name is unknown:
-> 
-> ./tools/virtiofsd/virtiofsd .... --socket-group=zaphod
-> vhost socket: unable to find group 'zaphod'
-> 
-> Reported-by: Xiaoling Gao <xiagao@redhat.com>
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> Since all values besides -511..0 are reserved this seems okay.
+> However this needs to be a named value and added to uapi/linux/fuse.h.
 
-Hi Dave,
+Ok, I will define this value and put in uapi/linux/fuse.h. 
 
-This looks good to me. Just a minor nit for code cleanup. It could
-be done in a separate patch or sometime later as well.
-
-Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
-
-> ---
->  tools/virtiofsd/fuse_virtio.c | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-> index 8f4fd165b9..39eebffb62 100644
-> --- a/tools/virtiofsd/fuse_virtio.c
-> +++ b/tools/virtiofsd/fuse_virtio.c
-> @@ -999,6 +999,13 @@ static int fv_create_listen_socket(struct fuse_session *se)
->                           "vhost socket failed to set group to %s (%d): %m\n",
->                           se->vu_socket_group, g->gr_gid);
->              }
-> +        } else {
-> +            fuse_log(FUSE_LOG_ERR,
-> +                     "vhost socket: unable to find group '%s'\n",
-> +                     se->vu_socket_group);
-> +            close(listen_sock);
-> +            umask(old_umask);
-		^^^
-> +            return -1;
->          }
->      }
->      umask(old_umask);
-
-This umask() call could be moved little early right after bind() call and
-that way we don't have to take care of calling umask(old_umask) in error
-path if group name could not be found.
-
+Thanks
 Vivek
-> -- 
-> 2.31.1
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
-> 
 

@@ -1,14 +1,13 @@
-Date: Tue, 19 Oct 2021 14:57:09 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YW8VBVsCqdUrm+M7@redhat.com>
-References: <20210916084045.31684-1-hreitz@redhat.com>
-	<20210916084045.31684-12-hreitz@redhat.com>
+References: <20210930153037.1194279-1-vgoyal@redhat.com>
+	<20210930153037.1194279-13-vgoyal@redhat.com>
+From: Christophe de Dinechin <dinechin@redhat.com>
+Date: Wed, 06 Oct 2021 17:34:59 +0200
+In-reply-to: <20210930153037.1194279-13-vgoyal@redhat.com>
+Message-ID: <lyr1cyi1re.fsf@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210916084045.31684-12-hreitz@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v4 11/12] virtiofsd: Optionally fill
-	lo_inode.fhandle
+Content-Type: text/plain
+Subject: Re: [Virtio-fs] [PATCH 12/13] virtiofsd: Implement blocking posix
+ locks
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,543 +16,357 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Hanna Reitz <hreitz@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, miklos@szeredi.hu
 
-On Thu, Sep 16, 2021 at 10:40:44AM +0200, Hanna Reitz wrote:
-> When the inode_file_handles option is set, try to generate a file handle
-> for new inodes instead of opening an O_PATH FD.
-> 
-> Being able to open these again will require CAP_DAC_READ_SEARCH, so
-> setting this option will result in us taking that capability.
-> 
-> Generating a file handle returns the mount ID it is valid for.  Opening
-> it will require an FD instead.  We have mount_fds to map an ID to an FD.
-> get_file_handle() scans /proc/self/mountinfo to map mount IDs to their
-> mount points, which we open to get the mount FD we need.  To verify that
-> the resulting FD indeed represents the handle's mount ID, we use
-> statx().  Therefore, using file handles requires statx() support.
-> 
-> Signed-off-by: Hanna Reitz <hreitz@redhat.com>
+
+On 2021-09-30 at 11:30 -04, Vivek Goyal <vgoyal@redhat.com> wrote...
+> As of now we don't support fcntl(F_SETLKW) and if we see one, we return
+> -EOPNOTSUPP.
+>
+> Change that by accepting these requests and returning a reply
+> immediately asking caller to wait. Once lock is available, send a
+> notification to the waiter indicating lock is available.
+>
+> In response to lock request, we are returning error value as "1", which
+> signals to client to queue the lock request internally and later client
+> will get a notification which will signal lock is taken (or error). And
+> then fuse client should wake up the guest process.
+>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> Signed-off-by: Ioannis Angelakopoulos <iangelak@redhat.com>
 > ---
->  tools/virtiofsd/helper.c              |   3 +
->  tools/virtiofsd/passthrough_ll.c      | 297 ++++++++++++++++++++++++--
->  tools/virtiofsd/passthrough_seccomp.c |   1 +
->  3 files changed, 289 insertions(+), 12 deletions(-)
-> 
-> diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
-> index a8295d975a..311f05c7ee 100644
-> --- a/tools/virtiofsd/helper.c
-> +++ b/tools/virtiofsd/helper.c
-> @@ -187,6 +187,9 @@ void fuse_cmdline_help(void)
->             "                               default: no_allow_direct_io\n"
->             "    -o announce_submounts      Announce sub-mount points to the guest\n"
->             "    -o posix_acl/no_posix_acl  Enable/Disable posix_acl. (default: disabled)\n"
-> +           "    -o inode_file_handles      Use file handles to reference inodes\n"
-> +           "                               instead of O_PATH file descriptors\n"
-> +           "                               (adds +dac_read_search to modcaps)\n"
->             );
+>  tools/virtiofsd/fuse_lowlevel.c  | 37 ++++++++++++++++-
+>  tools/virtiofsd/fuse_lowlevel.h  | 26 ++++++++++++
+>  tools/virtiofsd/fuse_virtio.c    | 50 ++++++++++++++++++++---
+>  tools/virtiofsd/passthrough_ll.c | 70 ++++++++++++++++++++++++++++----
+>  4 files changed, 167 insertions(+), 16 deletions(-)
+>
+> diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+> index e4679c73ab..2e7f4b786d 100644
+> --- a/tools/virtiofsd/fuse_lowlevel.c
+> +++ b/tools/virtiofsd/fuse_lowlevel.c
+> @@ -179,8 +179,8 @@ int fuse_send_reply_iov_nofree(fuse_req_t req, int error, struct iovec *iov,
+>          .unique = req->unique,
+>          .error = error,
+>      };
+> -
+> -    if (error <= -1000 || error > 0) {
+> +    /* error = 1 has been used to signal client to wait for notificaiton */
+> +    if (error <= -1000 || error > 1) {
+
+What about adding a #define for that special value 1?
+
+(and while we are at it, the -1000 does not look too good either, that could
+be a separate cleanup patch)
+
+>          fuse_log(FUSE_LOG_ERR, "fuse: bad error value: %i\n", error);
+>          out.error = -ERANGE;
+>      }
+> @@ -290,6 +290,11 @@ int fuse_reply_err(fuse_req_t req, int err)
+>      return send_reply(req, -err, NULL, 0);
 >  }
->  
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index b7d6aa7f9d..e86fad8b2f 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -206,6 +206,8 @@ struct lo_data {
->      /* Maps (integer) mount IDs to lo_mount_fd objects */
->      GHashTable *mount_fds;
->      pthread_rwlock_t mount_fds_lock;
-> +
-> +    int inode_file_handles;
->  };
->  
->  /**
-> @@ -262,6 +264,10 @@ static const struct fuse_opt lo_opts[] = {
->      { "no_killpriv_v2", offsetof(struct lo_data, user_killpriv_v2), 0 },
->      { "posix_acl", offsetof(struct lo_data, user_posix_acl), 1 },
->      { "no_posix_acl", offsetof(struct lo_data, user_posix_acl), 0 },
-> +    { "inode_file_handles", offsetof(struct lo_data, inode_file_handles), 1 },
-> +    { "no_inode_file_handles",
-> +      offsetof(struct lo_data, inode_file_handles),
-> +      0 },
->      FUSE_OPT_END
->  };
->  static bool use_syslog = false;
-> @@ -359,8 +365,15 @@ static void free_lo_mount_fd(gpointer data)
->   *
->   * Pass @drop_mount_fd_ref == true if and only if this handle has a
->   * strong reference to an lo_mount_fd object in the mount_fds hash
-> - * table.  That is always the case for file handles stored in lo_inode
-> - * objects.
-> + * table, i.e. if this file handle has been returned by a
-> + * get_file_handle() call where *can_open_handle was returned to be
-> + * true.  (That is always the case for file handles stored in lo_inode
-> + * objects, because those file handles must be open-able.)
-> + *
-> + * Conversely, pass @drop_mount_fd_ref == false if and only if this
-> + * file handle has been returned by a get_file_handle() call where
-> + * either NULL was passed for @can_open_handle, or where
-> + * *can_open_handle was returned to be false.
->   */
->  static void release_file_handle(struct lo_data *lo, struct lo_fhandle *fh,
->                                  bool drop_mount_fd_ref)
-> @@ -399,6 +412,196 @@ static void release_file_handle(struct lo_data *lo, struct lo_fhandle *fh,
->      g_free(fh);
->  }
->  
-> +/**
-> + * Generate a file handle for the given dirfd/name combination.
-> + *
-> + * If mount_fds does not yet contain an entry for the handle's mount
-> + * ID, (re)open dirfd/name in O_RDONLY mode and add it to mount_fds
-> + * as the FD for that mount ID.  (That is the file that we have
-> + * generated a handle for, so it should be representative for the
-> + * mount ID.  However, to be sure (and to rule out races), we use
-> + * statx() to verify that our assumption is correct.)
-> + *
-> + * Opening a mount FD can fail in various ways, and independently of
-> + * whether generating a file handle was possible.  Many callers only
-> + * care about getting a file handle for a lookup, though, and so do
-> + * not necessarily need it to be usable.  (You need a valid mount FD
-> + * for the handle to be usable.)
-> + * *can_open_handle will be set to true if the file handle can be
-> + * opened (i.e., we have a mount FD for it), and to false otherwise.
-> + * By passing NULL for @can_open_handle, the caller indicates that
-> + * they do not care about the handle being open-able, and so
-> + * generating a mount FD will be skipped altogether.
-> + *
-> + * File handles must be freed with release_file_handle().
-> + */
-> +static struct lo_fhandle *get_file_handle(struct lo_data *lo,
-> +                                          int dirfd, const char *name,
-> +                                          bool *can_open_handle)
+>
+> +int fuse_reply_wait(fuse_req_t req)
 > +{
-> +    /* We need statx() to verify the mount ID */
-> +#if defined(CONFIG_STATX) && defined(STATX_MNT_ID)
-> +    int root_path_fd = -1;
-> +    int mount_fd = -1;
-> +    struct lo_fhandle *fh = NULL;
-> +    struct lo_mount_fd *mfd;
-> +    int ret;
-> +
-> +    if (!lo->use_statx || !lo->inode_file_handles || !lo->mountinfo_fp) {
-> +        goto fail_handle;
-> +    }
-> +
-> +    fh = g_new0(struct lo_fhandle, 1);
-> +
-> +    fh->handle.handle_bytes = sizeof(fh->padding) - sizeof(fh->handle);
-> +    ret = name_to_handle_at(dirfd, name, &fh->handle, &fh->mount_id,
-> +                            AT_EMPTY_PATH);
-> +    if (ret < 0) {
-> +        goto fail_handle;
-> +    }
-> +
-> +    if (!can_open_handle) {
-> +        /* No need to generate a mount FD if the caller does not care */
-> +        return fh;
-> +    }
-> +
-> +    if (pthread_rwlock_rdlock(&lo->mount_fds_lock)) {
-> +        goto fail_mount_fd;
-> +    }
-> +
-> +    mfd = g_hash_table_lookup(lo->mount_fds, GINT_TO_POINTER(fh->mount_id));
-> +    if (mfd) {
-> +        g_atomic_int_inc(&mfd->refcount);
-> +    } else {
-> +        char *mi_line = NULL;
-> +        size_t mi_line_len = 0;
-> +        char *mount_root = NULL;
-> +        struct statx stx;
-> +        char procname[64];
-> +
-> +        pthread_rwlock_unlock(&lo->mount_fds_lock);
-> +
-> +        rewind(lo->mountinfo_fp);
-> +        while (!mount_root) {
-> +            ssize_t read_count;
-> +            int scan_count;
-> +            int mount_id;
-> +
-> +            read_count = getline(&mi_line, &mi_line_len, lo->mountinfo_fp);
-> +            if (read_count < 0) {
-> +                break;
-> +            }
-> +
-> +            scan_count = sscanf(mi_line, "%d %*d %*d:%*d %*s %ms",
-> +                                &mount_id, &mount_root);
-> +            if (scan_count != 2 || mount_id != fh->mount_id) {
-> +                free(mount_root);
-> +                mount_root = NULL;
-> +            }
-> +        }
-> +        free(mi_line);
-> +
-> +        if (!mount_root) {
-> +            goto fail_mount_fd;
-> +        }
-> +
-> +        root_path_fd = open(mount_root, O_PATH);
+> +    return send_reply(req, 1, NULL, 0);
 
-So root_path_fd is basically O_PATH fd for mount point. And you want to
-first open it O_PATH so that you can check that it is either regular
-file or directory before opening it  O_RDONLY. Hmm.., I guess its little
-more complicated but safe.
+... to be used here too.
 
-BTW, if O_RDONLY for mount point is called mount_fd, then calling O_PATH
-fd mount_path_fd will probably be better. A minor nit. You can change it
-if you end up respinning patches.
-
-> +        free(mount_root);
-> +        if (root_path_fd < 0) {
-> +            goto fail_mount_fd;
-
-We seem to have initialized fh already. In case of failure, fail_mount_fd,
-should we free fh and set fh = NULL. Or is it intentional that you still
-want to return fh even if mount_fd could not be opened. What's the use
-case.
-
-> +        }
-> +
-> +        ret = statx(root_path_fd, "", AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW,
-> +                    STATX_TYPE | STATX_MNT_ID, &stx);
-> +        if (ret < 0) {
-> +            if (errno == ENOSYS) {
-> +                lo->use_statx = false;
-> +                fuse_log(FUSE_LOG_WARNING,
-> +                         "statx() does not work: Will not be able to use file "
-> +                         "handles for inodes\n");
-> +            }
-> +            goto fail_mount_fd;
-> +        }
-> +        if (!(stx.stx_mask & STATX_MNT_ID) || stx.stx_mnt_id != fh->mount_id) {
-> +            /*
-> +             * Perhaps a TOCTTOU problem.  Just return a non-openable file
-> +             * handle this time and retry for the next handle that we want to
-> +             * generate for this mount.
-> +             */
-> +            goto fail_mount_fd;
-> +        }
-> +        if (!(stx.stx_mask & STATX_TYPE) ||
-> +            !(S_ISREG(stx.stx_mode) || S_ISDIR(stx.stx_mode)))
-> +        {
-> +            /*
-> +             * We must not open special files with anything but O_PATH, so we
-> +             * cannot use this file for mount_fds.  (Note that filesystems can
-> +             * have special files as their root node, so this case can happen.)
-> +             * Just return a failure in such a case and let the lo_inode have
-> +             * an O_PATH fd instead of a file handle.
-> +             */
-> +            goto fail_mount_fd;
-> +        }
-> +
-> +        /* Now that we know this fd is safe to open, do it */
-> +        snprintf(procname, sizeof(procname), "%i", root_path_fd);
-> +        mount_fd = openat(lo->proc_self_fd, procname, O_RDONLY);
-> +        if (mount_fd < 0) {
-> +            goto fail_mount_fd;
-> +        }
-> +
-> +        if (pthread_rwlock_wrlock(&lo->mount_fds_lock)) {
-> +            goto fail_mount_fd;
-> +        }
-> +
-> +        /* Check again, might have changed */
-> +        if (!g_hash_table_contains(lo->mount_fds,
-> +                                   GINT_TO_POINTER(fh->mount_id))) {
-> +            mfd = g_new(struct lo_mount_fd, 1);
-> +
-> +            *mfd = (struct lo_mount_fd) {
-> +                .fd = mount_fd,
-> +                .refcount = 1,
-> +            };
-> +            mount_fd = -1; /* reference moved to *mfd */
-> +
-> +            g_hash_table_insert(lo->mount_fds,
-> +                                GINT_TO_POINTER(fh->mount_id),
-> +                                mfd);
-> +        }
-> +    }
-> +    pthread_rwlock_unlock(&lo->mount_fds_lock);
-> +
-> +    assert(can_open_handle != NULL);
-> +    *can_open_handle = true;
-> +
-> +    goto out;
-> +
-> +fail_handle:
-> +    release_file_handle(lo, fh, false);
-> +    fh = NULL;
-> +
-> +fail_mount_fd:
-> +    if (can_open_handle) {
-> +        *can_open_handle = false;
-> +    }
-> +
-> +out:
-> +    if (root_path_fd >= 0) {
-> +        close(root_path_fd);
-> +    }
-> +    if (mount_fd >= 0) {
-> +        close(mount_fd);
-> +    }
-> +    return fh;
-> +#else /* defined(CONFIG_STATX) && defined(STATX_MNT_ID) */
-> +    if (can_open_handle) {
-> +        *can_open_handle = false;
-> +    }
-> +    return NULL;
-> +#endif
 > +}
 > +
->  /**
->   * Open the given file handle with the given flags.
->   *
-> @@ -1244,6 +1447,11 @@ static int do_statx(struct lo_data *lo, int dirfd, const char *pathname,
->              return -1;
->          }
->          lo->use_statx = false;
-> +        if (lo->inode_file_handles) {
-> +            fuse_log(FUSE_LOG_WARNING,
-> +                     "statx() does not work: Will not be able to use file "
-> +                     "handles for inodes\n");
-> +        }
->          /* fallback */
->      }
->  #endif
-> @@ -1273,6 +1481,8 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
->      struct lo_data *lo = lo_data(req);
->      struct lo_inode *inode = NULL;
->      struct lo_inode *dir = lo_inode(req, parent);
-> +    struct lo_fhandle *fh = NULL;
-> +    bool can_open_handle = false;
->  
->      if (inodep) {
->          *inodep = NULL; /* in case there is an error */
-> @@ -1302,13 +1512,26 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
->          goto out;
->      }
->  
-> -    newfd = openat(dir_path_fd.fd, name, O_PATH | O_NOFOLLOW);
-> -    if (newfd == -1) {
-> -        goto out_err;
-> +    fh = get_file_handle(lo, dir_path_fd.fd, name, &can_open_handle);
-> +    if (!fh || !can_open_handle) {
-> +        /*
-> +         * If we will not be able to open the file handle again
-> +         * (can_open_handle is false), open an FD that we can put into
-> +         * lo_inode (in case we need to create a new lo_inode).
-> +         */
-> +        newfd = openat(dir_path_fd.fd, name, O_PATH | O_NOFOLLOW);
-> +        if (newfd == -1) {
-> +            goto out_err;
-> +        }
->      }
->  
-> -    res = do_statx(lo, newfd, "", &e->attr, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW,
-> -                   &mnt_id);
-> +    if (newfd >= 0) {
-> +        res = do_statx(lo, newfd, "", &e->attr,
-> +                       AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW, &mnt_id);
-> +    } else {
-> +        res = do_statx(lo, dir_path_fd.fd, name, &e->attr,
-> +                       AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW, &mnt_id);
-> +    }
->      if (res == -1) {
->          goto out_err;
->      }
-> @@ -1318,9 +1541,19 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
->          e->attr_flags |= FUSE_ATTR_SUBMOUNT;
-
-Can this FUSE_ATTR_SUBMOUNT check be racy w.r.t file handles. I mean
-say we open the file handle, and before we call do_statx(), another
-mount shows up on the directory in queustion. So stats now belong
-to file in new mount and we will think it is a SUBMOUNT. So effectively
-now we have fh belonging to old file but stats belonging to new file
-in new mount?
-
->      }
->  
-> -    inode = lo_find(lo, NULL, &e->attr, mnt_id);
-> +    /*
-> +     * Note that fh is always NULL if lo->inode_file_handles is false,
-> +     * and so we will never do a lookup by file handle here, and
-> +     * lo->inodes_by_handle will always remain empty.  We only need
-> +     * this map when we do not have an O_PATH fd open for every
-> +     * lo_inode, though, so if inode_file_handles is false, we do not
-> +     * need that map anyway.
-> +     */
-> +    inode = lo_find(lo, fh, &e->attr, mnt_id);
->      if (inode) {
-> -        close(newfd);
-> +        if (newfd != -1) {
-> +            close(newfd);
-> +        }
->      } else {
->          inode = calloc(1, sizeof(struct lo_inode));
->          if (!inode) {
-> @@ -1338,6 +1571,10 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
->  
->          inode->nlookup = 1;
->          inode->fd = newfd;
-> +        if (can_open_handle) {
-> +            inode->fhandle = fh;
-> +            fh = NULL; /* owned by the lo_inode now */
-> +        }
->          inode->key.ino = e->attr.st_ino;
->          inode->key.dev = e->attr.st_dev;
->          inode->key.mnt_id = mnt_id;
-> @@ -1349,6 +1586,9 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
->          pthread_mutex_lock(&lo->mutex);
->          inode->fuse_ino = lo_add_inode_mapping(req, inode);
->          g_hash_table_insert(lo->inodes_by_ids, &inode->key, inode);
-> +        if (inode->fhandle) {
-> +            g_hash_table_insert(lo->inodes_by_handle, inode->fhandle, inode);
-> +        }
->          pthread_mutex_unlock(&lo->mutex);
->      }
->      e->ino = inode->fuse_ino;
-> @@ -1362,6 +1602,8 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
->  
->      lo_inode_put(lo, &dir);
->  
-> +    release_file_handle(lo, fh, can_open_handle);
-
-We transferred ownership of fh to inode (inode->fhandle). Should we be
-releasing it now? What am I missing.
-
-> +
->      fuse_log(FUSE_LOG_DEBUG, "  %lli/%s -> %lli\n", (unsigned long long)parent,
->               name, (unsigned long long)e->ino);
->  
-> @@ -1373,6 +1615,7 @@ out:
->      if (newfd != -1) {
->          close(newfd);
->      }
-> +    release_file_handle(lo, fh, can_open_handle);
->      lo_inode_put(lo, &inode);
->      lo_inode_put(lo, &dir);
->      return saverr;
-> @@ -1695,6 +1938,7 @@ static struct lo_inode *lookup_name(fuse_req_t req, fuse_ino_t parent,
->      int res;
->      uint64_t mnt_id;
->      struct stat attr;
-> +    struct lo_fhandle *fh;
->      struct lo_data *lo = lo_data(req);
->      struct lo_inode *dir = lo_inode(req, parent);
->      struct lo_inode *inode = NULL;
-> @@ -1708,13 +1952,17 @@ static struct lo_inode *lookup_name(fuse_req_t req, fuse_ino_t parent,
->          goto out;
->      }
->  
-> +    fh = get_file_handle(lo, dir_path_fd.fd, name, NULL);
-> +    /* Ignore errors, this is just an optional key for the lookup */
-> +
->      res = do_statx(lo, dir_path_fd.fd, name, &attr, AT_SYMLINK_NOFOLLOW,
->                     &mnt_id);
->      if (res == -1) {
->          goto out;
->      }
->  
-> -    inode = lo_find(lo, NULL, &attr, mnt_id);
-> +    inode = lo_find(lo, fh, &attr, mnt_id);
-> +    release_file_handle(lo, fh, false);
->  
->  out:
->      lo_inode_put(lo, &dir);
-> @@ -1882,6 +2130,9 @@ static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
->      if (!inode->nlookup) {
->          lo_map_remove(&lo->ino_map, inode->fuse_ino);
->          g_hash_table_remove(lo->inodes_by_ids, &inode->key);
-> +        if (inode->fhandle) {
-> +            g_hash_table_remove(lo->inodes_by_handle, inode->fhandle);
-> +        }
->          if (lo->posix_lock) {
->              if (g_hash_table_size(inode->posix_locks)) {
->                  fuse_log(FUSE_LOG_WARNING, "Hash table is not empty\n");
-> @@ -3978,8 +4229,11 @@ static void setup_mounts(const char *source)
->  /*
->   * Only keep capabilities in allowlist that are needed for file system operation
->   * The (possibly NULL) modcaps_in string passed in is free'd before exit.
-> + *
-> + * Passing true for cap_dac_read_search adds CAP_DAC_READ_SEARCH to the
-> + * allowlist.
->   */
-> -static void setup_capabilities(char *modcaps_in)
-> +static void setup_capabilities(char *modcaps_in, bool cap_dac_read_search)
+>  void fuse_reply_none(fuse_req_t req)
 >  {
->      char *modcaps = modcaps_in;
->      pthread_mutex_lock(&cap.mutex);
-> @@ -4012,6 +4266,17 @@ static void setup_capabilities(char *modcaps_in)
->          exit(1);
->      }
->  
-> +    /*
-> +     * If we need CAP_DAC_READ_SEARCH (for file handles), add that, too.
-> +     */
-> +    if (cap_dac_read_search &&
-> +        capng_update(CAPNG_ADD, CAPNG_PERMITTED | CAPNG_EFFECTIVE,
-> +                     CAP_DAC_READ_SEARCH)) {
-> +        fuse_log(FUSE_LOG_ERR, "%s: capng_update failed for "
-> +                 "CAP_DAC_READ_SEARCH\n", __func__);
-> +        exit(1);
-> +    }
-> +
->      /*
->       * The modcaps option is a colon separated list of caps,
->       * each preceded by either + or -.
-> @@ -4158,7 +4423,7 @@ static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
->      }
->  
->      setup_seccomp(enable_syslog);
-> -    setup_capabilities(g_strdup(lo->modcaps));
-> +    setup_capabilities(g_strdup(lo->modcaps), lo->inode_file_handles);
+>      fuse_free_req(req);
+> @@ -2165,6 +2170,34 @@ static void do_destroy(fuse_req_t req, fuse_ino_t nodeid,
+>      send_reply_ok(req, NULL, 0);
 >  }
->  
->  /* Set the maximum number of open file descriptors */
-> @@ -4498,6 +4763,14 @@ int main(int argc, char *argv[])
->  
->      lo.use_statx = true;
->  
-> +#if !defined(CONFIG_STATX) || !defined(STATX_MNT_ID)
-> +    if (lo.inode_file_handles) {
-> +        fuse_log(FUSE_LOG_WARNING,
-> +                 "No statx() or mount ID support: Will not be able to use file "
-> +                 "handles for inodes\n");
+>
+> +static int send_notify_iov(struct fuse_session *se, int notify_code,
+> +                           struct iovec *iov, int count)
+> +{
+> +    struct fuse_out_header out;
+> +    if (!se->got_init) {
+> +        return -ENOTCONN;
 > +    }
-
-Again, I think we should error out if user asked for file handle support
-explicitly and we can't enable it. But if we end up enabling by default,
-it probably is fine to just log a message and not use it.
-
-This begs the question what happens if filesystem does not support the
-file handles. Ideally, I would think that we can error out. But for
-submounts check will happen much later. For root mount atleast we
-should be able to check at startup time and make sure file handles are
-supported by filesystem.
-
-Thanks
-Vivek
-
-> +#endif
+> +    out.unique = 0;
+> +    out.error = notify_code;
+> +    iov[0].iov_base = &out;
+> +    iov[0].iov_len = sizeof(struct fuse_out_header);
+> +    return fuse_send_msg(se, NULL, iov, count);
+> +}
 > +
->      se = fuse_session_new(&args, &lo_oper, sizeof(lo_oper), &lo);
->      if (se == NULL) {
->          goto err_out1;
-> diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
-> index af04c638cb..ab4dc07e3f 100644
-> --- a/tools/virtiofsd/passthrough_seccomp.c
-> +++ b/tools/virtiofsd/passthrough_seccomp.c
-> @@ -73,6 +73,7 @@ static const int syscall_allowlist[] = {
->      SCMP_SYS(mprotect),
->      SCMP_SYS(mremap),
->      SCMP_SYS(munmap),
-> +    SCMP_SYS(name_to_handle_at),
->      SCMP_SYS(newfstatat),
->      SCMP_SYS(statx),
->      SCMP_SYS(open),
-> -- 
-> 2.31.1
-> 
+> +int fuse_lowlevel_notify_lock(struct fuse_session *se, uint64_t unique,
+> +                  int32_t error)
+> +{
+> +    struct fuse_notify_lock_out outarg = {0};
+> +    struct iovec iov[2];
+> +
+> +    outarg.unique = unique;
+> +    outarg.error = -error;
+> +
+> +    iov[1].iov_base = &outarg;
+> +    iov[1].iov_len = sizeof(outarg);
+> +    return send_notify_iov(se, FUSE_NOTIFY_LOCK, iov, 2);
+> +}
+
+This may be just me, but I find it odd that you fill iov[0] and iov[1] in
+two separate functions, one of them being static and AFAICT only used once.
+I understand that you are trying to split the notify logic from the lock.
+But the logic is not fully isolated, e.g. the caller needs to know to add
+one to the count, start filling at 1, etc.
+
+Just a matter of taste, I guess ;-)
+
+> +
+>  int fuse_lowlevel_notify_store(struct fuse_session *se, fuse_ino_t ino,
+>                                 off_t offset, struct fuse_bufvec *bufv)
+>  {
+> diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
+> index c55c0ca2fc..64624b48dc 100644
+> --- a/tools/virtiofsd/fuse_lowlevel.h
+> +++ b/tools/virtiofsd/fuse_lowlevel.h
+> @@ -1251,6 +1251,22 @@ struct fuse_lowlevel_ops {
+>   */
+>  int fuse_reply_err(fuse_req_t req, int err);
+>
+> +/**
+> + * Ask caller to wait for lock.
+> + *
+> + * Possible requests:
+> + *   setlkw
+> + *
+> + * If caller sends a blocking lock request (setlkw), then reply to caller
+> + * that wait for lock to be available. Once lock is available caller will
+> + * receive a notification with request's unique id. Notification will
+> + * carry info whether lock was successfully obtained or not.
+> + *
+> + * @param req request handle
+> + * @return zero for success, -errno for failure to send reply
+> + */
+> +int fuse_reply_wait(fuse_req_t req);
+> +
+>  /**
+>   * Don't send reply
+>   *
+> @@ -1685,6 +1701,16 @@ int fuse_lowlevel_notify_delete(struct fuse_session *se, fuse_ino_t parent,
+>  int fuse_lowlevel_notify_store(struct fuse_session *se, fuse_ino_t ino,
+>                                 off_t offset, struct fuse_bufvec *bufv);
+>
+> +/**
+> + * Notify event related to previous lock request
+> + *
+> + * @param se the session object
+> + * @param unique the unique id of the request which requested setlkw
+> + * @param error zero for success, -errno for the failure
+> + */
+> +int fuse_lowlevel_notify_lock(struct fuse_session *se, uint64_t unique,
+> +                              int32_t error);
+> +
+>  /*
+>   * Utility functions
+>   */
+> diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+> index a87e88e286..bb2d4456fc 100644
+> --- a/tools/virtiofsd/fuse_virtio.c
+> +++ b/tools/virtiofsd/fuse_virtio.c
+> @@ -273,6 +273,23 @@ static void vq_send_element(struct fv_QueueInfo *qi, VuVirtqElement *elem,
+>      vu_dispatch_unlock(qi->virtio_dev);
+>  }
+>
+> +/* Returns NULL if queue is empty */
+> +static FVRequest *vq_pop_notify_elem(struct fv_QueueInfo *qi)
+> +{
+> +    struct fuse_session *se = qi->virtio_dev->se;
+> +    VuDev *dev = &se->virtio_dev->dev;
+> +    VuVirtq *q = vu_get_queue(dev, qi->qidx);
+> +    FVRequest *req;
+> +
+> +    vu_dispatch_rdlock(qi->virtio_dev);
+> +    pthread_mutex_lock(&qi->vq_lock);
+> +    /* Pop an element from queue */
+> +    req = vu_queue_pop(dev, q, sizeof(FVRequest));
+> +    pthread_mutex_unlock(&qi->vq_lock);
+> +    vu_dispatch_unlock(qi->virtio_dev);
+> +    return req;
+> +}
+> +
+>  /*
+>   * Called back by ll whenever it wants to send a reply/message back
+>   * The 1st element of the iov starts with the fuse_out_header
+> @@ -281,9 +298,9 @@ static void vq_send_element(struct fv_QueueInfo *qi, VuVirtqElement *elem,
+>  int virtio_send_msg(struct fuse_session *se, struct fuse_chan *ch,
+>                      struct iovec *iov, int count)
+>  {
+> -    FVRequest *req = container_of(ch, FVRequest, ch);
+> -    struct fv_QueueInfo *qi = ch->qi;
+> -    VuVirtqElement *elem = &req->elem;
+> +    FVRequest *req;
+> +    struct fv_QueueInfo *qi;
+> +    VuVirtqElement *elem;
+>      int ret = 0;
+>
+>      assert(count >= 1);
+> @@ -294,8 +311,30 @@ int virtio_send_msg(struct fuse_session *se, struct fuse_chan *ch,
+>
+>      size_t tosend_len = iov_size(iov, count);
+>
+> -    /* unique == 0 is notification, which we don't support */
+> -    assert(out->unique);
+> +    /* unique == 0 is notification */
+> +    if (!out->unique) {
+> +        if (!se->notify_enabled) {
+> +            return -EOPNOTSUPP;
+> +        }
+> +        /* If notifications are enabled, queue index 1 is notification queue */
+> +        qi = se->virtio_dev->qi[1];
+> +        req = vq_pop_notify_elem(qi);
+> +        if (!req) {
+> +            /*
+> +             * TODO: Implement some sort of ring buffer and queue notifications
+> +             * on that and send these later when notification queue has space
+> +             * available.
+> +             */
+
+Maybe add a trace / message here to debug more easily if we hit that case?
+
+> +            return -ENOSPC;
+> +        }
+> +        req->reply_sent = false;
+> +    } else {
+> +        assert(ch);
+> +        req = container_of(ch, FVRequest, ch);
+> +        qi = ch->qi;
+> +    }
+> +
+> +    elem = &req->elem;
+>      assert(!req->reply_sent);
+>
+>      /* The 'in' part of the elem is to qemu */
+> @@ -985,6 +1024,7 @@ static int fv_get_config(VuDev *dev, uint8_t *config, uint32_t len)
+>          struct fuse_notify_delete_out       delete_out;
+>          struct fuse_notify_store_out        store_out;
+>          struct fuse_notify_retrieve_out     retrieve_out;
+> +        struct fuse_notify_lock_out         lock_out;
+>      };
+>
+>      notify_size = sizeof(struct fuse_out_header) +
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 6928662e22..277f74762b 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -2131,13 +2131,35 @@ out:
+>      }
+>  }
+>
+> +static void setlk_send_notification(struct fuse_session *se, uint64_t unique,
+> +                                    int saverr)
+> +{
+> +    int ret;
+> +
+> +    do {
+> +        ret = fuse_lowlevel_notify_lock(se, unique, saverr);
+> +        /*
+> +         * Retry sending notification if notification queue does not have
+> +         * free descriptor yet, otherwise break out of loop. Either we
+> +         * successfully sent notifiation or some other error occurred.
+> +         */
+> +        if (ret != -ENOSPC) {
+> +            break;
+> +        }
+> +        usleep(10000);
+> +    } while (1);
+> +}
+> +
+>  static void lo_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
+>                       struct flock *lock, int sleep)
+>  {
+>      struct lo_data *lo = lo_data(req);
+>      struct lo_inode *inode;
+>      struct lo_inode_plock *plock;
+> -    int ret, saverr = 0;
+> +    int ret, saverr = 0, ofd;
+> +    uint64_t unique;
+> +    struct fuse_session *se = req->se;
+> +    bool blocking_lock = false;
+>
+>      fuse_log(FUSE_LOG_DEBUG,
+>               "lo_setlk(ino=%" PRIu64 ", flags=%d)"
+> @@ -2151,11 +2173,6 @@ static void lo_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
+>          return;
+>      }
+>
+> -    if (sleep) {
+> -        fuse_reply_err(req, EOPNOTSUPP);
+> -        return;
+> -    }
+> -
+>      inode = lo_inode(req, ino);
+>      if (!inode) {
+>          fuse_reply_err(req, EBADF);
+> @@ -2168,21 +2185,56 @@ static void lo_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
+>
+>      if (!plock) {
+>          saverr = ret;
+> +        pthread_mutex_unlock(&inode->plock_mutex);
+>          goto out;
+>      }
+>
+> +    /*
+> +     * plock is now released when inode is going away. We already have
+> +     * a reference on inode, so it is guaranteed that plock->fd is
+> +     * still around even after dropping inode->plock_mutex lock
+> +     */
+> +    ofd = plock->fd;
+> +    pthread_mutex_unlock(&inode->plock_mutex);
+> +
+> +    /*
+> +     * If this lock request can block, request caller to wait for
+> +     * notification. Do not access req after this. Once lock is
+> +     * available, send a notification instead.
+> +     */
+> +    if (sleep && lock->l_type != F_UNLCK) {
+> +        /*
+> +         * If notification queue is not enabled, can't support async
+> +         * locks.
+> +         */
+> +        if (!se->notify_enabled) {
+> +            saverr = EOPNOTSUPP;
+> +            goto out;
+> +        }
+> +        blocking_lock = true;
+> +        unique = req->unique;
+> +        fuse_reply_wait(req);
+> +    }
+> +
+>      /* TODO: Is it alright to modify flock? */
+>      lock->l_pid = 0;
+> -    ret = fcntl(plock->fd, F_OFD_SETLK, lock);
+> +    if (blocking_lock) {
+> +        ret = fcntl(ofd, F_OFD_SETLKW, lock);
+> +    } else {
+> +        ret = fcntl(ofd, F_OFD_SETLK, lock);
+> +    }
+>      if (ret == -1) {
+>          saverr = errno;
+>      }
+>
+>  out:
+> -    pthread_mutex_unlock(&inode->plock_mutex);
+>      lo_inode_put(lo, &inode);
+>
+> -    fuse_reply_err(req, saverr);
+> +    if (!blocking_lock) {
+> +        fuse_reply_err(req, saverr);
+> +    } else {
+> +        setlk_send_notification(se, unique, saverr);
+> +    }
+>  }
+>
+>  static void lo_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
+
+
+--
+Cheers,
+Christophe de Dinechin (IRC c3d)
 

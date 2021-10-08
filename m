@@ -1,25 +1,16 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=PuYqO/zJtQOmgXw2qiQOgqREvWNqtpex61JFiCc79Ko=;
-	b=CCe9Q+Wzt/QEv9979yejyS0tWuJH+dcvGtBBW1bYtkVqjeObvjvXAzy4XCUc1dHK6H
-	25jiPL/FjQlKqZKH51ekonjY7Pk4eccOYYyuN+5i0GhVq1k8DYIt5yvfrkjwqiN1egX8
-	yBDLwKlo3HbldtdGWxmZIQ61rc9kSwZ+1NdB8=
+Date: Fri, 8 Oct 2021 09:25:33 +0200
+From: Greg Kurz <groug@kaod.org>
+Message-ID: <20211008092533.376b568b@bahia.huguette>
+In-Reply-To: <YV8VeaWiwD8DRFtz@stefanha-x1.localdomain>
+References: <cover.1633376313.git.qemu_oss@crudebyte.com>
+	<YV6EbwMFmcIEC+za@stefanha-x1.localdomain>
+	<2233456.PtHKNz60go@silver>
+	<YV8VeaWiwD8DRFtz@stefanha-x1.localdomain>
 MIME-Version: 1.0
-References: <20210930143850.1188628-1-vgoyal@redhat.com>
-	<20210930143850.1188628-8-vgoyal@redhat.com>
-	<CAJfpegtdftj7jQFu+4LBjysiAJ-hhLHkBC_KhowfJtepvZqaoQ@mail.gmail.com>
-	<YV3LBNM3jnGBBzwS@redhat.com>
-	<CAJfpegtoNSXFwiiFuU0tczogS6NFqeodLaxcr0Ax5d=dG0-utw@mail.gmail.com>
-	<YV8Ca/wP9HDWJITq@redhat.com>
-	<CAJfpegsguYZ3y5G6Rj4hoxEOn2ObnUVajTVhtyvm4ZSeFqGtFw@mail.gmail.com>
-	<YV89S46OMGOVN8zZ@redhat.com>
-In-Reply-To: <YV89S46OMGOVN8zZ@redhat.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Thu, 7 Oct 2021 20:46:11 +0200
-Message-ID: <CAJfpegsWP7G=PQQRfVnB0kBup9qnOrZBx4VJ+4X1r5u-yqoneQ@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH 7/8] virtiofs: Add new notification type
-	FUSE_NOTIFY_LOCK
+Content-Type: multipart/signed; boundary="Sig_/PwqkGmH=B9xsrqUY1mTMXrp";
+	protocol="application/pgp-signature"; micalg=pgp-sha256
+Subject: Re: [Virtio-fs] [PATCH v2 0/3] virtio: increase VIRTQUEUE_MAX_SIZE
+	to 32k
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -28,112 +19,181 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, linux-fsdevel@vger.kernel.org
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: Kevin Wolf <kwolf@redhat.com>, Laurent Vivier <lvivier@redhat.com>, Gerd, qemu-block@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, Jason Wang <jasowang@redhat.com>, Amit Shah <amit@kernel.org>, Christian Schoenebeck <qemu_oss@crudebyte.com>, qemu-devel@nongnu.org, Raphael Norwitz <raphael.norwitz@nutanix.com>, virtio-fs@redhat.com, Eric Auger <eric.auger@redhat.com>, Hanna Reitz <hreitz@redhat.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Hoffmann <kraxel@redhat.com>, Zheng <fam@euphon.net>, =?UTF-8?B?TWFyYy1BbmRyw6k=?= Lureau <marcandre.lureau@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, David Hildenbrand <david@redhat.com>, Fam
 
-On Thu, 7 Oct 2021 at 20:32, Vivek Goyal <vgoyal@redhat.com> wrote:
->
-> On Thu, Oct 07, 2021 at 08:11:13PM +0200, Miklos Szeredi wrote:
-> > On Thu, 7 Oct 2021 at 16:22, Vivek Goyal <vgoyal@redhat.com> wrote:
-> > >
-> > > On Thu, Oct 07, 2021 at 03:45:40PM +0200, Miklos Szeredi wrote:
-> > > > On Wed, 6 Oct 2021 at 18:13, Vivek Goyal <vgoyal@redhat.com> wrote:
-> > > > >
-> > > > > On Wed, Oct 06, 2021 at 03:02:36PM +0200, Miklos Szeredi wrote:
-> > > > > > On Thu, 30 Sept 2021 at 16:39, Vivek Goyal <vgoyal@redhat.com> wrote:
-> > > > > > >
-> > > > > > > Add a new notification type FUSE_NOTIFY_LOCK. This notification can be
-> > > > > > > sent by file server to signifiy that a previous locking request has
-> > > > > > > completed and actual caller should be woken up.
-> > > > > >
-> > > > > > Shouldn't this also be generic instead of lock specific?
-> > > > > >
-> > > > > > I.e. generic header  + original outarg.
-> > > > >
-> > > > > Hi Miklos,
-> > > > >
-> > > > > I am not sure I understand the idea. Can you please elaborate a bit more.
-> > > > >
-> > > > > IIUC, "fuse_out_header + original outarg"  is format for responding
-> > > > > to regular fuse requests. If we use that it will become like responding
-> > > > > to same request twice. First time we responded with ->error=1 so that
-> > > > > caller can wait and second time we respond with actual outarg (if
-> > > > > there is one depending on the type of request).
-> > > > >
-> > > > > IOW, this will become more like implementing blocking of request in
-> > > > > client in a more generic manner.
-> > > > >
-> > > > > But outarg, depends on type of request (In case of locking there is
-> > > > > none). And outarg memory is allocated by driver and filled by server.
-> > > > > In case of notifications, driver is allocating the memory but it
-> > > > > does not know what will come in notification and how much memory
-> > > > > to allocate. So it relies on device telling it how much memory
-> > > > > to allocate in general so that bunch of pre-defined notification
-> > > > > types can fit in (fs->notify_buf_size).
-> > > > >
-> > > > > I modeled this on the same lines as other fuse notifications where
-> > > > > server sends notifications with following format.
-> > > > >
-> > > > > fuse_out_header + <structure based on notification type>
-> > > > >
-> > > > > out_header->unique is 0 for notifications to differentiate notifications
-> > > > > from request reply.
-> > > > >
-> > > > > out_header->error contains the code of actual notification being sent.
-> > > > > ex. FUSE_NOTIFY_INVAL_INODE or FUSE_NOTIFY_LOCK or FUSE_NOTIFY_DELETE.
-> > > > > Right now virtiofs supports only one notification type. But in future
-> > > > > we can introduce more types (to support inotify stuff etc).
-> > > > >
-> > > > > In short, I modeled this on existing notion of fuse notifications
-> > > > > (and not fuse reply). And given notifications are asynchronous,
-> > > > > we don't know what were original outarg. In fact they might
-> > > > > be generated not necessarily in response to a request. And that's
-> > > > > why this notion of defining a type of notification (FUSE_NOTIFY_LOCK)
-> > > > > and then let driver decide how to handle this notification.
-> > > > >
-> > > > > I might have completely misunderstood your suggestion. Please help
-> > > > > me understand.
-> > > >
-> > > > Okay, so we are expecting this mechanism to be only used for blocking
-> > > > locks.
-> > >
-> > > Yes, as of now it is only being used only for blocking locks. So there
-> > > are two parts to it.
-> > >
-> > > A. For a blocking operation, server can reply with error=1, and that's
-> > >    a signal to client to wait for a notification to arrive later. And
-> > >    fuse client will not complete the request and instead will queue it
-> > >    in one of the internal lists.
-> > >
-> > > B. Later server will send a fuse notification event (FUSE_NOTIFY_LOCK)
-> > >    when it has acquired the lock. This notification will have unique
-> > >    number of request for which this notification has been generated.
-> > >    Fuse client will search for the request with expected unique number
-> > >    in the list and complete the request.
-> > >
-> > > I think part A is generic in the sense it could be used for other
-> > > kind of blocking requests as well down the line, where server is
-> > > doing the blocking operation on behalf of client and will send
-> > > notification later. Part B is very specific to blocking locks though.
+--Sig_/PwqkGmH=B9xsrqUY1mTMXrp
+Content-Type: text/plain; charset=US-ASCII
+Content-Transfer-Encoding: quoted-printable
+
+On Thu, 7 Oct 2021 16:42:49 +0100
+Stefan Hajnoczi <stefanha@redhat.com> wrote:
+
+> On Thu, Oct 07, 2021 at 02:51:55PM +0200, Christian Schoenebeck wrote:
+> > On Donnerstag, 7. Oktober 2021 07:23:59 CEST Stefan Hajnoczi wrote:
+> > > On Mon, Oct 04, 2021 at 09:38:00PM +0200, Christian Schoenebeck wrote:
+> > > > At the moment the maximum transfer size with virtio is limited to 4M
+> > > > (1024 * PAGE_SIZE). This series raises this limit to its maximum
+> > > > theoretical possible transfer size of 128M (32k pages) according to=
+ the
+> > > > virtio specs:
+> > > >=20
+> > > > https://docs.oasis-open.org/virtio/virtio/v1.1/cs01/virtio-v1.1-cs0=
+1.html#
+> > > > x1-240006
+> > > Hi Christian,
+> > > I took a quick look at the code:
+> > >=20
+
+
+Hi,
+
+Thanks Stefan for sharing virtio expertise and helping Christian !
+
+> > > - The Linux 9p driver restricts descriptor chains to 128 elements
+> > >   (net/9p/trans_virtio.c:VIRTQUEUE_NUM)
+> >=20
+> > Yes, that's the limitation that I am about to remove (WIP); current ker=
+nel=20
+> > patches:
+> > https://lore.kernel.org/netdev/cover.1632327421.git.linux_oss@crudebyte=
+.com/
+>=20
+> I haven't read the patches yet but I'm concerned that today the driver
+> is pretty well-behaved and this new patch series introduces a spec
+> violation. Not fixing existing spec violations is okay, but adding new
+> ones is a red flag. I think we need to figure out a clean solution.
+>=20
+> > > - The QEMU 9pfs code passes iovecs directly to preadv(2) and will fail
+> > >   with EINVAL when called with more than IOV_MAX iovecs
+> > >   (hw/9pfs/9p.c:v9fs_read())
+> >=20
+> > Hmm, which makes me wonder why I never encountered this error during te=
+sting.
+> >=20
+> > Most people will use the 9p qemu 'local' fs driver backend in practice,=
+ so=20
+> > that v9fs_read() call would translate for most people to this implement=
+ation=20
+> > on QEMU side (hw/9p/9p-local.c):
+> >=20
+> > static ssize_t local_preadv(FsContext *ctx, V9fsFidOpenState *fs,
+> >                             const struct iovec *iov,
+> >                             int iovcnt, off_t offset)
+> > {
+> > #ifdef CONFIG_PREADV
+> >     return preadv(fs->fd, iov, iovcnt, offset);
+> > #else
+> >     int err =3D lseek(fs->fd, offset, SEEK_SET);
+> >     if (err =3D=3D -1) {
+> >         return err;
+> >     } else {
+> >         return readv(fs->fd, iov, iovcnt);
+> >     }
+> > #endif
+> > }
+> >=20
+> > > Unless I misunderstood the code, neither side can take advantage of t=
+he
+> > > new 32k descriptor chain limit?
+> > >=20
+> > > Thanks,
+> > > Stefan
+> >=20
+> > I need to check that when I have some more time. One possible explanati=
+on=20
+> > might be that preadv() already has this wrapped into a loop in its=20
+> > implementation to circumvent a limit like IOV_MAX. It might be another =
+"it=20
+> > works, but not portable" issue, but not sure.
 > >
-> > I don't really get why B is specific to blocking locks. But anyway...
-> > we are only implementing it for blocking locks for now.
->
-> Hmm.., I am wondering do I have to make notification specific to
-> lock. All it is doing is returning an "error" code which signifies
-> either operation completed successfully or represents error code
-> if error occurred.
->
-> This probably could be more generic. May be I can call this
-> notification FUSE_NOTIFY_OP_COMPLETE. This notification is
-> just signalling that a previously issued request has completed.
-> Request is identified by notify->unique and result of blocking operation
-> is in notify->error. So that way it is more generic and can be
-> used for other kind of operations too (and not just locking).
+> > There are still a bunch of other issues I have to resolve. If you look =
+at
+> > net/9p/client.c on kernel side, you'll notice that it basically does th=
+is ATM
+> >=20
+> >     kmalloc(msize);
+> >=20
 
-That's exactly what I was thinking.   The implementation can remain
-the same for now...
+Note that this is done twice : once for the T message (client request) and =
+once
+for the R message (server answer). The 9p driver could adjust the size of t=
+he T
+message to what's really needed instead of allocating the full msize. R mes=
+sage
+size is not known though.
 
-Thanks,
-Miklos
+> > for every 9p request. So not only does it allocate much more memory for=
+ every=20
+> > request than actually required (i.e. say 9pfs was mounted with msize=3D=
+8M, then=20
+> > a 9p request that actually would just need 1k would nevertheless alloca=
+te 8M),=20
+> > but also it allocates > PAGE_SIZE, which obviously may fail at any time.
+>=20
+> The PAGE_SIZE limitation sounds like a kmalloc() vs vmalloc() situation.
+>=20
+> I saw zerocopy code in the 9p guest driver but didn't investigate when
+> it's used. Maybe that should be used for large requests (file
+> reads/writes)?
+
+This is the case already : zero-copy is only used for reads/writes/readdir
+if the requested size is 1k or more.
+
+Also you'll note that in this case, the 9p driver doesn't allocate msize
+for the T/R messages but only 4k, which is largely enough to hold the
+header.
+
+	/*
+	 * We allocate a inline protocol data of only 4k bytes.
+	 * The actual content is passed in zero-copy fashion.
+	 */
+	req =3D p9_client_prepare_req(c, type, P9_ZC_HDR_SZ, fmt, ap);
+
+and
+
+/* size of header for zero copy read/write */
+#define P9_ZC_HDR_SZ 4096
+
+A huge msize only makes sense for Twrite, Rread and Rreaddir because
+of the amount of data they convey. All other messages certainly fit
+in a couple of kilobytes only (sorry, don't remember the numbers).
+
+A first change should be to allocate MIN(XXX, msize) for the
+regular non-zc case, where XXX could be a reasonable fixed
+value (8k?). In the case of T messages, it is even possible
+to adjust the size to what's exactly needed, ala snprintf(NULL).
+
+> virtio-blk/scsi don't memcpy data into a new buffer, they
+> directly access page cache or O_DIRECT pinned pages.
+>=20
+> Stefan
+
+Cheers,
+
+--
+Greg
+
+--Sig_/PwqkGmH=B9xsrqUY1mTMXrp
+Content-Type: application/pgp-signature
+Content-Description: OpenPGP digital signature
+
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCAAdFiEEtIKLr5QxQM7yo0kQcdTV5YIvc9YFAmFf8m0ACgkQcdTV5YIv
+c9aU+BAAnCDtqb7h9QtDnzW5UzrvMFctYVfKaqbZHL8vHWf5AGiU3JtT4HwDsSlc
+BivgjkI5oGkzuw2Q4WFufn6DK2mhOAaBKlec8Pwz/xJve3QKT6QrYuvVVA0S4PpI
+tWAcqHVdO5mkCObw1khcH7JIWIyoFyQL5JU7JKY+6lwkS2w/lq7bJZVuJav09EQi
+qp+t+v7gMUsIBwxzooPNFmjAPvV1rnFmp5zO6OaLYRZvL0L2ix2GO91nMm/ZmW7q
++yBIvqmQAZfFGEhTeZbG10tgzBPPze/3L0Xn0NFPnVk3wJ9P5946eU4qrXtJ90L7
+slpOHMy0URg+Fms9UnFDST4ZPVT6zmBTJBzlqImMGsoKLr1qcw5WREIQ9CM8nVtS
+twZ0E0P3Qfb6eSvNTxKHwHLyTYdyajeaOGubAWWlMMGgZDebvZHdGA1y37xAhTry
+YZJOovfC/T1x9ILz09Fys6HnPXVC+i//DMrFeFy37aWsDc2G/AAOT7poh1Ol/raV
+DewgzjjQ4aqTmApOhehZeErE6nv/UR1O/zMsBz4+gdDZN9l43Hii3lZ/4YkerdTF
+6puMtH02/NQzK04K69GoGSMaHk3ARuZLbFNAl1iKFKaPx729YO7lur/Cq1mi/O/e
+8fPI6ni/Iz0P3ku7K5U3o76GeQ05UuCL3nLF3WHopPmCgvuSIuM=
+=+oHe
+-----END PGP SIGNATURE-----
+
+--Sig_/PwqkGmH=B9xsrqUY1mTMXrp--
 

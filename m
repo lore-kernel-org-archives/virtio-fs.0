@@ -2,29 +2,29 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=crudebyte.com; s=kylie; h=Content-Type:Content-Transfer-Encoding:
 	MIME-Version:References:In-Reply-To:Message-ID:Date:Subject:Cc:To:From:
 	Content-ID:Content-Description;
-	bh=RZ13MZivdugXV0dLtx5xbRJbITUpu2zyl25L9nPmuJw=;
-	b=EHcKVYbg4wGng2H68ZxfN62Jvs
-	J/19ViQpHUiMycxY2NlYLj0fNcA2B79J9JIGXFAYmMsZhUb+7rXhimWPMjrsWbCXfvxHSbGU/PCet
-	kAg0wBZm8c/4VdRursOoURbPnVI4YEMSTJ6pCgVjyU9lcokNpciqCOVTSQTlYuP3XIwscs6ErNfuE
-	hZjMe132MwgehU7xRXHs/1K8ag8tDzRxYOd7vNlv23f3EnLvAoqcRsX6CxaUEPr5hZ2LZ5DFSFbnI
-	6opNNpWcPTtvXb2PCUBbyylRkNNAbdJBkK3OSGO9fwroSNoQQcajHs+X4yFAncwT3xUjW/jl7XD6y
-	/ynduDmfG0mbCL5rE+U8c7wCtF2dycOsxDiRbPpirFrR5/0axMB3H2tIMGa5rLPnfyfyZLIfIWp/A
-	u2/2HGgibpN/bsWIAcw9UHI8Mw7ylMHzNeUHydnI7tjaUHroTL3tWmbKETaslEESS6kAd7NQdEg3m
-	fj/ejDzvfXkFgvUfM0V7oxZflCwIXPjRyR6exy0Ok1V08SnqMXzbd2jc0SEPd09oPeZNOwJZYUijY
-	j0AOUFIHcYVlPbpQ9dlEtovSCZboWdZs3rJcz6hNFOqT+V74kno2wNdiEV13pmUardUCPab0WbMtJ
-	K8ROIpi9OpdjlM3C8p14XnVm9lM5wIo3zI3JiKJcw=
+	bh=vBNlGsFfxAMJasg2xaw1tA/8bhJQ/QzW2d99MEym6Yw=;
+	b=J6Dye207QzdnzHGb80gpquxM+g
+	YNm21tu55kfqWAeZkja5VkX2vlxQiDNhBqg2bT9E/hKCRCYmAnIyDDRaKWn9+ZwHQHJN84dTjGJBz
+	8edMpy8vjdglhX3/POvdpu3HqDNe9ThosrKg7crSI3ifodtp9n22oMbwz23+qdnonv69p2IIt10L2
+	WGKXJc1xBODjHv/2OIOFT9hNJ779VdwpurPuO08uYgT19x6HXcy63ubEYIhdz5u+ewPHXg3N6m/D1
+	d8/ssbt80fmWQWY0Wxv5QZ/6BRo4Sa3gn5GLGkulrIreo6sI3oU6DPrE1RsvLVY9ezvfyaNXxN9DJ
+	oLzNU1PWZGFskg89FYDmyJ+gPdEYsDOH+NLuMVTET8F6O7yzQg4hWV0tIshB8ThTbKFeNNAe9mKZs
+	zcWL+uFd4FhuxwG2RPaFhdL+HrV/HM+a2RJKgHEz8XwMigThytd5Kz/aBNlv5qxXzetX9IseTxT5l
+	sRhFA5tVE7PQx67Hnzwi17PbBSJ8rTuq2Fi2ZWyki5tSKctDM2txfLPIiV1xWDzXKzMpyb3hLLK34
+	tyrUTb7w63bb6vBmuYhTGAYVk9mCt/TCFGf5l1LAz8rsiSCLbG+0ruupR/IlRiemdZfqv/IIeUFgQ
+	PWmQfbXlI4Wjz9EzYdXUft8vZLKt317tcLO49wGJw=
 From: Christian Schoenebeck <qemu_oss@crudebyte.com>
-Date: Fri, 08 Oct 2021 16:48:33 +0200
-Message-ID: <1903319.Sgii2z2lGP@silver>
-In-Reply-To: <YV8Pqwap4oR8fpvc@stefanha-x1.localdomain>
+Date: Fri, 08 Oct 2021 18:08:48 +0200
+Message-ID: <2657765.azTuxnmmC0@silver>
+In-Reply-To: <1853723.Wj769PA2Ue@silver>
 References: <cover.1633376313.git.qemu_oss@crudebyte.com>
-	<5138892.89BctLniTh@silver>
-	<YV8Pqwap4oR8fpvc@stefanha-x1.localdomain>
+	<20211008092533.376b568b@bahia.huguette>
+	<1853723.Wj769PA2Ue@silver>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7Bit
 Content-Type: text/plain; charset="us-ascii"
-Subject: Re: [Virtio-fs] [PATCH v2 1/3] virtio: turn VIRTQUEUE_MAX_SIZE into
-	a variable
+Subject: Re: [Virtio-fs] [PATCH v2 0/3] virtio: increase VIRTQUEUE_MAX_SIZE
+	to 32k
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -36,430 +36,259 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org
 Cc: Kevin Wolf <kwolf@redhat.com>, Laurent Vivier <lvivier@redhat.com>, qemu-block@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, Jason Wang <jasowang@redhat.com>, Amit Shah <amit@kernel.org>, David Hildenbrand <david@redhat.com>, Raphael Norwitz <raphael.norwitz@nutanix.com>, virtio-fs@redhat.com, Eric Auger <eric.auger@redhat.com>, Hanna Reitz <hreitz@redhat.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Gerd Hoffmann <kraxel@redhat.com>, =?ISO-8859-1?Q?Marc=2DAndr=E9?= Lureau <marcandre.lureau@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>
 
-On Donnerstag, 7. Oktober 2021 17:18:03 CEST Stefan Hajnoczi wrote:
-> On Thu, Oct 07, 2021 at 03:09:16PM +0200, Christian Schoenebeck wrote:
-> > On Mittwoch, 6. Oktober 2021 16:42:34 CEST Stefan Hajnoczi wrote:
-> > > On Wed, Oct 06, 2021 at 02:50:07PM +0200, Christian Schoenebeck wrote:
-> > > > On Mittwoch, 6. Oktober 2021 13:06:55 CEST Stefan Hajnoczi wrote:
-> > > > > On Tue, Oct 05, 2021 at 06:32:46PM +0200, Christian Schoenebeck 
-wrote:
-> > > > > > On Dienstag, 5. Oktober 2021 17:10:40 CEST Stefan Hajnoczi wrote:
-> > > > > > > On Tue, Oct 05, 2021 at 03:15:26PM +0200, Christian Schoenebeck
+On Freitag, 8. Oktober 2021 16:24:42 CEST Christian Schoenebeck wrote:
+> On Freitag, 8. Oktober 2021 09:25:33 CEST Greg Kurz wrote:
+> > On Thu, 7 Oct 2021 16:42:49 +0100
 > > 
-> > wrote:
-> > > > > > > > On Dienstag, 5. Oktober 2021 14:45:56 CEST Stefan Hajnoczi 
+> > Stefan Hajnoczi <stefanha@redhat.com> wrote:
+> > > On Thu, Oct 07, 2021 at 02:51:55PM +0200, Christian Schoenebeck wrote:
+> > > > On Donnerstag, 7. Oktober 2021 07:23:59 CEST Stefan Hajnoczi wrote:
+> > > > > On Mon, Oct 04, 2021 at 09:38:00PM +0200, Christian Schoenebeck 
 wrote:
-> > > > > > > > > On Mon, Oct 04, 2021 at 09:38:04PM +0200, Christian
-> > > > > > > > > Schoenebeck
-> > > > 
-> > > > wrote:
-> > > > > > > > > > Refactor VIRTQUEUE_MAX_SIZE to effectively become a
-> > > > > > > > > > runtime
-> > > > > > > > > > variable per virtio user.
-> > > > > > > > > 
-> > > > > > > > > virtio user == virtio device model?
-> > > > > > > > 
-> > > > > > > > Yes
-> > > > > > > > 
-> > > > > > > > > > Reasons:
-> > > > > > > > > > 
-> > > > > > > > > > (1) VIRTQUEUE_MAX_SIZE should reflect the absolute
-> > > > > > > > > > theoretical
-> > > > > > > > > > 
-> > > > > > > > > >     maximum queue size possible. Which is actually the
-> > > > > > > > > >     maximum
-> > > > > > > > > >     queue size allowed by the virtio protocol. The
-> > > > > > > > > >     appropriate
-> > > > > > > > > >     value for VIRTQUEUE_MAX_SIZE would therefore be 32768:
-> > > > > > > > > >     
-> > > > > > > > > >     https://docs.oasis-open.org/virtio/virtio/v1.1/cs01/vi
-> > > > > > > > > >     rtio
-> > > > > > > > > >     -v1.
-> > > > > > > > > >     1-cs
-> > > > > > > > > >     01.h
-> > > > > > > > > >     tml#x1-240006
-> > > > > > > > > >     
-> > > > > > > > > >     Apparently VIRTQUEUE_MAX_SIZE was instead defined with
-> > > > > > > > > >     a
-> > > > > > > > > >     more or less arbitrary value of 1024 in the past,
-> > > > > > > > > >     which
-> > > > > > > > > >     limits the maximum transfer size with virtio to 4M
-> > > > > > > > > >     (more precise: 1024 * PAGE_SIZE, with the latter
-> > > > > > > > > >     typically
-> > > > > > > > > >     being 4k).
-> > > > > > > > > 
-> > > > > > > > > Being equal to IOV_MAX is a likely reason. Buffers with more
-> > > > > > > > > iovecs
-> > > > > > > > > than
-> > > > > > > > > that cannot be passed to host system calls (sendmsg(2),
-> > > > > > > > > pwritev(2),
-> > > > > > > > > etc).
-> > > > > > > > 
-> > > > > > > > Yes, that's use case dependent. Hence the solution to opt-in
-> > > > > > > > if it
-> > > > > > > > is
-> > > > > > > > desired and feasible.
-> > > > > > > > 
-> > > > > > > > > > (2) Additionally the current value of 1024 poses a hidden
-> > > > > > > > > > limit,
-> > > > > > > > > > 
-> > > > > > > > > >     invisible to guest, which causes a system hang with
-> > > > > > > > > >     the
-> > > > > > > > > >     following QEMU error if guest tries to exceed it:
-> > > > > > > > > >     
-> > > > > > > > > >     virtio: too many write descriptors in indirect table
-> > > > > > > > > 
-> > > > > > > > > I don't understand this point. 2.6.5 The Virtqueue
-> > > > > > > > > Descriptor
-> > > > > > > > > Table
-> > > > > > 
-> > > > > > says:
-> > > > > > > > >   The number of descriptors in the table is defined by the
-> > > > > > > > >   queue
-> > > > > > > > >   size
-> > > > > > > > >   for
-> > > > > > > > > 
-> > > > > > > > > this virtqueue: this is the maximum possible descriptor
-> > > > > > > > > chain
-> > > > > > > > > length.
-> > > > > > > > > 
-> > > > > > > > > and 2.6.5.3.1 Driver Requirements: Indirect Descriptors 
-says:
-> > > > > > > > >   A driver MUST NOT create a descriptor chain longer than
-> > > > > > > > >   the
-> > > > > > > > >   Queue
-> > > > > > > > >   Size
-> > > > > > > > >   of
-> > > > > > > > > 
-> > > > > > > > > the device.
-> > > > > > > > > 
-> > > > > > > > > Do you mean a broken/malicious guest driver that is
-> > > > > > > > > violating
-> > > > > > > > > the
-> > > > > > > > > spec?
-> > > > > > > > > That's not a hidden limit, it's defined by the spec.
-> > > > > > > > 
-> > > > > > > > https://lists.gnu.org/archive/html/qemu-devel/2021-10/msg00781
-> > > > > > > > .htm
-> > > > > > > > l
-> > > > > > > > https://lists.gnu.org/archive/html/qemu-devel/2021-10/msg00788
-> > > > > > > > .htm
-> > > > > > > > l
-> > > > > > > > 
-> > > > > > > > You can already go beyond that queue size at runtime with the
-> > > > > > > > indirection
-> > > > > > > > table. The only actual limit is the currently hard coded value
-> > > > > > > > of
-> > > > > > > > 1k
-> > > > > > > > pages.
-> > > > > > > > Hence the suggestion to turn that into a variable.
-> > > > > > > 
-> > > > > > > Exceeding Queue Size is a VIRTIO spec violation. Drivers that
-> > > > > > > operate
-> > > > > > > outsided the spec do so at their own risk. They may not be
-> > > > > > > compatible
-> > > > > > > with all device implementations.
-> > > > > > 
-> > > > > > Yes, I am ware about that. And still, this practice is already
-> > > > > > done,
-> > > > > > which
-> > > > > > apparently is not limited to 9pfs.
-> > > > > > 
-> > > > > > > The limit is not hidden, it's Queue Size as defined by the spec
-> > > > > > > :).
-> > > > > > > 
-> > > > > > > If you have a driver that is exceeding the limit, then please
-> > > > > > > fix
-> > > > > > > the
-> > > > > > > driver.
-> > > > > > 
-> > > > > > I absolutely understand your position, but I hope you also
-> > > > > > understand
-> > > > > > that
-> > > > > > this violation of the specs is a theoretical issue, it is not a
-> > > > > > real-life
-> > > > > > problem right now, and due to lack of man power unfortunately I
-> > > > > > have
+> > > > > > At the moment the maximum transfer size with virtio is limited to
+> > > > > > 4M
+> > > > > > (1024 * PAGE_SIZE). This series raises this limit to its maximum
+> > > > > > theoretical possible transfer size of 128M (32k pages) according
 > > > > > > to
-> > > > > > prioritize real-life problems over theoretical ones ATM. Keep in
-> > > > > > mind
-> > > > > > that
-> > > > > > right now I am the only person working on 9pfs actively, I do this
-> > > > > > voluntarily whenever I find a free time slice, and I am not paid
-> > > > > > for
-> > > > > > it
-> > > > > > either.
+> > > > > > the
+> > > > > > virtio specs:
 > > > > > > 
-> > > > > > I don't see any reasonable way with reasonable effort to do what
-> > > > > > you
-> > > > > > are
-> > > > > > asking for here in 9pfs, and Greg may correct me here if I am
-> > > > > > saying
-> > > > > > anything wrong. If you are seeing any specific real-life issue
-> > > > > > here,
-> > > > > > then
-> > > > > > please tell me which one, otherwise I have to postpone that "specs
-> > > > > > violation" issue.
-> > > > > > 
-> > > > > > There is still a long list of real problems that I need to hunt
-> > > > > > down
-> > > > > > in
-> > > > > > 9pfs, afterwards I can continue with theoretical ones if you want,
-> > > > > > but
-> > > > > > right now I simply can't, sorry.
+> > > > > > https://docs.oasis-open.org/virtio/virtio/v1.1/cs01/virtio-v1.1-cs
+> > > > > > 01
+> > > > > > .html#
+> > > > > > x1-240006
 > > > > > 
-> > > > > I understand. If you don't have time to fix the Linux virtio-9p
-> > > > > driver
-> > > > > then that's fine.
-> > > > 
-> > > > I will look at this again, but it might be tricky. On doubt I'll
-> > > > postpone
-> > > > it.>
-> > > > 
-> > > > > I still wanted us to agree on the spec position because the commit
-> > > > > description says it's a "hidden limit", which is incorrect. It might
-> > > > > seem pedantic, but my concern is that misconceptions can spread if
-> > > > > we
-> > > > > let them. That could cause people to write incorrect code later on.
-> > > > > Please update the commit description either by dropping 2) or by
-> > > > > 
-> > > > > replacing it with something else. For example:
-> > > > >   2) The Linux virtio-9p guest driver does not honor the VIRTIO
-> > > > >   Queue
-> > > > >   
-> > > > >      Size value and can submit descriptor chains that exceed it.
-> > > > >      That is
-> > > > >      a spec violation but is accepted by QEMU's device
-> > > > >      implementation.
-> > > > >      
-> > > > >      When the guest creates a descriptor chain larger than 1024 the
-> > > > >      following QEMU error is printed and the guest hangs:
-> > > > >      
-> > > > >      virtio: too many write descriptors in indirect table
-> > > > 
-> > > > I am fine with both, probably preferring the text block above instead
-> > > > of
-> > > > silently dropping the reason, just for clarity.
-> > > > 
-> > > > But keep in mind that this might not be limited to virtio-9p as your
-> > > > text
-> > > > would suggest, see below.
-> > > > 
-> > > > > > > > > > (3) Unfortunately not all virtio users in QEMU would
-> > > > > > > > > > currently
-> > > > > > > > > > 
-> > > > > > > > > >     work correctly with the new value of 32768.
-> > > > > > > > > > 
-> > > > > > > > > > So let's turn this hard coded global value into a runtime
-> > > > > > > > > > variable as a first step in this commit, configurable for
-> > > > > > > > > > each
-> > > > > > > > > > virtio user by passing a corresponding value with
-> > > > > > > > > > virtio_init()
-> > > > > > > > > > call.
-> > > > > > > > > 
-> > > > > > > > > virtio_add_queue() already has an int queue_size argument,
-> > > > > > > > > why
-> > > > > > > > > isn't
-> > > > > > > > > that enough to deal with the maximum queue size? There's
-> > > > > > > > > probably a
-> > > > > > > > > good
-> > > > > > > > > reason for it, but please include it in the commit
-> > > > > > > > > description.
-> > > > > > > > 
-> > > > > > > > [...]
-> > > > > > > > 
-> > > > > > > > > Can you make this value per-vq instead of per-vdev since
-> > > > > > > > > virtqueues
-> > > > > > > > > can
-> > > > > > > > > have different queue sizes?
-> > > > > > > > > 
-> > > > > > > > > The same applies to the rest of this patch. Anything using
-> > > > > > > > > vdev->queue_max_size should probably use vq->vring.num
-> > > > > > > > > instead.
-> > > > > > > > 
-> > > > > > > > I would like to avoid that and keep it per device. The maximum
-> > > > > > > > size
-> > > > > > > > stored
-> > > > > > > > there is the maximum size supported by virtio user (or vortio
-> > > > > > > > device
-> > > > > > > > model,
-> > > > > > > > however you want to call it). So that's really a limit per
-> > > > > > > > device,
-> > > > > > > > not
-> > > > > > > > per
-> > > > > > > > queue, as no queue of the device would ever exceed that limit.
-> > > > > > > > 
-> > > > > > > > Plus a lot more code would need to be refactored, which I
-> > > > > > > > think is
-> > > > > > > > unnecessary.
-> > > > > > > 
-> > > > > > > I'm against a per-device limit because it's a concept that
-> > > > > > > cannot
-> > > > > > > accurately describe reality. Some devices have multiple classes
-> > > > > > > of
-> > > > > > 
-> > > > > > It describes current reality, because VIRTQUEUE_MAX_SIZE obviously
-> > > > > > is
-> > > > > > not
-> > > > > > per queue either ATM, and nobody ever cared.
-> > > > > > 
-> > > > > > All this series does, is allowing to override that currently
-> > > > > > project-wide
-> > > > > > compile-time constant to a per-driver-model compile-time constant.
-> > > > > > Which
-> > > > > > makes sense, because that's what it is: some drivers could cope
-> > > > > > with
-> > > > > > any
-> > > > > > transfer size, and some drivers are constrained to a certain
-> > > > > > maximum
-> > > > > > application specific transfer size (e.g. IOV_MAX).
-> > > > > > 
-> > > > > > > virtqueues and they are sized differently, so a per-device limit
-> > > > > > > is
-> > > > > > > insufficient. virtio-net has separate rx_queue_size and
-> > > > > > > tx_queue_size
-> > > > > > > parameters (plus a control vq hardcoded to 64 descriptors).
-> > > > > > 
-> > > > > > I simply find this overkill. This value semantically means "my
-> > > > > > driver
-> > > > > > model
-> > > > > > supports at any time and at any coincidence at the very most x *
-> > > > > > PAGE_SIZE
-> > > > > > = max_transfer_size". Do you see any driver that might want a more
-> > > > > > fine
-> > > > > > graded control over this?
-> > > > > 
-> > > > > One reason why per-vq limits could make sense is that the maximum
-> > > > > possible number of struct elements is allocated upfront in some code
-> > > > > paths. Those code paths may need to differentiate between per-vq
-> > > > > limits
-> > > > > for performance or memory utilization reasons. Today some places
-> > > > > allocate 1024 elements on the stack in some code paths, but maybe
-> > > > > that's
-> > > > > not acceptable when the per-device limit is 32k. This can matter
-> > > > > when a
-> > > > > device has vqs with very different sizes.
-> > > > 
-> > > > [...]
-> > > > 
-> > > > > > ... I leave that up to Michael or whoever might be in charge to
-> > > > > > decide. I
-> > > > > > still find this overkill, but I will adapt this to whatever the
-> > > > > > decision
-> > > > > > eventually will be in v3.
-> > > > > > 
-> > > > > > But then please tell me the precise representation that you find
-> > > > > > appropriate, i.e. whether you want a new function for that, or
-> > > > > > rather
-> > > > > > an
-> > > > > > additional argument to virtio_add_queue(). Your call.
-> > > > > 
-> > > > > virtio_add_queue() already takes an int queue_size argument. I think
-> > > > > the
-> > > > > necessary information is already there.
-> > > > > 
-> > > > > This patch just needs to be tweaked to use the
-> > > > > virtio_queue_get_num()
-> > > > > (or a new virtqueue_get_num() API if that's easier because only a
-> > > > > VirtQueue *vq pointer is available) instead of introducing a new
-> > > > > per-device limit.
-> > > > 
-> > > > My understanding is that both the original 9p virtio device authors,
-> > > > as
-> > > > well as other virtio device authors in QEMU have been and are still
-> > > > using
-> > > > this as a default value (i.e. to allocate some upfront, and the rest
-> > > > on
-> > > > demand).
-> > > > 
-> > > > So yes, I know your argument about the specs, but AFAICS if I would
-> > > > just
-> > > > take this existing numeric argument for the limit, then it would
-> > > > probably
-> > > > break those other QEMU devices as well.
-> > > 
-> > > This is a good point that I didn't consider. If guest drivers currently
-> > > violate the spec, then restricting descriptor chain length to vring.num
-> > > will introduce regressions.
-> > > 
-> > > We can't use virtio_queue_get_num() directly. A backwards-compatible
-> > > 
-> > > limit is required:
-> > >   int virtio_queue_get_desc_chain_max(VirtIODevice *vdev, int n)
-> > >   {
-> > >   
-> > >       /*
-> > >       
-> > >        * QEMU historically allowed 1024 descriptors even if the
-> > >        * descriptor table was smaller.
-> > >        */
-> > >       
-> > >       return MAX(virtio_queue_get_num(vdev, qidx), 1024);
-> > >   
-> > >   }
+> > > > > Hi Christian,
 > > 
-> > That was an alternative that I thought about as well, but decided against.
-> > It would require devices (that would want to support large transmissions
-> > sizes)> 
-> > to create the virtio queue(s) with the maximum possible size, i.e:
-> >   virtio_add_queue(32k);
+> > > > > I took a quick look at the code:
+> > Hi,
+> > 
+> > Thanks Stefan for sharing virtio expertise and helping Christian !
+> > 
+> > > > > - The Linux 9p driver restricts descriptor chains to 128 elements
+> > > > > 
+> > > > >   (net/9p/trans_virtio.c:VIRTQUEUE_NUM)
+> > > > 
+> > > > Yes, that's the limitation that I am about to remove (WIP); current
+> > > > kernel
+> > > > patches:
+> > > > https://lore.kernel.org/netdev/cover.1632327421.git.linux_oss@crudebyt
+> > > > e.
+> > > > com/>
+> > > 
+> > > I haven't read the patches yet but I'm concerned that today the driver
+> > > is pretty well-behaved and this new patch series introduces a spec
+> > > violation. Not fixing existing spec violations is okay, but adding new
+> > > ones is a red flag. I think we need to figure out a clean solution.
 > 
-> The spec allows drivers to set the size of the vring as long as they do
-> not exceed Queue Size.
+> Nobody has reviewed the kernel patches yet. My main concern therefore
+> actually is that the kernel patches are already too complex, because the
+> current situation is that only Dominique is handling 9p patches on kernel
+> side, and he barely has time for 9p anymore.
 > 
-> The Linux drivers accept the device's default size, so you're right that
-> this would cause large vrings to be allocated if the device sets the
-> virtqueue size to 32k.
+> Another reason for me to catch up on reading current kernel code and
+> stepping in as reviewer of 9p on kernel side ASAP, independent of this
+> issue.
 > 
-> > And that's the point where my current lack of knowledge, of what this
-> > would
-> > precisely mean to the resulting allocation set, decided against it. I mean
-> > would that mean would QEMU's virtio implementation would just a) allocate
-> > 32k scatter gather list entries? Or would it rather b) additionally also
-> > allocate the destination memory pages as well?
+> As for current kernel patches' complexity: I can certainly drop patch 7
+> entirely as it is probably just overkill. Patch 4 is then the biggest chunk,
+> I have to see if I can simplify it, and whether it would make sense to
+> squash with patch 3.
 > 
-> The vring consumes guest RAM but it just consists of descriptors, not
-> the buffer memory pages. The guest RAM requirements are:
-> - split layout: 32k * 16 + 6 + 32k * 2 + 6 + 8 * 32k = 851,980 bytes
-> - packed layout: 32k * 16 + 4 + 4 = 524,296 bytes
+> > > > > - The QEMU 9pfs code passes iovecs directly to preadv(2) and will
+> > > > > fail
+> > > > > 
+> > > > >   with EINVAL when called with more than IOV_MAX iovecs
+> > > > >   (hw/9pfs/9p.c:v9fs_read())
+> > > > 
+> > > > Hmm, which makes me wonder why I never encountered this error during
+> > > > testing.
+> > > > 
+> > > > Most people will use the 9p qemu 'local' fs driver backend in
+> > > > practice,
+> > > > so
+> > > > that v9fs_read() call would translate for most people to this
+> > > > implementation on QEMU side (hw/9p/9p-local.c):
+> > > > 
+> > > > static ssize_t local_preadv(FsContext *ctx, V9fsFidOpenState *fs,
+> > > > 
+> > > >                             const struct iovec *iov,
+> > > >                             int iovcnt, off_t offset)
+> > > > 
+> > > > {
+> > > > #ifdef CONFIG_PREADV
+> > > > 
+> > > >     return preadv(fs->fd, iov, iovcnt, offset);
+> > > > 
+> > > > #else
+> > > > 
+> > > >     int err = lseek(fs->fd, offset, SEEK_SET);
+> > > >     if (err == -1) {
+> > > >     
+> > > >         return err;
+> > > >     
+> > > >     } else {
+> > > >     
+> > > >         return readv(fs->fd, iov, iovcnt);
+> > > >     
+> > > >     }
+> > > > 
+> > > > #endif
+> > > > }
+> > > > 
+> > > > > Unless I misunderstood the code, neither side can take advantage of
+> > > > > the
+> > > > > new 32k descriptor chain limit?
+> > > > > 
+> > > > > Thanks,
+> > > > > Stefan
+> > > > 
+> > > > I need to check that when I have some more time. One possible
+> > > > explanation
+> > > > might be that preadv() already has this wrapped into a loop in its
+> > > > implementation to circumvent a limit like IOV_MAX. It might be another
+> > > > "it
+> > > > works, but not portable" issue, but not sure.
+> > > > 
+> > > > There are still a bunch of other issues I have to resolve. If you look
+> > > > at
+> > > > net/9p/client.c on kernel side, you'll notice that it basically does
+> > > > this ATM> >
+> > > > 
+> > > >     kmalloc(msize);
+> > 
+> > Note that this is done twice : once for the T message (client request) and
+> > once for the R message (server answer). The 9p driver could adjust the
+> > size
+> > of the T message to what's really needed instead of allocating the full
+> > msize. R message size is not known though.
 > 
-> That's still quite large!
+> Would it make sense adding a second virtio ring, dedicated to server
+> responses to solve this? IIRC 9p server already calculates appropriate
+> exact sizes for each response type. So server could just push space that's
+> really needed for its responses.
 > 
-> By the way, virtio-blk currently uses a virtqueue size of 256
-> descriptors and this has been found reasonable for disk I/O performance.
-> The Linux block layer splits requests at around 1.25 MB for virtio-blk.
-> The virtio-blk queue limits are reported by the device and the guest
-> Linux block layer uses them to size/split requests appropriately. I'm
-> not sure 9p really needs 32k, although you're right that fragmented
-> physical memory requires 32k descriptors to describe 128 MB of buffers.
+> > > > for every 9p request. So not only does it allocate much more memory
+> > > > for
+> > > > every request than actually required (i.e. say 9pfs was mounted with
+> > > > msize=8M, then a 9p request that actually would just need 1k would
+> > > > nevertheless allocate 8M), but also it allocates > PAGE_SIZE, which
+> > > > obviously may fail at any time.>
+> > > 
+> > > The PAGE_SIZE limitation sounds like a kmalloc() vs vmalloc() situation.
 > 
-> Going back to the original problem, a vring feature bit could be added
-> to the VIRTIO specification indicating that indirect descriptor tables
-> are limited to the maximum (32k) instead of Queue Size. This way the
-> device's default vring size could be small but drivers could allocate
-> indirect descriptor tables that are large when necessary. Then the Linux
-> virtio driver API would need to report the maximum supported sglist
-> length for a given virtqueue so drivers can take advantage of this
-> information.
+> Hu, I didn't even consider vmalloc(). I just tried the kvmalloc() wrapper as
+> a quick & dirty test, but it crashed in the same way as kmalloc() with
+> large msize values immediately on mounting:
+> 
+> diff --git a/net/9p/client.c b/net/9p/client.c
+> index a75034fa249b..cfe300a4b6ca 100644
+> --- a/net/9p/client.c
+> +++ b/net/9p/client.c
+> @@ -227,15 +227,18 @@ static int parse_opts(char *opts, struct p9_client
+> *clnt)
+>  static int p9_fcall_init(struct p9_client *c, struct p9_fcall *fc,
+>                          int alloc_msize)
+>  {
+> -       if (likely(c->fcall_cache) && alloc_msize == c->msize) {
+> +       //if (likely(c->fcall_cache) && alloc_msize == c->msize) {
+> +       if (false) {
+>                 fc->sdata = kmem_cache_alloc(c->fcall_cache, GFP_NOFS);
+>                 fc->cache = c->fcall_cache;
+>         } else {
+> -               fc->sdata = kmalloc(alloc_msize, GFP_NOFS);
+> +               fc->sdata = kvmalloc(alloc_msize, GFP_NOFS);
 
-Due to forced pragmatism, ~1M unused/wasted space would be acceptable IMHO.
+Ok, GFP_NOFS -> GFP_KERNEL did the trick.
 
-But if that might really go up to 128M+ as you said if physical RAM is highly 
-fragmented, then a cleaner solution would definitely make sense, yes, if 
-that's possible.
+Now I get:
 
-But as changing specs etc. is probably a long process, it would make sense 
-first doing some more tests with the kernel patches to find out whether there 
-was probably some show stopper like IOV_MAX anyway.
+   virtio: bogus descriptor or out of resources
 
-As for whether large transfer sizes make sense at all: well, from the 
-benchmarks I made so far I "think" it does make sense going >4M. It might be 
-something specific to 9p (its a full file server), I guess it has a higher 
-latency than raw virtio block devices. OTOH with M.2 SSDs we now have several 
-thousand MB/s, so not sure if the old common transfer size of 1M for block 
-devices is still reasonable today.
+So, still some work ahead on both ends.
 
-Best regards,
-Christian Schoenebeck
+>                 fc->cache = NULL;
+>         }
+> -       if (!fc->sdata)
+> +       if (!fc->sdata) {
+> +               pr_info("%s !fc->sdata", __func__);
+>                 return -ENOMEM;
+> +       }
+>         fc->capacity = alloc_msize;
+>         return 0;
+>  }
+> 
+> I try to look at this at the weekend, I would have expected this hack to
+> bypass this issue.
+> 
+> > > I saw zerocopy code in the 9p guest driver but didn't investigate when
+> > > it's used. Maybe that should be used for large requests (file
+> > > reads/writes)?
+> > 
+> > This is the case already : zero-copy is only used for reads/writes/readdir
+> > if the requested size is 1k or more.
+> > 
+> > Also you'll note that in this case, the 9p driver doesn't allocate msize
+> > for the T/R messages but only 4k, which is largely enough to hold the
+> > header.
+> > 
+> > 	/*
+> > 	
+> > 	 * We allocate a inline protocol data of only 4k bytes.
+> > 	 * The actual content is passed in zero-copy fashion.
+> > 	 */
+> > 	
+> > 	req = p9_client_prepare_req(c, type, P9_ZC_HDR_SZ, fmt, ap);
+> > 
+> > and
+> > 
+> > /* size of header for zero copy read/write */
+> > #define P9_ZC_HDR_SZ 4096
+> > 
+> > A huge msize only makes sense for Twrite, Rread and Rreaddir because
+> > of the amount of data they convey. All other messages certainly fit
+> > in a couple of kilobytes only (sorry, don't remember the numbers).
+> > 
+> > A first change should be to allocate MIN(XXX, msize) for the
+> > regular non-zc case, where XXX could be a reasonable fixed
+> > value (8k?). In the case of T messages, it is even possible
+> > to adjust the size to what's exactly needed, ala snprintf(NULL).
+> 
+> Good idea actually! That would limit this problem to reviewing the 9p specs
+> and picking one reasonable max value. Because you are right, those message
+> types are tiny. Probably not worth to pile up new code to calculate exact
+> message sizes for each one of them.
+> 
+> Adding some safety net would make sense though, to force e.g. if a new
+> message type is added in future, that this value would be reviewed as well,
+> something like:
+> 
+> static int max_msg_size(int msg_type) {
+>     switch (msg_type) {
+>         /* large zero copy messages */
+>         case Twrite:
+>         case Tread:
+>         case Treaddir:
+>             BUG_ON(true);
+> 
+>         /* small messages */
+>         case Tversion:
+>         ....
+>             return 8k; /* to be replaced with appropriate max value */
+>     }
+> }
+> 
+> That way the compiler would bark on future additions. But on doubt, a simple
+> comment on msg type enum might do as well though.
+> 
+> > > virtio-blk/scsi don't memcpy data into a new buffer, they
+> > > directly access page cache or O_DIRECT pinned pages.
+> > > 
+> > > Stefan
+> > 
+> > Cheers,
+> > 
+> > --
+> > Greg
 
 

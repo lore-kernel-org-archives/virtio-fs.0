@@ -1,12 +1,13 @@
 From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Mon, 11 Oct 2021 11:09:33 +0800
-Message-Id: <20211011030938.109206-2-jefflexu@linux.alibaba.com>
+Date: Mon, 11 Oct 2021 11:09:38 +0800
+Message-Id: <20211011030938.109206-7-jefflexu@linux.alibaba.com>
 In-Reply-To: <20211011030938.109206-1-jefflexu@linux.alibaba.com>
 References: <20211011030938.109206-1-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd PATCH v6 1/6] virtiofsd: add .ioctl() support
+Subject: [Virtio-fs] [virtiofsd PATCH v6 6/6] virtiofsd: implement
+	persistent inode attribute based dax policy
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,122 +19,70 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
 Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com
 
-For passthrough, it passes corresponding ioctls to host directly.
+The per-file DAX feature in ext4/xfs uses the persistent inode
+attribute, i.e. FS_DAX_FL/FS_XFLAG_DAX, to indicate if DAX shall be
+enable for this file or not when filesystem is mounted in per-file DAX
+mode.
 
-Currently only these ioctls that handling persistent inode flags, i.e.,
-FS_IOC_[G|S]ETFLAGS and FS_IOC_FS[G|S]ETXATTR are supported for security
-concern, though it's implemented in a quite general way, so that we can
-expand the scope of allowed ioctls if it is really needed later.
+To keep compatible with this feature in ext4/xfs, virtiofs also supports
+enabling DAX depending on the persistent inode attribute, which may be
+set/cleared by users inside guest or admin on host.
+
+This policy is used when '-o dax=attr' option is specified for
+virtiofsd.
 
 Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
 ---
- tools/virtiofsd/passthrough_ll.c      | 59 +++++++++++++++++++++++++++
- tools/virtiofsd/passthrough_seccomp.c |  1 +
- 2 files changed, 60 insertions(+)
+ tools/virtiofsd/passthrough_ll.c | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
 
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index b76d878509..5969d67810 100644
+index a5a5061906..6f75cd6d92 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -47,6 +47,7 @@
- #include <dirent.h>
- #include <pthread.h>
- #include <sys/file.h>
-+#include <sys/ioctl.h>
- #include <sys/mount.h>
- #include <sys/prctl.h>
- #include <sys/resource.h>
-@@ -54,6 +55,7 @@
- #include <sys/wait.h>
- #include <sys/xattr.h>
- #include <syslog.h>
-+#include <linux/fs.h>
- 
- #include "qemu/cutils.h"
- #include "passthrough_helpers.h"
-@@ -2105,6 +2107,62 @@ out:
-     fuse_reply_err(req, saverr);
+@@ -1000,7 +1000,7 @@ static int do_statx(struct lo_data *lo, int dirfd, const char *pathname,
+     return 0;
  }
  
-+
-+static void lo_ioctl(fuse_req_t req, fuse_ino_t ino, unsigned int cmd, void *arg,
-+                          struct fuse_file_info *fi, unsigned flags, const void *in_buf,
-+                          size_t in_bufsz, size_t out_bufsz)
-+{
-+    int fd = lo_fi_fd(req, fi);
-+    int res;
-+    int saverr = ENOSYS;
-+    int dir;
-+    void *buf = NULL;
-+    size_t size = 0;
-+
-+    fuse_log(FUSE_LOG_DEBUG, "lo_ioctl(ino=%" PRIu64 ", cmd=0x%x, flags=0x%x, "
-+            "in_bufsz = %lu, out_bufsz = %lu)\n",
-+            ino, cmd, flags, in_bufsz, out_bufsz);
-+
-+    if (cmd != FS_IOC_SETFLAGS || cmd != FS_IOC_GETFLAGS ||
-+        cmd != FS_IOC_FSSETXATTR || cmd != FS_IOC_FSGETXATTR)
-+        goto out;
-+
-+    /* unrestricted ioctl is not supported yet */
-+    if (flags & FUSE_IOCTL_UNRESTRICTED)
-+        goto out;
-+
-+    dir = _IOC_DIR(cmd);
-+
-+    if (dir & _IOC_READ) {
-+        size = out_bufsz;
-+        buf = malloc(size);
-+        if (!buf)
-+            goto out_err;
-+
-+        if (dir & _IOC_WRITE)
-+            memcpy(buf, in_buf, size);
-+
-+        res = ioctl(fd, cmd, buf);
-+    }
-+    else if (dir & _IOC_WRITE) {
-+        res = ioctl(fd, cmd, in_buf);
-+    }
-+    else {
-+        res = ioctl(fd, cmd, arg);
-+    }
-+
-+    if (res < 0)
-+        goto out_err;
-+
-+    fuse_reply_ioctl(req, 0, buf, size);
-+    return;
-+
-+out_err:
-+    saverr = errno;
-+out:
-+    fuse_reply_err(req, saverr);
-+}
-+
- static void lo_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
-                         struct fuse_file_info *fi)
+-static bool lo_should_enable_dax(struct lo_data *lo,
++static bool lo_should_enable_dax(struct lo_data *lo, struct lo_inode *inode,
+                                  struct fuse_entry_param *e)
  {
-@@ -3278,6 +3336,7 @@ static struct fuse_lowlevel_ops lo_oper = {
-     .fsyncdir = lo_fsyncdir,
-     .create = lo_create,
-     .getlk = lo_getlk,
-+    .ioctl = lo_ioctl,
-     .setlk = lo_setlk,
-     .open = lo_open,
-     .release = lo_release,
-diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
-index 62441cfcdb..2a5f7614fc 100644
---- a/tools/virtiofsd/passthrough_seccomp.c
-+++ b/tools/virtiofsd/passthrough_seccomp.c
-@@ -62,6 +62,7 @@ static const int syscall_allowlist[] = {
-     SCMP_SYS(gettid),
-     SCMP_SYS(gettimeofday),
-     SCMP_SYS(getxattr),
-+    SCMP_SYS(ioctl),
-     SCMP_SYS(linkat),
-     SCMP_SYS(listxattr),
-     SCMP_SYS(lseek),
+     if (lo->dax == DAX_NONE || !S_ISREG(e->attr.st_mode)) {
+@@ -1011,6 +1011,24 @@ static bool lo_should_enable_dax(struct lo_data *lo,
+         return e->attr.st_size > FUSE_PERFILE_DAX_POINT;
+     }
+ 
++    if (lo->dax & DAX_ATTR) {
++        int res, fd;
++        int ret = false;;
++        unsigned int attr;
++
++        fd = lo_inode_open(lo, inode, O_RDONLY);
++        if (fd == -1) {
++            return false;
++        }
++
++        res = ioctl(fd, FS_IOC_GETFLAGS, &attr);
++        if (!res && (attr & FS_DAX_FL))
++            ret = true;
++
++        close(fd);
++        return ret;
++    }
++
+     return false;
+ }
+ 
+@@ -1104,7 +1122,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+     }
+     e->ino = inode->fuse_ino;
+ 
+-    if (lo_should_enable_dax(lo, e)) {
++    if (lo_should_enable_dax(lo, inode, e)) {
+         e->attr_flags |= FUSE_ATTR_DAX;
+     }
+ 
 -- 
 2.27.0
 

@@ -1,27 +1,13 @@
-Date: Sat, 9 Oct 2021 10:00:50 -0400
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	from:to:subject; s=fm2; bh=TtcG6rEzUpZZSIk/mxYhWAOX+ZuWUHRkNv5b5
-	xq3myc=; b=u+TeiwOanhq9NXmSJLc2GhaW1M4rWXU1INHpSm7DxpErsDFzFJt0n
-	RzNYfkyWAYXhOTTZ7N6jVH6sjjwTcY2Kp0MFwhOThrmw/OyocDsVwafwHlnb2+ax
-	OelpibXQZEr1F9ioWYAKh7JI+Qw4S0DBRbfzIaXhS5w8u3lBtKRUEFPdnd0/4hBs
-	7Ag7PjP9R/ditzbPowui5wwwr+dk8lxJt3E8ZEgQ+PYPGrCO1OhLo1N5j7Sj2WSb
-	yYW3elV3qyMKtmGn8zBo5yPiF0VdV8xHqfg9SSNkOIyOaCewj/3c7UhwzYitacmO
-	eyjpMoiZWyR3TIZ0c7hPr4T3mtvmLKtRg==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=TtcG6rEzUpZZSIk/m
-	xYhWAOX+ZuWUHRkNv5b5xq3myc=; b=MREOzGVQAadPSjB9kCQ8LE6HnXvqbHveV
-	m80ydE2mcjNTlAEyArzZSynq29VyWSje8CzdpqJDcT/XjZSmoAnTylKaKuu6YAq7
-	/ahrzYSTGFaQWbpN82am+y5Bpg+yHJTfqOkYx4on5wj8hLMwQ7g76WSiMQIlaCeR
-	+AmJ6tIKsgueoB+LAvFycg3qWSHc4fzFmqQ8/mmEuzTsObQyWJ15QJZK2LBdpPJh
-	DJaP71WzS8JLA47fMdWSDSZpi030YsHXYG1xcN8NfCGldpLbMuw0Jw0RkGs50zjs
-	CoifbKn5jqKxD3X0M1gB/DSedqp6vAWGLC3Dq8NmU5im+1Er7g+vA==
-From: virtiofs-bot@sinrega.org
-Message-Id: <96380.121100910004800283@us-mta-120.us.mimecast.lan>
+From: Jeffle Xu <jefflexu@linux.alibaba.com>
+Date: Mon, 11 Oct 2021 11:00:48 +0800
+Message-Id: <20211011030052.98923-4-jefflexu@linux.alibaba.com>
+In-Reply-To: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
+References: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] Issue opened: [2021-10-09T13:58:55Z
-	ERROR virtiofsd_rs] Waiting for daemon failed:
-	HandleRequest(PartialMessage)
+Subject: [Virtio-fs] [PATCH v6 3/7] fuse: support per-file DAX in fuse
+	protocol
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -30,29 +16,73 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hub
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com
 
-doesnt appear to work on arm64.
+Expand the fuse protocol to support per-file DAX.
 
+FUSE_PERFILE_DAX flag is added indicating if fuse server/client
+supporting per-file DAX. It can be conveyed in both FUSE_INIT request
+and reply.
 
-```
-[2021-10-09T13:58:55Z ERROR virtiofsd_rs] Waiting for daemon failed: HandleRequest(PartialMessage)
-```
+FUSE_ATTR_DAX flag is added indicating if DAX shall be enabled for
+corresponding file. It is conveyed in FUSE_LOOKUP reply.
 
-kernel says
-
-```
-[    0.738564] virtio-fs: tag <rootfs> not found
-[    0.740972] virtio-fs: tag </dev/root> not found
-[    0.743308] List of all partitions:
-[    0.745015] No filesystem could mount root, tried: 
-[    0.745019]  virtiofs
-[    0.747413] 
-[    0.749438] Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
-[    0.753228] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 5.15.0-rc3+ #14
-[    0.756265] Hardware name: linux,dummy-virt (DT)
-
-```
+Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
 ---
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/issues/14
+ include/uapi/linux/fuse.h | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
+index 36ed092227fa..15a1f5fc0797 100644
+--- a/include/uapi/linux/fuse.h
++++ b/include/uapi/linux/fuse.h
+@@ -184,6 +184,9 @@
+  *
+  *  7.34
+  *  - add FUSE_SYNCFS
++ *
++ *  7.35
++ *  - add FUSE_PERFILE_DAX, FUSE_ATTR_DAX
+  */
+ 
+ #ifndef _LINUX_FUSE_H
+@@ -219,7 +222,7 @@
+ #define FUSE_KERNEL_VERSION 7
+ 
+ /** Minor version number of this interface */
+-#define FUSE_KERNEL_MINOR_VERSION 34
++#define FUSE_KERNEL_MINOR_VERSION 35
+ 
+ /** The node ID of the root inode */
+ #define FUSE_ROOT_ID 1
+@@ -336,6 +339,7 @@ struct fuse_file_lock {
+  *			write/truncate sgid is killed only if file has group
+  *			execute permission. (Same as Linux VFS behavior).
+  * FUSE_SETXATTR_EXT:	Server supports extended struct fuse_setxattr_in
++ * FUSE_PERFILE_DAX:	kernel supports per-file DAX
+  */
+ #define FUSE_ASYNC_READ		(1 << 0)
+ #define FUSE_POSIX_LOCKS	(1 << 1)
+@@ -367,6 +371,7 @@ struct fuse_file_lock {
+ #define FUSE_SUBMOUNTS		(1 << 27)
+ #define FUSE_HANDLE_KILLPRIV_V2	(1 << 28)
+ #define FUSE_SETXATTR_EXT	(1 << 29)
++#define FUSE_PERFILE_DAX	(1 << 30)
+ 
+ /**
+  * CUSE INIT request/reply flags
+@@ -449,8 +454,10 @@ struct fuse_file_lock {
+  * fuse_attr flags
+  *
+  * FUSE_ATTR_SUBMOUNT: Object is a submount root
++ * FUSE_ATTR_DAX: Enable DAX for this file in per-file DAX mode
+  */
+ #define FUSE_ATTR_SUBMOUNT      (1 << 0)
++#define FUSE_ATTR_DAX		(1 << 1)
+ 
+ /**
+  * Open flags
+-- 
+2.27.0
 

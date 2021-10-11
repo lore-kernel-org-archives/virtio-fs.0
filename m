@@ -1,12 +1,13 @@
 From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Mon, 11 Oct 2021 11:00:49 +0800
-Message-Id: <20211011030052.98923-5-jefflexu@linux.alibaba.com>
-In-Reply-To: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
-References: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
+Date: Mon, 11 Oct 2021 11:09:34 +0800
+Message-Id: <20211011030938.109206-3-jefflexu@linux.alibaba.com>
+In-Reply-To: <20211011030938.109206-1-jefflexu@linux.alibaba.com>
+References: <20211011030938.109206-1-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v6 4/7] fuse: negotiate per-file DAX in FUSE_INIT
+Subject: [Virtio-fs] [virtiofsd PATCH v6 2/6] virtiofsd: support per-file
+	DAX in fuse protocol
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,32 +16,36 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hub
-Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com
+To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
+Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com
 
-Among the FUSE_INIT phase, client shall advertise per-file DAX if it's
-mounted with "-o dax=inode". Then server is aware that client is in
-per-file DAX mode, and will construct per-inode DAX attribute
-accordingly.
+... in prep for the following support for per-file DAX feature.
 
 Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
 ---
- fs/fuse/inode.c | 2 ++
+ include/standard-headers/linux/fuse.h | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index b4b41683e97e..f4ad99e2415b 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -1203,6 +1203,8 @@ void fuse_send_init(struct fuse_mount *fm)
- #ifdef CONFIG_FUSE_DAX
- 	if (fm->fc->dax)
- 		ia->in.flags |= FUSE_MAP_ALIGNMENT;
-+	if (fm->fc->dax_mode == FUSE_DAX_INODE)
-+		ia->in.flags |= FUSE_PERFILE_DAX;
- #endif
- 	if (fm->fc->auto_submounts)
- 		ia->in.flags |= FUSE_SUBMOUNTS;
+diff --git a/include/standard-headers/linux/fuse.h b/include/standard-headers/linux/fuse.h
+index 950d7edb7e..7bd006ffcb 100644
+--- a/include/standard-headers/linux/fuse.h
++++ b/include/standard-headers/linux/fuse.h
+@@ -356,6 +356,7 @@ struct fuse_file_lock {
+ #define FUSE_MAP_ALIGNMENT	(1 << 26)
+ #define FUSE_SUBMOUNTS		(1 << 27)
+ #define FUSE_HANDLE_KILLPRIV_V2	(1 << 28)
++#define FUSE_PERFILE_DAX	(1 << 30)
+ 
+ /**
+  * CUSE INIT request/reply flags
+@@ -440,6 +441,7 @@ struct fuse_file_lock {
+  * FUSE_ATTR_SUBMOUNT: Object is a submount root
+  */
+ #define FUSE_ATTR_SUBMOUNT      (1 << 0)
++#define FUSE_ATTR_DAX		(1 << 1)
+ 
+ /**
+  * Open flags
 -- 
 2.27.0
 

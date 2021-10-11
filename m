@@ -1,19 +1,10 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=xexEpJdvSs8WA8ytXi5Jvt5/cU1ono4iJfJ2H9LSanI=;
-	b=XPTZYNUAGTD6PuQEs5Xnr6OTxYtUaCDBi3AEe+52RdarJKKJnE5CizERVElvjXPzKM
-	4d/gtP5lgLu4BDUhPptbBVeRvJrT8oRMEDkKjqKvP9rskHDrmLI5sBGKPAdreEiq4WCU
-	/9E9J0lxb4EB7BEUXcFWSyv/3YC8Q4ZRLXyQ0=
+From: Jeffle Xu <jefflexu@linux.alibaba.com>
+Date: Mon, 11 Oct 2021 11:00:45 +0800
+Message-Id: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
-References: <20210930143850.1188628-1-vgoyal@redhat.com>
-	<20210930143850.1188628-8-vgoyal@redhat.com>
-In-Reply-To: <20210930143850.1188628-8-vgoyal@redhat.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Wed, 6 Oct 2021 15:02:36 +0200
-Message-ID: <CAJfpegtdftj7jQFu+4LBjysiAJ-hhLHkBC_KhowfJtepvZqaoQ@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH 7/8] virtiofs: Add new notification type
-	FUSE_NOTIFY_LOCK
+Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [PATCH v6 0/7] fuse,virtiofs: support per-file DAX
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,19 +13,133 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, linux-fsdevel@vger.kernel.org
+To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hub
+Cc: linux-fsdevel@vger.kernel.org, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com
 
-On Thu, 30 Sept 2021 at 16:39, Vivek Goyal <vgoyal@redhat.com> wrote:
->
-> Add a new notification type FUSE_NOTIFY_LOCK. This notification can be
-> sent by file server to signifiy that a previous locking request has
-> completed and actual caller should be woken up.
+changes since v5:
+Overall Design Changes:
+1. virtiofsd now supports ioctl (only FS_IOC_SETFLAGS and
+  FS_IOC_FSSETXATTR), so that users inside guest could set/clear
+  persistent inode flags now. (FUSE kernel module has already supported
+  .ioctl(), virtiofsd need to suuport it.)
+2. When FUSE client is mounted with '-o dax=inode', it indicates that
+  whether DAX shall be enabled or not for one specific file is
+  completely determined by FUSE server while FUSE client has no say on
+  it, and the decision whether DAX shall be enabled or not for specific
+  file is communicated through FUSE_ATTR_DAX flag of FUSE protocol. The
+  algorithm used by virtiofsd to determine whether DAX shall be enabled
+  or not is totally implementation specific, and thus the following
+  scenario may exist: users inside guest has already set related persistent
+  inode flag (i.e. FS_XFLAG_DAX) on corresponding file but FUSE server finnaly
+  decides not to enable DAX for this file. This slight semantic difference
+  is documented in patch 7. Also because of this, d_mark_dontcache() is
+  not called when FS_IOC_SETFLAGS/FS_IOC_FSSETXATTR ioctl is done inside
+  guest. It's delayed to be done if the FUSE_ATTR_DAX flag **indeed**
+  changes (as showed in patch 6).
+3. patch 1: slightly modify logic of fuse_should_enable_dax()
+4. patch 4: add back negotiation during FUSE_INIT. FUSE client shall
+  advertise to FUSE server that it's in per-file DAX mode, so that FUSE
+  server may omit querying persistent inode flags on host if FUSE client
+  is not mounted in per-file DAX mode, giving querying persistent inode
+  flags could be quite expensive.
 
-Shouldn't this also be generic instead of lock specific?
 
-I.e. generic header  + original outarg.
+chanegs since v4:
+- drop support for setting/clearing FS_DAX inside guest
+- and thus drop the negotiation phase during FUSE_INIT
 
-Thanks,
-Miklos
+This patchset adds support of per-file DAX for virtiofs, which is
+inspired by Ira Weiny's work on ext4[1] and xfs[2].
+
+Any comment is welcome.
+
+[1] commit 9cb20f94afcd ("fs/ext4: Make DAX mount option a tri-state")
+[2] commit 02beb2686ff9 ("fs/xfs: Make DAX mount option a tri-state")
+
+[Purpose]
+DAX may be limited in some specific situation. When the number of usable
+DAX windows is under watermark, the recalim routine will be triggered to
+reclaim some DAX windows. It may have a negative impact on the
+performance, since some processes may need to wait for DAX windows to be
+recalimed and reused then. To mitigate the performance degradation, the
+overall DAX window need to be expanded larger.
+
+However, simply expanding the DAX window may not be a good deal in some
+scenario. To maintain one DAX window chunk (i.e., 2MB in size), 32KB
+(512 * 64 bytes) memory footprint will be consumed for page descriptors
+inside guest, which is greater than the memory footprint if it uses
+guest page cache when DAX disabled. Thus it'd better disable DAX for
+those files smaller than 32KB, to reduce the demand for DAX window and
+thus avoid the unworthy memory overhead.
+
+Per-file DAX feature is introduced to address this issue, by offering a
+finer grained control for dax to users, trying to achieve a balance
+between performance and memory overhead.
+
+
+[Note]
+When the per-file DAX hint changes while the file is still *opened*, it
+is quite complicated and maybe fragile to dynamically change the DAX
+state, since dynamic switching needs to switch a_ops atomiclly. Ira
+Weiny had ever implemented a so called i_aops_sem lock [3] but
+eventually gave up since the complexity of the implementation
+[4][5][6][7].
+
+Hence mark the inode and corresponding dentries as DONE_CACHE once the
+per-file DAX hint changes, so that the inode instance will be evicted
+and freed as soon as possible once the file is closed and the last
+reference to the inode is put. And then when the file gets reopened next
+time, the new instantiated inode will reflect the new DAX state.
+
+In summary, when the per-file DAX hint changes for an *opened* file, the
+DAX state of the file won't be updated until this file is closed and
+reopened later. This is also how ext4/xfs per-file DAX works.
+
+[3] https://lore.kernel.org/lkml/20200227052442.22524-7-ira.weiny@intel.com/
+[4] https://patchwork.kernel.org/project/xfs/cover/20200407182958.568475-1-ira.weiny@intel.com/
+[5] https://lore.kernel.org/lkml/20200305155144.GA5598@lst.de/
+[6] https://lore.kernel.org/lkml/20200401040021.GC56958@magnolia/
+[7] https://lore.kernel.org/lkml/20200403182904.GP80283@magnolia/
+
+changes since v3:
+- bug fix (patch 6): s/"IS_DAX(inode) != newdax"/"!!IS_DAX(inode) !=
+  newdax"
+- during FUSE_INIT, advertise capability for per-file DAX only when
+  mounted as "-o dax=inode" (patch 4)
+
+changes since v2:
+- modify fuse_show_options() accordingly to make it compatible with
+  new tri-state mount option (patch 2)
+- extract FUSE protocol changes into one separate patch (patch 3)
+- FUSE server/client need to negotiate if they support per-file DAX
+  (patch 4)
+- extract DONT_CACHE logic into patch 6/7
+
+v5: https://lore.kernel.org/all/20210923092526.72341-1-jefflexu@linux.alibaba.com/
+v4: https://lore.kernel.org/linux-fsdevel/20210817022220.17574-1-jefflexu@linux.alibaba.com/
+v3: https://www.spinics.net/lists/linux-fsdevel/msg200852.html
+v2: https://www.spinics.net/lists/linux-fsdevel/msg199584.html
+v1: https://www.spinics.net/lists/linux-virtualization/msg51008.html
+
+
+Jeffle Xu (7):
+  fuse: add fuse_should_enable_dax() helper
+  fuse: make DAX mount option a tri-state
+  fuse: support per-file DAX in fuse protocol
+  fuse: negotiate per-file DAX in FUSE_INIT
+  fuse: enable per-file DAX
+  fuse: mark inode DONT_CACHE when per-file DAX hint changes
+  Documentation/filesystem/dax: record DAX on virtiofs
+
+ Documentation/filesystems/dax.rst | 20 +++++++++++++++--
+ fs/fuse/dax.c                     | 36 ++++++++++++++++++++++++++++---
+ fs/fuse/file.c                    |  4 ++--
+ fs/fuse/fuse_i.h                  | 19 ++++++++++++----
+ fs/fuse/inode.c                   | 17 +++++++++++----
+ fs/fuse/virtio_fs.c               | 16 ++++++++++++--
+ include/uapi/linux/fuse.h         |  9 +++++++-
+ 7 files changed, 103 insertions(+), 18 deletions(-)
+
+-- 
+2.27.0
 

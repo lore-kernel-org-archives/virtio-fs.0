@@ -1,26 +1,26 @@
-Date: Mon, 11 Oct 2021 04:00:30 -0400
+Date: Tue, 12 Oct 2021 08:52:25 -0400
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	from:to:subject; s=fm2; bh=hlOqkFr/eTXMZRwHdU8GO5cyE83RYdls3qAy+
-	JnT9mE=; b=f3n4A4Nj1JJDAf00t/40736lUMlPYaFzmIk7jghcF5ZIF06z5CvAe
-	v9cFtvQ2dgLjzv3BgSIiuGAfT8YsUl3377aFgM5ie89x9VWOVCeqg4NPBTqsFAXI
-	vvPGtMyhtkYvwjGnzOZf2A+UfP9Xgf9Oy+QC+mlGmlk7dwReSdVXT2l9g79aaKZr
-	y0lg4F7UzRUyNO+IrEmPV2BJTMwsWxwFnw4vRyRHDUAfUw2huJ6lopyqbHfwLp0b
-	31gtDdBTCVHtWBaigHKuKZHuONjVZH/Jn5Q4cKgGOhbaMUaAB44hXLyeMFMRI/5S
-	gSadLmr5g1J12g/3F5FHnGyWaX7PpJ3iQ==
+	from:to:subject; s=fm2; bh=R/ArR3XmEEfe3QTgT09vivv5qufDnSb8UJafW
+	Ypf0rI=; b=Hcf8GpgkT1hmuKGA4fAHJvhgBVs3Wu1kG9fld+H00PyLRDJ5vylH8
+	LkJFoT8SiGn54+JAIpbFHpc29ZC4wrjbEoVwzENjhNlRmBAoG/EdKGgL/6sMNhzu
+	ICCw1aAipmCWjL0RfF04FfdZWW+u3Y0r5vFK4LYcxfGZ4jGYKi1PDgaLQXWvnjHj
+	o0FQcH966T9yNv6o43ob8i9dsA0bFaUr6TGIfRF9GICnIixm2a9+w2yWyHoo0yRx
+	sahyuWMF+o6FvjvH+f8P12PpTS92yVwRN0XMgh723b193A2LOeJ/0ndaZZ17acgo
+	E1egFw6TekMOIf2Ko8WjGy9cpiHgnSafg==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=hlOqkFr/eTXMZRwHd
-	U8GO5cyE83RYdls3qAy+JnT9mE=; b=M1k+6WC2prcaRWJ9f++NYTYolAUeU5iXi
-	jnr2r5dI+1L++U72APRa2UFcTk5RH/yKZ2VV7M7ickc2QDPibf6U5LhmQIHuNkq5
-	TXaumcKHAbVPpeALEGle0xXC4cUpwX7rmZQP+gi436RwckjyMn5aEFM12pSSeN37
-	MNxXq28DerKeMIerx/X1GMHCYFXaTpOFjbh2fX5FJTee/CNNhAfsd4VYCRYAJvbO
-	uw7GRatfbjSV07h/B+7thvo3L2gCWIbb7WuwhNam5DWbSkTaJQinTEC0Fz+78e5D
-	4GJ7+Qah3N7xhvTsDHLHZfOgU0mhPl3PLaK4s7GtOiUusSSx+CiKQ==
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=R/ArR3XmEEfe3QTgT
+	09vivv5qufDnSb8UJafWYpf0rI=; b=JWPplcnRWGV25cE25yOg+wXBWxnj/iiwu
+	rXX4VIjsO8yc/0CigiW0SL5y68f/e9hstfqVVJ+pS+kcg661ZhrD2GCIYrU5EIeJ
+	ZLGFRz8RaC/HJ4npf1Dm4iFn/v0JGZlxIbRZVlHwDN6wITjKtXcKvD+/fRgTpe5T
+	jiPzbsuYyiCdHgpTnuSehOg0z53Cp/YBg/3MICgbMtC9xvxp7WY7K4UlkjhLvbVa
+	oli9JM20ZOInjgNeur9GJ1uG23EpeL/ciNrU/Rz19fgGTOsF88wEFsAvOgayfa+1
+	NHgRUzyVs/pMGbbM7cGVWyl+QYtkgAYumMZKWBq8JKNW9jiUsnm6g==
 From: virtiofs-bot@sinrega.org
-Message-Id: <59051.121101104002500151@us-mta-87.us.mimecast.lan>
+Message-Id: <76632.121101208521600417@us-mta-330.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] Issue closed: Incorporate mitigations
-	for CVE-2020-35517
+Subject: [Virtio-fs] [virtiofsd-rs] Issue opened: Virtiofsd panic when
+	reaching max open descriptor.
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,9 +31,23 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-We should incorporate mitigations for CVE-2020-35517:
+Virtiofsd reports correctly "too many open files" to the guest until some value, after reaching this point it will just panic with the following message:
+```
+[...]
+[2021-10-12T11:46:16Z DEBUG virtiofsd_rs] QUEUE_EVENT
+thread 'vring_worker' panicked at 'called `Result::unwrap()` on an `Err` value: Os { code: 24, kind: Uncategorized, message: "Too many open files"}
+```
 
-https://www.redhat.com/archives/virtio-fs/2021-February/msg00003.html
+I think the correct behavior would be to continue the error report to the guest while the guest OS tries to open file descriptors without panicking.
+
+I didn't see any other error related to this limit in the debug logs. Reporting such OS error in the debug log might be interesting?
+
+virtiofsd-rs was launched using the following parameters:
+```
+virtiofsd-rs --socket=/path/to/socket --shared-dir=/path/to/dir --cache=never --sandbox=chroot --log-level=debug 2> "$VIRTIOFSD_LOG"
+```
+
+The issue can be reproduced consistently every time on my setup, before hitting that limit everything works fine.
 ---
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/issues/9
+https://gitlab.com/virtio-fs/virtiofsd-rs/-/issues/15
 

@@ -1,11 +1,10 @@
-Date: Tue, 12 Oct 2021 09:23:07 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YWWMO/ZDrvDZ5X4c@redhat.com>
+Date: Tue, 12 Oct 2021 14:06:22 -0400
+Message-Id: <20211012180624.447474-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: [Virtio-fs] [PATCH v2] security: Return xattr name from
- security_dentry_init_security()
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2 0/2] fuse: Send file/inode security context
+	during creation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,180 +13,66 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: jmorris@namei.org, linux-security-module@vger.kernel.org, selinux@vger.kernel.org, serge@hallyn.com
-Cc: bfields@fieldses.org, linux-nfs@vger.kernel.org, Miklos Szeredi <miklos@szeredi.hu>, stephen.smalley.work@gmail.com, jlayton@kernel.org, Ondrej Mosnacek <omosnace@redhat.com>, anna.schumaker@netapp.com, virtio-fs@redhat.com, casey@schaufler-ca.com, chuck.lever@oracle.com, linux-fsdevel@vger.kernel.org, idryomov@gmail.com, ceph-devel@vger.kernel.org, trond.myklebust@hammerspace.com
+To: linux-fsdevel@vger.kernel.org, selinux@vger.kernel.org, linux-security-module@vger.kernel.org, miklos@szeredi.hu
+Cc: stephen.smalley.work@gmail.com, omosnace@redhat.com, virtio-fs@redhat.com, casey@schaufler-ca.com, vgoyal@redhat.com
 
-Right now security_dentry_init_security() only supports single security
-label and is used by SELinux only. There are two users of of this hook,
-namely ceph and nfs.
+Hi,
 
-NFS does not care about xattr name. Ceph hardcodes the xattr name to
-security.selinux (XATTR_NAME_SELINUX).
+This is V2 of patches. Posted V1 here.
 
-I am making changes to fuse/virtiofs to send security label to virtiofsd
-and I need to send xattr name as well. I also hardcoded the name of
-xattr to security.selinux.
-
-Stephen Smalley suggested that it probably is a good idea to modify
-security_dentry_init_security() to also return name of xattr so that
-we can avoid this hardcoding in the callers.
-
-This patch adds a new parameter "const char **xattr_name" to
-security_dentry_init_security() and LSM puts the name of xattr
-too if caller asked for it (xattr_name != NULL).
-
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-Reviewed-by: Jeff Layton <jlayton@kernel.org>
----
+https://lore.kernel.org/linux-fsdevel/20210924192442.916927-1-vgoyal@redhat.com/
 
 Changes since v1:
-- Updated comment to make it clear caller does not have to free the
-  xattr_name. (Jeff Layton).
-- Captured Jeff's Reviewed-by ack.
 
-I have tested this patch with virtiofs and compile tested for ceph and nfs.
+- Added capability to send multiple security contexts in fuse protocol.
+  Miklos suggestd this. So now protocol can easily carry multiple
+  security labels. Just that right now we only send one. When a security
+  hook becomes available which can handle multiple security labels,
+  it should be easy to send those.
 
-NFS changes are trivial. Looking for an ack from NFS maintainers.
+This patch series is dependent on following patch I have posted to
+change signature of security_dentry_init_security().
 
----
- fs/ceph/xattr.c               |    3 +--
- fs/nfs/nfs4proc.c             |    3 ++-
- include/linux/lsm_hook_defs.h |    3 ++-
- include/linux/lsm_hooks.h     |    3 +++
- include/linux/security.h      |    6 ++++--
- security/security.c           |    7 ++++---
- security/selinux/hooks.c      |    6 +++++-
- 7 files changed, 21 insertions(+), 10 deletions(-)
+https://lore.kernel.org/linux-fsdevel/YWWMO%2FZDrvDZ5X4c@redhat.com/
 
-Index: redhat-linux/security/selinux/hooks.c
-===================================================================
---- redhat-linux.orig/security/selinux/hooks.c	2021-10-04 15:40:28.978453324 -0400
-+++ redhat-linux/security/selinux/hooks.c	2021-10-06 15:20:57.745247170 -0400
-@@ -2948,7 +2948,8 @@ static void selinux_inode_free_security(
- }
- 
- static int selinux_dentry_init_security(struct dentry *dentry, int mode,
--					const struct qstr *name, void **ctx,
-+					const struct qstr *name,
-+					const char **xattr_name, void **ctx,
- 					u32 *ctxlen)
- {
- 	u32 newsid;
-@@ -2961,6 +2962,9 @@ static int selinux_dentry_init_security(
- 	if (rc)
- 		return rc;
- 
-+	if (xattr_name)
-+		*xattr_name = XATTR_NAME_SELINUX;
-+
- 	return security_sid_to_context(&selinux_state, newsid, (char **)ctx,
- 				       ctxlen);
- }
-Index: redhat-linux/security/security.c
-===================================================================
---- redhat-linux.orig/security/security.c	2021-10-04 15:40:28.978453324 -0400
-+++ redhat-linux/security/security.c	2021-10-06 15:20:57.749247170 -0400
-@@ -1052,11 +1052,12 @@ void security_inode_free(struct inode *i
- }
- 
- int security_dentry_init_security(struct dentry *dentry, int mode,
--					const struct qstr *name, void **ctx,
--					u32 *ctxlen)
-+				  const struct qstr *name,
-+				  const char **xattr_name, void **ctx,
-+				  u32 *ctxlen)
- {
- 	return call_int_hook(dentry_init_security, -EOPNOTSUPP, dentry, mode,
--				name, ctx, ctxlen);
-+				name, xattr_name, ctx, ctxlen);
- }
- EXPORT_SYMBOL(security_dentry_init_security);
- 
-Index: redhat-linux/include/linux/lsm_hooks.h
-===================================================================
---- redhat-linux.orig/include/linux/lsm_hooks.h	2021-10-04 15:40:28.978453324 -0400
-+++ redhat-linux/include/linux/lsm_hooks.h	2021-10-12 09:05:00.830399245 -0400
-@@ -196,6 +196,9 @@
-  *	@dentry dentry to use in calculating the context.
-  *	@mode mode used to determine resource type.
-  *	@name name of the last path component used to create file
-+ *	@xattr_name pointer to place the pointer to security xattr name.
-+ *		    Caller does not have to free the resulting pointer. Its
-+ *		    a pointer to static string.
-  *	@ctx pointer to place the pointer to the resulting context in.
-  *	@ctxlen point to place the length of the resulting context.
-  * @dentry_create_files_as:
-Index: redhat-linux/include/linux/security.h
-===================================================================
---- redhat-linux.orig/include/linux/security.h	2021-10-04 15:40:28.978453324 -0400
-+++ redhat-linux/include/linux/security.h	2021-10-06 15:20:57.751247170 -0400
-@@ -317,8 +317,9 @@ int security_add_mnt_opt(const char *opt
- 				int len, void **mnt_opts);
- int security_move_mount(const struct path *from_path, const struct path *to_path);
- int security_dentry_init_security(struct dentry *dentry, int mode,
--					const struct qstr *name, void **ctx,
--					u32 *ctxlen);
-+				  const struct qstr *name,
-+				  const char **xattr_name, void **ctx,
-+				  u32 *ctxlen);
- int security_dentry_create_files_as(struct dentry *dentry, int mode,
- 					struct qstr *name,
- 					const struct cred *old,
-@@ -739,6 +740,7 @@ static inline void security_inode_free(s
- static inline int security_dentry_init_security(struct dentry *dentry,
- 						 int mode,
- 						 const struct qstr *name,
-+						 const char **xattr_name,
- 						 void **ctx,
- 						 u32 *ctxlen)
- {
-Index: redhat-linux/include/linux/lsm_hook_defs.h
-===================================================================
---- redhat-linux.orig/include/linux/lsm_hook_defs.h	2021-10-04 15:40:28.978453324 -0400
-+++ redhat-linux/include/linux/lsm_hook_defs.h	2021-10-06 15:20:57.752247170 -0400
-@@ -83,7 +83,8 @@ LSM_HOOK(int, 0, sb_add_mnt_opt, const c
- LSM_HOOK(int, 0, move_mount, const struct path *from_path,
- 	 const struct path *to_path)
- LSM_HOOK(int, 0, dentry_init_security, struct dentry *dentry,
--	 int mode, const struct qstr *name, void **ctx, u32 *ctxlen)
-+	 int mode, const struct qstr *name, const char **xattr_name,
-+	 void **ctx, u32 *ctxlen)
- LSM_HOOK(int, 0, dentry_create_files_as, struct dentry *dentry, int mode,
- 	 struct qstr *name, const struct cred *old, struct cred *new)
- 
-Index: redhat-linux/fs/nfs/nfs4proc.c
-===================================================================
---- redhat-linux.orig/fs/nfs/nfs4proc.c	2021-10-04 15:40:28.978453324 -0400
-+++ redhat-linux/fs/nfs/nfs4proc.c	2021-10-06 15:20:57.754247170 -0400
-@@ -127,7 +127,8 @@ nfs4_label_init_security(struct inode *d
- 		return NULL;
- 
- 	err = security_dentry_init_security(dentry, sattr->ia_mode,
--				&dentry->d_name, (void **)&label->label, &label->len);
-+				&dentry->d_name, NULL,
-+				(void **)&label->label, &label->len);
- 	if (err == 0)
- 		return label;
- 
-Index: redhat-linux/fs/ceph/xattr.c
-===================================================================
---- redhat-linux.orig/fs/ceph/xattr.c	2021-10-04 15:40:28.978453324 -0400
-+++ redhat-linux/fs/ceph/xattr.c	2021-10-06 15:20:57.756247170 -0400
-@@ -1311,7 +1311,7 @@ int ceph_security_init_secctx(struct den
- 	int err;
- 
- 	err = security_dentry_init_security(dentry, mode, &dentry->d_name,
--					    &as_ctx->sec_ctx,
-+					    &name, &as_ctx->sec_ctx,
- 					    &as_ctx->sec_ctxlen);
- 	if (err < 0) {
- 		WARN_ON_ONCE(err != -EOPNOTSUPP);
-@@ -1335,7 +1335,6 @@ int ceph_security_init_secctx(struct den
- 	 * It only supports single security module and only selinux has
- 	 * dentry_init_security hook.
- 	 */
--	name = XATTR_NAME_SELINUX;
- 	name_len = strlen(name);
- 	err = ceph_pagelist_reserve(pagelist,
- 				    4 * 2 + name_len + as_ctx->sec_ctxlen);
+Description
+-----------
+When a file is created (create, mknod, mkdir, symlink), typically file
+systems call  security_inode_init_security() to initialize security
+context of an inode. But this does not very well with remote filesystems
+as inode is not there yet. Client will send a creation request to
+server and once server has created the file, client will instantiate
+the inode.
+
+So filesystems like nfs and ceph use security_dentry_init_security()
+instead. This takes in a dentry and returns the security context of
+file if any.
+
+These patches call security_dentry_init_security() and send security
+label of file along with creation request (FUSE_CREATE, FUSE_MKDIR,
+FUSE_MKNOD, FUSE_SYMLINK). This will give server an opportunity
+to create new file and also set security label (possibly atomically
+where possible).
+
+These patches are based on the work Chirantan Ekbote did some time
+back but it never got upstreamed. So I have taken his patches,
+and made modifications on top.
+
+https://listman.redhat.com/archives/virtio-fs/2020-July/msg00014.html
+https://listman.redhat.com/archives/virtio-fs/2020-July/msg00015.html
+
+These patches will allow us to support SELinux on virtiofs.
+
+Vivek Goyal (2):
+  fuse: Add a flag FUSE_SECURITY_CTX
+  fuse: Send security context of inode on file creation
+
+ fs/fuse/dir.c             | 115 ++++++++++++++++++++++++++++++++++++--
+ fs/fuse/fuse_i.h          |   3 +
+ fs/fuse/inode.c           |   4 +-
+ include/uapi/linux/fuse.h |  29 +++++++++-
+ 4 files changed, 144 insertions(+), 7 deletions(-)
+
+-- 
+2.31.1
 

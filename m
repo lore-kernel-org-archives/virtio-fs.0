@@ -1,12 +1,10 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Thu, 14 Oct 2021 11:31:21 -0400
-Message-Id: <20211014153126.575173-2-vgoyal@redhat.com>
-In-Reply-To: <20211014153126.575173-1-vgoyal@redhat.com>
-References: <20211014153126.575173-1-vgoyal@redhat.com>
+Date: Thu, 14 Oct 2021 11:31:20 -0400
+Message-Id: <20211014153126.575173-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 1/6] fuse: Header file changes for
-	FUSE_SECURITY_CTX
+Subject: [Virtio-fs] [PATCH v2 0/6] virtiofsd: Add support for file security
+	context at creation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,70 +16,70 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: miklos@szeredi.hu, stephen.smalley.work@gmail.com, omosnace@redhat.com, casey@schaufler-ca.com, vgoyal@redhat.com
 
-These are just header file changes which should show up in qemu if
-corresponding kernel changes get merged.
+Hi,
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- include/standard-headers/linux/fuse.h | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+This is v2 of patches. I posted v1 here.
 
-diff --git a/include/standard-headers/linux/fuse.h b/include/standard-headers/linux/fuse.h
-index cce105bfba..adf70b884c 100644
---- a/include/standard-headers/linux/fuse.h
-+++ b/include/standard-headers/linux/fuse.h
-@@ -181,6 +181,10 @@
-  *  - add FUSE_OPEN_KILL_SUIDGID
-  *  - extend fuse_setxattr_in, add FUSE_SETXATTR_EXT
-  *  - add FUSE_SETXATTR_ACL_KILL_SGID
-+ *
-+ *  7.35
-+ *  - add FUSE_SECURITY_CTX flag for fuse_init_out
-+ *  - add security context to create, mkdir, symlink, and mknod requests
-  */
- 
- #ifndef _LINUX_FUSE_H
-@@ -212,7 +216,7 @@
- #define FUSE_KERNEL_VERSION 7
- 
- /** Minor version number of this interface */
--#define FUSE_KERNEL_MINOR_VERSION 33
-+#define FUSE_KERNEL_MINOR_VERSION 35
- 
- /** The node ID of the root inode */
- #define FUSE_ROOT_ID 1
-@@ -329,6 +333,8 @@ struct fuse_file_lock {
-  *			write/truncate sgid is killed only if file has group
-  *			execute permission. (Same as Linux VFS behavior).
-  * FUSE_SETXATTR_EXT:	Server supports extended struct fuse_setxattr_in
-+ * FUSE_SECURITY_CTX:  add security context to create, mkdir, symlink, and
-+ *                     mknod
-  */
- #define FUSE_ASYNC_READ		(1 << 0)
- #define FUSE_POSIX_LOCKS	(1 << 1)
-@@ -360,6 +366,7 @@ struct fuse_file_lock {
- #define FUSE_SUBMOUNTS		(1 << 27)
- #define FUSE_HANDLE_KILLPRIV_V2	(1 << 28)
- #define FUSE_SETXATTR_EXT	(1 << 29)
-+#define FUSE_SECURITY_CTX	(1 << 30)
- 
- /**
-  * CUSE INIT request/reply flags
-@@ -967,4 +974,14 @@ struct fuse_removemapping_one {
- #define FUSE_REMOVEMAPPING_MAX_ENTRY   \
- 		(PAGE_SIZE / sizeof(struct fuse_removemapping_one))
- 
-+struct fuse_secctx {
-+	uint32_t        size;
-+	uint32_t        padding;
-+};
-+
-+struct fuse_secctxs {
-+	uint32_t        nr_secctx;
-+	uint32_t        padding;
-+};
-+
- #endif /* _LINUX_FUSE_H */
+https://lore.kernel.org/qemu-devel/20210924194854.919414-1-vgoyal@redhat.com/
+
+Posted corresponding kernel patches here.
+
+https://lore.kernel.org/linux-fsdevel/20211012180624.447474-1-vgoyal@redhat.com/
+
+changes since v1:
+
+- Modified patches to handle changes to fuse protocol which allowed
+  protocol to send multiple security lables. As of now we can handle
+  only one label and we expect it to be selinux label.
+
+- Added an option (-o security_label/no_security_label) to
+  enable/disable security label. It is disabled by default.
+
+- Did a fix to not use fscreate if host does not have selinux enabled.   
+
+Description
+-----------
+These patches add support to receive and set file security context at
+the time of file creation. This is one of the components needed to
+support SELinux on virtiofs.
+
+These patches will allow users to configure virtiofsd in multiple modes
+to set security context.
+
+A. Guest and host selinux policies can work with each other.
+        - virtiofsd will use /proc/thread-self/attr/fscreate knob to
+          set security context before file creation.
+
+B. Remap guest selinux security xattr to something else say,
+   trusted.virtiofs.security.selinux.
+        - Give CAP_SYS_ADMIN to virtiofsd.
+        - "-o -o xattrmap=:map:security.selinux:trusted.virtiofsd.:"
+
+C. If no SELinux on host.
+        - Give CAP_SYS_ADMIN to virtiofsd and security xattr will be
+	  saved in security.selinux xattr on host.
+
+With these patches, I am able to boot a guest VM with rootfs on virtiofs
+and with SELinux enabled in guest.
+
+
+Vivek Goyal (6):
+  fuse: Header file changes for FUSE_SECURITY_CTX
+  virtiofsd, fuse_lowlevel.c: Add capability to parse security context
+  virtiofsd: Move core file creation code in separate function
+  virtiofsd: Create new file with fscreate set
+  virtiofsd: Create new file using O_TMPFILE and set security context
+  virtiofsd: Add an option to enable/disable security label
+
+ docs/tools/virtiofsd.rst              |   7 +
+ include/standard-headers/linux/fuse.h |  19 +-
+ tools/virtiofsd/fuse_common.h         |   5 +
+ tools/virtiofsd/fuse_i.h              |   7 +
+ tools/virtiofsd/fuse_lowlevel.c       |  91 ++++++
+ tools/virtiofsd/helper.c              |   1 +
+ tools/virtiofsd/passthrough_ll.c      | 414 ++++++++++++++++++++++++--
+ 7 files changed, 514 insertions(+), 30 deletions(-)
+
 -- 
 2.31.1
 

@@ -1,12 +1,12 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Thu, 14 Oct 2021 11:31:23 -0400
-Message-Id: <20211014153126.575173-4-vgoyal@redhat.com>
-In-Reply-To: <20211014153126.575173-1-vgoyal@redhat.com>
-References: <20211014153126.575173-1-vgoyal@redhat.com>
+From: Jeffle Xu <jefflexu@linux.alibaba.com>
+Date: Fri, 15 Oct 2021 10:49:10 +0800
+Message-Id: <20211015024910.22049-1-jefflexu@linux.alibaba.com>
+In-Reply-To: <20211011030938.109206-2-jefflexu@linux.alibaba.com>
+References: <20211011030938.109206-2-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 3/6] virtiofsd: Move core file creation code
-	in separate function
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd PATCH v7 1/6] virtiofsd: add .ioctl() support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,81 +15,132 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com
-Cc: miklos@szeredi.hu, stephen.smalley.work@gmail.com, omosnace@redhat.com, casey@schaufler-ca.com, vgoyal@redhat.com
+To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
+Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com
 
-Move core file creation bits in a separate function. Soon this is going
-to get more complex as file creation need to set security context also.
-And there will be multiple modes of file creation in next patch.
+changes since v6:
+- correct the logic of limiting ioctls other than FS_IOC_[G|S]ETFLAGS
+  and FS_IOC_FS[G|S]ETXATTR
+- add missing free() corresponding to malloc()
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+For passthrough, it passes corresponding ioctls to host directly.
+
+Currently only these ioctls that handling persistent inode flags, i.e.,
+FS_IOC_[G|S]ETFLAGS and FS_IOC_FS[G|S]ETXATTR are supported for security
+concern, though it's implemented in a quite general way, so that we can
+expand the scope of allowed ioctls if it is really needed later.
+
+Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 36 ++++++++++++++++++++++----------
- 1 file changed, 25 insertions(+), 11 deletions(-)
+ tools/virtiofsd/passthrough_ll.c      | 61 +++++++++++++++++++++++++++
+ tools/virtiofsd/passthrough_seccomp.c |  1 +
+ 2 files changed, 62 insertions(+)
 
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 64b5b4fbb1..54978b7fae 100644
+index b76d878509..c1cb54c31a 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -1976,6 +1976,30 @@ static int lo_do_open(struct lo_data *lo, struct lo_inode *inode,
-     return 0;
+@@ -47,6 +47,7 @@
+ #include <dirent.h>
+ #include <pthread.h>
+ #include <sys/file.h>
++#include <sys/ioctl.h>
+ #include <sys/mount.h>
+ #include <sys/prctl.h>
+ #include <sys/resource.h>
+@@ -54,6 +55,7 @@
+ #include <sys/wait.h>
+ #include <sys/xattr.h>
+ #include <syslog.h>
++#include <linux/fs.h>
+ 
+ #include "qemu/cutils.h"
+ #include "passthrough_helpers.h"
+@@ -2105,6 +2107,64 @@ out:
+     fuse_reply_err(req, saverr);
  }
  
-+static int do_lo_create(fuse_req_t req, struct lo_inode *parent_inode,
-+                        const char *name, mode_t mode,
-+                        struct fuse_file_info *fi, int* open_fd)
++
++static void lo_ioctl(fuse_req_t req, fuse_ino_t ino, unsigned int cmd, void *arg,
++                          struct fuse_file_info *fi, unsigned flags, const void *in_buf,
++                          size_t in_bufsz, size_t out_bufsz)
 +{
-+    int err = 0, fd;
-+    struct lo_cred old = {};
-+    struct lo_data *lo = lo_data(req);
++    int res, dir;
++    int fd = lo_fi_fd(req, fi);
++    int saverr = ENOSYS;
++    void *buf = NULL;
++    size_t size = 0;
 +
-+    err = lo_change_cred(req, &old, lo->change_umask);
-+    if (err) {
-+        return err;
++    fuse_log(FUSE_LOG_DEBUG, "lo_ioctl(ino=%" PRIu64 ", cmd=0x%x, flags=0x%x, "
++            "in_bufsz = %lu, out_bufsz = %lu)\n",
++            ino, cmd, flags, in_bufsz, out_bufsz);
++
++    if (!(cmd == FS_IOC_SETFLAGS || cmd == FS_IOC_GETFLAGS ||
++          cmd == FS_IOC_FSSETXATTR || cmd == FS_IOC_FSGETXATTR))
++        goto out;
++
++    /* unrestricted ioctl is not supported yet */
++    if (flags & FUSE_IOCTL_UNRESTRICTED)
++        goto out;
++
++    dir = _IOC_DIR(cmd);
++
++    if (dir & _IOC_READ) {
++        size = out_bufsz;
++        buf = malloc(size);
++        if (!buf)
++            goto out_err;
++
++        if (dir & _IOC_WRITE)
++            memcpy(buf, in_buf, size);
++
++        res = ioctl(fd, cmd, buf);
++    }
++    else if (dir & _IOC_WRITE) {
++        res = ioctl(fd, cmd, in_buf);
++    }
++    else {
++        res = ioctl(fd, cmd, arg);
 +    }
 +
-+    /* Try to create a new file but don't open existing files */
-+    fd = openat(parent_inode->fd, name, fi->flags | O_CREAT | O_EXCL, mode);
-+    if (fd == -1) {
-+        err = errno;
-+    } else {
-+        *open_fd = fd;
-+    }
-+    lo_restore_cred(&old, lo->change_umask);
-+    return err;
++    if (res < 0)
++        goto out_err;
++
++    fuse_reply_ioctl(req, 0, buf, size);
++    free(buf);
++
++    return;
++
++out_err:
++    saverr = errno;
++out:
++    fuse_reply_err(req, saverr);
++    free(buf);
 +}
 +
- static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
-                       mode_t mode, struct fuse_file_info *fi)
+ static void lo_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
+                         struct fuse_file_info *fi)
  {
-@@ -1985,7 +2009,6 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
-     struct lo_inode *inode = NULL;
-     struct fuse_entry_param e;
-     int err;
--    struct lo_cred old = {};
- 
-     fuse_log(FUSE_LOG_DEBUG, "lo_create(parent=%" PRIu64 ", name=%s)"
-              " kill_priv=%d\n", parent, name, fi->kill_priv);
-@@ -2001,18 +2024,9 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
-         return;
-     }
- 
--    err = lo_change_cred(req, &old, lo->change_umask);
--    if (err) {
--        goto out;
--    }
--
-     update_open_flags(lo->writeback, lo->allow_direct_io, fi);
- 
--    /* Try to create a new file but don't open existing files */
--    fd = openat(parent_inode->fd, name, fi->flags | O_CREAT | O_EXCL, mode);
--    err = fd == -1 ? errno : 0;
--
--    lo_restore_cred(&old, lo->change_umask);
-+    err = do_lo_create(req, parent_inode, name, mode, fi, &fd);
- 
-     /* Ignore the error if file exists and O_EXCL was not given */
-     if (err && (err != EEXIST || (fi->flags & O_EXCL))) {
+@@ -3278,6 +3338,7 @@ static struct fuse_lowlevel_ops lo_oper = {
+     .fsyncdir = lo_fsyncdir,
+     .create = lo_create,
+     .getlk = lo_getlk,
++    .ioctl = lo_ioctl,
+     .setlk = lo_setlk,
+     .open = lo_open,
+     .release = lo_release,
+diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
+index 62441cfcdb..2a5f7614fc 100644
+--- a/tools/virtiofsd/passthrough_seccomp.c
++++ b/tools/virtiofsd/passthrough_seccomp.c
+@@ -62,6 +62,7 @@ static const int syscall_allowlist[] = {
+     SCMP_SYS(gettid),
+     SCMP_SYS(gettimeofday),
+     SCMP_SYS(getxattr),
++    SCMP_SYS(ioctl),
+     SCMP_SYS(linkat),
+     SCMP_SYS(listxattr),
+     SCMP_SYS(lseek),
 -- 
-2.31.1
+2.27.0
 

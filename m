@@ -1,12 +1,14 @@
-Date: Mon, 18 Oct 2021 11:21:09 -0400
+Date: Mon, 18 Oct 2021 13:07:32 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YW2Q5Y3u1TMlQEcW@redhat.com>
-References: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
+Message-ID: <YW2p1NAv5wiOtzDs@redhat.com>
+References: <20210916084045.31684-1-hreitz@redhat.com>
+	<20210916084045.31684-2-hreitz@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH v6 0/7] fuse,virtiofs: support per-file DAX
+In-Reply-To: <20210916084045.31684-2-hreitz@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v4 01/12] virtiofsd: Keep
+	/proc/self/mountinfo open
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,141 +17,127 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Jeffle Xu <jefflexu@linux.alibaba.com>
-Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, miklos@szeredi.hub, linux-fsdevel@vger.kernel.org
+To: Hanna Reitz <hreitz@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Mon, Oct 11, 2021 at 11:00:45AM +0800, Jeffle Xu wrote:
-> changes since v5:
-> Overall Design Changes:
-> 1. virtiofsd now supports ioctl (only FS_IOC_SETFLAGS and
->   FS_IOC_FSSETXATTR), so that users inside guest could set/clear
->   persistent inode flags now. (FUSE kernel module has already supported
->   .ioctl(), virtiofsd need to suuport it.)
+On Thu, Sep 16, 2021 at 10:40:34AM +0200, Hanna Reitz wrote:
+> File handles are specific to mounts, and so name_to_handle_at() returns
+> the respective mount ID.  However, open_by_handle_at() is not content
+> with an ID, it wants a file descriptor for some inode on the mount,
+> which we have to open.
+> 
+> We want to use /proc/self/mountinfo to find the mounts' root directories
+> so we can open them and pass the respective FDs to open_by_handle_at().
+> (We need to use the root directory, because we want the inode belonging
+> to every mount FD be deletable.  Before the root directory can be
+> deleted, all entries within must have been closed, and so when it is
+> deleted, there should not be any file handles left that need its FD as
+> their mount FD.  Thus, we can then close that FD and the inode can be
+> deleted.[1])
+> 
+> That is why we need to open /proc/self/mountinfo so that we can use it
+> to translate mount IDs into root directory paths.  We have to open it
+> after setup_mounts() was called, because if we try to open it before, it
+> will appear as an empty file after setup_mounts().
+> 
+> [1] Note that in practice, you still cannot delete the mount root
+> directory.  It is a mount point on the host, after all, and mount points
+> cannot be deleted.  But by using the mount point as the mount FD, we
+> will at least not hog any actually deletable inodes.
+> 
+> Signed-off-by: Hanna Reitz <hreitz@redhat.com>
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 40 ++++++++++++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 38b2af8599..6511a6acb4 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -172,6 +172,8 @@ struct lo_data {
+>  
+>      /* An O_PATH file descriptor to /proc/self/fd/ */
+>      int proc_self_fd;
+> +    /* A read-only FILE pointer for /proc/self/mountinfo */
+> +    FILE *mountinfo_fp;
+>      int user_killpriv_v2, killpriv_v2;
+>      /* If set, virtiofsd is responsible for setting umask during creation */
+>      bool change_umask;
+> @@ -3718,6 +3720,19 @@ static void setup_chroot(struct lo_data *lo)
+>  static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
+>                            bool enable_syslog)
+>  {
+> +    int proc_self, mountinfo_fd;
+> +    int saverr;
+> +
+> +    /*
+> +     * Open /proc/self before we pivot to the new root so we can still
+> +     * open /proc/self/mountinfo afterwards
+> +     */
+> +    proc_self = open("/proc/self", O_PATH);
+> +    if (proc_self < 0) {
+> +        fuse_log(FUSE_LOG_WARNING, "Failed to open /proc/self: %m; "
+> +                 "will not be able to use file handles\n");
+> +    }
+> +
 
-So no changes needed in fuse side (kernel) to support FS_IOC_FSSETXATTR?
-Only virtiofsd needs to be changed. That sounds good.
+Hi Hanna,
 
+Should we open /proc/self and /proc/self/mountinfo only if user wants
+to file handle. We have already parsed options by now so we know.
+
+Also, if user asked for file handles, and we can't open /proc/self or
+/proc/self/mountinfo successfully, I would think we should error out
+and not continue (instead of just log it and continue).
+
+That seems to be general theme. If user asked for a feature and if
+we can't enable it, we error out and let user retry without that
+particular feature.
+
+>      if (lo->sandbox == SANDBOX_NAMESPACE) {
+>          setup_namespaces(lo, se);
+>          setup_mounts(lo->source);
+> @@ -3725,6 +3740,31 @@ static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
+>          setup_chroot(lo);
+>      }
+>  
+> +    /*
+> +     * Opening /proc/self/mountinfo before the umount2() call in
+> +     * setup_mounts() leads to the file appearing empty.  That is why
+> +     * we defer opening it until here.
+> +     */
+> +    lo->mountinfo_fp = NULL;
+> +    if (proc_self >= 0) {
+> +        mountinfo_fd = openat(proc_self, "mountinfo", O_RDONLY);
+> +        if (mountinfo_fd < 0) {
+> +            saverr = errno;
+> +        } else if (mountinfo_fd >= 0) {
+> +            lo->mountinfo_fp = fdopen(mountinfo_fd, "r");
+> +            if (!lo->mountinfo_fp) {
+> +                saverr = errno;
+> +                close(mountinfo_fd);
+> +            }
+> +        }
+> +        if (!lo->mountinfo_fp) {
+> +            fuse_log(FUSE_LOG_WARNING, "Failed to open /proc/self/mountinfo: "
+> +                     "%s; will not be able to use file handles\n",
+> +                     strerror(saverr));
+> +        }
+> +        close(proc_self);
+> +    }
+> +
+
+Above code couple probably be moved in a helper function. Makes it
+easier to read setup_sandbox(). Same here, open mountinfo only if
+user wants file handle support and error out if file handle support
+can't be enabled.
+
+Thanks
 Vivek
-
-> 2. When FUSE client is mounted with '-o dax=inode', it indicates that
->   whether DAX shall be enabled or not for one specific file is
->   completely determined by FUSE server while FUSE client has no say on
->   it, and the decision whether DAX shall be enabled or not for specific
->   file is communicated through FUSE_ATTR_DAX flag of FUSE protocol. The
->   algorithm used by virtiofsd to determine whether DAX shall be enabled
->   or not is totally implementation specific, and thus the following
->   scenario may exist: users inside guest has already set related persistent
->   inode flag (i.e. FS_XFLAG_DAX) on corresponding file but FUSE server finnaly
->   decides not to enable DAX for this file. This slight semantic difference
->   is documented in patch 7. Also because of this, d_mark_dontcache() is
->   not called when FS_IOC_SETFLAGS/FS_IOC_FSSETXATTR ioctl is done inside
->   guest. It's delayed to be done if the FUSE_ATTR_DAX flag **indeed**
->   changes (as showed in patch 6).
-> 3. patch 1: slightly modify logic of fuse_should_enable_dax()
-> 4. patch 4: add back negotiation during FUSE_INIT. FUSE client shall
->   advertise to FUSE server that it's in per-file DAX mode, so that FUSE
->   server may omit querying persistent inode flags on host if FUSE client
->   is not mounted in per-file DAX mode, giving querying persistent inode
->   flags could be quite expensive.
-> 
-> 
-> chanegs since v4:
-> - drop support for setting/clearing FS_DAX inside guest
-> - and thus drop the negotiation phase during FUSE_INIT
-> 
-> This patchset adds support of per-file DAX for virtiofs, which is
-> inspired by Ira Weiny's work on ext4[1] and xfs[2].
-> 
-> Any comment is welcome.
-> 
-> [1] commit 9cb20f94afcd ("fs/ext4: Make DAX mount option a tri-state")
-> [2] commit 02beb2686ff9 ("fs/xfs: Make DAX mount option a tri-state")
-> 
-> [Purpose]
-> DAX may be limited in some specific situation. When the number of usable
-> DAX windows is under watermark, the recalim routine will be triggered to
-> reclaim some DAX windows. It may have a negative impact on the
-> performance, since some processes may need to wait for DAX windows to be
-> recalimed and reused then. To mitigate the performance degradation, the
-> overall DAX window need to be expanded larger.
-> 
-> However, simply expanding the DAX window may not be a good deal in some
-> scenario. To maintain one DAX window chunk (i.e., 2MB in size), 32KB
-> (512 * 64 bytes) memory footprint will be consumed for page descriptors
-> inside guest, which is greater than the memory footprint if it uses
-> guest page cache when DAX disabled. Thus it'd better disable DAX for
-> those files smaller than 32KB, to reduce the demand for DAX window and
-> thus avoid the unworthy memory overhead.
-> 
-> Per-file DAX feature is introduced to address this issue, by offering a
-> finer grained control for dax to users, trying to achieve a balance
-> between performance and memory overhead.
-> 
-> 
-> [Note]
-> When the per-file DAX hint changes while the file is still *opened*, it
-> is quite complicated and maybe fragile to dynamically change the DAX
-> state, since dynamic switching needs to switch a_ops atomiclly. Ira
-> Weiny had ever implemented a so called i_aops_sem lock [3] but
-> eventually gave up since the complexity of the implementation
-> [4][5][6][7].
-> 
-> Hence mark the inode and corresponding dentries as DONE_CACHE once the
-> per-file DAX hint changes, so that the inode instance will be evicted
-> and freed as soon as possible once the file is closed and the last
-> reference to the inode is put. And then when the file gets reopened next
-> time, the new instantiated inode will reflect the new DAX state.
-> 
-> In summary, when the per-file DAX hint changes for an *opened* file, the
-> DAX state of the file won't be updated until this file is closed and
-> reopened later. This is also how ext4/xfs per-file DAX works.
-> 
-> [3] https://lore.kernel.org/lkml/20200227052442.22524-7-ira.weiny@intel.com/
-> [4] https://patchwork.kernel.org/project/xfs/cover/20200407182958.568475-1-ira.weiny@intel.com/
-> [5] https://lore.kernel.org/lkml/20200305155144.GA5598@lst.de/
-> [6] https://lore.kernel.org/lkml/20200401040021.GC56958@magnolia/
-> [7] https://lore.kernel.org/lkml/20200403182904.GP80283@magnolia/
-> 
-> changes since v3:
-> - bug fix (patch 6): s/"IS_DAX(inode) != newdax"/"!!IS_DAX(inode) !=
->   newdax"
-> - during FUSE_INIT, advertise capability for per-file DAX only when
->   mounted as "-o dax=inode" (patch 4)
-> 
-> changes since v2:
-> - modify fuse_show_options() accordingly to make it compatible with
->   new tri-state mount option (patch 2)
-> - extract FUSE protocol changes into one separate patch (patch 3)
-> - FUSE server/client need to negotiate if they support per-file DAX
->   (patch 4)
-> - extract DONT_CACHE logic into patch 6/7
-> 
-> v5: https://lore.kernel.org/all/20210923092526.72341-1-jefflexu@linux.alibaba.com/
-> v4: https://lore.kernel.org/linux-fsdevel/20210817022220.17574-1-jefflexu@linux.alibaba.com/
-> v3: https://www.spinics.net/lists/linux-fsdevel/msg200852.html
-> v2: https://www.spinics.net/lists/linux-fsdevel/msg199584.html
-> v1: https://www.spinics.net/lists/linux-virtualization/msg51008.html
-> 
-> 
-> Jeffle Xu (7):
->   fuse: add fuse_should_enable_dax() helper
->   fuse: make DAX mount option a tri-state
->   fuse: support per-file DAX in fuse protocol
->   fuse: negotiate per-file DAX in FUSE_INIT
->   fuse: enable per-file DAX
->   fuse: mark inode DONT_CACHE when per-file DAX hint changes
->   Documentation/filesystem/dax: record DAX on virtiofs
-> 
->  Documentation/filesystems/dax.rst | 20 +++++++++++++++--
->  fs/fuse/dax.c                     | 36 ++++++++++++++++++++++++++++---
->  fs/fuse/file.c                    |  4 ++--
->  fs/fuse/fuse_i.h                  | 19 ++++++++++++----
->  fs/fuse/inode.c                   | 17 +++++++++++----
->  fs/fuse/virtio_fs.c               | 16 ++++++++++++--
->  include/uapi/linux/fuse.h         |  9 +++++++-
->  7 files changed, 103 insertions(+), 18 deletions(-)
-> 
+>      setup_seccomp(enable_syslog);
+>      setup_capabilities(g_strdup(lo->modcaps));
+>  }
 > -- 
-> 2.27.0
+> 2.31.1
 > 
 

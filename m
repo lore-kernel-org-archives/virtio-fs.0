@@ -1,15 +1,14 @@
-Date: Mon, 18 Oct 2021 10:20:59 -0400
+Date: Mon, 18 Oct 2021 10:30:02 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YW2Cyxtijcq5UqYA@redhat.com>
+Message-ID: <YW2E6jaTbv1FcFnu@redhat.com>
 References: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
-	<20211011030052.98923-4-jefflexu@linux.alibaba.com>
-	<YW2BLCtThkdrEs3K@redhat.com>
+	<20211011030052.98923-5-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <YW2BLCtThkdrEs3K@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v6 3/7] fuse: support per-file DAX in fuse
-	protocol
+In-Reply-To: <20211011030052.98923-5-jefflexu@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH v6 4/7] fuse: negotiate per-file DAX in
+	FUSE_INIT
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,85 +20,39 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: Jeffle Xu <jefflexu@linux.alibaba.com>
 Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, miklos@szeredi.hub, linux-fsdevel@vger.kernel.org
 
-On Mon, Oct 18, 2021 at 10:14:04AM -0400, Vivek Goyal wrote:
-> On Mon, Oct 11, 2021 at 11:00:48AM +0800, Jeffle Xu wrote:
-> > Expand the fuse protocol to support per-file DAX.
-> > 
-> > FUSE_PERFILE_DAX flag is added indicating if fuse server/client
+On Mon, Oct 11, 2021 at 11:00:49AM +0800, Jeffle Xu wrote:
+> Among the FUSE_INIT phase, client shall advertise per-file DAX if it's
+> mounted with "-o dax=inode". Then server is aware that client is in
+> per-file DAX mode, and will construct per-inode DAX attribute
+> accordingly.
 > 
-> Should we call this flag FUSE_INODE_DAX instead? It is per inode property?
+> Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
+> ---
+>  fs/fuse/inode.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
+> diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+> index b4b41683e97e..f4ad99e2415b 100644
+> --- a/fs/fuse/inode.c
+> +++ b/fs/fuse/inode.c
+> @@ -1203,6 +1203,8 @@ void fuse_send_init(struct fuse_mount *fm)
+>  #ifdef CONFIG_FUSE_DAX
+>  	if (fm->fc->dax)
+>  		ia->in.flags |= FUSE_MAP_ALIGNMENT;
+> +	if (fm->fc->dax_mode == FUSE_DAX_INODE)
+> +		ia->in.flags |= FUSE_PERFILE_DAX;
 
-I realized that you are using FUSE_DAX_INODE to represent dax mode. So it
-will be confusing to use FUSE_INODE_DAX as protocol flag. How about
-FUSE_INODE_DAX_STATE instead?
+Are you not keeping track of server's response whether server supports
+per inode dax or not. Client might be new and server might be old and
+server might not support per inode dax. In that case, we probably 
+should error out if user mounted with "-o dax=inode".
 
 Vivek
 
-> Vivek
+>  #endif
+>  	if (fm->fc->auto_submounts)
+>  		ia->in.flags |= FUSE_SUBMOUNTS;
+> -- 
+> 2.27.0
 > 
-> > supporting per-file DAX. It can be conveyed in both FUSE_INIT request
-> > and reply.
-> > 
-> > FUSE_ATTR_DAX flag is added indicating if DAX shall be enabled for
-> > corresponding file. It is conveyed in FUSE_LOOKUP reply.
-> > 
-> > Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
-> > ---
-> >  include/uapi/linux/fuse.h | 9 ++++++++-
-> >  1 file changed, 8 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-> > index 36ed092227fa..15a1f5fc0797 100644
-> > --- a/include/uapi/linux/fuse.h
-> > +++ b/include/uapi/linux/fuse.h
-> > @@ -184,6 +184,9 @@
-> >   *
-> >   *  7.34
-> >   *  - add FUSE_SYNCFS
-> > + *
-> > + *  7.35
-> > + *  - add FUSE_PERFILE_DAX, FUSE_ATTR_DAX
-> >   */
-> >  
-> >  #ifndef _LINUX_FUSE_H
-> > @@ -219,7 +222,7 @@
-> >  #define FUSE_KERNEL_VERSION 7
-> >  
-> >  /** Minor version number of this interface */
-> > -#define FUSE_KERNEL_MINOR_VERSION 34
-> > +#define FUSE_KERNEL_MINOR_VERSION 35
-> >  
-> >  /** The node ID of the root inode */
-> >  #define FUSE_ROOT_ID 1
-> > @@ -336,6 +339,7 @@ struct fuse_file_lock {
-> >   *			write/truncate sgid is killed only if file has group
-> >   *			execute permission. (Same as Linux VFS behavior).
-> >   * FUSE_SETXATTR_EXT:	Server supports extended struct fuse_setxattr_in
-> > + * FUSE_PERFILE_DAX:	kernel supports per-file DAX
-> >   */
-> >  #define FUSE_ASYNC_READ		(1 << 0)
-> >  #define FUSE_POSIX_LOCKS	(1 << 1)
-> > @@ -367,6 +371,7 @@ struct fuse_file_lock {
-> >  #define FUSE_SUBMOUNTS		(1 << 27)
-> >  #define FUSE_HANDLE_KILLPRIV_V2	(1 << 28)
-> >  #define FUSE_SETXATTR_EXT	(1 << 29)
-> > +#define FUSE_PERFILE_DAX	(1 << 30)
-> >  
-> >  /**
-> >   * CUSE INIT request/reply flags
-> > @@ -449,8 +454,10 @@ struct fuse_file_lock {
-> >   * fuse_attr flags
-> >   *
-> >   * FUSE_ATTR_SUBMOUNT: Object is a submount root
-> > + * FUSE_ATTR_DAX: Enable DAX for this file in per-file DAX mode
-> >   */
-> >  #define FUSE_ATTR_SUBMOUNT      (1 << 0)
-> > +#define FUSE_ATTR_DAX		(1 << 1)
-> >  
-> >  /**
-> >   * Open flags
-> > -- 
-> > 2.27.0
-> > 
 

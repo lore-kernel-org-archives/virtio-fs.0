@@ -1,14 +1,19 @@
-Date: Tue, 19 Oct 2021 16:02:53 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YW8kbdCeqs11E0Tl@redhat.com>
-References: <20210916084045.31684-1-hreitz@redhat.com>
-	<20210916084045.31684-11-hreitz@redhat.com>
+DKIM-Filter: OpenDKIM Filter v2.11.0 mail.namei.org 3A5781C2
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=namei.org; s=2;
+	t=1634676775; bh=eJ38SycwOWDCZsBfSsnUj9RXqKdsL9o4kYObW0CKim0=;
+	h=Date:From:To:cc:Subject:In-Reply-To:References:From;
+	b=ap83rxBCm0keV5NBaLe8KLpMnIwqcHEq9pgLJI793OJ5Of4PzaUjTwC7Hx5QHGtsH
+	MEK3P9I8WrBZfxX4R/jEcUYZTcTsZxIorz4cKYTfWtAr7yDMIoIFMuIcTchwBChlmk
+	/Zn8v2W44qp6Lts4z9QzcOjQyFUsW82uuihq8CQI=
+Date: Wed, 20 Oct 2021 07:52:55 +1100 (AEDT)
+From: James Morris <jmorris@namei.org>
+In-Reply-To: <YW1qJKLHYHWia2Nd@redhat.com>
+Message-ID: <3bd86fa3-b3b0-754f-25a5-5e4f723babe4@namei.org>
+References: <YWWMO/ZDrvDZ5X4c@redhat.com> <YW1qJKLHYHWia2Nd@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20210916084045.31684-11-hreitz@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v4 10/12] virtiofsd: Add inodes_by_handle
-	hash table
+Content-Type: text/plain; charset=US-ASCII
+Subject: Re: [Virtio-fs] [PATCH v2] security: Return xattr name from
+ security_dentry_init_security()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,145 +22,25 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Hanna Reitz <hreitz@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: bfields@fieldses.org, linux-nfs@vger.kernel.org, Miklos Szeredi <miklos@szeredi.hu>, selinux@vger.kernel.org, stephen.smalley.work@gmail.com, jlayton@kernel.org, Ondrej Mosnacek <omosnace@redhat.com>, anna.schumaker@netapp.com, virtio-fs@redhat.com, casey@schaufler-ca.com, linux-security-module@vger.kernel.org, chuck.lever@oracle.com, linux-fsdevel@vger.kernel.org, idryomov@gmail.com, ceph-devel@vger.kernel.org, trond.myklebust@hammerspace.com, serge@hallyn.com
 
-On Thu, Sep 16, 2021 at 10:40:43AM +0200, Hanna Reitz wrote:
-> Currently, lo_inode.fhandle is always NULL and so always keep an O_PATH
-> FD in lo_inode.fd.  Therefore, when the respective inode is unlinked,
-> its inode ID will remain in use until we drop our lo_inode (and
-> lo_inode_put() thus closes the FD).  Therefore, lo_find() can safely use
-> the inode ID as an lo_inode key, because any inode with an inode ID we
-> find in lo_data.inodes (on the same filesystem) must be the exact same
-> file.
-> 
-> This will change when we start setting lo_inode.fhandle so we do not
-> have to keep an O_PATH FD open.  Then, unlinking such an inode will
-> immediately remove it, so its ID can then be reused by newly created
-> files, even while the lo_inode object is still there[1].
-> 
-> So creating a new file can then reuse the old file's inode ID, and
-> looking up the new file would lead to us finding the old file's
-> lo_inode, which is not ideal.
-> 
-> Luckily, just as file handles cause this problem, they also solve it:  A
-> file handle contains a generation ID, which changes when an inode ID is
-> reused, so the new file can be distinguished from the old one.  So all
-> we need to do is to add a second map besides lo_data.inodes that maps
-> file handles to lo_inodes, namely lo_data.inodes_by_handle.  For
-> clarity, lo_data.inodes is renamed to lo_data.inodes_by_ids.
-> 
-> Unfortunately, we cannot rely on being able to generate file handles
-> every time.  Therefore, we still enter every lo_inode object into
-> inodes_by_ids, but having an entry in inodes_by_handle is optional.  A
-> potential inodes_by_handle entry then has precedence, the inodes_by_ids
-> entry is just a fallback.
-> 
-> Note that we do not generate lo_fhandle objects yet, and so we also do
-> not enter anything into the inodes_by_handle map yet.  Also, all lookups
-> skip that map.  We might manually create file handles with some code
-> that is immediately removed by the next patch again, but that would
-> break the assumption in lo_find() that every lo_inode with a non-NULL
-> .fhandle must have an entry in inodes_by_handle and vice versa.  So we
-> leave actually using the inodes_by_handle map for the next patch.
-> 
-> [1] If some application in the guest still has the file open, there is
-> going to be a corresponding FD mapping in lo_data.fd_map.  In such a
-> case, the inode will only go away once every application in the guest
-> has closed it.  The problem described only applies to cases where the
-> guest does not have the file open, and it is just in the dentry cache,
-> basically.
-> 
-> Signed-off-by: Hanna Reitz <hreitz@redhat.com>
-> ---
->  tools/virtiofsd/passthrough_ll.c | 81 +++++++++++++++++++++++++-------
->  1 file changed, 65 insertions(+), 16 deletions(-)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index bd8fc922ea..b7d6aa7f9d 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -186,7 +186,8 @@ struct lo_data {
->      int announce_submounts;
->      bool use_statx;
->      struct lo_inode root;
-> -    GHashTable *inodes; /* protected by lo->mutex */
-> +    GHashTable *inodes_by_ids; /* protected by lo->mutex */
-> +    GHashTable *inodes_by_handle; /* protected by lo->mutex */
->      struct lo_map ino_map; /* protected by lo->mutex */
->      struct lo_map dirp_map; /* protected by lo->mutex */
->      struct lo_map fd_map; /* protected by lo->mutex */
-> @@ -275,8 +276,9 @@ static struct {
->  /* That we loaded cap-ng in the current thread from the saved */
->  static __thread bool cap_loaded = 0;
->  
-> -static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
-> -                                uint64_t mnt_id);
-> +static struct lo_inode *lo_find(struct lo_data *lo,
-> +                                const struct lo_fhandle *fhandle,
-> +                                struct stat *st, uint64_t mnt_id);
->  static int xattr_map_client(const struct lo_data *lo, const char *client_name,
->                              char **out_name);
->  
-> @@ -1143,18 +1145,40 @@ out_err:
->      fuse_reply_err(req, saverr);
->  }
->  
-> -static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
-> -                                uint64_t mnt_id)
+On Mon, 18 Oct 2021, Vivek Goyal wrote:
 
-> +static struct lo_inode *lo_find(struct lo_data *lo,
-> +                                const struct lo_fhandle *fhandle,
-> +                                struct stat *st, uint64_t mnt_id)
->  {
-> -    struct lo_inode *p;
-> -    struct lo_key key = {
-> +    struct lo_inode *p = NULL;
-> +    struct lo_key ids_key = {
->          .ino = st->st_ino,
->          .dev = st->st_dev,
->          .mnt_id = mnt_id,
->      };
->  
->      pthread_mutex_lock(&lo->mutex);
-> -    p = g_hash_table_lookup(lo->inodes, &key);
-> +    if (fhandle) {
-> +        p = g_hash_table_lookup(lo->inodes_by_handle, fhandle);
-> +    }
-> +    if (!p) {
-> +        p = g_hash_table_lookup(lo->inodes_by_ids, &ids_key);
-> +        /*
-> +         * When we had to fall back to looking up an inode by its
-> +         * inode ID, ensure that we hit an entry that has a valid file
-> +         * descriptor.  Having an FD open means that the inode cannot
-> +         * really be deleted until the FD is closed, so that the inode
-> +         * ID remains valid until we evict our lo_inode.
-> +         * With no FD open (and just a file handle), the inode can be
-> +         * deleted while we still have our lo_inode, and so the inode
-> +         * ID may be reused by a completely different new inode.  We
-> +         * then must look up the lo_inode by file handle, because this
-> +         * handle contains a generation ID to differentiate between
-> +         * the old and the new inode.
-> +         */
-> +        if (p && p->fd == -1) {
-> +            p = NULL;
-> +        }
+> Hi James,
+> 
+> I am assuming this patch will need to be routed through security tree.
+> Can you please consider it for inclusion.
+> 
 
-What happens in following scenario.
+I'm happy for this to go via Paul's tree as it impacts SELinux and is 
+fairly minor in scope.
 
-- Say I have a hard linked file foo.txt with link foo-link.txt.
 
-- I lookup foo.txt. We generate file handle and add inode for foo.txt
-  to inode cache. lo_inode->fhandle will be valie but lo_inode->fd == -1.
+Acked-by: James Morris <jamorris@linux.microsoft.com>
 
-- Now later lookup for foo-link.txt happens. Say this time we can't
-  generate file handle. When we try to lookup inode, lo_find() should
-  return NULL. It will find inode by ids but not use it because inode
-  was added using file handle and p->fd == -1. That means lookup
-  for foo-link.txt will end up adding another inode, when it should
-  not have?
 
-Am I understanding it correctly?
-
-Vivek
+-- 
+James Morris
+<jmorris@namei.org>
 

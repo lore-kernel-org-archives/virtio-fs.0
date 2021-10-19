@@ -1,13 +1,14 @@
-References: <20210930153037.1194279-1-vgoyal@redhat.com>
-	<20210930153037.1194279-13-vgoyal@redhat.com>
-From: Christophe de Dinechin <dinechin@redhat.com>
-Date: Wed, 06 Oct 2021 17:34:59 +0200
-In-reply-to: <20210930153037.1194279-13-vgoyal@redhat.com>
-Message-ID: <lyr1cyi1re.fsf@redhat.com>
+Date: Tue, 19 Oct 2021 16:02:53 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YW8kbdCeqs11E0Tl@redhat.com>
+References: <20210916084045.31684-1-hreitz@redhat.com>
+	<20210916084045.31684-11-hreitz@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain
-Subject: Re: [Virtio-fs] [PATCH 12/13] virtiofsd: Implement blocking posix
- locks
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20210916084045.31684-11-hreitz@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v4 10/12] virtiofsd: Add inodes_by_handle
+	hash table
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,357 +17,145 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, miklos@szeredi.hu
+To: Hanna Reitz <hreitz@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-
-On 2021-09-30 at 11:30 -04, Vivek Goyal <vgoyal@redhat.com> wrote...
-> As of now we don't support fcntl(F_SETLKW) and if we see one, we return
-> -EOPNOTSUPP.
->
-> Change that by accepting these requests and returning a reply
-> immediately asking caller to wait. Once lock is available, send a
-> notification to the waiter indicating lock is available.
->
-> In response to lock request, we are returning error value as "1", which
-> signals to client to queue the lock request internally and later client
-> will get a notification which will signal lock is taken (or error). And
-> then fuse client should wake up the guest process.
->
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> Signed-off-by: Ioannis Angelakopoulos <iangelak@redhat.com>
+On Thu, Sep 16, 2021 at 10:40:43AM +0200, Hanna Reitz wrote:
+> Currently, lo_inode.fhandle is always NULL and so always keep an O_PATH
+> FD in lo_inode.fd.  Therefore, when the respective inode is unlinked,
+> its inode ID will remain in use until we drop our lo_inode (and
+> lo_inode_put() thus closes the FD).  Therefore, lo_find() can safely use
+> the inode ID as an lo_inode key, because any inode with an inode ID we
+> find in lo_data.inodes (on the same filesystem) must be the exact same
+> file.
+> 
+> This will change when we start setting lo_inode.fhandle so we do not
+> have to keep an O_PATH FD open.  Then, unlinking such an inode will
+> immediately remove it, so its ID can then be reused by newly created
+> files, even while the lo_inode object is still there[1].
+> 
+> So creating a new file can then reuse the old file's inode ID, and
+> looking up the new file would lead to us finding the old file's
+> lo_inode, which is not ideal.
+> 
+> Luckily, just as file handles cause this problem, they also solve it:  A
+> file handle contains a generation ID, which changes when an inode ID is
+> reused, so the new file can be distinguished from the old one.  So all
+> we need to do is to add a second map besides lo_data.inodes that maps
+> file handles to lo_inodes, namely lo_data.inodes_by_handle.  For
+> clarity, lo_data.inodes is renamed to lo_data.inodes_by_ids.
+> 
+> Unfortunately, we cannot rely on being able to generate file handles
+> every time.  Therefore, we still enter every lo_inode object into
+> inodes_by_ids, but having an entry in inodes_by_handle is optional.  A
+> potential inodes_by_handle entry then has precedence, the inodes_by_ids
+> entry is just a fallback.
+> 
+> Note that we do not generate lo_fhandle objects yet, and so we also do
+> not enter anything into the inodes_by_handle map yet.  Also, all lookups
+> skip that map.  We might manually create file handles with some code
+> that is immediately removed by the next patch again, but that would
+> break the assumption in lo_find() that every lo_inode with a non-NULL
+> .fhandle must have an entry in inodes_by_handle and vice versa.  So we
+> leave actually using the inodes_by_handle map for the next patch.
+> 
+> [1] If some application in the guest still has the file open, there is
+> going to be a corresponding FD mapping in lo_data.fd_map.  In such a
+> case, the inode will only go away once every application in the guest
+> has closed it.  The problem described only applies to cases where the
+> guest does not have the file open, and it is just in the dentry cache,
+> basically.
+> 
+> Signed-off-by: Hanna Reitz <hreitz@redhat.com>
 > ---
->  tools/virtiofsd/fuse_lowlevel.c  | 37 ++++++++++++++++-
->  tools/virtiofsd/fuse_lowlevel.h  | 26 ++++++++++++
->  tools/virtiofsd/fuse_virtio.c    | 50 ++++++++++++++++++++---
->  tools/virtiofsd/passthrough_ll.c | 70 ++++++++++++++++++++++++++++----
->  4 files changed, 167 insertions(+), 16 deletions(-)
->
-> diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-> index e4679c73ab..2e7f4b786d 100644
-> --- a/tools/virtiofsd/fuse_lowlevel.c
-> +++ b/tools/virtiofsd/fuse_lowlevel.c
-> @@ -179,8 +179,8 @@ int fuse_send_reply_iov_nofree(fuse_req_t req, int error, struct iovec *iov,
->          .unique = req->unique,
->          .error = error,
->      };
-> -
-> -    if (error <= -1000 || error > 0) {
-> +    /* error = 1 has been used to signal client to wait for notificaiton */
-> +    if (error <= -1000 || error > 1) {
-
-What about adding a #define for that special value 1?
-
-(and while we are at it, the -1000 does not look too good either, that could
-be a separate cleanup patch)
-
->          fuse_log(FUSE_LOG_ERR, "fuse: bad error value: %i\n", error);
->          out.error = -ERANGE;
->      }
-> @@ -290,6 +290,11 @@ int fuse_reply_err(fuse_req_t req, int err)
->      return send_reply(req, -err, NULL, 0);
->  }
->
-> +int fuse_reply_wait(fuse_req_t req)
-> +{
-> +    return send_reply(req, 1, NULL, 0);
-
-... to be used here too.
-
-> +}
-> +
->  void fuse_reply_none(fuse_req_t req)
->  {
->      fuse_free_req(req);
-> @@ -2165,6 +2170,34 @@ static void do_destroy(fuse_req_t req, fuse_ino_t nodeid,
->      send_reply_ok(req, NULL, 0);
->  }
->
-> +static int send_notify_iov(struct fuse_session *se, int notify_code,
-> +                           struct iovec *iov, int count)
-> +{
-> +    struct fuse_out_header out;
-> +    if (!se->got_init) {
-> +        return -ENOTCONN;
-> +    }
-> +    out.unique = 0;
-> +    out.error = notify_code;
-> +    iov[0].iov_base = &out;
-> +    iov[0].iov_len = sizeof(struct fuse_out_header);
-> +    return fuse_send_msg(se, NULL, iov, count);
-> +}
-> +
-> +int fuse_lowlevel_notify_lock(struct fuse_session *se, uint64_t unique,
-> +                  int32_t error)
-> +{
-> +    struct fuse_notify_lock_out outarg = {0};
-> +    struct iovec iov[2];
-> +
-> +    outarg.unique = unique;
-> +    outarg.error = -error;
-> +
-> +    iov[1].iov_base = &outarg;
-> +    iov[1].iov_len = sizeof(outarg);
-> +    return send_notify_iov(se, FUSE_NOTIFY_LOCK, iov, 2);
-> +}
-
-This may be just me, but I find it odd that you fill iov[0] and iov[1] in
-two separate functions, one of them being static and AFAICT only used once.
-I understand that you are trying to split the notify logic from the lock.
-But the logic is not fully isolated, e.g. the caller needs to know to add
-one to the count, start filling at 1, etc.
-
-Just a matter of taste, I guess ;-)
-
-> +
->  int fuse_lowlevel_notify_store(struct fuse_session *se, fuse_ino_t ino,
->                                 off_t offset, struct fuse_bufvec *bufv)
->  {
-> diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
-> index c55c0ca2fc..64624b48dc 100644
-> --- a/tools/virtiofsd/fuse_lowlevel.h
-> +++ b/tools/virtiofsd/fuse_lowlevel.h
-> @@ -1251,6 +1251,22 @@ struct fuse_lowlevel_ops {
->   */
->  int fuse_reply_err(fuse_req_t req, int err);
->
-> +/**
-> + * Ask caller to wait for lock.
-> + *
-> + * Possible requests:
-> + *   setlkw
-> + *
-> + * If caller sends a blocking lock request (setlkw), then reply to caller
-> + * that wait for lock to be available. Once lock is available caller will
-> + * receive a notification with request's unique id. Notification will
-> + * carry info whether lock was successfully obtained or not.
-> + *
-> + * @param req request handle
-> + * @return zero for success, -errno for failure to send reply
-> + */
-> +int fuse_reply_wait(fuse_req_t req);
-> +
->  /**
->   * Don't send reply
->   *
-> @@ -1685,6 +1701,16 @@ int fuse_lowlevel_notify_delete(struct fuse_session *se, fuse_ino_t parent,
->  int fuse_lowlevel_notify_store(struct fuse_session *se, fuse_ino_t ino,
->                                 off_t offset, struct fuse_bufvec *bufv);
->
-> +/**
-> + * Notify event related to previous lock request
-> + *
-> + * @param se the session object
-> + * @param unique the unique id of the request which requested setlkw
-> + * @param error zero for success, -errno for the failure
-> + */
-> +int fuse_lowlevel_notify_lock(struct fuse_session *se, uint64_t unique,
-> +                              int32_t error);
-> +
->  /*
->   * Utility functions
->   */
-> diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-> index a87e88e286..bb2d4456fc 100644
-> --- a/tools/virtiofsd/fuse_virtio.c
-> +++ b/tools/virtiofsd/fuse_virtio.c
-> @@ -273,6 +273,23 @@ static void vq_send_element(struct fv_QueueInfo *qi, VuVirtqElement *elem,
->      vu_dispatch_unlock(qi->virtio_dev);
->  }
->
-> +/* Returns NULL if queue is empty */
-> +static FVRequest *vq_pop_notify_elem(struct fv_QueueInfo *qi)
-> +{
-> +    struct fuse_session *se = qi->virtio_dev->se;
-> +    VuDev *dev = &se->virtio_dev->dev;
-> +    VuVirtq *q = vu_get_queue(dev, qi->qidx);
-> +    FVRequest *req;
-> +
-> +    vu_dispatch_rdlock(qi->virtio_dev);
-> +    pthread_mutex_lock(&qi->vq_lock);
-> +    /* Pop an element from queue */
-> +    req = vu_queue_pop(dev, q, sizeof(FVRequest));
-> +    pthread_mutex_unlock(&qi->vq_lock);
-> +    vu_dispatch_unlock(qi->virtio_dev);
-> +    return req;
-> +}
-> +
->  /*
->   * Called back by ll whenever it wants to send a reply/message back
->   * The 1st element of the iov starts with the fuse_out_header
-> @@ -281,9 +298,9 @@ static void vq_send_element(struct fv_QueueInfo *qi, VuVirtqElement *elem,
->  int virtio_send_msg(struct fuse_session *se, struct fuse_chan *ch,
->                      struct iovec *iov, int count)
->  {
-> -    FVRequest *req = container_of(ch, FVRequest, ch);
-> -    struct fv_QueueInfo *qi = ch->qi;
-> -    VuVirtqElement *elem = &req->elem;
-> +    FVRequest *req;
-> +    struct fv_QueueInfo *qi;
-> +    VuVirtqElement *elem;
->      int ret = 0;
->
->      assert(count >= 1);
-> @@ -294,8 +311,30 @@ int virtio_send_msg(struct fuse_session *se, struct fuse_chan *ch,
->
->      size_t tosend_len = iov_size(iov, count);
->
-> -    /* unique == 0 is notification, which we don't support */
-> -    assert(out->unique);
-> +    /* unique == 0 is notification */
-> +    if (!out->unique) {
-> +        if (!se->notify_enabled) {
-> +            return -EOPNOTSUPP;
-> +        }
-> +        /* If notifications are enabled, queue index 1 is notification queue */
-> +        qi = se->virtio_dev->qi[1];
-> +        req = vq_pop_notify_elem(qi);
-> +        if (!req) {
-> +            /*
-> +             * TODO: Implement some sort of ring buffer and queue notifications
-> +             * on that and send these later when notification queue has space
-> +             * available.
-> +             */
-
-Maybe add a trace / message here to debug more easily if we hit that case?
-
-> +            return -ENOSPC;
-> +        }
-> +        req->reply_sent = false;
-> +    } else {
-> +        assert(ch);
-> +        req = container_of(ch, FVRequest, ch);
-> +        qi = ch->qi;
-> +    }
-> +
-> +    elem = &req->elem;
->      assert(!req->reply_sent);
->
->      /* The 'in' part of the elem is to qemu */
-> @@ -985,6 +1024,7 @@ static int fv_get_config(VuDev *dev, uint8_t *config, uint32_t len)
->          struct fuse_notify_delete_out       delete_out;
->          struct fuse_notify_store_out        store_out;
->          struct fuse_notify_retrieve_out     retrieve_out;
-> +        struct fuse_notify_lock_out         lock_out;
->      };
->
->      notify_size = sizeof(struct fuse_out_header) +
+>  tools/virtiofsd/passthrough_ll.c | 81 +++++++++++++++++++++++++-------
+>  1 file changed, 65 insertions(+), 16 deletions(-)
+> 
 > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 6928662e22..277f74762b 100644
+> index bd8fc922ea..b7d6aa7f9d 100644
 > --- a/tools/virtiofsd/passthrough_ll.c
 > +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2131,13 +2131,35 @@ out:
->      }
+> @@ -186,7 +186,8 @@ struct lo_data {
+>      int announce_submounts;
+>      bool use_statx;
+>      struct lo_inode root;
+> -    GHashTable *inodes; /* protected by lo->mutex */
+> +    GHashTable *inodes_by_ids; /* protected by lo->mutex */
+> +    GHashTable *inodes_by_handle; /* protected by lo->mutex */
+>      struct lo_map ino_map; /* protected by lo->mutex */
+>      struct lo_map dirp_map; /* protected by lo->mutex */
+>      struct lo_map fd_map; /* protected by lo->mutex */
+> @@ -275,8 +276,9 @@ static struct {
+>  /* That we loaded cap-ng in the current thread from the saved */
+>  static __thread bool cap_loaded = 0;
+>  
+> -static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
+> -                                uint64_t mnt_id);
+> +static struct lo_inode *lo_find(struct lo_data *lo,
+> +                                const struct lo_fhandle *fhandle,
+> +                                struct stat *st, uint64_t mnt_id);
+>  static int xattr_map_client(const struct lo_data *lo, const char *client_name,
+>                              char **out_name);
+>  
+> @@ -1143,18 +1145,40 @@ out_err:
+>      fuse_reply_err(req, saverr);
 >  }
->
-> +static void setlk_send_notification(struct fuse_session *se, uint64_t unique,
-> +                                    int saverr)
-> +{
-> +    int ret;
-> +
-> +    do {
-> +        ret = fuse_lowlevel_notify_lock(se, unique, saverr);
-> +        /*
-> +         * Retry sending notification if notification queue does not have
-> +         * free descriptor yet, otherwise break out of loop. Either we
-> +         * successfully sent notifiation or some other error occurred.
-> +         */
-> +        if (ret != -ENOSPC) {
-> +            break;
-> +        }
-> +        usleep(10000);
-> +    } while (1);
-> +}
-> +
->  static void lo_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
->                       struct flock *lock, int sleep)
+>  
+> -static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
+> -                                uint64_t mnt_id)
+
+> +static struct lo_inode *lo_find(struct lo_data *lo,
+> +                                const struct lo_fhandle *fhandle,
+> +                                struct stat *st, uint64_t mnt_id)
 >  {
->      struct lo_data *lo = lo_data(req);
->      struct lo_inode *inode;
->      struct lo_inode_plock *plock;
-> -    int ret, saverr = 0;
-> +    int ret, saverr = 0, ofd;
-> +    uint64_t unique;
-> +    struct fuse_session *se = req->se;
-> +    bool blocking_lock = false;
->
->      fuse_log(FUSE_LOG_DEBUG,
->               "lo_setlk(ino=%" PRIu64 ", flags=%d)"
-> @@ -2151,11 +2173,6 @@ static void lo_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
->          return;
->      }
->
-> -    if (sleep) {
-> -        fuse_reply_err(req, EOPNOTSUPP);
-> -        return;
-> -    }
-> -
->      inode = lo_inode(req, ino);
->      if (!inode) {
->          fuse_reply_err(req, EBADF);
-> @@ -2168,21 +2185,56 @@ static void lo_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
->
->      if (!plock) {
->          saverr = ret;
-> +        pthread_mutex_unlock(&inode->plock_mutex);
->          goto out;
->      }
->
-> +    /*
-> +     * plock is now released when inode is going away. We already have
-> +     * a reference on inode, so it is guaranteed that plock->fd is
-> +     * still around even after dropping inode->plock_mutex lock
-> +     */
-> +    ofd = plock->fd;
-> +    pthread_mutex_unlock(&inode->plock_mutex);
-> +
-> +    /*
-> +     * If this lock request can block, request caller to wait for
-> +     * notification. Do not access req after this. Once lock is
-> +     * available, send a notification instead.
-> +     */
-> +    if (sleep && lock->l_type != F_UNLCK) {
+> -    struct lo_inode *p;
+> -    struct lo_key key = {
+> +    struct lo_inode *p = NULL;
+> +    struct lo_key ids_key = {
+>          .ino = st->st_ino,
+>          .dev = st->st_dev,
+>          .mnt_id = mnt_id,
+>      };
+>  
+>      pthread_mutex_lock(&lo->mutex);
+> -    p = g_hash_table_lookup(lo->inodes, &key);
+> +    if (fhandle) {
+> +        p = g_hash_table_lookup(lo->inodes_by_handle, fhandle);
+> +    }
+> +    if (!p) {
+> +        p = g_hash_table_lookup(lo->inodes_by_ids, &ids_key);
 > +        /*
-> +         * If notification queue is not enabled, can't support async
-> +         * locks.
+> +         * When we had to fall back to looking up an inode by its
+> +         * inode ID, ensure that we hit an entry that has a valid file
+> +         * descriptor.  Having an FD open means that the inode cannot
+> +         * really be deleted until the FD is closed, so that the inode
+> +         * ID remains valid until we evict our lo_inode.
+> +         * With no FD open (and just a file handle), the inode can be
+> +         * deleted while we still have our lo_inode, and so the inode
+> +         * ID may be reused by a completely different new inode.  We
+> +         * then must look up the lo_inode by file handle, because this
+> +         * handle contains a generation ID to differentiate between
+> +         * the old and the new inode.
 > +         */
-> +        if (!se->notify_enabled) {
-> +            saverr = EOPNOTSUPP;
-> +            goto out;
+> +        if (p && p->fd == -1) {
+> +            p = NULL;
 > +        }
-> +        blocking_lock = true;
-> +        unique = req->unique;
-> +        fuse_reply_wait(req);
-> +    }
-> +
->      /* TODO: Is it alright to modify flock? */
->      lock->l_pid = 0;
-> -    ret = fcntl(plock->fd, F_OFD_SETLK, lock);
-> +    if (blocking_lock) {
-> +        ret = fcntl(ofd, F_OFD_SETLKW, lock);
-> +    } else {
-> +        ret = fcntl(ofd, F_OFD_SETLK, lock);
-> +    }
->      if (ret == -1) {
->          saverr = errno;
->      }
->
->  out:
-> -    pthread_mutex_unlock(&inode->plock_mutex);
->      lo_inode_put(lo, &inode);
->
-> -    fuse_reply_err(req, saverr);
-> +    if (!blocking_lock) {
-> +        fuse_reply_err(req, saverr);
-> +    } else {
-> +        setlk_send_notification(se, unique, saverr);
-> +    }
->  }
->
->  static void lo_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
 
+What happens in following scenario.
 
---
-Cheers,
-Christophe de Dinechin (IRC c3d)
+- Say I have a hard linked file foo.txt with link foo-link.txt.
+
+- I lookup foo.txt. We generate file handle and add inode for foo.txt
+  to inode cache. lo_inode->fhandle will be valie but lo_inode->fd == -1.
+
+- Now later lookup for foo-link.txt happens. Say this time we can't
+  generate file handle. When we try to lookup inode, lo_find() should
+  return NULL. It will find inode by ids but not use it because inode
+  was added using file handle and p->fd == -1. That means lookup
+  for foo-link.txt will end up adding another inode, when it should
+  not have?
+
+Am I understanding it correctly?
+
+Vivek
 

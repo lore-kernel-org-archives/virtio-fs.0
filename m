@@ -1,14 +1,26 @@
-References: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
-	<YW2Q5Y3u1TMlQEcW@redhat.com>
-From: JeffleXu <jefflexu@linux.alibaba.com>
-Message-ID: <85e66fb6-7587-4b8b-3e6f-0fc1019996fc@linux.alibaba.com>
-Date: Wed, 20 Oct 2021 13:22:32 +0800
-MIME-Version: 1.0
-In-Reply-To: <YW2Q5Y3u1TMlQEcW@redhat.com>
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH v6 0/7] fuse,virtiofs: support per-file DAX
+Date: Wed, 20 Oct 2021 01:42:31 -0400
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	from:to:subject; s=fm2; bh=lb0FriZ4YhI+l6hcIkW2utP/oPxaVV3r9Vf5X
+	soz/ko=; b=I6zW4dWPeibjh/Sihgwnjl8soHD75rAmYMCd7Bj4p1ruKx6WjDjNa
+	XcM7hKzxBGagxuuRNup5yiub43k87U/7tuFbKIrnxSGmtYzMmzKzMs+1mD/IO2A4
+	LF5XV+iOLoKIQrp6TOn+uiVoZzZVpBT30k/3fi09lROZ+Hjs2CxHaKgjmpLd6j9l
+	1WSQCyJjzV2qdmQgra8YgnTwUXsIH8zwD3Q8TwwXFliKJzeuFMsix3JxQYRYdQim
+	M9UGcf4e/lq/m0v2xCb2c5Y6+ixZq989d0PUiG+K2QKbW1Zh5QH0gPDntHmeoxZ+
+	9O7Yzf0yWHneAznQWp2gxxmL/D3vywvMQ==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=lb0FriZ4YhI+l6hcI
+	kW2utP/oPxaVV3r9Vf5Xsoz/ko=; b=CIDYtE9BcSS9m5SIztTnI1fuE1ADeviGy
+	QHZc9sYZtebs28kphV7kWdjn4e25qJd2CzUs/qrzgIVsPhjA+GsvJdNXJ/aE2O6s
+	BHj4hO1mBGyrXoKqeLba/I6/mOeaUW7jad+uXmZfBvq8OxB89x7EvQdyd6qmBwgu
+	RqDN7yomUrOhwKpjG9gMlX40sjqB5QNrmj8JNf6Ga+Px9NGMkb+fnkwQ/imY7sak
+	FVR8OUFOHH2lz+aJw1CH+lhDi+h401K5NeSF3LLO3NrczntgL3DLdCL4M268pdDp
+	kbUwrFMxAjPl1/+GPdbtyB3Kb98OcpiJx/7YBCk068EDYlnMi2EwA==
+From: virtiofs-bot@sinrega.org
+Message-Id: <11466.121102001422500325@us-mta-546.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd-rs] Issue closed: switch to using
+	fuse-backend-rs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,63 +29,13 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: miklos@szeredi.hu, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, linux-fsdevel@vger.kernel.org
+To: virtio-fs@redhat.com
 
+For clh, there is a crate [fuse-backend-rs](https://github.com/cloud-hypervisor/fuse-backend-rs) which provides core components like passthroughfs and fuse, including forget support and several corner case fixes around readdir (with [more](https://github.com/cloud-hypervisor/fuse-backend-rs/pull/10) to come)
 
+By switching to it, virtiofsd-rs can not only get all fixes, but save a lot of code base.
 
-On 10/18/21 11:21 PM, Vivek Goyal wrote:
-> On Mon, Oct 11, 2021 at 11:00:45AM +0800, Jeffle Xu wrote:
->> changes since v5:
->> Overall Design Changes:
->> 1. virtiofsd now supports ioctl (only FS_IOC_SETFLAGS and
->>   FS_IOC_FSSETXATTR), so that users inside guest could set/clear
->>   persistent inode flags now. (FUSE kernel module has already supported
->>   .ioctl(), virtiofsd need to suuport it.)
-> 
-> So no changes needed in fuse side (kernel) to support FS_IOC_FSSETXATTR?
-> Only virtiofsd needs to be changed. That sounds good.
-> 
-
-Yes, the fuse kernel modules has already supported FUSE_IOCTL.
-
-Per inode DAX on ext4/xfs will also call d_mark_dontcache() and try to
-evict this inode as soon as possible when the persistent (DAX) inode
-attribute has changed, just like [1].
-
-But because of following reason:
-> 
->> 2. The
->>   algorithm used by virtiofsd to determine whether DAX shall be enabled
->>   or not is totally implementation specific, and thus the following
->>   scenario may exist: users inside guest has already set related persistent
->>   inode flag (i.e. FS_XFLAG_DAX) on corresponding file but FUSE server finnaly
->>   decides not to enable DAX for this file.
-
-If we always call d_mark_dontcache() and try to evict this inode when
-the persistent (DAX) inode attribute has changed, the DAX state returned
-by virtiofsd may sustain the same, and thus the previous eviction is
-totally wasted and unnecessary.
-
-So, as the following said,
-
->> Also because of this, d_mark_dontcache() is
->>   not called when FS_IOC_SETFLAGS/FS_IOC_FSSETXATTR ioctl is done inside
->>   guest. It's delayed to be done if the FUSE_ATTR_DAX flag **indeed**
->>   changes (as showed in patch 6).
-
-the call for d_mark_dontcache() and inode eviction is delayed when the
-DAX state returned by virtiofsd **indeed** changed (when dentry is timed
-out and a new FUSE_LOOKUP is requested). But the defect is that, if '-o
-cache=always' is set for virtiofsd, then the DAX state won't be updated
-for a long time, after users have changed the persistent (DAX) inode
-attribute inside guest via FS_IOC_FSSETXATTR ioctl.
-
-
-
-[1] https://www.spinics.net/lists/linux-fsdevel/msg200851.html
-
--- 
-Thanks,
-Jeffle
+Thoughts?
+---
+https://gitlab.com/virtio-fs/virtiofsd-rs/-/issues/4
 

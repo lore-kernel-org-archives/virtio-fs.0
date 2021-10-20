@@ -1,18 +1,16 @@
-Message-ID: <53540c84-a06a-281d-db4a-51affe7a0e0c@redhat.com>
-Date: Wed, 20 Oct 2021 16:10:51 +0200
+Date: Wed, 20 Oct 2021 10:48:55 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YXAsV3xp3aeOjaeh@redhat.com>
+References: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
+	<20211011030052.98923-3-jefflexu@linux.alibaba.com>
+	<YW2AU/E0pLHO5Yl8@redhat.com>
+	<652ac323-6546-01b8-992e-460ad59577ca@linux.alibaba.com>
 MIME-Version: 1.0
-References: <20210916084045.31684-1-hreitz@redhat.com>
-	<20210916084045.31684-11-hreitz@redhat.com>
-	<YW8kbdCeqs11E0Tl@redhat.com>
-	<194cd5f5-e5b3-2929-3ae7-ad2fb1083021@redhat.com>
-	<YXALvGmoKxXOXMdN@redhat.com>
-From: Hanna Reitz <hreitz@redhat.com>
-In-Reply-To: <YXALvGmoKxXOXMdN@redhat.com>
-Content-Language: en-US
-Content-Type: text/plain; charset="utf-8"; format="flowed"
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH v4 10/12] virtiofsd: Add inodes_by_handle
-	hash table
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <652ac323-6546-01b8-992e-460ad59577ca@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH v6 2/7] fuse: make DAX mount option a
+	tri-state
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,188 +19,282 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: JeffleXu <jefflexu@linux.alibaba.com>
+Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, miklos@szeredi.hub, linux-fsdevel@vger.kernel.org
 
-On 20.10.21 14:29, Vivek Goyal wrote:
-> On Wed, Oct 20, 2021 at 12:02:32PM +0200, Hanna Reitz wrote:
->> On 19.10.21 22:02, Vivek Goyal wrote:
->>> On Thu, Sep 16, 2021 at 10:40:43AM +0200, Hanna Reitz wrote:
->>>> Currently, lo_inode.fhandle is always NULL and so always keep an O_PATH
->>>> FD in lo_inode.fd.  Therefore, when the respective inode is unlinked,
->>>> its inode ID will remain in use until we drop our lo_inode (and
->>>> lo_inode_put() thus closes the FD).  Therefore, lo_find() can safely use
->>>> the inode ID as an lo_inode key, because any inode with an inode ID we
->>>> find in lo_data.inodes (on the same filesystem) must be the exact same
->>>> file.
->>>>
->>>> This will change when we start setting lo_inode.fhandle so we do not
->>>> have to keep an O_PATH FD open.  Then, unlinking such an inode will
->>>> immediately remove it, so its ID can then be reused by newly created
->>>> files, even while the lo_inode object is still there[1].
->>>>
->>>> So creating a new file can then reuse the old file's inode ID, and
->>>> looking up the new file would lead to us finding the old file's
->>>> lo_inode, which is not ideal.
->>>>
->>>> Luckily, just as file handles cause this problem, they also solve it:  A
->>>> file handle contains a generation ID, which changes when an inode ID is
->>>> reused, so the new file can be distinguished from the old one.  So all
->>>> we need to do is to add a second map besides lo_data.inodes that maps
->>>> file handles to lo_inodes, namely lo_data.inodes_by_handle.  For
->>>> clarity, lo_data.inodes is renamed to lo_data.inodes_by_ids.
->>>>
->>>> Unfortunately, we cannot rely on being able to generate file handles
->>>> every time.  Therefore, we still enter every lo_inode object into
->>>> inodes_by_ids, but having an entry in inodes_by_handle is optional.  A
->>>> potential inodes_by_handle entry then has precedence, the inodes_by_ids
->>>> entry is just a fallback.
->>>>
->>>> Note that we do not generate lo_fhandle objects yet, and so we also do
->>>> not enter anything into the inodes_by_handle map yet.  Also, all lookups
->>>> skip that map.  We might manually create file handles with some code
->>>> that is immediately removed by the next patch again, but that would
->>>> break the assumption in lo_find() that every lo_inode with a non-NULL
->>>> .fhandle must have an entry in inodes_by_handle and vice versa.  So we
->>>> leave actually using the inodes_by_handle map for the next patch.
->>>>
->>>> [1] If some application in the guest still has the file open, there is
->>>> going to be a corresponding FD mapping in lo_data.fd_map.  In such a
->>>> case, the inode will only go away once every application in the guest
->>>> has closed it.  The problem described only applies to cases where the
->>>> guest does not have the file open, and it is just in the dentry cache,
->>>> basically.
->>>>
->>>> Signed-off-by: Hanna Reitz <hreitz@redhat.com>
->>>> ---
->>>>    tools/virtiofsd/passthrough_ll.c | 81 +++++++++++++++++++++++++-------
->>>>    1 file changed, 65 insertions(+), 16 deletions(-)
->>>>
->>>> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
->>>> index bd8fc922ea..b7d6aa7f9d 100644
->>>> --- a/tools/virtiofsd/passthrough_ll.c
->>>> +++ b/tools/virtiofsd/passthrough_ll.c
->>>> @@ -186,7 +186,8 @@ struct lo_data {
->>>>        int announce_submounts;
->>>>        bool use_statx;
->>>>        struct lo_inode root;
->>>> -    GHashTable *inodes; /* protected by lo->mutex */
->>>> +    GHashTable *inodes_by_ids; /* protected by lo->mutex */
->>>> +    GHashTable *inodes_by_handle; /* protected by lo->mutex */
->>>>        struct lo_map ino_map; /* protected by lo->mutex */
->>>>        struct lo_map dirp_map; /* protected by lo->mutex */
->>>>        struct lo_map fd_map; /* protected by lo->mutex */
->>>> @@ -275,8 +276,9 @@ static struct {
->>>>    /* That we loaded cap-ng in the current thread from the saved */
->>>>    static __thread bool cap_loaded = 0;
->>>> -static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
->>>> -                                uint64_t mnt_id);
->>>> +static struct lo_inode *lo_find(struct lo_data *lo,
->>>> +                                const struct lo_fhandle *fhandle,
->>>> +                                struct stat *st, uint64_t mnt_id);
->>>>    static int xattr_map_client(const struct lo_data *lo, const char *client_name,
->>>>                                char **out_name);
->>>> @@ -1143,18 +1145,40 @@ out_err:
->>>>        fuse_reply_err(req, saverr);
->>>>    }
->>>> -static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
->>>> -                                uint64_t mnt_id)
->>>> +static struct lo_inode *lo_find(struct lo_data *lo,
->>>> +                                const struct lo_fhandle *fhandle,
->>>> +                                struct stat *st, uint64_t mnt_id)
->>>>    {
->>>> -    struct lo_inode *p;
->>>> -    struct lo_key key = {
->>>> +    struct lo_inode *p = NULL;
->>>> +    struct lo_key ids_key = {
->>>>            .ino = st->st_ino,
->>>>            .dev = st->st_dev,
->>>>            .mnt_id = mnt_id,
->>>>        };
->>>>        pthread_mutex_lock(&lo->mutex);
->>>> -    p = g_hash_table_lookup(lo->inodes, &key);
->>>> +    if (fhandle) {
->>>> +        p = g_hash_table_lookup(lo->inodes_by_handle, fhandle);
->>>> +    }
->>>> +    if (!p) {
->>>> +        p = g_hash_table_lookup(lo->inodes_by_ids, &ids_key);
->>>> +        /*
->>>> +         * When we had to fall back to looking up an inode by its
->>>> +         * inode ID, ensure that we hit an entry that has a valid file
->>>> +         * descriptor.  Having an FD open means that the inode cannot
->>>> +         * really be deleted until the FD is closed, so that the inode
->>>> +         * ID remains valid until we evict our lo_inode.
->>>> +         * With no FD open (and just a file handle), the inode can be
->>>> +         * deleted while we still have our lo_inode, and so the inode
->>>> +         * ID may be reused by a completely different new inode.  We
->>>> +         * then must look up the lo_inode by file handle, because this
->>>> +         * handle contains a generation ID to differentiate between
->>>> +         * the old and the new inode.
->>>> +         */
->>>> +        if (p && p->fd == -1) {
->>>> +            p = NULL;
->>>> +        }
->>> What happens in following scenario.
->>>
->>> - Say I have a hard linked file foo.txt with link foo-link.txt.
->>>
->>> - I lookup foo.txt. We generate file handle and add inode for foo.txt
->>>     to inode cache. lo_inode->fhandle will be valie but lo_inode->fd == -1.
->>>
->>> - Now later lookup for foo-link.txt happens. Say this time we can't
->>>     generate file handle.
->> Which we’ve already decided is practically impossible.
-> Agreed that probably is very less but it can happen when sufficient
-> resources are not available, like -ENOMEM.
->
-> static long do_sys_name_to_handle(struct path *path,
->                                    struct file_handle __user *ufh,
->                                    int __user *mnt_id)
-> {
->          handle = kmalloc(sizeof(struct file_handle) + f_handle.handle_bytes,
->                           GFP_KERNEL);
->          if (!handle)
->                  return -ENOMEM;
-> }
+On Wed, Oct 20, 2021 at 10:52:38AM +0800, JeffleXu wrote:
+> 
+> 
+> On 10/18/21 10:10 PM, Vivek Goyal wrote:
+> > On Mon, Oct 11, 2021 at 11:00:47AM +0800, Jeffle Xu wrote:
+> >> We add 'always', 'never', and 'inode' (default). '-o dax' continues to
+> >> operate the same which is equivalent to 'always'. To be consistemt with
+> >> ext4/xfs's tri-state mount option, when neither '-o dax' nor '-o dax='
+> >> option is specified, the default behaviour is equal to 'inode'.
+> > 
+> > Hi Jeffle,
+> > 
+> > I am not sure when  -o "dax=inode"  is used as a default? If user
+> > specifies, "-o dax" then it is equal to "-o dax=always", otherwise
+> > user will explicitly specify "-o dax=always/never/inode". So when
+> > is dax=inode is used as default?
+> 
+> That means when neither '-o dax' nor '-o dax=always/never/inode' is
+> specified, it is actually equal to '-o dax=inode', which is also how
+> per-file DAX on ext4/xfs works.
+> 
+> This default behaviour for local filesystem, e.g. ext4/xfs, may be
+> straightforward, since the disk inode will be read into memory during
+> the inode instantiation, and checking for persistent inode attribute
+> shall be realatively cheap, except that the default behaviour has
+> changed from 'dax=never' to 'dax=inode'.
 
-OK, but do we really want to be prepared for an ENOMEM from the kernel?
+Interesting that ext4/xfs allowed for this behavior change.
 
->>> When we try to lookup inode, lo_find() should
->>>     return NULL. It will find inode by ids but not use it because inode
->>>     was added using file handle and p->fd == -1. That means lookup
->>>     for foo-link.txt will end up adding another inode, when it should
->>>     not have?
->> Yes, it would end up adding another inode, which doesn’t seem catastrophic
->> to me.
->> But again, the whole case seems impossible to me.
-> Given we can get -ENOMEM error it is not impossible.
->
-> I thought all along you wanted to write code so that we could fallback
-> to ids in case of errors.
+> 
+> Come back to virtiofs, when neither '-o dax' nor '-o
+> dax=always/never/inode' is specified, and it actually behaves as '-o
+> dax=inode', as long as '-o dax=server/attr' option is not specified for
+> virtiofsd, virtiofsd will always clear FUSE_ATTR_DAX and thus guest will
+> always disable DAX. IOWs, the guest virtiofs atually behaves as '-o
+> dax=never' when neither '-o dax' nor '-o dax=always/never/inode' is
+> specified, and '-o dax=server/attr' option is not specified for virtiofsd.
+> 
+> But I'm okay if we need to change the default behaviour for virtiofs.
 
-Well, yes, if possible, but unfortunately it isn’t possible here.
+This is change of behavior from client's perspective. Even if client
+did not opt-in for DAX, DAX can be enabled based on server's setting.
+Not that there is anything wrong with it, but change of behavior part
+concerns me.
 
-> Anyway, if you agree that except the case of
-> -EOPNOTSUPP, we don't have to worry about fallback, then let us just
-> reutrn error to caller if get_file_handle() fails (except the case
-> of -EOPNOTSUPP).
+In case of virtiofs, lot of features we are controlling from server.
+Client typically just calls "mount" and there are not many options
+users can specify for mount.  
 
-We’ve had this discussion before, and so I tried that for v3 but 
-abandoned it again because I found it unreasonably complicated. Always 
-falling back is simpler than deciding when to return an error to the 
-guest and when not to; and also, considering errors other than 
-EOPNOTSUPP should be rare, the code that returns errors to the guest 
-would effectively be dead code.
+Given we already allowed to make client a choice about DAX behavior,
+I will feel more comfortable that we don't change it and let client
+request a specific DAX mode and if client does not specify anything,
+then DAX is not enabled.
 
-If we really must return an error in the case you describe, then I don’t 
-think there’s a way around it, though...  In virtiofsd-rs, we could let 
-FileHandle::from_name_at() return an io::Result<Option<Self>>, such that 
-it returns Ok(None) in case of EOPNOTSUPP, or an Error in case there is 
-an unexpected error like ENOMEM.  I think that shouldn’t be too bad, but 
-my experience says the devil’s in the details.
-
-It’s just that it seems to be a purely theoretical problem, because if 
-the kernel gives us ENOMEM, we probably won’t live too long anyway.
-
-Hanna
+Vivek
+> 
+> 
+> > 
+> >>
+> >> By the time this patch is applied, 'inode' mode is actually equal to
+> >> 'always' mode, before the per-file DAX flag is introduced in the
+> >> following patch.
+> >>
+> >> Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
+> >> ---
+> >>  fs/fuse/dax.c       | 19 ++++++++++++++++---
+> >>  fs/fuse/fuse_i.h    | 14 ++++++++++++--
+> >>  fs/fuse/inode.c     | 10 +++++++---
+> >>  fs/fuse/virtio_fs.c | 16 ++++++++++++++--
+> >>  4 files changed, 49 insertions(+), 10 deletions(-)
+> >>
+> >> diff --git a/fs/fuse/dax.c b/fs/fuse/dax.c
+> >> index 1eb6538bf1b2..4c6c64efc950 100644
+> >> --- a/fs/fuse/dax.c
+> >> +++ b/fs/fuse/dax.c
+> >> @@ -1284,11 +1284,14 @@ static int fuse_dax_mem_range_init(struct fuse_conn_dax *fcd)
+> >>  	return ret;
+> >>  }
+> >>  
+> >> -int fuse_dax_conn_alloc(struct fuse_conn *fc, struct dax_device *dax_dev)
+> >> +int fuse_dax_conn_alloc(struct fuse_conn *fc, enum fuse_dax_mode dax_mode,
+> >> +			struct dax_device *dax_dev)
+> >>  {
+> >>  	struct fuse_conn_dax *fcd;
+> >>  	int err;
+> >>  
+> >> +	fc->dax_mode = dax_mode;
+> >> +
+> >>  	if (!dax_dev)
+> >>  		return 0;
+> >>  
+> >> @@ -1335,11 +1338,21 @@ static const struct address_space_operations fuse_dax_file_aops  = {
+> >>  static bool fuse_should_enable_dax(struct inode *inode)
+> >>  {
+> >>  	struct fuse_conn *fc = get_fuse_conn(inode);
+> >> +	unsigned int dax_mode = fc->dax_mode;
+> >> +
+> >> +	if (dax_mode == FUSE_DAX_NEVER)
+> >> +		return false;
+> >>  
+> >> -	if (fc->dax)
+> >> +	/*
+> >> +	 * If 'dax=always/inode', fc->dax couldn't be NULL even when fuse
+> >> +	 * daemon doesn't support DAX, since the mount routine will fail
+> >> +	 * early in this case.
+> >> +	 */
+> >> +	if (dax_mode == FUSE_DAX_ALWAYS)
+> >>  		return true;
+> >>  
+> >> -	return false;
+> >> +	/* dax_mode == FUSE_DAX_INODE */
+> >> +	return true;
+> > 
+> > So as of this patch except FUSE_DAX_NEVER return true and this will
+> > change in later patches for FUSE_DAX_INODE? If that's the case, keep
+> > it simple in this patch and change it later in the patch series.
+> > 
+> > fuse_should_enable_dax()
+> > {
+> > 	if (dax_mode == FUSE_DAX_NEVER)
+> > 		return false;
+> > 	return true;
+> > }
+> > 
+> >>  }
+> >>  
+> >>  void fuse_dax_inode_init(struct inode *inode)
+> >> diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
+> >> index 319596df5dc6..5abf9749923f 100644
+> >> --- a/fs/fuse/fuse_i.h
+> >> +++ b/fs/fuse/fuse_i.h
+> >> @@ -480,6 +480,12 @@ struct fuse_dev {
+> >>  	struct list_head entry;
+> >>  };
+> >>  
+> >> +enum fuse_dax_mode {
+> >> +	FUSE_DAX_INODE,
+> >> +	FUSE_DAX_ALWAYS,
+> >> +	FUSE_DAX_NEVER,
+> >> +};
+> >> +
+> >>  struct fuse_fs_context {
+> >>  	int fd;
+> >>  	struct file *file;
+> >> @@ -497,7 +503,7 @@ struct fuse_fs_context {
+> >>  	bool no_control:1;
+> >>  	bool no_force_umount:1;
+> >>  	bool legacy_opts_show:1;
+> >> -	bool dax:1;
+> >> +	enum fuse_dax_mode dax_mode;
+> >>  	unsigned int max_read;
+> >>  	unsigned int blksize;
+> >>  	const char *subtype;
+> >> @@ -802,6 +808,9 @@ struct fuse_conn {
+> >>  	struct list_head devices;
+> >>  
+> >>  #ifdef CONFIG_FUSE_DAX
+> >> +	/* dax mode: FUSE_DAX_* (always, never or per-file) */
+> >> +	enum fuse_dax_mode dax_mode;
+> >> +
+> >>  	/* Dax specific conn data, non-NULL if DAX is enabled */
+> >>  	struct fuse_conn_dax *dax;
+> >>  #endif
+> >> @@ -1255,7 +1264,8 @@ ssize_t fuse_dax_read_iter(struct kiocb *iocb, struct iov_iter *to);
+> >>  ssize_t fuse_dax_write_iter(struct kiocb *iocb, struct iov_iter *from);
+> >>  int fuse_dax_mmap(struct file *file, struct vm_area_struct *vma);
+> >>  int fuse_dax_break_layouts(struct inode *inode, u64 dmap_start, u64 dmap_end);
+> >> -int fuse_dax_conn_alloc(struct fuse_conn *fc, struct dax_device *dax_dev);
+> >> +int fuse_dax_conn_alloc(struct fuse_conn *fc, enum fuse_dax_mode mode,
+> >> +			struct dax_device *dax_dev);
+> >>  void fuse_dax_conn_free(struct fuse_conn *fc);
+> >>  bool fuse_dax_inode_alloc(struct super_block *sb, struct fuse_inode *fi);
+> >>  void fuse_dax_inode_init(struct inode *inode);
+> >> diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
+> >> index 36cd03114b6d..b4b41683e97e 100644
+> >> --- a/fs/fuse/inode.c
+> >> +++ b/fs/fuse/inode.c
+> >> @@ -742,8 +742,12 @@ static int fuse_show_options(struct seq_file *m, struct dentry *root)
+> >>  			seq_printf(m, ",blksize=%lu", sb->s_blocksize);
+> >>  	}
+> >>  #ifdef CONFIG_FUSE_DAX
+> >> -	if (fc->dax)
+> >> -		seq_puts(m, ",dax");
+> >> +	if (fc->dax_mode == FUSE_DAX_ALWAYS)
+> >> +		seq_puts(m, ",dax=always");
+> > 
+> > So if somebody mounts with "-o dax" then kernel previous to this change
+> > will show "dax" and kernel after this change will show "dax=always"?
+> 
+> Yes. It's actually how per-file DAX on ext4/xfs behaves.
+> 
+> > 
+> > How about not change the behavior. Keep a mode say FUSE_DAX_LEGACY which
+> > will be set when user specifies "-o dax". Internally FUSE_DAX_LEGACY
+> > and FUSE_DAX_ALWAYS will be same.
+> > 
+> > 	if (fc->dax_mode == FUSE_DAX_LEGACY)
+> > 		seq_puts(m, ",dax");
+> > 
+> 
+> 
+> 
+> 
+> > 
+> >> +	else if (fc->dax_mode == FUSE_DAX_NEVER)
+> >> +		seq_puts(m, ",dax=never");
+> >> +	else if (fc->dax_mode == FUSE_DAX_INODE)
+> >> +		seq_puts(m, ",dax=inode");
+> >>  #endif
+> >>  
+> >>  	return 0;
+> >> @@ -1493,7 +1497,7 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
+> >>  	sb->s_subtype = ctx->subtype;
+> >>  	ctx->subtype = NULL;
+> >>  	if (IS_ENABLED(CONFIG_FUSE_DAX)) {
+> >> -		err = fuse_dax_conn_alloc(fc, ctx->dax_dev);
+> >> +		err = fuse_dax_conn_alloc(fc, ctx->dax_mode, ctx->dax_dev);
+> >>  		if (err)
+> >>  			goto err;
+> >>  	}
+> >> diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
+> >> index 0ad89c6629d7..58cfbaeb4a7d 100644
+> >> --- a/fs/fuse/virtio_fs.c
+> >> +++ b/fs/fuse/virtio_fs.c
+> >> @@ -88,12 +88,21 @@ struct virtio_fs_req_work {
+> >>  static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
+> >>  				 struct fuse_req *req, bool in_flight);
+> >>  
+> >> +static const struct constant_table dax_param_enums[] = {
+> >> +	{"inode",	FUSE_DAX_INODE },
+> >> +	{"always",	FUSE_DAX_ALWAYS },
+> >> +	{"never",	FUSE_DAX_NEVER },
+> >> +	{}
+> >> +};
+> >> +
+> >>  enum {
+> >>  	OPT_DAX,
+> >> +	OPT_DAX_ENUM,
+> >>  };
+> >>  
+> >>  static const struct fs_parameter_spec virtio_fs_parameters[] = {
+> >>  	fsparam_flag("dax", OPT_DAX),
+> >> +	fsparam_enum("dax", OPT_DAX_ENUM, dax_param_enums),
+> >>  	{}
+> >>  };
+> >>  
+> >> @@ -110,7 +119,10 @@ static int virtio_fs_parse_param(struct fs_context *fsc,
+> >>  
+> >>  	switch (opt) {
+> >>  	case OPT_DAX:
+> >> -		ctx->dax = 1;
+> >> +		ctx->dax_mode = FUSE_DAX_ALWAYS;
+> >> +		break;
+> >> +	case OPT_DAX_ENUM:
+> >> +		ctx->dax_mode = result.uint_32;
+> >>  		break;
+> >>  	default:
+> >>  		return -EINVAL;
+> >> @@ -1326,7 +1338,7 @@ static int virtio_fs_fill_super(struct super_block *sb, struct fs_context *fsc)
+> >>  
+> >>  	/* virtiofs allocates and installs its own fuse devices */
+> >>  	ctx->fudptr = NULL;
+> >> -	if (ctx->dax) {
+> >> +	if (ctx->dax_mode != FUSE_DAX_NEVER) {
+> >>  		if (!fs->dax_dev) {
+> >>  			err = -EINVAL;
+> >>  			pr_err("virtio-fs: dax can't be enabled as filesystem"
+> >> -- 
+> >> 2.27.0
+> >>
+> 
+> -- 
+> Thanks,
+> Jeffle
+> 
 

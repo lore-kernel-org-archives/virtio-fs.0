@@ -1,14 +1,14 @@
-Date: Wed, 20 Oct 2021 12:06:13 -0400
+Date: Wed, 20 Oct 2021 13:36:05 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YXA+dYmIUGwGVskC@redhat.com>
-References: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
-	<YW2Q5Y3u1TMlQEcW@redhat.com>
-	<85e66fb6-7587-4b8b-3e6f-0fc1019996fc@linux.alibaba.com>
+Message-ID: <YXBThZt5/Z/RS1S6@redhat.com>
+References: <20211011030938.109206-1-jefflexu@linux.alibaba.com>
+	<20211011030938.109206-2-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <85e66fb6-7587-4b8b-3e6f-0fc1019996fc@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH v6 0/7] fuse,virtiofs: support per-file DAX
+In-Reply-To: <20211011030938.109206-2-jefflexu@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [virtiofsd PATCH v6 1/6] virtiofsd: add .ioctl()
+	support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,71 +17,137 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: JeffleXu <jefflexu@linux.alibaba.com>
-Cc: miklos@szeredi.hu, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, linux-fsdevel@vger.kernel.org
+To: Jeffle Xu <jefflexu@linux.alibaba.com>
+Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, miklos@szeredi.hu
 
-On Wed, Oct 20, 2021 at 01:22:32PM +0800, JeffleXu wrote:
+On Mon, Oct 11, 2021 at 11:09:33AM +0800, Jeffle Xu wrote:
+> For passthrough, it passes corresponding ioctls to host directly.
 > 
+> Currently only these ioctls that handling persistent inode flags, i.e.,
+> FS_IOC_[G|S]ETFLAGS and FS_IOC_FS[G|S]ETXATTR are supported for security
+> concern, though it's implemented in a quite general way, so that we can
+> expand the scope of allowed ioctls if it is really needed later.
 > 
-> On 10/18/21 11:21 PM, Vivek Goyal wrote:
-> > On Mon, Oct 11, 2021 at 11:00:45AM +0800, Jeffle Xu wrote:
-> >> changes since v5:
-> >> Overall Design Changes:
-> >> 1. virtiofsd now supports ioctl (only FS_IOC_SETFLAGS and
-> >>   FS_IOC_FSSETXATTR), so that users inside guest could set/clear
-> >>   persistent inode flags now. (FUSE kernel module has already supported
-> >>   .ioctl(), virtiofsd need to suuport it.)
-> > 
-> > So no changes needed in fuse side (kernel) to support FS_IOC_FSSETXATTR?
-> > Only virtiofsd needs to be changed. That sounds good.
-> > 
+> Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
+> ---
+>  tools/virtiofsd/passthrough_ll.c      | 59 +++++++++++++++++++++++++++
+>  tools/virtiofsd/passthrough_seccomp.c |  1 +
+>  2 files changed, 60 insertions(+)
 > 
-> Yes, the fuse kernel modules has already supported FUSE_IOCTL.
-> 
-> Per inode DAX on ext4/xfs will also call d_mark_dontcache() and try to
-> evict this inode as soon as possible when the persistent (DAX) inode
-> attribute has changed, just like [1].
-> 
-> But because of following reason:
-> > 
-> >> 2. The
-> >>   algorithm used by virtiofsd to determine whether DAX shall be enabled
-> >>   or not is totally implementation specific, and thus the following
-> >>   scenario may exist: users inside guest has already set related persistent
-> >>   inode flag (i.e. FS_XFLAG_DAX) on corresponding file but FUSE server finnaly
-> >>   decides not to enable DAX for this file.
-> 
-> If we always call d_mark_dontcache() and try to evict this inode when
-> the persistent (DAX) inode attribute has changed, the DAX state returned
-> by virtiofsd may sustain the same, and thus the previous eviction is
-> totally wasted and unnecessary.
-> 
-> So, as the following said,
-> 
-> >> Also because of this, d_mark_dontcache() is
-> >>   not called when FS_IOC_SETFLAGS/FS_IOC_FSSETXATTR ioctl is done inside
-> >>   guest. It's delayed to be done if the FUSE_ATTR_DAX flag **indeed**
-> >>   changes (as showed in patch 6).
-> 
-> the call for d_mark_dontcache() and inode eviction is delayed when the
-> DAX state returned by virtiofsd **indeed** changed (when dentry is timed
-> out and a new FUSE_LOOKUP is requested). But the defect is that, if '-o
-> cache=always' is set for virtiofsd, then the DAX state won't be updated
-> for a long time, after users have changed the persistent (DAX) inode
-> attribute inside guest via FS_IOC_FSSETXATTR ioctl.
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index b76d878509..5969d67810 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -47,6 +47,7 @@
+>  #include <dirent.h>
+>  #include <pthread.h>
+>  #include <sys/file.h>
+> +#include <sys/ioctl.h>
+>  #include <sys/mount.h>
+>  #include <sys/prctl.h>
+>  #include <sys/resource.h>
+> @@ -54,6 +55,7 @@
+>  #include <sys/wait.h>
+>  #include <sys/xattr.h>
+>  #include <syslog.h>
+> +#include <linux/fs.h>
+>  
+>  #include "qemu/cutils.h"
+>  #include "passthrough_helpers.h"
+> @@ -2105,6 +2107,62 @@ out:
+>      fuse_reply_err(req, saverr);
+>  }
+>  
+> +
+> +static void lo_ioctl(fuse_req_t req, fuse_ino_t ino, unsigned int cmd, void *arg,
+> +                          struct fuse_file_info *fi, unsigned flags, const void *in_buf,
+> +                          size_t in_bufsz, size_t out_bufsz)
+> +{
+> +    int fd = lo_fi_fd(req, fi);
+> +    int res;
+> +    int saverr = ENOSYS;
+> +    int dir;
+> +    void *buf = NULL;
+> +    size_t size = 0;
+> +
+> +    fuse_log(FUSE_LOG_DEBUG, "lo_ioctl(ino=%" PRIu64 ", cmd=0x%x, flags=0x%x, "
+> +            "in_bufsz = %lu, out_bufsz = %lu)\n",
+> +            ino, cmd, flags, in_bufsz, out_bufsz);
+> +
+> +    if (cmd != FS_IOC_SETFLAGS || cmd != FS_IOC_GETFLAGS ||
+> +        cmd != FS_IOC_FSSETXATTR || cmd != FS_IOC_FSGETXATTR)
+> +        goto out;
+> +
+> +    /* unrestricted ioctl is not supported yet */
+> +    if (flags & FUSE_IOCTL_UNRESTRICTED)
+> +        goto out;
+> +
+> +    dir = _IOC_DIR(cmd);
+> +
+> +    if (dir & _IOC_READ) {
+> +        size = out_bufsz;
+> +        buf = malloc(size);
+> +        if (!buf)
+> +            goto out_err;
+> +
+> +        if (dir & _IOC_WRITE)
+> +            memcpy(buf, in_buf, size);
+> +
+> +        res = ioctl(fd, cmd, buf);
+> +    }
+> +    else if (dir & _IOC_WRITE) {
 
-Good point. I guess this probably is not too bad. If it becomes a concern,
-we can always mark inode don't cache whenever client changes persistent
-DAX flag.
+Typically else is on same line as } braces.
+
+} else if (dir & _IOC_WRITE) {
+
+Have you tried running qemu/script/checkpatch.pl on these patches. Does it
+flag it?
 
 Vivek
-> 
-> 
-> 
-> [1] https://www.spinics.net/lists/linux-fsdevel/msg200851.html
-> 
+
+> +        res = ioctl(fd, cmd, in_buf);
+> +    }
+> +    else {
+> +        res = ioctl(fd, cmd, arg);
+> +    }
+> +
+> +    if (res < 0)
+> +        goto out_err;
+> +
+> +    fuse_reply_ioctl(req, 0, buf, size);
+> +    return;
+> +
+> +out_err:
+> +    saverr = errno;
+> +out:
+> +    fuse_reply_err(req, saverr);
+> +}
+> +
+>  static void lo_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
+>                          struct fuse_file_info *fi)
+>  {
+> @@ -3278,6 +3336,7 @@ static struct fuse_lowlevel_ops lo_oper = {
+>      .fsyncdir = lo_fsyncdir,
+>      .create = lo_create,
+>      .getlk = lo_getlk,
+> +    .ioctl = lo_ioctl,
+>      .setlk = lo_setlk,
+>      .open = lo_open,
+>      .release = lo_release,
+> diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
+> index 62441cfcdb..2a5f7614fc 100644
+> --- a/tools/virtiofsd/passthrough_seccomp.c
+> +++ b/tools/virtiofsd/passthrough_seccomp.c
+> @@ -62,6 +62,7 @@ static const int syscall_allowlist[] = {
+>      SCMP_SYS(gettid),
+>      SCMP_SYS(gettimeofday),
+>      SCMP_SYS(getxattr),
+> +    SCMP_SYS(ioctl),
+>      SCMP_SYS(linkat),
+>      SCMP_SYS(listxattr),
+>      SCMP_SYS(lseek),
 > -- 
-> Thanks,
-> Jeffle
+> 2.27.0
 > 
 

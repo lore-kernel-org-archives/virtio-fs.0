@@ -1,19 +1,17 @@
-Date: Wed, 20 Oct 2021 14:06:09 -0400
+Date: Wed, 20 Oct 2021 14:25:16 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YXBakXrPBcZmXQox@redhat.com>
+Message-ID: <YXBfDHfZlnaqE7rf@redhat.com>
 References: <20210916084045.31684-1-hreitz@redhat.com>
-	<20210916084045.31684-11-hreitz@redhat.com>
-	<YW8kbdCeqs11E0Tl@redhat.com>
-	<194cd5f5-e5b3-2929-3ae7-ad2fb1083021@redhat.com>
-	<YXALvGmoKxXOXMdN@redhat.com>
-	<53540c84-a06a-281d-db4a-51affe7a0e0c@redhat.com>
+	<20210916084045.31684-2-hreitz@redhat.com>
+	<YW2p1NAv5wiOtzDs@redhat.com>
+	<fdc893e8-2858-9930-5b41-2d489e066c34@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-In-Reply-To: <53540c84-a06a-281d-db4a-51affe7a0e0c@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v4 10/12] virtiofsd: Add inodes_by_handle
-	hash table
+In-Reply-To: <fdc893e8-2858-9930-5b41-2d489e066c34@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v4 01/12] virtiofsd: Keep
+	/proc/self/mountinfo open
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,211 +23,157 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: Hanna Reitz <hreitz@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Wed, Oct 20, 2021 at 04:10:51PM +0200, Hanna Reitz wrote:
-> On 20.10.21 14:29, Vivek Goyal wrote:
-> > On Wed, Oct 20, 2021 at 12:02:32PM +0200, Hanna Reitz wrote:
-> > > On 19.10.21 22:02, Vivek Goyal wrote:
-> > > > On Thu, Sep 16, 2021 at 10:40:43AM +0200, Hanna Reitz wrote:
-> > > > > Currently, lo_inode.fhandle is always NULL and so always keep an O_PATH
-> > > > > FD in lo_inode.fd.  Therefore, when the respective inode is unlinked,
-> > > > > its inode ID will remain in use until we drop our lo_inode (and
-> > > > > lo_inode_put() thus closes the FD).  Therefore, lo_find() can safely use
-> > > > > the inode ID as an lo_inode key, because any inode with an inode ID we
-> > > > > find in lo_data.inodes (on the same filesystem) must be the exact same
-> > > > > file.
-> > > > > 
-> > > > > This will change when we start setting lo_inode.fhandle so we do not
-> > > > > have to keep an O_PATH FD open.  Then, unlinking such an inode will
-> > > > > immediately remove it, so its ID can then be reused by newly created
-> > > > > files, even while the lo_inode object is still there[1].
-> > > > > 
-> > > > > So creating a new file can then reuse the old file's inode ID, and
-> > > > > looking up the new file would lead to us finding the old file's
-> > > > > lo_inode, which is not ideal.
-> > > > > 
-> > > > > Luckily, just as file handles cause this problem, they also solve it:  A
-> > > > > file handle contains a generation ID, which changes when an inode ID is
-> > > > > reused, so the new file can be distinguished from the old one.  So all
-> > > > > we need to do is to add a second map besides lo_data.inodes that maps
-> > > > > file handles to lo_inodes, namely lo_data.inodes_by_handle.  For
-> > > > > clarity, lo_data.inodes is renamed to lo_data.inodes_by_ids.
-> > > > > 
-> > > > > Unfortunately, we cannot rely on being able to generate file handles
-> > > > > every time.  Therefore, we still enter every lo_inode object into
-> > > > > inodes_by_ids, but having an entry in inodes_by_handle is optional.  A
-> > > > > potential inodes_by_handle entry then has precedence, the inodes_by_ids
-> > > > > entry is just a fallback.
-> > > > > 
-> > > > > Note that we do not generate lo_fhandle objects yet, and so we also do
-> > > > > not enter anything into the inodes_by_handle map yet.  Also, all lookups
-> > > > > skip that map.  We might manually create file handles with some code
-> > > > > that is immediately removed by the next patch again, but that would
-> > > > > break the assumption in lo_find() that every lo_inode with a non-NULL
-> > > > > .fhandle must have an entry in inodes_by_handle and vice versa.  So we
-> > > > > leave actually using the inodes_by_handle map for the next patch.
-> > > > > 
-> > > > > [1] If some application in the guest still has the file open, there is
-> > > > > going to be a corresponding FD mapping in lo_data.fd_map.  In such a
-> > > > > case, the inode will only go away once every application in the guest
-> > > > > has closed it.  The problem described only applies to cases where the
-> > > > > guest does not have the file open, and it is just in the dentry cache,
-> > > > > basically.
-> > > > > 
-> > > > > Signed-off-by: Hanna Reitz <hreitz@redhat.com>
-> > > > > ---
-> > > > >    tools/virtiofsd/passthrough_ll.c | 81 +++++++++++++++++++++++++-------
-> > > > >    1 file changed, 65 insertions(+), 16 deletions(-)
-> > > > > 
-> > > > > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> > > > > index bd8fc922ea..b7d6aa7f9d 100644
-> > > > > --- a/tools/virtiofsd/passthrough_ll.c
-> > > > > +++ b/tools/virtiofsd/passthrough_ll.c
-> > > > > @@ -186,7 +186,8 @@ struct lo_data {
-> > > > >        int announce_submounts;
-> > > > >        bool use_statx;
-> > > > >        struct lo_inode root;
-> > > > > -    GHashTable *inodes; /* protected by lo->mutex */
-> > > > > +    GHashTable *inodes_by_ids; /* protected by lo->mutex */
-> > > > > +    GHashTable *inodes_by_handle; /* protected by lo->mutex */
-> > > > >        struct lo_map ino_map; /* protected by lo->mutex */
-> > > > >        struct lo_map dirp_map; /* protected by lo->mutex */
-> > > > >        struct lo_map fd_map; /* protected by lo->mutex */
-> > > > > @@ -275,8 +276,9 @@ static struct {
-> > > > >    /* That we loaded cap-ng in the current thread from the saved */
-> > > > >    static __thread bool cap_loaded = 0;
-> > > > > -static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
-> > > > > -                                uint64_t mnt_id);
-> > > > > +static struct lo_inode *lo_find(struct lo_data *lo,
-> > > > > +                                const struct lo_fhandle *fhandle,
-> > > > > +                                struct stat *st, uint64_t mnt_id);
-> > > > >    static int xattr_map_client(const struct lo_data *lo, const char *client_name,
-> > > > >                                char **out_name);
-> > > > > @@ -1143,18 +1145,40 @@ out_err:
-> > > > >        fuse_reply_err(req, saverr);
-> > > > >    }
-> > > > > -static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
-> > > > > -                                uint64_t mnt_id)
-> > > > > +static struct lo_inode *lo_find(struct lo_data *lo,
-> > > > > +                                const struct lo_fhandle *fhandle,
-> > > > > +                                struct stat *st, uint64_t mnt_id)
-> > > > >    {
-> > > > > -    struct lo_inode *p;
-> > > > > -    struct lo_key key = {
-> > > > > +    struct lo_inode *p = NULL;
-> > > > > +    struct lo_key ids_key = {
-> > > > >            .ino = st->st_ino,
-> > > > >            .dev = st->st_dev,
-> > > > >            .mnt_id = mnt_id,
-> > > > >        };
-> > > > >        pthread_mutex_lock(&lo->mutex);
-> > > > > -    p = g_hash_table_lookup(lo->inodes, &key);
-> > > > > +    if (fhandle) {
-> > > > > +        p = g_hash_table_lookup(lo->inodes_by_handle, fhandle);
-> > > > > +    }
-> > > > > +    if (!p) {
-> > > > > +        p = g_hash_table_lookup(lo->inodes_by_ids, &ids_key);
-> > > > > +        /*
-> > > > > +         * When we had to fall back to looking up an inode by its
-> > > > > +         * inode ID, ensure that we hit an entry that has a valid file
-> > > > > +         * descriptor.  Having an FD open means that the inode cannot
-> > > > > +         * really be deleted until the FD is closed, so that the inode
-> > > > > +         * ID remains valid until we evict our lo_inode.
-> > > > > +         * With no FD open (and just a file handle), the inode can be
-> > > > > +         * deleted while we still have our lo_inode, and so the inode
-> > > > > +         * ID may be reused by a completely different new inode.  We
-> > > > > +         * then must look up the lo_inode by file handle, because this
-> > > > > +         * handle contains a generation ID to differentiate between
-> > > > > +         * the old and the new inode.
-> > > > > +         */
-> > > > > +        if (p && p->fd == -1) {
-> > > > > +            p = NULL;
-> > > > > +        }
-> > > > What happens in following scenario.
-> > > > 
-> > > > - Say I have a hard linked file foo.txt with link foo-link.txt.
-> > > > 
-> > > > - I lookup foo.txt. We generate file handle and add inode for foo.txt
-> > > >     to inode cache. lo_inode->fhandle will be valie but lo_inode->fd == -1.
-> > > > 
-> > > > - Now later lookup for foo-link.txt happens. Say this time we can't
-> > > >     generate file handle.
-> > > Which we’ve already decided is practically impossible.
-> > Agreed that probably is very less but it can happen when sufficient
-> > resources are not available, like -ENOMEM.
+On Wed, Oct 20, 2021 at 11:04:31AM +0200, Hanna Reitz wrote:
+> On 18.10.21 19:07, Vivek Goyal wrote:
+> > On Thu, Sep 16, 2021 at 10:40:34AM +0200, Hanna Reitz wrote:
+> > > File handles are specific to mounts, and so name_to_handle_at() returns
+> > > the respective mount ID.  However, open_by_handle_at() is not content
+> > > with an ID, it wants a file descriptor for some inode on the mount,
+> > > which we have to open.
+> > > 
+> > > We want to use /proc/self/mountinfo to find the mounts' root directories
+> > > so we can open them and pass the respective FDs to open_by_handle_at().
+> > > (We need to use the root directory, because we want the inode belonging
+> > > to every mount FD be deletable.  Before the root directory can be
+> > > deleted, all entries within must have been closed, and so when it is
+> > > deleted, there should not be any file handles left that need its FD as
+> > > their mount FD.  Thus, we can then close that FD and the inode can be
+> > > deleted.[1])
+> > > 
+> > > That is why we need to open /proc/self/mountinfo so that we can use it
+> > > to translate mount IDs into root directory paths.  We have to open it
+> > > after setup_mounts() was called, because if we try to open it before, it
+> > > will appear as an empty file after setup_mounts().
+> > > 
+> > > [1] Note that in practice, you still cannot delete the mount root
+> > > directory.  It is a mount point on the host, after all, and mount points
+> > > cannot be deleted.  But by using the mount point as the mount FD, we
+> > > will at least not hog any actually deletable inodes.
+> > > 
+> > > Signed-off-by: Hanna Reitz <hreitz@redhat.com>
+> > > ---
+> > >   tools/virtiofsd/passthrough_ll.c | 40 ++++++++++++++++++++++++++++++++
+> > >   1 file changed, 40 insertions(+)
+> > > 
+> > > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> > > index 38b2af8599..6511a6acb4 100644
+> > > --- a/tools/virtiofsd/passthrough_ll.c
+> > > +++ b/tools/virtiofsd/passthrough_ll.c
+> > > @@ -172,6 +172,8 @@ struct lo_data {
+> > >       /* An O_PATH file descriptor to /proc/self/fd/ */
+> > >       int proc_self_fd;
+> > > +    /* A read-only FILE pointer for /proc/self/mountinfo */
+> > > +    FILE *mountinfo_fp;
+> > >       int user_killpriv_v2, killpriv_v2;
+> > >       /* If set, virtiofsd is responsible for setting umask during creation */
+> > >       bool change_umask;
+> > > @@ -3718,6 +3720,19 @@ static void setup_chroot(struct lo_data *lo)
+> > >   static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
+> > >                             bool enable_syslog)
+> > >   {
+> > > +    int proc_self, mountinfo_fd;
+> > > +    int saverr;
+> > > +
+> > > +    /*
+> > > +     * Open /proc/self before we pivot to the new root so we can still
+> > > +     * open /proc/self/mountinfo afterwards
+> > > +     */
+> > > +    proc_self = open("/proc/self", O_PATH);
+> > > +    if (proc_self < 0) {
+> > > +        fuse_log(FUSE_LOG_WARNING, "Failed to open /proc/self: %m; "
+> > > +                 "will not be able to use file handles\n");
+> > > +    }
+> > > +
+> > Hi Hanna,
 > > 
-> > static long do_sys_name_to_handle(struct path *path,
-> >                                    struct file_handle __user *ufh,
-> >                                    int __user *mnt_id)
-> > {
-> >          handle = kmalloc(sizeof(struct file_handle) + f_handle.handle_bytes,
-> >                           GFP_KERNEL);
-> >          if (!handle)
-> >                  return -ENOMEM;
-> > }
+> > Should we open /proc/self and /proc/self/mountinfo only if user wants
+> > to file handle. We have already parsed options by now so we know.
 > 
-> OK, but do we really want to be prepared for an ENOMEM from the kernel?
-
-Why not. Other filesystem methods are dealing with it and return -ENOMEM
-to fuse client. So I don't see any reason why file handle stuff should
-be special. In fact in an attempt to trying to make it special just
-increases complexity and having to deal with fallback plans (except
--EOPNOTSUP).
-
-
+> I didn’t think it would matter given that it wouldn’t have an adverse
+> effect.  If we can’t open them (and I can’t imagine a case where we’d be
+> unable to open them), the only result is a warning.
 > 
-> > > > When we try to lookup inode, lo_find() should
-> > > >     return NULL. It will find inode by ids but not use it because inode
-> > > >     was added using file handle and p->fd == -1. That means lookup
-> > > >     for foo-link.txt will end up adding another inode, when it should
-> > > >     not have?
-> > > Yes, it would end up adding another inode, which doesn’t seem catastrophic
-> > > to me.
-> > > But again, the whole case seems impossible to me.
-> > Given we can get -ENOMEM error it is not impossible.
+> > Also, if user asked for file handles, and we can't open /proc/self or
+> > /proc/self/mountinfo successfully, I would think we should error out
+> > and not continue (instead of just log it and continue).
+> 
+> Well, that would break the assumption I had above.  Not that that’s really
+> relevant, I just want to mention it.
+> 
+> File handles are a best effort in any case.  If they don’t work, we always
+> fall back.  So I don’t know whether we must error out.
+> 
+> OTOH if we know they can never work, then perhaps it would be more sensible
+> to error out.
+
+Yes. If they can't work because filesystem does not have capability or
+we don't have CAP_DAC_READ_SEARCH or any other necessary component is
+not there then we should fail.
+> 
+> FWIW I’ve ported the relevant v1..v4 changes to virtiofsd-rs, and there it
+> errors out.  The error is unconditional, though, so even if you don’t
+> request file handles, it’ll try to open mountinfo and exit on error.  I
+> found that reasonable because I can’t imagine a case where opening
+> /proc/self/fd would work, but /proc/self/mountinfo wouldn’t – and working
+> around that would be a bit cumbersome (it would mean wrapping
+> PassthroughFs.mount_fds in an Option<> and .unwrap()-ing it on every use,
+> with a comment why that’s fine). Honestly, I’d prefer to wait until we get a
+> bug report about a failure to open /proc/self/mountinfo.
+> 
+> > That seems to be general theme. If user asked for a feature and if
+> > we can't enable it, we error out and let user retry without that
+> > particular feature.
 > > 
-> > I thought all along you wanted to write code so that we could fallback
-> > to ids in case of errors.
+> > >       if (lo->sandbox == SANDBOX_NAMESPACE) {
+> > >           setup_namespaces(lo, se);
+> > >           setup_mounts(lo->source);
+> > > @@ -3725,6 +3740,31 @@ static void setup_sandbox(struct lo_data *lo, struct fuse_session *se,
+> > >           setup_chroot(lo);
+> > >       }
+> > > +    /*
+> > > +     * Opening /proc/self/mountinfo before the umount2() call in
+> > > +     * setup_mounts() leads to the file appearing empty.  That is why
+> > > +     * we defer opening it until here.
+> > > +     */
+> > > +    lo->mountinfo_fp = NULL;
+> > > +    if (proc_self >= 0) {
+> > > +        mountinfo_fd = openat(proc_self, "mountinfo", O_RDONLY);
+> > > +        if (mountinfo_fd < 0) {
+> > > +            saverr = errno;
+> > > +        } else if (mountinfo_fd >= 0) {
+> > > +            lo->mountinfo_fp = fdopen(mountinfo_fd, "r");
+> > > +            if (!lo->mountinfo_fp) {
+> > > +                saverr = errno;
+> > > +                close(mountinfo_fd);
+> > > +            }
+> > > +        }
+> > > +        if (!lo->mountinfo_fp) {
+> > > +            fuse_log(FUSE_LOG_WARNING, "Failed to open /proc/self/mountinfo: "
+> > > +                     "%s; will not be able to use file handles\n",
+> > > +                     strerror(saverr));
+> > > +        }
+> > > +        close(proc_self);
+> > > +    }
+> > > +
+> > Above code couple probably be moved in a helper function. Makes it
+> > easier to read setup_sandbox(). Same here, open mountinfo only if
+> > user wants file handle support and error out if file handle support
+> > can't be enabled.
 > 
-> Well, yes, if possible, but unfortunately it isn’t possible here.
+> Perhaps, but frankly I don’t see a need to keep setup_sandbox() readable. 
+> AFAIU, we are planning to deprecate C virtiofsd anyway, so while it pains me
+> to say something like this, we don’t need to keep it maintainable.
 > 
-> > Anyway, if you agree that except the case of
-> > -EOPNOTSUPP, we don't have to worry about fallback, then let us just
-> > reutrn error to caller if get_file_handle() fails (except the case
-> > of -EOPNOTSUPP).
-> 
-> We’ve had this discussion before, and so I tried that for v3 but abandoned
-> it again because I found it unreasonably complicated.
+> Now that I’ve opened an MR to bring the v1..v4 changes to virtiofsd-rs
+> (https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/41), I also
+> don’t really see a justification for putting further development effort into
+> bringing file handles to C virtiofsd.  Of course I’m still grateful for your
+> review, and I’ll try to adapt it to virtiofsd-rs, but right now I don’t plan
+> on sending a v5.
 
-I guess you had some code previously (when you were not parsing mountinfo)
-that made it harder to deal with -ENOMEM. You could not afford a failure.
-With a move to mountinfo parsing, that restriction might have gone away
-now.
+Fair enough. If file handle stuff is important for C version, I am hoping
+somebody else can pick this work. Anyway I think its almost 90% ready, we
+are just dealing with last 10% of issues.
 
-> Always falling back is
-> simpler than deciding when to return an error to the guest and when not to;
-> and also, considering errors other than EOPNOTSUPP should be rare, the code
-> that returns errors to the guest would effectively be dead code.
-
-May be. I probably should take your patches and try to convert them to 
-return all temporary errors to client (except -ENOTSUPP) and see what
-are the issues I face.
-
-> 
-> If we really must return an error in the case you describe, then I don’t
-> think there’s a way around it, though...  In virtiofsd-rs, we could let
-> FileHandle::from_name_at() return an io::Result<Option<Self>>, such that it
-> returns Ok(None) in case of EOPNOTSUPP, or an Error in case there is an
-> unexpected error like ENOMEM.  I think that shouldn’t be too bad, but my
-> experience says the devil’s in the details.
-> 
-> It’s just that it seems to be a purely theoretical problem, because if the
-> kernel gives us ENOMEM, we probably won’t live too long anyway.
-
-Or may be some other process will exit/die freeing memory and virtiofsd
-will continue to live. So we should not conclude that after -ENOMEM
-virtiofsd will not live too long anyway. Atleast code should not be
-written with this assumption.
-
-Thanks
 Vivek
 

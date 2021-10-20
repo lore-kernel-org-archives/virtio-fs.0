@@ -1,16 +1,14 @@
-Date: Wed, 20 Oct 2021 11:44:53 -0400
+Date: Wed, 20 Oct 2021 12:06:13 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YXA5dWiJseIcdxiH@redhat.com>
+Message-ID: <YXA+dYmIUGwGVskC@redhat.com>
 References: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
-	<20211011030052.98923-5-jefflexu@linux.alibaba.com>
-	<YW2E6jaTbv1FcFnu@redhat.com>
-	<778cd99d-fb40-1135-5d62-58a008c14919@linux.alibaba.com>
+	<YW2Q5Y3u1TMlQEcW@redhat.com>
+	<85e66fb6-7587-4b8b-3e6f-0fc1019996fc@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <778cd99d-fb40-1135-5d62-58a008c14919@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH v6 4/7] fuse: negotiate per-file DAX in
-	FUSE_INIT
+In-Reply-To: <85e66fb6-7587-4b8b-3e6f-0fc1019996fc@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH v6 0/7] fuse,virtiofs: support per-file DAX
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,51 +20,65 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: JeffleXu <jefflexu@linux.alibaba.com>
 Cc: miklos@szeredi.hu, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, linux-fsdevel@vger.kernel.org
 
-On Wed, Oct 20, 2021 at 11:10:30AM +0800, JeffleXu wrote:
+On Wed, Oct 20, 2021 at 01:22:32PM +0800, JeffleXu wrote:
 > 
 > 
-> On 10/18/21 10:30 PM, Vivek Goyal wrote:
-> > On Mon, Oct 11, 2021 at 11:00:49AM +0800, Jeffle Xu wrote:
-> >> Among the FUSE_INIT phase, client shall advertise per-file DAX if it's
-> >> mounted with "-o dax=inode". Then server is aware that client is in
-> >> per-file DAX mode, and will construct per-inode DAX attribute
-> >> accordingly.
-> >>
-> >> Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
-> >> ---
-> >>  fs/fuse/inode.c | 2 ++
-> >>  1 file changed, 2 insertions(+)
-> >>
-> >> diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-> >> index b4b41683e97e..f4ad99e2415b 100644
-> >> --- a/fs/fuse/inode.c
-> >> +++ b/fs/fuse/inode.c
-> >> @@ -1203,6 +1203,8 @@ void fuse_send_init(struct fuse_mount *fm)
-> >>  #ifdef CONFIG_FUSE_DAX
-> >>  	if (fm->fc->dax)
-> >>  		ia->in.flags |= FUSE_MAP_ALIGNMENT;
-> >> +	if (fm->fc->dax_mode == FUSE_DAX_INODE)
-> >> +		ia->in.flags |= FUSE_PERFILE_DAX;
+> On 10/18/21 11:21 PM, Vivek Goyal wrote:
+> > On Mon, Oct 11, 2021 at 11:00:45AM +0800, Jeffle Xu wrote:
+> >> changes since v5:
+> >> Overall Design Changes:
+> >> 1. virtiofsd now supports ioctl (only FS_IOC_SETFLAGS and
+> >>   FS_IOC_FSSETXATTR), so that users inside guest could set/clear
+> >>   persistent inode flags now. (FUSE kernel module has already supported
+> >>   .ioctl(), virtiofsd need to suuport it.)
 > > 
-> > Are you not keeping track of server's response whether server supports
-> > per inode dax or not. Client might be new and server might be old and
-> > server might not support per inode dax. In that case, we probably 
-> > should error out if user mounted with "-o dax=inode".
+> > So no changes needed in fuse side (kernel) to support FS_IOC_FSSETXATTR?
+> > Only virtiofsd needs to be changed. That sounds good.
 > > 
 > 
-> Yes, if guest virtiofs is mounted with '-o dax=inode' while virtiofsd is
-> old and doesn't support per inode dax, then guest virtiofs will never
-> receive FUSE_ATTR_DAX and actually behaves as '-o dax=never'. So the
-> whole system works in this case, though the behavior may be beyond the
-> expectation of users ....
+> Yes, the fuse kernel modules has already supported FUSE_IOCTL.
 > 
-> If the behavior really matters, I could change the behavior and fail
-> directly if virtiofsd doesn't advertise supporting per inode DAX.
+> Per inode DAX on ext4/xfs will also call d_mark_dontcache() and try to
+> evict this inode as soon as possible when the persistent (DAX) inode
+> attribute has changed, just like [1].
+> 
+> But because of following reason:
+> > 
+> >> 2. The
+> >>   algorithm used by virtiofsd to determine whether DAX shall be enabled
+> >>   or not is totally implementation specific, and thus the following
+> >>   scenario may exist: users inside guest has already set related persistent
+> >>   inode flag (i.e. FS_XFLAG_DAX) on corresponding file but FUSE server finnaly
+> >>   decides not to enable DAX for this file.
+> 
+> If we always call d_mark_dontcache() and try to evict this inode when
+> the persistent (DAX) inode attribute has changed, the DAX state returned
+> by virtiofsd may sustain the same, and thus the previous eviction is
+> totally wasted and unnecessary.
+> 
+> So, as the following said,
+> 
+> >> Also because of this, d_mark_dontcache() is
+> >>   not called when FS_IOC_SETFLAGS/FS_IOC_FSSETXATTR ioctl is done inside
+> >>   guest. It's delayed to be done if the FUSE_ATTR_DAX flag **indeed**
+> >>   changes (as showed in patch 6).
+> 
+> the call for d_mark_dontcache() and inode eviction is delayed when the
+> DAX state returned by virtiofsd **indeed** changed (when dentry is timed
+> out and a new FUSE_LOOKUP is requested). But the defect is that, if '-o
+> cache=always' is set for virtiofsd, then the DAX state won't be updated
+> for a long time, after users have changed the persistent (DAX) inode
+> attribute inside guest via FS_IOC_FSSETXATTR ioctl.
 
-I think it probably is better to error out if client asked for per-inode
-DAX and server does not support it. 
+Good point. I guess this probably is not too bad. If it becomes a concern,
+we can always mark inode don't cache whenever client changes persistent
+DAX flag.
 
 Vivek
+> 
+> 
+> 
+> [1] https://www.spinics.net/lists/linux-fsdevel/msg200851.html
 > 
 > -- 
 > Thanks,

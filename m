@@ -1,15 +1,17 @@
-Date: Wed, 6 Oct 2021 13:40:06 -0400
+Date: Wed, 20 Oct 2021 08:53:29 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YV3fdurX29J3ZelO@redhat.com>
-References: <20210930153037.1194279-1-vgoyal@redhat.com>
-	<20210930153037.1194279-7-vgoyal@redhat.com>
-	<lywnmqi89e.fsf@redhat.com>
+Message-ID: <YXARSSnHSIdYpn+/@redhat.com>
+References: <20210916084045.31684-1-hreitz@redhat.com>
+	<20210916084045.31684-11-hreitz@redhat.com>
+	<YW8kbdCeqs11E0Tl@redhat.com>
+	<194cd5f5-e5b3-2929-3ae7-ad2fb1083021@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
-In-Reply-To: <lywnmqi89e.fsf@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH 06/13] vhost-user-fs: Use helpers to
- create/cleanup virtqueue
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <194cd5f5-e5b3-2929-3ae7-ad2fb1083021@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v4 10/12] virtiofsd: Add inodes_by_handle
+	hash table
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,177 +20,155 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Christophe de Dinechin <dinechin@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, miklos@szeredi.hu
+To: Hanna Reitz <hreitz@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Wed, Oct 06, 2021 at 03:35:30PM +0200, Christophe de Dinechin wrote:
+On Wed, Oct 20, 2021 at 12:02:32PM +0200, Hanna Reitz wrote:
+> On 19.10.21 22:02, Vivek Goyal wrote:
+> > On Thu, Sep 16, 2021 at 10:40:43AM +0200, Hanna Reitz wrote:
+> > > Currently, lo_inode.fhandle is always NULL and so always keep an O_PATH
+> > > FD in lo_inode.fd.  Therefore, when the respective inode is unlinked,
+> > > its inode ID will remain in use until we drop our lo_inode (and
+> > > lo_inode_put() thus closes the FD).  Therefore, lo_find() can safely use
+> > > the inode ID as an lo_inode key, because any inode with an inode ID we
+> > > find in lo_data.inodes (on the same filesystem) must be the exact same
+> > > file.
+> > > 
+> > > This will change when we start setting lo_inode.fhandle so we do not
+> > > have to keep an O_PATH FD open.  Then, unlinking such an inode will
+> > > immediately remove it, so its ID can then be reused by newly created
+> > > files, even while the lo_inode object is still there[1].
+> > > 
+> > > So creating a new file can then reuse the old file's inode ID, and
+> > > looking up the new file would lead to us finding the old file's
+> > > lo_inode, which is not ideal.
+> > > 
+> > > Luckily, just as file handles cause this problem, they also solve it:  A
+> > > file handle contains a generation ID, which changes when an inode ID is
+> > > reused, so the new file can be distinguished from the old one.  So all
+> > > we need to do is to add a second map besides lo_data.inodes that maps
+> > > file handles to lo_inodes, namely lo_data.inodes_by_handle.  For
+> > > clarity, lo_data.inodes is renamed to lo_data.inodes_by_ids.
+> > > 
+> > > Unfortunately, we cannot rely on being able to generate file handles
+> > > every time.  Therefore, we still enter every lo_inode object into
+> > > inodes_by_ids, but having an entry in inodes_by_handle is optional.  A
+> > > potential inodes_by_handle entry then has precedence, the inodes_by_ids
+> > > entry is just a fallback.
+> > > 
+> > > Note that we do not generate lo_fhandle objects yet, and so we also do
+> > > not enter anything into the inodes_by_handle map yet.  Also, all lookups
+> > > skip that map.  We might manually create file handles with some code
+> > > that is immediately removed by the next patch again, but that would
+> > > break the assumption in lo_find() that every lo_inode with a non-NULL
+> > > .fhandle must have an entry in inodes_by_handle and vice versa.  So we
+> > > leave actually using the inodes_by_handle map for the next patch.
+> > > 
+> > > [1] If some application in the guest still has the file open, there is
+> > > going to be a corresponding FD mapping in lo_data.fd_map.  In such a
+> > > case, the inode will only go away once every application in the guest
+> > > has closed it.  The problem described only applies to cases where the
+> > > guest does not have the file open, and it is just in the dentry cache,
+> > > basically.
+> > > 
+> > > Signed-off-by: Hanna Reitz <hreitz@redhat.com>
+> > > ---
+> > >   tools/virtiofsd/passthrough_ll.c | 81 +++++++++++++++++++++++++-------
+> > >   1 file changed, 65 insertions(+), 16 deletions(-)
+> > > 
+> > > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> > > index bd8fc922ea..b7d6aa7f9d 100644
+> > > --- a/tools/virtiofsd/passthrough_ll.c
+> > > +++ b/tools/virtiofsd/passthrough_ll.c
+> > > @@ -186,7 +186,8 @@ struct lo_data {
+> > >       int announce_submounts;
+> > >       bool use_statx;
+> > >       struct lo_inode root;
+> > > -    GHashTable *inodes; /* protected by lo->mutex */
+> > > +    GHashTable *inodes_by_ids; /* protected by lo->mutex */
+> > > +    GHashTable *inodes_by_handle; /* protected by lo->mutex */
+> > >       struct lo_map ino_map; /* protected by lo->mutex */
+> > >       struct lo_map dirp_map; /* protected by lo->mutex */
+> > >       struct lo_map fd_map; /* protected by lo->mutex */
+> > > @@ -275,8 +276,9 @@ static struct {
+> > >   /* That we loaded cap-ng in the current thread from the saved */
+> > >   static __thread bool cap_loaded = 0;
+> > > -static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
+> > > -                                uint64_t mnt_id);
+> > > +static struct lo_inode *lo_find(struct lo_data *lo,
+> > > +                                const struct lo_fhandle *fhandle,
+> > > +                                struct stat *st, uint64_t mnt_id);
+> > >   static int xattr_map_client(const struct lo_data *lo, const char *client_name,
+> > >                               char **out_name);
+> > > @@ -1143,18 +1145,40 @@ out_err:
+> > >       fuse_reply_err(req, saverr);
+> > >   }
+> > > -static struct lo_inode *lo_find(struct lo_data *lo, struct stat *st,
+> > > -                                uint64_t mnt_id)
+> > > +static struct lo_inode *lo_find(struct lo_data *lo,
+> > > +                                const struct lo_fhandle *fhandle,
+> > > +                                struct stat *st, uint64_t mnt_id)
+> > >   {
+> > > -    struct lo_inode *p;
+> > > -    struct lo_key key = {
+> > > +    struct lo_inode *p = NULL;
+> > > +    struct lo_key ids_key = {
+> > >           .ino = st->st_ino,
+> > >           .dev = st->st_dev,
+> > >           .mnt_id = mnt_id,
+> > >       };
+> > >       pthread_mutex_lock(&lo->mutex);
+> > > -    p = g_hash_table_lookup(lo->inodes, &key);
+> > > +    if (fhandle) {
+> > > +        p = g_hash_table_lookup(lo->inodes_by_handle, fhandle);
+> > > +    }
+> > > +    if (!p) {
+> > > +        p = g_hash_table_lookup(lo->inodes_by_ids, &ids_key);
+> > > +        /*
+> > > +         * When we had to fall back to looking up an inode by its
+> > > +         * inode ID, ensure that we hit an entry that has a valid file
+> > > +         * descriptor.  Having an FD open means that the inode cannot
+> > > +         * really be deleted until the FD is closed, so that the inode
+> > > +         * ID remains valid until we evict our lo_inode.
+> > > +         * With no FD open (and just a file handle), the inode can be
+> > > +         * deleted while we still have our lo_inode, and so the inode
+> > > +         * ID may be reused by a completely different new inode.  We
+> > > +         * then must look up the lo_inode by file handle, because this
+> > > +         * handle contains a generation ID to differentiate between
+> > > +         * the old and the new inode.
+> > > +         */
+> > > +        if (p && p->fd == -1) {
+> > > +            p = NULL;
+> > > +        }
+> > What happens in following scenario.
+> > 
+> > - Say I have a hard linked file foo.txt with link foo-link.txt.
+> > 
+> > - I lookup foo.txt. We generate file handle and add inode for foo.txt
+> >    to inode cache. lo_inode->fhandle will be valie but lo_inode->fd == -1.
+> > 
+> > - Now later lookup for foo-link.txt happens. Say this time we can't
+> >    generate file handle.
 > 
-> On 2021-09-30 at 11:30 -04, Vivek Goyal <vgoyal@redhat.com> wrote...
-> > Add helpers to create/cleanup virtuqueues and use those helpers. I will
+> Which we’ve already decided is practically impossible.
 > 
-> Typo, virtuqueues -> virtqueues
+> > When we try to lookup inode, lo_find() should
+> >    return NULL. It will find inode by ids but not use it because inode
+> >    was added using file handle and p->fd == -1. That means lookup
+> >    for foo-link.txt will end up adding another inode, when it should
+> >    not have?
 > 
-> Also, while I'm nitpicking, virtqueue could be plural in commit description ;-)
+> Yes, it would end up adding another inode, which doesn’t seem catastrophic
+> to me.  But again, the whole case seems impossible to me.
 
-Will do. Thanks. :-)
+Have been thinking what can break if we end up creating two inodes for
+hard linked files. One thing jumps out is posix locks. We keep the
+posix lock hash table in lo_inode.
+
+So if I open foo.txt, take posix lock. And then open foo-link.txt and
+close the fd for foo-link.txt, it will not drop the posix lock held
+on this inode because inodes have diverged and break remote posix lock
+functionality.
 
 Vivek
-
-> 
-> > need to reconfigure queues in later patches and using helpers will allow
-> > reusing the code.
-> >
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > ---
-> >  hw/virtio/vhost-user-fs.c | 87 +++++++++++++++++++++++----------------
-> >  1 file changed, 52 insertions(+), 35 deletions(-)
-> >
-> > diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-> > index c595957983..d1efbc5b18 100644
-> > --- a/hw/virtio/vhost-user-fs.c
-> > +++ b/hw/virtio/vhost-user-fs.c
-> > @@ -139,6 +139,55 @@ static void vuf_set_status(VirtIODevice *vdev, uint8_t status)
-> >      }
-> >  }
-> >
-> > +static void vuf_handle_output(VirtIODevice *vdev, VirtQueue *vq)
-> > +{
-> > +    /*
-> > +     * Not normally called; it's the daemon that handles the queue;
-> > +     * however virtio's cleanup path can call this.
-> > +     */
-> > +}
-> > +
-> > +static void vuf_create_vqs(VirtIODevice *vdev)
-> > +{
-> > +    VHostUserFS *fs = VHOST_USER_FS(vdev);
-> > +    unsigned int i;
-> > +
-> > +    /* Hiprio queue */
-> > +    fs->hiprio_vq = virtio_add_queue(vdev, fs->conf.queue_size,
-> > +                                     vuf_handle_output);
-> > +
-> > +    /* Request queues */
-> > +    fs->req_vqs = g_new(VirtQueue *, fs->conf.num_request_queues);
-> > +    for (i = 0; i < fs->conf.num_request_queues; i++) {
-> > +        fs->req_vqs[i] = virtio_add_queue(vdev, fs->conf.queue_size,
-> > +                                          vuf_handle_output);
-> > +    }
-> > +
-> > +    /* 1 high prio queue, plus the number configured */
-> > +    fs->vhost_dev.nvqs = 1 + fs->conf.num_request_queues;
-> > +    fs->vhost_dev.vqs = g_new0(struct vhost_virtqueue, fs->vhost_dev.nvqs);
-> > +}
-> > +
-> > +static void vuf_cleanup_vqs(VirtIODevice *vdev)
-> > +{
-> > +    VHostUserFS *fs = VHOST_USER_FS(vdev);
-> > +    unsigned int i;
-> > +
-> > +    virtio_delete_queue(fs->hiprio_vq);
-> > +    fs->hiprio_vq = NULL;
-> > +
-> > +    for (i = 0; i < fs->conf.num_request_queues; i++) {
-> > +        virtio_delete_queue(fs->req_vqs[i]);
-> > +    }
-> > +
-> > +    g_free(fs->req_vqs);
-> > +    fs->req_vqs = NULL;
-> > +
-> > +    fs->vhost_dev.nvqs = 0;
-> > +    g_free(fs->vhost_dev.vqs);
-> > +    fs->vhost_dev.vqs = NULL;
-> > +}
-> > +
-> >  static uint64_t vuf_get_features(VirtIODevice *vdev,
-> >                                   uint64_t features,
-> >                                   Error **errp)
-> > @@ -148,14 +197,6 @@ static uint64_t vuf_get_features(VirtIODevice *vdev,
-> >      return vhost_get_features(&fs->vhost_dev, user_feature_bits, features);
-> >  }
-> >
-> > -static void vuf_handle_output(VirtIODevice *vdev, VirtQueue *vq)
-> > -{
-> > -    /*
-> > -     * Not normally called; it's the daemon that handles the queue;
-> > -     * however virtio's cleanup path can call this.
-> > -     */
-> > -}
-> > -
-> >  static void vuf_guest_notifier_mask(VirtIODevice *vdev, int idx,
-> >                                              bool mask)
-> >  {
-> > @@ -175,7 +216,6 @@ static void vuf_device_realize(DeviceState *dev, Error **errp)
-> >  {
-> >      VirtIODevice *vdev = VIRTIO_DEVICE(dev);
-> >      VHostUserFS *fs = VHOST_USER_FS(dev);
-> > -    unsigned int i;
-> >      size_t len;
-> >      int ret;
-> >
-> > @@ -222,18 +262,7 @@ static void vuf_device_realize(DeviceState *dev, Error **errp)
-> >      virtio_init(vdev, "vhost-user-fs", VIRTIO_ID_FS,
-> >                  sizeof(struct virtio_fs_config));
-> >
-> > -    /* Hiprio queue */
-> > -    fs->hiprio_vq = virtio_add_queue(vdev, fs->conf.queue_size, vuf_handle_output);
-> > -
-> > -    /* Request queues */
-> > -    fs->req_vqs = g_new(VirtQueue *, fs->conf.num_request_queues);
-> > -    for (i = 0; i < fs->conf.num_request_queues; i++) {
-> > -        fs->req_vqs[i] = virtio_add_queue(vdev, fs->conf.queue_size, vuf_handle_output);
-> > -    }
-> > -
-> > -    /* 1 high prio queue, plus the number configured */
-> > -    fs->vhost_dev.nvqs = 1 + fs->conf.num_request_queues;
-> > -    fs->vhost_dev.vqs = g_new0(struct vhost_virtqueue, fs->vhost_dev.nvqs);
-> > +    vuf_create_vqs(vdev);
-> >      ret = vhost_dev_init(&fs->vhost_dev, &fs->vhost_user,
-> >                           VHOST_BACKEND_TYPE_USER, 0, errp);
-> >      if (ret < 0) {
-> > @@ -244,13 +273,8 @@ static void vuf_device_realize(DeviceState *dev, Error **errp)
-> >
-> >  err_virtio:
-> >      vhost_user_cleanup(&fs->vhost_user);
-> > -    virtio_delete_queue(fs->hiprio_vq);
-> > -    for (i = 0; i < fs->conf.num_request_queues; i++) {
-> > -        virtio_delete_queue(fs->req_vqs[i]);
-> > -    }
-> > -    g_free(fs->req_vqs);
-> > +    vuf_cleanup_vqs(vdev);
-> >      virtio_cleanup(vdev);
-> > -    g_free(fs->vhost_dev.vqs);
-> >      return;
-> >  }
-> >
-> > @@ -258,7 +282,6 @@ static void vuf_device_unrealize(DeviceState *dev)
-> >  {
-> >      VirtIODevice *vdev = VIRTIO_DEVICE(dev);
-> >      VHostUserFS *fs = VHOST_USER_FS(dev);
-> > -    int i;
-> >
-> >      /* This will stop vhost backend if appropriate. */
-> >      vuf_set_status(vdev, 0);
-> > @@ -267,14 +290,8 @@ static void vuf_device_unrealize(DeviceState *dev)
-> >
-> >      vhost_user_cleanup(&fs->vhost_user);
-> >
-> > -    virtio_delete_queue(fs->hiprio_vq);
-> > -    for (i = 0; i < fs->conf.num_request_queues; i++) {
-> > -        virtio_delete_queue(fs->req_vqs[i]);
-> > -    }
-> > -    g_free(fs->req_vqs);
-> > +    vuf_cleanup_vqs(vdev);
-> >      virtio_cleanup(vdev);
-> > -    g_free(fs->vhost_dev.vqs);
-> > -    fs->vhost_dev.vqs = NULL;
-> >  }
-> >
-> >  static const VMStateDescription vuf_vmstate = {
-> 
-> 
-> --
-> Cheers,
-> Christophe de Dinechin (IRC c3d)
-> 
 

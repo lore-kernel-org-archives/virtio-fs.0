@@ -1,14 +1,14 @@
-Date: Wed, 20 Oct 2021 13:36:05 -0400
+Date: Wed, 20 Oct 2021 13:54:25 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YXBThZt5/Z/RS1S6@redhat.com>
+Message-ID: <YXBX0flS4CocXyDk@redhat.com>
 References: <20211011030938.109206-1-jefflexu@linux.alibaba.com>
-	<20211011030938.109206-2-jefflexu@linux.alibaba.com>
+	<20211011030938.109206-6-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20211011030938.109206-2-jefflexu@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [virtiofsd PATCH v6 1/6] virtiofsd: add .ioctl()
-	support
+In-Reply-To: <20211011030938.109206-6-jefflexu@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [virtiofsd PATCH v6 5/6] virtiofsd: implement file
+ size based dax policy
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,133 +20,120 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: Jeffle Xu <jefflexu@linux.alibaba.com>
 Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, miklos@szeredi.hu
 
-On Mon, Oct 11, 2021 at 11:09:33AM +0800, Jeffle Xu wrote:
-> For passthrough, it passes corresponding ioctls to host directly.
+On Mon, Oct 11, 2021 at 11:09:37AM +0800, Jeffle Xu wrote:
+> When DAX window is fully utilized and needs to be expanded to avoid the
+> performance fluctuation triggered by DAX window recaliming, it may not
+> be wise to allocate DAX window for files with size smaller than some
+> specific point, considering from the perspective of reducing memory
+> overhead.
 > 
-> Currently only these ioctls that handling persistent inode flags, i.e.,
-> FS_IOC_[G|S]ETFLAGS and FS_IOC_FS[G|S]ETXATTR are supported for security
-> concern, though it's implemented in a quite general way, so that we can
-> expand the scope of allowed ioctls if it is really needed later.
+> To maintain one DAX window chunk (e.g., 2MB in size), 32KB
+> (512 * 64 bytes) memory footprint will be consumed for page descriptors
+> inside guest. Thus it'd better disable DAX for those files smaller than
+> 32KB, to reduce the demand for DAX window and thus avoid the unworthy
+> memory overhead.
 > 
-> Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
-> ---
->  tools/virtiofsd/passthrough_ll.c      | 59 +++++++++++++++++++++++++++
->  tools/virtiofsd/passthrough_seccomp.c |  1 +
->  2 files changed, 60 insertions(+)
+> Thus only flag the file with FUSE_ATTR_DAX when the file size is greater
+> than 32 KB. The guest will enable DAX only for those files flagged with
+> FUSE_ATTR_DAX, when virtiofs is mounted with '-o dax=inode'.
 > 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index b76d878509..5969d67810 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -47,6 +47,7 @@
->  #include <dirent.h>
->  #include <pthread.h>
->  #include <sys/file.h>
-> +#include <sys/ioctl.h>
->  #include <sys/mount.h>
->  #include <sys/prctl.h>
->  #include <sys/resource.h>
-> @@ -54,6 +55,7 @@
->  #include <sys/wait.h>
->  #include <sys/xattr.h>
->  #include <syslog.h>
-> +#include <linux/fs.h>
->  
->  #include "qemu/cutils.h"
->  #include "passthrough_helpers.h"
-> @@ -2105,6 +2107,62 @@ out:
->      fuse_reply_err(req, saverr);
->  }
->  
-> +
-> +static void lo_ioctl(fuse_req_t req, fuse_ino_t ino, unsigned int cmd, void *arg,
-> +                          struct fuse_file_info *fi, unsigned flags, const void *in_buf,
-> +                          size_t in_bufsz, size_t out_bufsz)
-> +{
-> +    int fd = lo_fi_fd(req, fi);
-> +    int res;
-> +    int saverr = ENOSYS;
-> +    int dir;
-> +    void *buf = NULL;
-> +    size_t size = 0;
-> +
-> +    fuse_log(FUSE_LOG_DEBUG, "lo_ioctl(ino=%" PRIu64 ", cmd=0x%x, flags=0x%x, "
-> +            "in_bufsz = %lu, out_bufsz = %lu)\n",
-> +            ino, cmd, flags, in_bufsz, out_bufsz);
-> +
-> +    if (cmd != FS_IOC_SETFLAGS || cmd != FS_IOC_GETFLAGS ||
-> +        cmd != FS_IOC_FSSETXATTR || cmd != FS_IOC_FSGETXATTR)
-> +        goto out;
-> +
-> +    /* unrestricted ioctl is not supported yet */
-> +    if (flags & FUSE_IOCTL_UNRESTRICTED)
-> +        goto out;
-> +
-> +    dir = _IOC_DIR(cmd);
-> +
-> +    if (dir & _IOC_READ) {
-> +        size = out_bufsz;
-> +        buf = malloc(size);
-> +        if (!buf)
-> +            goto out_err;
-> +
-> +        if (dir & _IOC_WRITE)
-> +            memcpy(buf, in_buf, size);
-> +
-> +        res = ioctl(fd, cmd, buf);
-> +    }
-> +    else if (dir & _IOC_WRITE) {
+> To be noted that both FUSE_LOOKUP and FUSE_READDIRPLUS are affected, and
+> will convey FUSE_ATTR_DAX flag to the guest.
+> 
+> This policy will be used when '-o dax=server' option is specified for
+> virtiofsd.
 
-Typically else is on same line as } braces.
+So enabling DAX based on size is just one type of policy. Tomorrow one
+could think of enabling DAX on some other attribute. So only enable it
+for non-executable files etc. 
 
-} else if (dir & _IOC_WRITE) {
+We could be more specific and define a policy say "-o dax=filesize". This
+will allow defining other policies easily later. 
 
-Have you tried running qemu/script/checkpatch.pl on these patches. Does it
-flag it?
+But problem with this option is that defining more complex policies
+will be hard. Say I want to enable DAX on non-executable files which
+have size greater than 32K. Being able to combine multiple policies
+will be easy if we implement separate options/knobs to control them
+and that will allow turning on multiple policies together.
+
+Say, -o dax_size_threshold=1MB -o dax_no_exec_file
+
+So I guess a generic "-o dax=server" is not a bad idea. As of now this
+will implement a default size based policy of 32K size. But one can add
+options later to tweak this.
 
 Vivek
 
-> +        res = ioctl(fd, cmd, in_buf);
+> 
+> Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 32 ++++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index b4de86e317..a5a5061906 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -54,6 +54,7 @@
+>  #include <sys/syscall.h>
+>  #include <sys/wait.h>
+>  #include <sys/xattr.h>
+> +#include <sys/user.h>
+>  #include <syslog.h>
+>  #include <linux/fs.h>
+>  
+> @@ -61,6 +62,19 @@
+>  #include "passthrough_helpers.h"
+>  #include "passthrough_seccomp.h"
+>  
+> +/*
+> + * One page descriptor (64 bytes in size) needs to be maintained for every page
+> + * in the DAX window chunk, i.e., there is certain guest memory overhead when
+> + * DAX is enabled. Thus disable DAX for those files smaller than this certain
+> + * memory overhead if virtiofs is mounted in per-file DAX mode, in which case
+> + * the guest page cache will consume less memory when DAX is disabled.
+> + */
+> +#define FUSE_DAX_SHIFT	21
+> +#define PAGE_DESC_SHIFT	6
+> +#define FUSE_PERFILE_DAX_SHIFT \
+> +    (FUSE_DAX_SHIFT - PAGE_SHIFT + PAGE_DESC_SHIFT)
+> +#define FUSE_PERFILE_DAX_POINT	(1 << FUSE_PERFILE_DAX_SHIFT)
+> +
+>  /* Keep track of inode posix locks for each owner. */
+>  struct lo_inode_plock {
+>      uint64_t lock_owner;
+> @@ -986,6 +1000,20 @@ static int do_statx(struct lo_data *lo, int dirfd, const char *pathname,
+>      return 0;
+>  }
+>  
+> +static bool lo_should_enable_dax(struct lo_data *lo,
+> +                                 struct fuse_entry_param *e)
+> +{
+> +    if (lo->dax == DAX_NONE || !S_ISREG(e->attr.st_mode)) {
+> +        return false;
 > +    }
-> +    else {
-> +        res = ioctl(fd, cmd, arg);
+> +
+> +    if (lo->dax & DAX_SERVER) {
+> +        return e->attr.st_size > FUSE_PERFILE_DAX_POINT;
 > +    }
 > +
-> +    if (res < 0)
-> +        goto out_err;
-> +
-> +    fuse_reply_ioctl(req, 0, buf, size);
-> +    return;
-> +
-> +out_err:
-> +    saverr = errno;
-> +out:
-> +    fuse_reply_err(req, saverr);
+> +    return false;
 > +}
 > +
->  static void lo_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
->                          struct fuse_file_info *fi)
->  {
-> @@ -3278,6 +3336,7 @@ static struct fuse_lowlevel_ops lo_oper = {
->      .fsyncdir = lo_fsyncdir,
->      .create = lo_create,
->      .getlk = lo_getlk,
-> +    .ioctl = lo_ioctl,
->      .setlk = lo_setlk,
->      .open = lo_open,
->      .release = lo_release,
-> diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
-> index 62441cfcdb..2a5f7614fc 100644
-> --- a/tools/virtiofsd/passthrough_seccomp.c
-> +++ b/tools/virtiofsd/passthrough_seccomp.c
-> @@ -62,6 +62,7 @@ static const int syscall_allowlist[] = {
->      SCMP_SYS(gettid),
->      SCMP_SYS(gettimeofday),
->      SCMP_SYS(getxattr),
-> +    SCMP_SYS(ioctl),
->      SCMP_SYS(linkat),
->      SCMP_SYS(listxattr),
->      SCMP_SYS(lseek),
+>  /*
+>   * Increments nlookup on the inode on success. unref_inode_lolocked() must be
+>   * called eventually to decrement nlookup again. If inodep is non-NULL, the
+> @@ -1076,6 +1104,10 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+>      }
+>      e->ino = inode->fuse_ino;
+>  
+> +    if (lo_should_enable_dax(lo, e)) {
+> +        e->attr_flags |= FUSE_ATTR_DAX;
+> +    }
+> +
+>      /* Transfer ownership of inode pointer to caller or drop it */
+>      if (inodep) {
+>          *inodep = inode;
 > -- 
 > 2.27.0
 > 

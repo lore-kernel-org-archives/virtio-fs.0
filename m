@@ -1,13 +1,25 @@
-Date: Mon, 25 Oct 2021 18:48:44 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YXbt/JnPITP780GO@work-vm>
-References: <YUt9qbmgAfCFfg5t@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=posteo.de; s=2017;
+	t=1635184360; bh=3vVtakb0CQTPIBKAOWkwdo/T9kjU717fcryZdwOcMgc=;
+	h=Date:From:To:Cc:Subject:From;
+	b=DEso/VgthWyAwjX43cY41hvdAWz7V2ZiU1Mj5iIw1OHj2KlFZx6jaM8/poFw5CkDt
+	aO6MiwZYH5l+PzrHu+pagefXl7/9WsfmL/Rn53T8wRV4f6gYJVR9zL5qSkaimt+DV3
+	EG5lhQ7lvRbq0MU+4cBXTx6MoA9OdROdWlF1VzYEyfSHJdT24/4inDuDwd9cGGYvly
+	D+TrPiGypfKxl+yjMmncaNOd69ey548OjPsBnrcSA+kC/KUUKs45Fa65+ZgB5tEfxP
+	0VHKkoAOQDfmVhRzV8RGjvrS09tui1EruN+cfZqZh3IQltfxPKCz+U5NTWy8AlshmS
+	22nvAaTftzYCQ==
 MIME-Version: 1.0
-In-Reply-To: <YUt9qbmgAfCFfg5t@redhat.com>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: xattr mapping add a new type
-	"unsupported"
+Date: Mon, 25 Oct 2021 17:52:39 +0000
+From: birnenkram@posteo.de
+In-Reply-To: <YXbqL6qTfi/gzOOJ@redhat.com>
+References: <5e79ba8579b33e60e9670f2fd99b1c1b@posteo.de>
+	<YXauFapuRuxXRR2k@redhat.com>
+	<0c4d0bb990217000fe24f4a8522dcfa3@posteo.de>
+	<YXbqL6qTfi/gzOOJ@redhat.com>
+Message-ID: <a06f048f33a2edac78e816bfb19b5270@posteo.de>
+Content-Type: text/plain; charset=US-ASCII;
+ format=flowed
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] write permissions for Windows host on Linux guest
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,112 +29,18 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+Cc: virtio-fs-list <virtio-fs@redhat.com>, Gal Hammer <ghammer@redhat.com>
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> Right now for xattr remapping, we support types of "prefix", "ok" or "bad".
-> Type "bad" returns -EPERM on setxattr and hides xattr in listxattr. For
-> getxattr, mapping code returns -EPERM but getxattr code converts it to -ENODATA.
-> 
-> I need a new semantics where if an xattr is unsupported, then
-> getxattr()/setxattr() return -ENOTSUP and listxattr() should hide the xattr.
-> This is needed to simulate that security.selinux is not supported by
-> virtiofs filesystem and in that case client falls back to some default
-> label specified by policy.
-> 
-> So add a new type "unsupported" which returns -ENOTSUP on getxattr() and
-> setxattr() and hides xattrs in listxattr().
-> 
-> For example, one can use following mapping rule to not support
-> security.selinux xattr and allow others.
-> 
-> "-o xattrmap=/unsupported/all/security.selinux/security.selinux//ok/all///"
-> 
-> Suggested-by: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Thanks for your suggestions. I'll let you know in case I find anything 
+unexpected. The Linux (host) side will be easier to debug than the 
+Windows (guest) side. Currently, SID S-1-5-0 is returned independently 
+of the uid on the host.
 
-Queued
+Best regards, Michael
 
-> ---
->  docs/tools/virtiofsd.rst         |    6 ++++++
->  tools/virtiofsd/passthrough_ll.c |   17 ++++++++++++++---
->  2 files changed, 20 insertions(+), 3 deletions(-)
-> 
-> Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
-> ===================================================================
-> --- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2021-09-22 08:37:16.070377732 -0400
-> +++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2021-09-22 14:17:09.543016250 -0400
-> @@ -2465,6 +2465,11 @@ static void lo_flock(fuse_req_t req, fus
->   * Automatically reversed on read
->   */
->  #define XATTR_MAP_FLAG_PREFIX  (1 <<  2)
-> +/*
-> + * The attribute is unsupported;
-> + * ENOTSUP on write, hidden on read.
-> + */
-> +#define XATTR_MAP_FLAG_UNSUPPORTED     (1 <<  3)
->  
->  /* scopes */
->  /* Apply rule to get/set/remove */
-> @@ -2636,6 +2641,8 @@ static void parse_xattrmap(struct lo_dat
->              tmp_entry.flags |= XATTR_MAP_FLAG_OK;
->          } else if (strstart(map, "bad", &map)) {
->              tmp_entry.flags |= XATTR_MAP_FLAG_BAD;
-> +        } else if (strstart(map, "unsupported", &map)) {
-> +            tmp_entry.flags |= XATTR_MAP_FLAG_UNSUPPORTED;
->          } else if (strstart(map, "map", &map)) {
->              /*
->               * map is sugar that adds a number of rules, and must be
-> @@ -2646,8 +2653,8 @@ static void parse_xattrmap(struct lo_dat
->          } else {
->              fuse_log(FUSE_LOG_ERR,
->                       "%s: Unexpected type;"
-> -                     "Expecting 'prefix', 'ok', 'bad' or 'map' in rule %zu\n",
-> -                     __func__, lo->xattr_map_nentries);
-> +                     "Expecting 'prefix', 'ok', 'bad', 'unsupported' or 'map'"
-> +                     " in rule %zu\n", __func__, lo->xattr_map_nentries);
->              exit(1);
->          }
->  
-> @@ -2749,6 +2756,9 @@ static int xattr_map_client(const struct
->              if (cur_entry->flags & XATTR_MAP_FLAG_BAD) {
->                  return -EPERM;
->              }
-> +            if (cur_entry->flags & XATTR_MAP_FLAG_UNSUPPORTED) {
-> +                return -ENOTSUP;
-> +            }
->              if (cur_entry->flags & XATTR_MAP_FLAG_OK) {
->                  /* Unmodified name */
->                  return 0;
-> @@ -2788,7 +2798,8 @@ static int xattr_map_server(const struct
->  
->          if ((cur_entry->flags & XATTR_MAP_FLAG_SERVER) &&
->              (strstart(server_name, cur_entry->prepend, &end))) {
-> -            if (cur_entry->flags & XATTR_MAP_FLAG_BAD) {
-> +            if (cur_entry->flags & XATTR_MAP_FLAG_BAD ||
-> +                cur_entry->flags & XATTR_MAP_FLAG_UNSUPPORTED) {
->                  return -ENODATA;
->              }
->              if (cur_entry->flags & XATTR_MAP_FLAG_OK) {
-> Index: rhvgoyal-qemu/docs/tools/virtiofsd.rst
-> ===================================================================
-> --- rhvgoyal-qemu.orig/docs/tools/virtiofsd.rst	2021-09-22 08:37:15.938372097 -0400
-> +++ rhvgoyal-qemu/docs/tools/virtiofsd.rst	2021-09-22 14:44:09.814188712 -0400
-> @@ -183,6 +183,12 @@ Using ':' as the separator a rule is of
->    'ok' as either an explicit terminator or for special handling of certain
->    patterns.
->  
-> +- 'unsupported' - If a client tries to use a name matching 'key' it's
-> +  denied using ENOTSUP; when the server passes an attribute
-> +  name matching 'prepend' it's hidden.  In many ways it's use is very like
-> +  'ok' as either an explicit terminator or for special handling of certain
-> +  patterns.
-> +
->  **key** is a string tested as a prefix on an attribute name originating
->  on the client.  It maybe empty in which case a 'client' rule
->  will always match on client names.
-> 
-> 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> If you like you can debug virtiofsd easily, put few printf statements
+> and make sure correct uid/gid is being returned. May be next step is
+> to debug virtiofs driver in windows and make sure it receives correct
+> uid/gid. And if that works, then final step is making sure permissions
+> are being mapped properly.
 

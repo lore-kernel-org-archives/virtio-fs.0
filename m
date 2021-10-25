@@ -1,19 +1,13 @@
-Date: Mon, 25 Oct 2021 14:12:10 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YXbzeomdC5cD1xfF@redhat.com>
-References: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
-	<20211011030052.98923-3-jefflexu@linux.alibaba.com>
-	<YW2AU/E0pLHO5Yl8@redhat.com>
-	<652ac323-6546-01b8-992e-460ad59577ca@linux.alibaba.com>
-	<YXAzB5sOrFRUzTC5@redhat.com>
-	<96956132-fced-5739-d69a-7b424dc65f7c@linux.alibaba.com>
-	<20211025175251.GF3465596@iweiny-DESK2.sc.intel.com>
+Date: Mon, 25 Oct 2021 19:41:05 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YXb6Qb1eB755PNhf@work-vm>
+References: <20211014122554.34599-1-dgilbert@redhat.com>
+	<YW1uK9J9GzNUbC6S@redhat.com>
 MIME-Version: 1.0
+In-Reply-To: <YW1uK9J9GzNUbC6S@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20211025175251.GF3465596@iweiny-DESK2.sc.intel.com>
-Subject: Re: [Virtio-fs] [PATCH v6 2/7] fuse: make DAX mount option a
-	tri-state
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Error on bad socket group name
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,127 +16,71 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Ira Weiny <ira.weiny@intel.com>
-Cc: miklos@szeredi.hu, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Dave Chinner <dchinner@redhat.com>, joseph.qi@linux.alibaba.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, xiagao@redhat.com
 
-On Mon, Oct 25, 2021 at 10:52:51AM -0700, Ira Weiny wrote:
-> On Fri, Oct 22, 2021 at 02:54:03PM +0800, JeffleXu wrote:
-> > cc [Ira Weiny], author of per inode DAX on xfs/ext4
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> On Thu, Oct 14, 2021 at 01:25:54PM +0100, Dr. David Alan Gilbert (git) wrote:
+> > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 > > 
-> > On 10/20/21 11:17 PM, Vivek Goyal wrote:
-> > > On Wed, Oct 20, 2021 at 10:52:38AM +0800, JeffleXu wrote:
-> > >>
-> > >>
-> > >> On 10/18/21 10:10 PM, Vivek Goyal wrote:
-> > >>> On Mon, Oct 11, 2021 at 11:00:47AM +0800, Jeffle Xu wrote:
-> > >>>> We add 'always', 'never', and 'inode' (default). '-o dax' continues to
-> > >>>> operate the same which is equivalent to 'always'. To be consistemt with
-> > >>>> ext4/xfs's tri-state mount option, when neither '-o dax' nor '-o dax='
-> > >>>> option is specified, the default behaviour is equal to 'inode'.
-> > >>>
-> > >>> Hi Jeffle,
-> > >>>
-> > >>> I am not sure when  -o "dax=inode"  is used as a default? If user
-> > >>> specifies, "-o dax" then it is equal to "-o dax=always", otherwise
-> > >>> user will explicitly specify "-o dax=always/never/inode". So when
-> > >>> is dax=inode is used as default?
-> > >>
-> > >> That means when neither '-o dax' nor '-o dax=always/never/inode' is
-> > >> specified, it is actually equal to '-o dax=inode', which is also how
-> > >> per-file DAX on ext4/xfs works.
-> > > 
-> 
-> It's been a while so I'm fuzzy on the details of the discussions but yes that
-> is the way things are now in the code.
-> 
-> > > [ CC dave chinner] 
-> > > 
-> > > Is it not change of default behavior for ext4/xfs as well. My
-> > > understanding is that prior to this new dax options, "-o dax" enabled
-> > > dax on filesystem and if user did not specify it, DAX is disbaled
-> > > by default.
-> 
-> Technically it does change default behavior...  However, NOT in a way which
-> breaks anything.  See below.
-> 
-> > > 
-> > > Now after introduction of "-o dax=always/never/inode", if suddenly
-> > > "-o dax=inode" became the default if user did not specify anything,
-> > > that's change of behavior.
-> 
-> Technically yes but not in a broken way.
-> 
-> > >
-> > > Is that intentional. If given a choice,
-> > > I would rather not change default and ask user to opt-in for
-> > > appropriate dax functionality.
-> 
-> There is no need for this.
-> 
-> > > 
-> > > Dave, you might have thoughts on this. It makes me uncomfortable to
-> > > change virtiofs dax default now just because other filesytems did it.
-> > > 
+> > Make the '--socket-group=' option fail if the group name is unknown:
 > > 
-> > I can only find the following discussions about the earliest record on
-> > this tri-state mount option:
+> > ./tools/virtiofsd/virtiofsd .... --socket-group=zaphod
+> > vhost socket: unable to find group 'zaphod'
 > > 
-> > https://lore.kernel.org/lkml/20200316095509.GA13788@lst.de/
-> > https://lore.kernel.org/lkml/20200401040021.GC56958@magnolia/
-> > 
-> > 
-> > Hi, Ira Weiny,
-> > 
-> > Do you have any thought on this, i.e. why the default behavior has
-> > changed after introduction of per inode dax?
+> > Reported-by: Xiaoling Gao <xiagao@redhat.com>
+> > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 > 
-> While this is 'technically' different behavior the end user does not see any
-> difference in behavior if they continue without software changes.  Specifically
-> specifying nothing continues to operate with all the files on the FS to be
-> '_not_ DAX'.  While specifying '-o dax' forces DAX on all files.
+> Hi Dave,
 > 
-> This expands the default behavior in a backwards compatible manner.
-
-This is backward compatible in a sense that if somebody upgrades to new
-kernel, things will still be same. 
-
-I think little problematic change is that say I bring in persistent
-memory from another system (which has FS_XFLAGS_DAX set on some inodes)
-and then mount it without andy of the dax mount options, then per
-inode dax will be enabled unexpectedly if I boot with newer kernels
-but it will be disable if I mount with older kernels. Do I understand it
-right.
-
-> The user
-> can now enable DAX on some files.  But this is an opt-in on the part of the
-> user of the FS and again does not change with existing software/scripts/etc.
-
-Don't understand this "opt-in" bit. If user mounts an fs without
-specifying any of the dax options, then per inode dax will still be
-enabled if inode has the correct flag set. So is setting of flag being
-considered as opt-in (insted of mount option).
-
-If setting of flag is being considered as opt-in, that probably will not
-work very well with virtiofs. Because server can enforce a different
-policy for enabling per file dax (instead of FS_XFLAG_DAX).
-
-And given there are two entities here (client and server), I think it
-will be good if if we give client a chance as well to decide whether
-it wants to enable per file dax or not. I know it can alwasy do 
-"dax=never" but it can still be broken if client software remains
-same but host/server software is upgraded or commnad line changed.
-
-So for virtiofs, I think better behavior is to continue to not enable
-any dax until and unless user opts-in using "-o dax=foo" options.
+> This looks good to me. Just a minor nit for code cleanup. It could
+> be done in a separate patch or sometime later as well.
+> 
+> Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
 
 Thanks
-Vivek
 
+> > ---
+> >  tools/virtiofsd/fuse_virtio.c | 7 +++++++
+> >  1 file changed, 7 insertions(+)
+> > 
+> > diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+> > index 8f4fd165b9..39eebffb62 100644
+> > --- a/tools/virtiofsd/fuse_virtio.c
+> > +++ b/tools/virtiofsd/fuse_virtio.c
+> > @@ -999,6 +999,13 @@ static int fv_create_listen_socket(struct fuse_session *se)
+> >                           "vhost socket failed to set group to %s (%d): %m\n",
+> >                           se->vu_socket_group, g->gr_gid);
+> >              }
+> > +        } else {
+> > +            fuse_log(FUSE_LOG_ERR,
+> > +                     "vhost socket: unable to find group '%s'\n",
+> > +                     se->vu_socket_group);
+> > +            close(listen_sock);
+> > +            umask(old_umask);
+> 		^^^
+> > +            return -1;
+> >          }
+> >      }
+> >      umask(old_umask);
+> 
+> This umask() call could be moved little early right after bind() call and
+> that way we don't have to take care of calling umask(old_umask) in error
+> path if group name could not be found.
 
+One to fight another day.
 
+> Vivek
+> > -- 
+> > 2.31.1
+> > 
+> > _______________________________________________
+> > Virtio-fs mailing list
+> > Virtio-fs@redhat.com
+> > https://listman.redhat.com/mailman/listinfo/virtio-fs
+> > 
 > 
-> Does that make sense?
 > 
-> Ira
-> 
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

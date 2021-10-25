@@ -1,10 +1,9 @@
-Date: Mon, 25 Oct 2021 19:41:05 +0100
+Date: Mon, 25 Oct 2021 19:47:50 +0100
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YXb6Qb1eB755PNhf@work-vm>
+Message-ID: <YXb71uIKOIGhqHCg@work-vm>
 References: <20211014122554.34599-1-dgilbert@redhat.com>
-	<YW1uK9J9GzNUbC6S@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <YW1uK9J9GzNUbC6S@redhat.com>
+In-Reply-To: <20211014122554.34599-1-dgilbert@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Error on bad socket group name
@@ -16,69 +15,46 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, xiagao@redhat.com
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com
+Cc: xiagao@redhat.com
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> On Thu, Oct 14, 2021 at 01:25:54PM +0100, Dr. David Alan Gilbert (git) wrote:
-> > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-> > 
-> > Make the '--socket-group=' option fail if the group name is unknown:
-> > 
-> > ./tools/virtiofsd/virtiofsd .... --socket-group=zaphod
-> > vhost socket: unable to find group 'zaphod'
-> > 
-> > Reported-by: Xiaoling Gao <xiagao@redhat.com>
-> > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+* Dr. David Alan Gilbert (git) (dgilbert@redhat.com) wrote:
+> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 > 
-> Hi Dave,
+> Make the '--socket-group=' option fail if the group name is unknown:
 > 
-> This looks good to me. Just a minor nit for code cleanup. It could
-> be done in a separate patch or sometime later as well.
+> ./tools/virtiofsd/virtiofsd .... --socket-group=zaphod
+> vhost socket: unable to find group 'zaphod'
 > 
-> Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
+> Reported-by: Xiaoling Gao <xiagao@redhat.com>
+> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 
-Thanks
+Queued
 
-> > ---
-> >  tools/virtiofsd/fuse_virtio.c | 7 +++++++
-> >  1 file changed, 7 insertions(+)
-> > 
-> > diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-> > index 8f4fd165b9..39eebffb62 100644
-> > --- a/tools/virtiofsd/fuse_virtio.c
-> > +++ b/tools/virtiofsd/fuse_virtio.c
-> > @@ -999,6 +999,13 @@ static int fv_create_listen_socket(struct fuse_session *se)
-> >                           "vhost socket failed to set group to %s (%d): %m\n",
-> >                           se->vu_socket_group, g->gr_gid);
-> >              }
-> > +        } else {
-> > +            fuse_log(FUSE_LOG_ERR,
-> > +                     "vhost socket: unable to find group '%s'\n",
-> > +                     se->vu_socket_group);
-> > +            close(listen_sock);
-> > +            umask(old_umask);
-> 		^^^
-> > +            return -1;
-> >          }
-> >      }
-> >      umask(old_umask);
+> ---
+>  tools/virtiofsd/fuse_virtio.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> This umask() call could be moved little early right after bind() call and
-> that way we don't have to take care of calling umask(old_umask) in error
-> path if group name could not be found.
-
-One to fight another day.
-
-> Vivek
-> > -- 
-> > 2.31.1
-> > 
-> > _______________________________________________
-> > Virtio-fs mailing list
-> > Virtio-fs@redhat.com
-> > https://listman.redhat.com/mailman/listinfo/virtio-fs
-> > 
+> diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+> index 8f4fd165b9..39eebffb62 100644
+> --- a/tools/virtiofsd/fuse_virtio.c
+> +++ b/tools/virtiofsd/fuse_virtio.c
+> @@ -999,6 +999,13 @@ static int fv_create_listen_socket(struct fuse_session *se)
+>                           "vhost socket failed to set group to %s (%d): %m\n",
+>                           se->vu_socket_group, g->gr_gid);
+>              }
+> +        } else {
+> +            fuse_log(FUSE_LOG_ERR,
+> +                     "vhost socket: unable to find group '%s'\n",
+> +                     se->vu_socket_group);
+> +            close(listen_sock);
+> +            umask(old_umask);
+> +            return -1;
+>          }
+>      }
+>      umask(old_umask);
+> -- 
+> 2.31.1
 > 
 > 
 -- 

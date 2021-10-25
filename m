@@ -1,14 +1,13 @@
-Date: Mon, 25 Oct 2021 13:32:31 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YXbqL6qTfi/gzOOJ@redhat.com>
-References: <5e79ba8579b33e60e9670f2fd99b1c1b@posteo.de>
-	<YXauFapuRuxXRR2k@redhat.com>
-	<0c4d0bb990217000fe24f4a8522dcfa3@posteo.de>
+Date: Mon, 25 Oct 2021 18:48:44 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YXbt/JnPITP780GO@work-vm>
+References: <YUt9qbmgAfCFfg5t@redhat.com>
 MIME-Version: 1.0
+In-Reply-To: <YUt9qbmgAfCFfg5t@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <0c4d0bb990217000fe24f4a8522dcfa3@posteo.de>
-Subject: Re: [Virtio-fs] write permissions for Windows host on Linux guest
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: xattr mapping add a new type
+	"unsupported"
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,80 +16,113 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: birnenkram@posteo.de
-Cc: virtio-fs-list <virtio-fs@redhat.com>, Gal Hammer <ghammer@redhat.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Mon, Oct 25, 2021 at 04:28:45PM +0000, birnenkram@posteo.de wrote:
-> Hi Vivek,
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> Right now for xattr remapping, we support types of "prefix", "ok" or "bad".
+> Type "bad" returns -EPERM on setxattr and hides xattr in listxattr. For
+> getxattr, mapping code returns -EPERM but getxattr code converts it to -ENODATA.
 > 
+> I need a new semantics where if an xattr is unsupported, then
+> getxattr()/setxattr() return -ENOTSUP and listxattr() should hide the xattr.
+> This is needed to simulate that security.selinux is not supported by
+> virtiofs filesystem and in that case client falls back to some default
+> label specified by policy.
+> 
+> So add a new type "unsupported" which returns -ENOTSUP on getxattr() and
+> setxattr() and hides xattrs in listxattr().
+> 
+> For example, one can use following mapping rule to not support
+> security.selinux xattr and allow others.
+> 
+> "-o xattrmap=/unsupported/all/security.selinux/security.selinux//ok/all///"
+> 
+> Suggested-by: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 
-Hi Michael,
+Queued
 
-[ CC virtio-fs list, Gal Hammer ]
-
-Lets keep the discussion on mailing list. Not sure if you removed mailing
-list from cc list accidently.
-
-> thanks for your answer. Based on it I tried again, this time using matching
-> uids on guest and host (by creating a test account on the host with a uid
-> matching the guest uid). However this did not solve the problem. In fact I
-> observe that regardless of the uid on the host it is always mapped to SID
-> S-1-5-0 on the guest.
+> ---
+>  docs/tools/virtiofsd.rst         |    6 ++++++
+>  tools/virtiofsd/passthrough_ll.c |   17 ++++++++++++++---
+>  2 files changed, 20 insertions(+), 3 deletions(-)
 > 
-> Which has been noted by other users as well. In fact there's a comment from
-> the WinFsp responsible Bill Zissimopoulos (on
-> https://groups.google.com/g/winfsp/c/5JhqnV5siiU) from February this year:
+> Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
+> ===================================================================
+> --- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2021-09-22 08:37:16.070377732 -0400
+> +++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2021-09-22 14:17:09.543016250 -0400
+> @@ -2465,6 +2465,11 @@ static void lo_flock(fuse_req_t req, fus
+>   * Automatically reversed on read
+>   */
+>  #define XATTR_MAP_FLAG_PREFIX  (1 <<  2)
+> +/*
+> + * The attribute is unsupported;
+> + * ENOTSUP on write, hidden on read.
+> + */
+> +#define XATTR_MAP_FLAG_UNSUPPORTED     (1 <<  3)
+>  
+>  /* scopes */
+>  /* Apply rule to get/set/remove */
+> @@ -2636,6 +2641,8 @@ static void parse_xattrmap(struct lo_dat
+>              tmp_entry.flags |= XATTR_MAP_FLAG_OK;
+>          } else if (strstart(map, "bad", &map)) {
+>              tmp_entry.flags |= XATTR_MAP_FLAG_BAD;
+> +        } else if (strstart(map, "unsupported", &map)) {
+> +            tmp_entry.flags |= XATTR_MAP_FLAG_UNSUPPORTED;
+>          } else if (strstart(map, "map", &map)) {
+>              /*
+>               * map is sugar that adds a number of rules, and must be
+> @@ -2646,8 +2653,8 @@ static void parse_xattrmap(struct lo_dat
+>          } else {
+>              fuse_log(FUSE_LOG_ERR,
+>                       "%s: Unexpected type;"
+> -                     "Expecting 'prefix', 'ok', 'bad' or 'map' in rule %zu\n",
+> -                     __func__, lo->xattr_map_nentries);
+> +                     "Expecting 'prefix', 'ok', 'bad', 'unsupported' or 'map'"
+> +                     " in rule %zu\n", __func__, lo->xattr_map_nentries);
+>              exit(1);
+>          }
+>  
+> @@ -2749,6 +2756,9 @@ static int xattr_map_client(const struct
+>              if (cur_entry->flags & XATTR_MAP_FLAG_BAD) {
+>                  return -EPERM;
+>              }
+> +            if (cur_entry->flags & XATTR_MAP_FLAG_UNSUPPORTED) {
+> +                return -ENOTSUP;
+> +            }
+>              if (cur_entry->flags & XATTR_MAP_FLAG_OK) {
+>                  /* Unmodified name */
+>                  return 0;
+> @@ -2788,7 +2798,8 @@ static int xattr_map_server(const struct
+>  
+>          if ((cur_entry->flags & XATTR_MAP_FLAG_SERVER) &&
+>              (strstart(server_name, cur_entry->prepend, &end))) {
+> -            if (cur_entry->flags & XATTR_MAP_FLAG_BAD) {
+> +            if (cur_entry->flags & XATTR_MAP_FLAG_BAD ||
+> +                cur_entry->flags & XATTR_MAP_FLAG_UNSUPPORTED) {
+>                  return -ENODATA;
+>              }
+>              if (cur_entry->flags & XATTR_MAP_FLAG_OK) {
+> Index: rhvgoyal-qemu/docs/tools/virtiofsd.rst
+> ===================================================================
+> --- rhvgoyal-qemu.orig/docs/tools/virtiofsd.rst	2021-09-22 08:37:15.938372097 -0400
+> +++ rhvgoyal-qemu/docs/tools/virtiofsd.rst	2021-09-22 14:44:09.814188712 -0400
+> @@ -183,6 +183,12 @@ Using ':' as the separator a rule is of
+>    'ok' as either an explicit terminator or for special handling of certain
+>    patterns.
+>  
+> +- 'unsupported' - If a client tries to use a name matching 'key' it's
+> +  denied using ENOTSUP; when the server passes an attribute
+> +  name matching 'prepend' it's hidden.  In many ways it's use is very like
+> +  'ok' as either an explicit terminator or for special handling of certain
+> +  patterns.
+> +
+>  **key** is a string tested as a prefix on an attribute name originating
+>  on the client.  It maybe empty in which case a 'client' rule
+>  will always match on client names.
 > 
-> "When I [...] looked at the virtiofs source code I saw that this file system
-> implements the native WinFsp API. This means that relevant security calls
-> would be in the operations GetSecurityByName and GetSecurity:
 > 
->     GetSecurityByName: https://github.com/virtio-win/kvm-guest-drivers-windows/blob/e2fc291866a7d2f147a8117dacdce7ac6375b6b8/viofs/svc/virtiofs.c#L839
->     GetSecurity: https://github.com/virtio-win/kvm-guest-drivers-windows/blob/e2fc291866a7d2f147a8117dacdce7ac6375b6b8/viofs/svc/virtiofs.c#L1619
-> 
->  Both of these functions call the WinFsp API
-> FspPosixMapPermissionsToSecurityDescriptor to map UNIX permissions (that
-> they got from their internal API's) to Windows security descriptors. For
-> example, GetSecurity calls (via GetFileInfoInternal) the internal
-> VirtFsFuseRequest to perform a getattr. I bet that the returned
-> VirtFs->LocalUid == VirtFs->LocalGid == 0, but do not ask me why.
-> 
-> In any case this seems unrelated to WinFsp. I note that FspPosixMapUidToSid
-> returns the SID S-1-0-65534 when it fails to map (and not S-1-5-0)."
-> 
-> Can it be that Bill is correct and (at least for a Windows guest)
-> VirtFsFuseRequest always returns uid == gid == 0? Which would then be mapped
-> to S-1-5-0, requiring Administrator rights for file modifications and
-> deletions?
-
-IIUC, you are saying what uid/gid vrtiofs server is returning for a file. It
-returns whatever it sees on the host. So for a file owned by uid/gid
-1000/1000 on host, it should return it. That should be mapped to
-SID using WinFsp API? I have no idea how does that work.
-
-If you like you can debug virtiofsd easily, put few printf statements
-and make sure correct uid/gid is being returned. May be next step is
-to debug virtiofs driver in windows and make sure it receives correct
-uid/gid. And if that works, then final step is making sure permissions
-are being mapped properly.
-
-Frankly, I have not done any work on windows side and have no idea what
-components are there and how do they interact. Copying Gal Hammer, and
-he might have thoughts on this.
-
-Vivek
-
-> 
-> Michael
-> 
-> > Hi Michael,
-> 
-> > FUSE protocol sends the uid/gid of the client to the server and server
-> > switches to that uid/gid before performing file operation. I am not
-> > sure how the concept of uid/gid works with windows client but if you
-> > are sharing a directory owned by a uid/gid on host, guest will have
-> > to use same uid/gid to be able to use it (or become root inside).
-> 
-> > Vivek
-> 
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

@@ -1,30 +1,20 @@
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=crudebyte.com; s=kylie; h=Content-Type:Content-Transfer-Encoding:
-	MIME-Version:References:In-Reply-To:Message-ID:Date:Subject:Cc:To:From:
-	Content-ID:Content-Description;
-	bh=/uuTssCrIpb2FxRAXo1XepgllJ62U9XSI0xLSAg/Mvs=;
-	b=SyljRAQQkDULjCY5PCG3a/iuY2
-	3dZQTImefoWQw90zCP4h67tEOk0+cACnEVo1z+B2MTIybxOe4NF0fkVY2kHtoUu8PZd0u0Tkyrm2h
-	8nBrvEJ31j0XQL6hvhydLtteAK4CL/1jVaym3F1n5H7F/i9SA8zVUP8vbmE+jYZkRotG4HNyzHuzt
-	CNWEMwiYmCP6bz5fEkXp1ARcJxW1Cff5jJ8RzWTt73vLDQJ+/zkwYerzhp7ImI2GhL8SxzQ4+WniC
-	xWZruUWAue2pIuVxA0ZbiJravHCDn2qzk+2grBReiCsn0QMMX7i41qkvuIylqGNagrOn0l9WFWtC9
-	xgjGvts3Nou9Iwf3fB2prLcFVfYOJg0Zn14E/SyrNQU/OKw+s0iJiMeMY2gXDimESLdPpKfxF/hl4
-	QM21DbLz3rhIGBhI6HmFxd+a5nlpANIQu0hCPn5iZPKRzRHaYecgEMcglK5aOMm06myv0RN4BIQJJ
-	9ulGZInHCdmpE2FojoZgb69uKNtPs4pbXNn/hIoZG0SsD8yw/3Cvs5Mc/m/C2ZFgDMJ3JN7T2XpKI
-	71ILsQ7ozWWi9DJha6HEVFywakXXsZz7AZLX39nQjIYlyfQs5pvSIKpOTbiQKLio34CGgO9jWe2GN
-	B1/3KTZMl9U0FeK0V/E2Dj8iSMwj8YqFBIn9bwK1s=
-From: Christian Schoenebeck <qemu_oss@crudebyte.com>
-Date: Wed, 06 Oct 2021 14:50:07 +0200
-Message-ID: <6923459.JjrQbDWbmU@silver>
-In-Reply-To: <YV2DT+EMqDN+gSHf@stefanha-x1.localdomain>
-References: <cover.1633376313.git.qemu_oss@crudebyte.com>
-	<1950551.Wq8TZpmmRU@silver>
-	<YV2DT+EMqDN+gSHf@stefanha-x1.localdomain>
+Date: Mon, 25 Oct 2021 12:02:01 -0700
+From: Ira Weiny <ira.weiny@intel.com>
+Message-ID: <20211025190201.GG3465596@iweiny-DESK2.sc.intel.com>
+References: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
+	<20211011030052.98923-3-jefflexu@linux.alibaba.com>
+	<YW2AU/E0pLHO5Yl8@redhat.com>
+	<652ac323-6546-01b8-992e-460ad59577ca@linux.alibaba.com>
+	<YXAzB5sOrFRUzTC5@redhat.com>
+	<96956132-fced-5739-d69a-7b424dc65f7c@linux.alibaba.com>
+	<20211025175251.GF3465596@iweiny-DESK2.sc.intel.com>
+	<YXbzeomdC5cD1xfF@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 7Bit
-Content-Type: text/plain; charset="us-ascii"
-Subject: Re: [Virtio-fs] [PATCH v2 1/3] virtio: turn VIRTQUEUE_MAX_SIZE into
-	a variable
+In-Reply-To: <YXbzeomdC5cD1xfF@redhat.com>
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: Re: [Virtio-fs] [PATCH v6 2/7] fuse: make DAX mount option a
+	tri-state
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,234 +23,145 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: Kevin Wolf <kwolf@redhat.com>, Laurent Vivier <lvivier@redhat.com>, qemu-block@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, Jason Wang <jasowang@redhat.com>, Amit Shah <amit@kernel.org>, David Hildenbrand <david@redhat.com>, Raphael Norwitz <raphael.norwitz@nutanix.com>, virtio-fs@redhat.com, Eric Auger <eric.auger@redhat.com>, Hanna Reitz <hreitz@redhat.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Gerd Hoffmann <kraxel@redhat.com>, =?ISO-8859-1?Q?Marc=2DAndr=E9?= Lureau <marcandre.lureau@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: miklos@szeredi.hu, virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, Dave Chinner <dchinner@redhat.com>, joseph.qi@linux.alibaba.com
 
-On Mittwoch, 6. Oktober 2021 13:06:55 CEST Stefan Hajnoczi wrote:
-> On Tue, Oct 05, 2021 at 06:32:46PM +0200, Christian Schoenebeck wrote:
-> > On Dienstag, 5. Oktober 2021 17:10:40 CEST Stefan Hajnoczi wrote:
-> > > On Tue, Oct 05, 2021 at 03:15:26PM +0200, Christian Schoenebeck wrote:
-> > > > On Dienstag, 5. Oktober 2021 14:45:56 CEST Stefan Hajnoczi wrote:
-> > > > > On Mon, Oct 04, 2021 at 09:38:04PM +0200, Christian Schoenebeck 
-wrote:
-> > > > > > Refactor VIRTQUEUE_MAX_SIZE to effectively become a runtime
-> > > > > > variable per virtio user.
-> > > > > 
-> > > > > virtio user == virtio device model?
-> > > > 
-> > > > Yes
-> > > > 
-> > > > > > Reasons:
-> > > > > > 
-> > > > > > (1) VIRTQUEUE_MAX_SIZE should reflect the absolute theoretical
-> > > > > > 
-> > > > > >     maximum queue size possible. Which is actually the maximum
-> > > > > >     queue size allowed by the virtio protocol. The appropriate
-> > > > > >     value for VIRTQUEUE_MAX_SIZE would therefore be 32768:
-> > > > > >     
-> > > > > >     https://docs.oasis-open.org/virtio/virtio/v1.1/cs01/virtio-v1.
-> > > > > >     1-cs
-> > > > > >     01.h
-> > > > > >     tml#x1-240006
-> > > > > >     
-> > > > > >     Apparently VIRTQUEUE_MAX_SIZE was instead defined with a
-> > > > > >     more or less arbitrary value of 1024 in the past, which
-> > > > > >     limits the maximum transfer size with virtio to 4M
-> > > > > >     (more precise: 1024 * PAGE_SIZE, with the latter typically
-> > > > > >     being 4k).
-> > > > > 
-> > > > > Being equal to IOV_MAX is a likely reason. Buffers with more iovecs
-> > > > > than
-> > > > > that cannot be passed to host system calls (sendmsg(2), pwritev(2),
-> > > > > etc).
-> > > > 
-> > > > Yes, that's use case dependent. Hence the solution to opt-in if it is
-> > > > desired and feasible.
-> > > > 
-> > > > > > (2) Additionally the current value of 1024 poses a hidden limit,
-> > > > > > 
-> > > > > >     invisible to guest, which causes a system hang with the
-> > > > > >     following QEMU error if guest tries to exceed it:
-> > > > > >     
-> > > > > >     virtio: too many write descriptors in indirect table
-> > > > > 
-> > > > > I don't understand this point. 2.6.5 The Virtqueue Descriptor Table
-> > 
-> > says:
-> > > > >   The number of descriptors in the table is defined by the queue
-> > > > >   size
-> > > > >   for
-> > > > > 
-> > > > > this virtqueue: this is the maximum possible descriptor chain
-> > > > > length.
-> > > > > 
-> > > > > and 2.6.5.3.1 Driver Requirements: Indirect Descriptors says:
-> > > > >   A driver MUST NOT create a descriptor chain longer than the Queue
-> > > > >   Size
-> > > > >   of
-> > > > > 
-> > > > > the device.
-> > > > > 
-> > > > > Do you mean a broken/malicious guest driver that is violating the
-> > > > > spec?
-> > > > > That's not a hidden limit, it's defined by the spec.
-> > > > 
-> > > > https://lists.gnu.org/archive/html/qemu-devel/2021-10/msg00781.html
-> > > > https://lists.gnu.org/archive/html/qemu-devel/2021-10/msg00788.html
-> > > > 
-> > > > You can already go beyond that queue size at runtime with the
-> > > > indirection
-> > > > table. The only actual limit is the currently hard coded value of 1k
-> > > > pages.
-> > > > Hence the suggestion to turn that into a variable.
+On Mon, Oct 25, 2021 at 02:12:10PM -0400, Vivek Goyal wrote:
+> On Mon, Oct 25, 2021 at 10:52:51AM -0700, Ira Weiny wrote:
+> > On Fri, Oct 22, 2021 at 02:54:03PM +0800, JeffleXu wrote:
+> > > cc [Ira Weiny], author of per inode DAX on xfs/ext4
 > > > 
-> > > Exceeding Queue Size is a VIRTIO spec violation. Drivers that operate
-> > > outsided the spec do so at their own risk. They may not be compatible
-> > > with all device implementations.
+> > > On 10/20/21 11:17 PM, Vivek Goyal wrote:
+> > > > On Wed, Oct 20, 2021 at 10:52:38AM +0800, JeffleXu wrote:
+> > > >>
+> > > >>
+> > > >> On 10/18/21 10:10 PM, Vivek Goyal wrote:
+> > > >>> On Mon, Oct 11, 2021 at 11:00:47AM +0800, Jeffle Xu wrote:
+> > > >>>> We add 'always', 'never', and 'inode' (default). '-o dax' continues to
+> > > >>>> operate the same which is equivalent to 'always'. To be consistemt with
+> > > >>>> ext4/xfs's tri-state mount option, when neither '-o dax' nor '-o dax='
+> > > >>>> option is specified, the default behaviour is equal to 'inode'.
+> > > >>>
+> > > >>> Hi Jeffle,
+> > > >>>
+> > > >>> I am not sure when  -o "dax=inode"  is used as a default? If user
+> > > >>> specifies, "-o dax" then it is equal to "-o dax=always", otherwise
+> > > >>> user will explicitly specify "-o dax=always/never/inode". So when
+> > > >>> is dax=inode is used as default?
+> > > >>
+> > > >> That means when neither '-o dax' nor '-o dax=always/never/inode' is
+> > > >> specified, it is actually equal to '-o dax=inode', which is also how
+> > > >> per-file DAX on ext4/xfs works.
+> > > > 
 > > 
-> > Yes, I am ware about that. And still, this practice is already done, which
-> > apparently is not limited to 9pfs.
+> > It's been a while so I'm fuzzy on the details of the discussions but yes that
+> > is the way things are now in the code.
 > > 
-> > > The limit is not hidden, it's Queue Size as defined by the spec :).
+> > > > [ CC dave chinner] 
+> > > > 
+> > > > Is it not change of default behavior for ext4/xfs as well. My
+> > > > understanding is that prior to this new dax options, "-o dax" enabled
+> > > > dax on filesystem and if user did not specify it, DAX is disbaled
+> > > > by default.
+> > 
+> > Technically it does change default behavior...  However, NOT in a way which
+> > breaks anything.  See below.
+> > 
+> > > > 
+> > > > Now after introduction of "-o dax=always/never/inode", if suddenly
+> > > > "-o dax=inode" became the default if user did not specify anything,
+> > > > that's change of behavior.
+> > 
+> > Technically yes but not in a broken way.
+> > 
+> > > >
+> > > > Is that intentional. If given a choice,
+> > > > I would rather not change default and ask user to opt-in for
+> > > > appropriate dax functionality.
+> > 
+> > There is no need for this.
+> > 
+> > > > 
+> > > > Dave, you might have thoughts on this. It makes me uncomfortable to
+> > > > change virtiofs dax default now just because other filesytems did it.
+> > > > 
 > > > 
-> > > If you have a driver that is exceeding the limit, then please fix the
-> > > driver.
-> > 
-> > I absolutely understand your position, but I hope you also understand that
-> > this violation of the specs is a theoretical issue, it is not a real-life
-> > problem right now, and due to lack of man power unfortunately I have to
-> > prioritize real-life problems over theoretical ones ATM. Keep in mind that
-> > right now I am the only person working on 9pfs actively, I do this
-> > voluntarily whenever I find a free time slice, and I am not paid for it
-> > either.
-> > 
-> > I don't see any reasonable way with reasonable effort to do what you are
-> > asking for here in 9pfs, and Greg may correct me here if I am saying
-> > anything wrong. If you are seeing any specific real-life issue here, then
-> > please tell me which one, otherwise I have to postpone that "specs
-> > violation" issue.
-> > 
-> > There is still a long list of real problems that I need to hunt down in
-> > 9pfs, afterwards I can continue with theoretical ones if you want, but
-> > right now I simply can't, sorry.
-> 
-> I understand. If you don't have time to fix the Linux virtio-9p driver
-> then that's fine.
-
-I will look at this again, but it might be tricky. On doubt I'll postpone it.
-
-> I still wanted us to agree on the spec position because the commit
-> description says it's a "hidden limit", which is incorrect. It might
-> seem pedantic, but my concern is that misconceptions can spread if we
-> let them. That could cause people to write incorrect code later on.
-> Please update the commit description either by dropping 2) or by
-> replacing it with something else. For example:
-> 
->   2) The Linux virtio-9p guest driver does not honor the VIRTIO Queue
->      Size value and can submit descriptor chains that exceed it. That is
->      a spec violation but is accepted by QEMU's device implementation.
-> 
->      When the guest creates a descriptor chain larger than 1024 the
->      following QEMU error is printed and the guest hangs:
-> 
->      virtio: too many write descriptors in indirect table
-
-I am fine with both, probably preferring the text block above instead of 
-silently dropping the reason, just for clarity.
-
-But keep in mind that this might not be limited to virtio-9p as your text 
-would suggest, see below.
-
-> > > > > > (3) Unfortunately not all virtio users in QEMU would currently
-> > > > > > 
-> > > > > >     work correctly with the new value of 32768.
-> > > > > > 
-> > > > > > So let's turn this hard coded global value into a runtime
-> > > > > > variable as a first step in this commit, configurable for each
-> > > > > > virtio user by passing a corresponding value with virtio_init()
-> > > > > > call.
-> > > > > 
-> > > > > virtio_add_queue() already has an int queue_size argument, why isn't
-> > > > > that enough to deal with the maximum queue size? There's probably a
-> > > > > good
-> > > > > reason for it, but please include it in the commit description.
-> > > > 
-> > > > [...]
-> > > > 
-> > > > > Can you make this value per-vq instead of per-vdev since virtqueues
-> > > > > can
-> > > > > have different queue sizes?
-> > > > > 
-> > > > > The same applies to the rest of this patch. Anything using
-> > > > > vdev->queue_max_size should probably use vq->vring.num instead.
-> > > > 
-> > > > I would like to avoid that and keep it per device. The maximum size
-> > > > stored
-> > > > there is the maximum size supported by virtio user (or vortio device
-> > > > model,
-> > > > however you want to call it). So that's really a limit per device, not
-> > > > per
-> > > > queue, as no queue of the device would ever exceed that limit.
-> > > > 
-> > > > Plus a lot more code would need to be refactored, which I think is
-> > > > unnecessary.
+> > > I can only find the following discussions about the earliest record on
+> > > this tri-state mount option:
 > > > 
-> > > I'm against a per-device limit because it's a concept that cannot
-> > > accurately describe reality. Some devices have multiple classes of
+> > > https://lore.kernel.org/lkml/20200316095509.GA13788@lst.de/
+> > > https://lore.kernel.org/lkml/20200401040021.GC56958@magnolia/
+> > > 
+> > > 
+> > > Hi, Ira Weiny,
+> > > 
+> > > Do you have any thought on this, i.e. why the default behavior has
+> > > changed after introduction of per inode dax?
 > > 
-> > It describes current reality, because VIRTQUEUE_MAX_SIZE obviously is not
-> > per queue either ATM, and nobody ever cared.
+> > While this is 'technically' different behavior the end user does not see any
+> > difference in behavior if they continue without software changes.  Specifically
+> > specifying nothing continues to operate with all the files on the FS to be
+> > '_not_ DAX'.  While specifying '-o dax' forces DAX on all files.
 > > 
-> > All this series does, is allowing to override that currently project-wide
-> > compile-time constant to a per-driver-model compile-time constant. Which
-> > makes sense, because that's what it is: some drivers could cope with any
-> > transfer size, and some drivers are constrained to a certain maximum
-> > application specific transfer size (e.g. IOV_MAX).
-> > 
-> > > virtqueues and they are sized differently, so a per-device limit is
-> > > insufficient. virtio-net has separate rx_queue_size and tx_queue_size
-> > > parameters (plus a control vq hardcoded to 64 descriptors).
-> > 
-> > I simply find this overkill. This value semantically means "my driver
-> > model
-> > supports at any time and at any coincidence at the very most x * PAGE_SIZE
-> > = max_transfer_size". Do you see any driver that might want a more fine
-> > graded control over this?
+> > This expands the default behavior in a backwards compatible manner.
 > 
-> One reason why per-vq limits could make sense is that the maximum
-> possible number of struct elements is allocated upfront in some code
-> paths. Those code paths may need to differentiate between per-vq limits
-> for performance or memory utilization reasons. Today some places
-> allocate 1024 elements on the stack in some code paths, but maybe that's
-> not acceptable when the per-device limit is 32k. This can matter when a
-> device has vqs with very different sizes.
+> This is backward compatible in a sense that if somebody upgrades to new
+> kernel, things will still be same. 
 > 
-[...]
-> > ... I leave that up to Michael or whoever might be in charge to decide. I
-> > still find this overkill, but I will adapt this to whatever the decision
-> > eventually will be in v3.
-> > 
-> > But then please tell me the precise representation that you find
-> > appropriate, i.e. whether you want a new function for that, or rather an
-> > additional argument to virtio_add_queue(). Your call.
+> I think little problematic change is that say I bring in persistent
+> memory from another system (which has FS_XFLAGS_DAX set on some inodes)
+> and then mount it without andy of the dax mount options, then per
+> inode dax will be enabled unexpectedly if I boot with newer kernels
+> but it will be disable if I mount with older kernels. Do I understand it
+> right.
+
+Indeed that will happen.  However, wouldn't the users (software) of those files
+have knowledge that those files were DAX and want to continue with them in that
+mode?
+
 > 
-> virtio_add_queue() already takes an int queue_size argument. I think the
-> necessary information is already there.
+> > The user
+> > can now enable DAX on some files.  But this is an opt-in on the part of the
+> > user of the FS and again does not change with existing software/scripts/etc.
 > 
-> This patch just needs to be tweaked to use the virtio_queue_get_num()
-> (or a new virtqueue_get_num() API if that's easier because only a
-> VirtQueue *vq pointer is available) instead of introducing a new
-> per-device limit.
+> Don't understand this "opt-in" bit. If user mounts an fs without
+> specifying any of the dax options, then per inode dax will still be
+> enabled if inode has the correct flag set.
 
-My understanding is that both the original 9p virtio device authors, as well 
-as other virtio device authors in QEMU have been and are still using this as a 
-default value (i.e. to allocate some upfront, and the rest on demand).
+But only users who actually set that flag 'opt-in'.
 
-So yes, I know your argument about the specs, but AFAICS if I would just take 
-this existing numeric argument for the limit, then it would probably break 
-those other QEMU devices as well.
+> So is setting of flag being
+> considered as opt-in (insted of mount option).
 
-Best regards,
-Christian Schoenebeck
+Yes.
 
+> 
+> If setting of flag is being considered as opt-in, that probably will not
+> work very well with virtiofs. Because server can enforce a different
+> policy for enabling per file dax (instead of FS_XFLAG_DAX).
+
+I'm not sure I understand how this happens?  I think the server probably has to
+enable per INODE by default to allow the client to do what the end users wants.
+
+I agree that if the end user is expecting DAX and the server disables it then
+that is a problem but couldn't that happen before?  Maybe I'm getting confused
+because I'm not familiar enough with virtiofs.
+
+> 
+> And given there are two entities here (client and server), I think it
+> will be good if if we give client a chance as well to decide whether
+> it wants to enable per file dax or not. I know it can alwasy do 
+> "dax=never" but it can still be broken if client software remains
+> same but host/server software is upgraded or commnad line changed.
+
+But the files are 'owned' by a single user or group of users who must have
+placed the file in DAX mode at some point right?
+
+> 
+> So for virtiofs, I think better behavior is to continue to not enable
+> any dax until and unless user opts-in using "-o dax=foo" options.
+
+I'm not sure, maybe.
+
+Ira
 

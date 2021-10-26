@@ -1,15 +1,14 @@
 MIME-Version: 1.0
 References: <20211025204634.2517-1-iangelak@redhat.com>
-	<CAOQ4uxieK3KpY7pf0YTKcrNHW7rnTATTDZdK9L4Mqy32cDwV8w@mail.gmail.com>
-	<YXgqRb21hvYyI69D@redhat.com>
-	<CAOQ4uxhpCKK2MYxSmRJYYMEWaHKy5ezyKgxaM+YAKtpjsZkD-g@mail.gmail.com>
-	<YXhIm3mOvPsueWab@redhat.com>
-In-Reply-To: <YXhIm3mOvPsueWab@redhat.com>
+	<20211025204634.2517-2-iangelak@redhat.com>
+	<CAOQ4uxinGYb0QtgE8To5wc2iijT9VpTgDiXEp-9YXz=t_6eMbA@mail.gmail.com>
+In-Reply-To: <CAOQ4uxinGYb0QtgE8To5wc2iijT9VpTgDiXEp-9YXz=t_6eMbA@mail.gmail.com>
 From: Ioannis Angelakopoulos <iangelak@redhat.com>
-Date: Tue, 26 Oct 2021 15:14:10 -0400
-Message-ID: <CAO17o20sdKAWQN6w7Oe0Ze06qcK+J=6rrmA_aWGnY__MRVDCKw@mail.gmail.com>
-Content-Type: multipart/alternative; boundary="00000000000060399c05cf464a55"
-Subject: Re: [Virtio-fs] [RFC PATCH 0/7] Inotify support in FUSE and virtiofs
+Date: Tue, 26 Oct 2021 16:47:56 -0400
+Message-ID: <CAO17o20+jiij64y7b3eKoCjG5b_mLZj6o1LSnZ7+8exN3dFYEg@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="000000000000bef64b05cf47998d"
+Subject: Re: [Virtio-fs] [RFC PATCH 1/7] FUSE: Add the fsnotify opcode and
+ in/out structs to FUSE
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,267 +17,295 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: Steve French <sfrench@samba.org>, Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, Amir Goldstein <amir73il@gmail.com>, linux-kernel <linux-kernel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>
+To: Amir Goldstein <amir73il@gmail.com>
+Cc: Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, linux-kernel <linux-kernel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Vivek Goyal <vgoyal@redhat.com>
 
---00000000000060399c05cf464a55
+--000000000000bef64b05cf47998d
 Content-Type: text/plain; charset="UTF-8"
 
-On Tue, Oct 26, 2021 at 2:27 PM Vivek Goyal <vgoyal@redhat.com> wrote:
+On Tue, Oct 26, 2021 at 10:56 AM Amir Goldstein <amir73il@gmail.com> wrote:
 
-> On Tue, Oct 26, 2021 at 08:59:44PM +0300, Amir Goldstein wrote:
-> > On Tue, Oct 26, 2021 at 7:18 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> > >
-> > > On Tue, Oct 26, 2021 at 06:23:50PM +0300, Amir Goldstein wrote:
-> > >
-> > > [..]
-> > > > > 3) The lifetime of the local watch in the guest kernel is very
-> > > > > important. Specifically, there is a possibility that the guest
-> does not
-> > > > > receive remote events on time, if it removes its local watch on the
-> > > > > target or deletes the inode (and thus the guest kernel removes the
-> watch).
-> > > > > In these cases the guest kernel removes the local watch before the
-> > > > > remote events arrive from the host (virtiofsd) and as such the
-> guest
-> > > > > kernel drops all the remote events for the target inode (since the
-> > > > > corresponding local watch does not exist anymore).
-> > >
-> > > So this is one of the issues which has been haunting us in virtiofs. If
-> > > a file is removed, for local events, event is generated first and
-> > > then watch is removed. But in case of remote filesystems, it is racy.
-> > > It is possible that by the time event arrives, watch is already gone
-> > > and application never sees the delete event.
-> > >
-> > > Not sure how to address this issue.
+> On Mon, Oct 25, 2021 at 11:47 PM Ioannis Angelakopoulos
+> <iangelak@redhat.com> wrote:
 > >
+> > Since fsnotify is the backend for the inotify subsystem all the backend
+> > code implementation we add is related to fsnotify.
+> >
+> > To support an fsnotify request in FUSE and specifically virtiofs we add a
+> > new opcode for the FSNOTIFY (51) operation request in the "fuse.h"
+> header.
+> >
+> > Also add the "fuse_notify_fsnotify_in" and "fuse_notify_fsnotify_out"
+> > structs that are responsible for passing the fsnotify/inotify related
+> data
+> > to and from the FUSE server.
+> >
+> > Signed-off-by: Ioannis Angelakopoulos <iangelak@redhat.com>
+> > ---
+> >  include/uapi/linux/fuse.h | 23 ++++++++++++++++++++++-
+> >  1 file changed, 22 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
+> > index 46838551ea84..418b7fc72417 100644
+> > --- a/include/uapi/linux/fuse.h
+> > +++ b/include/uapi/linux/fuse.h
+> > @@ -186,6 +186,9 @@
+> >   *  - add FUSE_SYNCFS
+> >   *  7.35
+> >   *  - add FUSE_NOTIFY_LOCK
+> > + *  7.36
+> > + *  - add FUSE_HAVE_FSNOTIFY
+> > + *  - add fuse_notify_fsnotify_(in,out)
+> >   */
+> >
+> >  #ifndef _LINUX_FUSE_H
+> > @@ -221,7 +224,7 @@
+> >  #define FUSE_KERNEL_VERSION 7
+> >
+> >  /** Minor version number of this interface */
+> > -#define FUSE_KERNEL_MINOR_VERSION 35
+> > +#define FUSE_KERNEL_MINOR_VERSION 36
+> >
+> >  /** The node ID of the root inode */
+> >  #define FUSE_ROOT_ID 1
+> > @@ -338,6 +341,7 @@ struct fuse_file_lock {
+> >   *                     write/truncate sgid is killed only if file has
+> group
+> >   *                     execute permission. (Same as Linux VFS behavior).
+> >   * FUSE_SETXATTR_EXT:  Server supports extended struct fuse_setxattr_in
+> > + * FUSE_HAVE_FSNOTIFY: remote fsnotify/inotify event subsystem support
+> >   */
+> >  #define FUSE_ASYNC_READ                (1 << 0)
+> >  #define FUSE_POSIX_LOCKS       (1 << 1)
+> > @@ -369,6 +373,7 @@ struct fuse_file_lock {
+> >  #define FUSE_SUBMOUNTS         (1 << 27)
+> >  #define FUSE_HANDLE_KILLPRIV_V2        (1 << 28)
+> >  #define FUSE_SETXATTR_EXT      (1 << 29)
+> > +#define FUSE_HAVE_FSNOTIFY     (1 << 30)
+> >
+> >  /**
+> >   * CUSE INIT request/reply flags
+> > @@ -515,6 +520,7 @@ enum fuse_opcode {
+> >         FUSE_SETUPMAPPING       = 48,
+> >         FUSE_REMOVEMAPPING      = 49,
+> >         FUSE_SYNCFS             = 50,
+> > +       FUSE_FSNOTIFY           = 51,
+> >
+> >         /* CUSE specific operations */
+> >         CUSE_INIT               = 4096,
+> > @@ -532,6 +538,7 @@ enum fuse_notify_code {
+> >         FUSE_NOTIFY_RETRIEVE = 5,
+> >         FUSE_NOTIFY_DELETE = 6,
+> >         FUSE_NOTIFY_LOCK = 7,
+> > +       FUSE_NOTIFY_FSNOTIFY = 8,
+> >         FUSE_NOTIFY_CODE_MAX,
+> >  };
+> >
+> > @@ -571,6 +578,20 @@ struct fuse_getattr_in {
+> >         uint64_t        fh;
+> >  };
+> >
+> > +struct fuse_notify_fsnotify_out {
+> > +       uint64_t inode;
 >
-> > Can you take me through the scenario step by step.
-> > I am not sure I understand the exact sequence of the race.
+> 64bit inode is not a good unique identifier of the object.
+> you need to either include the generation in object identifier
+> or much better use the object's nfs file handle, the same way
+> that fanotify stores object identifiers.
 >
-> Ioannis, please correct me If I get something wrong. You know exact
-> details much more than me.
->
-> A. Say a guest process unlinks a file.
-> B. Fuse sends an unlink request to server (virtiofsd)
-> C. File is unlinked on host. Assume there are no other users so inode
->    will be freed as well. And event will be generated on host and watch
->    removed.
-> D. Now Fuse server will send a unlink request reply. unlink notification
->    might still be in kernel buffers or still be in virtiofsd or could
->    be in virtiofs virtqueue.
-> E. Fuse client will receive unlink reply and remove local watch.
->
-> Fuse reply and notification event are now traveling in parallel on
-> different virtqueues and there is no connection between these two. And
-> it could very well happen that fuse reply comes first, gets processed
-> first and local watch is removed. And notification is processed right
-> after but by then local watch is gone and filesystem will be forced to
-> drop event.
->
-> As of now situation is more complicated in virtiofsd. We don't keep
-> file handle open for file and keep an O_PATH fd open for each file.
-> That means in step D above, inode on host is not freed yet and unlink
-> event is not generated yet. When unlink reply reaches fuse client,
-> it sends FORGET messages to server, and then server closes O_PATH fd
-> and then host generates unlink events. By that time its too late,
-> guest has already remove local watches (and triggered removal of
-> remote watches too).
->
-> This second problem probably can be solved by using file handles, but
-> basic race will still continue to be there.
->
-> > If it is local file removal that causes watch to be removed,
-> > then don't drop local events and you are good to go.
-> > Is it something else?
->
-> - If remote events are enabled, then idea will be that user space gets
->   and event when file is actually removed from server, right? Now it
->   is possible that another VM has this file open and file has not been
->   yet removed. So local event only tells you that file has been removed
->   in guest VM (or locally) but does not tell anything about the state
->   of file on server. (It has been unlinked on server but inode continues
->   to be alive internall).
->
-> - If user receives both local and remote delete event, it will be
->   confusing. I guess if we want to see both the events, then there
->   has to be some sort of info in event which classifies whether event
->   is local or remote. And let application act accordingly.
->
-> Thanks
-> Vivek
->
->
-Hello Amir!
 
-Sorry for taking part in the conversation a bit late.  Vivek was on point
-with the
-example he gave but the race is a bit more generic than only the DELETE
-event.
+Ok thank you for pointing that out. I will change this implementation to
+include either the generation or use the object's nfs file handle.
 
-Let's say that a guest process monitors an inode for OPEN events:
+> > +       uint64_t mask;
+> > +       uint32_t namelen;
+> > +       uint32_t cookie;
+>
+> I object to persisting with the two-events-joined-by-cookie design.
+> Any new design should include a single event for rename
+> with information about src and dst.
+>
+> I know this is inconvenient, but we are NOT going to create a "remote
+> inotify"
+> interface, we need to create a "remote fsnotify" interface and if server
+> wants
+> to use inotify, it will need to join the disjoined MOVE_FROM/TO event into
+> a single "remote event", that FUSE will use to call fsnotify_move().
+>
+> I do not fully understand this. Should we define a new "remote" event
+that corresponds to the merged MOVE_FROM/TO events and send that to the
+guest instead?
+If that is the case, wouldn't that require that user space processes be
+aware of this newly added "remote"
+event? Also in the inotify man page there is a limitations case that states
+that it is possible for one of these events
+to be missing. What should the server do in this case?
 
-1) The same guest process or another guest process opens the file (related
-to the
-monitored inode), and then closes and immediately deletes the file/inode.
-2) The FUSE server (virtiofsd) will mimic the operations of the guest
-process:
-     a) Will open the file on the host side and thus a remote OPEN event is
-going to
-     be generated on the host and sent to the guest.
-     b) Will unlink the remote inode and if no other host process uses the
-inode then the
-     inode will be freed and a DELETE event is going to be generated on the
-host and sent
-     to the guest (However, due to how virtiofsd works and Vivek mentioned,
-this step won't
-     happen immediately)
+Thanks,
+Ioannis
 
-The problem here is that the OPEN event might still be travelling towards
-the guest in the
-virtqueues and arrives after the guest has already deleted its local inode.
-While the remote event (OPEN) received by the guest is valid, its fsnotify
-subsystem will drop it since the local inode is not there.
+> Thanks,
+> Amir.
+>
+>
 
 -- 
 Ioannis Angelakopoulos
 Software Engineer Intern at Red Hat
 
---00000000000060399c05cf464a55
+--000000000000bef64b05cf47998d
 Content-Type: text/html; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 
 <div dir=3D"ltr"><div dir=3D"ltr"><br></div><br><div class=3D"gmail_quote">=
-<div dir=3D"ltr" class=3D"gmail_attr">On Tue, Oct 26, 2021 at 2:27 PM Vivek=
- Goyal &lt;<a href=3D"mailto:vgoyal@redhat.com" target=3D"_blank">vgoyal@re=
-dhat.com</a>&gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D=
-"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-le=
-ft:1ex">On Tue, Oct 26, 2021 at 08:59:44PM +0300, Amir Goldstein wrote:<br>
-&gt; On Tue, Oct 26, 2021 at 7:18 PM Vivek Goyal &lt;<a href=3D"mailto:vgoy=
-al@redhat.com" target=3D"_blank">vgoyal@redhat.com</a>&gt; wrote:<br>
-&gt; &gt;<br>
-&gt; &gt; On Tue, Oct 26, 2021 at 06:23:50PM +0300, Amir Goldstein wrote:<b=
-r>
-&gt; &gt;<br>
-&gt; &gt; [..]<br>
-&gt; &gt; &gt; &gt; 3) The lifetime of the local watch in the guest kernel =
-is very<br>
-&gt; &gt; &gt; &gt; important. Specifically, there is a possibility that th=
-e guest does not<br>
-&gt; &gt; &gt; &gt; receive remote events on time, if it removes its local =
-watch on the<br>
-&gt; &gt; &gt; &gt; target or deletes the inode (and thus the guest kernel =
-removes the watch).<br>
-&gt; &gt; &gt; &gt; In these cases the guest kernel removes the local watch=
- before the<br>
-&gt; &gt; &gt; &gt; remote events arrive from the host (virtiofsd) and as s=
-uch the guest<br>
-&gt; &gt; &gt; &gt; kernel drops all the remote events for the target inode=
- (since the<br>
-&gt; &gt; &gt; &gt; corresponding local watch does not exist anymore).<br>
-&gt; &gt;<br>
-&gt; &gt; So this is one of the issues which has been haunting us in virtio=
-fs. If<br>
-&gt; &gt; a file is removed, for local events, event is generated first and=
-<br>
-&gt; &gt; then watch is removed. But in case of remote filesystems, it is r=
-acy.<br>
-&gt; &gt; It is possible that by the time event arrives, watch is already g=
-one<br>
-&gt; &gt; and application never sees the delete event.<br>
-&gt; &gt;<br>
-&gt; &gt; Not sure how to address this issue.<br>
-&gt; <br>
-<br>
-&gt; Can you take me through the scenario step by step.<br>
-&gt; I am not sure I understand the exact sequence of the race.<br>
-<br>
-Ioannis, please correct me If I get something wrong. You know exact<br>
-details much more than me.<br>
-<br>
-A. Say a guest process unlinks a file.<br>
-B. Fuse sends an unlink request to server (virtiofsd)<br>
-C. File is unlinked on host. Assume there are no other users so inode<br>
-=C2=A0 =C2=A0will be freed as well. And event will be generated on host and=
- watch<br>
-=C2=A0 =C2=A0removed.<br>
-D. Now Fuse server will send a unlink request reply. unlink notification<br=
->
-=C2=A0 =C2=A0might still be in kernel buffers or still be in virtiofsd or c=
-ould<br>
-=C2=A0 =C2=A0be in virtiofs virtqueue.<br>
-E. Fuse client will receive unlink reply and remove local watch.<br><br></b=
-lockquote><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8=
-ex;border-left:1px solid rgb(204,204,204);padding-left:1ex">
-Fuse reply and notification event are now traveling in parallel on<br>
-different virtqueues and there is no connection between these two. And<br>
-it could very well happen that fuse reply comes first, gets processed<br>
-first and local watch is removed. And notification is processed right<br>
-after but by then local watch is gone and filesystem will be forced to<br>
-drop event.<br>
-<br>
-As of now situation is more complicated in virtiofsd. We don&#39;t keep<br>
-file handle open for file and keep an O_PATH fd open for each file.<br>
-That means in step D above, inode on host is not freed yet and unlink<br>
-event is not generated yet. When unlink reply reaches fuse client,<br>
-it sends FORGET messages to server, and then server closes O_PATH fd<br>
-and then host generates unlink events. By that time its too late,<br>
-guest has already remove local watches (and triggered removal of<br>
-remote watches too).<br>
-<br>
-This second problem probably can be solved by using file handles, but<br>
-basic race will still continue to be there.<br>
-<br>
-&gt; If it is local file removal that causes watch to be removed,<br>
-&gt; then don&#39;t drop local events and you are good to go.<br>
-&gt; Is it something else?<br>
-<br>
-- If remote events are enabled, then idea will be that user space gets<br>
-=C2=A0 and event when file is actually removed from server, right? Now it<b=
-r>
-=C2=A0 is possible that another VM has this file open and file has not been=
-<br>
-=C2=A0 yet removed. So local event only tells you that file has been remove=
+<div dir=3D"ltr" class=3D"gmail_attr">On Tue, Oct 26, 2021 at 10:56 AM Amir=
+ Goldstein &lt;<a href=3D"mailto:amir73il@gmail.com">amir73il@gmail.com</a>=
+&gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"margin:0px =
+0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex">On M=
+on, Oct 25, 2021 at 11:47 PM Ioannis Angelakopoulos<br>
+&lt;<a href=3D"mailto:iangelak@redhat.com" target=3D"_blank">iangelak@redha=
+t.com</a>&gt; wrote:<br>
+&gt;<br>
+&gt; Since fsnotify is the backend for the inotify subsystem all the backen=
 d<br>
-=C2=A0 in guest VM (or locally) but does not tell anything about the state<=
+&gt; code implementation we add is related to fsnotify.<br>
+&gt;<br>
+&gt; To support an fsnotify request in FUSE and specifically virtiofs we ad=
+d a<br>
+&gt; new opcode for the FSNOTIFY (51) operation request in the &quot;fuse.h=
+&quot; header.<br>
+&gt;<br>
+&gt; Also add the &quot;fuse_notify_fsnotify_in&quot; and &quot;fuse_notify=
+_fsnotify_out&quot;<br>
+&gt; structs that are responsible for passing the fsnotify/inotify related =
+data<br>
+&gt; to and from the FUSE server.<br>
+&gt;<br>
+&gt; Signed-off-by: Ioannis Angelakopoulos &lt;<a href=3D"mailto:iangelak@r=
+edhat.com" target=3D"_blank">iangelak@redhat.com</a>&gt;<br>
+&gt; ---<br>
+&gt;=C2=A0 include/uapi/linux/fuse.h | 23 ++++++++++++++++++++++-<br>
+&gt;=C2=A0 1 file changed, 22 insertions(+), 1 deletion(-)<br>
+&gt;<br>
+&gt; diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h<br>
+&gt; index 46838551ea84..418b7fc72417 100644<br>
+&gt; --- a/include/uapi/linux/fuse.h<br>
+&gt; +++ b/include/uapi/linux/fuse.h<br>
+&gt; @@ -186,6 +186,9 @@<br>
+&gt;=C2=A0 =C2=A0*=C2=A0 - add FUSE_SYNCFS<br>
+&gt;=C2=A0 =C2=A0*=C2=A0 7.35<br>
+&gt;=C2=A0 =C2=A0*=C2=A0 - add FUSE_NOTIFY_LOCK<br>
+&gt; + *=C2=A0 7.36<br>
+&gt; + *=C2=A0 - add FUSE_HAVE_FSNOTIFY<br>
+&gt; + *=C2=A0 - add fuse_notify_fsnotify_(in,out)<br>
+&gt;=C2=A0 =C2=A0*/<br>
+&gt;<br>
+&gt;=C2=A0 #ifndef _LINUX_FUSE_H<br>
+&gt; @@ -221,7 +224,7 @@<br>
+&gt;=C2=A0 #define FUSE_KERNEL_VERSION 7<br>
+&gt;<br>
+&gt;=C2=A0 /** Minor version number of this interface */<br>
+&gt; -#define FUSE_KERNEL_MINOR_VERSION 35<br>
+&gt; +#define FUSE_KERNEL_MINOR_VERSION 36<br>
+&gt;<br>
+&gt;=C2=A0 /** The node ID of the root inode */<br>
+&gt;=C2=A0 #define FUSE_ROOT_ID 1<br>
+&gt; @@ -338,6 +341,7 @@ struct fuse_file_lock {<br>
+&gt;=C2=A0 =C2=A0*=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =
+=C2=A0 =C2=A0 =C2=A0write/truncate sgid is killed only if file has group<br=
+>
+&gt;=C2=A0 =C2=A0*=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =
+=C2=A0 =C2=A0 =C2=A0execute permission. (Same as Linux VFS behavior).<br>
+&gt;=C2=A0 =C2=A0* FUSE_SETXATTR_EXT:=C2=A0 Server supports extended struct=
+ fuse_setxattr_in<br>
+&gt; + * FUSE_HAVE_FSNOTIFY: remote fsnotify/inotify event subsystem suppor=
+t<br>
+&gt;=C2=A0 =C2=A0*/<br>
+&gt;=C2=A0 #define FUSE_ASYNC_READ=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0=
+ =C2=A0 =C2=A0 (1 &lt;&lt; 0)<br>
+&gt;=C2=A0 #define FUSE_POSIX_LOCKS=C2=A0 =C2=A0 =C2=A0 =C2=A0(1 &lt;&lt; 1=
+)<br>
+&gt; @@ -369,6 +373,7 @@ struct fuse_file_lock {<br>
+&gt;=C2=A0 #define FUSE_SUBMOUNTS=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0(1 &lt;&=
+lt; 27)<br>
+&gt;=C2=A0 #define FUSE_HANDLE_KILLPRIV_V2=C2=A0 =C2=A0 =C2=A0 =C2=A0 (1 &l=
+t;&lt; 28)<br>
+&gt;=C2=A0 #define FUSE_SETXATTR_EXT=C2=A0 =C2=A0 =C2=A0 (1 &lt;&lt; 29)<br=
+>
+&gt; +#define FUSE_HAVE_FSNOTIFY=C2=A0 =C2=A0 =C2=A0(1 &lt;&lt; 30)<br>
+&gt;<br>
+&gt;=C2=A0 /**<br>
+&gt;=C2=A0 =C2=A0* CUSE INIT request/reply flags<br>
+&gt; @@ -515,6 +520,7 @@ enum fuse_opcode {<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0FUSE_SETUPMAPPING=C2=A0 =C2=A0 =C2=A0=
+ =C2=A0=3D 48,<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0FUSE_REMOVEMAPPING=C2=A0 =C2=A0 =C2=
+=A0 =3D 49,<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0FUSE_SYNCFS=C2=A0 =C2=A0 =C2=A0 =C2=
+=A0 =C2=A0 =C2=A0 =C2=A0=3D 50,<br>
+&gt; +=C2=A0 =C2=A0 =C2=A0 =C2=A0FUSE_FSNOTIFY=C2=A0 =C2=A0 =C2=A0 =C2=A0 =
+=C2=A0 =C2=A0=3D 51,<br>
+&gt;<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0/* CUSE specific operations */<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0CUSE_INIT=C2=A0 =C2=A0 =C2=A0 =C2=A0 =
+=C2=A0 =C2=A0 =C2=A0 =C2=A0=3D 4096,<br>
+&gt; @@ -532,6 +538,7 @@ enum fuse_notify_code {<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0FUSE_NOTIFY_RETRIEVE =3D 5,<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0FUSE_NOTIFY_DELETE =3D 6,<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0FUSE_NOTIFY_LOCK =3D 7,<br>
+&gt; +=C2=A0 =C2=A0 =C2=A0 =C2=A0FUSE_NOTIFY_FSNOTIFY =3D 8,<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0FUSE_NOTIFY_CODE_MAX,<br>
+&gt;=C2=A0 };<br>
+&gt;<br>
+&gt; @@ -571,6 +578,20 @@ struct fuse_getattr_in {<br>
+&gt;=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0uint64_t=C2=A0 =C2=A0 =C2=A0 =C2=A0 f=
+h;<br>
+&gt;=C2=A0 };<br>
+&gt;<br>
+&gt; +struct fuse_notify_fsnotify_out {<br>
+&gt; +=C2=A0 =C2=A0 =C2=A0 =C2=A0uint64_t inode;<br>
+<br>
+64bit inode is not a good unique identifier of the object.<br>
+you need to either include the generation in object identifier<br>
+or much better use the object&#39;s nfs file handle, the same way<br>
+that fanotify stores object identifiers.<br></blockquote><div><br></div><di=
+v>Ok thank you for pointing that out. I will change this implementation to=
+=C2=A0</div><div>include either the generation or use the object&#39;s nfs =
+file handle.=C2=A0=C2=A0<br></div><blockquote class=3D"gmail_quote" style=
+=3D"margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding=
+-left:1ex">
+&gt; +=C2=A0 =C2=A0 =C2=A0 =C2=A0uint64_t mask;<br>
+&gt; +=C2=A0 =C2=A0 =C2=A0 =C2=A0uint32_t namelen;<br>
+&gt; +=C2=A0 =C2=A0 =C2=A0 =C2=A0uint32_t cookie;<br>
+<br>
+I object to persisting with the two-events-joined-by-cookie design.<br>
+Any new design should include a single event for rename<br>
+with information about src and dst.<br>
+<br>
+I know this is inconvenient, but we are NOT going to create a &quot;remote =
+inotify&quot;<br>
+interface, we need to create a &quot;remote fsnotify&quot; interface and if=
+ server wants<br>
+to use inotify, it will need to join the disjoined MOVE_FROM/TO event into<=
 br>
-=C2=A0 of file on server. (It has been unlinked on server but inode continu=
-es<br>
-=C2=A0 to be alive internall).<br>
+a single &quot;remote event&quot;, that FUSE will use to call fsnotify_move=
+().<br>
+<br></blockquote><div>I do not fully understand this. Should we define a ne=
+w &quot;remote&quot; event</div><div>that corresponds to the merged MOVE_FR=
+OM/TO events and send that to the guest instead?</div><div>If that is the c=
+ase, wouldn&#39;t that require that user space processes be aware of this n=
+ewly added &quot;remote&quot;</div><div>event? Also in the inotify man page=
+ there is a limitations case that states that it is possible for one of the=
+se events</div><div>to be missing. What should the server do in this case?<=
+/div><div><br></div><div>Thanks,</div><div>Ioannis=C2=A0</div><blockquote c=
+lass=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;border-left:1px soli=
+d rgb(204,204,204);padding-left:1ex">
+Thanks,<br>
+Amir.<br>
 <br>
-- If user receives both local and remote delete event, it will be<br>
-=C2=A0 confusing. I guess if we want to see both the events, then there<br>
-=C2=A0 has to be some sort of info in event which classifies whether event<=
-br>
-=C2=A0 is local or remote. And let application act accordingly.<br>
-<br>
-Thanks<br>
-Vivek<br>
-<br>
-</blockquote></div><div><br>Hello Amir!=C2=A0</div><div><br></div><div>Sorr=
-y for taking part in the conversation a bit late.=C2=A0 Vivek was on point =
-with the</div><div>example he gave but the race is a bit more generic than =
-only the DELETE event.</div><div><br></div><div>Let&#39;s say that a guest =
-process monitors an inode for OPEN events:</div><div><br></div><div>1) The =
-same guest process or another guest process opens the file (related to the<=
-/div><div>monitored inode), and then closes and immediately deletes the fil=
-e/inode.</div><div>2) The FUSE server (virtiofsd) will mimic the operations=
- of the guest process:</div><div>=C2=A0 =C2=A0 =C2=A0a) Will open the file =
-on the host side and thus a remote OPEN event is going to=C2=A0</div><div>=
-=C2=A0 =C2=A0 =C2=A0be generated on the host and sent to the guest.</div><d=
-iv>=C2=A0 =C2=A0 =C2=A0b) Will unlink the remote inode and if no other host=
- process uses the inode then the</div><div>=C2=A0 =C2=A0 =C2=A0inode will b=
-e freed and a DELETE event is going to be generated on the host and sent</d=
-iv><div>=C2=A0 =C2=A0 =C2=A0to the guest (However, due to how virtiofsd=C2=
-=A0works and Vivek mentioned, this step won&#39;t=C2=A0</div><div>=C2=A0 =
-=C2=A0 =C2=A0happen immediately)</div><div><br></div><div>The problem here =
-is that the OPEN event might still be travelling towards the guest in the</=
-div><div>virtqueues and arrives after the guest has already deleted its loc=
-al inode.=C2=A0</div><div>While the remote event (OPEN) received by the gue=
-st is valid, its fsnotify</div><div>subsystem will drop it since the local =
-inode is not there.</div><div><br></div>-- <br><div dir=3D"ltr"><div dir=3D=
-"ltr">Ioannis Angelakopoulos<div>Software Engineer Intern at Red Hat</div><=
-/div></div></div>
+</blockquote></div><br clear=3D"all"><div><br></div>-- <br><div dir=3D"ltr"=
+ class=3D"gmail_signature"><div dir=3D"ltr">Ioannis Angelakopoulos<div>Soft=
+ware Engineer Intern at Red Hat</div></div></div></div>
 
---00000000000060399c05cf464a55--
+--000000000000bef64b05cf47998d--
 

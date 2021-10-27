@@ -1,22 +1,11 @@
-References: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
-	<20211011030052.98923-3-jefflexu@linux.alibaba.com>
-	<YW2AU/E0pLHO5Yl8@redhat.com>
-	<652ac323-6546-01b8-992e-460ad59577ca@linux.alibaba.com>
-	<YXAzB5sOrFRUzTC5@redhat.com>
-	<96956132-fced-5739-d69a-7b424dc65f7c@linux.alibaba.com>
-	<20211025175251.GF3465596@iweiny-DESK2.sc.intel.com>
-	<YXbzeomdC5cD1xfF@redhat.com>
-	<20211025190201.GG3465596@iweiny-DESK2.sc.intel.com>
 From: JeffleXu <jefflexu@linux.alibaba.com>
-Message-ID: <5cb17c6b-380d-857b-d676-7ab2e8eba731@linux.alibaba.com>
-Date: Wed, 27 Oct 2021 14:00:30 +0800
+Message-ID: <07161fda-3f82-8a47-ac4e-cfe26d51b65e@linux.alibaba.com>
+Date: Wed, 27 Oct 2021 19:59:07 +0800
 MIME-Version: 1.0
-In-Reply-To: <20211025190201.GG3465596@iweiny-DESK2.sc.intel.com>
 Content-Type: text/plain; charset=utf-8
 Content-Language: en-US
 Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH v6 2/7] fuse: make DAX mount option a
-	tri-state
+Subject: [Virtio-fs] [Question] on Virtiofs External Meeting
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,105 +14,18 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Ira Weiny <ira.weiny@intel.com>, Vivek Goyal <vgoyal@redhat.com>
-Cc: miklos@szeredi.hu, virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, Dave Chinner <dchinner@redhat.com>, linux-fsdevel@vger.kernel.org
+To: virtio-fs-list <virtio-fs@redhat.com>
 
-Thanks for your replying, Ira Weiny.
+Hi,
+
+I see that there's a biweekly meeting with external virtiofs developers
+and it seems that November 3 shall be the next time. Since there's no
+place for November 3 yet on [1], I wonder if it will be as scheduled. If
+it is, I'm glad to share the progress of per indoe dax currently, and
+its using scenario in our internal environment.
 
 
-On 10/26/21 3:02 AM, Ira Weiny wrote:
-> [snippet]
->>>> Hi, Ira Weiny,
->>>>
->>>> Do you have any thought on this, i.e. why the default behavior has
->>>> changed after introduction of per inode dax?
->>>
->>> While this is 'technically' different behavior the end user does not see any
->>> difference in behavior if they continue without software changes.  Specifically
->>> specifying nothing continues to operate with all the files on the FS to be
->>> '_not_ DAX'.  While specifying '-o dax' forces DAX on all files.
->>>
->>> This expands the default behavior in a backwards compatible manner.
->>
->> This is backward compatible in a sense that if somebody upgrades to new
->> kernel, things will still be same. 
->>
->> I think little problematic change is that say I bring in persistent
->> memory from another system (which has FS_XFLAGS_DAX set on some inodes)
->> and then mount it without andy of the dax mount options, then per
->> inode dax will be enabled unexpectedly if I boot with newer kernels
->> but it will be disable if I mount with older kernels. Do I understand it
->> right.
-> 
-> Indeed that will happen.  However, wouldn't the users (software) of those files
-> have knowledge that those files were DAX and want to continue with them in that
-> mode?
-> 
->>
->>> The user
->>> can now enable DAX on some files.  But this is an opt-in on the part of the
->>> user of the FS and again does not change with existing software/scripts/etc.
->>
->> Don't understand this "opt-in" bit. If user mounts an fs without
->> specifying any of the dax options, then per inode dax will still be
->> enabled if inode has the correct flag set.
-> 
-> But only users who actually set that flag 'opt-in'.
-> 
->> So is setting of flag being
->> considered as opt-in (insted of mount option).
-> 
-> Yes.
-> 
->>
->> If setting of flag is being considered as opt-in, that probably will not
->> work very well with virtiofs. Because server can enforce a different
->> policy for enabling per file dax (instead of FS_XFLAG_DAX).
-> 
-> I'm not sure I understand how this happens?  I think the server probably has to
-> enable per INODE by default to allow the client to do what the end users wants.
-> 
-> I agree that if the end user is expecting DAX and the server disables it then
-> that is a problem but couldn't that happen before?  Maybe I'm getting confused
-> because I'm not familiar enough with virtiofs.
-> 
->>
->> And given there are two entities here (client and server), I think it
->> will be good if if we give client a chance as well to decide whether
->> it wants to enable per file dax or not. I know it can alwasy do 
->> "dax=never" but it can still be broken if client software remains
->> same but host/server software is upgraded or commnad line changed.
-> 
-> But the files are 'owned' by a single user or group of users who must have
-> placed the file in DAX mode at some point right?
-
-So this is the essence of this issue, i.e. whether those who mount the
-filesystem (responsible for specifying mount options) and those who set
-the persistent inode flag are one same group people.
-
-For local filesystem like ext4/xfs, these two entities are most likely
-one group people, so we can say that 'the default behavior is still
-backward compatible'.
-
-However this semantic can be challenged a little by the example exposed
-by Vivek, that these two entities may not be one group even in local
-filesystem. Though this case may be rare in real world.
-
-But for remote filesystem like virtiofs, the deviation between these two
-entities can be larger. For example, if the exported directory on host
-is shared by two guest and guest A sets the persistent inode flag for
-one file, then guest B will also see that DAX is enabled for this file
-when the virtiofs is mounted with the default option inside guest B. In
-this case, the persistent indoe flag is not set by guest B itself nor
-the server, and it may break the expectation of guest B.
-
-> 
->>
->> So for virtiofs, I think better behavior is to continue to not enable
->> any dax until and unless user opts-in using "-o dax=foo" options.
-> 
-
-I also prefer keeping the 'dax=never' default behavior for virtiofs.
+[1] https://etherpad.opendev.org/p/virtiofs-external-meeting
 
 -- 
 Thanks,

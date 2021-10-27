@@ -1,20 +1,15 @@
-Date: Wed, 27 Oct 2021 16:37:12 -0400
+Date: Wed, 27 Oct 2021 17:46:00 -0400
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YXm4eNztvEyGGp4L@redhat.com>
+Message-ID: <YXnImHp1QfZYZ1OU@redhat.com>
 References: <20211025204634.2517-1-iangelak@redhat.com>
-	<CAOQ4uxieK3KpY7pf0YTKcrNHW7rnTATTDZdK9L4Mqy32cDwV8w@mail.gmail.com>
-	<YXgqRb21hvYyI69D@redhat.com>
-	<CAOQ4uxhpCKK2MYxSmRJYYMEWaHKy5ezyKgxaM+YAKtpjsZkD-g@mail.gmail.com>
-	<YXhIm3mOvPsueWab@redhat.com>
-	<CAO17o20sdKAWQN6w7Oe0Ze06qcK+J=6rrmA_aWGnY__MRVDCKw@mail.gmail.com>
-	<CAOQ4uxhA+f-GZs-6SwNtSYZvSwfsYz4_=8_tWAUqt9s-49bqLw@mail.gmail.com>
-	<20211027132319.GA7873@quack2.suse.cz>
-	<YXm2tAMYwFFVR8g/@redhat.com>
+	<20211025204634.2517-2-iangelak@redhat.com>
+	<CAOQ4uxinGYb0QtgE8To5wc2iijT9VpTgDiXEp-9YXz=t_6eMbA@mail.gmail.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <YXm2tAMYwFFVR8g/@redhat.com>
-Subject: Re: [Virtio-fs] [RFC PATCH 0/7] Inotify support in FUSE and virtiofs
+In-Reply-To: <CAOQ4uxinGYb0QtgE8To5wc2iijT9VpTgDiXEp-9YXz=t_6eMbA@mail.gmail.com>
+Subject: Re: [Virtio-fs] [RFC PATCH 1/7] FUSE: Add the fsnotify opcode and
+ in/out structs to FUSE
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,51 +18,146 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Jan Kara <jack@suse.cz>
-Cc: Steve French <sfrench@samba.org>, Miklos Szeredi <miklos@szeredi.hu>, Amir Goldstein <amir73il@gmail.com>, linux-kernel <linux-kernel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>
+To: Amir Goldstein <amir73il@gmail.com>
+Cc: Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, linux-kernel <linux-kernel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>
 
-On Wed, Oct 27, 2021 at 04:29:41PM -0400, Vivek Goyal wrote:
-> On Wed, Oct 27, 2021 at 03:23:19PM +0200, Jan Kara wrote:
-> > On Wed 27-10-21 08:59:15, Amir Goldstein wrote:
-> > > On Tue, Oct 26, 2021 at 10:14 PM Ioannis Angelakopoulos
-> > > <iangelak@redhat.com> wrote:
-> > > > On Tue, Oct 26, 2021 at 2:27 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> > > > The problem here is that the OPEN event might still be travelling towards the guest in the
-> > > > virtqueues and arrives after the guest has already deleted its local inode.
-> > > > While the remote event (OPEN) received by the guest is valid, its fsnotify
-> > > > subsystem will drop it since the local inode is not there.
-> > > >
-> > > 
-> > > I have a feeling that we are mixing issues related to shared server
-> > > and remote fsnotify.
-> > 
-> > I don't think Ioannis was speaking about shared server case here. I think
-> > he says that in a simple FUSE remote notification setup we can loose OPEN
-> > events (or basically any other) if the inode for which the event happens
-> > gets deleted sufficiently early after the event being generated. That seems
-> > indeed somewhat unexpected and could be confusing if it happens e.g. for
-> > some directory operations.
+On Tue, Oct 26, 2021 at 05:56:03PM +0300, Amir Goldstein wrote:
+> On Mon, Oct 25, 2021 at 11:47 PM Ioannis Angelakopoulos
+> <iangelak@redhat.com> wrote:
+> >
+> > Since fsnotify is the backend for the inotify subsystem all the backend
+> > code implementation we add is related to fsnotify.
+> >
+> > To support an fsnotify request in FUSE and specifically virtiofs we add a
+> > new opcode for the FSNOTIFY (51) operation request in the "fuse.h" header.
+> >
+> > Also add the "fuse_notify_fsnotify_in" and "fuse_notify_fsnotify_out"
+> > structs that are responsible for passing the fsnotify/inotify related data
+> > to and from the FUSE server.
+> >
+> > Signed-off-by: Ioannis Angelakopoulos <iangelak@redhat.com>
+> > ---
+> >  include/uapi/linux/fuse.h | 23 ++++++++++++++++++++++-
+> >  1 file changed, 22 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
+> > index 46838551ea84..418b7fc72417 100644
+> > --- a/include/uapi/linux/fuse.h
+> > +++ b/include/uapi/linux/fuse.h
+> > @@ -186,6 +186,9 @@
+> >   *  - add FUSE_SYNCFS
+> >   *  7.35
+> >   *  - add FUSE_NOTIFY_LOCK
+> > + *  7.36
+> > + *  - add FUSE_HAVE_FSNOTIFY
+> > + *  - add fuse_notify_fsnotify_(in,out)
+> >   */
+> >
+> >  #ifndef _LINUX_FUSE_H
+> > @@ -221,7 +224,7 @@
+> >  #define FUSE_KERNEL_VERSION 7
+> >
+> >  /** Minor version number of this interface */
+> > -#define FUSE_KERNEL_MINOR_VERSION 35
+> > +#define FUSE_KERNEL_MINOR_VERSION 36
+> >
+> >  /** The node ID of the root inode */
+> >  #define FUSE_ROOT_ID 1
+> > @@ -338,6 +341,7 @@ struct fuse_file_lock {
+> >   *                     write/truncate sgid is killed only if file has group
+> >   *                     execute permission. (Same as Linux VFS behavior).
+> >   * FUSE_SETXATTR_EXT:  Server supports extended struct fuse_setxattr_in
+> > + * FUSE_HAVE_FSNOTIFY: remote fsnotify/inotify event subsystem support
+> >   */
+> >  #define FUSE_ASYNC_READ                (1 << 0)
+> >  #define FUSE_POSIX_LOCKS       (1 << 1)
+> > @@ -369,6 +373,7 @@ struct fuse_file_lock {
+> >  #define FUSE_SUBMOUNTS         (1 << 27)
+> >  #define FUSE_HANDLE_KILLPRIV_V2        (1 << 28)
+> >  #define FUSE_SETXATTR_EXT      (1 << 29)
+> > +#define FUSE_HAVE_FSNOTIFY     (1 << 30)
+> >
+> >  /**
+> >   * CUSE INIT request/reply flags
+> > @@ -515,6 +520,7 @@ enum fuse_opcode {
+> >         FUSE_SETUPMAPPING       = 48,
+> >         FUSE_REMOVEMAPPING      = 49,
+> >         FUSE_SYNCFS             = 50,
+> > +       FUSE_FSNOTIFY           = 51,
+> >
+> >         /* CUSE specific operations */
+> >         CUSE_INIT               = 4096,
+> > @@ -532,6 +538,7 @@ enum fuse_notify_code {
+> >         FUSE_NOTIFY_RETRIEVE = 5,
+> >         FUSE_NOTIFY_DELETE = 6,
+> >         FUSE_NOTIFY_LOCK = 7,
+> > +       FUSE_NOTIFY_FSNOTIFY = 8,
+> >         FUSE_NOTIFY_CODE_MAX,
+> >  };
+> >
+> > @@ -571,6 +578,20 @@ struct fuse_getattr_in {
+> >         uint64_t        fh;
+> >  };
+> >
+> > +struct fuse_notify_fsnotify_out {
+> > +       uint64_t inode;
 > 
-> Hi Jan,
+> 64bit inode is not a good unique identifier of the object.
+
+I think he wants to store 64bit nodeid (internal to fuse so that client
+and server can figure out which inode they are talking about). But I 
+think you are concerned about what happens if an event arrived for an
+inode after inode has been released and nodeid possibly used for some
+other inode. And then we will find that new inode in guest cache and
+end up associating event with wrong inode.
+
+Generation number will help in the sense that server has a chance
+to always update generation number on lookup. So even if nodeid
+is reused, generation number will make make sure we don't end
+up associating this event with reused node id inode. I guess
+makes sense.
+
+> you need to either include the generation in object identifier
+> or much better use the object's nfs file handle, the same way
+> that fanotify stores object identifiers.
+
+I think nfs file handle is much more complicated and its a separate
+project altogether. I am assuming we are talking about persistent
+nfs file handle as generated by host. I think biggest issue we faced
+with that is that guest is untrusted and we don't want to resolve
+file handle provided by guest on host otherwise guest can craft
+file handles and possibly be able to open other files on same filesystem
+outside shared dir. 
+
 > 
-> Agreed. That's what Ioannis is trying to say. That some of the remote events
-> can be lost if fuse/guest local inode is unlinked. I think problem exists
-> both for shared and non-shared directory case.
+> > +       uint64_t mask;
+> > +       uint32_t namelen;
+> > +       uint32_t cookie;
+> 
+> I object to persisting with the two-events-joined-by-cookie design.
+> Any new design should include a single event for rename
+> with information about src and dst.
+> 
+> I know this is inconvenient, but we are NOT going to create a "remote inotify"
+> interface, we need to create a "remote fsnotify" interface and if server wants
+> to use inotify, it will need to join the disjoined MOVE_FROM/TO event into
+> a single "remote event", that FUSE will use to call fsnotify_move().
 
-Thinking more about it, one will need remote fsnotify support only if
-this is a case of shared direcotry. If there are no clients doing parallel
-operations in shared dir (like dropping some new files), then local
-inotify should be good enough. And I think Ioannis mentioned that local
-inotify already work with fuse.
+man inotify says following.
 
-For example, kata container developers wanted to use inotify on virtiofs,
-because a process on host (kubernetes?) will update some sort of config
-file in shared directory. They wanted to monitor that config in guest,
-get an inotify event and then act on updated config file. That's the
-case of shared dir.
+"       Matching up the IN_MOVED_FROM and IN_MOVED_TO event pair  generated  by
+       rename(2)  is thus inherently racy.  (Don't forget that if an object is
+       renamed outside of a monitored directory, there  may  not  even  be  an
+       IN_MOVED_TO  event.)"
 
-Given we do not support inotify yet, I think they went ahead with some
-sort of polling mechanism to take care of there use case.
+So if guest is no monitoring target dir of renamed file, then we will not
+even get IN_MOVED_TO. In that case we can't merge two events into one.
+
+And this sounds like inotify/fanotify interface needs to come up with
+an merged event and in that case remote filesystem will simply propagate
+that event. (Instead of coming up with a new event only for remote
+filesystems. Sounds like this is not a problem limited to remote
+filesystems only).
 
 Thanks
 Vivek

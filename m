@@ -1,13 +1,22 @@
-Date: Wed, 27 Oct 2021 17:46:00 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YXnImHp1QfZYZ1OU@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=5r+33U1uPYiFPTnh2Xd8jicIMSHfddEZuVW3fEW/Lz8=;
+	b=ZRH/bDHtnLi1gDo9lKFYyuYY/9P8nu3jKlS3XZyDwNAuWzybFmV3ew1ZVrt2w8fHFB
+	zUB/EHZDFSfGR9TxC+q8sdIVTD3pee+AcDE5bynMGU7CXRcgvjXcQVekUbme8LRiPC7/
+	hOc5dHt5v91exsQBT8AQEFO8QGl5xPu1NLiXZBZ1CCCFwIXoExtGAxMHkk1kg0K61zgy
+	RbkRDnI1mW3CNGnnuyL23N8FjEsWeS2qScyTy5XVNAhDsueIov2pio7HcaFpBBwZ0YBg
+	y2gmnfb8wT1V92nA8A3Ao/yjanGtL8nJ3W8feOuFOeUj658LbCmJjURHxLF/wnpPRnMA
+	llFA==
+MIME-Version: 1.0
 References: <20211025204634.2517-1-iangelak@redhat.com>
 	<20211025204634.2517-2-iangelak@redhat.com>
 	<CAOQ4uxinGYb0QtgE8To5wc2iijT9VpTgDiXEp-9YXz=t_6eMbA@mail.gmail.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <CAOQ4uxinGYb0QtgE8To5wc2iijT9VpTgDiXEp-9YXz=t_6eMbA@mail.gmail.com>
+	<YXnImHp1QfZYZ1OU@redhat.com>
+In-Reply-To: <YXnImHp1QfZYZ1OU@redhat.com>
+From: Amir Goldstein <amir73il@gmail.com>
+Date: Thu, 28 Oct 2021 07:13:10 +0300
+Message-ID: <CAOQ4uxiY=sZVsJF670T73bk2zq+LpG9B5VQA-5rOOpaSrvhdXA@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
 Subject: Re: [Virtio-fs] [RFC PATCH 1/7] FUSE: Add the fsnotify opcode and
  in/out structs to FUSE
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -18,147 +27,96 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Amir Goldstein <amir73il@gmail.com>
+To: Vivek Goyal <vgoyal@redhat.com>
 Cc: Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, linux-kernel <linux-kernel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>
 
-On Tue, Oct 26, 2021 at 05:56:03PM +0300, Amir Goldstein wrote:
-> On Mon, Oct 25, 2021 at 11:47 PM Ioannis Angelakopoulos
-> <iangelak@redhat.com> wrote:
-> >
-> > Since fsnotify is the backend for the inotify subsystem all the backend
-> > code implementation we add is related to fsnotify.
-> >
-> > To support an fsnotify request in FUSE and specifically virtiofs we add a
-> > new opcode for the FSNOTIFY (51) operation request in the "fuse.h" header.
-> >
-> > Also add the "fuse_notify_fsnotify_in" and "fuse_notify_fsnotify_out"
-> > structs that are responsible for passing the fsnotify/inotify related data
-> > to and from the FUSE server.
-> >
-> > Signed-off-by: Ioannis Angelakopoulos <iangelak@redhat.com>
-> > ---
-> >  include/uapi/linux/fuse.h | 23 ++++++++++++++++++++++-
-> >  1 file changed, 22 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-> > index 46838551ea84..418b7fc72417 100644
-> > --- a/include/uapi/linux/fuse.h
-> > +++ b/include/uapi/linux/fuse.h
-> > @@ -186,6 +186,9 @@
-> >   *  - add FUSE_SYNCFS
-> >   *  7.35
-> >   *  - add FUSE_NOTIFY_LOCK
-> > + *  7.36
-> > + *  - add FUSE_HAVE_FSNOTIFY
-> > + *  - add fuse_notify_fsnotify_(in,out)
-> >   */
-> >
-> >  #ifndef _LINUX_FUSE_H
-> > @@ -221,7 +224,7 @@
-> >  #define FUSE_KERNEL_VERSION 7
-> >
-> >  /** Minor version number of this interface */
-> > -#define FUSE_KERNEL_MINOR_VERSION 35
-> > +#define FUSE_KERNEL_MINOR_VERSION 36
-> >
-> >  /** The node ID of the root inode */
-> >  #define FUSE_ROOT_ID 1
-> > @@ -338,6 +341,7 @@ struct fuse_file_lock {
-> >   *                     write/truncate sgid is killed only if file has group
-> >   *                     execute permission. (Same as Linux VFS behavior).
-> >   * FUSE_SETXATTR_EXT:  Server supports extended struct fuse_setxattr_in
-> > + * FUSE_HAVE_FSNOTIFY: remote fsnotify/inotify event subsystem support
-> >   */
-> >  #define FUSE_ASYNC_READ                (1 << 0)
-> >  #define FUSE_POSIX_LOCKS       (1 << 1)
-> > @@ -369,6 +373,7 @@ struct fuse_file_lock {
-> >  #define FUSE_SUBMOUNTS         (1 << 27)
-> >  #define FUSE_HANDLE_KILLPRIV_V2        (1 << 28)
-> >  #define FUSE_SETXATTR_EXT      (1 << 29)
-> > +#define FUSE_HAVE_FSNOTIFY     (1 << 30)
-> >
-> >  /**
-> >   * CUSE INIT request/reply flags
-> > @@ -515,6 +520,7 @@ enum fuse_opcode {
-> >         FUSE_SETUPMAPPING       = 48,
-> >         FUSE_REMOVEMAPPING      = 49,
-> >         FUSE_SYNCFS             = 50,
-> > +       FUSE_FSNOTIFY           = 51,
-> >
-> >         /* CUSE specific operations */
-> >         CUSE_INIT               = 4096,
-> > @@ -532,6 +538,7 @@ enum fuse_notify_code {
-> >         FUSE_NOTIFY_RETRIEVE = 5,
-> >         FUSE_NOTIFY_DELETE = 6,
-> >         FUSE_NOTIFY_LOCK = 7,
-> > +       FUSE_NOTIFY_FSNOTIFY = 8,
-> >         FUSE_NOTIFY_CODE_MAX,
-> >  };
-> >
-> > @@ -571,6 +578,20 @@ struct fuse_getattr_in {
-> >         uint64_t        fh;
-> >  };
-> >
-> > +struct fuse_notify_fsnotify_out {
-> > +       uint64_t inode;
-> 
-> 64bit inode is not a good unique identifier of the object.
+> > you need to either include the generation in object identifier
+> > or much better use the object's nfs file handle, the same way
+> > that fanotify stores object identifiers.
+>
+> I think nfs file handle is much more complicated and its a separate
+> project altogether. I am assuming we are talking about persistent
+> nfs file handle as generated by host. I think biggest issue we faced
+> with that is that guest is untrusted and we don't want to resolve
+> file handle provided by guest on host otherwise guest can craft
+> file handles and possibly be able to open other files on same filesystem
+> outside shared dir.
+>
 
-I think he wants to store 64bit nodeid (internal to fuse so that client
-and server can figure out which inode they are talking about). But I 
-think you are concerned about what happens if an event arrived for an
-inode after inode has been released and nodeid possibly used for some
-other inode. And then we will find that new inode in guest cache and
-end up associating event with wrong inode.
+Right now, virtiofsd keeps all inodes and dentries of live client inodes
+pinned in cache on the server.
+If you switch to file handles design, virtiofsd only need to keep a map
+of all the file handles that server handed out to client to address
+this concern.
 
-Generation number will help in the sense that server has a chance
-to always update generation number on lookup. So even if nodeid
-is reused, generation number will make make sure we don't end
-up associating this event with reused node id inode. I guess
-makes sense.
+For directories, this practice is not even needed for security, because
+a decoded directory file handle can be verified to be within the shared dir.
+It is only needed to prevent DoS, because a crafted directory file handle
+(outside of shared dir) can be used to generate extra IO and thrash the
+inode/dentry cache on the server.
 
-> you need to either include the generation in object identifier
-> or much better use the object's nfs file handle, the same way
-> that fanotify stores object identifiers.
+> >
+> > > +       uint64_t mask;
+> > > +       uint32_t namelen;
+> > > +       uint32_t cookie;
+> >
+> > I object to persisting with the two-events-joined-by-cookie design.
+> > Any new design should include a single event for rename
+> > with information about src and dst.
+> >
+> > I know this is inconvenient, but we are NOT going to create a "remote inotify"
+> > interface, we need to create a "remote fsnotify" interface and if server wants
+> > to use inotify, it will need to join the disjoined MOVE_FROM/TO event into
+> > a single "remote event", that FUSE will use to call fsnotify_move().
+>
+> man inotify says following.
+>
+> "       Matching up the IN_MOVED_FROM and IN_MOVED_TO event pair  generated  by
+>        rename(2)  is thus inherently racy.  (Don't forget that if an object is
+>        renamed outside of a monitored directory, there  may  not  even  be  an
+>        IN_MOVED_TO  event.)"
+>
+> So if guest is no monitoring target dir of renamed file, then we will not
+> even get IN_MOVED_TO. In that case we can't merge two events into one.
+>
+> And this sounds like inotify/fanotify interface needs to come up with
+> an merged event and in that case remote filesystem will simply propagate
+> that event. (Instead of coming up with a new event only for remote
+> filesystems. Sounds like this is not a problem limited to remote
+> filesystems only).
+>
 
-I think nfs file handle is much more complicated and its a separate
-project altogether. I am assuming we are talking about persistent
-nfs file handle as generated by host. I think biggest issue we faced
-with that is that guest is untrusted and we don't want to resolve
-file handle provided by guest on host otherwise guest can craft
-file handles and possibly be able to open other files on same filesystem
-outside shared dir. 
+I don't see it that way.
+I see the "internal protocol" for filesystems/vfs to report rename is
+fsnotify_move() which carries information about both src and target.
+I would like the remote protocol  to carry the same information.
+It is then up to the userspace API whether to report the rename
+as two events or a unified event.
 
-> 
-> > +       uint64_t mask;
-> > +       uint32_t namelen;
-> > +       uint32_t cookie;
-> 
-> I object to persisting with the two-events-joined-by-cookie design.
-> Any new design should include a single event for rename
-> with information about src and dst.
-> 
-> I know this is inconvenient, but we are NOT going to create a "remote inotify"
-> interface, we need to create a "remote fsnotify" interface and if server wants
-> to use inotify, it will need to join the disjoined MOVE_FROM/TO event into
-> a single "remote event", that FUSE will use to call fsnotify_move().
+For example, debugfs, calls fsnotify_move() when an object is renamed
+from underneath the vfs. It does not call fsnotify() twice with a cookie,
+because we would not want to change local filesystem nor remote protocols
+when we want to add new userspace APIs for reporting fsevents.
 
-man inotify says following.
+That comes down to my feeling that this claims to be a proposal
+for "remote fsnotify", but it looks and sounds like a proposal for
+"remote inotify" and this is the core of my objection to passing
+the rename cookie in the protocol.
 
-"       Matching up the IN_MOVED_FROM and IN_MOVED_TO event pair  generated  by
-       rename(2)  is thus inherently racy.  (Don't forget that if an object is
-       renamed outside of a monitored directory, there  may  not  even  be  an
-       IN_MOVED_TO  event.)"
+Regarding the issue that the src/dst path may not be known
+to the server, as I wrote, it is fine if either the src/dst path information
+is omitted from an event, but the protocol should provide the
+placeholder to report them.
 
-So if guest is no monitoring target dir of renamed file, then we will not
-even get IN_MOVED_TO. In that case we can't merge two events into one.
+After sufficient arguing, I might be convinced that the cookie may be included
+as an optional field in addition to the fields that I requested.
 
-And this sounds like inotify/fanotify interface needs to come up with
-an merged event and in that case remote filesystem will simply propagate
-that event. (Instead of coming up with a new event only for remote
-filesystems. Sounds like this is not a problem limited to remote
-filesystems only).
+I understand why you write that this sounds like an fanotify interface
+that needs to be resolved and you are correct, but the reason that the
+fanotify interface issue was not yet resolved is that we are trying to not
+repeat the mistakes of the past and for that same reason, I am insisting
+on the protocol.
 
-Thanks
-Vivek
+Thanks,
+Amir.
 

@@ -1,16 +1,16 @@
+Date: Fri, 29 Oct 2021 09:03:52 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YXvxOEbGxqhoG7Ti@redhat.com>
 References: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
 	<20211011030052.98923-3-jefflexu@linux.alibaba.com>
 	<YW2AU/E0pLHO5Yl8@redhat.com>
 	<652ac323-6546-01b8-992e-460ad59577ca@linux.alibaba.com>
 	<YXAsV3xp3aeOjaeh@redhat.com>
-From: JeffleXu <jefflexu@linux.alibaba.com>
-Message-ID: <eb0c9711-66cb-bf79-0cf6-c6d6eec5ceea@linux.alibaba.com>
-Date: Fri, 29 Oct 2021 16:33:06 +0800
+	<eb0c9711-66cb-bf79-0cf6-c6d6eec5ceea@linux.alibaba.com>
 MIME-Version: 1.0
-In-Reply-To: <YXAsV3xp3aeOjaeh@redhat.com>
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <eb0c9711-66cb-bf79-0cf6-c6d6eec5ceea@linux.alibaba.com>
 Subject: Re: [Virtio-fs] [PATCH v6 2/7] fuse: make DAX mount option a
 	tri-state
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -21,88 +21,109 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
+To: JeffleXu <jefflexu@linux.alibaba.com>
 Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, miklos@szeredi.hub, linux-fsdevel@vger.kernel.org
 
-
-
-On 10/20/21 10:48 PM, Vivek Goyal wrote:
-> On Wed, Oct 20, 2021 at 10:52:38AM +0800, JeffleXu wrote:
->>
->>
->> On 10/18/21 10:10 PM, Vivek Goyal wrote:
->>> On Mon, Oct 11, 2021 at 11:00:47AM +0800, Jeffle Xu wrote:
->>>> We add 'always', 'never', and 'inode' (default). '-o dax' continues to
->>>> operate the same which is equivalent to 'always'. To be consistemt with
->>>> ext4/xfs's tri-state mount option, when neither '-o dax' nor '-o dax='
->>>> option is specified, the default behaviour is equal to 'inode'.
->>>
->>> Hi Jeffle,
->>>
->>> I am not sure when  -o "dax=inode"  is used as a default? If user
->>> specifies, "-o dax" then it is equal to "-o dax=always", otherwise
->>> user will explicitly specify "-o dax=always/never/inode". So when
->>> is dax=inode is used as default?
->>
->> That means when neither '-o dax' nor '-o dax=always/never/inode' is
->> specified, it is actually equal to '-o dax=inode', which is also how
->> per-file DAX on ext4/xfs works.
->>
->> This default behaviour for local filesystem, e.g. ext4/xfs, may be
->> straightforward, since the disk inode will be read into memory during
->> the inode instantiation, and checking for persistent inode attribute
->> shall be realatively cheap, except that the default behaviour has
->> changed from 'dax=never' to 'dax=inode'.
+On Fri, Oct 29, 2021 at 04:33:06PM +0800, JeffleXu wrote:
 > 
-> Interesting that ext4/xfs allowed for this behavior change.
 > 
->>
->> Come back to virtiofs, when neither '-o dax' nor '-o
->> dax=always/never/inode' is specified, and it actually behaves as '-o
->> dax=inode', as long as '-o dax=server/attr' option is not specified for
->> virtiofsd, virtiofsd will always clear FUSE_ATTR_DAX and thus guest will
->> always disable DAX. IOWs, the guest virtiofs atually behaves as '-o
->> dax=never' when neither '-o dax' nor '-o dax=always/never/inode' is
->> specified, and '-o dax=server/attr' option is not specified for virtiofsd.
->>
->> But I'm okay if we need to change the default behaviour for virtiofs.
+> On 10/20/21 10:48 PM, Vivek Goyal wrote:
+> > On Wed, Oct 20, 2021 at 10:52:38AM +0800, JeffleXu wrote:
+> >>
+> >>
+> >> On 10/18/21 10:10 PM, Vivek Goyal wrote:
+> >>> On Mon, Oct 11, 2021 at 11:00:47AM +0800, Jeffle Xu wrote:
+> >>>> We add 'always', 'never', and 'inode' (default). '-o dax' continues to
+> >>>> operate the same which is equivalent to 'always'. To be consistemt with
+> >>>> ext4/xfs's tri-state mount option, when neither '-o dax' nor '-o dax='
+> >>>> option is specified, the default behaviour is equal to 'inode'.
+> >>>
+> >>> Hi Jeffle,
+> >>>
+> >>> I am not sure when  -o "dax=inode"  is used as a default? If user
+> >>> specifies, "-o dax" then it is equal to "-o dax=always", otherwise
+> >>> user will explicitly specify "-o dax=always/never/inode". So when
+> >>> is dax=inode is used as default?
+> >>
+> >> That means when neither '-o dax' nor '-o dax=always/never/inode' is
+> >> specified, it is actually equal to '-o dax=inode', which is also how
+> >> per-file DAX on ext4/xfs works.
+> >>
+> >> This default behaviour for local filesystem, e.g. ext4/xfs, may be
+> >> straightforward, since the disk inode will be read into memory during
+> >> the inode instantiation, and checking for persistent inode attribute
+> >> shall be realatively cheap, except that the default behaviour has
+> >> changed from 'dax=never' to 'dax=inode'.
+> > 
+> > Interesting that ext4/xfs allowed for this behavior change.
+> > 
+> >>
+> >> Come back to virtiofs, when neither '-o dax' nor '-o
+> >> dax=always/never/inode' is specified, and it actually behaves as '-o
+> >> dax=inode', as long as '-o dax=server/attr' option is not specified for
+> >> virtiofsd, virtiofsd will always clear FUSE_ATTR_DAX and thus guest will
+> >> always disable DAX. IOWs, the guest virtiofs atually behaves as '-o
+> >> dax=never' when neither '-o dax' nor '-o dax=always/never/inode' is
+> >> specified, and '-o dax=server/attr' option is not specified for virtiofsd.
+> >>
+> >> But I'm okay if we need to change the default behaviour for virtiofs.
+> > 
+> > This is change of behavior from client's perspective. Even if client
+> > did not opt-in for DAX, DAX can be enabled based on server's setting.
+> > Not that there is anything wrong with it, but change of behavior part
+> > concerns me.
+> > 
+> > In case of virtiofs, lot of features we are controlling from server.
+> > Client typically just calls "mount" and there are not many options
+> > users can specify for mount.  
+> > 
+> > Given we already allowed to make client a choice about DAX behavior,
+> > I will feel more comfortable that we don't change it and let client
+> > request a specific DAX mode and if client does not specify anything,
+> > then DAX is not enabled.
+> > 
 > 
-> This is change of behavior from client's perspective. Even if client
-> did not opt-in for DAX, DAX can be enabled based on server's setting.
-> Not that there is anything wrong with it, but change of behavior part
-> concerns me.
+> Hi Vivek,
 > 
-> In case of virtiofs, lot of features we are controlling from server.
-> Client typically just calls "mount" and there are not many options
-> users can specify for mount.  
+> How about the following design about the default behavior to move this
+> patchset forward, considering the discussion on another thread [1]?
 > 
-> Given we already allowed to make client a choice about DAX behavior,
-> I will feel more comfortable that we don't change it and let client
-> request a specific DAX mode and if client does not specify anything,
-> then DAX is not enabled.
+> - guest side: '-o dax=inode' acts as the default, keeping consistent
+> with xfs/ext4
+
+This sounds good.
+
+> - virtiofsd: the default behavior is like, neither file size based
+> policy ('dax=server') nor persistent inode flags based policy
+> ('dax=attr') is used, though virtiofsd indeed advertises that
+> it supports per inode DAX feature (so that it won't fail FUSE_INIT
+> negotiation phase when guest advertises dax=inode by default)... In
+> fact, it acts like 'dax=never' in this case.
+
+Not sure why virtiofsd needs to advertise that it supports per inode
+DAX even if no per inode dax policy is in affect. Guest will know that
+server is not supporting per inode DAX. But it will not return an
+error to user space (because dax=inode seems to be advisory).
+
+IOW, this is very similar to the case of using dax=inode on a block
+device which does not support DAX. No errors and no warnings.
+
 > 
+> Then when guest opts-in and specifies '-o dax=inode' manually, then it
+> shall realize that proper configuration for virtiofsd is also needed (-o
+> dax=server|attr).
 
-Hi Vivek,
+I gave some comments w.r.t dax=server naming in your posting. Not sure if
+you got a chance to look at it.
 
-How about the following design about the default behavior to move this
-patchset forward, considering the discussion on another thread [1]?
+Thanks
+Vivek
 
-- guest side: '-o dax=inode' acts as the default, keeping consistent
-with xfs/ext4
-- virtiofsd: the default behavior is like, neither file size based
-policy ('dax=server') nor persistent inode flags based policy
-('dax=attr') is used, though virtiofsd indeed advertises that
-it supports per inode DAX feature (so that it won't fail FUSE_INIT
-negotiation phase when guest advertises dax=inode by default)... In
-fact, it acts like 'dax=never' in this case.
-
-Then when guest opts-in and specifies '-o dax=inode' manually, then it
-shall realize that proper configuration for virtiofsd is also needed (-o
-dax=server|attr).
-
-[1] https://www.spinics.net/lists/linux-xfs/msg56642.html
-
--- 
-Thanks,
-Jeffle
+> 
+> [1] https://www.spinics.net/lists/linux-xfs/msg56642.html
+> 
+> -- 
+> Thanks,
+> Jeffle
+> 
 

@@ -1,20 +1,16 @@
-References: <20211011030052.98923-1-jefflexu@linux.alibaba.com>
-	<20211011030052.98923-3-jefflexu@linux.alibaba.com>
-	<YW2AU/E0pLHO5Yl8@redhat.com>
-	<652ac323-6546-01b8-992e-460ad59577ca@linux.alibaba.com>
-	<YXAsV3xp3aeOjaeh@redhat.com>
-	<eb0c9711-66cb-bf79-0cf6-c6d6eec5ceea@linux.alibaba.com>
-	<YXvxOEbGxqhoG7Ti@redhat.com>
 From: JeffleXu <jefflexu@linux.alibaba.com>
-Message-ID: <18ec4862-8bdc-7a6b-c5b2-6c39d5968ba4@linux.alibaba.com>
-Date: Mon, 1 Nov 2021 16:21:49 +0800
+References: <20211011030938.109206-1-jefflexu@linux.alibaba.com>
+	<20211011030938.109206-6-jefflexu@linux.alibaba.com>
+	<YXBX0flS4CocXyDk@redhat.com>
+Message-ID: <526d3ccc-72ab-ddfe-404b-33667a19583e@linux.alibaba.com>
+Date: Mon, 1 Nov 2021 16:59:20 +0800
 MIME-Version: 1.0
-In-Reply-To: <YXvxOEbGxqhoG7Ti@redhat.com>
+In-Reply-To: <YXBX0flS4CocXyDk@redhat.com>
 Content-Type: text/plain; charset=utf-8
 Content-Language: en-US
 Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH v6 2/7] fuse: make DAX mount option a
-	tri-state
+Subject: Re: [Virtio-fs] [virtiofsd PATCH v6 5/6] virtiofsd: implement file
+ size based dax policy
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,119 +20,76 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, miklos@szeredi.hub, linux-fsdevel@vger.kernel.org
+Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, miklos@szeredi.hu
 
 
 
-On 10/29/21 9:03 PM, Vivek Goyal wrote:
-> On Fri, Oct 29, 2021 at 04:33:06PM +0800, JeffleXu wrote:
+On 10/21/21 1:54 AM, Vivek Goyal wrote:
+> On Mon, Oct 11, 2021 at 11:09:37AM +0800, Jeffle Xu wrote:
+>> When DAX window is fully utilized and needs to be expanded to avoid the
+>> performance fluctuation triggered by DAX window recaliming, it may not
+>> be wise to allocate DAX window for files with size smaller than some
+>> specific point, considering from the perspective of reducing memory
+>> overhead.
 >>
+>> To maintain one DAX window chunk (e.g., 2MB in size), 32KB
+>> (512 * 64 bytes) memory footprint will be consumed for page descriptors
+>> inside guest. Thus it'd better disable DAX for those files smaller than
+>> 32KB, to reduce the demand for DAX window and thus avoid the unworthy
+>> memory overhead.
 >>
->> On 10/20/21 10:48 PM, Vivek Goyal wrote:
->>> On Wed, Oct 20, 2021 at 10:52:38AM +0800, JeffleXu wrote:
->>>>
->>>>
->>>> On 10/18/21 10:10 PM, Vivek Goyal wrote:
->>>>> On Mon, Oct 11, 2021 at 11:00:47AM +0800, Jeffle Xu wrote:
->>>>>> We add 'always', 'never', and 'inode' (default). '-o dax' continues to
->>>>>> operate the same which is equivalent to 'always'. To be consistemt with
->>>>>> ext4/xfs's tri-state mount option, when neither '-o dax' nor '-o dax='
->>>>>> option is specified, the default behaviour is equal to 'inode'.
->>>>>
->>>>> Hi Jeffle,
->>>>>
->>>>> I am not sure when  -o "dax=inode"  is used as a default? If user
->>>>> specifies, "-o dax" then it is equal to "-o dax=always", otherwise
->>>>> user will explicitly specify "-o dax=always/never/inode". So when
->>>>> is dax=inode is used as default?
->>>>
->>>> That means when neither '-o dax' nor '-o dax=always/never/inode' is
->>>> specified, it is actually equal to '-o dax=inode', which is also how
->>>> per-file DAX on ext4/xfs works.
->>>>
->>>> This default behaviour for local filesystem, e.g. ext4/xfs, may be
->>>> straightforward, since the disk inode will be read into memory during
->>>> the inode instantiation, and checking for persistent inode attribute
->>>> shall be realatively cheap, except that the default behaviour has
->>>> changed from 'dax=never' to 'dax=inode'.
->>>
->>> Interesting that ext4/xfs allowed for this behavior change.
->>>
->>>>
->>>> Come back to virtiofs, when neither '-o dax' nor '-o
->>>> dax=always/never/inode' is specified, and it actually behaves as '-o
->>>> dax=inode', as long as '-o dax=server/attr' option is not specified for
->>>> virtiofsd, virtiofsd will always clear FUSE_ATTR_DAX and thus guest will
->>>> always disable DAX. IOWs, the guest virtiofs atually behaves as '-o
->>>> dax=never' when neither '-o dax' nor '-o dax=always/never/inode' is
->>>> specified, and '-o dax=server/attr' option is not specified for virtiofsd.
->>>>
->>>> But I'm okay if we need to change the default behaviour for virtiofs.
->>>
->>> This is change of behavior from client's perspective. Even if client
->>> did not opt-in for DAX, DAX can be enabled based on server's setting.
->>> Not that there is anything wrong with it, but change of behavior part
->>> concerns me.
->>>
->>> In case of virtiofs, lot of features we are controlling from server.
->>> Client typically just calls "mount" and there are not many options
->>> users can specify for mount.  
->>>
->>> Given we already allowed to make client a choice about DAX behavior,
->>> I will feel more comfortable that we don't change it and let client
->>> request a specific DAX mode and if client does not specify anything,
->>> then DAX is not enabled.
->>>
+>> Thus only flag the file with FUSE_ATTR_DAX when the file size is greater
+>> than 32 KB. The guest will enable DAX only for those files flagged with
+>> FUSE_ATTR_DAX, when virtiofs is mounted with '-o dax=inode'.
 >>
->> Hi Vivek,
+>> To be noted that both FUSE_LOOKUP and FUSE_READDIRPLUS are affected, and
+>> will convey FUSE_ATTR_DAX flag to the guest.
 >>
->> How about the following design about the default behavior to move this
->> patchset forward, considering the discussion on another thread [1]?
->>
->> - guest side: '-o dax=inode' acts as the default, keeping consistent
->> with xfs/ext4
+>> This policy will be used when '-o dax=server' option is specified for
+>> virtiofsd.
 > 
-> This sounds good.
+> So enabling DAX based on size is just one type of policy. Tomorrow one
+> could think of enabling DAX on some other attribute. So only enable it
+> for non-executable files etc. 
 > 
->> - virtiofsd: the default behavior is like, neither file size based
->> policy ('dax=server') nor persistent inode flags based policy
->> ('dax=attr') is used, though virtiofsd indeed advertises that
->> it supports per inode DAX feature (so that it won't fail FUSE_INIT
->> negotiation phase when guest advertises dax=inode by default)... In
->> fact, it acts like 'dax=never' in this case.
+> We could be more specific and define a policy say "-o dax=filesize". This
+> will allow defining other policies easily later. 
 > 
-> Not sure why virtiofsd needs to advertise that it supports per inode
-> DAX even if no per inode dax policy is in affect. Guest will know that
-> server is not supporting per inode DAX. But it will not return an
-> error to user space (because dax=inode seems to be advisory).
+> But problem with this option is that defining more complex policies
+> will be hard. Say I want to enable DAX on non-executable files which
+> have size greater than 32K. Being able to combine multiple policies
+> will be easy if we implement separate options/knobs to control them
+> and that will allow turning on multiple policies together.
 > 
-> IOW, this is very similar to the case of using dax=inode on a block
-> device which does not support DAX. No errors and no warnings.
+> Say, -o dax_size_threshold=1MB -o dax_no_exec_file
+> 
+> So I guess a generic "-o dax=server" is not a bad idea. As of now this
+> will implement a default size based policy of 32K size. But one can add
+> options later to tweak this.
+> 
 
-OK. I will adopt this behavior. That is, if virtiofsd is not specified
-with 'dax=server|attr' option, it won't advertise support for per inode
-DAX in FUSE_INIT either. And then client will fallback to 'dax=never'
-even if it is mounted with 'dax=inode'.
+The reason why I originally use the 'dax=server' name is that, I want to
+emphasize that it's a heuristic strategy implemented by virtiofsd
+itself. But now I realized that the input of virtiofsd is all various
+kinds of file attributes, e.g. filesize, persistent inode flags, file
+type, etc, and so "dax=attr" name is also a vague name in this degree.
 
-> 
->>
->> Then when guest opts-in and specifies '-o dax=inode' manually, then it
->> shall realize that proper configuration for virtiofsd is also needed (-o
->> dax=server|attr).
-> 
-> I gave some comments w.r.t dax=server naming in your posting. Not sure if
-> you got a chance to look at it.
-> 
-> Thanks
-> Vivek
-> 
->>
->> [1] https://www.spinics.net/lists/linux-xfs/msg56642.html
->>
->> -- 
->> Thanks,
->> Jeffle
->>
+Now I prefer "dax=filesize" and "dax=xflag", which shall be more clear
+to users at the first glance. The former allows DAX for those smaller
+than 32KB, while the latter queries the persistent DAX inode flag and
+allows DAX accordingly.
+
+w.r.t. the complex policy you described, e.g. 'non-executable files
+which have size greater than 32K', indeed we may need more option knobs
+then, maybe "dax=filesize|xflag" need to be transformed to
+"dax_filesize" and "dax_xflag"? But one problem of this multiple option
+knob design is that, it may be meaningless to specify "dax_filesize" and
+"dax_xflag" at the same time.
+
+In a summary, personally I prefer "dax=filesize" and "dax=xflag" so far,
+and we can tweak this, e.g. expand to multiple option knobs, if it's
+really needed later.
+
 
 -- 
 Thanks,

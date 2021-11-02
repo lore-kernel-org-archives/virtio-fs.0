@@ -1,26 +1,21 @@
-Date: Fri, 17 Dec 2021 05:13:32 -0500
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	from:to:subject; s=fm2; bh=+EvlwYzVSdbDz/qmzcu1hyG+aH/XPTFEiwQt6
-	K/UC84=; b=jsOHVykfyW0GtB+AlyI6FshA/lheqDYftTCLrw2QTbywcG8UgZFn5
-	Lp+l+Gmv3fNtrl4gNv9qNmRwx4B24BGoaLyCHeeRL47coXQzKJH+0yR8/TzySctm
-	C9zNJSQsDxkYrorQudKiqwyo5LxOdEv9vWATEcL1NhHz80eNuhSRKIhKpSlgxmA0
-	w0l0tTgzOC/rgM74v+Fdy65f/OeaxHKd7efCwWB9DRy9ipVzFyazCGJ+6Bbxxkgi
-	UMUJgPpTybE2vn0GchDhtku7DP0sgioPQ3LpCohJ8JDztexQf1Gh8q+ejm8z6kVm
-	h7xValpS+OxbLzCSMzTreZXlkpzLsibvA==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=+EvlwYzVSdbDz/qmz
-	cu1hyG+aH/XPTFEiwQt6K/UC84=; b=D2KF502wXKBYLj2JPY5udbBDYX+ZniGDH
-	nhku5BfB0Cx3+sxP8BxJke6XuS0XC3Hn5vqkEOy7qVfHQlmi8EMlPpcWFdQPgZfU
-	+g+4soGGo8qL6/bNrjrlN9MEqqZTZX9Ywj+9ZTPCKwLsPm7E4agwUEqLXphZUYSo
-	R8/91tQdKpKpUJ7NQ1TC0CWCDwFRwJh7FqFZYkEG6C1Kl3y4g5Sf9dw0kAggNzvi
-	6L/O0v9vQYKGiZB1vcj+6Xh3Xb1JMsF8NtOU+7lCg5/O9mTEiNx9tTVCpTgdiV4D
-	VcX2v+K3ctHgPHiHWWSjOTV/GQ+OEhOG7H3iQETOVjJEAzReHfBxw==
-From: virtiofs-bot@sinrega.org
-Message-Id: <71237.121121705132700314@us-mta-520.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] MR closed: Implement support for remote
-	locks
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=hvn6IK84CbRQLtjc7l/5dJ9gRPuu8dy76RLolQ2t/AM=;
+	b=qeOes2SFm05r0+Umjia2PAG8jdD4k4XAmhZPdxsEBv9der0W90mE02ru69zop8Nrqa
+	hVO/svx+EkayJnWXzRND3cJG6t3JfdWfGyThkj1RnWXoPj2dbSb+sneRNvceNByd3NDP
+	kSusTZQN6PPsTKrF2jcjaZ9uvDqtArXDiE9UU=
+MIME-Version: 1.0
+References: <20211012180624.447474-1-vgoyal@redhat.com>
+	<20211012180624.447474-3-vgoyal@redhat.com>
+	<CAJfpegs-EHBjjnsVQdPWfH=idVENj9Aw0e-L4tjcgx3v38NJtg@mail.gmail.com>
+	<YYFZl3egeX88G3FQ@redhat.com>
+In-Reply-To: <YYFZl3egeX88G3FQ@redhat.com>
+From: Miklos Szeredi <miklos@szeredi.hu>
+Date: Tue, 2 Nov 2021 16:38:06 +0100
+Message-ID: <CAJfpeguMLE1rgpuP7gWWNcip6R+cgp-BdDfdQGtV=TouOVEn4A@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PATCH v2 2/2] fuse: Send security context of inode
+	on file creation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -29,31 +24,62 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: SElinux list <selinux@vger.kernel.org>, Casey Schaufler <casey@schaufler-ca.com>, Stephen Smalley <stephen.smalley.work@gmail.com>, Ondrej Mosnacek <omosnace@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, LSM <linux-security-module@vger.kernel.org>, linux-fsdevel@vger.kernel.org
 
-Locks can either be managed locally by the guest kernel, or remotely
-by the virtio-fs daemon. The latter option is more expensive, but
-allows those locks to be visible outside the guest, a critical feature
-if multiple actors (guests or other applications running on the host)
-intend to access the same files using locking semantics.
+On Tue, 2 Nov 2021 at 16:30, Vivek Goyal <vgoyal@redhat.com> wrote:
+>
+> On Tue, Nov 02, 2021 at 03:00:30PM +0100, Miklos Szeredi wrote:
+> > On Tue, 12 Oct 2021 at 20:06, Vivek Goyal <vgoyal@redhat.com> wrote:
 
-This commit implements support for remote locks, both POSIX locks and
-flock, adding the command line flag "remote-locks" to allow users to
-configure the desired behavior from either "disabled" (the default
-option), "enabled-safe" and "enabled-unsafe".
+> > > @@ -633,7 +713,29 @@ static int create_new_entry(struct fuse_mount *fm, struct fuse_args *args,
+> > >         args->out_numargs = 1;
+> > >         args->out_args[0].size = sizeof(outarg);
+> > >         args->out_args[0].value = &outarg;
+> > > +
+> > > +       if (init_security) {
+> >
+>
+> Hi Miklos,
+>
+> > Instead of a new arg to create_new_entry(), this could check
+> > args.opcode != FUSE_LINK.
+>
+> Will do.
+>
+> >
+> > > +               unsigned short idx = args->in_numargs;
+> > > +
+> > > +               if ((size_t)idx >= ARRAY_SIZE(args->in_args)) {
+> > > +                       err = -ENOMEM;
+> > > +                       goto out_put_forget_req;
+> > > +               }
+> > > +
+> > > +               err = get_security_context(entry, mode, &security_ctx,
+> > > +                                          &security_ctxlen);
+> > > +               if (err)
+> > > +                       goto out_put_forget_req;
+> > > +
+> > > +               if (security_ctxlen > 0) {
+> >
+> > This doesn't seem right.  How would the server know if this is arg is missing?
+> >
+> > I think if FUSE_SECURITY_CTX was negotiated, then the secctx header
+> > will always need to be added to the MK* requests.
+>
+> Even for the case of FUSE_LINK request? I think I put this check because
+> FUSE_LINK is not sending secctx header. Other requests are appending
+> this header even if a security module is not loaded/enabled.
 
-The reason for having two different "enabled" options, one "safe" and
-another "unsafe", is because some locking operations are blocking,
-meaning the thread servicing the request will be kept busy until the
-lock is released. Thus, a malicious application running in the guest
-may starve the virtio-fs daemon by issuing a number of blocking lock
-operations.
+No, FUSE_LINK wouldn't even get this far.
 
-The "safe" variant allows all locking operations, except the ones that
-may be blocking, returning ENOTSUP for them, while the "unsafe" one
-allows all operations with no exceptions.
+> I guess it makes more sense to add secctx header even for FUSE_LINK
+> request. Just that header will mention 0 security contexts are
+> following. This will interface more uniform. I will make this change.
 
-Signed-off-by: Sergio Lopez <slp@redhat.com>
----
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/4
+Why? FUSE_LINK is not an inode creation op, it just shares the
+instantiation part with creation.
+
+Thanks,
+Miklos
 

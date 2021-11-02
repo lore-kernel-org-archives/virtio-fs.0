@@ -1,13 +1,13 @@
 From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Thu, 25 Nov 2021 15:05:26 +0800
-Message-Id: <20211125070530.79602-4-jefflexu@linux.alibaba.com>
-In-Reply-To: <20211125070530.79602-1-jefflexu@linux.alibaba.com>
-References: <20211125070530.79602-1-jefflexu@linux.alibaba.com>
+Date: Tue,  2 Nov 2021 13:56:46 +0800
+Message-Id: <20211102055646.103337-7-jefflexu@linux.alibaba.com>
+In-Reply-To: <20211102055646.103337-1-jefflexu@linux.alibaba.com>
+References: <20211102055646.103337-1-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v8 3/7] fuse: support per inode DAX in fuse
-	protocol
+Subject: [Virtio-fs] [PATCH v7 6/6] virtiofsd: implement file size based dax
+	policy
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,61 +17,79 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
-Cc: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, joseph.qi@linux.alibaba.com
+Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com
 
-Expand the fuse protocol to support per inode DAX.
+When DAX window is fully utilized and needs to be expanded to avoid the
+performance fluctuation triggered by DAX window recaliming, it may not
+be wise to allocate DAX window for files with size smaller than some
+specific point, considering from the perspective of reducing memory
+overhead.
 
-FUSE_HAS_INODE_DAX flag is added indicating if fuse server/client
-supporting per inode DAX. It can be conveyed in both FUSE_INIT request
-and reply.
+To maintain one DAX window chunk (e.g., 2MB in size), 32KB
+(512 * 64 bytes) memory footprint will be consumed for page descriptors
+inside guest. Thus it'd better disable DAX for those files smaller than
+32KB, to reduce the demand for DAX window and thus avoid the unworthy
+memory overhead.
 
-FUSE_ATTR_DAX flag is added indicating if DAX shall be enabled for
-corresponding file. It is conveyed in FUSE_LOOKUP reply.
+Thus only flag the file with FUSE_ATTR_DAX when the file size is greater
+than 32 KB. The guest will enable DAX only for those files flagged with
+FUSE_ATTR_DAX, when virtiofs is mounted with '-o dax=inode'.
+
+To be noted that both FUSE_LOOKUP and FUSE_READDIRPLUS are affected, and
+will convey FUSE_ATTR_DAX flag to the guest.
+
+This policy will be used when '-o dax=filesize' option is specified for
+virtiofsd.
 
 Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
 ---
- include/uapi/linux/fuse.h | 5 +++++
- 1 file changed, 5 insertions(+)
+ tools/virtiofsd/passthrough_ll.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-index a1dc3ee1d17c..63a9a963f4d9 100644
---- a/include/uapi/linux/fuse.h
-+++ b/include/uapi/linux/fuse.h
-@@ -187,6 +187,7 @@
-  *
-  *  7.35
-  *  - add FOPEN_NOFLUSH
-+ *  - add FUSE_HAS_INODE_DAX, FUSE_ATTR_DAX
-  */
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index dac5063594..cbf81d1593 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -54,6 +54,7 @@
+ #include <sys/syscall.h>
+ #include <sys/wait.h>
+ #include <sys/xattr.h>
++#include <sys/user.h>
+ #include <syslog.h>
+ #include <linux/fs.h>
  
- #ifndef _LINUX_FUSE_H
-@@ -341,6 +342,7 @@ struct fuse_file_lock {
-  *			write/truncate sgid is killed only if file has group
-  *			execute permission. (Same as Linux VFS behavior).
-  * FUSE_SETXATTR_EXT:	Server supports extended struct fuse_setxattr_in
-+ * FUSE_HAS_INODE_DAX:  use per inode DAX
-  */
- #define FUSE_ASYNC_READ		(1 << 0)
- #define FUSE_POSIX_LOCKS	(1 << 1)
-@@ -372,6 +374,7 @@ struct fuse_file_lock {
- #define FUSE_SUBMOUNTS		(1 << 27)
- #define FUSE_HANDLE_KILLPRIV_V2	(1 << 28)
- #define FUSE_SETXATTR_EXT	(1 << 29)
-+#define FUSE_HAS_INODE_DAX	(1 << 30)
+@@ -61,6 +62,20 @@
+ #include "passthrough_helpers.h"
+ #include "passthrough_seccomp.h"
  
- /**
-  * CUSE INIT request/reply flags
-@@ -454,8 +457,10 @@ struct fuse_file_lock {
-  * fuse_attr flags
-  *
-  * FUSE_ATTR_SUBMOUNT: Object is a submount root
-+ * FUSE_ATTR_DAX: Enable DAX for this file in per inode DAX mode
-  */
- #define FUSE_ATTR_SUBMOUNT      (1 << 0)
-+#define FUSE_ATTR_DAX		(1 << 1)
++/*
++ * One page descriptor (64 bytes in size) needs to be maintained for every page
++ * in the DAX window chunk, i.e., there is certain guest memory overhead when
++ * DAX is enabled. Thus disable DAX for those with file size smaller than this
++ * certain memory overhead if virtiofs is mounted in per inode DAX mode. In
++ * this case, the guest page cache will consume less memory than that when DAX
++ * is enabled.
++ */
++#define FUSE_DAX_SHIFT      21
++#define PAGE_DESC_SHIFT     6
++#define FUSE_INODE_DAX_SHIFT \
++    (FUSE_DAX_SHIFT - PAGE_SHIFT + PAGE_DESC_SHIFT)
++#define FUSE_INODE_DAX_THRESH  (1 << FUSE_INODE_DAX_SHIFT)
++
+ /* Keep track of inode posix locks for each owner. */
+ struct lo_inode_plock {
+     uint64_t lock_owner;
+@@ -1052,6 +1067,10 @@ static bool lo_should_enable_dax(struct lo_data *lo, struct lo_inode *inode,
+         return ret;
+     }
  
- /**
-  * Open flags
++    if (lo->dax == INODE_DAX_FILESIZE) {
++        return e->attr.st_size > FUSE_INODE_DAX_THRESH;
++    }
++
+     return false;
+ }
+ 
 -- 
 2.27.0
 

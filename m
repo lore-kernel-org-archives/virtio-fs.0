@@ -1,12 +1,13 @@
 From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Tue,  2 Nov 2021 13:25:58 +0800
-Message-Id: <20211102052604.59462-2-jefflexu@linux.alibaba.com>
+Date: Tue,  2 Nov 2021 13:26:04 +0800
+Message-Id: <20211102052604.59462-8-jefflexu@linux.alibaba.com>
 In-Reply-To: <20211102052604.59462-1-jefflexu@linux.alibaba.com>
 References: <20211102052604.59462-1-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v7 1/7] fuse: add fuse_should_enable_dax() helper
+Subject: [Virtio-fs] [PATCH v7 7/7] Documentation/filesystem/dax: record DAX
+	on virtiofs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,38 +19,52 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
 Cc: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, joseph.qi@linux.alibaba.com
 
-This is in prep for following per inode DAX checking.
+Record DAX on virtiofs and the semantic difference with that on ext4
+and xfs.
 
 Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
 ---
- fs/fuse/dax.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ Documentation/filesystems/dax.rst | 20 ++++++++++++++++++--
+ 1 file changed, 18 insertions(+), 2 deletions(-)
 
-diff --git a/fs/fuse/dax.c b/fs/fuse/dax.c
-index 79df61ed7481..8c187b04874e 100644
---- a/fs/fuse/dax.c
-+++ b/fs/fuse/dax.c
-@@ -1332,11 +1332,19 @@ static const struct address_space_operations fuse_dax_file_aops  = {
- 	.invalidatepage	= noop_invalidatepage,
- };
+diff --git a/Documentation/filesystems/dax.rst b/Documentation/filesystems/dax.rst
+index 9a1b8fd9e82b..e3b30429d703 100644
+--- a/Documentation/filesystems/dax.rst
++++ b/Documentation/filesystems/dax.rst
+@@ -23,8 +23,8 @@ on it as usual.  The `DAX` code currently only supports files with a block
+ size equal to your kernel's `PAGE_SIZE`, so you may need to specify a block
+ size when creating the filesystem.
  
--void fuse_dax_inode_init(struct inode *inode)
-+static bool fuse_should_enable_dax(struct inode *inode)
- {
- 	struct fuse_conn *fc = get_fuse_conn(inode);
+-Currently 3 filesystems support `DAX`: ext2, ext4 and xfs.  Enabling `DAX` on them
+-is different.
++Currently 4 filesystems support `DAX`: ext2, ext4, xfs and virtiofs.
++Enabling `DAX` on them is different.
  
- 	if (!fc->dax)
-+		return false;
+ Enabling DAX on ext2
+ --------------------
+@@ -168,6 +168,22 @@ if the underlying media does not support dax and/or the filesystem is
+ overridden with a mount option.
+ 
+ 
++Enabling DAX on virtiofs
++----------------------------
++The semantic of DAX on virtiofs is basically equal to that on ext4 and xfs,
++except that when '-o dax=inode' is specified, virtiofs client derives the hint
++whether DAX shall be enabled or not from virtiofs server through FUSE protocol,
++rather than the persistent `FS_XFLAG_DAX` flag. That is, whether DAX shall be
++enabled or not is completely determined by virtiofs server, while virtiofs
++server itself may deploy various algorithm making this decision, e.g. depending
++on the persistent `FS_XFLAG_DAX` flag on the host.
 +
-+	return true;
-+}
++It is still supported to set or clear persistent `FS_XFLAG_DAX` flag inside
++guest, but it is not guaranteed that DAX will be enabled or disabled for
++corresponding file then. Users inside guest still need to call statx(2) and
++check the statx flag `STATX_ATTR_DAX` to see if DAX is enabled for this file.
 +
-+void fuse_dax_inode_init(struct inode *inode)
-+{
-+	if (!fuse_should_enable_dax(inode))
- 		return;
++
+ Implementation Tips for Block Driver Writers
+ --------------------------------------------
  
- 	inode->i_flags |= S_DAX;
 -- 
 2.27.0
 

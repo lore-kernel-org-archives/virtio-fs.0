@@ -1,26 +1,21 @@
-Date: Wed, 3 Nov 2021 08:47:44 -0400
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	from:to:subject; s=fm2; bh=Sc+3hD9PUHVnU7eHcYkeRmCn+aSOfXPx3/0Ww
-	zPnQhA=; b=GQSrhY/R4oa8wpY7X5/zOxOg0bhMxshmG+EDeB/RjJewoeH4V3Rlk
-	GVYSAZLI+XZnzZoJfvX2xlJ5DEQSEc2eJj4kb7JU0gsRelj0AAiTRWpDzdrw4dLX
-	MlnCpLTE4Gkmuvkw1I+0bD7pjwyNM9J2OnC1ymo8+jyHuzZg6BOXRUXdZwAjZwNC
-	bV/N3b7K3Pce6Q6aDJTT/I4py2hE0ATHnvEwc8raDte4gQTKiNdsQhJaO2fYd1yv
-	W00xjJkaDuXwOIxPVhCuWJrS5H0Z3e1xRkHtnXlRL9grT4kdxtW03bZr2ICZrJiJ
-	148yBTNcZM0HCEsPMRJKIqKmcUoxaU7XA==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=Sc+3hD9PUHVnU7eHc
-	YkeRmCn+aSOfXPx3/0WwzPnQhA=; b=nJ2c1+sEhRaBoKd0s2vrLiHeJ4VHN0bsS
-	+AdZJjE1BfpjWOtEcwUZdz6626raUF9Sz1nnyA5RzEbM/G8Lp4UL8lGk3ZoJbQ/y
-	CBx3gEQlcuqYJ0jbGNbmOBFtTGm2GUVGPWmuFuAImiFWtHj64CoSuTdDQLfQC3d/
-	24wG7dKxerpeptksh+tU3SbRgiQw/buVugZP3yX7gTsbXD7qrqXPIQ1rwuJ8x7aJ
-	3iEyKS1LRSaRSgrobL3NT/Gl5tN2mXhliBKhkCI3nrSSyunLNlk66/Hhh+y4uSoo
-	TYS4347CjizWLuw8Z2889leXV04JdG3j4dI/fi6j0/32EhrjzihUA==
-From: virtiofs-bot@sinrega.org
-Message-Id: <17342.121110308474200189@us-mta-118.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] Issue closed: Follow-up from "File
-	handle follow-up patches"
+Date: Wed, 3 Nov 2021 18:29:18 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YYMNPqVnOWD3gNsw@redhat.com>
+References: <CAOQ4uxhpCKK2MYxSmRJYYMEWaHKy5ezyKgxaM+YAKtpjsZkD-g@mail.gmail.com>
+	<YXhIm3mOvPsueWab@redhat.com>
+	<CAO17o20sdKAWQN6w7Oe0Ze06qcK+J=6rrmA_aWGnY__MRVDCKw@mail.gmail.com>
+	<CAOQ4uxhA+f-GZs-6SwNtSYZvSwfsYz4_=8_tWAUqt9s-49bqLw@mail.gmail.com>
+	<20211027132319.GA7873@quack2.suse.cz>
+	<YXm2tAMYwFFVR8g/@redhat.com>
+	<20211102110931.GD12774@quack2.suse.cz>
+	<CAOQ4uxiYQYG8Ta=MNJKpa_0pAPd0MS9PL2r_0ZRD+_TKOw6C7g@mail.gmail.com>
+	<YYGg1w/q31SC3PQ8@redhat.com>
+	<CAOQ4uxg_KAg34TgmVRQ5nrfgHddzQepVv_bAUAhqtkDfHB7URw@mail.gmail.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAOQ4uxg_KAg34TgmVRQ5nrfgHddzQepVv_bAUAhqtkDfHB7URw@mail.gmail.com>
+Subject: Re: [Virtio-fs] [RFC PATCH 0/7] Inotify support in FUSE and virtiofs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -29,16 +24,102 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Amir Goldstein <amir73il@gmail.com>
+Cc: Steve French <sfrench@samba.org>, Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, linux-kernel <linux-kernel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>
 
-The following discussion from !41 should be addressed:
+On Wed, Nov 03, 2021 at 09:31:02AM +0200, Amir Goldstein wrote:
+> > > >
+> > >
+> > > What about group #1 that wants mask A and group #2 that wants mask B
+> > > events?
+> > >
+> > > Do you propose to maintain separate event queues over the protocol?
+> > > Attach a "recipient list" to each event?
+> > >
+> > > I just don't see how this can scale other than:
+> > > - Local marks and connectors manage the subscriptions on local machine
+> > > - Protocol updates the server with the combined masks for watched objects
+> > >
+> > > I think that the "post-mortem events" issue could be solved by keeping an
+> > > S_DEAD fuse inode object in limbo just for the mark.
+> > > When a remote server sends FS_IN_IGNORED or FS_DELETE_SELF for
+> > > an inode, the fuse client inode can be finally evicted.
+> >
+> > There is no guarantee that FS_IN_IGNORED or FS_DELETE_SELF will come
+> > or when will it come. If another guest has reference on inode it might
+> > not come for a long time. And this will kind of become a mechanism
+> > for one guest to keep other's inode cache full of such objects.
+> >
+> > If event queue becomes too full, we might drop these events. But I guess
+> > in that case we will have to generate IN_Q_OVERFLOW and that can somehow
+> > be used to cleanup such S_DEAD inodes?
+> 
+> That depends on the server implementation.
+> If the server is watching host fs using fanotify filesystem mark, then
+> an overflow
+> event does NOT mean that other new events on inode may be missed only
+> that old events could have been missed.
+> Server should know about all the watched inodes, so it can check on overflow
+> if any of the watched inodes were deleted and notify the client using a reliable
+> channel.
 
-- [ ] @marcandre.lureau started a [discussion](https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/41#note_703625402):  (+2 comments)
+Ok. We have only one channel for notifications. I guess we can program
+the channel in such a way so that it does not drop overflow events but
+can drop other kind of events if things get crazy. If too many overflow
+events and we allocate too much of memory, I guess at some point of
+time, oom killer will kick in a kill server.
 
-    > I like it even better with .rustfmt.toml:
-    > `imports_granularity="Crate"`
-    > 
-    > ok
----
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/issues/16
+> 
+> Given the current server implementation with inotify, IN_Q_OVERFLOW
+> means server may have lost an IN_IGNORED event and may not get any
+> more events on inode, so server should check all the watched inodes after
+> overflow, notify the client of all deleted inodes and try to re-create
+> the watches
+> for all inodes with known path or use magic /prod/pid/fd path if that
+> works (??).
+
+Re-doing the watches sounds very painful. That means we will need to
+keep track of aggregated mask in server side inode as well. As of
+now we just pass mask to kernel using inotify_add_watch() and forget
+about it.
+
+/proc/pid/fd should work because I think that's how ioannis is putting
+current watches on inodes. We don't send path info to server.
+
+> 
+> >
+> > nodeid is managed by server. So I am assuming that FORGET messages will
+> > not be sent to server for this inode till we have seen FS_IN_IGNORED
+> > and FS_DELETE_SELF events?
+> >
+> 
+> Or until the application that requested the watch calls
+> inotify_rm_watch() or closes
+> the inotify fd.
+> 
+> IOW, when fs implements remote fsnotify, the local watch keeps the local deleted
+> inode object in limbo until the local watch is removed.
+> When the remote fsnotify server informs that the remote watch (or remote inode)
+> is gone, the local watch is removed as well and then the inotify
+> application also gets
+> an FS_IN_IGNORED event.
+
+Hmm.., I guess remote server will simply send IN_DELETE event when it
+gets it and forward to client. And client will have to then cleanup
+this S_DEAD inode which is in limbo waiting for IN_DELETE_SELF event.
+And that should trigger cleanup of marks/local-watches on the inode, IIUC.
+
+> 
+> Lifetime of local inode is complicated and lifetime of this "shared inode"
+> is much more complicated, so I am not pretending to claim that I have this all
+> figured out or that it could be reliably done at all.
+
+Yes this handling of IN_DELETE_SELF is turning out to be the most
+complicated piece of this proposal. I wish initial implementation
+could just be designed that it does not send IN_DELETE_SELF and
+IN_INGORED is generated locally. And later enhance it to support
+reliable delivery of IN_DELETE_SELF.
+
+Thanks
+Vivek
 

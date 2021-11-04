@@ -1,28 +1,37 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=KCzyf93QJNuKwifW+Nffo8te0nxMymfSTSoBlo601P0=;
-	b=Tq4ABWi0eLIi+uMMQ2zAh3NtcSCzbrCCjBP+97a4kJuAOsZBpbT0Jsz8ZqSYRQV8pX
-	JRE0V2pUUdeUsMYuVzDdpGNNh08NcdFnfA6hWOm3OFAPcitql7b54iUhtzsP8lDRcOZx
-	qMG+Uz/9prIbxU8JatcU+DqPzgp6CZEDDdeSM8KFaO8MEuJxT65q4U3oZmoK+TIQBr08
-	xCEOXit8pcgzQGHpPhpfc5Y3aMsdjGMi9Gc5swwzwYu+7G/Pjj4SEhFUnpUfjxCfvd9r
-	lwu9zAhLDI2lgY0nwkwwwA0u/I1Xo5l6zK3lOdkfZ7xopxxoOqJuk6coXiIc9PJHTjbd
-	E5KQ==
-MIME-Version: 1.0
-References: <CAOQ4uxhpCKK2MYxSmRJYYMEWaHKy5ezyKgxaM+YAKtpjsZkD-g@mail.gmail.com>
-	<YXhIm3mOvPsueWab@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=suse.cz; s=susede2_rsa;
+	t=1636020199;
+	h=from:from:reply-to:date:date:message-id:message-id:to:to:cc:cc:
+	mime-version:mime-version:content-type:content-type:
+	in-reply-to:in-reply-to:references:references;
+	bh=sVjy7Hw4GYNbSvj0ehLiUNu3FfEdD2HU+7SF+Zx3qk4=;
+	b=TNdu7+J7NWAB1VvsLkufNxmcRY0fJihnQj7K3kNiYgsqeknZcr7R5aQIylKeBRC9k9HxCR
+	capTDiMyClwLaMc1r+TG367sqBkWrl6LCt4iC1hL8r5bh2Qz9wAMxU/im2iP3iy0Ct7JL4
+	YToFeEtJB/u5kvx70Qxq+bmQ+L/XEWE=
+DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=suse.cz;
+	s=susede2_ed25519; t=1636020199;
+	h=from:from:reply-to:date:date:message-id:message-id:to:to:cc:cc:
+	mime-version:mime-version:content-type:content-type:
+	in-reply-to:in-reply-to:references:references;
+	bh=sVjy7Hw4GYNbSvj0ehLiUNu3FfEdD2HU+7SF+Zx3qk4=;
+	b=kkNzGMIRpEgI2uvzRMkBfmgY2aQxzbDw37NYJr99e8NEsvLllKKtBpoUqBh5U+T3q5Q82S
+	6UC+w0VgqXxVoYDQ==
+Date: Thu, 4 Nov 2021 11:03:16 +0100
+From: Jan Kara <jack@suse.cz>
+Message-ID: <20211104100316.GA10060@quack2.suse.cz>
+References: <YXhIm3mOvPsueWab@redhat.com>
 	<CAO17o20sdKAWQN6w7Oe0Ze06qcK+J=6rrmA_aWGnY__MRVDCKw@mail.gmail.com>
 	<CAOQ4uxhA+f-GZs-6SwNtSYZvSwfsYz4_=8_tWAUqt9s-49bqLw@mail.gmail.com>
-	<20211027132319.GA7873@quack2.suse.cz> <YXm2tAMYwFFVR8g/@redhat.com>
+	<20211027132319.GA7873@quack2.suse.cz>
+	<YXm2tAMYwFFVR8g/@redhat.com>
 	<20211102110931.GD12774@quack2.suse.cz>
 	<CAOQ4uxiYQYG8Ta=MNJKpa_0pAPd0MS9PL2r_0ZRD+_TKOw6C7g@mail.gmail.com>
 	<20211103100900.GB20482@quack2.suse.cz>
 	<CAOQ4uxjsULgLuOFUYkEePySx6iPXRczgCZMxx8E5ncw=oarLPg@mail.gmail.com>
 	<YYMO1ip9ynXFXc8f@redhat.com>
+MIME-Version: 1.0
 In-Reply-To: <YYMO1ip9ynXFXc8f@redhat.com>
-From: Amir Goldstein <amir73il@gmail.com>
-Date: Thu, 4 Nov 2021 07:29:20 +0200
-Message-ID: <CAOQ4uxioM+Tnm-rJ0ZJk=0JHrL31FSyZqYfx2wX9oU0tpGJT-Q@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
 Subject: Re: [Virtio-fs] [RFC PATCH 0/7] Inotify support in FUSE and virtiofs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -33,10 +42,9 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: Steve French <sfrench@samba.org>, Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, linux-kernel <linux-kernel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>
+Cc: Steve French <sfrench@samba.org>, Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, Amir Goldstein <amir73il@gmail.com>, linux-kernel <linux-kernel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>
 
-On Thu, Nov 4, 2021 at 12:36 AM Vivek Goyal <vgoyal@redhat.com> wrote:
->
+On Wed 03-11-21 18:36:06, Vivek Goyal wrote:
 > On Wed, Nov 03, 2021 at 01:17:36PM +0200, Amir Goldstein wrote:
 > > > > > > Hi Jan,
 > > > > > >
@@ -113,60 +121,37 @@ On Thu, Nov 4, 2021 at 12:36 AM Vivek Goyal <vgoyal@redhat.com> wrote:
 > > > want to discuss the other architecture to see why we cannot to it in a
 > > > simple way :).
 > > >
-> >
+> > 
 > > Fair enough.
-> >
+> > 
 > > Beyond the scalability aspects, I think that a design that exposes the group
 > > to the remote server and allows to "inject" events to the group queue
 > > will prevent
 > > users from useful features going forward.
-> >
+> > 
 > > For example, fanotify ignored_mask could be added to a group, even on
 > > a mount mark, even if the remote server only supports inode marks and it
 > > would just work.
-> >
+> > 
 > > Another point of view for the post-mortem events:
 > > As Miklos once noted and as you wrote above, for cache coherency and leases,
 > > an async notification queue is not adequate and synchronous notifications are
 > > too costly, so there needs to be some shared memory solution involving guest
 > > cache invalidation by host.
->
+> 
 > Any shared memory solution works only limited setup. If server is remote
 > on other machine, there is no sharing. I am hoping that this can be
 > generic enough to support other remote filesystems down the line.
->
 
-I do too :)
+OK, so do I understand both you and Amir correctly that you think that
+always relying on the FUSE server for generating the events and just piping
+them to the client is not long-term viable design for FUSE? Mostly because
+caching of modifications on the client is essentially inevitable and hence
+generating events from the server would be unreliable (delayed too much)?
 
-> >
-> > Suppose said cache invalidation solution would be able to set a variety of
-> > "dirty" flags, not just one type of dirty or to call in another way -
-> > an "event mask".
-> > If that is available, then when a fuse inode gets evicted, the events from the
-> > "event mask" can be queued before destroying the inode and mark -
-> > post mortem event issue averted...
->
-> This is assuming that that server itself got the "IN_DELETE_SELF" event
-> when fuse is destroying its inode. But if inode might be alive due to
-> other client having fd open.
->
-> Even if other client does not have fd open, this still sounds racy. By
-> the time we set inode event_mask (using shared memory, instead of
-> sending an event notifiation), fuse might have cleaned up its inode.
->
+								Honza
 
-There is no escape from some sort of leases design for a reliable
-and efficient shared remote fs.
-Unless the client has an exclusive lease on the inode, it must provide
-enough grace period before cleaning the inode to wait for an update
-from the server if the client cares about getting all events on inode.
-
-> There is a good chance I completely misunderstood what you are suggesting
-> here. :-)
->
-
-There is a good chance that I am talking nonsense :-)
-
-Thanks,
-Amir.
+-- 
+Jan Kara <jack@suse.com>
+SUSE Labs, CR
 

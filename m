@@ -1,12 +1,29 @@
-From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Tue,  2 Nov 2021 13:26:01 +0800
-Message-Id: <20211102052604.59462-5-jefflexu@linux.alibaba.com>
-In-Reply-To: <20211102052604.59462-1-jefflexu@linux.alibaba.com>
-References: <20211102052604.59462-1-jefflexu@linux.alibaba.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=dAk5/osJZq4gVCoii5+s2PH0Pm1YjVcsN6t5OCUDyZc=;
+	b=V9s4kTZyRzgPv0jMoeyWoFlHUpjs92Fa96lGXL6b/N0v6WABgS/X35nmdrJ6I221rU
+	0fSa6WgWd4eZsumy+f90w4t7c8TiRpZ/QnBCskfqitrmBptdaPoD5d4taHYlm6a+OtqI
+	6kPmHx7136SfGlHm9r4zAYNJdxFJDuuhmDqW7l8Zw5cmc1NvjKwbAt6cu+VTwbGyeP0q
+	rkt+Heb9ExtdsOXPxCAQTZjMqpoihft7Ri08/lC+yKhef8/MB4XyQcgdfWw8eXld3bYv
+	QfO33OBzcVMT1PdpUrI/S7rTAXmX+UDmhrwGtN2WHXUiAoTGb8Ym9gvJKcgB/FqwNCUj
+	P+0w==
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v7 4/7] fuse: enable per inode DAX
+References: <CAOQ4uxhpCKK2MYxSmRJYYMEWaHKy5ezyKgxaM+YAKtpjsZkD-g@mail.gmail.com>
+	<YXhIm3mOvPsueWab@redhat.com>
+	<CAO17o20sdKAWQN6w7Oe0Ze06qcK+J=6rrmA_aWGnY__MRVDCKw@mail.gmail.com>
+	<CAOQ4uxhA+f-GZs-6SwNtSYZvSwfsYz4_=8_tWAUqt9s-49bqLw@mail.gmail.com>
+	<20211027132319.GA7873@quack2.suse.cz> <YXm2tAMYwFFVR8g/@redhat.com>
+	<20211102110931.GD12774@quack2.suse.cz>
+	<CAOQ4uxiYQYG8Ta=MNJKpa_0pAPd0MS9PL2r_0ZRD+_TKOw6C7g@mail.gmail.com>
+	<YYGg1w/q31SC3PQ8@redhat.com>
+	<CAOQ4uxg_KAg34TgmVRQ5nrfgHddzQepVv_bAUAhqtkDfHB7URw@mail.gmail.com>
+	<YYMNPqVnOWD3gNsw@redhat.com>
+In-Reply-To: <YYMNPqVnOWD3gNsw@redhat.com>
+From: Amir Goldstein <amir73il@gmail.com>
+Date: Thu, 4 Nov 2021 07:19:37 +0200
+Message-ID: <CAOQ4uxjTw+4ReoxdMKN-EX0q1dwtLCZgZq4A9qdWhgnOiRb1vg@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [RFC PATCH 0/7] Inotify support in FUSE and virtiofs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,129 +32,111 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
-Cc: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, joseph.qi@linux.alibaba.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: Steve French <sfrench@samba.org>, Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, linux-kernel <linux-kernel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>
 
-DAX may be limited in some specific situation. When the number of usable
-DAX windows is under watermark, the recalim routine will be triggered to
-reclaim some DAX windows. It may have a negative impact on the
-performance, since some processes may need to wait for DAX windows to be
-recalimed and reused then. To mitigate the performance degradation, the
-overall DAX window need to be expanded larger.
+> > > If event queue becomes too full, we might drop these events. But I guess
+> > > in that case we will have to generate IN_Q_OVERFLOW and that can somehow
+> > > be used to cleanup such S_DEAD inodes?
+> >
+> > That depends on the server implementation.
+> > If the server is watching host fs using fanotify filesystem mark, then
+> > an overflow
+> > event does NOT mean that other new events on inode may be missed only
+> > that old events could have been missed.
+> > Server should know about all the watched inodes, so it can check on overflow
+> > if any of the watched inodes were deleted and notify the client using a reliable
+> > channel.
+>
+> Ok. We have only one channel for notifications. I guess we can program
+> the channel in such a way so that it does not drop overflow events but
+> can drop other kind of events if things get crazy. If too many overflow
+> events and we allocate too much of memory, I guess at some point of
+> time, oom killer will kick in a kill server.
+>
 
-However, simply expanding the DAX window may not be a good deal in some
-scenario. To maintain one DAX window chunk (i.e., 2MB in size), 32KB
-(512 * 64 bytes) memory footprint will be consumed for page descriptors
-inside guest, which is greater than the memory footprint if it uses
-guest page cache when DAX disabled. Thus it'd better disable DAX for
-those files smaller than 32KB, to reduce the demand for DAX window and
-thus avoid the unworthy memory overhead.
+The kernel implementation of fsnotify events queue pre-allocates
+a single overflow event and never queues more than a single overflow
+event. IN_Q_OVERFLOW must be delivered reliably, but delivering one
+overflow event is enough (until it is consumed).
 
-Per inode DAX feature is introduced to address this issue, by offering a
-finer grained control for dax to users, trying to achieve a balance
-between performance and memory overhead.
+> >
+> > Given the current server implementation with inotify, IN_Q_OVERFLOW
+> > means server may have lost an IN_IGNORED event and may not get any
+> > more events on inode, so server should check all the watched inodes after
+> > overflow, notify the client of all deleted inodes and try to re-create
+> > the watches
+> > for all inodes with known path or use magic /prod/pid/fd path if that
+> > works (??).
+>
+> Re-doing the watches sounds very painful.
 
-The FUSE_ATTR_DAX flag in FUSE_LOOKUP reply is used to indicate whether
-DAX should be enabled or not for corresponding file. Currently the state
-whether DAX is enabled or not for the file is initialized only when
-inode is instantiated.
+Event overflow is a painful incident and systems usually pay a large
+penalty when it happens (e.g. full recrawl of watched tree).
+If virtiofsd is going to use inotify, it is no different than any other inotify
+application that needs to bear the consequence of event overflow.
 
-Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
----
- fs/fuse/dax.c    | 12 ++++++++----
- fs/fuse/file.c   |  4 ++--
- fs/fuse/fuse_i.h |  4 ++--
- fs/fuse/inode.c  |  2 +-
- 4 files changed, 13 insertions(+), 9 deletions(-)
+> That means we will need to
+> keep track of aggregated mask in server side inode as well. As of
+> now we just pass mask to kernel using inotify_add_watch() and forget
+> about it.
+>
 
-diff --git a/fs/fuse/dax.c b/fs/fuse/dax.c
-index 91c8d146dbc4..8a328fb20dcb 100644
---- a/fs/fuse/dax.c
-+++ b/fs/fuse/dax.c
-@@ -1335,7 +1335,7 @@ static const struct address_space_operations fuse_dax_file_aops  = {
- 	.invalidatepage	= noop_invalidatepage,
- };
- 
--static bool fuse_should_enable_dax(struct inode *inode)
-+static bool fuse_should_enable_dax(struct inode *inode, unsigned int flags)
- {
- 	struct fuse_conn *fc = get_fuse_conn(inode);
- 	enum fuse_dax_mode dax_mode = fc->dax_mode;
-@@ -1346,12 +1346,16 @@ static bool fuse_should_enable_dax(struct inode *inode)
- 	if (!fc->dax)
- 		return false;
- 
--	return true;
-+	if (dax_mode == FUSE_DAX_ALWAYS)
-+		return true;
-+
-+	/* dax_mode is FUSE_DAX_INODE or FUSE_DAX_NONE */
-+	return flags & FUSE_ATTR_DAX;
- }
- 
--void fuse_dax_inode_init(struct inode *inode)
-+void fuse_dax_inode_init(struct inode *inode, unsigned int flags)
- {
--	if (!fuse_should_enable_dax(inode))
-+	if (!fuse_should_enable_dax(inode, flags))
- 		return;
- 
- 	inode->i_flags |= S_DAX;
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index e6039f22311b..8449d6fca413 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -3163,7 +3163,7 @@ static const struct address_space_operations fuse_file_aops  = {
- 	.write_end	= fuse_write_end,
- };
- 
--void fuse_init_file_inode(struct inode *inode)
-+void fuse_init_file_inode(struct inode *inode, unsigned int flags)
- {
- 	struct fuse_inode *fi = get_fuse_inode(inode);
- 
-@@ -3177,5 +3177,5 @@ void fuse_init_file_inode(struct inode *inode)
- 	fi->writepages = RB_ROOT;
- 
- 	if (IS_ENABLED(CONFIG_FUSE_DAX))
--		fuse_dax_inode_init(inode);
-+		fuse_dax_inode_init(inode, flags);
- }
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 4f9c2358f343..055b39430540 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -1022,7 +1022,7 @@ int fuse_notify_poll_wakeup(struct fuse_conn *fc,
- /**
-  * Initialize file operations on a regular file
-  */
--void fuse_init_file_inode(struct inode *inode);
-+void fuse_init_file_inode(struct inode *inode, unsigned int flags);
- 
- /**
-  * Initialize inode operations on regular files and special files
-@@ -1277,7 +1277,7 @@ int fuse_dax_conn_alloc(struct fuse_conn *fc, enum fuse_dax_mode mode,
- 			struct dax_device *dax_dev);
- void fuse_dax_conn_free(struct fuse_conn *fc);
- bool fuse_dax_inode_alloc(struct super_block *sb, struct fuse_inode *fi);
--void fuse_dax_inode_init(struct inode *inode);
-+void fuse_dax_inode_init(struct inode *inode, unsigned int flags);
- void fuse_dax_inode_cleanup(struct inode *inode);
- bool fuse_dax_check_alignment(struct fuse_conn *fc, unsigned int map_alignment);
- void fuse_dax_cancel_work(struct fuse_conn *fc);
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index 15ce56f9cf11..acba14002d04 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -280,7 +280,7 @@ static void fuse_init_inode(struct inode *inode, struct fuse_attr *attr)
- 	inode->i_ctime.tv_nsec = attr->ctimensec;
- 	if (S_ISREG(inode->i_mode)) {
- 		fuse_init_common(inode);
--		fuse_init_file_inode(inode);
-+		fuse_init_file_inode(inode, attr->flags);
- 	} else if (S_ISDIR(inode->i_mode))
- 		fuse_init_dir(inode);
- 	else if (S_ISLNK(inode->i_mode))
--- 
-2.27.0
+It costs nothing to keep the aggregated mask in server side inode
+and it makes sense to do that anyway.
+This allows an implementation to notify about changes that the server
+itself handles even if there is no backing filesystem behind it or
+host OS has no fs notification support.
+
+> /proc/pid/fd should work because I think that's how ioannis is putting
+> current watches on inodes. We don't send path info to server.
+>
+> >
+> > >
+> > > nodeid is managed by server. So I am assuming that FORGET messages will
+> > > not be sent to server for this inode till we have seen FS_IN_IGNORED
+> > > and FS_DELETE_SELF events?
+> > >
+> >
+> > Or until the application that requested the watch calls
+> > inotify_rm_watch() or closes
+> > the inotify fd.
+> >
+> > IOW, when fs implements remote fsnotify, the local watch keeps the local deleted
+> > inode object in limbo until the local watch is removed.
+> > When the remote fsnotify server informs that the remote watch (or remote inode)
+> > is gone, the local watch is removed as well and then the inotify
+> > application also gets
+> > an FS_IN_IGNORED event.
+>
+> Hmm.., I guess remote server will simply send IN_DELETE event when it
+> gets it and forward to client. And client will have to then cleanup
+> this S_DEAD inode which is in limbo waiting for IN_DELETE_SELF event.
+> And that should trigger cleanup of marks/local-watches on the inode, IIUC.
+>
+
+In very broad lines, but the server notification must be delivered reliably.
+
+> >
+> > Lifetime of local inode is complicated and lifetime of this "shared inode"
+> > is much more complicated, so I am not pretending to claim that I have this all
+> > figured out or that it could be reliably done at all.
+>
+> Yes this handling of IN_DELETE_SELF is turning out to be the most
+> complicated piece of this proposal. I wish initial implementation
+> could just be designed that it does not send IN_DELETE_SELF and
+> IN_INGORED is generated locally. And later enhance it to support
+> reliable delivery of IN_DELETE_SELF.
+>
+
+Not allowing DELETE_SELF in the mask sounds reasonable, but
+as Ioannis explained, other events can be missed on local file delete.
+If you want to preserve inotify semantics, you could queue an overflow
+event if a fuse inode that gets evicted still has inotify marks.
+That's a bit harsh though.
+Alternatively, you could document in inotify man page that IN_INGORED
+could mean that some events were dropped and hope for the best...
+
+Thanks,
+Amir.
 

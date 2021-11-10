@@ -1,10 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 10 Nov 2021 17:55:27 -0500
-Message-Id: <20211110225528.48601-1-vgoyal@redhat.com>
+Date: Wed, 10 Nov 2021 18:17:25 -0500
+Message-Id: <20211110231728.50385-4-vgoyal@redhat.com>
+In-Reply-To: <20211110231728.50385-1-vgoyal@redhat.com>
+References: <20211110231728.50385-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 0/1] fuse: Send file/inode security context
-	during creation
+Subject: [Virtio-fs] [PATCH v3 3/6] virtiofsd: Move core file creation code
+	in separate function
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,37 +15,81 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: miklos@szeredi.hu
-Cc: selinux@vger.kernel.org, casey@schaufler-ca.com, stephen.smalley.work@gmail.com, omosnace@redhat.com, virtio-fs@redhat.com, linux-security-module@vger.kernel.org, linux-fsdevel@vger.kernel.org, vgoyal@redhat.com
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com, dgilbert@redhat.com
+Cc: casey@schaufler-ca.com, omosnace@redhat.com, vgoyal@redhat.com
 
-Hi,
+Move core file creation bits in a separate function. Soon this is going
+to get more complex as file creation need to set security context also.
+And there will be multiple modes of file creation in next patch.
 
-This is V3 of the patch. V2 was posted here.
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c | 36 ++++++++++++++++++++++----------
+ 1 file changed, 25 insertions(+), 11 deletions(-)
 
-https://lore.kernel.org/linux-fsdevel/20210924192442.916927-1-vgoyal@redhat.com/
-
-I took care of feedback from Miklos. Changes since v2 are.
-
-- Merged two patches into one. (Miklos)
-- Renamed fuse_secctxs to fuse_secctx_header (Miklos)
-- Added total size of all contexts (including fuse_secctx_header) field
-  in fuse_secctx_header. (Miklos)
-- Fixed changelogs (Casey Schaufler)
-- Removed one unnecessary if condition check (Miklos)
-- Removed a function argument to function create_new_entry() (Miklos)
-
-Thanks
-Vivek
-
-Vivek Goyal (1):
-  fuse: Send security context of inode on file creation
-
- fs/fuse/dir.c             | 103 ++++++++++++++++++++++++++++++++++++++
- fs/fuse/fuse_i.h          |   3 ++
- fs/fuse/inode.c           |   4 +-
- include/uapi/linux/fuse.h |  31 +++++++++++-
- 4 files changed, 139 insertions(+), 2 deletions(-)
-
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 64b5b4fbb1..54978b7fae 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -1976,6 +1976,30 @@ static int lo_do_open(struct lo_data *lo, struct lo_inode *inode,
+     return 0;
+ }
+ 
++static int do_lo_create(fuse_req_t req, struct lo_inode *parent_inode,
++                        const char *name, mode_t mode,
++                        struct fuse_file_info *fi, int* open_fd)
++{
++    int err = 0, fd;
++    struct lo_cred old = {};
++    struct lo_data *lo = lo_data(req);
++
++    err = lo_change_cred(req, &old, lo->change_umask);
++    if (err) {
++        return err;
++    }
++
++    /* Try to create a new file but don't open existing files */
++    fd = openat(parent_inode->fd, name, fi->flags | O_CREAT | O_EXCL, mode);
++    if (fd == -1) {
++        err = errno;
++    } else {
++        *open_fd = fd;
++    }
++    lo_restore_cred(&old, lo->change_umask);
++    return err;
++}
++
+ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+                       mode_t mode, struct fuse_file_info *fi)
+ {
+@@ -1985,7 +2009,6 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+     struct lo_inode *inode = NULL;
+     struct fuse_entry_param e;
+     int err;
+-    struct lo_cred old = {};
+ 
+     fuse_log(FUSE_LOG_DEBUG, "lo_create(parent=%" PRIu64 ", name=%s)"
+              " kill_priv=%d\n", parent, name, fi->kill_priv);
+@@ -2001,18 +2024,9 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+         return;
+     }
+ 
+-    err = lo_change_cred(req, &old, lo->change_umask);
+-    if (err) {
+-        goto out;
+-    }
+-
+     update_open_flags(lo->writeback, lo->allow_direct_io, fi);
+ 
+-    /* Try to create a new file but don't open existing files */
+-    fd = openat(parent_inode->fd, name, fi->flags | O_CREAT | O_EXCL, mode);
+-    err = fd == -1 ? errno : 0;
+-
+-    lo_restore_cred(&old, lo->change_umask);
++    err = do_lo_create(req, parent_inode, name, mode, fi, &fd);
+ 
+     /* Ignore the error if file exists and O_EXCL was not given */
+     if (err && (err != EEXIST || (fi->flags & O_EXCL))) {
 -- 
 2.31.1
 

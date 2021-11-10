@@ -1,12 +1,28 @@
-From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Tue,  2 Nov 2021 13:25:59 +0800
-Message-Id: <20211102052604.59462-3-jefflexu@linux.alibaba.com>
-In-Reply-To: <20211102052604.59462-1-jefflexu@linux.alibaba.com>
-References: <20211102052604.59462-1-jefflexu@linux.alibaba.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=omPGHcZQOamvxruFWJbitibaFxtFGC3+SEZUecILkcU=;
+	b=JRRgF2gWZl43etxwl1b8rEI6btrcMR3sK2fTidwaWvnPbgpHDPxyPSi30GoGNoacF/
+	swnNC5X7ZCBk6dDUJ+ZWfYHUbPZLD6twOoRqiBjVX0KnQot/BPVzBcfNmwVHfZVjkl8D
+	NwjUe9gJ/2nZNPVRW1G2WfThaWcNKwkWltg/NCAGXR9Nc3Vb0BH3MhVakQCEBYylClyD
+	Sl0ciRhdutKxTwc6tksCj3yKaf9lbFvyxQIKb5JKP2vcQVTfZblGbvWZ25XGNhR0oh+j
+	nKa7LOKQdf6kcDxwDDRoA4C01yoymNtuzxj1Itd+qR2/S1EBlBZac8WHw4hjD7QMEppg
+	eksQ==
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v7 2/7] fuse: make DAX mount option a tri-state
+References: <CAO17o20sdKAWQN6w7Oe0Ze06qcK+J=6rrmA_aWGnY__MRVDCKw@mail.gmail.com>
+	<CAOQ4uxhA+f-GZs-6SwNtSYZvSwfsYz4_=8_tWAUqt9s-49bqLw@mail.gmail.com>
+	<20211027132319.GA7873@quack2.suse.cz> <YXm2tAMYwFFVR8g/@redhat.com>
+	<20211102110931.GD12774@quack2.suse.cz>
+	<CAOQ4uxiYQYG8Ta=MNJKpa_0pAPd0MS9PL2r_0ZRD+_TKOw6C7g@mail.gmail.com>
+	<20211103100900.GB20482@quack2.suse.cz>
+	<CAOQ4uxjsULgLuOFUYkEePySx6iPXRczgCZMxx8E5ncw=oarLPg@mail.gmail.com>
+	<YYMO1ip9ynXFXc8f@redhat.com> <20211104100316.GA10060@quack2.suse.cz>
+	<YYU/7269JX2neLjz@redhat.com>
+In-Reply-To: <YYU/7269JX2neLjz@redhat.com>
+From: Amir Goldstein <amir73il@gmail.com>
+Date: Wed, 10 Nov 2021 08:28:13 +0200
+Message-ID: <CAOQ4uxiM_i+6Zs+ewg8mfA5aKs-gY7yj3kdrmPLO8Zn+bz4DbA@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [RFC PATCH 0/7] Inotify support in FUSE and virtiofs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,191 +31,79 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
-Cc: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, joseph.qi@linux.alibaba.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: Steve French <sfrench@samba.org>, Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, linux-kernel <linux-kernel@vger.kernel.org>, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>
 
-We add 'always', 'never', and 'inode' (default). '-o dax' continues to
-operate the same which is equivalent to 'always'.
+> > OK, so do I understand both you and Amir correctly that you think that
+> > always relying on the FUSE server for generating the events and just piping
+> > them to the client is not long-term viable design for FUSE? Mostly because
+> > caching of modifications on the client is essentially inevitable and hence
+> > generating events from the server would be unreliable (delayed too much)?
 
-The following behavior is consistent with that on ext4/xfs:
-- The default behavior (when neither '-o dax' nor
-  '-o dax=always|never|inode' option is specified) is equal to 'inode'
-  mode, while 'dax=inode' won't be printed among the mount option list.
-- The 'inode' mode is only advisory. It will silently fallback to
-  'never' mode if fuse server doesn't support that.
+This is one aspect, but we do not have to tie remote notifications to
+the cache coherency problem that is more complicated.
 
-Also noted that by the time of this commit, 'inode' mode is actually
-equal to 'always' mode, before the per inode DAX flag is introduced in
-the following patch.
+OTOH, if virtiofs take the route of "remote groups", why not take it one step
+further and implement "remote event queue".
+Then, it does not need to push event notifications from the server
+into fsnotify at all.
+Instead, FUSE client can communicate with the server using ioctl or a new
+command to implement new_group() that returns a special FUSE file and
+use FUSE POLL/READ to check/read the server's event queue.
 
-Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
----
- fs/fuse/dax.c       |  9 ++++++++-
- fs/fuse/fuse_i.h    | 20 ++++++++++++++++++--
- fs/fuse/inode.c     | 10 +++++++---
- fs/fuse/virtio_fs.c | 18 +++++++++++++++---
- 4 files changed, 48 insertions(+), 9 deletions(-)
+There is already a precedent of this model with CIFS_IOC_NOTIFY
+and SMB2_CHANGE_NOTIFY - SMB protocol, samba server and Windows server
+support watching a directory or a subtree. I think it is a "oneshot" watch, so
+there is no polling nor queue involved.
 
-diff --git a/fs/fuse/dax.c b/fs/fuse/dax.c
-index 8c187b04874e..91c8d146dbc4 100644
---- a/fs/fuse/dax.c
-+++ b/fs/fuse/dax.c
-@@ -1284,11 +1284,14 @@ static int fuse_dax_mem_range_init(struct fuse_conn_dax *fcd)
- 	return ret;
- }
- 
--int fuse_dax_conn_alloc(struct fuse_conn *fc, struct dax_device *dax_dev)
-+int fuse_dax_conn_alloc(struct fuse_conn *fc, enum fuse_dax_mode dax_mode,
-+			struct dax_device *dax_dev)
- {
- 	struct fuse_conn_dax *fcd;
- 	int err;
- 
-+	fc->dax_mode = dax_mode;
-+
- 	if (!dax_dev)
- 		return 0;
- 
-@@ -1335,6 +1338,10 @@ static const struct address_space_operations fuse_dax_file_aops  = {
- static bool fuse_should_enable_dax(struct inode *inode)
- {
- 	struct fuse_conn *fc = get_fuse_conn(inode);
-+	enum fuse_dax_mode dax_mode = fc->dax_mode;
-+
-+	if (dax_mode == FUSE_DAX_NEVER)
-+		return false;
- 
- 	if (!fc->dax)
- 		return false;
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index f55f9f94b1a4..4f9c2358f343 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -480,6 +480,18 @@ struct fuse_dev {
- 	struct list_head entry;
- };
- 
-+enum fuse_dax_mode {
-+	FUSE_DAX_NONE,	 /* default */
-+	FUSE_DAX_ALWAYS, /* "-o dax=always" */
-+	FUSE_DAX_NEVER,  /* "-o dax=never" */
-+	FUSE_DAX_INODE,  /* "-o dax=inode" */
-+};
-+
-+static inline bool fuse_is_inode_dax_mode(enum fuse_dax_mode mode)
-+{
-+	return mode == FUSE_DAX_INODE || mode == FUSE_DAX_NONE;
-+}
-+
- struct fuse_fs_context {
- 	int fd;
- 	struct file *file;
-@@ -497,7 +509,7 @@ struct fuse_fs_context {
- 	bool no_control:1;
- 	bool no_force_umount:1;
- 	bool legacy_opts_show:1;
--	bool dax:1;
-+	enum fuse_dax_mode dax_mode;
- 	unsigned int max_read;
- 	unsigned int blksize;
- 	const char *subtype;
-@@ -802,6 +814,9 @@ struct fuse_conn {
- 	struct list_head devices;
- 
- #ifdef CONFIG_FUSE_DAX
-+	/* Dax mode */
-+	enum fuse_dax_mode dax_mode;
-+
- 	/* Dax specific conn data, non-NULL if DAX is enabled */
- 	struct fuse_conn_dax *dax;
- #endif
-@@ -1258,7 +1273,8 @@ ssize_t fuse_dax_read_iter(struct kiocb *iocb, struct iov_iter *to);
- ssize_t fuse_dax_write_iter(struct kiocb *iocb, struct iov_iter *from);
- int fuse_dax_mmap(struct file *file, struct vm_area_struct *vma);
- int fuse_dax_break_layouts(struct inode *inode, u64 dmap_start, u64 dmap_end);
--int fuse_dax_conn_alloc(struct fuse_conn *fc, struct dax_device *dax_dev);
-+int fuse_dax_conn_alloc(struct fuse_conn *fc, enum fuse_dax_mode mode,
-+			struct dax_device *dax_dev);
- void fuse_dax_conn_free(struct fuse_conn *fc);
- bool fuse_dax_inode_alloc(struct super_block *sb, struct fuse_inode *fi);
- void fuse_dax_inode_init(struct inode *inode);
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index 12d49a1914e8..15ce56f9cf11 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -734,8 +734,12 @@ static int fuse_show_options(struct seq_file *m, struct dentry *root)
- 			seq_printf(m, ",blksize=%lu", sb->s_blocksize);
- 	}
- #ifdef CONFIG_FUSE_DAX
--	if (fc->dax)
--		seq_puts(m, ",dax");
-+	if (fc->dax_mode == FUSE_DAX_ALWAYS)
-+		seq_puts(m, ",dax=always");
-+	else if (fc->dax_mode == FUSE_DAX_NEVER)
-+		seq_puts(m, ",dax=never");
-+	else if (fc->dax_mode == FUSE_DAX_INODE)
-+		seq_puts(m, ",dax=inode");
- #endif
- 
- 	return 0;
-@@ -1481,7 +1485,7 @@ int fuse_fill_super_common(struct super_block *sb, struct fuse_fs_context *ctx)
- 	sb->s_subtype = ctx->subtype;
- 	ctx->subtype = NULL;
- 	if (IS_ENABLED(CONFIG_FUSE_DAX)) {
--		err = fuse_dax_conn_alloc(fc, ctx->dax_dev);
-+		err = fuse_dax_conn_alloc(fc, ctx->dax_mode, ctx->dax_dev);
- 		if (err)
- 			goto err;
- 	}
-diff --git a/fs/fuse/virtio_fs.c b/fs/fuse/virtio_fs.c
-index 94fc874f5de7..e8c404946c63 100644
---- a/fs/fuse/virtio_fs.c
-+++ b/fs/fuse/virtio_fs.c
-@@ -88,12 +88,21 @@ struct virtio_fs_req_work {
- static int virtio_fs_enqueue_req(struct virtio_fs_vq *fsvq,
- 				 struct fuse_req *req, bool in_flight);
- 
-+static const struct constant_table dax_param_enums[] = {
-+	{"always",	FUSE_DAX_ALWAYS },
-+	{"never",	FUSE_DAX_NEVER },
-+	{"inode",	FUSE_DAX_INODE },
-+	{}
-+};
-+
- enum {
- 	OPT_DAX,
-+	OPT_DAX_ENUM,
- };
- 
- static const struct fs_parameter_spec virtio_fs_parameters[] = {
- 	fsparam_flag("dax", OPT_DAX),
-+	fsparam_enum("dax", OPT_DAX_ENUM, dax_param_enums),
- 	{}
- };
- 
-@@ -110,7 +119,10 @@ static int virtio_fs_parse_param(struct fs_context *fsc,
- 
- 	switch (opt) {
- 	case OPT_DAX:
--		ctx->dax = 1;
-+		ctx->dax_mode = FUSE_DAX_ALWAYS;
-+		break;
-+	case OPT_DAX_ENUM:
-+		ctx->dax_mode = result.uint_32;
- 		break;
- 	default:
- 		return -EINVAL;
-@@ -1326,8 +1338,8 @@ static int virtio_fs_fill_super(struct super_block *sb, struct fs_context *fsc)
- 
- 	/* virtiofs allocates and installs its own fuse devices */
- 	ctx->fudptr = NULL;
--	if (ctx->dax) {
--		if (!fs->dax_dev) {
-+	if (ctx->dax_mode != FUSE_DAX_NEVER) {
-+		if (ctx->dax_mode == FUSE_DAX_ALWAYS && !fs->dax_dev) {
- 			err = -EINVAL;
- 			pr_err("virtio-fs: dax can't be enabled as filesystem"
- 			       " device does not support it.\n");
--- 
-2.27.0
+>
+> So initial implementation could be about, application either get local
+> events or remote events (based on filesystem). Down the line more
+> complicated modes can emerge where some combination of local and remote
+> events could be generated and applications could specify it. That
+> probably will be extension of fanotiy/inotify API.
+>
+
+There is one more problem with this approach.
+We cannot silently change the behavior of existing FUSE filesystems.
+What if a system has antivirus configured to scan access to virtiofs mounts?
+Do you consider it reasonable that on system upgrade, the capability of
+adding local watches would go away?
+
+I understand the desire to have existing inotify applications work out of
+the box to get remote notifications, but I have doubts if this goal is even
+worth pursuing. Considering that the existing known use case described in this
+thread is already using polling to identify changes to config files on the host,
+it could just as well be using a new API to get the job done.
+
+If we had to plan an interface without considering existing applications,
+I think it would look something like:
+
+#define FAN_MARK_INODE                                 0x00000000
+#define FAN_MARK_MOUNT                               0x00000010
+#define FAN_MARK_FILESYSTEM                      0x00000100
+#define FAN_MARK_REMOTE_INODE                0x00001000
+#define FAN_MARK_REMOTE_FILESYSTEM     0x00001100
+
+Then, the application can choose to add a remote mark with a certain
+event mask and a local mark with a different event mask without any ambiguity.
+The remote events could be tagged with a flag (turn reserved member of
+fanotify_event_metadata into flags).
+
+We have made a lot of effort to make fanotify a super set of inotify
+functionality removing old UAPI mistakes and baggage along the way,
+so I'd really hate to see us going down the path of ambiguous UAPI
+again.
+
+IMO, the work that Ioannis has already done to support remote
+notifications with virtiofsd is perfectly valid as a private functionality
+of virtiofs, just like cifs CIFS_IOC_NOTIFY.
+
+If we want to go further and implement a "remote notification subsystem"
+then I think we should take other fs (e.g.cifs) into consideration and think
+about functionality beyond the plain remote watch and create an UAPI
+that can be used to extend the functionality further.
+
+Thanks,
+Amir.
 

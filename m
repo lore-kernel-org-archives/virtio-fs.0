@@ -1,10 +1,12 @@
-From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Tue,  2 Nov 2021 13:56:40 +0800
-Message-Id: <20211102055646.103337-1-jefflexu@linux.alibaba.com>
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Wed, 10 Nov 2021 18:17:27 -0500
+Message-Id: <20211110231728.50385-6-vgoyal@redhat.com>
+In-Reply-To: <20211110231728.50385-1-vgoyal@redhat.com>
+References: <20211110231728.50385-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v7 0/6] virtiofsd: support per inode DAX
+Subject: [Virtio-fs] [PATCH v3 5/6] virtiofsd: Create new file using
+	O_TMPFILE and set security context
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -13,54 +15,165 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
-Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com, dgilbert@redhat.com
+Cc: casey@schaufler-ca.com, omosnace@redhat.com, vgoyal@redhat.com
 
-The corresponding kernel patch set:
-https://lore.kernel.org/all/20211102052604.59462-1-jefflexu@linux.alibaba.com/
+If guest and host policies can't work with each other, then guest security
+context (selinux label) needs to be set into an xattr. Say remap guest
+security.selinux xattr to trusted.virtiofs.security.selinux.
 
-changes since v6:
-- rebase to 'virtio-fs-dev' branch
-- the added new option is now named as "-o dax=inode|filesize"
-- virtiofsd won't advertise support for per inode DAX if no DAX policy
-  specified
+That means setting "fscreate" is not going to help as that's ony useful
+for security.selinux xattr on host.
 
-changes since v5:
-- add back support for .ioctl()
-- add back negotiation during FUSE_INIT
-- add '-o dax=[server|attr]' option to control the policy used by
-  virtiofsd to determine whether DAX shall be enabled or not for
-  specific file. Please refer to the commit log of patch 4/5/6 for
-  more detailed information.
+So we need another method which is atomic. Use O_TMPFILE to create new
+file, set xattr and then linkat() to proper place.
 
+But this works only for regular files. So dir, symlinks will continue
+to be non-atomic.
 
-changes since v4:
-- decide whether DAX shall be enabled or not solely depending on file
-  size (DAX is disabled for files smaller than 32KB)
-- negotiation during FUSE_INIT is droped
-- drop support for .ioctl() for passthrough
+Also if host filesystem does not support O_TMPFILE, we fallback to
+non-atomic behavior.
 
-changes since v2/v3:
-Patch 4 in v2 is incomplete by mistake and it will fail to be compiled.
-I had ever sent a seperate patch 4 of v3. Now I send the whole complete
-set in v4. Except for this, there's no other diferrence.
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c | 80 ++++++++++++++++++++++++++++----
+ 1 file changed, 72 insertions(+), 8 deletions(-)
 
-Jeffle Xu (6):
-  virtiofsd: add .ioctl() support
-  virtiofsd: support per inode DAX in fuse protocol
-  virtiofsd: add 'dax=' option
-  virtiofsd: negotiate per inode DAX in FUSE_INIT
-  virtiofsd: implement xflag based dax policy
-  virtiofsd: implement file size based dax policy
-
- include/standard-headers/linux/fuse.h |   2 +
- tools/virtiofsd/fuse_common.h         |   5 +
- tools/virtiofsd/fuse_lowlevel.c       |   6 ++
- tools/virtiofsd/helper.c              |   5 +
- tools/virtiofsd/passthrough_ll.c      | 141 ++++++++++++++++++++++++++
- tools/virtiofsd/passthrough_seccomp.c |   1 +
- 6 files changed, 160 insertions(+)
-
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 7a714b1b5e..4505c0c363 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -2128,14 +2128,29 @@ static int lo_do_open(struct lo_data *lo, struct lo_inode *inode,
+ 
+ static int do_create_nosecctx(fuse_req_t req, struct lo_inode *parent_inode,
+                                const char *name, mode_t mode,
+-                               struct fuse_file_info *fi, int *open_fd)
++                               struct fuse_file_info *fi, int *open_fd,
++                              bool tmpfile)
+ {
+     int err, fd;
+     struct lo_cred old = {};
+     struct lo_data *lo = lo_data(req);
+     int flags;
+ 
+-    flags = fi->flags | O_CREAT | O_EXCL;
++    if (tmpfile) {
++        flags = fi->flags | O_TMPFILE;
++        /*
++         * Don't use O_EXCL as we want to link file later. Also reset O_CREAT
++         * otherwise openat() returns -EINVAL.
++         */
++        flags &= ~(O_CREAT | O_EXCL);
++
++        /* O_TMPFILE needs either O_RDWR or O_WRONLY */
++        if ((flags & O_ACCMODE) == O_RDONLY) {
++            flags |= O_RDWR;
++        }
++    } else {
++        flags = fi->flags | O_CREAT | O_EXCL;
++    }
+ 
+     err = lo_change_cred(req, &old, lo->change_umask);
+     if (err) {
+@@ -2166,7 +2181,7 @@ static int do_create_secctx_fscreate(fuse_req_t req,
+         return err;
+     }
+ 
+-    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd);
++    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd, false);
+ 
+     close_reset_proc_fscreate(fscreate_fd);
+     if (!err) {
+@@ -2175,6 +2190,44 @@ static int do_create_secctx_fscreate(fuse_req_t req,
+     return err;
+ }
+ 
++static int do_create_secctx_tmpfile(fuse_req_t req,
++                                    struct lo_inode *parent_inode,
++                                    const char *name, mode_t mode,
++                                    struct fuse_file_info *fi,
++                                    const char *secctx_name, int *open_fd)
++{
++    int err, fd = -1;
++    struct lo_data *lo = lo_data(req);
++    char procname[64];
++
++    err = do_create_nosecctx(req, parent_inode, ".", mode, fi, &fd, true);
++    if (err) {
++        return err;
++    }
++
++    err = fsetxattr(fd, secctx_name, req->secctx.ctx, req->secctx.ctxlen, 0);
++    if (err) {
++        err = errno;
++        goto out;
++    }
++
++    /* Security context set on file. Link it in place */
++    sprintf(procname, "%d", fd);
++    FCHDIR_NOFAIL(lo->proc_self_fd);
++    err = linkat(AT_FDCWD, procname, parent_inode->fd, name,
++                 AT_SYMLINK_FOLLOW);
++    err = err == -1 ? errno : 0;
++    FCHDIR_NOFAIL(lo->root.fd);
++
++out:
++    if (!err) {
++        *open_fd = fd;
++    } else if (fd != -1) {
++        close(fd);
++    }
++    return err;
++}
++
+ static int do_create_secctx_noatomic(fuse_req_t req,
+                                      struct lo_inode *parent_inode,
+                                      const char *name, mode_t mode,
+@@ -2183,7 +2236,7 @@ static int do_create_secctx_noatomic(fuse_req_t req,
+ {
+     int err = 0, fd = -1;
+ 
+-    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd);
++    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd, false);
+     if (err) {
+         goto out;
+     }
+@@ -2225,20 +2278,31 @@ static int do_lo_create(fuse_req_t req, struct lo_inode *parent_inode,
+     if (secctx_enabled) {
+         /*
+          * If security.selinux has not been remapped and selinux is enabled,
+-         * use fscreate to set context before file creation.
+-         * Otherwise fallback to non-atomic method of file creation
+-         * and xattr settting.
++         * use fscreate to set context before file creation. If not, use
++         * tmpfile method for regular files. Otherwise fallback to
++         * non-atomic method of file creation and xattr settting.
+          */
+         if (!mapped_name && lo->use_fscreate) {
+             err = do_create_secctx_fscreate(req, parent_inode, name, mode, fi,
+                                             open_fd);
+             goto out;
++        } else if (S_ISREG(mode)) {
++            err = do_create_secctx_tmpfile(req, parent_inode, name, mode, fi,
++                                           ctxname, open_fd);
++            /*
++             * If filesystem does not support O_TMPFILE, fallback to non-atomic
++             * method.
++             */
++            if (!err || err != EOPNOTSUPP) {
++                goto out;
++            }
+         }
+ 
+         err = do_create_secctx_noatomic(req, parent_inode, name, mode, fi,
+                                         ctxname, open_fd);
+     } else {
+-        err = do_create_nosecctx(req, parent_inode, name, mode, fi, open_fd);
++        err = do_create_nosecctx(req, parent_inode, name, mode, fi, open_fd,
++                                 false);
+     }
+ 
+ out:
 -- 
-2.27.0
+2.31.1
 

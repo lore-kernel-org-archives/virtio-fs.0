@@ -1,14 +1,17 @@
-Date: Thu, 11 Nov 2021 09:32:49 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YY0pkR3tJuxuBQzD@redhat.com>
-References: <20211110225528.48601-1-vgoyal@redhat.com>
-	<20211110225528.48601-2-vgoyal@redhat.com>
+Date: Thu, 11 Nov 2021 16:31:52 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <YY1FeMyvTOOWYEhV@stefanha-x1.localdomain>
+References: <cover.1633376313.git.qemu_oss@crudebyte.com>
+	<2300275.fgjvgC56zr@silver>
+	<YYvhy5Lm7YaqCWix@stefanha-x1.localdomain>
+	<1965987.S3ubrJPkfX@silver>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="8umAcu99m7SDsc3t"
 Content-Disposition: inline
-In-Reply-To: <20211110225528.48601-2-vgoyal@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v3 1/1] fuse: Send security context of inode
- on file creation
+In-Reply-To: <1965987.S3ubrJPkfX@silver>
+Subject: Re: [Virtio-fs] [PATCH v2 0/3] virtio: increase VIRTQUEUE_MAX_SIZE
+	to 32k
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,319 +20,88 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: miklos@szeredi.hu
-Cc: selinux@vger.kernel.org, casey@schaufler-ca.com, stephen.smalley.work@gmail.com, omosnace@redhat.com, virtio-fs@redhat.com, linux-security-module@vger.kernel.org, linux-fsdevel@vger.kernel.org
+To: Christian Schoenebeck <qemu_oss@crudebyte.com>
+Cc: Kevin Wolf <kwolf@redhat.com>, Laurent Vivier <lvivier@redhat.com>, qemu-block@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, Jason Wang <jasowang@redhat.com>, Amit Shah <amit@kernel.org>, David Hildenbrand <david@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, Eric Auger <eric.auger@redhat.com>, Hanna Reitz <hreitz@redhat.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Gerd Hoffmann <kraxel@redhat.com>, =?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, Raphael Norwitz <raphael.norwitz@nutanix.com>
 
-When a new inode is created, send its security context to server along
-with creation request (FUSE_CREAT, FUSE_MKNOD, FUSE_MKDIR and FUSE_SYMLINK).
-This gives server an opportunity to create new file and set security
-context (possibly atomically). In all the configurations it might not
-be possible to set context atomically.
 
-Like nfs and ceph, use security_dentry_init_security() to dermine security
-context of inode and send it with create, mkdir, mknod, and symlink requests.
+--8umAcu99m7SDsc3t
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Following is the information sent to server.
+On Wed, Nov 10, 2021 at 04:53:33PM +0100, Christian Schoenebeck wrote:
+> On Mittwoch, 10. November 2021 16:14:19 CET Stefan Hajnoczi wrote:
+> > On Wed, Nov 10, 2021 at 02:14:43PM +0100, Christian Schoenebeck wrote:
+> > > On Mittwoch, 10. November 2021 11:05:50 CET Stefan Hajnoczi wrote:
+> > > As you are apparently reluctant for changing the virtio specs, what a=
+bout
+> > > introducing those discussed virtio capabalities either as experimental
+> > > ones
+> > > without specs changes, or even just as 9p specific device capabilitie=
+s for
+> > > now. I mean those could be revoked on both sides at any time anyway.
+> >=20
+> > I would like to understand the root cause before making changes.
+> >=20
+> > "It's faster when I do X" is useful information but it doesn't
+> > necessarily mean doing X is the solution. The "it's faster when I do X
+> > because Y" part is missing in my mind. Once there is evidence that shows
+> > Y then it will be clearer if X is a good solution, if there's a more
+> > general solution, or if it was just a side-effect.
+>=20
+> I think I made it clear that the root cause of the observed performance g=
+ain=20
+> with rising transmission size is latency (and also that performance is no=
+t the=20
+> only reason for addressing this queue size issue).
+>=20
+> Each request roundtrip has a certain minimum latency, the virtio ring alo=
+ne=20
+> has its latency, plus latency of the controller portion of the file serve=
+r=20
+> (e.g. permissions, sandbox checks, file IDs) that is executed with *every=
+*=20
+> request, plus latency of dispatching the request handling between threads=
+=20
+> several times back and forth (also for each request).
+>=20
+> Therefore when you split large payloads (e.g. reading a large file) into=
+=20
+> smaller n amount of chunks, then that individual latency per request=20
+> accumulates to n times the individual latency, eventually leading to degr=
+aded=20
+> transmission speed as those requests are serialized.
 
-fuse_sectx_header, fuse_secctx, xattr_name, security_context
+It's easy to increase the blocksize in benchmarks, but real applications
+offer less control over the I/O pattern. If latency in the device
+implementation (QEMU) is the root cause then reduce the latency to speed
+up all applications, even those that cannot send huge requests.
 
-- struct fuse_secctx_header
-  This contains total number of security contexts being sent and total
-  size of all the security contexts (including size of fuse_secctx_header).
+One idea is request merging on the QEMU side. If the application sends
+10 sequential read or write requests, coalesce them together before the
+main part of request processing begins in the device. Process a single
+large request to spread the cost of the file server over the 10
+requests. (virtio-blk has request merging to help with the cost of lots
+of small qcow2 I/O requests.) The cool thing about this is that the
+guest does not need to change its I/O pattern to benefit from the
+optimization.
 
-- struct fuse_secctx.
-  This contains size of security context which follows this structure.
-  There is one fuse_secctx instance per security context.
+Stefan
 
-- xattr name string.
-  This string represents name of xattr which should be used while setting
-  security context.
+--8umAcu99m7SDsc3t
+Content-Type: application/pgp-signature; name="signature.asc"
 
-- security context.
-  This is the actual security context whose size is specified in fuse_secctx
-  struct.
+-----BEGIN PGP SIGNATURE-----
 
-Also add the FUSE_SECURITY_CTX flag for the `flags` field of the
-fuse_init_out struct.  When this flag is set the kernel will append the
-security context for a newly created inode to the request (create,
-mkdir, mknod, and symlink).  The server is responsible for ensuring that
-the inode appears atomically (preferrably) with the requested security
-context.
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmGNRXgACgkQnKSrs4Gr
+c8iGFggAv4oGiMttfre5NapGzSdD/VF4Pm7sQUgs7v3CBlUtsyiBSExNrEtTpWdw
+/9RDjpLVxcsStB5rnQtQ6Dk8AqAFuetwRdVMUMUmjouY1sGl263h78L6LeWJ9HnC
+5QYd7Hy600+ldKtRoFqHOwpqpoGtTOStfxiOFiR0ievwkX0kUeHE81EBmkqbjBEm
+Mlmgu+BdJWGxtpPQm/1m2vG21+xOXWxuwOzDwIx7mpZGUaNUqteueBhdw1Fl0n1y
+GwviY3a4sW00x1n31by8KQ2laZbxnV5hwMwJ9Kae+aPDdNvSPi5HqD3OqHrn3eBI
+Lg5js5lrBMIjm0FH15JRAFUeiDJ49g==
+=xKav
+-----END PGP SIGNATURE-----
 
-For example, If the server is using SELinux and backed by a "real" linux
-file system that supports extended attributes it can write the security
-context value to /proc/thread-self/attr/fscreate before making the syscall
-to create the inode.
-
-This patch is based on patch from Chirantan Ekbote <chirantan@chromium.org>.
-
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- fs/fuse/dir.c             |  103 ++++++++++++++++++++++++++++++++++++++++++++++
- fs/fuse/fuse_i.h          |    3 +
- fs/fuse/inode.c           |    4 +
- include/uapi/linux/fuse.h |   31 +++++++++++++
- 4 files changed, 139 insertions(+), 2 deletions(-)
-
-Index: redhat-linux/include/uapi/linux/fuse.h
-===================================================================
---- redhat-linux.orig/include/uapi/linux/fuse.h	2021-11-11 08:53:18.570236125 -0500
-+++ redhat-linux/include/uapi/linux/fuse.h	2021-11-11 08:58:38.970236125 -0500
-@@ -187,6 +187,10 @@
-  *
-  *  7.35
-  *  - add FOPEN_NOFLUSH
-+ *
-+ *  7.36
-+ *  - add FUSE_SECURITY_CTX flag for fuse_init_out
-+ *  - add security context to create, mkdir, symlink, and mknod requests
-  */
- 
- #ifndef _LINUX_FUSE_H
-@@ -222,7 +226,7 @@
- #define FUSE_KERNEL_VERSION 7
- 
- /** Minor version number of this interface */
--#define FUSE_KERNEL_MINOR_VERSION 35
-+#define FUSE_KERNEL_MINOR_VERSION 36
- 
- /** The node ID of the root inode */
- #define FUSE_ROOT_ID 1
-@@ -341,6 +345,8 @@ struct fuse_file_lock {
-  *			write/truncate sgid is killed only if file has group
-  *			execute permission. (Same as Linux VFS behavior).
-  * FUSE_SETXATTR_EXT:	Server supports extended struct fuse_setxattr_in
-+ * FUSE_SECURITY_CTX:	add security context to create, mkdir, symlink, and
-+ * 			mknod
-  */
- #define FUSE_ASYNC_READ		(1 << 0)
- #define FUSE_POSIX_LOCKS	(1 << 1)
-@@ -372,6 +378,7 @@ struct fuse_file_lock {
- #define FUSE_SUBMOUNTS		(1 << 27)
- #define FUSE_HANDLE_KILLPRIV_V2	(1 << 28)
- #define FUSE_SETXATTR_EXT	(1 << 29)
-+#define FUSE_SECURITY_CTX	(1 << 30)
- 
- /**
-  * CUSE INIT request/reply flags
-@@ -984,4 +991,26 @@ struct fuse_syncfs_in {
- 	uint64_t	padding;
- };
- 
-+/*
-+ * For each security context, send fuse_secctx with size of security context
-+ * fuse_secctx will be followed by security context name and this in turn
-+ * will be followed by actual context label.
-+ * fuse_secctx, name, context
-+ * */
-+struct fuse_secctx {
-+	uint32_t	size;
-+	uint32_t	padding;
-+};
-+
-+/*
-+ * Contains the information about how many fuse_secctx structures are being
-+ * sent and what's the total size of all security contexts (including
-+ * size of fuse_secctx_header).
-+ *
-+ */
-+struct fuse_secctx_header {
-+	uint32_t	size;
-+	uint32_t	nr_secctx;
-+};
-+
- #endif /* _LINUX_FUSE_H */
-Index: redhat-linux/fs/fuse/dir.c
-===================================================================
---- redhat-linux.orig/fs/fuse/dir.c	2021-11-11 08:56:19.812236125 -0500
-+++ redhat-linux/fs/fuse/dir.c	2021-11-11 08:57:10.575236125 -0500
-@@ -17,6 +17,9 @@
- #include <linux/xattr.h>
- #include <linux/iversion.h>
- #include <linux/posix_acl.h>
-+#include <linux/security.h>
-+#include <linux/types.h>
-+#include <linux/kernel.h>
- 
- static void fuse_advise_use_readdirplus(struct inode *dir)
- {
-@@ -456,6 +459,69 @@ static struct dentry *fuse_lookup(struct
- 	return ERR_PTR(err);
- }
- 
-+static int get_security_context(struct dentry *entry, umode_t mode,
-+				void **security_ctx, u32 *security_ctxlen)
-+{
-+	struct fuse_secctx *fsecctx;
-+	struct fuse_secctx_header *fsecctx_header;
-+	void *ctx, *full_ctx;
-+	u32 ctxlen, full_ctxlen;
-+	int err = 0;
-+	const char *name;
-+
-+	err = security_dentry_init_security(entry, mode, &entry->d_name,
-+					    &name, &ctx, &ctxlen);
-+	if (err) {
-+		if (err != -EOPNOTSUPP)
-+			goto out_err;
-+		/* No LSM is supporting this security hook. Ignore error */
-+		err = 0;
-+		ctxlen = 0;
-+	}
-+
-+	if (ctxlen > 0) {
-+		void *ptr;
-+
-+		full_ctxlen = sizeof(*fsecctx_header) + sizeof(*fsecctx) +
-+			      strlen(name) + ctxlen + 1;
-+		full_ctx = kzalloc(full_ctxlen, GFP_KERNEL);
-+		if (!full_ctx) {
-+			err = -ENOMEM;
-+			kfree(ctx);
-+			goto out_err;
-+		}
-+
-+		ptr = full_ctx;
-+		fsecctx_header = (struct fuse_secctx_header*) ptr;
-+		fsecctx_header->nr_secctx = 1;
-+		fsecctx_header->size = full_ctxlen;
-+		ptr += sizeof(*fsecctx_header);
-+
-+		fsecctx = (struct fuse_secctx*) ptr;
-+		fsecctx->size = ctxlen;
-+		ptr += sizeof(*fsecctx);
-+
-+		strcpy(ptr, name);
-+		ptr += strlen(name) + 1;
-+		memcpy(ptr, ctx, ctxlen);
-+		kfree(ctx);
-+	} else {
-+		full_ctxlen = sizeof(*fsecctx_header);
-+		full_ctx = kzalloc(full_ctxlen, GFP_KERNEL);
-+		if (!full_ctx) {
-+			err = -ENOMEM;
-+			goto out_err;
-+		}
-+		fsecctx_header = full_ctx;
-+		fsecctx_header->size = full_ctxlen;
-+	}
-+
-+	*security_ctxlen = full_ctxlen;
-+	*security_ctx = full_ctx;
-+out_err:
-+	return err;
-+}
-+
- /*
-  * Atomic create+open operation
-  *
-@@ -476,6 +542,8 @@ static int fuse_create_open(struct inode
- 	struct fuse_entry_out outentry;
- 	struct fuse_inode *fi;
- 	struct fuse_file *ff;
-+	void *security_ctx = NULL;
-+	u32 security_ctxlen;
- 
- 	/* Userspace expects S_IFREG in create mode */
- 	BUG_ON((mode & S_IFMT) != S_IFREG);
-@@ -517,6 +585,18 @@ static int fuse_create_open(struct inode
- 	args.out_args[0].value = &outentry;
- 	args.out_args[1].size = sizeof(outopen);
- 	args.out_args[1].value = &outopen;
-+
-+	if (fm->fc->init_security) {
-+		err = get_security_context(entry, mode, &security_ctx,
-+					   &security_ctxlen);
-+		if (err)
-+			goto out_put_forget_req;
-+
-+		args.in_numargs = 3;
-+		args.in_args[2].size = security_ctxlen;
-+		args.in_args[2].value = security_ctx;
-+	}
-+
- 	err = fuse_simple_request(fm, &args);
- 	if (err)
- 		goto out_free_ff;
-@@ -554,6 +634,7 @@ static int fuse_create_open(struct inode
- 
- out_free_ff:
- 	fuse_file_free(ff);
-+	kfree(security_ctx);
- out_put_forget_req:
- 	kfree(forget);
- out_err:
-@@ -620,6 +701,8 @@ static int create_new_entry(struct fuse_
- 	struct dentry *d;
- 	int err;
- 	struct fuse_forget_link *forget;
-+	void *security_ctx = NULL;
-+	u32 security_ctxlen = 0;
- 
- 	if (fuse_is_bad(dir))
- 		return -EIO;
-@@ -633,7 +716,27 @@ static int create_new_entry(struct fuse_
- 	args->out_numargs = 1;
- 	args->out_args[0].size = sizeof(outarg);
- 	args->out_args[0].value = &outarg;
-+
-+	if (fm->fc->init_security && args->opcode != FUSE_LINK) {
-+		unsigned short idx = args->in_numargs;
-+
-+		if ((size_t)idx >= ARRAY_SIZE(args->in_args)) {
-+			err = -ENOMEM;
-+			goto out_put_forget_req;
-+		}
-+
-+		err = get_security_context(entry, mode, &security_ctx,
-+					   &security_ctxlen);
-+		if (err)
-+			goto out_put_forget_req;
-+
-+		args->in_args[idx].size = security_ctxlen;
-+		args->in_args[idx].value = security_ctx;
-+		args->in_numargs++;
-+	}
-+
- 	err = fuse_simple_request(fm, args);
-+	kfree(security_ctx);
- 	if (err)
- 		goto out_put_forget_req;
- 
-Index: redhat-linux/fs/fuse/fuse_i.h
-===================================================================
---- redhat-linux.orig/fs/fuse/fuse_i.h	2021-11-11 08:56:19.814236125 -0500
-+++ redhat-linux/fs/fuse/fuse_i.h	2021-11-11 08:57:10.576236125 -0500
-@@ -765,6 +765,9 @@ struct fuse_conn {
- 	/* Propagate syncfs() to server */
- 	unsigned int sync_fs:1;
- 
-+	/* Initialize security xattrs when creating a new inode */
-+	unsigned int init_security:1;
-+
- 	/** The number of requests waiting for completion */
- 	atomic_t num_waiting;
- 
-Index: redhat-linux/fs/fuse/inode.c
-===================================================================
---- redhat-linux.orig/fs/fuse/inode.c	2021-11-11 08:56:19.815236125 -0500
-+++ redhat-linux/fs/fuse/inode.c	2021-11-11 08:57:10.576236125 -0500
-@@ -1176,6 +1176,8 @@ static void process_init_reply(struct fu
- 			}
- 			if (arg->flags & FUSE_SETXATTR_EXT)
- 				fc->setxattr_ext = 1;
-+			if (arg->flags & FUSE_SECURITY_CTX)
-+				fc->init_security = 1;
- 		} else {
- 			ra_pages = fc->max_read / PAGE_SIZE;
- 			fc->no_lock = 1;
-@@ -1219,7 +1221,7 @@ void fuse_send_init(struct fuse_mount *f
- 		FUSE_PARALLEL_DIROPS | FUSE_HANDLE_KILLPRIV | FUSE_POSIX_ACL |
- 		FUSE_ABORT_ERROR | FUSE_MAX_PAGES | FUSE_CACHE_SYMLINKS |
- 		FUSE_NO_OPENDIR_SUPPORT | FUSE_EXPLICIT_INVAL_DATA |
--		FUSE_HANDLE_KILLPRIV_V2 | FUSE_SETXATTR_EXT;
-+		FUSE_HANDLE_KILLPRIV_V2 | FUSE_SETXATTR_EXT | FUSE_SECURITY_CTX;
- #ifdef CONFIG_FUSE_DAX
- 	if (fm->fc->dax)
- 		ia->in.flags |= FUSE_MAP_ALIGNMENT;
+--8umAcu99m7SDsc3t--
 

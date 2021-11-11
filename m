@@ -1,12 +1,16 @@
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Wed, 10 Nov 2021 18:17:23 -0500
-Message-Id: <20211110231728.50385-2-vgoyal@redhat.com>
-In-Reply-To: <20211110231728.50385-1-vgoyal@redhat.com>
-References: <20211110231728.50385-1-vgoyal@redhat.com>
+References: <20211102052604.59462-1-jefflexu@linux.alibaba.com>
+	<20211102052604.59462-7-jefflexu@linux.alibaba.com>
+	<CAJfpegvfQbA32HjqWv9-Ds04W7Qs2idTOP7w5_NvKS_n=0Td7Q@mail.gmail.com>
+From: JeffleXu <jefflexu@linux.alibaba.com>
+Message-ID: <c41837f0-a183-d911-885d-cf3bcdd9b7c8@linux.alibaba.com>
+Date: Thu, 11 Nov 2021 09:46:26 +0800
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 1/6] fuse: Header file changes for
-	FUSE_SECURITY_CTX
+In-Reply-To: <CAJfpegvfQbA32HjqWv9-Ds04W7Qs2idTOP7w5_NvKS_n=0Td7Q@mail.gmail.com>
+Content-Type: text/plain; charset=utf-8
+Content-Language: en-US
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH v7 6/7] fuse: mark inode DONT_CACHE when per
+ inode DAX hint changes
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,73 +19,46 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com, dgilbert@redhat.com
-Cc: casey@schaufler-ca.com, omosnace@redhat.com, vgoyal@redhat.com
+To: Miklos Szeredi <miklos@szeredi.hu>
+Cc: virtio-fs-list <virtio-fs@redhat.com>, linux-fsdevel@vger.kernel.org, Vivek Goyal <vgoyal@redhat.com>, Joseph Qi <joseph.qi@linux.alibaba.com>
 
-These are just header file changes which should show up in qemu if
-corresponding kernel changes get merged.
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- include/standard-headers/linux/fuse.h | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/include/standard-headers/linux/fuse.h b/include/standard-headers/linux/fuse.h
-index cce105bfba..f412ff7f50 100644
---- a/include/standard-headers/linux/fuse.h
-+++ b/include/standard-headers/linux/fuse.h
-@@ -181,6 +181,10 @@
-  *  - add FUSE_OPEN_KILL_SUIDGID
-  *  - extend fuse_setxattr_in, add FUSE_SETXATTR_EXT
-  *  - add FUSE_SETXATTR_ACL_KILL_SGID
-+ *
-+ *  7.35
-+ *  - add FUSE_SECURITY_CTX flag for fuse_init_out
-+ *  - add security context to create, mkdir, symlink, and mknod requests
-  */
- 
- #ifndef _LINUX_FUSE_H
-@@ -212,7 +216,7 @@
- #define FUSE_KERNEL_VERSION 7
- 
- /** Minor version number of this interface */
--#define FUSE_KERNEL_MINOR_VERSION 33
-+#define FUSE_KERNEL_MINOR_VERSION 35
- 
- /** The node ID of the root inode */
- #define FUSE_ROOT_ID 1
-@@ -329,6 +333,8 @@ struct fuse_file_lock {
-  *			write/truncate sgid is killed only if file has group
-  *			execute permission. (Same as Linux VFS behavior).
-  * FUSE_SETXATTR_EXT:	Server supports extended struct fuse_setxattr_in
-+ * FUSE_SECURITY_CTX:  add security context to create, mkdir, symlink, and
-+ *                     mknod
-  */
- #define FUSE_ASYNC_READ		(1 << 0)
- #define FUSE_POSIX_LOCKS	(1 << 1)
-@@ -360,6 +366,7 @@ struct fuse_file_lock {
- #define FUSE_SUBMOUNTS		(1 << 27)
- #define FUSE_HANDLE_KILLPRIV_V2	(1 << 28)
- #define FUSE_SETXATTR_EXT	(1 << 29)
-+#define FUSE_SECURITY_CTX	(1 << 30)
- 
- /**
-  * CUSE INIT request/reply flags
-@@ -967,4 +974,14 @@ struct fuse_removemapping_one {
- #define FUSE_REMOVEMAPPING_MAX_ENTRY   \
- 		(PAGE_SIZE / sizeof(struct fuse_removemapping_one))
- 
-+struct fuse_secctx {
-+	uint32_t        size;
-+	uint32_t        padding;
-+};
-+
-+struct fuse_secctx_header {
-+	uint32_t        size;
-+	uint32_t        nr_secctx;
-+};
-+
- #endif /* _LINUX_FUSE_H */
+On 11/10/21 11:50 PM, Miklos Szeredi wrote:
+> On Tue, 2 Nov 2021 at 06:26, Jeffle Xu <jefflexu@linux.alibaba.com> wrote:
+>>
+>> When the per inode DAX hint changes while the file is still *opened*, it
+>> is quite complicated and maybe fragile to dynamically change the DAX
+>> state.
+>>
+>> Hence mark the inode and corresponding dentries as DONE_CACHE once the
+>> per inode DAX hint changes, so that the inode instance will be evicted
+>> and freed as soon as possible once the file is closed and the last
+>> reference to the inode is put. And then when the file gets reopened next
+>> time, the new instantiated inode will reflect the new DAX state.
+>>
+>> In summary, when the per inode DAX hint changes for an *opened* file, the
+>> DAX state of the file won't be updated until this file is closed and
+>> reopened later.
+> 
+> This patch does nothing, since fuse already uses .drop_inode =
+> generic_delete_inode, which is has the same effect as setting
+> I_DONTCACHE, at least in the fuse case (inode should never be dirty at
+> eviction).  
+
+Yes, it is. .drop_inode() of FUSE will always free inode. Here we only
+need to set dentry as DCACHE_DONTCACHE. Here I just call
+d_mark_dontcache() directly, though I_DONTCACHE is useless but harmless
+in the case of FUSE...
+
+
+> In fact it may be cleaner to set I_DONTCACHE
+> unconditionally and remove the .drop_inode callback setting.
+
+It works in both cases, I mean, in current case (current code retained
+untouched) and the case you described above.
+
 -- 
-2.31.1
+Thanks,
+Jeffle
 

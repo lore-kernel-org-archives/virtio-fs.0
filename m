@@ -1,16 +1,26 @@
-References: <20211102052604.59462-1-jefflexu@linux.alibaba.com>
-	<20211102052604.59462-6-jefflexu@linux.alibaba.com>
-	<YY1yzRcX6u60zYAl@redhat.com>
-From: JeffleXu <jefflexu@linux.alibaba.com>
-Message-ID: <eb6b386f-cbdd-8219-98af-93b3b3291b73@linux.alibaba.com>
-Date: Fri, 12 Nov 2021 10:04:54 +0800
-MIME-Version: 1.0
-In-Reply-To: <YY1yzRcX6u60zYAl@redhat.com>
-Content-Type: text/plain; charset=utf-8
-Content-Language: en-US
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH v7 5/7] fuse: negotiate per inode DAX in
-	FUSE_INIT
+Date: Fri, 12 Nov 2021 04:14:47 -0500
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	from:to:subject; s=fm2; bh=bTWqcOAaQ7Erd7XYdn/nFIhA5r6pFJWbFdreu
+	7V23Ig=; b=v+Ammar8GC05K171XAOcsL/HcRjfOdXThgl1N8niwH9ufFvtNAelW
+	pzGP0ZGbRe2skj3HBcjQ0UutYfcFmVim0OTNdALNvpjB1e+fuPjlO90SClGNkYY+
+	5s7jpy9jksQD/4C94hEq8T8qz1ilQv2GqoWajxBAIiYwKs6TMN8SAlGKAt0xC1+Y
+	LndqZqkKt26/pLofa/ZNxBQSFxTx4YBJg4HYTBH61Wscg2vVFFA202MyI/GF7w7f
+	4nWrDcL0vyskpXrYFm4pXej+m/X+0Te//OQMxilvE2RiRRpdyMSYjRJpgEi44M7p
+	Lb7H1GID/SOZHUzAWb8EM8ThiM1NYLwtw==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=bTWqcOAaQ7Erd7XYd
+	n/nFIhA5r6pFJWbFdreu7V23Ig=; b=JakUprcLKaoHeCFlXH1G/r43IqCKLBXXU
+	/G59RmXs/2pKVjnjElM6DN1CbXrkmxRW2UfDTPju5CpCQvFWrTwkKwTwZvWZakE0
+	+jjGH7k5i9REwe1xBmDU/KhuvdcztviazCOJK5A9UUFR5tx/4j+FMjCrYGUdBrAI
+	XxP6bJUz3zAJgS+nhBuGQ1g7s6SmdTe9i9iNPTnNGloS3qsfHzqmcbeGs48U+ai4
+	Q8HtERzoIcI1RFbI4X5z/YInSjUXfOH0Y5aiei3UTpJBxZzSZERhJ0kywRrkQJ30
+	HO3khkshRjoIporCPBhbc0Gk0Q7bO/a4QfHHU/hGJWFZCZDYfp+7A==
+From: virtiofs-bot@sinrega.org
+Message-Id: <59490.121111204144200311@us-mta-377.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd-rs] MR merged: Drop capabilties,
+	don't announce KILLPRIV and implement support for KILLPRIV_V2
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,107 +29,9 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, joseph.qi@linux.alibaba.com, miklos@szeredi.hu
+To: virtio-fs@redhat.com
 
-
-
-On 11/12/21 3:45 AM, Vivek Goyal wrote:
-> On Tue, Nov 02, 2021 at 01:26:02PM +0800, Jeffle Xu wrote:
->> Among the FUSE_INIT phase, client shall advertise per inode DAX if it's
->> mounted with "dax=inode". Then server is aware that client is in per
->> inode DAX mode, and will construct per-inode DAX attribute accordingly.
->>
->> Server shall also advertise support for per inode DAX. If server doesn't
->> support it while client is mounted with "dax=inode", client will
->> silently fallback to "dax=never" since "dax=inode" is advisory only.
->>
->> Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
->> ---
->>  fs/fuse/dax.c    |  2 +-
->>  fs/fuse/fuse_i.h |  3 +++
->>  fs/fuse/inode.c  | 16 +++++++++++++---
->>  3 files changed, 17 insertions(+), 4 deletions(-)
->>
->> diff --git a/fs/fuse/dax.c b/fs/fuse/dax.c
->> index 8a328fb20dcb..c8ee601b94b8 100644
->> --- a/fs/fuse/dax.c
->> +++ b/fs/fuse/dax.c
->> @@ -1350,7 +1350,7 @@ static bool fuse_should_enable_dax(struct inode *inode, unsigned int flags)
->>  		return true;
->>  
->>  	/* dax_mode is FUSE_DAX_INODE or FUSE_DAX_NONE */
->> -	return flags & FUSE_ATTR_DAX;
->> +	return fc->inode_dax && (flags & FUSE_ATTR_DAX);
->>  }
->>  
->>  void fuse_dax_inode_init(struct inode *inode, unsigned int flags)
->> diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
->> index 055b39430540..58e54b5a4d65 100644
->> --- a/fs/fuse/fuse_i.h
->> +++ b/fs/fuse/fuse_i.h
->> @@ -777,6 +777,9 @@ struct fuse_conn {
->>  	/* Propagate syncfs() to server */
->>  	unsigned int sync_fs:1;
->>  
->> +	/* Does the filesystem support per inode DAX? */
->> +	unsigned int inode_dax:1;
->> +
->>  	/** The number of requests waiting for completion */
->>  	atomic_t num_waiting;
->>  
->> diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
->> index acba14002d04..0512d8cb36c3 100644
->> --- a/fs/fuse/inode.c
->> +++ b/fs/fuse/inode.c
->> @@ -1136,11 +1136,19 @@ static void process_init_reply(struct fuse_mount *fm, struct fuse_args *args,
->>  					min_t(unsigned int, fc->max_pages_limit,
->>  					max_t(unsigned int, arg->max_pages, 1));
->>  			}
->> -			if (IS_ENABLED(CONFIG_FUSE_DAX) &&
->> -			    arg->flags & FUSE_MAP_ALIGNMENT &&
->> +#ifdef CONFIG_FUSE_DAX
->> +			if ((arg->flags & FUSE_HAS_INODE_DAX) &&
->> +			    fuse_is_inode_dax_mode(fc->dax_mode)) {
-> 
-> Why do we call fuse_is_inode_dax_mode() here? While sending INIT request
-> we set FUSE_HAS_INODE_DAX only if fuse_is_inode_dax_mode() is true. So
-> we should not have to call it again when server replies.?
-
-OK I'll remove this redundant call for fuse_is_inode_dax_mode(). If fuse
-server replies with FUSE_HAS_INODE_DAX when fuse client doesn't
-advertise FUSE_HAS_INODE_DAX, then obviously fuse server shall be blamed.
-
-
-> 
->> +				fc->inode_dax = 1;
->> +			}
->> +			if (arg->flags & FUSE_MAP_ALIGNMENT &&
->>  			    !fuse_dax_check_alignment(fc, arg->map_alignment)) {
->> -				ok = false;
->> +				if (fuse_is_inode_dax_mode(fc->dax_mode))
->> +					fc->inode_dax = 0;
-> 
-> If mapping alignment is not right, I guess we can fail (even in case
-> of dax=inode). In this case client wants per dax inode, server supports
-> it but alignment is wrong. I think that should be an error and user should
-> fix it. IMHO, just leave this code path in place and we will error out.
-
-I'm OK with the behavior of reporting error directly, but I'm afraid the
-behavior is inconsistency then. That is, the following requirements are
-needed to support DAX mode:
-
-1. the virtiofs device doesn't support DAX at all
-(VIRTIO_FS_SHMCAP_ID_CACHE not defined at all)
-2. server's map alignment is non-compliant (fail fuse_dax_check_alignment())
-3. server doesn't advertise support for per inode DAX
-(FUSE_HAS_INODE_DAX) during FUSE_INIT
-
-When virtiofs is mounted in 'dax=inode' mode inside guest, when case 1/3
-occur, we silently fallback to 'dax=never'; while case 2 occurs, we just
-error out.
-
--- 
-Thanks,
-Jeffle
+This series introduces the ability to drop the capabilities before starting the service, stops announcing KILLPRIV support (which we never really supported) and implements support for KILLPRIV_V2.
+---
+https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/44
 

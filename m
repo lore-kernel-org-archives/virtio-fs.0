@@ -1,34 +1,11 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc:content-transfer-encoding;
-	bh=iVK8JRJyhm68OE7PDflDhUDBMxaZsU8Qq50xwjSMVco=;
-	b=nki9JZ9gikXSHsLS0RYfoT0cz4prkQglgPbmhPg1BIWmDrfqMGPzLnJkoA04eoy+F/
-	B/ZGUuE0exAX3Bs2pDkLsD18N1iWQ1umZNVKjdbZG4YYPXn47Z6O8ELukzZ6nBnDGTNG
-	KN7idTyLCEDNGOQU7FJfWiRSLHgLEhRQQTvkQA1hCt7OK8FK/qAXuxBy36m4Ete4n6p9
-	9QwIhuTdxkyx25vymEVTQ/Shs+0kmSEdch5GM+kc7GhE4lRW3fZmoQa1ZXAmPNEoiLlZ
-	KIdrLDX+lFcCBldRiRhsYfN4mY+zA/fvJdsB5xmUuuUjvjbpuoJtk6m9rCkSHbG9cpZX
-	xnhA==
+From: =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@redhat.com>
+Date: Thu, 18 Nov 2021 15:43:17 +0100
+Message-Id: <20211118144317.4106651-1-philmd@redhat.com>
 MIME-Version: 1.0
-References: <20211027132319.GA7873@quack2.suse.cz>
-	<YXm2tAMYwFFVR8g/@redhat.com>
-	<20211102110931.GD12774@quack2.suse.cz>
-	<CAOQ4uxiYQYG8Ta=MNJKpa_0pAPd0MS9PL2r_0ZRD+_TKOw6C7g@mail.gmail.com>
-	<20211103100900.GB20482@quack2.suse.cz>
-	<CAOQ4uxjsULgLuOFUYkEePySx6iPXRczgCZMxx8E5ncw=oarLPg@mail.gmail.com>
-	<YYMO1ip9ynXFXc8f@redhat.com> <20211104100316.GA10060@quack2.suse.cz>
-	<YYU/7269JX2neLjz@redhat.com>
-	<CAOQ4uxiM_i+6Zs+ewg8mfA5aKs-gY7yj3kdrmPLO8Zn+bz4DbA@mail.gmail.com>
-	<20211111173043.GB25491@quack2.suse.cz>
-	<CAOQ4uxiOUM6=190w4018w4nJRnqi+9gzzfQTsLh5gGwbQH_HgQ@mail.gmail.com>
-	<CANXojcy9JzXeLQ6bz9+UOekkpqo8NkgQbhugmGmPE+x3+_=h3Q@mail.gmail.com>
-	<CAO17o21YVczE2-BTAVg-0HJU6gjSUkzUSqJVs9k-_t7mYFNHaA@mail.gmail.com>
-In-Reply-To: <CAO17o21YVczE2-BTAVg-0HJU6gjSUkzUSqJVs9k-_t7mYFNHaA@mail.gmail.com>
-From: Amir Goldstein <amir73il@gmail.com>
-Date: Wed, 17 Nov 2021 08:40:57 +0200
-Message-ID: <CAOQ4uxjpGMYZrq74S=EaSO2nvss4hm1WZ_k+Xxgrj2k9pngJgg@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
+Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [RFC PATCH 0/7] Inotify support in FUSE and virtiofs
+Subject: [Virtio-fs] [PATCH-for-6.2?] docs: Render binary names as
+	monospaced text
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -37,144 +14,328 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Ioannis Angelakopoulos <iangelak@redhat.com>
-Cc: Steve French <sfrench@samba.org>, Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, Nathan Youngman <git@nathany.com>, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Vivek Goyal <vgoyal@redhat.com>, Stef Bon <stefbon@gmail.com>
+To: qemu-devel@nongnu.org
+Cc: Kevin Wolf <kwolf@redhat.com>, John G Johnson <john.g.johnson@oracle.com>, Vladimir Sementsov-Ogievskiy <vsementsov@virtuozzo.com>, Jagannathan Raman <jag.raman@oracle.com>, qemu-block@nongnu.org, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@redhat.com>, Niek Linnenbank <nieklinnenbank@gmail.com>, Elena Ufimtseva <elena.ufimtseva@oracle.com>, virtio-fs@redhat.com, Hanna Reitz <hreitz@redhat.com>, qemu-arm@nongnu.org, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>, Eric Blake <eblake@redhat.com>
 
-On Wed, Nov 17, 2021 at 12:12 AM Ioannis Angelakopoulos
-<iangelak@redhat.com> wrote:
->
->
->
-> On Tue, Nov 16, 2021 at 12:10 AM Stef Bon <stefbon@gmail.com> wrote:
->>
->> Hi Ioannis,
->>
->> I see that you have been working on making fsnotify work on virtiofs.
->> Earlier you contacted me since I've written this:
->>
->> https://github.com/libfuse/libfuse/wiki/Fsnotify-and-FUSE
->>
->> and send you my patches on 23 june.
->> I want to mention first that I would have appreciated it if you would
->> have reacted to me after I've sent you my patches. I did not get any
->> reaction from you. Maybe these patches (which differ from what you
->> propose now, but there is also a lot in common) have been an
->> inspiration for you.
->>
->> Second, what I've written about is that with network filesystems (eg a
->> backend shared with other systems) fsnotify support in FUSE has some
->> drawbacks.
->> In a network environment, where a network fs is part of making people
->> collaborate, it's very useful to have information on who did what on
->> which host, and also when. Simply a message "a file has been created
->> in the folder you watch" is not enough. For example, if you are part
->> of a team, and assigned to your team is a directory on a server where
->> you can work on some shared documents. Now in this example there is a
->> planning, and some documents have to be written. In that case you want
->> to be informed that someone in your team has started a document (by
->> creating it) by the system.
->>
-> I agree that the out of band approach you propose is actually more powerful, since it can
-> provide the client with more information than remote fsnotify. However, in the virtiofs setup
-> your approach might not be as efficient.
->
-> Specifically, the information on who did what might not make sense to the guest within QEMU, since all the
-> virtiofs filesystem operations are handled by viritofsd on the host and the guest does not know about the
-> server or any other guests. Vivek, correct me here if I am wrong.
->
-> Thus, for now at least, it might be sufficient for the guest to know that just a remote event
-> occurred.
->
->> This "extended" information will never get through fsnotify.
->>
->> Other info useful to you as team member:
->>
->> -  you have become member of another team: sbon@anotherteam.example.org
->> -  diskspace and/or quota shortage reported by networksystem
->> -  new teammember, teammember left
->> -  your "rights" or role in the network/team have been changed (for
->> example from reader to reader and writer to some documents)
->>
->> What I want to say is that in a network where lots of people work
->> together in teams/projects, (and I want Linux to play a role there, as
->> desktop/workstation) communication is very important, and all these
->> messages should be supported by the system. My idea is the support of
->> watching fs events with FUSE filesystems should go through userspace,
->> and not via the kernel (cause fs events are part of your setup in the
->> network, together with all other tools to make people collaborate like
->> chat/call/text, and because mentioned above extended info about the
->> who on what host etc is not supported by fsnotify).
->> There should be a fs event watcher which takes care of all watches on
->> behalf of applications during a session, similar to gamin and FAM once
->> did (not used anymore?).
->> When receiving a request from one of the applications this fsevent
->> watcher will use inotify and/or fanotify for local fs's only. With a
->> FUSE fs, it should contact (via a socket) this fs that a watch has
->> been set on an inode with a certain mask.
->> If the FUSE fs does not support this, fallback on normal inotify/fanotify.
->> This way extended info is possible.
->>
->> Is this extended information also useful for virtiofs?
->>
-> Also based on your explanation, your out of band approach is specific to FUSE filesystems.
-> Granted, with your approach there is less complexity in the kernel and more flexibility since
-> the event notification occurs solely in user-space.
-> However, during the discussion with Amir and Jan about potential routes we could take to support the remote
-> fanotify/inotify/fsnotify one important concern was that the API should be able to support other
-> network/remote filesystems if needed and not only FUSE filesystems.
-> It seems that your approach would require a lot of work (correct me if I am wrong) to be adopted
-> by other network filesystems.
->
-> Finally, user-space applications should also be aware of your new API, which will probably result in a non-negligible effort by app developers to adopt it or change their existing apps. The remote inotify/fsnotify ( the current implementation) even though it has many limitations, relies on the existing API and should require less modifications in user space apps. That is why we chose the remote inotify/fsnotify route.
->
+Signed-off-by: Philippe Mathieu-Daudé <philmd@redhat.com>
+---
+ docs/about/removed-features.rst        |  8 ++++----
+ docs/devel/build-system.rst            |  6 +++---
+ docs/devel/multi-process.rst           |  6 +++---
+ docs/devel/testing.rst                 |  8 ++++----
+ docs/image-fuzzer.txt                  |  6 +++---
+ docs/system/arm/orangepi.rst           |  2 +-
+ docs/system/images.rst                 |  2 +-
+ docs/system/qemu-block-drivers.rst.inc |  6 +++---
+ docs/system/tls.rst                    |  2 +-
+ docs/tools/qemu-img.rst                | 18 +++++++++---------
+ docs/tools/qemu-nbd.rst                |  4 ++--
+ docs/tools/qemu-storage-daemon.rst     |  7 ++++---
+ docs/tools/virtiofsd.rst               |  4 ++--
+ 13 files changed, 40 insertions(+), 39 deletions(-)
 
-The way you depict the options seems like either applications are not
-aware of the UAPI
-changes or they need to be modified to adapt to the changes.
-
-I actually think that the much better approach would be to deal with
-most of the UAPI
-complexity in a library, so applications may need to be rebuilt or
-adapted to use a new
-library, but going forward, the library would abstract most of the
-complexity from the
-applications.
-
-The holy grail would be a portable library, such as this go library [1].
-It is quite hard to design an API that would abstract all the
-different capabilities
-on Linux-inotify/Linux-fanotify/MacOS-fsevents/Win-USNJournal and more.
-
-The second best would be a library to abstract the ever growing complexity
-of Linux inotify/fanotify UAPI from applications.
-I had already made the first step with adapting libinotifytools to fanotify [2].
-We could continue down that path or start creating/improving a
-different library.
-
-The point is that abstracting different capabilities of remote fs notifications
-(i.e. cifs, virtiofs, generic FUSE) is going to be challenging, so starting the
-design from a user library API and deriving the needed pieces from the
-kernel UAPI is the right way to go IMO.
-
-The library approach will have the advantage that some remote fs capabilities
-(e.g. for cifs) will be available for old kernels as well and in
-theory, the library
-could also use some standardized OOB notifications channel to get changed
-made on the host from VM guest tools as Stef proposed.
-
-> That said, I do not see a reason why both implementations cannot co-exist
-> and have the user-space applications choose which approach they want.
->
-
-True, an OOB channel and kernel generic remote fs support can both exist,
-but it would be best if the application was not aware of either.
-The library would pick the facility based on the requested functionality,
-availability of the facilities in the filesystem and sysadmin/user policy.
-
-Thanks,
-Amir.
-
-[1] https://github.com/fsnotify/fsnotify
-[2] https://github.com/inotify-tools/inotify-tools/pull/134
-
+diff --git a/docs/about/removed-features.rst b/docs/about/removed-features.rst
+index 9d0d90c90d9..c02d1f6d494 100644
+--- a/docs/about/removed-features.rst
++++ b/docs/about/removed-features.rst
+@@ -658,8 +658,8 @@ enforce that any failure to open the backing image (including if the
+ backing file is missing or an incorrect format was specified) is an
+ error when ``-u`` is not used.
+ 
+-qemu-img amend to adjust backing file (removed in 6.1)
+-''''''''''''''''''''''''''''''''''''''''''''''''''''''
++``qemu-img`` amend to adjust backing file (removed in 6.1)
++''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+ 
+ The use of ``qemu-img amend`` to modify the name or format of a qcow2
+ backing image was never fully documented or tested, and interferes
+@@ -670,8 +670,8 @@ backing chain should be performed with ``qemu-img rebase -u`` either
+ before or after the remaining changes being performed by amend, as
+ appropriate.
+ 
+-qemu-img backing file without format (removed in 6.1)
+-'''''''''''''''''''''''''''''''''''''''''''''''''''''
++``qemu-img`` backing file without format (removed in 6.1)
++'''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+ 
+ The use of ``qemu-img create``, ``qemu-img rebase``, or ``qemu-img
+ convert`` to create or modify an image that depends on a backing file
+diff --git a/docs/devel/build-system.rst b/docs/devel/build-system.rst
+index 7a83f5fc0db..431caba7aa0 100644
+--- a/docs/devel/build-system.rst
++++ b/docs/devel/build-system.rst
+@@ -121,11 +121,11 @@ process for:
+ 
+ 1) executables, which include:
+ 
+-   - Tools - qemu-img, qemu-nbd, qga (guest agent), etc
++   - Tools - ``qemu-img``, ``qemu-nbd``, ``qga`` (guest agent), etc
+ 
+-   - System emulators - qemu-system-$ARCH
++   - System emulators - ``qemu-system-$ARCH``
+ 
+-   - Userspace emulators - qemu-$ARCH
++   - Userspace emulators - ``qemu-$ARCH``
+ 
+    - Unit tests
+ 
+diff --git a/docs/devel/multi-process.rst b/docs/devel/multi-process.rst
+index e5758a79aba..2c5ec977df8 100644
+--- a/docs/devel/multi-process.rst
++++ b/docs/devel/multi-process.rst
+@@ -187,9 +187,9 @@ desired, in which the emulation application should only be allowed to
+ access the files or devices the VM it's running on behalf of can access.
+ #### qemu-io model
+ 
+-Qemu-io is a test harness used to test changes to the QEMU block backend
+-object code. (e.g., the code that implements disk images for disk driver
+-emulation) Qemu-io is not a device emulation application per se, but it
++``qemu-io`` is a test harness used to test changes to the QEMU block backend
++object code (e.g., the code that implements disk images for disk driver
++emulation). ``qemu-io`` is not a device emulation application per se, but it
+ does compile the QEMU block objects into a separate binary from the main
+ QEMU one. This could be useful for disk device emulation, since its
+ emulation applications will need to include the QEMU block objects.
+diff --git a/docs/devel/testing.rst b/docs/devel/testing.rst
+index 60c59023e58..755343c7dd0 100644
+--- a/docs/devel/testing.rst
++++ b/docs/devel/testing.rst
+@@ -564,11 +564,11 @@ exploiting a QEMU security bug to compromise the host.
+ QEMU binaries
+ ~~~~~~~~~~~~~
+ 
+-By default, qemu-system-x86_64 is searched in $PATH to run the guest. If there
+-isn't one, or if it is older than 2.10, the test won't work. In this case,
++By default, ``qemu-system-x86_64`` is searched in $PATH to run the guest. If
++there isn't one, or if it is older than 2.10, the test won't work. In this case,
+ provide the QEMU binary in env var: ``QEMU=/path/to/qemu-2.10+``.
+ 
+-Likewise the path to qemu-img can be set in QEMU_IMG environment variable.
++Likewise the path to ``qemu-img`` can be set in QEMU_IMG environment variable.
+ 
+ Make jobs
+ ~~~~~~~~~
+@@ -650,7 +650,7 @@ supported. To start the fuzzer, run
+ 
+   tests/image-fuzzer/runner.py -c '[["qemu-img", "info", "$test_img"]]' /tmp/test qcow2
+ 
+-Alternatively, some command different from "qemu-img info" can be tested, by
++Alternatively, some command different from ``qemu-img info`` can be tested, by
+ changing the ``-c`` option.
+ 
+ Integration tests using the Avocado Framework
+diff --git a/docs/image-fuzzer.txt b/docs/image-fuzzer.txt
+index 3e23ebec331..279cc8c807f 100644
+--- a/docs/image-fuzzer.txt
++++ b/docs/image-fuzzer.txt
+@@ -51,10 +51,10 @@ assumes that core dumps will be generated in the current working directory.
+ For comprehensive test results, please, set up your test environment
+ properly.
+ 
+-Paths to binaries under test (SUTs) qemu-img and qemu-io are retrieved from
+-environment variables. If the environment check fails the runner will
++Paths to binaries under test (SUTs) ``qemu-img`` and ``qemu-io`` are retrieved
++from environment variables. If the environment check fails the runner will
+ use SUTs installed in system paths.
+-qemu-img is required for creation of backing files, so it's mandatory to set
++``qemu-img`` is required for creation of backing files, so it's mandatory to set
+ the related environment variable if it's not installed in the system path.
+ For details about environment variables see qemu-iotests/check.
+ 
+diff --git a/docs/system/arm/orangepi.rst b/docs/system/arm/orangepi.rst
+index c55694dd91b..83c7445197b 100644
+--- a/docs/system/arm/orangepi.rst
++++ b/docs/system/arm/orangepi.rst
+@@ -128,7 +128,7 @@ Alternatively, you can also choose to build you own image with buildroot
+ using the orangepi_pc_defconfig. Also see https://buildroot.org for more information.
+ 
+ When using an image as an SD card, it must be resized to a power of two. This can be
+-done with the qemu-img command. It is recommended to only increase the image size
++done with the ``qemu-img`` command. It is recommended to only increase the image size
+ instead of shrinking it to a power of two, to avoid loss of data. For example,
+ to prepare a downloaded Armbian image, first extract it and then increase
+ its size to one gigabyte as follows:
+diff --git a/docs/system/images.rst b/docs/system/images.rst
+index 3d9144e6258..d000bd6b6f1 100644
+--- a/docs/system/images.rst
++++ b/docs/system/images.rst
+@@ -20,7 +20,7 @@ where myimage.img is the disk image filename and mysize is its size in
+ kilobytes. You can add an ``M`` suffix to give the size in megabytes and
+ a ``G`` suffix for gigabytes.
+ 
+-See the qemu-img invocation documentation for more information.
++See the ``qemu-img`` invocation documentation for more information.
+ 
+ .. _disk_005fimages_005fsnapshot_005fmode:
+ 
+diff --git a/docs/system/qemu-block-drivers.rst.inc b/docs/system/qemu-block-drivers.rst.inc
+index 16225710ebb..e313784426d 100644
+--- a/docs/system/qemu-block-drivers.rst.inc
++++ b/docs/system/qemu-block-drivers.rst.inc
+@@ -511,13 +511,13 @@ of an inet socket:
+ 
+   |qemu_system| linux.img -hdb nbd+unix://?socket=/tmp/my_socket
+ 
+-In this case, the block device must be exported using qemu-nbd:
++In this case, the block device must be exported using ``qemu-nbd``:
+ 
+ .. parsed-literal::
+ 
+   qemu-nbd --socket=/tmp/my_socket my_disk.qcow2
+ 
+-The use of qemu-nbd allows sharing of a disk between several guests:
++The use of ``qemu-nbd`` allows sharing of a disk between several guests:
+ 
+ .. parsed-literal::
+ 
+@@ -530,7 +530,7 @@ and then you can use it with two guests:
+   |qemu_system| linux1.img -hdb nbd+unix://?socket=/tmp/my_socket
+   |qemu_system| linux2.img -hdb nbd+unix://?socket=/tmp/my_socket
+ 
+-If the nbd-server uses named exports (supported since NBD 2.9.18, or with QEMU's
++If the ``nbd-server`` uses named exports (supported since NBD 2.9.18, or with QEMU's
+ own embedded NBD server), you must specify an export name in the URI:
+ 
+ .. parsed-literal::
+diff --git a/docs/system/tls.rst b/docs/system/tls.rst
+index b0973afe1bf..1a04674362e 100644
+--- a/docs/system/tls.rst
++++ b/docs/system/tls.rst
+@@ -311,7 +311,7 @@ containing one or more usernames and random keys::
+    mkdir -m 0700 /tmp/keys
+    psktool -u rich -p /tmp/keys/keys.psk
+ 
+-TLS-enabled servers such as qemu-nbd can use this directory like so::
++TLS-enabled servers such as ``qemu-nbd`` can use this directory like so::
+ 
+    qemu-nbd \
+      -t -x / \
+diff --git a/docs/tools/qemu-img.rst b/docs/tools/qemu-img.rst
+index c0a44431467..d663dd92bd7 100644
+--- a/docs/tools/qemu-img.rst
++++ b/docs/tools/qemu-img.rst
+@@ -127,9 +127,9 @@ by the used format or see the format descriptions below for details.
+ .. option:: -S SIZE
+ 
+   Indicates the consecutive number of bytes that must contain only zeros
+-  for qemu-img to create a sparse image during conversion. This value is rounded
+-  down to the nearest 512 bytes. You may use the common size suffixes like
+-  ``k`` for kilobytes.
++  for ``qemu-img`` to create a sparse image during conversion. This value is
++  rounded down to the nearest 512 bytes. You may use the common size suffixes
++  like ``k`` for kilobytes.
+ 
+ .. option:: -t CACHE
+ 
+@@ -431,7 +431,7 @@ Command description:
+   suppressed from the destination image.
+ 
+   *SPARSE_SIZE* indicates the consecutive number of bytes (defaults to 4k)
+-  that must contain only zeros for qemu-img to create a sparse image during
++  that must contain only zeros for ``qemu-img`` to create a sparse image during
+   conversion. If *SPARSE_SIZE* is 0, the source will not be scanned for
+   unallocated or zero sectors, and the destination image will always be
+   fully allocated.
+@@ -447,7 +447,7 @@ Command description:
+   If the ``-n`` option is specified, the target volume creation will be
+   skipped. This is useful for formats such as ``rbd`` if the target
+   volume has already been created with site specific options that cannot
+-  be supplied through qemu-img.
++  be supplied through ``qemu-img``.
+ 
+   Out of order writes can be enabled with ``-W`` to improve performance.
+   This is only recommended for preallocated devices like host devices or other
+@@ -472,7 +472,7 @@ Command description:
+   If the option *BACKING_FILE* is specified, then the image will record
+   only the differences from *BACKING_FILE*. No size needs to be specified in
+   this case. *BACKING_FILE* will never be modified unless you use the
+-  ``commit`` monitor command (or qemu-img commit).
++  ``commit`` monitor command (or ``qemu-img commit``).
+ 
+   If a relative path name is given, the backing file is looked up relative to
+   the directory containing *FILENAME*.
+@@ -684,7 +684,7 @@ Command description:
+ 
+   Safe mode
+     This is the default mode and performs a real rebase operation. The
+-    new backing file may differ from the old one and qemu-img rebase
++    new backing file may differ from the old one and ``qemu-img rebase``
+     will take care of keeping the guest-visible content of *FILENAME*
+     unchanged.
+ 
+@@ -697,7 +697,7 @@ Command description:
+     exists.
+ 
+   Unsafe mode
+-    qemu-img uses the unsafe mode if ``-u`` is specified. In this
++    ``qemu-img`` uses the unsafe mode if ``-u`` is specified. In this
+     mode, only the backing file name and format of *FILENAME* is changed
+     without any checks on the file contents. The user must take care of
+     specifying the correct new backing file, or the guest-visible
+@@ -735,7 +735,7 @@ Command description:
+   sizes accordingly.  Failure to do so will result in data loss!
+ 
+   When shrinking images, the ``--shrink`` option must be given. This informs
+-  qemu-img that the user acknowledges all loss of data beyond the truncated
++  ``qemu-img`` that the user acknowledges all loss of data beyond the truncated
+   image's end.
+ 
+   After using this command to grow a disk image, you must use file system and
+diff --git a/docs/tools/qemu-nbd.rst b/docs/tools/qemu-nbd.rst
+index 56e54cd4411..a1eebbce4fa 100644
+--- a/docs/tools/qemu-nbd.rst
++++ b/docs/tools/qemu-nbd.rst
+@@ -38,7 +38,7 @@ driver options if ``--image-opts`` is specified.
+   supported. The common object types that it makes sense to define are the
+   ``secret`` object, which is used to supply passwords and/or encryption
+   keys, and the ``tls-creds`` object, which is used to supply TLS
+-  credentials for the qemu-nbd server or client.
++  credentials for the ``qemu-nbd`` server or client.
+ 
+ .. option:: -p, --port=PORT
+ 
+@@ -238,7 +238,7 @@ daemon:
+ Expose the guest-visible contents of a qcow2 file via a block device
+ /dev/nbd0 (and possibly creating /dev/nbd0p1 and friends for
+ partitions found within), then disconnect the device when done.
+-Access to bind qemu-nbd to an /dev/nbd device generally requires root
++Access to bind ``qemu-nbd`` to an /dev/nbd device generally requires root
+ privileges, and may also require the execution of ``modprobe nbd``
+ to enable the kernel NBD client module.  *CAUTION*: Do not use
+ this method to mount filesystems from an untrusted guest image - a
+diff --git a/docs/tools/qemu-storage-daemon.rst b/docs/tools/qemu-storage-daemon.rst
+index b8ef4486f1e..3e5a9dc0320 100644
+--- a/docs/tools/qemu-storage-daemon.rst
++++ b/docs/tools/qemu-storage-daemon.rst
+@@ -10,9 +10,10 @@ Synopsis
+ Description
+ -----------
+ 
+-qemu-storage-daemon provides disk image functionality from QEMU, qemu-img, and
+-qemu-nbd in a long-running process controlled via QMP commands without running
+-a virtual machine. It can export disk images, run block job operations, and
++``qemu-storage-daemon`` provides disk image functionality from QEMU,
++``qemu-img``, and ``qemu-nbd`` in a long-running process controlled via QMP
++commands without running a virtual machine.
++It can export disk images, run block job operations, and
+ perform other disk-related operations. The daemon is controlled via a QMP
+ monitor and initial configuration from the command-line.
+ 
+diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
+index cc314028309..07ac0be5511 100644
+--- a/docs/tools/virtiofsd.rst
++++ b/docs/tools/virtiofsd.rst
+@@ -136,8 +136,8 @@ Extended attribute (xattr) mapping
+ By default the name of xattr's used by the client are passed through to the server
+ file system.  This can be a problem where either those xattr names are used
+ by something on the server (e.g. selinux client/server confusion) or if the
+-virtiofsd is running in a container with restricted privileges where it cannot
+-access some attributes.
++``virtiofsd`` is running in a container with restricted privileges where it
++cannot access some attributes.
+ 
+ Mapping syntax
+ ~~~~~~~~~~~~~~
+-- 
+2.31.1
 

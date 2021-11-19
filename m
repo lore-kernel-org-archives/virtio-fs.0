@@ -1,12 +1,25 @@
-From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Tue,  2 Nov 2021 13:56:41 +0800
-Message-Id: <20211102055646.103337-2-jefflexu@linux.alibaba.com>
-In-Reply-To: <20211102055646.103337-1-jefflexu@linux.alibaba.com>
-References: <20211102055646.103337-1-jefflexu@linux.alibaba.com>
-MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
+Date: Fri, 19 Nov 2021 06:17:35 -0500
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	from:to:subject; s=fm2; bh=xg5K6XE1taO5fAmCUukHngZ5kaA9N9yILUCnA
+	TygCF0=; b=H2A3sA/lwIFf+nNRTvo8Qtu/gVtgBWaAN2yuNB2ORS7YtiuZTNAkp
+	J9anMxIgNf26flBBYTIrWBEstDzhZkK7biRIsi0g2DizUmuVz/woD83tr5tsjiUE
+	aH4Gy4PwC4beSNi2q3dLYs6WTI2frdHuk2PChJeEUDLhAft/lQUeeVHVxeIyFqqN
+	npiVKI4UMKu9CoMH5emXWFaO1lincW/i3YRmebrgvn5NHR++H1TlV7j4fcg35hs9
+	BfIytltKfw1fNWFzo/zR9zi1eJgsWltjQNZSsk1YbuNaTQjDcRDmmE2R+Heq7oXR
+	f9ToHQWR2L7H6LBbFd+NxlGvwE+FeqTEQ==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=xg5K6XE1taO5fAmCU
+	ukHngZ5kaA9N9yILUCnATygCF0=; b=JNMIXltjw8bQ3XvzMj3EX/e2k01AeLyt1
+	9Tf2QEH0KfTqY022YAIgIeLKGOr2wrwHYCB2aMoK0DL4ZVKlHeDvvvN5v8UpkM9K
+	KW05z2jsQYZnm2AWipr6cb0E5IYjnyFU4ccDvEX6/x0yBTcXpaJR0Thf83cwyegV
+	6uNVFUlE9Wb2iD6GV45byL9TvSYZtLVGKDdF1dlUcctGTiqm4UazsFjuRU99Vcsl
+	mTU/sRAWnO/A2IsST75UgAmzUQQw7e/UsNtFIHpL6yIE94TRYsOKb9uXPY2XpieS
+	cl0yCh1JW0a7ToQ84a7dCVzryKHbHhPhMK/I4MUnXr6CqSDiZqFqg==
+From: virtiofs-bot@sinrega.org
+Message-Id: <76168.121111906172800154@us-mta-490.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v7 1/6] virtiofsd: add .ioctl() support
+Subject: [Virtio-fs] [virtiofsd-rs] Issue closed: Drop unneeded capabilities
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,131 +28,9 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
-Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com
+To: virtio-fs@redhat.com
 
-For passthrough, it passes corresponding ioctls to host directly.
-
-Currently only these ioctls that handling persistent inode flags, i.e.,
-FS_IOC_[G|S]ETFLAGS and FS_IOC_FS[G|S]ETXATTR are supported for security
-concern, though it's implemented in a quite general way, so that we can
-expand the scope of allowed ioctls if it is really needed later.
-
-Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
+As part of the self-sandboxing process, drop unneeded capabilities. Some time ago I created [capng](https://crates.io/crates/capng), a crate that wraps around `libcapng`, and I'd swear I added support to use it to drop capabilities in `vhost-user-fs`, but seems that I never created the PR. :-?
 ---
- tools/virtiofsd/passthrough_ll.c      | 65 +++++++++++++++++++++++++++
- tools/virtiofsd/passthrough_seccomp.c |  1 +
- 2 files changed, 66 insertions(+)
-
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index b7c1fa71b5..2768497be4 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -47,6 +47,7 @@
- #include <dirent.h>
- #include <pthread.h>
- #include <sys/file.h>
-+#include <sys/ioctl.h>
- #include <sys/mount.h>
- #include <sys/prctl.h>
- #include <sys/resource.h>
-@@ -54,6 +55,7 @@
- #include <sys/wait.h>
- #include <sys/xattr.h>
- #include <syslog.h>
-+#include <linux/fs.h>
- 
- #include "qemu/cutils.h"
- #include "passthrough_helpers.h"
-@@ -2188,6 +2190,68 @@ out:
-     fuse_reply_err(req, saverr);
- }
- 
-+
-+static void lo_ioctl(fuse_req_t req, fuse_ino_t ino, unsigned int cmd,
-+                     void *arg, struct fuse_file_info *fi,
-+                     unsigned flags, const void *in_buf,
-+                     size_t in_bufsz, size_t out_bufsz)
-+{
-+    int res, dir;
-+    int fd = lo_fi_fd(req, fi);
-+    int saverr = ENOSYS;
-+    void *buf = NULL;
-+    size_t size = 0;
-+
-+    fuse_log(FUSE_LOG_DEBUG, "lo_ioctl(ino=%" PRIu64 ", cmd=0x%x, flags=0x%x, "
-+            "in_bufsz = %lu, out_bufsz = %lu)\n",
-+            ino, cmd, flags, in_bufsz, out_bufsz);
-+
-+    if (!(cmd == FS_IOC_SETFLAGS || cmd == FS_IOC_GETFLAGS ||
-+          cmd == FS_IOC_FSSETXATTR || cmd == FS_IOC_FSGETXATTR)) {
-+        goto out;
-+    }
-+
-+    /* unrestricted ioctl is not supported yet */
-+    if (flags & FUSE_IOCTL_UNRESTRICTED) {
-+        goto out;
-+    }
-+
-+    dir = _IOC_DIR(cmd);
-+
-+    if (dir & _IOC_READ) {
-+        size = out_bufsz;
-+        buf = malloc(size);
-+        if (!buf) {
-+            goto out_err;
-+        }
-+
-+        if (dir & _IOC_WRITE) {
-+            memcpy(buf, in_buf, size);
-+        }
-+
-+        res = ioctl(fd, cmd, buf);
-+    } else if (dir & _IOC_WRITE) {
-+        res = ioctl(fd, cmd, in_buf);
-+    } else {
-+        res = ioctl(fd, cmd, arg);
-+    }
-+
-+    if (res < 0) {
-+        goto out_err;
-+    }
-+
-+    fuse_reply_ioctl(req, 0, buf, size);
-+    free(buf);
-+
-+    return;
-+
-+out_err:
-+    saverr = errno;
-+out:
-+    fuse_reply_err(req, saverr);
-+    free(buf);
-+}
-+
- static void lo_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
-                         struct fuse_file_info *fi)
- {
-@@ -3474,6 +3538,7 @@ static struct fuse_lowlevel_ops lo_oper = {
-     .fsyncdir = lo_fsyncdir,
-     .create = lo_create,
-     .getlk = lo_getlk,
-+    .ioctl = lo_ioctl,
-     .setlk = lo_setlk,
-     .open = lo_open,
-     .release = lo_release,
-diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
-index f49ed94b5e..eaed5b151b 100644
---- a/tools/virtiofsd/passthrough_seccomp.c
-+++ b/tools/virtiofsd/passthrough_seccomp.c
-@@ -62,6 +62,7 @@ static const int syscall_allowlist[] = {
-     SCMP_SYS(gettid),
-     SCMP_SYS(gettimeofday),
-     SCMP_SYS(getxattr),
-+    SCMP_SYS(ioctl),
-     SCMP_SYS(linkat),
-     SCMP_SYS(listxattr),
-     SCMP_SYS(lseek),
--- 
-2.27.0
+https://gitlab.com/virtio-fs/virtiofsd-rs/-/issues/7
 

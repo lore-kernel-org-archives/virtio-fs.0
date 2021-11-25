@@ -1,12 +1,13 @@
 From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Thu, 25 Nov 2021 15:05:27 +0800
-Message-Id: <20211125070530.79602-5-jefflexu@linux.alibaba.com>
+Date: Thu, 25 Nov 2021 15:05:29 +0800
+Message-Id: <20211125070530.79602-7-jefflexu@linux.alibaba.com>
 In-Reply-To: <20211125070530.79602-1-jefflexu@linux.alibaba.com>
 References: <20211125070530.79602-1-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v8 4/7] fuse: enable per inode DAX
+Subject: [Virtio-fs] [PATCH v8 6/7] fuse: mark inode DONT_CACHE when per
+	inode DAX hint changes
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,126 +19,73 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
 Cc: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, joseph.qi@linux.alibaba.com
 
-DAX may be limited in some specific situation. When the number of usable
-DAX windows is under watermark, the recalim routine will be triggered to
-reclaim some DAX windows. It may have a negative impact on the
-performance, since some processes may need to wait for DAX windows to be
-recalimed and reused then. To mitigate the performance degradation, the
-overall DAX window need to be expanded larger.
+When the per inode DAX hint changes while the file is still *opened*, it
+is quite complicated and maybe fragile to dynamically change the DAX
+state.
 
-However, simply expanding the DAX window may not be a good deal in some
-scenario. To maintain one DAX window chunk (i.e., 2MB in size), 32KB
-(512 * 64 bytes) memory footprint will be consumed for page descriptors
-inside guest, which is greater than the memory footprint if it uses
-guest page cache when DAX disabled. Thus it'd better disable DAX for
-those files smaller than 32KB, to reduce the demand for DAX window and
-thus avoid the unworthy memory overhead.
+Hence mark the inode and corresponding dentries as DONE_CACHE once the
+per inode DAX hint changes, so that the inode instance will be evicted
+and freed as soon as possible once the file is closed and the last
+reference to the inode is put. And then when the file gets reopened next
+time, the new instantiated inode will reflect the new DAX state.
 
-Per inode DAX feature is introduced to address this issue, by offering a
-finer grained control for dax to users, trying to achieve a balance
-between performance and memory overhead.
-
-The FUSE_ATTR_DAX flag in FUSE_LOOKUP reply is used to indicate whether
-DAX should be enabled or not for corresponding file. Currently the state
-whether DAX is enabled or not for the file is initialized only when
-inode is instantiated.
+In summary, when the per inode DAX hint changes for an *opened* file, the
+DAX state of the file won't be updated until this file is closed and
+reopened later.
 
 Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
 ---
- fs/fuse/dax.c    | 12 ++++++++----
- fs/fuse/file.c   |  4 ++--
- fs/fuse/fuse_i.h |  4 ++--
- fs/fuse/inode.c  |  2 +-
- 4 files changed, 13 insertions(+), 9 deletions(-)
+ fs/fuse/dax.c    | 9 +++++++++
+ fs/fuse/fuse_i.h | 1 +
+ fs/fuse/inode.c  | 3 +++
+ 3 files changed, 13 insertions(+)
 
 diff --git a/fs/fuse/dax.c b/fs/fuse/dax.c
-index b9a031a82934..1550c3624414 100644
+index 234c2278420f..b19e7eaed4ef 100644
 --- a/fs/fuse/dax.c
 +++ b/fs/fuse/dax.c
-@@ -1332,7 +1332,7 @@ static const struct address_space_operations fuse_dax_file_aops  = {
- 	.invalidatepage	= noop_invalidatepage,
- };
+@@ -1363,6 +1363,15 @@ void fuse_dax_inode_init(struct inode *inode, unsigned int flags)
+ 	inode->i_data.a_ops = &fuse_dax_file_aops;
+ }
  
--static bool fuse_should_enable_dax(struct inode *inode)
-+static bool fuse_should_enable_dax(struct inode *inode, unsigned int flags)
- {
- 	struct fuse_conn *fc = get_fuse_conn(inode);
- 	enum fuse_dax_mode dax_mode = fc->dax_mode;
-@@ -1347,12 +1347,16 @@ static bool fuse_should_enable_dax(struct inode *inode)
- 	if (!fc->dax)
- 		return false;
- 
--	return true;
-+	if (dax_mode == FUSE_DAX_ALWAYS)
-+		return true;
++void fuse_dax_dontcache(struct inode *inode, unsigned int flags)
++{
++	struct fuse_conn *fc = get_fuse_conn(inode);
 +
-+	/* dax_mode is FUSE_DAX_INODE* */
-+	return flags & FUSE_ATTR_DAX;
- }
- 
--void fuse_dax_inode_init(struct inode *inode)
-+void fuse_dax_inode_init(struct inode *inode, unsigned int flags)
++	if (fuse_is_inode_dax_mode(fc->dax_mode) &&
++	    (!!IS_DAX(inode) != !!(flags & FUSE_ATTR_DAX)))
++		d_mark_dontcache(inode);
++}
++
+ bool fuse_dax_check_alignment(struct fuse_conn *fc, unsigned int map_alignment)
  {
--	if (!fuse_should_enable_dax(inode))
-+	if (!fuse_should_enable_dax(inode, flags))
- 		return;
- 
- 	inode->i_flags |= S_DAX;
-diff --git a/fs/fuse/file.c b/fs/fuse/file.c
-index 9d6c5f6361f7..90067584e103 100644
---- a/fs/fuse/file.c
-+++ b/fs/fuse/file.c
-@@ -3169,7 +3169,7 @@ static const struct address_space_operations fuse_file_aops  = {
- 	.write_end	= fuse_write_end,
- };
- 
--void fuse_init_file_inode(struct inode *inode)
-+void fuse_init_file_inode(struct inode *inode, unsigned int flags)
- {
- 	struct fuse_inode *fi = get_fuse_inode(inode);
- 
-@@ -3183,5 +3183,5 @@ void fuse_init_file_inode(struct inode *inode)
- 	fi->writepages = RB_ROOT;
- 
- 	if (IS_ENABLED(CONFIG_FUSE_DAX))
--		fuse_dax_inode_init(inode);
-+		fuse_dax_inode_init(inode, flags);
- }
+ 	if (fc->dax && (map_alignment > FUSE_DAX_SHIFT)) {
 diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 19ded93cfc49..f03ea7cb74b0 100644
+index 83970723314a..af19d1d821ea 100644
 --- a/fs/fuse/fuse_i.h
 +++ b/fs/fuse/fuse_i.h
-@@ -1022,7 +1022,7 @@ int fuse_notify_poll_wakeup(struct fuse_conn *fc,
- /**
-  * Initialize file operations on a regular file
-  */
--void fuse_init_file_inode(struct inode *inode);
-+void fuse_init_file_inode(struct inode *inode, unsigned int flags);
- 
- /**
-  * Initialize inode operations on regular files and special files
-@@ -1288,7 +1288,7 @@ int fuse_dax_conn_alloc(struct fuse_conn *fc, enum fuse_dax_mode mode,
- 			struct dax_device *dax_dev);
- void fuse_dax_conn_free(struct fuse_conn *fc);
+@@ -1293,6 +1293,7 @@ void fuse_dax_conn_free(struct fuse_conn *fc);
  bool fuse_dax_inode_alloc(struct super_block *sb, struct fuse_inode *fi);
--void fuse_dax_inode_init(struct inode *inode);
-+void fuse_dax_inode_init(struct inode *inode, unsigned int flags);
+ void fuse_dax_inode_init(struct inode *inode, unsigned int flags);
  void fuse_dax_inode_cleanup(struct inode *inode);
++void fuse_dax_dontcache(struct inode *inode, unsigned int flags);
  bool fuse_dax_check_alignment(struct fuse_conn *fc, unsigned int map_alignment);
  void fuse_dax_cancel_work(struct fuse_conn *fc);
+ 
 diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index 4a41e6a73f3f..0669e41a9645 100644
+index b26612fce6d0..b25d99eb8411 100644
 --- a/fs/fuse/inode.c
 +++ b/fs/fuse/inode.c
-@@ -313,7 +313,7 @@ static void fuse_init_inode(struct inode *inode, struct fuse_attr *attr)
- 	inode->i_ctime.tv_nsec = attr->ctimensec;
- 	if (S_ISREG(inode->i_mode)) {
- 		fuse_init_common(inode);
--		fuse_init_file_inode(inode);
-+		fuse_init_file_inode(inode, attr->flags);
- 	} else if (S_ISDIR(inode->i_mode))
- 		fuse_init_dir(inode);
- 	else if (S_ISLNK(inode->i_mode))
+@@ -301,6 +301,9 @@ void fuse_change_attributes(struct inode *inode, struct fuse_attr *attr,
+ 		if (inval)
+ 			invalidate_inode_pages2(inode->i_mapping);
+ 	}
++
++	if (IS_ENABLED(CONFIG_FUSE_DAX))
++		fuse_dax_dontcache(inode, attr->flags);
+ }
+ 
+ static void fuse_init_inode(struct inode *inode, struct fuse_attr *attr)
 -- 
 2.27.0
 

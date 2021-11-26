@@ -1,13 +1,26 @@
-From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Thu, 25 Nov 2021 15:05:30 +0800
-Message-Id: <20211125070530.79602-8-jefflexu@linux.alibaba.com>
-In-Reply-To: <20211125070530.79602-1-jefflexu@linux.alibaba.com>
-References: <20211125070530.79602-1-jefflexu@linux.alibaba.com>
-MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
+Date: Fri, 26 Nov 2021 06:32:46 -0500
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	from:to:subject; s=fm2; bh=732KAdVt4UaZuLnrxveRSSEmqu9A9HnCVavlQ
+	vNOv9c=; b=axjEtr+JTUbK2npX6OEkukRPrkrxa2gLNLbcxyBw51o8gQC4XBtfU
+	+VoNTyXRxVQ8XXvm02+zN9GdQ5Etq6ybcDxtgy1D1sKHvQ90+xujOdcOTPs/Ub66
+	BDlZrkV5K9jiPzKsSqo4Lb6qF2kVLAl6yqr/Gf9UO4r+wUaEkZO21UZw6e/un0SI
+	DppJi6p7ER1l9PO7djnCx+hgKOEupj6e6869RqyvU89y115BjF5OAnuA5uVEnjV9
+	iiqozyVs1kL2pGkA6K21mbUxL6lmIuovmyp7Yn82zEU9mDFPfUId8u9IIXWuv/NN
+	L2sWsl/hSkujfc5F9Id3oxdio+SBcYwcg==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=732KAdVt4UaZuLnrx
+	veRSSEmqu9A9HnCVavlQvNOv9c=; b=DkI5CV0znI4liSasy8BB3rBaFPwnmj0Kl
+	T+V+bx6Q9hp6eXf8XykMrNQDDpQxdwW6FK+ZQYfJSeCdlDH9PsNA9eAdGVbdFlmZ
+	10smo0cM59c7f/DQYmSs2zjrLbYf1U/gFeKIrkiffU25flNSJxy6W7y69f61MdxY
+	ttFfMrcCbvS07ZEBeYapDZs5ey9wL4l7D0oFu/nMP+JXwPD4fdwX/hD6uc7Xvk3Z
+	KJwiJdC5qOrkmtq+LjRArV3XcLeG4qDANE+ckiAtOoViIK35EBRHaOYZMb0GN6qQ
+	mJyDtZdOeh7vy24HUS6cj2uy8dGzQYZV/pplz2UOqZICZsON4GMhA==
+From: virtiofs-bot@sinrega.org
+Message-Id: <29415.121112606324100812@us-mta-583.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v8 7/7] Documentation/filesystem/dax: DAX on
-	virtiofs
+Subject: [Virtio-fs] [virtiofsd-rs] MR merged: Enable back descriptor-utils
+	tests
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,55 +29,12 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
-Cc: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, joseph.qi@linux.alibaba.com
+To: virtio-fs@redhat.com
 
-Record DAX on virtiofs and the semantic difference with that on ext4
-and xfs.
+Create a temporary Queue with an avail ring added at the end of the
+descriptors table to avoid using an internal vm-virtio API.
 
-Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
+Fixes: https://gitlab.com/virtio-fs/virtiofsd-rs/-/issues/1
 ---
- Documentation/filesystems/dax.rst | 20 ++++++++++++++++++--
- 1 file changed, 18 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/filesystems/dax.rst b/Documentation/filesystems/dax.rst
-index 9a1b8fd9e82b..e3b30429d703 100644
---- a/Documentation/filesystems/dax.rst
-+++ b/Documentation/filesystems/dax.rst
-@@ -23,8 +23,8 @@ on it as usual.  The `DAX` code currently only supports files with a block
- size equal to your kernel's `PAGE_SIZE`, so you may need to specify a block
- size when creating the filesystem.
- 
--Currently 3 filesystems support `DAX`: ext2, ext4 and xfs.  Enabling `DAX` on them
--is different.
-+Currently 4 filesystems support `DAX`: ext2, ext4, xfs and virtiofs.
-+Enabling `DAX` on them is different.
- 
- Enabling DAX on ext2
- --------------------
-@@ -168,6 +168,22 @@ if the underlying media does not support dax and/or the filesystem is
- overridden with a mount option.
- 
- 
-+Enabling DAX on virtiofs
-+----------------------------
-+The semantic of DAX on virtiofs is basically equal to that on ext4 and xfs,
-+except that when '-o dax=inode' is specified, virtiofs client derives the hint
-+whether DAX shall be enabled or not from virtiofs server through FUSE protocol,
-+rather than the persistent `FS_XFLAG_DAX` flag. That is, whether DAX shall be
-+enabled or not is completely determined by virtiofs server, while virtiofs
-+server itself may deploy various algorithm making this decision, e.g. depending
-+on the persistent `FS_XFLAG_DAX` flag on the host.
-+
-+It is still supported to set or clear persistent `FS_XFLAG_DAX` flag inside
-+guest, but it is not guaranteed that DAX will be enabled or disabled for
-+corresponding file then. Users inside guest still need to call statx(2) and
-+check the statx flag `STATX_ATTR_DAX` to see if DAX is enabled for this file.
-+
-+
- Implementation Tips for Block Driver Writers
- --------------------------------------------
- 
--- 
-2.27.0
+https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/50
 

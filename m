@@ -1,26 +1,25 @@
 Date: Fri, 26 Nov 2021 06:32:46 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	from:to:subject; s=fm2; bh=732KAdVt4UaZuLnrxveRSSEmqu9A9HnCVavlQ
-	vNOv9c=; b=axjEtr+JTUbK2npX6OEkukRPrkrxa2gLNLbcxyBw51o8gQC4XBtfU
-	+VoNTyXRxVQ8XXvm02+zN9GdQ5Etq6ybcDxtgy1D1sKHvQ90+xujOdcOTPs/Ub66
-	BDlZrkV5K9jiPzKsSqo4Lb6qF2kVLAl6yqr/Gf9UO4r+wUaEkZO21UZw6e/un0SI
-	DppJi6p7ER1l9PO7djnCx+hgKOEupj6e6869RqyvU89y115BjF5OAnuA5uVEnjV9
-	iiqozyVs1kL2pGkA6K21mbUxL6lmIuovmyp7Yn82zEU9mDFPfUId8u9IIXWuv/NN
-	L2sWsl/hSkujfc5F9Id3oxdio+SBcYwcg==
+	from:to:subject; s=fm2; bh=FygHnPd2HD/unaZtFe+qBAvq5yBYp/5EwvFKF
+	tIrKQ4=; b=MQan6PdCmGeweEVEOYEyUWbIdB21AKVmsYSBRG0ctj0fO7gHC+HQG
+	8/WLrFpDF17MtsZeQkBtZ86BsnjCZxcHRNerucyk9LglGkQWxPPQsxzuNFRO8iVF
+	iC8zOCLL/aNFEPgeqvY39caPkS0SBi0qjq/EMair8JeXcjgf7AmnAn3ZGWiP87ve
+	/+8Xh87b8jt+xaT4fvVofDKQOPqvU96sO+k+yXGOVw2Pn6yhKSneRp5tE6G/1/7k
+	CvR7X6egBV80VITFxAUlBsSx+XXoNw+19Ma4a/7MGKeZItTbSwZkyRNIuyFyUnsu
+	z4JKwe7Ngs+628PEb3LTgKZr04nnDeMTQ==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=732KAdVt4UaZuLnrx
-	veRSSEmqu9A9HnCVavlQvNOv9c=; b=DkI5CV0znI4liSasy8BB3rBaFPwnmj0Kl
-	T+V+bx6Q9hp6eXf8XykMrNQDDpQxdwW6FK+ZQYfJSeCdlDH9PsNA9eAdGVbdFlmZ
-	10smo0cM59c7f/DQYmSs2zjrLbYf1U/gFeKIrkiffU25flNSJxy6W7y69f61MdxY
-	ttFfMrcCbvS07ZEBeYapDZs5ey9wL4l7D0oFu/nMP+JXwPD4fdwX/hD6uc7Xvk3Z
-	KJwiJdC5qOrkmtq+LjRArV3XcLeG4qDANE+ckiAtOoViIK35EBRHaOYZMb0GN6qQ
-	mJyDtZdOeh7vy24HUS6cj2uy8dGzQYZV/pplz2UOqZICZsON4GMhA==
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=FygHnPd2HD/unaZtF
+	e+qBAvq5yBYp/5EwvFKFtIrKQ4=; b=OpYSCikH9/pKIvBAveVwsa/xGEdmLe7Gb
+	4UW46yoCKScI1vz8CJ88x1UgU4EgrPhQ02XLUSjUWnAl3oPmiTSGXwt0s0bfLm1n
+	U18iOAmS/e6tMeahZu0cBVVUMsMWYR+l1gg/0KV5UNpSUscvqSA6xynKxmmp6lPW
+	v1ygcdFqqLAjyPvwmjOt8g6eO+jUHSF9Ba180eSYUcpoDbLjLD3Q9k8K8ByiKKYU
+	CepsdVhFNlf1CV6RYpU/DvbaJ1li9DqHA0eg21nDqf9ilPk3loSfE5CqnOen6NbC
+	y3lmxB9DGDKWKp9O1L/aBm00e2fnCm8WTE+BV/W1e/90FppSk7PrA==
 From: virtiofs-bot@sinrega.org
-Message-Id: <29415.121112606324100812@us-mta-583.us.mimecast.lan>
+Message-Id: <01749.121112606324100421@us-mta-315.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] MR merged: Enable back descriptor-utils
-	tests
+Subject: [Virtio-fs] [virtiofsd-rs] Issue closed: Fix unit tests
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,10 +30,9 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Create a temporary Queue with an avail ring added at the end of the
-descriptors table to avoid using an internal vm-virtio API.
+Unit tests are broken because ```vm_virtio::queue::DescriptorChain::checked_new```, in the version found in the rust-vmm crate, is not public.
 
-Fixes: https://gitlab.com/virtio-fs/virtiofsd-rs/-/issues/1
+We should either find an alternative, or tweak ```vm-virtio``` to expose an equivalent method for tests.
 ---
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/50
+https://gitlab.com/virtio-fs/virtiofsd-rs/-/issues/1
 

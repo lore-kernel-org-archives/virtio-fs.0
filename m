@@ -1,25 +1,26 @@
-Date: Fri, 26 Nov 2021 06:32:46 -0500
+Date: Tue, 30 Nov 2021 04:04:37 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	from:to:subject; s=fm2; bh=FygHnPd2HD/unaZtFe+qBAvq5yBYp/5EwvFKF
-	tIrKQ4=; b=MQan6PdCmGeweEVEOYEyUWbIdB21AKVmsYSBRG0ctj0fO7gHC+HQG
-	8/WLrFpDF17MtsZeQkBtZ86BsnjCZxcHRNerucyk9LglGkQWxPPQsxzuNFRO8iVF
-	iC8zOCLL/aNFEPgeqvY39caPkS0SBi0qjq/EMair8JeXcjgf7AmnAn3ZGWiP87ve
-	/+8Xh87b8jt+xaT4fvVofDKQOPqvU96sO+k+yXGOVw2Pn6yhKSneRp5tE6G/1/7k
-	CvR7X6egBV80VITFxAUlBsSx+XXoNw+19Ma4a/7MGKeZItTbSwZkyRNIuyFyUnsu
-	z4JKwe7Ngs+628PEb3LTgKZr04nnDeMTQ==
+	from:to:subject; s=fm2; bh=4HWrMdKhD4LhdSzMF1sPEHdY9+ZNgBuEpme3i
+	lbGOhE=; b=dLI9Fqm+bgngLQGJ2HOio9A3oiP46C6PH9nH8eCMMBdTRE8CLeO+i
+	ECF9avgNki3HNI5YQmu2tnufZxlL4OEDXBAMp8w9HrljLGp/UndkDYTWA3NOKMnA
+	lsCl/LaETaG+5LZdWaW5ZBE+Lb9+6p+ULsvJar+tjGSeJyp7IvkL7IVh4umjAISF
+	lT4/BgjzV8+KACUXIto0WmqrMtrD1/UChsylKlQVQYBmQmCks8F4LHL4AZ+QBGaS
+	B0ft3twLWs9C3dkZ1y8e3DXt8ZCrhCT2e0lH6w2bOG4zeYAGw6T93q1S95Xwl3M6
+	lOqriuMWydQT5NHdwYP9DLVXr9p9/068w==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=FygHnPd2HD/unaZtF
-	e+qBAvq5yBYp/5EwvFKFtIrKQ4=; b=OpYSCikH9/pKIvBAveVwsa/xGEdmLe7Gb
-	4UW46yoCKScI1vz8CJ88x1UgU4EgrPhQ02XLUSjUWnAl3oPmiTSGXwt0s0bfLm1n
-	U18iOAmS/e6tMeahZu0cBVVUMsMWYR+l1gg/0KV5UNpSUscvqSA6xynKxmmp6lPW
-	v1ygcdFqqLAjyPvwmjOt8g6eO+jUHSF9Ba180eSYUcpoDbLjLD3Q9k8K8ByiKKYU
-	CepsdVhFNlf1CV6RYpU/DvbaJ1li9DqHA0eg21nDqf9ilPk3loSfE5CqnOen6NbC
-	y3lmxB9DGDKWKp9O1L/aBm00e2fnCm8WTE+BV/W1e/90FppSk7PrA==
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=4HWrMdKhD4LhdSzMF
+	1sPEHdY9+ZNgBuEpme3ilbGOhE=; b=QZssh7i14QytwKZ19Wlt23dLDYiBgWeUG
+	mU/Drjuc5sm4R64f+p9gXxHbs3ZhhR1nrLjgfX2hBp2ApR3tHWzc3ieraAEyoFk3
+	ZOhM5N+QEao9xpldThDYx9LVSmp7njgnPT6Zf5yT1snMCb5qKNgUbiN4R/Ou8myb
+	A/bbAkgIgPGFubDexIc9qquW3RCqWN6iL02oDIuCLozswI3BTfmznoWBMkw8M+8r
+	dnMO5ntF5C50Tez/RCYYfrVYMRs5MWubXGywI0ekHJ8TdWtkCAAddvBaLrW7zsHF
+	+u4D5ffsiagWWWisVsKW1UMsCvmRVmgrQPi2yPdU9qK/SfuA1lNsA==
 From: virtiofs-bot@sinrega.org
-Message-Id: <01749.121112606324100421@us-mta-315.us.mimecast.lan>
+Message-Id: <55052.121113004043400953@us-mta-487.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] Issue closed: Fix unit tests
+Subject: [Virtio-fs] [virtiofsd-rs] MR merged: descriptor-utils: fix
+	split_at()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -30,9 +31,10 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Unit tests are broken because ```vm_virtio::queue::DescriptorChain::checked_new```, in the version found in the rust-vmm crate, is not public.
+split_at() doesn't correctly handle the front part of the splitted
+buffer, which should be truncated to [0, rem].
 
-We should either find an alternative, or tweak ```vm-virtio``` to expose an equivalent method for tests.
+Fixes: https://gitlab.com/virtio-fs/virtiofsd-rs/-/issues/6
 ---
-https://gitlab.com/virtio-fs/virtiofsd-rs/-/issues/1
+https://gitlab.com/virtio-fs/virtiofsd-rs/-/merge_requests/51
 

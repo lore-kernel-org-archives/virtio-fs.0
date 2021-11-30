@@ -1,7 +1,9 @@
-Date: Tue, 30 Nov 2021 10:27:53 -0500
+Date: Tue, 30 Nov 2021 10:36:45 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YaZC+R7xpGimBrD1@redhat.com>
-References: <CAOQ4uxjsULgLuOFUYkEePySx6iPXRczgCZMxx8E5ncw=oarLPg@mail.gmail.com>
+Message-ID: <YaZFDS2u5PBoUvkl@redhat.com>
+References: <CAOQ4uxiYQYG8Ta=MNJKpa_0pAPd0MS9PL2r_0ZRD+_TKOw6C7g@mail.gmail.com>
+	<20211103100900.GB20482@quack2.suse.cz>
+	<CAOQ4uxjsULgLuOFUYkEePySx6iPXRczgCZMxx8E5ncw=oarLPg@mail.gmail.com>
 	<YYMO1ip9ynXFXc8f@redhat.com>
 	<20211104100316.GA10060@quack2.suse.cz>
 	<YYU/7269JX2neLjz@redhat.com>
@@ -9,12 +11,10 @@ References: <CAOQ4uxjsULgLuOFUYkEePySx6iPXRczgCZMxx8E5ncw=oarLPg@mail.gmail.com>
 	<20211111173043.GB25491@quack2.suse.cz>
 	<CAOQ4uxiOUM6=190w4018w4nJRnqi+9gzzfQTsLh5gGwbQH_HgQ@mail.gmail.com>
 	<CANXojcy9JzXeLQ6bz9+UOekkpqo8NkgQbhugmGmPE+x3+_=h3Q@mail.gmail.com>
-	<CAO17o21YVczE2-BTAVg-0HJU6gjSUkzUSqJVs9k-_t7mYFNHaA@mail.gmail.com>
-	<CAOQ4uxjpGMYZrq74S=EaSO2nvss4hm1WZ_k+Xxgrj2k9pngJgg@mail.gmail.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <CAOQ4uxjpGMYZrq74S=EaSO2nvss4hm1WZ_k+Xxgrj2k9pngJgg@mail.gmail.com>
+In-Reply-To: <CANXojcy9JzXeLQ6bz9+UOekkpqo8NkgQbhugmGmPE+x3+_=h3Q@mail.gmail.com>
 Subject: Re: [Virtio-fs] [RFC PATCH 0/7] Inotify support in FUSE and virtiofs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -24,159 +24,92 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Amir Goldstein <amir73il@gmail.com>
-Cc: Steve French <sfrench@samba.org>, Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, Nathan Youngman <git@nathany.com>, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Stef Bon <stefbon@gmail.com>
+To: Stef Bon <stefbon@gmail.com>
+Cc: Steve French <sfrench@samba.org>, Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, Amir Goldstein <amir73il@gmail.com>, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>
 
-On Wed, Nov 17, 2021 at 08:40:57AM +0200, Amir Goldstein wrote:
-> On Wed, Nov 17, 2021 at 12:12 AM Ioannis Angelakopoulos
-> <iangelak@redhat.com> wrote:
-> >
-> >
-> >
-> > On Tue, Nov 16, 2021 at 12:10 AM Stef Bon <stefbon@gmail.com> wrote:
-> >>
-> >> Hi Ioannis,
-> >>
-> >> I see that you have been working on making fsnotify work on virtiofs.
-> >> Earlier you contacted me since I've written this:
-> >>
-> >> https://github.com/libfuse/libfuse/wiki/Fsnotify-and-FUSE
-> >>
-> >> and send you my patches on 23 june.
-> >> I want to mention first that I would have appreciated it if you would
-> >> have reacted to me after I've sent you my patches. I did not get any
-> >> reaction from you. Maybe these patches (which differ from what you
-> >> propose now, but there is also a lot in common) have been an
-> >> inspiration for you.
-> >>
-> >> Second, what I've written about is that with network filesystems (eg a
-> >> backend shared with other systems) fsnotify support in FUSE has some
-> >> drawbacks.
-> >> In a network environment, where a network fs is part of making people
-> >> collaborate, it's very useful to have information on who did what on
-> >> which host, and also when. Simply a message "a file has been created
-> >> in the folder you watch" is not enough. For example, if you are part
-> >> of a team, and assigned to your team is a directory on a server where
-> >> you can work on some shared documents. Now in this example there is a
-> >> planning, and some documents have to be written. In that case you want
-> >> to be informed that someone in your team has started a document (by
-> >> creating it) by the system.
-> >>
-> > I agree that the out of band approach you propose is actually more powerful, since it can
-> > provide the client with more information than remote fsnotify. However, in the virtiofs setup
-> > your approach might not be as efficient.
-> >
-> > Specifically, the information on who did what might not make sense to the guest within QEMU, since all the
-> > virtiofs filesystem operations are handled by viritofsd on the host and the guest does not know about the
-> > server or any other guests. Vivek, correct me here if I am wrong.
-> >
-> > Thus, for now at least, it might be sufficient for the guest to know that just a remote event
-> > occurred.
-> >
-> >> This "extended" information will never get through fsnotify.
-> >>
-> >> Other info useful to you as team member:
-> >>
-> >> -  you have become member of another team: sbon@anotherteam.example.org
-> >> -  diskspace and/or quota shortage reported by networksystem
-> >> -  new teammember, teammember left
-> >> -  your "rights" or role in the network/team have been changed (for
-> >> example from reader to reader and writer to some documents)
-> >>
-> >> What I want to say is that in a network where lots of people work
-> >> together in teams/projects, (and I want Linux to play a role there, as
-> >> desktop/workstation) communication is very important, and all these
-> >> messages should be supported by the system. My idea is the support of
-> >> watching fs events with FUSE filesystems should go through userspace,
-> >> and not via the kernel (cause fs events are part of your setup in the
-> >> network, together with all other tools to make people collaborate like
-> >> chat/call/text, and because mentioned above extended info about the
-> >> who on what host etc is not supported by fsnotify).
-> >> There should be a fs event watcher which takes care of all watches on
-> >> behalf of applications during a session, similar to gamin and FAM once
-> >> did (not used anymore?).
-> >> When receiving a request from one of the applications this fsevent
-> >> watcher will use inotify and/or fanotify for local fs's only. With a
-> >> FUSE fs, it should contact (via a socket) this fs that a watch has
-> >> been set on an inode with a certain mask.
-> >> If the FUSE fs does not support this, fallback on normal inotify/fanotify.
-> >> This way extended info is possible.
-> >>
-> >> Is this extended information also useful for virtiofs?
-> >>
-> > Also based on your explanation, your out of band approach is specific to FUSE filesystems.
-> > Granted, with your approach there is less complexity in the kernel and more flexibility since
-> > the event notification occurs solely in user-space.
-> > However, during the discussion with Amir and Jan about potential routes we could take to support the remote
-> > fanotify/inotify/fsnotify one important concern was that the API should be able to support other
-> > network/remote filesystems if needed and not only FUSE filesystems.
-> > It seems that your approach would require a lot of work (correct me if I am wrong) to be adopted
-> > by other network filesystems.
-> >
-> > Finally, user-space applications should also be aware of your new API, which will probably result in a non-negligible effort by app developers to adopt it or change their existing apps. The remote inotify/fsnotify ( the current implementation) even though it has many limitations, relies on the existing API and should require less modifications in user space apps. That is why we chose the remote inotify/fsnotify route.
-> >
+On Tue, Nov 16, 2021 at 06:09:41AM +0100, Stef Bon wrote:
+> Hi Ioannis,
 > 
-> The way you depict the options seems like either applications are not
-> aware of the UAPI
-> changes or they need to be modified to adapt to the changes.
+> I see that you have been working on making fsnotify work on virtiofs.
+> Earlier you contacted me since I've written this:
 > 
-> I actually think that the much better approach would be to deal with
-> most of the UAPI
-> complexity in a library, so applications may need to be rebuilt or
-> adapted to use a new
-> library, but going forward, the library would abstract most of the
-> complexity from the
-> applications.
+> https://github.com/libfuse/libfuse/wiki/Fsnotify-and-FUSE
 > 
-> The holy grail would be a portable library, such as this go library [1].
-> It is quite hard to design an API that would abstract all the
-> different capabilities
-> on Linux-inotify/Linux-fanotify/MacOS-fsevents/Win-USNJournal and more.
-> 
-> The second best would be a library to abstract the ever growing complexity
-> of Linux inotify/fanotify UAPI from applications.
-> I had already made the first step with adapting libinotifytools to fanotify [2].
-> We could continue down that path or start creating/improving a
-> different library.
-> 
-> The point is that abstracting different capabilities of remote fs notifications
-> (i.e. cifs, virtiofs, generic FUSE) is going to be challenging, so starting the
-> design from a user library API and deriving the needed pieces from the
-> kernel UAPI is the right way to go IMO.
-> 
-> The library approach will have the advantage that some remote fs capabilities
-> (e.g. for cifs) will be available for old kernels as well and in
-> theory, the library
-> could also use some standardized OOB notifications channel to get changed
-> made on the host from VM guest tools as Stef proposed.
-> 
-> > That said, I do not see a reason why both implementations cannot co-exist
-> > and have the user-space applications choose which approach they want.
-> >
-> 
-> True, an OOB channel and kernel generic remote fs support can both exist,
-> but it would be best if the application was not aware of either.
-> The library would pick the facility based on the requested functionality,
-> availability of the facilities in the filesystem and sysadmin/user policy.
+> and send you my patches on 23 june.
+> I want to mention first that I would have appreciated it if you would
+> have reacted to me after I've sent you my patches. I did not get any
+> reaction from you. Maybe these patches (which differ from what you
+> propose now, but there is also a lot in common) have been an
+> inspiration for you.
 
-Sure. A library will be nice to abstract kernel generic remote fs and OOB
-channel. This sounds like another project for somebody to work on.
+Hi Stef,
 
-IIUC, it looks like that both the approaches can make progress in
-parallel. Advantange of OOB channel approach seems that it will be easier to
-make changes in user space and add more events and send extra information.
+Sorry about not giving you the credit you deserved. We definitely made
+a mistake here. We will be more careful in future and not repeat such
+things.
 
-While advantage of remote fsnotify is that its a known existing events
-API and it makes it easier for applications to use same API for remote
-fs (however limited it might be).
+> 
+> Second, what I've written about is that with network filesystems (eg a
+> backend shared with other systems) fsnotify support in FUSE has some
+> drawbacks.
+> In a network environment, where a network fs is part of making people
+> collaborate, it's very useful to have information on who did what on
+> which host, and also when. Simply a message "a file has been created
+> in the folder you watch" is not enough. For example, if you are part
+> of a team, and assigned to your team is a directory on a server where
+> you can work on some shared documents. Now in this example there is a
+> planning, and some documents have to be written. In that case you want
+> to be informed that someone in your team has started a document (by
+> creating it) by the system.
+> 
+> This "extended" information will never get through fsnotify.
+
+Wondering fsnotify can be extended to carry this info when available.
+
+> 
+> Other info useful to you as team member:
+> 
+> -  you have become member of another team: sbon@anotherteam.example.org
+> -  diskspace and/or quota shortage reported by networksystem
+> -  new teammember, teammember left
+> -  your "rights" or role in the network/team have been changed (for
+> example from reader to reader and writer to some documents)
+
+All these sound useful. Some of them like change of team/group or
+change of rights/role seem outside the scope of filesystem notificaitons
+as such.  Some sort of notifications for diskspace/quota could be
+applicable to local filesystems too.
+
+> 
+> What I want to say is that in a network where lots of people work
+> together in teams/projects, (and I want Linux to play a role there, as
+> desktop/workstation) communication is very important, and all these
+> messages should be supported by the system. My idea is the support of
+> watching fs events with FUSE filesystems should go through userspace,
+> and not via the kernel (cause fs events are part of your setup in the
+> network, together with all other tools to make people collaborate like
+> chat/call/text, and because mentioned above extended info about the
+> who on what host etc is not supported by fsnotify).
+
+> There should be a fs event watcher which takes care of all watches on
+> behalf of applications during a session, similar to gamin and FAM once
+> did (not used anymore?).
+
+So how does the API look like for this OOB channel? Have you published
+it somewhere.
 
 Thanks
 Vivek
 
-> Thanks,
-> Amir.
+> When receiving a request from one of the applications this fsevent
+> watcher will use inotify and/or fanotify for local fs's only. With a
+> FUSE fs, it should contact (via a socket) this fs that a watch has
+> been set on an inode with a certain mask.
+> If the FUSE fs does not support this, fallback on normal inotify/fanotify.
+> This way extended info is possible.
 > 
-> [1] https://github.com/fsnotify/fsnotify
-> [2] https://github.com/inotify-tools/inotify-tools/pull/134
+> Is this extended information also useful for virtiofs?
+> 
+> Stef Bon
 > 
 

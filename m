@@ -1,13 +1,9 @@
-From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Tue,  2 Nov 2021 13:56:45 +0800
-Message-Id: <20211102055646.103337-6-jefflexu@linux.alibaba.com>
-In-Reply-To: <20211102055646.103337-1-jefflexu@linux.alibaba.com>
-References: <20211102055646.103337-1-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v7 5/6] virtiofsd: implement xflag based dax
-	policy
+From: German Maglione <gmaglione@redhat.com>
+Date: Wed, 1 Dec 2021 13:06:23 +0100
+Message-ID: <CAJh=p+6o8_2UekwO0nQ8+sjcgpcEzGhFrTsiTjN4n72R3vNAGw@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="000000000000c72d9d05d21482fd"
+Subject: [Virtio-fs] [virtiofsd][virtiofsd-rs] unlink an openfile over NFS
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,76 +12,79 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
-Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com
+To: virtio-fs-list <virtio-fs@redhat.com>
+Cc: Vivek Goyal <vgoyal@redhat.com>
 
-The per inode DAX feature in ext4/xfs uses the persistent inode flag,
-i.e. FS_DAX_FL/FS_XFLAG_DAX, to indicate if DAX shall be enabled for
-this file or not when filesystem is mounted in per inode DAX mode.
+--000000000000c72d9d05d21482fd
+Content-Type: text/plain; charset="UTF-8"
 
-To keep compatible with this feature in ext4/xfs, virtiofs also supports
-enabling DAX depending on the persistent inode flag, which may be
-set/cleared by users inside guest or admin on host.
+Hi,
 
-This policy is used when '-o dax=inode' option is specified for
-virtiofsd.
+I was working on [1] (related to [2]), and I saw that both versions
+(C and rust) of virtiofsd make the NFs client to "silly rename" an open
+file that were unlinked, because we keep each file open as O_PATH in the
+lo_do_lookup/do_lookup function. David pointed me to this problem, and I
+confirmed that this is the case.
 
-Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
----
- tools/virtiofsd/passthrough_ll.c | 33 ++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+This fires the silly rename in the nfs client. I'm talking with
+Bruce Fields (nfs team) to see how to move the silly rename functionality
+to the nfs server and outside the directory tree [4], to avoid having
+non-really-empty
+dirs full of .nfsxxx files. But it is not an easy task.
+Also, this will not solve some potential issues with the resource usage:
+disk space and open file limits (I hit this limit a couple of times during
+my
+tests). And, in some cases could be worst, more than one guest sharing the
+same
+exported dir, one guest just 'ls' or 'find' while the other 'rm' some files.
+(The 'find' command will open all files, btw)
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 999c906da2..dac5063594 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -1026,6 +1026,35 @@ static int do_statx(struct lo_data *lo, int dirfd, const char *pathname,
-     return 0;
- }
- 
-+static bool lo_should_enable_dax(struct lo_data *lo, struct lo_inode *inode,
-+                                 struct fuse_entry_param *e)
-+{
-+    if (lo->dax == INODE_DAX_NONE || !S_ISREG(e->attr.st_mode)) {
-+        return false;
-+    }
-+
-+    if (lo->dax == INODE_DAX_INODE) {
-+        int res, fd;
-+        int ret = false;
-+        unsigned int attr;
-+
-+        fd = lo_inode_open(lo, inode, O_RDONLY);
-+        if (fd == -1) {
-+            return false;
-+        }
-+
-+        res = ioctl(fd, FS_IOC_GETFLAGS, &attr);
-+        if (!res && (attr & FS_DAX_FL)) {
-+            ret = true;
-+        }
-+
-+        close(fd);
-+        return ret;
-+    }
-+
-+    return false;
-+}
-+
- /*
-  * Increments nlookup on the inode on success. unref_inode_lolocked() must be
-  * called eventually to decrement nlookup again. If inodep is non-NULL, the
-@@ -1116,6 +1145,10 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-     }
-     e->ino = inode->fuse_ino;
- 
-+    if (lo_should_enable_dax(lo, inode, e)) {
-+        e->attr_flags |= FUSE_ATTR_DAX;
-+    }
-+
-     /* Transfer ownership of inode pointer to caller or drop it */
-     if (inodep) {
-         *inodep = inode;
+Vivek, I saw in [5] that you mentioned that this could be fixed introducing
+synchronous, could you elaborate a bit or point me to some code?
+
+Thanks,
+[1] https://bugzilla.redhat.com/show_bug.cgi?id=2018072
+[2] https://bugzilla.redhat.com/show_bug.cgi?id=1908490
+[4] https://wiki.linux-nfs.org/wiki/index.php/Server-side_silly_rename
+[5]
+https://sourceforge.net/p/fuse/mailman/fuse-devel/?viewmonth=202101&viewday=4
+
+
 -- 
-2.27.0
+German
+
+--000000000000c72d9d05d21482fd
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr">Hi,<br><br>I was working on [1] (related to [2]), and I sa=
+w that both versions<br>(C and rust) of virtiofsd make the NFs client to &q=
+uot;silly rename&quot; an open<br>file that were unlinked, because we keep =
+each file open as O_PATH in the <br>lo_do_lookup/do_lookup function. David =
+pointed me to this problem, and I<br>confirmed that this is the case.<br><b=
+r>This fires the silly rename in the nfs client. I&#39;m talking with<br><d=
+iv>Bruce Fields (nfs team) to see how to move the silly rename functionalit=
+y</div><div> to the nfs server and outside the directory tree [4], to avoid=
+ having non-really-empty<br></div>dirs full of .nfsxxx files. But it is not=
+ an easy task.<br>Also, this will not solve some potential issues with the =
+resource usage:<br>disk space and open file limits (I hit this limit a coup=
+le of times during my<br>tests). And, in some cases could be worst, more th=
+an one guest sharing the same<br>exported dir, one guest just &#39;ls&#39; =
+or &#39;find&#39; while the other &#39;rm&#39; some files.<br>(The &#39;fin=
+d&#39; command will open all files, btw)<br><br>Vivek, I saw in [5] that yo=
+u mentioned that this could be fixed introducing<br>synchronous, could you =
+elaborate a bit or point me to some code?<br><br>Thanks,<br>[1] <a href=3D"=
+https://bugzilla.redhat.com/show_bug.cgi?id=3D2018072">https://bugzilla.red=
+hat.com/show_bug.cgi?id=3D2018072</a><br>[2] <a href=3D"https://bugzilla.re=
+dhat.com/show_bug.cgi?id=3D1908490">https://bugzilla.redhat.com/show_bug.cg=
+i?id=3D1908490</a><br>[4] <a href=3D"https://wiki.linux-nfs.org/wiki/index.=
+php/Server-side_silly_rename">https://wiki.linux-nfs.org/wiki/index.php/Ser=
+ver-side_silly_rename</a><br>[5] <a href=3D"https://sourceforge.net/p/fuse/=
+mailman/fuse-devel/?viewmonth=3D202101&amp;viewday=3D4">https://sourceforge=
+.net/p/fuse/mailman/fuse-devel/?viewmonth=3D202101&amp;viewday=3D4</a><br><=
+br clear=3D"all"><br>-- <br><div dir=3D"ltr" class=3D"gmail_signature" data=
+-smartmail=3D"gmail_signature"><div dir=3D"ltr">German<br></div></div></div=
+>
+
+--000000000000c72d9d05d21482fd--
 

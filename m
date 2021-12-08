@@ -1,16 +1,14 @@
-Message-ID: <98ec5a66-4809-bf79-5135-2564b53ab95e@linux.alibaba.com>
-Date: Wed, 8 Dec 2021 09:36:54 +0800
+Message-ID: <dab8877d-54ad-9384-4a0f-34eae2c93b75@linux.alibaba.com>
+Date: Wed, 8 Dec 2021 09:38:45 +0800
 MIME-Version: 1.0
-References: <20211125070530.79602-1-jefflexu@linux.alibaba.com>
-	<20211125070530.79602-7-jefflexu@linux.alibaba.com>
-	<Ya+FIsGgn4wsYG+4@redhat.com>
+References: <20211102055646.103337-1-jefflexu@linux.alibaba.com>
+	<Ya9y7uqsMoDfGIbc@redhat.com>
 From: JeffleXu <jefflexu@linux.alibaba.com>
-In-Reply-To: <Ya+FIsGgn4wsYG+4@redhat.com>
+In-Reply-To: <Ya9y7uqsMoDfGIbc@redhat.com>
 Content-Language: en-US
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH v8 6/7] fuse: mark inode DONT_CACHE when per
- inode DAX hint changes
+Subject: Re: [Virtio-fs] [PATCH v7 0/6] virtiofsd: support per inode DAX
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,52 +17,38 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, joseph.qi@linux.alibaba.com, miklos@szeredi.hu
+To: Vivek Goyal <vgoyal@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, miklos@szeredi.hu
 
 
 
-On 12/8/21 12:00 AM, Vivek Goyal wrote:
-> On Thu, Nov 25, 2021 at 03:05:29PM +0800, Jeffle Xu wrote:
->> When the per inode DAX hint changes while the file is still *opened*, it
->> is quite complicated and maybe fragile to dynamically change the DAX
->> state.
->>
->> Hence mark the inode and corresponding dentries as DONE_CACHE once the
->> per inode DAX hint changes, so that the inode instance will be evicted
->> and freed as soon as possible once the file is closed and the last
->> reference to the inode is put. And then when the file gets reopened next
->> time, the new instantiated inode will reflect the new DAX state.
->>
->> In summary, when the per inode DAX hint changes for an *opened* file, the
->> DAX state of the file won't be updated until this file is closed and
->> reopened later.
+On 12/7/21 10:42 PM, Vivek Goyal wrote:
+> Hi Jeffle,
 > 
-> Is this true for cache=always mode as well? If inode continues to be
-> cached in guest cache, I am assuming we will not refresh inode attrs
-> due to cache=always mode and will not get new DAX state from server.
+> I noticed that you posted V8 of kernel patches. I was away from work
+> so could not look at it. Now I am back and want to review and test
+> those patches.
+
+Thanks for reviewing and evaluating.
+
 > 
-> IOW, changing DAX state of file is combination of two things.
+> Is there a new version of patches for virtiofsd as well?
+
+Nope. Patches for virtiofsd is not updated. v7 is the latest version.
+
 > 
-> A. Client comes to know about it using GETATTR.
-> B. Once client knows about updated state, it will take affect when
->    existing inode is released and new inode is instantiated.
+> As per v6 changelog, I see that you have rebased virtiofsd patches to.
 > 
-> And step A might take time depending on cache mode as well as when
-> is GETATTR actually initiated by the client. Its not deterministic
-> and can't be guaranteed. Right?
+> https://gitlab.com/virtio-fs/qemu/-/commits/virtio-fs-dev
+> 
+> I am not sure if that's the branch where latest DAX patches are supposed
+> to be.
+> 
+> David, could you please let us know which branch should we use for
+> latest DAX patches you have. Or push your latest patches to virtio-fs-dev
+> so that we are on same page.
 > 
 
-Right.
-
-If it is virtiofsd that determines to *change* the DAX state, then guest
-kernel has no way knowing that. If the notify queue is ready, maybe a
-notify event can be sent to guest kernel to notify that the DAX state is
-to be changed, if it is really needed later.
-
-If it is the user inside guest that changes the DAX state, e.g. by
-SETFLAGS ioctl, then we can mark the inode/dentry DONTCACHE following
-the SETFLAGS ioctl, though it's not included in this patch.
 
 -- 
 Thanks,

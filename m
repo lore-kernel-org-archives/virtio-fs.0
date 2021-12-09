@@ -1,14 +1,14 @@
-Date: Thu, 9 Dec 2021 15:16:07 -0500
+Date: Thu, 9 Dec 2021 16:59:14 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YbJkB/11x/Wq6lHS@redhat.com>
+Message-ID: <YbJ8MjbX96EiwDxr@redhat.com>
 References: <20211102055646.103337-1-jefflexu@linux.alibaba.com>
-	<20211102055646.103337-6-jefflexu@linux.alibaba.com>
+	<20211102055646.103337-7-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20211102055646.103337-6-jefflexu@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH v7 5/6] virtiofsd: implement xflag based dax
-	policy
+In-Reply-To: <20211102055646.103337-7-jefflexu@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH v7 6/6] virtiofsd: implement file size based
+	dax policy
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,94 +20,89 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: Jeffle Xu <jefflexu@linux.alibaba.com>
 Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, miklos@szeredi.hu
 
-On Tue, Nov 02, 2021 at 01:56:45PM +0800, Jeffle Xu wrote:
-> The per inode DAX feature in ext4/xfs uses the persistent inode flag,
-> i.e. FS_DAX_FL/FS_XFLAG_DAX, to indicate if DAX shall be enabled for
-> this file or not when filesystem is mounted in per inode DAX mode.
+On Tue, Nov 02, 2021 at 01:56:46PM +0800, Jeffle Xu wrote:
+> When DAX window is fully utilized and needs to be expanded to avoid the
+> performance fluctuation triggered by DAX window recaliming, it may not
+> be wise to allocate DAX window for files with size smaller than some
+> specific point, considering from the perspective of reducing memory
+> overhead.
 > 
-> To keep compatible with this feature in ext4/xfs, virtiofs also supports
-> enabling DAX depending on the persistent inode flag, which may be
-> set/cleared by users inside guest or admin on host.
+> To maintain one DAX window chunk (e.g., 2MB in size), 32KB
+> (512 * 64 bytes) memory footprint will be consumed for page descriptors
+> inside guest. Thus it'd better disable DAX for those files smaller than
+> 32KB, to reduce the demand for DAX window and thus avoid the unworthy
+> memory overhead.
 > 
-> This policy is used when '-o dax=inode' option is specified for
+> Thus only flag the file with FUSE_ATTR_DAX when the file size is greater
+> than 32 KB. The guest will enable DAX only for those files flagged with
+> FUSE_ATTR_DAX, when virtiofs is mounted with '-o dax=inode'.
+> 
+> To be noted that both FUSE_LOOKUP and FUSE_READDIRPLUS are affected, and
+> will convey FUSE_ATTR_DAX flag to the guest.
+> 
+> This policy will be used when '-o dax=filesize' option is specified for
 > virtiofsd.
 > 
 > Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
 > ---
->  tools/virtiofsd/passthrough_ll.c | 33 ++++++++++++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
+>  tools/virtiofsd/passthrough_ll.c | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
 > 
 > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 999c906da2..dac5063594 100644
+> index dac5063594..cbf81d1593 100644
 > --- a/tools/virtiofsd/passthrough_ll.c
 > +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -1026,6 +1026,35 @@ static int do_statx(struct lo_data *lo, int dirfd, const char *pathname,
->      return 0;
->  }
+> @@ -54,6 +54,7 @@
+>  #include <sys/syscall.h>
+>  #include <sys/wait.h>
+>  #include <sys/xattr.h>
+> +#include <sys/user.h>
+>  #include <syslog.h>
+>  #include <linux/fs.h>
 >  
-> +static bool lo_should_enable_dax(struct lo_data *lo, struct lo_inode *inode,
-> +                                 struct fuse_entry_param *e)
-> +{
-> +    if (lo->dax == INODE_DAX_NONE || !S_ISREG(e->attr.st_mode)) {
-> +        return false;
-> +    }
-> +
-> +    if (lo->dax == INODE_DAX_INODE) {
-> +        int res, fd;
-> +        int ret = false;
-> +        unsigned int attr;
-> +
-> +        fd = lo_inode_open(lo, inode, O_RDONLY);
-> +        if (fd == -1) {
-> +            return false;
-> +        }
+> @@ -61,6 +62,20 @@
+>  #include "passthrough_helpers.h"
+>  #include "passthrough_seccomp.h"
+>  
+> +/*
+> + * One page descriptor (64 bytes in size) needs to be maintained for every page
+> + * in the DAX window chunk, i.e., there is certain guest memory overhead when
+> + * DAX is enabled. Thus disable DAX for those with file size smaller than this
+> + * certain memory overhead if virtiofs is mounted in per inode DAX mode. In
+> + * this case, the guest page cache will consume less memory than that when DAX
+> + * is enabled.
+> + */
+> +#define FUSE_DAX_SHIFT      21
 
-So we can't call this ioctl() on an O_PATH fd, and that's why you
-are opening the file O_RDONLY?
+Hmm.., this is hardcoded value. If we change chunk size down the
+line then it will not be valid anymore.
 
-Concerned about error handling. If we fail to open file, you are
-not returning error to client. Instead simply falling back to
-not enabling DAX (and hiding an error in the process).
+I guess when we change chunk size, we can think of negotiating
+this with server and that will help.
 
-I am not sure about this fallback behavior. I would rather capture
-error and return to client. A user has configured system to
-enable DAX on inode and if we can't open that inode or can't
-query the state of FS_XFLAG_DAX, then its an error and should
-be reported back.
-
-> +
-> +        res = ioctl(fd, FS_IOC_GETFLAGS, &attr);
-> +        if (!res && (attr & FS_DAX_FL)) {
-> +            ret = true;
-> +        }
-
-Same here. What if ioctl() fails. Shouldn't we return error to
-caller? That way if there is something wrong with configuration,
-user can fix it. (Instead of silently not enabling DAX).
+I guess for now it is ok.
 
 Vivek
+
+> +#define PAGE_DESC_SHIFT     6
+> +#define FUSE_INODE_DAX_SHIFT \
+> +    (FUSE_DAX_SHIFT - PAGE_SHIFT + PAGE_DESC_SHIFT)
+> +#define FUSE_INODE_DAX_THRESH  (1 << FUSE_INODE_DAX_SHIFT)
 > +
-> +        close(fd);
-> +        return ret;
-> +    }
-> +
-> +    return false;
-> +}
-> +
->  /*
->   * Increments nlookup on the inode on success. unref_inode_lolocked() must be
->   * called eventually to decrement nlookup again. If inodep is non-NULL, the
-> @@ -1116,6 +1145,10 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+>  /* Keep track of inode posix locks for each owner. */
+>  struct lo_inode_plock {
+>      uint64_t lock_owner;
+> @@ -1052,6 +1067,10 @@ static bool lo_should_enable_dax(struct lo_data *lo, struct lo_inode *inode,
+>          return ret;
 >      }
->      e->ino = inode->fuse_ino;
 >  
-> +    if (lo_should_enable_dax(lo, inode, e)) {
-> +        e->attr_flags |= FUSE_ATTR_DAX;
+> +    if (lo->dax == INODE_DAX_FILESIZE) {
+> +        return e->attr.st_size > FUSE_INODE_DAX_THRESH;
 > +    }
 > +
->      /* Transfer ownership of inode pointer to caller or drop it */
->      if (inodep) {
->          *inodep = inode;
+>      return false;
+>  }
+>  
 > -- 
 > 2.27.0
 > 

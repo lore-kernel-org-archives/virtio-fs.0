@@ -1,13 +1,13 @@
-Date: Thu, 9 Dec 2021 14:33:59 -0500
+Date: Thu, 9 Dec 2021 15:00:52 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YbJaJ90FldHUo1/C@redhat.com>
+Message-ID: <YbJgdNSaMnQuZgO/@redhat.com>
 References: <20211102055646.103337-1-jefflexu@linux.alibaba.com>
-	<20211102055646.103337-2-jefflexu@linux.alibaba.com>
+	<20211102055646.103337-4-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20211102055646.103337-2-jefflexu@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH v7 1/6] virtiofsd: add .ioctl() support
+In-Reply-To: <20211102055646.103337-4-jefflexu@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH v7 3/6] virtiofsd: add 'dax=' option
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,150 +19,119 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: Jeffle Xu <jefflexu@linux.alibaba.com>
 Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, miklos@szeredi.hu
 
-On Tue, Nov 02, 2021 at 01:56:41PM +0800, Jeffle Xu wrote:
-> For passthrough, it passes corresponding ioctls to host directly.
+On Tue, Nov 02, 2021 at 01:56:43PM +0800, Jeffle Xu wrote:
+> This option is used to specify the policy of constructing per-inode DAX
+> attribute when guest virtiofs is mounted with "-o dax=inode".
 > 
-> Currently only these ioctls that handling persistent inode flags, i.e.,
-> FS_IOC_[G|S]ETFLAGS and FS_IOC_FS[G|S]ETXATTR are supported for security
-> concern, though it's implemented in a quite general way, so that we can
-> expand the scope of allowed ioctls if it is really needed later.
+> Currently there are two valid policies, "inode" and "filesize".
+
+General thoughts.
+
+I think additional policies like "dax=always" and "dax=none" will
+also make sense. "dax=always" will set ATTR_FLAG_DAX on all inodes.
+"dax=none" is default as of now but if somebody wants to enforce
+it, they can pass it explicitly, just in case default changes later
+down the line.
+
+It should be trivial to add these two policies as well now.
+
+I am little concenred with "dax=filesize". It has implicit threshold
+of 32KB. What if somebody wants threshold of 64KB or 1MB or even
+higher? One option would be to add another option say,
+--dax-filesize-threshold=<foo> and that will allow one to override
+default. Or we could hardcode threshold in policy name say
+filesize_32KB or filesize_1MB etc.
+
+I guess adding a separate option to modify filesize threshold
+is better because it will allow wide range of values. So "dax=filesize"
+will just mean that there is an inbuilt threshold of 32KB to enable
+dax and and user can override it by passing new option
+--dax-filesize-threshold (TBD in future when somebody needs it).
+
+
+Vivek
+> 
+> When "dax=inode" is specified, virtiofsd will construct per-inode DAX
+> attribute denpending on the persistent inode flags, i.e.
+> FS_XFLAG_DAX/FS_DAX_FL of host files. With this option, admin could
+> select those files that should be DAX enabled and mark them with
+> persistent inode flags, or users could mark files as DAX enabled inside
+> guest.
+> 
+> When "dax=filesize" is specified, virtiofsd will construct per-inode DAX
+> attribute depending on the file size. In this case DAX will be disabled
+> for those with file size smaller than 32KB.
+> 
+> The default behavior is "none". That is, virtiofsd will always clear
+> per-inode DAX attribute and thus DAX is always disabled for all files
+> when guest virtiofs is mounted with "-o dax=inode".
 > 
 > Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
 > ---
->  tools/virtiofsd/passthrough_ll.c      | 65 +++++++++++++++++++++++++++
->  tools/virtiofsd/passthrough_seccomp.c |  1 +
->  2 files changed, 66 insertions(+)
+>  tools/virtiofsd/helper.c         |  5 +++++
+>  tools/virtiofsd/passthrough_ll.c | 12 ++++++++++++
+>  2 files changed, 17 insertions(+)
 > 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index b7c1fa71b5..2768497be4 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -47,6 +47,7 @@
->  #include <dirent.h>
->  #include <pthread.h>
->  #include <sys/file.h>
-> +#include <sys/ioctl.h>
->  #include <sys/mount.h>
->  #include <sys/prctl.h>
->  #include <sys/resource.h>
-> @@ -54,6 +55,7 @@
->  #include <sys/wait.h>
->  #include <sys/xattr.h>
->  #include <syslog.h>
-> +#include <linux/fs.h>
->  
->  #include "qemu/cutils.h"
->  #include "passthrough_helpers.h"
-> @@ -2188,6 +2190,68 @@ out:
->      fuse_reply_err(req, saverr);
+> diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
+> index a8295d975a..c613bebf2c 100644
+> --- a/tools/virtiofsd/helper.c
+> +++ b/tools/virtiofsd/helper.c
+> @@ -187,6 +187,11 @@ void fuse_cmdline_help(void)
+>             "                               default: no_allow_direct_io\n"
+>             "    -o announce_submounts      Announce sub-mount points to the guest\n"
+>             "    -o posix_acl/no_posix_acl  Enable/Disable posix_acl. (default: disabled)\n"
+> +           "    -o dax=<policy>            policies of constructing per-inode DAX attribute.\n"
+> +           "                               could be one of \"inode\", \"filesize\"\n"
+> +           "                               - inode: depending on persistent inode flags\n"
+> +           "                               - filesize: depending on file size\n"
+> +           "                               default: none\n"
+>             );
 >  }
 >  
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 2768497be4..13a632bddd 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -138,6 +138,12 @@ enum {
+>      SANDBOX_CHROOT,
+>  };
+>  
+> +enum {
+> +    INODE_DAX_NONE,
+> +    INODE_DAX_INODE,
+> +    INODE_DAX_FILESIZE,
+> +};
 > +
-> +static void lo_ioctl(fuse_req_t req, fuse_ino_t ino, unsigned int cmd,
-> +                     void *arg, struct fuse_file_info *fi,
-> +                     unsigned flags, const void *in_buf,
-> +                     size_t in_bufsz, size_t out_bufsz)
-> +{
-> +    int res, dir;
-> +    int fd = lo_fi_fd(req, fi);
-> +    int saverr = ENOSYS;
-> +    void *buf = NULL;
-> +    size_t size = 0;
+>  typedef struct xattr_map_entry {
+>      char *key;
+>      char *prepend;
+> @@ -163,6 +169,8 @@ struct lo_data {
+>      int readdirplus_clear;
+>      int allow_direct_io;
+>      int announce_submounts;
+> +    int user_dax;
+> +    int dax;
+>      bool use_statx;
+>      struct lo_inode root;
+>      GHashTable *inodes; /* protected by lo->mutex */
+> @@ -212,6 +220,8 @@ static const struct fuse_opt lo_opts[] = {
+>      { "no_killpriv_v2", offsetof(struct lo_data, user_killpriv_v2), 0 },
+>      { "posix_acl", offsetof(struct lo_data, user_posix_acl), 1 },
+>      { "no_posix_acl", offsetof(struct lo_data, user_posix_acl), 0 },
+> +    { "dax=inode", offsetof(struct lo_data, user_dax), INODE_DAX_INODE },
+> +    { "dax=filesize", offsetof(struct lo_data, user_dax), INODE_DAX_FILESIZE },
+>      FUSE_OPT_END
+>  };
+>  static bool use_syslog = false;
+> @@ -736,6 +746,8 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
+>          fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling posix_acl\n");
+>          conn->want &= ~FUSE_CAP_POSIX_ACL;
+>      }
 > +
-> +    fuse_log(FUSE_LOG_DEBUG, "lo_ioctl(ino=%" PRIu64 ", cmd=0x%x, flags=0x%x, "
-> +            "in_bufsz = %lu, out_bufsz = %lu)\n",
-> +            ino, cmd, flags, in_bufsz, out_bufsz);
-> +
-> +    if (!(cmd == FS_IOC_SETFLAGS || cmd == FS_IOC_GETFLAGS ||
-> +          cmd == FS_IOC_FSSETXATTR || cmd == FS_IOC_FSGETXATTR)) {
-> +        goto out;
-
-Good that you allowed only two operations. Still I think people might
-have concern about all the inode attrs and whether it is safe to
-allow that. For example immutable flag. Now even host can't delete
-that file without first clearing that flag. I think it is doable
-just that involves extra step.
-
-So we probably might have to block certain attrs if it becomes an
-issue or make it configurable.
-
-> +    }
-> +
-> +    /* unrestricted ioctl is not supported yet */
-> +    if (flags & FUSE_IOCTL_UNRESTRICTED) {
-> +        goto out;
-> +    }
-> +
-> +    dir = _IOC_DIR(cmd);
-> +
-> +    if (dir & _IOC_READ) {
-> +        size = out_bufsz;
-> +        buf = malloc(size);
-> +        if (!buf) {
-> +            goto out_err;
-> +        }
-> +
-> +        if (dir & _IOC_WRITE) {
-> +            memcpy(buf, in_buf, size);
-> +        }
-> +
-> +        res = ioctl(fd, cmd, buf);
-> +    } else if (dir & _IOC_WRITE) {
-> +        res = ioctl(fd, cmd, in_buf);
-> +    } else {
-> +        res = ioctl(fd, cmd, arg);
-> +    }
-
-I do not understand this if block. So if _IOC_READ and _IOC_WRITE
-is not set, then we just send "arg" as third argument. Can you
-shed some light on how this third argument works for file attr
-flags. I am assuming that "lsattr" will use the _IOC_READ path,
-while chattr will use "_IOC_WRITE" path? If that's the case,
-as of now third condition is not even required. Until and unless
-we are supporting more ioctls.
-
-Thanks
-Vivek
-> +
-> +    if (res < 0) {
-> +        goto out_err;
-> +    }
-> +
-> +    fuse_reply_ioctl(req, 0, buf, size);
-> +    free(buf);
-> +
-> +    return;
-> +
-> +out_err:
-> +    saverr = errno;
-> +out:
-> +    fuse_reply_err(req, saverr);
-> +    free(buf);
-> +}
-> +
->  static void lo_fsyncdir(fuse_req_t req, fuse_ino_t ino, int datasync,
->                          struct fuse_file_info *fi)
->  {
-> @@ -3474,6 +3538,7 @@ static struct fuse_lowlevel_ops lo_oper = {
->      .fsyncdir = lo_fsyncdir,
->      .create = lo_create,
->      .getlk = lo_getlk,
-> +    .ioctl = lo_ioctl,
->      .setlk = lo_setlk,
->      .open = lo_open,
->      .release = lo_release,
-> diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
-> index f49ed94b5e..eaed5b151b 100644
-> --- a/tools/virtiofsd/passthrough_seccomp.c
-> +++ b/tools/virtiofsd/passthrough_seccomp.c
-> @@ -62,6 +62,7 @@ static const int syscall_allowlist[] = {
->      SCMP_SYS(gettid),
->      SCMP_SYS(gettimeofday),
->      SCMP_SYS(getxattr),
-> +    SCMP_SYS(ioctl),
->      SCMP_SYS(linkat),
->      SCMP_SYS(listxattr),
->      SCMP_SYS(lseek),
+> +    lo->dax = lo->user_dax;
+>  }
+>  
+>  static void lo_getattr(fuse_req_t req, fuse_ino_t ino,
 > -- 
 > 2.27.0
 > 

@@ -1,16 +1,15 @@
-Message-ID: <7815cbb4-4889-4d37-14d1-a23a0a960204@linux.alibaba.com>
-Date: Fri, 10 Dec 2021 10:54:20 +0800
+Message-ID: <4a67dd65-c3e7-d2dc-51ff-7abc8714a400@linux.alibaba.com>
+Date: Fri, 10 Dec 2021 11:02:54 +0800
 MIME-Version: 1.0
 References: <20211102055646.103337-1-jefflexu@linux.alibaba.com>
-	<Ya9y7uqsMoDfGIbc@redhat.com>
-	<dab8877d-54ad-9384-4a0f-34eae2c93b75@linux.alibaba.com>
-	<YbEP/1IeGVkDhbaC@redhat.com>
+	<20211102055646.103337-4-jefflexu@linux.alibaba.com>
+	<YbJgdNSaMnQuZgO/@redhat.com>
 From: JeffleXu <jefflexu@linux.alibaba.com>
-In-Reply-To: <YbEP/1IeGVkDhbaC@redhat.com>
+In-Reply-To: <YbJgdNSaMnQuZgO/@redhat.com>
 Content-Language: en-US
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH v7 0/6] virtiofsd: support per inode DAX
+Subject: Re: [Virtio-fs] [PATCH v7 3/6] virtiofsd: add 'dax=' option
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,47 +21,44 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: Vivek Goyal <vgoyal@redhat.com>
 Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, miklos@szeredi.hu
 
-Hi Vivek,
-
-Besides, I'd like to know that, to make the per inode DAX feature merged
-into v5.17, shall the patches for virtiofsd also be ready during the
-merge window?
 
 
-On 12/9/21 4:05 AM, Vivek Goyal wrote:
-> On Wed, Dec 08, 2021 at 09:38:45AM +0800, JeffleXu wrote:
+On 12/10/21 4:00 AM, Vivek Goyal wrote:
+> On Tue, Nov 02, 2021 at 01:56:43PM +0800, Jeffle Xu wrote:
+>> This option is used to specify the policy of constructing per-inode DAX
+>> attribute when guest virtiofs is mounted with "-o dax=inode".
 >>
->>
->> On 12/7/21 10:42 PM, Vivek Goyal wrote:
->>> Hi Jeffle,
->>>
->>> I noticed that you posted V8 of kernel patches. I was away from work
->>> so could not look at it. Now I am back and want to review and test
->>> those patches.
->>
->> Thanks for reviewing and evaluating.
->>
->>>
->>> Is there a new version of patches for virtiofsd as well?
->>
->> Nope. Patches for virtiofsd is not updated. v7 is the latest version.
+>> Currently there are two valid policies, "inode" and "filesize".
 > 
-> Hi Jeffle,
+> General thoughts.
 > 
-> I am testing these patches now. Using virtio-fs-dev branch and your
-> patches on top.
+> I think additional policies like "dax=always" and "dax=none" will
+> also make sense. "dax=always" will set ATTR_FLAG_DAX on all inodes.
+> "dax=none" is default as of now but if somebody wants to enforce
+> it, they can pass it explicitly, just in case default changes later
+> down the line.
 > 
-> When I unmount virtiofs in guest, I see following qemu-kvm message
-> on console.
+> It should be trivial to add these two policies as well now.
+
+Make sense. I will add "dax=always" and "dax=none" in the next version.
+
 > 
-> qemu-kvm: check_slave_message_entries: Short VhostUserFSSlaveMsg size, 8
+> I am little concenred with "dax=filesize". It has implicit threshold
+> of 32KB. What if somebody wants threshold of 64KB or 1MB or even
+> higher? One option would be to add another option say,
+> --dax-filesize-threshold=<foo> and that will allow one to override
+> default. Or we could hardcode threshold in policy name say
+> filesize_32KB or filesize_1MB etc.
 > 
-> Wondering have you noticed it. I have not debugged it. Wondering if
-> it is due to your patches or there is something in virtio-fs-dev
-> branch patches which triggers it.
+> I guess adding a separate option to modify filesize threshold
+> is better because it will allow wide range of values. So "dax=filesize"
+> will just mean that there is an inbuilt threshold of 32KB to enable
+> dax and and user can override it by passing new option
+> --dax-filesize-threshold (TBD in future when somebody needs it).
 > 
-> Vivek
-> 
+
+Yes, at least for now, the "--dax-filesize-threshold" shall be more
+flexible.
 
 -- 
 Thanks,

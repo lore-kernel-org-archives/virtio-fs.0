@@ -1,14 +1,14 @@
-Date: Mon, 13 Dec 2021 13:10:24 -0500
+Date: Mon, 13 Dec 2021 13:11:08 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YbeMkISPOnD10nOZ@redhat.com>
+Message-ID: <YbeMvKVmzUwmrZhC@redhat.com>
 References: <20211125070530.79602-1-jefflexu@linux.alibaba.com>
-	<20211125070530.79602-6-jefflexu@linux.alibaba.com>
+	<20211125070530.79602-8-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20211125070530.79602-6-jefflexu@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH v8 5/7] fuse: negotiate per inode DAX in
-	FUSE_INIT
+In-Reply-To: <20211125070530.79602-8-jefflexu@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH v8 7/7] Documentation/filesystem/dax: DAX on
+	virtiofs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,84 +20,58 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: Jeffle Xu <jefflexu@linux.alibaba.com>
 Cc: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, joseph.qi@linux.alibaba.com, miklos@szeredi.hu
 
-On Thu, Nov 25, 2021 at 03:05:28PM +0800, Jeffle Xu wrote:
-> Among the FUSE_INIT phase, client shall advertise per inode DAX if it's
-> mounted with "dax=inode". Then server is aware that client is in per
-> inode DAX mode, and will construct per-inode DAX attribute accordingly.
-> 
-> Server shall also advertise support for per inode DAX. If server doesn't
-> support it while client is mounted with "dax=inode", client will
-> silently fallback to "dax=never" since "dax=inode" is advisory only.
+On Thu, Nov 25, 2021 at 03:05:30PM +0800, Jeffle Xu wrote:
+> Record DAX on virtiofs and the semantic difference with that on ext4
+> and xfs.
 > 
 > Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
 
 Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
 
 Vivek
+
 > ---
->  fs/fuse/dax.c    |  2 +-
->  fs/fuse/fuse_i.h |  3 +++
->  fs/fuse/inode.c  | 13 +++++++++----
->  3 files changed, 13 insertions(+), 5 deletions(-)
+>  Documentation/filesystems/dax.rst | 20 ++++++++++++++++++--
+>  1 file changed, 18 insertions(+), 2 deletions(-)
 > 
-> diff --git a/fs/fuse/dax.c b/fs/fuse/dax.c
-> index 1550c3624414..234c2278420f 100644
-> --- a/fs/fuse/dax.c
-> +++ b/fs/fuse/dax.c
-> @@ -1351,7 +1351,7 @@ static bool fuse_should_enable_dax(struct inode *inode, unsigned int flags)
->  		return true;
+> diff --git a/Documentation/filesystems/dax.rst b/Documentation/filesystems/dax.rst
+> index 9a1b8fd9e82b..e3b30429d703 100644
+> --- a/Documentation/filesystems/dax.rst
+> +++ b/Documentation/filesystems/dax.rst
+> @@ -23,8 +23,8 @@ on it as usual.  The `DAX` code currently only supports files with a block
+>  size equal to your kernel's `PAGE_SIZE`, so you may need to specify a block
+>  size when creating the filesystem.
 >  
->  	/* dax_mode is FUSE_DAX_INODE* */
-> -	return flags & FUSE_ATTR_DAX;
-> +	return fc->inode_dax && (flags & FUSE_ATTR_DAX);
->  }
+> -Currently 3 filesystems support `DAX`: ext2, ext4 and xfs.  Enabling `DAX` on them
+> -is different.
+> +Currently 4 filesystems support `DAX`: ext2, ext4, xfs and virtiofs.
+> +Enabling `DAX` on them is different.
 >  
->  void fuse_dax_inode_init(struct inode *inode, unsigned int flags)
-> diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-> index f03ea7cb74b0..83970723314a 100644
-> --- a/fs/fuse/fuse_i.h
-> +++ b/fs/fuse/fuse_i.h
-> @@ -777,6 +777,9 @@ struct fuse_conn {
->  	/* Propagate syncfs() to server */
->  	unsigned int sync_fs:1;
+>  Enabling DAX on ext2
+>  --------------------
+> @@ -168,6 +168,22 @@ if the underlying media does not support dax and/or the filesystem is
+>  overridden with a mount option.
 >  
-> +	/* Does the filesystem support per inode DAX? */
-> +	unsigned int inode_dax:1;
+>  
+> +Enabling DAX on virtiofs
+> +----------------------------
+> +The semantic of DAX on virtiofs is basically equal to that on ext4 and xfs,
+> +except that when '-o dax=inode' is specified, virtiofs client derives the hint
+> +whether DAX shall be enabled or not from virtiofs server through FUSE protocol,
+> +rather than the persistent `FS_XFLAG_DAX` flag. That is, whether DAX shall be
+> +enabled or not is completely determined by virtiofs server, while virtiofs
+> +server itself may deploy various algorithm making this decision, e.g. depending
+> +on the persistent `FS_XFLAG_DAX` flag on the host.
 > +
->  	/** The number of requests waiting for completion */
->  	atomic_t num_waiting;
+> +It is still supported to set or clear persistent `FS_XFLAG_DAX` flag inside
+> +guest, but it is not guaranteed that DAX will be enabled or disabled for
+> +corresponding file then. Users inside guest still need to call statx(2) and
+> +check the statx flag `STATX_ATTR_DAX` to see if DAX is enabled for this file.
+> +
+> +
+>  Implementation Tips for Block Driver Writers
+>  --------------------------------------------
 >  
-> diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-> index 0669e41a9645..b26612fce6d0 100644
-> --- a/fs/fuse/inode.c
-> +++ b/fs/fuse/inode.c
-> @@ -1169,10 +1169,13 @@ static void process_init_reply(struct fuse_mount *fm, struct fuse_args *args,
->  					min_t(unsigned int, fc->max_pages_limit,
->  					max_t(unsigned int, arg->max_pages, 1));
->  			}
-> -			if (IS_ENABLED(CONFIG_FUSE_DAX) &&
-> -			    arg->flags & FUSE_MAP_ALIGNMENT &&
-> -			    !fuse_dax_check_alignment(fc, arg->map_alignment)) {
-> -				ok = false;
-> +			if (IS_ENABLED(CONFIG_FUSE_DAX)) {
-> +				if (arg->flags & FUSE_MAP_ALIGNMENT &&
-> +				    !fuse_dax_check_alignment(fc, arg->map_alignment)) {
-> +					ok = false;
-> +				}
-> +				if (arg->flags & FUSE_HAS_INODE_DAX)
-> +					fc->inode_dax = 1;
->  			}
->  			if (arg->flags & FUSE_HANDLE_KILLPRIV_V2) {
->  				fc->handle_killpriv_v2 = 1;
-> @@ -1227,6 +1230,8 @@ void fuse_send_init(struct fuse_mount *fm)
->  #ifdef CONFIG_FUSE_DAX
->  	if (fm->fc->dax)
->  		ia->in.flags |= FUSE_MAP_ALIGNMENT;
-> +	if (fuse_is_inode_dax_mode(fm->fc->dax_mode))
-> +		ia->in.flags |= FUSE_HAS_INODE_DAX;
->  #endif
->  	if (fm->fc->auto_submounts)
->  		ia->in.flags |= FUSE_SUBMOUNTS;
 > -- 
 > 2.27.0
 > 

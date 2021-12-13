@@ -1,19 +1,12 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=szeredi.hu; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=XKRSF6c/DmbtPVq1mlYxGANP5GLjrBjlESQv0EVA9n4=;
-	b=IBRfrt0Sco5aw8dZ/hQ7JVTZo4ara5XAzA7LJCYTYn96HC6qgWyZAaRYNV3tEK4ITX
-	0o9zUNtgcoJuve31Dyhl0wdZpG5HdsdEXoxAX+qTWJYphOPpShI7hPd2AM4OoPlvObqK
-	W/d5z7YvemKn/JISzn/rfH+jhOp4dheNiEfOo=
+Date: Mon, 13 Dec 2021 13:12:38 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YbeNFkzynMUHRnoS@redhat.com>
+References: <20211125070530.79602-1-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
-References: <20211012180624.447474-1-vgoyal@redhat.com>
-	<20211012180624.447474-3-vgoyal@redhat.com>
-In-Reply-To: <20211012180624.447474-3-vgoyal@redhat.com>
-From: Miklos Szeredi <miklos@szeredi.hu>
-Date: Tue, 2 Nov 2021 15:00:30 +0100
-Message-ID: <CAJfpegs-EHBjjnsVQdPWfH=idVENj9Aw0e-L4tjcgx3v38NJtg@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH v2 2/2] fuse: Send security context of inode
-	on file creation
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20211125070530.79602-1-jefflexu@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH v8 0/7] fuse,virtiofs: support per-file DAX
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,345 +15,117 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: SElinux list <selinux@vger.kernel.org>, Casey Schaufler <casey@schaufler-ca.com>, Stephen Smalley <stephen.smalley.work@gmail.com>, Ondrej Mosnacek <omosnace@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, LSM <linux-security-module@vger.kernel.org>, linux-fsdevel@vger.kernel.org
+To: Jeffle Xu <jefflexu@linux.alibaba.com>
+Cc: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, joseph.qi@linux.alibaba.com, miklos@szeredi.hu
 
-On Tue, 12 Oct 2021 at 20:06, Vivek Goyal <vgoyal@redhat.com> wrote:
->
-> When a new inode is created, send its security context to server along
-> with creation request (FUSE_CREAT, FUSE_MKNOD, FUSE_MKDIR and FUSE_SYMLINK).
-> This gives server an opportunity to create new file and set security
-> context (possibly atomically). In all the configurations it might not
-> be possible to set context atomically.
->
-> Like nfs and ceph, use security_dentry_init_security() to dermine security
-> context of inode and send it with create, mkdir, mknod, and symlink requests.
->
-> Following is the information sent to server.
->
-> - struct fuse_secctxs.
->   This contains total number of security contexts being sent.
->
-> - struct fuse_secctx.
->   This contains total size of security context which follows this structure.
->   There is one fuse_secctx instance per security context.
->
-> - xattr name string.
->   This string represents name of xattr which should be used while setting
->   security context. As of now it is hardcoded to "security.selinux".
->
-> - security context.
->   This is the actual security context whose size is specified in fuse_secctx
->   struct.
->
-> This patch is modified version of patch from
-> Chirantan Ekbote <chirantan@chromium.org>
->
-> v2:
-> - Added "fuse_secctxs" structure where one can specify how many security
->   contexts are being sent. This can be useful down the line if we
->   have more than one security contexts being set.
->
-> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> ---
->  fs/fuse/dir.c             | 115 ++++++++++++++++++++++++++++++++++++--
->  fs/fuse/fuse_i.h          |   3 +
->  fs/fuse/inode.c           |   4 +-
->  include/uapi/linux/fuse.h |  20 +++++++
->  4 files changed, 136 insertions(+), 6 deletions(-)
->
-> diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
-> index d9b977c0f38d..ce62593a61f9 100644
-> --- a/fs/fuse/dir.c
-> +++ b/fs/fuse/dir.c
-> @@ -17,6 +17,9 @@
->  #include <linux/xattr.h>
->  #include <linux/iversion.h>
->  #include <linux/posix_acl.h>
-> +#include <linux/security.h>
-> +#include <linux/types.h>
-> +#include <linux/kernel.h>
->
->  static void fuse_advise_use_readdirplus(struct inode *dir)
->  {
-> @@ -456,6 +459,66 @@ static struct dentry *fuse_lookup(struct inode *dir, struct dentry *entry,
->         return ERR_PTR(err);
->  }
->
-> +static int get_security_context(struct dentry *entry, umode_t mode,
-> +                               void **security_ctx, u32 *security_ctxlen)
-> +{
-> +       struct fuse_secctx *fsecctx;
-> +       struct fuse_secctxs *fsecctxs;
-> +       void *ctx, *full_ctx;
-> +       u32 ctxlen, full_ctxlen;
-> +       int err = 0;
-> +       const char *name;
-> +
-> +       err = security_dentry_init_security(entry, mode, &entry->d_name,
-> +                                           &name, &ctx, &ctxlen);
-> +       if (err) {
-> +               if (err != -EOPNOTSUPP)
-> +                       goto out_err;
-> +               /* No LSM is supporting this security hook. Ignore error */
-> +               err = 0;
-> +               ctxlen = 0;
-> +       }
-> +
-> +       if (ctxlen > 0) {
-> +               void *ptr;
-> +
-> +               full_ctxlen = sizeof(*fsecctxs) + sizeof(*fsecctx) +
-> +                             strlen(name) + ctxlen + 1;
-> +               full_ctx = kzalloc(full_ctxlen, GFP_KERNEL);
-> +               if (!full_ctx) {
-> +                       err = -ENOMEM;
-> +                       kfree(ctx);
-> +                       goto out_err;
-> +               }
-> +
-> +               ptr = full_ctx;
-> +               fsecctxs = (struct fuse_secctxs*) ptr;
-> +               fsecctxs->nr_secctx = 1;
-> +               ptr += sizeof(*fsecctxs);
-> +
-> +               fsecctx = (struct fuse_secctx*) ptr;
-> +               fsecctx->size = ctxlen;
-> +               ptr += sizeof(*fsecctx);
-> +
-> +               strcpy(ptr, name);
-> +               ptr += strlen(name) + 1;
-> +               memcpy(ptr, ctx, ctxlen);
-> +               kfree(ctx);
-> +       } else {
-> +               full_ctxlen = sizeof(*fsecctxs);
-> +               full_ctx = kzalloc(full_ctxlen, GFP_KERNEL);
-> +               if (!full_ctx) {
-> +                       err = -ENOMEM;
-> +                       goto out_err;
-> +               }
-> +       }
-> +
-> +       *security_ctxlen = full_ctxlen;
-> +       *security_ctx = full_ctx;
-> +out_err:
-> +       return err;
-> +}
-> +
->  /*
->   * Atomic create+open operation
->   *
-> @@ -476,6 +539,8 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
->         struct fuse_entry_out outentry;
->         struct fuse_inode *fi;
->         struct fuse_file *ff;
-> +       void *security_ctx = NULL;
-> +       u32 security_ctxlen;
->
->         /* Userspace expects S_IFREG in create mode */
->         BUG_ON((mode & S_IFMT) != S_IFREG);
-> @@ -517,6 +582,18 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
->         args.out_args[0].value = &outentry;
->         args.out_args[1].size = sizeof(outopen);
->         args.out_args[1].value = &outopen;
-> +
-> +       if (fm->fc->init_security) {
-> +               err = get_security_context(entry, mode, &security_ctx,
-> +                                          &security_ctxlen);
-> +               if (err)
-> +                       goto out_put_forget_req;
-> +
-> +               args.in_numargs = 3;
-> +               args.in_args[2].size = security_ctxlen;
-> +               args.in_args[2].value = security_ctx;
-> +       }
-> +
->         err = fuse_simple_request(fm, &args);
->         if (err)
->                 goto out_free_ff;
-> @@ -554,6 +631,7 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
->
->  out_free_ff:
->         fuse_file_free(ff);
-> +       kfree(security_ctx);
->  out_put_forget_req:
->         kfree(forget);
->  out_err:
-> @@ -613,13 +691,15 @@ static int fuse_atomic_open(struct inode *dir, struct dentry *entry,
->   */
->  static int create_new_entry(struct fuse_mount *fm, struct fuse_args *args,
->                             struct inode *dir, struct dentry *entry,
-> -                           umode_t mode)
-> +                           umode_t mode, bool init_security)
->  {
->         struct fuse_entry_out outarg;
->         struct inode *inode;
->         struct dentry *d;
->         int err;
->         struct fuse_forget_link *forget;
-> +       void *security_ctx = NULL;
-> +       u32 security_ctxlen = 0;
->
->         if (fuse_is_bad(dir))
->                 return -EIO;
-> @@ -633,7 +713,29 @@ static int create_new_entry(struct fuse_mount *fm, struct fuse_args *args,
->         args->out_numargs = 1;
->         args->out_args[0].size = sizeof(outarg);
->         args->out_args[0].value = &outarg;
-> +
-> +       if (init_security) {
+On Thu, Nov 25, 2021 at 03:05:23PM +0800, Jeffle Xu wrote:
+> changes since v7:
+> - rebase to v5.16
+> - patch 2: rename FUSE_DAX_NONE|FUSE_DAX_INODE to
+>   FUSE_DAX_INODE_DEFAULT|FUSE_DAX_INODE_USER
+> - patch 5: remove redundant call for fuse_is_inode_dax_mode() in
+>   process_init_reply()
+> - patch 5: if server's map alignment is non-compliant (fail
+>   fuse_dax_check_alignment()), the mounted fs won't work and users are
+>   required to remount it explicitly, instead of silently falling back to
+>   'never' mode.
 
-Instead of a new arg to create_new_entry(), this could check
-args.opcode != FUSE_LINK.
+Thanks Jeffle for this work. These patches look good to me. I have done
+a basic testing with it and it seems to work as expected. Hence I have
+provided my Reviewed-by tags for all the patches. 
 
-> +               unsigned short idx = args->in_numargs;
-> +
-> +               if ((size_t)idx >= ARRAY_SIZE(args->in_args)) {
-> +                       err = -ENOMEM;
-> +                       goto out_put_forget_req;
-> +               }
-> +
-> +               err = get_security_context(entry, mode, &security_ctx,
-> +                                          &security_ctxlen);
-> +               if (err)
-> +                       goto out_put_forget_req;
-> +
-> +               if (security_ctxlen > 0) {
+Now it is up to the Miklos to decide whether he likes the patches or not.
 
-This doesn't seem right.  How would the server know if this is arg is missing?
-
-I think if FUSE_SECURITY_CTX was negotiated, then the secctx header
-will always need to be added to the MK* requests.
-
-> +                       args->in_args[idx].size = security_ctxlen;
-> +                       args->in_args[idx].value = security_ctx;
-> +                       args->in_numargs++;
-> +               }
-> +       }
-> +
->         err = fuse_simple_request(fm, args);
-> +       kfree(security_ctx);
->         if (err)
->                 goto out_put_forget_req;
->
-> @@ -691,7 +793,7 @@ static int fuse_mknod(struct user_namespace *mnt_userns, struct inode *dir,
->         args.in_args[0].value = &inarg;
->         args.in_args[1].size = entry->d_name.len + 1;
->         args.in_args[1].value = entry->d_name.name;
-> -       return create_new_entry(fm, &args, dir, entry, mode);
-> +       return create_new_entry(fm, &args, dir, entry, mode, fm->fc->init_security);
->  }
->
->  static int fuse_create(struct user_namespace *mnt_userns, struct inode *dir,
-> @@ -719,7 +821,8 @@ static int fuse_mkdir(struct user_namespace *mnt_userns, struct inode *dir,
->         args.in_args[0].value = &inarg;
->         args.in_args[1].size = entry->d_name.len + 1;
->         args.in_args[1].value = entry->d_name.name;
-> -       return create_new_entry(fm, &args, dir, entry, S_IFDIR);
-> +       return create_new_entry(fm, &args, dir, entry, S_IFDIR,
-> +                               fm->fc->init_security);
->  }
->
->  static int fuse_symlink(struct user_namespace *mnt_userns, struct inode *dir,
-> @@ -735,7 +838,8 @@ static int fuse_symlink(struct user_namespace *mnt_userns, struct inode *dir,
->         args.in_args[0].value = entry->d_name.name;
->         args.in_args[1].size = len;
->         args.in_args[1].value = link;
-> -       return create_new_entry(fm, &args, dir, entry, S_IFLNK);
-> +       return create_new_entry(fm, &args, dir, entry, S_IFLNK,
-> +                               fm->fc->init_security);
->  }
->
->  void fuse_update_ctime(struct inode *inode)
-> @@ -915,7 +1019,8 @@ static int fuse_link(struct dentry *entry, struct inode *newdir,
->         args.in_args[0].value = &inarg;
->         args.in_args[1].size = newent->d_name.len + 1;
->         args.in_args[1].value = newent->d_name.name;
-> -       err = create_new_entry(fm, &args, newdir, newent, inode->i_mode);
-> +       err = create_new_entry(fm, &args, newdir, newent, inode->i_mode,
-> +                              false);
->         /* Contrary to "normal" filesystems it can happen that link
->            makes two "logical" inodes point to the same "physical"
->            inode.  We invalidate the attributes of the old one, so it
-> diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-> index 319596df5dc6..885f34f9967f 100644
-> --- a/fs/fuse/fuse_i.h
-> +++ b/fs/fuse/fuse_i.h
-> @@ -765,6 +765,9 @@ struct fuse_conn {
->         /* Propagate syncfs() to server */
->         unsigned int sync_fs:1;
->
-> +       /* Initialize security xattrs when creating a new inode */
-> +       unsigned int init_security:1;
-> +
->         /** The number of requests waiting for completion */
->         atomic_t num_waiting;
->
-> diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-> index 36cd03114b6d..343bc9cfbd92 100644
-> --- a/fs/fuse/inode.c
-> +++ b/fs/fuse/inode.c
-> @@ -1152,6 +1152,8 @@ static void process_init_reply(struct fuse_mount *fm, struct fuse_args *args,
->                         }
->                         if (arg->flags & FUSE_SETXATTR_EXT)
->                                 fc->setxattr_ext = 1;
-> +                       if (arg->flags & FUSE_SECURITY_CTX)
-> +                               fc->init_security = 1;
->                 } else {
->                         ra_pages = fc->max_read / PAGE_SIZE;
->                         fc->no_lock = 1;
-> @@ -1195,7 +1197,7 @@ void fuse_send_init(struct fuse_mount *fm)
->                 FUSE_PARALLEL_DIROPS | FUSE_HANDLE_KILLPRIV | FUSE_POSIX_ACL |
->                 FUSE_ABORT_ERROR | FUSE_MAX_PAGES | FUSE_CACHE_SYMLINKS |
->                 FUSE_NO_OPENDIR_SUPPORT | FUSE_EXPLICIT_INVAL_DATA |
-> -               FUSE_HANDLE_KILLPRIV_V2 | FUSE_SETXATTR_EXT;
-> +               FUSE_HANDLE_KILLPRIV_V2 | FUSE_SETXATTR_EXT | FUSE_SECURITY_CTX;
->  #ifdef CONFIG_FUSE_DAX
->         if (fm->fc->dax)
->                 ia->in.flags |= FUSE_MAP_ALIGNMENT;
-> diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-> index 2fe54c80051a..b31a0f79fde8 100644
-> --- a/include/uapi/linux/fuse.h
-> +++ b/include/uapi/linux/fuse.h
-
-I don't see why the API changes are split between the first and the
-second patch in the series.   Please either move all API changes to
-1/2 or fold 1/2 into this patch.
-
-> @@ -986,4 +986,24 @@ struct fuse_syncfs_in {
->         uint64_t        padding;
->  };
->
-> +/*
-> + * For each security context, send fuse_secctx with size of security context
-> + * fuse_secctx will be followed by security context name and this in turn
-> + * will be followed by actual context label.
-> + * fuse_secctx, name, context
-> + * */
-> +struct fuse_secctx {
-> +       uint32_t        size;
-> +       uint32_t        padding;
-> +};
-> +
-> +/*
-> + * Contains the information about how many fuse_secctx structures are being
-> + * sent.
-> + */
-> +struct fuse_secctxs {
-> +       uint32_t        nr_secctx;
-> +       uint32_t        padding;
-> +};
-
-The name of this struct is very confusing due to similarity with
-fuse_secctx.  How about "fuse_secctx_header"?
-
-Also I'd add the total length of the security context (including the
-header), otherwise further args would need to parse the security
-context completely to find the position of the next arg.   The
-counterexample is null-terminated names; while parsing these is pretty
-trivial,  in hindsight it would probably have been better to add a
-header to names as well.
-
-Thanks,
-Miklos
+Thanks
+Vivek
+> 
+> Corresponding changes to virtiofsd:
+> https://www.mail-archive.com/virtio-fs@redhat.com/msg04349.html
+> 
+> v7: https://lore.kernel.org/all/c41837f0-a183-d911-885d-cf3bcdd9b7c8@linux.alibaba.com/T/
+> v6: https://lore.kernel.org/all/20211011030052.98923-1-jefflexu@linux.alibaba.com/
+> v5: https://lore.kernel.org/all/20210923092526.72341-1-jefflexu@linux.alibaba.com/
+> v4: https://lore.kernel.org/linux-fsdevel/20210817022220.17574-1-jefflexu@linux.alibaba.com/
+> v3: https://www.spinics.net/lists/linux-fsdevel/msg200852.html
+> v2: https://www.spinics.net/lists/linux-fsdevel/msg199584.html
+> v1: https://www.spinics.net/lists/linux-virtualization/msg51008.html
+> 
+> Original Rationale for this Patchset
+> ====================================
+> 
+> This patchset adds support of per-file DAX for virtiofs, which is
+> inspired by Ira Weiny's work on ext4[1] and xfs[2].
+> 
+> Any comment is welcome.
+> 
+> [1] commit 9cb20f94afcd ("fs/ext4: Make DAX mount option a tri-state")
+> [2] commit 02beb2686ff9 ("fs/xfs: Make DAX mount option a tri-state")
+> 
+> [Purpose]
+> DAX may be limited in some specific situation. When the number of usable
+> DAX windows is under watermark, the recalim routine will be triggered to
+> reclaim some DAX windows. It may have a negative impact on the
+> performance, since some processes may need to wait for DAX windows to be
+> recalimed and reused then. To mitigate the performance degradation, the
+> overall DAX window need to be expanded larger.
+> 
+> However, simply expanding the DAX window may not be a good deal in some
+> scenario. To maintain one DAX window chunk (i.e., 2MB in size), 32KB
+> (512 * 64 bytes) memory footprint will be consumed for page descriptors
+> inside guest, which is greater than the memory footprint if it uses
+> guest page cache when DAX disabled. Thus it'd better disable DAX for
+> those files smaller than 32KB, to reduce the demand for DAX window and
+> thus avoid the unworthy memory overhead.
+> 
+> Per-file DAX feature is introduced to address this issue, by offering a
+> finer grained control for dax to users, trying to achieve a balance
+> between performance and memory overhead.
+> 
+> 
+> [Note]
+> When the per-file DAX hint changes while the file is still *opened*, it
+> is quite complicated and maybe fragile to dynamically change the DAX
+> state, since dynamic switching needs to switch a_ops atomiclly. Ira
+> Weiny had ever implemented a so called i_aops_sem lock [3] but
+> eventually gave up since the complexity of the implementation
+> [4][5][6][7].
+> 
+> Hence mark the inode and corresponding dentries as DONE_CACHE once the
+> per-file DAX hint changes, so that the inode instance will be evicted
+> and freed as soon as possible once the file is closed and the last
+> reference to the inode is put. And then when the file gets reopened next
+> time, the new instantiated inode will reflect the new DAX state.
+> 
+> In summary, when the per-file DAX hint changes for an *opened* file, the
+> DAX state of the file won't be updated until this file is closed and
+> reopened later. This is also how ext4/xfs per-file DAX works.
+> 
+> [3] https://lore.kernel.org/lkml/20200227052442.22524-7-ira.weiny@intel.com/
+> [4] https://patchwork.kernel.org/project/xfs/cover/20200407182958.568475-1-ira.weiny@intel.com/
+> [5] https://lore.kernel.org/lkml/20200305155144.GA5598@lst.de/
+> [6] https://lore.kernel.org/lkml/20200401040021.GC56958@magnolia/
+> [7] https://lore.kernel.org/lkml/20200403182904.GP80283@magnolia/
+> 
+> 
+> Jeffle Xu (7):
+>   fuse: add fuse_should_enable_dax() helper
+>   fuse: make DAX mount option a tri-state
+>   fuse: support per inode DAX in fuse protocol
+>   fuse: enable per inode DAX
+>   fuse: negotiate per inode DAX in FUSE_INIT
+>   fuse: mark inode DONT_CACHE when per inode DAX hint changes
+>   Documentation/filesystem/dax: DAX on virtiofs
+> 
+>  Documentation/filesystems/dax.rst | 20 +++++++++++++++--
+>  fs/fuse/dax.c                     | 36 +++++++++++++++++++++++++++++--
+>  fs/fuse/file.c                    |  4 ++--
+>  fs/fuse/fuse_i.h                  | 28 ++++++++++++++++++++----
+>  fs/fuse/inode.c                   | 28 +++++++++++++++++-------
+>  fs/fuse/virtio_fs.c               | 18 +++++++++++++---
+>  include/uapi/linux/fuse.h         |  5 +++++
+>  7 files changed, 118 insertions(+), 21 deletions(-)
+> 
+> -- 
+> 2.27.0
+> 
 

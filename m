@@ -1,14 +1,14 @@
-Date: Mon, 13 Dec 2021 13:10:43 -0500
+Date: Mon, 13 Dec 2021 13:10:24 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YbeMo86J2/AYipbB@redhat.com>
+Message-ID: <YbeMkISPOnD10nOZ@redhat.com>
 References: <20211125070530.79602-1-jefflexu@linux.alibaba.com>
-	<20211125070530.79602-7-jefflexu@linux.alibaba.com>
+	<20211125070530.79602-6-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20211125070530.79602-7-jefflexu@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH v8 6/7] fuse: mark inode DONT_CACHE when per
- inode DAX hint changes
+In-Reply-To: <20211125070530.79602-6-jefflexu@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH v8 5/7] fuse: negotiate per inode DAX in
+	FUSE_INIT
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,20 +20,14 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: Jeffle Xu <jefflexu@linux.alibaba.com>
 Cc: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, joseph.qi@linux.alibaba.com, miklos@szeredi.hu
 
-On Thu, Nov 25, 2021 at 03:05:29PM +0800, Jeffle Xu wrote:
-> When the per inode DAX hint changes while the file is still *opened*, it
-> is quite complicated and maybe fragile to dynamically change the DAX
-> state.
+On Thu, Nov 25, 2021 at 03:05:28PM +0800, Jeffle Xu wrote:
+> Among the FUSE_INIT phase, client shall advertise per inode DAX if it's
+> mounted with "dax=inode". Then server is aware that client is in per
+> inode DAX mode, and will construct per-inode DAX attribute accordingly.
 > 
-> Hence mark the inode and corresponding dentries as DONE_CACHE once the
-> per inode DAX hint changes, so that the inode instance will be evicted
-> and freed as soon as possible once the file is closed and the last
-> reference to the inode is put. And then when the file gets reopened next
-> time, the new instantiated inode will reflect the new DAX state.
-> 
-> In summary, when the per inode DAX hint changes for an *opened* file, the
-> DAX state of the file won't be updated until this file is closed and
-> reopened later.
+> Server shall also advertise support for per inode DAX. If server doesn't
+> support it while client is mounted with "dax=inode", client will
+> silently fallback to "dax=never" since "dax=inode" is advisory only.
 > 
 > Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
 
@@ -41,57 +35,69 @@ Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
 
 Vivek
 > ---
->  fs/fuse/dax.c    | 9 +++++++++
->  fs/fuse/fuse_i.h | 1 +
->  fs/fuse/inode.c  | 3 +++
->  3 files changed, 13 insertions(+)
+>  fs/fuse/dax.c    |  2 +-
+>  fs/fuse/fuse_i.h |  3 +++
+>  fs/fuse/inode.c  | 13 +++++++++----
+>  3 files changed, 13 insertions(+), 5 deletions(-)
 > 
 > diff --git a/fs/fuse/dax.c b/fs/fuse/dax.c
-> index 234c2278420f..b19e7eaed4ef 100644
+> index 1550c3624414..234c2278420f 100644
 > --- a/fs/fuse/dax.c
 > +++ b/fs/fuse/dax.c
-> @@ -1363,6 +1363,15 @@ void fuse_dax_inode_init(struct inode *inode, unsigned int flags)
->  	inode->i_data.a_ops = &fuse_dax_file_aops;
+> @@ -1351,7 +1351,7 @@ static bool fuse_should_enable_dax(struct inode *inode, unsigned int flags)
+>  		return true;
+>  
+>  	/* dax_mode is FUSE_DAX_INODE* */
+> -	return flags & FUSE_ATTR_DAX;
+> +	return fc->inode_dax && (flags & FUSE_ATTR_DAX);
 >  }
 >  
-> +void fuse_dax_dontcache(struct inode *inode, unsigned int flags)
-> +{
-> +	struct fuse_conn *fc = get_fuse_conn(inode);
-> +
-> +	if (fuse_is_inode_dax_mode(fc->dax_mode) &&
-> +	    (!!IS_DAX(inode) != !!(flags & FUSE_ATTR_DAX)))
-> +		d_mark_dontcache(inode);
-> +}
-> +
->  bool fuse_dax_check_alignment(struct fuse_conn *fc, unsigned int map_alignment)
->  {
->  	if (fc->dax && (map_alignment > FUSE_DAX_SHIFT)) {
+>  void fuse_dax_inode_init(struct inode *inode, unsigned int flags)
 > diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-> index 83970723314a..af19d1d821ea 100644
+> index f03ea7cb74b0..83970723314a 100644
 > --- a/fs/fuse/fuse_i.h
 > +++ b/fs/fuse/fuse_i.h
-> @@ -1293,6 +1293,7 @@ void fuse_dax_conn_free(struct fuse_conn *fc);
->  bool fuse_dax_inode_alloc(struct super_block *sb, struct fuse_inode *fi);
->  void fuse_dax_inode_init(struct inode *inode, unsigned int flags);
->  void fuse_dax_inode_cleanup(struct inode *inode);
-> +void fuse_dax_dontcache(struct inode *inode, unsigned int flags);
->  bool fuse_dax_check_alignment(struct fuse_conn *fc, unsigned int map_alignment);
->  void fuse_dax_cancel_work(struct fuse_conn *fc);
+> @@ -777,6 +777,9 @@ struct fuse_conn {
+>  	/* Propagate syncfs() to server */
+>  	unsigned int sync_fs:1;
+>  
+> +	/* Does the filesystem support per inode DAX? */
+> +	unsigned int inode_dax:1;
+> +
+>  	/** The number of requests waiting for completion */
+>  	atomic_t num_waiting;
 >  
 > diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-> index b26612fce6d0..b25d99eb8411 100644
+> index 0669e41a9645..b26612fce6d0 100644
 > --- a/fs/fuse/inode.c
 > +++ b/fs/fuse/inode.c
-> @@ -301,6 +301,9 @@ void fuse_change_attributes(struct inode *inode, struct fuse_attr *attr,
->  		if (inval)
->  			invalidate_inode_pages2(inode->i_mapping);
->  	}
-> +
-> +	if (IS_ENABLED(CONFIG_FUSE_DAX))
-> +		fuse_dax_dontcache(inode, attr->flags);
->  }
->  
->  static void fuse_init_inode(struct inode *inode, struct fuse_attr *attr)
+> @@ -1169,10 +1169,13 @@ static void process_init_reply(struct fuse_mount *fm, struct fuse_args *args,
+>  					min_t(unsigned int, fc->max_pages_limit,
+>  					max_t(unsigned int, arg->max_pages, 1));
+>  			}
+> -			if (IS_ENABLED(CONFIG_FUSE_DAX) &&
+> -			    arg->flags & FUSE_MAP_ALIGNMENT &&
+> -			    !fuse_dax_check_alignment(fc, arg->map_alignment)) {
+> -				ok = false;
+> +			if (IS_ENABLED(CONFIG_FUSE_DAX)) {
+> +				if (arg->flags & FUSE_MAP_ALIGNMENT &&
+> +				    !fuse_dax_check_alignment(fc, arg->map_alignment)) {
+> +					ok = false;
+> +				}
+> +				if (arg->flags & FUSE_HAS_INODE_DAX)
+> +					fc->inode_dax = 1;
+>  			}
+>  			if (arg->flags & FUSE_HANDLE_KILLPRIV_V2) {
+>  				fc->handle_killpriv_v2 = 1;
+> @@ -1227,6 +1230,8 @@ void fuse_send_init(struct fuse_mount *fm)
+>  #ifdef CONFIG_FUSE_DAX
+>  	if (fm->fc->dax)
+>  		ia->in.flags |= FUSE_MAP_ALIGNMENT;
+> +	if (fuse_is_inode_dax_mode(fm->fc->dax_mode))
+> +		ia->in.flags |= FUSE_HAS_INODE_DAX;
+>  #endif
+>  	if (fm->fc->auto_submounts)
+>  		ia->in.flags |= FUSE_SUBMOUNTS;
 > -- 
 > 2.27.0
 > 

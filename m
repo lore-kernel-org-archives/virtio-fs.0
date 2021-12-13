@@ -1,15 +1,16 @@
-Date: Mon, 13 Dec 2021 13:02:16 -0500
+Date: Mon, 13 Dec 2021 13:03:28 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YbeKqE0n5eyDwW35@redhat.com>
+Message-ID: <YbeK8HOF5F8n+ZG8@redhat.com>
 References: <20211102055646.103337-1-jefflexu@linux.alibaba.com>
-	<20211102055646.103337-2-jefflexu@linux.alibaba.com>
-	<YbJaJ90FldHUo1/C@redhat.com>
-	<f2a1bceb-5983-b450-f3c6-dbbbae11af3a@linux.alibaba.com>
+	<Ya9y7uqsMoDfGIbc@redhat.com>
+	<dab8877d-54ad-9384-4a0f-34eae2c93b75@linux.alibaba.com>
+	<YbEP/1IeGVkDhbaC@redhat.com>
+	<7815cbb4-4889-4d37-14d1-a23a0a960204@linux.alibaba.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <f2a1bceb-5983-b450-f3c6-dbbbae11af3a@linux.alibaba.com>
-Subject: Re: [Virtio-fs] [PATCH v7 1/6] virtiofsd: add .ioctl() support
+In-Reply-To: <7815cbb4-4889-4d37-14d1-a23a0a960204@linux.alibaba.com>
+Subject: Re: [Virtio-fs] [PATCH v7 0/6] virtiofsd: support per inode DAX
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,157 +22,59 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: JeffleXu <jefflexu@linux.alibaba.com>
 Cc: virtio-fs@redhat.com, joseph.qi@linux.alibaba.com, miklos@szeredi.hu
 
-On Fri, Dec 10, 2021 at 10:51:45AM +0800, JeffleXu wrote:
+On Fri, Dec 10, 2021 at 10:54:20AM +0800, JeffleXu wrote:
+> Hi Vivek,
 > 
-> 
-> On 12/10/21 3:33 AM, Vivek Goyal wrote:
-> > On Tue, Nov 02, 2021 at 01:56:41PM +0800, Jeffle Xu wrote:
-> >> For passthrough, it passes corresponding ioctls to host directly.
-> >>
-> >> Currently only these ioctls that handling persistent inode flags, i.e.,
-> >> FS_IOC_[G|S]ETFLAGS and FS_IOC_FS[G|S]ETXATTR are supported for security
-> >> concern, though it's implemented in a quite general way, so that we can
-> >> expand the scope of allowed ioctls if it is really needed later.
-> >>
-> >> Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
-> >> ---
-> >>  tools/virtiofsd/passthrough_ll.c      | 65 +++++++++++++++++++++++++++
-> >>  tools/virtiofsd/passthrough_seccomp.c |  1 +
-> >>  2 files changed, 66 insertions(+)
-> >>
-> >> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> >> index b7c1fa71b5..2768497be4 100644
-> >> --- a/tools/virtiofsd/passthrough_ll.c
-> >> +++ b/tools/virtiofsd/passthrough_ll.c
-> >> @@ -47,6 +47,7 @@
-> >>  #include <dirent.h>
-> >>  #include <pthread.h>
-> >>  #include <sys/file.h>
-> >> +#include <sys/ioctl.h>
-> >>  #include <sys/mount.h>
-> >>  #include <sys/prctl.h>
-> >>  #include <sys/resource.h>
-> >> @@ -54,6 +55,7 @@
-> >>  #include <sys/wait.h>
-> >>  #include <sys/xattr.h>
-> >>  #include <syslog.h>
-> >> +#include <linux/fs.h>
-> >>  
-> >>  #include "qemu/cutils.h"
-> >>  #include "passthrough_helpers.h"
-> >> @@ -2188,6 +2190,68 @@ out:
-> >>      fuse_reply_err(req, saverr);
-> >>  }
-> >>  
-> >> +
-> >> +static void lo_ioctl(fuse_req_t req, fuse_ino_t ino, unsigned int cmd,
-> >> +                     void *arg, struct fuse_file_info *fi,
-> >> +                     unsigned flags, const void *in_buf,
-> >> +                     size_t in_bufsz, size_t out_bufsz)
-> >> +{
-> >> +    int res, dir;
-> >> +    int fd = lo_fi_fd(req, fi);
-> >> +    int saverr = ENOSYS;
-> >> +    void *buf = NULL;
-> >> +    size_t size = 0;
-> >> +
-> >> +    fuse_log(FUSE_LOG_DEBUG, "lo_ioctl(ino=%" PRIu64 ", cmd=0x%x, flags=0x%x, "
-> >> +            "in_bufsz = %lu, out_bufsz = %lu)\n",
-> >> +            ino, cmd, flags, in_bufsz, out_bufsz);
-> >> +
-> >> +    if (!(cmd == FS_IOC_SETFLAGS || cmd == FS_IOC_GETFLAGS ||
-> >> +          cmd == FS_IOC_FSSETXATTR || cmd == FS_IOC_FSGETXATTR)) {
-> >> +        goto out;
-> > 
-> > Good that you allowed only two operations. Still I think people might
-> > have concern about all the inode attrs and whether it is safe to
-> > allow that. For example immutable flag. Now even host can't delete
-> > that file without first clearing that flag. 
-> 
-> Yes, this will be an issue.
-> 
-> > I think it is doable
-> > just that involves extra step.
-> > 
-> > So we probably might have to block certain attrs if it becomes an
-> > issue or make it configurable.
-> 
-> Currently fuse kernel module only requires that virtiofsd shall support
-> the set flag path (FS_IOC_SETFLAGS/FS_IOC_FSSETXATTR), so that users
-> inside guest are able to set/clear FS_XFLAG_DAX flag. For the set flag
-> path, maybe we could support modifying FS_XFLAG_DAX flag first for the
-> security concern?
+> Besides, I'd like to know that, to make the per inode DAX feature merged
+> into v5.17, shall the patches for virtiofsd also be ready during the
+> merge window?
 
-I think right now limiting ioctl operations to FS_XFLAG_DAX is not
-a bad idea. That's what we need for now. Others can be opened when
-people need it.
+I think having virtiofsd patches ready is not a strict requirement to
+merge kernel patches. I will provide my ack for the kernel patches.
+After that it is up to the Miklos to accept or reject those patches.
 
-> 
-> The get flag path(FS_IOC_GETFLAGS/FS_IOC_FSGETXATTR) is not strongly
-> required currently, since the DAX flag is totally constructed by
-> virtiofsd now. The use case of the get flag path may be like, users
-> inside guest may want to query the FS_XFLAG_DAX flag after setting
-> FS_XFLAG_DAX flag previously. The get flag path may also expose the file
-> attr of the host file to the guest, and thus maybe we shall also only
-> support quering FS_XFLAG_DAX flag as the first step.
-
-Querying FS_XFLAG_DAX is fine. And I agreed that it is needed because
-guest might want to query it.
-
-So let us support both setting and querying FS_XFLAG_DAX and block other
-operations for now.
-
-> 
-> 
-> > 
-> >> +    }
-> >> +
-> >> +    /* unrestricted ioctl is not supported yet */
-> >> +    if (flags & FUSE_IOCTL_UNRESTRICTED) {
-> >> +        goto out;
-> >> +    }
-> >> +
-> >> +    dir = _IOC_DIR(cmd);
-> >> +
-> >> +    if (dir & _IOC_READ) {
-> >> +        size = out_bufsz;
-> >> +        buf = malloc(size);
-> >> +        if (!buf) {
-> >> +            goto out_err;
-> >> +        }
-> >> +
-> >> +        if (dir & _IOC_WRITE) {
-> >> +            memcpy(buf, in_buf, size);
-> >> +        }
-> >> +
-> >> +        res = ioctl(fd, cmd, buf);
-> >> +    } else if (dir & _IOC_WRITE) {
-> >> +        res = ioctl(fd, cmd, in_buf);
-> >> +    } else {
-> >> +        res = ioctl(fd, cmd, arg);
-> >> +    }
-> > 
-> > I do not understand this if block. So if _IOC_READ and _IOC_WRITE
-> > is not set, then we just send "arg" as third argument. Can you
-> > shed some light on how this third argument works for file attr
-> > flags. 
-> 
-> In theory ioctl could be neither _IOC_READ nor _IOC_WRITE. I implement
-> this if block just for the completeness of the logic for ioctl support.
-> It doesn't matter with the file attr though.
-> 
-> 
-> > I am assuming that "lsattr" will use the _IOC_READ path,
-> > while chattr will use "_IOC_WRITE" path? If that's the case,
-> > as of now third condition is not even required. Until and unless
-> > we are supporting more ioctls.
-> > 
-> 
-> Sure, I can remove this if block for now.
-
-Sounds good. Let somebody else add it later when need be. For now, we 
-can probably focus on FS_XFLAG_DAX attr only. And put a comment in code
-explaining this restriction.
-
+Thanks
 Vivek
+
+> 
+> 
+> On 12/9/21 4:05 AM, Vivek Goyal wrote:
+> > On Wed, Dec 08, 2021 at 09:38:45AM +0800, JeffleXu wrote:
+> >>
+> >>
+> >> On 12/7/21 10:42 PM, Vivek Goyal wrote:
+> >>> Hi Jeffle,
+> >>>
+> >>> I noticed that you posted V8 of kernel patches. I was away from work
+> >>> so could not look at it. Now I am back and want to review and test
+> >>> those patches.
+> >>
+> >> Thanks for reviewing and evaluating.
+> >>
+> >>>
+> >>> Is there a new version of patches for virtiofsd as well?
+> >>
+> >> Nope. Patches for virtiofsd is not updated. v7 is the latest version.
+> > 
+> > Hi Jeffle,
+> > 
+> > I am testing these patches now. Using virtio-fs-dev branch and your
+> > patches on top.
+> > 
+> > When I unmount virtiofs in guest, I see following qemu-kvm message
+> > on console.
+> > 
+> > qemu-kvm: check_slave_message_entries: Short VhostUserFSSlaveMsg size, 8
+> > 
+> > Wondering have you noticed it. I have not debugged it. Wondering if
+> > it is due to your patches or there is something in virtio-fs-dev
+> > branch patches which triggers it.
+> > 
+> > Vivek
+> > 
+> 
+> -- 
+> Thanks,
+> Jeffle
+> 
 

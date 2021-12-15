@@ -1,15 +1,21 @@
-Date: Tue, 2 Nov 2021 11:30:31 -0400
+Date: Wed, 15 Dec 2021 14:20:06 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YYFZl3egeX88G3FQ@redhat.com>
-References: <20211012180624.447474-1-vgoyal@redhat.com>
-	<20211012180624.447474-3-vgoyal@redhat.com>
-	<CAJfpegs-EHBjjnsVQdPWfH=idVENj9Aw0e-L4tjcgx3v38NJtg@mail.gmail.com>
+Message-ID: <Ybo/5h9umGlinaM4@redhat.com>
+References: <20211111173043.GB25491@quack2.suse.cz>
+	<CAOQ4uxiOUM6=190w4018w4nJRnqi+9gzzfQTsLh5gGwbQH_HgQ@mail.gmail.com>
+	<CANXojcy9JzXeLQ6bz9+UOekkpqo8NkgQbhugmGmPE+x3+_=h3Q@mail.gmail.com>
+	<CAO17o21YVczE2-BTAVg-0HJU6gjSUkzUSqJVs9k-_t7mYFNHaA@mail.gmail.com>
+	<CAOQ4uxjpGMYZrq74S=EaSO2nvss4hm1WZ_k+Xxgrj2k9pngJgg@mail.gmail.com>
+	<YaZC+R7xpGimBrD1@redhat.com>
+	<CAO17o21uh3fJHd0gMu-SmZei5et6HJo91DiLk_YyfUqrtHy2pQ@mail.gmail.com>
+	<CAOQ4uxjfCs=+Of69U6moOJ9T6_zDb1wcrLXWu4DROVme1cNnfQ@mail.gmail.com>
+	<YbobZMGEl6sl+gcX@redhat.com>
+	<CAOQ4uxj9XZNhHB3y9LuGcUJYp-i4f-LXQa2tzX8AkZpRERH+8w@mail.gmail.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <CAJfpegs-EHBjjnsVQdPWfH=idVENj9Aw0e-L4tjcgx3v38NJtg@mail.gmail.com>
-Subject: Re: [Virtio-fs] [PATCH v2 2/2] fuse: Send security context of inode
- on file creation
+In-Reply-To: <CAOQ4uxj9XZNhHB3y9LuGcUJYp-i4f-LXQa2tzX8AkZpRERH+8w@mail.gmail.com>
+Subject: Re: [Virtio-fs] [RFC PATCH 0/7] Inotify support in FUSE and virtiofs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,373 +24,137 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Miklos Szeredi <miklos@szeredi.hu>
-Cc: SElinux list <selinux@vger.kernel.org>, Casey Schaufler <casey@schaufler-ca.com>, Stephen Smalley <stephen.smalley.work@gmail.com>, Ondrej Mosnacek <omosnace@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, LSM <linux-security-module@vger.kernel.org>, linux-fsdevel@vger.kernel.org
+To: Amir Goldstein <amir73il@gmail.com>
+Cc: Steve French <sfrench@samba.org>, Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, Nathan Youngman <git@nathany.com>, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Stef Bon <stefbon@gmail.com>
 
-On Tue, Nov 02, 2021 at 03:00:30PM +0100, Miklos Szeredi wrote:
-> On Tue, 12 Oct 2021 at 20:06, Vivek Goyal <vgoyal@redhat.com> wrote:
+On Wed, Dec 15, 2021 at 07:29:29PM +0200, Amir Goldstein wrote:
+> > >
+> > > The mistake in your premise at 1) is to state that "fuse does not
+> > > support persistent file handles"
+> > > without looking into what that statement means.
+> > > What it really means is that user cannot always open_by_handle_at()
+> > > from a previously
+> > > obtained file handle, which has obvious impact on exporting fuse to NFS (*).
 > >
-> > When a new inode is created, send its security context to server along
-> > with creation request (FUSE_CREAT, FUSE_MKNOD, FUSE_MKDIR and FUSE_SYMLINK).
-> > This gives server an opportunity to create new file and set security
-> > context (possibly atomically). In all the configurations it might not
-> > be possible to set context atomically.
+> > Hi Amir,
 > >
-> > Like nfs and ceph, use security_dentry_init_security() to dermine security
-> > context of inode and send it with create, mkdir, mknod, and symlink requests.
-> >
-> > Following is the information sent to server.
-> >
-> > - struct fuse_secctxs.
-> >   This contains total number of security contexts being sent.
-> >
-> > - struct fuse_secctx.
-> >   This contains total size of security context which follows this structure.
-> >   There is one fuse_secctx instance per security context.
-> >
-> > - xattr name string.
-> >   This string represents name of xattr which should be used while setting
-> >   security context. As of now it is hardcoded to "security.selinux".
-> >
-> > - security context.
-> >   This is the actual security context whose size is specified in fuse_secctx
-> >   struct.
-> >
-> > This patch is modified version of patch from
-> > Chirantan Ekbote <chirantan@chromium.org>
-> >
-> > v2:
-> > - Added "fuse_secctxs" structure where one can specify how many security
-> >   contexts are being sent. This can be useful down the line if we
-> >   have more than one security contexts being set.
-> >
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > ---
-> >  fs/fuse/dir.c             | 115 ++++++++++++++++++++++++++++++++++++--
-> >  fs/fuse/fuse_i.h          |   3 +
-> >  fs/fuse/inode.c           |   4 +-
-> >  include/uapi/linux/fuse.h |  20 +++++++
-> >  4 files changed, 136 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
-> > index d9b977c0f38d..ce62593a61f9 100644
-> > --- a/fs/fuse/dir.c
-> > +++ b/fs/fuse/dir.c
-> > @@ -17,6 +17,9 @@
-> >  #include <linux/xattr.h>
-> >  #include <linux/iversion.h>
-> >  #include <linux/posix_acl.h>
-> > +#include <linux/security.h>
-> > +#include <linux/types.h>
-> > +#include <linux/kernel.h>
-> >
-> >  static void fuse_advise_use_readdirplus(struct inode *dir)
-> >  {
-> > @@ -456,6 +459,66 @@ static struct dentry *fuse_lookup(struct inode *dir, struct dentry *entry,
-> >         return ERR_PTR(err);
-> >  }
-> >
-> > +static int get_security_context(struct dentry *entry, umode_t mode,
-> > +                               void **security_ctx, u32 *security_ctxlen)
-> > +{
-> > +       struct fuse_secctx *fsecctx;
-> > +       struct fuse_secctxs *fsecctxs;
-> > +       void *ctx, *full_ctx;
-> > +       u32 ctxlen, full_ctxlen;
-> > +       int err = 0;
-> > +       const char *name;
-> > +
-> > +       err = security_dentry_init_security(entry, mode, &entry->d_name,
-> > +                                           &name, &ctx, &ctxlen);
-> > +       if (err) {
-> > +               if (err != -EOPNOTSUPP)
-> > +                       goto out_err;
-> > +               /* No LSM is supporting this security hook. Ignore error */
-> > +               err = 0;
-> > +               ctxlen = 0;
-> > +       }
-> > +
-> > +       if (ctxlen > 0) {
-> > +               void *ptr;
-> > +
-> > +               full_ctxlen = sizeof(*fsecctxs) + sizeof(*fsecctx) +
-> > +                             strlen(name) + ctxlen + 1;
-> > +               full_ctx = kzalloc(full_ctxlen, GFP_KERNEL);
-> > +               if (!full_ctx) {
-> > +                       err = -ENOMEM;
-> > +                       kfree(ctx);
-> > +                       goto out_err;
-> > +               }
-> > +
-> > +               ptr = full_ctx;
-> > +               fsecctxs = (struct fuse_secctxs*) ptr;
-> > +               fsecctxs->nr_secctx = 1;
-> > +               ptr += sizeof(*fsecctxs);
-> > +
-> > +               fsecctx = (struct fuse_secctx*) ptr;
-> > +               fsecctx->size = ctxlen;
-> > +               ptr += sizeof(*fsecctx);
-> > +
-> > +               strcpy(ptr, name);
-> > +               ptr += strlen(name) + 1;
-> > +               memcpy(ptr, ctx, ctxlen);
-> > +               kfree(ctx);
-> > +       } else {
-> > +               full_ctxlen = sizeof(*fsecctxs);
-> > +               full_ctx = kzalloc(full_ctxlen, GFP_KERNEL);
-> > +               if (!full_ctx) {
-> > +                       err = -ENOMEM;
-> > +                       goto out_err;
-> > +               }
-> > +       }
-> > +
-> > +       *security_ctxlen = full_ctxlen;
-> > +       *security_ctx = full_ctx;
-> > +out_err:
-> > +       return err;
-> > +}
-> > +
-> >  /*
-> >   * Atomic create+open operation
-> >   *
-> > @@ -476,6 +539,8 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
-> >         struct fuse_entry_out outentry;
-> >         struct fuse_inode *fi;
-> >         struct fuse_file *ff;
-> > +       void *security_ctx = NULL;
-> > +       u32 security_ctxlen;
-> >
-> >         /* Userspace expects S_IFREG in create mode */
-> >         BUG_ON((mode & S_IFMT) != S_IFREG);
-> > @@ -517,6 +582,18 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
-> >         args.out_args[0].value = &outentry;
-> >         args.out_args[1].size = sizeof(outopen);
-> >         args.out_args[1].value = &outopen;
-> > +
-> > +       if (fm->fc->init_security) {
-> > +               err = get_security_context(entry, mode, &security_ctx,
-> > +                                          &security_ctxlen);
-> > +               if (err)
-> > +                       goto out_put_forget_req;
-> > +
-> > +               args.in_numargs = 3;
-> > +               args.in_args[2].size = security_ctxlen;
-> > +               args.in_args[2].value = security_ctx;
-> > +       }
-> > +
-> >         err = fuse_simple_request(fm, &args);
-> >         if (err)
-> >                 goto out_free_ff;
-> > @@ -554,6 +631,7 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
-> >
-> >  out_free_ff:
-> >         fuse_file_free(ff);
-> > +       kfree(security_ctx);
-> >  out_put_forget_req:
-> >         kfree(forget);
-> >  out_err:
-> > @@ -613,13 +691,15 @@ static int fuse_atomic_open(struct inode *dir, struct dentry *entry,
-> >   */
-> >  static int create_new_entry(struct fuse_mount *fm, struct fuse_args *args,
-> >                             struct inode *dir, struct dentry *entry,
-> > -                           umode_t mode)
-> > +                           umode_t mode, bool init_security)
-> >  {
-> >         struct fuse_entry_out outarg;
-> >         struct inode *inode;
-> >         struct dentry *d;
-> >         int err;
-> >         struct fuse_forget_link *forget;
-> > +       void *security_ctx = NULL;
-> > +       u32 security_ctxlen = 0;
-> >
-> >         if (fuse_is_bad(dir))
-> >                 return -EIO;
-> > @@ -633,7 +713,29 @@ static int create_new_entry(struct fuse_mount *fm, struct fuse_args *args,
-> >         args->out_numargs = 1;
-> >         args->out_args[0].size = sizeof(outarg);
-> >         args->out_args[0].value = &outarg;
-> > +
-> > +       if (init_security) {
+> > What good is file handle if one can't use it for open_by_handle_at(). I
+> > mean, are there other use cases?
 > 
+> commit 44d705b0:
+> "...There are several ways that an application can use this information:
+> 
+>     1. When watching a single directory, the name is always relative to
+>     the watched directory, so application need to fstatat(2) the name
+>     relative to the watched directory.
+> 
+>     2. When watching a set of directories, the application could keep a map
+>     of dirfd for all watched directories and hash the map by fid obtained
+>     with name_to_handle_at(2).  When getting a name event, the fid in the
+>     event info could be used to lookup the base dirfd in the map and then
+>     call fstatat(2) with that dirfd.
 
-Hi Miklos,
-
-> Instead of a new arg to create_new_entry(), this could check
-> args.opcode != FUSE_LINK.
-
-Will do.
+Ok, so case 1 and 2 still might be doable.
 
 > 
-> > +               unsigned short idx = args->in_numargs;
-> > +
-> > +               if ((size_t)idx >= ARRAY_SIZE(args->in_args)) {
-> > +                       err = -ENOMEM;
-> > +                       goto out_put_forget_req;
-> > +               }
-> > +
-> > +               err = get_security_context(entry, mode, &security_ctx,
-> > +                                          &security_ctxlen);
-> > +               if (err)
-> > +                       goto out_put_forget_req;
-> > +
-> > +               if (security_ctxlen > 0) {
+>     3. When watching a filesystem (FAN_MARK_FILESYSTEM) or a large set of
+>     directories, the application could use open_by_handle_at(2) with the fid
+>     in event info to obtain dirfd for the directory where event happened and
+>     call fstatat(2) with this dirfd.
 > 
-> This doesn't seem right.  How would the server know if this is arg is missing?
-> 
-> I think if FUSE_SECURITY_CTX was negotiated, then the secctx header
-> will always need to be added to the MK* requests.
+>     The last option scales better for a large number of watched directories.
+>     The first two options may be available in the future also for non
+>     privileged fanotify watchers, because open_by_handle_at(2) requires
+>     the CAP_DAC_READ_SEARCH capability.
+> "
 
-Even for the case of FUSE_LINK request? I think I put this check because
-FUSE_LINK is not sending secctx header. Other requests are appending
-this header even if a security module is not loaded/enabled.
-
-I guess it makes more sense to add secctx header even for FUSE_LINK
-request. Just that header will mention 0 security contexts are
-following. This will interface more uniform. I will make this change.
-
+This is one is not possible as it needs open_by_handle_at().
 
 > 
-> > +                       args->in_args[idx].size = security_ctxlen;
-> > +                       args->in_args[idx].value = security_ctx;
-> > +                       args->in_numargs++;
-> > +               }
-> > +       }
-> > +
-> >         err = fuse_simple_request(fm, args);
-> > +       kfree(security_ctx);
-> >         if (err)
-> >                 goto out_put_forget_req;
-> >
-> > @@ -691,7 +793,7 @@ static int fuse_mknod(struct user_namespace *mnt_userns, struct inode *dir,
-> >         args.in_args[0].value = &inarg;
-> >         args.in_args[1].size = entry->d_name.len + 1;
-> >         args.in_args[1].value = entry->d_name.name;
-> > -       return create_new_entry(fm, &args, dir, entry, mode);
-> > +       return create_new_entry(fm, &args, dir, entry, mode, fm->fc->init_security);
-> >  }
-> >
-> >  static int fuse_create(struct user_namespace *mnt_userns, struct inode *dir,
-> > @@ -719,7 +821,8 @@ static int fuse_mkdir(struct user_namespace *mnt_userns, struct inode *dir,
-> >         args.in_args[0].value = &inarg;
-> >         args.in_args[1].size = entry->d_name.len + 1;
-> >         args.in_args[1].value = entry->d_name.name;
-> > -       return create_new_entry(fm, &args, dir, entry, S_IFDIR);
-> > +       return create_new_entry(fm, &args, dir, entry, S_IFDIR,
-> > +                               fm->fc->init_security);
-> >  }
-> >
-> >  static int fuse_symlink(struct user_namespace *mnt_userns, struct inode *dir,
-> > @@ -735,7 +838,8 @@ static int fuse_symlink(struct user_namespace *mnt_userns, struct inode *dir,
-> >         args.in_args[0].value = entry->d_name.name;
-> >         args.in_args[1].size = len;
-> >         args.in_args[1].value = link;
-> > -       return create_new_entry(fm, &args, dir, entry, S_IFLNK);
-> > +       return create_new_entry(fm, &args, dir, entry, S_IFLNK,
-> > +                               fm->fc->init_security);
-> >  }
-> >
-> >  void fuse_update_ctime(struct inode *inode)
-> > @@ -915,7 +1019,8 @@ static int fuse_link(struct dentry *entry, struct inode *newdir,
-> >         args.in_args[0].value = &inarg;
-> >         args.in_args[1].size = newent->d_name.len + 1;
-> >         args.in_args[1].value = newent->d_name.name;
-> > -       err = create_new_entry(fm, &args, newdir, newent, inode->i_mode);
-> > +       err = create_new_entry(fm, &args, newdir, newent, inode->i_mode,
-> > +                              false);
-> >         /* Contrary to "normal" filesystems it can happen that link
-> >            makes two "logical" inodes point to the same "physical"
-> >            inode.  We invalidate the attributes of the old one, so it
-> > diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-> > index 319596df5dc6..885f34f9967f 100644
-> > --- a/fs/fuse/fuse_i.h
-> > +++ b/fs/fuse/fuse_i.h
-> > @@ -765,6 +765,9 @@ struct fuse_conn {
-> >         /* Propagate syncfs() to server */
-> >         unsigned int sync_fs:1;
-> >
-> > +       /* Initialize security xattrs when creating a new inode */
-> > +       unsigned int init_security:1;
-> > +
-> >         /** The number of requests waiting for completion */
-> >         atomic_t num_waiting;
-> >
-> > diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-> > index 36cd03114b6d..343bc9cfbd92 100644
-> > --- a/fs/fuse/inode.c
-> > +++ b/fs/fuse/inode.c
-> > @@ -1152,6 +1152,8 @@ static void process_init_reply(struct fuse_mount *fm, struct fuse_args *args,
-> >                         }
-> >                         if (arg->flags & FUSE_SETXATTR_EXT)
-> >                                 fc->setxattr_ext = 1;
-> > +                       if (arg->flags & FUSE_SECURITY_CTX)
-> > +                               fc->init_security = 1;
-> >                 } else {
-> >                         ra_pages = fc->max_read / PAGE_SIZE;
-> >                         fc->no_lock = 1;
-> > @@ -1195,7 +1197,7 @@ void fuse_send_init(struct fuse_mount *fm)
-> >                 FUSE_PARALLEL_DIROPS | FUSE_HANDLE_KILLPRIV | FUSE_POSIX_ACL |
-> >                 FUSE_ABORT_ERROR | FUSE_MAX_PAGES | FUSE_CACHE_SYMLINKS |
-> >                 FUSE_NO_OPENDIR_SUPPORT | FUSE_EXPLICIT_INVAL_DATA |
-> > -               FUSE_HANDLE_KILLPRIV_V2 | FUSE_SETXATTR_EXT;
-> > +               FUSE_HANDLE_KILLPRIV_V2 | FUSE_SETXATTR_EXT | FUSE_SECURITY_CTX;
-> >  #ifdef CONFIG_FUSE_DAX
-> >         if (fm->fc->dax)
-> >                 ia->in.flags |= FUSE_MAP_ALIGNMENT;
-> > diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
-> > index 2fe54c80051a..b31a0f79fde8 100644
-> > --- a/include/uapi/linux/fuse.h
-> > +++ b/include/uapi/linux/fuse.h
-> 
-> I don't see why the API changes are split between the first and the
-> second patch in the series.   Please either move all API changes to
-> 1/2 or fold 1/2 into this patch.
+> fsnotifywait [1] has an example of use case #2.
+> Essentially, when watching inodes, the fanotify file identifier is not very much
+> different from the inotify "watch descriptor" - it identifies the watched object
+> and the watched object is pinned to cache as long as the inode mark is set
+> so file handle would not change also in fuse.
 
-I guess I will fold first patch into this one, so that there is only
-one patch.
+Ok, so if we are maintaining a hash map keyed by file handle, then first
+we need to pin down the inode and then call name_to_handle_at() for the
+watched object and add to hash table. Something like this.
+
+A. foo_fd = open(foo.txt)
+B. name_to_handle_at(.., foo.txt,...)
+C. Add info in hash table using foo_handle as key.
+D. Add watch on foo.txt (fanotify_mark()).
+E. close(foo_fd). 
+
+One could probably skip step A and E. And do this instead.
+
+A. Add watch on foo.txt (fanotify_mark())
+B. name_to_handle_at(.., foo.txt,...)
+C. Add info in hash table using foo_handle as key.
+
+But this is little bit racy. You might start getting events with file
+handles of foo.txt before you could complete B or C.
 
 > 
-> > @@ -986,4 +986,24 @@ struct fuse_syncfs_in {
-> >         uint64_t        padding;
-> >  };
+> [1] https://github.com/inotify-tools/inotify-tools/pull/134
+> 
 > >
-> > +/*
-> > + * For each security context, send fuse_secctx with size of security context
-> > + * fuse_secctx will be followed by security context name and this in turn
-> > + * will be followed by actual context label.
-> > + * fuse_secctx, name, context
-> > + * */
-> > +struct fuse_secctx {
-> > +       uint32_t        size;
-> > +       uint32_t        padding;
-> > +};
-> > +
-> > +/*
-> > + * Contains the information about how many fuse_secctx structures are being
-> > + * sent.
-> > + */
-> > +struct fuse_secctxs {
-> > +       uint32_t        nr_secctx;
-> > +       uint32_t        padding;
-> > +};
+> > IIUC, file handle for the same object can change if inode had been flushed
+> > out of guest cache and brought back in later. So if application say
+> > generated file handle for an object and saved it and later put a watch
+> > on that object, by that time file handle of the object might have changed
+> > (as seen by fuse). So one can't even use to match it with previous saved
+> > file handle.
+> >
 > 
-> The name of this struct is very confusing due to similarity with
-> fuse_secctx.  How about "fuse_secctx_header"?
+> The argument is not applicable for inode watches.
 
-Sounds good.  Will do.
+Fair enough. I could see a very limited use case and thought that's not
+enough. But looks like you seem to be ok with that.
+
+> Filesystem and mount watches are not going to be supported with virtiofs
+> or any filesystem that does not support persistent file handles.
+
+Ok, so no filesystem and mount watches for virtiofs to begin with.
 
 > 
-> Also I'd add the total length of the security context (including the
-> header), otherwise further args would need to parse the security
-> context completely to find the position of the next arg.   The
-> counterexample is null-terminated names; while parsing these is pretty
-> trivial,  in hindsight it would probably have been better to add a
-> header to names as well.
+> > So I can't use file handle for open_by_handle_at(). I can't use it to
+> > match it with previously saved file handle. So what can I use it for?
+> >
+> > IOW, I could not imagine supporting fanotify file handles without
+> > fixing the file handles properly in fuse. And it needs fixing in
+> > virtiofs as well as we can't trust random file handles from guest
+> > for regular files.
+> >
+> 
+> Partly correct statements, but when looking at the details, they are
+> not relevant to the case of fanotify inode watch.
+> 
+> Note that at the moment, fuse does not even support local fanotify
+> watch with file handles because of fanotify_test_fsid() - fuse does
+> not set f_fsid (not s_uuid), so it's not really about supporting fanotify
+> on fuse now.
 
-Agreed. Will add total length also to "fuse_secctx_header". That will
-act as a strong check/verification mechanism as well as allow to
-quickly skip to next args if one does not want to parse security contexts
-for whatever reason.
+Hmm..., that means we first will have to look into supporting local
+fanotify events with file handles on fuse. Without that we can't even
+test our remote fsnotify changes looks like.
+
+This sounds like another blocker (or dependency project to complete first)
+before one can make progress with remote inotify/fanotify/fsnotify.
+
+> It's about the vfs APIs for remote fsnotify that should not be inotify
+> specific.
+
+I understand that part. But at the same time, remote fsnotify API will
+probably evolve as you keep on adding more functionality. What if there
+is another notification mechanism tomorrow say newfancynotify(), we
+might have to modify remote fsnoitfy again to accomodate that.
+
+IOW, fsnotify seems to be just underlying plumbing and whatever you
+add today might not be enough to support tomorrow's features. That's
+why I wanted to start with a minimal set of functionality and add
+more to it later.
 
 Thanks
 Vivek

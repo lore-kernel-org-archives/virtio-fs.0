@@ -1,17 +1,7 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=xNID7Sbx1YrHMAqjDAV6CUzhEiec7Mg9Bx/OS+Vsixc=;
-	b=g0cW84uIYeFNmoqWgs8bcw1iIveqC4ILmnfk4sDrT/8R1Xq0KrwPWKErvGe2X++1oJ
-	dARqW9hHCDfO8WdnLI42gt+UjeWYKDU25uvrzStw1Aql2sxwyMdxBeIxLKGWfEuyMRza
-	b/iZtyDjB6KJkYe4k5eTjgbkuMvbO7saJ8Hs+zfhZe6bbVXEbtVn+PzXv72ZSO5DqGGA
-	PTHrdHTt1uKTyLCGVILLM5+98w+ceBFLjl2aTAFmsItJPkv2v2BOF3lG3SP0jgTa9GbH
-	y/8xIJouCFsLCglqHj/1nsDmFO/tzLGu5UMOJJFz3EcwAOeMDWUmST+DvXyhzO91c43R
-	Gadg==
-MIME-Version: 1.0
-References: <20211111173043.GB25491@quack2.suse.cz>
-	<CAOQ4uxiOUM6=190w4018w4nJRnqi+9gzzfQTsLh5gGwbQH_HgQ@mail.gmail.com>
-	<CANXojcy9JzXeLQ6bz9+UOekkpqo8NkgQbhugmGmPE+x3+_=h3Q@mail.gmail.com>
-	<CAO17o21YVczE2-BTAVg-0HJU6gjSUkzUSqJVs9k-_t7mYFNHaA@mail.gmail.com>
+Date: Thu, 16 Dec 2021 11:24:32 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YbtoQGKflkChU8lZ@redhat.com>
+References: <CAO17o21YVczE2-BTAVg-0HJU6gjSUkzUSqJVs9k-_t7mYFNHaA@mail.gmail.com>
 	<CAOQ4uxjpGMYZrq74S=EaSO2nvss4hm1WZ_k+Xxgrj2k9pngJgg@mail.gmail.com>
 	<YaZC+R7xpGimBrD1@redhat.com>
 	<CAO17o21uh3fJHd0gMu-SmZei5et6HJo91DiLk_YyfUqrtHy2pQ@mail.gmail.com>
@@ -20,11 +10,11 @@ References: <20211111173043.GB25491@quack2.suse.cz>
 	<CAOQ4uxj9XZNhHB3y9LuGcUJYp-i4f-LXQa2tzX8AkZpRERH+8w@mail.gmail.com>
 	<Ybo/5h9umGlinaM4@redhat.com>
 	<CAOQ4uxheVq-YHkT9eOu3vUNt1RU4Wa6MkyzXXLboHE_Pj6-6tw@mail.gmail.com>
-In-Reply-To: <CAOQ4uxheVq-YHkT9eOu3vUNt1RU4Wa6MkyzXXLboHE_Pj6-6tw@mail.gmail.com>
-From: Amir Goldstein <amir73il@gmail.com>
-Date: Thu, 16 Dec 2021 13:03:00 +0200
-Message-ID: <CAOQ4uxjzW7mt0pqA+K_sEJokYcv_D3e7axAOWLXxQ84bZDnfcw@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
+	<CAOQ4uxjzW7mt0pqA+K_sEJokYcv_D3e7axAOWLXxQ84bZDnfcw@mail.gmail.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAOQ4uxjzW7mt0pqA+K_sEJokYcv_D3e7axAOWLXxQ84bZDnfcw@mail.gmail.com>
 Subject: Re: [Virtio-fs] [RFC PATCH 0/7] Inotify support in FUSE and virtiofs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -34,99 +24,178 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
+To: Amir Goldstein <amir73il@gmail.com>
 Cc: Steve French <sfrench@samba.org>, Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, Nathan Youngman <git@nathany.com>, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Stef Bon <stefbon@gmail.com>
 
-> > I understand that part. But at the same time, remote fsnotify API will
-> > probably evolve as you keep on adding more functionality. What if there
-> > is another notification mechanism tomorrow say newfancynotify(), we
-> > might have to modify remote fsnoitfy again to accomodate that.
+On Thu, Dec 16, 2021 at 01:03:00PM +0200, Amir Goldstein wrote:
+> > > I understand that part. But at the same time, remote fsnotify API will
+> > > probably evolve as you keep on adding more functionality. What if there
+> > > is another notification mechanism tomorrow say newfancynotify(), we
+> > > might have to modify remote fsnoitfy again to accomodate that.
+> > >
+> > > IOW, fsnotify seems to be just underlying plumbing and whatever you
+> > > add today might not be enough to support tomorrow's features. That's
+> > > why I wanted to start with a minimal set of functionality and add
+> > > more to it later.
+> > >
 > >
-> > IOW, fsnotify seems to be just underlying plumbing and whatever you
-> > add today might not be enough to support tomorrow's features. That's
-> > why I wanted to start with a minimal set of functionality and add
-> > more to it later.
+> > I do want to start with minimal functionality.
+> > I did not request that you implement more functionality than what inotify
+> > provides.
 > >
->
-> I do want to start with minimal functionality.
-> I did not request that you implement more functionality than what inotify
-> provides.
->
-> TBH, I can't even remember the specific details that made me say
-> "this is remote inotify not remote fsnotify", but there were such details.
-> I remember inotify rename cookie being one of them.
->
+> > TBH, I can't even remember the specific details that made me say
+> > "this is remote inotify not remote fsnotify", but there were such details.
+> > I remember inotify rename cookie being one of them.
+> >
+> 
+> Let me repeat my concern about the rename cookie API.
+> 
+> As Jan has convinced me to create a new event FS_RENAME
+> for fanotify, there is no harm in FUSE passing the rename cookie
+> along with FS_MOVE events, but the FUSE out args:
+> 
+> struct fuse_notify_fsnotify_out {
+>  uint64_t inode;
+>  uint64_t mask;
+>  uint32_t namelen;
+>  uint32_t cookie;
+> };
+> 
+> How do you expect to extend it when somebody wants to implement
+> the FS_RENAME event that carries two names and two dir inodes
+> (and no cookie)?
+> Will they need to use a new out struct? a union?
 
-Let me repeat my concern about the rename cookie API.
+I was thinking of defining a new struct say "fuse_notify_fsnotify_out_ext"
+when one reached to a state where fanotify can be supported. Because
+fanotify seems much more rich as compared to inotify and more data
+needs to be transferred in fuse events. Without being able to test
+fanotify, its little hard to design and test this struct to meet
+fanotify needs as well.
 
-As Jan has convinced me to create a new event FS_RENAME
-for fanotify, there is no harm in FUSE passing the rename cookie
-along with FS_MOVE events, but the FUSE out args:
+> 
+> Unlike inotify, fanotify can sometimes report the inode of the child
+> along with inode of the parent in events (e.g. FS_OPEN) when watching
+> a parent directory.
+> 
+> How will this out args struct be extended if we would want to pass that
+> information?
 
-struct fuse_notify_fsnotify_out {
- uint64_t inode;
- uint64_t mask;
- uint32_t namelen;
- uint32_t cookie;
-};
+I was thinking of a new struct which takes care of all of fanotify needs.
 
-How do you expect to extend it when somebody wants to implement
-the FS_RENAME event that carries two names and two dir inodes
-(and no cookie)?
-Will they need to use a new out struct? a union?
+> 
+> There is no need to address this now. I just want to know that the
+> design you suggest is extendable to future needs and if it is not,
+> I would prefer to reserve enough fields in the FUSE event
+> struct for the common needs of all current fsnotify backends,
+> just as we pass all the relevant info to the fsnotify_XXX() hooks.
 
-Unlike inotify, fanotify can sometimes report the inode of the child
-along with inode of the parent in events (e.g. FS_OPEN) when watching
-a parent directory.
+So there are two ways.
 
-How will this out args struct be extended if we would want to pass that
-information?
+- Either we now define a struct which meeds the needs of inotify only. 
+  And make remote inotify work.
 
-There is no need to address this now. I just want to know that the
-design you suggest is extendable to future needs and if it is not,
-I would prefer to reserve enough fields in the FUSE event
-struct for the common needs of all current fsnotify backends,
-just as we pass all the relevant info to the fsnotify_XXX() hooks.
+- Or we try to make it generic enough so that both inotify and fanotify
+  can be supported. Given local fanotify does not work on fuse yet,
+  it will be hard to test it. And without testing it will be hard to
+  ascertain, have we met all the needs of fanotify. It will be just
+  sort of a guess.
 
-> I guess this discussion is not very productive at this point as none of us
-> are saying anything very specific about what should and should not
-> be done, so let me try to suggest something -
->
-> Try to see if you could replace the server side implementation with
-> fanotify even if you use CAP_SYS_ADMIN for the experiment.
-> fanotify should be almost a drop-in replacement for inotify at this point
-> If you think that you cannot make this experiment with your current
-> protocol and vfs extensions then you must have done something wrong
-> and tied the protocol and/or the vfs API to inotify terminology.
->
+IMHO, first choice also seems reasonable. This is small enough to make
+progress and take care of other pending issues like events coming after
+inode unlink etc.
 
-So I did this thought experiment myself.
-I did not find any obvious issues with implementing the backend as
-fanotify. If anything, mapping fhandle to inode is even a bit easier
-than mapping wd to inode if you know the fhandle encoding.
+> 
+> > I guess this discussion is not very productive at this point as none of us
+> > are saying anything very specific about what should and should not
+> > be done, so let me try to suggest something -
+> >
+> > Try to see if you could replace the server side implementation with
+> > fanotify even if you use CAP_SYS_ADMIN for the experiment.
+> > fanotify should be almost a drop-in replacement for inotify at this point
+> > If you think that you cannot make this experiment with your current
+> > protocol and vfs extensions then you must have done something wrong
+> > and tied the protocol and/or the vfs API to inotify terminology.
+> >
+> 
+> So I did this thought experiment myself.
+> I did not find any obvious issues with implementing the backend as
+> fanotify. If anything, mapping fhandle to inode is even a bit easier
+> than mapping wd to inode if you know the fhandle encoding.
 
-For event reporting, besides generalizing the out args, implementation
-would be similar. Since FUSE uses nodeid to identify the object in
-events, there is no problem for fanotify to report fhandle and inotify
-to report wd.
+Fair enough. I think Ioannis is trying to replace inotify backend
+with fanotify backend. If we run into issues with this, we will
+let you know.
 
-For setting watches, protocol seems generic enough, although
-I dislike how fuse_fsnotify_update_mark() masks out inotify
-specific flags.
+> 
+> For event reporting, besides generalizing the out args, implementation
+> would be similar. Since FUSE uses nodeid to identify the object in
+> events, there is no problem for fanotify to report fhandle and inotify
+> to report wd.
 
-inotify back should mask out its own private flags when calling
-into a generic vfs API for registering remote watches.
-Also, masking out FS_EVENT_ON_CHILD is pretty weird, because
-requesting a watch on children is functionally completely different
-than requesting to watch the directory itself.
+I think hardes part is generalizing out_args. One thing I am not sure
+about is, will we be carrying file handles in this struct? I thought
+that we will be sending nodeid to refer to inodes because that seems
+to be the fuse interface. And if fanotify requires file handles, they
+will use fuse interface to convert nodeid/generation into a file
+handle and report to user space. Is that a reasonable thing to do.
 
-I think I gave you enough comments already for a new revision.
-Are there any open questions left unanswered?
+So how much information we need to carry which covers all the existing
+events. So for the case of rename, looks 
 
-And please grep your kernel patches for "inotify" and "remote inotify"
-in particular. When this term is used in comments and commit messages,
-it is very likely that either the code or documentation is inaccurate.
+For the case of rename, it sounds like we will need to report
+"node ids" of two directories and two names. Once we have space
+to report two "node ids", this could also be used to report
+node ids of parent dir as well as node id of file in question (if needed).
+So will this be good enough. 
 
-Thanks,
-Amir.
+Carrying names will be little tricky I guess because namelen will be
+variable. Until and unless we reserve some fixed amount of space for
+each name say PATH_MAX. But that sounds like a lot of space.
+
+> 
+> For setting watches, protocol seems generic enough, although
+> I dislike how fuse_fsnotify_update_mark() masks out inotify
+> specific flags.
+> 
+> inotify back should mask out its own private flags when calling
+> into a generic vfs API for registering remote watches.
+> Also, masking out FS_EVENT_ON_CHILD is pretty weird, because
+> requesting a watch on children is functionally completely different
+> than requesting to watch the directory itself.
+
+I will look into above two points. I need to familiarize myself with
+the code better before I can understand the issue.
+
+> 
+> I think I gave you enough comments already for a new revision.
+> Are there any open questions left unanswered?
+
+Thank you. After initial round of review, one of our biggest take
+away was that try to make basic fanotify work in V2 of the posting
+and Ioannis started looking into it and ran into various issues.
+
+And that's why we opened this conversation again mentioning the
+issues we are facing with fanotify and trying to figure out if
+supporting fanotify is a basic requirement for this implementation.
+We personally are happy to even support remote inotify only in
+first round of implementation.
+
+So looks like supporting fanotify is not a strict requirement. Though
+you will perfer that fuse notification message is generic enough
+so that it carries enough information to support fanotify. We can
+try that, but I am not 100% sure. Maybe two node ids and two names
+are generic enough to support fanotify rename and other cases were
+two file handles can be reported.
+
+> 
+> And please grep your kernel patches for "inotify" and "remote inotify"
+> in particular. When this term is used in comments and commit messages,
+> it is very likely that either the code or documentation is inaccurate.
+
+IIUC, you want all the comments to call it "remote fsnotify" and not
+"remote inotify", right? Will do.
+
+Thanks
+Vivek
 

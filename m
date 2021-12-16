@@ -1,12 +1,12 @@
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
 	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=ALt1Hb7Qa7bjO8VxujJAaYdZEXhXT8CXyG09xsCi9Qw=;
-	b=bh7AbqnSnaHPpjnf/WLCUXwSULoQLSQ+ntjWOuHzwUmwMQAq02wDvgakifAnkzrS3h
-	W8bxp82nr+FKh5buagap6SrPHF8xuid0GevTnQsKRaCIuISBgWG11K7So6veGpumEdPj
-	lexi5yNbgFcEjAbPA7X/Q59woW3JnwO6GfGa4lJBV/d0wZwrH6w6FT6mCBeibSWSspi5
-	erQlVblyZrMoYKbhIyDseYzPyhlxfQZ0zhsMBr39btqv0wrDV9SCkGHJfWcU20EncF9G
-	EgZx07kSe5FUZaKOTzvZ4gSueSxCmkM19qhrBcWg6qYixPj/uG1n96bnFFNWOnnZOwzI
-	MrtA==
+	:cc; bh=xNID7Sbx1YrHMAqjDAV6CUzhEiec7Mg9Bx/OS+Vsixc=;
+	b=g0cW84uIYeFNmoqWgs8bcw1iIveqC4ILmnfk4sDrT/8R1Xq0KrwPWKErvGe2X++1oJ
+	dARqW9hHCDfO8WdnLI42gt+UjeWYKDU25uvrzStw1Aql2sxwyMdxBeIxLKGWfEuyMRza
+	b/iZtyDjB6KJkYe4k5eTjgbkuMvbO7saJ8Hs+zfhZe6bbVXEbtVn+PzXv72ZSO5DqGGA
+	PTHrdHTt1uKTyLCGVILLM5+98w+ceBFLjl2aTAFmsItJPkv2v2BOF3lG3SP0jgTa9GbH
+	y/8xIJouCFsLCglqHj/1nsDmFO/tzLGu5UMOJJFz3EcwAOeMDWUmST+DvXyhzO91c43R
+	Gadg==
 MIME-Version: 1.0
 References: <20211111173043.GB25491@quack2.suse.cz>
 	<CAOQ4uxiOUM6=190w4018w4nJRnqi+9gzzfQTsLh5gGwbQH_HgQ@mail.gmail.com>
@@ -19,10 +19,11 @@ References: <20211111173043.GB25491@quack2.suse.cz>
 	<YbobZMGEl6sl+gcX@redhat.com>
 	<CAOQ4uxj9XZNhHB3y9LuGcUJYp-i4f-LXQa2tzX8AkZpRERH+8w@mail.gmail.com>
 	<Ybo/5h9umGlinaM4@redhat.com>
-In-Reply-To: <Ybo/5h9umGlinaM4@redhat.com>
+	<CAOQ4uxheVq-YHkT9eOu3vUNt1RU4Wa6MkyzXXLboHE_Pj6-6tw@mail.gmail.com>
+In-Reply-To: <CAOQ4uxheVq-YHkT9eOu3vUNt1RU4Wa6MkyzXXLboHE_Pj6-6tw@mail.gmail.com>
 From: Amir Goldstein <amir73il@gmail.com>
-Date: Wed, 15 Dec 2021 21:54:38 +0200
-Message-ID: <CAOQ4uxheVq-YHkT9eOu3vUNt1RU4Wa6MkyzXXLboHE_Pj6-6tw@mail.gmail.com>
+Date: Thu, 16 Dec 2021 13:03:00 +0200
+Message-ID: <CAOQ4uxjzW7mt0pqA+K_sEJokYcv_D3e7axAOWLXxQ84bZDnfcw@mail.gmail.com>
 Content-Type: text/plain; charset="UTF-8"
 Subject: Re: [Virtio-fs] [RFC PATCH 0/7] Inotify support in FUSE and virtiofs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -36,174 +37,95 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: Vivek Goyal <vgoyal@redhat.com>
 Cc: Steve French <sfrench@samba.org>, Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, Nathan Youngman <git@nathany.com>, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Stef Bon <stefbon@gmail.com>
 
-On Wed, Dec 15, 2021 at 9:20 PM Vivek Goyal <vgoyal@redhat.com> wrote:
->
-> On Wed, Dec 15, 2021 at 07:29:29PM +0200, Amir Goldstein wrote:
-> > > >
-> > > > The mistake in your premise at 1) is to state that "fuse does not
-> > > > support persistent file handles"
-> > > > without looking into what that statement means.
-> > > > What it really means is that user cannot always open_by_handle_at()
-> > > > from a previously
-> > > > obtained file handle, which has obvious impact on exporting fuse to NFS (*).
-> > >
-> > > Hi Amir,
-> > >
-> > > What good is file handle if one can't use it for open_by_handle_at(). I
-> > > mean, are there other use cases?
+> > I understand that part. But at the same time, remote fsnotify API will
+> > probably evolve as you keep on adding more functionality. What if there
+> > is another notification mechanism tomorrow say newfancynotify(), we
+> > might have to modify remote fsnoitfy again to accomodate that.
 > >
-> > commit 44d705b0:
-> > "...There are several ways that an application can use this information:
+> > IOW, fsnotify seems to be just underlying plumbing and whatever you
+> > add today might not be enough to support tomorrow's features. That's
+> > why I wanted to start with a minimal set of functionality and add
+> > more to it later.
 > >
-> >     1. When watching a single directory, the name is always relative to
-> >     the watched directory, so application need to fstatat(2) the name
-> >     relative to the watched directory.
-> >
-> >     2. When watching a set of directories, the application could keep a map
-> >     of dirfd for all watched directories and hash the map by fid obtained
-> >     with name_to_handle_at(2).  When getting a name event, the fid in the
-> >     event info could be used to lookup the base dirfd in the map and then
-> >     call fstatat(2) with that dirfd.
 >
-> Ok, so case 1 and 2 still might be doable.
+> I do want to start with minimal functionality.
+> I did not request that you implement more functionality than what inotify
+> provides.
 >
-> >
-> >     3. When watching a filesystem (FAN_MARK_FILESYSTEM) or a large set of
-> >     directories, the application could use open_by_handle_at(2) with the fid
-> >     in event info to obtain dirfd for the directory where event happened and
-> >     call fstatat(2) with this dirfd.
-> >
-> >     The last option scales better for a large number of watched directories.
-> >     The first two options may be available in the future also for non
-> >     privileged fanotify watchers, because open_by_handle_at(2) requires
-> >     the CAP_DAC_READ_SEARCH capability.
-> > "
->
-> This is one is not possible as it needs open_by_handle_at().
->
-> >
-> > fsnotifywait [1] has an example of use case #2.
-> > Essentially, when watching inodes, the fanotify file identifier is not very much
-> > different from the inotify "watch descriptor" - it identifies the watched object
-> > and the watched object is pinned to cache as long as the inode mark is set
-> > so file handle would not change also in fuse.
->
-> Ok, so if we are maintaining a hash map keyed by file handle, then first
-> we need to pin down the inode and then call name_to_handle_at() for the
-> watched object and add to hash table. Something like this.
->
-> A. foo_fd = open(foo.txt)
-> B. name_to_handle_at(.., foo.txt,...)
-> C. Add info in hash table using foo_handle as key.
-> D. Add watch on foo.txt (fanotify_mark()).
-> E. close(foo_fd).
->
-> One could probably skip step A and E. And do this instead.
->
-> A. Add watch on foo.txt (fanotify_mark())
-> B. name_to_handle_at(.., foo.txt,...)
-> C. Add info in hash table using foo_handle as key.
->
-> But this is little bit racy. You might start getting events with file
-> handles of foo.txt before you could complete B or C.
+> TBH, I can't even remember the specific details that made me say
+> "this is remote inotify not remote fsnotify", but there were such details.
+> I remember inotify rename cookie being one of them.
 >
 
-I suppose you can also use O_PATH fd to name_to_handle_at()
-with AT_EMPTY_PATH if you are concerned with races, but the
-races of name_to_handle_at() vs read events are pretty easy to handle
-in userspace.
+Let me repeat my concern about the rename cookie API.
 
-> >
-> > [1] https://github.com/inotify-tools/inotify-tools/pull/134
-> >
-> > >
-> > > IIUC, file handle for the same object can change if inode had been flushed
-> > > out of guest cache and brought back in later. So if application say
-> > > generated file handle for an object and saved it and later put a watch
-> > > on that object, by that time file handle of the object might have changed
-> > > (as seen by fuse). So one can't even use to match it with previous saved
-> > > file handle.
-> > >
-> >
-> > The argument is not applicable for inode watches.
->
-> Fair enough. I could see a very limited use case and thought that's not
-> enough. But looks like you seem to be ok with that.
->
-> > Filesystem and mount watches are not going to be supported with virtiofs
-> > or any filesystem that does not support persistent file handles.
->
-> Ok, so no filesystem and mount watches for virtiofs to begin with.
->
+As Jan has convinced me to create a new event FS_RENAME
+for fanotify, there is no harm in FUSE passing the rename cookie
+along with FS_MOVE events, but the FUSE out args:
 
-No, but I do expect the remote fsnotify vfs API design to take those
-into account as future extensions.
+struct fuse_notify_fsnotify_out {
+ uint64_t inode;
+ uint64_t mask;
+ uint32_t namelen;
+ uint32_t cookie;
+};
 
-> >
-> > > So I can't use file handle for open_by_handle_at(). I can't use it to
-> > > match it with previously saved file handle. So what can I use it for?
-> > >
-> > > IOW, I could not imagine supporting fanotify file handles without
-> > > fixing the file handles properly in fuse. And it needs fixing in
-> > > virtiofs as well as we can't trust random file handles from guest
-> > > for regular files.
-> > >
-> >
-> > Partly correct statements, but when looking at the details, they are
-> > not relevant to the case of fanotify inode watch.
-> >
-> > Note that at the moment, fuse does not even support local fanotify
-> > watch with file handles because of fanotify_test_fsid() - fuse does
-> > not set f_fsid (not s_uuid), so it's not really about supporting fanotify
-> > on fuse now.
+How do you expect to extend it when somebody wants to implement
+the FS_RENAME event that carries two names and two dir inodes
+(and no cookie)?
+Will they need to use a new out struct? a union?
+
+Unlike inotify, fanotify can sometimes report the inode of the child
+along with inode of the parent in events (e.g. FS_OPEN) when watching
+a parent directory.
+
+How will this out args struct be extended if we would want to pass that
+information?
+
+There is no need to address this now. I just want to know that the
+design you suggest is extendable to future needs and if it is not,
+I would prefer to reserve enough fields in the FUSE event
+struct for the common needs of all current fsnotify backends,
+just as we pass all the relevant info to the fsnotify_XXX() hooks.
+
+> I guess this discussion is not very productive at this point as none of us
+> are saying anything very specific about what should and should not
+> be done, so let me try to suggest something -
 >
-> Hmm..., that means we first will have to look into supporting local
-> fanotify events with file handles on fuse. Without that we can't even
-> test our remote fsnotify changes looks like.
->
-> This sounds like another blocker (or dependency project to complete first)
-> before one can make progress with remote inotify/fanotify/fsnotify.
+> Try to see if you could replace the server side implementation with
+> fanotify even if you use CAP_SYS_ADMIN for the experiment.
+> fanotify should be almost a drop-in replacement for inotify at this point
+> If you think that you cannot make this experiment with your current
+> protocol and vfs extensions then you must have done something wrong
+> and tied the protocol and/or the vfs API to inotify terminology.
 >
 
-I am not saying you need to do any of those things, but you need to
-take into account that someone else will want to implement them
-in virtiofs, other fuse server or other remote fs.
+So I did this thought experiment myself.
+I did not find any obvious issues with implementing the backend as
+fanotify. If anything, mapping fhandle to inode is even a bit easier
+than mapping wd to inode if you know the fhandle encoding.
 
-All I am asking is that the vfs API and to some extent also the FUSE
-fsnotify protocol extension will not be limited to inotify terminology.
+For event reporting, besides generalizing the out args, implementation
+would be similar. Since FUSE uses nodeid to identify the object in
+events, there is no problem for fanotify to report fhandle and inotify
+to report wd.
 
-> > It's about the vfs APIs for remote fsnotify that should not be inotify
-> > specific.
->
-> I understand that part. But at the same time, remote fsnotify API will
-> probably evolve as you keep on adding more functionality. What if there
-> is another notification mechanism tomorrow say newfancynotify(), we
-> might have to modify remote fsnoitfy again to accomodate that.
->
-> IOW, fsnotify seems to be just underlying plumbing and whatever you
-> add today might not be enough to support tomorrow's features. That's
-> why I wanted to start with a minimal set of functionality and add
-> more to it later.
->
+For setting watches, protocol seems generic enough, although
+I dislike how fuse_fsnotify_update_mark() masks out inotify
+specific flags.
 
-I do want to start with minimal functionality.
-I did not request that you implement more functionality than what inotify
-provides.
+inotify back should mask out its own private flags when calling
+into a generic vfs API for registering remote watches.
+Also, masking out FS_EVENT_ON_CHILD is pretty weird, because
+requesting a watch on children is functionally completely different
+than requesting to watch the directory itself.
 
-TBH, I can't even remember the specific details that made me say
-"this is remote inotify not remote fsnotify", but there were such details.
-I remember inotify rename cookie being one of them.
+I think I gave you enough comments already for a new revision.
+Are there any open questions left unanswered?
 
-I guess this discussion is not very productive at this point as none of us
-are saying anything very specific about what should and should not
-be done, so let me try to suggest something -
-
-Try to see if you could replace the server side implementation with
-fanotify even if you use CAP_SYS_ADMIN for the experiment.
-fanotify should be almost a drop-in replacement for inotify at this point
-If you think that you cannot make this experiment with your current
-protocol and vfs extensions then you must have done something wrong
-and tied the protocol and/or the vfs API to inotify terminology.
+And please grep your kernel patches for "inotify" and "remote inotify"
+in particular. When this term is used in comments and commit messages,
+it is very likely that either the code or documentation is inaccurate.
 
 Thanks,
 Amir.

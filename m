@@ -1,26 +1,25 @@
-Date: Fri, 17 Dec 2021 05:13:32 -0500
+Date: Fri, 17 Dec 2021 05:19:02 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	from:to:subject; s=fm2; bh=2gDz3DoJ8vd7cBtlHaq+vMboZ+g3EiPsJxmLm
-	hhAaKU=; b=alI8IMaa0jR0FHeAyzboH46WAF//Hog/b+Y0S+S08vqzdKc4E7RKb
-	aj3CZvuvJBV3YjA65xMj/0TOhMc3nA3YK2Uy9/3rTuRL3AOiyROx04kC+TcFaiQt
-	GFjzSRG/vh1O79XSzbzPuTtJ2jlnuNjfuenwzBEmdKRo/FbN+3CaDD/csBiR+sPv
-	zEyDJzNss992eJ7OzqI/jqtEHNJtQf2EOug5/5o4Aben3u3YA3MIQwF1IHkx/a5B
-	Rwm2mXIbDs/JgrJftDENhDgIUDodKmwio1mVWyGINml2UrwnT17vizGmCQbsDgof
-	xrhku6pUKjq8DLn7kuHsRcOy/IBo6zS1Q==
+	from:to:subject; s=fm2; bh=kU3/S1wBB/cWgoD/uW6jU+t5V+y2jpGBZvrqG
+	IGtq+o=; b=D9qRQz/lWWRzMFLULvPhkFR5zRs+c64hY9+nkJ0/4REMmDPInn8RE
+	6WSUhS6tBfj/thxPSoWK3M8dVMx90EtDNF8l+FXyTHawDzAee69zzuQiuLgI4kdM
+	WrTww9Kbn0G0OOO35AMgEPxB5PgoHJ3IMrFrmBRmjNPvdrPhRafY8WwHgTRWXsmL
+	c7Qbhma3oACGiwEXl44UyFI6XkSPPRkQ8udSlZgPTc9GsPuK+vr5fmjxzBvHrT1a
+	p8ncDs76BfFdQpiA3UgQjIR1m9kOtJXyKxJEk06v9o42Q1EWGSy+lHNIRuYiZ4RI
+	ki6njyukVrRgDVkGZ1dbQhcErKnKP5PEQ==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=2gDz3DoJ8vd7cBtlH
-	aq+vMboZ+g3EiPsJxmLmhhAaKU=; b=b+wjuottF5ICLtWH+CTKB3liQglnM0oNY
-	ttiZx5AAc6l1J+poUoLFNcVYVy9c6FceuPCB/Ak/CocjUA8/JyWmmqpSsIovl3xj
-	vT6SEefB8AQiFGSHtQiuXF+rbjyLG5DZjogReOH1RtbMk7upeAUCQgzhfYTz4QoL
-	nXRGhuf3zyJC7xnekACgfNoOZuH4PLkwwGv3ZNZomzVTEMNFNjSnSwucRNP8tW9/
-	Aj9hRJdnSj3WDCYTWAHQqds/8kwUinsdj7Cx62Rte2mSJJjGexg5hUIj+EZIrjlV
-	TliCEHiqzErWfAo1gCV9IVTt29nl/QPz2urfmHvxvEJsJy8lDoGDQ==
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=kU3/S1wBB/cWgoD/u
+	W6jU+t5V+y2jpGBZvrqGIGtq+o=; b=PK5hTbDCZsxo3h5FZhFkZQvGdlYtc05f2
+	+zUIJUwVMf6dO8AKANzahb4orrdbASaz5WvcA3L62gDiQjk4ah4hSG2yTSRkwIzL
+	340IewGF9Xv+riH6HmEtq6R8Ml75ugNhb5AZbDJdhc9yn1P6P26kQskEew2NZxVJ
+	8d85b+loTVfQGIeds5OV+xAGYiZ0+knS8DPUo4SbkjRd/a58FOwfCxXB4ez0h9J1
+	OgvuCykMq8Xxs9PgRq7/5T6jov7y4wtXBpr4mv6g9+2youpdMOw/ZyLI1d0JIOay
+	bzlBCJNmwVgSSu4GRvr7uIAv/iUOPGg0pEyqx59xnLUWm+j7FaVdw==
 From: virtiofs-bot@sinrega.org
-Message-Id: <64827.121121705132700346@us-mta-381.us.mimecast.lan>
+Message-Id: <52877.121121705190000355@us-mta-249.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] MR closed: Set up uid/gid mappings in
-	user_namespace sandbox
+Subject: [Virtio-fs] [virtiofsd-rs] MR opened: Set up the stage for v1.0.0
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,13 +30,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-When using the namespace sandbox mode with a non-privileged user, set
-up 1-to-1 mappings for the current process uid and gid. This allows
-both root and a user with the same uid/gid in the VM to access the
-files served by us. This scenario fits nicely with the "shared folder"
-use case.
-
-Signed-off-by: Sergio Lopez <slp@redhat.com>
+This patch series gives the final touches to get the project ready for the v1.0.0 release.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/16
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/56
 

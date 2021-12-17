@@ -1,6 +1,13 @@
-Date: Thu, 16 Dec 2021 17:24:00 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <Ybu8gBglHi+xikww@redhat.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=XqDmBivzng2XR0rT0C/5y1tKFxU70C4Ltba0a2wm1Hg=;
+	b=VhtwVoJcFW64OIcl+6Asb90qSSA8AiJEDqOM/w8SazCELHSw89xN2/UuaO+SWlMYRC
+	rHYLRR1G54l5NG4OSGP+pnxR1vBql/7dQFtbiqpeFmZG6H/l1tRWHixXPKp7HppRU8oF
+	XB8PChJXDLRN2LiRFnJBt1vOeoEogJ0DH2KU2z6yJTIceHKzza61IShk3kwkJRQS0tyh
+	cIyrJT/VItWOxtxX7PQJWjRenU6LxioWztdxAFUj6bjfcixkVwgS90ex4+/8VmNepUkv
+	8KzKhAGwOQQUyyEksU25jJVQy7vDqzsgymc2zigMu3LVz1wAKrAS1O4Px4H2+4h3QPOW
+	/YKw==
+MIME-Version: 1.0
 References: <YaZC+R7xpGimBrD1@redhat.com>
 	<CAO17o21uh3fJHd0gMu-SmZei5et6HJo91DiLk_YyfUqrtHy2pQ@mail.gmail.com>
 	<CAOQ4uxjfCs=+Of69U6moOJ9T6_zDb1wcrLXWu4DROVme1cNnfQ@mail.gmail.com>
@@ -11,10 +18,12 @@ References: <YaZC+R7xpGimBrD1@redhat.com>
 	<CAOQ4uxjzW7mt0pqA+K_sEJokYcv_D3e7axAOWLXxQ84bZDnfcw@mail.gmail.com>
 	<YbtoQGKflkChU8lZ@redhat.com>
 	<CAOQ4uxhucsMYO1YdHdLDPBJEaoOOyXb57wFJgijQznis2feE1A@mail.gmail.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <CAOQ4uxhucsMYO1YdHdLDPBJEaoOOyXb57wFJgijQznis2feE1A@mail.gmail.com>
+	<Ybu8gBglHi+xikww@redhat.com>
+In-Reply-To: <Ybu8gBglHi+xikww@redhat.com>
+From: Amir Goldstein <amir73il@gmail.com>
+Date: Fri, 17 Dec 2021 06:21:28 +0200
+Message-ID: <CAOQ4uxj6FKZr_QWRN_Ts14+dcT1cxR6PmtZCJEyp2chCGKVh7w@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
 Subject: Re: [Virtio-fs] [RFC PATCH 0/7] Inotify support in FUSE and virtiofs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -24,101 +33,106 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Amir Goldstein <amir73il@gmail.com>
+To: Vivek Goyal <vgoyal@redhat.com>
 Cc: Steve French <sfrench@samba.org>, Jan Kara <jack@suse.cz>, Miklos Szeredi <miklos@szeredi.hu>, Nathan Youngman <git@nathany.com>, virtio-fs-list <virtio-fs@redhat.com>, Al Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Stef Bon <stefbon@gmail.com>
 
-On Thu, Dec 16, 2021 at 08:22:19PM +0200, Amir Goldstein wrote:
-[..]
-> > So how much information we need to carry which covers all the existing
-> > events. So for the case of rename, looks
+> Ok, lets spend some time on figuring out how the fsnotify_out struct
+> should look like to meet the needs of fanotify as well.
+>
 > >
-> > For the case of rename, it sounds like we will need to report
-> > "node ids" of two directories and two names. Once we have space
-> > to report two "node ids", this could also be used to report
-> > node ids of parent dir as well as node id of file in question (if needed).
-> > So will this be good enough.
+> > I thought you passed the name as buffer in iov array.
+> > Or maybe that's not how it works?
 > >
-> > Carrying names will be little tricky I guess because namelen will be
-> > variable. Until and unless we reserve some fixed amount of space for
-> > each name say PATH_MAX. But that sounds like a lot of space.
-> >
+> > My suggestion:
+> > 1. Reserve a zero padded 64bit member for future child nodeid
+> >     in struct fuse_notify_fsnotify_out
+>
+> Ok, I think this doable. So right now it can send only one nodeid. You
+> basically want to have capability to send two 64bit nodeids in same
+> event, right. This is useful where you might want to send nodeid
+> of dir and nodeid of child object, IIUC.
 
-Ok, lets spend some time on figuring out how the fsnotify_out struct
-should look like to meet the needs of fanotify as well.
+Correct, but I forgot to mention (I mentioned it earlier in review) that the
+protocol should send nodeid+generation
+this is not related to file handles.
+It is needed to avoid reporting an event on the wrong object
+when FUSE reuses nodeid.
 
-> 
-> I thought you passed the name as buffer in iov array.
-> Or maybe that's not how it works?
-> 
-> My suggestion:
-> 1. Reserve a zero padded 64bit member for future child nodeid
->     in struct fuse_notify_fsnotify_out
+>
+> Maybe we should add a 64bit field for some sort of flags also which
+> might give additional informatin about the event.
+>
+> It might look like.
+>
+> struct fuse_notify_fsnotify_out {
+>         uint64_t inode;
+>         uint64_t mask;
 
-Ok, I think this doable. So right now it can send only one nodeid. You
-basically want to have capability to send two 64bit nodeids in same
-event, right. This is useful where you might want to send nodeid 
-of dir and nodeid of child object, IIUC.
+So you may want to cram 32bit gen above and make mask 32bit
+depending on how much you really need to save space in the event queue.
 
-Maybe we should add a 64bit field for some sort of flags also which
-might give additional informatin about the event.
+>         uint32_t namelen;
+>         uint32_t cookie;
+>         /* Can carry additional info about the event */
+>         uint64_t flags;
+>         /* Reserved for future use. Possibly another inode node id */
+>         uint64_t reserved;
 
-It might look like.
+Same here, we will need ino+gen for child
 
-struct fuse_notify_fsnotify_out {
-        uint64_t inode;
-        uint64_t mask;
-        uint32_t namelen;
-        uint32_t cookie;
-	/* Can carry additional info about the event */
-        uint64_t flags;
-	/* Reserved for future use. Possibly another inode node id */
-        uint64_t reserved;
-};
+> };
+>
+> > 2. For FS_RENAME, will we be able to pass 4 buffers in iov?
+> >     src_fuse_notify_fsnotify_out, src_name,
+> >     dst_fuse_notify_fsnotify_out, dst_name
+>
+> So it is sort of two fsnotify events travelling in same event. We will
+> have to have some sort of information in the src_fuse_notify_fsnotify_out
+> which signals that another fsnotify_out is following. May be that's
+> where fsnotify_flags->field can be used. Set a bit to signal another
+> fsnotify_out is part of same event and this will also mean first one
+> is src and second one is dst.
+>
+> Challenge I see is "src_name" and "dst_name", especially in the context
+> of virtio queues.
+>
+> So we have a notification queue and for each notification, driver
+> allocates a fixed amount of memory for each element and queues these
+> elements in virtqueue. Server side pops these elements, places
+> notification info in this vq element and sends back.
+>
+> So basically size of notification buffer needs to be known in advance,
+> because these are allocated by driver (and not device/server). And
+> that's the reason virtio spec has added a new filed "notify_buf_size"
+> in device configuration space. Using this field device lets the driver
+> know how much memory to allocate for each notification element.
+>
+> IOW, we can put variable sized elements in notifiation but max size
+> of that variable length needs to be fixed in advance and needs to
+> be told to driver at device initialization time.
+>
+> So what can be the max length of "src_name" and "dst_name"? Is it fair
+> to use NAME_MAX to determine max length of name. So say "255" bytes
+> (not including null) for each name. That means notify_buf_size will
+> be.
+>
+> notify_buf_size = 2 * 255 + 2 * sizeof(struct fuse_notify_fsnotify_out);
+>
 
-> 2. For FS_RENAME, will we be able to pass 4 buffers in iov?
->     src_fuse_notify_fsnotify_out, src_name,
->     dst_fuse_notify_fsnotify_out, dst_name
+Can you push two subsequent elements to the events queue atomically?
+If you can, then it is not a problem to queue the FS_MOVED_FROM
+event (with one name) followed by FS_MOVED_TO event with
+a self generated cookie in response to FAN_RENAME event on virtiofsd
+server and rejoin them in virtiofs client.
 
-So it is sort of two fsnotify events travelling in same event. We will
-have to have some sort of information in the src_fuse_notify_fsnotify_out
-which signals that another fsnotify_out is following. May be that's
-where fsnotify_flags->field can be used. Set a bit to signal another
-fsnotify_out is part of same event and this will also mean first one
-is src and second one is dst. 
+You see, I don't mind using the rename cookie API as long as rejoining
+the disjoint events is possible for reporting the joint event to fanotify user.
 
-Challenge I see is "src_name" and "dst_name", especially in the context
-of virtio queues. 
+In case virtiofsd backend is implemented with inotify, it will receive and
+report only disjoint events and in that case, FAN_RENAME cannot be
+requested by fanotify user which is fine, as long as it will be possible
+with another implementation of virtiofsd server down the road.
 
-So we have a notification queue and for each notification, driver
-allocates a fixed amount of memory for each element and queues these
-elements in virtqueue. Server side pops these elements, places
-notification info in this vq element and sends back.
-
-So basically size of notification buffer needs to be known in advance,
-because these are allocated by driver (and not device/server). And
-that's the reason virtio spec has added a new filed "notify_buf_size"
-in device configuration space. Using this field device lets the driver
-know how much memory to allocate for each notification element.
-
-IOW, we can put variable sized elements in notifiation but max size
-of that variable length needs to be fixed in advance and needs to
-be told to driver at device initialization time.
-
-So what can be the max length of "src_name" and "dst_name"? Is it fair
-to use NAME_MAX to determine max length of name. So say "255" bytes
-(not including null) for each name. That means notify_buf_size will
-be.
-
-notify_buf_size = 2 * 255 + 2 * sizeof(struct fuse_notify_fsnotify_out);
-
-I am currently creating 16 notification elements (VQ_NOTIFY_ELEMS) in
-driver and pushing on notification queue. This number is arbitrary
-and in future might have to be raised so that more events can travel
-on notification queue in parallel.
-
-Memory usage looks little high per notification due to name but not too
-bad I guess.
-
-Thanks
-Vivek
+Thanks,
+Amir.
 

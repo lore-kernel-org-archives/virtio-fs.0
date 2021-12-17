@@ -1,13 +1,26 @@
-From: Jeffle Xu <jefflexu@linux.alibaba.com>
-Date: Tue,  2 Nov 2021 13:26:03 +0800
-Message-Id: <20211102052604.59462-7-jefflexu@linux.alibaba.com>
-In-Reply-To: <20211102052604.59462-1-jefflexu@linux.alibaba.com>
-References: <20211102052604.59462-1-jefflexu@linux.alibaba.com>
-MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
+Date: Fri, 17 Dec 2021 05:13:32 -0500
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	from:to:subject; s=fm2; bh=+EvlwYzVSdbDz/qmzcu1hyG+aH/XPTFEiwQt6
+	K/UC84=; b=jsOHVykfyW0GtB+AlyI6FshA/lheqDYftTCLrw2QTbywcG8UgZFn5
+	Lp+l+Gmv3fNtrl4gNv9qNmRwx4B24BGoaLyCHeeRL47coXQzKJH+0yR8/TzySctm
+	C9zNJSQsDxkYrorQudKiqwyo5LxOdEv9vWATEcL1NhHz80eNuhSRKIhKpSlgxmA0
+	w0l0tTgzOC/rgM74v+Fdy65f/OeaxHKd7efCwWB9DRy9ipVzFyazCGJ+6Bbxxkgi
+	UMUJgPpTybE2vn0GchDhtku7DP0sgioPQ3LpCohJ8JDztexQf1Gh8q+ejm8z6kVm
+	h7xValpS+OxbLzCSMzTreZXlkpzLsibvA==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=+EvlwYzVSdbDz/qmz
+	cu1hyG+aH/XPTFEiwQt6K/UC84=; b=D2KF502wXKBYLj2JPY5udbBDYX+ZniGDH
+	nhku5BfB0Cx3+sxP8BxJke6XuS0XC3Hn5vqkEOy7qVfHQlmi8EMlPpcWFdQPgZfU
+	+g+4soGGo8qL6/bNrjrlN9MEqqZTZX9Ywj+9ZTPCKwLsPm7E4agwUEqLXphZUYSo
+	R8/91tQdKpKpUJ7NQ1TC0CWCDwFRwJh7FqFZYkEG6C1Kl3y4g5Sf9dw0kAggNzvi
+	6L/O0v9vQYKGiZB1vcj+6Xh3Xb1JMsF8NtOU+7lCg5/O9mTEiNx9tTVCpTgdiV4D
+	VcX2v+K3ctHgPHiHWWSjOTV/GQ+OEhOG7H3iQETOVjJEAzReHfBxw==
+From: virtiofs-bot@sinrega.org
+Message-Id: <71237.121121705132700314@us-mta-520.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v7 6/7] fuse: mark inode DONT_CACHE when per
-	inode DAX hint changes
+Subject: [Virtio-fs] [virtiofsd-rs] MR closed: Implement support for remote
+	locks
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,76 +29,31 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu
-Cc: virtio-fs@redhat.com, linux-fsdevel@vger.kernel.org, joseph.qi@linux.alibaba.com
+To: virtio-fs@redhat.com
 
-When the per inode DAX hint changes while the file is still *opened*, it
-is quite complicated and maybe fragile to dynamically change the DAX
-state.
+Locks can either be managed locally by the guest kernel, or remotely
+by the virtio-fs daemon. The latter option is more expensive, but
+allows those locks to be visible outside the guest, a critical feature
+if multiple actors (guests or other applications running on the host)
+intend to access the same files using locking semantics.
 
-Hence mark the inode and corresponding dentries as DONE_CACHE once the
-per inode DAX hint changes, so that the inode instance will be evicted
-and freed as soon as possible once the file is closed and the last
-reference to the inode is put. And then when the file gets reopened next
-time, the new instantiated inode will reflect the new DAX state.
+This commit implements support for remote locks, both POSIX locks and
+flock, adding the command line flag "remote-locks" to allow users to
+configure the desired behavior from either "disabled" (the default
+option), "enabled-safe" and "enabled-unsafe".
 
-In summary, when the per inode DAX hint changes for an *opened* file, the
-DAX state of the file won't be updated until this file is closed and
-reopened later.
+The reason for having two different "enabled" options, one "safe" and
+another "unsafe", is because some locking operations are blocking,
+meaning the thread servicing the request will be kept busy until the
+lock is released. Thus, a malicious application running in the guest
+may starve the virtio-fs daemon by issuing a number of blocking lock
+operations.
 
-Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
+The "safe" variant allows all locking operations, except the ones that
+may be blocking, returning ENOTSUP for them, while the "unsafe" one
+allows all operations with no exceptions.
+
+Signed-off-by: Sergio Lopez <slp@redhat.com>
 ---
- fs/fuse/dax.c    | 9 +++++++++
- fs/fuse/fuse_i.h | 1 +
- fs/fuse/inode.c  | 3 +++
- 3 files changed, 13 insertions(+)
-
-diff --git a/fs/fuse/dax.c b/fs/fuse/dax.c
-index c8ee601b94b8..e8766420c708 100644
---- a/fs/fuse/dax.c
-+++ b/fs/fuse/dax.c
-@@ -1362,6 +1362,15 @@ void fuse_dax_inode_init(struct inode *inode, unsigned int flags)
- 	inode->i_data.a_ops = &fuse_dax_file_aops;
- }
- 
-+void fuse_dax_dontcache(struct inode *inode, unsigned int flags)
-+{
-+	struct fuse_conn *fc = get_fuse_conn(inode);
-+
-+	if (fuse_is_inode_dax_mode(fc->dax_mode) &&
-+	    (!!IS_DAX(inode) != !!(flags & FUSE_ATTR_DAX)))
-+		d_mark_dontcache(inode);
-+}
-+
- bool fuse_dax_check_alignment(struct fuse_conn *fc, unsigned int map_alignment)
- {
- 	if (fc->dax && (map_alignment > FUSE_DAX_SHIFT)) {
-diff --git a/fs/fuse/fuse_i.h b/fs/fuse/fuse_i.h
-index 58e54b5a4d65..fe8364b522ac 100644
---- a/fs/fuse/fuse_i.h
-+++ b/fs/fuse/fuse_i.h
-@@ -1282,6 +1282,7 @@ void fuse_dax_conn_free(struct fuse_conn *fc);
- bool fuse_dax_inode_alloc(struct super_block *sb, struct fuse_inode *fi);
- void fuse_dax_inode_init(struct inode *inode, unsigned int flags);
- void fuse_dax_inode_cleanup(struct inode *inode);
-+void fuse_dax_dontcache(struct inode *inode, unsigned int flags);
- bool fuse_dax_check_alignment(struct fuse_conn *fc, unsigned int map_alignment);
- void fuse_dax_cancel_work(struct fuse_conn *fc);
- 
-diff --git a/fs/fuse/inode.c b/fs/fuse/inode.c
-index 0512d8cb36c3..4a2a58cc71af 100644
---- a/fs/fuse/inode.c
-+++ b/fs/fuse/inode.c
-@@ -268,6 +268,9 @@ void fuse_change_attributes(struct inode *inode, struct fuse_attr *attr,
- 		if (inval)
- 			invalidate_inode_pages2(inode->i_mapping);
- 	}
-+
-+	if (IS_ENABLED(CONFIG_FUSE_DAX))
-+		fuse_dax_dontcache(inode, attr->flags);
- }
- 
- static void fuse_init_inode(struct inode *inode, struct fuse_attr *attr)
--- 
-2.27.0
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/4
 

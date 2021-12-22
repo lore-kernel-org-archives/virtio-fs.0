@@ -1,27 +1,25 @@
-Date: Wed, 22 Dec 2021 10:30:10 -0500
+Date: Wed, 22 Dec 2021 10:49:24 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	from:to:subject; s=fm2; bh=dBaWyPD5bAZgMfFYuuejzalriA9ri8tFa8yUT
-	XCldWs=; b=eu0pfFHKRiqToO780N3aMhJoml/sxiZcZs3zFoLBcqfDNxYrPn1U8
-	7x/YFUMzMfHZL0uC24Xjppr2GGfaOkVIGZxGSAhY+n34zP+3n1qA7JzBAdMUt4g+
-	nlooG7RxJao7L+1YpLARWScbqEQOh+OTbjePsoxkTxe16wxKcaAo3rGvM+JN0zHY
-	T2I/QPO1R2CirTpu3Bw1K1xDybRaW2d7q+bhLCarRDZzhrCecPrIdVeaOGRYRq6q
-	RUrpql/TnfmR5o5b/EZZsa8bM5Tq4ynkwZ6kj1PFHBQQEQlXtKEJbsWsX8rh96dt
-	AshH7cuDopPkUHi93Uu0g0/VvPUIV2O/A==
+	from:to:subject; s=fm2; bh=CtBFUPZkC6Im0OfkQP1GfpJTLvd2icaMslPdO
+	AjrXmA=; b=S/pNM7K2+vNORkFzYFYukoepwSv8ImBklSyZY5/qtcWyvSJHnjIlk
+	lcyikt/Sw5dCcH8FgWjTujgnL18K/FjLaLH2FxNsDPQs1txFBhos2iKawT+47MGm
+	FFhy1o1CfMT2uokUes6BjKpFbO1b5Ahuo4pcf+WMruYtNxLun3KYEK8/qckxgQcU
+	dtUiWbw6/njHn1Fu4dEb2hmIR/Hwgd+OHza6tvtHsQ8v0rPr8uMnL05HP/fd3X0d
+	5egOUPRH4MEx8wjqXwcomEbDVx01NJh+bbTFWY+ha7mlqLgVauVQnbXhar8DSiNy
+	6s7Qbf9yGvKEEC550xHHTbW8vF2+Er7Gw==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=dBaWyPD5bAZgMfFYu
-	uejzalriA9ri8tFa8yUTXCldWs=; b=fzgO5SIVrYo7cuhNFWJQwuLQiWJVbJI/R
-	FEFnxLFogUwY67OJqjieo4OWc4Vhmw0/+htjSSNGALB9SYuqaiG+szGHflnuNtun
-	t+XPoOawsTJijpkzW3Kc8NmxUDhJIq49xGR3zfIK0k0F+rCuZoJP593KynbCmPj4
-	UgsA4zbeo0gn0g7fZO2XG/QmGo+D2EdfX2hz66Eq3X38Ch8HUSCT1Frpc4C9ju7i
-	DfiYKJLIjmw9eJ+CtdmlrXYVAWz+hZFYm58EifC5Ffmk5eAaOKza506EVoTnpKfW
-	UxwXHJpgMtRTbur0wBxI7wOJSYbTvdTPEguisHuTAM77Pijap8Yxw==
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=CtBFUPZkC6Im0OfkQ
+	P1GfpJTLvd2icaMslPdOAjrXmA=; b=Rq2QcaMyBq3SkJJk4D5EG2r2f/Sl+0h+S
+	IZSUk/nV9hPujSmeWIUNmlRJypJMrmGGMP35JnNu5Zhuamzy9lYatkmrjWtPrUkS
+	eQbIohSvdChbGI56wULswS+6tpSRxP6zJN0q3G3Zz7lTIXFK0Uk4Uen9ha7eK1dU
+	HaZbIAzXNalzLFGp4GrHo9pUC2YQ6esUiVFR6gelBWUrLUVmCL+1nlPWiMNXPDEJ
+	2hvW7Wg/7cbR0VZoqKXc/s93qri9cx/UPOLcQ9LxM1M0QfAB76IlyQH7nz+XhW4C
+	7P+TrDT0IZqY9/+6GzQKuODlDnl7Jq0b7q5VP81HNCMvv5LA5wBFg==
 From: virtiofs-bot@sinrega.org
-Message-Id: <37519.121122210300900125@us-mta-389.us.mimecast.lan>
+Message-Id: <52177.121122210492202944@us-mta-654.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] =?utf-8?q?=5Bvirtiofsd-rs=5D_MR_merged=3A_Strip_share?=
-	=?utf-8?q?d_directory_from_mountinfo=E2=80=99s_mount_points_with_s?=
-	=?utf-8?q?andbox=3Dchroot?=
+Subject: [Virtio-fs] [virtiofsd-rs] MR opened: Set up the stage for v1.0.0
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -32,11 +30,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-When using *sandbox=chroot*, `/proc/self/mountinfo` still contains the pre-chroot mount point paths.  To open them, we need to strip the shared directory as a prefix from them.
-
-This series does so by first canonicalizing the shared directory path, and then (when using *sandbox=chroot*) stripping it from every mount point in `/proc/self/mountinfo` that we want to open.
-
-(Reported by German)
+This patch series gives the final touches to get the project ready for the v1.0.0 release.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/58
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/60
 

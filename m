@@ -1,25 +1,26 @@
-Date: Wed, 22 Dec 2021 09:59:45 -0500
+Date: Wed, 22 Dec 2021 10:03:24 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	from:to:subject; s=fm2; bh=k1hsyYqqjiPfeBFku2H+tp30nRQarp7nOPvz3
-	O9qz/I=; b=wCsSvOBX+NEA43uwxt2vRYM1liKEDeIiuosnqjxhe/DkxsaI4K6w4
-	gIgCIeKXgKqDTHyKPrPspTZ0Z9+b8ttcVYqs7RlwatZ/jPVyORVYgTJHh9w5R8Mn
-	uGxRMKUgWhkWI1p1midYx0wmCQ+YfFnIhbY2vilMmBtJ6g5A9Eei8qna1meL11rt
-	gD7vXlH/DYgbRV3AH/g2Ey+r3mRDwD1otDTSI5VGqEB4ZnVn/K6CD8U4bJYs3Tq+
-	CFng+0ynQZbXmr+dExF4Om4IazsogwRr2P+uTryCX2OmCB4dWNDNl62rKC+44vyy
-	Oy6Z+AJEnk5RVSr0rh0Ay9Gik0fNtXFPQ==
+	from:to:subject; s=fm2; bh=uyclnAp2bKKXKj1koGilOfgiUBCxXH5vVnYvf
+	8RzbM4=; b=FNiFUjjzsBnZ0Ku4Ef79+WPdXKCg7blRNM8UwPFvIBayY7UVfT7yn
+	LJDrTwxmCEMUmyJw+rOxTyQqryFqCbTDZggt354BM5vK07IX6o4174VUp3gkjb2z
+	V/111H4ilb6SmLZSeweKQ+Fg4Lqxhv5UuqUyjL46WLwZXSwbxWqOHcB0QF68AHP5
+	2MHjYz1SlYz609P0QX9XHaxaqsePur9tSKDYXN2doRlP3xZKd4eYcopoUeYbOEGu
+	7uDvGuclxuYxeqzKyjeHdSX8OwJ1lyFl4E/Ju0GUR8iaUH4aP/CbVmk+0pbUiThS
+	mGST1FpfXyejPVm7OcS2ZmqwH41A/s8hw==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=k1hsyYqqjiPfeBFku
-	2H+tp30nRQarp7nOPvz3O9qz/I=; b=WRh7q9JZB5bC1pbMCqikgQLAUREQTFYya
-	COhRrB35dwNM0emUL/LGYKrIooSTxDgn1HivlAf7neirJHpAgJv9JK/cqqzDyopQ
-	Vj53qpvds0Hsn2q4A28dlfV3xZXhLhZb3JaosgN8iFzQhX4PYsXQqt99lLsp8Ynl
-	E98El9dQ1XdaaZkas//j4Lu7Q/Q9kVRkYMvWLm+lJafK2Hwokpx4vHTq5WTUqu6e
-	ig7z62rZpD6MM/KFnD6Sgqj9fkMTEPIiSycYgyhkJ4cJtL7YHknkYwvlRUm4569A
-	KQhYPxkW0Vx4tecVJxVf1tLqge5W26YN9BkRGZH5ePMhe7ve33vtg==
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=uyclnAp2bKKXKj1ko
+	GilOfgiUBCxXH5vVnYvf8RzbM4=; b=V2JtI6YW5ggFzV15aQMsmn+bDnSYm5qQn
+	fd62hyx0plQ+iFjR/R9fzECJeMMnjwVmXvD/oVpVFl9rb9yagQinQ0odqB2qKJO4
+	NIm4L+ks4+U9ypSPG9sErNgwOM0ysLdTv8SaiAJrvbgbIESwv0x0yLvuzcp2jK8h
+	P9mojZZSJMjrh9WHNvyMAYw/zmTKxTSmB5XiUe470Ssp6Ismf8eNkSykqNbvIIcx
+	I2KLab87GX6MxJeSfGezDmak+VMweNNQbi5o+3BclzKJb3yT4w0wfFn3bjv9oFpA
+	66OUkMWJNDDj2fUvRwgIrGVur0X0Hmp9kyKDlq2NwVz6ocJRcEZ4Q==
 From: virtiofs-bot@sinrega.org
-Message-Id: <25163.121122209594000493@us-mta-266.us.mimecast.lan>
+Message-Id: <10643.121122210032100275@us-mta-277.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd-rs] Issue opened: Add syncfs() support
+Subject: [Virtio-fs] [virtiofsd-rs] MR opened: Add
+	--inode-file-handles=mandatory
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -30,13 +31,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Fuse in kernel now has support to send FUSE_SYNCFS request. But there is no support in virtiofsd. Add the support. This is important because it is a data integrity operation.
-
-Greg was doing syncfs() work (and was fixing issues related to submounts). I think submounts related issues he unearthed as part of syncfs work.
-
-His last posting of syncfs patches is here.
-
-https://lore.kernel.org/kvm/20210510191502.GA193692@horse/T/
+In this mode, we never fall back to opening an `O_PATH` file descriptor to keep in our `InodeData` objects, but instead return all `name_to_handle_at()` errors to the guest.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/19
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/59
 

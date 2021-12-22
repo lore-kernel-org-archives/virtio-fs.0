@@ -1,27 +1,25 @@
-Date: Wed, 22 Dec 2021 08:25:53 -0500
+Date: Wed, 22 Dec 2021 09:59:45 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	from:to:subject; s=fm2; bh=dBaWyPD5bAZgMfFYuuejzalriA9ri8tFa8yUT
-	XCldWs=; b=y+vYtr2NZGUdrXHnpYZneHawjrOJ7WCCq3dgJBEbwcuoeZWnSUF/J
-	DOaSQAHk1jKuMH+7KCKelKGEe+v67b5aiw6LNX5VyOQVKeHwTIrBWmMz+lQYpL8n
-	6Y8xniyASjs/XP2LHs73LBR8F8rVzyNt1b+55eXbptAVH2qQ6IMfduBtnQFZI+6s
-	JcODiZjKVrOmligLkR0QEcSQgN6368EhoXIEagJX038KPSTA9a9e11l7KHhKYOiu
-	hOETpFkxpIpQjUb8aumFC/GdAD6CNuRT3P3tlb91+owB+FKmNmsgh9YzgqkBWT2V
-	exdc7oX4ymEy+9iKz9ra8MfzF7TPslxOg==
+	from:to:subject; s=fm2; bh=k1hsyYqqjiPfeBFku2H+tp30nRQarp7nOPvz3
+	O9qz/I=; b=wCsSvOBX+NEA43uwxt2vRYM1liKEDeIiuosnqjxhe/DkxsaI4K6w4
+	gIgCIeKXgKqDTHyKPrPspTZ0Z9+b8ttcVYqs7RlwatZ/jPVyORVYgTJHh9w5R8Mn
+	uGxRMKUgWhkWI1p1midYx0wmCQ+YfFnIhbY2vilMmBtJ6g5A9Eei8qna1meL11rt
+	gD7vXlH/DYgbRV3AH/g2Ey+r3mRDwD1otDTSI5VGqEB4ZnVn/K6CD8U4bJYs3Tq+
+	CFng+0ynQZbXmr+dExF4Om4IazsogwRr2P+uTryCX2OmCB4dWNDNl62rKC+44vyy
+	Oy6Z+AJEnk5RVSr0rh0Ay9Gik0fNtXFPQ==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=dBaWyPD5bAZgMfFYu
-	uejzalriA9ri8tFa8yUTXCldWs=; b=SEXNo3HH45lOqGowsB8u3CoHc0d2ywZbN
-	Kxd+ZfrSXQle1bYTGlQ1E1POGjHbbOy80J5E3/Fl+3YncoomR+MhVxSw2xx2WTEy
-	fV+6DYAcQqD7KqdfbQMpNQ8HH9ZyGlqV+fDJJQNFFWxetq+b2U51/qQ5Oxp1ubic
-	ICNvwNOdIzS+YGbSQsXdPkB/mlePoD+bU7A29k9+/fxX7SRefXezeaTcfUF0PaYZ
-	LqHUUdC3wJTWXWwXHBhASWFY0VnqJeGmaxUOrAHMKJOPIkdO2QeSAEYxP/v/y9V1
-	7oHzrTuS9DZF3t97B7+uvqlAC3eMVcd+8oqHOR1GT290GfNkQOZBw==
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=k1hsyYqqjiPfeBFku
+	2H+tp30nRQarp7nOPvz3O9qz/I=; b=WRh7q9JZB5bC1pbMCqikgQLAUREQTFYya
+	COhRrB35dwNM0emUL/LGYKrIooSTxDgn1HivlAf7neirJHpAgJv9JK/cqqzDyopQ
+	Vj53qpvds0Hsn2q4A28dlfV3xZXhLhZb3JaosgN8iFzQhX4PYsXQqt99lLsp8Ynl
+	E98El9dQ1XdaaZkas//j4Lu7Q/Q9kVRkYMvWLm+lJafK2Hwokpx4vHTq5WTUqu6e
+	ig7z62rZpD6MM/KFnD6Sgqj9fkMTEPIiSycYgyhkJ4cJtL7YHknkYwvlRUm4569A
+	KQhYPxkW0Vx4tecVJxVf1tLqge5W26YN9BkRGZH5ePMhe7ve33vtg==
 From: virtiofs-bot@sinrega.org
-Message-Id: <51695.121122208255000419@us-mta-33.us.mimecast.lan>
+Message-Id: <25163.121122209594000493@us-mta-266.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] =?utf-8?q?=5Bvirtiofsd-rs=5D_MR_opened=3A_Strip_share?=
-	=?utf-8?q?d_directory_from_mountinfo=E2=80=99s_mount_points_with_s?=
-	=?utf-8?q?andbox=3Dchroot?=
+Subject: [Virtio-fs] [virtiofsd-rs] Issue opened: Add syncfs() support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -32,11 +30,13 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-When using *sandbox=chroot*, `/proc/self/mountinfo` still contains the pre-chroot mount point paths.  To open them, we need to strip the shared directory as a prefix from them.
+Fuse in kernel now has support to send FUSE_SYNCFS request. But there is no support in virtiofsd. Add the support. This is important because it is a data integrity operation.
 
-This series does so by first canonicalizing the shared directory path, and then (when using *sandbox=chroot*) stripping it from every mount point in `/proc/self/mountinfo` that we want to open.
+Greg was doing syncfs() work (and was fixing issues related to submounts). I think submounts related issues he unearthed as part of syncfs work.
 
-(Reported by German)
+His last posting of syncfs patches is here.
+
+https://lore.kernel.org/kvm/20210510191502.GA193692@horse/T/
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/58
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/19
 

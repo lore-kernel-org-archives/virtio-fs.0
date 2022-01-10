@@ -1,16 +1,13 @@
-Date: Mon, 7 Feb 2022 09:50:18 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YgExqkdu7mPIO2rV@redhat.com>
-References: <20220202193935.268777-1-vgoyal@redhat.com>
-	<YgEZDOcFr80tZGWd@redhat.com> <YgEdeGud4xlZEAwy@redhat.com>
-	<YgEe6L+wunrGwQsX@redhat.com>
+Date: Mon, 10 Jan 2022 16:05:12 -0500
+From: "Michael S. Tsirkin" <mst@redhat.com>
+Message-ID: <20220110210416.18779-11-mst@redhat.com>
+References: <20220110210416.18779-1-mst@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="iso-8859-1"
+In-Reply-To: <20220110210416.18779-1-mst@redhat.com>
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-In-Reply-To: <YgEe6L+wunrGwQsX@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v5 0/9] virtiofsd: Add support for file
- security context at file creation
+Subject: [Virtio-fs] [PULL v2 10/10] Revert "virtio: introduce macro
+	IRTIO_CONFIG_IRQ_IDX"
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,74 +16,161 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: qemu-devel@nongnu.org
+Cc: Peter Maydell <peter.maydell@linaro.org>, Cindy Lu <lulu@redhat.com>, Jason Wang <jasowang@redhat.com>, virtio-fs@redhat.com, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Gerd Hoffmann <kraxel@redhat.com>, =?utf-8?Q?Marc-Andr=C3=A9?= Lureau <marcandre.lureau@redhat.com>
 
-On Mon, Feb 07, 2022 at 01:30:16PM +0000, Daniel P. Berrang=E9 wrote:
-> On Mon, Feb 07, 2022 at 08:24:08AM -0500, Vivek Goyal wrote:
-> > On Mon, Feb 07, 2022 at 01:05:16PM +0000, Daniel P. Berrang=E9 wrote:
-> > > On Wed, Feb 02, 2022 at 02:39:26PM -0500, Vivek Goyal wrote:
-> > > > Hi,
-> > > >=20
-> > > > This is V5 of the patches. I posted V4 here.
-> > > >=20
-> > > > https://listman.redhat.com/archives/virtio-fs/2022-January/msg00041=
-.html
-> > > >=20
-> > > > These will allow us to support SELinux with virtiofs. This will send
-> > > > SELinux context at file creation to server and server can set it on
-> > > > file.
-> > >=20
-> > > I've not entirely figured it out from the code, so easier for me
-> > > to ask...
-> > >=20
-> > > How is the SELinux labelled stored on the host side ? It is stored
-> > > directly in the security.* xattr namespace, or is is subject to
-> > > xattr remapping that virtiofsd already supports.
-> > >=20
-> > > Storing directly means virtiofsd has to run in an essentially
-> > > unconfined context, to let it do arbitrary  changes on security.*
-> > > xattrs without being blocked by SELinux) and has risk that guest
-> > > initiated changes can open holes in the host confinement if
-> > > the exported FS is generally visible to processes on the host.
-> > >=20
-> > >=20
-> > > Using remapping lets virtiofsd be strictly isolated by SELinux
-> > > policy on the host, and ensures that guest context changes
-> > > can't open up holes in the host.
-> > >=20
-> > > Both are valid use cases, so I'd ultimately expect us to want
-> > > to support both, but my preference for a "default" behaviour
-> > > would be remapping.
-> >=20
-> > I am expecting users to configure virtiofsd to remap "security.selinux"
-> > to "trusted.virtiofsd.security.selinux" and that will allow guest
-> > and host security selinux to co-exist and allow separate SELinux polici=
-es
-> > for guest and host.
-> >=20
-> > I agree that my preference for a default behavior is remapping as well.
-> > That makes most sense.=20
-> >=20
-> > One downside of mapping to trusted namespace is that it requires
-> > CAP_SYS_ADMIN for virtiofsd.
-> >=20
-> > Having said that, these patches don't enforce the remapping default. Th=
-at
-> > has to come from the user because it also needs to be given CAP_SYS_ADM=
-IN.
-> > So out of box default is no remapping and passthrough SELinux.
->=20
-> Ok, that all makes sense then. My only suggestion then is to put something
-> more explicit in the man page docs to highlight the implications /
-> interaction beteen the new command line options for labelling and the
-> likely need for remapping security.*
+This reverts commit bf1d85c166c19af95dbd27b1faba1d2909732323.
 
-Ok, will do. While describing this new command line option, will also
-mention the likely need of remapping and additional capability and
-security implication. Or may be I will create a small new section for
-SELinux in same file.
+Fixes: bf1d85c166 ("virtio: introduce macro IRTIO_CONFIG_IRQ_IDX")
+Cc: "Cindy Lu" <lulu@redhat.com>
+Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+---
+ include/hw/virtio/virtio.h     |  3 ---
+ hw/display/vhost-user-gpu.c    |  6 ------
+ hw/net/virtio-net.c            | 10 ++--------
+ hw/virtio/vhost-user-fs.c      |  6 ------
+ hw/virtio/vhost-vsock-common.c |  6 ------
+ hw/virtio/virtio-crypto.c      |  6 ------
+ 6 files changed, 2 insertions(+), 35 deletions(-)
 
-Thanks
-Vivek
+diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
+index 605ea79c90..8bab9cfb75 100644
+--- a/include/hw/virtio/virtio.h
++++ b/include/hw/virtio/virtio.h
+@@ -67,9 +67,6 @@ typedef struct VirtQueueElement
+ 
+ #define VIRTIO_NO_VECTOR 0xffff
+ 
+-/* special index value used internally for config irqs */
+-#define VIRTIO_CONFIG_IRQ_IDX -1
+-
+ #define TYPE_VIRTIO_DEVICE "virtio-device"
+ OBJECT_DECLARE_TYPE(VirtIODevice, VirtioDeviceClass, VIRTIO_DEVICE)
+ 
+diff --git a/hw/display/vhost-user-gpu.c b/hw/display/vhost-user-gpu.c
+index d4a440e815..09818231bd 100644
+--- a/hw/display/vhost-user-gpu.c
++++ b/hw/display/vhost-user-gpu.c
+@@ -485,9 +485,6 @@ vhost_user_gpu_guest_notifier_pending(VirtIODevice *vdev, int idx)
+ {
+     VhostUserGPU *g = VHOST_USER_GPU(vdev);
+ 
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return false;
+-    }
+     return vhost_virtqueue_pending(&g->vhost->dev, idx);
+ }
+ 
+@@ -496,9 +493,6 @@ vhost_user_gpu_guest_notifier_mask(VirtIODevice *vdev, int idx, bool mask)
+ {
+     VhostUserGPU *g = VHOST_USER_GPU(vdev);
+ 
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return;
+-    }
+     vhost_virtqueue_mask(&g->vhost->dev, vdev, idx, mask);
+ }
+ 
+diff --git a/hw/net/virtio-net.c b/hw/net/virtio-net.c
+index 5e03c0dd14..cf8ab0f8af 100644
+--- a/hw/net/virtio-net.c
++++ b/hw/net/virtio-net.c
+@@ -3168,9 +3168,6 @@ static bool virtio_net_guest_notifier_pending(VirtIODevice *vdev, int idx)
+     VirtIONet *n = VIRTIO_NET(vdev);
+     NetClientState *nc = qemu_get_subqueue(n->nic, vq2q(idx));
+     assert(n->vhost_started);
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return false;
+-    }
+     return vhost_net_virtqueue_pending(get_vhost_net(nc->peer), idx);
+ }
+ 
+@@ -3180,11 +3177,8 @@ static void virtio_net_guest_notifier_mask(VirtIODevice *vdev, int idx,
+     VirtIONet *n = VIRTIO_NET(vdev);
+     NetClientState *nc = qemu_get_subqueue(n->nic, vq2q(idx));
+     assert(n->vhost_started);
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return;
+-    }
+-
+-    vhost_net_virtqueue_mask(get_vhost_net(nc->peer), vdev, idx, mask);
++    vhost_net_virtqueue_mask(get_vhost_net(nc->peer),
++                             vdev, idx, mask);
+ }
+ 
+ static void virtio_net_set_config_size(VirtIONet *n, uint64_t host_features)
+diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+index 9b0349922e..c595957983 100644
+--- a/hw/virtio/vhost-user-fs.c
++++ b/hw/virtio/vhost-user-fs.c
+@@ -161,9 +161,6 @@ static void vuf_guest_notifier_mask(VirtIODevice *vdev, int idx,
+ {
+     VHostUserFS *fs = VHOST_USER_FS(vdev);
+ 
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return;
+-    }
+     vhost_virtqueue_mask(&fs->vhost_dev, vdev, idx, mask);
+ }
+ 
+@@ -171,9 +168,6 @@ static bool vuf_guest_notifier_pending(VirtIODevice *vdev, int idx)
+ {
+     VHostUserFS *fs = VHOST_USER_FS(vdev);
+ 
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return false;
+-    }
+     return vhost_virtqueue_pending(&fs->vhost_dev, idx);
+ }
+ 
+diff --git a/hw/virtio/vhost-vsock-common.c b/hw/virtio/vhost-vsock-common.c
+index d1b9c027b6..3f3771274e 100644
+--- a/hw/virtio/vhost-vsock-common.c
++++ b/hw/virtio/vhost-vsock-common.c
+@@ -125,9 +125,6 @@ static void vhost_vsock_common_guest_notifier_mask(VirtIODevice *vdev, int idx,
+ {
+     VHostVSockCommon *vvc = VHOST_VSOCK_COMMON(vdev);
+ 
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return;
+-    }
+     vhost_virtqueue_mask(&vvc->vhost_dev, vdev, idx, mask);
+ }
+ 
+@@ -136,9 +133,6 @@ static bool vhost_vsock_common_guest_notifier_pending(VirtIODevice *vdev,
+ {
+     VHostVSockCommon *vvc = VHOST_VSOCK_COMMON(vdev);
+ 
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return false;
+-    }
+     return vhost_virtqueue_pending(&vvc->vhost_dev, idx);
+ }
+ 
+diff --git a/hw/virtio/virtio-crypto.c b/hw/virtio/virtio-crypto.c
+index 1d5192f8b4..54f9bbb789 100644
+--- a/hw/virtio/virtio-crypto.c
++++ b/hw/virtio/virtio-crypto.c
+@@ -948,9 +948,6 @@ static void virtio_crypto_guest_notifier_mask(VirtIODevice *vdev, int idx,
+ 
+     assert(vcrypto->vhost_started);
+ 
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return;
+-    }
+     cryptodev_vhost_virtqueue_mask(vdev, queue, idx, mask);
+ }
+ 
+@@ -961,9 +958,6 @@ static bool virtio_crypto_guest_notifier_pending(VirtIODevice *vdev, int idx)
+ 
+     assert(vcrypto->vhost_started);
+ 
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return false;
+-    }
+     return cryptodev_vhost_virtqueue_pending(vdev, queue, idx);
+ }
+ 
+-- 
+MST
 

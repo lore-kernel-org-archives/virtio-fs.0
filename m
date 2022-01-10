@@ -1,15 +1,13 @@
-Date: Mon, 7 Feb 2022 08:31:24 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YgEfLOk/GPwZjWhj@redhat.com>
-References: <20220202193935.268777-1-vgoyal@redhat.com>
-	<20220202193935.268777-4-vgoyal@redhat.com>
-	<Yfwlekwcu35SN9MU@work-vm>
+Date: Mon, 10 Jan 2022 02:16:30 -0500
+From: "Michael S. Tsirkin" <mst@redhat.com>
+Message-ID: <20220110071547.195669-11-mst@redhat.com>
+References: <20220110071547.195669-1-mst@redhat.com>
 MIME-Version: 1.0
+In-Reply-To: <20220110071547.195669-1-mst@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <Yfwlekwcu35SN9MU@work-vm>
-Subject: Re: [Virtio-fs] [PATCH v5 3/9] virtiofsd: Parse extended "struct
-	fuse_init_in"
+Subject: [Virtio-fs] [PULL 10/10] Revert "virtio: introduce macro
+	IRTIO_CONFIG_IRQ_IDX"
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,215 +16,157 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: qemu-devel@nongnu.org
+Cc: Peter Maydell <peter.maydell@linaro.org>, Jason Wang <jasowang@redhat.com>, virtio-fs@redhat.com, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Gerd Hoffmann <kraxel@redhat.com>, =?utf-8?Q?Marc-Andr=C3=A9?= Lureau <marcandre.lureau@redhat.com>
 
-On Thu, Feb 03, 2022 at 06:56:58PM +0000, Dr. David Alan Gilbert wrote:
-> * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > Add some code to parse extended "struct fuse_init_in". And use a local
-> > variable "flag" to represent 64 bit flags. This will make it easier
-> > to add more features without having to worry about two 32bit flags (->flags
-> > and ->flags2) in "fuse_struct_in".
-> > 
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > ---
-> >  tools/virtiofsd/fuse_lowlevel.c | 62 +++++++++++++++++++++------------
-> >  1 file changed, 40 insertions(+), 22 deletions(-)
-> > 
-> > diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-> > index ce29a70253..1f10dcc75b 100644
-> > --- a/tools/virtiofsd/fuse_lowlevel.c
-> > +++ b/tools/virtiofsd/fuse_lowlevel.c
-> > @@ -1881,11 +1881,15 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-> >  {
-> >      size_t compat_size = offsetof(struct fuse_init_in, max_readahead);
-> >      size_t compat2_size = offsetof(struct fuse_init_in, flags) + sizeof(uint32_t);
-> > +    /* Fuse structure extended with minor version 36 */
-> > +    size_t compat3_size = offsetof(struct fuse_init_in, unused) +
-> > +                          (11 * sizeof(uint32_t));
-> 
-> Hmm that's actually quite difficult; what we have at the moment is:
-> 
-> struct fuse_init_in {
->         uint32_t        major;
->         uint32_t        minor;
->         uint32_t        max_readahead;
->         uint32_t        flags;
->         uint32_t        flags2;
->         uint32_t        unused[11];
-> };
-> 
-> so imagine someone comes along and changes that to:
-> 
-> struct fuse_init_in {    
->         uint32_t        major;
->         uint32_t        minor;
->         uint32_t        max_readahead;
->         uint32_t        flags;
->         uint32_t        flags2;
->         uint32_t        flags3;
->         uint32_t        unused[10];
-> };
-> 
-> Then this code will break (oddly!), where the old code that didn't reference the
-> unusued field wouldn't.
+This reverts commit bf1d85c166c19af95dbd27b1faba1d2909732323.
+---
+ include/hw/virtio/virtio.h     |  3 ---
+ hw/display/vhost-user-gpu.c    |  6 ------
+ hw/net/virtio-net.c            | 10 ++--------
+ hw/virtio/vhost-user-fs.c      |  6 ------
+ hw/virtio/vhost-vsock-common.c |  6 ------
+ hw/virtio/virtio-crypto.c      |  6 ------
+ 6 files changed, 2 insertions(+), 35 deletions(-)
 
-Good catch. I did not think about it.
-
-> It looks like qemu defines an 'endof' macro, so I think you can do:
-> 
->   size_t compat3_size = endof(struct fuse_init_in, unused);
-> 
-> I think that should work as long as people nibble away at unused from
-> the top.
-
-Will use "endof" macro.
-
-Thanks
-Vivek
-
-> 
-> Dave
-> 
-> 
-> >      struct fuse_init_in *arg;
-> >      struct fuse_init_out outarg;
-> >      struct fuse_session *se = req->se;
-> >      size_t bufsize = se->bufsize;
-> >      size_t outargsize = sizeof(outarg);
-> > +    uint64_t flags = 0;
-> >  
-> >      (void)nodeid;
-> >  
-> > @@ -1902,11 +1906,25 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-> >              fuse_reply_err(req, EINVAL);
-> >              return;
-> >          }
-> > +        flags |= arg->flags;
-> > +    }
-> > +
-> > +    /*
-> > +     * fuse_init_in was extended again with minor version 36. Just read
-> > +     * current known size of fuse_init so that future extension and
-> > +     * header rebase does not cause breakage.
-> > +     */
-> > +    if (sizeof(*arg) > compat2_size && (arg->flags & FUSE_INIT_EXT)) {
-> > +        if (!fuse_mbuf_iter_advance(iter, compat3_size - compat2_size)) {
-> > +            fuse_reply_err(req, EINVAL);
-> > +            return;
-> > +        }
-> > +        flags |= (uint64_t) arg->flags2 << 32;
-> >      }
-> >  
-> >      fuse_log(FUSE_LOG_DEBUG, "INIT: %u.%u\n", arg->major, arg->minor);
-> >      if (arg->major == 7 && arg->minor >= 6) {
-> > -        fuse_log(FUSE_LOG_DEBUG, "flags=0x%08x\n", arg->flags);
-> > +        fuse_log(FUSE_LOG_DEBUG, "flags=0x%016llx\n", flags);
-> >          fuse_log(FUSE_LOG_DEBUG, "max_readahead=0x%08x\n", arg->max_readahead);
-> >      }
-> >      se->conn.proto_major = arg->major;
-> > @@ -1934,68 +1952,68 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-> >      if (arg->max_readahead < se->conn.max_readahead) {
-> >          se->conn.max_readahead = arg->max_readahead;
-> >      }
-> > -    if (arg->flags & FUSE_ASYNC_READ) {
-> > +    if (flags & FUSE_ASYNC_READ) {
-> >          se->conn.capable |= FUSE_CAP_ASYNC_READ;
-> >      }
-> > -    if (arg->flags & FUSE_POSIX_LOCKS) {
-> > +    if (flags & FUSE_POSIX_LOCKS) {
-> >          se->conn.capable |= FUSE_CAP_POSIX_LOCKS;
-> >      }
-> > -    if (arg->flags & FUSE_ATOMIC_O_TRUNC) {
-> > +    if (flags & FUSE_ATOMIC_O_TRUNC) {
-> >          se->conn.capable |= FUSE_CAP_ATOMIC_O_TRUNC;
-> >      }
-> > -    if (arg->flags & FUSE_EXPORT_SUPPORT) {
-> > +    if (flags & FUSE_EXPORT_SUPPORT) {
-> >          se->conn.capable |= FUSE_CAP_EXPORT_SUPPORT;
-> >      }
-> > -    if (arg->flags & FUSE_DONT_MASK) {
-> > +    if (flags & FUSE_DONT_MASK) {
-> >          se->conn.capable |= FUSE_CAP_DONT_MASK;
-> >      }
-> > -    if (arg->flags & FUSE_FLOCK_LOCKS) {
-> > +    if (flags & FUSE_FLOCK_LOCKS) {
-> >          se->conn.capable |= FUSE_CAP_FLOCK_LOCKS;
-> >      }
-> > -    if (arg->flags & FUSE_AUTO_INVAL_DATA) {
-> > +    if (flags & FUSE_AUTO_INVAL_DATA) {
-> >          se->conn.capable |= FUSE_CAP_AUTO_INVAL_DATA;
-> >      }
-> > -    if (arg->flags & FUSE_DO_READDIRPLUS) {
-> > +    if (flags & FUSE_DO_READDIRPLUS) {
-> >          se->conn.capable |= FUSE_CAP_READDIRPLUS;
-> >      }
-> > -    if (arg->flags & FUSE_READDIRPLUS_AUTO) {
-> > +    if (flags & FUSE_READDIRPLUS_AUTO) {
-> >          se->conn.capable |= FUSE_CAP_READDIRPLUS_AUTO;
-> >      }
-> > -    if (arg->flags & FUSE_ASYNC_DIO) {
-> > +    if (flags & FUSE_ASYNC_DIO) {
-> >          se->conn.capable |= FUSE_CAP_ASYNC_DIO;
-> >      }
-> > -    if (arg->flags & FUSE_WRITEBACK_CACHE) {
-> > +    if (flags & FUSE_WRITEBACK_CACHE) {
-> >          se->conn.capable |= FUSE_CAP_WRITEBACK_CACHE;
-> >      }
-> > -    if (arg->flags & FUSE_NO_OPEN_SUPPORT) {
-> > +    if (flags & FUSE_NO_OPEN_SUPPORT) {
-> >          se->conn.capable |= FUSE_CAP_NO_OPEN_SUPPORT;
-> >      }
-> > -    if (arg->flags & FUSE_PARALLEL_DIROPS) {
-> > +    if (flags & FUSE_PARALLEL_DIROPS) {
-> >          se->conn.capable |= FUSE_CAP_PARALLEL_DIROPS;
-> >      }
-> > -    if (arg->flags & FUSE_POSIX_ACL) {
-> > +    if (flags & FUSE_POSIX_ACL) {
-> >          se->conn.capable |= FUSE_CAP_POSIX_ACL;
-> >      }
-> > -    if (arg->flags & FUSE_HANDLE_KILLPRIV) {
-> > +    if (flags & FUSE_HANDLE_KILLPRIV) {
-> >          se->conn.capable |= FUSE_CAP_HANDLE_KILLPRIV;
-> >      }
-> > -    if (arg->flags & FUSE_NO_OPENDIR_SUPPORT) {
-> > +    if (flags & FUSE_NO_OPENDIR_SUPPORT) {
-> >          se->conn.capable |= FUSE_CAP_NO_OPENDIR_SUPPORT;
-> >      }
-> > -    if (!(arg->flags & FUSE_MAX_PAGES)) {
-> > +    if (!(flags & FUSE_MAX_PAGES)) {
-> >          size_t max_bufsize = FUSE_DEFAULT_MAX_PAGES_PER_REQ * getpagesize() +
-> >                               FUSE_BUFFER_HEADER_SIZE;
-> >          if (bufsize > max_bufsize) {
-> >              bufsize = max_bufsize;
-> >          }
-> >      }
-> > -    if (arg->flags & FUSE_SUBMOUNTS) {
-> > +    if (flags & FUSE_SUBMOUNTS) {
-> >          se->conn.capable |= FUSE_CAP_SUBMOUNTS;
-> >      }
-> > -    if (arg->flags & FUSE_HANDLE_KILLPRIV_V2) {
-> > +    if (flags & FUSE_HANDLE_KILLPRIV_V2) {
-> >          se->conn.capable |= FUSE_CAP_HANDLE_KILLPRIV_V2;
-> >      }
-> > -    if (arg->flags & FUSE_SETXATTR_EXT) {
-> > +    if (flags & FUSE_SETXATTR_EXT) {
-> >          se->conn.capable |= FUSE_CAP_SETXATTR_EXT;
-> >      }
-> >  #ifdef HAVE_SPLICE
-> > @@ -2063,7 +2081,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-> >      if (se->conn.max_write < bufsize - FUSE_BUFFER_HEADER_SIZE) {
-> >          se->bufsize = se->conn.max_write + FUSE_BUFFER_HEADER_SIZE;
-> >      }
-> > -    if (arg->flags & FUSE_MAX_PAGES) {
-> > +    if (flags & FUSE_MAX_PAGES) {
-> >          outarg.flags |= FUSE_MAX_PAGES;
-> >          outarg.max_pages = (se->conn.max_write - 1) / getpagesize() + 1;
-> >      }
-> > -- 
-> > 2.34.1
-> > 
-> -- 
-> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
-> 
+diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
+index 605ea79c90..8bab9cfb75 100644
+--- a/include/hw/virtio/virtio.h
++++ b/include/hw/virtio/virtio.h
+@@ -67,9 +67,6 @@ typedef struct VirtQueueElement
+ 
+ #define VIRTIO_NO_VECTOR 0xffff
+ 
+-/* special index value used internally for config irqs */
+-#define VIRTIO_CONFIG_IRQ_IDX -1
+-
+ #define TYPE_VIRTIO_DEVICE "virtio-device"
+ OBJECT_DECLARE_TYPE(VirtIODevice, VirtioDeviceClass, VIRTIO_DEVICE)
+ 
+diff --git a/hw/display/vhost-user-gpu.c b/hw/display/vhost-user-gpu.c
+index d4a440e815..09818231bd 100644
+--- a/hw/display/vhost-user-gpu.c
++++ b/hw/display/vhost-user-gpu.c
+@@ -485,9 +485,6 @@ vhost_user_gpu_guest_notifier_pending(VirtIODevice *vdev, int idx)
+ {
+     VhostUserGPU *g = VHOST_USER_GPU(vdev);
+ 
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return false;
+-    }
+     return vhost_virtqueue_pending(&g->vhost->dev, idx);
+ }
+ 
+@@ -496,9 +493,6 @@ vhost_user_gpu_guest_notifier_mask(VirtIODevice *vdev, int idx, bool mask)
+ {
+     VhostUserGPU *g = VHOST_USER_GPU(vdev);
+ 
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return;
+-    }
+     vhost_virtqueue_mask(&g->vhost->dev, vdev, idx, mask);
+ }
+ 
+diff --git a/hw/net/virtio-net.c b/hw/net/virtio-net.c
+index 5e03c0dd14..cf8ab0f8af 100644
+--- a/hw/net/virtio-net.c
++++ b/hw/net/virtio-net.c
+@@ -3168,9 +3168,6 @@ static bool virtio_net_guest_notifier_pending(VirtIODevice *vdev, int idx)
+     VirtIONet *n = VIRTIO_NET(vdev);
+     NetClientState *nc = qemu_get_subqueue(n->nic, vq2q(idx));
+     assert(n->vhost_started);
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return false;
+-    }
+     return vhost_net_virtqueue_pending(get_vhost_net(nc->peer), idx);
+ }
+ 
+@@ -3180,11 +3177,8 @@ static void virtio_net_guest_notifier_mask(VirtIODevice *vdev, int idx,
+     VirtIONet *n = VIRTIO_NET(vdev);
+     NetClientState *nc = qemu_get_subqueue(n->nic, vq2q(idx));
+     assert(n->vhost_started);
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return;
+-    }
+-
+-    vhost_net_virtqueue_mask(get_vhost_net(nc->peer), vdev, idx, mask);
++    vhost_net_virtqueue_mask(get_vhost_net(nc->peer),
++                             vdev, idx, mask);
+ }
+ 
+ static void virtio_net_set_config_size(VirtIONet *n, uint64_t host_features)
+diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+index 9b0349922e..c595957983 100644
+--- a/hw/virtio/vhost-user-fs.c
++++ b/hw/virtio/vhost-user-fs.c
+@@ -161,9 +161,6 @@ static void vuf_guest_notifier_mask(VirtIODevice *vdev, int idx,
+ {
+     VHostUserFS *fs = VHOST_USER_FS(vdev);
+ 
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return;
+-    }
+     vhost_virtqueue_mask(&fs->vhost_dev, vdev, idx, mask);
+ }
+ 
+@@ -171,9 +168,6 @@ static bool vuf_guest_notifier_pending(VirtIODevice *vdev, int idx)
+ {
+     VHostUserFS *fs = VHOST_USER_FS(vdev);
+ 
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return false;
+-    }
+     return vhost_virtqueue_pending(&fs->vhost_dev, idx);
+ }
+ 
+diff --git a/hw/virtio/vhost-vsock-common.c b/hw/virtio/vhost-vsock-common.c
+index d1b9c027b6..3f3771274e 100644
+--- a/hw/virtio/vhost-vsock-common.c
++++ b/hw/virtio/vhost-vsock-common.c
+@@ -125,9 +125,6 @@ static void vhost_vsock_common_guest_notifier_mask(VirtIODevice *vdev, int idx,
+ {
+     VHostVSockCommon *vvc = VHOST_VSOCK_COMMON(vdev);
+ 
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return;
+-    }
+     vhost_virtqueue_mask(&vvc->vhost_dev, vdev, idx, mask);
+ }
+ 
+@@ -136,9 +133,6 @@ static bool vhost_vsock_common_guest_notifier_pending(VirtIODevice *vdev,
+ {
+     VHostVSockCommon *vvc = VHOST_VSOCK_COMMON(vdev);
+ 
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return false;
+-    }
+     return vhost_virtqueue_pending(&vvc->vhost_dev, idx);
+ }
+ 
+diff --git a/hw/virtio/virtio-crypto.c b/hw/virtio/virtio-crypto.c
+index 1d5192f8b4..54f9bbb789 100644
+--- a/hw/virtio/virtio-crypto.c
++++ b/hw/virtio/virtio-crypto.c
+@@ -948,9 +948,6 @@ static void virtio_crypto_guest_notifier_mask(VirtIODevice *vdev, int idx,
+ 
+     assert(vcrypto->vhost_started);
+ 
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return;
+-    }
+     cryptodev_vhost_virtqueue_mask(vdev, queue, idx, mask);
+ }
+ 
+@@ -961,9 +958,6 @@ static bool virtio_crypto_guest_notifier_pending(VirtIODevice *vdev, int idx)
+ 
+     assert(vcrypto->vhost_started);
+ 
+-    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+-        return false;
+-    }
+     return cryptodev_vhost_virtqueue_pending(vdev, queue, idx);
+ }
+ 
+-- 
+MST
 

@@ -1,26 +1,12 @@
-Date: Fri, 14 Jan 2022 06:13:41 -0500
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	from:to:subject; s=fm3; bh=5TmA/etBZ8be4SE0fRm3dkXbGx9k/R/FexPQT
-	N6MneQ=; b=TqQoAP2La18evhJqji2NhWjouqhK4OrWY8OkpVmU8o7ryi83R+/3V
-	gE9cXtOQwM7VsmiI+qLe9PqPTYm6vpalNxhqT10mZqoRv0bDgSzo8Y9uQUM76p5A
-	lY9KqQYQtlfctarcw4XoD1FrFH4JF9FSiOcUux7U2iGQa/3wC77MLIy1fRwkZw2x
-	6UYc818zpWoXxxBLulNBM9zgopLWVf7uHf/zwZiNxiHXMTPzk2O6vDwvdlW+368F
-	FfG2r/t3I0b1tODIflc3S8ZGgCIky1L00qrtHAXHxjCoGn+iYHOgAD4f8JS3hDoE
-	tGA/AfXTZpNNVrTM58jOSsAjWkR9auTUg==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=5TmA/etBZ8be4SE0f
-	Rm3dkXbGx9k/R/FexPQTN6MneQ=; b=iiTQuyQwnUwNFYjDJuQ5mIIJnigViR6zJ
-	OGjhsOcE17Phlb7J/JfNsAX5aB9rRkX7x+zfcHymk6CPrsTLOrcO/JiPUdeuvWyc
-	R9fH88cOSgIFwgCwCb/k+xhkb5SSPwjsKyuD0eekeD+c4x9MwIl9mN4Wj5nVlN06
-	7fYAWavDHAjQk1RAJPeZaGeIr+y7mlHAiVVBHsXVyYdXqc5tfFsSJ4mpmYBVQepn
-	0d8ThhpO6PKRC68IiN1lbazgVl4qO4vGggIGZVqBFpd8uh838iQyZZNV0qwcPOTW
-	lOrNLvQXmGNDF71dCRWcAQmO+NGOKh8nJIoB5XKma/AH4ihHD73rQ==
-From: virtiofs-bot@sinrega.org
-Message-Id: <14484.122011406133600314@us-mta-644.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR opened: Draft: vhost_user_fs: Implement
-	syncfs
+Date: Fri, 14 Jan 2022 13:20:17 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YeG+4Uqeoj4hUpa4@redhat.com>
+References: <20220113153249.710216-1-sebastian.hasler@stuvus.uni-stuttgart.de>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20220113153249.710216-1-sebastian.hasler@stuvus.uni-stuttgart.de>
+Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: Do not support blocking flock
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -29,9 +15,65 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Sebastian Hasler <sebastian.hasler@stuvus.uni-stuttgart.de>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
+On Thu, Jan 13, 2022 at 04:32:49PM +0100, Sebastian Hasler wrote:
+> With the current implementation, blocking flock can lead to
+> deadlock. Thus, it's better to return EOPNOTSUPP if a user attempts
+> to perform a blocking flock request.
+> 
+> Signed-off-by: Sebastian Hasler <sebastian.hasler@stuvus.uni-stuttgart.de>
 
----
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/66
+Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
+
+Thanks Sebastian. Good fix. I can easily reproduce the deadlock.
+
+shell1> flock foo.txt -c "sleep 10"
+shell2> flock foo.txt -c echo
+
+First commands take flock on foo.txt. Second command blocks on lock. And
+only virtiofsd thread serving the virt messages blocks on flock(). Now
+first command never exits. I think it will try to free lock once sleep
+is over and that will deadlock. virtiofsd thread is blocked and it will
+never wake up because lock release operation will never make progress.
+
+This will be little painful for people as they will start seeing
+errors. But I guess erroring out early is better than a potential
+deadlock later.
+
+Vivek
+
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 64b5b4fbb1..faa62278c5 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -2442,6 +2442,15 @@ static void lo_flock(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
+>      int res;
+>      (void)ino;
+>  
+> +    if (!(op & LOCK_NB)) {
+> +        /*
+> +         * Blocking flock can deadlock as there is only one thread
+> +         * serving the queue.
+> +         */
+> +        fuse_reply_err(req, EOPNOTSUPP);
+> +        return;
+> +    }
+> +
+>      res = flock(lo_fi_fd(req, fi), op);
+>  
+>      fuse_reply_err(req, res == -1 ? errno : 0);
+> -- 
+> 2.33.1
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
+> 
 

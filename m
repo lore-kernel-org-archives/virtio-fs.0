@@ -1,12 +1,26 @@
-Date: Fri, 14 Jan 2022 13:20:17 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YeG+4Uqeoj4hUpa4@redhat.com>
-References: <20220113153249.710216-1-sebastian.hasler@stuvus.uni-stuttgart.de>
-MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20220113153249.710216-1-sebastian.hasler@stuvus.uni-stuttgart.de>
-Subject: Re: [Virtio-fs] [PATCH v2] virtiofsd: Do not support blocking flock
+Date: Mon, 17 Jan 2022 06:57:20 -0500
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	from:to:subject; s=fm3; bh=NgebdAXy7uyUtUGIPY66WWXlD6XOvxPHZgmhI
+	8H+cpQ=; b=imp+6xKvW2YI65oxK0lpR9EuKKrwuI+foesIie4CuQJFFg5FBEw6V
+	8Zw//5ntjeTndY9e9jh4ANx+DHg3a8DP9DpODdsoC7zGlEieehZft+xYtctl+yeH
+	DBLhHZZl3mmMPQGuhD/C6a6TPKBc64JOGDhr3vZ40hZZ+I1wOwspc6mjmSqtwWNL
+	KPY4jnuOyAgYYM+fpK4MOIIWatVbkPvfj3/8ejYkjHlFc6jKfcHqEYWjqXctNyFF
+	LHsEg6R7RVjAeCyhHuGqsb8QO5hRTS+7mnB/AWyFtvX3/uorp7yJF7vaVx7LkNtT
+	SuZxWGv1ca2jRb3IzC8ZiGUSXSFORqNqQ==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=NgebdAXy7uyUtUGIP
+	Y66WWXlD6XOvxPHZgmhI8H+cpQ=; b=jANqCW11C7xc2lANSsOl3yQyjqOJIjInJ
+	5emM5/xLoeiztiK7M7IGUKuERLZKUDcgf78C3HPOQzy+j5kFUwHruoQJlk1Gx6r+
+	exVLMEnVV5FX1HpbPYV2Tt9UNGTeIxg7E7utsCnwwKC8MF32xMZ0HxERZdidlPaE
+	nFAXvTyYCBVHx0fvEmYwqDhLTU8D4ZI1BZSpqJauff9dDWRQmZ3E8DR92SOEyXjX
+	EM2drjx531HoaopvbKrllLiowzeQ5XYW7KO9Do6IWgW68fx7LSJMiiyL80hi2EsC
+	7knX0ofSUflCegaveqjHNHPsHxC1NR534/4bzdcqgojYkz92WdUGQ==
+From: virtiofs-bot@sinrega.org
+Message-Id: <86072.122011706571300608@us-mta-422.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd] MR opened: xattr mapping add a new type
+	"unsupported"
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,65 +29,30 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Sebastian Hasler <sebastian.hasler@stuvus.uni-stuttgart.de>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: virtio-fs@redhat.com
 
-On Thu, Jan 13, 2022 at 04:32:49PM +0100, Sebastian Hasler wrote:
-> With the current implementation, blocking flock can lead to
-> deadlock. Thus, it's better to return EOPNOTSUPP if a user attempts
-> to perform a blocking flock request.
-> 
-> Signed-off-by: Sebastian Hasler <sebastian.hasler@stuvus.uni-stuttgart.de>
+This is ported from the C version.
 
-Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
+Right now for xattr remapping, we support types of "prefix", "ok" or
+"bad". Type "bad" returns -EPERM on getxattr()/setxattr() and hides xattr in
+listxattr().
 
-Thanks Sebastian. Good fix. I can easily reproduce the deadlock.
+A new semantics is needed where if an xattr is unsupported, then
+getxattr()/setxattr() return -ENOTSUP and listxattr() should hide
+the xattr. And, for getxattr(), when the mapping code returns -EPERM,
+for type "bad", getxattr() code converts it to -ENODATA.
 
-shell1> flock foo.txt -c "sleep 10"
-shell2> flock foo.txt -c echo
+This is needed to simulate that security.selinux is not
+supported by virtiofs filesystem and in that case client falls back
+to some default label specified by policy.
 
-First commands take flock on foo.txt. Second command blocks on lock. And
-only virtiofsd thread serving the virt messages blocks on flock(). Now
-first command never exits. I think it will try to free lock once sleep
-is over and that will deadlock. virtiofsd thread is blocked and it will
-never wake up because lock release operation will never make progress.
+So add a new type "unsupported" which returns -ENOTSUP on getxattr()
+and setxattr() and hides xattrs in listxattr().
 
-This will be little painful for people as they will start seeing
-errors. But I guess erroring out early is better than a potential
-deadlock later.
+For example, one can use following mapping rule to not support
+security.selinux xattr and allow others.
 
-Vivek
-
-> ---
->  tools/virtiofsd/passthrough_ll.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 64b5b4fbb1..faa62278c5 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2442,6 +2442,15 @@ static void lo_flock(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
->      int res;
->      (void)ino;
->  
-> +    if (!(op & LOCK_NB)) {
-> +        /*
-> +         * Blocking flock can deadlock as there is only one thread
-> +         * serving the queue.
-> +         */
-> +        fuse_reply_err(req, EOPNOTSUPP);
-> +        return;
-> +    }
-> +
->      res = flock(lo_fi_fd(req, fi), op);
->  
->      fuse_reply_err(req, res == -1 ? errno : 0);
-> -- 
-> 2.33.1
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
-> 
+"-o xattrmap=/unsupported/all/security.selinux/security.selinux//ok/all///"
+---
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/67
 

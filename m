@@ -1,26 +1,26 @@
-Date: Mon, 17 Jan 2022 06:57:20 -0500
+Date: Mon, 17 Jan 2022 07:20:14 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	from:to:subject; s=fm3; bh=NgebdAXy7uyUtUGIPY66WWXlD6XOvxPHZgmhI
-	8H+cpQ=; b=imp+6xKvW2YI65oxK0lpR9EuKKrwuI+foesIie4CuQJFFg5FBEw6V
-	8Zw//5ntjeTndY9e9jh4ANx+DHg3a8DP9DpODdsoC7zGlEieehZft+xYtctl+yeH
-	DBLhHZZl3mmMPQGuhD/C6a6TPKBc64JOGDhr3vZ40hZZ+I1wOwspc6mjmSqtwWNL
-	KPY4jnuOyAgYYM+fpK4MOIIWatVbkPvfj3/8ejYkjHlFc6jKfcHqEYWjqXctNyFF
-	LHsEg6R7RVjAeCyhHuGqsb8QO5hRTS+7mnB/AWyFtvX3/uorp7yJF7vaVx7LkNtT
-	SuZxWGv1ca2jRb3IzC8ZiGUSXSFORqNqQ==
+	from:to:subject; s=fm3; bh=kbI1OlAUjMlcUPAhF+ItAkfIfJLcnUUzTBSg9
+	tBSZzc=; b=G6XhxYnInaoKfUpYtCSOTCttd4Tmci7oSrzJlu55ctrI0gOGlHeDw
+	rJf60vdLSGsBlNufDJWNYC6IYGpQYWaa32H1BGMADTo6035Y4ixC4xbzhBd6b9jn
+	8kQF2g452ap2bCzmJsGEuvDjhL5TyYRycP/ZUPDFQ6pCmwgWMQuSQQ6sW5wLgVbW
+	cLOiWGSc8aSrgoCfICjDaswI57iTfSlJ+oDp7///UvAGYqwKxm8w1GN9jALAgsOt
+	zFnDMsB7iJfxRxy/sqUPbOVs4uUF6342Ie3QeVIu7VE8I4quStnigVY+AnpIUADW
+	ahA6HtcuiuBEp6c8+ZbFrNgqLZ381GlpA==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=NgebdAXy7uyUtUGIP
-	Y66WWXlD6XOvxPHZgmhI8H+cpQ=; b=jANqCW11C7xc2lANSsOl3yQyjqOJIjInJ
-	5emM5/xLoeiztiK7M7IGUKuERLZKUDcgf78C3HPOQzy+j5kFUwHruoQJlk1Gx6r+
-	exVLMEnVV5FX1HpbPYV2Tt9UNGTeIxg7E7utsCnwwKC8MF32xMZ0HxERZdidlPaE
-	nFAXvTyYCBVHx0fvEmYwqDhLTU8D4ZI1BZSpqJauff9dDWRQmZ3E8DR92SOEyXjX
-	EM2drjx531HoaopvbKrllLiowzeQ5XYW7KO9Do6IWgW68fx7LSJMiiyL80hi2EsC
-	7knX0ofSUflCegaveqjHNHPsHxC1NR534/4bzdcqgojYkz92WdUGQ==
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=kbI1OlAUjMlcUPAhF
+	+ItAkfIfJLcnUUzTBSg9tBSZzc=; b=JwVb4UsoGplsB/foHiMCHaQMAJyi8HB3N
+	DXnr+7hYwVpGYY4e5YHznsJit+ZjyLuaK4WoWSmX9BuvRfUIFeoQ/1M2ImxlTBlr
+	/9mF1JCq73nw6UNLHvNC6jIyXM3OGRU5PMjBAUwLReSmvKwbg/ejub06uXLKnCPq
+	oG7LoEjWYpZkoptm/NxGonlRv5WeqKw5mefCEniju1LyBcxVRA7c3mvvJg1L3PiN
+	2RUTi9p5pjlnzzzQwFVVVr+X+83MZZgdf5YVHeAPUC/HMTO/hU4Sj7mucg9wkBf1
+	3FuKw9WT7bwfnxofF8f2+MOSkBu3QzpGnNKM+yYmMGqiiY92Fcl5w==
 From: virtiofs-bot@sinrega.org
-Message-Id: <86072.122011706571300608@us-mta-422.us.mimecast.lan>
+Message-Id: <96293.122011707201202646@us-mta-608.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR opened: xattr mapping add a new type
-	"unsupported"
+Subject: [Virtio-fs] [virtiofsd] MR opened: xattrmap: Fix documentation for
+	type "map"
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,28 +31,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-This is ported from the C version.
 
-Right now for xattr remapping, we support types of "prefix", "ok" or
-"bad". Type "bad" returns -EPERM on getxattr()/setxattr() and hides xattr in
-listxattr().
-
-A new semantics is needed where if an xattr is unsupported, then
-getxattr()/setxattr() return -ENOTSUP and listxattr() should hide
-the xattr. And, for getxattr(), when the mapping code returns -EPERM,
-for type "bad", getxattr() code converts it to -ENODATA.
-
-This is needed to simulate that security.selinux is not
-supported by virtiofs filesystem and in that case client falls back
-to some default label specified by policy.
-
-So add a new type "unsupported" which returns -ENOTSUP on getxattr()
-and setxattr() and hides xattrs in listxattr().
-
-For example, one can use following mapping rule to not support
-security.selinux xattr and allow others.
-
-"-o xattrmap=/unsupported/all/security.selinux/security.selinux//ok/all///"
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/67
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/68
 

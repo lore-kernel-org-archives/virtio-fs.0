@@ -1,26 +1,26 @@
-Date: Tue, 18 Jan 2022 02:03:39 -0500
+Date: Tue, 18 Jan 2022 05:53:10 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	from:to:subject; s=fm3; bh=bAGMj33934tYeuVkwJ2GMvjSoD0MoEC5sLCIH
-	QpjCBw=; b=zZTb293Q7PSRQjMuyHF0xJ+jOf9PW/LvQpzqGF4tuLXaPZF6ghOvv
-	oeFqFp0Dkc9PJGyrTHDccuWy2Nq0aGEfZQF2hD4bnSUzWGy4Egn69m6Pqy3eoQaH
-	03qzh8E+pdKw7WJg7YGgJbSj4ngD3qPT14fhLgW+mFG33Izqc4N8EOP1JOeej38I
-	L4OgyMxojc1fDvOLNMM1IXfGuvAG2lzt3BcYzoMBwZF0E7exHJQ0UDDoJ5qyJTJ3
-	6iebESC0HZNQVothWhMwJ5lw1IUZW3QUh+mfE+gHlKZML3qGiDhtQpOgK30FaVG3
-	04vO9uQLeD8GJ1BpatclSpl2hrZuW/FiA==
+	from:to:subject; s=fm3; bh=rWkubUZNhMjF2IwGu3Wz2q+r941eYzc59G7cm
+	c0jG8Y=; b=iMVYpiR2FjdUo9mRWK0hIWMbzDgN3iXkFjLqNdsUhb2RvLb2XfX8y
+	NOiqAupFChWE1Gz+VANFxWui2l14aMWhfbYEZ6dmqURiXHeA+ODaMsgp6PRSUac6
+	j6VdZvG3ktmn/2R+DFnb0lJAuAeNAeOO62Q1abljDrQFa3ms9QMZ7JyPAqcSou03
+	vNY2Ks3lS71eptswTkXIeFx9l9qkVANyQLDAcdQMIrFwUamyVg7HnVYFSG+J5i8E
+	/UwaiCL2lVBF+cpPGzL3jnHkoToN18NkA7/cEq49sGjqFs180WmPqOLddeO/5T7i
+	ksk6TuXlGPTtzTY+2G3MnO8t9B/WSGP2A==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=bAGMj33934tYeuVkw
-	J2GMvjSoD0MoEC5sLCIHQpjCBw=; b=WS1/jlf9lpeoa8uOd3jIGFzb5nJjvbvYM
-	LZxxF2NPAnb+9dapQq1I8s6ctmFj5RjFwSED6Bwt778DN1d6H2LkcLgGL3XEu6Nb
-	tC3zQUCmND0VSdzABaUl95BQADUXUP8s8dgQv80gy088PnrHNjfmrb5YDWGclTXR
-	/MeWRtoxEhK2KcsUI3RTq1EeZb9S69RmmwLG8s3O+08V1OjtyWHW+YYGgtS1ErpZ
-	DwrergHmXz5Wng1kUlvOQBcYCjknHhvjMorZfpH/to/rVzPDMbe1ZrN0NCslNfS0
-	leie98VjzzjNsDzkZpvFuLKYmc6QnvC/Tb7R6f6xfYUtvBf1yGV0A==
+	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=rWkubUZNhMjF2IwGu
+	3Wz2q+r941eYzc59G7cmc0jG8Y=; b=UsSYTXSRUSnoqYW5cCFdN5j6fcJEfM/nA
+	fI9OoNQkEDYV+zTbi1o9zzacDd6it3C7u8kw33PnlX1AXs2crfkJJw/PvSyP8smc
+	wzQrsNsCoa8cAwGS86JH8//F8nOMZyLGv71nocnKIruLF4MzImsP3exxAF5TPvoz
+	MrSY7THVesGdTp+kZcZ4e0yB8DcRv6q/M6OCb09uwQlEUsPxqeyiVU8YCn+BJyZw
+	5YlIqbv6l7VN0O86Na1GDfWXl/eAMYWdQD1eZjCdI1ZhuqOLuyj3+nkIzZy3QwMz
+	g2L7cEWNpUTtvOANX4WfppAWTwdTGZBnrlPKEU+meyCaaEx8LFMkg==
 From: virtiofs-bot@sinrega.org
-Message-Id: <00856.122011802033300726@us-mta-636.us.mimecast.lan>
+Message-Id: <08955.122011805530200405@us-mta-380.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] Issue closed: Propagate exit code from
-	child to parent
+Subject: [Virtio-fs] [virtiofsd] MR merged: sandbox: Support combining
+	--rlimit-nofile and --sandbox=chroot
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,7 +31,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-When running in a sandbox, propagate exit code from child to parent.
+Related: #15
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/10
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/65
 

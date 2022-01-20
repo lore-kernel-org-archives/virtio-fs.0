@@ -1,27 +1,28 @@
-Date: Thu, 20 Jan 2022 06:56:46 -0500
+Date: Thu, 20 Jan 2022 09:15:15 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
 	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=Y3K99WKbK0eN0xJwknJWUCeZPYTAJqsz0rVFRDdbRak=; b=r
-	oUIzGufEaUgJyAIyPesk+YaDO4GRYJIySifSTOzmAsJh3Cn1WspQvfadL92aRswj
-	uELnOHnLl+ZMbTgqucqWKPnKhKhlUhsUqESb+BmbV45eMNiSIBVAum3ZmTQ5qn+U
-	99qWaCKjWcumNWGwTVZexhGNA7LU/YjN5sp0AkdbqtqbYHDeWTuhoaNMBb/HleCL
-	0Wo4YOrcDZICA3dYW+pBYbOzUbTE/68A3BLPZin+JR60FwyTRsZSZh9I6CuERCDL
-	4CFOI/TaxRt7aoY7WYpCUnbJDwFE4h4/4pP39qsicnKno9qvTA4LuzXMvnU1MWDi
-	0jPhu+/Rq03/trT5riHTg==
+	:to; s=fm3; bh=akd+ZWPb1s8OsHebYeuSmWmHwO0Cv1cFOwVVj92IOtI=; b=n
+	nLZsTK2979KHhvLn50+sRT36sIedqIUM9+ELsWdMKZZ3HBltsoryIyYNXMP3YdaC
+	o+HSm4v0rZBppbHJynDTKN3akGy2BxTZFmOfCH51AXNRMQHL5GxOGVf+Jh3FtcKr
+	XSZUl7DpQiT6A/ZUsFEsn00fD3iwNgxhkVTgs16J2WjWhlHgA6FXCB8tL9HZxkym
+	NqhTtm0o5syx2tHpepaC2vFXwdxkz4clqY0WwJo739XqRV+k9fmLkYTAWZn4eYa1
+	wRUKLGHyJctTTTrOuJ5uqM/6q4qDKoPwkNBXJAAd7291ox9a1v1oiqAvXXYb+UL7
+	hD2WFQHfI3ZGQ86JVkSGA==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
 	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm1; bh=Y3K99WKbK0eN0xJwknJWUCeZPYTAJ
-	qsz0rVFRDdbRak=; b=WxhZgMohqmGbILgfV2wp+ebOTA491f12w/mwBcfWeUrsu
-	FzzRoRkUDi7+S4ZcBSdO28rvkQwcBD1But7EyvnRT6Lcm5+dK0tmO1eZTFSLH4ng
-	s1bmqE3d317pQoyllVyMxuNDpXwKd5Ym3s9dP21fkEYlBI8ly4wxi4fPkBdum2R2
-	D7LTs2esDbzp0kyIgzunCSQv1uCLrJhhAJmVdEhrSv5ZRX2btl1gm3v0zCovfzOh
-	AX6hZwHIjHrw2vww15v9d5JIpN88LoqZbrThutOdseg5waOl/cRhU8VQodp/0pJQ
-	TNpcvW+ybB9Y6z860fK+O7+8PaecoFGMMkiFlK3FA==
+	:x-me-sender:x-sasl-enc; s=fm1; bh=akd+ZWPb1s8OsHebYeuSmWmHwO0Cv
+	1cFOwVVj92IOtI=; b=gGgW/OkrRineZ7wbMhdJwAD2XiyzMZze//ilN0IgFEAz9
+	rj154JuNqucg+hKZdJIBHRbeF7o/b6GiBOIALOICoCNydiLyN7LkFmhK5ZDHtzcW
+	ZBGujjpEAos8+JiPpR4q6Iuy0vDiQskb7E0zUc6VbuhO11m58vcL/cRBtaFqdZ0y
+	UYGH1h6etzSUSxM4sKqptT8KvKg/702zw0Cey5KT2TmfpdsZpcym534O+1TJYiRh
+	U1nbKSwde9Vn81v2o9HT5PDBrUAK2X/XpoCH0G8Nj+r0md0CTxvgKS2bpZpnzs2G
+	xl8UKhDSggTt8bFkHlctfyfLM6igjp9j1FqNqpaug==
 From: virtiofs-bot@sinrega.org
-Message-Id: <69042.122012006564300794@us-mta-497.us.mimecast.lan>
+Message-Id: <84039.122012009151301618@us-mta-479.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] Issue opened: Release v1.0.1
+Subject: [Virtio-fs] [virtiofsd] MR opened: Flexibilize our deps to support
+	new patch versions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -32,14 +33,10 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Checklist for v1.0.1:
+For crates that follow SemVer, flexibilize the dependency so we can
+support newer patch versions without updating our Cargo.toml
 
-- [x] [Adds compatibility options](!61)
-- [ ] [Draft: Adds killpriv_v2/no_killpriv_v2 options](!62)
-- [ ] [xattr mapping add a new type "unsupported"](!67)
-- [ ] [Replace crate seccomp-sys with libseccomp-sys](!71)
-
-If you think there's something missing here, please say so.
+Signed-off-by: Sergio Lopez <slp@redhat.com>
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/24
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/72
 

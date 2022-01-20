@@ -1,26 +1,27 @@
-Date: Tue, 18 Jan 2022 10:33:12 -0500
+Date: Thu, 20 Jan 2022 05:02:05 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	from:to:subject; s=fm3; bh=kbI1OlAUjMlcUPAhF+ItAkfIfJLcnUUzTBSg9
-	tBSZzc=; b=u31e7zWkGuLEvkyvF1MbuaAWNOmHZErRI4fE40VJXJABPKiAfWr29
-	aFZ8YYKeLbPtcMDgAmh4USw8EI8HK5ShTg+k7lUA+2Hq57huS+2O5aXsyd0zAVPb
-	CYNIyCQvKLNCwy/dLFhO4ptpsyEqqR+AyywWoN5KBBni/n5+xexcgvEgw0LrwOWF
-	1n7v42WF9uCsL9xN4CI5SPGwlAZSQ2gjgf/Q2Jsj2vdyYBc9BDPgLbPGWxHSkBlD
-	HQc5E5kEb9WrNxol8XmpHzNALfjrPc4aCuMlT1ysFxhVgExegEBGri+eJmPmxV+Q
-	c4ElDB2YJ7Y0L+Lz8VOne9FMlzYZshYAg==
+	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+	:to; s=fm3; bh=EUfLifk/77p9R+KSLqG46xi8ITBa0N76RPybks7PCdY=; b=R
+	wsRmsZMYwV0BubNKqS/6pznmNw3guK7HIXRsVmmN+8fKC4mYuenA0C2aDEfxPqe+
+	rLQmjrc435LsJkdXDwr8qTl3AwO4KuWiIdVailCT7uQHaDjhCyyGglLJj7yFdOma
+	u0TUg4FkFVf1H2H2IGBTKgFjqV3PGq5I75jKtQ68sERtwXygeKaTVjFbtjtSrZ/T
+	jZ1p7fjYQNYgf173xCQFkGIk+rGmyfKz8nQAQ6pD2J11jYLS4qcp+X9qLS87Tafp
+	dUUIFtdzKi/JAHboXpNt3fFxsk6T/Bxwq2EPgVdk9XJj5J/WXTKj6U8WRK8UGEB3
+	yvb6+3+WNnyObe8Mm8zFQ==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=from:subject:to:x-me-proxy:x-me-proxy
-	:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; bh=kbI1OlAUjMlcUPAhF
-	+ItAkfIfJLcnUUzTBSg9tBSZzc=; b=NIYSRDTS2fHDW+DmHoMtZwzGnrDlRsRiH
-	xNEgqciDVOGg7uIwwVQRIfctGp3gFz5nlx60qXyCg9O71yhnRTyztDx2PIa0ad5V
-	/Kj1rQOZvFk1kbvRMyThJmRhGDqvj+0V78yrumm0PuxrwgTlK4HG67SK78l7LdPQ
-	LiJbFgD2BYB/V3ZLu2rZkgnLnr19xQPFMjhZBAPEWzPxl9Vr0ZH/0mgws+2wOIGL
-	06uStgbBTRT4tJ0w1PewpB69b7WkDyt1/GI7Z6eLQVHBrvzygZ0W58/KmOuAZVe9
-	OLvUGokcwTT/nhaxzzDJrB4bOOTk52Pb8cJBMK7KMc7vscz58s3YA==
+	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
+	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
+	:x-me-sender:x-sasl-enc; s=fm1; bh=EUfLifk/77p9R+KSLqG46xi8ITBa0
+	N76RPybks7PCdY=; b=CVbNy+8VBYwC+TT6EboZVgdj0I+SsDrNzJ/kZqQXBxVk1
+	PQjpXVQWEd/nA4y2xAsFjSmvz9kOT5Upa+V9I7RzKJ7VB7QvKrxoUQbOP/FAlQ8g
+	qrmKBba2nvdsZccffL1KT0HfBwI5txiYmhFMvThlj/oZSnxAFvYlV2l0c1rLLxpC
+	lz96nb8L4omnlimK5Ws8nW+ZDJdYUr5cyfY2vPeO1W3UKNGUSiLdoq5tKL67mPAR
+	tuVGJqBI5CBHkdEY2TKbwJ+m5f6d2ACNxjfcIh4wwCz/+1y2zvFIlyC/44PLVl4x
+	BTgWOTGwIGC2p+LHaDCQXNsjeoCFGOheiQ0/hXflw==
 From: virtiofs-bot@sinrega.org
-Message-Id: <48936.122011810330800614@us-mta-520.us.mimecast.lan>
+Message-Id: <31237.122012005020000320@us-mta-602.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR merged: xattrmap: Fix documentation for
-	type "map"
+Subject: [Virtio-fs] [virtiofsd] MR merged: Adds compatibility options
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,7 +32,8 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-
+Adds compatibility options: `no_posix_lock`, `no_flock`, `-f` and `--syslog`.
+The first 3 ones are just ignored, while the latter depends on the `syslog`crate to support sending log messages via syslog.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/68
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/61
 

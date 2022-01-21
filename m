@@ -1,28 +1,28 @@
-Date: Thu, 20 Jan 2022 09:15:15 -0500
+Date: Fri, 21 Jan 2022 04:41:22 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
 	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=akd+ZWPb1s8OsHebYeuSmWmHwO0Cv1cFOwVVj92IOtI=; b=n
-	nLZsTK2979KHhvLn50+sRT36sIedqIUM9+ELsWdMKZZ3HBltsoryIyYNXMP3YdaC
-	o+HSm4v0rZBppbHJynDTKN3akGy2BxTZFmOfCH51AXNRMQHL5GxOGVf+Jh3FtcKr
-	XSZUl7DpQiT6A/ZUsFEsn00fD3iwNgxhkVTgs16J2WjWhlHgA6FXCB8tL9HZxkym
-	NqhTtm0o5syx2tHpepaC2vFXwdxkz4clqY0WwJo739XqRV+k9fmLkYTAWZn4eYa1
-	wRUKLGHyJctTTTrOuJ5uqM/6q4qDKoPwkNBXJAAd7291ox9a1v1oiqAvXXYb+UL7
-	hD2WFQHfI3ZGQ86JVkSGA==
+	:to; s=fm3; bh=NgebdAXy7uyUtUGIPY66WWXlD6XOvxPHZgmhI8H+cpQ=; b=t
+	Ce0TbxtkWkbVyHbebKE1cAmMViegD3nCcvMSPglkestbXBUGCjqr6TgpUNrvezLI
+	PLrY+5sfRGWDWu2MYZRFBB/Ya8O2de07pAPXdhbOtPVevGhAlDsKVcMzteQy8n9c
+	7NmOnOd7rI3NbdETT7u8XVmLcVBRiqDQB316dp8Ny6b1Y2r/Y8dY+Yo32/I64Y1c
+	GVZJkB0xv2IRZ3GI6tX3b7XLFLj6iymYqILNVtZZVnueFsyqOXBzljOjjxf2+4pY
+	kytEjIurJhfpniT1bBuoGOybL52U3f88jHUmlGzriyAf1xQrZJM4K2mYmfrqSisg
+	fDdG95lnHQswg1baACu6A==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
 	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm1; bh=akd+ZWPb1s8OsHebYeuSmWmHwO0Cv
-	1cFOwVVj92IOtI=; b=gGgW/OkrRineZ7wbMhdJwAD2XiyzMZze//ilN0IgFEAz9
-	rj154JuNqucg+hKZdJIBHRbeF7o/b6GiBOIALOICoCNydiLyN7LkFmhK5ZDHtzcW
-	ZBGujjpEAos8+JiPpR4q6Iuy0vDiQskb7E0zUc6VbuhO11m58vcL/cRBtaFqdZ0y
-	UYGH1h6etzSUSxM4sKqptT8KvKg/702zw0Cey5KT2TmfpdsZpcym534O+1TJYiRh
-	U1nbKSwde9Vn81v2o9HT5PDBrUAK2X/XpoCH0G8Nj+r0md0CTxvgKS2bpZpnzs2G
-	xl8UKhDSggTt8bFkHlctfyfLM6igjp9j1FqNqpaug==
+	:x-me-sender:x-sasl-enc; s=fm1; bh=NgebdAXy7uyUtUGIPY66WWXlD6XOv
+	xPHZgmhI8H+cpQ=; b=f6USu66SG/fICgi10pXm3TblSzrAiTHC7dPej9hZvo60m
+	I5TJBmlnujyg04s/M+NelL6i+FSU+KtPOiZ0Q1GooGYxmC6GBuRnjwTOnNYPqvd3
+	MVoPDhbpgN2W5HTlWLldm7fASshn8tPytYzNdTrbks81pyztso9L8z0nna/rweIj
+	ZlKV3dqH2hvQI7jX1c5IfjSkflu8+VF8Ze6d1yx6P18tQViMNYRh3AyxdVVKGvO4
+	BCqzTdo482SggZ4weLBPiLVtOa0UqKkkNF6KnZDEQ85L8hKUvbaJyeiPz8xmZhQp
+	rpbFds1FltwydLK6RsyLqx7q1RYBnIhg0SwlNzIBg==
 From: virtiofs-bot@sinrega.org
-Message-Id: <84039.122012009151301618@us-mta-479.us.mimecast.lan>
+Message-Id: <03375.122012104411900643@us-mta-245.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR opened: Flexibilize our deps to support
-	new patch versions
+Subject: [Virtio-fs] [virtiofsd] MR merged: xattr mapping add a new type
+	"unsupported"
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,10 +33,28 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-For crates that follow SemVer, flexibilize the dependency so we can
-support newer patch versions without updating our Cargo.toml
+This is ported from the C version.
 
-Signed-off-by: Sergio Lopez <slp@redhat.com>
+Right now for xattr remapping, we support types of "prefix", "ok" or
+"bad". Type "bad" returns -EPERM on getxattr()/setxattr() and hides xattr in
+listxattr().
+
+A new semantics is needed where if an xattr is unsupported, then
+getxattr()/setxattr() return -ENOTSUP and listxattr() should hide
+the xattr. And, for getxattr(), when the mapping code returns -EPERM,
+for type "bad", getxattr() code converts it to -ENODATA.
+
+This is needed to simulate that security.selinux is not
+supported by virtiofs filesystem and in that case client falls back
+to some default label specified by policy.
+
+So add a new type "unsupported" which returns -ENOTSUP on getxattr()
+and setxattr() and hides xattrs in listxattr().
+
+For example, one can use following mapping rule to not support
+security.selinux xattr and allow others.
+
+"-o xattrmap=/unsupported/all/security.selinux/security.selinux//ok/all///"
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/72
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/67
 

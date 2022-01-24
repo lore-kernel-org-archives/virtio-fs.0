@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Mon, 24 Jan 2022 16:24:50 -0500
-Message-Id: <20220124212455.83968-5-vgoyal@redhat.com>
+Date: Mon, 24 Jan 2022 16:24:54 -0500
+Message-Id: <20220124212455.83968-9-vgoyal@redhat.com>
 In-Reply-To: <20220124212455.83968-1-vgoyal@redhat.com>
 References: <20220124212455.83968-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v4 4/9] virtiofsd: Extend size of
-	fuse_conn_info->capable and ->want fields
+Subject: [Virtio-fs] [PATCH v4 8/9] virtiofsd: Create new file using
+	O_TMPFILE and set security context
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,57 +18,162 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: vgoyal@redhat.com
 
-->capable keeps track of what capabilities kernel supports and ->wants keep
-track of what capabilities filesytem wants.
+If guest and host policies can't work with each other, then guest security
+context (selinux label) needs to be set into an xattr. Say remap guest
+security.selinux xattr to trusted.virtiofs.security.selinux.
 
-Right now these fields are 32bit in size. But now fuse has run out of
-bits and capabilities can now have bit number which are higher than 31.
+That means setting "fscreate" is not going to help as that's ony useful
+for security.selinux xattr on host.
 
-That means 32 bit fields are not suffcient anymore. Increase size to 64
-bit so that we can add newer capabilities and still be able to use existing
-code to check and set the capabilities.
+So we need another method which is atomic. Use O_TMPFILE to create new
+file, set xattr and then linkat() to proper place.
+
+But this works only for regular files. So dir, symlinks will continue
+to be non-atomic.
+
+Also if host filesystem does not support O_TMPFILE, we fallback to
+non-atomic behavior.
 
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- tools/virtiofsd/fuse_common.h   | 4 ++--
- tools/virtiofsd/fuse_lowlevel.c | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ tools/virtiofsd/passthrough_ll.c | 80 ++++++++++++++++++++++++++++----
+ 1 file changed, 72 insertions(+), 8 deletions(-)
 
-diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
-index 0c2665b977..6f8a988202 100644
---- a/tools/virtiofsd/fuse_common.h
-+++ b/tools/virtiofsd/fuse_common.h
-@@ -439,7 +439,7 @@ struct fuse_conn_info {
-     /**
-      * Capability flags that the kernel supports (read-only)
-      */
--    unsigned capable;
-+    uint64_t capable;
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 7a714b1b5e..4505c0c363 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -2128,14 +2128,29 @@ static int lo_do_open(struct lo_data *lo, struct lo_inode *inode,
  
-     /**
-      * Capability flags that the filesystem wants to enable.
-@@ -447,7 +447,7 @@ struct fuse_conn_info {
-      * libfuse attempts to initialize this field with
-      * reasonable default values before calling the init() handler.
-      */
--    unsigned want;
-+    uint64_t want;
+ static int do_create_nosecctx(fuse_req_t req, struct lo_inode *parent_inode,
+                                const char *name, mode_t mode,
+-                               struct fuse_file_info *fi, int *open_fd)
++                               struct fuse_file_info *fi, int *open_fd,
++                              bool tmpfile)
+ {
+     int err, fd;
+     struct lo_cred old = {};
+     struct lo_data *lo = lo_data(req);
+     int flags;
  
-     /**
-      * Maximum number of pending "background" requests. A
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index c3af5ede08..f3f5e70be6 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -2063,7 +2063,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-     if (se->conn.want & (~se->conn.capable)) {
-         fuse_log(FUSE_LOG_ERR,
-                  "fuse: error: filesystem requested capabilities "
--                 "0x%x that are not supported by kernel, aborting.\n",
-+                 "0x%lx that are not supported by kernel, aborting.\n",
-                  se->conn.want & (~se->conn.capable));
-         fuse_reply_err(req, EPROTO);
-         se->error = -EPROTO;
+-    flags = fi->flags | O_CREAT | O_EXCL;
++    if (tmpfile) {
++        flags = fi->flags | O_TMPFILE;
++        /*
++         * Don't use O_EXCL as we want to link file later. Also reset O_CREAT
++         * otherwise openat() returns -EINVAL.
++         */
++        flags &= ~(O_CREAT | O_EXCL);
++
++        /* O_TMPFILE needs either O_RDWR or O_WRONLY */
++        if ((flags & O_ACCMODE) == O_RDONLY) {
++            flags |= O_RDWR;
++        }
++    } else {
++        flags = fi->flags | O_CREAT | O_EXCL;
++    }
+ 
+     err = lo_change_cred(req, &old, lo->change_umask);
+     if (err) {
+@@ -2166,7 +2181,7 @@ static int do_create_secctx_fscreate(fuse_req_t req,
+         return err;
+     }
+ 
+-    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd);
++    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd, false);
+ 
+     close_reset_proc_fscreate(fscreate_fd);
+     if (!err) {
+@@ -2175,6 +2190,44 @@ static int do_create_secctx_fscreate(fuse_req_t req,
+     return err;
+ }
+ 
++static int do_create_secctx_tmpfile(fuse_req_t req,
++                                    struct lo_inode *parent_inode,
++                                    const char *name, mode_t mode,
++                                    struct fuse_file_info *fi,
++                                    const char *secctx_name, int *open_fd)
++{
++    int err, fd = -1;
++    struct lo_data *lo = lo_data(req);
++    char procname[64];
++
++    err = do_create_nosecctx(req, parent_inode, ".", mode, fi, &fd, true);
++    if (err) {
++        return err;
++    }
++
++    err = fsetxattr(fd, secctx_name, req->secctx.ctx, req->secctx.ctxlen, 0);
++    if (err) {
++        err = errno;
++        goto out;
++    }
++
++    /* Security context set on file. Link it in place */
++    sprintf(procname, "%d", fd);
++    FCHDIR_NOFAIL(lo->proc_self_fd);
++    err = linkat(AT_FDCWD, procname, parent_inode->fd, name,
++                 AT_SYMLINK_FOLLOW);
++    err = err == -1 ? errno : 0;
++    FCHDIR_NOFAIL(lo->root.fd);
++
++out:
++    if (!err) {
++        *open_fd = fd;
++    } else if (fd != -1) {
++        close(fd);
++    }
++    return err;
++}
++
+ static int do_create_secctx_noatomic(fuse_req_t req,
+                                      struct lo_inode *parent_inode,
+                                      const char *name, mode_t mode,
+@@ -2183,7 +2236,7 @@ static int do_create_secctx_noatomic(fuse_req_t req,
+ {
+     int err = 0, fd = -1;
+ 
+-    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd);
++    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd, false);
+     if (err) {
+         goto out;
+     }
+@@ -2225,20 +2278,31 @@ static int do_lo_create(fuse_req_t req, struct lo_inode *parent_inode,
+     if (secctx_enabled) {
+         /*
+          * If security.selinux has not been remapped and selinux is enabled,
+-         * use fscreate to set context before file creation.
+-         * Otherwise fallback to non-atomic method of file creation
+-         * and xattr settting.
++         * use fscreate to set context before file creation. If not, use
++         * tmpfile method for regular files. Otherwise fallback to
++         * non-atomic method of file creation and xattr settting.
+          */
+         if (!mapped_name && lo->use_fscreate) {
+             err = do_create_secctx_fscreate(req, parent_inode, name, mode, fi,
+                                             open_fd);
+             goto out;
++        } else if (S_ISREG(mode)) {
++            err = do_create_secctx_tmpfile(req, parent_inode, name, mode, fi,
++                                           ctxname, open_fd);
++            /*
++             * If filesystem does not support O_TMPFILE, fallback to non-atomic
++             * method.
++             */
++            if (!err || err != EOPNOTSUPP) {
++                goto out;
++            }
+         }
+ 
+         err = do_create_secctx_noatomic(req, parent_inode, name, mode, fi,
+                                         ctxname, open_fd);
+     } else {
+-        err = do_create_nosecctx(req, parent_inode, name, mode, fi, open_fd);
++        err = do_create_nosecctx(req, parent_inode, name, mode, fi, open_fd,
++                                 false);
+     }
+ 
+ out:
 -- 
 2.31.1
 

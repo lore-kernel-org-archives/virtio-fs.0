@@ -1,28 +1,28 @@
-Date: Mon, 24 Jan 2022 13:46:55 -0500
+Date: Mon, 24 Jan 2022 14:24:32 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
 	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=TUkH2oVsCbM6in/c280VDgnlRZvJj+b85rkpK63A8oM=; b=z
-	YtcH6/0UDLQH9KWVxHnSZq5IaeUrYmCnLp7KbkHhYdrFcMl638PQETxICZnF0BDR
-	sw8tAUMW/yuUTr0/cEX2NsN9WR2axZj/+xHiosaBJpRDg+1Xx/tc9HR6vanbVCr+
-	Z3/utD5F5rndWIoZoQkWfJ8DuJjCECwzl7fp66iVKBkMaidYzfOwUXlrKcrmTMqp
-	+ebQB6yyX4n/lgJBTpKkbiE0q8779ebbXXvCokJZyaKyrnEYwuu9rWMrSFkAHeac
-	R4FPoiNp5kef1D3XsegNn5wFVi3Jdx4eBvyrm4c97uylzNRiSd7Svq9uYLd2LnAM
-	JVrNfpHxAGqCH8605J8bQ==
+	:to; s=fm3; bh=w1ZalB0n0a+iU821BqCfAe6NYbEPwZhpP3A0TD6dB7I=; b=h
+	zWAbCLWn+JnRyoi7jrWBl3rFpv47ezfe4WHD8sbwr94V/VEcH+uH+Fb/9wBXGh7H
+	gmxQV0sQ6ltho5rGNXj/2pQYTISz0s3Eps86jiJNu8BsJeAE32TapgbP4OVliIIj
+	8zODm/TBHqFcAPNYmCVSXRfQNrphojI8tLhkjt6ssbb/fZHoZHdfDWcUTbM1bXwJ
+	IaGvmCNLdD7s1DGrryV58mLjaAGd4XcVwDPIB5xbli+fHWeksANksbSYROKTC+XJ
+	Yrca0ZdKhpFkaPC7L2h+rBiV10aeD5Yv0HoBSAxZYuT3Z7MMVsNdKH+cZZfO2jqH
+	ESlgh1mtbP3dw/8vScAZw==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
 	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm1; bh=TUkH2oVsCbM6in/c280VDgnlRZvJj
-	+b85rkpK63A8oM=; b=bI8wUMm35/wEINWt8RSl7x3WtOqSo5SeyJeac62p/wgcM
-	XEBVItF2Q+pb+QZOTGYBWzK4r6JQOr284JSU/L1Gbxi51huIeSo9OjFCQbhRz9Zp
-	ptJ7cEUyLSxQcfx6t+C9OxpBPn1xA/V7hhayNvq13LkivitIehoyj2IkPcvY4EPq
-	kSN4YESuRABZqPilm252hdASWDFyajZD6FEuIOkKDFPWFR/DmZWuE6IXUYhVhb9G
-	qlvtQwRIX4oUUKyRBxuAPkq3YIC30x5q9brKI7jbftJQaScgWPSr0HvKyuWkitPd
-	xRJ04+PFp514Lruia3LmiF93rfvlZTuWq1VIucB2g==
+	:x-me-sender:x-sasl-enc; s=fm1; bh=w1ZalB0n0a+iU821BqCfAe6NYbEPw
+	ZhpP3A0TD6dB7I=; b=hpWKGwuqk4ytvKED/LGEZvZR3WOHcYMi+yzAbX8Bobayr
+	5+Ykj2VHoDFlEQ9MramrvEnBDihJ/Ff25E9AIklIzkNvLlNxqYJ2nlNj81jSf4TT
+	4tkeenzBNS8hKVGliJKv6uOO17xDCPC5Agb9w9Xi9oMdlcLVKeScIYTUDv16knxN
+	ux22+Td/6BzCVgR+elZHqzOF0siHoVxBBdcilpxiuYR49eiYMScRwhgncAF4Ha+F
+	YNSMGi1MXAZpWsbnIUXfeaeTQKHr4JA68W/lwmmbghKsgYBxVDKAyHrQv5iy4coh
+	8GJ1U7pWXKd3SMD1sLkCR2TtgEZZ2uZCZhkK0b0oQ==
 From: virtiofs-bot@sinrega.org
-Message-Id: <71103.122012413465301433@us-mta-275.us.mimecast.lan>
+Message-Id: <75741.122012414242901923@us-mta-620.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR closed: mount_fd: Use RAII for MountFd
-	reference counting
+Subject: [Virtio-fs] [virtiofsd] MR opened: Add examples of how to run
+	virtiofsd inside a user namespace
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,10 +33,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-This commit moves `MountFd` and `MountFds` into a separate module
-and introduces a new type `MountFdRef` that is a strong reference
-to a `MountFd`.  `MountFdRef` uses RAII in order to correctly
-mutate the refcount of the referenced `MountFd`.
+Expanding the current documentation with some examples of how to run virtiofsd inside a user namespace.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/70
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/74
 

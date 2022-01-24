@@ -1,12 +1,10 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Mon, 24 Jan 2022 16:24:48 -0500
-Message-Id: <20220124212455.83968-3-vgoyal@redhat.com>
-In-Reply-To: <20220124212455.83968-1-vgoyal@redhat.com>
-References: <20220124212455.83968-1-vgoyal@redhat.com>
+Date: Mon, 24 Jan 2022 16:24:46 -0500
+Message-Id: <20220124212455.83968-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v4 2/9] virtiofsd: Fix breakage due to
-	fuse_init_in size change
+Subject: [Virtio-fs] [PATCH v4 0/9] virtiofsd: Add support for file security
+	context at creation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,47 +16,76 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: vgoyal@redhat.com
 
-Kernel version 5.17 has increased the size of "struct fuse_init_in" struct.
-Previously this struct was 16 bytes and now it has been extended to
-64 bytes in size.
+Hi,
 
-Once qemu headers are updated to latest, it will expect to receive 64 byte
-size struct (for protocol version major 7 and minor > 6). But if guest is
-booting older kernel (older than 5.17), then it still sends older
-fuse_init_in of size 16 bytes. And do_init() fails. It is expecting
-64 byte struct. And this results in mount of virtiofs failing.
+This is V4 of the patches. I posted V3 here.
 
-Fix this by parsing 16 bytes only for now. Separate patches will be
-posted which will parse rest of the bytes and enable new functionality.
-Right now we don't support any of the new functionality, so we don't
-lose anything by not parsing bytes beyond 16.
+https://listman.redhat.com/archives/virtio-fs/2021-November/msg00058.html
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
----
- tools/virtiofsd/fuse_lowlevel.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Now corresponding kernel patches have been merged in 5.17-rc1. So I am
+requesting for inclusion of these patches.
 
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index e4679c73ab..ce29a70253 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -1880,6 +1880,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-                     struct fuse_mbuf_iter *iter)
- {
-     size_t compat_size = offsetof(struct fuse_init_in, max_readahead);
-+    size_t compat2_size = offsetof(struct fuse_init_in, flags) + sizeof(uint32_t);
-     struct fuse_init_in *arg;
-     struct fuse_init_out outarg;
-     struct fuse_session *se = req->se;
-@@ -1897,7 +1898,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
- 
-     /* ...and now consume the new fields. */
-     if (arg->major == 7 && arg->minor >= 6) {
--        if (!fuse_mbuf_iter_advance(iter, sizeof(*arg) - compat_size)) {
-+        if (!fuse_mbuf_iter_advance(iter, compat2_size - compat_size)) {
-             fuse_reply_err(req, EINVAL);
-             return;
-         }
+These will allow us to support SELinux with virtiofs. This will send
+SELinux context at file creation to server and server can set it on
+file.
+
+Please have a look and consider for inclusion.
+
+Thanks
+Vivek
+
+Vivek Goyal (9):
+  linux-headers: Update headers to v5.17-rc1
+  virtiofsd: Fix breakage due to fuse_init_in size change
+  virtiofsd: Parse extended "struct fuse_init_in"
+  virtiofsd: Extend size of fuse_conn_info->capable and ->want fields
+  virtiofsd, fuse_lowlevel.c: Add capability to parse security context
+  virtiofsd: Move core file creation code in separate function
+  virtiofsd: Create new file with fscreate set
+  virtiofsd: Create new file using O_TMPFILE and set security context
+  virtiofsd: Add an option to enable/disable security label
+
+ docs/tools/virtiofsd.rst                      |   7 +
+ include/standard-headers/asm-x86/kvm_para.h   |   1 +
+ include/standard-headers/drm/drm_fourcc.h     |  11 +
+ include/standard-headers/linux/ethtool.h      |   1 +
+ include/standard-headers/linux/fuse.h         |  60 ++-
+ include/standard-headers/linux/pci_regs.h     | 142 +++---
+ include/standard-headers/linux/virtio_gpio.h  |  72 +++
+ include/standard-headers/linux/virtio_i2c.h   |  47 ++
+ include/standard-headers/linux/virtio_iommu.h |   8 +-
+ .../standard-headers/linux/virtio_pcidev.h    |  65 +++
+ include/standard-headers/linux/virtio_scmi.h  |  24 +
+ linux-headers/asm-generic/unistd.h            |   5 +-
+ linux-headers/asm-mips/unistd_n32.h           |   2 +
+ linux-headers/asm-mips/unistd_n64.h           |   2 +
+ linux-headers/asm-mips/unistd_o32.h           |   2 +
+ linux-headers/asm-powerpc/unistd_32.h         |   2 +
+ linux-headers/asm-powerpc/unistd_64.h         |   2 +
+ linux-headers/asm-riscv/bitsperlong.h         |  14 +
+ linux-headers/asm-riscv/mman.h                |   1 +
+ linux-headers/asm-riscv/unistd.h              |  44 ++
+ linux-headers/asm-s390/unistd_32.h            |   2 +
+ linux-headers/asm-s390/unistd_64.h            |   2 +
+ linux-headers/asm-x86/kvm.h                   |  16 +-
+ linux-headers/asm-x86/unistd_32.h             |   1 +
+ linux-headers/asm-x86/unistd_64.h             |   1 +
+ linux-headers/asm-x86/unistd_x32.h            |   1 +
+ linux-headers/linux/kvm.h                     |  17 +
+ tools/virtiofsd/fuse_common.h                 |   9 +-
+ tools/virtiofsd/fuse_i.h                      |   7 +
+ tools/virtiofsd/fuse_lowlevel.c               | 155 +++++--
+ tools/virtiofsd/helper.c                      |   1 +
+ tools/virtiofsd/passthrough_ll.c              | 414 ++++++++++++++++--
+ 32 files changed, 1006 insertions(+), 132 deletions(-)
+ create mode 100644 include/standard-headers/linux/virtio_gpio.h
+ create mode 100644 include/standard-headers/linux/virtio_i2c.h
+ create mode 100644 include/standard-headers/linux/virtio_pcidev.h
+ create mode 100644 include/standard-headers/linux/virtio_scmi.h
+ create mode 100644 linux-headers/asm-riscv/bitsperlong.h
+ create mode 100644 linux-headers/asm-riscv/mman.h
+ create mode 100644 linux-headers/asm-riscv/unistd.h
+
 -- 
 2.31.1
 

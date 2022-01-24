@@ -1,10 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Mon, 24 Jan 2022 16:24:46 -0500
-Message-Id: <20220124212455.83968-1-vgoyal@redhat.com>
+Date: Mon, 24 Jan 2022 16:24:49 -0500
+Message-Id: <20220124212455.83968-4-vgoyal@redhat.com>
+In-Reply-To: <20220124212455.83968-1-vgoyal@redhat.com>
+References: <20220124212455.83968-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v4 0/9] virtiofsd: Add support for file security
-	context at creation
+Subject: [Virtio-fs] [PATCH v4 3/9] virtiofsd: Parse extended "struct
+	fuse_init_in"
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,76 +18,149 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: vgoyal@redhat.com
 
-Hi,
+Add some code to parse extended "struct fuse_init_in". And use a local
+variable "flag" to represent 64 bit flags. This will make it easier
+to add more features without having to worry about two 32bit flags (->flags
+and ->flags2) in "fuse_struct_in".
 
-This is V4 of the patches. I posted V3 here.
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ tools/virtiofsd/fuse_lowlevel.c | 55 ++++++++++++++++++++-------------
+ 1 file changed, 33 insertions(+), 22 deletions(-)
 
-https://listman.redhat.com/archives/virtio-fs/2021-November/msg00058.html
-
-Now corresponding kernel patches have been merged in 5.17-rc1. So I am
-requesting for inclusion of these patches.
-
-These will allow us to support SELinux with virtiofs. This will send
-SELinux context at file creation to server and server can set it on
-file.
-
-Please have a look and consider for inclusion.
-
-Thanks
-Vivek
-
-Vivek Goyal (9):
-  linux-headers: Update headers to v5.17-rc1
-  virtiofsd: Fix breakage due to fuse_init_in size change
-  virtiofsd: Parse extended "struct fuse_init_in"
-  virtiofsd: Extend size of fuse_conn_info->capable and ->want fields
-  virtiofsd, fuse_lowlevel.c: Add capability to parse security context
-  virtiofsd: Move core file creation code in separate function
-  virtiofsd: Create new file with fscreate set
-  virtiofsd: Create new file using O_TMPFILE and set security context
-  virtiofsd: Add an option to enable/disable security label
-
- docs/tools/virtiofsd.rst                      |   7 +
- include/standard-headers/asm-x86/kvm_para.h   |   1 +
- include/standard-headers/drm/drm_fourcc.h     |  11 +
- include/standard-headers/linux/ethtool.h      |   1 +
- include/standard-headers/linux/fuse.h         |  60 ++-
- include/standard-headers/linux/pci_regs.h     | 142 +++---
- include/standard-headers/linux/virtio_gpio.h  |  72 +++
- include/standard-headers/linux/virtio_i2c.h   |  47 ++
- include/standard-headers/linux/virtio_iommu.h |   8 +-
- .../standard-headers/linux/virtio_pcidev.h    |  65 +++
- include/standard-headers/linux/virtio_scmi.h  |  24 +
- linux-headers/asm-generic/unistd.h            |   5 +-
- linux-headers/asm-mips/unistd_n32.h           |   2 +
- linux-headers/asm-mips/unistd_n64.h           |   2 +
- linux-headers/asm-mips/unistd_o32.h           |   2 +
- linux-headers/asm-powerpc/unistd_32.h         |   2 +
- linux-headers/asm-powerpc/unistd_64.h         |   2 +
- linux-headers/asm-riscv/bitsperlong.h         |  14 +
- linux-headers/asm-riscv/mman.h                |   1 +
- linux-headers/asm-riscv/unistd.h              |  44 ++
- linux-headers/asm-s390/unistd_32.h            |   2 +
- linux-headers/asm-s390/unistd_64.h            |   2 +
- linux-headers/asm-x86/kvm.h                   |  16 +-
- linux-headers/asm-x86/unistd_32.h             |   1 +
- linux-headers/asm-x86/unistd_64.h             |   1 +
- linux-headers/asm-x86/unistd_x32.h            |   1 +
- linux-headers/linux/kvm.h                     |  17 +
- tools/virtiofsd/fuse_common.h                 |   9 +-
- tools/virtiofsd/fuse_i.h                      |   7 +
- tools/virtiofsd/fuse_lowlevel.c               | 155 +++++--
- tools/virtiofsd/helper.c                      |   1 +
- tools/virtiofsd/passthrough_ll.c              | 414 ++++++++++++++++--
- 32 files changed, 1006 insertions(+), 132 deletions(-)
- create mode 100644 include/standard-headers/linux/virtio_gpio.h
- create mode 100644 include/standard-headers/linux/virtio_i2c.h
- create mode 100644 include/standard-headers/linux/virtio_pcidev.h
- create mode 100644 include/standard-headers/linux/virtio_scmi.h
- create mode 100644 linux-headers/asm-riscv/bitsperlong.h
- create mode 100644 linux-headers/asm-riscv/mman.h
- create mode 100644 linux-headers/asm-riscv/unistd.h
-
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index ce29a70253..c3af5ede08 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -1886,6 +1886,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+     struct fuse_session *se = req->se;
+     size_t bufsize = se->bufsize;
+     size_t outargsize = sizeof(outarg);
++    uint64_t flags = 0;
+ 
+     (void)nodeid;
+ 
+@@ -1902,11 +1903,21 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+             fuse_reply_err(req, EINVAL);
+             return;
+         }
++        flags |= arg->flags;
++    }
++
++    /* fuse_init_in was extended again with minor version 36 */
++    if (sizeof(*arg) > compat2_size && (arg->flags & FUSE_INIT_EXT)) {
++        if (!fuse_mbuf_iter_advance(iter, sizeof(*arg) - compat2_size)) {
++            fuse_reply_err(req, EINVAL);
++            return;
++        }
++        flags |= (uint64_t) arg->flags2 << 32;
+     }
+ 
+     fuse_log(FUSE_LOG_DEBUG, "INIT: %u.%u\n", arg->major, arg->minor);
+     if (arg->major == 7 && arg->minor >= 6) {
+-        fuse_log(FUSE_LOG_DEBUG, "flags=0x%08x\n", arg->flags);
++        fuse_log(FUSE_LOG_DEBUG, "flags=0x%016llx\n", flags);
+         fuse_log(FUSE_LOG_DEBUG, "max_readahead=0x%08x\n", arg->max_readahead);
+     }
+     se->conn.proto_major = arg->major;
+@@ -1934,68 +1945,68 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+     if (arg->max_readahead < se->conn.max_readahead) {
+         se->conn.max_readahead = arg->max_readahead;
+     }
+-    if (arg->flags & FUSE_ASYNC_READ) {
++    if (flags & FUSE_ASYNC_READ) {
+         se->conn.capable |= FUSE_CAP_ASYNC_READ;
+     }
+-    if (arg->flags & FUSE_POSIX_LOCKS) {
++    if (flags & FUSE_POSIX_LOCKS) {
+         se->conn.capable |= FUSE_CAP_POSIX_LOCKS;
+     }
+-    if (arg->flags & FUSE_ATOMIC_O_TRUNC) {
++    if (flags & FUSE_ATOMIC_O_TRUNC) {
+         se->conn.capable |= FUSE_CAP_ATOMIC_O_TRUNC;
+     }
+-    if (arg->flags & FUSE_EXPORT_SUPPORT) {
++    if (flags & FUSE_EXPORT_SUPPORT) {
+         se->conn.capable |= FUSE_CAP_EXPORT_SUPPORT;
+     }
+-    if (arg->flags & FUSE_DONT_MASK) {
++    if (flags & FUSE_DONT_MASK) {
+         se->conn.capable |= FUSE_CAP_DONT_MASK;
+     }
+-    if (arg->flags & FUSE_FLOCK_LOCKS) {
++    if (flags & FUSE_FLOCK_LOCKS) {
+         se->conn.capable |= FUSE_CAP_FLOCK_LOCKS;
+     }
+-    if (arg->flags & FUSE_AUTO_INVAL_DATA) {
++    if (flags & FUSE_AUTO_INVAL_DATA) {
+         se->conn.capable |= FUSE_CAP_AUTO_INVAL_DATA;
+     }
+-    if (arg->flags & FUSE_DO_READDIRPLUS) {
++    if (flags & FUSE_DO_READDIRPLUS) {
+         se->conn.capable |= FUSE_CAP_READDIRPLUS;
+     }
+-    if (arg->flags & FUSE_READDIRPLUS_AUTO) {
++    if (flags & FUSE_READDIRPLUS_AUTO) {
+         se->conn.capable |= FUSE_CAP_READDIRPLUS_AUTO;
+     }
+-    if (arg->flags & FUSE_ASYNC_DIO) {
++    if (flags & FUSE_ASYNC_DIO) {
+         se->conn.capable |= FUSE_CAP_ASYNC_DIO;
+     }
+-    if (arg->flags & FUSE_WRITEBACK_CACHE) {
++    if (flags & FUSE_WRITEBACK_CACHE) {
+         se->conn.capable |= FUSE_CAP_WRITEBACK_CACHE;
+     }
+-    if (arg->flags & FUSE_NO_OPEN_SUPPORT) {
++    if (flags & FUSE_NO_OPEN_SUPPORT) {
+         se->conn.capable |= FUSE_CAP_NO_OPEN_SUPPORT;
+     }
+-    if (arg->flags & FUSE_PARALLEL_DIROPS) {
++    if (flags & FUSE_PARALLEL_DIROPS) {
+         se->conn.capable |= FUSE_CAP_PARALLEL_DIROPS;
+     }
+-    if (arg->flags & FUSE_POSIX_ACL) {
++    if (flags & FUSE_POSIX_ACL) {
+         se->conn.capable |= FUSE_CAP_POSIX_ACL;
+     }
+-    if (arg->flags & FUSE_HANDLE_KILLPRIV) {
++    if (flags & FUSE_HANDLE_KILLPRIV) {
+         se->conn.capable |= FUSE_CAP_HANDLE_KILLPRIV;
+     }
+-    if (arg->flags & FUSE_NO_OPENDIR_SUPPORT) {
++    if (flags & FUSE_NO_OPENDIR_SUPPORT) {
+         se->conn.capable |= FUSE_CAP_NO_OPENDIR_SUPPORT;
+     }
+-    if (!(arg->flags & FUSE_MAX_PAGES)) {
++    if (!(flags & FUSE_MAX_PAGES)) {
+         size_t max_bufsize = FUSE_DEFAULT_MAX_PAGES_PER_REQ * getpagesize() +
+                              FUSE_BUFFER_HEADER_SIZE;
+         if (bufsize > max_bufsize) {
+             bufsize = max_bufsize;
+         }
+     }
+-    if (arg->flags & FUSE_SUBMOUNTS) {
++    if (flags & FUSE_SUBMOUNTS) {
+         se->conn.capable |= FUSE_CAP_SUBMOUNTS;
+     }
+-    if (arg->flags & FUSE_HANDLE_KILLPRIV_V2) {
++    if (flags & FUSE_HANDLE_KILLPRIV_V2) {
+         se->conn.capable |= FUSE_CAP_HANDLE_KILLPRIV_V2;
+     }
+-    if (arg->flags & FUSE_SETXATTR_EXT) {
++    if (flags & FUSE_SETXATTR_EXT) {
+         se->conn.capable |= FUSE_CAP_SETXATTR_EXT;
+     }
+ #ifdef HAVE_SPLICE
+@@ -2063,7 +2074,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+     if (se->conn.max_write < bufsize - FUSE_BUFFER_HEADER_SIZE) {
+         se->bufsize = se->conn.max_write + FUSE_BUFFER_HEADER_SIZE;
+     }
+-    if (arg->flags & FUSE_MAX_PAGES) {
++    if (flags & FUSE_MAX_PAGES) {
+         outarg.flags |= FUSE_MAX_PAGES;
+         outarg.max_pages = (se->conn.max_write - 1) / getpagesize() + 1;
+     }
 -- 
 2.31.1
 

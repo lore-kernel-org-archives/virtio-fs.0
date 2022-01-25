@@ -1,28 +1,11 @@
-Date: Tue, 25 Jan 2022 06:37:15 -0500
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=85dKdpMUxPf/QX1W/GWmWeIy/Z9TqddNEjmQ0mcIWaE=; b=V
-	1ZilX8JTluSY2l5hhltwSzhHJEYTWFvALRaUdpsjrCJ4VvIxPVGWJKLQhZpuIRGL
-	bFjrHTtbNqp513wny6LOF/qvj1TVvI1VUrk20r/lZSthGngeAijod4LJ4UJl4rmB
-	vPPBewLYaieWbcMQWxlmpUI2bA1p7UPLoq3yViuepsUmFl2OJ8O/H7Bkqhb8AGFU
-	eatXYg/4qP9U8s0ptE3YNzUDhYgGt0IINNmX4SiW8jzYGUs6Cj8Lsx3V8LDF88Jp
-	g658MdsR/Aft8rWpnW5d7X9aWUXddcoCJKdLYbWpAZIvWNInnZs79TWKyjQi7FFG
-	oW4KeLuYGT0b+pBmcLTWA==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
-	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm1; bh=85dKdpMUxPf/QX1W/GWmWeIy/Z9Tq
-	ddNEjmQ0mcIWaE=; b=NoUpS7Kojv7MjeQF2htP6x7lXevGcSb1ADT/QFvszBNjD
-	iY/J5HTS4/Lw+OQvoRQ2rijOay90xzlDzIGd37bBuooBrV5m8vYO3BBBBkWTBHP3
-	eX3E1GX9hzhq302HIhw6s2BSZ4PJONao8CejiJL/OV7Kgvj83Agw7jeavNIoju4Z
-	eKwfBD97g2aszdBAaJdsm+jnAcKvntwSuOAx9PPFN6Z7nqUnOlV+rofn4+Kz+WNg
-	hQmz7y0uElt+0riV9ylcLqAY6p2OL5u9NMTxoNOZyAjoeWaFfgvvCw4uOBqsxIxx
-	0isd11PWNWkR1Gm/7EnuxtmQeeU53K2UTtEHR7dzA==
-From: virtiofs-bot@sinrega.org
-Message-Id: <65809.122012506370900167@us-mta-352.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR opened: Set signal handlers,
-	required to be an "init" process in a PID namespace
+From: Greg Kurz <groug@kaod.org>
+Date: Tue, 25 Jan 2022 15:12:10 +0100
+Message-Id: <20220125141213.361930-1-groug@kaod.org>
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v4 0/2] virtiofsd: Add support for FUSE_SYNCFS
+	request
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,14 +14,36 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
-The first process created in a new PID namespace (pid_namespaces(7))
-is the "init" process, for that namespace. Only signals for which the
-"init" process has established a  signal handler can be sent to it.
-To run  virtiofsd with '--sandbox namespace', we need to set handlers
-to end the child process if the parent dies. Also, in case the
-PID namespace is set by an external tool. Fixes #23
----
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/75
+FUSE_SYNCFS allows the client to flush the host page cache.
+
+v4: - based on upstream linux FUSE_SYNCFS
+    - added support for the '-o announce_submounts' case, i.e. client sends
+      a FUSE_SYNCFS request for each submount (identified by its root inode)
+    - adapted the case without '-o announce_submounts' so that syncfs() is
+      no longer called with lo->mutex held
+
+v3: - track submounts and do per-submount syncfs() (Vivek)
+    - based on new version of FUSE_SYNCFS (still not upstream)
+      https://listman.redhat.com/archives/virtio-fs/2021-May/msg00025.html
+
+v2: - based on new version of FUSE_SYNCFS
+      https://listman.redhat.com/archives/virtio-fs/2021-April/msg00166.html
+    - propagate syncfs() errors to client (Vivek)
+
+Greg Kurz (2):
+  virtiofsd: Track mounts
+  virtiofsd: Add support for FUSE_SYNCFS request
+
+ tools/virtiofsd/fuse_lowlevel.c       |  11 ++
+ tools/virtiofsd/fuse_lowlevel.h       |  13 +++
+ tools/virtiofsd/passthrough_ll.c      | 141 +++++++++++++++++++++++++-
+ tools/virtiofsd/passthrough_seccomp.c |   1 +
+ 4 files changed, 163 insertions(+), 3 deletions(-)
+
+-- 
+2.34.1
+
 

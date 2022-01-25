@@ -1,11 +1,12 @@
 From: Greg Kurz <groug@kaod.org>
-Date: Tue, 25 Jan 2022 15:12:11 +0100
-Message-Id: <20220125141213.361930-2-groug@kaod.org>
+Date: Tue, 25 Jan 2022 15:12:12 +0100
+Message-Id: <20220125141213.361930-3-groug@kaod.org>
 In-Reply-To: <20220125141213.361930-1-groug@kaod.org>
 References: <20220125141213.361930-1-groug@kaod.org>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v4 1/2] virtiofsd: Track mounts
+Subject: [Virtio-fs] [PATCH v4 2/2] virtiofsd: Add support for FUSE_SYNCFS
+	request
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,144 +18,218 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org
 Cc: virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
-The upcoming implementation of ->sync_fs() needs to know about all
-submounts in order to call syncfs() on them when virtiofsd is started
-without '-o announce_submounts'.
+Honor the expected behavior of syncfs() to synchronously flush all data
+and metadata on linux systems.
 
-Track every inode that comes up with a new mount id in a GHashTable.
-If the mount id isn't available, e.g. no statx() on the host, fallback
-on the device id for the key. This is done during lookup because we
-only care for the submounts that the client knows about. The inode
-is removed from the hash table when ultimately unreferenced. This
-can happen on a per-mount basis when the client posts a FUSE_FORGET
-request or for all submounts at once with FUSE_DESTROY.
+If virtiofsd is started with '-o announce_submounts', the client is
+expected to send a FUSE_SYNCFS request for each individual submount.
+In this case, we just create a new file descriptor on the submount
+inode with lo_inode_open(), call syncfs() on it and close it. The
+intermediary file is needed because O_PATH descriptors aren't
+backed by an actual file and syncfs() would fail with EBADF.
+
+If virtiofsd is started without '-o announce_submounts', the client
+only sends a single FUSE_SYNCFS request, for the root inode. In this
+case, we need to loop on all known submounts to sync them. We cannot
+call syncfs() with the lo->mutex held since it could stall virtiofsd
+for an unbounded time : let's generate the list of inodes with the
+mutex held, drop the mutex and then loop on the temporary list. A
+reference must be taken on each inode to ensure it doesn't go away
+when the mutex is dropped.
+
+Note that syncfs() might suffer from a time penalty if the submounts
+are being hammered by some unrelated workload on the host. The only
+solution to prevent that is to avoid shared mounts.
 
 Signed-off-by: Greg Kurz <groug@kaod.org>
 ---
- tools/virtiofsd/passthrough_ll.c | 43 +++++++++++++++++++++++++++++---
- 1 file changed, 40 insertions(+), 3 deletions(-)
+ tools/virtiofsd/fuse_lowlevel.c       | 11 +++
+ tools/virtiofsd/fuse_lowlevel.h       | 13 ++++
+ tools/virtiofsd/passthrough_ll.c      | 98 +++++++++++++++++++++++++++
+ tools/virtiofsd/passthrough_seccomp.c |  1 +
+ 4 files changed, 123 insertions(+)
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 64b5b4fbb186..7bf31fc129c8 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -117,6 +117,7 @@ struct lo_inode {
-     GHashTable *posix_locks; /* protected by lo_inode->plock_mutex */
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index e4679c73abc2..e02d8b25a5f6 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -1876,6 +1876,16 @@ static void do_lseek(fuse_req_t req, fuse_ino_t nodeid,
+     }
+ }
  
-     mode_t filetype;
-+    bool is_mnt;
++static void do_syncfs(fuse_req_t req, fuse_ino_t nodeid,
++                      struct fuse_mbuf_iter *iter)
++{
++    if (req->se->op.syncfs) {
++        req->se->op.syncfs(req, nodeid);
++    } else {
++        fuse_reply_err(req, ENOSYS);
++    }
++}
++
+ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+                     struct fuse_mbuf_iter *iter)
+ {
+@@ -2280,6 +2290,7 @@ static struct {
+     [FUSE_RENAME2] = { do_rename2, "RENAME2" },
+     [FUSE_COPY_FILE_RANGE] = { do_copy_file_range, "COPY_FILE_RANGE" },
+     [FUSE_LSEEK] = { do_lseek, "LSEEK" },
++    [FUSE_SYNCFS] = { do_syncfs, "SYNCFS" },
  };
  
- struct lo_cred {
-@@ -164,6 +165,7 @@ struct lo_data {
-     bool use_statx;
-     struct lo_inode root;
-     GHashTable *inodes; /* protected by lo->mutex */
-+    GHashTable *mnt_inodes; /* protected by lo->mutex */
-     struct lo_map ino_map; /* protected by lo->mutex */
-     struct lo_map dirp_map; /* protected by lo->mutex */
-     struct lo_map fd_map; /* protected by lo->mutex */
-@@ -1000,6 +1002,31 @@ static int do_statx(struct lo_data *lo, int dirfd, const char *pathname,
-     return 0;
+ #define FUSE_MAXOP (sizeof(fuse_ll_ops) / sizeof(fuse_ll_ops[0]))
+diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
+index c55c0ca2fc1c..b889dae4de0e 100644
+--- a/tools/virtiofsd/fuse_lowlevel.h
++++ b/tools/virtiofsd/fuse_lowlevel.h
+@@ -1226,6 +1226,19 @@ struct fuse_lowlevel_ops {
+      */
+     void (*lseek)(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
+                   struct fuse_file_info *fi);
++
++    /**
++     * Synchronize file system content
++     *
++     * If this request is answered with an error code of ENOSYS,
++     * this is treated as success and future calls to syncfs() will
++     * succeed automatically without being sent to the filesystem
++     * process.
++     *
++     * @param req request handle
++     * @param ino the inode number
++     */
++    void (*syncfs)(fuse_req_t req, fuse_ino_t ino);
+ };
+ 
+ /**
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 7bf31fc129c8..9021eb091a28 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -3362,6 +3362,103 @@ static void lo_lseek(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
+     }
  }
  
-+static uint64_t mnt_inode_key(struct lo_inode *inode)
++static int do_syncfs(struct lo_data *lo, struct lo_inode *inode)
 +{
-+    /* Prefer mnt_id, fallback on dev */
-+    return inode->key.mnt_id ? inode->key.mnt_id : inode->key.dev;
-+}
++    int fd, err = 0;
 +
-+static void add_mnt_inode(struct lo_data *lo, struct lo_inode *inode)
-+{
-+    uint64_t mnt_key = mnt_inode_key(inode);
++    fuse_log(FUSE_LOG_DEBUG, "lo_syncfs(ino=%" PRIu64 ")\n", inode->fuse_ino);
 +
-+    if (!g_hash_table_contains(lo->mnt_inodes, &mnt_key)) {
-+        inode->is_mnt = true;
-+        g_hash_table_insert(lo->mnt_inodes, &mnt_key, inode);
++    fd = lo_inode_open(lo, inode, O_RDONLY);
++    if (fd < 0) {
++        return -fd;
 +    }
-+}
 +
-+static void remove_mnt_inode(struct lo_data *lo, struct lo_inode *inode)
-+{
-+    uint64_t mnt_key = mnt_inode_key(inode);
-+
-+    if (inode->is_mnt) {
-+        g_hash_table_remove(lo->mnt_inodes, &mnt_key);
++    if (syncfs(fd) < 0) {
++        err = -errno;
 +    }
++
++    close(fd);
++    return err;
 +}
 +
- /*
-  * Increments nlookup on the inode on success. unref_inode_lolocked() must be
-  * called eventually to decrement nlookup again. If inodep is non-NULL, the
-@@ -1086,10 +1113,15 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-         pthread_mutex_lock(&lo->mutex);
-         inode->fuse_ino = lo_add_inode_mapping(req, inode);
-         g_hash_table_insert(lo->inodes, &inode->key, inode);
-+        add_mnt_inode(lo, inode);
-         pthread_mutex_unlock(&lo->mutex);
-     }
-     e->ino = inode->fuse_ino;
- 
-+    fuse_log(FUSE_LOG_DEBUG, "  %lli/%s -> %lli%s\n",
-+             (unsigned long long) parent, name, (unsigned long long) e->ino,
-+             inode->is_mnt ? " (submount)" : "");
++struct syncfs_func_data {
++    struct lo_data *lo;
++    int err;
++};
 +
-     /* Transfer ownership of inode pointer to caller or drop it */
-     if (inodep) {
-         *inodep = inode;
-@@ -1099,9 +1131,6 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
- 
-     lo_inode_put(lo, &dir);
- 
--    fuse_log(FUSE_LOG_DEBUG, "  %lli/%s -> %lli\n", (unsigned long long)parent,
--             name, (unsigned long long)e->ino);
--
-     return 0;
- 
- out_err:
-@@ -1563,6 +1592,7 @@ static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
-             g_hash_table_destroy(inode->posix_locks);
-             pthread_mutex_destroy(&inode->plock_mutex);
-         }
-+        remove_mnt_inode(lo, inode);
-         /* Drop our refcount from lo_do_lookup() */
-         lo_inode_put(lo, &inode);
-     }
-@@ -3337,6 +3367,7 @@ static void lo_destroy(void *userdata)
-     struct lo_data *lo = (struct lo_data *)userdata;
- 
-     pthread_mutex_lock(&lo->mutex);
-+    g_hash_table_remove_all(lo->mnt_inodes);
-     while (true) {
-         GHashTableIter iter;
-         gpointer key, value;
-@@ -3850,6 +3881,7 @@ static void setup_root(struct lo_data *lo, struct lo_inode *root)
-         root->posix_locks = g_hash_table_new_full(
-             g_direct_hash, g_direct_equal, NULL, posix_locks_value_destroy);
-     }
-+    add_mnt_inode(lo, root);
- }
- 
- static guint lo_key_hash(gconstpointer key)
-@@ -3869,6 +3901,10 @@ static gboolean lo_key_equal(gconstpointer a, gconstpointer b)
- 
- static void fuse_lo_data_cleanup(struct lo_data *lo)
++static void syncfs_func(gpointer data, gpointer user_data)
++{
++    struct syncfs_func_data *sfdata = user_data;
++    struct lo_data *lo = sfdata->lo;
++    struct lo_inode *inode = data;
++
++    if (!sfdata->err) {
++        sfdata->err = do_syncfs(lo, inode);
++    }
++
++    lo_inode_put(lo, &inode);
++}
++
++static int lo_syncfs_all(fuse_req_t req)
++{
++    struct lo_data *lo = lo_data(req);
++    GHashTableIter iter;
++    gpointer key, value;
++    GSList *list = NULL;
++    struct syncfs_func_data sfdata = {
++        .lo = lo,
++        .err = 0,
++    };
++
++    pthread_mutex_lock(&lo->mutex);
++
++    g_hash_table_iter_init(&iter, lo->mnt_inodes);
++    while (g_hash_table_iter_next(&iter, &key, &value)) {
++        struct lo_inode *inode = value;
++
++        /* Reference is put in syncfs_func() */
++        g_atomic_int_inc(&inode->refcount);
++        list = g_slist_prepend(list, inode);
++    }
++
++    pthread_mutex_unlock(&lo->mutex);
++
++    g_slist_foreach(list, syncfs_func, &sfdata);
++    g_slist_free(list);
++    return sfdata.err;
++}
++
++static int lo_syncfs_one(fuse_req_t req, fuse_ino_t ino)
++{
++    struct lo_data *lo = lo_data(req);
++    struct lo_inode *inode;
++    int err;
++
++    inode = lo_inode(req, ino);
++    if (!inode) {
++        return -EBADF;
++    }
++
++    err = do_syncfs(lo, inode);
++    lo_inode_put(lo, &inode);
++    return err;
++}
++
++static void lo_syncfs(fuse_req_t req, fuse_ino_t ino)
++{
++    struct lo_data *lo = lo_data(req);
++    int err;
++
++    if (lo->announce_submounts) {
++        err = lo_syncfs_one(req, ino);
++    } else {
++        err = lo_syncfs_all(req);
++    }
++
++    fuse_reply_err(req, err);
++}
++
++
+ static void lo_destroy(void *userdata)
  {
-+    if (lo->mnt_inodes) {
-+        g_hash_table_destroy(lo->mnt_inodes);
-+    }
-+
-     if (lo->inodes) {
-         g_hash_table_destroy(lo->inodes);
-     }
-@@ -3931,6 +3967,7 @@ int main(int argc, char *argv[])
-     lo.root.fd = -1;
-     lo.root.fuse_ino = FUSE_ROOT_ID;
-     lo.cache = CACHE_AUTO;
-+    lo.mnt_inodes = g_hash_table_new(g_int64_hash, g_int64_equal);
+     struct lo_data *lo = (struct lo_data *)userdata;
+@@ -3423,6 +3520,7 @@ static struct fuse_lowlevel_ops lo_oper = {
+     .copy_file_range = lo_copy_file_range,
+ #endif
+     .lseek = lo_lseek,
++    .syncfs = lo_syncfs,
+     .destroy = lo_destroy,
+ };
  
-     /*
-      * Set up the ino map like this:
+diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
+index a3ce9f898d2d..3e9d6181dc69 100644
+--- a/tools/virtiofsd/passthrough_seccomp.c
++++ b/tools/virtiofsd/passthrough_seccomp.c
+@@ -108,6 +108,7 @@ static const int syscall_allowlist[] = {
+     SCMP_SYS(set_robust_list),
+     SCMP_SYS(setxattr),
+     SCMP_SYS(symlinkat),
++    SCMP_SYS(syncfs),
+     SCMP_SYS(time), /* Rarely needed, except on static builds */
+     SCMP_SYS(tgkill),
+     SCMP_SYS(unlinkat),
 -- 
 2.34.1
 

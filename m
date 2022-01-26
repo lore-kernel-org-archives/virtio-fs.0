@@ -1,28 +1,14 @@
-Date: Wed, 26 Jan 2022 04:53:54 -0500
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=h74sR9poeaQPRjIPdsOutd3Kk4yuf9IvtCvwjXNIOW0=; b=O
-	SqMVRGZgUqSsOM9mmlGw/9pmwQitoHNjVkw2VX7B/+CwWTBGieZ5pD7g32msliLS
-	JVv+f2cMWN1juhzUu4odkP4SxnpSjq5JQBWHmVznw4CTe9y4c46COHkPxCFDg947
-	jQOZdPqFr9c01jWMrfkhsHpFkVW/gTYt7kBbdWnUDXpBBaWfHrc3UzyMvoNK+qZS
-	Fd4EXx+L7VlxCAtnCRXmbxYkEBfVVNxVOqea5/FO/EMuftrOMIGQB86ft2GD6vO7
-	HF2kALeA58xYMnvmxXy61MBF+I4jG9/r0FSj/Yf4klqexsLTOAECbYS+V9g5l/xX
-	2C96D+igvE7A7yoaR46Cw==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
-	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm1; bh=h74sR9poeaQPRjIPdsOutd3Kk4yuf
-	9IvtCvwjXNIOW0=; b=jCr66FG92jVukE5OwOR0AgT5l4sFGT8ofhhOb9MxVJhba
-	aAA1h857YD+XsEE3GpmiirWczuOSe3r5xRlTM13/9ZQ9r1qMcOG52rNHgIehS4Lh
-	UOuTjMZFmGEHmlH7rdJh3BIT2SLvUQRqYFsrhEblPErOgfbwR/MIpTSLFL1RrCil
-	0wtee4H2mwhRt+pHdqZtZmwHsWjQbeJGHW7QiYsyKuGTtNhruoa+qjfr0xfJkzC3
-	PITfybxqDQxm5/dcco1weJmVO5DBIM8b7nomIvsMXTtZo8QjRJRbSONHxMUggxV4
-	HC41hZ0rb7O5yIymP56OSWHpXI+MKvv0e+wwDxUpQ==
-From: virtiofs-bot@sinrega.org
-Message-Id: <30150.122012604534800147@us-mta-38.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR merged: Replace crate seccomp-sys with
-	libseccomp-sys
+Date: Wed, 26 Jan 2022 10:03:34 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <YfEcdsTdIBc9nIdN@stefanha-x1.localdomain>
+References: <YfBGoriS38eBQrAb@redhat.com>
+MIME-Version: 1.0
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="jSvtBYRQZ+4qrsEh"
+Content-Disposition: inline
+In-Reply-To: <YfBGoriS38eBQrAb@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Drop membership of all
+ supplementary groups (CVE-2022-0358)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,21 +17,129 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: JIETAO XIAO <shawtao1125@gmail.com>, Mauro Matteo Cascella <mcascell@redhat.com>, qemu-devel@nongnu.org, virtio-fs-list <virtio-fs@redhat.com>, P J P <pj.pandit@yahoo.co.in>
 
-The crate seccomp-sys is licensed under the LGPLv2.1, which is
-problematic because code from crates is not dynamically linked, but
-compiled and linked into the binary.
 
-Replace it with libseccomp-sys, which also provides the bindings we
-need (in fact, we only need to change the reference to the crate), and
-it's licensed under MIT or Apache-2.0.
+--jSvtBYRQZ+4qrsEh
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-As a nice bonus, the bindings in libseccomp-sys are newer, meaning we
-can now support the "log" action for seccomp for real. We'll do that
-in the next commit.
+On Tue, Jan 25, 2022 at 01:51:14PM -0500, Vivek Goyal wrote:
+> At the start, drop membership of all supplementary groups. This is
+> not required.
+>=20
+> If we have membership of "root" supplementary group and when we switch
+> uid/gid using setresuid/setsgid, we still retain membership of existing
+> supplemntary groups. And that can allow some operations which are not
+> normally allowed.
+>=20
+> For example, if root in guest creates a dir as follows.
+>=20
+> $ mkdir -m 03777 test_dir
+>=20
+> This sets SGID on dir as well as allows unprivileged users to write into
+> this dir.=20
+>=20
+> And now as unprivileged user open file as follows.
+>=20
+> $ su test
+> $ fd =3D open("test_dir/priviledge_id", O_RDWR|O_CREAT|O_EXCL, 02755);
+>=20
+> This will create SGID set executable in test_dir/.
+>=20
+> And that's a problem because now an unpriviliged user can execute it,
+> get egid=3D0 and get access to resources owned by "root" group. This is
+> privilege escalation.
+>=20
+> Fixes: https://bugzilla.redhat.com/show_bug.cgi?id=3D2044863
+> Fixes: CVE-2022-0358
+> Reported-by: JIETAO XIAO <shawtao1125@gmail.com>
+> Suggested-by: Miklos Szeredi <mszeredi@redhat.com>
+> Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
+> Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  tools/virtiofsd/passthrough_ll.c |   26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>=20
+> Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
+> =3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+> --- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2022-01-25 13:38:=
+59.349534531 -0500
+> +++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2022-01-25 13:39:10.14=
+0177868 -0500
+> @@ -54,6 +54,7 @@
+>  #include <sys/wait.h>
+>  #include <sys/xattr.h>
+>  #include <syslog.h>
+> +#include <grp.h>
+> =20
+>  #include "qemu/cutils.h"
+>  #include "passthrough_helpers.h"
+> @@ -1161,6 +1162,29 @@ static void lo_lookup(fuse_req_t req, fu
+>  #define OURSYS_setresuid SYS_setresuid
+>  #endif
+> =20
+> +static void drop_supplementary_groups(void)
+> +{
+> +    int ret;
+> +
+> +    ret =3D getgroups(0, NULL);
+> +    if (ret =3D=3D -1) {
+> +        fuse_log(FUSE_LOG_ERR, "getgroups() failed with error=3D%d:%s\n",
+> +                 errno, strerror(errno));
+> +        exit(1);
+> +    }
+> +
+> +    if (!ret)
+> +        return;
+> +
+> +    /* Drop all supplementary groups. We should not need it */
+> +    ret =3D setgroups(0, NULL);
+> +    if (ret =3D=3D -1) {
+> +        fuse_log(FUSE_LOG_ERR, "setgroups() failed with error=3D%d:%s\n",
+> +                 errno, strerror(errno));
+> +        exit(1);
+> +    }
+> +}
+> +
+>  /*
+>   * Change to uid/gid of caller so that file is created with
+>   * ownership of caller.
+> @@ -3926,6 +3950,8 @@ int main(int argc, char *argv[])
+> =20
+>      qemu_init_exec_dir(argv[0]);
+> =20
+> +    drop_supplementary_groups();
+> +
+>      pthread_mutex_init(&lo.mutex, NULL);
+>      lo.inodes =3D g_hash_table_new(lo_key_hash, lo_key_equal);
+>      lo.root.fd =3D -1;
+>=20
 
-Signed-off-by: Sergio Lopez <slp@redhat.com>
----
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/71
+Thanks, applied to my block tree:
+https://gitlab.com/stefanha/qemu/commits/block
+
+Stefan
+
+--jSvtBYRQZ+4qrsEh
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmHxHHYACgkQnKSrs4Gr
+c8jbUggAh+7Be0D4ZOGQInjB24fvp2LnX7kIXpz5dDjsiII+PRgLdpGR+7I/qSnn
+td4RDMFfmrroRD2wUqBs6btnnIYfYh6H1c6K3Nd7Ntc1ARiTJ1E5/fQZFtcHIKFK
+lq6NSoDAzhGijIr0LOHuzwhdJjI3EGsWyPtp36qGXTijCVxOBHwNMexPIDtpfue6
+YnvnN8WSK9wfdIIVqeCtg2PhKMtK7qs2TChyXhvIv6huxUNSF5rHcuLrEqfSHSVC
+dD3XLP37eKdQMCmIaFk3PF8xNbX5gw3RpEYrB0Ujpcbs2w2PBn5qiZduDlBq1oTV
+Nav1bJ9JL0OOt2dylN4rhZaCe2hMPQ==
+=6Trd
+-----END PGP SIGNATURE-----
+
+--jSvtBYRQZ+4qrsEh--
 

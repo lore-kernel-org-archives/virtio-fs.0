@@ -1,11 +1,28 @@
-Date: Tue, 25 Jan 2022 13:51:14 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YfBGoriS38eBQrAb@redhat.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: [Virtio-fs] [PATCH] virtiofsd: Drop membership of all supplementary
- groups (CVE-2022-0358)
+Date: Wed, 26 Jan 2022 04:50:52 -0500
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+	:to; s=fm3; bh=0Htea9nMf1rInco7VrRvkMyIZxzBGZ6bFsy1aBFHCTo=; b=v
+	xK/vhRu6dmCoOkgOdWo9qXwED5Xr8TeKNd/yL/TUI7FCKR3uIgqdmGwXA0dD87el
+	bqFnyjdk3BhmfF0M8pACN1QmOVuWQ58LBSQ9FwjZ/ypGXLhVeuIZpBL+hsNjb7LN
+	mTAXB32P1M0AEtqSdxlZMGtei3cCCPiWjWvyHgk2xrqDd+YyFAWQHjyZBWUmBFLj
+	72fBbJKo6s5Muqxfp6oqLrqzIxcqaK2F5pNup8aKGPztFxdXIBYa5JYHbwCe3kFf
+	m7wRz+MqS+/k00hrDBsfzBdEIyIf13zHytwdKHDtie4dRwcHxHsSzWkVveIoSOEm
+	mtRn6bib8N8okfsUfL32w==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
+	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
+	:x-me-sender:x-sasl-enc; s=fm1; bh=0Htea9nMf1rInco7VrRvkMyIZxzBG
+	Z6bFsy1aBFHCTo=; b=A0BQ2I+TvlyAzadIgXhiKeLLPWl5LqVP1qx8gdL/itSTC
+	8Hyy1Ykk4C9gK+HgWTE6EIjMlEFH/TbGIJ9TCzMGzZpYJf1YQPXTWCXyX5M0wKCz
+	fqBAiqgyo9KKUxzQWCbeaQgH4NYH/OZth32rLLLcV2mStE9oQqzf21SlLALuP/pC
+	UbC2o4Z5BtkABInc1tcU23mMVnM6Iwg1ehwwd/R1VzdsyYv/uj1MohesCnG0fcCP
+	S8/N+aZLotzRmZn3ncDIzeLzAxKR2SIAfkB3mZ08PoSMz1GJWSzgJ0VCQKhnxtxH
+	O5tTK7Xu48SVFw9awQjRbDeqGgfO6TwWIAM7rEAWw==
+From: virtiofs-bot@sinrega.org
+Message-Id: <52672.122012604504800362@us-mta-517.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd] MR opened: Drop membership of all
+	supplementary groups (CVE-2022-0358)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,8 +31,7 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs-list <virtio-fs@redhat.com>
-Cc: Mauro Matteo Cascella <mcascell@redhat.com>, JIETAO XIAO <shawtao1125@gmail.com>, P J P <pj.pandit@yahoo.co.in>
+To: virtio-fs@redhat.com
 
 At the start, drop membership of all supplementary groups. This is
 not required.
@@ -30,7 +46,7 @@ For example, if root in guest creates a dir as follows.
 $ mkdir -m 03777 test_dir
 
 This sets SGID on dir as well as allows unprivileged users to write into
-this dir. 
+this dir.
 
 And now as unprivileged user open file as follows.
 
@@ -47,62 +63,7 @@ Fixes: https://bugzilla.redhat.com/show_bug.cgi?id=2044863
 Fixes: CVE-2022-0358
 Reported-by: JIETAO XIAO <shawtao1125@gmail.com>
 Suggested-by: Miklos Szeredi <mszeredi@redhat.com>
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Suggested-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c |   26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
-
-Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
-===================================================================
---- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2022-01-25 13:38:59.349534531 -0500
-+++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2022-01-25 13:39:10.140177868 -0500
-@@ -54,6 +54,7 @@
- #include <sys/wait.h>
- #include <sys/xattr.h>
- #include <syslog.h>
-+#include <grp.h>
- 
- #include "qemu/cutils.h"
- #include "passthrough_helpers.h"
-@@ -1161,6 +1162,29 @@ static void lo_lookup(fuse_req_t req, fu
- #define OURSYS_setresuid SYS_setresuid
- #endif
- 
-+static void drop_supplementary_groups(void)
-+{
-+    int ret;
-+
-+    ret = getgroups(0, NULL);
-+    if (ret == -1) {
-+        fuse_log(FUSE_LOG_ERR, "getgroups() failed with error=%d:%s\n",
-+                 errno, strerror(errno));
-+        exit(1);
-+    }
-+
-+    if (!ret)
-+        return;
-+
-+    /* Drop all supplementary groups. We should not need it */
-+    ret = setgroups(0, NULL);
-+    if (ret == -1) {
-+        fuse_log(FUSE_LOG_ERR, "setgroups() failed with error=%d:%s\n",
-+                 errno, strerror(errno));
-+        exit(1);
-+    }
-+}
-+
- /*
-  * Change to uid/gid of caller so that file is created with
-  * ownership of caller.
-@@ -3926,6 +3950,8 @@ int main(int argc, char *argv[])
- 
-     qemu_init_exec_dir(argv[0]);
- 
-+    drop_supplementary_groups();
-+
-     pthread_mutex_init(&lo.mutex, NULL);
-     lo.inodes = g_hash_table_new(lo_key_hash, lo_key_equal);
-     lo.root.fd = -1;
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/77
 

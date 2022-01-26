@@ -1,28 +1,28 @@
-Date: Wed, 26 Jan 2022 04:50:52 -0500
+Date: Wed, 26 Jan 2022 04:53:54 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
 	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=0Htea9nMf1rInco7VrRvkMyIZxzBGZ6bFsy1aBFHCTo=; b=v
-	xK/vhRu6dmCoOkgOdWo9qXwED5Xr8TeKNd/yL/TUI7FCKR3uIgqdmGwXA0dD87el
-	bqFnyjdk3BhmfF0M8pACN1QmOVuWQ58LBSQ9FwjZ/ypGXLhVeuIZpBL+hsNjb7LN
-	mTAXB32P1M0AEtqSdxlZMGtei3cCCPiWjWvyHgk2xrqDd+YyFAWQHjyZBWUmBFLj
-	72fBbJKo6s5Muqxfp6oqLrqzIxcqaK2F5pNup8aKGPztFxdXIBYa5JYHbwCe3kFf
-	m7wRz+MqS+/k00hrDBsfzBdEIyIf13zHytwdKHDtie4dRwcHxHsSzWkVveIoSOEm
-	mtRn6bib8N8okfsUfL32w==
+	:to; s=fm3; bh=h74sR9poeaQPRjIPdsOutd3Kk4yuf9IvtCvwjXNIOW0=; b=O
+	SqMVRGZgUqSsOM9mmlGw/9pmwQitoHNjVkw2VX7B/+CwWTBGieZ5pD7g32msliLS
+	JVv+f2cMWN1juhzUu4odkP4SxnpSjq5JQBWHmVznw4CTe9y4c46COHkPxCFDg947
+	jQOZdPqFr9c01jWMrfkhsHpFkVW/gTYt7kBbdWnUDXpBBaWfHrc3UzyMvoNK+qZS
+	Fd4EXx+L7VlxCAtnCRXmbxYkEBfVVNxVOqea5/FO/EMuftrOMIGQB86ft2GD6vO7
+	HF2kALeA58xYMnvmxXy61MBF+I4jG9/r0FSj/Yf4klqexsLTOAECbYS+V9g5l/xX
+	2C96D+igvE7A7yoaR46Cw==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
 	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm1; bh=0Htea9nMf1rInco7VrRvkMyIZxzBG
-	Z6bFsy1aBFHCTo=; b=A0BQ2I+TvlyAzadIgXhiKeLLPWl5LqVP1qx8gdL/itSTC
-	8Hyy1Ykk4C9gK+HgWTE6EIjMlEFH/TbGIJ9TCzMGzZpYJf1YQPXTWCXyX5M0wKCz
-	fqBAiqgyo9KKUxzQWCbeaQgH4NYH/OZth32rLLLcV2mStE9oQqzf21SlLALuP/pC
-	UbC2o4Z5BtkABInc1tcU23mMVnM6Iwg1ehwwd/R1VzdsyYv/uj1MohesCnG0fcCP
-	S8/N+aZLotzRmZn3ncDIzeLzAxKR2SIAfkB3mZ08PoSMz1GJWSzgJ0VCQKhnxtxH
-	O5tTK7Xu48SVFw9awQjRbDeqGgfO6TwWIAM7rEAWw==
+	:x-me-sender:x-sasl-enc; s=fm1; bh=h74sR9poeaQPRjIPdsOutd3Kk4yuf
+	9IvtCvwjXNIOW0=; b=jCr66FG92jVukE5OwOR0AgT5l4sFGT8ofhhOb9MxVJhba
+	aAA1h857YD+XsEE3GpmiirWczuOSe3r5xRlTM13/9ZQ9r1qMcOG52rNHgIehS4Lh
+	UOuTjMZFmGEHmlH7rdJh3BIT2SLvUQRqYFsrhEblPErOgfbwR/MIpTSLFL1RrCil
+	0wtee4H2mwhRt+pHdqZtZmwHsWjQbeJGHW7QiYsyKuGTtNhruoa+qjfr0xfJkzC3
+	PITfybxqDQxm5/dcco1weJmVO5DBIM8b7nomIvsMXTtZo8QjRJRbSONHxMUggxV4
+	HC41hZ0rb7O5yIymP56OSWHpXI+MKvv0e+wwDxUpQ==
 From: virtiofs-bot@sinrega.org
-Message-Id: <52672.122012604504800362@us-mta-517.us.mimecast.lan>
+Message-Id: <30150.122012604534800147@us-mta-38.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR opened: Drop membership of all
-	supplementary groups (CVE-2022-0358)
+Subject: [Virtio-fs] [virtiofsd] MR merged: Replace crate seccomp-sys with
+	libseccomp-sys
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,37 +33,19 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-At the start, drop membership of all supplementary groups. This is
-not required.
+The crate seccomp-sys is licensed under the LGPLv2.1, which is
+problematic because code from crates is not dynamically linked, but
+compiled and linked into the binary.
 
-If we have membership of "root" supplementary group and when we switch
-uid/gid using setresuid/setsgid, we still retain membership of existing
-supplemntary groups. And that can allow some operations which are not
-normally allowed.
+Replace it with libseccomp-sys, which also provides the bindings we
+need (in fact, we only need to change the reference to the crate), and
+it's licensed under MIT or Apache-2.0.
 
-For example, if root in guest creates a dir as follows.
+As a nice bonus, the bindings in libseccomp-sys are newer, meaning we
+can now support the "log" action for seccomp for real. We'll do that
+in the next commit.
 
-$ mkdir -m 03777 test_dir
-
-This sets SGID on dir as well as allows unprivileged users to write into
-this dir.
-
-And now as unprivileged user open file as follows.
-
-$ su test
-$ fd = open("test_dir/priviledge_id", O_RDWR|O_CREAT|O_EXCL, 02755);
-
-This will create SGID set executable in test_dir/.
-
-And that's a problem because now an unpriviliged user can execute it,
-get egid=0 and get access to resources owned by "root" group. This is
-privilege escalation.
-
-Fixes: https://bugzilla.redhat.com/show_bug.cgi?id=2044863
-Fixes: CVE-2022-0358
-Reported-by: JIETAO XIAO <shawtao1125@gmail.com>
-Suggested-by: Miklos Szeredi <mszeredi@redhat.com>
-Suggested-by: Vivek Goyal <vgoyal@redhat.com>
+Signed-off-by: Sergio Lopez <slp@redhat.com>
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/77
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/71
 

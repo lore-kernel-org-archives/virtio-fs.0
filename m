@@ -1,27 +1,28 @@
-Date: Wed, 26 Jan 2022 13:53:36 -0500
+Date: Wed, 26 Jan 2022 14:24:38 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
 	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=zpW/sYwiLqZh4AYEGUTt0OlfwWuGpfFk908+MTj+usc=; b=i
-	6GK7UYzJRzbhUI0BNKfM1Rv4exF+S3+XIavU7gY/8m5SZzurLeAmfhFYttbQGvz3
-	TCXub3H2TiPFQZoD9rEhhajolrWCLjHIxBmUmvNvhJ616ewQEB3uhLSD+nOzMskV
-	VBqkJhLLzPMIxrX0bRuHlLIpsbzFFMrcGejuZug5xVk5ma4eowBpNKGHVZKGbhky
-	LbSSygc83vKRG/LfnyMTYtyzKBt9fgES4/oX78hoHJxaFA/HbZ/ZvDhKMobA/B9g
-	XIJQQAj5TlCxhseV9nwWOORIbOx+M6BavR1W0Y3ppyXyW1ST8aYR4QPxoBhu0dXD
-	7/CCohbVKVbJmGIxSqq2g==
+	:to; s=fm3; bh=gCF0raMZ/0c8Cw7Egr5SHRnmSP2OMc48mhqtQ7D4nMM=; b=C
+	+PQgJimuwijSus3ZoqW1c+Rmd8Z0g6aeyHvHH+vb14zk9VEAtOgG4QqoHiWeLyOm
+	p9z279OyVBiezaCibh0I2s50YfS1i5/XYqaeWsFgYcdPYGYi46s0LnEPhpdDmNPb
+	/wAD7bHUsqa1vdUinpibwqRULjodCCgQSiwfjfS64b1Q2BQduI5uKjXv+hDObX0Z
+	orOA+BRNTzZn6nQEZ/9TLmh/fhQfqMgVCSfqG3WyPfxrXOXt0vQvLke0vYoAN9hH
+	sXpTBTe7jh9hmwNx1xp0+u+PT3dWKPoqeOzvNTXW5hPlQsPVs7fc0wDj6zjgV7A7
+	ekAkRcaipkthuEOVWyU0Q==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
 	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm1; bh=zpW/sYwiLqZh4AYEGUTt0OlfwWuGp
-	fFk908+MTj+usc=; b=OVgVk1mm2rGNZEmhzfrkK+/6ulAiW2hqCB3WUYoMsMCva
-	PXYmN9JAnfcuOPJP3CEHuvXscrS7t72mUu4TvUOiooLG9zIIuJK2QeEEOzbzqVZb
-	9EUeXDUVIOLjs6RTQ25n4GXNb1VfJx4L3hvvi9UCBVp+UzPk3cHKMIoZFrAH0z0E
-	kjtvTVefWWq1PoD/vg4rv7DxEgJQUESculUY/dJimMbcVWftMTBrZ2KIhxyzJCd3
-	tYaCy3eAM6UtgroqW2p1uRgsghsuDv3O5zu96LN2h/czQsz/Jv3ymZZOxz39sXno
-	j8SJ++i64Z4TiXiNGZqN3R2MgNR4YJBpNd/efisAw==
+	:x-me-sender:x-sasl-enc; s=fm1; bh=gCF0raMZ/0c8Cw7Egr5SHRnmSP2OM
+	c48mhqtQ7D4nMM=; b=ipb0/uAg5trbuqmewpy7Xh9UOmfJK5i1NyXtpz6jMBLlw
+	ybHs2RHbJsFPE1IP8x08TTP0b7c2IJxdXVOwu2GTaoIkIpMrZAcA8fhbo/ANN0D1
+	I+kmhD+DUcddlV2AQ0pcYYfyykSxE8eDg0Xm5nx1Dpx9RhLQKb8QcrmaQffTCmMu
+	wumZlhgw+lT8xw48PG8RW8CI1CDJMeWBSmmKQVkXK6z4X4g65uuz2/DQe2jHIeMM
+	6BWXFyyU+4hVx8Rf6DqkUVGvSEkl7xnDyEIVSVDhm2Mfmah2r7N7yRuHm6MM3xeA
+	/gd6Pje21kMiGSD2kScXHyDNubB5QsEBrwowKQRKQ==
 From: virtiofs-bot@sinrega.org
-Message-Id: <55596.122012613532000660@us-mta-548.us.mimecast.lan>
+Message-Id: <78111.122012614243600545@us-mta-272.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR merged: Bump version to v1.1.0
+Subject: [Virtio-fs] [virtiofsd] MR opened: mount_fd: Manually manage mount
+	file descriptors
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -32,21 +33,20 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Following SemVer, we need to bump the minor number, as we are adding
-new features.
+Still we have a hash map of all existing mount FDs. But instead of
+refcounting mount FDs and letting them remove themselves from the
+map, we manually
 
-Changes since v1.0.0:
+- add a mount FD when the (sub)mount inode is looked up, and
+- remove a mount FD when the (sub)mount inode is forgotten.
 
-- xattr mapping add a new type "unsupported" (!67)
-- sandbox: Support combining --rlimit-nofile and --sandbox=chroot (!65)
-- sandbox: Propagate exit code from child to parent (!64)
-- xattrmap: Fix documentation for type "map" (!68)
-- Adds compatibility options (!61)
-- Replace crate seccomp-sys with libseccomp-sys (!71)
-- Drop membership of all supplementary groups (CVE-2022-0358) (!77)
-- Adds killpriv_v2/no_killpriv_v2 options (!62)
-
-Signed-off-by: Sergio Lopez <slp@redhat.com>
+When later implementing FUSE_SYNCFS for the case without
+--announce-submounts, we need to defer removing mount FDs until
+syncfs was called by them. This can be done by either (a) calling
+syncfs on any mount FD that is about to be removed, or (b) keeping
+them until the client calls syncfs. Both ways ((a) or (b)) are
+easier to implement on top of the manual management introduced
+in this commit.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/78
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/79
 

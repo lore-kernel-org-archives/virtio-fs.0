@@ -1,14 +1,20 @@
-Date: Wed, 26 Jan 2022 10:51:50 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YfEnxhFIW9Y0A7O6@work-vm>
-References: <YfBGoriS38eBQrAb@redhat.com>
-	<YfEcdsTdIBc9nIdN@stefanha-x1.localdomain>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=q0sJ7a6j5xvVSDg6rIXfwSX5x16Wvu3orvAMR4Fx/F4=;
+	b=M81mkmVA1gFIsYQ9wjfg8L1KshCZBsYGPZhyDOLmmEL1SuUdzGg7T+sPTI6OluwXkd
+	IxCFCfj7IhtcUL/VLJOHjJbiFNxEWoimKYZ2YYVMLEk0yKA1qeBjoIjIm/ssU5me0Qn4
+	FKp3eFJ1fqDn6X+ERf/SQ16PERL2SMntrD5qecGnAl20Jn2iZY2rgMm0f8bCQczMe06E
+	Xcz7wXLGgJnEjuhqgOfwJxKYwXphpW1l1OiAYTtjSPe/eukYU6XtkXZg8SPV3nlauU1Z
+	4GlPyWWJTsl+sbkYgP+iF0w79MmUgPZlr58Vu4bLhEi9eEBMEokH+Fc3a2LaBXbDE5+h
+	t29w==
 MIME-Version: 1.0
-In-Reply-To: <YfEcdsTdIBc9nIdN@stefanha-x1.localdomain>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Drop membership of all
- supplementary groups (CVE-2022-0358)
+References: <20220126105112.28711-1-dgilbert@redhat.com>
+In-Reply-To: <20220126105112.28711-1-dgilbert@redhat.com>
+From: Peter Maydell <peter.maydell@linaro.org>
+Date: Wed, 26 Jan 2022 14:57:08 +0000
+Message-ID: <CAFEAcA9ok6VY5fS9stb8bUZ-yDbMLSCLCPokKWBtEc3Qif=Y4w@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PULL 0/1] virtiofs queue
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,115 +23,40 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: JIETAO XIAO <shawtao1125@gmail.com>, Mauro Matteo Cascella <mcascell@redhat.com>, qemu-devel@nongnu.org, virtio-fs-list <virtio-fs@redhat.com>, P J P <pj.pandit@yahoo.co.in>, Vivek Goyal <vgoyal@redhat.com>
+To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Cc: mcascell@redhat.com, qemu-devel@nongnu.org, shawtao1125@gmail.com, pj.pandit@yahoo.co.in, virtio-fs@redhat.com, vgoyal@redhat.com
 
-* Stefan Hajnoczi (stefanha@redhat.com) wrote:
-> On Tue, Jan 25, 2022 at 01:51:14PM -0500, Vivek Goyal wrote:
-> > At the start, drop membership of all supplementary groups. This is
-> > not required.
-> > 
-> > If we have membership of "root" supplementary group and when we switch
-> > uid/gid using setresuid/setsgid, we still retain membership of existing
-> > supplemntary groups. And that can allow some operations which are not
-> > normally allowed.
-> > 
-> > For example, if root in guest creates a dir as follows.
-> > 
-> > $ mkdir -m 03777 test_dir
-> > 
-> > This sets SGID on dir as well as allows unprivileged users to write into
-> > this dir. 
-> > 
-> > And now as unprivileged user open file as follows.
-> > 
-> > $ su test
-> > $ fd = open("test_dir/priviledge_id", O_RDWR|O_CREAT|O_EXCL, 02755);
-> > 
-> > This will create SGID set executable in test_dir/.
-> > 
-> > And that's a problem because now an unpriviliged user can execute it,
-> > get egid=0 and get access to resources owned by "root" group. This is
-> > privilege escalation.
-> > 
-> > Fixes: https://bugzilla.redhat.com/show_bug.cgi?id=2044863
-> > Fixes: CVE-2022-0358
-> > Reported-by: JIETAO XIAO <shawtao1125@gmail.com>
-> > Suggested-by: Miklos Szeredi <mszeredi@redhat.com>
-> > Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-> > Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > ---
-> >  tools/virtiofsd/passthrough_ll.c |   26 ++++++++++++++++++++++++++
-> >  1 file changed, 26 insertions(+)
-> > 
-> > Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
-> > ===================================================================
-> > --- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2022-01-25 13:38:59.349534531 -0500
-> > +++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2022-01-25 13:39:10.140177868 -0500
-> > @@ -54,6 +54,7 @@
-> >  #include <sys/wait.h>
-> >  #include <sys/xattr.h>
-> >  #include <syslog.h>
-> > +#include <grp.h>
-> >  
-> >  #include "qemu/cutils.h"
-> >  #include "passthrough_helpers.h"
-> > @@ -1161,6 +1162,29 @@ static void lo_lookup(fuse_req_t req, fu
-> >  #define OURSYS_setresuid SYS_setresuid
-> >  #endif
-> >  
-> > +static void drop_supplementary_groups(void)
-> > +{
-> > +    int ret;
-> > +
-> > +    ret = getgroups(0, NULL);
-> > +    if (ret == -1) {
-> > +        fuse_log(FUSE_LOG_ERR, "getgroups() failed with error=%d:%s\n",
-> > +                 errno, strerror(errno));
-> > +        exit(1);
-> > +    }
-> > +
-> > +    if (!ret)
-> > +        return;
-> > +
-> > +    /* Drop all supplementary groups. We should not need it */
-> > +    ret = setgroups(0, NULL);
-> > +    if (ret == -1) {
-> > +        fuse_log(FUSE_LOG_ERR, "setgroups() failed with error=%d:%s\n",
-> > +                 errno, strerror(errno));
-> > +        exit(1);
-> > +    }
-> > +}
-> > +
-> >  /*
-> >   * Change to uid/gid of caller so that file is created with
-> >   * ownership of caller.
-> > @@ -3926,6 +3950,8 @@ int main(int argc, char *argv[])
-> >  
-> >      qemu_init_exec_dir(argv[0]);
-> >  
-> > +    drop_supplementary_groups();
-> > +
-> >      pthread_mutex_init(&lo.mutex, NULL);
-> >      lo.inodes = g_hash_table_new(lo_key_hash, lo_key_equal);
-> >      lo.root.fd = -1;
-> > 
-> 
-> Thanks, applied to my block tree:
-> https://gitlab.com/stefanha/qemu/commits/block
-
-Actually, I just posted it as a separate pull by itself.
-
-(I added {}'s around the if (!ret) { return; }  to meet Qemu
-style guides).
-
-Dave
+On Wed, 26 Jan 2022 at 10:54, Dr. David Alan Gilbert (git)
+<dgilbert@redhat.com> wrote:
+>
+> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+>
+> The following changes since commit aeb0ae95b7f18c66158792641cb6ba0cde5789ab:
+>
+>   Merge remote-tracking branch 'remotes/jsnow-gitlab/tags/python-pull-request' into staging (2022-01-22 12:03:22 +0000)
+>
+> are available in the Git repository at:
+>
+>   https://gitlab.com/dagrh/qemu.git tags/pull-virtiofs-20220126
+>
+> for you to fetch changes up to 449e8171f96a6a944d1f3b7d3627ae059eae21ca:
+>
+>   virtiofsd: Drop membership of all supplementary groups (CVE-2022-0358) (2022-01-26 10:32:05 +0000)
+>
+> ----------------------------------------------------------------
+> virtiofsd: Security fix
+>
+> Fixes: CVE-2022-0358
+>
+> ----------------------------------------------------------------
+> Vivek Goyal (1):
+>       virtiofsd: Drop membership of all supplementary groups (CVE-2022-0358)
 
 
-> Stefan
+Applied, thanks.
 
+Please update the changelog at https://wiki.qemu.org/ChangeLog/7.0
+for any user-visible changes.
 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+-- PMM
 

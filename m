@@ -1,27 +1,27 @@
-Date: Wed, 26 Jan 2022 13:26:08 -0500
+Date: Wed, 26 Jan 2022 13:53:32 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
 	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=zpW/sYwiLqZh4AYEGUTt0OlfwWuGpfFk908+MTj+usc=; b=K
-	NIMGNflf0HvfFWEGDJ8ie587os8xeGvYc4BWRSraYZMRkWUxXEe5PT7YGtmhQc7d
-	EeJsiNtxpVZq0eGQy+90m3W66nVtw4YTnzB3snrXvrhj0O44vyF62C7IUdjTP2Rn
-	IvDHS1tXAsFgblCRe3adR7nfLX20bgqlBkbklpqEBBdmXqYzvNsESvjxs3DSwT6E
-	DiOHEnxOCX8dXnQk1ho7Z2tAgvFzCkm5KLDDgJp/PH1fZb0rHuvqvHkot5CedrAe
-	xq30qfTFsBcOcIiIfBC96P38CfRQEjFONQvhTVh2/kjh7I0WEvODZBB34A6NuthW
-	Qokfkf7FYvMkan8hWpc+w==
+	:to; s=fm3; bh=FUrfEnJd3Eui/lMX3gsWW50/8tn78WUMk7KFMI3sGDY=; b=A
+	2pwb+0XDo5QgBgtTuyOEGFS3QKz+aP4/kJ1QSbNu3caOIgcLXJdDzdlS3nLpsi/l
+	/GvYKmGzVVjM7NAIKJ6nJtrkjgUMYPGje2CmFYiilR0dU0bnPppj+0x3j29uA8/Q
+	5pQZ/yygIjJLvqrMd7tEoQUgSgaDzok4ihLZgM9Oe4gQbol0+ZeCpf5OTTLtY6aI
+	OY18tw8fnzAOzoOIkxlXIuDITM4b/BIStujnHZISd06hb0B1F8s29viBSAoxlUl2
+	L5pV7G+wUVJqDI/RiS98SFDAyimFButfKrkPOqoooGlgLO2hrxJHAh0h8B3lnbqC
+	YF0wi8AQgQ0OFIiXOHzlw==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
 	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm1; bh=zpW/sYwiLqZh4AYEGUTt0OlfwWuGp
-	fFk908+MTj+usc=; b=WbwJegIB0pKQv4FvFpkAclNfjU47bpirrSNDnbA/yKrW9
-	xfBYN5Udv1gsEU2ydRY9OCfVhV08otdGoRHClc9pbaeFRxi8aR0haWLM4nge4Jz7
-	3zvBeXerZltGNuWVGocN9+sIWKr8/wGqB/vIePViX915mKLDrHGDuxcs42/KVnoq
-	KEpJYQt2mv2YuBHAQrDh3CrM55fSEIW1yWstcxZ4HoUU3QxStjaKjjvcgL/rKL1k
-	ERZnETcHjKGVyHlSAHup01qUiXY0ephI5wBiK2v6dl88tSKI7On2N5ECRZkCFPeO
-	0WH8L24u28VwFkD/5L5tHCho1Yf2G/Bv8ZE4G/fGw==
+	:x-me-sender:x-sasl-enc; s=fm1; bh=FUrfEnJd3Eui/lMX3gsWW50/8tn78
+	WUMk7KFMI3sGDY=; b=nb+MraHPkH5Msf7wN1xpCDHRAmSCrJ+Aq4of5/31JsnFC
+	gqp7CpJGFuowZLoGfpraRoiOnMxECHR5OvHsRm+fovcl5D9P4/8UG9jOeUSx6zrf
+	TmAfBhunUG6nQMzP/g6ycc8CHMMkLJ4uDatlb0dShCYZsOKMGTjjjuwH5wIWYPWJ
+	hBCdWLBR6TR8ekNLZAqutu29nVTiL/LCEUQef9ATnfzc5e33ji/GC4g+Ci6X+3xG
+	KmNlpZu6QxQtGEyoola7N5tOOsUSk5J5wGLYgodJC/yOVfebQtz7n4kLoiXWJBKw
+	8wf9XdPWsSe5+DdPqkui3Gx2SIq7B/cAW9OcMDVIg==
 From: virtiofs-bot@sinrega.org
-Message-Id: <72580.122012613260600308@us-mta-658.us.mimecast.lan>
+Message-Id: <12317.122012613531701484@us-mta-538.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR opened: Bump version to v1.1.0
+Subject: [Virtio-fs] [virtiofsd] Issue closed: Release v1.1.0
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -32,21 +32,15 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Following SemVer, we need to bump the minor number, as we are adding
-new features.
+Checklist for v1.1.0:
 
-Changes since v1.0.0:
+- [x] [Adds compatibility options](!61)
+- [x] [Draft: Adds killpriv_v2/no_killpriv_v2 options](!62)
+- [x] [xattr mapping add a new type "unsupported"](!67)
+- [x] [Replace crate seccomp-sys with libseccomp-sys](!71)
+- [x] [Drop membership of all supplementary groups (CVE-2022-0358)](!77)
 
-- xattr mapping add a new type "unsupported" (!67)
-- sandbox: Support combining --rlimit-nofile and --sandbox=chroot (!65)
-- sandbox: Propagate exit code from child to parent (!64)
-- xattrmap: Fix documentation for type "map" (!68)
-- Adds compatibility options (!61)
-- Replace crate seccomp-sys with libseccomp-sys (!71)
-- Drop membership of all supplementary groups (CVE-2022-0358) (!77)
-- Adds killpriv_v2/no_killpriv_v2 options (!62)
-
-Signed-off-by: Sergio Lopez <slp@redhat.com>
+If you think there's something missing here, please say so.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/78
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/24
 

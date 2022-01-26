@@ -1,20 +1,28 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=q0sJ7a6j5xvVSDg6rIXfwSX5x16Wvu3orvAMR4Fx/F4=;
-	b=M81mkmVA1gFIsYQ9wjfg8L1KshCZBsYGPZhyDOLmmEL1SuUdzGg7T+sPTI6OluwXkd
-	IxCFCfj7IhtcUL/VLJOHjJbiFNxEWoimKYZ2YYVMLEk0yKA1qeBjoIjIm/ssU5me0Qn4
-	FKp3eFJ1fqDn6X+ERf/SQ16PERL2SMntrD5qecGnAl20Jn2iZY2rgMm0f8bCQczMe06E
-	Xcz7wXLGgJnEjuhqgOfwJxKYwXphpW1l1OiAYTtjSPe/eukYU6XtkXZg8SPV3nlauU1Z
-	4GlPyWWJTsl+sbkYgP+iF0w79MmUgPZlr58Vu4bLhEi9eEBMEokH+Fc3a2LaBXbDE5+h
-	t29w==
-MIME-Version: 1.0
-References: <20220126105112.28711-1-dgilbert@redhat.com>
-In-Reply-To: <20220126105112.28711-1-dgilbert@redhat.com>
-From: Peter Maydell <peter.maydell@linaro.org>
-Date: Wed, 26 Jan 2022 14:57:08 +0000
-Message-ID: <CAFEAcA9ok6VY5fS9stb8bUZ-yDbMLSCLCPokKWBtEc3Qif=Y4w@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PULL 0/1] virtiofs queue
+Date: Wed, 26 Jan 2022 11:27:27 -0500
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+	:to; s=fm3; bh=0Htea9nMf1rInco7VrRvkMyIZxzBGZ6bFsy1aBFHCTo=; b=R
+	jDdI2x3X/y/WzKG8tGdFcoKRmcRrXFaOJHdsr7VXp2zMWwV1S9MYKEuE9FZdQISR
+	PEzXJTQOmy1Ct1GqePGuY1YAmUemM8rVAeZTK46yB6NeU0bUcCNMTvtWHoHGcRU6
+	BG7gtm7cj7L5YcV9jSSORbyDtdtf+x6/s/XO3ThXktfbTjYGLFWp27So+/Las5Mr
+	XgyU5X5ny6ve8NYWNKOv9mTGMoHRMTqh+/PIMhJIkVkzlDZY7jF5GYhv8AkfhMNm
+	d3KLbqTpClY8x3GwJ1+ZYB8/04S9CQByLWIN3rvioIyKpzBRW54E8+yS6vcjKgxU
+	vA6Z4mZ7LpWqTRP4SPQ5g==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
+	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
+	:x-me-sender:x-sasl-enc; s=fm1; bh=0Htea9nMf1rInco7VrRvkMyIZxzBG
+	Z6bFsy1aBFHCTo=; b=jcqkgVZ17qbZ8X3HpeQjU9fqpLRBoyAmVT3MOmQv+UrKF
+	059URM8GhsahfIOi+HIfPPydrIY1B1tuyZ38u1CcvN6vVV4j7pWZBGbJmM3qrLzV
+	ElQq1WCy++ISu2h9CfujZczWk4i/oIR8/WQDX0GWAtelK2l6ki0V443NK9jsClZe
+	jqiXTIQ2EEpA1sd9YFZpQm5ngZbSKd/5Z2s5dwCHFNsgrCJfXrHVCC3o8gM2bHJd
+	DUWjmGkxDK9dRQESr67kz//JGy9JFWqg7uRgDa+vmUU+SKukrB2vRDVmLA/PH8B0
+	sqXE7c17Kkn/vbkD0u6sApQ0/wfwhMxBvXtqOEb+w==
+From: virtiofs-bot@sinrega.org
+Message-Id: <18694.122012611272500373@us-mta-427.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd] MR merged: Drop membership of all
+	supplementary groups (CVE-2022-0358)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,40 +31,39 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: mcascell@redhat.com, qemu-devel@nongnu.org, shawtao1125@gmail.com, pj.pandit@yahoo.co.in, virtio-fs@redhat.com, vgoyal@redhat.com
+To: virtio-fs@redhat.com
 
-On Wed, 26 Jan 2022 at 10:54, Dr. David Alan Gilbert (git)
-<dgilbert@redhat.com> wrote:
->
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
->
-> The following changes since commit aeb0ae95b7f18c66158792641cb6ba0cde5789ab:
->
->   Merge remote-tracking branch 'remotes/jsnow-gitlab/tags/python-pull-request' into staging (2022-01-22 12:03:22 +0000)
->
-> are available in the Git repository at:
->
->   https://gitlab.com/dagrh/qemu.git tags/pull-virtiofs-20220126
->
-> for you to fetch changes up to 449e8171f96a6a944d1f3b7d3627ae059eae21ca:
->
->   virtiofsd: Drop membership of all supplementary groups (CVE-2022-0358) (2022-01-26 10:32:05 +0000)
->
-> ----------------------------------------------------------------
-> virtiofsd: Security fix
->
-> Fixes: CVE-2022-0358
->
-> ----------------------------------------------------------------
-> Vivek Goyal (1):
->       virtiofsd: Drop membership of all supplementary groups (CVE-2022-0358)
+At the start, drop membership of all supplementary groups. This is
+not required.
 
+If we have membership of "root" supplementary group and when we switch
+uid/gid using setresuid/setsgid, we still retain membership of existing
+supplemntary groups. And that can allow some operations which are not
+normally allowed.
 
-Applied, thanks.
+For example, if root in guest creates a dir as follows.
 
-Please update the changelog at https://wiki.qemu.org/ChangeLog/7.0
-for any user-visible changes.
+$ mkdir -m 03777 test_dir
 
--- PMM
+This sets SGID on dir as well as allows unprivileged users to write into
+this dir.
+
+And now as unprivileged user open file as follows.
+
+$ su test
+$ fd = open("test_dir/priviledge_id", O_RDWR|O_CREAT|O_EXCL, 02755);
+
+This will create SGID set executable in test_dir/.
+
+And that's a problem because now an unpriviliged user can execute it,
+get egid=0 and get access to resources owned by "root" group. This is
+privilege escalation.
+
+Fixes: https://bugzilla.redhat.com/show_bug.cgi?id=2044863
+Fixes: CVE-2022-0358
+Reported-by: JIETAO XIAO <shawtao1125@gmail.com>
+Suggested-by: Miklos Szeredi <mszeredi@redhat.com>
+Suggested-by: Vivek Goyal <vgoyal@redhat.com>
+---
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/77
 

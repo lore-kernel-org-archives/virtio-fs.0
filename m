@@ -1,28 +1,14 @@
-Date: Thu, 27 Jan 2022 11:33:22 -0500
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=5aNlIrN07XJMAH64uTvTOzRMyRgZYfY3wP7gUaRCquQ=; b=n
-	k1eQqfTcPFuO+C3Ra2PyVT8wzG0kobVSB+BZ6ZOcPCFxdcOutkTIzEBK2PnSGy+G
-	T7QdvoKRJW7nbemIZB5NQ5k6uRIFPko0SGIt3Lz2djDgXwpydLrFFkeja7aZl9r+
-	YOsZ5eyUZEBxJEJCaIIOZf09abyYoSFPtUb6f4p6l9lHgdvQhGwIKFu664lkOvvq
-	dL76dCCojBp7766GNwzDzZ/gDfkgkNQPH6jVSDLnYXVYcZ+t0uJO8BFiMNK6fLT4
-	d/NkdeJRmAlCp6nzcMaFo88vyxNuHdh/t0EYIKeeJmp/z71zYTzLcHbNxKeeKkDe
-	AEanwSIaeWrxl7qldswgg==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
-	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm1; bh=5aNlIrN07XJMAH64uTvTOzRMyRgZY
-	fY3wP7gUaRCquQ=; b=gcRFLG+Mt5RZhW9JdhDcX5Y+idOS8tSs0CRD7EFXWA/hs
-	JkpCCHLz9erq5pQKOPbPQXh/LZ/tAqtk9rtorTrxvox5v2WcPXEGqMwNFZLy3sGe
-	fPXjjnzQ/aAIXGPjQt9MBXb14u7VN1ADIphrtMbZw2qU+aoReFk7y7WskBrzLeum
-	1EL/UYC8Wm9TDR6yoOrNxcswfoYm9KXfkF1P+GGkW9BvKArbhGDhoL7Fa2pzLEM+
-	41N/uTxh88NB0Mm0pH2Px40oDwGTVogJpEGI1cwHPTOVwHAFbLyDM9Jf+2P1XHYn
-	2H1Q2CVkcJobSf97JRBPNH2VfohG1j3D7Miy+wbXQ==
-From: virtiofs-bot@sinrega.org
-Message-Id: <18446.122012711332001169@us-mta-261.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR closed: mount_fd: Manually manage mount
-	file descriptors
+Date: Thu, 27 Jan 2022 17:17:38 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YfLTsnyhTdylJn+u@work-vm>
+References: <20220124212455.83968-1-vgoyal@redhat.com>
+	<20220124212455.83968-3-vgoyal@redhat.com>
+MIME-Version: 1.0
+In-Reply-To: <20220124212455.83968-3-vgoyal@redhat.com>
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: Re: [Virtio-fs] [PATCH v4 2/9] virtiofsd: Fix breakage due to
+ fuse_init_in size change
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,24 +17,64 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-Still we have a hash map of all existing mount FDs. But instead of
-refcounting mount FDs and letting them remove themselves from the
-map, we manually
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> Kernel version 5.17 has increased the size of "struct fuse_init_in" struct.
+> Previously this struct was 16 bytes and now it has been extended to
+> 64 bytes in size.
+> 
+> Once qemu headers are updated to latest, it will expect to receive 64 byte
+> size struct (for protocol version major 7 and minor > 6). But if guest is
+> booting older kernel (older than 5.17), then it still sends older
+> fuse_init_in of size 16 bytes. And do_init() fails. It is expecting
+> 64 byte struct. And this results in mount of virtiofs failing.
+> 
+> Fix this by parsing 16 bytes only for now. Separate patches will be
+> posted which will parse rest of the bytes and enable new functionality.
+> Right now we don't support any of the new functionality, so we don't
+> lose anything by not parsing bytes beyond 16.
+> 
+> Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 
-- add a mount FD when the (sub)mount inode is looked up, and
-- remove a mount FD when the (sub)mount inode is forgotten.
+OK, I think we should make this 1/9 and get this in quickly; that way
+bisect works.
 
-When later implementing FUSE_SYNCFS for the case without
---announce-submounts, we need to defer removing mount FDs until
-syncfs was called by them. This can be done by either (a) calling
-syncfs on any mount FD that is about to be removed, or (b) keeping
-them until the client calls syncfs. Both ways ((a) or (b)) are
-easier to implement on top of the manual management introduced
-in this commit.
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 
-This MR is an alternative to !73.
----
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/79
+> ---
+>  tools/virtiofsd/fuse_lowlevel.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+> index e4679c73ab..ce29a70253 100644
+> --- a/tools/virtiofsd/fuse_lowlevel.c
+> +++ b/tools/virtiofsd/fuse_lowlevel.c
+> @@ -1880,6 +1880,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+>                      struct fuse_mbuf_iter *iter)
+>  {
+>      size_t compat_size = offsetof(struct fuse_init_in, max_readahead);
+> +    size_t compat2_size = offsetof(struct fuse_init_in, flags) + sizeof(uint32_t);
+
+Yeh so that sizeof() is sizeof the flags, so that's the size of the
+sturcture upto and including the flags.
+
+>      struct fuse_init_in *arg;
+>      struct fuse_init_out outarg;
+>      struct fuse_session *se = req->se;
+> @@ -1897,7 +1898,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+>  
+>      /* ...and now consume the new fields. */
+>      if (arg->major == 7 && arg->minor >= 6) {
+> -        if (!fuse_mbuf_iter_advance(iter, sizeof(*arg) - compat_size)) {
+> +        if (!fuse_mbuf_iter_advance(iter, compat2_size - compat_size)) {
+>              fuse_reply_err(req, EINVAL);
+>              return;
+>          }
+> -- 
+> 2.31.1
+> 
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

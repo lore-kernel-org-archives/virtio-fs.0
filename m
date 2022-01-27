@@ -1,13 +1,13 @@
-Date: Wed, 26 Jan 2022 18:02:46 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YfHTFmQpM8hEU/I/@redhat.com>
+Date: Thu, 27 Jan 2022 12:11:39 +0100
+From: Greg Kurz <groug@kaod.org>
+Message-ID: <20220127121139.61ca8360@bahia>
+In-Reply-To: <YfHPbWRbWpZgLXVA@redhat.com>
 References: <20220125141213.361930-1-groug@kaod.org>
 	<20220125141213.361930-2-groug@kaod.org>
 	<YfHPbWRbWpZgLXVA@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <YfHPbWRbWpZgLXVA@redhat.com>
+Content-Type: text/plain; charset=US-ASCII
+Content-Transfer-Encoding: 7bit
 Subject: Re: [Virtio-fs] [PATCH v4 1/2] virtiofsd: Track mounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -17,10 +17,12 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
+To: Vivek Goyal <vgoyal@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Wed, Jan 26, 2022 at 05:47:09PM -0500, Vivek Goyal wrote:
+On Wed, 26 Jan 2022 17:47:09 -0500
+Vivek Goyal <vgoyal@redhat.com> wrote:
+
 > On Tue, Jan 25, 2022 at 03:12:11PM +0100, Greg Kurz wrote:
 > > The upcoming implementation of ->sync_fs() needs to know about all
 > > submounts in order to call syncfs() on them when virtiofsd is started
@@ -85,14 +87,27 @@ On Wed, Jan 26, 2022 at 05:47:09PM -0500, Vivek Goyal wrote:
 > in foo1/ followed by syncfs(), we will not issue syncfs() on filesystem
 > backed by /dev/sdb.
 > 
+
+Right, inode->key.dev isn't a safe fallback, which is the whole 
+point behind the need for mnt_id :-)
+
 > So what are the options.
 > 
 > A. Make mnt_id mandatory and do not implement it if mnt_id is not
 >    available.
 > 
+
+This is still quite recent (kernel 5.7 and glibc 2.33), it would
+be unfortunate for users of older versions.
+
 > B. Don't do anything and live with this. It is a corner case and
 >    still better than not implement submount syncfs at all.
 > 
+
+Having bind mounts isn't such a corner case, is it ? And anyway,
+this would be a serious flaw in the implementation. I don't think
+this is acceptable.
+
 > C. Instead of adding lo_inode to hash, create another kind of object
 >    and reference count that. It could be a mount fd which we open
 >    when we add object for the first time. So when foo1/ inode is
@@ -101,18 +116,16 @@ On Wed, Jan 26, 2022 at 05:47:09PM -0500, Vivek Goyal wrote:
 >    in the hash and just bump up the ref. Now this mountfd object
 >    will go away when both foo1 and foo2 inodes have been evicted
 >    and will take care of the issue I am referring to.
-
-And we could take a ref on mountfd object only when we find an
-inode whose parent's device id/mnt_id is different from us. That
-way for every inode in the system we don't go through this exercise.
-Just only those dir inodes which are a mount point.
-
-Vivek
-
 > 
 > I guess B is little extra complexity but probably not too bad.
+
+s/B/C
+
 > WDYT. It sounds litter better than option A and B.
 > 
+
+Definitely. I'll give a try.
+
 > 
 > > +
 > > +static void add_mnt_inode(struct lo_data *lo, struct lo_inode *inode)
@@ -139,6 +152,15 @@ Vivek
 > a syncfs(). By that time inode is gone and we will not issue any
 > syncfs() on this filesystem. Hence leaving data in host page cache.
 > 
+
+Right, I guess we can do that.
+
+
+Cheers,
+
+--
+Greg
+
 > Thanks
 > Vivek
 > 
@@ -218,10 +240,5 @@ Vivek
 > > -- 
 > > 2.34.1
 > > 
-> 
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://listman.redhat.com/mailman/listinfo/virtio-fs
 > 
 

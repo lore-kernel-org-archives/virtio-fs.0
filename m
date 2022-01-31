@@ -1,28 +1,28 @@
-Date: Sat, 29 Jan 2022 06:41:54 -0500
+Date: Mon, 31 Jan 2022 03:52:36 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
 	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=JlC292hx0IjOuYujVBeIlXsid/GxXzFDaZwZOX3b5c4=; b=S
-	xwrLdlqhHEMWYMhnfn+vi2Wlfs83T8SSliducZxKy54rRcpWVjr4GMK0ExjjOEsb
-	xWtvVsP2tfZa7H3xRga6rbgnbnd4V7TAGH1tAtYrO627qYXngQnEx1LEBOfi1Udc
-	stBoLj4WcY/BUY+U8R0vCHXXlzVtC4ZrwqDet6XGATEQIIMLV5AeaPcZzunK+xXh
-	wy0GoXUTRx7wQWw3d0imz5xuKleg94xWx0i5mGblT16Lf9LkkXz8fwIGwN3emiTN
-	MHeEk7YosykmBvPO2UqvJ+EVgWiufbDFo+0pFwlJpMjTl32jrWvP9RM0JA0hxZ76
-	0KENYsco79jiuBFxHUo3Q==
+	:to; s=fm3; bh=5dqMUoqHq757q4GPtpuWN1mTLGsx53XUwgXYjnorNXA=; b=r
+	3mhY9DQfVsw2B5O2uC0JDXrUcaRrYFs2Au0v/xPvcoTWrRzlbfPp4WuBmtJxuilP
+	81rsJXEmSDkMuA78xVVFhUNhkO3J6tUxsHrZmVFdGLOpTnsvDgco5K+y/h+YP720
+	fp9bd8l/zq7ZdIBdlXmIPbXFntfKs6YHjM1HA/ZQzM5sIKmryub04SECBkXilQXX
+	wNNrXiFFMs4YnuUPue/aker3H9w17rctGTZhNfw8korklWUE9iusD1+q61eNDkQQ
+	Utl5ysNLChX8OOpQRaqzh01enwr+se4AO0j8/o859cqp42Dqwd5sMEe8vnUUcYyY
+	C3l87vEp+1KdTI2D/dG0w==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
 	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm1; bh=JlC292hx0IjOuYujVBeIlXsid/GxX
-	zFDaZwZOX3b5c4=; b=c0W7etJrghyl6846HxDi35MGnbhrq9oawwqiHkhrF1ezh
-	Ztw8BWWuqkE7ug0fETGrW2qfDUCM+5Z4wIfT9EjkCxs/JxWYIv4llaGXS+3+uLEF
-	yKm0Tz77I+zvEYr7j68aOKCrhGODBVdVoBb6eP9GDjrMXiEmIj2v97rvbc94qfMI
-	ywVugnz+3pA38xOad9dLJgrItm+NCcFmNDSutofo7gLRCBbB4Nb5R1XBeEb/hyIq
-	GQcigfJ789vMTgjTY7GbA25sUQaJJuifDu14H3/EcPMtR1tIW1QBVSj7tGYxL9re
-	xdTTArISsWL6IA1Cj1/OZioDWWeAWJTvVNwIAOEhA==
+	:x-me-sender:x-sasl-enc; s=fm2; bh=5dqMUoqHq757q4GPtpuWN1mTLGsx5
+	3XUwgXYjnorNXA=; b=KJOT7k2paKBwcC827Qjm8xKzHR8Y+Xb0SPIDV5SQSr9kR
+	cAN67u6VODRwzvnE2LD67FC44IzC/1Ey+68by2Dg7RdzcfHec2KtjVylXSEF3JnU
+	yVv5HvSV2JD6PWOPkq/VORIP0qkuDtI6dniyMSdfqxk83AcB6EieZfp1j53MupwO
+	doXiOY7aOVDXkPZEPw7wjqwEgsvSadiK16MA2lB1oyTsjwJkCNUlzKIekmWBeWcn
+	QGdPFRPw4OCJ9WLRNs14E7fwuTUYadrpS+8eTVdhYSbwX99WfS70U/KrCbW4dduH
+	sMCj/pDmJxK/POjwHToDUT4tJEAWnMRWMS/rcEJLw==
 From: virtiofs-bot@sinrega.org
-Message-Id: <09872.122012906415100111@us-mta-614.us.mimecast.lan>
+Message-Id: <49949.122013103523301294@us-mta-580.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] Issue opened: Wrongly implemented InodeData
-	refcounting can increase refcount from 0 to 1
+Subject: [Virtio-fs] [virtiofsd] MR opened: passthrough: Fix InodeData
+	reference counting
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,8 +33,16 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-The code at https://gitlab.com/virtio-fs/virtiofsd/-/blob/50ffd53962ffe10bc18760d91f21eae79bb7f42c/src/passthrough/mod.rs#L775 can increase the refcount from 0 to 1.
-In this case, the consequence is that in `self.do_lookup()` we return an InodeData that is no longer in the `self.inodes` map. It probably doesn't violate any invariant we have, and hence it probably doesn't lead to a panic or the like. But it's nevertheless a behavior that's unexpected (and probably unintended by the programmer of that line).
+Previously, the `InodeData` reference counting could increment the
+refcount from 0 to 1. See #25. We fix this by using a CAS loop.
+
+Closes: #25
+
+Also, in `forget_one()`, we change the ordering of decrementing the
+refcount to `Ordering::Relaxed`, because the refcount itself doesn't
+protect any data. Furthermore, the old ordering `Ordering::Release`
+doesn't make any sense because there's no side-effect that could
+potentially get reordered to after the decrement.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/25
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/82
 

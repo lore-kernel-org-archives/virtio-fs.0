@@ -1,28 +1,28 @@
-Date: Tue, 1 Feb 2022 17:01:35 -0500
+Date: Wed, 2 Feb 2022 05:37:09 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
 	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=nwRVoize8rE9rdF8iLVJU4u5ZVs/nfq5l3Fz2lix83Y=; b=X
-	Lzqlzx4BSo8svA1ToxfCe9an28/wvPxSrnGBfLTY083VLoFx8LrUa4q6HZqBqH9Z
-	YynFJQFLBdh7Nzuke24HvI+jXuASLFW+4EcnWIr80UO/KmBznYH/kmoKEvR8DtIN
-	+V3Wj7STpxFZ31cKYoRxfDafFiKqTjQ54EmNx3Tp7DmbAVw48zx/mc1vXsqx73wa
-	czrqdlqnRFmk46QAirwO02QyLNIoDKfPS0uvivNRani49zB5u29YjBHTJzjGY1U9
-	neAKkkafBtkhr5Q0cPPfp4IQnUjT+u2uYUbklqCv6FZh01JHLYEaELuwXt5nNDKb
-	K7QQ124cBSD7X2EBTJp/w==
+	:to; s=fm3; bh=YfQ3jHuT4anRvIT9bLEr17qP9f6pHnUyalQz/AAyFBE=; b=V
+	xH0Wpx/pZk2SoLcg/0lTmyPxNSc81F77msyoUwwpPAtRidI3Dy8XhTFB7DQZzJJ2
+	lqKuIHpL4O2ky95MyrywIFoEcOwhnL4OOk4yEDMq8GCNAXVLBnWusfKi5RMbG3/D
+	1kHZ4IidSUPvPm2Y3cWEA6StBK0J+cvEfN7zw6lb4FhmKVejKh2bA1pzUV8yucam
+	qKF0K0mv637wiCX4xnYlU+1N6Az9jQUomdXGd5b2Ze1/oFstijUWfN8sei6QFxc1
+	exU7qErDtM3Z1XdNXxpTV1+66h7FgOPJceMyd6Rm0J0Dup7ioMRuOYvpDnJNp8U+
+	+8C5jxr+6sse/idpatBSQ==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
 	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm2; bh=nwRVoize8rE9rdF8iLVJU4u5ZVs/n
-	fq5l3Fz2lix83Y=; b=Ti7WIV3RF5nE3D1mwbnW46wym9us+LmyahgwOx1T7SlTf
-	cMyA6HTYVtmbFnwcaneOLenx2Aawv3xpG6gg1VVxsZIWtfki7Whd31JV595D9jfx
-	UANCkuN/6RdhzhgOEtT/qV/HXdkwxkrDHoNFalP/dKbflaQ3lMv7lsiN3jQLbxy1
-	KoLye5lVIVfndVWyL5H2yHbtWymyTmEm3LQbcKYVjrlZHedWEwRp/eSSXuMDeOpV
-	cisPY2+OOr6q/xy3ukIOw3vhTZ2ywB+GKp1QFrAS3tLzEke1q8+sAc3VlfpRNTSy
-	bkZp5RsCSd/liuNP+KGHFB9iZiNX1DeDJXzmXWz0Q==
+	:x-me-sender:x-sasl-enc; s=fm2; bh=YfQ3jHuT4anRvIT9bLEr17qP9f6pH
+	nUyalQz/AAyFBE=; b=BO0lLduh86sE7DtxJ9EHqlLZ2mR0WFmC1giHw4sadTY/w
+	gfN9gI8dTNPcR/Zhhv1sFYtq80785nP+Bgvdnrbjyio+J39i/i2S5sE+8DNu4Uge
+	bsQVXyW2orbbARXTY1J1VbGf//iZ0No7jJr+Zdy8wnpwkaVx+d8sVCuIiHEYoFZA
+	Efx8ktHbf/HUYlrCezHYkpitJJgdyL4iB+T+NGivRG3vwJrZvdbkvZX099dL1pl3
+	eDabLjcePqqxZZLnZsWvhnGOsGuxotvnv4jhQt99q2J93U7IiVo5juGywtQsntAM
+	DexW11CKukx6waUTGejfbXYGw80fgLSRh8+VMtDLQ==
 From: virtiofs-bot@sinrega.org
-Message-Id: <06332.122020117013300621@us-mta-315.us.mimecast.lan>
+Message-Id: <97857.122020205370400139@us-mta-643.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR opened: Handle FUSE_INIT and
-	FUSE_DESTROY non-concurrently
+Subject: [Virtio-fs] [virtiofsd] MR opened: Modify the list of enabled
+	capabilities from the command line
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,25 +33,9 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-- Replace `futures::executor::ThreadPool` by `tokio::runtime::Runtime`.
-  This prepares for using tokio's implementation of `RwLock` with
-  owning lock guards that are `Send`, i.e., can be moved into other
-  threads.
+Add both the new '--modcaps=<modcaps>' and the legacy option '-o modcaps=<modcaps>'. Both options expect the same format, a ':' separated list of '(+|-)capability',  e.g., --modcaps=+sys_adm:-mknod
 
-- Handling FUSE_INIT or FUSE_DESTROY requests shouldn't be done
-  concurrently with handling some other request.  To enforce this, we
-  require an exclusive reference (`&mut self`) when calling `init()`
-  or `destroy()` functions.
-
-  Furthermore, those requests (FUSE_INIT, FUSE_DESTROY) shouldn't be
-  reordered with other requests.  To enforce this, we lock an `RwLock`
-  from the main thread and move the lock guard into the worker thread.
-  Locking from the main thread ensures that all previously queued
-  requests have already acquired their lock.  This way, those requests
-  that require a write-lock (FUSE_INIT, FUSE_DESTROY) cannot be
-  reordered with requests that were enqueued earlier.  For similar
-  reasons, they also cannot be reordered with requests that will be
-  enqueued later.
+Requested by Kata
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/85
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/86
 

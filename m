@@ -1,28 +1,12 @@
-Date: Wed, 2 Feb 2022 11:55:28 -0500
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=ZvZ3/bYahGFKALj+fwBTkdayjGWkADtJvL0lYQ/9FUk=; b=3
-	U/mSxAtV4iq0mSbCJpKlZxorfLJPdcJwJuDf4B/QNEJX8nOXxaSQz75R9JtCNNWr
-	3jC/El7kPCIixIMxNk2Zgt8u6D3I486yCjZe56bg14EPJlesR6lv9gotB4MyHDls
-	FBemKVe5ONn+NqbvWxtzZS+7vUxW18ExbNx1HDRBe9qIXHO0IYkoDyEmkuHBuhDO
-	fBe6af7HDJ/hfL6VGci9Aq0MkTWVRu9gj+7/kehAPAylC89HD5hO4VeQg6gQ5Dhu
-	xoucc7q4ud60swJ8JvEOkUWAR9wBsf85GNSqSh23nZ5sVXOpa7hcVxx/L7TXgn8V
-	Gh05qD8Z0NZNvNzOpbi3A==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
-	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm2; bh=ZvZ3/bYahGFKALj+fwBTkdayjGWkA
-	DtJvL0lYQ/9FUk=; b=an+YyOjEqhiHxtMmo1dL9DyzH4pvKi8plySOalKjI57AT
-	onB18zMbkFAxBIo/YDmnt0/nEaiYdVbVPjMboTpo4e0WAIbSjM79IUmZAqQWRZvk
-	OX/bT1eNkSRLo3zwgb/ssvcOP7FDbRzU7ADHkaabs9FJzpzhp7c8zxSvUsmSleDz
-	3Qe0xVmEWUKJHkf61w0N7DBYmH4ZZMolpB7JR9yPLCvROoj4BwiutUPO4UUK0bBW
-	xxPv3xMGeW9lPLvlKyk9OANSIbxy/8juNg5ldlvwCpzCuqYPcpA/hwoJ9W6bQRDd
-	rrxwkKVeemTqMoNC7WV9uXVed9O3RPego7NFVFrUQ==
-From: virtiofs-bot@sinrega.org
-Message-Id: <17952.122020211552601215@us-mta-433.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR opened: process_queue_pool: Only acquire
-	the VringMutex lock once
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Wed,  2 Feb 2022 14:39:27 -0500
+Message-Id: <20220202193935.268777-2-vgoyal@redhat.com>
+In-Reply-To: <20220202193935.268777-1-vgoyal@redhat.com>
+References: <20220202193935.268777-1-vgoyal@redhat.com>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v5 1/9] virtiofsd: Fix breakage due to
+	fuse_init_in size change
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,12 +15,51 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com
+Cc: vgoyal@redhat.com
 
-Previously, the worker task in `process_queue_pool()` called
-up to 3 functions on `worker_vring` where each function is a
-wrapper that first locks the mutex.  This is unneccessary
-congestion.  We fix this by locking the mutex once.
+Kernel version 5.17 has increased the size of "struct fuse_init_in" struct.
+Previously this struct was 16 bytes and now it has been extended to
+64 bytes in size.
+
+Once qemu headers are updated to latest, it will expect to receive 64 byte
+size struct (for protocol version major 7 and minor > 6). But if guest is
+booting older kernel (older than 5.17), then it still sends older
+fuse_init_in of size 16 bytes. And do_init() fails. It is expecting
+64 byte struct. And this results in mount of virtiofs failing.
+
+Fix this by parsing 16 bytes only for now. Separate patches will be
+posted which will parse rest of the bytes and enable new functionality.
+Right now we don't support any of the new functionality, so we don't
+lose anything by not parsing bytes beyond 16.
+
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/87
+ tools/virtiofsd/fuse_lowlevel.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index e4679c73ab..ce29a70253 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -1880,6 +1880,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+                     struct fuse_mbuf_iter *iter)
+ {
+     size_t compat_size = offsetof(struct fuse_init_in, max_readahead);
++    size_t compat2_size = offsetof(struct fuse_init_in, flags) + sizeof(uint32_t);
+     struct fuse_init_in *arg;
+     struct fuse_init_out outarg;
+     struct fuse_session *se = req->se;
+@@ -1897,7 +1898,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+ 
+     /* ...and now consume the new fields. */
+     if (arg->major == 7 && arg->minor >= 6) {
+-        if (!fuse_mbuf_iter_advance(iter, sizeof(*arg) - compat_size)) {
++        if (!fuse_mbuf_iter_advance(iter, compat2_size - compat_size)) {
+             fuse_reply_err(req, EINVAL);
+             return;
+         }
+-- 
+2.34.1
 

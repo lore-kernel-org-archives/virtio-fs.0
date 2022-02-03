@@ -1,28 +1,28 @@
-Date: Thu, 3 Feb 2022 04:57:30 -0500
+Date: Thu, 3 Feb 2022 05:14:39 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
 	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=4J/JOhu8zdIGXd/0DzVMihmTh9qoc2drU2HmgfNbLk4=; b=0
-	pAFae0Y/n8eErh8qkg3xWYjq0MF4lfvfvpuqStN7pBAZA7wWLr7mqIcCaj3DA1PO
-	oHfdjiQnDyInN4DtKSwwGXiy+1TtU2Te9j1XsAI+SaUb7Dfd5bnHK8uBhHdxYVDJ
-	nRd+zEyTa1y036EXwvmKSzS8/wMCnwxzKpYVKSH9fObb0cCXzLdSlFJYpb+tOiz4
-	p7drIR2B7sdmitFVSY0LRI838adzpGhnMFi6DZnVd+w3O9qOzi83iPsid44as3Ev
-	uzJPzJrnnHawnu+b2xtfqaPadHJ1G7vXi+rOXp0WcwvinXt7VP5jMNl0QZNpe0hd
-	ShnWcfyaXc/vK1XJ+CN+w==
+	:to; s=fm3; bh=akd+ZWPb1s8OsHebYeuSmWmHwO0Cv1cFOwVVj92IOtI=; b=2
+	UnOX71grWqPwJEsHVQXr8tUMRuWVOvQWA5umSVfPQPsWDLcfJr0DgqbR2qI7R1KR
+	IEv4seTUUulJgOdOYpwItakSdtQoWET6EM5zaeauQb5nm3g/nvSu606J8TazN4jn
+	J9lXgNTJtnMBsIPdPZsJp4AjIFcOY64mfPaJ+F/VULNoQSDt+UJ6QBqfqHkTww+t
+	yqL5qW8GH04xrqCs5DffWvuPMNqlVCIyxSwECHmwuxXHavdHYqcvD9ZGx0atbsCn
+	H6GIxhXHSCeZ1pXuGGi/Ly/YunY+v5RDq5VpCU+FmP73R5mqQI9f4xUHfmi+lU43
+	dejtzCyaZGyJHYjzyg9HQ==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
 	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm2; bh=4J/JOhu8zdIGXd/0DzVMihmTh9qoc
-	2drU2HmgfNbLk4=; b=fZdrLWMgJF3M8U1O6gqstTFSRz5kb9OzkBegyqXDg2D5z
-	Du4O6mHZjIV5qXkqKpw/v/EpF/whoDVbvPbr2fQLmqu1c/wc6xs2RhZQjolSgIIu
-	32CROEVFkPAB1k+WNkVdeudmNdKQMxvA/Mh+Nv8mPu/m8YfLoSYbgaVM90dv7jTA
-	bjsPUM86ybTSNar+poXrzeli/oPW5Z9l/TFqXqlgiI8l0hIfAUZbqX/uG3fQnulC
-	m8/wfsmQBhsIlDpUjANgJfByNAKllaSlm5Bk4H5TOtUHpHZ3JLO/UEbSb6LDhD5E
-	5w+DKpji/oTgfOTtj2L3vFkAIou57tWFcsnOaOskg==
+	:x-me-sender:x-sasl-enc; s=fm2; bh=akd+ZWPb1s8OsHebYeuSmWmHwO0Cv
+	1cFOwVVj92IOtI=; b=YfP8DmCLqONNFZuO2zHsBZxqxl656nFRaEo/WDrCbr/ns
+	Gf+O4uAXtGMDxosAlF3itlR8NulR62bTVy9GtSmzElt5dH46ZDJXFjtBtyqgp9eq
+	v+MHDRY6hHcDVb4n30ut3Xa6bmMhHiaafqvOP8jK6pO7oo9h5nhlddS4K/9c4QAX
+	ORwlcFi+JWXbZsTa/C0eM8iWzMf6A62qw9iehh9e974YLK7yg65iq4FAKv1QySbr
+	O1OmTl7X0UFYBbVajIssqeM2YelePaklAv7csQpm51Oye//5J277dyTZWfQmYD76
+	+D7Y+bFZJJenWr2y6FwtugXKzKPIR17xOn84UkADg==
 From: virtiofs-bot@sinrega.org
-Message-Id: <84664.122020304572300129@us-mta-372.us.mimecast.lan>
+Message-Id: <60125.122020305143700137@us-mta-60.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR merged: mount_fd: Use Arc for MountFd
-	reference counting
+Subject: [Virtio-fs] [virtiofsd] MR closed: Flexibilize our deps to support
+	new patch versions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,11 +33,10 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-This commit moves `MountFd` and `MountFds` into a separate module
-and uses `Arc<MountFd>` for refcounting instead of rolling
-our own refcounting.
+For crates that follow SemVer, flexibilize the dependency so we can
+support newer patch versions without updating our Cargo.toml
 
-Supersedes !70
+Signed-off-by: Sergio Lopez <slp@redhat.com>
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/73
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/72
 

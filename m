@@ -1,13 +1,28 @@
-Date: Fri, 7 Jan 2022 20:03:39 -0500
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20220108003423.15830-4-mst@redhat.com>
-References: <20220108003423.15830-1-mst@redhat.com>
-MIME-Version: 1.0
-In-Reply-To: <20220108003423.15830-1-mst@redhat.com>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: [Virtio-fs] [PULL v3 03/55] virtio: introduce macro
-	IRTIO_CONFIG_IRQ_IDX
+Date: Sun, 6 Feb 2022 12:26:08 -0500
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+	:to; s=fm3; bh=TD1sBrghyPCvUPjk2De3WZOQMHRUYazfqE50sSx1VtY=; b=J
+	PITeroSg8VY4hyQ3vx5GTIxBN7rhMh4RzouZhogXawFsDYFoN4ywdkvUIzEjFpBh
+	JwguexH+atsjx+FUIb2b1P0FMTvGw+5tEcD4A44QNV096QxRRM8LQv/KViMkBIUY
+	YGhv2EBrq1+vk+RSth7QX12NZ+nlZs6qIkQ3AFXXhXnLsao1noxpw32kPJmwH4J2
+	yt82+DwUfXMKq346WlK5OBng0qqIxD6YgXRBl3cKwqVPNWE7B0wqY7py+p3rrAHD
+	ZslqnvGu1NTci7TneGXzIAC/6r9WCpruS8MYEYPJHcO6yrBPTagm0OM7gU7FbFEw
+	zluz4vZMI/thBSwy912sA==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
+	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
+	:x-me-sender:x-sasl-enc; s=fm2; bh=TD1sBrghyPCvUPjk2De3WZOQMHRUY
+	azfqE50sSx1VtY=; b=W/G2WUwVg64dJDyiEnKQ4+EMjJE7T4VHdUbzZXehucUfJ
+	SrlNerhFyOdRP1Um1tG1wUwTHgJ1xJeqWKaux8BLLCSEKoPtySaw4nfFlPzCQwkI
+	aeJnhnaCKYZUJdbId5fOeZwpnA0khSBvjszkNqJAxzu2X3Seblb0uOyt1hBilaTK
+	NkVQ40t02N+6LlkYMMnrddptFNu8750dgBiz3Aa43WfvBvEY8Hrhl1JuIE6BRLrB
+	zIp4cdHe5Nmq5umeMX/9UFih2xQhAhShJBOeOLqByXWFX3jbtWO2OKDnP0rozpYW
+	gVeTYkmS0yfNqo7OXZojGvml/AzXPOSRVeuVtpSWA==
+From: virtiofs-bot@sinrega.org
+Message-Id: <51682.122020612260300169@us-mta-261.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd] MR opened: process_queue_pool: Prevent
+	queue starvation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,168 +31,15 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: Peter Maydell <peter.maydell@linaro.org>, Cindy Lu <lulu@redhat.com>, Jason Wang <jasowang@redhat.com>, virtio-fs@redhat.com, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Gerd Hoffmann <kraxel@redhat.com>, =?utf-8?Q?Marc-Andr=C3=A9?= Lureau <marcandre.lureau@redhat.com>
+To: virtio-fs@redhat.com
 
-From: Cindy Lu <lulu@redhat.com>
-
-To support configure interrupt for vhost-vdpa
-Introduce VIRTIO_CONFIG_IRQ_IDX -1 as configure interrupt's queue index,
-Then we can reuse the functions guest_notifier_mask and guest_notifier_pending.
-Add the check of queue index in these drivers, if the driver does not support
-configure interrupt, the function will just return
-
-Signed-off-by: Cindy Lu <lulu@redhat.com>
-Message-Id: <20211104164827.21911-2-lulu@redhat.com>
-Reviewed-by: Michael S. Tsirkin <mst@redhat.com>
-Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+In `process_queue_pool()`, instead of processing the queue until
+it's empty, we collect the entries from the queue once and then
+process only those entries.  This prevents queues from starve
+other queues. Without this commit, `process_queue_pool()` might
+never return, preventing all other queues from making progress:
+e.g., the REQ queue might prevent the HIPRIO queue from making
+progress.
 ---
- include/hw/virtio/virtio.h     |  3 +++
- hw/display/vhost-user-gpu.c    |  6 ++++++
- hw/net/virtio-net.c            | 10 ++++++++--
- hw/virtio/vhost-user-fs.c      |  6 ++++++
- hw/virtio/vhost-vsock-common.c |  6 ++++++
- hw/virtio/virtio-crypto.c      |  6 ++++++
- 6 files changed, 35 insertions(+), 2 deletions(-)
-
-diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
-index 8bab9cfb75..605ea79c90 100644
---- a/include/hw/virtio/virtio.h
-+++ b/include/hw/virtio/virtio.h
-@@ -67,6 +67,9 @@ typedef struct VirtQueueElement
- 
- #define VIRTIO_NO_VECTOR 0xffff
- 
-+/* special index value used internally for config irqs */
-+#define VIRTIO_CONFIG_IRQ_IDX -1
-+
- #define TYPE_VIRTIO_DEVICE "virtio-device"
- OBJECT_DECLARE_TYPE(VirtIODevice, VirtioDeviceClass, VIRTIO_DEVICE)
- 
-diff --git a/hw/display/vhost-user-gpu.c b/hw/display/vhost-user-gpu.c
-index 09818231bd..d4a440e815 100644
---- a/hw/display/vhost-user-gpu.c
-+++ b/hw/display/vhost-user-gpu.c
-@@ -485,6 +485,9 @@ vhost_user_gpu_guest_notifier_pending(VirtIODevice *vdev, int idx)
- {
-     VhostUserGPU *g = VHOST_USER_GPU(vdev);
- 
-+    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
-+        return false;
-+    }
-     return vhost_virtqueue_pending(&g->vhost->dev, idx);
- }
- 
-@@ -493,6 +496,9 @@ vhost_user_gpu_guest_notifier_mask(VirtIODevice *vdev, int idx, bool mask)
- {
-     VhostUserGPU *g = VHOST_USER_GPU(vdev);
- 
-+    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
-+        return;
-+    }
-     vhost_virtqueue_mask(&g->vhost->dev, vdev, idx, mask);
- }
- 
-diff --git a/hw/net/virtio-net.c b/hw/net/virtio-net.c
-index cf8ab0f8af..5e03c0dd14 100644
---- a/hw/net/virtio-net.c
-+++ b/hw/net/virtio-net.c
-@@ -3168,6 +3168,9 @@ static bool virtio_net_guest_notifier_pending(VirtIODevice *vdev, int idx)
-     VirtIONet *n = VIRTIO_NET(vdev);
-     NetClientState *nc = qemu_get_subqueue(n->nic, vq2q(idx));
-     assert(n->vhost_started);
-+    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
-+        return false;
-+    }
-     return vhost_net_virtqueue_pending(get_vhost_net(nc->peer), idx);
- }
- 
-@@ -3177,8 +3180,11 @@ static void virtio_net_guest_notifier_mask(VirtIODevice *vdev, int idx,
-     VirtIONet *n = VIRTIO_NET(vdev);
-     NetClientState *nc = qemu_get_subqueue(n->nic, vq2q(idx));
-     assert(n->vhost_started);
--    vhost_net_virtqueue_mask(get_vhost_net(nc->peer),
--                             vdev, idx, mask);
-+    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
-+        return;
-+    }
-+
-+    vhost_net_virtqueue_mask(get_vhost_net(nc->peer), vdev, idx, mask);
- }
- 
- static void virtio_net_set_config_size(VirtIONet *n, uint64_t host_features)
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index c595957983..9b0349922e 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -161,6 +161,9 @@ static void vuf_guest_notifier_mask(VirtIODevice *vdev, int idx,
- {
-     VHostUserFS *fs = VHOST_USER_FS(vdev);
- 
-+    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
-+        return;
-+    }
-     vhost_virtqueue_mask(&fs->vhost_dev, vdev, idx, mask);
- }
- 
-@@ -168,6 +171,9 @@ static bool vuf_guest_notifier_pending(VirtIODevice *vdev, int idx)
- {
-     VHostUserFS *fs = VHOST_USER_FS(vdev);
- 
-+    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
-+        return false;
-+    }
-     return vhost_virtqueue_pending(&fs->vhost_dev, idx);
- }
- 
-diff --git a/hw/virtio/vhost-vsock-common.c b/hw/virtio/vhost-vsock-common.c
-index 3f3771274e..d1b9c027b6 100644
---- a/hw/virtio/vhost-vsock-common.c
-+++ b/hw/virtio/vhost-vsock-common.c
-@@ -125,6 +125,9 @@ static void vhost_vsock_common_guest_notifier_mask(VirtIODevice *vdev, int idx,
- {
-     VHostVSockCommon *vvc = VHOST_VSOCK_COMMON(vdev);
- 
-+    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
-+        return;
-+    }
-     vhost_virtqueue_mask(&vvc->vhost_dev, vdev, idx, mask);
- }
- 
-@@ -133,6 +136,9 @@ static bool vhost_vsock_common_guest_notifier_pending(VirtIODevice *vdev,
- {
-     VHostVSockCommon *vvc = VHOST_VSOCK_COMMON(vdev);
- 
-+    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
-+        return false;
-+    }
-     return vhost_virtqueue_pending(&vvc->vhost_dev, idx);
- }
- 
-diff --git a/hw/virtio/virtio-crypto.c b/hw/virtio/virtio-crypto.c
-index 54f9bbb789..1d5192f8b4 100644
---- a/hw/virtio/virtio-crypto.c
-+++ b/hw/virtio/virtio-crypto.c
-@@ -948,6 +948,9 @@ static void virtio_crypto_guest_notifier_mask(VirtIODevice *vdev, int idx,
- 
-     assert(vcrypto->vhost_started);
- 
-+    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
-+        return;
-+    }
-     cryptodev_vhost_virtqueue_mask(vdev, queue, idx, mask);
- }
- 
-@@ -958,6 +961,9 @@ static bool virtio_crypto_guest_notifier_pending(VirtIODevice *vdev, int idx)
- 
-     assert(vcrypto->vhost_started);
- 
-+    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
-+        return false;
-+    }
-     return cryptodev_vhost_virtqueue_pending(vdev, queue, idx);
- }
- 
--- 
-MST
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/90
 

@@ -1,14 +1,14 @@
-Date: Mon, 7 Feb 2022 12:23:56 +0000
+Date: Mon, 7 Feb 2022 12:40:21 +0000
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YgEPXBy6bPfCPjc1@work-vm>
+Message-ID: <YgETNXv8AnnuLQR/@work-vm>
 References: <20220202193935.268777-1-vgoyal@redhat.com>
-	<20220202193935.268777-9-vgoyal@redhat.com>
+	<20220202193935.268777-10-vgoyal@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20220202193935.268777-9-vgoyal@redhat.com>
+In-Reply-To: <20220202193935.268777-10-vgoyal@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH v5 8/9] virtiofsd: Create new file using
- O_TMPFILE and set security context
+Subject: Re: [Virtio-fs] [PATCH v5 9/9] virtiofsd: Add an option to
+ enable/disable security label
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,165 +21,108 @@ To: Vivek Goyal <vgoyal@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
 * Vivek Goyal (vgoyal@redhat.com) wrote:
-> If guest and host policies can't work with each other, then guest security
-> context (selinux label) needs to be set into an xattr. Say remap guest
-> security.selinux xattr to trusted.virtiofs.security.selinux.
+> Provide an option "-o security_label/no_security_label" to enable/disable
+> security label functionality. By default these are turned off.
 > 
-> That means setting "fscreate" is not going to help as that's ony useful
-> for security.selinux xattr on host.
-> 
-> So we need another method which is atomic. Use O_TMPFILE to create new
-> file, set xattr and then linkat() to proper place.
-> 
-> But this works only for regular files. So dir, symlinks will continue
-> to be non-atomic.
-> 
-> Also if host filesystem does not support O_TMPFILE, we fallback to
-> non-atomic behavior.
+> If enabled, server will indicate to client that it is capable of handling
+> one security label during file creation. Typically this is expected to
+> be a SELinux label. File server will set this label on the file. It will
+> try to set it atomically wherever possible. But its not possible in
+> all the cases.
 > 
 > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-
 > ---
->  tools/virtiofsd/passthrough_ll.c | 80 ++++++++++++++++++++++++++++----
->  1 file changed, 72 insertions(+), 8 deletions(-)
+>  docs/tools/virtiofsd.rst         |  7 +++++++
+>  tools/virtiofsd/helper.c         |  1 +
+>  tools/virtiofsd/passthrough_ll.c | 15 +++++++++++++++
+>  3 files changed, 23 insertions(+)
 > 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index acb99aa2fc..43c9b6dbe5 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2153,14 +2153,29 @@ static int lo_do_open(struct lo_data *lo, struct lo_inode *inode,
+> diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
+> index 07ac0be551..a2c005f4a0 100644
+> --- a/docs/tools/virtiofsd.rst
+> +++ b/docs/tools/virtiofsd.rst
+> @@ -104,6 +104,13 @@ Options
+>    * posix_acl|no_posix_acl -
+>      Enable/disable posix acl support.  Posix ACLs are disabled by default.
 >  
->  static int do_create_nosecctx(fuse_req_t req, struct lo_inode *parent_inode,
->                                 const char *name, mode_t mode,
-> -                               struct fuse_file_info *fi, int *open_fd)
-> +                               struct fuse_file_info *fi, int *open_fd,
-> +                              bool tmpfile)
->  {
->      int err, fd;
->      struct lo_cred old = {};
->      struct lo_data *lo = lo_data(req);
->      int flags;
->  
-> -    flags = fi->flags | O_CREAT | O_EXCL;
-> +    if (tmpfile) {
-> +        flags = fi->flags | O_TMPFILE;
-> +        /*
-> +         * Don't use O_EXCL as we want to link file later. Also reset O_CREAT
-> +         * otherwise openat() returns -EINVAL.
-> +         */
-> +        flags &= ~(O_CREAT | O_EXCL);
+> +  * security_label|no_security_label -
+> +    Enable/disable security label support. Security labels are disabled by
+> +    default. This will allow client to send a MAC label of file during
+                                ^ the                        ^ a
+> +    file creation. Typically this is expected to be SELinux security
+                                                      ^ an
+
+> +    label. Server will try to set that label on newly created file
+              ^The server
+> +    atomically wherever possible.
 > +
-> +        /* O_TMPFILE needs either O_RDWR or O_WRONLY */
-> +        if ((flags & O_ACCMODE) == O_RDONLY) {
-> +            flags |= O_RDWR;
-> +        }
-> +    } else {
-> +        flags = fi->flags | O_CREAT | O_EXCL;
-> +    }
+>  .. option:: --socket-path=PATH
 >  
->      err = lo_change_cred(req, &old, lo->change_umask);
->      if (err) {
-> @@ -2191,7 +2206,7 @@ static int do_create_secctx_fscreate(fuse_req_t req,
->          return err;
->      }
->  
-> -    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd);
-> +    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd, false);
->  
->      close_reset_proc_fscreate(fscreate_fd);
->      if (!err) {
-> @@ -2200,6 +2215,44 @@ static int do_create_secctx_fscreate(fuse_req_t req,
->      return err;
+>    Listen on vhost-user UNIX domain socket at PATH.
+> diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
+> index a8295d975a..e226fc590f 100644
+> --- a/tools/virtiofsd/helper.c
+> +++ b/tools/virtiofsd/helper.c
+> @@ -187,6 +187,7 @@ void fuse_cmdline_help(void)
+>             "                               default: no_allow_direct_io\n"
+>             "    -o announce_submounts      Announce sub-mount points to the guest\n"
+>             "    -o posix_acl/no_posix_acl  Enable/Disable posix_acl. (default: disabled)\n"
+> +           "    -o security_label/no_security_label  Enable/Disable security label. (default: disabled)\n"
+>             );
 >  }
 >  
-> +static int do_create_secctx_tmpfile(fuse_req_t req,
-> +                                    struct lo_inode *parent_inode,
-> +                                    const char *name, mode_t mode,
-> +                                    struct fuse_file_info *fi,
-> +                                    const char *secctx_name, int *open_fd)
-> +{
-> +    int err, fd = -1;
-> +    struct lo_data *lo = lo_data(req);
-> +    char procname[64];
-> +
-> +    err = do_create_nosecctx(req, parent_inode, ".", mode, fi, &fd, true);
-> +    if (err) {
-> +        return err;
-> +    }
-> +
-> +    err = fsetxattr(fd, secctx_name, req->secctx.ctx, req->secctx.ctxlen, 0);
-> +    if (err) {
-> +        err = errno;
-> +        goto out;
-> +    }
-> +
-> +    /* Security context set on file. Link it in place */
-> +    sprintf(procname, "%d", fd);
-> +    FCHDIR_NOFAIL(lo->proc_self_fd);
-> +    err = linkat(AT_FDCWD, procname, parent_inode->fd, name,
-> +                 AT_SYMLINK_FOLLOW);
-> +    err = err == -1 ? errno : 0;
-> +    FCHDIR_NOFAIL(lo->root.fd);
-> +
-> +out:
-> +    if (!err) {
-> +        *open_fd = fd;
-> +    } else if (fd != -1) {
-> +        close(fd);
-> +    }
-> +    return err;
-> +}
-> +
->  static int do_create_secctx_noatomic(fuse_req_t req,
->                                       struct lo_inode *parent_inode,
->                                       const char *name, mode_t mode,
-> @@ -2208,7 +2261,7 @@ static int do_create_secctx_noatomic(fuse_req_t req,
->  {
->      int err = 0, fd = -1;
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 43c9b6dbe5..fe8f3ccbb6 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -181,6 +181,7 @@ struct lo_data {
+>      int user_posix_acl, posix_acl;
+>      /* Keeps track if /proc/<pid>/attr/fscreate should be used or not */
+>      bool use_fscreate;
+> +    int user_security_label;
+>  };
 >  
-> -    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd);
-> +    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd, false);
->      if (err) {
->          goto out;
+>  static const struct fuse_opt lo_opts[] = {
+> @@ -215,6 +216,8 @@ static const struct fuse_opt lo_opts[] = {
+>      { "no_killpriv_v2", offsetof(struct lo_data, user_killpriv_v2), 0 },
+>      { "posix_acl", offsetof(struct lo_data, user_posix_acl), 1 },
+>      { "no_posix_acl", offsetof(struct lo_data, user_posix_acl), 0 },
+> +    { "security_label", offsetof(struct lo_data, user_security_label), 1 },
+> +    { "no_security_label", offsetof(struct lo_data, user_security_label), 0 },
+>      FUSE_OPT_END
+>  };
+>  static bool use_syslog = false;
+> @@ -771,6 +774,17 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
+>          fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling posix_acl\n");
+>          conn->want &= ~FUSE_CAP_POSIX_ACL;
 >      }
-> @@ -2250,20 +2303,31 @@ static int do_lo_create(fuse_req_t req, struct lo_inode *parent_inode,
->      if (secctx_enabled) {
->          /*
->           * If security.selinux has not been remapped and selinux is enabled,
-> -         * use fscreate to set context before file creation.
-> -         * Otherwise fallback to non-atomic method of file creation
-> -         * and xattr settting.
-> +         * use fscreate to set context before file creation. If not, use
-> +         * tmpfile method for regular files. Otherwise fallback to
-> +         * non-atomic method of file creation and xattr settting.
->           */
->          if (!mapped_name && lo->use_fscreate) {
->              err = do_create_secctx_fscreate(req, parent_inode, name, mode, fi,
->                                              open_fd);
->              goto out;
-> +        } else if (S_ISREG(mode)) {
-> +            err = do_create_secctx_tmpfile(req, parent_inode, name, mode, fi,
-> +                                           ctxname, open_fd);
-> +            /*
-> +             * If filesystem does not support O_TMPFILE, fallback to non-atomic
-> +             * method.
-> +             */
-> +            if (!err || err != EOPNOTSUPP) {
-> +                goto out;
-> +            }
->          }
+> +
+> +    if (lo->user_security_label == 1) {
+> +        if (!(conn->capable & FUSE_CAP_SECURITY_CTX)) {
+> +            fuse_log(FUSE_LOG_ERR, "lo_init: Can not enable security label."
+> +                     " kernel does not support FUSE_SECURITY_CTX capability.\n");
+> +        }
+
+Do you need to exit in this case - or at least clear the flag?
+
+Dave
+
+> +        conn->want |= FUSE_CAP_SECURITY_CTX;
+> +    } else {
+> +        fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling security label\n");
+> +        conn->want &= ~FUSE_CAP_SECURITY_CTX;
+> +    }
+>  }
 >  
->          err = do_create_secctx_noatomic(req, parent_inode, name, mode, fi,
->                                          ctxname, open_fd);
->      } else {
-> -        err = do_create_nosecctx(req, parent_inode, name, mode, fi, open_fd);
-> +        err = do_create_nosecctx(req, parent_inode, name, mode, fi, open_fd,
-> +                                 false);
->      }
->  
->  out:
+>  static void lo_getattr(fuse_req_t req, fuse_ino_t ino,
+> @@ -4279,6 +4293,7 @@ int main(int argc, char *argv[])
+>          .proc_self_task = -1,
+>          .user_killpriv_v2 = -1,
+>          .user_posix_acl = -1,
+> +        .user_security_label = -1,
+>      };
+>      struct lo_map_elem *root_elem;
+>      struct lo_map_elem *reserve_elem;
 > -- 
 > 2.34.1
 > 

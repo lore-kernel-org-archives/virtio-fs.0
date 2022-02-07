@@ -1,13 +1,15 @@
-Date: Mon, 10 Jan 2022 02:16:30 -0500
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20220110071547.195669-11-mst@redhat.com>
-References: <20220110071547.195669-1-mst@redhat.com>
+Date: Mon, 7 Feb 2022 08:47:50 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YgEjBo8MQhfyL/hc@redhat.com>
+References: <20220202193935.268777-1-vgoyal@redhat.com>
+	<20220202193935.268777-6-vgoyal@redhat.com>
+	<Yfwv5wDFb3OcTEtH@work-vm>
 MIME-Version: 1.0
-In-Reply-To: <20220110071547.195669-1-mst@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: [Virtio-fs] [PULL 10/10] Revert "virtio: introduce macro
-	IRTIO_CONFIG_IRQ_IDX"
+In-Reply-To: <Yfwv5wDFb3OcTEtH@work-vm>
+Subject: Re: [Virtio-fs] [PATCH v5 5/9] virtiofsd,
+ fuse_lowlevel.c: Add capability to parse security context
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,157 +18,276 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: Peter Maydell <peter.maydell@linaro.org>, Jason Wang <jasowang@redhat.com>, virtio-fs@redhat.com, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Gerd Hoffmann <kraxel@redhat.com>, =?utf-8?Q?Marc-Andr=C3=A9?= Lureau <marcandre.lureau@redhat.com>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-This reverts commit bf1d85c166c19af95dbd27b1faba1d2909732323.
----
- include/hw/virtio/virtio.h     |  3 ---
- hw/display/vhost-user-gpu.c    |  6 ------
- hw/net/virtio-net.c            | 10 ++--------
- hw/virtio/vhost-user-fs.c      |  6 ------
- hw/virtio/vhost-vsock-common.c |  6 ------
- hw/virtio/virtio-crypto.c      |  6 ------
- 6 files changed, 2 insertions(+), 35 deletions(-)
+On Thu, Feb 03, 2022 at 07:41:27PM +0000, Dr. David Alan Gilbert wrote:
+> * Vivek Goyal (vgoyal@redhat.com) wrote:
+> > Add capability to enable and parse security context as sent by client
+> > and put into fuse_req. Filesystems now can get security context from
+> > request and set it on files during creation.
+> > 
+> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > ---
+> >  tools/virtiofsd/fuse_common.h   |  5 ++
+> >  tools/virtiofsd/fuse_i.h        |  7 +++
+> >  tools/virtiofsd/fuse_lowlevel.c | 95 ++++++++++++++++++++++++++++++++-
+> >  3 files changed, 106 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
+> > index 6f8a988202..bf46954dab 100644
+> > --- a/tools/virtiofsd/fuse_common.h
+> > +++ b/tools/virtiofsd/fuse_common.h
+> > @@ -377,6 +377,11 @@ struct fuse_file_info {
+> >   */
+> >  #define FUSE_CAP_SETXATTR_EXT (1 << 29)
+> >  
+> > +/**
+> > + * Indicates that file server supports creating file security context
+> > + */
+> > +#define FUSE_CAP_SECURITY_CTX (1ULL << 32)
+> > +
+> >  /**
+> >   * Ioctl flags
+> >   *
+> > diff --git a/tools/virtiofsd/fuse_i.h b/tools/virtiofsd/fuse_i.h
+> > index 492e002181..a5572fa4ae 100644
+> > --- a/tools/virtiofsd/fuse_i.h
+> > +++ b/tools/virtiofsd/fuse_i.h
+> > @@ -15,6 +15,12 @@
+> >  struct fv_VuDev;
+> >  struct fv_QueueInfo;
+> >  
+> > +struct fuse_security_context {
+> > +        const char *name;
+> > +        uint32_t ctxlen;
+> > +        const void *ctx;
+> > +};
+> > +
+> >  struct fuse_req {
+> >      struct fuse_session *se;
+> >      uint64_t unique;
+> > @@ -35,6 +41,7 @@ struct fuse_req {
+> >      } u;
+> >      struct fuse_req *next;
+> >      struct fuse_req *prev;
+> > +    struct fuse_security_context secctx;
+> >  };
+> >  
+> >  struct fuse_notify_req {
+> > diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+> > index 83d29762a4..cd9ef97b3c 100644
+> > --- a/tools/virtiofsd/fuse_lowlevel.c
+> > +++ b/tools/virtiofsd/fuse_lowlevel.c
+> > @@ -886,11 +886,59 @@ static void do_readlink(fuse_req_t req, fuse_ino_t nodeid,
+> >      }
+> >  }
+> >  
+> > +static int parse_secctx_fill_req(fuse_req_t req, struct fuse_mbuf_iter *iter)
+> > +{
+> > +    struct fuse_secctx_header *fsecctx_header;
+> > +    struct fuse_secctx *fsecctx;
+> > +    const void *secctx;
+> > +    const char *name;
+> > +
+> > +    fsecctx_header = fuse_mbuf_iter_advance(iter, sizeof(*fsecctx_header));
+> > +    if (!fsecctx_header) {
+> > +        return -EINVAL;
+> > +    }
+> > +
+> > +    /*
+> > +     * As of now maximum of one security context is supported. It can
+> > +     * change in future though.
+> > +     */
+> > +    if (fsecctx_header->nr_secctx > 1) {
+> > +        return -EINVAL;
+> > +    }
+> > +
+> > +    /* No security context sent. Maybe no LSM supports it */
+> > +    if (!fsecctx_header->nr_secctx) {
+> > +        return 0;
+> > +    }
+> > +
+> > +    fsecctx = fuse_mbuf_iter_advance(iter, sizeof(*fsecctx));
+> > +    if (!fsecctx) {
+> > +        return -EINVAL;
+> > +    }
+> 
+> Are there any sanity checks to be done on fsecctx->size?
 
-diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
-index 605ea79c90..8bab9cfb75 100644
---- a/include/hw/virtio/virtio.h
-+++ b/include/hw/virtio/virtio.h
-@@ -67,9 +67,6 @@ typedef struct VirtQueueElement
- 
- #define VIRTIO_NO_VECTOR 0xffff
- 
--/* special index value used internally for config irqs */
--#define VIRTIO_CONFIG_IRQ_IDX -1
--
- #define TYPE_VIRTIO_DEVICE "virtio-device"
- OBJECT_DECLARE_TYPE(VirtIODevice, VirtioDeviceClass, VIRTIO_DEVICE)
- 
-diff --git a/hw/display/vhost-user-gpu.c b/hw/display/vhost-user-gpu.c
-index d4a440e815..09818231bd 100644
---- a/hw/display/vhost-user-gpu.c
-+++ b/hw/display/vhost-user-gpu.c
-@@ -485,9 +485,6 @@ vhost_user_gpu_guest_notifier_pending(VirtIODevice *vdev, int idx)
- {
-     VhostUserGPU *g = VHOST_USER_GPU(vdev);
- 
--    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
--        return false;
--    }
-     return vhost_virtqueue_pending(&g->vhost->dev, idx);
- }
- 
-@@ -496,9 +493,6 @@ vhost_user_gpu_guest_notifier_mask(VirtIODevice *vdev, int idx, bool mask)
- {
-     VhostUserGPU *g = VHOST_USER_GPU(vdev);
- 
--    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
--        return;
--    }
-     vhost_virtqueue_mask(&g->vhost->dev, vdev, idx, mask);
- }
- 
-diff --git a/hw/net/virtio-net.c b/hw/net/virtio-net.c
-index 5e03c0dd14..cf8ab0f8af 100644
---- a/hw/net/virtio-net.c
-+++ b/hw/net/virtio-net.c
-@@ -3168,9 +3168,6 @@ static bool virtio_net_guest_notifier_pending(VirtIODevice *vdev, int idx)
-     VirtIONet *n = VIRTIO_NET(vdev);
-     NetClientState *nc = qemu_get_subqueue(n->nic, vq2q(idx));
-     assert(n->vhost_started);
--    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
--        return false;
--    }
-     return vhost_net_virtqueue_pending(get_vhost_net(nc->peer), idx);
- }
- 
-@@ -3180,11 +3177,8 @@ static void virtio_net_guest_notifier_mask(VirtIODevice *vdev, int idx,
-     VirtIONet *n = VIRTIO_NET(vdev);
-     NetClientState *nc = qemu_get_subqueue(n->nic, vq2q(idx));
-     assert(n->vhost_started);
--    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
--        return;
--    }
--
--    vhost_net_virtqueue_mask(get_vhost_net(nc->peer), vdev, idx, mask);
-+    vhost_net_virtqueue_mask(get_vhost_net(nc->peer),
-+                             vdev, idx, mask);
- }
- 
- static void virtio_net_set_config_size(VirtIONet *n, uint64_t host_features)
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index 9b0349922e..c595957983 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -161,9 +161,6 @@ static void vuf_guest_notifier_mask(VirtIODevice *vdev, int idx,
- {
-     VHostUserFS *fs = VHOST_USER_FS(vdev);
- 
--    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
--        return;
--    }
-     vhost_virtqueue_mask(&fs->vhost_dev, vdev, idx, mask);
- }
- 
-@@ -171,9 +168,6 @@ static bool vuf_guest_notifier_pending(VirtIODevice *vdev, int idx)
- {
-     VHostUserFS *fs = VHOST_USER_FS(vdev);
- 
--    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
--        return false;
--    }
-     return vhost_virtqueue_pending(&fs->vhost_dev, idx);
- }
- 
-diff --git a/hw/virtio/vhost-vsock-common.c b/hw/virtio/vhost-vsock-common.c
-index d1b9c027b6..3f3771274e 100644
---- a/hw/virtio/vhost-vsock-common.c
-+++ b/hw/virtio/vhost-vsock-common.c
-@@ -125,9 +125,6 @@ static void vhost_vsock_common_guest_notifier_mask(VirtIODevice *vdev, int idx,
- {
-     VHostVSockCommon *vvc = VHOST_VSOCK_COMMON(vdev);
- 
--    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
--        return;
--    }
-     vhost_virtqueue_mask(&vvc->vhost_dev, vdev, idx, mask);
- }
- 
-@@ -136,9 +133,6 @@ static bool vhost_vsock_common_guest_notifier_pending(VirtIODevice *vdev,
- {
-     VHostVSockCommon *vvc = VHOST_VSOCK_COMMON(vdev);
- 
--    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
--        return false;
--    }
-     return vhost_virtqueue_pending(&vvc->vhost_dev, idx);
- }
- 
-diff --git a/hw/virtio/virtio-crypto.c b/hw/virtio/virtio-crypto.c
-index 1d5192f8b4..54f9bbb789 100644
---- a/hw/virtio/virtio-crypto.c
-+++ b/hw/virtio/virtio-crypto.c
-@@ -948,9 +948,6 @@ static void virtio_crypto_guest_notifier_mask(VirtIODevice *vdev, int idx,
- 
-     assert(vcrypto->vhost_started);
- 
--    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
--        return;
--    }
-     cryptodev_vhost_virtqueue_mask(vdev, queue, idx, mask);
- }
- 
-@@ -961,9 +958,6 @@ static bool virtio_crypto_guest_notifier_pending(VirtIODevice *vdev, int idx)
- 
-     assert(vcrypto->vhost_started);
- 
--    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
--        return false;
--    }
-     return cryptodev_vhost_virtqueue_pending(vdev, queue, idx);
- }
- 
--- 
-MST
+May be we can check fsecctx->size is not 0. Also "man xattr" says...
+
+"The  VFS  imposes limitations that an attribute names is limited to 255
+bytes and an attribute value is limited to 64 kB."
+
+We could probably check those limits. But if VFS decides to raise these
+limits at some time, then newer kernels will be broken if they decide
+to send longer security context with older virtiofsd. Very unlikely
+though. So if you prefer puttling limits of "255" on name and
+64kB on size, I can do that.
+
+
+> 
+> > +    name = fuse_mbuf_iter_advance_str(iter);
+> > +    if (!name) {
+> > +        return -EINVAL;
+> > +    }
+> > +
+> > +    secctx = fuse_mbuf_iter_advance(iter, fsecctx->size);
+> > +    if (!secctx) {
+> > +        return -EINVAL;
+> > +    }
+> > +
+> > +    req->secctx.name = name;
+> > +    req->secctx.ctx = secctx;
+> > +    req->secctx.ctxlen = fsecctx->size;
+> 
+> It's OK to use the pointers into the iter here rather than take copies?
+
+I see lookup() and setxattr() already do that. They pass "name" which
+is just a pointer into iter. 
+
+My understanding is that req will not be freed. So iter and associated
+memory will continue to be valid. So it should be ok and not make
+copies.
+
+Are you concerned about something specific.
+
+Thanks
+Vivek
+> 
+> > +    return 0;
+> > +}
+> > +
+> >  static void do_mknod(fuse_req_t req, fuse_ino_t nodeid,
+> >                       struct fuse_mbuf_iter *iter)
+> >  {
+> >      struct fuse_mknod_in *arg;
+> >      const char *name;
+> > +    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
+> > +    int err;
+> >  
+> >      arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
+> >      name = fuse_mbuf_iter_advance_str(iter);
+> > @@ -901,6 +949,13 @@ static void do_mknod(fuse_req_t req, fuse_ino_t nodeid,
+> >  
+> >      req->ctx.umask = arg->umask;
+> >  
+> > +    if (secctx_enabled) {
+> > +        err = parse_secctx_fill_req(req, iter);
+> > +        if (err) {
+> > +            fuse_reply_err(req, -err);
+> 
+> return ?
+> 
+> > +        }
+> > +    }
+> > +
+> >      if (req->se->op.mknod) {
+> >          req->se->op.mknod(req, nodeid, name, arg->mode, arg->rdev);
+> >      } else {
+> > @@ -913,6 +968,8 @@ static void do_mkdir(fuse_req_t req, fuse_ino_t nodeid,
+> >  {
+> >      struct fuse_mkdir_in *arg;
+> >      const char *name;
+> > +    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
+> > +    int err;
+> >  
+> >      arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
+> >      name = fuse_mbuf_iter_advance_str(iter);
+> > @@ -923,6 +980,13 @@ static void do_mkdir(fuse_req_t req, fuse_ino_t nodeid,
+> >  
+> >      req->ctx.umask = arg->umask;
+> >  
+> > +    if (secctx_enabled) {
+> > +        err = parse_secctx_fill_req(req, iter);
+> > +        if (err) {
+> > +            fuse_reply_err(req, err);
+> return ?
+> > +        }
+> > +    }
+> > +
+> >      if (req->se->op.mkdir) {
+> >          req->se->op.mkdir(req, nodeid, name, arg->mode);
+> >      } else {
+> > @@ -969,12 +1033,21 @@ static void do_symlink(fuse_req_t req, fuse_ino_t nodeid,
+> >  {
+> >      const char *name = fuse_mbuf_iter_advance_str(iter);
+> >      const char *linkname = fuse_mbuf_iter_advance_str(iter);
+> > +    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
+> > +    int err;
+> >  
+> >      if (!name || !linkname) {
+> >          fuse_reply_err(req, EINVAL);
+> >          return;
+> >      }
+> >  
+> > +    if (secctx_enabled) {
+> > +        err = parse_secctx_fill_req(req, iter);
+> > +        if (err) {
+> > +            fuse_reply_err(req, err);
+> return ?
+> > +        }
+> > +    }
+> > +
+> >      if (req->se->op.symlink) {
+> >          req->se->op.symlink(req, linkname, nodeid, name);
+> >      } else {
+> > @@ -1048,6 +1121,8 @@ static void do_link(fuse_req_t req, fuse_ino_t nodeid,
+> >  static void do_create(fuse_req_t req, fuse_ino_t nodeid,
+> >                        struct fuse_mbuf_iter *iter)
+> >  {
+> > +    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
+> > +
+> >      if (req->se->op.create) {
+> >          struct fuse_create_in *arg;
+> >          struct fuse_file_info fi;
+> > @@ -1060,6 +1135,15 @@ static void do_create(fuse_req_t req, fuse_ino_t nodeid,
+> >              return;
+> >          }
+> >  
+> > +        if (secctx_enabled) {
+> > +            int err;
+> > +            err = parse_secctx_fill_req(req, iter);
+> > +            if (err) {
+> > +                fuse_reply_err(req, err);
+> > +                return;
+> > +            }
+> > +        }
+> > +
+> >          memset(&fi, 0, sizeof(fi));
+> >          fi.flags = arg->flags;
+> >          fi.kill_priv = arg->open_flags & FUSE_OPEN_KILL_SUIDGID;
+> > @@ -2016,6 +2100,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+> >      if (flags & FUSE_SETXATTR_EXT) {
+> >          se->conn.capable |= FUSE_CAP_SETXATTR_EXT;
+> >      }
+> > +    if (flags & FUSE_SECURITY_CTX) {
+> > +        se->conn.capable |= FUSE_CAP_SECURITY_CTX;
+> > +    }
+> >  #ifdef HAVE_SPLICE
+> >  #ifdef HAVE_VMSPLICE
+> >      se->conn.capable |= FUSE_CAP_SPLICE_WRITE | FUSE_CAP_SPLICE_MOVE;
+> > @@ -2155,8 +2242,14 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+> >          outarg.flags |= FUSE_SETXATTR_EXT;
+> >      }
+> >  
+> > +    if (se->conn.want & FUSE_CAP_SECURITY_CTX) {
+> > +        /* bits 32..63 get shifted down 32 bits into the flags2 field */
+> > +        outarg.flags2 |= FUSE_SECURITY_CTX >> 32;
+> > +    }
+> > +
+> >      fuse_log(FUSE_LOG_DEBUG, "   INIT: %u.%u\n", outarg.major, outarg.minor);
+> > -    fuse_log(FUSE_LOG_DEBUG, "   flags=0x%08x\n", outarg.flags);
+> > +    fuse_log(FUSE_LOG_DEBUG, "   flags2=0x%08x flags=0x%08x\n", outarg.flags2,
+> > +             outarg.flags);
+> >      fuse_log(FUSE_LOG_DEBUG, "   max_readahead=0x%08x\n", outarg.max_readahead);
+> >      fuse_log(FUSE_LOG_DEBUG, "   max_write=0x%08x\n", outarg.max_write);
+> >      fuse_log(FUSE_LOG_DEBUG, "   max_background=%i\n", outarg.max_background);
+> > -- 
+> > 2.34.1
+> > 
+> -- 
+> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> 
 

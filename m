@@ -1,28 +1,28 @@
-Date: Mon, 7 Feb 2022 10:45:09 -0500
+Date: Mon, 7 Feb 2022 10:45:16 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
 	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=JlC292hx0IjOuYujVBeIlXsid/GxXzFDaZwZOX3b5c4=; b=W
-	6+lElWTaxjM37bjKy2IgoJcWNnD/go3YDszOQPkV4h7VqkMYGwDNhXKb5DiESQBU
-	BO8EFjTqYVlEsxotN0HW4iJ2gKK4ZovTuV2LQP1OV+02jOfPoe2ORqCH24edW/Zb
-	KAT75zrhhPkHFyJ33zzeoYmj22sb/dYIgoIT+R8DiuURIMN9987sa1gbZjcp77UL
-	v311Ngf/WhctFMPNEthEPHDuv9y/NYnIhYGR48u5qZ+q7HkjQgg490561AWlQc5o
-	564pPRAyIDmpum7M9aXrcIf2i9pOx1AyxYBgt4iyq4pada8fdgJW1guE9bYP9Sty
-	mdMYBOseHS34assb03m6Q==
+	:to; s=fm3; bh=5dqMUoqHq757q4GPtpuWN1mTLGsx53XUwgXYjnorNXA=; b=M
+	GtQLuVbTK4yOqPSGivs3MfzaJ4siNmhLpsYOckkCtFtYvXCy2jhsj1DmGL0QTuLE
+	jrs5kow42HPIBSyu/1FtDpNE5OADdvRnKIFVUQ8ZV87A18sIpYqBSaiRgaTwMjuP
+	cSLDtjtDeZ78hj/Akg1++mNtG1Uq/4OdgXYUggQME5SEVCjJ4nWRjaaTQm66Ynn4
+	/faCBv2LD2yEPL2Jt2DImNtW4ZD4miIZjaYYekWKYdKMWHk8CU9ZvqTc+QMf/8nI
+	WZ0H3ycXPTpeV4OZ688u248ty9xit+UHLS7gWm2k1zm/5YYV5Ae6SLctahkjXdB9
+	TCGF8wgeoUuO5GULPPLHA==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
 	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm2; bh=JlC292hx0IjOuYujVBeIlXsid/GxX
-	zFDaZwZOX3b5c4=; b=derkuyXGjkUal7YbNzyEw8piKS5Nq37lN8vnY2/Ib8K+G
-	FSo3kXcuILqEiZ4FVYSvJKFYKc1JMbietiwMQwApW1mHLG1LwZsyseLUI/A2dY65
-	m8VCjfR0CQyTQPOeCT3IDL4E5iXGlr4/7vj6VvRnV6WHamgjvMGEUpsLcmDEdtoi
-	vrC+V6Spw/4uTr9P/RHYv2t23kmZqjyFDnsduALN3VlTAwSsIqNywMkhevYiFMqP
-	YmiRIFps2iWXgjKnaPeaQ6BN/T7DaOrEJSqop/17JHxSNtEHWc2/YTQG9IX818Js
-	XcOxbggjCOYA3+1Tx7Sz/ebiEtMvwcIlm0vvsKFvQ==
+	:x-me-sender:x-sasl-enc; s=fm2; bh=5dqMUoqHq757q4GPtpuWN1mTLGsx5
+	3XUwgXYjnorNXA=; b=Vjm87rD+ue7LwGmZRDYUvv4uGiSn+xb/4/loi9U50iw60
+	t1fVo7Zy0wdF0fyrY2cOlJU0ZVuuA3jKLnztRkQAQWAE2FD64VjiarvQ4/0nasFY
+	jURXdACag7JiB/auEWdQRtO5cuhyG5fGPqlgBsrfsswiswVetOlOrXm96U4zAJ6D
+	10zlobYxdJtG/FTAjQuWfWdXwJBCPhVZEzA9sOAStVkrq6cOyMyqARS5W0NjGIB9
+	2Aoq/cD4CLrfyUmcUomcnpFhlIB+gZ9ordlN5saqtrj4DTBuOMSwJPjbhE/qlT3I
+	aPmbfCzvN/pWE6dLX5a0BK3nEj1W1e0Nu9bkhSdSg==
 From: virtiofs-bot@sinrega.org
-Message-Id: <22015.122020710450700407@us-mta-551.us.mimecast.lan>
+Message-Id: <44142.122020710450700501@us-mta-562.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] Issue closed: Wrongly implemented InodeData
-	refcounting can increase refcount from 0 to 1
+Subject: [Virtio-fs] [virtiofsd] MR merged: passthrough: Fix InodeData
+	reference counting
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,8 +33,16 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-The code at https://gitlab.com/virtio-fs/virtiofsd/-/blob/50ffd53962ffe10bc18760d91f21eae79bb7f42c/src/passthrough/mod.rs#L775 can increase the refcount from 0 to 1.
-In this case, the consequence is that in `self.do_lookup()` we return an InodeData that is no longer in the `self.inodes` map. It probably doesn't violate any invariant we have, and hence it probably doesn't lead to a panic or the like. But it's nevertheless a behavior that's unexpected (and probably unintended by the programmer of that line).
+Previously, the `InodeData` reference counting could increment the
+refcount from 0 to 1. See #25. We fix this by using a CAS loop.
+
+Closes: #25
+
+Also, in `forget_one()`, we change the ordering of decrementing the
+refcount to `Ordering::Relaxed`, because the refcount itself doesn't
+protect any data. Furthermore, the old ordering `Ordering::Release`
+doesn't make any sense because there's no side-effect that could
+potentially get reordered to after the decrement.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/25
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/82
 

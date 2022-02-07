@@ -1,15 +1,28 @@
-Date: Mon, 7 Feb 2022 08:47:50 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YgEjBo8MQhfyL/hc@redhat.com>
-References: <20220202193935.268777-1-vgoyal@redhat.com>
-	<20220202193935.268777-6-vgoyal@redhat.com>
-	<Yfwv5wDFb3OcTEtH@work-vm>
-MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <Yfwv5wDFb3OcTEtH@work-vm>
-Subject: Re: [Virtio-fs] [PATCH v5 5/9] virtiofsd,
- fuse_lowlevel.c: Add capability to parse security context
+Date: Mon, 7 Feb 2022 08:49:39 -0500
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+	:to; s=fm3; bh=ZvZ3/bYahGFKALj+fwBTkdayjGWkADtJvL0lYQ/9FUk=; b=0
+	aXzIhpsXf5HmkuOZGFzPDglIZ+uB0GKXRU5mQ15lJEoneo7VJkeIxGnsmALH0OWq
+	ZrWkDkL57rJjxVpLyIQWs02M3w0nOp/abAlHh3wRXFmMLYbydbfITNlmzmjMa1Ln
+	tdaYeC477xXvDr0JQsB6uuzcdi61EAvywbAYTMcuD66gie6iMa22wyqL9KArdI7S
+	b1yOeDjZxkguP2UDqiVgVMBQhJ/XPRE3Uws0yFNL0zXfCbHxKVZszPop5RkMaWUQ
+	ujYjLV4VYbjf5KHKoNs+wG05NQLjbKw8wv6p38HveRCxx44YmAKonqc5Hlgm1Vme
+	lGlAt0r+91DPn5c2VXGfA==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
+	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
+	:x-me-sender:x-sasl-enc; s=fm2; bh=ZvZ3/bYahGFKALj+fwBTkdayjGWkA
+	DtJvL0lYQ/9FUk=; b=SzogY0PIVZsMOoh5sK2trJWmvQXNVYF/mkVZxuusLgLJ8
+	2OPR0JTlHgPK/KKAVaIeIiSshMeN+4irS7lEF/XsNsD59Cw0nT4ytYXpNnmGi900
+	fasF6/E6sK1fsG5KIIVS+y0e2vb05uVl5m3uLF45kDSqQDeKoMZOaLh4SqOuOcCb
+	MGFcCm5VshAKkmPaz+zoZcyp+Q3+byeMZxwLh9JPNoo+jzeEzeGvrgVsnDh0B4xC
+	V+JBPIYnYAJSrwAC+T9qCTssFQPeZGvqAU4iWUSdnjsAqIoK9kyfUalq1hyR+YXs
+	PYX1BCoCpoavXduzVVRQS5sHOvnXdf1SOyu9ZbMew==
+From: virtiofs-bot@sinrega.org
+Message-Id: <34449.122020708493601035@us-mta-147.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd] MR merged: process_queue_pool: Only acquire
+	the VringMutex lock once
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,276 +31,12 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: virtio-fs@redhat.com
 
-On Thu, Feb 03, 2022 at 07:41:27PM +0000, Dr. David Alan Gilbert wrote:
-> * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > Add capability to enable and parse security context as sent by client
-> > and put into fuse_req. Filesystems now can get security context from
-> > request and set it on files during creation.
-> > 
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > ---
-> >  tools/virtiofsd/fuse_common.h   |  5 ++
-> >  tools/virtiofsd/fuse_i.h        |  7 +++
-> >  tools/virtiofsd/fuse_lowlevel.c | 95 ++++++++++++++++++++++++++++++++-
-> >  3 files changed, 106 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
-> > index 6f8a988202..bf46954dab 100644
-> > --- a/tools/virtiofsd/fuse_common.h
-> > +++ b/tools/virtiofsd/fuse_common.h
-> > @@ -377,6 +377,11 @@ struct fuse_file_info {
-> >   */
-> >  #define FUSE_CAP_SETXATTR_EXT (1 << 29)
-> >  
-> > +/**
-> > + * Indicates that file server supports creating file security context
-> > + */
-> > +#define FUSE_CAP_SECURITY_CTX (1ULL << 32)
-> > +
-> >  /**
-> >   * Ioctl flags
-> >   *
-> > diff --git a/tools/virtiofsd/fuse_i.h b/tools/virtiofsd/fuse_i.h
-> > index 492e002181..a5572fa4ae 100644
-> > --- a/tools/virtiofsd/fuse_i.h
-> > +++ b/tools/virtiofsd/fuse_i.h
-> > @@ -15,6 +15,12 @@
-> >  struct fv_VuDev;
-> >  struct fv_QueueInfo;
-> >  
-> > +struct fuse_security_context {
-> > +        const char *name;
-> > +        uint32_t ctxlen;
-> > +        const void *ctx;
-> > +};
-> > +
-> >  struct fuse_req {
-> >      struct fuse_session *se;
-> >      uint64_t unique;
-> > @@ -35,6 +41,7 @@ struct fuse_req {
-> >      } u;
-> >      struct fuse_req *next;
-> >      struct fuse_req *prev;
-> > +    struct fuse_security_context secctx;
-> >  };
-> >  
-> >  struct fuse_notify_req {
-> > diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-> > index 83d29762a4..cd9ef97b3c 100644
-> > --- a/tools/virtiofsd/fuse_lowlevel.c
-> > +++ b/tools/virtiofsd/fuse_lowlevel.c
-> > @@ -886,11 +886,59 @@ static void do_readlink(fuse_req_t req, fuse_ino_t nodeid,
-> >      }
-> >  }
-> >  
-> > +static int parse_secctx_fill_req(fuse_req_t req, struct fuse_mbuf_iter *iter)
-> > +{
-> > +    struct fuse_secctx_header *fsecctx_header;
-> > +    struct fuse_secctx *fsecctx;
-> > +    const void *secctx;
-> > +    const char *name;
-> > +
-> > +    fsecctx_header = fuse_mbuf_iter_advance(iter, sizeof(*fsecctx_header));
-> > +    if (!fsecctx_header) {
-> > +        return -EINVAL;
-> > +    }
-> > +
-> > +    /*
-> > +     * As of now maximum of one security context is supported. It can
-> > +     * change in future though.
-> > +     */
-> > +    if (fsecctx_header->nr_secctx > 1) {
-> > +        return -EINVAL;
-> > +    }
-> > +
-> > +    /* No security context sent. Maybe no LSM supports it */
-> > +    if (!fsecctx_header->nr_secctx) {
-> > +        return 0;
-> > +    }
-> > +
-> > +    fsecctx = fuse_mbuf_iter_advance(iter, sizeof(*fsecctx));
-> > +    if (!fsecctx) {
-> > +        return -EINVAL;
-> > +    }
-> 
-> Are there any sanity checks to be done on fsecctx->size?
-
-May be we can check fsecctx->size is not 0. Also "man xattr" says...
-
-"The  VFS  imposes limitations that an attribute names is limited to 255
-bytes and an attribute value is limited to 64 kB."
-
-We could probably check those limits. But if VFS decides to raise these
-limits at some time, then newer kernels will be broken if they decide
-to send longer security context with older virtiofsd. Very unlikely
-though. So if you prefer puttling limits of "255" on name and
-64kB on size, I can do that.
-
-
-> 
-> > +    name = fuse_mbuf_iter_advance_str(iter);
-> > +    if (!name) {
-> > +        return -EINVAL;
-> > +    }
-> > +
-> > +    secctx = fuse_mbuf_iter_advance(iter, fsecctx->size);
-> > +    if (!secctx) {
-> > +        return -EINVAL;
-> > +    }
-> > +
-> > +    req->secctx.name = name;
-> > +    req->secctx.ctx = secctx;
-> > +    req->secctx.ctxlen = fsecctx->size;
-> 
-> It's OK to use the pointers into the iter here rather than take copies?
-
-I see lookup() and setxattr() already do that. They pass "name" which
-is just a pointer into iter. 
-
-My understanding is that req will not be freed. So iter and associated
-memory will continue to be valid. So it should be ok and not make
-copies.
-
-Are you concerned about something specific.
-
-Thanks
-Vivek
-> 
-> > +    return 0;
-> > +}
-> > +
-> >  static void do_mknod(fuse_req_t req, fuse_ino_t nodeid,
-> >                       struct fuse_mbuf_iter *iter)
-> >  {
-> >      struct fuse_mknod_in *arg;
-> >      const char *name;
-> > +    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
-> > +    int err;
-> >  
-> >      arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
-> >      name = fuse_mbuf_iter_advance_str(iter);
-> > @@ -901,6 +949,13 @@ static void do_mknod(fuse_req_t req, fuse_ino_t nodeid,
-> >  
-> >      req->ctx.umask = arg->umask;
-> >  
-> > +    if (secctx_enabled) {
-> > +        err = parse_secctx_fill_req(req, iter);
-> > +        if (err) {
-> > +            fuse_reply_err(req, -err);
-> 
-> return ?
-> 
-> > +        }
-> > +    }
-> > +
-> >      if (req->se->op.mknod) {
-> >          req->se->op.mknod(req, nodeid, name, arg->mode, arg->rdev);
-> >      } else {
-> > @@ -913,6 +968,8 @@ static void do_mkdir(fuse_req_t req, fuse_ino_t nodeid,
-> >  {
-> >      struct fuse_mkdir_in *arg;
-> >      const char *name;
-> > +    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
-> > +    int err;
-> >  
-> >      arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
-> >      name = fuse_mbuf_iter_advance_str(iter);
-> > @@ -923,6 +980,13 @@ static void do_mkdir(fuse_req_t req, fuse_ino_t nodeid,
-> >  
-> >      req->ctx.umask = arg->umask;
-> >  
-> > +    if (secctx_enabled) {
-> > +        err = parse_secctx_fill_req(req, iter);
-> > +        if (err) {
-> > +            fuse_reply_err(req, err);
-> return ?
-> > +        }
-> > +    }
-> > +
-> >      if (req->se->op.mkdir) {
-> >          req->se->op.mkdir(req, nodeid, name, arg->mode);
-> >      } else {
-> > @@ -969,12 +1033,21 @@ static void do_symlink(fuse_req_t req, fuse_ino_t nodeid,
-> >  {
-> >      const char *name = fuse_mbuf_iter_advance_str(iter);
-> >      const char *linkname = fuse_mbuf_iter_advance_str(iter);
-> > +    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
-> > +    int err;
-> >  
-> >      if (!name || !linkname) {
-> >          fuse_reply_err(req, EINVAL);
-> >          return;
-> >      }
-> >  
-> > +    if (secctx_enabled) {
-> > +        err = parse_secctx_fill_req(req, iter);
-> > +        if (err) {
-> > +            fuse_reply_err(req, err);
-> return ?
-> > +        }
-> > +    }
-> > +
-> >      if (req->se->op.symlink) {
-> >          req->se->op.symlink(req, linkname, nodeid, name);
-> >      } else {
-> > @@ -1048,6 +1121,8 @@ static void do_link(fuse_req_t req, fuse_ino_t nodeid,
-> >  static void do_create(fuse_req_t req, fuse_ino_t nodeid,
-> >                        struct fuse_mbuf_iter *iter)
-> >  {
-> > +    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
-> > +
-> >      if (req->se->op.create) {
-> >          struct fuse_create_in *arg;
-> >          struct fuse_file_info fi;
-> > @@ -1060,6 +1135,15 @@ static void do_create(fuse_req_t req, fuse_ino_t nodeid,
-> >              return;
-> >          }
-> >  
-> > +        if (secctx_enabled) {
-> > +            int err;
-> > +            err = parse_secctx_fill_req(req, iter);
-> > +            if (err) {
-> > +                fuse_reply_err(req, err);
-> > +                return;
-> > +            }
-> > +        }
-> > +
-> >          memset(&fi, 0, sizeof(fi));
-> >          fi.flags = arg->flags;
-> >          fi.kill_priv = arg->open_flags & FUSE_OPEN_KILL_SUIDGID;
-> > @@ -2016,6 +2100,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-> >      if (flags & FUSE_SETXATTR_EXT) {
-> >          se->conn.capable |= FUSE_CAP_SETXATTR_EXT;
-> >      }
-> > +    if (flags & FUSE_SECURITY_CTX) {
-> > +        se->conn.capable |= FUSE_CAP_SECURITY_CTX;
-> > +    }
-> >  #ifdef HAVE_SPLICE
-> >  #ifdef HAVE_VMSPLICE
-> >      se->conn.capable |= FUSE_CAP_SPLICE_WRITE | FUSE_CAP_SPLICE_MOVE;
-> > @@ -2155,8 +2242,14 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-> >          outarg.flags |= FUSE_SETXATTR_EXT;
-> >      }
-> >  
-> > +    if (se->conn.want & FUSE_CAP_SECURITY_CTX) {
-> > +        /* bits 32..63 get shifted down 32 bits into the flags2 field */
-> > +        outarg.flags2 |= FUSE_SECURITY_CTX >> 32;
-> > +    }
-> > +
-> >      fuse_log(FUSE_LOG_DEBUG, "   INIT: %u.%u\n", outarg.major, outarg.minor);
-> > -    fuse_log(FUSE_LOG_DEBUG, "   flags=0x%08x\n", outarg.flags);
-> > +    fuse_log(FUSE_LOG_DEBUG, "   flags2=0x%08x flags=0x%08x\n", outarg.flags2,
-> > +             outarg.flags);
-> >      fuse_log(FUSE_LOG_DEBUG, "   max_readahead=0x%08x\n", outarg.max_readahead);
-> >      fuse_log(FUSE_LOG_DEBUG, "   max_write=0x%08x\n", outarg.max_write);
-> >      fuse_log(FUSE_LOG_DEBUG, "   max_background=%i\n", outarg.max_background);
-> > -- 
-> > 2.34.1
-> > 
-> -- 
-> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
-> 
+Previously, the worker task in `process_queue_pool()` called
+up to 3 functions on `worker_vring` where each function is a
+wrapper that first locks the mutex.  This is unneccessary
+congestion.  We fix this by locking the mutex once.
+---
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/87
 

@@ -1,13 +1,14 @@
-Date: Mon, 7 Feb 2022 12:49:24 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YgEVVLBv9eWbhcDV@work-vm>
+Date: Mon, 7 Feb 2022 13:05:16 +0000
+From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+Message-ID: <YgEZDOcFr80tZGWd@redhat.com>
 References: <20220202193935.268777-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20220202193935.268777-1-vgoyal@redhat.com>
-Content-Type: text/plain; charset=us-ascii
+Content-Type: text/plain; charset=utf-8
 Content-Disposition: inline
+In-Reply-To: <20220202193935.268777-1-vgoyal@redhat.com>
 Subject: Re: [Virtio-fs] [PATCH v5 0/9] virtiofsd: Add support for file
  security context at file creation
+Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,7 +20,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: Vivek Goyal <vgoyal@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
+On Wed, Feb 02, 2022 at 02:39:26PM -0500, Vivek Goyal wrote:
 > Hi,
 > 
 > This is V5 of the patches. I posted V4 here.
@@ -30,85 +31,32 @@ Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 > SELinux context at file creation to server and server can set it on
 > file.
 
-I think that's pretty close; I've got some minor comments I've replied
-to on the individual patches.
+I've not entirely figured it out from the code, so easier for me
+to ask...
 
-I do worry that the number of different paths for each operation is now
-quite large so hard to test.
-I also wonder what happens on something other than SELinux.
+How is the SELinux labelled stored on the host side ? It is stored
+directly in the security.* xattr namespace, or is is subject to
+xattr remapping that virtiofsd already supports.
 
-Dave
+Storing directly means virtiofsd has to run in an essentially
+unconfined context, to let it do arbitrary  changes on security.*
+xattrs without being blocked by SELinux) and has risk that guest
+initiated changes can open holes in the host confinement if
+the exported FS is generally visible to processes on the host.
 
-> Changes since V4
-> ----------------
-> - Parse only known current size of fuse_init_in. This will make sure
->   that future extension does not break existing code upon header
->   update. (David Gilbert)
-> 
-> - Changed order of one of the patch. It is first patch in series. This
->   will help fix the breakage before header update patch and code remains
->   git bisectable. (David Gilbert)
-> 
-> - Changed %lx to %llx at one place. (David Gilbert).
-> 
-> Thanks
-> Vivek
->  
-> Vivek Goyal (9):
->   virtiofsd: Fix breakage due to fuse_init_in size change
->   linux-headers: Update headers to v5.17-rc1
->   virtiofsd: Parse extended "struct fuse_init_in"
->   virtiofsd: Extend size of fuse_conn_info->capable and ->want fields
->   virtiofsd, fuse_lowlevel.c: Add capability to parse security context
->   virtiofsd: Move core file creation code in separate function
->   virtiofsd: Create new file with fscreate set
->   virtiofsd: Create new file using O_TMPFILE and set security context
->   virtiofsd: Add an option to enable/disable security label
-> 
->  docs/tools/virtiofsd.rst                      |   7 +
->  include/standard-headers/asm-x86/kvm_para.h   |   1 +
->  include/standard-headers/drm/drm_fourcc.h     |  11 +
->  include/standard-headers/linux/ethtool.h      |   1 +
->  include/standard-headers/linux/fuse.h         |  60 ++-
->  include/standard-headers/linux/pci_regs.h     | 142 +++---
->  include/standard-headers/linux/virtio_gpio.h  |  72 +++
->  include/standard-headers/linux/virtio_i2c.h   |  47 ++
->  include/standard-headers/linux/virtio_iommu.h |   8 +-
->  .../standard-headers/linux/virtio_pcidev.h    |  65 +++
->  include/standard-headers/linux/virtio_scmi.h  |  24 +
->  linux-headers/asm-generic/unistd.h            |   5 +-
->  linux-headers/asm-mips/unistd_n32.h           |   2 +
->  linux-headers/asm-mips/unistd_n64.h           |   2 +
->  linux-headers/asm-mips/unistd_o32.h           |   2 +
->  linux-headers/asm-powerpc/unistd_32.h         |   2 +
->  linux-headers/asm-powerpc/unistd_64.h         |   2 +
->  linux-headers/asm-riscv/bitsperlong.h         |  14 +
->  linux-headers/asm-riscv/mman.h                |   1 +
->  linux-headers/asm-riscv/unistd.h              |  44 ++
->  linux-headers/asm-s390/unistd_32.h            |   2 +
->  linux-headers/asm-s390/unistd_64.h            |   2 +
->  linux-headers/asm-x86/kvm.h                   |  16 +-
->  linux-headers/asm-x86/unistd_32.h             |   1 +
->  linux-headers/asm-x86/unistd_64.h             |   1 +
->  linux-headers/asm-x86/unistd_x32.h            |   1 +
->  linux-headers/linux/kvm.h                     |  17 +
->  tools/virtiofsd/fuse_common.h                 |   9 +-
->  tools/virtiofsd/fuse_i.h                      |   7 +
->  tools/virtiofsd/fuse_lowlevel.c               | 162 +++++--
->  tools/virtiofsd/helper.c                      |   1 +
->  tools/virtiofsd/passthrough_ll.c              | 414 ++++++++++++++++--
->  32 files changed, 1013 insertions(+), 132 deletions(-)
->  create mode 100644 include/standard-headers/linux/virtio_gpio.h
->  create mode 100644 include/standard-headers/linux/virtio_i2c.h
->  create mode 100644 include/standard-headers/linux/virtio_pcidev.h
->  create mode 100644 include/standard-headers/linux/virtio_scmi.h
->  create mode 100644 linux-headers/asm-riscv/bitsperlong.h
->  create mode 100644 linux-headers/asm-riscv/mman.h
->  create mode 100644 linux-headers/asm-riscv/unistd.h
-> 
-> -- 
-> 2.34.1
-> 
+
+Using remapping lets virtiofsd be strictly isolated by SELinux
+policy on the host, and ensures that guest context changes
+can't open up holes in the host.
+
+Both are valid use cases, so I'd ultimately expect us to want
+to support both, but my preference for a "default" behaviour
+would be remapping.
+
+Regards,
+Daniel
 -- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
+|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
+|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
 

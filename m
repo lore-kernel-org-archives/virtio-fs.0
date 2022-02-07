@@ -1,15 +1,14 @@
-Date: Mon, 7 Feb 2022 09:13:53 -0500
+Date: Mon, 7 Feb 2022 09:30:55 -0500
 From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YgEpIXyRiafE8NSu@redhat.com>
+Message-ID: <YgEtH+MQquXg7CPN@redhat.com>
 References: <20220202193935.268777-1-vgoyal@redhat.com>
-	<20220202193935.268777-10-vgoyal@redhat.com>
-	<YgETNXv8AnnuLQR/@work-vm>
+	<YgEVVLBv9eWbhcDV@work-vm>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <YgETNXv8AnnuLQR/@work-vm>
-Subject: Re: [Virtio-fs] [PATCH v5 9/9] virtiofsd: Add an option to
- enable/disable security label
+In-Reply-To: <YgEVVLBv9eWbhcDV@work-vm>
+Subject: Re: [Virtio-fs] [PATCH v5 0/9] virtiofsd: Add support for file
+ security context at file creation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,131 +20,115 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Mon, Feb 07, 2022 at 12:40:21PM +0000, Dr. David Alan Gilbert wrote:
+On Mon, Feb 07, 2022 at 12:49:24PM +0000, Dr. David Alan Gilbert wrote:
 > * Vivek Goyal (vgoyal@redhat.com) wrote:
-> > Provide an option "-o security_label/no_security_label" to enable/disable
-> > security label functionality. By default these are turned off.
+> > Hi,
 > > 
-> > If enabled, server will indicate to client that it is capable of handling
-> > one security label during file creation. Typically this is expected to
-> > be a SELinux label. File server will set this label on the file. It will
-> > try to set it atomically wherever possible. But its not possible in
-> > all the cases.
+> > This is V5 of the patches. I posted V4 here.
 > > 
-> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-> > ---
-> >  docs/tools/virtiofsd.rst         |  7 +++++++
-> >  tools/virtiofsd/helper.c         |  1 +
-> >  tools/virtiofsd/passthrough_ll.c | 15 +++++++++++++++
-> >  3 files changed, 23 insertions(+)
+> > https://listman.redhat.com/archives/virtio-fs/2022-January/msg00041.html
 > > 
-> > diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-> > index 07ac0be551..a2c005f4a0 100644
-> > --- a/docs/tools/virtiofsd.rst
-> > +++ b/docs/tools/virtiofsd.rst
-> > @@ -104,6 +104,13 @@ Options
-> >    * posix_acl|no_posix_acl -
-> >      Enable/disable posix acl support.  Posix ACLs are disabled by default.
-> >  
-> > +  * security_label|no_security_label -
-> > +    Enable/disable security label support. Security labels are disabled by
-> > +    default. This will allow client to send a MAC label of file during
->                                 ^ the                        ^ a
-> > +    file creation. Typically this is expected to be SELinux security
->                                                       ^ an
+> > These will allow us to support SELinux with virtiofs. This will send
+> > SELinux context at file creation to server and server can set it on
+> > file.
 > 
-> > +    label. Server will try to set that label on newly created file
->               ^The server
-> > +    atomically wherever possible.
-> > +
-> >  .. option:: --socket-path=PATH
-> >  
-> >    Listen on vhost-user UNIX domain socket at PATH.
-> > diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
-> > index a8295d975a..e226fc590f 100644
-> > --- a/tools/virtiofsd/helper.c
-> > +++ b/tools/virtiofsd/helper.c
-> > @@ -187,6 +187,7 @@ void fuse_cmdline_help(void)
-> >             "                               default: no_allow_direct_io\n"
-> >             "    -o announce_submounts      Announce sub-mount points to the guest\n"
-> >             "    -o posix_acl/no_posix_acl  Enable/Disable posix_acl. (default: disabled)\n"
-> > +           "    -o security_label/no_security_label  Enable/Disable security label. (default: disabled)\n"
-> >             );
-> >  }
-> >  
-> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> > index 43c9b6dbe5..fe8f3ccbb6 100644
-> > --- a/tools/virtiofsd/passthrough_ll.c
-> > +++ b/tools/virtiofsd/passthrough_ll.c
-> > @@ -181,6 +181,7 @@ struct lo_data {
-> >      int user_posix_acl, posix_acl;
-> >      /* Keeps track if /proc/<pid>/attr/fscreate should be used or not */
-> >      bool use_fscreate;
-> > +    int user_security_label;
-> >  };
-> >  
-> >  static const struct fuse_opt lo_opts[] = {
-> > @@ -215,6 +216,8 @@ static const struct fuse_opt lo_opts[] = {
-> >      { "no_killpriv_v2", offsetof(struct lo_data, user_killpriv_v2), 0 },
-> >      { "posix_acl", offsetof(struct lo_data, user_posix_acl), 1 },
-> >      { "no_posix_acl", offsetof(struct lo_data, user_posix_acl), 0 },
-> > +    { "security_label", offsetof(struct lo_data, user_security_label), 1 },
-> > +    { "no_security_label", offsetof(struct lo_data, user_security_label), 0 },
-> >      FUSE_OPT_END
-> >  };
-> >  static bool use_syslog = false;
-> > @@ -771,6 +774,17 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
-> >          fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling posix_acl\n");
-> >          conn->want &= ~FUSE_CAP_POSIX_ACL;
-> >      }
-> > +
-> > +    if (lo->user_security_label == 1) {
-> > +        if (!(conn->capable & FUSE_CAP_SECURITY_CTX)) {
-> > +            fuse_log(FUSE_LOG_ERR, "lo_init: Can not enable security label."
-> > +                     " kernel does not support FUSE_SECURITY_CTX capability.\n");
-> > +        }
+> I think that's pretty close; I've got some minor comments I've replied
+> to on the individual patches.
 > 
-> Do you need to exit in this case - or at least clear the flag?
+> I do worry that the number of different paths for each operation is now
+> quite large so hard to test.
 
-Actually we don't have to necessarily exit here because fuse_lowlevel.c
-has a check which makes it exit. And that's why I do not clear the
-flag from ->want to signifiy that filesystem wants that capability
-but client is not ->capable so error out and exit.
+It is indeed many combinations to test. During development, I have made
+sure to test every path atleast once to make sure it works.
 
+> I also wonder what happens on something other than SELinux.
 
-    if (se->conn.want & (~se->conn.capable)) {
-        fuse_log(FUSE_LOG_ERR,
-                 "fuse: error: filesystem requested capabilities "
-                 "0x%llx that are not supported by kernel, aborting.\n",
-                 se->conn.want & (~se->conn.capable));
-        fuse_reply_err(req, EPROTO);
-        se->error = -EPROTO;
-        fuse_session_exit(se);
-        return;
-    }
+As of now this pretty much works only for SELinux. Especially usage of
+fscreate knob is very specific to SELinux.
 
-Thanks
+In some cases, it will work with some other LSM other than SELinux
+as well. But lets not go there. 
+
+If we want to support multiple security contexts at some point of time,
+fuse procotol changes have been written in such a way so that fuse
+can send mutiple security context and then we will have to modify
+code to be able to deal with that.
+
+In short, for now, this code is pretty much expectin one security
+context that too SELinux. This is very much in line with ceph and
+nfs.
+
 Vivek
-
 > 
 > Dave
 > 
-> > +        conn->want |= FUSE_CAP_SECURITY_CTX;
-> > +    } else {
-> > +        fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling security label\n");
-> > +        conn->want &= ~FUSE_CAP_SECURITY_CTX;
-> > +    }
-> >  }
+> > Changes since V4
+> > ----------------
+> > - Parse only known current size of fuse_init_in. This will make sure
+> >   that future extension does not break existing code upon header
+> >   update. (David Gilbert)
+> > 
+> > - Changed order of one of the patch. It is first patch in series. This
+> >   will help fix the breakage before header update patch and code remains
+> >   git bisectable. (David Gilbert)
+> > 
+> > - Changed %lx to %llx at one place. (David Gilbert).
+> > 
+> > Thanks
+> > Vivek
 > >  
-> >  static void lo_getattr(fuse_req_t req, fuse_ino_t ino,
-> > @@ -4279,6 +4293,7 @@ int main(int argc, char *argv[])
-> >          .proc_self_task = -1,
-> >          .user_killpriv_v2 = -1,
-> >          .user_posix_acl = -1,
-> > +        .user_security_label = -1,
-> >      };
-> >      struct lo_map_elem *root_elem;
-> >      struct lo_map_elem *reserve_elem;
+> > Vivek Goyal (9):
+> >   virtiofsd: Fix breakage due to fuse_init_in size change
+> >   linux-headers: Update headers to v5.17-rc1
+> >   virtiofsd: Parse extended "struct fuse_init_in"
+> >   virtiofsd: Extend size of fuse_conn_info->capable and ->want fields
+> >   virtiofsd, fuse_lowlevel.c: Add capability to parse security context
+> >   virtiofsd: Move core file creation code in separate function
+> >   virtiofsd: Create new file with fscreate set
+> >   virtiofsd: Create new file using O_TMPFILE and set security context
+> >   virtiofsd: Add an option to enable/disable security label
+> > 
+> >  docs/tools/virtiofsd.rst                      |   7 +
+> >  include/standard-headers/asm-x86/kvm_para.h   |   1 +
+> >  include/standard-headers/drm/drm_fourcc.h     |  11 +
+> >  include/standard-headers/linux/ethtool.h      |   1 +
+> >  include/standard-headers/linux/fuse.h         |  60 ++-
+> >  include/standard-headers/linux/pci_regs.h     | 142 +++---
+> >  include/standard-headers/linux/virtio_gpio.h  |  72 +++
+> >  include/standard-headers/linux/virtio_i2c.h   |  47 ++
+> >  include/standard-headers/linux/virtio_iommu.h |   8 +-
+> >  .../standard-headers/linux/virtio_pcidev.h    |  65 +++
+> >  include/standard-headers/linux/virtio_scmi.h  |  24 +
+> >  linux-headers/asm-generic/unistd.h            |   5 +-
+> >  linux-headers/asm-mips/unistd_n32.h           |   2 +
+> >  linux-headers/asm-mips/unistd_n64.h           |   2 +
+> >  linux-headers/asm-mips/unistd_o32.h           |   2 +
+> >  linux-headers/asm-powerpc/unistd_32.h         |   2 +
+> >  linux-headers/asm-powerpc/unistd_64.h         |   2 +
+> >  linux-headers/asm-riscv/bitsperlong.h         |  14 +
+> >  linux-headers/asm-riscv/mman.h                |   1 +
+> >  linux-headers/asm-riscv/unistd.h              |  44 ++
+> >  linux-headers/asm-s390/unistd_32.h            |   2 +
+> >  linux-headers/asm-s390/unistd_64.h            |   2 +
+> >  linux-headers/asm-x86/kvm.h                   |  16 +-
+> >  linux-headers/asm-x86/unistd_32.h             |   1 +
+> >  linux-headers/asm-x86/unistd_64.h             |   1 +
+> >  linux-headers/asm-x86/unistd_x32.h            |   1 +
+> >  linux-headers/linux/kvm.h                     |  17 +
+> >  tools/virtiofsd/fuse_common.h                 |   9 +-
+> >  tools/virtiofsd/fuse_i.h                      |   7 +
+> >  tools/virtiofsd/fuse_lowlevel.c               | 162 +++++--
+> >  tools/virtiofsd/helper.c                      |   1 +
+> >  tools/virtiofsd/passthrough_ll.c              | 414 ++++++++++++++++--
+> >  32 files changed, 1013 insertions(+), 132 deletions(-)
+> >  create mode 100644 include/standard-headers/linux/virtio_gpio.h
+> >  create mode 100644 include/standard-headers/linux/virtio_i2c.h
+> >  create mode 100644 include/standard-headers/linux/virtio_pcidev.h
+> >  create mode 100644 include/standard-headers/linux/virtio_scmi.h
+> >  create mode 100644 linux-headers/asm-riscv/bitsperlong.h
+> >  create mode 100644 linux-headers/asm-riscv/mman.h
+> >  create mode 100644 linux-headers/asm-riscv/unistd.h
+> > 
 > > -- 
 > > 2.34.1
 > > 

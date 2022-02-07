@@ -1,16 +1,15 @@
-Date: Mon, 7 Feb 2022 13:30:16 +0000
-From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
-Message-ID: <YgEe6L+wunrGwQsX@redhat.com>
+Date: Mon, 7 Feb 2022 08:31:24 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YgEfLOk/GPwZjWhj@redhat.com>
 References: <20220202193935.268777-1-vgoyal@redhat.com>
-	<YgEZDOcFr80tZGWd@redhat.com> <YgEdeGud4xlZEAwy@redhat.com>
+	<20220202193935.268777-4-vgoyal@redhat.com>
+	<Yfwlekwcu35SN9MU@work-vm>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <YgEdeGud4xlZEAwy@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v5 0/9] virtiofsd: Add support for file
- security context at file creation
-Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+In-Reply-To: <Yfwlekwcu35SN9MU@work-vm>
+Subject: Re: [Virtio-fs] [PATCH v5 3/9] virtiofsd: Parse extended "struct
+	fuse_init_in"
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,69 +18,215 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-On Mon, Feb 07, 2022 at 08:24:08AM -0500, Vivek Goyal wrote:
-> On Mon, Feb 07, 2022 at 01:05:16PM +0000, Daniel P. Berrangé wrote:
-> > On Wed, Feb 02, 2022 at 02:39:26PM -0500, Vivek Goyal wrote:
-> > > Hi,
-> > > 
-> > > This is V5 of the patches. I posted V4 here.
-> > > 
-> > > https://listman.redhat.com/archives/virtio-fs/2022-January/msg00041.html
-> > > 
-> > > These will allow us to support SELinux with virtiofs. This will send
-> > > SELinux context at file creation to server and server can set it on
-> > > file.
+On Thu, Feb 03, 2022 at 06:56:58PM +0000, Dr. David Alan Gilbert wrote:
+> * Vivek Goyal (vgoyal@redhat.com) wrote:
+> > Add some code to parse extended "struct fuse_init_in". And use a local
+> > variable "flag" to represent 64 bit flags. This will make it easier
+> > to add more features without having to worry about two 32bit flags (->flags
+> > and ->flags2) in "fuse_struct_in".
 > > 
-> > I've not entirely figured it out from the code, so easier for me
-> > to ask...
+> > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+> > ---
+> >  tools/virtiofsd/fuse_lowlevel.c | 62 +++++++++++++++++++++------------
+> >  1 file changed, 40 insertions(+), 22 deletions(-)
 > > 
-> > How is the SELinux labelled stored on the host side ? It is stored
-> > directly in the security.* xattr namespace, or is is subject to
-> > xattr remapping that virtiofsd already supports.
-> > 
-> > Storing directly means virtiofsd has to run in an essentially
-> > unconfined context, to let it do arbitrary  changes on security.*
-> > xattrs without being blocked by SELinux) and has risk that guest
-> > initiated changes can open holes in the host confinement if
-> > the exported FS is generally visible to processes on the host.
-> > 
-> > 
-> > Using remapping lets virtiofsd be strictly isolated by SELinux
-> > policy on the host, and ensures that guest context changes
-> > can't open up holes in the host.
-> > 
-> > Both are valid use cases, so I'd ultimately expect us to want
-> > to support both, but my preference for a "default" behaviour
-> > would be remapping.
+> > diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+> > index ce29a70253..1f10dcc75b 100644
+> > --- a/tools/virtiofsd/fuse_lowlevel.c
+> > +++ b/tools/virtiofsd/fuse_lowlevel.c
+> > @@ -1881,11 +1881,15 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+> >  {
+> >      size_t compat_size = offsetof(struct fuse_init_in, max_readahead);
+> >      size_t compat2_size = offsetof(struct fuse_init_in, flags) + sizeof(uint32_t);
+> > +    /* Fuse structure extended with minor version 36 */
+> > +    size_t compat3_size = offsetof(struct fuse_init_in, unused) +
+> > +                          (11 * sizeof(uint32_t));
 > 
-> I am expecting users to configure virtiofsd to remap "security.selinux"
-> to "trusted.virtiofsd.security.selinux" and that will allow guest
-> and host security selinux to co-exist and allow separate SELinux policies
-> for guest and host.
+> Hmm that's actually quite difficult; what we have at the moment is:
 > 
-> I agree that my preference for a default behavior is remapping as well.
-> That makes most sense. 
+> struct fuse_init_in {
+>         uint32_t        major;
+>         uint32_t        minor;
+>         uint32_t        max_readahead;
+>         uint32_t        flags;
+>         uint32_t        flags2;
+>         uint32_t        unused[11];
+> };
 > 
-> One downside of mapping to trusted namespace is that it requires
-> CAP_SYS_ADMIN for virtiofsd.
+> so imagine someone comes along and changes that to:
 > 
-> Having said that, these patches don't enforce the remapping default. That
-> has to come from the user because it also needs to be given CAP_SYS_ADMIN.
-> So out of box default is no remapping and passthrough SELinux.
+> struct fuse_init_in {    
+>         uint32_t        major;
+>         uint32_t        minor;
+>         uint32_t        max_readahead;
+>         uint32_t        flags;
+>         uint32_t        flags2;
+>         uint32_t        flags3;
+>         uint32_t        unused[10];
+> };
+> 
+> Then this code will break (oddly!), where the old code that didn't reference the
+> unusued field wouldn't.
 
-Ok, that all makes sense then. My only suggestion then is to put something
-more explicit in the man page docs to highlight the implications /
-interaction beteen the new command line options for labelling and the
-likely need for remapping security.*
+Good catch. I did not think about it.
 
+> It looks like qemu defines an 'endof' macro, so I think you can do:
+> 
+>   size_t compat3_size = endof(struct fuse_init_in, unused);
+> 
+> I think that should work as long as people nibble away at unused from
+> the top.
 
-Regards,
-Daniel
--- 
-|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
-|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
-|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
+Will use "endof" macro.
+
+Thanks
+Vivek
+
+> 
+> Dave
+> 
+> 
+> >      struct fuse_init_in *arg;
+> >      struct fuse_init_out outarg;
+> >      struct fuse_session *se = req->se;
+> >      size_t bufsize = se->bufsize;
+> >      size_t outargsize = sizeof(outarg);
+> > +    uint64_t flags = 0;
+> >  
+> >      (void)nodeid;
+> >  
+> > @@ -1902,11 +1906,25 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+> >              fuse_reply_err(req, EINVAL);
+> >              return;
+> >          }
+> > +        flags |= arg->flags;
+> > +    }
+> > +
+> > +    /*
+> > +     * fuse_init_in was extended again with minor version 36. Just read
+> > +     * current known size of fuse_init so that future extension and
+> > +     * header rebase does not cause breakage.
+> > +     */
+> > +    if (sizeof(*arg) > compat2_size && (arg->flags & FUSE_INIT_EXT)) {
+> > +        if (!fuse_mbuf_iter_advance(iter, compat3_size - compat2_size)) {
+> > +            fuse_reply_err(req, EINVAL);
+> > +            return;
+> > +        }
+> > +        flags |= (uint64_t) arg->flags2 << 32;
+> >      }
+> >  
+> >      fuse_log(FUSE_LOG_DEBUG, "INIT: %u.%u\n", arg->major, arg->minor);
+> >      if (arg->major == 7 && arg->minor >= 6) {
+> > -        fuse_log(FUSE_LOG_DEBUG, "flags=0x%08x\n", arg->flags);
+> > +        fuse_log(FUSE_LOG_DEBUG, "flags=0x%016llx\n", flags);
+> >          fuse_log(FUSE_LOG_DEBUG, "max_readahead=0x%08x\n", arg->max_readahead);
+> >      }
+> >      se->conn.proto_major = arg->major;
+> > @@ -1934,68 +1952,68 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+> >      if (arg->max_readahead < se->conn.max_readahead) {
+> >          se->conn.max_readahead = arg->max_readahead;
+> >      }
+> > -    if (arg->flags & FUSE_ASYNC_READ) {
+> > +    if (flags & FUSE_ASYNC_READ) {
+> >          se->conn.capable |= FUSE_CAP_ASYNC_READ;
+> >      }
+> > -    if (arg->flags & FUSE_POSIX_LOCKS) {
+> > +    if (flags & FUSE_POSIX_LOCKS) {
+> >          se->conn.capable |= FUSE_CAP_POSIX_LOCKS;
+> >      }
+> > -    if (arg->flags & FUSE_ATOMIC_O_TRUNC) {
+> > +    if (flags & FUSE_ATOMIC_O_TRUNC) {
+> >          se->conn.capable |= FUSE_CAP_ATOMIC_O_TRUNC;
+> >      }
+> > -    if (arg->flags & FUSE_EXPORT_SUPPORT) {
+> > +    if (flags & FUSE_EXPORT_SUPPORT) {
+> >          se->conn.capable |= FUSE_CAP_EXPORT_SUPPORT;
+> >      }
+> > -    if (arg->flags & FUSE_DONT_MASK) {
+> > +    if (flags & FUSE_DONT_MASK) {
+> >          se->conn.capable |= FUSE_CAP_DONT_MASK;
+> >      }
+> > -    if (arg->flags & FUSE_FLOCK_LOCKS) {
+> > +    if (flags & FUSE_FLOCK_LOCKS) {
+> >          se->conn.capable |= FUSE_CAP_FLOCK_LOCKS;
+> >      }
+> > -    if (arg->flags & FUSE_AUTO_INVAL_DATA) {
+> > +    if (flags & FUSE_AUTO_INVAL_DATA) {
+> >          se->conn.capable |= FUSE_CAP_AUTO_INVAL_DATA;
+> >      }
+> > -    if (arg->flags & FUSE_DO_READDIRPLUS) {
+> > +    if (flags & FUSE_DO_READDIRPLUS) {
+> >          se->conn.capable |= FUSE_CAP_READDIRPLUS;
+> >      }
+> > -    if (arg->flags & FUSE_READDIRPLUS_AUTO) {
+> > +    if (flags & FUSE_READDIRPLUS_AUTO) {
+> >          se->conn.capable |= FUSE_CAP_READDIRPLUS_AUTO;
+> >      }
+> > -    if (arg->flags & FUSE_ASYNC_DIO) {
+> > +    if (flags & FUSE_ASYNC_DIO) {
+> >          se->conn.capable |= FUSE_CAP_ASYNC_DIO;
+> >      }
+> > -    if (arg->flags & FUSE_WRITEBACK_CACHE) {
+> > +    if (flags & FUSE_WRITEBACK_CACHE) {
+> >          se->conn.capable |= FUSE_CAP_WRITEBACK_CACHE;
+> >      }
+> > -    if (arg->flags & FUSE_NO_OPEN_SUPPORT) {
+> > +    if (flags & FUSE_NO_OPEN_SUPPORT) {
+> >          se->conn.capable |= FUSE_CAP_NO_OPEN_SUPPORT;
+> >      }
+> > -    if (arg->flags & FUSE_PARALLEL_DIROPS) {
+> > +    if (flags & FUSE_PARALLEL_DIROPS) {
+> >          se->conn.capable |= FUSE_CAP_PARALLEL_DIROPS;
+> >      }
+> > -    if (arg->flags & FUSE_POSIX_ACL) {
+> > +    if (flags & FUSE_POSIX_ACL) {
+> >          se->conn.capable |= FUSE_CAP_POSIX_ACL;
+> >      }
+> > -    if (arg->flags & FUSE_HANDLE_KILLPRIV) {
+> > +    if (flags & FUSE_HANDLE_KILLPRIV) {
+> >          se->conn.capable |= FUSE_CAP_HANDLE_KILLPRIV;
+> >      }
+> > -    if (arg->flags & FUSE_NO_OPENDIR_SUPPORT) {
+> > +    if (flags & FUSE_NO_OPENDIR_SUPPORT) {
+> >          se->conn.capable |= FUSE_CAP_NO_OPENDIR_SUPPORT;
+> >      }
+> > -    if (!(arg->flags & FUSE_MAX_PAGES)) {
+> > +    if (!(flags & FUSE_MAX_PAGES)) {
+> >          size_t max_bufsize = FUSE_DEFAULT_MAX_PAGES_PER_REQ * getpagesize() +
+> >                               FUSE_BUFFER_HEADER_SIZE;
+> >          if (bufsize > max_bufsize) {
+> >              bufsize = max_bufsize;
+> >          }
+> >      }
+> > -    if (arg->flags & FUSE_SUBMOUNTS) {
+> > +    if (flags & FUSE_SUBMOUNTS) {
+> >          se->conn.capable |= FUSE_CAP_SUBMOUNTS;
+> >      }
+> > -    if (arg->flags & FUSE_HANDLE_KILLPRIV_V2) {
+> > +    if (flags & FUSE_HANDLE_KILLPRIV_V2) {
+> >          se->conn.capable |= FUSE_CAP_HANDLE_KILLPRIV_V2;
+> >      }
+> > -    if (arg->flags & FUSE_SETXATTR_EXT) {
+> > +    if (flags & FUSE_SETXATTR_EXT) {
+> >          se->conn.capable |= FUSE_CAP_SETXATTR_EXT;
+> >      }
+> >  #ifdef HAVE_SPLICE
+> > @@ -2063,7 +2081,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+> >      if (se->conn.max_write < bufsize - FUSE_BUFFER_HEADER_SIZE) {
+> >          se->bufsize = se->conn.max_write + FUSE_BUFFER_HEADER_SIZE;
+> >      }
+> > -    if (arg->flags & FUSE_MAX_PAGES) {
+> > +    if (flags & FUSE_MAX_PAGES) {
+> >          outarg.flags |= FUSE_MAX_PAGES;
+> >          outarg.max_pages = (se->conn.max_write - 1) / getpagesize() + 1;
+> >      }
+> > -- 
+> > 2.34.1
+> > 
+> -- 
+> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> 
 

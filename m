@@ -1,28 +1,28 @@
-Date: Tue, 8 Feb 2022 11:15:00 -0500
+Date: Tue, 8 Feb 2022 11:15:31 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
 	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=ZI81X4/TWyT7gKBVcaPspbS8RjY5KhiTz2OIXcJMIAQ=; b=Q
-	ErZqB/3AUTS1w+T6KARicuI1L1cLm8OBb6dkJ6wGTY1DB/y61tC4YR9ClyHNgNai
-	ykTkKxSSetG15mCTQafnilQ3eSmkhR4J9G97Hf0uvJuhxFgv4kisOUNuvHEX7oEh
-	aX/N0PsPSi/hxScDNsHXOAWp1svGKB2paGLSNiW7oHMkDV07SBaT5wPj17ukjr2t
-	9iamAQx83yXJhmqXp/IpO0KpQ5SHVSgBERc5fDqAMCAfsEZGzHBAAuE5/ozLdslx
-	p096ePCUZ3NlDd4sx3pLZCtvg8G8wo51J/W4wlXLv/L2sUDoySVgGT+9eDnJ3sMs
-	SVseO5VtADrtabwW1DI1g==
+	:to; s=fm3; bh=TB2L56E5cur1pT8pjL8JjPJDIndaWSMgTWL4uCF5sEc=; b=N
+	d3GFh4vsfVs3USRNNe+3D4+jwFsi8wo7XOMmNvLIknsE9n7cWpkj3pM9/A220lqP
+	x4tjrSKu87OzZzUMenmxQVeM4oflKgQcUoCmf3D5I3qHlpEx4cFVK5HrMGDYPv5D
+	dYwwaFg5Ld8Ph4i8w11jNqDv6HApIIUgnj66HrxXXqSvXi4DSd7oUDvTPt5xyCG8
+	ehzVAYe5ioLk8bv4OzPniwkIzUeRraVQ/Fmiae0rjqpom1OOCwdgaEUwjFBF0g06
+	RSIoeX1TRIdBTpro46/ThZUmV15/VkiMGztlCDywUApJnSqQAK/GsV6r2NAiOqBm
+	Q6gXolzcC8cs7dKn2Whfw==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
 	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm2; bh=ZI81X4/TWyT7gKBVcaPspbS8RjY5K
-	hiTz2OIXcJMIAQ=; b=YYgq8GqxT/vZKrHw6rerZn9cVv+xg8WEqVBAlBa7NxhZf
-	u3CRrhZca46JLTL1/V6yMoU7rOKV5hwTaKe8/dP3re62YK9KDfsUmXcDJ3HTQ6XU
-	/IOyIDI+ZkiVCKQgZ3wghijMcwcD4yvbZd1csrRi/CoT9Jck0UjbNbl0M9EFerlX
-	orUt3NHz3TOqoWu0GbJm8YZYdR0L1028jHuhhPVZbF0hTbm4Ibq4dxpZxKGNc+Ed
-	K2WbQKIMGPCiXqA4ai/7wMo5xOcSwyH1Wfs5oRGY1clsuD0jWNtnPZfTHU5wUlG9
-	aNbu+rGBVj/p6FD9yK9v9aqNYO7okjHLOfsW26CFw==
+	:x-me-sender:x-sasl-enc; s=fm2; bh=TB2L56E5cur1pT8pjL8JjPJDIndaW
+	SMgTWL4uCF5sEc=; b=WdWATJ8ohwosmQInUha0VjBD6Qtu8q7CXyFiMtfrgG0n+
+	s8DhiF1XXAunLpWcU3l4s1hW7VO6w5/ryjzV0FRnfjXjvAmpdZoFUP2T5Lmwzrr8
+	k9WGB+j9bGyWR/T+IHutr6icbQGX9B8tp8AnuJzqvn5z9wv4Vq5wt0k0Q60fpvlg
+	ziDtxhttRy4B/WztKBLbljZxHWhyjRI004HUTUQcT983ym2ARGdFz6COVj33Hszm
+	OWOkc52ktOa5Hc+ZzLk3u1Hh7ix/L27f76G95V/mg/1xs4endj6cEpD1dILORwCp
+	WDBuCSQFyr4FSUIhjoAZFl6S9OioYz2n7ufFN5cYA==
 From: virtiofs-bot@sinrega.org
-Message-Id: <86900.122020811145705816@us-mta-625.us.mimecast.lan>
+Message-Id: <82965.122020811152901986@us-mta-645.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR closed: vhost_user_backend: Skip locking
-	if we have exclusive reference
+Subject: [Virtio-fs] [virtiofsd] MR closed: vhost_user_backend: Remove
+	unnecessary Mutex
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,9 +33,12 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-If we have an exclusive reference to the
-`Mutex<VhostUserFsThread<F>>`, then we don't need to lock it.
-Instead we can use `.get_mut()`.
+The `VhostUserFsThread<F>` doesn't need to be wrapped in a `Mutex`,
+because every write operation has an exclusive reference, anyway.
+
+Supersedes: !83
+
+Closes: !83
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/83
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/89
 

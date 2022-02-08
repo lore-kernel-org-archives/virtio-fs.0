@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue,  8 Feb 2022 15:48:10 -0500
-Message-Id: <20220208204813.682906-8-vgoyal@redhat.com>
+Date: Tue,  8 Feb 2022 15:48:13 -0500
+Message-Id: <20220208204813.682906-11-vgoyal@redhat.com>
 In-Reply-To: <20220208204813.682906-1-vgoyal@redhat.com>
 References: <20220208204813.682906-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v6 07/10] virtiofsd: Add helpers to work with
-	/proc/self/task/tid/attr/fscreate
+Subject: [Virtio-fs] [PATCH v6 10/10] virtiofsd: Add an option to
+	enable/disable security label
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,163 +18,131 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: berrange@redhat.com, vgoyal@redhat.com
 
-Soon we will be able to create and also set security context on the file
-atomically using /proc/self/task/tid/attr/fscreate knob. If this knob
-is available on the system, first set the knob with the desired context
-and then create the file. It will be created with the context set in
-fscreate. This works basically for SELinux and its per thread.
+Provide an option "-o security_label/no_security_label" to enable/disable
+security label functionality. By default these are turned off.
 
-This patch just introduces the helper functions. Subsequent patches will
-make use of these helpers.
+If enabled, server will indicate to client that it is capable of handling
+one security label during file creation. Typically this is expected to
+be a SELinux label. File server will set this label on the file. It will
+try to set it atomically wherever possible. But its not possible in
+all the cases.
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 92 ++++++++++++++++++++++++++++++++
- 1 file changed, 92 insertions(+)
+ docs/tools/virtiofsd.rst         | 32 ++++++++++++++++++++++++++++++++
+ tools/virtiofsd/helper.c         |  1 +
+ tools/virtiofsd/passthrough_ll.c | 15 +++++++++++++++
+ 3 files changed, 48 insertions(+)
 
+diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
+index 07ac0be551..0c0560203c 100644
+--- a/docs/tools/virtiofsd.rst
++++ b/docs/tools/virtiofsd.rst
+@@ -104,6 +104,13 @@ Options
+   * posix_acl|no_posix_acl -
+     Enable/disable posix acl support.  Posix ACLs are disabled by default.
+ 
++  * security_label|no_security_label -
++    Enable/disable security label support. Security labels are disabled by
++    default. This will allow client to send a MAC label of file during
++    file creation. Typically this is expected to be SELinux security
++    label. Server will try to set that label on newly created file
++    atomically wherever possible.
++
+ .. option:: --socket-path=PATH
+ 
+   Listen on vhost-user UNIX domain socket at PATH.
+@@ -348,6 +355,31 @@ client arguments or lists returned from the host.  This stops
+ the client seeing any 'security.' attributes on the server and
+ stops it setting any.
+ 
++SELinux support
++---------------
++One can enable support for SELinux by running virtiofsd with option
++"-o security_label". But this will try to save guest's security context
++in xattr security.selinux on host and it might fail if host's SELinux
++policy does not permit virtiofsd to do this operation.
++
++Hence, it is preferred to remap guest's "security.selinux" xattr to say
++"trusted.virtiofs.security.selinux" on host.
++
++"-o xattrmap=:map:security.selinux:trusted.virtiofs.:"
++
++This will make sure that guest and host's SELinux xattrs on same file
++remain separate and not interfere with each other. And will allow both
++host and guest to implement their own separate SELinux policies.
++
++Setting trusted xattr on host requires CAP_SYS_ADMIN. So one will need
++add this capability to daemon.
++
++"-o modcaps=+sys_admin"
++
++Giving CAP_SYS_ADMIN increases the risk on system. Now virtiofsd is more
++powerful and if gets compromised, it can do lot of damage to host system.
++So keep this trade-off in my mind while making a decision.
++
+ Examples
+ --------
+ 
+diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
+index a8295d975a..e226fc590f 100644
+--- a/tools/virtiofsd/helper.c
++++ b/tools/virtiofsd/helper.c
+@@ -187,6 +187,7 @@ void fuse_cmdline_help(void)
+            "                               default: no_allow_direct_io\n"
+            "    -o announce_submounts      Announce sub-mount points to the guest\n"
+            "    -o posix_acl/no_posix_acl  Enable/Disable posix_acl. (default: disabled)\n"
++           "    -o security_label/no_security_label  Enable/Disable security label. (default: disabled)\n"
+            );
+ }
+ 
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 82023bf3d4..7762bf0d2c 100644
+index d49128a58d..f3ec6aafe5 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -173,10 +173,14 @@ struct lo_data {
- 
-     /* An O_PATH file descriptor to /proc/self/fd/ */
-     int proc_self_fd;
-+    /* An O_PATH file descriptor to /proc/self/task/ */
-+    int proc_self_task;
-     int user_killpriv_v2, killpriv_v2;
-     /* If set, virtiofsd is responsible for setting umask during creation */
-     bool change_umask;
+@@ -181,6 +181,7 @@ struct lo_data {
      int user_posix_acl, posix_acl;
-+    /* Keeps track if /proc/<pid>/attr/fscreate should be used or not */
-+    bool use_fscreate;
+     /* Keeps track if /proc/<pid>/attr/fscreate should be used or not */
+     bool use_fscreate;
++    int user_security_label;
  };
  
  static const struct fuse_opt lo_opts[] = {
-@@ -256,6 +260,72 @@ static struct lo_data *lo_data(fuse_req_t req)
-     return (struct lo_data *)fuse_req_userdata(req);
+@@ -215,6 +216,8 @@ static const struct fuse_opt lo_opts[] = {
+     { "no_killpriv_v2", offsetof(struct lo_data, user_killpriv_v2), 0 },
+     { "posix_acl", offsetof(struct lo_data, user_posix_acl), 1 },
+     { "no_posix_acl", offsetof(struct lo_data, user_posix_acl), 0 },
++    { "security_label", offsetof(struct lo_data, user_security_label), 1 },
++    { "no_security_label", offsetof(struct lo_data, user_security_label), 0 },
+     FUSE_OPT_END
+ };
+ static bool use_syslog = false;
+@@ -808,6 +811,17 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
+         fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling posix_acl\n");
+         conn->want &= ~FUSE_CAP_POSIX_ACL;
+     }
++
++    if (lo->user_security_label == 1) {
++        if (!(conn->capable & FUSE_CAP_SECURITY_CTX)) {
++            fuse_log(FUSE_LOG_ERR, "lo_init: Can not enable security label."
++                     " kernel does not support FUSE_SECURITY_CTX capability.\n");
++        }
++        conn->want |= FUSE_CAP_SECURITY_CTX;
++    } else {
++        fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling security label\n");
++        conn->want &= ~FUSE_CAP_SECURITY_CTX;
++    }
  }
  
-+/*
-+ * Tries to figure out if /proc/<pid>/attr/fscreate is usable or not. With
-+ * selinux=0, read from fscreate returns -EINVAL.
-+ *
-+ * TODO: Link with libselinux and use is_selinux_enabled() instead down
-+ * the line. It probably will be more reliable indicator.
-+ */
-+static bool is_fscreate_usable(struct lo_data *lo)
-+{
-+    char procname[64];
-+    int fscreate_fd;
-+    size_t bytes_read;
-+
-+    sprintf(procname, "%d/attr/fscreate", gettid());
-+    fscreate_fd = openat(lo->proc_self_task, procname, O_RDWR);
-+    if (fscreate_fd == -1) {
-+        return false;
-+    }
-+
-+    bytes_read = read(fscreate_fd, procname, 64);
-+    close(fscreate_fd);
-+    if (bytes_read == -1) {
-+        return false;
-+    }
-+    return true;
-+}
-+
-+/* Helpers to set/reset fscreate */
-+__attribute__((unused))
-+static int open_set_proc_fscreate(struct lo_data *lo, const void *ctx,
-+                                  size_t ctxlen,int *fd)
-+{
-+    char procname[64];
-+    int fscreate_fd, err = 0;
-+    size_t written;
-+
-+    sprintf(procname, "%d/attr/fscreate", gettid());
-+    fscreate_fd = openat(lo->proc_self_task, procname, O_WRONLY);
-+    err = fscreate_fd == -1 ? errno : 0;
-+    if (err) {
-+        return err;
-+    }
-+
-+    written = write(fscreate_fd, ctx, ctxlen);
-+    err = written == -1 ? errno : 0;
-+    if (err) {
-+        goto out;
-+    }
-+
-+    *fd = fscreate_fd;
-+    return 0;
-+out:
-+    close(fscreate_fd);
-+    return err;
-+}
-+
-+__attribute__((unused))
-+static void close_reset_proc_fscreate(int fd)
-+{
-+    if ((write(fd, NULL, 0)) == -1) {
-+        fuse_log(FUSE_LOG_WARNING, "Failed to reset fscreate. err=%d\n", errno);
-+    }
-+    close(fd);
-+    return;
-+}
-+
- /*
-  * Load capng's state from our saved state if the current thread
-  * hadn't previously been loaded.
-@@ -3522,6 +3592,15 @@ static void setup_namespaces(struct lo_data *lo, struct fuse_session *se)
-         exit(1);
-     }
- 
-+    /* Get the /proc/self/task descriptor */
-+    lo->proc_self_task = open("/proc/self/task/", O_PATH);
-+    if (lo->proc_self_task == -1) {
-+        fuse_log(FUSE_LOG_ERR, "open(/proc/self/task, O_PATH): %m\n");
-+        exit(1);
-+    }
-+
-+    lo->use_fscreate = is_fscreate_usable(lo);
-+
-     /*
-      * We only need /proc/self/fd. Prevent ".." from accessing parent
-      * directories of /proc/self/fd by bind-mounting it over /proc. Since / was
-@@ -3738,6 +3817,14 @@ static void setup_chroot(struct lo_data *lo)
-         exit(1);
-     }
- 
-+    lo->proc_self_task = open("/proc/self/task", O_PATH);
-+    if (lo->proc_self_fd == -1) {
-+        fuse_log(FUSE_LOG_ERR, "open(\"/proc/self/task\", O_PATH): %m\n");
-+        exit(1);
-+    }
-+
-+    lo->use_fscreate = is_fscreate_usable(lo);
-+
-     /*
-      * Make the shared directory the file system root so that FUSE_OPEN
-      * (lo_open()) cannot escape the shared directory by opening a symlink.
-@@ -3923,6 +4010,10 @@ static void fuse_lo_data_cleanup(struct lo_data *lo)
-         close(lo->proc_self_fd);
-     }
- 
-+    if (lo->proc_self_task >= 0) {
-+        close(lo->proc_self_task);
-+    }
-+
-     if (lo->root.fd >= 0) {
-         close(lo->root.fd);
-     }
-@@ -3950,6 +4041,7 @@ int main(int argc, char *argv[])
-         .posix_lock = 0,
-         .allow_direct_io = 0,
-         .proc_self_fd = -1,
-+        .proc_self_task = -1,
+ static void lo_getattr(fuse_req_t req, fuse_ino_t ino,
+@@ -4279,6 +4293,7 @@ int main(int argc, char *argv[])
+         .proc_self_task = -1,
          .user_killpriv_v2 = -1,
          .user_posix_acl = -1,
++        .user_security_label = -1,
      };
+     struct lo_map_elem *root_elem;
+     struct lo_map_elem *reserve_elem;
 -- 
 2.34.1
 

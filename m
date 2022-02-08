@@ -1,27 +1,12 @@
-Date: Tue, 8 Feb 2022 12:14:32 -0500
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=sLwWaKjDpVCsk1q2+ePpfneswoPb1qvQEmCAaSARG6c=; b=h
-	bFOZTkKlG9xPgNEqIdgt5/DqA66zAcF542Uxpex7IWZGawkZu9BKquk3Q4lfd4ds
-	UruQt1YZ+4SEBg56ASlSCprXtVrWJ7jVfDthV8wNYUSJRlagaCUu7xIx0TBweAce
-	sXIGIWkheZ3BFVwZvsojiJywYTevXB6X/ApVUZwpHATLhg3wtQaxvnwZN+a+ohXX
-	9K4JzNPxJBDXSDELU0Z1kI5mFn9RNIVCx9u3s15St8mpBJAGmPdCwWwQ25Njv9nu
-	RTb7FS5PHuGEG094gtt6Xn8Db6a1En/tFTQP4gNDxR6VTtneDNmQtS4KKVLXxrun
-	jSxbpEcvTJusJXejClaiA==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
-	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm2; bh=sLwWaKjDpVCsk1q2+ePpfneswoPb1
-	qvQEmCAaSARG6c=; b=dX5Na/yGTRINS5Vjx08API3kk3MusS8jt67aXSo3OHFKk
-	SsFz9E9NnIO3LQHqNnix6S/rbpSp52YDClleGPIFPd0ZMdBWQPP/CDq315tvK5vt
-	5z1ugTRoMNNgo8qtf1ANInX4QM8LD5FAZkxKx2zlRfUukJH7Lb+A+maFiftN90F4
-	QAS7cmVQshMYRIY9SZabW99ZI5xx0PtyMwYsBs6RmzhZUgbQR9UANNovhBrNqlD+
-	Q2gR0FayA4u4Lq/dvHu3KzGq3EnnyN+Me2ETHHDaiDayWC6AsKOu9NgQikdk7mvS
-	WZeESv6C+/7amsBdFfpKL1cZhi8wexPVpkRXtehQw==
-From: virtiofs-bot@sinrega.org
-Message-Id: <96856.122020812142601561@us-mta-210.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR opened: Server: Store enabled FSOptions
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Tue,  8 Feb 2022 15:48:07 -0500
+Message-Id: <20220208204813.682906-5-vgoyal@redhat.com>
+In-Reply-To: <20220208204813.682906-1-vgoyal@redhat.com>
+References: <20220208204813.682906-1-vgoyal@redhat.com>
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v6 04/10] virtiofsd: Extend size of
+	fuse_conn_info->capable and ->want fields
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -30,11 +15,61 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com
+Cc: berrange@redhat.com, vgoyal@redhat.com
 
-Store enabled FSOptions as Server field and get the correct structure based on whether SETXATTR_EXT is set in the negotiated FSOptions flags.
+->capable keeps track of what capabilities kernel supports and ->wants keep
+track of what capabilities filesytem wants.
 
-Also, pass the 'SetxattrIn::setxattr_flags' as extra flags to 'FileSystem::setxattr', currently this argument is ignored, but will be required to implement posix_acls and selinux support.
+Right now these fields are 32bit in size. But now fuse has run out of
+bits and capabilities can now have bit number which are higher than 31.
+
+That means 32 bit fields are not suffcient anymore. Increase size to 64
+bit so that we can add newer capabilities and still be able to use existing
+code to check and set the capabilities.
+
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/92
+ tools/virtiofsd/fuse_common.h   | 4 ++--
+ tools/virtiofsd/fuse_lowlevel.c | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
+index 0c2665b977..6f8a988202 100644
+--- a/tools/virtiofsd/fuse_common.h
++++ b/tools/virtiofsd/fuse_common.h
+@@ -439,7 +439,7 @@ struct fuse_conn_info {
+     /**
+      * Capability flags that the kernel supports (read-only)
+      */
+-    unsigned capable;
++    uint64_t capable;
+ 
+     /**
+      * Capability flags that the filesystem wants to enable.
+@@ -447,7 +447,7 @@ struct fuse_conn_info {
+      * libfuse attempts to initialize this field with
+      * reasonable default values before calling the init() handler.
+      */
+-    unsigned want;
++    uint64_t want;
+ 
+     /**
+      * Maximum number of pending "background" requests. A
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index b6712b763a..d91cd9743a 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -2069,7 +2069,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+     if (se->conn.want & (~se->conn.capable)) {
+         fuse_log(FUSE_LOG_ERR,
+                  "fuse: error: filesystem requested capabilities "
+-                 "0x%x that are not supported by kernel, aborting.\n",
++                 "0x%llx that are not supported by kernel, aborting.\n",
+                  se->conn.want & (~se->conn.capable));
+         fuse_reply_err(req, EPROTO);
+         se->error = -EPROTO;
+-- 
+2.34.1
 

@@ -1,12 +1,12 @@
 From: Vivek Goyal <vgoyal@redhat.com>
-Date: Tue,  8 Feb 2022 15:48:12 -0500
-Message-Id: <20220208204813.682906-10-vgoyal@redhat.com>
+Date: Tue,  8 Feb 2022 15:48:08 -0500
+Message-Id: <20220208204813.682906-6-vgoyal@redhat.com>
 In-Reply-To: <20220208204813.682906-1-vgoyal@redhat.com>
 References: <20220208204813.682906-1-vgoyal@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v6 09/10] virtiofsd: Create new file using
-	O_TMPFILE and set security context
+Subject: [Virtio-fs] [PATCH v6 05/10] virtiofsd,
+	fuse_lowlevel.c: Add capability to parse security context
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,163 +18,239 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, virtio-fs@redhat.com
 Cc: berrange@redhat.com, vgoyal@redhat.com
 
-If guest and host policies can't work with each other, then guest security
-context (selinux label) needs to be set into an xattr. Say remap guest
-security.selinux xattr to trusted.virtiofs.security.selinux.
+Add capability to enable and parse security context as sent by client
+and put into fuse_req. Filesystems now can get security context from
+request and set it on files during creation.
 
-That means setting "fscreate" is not going to help as that's ony useful
-for security.selinux xattr on host.
-
-So we need another method which is atomic. Use O_TMPFILE to create new
-file, set xattr and then linkat() to proper place.
-
-But this works only for regular files. So dir, symlinks will continue
-to be non-atomic.
-
-Also if host filesystem does not support O_TMPFILE, we fallback to
-non-atomic behavior.
-
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
- tools/virtiofsd/passthrough_ll.c | 80 ++++++++++++++++++++++++++++----
- 1 file changed, 72 insertions(+), 8 deletions(-)
+ tools/virtiofsd/fuse_common.h   |   5 ++
+ tools/virtiofsd/fuse_i.h        |   7 +++
+ tools/virtiofsd/fuse_lowlevel.c | 102 +++++++++++++++++++++++++++++++-
+ 3 files changed, 113 insertions(+), 1 deletion(-)
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 68fa542fac..d49128a58d 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -2153,14 +2153,29 @@ static int lo_do_open(struct lo_data *lo, struct lo_inode *inode,
+diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
+index 6f8a988202..bf46954dab 100644
+--- a/tools/virtiofsd/fuse_common.h
++++ b/tools/virtiofsd/fuse_common.h
+@@ -377,6 +377,11 @@ struct fuse_file_info {
+  */
+ #define FUSE_CAP_SETXATTR_EXT (1 << 29)
  
- static int do_create_nosecctx(fuse_req_t req, struct lo_inode *parent_inode,
-                                const char *name, mode_t mode,
--                               struct fuse_file_info *fi, int *open_fd)
-+                               struct fuse_file_info *fi, int *open_fd,
-+                              bool tmpfile)
- {
-     int err, fd;
-     struct lo_cred old = {};
-     struct lo_data *lo = lo_data(req);
-     int flags;
- 
--    flags = fi->flags | O_CREAT | O_EXCL;
-+    if (tmpfile) {
-+        flags = fi->flags | O_TMPFILE;
-+        /*
-+         * Don't use O_EXCL as we want to link file later. Also reset O_CREAT
-+         * otherwise openat() returns -EINVAL.
-+         */
-+        flags &= ~(O_CREAT | O_EXCL);
++/**
++ * Indicates that file server supports creating file security context
++ */
++#define FUSE_CAP_SECURITY_CTX (1ULL << 32)
 +
-+        /* O_TMPFILE needs either O_RDWR or O_WRONLY */
-+        if ((flags & O_ACCMODE) == O_RDONLY) {
-+            flags |= O_RDWR;
-+        }
-+    } else {
-+        flags = fi->flags | O_CREAT | O_EXCL;
-+    }
+ /**
+  * Ioctl flags
+  *
+diff --git a/tools/virtiofsd/fuse_i.h b/tools/virtiofsd/fuse_i.h
+index 492e002181..a5572fa4ae 100644
+--- a/tools/virtiofsd/fuse_i.h
++++ b/tools/virtiofsd/fuse_i.h
+@@ -15,6 +15,12 @@
+ struct fv_VuDev;
+ struct fv_QueueInfo;
  
-     err = lo_change_cred(req, &old, lo->change_umask);
-     if (err) {
-@@ -2191,7 +2206,7 @@ static int do_create_secctx_fscreate(fuse_req_t req,
-         return err;
++struct fuse_security_context {
++        const char *name;
++        uint32_t ctxlen;
++        const void *ctx;
++};
++
+ struct fuse_req {
+     struct fuse_session *se;
+     uint64_t unique;
+@@ -35,6 +41,7 @@ struct fuse_req {
+     } u;
+     struct fuse_req *next;
+     struct fuse_req *prev;
++    struct fuse_security_context secctx;
+ };
+ 
+ struct fuse_notify_req {
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index d91cd9743a..2909122b23 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -886,11 +886,63 @@ static void do_readlink(fuse_req_t req, fuse_ino_t nodeid,
      }
- 
--    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd);
-+    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd, false);
- 
-     close_reset_proc_fscreate(fscreate_fd);
-     if (!err) {
-@@ -2200,6 +2215,44 @@ static int do_create_secctx_fscreate(fuse_req_t req,
-     return err;
  }
  
-+static int do_create_secctx_tmpfile(fuse_req_t req,
-+                                    struct lo_inode *parent_inode,
-+                                    const char *name, mode_t mode,
-+                                    struct fuse_file_info *fi,
-+                                    const char *secctx_name, int *open_fd)
++static int parse_secctx_fill_req(fuse_req_t req, struct fuse_mbuf_iter *iter)
 +{
-+    int err, fd = -1;
-+    struct lo_data *lo = lo_data(req);
-+    char procname[64];
++    struct fuse_secctx_header *fsecctx_header;
++    struct fuse_secctx *fsecctx;
++    const void *secctx;
++    const char *name;
 +
-+    err = do_create_nosecctx(req, parent_inode, ".", mode, fi, &fd, true);
-+    if (err) {
-+        return err;
++    fsecctx_header = fuse_mbuf_iter_advance(iter, sizeof(*fsecctx_header));
++    if (!fsecctx_header) {
++        return -EINVAL;
 +    }
 +
-+    err = fsetxattr(fd, secctx_name, req->secctx.ctx, req->secctx.ctxlen, 0);
-+    if (err) {
-+        err = errno;
-+        goto out;
++    /*
++     * As of now maximum of one security context is supported. It can
++     * change in future though.
++     */
++    if (fsecctx_header->nr_secctx > 1) {
++        return -EINVAL;
 +    }
 +
-+    /* Security context set on file. Link it in place */
-+    sprintf(procname, "%d", fd);
-+    FCHDIR_NOFAIL(lo->proc_self_fd);
-+    err = linkat(AT_FDCWD, procname, parent_inode->fd, name,
-+                 AT_SYMLINK_FOLLOW);
-+    err = err == -1 ? errno : 0;
-+    FCHDIR_NOFAIL(lo->root.fd);
-+
-+out:
-+    if (!err) {
-+        *open_fd = fd;
-+    } else if (fd != -1) {
-+        close(fd);
++    /* No security context sent. Maybe no LSM supports it */
++    if (!fsecctx_header->nr_secctx) {
++        return 0;
 +    }
-+    return err;
++
++    fsecctx = fuse_mbuf_iter_advance(iter, sizeof(*fsecctx));
++    if (!fsecctx) {
++        return -EINVAL;
++    }
++
++    /* struct fsecctx with zero sized context is not expected */
++    if (!fsecctx->size) {
++        return -EINVAL;
++    }
++    name = fuse_mbuf_iter_advance_str(iter);
++    if (!name) {
++        return -EINVAL;
++    }
++
++    secctx = fuse_mbuf_iter_advance(iter, fsecctx->size);
++    if (!secctx) {
++        return -EINVAL;
++    }
++
++    req->secctx.name = name;
++    req->secctx.ctx = secctx;
++    req->secctx.ctxlen = fsecctx->size;
++    return 0;
 +}
 +
- static int do_create_secctx_noatomic(fuse_req_t req,
-                                      struct lo_inode *parent_inode,
-                                      const char *name, mode_t mode,
-@@ -2208,7 +2261,7 @@ static int do_create_secctx_noatomic(fuse_req_t req,
+ static void do_mknod(fuse_req_t req, fuse_ino_t nodeid,
+                      struct fuse_mbuf_iter *iter)
  {
-     int err = 0, fd = -1;
+     struct fuse_mknod_in *arg;
+     const char *name;
++    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
++    int err;
  
--    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd);
-+    err = do_create_nosecctx(req, parent_inode, name, mode, fi, &fd, false);
-     if (err) {
-         goto out;
+     arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
+     name = fuse_mbuf_iter_advance_str(iter);
+@@ -901,6 +953,14 @@ static void do_mknod(fuse_req_t req, fuse_ino_t nodeid,
+ 
+     req->ctx.umask = arg->umask;
+ 
++    if (secctx_enabled) {
++        err = parse_secctx_fill_req(req, iter);
++        if (err) {
++            fuse_reply_err(req, -err);
++            return;
++        }
++    }
++
+     if (req->se->op.mknod) {
+         req->se->op.mknod(req, nodeid, name, arg->mode, arg->rdev);
+     } else {
+@@ -913,6 +973,8 @@ static void do_mkdir(fuse_req_t req, fuse_ino_t nodeid,
+ {
+     struct fuse_mkdir_in *arg;
+     const char *name;
++    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
++    int err;
+ 
+     arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
+     name = fuse_mbuf_iter_advance_str(iter);
+@@ -923,6 +985,14 @@ static void do_mkdir(fuse_req_t req, fuse_ino_t nodeid,
+ 
+     req->ctx.umask = arg->umask;
+ 
++    if (secctx_enabled) {
++        err = parse_secctx_fill_req(req, iter);
++        if (err) {
++            fuse_reply_err(req, err);
++            return;
++        }
++    }
++
+     if (req->se->op.mkdir) {
+         req->se->op.mkdir(req, nodeid, name, arg->mode);
+     } else {
+@@ -969,12 +1039,22 @@ static void do_symlink(fuse_req_t req, fuse_ino_t nodeid,
+ {
+     const char *name = fuse_mbuf_iter_advance_str(iter);
+     const char *linkname = fuse_mbuf_iter_advance_str(iter);
++    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
++    int err;
+ 
+     if (!name || !linkname) {
+         fuse_reply_err(req, EINVAL);
+         return;
      }
-@@ -2250,20 +2303,31 @@ static int do_lo_create(fuse_req_t req, struct lo_inode *parent_inode,
-     if (secctx_enabled) {
-         /*
-          * If security.selinux has not been remapped and selinux is enabled,
--         * use fscreate to set context before file creation.
--         * Otherwise fallback to non-atomic method of file creation
--         * and xattr settting.
-+         * use fscreate to set context before file creation. If not, use
-+         * tmpfile method for regular files. Otherwise fallback to
-+         * non-atomic method of file creation and xattr settting.
-          */
-         if (!mapped_name && lo->use_fscreate) {
-             err = do_create_secctx_fscreate(req, parent_inode, name, mode, fi,
-                                             open_fd);
-             goto out;
-+        } else if (S_ISREG(mode)) {
-+            err = do_create_secctx_tmpfile(req, parent_inode, name, mode, fi,
-+                                           ctxname, open_fd);
-+            /*
-+             * If filesystem does not support O_TMPFILE, fallback to non-atomic
-+             * method.
-+             */
-+            if (!err || err != EOPNOTSUPP) {
-+                goto out;
-+            }
+ 
++    if (secctx_enabled) {
++        err = parse_secctx_fill_req(req, iter);
++        if (err) {
++            fuse_reply_err(req, err);
++            return;
++        }
++    }
++
+     if (req->se->op.symlink) {
+         req->se->op.symlink(req, linkname, nodeid, name);
+     } else {
+@@ -1048,6 +1128,8 @@ static void do_link(fuse_req_t req, fuse_ino_t nodeid,
+ static void do_create(fuse_req_t req, fuse_ino_t nodeid,
+                       struct fuse_mbuf_iter *iter)
+ {
++    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
++
+     if (req->se->op.create) {
+         struct fuse_create_in *arg;
+         struct fuse_file_info fi;
+@@ -1060,6 +1142,15 @@ static void do_create(fuse_req_t req, fuse_ino_t nodeid,
+             return;
          }
  
-         err = do_create_secctx_noatomic(req, parent_inode, name, mode, fi,
-                                         ctxname, open_fd);
-     } else {
--        err = do_create_nosecctx(req, parent_inode, name, mode, fi, open_fd);
-+        err = do_create_nosecctx(req, parent_inode, name, mode, fi, open_fd,
-+                                 false);
++        if (secctx_enabled) {
++            int err;
++            err = parse_secctx_fill_req(req, iter);
++            if (err) {
++                fuse_reply_err(req, err);
++                return;
++            }
++        }
++
+         memset(&fi, 0, sizeof(fi));
+         fi.flags = arg->flags;
+         fi.kill_priv = arg->open_flags & FUSE_OPEN_KILL_SUIDGID;
+@@ -2015,6 +2106,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+     if (flags & FUSE_SETXATTR_EXT) {
+         se->conn.capable |= FUSE_CAP_SETXATTR_EXT;
+     }
++    if (flags & FUSE_SECURITY_CTX) {
++        se->conn.capable |= FUSE_CAP_SECURITY_CTX;
++    }
+ #ifdef HAVE_SPLICE
+ #ifdef HAVE_VMSPLICE
+     se->conn.capable |= FUSE_CAP_SPLICE_WRITE | FUSE_CAP_SPLICE_MOVE;
+@@ -2154,8 +2248,14 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+         outarg.flags |= FUSE_SETXATTR_EXT;
      }
  
- out:
++    if (se->conn.want & FUSE_CAP_SECURITY_CTX) {
++        /* bits 32..63 get shifted down 32 bits into the flags2 field */
++        outarg.flags2 |= FUSE_SECURITY_CTX >> 32;
++    }
++
+     fuse_log(FUSE_LOG_DEBUG, "   INIT: %u.%u\n", outarg.major, outarg.minor);
+-    fuse_log(FUSE_LOG_DEBUG, "   flags=0x%08x\n", outarg.flags);
++    fuse_log(FUSE_LOG_DEBUG, "   flags2=0x%08x flags=0x%08x\n", outarg.flags2,
++             outarg.flags);
+     fuse_log(FUSE_LOG_DEBUG, "   max_readahead=0x%08x\n", outarg.max_readahead);
+     fuse_log(FUSE_LOG_DEBUG, "   max_write=0x%08x\n", outarg.max_write);
+     fuse_log(FUSE_LOG_DEBUG, "   max_background=%i\n", outarg.max_background);
 -- 
 2.34.1
 

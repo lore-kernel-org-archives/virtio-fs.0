@@ -1,24 +1,28 @@
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=stuvus.uni-stuttgart.de; s=20200828.smtp02;
-	h=Content-Transfer-Encoding:
-	MIME-Version:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:Content-Type:
-	Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:
-	Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:
-	List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
-	bh=qddxRKK/Am2+hWt+gYqWMDbuPzwWnHe+PKonl18cm/E=;
-	b=oqHYwtx7dFuG+mI5NotKZYgow
-	SkM0vbDjFDc26R1OxKTm4BfkHa05jGsr+8ieUnnMXkg1BhVgM2h5VTVxSlgv7qW5AbhnqkGBJB3BE
-	S/hwqcWqYMuOpqGtcfSZ/xO+Gd+mRhasaQ2i6htv4iPsLbeM44InZD0ZyX/p7dbgsooKyJOSG7gI1
-	ZjOKJTIFKq/g6flEK+g4t9BmpnWBbHl+qsCTqMhlRCFBzvPp/4KtElSHaqbC2BHPGW9K84BLvXCVv
-	hFlssh5VzhJD0WhCVWkQjHSxTsP2MMbzqyXF4tjFE0IR6yYAPCY2jj4YiSEi2HEov3vQGATNk4l6x
-	dxpi9Wnaw==
-From: Sebastian Hasler <sebastian.hasler@stuvus.uni-stuttgart.de>
-Date: Tue, 11 Jan 2022 19:10:43 +0100
-Message-Id: <20220111181043.435915-1-sebastian.hasler@stuvus.uni-stuttgart.de>
-MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
+Date: Tue, 8 Feb 2022 10:48:23 -0500
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+	:to; s=fm3; bh=UH8TS/EzPGw/GBzDJWtcvbqn0HsrZSZIjurqR+DaLL8=; b=R
+	V1CyncCZ+3w0WMRHSQvd3LzmmzIrDyhdzJ6/PSwgMklfucr/nkn50GXOC2qLnWbx
+	8dkq5oveGdMlbnAjcks1L+s+s6LznKuKgcgEu7eHilw9BqI2lGelTWi0dBtP9boC
+	ILysE/ScDYoWJNa0E7DH3UHwPeG9n0KurMGDpYOf3tRCo2rE8Oo5//ATGuM/l7CY
+	JfLM6GJ16yZ4V/wB0MCba/68v5owBjrctebBexbdzlaTTDc5/bKgiW5OesudQu+h
+	+Zq0PH76DnmYiv9yS3T5g9iSib4IkmNK2Nv3brkqsiGlwLD3OECVVwO73WrtMZge
+	kS9jCjYUBTZUEOM8t7zXQ==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
+	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
+	:x-me-sender:x-sasl-enc; s=fm2; bh=UH8TS/EzPGw/GBzDJWtcvbqn0HsrZ
+	SZIjurqR+DaLL8=; b=koFot0sdaQ1q8X4mabQ4tNTYafb+BrrSOVmXGycj5cQxn
+	8OVteL6QQ27+bgOu80BEcEycALRFwmwV+4oKMxBA3IxRMmHL9k8Vlouw4ugrMuGO
+	mvSWkEULBNSzdWdAuWoy/+EcrlYu2F7B/R5NV7RspQzgbuFaK/4FCy7ahBZrycVs
+	XyOfvpeWu4UOJ3RjP+cauqLCSnkWZCySPtptpJHqYwlsHe62LbjM6EESjX4y1kHa
+	rQ1tK3SZ5z49S5ttahfsLmUICF+EIsn+SfS+Y6cFNwhNjaQ4V0oaY3KjragJjQYy
+	SBLFvZG1d2XOrfMw+CvAgcu900djmWzCGZ11M/wzw==
+From: virtiofs-bot@sinrega.org
+Message-Id: <52443.122020810482100643@us-mta-542.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH] virtiofsd: Do not support blocking flock
+Subject: [Virtio-fs] [virtiofsd] MR merged: Clean up the command line usage
+	message
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,35 +31,12 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: virtio-fs@redhat.com, Sebastian Hasler <sebastian.hasler@stuvus.uni-stuttgart.de>
+To: virtio-fs@redhat.com
 
-With the current implementation, blocking flock can lead to
-deadlock. Thus, it's better to return EOPNOTSUPP if a user attempts
-to perform a blocking flock request.
+In the usage message, we show legacy and deprecated options whose use we discourage without any warning or deprecated mark.
 
-Signed-off-by: Sebastian Hasler <sebastian.hasler@stuvus.uni-stuttgart.de>
+We can adopt a deprecation policy, for instance, where a deprecated option will be removed in the next major revision.
+In this MR the legacy options are marked as "deprecated" and a warning message is shown if are used.
 ---
- tools/virtiofsd/passthrough_ll.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 64b5b4fbb1..f3cc307f6d 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -2442,6 +2442,12 @@ static void lo_flock(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
-     int res;
-     (void)ino;
- 
-+    if (!(op & LOCK_NB)) {
-+        /* Blocking flock is not supported */
-+        fuse_reply_err(req, EOPNOTSUPP);
-+        return;
-+    }
-+
-     res = flock(lo_fi_fd(req, fi), op);
- 
-     fuse_reply_err(req, res == -1 ? errno : 0);
--- 
-2.33.1
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/69
 

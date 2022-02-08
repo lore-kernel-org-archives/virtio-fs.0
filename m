@@ -1,27 +1,12 @@
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=stuvus.uni-stuttgart.de; s=20200828.smtp01;
-	h=Content-Transfer-Encoding:
-	Content-Type:In-Reply-To:From:References:Cc:To:Subject:MIME-Version:Date:
-	Message-ID:Sender:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
-	List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
-	bh=dcRu7FojRWTNXtKiFm4Pu19KnNsiQKZkESkvqs4+2kM=;
-	b=hsBXdP2QbWeNNPDyIWBmCPUwx
-	ujzdcQ/giu/rFaVdFYJd2uqyHusZ9X99KsRAR741j4MM/EORNJF+bWAv2rMSzGP8SzH1d4Hx6XPOh
-	+fIWPYZR6bYHgew9n/KNb2cn64jNDsuAF1czj83ps7gw1jUbiJXWWI7cYTmLea1SlXogYVaSYeIkX
-	aIHrehC7GWunw8Zi1itVm+0CAwjQ35wqfsTk1RxgNGEwW9/iWuG1J3Z2ti/Ch+aqnXUUaRI4+HErB
-	MrrrQrUFlpyXICI1JvPDEZyT174C+xbmevDRlg8mi4HaPanM1zGDxxNF1hflMeaUDT8WNzsiDjzba
-	Ivuc/9Brw==
-Message-ID: <d2f48cc3-b539-eb4d-bb4d-96f915a51f80@stuvus.uni-stuttgart.de>
-Date: Wed, 12 Jan 2022 18:18:08 +0100
+From: Vivek Goyal <vgoyal@redhat.com>
+Date: Tue,  8 Feb 2022 15:48:09 -0500
+Message-Id: <20220208204813.682906-7-vgoyal@redhat.com>
+In-Reply-To: <20220208204813.682906-1-vgoyal@redhat.com>
+References: <20220208204813.682906-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-References: <20220111181043.435915-1-sebastian.hasler@stuvus.uni-stuttgart.de>
-From: Sebastian Hasler <sebastian.hasler@stuvus.uni-stuttgart.de>
-In-Reply-To: <20220111181043.435915-1-sebastian.hasler@stuvus.uni-stuttgart.de>
-Content-Language: en-US
-Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Do not support blocking flock
+Subject: [Virtio-fs] [PATCH v6 06/10] virtiofsd: Move core file creation
+	code in separate function
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -30,57 +15,82 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: virtio-fs@redhat.com
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com
+Cc: berrange@redhat.com, vgoyal@redhat.com
 
+Move core file creation bits in a separate function. Soon this is going
+to get more complex as file creation need to set security context also.
+And there will be multiple modes of file creation in next patch.
 
-On 11/01/2022 19:10, Sebastian Hasler wrote:
-> With the current implementation, blocking flock can lead to
-> deadlock. Thus, it's better to return EOPNOTSUPP if a user attempts
-> to perform a blocking flock request.
->
-> Signed-off-by: Sebastian Hasler <sebastian.hasler@stuvus.uni-stuttgart.de>
-> ---
->   tools/virtiofsd/passthrough_ll.c | 6 ++++++
->   1 file changed, 6 insertions(+)
->
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 64b5b4fbb1..f3cc307f6d 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2442,6 +2442,12 @@ static void lo_flock(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
->       int res;
->       (void)ino;
->   
-> +    if (!(op & LOCK_NB)) {
-> +        /* Blocking flock is not supported */
-> +        fuse_reply_err(req, EOPNOTSUPP);
-> +        return;
-> +    }
-> +
->       res = flock(lo_fi_fd(req, fi), op);
->   
->       fuse_reply_err(req, res == -1 ? errno : 0);
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c | 36 ++++++++++++++++++++++----------
+ 1 file changed, 25 insertions(+), 11 deletions(-)
 
-I tested this patch by cherry-picking it on v6.1.0 and using it with 
-Kata Containers 2.3.0. The bash code
-
-     exec 42>/lock/flock
-     flock -w 120 42
-
-outputs
-
-     flock: 42: Operation not supported
-
-while the bash code
-
-     exec 42>/lock/flock
-     flock --nonblock 42
-
-still works. So it works as intended.
-
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index b3d0674f6d..82023bf3d4 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -2001,6 +2001,30 @@ static int lo_do_open(struct lo_data *lo, struct lo_inode *inode,
+     return 0;
+ }
+ 
++static int do_lo_create(fuse_req_t req, struct lo_inode *parent_inode,
++                        const char *name, mode_t mode,
++                        struct fuse_file_info *fi, int* open_fd)
++{
++    int err = 0, fd;
++    struct lo_cred old = {};
++    struct lo_data *lo = lo_data(req);
++
++    err = lo_change_cred(req, &old, lo->change_umask);
++    if (err) {
++        return err;
++    }
++
++    /* Try to create a new file but don't open existing files */
++    fd = openat(parent_inode->fd, name, fi->flags | O_CREAT | O_EXCL, mode);
++    if (fd == -1) {
++        err = errno;
++    } else {
++        *open_fd = fd;
++    }
++    lo_restore_cred(&old, lo->change_umask);
++    return err;
++}
++
+ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+                       mode_t mode, struct fuse_file_info *fi)
+ {
+@@ -2010,7 +2034,6 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+     struct lo_inode *inode = NULL;
+     struct fuse_entry_param e;
+     int err;
+-    struct lo_cred old = {};
+ 
+     fuse_log(FUSE_LOG_DEBUG, "lo_create(parent=%" PRIu64 ", name=%s)"
+              " kill_priv=%d\n", parent, name, fi->kill_priv);
+@@ -2026,18 +2049,9 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+         return;
+     }
+ 
+-    err = lo_change_cred(req, &old, lo->change_umask);
+-    if (err) {
+-        goto out;
+-    }
+-
+     update_open_flags(lo->writeback, lo->allow_direct_io, fi);
+ 
+-    /* Try to create a new file but don't open existing files */
+-    fd = openat(parent_inode->fd, name, fi->flags | O_CREAT | O_EXCL, mode);
+-    err = fd == -1 ? errno : 0;
+-
+-    lo_restore_cred(&old, lo->change_umask);
++    err = do_lo_create(req, parent_inode, name, mode, fi, &fd);
+ 
+     /* Ignore the error if file exists and O_EXCL was not given */
+     if (err && (err != EEXIST || (fi->flags & O_EXCL))) {
 -- 
-Sebastian Hasler
-
-stuvus – Studierendenvertretung Universität Stuttgart
+2.34.1
 

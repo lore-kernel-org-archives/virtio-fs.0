@@ -1,28 +1,28 @@
-Date: Tue, 8 Feb 2022 10:48:23 -0500
+Date: Tue, 8 Feb 2022 10:48:43 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
 	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=UH8TS/EzPGw/GBzDJWtcvbqn0HsrZSZIjurqR+DaLL8=; b=R
-	V1CyncCZ+3w0WMRHSQvd3LzmmzIrDyhdzJ6/PSwgMklfucr/nkn50GXOC2qLnWbx
-	8dkq5oveGdMlbnAjcks1L+s+s6LznKuKgcgEu7eHilw9BqI2lGelTWi0dBtP9boC
-	ILysE/ScDYoWJNa0E7DH3UHwPeG9n0KurMGDpYOf3tRCo2rE8Oo5//ATGuM/l7CY
-	JfLM6GJ16yZ4V/wB0MCba/68v5owBjrctebBexbdzlaTTDc5/bKgiW5OesudQu+h
-	+Zq0PH76DnmYiv9yS3T5g9iSib4IkmNK2Nv3brkqsiGlwLD3OECVVwO73WrtMZge
-	kS9jCjYUBTZUEOM8t7zXQ==
+	:to; s=fm3; bh=w1ZalB0n0a+iU821BqCfAe6NYbEPwZhpP3A0TD6dB7I=; b=A
+	9IWjV5zb8pxuN2yrkn3qWBruvZNkneiBOUmNYSmQnZuYrFK+9ME+f6eIQ5oDpAWC
+	zn7TX7g9ZQp5sCO3m4nV+zJ9+STm4jRsFGipN5uKTJPz+0hY3KIUy4IVFKSYg67L
+	0EfkNOumbSJMusPYraOrdZL55hUz0DW0hY+87kwar9jK2fadmLbJknSW2gN0BDCq
+	CJgKNcUop6JQPbivCdSanJyDk1s9trd4qPPvIQybyVDF4cbtQXIkw6qRVA09u1wf
+	N6B2kHHwcQKOKJXkn/4HRPvse6CCswqehCyPGhLsr+V/qxyH1b5kxyOsRE56H8la
+	QaZZoinjRwb/m8yl4E2Mg==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
 	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm2; bh=UH8TS/EzPGw/GBzDJWtcvbqn0HsrZ
-	SZIjurqR+DaLL8=; b=koFot0sdaQ1q8X4mabQ4tNTYafb+BrrSOVmXGycj5cQxn
-	8OVteL6QQ27+bgOu80BEcEycALRFwmwV+4oKMxBA3IxRMmHL9k8Vlouw4ugrMuGO
-	mvSWkEULBNSzdWdAuWoy/+EcrlYu2F7B/R5NV7RspQzgbuFaK/4FCy7ahBZrycVs
-	XyOfvpeWu4UOJ3RjP+cauqLCSnkWZCySPtptpJHqYwlsHe62LbjM6EESjX4y1kHa
-	rQ1tK3SZ5z49S5ttahfsLmUICF+EIsn+SfS+Y6cFNwhNjaQ4V0oaY3KjragJjQYy
-	SBLFvZG1d2XOrfMw+CvAgcu900djmWzCGZ11M/wzw==
+	:x-me-sender:x-sasl-enc; s=fm2; bh=w1ZalB0n0a+iU821BqCfAe6NYbEPw
+	ZhpP3A0TD6dB7I=; b=g51PlU3XxfyQqiAL2krzZ4kr1XwGAFc1yrrJOf/EB8MJH
+	e6Gmpo85AnZyZ0hVEv2fiPvm4HXT4hdZeoxZD+o7WW93h2/YODeLrQcoCmeYaOJc
+	WkP85zE+aB+5f17/Gz/HgKmI7NOifOpoQzTO4i7jf93/7pbZ2ljN9CnK/CV0AIRU
+	KR2MOVFSXPtkktdkh9fnKYdE5HmP8J64REImBMHy0JxBwWiyT73RazwpWx6jB376
+	k5OAKGD9l2FSZK/XlHYORVir4EnkNbSaffgPgUQ8D5mUuvp5JEZl3098It0PHCLS
+	WOM5OuzwSmB4sVDE9gW54w8h4//pbtB5kJbnutBHA==
 From: virtiofs-bot@sinrega.org
-Message-Id: <52443.122020810482100643@us-mta-542.us.mimecast.lan>
+Message-Id: <38208.122020810484100785@us-mta-190.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR merged: Clean up the command line usage
-	message
+Subject: [Virtio-fs] [virtiofsd] MR merged: Add examples of how to run
+	virtiofsd inside a user namespace
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,10 +33,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-In the usage message, we show legacy and deprecated options whose use we discourage without any warning or deprecated mark.
-
-We can adopt a deprecation policy, for instance, where a deprecated option will be removed in the next major revision.
-In this MR the legacy options are marked as "deprecated" and a warning message is shown if are used.
+Expanding the current documentation with some examples of how to run virtiofsd inside a user namespace.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/69
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/74
 

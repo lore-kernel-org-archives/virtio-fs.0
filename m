@@ -1,16 +1,28 @@
-Date: Tue, 8 Feb 2022 08:59:38 +0000
-From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
-Message-ID: <YgIw+juiHLCXEhNn@redhat.com>
-References: <20220202193935.268777-1-vgoyal@redhat.com>
-	<YgEZDOcFr80tZGWd@redhat.com> <YgGM6pA2sXEAMa3a@redhat.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <YgGM6pA2sXEAMa3a@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v5 0/9] virtiofsd: Add support for file
- security context at file creation
-Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+Date: Tue, 8 Feb 2022 06:16:35 -0500
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+	:to; s=fm3; bh=Umuz9zo9JPjjDVTTBTp6L5Qasav+OGPqLaff996ZPEU=; b=l
+	tgrR3N3dz4O7k7XqjUZTyCw1IvLqn4A/G1CorAkwVkGY8Nf0JYOokf9perAAmXBM
+	4l/21sWleCpwoRw2B8PKHdWgJNQ7CnjsSDZD5VCOdt31Tq51icf0Deper6AO/zMu
+	hnGdT3RD4s6EdST5oyLcyU7jh1Np9TXW+Q5pzmxaRjQ+9fdhmdMYqy0pB2+nL4/t
+	CXo8s0Iz++ZWgapvjwhXnUPcjJQIrwOdZiGLVvtvHgi5cKaDFtOo/eO0ftWPYNaU
+	fRUdpcRvsu8IL9m3UrIxRoCr65WMrHJ7O7i0o2lpCR6BmVSzEK62Upjciz1bXqwd
+	v3YwETiPDKHMgdtfFozOw==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
+	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
+	:x-me-sender:x-sasl-enc; s=fm2; bh=Umuz9zo9JPjjDVTTBTp6L5Qasav+O
+	GPqLaff996ZPEU=; b=FljyhuNSJldlygKXtC5RpJMWtUmp63FE6pdR4QHsrhQp1
+	28KCxXb0HnXrJLD9g7DmjxIMmqUTuxMHVNw1NeyC7qMMcQ+gz6Q+D6Z3g4t3kjEM
+	oktN1Awa0CMFqYoK3D2r5jjFJOhIyuc0mh/PVfgtBR7w8zBEbR8RWP6DvLDhGkwM
+	UoS5EJMF6whHf4qaXnjy5HEJqgoFkJyvxJzsqMkbV1lK3i1lxE1Y7fI6yN19A/CI
+	Czb+BKM/2hPeZO2Q3v79zy1HSYxCF0nVdK93gMKczDulneZqRmp2IV/cBPxMFRDl
+	qzgGRweck5zPCbcSd27uG25Jz2Cyr1G9VAOLtPevg==
+From: virtiofs-bot@sinrega.org
+Message-Id: <71727.122020806163300649@us-mta-247.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd] MR opened: vhost_user_backend: Remove
+	nested RwLock
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,64 +31,13 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: virtio-fs@redhat.com
 
-On Mon, Feb 07, 2022 at 04:19:38PM -0500, Vivek Goyal wrote:
-> On Mon, Feb 07, 2022 at 01:05:16PM +0000, Daniel P. Berrangé wrote:
-> > On Wed, Feb 02, 2022 at 02:39:26PM -0500, Vivek Goyal wrote:
-> > > Hi,
-> > > 
-> > > This is V5 of the patches. I posted V4 here.
-> > > 
-> > > https://listman.redhat.com/archives/virtio-fs/2022-January/msg00041.html
-> > > 
-> > > These will allow us to support SELinux with virtiofs. This will send
-> > > SELinux context at file creation to server and server can set it on
-> > > file.
-> > 
-> > I've not entirely figured it out from the code, so easier for me
-> > to ask...
-> > 
-> > How is the SELinux labelled stored on the host side ? It is stored
-> > directly in the security.* xattr namespace,
-> 
-> [ CC Dan Walsh ]
-> 
-> I just tried to test the mode where I don't do xattr remapping and try
-> to set /proc/pid/attr/fscreate with the context I want to set. It will
-> set security.selinux xattr on host.
-> 
-> But write to /proc/pid/attr/fscreate fails if host does not recognize
-> the label sent by guest. I am running virtiofsd with unconfined_t but
-> it still fails because guest is trying to create a file with
-> "test_filesystem_filetranscon_t" and host does not recognize this
-> label. Seeing following in audit logs.
-> 
-> type=SELINUX_ERR msg=audit(1644268262.666:8111): op=fscreate invalid_context="unconfined_u:object_r:test_filesystem_filetranscon_t:s0"
-
-Yes, that's to be expected if the host policy doesn't know about the
-label that the guest is using.
-
-IOW, non-mapping case is only useful if you have a very good match
-between host + guest OS policy. This could be useful for an app
-like Kata because their guest is not a full OS, it is something
-special purpose and tightly controlled.
-
-> So if we don't remap xattrs and host has SELinux enabled, then it probably
-> work in very limited circumstances where host and guest policies don't
-> conflict. I guess its like running fedora 34 guest on fedora 34 host. 
-> I suspect that this will see very limited use. Though I have put the
-> code in for the sake of completeness.
-
-For general purpose guest OS virtualization remapping is going to be
-effectuively mandatory.  The non-mapped case only usable when you tightly
-control the guest OS packages from the host.
-
-Regards,
-Daniel
--- 
-|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
-|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
-|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
+Implement `VhostUserBackend` instead of `VhostUserBackendMut`, in
+order to avoid having a nested `RwLock`.  When using
+`VhostUserBackendMut`, it needs to be wrapped in an `RwLock` (or
+`Mutex`) which doesn't make sense, because our implementation uses
+its own `Mutex` for synchronization.
+---
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/91
 

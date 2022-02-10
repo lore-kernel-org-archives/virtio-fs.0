@@ -1,12 +1,15 @@
-Date: Thu, 13 Jan 2022 10:59:15 +0100
-From: Greg Kurz <groug@kaod.org>
-Message-ID: <20220113105915.0f46dbb6@bahia>
-In-Reply-To: <20220111181043.435915-1-sebastian.hasler@stuvus.uni-stuttgart.de>
-References: <20220111181043.435915-1-sebastian.hasler@stuvus.uni-stuttgart.de>
+Date: Thu, 10 Feb 2022 17:17:57 +0000
+From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+Message-ID: <YgVIxdu3/oyp3cU8@redhat.com>
+References: <20220209165040.56062-1-dgilbert@redhat.com>
+	<YgTTbAWj1CGlmv/R@redhat.com> <YgVHr2zgTrPHVhez@work-vm>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=US-ASCII
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Do not support blocking flock
+Content-Type: text/plain; charset="utf-8"
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <YgVHr2zgTrPHVhez@work-vm>
+Subject: Re: [Virtio-fs] [PATCH] Deprecate C virtiofsd
+Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,44 +18,60 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Sebastian Hasler <sebastian.hasler@stuvus.uni-stuttgart.de>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
 
-On Tue, 11 Jan 2022 19:10:43 +0100
-Sebastian Hasler <sebastian.hasler@stuvus.uni-stuttgart.de> wrote:
-
-> With the current implementation, blocking flock can lead to
-> deadlock. Thus, it's better to return EOPNOTSUPP if a user attempts
-> to perform a blocking flock request.
+On Thu, Feb 10, 2022 at 05:13:19PM +0000, Dr. David Alan Gilbert wrote:
+> * Daniel P. Berrangé (berrange@redhat.com) wrote:
+> > On Wed, Feb 09, 2022 at 04:50:40PM +0000, Dr. David Alan Gilbert (git) wrote:
+> > > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+> > > 
+> > > There's a nice new Rust implementation out there; recommend people
+> > > do new work on that.
+> > > 
+> > > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> > > ---
+> > >  docs/about/deprecated.rst | 14 ++++++++++++++
+> > >  1 file changed, 14 insertions(+)
+> > > 
+> > > diff --git a/docs/about/deprecated.rst b/docs/about/deprecated.rst
+> > > index 47a594a3b6..3a0e15f8f5 100644
+> > > --- a/docs/about/deprecated.rst
+> > > +++ b/docs/about/deprecated.rst
+> > > @@ -454,3 +454,17 @@ nanoMIPS ISA
+> > >  
+> > >  The ``nanoMIPS`` ISA has never been upstreamed to any compiler toolchain.
+> > >  As it is hard to generate binaries for it, declare it deprecated.
+> > > +
+> > > +Tools
+> > > +-----
+> > > +
+> > > +virtiofsd
+> > > +'''''''''
+> > > +
+> > > +There is a new Rust implementation of ``virtiofs`` at
+> > > +``https://gitlab.com/virtio-fs/virtiofsd``;
+> > > +since this is now marked stable, new development should be done on that
+> > > +rather than the existing C version in the QEMU tree.
+> > > +The C version will still accept fixes and patches that
+> > > +are already in development for the moment.
+> > 
+> > Just to be clear, 'deprecation' is usually expected to turn into
+> > 'deletion' a minimum of 2 releases later.  We are targetting the
+> > C virtiofsd to be deleted, right ?  The last sentance here gives
+> > vibes that we're expecting it to stick around despite deprecation.
 > 
-> Signed-off-by: Sebastian Hasler <sebastian.hasler@stuvus.uni-stuttgart.de>
-> ---
->  tools/virtiofsd/passthrough_ll.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index 64b5b4fbb1..f3cc307f6d 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -2442,6 +2442,12 @@ static void lo_flock(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
->      int res;
->      (void)ino;
->  
-> +    if (!(op & LOCK_NB)) {
-> +        /* Blocking flock is not supported */
+> I am targeting it to be deleted, but I'm expecting to give it a bit
+> more time than 2 releases; how do I do that?
 
-This paraphrases the code. It would be more informative to provide
-an explanation, something like /* Blocking flock can deadlock */ .
+You can forget to remove it after 2 releases, which is what
+happens with many deprecations :-)  '2' is really just the
+minimum bar in practice.
 
-No big deal.
-
-Reviewed-by: Greg Kurz <groug@kaod.org>
-
-> +        fuse_reply_err(req, EOPNOTSUPP);
-> +        return;
-> +    }
-> +
->      res = flock(lo_fi_fd(req, fi), op);
->  
->      fuse_reply_err(req, res == -1 ? errno : 0);
+Regards,
+Daniel
+-- 
+|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
+|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
+|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
 

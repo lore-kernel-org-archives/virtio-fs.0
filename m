@@ -1,15 +1,9 @@
-Date: Thu, 10 Feb 2022 17:27:37 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YgVLCUE9y69iilGa@work-vm>
-References: <20220209165040.56062-1-dgilbert@redhat.com>
-	<YgTTbAWj1CGlmv/R@redhat.com> <YgVHr2zgTrPHVhez@work-vm>
-	<YgVIxdu3/oyp3cU8@redhat.com>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Thu, 10 Feb 2022 17:47:14 +0000
+Message-Id: <20220210174714.19843-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <YgVIxdu3/oyp3cU8@redhat.com>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [PATCH] Deprecate C virtiofsd
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2] Deprecate C virtiofsd
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,74 +12,44 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
+To: qemu-devel@nongnu.org, virtio-fs@redhat.com
+Cc: berrange@redhat.com, vgoyal@redhat.com
 
-* Daniel P. Berrang=E9 (berrange@redhat.com) wrote:
-> On Thu, Feb 10, 2022 at 05:13:19PM +0000, Dr. David Alan Gilbert wrote:
-> > * Daniel P. Berrang=E9 (berrange@redhat.com) wrote:
-> > > On Wed, Feb 09, 2022 at 04:50:40PM +0000, Dr. David Alan Gilbert (git=
-) wrote:
-> > > > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-> > > >=20
-> > > > There's a nice new Rust implementation out there; recommend people
-> > > > do new work on that.
-> > > >=20
-> > > > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> > > > ---
-> > > >  docs/about/deprecated.rst | 14 ++++++++++++++
-> > > >  1 file changed, 14 insertions(+)
-> > > >=20
-> > > > diff --git a/docs/about/deprecated.rst b/docs/about/deprecated.rst
-> > > > index 47a594a3b6..3a0e15f8f5 100644
-> > > > --- a/docs/about/deprecated.rst
-> > > > +++ b/docs/about/deprecated.rst
-> > > > @@ -454,3 +454,17 @@ nanoMIPS ISA
-> > > > =20
-> > > >  The ``nanoMIPS`` ISA has never been upstreamed to any compiler too=
-lchain.
-> > > >  As it is hard to generate binaries for it, declare it deprecated.
-> > > > +
-> > > > +Tools
-> > > > +-----
-> > > > +
-> > > > +virtiofsd
-> > > > +'''''''''
-> > > > +
-> > > > +There is a new Rust implementation of ``virtiofs`` at
-> > > > +``https://gitlab.com/virtio-fs/virtiofsd``;
-> > > > +since this is now marked stable, new development should be done on=
- that
-> > > > +rather than the existing C version in the QEMU tree.
-> > > > +The C version will still accept fixes and patches that
-> > > > +are already in development for the moment.
-> > >=20
-> > > Just to be clear, 'deprecation' is usually expected to turn into
-> > > 'deletion' a minimum of 2 releases later.  We are targetting the
-> > > C virtiofsd to be deleted, right ?  The last sentance here gives
-> > > vibes that we're expecting it to stick around despite deprecation.
-> >=20
-> > I am targeting it to be deleted, but I'm expecting to give it a bit
-> > more time than 2 releases; how do I do that?
->=20
-> You can forget to remove it after 2 releases, which is what
-> happens with many deprecations :-)  '2' is really just the
-> minimum bar in practice.
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
 
-OK, I can remember to forget.
+There's a nice new Rust implementation out there; recommend people
+do new work on that.
 
-Dave
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+---
+ docs/about/deprecated.rst | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-> Regards,
-> Daniel
-> --=20
-> |: https://berrange.com      -o-    https://www.flickr.com/photos/dberran=
-ge :|
-> |: https://libvirt.org         -o-            https://fstop138.berrange.c=
-om :|
-> |: https://entangle-photo.org    -o-    https://www.instagram.com/dberran=
-ge :|
->=20
---=20
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+diff --git a/docs/about/deprecated.rst b/docs/about/deprecated.rst
+index 47a594a3b6..3c73d22729 100644
+--- a/docs/about/deprecated.rst
++++ b/docs/about/deprecated.rst
+@@ -454,3 +454,20 @@ nanoMIPS ISA
+ 
+ The ``nanoMIPS`` ISA has never been upstreamed to any compiler toolchain.
+ As it is hard to generate binaries for it, declare it deprecated.
++
++Tools
++-----
++
++virtiofsd
++'''''''''
++
++There is a new Rust implementation of ``virtiofsd`` at
++``https://gitlab.com/virtio-fs/virtiofsd``;
++since this is now marked stable, new development should be done on that
++rather than the existing C version in the QEMU tree.
++The C version will still accept fixes and patches that
++are already in development for the moment, but will eventually
++be deleted from this tree.
++New deployments should use the Rust version, and existing systems
++should consider moving to it.  The command line and feature set
++is very close and moving should be simple.
+-- 
+2.34.1
 

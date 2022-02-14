@@ -1,14 +1,14 @@
-Date: Mon, 14 Feb 2022 12:22:30 +0000
+Date: Mon, 14 Feb 2022 13:02:50 +0000
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YgpJho2KsssMkMK/@work-vm>
+Message-ID: <YgpS+jmOkI5YRUIH@work-vm>
 References: <20220208204813.682906-1-vgoyal@redhat.com>
-	<20220208204813.682906-4-vgoyal@redhat.com>
+	<20220208204813.682906-6-vgoyal@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20220208204813.682906-4-vgoyal@redhat.com>
+In-Reply-To: <20220208204813.682906-6-vgoyal@redhat.com>
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Subject: Re: [Virtio-fs] [PATCH v6 03/10] virtiofsd: Parse extended "struct
-	fuse_init_in"
+Subject: Re: [Virtio-fs] [PATCH v6 05/10] virtiofsd,
+ fuse_lowlevel.c: Add capability to parse security context
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,163 +21,245 @@ To: Vivek Goyal <vgoyal@redhat.com>
 Cc: virtio-fs@redhat.com, berrange@redhat.com, qemu-devel@nongnu.org
 
 * Vivek Goyal (vgoyal@redhat.com) wrote:
-> Add some code to parse extended "struct fuse_init_in". And use a local
-> variable "flag" to represent 64 bit flags. This will make it easier
-> to add more features without having to worry about two 32bit flags (->flags
-> and ->flags2) in "fuse_struct_in".
+> Add capability to enable and parse security context as sent by client
+> and put into fuse_req. Filesystems now can get security context from
+> request and set it on files during creation.
 > 
 > Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+
+I'd be tempted to move the secctx_enabled check into
+parse_secctx_fill_req - but OK.
 
 Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 
 > ---
->  tools/virtiofsd/fuse_lowlevel.c | 61 +++++++++++++++++++++------------
->  1 file changed, 39 insertions(+), 22 deletions(-)
+>  tools/virtiofsd/fuse_common.h   |   5 ++
+>  tools/virtiofsd/fuse_i.h        |   7 +++
+>  tools/virtiofsd/fuse_lowlevel.c | 102 +++++++++++++++++++++++++++++++-
+>  3 files changed, 113 insertions(+), 1 deletion(-)
 > 
+> diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
+> index 6f8a988202..bf46954dab 100644
+> --- a/tools/virtiofsd/fuse_common.h
+> +++ b/tools/virtiofsd/fuse_common.h
+> @@ -377,6 +377,11 @@ struct fuse_file_info {
+>   */
+>  #define FUSE_CAP_SETXATTR_EXT (1 << 29)
+>  
+> +/**
+> + * Indicates that file server supports creating file security context
+> + */
+> +#define FUSE_CAP_SECURITY_CTX (1ULL << 32)
+> +
+>  /**
+>   * Ioctl flags
+>   *
+> diff --git a/tools/virtiofsd/fuse_i.h b/tools/virtiofsd/fuse_i.h
+> index 492e002181..a5572fa4ae 100644
+> --- a/tools/virtiofsd/fuse_i.h
+> +++ b/tools/virtiofsd/fuse_i.h
+> @@ -15,6 +15,12 @@
+>  struct fv_VuDev;
+>  struct fv_QueueInfo;
+>  
+> +struct fuse_security_context {
+> +        const char *name;
+> +        uint32_t ctxlen;
+> +        const void *ctx;
+> +};
+> +
+>  struct fuse_req {
+>      struct fuse_session *se;
+>      uint64_t unique;
+> @@ -35,6 +41,7 @@ struct fuse_req {
+>      } u;
+>      struct fuse_req *next;
+>      struct fuse_req *prev;
+> +    struct fuse_security_context secctx;
+>  };
+>  
+>  struct fuse_notify_req {
 > diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-> index ce29a70253..b6712b763a 100644
+> index d91cd9743a..2909122b23 100644
 > --- a/tools/virtiofsd/fuse_lowlevel.c
 > +++ b/tools/virtiofsd/fuse_lowlevel.c
-> @@ -1881,11 +1881,14 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
->  {
->      size_t compat_size = offsetof(struct fuse_init_in, max_readahead);
->      size_t compat2_size = offsetof(struct fuse_init_in, flags) + sizeof(uint32_t);
-> +    /* Fuse structure extended with minor version 36 */
-> +    size_t compat3_size = endof(struct fuse_init_in, unused);
->      struct fuse_init_in *arg;
->      struct fuse_init_out outarg;
->      struct fuse_session *se = req->se;
->      size_t bufsize = se->bufsize;
->      size_t outargsize = sizeof(outarg);
-> +    uint64_t flags = 0;
+> @@ -886,11 +886,63 @@ static void do_readlink(fuse_req_t req, fuse_ino_t nodeid,
+>      }
+>  }
 >  
->      (void)nodeid;
->  
-> @@ -1902,11 +1905,25 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
->              fuse_reply_err(req, EINVAL);
->              return;
->          }
-> +        flags |= arg->flags;
+> +static int parse_secctx_fill_req(fuse_req_t req, struct fuse_mbuf_iter *iter)
+> +{
+> +    struct fuse_secctx_header *fsecctx_header;
+> +    struct fuse_secctx *fsecctx;
+> +    const void *secctx;
+> +    const char *name;
+> +
+> +    fsecctx_header = fuse_mbuf_iter_advance(iter, sizeof(*fsecctx_header));
+> +    if (!fsecctx_header) {
+> +        return -EINVAL;
 > +    }
 > +
 > +    /*
-> +     * fuse_init_in was extended again with minor version 36. Just read
-> +     * current known size of fuse_init so that future extension and
-> +     * header rebase does not cause breakage.
+> +     * As of now maximum of one security context is supported. It can
+> +     * change in future though.
 > +     */
-> +    if (sizeof(*arg) > compat2_size && (arg->flags & FUSE_INIT_EXT)) {
-> +        if (!fuse_mbuf_iter_advance(iter, compat3_size - compat2_size)) {
-> +            fuse_reply_err(req, EINVAL);
+> +    if (fsecctx_header->nr_secctx > 1) {
+> +        return -EINVAL;
+> +    }
+> +
+> +    /* No security context sent. Maybe no LSM supports it */
+> +    if (!fsecctx_header->nr_secctx) {
+> +        return 0;
+> +    }
+> +
+> +    fsecctx = fuse_mbuf_iter_advance(iter, sizeof(*fsecctx));
+> +    if (!fsecctx) {
+> +        return -EINVAL;
+> +    }
+> +
+> +    /* struct fsecctx with zero sized context is not expected */
+> +    if (!fsecctx->size) {
+> +        return -EINVAL;
+> +    }
+> +    name = fuse_mbuf_iter_advance_str(iter);
+> +    if (!name) {
+> +        return -EINVAL;
+> +    }
+> +
+> +    secctx = fuse_mbuf_iter_advance(iter, fsecctx->size);
+> +    if (!secctx) {
+> +        return -EINVAL;
+> +    }
+> +
+> +    req->secctx.name = name;
+> +    req->secctx.ctx = secctx;
+> +    req->secctx.ctxlen = fsecctx->size;
+> +    return 0;
+> +}
+> +
+>  static void do_mknod(fuse_req_t req, fuse_ino_t nodeid,
+>                       struct fuse_mbuf_iter *iter)
+>  {
+>      struct fuse_mknod_in *arg;
+>      const char *name;
+> +    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
+> +    int err;
+>  
+>      arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
+>      name = fuse_mbuf_iter_advance_str(iter);
+> @@ -901,6 +953,14 @@ static void do_mknod(fuse_req_t req, fuse_ino_t nodeid,
+>  
+>      req->ctx.umask = arg->umask;
+>  
+> +    if (secctx_enabled) {
+> +        err = parse_secctx_fill_req(req, iter);
+> +        if (err) {
+> +            fuse_reply_err(req, -err);
 > +            return;
 > +        }
-> +        flags |= (uint64_t) arg->flags2 << 32;
+> +    }
+> +
+>      if (req->se->op.mknod) {
+>          req->se->op.mknod(req, nodeid, name, arg->mode, arg->rdev);
+>      } else {
+> @@ -913,6 +973,8 @@ static void do_mkdir(fuse_req_t req, fuse_ino_t nodeid,
+>  {
+>      struct fuse_mkdir_in *arg;
+>      const char *name;
+> +    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
+> +    int err;
+>  
+>      arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
+>      name = fuse_mbuf_iter_advance_str(iter);
+> @@ -923,6 +985,14 @@ static void do_mkdir(fuse_req_t req, fuse_ino_t nodeid,
+>  
+>      req->ctx.umask = arg->umask;
+>  
+> +    if (secctx_enabled) {
+> +        err = parse_secctx_fill_req(req, iter);
+> +        if (err) {
+> +            fuse_reply_err(req, err);
+> +            return;
+> +        }
+> +    }
+> +
+>      if (req->se->op.mkdir) {
+>          req->se->op.mkdir(req, nodeid, name, arg->mode);
+>      } else {
+> @@ -969,12 +1039,22 @@ static void do_symlink(fuse_req_t req, fuse_ino_t nodeid,
+>  {
+>      const char *name = fuse_mbuf_iter_advance_str(iter);
+>      const char *linkname = fuse_mbuf_iter_advance_str(iter);
+> +    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
+> +    int err;
+>  
+>      if (!name || !linkname) {
+>          fuse_reply_err(req, EINVAL);
+>          return;
 >      }
 >  
->      fuse_log(FUSE_LOG_DEBUG, "INIT: %u.%u\n", arg->major, arg->minor);
->      if (arg->major == 7 && arg->minor >= 6) {
-> -        fuse_log(FUSE_LOG_DEBUG, "flags=0x%08x\n", arg->flags);
-> +        fuse_log(FUSE_LOG_DEBUG, "flags=0x%016llx\n", flags);
->          fuse_log(FUSE_LOG_DEBUG, "max_readahead=0x%08x\n", arg->max_readahead);
->      }
->      se->conn.proto_major = arg->major;
-> @@ -1934,68 +1951,68 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
->      if (arg->max_readahead < se->conn.max_readahead) {
->          se->conn.max_readahead = arg->max_readahead;
->      }
-> -    if (arg->flags & FUSE_ASYNC_READ) {
-> +    if (flags & FUSE_ASYNC_READ) {
->          se->conn.capable |= FUSE_CAP_ASYNC_READ;
->      }
-> -    if (arg->flags & FUSE_POSIX_LOCKS) {
-> +    if (flags & FUSE_POSIX_LOCKS) {
->          se->conn.capable |= FUSE_CAP_POSIX_LOCKS;
->      }
-> -    if (arg->flags & FUSE_ATOMIC_O_TRUNC) {
-> +    if (flags & FUSE_ATOMIC_O_TRUNC) {
->          se->conn.capable |= FUSE_CAP_ATOMIC_O_TRUNC;
->      }
-> -    if (arg->flags & FUSE_EXPORT_SUPPORT) {
-> +    if (flags & FUSE_EXPORT_SUPPORT) {
->          se->conn.capable |= FUSE_CAP_EXPORT_SUPPORT;
->      }
-> -    if (arg->flags & FUSE_DONT_MASK) {
-> +    if (flags & FUSE_DONT_MASK) {
->          se->conn.capable |= FUSE_CAP_DONT_MASK;
->      }
-> -    if (arg->flags & FUSE_FLOCK_LOCKS) {
-> +    if (flags & FUSE_FLOCK_LOCKS) {
->          se->conn.capable |= FUSE_CAP_FLOCK_LOCKS;
->      }
-> -    if (arg->flags & FUSE_AUTO_INVAL_DATA) {
-> +    if (flags & FUSE_AUTO_INVAL_DATA) {
->          se->conn.capable |= FUSE_CAP_AUTO_INVAL_DATA;
->      }
-> -    if (arg->flags & FUSE_DO_READDIRPLUS) {
-> +    if (flags & FUSE_DO_READDIRPLUS) {
->          se->conn.capable |= FUSE_CAP_READDIRPLUS;
->      }
-> -    if (arg->flags & FUSE_READDIRPLUS_AUTO) {
-> +    if (flags & FUSE_READDIRPLUS_AUTO) {
->          se->conn.capable |= FUSE_CAP_READDIRPLUS_AUTO;
->      }
-> -    if (arg->flags & FUSE_ASYNC_DIO) {
-> +    if (flags & FUSE_ASYNC_DIO) {
->          se->conn.capable |= FUSE_CAP_ASYNC_DIO;
->      }
-> -    if (arg->flags & FUSE_WRITEBACK_CACHE) {
-> +    if (flags & FUSE_WRITEBACK_CACHE) {
->          se->conn.capable |= FUSE_CAP_WRITEBACK_CACHE;
->      }
-> -    if (arg->flags & FUSE_NO_OPEN_SUPPORT) {
-> +    if (flags & FUSE_NO_OPEN_SUPPORT) {
->          se->conn.capable |= FUSE_CAP_NO_OPEN_SUPPORT;
->      }
-> -    if (arg->flags & FUSE_PARALLEL_DIROPS) {
-> +    if (flags & FUSE_PARALLEL_DIROPS) {
->          se->conn.capable |= FUSE_CAP_PARALLEL_DIROPS;
->      }
-> -    if (arg->flags & FUSE_POSIX_ACL) {
-> +    if (flags & FUSE_POSIX_ACL) {
->          se->conn.capable |= FUSE_CAP_POSIX_ACL;
->      }
-> -    if (arg->flags & FUSE_HANDLE_KILLPRIV) {
-> +    if (flags & FUSE_HANDLE_KILLPRIV) {
->          se->conn.capable |= FUSE_CAP_HANDLE_KILLPRIV;
->      }
-> -    if (arg->flags & FUSE_NO_OPENDIR_SUPPORT) {
-> +    if (flags & FUSE_NO_OPENDIR_SUPPORT) {
->          se->conn.capable |= FUSE_CAP_NO_OPENDIR_SUPPORT;
->      }
-> -    if (!(arg->flags & FUSE_MAX_PAGES)) {
-> +    if (!(flags & FUSE_MAX_PAGES)) {
->          size_t max_bufsize = FUSE_DEFAULT_MAX_PAGES_PER_REQ * getpagesize() +
->                               FUSE_BUFFER_HEADER_SIZE;
->          if (bufsize > max_bufsize) {
->              bufsize = max_bufsize;
+> +    if (secctx_enabled) {
+> +        err = parse_secctx_fill_req(req, iter);
+> +        if (err) {
+> +            fuse_reply_err(req, err);
+> +            return;
+> +        }
+> +    }
+> +
+>      if (req->se->op.symlink) {
+>          req->se->op.symlink(req, linkname, nodeid, name);
+>      } else {
+> @@ -1048,6 +1128,8 @@ static void do_link(fuse_req_t req, fuse_ino_t nodeid,
+>  static void do_create(fuse_req_t req, fuse_ino_t nodeid,
+>                        struct fuse_mbuf_iter *iter)
+>  {
+> +    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
+> +
+>      if (req->se->op.create) {
+>          struct fuse_create_in *arg;
+>          struct fuse_file_info fi;
+> @@ -1060,6 +1142,15 @@ static void do_create(fuse_req_t req, fuse_ino_t nodeid,
+>              return;
 >          }
->      }
-> -    if (arg->flags & FUSE_SUBMOUNTS) {
-> +    if (flags & FUSE_SUBMOUNTS) {
->          se->conn.capable |= FUSE_CAP_SUBMOUNTS;
->      }
-> -    if (arg->flags & FUSE_HANDLE_KILLPRIV_V2) {
-> +    if (flags & FUSE_HANDLE_KILLPRIV_V2) {
->          se->conn.capable |= FUSE_CAP_HANDLE_KILLPRIV_V2;
->      }
-> -    if (arg->flags & FUSE_SETXATTR_EXT) {
-> +    if (flags & FUSE_SETXATTR_EXT) {
+>  
+> +        if (secctx_enabled) {
+> +            int err;
+> +            err = parse_secctx_fill_req(req, iter);
+> +            if (err) {
+> +                fuse_reply_err(req, err);
+> +                return;
+> +            }
+> +        }
+> +
+>          memset(&fi, 0, sizeof(fi));
+>          fi.flags = arg->flags;
+>          fi.kill_priv = arg->open_flags & FUSE_OPEN_KILL_SUIDGID;
+> @@ -2015,6 +2106,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+>      if (flags & FUSE_SETXATTR_EXT) {
 >          se->conn.capable |= FUSE_CAP_SETXATTR_EXT;
 >      }
+> +    if (flags & FUSE_SECURITY_CTX) {
+> +        se->conn.capable |= FUSE_CAP_SECURITY_CTX;
+> +    }
 >  #ifdef HAVE_SPLICE
-> @@ -2063,7 +2080,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
->      if (se->conn.max_write < bufsize - FUSE_BUFFER_HEADER_SIZE) {
->          se->bufsize = se->conn.max_write + FUSE_BUFFER_HEADER_SIZE;
+>  #ifdef HAVE_VMSPLICE
+>      se->conn.capable |= FUSE_CAP_SPLICE_WRITE | FUSE_CAP_SPLICE_MOVE;
+> @@ -2154,8 +2248,14 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+>          outarg.flags |= FUSE_SETXATTR_EXT;
 >      }
-> -    if (arg->flags & FUSE_MAX_PAGES) {
-> +    if (flags & FUSE_MAX_PAGES) {
->          outarg.flags |= FUSE_MAX_PAGES;
->          outarg.max_pages = (se->conn.max_write - 1) / getpagesize() + 1;
->      }
+>  
+> +    if (se->conn.want & FUSE_CAP_SECURITY_CTX) {
+> +        /* bits 32..63 get shifted down 32 bits into the flags2 field */
+> +        outarg.flags2 |= FUSE_SECURITY_CTX >> 32;
+> +    }
+> +
+>      fuse_log(FUSE_LOG_DEBUG, "   INIT: %u.%u\n", outarg.major, outarg.minor);
+> -    fuse_log(FUSE_LOG_DEBUG, "   flags=0x%08x\n", outarg.flags);
+> +    fuse_log(FUSE_LOG_DEBUG, "   flags2=0x%08x flags=0x%08x\n", outarg.flags2,
+> +             outarg.flags);
+>      fuse_log(FUSE_LOG_DEBUG, "   max_readahead=0x%08x\n", outarg.max_readahead);
+>      fuse_log(FUSE_LOG_DEBUG, "   max_write=0x%08x\n", outarg.max_write);
+>      fuse_log(FUSE_LOG_DEBUG, "   max_background=%i\n", outarg.max_background);
 > -- 
 > 2.34.1
 > 

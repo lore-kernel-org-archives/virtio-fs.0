@@ -1,12 +1,12 @@
-Date: Mon, 14 Feb 2022 11:12:58 +0000
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <Ygo5Ouzpvg0Jdvvo@stefanha-x1.localdomain>
+Date: Mon, 14 Feb 2022 11:30:03 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <Ygo9O7oWsImstSJu@work-vm>
 References: <20220210174714.19843-1-dgilbert@redhat.com>
+	<20220210204404.GA22879@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="hzr9mwc4r5yZwhgQ"
+In-Reply-To: <20220210204404.GA22879@redhat.com>
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20220210174714.19843-1-dgilbert@redhat.com>
 Subject: Re: [Virtio-fs] [PATCH v2] Deprecate C virtiofsd
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -16,46 +16,69 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: virtio-fs@redhat.com, berrange@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
+To: "Richard W.M. Jones" <rjones@redhat.com>
+Cc: berrange@redhat.com, qemu-devel@nongnu.org, virtio-fs@redhat.com, vgoyal@redhat.com
 
+* Richard W.M. Jones (rjones@redhat.com) wrote:
+> On Thu, Feb 10, 2022 at 05:47:14PM +0000, Dr. David Alan Gilbert (git) wrote:
+> > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+> > 
+> > There's a nice new Rust implementation out there; recommend people
+> > do new work on that.
+> > 
+> > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> > ---
+> >  docs/about/deprecated.rst | 17 +++++++++++++++++
+> >  1 file changed, 17 insertions(+)
+> > 
+> > diff --git a/docs/about/deprecated.rst b/docs/about/deprecated.rst
+> > index 47a594a3b6..3c73d22729 100644
+> > --- a/docs/about/deprecated.rst
+> > +++ b/docs/about/deprecated.rst
+> > @@ -454,3 +454,20 @@ nanoMIPS ISA
+> >  
+> >  The ``nanoMIPS`` ISA has never been upstreamed to any compiler toolchain.
+> >  As it is hard to generate binaries for it, declare it deprecated.
+> > +
+> > +Tools
+> > +-----
+> > +
+> > +virtiofsd
+> > +'''''''''
+> > +
+> > +There is a new Rust implementation of ``virtiofsd`` at
+> > +``https://gitlab.com/virtio-fs/virtiofsd``;
+> > +since this is now marked stable, new development should be done on that
+> > +rather than the existing C version in the QEMU tree.
+> > +The C version will still accept fixes and patches that
+> > +are already in development for the moment, but will eventually
+> > +be deleted from this tree.
+> > +New deployments should use the Rust version, and existing systems
+> > +should consider moving to it.  The command line and feature set
+> > +is very close and moving should be simple.
+> 
+> I'm not qualified to say if the Rust impl is complete enough
+> to replace the C version, so I won't add a reviewed tag.
 
---hzr9mwc4r5yZwhgQ
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+We believe it is a complete replacement at this point, with compatible
+command line.
 
-On Thu, Feb 10, 2022 at 05:47:14PM +0000, Dr. David Alan Gilbert (git) wrot=
-e:
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
->=20
-> There's a nice new Rust implementation out there; recommend people
-> do new work on that.
->=20
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> ---
->  docs/about/deprecated.rst | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
+Dave
 
-Thanks, applied to my block tree:
-https://gitlab.com/stefanha/qemu/commits/block
-
-Stefan
-
---hzr9mwc4r5yZwhgQ
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmIKOToACgkQnKSrs4Gr
-c8hX5Af/RDI3Rqj6L5eyb+Ks56++lhhcC1yy85mDGrcy6ETmoDhFD74j3ElfYEY5
-jc48AY9P9qX+N56RAaAuK9nOreJZBJxYuSsfffs/1IhVPRvY030Fq1i3yG0ZOMMo
-5WXVmui8NwZROQ3beLzQYjkxklrGQVnkSGeycjNad8WZVtuzkq8taNBuIDj8r/Wn
-UowjkBOEchcMqg8qtoL3Il5cwgl4d9G73Ly2U/uMOdjxAAuagBexa3/tKx8Kftbt
-2WFfWuYBh0imPhOfk6gcZmhSBgRfvzogabZ7A0vGdTyM95AoXWNPY8/1mdQvTJbB
-9IEbvPQ7J48BTpCRJcr1OvdDSa7Xpg==
-=xAso
------END PGP SIGNATURE-----
-
---hzr9mwc4r5yZwhgQ--
+> However I want to say that from the point of view of downstream
+> packagers of qemu -- especially Fedora -- it would be helpful if we
+> could direct both upstream development effort and downstream packaging
+> into just the one virtiofsd.  So I agree in principle with this.
+> 
+> Rich.
+> 
+> -- 
+> Richard Jones, Virtualization Group, Red Hat http://people.redhat.com/~rjones
+> Read my programming and virtualization blog: http://rwmj.wordpress.com
+> virt-p2v converts physical machines to virtual machines.  Boot with a
+> live CD or over the network (PXE) and turn machines into KVM guests.
+> http://libguestfs.org/virt-v2v
+> 
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

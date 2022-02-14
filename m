@@ -1,15 +1,10 @@
-Date: Mon, 14 Feb 2022 17:02:48 +0100
-From: Greg Kurz <groug@kaod.org>
-Message-ID: <20220214170248.362805f4@bahia>
-In-Reply-To: <CAJh=p+6ALJA_UazTGoPbmF09AEnecppDvaFVJT2bOK-R6_0WBw@mail.gmail.com>
-References: <20220214135820.43897-1-groug@kaod.org>
-	<20220214135820.43897-2-groug@kaod.org>
-	<CAJh=p+6ALJA_UazTGoPbmF09AEnecppDvaFVJT2bOK-R6_0WBw@mail.gmail.com>
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Date: Mon, 14 Feb 2022 17:15:42 +0000
+Message-Id: <20220214171545.10242-1-stefanha@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=US-ASCII
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH v5 1/3] virtiofsd: Add support for
- FUSE_SYNCFS request with announce_submounts
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PULL 0/3] Block patches
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,197 +13,46 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: German Maglione <gmaglione@redhat.com>
-Cc: virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org, Vivek, Goyal <vgoyal@redhat.com>
+To: qemu-devel@nongnu.org, Peter Maydell <peter.maydell@linaro.org>
+Cc: Kevin Wolf <kwolf@redhat.com>, qemu-block@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, libvir-list@redhat.com, virtio-fs@redhat.com, Hanna Reitz <hreitz@redhat.com>
 
-On Mon, 14 Feb 2022 16:43:15 +0100
-German Maglione <gmaglione@redhat.com> wrote:
+The following changes since commit cc5ce8b8b6be83e5fe3b668dbd061ad97c534e3f:
 
-> On Mon, Feb 14, 2022 at 3:00 PM Greg Kurz <groug@kaod.org> wrote:
-> 
-> > Honor the expected behavior of syncfs() to synchronously flush all data
-> > and metadata to disk on linux systems.
-> >
-> > If virtiofsd is started with '-o announce_submounts', the client is
-> > expected to send a FUSE_SYNCFS request for each individual submount.
-> > In this case, we just create a new file descriptor on the submount
-> > inode with lo_inode_open(), call syncfs() on it and close it. The
-> > intermediary file is needed because O_PATH descriptors aren't
-> > backed by an actual file and syncfs() would fail with EBADF.
-> >
-> > If virtiofsd is started without '-o announce_submounts' or if the
-> > client doesn't have the FUSE_CAP_SUBMOUNTS capability, the client
-> > only sends a single FUSE_SYNCFS request for the root inode. The
-> > server would thus need to track submounts internally and call
-> > syncfs() on each of them. This will be implemented later.
-> >
-> > Note that syncfs() might suffer from a time penalty if the submounts
-> > are being hammered by some unrelated workload on the host. The only
-> > solution to prevent that is to avoid shared mounts.
-> >
-> > Signed-off-by: Greg Kurz <groug@kaod.org>
-> > ---
-> >  tools/virtiofsd/fuse_lowlevel.c       | 11 +++++++
-> >  tools/virtiofsd/fuse_lowlevel.h       | 13 ++++++++
-> >  tools/virtiofsd/passthrough_ll.c      | 45 +++++++++++++++++++++++++++
-> >  tools/virtiofsd/passthrough_seccomp.c |  1 +
-> >  4 files changed, 70 insertions(+)
-> >
-> > diff --git a/tools/virtiofsd/fuse_lowlevel.c
-> > b/tools/virtiofsd/fuse_lowlevel.c
-> > index e4679c73abc2..e02d8b25a5f6 100644
-> > --- a/tools/virtiofsd/fuse_lowlevel.c
-> > +++ b/tools/virtiofsd/fuse_lowlevel.c
-> > @@ -1876,6 +1876,16 @@ static void do_lseek(fuse_req_t req, fuse_ino_t
-> > nodeid,
-> >      }
-> >  }
-> >
-> > +static void do_syncfs(fuse_req_t req, fuse_ino_t nodeid,
-> > +                      struct fuse_mbuf_iter *iter)
-> > +{
-> > +    if (req->se->op.syncfs) {
-> > +        req->se->op.syncfs(req, nodeid);
-> > +    } else {
-> > +        fuse_reply_err(req, ENOSYS);
-> > +    }
-> > +}
-> > +
-> >  static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-> >                      struct fuse_mbuf_iter *iter)
-> >  {
-> > @@ -2280,6 +2290,7 @@ static struct {
-> >      [FUSE_RENAME2] = { do_rename2, "RENAME2" },
-> >      [FUSE_COPY_FILE_RANGE] = { do_copy_file_range, "COPY_FILE_RANGE" },
-> >      [FUSE_LSEEK] = { do_lseek, "LSEEK" },
-> > +    [FUSE_SYNCFS] = { do_syncfs, "SYNCFS" },
-> >  };
-> >
-> >  #define FUSE_MAXOP (sizeof(fuse_ll_ops) / sizeof(fuse_ll_ops[0]))
-> > diff --git a/tools/virtiofsd/fuse_lowlevel.h
-> > b/tools/virtiofsd/fuse_lowlevel.h
-> > index c55c0ca2fc1c..b889dae4de0e 100644
-> > --- a/tools/virtiofsd/fuse_lowlevel.h
-> > +++ b/tools/virtiofsd/fuse_lowlevel.h
-> > @@ -1226,6 +1226,19 @@ struct fuse_lowlevel_ops {
-> >       */
-> >      void (*lseek)(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
-> >                    struct fuse_file_info *fi);
-> > +
-> > +    /**
-> > +     * Synchronize file system content
-> > +     *
-> > +     * If this request is answered with an error code of ENOSYS,
-> > +     * this is treated as success and future calls to syncfs() will
-> > +     * succeed automatically without being sent to the filesystem
-> > +     * process.
-> > +     *
-> > +     * @param req request handle
-> > +     * @param ino the inode number
-> > +     */
-> > +    void (*syncfs)(fuse_req_t req, fuse_ino_t ino);
-> >  };
-> >
-> >  /**
-> > diff --git a/tools/virtiofsd/passthrough_ll.c
-> > b/tools/virtiofsd/passthrough_ll.c
-> > index b3d0674f6d2f..2bf5d40df531 100644
-> > --- a/tools/virtiofsd/passthrough_ll.c
-> > +++ b/tools/virtiofsd/passthrough_ll.c
-> > @@ -3357,6 +3357,50 @@ static void lo_lseek(fuse_req_t req, fuse_ino_t
-> > ino, off_t off, int whence,
-> >      }
-> >  }
-> >
-> > +static int lo_do_syncfs(struct lo_data *lo, struct lo_inode *inode)
-> > +{
-> > +    int fd, ret = 0;
-> > +
-> > +    fuse_log(FUSE_LOG_DEBUG, "lo_do_syncfs(ino=%" PRIu64 ")\n",
-> > +             inode->fuse_ino);
-> > +
-> > +    fd = lo_inode_open(lo, inode, O_RDONLY);
-> > +    if (fd < 0) {
-> > +        return -fd;
-> > +    }
-> > +
-> > +    if (syncfs(fd) < 0) {
-> > +        ret = errno;
-> > +    }
-> > +
-> > +    close(fd);
-> > +    return ret;
-> > +}
-> > +
-> > +static void lo_syncfs(fuse_req_t req, fuse_ino_t ino)
-> > +{
-> > +    struct lo_data *lo = lo_data(req);
-> > +    int err;
-> > +
-> > +    if (lo->announce_submounts) {
-> > +        struct lo_inode *inode;
-> > +
-> > +        inode = lo_inode(req, ino);
-> > +        if (!inode) {
-> > +            fuse_reply_err(req, EBADF);
-> > +            return;
-> > +        }
-> > +
-> > +        err = lo_do_syncfs(lo, inode);
-> > +        lo_inode_put(lo, &inode);
-> > +    } else {
-> > +        /* Requires the sever to track submounts. Not implemented yet */
-> > +        err = ENOSYS;
-> > +    }
-> >
-> 
-> In the current rust version we don't check if announce_submount is enabled,
-> with and without it lo_syncfs do the same thing. So, if announce_submount
-> is not enabled, at least the root shared dir get synced.
-> 
+  Merge remote-tracking branch 'remotes/legoater/tags/pull-ppc-20220210' into staging (2022-02-13 20:33:28 +0000)
 
-I hesitated to do that but since the announce_submount case is
-handled in patch 3, I kept it simple. Anyway, I'm fine to post
-a new version that matches what the rust implementation does.
+are available in the Git repository at:
 
-> 
-> 
-> > +
-> > +    fuse_reply_err(req, err);
-> > +}
-> > +
-> >  static void lo_destroy(void *userdata)
-> >  {
-> >      struct lo_data *lo = (struct lo_data *)userdata;
-> > @@ -3417,6 +3461,7 @@ static struct fuse_lowlevel_ops lo_oper = {
-> >      .copy_file_range = lo_copy_file_range,
-> >  #endif
-> >      .lseek = lo_lseek,
-> > +    .syncfs = lo_syncfs,
-> >      .destroy = lo_destroy,
-> >  };
-> >
-> > diff --git a/tools/virtiofsd/passthrough_seccomp.c
-> > b/tools/virtiofsd/passthrough_seccomp.c
-> > index a3ce9f898d2d..3e9d6181dc69 100644
-> > --- a/tools/virtiofsd/passthrough_seccomp.c
-> > +++ b/tools/virtiofsd/passthrough_seccomp.c
-> > @@ -108,6 +108,7 @@ static const int syscall_allowlist[] = {
-> >      SCMP_SYS(set_robust_list),
-> >      SCMP_SYS(setxattr),
-> >      SCMP_SYS(symlinkat),
-> > +    SCMP_SYS(syncfs),
-> >      SCMP_SYS(time), /* Rarely needed, except on static builds */
-> >      SCMP_SYS(tgkill),
-> >      SCMP_SYS(unlinkat),
-> > --
-> > 2.34.1
-> >
-> > _______________________________________________
-> > Virtio-fs mailing list
-> > Virtio-fs@redhat.com
-> > https://listman.redhat.com/mailman/listinfo/virtio-fs
-> >
-> >
-> 
+  https://gitlab.com/stefanha/qemu.git tags/block-pull-request
+
+for you to fetch changes up to 4c41c69e05fe28c0f95f8abd2ebf407e95a4f04b:
+
+  util: adjust coroutine pool size to virtio block queue (2022-02-14 17:11:25 +0000)
+
+----------------------------------------------------------------
+Pull request
+
+This contains coroutine poll size scaling, virtiofsd rseq seccomp for new glibc
+versions, and the QEMU C virtiofsd deprecation notice.
+
+----------------------------------------------------------------
+
+Christian Ehrhardt (1):
+  tools/virtiofsd: Add rseq syscall to the seccomp allowlist
+
+Dr. David Alan Gilbert (1):
+  Deprecate C virtiofsd
+
+Hiroki Narukawa (1):
+  util: adjust coroutine pool size to virtio block queue
+
+ docs/about/deprecated.rst             | 17 +++++++++++++++++
+ include/qemu/coroutine.h              | 10 ++++++++++
+ hw/block/virtio-blk.c                 |  5 +++++
+ tools/virtiofsd/passthrough_seccomp.c |  3 +++
+ util/qemu-coroutine.c                 | 20 ++++++++++++++++----
+ 5 files changed, 51 insertions(+), 4 deletions(-)
+
+-- 
+2.34.1
+
 

@@ -1,13 +1,13 @@
-Date: Mon, 14 Feb 2022 09:27:18 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <Ygpmxqs6rN8/5aJh@redhat.com>
-References: <20220210174714.19843-1-dgilbert@redhat.com>
-	<20220210204404.GA22879@redhat.com> <Ygo9O7oWsImstSJu@work-vm>
+Date: Mon, 14 Feb 2022 16:43:14 +0100
+From: Greg Kurz <groug@kaod.org>
+Message-ID: <20220214164314.0898c036@bahia>
+In-Reply-To: <20220214135820.43897-3-groug@kaod.org>
+References: <20220214135820.43897-1-groug@kaod.org>
+	<20220214135820.43897-3-groug@kaod.org>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <Ygo9O7oWsImstSJu@work-vm>
-Subject: Re: [Virtio-fs] [PATCH v2] Deprecate C virtiofsd
+Content-Type: text/plain; charset=US-ASCII
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PATCH v5 2/3] virtiofsd: Track submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,79 +16,89 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Cc: berrange@redhat.com, "Richard W.M. Jones" <rjones@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com
+To: qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
-On Mon, Feb 14, 2022 at 11:30:03AM +0000, Dr. David Alan Gilbert wrote:
-> * Richard W.M. Jones (rjones@redhat.com) wrote:
-> > On Thu, Feb 10, 2022 at 05:47:14PM +0000, Dr. David Alan Gilbert (git) wrote:
-> > > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-> > > 
-> > > There's a nice new Rust implementation out there; recommend people
-> > > do new work on that.
-> > > 
-> > > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-> > > ---
-> > >  docs/about/deprecated.rst | 17 +++++++++++++++++
-> > >  1 file changed, 17 insertions(+)
-> > > 
-> > > diff --git a/docs/about/deprecated.rst b/docs/about/deprecated.rst
-> > > index 47a594a3b6..3c73d22729 100644
-> > > --- a/docs/about/deprecated.rst
-> > > +++ b/docs/about/deprecated.rst
-> > > @@ -454,3 +454,20 @@ nanoMIPS ISA
-> > >  
-> > >  The ``nanoMIPS`` ISA has never been upstreamed to any compiler toolchain.
-> > >  As it is hard to generate binaries for it, declare it deprecated.
-> > > +
-> > > +Tools
-> > > +-----
-> > > +
-> > > +virtiofsd
-> > > +'''''''''
-> > > +
-> > > +There is a new Rust implementation of ``virtiofsd`` at
-> > > +``https://gitlab.com/virtio-fs/virtiofsd``;
-> > > +since this is now marked stable, new development should be done on that
-> > > +rather than the existing C version in the QEMU tree.
-> > > +The C version will still accept fixes and patches that
-> > > +are already in development for the moment, but will eventually
-> > > +be deleted from this tree.
-> > > +New deployments should use the Rust version, and existing systems
-> > > +should consider moving to it.  The command line and feature set
-> > > +is very close and moving should be simple.
-> > 
-> > I'm not qualified to say if the Rust impl is complete enough
-> > to replace the C version, so I won't add a reviewed tag.
-> 
-> We believe it is a complete replacement at this point, with compatible
-> command line.
+On Mon, 14 Feb 2022 14:58:19 +0100
+Greg Kurz <groug@kaod.org> wrote:
 
-I think its not a complete replacement yet. For example, POSIX_ACLs are
-not supported yet. German is looking into making it work.
+> If
+> Support for FUSE_SYNCFS requires the server to track submounts
+> 
+> that may exist under the shared directory. lo_do_lookup() already knows
+> how to detect them : it is a directory with a different device ID or
+> mount ID than its parent. Use the same logic and record the information
+> under the lo_inode structure.
+> 
+> Signed-off-by: Greg Kurz <groug@kaod.org>
+> ---
 
-There might be other small things here and there, but nothing major, I
-think.
+Oops I obviously did something wrong with the changelog. It should read:
 
-Vivek
+---
+If the server doesn't announce submounts to the client, it needs to
+track them internally to properly support FUSE_SYNCFS. lo_do_lookup()
+already knows how to detect them : it is a directory with a different
+device ID or mount ID than its parent. Use the same logic and record
+the information under the lo_inode structure.
+---
+
+I can send an updated version if needed.
+
+>  tools/virtiofsd/passthrough_ll.c | 14 ++++++++++----
+>  1 file changed, 10 insertions(+), 4 deletions(-)
 > 
-> Dave
-> 
-> > However I want to say that from the point of view of downstream
-> > packagers of qemu -- especially Fedora -- it would be helpful if we
-> > could direct both upstream development effort and downstream packaging
-> > into just the one virtiofsd.  So I agree in principle with this.
-> > 
-> > Rich.
-> > 
-> > -- 
-> > Richard Jones, Virtualization Group, Red Hat http://people.redhat.com/~rjones
-> > Read my programming and virtualization blog: http://rwmj.wordpress.com
-> > virt-p2v converts physical machines to virtual machines.  Boot with a
-> > live CD or over the network (PXE) and turn machines into KVM guests.
-> > http://libguestfs.org/virt-v2v
-> > 
-> -- 
-> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
-> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 2bf5d40df531..e94c4e6f8635 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -118,6 +118,7 @@ struct lo_inode {
+>      GHashTable *posix_locks; /* protected by lo_inode->plock_mutex */
+>  
+>      mode_t filetype;
+> +    bool is_submount;
+>  };
+>  
+>  struct lo_cred {
+> @@ -1017,6 +1018,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+>      struct lo_data *lo = lo_data(req);
+>      struct lo_inode *inode = NULL;
+>      struct lo_inode *dir = lo_inode(req, parent);
+> +    bool is_submount;
+>  
+>      if (inodep) {
+>          *inodep = NULL; /* in case there is an error */
+> @@ -1051,8 +1053,10 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+>          goto out_err;
+>      }
+>  
+> -    if (S_ISDIR(e->attr.st_mode) && lo->announce_submounts &&
+> -        (e->attr.st_dev != dir->key.dev || mnt_id != dir->key.mnt_id)) {
+> +    is_submount = S_ISDIR(e->attr.st_mode) &&
+> +        (e->attr.st_dev != dir->key.dev || mnt_id != dir->key.mnt_id);
+> +
+> +    if (is_submount && lo->announce_submounts) {
+>          e->attr_flags |= FUSE_ATTR_SUBMOUNT;
+>      }
+>  
+> @@ -1079,6 +1083,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+>          inode->key.ino = e->attr.st_ino;
+>          inode->key.dev = e->attr.st_dev;
+>          inode->key.mnt_id = mnt_id;
+> +        inode->is_submount = is_submount;
+>          if (lo->posix_lock) {
+>              pthread_mutex_init(&inode->plock_mutex, NULL);
+>              inode->posix_locks = g_hash_table_new_full(
+> @@ -1100,8 +1105,9 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
+>  
+>      lo_inode_put(lo, &dir);
+>  
+> -    fuse_log(FUSE_LOG_DEBUG, "  %lli/%s -> %lli\n", (unsigned long long)parent,
+> -             name, (unsigned long long)e->ino);
+> +    fuse_log(FUSE_LOG_DEBUG, "  %lli/%s -> %lli%s\n",
+> +             (unsigned long long) parent, name, (unsigned long long) e->ino,
+> +             is_submount ? " (submount)" : "");
+>  
+>      return 0;
+>  
 

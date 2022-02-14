@@ -1,24 +1,13 @@
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=stuvus.uni-stuttgart.de; s=20200828.smtp01;
-	h=Content-Transfer-Encoding:
-	MIME-Version:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:Content-Type:
-	Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:
-	Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:
-	List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
-	bh=K47Phf+baWik1OtUpOcdWSSeVU2rZCJrwMNuGUWLoqk=;
-	b=Jz3+T9hCz85lKlAX5QIyVhCOo
-	e1RLDcZTNMltf3EJvTcIr5OZWJq8RZIaEJMsxJRXCd1rZmIGyy2rLya7K5iHP/PwcbyFixJBbCUMA
-	gNajrBiqw9x6Wb/mjKiPVM3io6+Ti98C4RCsNO5XwBq+HP7X6Enk/8YkKqKH/xdoZfhsuIiuaRkId
-	fpejRtmWX5Cx+RJde4ecFAVwCh2MHj0CiTiP3DbD+Ofq2clBQphspBFpO1O3BjRrMoTke0QWJcgNd
-	YEWyJXoCahC/czs02htGLhDV1hGnmsbs5AQN6qQP+oAlPIsPvYNsjKkUwvXmhdHB2FenPw+KwDS0A
-	CaIElVkoQ==
-From: Sebastian Hasler <sebastian.hasler@stuvus.uni-stuttgart.de>
-Date: Thu, 13 Jan 2022 16:32:49 +0100
-Message-Id: <20220113153249.710216-1-sebastian.hasler@stuvus.uni-stuttgart.de>
+Date: Mon, 14 Feb 2022 09:27:18 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <Ygpmxqs6rN8/5aJh@redhat.com>
+References: <20220210174714.19843-1-dgilbert@redhat.com>
+	<20220210204404.GA22879@redhat.com> <Ygo9O7oWsImstSJu@work-vm>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [PATCH v2] virtiofsd: Do not support blocking flock
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <Ygo9O7oWsImstSJu@work-vm>
+Subject: Re: [Virtio-fs] [PATCH v2] Deprecate C virtiofsd
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,38 +16,79 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: virtio-fs@redhat.com
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: berrange@redhat.com, "Richard W.M. Jones" <rjones@redhat.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com
 
-With the current implementation, blocking flock can lead to
-deadlock. Thus, it's better to return EOPNOTSUPP if a user attempts
-to perform a blocking flock request.
+On Mon, Feb 14, 2022 at 11:30:03AM +0000, Dr. David Alan Gilbert wrote:
+> * Richard W.M. Jones (rjones@redhat.com) wrote:
+> > On Thu, Feb 10, 2022 at 05:47:14PM +0000, Dr. David Alan Gilbert (git) wrote:
+> > > From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+> > > 
+> > > There's a nice new Rust implementation out there; recommend people
+> > > do new work on that.
+> > > 
+> > > Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> > > ---
+> > >  docs/about/deprecated.rst | 17 +++++++++++++++++
+> > >  1 file changed, 17 insertions(+)
+> > > 
+> > > diff --git a/docs/about/deprecated.rst b/docs/about/deprecated.rst
+> > > index 47a594a3b6..3c73d22729 100644
+> > > --- a/docs/about/deprecated.rst
+> > > +++ b/docs/about/deprecated.rst
+> > > @@ -454,3 +454,20 @@ nanoMIPS ISA
+> > >  
+> > >  The ``nanoMIPS`` ISA has never been upstreamed to any compiler toolchain.
+> > >  As it is hard to generate binaries for it, declare it deprecated.
+> > > +
+> > > +Tools
+> > > +-----
+> > > +
+> > > +virtiofsd
+> > > +'''''''''
+> > > +
+> > > +There is a new Rust implementation of ``virtiofsd`` at
+> > > +``https://gitlab.com/virtio-fs/virtiofsd``;
+> > > +since this is now marked stable, new development should be done on that
+> > > +rather than the existing C version in the QEMU tree.
+> > > +The C version will still accept fixes and patches that
+> > > +are already in development for the moment, but will eventually
+> > > +be deleted from this tree.
+> > > +New deployments should use the Rust version, and existing systems
+> > > +should consider moving to it.  The command line and feature set
+> > > +is very close and moving should be simple.
+> > 
+> > I'm not qualified to say if the Rust impl is complete enough
+> > to replace the C version, so I won't add a reviewed tag.
+> 
+> We believe it is a complete replacement at this point, with compatible
+> command line.
 
-Signed-off-by: Sebastian Hasler <sebastian.hasler@stuvus.uni-stuttgart.de>
----
- tools/virtiofsd/passthrough_ll.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+I think its not a complete replacement yet. For example, POSIX_ACLs are
+not supported yet. German is looking into making it work.
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 64b5b4fbb1..faa62278c5 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -2442,6 +2442,15 @@ static void lo_flock(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
-     int res;
-     (void)ino;
- 
-+    if (!(op & LOCK_NB)) {
-+        /*
-+         * Blocking flock can deadlock as there is only one thread
-+         * serving the queue.
-+         */
-+        fuse_reply_err(req, EOPNOTSUPP);
-+        return;
-+    }
-+
-     res = flock(lo_fi_fd(req, fi), op);
- 
-     fuse_reply_err(req, res == -1 ? errno : 0);
--- 
-2.33.1
+There might be other small things here and there, but nothing major, I
+think.
+
+Vivek
+> 
+> Dave
+> 
+> > However I want to say that from the point of view of downstream
+> > packagers of qemu -- especially Fedora -- it would be helpful if we
+> > could direct both upstream development effort and downstream packaging
+> > into just the one virtiofsd.  So I agree in principle with this.
+> > 
+> > Rich.
+> > 
+> > -- 
+> > Richard Jones, Virtualization Group, Red Hat http://people.redhat.com/~rjones
+> > Read my programming and virtualization blog: http://rwmj.wordpress.com
+> > virt-p2v converts physical machines to virtual machines.  Boot with a
+> > live CD or over the network (PXE) and turn machines into KVM guests.
+> > http://libguestfs.org/virt-v2v
+> > 
+> -- 
+> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> 
 

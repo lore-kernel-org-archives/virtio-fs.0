@@ -1,11 +1,12 @@
 From: Greg Kurz <groug@kaod.org>
-Date: Mon, 14 Feb 2022 14:58:19 +0100
-Message-Id: <20220214135820.43897-3-groug@kaod.org>
+Date: Mon, 14 Feb 2022 14:58:20 +0100
+Message-Id: <20220214135820.43897-4-groug@kaod.org>
 In-Reply-To: <20220214135820.43897-1-groug@kaod.org>
 References: <20220214135820.43897-1-groug@kaod.org>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v5 2/3] virtiofsd: Track submounts
+Subject: [Virtio-fs] [PATCH v5 3/3] virtiofsd: Add support for FUSE_SYNCFS
+	request without announce_submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,72 +18,71 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org
 Cc: virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
-If
-Support for FUSE_SYNCFS requires the server to track submounts
+This adds the missing bits to support FUSE_SYNCFS in the case submounts
+aren't announced to the client.
 
-that may exist under the shared directory. lo_do_lookup() already knows
-how to detect them : it is a directory with a different device ID or
-mount ID than its parent. Use the same logic and record the information
-under the lo_inode structure.
+Iterate over all inodes and call syncfs() on the ones marked as submounts.
+Since syncfs() can block for an indefinite time, we cannot call it with
+lo->mutex held as it would prevent the server to process other requests.
+This is thus broken down in two steps. First build a list of submounts
+with lo->mutex held, drop the mutex and finally process the list. A
+reference is taken on the inodes to ensure they don't go away when
+lo->mutex is dropped.
 
 Signed-off-by: Greg Kurz <groug@kaod.org>
 ---
- tools/virtiofsd/passthrough_ll.c | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+ tools/virtiofsd/passthrough_ll.c | 38 ++++++++++++++++++++++++++++++--
+ 1 file changed, 36 insertions(+), 2 deletions(-)
 
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 2bf5d40df531..e94c4e6f8635 100644
+index e94c4e6f8635..7ce944bfe2a0 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -118,6 +118,7 @@ struct lo_inode {
-     GHashTable *posix_locks; /* protected by lo_inode->plock_mutex */
- 
-     mode_t filetype;
-+    bool is_submount;
- };
- 
- struct lo_cred {
-@@ -1017,6 +1018,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-     struct lo_data *lo = lo_data(req);
-     struct lo_inode *inode = NULL;
-     struct lo_inode *dir = lo_inode(req, parent);
-+    bool is_submount;
- 
-     if (inodep) {
-         *inodep = NULL; /* in case there is an error */
-@@ -1051,8 +1053,10 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-         goto out_err;
-     }
- 
--    if (S_ISDIR(e->attr.st_mode) && lo->announce_submounts &&
--        (e->attr.st_dev != dir->key.dev || mnt_id != dir->key.mnt_id)) {
-+    is_submount = S_ISDIR(e->attr.st_mode) &&
-+        (e->attr.st_dev != dir->key.dev || mnt_id != dir->key.mnt_id);
+@@ -3400,8 +3400,42 @@ static void lo_syncfs(fuse_req_t req, fuse_ino_t ino)
+         err = lo_do_syncfs(lo, inode);
+         lo_inode_put(lo, &inode);
+     } else {
+-        /* Requires the sever to track submounts. Not implemented yet */
+-        err = ENOSYS;
++        g_autoptr(GSList) submount_list = NULL;
++        GSList *elem;
++        GHashTableIter iter;
++        gpointer key, value;
 +
-+    if (is_submount && lo->announce_submounts) {
-         e->attr_flags |= FUSE_ATTR_SUBMOUNT;
++        pthread_mutex_lock(&lo->mutex);
++
++        g_hash_table_iter_init(&iter, lo->inodes);
++        while (g_hash_table_iter_next(&iter, &key, &value)) {
++            struct lo_inode *inode = value;
++
++            if (inode->is_submount) {
++                g_atomic_int_inc(&inode->refcount);
++                submount_list = g_slist_prepend(submount_list, inode);
++            }
++        }
++
++        pthread_mutex_unlock(&lo->mutex);
++
++        /* The root inode is always present and not tracked in the hash table */
++        err = lo_do_syncfs(lo, &lo->root);
++
++        for (elem = submount_list; elem; elem = g_slist_next(elem)) {
++            struct lo_inode *inode = elem->data;
++            int r;
++
++            r = lo_do_syncfs(lo, inode);
++            if (r) {
++                /*
++                 * Try to sync as much as possible. Only one error can be
++                 * reported to the client though, arbitrarily the last one.
++                 */
++                err = r;
++            }
++            lo_inode_put(lo, &inode);
++        }
      }
  
-@@ -1079,6 +1083,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-         inode->key.ino = e->attr.st_ino;
-         inode->key.dev = e->attr.st_dev;
-         inode->key.mnt_id = mnt_id;
-+        inode->is_submount = is_submount;
-         if (lo->posix_lock) {
-             pthread_mutex_init(&inode->plock_mutex, NULL);
-             inode->posix_locks = g_hash_table_new_full(
-@@ -1100,8 +1105,9 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
- 
-     lo_inode_put(lo, &dir);
- 
--    fuse_log(FUSE_LOG_DEBUG, "  %lli/%s -> %lli\n", (unsigned long long)parent,
--             name, (unsigned long long)e->ino);
-+    fuse_log(FUSE_LOG_DEBUG, "  %lli/%s -> %lli%s\n",
-+             (unsigned long long) parent, name, (unsigned long long) e->ino,
-+             is_submount ? " (submount)" : "");
- 
-     return 0;
- 
+     fuse_reply_err(req, err);
 -- 
 2.34.1
 

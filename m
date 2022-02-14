@@ -1,12 +1,14 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Thu, 17 Feb 2022 14:23:56 +0000
-Message-Id: <20220217142402.52819-7-dgilbert@redhat.com>
-In-Reply-To: <20220217142402.52819-1-dgilbert@redhat.com>
-References: <20220217142402.52819-1-dgilbert@redhat.com>
+Date: Mon, 14 Feb 2022 13:27:22 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YgqfCtcjhApw5Fyw@redhat.com>
+References: <20220214135820.43897-1-groug@kaod.org>
+	<20220214135820.43897-4-groug@kaod.org>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 06/12] virtiofsd,
-	fuse_lowlevel.c: Add capability to parse security context
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20220214135820.43897-4-groug@kaod.org>
+Subject: Re: [Virtio-fs] [PATCH v5 3/3] virtiofsd: Add support for
+ FUSE_SYNCFS request without announce_submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,247 +17,114 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, vgoyal@redhat.com, groug@kaod.org, sebastian.hasler@stuvus.uni-stuttgart.de
-Cc: virtio-fs@redhat.com
+To: Greg Kurz <groug@kaod.org>
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-From: Vivek Goyal <vgoyal@redhat.com>
+On Mon, Feb 14, 2022 at 02:58:20PM +0100, Greg Kurz wrote:
+> This adds the missing bits to support FUSE_SYNCFS in the case submounts
+> aren't announced to the client.
+> 
+> Iterate over all inodes and call syncfs() on the ones marked as submounts.
+> Since syncfs() can block for an indefinite time, we cannot call it with
+> lo->mutex held as it would prevent the server to process other requests.
+> This is thus broken down in two steps. First build a list of submounts
+> with lo->mutex held, drop the mutex and finally process the list. A
+> reference is taken on the inodes to ensure they don't go away when
+> lo->mutex is dropped.
+> 
+> Signed-off-by: Greg Kurz <groug@kaod.org>
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 38 ++++++++++++++++++++++++++++++--
+>  1 file changed, 36 insertions(+), 2 deletions(-)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index e94c4e6f8635..7ce944bfe2a0 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -3400,8 +3400,42 @@ static void lo_syncfs(fuse_req_t req, fuse_ino_t ino)
+>          err = lo_do_syncfs(lo, inode);
+>          lo_inode_put(lo, &inode);
+>      } else {
+> -        /* Requires the sever to track submounts. Not implemented yet */
+> -        err = ENOSYS;
+> +        g_autoptr(GSList) submount_list = NULL;
+> +        GSList *elem;
+> +        GHashTableIter iter;
+> +        gpointer key, value;
+> +
+> +        pthread_mutex_lock(&lo->mutex);
+> +
+> +        g_hash_table_iter_init(&iter, lo->inodes);
+> +        while (g_hash_table_iter_next(&iter, &key, &value)) {
 
-Add capability to enable and parse security context as sent by client
-and put into fuse_req. Filesystems now can get security context from
-request and set it on files during creation.
+Going through all the inodes sounds very inefficient. If there are large
+number of inodes (say 1 million or more), and if frequent syncfs requests
+are coming this can consume lot of cpu cycles.
 
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-Message-Id: <20220208204813.682906-6-vgoyal@redhat.com>
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
----
- tools/virtiofsd/fuse_common.h   |   5 ++
- tools/virtiofsd/fuse_i.h        |   7 +++
- tools/virtiofsd/fuse_lowlevel.c | 102 +++++++++++++++++++++++++++++++-
- 3 files changed, 113 insertions(+), 1 deletion(-)
+Given C virtiofsd is slowly going away, so I don't want to be too
+particular about it. But, I would have thought to put submount
+inodes into another list or hash map (using mount id as key) and just
+traverse through that list instead. Given number of submounts should
+be small, it should be pretty quick to walk through that list.
 
-diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
-index 6f8a988202..bf46954dab 100644
---- a/tools/virtiofsd/fuse_common.h
-+++ b/tools/virtiofsd/fuse_common.h
-@@ -377,6 +377,11 @@ struct fuse_file_info {
-  */
- #define FUSE_CAP_SETXATTR_EXT (1 << 29)
- 
-+/**
-+ * Indicates that file server supports creating file security context
-+ */
-+#define FUSE_CAP_SECURITY_CTX (1ULL << 32)
-+
- /**
-  * Ioctl flags
-  *
-diff --git a/tools/virtiofsd/fuse_i.h b/tools/virtiofsd/fuse_i.h
-index 492e002181..a5572fa4ae 100644
---- a/tools/virtiofsd/fuse_i.h
-+++ b/tools/virtiofsd/fuse_i.h
-@@ -15,6 +15,12 @@
- struct fv_VuDev;
- struct fv_QueueInfo;
- 
-+struct fuse_security_context {
-+        const char *name;
-+        uint32_t ctxlen;
-+        const void *ctx;
-+};
-+
- struct fuse_req {
-     struct fuse_session *se;
-     uint64_t unique;
-@@ -35,6 +41,7 @@ struct fuse_req {
-     } u;
-     struct fuse_req *next;
-     struct fuse_req *prev;
-+    struct fuse_security_context secctx;
- };
- 
- struct fuse_notify_req {
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index d91cd9743a..2909122b23 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -886,11 +886,63 @@ static void do_readlink(fuse_req_t req, fuse_ino_t nodeid,
-     }
- }
- 
-+static int parse_secctx_fill_req(fuse_req_t req, struct fuse_mbuf_iter *iter)
-+{
-+    struct fuse_secctx_header *fsecctx_header;
-+    struct fuse_secctx *fsecctx;
-+    const void *secctx;
-+    const char *name;
-+
-+    fsecctx_header = fuse_mbuf_iter_advance(iter, sizeof(*fsecctx_header));
-+    if (!fsecctx_header) {
-+        return -EINVAL;
-+    }
-+
-+    /*
-+     * As of now maximum of one security context is supported. It can
-+     * change in future though.
-+     */
-+    if (fsecctx_header->nr_secctx > 1) {
-+        return -EINVAL;
-+    }
-+
-+    /* No security context sent. Maybe no LSM supports it */
-+    if (!fsecctx_header->nr_secctx) {
-+        return 0;
-+    }
-+
-+    fsecctx = fuse_mbuf_iter_advance(iter, sizeof(*fsecctx));
-+    if (!fsecctx) {
-+        return -EINVAL;
-+    }
-+
-+    /* struct fsecctx with zero sized context is not expected */
-+    if (!fsecctx->size) {
-+        return -EINVAL;
-+    }
-+    name = fuse_mbuf_iter_advance_str(iter);
-+    if (!name) {
-+        return -EINVAL;
-+    }
-+
-+    secctx = fuse_mbuf_iter_advance(iter, fsecctx->size);
-+    if (!secctx) {
-+        return -EINVAL;
-+    }
-+
-+    req->secctx.name = name;
-+    req->secctx.ctx = secctx;
-+    req->secctx.ctxlen = fsecctx->size;
-+    return 0;
-+}
-+
- static void do_mknod(fuse_req_t req, fuse_ino_t nodeid,
-                      struct fuse_mbuf_iter *iter)
- {
-     struct fuse_mknod_in *arg;
-     const char *name;
-+    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
-+    int err;
- 
-     arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
-     name = fuse_mbuf_iter_advance_str(iter);
-@@ -901,6 +953,14 @@ static void do_mknod(fuse_req_t req, fuse_ino_t nodeid,
- 
-     req->ctx.umask = arg->umask;
- 
-+    if (secctx_enabled) {
-+        err = parse_secctx_fill_req(req, iter);
-+        if (err) {
-+            fuse_reply_err(req, -err);
-+            return;
-+        }
-+    }
-+
-     if (req->se->op.mknod) {
-         req->se->op.mknod(req, nodeid, name, arg->mode, arg->rdev);
-     } else {
-@@ -913,6 +973,8 @@ static void do_mkdir(fuse_req_t req, fuse_ino_t nodeid,
- {
-     struct fuse_mkdir_in *arg;
-     const char *name;
-+    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
-+    int err;
- 
-     arg = fuse_mbuf_iter_advance(iter, sizeof(*arg));
-     name = fuse_mbuf_iter_advance_str(iter);
-@@ -923,6 +985,14 @@ static void do_mkdir(fuse_req_t req, fuse_ino_t nodeid,
- 
-     req->ctx.umask = arg->umask;
- 
-+    if (secctx_enabled) {
-+        err = parse_secctx_fill_req(req, iter);
-+        if (err) {
-+            fuse_reply_err(req, err);
-+            return;
-+        }
-+    }
-+
-     if (req->se->op.mkdir) {
-         req->se->op.mkdir(req, nodeid, name, arg->mode);
-     } else {
-@@ -969,12 +1039,22 @@ static void do_symlink(fuse_req_t req, fuse_ino_t nodeid,
- {
-     const char *name = fuse_mbuf_iter_advance_str(iter);
-     const char *linkname = fuse_mbuf_iter_advance_str(iter);
-+    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
-+    int err;
- 
-     if (!name || !linkname) {
-         fuse_reply_err(req, EINVAL);
-         return;
-     }
- 
-+    if (secctx_enabled) {
-+        err = parse_secctx_fill_req(req, iter);
-+        if (err) {
-+            fuse_reply_err(req, err);
-+            return;
-+        }
-+    }
-+
-     if (req->se->op.symlink) {
-         req->se->op.symlink(req, linkname, nodeid, name);
-     } else {
-@@ -1048,6 +1128,8 @@ static void do_link(fuse_req_t req, fuse_ino_t nodeid,
- static void do_create(fuse_req_t req, fuse_ino_t nodeid,
-                       struct fuse_mbuf_iter *iter)
- {
-+    bool secctx_enabled = req->se->conn.want & FUSE_CAP_SECURITY_CTX;
-+
-     if (req->se->op.create) {
-         struct fuse_create_in *arg;
-         struct fuse_file_info fi;
-@@ -1060,6 +1142,15 @@ static void do_create(fuse_req_t req, fuse_ino_t nodeid,
-             return;
-         }
- 
-+        if (secctx_enabled) {
-+            int err;
-+            err = parse_secctx_fill_req(req, iter);
-+            if (err) {
-+                fuse_reply_err(req, err);
-+                return;
-+            }
-+        }
-+
-         memset(&fi, 0, sizeof(fi));
-         fi.flags = arg->flags;
-         fi.kill_priv = arg->open_flags & FUSE_OPEN_KILL_SUIDGID;
-@@ -2015,6 +2106,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-     if (flags & FUSE_SETXATTR_EXT) {
-         se->conn.capable |= FUSE_CAP_SETXATTR_EXT;
-     }
-+    if (flags & FUSE_SECURITY_CTX) {
-+        se->conn.capable |= FUSE_CAP_SECURITY_CTX;
-+    }
- #ifdef HAVE_SPLICE
- #ifdef HAVE_VMSPLICE
-     se->conn.capable |= FUSE_CAP_SPLICE_WRITE | FUSE_CAP_SPLICE_MOVE;
-@@ -2154,8 +2248,14 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-         outarg.flags |= FUSE_SETXATTR_EXT;
-     }
- 
-+    if (se->conn.want & FUSE_CAP_SECURITY_CTX) {
-+        /* bits 32..63 get shifted down 32 bits into the flags2 field */
-+        outarg.flags2 |= FUSE_SECURITY_CTX >> 32;
-+    }
-+
-     fuse_log(FUSE_LOG_DEBUG, "   INIT: %u.%u\n", outarg.major, outarg.minor);
--    fuse_log(FUSE_LOG_DEBUG, "   flags=0x%08x\n", outarg.flags);
-+    fuse_log(FUSE_LOG_DEBUG, "   flags2=0x%08x flags=0x%08x\n", outarg.flags2,
-+             outarg.flags);
-     fuse_log(FUSE_LOG_DEBUG, "   max_readahead=0x%08x\n", outarg.max_readahead);
-     fuse_log(FUSE_LOG_DEBUG, "   max_write=0x%08x\n", outarg.max_write);
-     fuse_log(FUSE_LOG_DEBUG, "   max_background=%i\n", outarg.max_background);
--- 
-2.35.1
+> +            struct lo_inode *inode = value;
+> +
+> +            if (inode->is_submount) {
+> +                g_atomic_int_inc(&inode->refcount);
+> +                submount_list = g_slist_prepend(submount_list, inode);
+> +            }
+> +        }
+> +
+> +        pthread_mutex_unlock(&lo->mutex);
+> +
+> +        /* The root inode is always present and not tracked in the hash table */
+> +        err = lo_do_syncfs(lo, &lo->root);
+> +
+> +        for (elem = submount_list; elem; elem = g_slist_next(elem)) {
+> +            struct lo_inode *inode = elem->data;
+> +            int r;
+> +
+> +            r = lo_do_syncfs(lo, inode);
+> +            if (r) {
+> +                /*
+> +                 * Try to sync as much as possible. Only one error can be
+> +                 * reported to the client though, arbitrarily the last one.
+> +                 */
+> +                err = r;
+> +            }
+> +            lo_inode_put(lo, &inode);
+> +        }
+
+One more minor nit. What happens if virtiofsd is processing syncfs list
+and then somebody hard reboots qemu and mounts virtiofs again. That
+will trigger FUSE_INIT and will call lo_destroy() first.
+
+fuse_lowlevel.c
+
+fuse_session_process_buf_int()
+{
+            fuse_log(FUSE_LOG_DEBUG, "%s: reinit\n", __func__);
+            se->got_destroy = 1;
+            se->got_init = 0;
+            if (se->op.destroy) {
+                se->op.destroy(se->userdata);
+            }
+}
+
+IIUC, there is no synchronization with this path. If we are running with
+thread pool enabled, it could very well happen that one thread is still
+doing syncfs while other thread is executing do_init(). That sounds
+like little bit of a problem. It will be good if there is a way
+to either abort syncfs() or do_destroy() waits for all the previous
+syncfs() to finish.
+
+Greg, if you like, you could break down this work in two patch series.
+First patch series just issues syncfs() on inode id sent with FUSE_SYNCFS.
+That's easy fix and can get merged now.
+
+And second patch series take care of above issues and will be little bit
+more work.
+
+Thanks
+Vivek
 

@@ -1,28 +1,13 @@
-Date: Mon, 14 Feb 2022 02:56:32 -0500
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=UIimVwp4qpcDdxGvQ0h2gp+vfRENCOdas6tfmHMbOr8=; b=d
-	ljAn8W7h3tH7AEbywAYdFWjX8aWycKAF75VNZE0Vkfo/KuKNCFg4Fy8P0GZzZRBb
-	X6hWZH4CRksc7hHdP3O6mLB+wre0kJqy0G7sf9bhNKyR7mMFSd/jxeyvu39Lmaw8
-	v/xA+/qjvxwAwGI69BmVBmLeDhcPavh2u/KKkgUaiTVmD8i1KaRYJPrN3IKbgj/w
-	oKknCRi22qQpdnbR35zV0gIGHsnS4adKQYQvk8riv4GG5cqTJmMwO6at/EzhBXID
-	LzGd+JW/dHM0GL//C8pDKSkcVBlfIYTGYZ3vZFPB3/lbIMrzxHryHDgiiq8LmZ9w
-	0N4PfGo3HdnoI26kDuxsg==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
-	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm2; bh=UIimVwp4qpcDdxGvQ0h2gp+vfRENC
-	Odas6tfmHMbOr8=; b=ggRC3DeCnNaAaxNgJuxT7P6VBVgTLYuQ/vcy408/M9WF8
-	ouZJYszqK9vE6PUrpfY615fgf6qHtOz5i8f+JjE6/P/OYx++lW5WpAjzkmYm2is2
-	V3Eci9zQN2lFjdjsDdqSP1GW3B+/ojQPVs4ByWgOlS/9r6Klz8Rz9ueqEy0P2nFf
-	DOsin/+KaoM5IYvOP/WYG+ejoZ4MzxEd3yRuhicATC4PLy0yXAd98vjd721lR7KU
-	ayh9DgePxV6tS4MTgaJjeU8FQaT+Pc2EQu8dPaDXq0zwE0PRkjSU+Ix+Co/sHdB5
-	dH1yDNm9BXHntdKGNdYVtPRJG32eLni17REE9bVHA==
-From: virtiofs-bot@sinrega.org
-Message-Id: <50893.122021402562900202@us-mta-634.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] Issue opened: Consider distributing the
-	virtiofsd binary as part of the release
+Date: Mon, 14 Feb 2022 11:12:58 +0000
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Message-ID: <Ygo5Ouzpvg0Jdvvo@stefanha-x1.localdomain>
+References: <20220210174714.19843-1-dgilbert@redhat.com>
+MIME-Version: 1.0
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="hzr9mwc4r5yZwhgQ"
+Content-Disposition: inline
+In-Reply-To: <20220210174714.19843-1-dgilbert@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH v2] Deprecate C virtiofsd
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,11 +16,46 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Cc: virtio-fs@redhat.com, berrange@redhat.com, qemu-devel@nongnu.org, vgoyal@redhat.com
 
-In the same way the binary is provided on every MR merge (see https://gitlab.com/virtio-fs/virtiofsd/-/tree/main#ci-built-binaries), it'd be really handy to have static binaries (using `musl` libc) provided on every release tag.
 
-That would help and simplify **a lot** the CIs of projects consuming virtio-fs (such as Kata Containers).
----
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/28
+--hzr9mwc4r5yZwhgQ
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Thu, Feb 10, 2022 at 05:47:14PM +0000, Dr. David Alan Gilbert (git) wrot=
+e:
+> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+>=20
+> There's a nice new Rust implementation out there; recommend people
+> do new work on that.
+>=20
+> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> ---
+>  docs/about/deprecated.rst | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+
+Thanks, applied to my block tree:
+https://gitlab.com/stefanha/qemu/commits/block
+
+Stefan
+
+--hzr9mwc4r5yZwhgQ
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmIKOToACgkQnKSrs4Gr
+c8hX5Af/RDI3Rqj6L5eyb+Ks56++lhhcC1yy85mDGrcy6ETmoDhFD74j3ElfYEY5
+jc48AY9P9qX+N56RAaAuK9nOreJZBJxYuSsfffs/1IhVPRvY030Fq1i3yG0ZOMMo
+5WXVmui8NwZROQ3beLzQYjkxklrGQVnkSGeycjNad8WZVtuzkq8taNBuIDj8r/Wn
+UowjkBOEchcMqg8qtoL3Il5cwgl4d9G73Ly2U/uMOdjxAAuagBexa3/tKx8Kftbt
+2WFfWuYBh0imPhOfk6gcZmhSBgRfvzogabZ7A0vGdTyM95AoXWNPY8/1mdQvTJbB
+9IEbvPQ7J48BTpCRJcr1OvdDSa7Xpg==
+=xAso
+-----END PGP SIGNATURE-----
+
+--hzr9mwc4r5yZwhgQ--
 

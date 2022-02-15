@@ -1,28 +1,20 @@
-Date: Tue, 15 Feb 2022 16:47:19 -0500
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=mDQ5/vilR3+AimC4mT2yZ2yS59H0gpyw4Azg5HAJ61k=; b=I
-	bSQB4PNbZCh1SoSvGS1lrwlwzQy8EMiEZ8wjuMhwUZsHeAONJGNjIavqRKj15VFU
-	+5XoyxOdzJmfqjtlkk+0du+MX9lvLaTRgxSIvjT/bnnYtib25M+BeddeW1p5hz8d
-	iGj7hN6ZTzwXYN6uSbF/ZgBcvJm8d/5FX7m88ksI7o3jVyWdGWNWdq8waK84dJrk
-	9lye8t8Xvji7Z3uQR78EpuHZ7LzJDAVBI5P9cYAHFiL/gzBoCNTOPoOqvAYq/8A8
-	5wl257dyii8TLBTO2MVgP6jNQ2VvhdqsmB2u6obXWOULhOA/UCteZqAzATPzF0MN
-	I2TninGg0fv5MTF/IOVsw==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
-	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm2; bh=mDQ5/vilR3+AimC4mT2yZ2yS59H0g
-	pyw4Azg5HAJ61k=; b=d1luio89XgLs3CRQ4ouUrj7pVYMYxho/4+ZloXZRhEVa9
-	uocfNUXvhccztAe+AljWeSB8lD/aerCHH1rOe26OaOdiJjaFIZiZ1wHoWpZq2+Jo
-	LB/3XEpvoLa4OY1fK3+HYOC3cBW2If6eL4agtw1FCCZA28vFhv4PYHgDb/0HMEFP
-	sFS0B+ZvjahFVtDpk78wjH0LEE7+eXCuTUHmdrcJwMiB1S9vuHxDn2Q8IKvEVftR
-	QqsIsB/uq3e+nC7iKOiVQqohaMiJjzCJ+BmKvZb+tRNRReCXyf63eYOeDAiz+RcJ
-	jz7aaLqMUR8qVNuhoZYvSdkTTR4waVGXUXDrWaSmg==
-From: virtiofs-bot@sinrega.org
-Message-Id: <85025.122021516470901923@us-mta-376.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] Issue opened: Do not allow two daemons to
-	listen on same socket
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+	:cc; bh=PcFBTJ/FJSIMzco4pkUj7WHkUKvwPRNSLBpa49AXX5A=;
+	b=SjEhSkX2uZOq9UjrXLHdsYFVIYYgtuVECg81zGn9VVnu4C2/o5aKLk6NTJ6XGB48kU
+	we12fekI3ggjtusdyPy0W8lmpjHgOb1f9+NUxaawhRl0BFq8NIPDHGmKKF9X4Q4Pv2Ht
+	hhVBtTL+zqHDrde/WtCyDI/sS9IP5k0MJl7tLsgrBYTt/+XJlbcUTksKPcAz4l3UmK8g
+	vGJbXi981Mr6ZJAt5zG4rNvul1gn0hnJgaeKWQeTALH65+oWmicst7cNh+iEZ3tqTZgp
+	bkJxuZehzgZvAUXTo/VUf0mBNUdpj2zWWASuYBxMTumSo0t3u0QHCGq13BpKiMmHvFmT
+	0S0g==
+MIME-Version: 1.0
+References: <20220214171545.10242-1-stefanha@redhat.com>
+In-Reply-To: <20220214171545.10242-1-stefanha@redhat.com>
+From: Peter Maydell <peter.maydell@linaro.org>
+Date: Tue, 15 Feb 2022 22:40:55 +0000
+Message-ID: <CAFEAcA_R1aqTqrD7Pmo-jqkniJNpJGE=UbxBnBUvVFLMb-5Fxw@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PULL 0/3] Block patches
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,11 +23,33 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: Kevin Wolf <kwolf@redhat.com>, qemu-block@nongnu.org, "Michael S. Tsirkin" <mst@redhat.com>, libvir-list@redhat.com, qemu-devel@nongnu.org, virtio-fs@redhat.com, Hanna Reitz <hreitz@redhat.com>
 
-Right now I can start two daemons listening on same socket /tmp/vhostqemu. Drop in a pid lock file and use flock so that only one virtiofsd instance can listen and other fails with error. C version already does it and errors out with error.
+On Mon, 14 Feb 2022 at 17:44, Stefan Hajnoczi <stefanha@redhat.com> wrote:
+>
+> The following changes since commit cc5ce8b8b6be83e5fe3b668dbd061ad97c534e3f:
+>
+>   Merge remote-tracking branch 'remotes/legoater/tags/pull-ppc-20220210' into staging (2022-02-13 20:33:28 +0000)
+>
+> are available in the Git repository at:
+>
+>   https://gitlab.com/stefanha/qemu.git tags/block-pull-request
+>
+> for you to fetch changes up to 4c41c69e05fe28c0f95f8abd2ebf407e95a4f04b:
+>
+>   util: adjust coroutine pool size to virtio block queue (2022-02-14 17:11:25 +0000)
+>
+> ----------------------------------------------------------------
+> Pull request
+>
+> This contains coroutine poll size scaling, virtiofsd rseq seccomp for new glibc
+> versions, and the QEMU C virtiofsd deprecation notice.
+>
+> ----------------------------------------------------------------
 
-"Cannot lock pid file: Resource temporarily unavailable"
----
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/31
+Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
+
+thanks
+-- PMM
 

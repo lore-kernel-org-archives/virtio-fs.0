@@ -1,9 +1,11 @@
-From: Hanna Reitz <hreitz@redhat.com>
-Date: Wed, 23 Feb 2022 10:23:40 +0100
-Message-Id: <20220223092340.9043-1-hreitz@redhat.com>
+From: Greg Kurz <groug@kaod.org>
+Date: Tue, 15 Feb 2022 19:15:28 +0100
+Message-Id: <20220215181529.164070-1-groug@kaod.org>
+Content-Type: text/plain; charset="utf-8"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH] virtiofsd: Let meson check for statx.stx_mnt_id
+Subject: [Virtio-fs] [PATCH v6 0/1] virtiofsd: Add support for FUSE_SYNCFS
+	request
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -12,70 +14,44 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, virtio-fs@redhat.com
-Cc: Hanna Reitz <hreitz@redhat.com>
+To: qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
-In virtiofsd, we assume that the presence of the STATX_MNT_ID macro
-implies existence of the statx.stx_mnt_id field.  Unfortunately, that is
-not necessarily the case: glibc has introduced the macro in its commit
-88a2cf6c4bab6e94a65e9c0db8813709372e9180, but the statx.stx_mnt_id field
-is still missing from its own headers.
+FUSE_SYNCFS allows the client to flush the host page cache.
 
-Let meson.build actually chek for both STATX_MNT_ID and
-statx.stx_mnt_id, and set CONFIG_STATX_MNT_ID if both are present.
-Then, use this config macro in virtiofsd.
+v6: - drop ! announce_submounts part for now, only the root inode is
+      synced in this case
 
-Closes: https://gitlab.com/qemu-project/qemu/-/issues/882
-Signed-off-by: Hanna Reitz <hreitz@redhat.com>
----
- meson.build                      | 13 +++++++++++++
- tools/virtiofsd/passthrough_ll.c |  2 +-
- 2 files changed, 14 insertions(+), 1 deletion(-)
+v5: - split announce_submounts and ! announce_submounts to separate patches
+      for easier review (but could be squashed together)
+    - track submounts directly in lo_inode structure following the same
+      logic as FUSE_ATTR_SUBMOUNT (i.e. directory with either st_dev or
+      stx_mnt_id different from parent)
 
-diff --git a/meson.build b/meson.build
-index 8df40bfac4..a5b63e62cd 100644
---- a/meson.build
-+++ b/meson.build
-@@ -1306,6 +1306,18 @@ statx_test = gnu_source_prefix + '''
- 
- has_statx = cc.links(statx_test)
- 
-+# Check whether statx() provides mount ID information
-+
-+statx_mnt_id_test = gnu_source_prefix + '''
-+  #include <sys/stat.h>
-+  int main(void) {
-+    struct statx statxbuf;
-+    statx(0, "", 0, STATX_BASIC_STATS | STATX_MNT_ID, &statxbuf);
-+    return statxbuf.stx_mnt_id;
-+  }'''
-+
-+has_statx_mnt_id = cc.links(statx_mnt_id_test)
-+
- have_vhost_user_blk_server = get_option('vhost_user_blk_server') \
-   .require(targetos == 'linux',
-            error_message: 'vhost_user_blk_server requires linux') \
-@@ -1553,6 +1565,7 @@ config_host_data.set('CONFIG_NETTLE', nettle.found())
- config_host_data.set('CONFIG_QEMU_PRIVATE_XTS', xts == 'private')
- config_host_data.set('CONFIG_MALLOC_TRIM', has_malloc_trim)
- config_host_data.set('CONFIG_STATX', has_statx)
-+config_host_data.set('CONFIG_STATX_MNT_ID', has_statx_mnt_id)
- config_host_data.set('CONFIG_ZSTD', zstd.found())
- config_host_data.set('CONFIG_FUSE', fuse.found())
- config_host_data.set('CONFIG_FUSE_LSEEK', fuse_lseek.found())
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index dfa2fc250d..028dacdd8f 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -1039,7 +1039,7 @@ static int do_statx(struct lo_data *lo, int dirfd, const char *pathname,
- {
-     int res;
- 
--#if defined(CONFIG_STATX) && defined(STATX_MNT_ID)
-+#if defined(CONFIG_STATX) && defined(CONFIG_STATX_MNT_ID)
-     if (lo->use_statx) {
-         struct statx statxbuf;
- 
+v4: - based on upstream linux FUSE_SYNCFS
+    - added support for the '-o announce_submounts' case, i.e. client sends
+      a FUSE_SYNCFS request for each submount (identified by its root inode)
+    - adapted the case without '-o announce_submounts' so that syncfs() is
+      no longer called with lo->mutex held
+
+v3: - track submounts and do per-submount syncfs() (Vivek)
+    - based on new version of FUSE_SYNCFS (still not upstream)
+      https://listman.redhat.com/archives/virtio-fs/2021-May/msg00025.html
+
+v2: - based on new version of FUSE_SYNCFS
+      https://listman.redhat.com/archives/virtio-fs/2021-April/msg00166.html
+    - propagate syncfs() errors to client (Vivek)
+
+Greg Kurz (1):
+  virtiofsd: Add basic support for FUSE_SYNCFS request
+
+ tools/virtiofsd/fuse_lowlevel.c       | 11 +++++++
+ tools/virtiofsd/fuse_lowlevel.h       | 13 ++++++++
+ tools/virtiofsd/passthrough_ll.c      | 44 +++++++++++++++++++++++++++
+ tools/virtiofsd/passthrough_seccomp.c |  1 +
+ 4 files changed, 69 insertions(+)
+
 -- 
 2.34.1
+
 

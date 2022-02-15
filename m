@@ -1,28 +1,28 @@
-Date: Fri, 4 Mar 2022 11:53:45 -0500
+Date: Tue, 15 Feb 2022 16:47:19 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
 	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=ltE6nf2wd5rKcpvby7T62giVxLM7K28oEqHFoMA0DCk=; b=E
-	IRl3MvWQH+DxxbXfAG+TxQMj9JUBxJPeLXDc4xxQ6ztjxtXEAfQ28aap3POsYy5V
-	tKLBvskmzgykzFyuwB2lpE39MSB/dWkPhGV6CeJjqOYwIkIaGZGPB8bWMIWsJ5vO
-	Lnib81Y8ll6c2+g0QTucaeFNvwmQMNY5rjNajppSF3sBuYKt1LAQPr3wPRNXrn8h
-	yjRzkCLYjzlOIX36a7bNjuWp3FSOfXx7zMWfahy6+livDLCOhfDFagAbEqqQncOQ
-	mSTRcJeobhA9Ef+f00I6W1yEfPWFCYk+BJZx8u8102yXTx9GKfd04p31XiI2/lUb
-	u6bt7rm84xLWXIF+wG8qQ==
+	:to; s=fm3; bh=mDQ5/vilR3+AimC4mT2yZ2yS59H0gpyw4Azg5HAJ61k=; b=I
+	bSQB4PNbZCh1SoSvGS1lrwlwzQy8EMiEZ8wjuMhwUZsHeAONJGNjIavqRKj15VFU
+	+5XoyxOdzJmfqjtlkk+0du+MX9lvLaTRgxSIvjT/bnnYtib25M+BeddeW1p5hz8d
+	iGj7hN6ZTzwXYN6uSbF/ZgBcvJm8d/5FX7m88ksI7o3jVyWdGWNWdq8waK84dJrk
+	9lye8t8Xvji7Z3uQR78EpuHZ7LzJDAVBI5P9cYAHFiL/gzBoCNTOPoOqvAYq/8A8
+	5wl257dyii8TLBTO2MVgP6jNQ2VvhdqsmB2u6obXWOULhOA/UCteZqAzATPzF0MN
+	I2TninGg0fv5MTF/IOVsw==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
 	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm2; bh=ltE6nf2wd5rKcpvby7T62giVxLM7K
-	28oEqHFoMA0DCk=; b=fQGt986T44iWyD/Xizj/c4MV/ldzwv1M5B61P7QG5NAA/
-	6/IAVxBu6pSo5Avxa2PJMCxlyeaJuV9y4P4Pq3oBr6vUTDL0WxiJ9jDqPpVxUc6t
-	QuPDFi0p0WVSFIsgmDeL1VAq8d2BGWTURkWIJR3wQFHypF/AAiAoEJjgatNNpT1T
-	byKL17yzU7WYIyBeTsvnOJzJgNkLpWJGN2WR8HCKs6eVIkPZGvu/t7eHuEM9yzoq
-	XefSMqO8Lpc/mIrNvLxHHioz+plW1WV5Va8gIIVmyyLF88B7NwT5Vg4Ev6cYJ758
-	z6VSdC4h4WT4gjqo4TMi4rTM3R4aFBYCSEI2+SQCw==
+	:x-me-sender:x-sasl-enc; s=fm2; bh=mDQ5/vilR3+AimC4mT2yZ2yS59H0g
+	pyw4Azg5HAJ61k=; b=d1luio89XgLs3CRQ4ouUrj7pVYMYxho/4+ZloXZRhEVa9
+	uocfNUXvhccztAe+AljWeSB8lD/aerCHH1rOe26OaOdiJjaFIZiZ1wHoWpZq2+Jo
+	LB/3XEpvoLa4OY1fK3+HYOC3cBW2If6eL4agtw1FCCZA28vFhv4PYHgDb/0HMEFP
+	sFS0B+ZvjahFVtDpk78wjH0LEE7+eXCuTUHmdrcJwMiB1S9vuHxDn2Q8IKvEVftR
+	QqsIsB/uq3e+nC7iKOiVQqohaMiJjzCJ+BmKvZb+tRNRReCXyf63eYOeDAiz+RcJ
+	jz7aaLqMUR8qVNuhoZYvSdkTTR4waVGXUXDrWaSmg==
 From: virtiofs-bot@sinrega.org
-Message-Id: <92677.122030411534300588@us-mta-371.us.mimecast.lan>
+Message-Id: <85025.122021516470901923@us-mta-376.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] Issue opened: Can't run unprivileged any
-	more due to setgroups
+Subject: [Virtio-fs] [virtiofsd] Issue opened: Do not allow two daemons to
+	listen on same socket
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,15 +33,9 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Since !77, it's not possible to run virtiofsd as an unprivileged user any more:
+Right now I can start two daemons listening on same socket /tmp/vhostqemu. Drop in a pid lock file and use flock so that only one virtiofsd instance can listen and other fails with error. C version already does it and errors out with error.
 
-```
-[2022-03-04T16:46:42Z ERROR virtiofsd] Error entering sandbox: DropSupplementalGroups(Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" })
-```
-
-This is because `setgroups` is always called at startup, and it requires `CAP_SETGID`.  When using the namespace sandbox mode, should `setgroups` be called _after_ setting up the namespace?
-
-cc @slp @vgoyal
+"Cannot lock pid file: Resource temporarily unavailable"
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/36
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/31
 

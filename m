@@ -1,12 +1,12 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Wed, 16 Feb 2022 17:36:25 +0000
-Message-Id: <20220216173625.128109-13-dgilbert@redhat.com>
-In-Reply-To: <20220216173625.128109-1-dgilbert@redhat.com>
+Date: Wed, 16 Feb 2022 19:40:14 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <Yg1THoNoxjSAcK7u@work-vm>
 References: <20220216173625.128109-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 12/12] virtiofsd: Add basic support for
-	FUSE_SYNCFS request
+In-Reply-To: <20220216173625.128109-1-dgilbert@redhat.com>
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: Re: [Virtio-fs] [PULL 00/12] virtiofs queue
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,166 +18,105 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, vgoyal@redhat.com, groug@kaod.org, sebastian.hasler@stuvus.uni-stuttgart.de
 Cc: virtio-fs@redhat.com
 
-From: Greg Kurz <groug@kaod.org>
+* Dr. David Alan Gilbert (git) (dgilbert@redhat.com) wrote:
+> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+> 
+> The following changes since commit c13b8e9973635f34f3ce4356af27a311c993729c:
+> 
+>   Merge remote-tracking branch 'remotes/alistair/tags/pull-riscv-to-apply-20220216' into staging (2022-02-16 09:57:11 +0000)
+> 
+> are available in the Git repository at:
+> 
+>   https://gitlab.com/dagrh/qemu.git tags/pull-virtiofs-20220216
+> 
+> for you to fetch changes up to 47cc3ef597b2ee926c13c9433f4f73645429e128:
+> 
+>   virtiofsd: Add basic support for FUSE_SYNCFS request (2022-02-16 17:29:32 +0000)
 
-Honor the expected behavior of syncfs() to synchronously flush all data
-and metadata to disk on linux systems.
+NAK
+this doesn't build on older Linuxes.
 
-If virtiofsd is started with '-o announce_submounts', the client is
-expected to send a FUSE_SYNCFS request for each individual submount.
-In this case, we just create a new file descriptor on the submount
-inode with lo_inode_open(), call syncfs() on it and close it. The
-intermediary file is needed because O_PATH descriptors aren't
-backed by an actual file and syncfs() would fail with EBADF.
+Rework version in the works.
 
-If virtiofsd is started without '-o announce_submounts' or if the
-client doesn't have the FUSE_CAP_SUBMOUNTS capability, the client
-only sends a single FUSE_SYNCFS request for the root inode. The
-server would thus need to track submounts internally and call
-syncfs() on each of them. This will be implemented later.
+Dave
 
-Note that syncfs() might suffer from a time penalty if the submounts
-are being hammered by some unrelated workload on the host. The only
-solution to prevent that is to avoid shared mounts.
-
-Signed-off-by: Greg Kurz <groug@kaod.org>
-Message-Id: <20220215181529.164070-2-groug@kaod.org>
-Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
----
- tools/virtiofsd/fuse_lowlevel.c       | 11 +++++++
- tools/virtiofsd/fuse_lowlevel.h       | 13 ++++++++
- tools/virtiofsd/passthrough_ll.c      | 44 +++++++++++++++++++++++++++
- tools/virtiofsd/passthrough_seccomp.c |  1 +
- 4 files changed, 69 insertions(+)
-
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index 2909122b23..6a427caa3d 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -1967,6 +1967,16 @@ static void do_lseek(fuse_req_t req, fuse_ino_t nodeid,
-     }
- }
- 
-+static void do_syncfs(fuse_req_t req, fuse_ino_t nodeid,
-+                      struct fuse_mbuf_iter *iter)
-+{
-+    if (req->se->op.syncfs) {
-+        req->se->op.syncfs(req, nodeid);
-+    } else {
-+        fuse_reply_err(req, ENOSYS);
-+    }
-+}
-+
- static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-                     struct fuse_mbuf_iter *iter)
- {
-@@ -2398,6 +2408,7 @@ static struct {
-     [FUSE_RENAME2] = { do_rename2, "RENAME2" },
-     [FUSE_COPY_FILE_RANGE] = { do_copy_file_range, "COPY_FILE_RANGE" },
-     [FUSE_LSEEK] = { do_lseek, "LSEEK" },
-+    [FUSE_SYNCFS] = { do_syncfs, "SYNCFS" },
- };
- 
- #define FUSE_MAXOP (sizeof(fuse_ll_ops) / sizeof(fuse_ll_ops[0]))
-diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
-index c55c0ca2fc..b889dae4de 100644
---- a/tools/virtiofsd/fuse_lowlevel.h
-+++ b/tools/virtiofsd/fuse_lowlevel.h
-@@ -1226,6 +1226,19 @@ struct fuse_lowlevel_ops {
-      */
-     void (*lseek)(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
-                   struct fuse_file_info *fi);
-+
-+    /**
-+     * Synchronize file system content
-+     *
-+     * If this request is answered with an error code of ENOSYS,
-+     * this is treated as success and future calls to syncfs() will
-+     * succeed automatically without being sent to the filesystem
-+     * process.
-+     *
-+     * @param req request handle
-+     * @param ino the inode number
-+     */
-+    void (*syncfs)(fuse_req_t req, fuse_ino_t ino);
- };
- 
- /**
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 9232cfd9d4..a45cf4b343 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -3699,6 +3699,49 @@ static void lo_lseek(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
-     }
- }
- 
-+static int lo_do_syncfs(struct lo_data *lo, struct lo_inode *inode)
-+{
-+    int fd, ret = 0;
-+
-+    fuse_log(FUSE_LOG_DEBUG, "lo_do_syncfs(ino=%" PRIu64 ")\n",
-+             inode->fuse_ino);
-+
-+    fd = lo_inode_open(lo, inode, O_RDONLY);
-+    if (fd < 0) {
-+        return -fd;
-+    }
-+
-+    if (syncfs(fd) < 0) {
-+        ret = errno;
-+    }
-+
-+    close(fd);
-+    return ret;
-+}
-+
-+static void lo_syncfs(fuse_req_t req, fuse_ino_t ino)
-+{
-+    struct lo_data *lo = lo_data(req);
-+    struct lo_inode *inode = lo_inode(req, ino);
-+    int err;
-+
-+    if (!inode) {
-+        fuse_reply_err(req, EBADF);
-+        return;
-+    }
-+
-+    err = lo_do_syncfs(lo, inode);
-+    lo_inode_put(lo, &inode);
-+
-+    /*
-+     * If submounts aren't announced, the client only sends a request to
-+     * sync the root inode. TODO: Track submounts internally and iterate
-+     * over them as well.
-+     */
-+
-+    fuse_reply_err(req, err);
-+}
-+
- static void lo_destroy(void *userdata)
- {
-     struct lo_data *lo = (struct lo_data *)userdata;
-@@ -3759,6 +3802,7 @@ static struct fuse_lowlevel_ops lo_oper = {
-     .copy_file_range = lo_copy_file_range,
- #endif
-     .lseek = lo_lseek,
-+    .syncfs = lo_syncfs,
-     .destroy = lo_destroy,
- };
- 
-diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
-index 2bc0127b69..888295c073 100644
---- a/tools/virtiofsd/passthrough_seccomp.c
-+++ b/tools/virtiofsd/passthrough_seccomp.c
-@@ -111,6 +111,7 @@ static const int syscall_allowlist[] = {
-     SCMP_SYS(set_robust_list),
-     SCMP_SYS(setxattr),
-     SCMP_SYS(symlinkat),
-+    SCMP_SYS(syncfs),
-     SCMP_SYS(time), /* Rarely needed, except on static builds */
-     SCMP_SYS(tgkill),
-     SCMP_SYS(unlinkat),
+> ----------------------------------------------------------------
+> virtiofs pull 2022-02-16
+> 
+> Security label improvements from Vivek
+>   - includes a fix for building against new kernel headers
+> Blocking flock disable from Sebastian
+> SYNCFS support from Greg
+> 
+> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> 
+> ----------------------------------------------------------------
+> Greg Kurz (1):
+>       virtiofsd: Add basic support for FUSE_SYNCFS request
+> 
+> Sebastian Hasler (1):
+>       virtiofsd: Do not support blocking flock
+> 
+> Vivek Goyal (10):
+>       virtiofsd: Fix breakage due to fuse_init_in size change
+>       linux-headers: Update headers to v5.17-rc1
+>       virtiofsd: Parse extended "struct fuse_init_in"
+>       virtiofsd: Extend size of fuse_conn_info->capable and ->want fields
+>       virtiofsd, fuse_lowlevel.c: Add capability to parse security context
+>       virtiofsd: Move core file creation code in separate function
+>       virtiofsd: Add helpers to work with /proc/self/task/tid/attr/fscreate
+>       virtiofsd: Create new file with security context
+>       virtiofsd: Create new file using O_TMPFILE and set security context
+>       virtiofsd: Add an option to enable/disable security label
+> 
+>  docs/tools/virtiofsd.rst                       |  32 ++
+>  include/standard-headers/asm-x86/kvm_para.h    |   1 +
+>  include/standard-headers/drm/drm_fourcc.h      |  11 +
+>  include/standard-headers/linux/ethtool.h       |   1 +
+>  include/standard-headers/linux/fuse.h          |  60 +++-
+>  include/standard-headers/linux/pci_regs.h      | 142 ++++----
+>  include/standard-headers/linux/virtio_gpio.h   |  72 ++++
+>  include/standard-headers/linux/virtio_i2c.h    |  47 +++
+>  include/standard-headers/linux/virtio_iommu.h  |   8 +-
+>  include/standard-headers/linux/virtio_pcidev.h |  65 ++++
+>  include/standard-headers/linux/virtio_scmi.h   |  24 ++
+>  linux-headers/asm-generic/unistd.h             |   5 +-
+>  linux-headers/asm-mips/unistd_n32.h            |   2 +
+>  linux-headers/asm-mips/unistd_n64.h            |   2 +
+>  linux-headers/asm-mips/unistd_o32.h            |   2 +
+>  linux-headers/asm-powerpc/unistd_32.h          |   2 +
+>  linux-headers/asm-powerpc/unistd_64.h          |   2 +
+>  linux-headers/asm-riscv/bitsperlong.h          |  14 +
+>  linux-headers/asm-riscv/mman.h                 |   1 +
+>  linux-headers/asm-riscv/unistd.h               |  44 +++
+>  linux-headers/asm-s390/unistd_32.h             |   2 +
+>  linux-headers/asm-s390/unistd_64.h             |   2 +
+>  linux-headers/asm-x86/kvm.h                    |  16 +-
+>  linux-headers/asm-x86/unistd_32.h              |   1 +
+>  linux-headers/asm-x86/unistd_64.h              |   1 +
+>  linux-headers/asm-x86/unistd_x32.h             |   1 +
+>  linux-headers/linux/kvm.h                      |  17 +
+>  tools/virtiofsd/fuse_common.h                  |   9 +-
+>  tools/virtiofsd/fuse_i.h                       |   7 +
+>  tools/virtiofsd/fuse_lowlevel.c                | 179 ++++++++--
+>  tools/virtiofsd/fuse_lowlevel.h                |  13 +
+>  tools/virtiofsd/helper.c                       |   1 +
+>  tools/virtiofsd/passthrough_ll.c               | 467 +++++++++++++++++++++++--
+>  tools/virtiofsd/passthrough_seccomp.c          |   1 +
+>  34 files changed, 1122 insertions(+), 132 deletions(-)
+>  create mode 100644 include/standard-headers/linux/virtio_gpio.h
+>  create mode 100644 include/standard-headers/linux/virtio_i2c.h
+>  create mode 100644 include/standard-headers/linux/virtio_pcidev.h
+>  create mode 100644 include/standard-headers/linux/virtio_scmi.h
+>  create mode 100644 linux-headers/asm-riscv/bitsperlong.h
+>  create mode 100644 linux-headers/asm-riscv/mman.h
+>  create mode 100644 linux-headers/asm-riscv/unistd.h
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs
+> 
 -- 
-2.35.1
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

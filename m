@@ -1,15 +1,12 @@
-Date: Mon, 14 Feb 2022 14:09:47 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <Ygqo+24vo1z7rSvk@redhat.com>
-References: <20220214135820.43897-1-groug@kaod.org>
-	<20220214135820.43897-4-groug@kaod.org>
-	<YgqfCtcjhApw5Fyw@redhat.com> <YgqlyP5M7NF/bMoj@redhat.com>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Wed, 16 Feb 2022 17:36:21 +0000
+Message-Id: <20220216173625.128109-9-dgilbert@redhat.com>
+In-Reply-To: <20220216173625.128109-1-dgilbert@redhat.com>
+References: <20220216173625.128109-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <YgqlyP5M7NF/bMoj@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v5 3/3] virtiofsd: Add support for
- FUSE_SYNCFS request without announce_submounts
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PULL 08/12] virtiofsd: Add helpers to work with
+	/proc/self/task/tid/attr/fscreate
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,144 +15,170 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: qemu-devel@nongnu.org, vgoyal@redhat.com, groug@kaod.org, sebastian.hasler@stuvus.uni-stuttgart.de
+Cc: virtio-fs@redhat.com
 
-On Mon, Feb 14, 2022 at 01:56:08PM -0500, Vivek Goyal wrote:
-> On Mon, Feb 14, 2022 at 01:27:22PM -0500, Vivek Goyal wrote:
-> > On Mon, Feb 14, 2022 at 02:58:20PM +0100, Greg Kurz wrote:
-> > > This adds the missing bits to support FUSE_SYNCFS in the case submounts
-> > > aren't announced to the client.
-> > > 
-> > > Iterate over all inodes and call syncfs() on the ones marked as submounts.
-> > > Since syncfs() can block for an indefinite time, we cannot call it with
-> > > lo->mutex held as it would prevent the server to process other requests.
-> > > This is thus broken down in two steps. First build a list of submounts
-> > > with lo->mutex held, drop the mutex and finally process the list. A
-> > > reference is taken on the inodes to ensure they don't go away when
-> > > lo->mutex is dropped.
-> > > 
-> > > Signed-off-by: Greg Kurz <groug@kaod.org>
-> > > ---
-> > >  tools/virtiofsd/passthrough_ll.c | 38 ++++++++++++++++++++++++++++++--
-> > >  1 file changed, 36 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> > > index e94c4e6f8635..7ce944bfe2a0 100644
-> > > --- a/tools/virtiofsd/passthrough_ll.c
-> > > +++ b/tools/virtiofsd/passthrough_ll.c
-> > > @@ -3400,8 +3400,42 @@ static void lo_syncfs(fuse_req_t req, fuse_ino_t ino)
-> > >          err = lo_do_syncfs(lo, inode);
-> > >          lo_inode_put(lo, &inode);
-> > >      } else {
-> > > -        /* Requires the sever to track submounts. Not implemented yet */
-> > > -        err = ENOSYS;
-> > > +        g_autoptr(GSList) submount_list = NULL;
-> > > +        GSList *elem;
-> > > +        GHashTableIter iter;
-> > > +        gpointer key, value;
-> > > +
-> > > +        pthread_mutex_lock(&lo->mutex);
-> > > +
-> > > +        g_hash_table_iter_init(&iter, lo->inodes);
-> > > +        while (g_hash_table_iter_next(&iter, &key, &value)) {
-> > 
-> > Going through all the inodes sounds very inefficient. If there are large
-> > number of inodes (say 1 million or more), and if frequent syncfs requests
-> > are coming this can consume lot of cpu cycles.
-> > 
-> > Given C virtiofsd is slowly going away, so I don't want to be too
-> > particular about it. But, I would have thought to put submount
-> > inodes into another list or hash map (using mount id as key) and just
-> > traverse through that list instead. Given number of submounts should
-> > be small, it should be pretty quick to walk through that list.
-> > 
-> > > +            struct lo_inode *inode = value;
-> > > +
-> > > +            if (inode->is_submount) {
-> > > +                g_atomic_int_inc(&inode->refcount);
-> > > +                submount_list = g_slist_prepend(submount_list, inode);
-> > > +            }
-> > > +        }
-> > > +
-> > > +        pthread_mutex_unlock(&lo->mutex);
-> > > +
-> > > +        /* The root inode is always present and not tracked in the hash table */
-> > > +        err = lo_do_syncfs(lo, &lo->root);
-> > > +
-> > > +        for (elem = submount_list; elem; elem = g_slist_next(elem)) {
-> > > +            struct lo_inode *inode = elem->data;
-> > > +            int r;
-> > > +
-> > > +            r = lo_do_syncfs(lo, inode);
-> > > +            if (r) {
-> > > +                /*
-> > > +                 * Try to sync as much as possible. Only one error can be
-> > > +                 * reported to the client though, arbitrarily the last one.
-> > > +                 */
-> > > +                err = r;
-> > > +            }
-> > > +            lo_inode_put(lo, &inode);
-> > > +        }
-> > 
-> > One more minor nit. What happens if virtiofsd is processing syncfs list
-> > and then somebody hard reboots qemu and mounts virtiofs again. That
-> > will trigger FUSE_INIT and will call lo_destroy() first.
-> > 
-> > fuse_lowlevel.c
-> > 
-> > fuse_session_process_buf_int()
-> > {
-> >             fuse_log(FUSE_LOG_DEBUG, "%s: reinit\n", __func__);
-> >             se->got_destroy = 1;
-> >             se->got_init = 0;
-> >             if (se->op.destroy) {
-> >                 se->op.destroy(se->userdata);
-> >             }
-> > }
-> > 
-> > IIUC, there is no synchronization with this path. If we are running with
-> > thread pool enabled, it could very well happen that one thread is still
-> > doing syncfs while other thread is executing do_init(). That sounds
-> > like little bit of a problem. It will be good if there is a way
-> > to either abort syncfs() or do_destroy() waits for all the previous
-> > syncfs() to finish.
-> > 
-> > Greg, if you like, you could break down this work in two patch series.
-> > First patch series just issues syncfs() on inode id sent with FUSE_SYNCFS.
-> > That's easy fix and can get merged now.
-> 
-> Actually I think even single "syncfs" will have synchronization issue
-> with do_init() upon hard reboot if we drop lo->mutex during syncfs().
+From: Vivek Goyal <vgoyal@redhat.com>
 
-Actually, we have similar issues with ->fsync(). We take lo->mutex,
-and then take a reference on inode. Call fsync() on this. Now it is
-possible that guest hard reboots, triggers, FUSE_INIT and lo_destroy()
-is called. It will take lo->mutex and drop its referene on inode.
+Soon we will be able to create and also set security context on the file
+atomically using /proc/self/task/tid/attr/fscreate knob. If this knob
+is available on the system, first set the knob with the desired context
+and then create the file. It will be created with the context set in
+fscreate. This works basically for SELinux and its per thread.
 
-So it looks like in extreme case a new connection can start looking
-up inodes which we still have old inodes in hash table because
-some thread is blocked doing operation and has not dropped its
-reference.
+This patch just introduces the helper functions. Subsequent patches will
+make use of these helpers.
 
-David, do I understand it right?
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Message-Id: <20220208204813.682906-8-vgoyal@redhat.com>
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c | 92 ++++++++++++++++++++++++++++++++
+ 1 file changed, 92 insertions(+)
 
-We probably need to have a notion of keeping track of number of requests
-which are in progress. And lo_destroy() should wait till number of
-requests in progress come to zero. This will be equivalent of draining
-the queues operation in virtiofs kernel driver.
-
-Anyway, given we already have the issue w.r.t lo_destroy(), and C code
-is going away, I will be fine even if you don't fix races with FUSE_INIT.
-
-Vivek
-> 
-> Vivek
-> 
-> > 
-> > And second patch series take care of above issues and will be little bit
-> > more work.
-> > 
-> > Thanks
-> > Vivek
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index e27479f1c9..ea8c367207 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -173,10 +173,14 @@ struct lo_data {
+ 
+     /* An O_PATH file descriptor to /proc/self/fd/ */
+     int proc_self_fd;
++    /* An O_PATH file descriptor to /proc/self/task/ */
++    int proc_self_task;
+     int user_killpriv_v2, killpriv_v2;
+     /* If set, virtiofsd is responsible for setting umask during creation */
+     bool change_umask;
+     int user_posix_acl, posix_acl;
++    /* Keeps track if /proc/<pid>/attr/fscreate should be used or not */
++    bool use_fscreate;
+ };
+ 
+ static const struct fuse_opt lo_opts[] = {
+@@ -256,6 +260,72 @@ static struct lo_data *lo_data(fuse_req_t req)
+     return (struct lo_data *)fuse_req_userdata(req);
+ }
+ 
++/*
++ * Tries to figure out if /proc/<pid>/attr/fscreate is usable or not. With
++ * selinux=0, read from fscreate returns -EINVAL.
++ *
++ * TODO: Link with libselinux and use is_selinux_enabled() instead down
++ * the line. It probably will be more reliable indicator.
++ */
++static bool is_fscreate_usable(struct lo_data *lo)
++{
++    char procname[64];
++    int fscreate_fd;
++    size_t bytes_read;
++
++    sprintf(procname, "%d/attr/fscreate", gettid());
++    fscreate_fd = openat(lo->proc_self_task, procname, O_RDWR);
++    if (fscreate_fd == -1) {
++        return false;
++    }
++
++    bytes_read = read(fscreate_fd, procname, 64);
++    close(fscreate_fd);
++    if (bytes_read == -1) {
++        return false;
++    }
++    return true;
++}
++
++/* Helpers to set/reset fscreate */
++__attribute__((unused))
++static int open_set_proc_fscreate(struct lo_data *lo, const void *ctx,
++                                  size_t ctxlen,int *fd)
++{
++    char procname[64];
++    int fscreate_fd, err = 0;
++    size_t written;
++
++    sprintf(procname, "%d/attr/fscreate", gettid());
++    fscreate_fd = openat(lo->proc_self_task, procname, O_WRONLY);
++    err = fscreate_fd == -1 ? errno : 0;
++    if (err) {
++        return err;
++    }
++
++    written = write(fscreate_fd, ctx, ctxlen);
++    err = written == -1 ? errno : 0;
++    if (err) {
++        goto out;
++    }
++
++    *fd = fscreate_fd;
++    return 0;
++out:
++    close(fscreate_fd);
++    return err;
++}
++
++__attribute__((unused))
++static void close_reset_proc_fscreate(int fd)
++{
++    if ((write(fd, NULL, 0)) == -1) {
++        fuse_log(FUSE_LOG_WARNING, "Failed to reset fscreate. err=%d\n", errno);
++    }
++    close(fd);
++    return;
++}
++
+ /*
+  * Load capng's state from our saved state if the current thread
+  * hadn't previously been loaded.
+@@ -3531,6 +3601,15 @@ static void setup_namespaces(struct lo_data *lo, struct fuse_session *se)
+         exit(1);
+     }
+ 
++    /* Get the /proc/self/task descriptor */
++    lo->proc_self_task = open("/proc/self/task/", O_PATH);
++    if (lo->proc_self_task == -1) {
++        fuse_log(FUSE_LOG_ERR, "open(/proc/self/task, O_PATH): %m\n");
++        exit(1);
++    }
++
++    lo->use_fscreate = is_fscreate_usable(lo);
++
+     /*
+      * We only need /proc/self/fd. Prevent ".." from accessing parent
+      * directories of /proc/self/fd by bind-mounting it over /proc. Since / was
+@@ -3747,6 +3826,14 @@ static void setup_chroot(struct lo_data *lo)
+         exit(1);
+     }
+ 
++    lo->proc_self_task = open("/proc/self/task", O_PATH);
++    if (lo->proc_self_fd == -1) {
++        fuse_log(FUSE_LOG_ERR, "open(\"/proc/self/task\", O_PATH): %m\n");
++        exit(1);
++    }
++
++    lo->use_fscreate = is_fscreate_usable(lo);
++
+     /*
+      * Make the shared directory the file system root so that FUSE_OPEN
+      * (lo_open()) cannot escape the shared directory by opening a symlink.
+@@ -3932,6 +4019,10 @@ static void fuse_lo_data_cleanup(struct lo_data *lo)
+         close(lo->proc_self_fd);
+     }
+ 
++    if (lo->proc_self_task >= 0) {
++        close(lo->proc_self_task);
++    }
++
+     if (lo->root.fd >= 0) {
+         close(lo->root.fd);
+     }
+@@ -3959,6 +4050,7 @@ int main(int argc, char *argv[])
+         .posix_lock = 0,
+         .allow_direct_io = 0,
+         .proc_self_fd = -1,
++        .proc_self_task = -1,
+         .user_killpriv_v2 = -1,
+         .user_posix_acl = -1,
+     };
+-- 
+2.35.1
 

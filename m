@@ -1,15 +1,14 @@
-Date: Mon, 14 Feb 2022 13:56:08 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YgqlyP5M7NF/bMoj@redhat.com>
-References: <20220214135820.43897-1-groug@kaod.org>
-	<20220214135820.43897-4-groug@kaod.org>
-	<YgqfCtcjhApw5Fyw@redhat.com>
+Date: Wed, 16 Feb 2022 12:08:40 +0000
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YgzpSIIolYItX4Mj@work-vm>
+References: <20220208204813.682906-1-vgoyal@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
+In-Reply-To: <20220208204813.682906-1-vgoyal@redhat.com>
+Content-Type: text/plain; charset="iso-8859-1"
 Content-Disposition: inline
-In-Reply-To: <YgqfCtcjhApw5Fyw@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v5 3/3] virtiofsd: Add support for
- FUSE_SYNCFS request without announce_submounts
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH v6 00/10] virtiofsd: Add support for file
+ security context at file creation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,121 +17,128 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: virtio-fs@redhat.com, berrange@redhat.com, qemu-devel@nongnu.org
 
-On Mon, Feb 14, 2022 at 01:27:22PM -0500, Vivek Goyal wrote:
-> On Mon, Feb 14, 2022 at 02:58:20PM +0100, Greg Kurz wrote:
-> > This adds the missing bits to support FUSE_SYNCFS in the case submounts
-> > aren't announced to the client.
-> > 
-> > Iterate over all inodes and call syncfs() on the ones marked as submounts.
-> > Since syncfs() can block for an indefinite time, we cannot call it with
-> > lo->mutex held as it would prevent the server to process other requests.
-> > This is thus broken down in two steps. First build a list of submounts
-> > with lo->mutex held, drop the mutex and finally process the list. A
-> > reference is taken on the inodes to ensure they don't go away when
-> > lo->mutex is dropped.
-> > 
-> > Signed-off-by: Greg Kurz <groug@kaod.org>
-> > ---
-> >  tools/virtiofsd/passthrough_ll.c | 38 ++++++++++++++++++++++++++++++--
-> >  1 file changed, 36 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> > index e94c4e6f8635..7ce944bfe2a0 100644
-> > --- a/tools/virtiofsd/passthrough_ll.c
-> > +++ b/tools/virtiofsd/passthrough_ll.c
-> > @@ -3400,8 +3400,42 @@ static void lo_syncfs(fuse_req_t req, fuse_ino_t ino)
-> >          err = lo_do_syncfs(lo, inode);
-> >          lo_inode_put(lo, &inode);
-> >      } else {
-> > -        /* Requires the sever to track submounts. Not implemented yet */
-> > -        err = ENOSYS;
-> > +        g_autoptr(GSList) submount_list = NULL;
-> > +        GSList *elem;
-> > +        GHashTableIter iter;
-> > +        gpointer key, value;
-> > +
-> > +        pthread_mutex_lock(&lo->mutex);
-> > +
-> > +        g_hash_table_iter_init(&iter, lo->inodes);
-> > +        while (g_hash_table_iter_next(&iter, &key, &value)) {
-> 
-> Going through all the inodes sounds very inefficient. If there are large
-> number of inodes (say 1 million or more), and if frequent syncfs requests
-> are coming this can consume lot of cpu cycles.
-> 
-> Given C virtiofsd is slowly going away, so I don't want to be too
-> particular about it. But, I would have thought to put submount
-> inodes into another list or hash map (using mount id as key) and just
-> traverse through that list instead. Given number of submounts should
-> be small, it should be pretty quick to walk through that list.
-> 
-> > +            struct lo_inode *inode = value;
-> > +
-> > +            if (inode->is_submount) {
-> > +                g_atomic_int_inc(&inode->refcount);
-> > +                submount_list = g_slist_prepend(submount_list, inode);
-> > +            }
-> > +        }
-> > +
-> > +        pthread_mutex_unlock(&lo->mutex);
-> > +
-> > +        /* The root inode is always present and not tracked in the hash table */
-> > +        err = lo_do_syncfs(lo, &lo->root);
-> > +
-> > +        for (elem = submount_list; elem; elem = g_slist_next(elem)) {
-> > +            struct lo_inode *inode = elem->data;
-> > +            int r;
-> > +
-> > +            r = lo_do_syncfs(lo, inode);
-> > +            if (r) {
-> > +                /*
-> > +                 * Try to sync as much as possible. Only one error can be
-> > +                 * reported to the client though, arbitrarily the last one.
-> > +                 */
-> > +                err = r;
-> > +            }
-> > +            lo_inode_put(lo, &inode);
-> > +        }
-> 
-> One more minor nit. What happens if virtiofsd is processing syncfs list
-> and then somebody hard reboots qemu and mounts virtiofs again. That
-> will trigger FUSE_INIT and will call lo_destroy() first.
-> 
-> fuse_lowlevel.c
-> 
-> fuse_session_process_buf_int()
-> {
->             fuse_log(FUSE_LOG_DEBUG, "%s: reinit\n", __func__);
->             se->got_destroy = 1;
->             se->got_init = 0;
->             if (se->op.destroy) {
->                 se->op.destroy(se->userdata);
->             }
-> }
-> 
-> IIUC, there is no synchronization with this path. If we are running with
-> thread pool enabled, it could very well happen that one thread is still
-> doing syncfs while other thread is executing do_init(). That sounds
-> like little bit of a problem. It will be good if there is a way
-> to either abort syncfs() or do_destroy() waits for all the previous
-> syncfs() to finish.
-> 
-> Greg, if you like, you could break down this work in two patch series.
-> First patch series just issues syncfs() on inode id sent with FUSE_SYNCFS.
-> That's easy fix and can get merged now.
+Queued
 
-Actually I think even single "syncfs" will have synchronization issue
-with do_init() upon hard reboot if we drop lo->mutex during syncfs().
-
-Vivek
-
-> 
-> And second patch series take care of above issues and will be little bit
-> more work.
-> 
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> Hi,
+>=20
+> This is V6 of the patches. I posted V5 here.
+>=20
+> https://listman.redhat.com/archives/virtio-fs/2022-February/msg00012.html
+>=20
+> This patch series basically allows client to send a security context=20
+> (which is expected to be xattr security.selinux and its content) to
+> virtiofsd and it will set that security context on file during creation
+> based on various settings. Hence, this patch series basically allows
+> supporting SELinux with virtiofs.
+>=20
+> There are primarily 3 modes.
+>=20
+> - If no security context enabled, then it continues to create files witho=
+ut
+>   security context.
+>=20
+> - If security context is enabled and but security.selinux has not been
+>   remapped, then it uses /proc/thread-self/attr/fscreate knob to set
+>   security context and then create the file. This will make sure that
+>   newly created file gets the security context as set in "fscreate" and
+>   this is atomic w.r.t file creation.
+>=20
+>   This is useful and host and guest SELinux policies don't conflict and
+>   can work with each other. In that case, guest security.selinux xattr
+>   is not remapped and it is passthrough as "security.selinux" xattr
+>   on host.
+>=20
+> - If security context is enabled but security.selinux xattr has been
+>   remapped to something else, then it first creates the file and then
+>   uses setxattr() to set the remapped xattr with the security context.
+>   This is a non-atomic operation w.r.t file creation.
+>=20
+>   This mode will be most versatile and allow host and guest to have their
+>   own separate SELinux xattrs and have their own separate SELinux policie=
+s.
+>=20
+> Changes since V5:
+>=20
+> - Added some documentation to recommend using xattr remapping to remap
+>   "security.selinux" to "trusted.virtiofs.security.selinux" and also=20
+>   give CAP_SYS_ADMIN to daemon. Also put a warning to make users aware
+>   of trade-off involved here. ("Daniel P. Berrang=E9")
+>=20
+> - Used macro endof() to determine end of fuse_init_in struct. (David
+>   Gilbert).
+>=20
+> - Added a check to make sure fsecctx->size is not zero. Also added
+>   "return" statement at few places where it was required. (David Gilbert)
+>=20
+> - Split patch 7 in the series. Some of the handling of setting and
+>   clearing fscreate knob has been moved into a separate patch. Found
+>   it hard to break it down further. So it helps a bit but not too
+>   much. (David Gilbert).
+>=20
 > Thanks
 > Vivek
+>=20
+> Vivek Goyal (10):
+>   virtiofsd: Fix breakage due to fuse_init_in size change
+>   linux-headers: Update headers to v5.17-rc1
+>   virtiofsd: Parse extended "struct fuse_init_in"
+>   virtiofsd: Extend size of fuse_conn_info->capable and ->want fields
+>   virtiofsd, fuse_lowlevel.c: Add capability to parse security context
+>   virtiofsd: Move core file creation code in separate function
+>   virtiofsd: Add helpers to work with /proc/self/task/tid/attr/fscreate
+>   virtiofsd: Create new file with security context
+>   virtiofsd: Create new file using O_TMPFILE and set security context
+>   virtiofsd: Add an option to enable/disable security label
+>=20
+>  docs/tools/virtiofsd.rst                      |  32 ++
+>  include/standard-headers/asm-x86/kvm_para.h   |   1 +
+>  include/standard-headers/drm/drm_fourcc.h     |  11 +
+>  include/standard-headers/linux/ethtool.h      |   1 +
+>  include/standard-headers/linux/fuse.h         |  60 ++-
+>  include/standard-headers/linux/pci_regs.h     | 142 +++---
+>  include/standard-headers/linux/virtio_gpio.h  |  72 +++
+>  include/standard-headers/linux/virtio_i2c.h   |  47 ++
+>  include/standard-headers/linux/virtio_iommu.h |   8 +-
+>  .../standard-headers/linux/virtio_pcidev.h    |  65 +++
+>  include/standard-headers/linux/virtio_scmi.h  |  24 +
+>  linux-headers/asm-generic/unistd.h            |   5 +-
+>  linux-headers/asm-mips/unistd_n32.h           |   2 +
+>  linux-headers/asm-mips/unistd_n64.h           |   2 +
+>  linux-headers/asm-mips/unistd_o32.h           |   2 +
+>  linux-headers/asm-powerpc/unistd_32.h         |   2 +
+>  linux-headers/asm-powerpc/unistd_64.h         |   2 +
+>  linux-headers/asm-riscv/bitsperlong.h         |  14 +
+>  linux-headers/asm-riscv/mman.h                |   1 +
+>  linux-headers/asm-riscv/unistd.h              |  44 ++
+>  linux-headers/asm-s390/unistd_32.h            |   2 +
+>  linux-headers/asm-s390/unistd_64.h            |   2 +
+>  linux-headers/asm-x86/kvm.h                   |  16 +-
+>  linux-headers/asm-x86/unistd_32.h             |   1 +
+>  linux-headers/asm-x86/unistd_64.h             |   1 +
+>  linux-headers/asm-x86/unistd_x32.h            |   1 +
+>  linux-headers/linux/kvm.h                     |  17 +
+>  tools/virtiofsd/fuse_common.h                 |   9 +-
+>  tools/virtiofsd/fuse_i.h                      |   7 +
+>  tools/virtiofsd/fuse_lowlevel.c               | 168 +++++--
+>  tools/virtiofsd/helper.c                      |   1 +
+>  tools/virtiofsd/passthrough_ll.c              | 414 ++++++++++++++++--
+>  32 files changed, 1044 insertions(+), 132 deletions(-)
+>  create mode 100644 include/standard-headers/linux/virtio_gpio.h
+>  create mode 100644 include/standard-headers/linux/virtio_i2c.h
+>  create mode 100644 include/standard-headers/linux/virtio_pcidev.h
+>  create mode 100644 include/standard-headers/linux/virtio_scmi.h
+>  create mode 100644 linux-headers/asm-riscv/bitsperlong.h
+>  create mode 100644 linux-headers/asm-riscv/mman.h
+>  create mode 100644 linux-headers/asm-riscv/unistd.h
+>=20
+> --=20
+> 2.34.1
+>=20
+>=20
+--=20
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

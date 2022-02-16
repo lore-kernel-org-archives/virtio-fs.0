@@ -1,14 +1,15 @@
-Date: Wed, 16 Feb 2022 12:08:40 +0000
+Date: Wed, 16 Feb 2022 12:18:13 +0000
 From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YgzpSIIolYItX4Mj@work-vm>
-References: <20220208204813.682906-1-vgoyal@redhat.com>
+Message-ID: <YgzrhYK1eskcbTjV@work-vm>
+References: <20220215181529.164070-1-groug@kaod.org>
+	<20220215181529.164070-2-groug@kaod.org>
+	<Ygv5r+6JfG1XsG8n@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20220208204813.682906-1-vgoyal@redhat.com>
-Content-Type: text/plain; charset="iso-8859-1"
+In-Reply-To: <Ygv5r+6JfG1XsG8n@redhat.com>
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [PATCH v6 00/10] virtiofsd: Add support for file
- security context at file creation
+Subject: Re: [Virtio-fs] [PATCH v6 1/1] virtiofsd: Add basic support for
+ FUSE_SYNCFS request
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,127 +19,178 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: virtio-fs@redhat.com, berrange@redhat.com, qemu-devel@nongnu.org
+Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+
+* Vivek Goyal (vgoyal@redhat.com) wrote:
+> On Tue, Feb 15, 2022 at 07:15:29PM +0100, Greg Kurz wrote:
+> > Honor the expected behavior of syncfs() to synchronously flush all data
+> > and metadata to disk on linux systems.
+> > 
+> > If virtiofsd is started with '-o announce_submounts', the client is
+> > expected to send a FUSE_SYNCFS request for each individual submount.
+> > In this case, we just create a new file descriptor on the submount
+> > inode with lo_inode_open(), call syncfs() on it and close it. The
+> > intermediary file is needed because O_PATH descriptors aren't
+> > backed by an actual file and syncfs() would fail with EBADF.
+> > 
+> > If virtiofsd is started without '-o announce_submounts' or if the
+> > client doesn't have the FUSE_CAP_SUBMOUNTS capability, the client
+> > only sends a single FUSE_SYNCFS request for the root inode. The
+> > server would thus need to track submounts internally and call
+> > syncfs() on each of them. This will be implemented later.
+> > 
+> > Note that syncfs() might suffer from a time penalty if the submounts
+> > are being hammered by some unrelated workload on the host. The only
+> > solution to prevent that is to avoid shared mounts.
+> > 
+> > Signed-off-by: Greg Kurz <groug@kaod.org>
+> 
+> Looks good to me. Thanks Greg.
+> 
+> Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
 
 Queued
 
-* Vivek Goyal (vgoyal@redhat.com) wrote:
-> Hi,
->=20
-> This is V6 of the patches. I posted V5 here.
->=20
-> https://listman.redhat.com/archives/virtio-fs/2022-February/msg00012.html
->=20
-> This patch series basically allows client to send a security context=20
-> (which is expected to be xattr security.selinux and its content) to
-> virtiofsd and it will set that security context on file during creation
-> based on various settings. Hence, this patch series basically allows
-> supporting SELinux with virtiofs.
->=20
-> There are primarily 3 modes.
->=20
-> - If no security context enabled, then it continues to create files witho=
-ut
->   security context.
->=20
-> - If security context is enabled and but security.selinux has not been
->   remapped, then it uses /proc/thread-self/attr/fscreate knob to set
->   security context and then create the file. This will make sure that
->   newly created file gets the security context as set in "fscreate" and
->   this is atomic w.r.t file creation.
->=20
->   This is useful and host and guest SELinux policies don't conflict and
->   can work with each other. In that case, guest security.selinux xattr
->   is not remapped and it is passthrough as "security.selinux" xattr
->   on host.
->=20
-> - If security context is enabled but security.selinux xattr has been
->   remapped to something else, then it first creates the file and then
->   uses setxattr() to set the remapped xattr with the security context.
->   This is a non-atomic operation w.r.t file creation.
->=20
->   This mode will be most versatile and allow host and guest to have their
->   own separate SELinux xattrs and have their own separate SELinux policie=
-s.
->=20
-> Changes since V5:
->=20
-> - Added some documentation to recommend using xattr remapping to remap
->   "security.selinux" to "trusted.virtiofs.security.selinux" and also=20
->   give CAP_SYS_ADMIN to daemon. Also put a warning to make users aware
->   of trade-off involved here. ("Daniel P. Berrang=E9")
->=20
-> - Used macro endof() to determine end of fuse_init_in struct. (David
->   Gilbert).
->=20
-> - Added a check to make sure fsecctx->size is not zero. Also added
->   "return" statement at few places where it was required. (David Gilbert)
->=20
-> - Split patch 7 in the series. Some of the handling of setting and
->   clearing fscreate knob has been moved into a separate patch. Found
->   it hard to break it down further. So it helps a bit but not too
->   much. (David Gilbert).
->=20
-> Thanks
 > Vivek
->=20
-> Vivek Goyal (10):
->   virtiofsd: Fix breakage due to fuse_init_in size change
->   linux-headers: Update headers to v5.17-rc1
->   virtiofsd: Parse extended "struct fuse_init_in"
->   virtiofsd: Extend size of fuse_conn_info->capable and ->want fields
->   virtiofsd, fuse_lowlevel.c: Add capability to parse security context
->   virtiofsd: Move core file creation code in separate function
->   virtiofsd: Add helpers to work with /proc/self/task/tid/attr/fscreate
->   virtiofsd: Create new file with security context
->   virtiofsd: Create new file using O_TMPFILE and set security context
->   virtiofsd: Add an option to enable/disable security label
->=20
->  docs/tools/virtiofsd.rst                      |  32 ++
->  include/standard-headers/asm-x86/kvm_para.h   |   1 +
->  include/standard-headers/drm/drm_fourcc.h     |  11 +
->  include/standard-headers/linux/ethtool.h      |   1 +
->  include/standard-headers/linux/fuse.h         |  60 ++-
->  include/standard-headers/linux/pci_regs.h     | 142 +++---
->  include/standard-headers/linux/virtio_gpio.h  |  72 +++
->  include/standard-headers/linux/virtio_i2c.h   |  47 ++
->  include/standard-headers/linux/virtio_iommu.h |   8 +-
->  .../standard-headers/linux/virtio_pcidev.h    |  65 +++
->  include/standard-headers/linux/virtio_scmi.h  |  24 +
->  linux-headers/asm-generic/unistd.h            |   5 +-
->  linux-headers/asm-mips/unistd_n32.h           |   2 +
->  linux-headers/asm-mips/unistd_n64.h           |   2 +
->  linux-headers/asm-mips/unistd_o32.h           |   2 +
->  linux-headers/asm-powerpc/unistd_32.h         |   2 +
->  linux-headers/asm-powerpc/unistd_64.h         |   2 +
->  linux-headers/asm-riscv/bitsperlong.h         |  14 +
->  linux-headers/asm-riscv/mman.h                |   1 +
->  linux-headers/asm-riscv/unistd.h              |  44 ++
->  linux-headers/asm-s390/unistd_32.h            |   2 +
->  linux-headers/asm-s390/unistd_64.h            |   2 +
->  linux-headers/asm-x86/kvm.h                   |  16 +-
->  linux-headers/asm-x86/unistd_32.h             |   1 +
->  linux-headers/asm-x86/unistd_64.h             |   1 +
->  linux-headers/asm-x86/unistd_x32.h            |   1 +
->  linux-headers/linux/kvm.h                     |  17 +
->  tools/virtiofsd/fuse_common.h                 |   9 +-
->  tools/virtiofsd/fuse_i.h                      |   7 +
->  tools/virtiofsd/fuse_lowlevel.c               | 168 +++++--
->  tools/virtiofsd/helper.c                      |   1 +
->  tools/virtiofsd/passthrough_ll.c              | 414 ++++++++++++++++--
->  32 files changed, 1044 insertions(+), 132 deletions(-)
->  create mode 100644 include/standard-headers/linux/virtio_gpio.h
->  create mode 100644 include/standard-headers/linux/virtio_i2c.h
->  create mode 100644 include/standard-headers/linux/virtio_pcidev.h
->  create mode 100644 include/standard-headers/linux/virtio_scmi.h
->  create mode 100644 linux-headers/asm-riscv/bitsperlong.h
->  create mode 100644 linux-headers/asm-riscv/mman.h
->  create mode 100644 linux-headers/asm-riscv/unistd.h
->=20
-> --=20
-> 2.34.1
->=20
->=20
---=20
+> 
+> > ---
+> >  tools/virtiofsd/fuse_lowlevel.c       | 11 +++++++
+> >  tools/virtiofsd/fuse_lowlevel.h       | 13 ++++++++
+> >  tools/virtiofsd/passthrough_ll.c      | 44 +++++++++++++++++++++++++++
+> >  tools/virtiofsd/passthrough_seccomp.c |  1 +
+> >  4 files changed, 69 insertions(+)
+> > 
+> > diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+> > index e4679c73abc2..e02d8b25a5f6 100644
+> > --- a/tools/virtiofsd/fuse_lowlevel.c
+> > +++ b/tools/virtiofsd/fuse_lowlevel.c
+> > @@ -1876,6 +1876,16 @@ static void do_lseek(fuse_req_t req, fuse_ino_t nodeid,
+> >      }
+> >  }
+> >  
+> > +static void do_syncfs(fuse_req_t req, fuse_ino_t nodeid,
+> > +                      struct fuse_mbuf_iter *iter)
+> > +{
+> > +    if (req->se->op.syncfs) {
+> > +        req->se->op.syncfs(req, nodeid);
+> > +    } else {
+> > +        fuse_reply_err(req, ENOSYS);
+> > +    }
+> > +}
+> > +
+> >  static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+> >                      struct fuse_mbuf_iter *iter)
+> >  {
+> > @@ -2280,6 +2290,7 @@ static struct {
+> >      [FUSE_RENAME2] = { do_rename2, "RENAME2" },
+> >      [FUSE_COPY_FILE_RANGE] = { do_copy_file_range, "COPY_FILE_RANGE" },
+> >      [FUSE_LSEEK] = { do_lseek, "LSEEK" },
+> > +    [FUSE_SYNCFS] = { do_syncfs, "SYNCFS" },
+> >  };
+> >  
+> >  #define FUSE_MAXOP (sizeof(fuse_ll_ops) / sizeof(fuse_ll_ops[0]))
+> > diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
+> > index c55c0ca2fc1c..b889dae4de0e 100644
+> > --- a/tools/virtiofsd/fuse_lowlevel.h
+> > +++ b/tools/virtiofsd/fuse_lowlevel.h
+> > @@ -1226,6 +1226,19 @@ struct fuse_lowlevel_ops {
+> >       */
+> >      void (*lseek)(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
+> >                    struct fuse_file_info *fi);
+> > +
+> > +    /**
+> > +     * Synchronize file system content
+> > +     *
+> > +     * If this request is answered with an error code of ENOSYS,
+> > +     * this is treated as success and future calls to syncfs() will
+> > +     * succeed automatically without being sent to the filesystem
+> > +     * process.
+> > +     *
+> > +     * @param req request handle
+> > +     * @param ino the inode number
+> > +     */
+> > +    void (*syncfs)(fuse_req_t req, fuse_ino_t ino);
+> >  };
+> >  
+> >  /**
+> > diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> > index b3d0674f6d2f..0f65e6423cf5 100644
+> > --- a/tools/virtiofsd/passthrough_ll.c
+> > +++ b/tools/virtiofsd/passthrough_ll.c
+> > @@ -3357,6 +3357,49 @@ static void lo_lseek(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
+> >      }
+> >  }
+> >  
+> > +static int lo_do_syncfs(struct lo_data *lo, struct lo_inode *inode)
+> > +{
+> > +    int fd, ret = 0;
+> > +
+> > +    fuse_log(FUSE_LOG_DEBUG, "lo_do_syncfs(ino=%" PRIu64 ")\n",
+> > +             inode->fuse_ino);
+> > +
+> > +    fd = lo_inode_open(lo, inode, O_RDONLY);
+> > +    if (fd < 0) {
+> > +        return -fd;
+> > +    }
+> > +
+> > +    if (syncfs(fd) < 0) {
+> > +        ret = errno;
+> > +    }
+> > +
+> > +    close(fd);
+> > +    return ret;
+> > +}
+> > +
+> > +static void lo_syncfs(fuse_req_t req, fuse_ino_t ino)
+> > +{
+> > +    struct lo_data *lo = lo_data(req);
+> > +    struct lo_inode *inode = lo_inode(req, ino);
+> > +    int err;
+> > +
+> > +    if (!inode) {
+> > +        fuse_reply_err(req, EBADF);
+> > +        return;
+> > +    }
+> > +
+> > +    err = lo_do_syncfs(lo, inode);
+> > +    lo_inode_put(lo, &inode);
+> > +
+> > +    /*
+> > +     * If submounts aren't announced, the client only sends a request to
+> > +     * sync the root inode. TODO: Track submounts internally and iterate
+> > +     * over them as well.
+> > +     */
+> > +
+> > +    fuse_reply_err(req, err);
+> > +}
+> > +
+> >  static void lo_destroy(void *userdata)
+> >  {
+> >      struct lo_data *lo = (struct lo_data *)userdata;
+> > @@ -3417,6 +3460,7 @@ static struct fuse_lowlevel_ops lo_oper = {
+> >      .copy_file_range = lo_copy_file_range,
+> >  #endif
+> >      .lseek = lo_lseek,
+> > +    .syncfs = lo_syncfs,
+> >      .destroy = lo_destroy,
+> >  };
+> >  
+> > diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
+> > index a3ce9f898d2d..3e9d6181dc69 100644
+> > --- a/tools/virtiofsd/passthrough_seccomp.c
+> > +++ b/tools/virtiofsd/passthrough_seccomp.c
+> > @@ -108,6 +108,7 @@ static const int syscall_allowlist[] = {
+> >      SCMP_SYS(set_robust_list),
+> >      SCMP_SYS(setxattr),
+> >      SCMP_SYS(symlinkat),
+> > +    SCMP_SYS(syncfs),
+> >      SCMP_SYS(time), /* Rarely needed, except on static builds */
+> >      SCMP_SYS(tgkill),
+> >      SCMP_SYS(unlinkat),
+> > -- 
+> > 2.34.1
+> > 
+> 
+-- 
 Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

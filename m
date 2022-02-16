@@ -1,28 +1,29 @@
-Date: Wed, 16 Feb 2022 12:20:44 -0500
+Date: Wed, 16 Feb 2022 12:21:09 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
 	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=YfQ3jHuT4anRvIT9bLEr17qP9f6pHnUyalQz/AAyFBE=; b=m
-	wyPjDaLq23CtFw5la6yfX8mC/iIBFXXl7bgwvvcukDbVURbKzotlf3lRoN0LAs5Q
-	CBd5lP4IQOVXKQUIwbsDdYQqsrJUwaWr8ra/E8GfPWlhSsLGeYSD+TLlnrmr3n6n
-	dO83xnJnlzcxW+qfOcHGH5Ja3vq5J1HT1kN01W3gAV/BjwjbNXqS6co+utPLxAqa
-	Tv9S/UnsHblOcsifNgUJ4pt8KGHCld+61FL3cJzsg5XrysHm8jiU/Zze1/bxdKZx
-	ApfwAt3wv36FnhFf+on0coB8cR3jgsKcZwS0nVEPF1HvgEA60wkAVXWq1nLF+j9m
-	cliGkcKpJO/XxGDvIOkbQ==
+	:to; s=fm3; bh=sLwWaKjDpVCsk1q2+ePpfneswoPb1qvQEmCAaSARG6c=; b=1
+	t48bYDckESkXgmJlBhQ+keady7R4DF0dkzZqGiC3yo5Ux4eTIKd3Ar6f2JyN6Foh
+	spOy49ckYYFDE0Mf7DM+DUMsK0IDg0G9eUfMY9yVw3qYxGLqrvVRo/CHHyPVkc/I
+	uhMSW39KmOOAjHDEJwjkEwUIoJH5pV/qBNYavRLTCN3AigNacWh1mCn6d4y6QZr0
+	+MaKwvNJu6gLMZv1hQFel713frxW/q38LxOtHUREtUdJKBrmQH9DYb8Iv8dfVdsV
+	01JAjzMHbL5NLZwNNKysTPyn64Jm8T8V5pOzCJcBOqfBZjAqRO8SEBponAkfFhpB
+	s/OUOy83s7GZ5pwteCITA==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
 	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm2; bh=YfQ3jHuT4anRvIT9bLEr17qP9f6pH
-	nUyalQz/AAyFBE=; b=It8Sh8o7pktHewNzYkmGk+lS4d8O5JdqOdDSad6y1126D
-	kBbCn635S2xVhFX+TwwOJiazNDg1aZVB3+ug4OO0+meu7EHo8BvIpn557wxxx5yt
-	3NE0b8aGgedwKYRCFQBEfq+TytYY/bQPzBn6n8MPpRIo0cCNvY+pXGQvxTsbxO1v
-	heHBNZFgVB/a+Crkdju5DTuPPtecR0kwyuAUOXVGdaByLoYlaGgj+t7WcOmfvqS8
-	lFWmQ88yHrBEBYUK/rnYPkiqSTPq1D/UA97dswIe8JEkRtGDzEOtGzjrH4Eq6gT0
-	iWahsKfWNG/83b/SSim8JePjnp0l/Wabu8RMjFDeg==
+	:x-me-sender:x-sasl-enc; s=fm2; bh=sLwWaKjDpVCsk1q2+ePpfneswoPb1
+	qvQEmCAaSARG6c=; b=YGqXA/80QnOoUmzGj522+xT/fnPGBK4NQ5RNGcC0NpBXo
+	qjTZ5H5r+7l4TfGfKJe5ZVp6qZqNG61tZORuqHBOP1RS12N6OTlJscoT//HzVH3G
+	8ny0JJIf5NueQSpWrAj3q4Mv4X85/uQAtIqXQEzZNL+vCnYnnt8JMtRzn2at7R3b
+	rO0yvYIVCG/n3kHHv5rbUFJxEHQ/QTAktI3oaKyeoOqH6Pr+RzKccb4R9Xxbn4aY
+	+WmpuwvLMqbIyWhB12mI0Lg7HK5pbnAt0hcQAFIfldgE7adgx3P+dhBJC5rV3URV
+	8zXPNYnZZxUJt2KCfVT7uDRmW2eUwBAADwoWojhrg==
 From: virtiofs-bot@sinrega.org
-Message-Id: <07599.122021612204101355@us-mta-214.us.mimecast.lan>
+Message-Id: <59496.122021612210301715@us-mta-42.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR merged: Modify the list of enabled
-	capabilities from the command line
+Subject: [Virtio-fs] [virtiofsd] MR merged: Setxattr: get the correct
+	structure based on whether SETXATTR_EXT is set in the
+	negotiated FSOptions flags
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,9 +34,9 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Add both the new '--modcaps=<modcaps>' and the legacy option '-o modcaps=<modcaps>'. Both options expect the same format, a ':' separated list of '(+|-)capability',  e.g., --modcaps=+sys_adm:-mknod
+Store enabled FSOptions as Server field and get the correct structure based on whether SETXATTR_EXT is set in the negotiated FSOptions flags.
 
-Requested by Kata
+Also, pass the 'SetxattrIn::setxattr_flags' as extra flags to 'FileSystem::setxattr', currently this argument is ignored, but will be required to implement posix_acls and selinux support.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/86
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/92
 

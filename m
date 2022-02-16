@@ -1,28 +1,28 @@
 Date: Wed, 16 Feb 2022 12:37:52 -0500
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
 	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=ZlN7mrAJBZa3ZTkh9yJAXYpS261X1kzfHI1wPKBRifU=; b=N
-	gyxIS67u7Z2OgY/jb/d5tBpIFgReQOZd5oj7zvWQXzL0QsrXU+OO6LA2zMh+wZ12
-	d68lH1EYTnPe+jK/CTm+UneAnM1nowu47JFUnk+Zh1t1m0eSUilGqQ2D9rwIn1Yk
-	gqmKw8ACTi4r2WE88jQpFpioK4YbNthdZEA3gb08lzBYEobDVg94Oae646n6kEQq
-	iKFTwtANqfWGUk4z5HvItylzgypCMRbatEY7GQiBMSg/9nbv0fH9QTyk0I0JA6Yy
-	adZNixSk3m5pWS3HZ5Q6+OT27NeloL8ALCs5cP1xkdoJumDvsRAqoh7dFg+hz/SK
-	vDrJLkLy08zldlKHTtPEg==
+	:to; s=fm3; bh=/WeDeqWb8vGhDA/ScTvKBpzrgSLnmXlQZycmrV4q7L4=; b=h
+	xj/SoPGVuf5gO3wvW4y11deoWbW/GWKgANaSA0ABP04hvNFH00c1Yzd1f633xnUy
+	o4izTGYRm6+Oj7wiuYnAQMWXuLlRMqH20oMo8M+PNJHwfi39NFm4icXqXilXcusm
+	YY55BALqvLsxP0Dns1GYT/xgqH3+kD2g8R4u8FNM67PZamY4zF4Pp06f5dpDaOR5
+	a9oXg+SmdTFmcXF/HSo9mUcy/zSbnoJSBJZ6L6FScmVrikssE+YJHYfW/1gwGCYT
+	eyQIVvE0c3DrcNjZPIdt1ZJiR08QgvjYSvQ3oJBtwayJS8Xk+oHffJVXPqyV03db
+	zybQjcoAF2L1rj+2ea5ZQ==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
 	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
 	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm2; bh=ZlN7mrAJBZa3ZTkh9yJAXYpS261X1
-	kzfHI1wPKBRifU=; b=Uefr68hQKPkV6mSTGcNH0z/DA0kb8q/Fs2fVijeHmJcxI
-	vnUw8uvNnDPuptn1HDxedK3AK42VpIuj0Rllto0oy64KSgDGwI5q8qA2QTB56kA5
-	JIWuoxnEn1PNLHpre2/bGa8e12aPuZNWe/ZhA5jLM+FF52Ys8dMfNtenz0Q0RDDH
-	jbGBT4CZm6T8Ww8YOVAbrbFm2qzi0Mu5YyXIZfoQFivMFWDyKvvaDzFeObL9Osvc
-	t/wCrURkN1y0vSn5Uh6XR9ki4Fej6OaRG2UdOYNlhgtMr7MHMhfJjYqnBbOU6FBR
-	jDmlDmR/s6evq8HjF7pZARd7rRwHZXnjPI0tU0QAw==
+	:x-me-sender:x-sasl-enc; s=fm2; bh=/WeDeqWb8vGhDA/ScTvKBpzrgSLnm
+	XlQZycmrV4q7L4=; b=Q2ufqBgpxFtabN/cwKp+A9ueHmJhxMr355Xcbfo8c7PFM
+	L/J5dU9fmozSTN4pcRyRIw0XgtakGqoFazHuv02F5bIFWglqU2aw3tElUdUS+kFV
+	ghOMwySYzZ8r7FV/OMfTvAm39R5OiQitxaDn473WzkXS0ti2s4bKZysbSRL2l7xd
+	I43ZKTPnKTIUEOgLeSz2/MAI8Ph43ww+dHIg+nu2XGZIUWV4X4OVJR1HiXSc2yMe
+	E0RLLmujRW380Jm2Q0SKf3XkDuVea3GR2NXTuCCpRwxzk+zj9HevW5RM4lgT86j6
+	tHBIT0OrEGbGKY7uqOI7qlGbPQh4Zm4v9msi6nJDw==
 From: virtiofs-bot@sinrega.org
-Message-Id: <05886.122021612374704092@us-mta-629.us.mimecast.lan>
+Message-Id: <04825.122021612374700958@us-mta-378.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] MR merged: Parent exits with signal
-	received by child
+Subject: [Virtio-fs] [virtiofsd] Issue closed: Indicate an error if child
+	gets killed by SIGSYS
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,8 +33,9 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Make the parent process return the child's exit code or the signal
-received by the child. Closes #21.
+Currently, if the child gets killed by SIGSYS, the parent indicates no error.
+
+Q: Should this be a logged error, or non-zero exit code, or both? Currently none of that happens.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/80
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/21
 

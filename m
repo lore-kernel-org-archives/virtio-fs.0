@@ -1,12 +1,28 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Wed, 16 Feb 2022 17:36:18 +0000
-Message-Id: <20220216173625.128109-6-dgilbert@redhat.com>
-In-Reply-To: <20220216173625.128109-1-dgilbert@redhat.com>
-References: <20220216173625.128109-1-dgilbert@redhat.com>
-MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 05/12] virtiofsd: Extend size of
-	fuse_conn_info->capable and ->want fields
+Date: Wed, 16 Feb 2022 12:37:52 -0500
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+	:to; s=fm3; bh=ZlN7mrAJBZa3ZTkh9yJAXYpS261X1kzfHI1wPKBRifU=; b=N
+	gyxIS67u7Z2OgY/jb/d5tBpIFgReQOZd5oj7zvWQXzL0QsrXU+OO6LA2zMh+wZ12
+	d68lH1EYTnPe+jK/CTm+UneAnM1nowu47JFUnk+Zh1t1m0eSUilGqQ2D9rwIn1Yk
+	gqmKw8ACTi4r2WE88jQpFpioK4YbNthdZEA3gb08lzBYEobDVg94Oae646n6kEQq
+	iKFTwtANqfWGUk4z5HvItylzgypCMRbatEY7GQiBMSg/9nbv0fH9QTyk0I0JA6Yy
+	adZNixSk3m5pWS3HZ5Q6+OT27NeloL8ALCs5cP1xkdoJumDvsRAqoh7dFg+hz/SK
+	vDrJLkLy08zldlKHTtPEg==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
+	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
+	:x-me-sender:x-sasl-enc; s=fm2; bh=ZlN7mrAJBZa3ZTkh9yJAXYpS261X1
+	kzfHI1wPKBRifU=; b=Uefr68hQKPkV6mSTGcNH0z/DA0kb8q/Fs2fVijeHmJcxI
+	vnUw8uvNnDPuptn1HDxedK3AK42VpIuj0Rllto0oy64KSgDGwI5q8qA2QTB56kA5
+	JIWuoxnEn1PNLHpre2/bGa8e12aPuZNWe/ZhA5jLM+FF52Ys8dMfNtenz0Q0RDDH
+	jbGBT4CZm6T8Ww8YOVAbrbFm2qzi0Mu5YyXIZfoQFivMFWDyKvvaDzFeObL9Osvc
+	t/wCrURkN1y0vSn5Uh6XR9ki4Fej6OaRG2UdOYNlhgtMr7MHMhfJjYqnBbOU6FBR
+	jDmlDmR/s6evq8HjF7pZARd7rRwHZXnjPI0tU0QAw==
+From: virtiofs-bot@sinrega.org
+Message-Id: <05886.122021612374704092@us-mta-629.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd] MR merged: Parent exits with signal
+	received by child
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,65 +31,10 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, vgoyal@redhat.com, groug@kaod.org, sebastian.hasler@stuvus.uni-stuttgart.de
-Cc: virtio-fs@redhat.com
+To: virtio-fs@redhat.com
 
-From: Vivek Goyal <vgoyal@redhat.com>
-
-->capable keeps track of what capabilities kernel supports and ->wants keep
-track of what capabilities filesytem wants.
-
-Right now these fields are 32bit in size. But now fuse has run out of
-bits and capabilities can now have bit number which are higher than 31.
-
-That means 32 bit fields are not suffcient anymore. Increase size to 64
-bit so that we can add newer capabilities and still be able to use existing
-code to check and set the capabilities.
-
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-Message-Id: <20220208204813.682906-5-vgoyal@redhat.com>
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Make the parent process return the child's exit code or the signal
+received by the child. Closes #21.
 ---
- tools/virtiofsd/fuse_common.h   | 4 ++--
- tools/virtiofsd/fuse_lowlevel.c | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
-index 0c2665b977..6f8a988202 100644
---- a/tools/virtiofsd/fuse_common.h
-+++ b/tools/virtiofsd/fuse_common.h
-@@ -439,7 +439,7 @@ struct fuse_conn_info {
-     /**
-      * Capability flags that the kernel supports (read-only)
-      */
--    unsigned capable;
-+    uint64_t capable;
- 
-     /**
-      * Capability flags that the filesystem wants to enable.
-@@ -447,7 +447,7 @@ struct fuse_conn_info {
-      * libfuse attempts to initialize this field with
-      * reasonable default values before calling the init() handler.
-      */
--    unsigned want;
-+    uint64_t want;
- 
-     /**
-      * Maximum number of pending "background" requests. A
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index b6712b763a..d91cd9743a 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -2069,7 +2069,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-     if (se->conn.want & (~se->conn.capable)) {
-         fuse_log(FUSE_LOG_ERR,
-                  "fuse: error: filesystem requested capabilities "
--                 "0x%x that are not supported by kernel, aborting.\n",
-+                 "0x%llx that are not supported by kernel, aborting.\n",
-                  se->conn.want & (~se->conn.capable));
-         fuse_reply_err(req, EPROTO);
-         se->error = -EPROTO;
--- 
-2.35.1
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/80
 

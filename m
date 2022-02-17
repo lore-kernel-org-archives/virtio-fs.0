@@ -1,12 +1,28 @@
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Thu, 17 Feb 2022 14:24:02 +0000
-Message-Id: <20220217142402.52819-13-dgilbert@redhat.com>
-In-Reply-To: <20220217142402.52819-1-dgilbert@redhat.com>
-References: <20220217142402.52819-1-dgilbert@redhat.com>
-MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 12/12] virtiofsd: Add basic support for
-	FUSE_SYNCFS request
+Date: Thu, 17 Feb 2022 09:30:20 -0500
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+	:to; s=fm3; bh=nBbWZygSzvlp2YQhUufUUWa1xPeb+IeFDDxKVMYGF00=; b=D
+	hC2Jde8alBoaBiyqXZa4dT2PDup7bWwVJ2TiyV9tXUG1u0ggKFPI/THf0nvGxfxo
+	ZWlt4DK/hRk7iDwqygl663vISzskhd9TAY1ANu4Fz0lsNTtlBl1IU0hI6CGlKrjN
+	WrPTqd9erOo1Bkb7niQ62kXPB8jKYc89ChoyA7tBMq5QFcv8ybz3YazlbEP/Gm/J
+	bVXyuS3IvD5gE1mOz2a7uclL5VBek5uUY8Ky5L0VO8srhIVECNlRR7BxjT0haVzJ
+	eEmpbvJqD7BfGnAl/w1hj+TlgP0z3Zqa/ygNDZftEBv9s1LCvFClEyxdOZ/3DzfR
+	PYVLqzuQ4dRC2Oevzc/qg==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
+	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
+	:x-me-sender:x-sasl-enc; s=fm2; bh=nBbWZygSzvlp2YQhUufUUWa1xPeb+
+	IeFDDxKVMYGF00=; b=JXQNynAgeKxZTVK+lW8G9197N+oxLIQ2HnENAAKR4GO1q
+	cq28k02siKjYJWO5Tsk6FywIlhXRHF2FcVK2L9C72i//IcXjr0KnY6d9LnMZxjj6
+	ji0oNMK4gZ3Ommo+gfjYngTAnkro6caun8QUpA8mICQv/E/z+YuZqmcdvwZhZT4Z
+	3lnbr/ycBbNauQujKrbXSWeAJRRI3i/BBOvz4ZgkGelbrryLAy5/h9udPKV/vZT7
+	7ZeB5YHUFHnsHOzS5GqD6wB4Iaqv8ox8GeGMZ1lw9ego+HTBQ3M/piG5fLJ5Uloc
+	vXwDeYWqFoxgfvCRXd04ylIGu6sYmkX/AL5uA1qfg==
+From: virtiofs-bot@sinrega.org
+Message-Id: <48494.122021709301701447@us-mta-588.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd] MR closed: Draft: process_queue_pool:
+	Prevent queue starvation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,169 +31,15 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, vgoyal@redhat.com, groug@kaod.org, sebastian.hasler@stuvus.uni-stuttgart.de
-Cc: virtio-fs@redhat.com
+To: virtio-fs@redhat.com
 
-From: Greg Kurz <groug@kaod.org>
-
-Honor the expected behavior of syncfs() to synchronously flush all data
-and metadata to disk on linux systems.
-
-If virtiofsd is started with '-o announce_submounts', the client is
-expected to send a FUSE_SYNCFS request for each individual submount.
-In this case, we just create a new file descriptor on the submount
-inode with lo_inode_open(), call syncfs() on it and close it. The
-intermediary file is needed because O_PATH descriptors aren't
-backed by an actual file and syncfs() would fail with EBADF.
-
-If virtiofsd is started without '-o announce_submounts' or if the
-client doesn't have the FUSE_CAP_SUBMOUNTS capability, the client
-only sends a single FUSE_SYNCFS request for the root inode. The
-server would thus need to track submounts internally and call
-syncfs() on each of them. This will be implemented later.
-
-Note that syncfs() might suffer from a time penalty if the submounts
-are being hammered by some unrelated workload on the host. The only
-solution to prevent that is to avoid shared mounts.
-
-Signed-off-by: Greg Kurz <groug@kaod.org>
-Message-Id: <20220215181529.164070-2-groug@kaod.org>
-Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+In `process_queue_pool()`, instead of processing the queue until
+it's empty, we collect the entries from the queue once and then
+process only those entries.  This prevents queues from starving
+other queues. Without this commit, `process_queue_pool()` might
+never return, preventing all other queues from making progress:
+e.g., the REQ queue might prevent the HIPRIO queue from making
+progress.
 ---
- tools/virtiofsd/fuse_lowlevel.c       | 11 +++++++
- tools/virtiofsd/fuse_lowlevel.h       | 13 ++++++++
- tools/virtiofsd/passthrough_ll.c      | 44 +++++++++++++++++++++++++++
- tools/virtiofsd/passthrough_seccomp.c |  1 +
- 4 files changed, 69 insertions(+)
-
-diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
-index 2909122b23..6a427caa3d 100644
---- a/tools/virtiofsd/fuse_lowlevel.c
-+++ b/tools/virtiofsd/fuse_lowlevel.c
-@@ -1967,6 +1967,16 @@ static void do_lseek(fuse_req_t req, fuse_ino_t nodeid,
-     }
- }
- 
-+static void do_syncfs(fuse_req_t req, fuse_ino_t nodeid,
-+                      struct fuse_mbuf_iter *iter)
-+{
-+    if (req->se->op.syncfs) {
-+        req->se->op.syncfs(req, nodeid);
-+    } else {
-+        fuse_reply_err(req, ENOSYS);
-+    }
-+}
-+
- static void do_init(fuse_req_t req, fuse_ino_t nodeid,
-                     struct fuse_mbuf_iter *iter)
- {
-@@ -2398,6 +2408,7 @@ static struct {
-     [FUSE_RENAME2] = { do_rename2, "RENAME2" },
-     [FUSE_COPY_FILE_RANGE] = { do_copy_file_range, "COPY_FILE_RANGE" },
-     [FUSE_LSEEK] = { do_lseek, "LSEEK" },
-+    [FUSE_SYNCFS] = { do_syncfs, "SYNCFS" },
- };
- 
- #define FUSE_MAXOP (sizeof(fuse_ll_ops) / sizeof(fuse_ll_ops[0]))
-diff --git a/tools/virtiofsd/fuse_lowlevel.h b/tools/virtiofsd/fuse_lowlevel.h
-index c55c0ca2fc..b889dae4de 100644
---- a/tools/virtiofsd/fuse_lowlevel.h
-+++ b/tools/virtiofsd/fuse_lowlevel.h
-@@ -1226,6 +1226,19 @@ struct fuse_lowlevel_ops {
-      */
-     void (*lseek)(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
-                   struct fuse_file_info *fi);
-+
-+    /**
-+     * Synchronize file system content
-+     *
-+     * If this request is answered with an error code of ENOSYS,
-+     * this is treated as success and future calls to syncfs() will
-+     * succeed automatically without being sent to the filesystem
-+     * process.
-+     *
-+     * @param req request handle
-+     * @param ino the inode number
-+     */
-+    void (*syncfs)(fuse_req_t req, fuse_ino_t ino);
- };
- 
- /**
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index f586df955a..9f6439c405 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -3699,6 +3699,49 @@ static void lo_lseek(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
-     }
- }
- 
-+static int lo_do_syncfs(struct lo_data *lo, struct lo_inode *inode)
-+{
-+    int fd, ret = 0;
-+
-+    fuse_log(FUSE_LOG_DEBUG, "lo_do_syncfs(ino=%" PRIu64 ")\n",
-+             inode->fuse_ino);
-+
-+    fd = lo_inode_open(lo, inode, O_RDONLY);
-+    if (fd < 0) {
-+        return -fd;
-+    }
-+
-+    if (syncfs(fd) < 0) {
-+        ret = errno;
-+    }
-+
-+    close(fd);
-+    return ret;
-+}
-+
-+static void lo_syncfs(fuse_req_t req, fuse_ino_t ino)
-+{
-+    struct lo_data *lo = lo_data(req);
-+    struct lo_inode *inode = lo_inode(req, ino);
-+    int err;
-+
-+    if (!inode) {
-+        fuse_reply_err(req, EBADF);
-+        return;
-+    }
-+
-+    err = lo_do_syncfs(lo, inode);
-+    lo_inode_put(lo, &inode);
-+
-+    /*
-+     * If submounts aren't announced, the client only sends a request to
-+     * sync the root inode. TODO: Track submounts internally and iterate
-+     * over them as well.
-+     */
-+
-+    fuse_reply_err(req, err);
-+}
-+
- static void lo_destroy(void *userdata)
- {
-     struct lo_data *lo = (struct lo_data *)userdata;
-@@ -3759,6 +3802,7 @@ static struct fuse_lowlevel_ops lo_oper = {
-     .copy_file_range = lo_copy_file_range,
- #endif
-     .lseek = lo_lseek,
-+    .syncfs = lo_syncfs,
-     .destroy = lo_destroy,
- };
- 
-diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/passthrough_seccomp.c
-index 2bc0127b69..888295c073 100644
---- a/tools/virtiofsd/passthrough_seccomp.c
-+++ b/tools/virtiofsd/passthrough_seccomp.c
-@@ -111,6 +111,7 @@ static const int syscall_allowlist[] = {
-     SCMP_SYS(set_robust_list),
-     SCMP_SYS(setxattr),
-     SCMP_SYS(symlinkat),
-+    SCMP_SYS(syncfs),
-     SCMP_SYS(time), /* Rarely needed, except on static builds */
-     SCMP_SYS(tgkill),
-     SCMP_SYS(unlinkat),
--- 
-2.35.1
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/90
 

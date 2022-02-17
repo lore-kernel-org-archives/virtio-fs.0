@@ -1,14 +1,12 @@
-Date: Mon, 14 Feb 2022 13:27:22 -0500
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YgqfCtcjhApw5Fyw@redhat.com>
-References: <20220214135820.43897-1-groug@kaod.org>
-	<20220214135820.43897-4-groug@kaod.org>
+From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
+Date: Thu, 17 Feb 2022 14:23:57 +0000
+Message-Id: <20220217142402.52819-8-dgilbert@redhat.com>
+In-Reply-To: <20220217142402.52819-1-dgilbert@redhat.com>
+References: <20220217142402.52819-1-dgilbert@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <20220214135820.43897-4-groug@kaod.org>
-Subject: Re: [Virtio-fs] [PATCH v5 3/3] virtiofsd: Add support for
- FUSE_SYNCFS request without announce_submounts
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PULL 07/12] virtiofsd: Move core file creation code in
+	separate function
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,114 +15,86 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
-Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
+To: qemu-devel@nongnu.org, vgoyal@redhat.com, groug@kaod.org, sebastian.hasler@stuvus.uni-stuttgart.de
+Cc: virtio-fs@redhat.com
 
-On Mon, Feb 14, 2022 at 02:58:20PM +0100, Greg Kurz wrote:
-> This adds the missing bits to support FUSE_SYNCFS in the case submounts
-> aren't announced to the client.
-> 
-> Iterate over all inodes and call syncfs() on the ones marked as submounts.
-> Since syncfs() can block for an indefinite time, we cannot call it with
-> lo->mutex held as it would prevent the server to process other requests.
-> This is thus broken down in two steps. First build a list of submounts
-> with lo->mutex held, drop the mutex and finally process the list. A
-> reference is taken on the inodes to ensure they don't go away when
-> lo->mutex is dropped.
-> 
-> Signed-off-by: Greg Kurz <groug@kaod.org>
-> ---
->  tools/virtiofsd/passthrough_ll.c | 38 ++++++++++++++++++++++++++++++--
->  1 file changed, 36 insertions(+), 2 deletions(-)
-> 
-> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-> index e94c4e6f8635..7ce944bfe2a0 100644
-> --- a/tools/virtiofsd/passthrough_ll.c
-> +++ b/tools/virtiofsd/passthrough_ll.c
-> @@ -3400,8 +3400,42 @@ static void lo_syncfs(fuse_req_t req, fuse_ino_t ino)
->          err = lo_do_syncfs(lo, inode);
->          lo_inode_put(lo, &inode);
->      } else {
-> -        /* Requires the sever to track submounts. Not implemented yet */
-> -        err = ENOSYS;
-> +        g_autoptr(GSList) submount_list = NULL;
-> +        GSList *elem;
-> +        GHashTableIter iter;
-> +        gpointer key, value;
-> +
-> +        pthread_mutex_lock(&lo->mutex);
-> +
-> +        g_hash_table_iter_init(&iter, lo->inodes);
-> +        while (g_hash_table_iter_next(&iter, &key, &value)) {
+From: Vivek Goyal <vgoyal@redhat.com>
 
-Going through all the inodes sounds very inefficient. If there are large
-number of inodes (say 1 million or more), and if frequent syncfs requests
-are coming this can consume lot of cpu cycles.
+Move core file creation bits in a separate function. Soon this is going
+to get more complex as file creation need to set security context also.
+And there will be multiple modes of file creation in next patch.
 
-Given C virtiofsd is slowly going away, so I don't want to be too
-particular about it. But, I would have thought to put submount
-inodes into another list or hash map (using mount id as key) and just
-traverse through that list instead. Given number of submounts should
-be small, it should be pretty quick to walk through that list.
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Message-Id: <20220208204813.682906-7-vgoyal@redhat.com>
+Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c | 36 ++++++++++++++++++++++----------
+ 1 file changed, 25 insertions(+), 11 deletions(-)
 
-> +            struct lo_inode *inode = value;
-> +
-> +            if (inode->is_submount) {
-> +                g_atomic_int_inc(&inode->refcount);
-> +                submount_list = g_slist_prepend(submount_list, inode);
-> +            }
-> +        }
-> +
-> +        pthread_mutex_unlock(&lo->mutex);
-> +
-> +        /* The root inode is always present and not tracked in the hash table */
-> +        err = lo_do_syncfs(lo, &lo->root);
-> +
-> +        for (elem = submount_list; elem; elem = g_slist_next(elem)) {
-> +            struct lo_inode *inode = elem->data;
-> +            int r;
-> +
-> +            r = lo_do_syncfs(lo, inode);
-> +            if (r) {
-> +                /*
-> +                 * Try to sync as much as possible. Only one error can be
-> +                 * reported to the client though, arbitrarily the last one.
-> +                 */
-> +                err = r;
-> +            }
-> +            lo_inode_put(lo, &inode);
-> +        }
-
-One more minor nit. What happens if virtiofsd is processing syncfs list
-and then somebody hard reboots qemu and mounts virtiofs again. That
-will trigger FUSE_INIT and will call lo_destroy() first.
-
-fuse_lowlevel.c
-
-fuse_session_process_buf_int()
-{
-            fuse_log(FUSE_LOG_DEBUG, "%s: reinit\n", __func__);
-            se->got_destroy = 1;
-            se->got_init = 0;
-            if (se->op.destroy) {
-                se->op.destroy(se->userdata);
-            }
-}
-
-IIUC, there is no synchronization with this path. If we are running with
-thread pool enabled, it could very well happen that one thread is still
-doing syncfs while other thread is executing do_init(). That sounds
-like little bit of a problem. It will be good if there is a way
-to either abort syncfs() or do_destroy() waits for all the previous
-syncfs() to finish.
-
-Greg, if you like, you could break down this work in two patch series.
-First patch series just issues syncfs() on inode id sent with FUSE_SYNCFS.
-That's easy fix and can get merged now.
-
-And second patch series take care of above issues and will be little bit
-more work.
-
-Thanks
-Vivek
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 3e56d1cd95..e27479f1c9 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -2001,6 +2001,30 @@ static int lo_do_open(struct lo_data *lo, struct lo_inode *inode,
+     return 0;
+ }
+ 
++static int do_lo_create(fuse_req_t req, struct lo_inode *parent_inode,
++                        const char *name, mode_t mode,
++                        struct fuse_file_info *fi, int* open_fd)
++{
++    int err = 0, fd;
++    struct lo_cred old = {};
++    struct lo_data *lo = lo_data(req);
++
++    err = lo_change_cred(req, &old, lo->change_umask);
++    if (err) {
++        return err;
++    }
++
++    /* Try to create a new file but don't open existing files */
++    fd = openat(parent_inode->fd, name, fi->flags | O_CREAT | O_EXCL, mode);
++    if (fd == -1) {
++        err = errno;
++    } else {
++        *open_fd = fd;
++    }
++    lo_restore_cred(&old, lo->change_umask);
++    return err;
++}
++
+ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+                       mode_t mode, struct fuse_file_info *fi)
+ {
+@@ -2010,7 +2034,6 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+     struct lo_inode *inode = NULL;
+     struct fuse_entry_param e;
+     int err;
+-    struct lo_cred old = {};
+ 
+     fuse_log(FUSE_LOG_DEBUG, "lo_create(parent=%" PRIu64 ", name=%s)"
+              " kill_priv=%d\n", parent, name, fi->kill_priv);
+@@ -2026,18 +2049,9 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
+         return;
+     }
+ 
+-    err = lo_change_cred(req, &old, lo->change_umask);
+-    if (err) {
+-        goto out;
+-    }
+-
+     update_open_flags(lo->writeback, lo->allow_direct_io, fi);
+ 
+-    /* Try to create a new file but don't open existing files */
+-    fd = openat(parent_inode->fd, name, fi->flags | O_CREAT | O_EXCL, mode);
+-    err = fd == -1 ? errno : 0;
+-
+-    lo_restore_cred(&old, lo->change_umask);
++    err = do_lo_create(req, parent_inode, name, mode, fi, &fd);
+ 
+     /* Ignore the error if file exists and O_EXCL was not given */
+     if (err && (err != EEXIST || (fi->flags & O_EXCL))) {
+-- 
+2.35.1
 

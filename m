@@ -1,12 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Thu, 17 Feb 2022 17:24:55 +0000
-Message-Id: <20220217172500.60500-8-dgilbert@redhat.com>
+Date: Thu, 17 Feb 2022 17:24:56 +0000
+Message-Id: <20220217172500.60500-9-dgilbert@redhat.com>
 In-Reply-To: <20220217172500.60500-1-dgilbert@redhat.com>
 References: <20220217172500.60500-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 07/12] virtiofsd: Move core file creation code in
-	separate function
+Subject: [Virtio-fs] [PULL 08/12] virtiofsd: Add helpers to work with
+	/proc/self/task/tid/attr/fscreate
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,81 +20,166 @@ Cc: virtio-fs@redhat.com
 
 From: Vivek Goyal <vgoyal@redhat.com>
 
-Move core file creation bits in a separate function. Soon this is going
-to get more complex as file creation need to set security context also.
-And there will be multiple modes of file creation in next patch.
+Soon we will be able to create and also set security context on the file
+atomically using /proc/self/task/tid/attr/fscreate knob. If this knob
+is available on the system, first set the knob with the desired context
+and then create the file. It will be created with the context set in
+fscreate. This works basically for SELinux and its per thread.
+
+This patch just introduces the helper functions. Subsequent patches will
+make use of these helpers.
 
 Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
-Message-Id: <20220208204813.682906-7-vgoyal@redhat.com>
+Message-Id: <20220208204813.682906-8-vgoyal@redhat.com>
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+  dgilbert: Manually merged gettid syscall number fixup from Vivek
 ---
- tools/virtiofsd/passthrough_ll.c | 36 ++++++++++++++++++++++----------
- 1 file changed, 25 insertions(+), 11 deletions(-)
+ tools/virtiofsd/passthrough_ll.c | 92 ++++++++++++++++++++++++++++++++
+ 1 file changed, 92 insertions(+)
 
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 3e56d1cd95..e27479f1c9 100644
+index e27479f1c9..e694980a53 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -2001,6 +2001,30 @@ static int lo_do_open(struct lo_data *lo, struct lo_inode *inode,
-     return 0;
+@@ -173,10 +173,14 @@ struct lo_data {
+ 
+     /* An O_PATH file descriptor to /proc/self/fd/ */
+     int proc_self_fd;
++    /* An O_PATH file descriptor to /proc/self/task/ */
++    int proc_self_task;
+     int user_killpriv_v2, killpriv_v2;
+     /* If set, virtiofsd is responsible for setting umask during creation */
+     bool change_umask;
+     int user_posix_acl, posix_acl;
++    /* Keeps track if /proc/<pid>/attr/fscreate should be used or not */
++    bool use_fscreate;
+ };
+ 
+ static const struct fuse_opt lo_opts[] = {
+@@ -256,6 +260,72 @@ static struct lo_data *lo_data(fuse_req_t req)
+     return (struct lo_data *)fuse_req_userdata(req);
  }
  
-+static int do_lo_create(fuse_req_t req, struct lo_inode *parent_inode,
-+                        const char *name, mode_t mode,
-+                        struct fuse_file_info *fi, int* open_fd)
++/*
++ * Tries to figure out if /proc/<pid>/attr/fscreate is usable or not. With
++ * selinux=0, read from fscreate returns -EINVAL.
++ *
++ * TODO: Link with libselinux and use is_selinux_enabled() instead down
++ * the line. It probably will be more reliable indicator.
++ */
++static bool is_fscreate_usable(struct lo_data *lo)
 +{
-+    int err = 0, fd;
-+    struct lo_cred old = {};
-+    struct lo_data *lo = lo_data(req);
++    char procname[64];
++    int fscreate_fd;
++    size_t bytes_read;
 +
-+    err = lo_change_cred(req, &old, lo->change_umask);
++    sprintf(procname, "%ld/attr/fscreate", syscall(SYS_gettid));
++    fscreate_fd = openat(lo->proc_self_task, procname, O_RDWR);
++    if (fscreate_fd == -1) {
++        return false;
++    }
++
++    bytes_read = read(fscreate_fd, procname, 64);
++    close(fscreate_fd);
++    if (bytes_read == -1) {
++        return false;
++    }
++    return true;
++}
++
++/* Helpers to set/reset fscreate */
++__attribute__((unused))
++static int open_set_proc_fscreate(struct lo_data *lo, const void *ctx,
++                                  size_t ctxlen, int *fd)
++{
++    char procname[64];
++    int fscreate_fd, err = 0;
++    size_t written;
++
++    sprintf(procname, "%ld/attr/fscreate", syscall(SYS_gettid));
++    fscreate_fd = openat(lo->proc_self_task, procname, O_WRONLY);
++    err = fscreate_fd == -1 ? errno : 0;
 +    if (err) {
 +        return err;
 +    }
 +
-+    /* Try to create a new file but don't open existing files */
-+    fd = openat(parent_inode->fd, name, fi->flags | O_CREAT | O_EXCL, mode);
-+    if (fd == -1) {
-+        err = errno;
-+    } else {
-+        *open_fd = fd;
++    written = write(fscreate_fd, ctx, ctxlen);
++    err = written == -1 ? errno : 0;
++    if (err) {
++        goto out;
 +    }
-+    lo_restore_cred(&old, lo->change_umask);
++
++    *fd = fscreate_fd;
++    return 0;
++out:
++    close(fscreate_fd);
 +    return err;
 +}
 +
- static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
-                       mode_t mode, struct fuse_file_info *fi)
- {
-@@ -2010,7 +2034,6 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
-     struct lo_inode *inode = NULL;
-     struct fuse_entry_param e;
-     int err;
--    struct lo_cred old = {};
- 
-     fuse_log(FUSE_LOG_DEBUG, "lo_create(parent=%" PRIu64 ", name=%s)"
-              " kill_priv=%d\n", parent, name, fi->kill_priv);
-@@ -2026,18 +2049,9 @@ static void lo_create(fuse_req_t req, fuse_ino_t parent, const char *name,
-         return;
++__attribute__((unused))
++static void close_reset_proc_fscreate(int fd)
++{
++    if ((write(fd, NULL, 0)) == -1) {
++        fuse_log(FUSE_LOG_WARNING, "Failed to reset fscreate. err=%d\n", errno);
++    }
++    close(fd);
++    return;
++}
++
+ /*
+  * Load capng's state from our saved state if the current thread
+  * hadn't previously been loaded.
+@@ -3531,6 +3601,15 @@ static void setup_namespaces(struct lo_data *lo, struct fuse_session *se)
+         exit(1);
      }
  
--    err = lo_change_cred(req, &old, lo->change_umask);
--    if (err) {
--        goto out;
--    }
--
-     update_open_flags(lo->writeback, lo->allow_direct_io, fi);
++    /* Get the /proc/self/task descriptor */
++    lo->proc_self_task = open("/proc/self/task/", O_PATH);
++    if (lo->proc_self_task == -1) {
++        fuse_log(FUSE_LOG_ERR, "open(/proc/self/task, O_PATH): %m\n");
++        exit(1);
++    }
++
++    lo->use_fscreate = is_fscreate_usable(lo);
++
+     /*
+      * We only need /proc/self/fd. Prevent ".." from accessing parent
+      * directories of /proc/self/fd by bind-mounting it over /proc. Since / was
+@@ -3747,6 +3826,14 @@ static void setup_chroot(struct lo_data *lo)
+         exit(1);
+     }
  
--    /* Try to create a new file but don't open existing files */
--    fd = openat(parent_inode->fd, name, fi->flags | O_CREAT | O_EXCL, mode);
--    err = fd == -1 ? errno : 0;
--
--    lo_restore_cred(&old, lo->change_umask);
-+    err = do_lo_create(req, parent_inode, name, mode, fi, &fd);
++    lo->proc_self_task = open("/proc/self/task", O_PATH);
++    if (lo->proc_self_fd == -1) {
++        fuse_log(FUSE_LOG_ERR, "open(\"/proc/self/task\", O_PATH): %m\n");
++        exit(1);
++    }
++
++    lo->use_fscreate = is_fscreate_usable(lo);
++
+     /*
+      * Make the shared directory the file system root so that FUSE_OPEN
+      * (lo_open()) cannot escape the shared directory by opening a symlink.
+@@ -3932,6 +4019,10 @@ static void fuse_lo_data_cleanup(struct lo_data *lo)
+         close(lo->proc_self_fd);
+     }
  
-     /* Ignore the error if file exists and O_EXCL was not given */
-     if (err && (err != EEXIST || (fi->flags & O_EXCL))) {
++    if (lo->proc_self_task >= 0) {
++        close(lo->proc_self_task);
++    }
++
+     if (lo->root.fd >= 0) {
+         close(lo->root.fd);
+     }
+@@ -3959,6 +4050,7 @@ int main(int argc, char *argv[])
+         .posix_lock = 0,
+         .allow_direct_io = 0,
+         .proc_self_fd = -1,
++        .proc_self_task = -1,
+         .user_killpriv_v2 = -1,
+         .user_posix_acl = -1,
+     };
 -- 
 2.35.1
 

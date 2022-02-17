@@ -1,11 +1,12 @@
 From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Thu, 17 Feb 2022 14:23:51 +0000
-Message-Id: <20220217142402.52819-2-dgilbert@redhat.com>
+Date: Thu, 17 Feb 2022 14:23:52 +0000
+Message-Id: <20220217142402.52819-3-dgilbert@redhat.com>
 In-Reply-To: <20220217142402.52819-1-dgilbert@redhat.com>
 References: <20220217142402.52819-1-dgilbert@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 01/12] virtiofsd: Do not support blocking flock
+Subject: [Virtio-fs] [PULL 02/12] virtiofsd: Fix breakage due to
+	fuse_init_in size change
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,41 +18,52 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org, vgoyal@redhat.com, groug@kaod.org, sebastian.hasler@stuvus.uni-stuttgart.de
 Cc: virtio-fs@redhat.com
 
-From: Sebastian Hasler <sebastian.hasler@stuvus.uni-stuttgart.de>
+From: Vivek Goyal <vgoyal@redhat.com>
 
-With the current implementation, blocking flock can lead to
-deadlock. Thus, it's better to return EOPNOTSUPP if a user attempts
-to perform a blocking flock request.
+Kernel version 5.17 has increased the size of "struct fuse_init_in" struct.
+Previously this struct was 16 bytes and now it has been extended to
+64 bytes in size.
 
-Signed-off-by: Sebastian Hasler <sebastian.hasler@stuvus.uni-stuttgart.de>
-Message-Id: <20220113153249.710216-1-sebastian.hasler@stuvus.uni-stuttgart.de>
+Once qemu headers are updated to latest, it will expect to receive 64 byte
+size struct (for protocol version major 7 and minor > 6). But if guest is
+booting older kernel (older than 5.17), then it still sends older
+fuse_init_in of size 16 bytes. And do_init() fails. It is expecting
+64 byte struct. And this results in mount of virtiofs failing.
+
+Fix this by parsing 16 bytes only for now. Separate patches will be
+posted which will parse rest of the bytes and enable new functionality.
+Right now we don't support any of the new functionality, so we don't
+lose anything by not parsing bytes beyond 16.
+
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+Message-Id: <20220208204813.682906-2-vgoyal@redhat.com>
 Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Reviewed-by: Vivek Goyal <vgoyal@redhat.com>
-Reviewed-by: Greg Kurz <groug@kaod.org>
 ---
- tools/virtiofsd/passthrough_ll.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ tools/virtiofsd/fuse_lowlevel.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index b3d0674f6d..3e56d1cd95 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -2467,6 +2467,15 @@ static void lo_flock(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi,
-     int res;
-     (void)ino;
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index e4679c73ab..ce29a70253 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -1880,6 +1880,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+                     struct fuse_mbuf_iter *iter)
+ {
+     size_t compat_size = offsetof(struct fuse_init_in, max_readahead);
++    size_t compat2_size = offsetof(struct fuse_init_in, flags) + sizeof(uint32_t);
+     struct fuse_init_in *arg;
+     struct fuse_init_out outarg;
+     struct fuse_session *se = req->se;
+@@ -1897,7 +1898,7 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
  
-+    if (!(op & LOCK_NB)) {
-+        /*
-+         * Blocking flock can deadlock as there is only one thread
-+         * serving the queue.
-+         */
-+        fuse_reply_err(req, EOPNOTSUPP);
-+        return;
-+    }
-+
-     res = flock(lo_fi_fd(req, fi), op);
- 
-     fuse_reply_err(req, res == -1 ? errno : 0);
+     /* ...and now consume the new fields. */
+     if (arg->major == 7 && arg->minor >= 6) {
+-        if (!fuse_mbuf_iter_advance(iter, sizeof(*arg) - compat_size)) {
++        if (!fuse_mbuf_iter_advance(iter, compat2_size - compat_size)) {
+             fuse_reply_err(req, EINVAL);
+             return;
+         }
 -- 
 2.35.1
 

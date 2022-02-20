@@ -1,20 +1,27 @@
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
-	h=mime-version:references:in-reply-to:from:date:message-id:subject:to
-	:cc; bh=mfoaHmtYn7qQB93RGFLpowS77DV1zylNQFTokSnR44s=;
-	b=mfJaFZA+WVxHnKlaKPES8d/dIVZ6cyh/NafzQm3btcrR9g2Vkt2A6W1W/OOkSbYVES
-	rziXsDH6uEaiqcaJ+bG/R7BgVH5kAXyjxJmc7mreDIRh1NBW8xwRZL77XTbrRY+3qixQ
-	f35oUB/1N+LyR/7eMeNUztALjkIKR8J+R+S/kC0eoPAyh0bZq0C+oA2yvfaeEOwuOumb
-	ENEQnh56DYiIEtun95lxWyY1dWtXJXApJY+tHaYFtdbr1AKBG3tJqT2KTzsdLOXfqrk4
-	9sFWRcyb4WzuPqeHmMfwnN4IDUDwC+a05E2t2TRZH+wr7Vy1oYbxHodH+9zkNih/+GyY
-	1/Ww==
-MIME-Version: 1.0
-References: <20220217172500.60500-1-dgilbert@redhat.com>
-In-Reply-To: <20220217172500.60500-1-dgilbert@redhat.com>
-From: Peter Maydell <peter.maydell@linaro.org>
-Date: Sun, 20 Feb 2022 15:05:30 +0000
-Message-ID: <CAFEAcA8TQJ8Wx0+Ns4XoFCG3JKC8VrcnTJ-=Oo+WuBhtd_qkUg@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PULL 00/12] virtiofs queue
+Date: Sun, 20 Feb 2022 11:56:30 -0500
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+	:to; s=fm3; bh=8jFQn7jzTNwosIKxFsLz0NRapjHlOeOpEVSyhBnsUM8=; b=R
+	KoDBXF+EcH+ui22QrzcwPTWwh/J8Bq6l6LgWN7qjfcuJY2En1b2cPl/DomKVFn2R
+	tNgrOG1IZnVvDCyo4e2YkER5rMWxOlnPeL5aQZuuWdynzk7rWu2/ReIKyZS0NCA/
+	D0i8Fw0p+xk5O7+LqxwcHzm6dFX7/9+OHZO4FHRgaO2tf/Q3QQIit1/K1JDKhUw7
+	iHDdfOS2G8FkrzYAmrBzoJocMa0S9VU0wnMFxGuX/oRnQ1mOK4nh44l4YpZsCVB+
+	VILVlVcVem3tYrmtLaQ+yOuWOF3/dFJx0iIWZwq1sfd5qVvCapcZyE63SrDvosyN
+	93BVQvSYIKbEsLOvwQaqA==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
+	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
+	:x-me-sender:x-sasl-enc; s=fm2; bh=8jFQn7jzTNwosIKxFsLz0NRapjHlO
+	eOpEVSyhBnsUM8=; b=joLSQwBywklk91peXekMmvllycX0NwzaTZNW3OdfJxC/A
+	kYKdtgTfWaKv7qR7ilS8PuCBQrjVjjd1ZHo5UgXXiaa3+OdIX6lLEnGZ4IWtaZL0
+	PzrJY6sgQfM/pV24qP1xYg7mhgGop7D/Fc9yUce8YmqKTdURVtB7Ma7KaFkXMPed
+	1OhXwRt45BIeAjD2tWECR7c9qfYxtLBvQUbDN1k40zBPwvzfMc18sTyEsJPn3UD3
+	ahNbccptmXqr58FoxqCzjzKVA+I+VpGKInBzENFszL/tnWc2wZBfCAwWeKEK4p1L
+	Gpi/IrcRTlnumImHpLWTcCpBaUqJN+sgsH4dmkYMA==
+From: virtiofs-bot@sinrega.org
+Message-Id: <52924.122022011562400131@us-mta-213.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd] Issue opened: WinError 1005 on realpath()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,44 +30,23 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, vgoyal@redhat.com
+To: virtio-fs@redhat.com
 
-On Thu, 17 Feb 2022 at 17:30, Dr. David Alan Gilbert (git)
-<dgilbert@redhat.com> wrote:
->
-> From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
->
-> The following changes since commit c13b8e9973635f34f3ce4356af27a311c993729c:
->
->   Merge remote-tracking branch 'remotes/alistair/tags/pull-riscv-to-apply-20220216' into staging (2022-02-16 09:57:11 +0000)
->
-> are available in the Git repository at:
->
->   https://gitlab.com/dagrh/qemu.git tags/pull-virtiofs-20220217b
->
-> for you to fetch changes up to 45b04ef48dbbeb18d93c2631bf5584ac493de749:
->
->   virtiofsd: Add basic support for FUSE_SYNCFS request (2022-02-17 17:22:26 +0000)
->
-> ----------------------------------------------------------------
-> V3: virtiofs pull 2022-02-17
->
-> Security label improvements from Vivek
->   - includes a fix for building against new kernel headers
->   [V3: checkpatch style fixes]
->   [V2: Fix building on old Linux]
-> Blocking flock disable from Sebastian
-> SYNCFS support from Greg
->
-> Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
->
+Steps to reproduce:
 
+1. Have a Windows guest
+2. Mount virtio-fs on Z:
+3. Create directory `Z:\foobar`
+4. Run python interpreter
+5. Call `os.path.realpath('Z:\\foobar')`
 
-Applied, thanks.
+What happens:
 
-Please update the changelog at https://wiki.qemu.org/ChangeLog/7.0
-for any user-visible changes.
+```
+OSError: [WinError 1005] The volume does not contain a recognized file system.
+```
 
--- PMM
+That's the line where the error is raised: https://github.com/python/cpython/blob/b77158b4da449ec5b8f682816a79d004fd65ed07/Lib/ntpath.py#L674
+---
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/32
 

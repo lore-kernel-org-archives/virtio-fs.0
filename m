@@ -1,13 +1,13 @@
-Date: Wed, 23 Feb 2022 10:14:32 +0000
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YhYJCNvA1raSxHvT@work-vm>
+Date: Wed, 23 Feb 2022 11:18:35 +0100
+From: Greg Kurz <groug@kaod.org>
+Message-ID: <20220223111835.00ef0e83@bahia>
+In-Reply-To: <20220223092340.9043-1-hreitz@redhat.com>
 References: <20220223092340.9043-1-hreitz@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20220223092340.9043-1-hreitz@redhat.com>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
+Content-Type: text/plain; charset=US-ASCII
+Content-Transfer-Encoding: 7bit
 Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Let meson check for
-	statx.stx_mnt_id
+ statx.stx_mnt_id
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,7 +19,9 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: Hanna Reitz <hreitz@redhat.com>
 Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 
-* Hanna Reitz (hreitz@redhat.com) wrote:
+On Wed, 23 Feb 2022 10:23:40 +0100
+Hanna Reitz <hreitz@redhat.com> wrote:
+
 > In virtiofsd, we assume that the presence of the STATX_MNT_ID macro
 > implies existence of the statx.stx_mnt_id field.  Unfortunately, that is
 > not necessarily the case: glibc has introduced the macro in its commit
@@ -32,10 +34,10 @@ Cc: virtio-fs@redhat.com, qemu-devel@nongnu.org
 > 
 > Closes: https://gitlab.com/qemu-project/qemu/-/issues/882
 > Signed-off-by: Hanna Reitz <hreitz@redhat.com>
-
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-
 > ---
+
+Reviewed-by: Greg Kurz <groug@kaod.org>
+
 >  meson.build                      | 13 +++++++++++++
 >  tools/virtiofsd/passthrough_ll.c |  2 +-
 >  2 files changed, 14 insertions(+), 1 deletion(-)
@@ -84,9 +86,4 @@ Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
 >      if (lo->use_statx) {
 >          struct statx statxbuf;
 >  
-> -- 
-> 2.34.1
-> 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

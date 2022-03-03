@@ -1,12 +1,27 @@
-From: Greg Kurz <groug@kaod.org>
-Date: Thu,  3 Mar 2022 18:13:23 +0100
-Message-Id: <20220303171323.580712-3-groug@kaod.org>
-In-Reply-To: <20220303171323.580712-1-groug@kaod.org>
-References: <20220303171323.580712-1-groug@kaod.org>
-MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 2/2] virtiofsd: Support FUSE_SYNCFS on
-	unannounced submounts
+Date: Thu, 3 Mar 2022 12:42:30 -0500
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+	:to; s=fm3; bh=DcW3bqL2gZV+5zNh+zCo8d9VYYVUn3Ff2c79W2OIQuM=; b=h
+	z1GxQaeQyAK5Srcn4l6c2rhi8FO2RXab5DD2mcguqHef00UwrXDRqPKI3ZQ8SmfN
+	TplLBQFlauvFB4y7w85TVm3Og7D0+fSCs3sDdiPwBFRdHzGGve3BeJndKt7Porx5
+	XnRRfnSO0T1//RoLrsPp6TO8ApZfshbyLQlZ/WimJS+FIJlBqLVCQBcFiRaC2F3F
+	jkHOQD2Kpw3aKo4ahDd3C00GqOhuCNQR3rlHR6hKP+/N1/AWuKNcxJpaDEVb7eVZ
+	vugypMzKddWrII/XcYPU4oEdi/xQyDX/Bs8yDVOTX8m97x3wCP+fxWvD75PiR6Hf
+	M8MlgUOnkh6m+pR6ng6gg==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
+	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
+	:x-me-sender:x-sasl-enc; s=fm2; bh=DcW3bqL2gZV+5zNh+zCo8d9VYYVUn
+	3Ff2c79W2OIQuM=; b=gVP9J6oqfqAQlJ1kE+02k/w6KFqd4oe6WUkmZgfcL5cjP
+	Flv9fGo3A2J3ieS4Qa0fss5vp5rzh0rt11yOlJDcJt4mJL/f1bXfSKGeb/znyJDS
+	kHiHF0c9N26S1QHWfxDJYBviMnc1u/LRCDsKCrPYqQlSLYjQ2Xc50ABb7L0uSKZk
+	2ybzp0grLTuPCjRproBvFiH3qwe4V9z2O8hKBFuq1JIxVkLWvBo2DBcAYbHWDhnK
+	SlFgHJxsR/q8mZ1KmjDGkJWxPkoMcp9WpewYmwsz7wpARliOhU0LwkvZGtwumq+O
+	rsURKzNZFRNOTDOWHziDLo0A+OdTTZXhFQlBXZKPg==
+From: virtiofs-bot@sinrega.org
+Message-Id: <89334.122030312422800788@us-mta-495.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"
+Subject: [Virtio-fs] [virtiofsd] Issue opened: Change options defaults
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,76 +30,21 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
+To: virtio-fs@redhat.com
 
-This adds the missing bits to support FUSE_SYNCFS in the case submounts
-aren't announced to the client.
+This list compiles some proposed changes from default values.
 
-Iterate over all submounts and call syncfs() on them. Since syncfs() can
-block for an indefinite time, we cannot call it with lo->mutex held as
-it would prevent the server to process other requests. Generate a list
-of submounts with lo->mutex held and bump their reference count to
-ensure they don't vanish when lo->mutex is dropped.
+Make default:
+- [] `--inode-files-handles=fallback`
+We could also take the opportunity to take a look at #20 deprecating `fallback` and changing it to: `best-effort`, `prefer`, `preferred`, etc.
 
-Each individual call to syncfs() can legitimately fail. Try to flush
-as much as possible anyway. A single error will be returned to the
-client so that it knows that the flush didn't fully succeed.
+- [] `--announce-submounts`
 
-Signed-off-by: Greg Kurz <groug@kaod.org>
+
+- [] `--no-killpriv-v2`
+
+
+If you think there's something missing here, please add it.
 ---
- tools/virtiofsd/passthrough_ll.c | 37 ++++++++++++++++++++++++++++++--
- 1 file changed, 35 insertions(+), 2 deletions(-)
-
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 177e4b46c1bb..628ae0e9589d 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -3746,9 +3746,42 @@ static void lo_syncfs(fuse_req_t req, fuse_ino_t ino)
- 
-     /*
-      * If submounts aren't announced, the client only sends a request to
--     * sync the root inode. TODO: Track submounts internally and iterate
--     * over them as well.
-+     * sync the root inode. Iterate over the known submounts to sync them
-+     * as well.
-      */
-+    if (!lo->announce_submounts) {
-+        g_autoptr(GSList) submount_list = NULL;
-+        GSList *elem;
-+        GHashTableIter iter;
-+        gpointer key, value;
-+
-+        pthread_mutex_lock(&lo->mutex);
-+
-+        g_hash_table_iter_init(&iter, lo->submounts);
-+        while (g_hash_table_iter_next(&iter, &key, &value)) {
-+            struct lo_inode *inode = value;
-+
-+            g_atomic_int_inc(&inode->refcount);
-+            submount_list = g_slist_prepend(submount_list, inode);
-+        }
-+
-+        pthread_mutex_unlock(&lo->mutex);
-+
-+        for (elem = submount_list; elem; elem = g_slist_next(elem)) {
-+            struct lo_inode *inode = elem->data;
-+            int r;
-+
-+            r = lo_do_syncfs(lo, inode);
-+            if (r) {
-+                /*
-+                 * Try to sync as much as possible. Only one error can be
-+                 * reported to the client though, arbitrarily the last one.
-+                 */
-+                err = r;
-+            }
-+            lo_inode_put(lo, &inode);
-+        }
-+    }
- 
-     fuse_reply_err(req, err);
- }
--- 
-2.34.1
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/35
 

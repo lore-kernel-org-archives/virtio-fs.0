@@ -1,11 +1,12 @@
 From: Greg Kurz <groug@kaod.org>
-Date: Thu,  3 Mar 2022 18:13:22 +0100
-Message-Id: <20220303171323.580712-2-groug@kaod.org>
+Date: Thu,  3 Mar 2022 18:13:23 +0100
+Message-Id: <20220303171323.580712-3-groug@kaod.org>
 In-Reply-To: <20220303171323.580712-1-groug@kaod.org>
 References: <20220303171323.580712-1-groug@kaod.org>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 1/2] virtiofsd: Track submounts
+Subject: [Virtio-fs] [PATCH 2/2] virtiofsd: Support FUSE_SYNCFS on
+	unannounced submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,102 +18,73 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 To: qemu-devel@nongnu.org
 Cc: virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
-If the server doesn't announce submounts to the client, it needs to
-track them internally to properly support FUSE_SYNCFS. lo_do_lookup()
-already knows how to detect them : it is a directory with a different
-device ID or mount ID than its parent. Use the same logic and put
-submount inodes into a dedicated hash : this will allow to iterate
-on them in lo_syncfs().
+This adds the missing bits to support FUSE_SYNCFS in the case submounts
+aren't announced to the client.
+
+Iterate over all submounts and call syncfs() on them. Since syncfs() can
+block for an indefinite time, we cannot call it with lo->mutex held as
+it would prevent the server to process other requests. Generate a list
+of submounts with lo->mutex held and bump their reference count to
+ensure they don't vanish when lo->mutex is dropped.
+
+Each individual call to syncfs() can legitimately fail. Try to flush
+as much as possible anyway. A single error will be returned to the
+client so that it knows that the flush didn't fully succeed.
 
 Signed-off-by: Greg Kurz <groug@kaod.org>
 ---
- tools/virtiofsd/passthrough_ll.c | 24 ++++++++++++++++++++----
- 1 file changed, 20 insertions(+), 4 deletions(-)
+ tools/virtiofsd/passthrough_ll.c | 37 ++++++++++++++++++++++++++++++--
+ 1 file changed, 35 insertions(+), 2 deletions(-)
 
 diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index dfa2fc250d64..177e4b46c1bb 100644
+index 177e4b46c1bb..628ae0e9589d 100644
 --- a/tools/virtiofsd/passthrough_ll.c
 +++ b/tools/virtiofsd/passthrough_ll.c
-@@ -165,6 +165,7 @@ struct lo_data {
-     bool use_statx;
-     struct lo_inode root;
-     GHashTable *inodes; /* protected by lo->mutex */
-+    GHashTable *submounts; /* protected by lo->mutex */
-     struct lo_map ino_map; /* protected by lo->mutex */
-     struct lo_map dirp_map; /* protected by lo->mutex */
-     struct lo_map fd_map; /* protected by lo->mutex */
-@@ -1104,6 +1105,7 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-     struct lo_data *lo = lo_data(req);
-     struct lo_inode *inode = NULL;
-     struct lo_inode *dir = lo_inode(req, parent);
-+    bool is_submount;
+@@ -3746,9 +3746,42 @@ static void lo_syncfs(fuse_req_t req, fuse_ino_t ino)
  
-     if (inodep) {
-         *inodep = NULL; /* in case there is an error */
-@@ -1138,8 +1140,10 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-         goto out_err;
-     }
- 
--    if (S_ISDIR(e->attr.st_mode) && lo->announce_submounts &&
--        (e->attr.st_dev != dir->key.dev || mnt_id != dir->key.mnt_id)) {
-+    is_submount = S_ISDIR(e->attr.st_mode) &&
-+        (e->attr.st_dev != dir->key.dev || mnt_id != dir->key.mnt_id);
+     /*
+      * If submounts aren't announced, the client only sends a request to
+-     * sync the root inode. TODO: Track submounts internally and iterate
+-     * over them as well.
++     * sync the root inode. Iterate over the known submounts to sync them
++     * as well.
+      */
++    if (!lo->announce_submounts) {
++        g_autoptr(GSList) submount_list = NULL;
++        GSList *elem;
++        GHashTableIter iter;
++        gpointer key, value;
 +
-+    if (is_submount && lo->announce_submounts) {
-         e->attr_flags |= FUSE_ATTR_SUBMOUNT;
-     }
- 
-@@ -1174,6 +1178,9 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
-         pthread_mutex_lock(&lo->mutex);
-         inode->fuse_ino = lo_add_inode_mapping(req, inode);
-         g_hash_table_insert(lo->inodes, &inode->key, inode);
-+        if (is_submount && !lo->announce_submounts) {
-+            g_hash_table_insert(lo->submounts, &inode->key, inode);
++        pthread_mutex_lock(&lo->mutex);
++
++        g_hash_table_iter_init(&iter, lo->submounts);
++        while (g_hash_table_iter_next(&iter, &key, &value)) {
++            struct lo_inode *inode = value;
++
++            g_atomic_int_inc(&inode->refcount);
++            submount_list = g_slist_prepend(submount_list, inode);
 +        }
-         pthread_mutex_unlock(&lo->mutex);
-     }
-     e->ino = inode->fuse_ino;
-@@ -1187,8 +1194,9 @@ static int lo_do_lookup(fuse_req_t req, fuse_ino_t parent, const char *name,
- 
-     lo_inode_put(lo, &dir);
- 
--    fuse_log(FUSE_LOG_DEBUG, "  %lli/%s -> %lli\n", (unsigned long long)parent,
--             name, (unsigned long long)e->ino);
-+    fuse_log(FUSE_LOG_DEBUG, "  %lli/%s -> %lli%s\n",
-+             (unsigned long long) parent, name, (unsigned long long) e->ino,
-+             is_submount ? " (submount)" : "");
- 
-     return 0;
- 
-@@ -1745,6 +1753,9 @@ static void unref_inode(struct lo_data *lo, struct lo_inode *inode, uint64_t n)
-     if (!inode->nlookup) {
-         lo_map_remove(&lo->ino_map, inode->fuse_ino);
-         g_hash_table_remove(lo->inodes, &inode->key);
-+        if (!lo->announce_submounts) {
-+            g_hash_table_remove(lo->submounts, &inode->key);
++
++        pthread_mutex_unlock(&lo->mutex);
++
++        for (elem = submount_list; elem; elem = g_slist_next(elem)) {
++            struct lo_inode *inode = elem->data;
++            int r;
++
++            r = lo_do_syncfs(lo, inode);
++            if (r) {
++                /*
++                 * Try to sync as much as possible. Only one error can be
++                 * reported to the client though, arbitrarily the last one.
++                 */
++                err = r;
++            }
++            lo_inode_put(lo, &inode);
 +        }
-         if (lo->posix_lock) {
-             if (g_hash_table_size(inode->posix_locks)) {
-                 fuse_log(FUSE_LOG_WARNING, "Hash table is not empty\n");
-@@ -4297,6 +4308,10 @@ static gboolean lo_key_equal(gconstpointer a, gconstpointer b)
- 
- static void fuse_lo_data_cleanup(struct lo_data *lo)
- {
-+    if (lo->submounts) {
-+        g_hash_table_destroy(lo->submounts);
 +    }
-+
-     if (lo->inodes) {
-         g_hash_table_destroy(lo->inodes);
-     }
-@@ -4364,6 +4379,7 @@ int main(int argc, char *argv[])
  
-     pthread_mutex_init(&lo.mutex, NULL);
-     lo.inodes = g_hash_table_new(lo_key_hash, lo_key_equal);
-+    lo.submounts = g_hash_table_new(lo_key_hash, lo_key_equal);
-     lo.root.fd = -1;
-     lo.root.fuse_ino = FUSE_ROOT_ID;
-     lo.cache = CACHE_AUTO;
+     fuse_reply_err(req, err);
+ }
 -- 
 2.34.1
 

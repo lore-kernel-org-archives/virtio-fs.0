@@ -1,27 +1,13 @@
-Date: Thu, 3 Mar 2022 12:42:30 -0500
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
-	cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
-	:to; s=fm3; bh=DcW3bqL2gZV+5zNh+zCo8d9VYYVUn3Ff2c79W2OIQuM=; b=h
-	z1GxQaeQyAK5Srcn4l6c2rhi8FO2RXab5DD2mcguqHef00UwrXDRqPKI3ZQ8SmfN
-	TplLBQFlauvFB4y7w85TVm3Og7D0+fSCs3sDdiPwBFRdHzGGve3BeJndKt7Porx5
-	XnRRfnSO0T1//RoLrsPp6TO8ApZfshbyLQlZ/WimJS+FIJlBqLVCQBcFiRaC2F3F
-	jkHOQD2Kpw3aKo4ahDd3C00GqOhuCNQR3rlHR6hKP+/N1/AWuKNcxJpaDEVb7eVZ
-	vugypMzKddWrII/XcYPU4oEdi/xQyDX/Bs8yDVOTX8m97x3wCP+fxWvD75PiR6Hf
-	M8MlgUOnkh6m+pR6ng6gg==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
-	messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
-	:sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
-	:x-me-sender:x-sasl-enc; s=fm2; bh=DcW3bqL2gZV+5zNh+zCo8d9VYYVUn
-	3Ff2c79W2OIQuM=; b=gVP9J6oqfqAQlJ1kE+02k/w6KFqd4oe6WUkmZgfcL5cjP
-	Flv9fGo3A2J3ieS4Qa0fss5vp5rzh0rt11yOlJDcJt4mJL/f1bXfSKGeb/znyJDS
-	kHiHF0c9N26S1QHWfxDJYBviMnc1u/LRCDsKCrPYqQlSLYjQ2Xc50ABb7L0uSKZk
-	2ybzp0grLTuPCjRproBvFiH3qwe4V9z2O8hKBFuq1JIxVkLWvBo2DBcAYbHWDhnK
-	SlFgHJxsR/q8mZ1KmjDGkJWxPkoMcp9WpewYmwsz7wpARliOhU0LwkvZGtwumq+O
-	rsURKzNZFRNOTDOWHziDLo0A+OdTTZXhFQlBXZKPg==
-From: virtiofs-bot@sinrega.org
-Message-Id: <89334.122030312422800788@us-mta-495.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"
-Subject: [Virtio-fs] [virtiofsd] Issue opened: Change options defaults
+Date: Fri, 4 Mar 2022 07:11:29 -0500
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YiIB8XnpQPqktxWG@redhat.com>
+References: <20220303171323.580712-1-groug@kaod.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20220303171323.580712-1-groug@kaod.org>
+Subject: Re: [Virtio-fs] [PATCH 0/2] virtiofsd: Support FUSE_SYNCFS on
+ unannounced submounts
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -30,21 +16,39 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
 	<mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Greg Kurz <groug@kaod.org>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com
 
-This list compiles some proposed changes from default values.
+On Thu, Mar 03, 2022 at 06:13:21PM +0100, Greg Kurz wrote:
+> This is the current patches I have : one to track submounts
+> and the other to call syncfs() on them. Tested on simple
+> cases only.
+> 
+> I won't be able to work on this anymore, so I'm posting for the
+> records. Anyone is welcome to pick it up as there won't be a v2
+> from my side.
 
-Make default:
-- [] `--inode-files-handles=fallback`
-We could also take the opportunity to take a look at #20 deprecating `fallback` and changing it to: `best-effort`, `prefer`, `preferred`, etc.
+Thanks Greg. Hopefully somebody else will be able to pick it up.
 
-- [] `--announce-submounts`
+What are TODO items to take this patch series to completion.
 
+Vivek
 
-- [] `--no-killpriv-v2`
-
-
-If you think there's something missing here, please add it.
----
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/35
+> 
+> Cheers,
+> 
+> --
+> Greg
+> 
+> Greg Kurz (2):
+>   virtiofsd: Track submounts
+>   virtiofsd: Support FUSE_SYNCFS on unannounced submounts
+> 
+>  tools/virtiofsd/passthrough_ll.c | 61 ++++++++++++++++++++++++++++----
+>  1 file changed, 55 insertions(+), 6 deletions(-)
+> 
+> -- 
+> 2.34.1
+> 
+> 
 

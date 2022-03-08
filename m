@@ -1,67 +1,40 @@
-Received: from us-smtp-delivery-124.mimecast.com (us-smtp-delivery-124.mimecast.com [170.10.133.124])
-	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
-	(No client certificate requested)
-	by smtp.subspace.kernel.org (Postfix) with ESMTPS id BC7D823778
-	for <virtio-fs@lists.linux.dev>; Mon, 13 Nov 2023 19:53:51 +0000 (UTC)
-Authentication-Results: smtp.subspace.kernel.org; dmarc=pass (p=none dis=none) header.from=redhat.com
-Authentication-Results: smtp.subspace.kernel.org; spf=pass smtp.mailfrom=redhat.com
-Authentication-Results: smtp.subspace.kernel.org;
-	dkim=pass (1024-bit key) header.d=redhat.com header.i=@redhat.com header.b="DgvyWa+e"
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=redhat.com;
-	s=mimecast20190719; t=1699905230;
-	h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
-	 to:to:cc:mime-version:mime-version:content-type:content-type;
-	bh=jsB/blGJe10FBypomL2a71Dy+mRX5eGykP5hzFFdqfY=;
-	b=DgvyWa+eI/X+0ajjksrJeyoXYhggacR8wnak3z4Jbm6N5kV6VexPdUiirCT6Ql2BVlcS8U
-	1SBxKniQsNIaKuPnfL3r6+qwFjyrm62mWTuEbVhXFGlZ/MIeh+T/TSUT0pqYWx0S5hMW2p
-	aWS0Fkw247g0u569dJcO9Mu33unvzH4=
-Received: from mail-ej1-f71.google.com (mail-ej1-f71.google.com
- [209.85.218.71]) by relay.mimecast.com with ESMTP with STARTTLS
- (version=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384) id
- us-mta-176-D37M29vUOzmPVHRkK074Yg-1; Mon, 13 Nov 2023 14:53:49 -0500
-X-MC-Unique: D37M29vUOzmPVHRkK074Yg-1
-Received: by mail-ej1-f71.google.com with SMTP id a640c23a62f3a-9c983b42c3bso636263066b.1
-        for <virtio-fs@lists.linux.dev>; Mon, 13 Nov 2023 11:53:48 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
-        d=1e100.net; s=20230601; t=1699905228; x=1700510028;
-        h=to:subject:message-id:date:from:mime-version:x-gm-message-state
-         :from:to:cc:subject:date:message-id:reply-to;
-        bh=jsB/blGJe10FBypomL2a71Dy+mRX5eGykP5hzFFdqfY=;
-        b=lbubFbk9ha8JOK8NKR2wzsN+fy7gWSYNlAePvbWMNCOSP01jP19ftVnqTc0eosQ4yP
-         8fWODtZh11AQD+1DGwBuFAHGU01o7G2RU7Z0dLNZXq1FUYAwLkNJ1TAhoGO/O3tEwXFI
-         0WsQijSokurcLXDDq4i8Cd4k7eMOwMzvM8y/jyuL7LO57zB9ODCqqENcDBTsATI6ZLYz
-         bVDrOALJTM07+kkDP3h0TujYFzCx0I8lB+OsAvfbPLhV/0ROBqd1Sp6FspZ/WVA9+Wkl
-         oVHRkIeLh1jt/vkbZVVi52qRTky4QCQp6LwfNOy1Xo1lPrT79G1CN7oV6I8lscCI0o8f
-         s3sA==
-X-Gm-Message-State: AOJu0YygWMZSjITIyP5WNleauCdWF0+csH5yzQpEVShYU2+TJhePPAlO
-	lNtV+4CasQOWNyJCX08gvbZFbS6rM0UKMVpBvc0Eu7W6fc3tHg2NvccxRfmfkB3IFpdBlxtsL/1
-	IrMBePIIrdGj5YYVwzb1Ft8Nl6sLBmbkRszlYnIUsxEks5Gk=
-X-Received: by 2002:a17:907:868e:b0:9ae:5a56:be32 with SMTP id qa14-20020a170907868e00b009ae5a56be32mr483875ejc.38.1699905227903;
-        Mon, 13 Nov 2023 11:53:47 -0800 (PST)
-X-Google-Smtp-Source: AGHT+IHvsW7bn2gp+IAFBx9xb/1LrNIKW7fIOiEAZxkAAgdLCD2VPIw7BN0zRm2NDr+WXJbCjuPbJQKQUxRrftO+8pY=
-X-Received: by 2002:a17:907:868e:b0:9ae:5a56:be32 with SMTP id
- qa14-20020a170907868e00b009ae5a56be32mr483864ejc.38.1699905227600; Mon, 13
- Nov 2023 11:53:47 -0800 (PST)
-Precedence: bulk
-X-Mailing-List: virtio-fs@lists.linux.dev
-List-Id: <virtio-fs.lists.linux.dev>
-List-Subscribe: <mailto:virtio-fs+subscribe@lists.linux.dev>
-List-Unsubscribe: <mailto:virtio-fs+unsubscribe@lists.linux.dev>
-MIME-Version: 1.0
-From: Vivek Goyal <vgoyal@redhat.com>
-Date: Mon, 13 Nov 2023 14:53:36 -0500
-Message-ID: <CAGJMmikZKqijQrhSRmKoaGkvRfJEjLPftmZ8Ngqv=NEYb=sfPg@mail.gmail.com>
-Subject: Test Message
-To: virtio-fs@lists.linux.dev
-X-Mimecast-Spam-Score: 0
-X-Mimecast-Originator: redhat.com
-Content-Type: text/plain; charset="UTF-8"
+Return-Path: <virtiofs-bot@sinrega.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+ cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+ :to; s=fm1; bh=BNnE3HpM3Kz2IPMF9+K3CNCl3RrbJeTWsOeOZeyEKy8=; b=M
+ pnpqzxLcK6MTWI/Siu9o7R+b6bGGIV/So+8eti1ZRUHJx73NMZDedDXS/wVIhxnp
+ BSs9QsL4A8LQtGQVTVZ6oaselrsSrt/f6c/N/5x+poySU5+b5NTUvUfzWoOFACCf
+ l0UHvs/Cjhh6vO8RnDFU/qGGnEFLckQlY3HLiazejHXiWz7PTZY5OSKuhXZlBn2I
+ fhzfH1uKyq1CvgWldyWsHXjiKLnCtifXLXOX21bZaYb+2MHjy78YxZtZYOHEgjhX
+ xLJc+pi51rNUpXL+OjhqeltzyQ6NaE/TyiunrLs3WwCgQuBZi7sSY6Z5QI9uHoy2
+ BUnI3an7N6GOfZ15oMX1g==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+ messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
+ :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
+ :x-me-sender:x-sasl-enc; s=fm2; bh=BNnE3HpM3Kz2IPMF9+K3CNCl3RrbJ
+ eTWsOeOZeyEKy8=; b=cTF4CQl3XIdyMyQ+w8JzgU6kx7XxL1Z+EnxfoRMrnONpY
+ 7NyJ/yYG3exJuqELjH3dSZoUWhw7+HCQIc4CcIMT0+ZtwgjSFF80Yeelp7r7plCR
+ GqiqYfxxTFkrHc4dnCKA3OIL0m3T2fdqzvusrir0H0itOVV24kPigJ/9UB5bEKLa
+ A4OrQTn7r/+iwXSY12pyrNO0dM47Onftmm9DYd2YeqfF0wz5yU61TxyS87yuISp1
+ UgkXSpCLpgkp41VacFkmEMGgVV07YUAdlZctbW3dzZLb0aJHtmknvevH567d3+BX
+ 9gjZR2sbGwC68xmR3CXIGLQAZ3vmuLM+NoaflrEpA==
+From: virtiofs-bot@sinrega.org
+Message-Id: <11997.122030808341200585@us-mta-460.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"
+Date: Tue,  8 Mar 2022 13:34:14 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR opened: Set edition to 2018 in
+ rustfmt.toml and update some deps
+List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
+List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
+ <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
+List-Archive: <http://listman.redhat.com/archives/virtio-fs/>
+List-Post: <mailto:virtio-fs@redhat.com>
+List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
+List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
+ <mailto:virtio-fs-request@redhat.com?subject=subscribe>
+To: virtio-fs@redhat.com
 
-Hi,
-
-This is just a test message. Trying to figure out if this list is now
-active or not.
-
-Thanks
-Vivek
+Set edition to 2018 in rustfmt.toml and update some deps
+---
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/98
 

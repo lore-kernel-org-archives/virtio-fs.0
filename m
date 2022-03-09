@@ -1,28 +1,29 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; bh=d9B6Y5jISwFRUaLEmQbtdBXOzjJN/8qRaPVaLRjShNA=; b=m
- 2g8qHrFtczT2G+Y8Ik6FEj0jAT6jVYiWUGxvL8A6qr4GhMtCIOFX8l060CfSjGm/
- +CsmUsJo5hIFvAhqsytp5XWrGKJ/Ai5qSC3jmKdPz1ZcFUKZktet9VnY0tqKa6vj
- Vu+6QCFi+l+SdQFmI3Q++VGkKVuEJokuVuoM3Q85t8EgnG5+9K+ZtIHG1Ylz4PQc
- Ya9q9UnluwDOJ3QnlJ3joBmaBzDoXY2O7Ingux92SKiEQOyuJMImUNFtHva73/pC
- BpIPDkg6DhjHS4mYm6mJd3bEfTMjsSviOJQDRQIl5RA3RXS8NZwzsioERpTWy4wb
- B3o57B2m2hivQBwHQvy9w==
+ :to; s=fm1; bh=8teeNpjXrkRE3k9qjwUN78Cg2gSvEelyeNj1X0lJEAk=; b=m
+ 42V8QmHpwgdbhcomoNGC6hLh4OecXpBhvcrVnv1lMNDFTT7Emr3CzelPvDJbt47Y
+ 2oU7FRKkUYXSaOaO+fu2yfvH7JSoLq6wCBMy7T8fywR4YQSoHhRpbdjVa80P9S6/
+ QiAIZT+qlaTfdVWBt0/2WsIkUUek6anAX4mwyxmrFzY+ADd8PvT/9BfIgahLqq1D
+ W+mK+7cmqu1Jo5mMQUZL49t4yguo0oBDabHnOGWh61AWLoiTO0L9HsCiy6UI73gx
+ 230Q6KfiZ2njkRNp9GG6v15fVn9tW9fb+zgtZcpFlSToHY+tS7MSz6tDwoJaR5/3
+ 05zVrBjzKdleKyVZYMf7w==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
  :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
- :x-me-sender:x-sasl-enc; s=fm2; bh=d9B6Y5jISwFRUaLEmQbtdBXOzjJN/
- 8qRaPVaLRjShNA=; b=DtLsYURJJpvOX1bQLOXfSk5ZX7FatpyNSj7rYUcxrO9dZ
- 6/FPDpUuBRbnBjy43hQ714a920Qb2yQScmJx1f6gffVTTzDRrr6psV6ewIFB3UsU
- j/XyWqXZzldVYAcNxuvMiJGxaRe4jUxbA1L+CF/DtAWp3k6MUwY8oUW9pvymuvlc
- 4U89d1TMGl0TNbroEyWTOwM/s8WeN4lipv83o3XAw8owNMwCRoBKnLABNkzlZ2cD
- 8y1Z2/g/09stO1+0IrZ8G5E3fsFDEJ96VxrjPjD8DrZIlbrayAyMH5uRlujnCIB+
- 4iJG3rwwLUyDSveohqWIGZQAoeeBbSe8tb3R2tQcA==
+ :x-me-sender:x-sasl-enc; s=fm2; bh=8teeNpjXrkRE3k9qjwUN78Cg2gSvE
+ elyeNj1X0lJEAk=; b=ltMGHfIrV0tb4uwN53HFmfH1uaHytZWyTLBlnBI5s59ZF
+ j327eKiU1SqdtU2nphFtwJ0gwhhz3ZO3AQkHB7HzxmWiQpiSrZIJkQTXN7tHlvFT
+ BNer1QrNXJ5uTKsNG40S9D2pSQCe54btFNwg7Xg+kdp3ppw7n3jAFrKYqCJHeisk
+ rYe2J03nhQe9DIxIAkw+ulUwQ+ssbQcZpX9hjGAq/fKTGeyQ7aJ87ebRvY+lam2o
+ V852JaCkRI8JdaEOwZf3LsBiNP6aoDnE4xA4hoMZXS+DUNxoBYBzjCGOazWlvwzU
+ kEo5+H2cy3DGOIUEETZddu5wQa+J7tv+0krMWCSXQ==
 From: virtiofs-bot@sinrega.org
-Message-Id: <50232.122030813545701235@us-mta-501.us.mimecast.lan>
+Message-Id: <11758.122030907041800267@us-mta-206.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Date: Tue,  8 Mar 2022 18:55:02 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR opened: Add statx musl support
+Date: Wed,  9 Mar 2022 12:04:26 +0000 (UTC)
+Subject: [Virtio-fs] =?utf-8?q?=5Bvirtiofsd=5D_MR_opened=3A_Add_=28and_pr?=
+ =?utf-8?q?efer=29_=E2=80=9Cprefer=E2=80=9D_alias_to_--inode-file-handles?=
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,9 +34,9 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-This MR adds musl support, adding the missing bit to make statx() available for the musl compilation target.
+As written in #20, the current name of the `fallback` mode for `--inode-file-handles` can be misleading.  This series first adds a `prefer` alias, then deprecates the `fallback` value, and finally changes the internal `InodeFileHandlesMode` enum to call it `Prefer` instead of `Fallback`, too.
 
-And removes the unused stat64() function. Currently, MountFds::get() uses statx() without checking its availability. But, even though PassthroughFs::new() checks if statx() is available, stat64() always returns a mount ID 0. This silently breaks '--announce-submounts', and with '--inode-file-handles' virtiofsd fails with a cryptic error, during mount.
+**Note**: Patch 3 will conflict with !96.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/99
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/100
 

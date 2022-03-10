@@ -1,29 +1,28 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; bh=X0psM8mOPC5tboc4ALX7pSxlL04I+h8MQinfw7nvcP8=; b=Q
- 9T9eeYpA/5pSBP7anDj1ZYXwidmfUBqmIUgfjeUClFr66MTm8yt1qtLevgg61OSA
- ntfIN4iphkRSLyfQ6/xHE2hiZGHjuuLbqSqUKmgaDDw7nE0bsJy16mVi5h/25P2P
- GZ8sqJ4yiOKHcFfJHN7qRTHQ25uloUh7wYqN/FSMuM+QEb496d7VduqB1TF6LK0/
- Xx//YH2t/GeH1usfKPM9r37B+AJcyCDNg/d1vO4iPSn2pO7svImroL0BsKRtYnz9
- 9rBYDKvmhodH6bSRMiDiOKiynzaRoS7VjI1DvdixrRs5GigJeDsf/hiey8Htld3W
- 4+KgnQ3mgJA3aYmCbRbRA==
+ :to; s=fm1; bh=BwfVvNrgpoQuQ1ShHkg+kDtSQpgeXHnC8Nw4lEvDoYY=; b=C
+ 6/PhVXZkJ6EyI+efUZOy0yPKiviBbGO2azxSZGVNLzbiLHM2l/3z3cE6nFaO+kmx
+ XVK/430Idj42oW6XefDPnP3GgPrQK2Lh6mhefsaTqoYyPdoVWThGcn0zgQUxJwRY
+ I7/ultqDvkQYXgU/Gq/3fr78GyzMNDaeV63PlW7B6MThGOrWL3QRPp/uYJQeZak3
+ +5/s0CGsBDnKGOv+afvDjjrC8aJonIBflpamWH4nb5HQjVQkDnRfj/xGiyTtbfEr
+ w5HfUCcYLFwi/Gjl/bT3gvJ74zkMJ/PMo1XIRIL+R+/4NEp9/mAEGrZFZuI+uqJo
+ 4Y+aEpJ4tUsb9kW1hqVrw==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
  :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
- :x-me-sender:x-sasl-enc; s=fm2; bh=X0psM8mOPC5tboc4ALX7pSxlL04I+
- h8MQinfw7nvcP8=; b=ZAp/WgIi19dH/+DXI59A6dyNHHrdo14Wd1teD6DZ5I9nC
- gt5Algk6WfjH2k1k1+Cevma0wkbjZgy7Ld9l6BfHobGN7xmhb5fvz/VZPu6e8q78
- 2ew8CJ5rFcg4NGZkwitjvw3fieJwBVUVD7Ig/NpJ/hlYHrPJ/u0hsxFRiUiJubC8
- ZJAUumokgmLwXvLuogfpwEw4HhrQILlnM1z+dBCMRV2vZBmljnVENnLE5MZYM8Yb
- rUeuACtKhcoXQ2TaNxsE4d91Dm+EWGPYsTbxzwKQ/4QqbPAeH7Pw8GTQl3z4Uy2W
- /xf21fOktkpp+UOCxls5YbMXNx+2VsxP9qxaecSbA==
+ :x-me-sender:x-sasl-enc; s=fm2; bh=BwfVvNrgpoQuQ1ShHkg+kDtSQpgeX
+ HnC8Nw4lEvDoYY=; b=SHbFA/Oz3Mc8yGjMYQY13YFWn9RKNQeH+cES0Yg7GQsKR
+ YIhv4aX4IRAgI4u+QkwT1f4O/YYOoKtJNcxep58qMlH58i0Ag5QBD/BW6Ipc1YOj
+ UrwZ9PRTqWGBocGnkjC/bnhzrhbQgIy4apdYFJeZKfL13Ad4Xka//H3ug/XsCBM9
+ IFMPFHzrHQOFRyYk0riK3mYp4J7BB+yEwK+lROOudi71u1nccnRGay6rx8d3tGh6
+ bvCVBfxGKrLhwyoelJG/IBVVfBZUxNvAzMq/Gbrz1RCm3gUzI4IvyYMr8Jvp6vuG
+ zpk7t7Ph6WvX8JgGibk41supfdGqXYJVX3xBmHNYQ==
 From: virtiofs-bot@sinrega.org
-Message-Id: <57298.122031008550300183@us-mta-36.us.mimecast.lan>
+Message-Id: <27727.122031010074001438@us-mta-441.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Date: Thu, 10 Mar 2022 13:55:06 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] Issue opened: Match default rlimit_nofile
- logic with C virtiofsd
+Date: Thu, 10 Mar 2022 15:07:48 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR merged: Extend the documentation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -34,13 +33,15 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Currently we don't raise open fd limit for sandbox=chroot mode. And for sandbox=namespace mode we do raise it.
+This MR extends the documentation in the following ways:
+- enumerating the required capabilities
+- showing a short description of each flag/option
+- porting the documentation from the C version on how to do xattr mapping
+- adding links to relevant sections/documents, such as contributing, running as non-root and xattr mapping
+- adding the uid/gid mapping requirement for user namespaces 
+- adding a shot FAQ section
 
-I would say try to match the logic we have in C version. Idea is to get a minimum default in all configurations so that it works reasonably well for all configurations.
-
-- If user passed option -o rlimit_nofile, simply follow that.
-- If user did not pass anything, then try to keep a default of 1M. This should work reasonably well for lot of workloads out of the box.
-- Call getrlimit() before raising limits. If caller has already setup the limit higher than 1M, don't do anything.
+It also adds the `off` option to the `--log-level` documentation and changes `--sandbox none` to `--sandbox chroot` in the "Running as non-privileged user" section examples.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/37
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/97
 

@@ -1,28 +1,29 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; bh=BwfVvNrgpoQuQ1ShHkg+kDtSQpgeXHnC8Nw4lEvDoYY=; b=C
- 6/PhVXZkJ6EyI+efUZOy0yPKiviBbGO2azxSZGVNLzbiLHM2l/3z3cE6nFaO+kmx
- XVK/430Idj42oW6XefDPnP3GgPrQK2Lh6mhefsaTqoYyPdoVWThGcn0zgQUxJwRY
- I7/ultqDvkQYXgU/Gq/3fr78GyzMNDaeV63PlW7B6MThGOrWL3QRPp/uYJQeZak3
- +5/s0CGsBDnKGOv+afvDjjrC8aJonIBflpamWH4nb5HQjVQkDnRfj/xGiyTtbfEr
- w5HfUCcYLFwi/Gjl/bT3gvJ74zkMJ/PMo1XIRIL+R+/4NEp9/mAEGrZFZuI+uqJo
- 4Y+aEpJ4tUsb9kW1hqVrw==
+ :to; s=fm1; bh=uq2MBwhxNTvM44uB0e2sH8srrUwd7CAyI9VpWDuTqSw=; b=V
+ WPus0C5gDpkpC0d+Ovee2lQMo8u3CEZnj30TN7l6hVf49uCRbRc3ddowNFFwPqkF
+ uiQu9pdWYQAATLnfMCkb5SMHrF5Bl4gTFAmrQSzMGGxIHlcedIxKMPh/cpjF/Gtq
+ fZ5EMwIAUuJxRayE9le0EOkTEItuAMyQp84//nEF2QvwM/+6j3uT2T1MoAOaYnii
+ To8vq+NjnvR2bwuHSJrhR5uFm+bKNPwEfLxDUCsrG1lF8/vAREyDn4Q/5or/dBGe
+ rgvOirhQ89lXn7vaZD1ViLDkxX9mls1m99s19+FNoLtxTO+mRe73GmtyhXPNe4zu
+ oSDvSFe5wtrsXUTfoMHnw==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
  :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
- :x-me-sender:x-sasl-enc; s=fm2; bh=BwfVvNrgpoQuQ1ShHkg+kDtSQpgeX
- HnC8Nw4lEvDoYY=; b=SHbFA/Oz3Mc8yGjMYQY13YFWn9RKNQeH+cES0Yg7GQsKR
- YIhv4aX4IRAgI4u+QkwT1f4O/YYOoKtJNcxep58qMlH58i0Ag5QBD/BW6Ipc1YOj
- UrwZ9PRTqWGBocGnkjC/bnhzrhbQgIy4apdYFJeZKfL13Ad4Xka//H3ug/XsCBM9
- IFMPFHzrHQOFRyYk0riK3mYp4J7BB+yEwK+lROOudi71u1nccnRGay6rx8d3tGh6
- bvCVBfxGKrLhwyoelJG/IBVVfBZUxNvAzMq/Gbrz1RCm3gUzI4IvyYMr8Jvp6vuG
- zpk7t7Ph6WvX8JgGibk41supfdGqXYJVX3xBmHNYQ==
+ :x-me-sender:x-sasl-enc; s=fm2; bh=uq2MBwhxNTvM44uB0e2sH8srrUwd7
+ CAyI9VpWDuTqSw=; b=odpZ+lFx+0AohzJr8D+09h/EQDxxZOiVUSxLuuylL98SV
+ hu6X1udqWmcDoIONfmGsfCf2UZbz7ND1B+vURXe3sgbiqGr7fWHoiQ2/034LGekm
+ 8fg01EuA2pNWDnJEnxRouNG9lCDWJzpcNTJy+prU5iGWocShsH7J777tazrFHCXs
+ q3X5QPI1smciHcEAe4V0sxPnz9HxJeJ50ZWHPkZwPjNJZZA17GNjdpatcyvBVqc6
+ DYu6B7BePgq2lZi0OlYHls2V2ZSi3oVVlhqq5MVWowFEYO5hmTv6JajI2EeYdcbD
+ 1qsT1j/i+eprCGAYuiXZR2YUg3/6dczS/5rQSI8Qg==
 From: virtiofs-bot@sinrega.org
-Message-Id: <27727.122031010074001438@us-mta-441.us.mimecast.lan>
+Message-Id: <09914.122031017062400633@us-mta-187.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Date: Thu, 10 Mar 2022 15:07:48 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR merged: Extend the documentation
+Date: Thu, 10 Mar 2022 22:06:27 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR opened: Add capability to create
+ security context (SELinux) during file creation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,15 +34,13 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-This MR extends the documentation in the following ways:
-- enumerating the required capabilities
-- showing a short description of each flag/option
-- porting the documentation from the C version on how to do xattr mapping
-- adding links to relevant sections/documents, such as contributing, running as non-root and xattr mapping
-- adding the uid/gid mapping requirement for user namespaces 
-- adding a shot FAQ section
+Fuse has capability to send security context of file (SELinux), during file creation if server opted for it (FUSE_SECURITY_CTX). Enable this feature and opt for SECURITY_CTX if user passed option "-o security_label". This should help with support SELinux on top of virtiofs.
 
-It also adds the `off` option to the `--log-level` documentation and changes `--sandbox none` to `--sandbox chroot` in the "Running as non-privileged user" section examples.
+As of now file creation and security context setting operation are non-atomic. In some cases these can be made atomic. These additional changes I will follow in separate MR once these changes are merged. Otherwise it becomes too much of code.
+
+Please review.
+
+Vivek
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/97
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/102
 

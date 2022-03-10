@@ -1,29 +1,29 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; bh=LlD53OdPJj/B9UxjponE4ASLGJ6LsvX0fsw4icQz/G8=; b=G
- 3z/0x7OXGSwj1K6ThtXqQkNeO/yYgYuupOCw4YrT2ZuKdsx1rgZd3+qrlgnr1dEs
- jrgJ9UupPy+oldQgd4gXNJcNVrCQyTA6JfS2k7I/2J2c4vhiYyWnDzV9BOdcMYxj
- KWnrSXG/QcmIKLBASqUyfV5LUejayYqbtkWN0y+QEf/Q1OX3+78kdmkwnaQB+Rd4
- Q/e5+qtOeQzqBFDj3+RRlS9++if+TuD5C/QyD8cYoZbYvIM4LBiqRWUisUQL8KFo
- lRMrmSp8OxqtH9b5i81g5uS91SwlcuYBqbJJHbgCnshe98KrN06C7AY32nzO48gn
- Q529ACijO8Lj73hxKks7g==
+ :to; s=fm1; bh=X0psM8mOPC5tboc4ALX7pSxlL04I+h8MQinfw7nvcP8=; b=Q
+ 9T9eeYpA/5pSBP7anDj1ZYXwidmfUBqmIUgfjeUClFr66MTm8yt1qtLevgg61OSA
+ ntfIN4iphkRSLyfQ6/xHE2hiZGHjuuLbqSqUKmgaDDw7nE0bsJy16mVi5h/25P2P
+ GZ8sqJ4yiOKHcFfJHN7qRTHQ25uloUh7wYqN/FSMuM+QEb496d7VduqB1TF6LK0/
+ Xx//YH2t/GeH1usfKPM9r37B+AJcyCDNg/d1vO4iPSn2pO7svImroL0BsKRtYnz9
+ 9rBYDKvmhodH6bSRMiDiOKiynzaRoS7VjI1DvdixrRs5GigJeDsf/hiey8Htld3W
+ 4+KgnQ3mgJA3aYmCbRbRA==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
  :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
- :x-me-sender:x-sasl-enc; s=fm2; bh=LlD53OdPJj/B9UxjponE4ASLGJ6Ls
- vX0fsw4icQz/G8=; b=noy9uolynXNUjAnRgBAnPBrOKsELbQXoZUfiqE0B+XoQ/
- PZpk8oubDAv4lrGBQhHTVhpc+S9ih3WI31PUqmY7f3B//GqLqSO7qbpKEDdZW2H4
- 9lFsf0JbTW0hqE6lbXKOwxVQ45f+yneiEVKIgFnvvQSCqtSMNex1A2c0gdAUJX4A
- 75RMI7WihxL973eyVBxcE4f3u4YPY02zSHT7zJ1F8OiEAh9j81XPZB5kJfvJmmt6
- YqwF1nPToriPKyfmDww+hzJ9rGQ1b5LK9z/gvt1h7gDwuPnarfxMy0g1n3k6U2cf
- wPnMB0hV84dTPWWWnoJMCoba4bftP9MjuDTqjcYoA==
+ :x-me-sender:x-sasl-enc; s=fm2; bh=X0psM8mOPC5tboc4ALX7pSxlL04I+
+ h8MQinfw7nvcP8=; b=ZAp/WgIi19dH/+DXI59A6dyNHHrdo14Wd1teD6DZ5I9nC
+ gt5Algk6WfjH2k1k1+Cevma0wkbjZgy7Ld9l6BfHobGN7xmhb5fvz/VZPu6e8q78
+ 2ew8CJ5rFcg4NGZkwitjvw3fieJwBVUVD7Ig/NpJ/hlYHrPJ/u0hsxFRiUiJubC8
+ ZJAUumokgmLwXvLuogfpwEw4HhrQILlnM1z+dBCMRV2vZBmljnVENnLE5MZYM8Yb
+ rUeuACtKhcoXQ2TaNxsE4d91Dm+EWGPYsTbxzwKQ/4QqbPAeH7Pw8GTQl3z4Uy2W
+ /xf21fOktkpp+UOCxls5YbMXNx+2VsxP9qxaecSbA==
 From: virtiofs-bot@sinrega.org
-Message-Id: <70522.122031006113800165@us-mta-135.us.mimecast.lan>
+Message-Id: <57298.122031008550300183@us-mta-36.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Date: Thu, 10 Mar 2022 11:11:40 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR opened: Set the number of written bytes
- for used descs
+Date: Thu, 10 Mar 2022 13:55:06 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] Issue opened: Match default rlimit_nofile
+ logic with C virtiofsd
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -34,14 +34,13 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-As the Linux driver ignores the "len" field of used descriptors, we
-didn't bother to set it properly when return those descriptors to the
-queue.
+Currently we don't raise open fd limit for sandbox=chroot mode. And for sandbox=namespace mode we do raise it.
 
-The problem is that other implementations (at least, the Windows one),
-do care about it, so let's do the right thing and set it properly.
+I would say try to match the logic we have in C version. Idea is to get a minimum default in all configurations so that it works reasonably well for all configurations.
 
-Signed-off-by: Sergio Lopez <slp@redhat.com>
+- If user passed option -o rlimit_nofile, simply follow that.
+- If user did not pass anything, then try to keep a default of 1M. This should work reasonably well for lot of workloads out of the box.
+- Call getrlimit() before raising limits. If caller has already setup the limit higher than 1M, don't do anything.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/101
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/37
 

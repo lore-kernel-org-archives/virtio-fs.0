@@ -1,29 +1,29 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; bh=8teeNpjXrkRE3k9qjwUN78Cg2gSvEelyeNj1X0lJEAk=; b=m
- 42V8QmHpwgdbhcomoNGC6hLh4OecXpBhvcrVnv1lMNDFTT7Emr3CzelPvDJbt47Y
- 2oU7FRKkUYXSaOaO+fu2yfvH7JSoLq6wCBMy7T8fywR4YQSoHhRpbdjVa80P9S6/
- QiAIZT+qlaTfdVWBt0/2WsIkUUek6anAX4mwyxmrFzY+ADd8PvT/9BfIgahLqq1D
- W+mK+7cmqu1Jo5mMQUZL49t4yguo0oBDabHnOGWh61AWLoiTO0L9HsCiy6UI73gx
- 230Q6KfiZ2njkRNp9GG6v15fVn9tW9fb+zgtZcpFlSToHY+tS7MSz6tDwoJaR5/3
- 05zVrBjzKdleKyVZYMf7w==
+ :to; s=fm1; bh=LlD53OdPJj/B9UxjponE4ASLGJ6LsvX0fsw4icQz/G8=; b=G
+ 3z/0x7OXGSwj1K6ThtXqQkNeO/yYgYuupOCw4YrT2ZuKdsx1rgZd3+qrlgnr1dEs
+ jrgJ9UupPy+oldQgd4gXNJcNVrCQyTA6JfS2k7I/2J2c4vhiYyWnDzV9BOdcMYxj
+ KWnrSXG/QcmIKLBASqUyfV5LUejayYqbtkWN0y+QEf/Q1OX3+78kdmkwnaQB+Rd4
+ Q/e5+qtOeQzqBFDj3+RRlS9++if+TuD5C/QyD8cYoZbYvIM4LBiqRWUisUQL8KFo
+ lRMrmSp8OxqtH9b5i81g5uS91SwlcuYBqbJJHbgCnshe98KrN06C7AY32nzO48gn
+ Q529ACijO8Lj73hxKks7g==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
  :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
- :x-me-sender:x-sasl-enc; s=fm2; bh=8teeNpjXrkRE3k9qjwUN78Cg2gSvE
- elyeNj1X0lJEAk=; b=ltMGHfIrV0tb4uwN53HFmfH1uaHytZWyTLBlnBI5s59ZF
- j327eKiU1SqdtU2nphFtwJ0gwhhz3ZO3AQkHB7HzxmWiQpiSrZIJkQTXN7tHlvFT
- BNer1QrNXJ5uTKsNG40S9D2pSQCe54btFNwg7Xg+kdp3ppw7n3jAFrKYqCJHeisk
- rYe2J03nhQe9DIxIAkw+ulUwQ+ssbQcZpX9hjGAq/fKTGeyQ7aJ87ebRvY+lam2o
- V852JaCkRI8JdaEOwZf3LsBiNP6aoDnE4xA4hoMZXS+DUNxoBYBzjCGOazWlvwzU
- kEo5+H2cy3DGOIUEETZddu5wQa+J7tv+0krMWCSXQ==
+ :x-me-sender:x-sasl-enc; s=fm2; bh=LlD53OdPJj/B9UxjponE4ASLGJ6Ls
+ vX0fsw4icQz/G8=; b=noy9uolynXNUjAnRgBAnPBrOKsELbQXoZUfiqE0B+XoQ/
+ PZpk8oubDAv4lrGBQhHTVhpc+S9ih3WI31PUqmY7f3B//GqLqSO7qbpKEDdZW2H4
+ 9lFsf0JbTW0hqE6lbXKOwxVQ45f+yneiEVKIgFnvvQSCqtSMNex1A2c0gdAUJX4A
+ 75RMI7WihxL973eyVBxcE4f3u4YPY02zSHT7zJ1F8OiEAh9j81XPZB5kJfvJmmt6
+ YqwF1nPToriPKyfmDww+hzJ9rGQ1b5LK9z/gvt1h7gDwuPnarfxMy0g1n3k6U2cf
+ wPnMB0hV84dTPWWWnoJMCoba4bftP9MjuDTqjcYoA==
 From: virtiofs-bot@sinrega.org
-Message-Id: <11758.122030907041800267@us-mta-206.us.mimecast.lan>
+Message-Id: <70522.122031006113800165@us-mta-135.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Date: Wed,  9 Mar 2022 12:04:26 +0000 (UTC)
-Subject: [Virtio-fs] =?utf-8?q?=5Bvirtiofsd=5D_MR_opened=3A_Add_=28and_pr?=
- =?utf-8?q?efer=29_=E2=80=9Cprefer=E2=80=9D_alias_to_--inode-file-handles?=
+Date: Thu, 10 Mar 2022 11:11:40 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR opened: Set the number of written bytes
+ for used descs
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -34,9 +34,14 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-As written in #20, the current name of the `fallback` mode for `--inode-file-handles` can be misleading.  This series first adds a `prefer` alias, then deprecates the `fallback` value, and finally changes the internal `InodeFileHandlesMode` enum to call it `Prefer` instead of `Fallback`, too.
+As the Linux driver ignores the "len" field of used descriptors, we
+didn't bother to set it properly when return those descriptors to the
+queue.
 
-**Note**: Patch 3 will conflict with !96.
+The problem is that other implementations (at least, the Windows one),
+do care about it, so let's do the right thing and set it properly.
+
+Signed-off-by: Sergio Lopez <slp@redhat.com>
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/100
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/101
 

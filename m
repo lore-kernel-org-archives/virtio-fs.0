@@ -1,29 +1,29 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; bh=VgTpdYuRKbaO09MCQPAESi0U9ZAq6W/1PsrYKirF4Tg=; b=q
- vpZtmczYqCxL/Hf7xm9oqUqXpPXluogM+si9j/szDX4+HJgpcFPUid2Zieix+ihk
- ba7aJNmjTwDk0v7gyy9eASKmzOChfHr6Rg+W18IAZd5n+AO91dFe6lpA171U6ndd
- X1Um0eCJnXZl+PHJePNIiWwJH0ZGGuWlQ4vr/qc6JRSzGyk3BlE2Ehnyx6Ald3hQ
- C6Cw9kh28DgX7NhYAja02A4ci83uEP35KXtuIlSw39blw5xp8dhnm708iV1a2NvF
- 0H/UpG7LYIvaWj2lWJFjc+f2V/0P0NjSAv5I0IJdZ7eoO6IRTTp+6xTITzf+ci63
- 9/aPEr9CD6ZGg7rFNPVDw==
+ :to; s=fm1; bh=8teeNpjXrkRE3k9qjwUN78Cg2gSvEelyeNj1X0lJEAk=; b=G
+ 9at8iOiTTSAgDaguoLz3mYfDSNG7ZPXsMNJaLt8kBbnMVqC3Jd7oC6It0K/sUpB0
+ OTBle4gj29ot6NcXqZz458lycu/SEkRxMsOxfkujPOuaUXmXSBzRCw9qim5X0G1X
+ n5XAGKrMGYVUOUwQqC3+ZiaxIhZyhk8tVGKRR02OGpmlIhgLTDtUP+C/gyySMmlO
+ qOEZZ8oPcM0USqZu3XY2z/YoaljAT5PCboi/ldAnk/TQUCfcNdUF1u7CtdCWFs5q
+ 5iRqPWLCM/VnUhgrkZEXGpMDF8Q7i5MrQKGw4IO9XOVC6KMPjiwBWOyX83fnso0j
+ 4wOwhhgJE/6L2QjnXdCew==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
  :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
- :x-me-sender:x-sasl-enc; s=fm2; bh=VgTpdYuRKbaO09MCQPAESi0U9ZAq6
- W/1PsrYKirF4Tg=; b=CJgUeQCA0JAqcSBwQwccDjoP3sNGvSxDLlfTmWq9+jyvd
- zejX7kiWwOReWp/TkNBpiH7oqs1E/X74tkDWfHdW6Hvlf21MD650fQlFvGZrcb8e
- 0MPrqJW57jIs5sgsy5vnyrCuOQLplSkvT4sdbtqooiTs4g5lryLAlARkP6l94GOe
- xEeaY7tpI9mTjWXFGCgvtOOdsMgMNXMsu+ZGvYX6iDQipwcHR87lKDemRazXxaYs
- 1KaPlHvhDTs7Dc9oXksnPmbYZhXs4RMHmnJJrZn0g2DDXtFIK8Nn5tIr8sScTHwf
- Y0v7n4BNPylXlCyicDYJPwIxJHrBr6IFGzqrLEcHg==
+ :x-me-sender:x-sasl-enc; s=fm2; bh=8teeNpjXrkRE3k9qjwUN78Cg2gSvE
+ elyeNj1X0lJEAk=; b=LBIHxuQEramvB0I/5G+lYzKo0XyrAsWXCMkC//TA1aKi8
+ 2fcGJB6Rd/zzWB4PFfQ2y3NcGontQEpncQdcV2ipHeQLdi7dB7fxtCys+kKDpWZM
+ W8mM6Fdr0UHtYcs8KitH7Ti900ZBPiB5isYLwHALvZWTXibVfDiA6c38KQUe/gP/
+ uxEtk3RHiHfJGiqTjA9b4jaH7pQh8+qJ4eqnvfqfPsXGdr8fskLVYS2GIeC5mQVy
+ cZLlz0QtqPeREuwhJpaQNn+tJJ8XViID1fC8GQsI7NxnbYQ2+oAUAPvfRvc5K8wJ
+ w3Q3TTVgsntWYZetVH14x2R/jDc3oj79tTBEYlaGA==
 From: virtiofs-bot@sinrega.org
-Message-Id: <68701.122031408053300877@us-mta-299.us.mimecast.lan>
+Message-Id: <78780.122031408053400176@us-mta-505.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
 Date: Mon, 14 Mar 2022 12:05:35 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] Issue closed: --inode-file-handles=fallback
- is misleading
+Subject: [Virtio-fs] =?utf-8?q?=5Bvirtiofsd=5D_MR_merged=3A_Add_=28and_pr?=
+ =?utf-8?q?efer=29_=E2=80=9Cprefer=E2=80=9D_alias_to_--inode-file-handles?=
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -34,7 +34,9 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-`--inode-file-handles=fallback` sounds like inode file handles are used as fallback. However, as far as I know, it's the other way around: with this knob, inode file handles are prefered and O_PATH FDs are used as a fallback. Thus, I think `--inode-file-handles=fallback` should be renamed to `--inode-file-handles=prefer` or something like that.
+As written in #20, the current name of the `fallback` mode for `--inode-file-handles` can be misleading.  This series first adds a `prefer` alias, then deprecates the `fallback` value, and finally changes the internal `InodeFileHandlesMode` enum to call it `Prefer` instead of `Fallback`, too.
+
+**Note**: Patch 3 will conflict with !96.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/20
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/100
 

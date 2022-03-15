@@ -1,29 +1,29 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; bh=LlD53OdPJj/B9UxjponE4ASLGJ6LsvX0fsw4icQz/G8=; b=V
- xGJEv2mwxrtk9LWOl7CkqeZzAlXy6cX7q46soSp0TYb7LeU9EKRyJKFlAsBkQJJ7
- PyPV/T5MvSisuUl2qhBpDLmSymbelRFBCXzq0GgnkZ2dXSAQ96RTBqBbi6HIYXqd
- 2eDzAPXU1sOPzhziUOdgGrFnzSEVhRskeIh1JBOn8bazB0Oswlm+eP9LVMDJ2J1H
- HK4VE4q8+9ShYNxC1wXlQL8XloANvABo/uTS3i4RQIpcg9QR4ak90x2s4dQyCjhT
- 4A31LPrUxp318dGsJklronD9A+iII6assG4rvrEHo3FGrisBrBq6Jg/Hm/oT40ua
- 0z5ykz4FQpEbAnLq9v8+g==
+ :to; s=fm1; bh=6/qgWS0oEgYI1vFW4geT6bUtNw8pW+/ff6GpIvHMyoY=; b=E
+ elxbE933kP5z7eSwNCONcQLILwIiBc2lss7VSjksE2Mxle7JhrnCSg8WmYPBnA2s
+ 9vRMuRDh9ZaMuAQBn64YF58wKNS27JD3rr5lUrHFGEYqXJwSiV+Ea79v1xwuNukg
+ z2wN9JVE9Gj0gc9yK41knuv4mP4Ayg+l44ICrWV+benmyhxJYegXO674MpRIT1Xo
+ f3VddfNKydE0QjR8Cgnel0RaqEbgma+Ns0BiFs+AfzKBxH4XwA1haZ0wNBcayVe7
+ C3iYV/mBN6uGpkF+FqlUXArv8wkE0o36F47S8hATO0yzGvT8P4vbkBeGnZnjnXyl
+ Ya23xE92x8GKxZXFa1Ryw==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
  :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
- :x-me-sender:x-sasl-enc; s=fm2; bh=LlD53OdPJj/B9UxjponE4ASLGJ6Ls
- vX0fsw4icQz/G8=; b=oBkk7e36NkB8USwj42SEP9z9q4nvpMIQsc2+cPXqrcCD0
- 6PqzKqpKUAvWm6Z7TiDTj6dHi3e2jFOsUmBv9RpxV/zNIQoE/50JT9JRJ7eij79C
- Ce/FsS7+cx1+5XTaL2bFESc3Ust0soZuslqm786MaBjoidOm5oM4p9IRUyFwBQjm
- 2mj0XodISXxIGhgeDovqwyyLftAVHdcYCKZeqg6i6fB3cScRPzKU1pbwshpgFYTc
- 2Qnmr28qx1Z2eF2rBSlDvw3g2/HWhaoBQ4FGnyJOKzOjOseGheq29wZWdrBIEYzN
- ei2oEmfQMN9c27addLnGkW/w0dFH4UVCOJKL9FxmA==
+ :x-me-sender:x-sasl-enc; s=fm3; bh=6/qgWS0oEgYI1vFW4geT6bUtNw8pW
+ +/ff6GpIvHMyoY=; b=lGRIBndVkXzlJZ0HAe75E/483WAVHZcP7OAH1pJq0WSs/
+ SIfU5GPKpq+au0v/Ji6cMhHrrPACAhH6xIFehHok5w3E1ORDk80Q7V1riQbqANUP
+ 5j01AwEuDMSNI79PkRKACLxWYNjcasj5BoMiO+s69FyjX4Oie8fgB4mTt8QcAM2b
+ d60O2pKeFYAqforDxqSmpFJhGrdV31hMfsiXo4tVZNvVM7hQ41xNVaPHWJhldCr9
+ fc+czSiQIRx6OuVUgcFh1RVNb4hwfmzODk+gCYWd/J/vxUrkequo6HXtnnvSt5wy
+ 8kZMvC1+5m9KEYjWpb6YfiTLahXCGpm3Vx6M3lwOQ==
 From: virtiofs-bot@sinrega.org
-Message-Id: <77812.122031408060402423@us-mta-620.us.mimecast.lan>
+Message-Id: <94031.122031420431100535@us-mta-274.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Date: Mon, 14 Mar 2022 12:06:06 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR merged: Set the number of written bytes
- for used descs
+Date: Tue, 15 Mar 2022 00:43:14 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] Issue opened: virtiofsd-rs dax panic
+ QueueReader(FindMemoryRegion); virtiofsd(qemu) works.
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -34,14 +34,27 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-As the Linux driver ignores the "len" field of used descriptors, we
-didn't bother to set it properly when return those descriptors to the
-queue.
+virtiofsd-rs behavior diverges from virtiofsd(qemu).
 
-The problem is that other implementations (at least, the Windows one),
-do care about it, so let's do the right thing and set it properly.
+To reproduce:
+boot guest with rootflags=dax with shared dir being a rootfs.
+on the guest run:
+`env -i -- firefox -headless`
 
-Signed-off-by: Sergio Lopez <slp@redhat.com>
+virtiofsd-rs result:
+`thread 'vring_worker' panicked at 'called `Result::unwrap()` on an `Err` value: QueueReader(FindMemoryRegion)', src/main.rs:222:18`
+
+Platform used is cloud-hypervisor
+
+As per sources Error(FindMemoryRegion) is associated with "no memory region for this address range"  and  "Failed to find memory region for guest physical address".
+
+
+This may contribute some information on the issue, or be an unrelated issue:
+When using virtiofsd(qemu) with stock cloud-hypervisor, cloud-hypervisor's seccomp kills CH process due to syscall=18 (pwrite64. pread, pwrite - read from or write to a file descriptor at a given offset) apparently being an unexpected syscall which doesn't occur in normal operation. Launching firefox triggers this syscall in the VMM.
+
+Running cloud-hypervisor with --seccomp false and virtiofsd(qemu) results in no observable problems when launching firefox.
+
+Unknown if issue reproduces on qemu.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/101
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/39
 

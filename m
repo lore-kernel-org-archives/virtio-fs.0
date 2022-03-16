@@ -1,29 +1,29 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; bh=6/qgWS0oEgYI1vFW4geT6bUtNw8pW+/ff6GpIvHMyoY=; b=E
- elxbE933kP5z7eSwNCONcQLILwIiBc2lss7VSjksE2Mxle7JhrnCSg8WmYPBnA2s
- 9vRMuRDh9ZaMuAQBn64YF58wKNS27JD3rr5lUrHFGEYqXJwSiV+Ea79v1xwuNukg
- z2wN9JVE9Gj0gc9yK41knuv4mP4Ayg+l44ICrWV+benmyhxJYegXO674MpRIT1Xo
- f3VddfNKydE0QjR8Cgnel0RaqEbgma+Ns0BiFs+AfzKBxH4XwA1haZ0wNBcayVe7
- C3iYV/mBN6uGpkF+FqlUXArv8wkE0o36F47S8hATO0yzGvT8P4vbkBeGnZnjnXyl
- Ya23xE92x8GKxZXFa1Ryw==
+ :to; s=fm1; bh=zwkhmPk1Z7yd4Zi4OQjO47FwCcH/DVYghDpIbtYRdnc=; b=j
+ hTdRw8xeJLSo6/tez05JuUu2gruo2qeb8/sEdpM4ZyR7DhxLvZsuOYTY2bCzaICf
+ 7omNqk5kD4XykWZrVpmVAKZFeR8pf0psiwcviZmxUZDo77GTfYSVFSENR8J+hbcH
+ 5wCcIiDIkbBIp7uDhFAWuzNh9eZT2/RCuz3gKWXaY7t5YPr+83t3ZztUqRe84VjD
+ YL7hGgh+1MJmWcB0ZSw5ZR7V+Ey5k0HA/jkOglSk8RshZA3bk/WVfg55DRmTLlTv
+ JPbjr9FfKsA7/N9QeVnvGJdt6YVNNWGCKgzheN5hqQvqT0u7hW/FSZR6g5oYpmSW
+ WQWkxD/WW0bTK7GJ7Rezg==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
  :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
- :x-me-sender:x-sasl-enc; s=fm3; bh=6/qgWS0oEgYI1vFW4geT6bUtNw8pW
- +/ff6GpIvHMyoY=; b=lGRIBndVkXzlJZ0HAe75E/483WAVHZcP7OAH1pJq0WSs/
- SIfU5GPKpq+au0v/Ji6cMhHrrPACAhH6xIFehHok5w3E1ORDk80Q7V1riQbqANUP
- 5j01AwEuDMSNI79PkRKACLxWYNjcasj5BoMiO+s69FyjX4Oie8fgB4mTt8QcAM2b
- d60O2pKeFYAqforDxqSmpFJhGrdV31hMfsiXo4tVZNvVM7hQ41xNVaPHWJhldCr9
- fc+czSiQIRx6OuVUgcFh1RVNb4hwfmzODk+gCYWd/J/vxUrkequo6HXtnnvSt5wy
- 8kZMvC1+5m9KEYjWpb6YfiTLahXCGpm3Vx6M3lwOQ==
+ :x-me-sender:x-sasl-enc; s=fm3; bh=zwkhmPk1Z7yd4Zi4OQjO47FwCcH/D
+ VYghDpIbtYRdnc=; b=k4JBGVhLPQaXtLlcJqR+eppUGHYfSc2/+zKTtdt26kbkP
+ lmWaZbR5MEdk3ems9Fr7irGokYnQncYtkLD1p3OvzJEsaDM2ATH/YICySEGxH9YW
+ UenjVtYpff8ge8qBJOyHj1cHjp9bwALvDxK9o62U2thIHZ5tC1+YlsZ//7q4VWon
+ 6Dr8ieheKUmJJNy0OEaTGgiRpCvqd74510EaeheSlmeXBP21dcWaB3nrlsNkmcwN
+ +nORTNshqwNvO4VLPlirQrvaAojzIJF2WEBA9GUrruIoEUc46AKESeJToUtXZI5j
+ YRdU2PQPreE8rCtP+w37AqUPrurNE/arfAR/A/Ttw==
 From: virtiofs-bot@sinrega.org
-Message-Id: <94031.122031420431100535@us-mta-274.us.mimecast.lan>
+Message-Id: <06834.122031610534600288@us-mta-371.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Date: Tue, 15 Mar 2022 00:43:14 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] Issue opened: virtiofsd-rs dax panic
- QueueReader(FindMemoryRegion); virtiofsd(qemu) works.
+Date: Wed, 16 Mar 2022 14:53:49 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] Issue opened: Xattrmap "map" type does not
+ add automatic rules
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -34,27 +34,20 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-virtiofsd-rs behavior diverges from virtiofsd(qemu).
-
-To reproduce:
-boot guest with rootflags=dax with shared dir being a rootfs.
-on the guest run:
-`env -i -- firefox -headless`
-
-virtiofsd-rs result:
-`thread 'vring_worker' panicked at 'called `Result::unwrap()` on an `Err` value: QueueReader(FindMemoryRegion)', src/main.rs:222:18`
-
-Platform used is cloud-hypervisor
-
-As per sources Error(FindMemoryRegion) is associated with "no memory region for this address range"  and  "Failed to find memory region for guest physical address".
-
-
-This may contribute some information on the issue, or be an unrelated issue:
-When using virtiofsd(qemu) with stock cloud-hypervisor, cloud-hypervisor's seccomp kills CH process due to syscall=18 (pwrite64. pread, pwrite - read from or write to a file descriptor at a given offset) apparently being an unexpected syscall which doesn't occur in normal operation. Launching firefox triggers this syscall in the VMM.
-
-Running cloud-hypervisor with --seccomp false and virtiofsd(qemu) results in no observable problems when launching firefox.
-
-Unknown if issue reproduces on qemu.
+The "map" type is expected to be expanded from
+`:map:key:prepend`
+ to:
+```
+:prefix:key:prepend:
+:bad:server::prepend:
+:bad:client:key::
+:ok:all::
+```
+or if `key` is empty:
+```
+:prefix::prepend:
+:bad:all::
+```
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/39
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/40
 

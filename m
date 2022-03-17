@@ -1,29 +1,28 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; bh=zwkhmPk1Z7yd4Zi4OQjO47FwCcH/DVYghDpIbtYRdnc=; b=j
- hTdRw8xeJLSo6/tez05JuUu2gruo2qeb8/sEdpM4ZyR7DhxLvZsuOYTY2bCzaICf
- 7omNqk5kD4XykWZrVpmVAKZFeR8pf0psiwcviZmxUZDo77GTfYSVFSENR8J+hbcH
- 5wCcIiDIkbBIp7uDhFAWuzNh9eZT2/RCuz3gKWXaY7t5YPr+83t3ZztUqRe84VjD
- YL7hGgh+1MJmWcB0ZSw5ZR7V+Ey5k0HA/jkOglSk8RshZA3bk/WVfg55DRmTLlTv
- JPbjr9FfKsA7/N9QeVnvGJdt6YVNNWGCKgzheN5hqQvqT0u7hW/FSZR6g5oYpmSW
- WQWkxD/WW0bTK7GJ7Rezg==
+ :to; s=fm1; bh=sfdjsJgQWeb0JP1zD0y1OmOw38vmpB1vChhNSW9CmjY=; b=Z
+ KNDng3kZ0x7A5suNrnN8F9PMbQaH6BoX1CglqNx8fOwsFRk9tOc+x7+MoBmIsXrC
+ 1izvHUX7vZAvvA69BHHLhVaK1EDnP/+TgyzlFFCsRWxBV87qJbQ61tlAvpXOgls9
+ K2wYuIW5EeAFM3k/2Yw3oq1PKVFlxAbaVhNiyelxR6VbQXVN2dtt0sEQ4Iy8+2r+
+ hl77iaDrywuiNPRZJsDnJHQAcANRtGW0SHU4pdVJ3jKhJ6y8AFqGViRGoIeFoOTe
+ CyE7/DbE24bsOvvoz8eaKMt4H7nOWGpEvrac+KdzVgpY6tL65A3htuFXz4aBAsCC
+ bbEGXWMXkixIs1JIHSvDg==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
  :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
- :x-me-sender:x-sasl-enc; s=fm3; bh=zwkhmPk1Z7yd4Zi4OQjO47FwCcH/D
- VYghDpIbtYRdnc=; b=k4JBGVhLPQaXtLlcJqR+eppUGHYfSc2/+zKTtdt26kbkP
- lmWaZbR5MEdk3ems9Fr7irGokYnQncYtkLD1p3OvzJEsaDM2ATH/YICySEGxH9YW
- UenjVtYpff8ge8qBJOyHj1cHjp9bwALvDxK9o62U2thIHZ5tC1+YlsZ//7q4VWon
- 6Dr8ieheKUmJJNy0OEaTGgiRpCvqd74510EaeheSlmeXBP21dcWaB3nrlsNkmcwN
- +nORTNshqwNvO4VLPlirQrvaAojzIJF2WEBA9GUrruIoEUc46AKESeJToUtXZI5j
- YRdU2PQPreE8rCtP+w37AqUPrurNE/arfAR/A/Ttw==
+ :x-me-sender:x-sasl-enc; s=fm3; bh=sfdjsJgQWeb0JP1zD0y1OmOw38vmp
+ B1vChhNSW9CmjY=; b=Db7OW8khcva8/6x9Zt5kEK44wspZRYg+Ay2wXw7Fm/G3W
+ XtHtvNCJxGwjRogtpFb9IUI8KqfE7Lilx9QIwxeS45ntdvRuDJKSKvLZd55zFAfq
+ YmeuV5D3PGTwooCRhU8GlpYmcurNioq4RqdzaBGUY9hqZOla14gXBmQMW8SYAqx2
+ dQPAGdCn9UuQEeF7oOW9K2C5jelUex0QnMMyNVRVdP9649JRGxdWbtq8ORoBuL16
+ 3UEEAPpX9lfL1hOd3HA8dwzZNGvKWopUbsX6j47MAeIZlOJPU2Rc5DwI2YkmY1/2
+ UCEQt9dYm41tWPf1lP79Y+0ZFDq6zxtEjB4b1X0Rw==
 From: virtiofs-bot@sinrega.org
-Message-Id: <06834.122031610534600288@us-mta-371.us.mimecast.lan>
+Message-Id: <34267.122031711373300427@us-mta-258.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"
-Date: Wed, 16 Mar 2022 14:53:49 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] Issue opened: Xattrmap "map" type does not
- add automatic rules
+Date: Thu, 17 Mar 2022 15:37:35 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR opened: Expand "map" type rule
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -34,20 +33,20 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-The "map" type is expected to be expanded from
-`:map:key:prepend`
- to:
-```
-:prefix:key:prepend:
-:bad:server::prepend:
-:bad:client:key::
-:ok:all::
-```
-or if `key` is empty:
-```
+The XattrMap "map" type must add  automatic rules,
+depending on whether "key" is empty or not.
+
+The rule ":map::prepend" must be expanded to:
 :prefix::prepend:
 :bad:all::
-```
+
+The rule ":map:key:prepend" must be expanded to
+:prefix:all:key:prepend:
+:bad:server::key:
+:bad:client:prepend::
+:ok:all::
+
+Closes #40
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/40
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/103
 

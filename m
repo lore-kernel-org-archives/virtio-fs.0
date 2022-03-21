@@ -1,24 +1,28 @@
-Return-Path: <alex.bennee@linaro.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=KzFM1VC1qBaGEQEgt4KuUH64XXgDfuuoU/tIcKK95PA=;
- b=y7ah77aCdoCwhhQF3h84K+hYDsXYZpWiahs7t777135BUKrIrjPXGMwGHsnYMXvB6F
- liIMUY51aST51ETTjbBndNhx9a41JxD2z1pJKqaf+vsQ49L+9hnMaw9yAfH5ldM+CbrH
- njg/KYGMXKAcdc/rDpvaW5Ua6bCpasOS6i2I1DPgFJJVnUt9jwktTVQU6e6TpIbd68s5
- SxJXdrgrNfyIdPXKi+wqjUxsKcFrGaSP+SYbLawn0T8aSNsIk3xqiF8j45I4uCpNeoeC
- 26CmzPxD2prm6Bd3SZTdT5K2HEfbU00Dl8qF1pb/exfZWSlf/go32FEfEZEy5R70nkHA
- 1VSQ==
-From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
-Date: Mon, 21 Mar 2022 15:30:25 +0000
-Message-Id: <20220321153037.3622127-2-alex.bennee@linaro.org>
-In-Reply-To: <20220321153037.3622127-1-alex.bennee@linaro.org>
-References: <20220321153037.3622127-1-alex.bennee@linaro.org>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v1 01/13] hw/virtio: move virtio-pci.h into
- shared include space
+Return-Path: <virtiofs-bot@sinrega.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+ cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+ :to; s=fm1; bh=9LmaaXDwhFJu8GF97co3mYJVRZEAYfPwCRdjUDCFcBs=; b=B
+ i+upkht8yaUWkAVAy41kGikOungUIwDQ1WLSJS9kV00fhAwTkLx6FhiZW5K5GhmN
+ 0u+4ssvE59GdtHTIcjcw97rgGuIjDHTJeob7IO/oq5OKyEZqeenNoPA6IzBWLvIT
+ mU2bOBy2FFhhaXiT86AcZUiIGObxbAdcOY6/6KxvpjGops2gJtUmhryNKIiDJKPn
+ fYlnGBHeP8ipyUClDZqcwKOXqhxM39IelbAEOEMyw6BxXiBdI/gdztAQ4/gXSrzY
+ Lynrh01feKQSzlDzu/Boc9GPm4iIXGoSf60Z7LTXw2v5EUVFFX4waiBfLgG3dgmp
+ pMqR2UVheZA9eMUzeT/dQ==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+ messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
+ :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
+ :x-me-sender:x-sasl-enc; s=fm3; bh=9LmaaXDwhFJu8GF97co3mYJVRZEAY
+ fPwCRdjUDCFcBs=; b=ZnqoxEZBk3ExZTFGnkwNPSYue/6hYE4xVoydAaSmU+a7V
+ fFqA0BsscVY1My61gje7eFmYZB0L6Z1T9rBWgMIz6fzGFLYt8d/PTl3p5kypd08w
+ L8qu/XWv6mSvhsqovGK8IgAyxC+I29oOTOpeqWE3+iav/ncgS4OfaO0GZU1mrX1K
+ 5sBNzxLKwiZEZm8glSCXRpuwU60BxOR4kAMOmeVpyGwdAln/pgKtlogNF0/bNWI6
+ 0E3OqOVL+lvKVQuKiiM0upge1YuLvolTIG7C0WbQmpoimOlyxgdFpp4kceMtVD9k
+ 3I7Zuie/o5nXCfaq6CJ2aAAdjSP0k3Bf6DBxPJcFw==
+From: virtiofs-bot@sinrega.org
+Message-Id: <47147.122032111552201687@us-mta-355.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"
+Date: Mon, 21 Mar 2022 15:55:25 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] Issue closed: Support using `musl` libc.
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,308 +31,140 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: slp@redhat.com, mst@redhat.com, marcandre.lureau@redhat.com, stefanha@redhat.com, mathieu.poirier@linaro.org, viresh.kumar@linaro.org, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, David Hildenbrand <david@redhat.com>, Eric Auger <eric.auger@redhat.com>, "open list:virtiofs" <virtio-fs@redhat.com>
+To: virtio-fs@redhat.com
 
-This allows other device classes that will be exposed via PCI to be
-able to do so in the appropriate hw/ directory. I resisted the
-temptation to re-order headers to be more aesthetically pleasing.
+When trying to build virtiofsd using `musl` libc we get the following errors:
+```
+$ cargo build --release --target x86_64-unknown-linux-musl
+...
+   Compiling virtiofsd v1.1.0 (/home/ffidenci/src/upstream/virtiofsd-rs)
+error[E0412]: cannot find type `statx` in crate `libc`
+   --> src/passthrough/stat.rs:58:32
+    |
+58  |   impl SafeStatXAccess for libc::statx {
+    |                                  ^^^^^ help: a struct with a similar name exists: `stat`
+    |
+   ::: /home/ffidenci/.cargo/registry/src/github.com-1ecc6299db9ec823/libc-0.2.112/src/unix/linux_like/linux/musl/b64/x86_64/mod.rs:8:1
+    |
+8   | / s! {
+9   | |     pub struct stat {
+10  | |         pub st_dev: ::dev_t,
+11  | |         pub st_ino: ::ino_t,
+...   |
+121 | |     }
+122 | | }
+    | |_- similarly named struct `stat` defined here
 
-Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
-Message-Id: <20200925125147.26943-4-alex.bennee@linaro.org>
+error[E0425]: cannot find value `STATX_BASIC_STATS` in crate `libc`
+  --> src/passthrough/stat.rs:65:34
+   |
+65 |         if self.stx_mask & libc::STATX_BASIC_STATS != 0 {
+   |                                  ^^^^^^^^^^^^^^^^^ not found in `libc`
 
----
-v2
-  - add i2c/rng device to changes
----
- {hw => include/hw}/virtio/virtio-pci.h | 0
- hw/virtio/vhost-scsi-pci.c             | 2 +-
- hw/virtio/vhost-user-blk-pci.c         | 2 +-
- hw/virtio/vhost-user-fs-pci.c          | 2 +-
- hw/virtio/vhost-user-i2c-pci.c         | 2 +-
- hw/virtio/vhost-user-input-pci.c       | 2 +-
- hw/virtio/vhost-user-rng-pci.c         | 2 +-
- hw/virtio/vhost-user-scsi-pci.c        | 2 +-
- hw/virtio/vhost-user-vsock-pci.c       | 2 +-
- hw/virtio/vhost-vsock-pci.c            | 2 +-
- hw/virtio/virtio-9p-pci.c              | 2 +-
- hw/virtio/virtio-balloon-pci.c         | 2 +-
- hw/virtio/virtio-blk-pci.c             | 2 +-
- hw/virtio/virtio-input-host-pci.c      | 2 +-
- hw/virtio/virtio-input-pci.c           | 2 +-
- hw/virtio/virtio-iommu-pci.c           | 2 +-
- hw/virtio/virtio-net-pci.c             | 2 +-
- hw/virtio/virtio-pci.c                 | 2 +-
- hw/virtio/virtio-rng-pci.c             | 2 +-
- hw/virtio/virtio-scsi-pci.c            | 2 +-
- hw/virtio/virtio-serial-pci.c          | 2 +-
- 21 files changed, 20 insertions(+), 20 deletions(-)
- rename {hw => include/hw}/virtio/virtio-pci.h (100%)
+error[E0425]: cannot find value `STATX_MNT_ID` in crate `libc`
+   --> src/passthrough/stat.rs:100:34
+    |
+100 |         if self.stx_mask & libc::STATX_MNT_ID != 0 {
+    |                                  ^^^^^^^^^^^^ not found in `libc`
 
-diff --git a/hw/virtio/virtio-pci.h b/include/hw/virtio/virtio-pci.h
-similarity index 100%
-rename from hw/virtio/virtio-pci.h
-rename to include/hw/virtio/virtio-pci.h
-diff --git a/hw/virtio/vhost-scsi-pci.c b/hw/virtio/vhost-scsi-pci.c
-index cb71a294fa..08980bc23b 100644
---- a/hw/virtio/vhost-scsi-pci.c
-+++ b/hw/virtio/vhost-scsi-pci.c
-@@ -21,7 +21,7 @@
- #include "hw/virtio/vhost-scsi.h"
- #include "qapi/error.h"
- #include "qemu/module.h"
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- #include "qom/object.h"
+error[E0412]: cannot find type `statx` in crate `libc`
+   --> src/passthrough/stat.rs:121:26
+    |
+121 |       statxbuf: *mut libc::statx,
+    |                            ^^^^^ help: a struct with a similar name exists: `stat`
+    |
+   ::: /home/ffidenci/.cargo/registry/src/github.com-1ecc6299db9ec823/libc-0.2.112/src/unix/linux_like/linux/musl/b64/x86_64/mod.rs:8:1
+    |
+8   | / s! {
+9   | |     pub struct stat {
+10  | |         pub st_dev: ::dev_t,
+11  | |         pub st_ino: ::ino_t,
+...   |
+121 | |     }
+122 | | }
+    | |_- similarly named struct `stat` defined here
+
+error[E0412]: cannot find type `statx` in crate `libc`
+   --> src/passthrough/stat.rs:129:42
+    |
+129 |       let mut stx_ui = MaybeUninit::<libc::statx>::zeroed();
+    |                                            ^^^^^ help: a struct with a similar name exists: `stat`
+    |
+   ::: /home/ffidenci/.cargo/registry/src/github.com-1ecc6299db9ec823/libc-0.2.112/src/unix/linux_like/linux/musl/b64/x86_64/mod.rs:8:1
+    |
+8   | / s! {
+9   | |     pub struct stat {
+10  | |         pub st_dev: ::dev_t,
+11  | |         pub st_ino: ::ino_t,
+...   |
+121 | |     }
+122 | | }
+    | |_- similarly named struct `stat` defined here
+
+error[E0425]: cannot find value `STATX_BASIC_STATS` in crate `libc`
+   --> src/passthrough/stat.rs:141:19
+    |
+141 |             libc::STATX_BASIC_STATS | libc::STATX_MNT_ID,
+    |                   ^^^^^^^^^^^^^^^^^ not found in `libc`
+
+error[E0425]: cannot find value `STATX_MNT_ID` in crate `libc`
+   --> src/passthrough/stat.rs:141:45
+    |
+141 |             libc::STATX_BASIC_STATS | libc::STATX_MNT_ID,
+    |                                             ^^^^^^^^^^^^ not found in `libc`
+
+```
+
+Those happen as libc:statx doesn't seem to be supported when using musl, at least not yet.
+Building it with `musl` could as simple as guarding the right functions, as shown below:
+```
+diff --git a/src/passthrough/stat.rs b/src/passthrough/stat.rs
+index 2e2705c..8340739 100644
+--- a/src/passthrough/stat.rs
++++ b/src/passthrough/stat.rs
+@@ -55,6 +55,7 @@ trait SafeStatXAccess {
+     fn mount_id(&self) -> Option<u64>;
+ }
  
- typedef struct VHostSCSIPCI VHostSCSIPCI;
-diff --git a/hw/virtio/vhost-user-blk-pci.c b/hw/virtio/vhost-user-blk-pci.c
-index 33b404d8a2..eef8641a98 100644
---- a/hw/virtio/vhost-user-blk-pci.c
-+++ b/hw/virtio/vhost-user-blk-pci.c
-@@ -26,7 +26,7 @@
- #include "qapi/error.h"
- #include "qemu/error-report.h"
- #include "qemu/module.h"
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- #include "qom/object.h"
++#[cfg(all(target_os = "linux", any(target_env = "gnu")))]
+ impl SafeStatXAccess for libc::statx {
+     fn stat64(&self) -> Option<libc::stat64> {
+         fn makedev(maj: libc::c_uint, min: libc::c_uint) -> libc::dev_t {
+@@ -107,7 +108,7 @@ impl SafeStatXAccess for libc::statx {
  
- typedef struct VHostUserBlkPCI VHostUserBlkPCI;
-diff --git a/hw/virtio/vhost-user-fs-pci.c b/hw/virtio/vhost-user-fs-pci.c
-index 2ed8492b3f..6829b8b743 100644
---- a/hw/virtio/vhost-user-fs-pci.c
-+++ b/hw/virtio/vhost-user-fs-pci.c
-@@ -14,7 +14,7 @@
- #include "qemu/osdep.h"
- #include "hw/qdev-properties.h"
- #include "hw/virtio/vhost-user-fs.h"
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- #include "qom/object.h"
+ // Only works on Linux, and libc::SYS_statx is only defined for these
+ // environments
+-#[cfg(all(target_os = "linux", any(target_env = "gnu", target_env = "musl")))]
++#[cfg(all(target_os = "linux", any(target_env = "gnu")))]
+ /// Performs a statx() syscall.  libc provides libc::statx() that does
+ /// the same, however, the system's libc may not have a statx() wrapper
+ /// (e.g. glibc before 2.28), so linking to it may fail.
+@@ -124,7 +125,7 @@ unsafe fn do_statx(
+ }
  
- struct VHostUserFSPCI {
-diff --git a/hw/virtio/vhost-user-i2c-pci.c b/hw/virtio/vhost-user-i2c-pci.c
-index 70b7b65fd9..00ac10941f 100644
---- a/hw/virtio/vhost-user-i2c-pci.c
-+++ b/hw/virtio/vhost-user-i2c-pci.c
-@@ -9,7 +9,7 @@
- #include "qemu/osdep.h"
- #include "hw/qdev-properties.h"
- #include "hw/virtio/vhost-user-i2c.h"
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
+ // Real statx() that depends on do_statx()
+-#[cfg(all(target_os = "linux", any(target_env = "gnu", target_env = "musl")))]
++#[cfg(all(target_os = "linux", any(target_env = "gnu")))]
+ pub fn statx(dir: &impl AsRawFd, path: Option<&CStr>) -> io::Result<StatExt> {
+     let mut stx_ui = MaybeUninit::<libc::statx>::zeroed();
  
- struct VHostUserI2CPCI {
-     VirtIOPCIProxy parent_obj;
-diff --git a/hw/virtio/vhost-user-input-pci.c b/hw/virtio/vhost-user-input-pci.c
-index c9d3e9113a..b858898a36 100644
---- a/hw/virtio/vhost-user-input-pci.c
-+++ b/hw/virtio/vhost-user-input-pci.c
-@@ -9,7 +9,7 @@
- #include "hw/virtio/virtio-input.h"
- #include "qapi/error.h"
- #include "qemu/error-report.h"
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- #include "qom/object.h"
+@@ -159,7 +160,7 @@ pub fn statx(dir: &impl AsRawFd, path: Option<&CStr>) -> io::Result<StatExt> {
+ }
  
- typedef struct VHostUserInputPCI VHostUserInputPCI;
-diff --git a/hw/virtio/vhost-user-rng-pci.c b/hw/virtio/vhost-user-rng-pci.c
-index c83dc86813..f64935453b 100644
---- a/hw/virtio/vhost-user-rng-pci.c
-+++ b/hw/virtio/vhost-user-rng-pci.c
-@@ -9,7 +9,7 @@
- #include "qemu/osdep.h"
- #include "hw/qdev-properties.h"
- #include "hw/virtio/vhost-user-rng.h"
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- 
- struct VHostUserRNGPCI {
-     VirtIOPCIProxy parent_obj;
-diff --git a/hw/virtio/vhost-user-scsi-pci.c b/hw/virtio/vhost-user-scsi-pci.c
-index d5343412a1..75882e3cf9 100644
---- a/hw/virtio/vhost-user-scsi-pci.c
-+++ b/hw/virtio/vhost-user-scsi-pci.c
-@@ -30,7 +30,7 @@
- #include "hw/pci/msix.h"
- #include "hw/loader.h"
- #include "sysemu/kvm.h"
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- #include "qom/object.h"
- 
- typedef struct VHostUserSCSIPCI VHostUserSCSIPCI;
-diff --git a/hw/virtio/vhost-user-vsock-pci.c b/hw/virtio/vhost-user-vsock-pci.c
-index 72a96199cd..e5a86e8013 100644
---- a/hw/virtio/vhost-user-vsock-pci.c
-+++ b/hw/virtio/vhost-user-vsock-pci.c
-@@ -10,7 +10,7 @@
- 
- #include "qemu/osdep.h"
- 
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- #include "hw/qdev-properties.h"
- #include "hw/virtio/vhost-user-vsock.h"
- #include "qom/object.h"
-diff --git a/hw/virtio/vhost-vsock-pci.c b/hw/virtio/vhost-vsock-pci.c
-index 205da8d1f5..9f34414d38 100644
---- a/hw/virtio/vhost-vsock-pci.c
-+++ b/hw/virtio/vhost-vsock-pci.c
-@@ -13,7 +13,7 @@
- 
- #include "qemu/osdep.h"
- 
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- #include "hw/qdev-properties.h"
- #include "hw/virtio/vhost-vsock.h"
- #include "qemu/module.h"
-diff --git a/hw/virtio/virtio-9p-pci.c b/hw/virtio/virtio-9p-pci.c
-index e07adcd9ea..94c14f0b98 100644
---- a/hw/virtio/virtio-9p-pci.c
-+++ b/hw/virtio/virtio-9p-pci.c
-@@ -15,7 +15,7 @@
- 
- #include "qemu/osdep.h"
- 
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- #include "hw/9pfs/virtio-9p.h"
- #include "hw/qdev-properties.h"
- #include "qemu/module.h"
-diff --git a/hw/virtio/virtio-balloon-pci.c b/hw/virtio/virtio-balloon-pci.c
-index 79a3ba979a..ce2645ba71 100644
---- a/hw/virtio/virtio-balloon-pci.c
-+++ b/hw/virtio/virtio-balloon-pci.c
-@@ -14,7 +14,7 @@
- 
- #include "qemu/osdep.h"
- 
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- #include "hw/qdev-properties.h"
- #include "hw/virtio/virtio-balloon.h"
- #include "qapi/error.h"
-diff --git a/hw/virtio/virtio-blk-pci.c b/hw/virtio/virtio-blk-pci.c
-index 9d5795810c..9743bee965 100644
---- a/hw/virtio/virtio-blk-pci.c
-+++ b/hw/virtio/virtio-blk-pci.c
-@@ -19,7 +19,7 @@
- 
- #include "hw/qdev-properties.h"
- #include "hw/virtio/virtio-blk.h"
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- #include "qapi/error.h"
- #include "qemu/module.h"
- #include "qom/object.h"
-diff --git a/hw/virtio/virtio-input-host-pci.c b/hw/virtio/virtio-input-host-pci.c
-index 0ac360de4f..cf8a9cf9e8 100644
---- a/hw/virtio/virtio-input-host-pci.c
-+++ b/hw/virtio/virtio-input-host-pci.c
-@@ -8,7 +8,7 @@
- 
- #include "qemu/osdep.h"
- 
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- #include "hw/virtio/virtio-input.h"
- #include "qemu/module.h"
- #include "qom/object.h"
-diff --git a/hw/virtio/virtio-input-pci.c b/hw/virtio/virtio-input-pci.c
-index 48e9ff38e2..a9d0992389 100644
---- a/hw/virtio/virtio-input-pci.c
-+++ b/hw/virtio/virtio-input-pci.c
-@@ -8,7 +8,7 @@
- 
- #include "qemu/osdep.h"
- 
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- #include "hw/qdev-properties.h"
- #include "hw/virtio/virtio-input.h"
- #include "qemu/module.h"
-diff --git a/hw/virtio/virtio-iommu-pci.c b/hw/virtio/virtio-iommu-pci.c
-index 6a1df7fe50..844d647704 100644
---- a/hw/virtio/virtio-iommu-pci.c
-+++ b/hw/virtio/virtio-iommu-pci.c
-@@ -11,7 +11,7 @@
- 
- #include "qemu/osdep.h"
- 
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- #include "hw/virtio/virtio-iommu.h"
- #include "hw/qdev-properties.h"
- #include "hw/qdev-properties-system.h"
-diff --git a/hw/virtio/virtio-net-pci.c b/hw/virtio/virtio-net-pci.c
-index aa0b3caecb..e03543a70a 100644
---- a/hw/virtio/virtio-net-pci.c
-+++ b/hw/virtio/virtio-net-pci.c
-@@ -19,7 +19,7 @@
- 
- #include "hw/qdev-properties.h"
- #include "hw/virtio/virtio-net.h"
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- #include "qapi/error.h"
- #include "qemu/module.h"
- #include "qom/object.h"
-diff --git a/hw/virtio/virtio-pci.c b/hw/virtio/virtio-pci.c
-index 7cf1231c1c..602be7f83d 100644
---- a/hw/virtio/virtio-pci.c
-+++ b/hw/virtio/virtio-pci.c
-@@ -33,7 +33,7 @@
- #include "hw/pci/msix.h"
- #include "hw/loader.h"
- #include "sysemu/kvm.h"
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- #include "qemu/range.h"
- #include "hw/virtio/virtio-bus.h"
- #include "qapi/visitor.h"
-diff --git a/hw/virtio/virtio-rng-pci.c b/hw/virtio/virtio-rng-pci.c
-index c1f916268b..151ece6f94 100644
---- a/hw/virtio/virtio-rng-pci.c
-+++ b/hw/virtio/virtio-rng-pci.c
-@@ -11,7 +11,7 @@
- 
- #include "qemu/osdep.h"
- 
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- #include "hw/virtio/virtio-rng.h"
- #include "qapi/error.h"
- #include "qemu/module.h"
-diff --git a/hw/virtio/virtio-scsi-pci.c b/hw/virtio/virtio-scsi-pci.c
-index 97fab74236..e8e3442f38 100644
---- a/hw/virtio/virtio-scsi-pci.c
-+++ b/hw/virtio/virtio-scsi-pci.c
-@@ -18,7 +18,7 @@
- #include "hw/qdev-properties.h"
- #include "hw/virtio/virtio-scsi.h"
- #include "qemu/module.h"
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- #include "qom/object.h"
- 
- typedef struct VirtIOSCSIPCI VirtIOSCSIPCI;
-diff --git a/hw/virtio/virtio-serial-pci.c b/hw/virtio/virtio-serial-pci.c
-index 35bcd961c9..cea31adcc4 100644
---- a/hw/virtio/virtio-serial-pci.c
-+++ b/hw/virtio/virtio-serial-pci.c
-@@ -20,7 +20,7 @@
- #include "hw/qdev-properties.h"
- #include "hw/virtio/virtio-serial.h"
- #include "qemu/module.h"
--#include "virtio-pci.h"
-+#include "hw/virtio/virtio-pci.h"
- #include "qom/object.h"
- 
- typedef struct VirtIOSerialPCI VirtIOSerialPCI;
+ // Fallback for when do_statx() is not available
+-#[cfg(not(all(target_os = "linux", any(target_env = "gnu", target_env = "musl"))))]
++#[cfg(not(all(target_os = "linux", any(target_env = "gnu"))))]
+ pub fn statx(_dir: &impl AsRawFd, _path: Option<&CStr>) -> io::Result<StatExt> {
+     Err(io::Error::from_raw_os_error(libc::ENOSYS))
+ }
 -- 
-2.30.2
+2.35.1
+```
+
+Although the simple patch above allows **building** using `musl` libc, when trying to spawn a VM using the patched daemon I get:
+```
+Failed to create pod sandbox: rpc error: code = Unknown desc = CreateContainer failed: error: 500  reason: VmBoot(VmBoot(DeviceManager(CreateVirtioFs(VhostUserGetFeatures(VhostUserProtocol(SocketBroken(Os { code: 104, kind: ConnectionReset, message: "Connection reset by peer" }))))))): unknown
+```
+---
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/27
 

@@ -1,29 +1,29 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; bh=c0nUnLAeOew6kS70/dF7WuB6fjVZ/CQXHBlYs2LKkRM=; b=U
- uwntOQtN9MFpv55BJuaFQLykaKOQYQqvlTGfitfTUHeZ7Wvrg4pZy+gFYGN8O90U
- epQ85yoM21OjmFKLshgo4DxZ5KnyvkZ8RgQrwD9NFuyRHTJklONiShrQtfGaDUvT
- gHmgEorX/0+rvzC0S86JgZ7lZpQZcJaqp5J1lcxpJnpshuIAkT5qw3fvKnMfXhr7
- edIzaUtwZgKMohSw5FYnarAxofJwbPPUx5iMHQ7A9Myjdgz71xvQKAnBwBDGsRuk
- tZnIB/XWow5YZeE8OFsjlIE/SiPR4UZ5HEC+8nTXOdR01Q0FbbmioaypWhFQH+b7
- LUNniN3i+uFo1of2xYhKA==
+ :to; s=fm1; bh=T+sraxTsgVW3hLMBsphV2TbCFPqpbnliPIarQ8qX4Pc=; b=P
+ i1YGPK5IrgrrvYT3MK7cQgvB0PKvY56HgcwikDlRKffkLyUqcBNnIvZrwTPh83Tl
+ xvc8FaKgHAVycCPwGIkQnS+uyMYz2yZOzsOK1gE65N+xA3UsAGBQoE3M4Q0A7z3w
+ YhnRwbRa4xGWm2ezY4wHYD3Xl0RN2eJcG2dCPaodyPVQuAm6+47E2qmFhngVHuGd
+ kJGAjSxvRYbC1N68mQRtxgbud9XXeDFzgkRsTIao7SL9VOE9UJgVr+hcmfiJkCi8
+ 01bPGdhgZrbf7cMDQGeEwWH20nzy+j7sYZ7+nVU7JQN0nO/ongOT6HI2jKqvBtSI
+ yYbIeItDp7ABG3Fc3eMmQ==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
  :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
- :x-me-sender:x-sasl-enc; s=fm3; bh=c0nUnLAeOew6kS70/dF7WuB6fjVZ/
- CQXHBlYs2LKkRM=; b=bdR5QU6UknDnmXTFtjo9AWpeWgxLyIRuAsZ3aX0BqlBTV
- h0fggctVe+RU2gWbGE5GUMwLP80GpQ6SkHVf7he8a9FdRjgi+aPceE0RNNly/2Xy
- KahZblB9RcSjjxyKTv0+E+4xX3/HDQdyiuvEXHqQT8q1UY+aXvYu3958v0DIbV1n
- aLWIz1Ij7j6pSCoC5KxflZaM/IHazXncwDWjzmuyDoGSX7hjNMuk2T6oMcb0ppfU
- /ShgUVMCqA06YnIIUChQPVsWTyvtAjbaDsAPSYKj1D83Z26CQZP1ZyH5GxD23i0t
- y9JOgEZ57a9sNvwFB7OgCZKpsCJGwEdwgG+grmsPg==
+ :x-me-sender:x-sasl-enc; s=fm3; bh=T+sraxTsgVW3hLMBsphV2TbCFPqpb
+ nliPIarQ8qX4Pc=; b=J4J5dogq72zoxWVqINEc3O/9LQw27Y/F04w24EKOK9I0j
+ AmUCADBLmif4u4EdqaSmKRLGFKBn2zrF0eh4jL606CVRKFp8FGbbeUWSjdfDApqR
+ ZLLE0Y7sXBRhaeb3uVdNJJXg9+jDfubESZbvD8I/JdrE2I1UHrBEgGNtB1g7KcYg
+ mVf67WmiJUAu8tqWhZFyenSXuiy8vA93jiDWCAFBOERN3G0f26yjpT/EEvkqazNF
+ /3LfV0yuE7ZYO6bdXsWPcJ0m2JUK8IY9NWI3ybO9FoRxKk1mzF/nWlaUSBabCh4l
+ 0qseMlS4LTbmBaOk1u4+6u+OQB9dSw8iFl4Zd7Qbg==
 From: virtiofs-bot@sinrega.org
-Message-Id: <65007.122032312484500555@us-mta-214.us.mimecast.lan>
+Message-Id: <39395.122032418361400255@us-mta-532.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Wed, 23 Mar 2022 16:48:48 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] Issue opened: Implement
- VHOST_USER_SLAVE_FS_IO
+Date: Thu, 24 Mar 2022 22:36:17 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR opened: Do not call setgroups() for
+ unprivileged user namespace mode
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -34,10 +34,13 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-The DAX support is only partial at the moment, as a complete support of this feature expects the command `VHOST_USER_SLAVE_FS_IO` to be honored.
-Without this command, the guest might expect the backend to access some non-guest memory ranges, which it won't be able to do without this extra command.
+Right now --sandbox=Namespace is broken when called by unprivileged user. Reason being that we call setgroups() and that's not allowed for unprivileged user both outside and inside user namespace.
 
-Reference: https://gitlab.com/virtio-fs/virtiofsd/-/issues/39 and https://github.com/cloud-hypervisor/cloud-hypervisor/issues/3869
+When unprivileged user is launching user namespace (without help from newuidmap/newgidmap), then it can only map its own id. That means there is no arbitrary swithing of uid/gid. And that also means anything not owned by user will show up as "nobody" and user can not write to that file/dir.
+
+So all this means that we should not have to necessary call setgroups() for this particular mode. This patch gets rid of call for setgroups() for "--sandbox=Namespace" mode when called by unprivileged user. When root starts with "--sandbox=Namespace", setgroups() is still called.
+
+I also picked a patch from Sergio which establishes 1:1 mapping of uid/gid in newly created namespace. So uid outside the user namespace is mapped to same uid inside the user namespace. This is good if user wants to export his/her own home directory into a VM. Without this patch, user owned files show up as nobody which is not very useful at all.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/41
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/105
 

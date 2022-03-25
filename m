@@ -1,29 +1,29 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; bh=T+sraxTsgVW3hLMBsphV2TbCFPqpbnliPIarQ8qX4Pc=; b=P
- i1YGPK5IrgrrvYT3MK7cQgvB0PKvY56HgcwikDlRKffkLyUqcBNnIvZrwTPh83Tl
- xvc8FaKgHAVycCPwGIkQnS+uyMYz2yZOzsOK1gE65N+xA3UsAGBQoE3M4Q0A7z3w
- YhnRwbRa4xGWm2ezY4wHYD3Xl0RN2eJcG2dCPaodyPVQuAm6+47E2qmFhngVHuGd
- kJGAjSxvRYbC1N68mQRtxgbud9XXeDFzgkRsTIao7SL9VOE9UJgVr+hcmfiJkCi8
- 01bPGdhgZrbf7cMDQGeEwWH20nzy+j7sYZ7+nVU7JQN0nO/ongOT6HI2jKqvBtSI
- yYbIeItDp7ABG3Fc3eMmQ==
+ :to; s=fm1; bh=ZUiyo8kf+mAz9qS6ken/5XZsm9HQeLCVPVTr2Hwzp8A=; b=J
+ T2Sr+saF5aabRYsq/Sxr+p9yLc7qiZt3bEaMQMpKEtOzkHz+oj+wTdwlohpYXdpN
+ nYfjuJr5O0ccI1OJzUmJ5EU0xDYQsXGet6MmGbVNq64shsAjdCLDvqUP3/r5BEBk
+ 0mf9rSSKlVkfcYln93DjyKdrKJ26YZCgEv58B9bfzLjCld/mpPoCY55UUclG6/J0
+ oOwpNcapqiYF1bETRyZZBicxQPlHNgw99Uu57PQPY6TpKcrJXXAXcMqpvBZwZjV/
+ NyMIUG95FIsTcq7+cGOah2iinDczCE3mH3lWy2GQSVyyYQ+7zps8rXFCII9Eq9Jv
+ 2nlvhr/C1CrvA6u+94PsA==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
  :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
- :x-me-sender:x-sasl-enc; s=fm3; bh=T+sraxTsgVW3hLMBsphV2TbCFPqpb
- nliPIarQ8qX4Pc=; b=J4J5dogq72zoxWVqINEc3O/9LQw27Y/F04w24EKOK9I0j
- AmUCADBLmif4u4EdqaSmKRLGFKBn2zrF0eh4jL606CVRKFp8FGbbeUWSjdfDApqR
- ZLLE0Y7sXBRhaeb3uVdNJJXg9+jDfubESZbvD8I/JdrE2I1UHrBEgGNtB1g7KcYg
- mVf67WmiJUAu8tqWhZFyenSXuiy8vA93jiDWCAFBOERN3G0f26yjpT/EEvkqazNF
- /3LfV0yuE7ZYO6bdXsWPcJ0m2JUK8IY9NWI3ybO9FoRxKk1mzF/nWlaUSBabCh4l
- 0qseMlS4LTbmBaOk1u4+6u+OQB9dSw8iFl4Zd7Qbg==
+ :x-me-sender:x-sasl-enc; s=fm3; bh=ZUiyo8kf+mAz9qS6ken/5XZsm9HQe
+ LCVPVTr2Hwzp8A=; b=eNM73P9yZQAg0C+h04yULhHKwKdR1StC7BEmAJ2Vs1/Bo
+ TaLb7HzLfCe5hAME9xx5Qz20whnttlsbz5LtfzC5N2F63YDzivRHU1HwOX+hXWhm
+ JEKOAuBsGRsFdw4aJ86kgBRzt2sBtBJfTgPgzUkWQe8CUvCjJ8DticSnU6qkHOXT
+ oFRQotC7EgOJaUSLmFQk/4VEkPeCvvvfUqc2d/meRfwYT382RmOtQw37cpUYp7Yc
+ 9kC9H8gGIm+dPWLY19mjloE59AjusgJ67L6mepxpVwqZrRiZcR9s48w93gi3/i8H
+ tBI7+wV42L1kpg3BaMDE/neGa7opAjRyauw5qfU2Q==
 From: virtiofs-bot@sinrega.org
-Message-Id: <39395.122032418361400255@us-mta-532.us.mimecast.lan>
+Message-Id: <42577.122032506424500267@us-mta-642.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Thu, 24 Mar 2022 22:36:17 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR opened: Do not call setgroups() for
- unprivileged user namespace mode
+Date: Fri, 25 Mar 2022 10:42:48 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] Issue opened: Support for running with
+ sandbox=none without root and without namespaces
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -34,13 +34,11 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Right now --sandbox=Namespace is broken when called by unprivileged user. Reason being that we call setgroups() and that's not allowed for unprivileged user both outside and inside user namespace.
-
-When unprivileged user is launching user namespace (without help from newuidmap/newgidmap), then it can only map its own id. That means there is no arbitrary swithing of uid/gid. And that also means anything not owned by user will show up as "nobody" and user can not write to that file/dir.
-
-So all this means that we should not have to necessary call setgroups() for this particular mode. This patch gets rid of call for setgroups() for "--sandbox=Namespace" mode when called by unprivileged user. When root starts with "--sandbox=Namespace", setgroups() is still called.
-
-I also picked a patch from Sergio which establishes 1:1 mapping of uid/gid in newly created namespace. So uid outside the user namespace is mapped to same uid inside the user namespace. This is good if user wants to export his/her own home directory into a VM. Without this patch, user owned files show up as nobody which is not very useful at all.
+Hello,
+I have question - before version 1.0 (somewhere around June 2021 eg. commit 513b9eaa0471d28c28a611f3ad447d15dccde446) it was possible to run with sandbox=none as unprivileged user and without namespace support, currently this is not possible.
+Are you planning to support running as normal user without namespace support with sandbox=none?
+Because currently sanbox=none is kinda not none and I really like old way of none, so want to ask if any plans for new sandbox mode maybe or if I have to stay on older version.
+Thanks for answer and this awesome tool
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/105
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/42
 

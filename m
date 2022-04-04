@@ -1,29 +1,29 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; bh=ltE6nf2wd5rKcpvby7T62giVxLM7K28oEqHFoMA0DCk=; b=G
- 6sKIhXZULor5En3kCw9oIH9xvL8Uc/sZQdpFm5Nsi8CW7wLqLR/KoWNx7T25u+Sy
- GJTFO7nM8C5nhOVGTDTMjYZO0XoqV2d1WYM2Tp8uIgCm7s6Cv0NZ77bmqefb+VoW
- VInZPRErDDEzG2iUok3iG2wnZgrzlo6+Tqv+872FwlWY6v+2U+QbXT0Dq3jbcqrk
- tp+Cba83yzPbUhO56h94E8eDxh24OOpwTeyxJezHPRqgweNGme8LkqbsaMxhaJK6
- iSJkcDBBQ4hDRugoVGcsWI+cY2/d0SD9RpsFNeAczPvOEfsNrLN7MGdD/OTW6VCb
- q9DK/o1XNaF4KcyCVBkCA==
+ :to; s=fm1; bh=a61E4znYOnXKt1M6WZYJzd/Pxwqd1UoUn7+UesWg0ZE=; b=E
+ 1kePIOk8wJIAARV9rZhUeacs9/Rs1wPPyowioevj+YgvxypGGkNBmtpV4vQA8DPf
+ mh4kKaN84tPZ3J9FmRWn2kUb9R+x8VUjd/B9UaAH8LysafVBu6QULaaWla6czbsT
+ 8kZFSlo4jSjqj37fIqPs9/vafY4GYqK01eBRUVMcL3nPjerYI3M5qhhzPb1bvijH
+ ZZ6Orw46cF1TV8UPCAO/4qPOcxAVm/cl+0XiJB184xvBTZFag1BMqgQbSQQ/adZD
+ q09weiabzsZxliV61edc4B0YMUR1/F988mA/l20st2pQsH5rtn0XC5qj/SWmwikM
+ QYkntHZ/LTs//qN5wdreg==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
  :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
- :x-me-sender:x-sasl-enc; s=fm3; bh=ltE6nf2wd5rKcpvby7T62giVxLM7K
- 28oEqHFoMA0DCk=; b=VIMG2sOgX8SC6gNBVIBHyMBUR+ElYB41YpHptQlOsFEW4
- VQVk5Rykd2MXdVpIgFCmTyjbgY8LvPv5g7/qQcawugVNzTnTZ06Rj/r5L0JiphZd
- zGvx71SKfiETyCpX9p1OF0FWAFW2reMaC5k9+O+dGcmKOJRPYrDiHBZtSy596xSw
- RUMTiHlYrgTjCrU15QbRibKfdkBhZ83Iqys3g+Otq0x5SWJU6ETZhwGkrt7G6X6j
- /2JBC47Uqxq5bemGFAiZHC1dSLnSKSGYUzNH6lcd8LwYVfDd9XI+Hte2b06JpxS9
- mWJIvNlHQOueinWthdWbIPgl6YmcSFqv5gsXvnl6A==
+ :x-me-sender:x-sasl-enc; s=fm3; bh=a61E4znYOnXKt1M6WZYJzd/Pxwqd1
+ UoUn7+UesWg0ZE=; b=JnX0rxS+AzEoupcLWwuVkUvH5p53v45hObsDFUSY9SY9x
+ XnEiLu2vOvaBAz71l2EWZOZ+EsFU1zVQJwZ7gLSoEPFRT9XAPXJHogbwFEq22mOy
+ ruOSlutDxuWASPUyAthcMxTLyDmXcbp+GEf+V23L+XeIo1LRdBp8so1A3mMy80j+
+ f7NC9mTDgtAkmnTcOERLt0KdlORNFR73GYtZ2KyvuntU5yKmDQgWhMKkREwMEbaj
+ 4ers5zy1vPJsExfeqqNULBRKGvJX6c4ojZgAO818OFlnrW9o78f/wlytUwBp6JgF
+ OyfyV230U8iXKzeyDheY1fmmzNOmxXkdkmxR2lsqA==
 From: virtiofs-bot@sinrega.org
-Message-Id: <90343.122040305555100233@us-mta-319.us.mimecast.lan>
+Message-Id: <24158.122040406223700185@us-mta-320.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Sun,  3 Apr 2022 09:55:57 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] Issue closed: Can't run unprivileged any
- more due to setgroups
+Date: Mon,  4 Apr 2022 10:22:41 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR opened: Switch to building statically
+ linked binaries for publishing
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -34,15 +34,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Since !77, it's not possible to run virtiofsd as an unprivileged user any more:
-
-```
-[2022-03-04T16:46:42Z ERROR virtiofsd] Error entering sandbox: DropSupplementalGroups(Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" })
-```
-
-This is because `setgroups` is always called at startup, and it requires `CAP_SETGID`.  When using the namespace sandbox mode, should `setgroups` be called _after_ setting up the namespace?
-
-cc @slp @vgoyal
+Switch to building statically linked binaries for publishing
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/36
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/106
 

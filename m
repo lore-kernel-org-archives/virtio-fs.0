@@ -1,30 +1,30 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; t=1649688579; x=1649774979; bh=X0psM8mOPC5tboc4ALX7p
- SxlL04I+h8MQinfw7nvcP8=; b=p/8DnXYeN2tll3V4bTVfvaRZ43bUUDQXvcr02
- aHkc34DYp/b9l8rO7nat2iHpCSpPKthISETCdKeEBylYa/5ZxVONcSvJJnX/flgk
- jJGQCIZCsTDsslHQqkzgEgg/hjGgmskB2peip7a4bdMPfOrX89VNOYkJmbkL2rBq
- XciW8cQ+O774y/aa/BxfEtNNiACbLD6zXpyrb+eOgZGldyoUpR6+OS2oNN1oknkg
- ZIajpsntAamgegV08fp5f7ckT4hbvPI+lEGw/64hJPZraARJOgQ/k7wkbNOwwZCF
- 2sU++zntINF6SZwNFEnkoCjNup6XqM8wyL8pz10FO3JDTZ+nQ==
+ :to; s=fm1; t=1649688579; x=1649774979; bh=BAgmpcwEt0gfVgvDpeDzY
+ s1wRFxGbkB+LV9cEifM9xc=; b=SegjjUMKDXTrhuQVzlPl8o+OscCRYpI/3zIMX
+ vf/zlcsBXrzHh9ldLCj4L5BAaCvf1gEuRC900LLG0Yu+VFkv2QRHkn4Y7o3e92+u
+ Lloe+CceBvtVu2Msox0UtFT1Z27+a7XwiCw6WBiOGsoJo/vbrxs0GTkBYJUiPFWe
+ tR9NuOFGzGvWc0mqUIsyjOlxtyuO90hlIGf73miir/jBFiibI22ACpZk6JSEPZ04
+ Syn24giQUaIxi7LDmUglI1KhD8IEqdSY4ODUt/gm83/h9unpCjv7Q/Mt4xhDtjry
+ RPUCunQjxD7AkoMJgblGQ7TNA/6EtoqPgeWZ0efRAaI7uL3zg==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
  :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
- :x-me-sender:x-sasl-enc; s=fm3; t=1649688579; x=1649774979; bh=X
- 0psM8mOPC5tboc4ALX7pSxlL04I+h8MQinfw7nvcP8=; b=je/jpwxhtLlOiUkq/
- g8IT6zHU2oKYbILVNJ6u1mzN3aNo19aRhkpoCZwXXUk9vlQd9COD2Ca1j/fdCqE+
- NqD2wVfYI6dOCqvbRIJoqoxX2ZzGKJPPUzbZy5axQwNMTEUQM6lyXA5CRSX+W7LR
- PtBt2rz8JKTBo5vClX2JcHEt0HlF4xhJ7WLPANBmvnBbULBwB2ZUFwSmj2vApoJM
- r18r9ojoheIqmwZYtDfr8BSVS/cSpOBOtajIlE2zy14t0paRvrbhu1lKlL2II3K+
- gW2CNvfFDZQsqrrMgmHf8xoRqUvQ0NNfICPsizwp0zmd5QaavnAYU8c8rLHMCtiO
- MIhuw==
+ :x-me-sender:x-sasl-enc; s=fm3; t=1649688579; x=1649774979; bh=B
+ AgmpcwEt0gfVgvDpeDzYs1wRFxGbkB+LV9cEifM9xc=; b=m52eBXeT19w8Yc9Wl
+ o8yT2zN0LvWeox4TaeFOxXxPQpxOC0aPpTPsA76TyIlMPyj0lGcnu0JhzjOOyoa2
+ tnMLec52tcCVbN4pRdlZxzM69mtqm/ieuE5gbgGvnpd0NzRS7MXI4cDBJtas11hk
+ S3i3wWcDtPbjrhCBStMEwj+Birat4DOgAnCxvhwD6D+2EFl8OJC83MhDSO8XJ3pb
+ PAGMDdXC4bA0HMkAOhXH8LenxbA55r9Lz6eKcRWig4JAdpEBuPiKYawE2pbJOx0G
+ TF55ucOpPA74tHBuSckvK9FkIeLZl+mL/ANox/bdObUSl3wZ+f0HKB+CLeM3i2zz
+ YVCHw==
 From: virtiofs-bot@sinrega.org
-Message-Id: <70411.122041110493901941@us-mta-124.us.mimecast.lan>
+Message-Id: <94891.122041110493903703@us-mta-648.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Mon, 11 Apr 2022 14:49:41 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] Issue closed: Match default rlimit_nofile
- logic with C virtiofsd
+Date: Mon, 11 Apr 2022 14:49:42 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR merged: Increment the rlimit_nofile for
+ all sandbox modes
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -35,13 +35,18 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Currently we don't raise open fd limit for sandbox=chroot mode. And for sandbox=namespace mode we do raise it.
+Currently, we only increment the rlimit_nofile with the user-supplied
+value within sandbox modes 'chroot' and 'namespace'. However, in the
+'namespace' mode, we don't honor '--rlimit-nofile=0' and we increase
+the value to the maximum, as in the default case.
+    
+This commit try to increase the rlimit_nofile for all modes,
+honoring '--rlimit-nofile=0'. Additionally, it leaves the limit
+unchanged if the limit is greater than 1M. Also, if everything fails
+the hard limit is used.
+    
 
-I would say try to match the logic we have in C version. Idea is to get a minimum default in all configurations so that it works reasonably well for all configurations.
-
-- If user passed option -o rlimit_nofile, simply follow that.
-- If user did not pass anything, then try to keep a default of 1M. This should work reasonably well for lot of workloads out of the box.
-- Call getrlimit() before raising limits. If caller has already setup the limit higher than 1M, don't do anything.
+Closes #37
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/37
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/104
 

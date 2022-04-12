@@ -1,30 +1,30 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; t=1649688999; x=1649775399; bh=9bIfyFRTfn3nCvd3AGih8
- Ku2POj+jAOGb/Op+4hZye0=; b=ThvDeQxkASBCjdwcMogK9WobQDBRbBMNLNYcc
- JBaZmpO1RJpTf5bBqmyrapH6VOUQIqvNCVjpeWuQjvYTXJ6yBdz4u0ls1RHbIoPg
- jW+LetFRH1z68JLJhosf2j9cRFO3FV0Pg5x0YhKogI6W4Qb83ZUDkn7hF/W/GqxM
- HeMCP2nx5UjgtXd/vkFShfnTEwfMqegAZ9jfmwUQ7gpkl7ICErXQIqy63S+ZvZLZ
- dLoJr5DFbPZP3RWbt+VgMUUqY+1RY1wIsLFLR5ZjrZOuVOtrA3+UlXHCFr1+ODvU
- uJhX7ISigyNmc7nWhntjRQyRdYMoaL05IFm+cihCQ2ZNnh75Q==
+ :to; s=fm1; t=1649806309; x=1649892709; bh=7j3GU+tpEUCt3Uhl+C8vH
+ IThAL9reYlSZrNEIKG9Ebg=; b=dfdO5MzcSJ/pK/XdP0UMAIue+Oh7KWcW1E5ue
+ Phr53iIrHciKb775/PmFYpXA3W4VOVtOkslCFa/zLrOMi47XUHCeuKboSi5cLE6r
+ 8GYXONqDgztuZixaWPG5A1TUzUrqenQuUAtdw5DHySn9oAHwMFREmCI4X5WUTxV9
+ 9vOrtF9k+pQCHQ7xopeprypWvTCygbm/CBQPYx/sKO5FQ8jOIgl+bRkXoGtxuDJH
+ swz6GWQdw/xYttKUnXMWqSRxsQWrygAMhaABWUyZF0KiiG1K6dpT0oiBwSvkgoUE
+ CkGFl4UZNxR2KRJceDproDrgKlEMDUuGCBetOc5rADNt52dCA==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
  :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
- :x-me-sender:x-sasl-enc; s=fm3; t=1649688999; x=1649775399; bh=9
- bIfyFRTfn3nCvd3AGih8Ku2POj+jAOGb/Op+4hZye0=; b=BaQH0j7ASQeFakcie
- vcV0c6h7dSGdc1glw5FP/tuFrdHVxstVzpGcDDk0V+PVSwb7uKRaLnuCifIqIOyD
- q5U5yuh7QiqxtGvb2UaAN7hZIKYA9K6WbiT8NFPqPx05KU/eRei8nP/RA4NyV292
- /AO1gdlb/qYToIftUZ8t2SNr+yTIIrZV0KqAHI8bEWzqhy2Za05mDYDc+oGnBVMn
- ACQm0ucBVWVY+rQDZu5wwpFtidXyhIoIt55TpLzjid4LZQTIFwAI7BEjZVgskuRc
- B88+6pChTVY0h21MWS+Vnw0882YBq+kLaOnaOuDLEDzrjyFajT1eUbILbmJ8Ct0x
- UNdog==
+ :x-me-sender:x-sasl-enc; s=fm3; t=1649806309; x=1649892709; bh=7
+ j3GU+tpEUCt3Uhl+C8vHIThAL9reYlSZrNEIKG9Ebg=; b=ZAo87agaJsdhYMj6Z
+ 6+Z37ZxLI+ZZ8+ldxmQc5NwPlq1syXM9F+gk+s/nEfNi7vDe8zThBX/P1kO20nF1
+ n4CYUyAMa9hLHQ3gsBzv7YYvejpqHU5VxxlBSA9vu/K+Mqkp/MWrsxtw0ee1HX3Q
+ +wfgv9eIStsxdVyIwLfNLmXvp65jmcoukmEbanux59jq5Pl4EBUSqLRTQJ/EjlZD
+ zHMjvZyxvR+Pz6tmz5UKsHYRAF1lYcWIIfgXXqcrGRa78zFFIF7WxvqHyzKIATu7
+ zdRRP8H1O+CWDxmQCEZI8Mfi9+ULAN6hQhW1BKsjtfxzGZCKegkV3Ep8d8X8WjrJ
+ EiQ3g==
 From: virtiofs-bot@sinrega.org
-Message-Id: <02521.122041110563902547@us-mta-122.us.mimecast.lan>
+Message-Id: <76194.122041219315000525@us-mta-546.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Mon, 11 Apr 2022 14:56:43 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR merged: Update inode file handles
- documentation
+Date: Tue, 12 Apr 2022 23:31:55 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR opened: Fix st_mode of . and ..
+ directories in readdirplus
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -35,7 +35,13 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Replaces the inode file handles deprecated option 'fallback' with 'prefer' introduced in !100.
+Generally, `st_mode` (as a field of `struct stat`) is made of `S_IFDIR`,
+`S_IFREG`, etc., but `d_type` (as a field of `struct dirent`) is made of
+`DT_DIR`, `DT_REG`, etc. But these definitions are differ up to a 12 bit
+shift.
+It leads to incorrect attributes of `.` and `..` in Windows guest, so fix it.
+
+Fixes https://bugzilla.redhat.com/show_bug.cgi?id=2074311
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/109
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/111
 

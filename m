@@ -1,30 +1,29 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; t=1649806309; x=1649892709; bh=7j3GU+tpEUCt3Uhl+C8vH
- IThAL9reYlSZrNEIKG9Ebg=; b=dfdO5MzcSJ/pK/XdP0UMAIue+Oh7KWcW1E5ue
- Phr53iIrHciKb775/PmFYpXA3W4VOVtOkslCFa/zLrOMi47XUHCeuKboSi5cLE6r
- 8GYXONqDgztuZixaWPG5A1TUzUrqenQuUAtdw5DHySn9oAHwMFREmCI4X5WUTxV9
- 9vOrtF9k+pQCHQ7xopeprypWvTCygbm/CBQPYx/sKO5FQ8jOIgl+bRkXoGtxuDJH
- swz6GWQdw/xYttKUnXMWqSRxsQWrygAMhaABWUyZF0KiiG1K6dpT0oiBwSvkgoUE
- CkGFl4UZNxR2KRJceDproDrgKlEMDUuGCBetOc5rADNt52dCA==
+ :to; s=fm1; t=1649834202; x=1649920602; bh=bGlrZqGW2NAZZ3zBqluFp
+ jtDLM+vC7/yDyOUiCrguAU=; b=q2vE0s0w/ukG1qg4BLAiHaGYBcx5AYsplOcx8
+ Rwcb+jodmyWKqBFzSoDZItt4NCosstO3cHsJFWLqOv0sjxqGEcPGBr9a4/N8BLxf
+ g2zzJC9GeONe2mwQNTMMTPxDRvbHAkU1ZigTY3HJlqvEVjM5pq2ip3vbme9luQoF
+ k9T3c2nd5CnxAJEKybPP2x6+QmYn2tCzN2SjRKHgR9SQyBAJlC1c+fxwxkyHPvxk
+ EOxes6RhsxOnNsGMLZz9g7O3d5Zrou/eWQ8MZAPATd95rcj0YL2JcgISMWMzKgpa
+ wonoapTaIcvsHzGHP/y3fyYuV9NyU7B5aZlMrndPT1TgXQIBQ==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
  :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
- :x-me-sender:x-sasl-enc; s=fm3; t=1649806309; x=1649892709; bh=7
- j3GU+tpEUCt3Uhl+C8vHIThAL9reYlSZrNEIKG9Ebg=; b=ZAo87agaJsdhYMj6Z
- 6+Z37ZxLI+ZZ8+ldxmQc5NwPlq1syXM9F+gk+s/nEfNi7vDe8zThBX/P1kO20nF1
- n4CYUyAMa9hLHQ3gsBzv7YYvejpqHU5VxxlBSA9vu/K+Mqkp/MWrsxtw0ee1HX3Q
- +wfgv9eIStsxdVyIwLfNLmXvp65jmcoukmEbanux59jq5Pl4EBUSqLRTQJ/EjlZD
- zHMjvZyxvR+Pz6tmz5UKsHYRAF1lYcWIIfgXXqcrGRa78zFFIF7WxvqHyzKIATu7
- zdRRP8H1O+CWDxmQCEZI8Mfi9+ULAN6hQhW1BKsjtfxzGZCKegkV3Ep8d8X8WjrJ
- EiQ3g==
+ :x-me-sender:x-sasl-enc; s=fm1; t=1649834202; x=1649920602; bh=b
+ GlrZqGW2NAZZ3zBqluFpjtDLM+vC7/yDyOUiCrguAU=; b=ELaAa7DxnsK/EQHbg
+ PZd5ZPR30LTC5jDpwDIJp3mGxKLbBHh7PhCGHFVwyXTyLSbQ5PmvhUie8VdV4JsK
+ 4hLZUSIacCCu9GzGzLx3cCbwnfc4vTW5lJ0PVMOq1myZEpvfxbyiZHQtA08IXws/
+ wtajGpRj9BczlsLHrpkuinJ0cScGGthwcH5Ol6cp2HzzzY3bOZna1GHnpqGU8awq
+ XUpWogmTZ2jOreeHtlJQ6O80/W/fAY9E60yaSQq8580T3UZf0Lh0tYHqmM+h9PgK
+ upbiT75ScTrwaAA/zWi/H0ad44HewTr1Yuzf8mzDO/tRUTroQSQp6shdM9vU0QPk
+ 6Atxg==
 From: virtiofs-bot@sinrega.org
-Message-Id: <76194.122041219315000525@us-mta-546.us.mimecast.lan>
+Message-Id: <67403.122041303164400203@us-mta-67.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Tue, 12 Apr 2022 23:31:55 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR opened: Fix st_mode of . and ..
- directories in readdirplus
+Date: Wed, 13 Apr 2022 07:16:52 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR merged: Add posix ACLs support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -35,13 +34,9 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Generally, `st_mode` (as a field of `struct stat`) is made of `S_IFDIR`,
-`S_IFREG`, etc., but `d_type` (as a field of `struct dirent`) is made of
-`DT_DIR`, `DT_REG`, etc. But these definitions are differ up to a 12 bit
-shift.
-It leads to incorrect attributes of `.` and `..` in Windows guest, so fix it.
+Fuse has an option FUSE_POSIX_ACL which needs to be opted in by fuse server to enable posix ACLs. Add virtiofsd option '--posix-acls ' to let users enable posix ACLs support, and the compatibility options '-o posix_acl/no_posix_acl'.
 
-Fixes https://bugzilla.redhat.com/show_bug.cgi?id=2074311
+Closes #33
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/111
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/95
 

@@ -1,30 +1,13 @@
-Return-Path: <virtiofs-bot@sinrega.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
- cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; t=1649874859; x=1649961259; bh=PpjFMT9SIXY4LoDU+DJBM
- HecofwmZ8z0Dhj63VOPHt0=; b=X86r6/JAy7AVbaZIvdhwxL1a14HVwLQny7DUQ
- 9t5jVyEWOdtEZCUbuhNdKl8d04JWT3V9mSkNUkszoiu4b7D8kNR0T7KuvtFCPEzf
- RwU9rAP6q3CtXMPun03d1WJ60OuHDZN+Y3erJQGieRYcFPaMpwtJFB6u1Sl1oFy6
- F4/tv1NgCclpL1NCO6VvIqZKfNQBCjXcYMK5CNlH/D9sJhjrTzJWyueKQbrbEjJB
- SZsBAKWPFsc7BUaML0hdYUjdEOzG5KW2FWx2CauXFRgLZpFhg2B/fbb/RGb/9W2L
- LB0Abkw0Ic2YtHi0hr6F/FfHa/449lo5wxAZLRVenCChfk1Yw==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
- messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
- :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
- :x-me-sender:x-sasl-enc; s=fm1; t=1649874859; x=1649961259; bh=P
- pjFMT9SIXY4LoDU+DJBMHecofwmZ8z0Dhj63VOPHt0=; b=PScQ0smyKFrRRGKrw
- Nb93pjZQH11QwN3Ri56385KbsL5Z4gY9EjhvxrTgKHQBGmeqBAvFYoTvkie/fGpr
- Wsnkx1MPcbET919/eLQJt/n8jXjWeKorbKZBxFG/v54QEPgt6YmxAcynmxMEE+NW
- 0wc+K0SeFVQ1wMwBJZeUe0k/nNRbKyg5zItc8pHVYV7TduRA6khKxaZeHniPqDDx
- 4xyCkyDJplIEvn3Zh/CsCCVcdNaV+/6kVxtECrEmtcHtg9eTtL9Hmr1HS3PusriS
- 2dqryV+NLqlpXCXZG9Tu4FsIImgLqWnRZt2exK1cH3gAkKnSImcxoE+EFcJFeMC+
- DiHUQ==
-From: virtiofs-bot@sinrega.org
-Message-Id: <39842.122041314342000118@us-mta-479.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Wed, 13 Apr 2022 18:34:22 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] Issue opened: virtiofsd process's fd keeps
- increasing, not decreasing
+Return-Path: <saarspass_mkt@saarspass.de>
+Date: Fri, 15 Apr 2022 09:56:05 +0000
+From: =?UTF-8?Q?Adventure_Golf_Z=C3=BClpich?= <info@adventuregolf-zuelpich.de>
+Reply-To: info@adventuregolf-zuelpich.de
+Message-ID: <JdI951lA76fMq4amNATtCNBnJRa60xVSz19UeAo@www.adventuregolf-zuelpich.de>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+Subject: [Virtio-fs] =?utf-8?q?Ihre_Gutscheinbestellung_bei_Adventure_Gol?=
+ =?utf-8?q?f_Z=C3=BClpich?=
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -35,10 +18,47 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-1. The directory /mnt/a of the virtual machine container is mounted on /mnt/b of the host. At this time, the process of virtiofsd runs in the background of the host. Assuming that the pid of virtiofsd is 100,
-2. Then enter /mnt/a of the virtual machine container, and execute the ls or touch command on the terminal
-3. Execute ls -l /proc/100/fd on the host, and you will find that the file fd displayed by the ls or touch command just executed is not closed
-hope to answer
----
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/45
+Vielen Dank f=C3=BCr Ihre Bestellung bei Adventure Golf Z=C3=BClpich!
+Wir melden uns schnellsm=C3=B6glich bei Ihnen.
+
+Hier die Bestellung noch einmal im =C3=9Cberblick:
+
+Von: =F0=9F=8D=93 Ann want to meet you! Click here: https://cutt.us/sIxnR?p=
+8w =F0=9F=8D=93 <virtio-fs@redhat.com>
+Betreff: [your-subject]
+
+Name:
+=F0=9F=8D=93 Ann want to meet you! Click here: https://cutt.us/sIxnR?p8w =
+=F0=9F=8D=93
+
+E-Mail-Adresse:
+virtio-fs@redhat.com
+
+Telefonnummer
+632533112504
+
+Stra=C3=9Fe
+380nt3
+
+PLZ und Ort
+3ox72kpa
+
+Wert des Gutscheins
+jjr627
+
+Gutschein f=C3=BCr Ticket:
+Saisonticket 2016 (nur Adventure Golf)
+
+Nachricht (optional):
+zy8evoa
+
+Einverst=C3=A4ndniserkl=C3=A4rung: Ja, ich bin einverstanden, dass meine pe=
+rsonenbezogenen Daten elektronisch erhoben und gespeichert werden. Meine Da=
+ten werden nur zum Zweck der Beantwortung meiner Anfrage verwendet. Mit den=
+ Datenschutzhinweisen https://adventuregolf-zuelpich/datenschutz/ bin ich e=
+inverstanden.
+
+--
+Diese E-Mail wurde von einem Kontaktformular von Adventure Golf Z=C3=BClpic=
+h (http://www.adventuregolf-zuelpich.de) gesendet
 

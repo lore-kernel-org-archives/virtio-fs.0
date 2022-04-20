@@ -1,30 +1,19 @@
-Return-Path: <virtiofs-bot@sinrega.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
- cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm2; t=1655445778; x=1655532178; bh=3Ozhf5+CBIb9hJkhDZu1d
- JfQJ7+xwCLC153GjlCxj20=; b=O6sVxaLGwDHm/wR02cUIVxT4yfeQCAAcK6yoQ
- Gz/VqcZPwr11AL3BOLLsaIkFW70NVNI0k5O556AsopGQXYGCplrTUlY19Gth/kxI
- 8lIqIwWpY7zDSaxMQA7mdL5/zRYECle6OOSekE7TCW5CDeTm4DP5dInF4QN3DHOC
- JiooL5sayzEIUP1GUf2B+4eiOtvDaxnuc7WWvcPx/VVa0iJPl1DFr1XgPbQK+f5l
- Le4A2XW0bKlTNwdkZThQlA09NjDZx9nekYBvP/yUlipS64/3D4VLDaXco+PNpr1z
- m2XEMMwGbuCt8Gey5y21d5azopa9de0M0cPPxz7bHERx+Is6w==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
- messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
- :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
- :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm2; t=
- 1655445778; x=1655532178; bh=3Ozhf5+CBIb9hJkhDZu1dJfQJ7+xwCLC153
- GjlCxj20=; b=CtSFXVmiQ6wSwZoCK6ecccUtj7VcBQA6jIKaDRewJUltL+HRfu5
- M/PFdxt8isIUGGJVYV9pWAj6a1fOyH2Os2KMNwGhOpS5ndtHUES2Bhpr3TkLkOkh
- nXq0PK0r/ZCXUwRE3L1KL/qvGE7Av5btBhOUKvKfu11ADh7zjZbJsaUSl76aQqLR
- Zqq5aKUulHSmEBzIneYDC/leiVJdw+qEi0mW0d/H9hSVy5GjyRTb8FPimj49TLhm
- e33nsjpJhyTEc75d9OT4MM03jk1xAl7u8EZgTZBJAGbIpptPObHTwbO9E+7Dcudt
- nC6sEgLYa0HS6P3qHLMEBseuS35v0w8C3Qg==
-From: virtiofs-bot@sinrega.org
-Message-Id: <92515.122061702030000245@us-mta-253.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Fri, 17 Jun 2022 06:03:02 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR merged: Fix nightly clippy
- derive_partial_eq_without_eq warning
+Return-Path: <berrange@redhat.com>
+Date: Wed, 20 Apr 2022 17:13:25 +0100
+From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+Message-ID: <YmAxJdh6mupPRxh+@redhat.com>
+Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+References: <20220420132624.2439741-1-marcandre.lureau@redhat.com>
+ <20220420132624.2439741-7-marcandre.lureau@redhat.com>
+ <YmAg+9GExN7wn6Yb@redhat.com>
+ <CAFEAcA-n89moZJX5t72ek0iB0MEMQCAyq9jhVymcwyHEK_NNMw@mail.gmail.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <CAFEAcA-n89moZJX5t72ek0iB0MEMQCAyq9jhVymcwyHEK_NNMw@mail.gmail.com>
+Subject: Re: [Virtio-fs] [PATCH 06/41] include: rename qemu-common.h
+ qemu/copyright.h
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,19 +22,36 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Peter Maydell <peter.maydell@linaro.org>
+Cc: marcandre.lureau@redhat.com, qemu-devel@nongnu.org, Kevin Wolf <kwolf@redhat.com>, Fam Zheng <fam@euphon.net>, Vladimir Sementsov-Ogievskiy <v.sementsov-og@mail.ru>, Akihiko Odaki <akihiko.odaki@gmail.com>, "open list:Block layer core" <qemu-block@nongnu.org>, Kyle Evans <kevans@freebsd.org>, Laurent Vivier <laurent@vivier.eu>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, "open list:virtiofs" <virtio-fs@redhat.com>, Hanna Reitz <hreitz@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Michael Roth <michael.roth@amd.com>, Eric Blake <eblake@redhat.com>, Warner Losh <imp@bsdimp.com>, Philippe =?utf-8?Q?Mathieu-Daud=C3=A9?= <f4bug@amsat.org>
 
-The nightly version of clippy (v1.63.0) warns about implementing
-`PartialEq` without implementing `Eq` when all the member of the
-`struct` or `enum` implement both:
+On Wed, Apr 20, 2022 at 05:10:51PM +0100, Peter Maydell wrote:
+> On Wed, 20 Apr 2022 at 16:04, Daniel P. Berrangé <berrange@redhat.com> wrote:
+> >
+> > On Wed, Apr 20, 2022 at 05:25:49PM +0400, marcandre.lureau@redhat.com wrote:
+> > > From: Marc-André Lureau <marcandre.lureau@redhat.com>
+> >
+> > Could use a commit message explaining why this is a good
+> > idea.
+> >
+> > I see it contains QEMU_COPYRIGHT macro, but it also then
+> > contains QEMU_HELP_BOTTOM which is about bug reporting
+> > not copyright.
+> >
+> > IMHO something like 'qemu-cli.h' could be a better match
+> 
+> "-cli" is both too broad and also inaccurate, because we use
+> these macros in the GUI UI frontends too. It's "macros defining
+> strings for use in version/usage/help dialogs and output".
+> Maybe qemu/help-texts.h ?
 
-```
-#[derive(Debug, Copy, Clone, PartialEq)]
-                             ^^^^^^^^^ help: consider deriving `Eq` as well: `PartialEq, Eq`
-```
+I guess I tend to still view qemu-system-XXX as cli, despite the
+possibility of a GUI, since you're passing 10's/100's of CLI
+parameters regardless.
 
-For further information visit
-https://rust-lang.github.io/rust-clippy/master/index.html#derive_partial_eq_without_eq
----
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/125
-
+With regards,
+Daniel
+-- 
+|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
+|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
+|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|

@@ -1,30 +1,26 @@
-Return-Path: <virtiofs-bot@sinrega.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
- cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm3; t=1657174093; x=1657260493; bh=29iIEq9Ayh7xJN5qCpGl9
- Jf8W/c0mjkU+deF9hXAevI=; b=aQ5P8EgfkyrxgnerKvmaPIRGxNHTXUL3/Xk/9
- vXqTJEbIhMvazC1a08uR6y1bGerVTZVd0UqnCW6IQIbkNGRfAx0Ufkkp3GiNM+Qp
- iAg8FTAj8luqchbs8gjoJUzcF8FkUPDk2byy8r0OojRDYlvzogEiaICWLQ6Rm24g
- 5I9y1gix8YAZnUujlCnWeeAJ/aDX57qx2mBJdPPwTi2tPmtcYHRO2WUt+r99EjWU
- mxUOhry+vFqxhkvxvlusDeUSKhNwV7Gq+rbapi3lcZ3NSvaXVHAHJKz4XjfPAgBr
- N3JcilblHPeOujgXDNiNlUwW4edPy+D6nqYMtO0GOX+ti3bvA==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
- messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
- :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
- :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm3; t=
- 1657174093; x=1657260493; bh=29iIEq9Ayh7xJN5qCpGl9Jf8W/c0mjkU+de
- F9hXAevI=; b=rBEXtd6hrZoYUPf8xGBn+iDrkQ/7xT2J8eJKiErrZvSp4i0C0Yy
- kXIN3cESBd+Wo0f2mEi0jU/RPnJu0N3o7mcUxRhdIaE2r20qg8zAe2134l5j7zTE
- 0Vl4Mlpd5Cjsm/KzbwCAOAoDd9wZJY6UeIwAMoAce+cgmr9wGPmpAV9SVGfy/K/5
- q+9qpUSDvfdk3819RkeHFPBMSsYu4B4nH4rTTjJdBDfsvaG2SR3yPurb1/NVkCGj
- 5+K0c+uFAbXPfqUEiRsqoQBoefhvdTphtNWQmSmaET8VOMfoOyhxvj3FJ8n+Otbs
- ryZ5FwO3OQsHEwrAiceeHr8WGNxZTKpDCIQ==
-From: virtiofs-bot@sinrega.org
-Message-Id: <65675.122070702081300201@us-mta-22.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Thu,  7 Jul 2022 06:08:27 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR opened: Update virtio-queue and
- vhost-user-backend deps
+Return-Path: <peter.maydell@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc:content-transfer-encoding;
+ bh=OwHUEDY2EXzaY0pEwGqTeB6dkRDc3iu9YRLJY5iV6xw=;
+ b=CAvpzHmxBceOdz1vEToatSSJmct5B2tkYgEsZ73GRy6p4aDFiuy4JAgY0kMlw0gDH7
+ HwPGpQHlFBMksWPRwriKncGI5hn9fQzkeBmvCR5gYwG0jdJ8jFpmxMXGEYR6xhwiLdNT
+ v+vr0u/GG6p3XtqcEYpVJUQiFFdLzFAV8vanO/Kxeg5YI3IexbceF7gixtYZRoJQCk1T
+ +vD3+3i6zPOQnD29UL8uZOj0ySyhmlbMzwNUxUXZ49eVHJa6sCh7ncPBFsnYYdKpnQ+4
+ YLifpM8YX9Pza5Z4kRfLxc6zJ0+gdC9cEZP/V2Km6GvfMJSPCW+kmvpNmjmt3DyQzwK8
+ q+1w==
+MIME-Version: 1.0
+References: <20220420132624.2439741-1-marcandre.lureau@redhat.com>
+ <20220420132624.2439741-7-marcandre.lureau@redhat.com>
+ <YmAg+9GExN7wn6Yb@redhat.com>
+In-Reply-To: <YmAg+9GExN7wn6Yb@redhat.com>
+From: Peter Maydell <peter.maydell@linaro.org>
+Date: Wed, 20 Apr 2022 17:10:51 +0100
+Message-ID: <CAFEAcA-n89moZJX5t72ek0iB0MEMQCAyq9jhVymcwyHEK_NNMw@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH 06/41] include: rename qemu-common.h
+ qemu/copyright.h
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,15 +29,29 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>
+Cc: marcandre.lureau@redhat.com, qemu-devel@nongnu.org, Kevin Wolf <kwolf@redhat.com>, Fam Zheng <fam@euphon.net>, Vladimir Sementsov-Ogievskiy <v.sementsov-og@mail.ru>, Akihiko Odaki <akihiko.odaki@gmail.com>, "open list:Block layer core" <qemu-block@nongnu.org>, Kyle Evans <kevans@freebsd.org>, Laurent Vivier <laurent@vivier.eu>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, "open list:virtiofs" <virtio-fs@redhat.com>, Hanna Reitz <hreitz@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Michael Roth <michael.roth@amd.com>, Eric Blake <eblake@redhat.com>, Warner Losh <imp@bsdimp.com>, =?UTF-8?Q?Philippe_Mathieu=2DDaud=C3=A9?= <f4bug@amsat.org>
 
-There are new releases of virtio-queue (0.4.0) and
-vhost-user-backend (0.5.0), update our dependencies to use them.
+On Wed, 20 Apr 2022 at 16:04, Daniel P. Berrang=C3=A9 <berrange@redhat.com>=
+ wrote:
+>
+> On Wed, Apr 20, 2022 at 05:25:49PM +0400, marcandre.lureau@redhat.com wro=
+te:
+> > From: Marc-Andr=C3=A9 Lureau <marcandre.lureau@redhat.com>
+>
+> Could use a commit message explaining why this is a good
+> idea.
+>
+> I see it contains QEMU_COPYRIGHT macro, but it also then
+> contains QEMU_HELP_BOTTOM which is about bug reporting
+> not copyright.
+>
+> IMHO something like 'qemu-cli.h' could be a better match
 
-This time, the API has stayed stable and we don't need any other
-changes than bumping their versions in Cargo.toml.
+"-cli" is both too broad and also inaccurate, because we use
+these macros in the GUI UI frontends too. It's "macros defining
+strings for use in version/usage/help dialogs and output".
+Maybe qemu/help-texts.h ?
 
-Signed-off-by: Sergio Lopez <slp@redhat.com>
----
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/126
+-- PMM
 

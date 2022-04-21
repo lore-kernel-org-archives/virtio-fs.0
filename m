@@ -1,11 +1,12 @@
-Return-Path: <lulu@redhat.com>
-From: Cindy Lu <lulu@redhat.com>
-Date: Wed, 20 Jul 2022 21:11:57 +0800
-Message-Id: <20220720131204.591104-4-lulu@redhat.com>
+Return-Path: <liuyd.fnst@fujitsu.com>
+From: Liu Yiding <liuyd.fnst@fujitsu.com>
+Date: Thu, 21 Apr 2022 17:51:51 +0800
+Message-ID: <20220421095151.2231099-1-liuyd.fnst@fujitsu.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v13 03/10] virtio-pci: decouple the single
- vector from the interrupt process
+Content-Type: text/plain
+Subject: [Virtio-fs] [PATCH] virtiofsd: Add docs/helper for
+ killpriv_v2/no_killpriv_v2 option
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -14,193 +15,50 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: lulu@redhat.com, qemu-devel@nongnu.org
-Cc: Jason Wang <jasowang@redhat.com>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Gerd Hoffmann <kraxel@redhat.com>, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
+Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, Liu Yiding <liuyd.fnst@fujitsu.com>
 
-To reuse the interrupt process in configure interrupt
-Need to decouple the single vector from the interrupt process.
-We add new function kvm_virtio_pci_vector_use_one and _release_one.
-These functions are used for the single vector, the whole process will
-finish in the loop with vq number.
+virtiofsd has introduced killpriv_v2/no_killpriv_v2 for a while. Add
+description of it to docs/helper.
 
-Signed-off-by: Cindy Lu <lulu@redhat.com>
+Signed-off-by: Liu Yiding <liuyd.fnst@fujitsu.com>
 ---
- hw/virtio/virtio-pci.c | 131 +++++++++++++++++++++++------------------
- 1 file changed, 73 insertions(+), 58 deletions(-)
+ docs/tools/virtiofsd.rst | 5 +++++
+ tools/virtiofsd/helper.c | 3 +++
+ 2 files changed, 8 insertions(+)
 
-diff --git a/hw/virtio/virtio-pci.c b/hw/virtio/virtio-pci.c
-index 2869d0d2f6..4b86008bcf 100644
---- a/hw/virtio/virtio-pci.c
-+++ b/hw/virtio/virtio-pci.c
-@@ -676,7 +676,6 @@ static uint32_t virtio_read_config(PCIDevice *pci_dev,
- }
+diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
+index 0c0560203c..85398cce09 100644
+--- a/docs/tools/virtiofsd.rst
++++ b/docs/tools/virtiofsd.rst
+@@ -111,6 +111,11 @@ Options
+     label. Server will try to set that label on newly created file
+     atomically wherever possible.
  
- static int kvm_virtio_pci_vq_vector_use(VirtIOPCIProxy *proxy,
--                                        unsigned int queue_no,
-                                         unsigned int vector)
- {
-     VirtIOIRQFD *irqfd = &proxy->vector_irqfd[vector];
-@@ -741,87 +740,103 @@ static int virtio_pci_get_notifier(VirtIOPCIProxy *proxy, int queue_no,
-     return 0;
- }
++  * killpriv_v2|no_killpriv_v2 -
++    Enable/disable ``FUSE_HANDLE_KILLPRIV_V2`` support. KILLPRIV_V2 is enabled
++    by default as long as client supports it.  Enabling this option helps with
++    performance in write path.
++
+ .. option:: --socket-path=PATH
  
--static int kvm_virtio_pci_vector_use(VirtIOPCIProxy *proxy, int nvqs)
-+static int kvm_virtio_pci_vector_use_one(VirtIOPCIProxy *proxy, int queue_no)
- {
-+    unsigned int vector;
-+    int ret;
-+    EventNotifier *n;
-     PCIDevice *dev = &proxy->pci_dev;
-     VirtIODevice *vdev = virtio_bus_get_device(&proxy->bus);
-     VirtioDeviceClass *k = VIRTIO_DEVICE_GET_CLASS(vdev);
--    unsigned int vector;
--    int ret, queue_no;
--    EventNotifier *n;
--    for (queue_no = 0; queue_no < nvqs; queue_no++) {
--        if (!virtio_queue_get_num(vdev, queue_no)) {
--            break;
--        }
--        ret = virtio_pci_get_notifier(proxy, queue_no, &n, &vector);
--        if (ret < 0) {
--            break;
--        }
--        if (vector >= msix_nr_vectors_allocated(dev)) {
--            continue;
--        }
--        ret = kvm_virtio_pci_vq_vector_use(proxy, queue_no, vector);
-+
-+    ret = virtio_pci_get_notifier(proxy, queue_no, &n, &vector);
-+    if (ret < 0) {
-+        return ret;
-+    }
-+    if (vector >= msix_nr_vectors_allocated(dev)) {
-+        return 0;
-+    }
-+    ret = kvm_virtio_pci_vq_vector_use(proxy, vector);
-+    if (ret < 0) {
-+        goto undo;
-+    }
-+    /*
-+     * If guest supports masking, set up irqfd now.
-+     * Otherwise, delay until unmasked in the frontend.
-+     */
-+    if (vdev->use_guest_notifier_mask && k->guest_notifier_mask) {
-+        ret = kvm_virtio_pci_irqfd_use(proxy, n, vector);
-         if (ret < 0) {
-+            kvm_virtio_pci_vq_vector_release(proxy, vector);
-             goto undo;
-         }
--        /* If guest supports masking, set up irqfd now.
--         * Otherwise, delay until unmasked in the frontend.
--         */
--        if (vdev->use_guest_notifier_mask && k->guest_notifier_mask) {
--            ret = kvm_virtio_pci_irqfd_use(proxy, n, vector);
--            if (ret < 0) {
--                kvm_virtio_pci_vq_vector_release(proxy, vector);
--                goto undo;
--            }
--        }
-     }
--    return 0;
- 
-+    return 0;
- undo:
--    while (--queue_no >= 0) {
--        vector = virtio_queue_vector(vdev, queue_no);
--        if (vector >= msix_nr_vectors_allocated(dev)) {
--            continue;
-+
-+    vector = virtio_queue_vector(vdev, queue_no);
-+    if (vector >= msix_nr_vectors_allocated(dev)) {
-+        return ret;
-+    }
-+    if (vdev->use_guest_notifier_mask && k->guest_notifier_mask) {
-+        ret = virtio_pci_get_notifier(proxy, queue_no, &n, &vector);
-+        if (ret < 0) {
-+            return ret;
-         }
--        if (vdev->use_guest_notifier_mask && k->guest_notifier_mask) {
--            ret = virtio_pci_get_notifier(proxy, queue_no, &n, &vector);
--            if (ret < 0) {
--                break;
--            }
--            kvm_virtio_pci_irqfd_release(proxy, n, vector);
-+        kvm_virtio_pci_irqfd_release(proxy, n, vector);
-+    }
-+    return ret;
-+}
-+static int kvm_virtio_pci_vector_use(VirtIOPCIProxy *proxy, int nvqs)
-+{
-+    int queue_no;
-+    int ret = 0;
-+    VirtIODevice *vdev = virtio_bus_get_device(&proxy->bus);
-+
-+    for (queue_no = 0; queue_no < nvqs; queue_no++) {
-+        if (!virtio_queue_get_num(vdev, queue_no)) {
-+            return -1;
-         }
--        kvm_virtio_pci_vq_vector_release(proxy, vector);
-+        ret = kvm_virtio_pci_vector_use_one(proxy, queue_no);
-     }
-     return ret;
- }
- 
--static void kvm_virtio_pci_vector_release(VirtIOPCIProxy *proxy, int nvqs)
-+
-+static void kvm_virtio_pci_vector_release_one(VirtIOPCIProxy *proxy,
-+                                              int queue_no)
- {
--    PCIDevice *dev = &proxy->pci_dev;
-     VirtIODevice *vdev = virtio_bus_get_device(&proxy->bus);
-     unsigned int vector;
--    int queue_no;
--    VirtioDeviceClass *k = VIRTIO_DEVICE_GET_CLASS(vdev);
-     EventNotifier *n;
--    int ret ;
-+    int ret;
-+    VirtioDeviceClass *k = VIRTIO_DEVICE_GET_CLASS(vdev);
-+    PCIDevice *dev = &proxy->pci_dev;
-+
-+    ret = virtio_pci_get_notifier(proxy, queue_no, &n, &vector);
-+    if (ret < 0) {
-+        return;
-+    }
-+    if (vector >= msix_nr_vectors_allocated(dev)) {
-+        return;
-+    }
-+    if (vdev->use_guest_notifier_mask && k->guest_notifier_mask) {
-+        kvm_virtio_pci_irqfd_release(proxy, n, vector);
-+    }
-+    kvm_virtio_pci_vq_vector_release(proxy, vector);
-+}
-+
-+static void kvm_virtio_pci_vector_release(VirtIOPCIProxy *proxy, int nvqs)
-+{
-+    int queue_no;
-+    VirtIODevice *vdev = virtio_bus_get_device(&proxy->bus);
-+
-     for (queue_no = 0; queue_no < nvqs; queue_no++) {
-         if (!virtio_queue_get_num(vdev, queue_no)) {
-             break;
-         }
--        ret = virtio_pci_get_notifier(proxy, queue_no, &n, &vector);
--        if (ret < 0) {
--            break;
--        }
--        if (vector >= msix_nr_vectors_allocated(dev)) {
--            continue;
--        }
--        /* If guest supports masking, clean up irqfd now.
--         * Otherwise, it was cleaned when masked in the frontend.
--         */
--        if (vdev->use_guest_notifier_mask && k->guest_notifier_mask) {
--            kvm_virtio_pci_irqfd_release(proxy, n, vector);
--        }
--        kvm_virtio_pci_vq_vector_release(proxy, vector);
-+        kvm_virtio_pci_vector_release_one(proxy, queue_no);
-     }
+   Listen on vhost-user UNIX domain socket at PATH.
+diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
+index e226fc590f..f8981e5bdf 100644
+--- a/tools/virtiofsd/helper.c
++++ b/tools/virtiofsd/helper.c
+@@ -188,6 +188,9 @@ void fuse_cmdline_help(void)
+            "    -o announce_submounts      Announce sub-mount points to the guest\n"
+            "    -o posix_acl/no_posix_acl  Enable/Disable posix_acl. (default: disabled)\n"
+            "    -o security_label/no_security_label  Enable/Disable security label. (default: disabled)\n"
++           "    -o killpriv_v2/no_killpriv_v2\n"
++           "                               Enable/Disable FUSE_HANDLE_KILLPRIV_V2.\n"
++           "                               (default: enabled as long as client supports it)\n"
+            );
  }
  
 -- 
-2.34.3
+2.31.1
+
+
 

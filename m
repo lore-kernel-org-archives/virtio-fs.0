@@ -1,19 +1,14 @@
-Return-Path: <elena.hifitech@gmail.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
- h=mime-version:from:date:message-id:subject:to;
- bh=r/+ZKNtU/AF4zoLIGFiBsb0BYalg7k3t3g8eIYEY3UM=;
- b=jwFjoTw4erNjYGgoALyyeO/QGYtnpAbE6BdNH0+DMyQeeprMQbm6A5tyOQJdMjL1DT
- BTlBMdGLns4hIjMI4DVCoAUl7nxFr2df8pMQJnbG6bgl5c563iMFLkCs9iZUWc9WU1PH
- BMI1QqZC8uw78mkOQ5+2MpWJTUrYHdQQInCSySFziptVy9P6wvc4pcguv6EhuGhqMYBk
- lVRbg7oaZpGwr7mmqERVt9bxga1aOVn7SZ6A9LZRTQfzEBUtK3J9poCQAtMJhqQcAYm2
- 9RXyI0spvuj1oUMz1zeyOtUlZEU38ZwCwTxTIVSomxK1+1taOHxBCBYk4qWqZdSo5e+l
- 9CwQ==
+Return-Path: <marcandre.lureau@redhat.com>
+From: marcandre.lureau@redhat.com
+Date: Thu, 21 Apr 2022 17:49:15 +0400
+Message-Id: <20220421134940.2887768-6-marcandre.lureau@redhat.com>
+In-Reply-To: <20220421134940.2887768-1-marcandre.lureau@redhat.com>
+References: <20220421134940.2887768-1-marcandre.lureau@redhat.com>
 MIME-Version: 1.0
-From: Ding Elena <elena.hifitech@gmail.com>
-Date: Tue, 19 Apr 2022 16:17:47 +0800
-Message-ID: <CAHszi0C5sZEgnv5S=gfhOviFJY1v-_Y1NFqbVvxOXtNabTfsPg@mail.gmail.com>
-Content-Type: multipart/alternative; boundary="000000000000bb2d7605dcfd8319"
-Subject: [Virtio-fs] Custom Beach Towels & T-shirts
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PULL 05/30] include: rename qemu-common.h
+ qemu/help-texts.h
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,199 +17,178 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: qemu-devel@nongnu.org
+Cc: richard.henderson@linaro.org, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Warner Losh <imp@bsdimp.com>, Kyle Evans <kevans@freebsd.org>, Laurent Vivier <laurent@vivier.eu>, Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, Eric Blake <eblake@redhat.com>, Vladimir Sementsov-Ogievskiy <v.sementsov-og@mail.ru>, Michael Roth <michael.roth@amd.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Peter Maydell <peter.maydell@linaro.org>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <f4bug@amsat.org>, Akihiko Odaki <akihiko.odaki@gmail.com>, Gerd Hoffmann <kraxel@redhat.com>, "open list:Block layer core" <qemu-block@nongnu.org>, "open list:virtiofs" <virtio-fs@redhat.com>
 
---000000000000bb2d7605dcfd8319
-Content-Type: text/plain; charset="UTF-8"
+From: Marc-André Lureau <marcandre.lureau@redhat.com>
 
-Hi Friend
+Suggested-by: Peter Maydell <peter.maydell@linaro.org>
+Signed-off-by: Marc-André Lureau <marcandre.lureau@redhat.com>
+Reviewed-by: Warner Losh <imp@bsdimp.com>
+Message-Id: <20220420132624.2439741-7-marcandre.lureau@redhat.com>
+---
+ include/{qemu-common.h => qemu/help-texts.h} | 0
+ bsd-user/main.c                              | 2 +-
+ linux-user/main.c                            | 2 +-
+ qemu-img.c                                   | 2 +-
+ qemu-io.c                                    | 2 +-
+ qemu-nbd.c                                   | 2 +-
+ qga/main.c                                   | 2 +-
+ scsi/qemu-pr-helper.c                        | 2 +-
+ softmmu/vl.c                                 | 2 +-
+ storage-daemon/qemu-storage-daemon.c         | 2 +-
+ tools/virtiofsd/passthrough_ll.c             | 2 +-
+ ui/cocoa.m                                   | 2 +-
+ 12 files changed, 11 insertions(+), 11 deletions(-)
+ rename include/{qemu-common.h => qemu/help-texts.h} (100%)
 
-
-
-Good day!
-
-This is Elena Ding from WELLSUCCEED EMBROIDERY LIMITED, established in 2007.
-
-Do you have needs for custom Beach Towels and T-shirts? They are now highly
-demanded. We can do all types of towels and t-shirts for your brand. They
-are easy to sell and can help expand your business.
-
-The minimum is only 50 pieces for Beach Towels, 100 pieces for T-shirts.
-
-
-We can do samples first for you to check the quality and for approval of
-mass production.
-3-5 working days for samples and 10-13 working days for mass production!
-Just reply to me to get more info:)
-
-
-
-Best regards,
-------------------------------
-
-Elena Ding
-
-Sales Department
-
-Cell/WhatsApp/Skype:+86 13101269050
-
-Wellsucceed Embroidery Limited
-Tel:+86 769 8618 0188
-Address: 4F, NO.38, 3rd South Xihu Road,
-Shilong, Dongguan, Guangdong, China. 523325
-
-*PS: Besides beach towels and t-shirts, slides, shorts,  Hawaii shirts,
-swimsuits, hats can also be custom made with your designs.*
-
---000000000000bb2d7605dcfd8319
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr">
-
-
-<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dgb2312">
-<meta name=3D"Generator" content=3D"Microsoft Word 15 (filtered)">
-<style>
-<!--
- /* Font Definitions */
- @font-face
- {font-family:Helvetica;
- panose-1:2 11 6 4 2 2 2 2 2 4;}
-@font-face
- {font-family:=E5=AE=8B=E4=BD=93;
- panose-1:2 1 6 0 3 1 1 1 1 1;}
-@font-face
- {font-family:"Cambria Math";
- panose-1:2 4 5 3 5 4 6 3 2 4;}
-@font-face
- {font-family:=E7=AD=89=E7=BA=BF;
- panose-1:2 1 6 0 3 1 1 1 1 1;}
-@font-face
- {font-family:"\@=E7=AD=89=E7=BA=BF";
- panose-1:2 1 6 0 3 1 1 1 1 1;}
-@font-face
- {font-family:"\@=E5=AE=8B=E4=BD=93";
- panose-1:2 1 6 0 3 1 1 1 1 1;}
- /* Style Definitions */
- p.MsoNormal, li.MsoNormal, div.MsoNormal
- {margin:0cm;
- margin-bottom:.0001pt;
- text-align:justify;
- text-justify:inter-ideograph;
- font-size:10.5pt;
- font-family:=E7=AD=89=E7=BA=BF;}
-p
- {margin-right:0cm;
- margin-left:0cm;
- font-size:12.0pt;
- font-family:=E7=AD=89=E7=BA=BF;}
-span.15
- {mso-style-name:15;}
-.MsoChpDefault
- {font-size:10.0pt;}
-@page WordSection1
- {size:595.3pt 841.9pt;
- margin:72.0pt 90.0pt 72.0pt 90.0pt;
- layout-grid:15.6pt;}
-div.WordSection1
- {page:WordSection1;}
--->
-</style>
-
-
-
-
-
-<div class=3D"WordSection1" style=3D"layout-grid:15.6pt">
-
-<p class=3D"MsoNormal" style=3D"background:white"><span lang=3D"EN-US" styl=
-e=3D"font-family:&quot;Helvetica&quot;,sans-serif;color:#666666">Hi Friend<=
-/span></p>
-
-<p style=3D"margin-top:7.5pt;margin-right:0cm;margin-bottom:7.5pt;margin-le=
-ft:0cm"><span lang=3D"EN-US" style=3D"font-size:10.5pt;font-family:&quot;He=
-lvetica&quot;,sans-serif;color:#666666">=C2=A0</span></p>
-
-<p style=3D"margin-top:7.5pt;margin-right:0cm;margin-bottom:7.5pt;margin-le=
-ft:0cm"><span lang=3D"EN-US" style=3D"font-size:10.5pt;font-family:&quot;He=
-lvetica&quot;,sans-serif;color:#666666">Good day!<br>
-<br>
-This is Elena Ding from WELLSUCCEED EMBROIDERY LIMITED, established in 2007=
-.</span></p>
-
-<p style=3D"margin-top:7.5pt;margin-right:0cm;margin-bottom:7.5pt;margin-le=
-ft:0cm"><span lang=3D"EN-US" style=3D"font-size:10.5pt;font-family:&quot;He=
-lvetica&quot;,sans-serif;color:#666666">Do you have needs for custom=C2=A0B=
-each
-Towels=C2=A0and=C2=A0T-shirts? They are now highly demanded. We can do all
-types of towels and t-shirts for your brand. They are easy to sell and can =
-help
-expand your business.<br>
-<br>
-The minimum is=C2=A0only 50 pieces for=C2=A0Beach Towels,=C2=A0100 pieces
-for=C2=A0T-shirts.</span></p>
-
-<p style=3D"margin-top:7.5pt;margin-right:0cm;margin-bottom:7.5pt;margin-le=
-ft:0cm"><span lang=3D"EN-US" style=3D"font-size:10.5pt;font-family:&quot;He=
-lvetica&quot;,sans-serif;color:#666666"><br>
-We can do samples first for you to check the quality and for approval of ma=
-ss
-production.<br>
-3-5 working days for samples and 10-13 working days for mass production!<br=
->
-Just reply to me to get more info:)</span></p>
-
-<p style=3D"margin-top:7.5pt;margin-right:0cm;margin-bottom:7.5pt;margin-le=
-ft:0cm"><span lang=3D"EN-US" style=3D"font-size:10.5pt;font-family:&quot;He=
-lvetica&quot;,sans-serif;color:#666666">=C2=A0</span></p>
-
-<p style=3D"margin-top:7.5pt;margin-right:0cm;margin-bottom:7.5pt;margin-le=
-ft:0cm"><span lang=3D"EN-US" style=3D"font-size:10.5pt;font-family:&quot;He=
-lvetica&quot;,sans-serif;color:#666666">Best regards,</span></p>
-
-<div class=3D"MsoNormal" align=3D"left" style=3D"text-align:left"><span lan=
-g=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans-serif;color:#66=
-6666">
-
-<hr size=3D"1" width=3D"210" style=3D"width:157.5pt" noshade align=3D"left"=
->
-
-</span></div>
-
-<p class=3D"MsoNormal" align=3D"left" style=3D"text-align:left;background:w=
-hite"><span lang=3D"EN-US" style=3D"font-family:&quot;Helvetica&quot;,sans-=
-serif;color:#666666">Elena Ding</span></p>
-
-<p style=3D"margin-top:7.5pt;margin-right:0cm;margin-bottom:7.5pt;margin-le=
-ft:0cm"><span lang=3D"EN-US" style=3D"font-size:10.5pt;font-family:&quot;He=
-lvetica&quot;,sans-serif;color:#666666">Sales Department</span></p>
-
-<p style=3D"margin-top:7.5pt;margin-right:0cm;margin-bottom:7.5pt;margin-le=
-ft:0cm"><span lang=3D"EN-US" style=3D"font-size:10.5pt;font-family:&quot;He=
-lvetica&quot;,sans-serif;color:#666666">Cell/WhatsApp/Skype:+86=C2=A0131012=
-69050<br>
-<br>
-Wellsucceed Embroidery Limited<br>
-Tel:+86 769 8618 0188<br>
-Address: 4F, NO.38, 3rd South Xihu Road,<br>
-Shilong, Dongguan, Guangdong, China. 523325<br>
-<br>
-</span><b><span lang=3D"EN-US" style=3D"font-size:10.5pt;font-family:&quot;=
-Helvetica&quot;,sans-serif;color:#ed7d31">PS: Besides beach towels and=C2=
-=A0t-shirts,=C2=A0slides,
-shorts,=C2=A0 Hawaii shirts, swimsuits, hats can also be custom made with y=
-our
-designs.</span></b></p>
-
-<p class=3D"MsoNormal"><b><span lang=3D"EN-US" style=3D"font-family:&quot;H=
-elvetica&quot;,sans-serif;color:#ed7d31">=C2=A0</span></b></p>
-
-</div>
-
-
-
-</div>
-
---000000000000bb2d7605dcfd8319--
+diff --git a/include/qemu-common.h b/include/qemu/help-texts.h
+similarity index 100%
+rename from include/qemu-common.h
+rename to include/qemu/help-texts.h
+diff --git a/bsd-user/main.c b/bsd-user/main.c
+index 74f2d35a5497..6f09180d6541 100644
+--- a/bsd-user/main.c
++++ b/bsd-user/main.c
+@@ -24,7 +24,7 @@
+ #include <sys/sysctl.h>
+ 
+ #include "qemu/osdep.h"
+-#include "qemu-common.h"
++#include "qemu/help-texts.h"
+ #include "qemu/units.h"
+ #include "qemu/accel.h"
+ #include "qemu-version.h"
+diff --git a/linux-user/main.c b/linux-user/main.c
+index 5fb6ecac3f86..7ca48664e447 100644
+--- a/linux-user/main.c
++++ b/linux-user/main.c
+@@ -18,7 +18,7 @@
+  */
+ 
+ #include "qemu/osdep.h"
+-#include "qemu-common.h"
++#include "qemu/help-texts.h"
+ #include "qemu/units.h"
+ #include "qemu/accel.h"
+ #include "qemu-version.h"
+diff --git a/qemu-img.c b/qemu-img.c
+index ef3224a9d4a8..6337a63b3b80 100644
+--- a/qemu-img.c
++++ b/qemu-img.c
+@@ -25,7 +25,7 @@
+ #include "qemu/osdep.h"
+ #include <getopt.h>
+ 
+-#include "qemu-common.h"
++#include "qemu/help-texts.h"
+ #include "qemu/qemu-progress.h"
+ #include "qemu-version.h"
+ #include "qapi/error.h"
+diff --git a/qemu-io.c b/qemu-io.c
+index 38321a27a301..d70d3dd4fde5 100644
+--- a/qemu-io.c
++++ b/qemu-io.c
+@@ -15,7 +15,7 @@
+ #include <termios.h>
+ #endif
+ 
+-#include "qemu-common.h"
++#include "qemu/help-texts.h"
+ #include "qapi/error.h"
+ #include "qemu-io.h"
+ #include "qemu/error-report.h"
+diff --git a/qemu-nbd.c b/qemu-nbd.c
+index bf9c5fedceba..397ffa64d768 100644
+--- a/qemu-nbd.c
++++ b/qemu-nbd.c
+@@ -21,7 +21,7 @@
+ #include <libgen.h>
+ #include <pthread.h>
+ 
+-#include "qemu-common.h"
++#include "qemu/help-texts.h"
+ #include "qapi/error.h"
+ #include "qemu/cutils.h"
+ #include "sysemu/block-backend.h"
+diff --git a/qga/main.c b/qga/main.c
+index 1deb0ee2fbfe..e4b22df01dcd 100644
+--- a/qga/main.c
++++ b/qga/main.c
+@@ -18,7 +18,7 @@
+ #include <syslog.h>
+ #include <sys/wait.h>
+ #endif
+-#include "qemu-common.h"
++#include "qemu/help-texts.h"
+ #include "qapi/qmp/json-parser.h"
+ #include "qapi/qmp/qdict.h"
+ #include "qapi/qmp/qjson.h"
+diff --git a/scsi/qemu-pr-helper.c b/scsi/qemu-pr-helper.c
+index 1f2a84c53454..df493e2a503e 100644
+--- a/scsi/qemu-pr-helper.c
++++ b/scsi/qemu-pr-helper.c
+@@ -36,7 +36,7 @@
+ #include <mpath_persist.h>
+ #endif
+ 
+-#include "qemu-common.h"
++#include "qemu/help-texts.h"
+ #include "qapi/error.h"
+ #include "qemu/cutils.h"
+ #include "qemu/main-loop.h"
+diff --git a/softmmu/vl.c b/softmmu/vl.c
+index f679d48d7415..2a38ebe5fbb4 100644
+--- a/softmmu/vl.c
++++ b/softmmu/vl.c
+@@ -23,7 +23,7 @@
+  */
+ 
+ #include "qemu/osdep.h"
+-#include "qemu-common.h"
++#include "qemu/help-texts.h"
+ #include "qemu/datadir.h"
+ #include "qemu/units.h"
+ #include "exec/cpu-common.h"
+diff --git a/storage-daemon/qemu-storage-daemon.c b/storage-daemon/qemu-storage-daemon.c
+index 1398f0443d76..9b8b17f52e48 100644
+--- a/storage-daemon/qemu-storage-daemon.c
++++ b/storage-daemon/qemu-storage-daemon.c
+@@ -42,7 +42,7 @@
+ #include "qapi/qmp/qstring.h"
+ #include "qapi/qobject-input-visitor.h"
+ 
+-#include "qemu-common.h"
++#include "qemu/help-texts.h"
+ #include "qemu-version.h"
+ #include "qemu/config-file.h"
+ #include "qemu/error-report.h"
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 028dacdd8f5a..b15c631ca512 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -38,7 +38,7 @@
+ #include "qemu/osdep.h"
+ #include "qemu/timer.h"
+ #include "qemu-version.h"
+-#include "qemu-common.h"
++#include "qemu/help-texts.h"
+ #include "fuse_virtio.h"
+ #include "fuse_log.h"
+ #include "fuse_lowlevel.h"
+diff --git a/ui/cocoa.m b/ui/cocoa.m
+index 839ae4f58a69..68bff4ff3796 100644
+--- a/ui/cocoa.m
++++ b/ui/cocoa.m
+@@ -27,7 +27,7 @@
+ #import <Cocoa/Cocoa.h>
+ #include <crt_externs.h>
+ 
+-#include "qemu-common.h"
++#include "qemu/help-texts.h"
+ #include "qemu-main.h"
+ #include "ui/clipboard.h"
+ #include "ui/console.h"
+-- 
+2.36.0
 

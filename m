@@ -1,30 +1,30 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; t=1650615162; x=1650701562; bh=an8X8qcH4Bgp8i6sJbUIB
- CNNbYWD8zbjbO1zjORVPXs=; b=RBcz5mY7ypuF0Z0lP+qIBrrpt2ZpNWPyFQly4
- Nordr1CBNhzCH/NS5kWxLPbSphsXvrQYbVSVezQ3YnawrevNfgOoUtFq0K8R+nm7
- PLpfQ/pShAUq/bOPUEfspd52z/HGza25gG3QZkZAE9L6v0NKjZCgpKUMTk90fhP8
- 8g7ICGdpodvfL5MPCu0B/d4gOJ9kSIqq7gKOuzJ6zSNWQ/8fpBwGCzh9jGf/uTio
- G0tMnrmFF1a2aRy8mk2+J86cSVwSc1bkTj1pJSItupBqKxmOYaZv35NNcnIOzzQ+
- /310ToG4RFGNy/cksEFvTAQ2ybPgUQSddiXdHCF7ZXLPIkTkg==
+ :to; s=fm1; t=1650630339; x=1650716739; bh=zG5YSkG3FK5bRGjlGFUOe
+ JhDsmXxIQG32uDrMDRvwS4=; b=hrHZtzzwJc8drFTKw4X3T8X+GWlPDOGHS0mtI
+ s6zA/qt0mzx2BM7xR5YQEK/Cc+MM9BEoYki1Z9Akh0eFUIq7R36N7NAgwa9Yr+u3
+ WWuPd/jtESJDzMrIeVT1tlrNos3capCNGWupyaeyn98jKkWWYWEDSRme64SrWrGJ
+ sBHjNQLDXKuBQC4F9CTwglW2XhbpSXQgjvT48GeEx9TZLELIGUXBSZi8MTfwN8kS
+ nSDS304kWHOGcL3w1pMWow1PQmwzS0gIXRN2HBgVPlYM05+wA/G0MRKF8TKMDkYb
+ VPEBg118T87RFDQ+VVtU1ObIolvWSxyB3qeHY3C4mcKWNP+Aw==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
  :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
- :x-me-sender:x-sasl-enc; s=fm1; t=1650615162; x=1650701562; bh=a
- n8X8qcH4Bgp8i6sJbUIBCNNbYWD8zbjbO1zjORVPXs=; b=UtSGOlxqUe2i6zW2p
- a6PqiZxWwQCohQOL27n7YSMRwIaD7pCLeTXnUEnpADbKPRN/um9ArLyqe+DywaTg
- r4PB9c56xWFqk7BHlPC7A5ej8vZFsbxyNtqYLxhXfA8MsPguWabCQ2C06pnlZiCw
- rUbkLy0JoERUogAJMxmqaIse7WAJ1YcRU5Xsg3jEJR/4X9v2YI5JwR0CmA8cVLB0
- q4vVxLA9A9A/KGLyfJy2QdEBkKeTriYCacUqd2KzkgnUofiPAkjG7n3Gskk8FtJF
- rprhJutalAyiMqIAZc8WM8j5wFXBFw9+lWcMc2rDwPC8XDRek9+kBDa+3CTqdSGN
- a3pFQ==
+ :x-me-sender:x-sasl-enc; s=fm1; t=1650630339; x=1650716739; bh=z
+ G5YSkG3FK5bRGjlGFUOeJhDsmXxIQG32uDrMDRvwS4=; b=mBfuW9K5uSLArxkF9
+ LZST9AWvaCKG0tmz0+FGkjChZfOx+y0fCn2+IgqiuwtnF0WNt4IzC/ij8e2Dz39m
+ d6k/wSkaNhMvjrwNoSLflo+dEWWdXF/qwrzgQidJM6K6GJTDtEaBWvf96U07pQzV
+ eyDXUCvB7H4A6t7RMyz3tCggZgigcZ5TqVMkwQ/wwN++N4iUeM9oK0eL1pcPaxDb
+ SM7srF6MKsBtZN+vFsKA4HHk0jQqrDFShICScBu+3BqxzxNLXQe9JmbBvWhzkT7r
+ xMQYsSzHrP1VM7H2IrSk2GMMgrfsl0vilrVnW6njazYkARHH9gPVIzw/tIsuW1sr
+ EC2ww==
 From: virtiofs-bot@sinrega.org
-Message-Id: <64139.122042204124300249@us-mta-103.us.mimecast.lan>
+Message-Id: <38966.122042208253906279@us-mta-630.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Fri, 22 Apr 2022 08:12:46 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] Issue opened: Daemon failure
- (MappingPastEof error)
+Date: Fri, 22 Apr 2022 12:25:42 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR opened: Replace deprecated MAX with the
+ associated constant on each type
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -35,45 +35,17 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Seeing `Waiting for daemon failed: HandleRequest(ReqHandlerError(Custom { kind: Other, error: MappingPastEof }))` in my `/var/log/libvirt/qemu/windose-fs0-virtiofsd.log` file.
+Replace the deprecated form of std::<type>::MAX with the associated MAX constant on each type <type>::MAX.
+For instance:
+```rust
+// deprecated way
+let max = std::usize::MAX;
 
-Here's the relevant libvirt XML for my filesystem device and memory backing:
-```xml
-<domain xmlns:qemu="http://libvirt.org/schemas/domain/qemu/1.0" type="kvm">
-  ...
-  <memoryBacking>
-    <source type='memfd'/>
-    <access mode='shared'/>
-  </memoryBacking>
-  ...
-  <devices>
-    ...
-    <filesystem type="mount" accessmode="passthrough">
-      <driver type="virtiofs"/>
-      <binary path="/run/current-system/sw/bin/virtiofsd" xattr="on">
-        <cache mode="always"/>
-      </binary>
-      <source dir="/test"/>
-      <target dir="test-1"/>
-      <alias name="fs0"/>
-      <address type="pci" domain="0x0000" bus="0x04" slot="0x00" function="0x0"/>
-    </filesystem>
-    ...
-  </devices>
-</domain>
+// intended way
+let max = usize::MAX;
 ```
 
-### Host Software Info:
-
-- **OS**: NixOS Unstable (kernel `5.17.1`)
-- **QEMU**: `6.2.0`
-- **virtiofsd backend**: `1.1.0`
-
-### Guest Software Info:
-
-- **OS**: Microsoft Windows 10 Pro for Workstations `10.0.19044 Build 19044`
-- **VirtIO Windows Driver Installer**: `0.1.217`
-- **WinFsp**: 2022 `1.10.22006`
+See https://doc.rust-lang.org/core/usize/constant.MAX.html
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/46
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/112
 

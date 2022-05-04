@@ -1,17 +1,30 @@
-Return-Path: <berrange@redhat.com>
-Date: Tue, 3 May 2022 11:16:52 +0100
-From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
-Message-ID: <YnEBFEVcSN2Jarwf@redhat.com>
-Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
-References: <20220426092715.3931705-1-marcandre.lureau@redhat.com>
- <20220426092715.3931705-16-marcandre.lureau@redhat.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <20220426092715.3931705-16-marcandre.lureau@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH v2 15/26] virtiofsd: replace pipe() with
- g_unix_open_pipe(CLOEXEC)
+Return-Path: <virtiofs-bot@sinrega.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+ cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+ :to; s=fm1; t=1651673744; x=1651760144; bh=NCMDEuVkmPF37gG6nHFEJ
+ eknQKVE1bavXVMRyjuv5dE=; b=o29g0ewKBXhjkK2C4meJSUl/TwmbcdmmFjycC
+ 2sohSmwUoelMv0TyCfXrI91/NhidJe+kSOt90qEp6C9pc7WZJaqMBLj+aMbS0DKz
+ xeBsXpcKAlIKjExUOrl29ACG0bggDu+rSvymV2kI8A5pfQ9ln/VsrfqE+hmzwpGp
+ yXB/AqsgE/T+Jyo0VwtxKrBmtf9omgz/hC6dZM4F/F4uROA4SP0oH6iQhRImjgsf
+ +8YjYQDCOBe0JzBp/RgE5P4TjlimIV+2k8o23YpdU4uJyJjX4iPUBxgCctPo56QS
+ M5ELBAbuULOfT6FLwLoTi1SP+Xz0VvgxtA5RTzXHrb1k8QAfA==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+ messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
+ :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
+ :x-me-sender:x-sasl-enc; s=fm1; t=1651673744; x=1651760144; bh=N
+ CMDEuVkmPF37gG6nHFEJeknQKVE1bavXVMRyjuv5dE=; b=X37Fh//J4m/iE8PbB
+ MXRrN8Cn6Z914TD0xyAMfErBeczaU0BypTitp8UWT+6+LNrX0ov65uwFGQkxqZ0s
+ OQZU7Zcd6cnD3BGqr1o5AYgP2yv7jaq1pK8xwSfqfRUn0+yDI+udyrHR7i+q21Jt
+ fEMUNwzyh3Rt/IpTDHtq5hvhDO8ohewcwBqiIW9DKFVUO0Ko7BzOelsoEzZoVH3S
+ /XyBcg/kW6Bjdt1L+xlSlyWIvZ/S/rAswacjGXSxSBEkA9A1R2CR1JycBAWZuFt0
+ MTF/ztrJdfn6X+7LHKfzg0AE8grRmhSnTrZosRKwf33f2jNnSTBE3TB6n7PmTnx3
+ H3xvA==
+From: virtiofs-bot@sinrega.org
+Message-Id: <49796.122050410154500924@us-mta-473.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"; x-default=true
+Date: Wed,  4 May 2022 14:15:47 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR opened: Log the errno error description
+ on debug
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,24 +33,10 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: marcandre.lureau@redhat.com
-Cc: qemu-devel@nongnu.org, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, "open list:virtiofs" <virtio-fs@redhat.com>
+To: virtio-fs@redhat.com
 
-On Tue, Apr 26, 2022 at 01:27:04PM +0400, marcandre.lureau@redhat.com wrote:
-> From: Marc-André Lureau <marcandre.lureau@redhat.com>
-> 
-> Suggested-by: Daniel P. Berrangé <berrange@redhat.com>
-> Signed-off-by: Marc-André Lureau <marcandre.lureau@redhat.com>
-> ---
->  tools/virtiofsd/helper.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Currently, when the debug level is selected, when replying an error we
+only log the errno value. This commit adds the error description.
+---
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/113
 
-Reviewed-by: Daniel P. Berrangé <berrange@redhat.com>
-
-
-With regards,
-Daniel
--- 
-|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
-|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
-|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|

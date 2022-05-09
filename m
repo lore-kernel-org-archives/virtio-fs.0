@@ -1,28 +1,30 @@
-Return-Path: <nyquist@kolabnow.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=kolabnow.com; h=
- content-transfer-encoding:content-type:content-type:mime-version
- :message-id:in-reply-to:subject:subject:from:from:date:date
- :received:received:received; s=dkim20160331; t=1651821837; x=
- 1653636238; bh=hNkslzgmr3+e83cPmWiGqZPGtFIslfeEl4WNPnK0H1c=; b=x
- mFtBzkQMWgjcuQ0EoEy6v4jNwGhvTgXBDuGlFOrKnrJC9TqLxNw10AEJpLc8l5lm
- k1kVYSmmlbROlY5MUtMEgukLSwzeAXCG4JVA2uCsYd4hwEpX5u7YaprvtZdfnCNM
- kG+Hpd/1x385WvyqS2q/FsjPcLJobOg53MfWjWW2zNqtBUs39Bfokz9W4UQfemsE
- cMLxELqv5PmuaKwLQQuY/1iV8uibKEHPss5ijiXfsGfkIs9+86WKqiVAJV086fPz
- zk7L6oyoRSImkZ0APGow8DyXIAtsENImAjROOWbEmlpBZW5b8Ms7PXWEMZuR/taL
- EfrqM4nBIbWP89Xe5lOiSAAlcBvLfUIx2ONlJrGBhmySci83aDRXmyMDRs8pDRxJ
- 5t54kp4leYOP6D2lIIcWDCG5VaLNsAUKqHBt22DJsiJpuYpVVgqK7J5r7Np7J/Jw
- 75b02S2QGtUKkPIE8S1E605V19ZNXtAYfhXXjiH2oje8f8kGE/VOTpNgBE86FE50
- CnvVif+qnKXJuCseiHfm4reRJCRElE+bJhiFc8az5bcwt8mXhaNbgmM8k10dtkh/
- eNYrRAlxYsrN/K3fsPbOGvW1sjcM2+mU8ZZoiLbvXP8YOL6Kb9Iay6sVUQuCPeFz
- hiNwIZPEaiGqAirwVsEoW0yhl8DcxBtmIrd4xSeTwA=
-Date: Fri, 06 May 2022 09:23:53 +0200
-From: Nyquist <nyquist@kolabnow.com>
-In-Reply-To: <a06f048f33a2edac78e816bfb19b5270@posteo.de>
-Message-ID: <2BA9B6F2-E09A-4E14-AA49-1C5ADFA56F53@kolabnow.com>
-MIME-Version: 1.0
-Content-Type: multipart/alternative;
- boundary=----29MY5XQI6621JDOLMOS2ZAY93OBSBG
-Subject: Re: [Virtio-fs] write permissions for Windows host on Linux guest
+Return-Path: <virtiofs-bot@sinrega.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+ cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+ :to; s=fm1; t=1652088956; x=1652175356; bh=KApii7/v/FgU82VXx1pUr
+ M3k2RYPflEkwoKPpRTx9QU=; b=Fb13C0MhjuQFlToNyt2EAFq3paiL22g+UkmIK
+ JkN3fn6dcLsQsQLYKVUCj4ADsQJ+azYYfXaidpbC897XJvXPt+RatG4MYXl82sb4
+ Q0w88XVmRjzOIXIvrEnQw1krmIBwiJauExlPGGsvhzXL08h58XxX9rba+MVgtrcr
+ /cfwC/MviTpVWY4zwJuwsa7Acrm23PSMVQLjKAFFhRLlPUtabnvS05u6yF2SxJqo
+ HyZTVnbK6KCx17RhDVicS9Wls0c9VEpKGdALkCKPK/wxtHHQI/RySnU7kJOjpDgi
+ oaKozhxoJf++gBy+iEJW6K2UrNcat+5VIyFuH7peCKw091bgg==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+ messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
+ :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
+ :x-me-sender:x-sasl-enc; s=fm1; t=1652088956; x=1652175356; bh=K
+ Apii7/v/FgU82VXx1pUrM3k2RYPflEkwoKPpRTx9QU=; b=LEUGRbT+6DoePskv1
+ vDrjZAIMlKRPA+OlJSCDCptIJ/kRZGnEIGeLwSpYcoYMQMrRn2QqNol+RMQ82TvK
+ bdmIfjIJEKgmNC/9bHb6S1sui+1WZgmPwFt6O77MCUhTxnJD/DDP0zYT9D/tp7kl
+ maY+ef5MNBSTI85CRhFrX5Op2kfOZjPP1MlBo1pFUn4HxOd2jsnQ2SG4OaNhC+4k
+ 9yWkrDDRPuLFRIvGxl54qsFodzMbaJughnu+NG33GculxmVBn4Wqd7NHuQkWA6ge
+ GWHJ00e2N4eBrErraXmgjoak0qTib9/gq3Lduuafn6XUEdNMBvYGMeTEoCp+Pg6n
+ Bc3Fw==
+From: virtiofs-bot@sinrega.org
+Message-Id: <58955.122050905355800339@us-mta-643.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"; x-default=true
+Date: Mon,  9 May 2022 09:36:00 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR merged: Allow only one daemon to bind
+ the socket
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,27 +33,11 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: birnenkram@posteo.de, Virtio-fs@redhat.com
+To: virtio-fs@redhat.com
 
-------29MY5XQI6621JDOLMOS2ZAY93OBSBG
-Content-Type: text/plain;
- charset=utf-8
-Content-Transfer-Encoding: quoted-printable
+Currently, more than one daemon can start using the same unix socket. Although only the last one will use it. This happens because the socket is deleted before bind to it. So, let's try to acquire a lock file before removing the socket file.
 
-Hello Michael,
-
-did you manage to find a solution to your problem. I am facing the same iss=
-ue, always getting SID S-1-5-0.
-
-Best regards,
-Mihael
-------29MY5XQI6621JDOLMOS2ZAY93OBSBG
-Content-Type: text/html;
- charset=utf-8
-Content-Transfer-Encoding: quoted-printable
-
-<!DOCTYPE html><html><body>Hello Michael,<br><br>did you manage to find a s=
-olution to your problem. I am facing the same issue, always getting SID S-1=
--5-0.<br><br>Best regards,<br>Mihael</body></html>
-------29MY5XQI6621JDOLMOS2ZAY93OBSBG--
+Closes #31
+---
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/110
 

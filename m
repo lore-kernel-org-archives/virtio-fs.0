@@ -1,30 +1,30 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; t=1652088956; x=1652175356; bh=mDQ5/vilR3+AimC4mT2yZ
- 2yS59H0gpyw4Azg5HAJ61k=; b=izUoZgkzOJSe+sZeWVgod+oKQFn5IClKUflKe
- 71LkD2qil0ImtP263BkXUXi9QS87cOOCARj/0Giz2l/Tc8JzFBLm1Ub4dwKZFPIw
- IeiTJ6LBZoCEbX5At6bQhHyM/HjNbSzQMEEQemaiKzkOTLlTB9iB0ZlVE4RXf6Uw
- 10LQkrwIuTfPOV6Ei3nnhxM/Vsy6CTR1toL48iszSCzsJHnJMjhDNxRnTmLKXNdU
- MFyoEQm9CietJuNZaCf5LPClWsXI4kMqMwiIEN4ezoQwVE/DZLg9or8kyzO2fHpj
- Qyv7dAJAWvFNuKY00wQ3FPz/OjxdWsyHBMsqeI6pAjEY8OuAA==
+ :to; s=fm1; t=1652089580; x=1652175980; bh=a61E4znYOnXKt1M6WZYJz
+ d/Pxwqd1UoUn7+UesWg0ZE=; b=EtB8+kHCLaGwJH5lU3a5iwtxCOTacdoVxN5h1
+ gz+izvbop0wAtFCifuPIUPaH5Khso1/JOsegbZj7IysYK8cQl/LWGkd2j55fJIBo
+ QkRz4DHkcHQXc9xJrSNhczgX8VOXgwzjPwv1NBbnpFU6piME5ZhD0Fc764LWQl11
+ GYgZA9o+gNz6o9Kg8aYaNhi2nR7yOxKn2GafGRtxU+LzbMWPKcLG11q56TDi6Dmv
+ mOuEMmyNlI/sb6eQSiEg8oZ5d783/arCE3VJ8RbdsmBNUSuEdyzmOL9yfL4YTGNb
+ 3sDby6JDu9riruAGMp5xlRyxJus4+Ez1a1d9ijilUHQTVkX3g==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:from:from:in-reply-to:reply-to
  :sender:subject:subject:to:to:x-me-proxy:x-me-proxy:x-me-sender
- :x-me-sender:x-sasl-enc; s=fm1; t=1652088956; x=1652175356; bh=m
- DQ5/vilR3+AimC4mT2yZ2yS59H0gpyw4Azg5HAJ61k=; b=z2D1KK1gmaVkG8RhB
- flygf39RsTkN503EZ0b7UK4pCBhuj/4XRZ3zERCc7WzIsE8tRagdQ4qfCcrs1wKB
- UmrxDDbYSmMjBQRhg/BQBilAFD1NlNeAFbfn9Mmsva+IaXRZ3XIF0hyWO3tpN3CL
- XD5Jm8G7wQu4SMk1EaQUaryEgggqVPAaoMEPVGF+8Edwkd2uQ+89QRCkWzrlFo6S
- 2jDqyh0v0twVQpm70X1ccmo4AAmEiugfSX0TzFX4OhGPlvRBfzvCF2GpBQa00tj6
- M3+dsMt60U+5YM8HBYVqa2ZUkjLo4KB0bEYqquy+Nv6PlFr0ZnHkbUfkBCGW/YKz
- MoNLw==
+ :x-me-sender:x-sasl-enc; s=fm1; t=1652089580; x=1652175980; bh=a
+ 61E4znYOnXKt1M6WZYJzd/Pxwqd1UoUn7+UesWg0ZE=; b=gehB2kdj1sqoH6I9y
+ 908cWkUhYOrq0RLA136iXMMLWp069+OcxHuZOXgeJ558N+mhODhLeYE+wA/7TzyW
+ VN6Xf4cI4IYq5wTtUqKBEkYIv0P6rMYOEPsOtTBh7BUHmmu+KsDvFb4ztC0fd608
+ ZzdNpOtL8HEdcvKUUEazaMny6QahHfd47P+wAjS/LSzdXa5OG3BsBgjqDxcQD3YD
+ l7OZqub/ZAoVXrMHHIDEwksOmRNOcgCFyaS/MnDNN3E8AgDnPUsY5Mydl0eH/QbN
+ +IrgoaIYoLvXnabuWhT6T3a5iYqkOK/przpf8LUbk3ctPDDKWD8ETeV3228W/Ia6
+ 9kfHw==
 From: virtiofs-bot@sinrega.org
-Message-Id: <97098.122050905355800231@us-mta-213.us.mimecast.lan>
+Message-Id: <16757.122050905462201062@us-mta-517.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Mon,  9 May 2022 09:36:01 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] Issue closed: Do not allow two daemons to
- listen on same socket
+Date: Mon,  9 May 2022 09:46:24 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR merged: Switch to building statically
+ linked binaries for publishing
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -35,9 +35,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Right now I can start two daemons listening on same socket /tmp/vhostqemu. Drop in a pid lock file and use flock so that only one virtiofsd instance can listen and other fails with error. C version already does it and errors out with error.
-
-"Cannot lock pid file: Resource temporarily unavailable"
+Switch to building statically linked binaries for publishing
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/31
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/106
 

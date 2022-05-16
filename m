@@ -1,14 +1,13 @@
-Return-Path: <marcandre.lureau@redhat.com>
-From: marcandre.lureau@redhat.com
-Date: Wed, 20 Apr 2022 17:26:21 +0400
-Message-Id: <20220420132624.2439741-39-marcandre.lureau@redhat.com>
-In-Reply-To: <20220420132624.2439741-1-marcandre.lureau@redhat.com>
-References: <20220420132624.2439741-1-marcandre.lureau@redhat.com>
+Return-Path: <jefflexu@linux.alibaba.com>
+From: Jeffle Xu <jefflexu@linux.alibaba.com>
+Date: Mon, 16 May 2022 11:39:06 +0800
+Message-Id: <20220516033906.58771-4-jefflexu@linux.alibaba.com>
+In-Reply-To: <20220516033906.58771-1-jefflexu@linux.alibaba.com>
+References: <20220516033906.58771-1-jefflexu@linux.alibaba.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 38/41] util: replace
- qemu_get_local_state_pathname()
+Content-Type: text/plain; charset="US-ASCII"; x-default=true
+Subject: [Virtio-fs] [PATCH v8 3/3] virtiofsd: add 'dax=' option
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,146 +16,151 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Michael Roth <michael.roth@amd.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Stefan Weil <sw@weilnetz.de>, "open list:Block SCSI subsystem" <qemu-block@nongnu.org>, "open list:virtiofs" <virtio-fs@redhat.com>
+To: vgoyal@redhat.com, stefanha@redhat.com, miklos@szeredi.hu, virtio-fs@redhat.com
+Cc: joseph.qi@linux.alibaba.com, hsiangkao@linux.alibaba.com, haibinzhang@tencent.com, liudonghua@uniontech.com
 
-From: Marc-André Lureau <marcandre.lureau@redhat.com>
+Add "dax=[none|always|inode|filesize]" option to specify the policy of
+constructing per-inode DAX attribute when guest virtiofs is mounted in
+per inode DAX mode.
 
-Simplify the function to only return the directory path. Callers are
-adjusted to use the GLib function to build paths, g_build_filename().
+The default behavior is "none". That is, virtiofsd will always clear
+per-inode DAX attribute and thus DAX is always disabled for all files.
+It will default to "none" mode when "dax=" option is not specified.
 
-Signed-off-by: Marc-André Lureau <marcandre.lureau@redhat.com>
+Similarly, when it works in "always" mode, DAX is always enabled for all
+files when guest virtiofs is mounted in per inode DAX mode.
+
+Then it comes two policies regarding to per inode attributes.
+
+When "dax=inode" is specified, virtiofsd will construct per-inode DAX
+attribute denpending on the persistent inode flags, i.e.
+FS_XFLAG_DAX/FS_DAX_FL of host files. With this option, admin could
+select those files that should be DAX enabled and mark them with
+persistent inode flags, or users could mark files as DAX enabled inside
+guest.
+
+When "dax=filesize" is specified, virtiofsd will construct per-inode DAX
+attribute depending on the file size. In this case DAX will be disabled
+for those with file size smaller than a specific threshold. Currently
+the threshold is hardcoded as 32KB, which is calculated from a hint that
+guest virtiofs manages DAX mapping at 2MB granularity. We can introduce
+a new option, e.g. "--dax-filesize-threshold" to make the threshold
+configurable if it's needed later.
+
+Besides, negotiate per inode DAX feature in FUSE_INIT phase. It is worth
+mentioning that, if no dax policy (other than "none" mode) is specified,
+virtiofsd won't advertise support for per indoe DAX feature.
+
+Signed-off-by: Jeffle Xu <jefflexu@linux.alibaba.com>
 ---
- include/qemu/osdep.h          | 9 +++------
- qga/main.c                    | 8 ++++----
- scsi/qemu-pr-helper.c         | 6 ++++--
- tools/virtiofsd/fuse_virtio.c | 4 +++-
- util/oslib-posix.c            | 7 ++-----
- util/oslib-win32.c            | 5 ++---
- 6 files changed, 18 insertions(+), 21 deletions(-)
+ tools/virtiofsd/fuse_common.h    |  5 +++++
+ tools/virtiofsd/fuse_lowlevel.c  |  6 ++++++
+ tools/virtiofsd/helper.c         |  6 ++++++
+ tools/virtiofsd/passthrough_ll.c | 20 ++++++++++++++++++++
+ 4 files changed, 37 insertions(+)
 
-diff --git a/include/qemu/osdep.h b/include/qemu/osdep.h
-index ccf10f05f806..220b44f710e5 100644
---- a/include/qemu/osdep.h
-+++ b/include/qemu/osdep.h
-@@ -556,16 +556,13 @@ void qemu_set_cloexec(int fd);
- void fips_set_state(bool requested);
- bool fips_get_state(void);
- 
--/* Return a dynamically allocated pathname denoting a file or directory that is
-- * appropriate for storing local state.
-- *
-- * @relative_pathname need not start with a directory separator; one will be
-- * added automatically.
-+/* Return a dynamically allocated directory path that is appropriate for storing
-+ * local state.
-  *
-  * The caller is responsible for releasing the value returned with g_free()
-  * after use.
+diff --git a/tools/virtiofsd/fuse_common.h b/tools/virtiofsd/fuse_common.h
+index df6202d174..760e30cdfa 100644
+--- a/tools/virtiofsd/fuse_common.h
++++ b/tools/virtiofsd/fuse_common.h
+@@ -377,6 +377,11 @@ struct fuse_file_info {
   */
--char *qemu_get_local_state_pathname(const char *relative_pathname);
-+char *qemu_get_local_state_dir(void);
+ #define FUSE_CAP_SETXATTR_EXT (1 << 29)
  
++/**
++ * Indicates support for per inode DAX.
++ */
++#define FUSE_CAP_INODE_DAX (1ULL << 33)
++
  /**
-  * qemu_getauxval:
-diff --git a/qga/main.c b/qga/main.c
-index b1dae0659d16..daff9bb024f3 100644
---- a/qga/main.c
-+++ b/qga/main.c
-@@ -129,12 +129,12 @@ static void stop_agent(GAState *s, bool requested);
- static void
- init_dfl_pathnames(void)
- {
-+    g_autofree char *state = qemu_get_local_state_dir();
-+
-     g_assert(dfl_pathnames.state_dir == NULL);
-     g_assert(dfl_pathnames.pidfile == NULL);
--    dfl_pathnames.state_dir = qemu_get_local_state_pathname(
--      QGA_STATE_RELATIVE_DIR);
--    dfl_pathnames.pidfile   = qemu_get_local_state_pathname(
--      QGA_STATE_RELATIVE_DIR G_DIR_SEPARATOR_S "qemu-ga.pid");
-+    dfl_pathnames.state_dir = g_build_filename(state, QGA_STATE_RELATIVE_DIR, NULL);
-+    dfl_pathnames.pidfile = g_build_filename(state, QGA_STATE_RELATIVE_DIR, "qemu-ga.pid", NULL);
- }
- 
- static void quit_handler(int sig)
-diff --git a/scsi/qemu-pr-helper.c b/scsi/qemu-pr-helper.c
-index e7549ffb3bc9..c77153392fcd 100644
---- a/scsi/qemu-pr-helper.c
-+++ b/scsi/qemu-pr-helper.c
-@@ -77,8 +77,10 @@ static int gid = -1;
- 
- static void compute_default_paths(void)
- {
--    socket_path = qemu_get_local_state_pathname("run/qemu-pr-helper.sock");
--    pidfile = qemu_get_local_state_pathname("run/qemu-pr-helper.pid");
-+    g_autofree char *state = qemu_get_local_state_dir();
-+
-+    socket_path = g_build_filename(state, "run", "qemu-pr-helper.sock", NULL);
-+    pidfile = g_build_filename(state, "run", "qemu-pr-helper.pid", NULL);
- }
- 
- static void usage(const char *name)
-diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-index 60b96470c51a..a52eacf82e1e 100644
---- a/tools/virtiofsd/fuse_virtio.c
-+++ b/tools/virtiofsd/fuse_virtio.c
-@@ -901,10 +901,12 @@ static bool fv_socket_lock(struct fuse_session *se)
- {
-     g_autofree gchar *sk_name = NULL;
-     g_autofree gchar *pidfile = NULL;
-+    g_autofree gchar *state = NULL;
-     g_autofree gchar *dir = NULL;
-     Error *local_err = NULL;
- 
--    dir = qemu_get_local_state_pathname("run/virtiofsd");
-+    state = qemu_get_local_state_dir();
-+    dir = g_build_filename(state, "run", "virtiofsd", NULL);
- 
-     if (g_mkdir_with_parents(dir, S_IRWXU) < 0) {
-         fuse_log(FUSE_LOG_ERR, "%s: Failed to create directory %s: %s\n",
-diff --git a/util/oslib-posix.c b/util/oslib-posix.c
-index ed8a2558b14d..03d97741562c 100644
---- a/util/oslib-posix.c
-+++ b/util/oslib-posix.c
-@@ -297,12 +297,9 @@ int qemu_pipe(int pipefd[2])
- }
- 
- char *
--qemu_get_local_state_pathname(const char *relative_pathname)
-+qemu_get_local_state_dir(void)
- {
--    g_autofree char *dir = g_strdup_printf("%s/%s",
--                                           CONFIG_QEMU_LOCALSTATEDIR,
--                                           relative_pathname);
--    return get_relocated_path(dir);
-+    return get_relocated_path(CONFIG_QEMU_LOCALSTATEDIR);
- }
- 
- void qemu_set_tty_echo(int fd, bool echo)
-diff --git a/util/oslib-win32.c b/util/oslib-win32.c
-index 41df0a289e28..9483c4c1d5de 100644
---- a/util/oslib-win32.c
-+++ b/util/oslib-win32.c
-@@ -235,7 +235,7 @@ int qemu_get_thread_id(void)
- }
- 
- char *
--qemu_get_local_state_pathname(const char *relative_pathname)
-+qemu_get_local_state_dir(void)
- {
-     HRESULT result;
-     char base_path[MAX_PATH+1] = "";
-@@ -247,8 +247,7 @@ qemu_get_local_state_pathname(const char *relative_pathname)
-         g_critical("CSIDL_COMMON_APPDATA unavailable: %ld", (long)result);
-         abort();
+  * Ioctl flags
+  *
+diff --git a/tools/virtiofsd/fuse_lowlevel.c b/tools/virtiofsd/fuse_lowlevel.c
+index 178c5dc968..3d448ba351 100644
+--- a/tools/virtiofsd/fuse_lowlevel.c
++++ b/tools/virtiofsd/fuse_lowlevel.c
+@@ -2093,6 +2093,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+     if (flags & FUSE_SETXATTR_EXT) {
+         se->conn.capable |= FUSE_CAP_SETXATTR_EXT;
      }
--    return g_strdup_printf("%s" G_DIR_SEPARATOR_S "%s", base_path,
--                           relative_pathname);
-+    return g_strdup(base_path);
++    if (flags & FUSE_HAS_INODE_DAX) {
++        se->conn.capable |= FUSE_CAP_INODE_DAX;
++    }
+ #ifdef HAVE_SPLICE
+ #ifdef HAVE_VMSPLICE
+     se->conn.capable |= FUSE_CAP_SPLICE_WRITE | FUSE_CAP_SPLICE_MOVE;
+@@ -2208,6 +2211,9 @@ static void do_init(fuse_req_t req, fuse_ino_t nodeid,
+     if (se->conn.want & FUSE_CAP_POSIX_ACL) {
+         outarg.flags |= FUSE_POSIX_ACL;
+     }
++    if (se->conn.want & FUSE_CAP_INODE_DAX) {
++        outarg.flags2 |= FUSE_HAS_INODE_DAX >> 32;
++    }
+     outarg.max_readahead = se->conn.max_readahead;
+     outarg.max_write = se->conn.max_write;
+     if (se->conn.max_background >= (1 << 16)) {
+diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
+index a8295d975a..81f0adea71 100644
+--- a/tools/virtiofsd/helper.c
++++ b/tools/virtiofsd/helper.c
+@@ -187,6 +187,12 @@ void fuse_cmdline_help(void)
+            "                               default: no_allow_direct_io\n"
+            "    -o announce_submounts      Announce sub-mount points to the guest\n"
+            "    -o posix_acl/no_posix_acl  Enable/Disable posix_acl. (default: disabled)\n"
++           "    -o dax=<policy>            policies of constructing per-inode DAX attribute when\n"
++           "                               guest advertises per-inode DAX mode.\n"
++           "                               - none: default, disable DAX for all files\n"
++           "                               - always: enable DAX for all files\n"
++           "                               - inode: depending on persistent inode flags\n"
++           "                               - filesize: depending on file size\n"
+            );
  }
  
- void qemu_set_tty_echo(int fd, bool echo)
+diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+index 00ec21bfc9..e6ebde138e 100644
+--- a/tools/virtiofsd/passthrough_ll.c
++++ b/tools/virtiofsd/passthrough_ll.c
+@@ -185,6 +185,7 @@ struct lo_data {
+     int readdirplus_clear;
+     int allow_direct_io;
+     int announce_submounts;
++    int user_dax;
+     int dax;
+     bool use_statx;
+     struct lo_inode root;
+@@ -235,6 +236,10 @@ static const struct fuse_opt lo_opts[] = {
+     { "no_killpriv_v2", offsetof(struct lo_data, user_killpriv_v2), 0 },
+     { "posix_acl", offsetof(struct lo_data, user_posix_acl), 1 },
+     { "no_posix_acl", offsetof(struct lo_data, user_posix_acl), 0 },
++    { "dax=none", offsetof(struct lo_data, user_dax), INODE_DAX_NONE },
++    { "dax=always", offsetof(struct lo_data, user_dax), INODE_DAX_ALWAYS },
++    { "dax=inode", offsetof(struct lo_data, user_dax), INODE_DAX_INODE },
++    { "dax=filesize", offsetof(struct lo_data, user_dax), INODE_DAX_FILESIZE },
+     FUSE_OPT_END
+ };
+ static bool use_syslog = false;
+@@ -759,6 +764,21 @@ static void lo_init(void *userdata, struct fuse_conn_info *conn)
+         fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling posix_acl\n");
+         conn->want &= ~FUSE_CAP_POSIX_ACL;
+     }
++
++    if (conn->capable & FUSE_CAP_INODE_DAX) {
++        lo->dax = lo->user_dax;
++    } else {
++        /* Set INODE_DAX_NONE explicitly to override the old value */
++        lo->dax = INODE_DAX_NONE;
++    }
++
++    /*
++     * If no dax policy is specified, then virtiofsd won't advertise support
++     * for per indoe DAX.
++     */
++    if (lo->dax != INODE_DAX_NONE) {
++        conn->want |= FUSE_CAP_INODE_DAX;
++    }
+ }
+ 
+ static void lo_getattr(fuse_req_t req, fuse_ino_t ino,
 -- 
-2.35.1.693.g805e0a68082a
+2.27.0
 

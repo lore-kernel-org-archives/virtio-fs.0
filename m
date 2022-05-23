@@ -1,14 +1,31 @@
-Return-Path: <mst@redhat.com>
-Date: Mon, 16 May 2022 16:55:04 -0400
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20220516204913.542894-72-mst@redhat.com>
-References: <20220516204913.542894-1-mst@redhat.com>
-MIME-Version: 1.0
-In-Reply-To: <20220516204913.542894-1-mst@redhat.com>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: [Virtio-fs] [PULL v2 71/86] virtio: add vhost support for virtio
- devices
+Return-Path: <virtiofs-bot@sinrega.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+ cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+ :to; s=fm1; t=1653325428; x=1653411828; bh=f0pYcHPmMY5yE1PDxIeWA
+ tuk5pgjiZ3rIPuXdHuFjgE=; b=D24a8UFEUB3iCdsfkT6873IvWyTytN5ldwpsf
+ kgLBj6YDWH8YqFkqdwfUKzsTyn5erH6ZEXYQ/HWudT+N2fhO6PXN1Oxu7rObpvmB
+ UIWS0T539hSLnimc4uvc5/xUoHu3WoEw8yQDpzWe5I6drPoNBsdKIZov5LCKCbV9
+ UmHeEWXEzDyjZqsX+5QKQxgRem9P9FMIZd4joBmGSvSwLxYklQjp6rp398pvKr9S
+ zGqGPRos6v9kB0y8fJtBt91Rzikb/O9gKiCcAo1Cllt2r8STLLDzUu8U6DP5Xpw+
+ FI2FxRq9kvAW7njgQPw3D21MA1uC9tXZhGwI4WSz/1AKyMy5g==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+ messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
+ :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
+ :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; t=
+ 1653325428; x=1653411828; bh=f0pYcHPmMY5yE1PDxIeWAtuk5pgjiZ3rIPu
+ XdHuFjgE=; b=Sgb6TxxU43nu/owYY5NsxwfytIC3QveS3tf9e1eGNM+mTIbchnt
+ H3eXYu1YsGIpu7/75V7hcqpIKL0oL5b1smdG7/5pbbtUlJB9tw3pHPk+qCcvk8Jo
+ Y/rlPXgskKvWBDQE3niozYMNYWWVIuS0+W7LLc9R2UZcH17RZxIrP42xS37e8dsJ
+ kHjOpPHE7FZkerTqwrJPY5KhEcIvX/nWuGgvgGGlokljuDpuKl1TJ5uc3UDfilky
+ /ySb6VIaxdFarwanveN7iVSwUs371ggAj7mk1RbycFTp+jSBvcfwUELCkudBU1xi
+ jNAn6xQxzoyviq1RfHu6zME644q293EWauw==
+From: virtiofs-bot@sinrega.org
+Message-Id: <78431.122052313035000525@us-mta-546.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"; x-default=true
+Date: Mon, 23 May 2022 17:03:53 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] Issue opened: virtiofsd fails to start due
+ to AVCs when running under the `container_kvm_t` label (aka,
+ with Kata Containers)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,338 +34,41 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: Peter Maydell <peter.maydell@linaro.org>, Jonah Palmer <jonah.palmer@oracle.com>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, =?utf-8?Q?Marc-Andr=C3=A9?= Lureau <marcandre.lureau@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Jason Wang <jasowang@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, qemu-block@nongnu.org, virtio-fs@redhat.com
+To: virtio-fs@redhat.com
 
-From: Jonah Palmer <jonah.palmer@oracle.com>
+Here are the AVCs:
+```
+time->Mon May 23 16:35:07 2022
+type=USER_AVC msg=audit(1653323707.241:18235): pid=816 uid=81 auid=4294967295 ses=4294967295 subj=system_u:system_r:system_dbusd_t:s0-s0:c0.c1023 msg='avc:  received setenforce notice (enforcing=0)  exe=2F7573722F62696E2F646275732D6461656D6F6E202864656C6574656429 sauid=81 hostname=? addr=? terminal=?'
+----
+time->Mon May 23 16:35:09 2022
+type=PROCTITLE msg=audit(1653323709.744:18242): proctitle=2F7573722F6C6962657865632F76697274696F667364002D2D7379736C6F67002D6F0063616368653D6175746F002D6F006E6F5F706F7369785F6C6F636B002D6F00736F757263653D2F72756E2F6B6174612D636F6E7461696E6572732F7368617265642F73616E64626F7865732F6565613263363938656633353431626635
+type=PATH msg=audit(1653323709.744:18242): item=1 name=(null) inode=15676422 dev=fc:01 mode=040755 ouid=0 ogid=0 rdev=00:00 obj=system_u:object_r:tmp_t:s0 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PATH msg=audit(1653323709.744:18242): item=0 name=(null) inode=8644264 dev=fc:01 mode=040755 ouid=1001 ogid=121 rdev=00:00 obj=system_u:object_r:tmp_t:s0 nametype=PARENT cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=CWD msg=audit(1653323709.744:18242): cwd="/run/containers/storage/overlay-containers/eea2c698ef3541bf593c2d33e51e6137c872ac03eef933f9ca27b772cce11603/userdata"
+type=SYSCALL msg=audit(1653323709.744:18242): arch=c000003e syscall=83 success=yes exit=0 a0=7f5859355100 a1=1ff a2=1d a3=fefefefefefefeff items=2 ppid=198568 pid=198572 auid=4294967295 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=4294967295 comm="virtiofsd" exe="/opt/kata/libexec/virtiofsd" subj=system_u:system_r:container_kvm_t:s0:c717,c1013 key=(null)
+type=AVC msg=audit(1653323709.744:18242): avc:  denied  { create } for  pid=198572 comm="virtiofsd" name="virtiofsd-.kxe6OCukLKKw" scontext=system_u:system_r:container_kvm_t:s0:c717,c1013 tcontext=system_u:object_r:tmp_t:s0 tclass=dir permissive=1
+type=AVC msg=audit(1653323709.744:18242): avc:  denied  { add_name } for  pid=198572 comm="virtiofsd" name="virtiofsd-.kxe6OCukLKKw" scontext=system_u:system_r:container_kvm_t:s0:c717,c1013 tcontext=system_u:object_r:tmp_t:s0 tclass=dir permissive=1
+type=AVC msg=audit(1653323709.744:18242): avc:  denied  { write } for  pid=198572 comm="virtiofsd" name="tmp" dev="vda1" ino=8644264 scontext=system_u:system_r:container_kvm_t:s0:c717,c1013 tcontext=system_u:object_r:tmp_t:s0 tclass=dir permissive=1
+----
+time->Mon May 23 16:35:09 2022
+type=PROCTITLE msg=audit(1653323709.744:18243): proctitle=2F7573722F6C6962657865632F76697274696F667364002D2D7379736C6F67002D6F0063616368653D6175746F002D6F006E6F5F706F7369785F6C6F636B002D6F00736F757263653D2F72756E2F6B6174612D636F6E7461696E6572732F7368617265642F73616E64626F7865732F6565613263363938656633353431626635
+type=PATH msg=audit(1653323709.744:18243): item=0 name="/proc/self/fd" inode=7324340 dev=00:a0 mode=040500 ouid=0 ogid=0 rdev=00:00 obj=system_u:system_r:container_kvm_t:s0:c717,c1013 nametype=NORMAL cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=CWD msg=audit(1653323709.744:18243): cwd="/run/containers/storage/overlay-containers/eea2c698ef3541bf593c2d33e51e6137c872ac03eef933f9ca27b772cce11603/userdata"
+type=SYSCALL msg=audit(1653323709.744:18243): arch=c000003e syscall=165 success=yes exit=0 a0=7f5859355660 a1=7f5859355130 a2=0 a3=1000 items=1 ppid=198568 pid=198572 auid=4294967295 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=4294967295 comm="virtiofsd" exe="/opt/kata/libexec/virtiofsd" subj=system_u:system_r:container_kvm_t:s0:c717,c1013 key=(null)
+type=AVC msg=audit(1653323709.744:18243): avc:  denied  { mounton } for  pid=198572 comm="virtiofsd" path="/tmp/virtiofsd-.kxe6OCukLKKw" dev="vda1" ino=15676422 scontext=system_u:system_r:container_kvm_t:s0:c717,c1013 tcontext=system_u:object_r:tmp_t:s0 tclass=dir permissive=1
+----
+time->Mon May 23 16:35:09 2022
+type=PROCTITLE msg=audit(1653323709.752:18244): proctitle=2F7573722F6C6962657865632F76697274696F667364002D2D7379736C6F67002D6F0063616368653D6175746F002D6F006E6F5F706F7369785F6C6F636B002D6F00736F757263653D2F72756E2F6B6174612D636F6E7461696E6572732F7368617265642F73616E64626F7865732F6565613263363938656633353431626635
+type=SYSCALL msg=audit(1653323709.752:18244): arch=c000003e syscall=84 success=yes exit=0 a0=7f5859355130 a1=2 a2=6 a3=0 items=0 ppid=198568 pid=198572 auid=4294967295 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=4294967295 comm="virtiofsd" exe="/opt/kata/libexec/virtiofsd" subj=system_u:system_r:container_kvm_t:s0:c717,c1013 key=(null)
+type=AVC msg=audit(1653323709.752:18244): avc:  denied  { rmdir } for  pid=198572 comm="virtiofsd" name="virtiofsd-.kxe6OCukLKKw" dev="vda1" ino=15676422 scontext=system_u:system_r:container_kvm_t:s0:c717,c1013 tcontext=system_u:object_r:tmp_t:s0 tclass=dir permissive=1
+type=AVC msg=audit(1653323709.752:18244): avc:  denied  { remove_name } for  pid=198572 comm="virtiofsd" name="virtiofsd-.kxe6OCukLKKw" dev="vda1" ino=15676422 scontext=system_u:system_r:container_kvm_t:s0:c717,c1013 tcontext=system_u:object_r:tmp_t:s0 tclass=dir permissive=1
+type=AVC msg=audit(1653323709.752:18244): avc:  denied  { write } for  pid=198572 comm="virtiofsd" name="tmp" dev="vda1" ino=8644264 scontext=system_u:system_r:container_kvm_t:s0:c717,c1013 tcontext=system_u:object_r:tmp_t:s0 tclass=dir permissive=1
+```
 
-This patch adds a get_vhost() callback function for VirtIODevices that
-returns the device's corresponding vhost_dev structure, if the vhost
-device is running. This patch also adds a vhost_started flag for
-VirtIODevices.
+This is most likely coming from: https://gitlab.com/virtio-fs/virtiofsd/-/blob/main/src/sandbox.rs#L199-212
 
-Previously, a VirtIODevice wouldn't be able to tell if its corresponding
-vhost device was active or not.
-
-Signed-off-by: Jonah Palmer <jonah.palmer@oracle.com>
-Message-Id: <1648819405-25696-3-git-send-email-jonah.palmer@oracle.com>
-Reviewed-by: Michael S. Tsirkin <mst@redhat.com>
-Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+A possible alternative for this would be using `/var/run`, instead, as the `container_kvm_t` label is allowed to perform the actions there: https://github.com/containers/container-selinux/blob/15c20d72b183d86955894e693127e5bc06722a1a/container.te#L1198-L1210
 ---
- include/hw/virtio/virtio.h     |  3 +++
- hw/block/vhost-user-blk.c      |  7 +++++++
- hw/display/vhost-user-gpu.c    |  7 +++++++
- hw/input/vhost-user-input.c    |  7 +++++++
- hw/net/virtio-net.c            |  9 +++++++++
- hw/scsi/vhost-scsi.c           |  8 ++++++++
- hw/virtio/vhost-user-fs.c      |  7 +++++++
- hw/virtio/vhost-user-rng.c     |  7 +++++++
- hw/virtio/vhost-vsock-common.c |  7 +++++++
- hw/virtio/vhost.c              |  4 +++-
- hw/virtio/virtio-crypto.c      | 10 ++++++++++
- hw/virtio/virtio.c             |  1 +
- 12 files changed, 76 insertions(+), 1 deletion(-)
-
-diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
-index b6890ffa70..db1c0ddf6b 100644
---- a/include/hw/virtio/virtio.h
-+++ b/include/hw/virtio/virtio.h
-@@ -22,6 +22,7 @@
- #include "standard-headers/linux/virtio_config.h"
- #include "standard-headers/linux/virtio_ring.h"
- #include "qom/object.h"
-+#include "hw/virtio/vhost.h"
- 
- /* A guest should never accept this.  It implies negotiation is broken. */
- #define VIRTIO_F_BAD_FEATURE		30
-@@ -102,6 +103,7 @@ struct VirtIODevice
-     bool started;
-     bool start_on_kick; /* when virtio 1.0 feature has not been negotiated */
-     bool disable_legacy_check;
-+    bool vhost_started;
-     VMChangeStateEntry *vmstate;
-     char *bus_name;
-     uint8_t device_endian;
-@@ -160,6 +162,7 @@ struct VirtioDeviceClass {
-     int (*post_load)(VirtIODevice *vdev);
-     const VMStateDescription *vmsd;
-     bool (*primary_unplug_pending)(void *opaque);
-+    struct vhost_dev *(*get_vhost)(VirtIODevice *vdev);
- };
- 
- void virtio_instance_init_common(Object *proxy_obj, void *data,
-diff --git a/hw/block/vhost-user-blk.c b/hw/block/vhost-user-blk.c
-index e8cb170032..5dca4eab09 100644
---- a/hw/block/vhost-user-blk.c
-+++ b/hw/block/vhost-user-blk.c
-@@ -569,6 +569,12 @@ static void vhost_user_blk_instance_init(Object *obj)
-                                   "/disk@0,0", DEVICE(obj));
- }
- 
-+static struct vhost_dev *vhost_user_blk_get_vhost(VirtIODevice *vdev)
-+{
-+    VHostUserBlk *s = VHOST_USER_BLK(vdev);
-+    return &s->dev;
-+}
-+
- static const VMStateDescription vmstate_vhost_user_blk = {
-     .name = "vhost-user-blk",
-     .minimum_version_id = 1,
-@@ -603,6 +609,7 @@ static void vhost_user_blk_class_init(ObjectClass *klass, void *data)
-     vdc->get_features = vhost_user_blk_get_features;
-     vdc->set_status = vhost_user_blk_set_status;
-     vdc->reset = vhost_user_blk_reset;
-+    vdc->get_vhost = vhost_user_blk_get_vhost;
- }
- 
- static const TypeInfo vhost_user_blk_info = {
-diff --git a/hw/display/vhost-user-gpu.c b/hw/display/vhost-user-gpu.c
-index 09818231bd..96e56c4467 100644
---- a/hw/display/vhost-user-gpu.c
-+++ b/hw/display/vhost-user-gpu.c
-@@ -565,6 +565,12 @@ vhost_user_gpu_device_realize(DeviceState *qdev, Error **errp)
-     g->vhost_gpu_fd = -1;
- }
- 
-+static struct vhost_dev *vhost_user_gpu_get_vhost(VirtIODevice *vdev)
-+{
-+    VhostUserGPU *g = VHOST_USER_GPU(vdev);
-+    return &g->vhost->dev;
-+}
-+
- static Property vhost_user_gpu_properties[] = {
-     VIRTIO_GPU_BASE_PROPERTIES(VhostUserGPU, parent_obj.conf),
-     DEFINE_PROP_END_OF_LIST(),
-@@ -586,6 +592,7 @@ vhost_user_gpu_class_init(ObjectClass *klass, void *data)
-     vdc->guest_notifier_pending = vhost_user_gpu_guest_notifier_pending;
-     vdc->get_config = vhost_user_gpu_get_config;
-     vdc->set_config = vhost_user_gpu_set_config;
-+    vdc->get_vhost = vhost_user_gpu_get_vhost;
- 
-     device_class_set_props(dc, vhost_user_gpu_properties);
- }
-diff --git a/hw/input/vhost-user-input.c b/hw/input/vhost-user-input.c
-index aeb0624fe5..1352e372ff 100644
---- a/hw/input/vhost-user-input.c
-+++ b/hw/input/vhost-user-input.c
-@@ -78,6 +78,12 @@ static void vhost_input_set_config(VirtIODevice *vdev,
-     virtio_notify_config(vdev);
- }
- 
-+static struct vhost_dev *vhost_input_get_vhost(VirtIODevice *vdev)
-+{
-+    VHostUserInput *vhi = VHOST_USER_INPUT(vdev);
-+    return &vhi->vhost->dev;
-+}
-+
- static const VMStateDescription vmstate_vhost_input = {
-     .name = "vhost-user-input",
-     .unmigratable = 1,
-@@ -92,6 +98,7 @@ static void vhost_input_class_init(ObjectClass *klass, void *data)
-     dc->vmsd = &vmstate_vhost_input;
-     vdc->get_config = vhost_input_get_config;
-     vdc->set_config = vhost_input_set_config;
-+    vdc->get_vhost = vhost_input_get_vhost;
-     vic->realize = vhost_input_realize;
-     vic->change_active = vhost_input_change_active;
- }
-diff --git a/hw/net/virtio-net.c b/hw/net/virtio-net.c
-index bd0224caaf..a788f1c5c7 100644
---- a/hw/net/virtio-net.c
-+++ b/hw/net/virtio-net.c
-@@ -3620,6 +3620,14 @@ static bool dev_unplug_pending(void *opaque)
-     return vdc->primary_unplug_pending(dev);
- }
- 
-+static struct vhost_dev *virtio_net_get_vhost(VirtIODevice *vdev)
-+{
-+    VirtIONet *n = VIRTIO_NET(vdev);
-+    NetClientState *nc = qemu_get_queue(n->nic);
-+    struct vhost_net *net = get_vhost_net(nc->peer);
-+    return &net->dev;
-+}
-+
- static const VMStateDescription vmstate_virtio_net = {
-     .name = "virtio-net",
-     .minimum_version_id = VIRTIO_NET_VM_VERSION,
-@@ -3722,6 +3730,7 @@ static void virtio_net_class_init(ObjectClass *klass, void *data)
-     vdc->post_load = virtio_net_post_load_virtio;
-     vdc->vmsd = &vmstate_virtio_net_device;
-     vdc->primary_unplug_pending = primary_unplug_pending;
-+    vdc->get_vhost = virtio_net_get_vhost;
- }
- 
- static const TypeInfo virtio_net_info = {
-diff --git a/hw/scsi/vhost-scsi.c b/hw/scsi/vhost-scsi.c
-index 778f43e4c1..3059068175 100644
---- a/hw/scsi/vhost-scsi.c
-+++ b/hw/scsi/vhost-scsi.c
-@@ -273,6 +273,13 @@ static void vhost_scsi_unrealize(DeviceState *dev)
-     virtio_scsi_common_unrealize(dev);
- }
- 
-+static struct vhost_dev *vhost_scsi_get_vhost(VirtIODevice *vdev)
-+{
-+    VHostSCSI *s = VHOST_SCSI(vdev);
-+    VHostSCSICommon *vsc = VHOST_SCSI_COMMON(s);
-+    return &vsc->dev;
-+}
-+
- static Property vhost_scsi_properties[] = {
-     DEFINE_PROP_STRING("vhostfd", VirtIOSCSICommon, conf.vhostfd),
-     DEFINE_PROP_STRING("wwpn", VirtIOSCSICommon, conf.wwpn),
-@@ -307,6 +314,7 @@ static void vhost_scsi_class_init(ObjectClass *klass, void *data)
-     vdc->get_features = vhost_scsi_common_get_features;
-     vdc->set_config = vhost_scsi_common_set_config;
-     vdc->set_status = vhost_scsi_set_status;
-+    vdc->get_vhost = vhost_scsi_get_vhost;
-     fwc->get_dev_path = vhost_scsi_common_get_fw_dev_path;
- }
- 
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index b875640147..e513e4fdda 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -276,6 +276,12 @@ static void vuf_device_unrealize(DeviceState *dev)
-     fs->vhost_dev.vqs = NULL;
- }
- 
-+static struct vhost_dev *vuf_get_vhost(VirtIODevice *vdev)
-+{
-+    VHostUserFS *fs = VHOST_USER_FS(vdev);
-+    return &fs->vhost_dev;
-+}
-+
- static const VMStateDescription vuf_vmstate = {
-     .name = "vhost-user-fs",
-     .unmigratable = 1,
-@@ -313,6 +319,7 @@ static void vuf_class_init(ObjectClass *klass, void *data)
-     vdc->set_status = vuf_set_status;
-     vdc->guest_notifier_mask = vuf_guest_notifier_mask;
-     vdc->guest_notifier_pending = vuf_guest_notifier_pending;
-+    vdc->get_vhost = vuf_get_vhost;
- }
- 
- static const TypeInfo vuf_info = {
-diff --git a/hw/virtio/vhost-user-rng.c b/hw/virtio/vhost-user-rng.c
-index 08bccba9dc..3a7bf8e32d 100644
---- a/hw/virtio/vhost-user-rng.c
-+++ b/hw/virtio/vhost-user-rng.c
-@@ -247,6 +247,12 @@ static void vu_rng_device_unrealize(DeviceState *dev)
-     vhost_user_cleanup(&rng->vhost_user);
- }
- 
-+static struct vhost_dev *vu_rng_get_vhost(VirtIODevice *vdev)
-+{
-+    VHostUserRNG *rng = VHOST_USER_RNG(vdev);
-+    return &rng->vhost_dev;
-+}
-+
- static const VMStateDescription vu_rng_vmstate = {
-     .name = "vhost-user-rng",
-     .unmigratable = 1,
-@@ -272,6 +278,7 @@ static void vu_rng_class_init(ObjectClass *klass, void *data)
-     vdc->set_status = vu_rng_set_status;
-     vdc->guest_notifier_mask = vu_rng_guest_notifier_mask;
-     vdc->guest_notifier_pending = vu_rng_guest_notifier_pending;
-+    vdc->get_vhost = vu_rng_get_vhost;
- }
- 
- static const TypeInfo vu_rng_info = {
-diff --git a/hw/virtio/vhost-vsock-common.c b/hw/virtio/vhost-vsock-common.c
-index ad5c8ff5d5..7394818e00 100644
---- a/hw/virtio/vhost-vsock-common.c
-+++ b/hw/virtio/vhost-vsock-common.c
-@@ -258,6 +258,12 @@ void vhost_vsock_common_unrealize(VirtIODevice *vdev)
-     virtio_cleanup(vdev);
- }
- 
-+static struct vhost_dev *vhost_vsock_common_get_vhost(VirtIODevice *vdev)
-+{
-+    VHostVSockCommon *vvc = VHOST_VSOCK_COMMON(vdev);
-+    return &vvc->vhost_dev;
-+}
-+
- static Property vhost_vsock_common_properties[] = {
-     DEFINE_PROP_ON_OFF_AUTO("seqpacket", VHostVSockCommon, seqpacket,
-                             ON_OFF_AUTO_AUTO),
-@@ -273,6 +279,7 @@ static void vhost_vsock_common_class_init(ObjectClass *klass, void *data)
-     set_bit(DEVICE_CATEGORY_MISC, dc->categories);
-     vdc->guest_notifier_mask = vhost_vsock_common_guest_notifier_mask;
-     vdc->guest_notifier_pending = vhost_vsock_common_guest_notifier_pending;
-+    vdc->get_vhost = vhost_vsock_common_get_vhost;
- }
- 
- static const TypeInfo vhost_vsock_common_info = {
-diff --git a/hw/virtio/vhost.c b/hw/virtio/vhost.c
-index 2bc72c27c5..dd3263df56 100644
---- a/hw/virtio/vhost.c
-+++ b/hw/virtio/vhost.c
-@@ -1738,6 +1738,7 @@ int vhost_dev_start(struct vhost_dev *hdev, VirtIODevice *vdev)
-     /* should only be called after backend is connected */
-     assert(hdev->vhost_ops);
- 
-+    vdev->vhost_started = true;
-     hdev->started = true;
-     hdev->vdev = vdev;
- 
-@@ -1810,7 +1811,7 @@ fail_vq:
- 
- fail_mem:
- fail_features:
--
-+    vdev->vhost_started = false;
-     hdev->started = false;
-     return r;
- }
-@@ -1841,6 +1842,7 @@ void vhost_dev_stop(struct vhost_dev *hdev, VirtIODevice *vdev)
-     }
-     vhost_log_put(hdev, true);
-     hdev->started = false;
-+    vdev->vhost_started = false;
-     hdev->vdev = NULL;
- }
- 
-diff --git a/hw/virtio/virtio-crypto.c b/hw/virtio/virtio-crypto.c
-index df9adb2c07..c3829e7498 100644
---- a/hw/virtio/virtio-crypto.c
-+++ b/hw/virtio/virtio-crypto.c
-@@ -961,6 +961,15 @@ static bool virtio_crypto_guest_notifier_pending(VirtIODevice *vdev, int idx)
-     return cryptodev_vhost_virtqueue_pending(vdev, queue, idx);
- }
- 
-+static struct vhost_dev *virtio_crypto_get_vhost(VirtIODevice *vdev)
-+{
-+    VirtIOCrypto *vcrypto = VIRTIO_CRYPTO(vdev);
-+    CryptoDevBackend *b = vcrypto->cryptodev;
-+    CryptoDevBackendClient *cc = b->conf.peers.ccs[0];
-+    CryptoDevBackendVhost *vhost_crypto = cryptodev_get_vhost(cc, b, 0);
-+    return &vhost_crypto->dev;
-+}
-+
- static void virtio_crypto_class_init(ObjectClass *klass, void *data)
- {
-     DeviceClass *dc = DEVICE_CLASS(klass);
-@@ -977,6 +986,7 @@ static void virtio_crypto_class_init(ObjectClass *klass, void *data)
-     vdc->set_status = virtio_crypto_set_status;
-     vdc->guest_notifier_mask = virtio_crypto_guest_notifier_mask;
-     vdc->guest_notifier_pending = virtio_crypto_guest_notifier_pending;
-+    vdc->get_vhost = virtio_crypto_get_vhost;
- }
- 
- static void virtio_crypto_instance_init(Object *obj)
-diff --git a/hw/virtio/virtio.c b/hw/virtio/virtio.c
-index 7f9fcfd06d..5d607aeaa0 100644
---- a/hw/virtio/virtio.c
-+++ b/hw/virtio/virtio.c
-@@ -3271,6 +3271,7 @@ void virtio_init(VirtIODevice *vdev, uint16_t device_id, size_t config_size)
- 
-     vdev->start_on_kick = false;
-     vdev->started = false;
-+    vdev->vhost_started = false;
-     vdev->device_id = device_id;
-     vdev->status = 0;
-     qatomic_set(&vdev->isr, 0);
--- 
-MST
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/49
 

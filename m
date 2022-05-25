@@ -1,30 +1,29 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; t=1653491400; x=1653577800; bh=BQ8Z96znvkVZhDxKmXZBq
- Ac4oRi+H1r/ollbC+6rqa4=; b=Ud9mO99deO95GSoqOq9rYqFc2UqTE3uQZ4K6T
- Fam7zbVAEHRsFjwXYvsYeOxAWG41U8M2kLxUH+3/0vPebsWPmMbJeC20VYgXKEWB
- oSH1OyQZ5QGbrbJ4w3hgoCvn/kqM+VVlQjF95NHrG5Vu/AM8wGdQG/yod3vMPOe+
- MOD+2tBGw+ajDY/AcBXVmx8luegqCE/2ogyUVA9TaNj5ez/oTja2nkpuN24hxmgA
- bSPiUYwzayMMUiZ1TCnmJ65NbE0RJ/fuktJkH9hRfqPDJUtlLJ5pp73SBVTYDVBB
- OqicmkZ+4zSDHePHhadfJ00QKa9FA5p9w3M53or/ZFtwXffFA==
+ :to; s=fm1; t=1653492126; x=1653578526; bh=D7YUHBa6+KyhoQcScapzs
+ qGNYKAJaOLLu+8ztpsXNi0=; b=HfOLy8z9jsH+KkkdWzfrscNzvEYUKycjTemdX
+ I1ECikgGt2U5n9haXzDBuTXMLZS0na3+82kRF+FD4YfeU7/j6Upkj/HQcJl+JnLT
+ gqTPzZst2HL6rn2ujPnN1+mcPfWwBFp0A8GLDtfhAL3J4YcLu/z3/cMktPZAcDV/
+ c2/WZLHI1ib4nXk7IJp/EbMPY7Ham9LyzwqEXlBGRD+Ka383DYUKjlzzOT+xImx9
+ YOceBccG0deY1g0VA82V+Dq4nbH8ZApEUgof9NCc3iULDK8tBQHYapvcmhRkl+iG
+ cFxvvPRvH9cU6y8lc+/LP2IIF9vkfsh0xVACCW+0omabPdFAQ==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
  :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
  :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; t=
- 1653491400; x=1653577800; bh=BQ8Z96znvkVZhDxKmXZBqAc4oRi+H1r/oll
- bC+6rqa4=; b=qadSaWOG/ml0KBudm7ykaoLOjR5UubULMemuq4HYBp/Mynn2QJY
- SNyz3rEf4wHYF1F42xsmFfy5IMp6CMotfyochrqiujX4eSrt3rbtf2pLGnemKk/f
- LLXf5hWnuTktPa0w12RXgw7ii5sxYVFThz69y2DeVWWfqdmi/ZVy4JL/EjrZwnHT
- c54e6YYktHwczQD2wjUmjKw/c6muG2RWMVVIadvvzfhahXvpBv+9y54Igu7IY9P2
- xPY/TevmtNdXtQUOud07W6bknwK1sUzIykGepM8o/U4XT+7Lt4iMwZD22w6jyEVh
- 3gKm0gVbA+8OZHWBNmxvFKP+XPFaihs01og==
+ 1653492126; x=1653578526; bh=D7YUHBa6+KyhoQcScapzsqGNYKAJaOLLu+8
+ ztpsXNi0=; b=egQ5jz9IV9FVoJRc/LrL1q2gJvFhqBFTJoniyRp/w4JpCmynkRU
+ G3/IzbMVxgpv3RUHbDMh6+gHU3EdvwJ9AfFXdB0/I1ttG8y4NJ1yYt0TYDscdnJE
+ DbkQJPi53Rah2T2UqYKOfv9J4aQ2g342x7ARW8hYSsSavrmWH6zYAxB9xVpoljDP
+ 2T1HOl8NV5l2x46sbirazbsflr9+cJZHYGv5jmw3EJhehmEUOS+30cbgXWqKXTDk
+ s/Lxvg9YwSFtwcBdJKG7V2jV88xPpP1ovLi8WneOGbqXlmxuqBe/0w/ARTvS4IU8
+ dxLRnFQpFJW92u8sRFolFyoncKhr9FIOPAQ==
 From: virtiofs-bot@sinrega.org
-Message-Id: <77739.122052511100102079@us-mta-630.us.mimecast.lan>
+Message-Id: <68837.122052511220801239@us-mta-29.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Wed, 25 May 2022 15:10:03 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR opened: Show the nofile hard limit value
- in the warning message
+Date: Wed, 25 May 2022 15:22:33 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR opened: implement std::error::Error trait
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -35,7 +34,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-If increasing the nofile rlimit to 1M fails, try the hard limit, let's display the value of this limit in the warning message.
+The seccomp and sandbox modules declare a custom error enum, they should implement the std:error:Error trait.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/120
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/121
 

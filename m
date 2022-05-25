@@ -1,15 +1,24 @@
-Return-Path: <stefanha@redhat.com>
-Date: Wed, 25 May 2022 17:18:25 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <Yo5W0Z3zXF3DZdq6@stefanha-x1.localdomain>
-References: <YoyuwoswrAKvzFIi@stefanha-x1.localdomain>
- <87v8tug1my.fsf@linux.ibm.com>
+Return-Path: <richard.henderson@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=message-id:date:mime-version:user-agent:subject:content-language:to
+ :cc:references:from:in-reply-to:content-transfer-encoding;
+ bh=fqMfvaNrGFXhAYRs0q/MprE5PxALdisd+UrJ3i/TB4Q=;
+ b=KU4F8q6shT3JzjSzW7VoMO/LyTJQ7ff2Sq+MUwa5n6IjmVNdS8jvYvqYaNri0Tc1hu
+ fnjNvt374wqAce5nyCpQVYzF7Nkqn7/fr8UfBbyeWGynJXusnqzxyswtArYRjQYe6/dv
+ snzlXvmwMp7kxbaa59y9pidn+C4O21oqUuzK/Zlg4naEqQLV5KxbRC8wzPYVGkMMQOZQ
+ gRTb+MZyohq1hGrKs3idnOovt/A+YEScKUSC44LiDNE0KihGL4ojKd1GumO5VUQBkI/E
+ pHvuyBISDxfuaxdOSzlJ7n1iMQAdIfXlzNaH28zrMi0TQ4fTvY7UjcZEje4ADGPZzd+p
+ rKWg==
+Message-ID: <bcd6d672-f14d-8f52-dc47-2cfafbf09f23@linaro.org>
+Date: Wed, 25 May 2022 11:35:41 -0700
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
- protocol="application/pgp-signature"; boundary="Q8CLmxQ9sbDO8lg1"
-Content-Disposition: inline
-In-Reply-To: <87v8tug1my.fsf@linux.ibm.com>
-Subject: Re: [Virtio-fs] virtio-fs-ci license file added
+References: <20220525124909.867787-1-stefanha@redhat.com>
+From: Richard Henderson <richard.henderson@linaro.org>
+In-Reply-To: <20220525124909.867787-1-stefanha@redhat.com>
+Content-Language: en-US
+Content-Type: text/plain; charset=UTF-8; format=flowed
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PULL 0/1] Block patches
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,53 +27,40 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Fabiano Rosas <farosas@linux.ibm.com>
-Cc: virtio-fs@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>, qemu-devel@nongnu.org
+Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, virtio-fs@redhat.com, qemu-block@nongnu.org
+
+On 5/25/22 05:49, Stefan Hajnoczi wrote:
+> The following changes since commit 0cac736e73723850a99e5142e35d14d8f8efb232:
+> 
+>    Merge tag 'pull-riscv-to-apply-20220525' of github.com:alistair23/qemu into staging (2022-05-24 15:55:12 -0700)
+> 
+> are available in the Git repository at:
+> 
+>    https://gitlab.com/stefanha/qemu.git tags/block-pull-request
+> 
+> for you to fetch changes up to 29320530cf6684646b3a642fdbb5bc77ee8039de:
+> 
+>    docs: Correct the default thread-pool-size (2022-05-25 11:01:38 +0100)
+> 
+> ----------------------------------------------------------------
+> Pull request
+> 
+> A small documentation fix.
+
+Applied, thanks.  Please update https://wiki.qemu.org/ChangeLog/7.1 as appropriate.
 
 
---Q8CLmxQ9sbDO8lg1
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+r~
 
-On Tue, May 24, 2022 at 04:40:37PM -0300, Fabiano Rosas wrote:
-> Stefan Hajnoczi <stefanha@redhat.com> writes:
->=20
-> > Hi Fabiano,
-> > I wanted to let you know that I have added the GPLv2 license text to the
-> > virtio-fs-ci.git repo so GitLab can detect the license.
-> >
-> > The code contributions you made were in files that already carried a
-> > GPL-2.0-or-later license header, so there is no change in the licensing
-> > of your code, except for a .config snippet you contributed without an
-> > explicit license header.
-> >
-> > If you want to specify an explicit license for the .config file or have
-> > any questions, please let me know. Thanks!
-> >
-> > Stefan
->=20
-> Hi Stefan, thanks for reaching out.
->=20
-> I think it's fine to leave the config snippet without a license header.
 
-Thanks!
+> 
+> ----------------------------------------------------------------
+> 
+> Liu Yiding (1):
+>    docs: Correct the default thread-pool-size
+> 
+>   docs/tools/virtiofsd.rst | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+> 
 
-Stefan
-
---Q8CLmxQ9sbDO8lg1
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmKOVtEACgkQnKSrs4Gr
-c8gdRwgAvU8yrdTFLIN3HdBXPsfDgXE5/krHPMmG+W5qz2Sp78Aic0cCcLbK/GtQ
-wMZiqGnkUXRCT4eArZkd5S2a64yfX985q/NgpGesTkDk7FihpTolKZrCP2OpgZ6m
-UprHrIbOkj03BMlQnB17kg+UnGN3oymFjHdz+ZYIqSr0AXzS+PYzaP6y0UMGDDW6
-ASaerPIT8xGpIE6gftQ6LMMO3/bsiXjWVZndXUFKKf5TI8l99uniJCmd1HixY0tX
-OF5W1am3uIq1FY0nmeWZa7Jd8hlwFXev+d89xkRILA+y40+j/9KQ2WLIiSlYlO/l
-1Kj3ZNcUpfrrqpLqZm3ct+DaPWOVcw==
-=EWRh
------END PGP SIGNATURE-----
-
---Q8CLmxQ9sbDO8lg1--

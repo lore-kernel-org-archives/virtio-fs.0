@@ -1,13 +1,14 @@
-Return-Path: <stefanha@redhat.com>
-Date: Thu, 26 May 2022 08:49:34 +0100
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <Yo8xDlTWijVMVNli@stefanha-x1.localdomain>
+Return-Path: <slp@redhat.com>
+Date: Thu, 26 May 2022 10:06:46 +0200
+From: Sergio Lopez <slp@redhat.com>
+Message-ID: <20220526080646.vsfmqgxyiglhe64r@mhamilton>
 References: <BY5PR14MB3893A6AA17C5FEBE843B640286D99@BY5PR14MB3893.namprd14.prod.outlook.com>
+ <Yo8xDlTWijVMVNli@stefanha-x1.localdomain>
 MIME-Version: 1.0
 Content-Type: multipart/signed; micalg=pgp-sha256;
- protocol="application/pgp-signature"; boundary="rlDir5U3QoVKFdNx"
+ protocol="application/pgp-signature"; boundary="feyfazohf67u3abn"
 Content-Disposition: inline
-In-Reply-To: <BY5PR14MB3893A6AA17C5FEBE843B640286D99@BY5PR14MB3893.namprd14.prod.outlook.com>
+In-Reply-To: <Yo8xDlTWijVMVNli@stefanha-x1.localdomain>
 Subject: Re: [Virtio-fs] vhost_set_vring_kick failed
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -17,82 +18,63 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Prashant Dewan <linux_learner@outlook.com>
-Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>, slp@redhat.com, gmaglione@redhat.com
+To: Stefan Hajnoczi <stefanha@redhat.com>
+Cc: Prashant Dewan <linux_learner@outlook.com>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, gmaglione@redhat.com
 
 
---rlDir5U3QoVKFdNx
+--feyfazohf67u3abn
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Thu, May 26, 2022 at 05:34:42AM +0000, Prashant Dewan wrote:
-> Hello Stefan,
+On Thu, May 26, 2022 at 08:49:34AM +0100, Stefan Hajnoczi wrote:
+> On Thu, May 26, 2022 at 05:34:42AM +0000, Prashant Dewan wrote:
+> > Hello Stefan,
+> >=20
+> > Here is the output from virtofsd..
+> >=20
+> > ------------------------------------
+> > - Journal begins at Thu 2022-05-26 04:23:42 UTC, ends at Thu 2022-05-26=
+ 04:41:57 UTC. --
+> > May 26 04:24:13 localhost systemd[1]: Started virtio-fs vhost-user devi=
+ce daemon.<<Placeholder: run this daemon as non-privileged user>>.
+> > May 26 04:24:13 localhost virtiofsd[505]: [2022-05-26T04:24:13Z INFO  v=
+irtiofsd] Waiting for vhost-user socket connection...
+> > May 26 04:27:11 device-3e4b479e2ee9c647 virtiofsd[505]: [2022-05-26T04:=
+27:11Z INFO  virtiofsd] Client connected, servicing requests
+> > May 26 04:27:33 device-3e4b479e2ee9c647 virtiofsd[505]: [2022-05-26T04:=
+27:33Z ERROR virtiofsd] Waiting for daemon failed: HandleRequest(InvalidPar=
+am)
 >=20
-> Here is the output from virtofsd..
->=20
-> ------------------------------------
-> - Journal begins at Thu 2022-05-26 04:23:42 UTC, ends at Thu 2022-05-26 0=
-4:41:57 UTC. --
-> May 26 04:24:13 localhost systemd[1]: Started virtio-fs vhost-user device=
- daemon.<<Placeholder: run this daemon as non-privileged user>>.
-> May 26 04:24:13 localhost virtiofsd[505]: [2022-05-26T04:24:13Z INFO  vir=
-tiofsd] Waiting for vhost-user socket connection...
-> May 26 04:27:11 device-3e4b479e2ee9c647 virtiofsd[505]: [2022-05-26T04:27=
-:11Z INFO  virtiofsd] Client connected, servicing requests
-> May 26 04:27:33 device-3e4b479e2ee9c647 virtiofsd[505]: [2022-05-26T04:27=
-:33Z ERROR virtiofsd] Waiting for daemon failed: HandleRequest(InvalidParam)
+> virtiofsd terminated. I have CCed Sergio and German, who may have
+> suggestions about what to check next.
 
-virtiofsd terminated. I have CCed Sergio and German, who may have
-suggestions about what to check next.
+Hi,
 
-Stefan
+Could you please tell us which QEMU version are you running, and paste
+here the its command line?
 
-> May 26 04:27:33 device-3e4b479e2ee9c647 systemd[1]: virtiofsd.service: De=
-activated successfully.
-> May 26 04:27:33 device-3e4b479e2ee9c647 systemd[1]: virtiofsd.service: Sc=
-heduled restart job, restart counter is at 1.
->=20
-> ________________________________
-> From: Stefan Hajnoczi
-> Sent: Wednesday, May 25, 2022 4:02 PM
-> To: Prashant Dewan
-> Cc: virtio-fs@redhat.com
-> Subject: Re: [Virtio-fs] vhost_set_vring_kick failed
->=20
-> On Tue, May 24, 2022 at 02:29:12PM +0000, Pra Dew wrote:
-> > I am trying to setup virtfs using KVM and QEMU.
-> >
-> >
-> >   1.  Inside the VM, I do
-> >      *   mount -t virtiofs myfs /dev/myfile  --succeeds
-> >      *   cd /dev/myfile  -hangs
-> >
-> >
-> >   1.  The host logs -
-> >
-> >  qemu-system: Failed to write msg. Wrote -1 instead of 20.
->=20
-> Sending a vhost-user protocol message failed. It is likely that the
-> virtiofsd process terminated and the UNIX domain socket closed on QEMU.
->=20
-> Is there any output from virtiofsd?
->=20
-> Stefan
+Thanks,
+Sergio.
 
---rlDir5U3QoVKFdNx
+--feyfazohf67u3abn
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmKPMQ4ACgkQnKSrs4Gr
-c8jg/gf9GEyzok9tVmhJzZu3hEJuC1UiHLt8l8uXnde55S/Iw+KF5muW8zQgzkl7
-K6u2S1Oku2e1QvyKvgvu8/7Ntb73kXTa1UIwXB7zjaLSNQ559QjqHpbeTL37iNzD
-CB867aFuht2R7DBHb+5CBXfKNOiRvoFJyGIHnBZzv4rPOxlHLcE7BipYeKAFVJqr
-MXrWRcPLg1z5lNvNUjGIje2xdgvmmB240X/MfP2HlKJF3ZWBZMavmQDnXomtjelr
-pAXOp63Rx1tVqvoyDj62do/Ak/F25Gy7v+jLp48jlaZmbY2gosEtn6dwkfKfdi6B
-U/ZuEufMY/jm/fq1NQvYlkDVdvIvAA==
-=s2mN
+iQIzBAABCAAdFiEEvtX891EthoCRQuii9GknjS8MAjUFAmKPNRMACgkQ9GknjS8M
+AjWQqQ//VMhoUpU/3z5bX4+aYFYQ1y7bmOJgUXZSsKsng2jD6I92HTaP0mwZn/1n
+SyNBf104uJUMjb+NVNlj+Td7h284NZ2BHbaAOcEMwacjpvU7TP+AG37U1eCxGHSA
+f4bsjrRrNrLux4IrWFOtXD53pDzf63JUMj9utdtbMHgqxxgdXqW/5MQzG2rngkUu
+/hZhxQk/abOtyY6Gs8ES9rvs2FTArdOHbF92HdLXcMLj904sLkBqtkBO4lad2kqx
+p3t0E5ONP2mBfsRsKZNLRhKSqAPX4gGKOnDxFnslDUf8N9W+U04POMFXJuXCVclV
+YzYUrU+j8SPeCB5N1ynYiogx/vgIa4oUxl8vwjmx8uuc6BTqlppF1hM1WCWXxOaW
+KAQPZeF0hTaoPfza810mA5kleqZB9lI2RPFCB+51KSwoQ8V2ZVjS8Ka93kaT8Ukl
+xWU7zeMIxj47djB3Rx+Fdz2Sr9O8jIWoUUVjb4Udx2N4zJjrQ/d1Lm83R3Z7ygTK
+SfT4QKxFpf6lP5jjMO6LvaIG8Ec5l7OLeoJrs3j72BgkoZ0TdU/J9BhR+MVhVzgf
+58KJNnm8JyS7qDKVid9E1jiwXs38faTXb2zga/ZsFDfE08pMQZrBtP53n48NlBw7
+rsGsQ1DZ1t2mxgVl/6ctZnWMCGHxLFG3tV1wVkTLT9Jtt7LQs5E=
+=+EMf
 -----END PGP SIGNATURE-----
 
---rlDir5U3QoVKFdNx--
+--feyfazohf67u3abn--

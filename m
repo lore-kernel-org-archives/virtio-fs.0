@@ -1,29 +1,29 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; t=1653995623; x=1654082023; bh=D7YUHBa6+KyhoQcScapzs
- qGNYKAJaOLLu+8ztpsXNi0=; b=GnknBq275mogR5WFzPeLks8ZIwEbW9y4EjUOR
- VHhAyty/Pgtn7n5B6kjV/9e3ypZRINIPmsKKyKgrkrLx2AQp21TPKoB4VT0G2g+2
- i6G3D1hmrNmwU6bi1KLa4nc9IE/4a/eeSryvO361BTqeaLDLoSMWC70/r70rUfvd
- 2TrD4MvjHpcyb7RhOk28N6+2qWff5+oJk1kX1IohXi7oNu8JNjVGa5NEeL0UZbn1
- wToI8NmbI3f/iQaeq0IBWDSIk3AAuCuHAndnkgAt5KBPbYo0lvtNUXE4PhgsCr/M
- 1PHR55JSusbtYNRQCTkOElsHEZ0rYkYxGamf37RQL0oiIdkyQ==
+ :to; s=fm1; t=1653995665; x=1654082065; bh=0032Qy8oaRZoOeUl1NjUK
+ TSw/VEsB+2sIXbAvFnc/8k=; b=nREleR1n/lHEQNz59gn/6BjnRcHJrRl4xTYQF
+ 00w/RbrqQw4UJ9+V/lmyYp42TaXolD+H97wN26c7/mSTS4q+owxZhKGYo/GDmjgb
+ u1gCPg4Bpg5Xe4P9P3xth6bmLdNqFTPQjdLtzn7/Fw411acG0Or6tPqS1lm6LPXU
+ hW8B/hi/H2Qhx2QAmqddaSlOrSAFH/WBLb3d9xrfyeFi3VE+QUG7ViwBWsL11EEO
+ B0WPZeFmmS5AYy8CvPPjm6Z+lRfxwAipONCZebbJ/OnOG5X9sl0MjNNSiGJnZXI3
+ xxPXLkif1i8pj4pZH8YyOBkN3tb/gRLi30DBIyHvV1p1POyvw==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
  :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
  :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; t=
- 1653995623; x=1654082023; bh=D7YUHBa6+KyhoQcScapzsqGNYKAJaOLLu+8
- ztpsXNi0=; b=ewdynhS4Wk4/0AtsE+lIwHtaoGXpOqzMwAMEufFHVT3H01OwMPA
- FeqOupC2fNmceVcnIpEohNbGGr95BXMKDeKwB+zfQpDCC6JG0JMmmDNXQEw75FFz
- Gczg23ksKYTa/RWUmqIxkuIS58CQ+Qpb6/BC9f9eik1pK+NAsGXqFlM2J5U+tvSo
- 0T9Qyb98UPrEy4gOt1OIon1macyywygnXgZKDFrqqZpzexPxIRsPG+2MhuW8+wFF
- Cc3vXnCzyyPuhYq+V7+BrD5j0HZXtcpAwH/c7peii80HU77WgN8w/Ax0GjHv2WEW
- 9+XrMz+igteSxcQisndxQ+p8MstmUf8J55Q==
+ 1653995665; x=1654082065; bh=0032Qy8oaRZoOeUl1NjUKTSw/VEsB+2sIXb
+ AvFnc/8k=; b=NCQwt1/LbE0pqIz/8lWJc2Wx4up6RgDbwvmWmgz2qWwaSGQg0QZ
+ 1w3bNFDrOxIHUNv1ImHsoai5dN8bVOekdpQYbZzLRJ21kwv/zWmCRVBnDEt8FxVE
+ 7RuyJX6boJv3jS8fqsvDEfw1jeSuhaBF+rx1RAV4GdL+R3C2xZSOfCXwOvK2qF2v
+ 0TdCHWrz0XKRjjhVcGjHY7pd0HBRJODt7l3AIhKFR2poJHY4ULYrfTDlyykSydr8
+ KXqmu1hosiPaK5dZHplAL/k/AJ+HAsYd93nPIKmwRNv6om4kXC5RUXre05zMXpms
+ QPZpz8LIDXnvk53D1BJ8acgeCFXfu7SDU/w==
 From: virtiofs-bot@sinrega.org
-Message-Id: <31738.122053107134501218@us-mta-557.us.mimecast.lan>
+Message-Id: <13116.122053107142601615@us-mta-518.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Tue, 31 May 2022 11:13:51 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR merged: implement std::error::Error trait
+Date: Tue, 31 May 2022 11:14:28 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR merged: Disable killpriv_v2 by default
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -34,7 +34,35 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-The seccomp and sandbox modules declare a custom error enum, they should implement the std:error:Error trait.
+Right now killpriv_v2 is enabled by default. It has few issues.
+
+- Does not work on NFS. And I think there are other remote filesystems it
+  will not work on because it primarily relies on dropping CAP_FSETID when
+  needed and that triggers clearing suid/sgid in many of the cases as
+  needed.
+
+- killpriv_v2 is not perfect. Came to know that couple of fstests
+  (generic/193 and generic/355) are failing. Something fails on
+  ext4 and while other thing fails on xfs etc. Some of them are probably
+  deep filesystem issues which need to be investigated and fixed.
+
+I plan to start diving into the these issues and see how many of these
+are fixable. But that will take time and fixes will show up slowly in
+future kernels. And we need to also cater to existing kernels.
+  
+Hence I think disabling killpriv_v2 by default is better default for
+our users. 
+
+Given it is disabled by default now, I also had to add a new parameter
+"--killpriv-v2" so that users can enable it if they want to test/debug
+with this option.
+
+Usage of overrides_with() allows POSIX style command line ordering
+between --killpriv-v2 and --no-killpriv-v2 where last option wins
+and takes affect if user decides to pass multiple of these arguments
+on command line. 
+ 
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/121
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/116
 

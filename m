@@ -1,14 +1,31 @@
-Return-Path: <slp@redhat.com>
-Date: Tue, 31 May 2022 12:50:50 +0200
-From: Sergio Lopez <slp@redhat.com>
-Message-ID: <20220531104953.3lpjjpuxepc7wwdg@mhamilton>
-References: <BY5PR14MB3893C17AAED9ECD7280AE7FD86D99@BY5PR14MB3893.namprd14.prod.outlook.com>
-MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
- protocol="application/pgp-signature"; boundary="w4e3uddoi5xt5n7k"
-Content-Disposition: inline
-In-Reply-To: <BY5PR14MB3893C17AAED9ECD7280AE7FD86D99@BY5PR14MB3893.namprd14.prod.outlook.com>
-Subject: Re: [Virtio-fs] vhost_set_vring_kick failed
+Return-Path: <virtiofs-bot@sinrega.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+ cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+ :to; s=fm1; t=1653995578; x=1654081978; bh=f0pYcHPmMY5yE1PDxIeWA
+ tuk5pgjiZ3rIPuXdHuFjgE=; b=h+EdimIZItAoSyUAARr0tS0XLkqY4g94Y/zrV
+ y0CAloooXKdY/5raggylWTTN62sTV4ScQ0QyEJ2dIqCtEECDHoLGLr0BVzf2Th3u
+ 5n2/WEJuJ/Sff6Fu/vodYMCtkp/Gh3i7TzVhYgEdXb22S/jW+NNoGpJWJC1Cq5uM
+ 7dmulAIHrwXLWWkw48thRmApCzr+Gp9GIKBdY+hEDnKoktirvI69EaeQXedF+Efg
+ Iu2533cphcglu7+QzXBECrc8xikuRr3yWtQ5biw4hHAGGy8hz8nCY0he+v3gdtT6
+ IjzS9NmRf6+V83F2ho65Nu3M53oCQ0imENA2Y/LWblLjVgfvA==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+ messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
+ :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
+ :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; t=
+ 1653995578; x=1654081978; bh=f0pYcHPmMY5yE1PDxIeWAtuk5pgjiZ3rIPu
+ XdHuFjgE=; b=gAWAEBE08G9jRGYnlmeZzVCow8T9FIlJ5ZKbaezTZ6LOaVLcL0W
+ v9+PMyurZx2Ca/drttC7Vw5c4WD1XRTrxnJ6kjM7WjqocjNBPxT+DAzviNOqJWIK
+ gfwuN7nAyCjLp7YKmDfXiRm+kjPTr19H7dS7iHLRe4xxHLlRUWKnjc4+wREwFJpm
+ KUMgPptzCVdnLRzErkBVOYgi2uBSxSHkpIZrHOig6RY0TT0/33zziDpi3eAmcT+f
+ KQxyUx90FvpVXEWu+C04vxuG3sim0Wzf138+LVakFT0oHMSR4M3YWRLMkRqYp/D9
+ hgfdyCqjuJ1S2vXZ128nlCfTbGXlJNyiHBg==
+From: virtiofs-bot@sinrega.org
+Message-Id: <64214.122053107130000627@us-mta-647.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"; x-default=true
+Date: Tue, 31 May 2022 11:13:03 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] Issue closed: virtiofsd fails to start due
+ to AVCs when running under the `container_kvm_t` label (aka,
+ with Kata Containers)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,90 +34,41 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Pra.. Dew.." <linux_learner@outlook.com>
-Cc: Stefan Hajnoczi <stefanha@redhat.com>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, "gmaglione@redhat.com" <gmaglione@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
+To: virtio-fs@redhat.com
 
+Here are the AVCs:
+```
+time->Mon May 23 16:35:07 2022
+type=USER_AVC msg=audit(1653323707.241:18235): pid=816 uid=81 auid=4294967295 ses=4294967295 subj=system_u:system_r:system_dbusd_t:s0-s0:c0.c1023 msg='avc:  received setenforce notice (enforcing=0)  exe=2F7573722F62696E2F646275732D6461656D6F6E202864656C6574656429 sauid=81 hostname=? addr=? terminal=?'
+----
+time->Mon May 23 16:35:09 2022
+type=PROCTITLE msg=audit(1653323709.744:18242): proctitle=2F7573722F6C6962657865632F76697274696F667364002D2D7379736C6F67002D6F0063616368653D6175746F002D6F006E6F5F706F7369785F6C6F636B002D6F00736F757263653D2F72756E2F6B6174612D636F6E7461696E6572732F7368617265642F73616E64626F7865732F6565613263363938656633353431626635
+type=PATH msg=audit(1653323709.744:18242): item=1 name=(null) inode=15676422 dev=fc:01 mode=040755 ouid=0 ogid=0 rdev=00:00 obj=system_u:object_r:tmp_t:s0 nametype=CREATE cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=PATH msg=audit(1653323709.744:18242): item=0 name=(null) inode=8644264 dev=fc:01 mode=040755 ouid=1001 ogid=121 rdev=00:00 obj=system_u:object_r:tmp_t:s0 nametype=PARENT cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=CWD msg=audit(1653323709.744:18242): cwd="/run/containers/storage/overlay-containers/eea2c698ef3541bf593c2d33e51e6137c872ac03eef933f9ca27b772cce11603/userdata"
+type=SYSCALL msg=audit(1653323709.744:18242): arch=c000003e syscall=83 success=yes exit=0 a0=7f5859355100 a1=1ff a2=1d a3=fefefefefefefeff items=2 ppid=198568 pid=198572 auid=4294967295 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=4294967295 comm="virtiofsd" exe="/opt/kata/libexec/virtiofsd" subj=system_u:system_r:container_kvm_t:s0:c717,c1013 key=(null)
+type=AVC msg=audit(1653323709.744:18242): avc:  denied  { create } for  pid=198572 comm="virtiofsd" name="virtiofsd-.kxe6OCukLKKw" scontext=system_u:system_r:container_kvm_t:s0:c717,c1013 tcontext=system_u:object_r:tmp_t:s0 tclass=dir permissive=1
+type=AVC msg=audit(1653323709.744:18242): avc:  denied  { add_name } for  pid=198572 comm="virtiofsd" name="virtiofsd-.kxe6OCukLKKw" scontext=system_u:system_r:container_kvm_t:s0:c717,c1013 tcontext=system_u:object_r:tmp_t:s0 tclass=dir permissive=1
+type=AVC msg=audit(1653323709.744:18242): avc:  denied  { write } for  pid=198572 comm="virtiofsd" name="tmp" dev="vda1" ino=8644264 scontext=system_u:system_r:container_kvm_t:s0:c717,c1013 tcontext=system_u:object_r:tmp_t:s0 tclass=dir permissive=1
+----
+time->Mon May 23 16:35:09 2022
+type=PROCTITLE msg=audit(1653323709.744:18243): proctitle=2F7573722F6C6962657865632F76697274696F667364002D2D7379736C6F67002D6F0063616368653D6175746F002D6F006E6F5F706F7369785F6C6F636B002D6F00736F757263653D2F72756E2F6B6174612D636F6E7461696E6572732F7368617265642F73616E64626F7865732F6565613263363938656633353431626635
+type=PATH msg=audit(1653323709.744:18243): item=0 name="/proc/self/fd" inode=7324340 dev=00:a0 mode=040500 ouid=0 ogid=0 rdev=00:00 obj=system_u:system_r:container_kvm_t:s0:c717,c1013 nametype=NORMAL cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
+type=CWD msg=audit(1653323709.744:18243): cwd="/run/containers/storage/overlay-containers/eea2c698ef3541bf593c2d33e51e6137c872ac03eef933f9ca27b772cce11603/userdata"
+type=SYSCALL msg=audit(1653323709.744:18243): arch=c000003e syscall=165 success=yes exit=0 a0=7f5859355660 a1=7f5859355130 a2=0 a3=1000 items=1 ppid=198568 pid=198572 auid=4294967295 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=4294967295 comm="virtiofsd" exe="/opt/kata/libexec/virtiofsd" subj=system_u:system_r:container_kvm_t:s0:c717,c1013 key=(null)
+type=AVC msg=audit(1653323709.744:18243): avc:  denied  { mounton } for  pid=198572 comm="virtiofsd" path="/tmp/virtiofsd-.kxe6OCukLKKw" dev="vda1" ino=15676422 scontext=system_u:system_r:container_kvm_t:s0:c717,c1013 tcontext=system_u:object_r:tmp_t:s0 tclass=dir permissive=1
+----
+time->Mon May 23 16:35:09 2022
+type=PROCTITLE msg=audit(1653323709.752:18244): proctitle=2F7573722F6C6962657865632F76697274696F667364002D2D7379736C6F67002D6F0063616368653D6175746F002D6F006E6F5F706F7369785F6C6F636B002D6F00736F757263653D2F72756E2F6B6174612D636F6E7461696E6572732F7368617265642F73616E64626F7865732F6565613263363938656633353431626635
+type=SYSCALL msg=audit(1653323709.752:18244): arch=c000003e syscall=84 success=yes exit=0 a0=7f5859355130 a1=2 a2=6 a3=0 items=0 ppid=198568 pid=198572 auid=4294967295 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=4294967295 comm="virtiofsd" exe="/opt/kata/libexec/virtiofsd" subj=system_u:system_r:container_kvm_t:s0:c717,c1013 key=(null)
+type=AVC msg=audit(1653323709.752:18244): avc:  denied  { rmdir } for  pid=198572 comm="virtiofsd" name="virtiofsd-.kxe6OCukLKKw" dev="vda1" ino=15676422 scontext=system_u:system_r:container_kvm_t:s0:c717,c1013 tcontext=system_u:object_r:tmp_t:s0 tclass=dir permissive=1
+type=AVC msg=audit(1653323709.752:18244): avc:  denied  { remove_name } for  pid=198572 comm="virtiofsd" name="virtiofsd-.kxe6OCukLKKw" dev="vda1" ino=15676422 scontext=system_u:system_r:container_kvm_t:s0:c717,c1013 tcontext=system_u:object_r:tmp_t:s0 tclass=dir permissive=1
+type=AVC msg=audit(1653323709.752:18244): avc:  denied  { write } for  pid=198572 comm="virtiofsd" name="tmp" dev="vda1" ino=8644264 scontext=system_u:system_r:container_kvm_t:s0:c717,c1013 tcontext=system_u:object_r:tmp_t:s0 tclass=dir permissive=1
+```
 
---w4e3uddoi5xt5n7k
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="pbfxsatzvymrrfo5"
-Content-Disposition: inline
+This is most likely coming from: https://gitlab.com/virtio-fs/virtiofsd/-/blob/main/src/sandbox.rs#L199-212
 
+A possible alternative for this would be using `/var/run`, instead, as the `container_kvm_t` label is allowed to perform the actions there: https://github.com/containers/container-selinux/blob/15c20d72b183d86955894e693127e5bc06722a1a/container.te#L1198-L1210
+---
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/49
 
---pbfxsatzvymrrfo5
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Thu, May 26, 2022 at 04:07:36PM +0000, Pra.. Dew.. wrote:
-> Thanks for the response.  The  version of the qemu is 5.1.0 and  here is =
-the comandline..
->=20
->=20
-> [/usr/bin/qemu-system-test-machine test --enable-kvm -display none -mon m=
-on-console,mode=3Dreadline -chardev socket,host=3D,port=3D5001,server,nowai=
-t,id=3Dmon-console -device virtio-serial-device,max_ports=3D2 -device virtc=
-onsole,chardev=3Dconsole,name=3Dconsole -chardev socket,host=3D,port=3D5000=
-,server,nowait,id=3Dconsole -netdev tap,id=3Dtap0,ifname=3Dtap0,vhost=3Don,=
-script=3Dno,downscript=3Dno -device virtio-net-device,netdev=3Dtap0 -device=
- vhost-vsock-device,guest-cid=3D4 -object rng-random,filename=3D/dev/urando=
-m,id=3Drng0 -device virtio-rng-device,rng=3Drng0 -chardev socket,id=3Dchar0=
-,path=3D/run/vm001-vhost-fs.sock -device vhost-user-fs-device,queue-size=3D=
-2,chardev=3Dchar0,tag=3Dmyfs -object memory-backend-memfd,id=3Dmem,size=3D4=
-G,share=3Don -kernel /var/lib/are/images/active/kernel.bin -dtb /var/lib/ar=
-e/images/active/device-tree.dtb -device virtio-blk-device,drive=3Dwritable,=
-serial=3Dwritable -drive file=3D/var/lib/are/volumes/writable.bin,if=3Dnone=
-,id=3Dwritable,format=3Draw -device virtio-blk-device,drive=3Drootfs,serial=
-=3Drootfs -drive file=3D/var/lib/are/images/active/rootfs/rootfs.bin,if=3Dn=
-one,id=3Drootfs,format=3Draw,readonly]
-
-Thanks for the details. I knew that we didn't support older versions,
-but didn't want to reply that without explaining why.
-
-I've just took a look, and the origin of this incompatibility is this
-change in "hw/virtio/vhost-user.c":
-
-qemu-5.1.0:
-
-typedef struct VhostUserMemRegMsg {
-    uint32_t padding;
-    VhostUserMemoryRegion region;
-} VhostUserMemRegMsg;
-
-qemu-upstream (since 3009edff8192991293fe9e2b50b0d90db83c4a89):
-
-typedef struct VhostUserMemRegMsg {
-    uint64_t padding;
-    VhostUserMemoryRegion region;
-} VhostUserMemRegMsg;
-
-Note how "padding" has changed from uint32_t to uint64_t.
-
-This means we only support QEMU versions starting 5.2.0.
-
-Regards,
-Sergio.
-
---pbfxsatzvymrrfo5--
-
---w4e3uddoi5xt5n7k
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAABCAAdFiEEvtX891EthoCRQuii9GknjS8MAjUFAmKV8wkACgkQ9GknjS8M
-AjWYrhAApFLNQAsOQaGf4zITTKo0GWWFr3l/faxGhku5d4nsDZgRr7+sasHsadaE
-8R1JaloTftFfbfAzcyoF8m/xFxuLextHFkGBG2UpsxP0w4pQnb6TMclXKGSHX5SI
-Nz50JtppzM/2cMDObLRlMAth+a4VC2QyP6nN2KBsWkoS70CaJ/Z7c3gFNAggVv4P
-WCi0PLg6wHQxr3NSS2tYi5BQxapm0eufjGpj9oKSRMfTwgE7vKK3sGPmuc4kjwyz
-8Z4tR3Ekg1n0oHerH7gD9YCzU/B48BjW8GAZzMlvqRKy9yiP7kFueeENw3O65xsP
-FCYUOXOD7exweNKQ/2AgSANiVd1jDsFvqLmoqhr8uUxEG387yolgG22+eNDoXu1T
-syhg5fVh+reSPttfD65J3TPj5y9eg96IT2N6tNsDP6KAEGOg7x4Z6+cFwB14R5AJ
-NTVIxtUJp+7iAIzxfa0vFzzIzNfg60FkzeqIf4PLPzrVDT7gcedWKrnQWybu1OUo
-5ghYk2KtC1YGmeSHpXPy9fxHjRdiPo3aDE0fCggNS6JMSgG11SnTXvkH4jfC47kB
-DZYvSIy0mcIBzJEeO2WFV6ReqBUSJW3JpAogPL8bjT6YR1//qmXqc/piM+b/fiON
-0NTat0fmZZtcnE/8yJR31LgYowaicJwUPjkr7VvrHdESStDGCQI=
-=2/kq
------END PGP SIGNATURE-----
-
---w4e3uddoi5xt5n7k--

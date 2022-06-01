@@ -1,17 +1,22 @@
-Return-Path: <vgoyal@redhat.com>
-Date: Tue, 31 May 2022 18:50:14 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YpabpsCK2CBbOPQL@redhat.com>
-References: <BY5PR14MB3893A6AA17C5FEBE843B640286D99@BY5PR14MB3893.namprd14.prod.outlook.com>
- <Yo8xDlTWijVMVNli@stefanha-x1.localdomain>
- <20220526080646.vsfmqgxyiglhe64r@mhamilton>
- <YpVBKsogLU8/5kiV@redhat.com>
- <BY5PR14MB3893602BAEFA362A5C62485386DC9@BY5PR14MB3893.namprd14.prod.outlook.com>
+Return-Path: <russ@openzurich.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=openzurich.com; s=google;
+ h=mime-version:sender:from:date:message-id:subject:to;
+ bh=UbEX4PSHxXG3pz9gqnJ/yz6cDv8BkxEkwOzsZkO5x5U=;
+ b=CGLHV0KW5G0oZyvSHqWnK0PURfFNfr5Ve/k4tmlrY3ZbohT3XiWJjNGZ8pCl/ZZxnr
+ XCj1rDWQkeUxp3yZOARjAIF+xIOFnSwVg7nvI22d3XRgD0fgebP/WPiHK6ym/OdezP2A
+ +ULF7uXPWGJLnrojanWrgyWZ3m5C4/RHUM+1/Jj1saoy752blbfbWqLlp9d++I7mKouw
+ dGMktP+3CjLTFPY8Pj1qYFwzCIrIQ4yl6tZpt8P3Jl9d4aMPeY6ng/bY+LdFCRQwCd1S
+ 5nZzUf38xcSZASlzhNyOFPPf/DJkbJ46vGKspi5k9uiyCcMsjWRNfG8+nyUkYY2BoGvI
+ PKZg==
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <BY5PR14MB3893602BAEFA362A5C62485386DC9@BY5PR14MB3893.namprd14.prod.outlook.com>
-Subject: Re: [Virtio-fs] vhost_set_vring_kick failed
+Sender: Russ Willians <russ@openzurich.com>
+From: Russ Willians <russ@openzurich.com>
+Date: Tue, 31 May 2022 20:07:42 -0700
+Message-ID: <CAO-n2O=oD6_B1ks3ancwhrOo1Muts88490J07yOvs5hY1D4RcA@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="00000000000050e52105e05a3113"
+Subject: [Virtio-fs] Advertising Options / Sponsored Content Options on
+ virtio-fs.gitlab.io
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,84 +25,199 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Pra.. Dew.." <linux_learner@outlook.com>
-Cc: Sergio Lopez <slp@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+To: Virtio-Fs <virtio-fs@redhat.com>
 
-On Tue, May 31, 2022 at 10:25:12PM +0000, Pra.. Dew.. wrote:
-> Thank you so much Vivek. I enabled the trace in the code itself and ran it. The only message I got was InvalidParam message below. I did not get any other message.  We are going to try changing the structure [VhostUserMemRegMsg]  padding to see if that fixes the problem. Is there anything else we should try?
+--00000000000050e52105e05a3113
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-Hi Prashant,
+Hi there,
 
-I was trying to look at some of the code today and looks like
-error message might be coming from vhost crate
-(src/vhost_user/slave_req_handler.rs).
 
-I don't understand the whole logic very well. So I will defer it to
-Sergio if something can be done to support older qemu.
 
-Thanks
-Vivek
+We=E2=80=99re currently working on behalf of a major industry-leading clien=
+t trying
+to enhance their brand via editorial content.
 
-> ________________________________
-> From: Vivek Goyal <vgoyal@redhat.com>
-> Sent: Monday, May 30, 2022 10:11 PM
-> To: Sergio Lopez <slp@redhat.com>; Prashant Dewan <linux_learner@outlook.com>
-> Cc: Stefan Hajnoczi <stefanha@redhat.com>; virtio-fs@redhat.com <virtio-fs@redhat.com>
-> Subject: Re: [Virtio-fs] vhost_set_vring_kick failed
-> 
-> On Thu, May 26, 2022 at 10:06:46AM +0200, Sergio Lopez wrote:
-> > On Thu, May 26, 2022 at 08:49:34AM +0100, Stefan Hajnoczi wrote:
-> > > On Thu, May 26, 2022 at 05:34:42AM +0000, Prashant Dewan wrote:
-> > > > Hello Stefan,
-> > > >
-> > > > Here is the output from virtofsd..
-> > > >
-> > > > ------------------------------------
-> > > > - Journal begins at Thu 2022-05-26 04:23:42 UTC, ends at Thu 2022-05-26 04:41:57 UTC. --
-> > > > May 26 04:24:13 localhost systemd[1]: Started virtio-fs vhost-user device daemon.<<Placeholder: run this daemon as non-privileged user>>.
-> > > > May 26 04:24:13 localhost virtiofsd[505]: [2022-05-26T04:24:13Z INFO  virtiofsd] Waiting for vhost-user socket connection...
-> > > > May 26 04:27:11 device-3e4b479e2ee9c647 virtiofsd[505]: [2022-05-26T04:27:11Z INFO  virtiofsd] Client connected, servicing requests
-> > > > May 26 04:27:33 device-3e4b479e2ee9c647 virtiofsd[505]: [2022-05-26T04:27:33Z ERROR virtiofsd] Waiting for daemon failed: HandleRequest(InvalidParam)
-> 
-> So looks like following gave error message. There is no error messsage
-> from the actual thread which failed. This is just the main thread
-> waiting.
-> 
->     if let Err(e) = daemon.wait() {
->         match e {
->             HandleRequest(PartialMessage) => info!("Client disconnected, shutting down"),
->             _ => error!("Waiting for daemon failed: {:?}", e),
->         }
->     }
-> 
-> I can't find "InvalidParam" in rust virtiofsd code. Does that mean,
-> that this error is being returned by one of the crates we are using.
-> 
-> Prashant, you could try running rust virtiofsd with option "-d" to enable
-> debug messages and that might show something interesting.
-> 
-> Also, if you are able to reproduce the problem all the time, I think
-> you can start virtiofsd under gdb and see where exactly is it failing.
-> 
-> Thanks
-> Vivek
-> 
-> > >
-> > > virtiofsd terminated. I have CCed Sergio and German, who may have
-> > > suggestions about what to check next.
-> >
-> > Hi,
-> >
-> > Could you please tell us which QEMU version are you running, and paste
-> > here the its command line?
-> >
-> > Thanks,
-> > Sergio.
-> 
-> 
-> 
-> > _______________________________________________
-> > Virtio-fs mailing list
-> > Virtio-fs@redhat.com
-> > https://nam12.safelinks.protection.outlook.com/?url=https%3A%2F%2Flistman.redhat.com%2Fmailman%2Flistinfo%2Fvirtio-fs&amp;data=05%7C01%7C%7Cc4d5792347234799874008da42896937%7C84df9e7fe9f640afb435aaaaaaaaaaaa%7C1%7C0%7C637895455186641964%7CUnknown%7CTWFpbGZsb3d8eyJWIjoiMC4wLjAwMDAiLCJQIjoiV2luMzIiLCJBTiI6Ik1haWwiLCJXVCI6Mn0%3D%7C3000%7C%7C%7C&amp;sdata=ox5y7KH0DjiooIeJ367DZiexKQutIouWSCi5OLld%2BNY%3D&amp;reserved=0
-> 
+
+
+Whilst looking for opportunities, we came across your website
+virtio-fs.gitlab.io
+
+
+
+Please let us know the pricing and options to place sponsored content on
+your website.
+
+
+
+We can provide you with a high-quality piece of content, fitting your
+website audience. We=E2=80=99ll include citations and images, so as to make=
+ the
+content naturally resonate with your readers.
+
+
+
+Furthermore, if you are interested in publishing sponsored content
+on websites/blogs owned by your company, please send us more details with
+the below info:
+
+
+
+- Website URLs
+
+- Pricing
+
+- Linking restrictions (Nofollowetc)
+
+- Any restrictions about the content or outgoing links
+
+
+
+Let me know and we can get something started.
+
+
+
+Best Regards,
+
+--=20
+
+[image: beacon]
+
+--00000000000050e52105e05a3113
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><p class=3D"MsoNormal" style=3D"margin:0in;line-height:nor=
+mal;background-image:initial;background-position:initial;background-size:in=
+itial;background-repeat:initial;background-origin:initial;background-clip:i=
+nitial;font-size:11pt;font-family:Calibri,sans-serif">Hi
+there,</p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
+age:initial;background-position:initial;background-size:initial;background-=
+repeat:initial;background-origin:initial;background-clip:initial;font-size:=
+11pt;font-family:Calibri,sans-serif">=C2=A0</p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
+age:initial;background-position:initial;background-size:initial;background-=
+repeat:initial;background-origin:initial;background-clip:initial;font-size:=
+11pt;font-family:Calibri,sans-serif">We=E2=80=99re
+currently working on behalf of a major industry-leading client trying to
+enhance their brand via editorial content.=C2=A0=C2=A0</p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
+age:initial;background-position:initial;background-size:initial;background-=
+repeat:initial;background-origin:initial;background-clip:initial;font-size:=
+11pt;font-family:Calibri,sans-serif">=C2=A0</p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
+age:initial;background-position:initial;background-size:initial;background-=
+repeat:initial;background-origin:initial;background-clip:initial;font-size:=
+11pt;font-family:Calibri,sans-serif">Whilst
+looking for opportunities, we came across your website <span style=3D"color=
+:black"><a href=3D"http://virtio-fs.gitlab.io">virtio-fs.gitlab.io</a></spa=
+n></p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
+age:initial;background-position:initial;background-size:initial;background-=
+repeat:initial;background-origin:initial;background-clip:initial;font-size:=
+11pt;font-family:Calibri,sans-serif">=C2=A0</p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
+age:initial;background-position:initial;background-size:initial;background-=
+repeat:initial;background-origin:initial;background-clip:initial;font-size:=
+11pt;font-family:Calibri,sans-serif"><span style=3D"color:black">Please
+let us know the pricing and options to place sponsored content on your webs=
+ite.</span></p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
+age:initial;background-position:initial;background-size:initial;background-=
+repeat:initial;background-origin:initial;background-clip:initial;font-size:=
+11pt;font-family:Calibri,sans-serif">=C2=A0</p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
+age:initial;background-position:initial;background-size:initial;background-=
+repeat:initial;background-origin:initial;background-clip:initial;font-size:=
+11pt;font-family:Calibri,sans-serif"><span style=3D"color:black">We can
+provide you with a high-quality piece of content, fitting your website
+audience. We=E2=80=99ll include citations and images, so as to make the con=
+tent naturally
+resonate with your readers.</span></p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
+age:initial;background-position:initial;background-size:initial;background-=
+repeat:initial;background-origin:initial;background-clip:initial;font-size:=
+11pt;font-family:Calibri,sans-serif">=C2=A0</p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
+age:initial;background-position:initial;background-size:initial;background-=
+repeat:initial;background-origin:initial;background-clip:initial;font-size:=
+11pt;font-family:Calibri,sans-serif"><span style=3D"color:black">Furthermor=
+e,
+if you are interested in publishing sponsored content on=C2=A0websites/blog=
+s
+owned by your company, please send us more details with the below info:</sp=
+an></p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
+age:initial;background-position:initial;background-size:initial;background-=
+repeat:initial;background-origin:initial;background-clip:initial;font-size:=
+11pt;font-family:Calibri,sans-serif">=C2=A0</p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
+age:initial;background-position:initial;background-size:initial;background-=
+repeat:initial;background-origin:initial;background-clip:initial;font-size:=
+11pt;font-family:Calibri,sans-serif"><span style=3D"color:black">-
+Website URLs</span></p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
+age:initial;background-position:initial;background-size:initial;background-=
+repeat:initial;background-origin:initial;background-clip:initial;font-size:=
+11pt;font-family:Calibri,sans-serif"><span style=3D"color:black">-
+Pricing</span></p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
+age:initial;background-position:initial;background-size:initial;background-=
+repeat:initial;background-origin:initial;background-clip:initial;font-size:=
+11pt;font-family:Calibri,sans-serif"><span style=3D"color:black">-
+Linking restrictions (Nofollowetc)</span></p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
+age:initial;background-position:initial;background-size:initial;background-=
+repeat:initial;background-origin:initial;background-clip:initial;font-size:=
+11pt;font-family:Calibri,sans-serif"><span style=3D"color:black">- Any
+restrictions about the content or outgoing links</span></p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
+age:initial;background-position:initial;background-size:initial;background-=
+repeat:initial;background-origin:initial;background-clip:initial;font-size:=
+11pt;font-family:Calibri,sans-serif">=C2=A0</p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
+age:initial;background-position:initial;background-size:initial;background-=
+repeat:initial;background-origin:initial;background-clip:initial;font-size:=
+11pt;font-family:Calibri,sans-serif">Let
+me know and we can get something started.</p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
+age:initial;background-position:initial;background-size:initial;background-=
+repeat:initial;background-origin:initial;background-clip:initial;font-size:=
+11pt;font-family:Calibri,sans-serif">=C2=A0</p>
+
+<p class=3D"MsoNormal" style=3D"margin:0in 0in 12pt;line-height:normal;back=
+ground-image:initial;background-position:initial;background-size:initial;ba=
+ckground-repeat:initial;background-origin:initial;background-clip:initial;f=
+ont-size:11pt;font-family:Calibri,sans-serif">Best
+Regards,</p><div><br></div>-- <br><div dir=3D"ltr" class=3D"gmail_signature=
+" data-smartmail=3D"gmail_signature"><div dir=3D"ltr"><img src=3D"https://c=
+i3.googleusercontent.com/mail-sig/AIorK4x-EjvpQpHKS1fb-DEaX0qS1WdFg7yPUFa7s=
+3mFsEeKJbC9iEUZ28ise5-yB5idgqWPbyAar9E"><br></div></div></div>
+<img src=3D"https://openzurich-dot-yamm-track.appspot.com/20wZm8o-rtOJFuooX=
+L8vfHPgO5DQZOkJAm9ach5IHiENatzsdgQHpq5xQwd3TEEZ-FZOGOtp_B4BaQWjyh8TYZTzha2Q=
+xAylEF4lVUcdKQs56jWen4P2y4utuj_r1YEmSHWinwiSa-GTmlUQtC6zcdXASlnEBkDy2" widt=
+h=3D"1" height=3D"1" alt=3D"beacon" style=3D"display:none; display:none!imp=
+ortant;">
+
+--00000000000050e52105e05a3113--
+

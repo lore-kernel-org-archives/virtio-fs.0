@@ -1,22 +1,18 @@
-Return-Path: <russ@openzurich.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=openzurich.com; s=google;
- h=mime-version:sender:from:date:message-id:subject:to;
- bh=UbEX4PSHxXG3pz9gqnJ/yz6cDv8BkxEkwOzsZkO5x5U=;
- b=CGLHV0KW5G0oZyvSHqWnK0PURfFNfr5Ve/k4tmlrY3ZbohT3XiWJjNGZ8pCl/ZZxnr
- XCj1rDWQkeUxp3yZOARjAIF+xIOFnSwVg7nvI22d3XRgD0fgebP/WPiHK6ym/OdezP2A
- +ULF7uXPWGJLnrojanWrgyWZ3m5C4/RHUM+1/Jj1saoy752blbfbWqLlp9d++I7mKouw
- dGMktP+3CjLTFPY8Pj1qYFwzCIrIQ4yl6tZpt8P3Jl9d4aMPeY6ng/bY+LdFCRQwCd1S
- 5nZzUf38xcSZASlzhNyOFPPf/DJkbJ46vGKspi5k9uiyCcMsjWRNfG8+nyUkYY2BoGvI
- PKZg==
+Return-Path: <slp@redhat.com>
+Date: Wed, 1 Jun 2022 08:01:19 +0200
+From: Sergio Lopez <slp@redhat.com>
+Message-ID: <20220601060045.7wjgfqkmcruraif7@mhamilton>
+References: <BY5PR14MB3893A6AA17C5FEBE843B640286D99@BY5PR14MB3893.namprd14.prod.outlook.com>
+ <Yo8xDlTWijVMVNli@stefanha-x1.localdomain>
+ <20220526080646.vsfmqgxyiglhe64r@mhamilton>
+ <YpVBKsogLU8/5kiV@redhat.com>
+ <BY5PR14MB3893602BAEFA362A5C62485386DC9@BY5PR14MB3893.namprd14.prod.outlook.com>
 MIME-Version: 1.0
-Sender: Russ Willians <russ@openzurich.com>
-From: Russ Willians <russ@openzurich.com>
-Date: Tue, 31 May 2022 20:07:42 -0700
-Message-ID: <CAO-n2O=oD6_B1ks3ancwhrOo1Muts88490J07yOvs5hY1D4RcA@mail.gmail.com>
-Content-Type: multipart/alternative; boundary="00000000000050e52105e05a3113"
-Subject: [Virtio-fs] Advertising Options / Sponsored Content Options on
- virtio-fs.gitlab.io
+Content-Type: multipart/signed; micalg=pgp-sha256;
+ protocol="application/pgp-signature"; boundary="ubi6gtl647wom7hw"
+Content-Disposition: inline
+In-Reply-To: <BY5PR14MB3893602BAEFA362A5C62485386DC9@BY5PR14MB3893.namprd14.prod.outlook.com>
+Subject: Re: [Virtio-fs] vhost_set_vring_kick failed
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,199 +21,229 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Virtio-Fs <virtio-fs@redhat.com>
+To: "Pra.. Dew.." <linux_learner@outlook.com>
+Cc: Vivek Goyal <vgoyal@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
---00000000000050e52105e05a3113
-Content-Type: text/plain; charset="UTF-8"
+
+--ubi6gtl647wom7hw
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="w73vybx4nlbw3jse"
+Content-Disposition: inline
+
+
+--w73vybx4nlbw3jse
+Content-Type: multipart/mixed; boundary="olxi4fcfwfrd7o5c"
+Content-Disposition: inline
+
+
+--olxi4fcfwfrd7o5c
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+
+On Tue, May 31, 2022 at 10:25:12PM +0000, Pra.. Dew.. wrote:
+> Thank you so much Vivek. I enabled the trace in the code itself and
+> ran it. The only message I got was InvalidParam message below. I did
+> not get any other message.  We are going to try changing the
+> structure [VhostUserMemRegMsg]  padding to see if that fixes the
+> problem. Is there anything else we should try?
+
+Applying 3009edff81 to qemu-5.1.0 should do the trick. I'm attaching
+the patch to this email, so you can simply apply it with something
+like:
+
+patch -p1 < 0001-vhost-user-fix-VHOST_USER_ADD-REM_MEM_REG-truncation.patch
+
+Sergio.
+
+--olxi4fcfwfrd7o5c
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: attachment;
+	filename="0001-vhost-user-fix-VHOST_USER_ADD-REM_MEM_REG-truncation.patch"
 Content-Transfer-Encoding: quoted-printable
 
-Hi there,
+=46rom 3009edff8192991293fe9e2b50b0d90db83c4a89 Mon Sep 17 00:00:00 2001
+=46rom: Stefan Hajnoczi <stefanha@redhat.com>
+Date: Mon, 9 Nov 2020 17:43:55 +0000
+Subject: [PATCH] vhost-user: fix VHOST_USER_ADD/REM_MEM_REG truncation
 
+QEMU currently truncates the mmap_offset field when sending
+VHOST_USER_ADD_MEM_REG and VHOST_USER_REM_MEM_REG messages. The struct
+layout looks like this:
 
+  typedef struct VhostUserMemoryRegion {
+      uint64_t guest_phys_addr;
+      uint64_t memory_size;
+      uint64_t userspace_addr;
+      uint64_t mmap_offset;
+  } VhostUserMemoryRegion;
 
-We=E2=80=99re currently working on behalf of a major industry-leading clien=
-t trying
-to enhance their brand via editorial content.
+  typedef struct VhostUserMemRegMsg {
+      uint32_t padding;
+      /* WARNING: there is a 32-bit hole here! */
+      VhostUserMemoryRegion region;
+  } VhostUserMemRegMsg;
 
+The payload size is calculated as follows when sending the message in
+hw/virtio/vhost-user.c:
 
+  msg->hdr.size =3D sizeof(msg->payload.mem_reg.padding) +
+      sizeof(VhostUserMemoryRegion);
 
-Whilst looking for opportunities, we came across your website
-virtio-fs.gitlab.io
+This calculation produces an incorrect result of only 36 bytes.
+sizeof(VhostUserMemRegMsg) is actually 40 bytes.
 
+The consequence of this is that the final field, mmap_offset, is
+truncated. This breaks x86_64 TCG guests on s390 hosts. Other guest/host
+combinations may get lucky if either of the following holds:
+1. The guest memory layout does not need mmap_offset !=3D 0.
+2. The host is little-endian and mmap_offset <=3D 0xffffffff so the
+   truncation has no effect.
 
+Fix this by extending the existing 32-bit padding field to 64-bit. Now
+the padding reflects the actual compiler padding. This can be verified
+using pahole(1).
 
-Please let us know the pricing and options to place sponsored content on
-your website.
+Also document the layout properly in the vhost-user specification.  The
+vhost-user spec did not document the exact layout. It would be
+impossible to implement the spec without looking at the QEMU source
+code.
 
+Existing vhost-user frontends and device backends continue to work after
+this fix has been applied. The only change in the wire protocol is that
+QEMU now sets hdr.size to 40 instead of 36. If a vhost-user
+implementation has a hardcoded size check for 36 bytes, then it will
+fail with new QEMUs. Both QEMU and DPDK/SPDK don't check the exact
+payload size, so they continue to work.
 
+Fixes: f1aeb14b0809e313c74244d838645ed25e85ea63 ("Transmit vhost-user memor=
+y regions individually")
+Cc: Raphael Norwitz <raphael.norwitz@nutanix.com>
+Cc: Cornelia Huck <cohuck@redhat.com>
+Cc: Michael S. Tsirkin <mst@redhat.com>
+Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+Message-Id: <20201109174355.1069147-1-stefanha@redhat.com>
+Reviewed-by: Michael S. Tsirkin <mst@redhat.com>
+Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+Fixes: f1aeb14b0809 ("Transmit vhost-user memory regions individually")
+Reviewed-by: Cornelia Huck <cohuck@redhat.com>
+Reviewed-by: Raphael Norwitz <raphael.norwitz@nutanix.com>
+---
+ contrib/libvhost-user/libvhost-user.h |  2 +-
+ docs/interop/vhost-user.rst           | 21 +++++++++++++++++++--
+ hw/virtio/vhost-user.c                |  5 ++---
+ 3 files changed, 22 insertions(+), 6 deletions(-)
 
-We can provide you with a high-quality piece of content, fitting your
-website audience. We=E2=80=99ll include citations and images, so as to make=
- the
-content naturally resonate with your readers.
-
-
-
-Furthermore, if you are interested in publishing sponsored content
-on websites/blogs owned by your company, please send us more details with
-the below info:
-
-
-
-- Website URLs
-
-- Pricing
-
-- Linking restrictions (Nofollowetc)
-
-- Any restrictions about the content or outgoing links
-
-
-
-Let me know and we can get something started.
-
-
-
-Best Regards,
-
+diff --git a/contrib/libvhost-user/libvhost-user.h b/contrib/libvhost-user/=
+libvhost-user.h
+index a1539dbb69..7d47f1364a 100644
+--- a/contrib/libvhost-user/libvhost-user.h
++++ b/contrib/libvhost-user/libvhost-user.h
+@@ -136,7 +136,7 @@ typedef struct VhostUserMemory {
+ } VhostUserMemory;
+=20
+ typedef struct VhostUserMemRegMsg {
+-    uint32_t padding;
++    uint64_t padding;
+     VhostUserMemoryRegion region;
+ } VhostUserMemRegMsg;
+=20
+diff --git a/docs/interop/vhost-user.rst b/docs/interop/vhost-user.rst
+index 988f154144..6d4025ba6a 100644
+--- a/docs/interop/vhost-user.rst
++++ b/docs/interop/vhost-user.rst
+@@ -131,6 +131,23 @@ A region is:
+=20
+ :mmap offset: 64-bit offset where region starts in the mapped memory
+=20
++Single memory region description
++^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++
+++---------+---------------+------+--------------+-------------+
++| padding | guest address | size | user address | mmap offset |
+++---------+---------------+------+--------------+-------------+
++
++:padding: 64-bit
++
++:guest address: a 64-bit guest address of the region
++
++:size: a 64-bit size
++
++:user address: a 64-bit user address
++
++:mmap offset: 64-bit offset where region starts in the mapped memory
++
+ Log description
+ ^^^^^^^^^^^^^^^
+=20
+@@ -1281,7 +1298,7 @@ Master message types
+ ``VHOST_USER_ADD_MEM_REG``
+   :id: 37
+   :equivalent ioctl: N/A
+-  :slave payload: memory region
++  :slave payload: single memory region description
+=20
+   When the ``VHOST_USER_PROTOCOL_F_CONFIGURE_MEM_SLOTS`` protocol
+   feature has been successfully negotiated, this message is submitted
+@@ -1296,7 +1313,7 @@ Master message types
+ ``VHOST_USER_REM_MEM_REG``
+   :id: 38
+   :equivalent ioctl: N/A
+-  :slave payload: memory region
++  :slave payload: single memory region description
+=20
+   When the ``VHOST_USER_PROTOCOL_F_CONFIGURE_MEM_SLOTS`` protocol
+   feature has been successfully negotiated, this message is submitted
+diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
+index 9c5b4f7fbc..2fdd5daf74 100644
+--- a/hw/virtio/vhost-user.c
++++ b/hw/virtio/vhost-user.c
+@@ -149,7 +149,7 @@ typedef struct VhostUserMemory {
+ } VhostUserMemory;
+=20
+ typedef struct VhostUserMemRegMsg {
+-    uint32_t padding;
++    uint64_t padding;
+     VhostUserMemoryRegion region;
+ } VhostUserMemRegMsg;
+=20
+@@ -800,8 +800,7 @@ static int vhost_user_add_remove_regions(struct vhost_d=
+ev *dev,
+     uint64_t shadow_pcb[VHOST_USER_MAX_RAM_SLOTS] =3D {};
+     int nr_add_reg, nr_rem_reg;
+=20
+-    msg->hdr.size =3D sizeof(msg->payload.mem_reg.padding) +
+-        sizeof(VhostUserMemoryRegion);
++    msg->hdr.size =3D sizeof(msg->payload.mem_reg);
+=20
+     /* Find the regions which need to be removed or added. */
+     scrub_shadow_regions(dev, add_reg, &nr_add_reg, rem_reg, &nr_rem_reg,
 --=20
+2.36.1
 
-[image: beacon]
 
---00000000000050e52105e05a3113
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
+--olxi4fcfwfrd7o5c--
 
-<div dir=3D"ltr"><p class=3D"MsoNormal" style=3D"margin:0in;line-height:nor=
-mal;background-image:initial;background-position:initial;background-size:in=
-itial;background-repeat:initial;background-origin:initial;background-clip:i=
-nitial;font-size:11pt;font-family:Calibri,sans-serif">Hi
-there,</p>
+--w73vybx4nlbw3jse--
 
-<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
-age:initial;background-position:initial;background-size:initial;background-=
-repeat:initial;background-origin:initial;background-clip:initial;font-size:=
-11pt;font-family:Calibri,sans-serif">=C2=A0</p>
+--ubi6gtl647wom7hw
+Content-Type: application/pgp-signature; name="signature.asc"
 
-<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
-age:initial;background-position:initial;background-size:initial;background-=
-repeat:initial;background-origin:initial;background-clip:initial;font-size:=
-11pt;font-family:Calibri,sans-serif">We=E2=80=99re
-currently working on behalf of a major industry-leading client trying to
-enhance their brand via editorial content.=C2=A0=C2=A0</p>
+-----BEGIN PGP SIGNATURE-----
 
-<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
-age:initial;background-position:initial;background-size:initial;background-=
-repeat:initial;background-origin:initial;background-clip:initial;font-size:=
-11pt;font-family:Calibri,sans-serif">=C2=A0</p>
+iQIzBAABCAAdFiEEvtX891EthoCRQuii9GknjS8MAjUFAmKXAK8ACgkQ9GknjS8M
+AjV9uw/+IvfPp5u8AOoIG72lz8IhE3ad5ZIgXV1u/xsfXRJac7yQR/64KUmDpLNz
+EoSI9M+9Q0CDpNKDyFo2PF6+vqmNcbunXqmE+5TwiTPvW59bYYg/jlzoPkdxGDmh
+jNt7mVKDYnywxh3riEiPqwAx8EJEROwHLjhY8CJMwPbodbYSwMczVHUJ+2fUIEEP
+CHo3sZZOyyCRw2nh4N+KMg2iynrU9nllb8d/NFScu8/CPXgmCfL/4xJAtU6jk64C
+zKXedcyU9/iIWiXfTxL1cxSOqQs0dgwxMYdwKCFFtmBzBCD9JW5XpEcZXkikjgmj
+4+O9pjfEN+eJCFyyb+y/23yqcxCz5r4JsWwysNlhRp6bujESxMYN3OilZM8aDDh8
+RF9JflmF6SCS2Ec1c3TzEze8zi0YTgr4rk302TSQE150o3ka88mfan+Uv50U7T5A
+zxC5ZC+38Dzq1pTxgWznLHt6D6y8LVit1RRc4AoIugTNdObIlgo/TT7tQyJ3EXSI
+aDzPOpVmkjqSVy0Cx7aZKKJ78OzWczVecv9VkdImAB3BfmbkeQ1S7KDh6YwKaDNy
+Xr79EhGeVv+QGiqgnez9dFtx3I6sXcdGLcn8lCR4RldrnOOEftxMjmQahk2bP4YZ
+EuNqPkTTIDG26HdeKTvCCB6KmP4NnqpzpKd/Q1stxtd7ZaXsuhQ=
+=ZqQX
+-----END PGP SIGNATURE-----
 
-<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
-age:initial;background-position:initial;background-size:initial;background-=
-repeat:initial;background-origin:initial;background-clip:initial;font-size:=
-11pt;font-family:Calibri,sans-serif">Whilst
-looking for opportunities, we came across your website <span style=3D"color=
-:black"><a href=3D"http://virtio-fs.gitlab.io">virtio-fs.gitlab.io</a></spa=
-n></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
-age:initial;background-position:initial;background-size:initial;background-=
-repeat:initial;background-origin:initial;background-clip:initial;font-size:=
-11pt;font-family:Calibri,sans-serif">=C2=A0</p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
-age:initial;background-position:initial;background-size:initial;background-=
-repeat:initial;background-origin:initial;background-clip:initial;font-size:=
-11pt;font-family:Calibri,sans-serif"><span style=3D"color:black">Please
-let us know the pricing and options to place sponsored content on your webs=
-ite.</span></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
-age:initial;background-position:initial;background-size:initial;background-=
-repeat:initial;background-origin:initial;background-clip:initial;font-size:=
-11pt;font-family:Calibri,sans-serif">=C2=A0</p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
-age:initial;background-position:initial;background-size:initial;background-=
-repeat:initial;background-origin:initial;background-clip:initial;font-size:=
-11pt;font-family:Calibri,sans-serif"><span style=3D"color:black">We can
-provide you with a high-quality piece of content, fitting your website
-audience. We=E2=80=99ll include citations and images, so as to make the con=
-tent naturally
-resonate with your readers.</span></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
-age:initial;background-position:initial;background-size:initial;background-=
-repeat:initial;background-origin:initial;background-clip:initial;font-size:=
-11pt;font-family:Calibri,sans-serif">=C2=A0</p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
-age:initial;background-position:initial;background-size:initial;background-=
-repeat:initial;background-origin:initial;background-clip:initial;font-size:=
-11pt;font-family:Calibri,sans-serif"><span style=3D"color:black">Furthermor=
-e,
-if you are interested in publishing sponsored content on=C2=A0websites/blog=
-s
-owned by your company, please send us more details with the below info:</sp=
-an></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
-age:initial;background-position:initial;background-size:initial;background-=
-repeat:initial;background-origin:initial;background-clip:initial;font-size:=
-11pt;font-family:Calibri,sans-serif">=C2=A0</p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
-age:initial;background-position:initial;background-size:initial;background-=
-repeat:initial;background-origin:initial;background-clip:initial;font-size:=
-11pt;font-family:Calibri,sans-serif"><span style=3D"color:black">-
-Website URLs</span></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
-age:initial;background-position:initial;background-size:initial;background-=
-repeat:initial;background-origin:initial;background-clip:initial;font-size:=
-11pt;font-family:Calibri,sans-serif"><span style=3D"color:black">-
-Pricing</span></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
-age:initial;background-position:initial;background-size:initial;background-=
-repeat:initial;background-origin:initial;background-clip:initial;font-size:=
-11pt;font-family:Calibri,sans-serif"><span style=3D"color:black">-
-Linking restrictions (Nofollowetc)</span></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
-age:initial;background-position:initial;background-size:initial;background-=
-repeat:initial;background-origin:initial;background-clip:initial;font-size:=
-11pt;font-family:Calibri,sans-serif"><span style=3D"color:black">- Any
-restrictions about the content or outgoing links</span></p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
-age:initial;background-position:initial;background-size:initial;background-=
-repeat:initial;background-origin:initial;background-clip:initial;font-size:=
-11pt;font-family:Calibri,sans-serif">=C2=A0</p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
-age:initial;background-position:initial;background-size:initial;background-=
-repeat:initial;background-origin:initial;background-clip:initial;font-size:=
-11pt;font-family:Calibri,sans-serif">Let
-me know and we can get something started.</p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in;line-height:normal;background-im=
-age:initial;background-position:initial;background-size:initial;background-=
-repeat:initial;background-origin:initial;background-clip:initial;font-size:=
-11pt;font-family:Calibri,sans-serif">=C2=A0</p>
-
-<p class=3D"MsoNormal" style=3D"margin:0in 0in 12pt;line-height:normal;back=
-ground-image:initial;background-position:initial;background-size:initial;ba=
-ckground-repeat:initial;background-origin:initial;background-clip:initial;f=
-ont-size:11pt;font-family:Calibri,sans-serif">Best
-Regards,</p><div><br></div>-- <br><div dir=3D"ltr" class=3D"gmail_signature=
-" data-smartmail=3D"gmail_signature"><div dir=3D"ltr"><img src=3D"https://c=
-i3.googleusercontent.com/mail-sig/AIorK4x-EjvpQpHKS1fb-DEaX0qS1WdFg7yPUFa7s=
-3mFsEeKJbC9iEUZ28ise5-yB5idgqWPbyAar9E"><br></div></div></div>
-<img src=3D"https://openzurich-dot-yamm-track.appspot.com/20wZm8o-rtOJFuooX=
-L8vfHPgO5DQZOkJAm9ach5IHiENatzsdgQHpq5xQwd3TEEZ-FZOGOtp_B4BaQWjyh8TYZTzha2Q=
-xAylEF4lVUcdKQs56jWen4P2y4utuj_r1YEmSHWinwiSa-GTmlUQtC6zcdXASlnEBkDy2" widt=
-h=3D"1" height=3D"1" alt=3D"beacon" style=3D"display:none; display:none!imp=
-ortant;">
-
---00000000000050e52105e05a3113--
-
+--ubi6gtl647wom7hw--

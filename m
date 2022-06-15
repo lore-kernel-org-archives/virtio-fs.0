@@ -1,12 +1,12 @@
 Return-Path: <stefanha@redhat.com>
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Wed, 15 Jun 2022 16:51:14 +0100
-Message-Id: <20220615155129.1025811-4-stefanha@redhat.com>
+Date: Wed, 15 Jun 2022 16:51:19 +0100
+Message-Id: <20220615155129.1025811-9-stefanha@redhat.com>
 In-Reply-To: <20220615155129.1025811-1-stefanha@redhat.com>
 References: <20220615155129.1025811-1-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 03/18] qdev: unplug blocker for devices
+Subject: [Virtio-fs] [PULL 08/18] vfio-user: instantiate vfio-user context
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,129 +20,166 @@ Cc: Thomas Huth <thuth@redhat.com>, Jagannathan Raman <jag.raman@oracle.com>, Aa
 
 From: Jagannathan Raman <jag.raman@oracle.com>
 
-Add blocker to prevent hot-unplug of devices
-
-TYPE_VFIO_USER_SERVER, which is introduced shortly, attaches itself to a
-PCIDevice on which it depends. If the attached PCIDevice gets removed
-while the server in use, it could cause it crash. To prevent this,
-TYPE_VFIO_USER_SERVER adds an unplug blocker for the PCIDevice.
+create a context with the vfio-user library to run a PCI device
 
 Signed-off-by: Elena Ufimtseva <elena.ufimtseva@oracle.com>
 Signed-off-by: John G Johnson <john.g.johnson@oracle.com>
 Signed-off-by: Jagannathan Raman <jag.raman@oracle.com>
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-Message-id: c41ef80b7cc063314d629737bed2159e5713f2e0.1655151679.git.jag.raman@oracle.com
+Message-id: a452871ac8c812ff96fc4f0ce6037f4769953fab.1655151679.git.jag.raman@oracle.com
 Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- include/hw/qdev-core.h | 29 +++++++++++++++++++++++++++++
- hw/core/qdev.c         | 24 ++++++++++++++++++++++++
- softmmu/qdev-monitor.c |  4 ++++
- 3 files changed, 57 insertions(+)
+ hw/remote/vfio-user-obj.c | 82 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 82 insertions(+)
 
-diff --git a/include/hw/qdev-core.h b/include/hw/qdev-core.h
-index 92c3d65208..98774e2835 100644
---- a/include/hw/qdev-core.h
-+++ b/include/hw/qdev-core.h
-@@ -193,6 +193,7 @@ struct DeviceState {
-     int instance_id_alias;
-     int alias_required_for_version;
-     ResettableState reset;
-+    GSList *unplug_blockers;
+diff --git a/hw/remote/vfio-user-obj.c b/hw/remote/vfio-user-obj.c
+index bc49adcc27..68f8a9dfa9 100644
+--- a/hw/remote/vfio-user-obj.c
++++ b/hw/remote/vfio-user-obj.c
+@@ -40,6 +40,9 @@
+ #include "hw/remote/machine.h"
+ #include "qapi/error.h"
+ #include "qapi/qapi-visit-sockets.h"
++#include "qemu/notify.h"
++#include "sysemu/sysemu.h"
++#include "libvfio-user.h"
+ 
+ #define TYPE_VFU_OBJECT "x-vfio-user-server"
+ OBJECT_DECLARE_TYPE(VfuObject, VfuObjectClass, VFU_OBJECT)
+@@ -73,8 +76,14 @@ struct VfuObject {
+     char *device;
+ 
+     Error *err;
++
++    Notifier machine_done;
++
++    vfu_ctx_t *vfu_ctx;
  };
  
- struct DeviceListener {
-@@ -419,6 +420,34 @@ void qdev_simple_device_unplug_cb(HotplugHandler *hotplug_dev,
- void qdev_machine_creation_done(void);
- bool qdev_machine_modified(void);
- 
-+/**
-+ * qdev_add_unplug_blocker: Add an unplug blocker to a device
-+ *
-+ * @dev: Device to be blocked from unplug
-+ * @reason: Reason for blocking
-+ */
-+void qdev_add_unplug_blocker(DeviceState *dev, Error *reason);
++static void vfu_object_init_ctx(VfuObject *o, Error **errp);
 +
-+/**
-+ * qdev_del_unplug_blocker: Remove an unplug blocker from a device
-+ *
-+ * @dev: Device to be unblocked
-+ * @reason: Pointer to the Error used with qdev_add_unplug_blocker.
-+ *          Used as a handle to lookup the blocker for deletion.
-+ */
-+void qdev_del_unplug_blocker(DeviceState *dev, Error *reason);
-+
-+/**
-+ * qdev_unplug_blocked: Confirm if a device is blocked from unplug
-+ *
-+ * @dev: Device to be tested
-+ * @reason: Returns one of the reasons why the device is blocked,
-+ *          if any
-+ *
-+ * Returns: true if device is blocked from unplug, false otherwise
-+ */
-+bool qdev_unplug_blocked(DeviceState *dev, Error **errp);
-+
- /**
-  * GpioPolarity: Polarity of a GPIO line
-  *
-diff --git a/hw/core/qdev.c b/hw/core/qdev.c
-index 84f3019440..0806d8fcaa 100644
---- a/hw/core/qdev.c
-+++ b/hw/core/qdev.c
-@@ -468,6 +468,28 @@ char *qdev_get_dev_path(DeviceState *dev)
-     return NULL;
- }
- 
-+void qdev_add_unplug_blocker(DeviceState *dev, Error *reason)
-+{
-+    dev->unplug_blockers = g_slist_prepend(dev->unplug_blockers, reason);
-+}
-+
-+void qdev_del_unplug_blocker(DeviceState *dev, Error *reason)
-+{
-+    dev->unplug_blockers = g_slist_remove(dev->unplug_blockers, reason);
-+}
-+
-+bool qdev_unplug_blocked(DeviceState *dev, Error **errp)
-+{
-+    ERRP_GUARD();
-+
-+    if (dev->unplug_blockers) {
-+        error_propagate(errp, error_copy(dev->unplug_blockers->data));
-+        return true;
-+    }
-+
-+    return false;
-+}
-+
- static bool device_get_realized(Object *obj, Error **errp)
+ static bool vfu_object_auto_shutdown(void)
  {
-     DeviceState *dev = DEVICE(obj);
-@@ -704,6 +726,8 @@ static void device_finalize(Object *obj)
+     bool auto_shutdown = true;
+@@ -107,6 +116,11 @@ static void vfu_object_set_socket(Object *obj, Visitor *v, const char *name,
+ {
+     VfuObject *o = VFU_OBJECT(obj);
  
-     DeviceState *dev = DEVICE(obj);
- 
-+    g_assert(!dev->unplug_blockers);
-+
-     QLIST_FOREACH_SAFE(ngl, &dev->gpios, node, next) {
-         QLIST_REMOVE(ngl, node);
-         qemu_free_irqs(ngl->in, ngl->num_in);
-diff --git a/softmmu/qdev-monitor.c b/softmmu/qdev-monitor.c
-index bb5897fc76..4b0ef65780 100644
---- a/softmmu/qdev-monitor.c
-+++ b/softmmu/qdev-monitor.c
-@@ -899,6 +899,10 @@ void qdev_unplug(DeviceState *dev, Error **errp)
-     HotplugHandlerClass *hdc;
-     Error *local_err = NULL;
- 
-+    if (qdev_unplug_blocked(dev, errp)) {
++    if (o->vfu_ctx) {
++        error_setg(errp, "vfu: Unable to set socket property - server busy");
 +        return;
 +    }
 +
-     if (dev->parent_bus && !qbus_is_hotpluggable(dev->parent_bus)) {
-         error_setg(errp, QERR_BUS_NO_HOTPLUG, dev->parent_bus->name);
+     qapi_free_SocketAddress(o->socket);
+ 
+     o->socket = NULL;
+@@ -122,17 +136,69 @@ static void vfu_object_set_socket(Object *obj, Visitor *v, const char *name,
+     }
+ 
+     trace_vfu_prop("socket", o->socket->u.q_unix.path);
++
++    vfu_object_init_ctx(o, errp);
+ }
+ 
+ static void vfu_object_set_device(Object *obj, const char *str, Error **errp)
+ {
+     VfuObject *o = VFU_OBJECT(obj);
+ 
++    if (o->vfu_ctx) {
++        error_setg(errp, "vfu: Unable to set device property - server busy");
++        return;
++    }
++
+     g_free(o->device);
+ 
+     o->device = g_strdup(str);
+ 
+     trace_vfu_prop("device", str);
++
++    vfu_object_init_ctx(o, errp);
++}
++
++/*
++ * TYPE_VFU_OBJECT depends on the availability of the 'socket' and 'device'
++ * properties. It also depends on devices instantiated in QEMU. These
++ * dependencies are not available during the instance_init phase of this
++ * object's life-cycle. As such, the server is initialized after the
++ * machine is setup. machine_init_done_notifier notifies TYPE_VFU_OBJECT
++ * when the machine is setup, and the dependencies are available.
++ */
++static void vfu_object_machine_done(Notifier *notifier, void *data)
++{
++    VfuObject *o = container_of(notifier, VfuObject, machine_done);
++    Error *err = NULL;
++
++    vfu_object_init_ctx(o, &err);
++
++    if (err) {
++        error_propagate(&error_abort, err);
++    }
++}
++
++static void vfu_object_init_ctx(VfuObject *o, Error **errp)
++{
++    ERRP_GUARD();
++
++    if (o->vfu_ctx || !o->socket || !o->device ||
++            !phase_check(PHASE_MACHINE_READY)) {
++        return;
++    }
++
++    if (o->err) {
++        error_propagate(errp, o->err);
++        o->err = NULL;
++        return;
++    }
++
++    o->vfu_ctx = vfu_create_ctx(VFU_TRANS_SOCK, o->socket->u.q_unix.path, 0,
++                                o, VFU_DEV_TYPE_PCI);
++    if (o->vfu_ctx == NULL) {
++        error_setg(errp, "vfu: Failed to create context - %s", strerror(errno));
++        return;
++    }
+ }
+ 
+ static void vfu_object_init(Object *obj)
+@@ -147,6 +213,12 @@ static void vfu_object_init(Object *obj)
+                    TYPE_VFU_OBJECT, TYPE_REMOTE_MACHINE);
          return;
+     }
++
++    if (!phase_check(PHASE_MACHINE_READY)) {
++        o->machine_done.notify = vfu_object_machine_done;
++        qemu_add_machine_init_done_notifier(&o->machine_done);
++    }
++
+ }
+ 
+ static void vfu_object_finalize(Object *obj)
+@@ -160,6 +232,11 @@ static void vfu_object_finalize(Object *obj)
+ 
+     o->socket = NULL;
+ 
++    if (o->vfu_ctx) {
++        vfu_destroy_ctx(o->vfu_ctx);
++        o->vfu_ctx = NULL;
++    }
++
+     g_free(o->device);
+ 
+     o->device = NULL;
+@@ -167,6 +244,11 @@ static void vfu_object_finalize(Object *obj)
+     if (!k->nr_devs && vfu_object_auto_shutdown()) {
+         qemu_system_shutdown_request(SHUTDOWN_CAUSE_GUEST_SHUTDOWN);
+     }
++
++    if (o->machine_done.notify) {
++        qemu_remove_machine_init_done_notifier(&o->machine_done);
++        o->machine_done.notify = NULL;
++    }
+ }
+ 
+ static void vfu_object_class_init(ObjectClass *klass, void *data)
 -- 
 2.36.1
 

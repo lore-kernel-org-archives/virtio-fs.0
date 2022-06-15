@@ -1,12 +1,12 @@
 Return-Path: <stefanha@redhat.com>
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Wed, 15 Jun 2022 16:51:25 +0100
-Message-Id: <20220615155129.1025811-15-stefanha@redhat.com>
+Date: Wed, 15 Jun 2022 16:51:20 +0100
+Message-Id: <20220615155129.1025811-10-stefanha@redhat.com>
 In-Reply-To: <20220615155129.1025811-1-stefanha@redhat.com>
 References: <20220615155129.1025811-1-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 14/18] vfio-user: handle PCI BAR accesses
+Subject: [Virtio-fs] [PULL 09/18] vfio-user: find and init PCI device
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,314 +20,125 @@ Cc: Thomas Huth <thuth@redhat.com>, Jagannathan Raman <jag.raman@oracle.com>, Aa
 
 From: Jagannathan Raman <jag.raman@oracle.com>
 
-Determine the BARs used by the PCI device and register handlers to
-manage the access to the same.
+Find the PCI device with specified id. Initialize the device context
+with the QEMU PCI device
 
 Signed-off-by: Elena Ufimtseva <elena.ufimtseva@oracle.com>
 Signed-off-by: John G Johnson <john.g.johnson@oracle.com>
 Signed-off-by: Jagannathan Raman <jag.raman@oracle.com>
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-Message-id: 3373e10b5be5f42846f0632d4382466e1698c505.1655151679.git.jag.raman@oracle.com
+Message-id: 7798dbd730099b33fdd00c4c202cfe79e5c5c151.1655151679.git.jag.raman@oracle.com
 Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- include/exec/memory.h           |   3 +
- hw/remote/vfio-user-obj.c       | 190 ++++++++++++++++++++++++++++++++
- softmmu/physmem.c               |   4 +-
- tests/qtest/fuzz/generic_fuzz.c |   9 +-
- hw/remote/trace-events          |   3 +
- 5 files changed, 203 insertions(+), 6 deletions(-)
+ hw/remote/vfio-user-obj.c | 67 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 67 insertions(+)
 
-diff --git a/include/exec/memory.h b/include/exec/memory.h
-index f1c19451bc..a6a0f4d8ad 100644
---- a/include/exec/memory.h
-+++ b/include/exec/memory.h
-@@ -2810,6 +2810,9 @@ MemTxResult address_space_write_cached_slow(MemoryRegionCache *cache,
-                                             hwaddr addr, const void *buf,
-                                             hwaddr len);
- 
-+int memory_access_size(MemoryRegion *mr, unsigned l, hwaddr addr);
-+bool prepare_mmio_access(MemoryRegion *mr);
-+
- static inline bool memory_access_is_direct(MemoryRegion *mr, bool is_write)
- {
-     if (is_write) {
 diff --git a/hw/remote/vfio-user-obj.c b/hw/remote/vfio-user-obj.c
-index 7b21f77052..dd760a99e2 100644
+index 68f8a9dfa9..3ca6aa2b45 100644
 --- a/hw/remote/vfio-user-obj.c
 +++ b/hw/remote/vfio-user-obj.c
-@@ -52,6 +52,7 @@
- #include "hw/qdev-core.h"
- #include "hw/pci/pci.h"
- #include "qemu/timer.h"
-+#include "exec/memory.h"
+@@ -43,6 +43,8 @@
+ #include "qemu/notify.h"
+ #include "sysemu/sysemu.h"
+ #include "libvfio-user.h"
++#include "hw/qdev-core.h"
++#include "hw/pci/pci.h"
  
  #define TYPE_VFU_OBJECT "x-vfio-user-server"
  OBJECT_DECLARE_TYPE(VfuObject, VfuObjectClass, VFU_OBJECT)
-@@ -332,6 +333,193 @@ static void dma_unregister(vfu_ctx_t *vfu_ctx, vfu_dma_info_t *info)
-     trace_vfu_dma_unregister((uint64_t)info->iova.iov_base);
- }
+@@ -80,6 +82,10 @@ struct VfuObject {
+     Notifier machine_done;
  
-+static int vfu_object_mr_rw(MemoryRegion *mr, uint8_t *buf, hwaddr offset,
-+                            hwaddr size, const bool is_write)
-+{
-+    uint8_t *ptr = buf;
-+    bool release_lock = false;
-+    uint8_t *ram_ptr = NULL;
-+    MemTxResult result;
-+    int access_size;
-+    uint64_t val;
+     vfu_ctx_t *vfu_ctx;
 +
-+    if (memory_access_is_direct(mr, is_write)) {
-+        /**
-+         * Some devices expose a PCI expansion ROM, which could be buffer
-+         * based as compared to other regions which are primarily based on
-+         * MemoryRegionOps. memory_region_find() would already check
-+         * for buffer overflow, we don't need to repeat it here.
-+         */
-+        ram_ptr = memory_region_get_ram_ptr(mr);
++    PCIDevice *pci_dev;
 +
-+        if (is_write) {
-+            memcpy((ram_ptr + offset), buf, size);
-+        } else {
-+            memcpy(buf, (ram_ptr + offset), size);
-+        }
-+
-+        return 0;
-+    }
-+
-+    while (size) {
-+        /**
-+         * The read/write logic used below is similar to the ones in
-+         * flatview_read/write_continue()
-+         */
-+        release_lock = prepare_mmio_access(mr);
-+
-+        access_size = memory_access_size(mr, size, offset);
-+
-+        if (is_write) {
-+            val = ldn_he_p(ptr, access_size);
-+
-+            result = memory_region_dispatch_write(mr, offset, val,
-+                                                  size_memop(access_size),
-+                                                  MEMTXATTRS_UNSPECIFIED);
-+        } else {
-+            result = memory_region_dispatch_read(mr, offset, &val,
-+                                                 size_memop(access_size),
-+                                                 MEMTXATTRS_UNSPECIFIED);
-+
-+            stn_he_p(ptr, access_size, val);
-+        }
-+
-+        if (release_lock) {
-+            qemu_mutex_unlock_iothread();
-+            release_lock = false;
-+        }
-+
-+        if (result != MEMTX_OK) {
-+            return -1;
-+        }
-+
-+        size -= access_size;
-+        ptr += access_size;
-+        offset += access_size;
-+    }
-+
-+    return 0;
-+}
-+
-+static size_t vfu_object_bar_rw(PCIDevice *pci_dev, int pci_bar,
-+                                hwaddr bar_offset, char * const buf,
-+                                hwaddr len, const bool is_write)
-+{
-+    MemoryRegionSection section = { 0 };
-+    uint8_t *ptr = (uint8_t *)buf;
-+    MemoryRegion *section_mr = NULL;
-+    uint64_t section_size;
-+    hwaddr section_offset;
-+    hwaddr size = 0;
-+
-+    while (len) {
-+        section = memory_region_find(pci_dev->io_regions[pci_bar].memory,
-+                                     bar_offset, len);
-+
-+        if (!section.mr) {
-+            warn_report("vfu: invalid address 0x%"PRIx64"", bar_offset);
-+            return size;
-+        }
-+
-+        section_mr = section.mr;
-+        section_offset = section.offset_within_region;
-+        section_size = int128_get64(section.size);
-+
-+        if (is_write && section_mr->readonly) {
-+            warn_report("vfu: attempting to write to readonly region in "
-+                        "bar %d - [0x%"PRIx64" - 0x%"PRIx64"]",
-+                        pci_bar, bar_offset,
-+                        (bar_offset + section_size));
-+            memory_region_unref(section_mr);
-+            return size;
-+        }
-+
-+        if (vfu_object_mr_rw(section_mr, ptr, section_offset,
-+                             section_size, is_write)) {
-+            warn_report("vfu: failed to %s "
-+                        "[0x%"PRIx64" - 0x%"PRIx64"] in bar %d",
-+                        is_write ? "write to" : "read from", bar_offset,
-+                        (bar_offset + section_size), pci_bar);
-+            memory_region_unref(section_mr);
-+            return size;
-+        }
-+
-+        size += section_size;
-+        bar_offset += section_size;
-+        ptr += section_size;
-+        len -= section_size;
-+
-+        memory_region_unref(section_mr);
-+    }
-+
-+    return size;
-+}
-+
-+/**
-+ * VFU_OBJECT_BAR_HANDLER - macro for defining handlers for PCI BARs.
-+ *
-+ * To create handler for BAR number 2, VFU_OBJECT_BAR_HANDLER(2) would
-+ * define vfu_object_bar2_handler
-+ */
-+#define VFU_OBJECT_BAR_HANDLER(BAR_NO)                                         \
-+    static ssize_t vfu_object_bar##BAR_NO##_handler(vfu_ctx_t *vfu_ctx,        \
-+                                        char * const buf, size_t count,        \
-+                                        loff_t offset, const bool is_write)    \
-+    {                                                                          \
-+        VfuObject *o = vfu_get_private(vfu_ctx);                               \
-+        PCIDevice *pci_dev = o->pci_dev;                                       \
-+                                                                               \
-+        return vfu_object_bar_rw(pci_dev, BAR_NO, offset,                      \
-+                                 buf, count, is_write);                        \
-+    }                                                                          \
-+
-+VFU_OBJECT_BAR_HANDLER(0)
-+VFU_OBJECT_BAR_HANDLER(1)
-+VFU_OBJECT_BAR_HANDLER(2)
-+VFU_OBJECT_BAR_HANDLER(3)
-+VFU_OBJECT_BAR_HANDLER(4)
-+VFU_OBJECT_BAR_HANDLER(5)
-+VFU_OBJECT_BAR_HANDLER(6)
-+
-+static vfu_region_access_cb_t *vfu_object_bar_handlers[PCI_NUM_REGIONS] = {
-+    &vfu_object_bar0_handler,
-+    &vfu_object_bar1_handler,
-+    &vfu_object_bar2_handler,
-+    &vfu_object_bar3_handler,
-+    &vfu_object_bar4_handler,
-+    &vfu_object_bar5_handler,
-+    &vfu_object_bar6_handler,
-+};
-+
-+/**
-+ * vfu_object_register_bars - Identify active BAR regions of pdev and setup
-+ *                            callbacks to handle read/write accesses
-+ */
-+static void vfu_object_register_bars(vfu_ctx_t *vfu_ctx, PCIDevice *pdev)
-+{
-+    int flags = VFU_REGION_FLAG_RW;
-+    int i;
-+
-+    for (i = 0; i < PCI_NUM_REGIONS; i++) {
-+        if (!pdev->io_regions[i].size) {
-+            continue;
-+        }
-+
-+        if ((i == VFU_PCI_DEV_ROM_REGION_IDX) ||
-+            pdev->io_regions[i].memory->readonly) {
-+            flags &= ~VFU_REGION_FLAG_WRITE;
-+        }
-+
-+        vfu_setup_region(vfu_ctx, VFU_PCI_DEV_BAR0_REGION_IDX + i,
-+                         (size_t)pdev->io_regions[i].size,
-+                         vfu_object_bar_handlers[i],
-+                         flags, NULL, 0, -1, 0);
-+
-+        trace_vfu_bar_register(i, pdev->io_regions[i].addr,
-+                               pdev->io_regions[i].size);
-+    }
-+}
-+
- /*
-  * TYPE_VFU_OBJECT depends on the availability of the 'socket' and 'device'
-  * properties. It also depends on devices instantiated in QEMU. These
-@@ -442,6 +630,8 @@ static void vfu_object_init_ctx(VfuObject *o, Error **errp)
-         goto fail;
++    Error *unplug_blocker;
+ };
+ 
+ static void vfu_object_init_ctx(VfuObject *o, Error **errp);
+@@ -181,6 +187,9 @@ static void vfu_object_machine_done(Notifier *notifier, void *data)
+ static void vfu_object_init_ctx(VfuObject *o, Error **errp)
+ {
+     ERRP_GUARD();
++    DeviceState *dev = NULL;
++    vfu_pci_type_t pci_type = VFU_PCI_TYPE_CONVENTIONAL;
++    int ret;
+ 
+     if (o->vfu_ctx || !o->socket || !o->device ||
+             !phase_check(PHASE_MACHINE_READY)) {
+@@ -199,6 +208,53 @@ static void vfu_object_init_ctx(VfuObject *o, Error **errp)
+         error_setg(errp, "vfu: Failed to create context - %s", strerror(errno));
+         return;
      }
- 
-+    vfu_object_register_bars(o->vfu_ctx, o->pci_dev);
 +
-     ret = vfu_realize_ctx(o->vfu_ctx);
-     if (ret < 0) {
-         error_setg(errp, "vfu: Failed to realize device %s- %s",
-diff --git a/softmmu/physmem.c b/softmmu/physmem.c
-index 657841eed0..fb16be57a6 100644
---- a/softmmu/physmem.c
-+++ b/softmmu/physmem.c
-@@ -2719,7 +2719,7 @@ void memory_region_flush_rom_device(MemoryRegion *mr, hwaddr addr, hwaddr size)
-     invalidate_and_set_dirty(mr, addr, size);
++    dev = qdev_find_recursive(sysbus_get_default(), o->device);
++    if (dev == NULL) {
++        error_setg(errp, "vfu: Device %s not found", o->device);
++        goto fail;
++    }
++
++    if (!object_dynamic_cast(OBJECT(dev), TYPE_PCI_DEVICE)) {
++        error_setg(errp, "vfu: %s not a PCI device", o->device);
++        goto fail;
++    }
++
++    o->pci_dev = PCI_DEVICE(dev);
++
++    object_ref(OBJECT(o->pci_dev));
++
++    if (pci_is_express(o->pci_dev)) {
++        pci_type = VFU_PCI_TYPE_EXPRESS;
++    }
++
++    ret = vfu_pci_init(o->vfu_ctx, pci_type, PCI_HEADER_TYPE_NORMAL, 0);
++    if (ret < 0) {
++        error_setg(errp,
++                   "vfu: Failed to attach PCI device %s to context - %s",
++                   o->device, strerror(errno));
++        goto fail;
++    }
++
++    error_setg(&o->unplug_blocker,
++               "vfu: %s for %s must be deleted before unplugging",
++               TYPE_VFU_OBJECT, o->device);
++    qdev_add_unplug_blocker(DEVICE(o->pci_dev), o->unplug_blocker);
++
++    return;
++
++fail:
++    vfu_destroy_ctx(o->vfu_ctx);
++    if (o->unplug_blocker && o->pci_dev) {
++        qdev_del_unplug_blocker(DEVICE(o->pci_dev), o->unplug_blocker);
++        error_free(o->unplug_blocker);
++        o->unplug_blocker = NULL;
++    }
++    if (o->pci_dev) {
++        object_unref(OBJECT(o->pci_dev));
++        o->pci_dev = NULL;
++    }
++    o->vfu_ctx = NULL;
  }
  
--static int memory_access_size(MemoryRegion *mr, unsigned l, hwaddr addr)
-+int memory_access_size(MemoryRegion *mr, unsigned l, hwaddr addr)
- {
-     unsigned access_size_max = mr->ops->valid.max_access_size;
+ static void vfu_object_init(Object *obj)
+@@ -241,6 +297,17 @@ static void vfu_object_finalize(Object *obj)
  
-@@ -2746,7 +2746,7 @@ static int memory_access_size(MemoryRegion *mr, unsigned l, hwaddr addr)
-     return l;
- }
+     o->device = NULL;
  
--static bool prepare_mmio_access(MemoryRegion *mr)
-+bool prepare_mmio_access(MemoryRegion *mr)
- {
-     bool release_lock = false;
- 
-diff --git a/tests/qtest/fuzz/generic_fuzz.c b/tests/qtest/fuzz/generic_fuzz.c
-index 25df19fd5a..447ffe8178 100644
---- a/tests/qtest/fuzz/generic_fuzz.c
-+++ b/tests/qtest/fuzz/generic_fuzz.c
-@@ -144,7 +144,7 @@ static void *pattern_alloc(pattern p, size_t len)
-     return buf;
- }
- 
--static int memory_access_size(MemoryRegion *mr, unsigned l, hwaddr addr)
-+static int fuzz_memory_access_size(MemoryRegion *mr, unsigned l, hwaddr addr)
- {
-     unsigned access_size_max = mr->ops->valid.max_access_size;
- 
-@@ -242,11 +242,12 @@ void fuzz_dma_read_cb(size_t addr, size_t len, MemoryRegion *mr)
- 
-         /*
-          *  If mr1 isn't RAM, address_space_translate doesn't update l. Use
--         *  memory_access_size to identify the number of bytes that it is safe
--         *  to write without accidentally writing to another MemoryRegion.
-+         *  fuzz_memory_access_size to identify the number of bytes that it
-+         *  is safe to write without accidentally writing to another
-+         *  MemoryRegion.
-          */
-         if (!memory_region_is_ram(mr1)) {
--            l = memory_access_size(mr1, l, addr1);
-+            l = fuzz_memory_access_size(mr1, l, addr1);
-         }
-         if (memory_region_is_ram(mr1) ||
-             memory_region_is_romd(mr1) ||
-diff --git a/hw/remote/trace-events b/hw/remote/trace-events
-index f945c7e33b..847d50d88f 100644
---- a/hw/remote/trace-events
-+++ b/hw/remote/trace-events
-@@ -9,3 +9,6 @@ vfu_cfg_read(uint32_t offset, uint32_t val) "vfu: cfg: 0x%u -> 0x%x"
- vfu_cfg_write(uint32_t offset, uint32_t val) "vfu: cfg: 0x%u <- 0x%x"
- vfu_dma_register(uint64_t gpa, size_t len) "vfu: registering GPA 0x%"PRIx64", %zu bytes"
- vfu_dma_unregister(uint64_t gpa) "vfu: unregistering GPA 0x%"PRIx64""
-+vfu_bar_register(int i, uint64_t addr, uint64_t size) "vfu: BAR %d: addr 0x%"PRIx64" size 0x%"PRIx64""
-+vfu_bar_rw_enter(const char *op, uint64_t addr) "vfu: %s request for BAR address 0x%"PRIx64""
-+vfu_bar_rw_exit(const char *op, uint64_t addr) "vfu: Finished %s of BAR address 0x%"PRIx64""
++    if (o->unplug_blocker && o->pci_dev) {
++        qdev_del_unplug_blocker(DEVICE(o->pci_dev), o->unplug_blocker);
++        error_free(o->unplug_blocker);
++        o->unplug_blocker = NULL;
++    }
++
++    if (o->pci_dev) {
++        object_unref(OBJECT(o->pci_dev));
++        o->pci_dev = NULL;
++    }
++
+     if (!k->nr_devs && vfu_object_auto_shutdown()) {
+         qemu_system_shutdown_request(SHUTDOWN_CAUSE_GUEST_SHUTDOWN);
+     }
 -- 
 2.36.1
 

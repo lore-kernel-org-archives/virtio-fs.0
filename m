@@ -1,13 +1,12 @@
 Return-Path: <stefanha@redhat.com>
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Wed, 15 Jun 2022 16:51:15 +0100
-Message-Id: <20220615155129.1025811-5-stefanha@redhat.com>
+Date: Wed, 15 Jun 2022 16:51:27 +0100
+Message-Id: <20220615155129.1025811-17-stefanha@redhat.com>
 In-Reply-To: <20220615155129.1025811-1-stefanha@redhat.com>
 References: <20220615155129.1025811-1-stefanha@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 04/18] remote/machine: add HotplugHandler for
- remote machine
+Subject: [Virtio-fs] [PULL 16/18] vfio-user: handle reset of remote device
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,61 +20,56 @@ Cc: Thomas Huth <thuth@redhat.com>, Jagannathan Raman <jag.raman@oracle.com>, Aa
 
 From: Jagannathan Raman <jag.raman@oracle.com>
 
-Allow hotplugging of PCI(e) devices to remote machine
+Adds handler to reset a remote device
 
 Signed-off-by: Elena Ufimtseva <elena.ufimtseva@oracle.com>
 Signed-off-by: John G Johnson <john.g.johnson@oracle.com>
 Signed-off-by: Jagannathan Raman <jag.raman@oracle.com>
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-Message-id: d1e6cfa0afb528ad343758f9b1d918be0175c5e5.1655151679.git.jag.raman@oracle.com
+Message-id: 112eeadf3bc4c6cdb100bc3f9a6fcfc20b467c1b.1655151679.git.jag.raman@oracle.com
 Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- hw/remote/machine.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ hw/remote/vfio-user-obj.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/hw/remote/machine.c b/hw/remote/machine.c
-index 92d71d47bb..a97e53e250 100644
---- a/hw/remote/machine.c
-+++ b/hw/remote/machine.c
-@@ -20,6 +20,7 @@
- #include "qapi/error.h"
- #include "hw/pci/pci_host.h"
- #include "hw/remote/iohub.h"
-+#include "hw/qdev-core.h"
- 
- static void remote_machine_init(MachineState *machine)
- {
-@@ -53,14 +54,19 @@ static void remote_machine_init(MachineState *machine)
- 
-     pci_bus_irqs(pci_host->bus, remote_iohub_set_irq, remote_iohub_map_irq,
-                  &s->iohub, REMOTE_IOHUB_NB_PIRQS);
-+
-+    qbus_set_hotplug_handler(BUS(pci_host->bus), OBJECT(s));
+diff --git a/hw/remote/vfio-user-obj.c b/hw/remote/vfio-user-obj.c
+index 5ecdec06f6..c6cc53acf2 100644
+--- a/hw/remote/vfio-user-obj.c
++++ b/hw/remote/vfio-user-obj.c
+@@ -676,6 +676,20 @@ void vfu_object_set_bus_irq(PCIBus *pci_bus)
+                  max_bdf);
  }
  
- static void remote_machine_class_init(ObjectClass *oc, void *data)
- {
-     MachineClass *mc = MACHINE_CLASS(oc);
-+    HotplugHandlerClass *hc = HOTPLUG_HANDLER_CLASS(oc);
- 
-     mc->init = remote_machine_init;
-     mc->desc = "Experimental remote machine";
++static int vfu_object_device_reset(vfu_ctx_t *vfu_ctx, vfu_reset_type_t type)
++{
++    VfuObject *o = vfu_get_private(vfu_ctx);
 +
-+    hc->unplug = qdev_simple_device_unplug_cb;
- }
- 
- static const TypeInfo remote_machine = {
-@@ -68,6 +74,10 @@ static const TypeInfo remote_machine = {
-     .parent = TYPE_MACHINE,
-     .instance_size = sizeof(RemoteMachineState),
-     .class_init = remote_machine_class_init,
-+    .interfaces = (InterfaceInfo[]) {
-+        { TYPE_HOTPLUG_HANDLER },
-+        { }
++    /* vfu_object_ctx_run() handles lost connection */
++    if (type == VFU_RESET_LOST_CONN) {
++        return 0;
 +    }
- };
++
++    qdev_reset_all(DEVICE(o->pci_dev));
++
++    return 0;
++}
++
+ /*
+  * TYPE_VFU_OBJECT depends on the availability of the 'socket' and 'device'
+  * properties. It also depends on devices instantiated in QEMU. These
+@@ -795,6 +809,12 @@ static void vfu_object_init_ctx(VfuObject *o, Error **errp)
+         goto fail;
+     }
  
- static void remote_machine_register_types(void)
++    ret = vfu_setup_device_reset_cb(o->vfu_ctx, &vfu_object_device_reset);
++    if (ret < 0) {
++        error_setg(errp, "vfu: Failed to setup reset callback");
++        goto fail;
++    }
++
+     ret = vfu_realize_ctx(o->vfu_ctx);
+     if (ret < 0) {
+         error_setg(errp, "vfu: Failed to realize device %s- %s",
 -- 
 2.36.1
 

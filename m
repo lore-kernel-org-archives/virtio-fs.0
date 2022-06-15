@@ -1,12 +1,13 @@
 Return-Path: <stefanha@redhat.com>
 From: Stefan Hajnoczi <stefanha@redhat.com>
-Date: Wed, 15 Jun 2022 16:51:19 +0100
-Message-Id: <20220615155129.1025811-9-stefanha@redhat.com>
+Date: Wed, 15 Jun 2022 16:51:23 +0100
+Message-Id: <20220615155129.1025811-13-stefanha@redhat.com>
 In-Reply-To: <20220615155129.1025811-1-stefanha@redhat.com>
 References: <20220615155129.1025811-1-stefanha@redhat.com>
 MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 08/18] vfio-user: instantiate vfio-user context
+Subject: [Virtio-fs] [PULL 12/18] vfio-user: IOMMU support for remote device
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,166 +21,270 @@ Cc: Thomas Huth <thuth@redhat.com>, Jagannathan Raman <jag.raman@oracle.com>, Aa
 
 From: Jagannathan Raman <jag.raman@oracle.com>
 
-create a context with the vfio-user library to run a PCI device
+Assign separate address space for each device in the remote processes.
 
 Signed-off-by: Elena Ufimtseva <elena.ufimtseva@oracle.com>
 Signed-off-by: John G Johnson <john.g.johnson@oracle.com>
 Signed-off-by: Jagannathan Raman <jag.raman@oracle.com>
 Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-Message-id: a452871ac8c812ff96fc4f0ce6037f4769953fab.1655151679.git.jag.raman@oracle.com
+Message-id: afe0b0a97582cdad42b5b25636a29c523265a10a.1655151679.git.jag.raman@oracle.com
 Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
 ---
- hw/remote/vfio-user-obj.c | 82 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 82 insertions(+)
+ MAINTAINERS               |   2 +
+ include/hw/remote/iommu.h |  40 ++++++++++++
+ hw/remote/iommu.c         | 131 ++++++++++++++++++++++++++++++++++++++
+ hw/remote/machine.c       |  13 +++-
+ hw/remote/meson.build     |   1 +
+ 5 files changed, 186 insertions(+), 1 deletion(-)
+ create mode 100644 include/hw/remote/iommu.h
+ create mode 100644 hw/remote/iommu.c
 
-diff --git a/hw/remote/vfio-user-obj.c b/hw/remote/vfio-user-obj.c
-index bc49adcc27..68f8a9dfa9 100644
---- a/hw/remote/vfio-user-obj.c
-+++ b/hw/remote/vfio-user-obj.c
-@@ -40,6 +40,9 @@
- #include "hw/remote/machine.h"
- #include "qapi/error.h"
- #include "qapi/qapi-visit-sockets.h"
-+#include "qemu/notify.h"
-+#include "sysemu/sysemu.h"
-+#include "libvfio-user.h"
+diff --git a/MAINTAINERS b/MAINTAINERS
+index cbac72e239..563259101b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -3644,6 +3644,8 @@ F: hw/remote/iohub.c
+ F: include/hw/remote/iohub.h
+ F: subprojects/libvfio-user
+ F: hw/remote/vfio-user-obj.c
++F: hw/remote/iommu.c
++F: include/hw/remote/iommu.h
  
- #define TYPE_VFU_OBJECT "x-vfio-user-server"
- OBJECT_DECLARE_TYPE(VfuObject, VfuObjectClass, VFU_OBJECT)
-@@ -73,8 +76,14 @@ struct VfuObject {
-     char *device;
- 
-     Error *err;
-+
-+    Notifier machine_done;
-+
-+    vfu_ctx_t *vfu_ctx;
- };
- 
-+static void vfu_object_init_ctx(VfuObject *o, Error **errp);
-+
- static bool vfu_object_auto_shutdown(void)
- {
-     bool auto_shutdown = true;
-@@ -107,6 +116,11 @@ static void vfu_object_set_socket(Object *obj, Visitor *v, const char *name,
- {
-     VfuObject *o = VFU_OBJECT(obj);
- 
-+    if (o->vfu_ctx) {
-+        error_setg(errp, "vfu: Unable to set socket property - server busy");
-+        return;
-+    }
-+
-     qapi_free_SocketAddress(o->socket);
- 
-     o->socket = NULL;
-@@ -122,17 +136,69 @@ static void vfu_object_set_socket(Object *obj, Visitor *v, const char *name,
-     }
- 
-     trace_vfu_prop("socket", o->socket->u.q_unix.path);
-+
-+    vfu_object_init_ctx(o, errp);
- }
- 
- static void vfu_object_set_device(Object *obj, const char *str, Error **errp)
- {
-     VfuObject *o = VFU_OBJECT(obj);
- 
-+    if (o->vfu_ctx) {
-+        error_setg(errp, "vfu: Unable to set device property - server busy");
-+        return;
-+    }
-+
-     g_free(o->device);
- 
-     o->device = g_strdup(str);
- 
-     trace_vfu_prop("device", str);
-+
-+    vfu_object_init_ctx(o, errp);
-+}
-+
-+/*
-+ * TYPE_VFU_OBJECT depends on the availability of the 'socket' and 'device'
-+ * properties. It also depends on devices instantiated in QEMU. These
-+ * dependencies are not available during the instance_init phase of this
-+ * object's life-cycle. As such, the server is initialized after the
-+ * machine is setup. machine_init_done_notifier notifies TYPE_VFU_OBJECT
-+ * when the machine is setup, and the dependencies are available.
+ EBPF:
+ M: Jason Wang <jasowang@redhat.com>
+diff --git a/include/hw/remote/iommu.h b/include/hw/remote/iommu.h
+new file mode 100644
+index 0000000000..33b68a8f4b
+--- /dev/null
++++ b/include/hw/remote/iommu.h
+@@ -0,0 +1,40 @@
++/**
++ * Copyright © 2022 Oracle and/or its affiliates.
++ *
++ * This work is licensed under the terms of the GNU GPL, version 2 or later.
++ * See the COPYING file in the top-level directory.
++ *
 + */
-+static void vfu_object_machine_done(Notifier *notifier, void *data)
++
++#ifndef REMOTE_IOMMU_H
++#define REMOTE_IOMMU_H
++
++#include "hw/pci/pci_bus.h"
++#include "hw/pci/pci.h"
++
++#ifndef INT2VOIDP
++#define INT2VOIDP(i) (void *)(uintptr_t)(i)
++#endif
++
++typedef struct RemoteIommuElem {
++    MemoryRegion *mr;
++
++    AddressSpace as;
++} RemoteIommuElem;
++
++#define TYPE_REMOTE_IOMMU "x-remote-iommu"
++OBJECT_DECLARE_SIMPLE_TYPE(RemoteIommu, REMOTE_IOMMU)
++
++struct RemoteIommu {
++    Object parent;
++
++    GHashTable *elem_by_devfn;
++
++    QemuMutex lock;
++};
++
++void remote_iommu_setup(PCIBus *pci_bus);
++
++void remote_iommu_unplug_dev(PCIDevice *pci_dev);
++
++#endif
+diff --git a/hw/remote/iommu.c b/hw/remote/iommu.c
+new file mode 100644
+index 0000000000..fd723d91f3
+--- /dev/null
++++ b/hw/remote/iommu.c
+@@ -0,0 +1,131 @@
++/**
++ * IOMMU for remote device
++ *
++ * Copyright © 2022 Oracle and/or its affiliates.
++ *
++ * This work is licensed under the terms of the GNU GPL, version 2 or later.
++ * See the COPYING file in the top-level directory.
++ *
++ */
++
++#include "qemu/osdep.h"
++
++#include "hw/remote/iommu.h"
++#include "hw/pci/pci_bus.h"
++#include "hw/pci/pci.h"
++#include "exec/memory.h"
++#include "exec/address-spaces.h"
++#include "trace.h"
++
++/**
++ * IOMMU for TYPE_REMOTE_MACHINE - manages DMA address space isolation
++ *     for remote machine. It is used by TYPE_VFIO_USER_SERVER.
++ *
++ * - Each TYPE_VFIO_USER_SERVER instance handles one PCIDevice on a PCIBus.
++ *   There is one RemoteIommu per PCIBus, so the RemoteIommu tracks multiple
++ *   PCIDevices by maintaining a ->elem_by_devfn mapping.
++ *
++ * - memory_region_init_iommu() is not used because vfio-user MemoryRegions
++ *   will be added to the elem->mr container instead. This is more natural
++ *   than implementing the IOMMUMemoryRegionClass APIs since vfio-user
++ *   provides something that is close to a full-fledged MemoryRegion and
++ *   not like an IOMMU mapping.
++ *
++ * - When a device is hot unplugged, the elem->mr reference is dropped so
++ *   all vfio-user MemoryRegions associated with this vfio-user server are
++ *   destroyed.
++ */
++
++static AddressSpace *remote_iommu_find_add_as(PCIBus *pci_bus,
++                                              void *opaque, int devfn)
 +{
-+    VfuObject *o = container_of(notifier, VfuObject, machine_done);
-+    Error *err = NULL;
++    RemoteIommu *iommu = opaque;
++    RemoteIommuElem *elem = NULL;
 +
-+    vfu_object_init_ctx(o, &err);
++    qemu_mutex_lock(&iommu->lock);
 +
-+    if (err) {
-+        error_propagate(&error_abort, err);
++    elem = g_hash_table_lookup(iommu->elem_by_devfn, INT2VOIDP(devfn));
++
++    if (!elem) {
++        elem = g_malloc0(sizeof(RemoteIommuElem));
++        g_hash_table_insert(iommu->elem_by_devfn, INT2VOIDP(devfn), elem);
++    }
++
++    if (!elem->mr) {
++        elem->mr = MEMORY_REGION(object_new(TYPE_MEMORY_REGION));
++        memory_region_set_size(elem->mr, UINT64_MAX);
++        address_space_init(&elem->as, elem->mr, NULL);
++    }
++
++    qemu_mutex_unlock(&iommu->lock);
++
++    return &elem->as;
++}
++
++void remote_iommu_unplug_dev(PCIDevice *pci_dev)
++{
++    AddressSpace *as = pci_device_iommu_address_space(pci_dev);
++    RemoteIommuElem *elem = NULL;
++
++    if (as == &address_space_memory) {
++        return;
++    }
++
++    elem = container_of(as, RemoteIommuElem, as);
++
++    address_space_destroy(&elem->as);
++
++    object_unref(elem->mr);
++
++    elem->mr = NULL;
++}
++
++static void remote_iommu_init(Object *obj)
++{
++    RemoteIommu *iommu = REMOTE_IOMMU(obj);
++
++    iommu->elem_by_devfn = g_hash_table_new_full(NULL, NULL, NULL, g_free);
++
++    qemu_mutex_init(&iommu->lock);
++}
++
++static void remote_iommu_finalize(Object *obj)
++{
++    RemoteIommu *iommu = REMOTE_IOMMU(obj);
++
++    qemu_mutex_destroy(&iommu->lock);
++
++    g_hash_table_destroy(iommu->elem_by_devfn);
++
++    iommu->elem_by_devfn = NULL;
++}
++
++void remote_iommu_setup(PCIBus *pci_bus)
++{
++    RemoteIommu *iommu = NULL;
++
++    g_assert(pci_bus);
++
++    iommu = REMOTE_IOMMU(object_new(TYPE_REMOTE_IOMMU));
++
++    pci_setup_iommu(pci_bus, remote_iommu_find_add_as, iommu);
++
++    object_property_add_child(OBJECT(pci_bus), "remote-iommu", OBJECT(iommu));
++
++    object_unref(OBJECT(iommu));
++}
++
++static const TypeInfo remote_iommu_info = {
++    .name = TYPE_REMOTE_IOMMU,
++    .parent = TYPE_OBJECT,
++    .instance_size = sizeof(RemoteIommu),
++    .instance_init = remote_iommu_init,
++    .instance_finalize = remote_iommu_finalize,
++};
++
++static void remote_iommu_register_types(void)
++{
++    type_register_static(&remote_iommu_info);
++}
++
++type_init(remote_iommu_register_types)
+diff --git a/hw/remote/machine.c b/hw/remote/machine.c
+index 4d008ed721..cbb2add291 100644
+--- a/hw/remote/machine.c
++++ b/hw/remote/machine.c
+@@ -20,6 +20,7 @@
+ #include "qapi/error.h"
+ #include "hw/pci/pci_host.h"
+ #include "hw/remote/iohub.h"
++#include "hw/remote/iommu.h"
+ #include "hw/qdev-core.h"
+ 
+ static void remote_machine_init(MachineState *machine)
+@@ -99,6 +100,16 @@ static void remote_machine_instance_init(Object *obj)
+     s->auto_shutdown = true;
+ }
+ 
++static void remote_machine_dev_unplug_cb(HotplugHandler *hotplug_dev,
++                                         DeviceState *dev, Error **errp)
++{
++    qdev_unrealize(dev);
++
++    if (object_dynamic_cast(OBJECT(dev), TYPE_PCI_DEVICE)) {
++        remote_iommu_unplug_dev(PCI_DEVICE(dev));
 +    }
 +}
 +
-+static void vfu_object_init_ctx(VfuObject *o, Error **errp)
-+{
-+    ERRP_GUARD();
-+
-+    if (o->vfu_ctx || !o->socket || !o->device ||
-+            !phase_check(PHASE_MACHINE_READY)) {
-+        return;
-+    }
-+
-+    if (o->err) {
-+        error_propagate(errp, o->err);
-+        o->err = NULL;
-+        return;
-+    }
-+
-+    o->vfu_ctx = vfu_create_ctx(VFU_TRANS_SOCK, o->socket->u.q_unix.path, 0,
-+                                o, VFU_DEV_TYPE_PCI);
-+    if (o->vfu_ctx == NULL) {
-+        error_setg(errp, "vfu: Failed to create context - %s", strerror(errno));
-+        return;
-+    }
- }
+ static void remote_machine_class_init(ObjectClass *oc, void *data)
+ {
+     MachineClass *mc = MACHINE_CLASS(oc);
+@@ -107,7 +118,7 @@ static void remote_machine_class_init(ObjectClass *oc, void *data)
+     mc->init = remote_machine_init;
+     mc->desc = "Experimental remote machine";
  
- static void vfu_object_init(Object *obj)
-@@ -147,6 +213,12 @@ static void vfu_object_init(Object *obj)
-                    TYPE_VFU_OBJECT, TYPE_REMOTE_MACHINE);
-         return;
-     }
-+
-+    if (!phase_check(PHASE_MACHINE_READY)) {
-+        o->machine_done.notify = vfu_object_machine_done;
-+        qemu_add_machine_init_done_notifier(&o->machine_done);
-+    }
-+
- }
+-    hc->unplug = qdev_simple_device_unplug_cb;
++    hc->unplug = remote_machine_dev_unplug_cb;
  
- static void vfu_object_finalize(Object *obj)
-@@ -160,6 +232,11 @@ static void vfu_object_finalize(Object *obj)
+     object_class_property_add_bool(oc, "vfio-user",
+                                    remote_machine_get_vfio_user,
+diff --git a/hw/remote/meson.build b/hw/remote/meson.build
+index 0eb5a0f375..ab25c04906 100644
+--- a/hw/remote/meson.build
++++ b/hw/remote/meson.build
+@@ -6,6 +6,7 @@ remote_ss.add(when: 'CONFIG_MULTIPROCESS', if_true: files('message.c'))
+ remote_ss.add(when: 'CONFIG_MULTIPROCESS', if_true: files('remote-obj.c'))
+ remote_ss.add(when: 'CONFIG_MULTIPROCESS', if_true: files('proxy.c'))
+ remote_ss.add(when: 'CONFIG_MULTIPROCESS', if_true: files('iohub.c'))
++remote_ss.add(when: 'CONFIG_MULTIPROCESS', if_true: files('iommu.c'))
+ remote_ss.add(when: 'CONFIG_VFIO_USER_SERVER', if_true: files('vfio-user-obj.c'))
  
-     o->socket = NULL;
- 
-+    if (o->vfu_ctx) {
-+        vfu_destroy_ctx(o->vfu_ctx);
-+        o->vfu_ctx = NULL;
-+    }
-+
-     g_free(o->device);
- 
-     o->device = NULL;
-@@ -167,6 +244,11 @@ static void vfu_object_finalize(Object *obj)
-     if (!k->nr_devs && vfu_object_auto_shutdown()) {
-         qemu_system_shutdown_request(SHUTDOWN_CAUSE_GUEST_SHUTDOWN);
-     }
-+
-+    if (o->machine_done.notify) {
-+        qemu_remove_machine_init_done_notifier(&o->machine_done);
-+        o->machine_done.notify = NULL;
-+    }
- }
- 
- static void vfu_object_class_init(ObjectClass *klass, void *data)
+ remote_ss.add(when: 'CONFIG_VFIO_USER_SERVER', if_true: libvfio_user_dep)
 -- 
 2.36.1
 

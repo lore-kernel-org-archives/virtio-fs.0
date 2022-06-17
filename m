@@ -1,30 +1,30 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm2; t=1655445879; x=1655532279; bh=NCMDEuVkmPF37gG6nHFEJ
- eknQKVE1bavXVMRyjuv5dE=; b=h17n1eeDFCcsJFrDWiIvmaF15AXIggCHFLZmw
- x3UmPQrtbXYkpp+rhY8hvtRZ5ffK//VnhHte5fpjxsp9j9mwv60L/z1dY5ZPjNe+
- fxYll+gxLYC6k8TQ8oeBYBXWt8MD8irRciDYaFwzWS4h5iyloKQ4OxPgvRN3rDqW
- V+XbRV+UDRYcV5RUZIX+5Bw7bNKu4kGyfDDNOS3Nuetg2/BMQqZbkHmbQxxIVhaH
- okGfTmNtNeIo2LdLFF0MqLkYNRNA78r95mYRE0S9jfZ8DdZJ/0xvxur+k4gNxFwb
- 8orBU/Uy+VHtlTD/ASlxXuANICdnB8w8pFFN/VK/FhsrzdklQ==
+ :to; s=fm2; t=1655456302; x=1655542702; bh=14YzaxmwaZX0TQTlCcrD9
+ R3msa7FrpoJ1SSN4k0Feek=; b=bNfLMFf36C1zkI/YAcoT6yTAFwkogF9fJycLU
+ CPibwX1XMKrmBLWLHvwNMgvrfOAP5G91Jmu8a/NsHqZJvP1D0RYhs2S92KSz2x5Z
+ aaMx2u1QoRPBeX1GWP7wOdgyRHkCgF9zqFYanglO70HXVD+31S4e1VGVB4Vt8oa9
+ EqThgB1KqEq38bO6V/m9hgEA+5hpMMknMAGqOpOCmUFBnAiyY4xqlZd3g9+k3lD/
+ OCNlqRi3pFEQh4/aCOwJZUyd88xqJbYwqbXbQAButkTEbhgOeyw/iBF+XP1wmlqL
+ twslxWKKjIDJWDqV3VgJVCkgWbDg3cQzPGtGCLjitgtxdSdRQ==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
  :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
  :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm2; t=
- 1655445879; x=1655532279; bh=NCMDEuVkmPF37gG6nHFEJeknQKVE1bavXVM
- Ryjuv5dE=; b=cgjZ6Ik9o42DE6Y5OOZIxsqDI2lxedEkHC0nm8cQQv+n24RTNNc
- qwYf8nHaKl1p8p3KP+wi7Ln7Zf5aHWjEmVCGO0kJTENE+HjBT1NCAIxBItzcjjei
- Jn/k6yqiHaV4TVxIDmhmeIIJd0sWvMgYF1LFJa8DS9P4WtZFqcZLIdpE+2jcvyqQ
- /wyO4lwyXocgPfqq5ctoAF+5yNZFdHjvvBvAPjpjWpUR2TUcmOnMqrgksosiy3ak
- +zbKkw3xQDSa6/oI1SoAPx60NXYR+Q4W0O8D6orOtskRFergl2n7JuAsoaG+fsl8
- 2OON1Sglejk3t+gKUZk1cr01alYVGjD0Sgg==
+ 1655456302; x=1655542702; bh=14YzaxmwaZX0TQTlCcrD9R3msa7FrpoJ1SS
+ N4k0Feek=; b=kQn4NVK5z03IrNYARhnKhuVF2dyXaDgJmXV3aKCZDzwfn8DQ6nj
+ XpJmoH/lz0BhNsOzzvb/fIsEQu9TD9nMOmdFH40kGy5O5RUCAOrR8GIPWW5zIL9T
+ ItWo5FyJI+nHhKBtBUFYr66E61Ty0d0NRfdguI0zJcUadOZiXSkJcscVJ2pFwTpv
+ CWHCLkwKuQ3yAaufxZXntLS1aAsmRPcmD463QHVN6NTr2FmWsVV2oK8Qo3NP/EvM
+ aawLhTKebozYop3XAbmxWlntIvvLqRttOXvIHTmlB5Hh1cXB3dsMO9prW3OFKVI0
+ Zc4k2qzaN5UMtNozd06STNHwufZQ8cEe+/g==
 From: virtiofs-bot@sinrega.org
-Message-Id: <76339.122061702044100218@us-mta-586.us.mimecast.lan>
+Message-Id: <19119.122061704582400209@us-mta-651.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Fri, 17 Jun 2022 06:04:43 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR merged: Log the errno error description
- on debug
+Date: Fri, 17 Jun 2022 08:58:27 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] Issue closed: Cannot run executables in
+ Windows guest
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -35,8 +35,10 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Currently, when the debug level is selected, when replying an error we
-only log the errno value. This commit adds the error description.
+When trying to run an executable on the mapped drive, I get "Windows cannot access Z:\something.exe":
+![image](https://gitlab.com/virtio-fs/virtiofsd/uploads/7e4aadd7ad761ff0941561dac49d6f03/image.png)
+
+I looks like the drive is mounted with limited permissions.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/113
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/51
 

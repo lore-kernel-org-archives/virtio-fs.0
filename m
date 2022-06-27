@@ -1,30 +1,30 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm2; t=1655456302; x=1655542702; bh=14YzaxmwaZX0TQTlCcrD9
- R3msa7FrpoJ1SSN4k0Feek=; b=bNfLMFf36C1zkI/YAcoT6yTAFwkogF9fJycLU
- CPibwX1XMKrmBLWLHvwNMgvrfOAP5G91Jmu8a/NsHqZJvP1D0RYhs2S92KSz2x5Z
- aaMx2u1QoRPBeX1GWP7wOdgyRHkCgF9zqFYanglO70HXVD+31S4e1VGVB4Vt8oa9
- EqThgB1KqEq38bO6V/m9hgEA+5hpMMknMAGqOpOCmUFBnAiyY4xqlZd3g9+k3lD/
- OCNlqRi3pFEQh4/aCOwJZUyd88xqJbYwqbXbQAButkTEbhgOeyw/iBF+XP1wmlqL
- twslxWKKjIDJWDqV3VgJVCkgWbDg3cQzPGtGCLjitgtxdSdRQ==
+ :to; s=fm2; t=1656314765; x=1656401165; bh=uq2MBwhxNTvM44uB0e2sH
+ 8srrUwd7CAyI9VpWDuTqSw=; b=igu/qHMJbgmvl6GH4V522gU8Q+uQyRt2qPBys
+ 8D2n/tVjwMgi+8r7AXW8o5vTcf+Br637i2rz0FhxPkmhAdDNtELz2624p2++akbZ
+ lW8LZBIfMgL6a4CuTaVsMNLO0QgUqHUIv8ksPKDeBR5nqp05sX5yfY2lwN+moFHe
+ k18gUwjZ3yZhGpr47hbgMaZJOAAaWX/Hdzcnetp0e6yEzObOBxY7kRiQiadcH/6f
+ 0LlQ4Ihms3WYu0N0z3Gfm/EsiWy7zmtFhcb3MwetXKEU/zzIVTLTFHJM6N/zN7G+
+ SJ/el1cBT6WukS3FBwgtOVLxggSVyEDAroQANaxAdxFuDa2CA==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
  :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
  :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm2; t=
- 1655456302; x=1655542702; bh=14YzaxmwaZX0TQTlCcrD9R3msa7FrpoJ1SS
- N4k0Feek=; b=kQn4NVK5z03IrNYARhnKhuVF2dyXaDgJmXV3aKCZDzwfn8DQ6nj
- XpJmoH/lz0BhNsOzzvb/fIsEQu9TD9nMOmdFH40kGy5O5RUCAOrR8GIPWW5zIL9T
- ItWo5FyJI+nHhKBtBUFYr66E61Ty0d0NRfdguI0zJcUadOZiXSkJcscVJ2pFwTpv
- CWHCLkwKuQ3yAaufxZXntLS1aAsmRPcmD463QHVN6NTr2FmWsVV2oK8Qo3NP/EvM
- aawLhTKebozYop3XAbmxWlntIvvLqRttOXvIHTmlB5Hh1cXB3dsMO9prW3OFKVI0
- Zc4k2qzaN5UMtNozd06STNHwufZQ8cEe+/g==
+ 1656314765; x=1656401165; bh=uq2MBwhxNTvM44uB0e2sH8srrUwd7CAyI9V
+ pWDuTqSw=; b=xsyvMS1nSa9DV72yr3pIt7xc/lwZ6jW8sPMoP/RDrFoMgrM8lhK
+ Omd9yinFVz60sde2LgmBBXShTLbdPUopxXqgZZUO9rvXqE6/96BiyVHdDy2BACPi
+ TwpN7yJWzZOx/9FQ6fVWzIjlFe1caN37oEdjx2UmfULvVz0NkcEaJPEWLZYLZFLC
+ g7MdZMZYm3prsHCnpZyMINdNPiz31RVB19CKXqhzCat8LIdD8zTCeR/RXWu8E/Fk
+ YXeEZaHaGQg9mTqXB3OPC+YhI1gN9ZZkNvbqTwCcsh+3a5oPMEb+LqRFa3wKBfJQ
+ dYFWtiWO/S7v9JYsi5ze/GsWkVIKgT2XPlw==
 From: virtiofs-bot@sinrega.org
-Message-Id: <19119.122061704582400209@us-mta-651.us.mimecast.lan>
+Message-Id: <63772.122062703260700135@us-mta-501.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Fri, 17 Jun 2022 08:58:27 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] Issue closed: Cannot run executables in
- Windows guest
+Date: Mon, 27 Jun 2022 07:26:10 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR merged: Add capability to create
+ security context (SELinux) during file creation
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -35,10 +35,13 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-When trying to run an executable on the mapped drive, I get "Windows cannot access Z:\something.exe":
-![image](https://gitlab.com/virtio-fs/virtiofsd/uploads/7e4aadd7ad761ff0941561dac49d6f03/image.png)
+Fuse has capability to send security context of file (SELinux), during file creation if server opted for it (FUSE_SECURITY_CTX). Enable this feature and opt for SECURITY_CTX if user passed option "-o security_label". This should help with support SELinux on top of virtiofs.
 
-I looks like the drive is mounted with limited permissions.
+As of now file creation and security context setting operation are non-atomic. In some cases these can be made atomic. These additional changes I will follow in separate MR once these changes are merged. Otherwise it becomes too much of code.
+
+Please review.
+
+Vivek
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/51
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/102
 

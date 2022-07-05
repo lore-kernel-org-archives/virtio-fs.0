@@ -1,14 +1,26 @@
-Return-Path: <dgilbert@redhat.com>
-Date: Tue, 5 Jul 2022 09:03:57 +0100
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-Message-ID: <YsPwbbiuxtkD6HSp@work-vm>
+Return-Path: <shirley.zhao@intel.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple;
+ d=intel.com; i=@intel.com; q=dns/txt; s=Intel;
+ t=1657011792; x=1688547792;
+ h=from:to:cc:subject:date:message-id:references:
+ in-reply-to:content-transfer-encoding:mime-version;
+ bh=LEvAumu54G5dqUCMQsOSjh9ZUPxmHyqQx9pj8p1dXqE=;
+ b=WRjuC4QwdgSCi42P8ImZB19cXzONRyCjSWwgJx2zoy4cYCBivKDvM296
+ qOqOtWiCYaKkAmEI31bRqUQKLq6XebxHgCaA8cD4wxEKUNu0iq55HDzii
+ L2grX3p109y3c1V2tDWMnL/Nn8pbLp3Xj5GkqivFWpgYazB+OhBcSTDuK
+ m66vgEu++bLkiRjokS5+aCOLtmvx2apcX7noOiIRASECMPh6RObl+PXkg
+ Dkh/gw88zLZIqcjxsl3HfAhrqjihLj00tNYy3+vk0GekkCsAncJW7lMp9
+ 6tNFZZw3nBNYLGfmt+RKYKJMRNALg9WhUJBbHPpEGfip2jzMtRTipX1tz w==
+From: "Zhao, Shirley" <shirley.zhao@intel.com>
+Date: Tue, 5 Jul 2022 09:01:45 +0000
+Message-ID: <BY5PR11MB42912BFEA77F94B5B20D6F258D819@BY5PR11MB4291.namprd11.prod.outlook.com>
 References: <BY5PR11MB42911D5BF55D9FAF501F64F68D819@BY5PR11MB4291.namprd11.prod.outlook.com>
- <3b6c8e16-3712-3402-3ab2-17bf53ec64a8@redhat.com>
+ <3b6c8e16-3712-3402-3ab2-17bf53ec64a8@redhat.com> <YsPwbbiuxtkD6HSp@work-vm>
+In-Reply-To: <YsPwbbiuxtkD6HSp@work-vm>
 MIME-Version: 1.0
-In-Reply-To: <3b6c8e16-3712-3402-3ab2-17bf53ec64a8@redhat.com>
+Content-Language: en-US
 Content-Type: text/plain; charset="utf-8"
-Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
+Content-Transfer-Encoding: base64
 Subject: Re: [Virtio-fs] [Qemu] how to use viriofs in qemu without NUMA
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -18,43 +30,55 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Thomas Huth <thuth@redhat.com>
-Cc: "Zhao, Shirley" <shirley.zhao@intel.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Thomas Huth <thuth@redhat.com>
+Cc: "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>
 
-* Thomas Huth (thuth@redhat.com) wrote:
-> On 05/07/2022 03.02, Zhao, Shirley wrote:
-> > Hi, all,
-> > 
-> > I want to use virtiofs to share folder between host and guest.
-> > 
-> >  From the guide, it must set the NUMA node.
-> > https://virtio-fs.gitlab.io/howto-qemu.html
-> > 
-> > But my guest doesn’t support NUMA.
-> > 
-> > Is there any guide to use qemu + virtiofs without NUMA?
-> > 
-> > Or does qemu have any plan to support it?
-> 
->  Hi!
-> 
-> At least on s390x, you can also specify the memory backend via the -machine
-> option instead of using the -numa option, e.g.:
-> 
->  qemu-system-s390x -machine memory-backend=mem \
->   -object memory-backend-file,id=mem,...
-> 
-> Not sure whether that works on other architectures, too, though. Stefan,
-> David, do you know?
-
-Right, that's the way I do it on x86.
-We wrote virtiofs before the memory-backend option existed, which is why
-the old docs talk about using the NUMA stuff.
-
-Dave
-
->  Thomas
-> 
--- 
-Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+VGhhbmtzIGZvciB0aGUgaW5mb3JtYXRpb24uIA0KWWVzLCBJIGFsc28gZm91bmQgdGhlIG1lbW9y
+eSBiYWNrZW5kIG9wdGlvbnMgb24gczM5MHgsIGFuZCBhbHNvIGNvcHkgdGhlIGNvbW1hbmQgdG8g
+eDg2LCBidXQgZmFpbGVkLiANCg0KVGhlIGZvbGxvd2luZyBpcyB0aGUgY29tbWFuZCB1c2VkIHRv
+IHN0YXJ0IHFlbXUgKyB2aXJ0aW9mcyArIHVidW50dSAyMC4wNC4gDQpPbmUgaXMgd29ya2VkIHdl
+bGwgdXNpbmcgTlVNQSwgYW5vdGhlciBvbmUgaXMgZmFpbGVkIHdpdGhvdXQgTlVNQS4gDQpJcyB0
+aGVyZSBhbnl0aGluZyB3cm9uZz8gDQoNClRoZSB3b3JrZWQgb25lIHdpdGggTlVNQSBvcHRpb25z
+OiANCg0KcWVtdS1zeXN0ZW0teDg2XzY0IC1NIHBjIC1jcHUgaG9zdCAtLWVuYWJsZS1rdm0gLXNt
+cCAyIC1tIDRHIC1vYmplY3QgbWVtb3J5LWJhY2tlbmQtZmlsZSxpZD1tZW0sc2l6ZT00RyxtZW0t
+cGF0aD0vZGV2L3NobSxzaGFyZT1vbiAtbnVtYSBub2RlLG1lbWRldj1tZW0gLWNoYXJkZXYgc29j
+a2V0LGlkPWNoYXIwLHBhdGg9L3RtcC92ZnNkLnNvY2sgLWRldmljZSB2aG9zdC11c2VyLWZzLXBj
+aSxxdWV1ZS1zaXplPTEwMjQsY2hhcmRldj1jaGFyMCx0YWc9bXlmcyAtY2hhcmRldiBzdGRpbyxt
+dXg9b24saWQ9bW9uIC1tb24gY2hhcmRldj1tb24sbW9kZT1yZWFkbGluZSAtZGV2aWNlIHZpcnRp
+by1zZXJpYWwtcGNpIC1kZXZpY2UgdmlydGNvbnNvbGUsY2hhcmRldj1tb24gLXZnYSBub25lIC1k
+aXNwbGF5IG5vbmUgLWRyaXZlIGlmPXZpcnRpbyxmaWxlPXVidW50dS5pbWcNCg0KVGhlIGZhaWxl
+ZCBvbmUgd2l0aG91dCBOVU1BIG9wdGlvbnM6IA0KDQpxZW11LXN5c3RlbS14ODZfNjQgLU0gcGMg
+LWNwdSBob3N0IC0tZW5hYmxlLWt2bSAtc21wIDIgLW0gNEcgLW9iamVjdCBtZW1vcnktYmFja2Vu
+ZC1maWxlLGlkPW1lbSxzaXplPTRHLG1lbS1wYXRoPS9kZXYvc2htLHNoYXJlPW9uIC1tYWNoaW5l
+IHEzNSxtZW1vcnktYmFja2VuZD1tZW0gLWNoYXJkZXYgc29ja2V0LGlkPWNoYXIwLHBhdGg9L3Rt
+cC92ZnNkLnNvY2sgLWRldmljZSB2aG9zdC11c2VyLWZzLXBjaSxxdWV1ZS1zaXplPTEwMjQsY2hh
+cmRldj1jaGFyMCx0YWc9bXlmcyAtY2hhcmRldiBzdGRpbyxtdXg9b24saWQ9bW9uIC1tb24gY2hh
+cmRldj1tb24sbW9kZT1yZWFkbGluZSAtZGV2aWNlIHZpcnRpby1zZXJpYWwtcGNpIC1kZXZpY2Ug
+dmlydGNvbnNvbGUsY2hhcmRldj1tb24gLXZnYSBub25lIC1kaXNwbGF5IG5vbmUgLWRyaXZlIGlm
+PXZpcnRpbyxmaWxlPXVidW50dS5pbWcNCg0KDQpUaGFua3MuIA0KLSBTaGlybGV5IA0KDQotLS0t
+LU9yaWdpbmFsIE1lc3NhZ2UtLS0tLQ0KRnJvbTogRHIuIERhdmlkIEFsYW4gR2lsYmVydCA8ZGdp
+bGJlcnRAcmVkaGF0LmNvbT4gDQpTZW50OiBUdWVzZGF5LCBKdWx5IDUsIDIwMjIgNDowNCBQTQ0K
+VG86IFRob21hcyBIdXRoIDx0aHV0aEByZWRoYXQuY29tPg0KQ2M6IFpoYW8sIFNoaXJsZXkgPHNo
+aXJsZXkuemhhb0BpbnRlbC5jb20+OyBxZW11LWRldmVsQG5vbmdudS5vcmc7IHZpcnRpby1mc0By
+ZWRoYXQuY29tOyBTdGVmYW4gSGFqbm9jemkgPHN0ZWZhbmhhQHJlZGhhdC5jb20+DQpTdWJqZWN0
+OiBSZTogW1FlbXVdIGhvdyB0byB1c2UgdmlyaW9mcyBpbiBxZW11IHdpdGhvdXQgTlVNQQ0KDQoq
+IFRob21hcyBIdXRoICh0aHV0aEByZWRoYXQuY29tKSB3cm90ZToNCj4gT24gMDUvMDcvMjAyMiAw
+My4wMiwgWmhhbywgU2hpcmxleSB3cm90ZToNCj4gPiBIaSwgYWxsLA0KPiA+IA0KPiA+IEkgd2Fu
+dCB0byB1c2UgdmlydGlvZnMgdG8gc2hhcmUgZm9sZGVyIGJldHdlZW4gaG9zdCBhbmQgZ3Vlc3Qu
+DQo+ID4gDQo+ID4gIEZyb20gdGhlIGd1aWRlLCBpdCBtdXN0IHNldCB0aGUgTlVNQSBub2RlLg0K
+PiA+IGh0dHBzOi8vdmlydGlvLWZzLmdpdGxhYi5pby9ob3d0by1xZW11Lmh0bWwNCj4gPiANCj4g
+PiBCdXQgbXkgZ3Vlc3QgZG9lc27igJl0IHN1cHBvcnQgTlVNQS4NCj4gPiANCj4gPiBJcyB0aGVy
+ZSBhbnkgZ3VpZGUgdG8gdXNlIHFlbXUgKyB2aXJ0aW9mcyB3aXRob3V0IE5VTUE/DQo+ID4gDQo+
+ID4gT3IgZG9lcyBxZW11IGhhdmUgYW55IHBsYW4gdG8gc3VwcG9ydCBpdD8NCj4gDQo+ICBIaSEN
+Cj4gDQo+IEF0IGxlYXN0IG9uIHMzOTB4LCB5b3UgY2FuIGFsc28gc3BlY2lmeSB0aGUgbWVtb3J5
+IGJhY2tlbmQgdmlhIHRoZSANCj4gLW1hY2hpbmUgb3B0aW9uIGluc3RlYWQgb2YgdXNpbmcgdGhl
+IC1udW1hIG9wdGlvbiwgZS5nLjoNCj4gDQo+ICBxZW11LXN5c3RlbS1zMzkweCAtbWFjaGluZSBt
+ZW1vcnktYmFja2VuZD1tZW0gXA0KPiAgIC1vYmplY3QgbWVtb3J5LWJhY2tlbmQtZmlsZSxpZD1t
+ZW0sLi4uDQo+IA0KPiBOb3Qgc3VyZSB3aGV0aGVyIHRoYXQgd29ya3Mgb24gb3RoZXIgYXJjaGl0
+ZWN0dXJlcywgdG9vLCB0aG91Z2guIA0KPiBTdGVmYW4sIERhdmlkLCBkbyB5b3Uga25vdz8NCg0K
+UmlnaHQsIHRoYXQncyB0aGUgd2F5IEkgZG8gaXQgb24geDg2Lg0KV2Ugd3JvdGUgdmlydGlvZnMg
+YmVmb3JlIHRoZSBtZW1vcnktYmFja2VuZCBvcHRpb24gZXhpc3RlZCwgd2hpY2ggaXMgd2h5IHRo
+ZSBvbGQgZG9jcyB0YWxrIGFib3V0IHVzaW5nIHRoZSBOVU1BIHN0dWZmLg0KDQpEYXZlDQoNCj4g
+IFRob21hcw0KPiANCi0tDQpEci4gRGF2aWQgQWxhbiBHaWxiZXJ0IC8gZGdpbGJlcnRAcmVkaGF0
+LmNvbSAvIE1hbmNoZXN0ZXIsIFVLDQoNCg==
 

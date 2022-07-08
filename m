@@ -1,26 +1,29 @@
-Return-Path: <peter.maydell@linaro.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=OwHUEDY2EXzaY0pEwGqTeB6dkRDc3iu9YRLJY5iV6xw=;
- b=CAvpzHmxBceOdz1vEToatSSJmct5B2tkYgEsZ73GRy6p4aDFiuy4JAgY0kMlw0gDH7
- HwPGpQHlFBMksWPRwriKncGI5hn9fQzkeBmvCR5gYwG0jdJ8jFpmxMXGEYR6xhwiLdNT
- v+vr0u/GG6p3XtqcEYpVJUQiFFdLzFAV8vanO/Kxeg5YI3IexbceF7gixtYZRoJQCk1T
- +vD3+3i6zPOQnD29UL8uZOj0ySyhmlbMzwNUxUXZ49eVHJa6sCh7ncPBFsnYYdKpnQ+4
- YLifpM8YX9Pza5Z4kRfLxc6zJ0+gdC9cEZP/V2Km6GvfMJSPCW+kmvpNmjmt3DyQzwK8
- q+1w==
+Return-Path: <shirley.zhao@intel.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple;
+ d=intel.com; i=@intel.com; q=dns/txt; s=Intel;
+ t=1657240879; x=1688776879;
+ h=from:to:cc:subject:date:message-id:references:
+ in-reply-to:content-transfer-encoding:mime-version;
+ bh=xXwIsXoH4s35xZqsvfhQbOh+r1SuMzRNEwrlkSqXjuU=;
+ b=b4mYN9l6DEiRdQ2tIcX+HlCHr6C8eB0Mx9v+tssSPGabO/JjSrpQrVvy
+ sMWsrZs//EYHjFMQLg0sMzmQcDzIJeA34uJ3U3/9br+DfqOYf13pOQg6G
+ 6w9avuf1gEraXPalxaMFD1nLMkRxI0x6iWzJ7VpDWV29aTGn4/Qot1cBv
+ tEn2VOMbTEeBpTMmitZdHeOGY8JsURE+u/eVycxIHVAyFkDb7hd1ThVsG
+ J+G2ZnVtgsYaR6ZdJcntXOvohtIuLgPwJ4SfS/CrX2+CTbkCo5P0tA2Kj
+ qwKmn+aYZdafvPfeaILMw5cExNQY9BRSIUcUxgimoajKpXbwTNNz4yutU w==
+From: "Zhao, Shirley" <shirley.zhao@intel.com>
+Date: Fri, 8 Jul 2022 00:40:06 +0000
+Message-ID: <BY5PR11MB4291BCA40054FB484003D4278D829@BY5PR11MB4291.namprd11.prod.outlook.com>
+References: <BY5PR11MB42911D5BF55D9FAF501F64F68D819@BY5PR11MB4291.namprd11.prod.outlook.com>
+ <3b6c8e16-3712-3402-3ab2-17bf53ec64a8@redhat.com> <YsPwbbiuxtkD6HSp@work-vm>
+ <BY5PR11MB42912BFEA77F94B5B20D6F258D819@BY5PR11MB4291.namprd11.prod.outlook.com>
+ <YsQGNk5hLv8b6DJS@work-vm>
+In-Reply-To: <YsQGNk5hLv8b6DJS@work-vm>
 MIME-Version: 1.0
-References: <20220420132624.2439741-1-marcandre.lureau@redhat.com>
- <20220420132624.2439741-7-marcandre.lureau@redhat.com>
- <YmAg+9GExN7wn6Yb@redhat.com>
-In-Reply-To: <YmAg+9GExN7wn6Yb@redhat.com>
-From: Peter Maydell <peter.maydell@linaro.org>
-Date: Wed, 20 Apr 2022 17:10:51 +0100
-Message-ID: <CAFEAcA-n89moZJX5t72ek0iB0MEMQCAyq9jhVymcwyHEK_NNMw@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [PATCH 06/41] include: rename qemu-common.h
- qemu/copyright.h
+Content-Language: en-US
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
+Subject: Re: [Virtio-fs] [Qemu] how to use viriofs in qemu without NUMA
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -29,29 +32,71 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: =?UTF-8?Q?Daniel_P=2E_Berrang=C3=A9?= <berrange@redhat.com>
-Cc: marcandre.lureau@redhat.com, qemu-devel@nongnu.org, Kevin Wolf <kwolf@redhat.com>, Fam Zheng <fam@euphon.net>, Vladimir Sementsov-Ogievskiy <v.sementsov-og@mail.ru>, Akihiko Odaki <akihiko.odaki@gmail.com>, "open list:Block layer core" <qemu-block@nongnu.org>, Kyle Evans <kevans@freebsd.org>, Laurent Vivier <laurent@vivier.eu>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, "open list:virtiofs" <virtio-fs@redhat.com>, Hanna Reitz <hreitz@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Michael Roth <michael.roth@amd.com>, Eric Blake <eblake@redhat.com>, Warner Losh <imp@bsdimp.com>, =?UTF-8?Q?Philippe_Mathieu=2DDaud=C3=A9?= <f4bug@amsat.org>
+To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: Thomas Huth <thuth@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>
 
-On Wed, 20 Apr 2022 at 16:04, Daniel P. Berrang=C3=A9 <berrange@redhat.com>=
- wrote:
->
-> On Wed, Apr 20, 2022 at 05:25:49PM +0400, marcandre.lureau@redhat.com wro=
-te:
-> > From: Marc-Andr=C3=A9 Lureau <marcandre.lureau@redhat.com>
->
-> Could use a commit message explaining why this is a good
-> idea.
->
-> I see it contains QEMU_COPYRIGHT macro, but it also then
-> contains QEMU_HELP_BOTTOM which is about bug reporting
-> not copyright.
->
-> IMHO something like 'qemu-cli.h' could be a better match
-
-"-cli" is both too broad and also inaccurate, because we use
-these macros in the GUI UI frontends too. It's "macros defining
-strings for use in version/usage/help dialogs and output".
-Maybe qemu/help-texts.h ?
-
--- PMM
+WWVzLCB0aGUgcWVtdSB2ZXJzaW9uIGlzIHRvbyBvbGQuIA0KTXkgcHJldmlvdXMgcWVtdSB2ZXJz
+aW9uIGlzIDQuMiwgYW5kIEkgdXBncmFkZWQgaXQgaW50byA2LjAsIGFuZCBpdCB3b3JrZWQgbm93
+LiANClRoYW5rcyBhIGxvdC4gDQoNCi0gU2hpcmxleSANCg0KLS0tLS1PcmlnaW5hbCBNZXNzYWdl
+LS0tLS0NCkZyb206IERyLiBEYXZpZCBBbGFuIEdpbGJlcnQgPGRnaWxiZXJ0QHJlZGhhdC5jb20+
+IA0KU2VudDogVHVlc2RheSwgSnVseSA1LCAyMDIyIDU6MzcgUE0NClRvOiBaaGFvLCBTaGlybGV5
+IDxzaGlybGV5LnpoYW9AaW50ZWwuY29tPg0KQ2M6IFRob21hcyBIdXRoIDx0aHV0aEByZWRoYXQu
+Y29tPjsgcWVtdS1kZXZlbEBub25nbnUub3JnOyB2aXJ0aW8tZnNAcmVkaGF0LmNvbTsgU3RlZmFu
+IEhham5vY3ppIDxzdGVmYW5oYUByZWRoYXQuY29tPg0KU3ViamVjdDogUmU6IFtRZW11XSBob3cg
+dG8gdXNlIHZpcmlvZnMgaW4gcWVtdSB3aXRob3V0IE5VTUENCg0KKiBaaGFvLCBTaGlybGV5IChz
+aGlybGV5LnpoYW9AaW50ZWwuY29tKSB3cm90ZToNCj4gVGhhbmtzIGZvciB0aGUgaW5mb3JtYXRp
+b24uIA0KPiBZZXMsIEkgYWxzbyBmb3VuZCB0aGUgbWVtb3J5IGJhY2tlbmQgb3B0aW9ucyBvbiBz
+MzkweCwgYW5kIGFsc28gY29weSB0aGUgY29tbWFuZCB0byB4ODYsIGJ1dCBmYWlsZWQuIA0KPiAN
+Cj4gVGhlIGZvbGxvd2luZyBpcyB0aGUgY29tbWFuZCB1c2VkIHRvIHN0YXJ0IHFlbXUgKyB2aXJ0
+aW9mcyArIHVidW50dSAyMC4wNC4gDQo+IE9uZSBpcyB3b3JrZWQgd2VsbCB1c2luZyBOVU1BLCBh
+bm90aGVyIG9uZSBpcyBmYWlsZWQgd2l0aG91dCBOVU1BLiANCj4gSXMgdGhlcmUgYW55dGhpbmcg
+d3Jvbmc/IA0KPiANCj4gVGhlIHdvcmtlZCBvbmUgd2l0aCBOVU1BIG9wdGlvbnM6IA0KPiANCj4g
+cWVtdS1zeXN0ZW0teDg2XzY0IC1NIHBjIC1jcHUgaG9zdCAtLWVuYWJsZS1rdm0gLXNtcCAyIC1t
+IDRHIC1vYmplY3QgDQo+IG1lbW9yeS1iYWNrZW5kLWZpbGUsaWQ9bWVtLHNpemU9NEcsbWVtLXBh
+dGg9L2Rldi9zaG0sc2hhcmU9b24gLW51bWEgDQo+IG5vZGUsbWVtZGV2PW1lbSAtY2hhcmRldiBz
+b2NrZXQsaWQ9Y2hhcjAscGF0aD0vdG1wL3Zmc2Quc29jayAtZGV2aWNlIA0KPiB2aG9zdC11c2Vy
+LWZzLXBjaSxxdWV1ZS1zaXplPTEwMjQsY2hhcmRldj1jaGFyMCx0YWc9bXlmcyAtY2hhcmRldiAN
+Cj4gc3RkaW8sbXV4PW9uLGlkPW1vbiAtbW9uIGNoYXJkZXY9bW9uLG1vZGU9cmVhZGxpbmUgLWRl
+dmljZSANCj4gdmlydGlvLXNlcmlhbC1wY2kgLWRldmljZSB2aXJ0Y29uc29sZSxjaGFyZGV2PW1v
+biAtdmdhIG5vbmUgLWRpc3BsYXkgDQo+IG5vbmUgLWRyaXZlIGlmPXZpcnRpbyxmaWxlPXVidW50
+dS5pbWcNCj4gDQo+IFRoZSBmYWlsZWQgb25lIHdpdGhvdXQgTlVNQSBvcHRpb25zOiANCj4gDQo+
+IHFlbXUtc3lzdGVtLXg4Nl82NCAtTSBwYyAtY3B1IGhvc3QgLS1lbmFibGUta3ZtIC1zbXAgMiAt
+bSA0RyAtb2JqZWN0IA0KPiBtZW1vcnktYmFja2VuZC1maWxlLGlkPW1lbSxzaXplPTRHLG1lbS1w
+YXRoPS9kZXYvc2htLHNoYXJlPW9uIC1tYWNoaW5lIA0KPiBxMzUsbWVtb3J5LWJhY2tlbmQ9bWVt
+IC1jaGFyZGV2IHNvY2tldCxpZD1jaGFyMCxwYXRoPS90bXAvdmZzZC5zb2NrIA0KPiAtZGV2aWNl
+IHZob3N0LXVzZXItZnMtcGNpLHF1ZXVlLXNpemU9MTAyNCxjaGFyZGV2PWNoYXIwLHRhZz1teWZz
+IA0KPiAtY2hhcmRldiBzdGRpbyxtdXg9b24saWQ9bW9uIC1tb24gY2hhcmRldj1tb24sbW9kZT1y
+ZWFkbGluZSAtZGV2aWNlIA0KPiB2aXJ0aW8tc2VyaWFsLXBjaSAtZGV2aWNlIHZpcnRjb25zb2xl
+LGNoYXJkZXY9bW9uIC12Z2Egbm9uZSAtZGlzcGxheSANCj4gbm9uZSAtZHJpdmUgaWY9dmlydGlv
+LGZpbGU9dWJ1bnR1LmltZw0KDQpXaGF0IGVycm9yIGRpZCBpdCBnaXZlPw0KDQoyMC4wNCBpcyBx
+dWl0ZSBvbGQsIHdoYXQgcWVtdSB2ZXJzaW9uIGlzIGl0Pw0KDQpJJ2QgaGF2ZSB0byBjaGVjayB3
+aGVuIHRoZSBtZW1kZXY9IHdlbnQgaW4uDQoNCkRhdmUNCg0KPiANCj4gVGhhbmtzLiANCj4gLSBT
+aGlybGV5DQo+IA0KPiAtLS0tLU9yaWdpbmFsIE1lc3NhZ2UtLS0tLQ0KPiBGcm9tOiBEci4gRGF2
+aWQgQWxhbiBHaWxiZXJ0IDxkZ2lsYmVydEByZWRoYXQuY29tPg0KPiBTZW50OiBUdWVzZGF5LCBK
+dWx5IDUsIDIwMjIgNDowNCBQTQ0KPiBUbzogVGhvbWFzIEh1dGggPHRodXRoQHJlZGhhdC5jb20+
+DQo+IENjOiBaaGFvLCBTaGlybGV5IDxzaGlybGV5LnpoYW9AaW50ZWwuY29tPjsgcWVtdS1kZXZl
+bEBub25nbnUub3JnOyANCj4gdmlydGlvLWZzQHJlZGhhdC5jb207IFN0ZWZhbiBIYWpub2N6aSA8
+c3RlZmFuaGFAcmVkaGF0LmNvbT4NCj4gU3ViamVjdDogUmU6IFtRZW11XSBob3cgdG8gdXNlIHZp
+cmlvZnMgaW4gcWVtdSB3aXRob3V0IE5VTUENCj4gDQo+ICogVGhvbWFzIEh1dGggKHRodXRoQHJl
+ZGhhdC5jb20pIHdyb3RlOg0KPiA+IE9uIDA1LzA3LzIwMjIgMDMuMDIsIFpoYW8sIFNoaXJsZXkg
+d3JvdGU6DQo+ID4gPiBIaSwgYWxsLA0KPiA+ID4gDQo+ID4gPiBJIHdhbnQgdG8gdXNlIHZpcnRp
+b2ZzIHRvIHNoYXJlIGZvbGRlciBiZXR3ZWVuIGhvc3QgYW5kIGd1ZXN0Lg0KPiA+ID4gDQo+ID4g
+PiAgRnJvbSB0aGUgZ3VpZGUsIGl0IG11c3Qgc2V0IHRoZSBOVU1BIG5vZGUuDQo+ID4gPiBodHRw
+czovL3ZpcnRpby1mcy5naXRsYWIuaW8vaG93dG8tcWVtdS5odG1sDQo+ID4gPiANCj4gPiA+IEJ1
+dCBteSBndWVzdCBkb2VzbuKAmXQgc3VwcG9ydCBOVU1BLg0KPiA+ID4gDQo+ID4gPiBJcyB0aGVy
+ZSBhbnkgZ3VpZGUgdG8gdXNlIHFlbXUgKyB2aXJ0aW9mcyB3aXRob3V0IE5VTUE/DQo+ID4gPiAN
+Cj4gPiA+IE9yIGRvZXMgcWVtdSBoYXZlIGFueSBwbGFuIHRvIHN1cHBvcnQgaXQ/DQo+ID4gDQo+
+ID4gIEhpIQ0KPiA+IA0KPiA+IEF0IGxlYXN0IG9uIHMzOTB4LCB5b3UgY2FuIGFsc28gc3BlY2lm
+eSB0aGUgbWVtb3J5IGJhY2tlbmQgdmlhIHRoZSANCj4gPiAtbWFjaGluZSBvcHRpb24gaW5zdGVh
+ZCBvZiB1c2luZyB0aGUgLW51bWEgb3B0aW9uLCBlLmcuOg0KPiA+IA0KPiA+ICBxZW11LXN5c3Rl
+bS1zMzkweCAtbWFjaGluZSBtZW1vcnktYmFja2VuZD1tZW0gXA0KPiA+ICAgLW9iamVjdCBtZW1v
+cnktYmFja2VuZC1maWxlLGlkPW1lbSwuLi4NCj4gPiANCj4gPiBOb3Qgc3VyZSB3aGV0aGVyIHRo
+YXQgd29ya3Mgb24gb3RoZXIgYXJjaGl0ZWN0dXJlcywgdG9vLCB0aG91Z2guIA0KPiA+IFN0ZWZh
+biwgRGF2aWQsIGRvIHlvdSBrbm93Pw0KPiANCj4gUmlnaHQsIHRoYXQncyB0aGUgd2F5IEkgZG8g
+aXQgb24geDg2Lg0KPiBXZSB3cm90ZSB2aXJ0aW9mcyBiZWZvcmUgdGhlIG1lbW9yeS1iYWNrZW5k
+IG9wdGlvbiBleGlzdGVkLCB3aGljaCBpcyB3aHkgdGhlIG9sZCBkb2NzIHRhbGsgYWJvdXQgdXNp
+bmcgdGhlIE5VTUEgc3R1ZmYuDQo+IA0KPiBEYXZlDQo+IA0KPiA+ICBUaG9tYXMNCj4gPiANCj4g
+LS0NCj4gRHIuIERhdmlkIEFsYW4gR2lsYmVydCAvIGRnaWxiZXJ0QHJlZGhhdC5jb20gLyBNYW5j
+aGVzdGVyLCBVSw0KPiANCi0tDQpEci4gRGF2aWQgQWxhbiBHaWxiZXJ0IC8gZGdpbGJlcnRAcmVk
+aGF0LmNvbSAvIE1hbmNoZXN0ZXIsIFVLDQoNCg==
 

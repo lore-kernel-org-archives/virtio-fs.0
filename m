@@ -1,33 +1,20 @@
-Return-Path: <jag.raman@oracle.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
- h=from : to : cc :
- subject : date : message-id : references : in-reply-to : content-type :
- content-id : content-transfer-encoding : mime-version; s=corp-2021-07-09;
- bh=uEhfJ0eCeTipUZD0q+z6W6iDZ1ID7C8gcSwIJgezod8=;
- b=LeBJ5WRVgOIYNIvsMjTh3b4hUNPowqvrkMrATFS5K5e6r5Fl2PEAWmufsPqfJraj713Z
- cq4grR4dH+EPlMsbqejRqg2eEbe094ujFfWy2eYcPLjAyN7xecHWNZUJ+8557BgMF199
- Mv2ATeSsUad53FUVPNCi5AQSoOX1Dih+dEEuM0Io7yQw6PGn3+i5rSqEWtsXOfjXFhJ3
- 6r9+F4NY2udIkIAPfcEA1ySVsjd1MmapD9HWfnueyujs0WlZEIwlF8FRxBwzLTvLec+v
- nU2myn+ZnrZKAG/CHin0F5mevKbVc3NHZIAUJ63OKKU5Ne0oxKRELByyQVjuTc4huU/Q cA==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=oracle.onmicrosoft.com; s=selector2-oracle-onmicrosoft-com;
+Return-Path: <linux_learner@outlook.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=outlook.com;
+ s=selector1;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=uEhfJ0eCeTipUZD0q+z6W6iDZ1ID7C8gcSwIJgezod8=;
- b=LU05l+pHcdDQdesECdpQ8R7lH0ZeOtlG4XprWhWUmNvGSfAUY8qGwJo5negDgvJYmJH8QNKbn7UdgsfRI5BgEoLHTXbnswaQAjfVGXwLs0SfqBs0uUPsSUhOK67i8VMJu5gJHt8NknMJEkIvWP7UcTAe9iG+NorHnlXCyOCK6Ys=
-From: Jag Raman <jag.raman@oracle.com>
-Date: Tue, 12 Jul 2022 17:13:51 +0000
-Message-ID: <31B45203-DEF9-4D9A-88C2-B047BBA87E92@oracle.com>
-References: <20220615155129.1025811-1-stefanha@redhat.com>
- <20220615155129.1025811-7-stefanha@redhat.com> <Ys0zQiFvsLozii7U@redhat.com>
- <5CF345CD-94BE-452C-A817-4A8AD3CD734A@oracle.com>
- <Ys2W1bm7LQVk7ifa@redhat.com>
-In-Reply-To: <Ys2W1bm7LQVk7ifa@redhat.com>
+ bh=aYzQnkB+hBSq+ESXO+MbGzhLeDx7dh/jhEVAIWHZmus=;
+ b=NkZ38v8jB/fT2pZbuSHDWaYnBU+/12Tn/cZ11sMAyZ68HrCCq8CZYVx09SPqb5FuZdV0ggZqd8nnmbHNJs1+RshjOLrxTB8UnuUQHKkMai+M6l7rdwRdCnNs+FvETASYiRimgx+sFOaSbNn0yBMUvAs0S/C/xDPl3LEuIRSxz/DC0q5ElU1EdqX12rTqAowXe7bMJpmef7VvGJ4gW87gfjCUiAtyn/fkk7Nm6zgYj3MIo/jfBeSsw6gEip19elovc+I0UdXvUiaZcSedZ8WhQhhreivWyIEWMAga7WmYkWJQ3O+wdlUXFfjNKkx6kSePCscdSx2YJ/ZxKtYEKcu4Ug==
+From: "Pra.. Dew.." <linux_learner@outlook.com>
+Date: Tue, 12 Jul 2022 23:14:29 +0000
+Message-ID: <BY5PR14MB3893F904F74C93FF851811D686869@BY5PR14MB3893.namprd14.prod.outlook.com>
+References: <BY5PR14MB38930999DE81BFE799016C8C86829@BY5PR14MB3893.namprd14.prod.outlook.com>
+ <Ys1rH9Mn6fKh35p7@redhat.com>
+In-Reply-To: <Ys1rH9Mn6fKh35p7@redhat.com>
 MIME-Version: 1.0
 Content-Language: en-US
-Content-Type: text/plain; charset="utf-8"
-Content-ID: <C91E2DC66F5817468A2C6D72CBABFF1C@namprd10.prod.outlook.com>
-Content-Transfer-Encoding: base64
-Subject: Re: [Virtio-fs] [PULL 06/18] vfio-user: build library
+Content-Type: multipart/alternative;
+ boundary="_000_BY5PR14MB3893F904F74C93FF851811D686869BY5PR14MB3893namp_"
+Subject: Re: [Virtio-fs] Ownership of a file shared between guest and host
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -36,70 +23,159 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: =?utf-8?B?RGFuaWVsIFAuIEJlcnJhbmfDqQ==?= <berrange@redhat.com>
-Cc: Stefan Hajnoczi <stefanha@redhat.com>, qemu-devel <qemu-devel@nongnu.org>, Thomas Huth <thuth@redhat.com>, Aarushi Mehta <mehta.aaru20@gmail.com>, =?utf-8?B?UGhpbGlwcGUgTWF0aGlldS1EYXVkw6k=?= <f4bug@amsat.org>, Elena Ufimtseva <elena.ufimtseva@oracle.com>, Marcel Apfelbaum <marcel.apfelbaum@gmail.com>, Laurent Vivier <lvivier@redhat.com>, "qemu-block@nongnu.org" <qemu-block@nongnu.org>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Richard Henderson <richard.henderson@linaro.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, Hanna Reitz <hreitz@redhat.com>, David Hildenbrand <david@redhat.com>, =?utf-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>, Eric Blake <eblake@redhat.com>, Kevin Wolf <kwolf@redhat.com>, Beraldo Leal <bleal@redhat.com>, Peter Xu <peterx@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Qiuhao Li <Qiuhao.Li@outlook.com>, Paolo Bonzini <pbonzini@redhat.com>, Markus Armbruster <armbru@redhat.com>, Bandan Das <bsd@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>, Alexander Bulekov <alxndr@bu.edu>, Julia Suvorova <jusual@redhat.com>, Darren Kenny <darren.kenny@oracle.com>, Wainer dos Santos Moschetta <wainersm@redhat.com>, John Johnson <john.g.johnson@oracle.com>
+To: Vivek Goyal <vgoyal@redhat.com>
+Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
-DQoNCj4gT24gSnVsIDEyLCAyMDIyLCBhdCAxMTo0NCBBTSwgRGFuaWVsIFAuIEJlcnJhbmfDqSA8
-YmVycmFuZ2VAcmVkaGF0LmNvbT4gd3JvdGU6DQo+IA0KPiBPbiBUdWUsIEp1bCAxMiwgMjAyMiBh
-dCAwMzoyNzowOVBNICswMDAwLCBKYWcgUmFtYW4gd3JvdGU6DQo+PiANCj4+IA0KPj4gT24gSnVs
-IDEyLCAyMDIyLCBhdCA0OjM5IEFNLCBEYW5pZWwgUC4gQmVycmFuZ8OpIDxiZXJyYW5nZUByZWRo
-YXQuY29tPG1haWx0bzpiZXJyYW5nZUByZWRoYXQuY29tPj4gd3JvdGU6DQo+PiANCj4+IE9uIFdl
-ZCwgSnVuIDE1LCAyMDIyIGF0IDA0OjUxOjE3UE0gKzAxMDAsIFN0ZWZhbiBIYWpub2N6aSB3cm90
-ZToNCj4+IEZyb206IEphZ2FubmF0aGFuIFJhbWFuIDxqYWcucmFtYW5Ab3JhY2xlLmNvbTxtYWls
-dG86amFnLnJhbWFuQG9yYWNsZS5jb20+Pg0KPj4gDQo+PiBhZGQgdGhlIGxpYnZmaW8tdXNlciBs
-aWJyYXJ5IGFzIGEgc3VibW9kdWxlLiBidWlsZCBpdCBhcyBhIG1lc29uDQo+PiBzdWJwcm9qZWN0
-Lg0KPj4gDQo+PiBsaWJ2ZmlvLXVzZXIgaXMgZGlzdHJpYnV0ZWQgd2l0aCBCU0QgMy1DbGF1c2Ug
-bGljZW5zZSBhbmQNCj4+IGpzb24tYyB3aXRoIE1JVCAoRXhwYXQpIGxpY2Vuc2UNCj4+IA0KPj4g
-U2lnbmVkLW9mZi1ieTogRWxlbmEgVWZpbXRzZXZhIDxlbGVuYS51ZmltdHNldmFAb3JhY2xlLmNv
-bTxtYWlsdG86ZWxlbmEudWZpbXRzZXZhQG9yYWNsZS5jb20+Pg0KPj4gU2lnbmVkLW9mZi1ieTog
-Sm9obiBHIEpvaG5zb24gPGpvaG4uZy5qb2huc29uQG9yYWNsZS5jb208bWFpbHRvOmpvaG4uZy5q
-b2huc29uQG9yYWNsZS5jb20+Pg0KPj4gU2lnbmVkLW9mZi1ieTogSmFnYW5uYXRoYW4gUmFtYW4g
-PGphZy5yYW1hbkBvcmFjbGUuY29tPG1haWx0bzpqYWcucmFtYW5Ab3JhY2xlLmNvbT4+DQo+PiBS
-ZXZpZXdlZC1ieTogU3RlZmFuIEhham5vY3ppIDxzdGVmYW5oYUByZWRoYXQuY29tPG1haWx0bzpz
-dGVmYW5oYUByZWRoYXQuY29tPj4NCj4+IE1lc3NhZ2UtaWQ6IGMyYWRlYzg3OTU4YjA4MWQxZGM4
-Nzc1ZDRhYTA1Yzg5NzkxMmYwMjUuMTY1NTE1MTY3OS5naXQuamFnLnJhbWFuQG9yYWNsZS5jb208
-bWFpbHRvOmMyYWRlYzg3OTU4YjA4MWQxZGM4Nzc1ZDRhYTA1Yzg5NzkxMmYwMjUuMTY1NTE1MTY3
-OS5naXQuamFnLnJhbWFuQG9yYWNsZS5jb20+DQo+PiANCj4+IFtDaGFuZ2VkIHN1Ym1vZHVsZSBV
-UkwgdG8gUUVNVSdzIGxpYnZmaW8tdXNlciBtaXJyb3Igb24gR2l0TGFiLiBUaGUgUUVNVQ0KPj4g
-cHJvamVjdCBtaXJyb3JzIGl0cyBkZXBlbmRlbmNpZXMgc28gdGhhdCBpdCBjYW4gcHJvdmlkZSBm
-dWxsIHNvdXJjZSBjb2RlDQo+PiBldmVuIGluIHRoZSBldmVudCB0aGF0IGl0cyBkZXBlbmRlbmNp
-ZXMgYmVjb21lIHVuYXZhaWxhYmxlLiBOb3RlIHRoYXQNCj4+IHRoZSBtaXJyb3IgcmVwbyBpcyBt
-YW51YWxseSB1cGRhdGVkLCBzbyBwbGVhc2UgY29udGFjdCBtZSB0byBtYWtlIG5ld2VyDQo+PiBs
-aWJ2ZmlvLXVzZXIgY29tbWl0cyBhdmFpbGFibGUuIElmIEkgYmVjb21lIGEgYm90dGxlbmVjayB3
-ZSBjYW4gc2V0IHVwIGENCj4+IGNyb25qb2IuDQo+PiANCj4+IFVwZGF0ZWQgc2NyaXB0cy9tZXNv
-bi1idWlsZG9wdGlvbnMuc2ggdG8gbWF0Y2ggdGhlIG1lc29uX29wdGlvbnMudHh0DQo+PiBjaGFu
-Z2UuIEZhaWx1cmUgdG8gZG8gc28gY2FuIHJlc3VsdCBpbiBzY3JpcHRzL21lc29uLWJ1aWxkb3B0
-aW9ucy5zaA0KPj4gYmVpbmcgbW9kaWZpZWQgYnkgdGhlIGJ1aWxkIHN5c3RlbSBsYXRlciBvbiBh
-bmQgeW91IGVuZCB1cCB3aXRoIGEgZGlydHkNCj4+IHdvcmtpbmcgdHJlZS4NCj4+IC0tU3RlZmFu
-XQ0KPj4gDQo+PiBzbmlwDQo+PiANCj4+IGRpZmYgLS1naXQgYS90ZXN0cy9kb2NrZXIvZG9ja2Vy
-ZmlsZXMvY2VudG9zOC5kb2NrZXIgYi90ZXN0cy9kb2NrZXIvZG9ja2VyZmlsZXMvY2VudG9zOC5k
-b2NrZXINCj4+IGluZGV4IDRiMjA5MjViYmYuLjEwNjE4YmZhODMgMTAwNjQ0DQo+PiAtLS0gYS90
-ZXN0cy9kb2NrZXIvZG9ja2VyZmlsZXMvY2VudG9zOC5kb2NrZXINCj4+ICsrKyBiL3Rlc3RzL2Rv
-Y2tlci9kb2NrZXJmaWxlcy9jZW50b3M4LmRvY2tlcg0KPj4gQEAgLTUxLDYgKzUxLDcgQEAgUlVO
-IGRuZiB1cGRhdGUgLXkgJiYgXA0KPj4gbGliYnBmLWRldmVsIFwNCj4+IGxpYmNhY2FyZC1kZXZl
-bCBcDQo+PiBsaWJjYXAtbmctZGV2ZWwgXA0KPj4gKyBsaWJjbW9ja2EtZGV2ZWwgXA0KPj4gbGli
-Y3VybC1kZXZlbCBcDQo+PiBsaWJkcm0tZGV2ZWwgXA0KPj4gbGliZXBveHktZGV2ZWwgXA0KPj4g
-QEAgLTU5LDYgKzYwLDcgQEAgUlVOIGRuZiB1cGRhdGUgLXkgJiYgXA0KPj4gbGliZ2NyeXB0LWRl
-dmVsIFwNCj4+IGxpYmlzY3NpLWRldmVsIFwNCj4+IGxpYmpwZWctZGV2ZWwgXA0KPj4gKyBqc29u
-LWMtZGV2ZWwgXA0KPj4gbGlibmZzLWRldmVsIFwNCj4+IGxpYnBtZW0tZGV2ZWwgXA0KPj4gbGli
-cG5nLWRldmVsIFwNCj4+IA0KPj4gUGVyIHRoZSBiaWcgd2FybmluZyBtZXNzYWdlIGF0IHRoZSB0
-b3Agb2YgdGhpcyBmaWxlLCB0aGlzIHBhY2thZ2UgbGlzdGluZw0KPj4gaXMgZW50aXJlbHkgYXV0
-by1nZW5lcmF0ZWQgc28gc2hvdWxkIG5vdCBiZSBoYW5kIGVkaXR0ZWQgbGlrZSB0aGlzLiBJdHMN
-Cj4+IGNvbnRlbnQgaXMgYWxsIGRyaXZlbiBieSBtYXBwaW5ncyBpbiB0aGUgdGVzdHMvbGNpdG9v
-bC9saWJ2aXJ0LWNpIHN1Ym1vZHVsZSwNCj4+IHdoaWNoIGlzIHdoYXQgc2hvdWxkIGhhdmUgYmVl
-biB1cGRhdGVkLiBJdCB3b3VsZCBoYXZlIHRoZW4gZW5zdXJlZCB0aGVzZQ0KPj4gbmV3IHBhY2th
-Z2VzIHdlcmUgYWRkZWQgdG8gYWxsIHRoZSBkb2NrZXJmaWxlcywgYW5kIHRoYXQgdGhlIGNoYW5n
-ZXMgYXJlDQo+PiBub3QgbG9zdGVkIHdoZW4gdGhlIGRvY2tlcmZpbGUgaXMgcmUtZ2VuZXJhdGVk
-Lg0KPj4gDQo+PiBUaGFua3MgZm9yIHBvaW50aW5nIHRoaXMgb3V0LCBEYW5pZWwhDQo+PiANCj4+
-IFdpbGwgdXBkYXRlIHRoZSBsaWJ2aXJ0LWNpIHByb2plY3Qgd2l0aCB0aGlzLCBhbmQgdXBkYXRl
-IFFFTVUNCj4+IG9uY2UgdGhhdCBjaGFuZ2UgaXMgcHVsbGVkIGludG8gbGlidmlydC1jaS4NCj4g
-DQo+IERvbid0IHdvcnJ5LCBJJ3ZlIGp1c3QgZ290IGEgbGlidmlydC1jaSB1cGRhdGUgbWVyZ2Vk
-Og0KPiANCj4gIGh0dHBzOi8vZ2l0bGFiLmNvbS9saWJ2aXJ0L2xpYnZpcnQtY2kvLS9tZXJnZV9y
-ZXF1ZXN0cy8yOTMNCj4gDQo+IGFzIEkgbmVlZCB0byBmaXggUUVNVSBDSSBmb3IgRnJlZUJTRCBh
-bHJlYWR5Lg0KDQpUaGFuayB5b3UhDQrigJQNCkphZw0KDQo+IA0KPiBXaXRoIHJlZ2FyZHMsDQo+
-IERhbmllbA0KPiAtLSANCj4gfDogaHR0cHM6Ly9iZXJyYW5nZS5jb20gICAgICAtby0gICAgaHR0
-cHM6Ly93d3cuZmxpY2tyLmNvbS9waG90b3MvZGJlcnJhbmdlIDp8DQo+IHw6IGh0dHBzOi8vbGli
-dmlydC5vcmcgICAgICAgICAtby0gICAgICAgICAgICBodHRwczovL2ZzdG9wMTM4LmJlcnJhbmdl
-LmNvbSA6fA0KPiB8OiBodHRwczovL2VudGFuZ2xlLXBob3RvLm9yZyAgICAtby0gICAgaHR0cHM6
-Ly93d3cuaW5zdGFncmFtLmNvbS9kYmVycmFuZ2UgOnwNCj4gDQoNCg==
+--_000_BY5PR14MB3893F904F74C93FF851811D686869BY5PR14MB3893namp_
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: quoted-printable
+
+Thank you so much!!! We are using the Rust version now. I will try out the =
+suggestions below. Thanks for the guidance.
+________________________________
+From: Vivek Goyal <vgoyal@redhat.com>
+Sent: Tuesday, July 12, 2022 12:37 PM
+To: Pra.. Dew.. <linux_learner@outlook.com>
+Cc: virtio-fs@redhat.com <virtio-fs@redhat.com>
+Subject: Re: [Virtio-fs] Ownership of a file shared between guest and host
+
+On Fri, Jul 08, 2022 at 08:18:19PM +0000, Pra.. Dew.. wrote:
+> We have been able to setup virtiofs between guest and host (QEMU 6.2/Linu=
+x 5.15). We run virtiofsd as a non-root user in the host. We did not want t=
+o run it as a root user in order to minimize the attack surface. We run it =
+as a virtiofs user. When we create a file in the shared folder, the permiss=
+ion of the file is virtiofs user and virtiofs group. When we read that file=
+ from the guest it shows virtiofs user (only the uid) and nobody group. The=
+ goal is to restrict the access of the file to a few services in the guest =
+(not give access to all services). We tried to create a group in the guest =
+and tried to move the file in the new group. However chown gives "bad descr=
+iptor." Is there a better way of doing this? Any input is really appreciate=
+d. Thank you so much!
+
+Hi,
+
+Are you using C version of virtiofsd (from qemu) or rust version of
+virtiofsd found here.
+
+https://nam12.safelinks.protection.outlook.com/?url=3Dhttps%3A%2F%2Fgitlab.=
+com%2Fvirtio-fs%2Fvirtiofsd&amp;data=3D05%7C01%7C%7C66056c4b61b0405d2a7008d=
+a640357c8%7C84df9e7fe9f640afb435aaaaaaaaaaaa%7C1%7C0%7C637932262768755509%7=
+CUnknown%7CTWFpbGZsb3d8eyJWIjoiMC4wLjAwMDAiLCJQIjoiV2luMzIiLCJBTiI6Ik1haWwi=
+LCJXVCI6Mn0%3D%7C3000%7C%7C%7C&amp;sdata=3DVFeOhTiZfwYU5QK4XNjRx%2F3WqfDyiI=
+60v%2FV1x9UJD%2BU%3D&amp;reserved=3D0
+
+I would recommend using rust version of virtiofsd now and as German
+suggested in another email, let unprivileged user launch a user namespace
+and run virtiofsd inside that. That should allow you to do arbitrary
+uid/gid switching inside guest.
+
+Thanks
+Vivek
+
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://nam12.safelinks.protection.outlook.com/?url=3Dhttps%3A%2F%2Flistm=
+an.redhat.com%2Fmailman%2Flistinfo%2Fvirtio-fs&amp;data=3D05%7C01%7C%7C6605=
+6c4b61b0405d2a7008da640357c8%7C84df9e7fe9f640afb435aaaaaaaaaaaa%7C1%7C0%7C6=
+37932262768755509%7CUnknown%7CTWFpbGZsb3d8eyJWIjoiMC4wLjAwMDAiLCJQIjoiV2luM=
+zIiLCJBTiI6Ik1haWwiLCJXVCI6Mn0%3D%7C3000%7C%7C%7C&amp;sdata=3Dq%2FAbKkN3lnM=
+CLaOo8bO6ZCpjxes%2BJcvTnqY7y3JFFa0%3D&amp;reserved=3D0
+
+
+--_000_BY5PR14MB3893F904F74C93FF851811D686869BY5PR14MB3893namp_
+Content-Type: text/html; charset="us-ascii"
+Content-Transfer-Encoding: quoted-printable
+
+<html>
+<head>
+<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dus-ascii"=
+>
+<style type=3D"text/css" style=3D"display:none;"> P {margin-top:0;margin-bo=
+ttom:0;} </style>
+</head>
+<body dir=3D"ltr">
+<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
+ color: rgb(0, 0, 0);" class=3D"elementToProof">
+Thank you&nbsp;so much!!! We are using the Rust version now. I will try out=
+ the suggestions below. Thanks for the guidance.</div>
+<div id=3D"appendonsend"></div>
+<hr style=3D"display:inline-block;width:98%" tabindex=3D"-1">
+<div id=3D"divRplyFwdMsg" dir=3D"ltr"><font face=3D"Calibri, sans-serif" st=
+yle=3D"font-size:11pt" color=3D"#000000"><b>From:</b> Vivek Goyal &lt;vgoya=
+l@redhat.com&gt;<br>
+<b>Sent:</b> Tuesday, July 12, 2022 12:37 PM<br>
+<b>To:</b> Pra.. Dew.. &lt;linux_learner@outlook.com&gt;<br>
+<b>Cc:</b> virtio-fs@redhat.com &lt;virtio-fs@redhat.com&gt;<br>
+<b>Subject:</b> Re: [Virtio-fs] Ownership of a file shared between guest an=
+d host</font>
+<div>&nbsp;</div>
+</div>
+<div class=3D"BodyFragment"><font size=3D"2"><span style=3D"font-size:11pt;=
+">
+<div class=3D"PlainText">On Fri, Jul 08, 2022 at 08:18:19PM +0000, Pra.. De=
+w.. wrote:<br>
+&gt; We have been able to setup virtiofs between guest and host (QEMU 6.2/L=
+inux 5.15). We run virtiofsd as a non-root user in the host. We did not wan=
+t to run it as a root user in order to minimize the attack surface. We run =
+it as a virtiofs user. When we create
+ a file in the shared folder, the permission of the file is virtiofs user a=
+nd virtiofs group. When we read that file from the guest it shows virtiofs =
+user (only the uid) and nobody group. The goal is to restrict the access of=
+ the file to a few services in the
+ guest (not give access to all services). We tried to create a group in the=
+ guest and tried to move the file in the new group. However chown gives &qu=
+ot;bad descriptor.&quot; Is there a better way of doing this? Any input is =
+really appreciated. Thank you so much!<br>
+<br>
+Hi,<br>
+<br>
+Are you using C version of virtiofsd (from qemu) or rust version of<br>
+virtiofsd found here.<br>
+<br>
+<a href=3D"https://nam12.safelinks.protection.outlook.com/?url=3Dhttps%3A%2=
+F%2Fgitlab.com%2Fvirtio-fs%2Fvirtiofsd&amp;amp;data=3D05%7C01%7C%7C66056c4b=
+61b0405d2a7008da640357c8%7C84df9e7fe9f640afb435aaaaaaaaaaaa%7C1%7C0%7C63793=
+2262768755509%7CUnknown%7CTWFpbGZsb3d8eyJWIjoiMC4wLjAwMDAiLCJQIjoiV2luMzIiL=
+CJBTiI6Ik1haWwiLCJXVCI6Mn0%3D%7C3000%7C%7C%7C&amp;amp;sdata=3DVFeOhTiZfwYU5=
+QK4XNjRx%2F3WqfDyiI60v%2FV1x9UJD%2BU%3D&amp;amp;reserved=3D0">https://nam12=
+.safelinks.protection.outlook.com/?url=3Dhttps%3A%2F%2Fgitlab.com%2Fvirtio-=
+fs%2Fvirtiofsd&amp;amp;data=3D05%7C01%7C%7C66056c4b61b0405d2a7008da640357c8=
+%7C84df9e7fe9f640afb435aaaaaaaaaaaa%7C1%7C0%7C637932262768755509%7CUnknown%=
+7CTWFpbGZsb3d8eyJWIjoiMC4wLjAwMDAiLCJQIjoiV2luMzIiLCJBTiI6Ik1haWwiLCJXVCI6M=
+n0%3D%7C3000%7C%7C%7C&amp;amp;sdata=3DVFeOhTiZfwYU5QK4XNjRx%2F3WqfDyiI60v%2=
+FV1x9UJD%2BU%3D&amp;amp;reserved=3D0</a><br>
+<br>
+I would recommend using rust version of virtiofsd now and as German<br>
+suggested in another email, let unprivileged user launch a user namespace<b=
+r>
+and run virtiofsd inside that. That should allow you to do arbitrary<br>
+uid/gid switching inside guest.<br>
+<br>
+Thanks<br>
+Vivek<br>
+<br>
+&gt; _______________________________________________<br>
+&gt; Virtio-fs mailing list<br>
+&gt; Virtio-fs@redhat.com<br>
+&gt; <a href=3D"https://nam12.safelinks.protection.outlook.com/?url=3Dhttps=
+%3A%2F%2Flistman.redhat.com%2Fmailman%2Flistinfo%2Fvirtio-fs&amp;amp;data=
+=3D05%7C01%7C%7C66056c4b61b0405d2a7008da640357c8%7C84df9e7fe9f640afb435aaaa=
+aaaaaaaa%7C1%7C0%7C637932262768755509%7CUnknown%7CTWFpbGZsb3d8eyJWIjoiMC4wL=
+jAwMDAiLCJQIjoiV2luMzIiLCJBTiI6Ik1haWwiLCJXVCI6Mn0%3D%7C3000%7C%7C%7C&amp;a=
+mp;sdata=3Dq%2FAbKkN3lnMCLaOo8bO6ZCpjxes%2BJcvTnqY7y3JFFa0%3D&amp;amp;reser=
+ved=3D0">
+https://nam12.safelinks.protection.outlook.com/?url=3Dhttps%3A%2F%2Flistman=
+.redhat.com%2Fmailman%2Flistinfo%2Fvirtio-fs&amp;amp;data=3D05%7C01%7C%7C66=
+056c4b61b0405d2a7008da640357c8%7C84df9e7fe9f640afb435aaaaaaaaaaaa%7C1%7C0%7=
+C637932262768755509%7CUnknown%7CTWFpbGZsb3d8eyJWIjoiMC4wLjAwMDAiLCJQIjoiV2l=
+uMzIiLCJBTiI6Ik1haWwiLCJXVCI6Mn0%3D%7C3000%7C%7C%7C&amp;amp;sdata=3Dq%2FAbK=
+kN3lnMCLaOo8bO6ZCpjxes%2BJcvTnqY7y3JFFa0%3D&amp;amp;reserved=3D0</a><br>
+<br>
+</div>
+</span></font></div>
+</body>
+</html>
+
+--_000_BY5PR14MB3893F904F74C93FF851811D686869BY5PR14MB3893namp_--
 

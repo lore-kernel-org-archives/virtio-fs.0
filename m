@@ -1,15 +1,20 @@
-Return-Path: <berrange@redhat.com>
-Date: Tue, 12 Jul 2022 09:39:30 +0100
-From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
-Message-ID: <Ys0zQiFvsLozii7U@redhat.com>
-Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
-References: <20220615155129.1025811-1-stefanha@redhat.com>
- <20220615155129.1025811-7-stefanha@redhat.com>
+Return-Path: <vgoyal@redhat.com>
+Date: Tue, 12 Jul 2022 08:33:18 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <Ys1qDhW/DCCt0XdS@redhat.com>
+References: <BY5PR11MB42911D5BF55D9FAF501F64F68D819@BY5PR11MB4291.namprd11.prod.outlook.com>
+ <3b6c8e16-3712-3402-3ab2-17bf53ec64a8@redhat.com>
+ <YsPwbbiuxtkD6HSp@work-vm>
+ <BY5PR11MB42912BFEA77F94B5B20D6F258D819@BY5PR11MB4291.namprd11.prod.outlook.com>
+ <YsQGNk5hLv8b6DJS@work-vm>
+ <BY5PR11MB4291BCA40054FB484003D4278D829@BY5PR11MB4291.namprd11.prod.outlook.com>
+ <BY5PR11MB42914FD092B4312B76417A9C8D869@BY5PR11MB4291.namprd11.prod.outlook.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=utf-8
+Content-Type: text/plain; charset="utf-8"
 Content-Disposition: inline
-In-Reply-To: <20220615155129.1025811-7-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PULL 06/18] vfio-user: build library
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <BY5PR11MB42914FD092B4312B76417A9C8D869@BY5PR11MB4291.namprd11.prod.outlook.com>
+Subject: Re: [Virtio-fs] [Qemu] how to use viriofs in qemu without NUMA
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,70 +23,192 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: qemu-devel@nongnu.org, Thomas Huth <thuth@redhat.com>, Jagannathan Raman <jag.raman@oracle.com>, Aarushi Mehta <mehta.aaru20@gmail.com>, Philippe =?utf-8?Q?Mathieu-Daud=C3=A9?= <f4bug@amsat.org>, Elena Ufimtseva <elena.ufimtseva@oracle.com>, Marcel Apfelbaum <marcel.apfelbaum@gmail.com>, Laurent Vivier <lvivier@redhat.com>, qemu-block@nongnu.org, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Richard Henderson <richard.henderson@linaro.org>, virtio-fs@redhat.com, Hanna Reitz <hreitz@redhat.com>, David Hildenbrand <david@redhat.com>, Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>, Eric Blake <eblake@redhat.com>, Kevin Wolf <kwolf@redhat.com>, Beraldo Leal <bleal@redhat.com>, Peter Xu <peterx@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Qiuhao Li <Qiuhao.Li@outlook.com>, Paolo Bonzini <pbonzini@redhat.com>, Markus Armbruster <armbru@redhat.com>, Bandan Das <bsd@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>, Alexander Bulekov <alxndr@bu.edu>, Julia Suvorova <jusual@redhat.com>, Darren Kenny <darren.kenny@oracle.com>, Wainer dos Santos Moschetta <wainersm@redhat.com>, John G Johnson <john.g.johnson@oracle.com>
+To: "Zhao, Shirley" <shirley.zhao@intel.com>
+Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, Thomas Huth <thuth@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>
 
-On Wed, Jun 15, 2022 at 04:51:17PM +0100, Stefan Hajnoczi wrote:
-> From: Jagannathan Raman <jag.raman@oracle.com>
+On Tue, Jul 12, 2022 at 07:06:50AM +0000, Zhao, Shirley wrote:
+> Hi, all, 
 > 
-> add the libvfio-user library as a submodule. build it as a meson
-> subproject.
+> I have another question want to consult you. 
+> To enable DAX in virtiofs, according to the memu https://virtio-fs.gitlab.io/howto-qemu.html. 
+> I need to add "cache-size=2G" as below. 
+> -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs,cache-size=2G
 > 
-> libvfio-user is distributed with BSD 3-Clause license and
-> json-c with MIT (Expat) license
+> My qemu command is: 
+> sudo qemu-system-x86_64 -M pc -cpu host --enable-kvm -smp 2 -m 4G -drive if=virtio,file=ubuntu.img -object memory-backend-file,id=mem,size=4G,mem-path=/dev/shm,share=on -machine q35,memory-backend=mem -chardev socket,id=char0,path=/tmp/vhostqemu -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs_root,cache-size=2G -chardev stdio,mux=on,id=mon -mon chardev=mon,mode=readline -device virtio-serial-pci -device virtconsole,chardev=mon -vga none -display none
 > 
-> Signed-off-by: Elena Ufimtseva <elena.ufimtseva@oracle.com>
-> Signed-off-by: John G Johnson <john.g.johnson@oracle.com>
-> Signed-off-by: Jagannathan Raman <jag.raman@oracle.com>
-> Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-> Message-id: c2adec87958b081d1dc8775d4aa05c897912f025.1655151679.git.jag.raman@oracle.com
+> And virtiofsd command is:
+> sudo ./virtiofsd --socket-path=/tmp/vhostqemu -o source=/home/shirley/testdir -o cache=always
 > 
-> [Changed submodule URL to QEMU's libvfio-user mirror on GitLab. The QEMU
-> project mirrors its dependencies so that it can provide full source code
-> even in the event that its dependencies become unavailable. Note that
-> the mirror repo is manually updated, so please contact me to make newer
-> libvfio-user commits available. If I become a bottleneck we can set up a
-> cronjob.
-> 
-> Updated scripts/meson-buildoptions.sh to match the meson_options.txt
-> change. Failure to do so can result in scripts/meson-buildoptions.sh
-> being modified by the build system later on and you end up with a dirty
-> working tree.
-> --Stefan]
+> But there is no option of "cache-size" in qemu 6.0, like below. So how to enable it? 
 
-snip
+Hi Shirley,
 
-> diff --git a/tests/docker/dockerfiles/centos8.docker b/tests/docker/dockerfiles/centos8.docker
-> index 4b20925bbf..10618bfa83 100644
-> --- a/tests/docker/dockerfiles/centos8.docker
-> +++ b/tests/docker/dockerfiles/centos8.docker
-> @@ -51,6 +51,7 @@ RUN dnf update -y && \
->          libbpf-devel \
->          libcacard-devel \
->          libcap-ng-devel \
-> +        libcmocka-devel \
->          libcurl-devel \
->          libdrm-devel \
->          libepoxy-devel \
-> @@ -59,6 +60,7 @@ RUN dnf update -y && \
->          libgcrypt-devel \
->          libiscsi-devel \
->          libjpeg-devel \
-> +        json-c-devel \
->          libnfs-devel \
->          libpmem-devel \
->          libpng-devel \
+DAX support in qemu is not upstream yet. We are carrying DAX patches
+out of the tree on a branch here.
 
-Per the big warning message at the top of this file, this package listing
-is entirely auto-generated so should not be hand editted like this. Its
-content is all driven by mappings in the tests/lcitool/libvirt-ci submodule,
-which is what should have been updated. It would have then ensured these
-new packages were added to all the dockerfiles, and that the changes are
-not losted when the dockerfile is re-generated.
+https://gitlab.com/virtio-fs/qemu/-/commits/virtio-fs-dev
 
-With regards,
-Daniel
--- 
-|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
-|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
-|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
+There are some changes required and David Gilbert is looking into
+making these changes. I am hoping at some point of time these patches
+will make into upstream.
+
+So for the time being, to test DAX, you will have to fetch above branch,
+build it and use that qemu.
+
+Thanks
+Vivek
+
+> qemu-6.0.0$ qemu-system-x86_64 -device vhost-user-fs-pci,help
+> vhost-user-fs-pci options:
+>   acpi-index=<uint32>    -  (default: 0)
+>   addr=<int32>           - Slot and optional function number, example: 06.0 or 06 (default: -1)
+>   aer=<bool>             - on/off (default: false)
+>   any_layout=<bool>      - on/off (default: true)
+>   ats=<bool>             - on/off (default: false)
+>   bootindex=<int32>
+>   chardev=<str>          - ID of a chardev to use as a backend
+>   event_idx=<bool>       - on/off (default: true)
+>   failover_pair_id=<str>
+>   indirect_desc=<bool>   - on/off (default: true)
+>   iommu_platform=<bool>  - on/off (default: false)
+>   migrate-extra=<bool>   - on/off (default: true)
+>   modern-pio-notify=<bool> - on/off (default: false)
+>   multifunction=<bool>   - on/off (default: false)
+>   notify_on_empty=<bool> - on/off (default: true)
+>   num-request-queues=<uint16> -  (default: 1)
+>   packed=<bool>          - on/off (default: false)
+>   page-per-vq=<bool>     - on/off (default: false)
+>   queue-size=<uint16>    -  (default: 128)
+>   rombar=<uint32>        -  (default: 1)
+>   romfile=<str>
+>   romsize=<uint32>       -  (default: 4294967295)
+>   tag=<str>
+>   use-disabled-flag=<bool> -  (default: true)
+>   use-started=<bool>     -  (default: true)
+>   vectors=<uint32>       -  (default: 4294967295)
+>   virtio-backend=<child<vhost-user-fs-device>>
+>   virtio-pci-bus-master-bug-migration=<bool> - on/off (default: false)
+>   x-ats-page-aligned=<bool> - on/off (default: true)
+>   x-disable-legacy-check=<bool> -  (default: false)
+>   x-disable-pcie=<bool>  - on/off (default: false)
+>   x-ignore-backend-features=<bool> -  (default: false)
+>   x-pcie-deverr-init=<bool> - on/off (default: true)
+>   x-pcie-extcap-init=<bool> - on/off (default: true)
+>   x-pcie-flr-init=<bool> - on/off (default: true)
+>   x-pcie-lnkctl-init=<bool> - on/off (default: true)
+>   x-pcie-lnksta-dllla=<bool> - on/off (default: true)
+>   x-pcie-pm-init=<bool>  - on/off (default: true) 
+> 
+> 
+> -----Original Message-----
+> From: Zhao, Shirley 
+> Sent: Friday, July 8, 2022 8:40 AM
+> To: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> Cc: Thomas Huth <thuth@redhat.com>; qemu-devel@nongnu.org; virtio-fs@redhat.com; Stefan Hajnoczi <stefanha@redhat.com>
+> Subject: RE: [Qemu] how to use viriofs in qemu without NUMA
+> 
+> Yes, the qemu version is too old. 
+> My previous qemu version is 4.2, and I upgraded it into 6.0, and it worked now. 
+> Thanks a lot. 
+> 
+> - Shirley 
+> 
+> -----Original Message-----
+> From: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> Sent: Tuesday, July 5, 2022 5:37 PM
+> To: Zhao, Shirley <shirley.zhao@intel.com>
+> Cc: Thomas Huth <thuth@redhat.com>; qemu-devel@nongnu.org; virtio-fs@redhat.com; Stefan Hajnoczi <stefanha@redhat.com>
+> Subject: Re: [Qemu] how to use viriofs in qemu without NUMA
+> 
+> * Zhao, Shirley (shirley.zhao@intel.com) wrote:
+> > Thanks for the information. 
+> > Yes, I also found the memory backend options on s390x, and also copy the command to x86, but failed. 
+> > 
+> > The following is the command used to start qemu + virtiofs + ubuntu 20.04. 
+> > One is worked well using NUMA, another one is failed without NUMA. 
+> > Is there anything wrong? 
+> > 
+> > The worked one with NUMA options: 
+> > 
+> > qemu-system-x86_64 -M pc -cpu host --enable-kvm -smp 2 -m 4G -object 
+> > memory-backend-file,id=mem,size=4G,mem-path=/dev/shm,share=on -numa 
+> > node,memdev=mem -chardev socket,id=char0,path=/tmp/vfsd.sock -device 
+> > vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs -chardev 
+> > stdio,mux=on,id=mon -mon chardev=mon,mode=readline -device 
+> > virtio-serial-pci -device virtconsole,chardev=mon -vga none -display 
+> > none -drive if=virtio,file=ubuntu.img
+> > 
+> > The failed one without NUMA options: 
+> > 
+> > qemu-system-x86_64 -M pc -cpu host --enable-kvm -smp 2 -m 4G -object 
+> > memory-backend-file,id=mem,size=4G,mem-path=/dev/shm,share=on -machine 
+> > q35,memory-backend=mem -chardev socket,id=char0,path=/tmp/vfsd.sock
+> > -device vhost-user-fs-pci,queue-size=1024,chardev=char0,tag=myfs
+> > -chardev stdio,mux=on,id=mon -mon chardev=mon,mode=readline -device 
+> > virtio-serial-pci -device virtconsole,chardev=mon -vga none -display 
+> > none -drive if=virtio,file=ubuntu.img
+> 
+> What error did it give?
+> 
+> 20.04 is quite old, what qemu version is it?
+> 
+> I'd have to check when the memdev= went in.
+> 
+> Dave
+> 
+> > 
+> > Thanks. 
+> > - Shirley
+> > 
+> > -----Original Message-----
+> > From: Dr. David Alan Gilbert <dgilbert@redhat.com>
+> > Sent: Tuesday, July 5, 2022 4:04 PM
+> > To: Thomas Huth <thuth@redhat.com>
+> > Cc: Zhao, Shirley <shirley.zhao@intel.com>; qemu-devel@nongnu.org; 
+> > virtio-fs@redhat.com; Stefan Hajnoczi <stefanha@redhat.com>
+> > Subject: Re: [Qemu] how to use viriofs in qemu without NUMA
+> > 
+> > * Thomas Huth (thuth@redhat.com) wrote:
+> > > On 05/07/2022 03.02, Zhao, Shirley wrote:
+> > > > Hi, all,
+> > > > 
+> > > > I want to use virtiofs to share folder between host and guest.
+> > > > 
+> > > >  From the guide, it must set the NUMA node.
+> > > > https://virtio-fs.gitlab.io/howto-qemu.html
+> > > > 
+> > > > But my guest doesn’t support NUMA.
+> > > > 
+> > > > Is there any guide to use qemu + virtiofs without NUMA?
+> > > > 
+> > > > Or does qemu have any plan to support it?
+> > > 
+> > >  Hi!
+> > > 
+> > > At least on s390x, you can also specify the memory backend via the 
+> > > -machine option instead of using the -numa option, e.g.:
+> > > 
+> > >  qemu-system-s390x -machine memory-backend=mem \
+> > >   -object memory-backend-file,id=mem,...
+> > > 
+> > > Not sure whether that works on other architectures, too, though. 
+> > > Stefan, David, do you know?
+> > 
+> > Right, that's the way I do it on x86.
+> > We wrote virtiofs before the memory-backend option existed, which is why the old docs talk about using the NUMA stuff.
+> > 
+> > Dave
+> > 
+> > >  Thomas
+> > > 
+> > --
+> > Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> > 
+> --
+> Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
+> 
+> _______________________________________________
+> Virtio-fs mailing list
+> Virtio-fs@redhat.com
+> https://listman.redhat.com/mailman/listinfo/virtio-fs

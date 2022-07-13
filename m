@@ -1,20 +1,32 @@
-Return-Path: <linux_learner@outlook.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=outlook.com;
- s=selector1;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=aYzQnkB+hBSq+ESXO+MbGzhLeDx7dh/jhEVAIWHZmus=;
- b=NkZ38v8jB/fT2pZbuSHDWaYnBU+/12Tn/cZ11sMAyZ68HrCCq8CZYVx09SPqb5FuZdV0ggZqd8nnmbHNJs1+RshjOLrxTB8UnuUQHKkMai+M6l7rdwRdCnNs+FvETASYiRimgx+sFOaSbNn0yBMUvAs0S/C/xDPl3LEuIRSxz/DC0q5ElU1EdqX12rTqAowXe7bMJpmef7VvGJ4gW87gfjCUiAtyn/fkk7Nm6zgYj3MIo/jfBeSsw6gEip19elovc+I0UdXvUiaZcSedZ8WhQhhreivWyIEWMAga7WmYkWJQ3O+wdlUXFfjNKkx6kSePCscdSx2YJ/ZxKtYEKcu4Ug==
-From: "Pra.. Dew.." <linux_learner@outlook.com>
-Date: Tue, 12 Jul 2022 23:14:29 +0000
-Message-ID: <BY5PR14MB3893F904F74C93FF851811D686869@BY5PR14MB3893.namprd14.prod.outlook.com>
-References: <BY5PR14MB38930999DE81BFE799016C8C86829@BY5PR14MB3893.namprd14.prod.outlook.com>
- <Ys1rH9Mn6fKh35p7@redhat.com>
-In-Reply-To: <Ys1rH9Mn6fKh35p7@redhat.com>
+Return-Path: <shirley.zhao@intel.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple;
+ d=intel.com; i=@intel.com; q=dns/txt; s=Intel;
+ t=1657691027; x=1689227027;
+ h=from:to:cc:subject:date:message-id:references:
+ in-reply-to:content-transfer-encoding:mime-version;
+ bh=Bbwtu2SoXY/bixuIorhCS1HuBH6dJ02IK930eJD4VTM=;
+ b=lxWvpTk+R/6xglrLX051pQSh3Mc1mNCJx544JQlonrtdibkBMcSrZ265
+ WWXgUEa0oKRnO3aLM6Xw2bGnvPoQlVOB+Z5DyfJ8hvcFqo7dLEdd9P/an
+ xWgvKoxij/4p37RXnXUdqK3n2pbrJat6fbH9Z53WbQClb30W6aMgLz4GB
+ bVPZEvCt+wZM0f0mAqJlBCLbk3Nnx3ZUoR2S2ldI0yuJSayMgUc1M90ny
+ HqZ/Qmf/LZL34BbjPXIk6CHiUkbCsPaSDLdOO3tisXDggztF675/Lkf0S
+ f2vZoZK46Zuj0E1nTiaZzkwMkqYPfjLt8MLX6QpmBqeLL8QrnxZql1OJN w==
+From: "Zhao, Shirley" <shirley.zhao@intel.com>
+Date: Wed, 13 Jul 2022 05:43:37 +0000
+Message-ID: <BY5PR11MB42915EB718B55C182CAF25BF8D899@BY5PR11MB4291.namprd11.prod.outlook.com>
+References: <BY5PR11MB42911D5BF55D9FAF501F64F68D819@BY5PR11MB4291.namprd11.prod.outlook.com>
+ <3b6c8e16-3712-3402-3ab2-17bf53ec64a8@redhat.com> <YsPwbbiuxtkD6HSp@work-vm>
+ <BY5PR11MB42912BFEA77F94B5B20D6F258D819@BY5PR11MB4291.namprd11.prod.outlook.com>
+ <YsQGNk5hLv8b6DJS@work-vm>
+ <BY5PR11MB4291BCA40054FB484003D4278D829@BY5PR11MB4291.namprd11.prod.outlook.com>
+ <BY5PR11MB42914FD092B4312B76417A9C8D869@BY5PR11MB4291.namprd11.prod.outlook.com>
+ <Ys1qDhW/DCCt0XdS@redhat.com>
+In-Reply-To: <Ys1qDhW/DCCt0XdS@redhat.com>
 MIME-Version: 1.0
 Content-Language: en-US
-Content-Type: multipart/alternative;
- boundary="_000_BY5PR14MB3893F904F74C93FF851811D686869BY5PR14MB3893namp_"
-Subject: Re: [Virtio-fs] Ownership of a file shared between guest and host
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
+Subject: Re: [Virtio-fs] [Qemu] how to use viriofs in qemu without NUMA
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -24,158 +36,154 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Vivek Goyal <vgoyal@redhat.com>
-Cc: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, Thomas Huth <thuth@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>
 
---_000_BY5PR14MB3893F904F74C93FF851811D686869BY5PR14MB3893namp_
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: quoted-printable
-
-Thank you so much!!! We are using the Rust version now. I will try out the =
-suggestions below. Thanks for the guidance.
-________________________________
-From: Vivek Goyal <vgoyal@redhat.com>
-Sent: Tuesday, July 12, 2022 12:37 PM
-To: Pra.. Dew.. <linux_learner@outlook.com>
-Cc: virtio-fs@redhat.com <virtio-fs@redhat.com>
-Subject: Re: [Virtio-fs] Ownership of a file shared between guest and host
-
-On Fri, Jul 08, 2022 at 08:18:19PM +0000, Pra.. Dew.. wrote:
-> We have been able to setup virtiofs between guest and host (QEMU 6.2/Linu=
-x 5.15). We run virtiofsd as a non-root user in the host. We did not want t=
-o run it as a root user in order to minimize the attack surface. We run it =
-as a virtiofs user. When we create a file in the shared folder, the permiss=
-ion of the file is virtiofs user and virtiofs group. When we read that file=
- from the guest it shows virtiofs user (only the uid) and nobody group. The=
- goal is to restrict the access of the file to a few services in the guest =
-(not give access to all services). We tried to create a group in the guest =
-and tried to move the file in the new group. However chown gives "bad descr=
-iptor." Is there a better way of doing this? Any input is really appreciate=
-d. Thank you so much!
-
-Hi,
-
-Are you using C version of virtiofsd (from qemu) or rust version of
-virtiofsd found here.
-
-https://nam12.safelinks.protection.outlook.com/?url=3Dhttps%3A%2F%2Fgitlab.=
-com%2Fvirtio-fs%2Fvirtiofsd&amp;data=3D05%7C01%7C%7C66056c4b61b0405d2a7008d=
-a640357c8%7C84df9e7fe9f640afb435aaaaaaaaaaaa%7C1%7C0%7C637932262768755509%7=
-CUnknown%7CTWFpbGZsb3d8eyJWIjoiMC4wLjAwMDAiLCJQIjoiV2luMzIiLCJBTiI6Ik1haWwi=
-LCJXVCI6Mn0%3D%7C3000%7C%7C%7C&amp;sdata=3DVFeOhTiZfwYU5QK4XNjRx%2F3WqfDyiI=
-60v%2FV1x9UJD%2BU%3D&amp;reserved=3D0
-
-I would recommend using rust version of virtiofsd now and as German
-suggested in another email, let unprivileged user launch a user namespace
-and run virtiofsd inside that. That should allow you to do arbitrary
-uid/gid switching inside guest.
-
-Thanks
-Vivek
-
-> _______________________________________________
-> Virtio-fs mailing list
-> Virtio-fs@redhat.com
-> https://nam12.safelinks.protection.outlook.com/?url=3Dhttps%3A%2F%2Flistm=
-an.redhat.com%2Fmailman%2Flistinfo%2Fvirtio-fs&amp;data=3D05%7C01%7C%7C6605=
-6c4b61b0405d2a7008da640357c8%7C84df9e7fe9f640afb435aaaaaaaaaaaa%7C1%7C0%7C6=
-37932262768755509%7CUnknown%7CTWFpbGZsb3d8eyJWIjoiMC4wLjAwMDAiLCJQIjoiV2luM=
-zIiLCJBTiI6Ik1haWwiLCJXVCI6Mn0%3D%7C3000%7C%7C%7C&amp;sdata=3Dq%2FAbKkN3lnM=
-CLaOo8bO6ZCpjxes%2BJcvTnqY7y3JFFa0%3D&amp;reserved=3D0
-
-
---_000_BY5PR14MB3893F904F74C93FF851811D686869BY5PR14MB3893namp_
-Content-Type: text/html; charset="us-ascii"
-Content-Transfer-Encoding: quoted-printable
-
-<html>
-<head>
-<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dus-ascii"=
->
-<style type=3D"text/css" style=3D"display:none;"> P {margin-top:0;margin-bo=
-ttom:0;} </style>
-</head>
-<body dir=3D"ltr">
-<div style=3D"font-family: Calibri, Helvetica, sans-serif; font-size: 12pt;=
- color: rgb(0, 0, 0);" class=3D"elementToProof">
-Thank you&nbsp;so much!!! We are using the Rust version now. I will try out=
- the suggestions below. Thanks for the guidance.</div>
-<div id=3D"appendonsend"></div>
-<hr style=3D"display:inline-block;width:98%" tabindex=3D"-1">
-<div id=3D"divRplyFwdMsg" dir=3D"ltr"><font face=3D"Calibri, sans-serif" st=
-yle=3D"font-size:11pt" color=3D"#000000"><b>From:</b> Vivek Goyal &lt;vgoya=
-l@redhat.com&gt;<br>
-<b>Sent:</b> Tuesday, July 12, 2022 12:37 PM<br>
-<b>To:</b> Pra.. Dew.. &lt;linux_learner@outlook.com&gt;<br>
-<b>Cc:</b> virtio-fs@redhat.com &lt;virtio-fs@redhat.com&gt;<br>
-<b>Subject:</b> Re: [Virtio-fs] Ownership of a file shared between guest an=
-d host</font>
-<div>&nbsp;</div>
-</div>
-<div class=3D"BodyFragment"><font size=3D"2"><span style=3D"font-size:11pt;=
-">
-<div class=3D"PlainText">On Fri, Jul 08, 2022 at 08:18:19PM +0000, Pra.. De=
-w.. wrote:<br>
-&gt; We have been able to setup virtiofs between guest and host (QEMU 6.2/L=
-inux 5.15). We run virtiofsd as a non-root user in the host. We did not wan=
-t to run it as a root user in order to minimize the attack surface. We run =
-it as a virtiofs user. When we create
- a file in the shared folder, the permission of the file is virtiofs user a=
-nd virtiofs group. When we read that file from the guest it shows virtiofs =
-user (only the uid) and nobody group. The goal is to restrict the access of=
- the file to a few services in the
- guest (not give access to all services). We tried to create a group in the=
- guest and tried to move the file in the new group. However chown gives &qu=
-ot;bad descriptor.&quot; Is there a better way of doing this? Any input is =
-really appreciated. Thank you so much!<br>
-<br>
-Hi,<br>
-<br>
-Are you using C version of virtiofsd (from qemu) or rust version of<br>
-virtiofsd found here.<br>
-<br>
-<a href=3D"https://nam12.safelinks.protection.outlook.com/?url=3Dhttps%3A%2=
-F%2Fgitlab.com%2Fvirtio-fs%2Fvirtiofsd&amp;amp;data=3D05%7C01%7C%7C66056c4b=
-61b0405d2a7008da640357c8%7C84df9e7fe9f640afb435aaaaaaaaaaaa%7C1%7C0%7C63793=
-2262768755509%7CUnknown%7CTWFpbGZsb3d8eyJWIjoiMC4wLjAwMDAiLCJQIjoiV2luMzIiL=
-CJBTiI6Ik1haWwiLCJXVCI6Mn0%3D%7C3000%7C%7C%7C&amp;amp;sdata=3DVFeOhTiZfwYU5=
-QK4XNjRx%2F3WqfDyiI60v%2FV1x9UJD%2BU%3D&amp;amp;reserved=3D0">https://nam12=
-.safelinks.protection.outlook.com/?url=3Dhttps%3A%2F%2Fgitlab.com%2Fvirtio-=
-fs%2Fvirtiofsd&amp;amp;data=3D05%7C01%7C%7C66056c4b61b0405d2a7008da640357c8=
-%7C84df9e7fe9f640afb435aaaaaaaaaaaa%7C1%7C0%7C637932262768755509%7CUnknown%=
-7CTWFpbGZsb3d8eyJWIjoiMC4wLjAwMDAiLCJQIjoiV2luMzIiLCJBTiI6Ik1haWwiLCJXVCI6M=
-n0%3D%7C3000%7C%7C%7C&amp;amp;sdata=3DVFeOhTiZfwYU5QK4XNjRx%2F3WqfDyiI60v%2=
-FV1x9UJD%2BU%3D&amp;amp;reserved=3D0</a><br>
-<br>
-I would recommend using rust version of virtiofsd now and as German<br>
-suggested in another email, let unprivileged user launch a user namespace<b=
-r>
-and run virtiofsd inside that. That should allow you to do arbitrary<br>
-uid/gid switching inside guest.<br>
-<br>
-Thanks<br>
-Vivek<br>
-<br>
-&gt; _______________________________________________<br>
-&gt; Virtio-fs mailing list<br>
-&gt; Virtio-fs@redhat.com<br>
-&gt; <a href=3D"https://nam12.safelinks.protection.outlook.com/?url=3Dhttps=
-%3A%2F%2Flistman.redhat.com%2Fmailman%2Flistinfo%2Fvirtio-fs&amp;amp;data=
-=3D05%7C01%7C%7C66056c4b61b0405d2a7008da640357c8%7C84df9e7fe9f640afb435aaaa=
-aaaaaaaa%7C1%7C0%7C637932262768755509%7CUnknown%7CTWFpbGZsb3d8eyJWIjoiMC4wL=
-jAwMDAiLCJQIjoiV2luMzIiLCJBTiI6Ik1haWwiLCJXVCI6Mn0%3D%7C3000%7C%7C%7C&amp;a=
-mp;sdata=3Dq%2FAbKkN3lnMCLaOo8bO6ZCpjxes%2BJcvTnqY7y3JFFa0%3D&amp;amp;reser=
-ved=3D0">
-https://nam12.safelinks.protection.outlook.com/?url=3Dhttps%3A%2F%2Flistman=
-.redhat.com%2Fmailman%2Flistinfo%2Fvirtio-fs&amp;amp;data=3D05%7C01%7C%7C66=
-056c4b61b0405d2a7008da640357c8%7C84df9e7fe9f640afb435aaaaaaaaaaaa%7C1%7C0%7=
-C637932262768755509%7CUnknown%7CTWFpbGZsb3d8eyJWIjoiMC4wLjAwMDAiLCJQIjoiV2l=
-uMzIiLCJBTiI6Ik1haWwiLCJXVCI6Mn0%3D%7C3000%7C%7C%7C&amp;amp;sdata=3Dq%2FAbK=
-kN3lnMCLaOo8bO6ZCpjxes%2BJcvTnqY7y3JFFa0%3D&amp;amp;reserved=3D0</a><br>
-<br>
-</div>
-</span></font></div>
-</body>
-</html>
-
---_000_BY5PR14MB3893F904F74C93FF851811D686869BY5PR14MB3893namp_--
+R2V0IGl0LCB0aGFua3MgZm9yIG91ciBpbmZvcm1hdGlvbi4gVml2ZWsuIA0KDQpUaGFua3MuIA0K
+LSBTaGlybGV5IA0KDQotLS0tLU9yaWdpbmFsIE1lc3NhZ2UtLS0tLQ0KRnJvbTogVml2ZWsgR295
+YWwgPHZnb3lhbEByZWRoYXQuY29tPiANClNlbnQ6IFR1ZXNkYXksIEp1bHkgMTIsIDIwMjIgODoz
+MyBQTQ0KVG86IFpoYW8sIFNoaXJsZXkgPHNoaXJsZXkuemhhb0BpbnRlbC5jb20+DQpDYzogRHIu
+IERhdmlkIEFsYW4gR2lsYmVydCA8ZGdpbGJlcnRAcmVkaGF0LmNvbT47IHZpcnRpby1mc0ByZWRo
+YXQuY29tOyBUaG9tYXMgSHV0aCA8dGh1dGhAcmVkaGF0LmNvbT47IHFlbXUtZGV2ZWxAbm9uZ251
+Lm9yZw0KU3ViamVjdDogUmU6IFtWaXJ0aW8tZnNdIFtRZW11XSBob3cgdG8gdXNlIHZpcmlvZnMg
+aW4gcWVtdSB3aXRob3V0IE5VTUENCg0KT24gVHVlLCBKdWwgMTIsIDIwMjIgYXQgMDc6MDY6NTBB
+TSArMDAwMCwgWmhhbywgU2hpcmxleSB3cm90ZToNCj4gSGksIGFsbCwNCj4gDQo+IEkgaGF2ZSBh
+bm90aGVyIHF1ZXN0aW9uIHdhbnQgdG8gY29uc3VsdCB5b3UuIA0KPiBUbyBlbmFibGUgREFYIGlu
+IHZpcnRpb2ZzLCBhY2NvcmRpbmcgdG8gdGhlIG1lbXUgaHR0cHM6Ly92aXJ0aW8tZnMuZ2l0bGFi
+LmlvL2hvd3RvLXFlbXUuaHRtbC4gDQo+IEkgbmVlZCB0byBhZGQgImNhY2hlLXNpemU9MkciIGFz
+IGJlbG93LiANCj4gLWRldmljZSANCj4gdmhvc3QtdXNlci1mcy1wY2kscXVldWUtc2l6ZT0xMDI0
+LGNoYXJkZXY9Y2hhcjAsdGFnPW15ZnMsY2FjaGUtc2l6ZT0yRw0KPiANCj4gTXkgcWVtdSBjb21t
+YW5kIGlzOiANCj4gc3VkbyBxZW11LXN5c3RlbS14ODZfNjQgLU0gcGMgLWNwdSBob3N0IC0tZW5h
+YmxlLWt2bSAtc21wIDIgLW0gNEcgDQo+IC1kcml2ZSBpZj12aXJ0aW8sZmlsZT11YnVudHUuaW1n
+IC1vYmplY3QgDQo+IG1lbW9yeS1iYWNrZW5kLWZpbGUsaWQ9bWVtLHNpemU9NEcsbWVtLXBhdGg9
+L2Rldi9zaG0sc2hhcmU9b24gLW1hY2hpbmUgDQo+IHEzNSxtZW1vcnktYmFja2VuZD1tZW0gLWNo
+YXJkZXYgc29ja2V0LGlkPWNoYXIwLHBhdGg9L3RtcC92aG9zdHFlbXUgDQo+IC1kZXZpY2UgDQo+
+IHZob3N0LXVzZXItZnMtcGNpLHF1ZXVlLXNpemU9MTAyNCxjaGFyZGV2PWNoYXIwLHRhZz1teWZz
+X3Jvb3QsY2FjaGUtc2kNCj4gemU9MkcgLWNoYXJkZXYgc3RkaW8sbXV4PW9uLGlkPW1vbiAtbW9u
+IGNoYXJkZXY9bW9uLG1vZGU9cmVhZGxpbmUgDQo+IC1kZXZpY2UgdmlydGlvLXNlcmlhbC1wY2kg
+LWRldmljZSB2aXJ0Y29uc29sZSxjaGFyZGV2PW1vbiAtdmdhIG5vbmUgDQo+IC1kaXNwbGF5IG5v
+bmUNCj4gDQo+IEFuZCB2aXJ0aW9mc2QgY29tbWFuZCBpczoNCj4gc3VkbyAuL3ZpcnRpb2ZzZCAt
+LXNvY2tldC1wYXRoPS90bXAvdmhvc3RxZW11IC1vIA0KPiBzb3VyY2U9L2hvbWUvc2hpcmxleS90
+ZXN0ZGlyIC1vIGNhY2hlPWFsd2F5cw0KPiANCj4gQnV0IHRoZXJlIGlzIG5vIG9wdGlvbiBvZiAi
+Y2FjaGUtc2l6ZSIgaW4gcWVtdSA2LjAsIGxpa2UgYmVsb3cuIFNvIGhvdyB0byBlbmFibGUgaXQ/
+IA0KDQpIaSBTaGlybGV5LA0KDQpEQVggc3VwcG9ydCBpbiBxZW11IGlzIG5vdCB1cHN0cmVhbSB5
+ZXQuIFdlIGFyZSBjYXJyeWluZyBEQVggcGF0Y2hlcyBvdXQgb2YgdGhlIHRyZWUgb24gYSBicmFu
+Y2ggaGVyZS4NCg0KaHR0cHM6Ly9naXRsYWIuY29tL3ZpcnRpby1mcy9xZW11Ly0vY29tbWl0cy92
+aXJ0aW8tZnMtZGV2DQoNClRoZXJlIGFyZSBzb21lIGNoYW5nZXMgcmVxdWlyZWQgYW5kIERhdmlk
+IEdpbGJlcnQgaXMgbG9va2luZyBpbnRvIG1ha2luZyB0aGVzZSBjaGFuZ2VzLiBJIGFtIGhvcGlu
+ZyBhdCBzb21lIHBvaW50IG9mIHRpbWUgdGhlc2UgcGF0Y2hlcyB3aWxsIG1ha2UgaW50byB1cHN0
+cmVhbS4NCg0KU28gZm9yIHRoZSB0aW1lIGJlaW5nLCB0byB0ZXN0IERBWCwgeW91IHdpbGwgaGF2
+ZSB0byBmZXRjaCBhYm92ZSBicmFuY2gsIGJ1aWxkIGl0IGFuZCB1c2UgdGhhdCBxZW11Lg0KDQpU
+aGFua3MNClZpdmVrDQoNCj4gcWVtdS02LjAuMCQgcWVtdS1zeXN0ZW0teDg2XzY0IC1kZXZpY2Ug
+dmhvc3QtdXNlci1mcy1wY2ksaGVscCANCj4gdmhvc3QtdXNlci1mcy1wY2kgb3B0aW9uczoNCj4g
+ICBhY3BpLWluZGV4PTx1aW50MzI+ICAgIC0gIChkZWZhdWx0OiAwKQ0KPiAgIGFkZHI9PGludDMy
+PiAgICAgICAgICAgLSBTbG90IGFuZCBvcHRpb25hbCBmdW5jdGlvbiBudW1iZXIsIGV4YW1wbGU6
+IDA2LjAgb3IgMDYgKGRlZmF1bHQ6IC0xKQ0KPiAgIGFlcj08Ym9vbD4gICAgICAgICAgICAgLSBv
+bi9vZmYgKGRlZmF1bHQ6IGZhbHNlKQ0KPiAgIGFueV9sYXlvdXQ9PGJvb2w+ICAgICAgLSBvbi9v
+ZmYgKGRlZmF1bHQ6IHRydWUpDQo+ICAgYXRzPTxib29sPiAgICAgICAgICAgICAtIG9uL29mZiAo
+ZGVmYXVsdDogZmFsc2UpDQo+ICAgYm9vdGluZGV4PTxpbnQzMj4NCj4gICBjaGFyZGV2PTxzdHI+
+ICAgICAgICAgIC0gSUQgb2YgYSBjaGFyZGV2IHRvIHVzZSBhcyBhIGJhY2tlbmQNCj4gICBldmVu
+dF9pZHg9PGJvb2w+ICAgICAgIC0gb24vb2ZmIChkZWZhdWx0OiB0cnVlKQ0KPiAgIGZhaWxvdmVy
+X3BhaXJfaWQ9PHN0cj4NCj4gICBpbmRpcmVjdF9kZXNjPTxib29sPiAgIC0gb24vb2ZmIChkZWZh
+dWx0OiB0cnVlKQ0KPiAgIGlvbW11X3BsYXRmb3JtPTxib29sPiAgLSBvbi9vZmYgKGRlZmF1bHQ6
+IGZhbHNlKQ0KPiAgIG1pZ3JhdGUtZXh0cmE9PGJvb2w+ICAgLSBvbi9vZmYgKGRlZmF1bHQ6IHRy
+dWUpDQo+ICAgbW9kZXJuLXBpby1ub3RpZnk9PGJvb2w+IC0gb24vb2ZmIChkZWZhdWx0OiBmYWxz
+ZSkNCj4gICBtdWx0aWZ1bmN0aW9uPTxib29sPiAgIC0gb24vb2ZmIChkZWZhdWx0OiBmYWxzZSkN
+Cj4gICBub3RpZnlfb25fZW1wdHk9PGJvb2w+IC0gb24vb2ZmIChkZWZhdWx0OiB0cnVlKQ0KPiAg
+IG51bS1yZXF1ZXN0LXF1ZXVlcz08dWludDE2PiAtICAoZGVmYXVsdDogMSkNCj4gICBwYWNrZWQ9
+PGJvb2w+ICAgICAgICAgIC0gb24vb2ZmIChkZWZhdWx0OiBmYWxzZSkNCj4gICBwYWdlLXBlci12
+cT08Ym9vbD4gICAgIC0gb24vb2ZmIChkZWZhdWx0OiBmYWxzZSkNCj4gICBxdWV1ZS1zaXplPTx1
+aW50MTY+ICAgIC0gIChkZWZhdWx0OiAxMjgpDQo+ICAgcm9tYmFyPTx1aW50MzI+ICAgICAgICAt
+ICAoZGVmYXVsdDogMSkNCj4gICByb21maWxlPTxzdHI+DQo+ICAgcm9tc2l6ZT08dWludDMyPiAg
+ICAgICAtICAoZGVmYXVsdDogNDI5NDk2NzI5NSkNCj4gICB0YWc9PHN0cj4NCj4gICB1c2UtZGlz
+YWJsZWQtZmxhZz08Ym9vbD4gLSAgKGRlZmF1bHQ6IHRydWUpDQo+ICAgdXNlLXN0YXJ0ZWQ9PGJv
+b2w+ICAgICAtICAoZGVmYXVsdDogdHJ1ZSkNCj4gICB2ZWN0b3JzPTx1aW50MzI+ICAgICAgIC0g
+IChkZWZhdWx0OiA0Mjk0OTY3Mjk1KQ0KPiAgIHZpcnRpby1iYWNrZW5kPTxjaGlsZDx2aG9zdC11
+c2VyLWZzLWRldmljZT4+DQo+ICAgdmlydGlvLXBjaS1idXMtbWFzdGVyLWJ1Zy1taWdyYXRpb249
+PGJvb2w+IC0gb24vb2ZmIChkZWZhdWx0OiBmYWxzZSkNCj4gICB4LWF0cy1wYWdlLWFsaWduZWQ9
+PGJvb2w+IC0gb24vb2ZmIChkZWZhdWx0OiB0cnVlKQ0KPiAgIHgtZGlzYWJsZS1sZWdhY3ktY2hl
+Y2s9PGJvb2w+IC0gIChkZWZhdWx0OiBmYWxzZSkNCj4gICB4LWRpc2FibGUtcGNpZT08Ym9vbD4g
+IC0gb24vb2ZmIChkZWZhdWx0OiBmYWxzZSkNCj4gICB4LWlnbm9yZS1iYWNrZW5kLWZlYXR1cmVz
+PTxib29sPiAtICAoZGVmYXVsdDogZmFsc2UpDQo+ICAgeC1wY2llLWRldmVyci1pbml0PTxib29s
+PiAtIG9uL29mZiAoZGVmYXVsdDogdHJ1ZSkNCj4gICB4LXBjaWUtZXh0Y2FwLWluaXQ9PGJvb2w+
+IC0gb24vb2ZmIChkZWZhdWx0OiB0cnVlKQ0KPiAgIHgtcGNpZS1mbHItaW5pdD08Ym9vbD4gLSBv
+bi9vZmYgKGRlZmF1bHQ6IHRydWUpDQo+ICAgeC1wY2llLWxua2N0bC1pbml0PTxib29sPiAtIG9u
+L29mZiAoZGVmYXVsdDogdHJ1ZSkNCj4gICB4LXBjaWUtbG5rc3RhLWRsbGxhPTxib29sPiAtIG9u
+L29mZiAoZGVmYXVsdDogdHJ1ZSkNCj4gICB4LXBjaWUtcG0taW5pdD08Ym9vbD4gIC0gb24vb2Zm
+IChkZWZhdWx0OiB0cnVlKQ0KPiANCj4gDQo+IC0tLS0tT3JpZ2luYWwgTWVzc2FnZS0tLS0tDQo+
+IEZyb206IFpoYW8sIFNoaXJsZXkNCj4gU2VudDogRnJpZGF5LCBKdWx5IDgsIDIwMjIgODo0MCBB
+TQ0KPiBUbzogRHIuIERhdmlkIEFsYW4gR2lsYmVydCA8ZGdpbGJlcnRAcmVkaGF0LmNvbT4NCj4g
+Q2M6IFRob21hcyBIdXRoIDx0aHV0aEByZWRoYXQuY29tPjsgcWVtdS1kZXZlbEBub25nbnUub3Jn
+OyANCj4gdmlydGlvLWZzQHJlZGhhdC5jb207IFN0ZWZhbiBIYWpub2N6aSA8c3RlZmFuaGFAcmVk
+aGF0LmNvbT4NCj4gU3ViamVjdDogUkU6IFtRZW11XSBob3cgdG8gdXNlIHZpcmlvZnMgaW4gcWVt
+dSB3aXRob3V0IE5VTUENCj4gDQo+IFllcywgdGhlIHFlbXUgdmVyc2lvbiBpcyB0b28gb2xkLiAN
+Cj4gTXkgcHJldmlvdXMgcWVtdSB2ZXJzaW9uIGlzIDQuMiwgYW5kIEkgdXBncmFkZWQgaXQgaW50
+byA2LjAsIGFuZCBpdCB3b3JrZWQgbm93LiANCj4gVGhhbmtzIGEgbG90LiANCj4gDQo+IC0gU2hp
+cmxleQ0KPiANCj4gLS0tLS1PcmlnaW5hbCBNZXNzYWdlLS0tLS0NCj4gRnJvbTogRHIuIERhdmlk
+IEFsYW4gR2lsYmVydCA8ZGdpbGJlcnRAcmVkaGF0LmNvbT4NCj4gU2VudDogVHVlc2RheSwgSnVs
+eSA1LCAyMDIyIDU6MzcgUE0NCj4gVG86IFpoYW8sIFNoaXJsZXkgPHNoaXJsZXkuemhhb0BpbnRl
+bC5jb20+DQo+IENjOiBUaG9tYXMgSHV0aCA8dGh1dGhAcmVkaGF0LmNvbT47IHFlbXUtZGV2ZWxA
+bm9uZ251Lm9yZzsgDQo+IHZpcnRpby1mc0ByZWRoYXQuY29tOyBTdGVmYW4gSGFqbm9jemkgPHN0
+ZWZhbmhhQHJlZGhhdC5jb20+DQo+IFN1YmplY3Q6IFJlOiBbUWVtdV0gaG93IHRvIHVzZSB2aXJp
+b2ZzIGluIHFlbXUgd2l0aG91dCBOVU1BDQo+IA0KPiAqIFpoYW8sIFNoaXJsZXkgKHNoaXJsZXku
+emhhb0BpbnRlbC5jb20pIHdyb3RlOg0KPiA+IFRoYW5rcyBmb3IgdGhlIGluZm9ybWF0aW9uLiAN
+Cj4gPiBZZXMsIEkgYWxzbyBmb3VuZCB0aGUgbWVtb3J5IGJhY2tlbmQgb3B0aW9ucyBvbiBzMzkw
+eCwgYW5kIGFsc28gY29weSB0aGUgY29tbWFuZCB0byB4ODYsIGJ1dCBmYWlsZWQuIA0KPiA+IA0K
+PiA+IFRoZSBmb2xsb3dpbmcgaXMgdGhlIGNvbW1hbmQgdXNlZCB0byBzdGFydCBxZW11ICsgdmly
+dGlvZnMgKyB1YnVudHUgMjAuMDQuIA0KPiA+IE9uZSBpcyB3b3JrZWQgd2VsbCB1c2luZyBOVU1B
+LCBhbm90aGVyIG9uZSBpcyBmYWlsZWQgd2l0aG91dCBOVU1BLiANCj4gPiBJcyB0aGVyZSBhbnl0
+aGluZyB3cm9uZz8gDQo+ID4gDQo+ID4gVGhlIHdvcmtlZCBvbmUgd2l0aCBOVU1BIG9wdGlvbnM6
+IA0KPiA+IA0KPiA+IHFlbXUtc3lzdGVtLXg4Nl82NCAtTSBwYyAtY3B1IGhvc3QgLS1lbmFibGUt
+a3ZtIC1zbXAgMiAtbSA0RyAtb2JqZWN0IA0KPiA+IG1lbW9yeS1iYWNrZW5kLWZpbGUsaWQ9bWVt
+LHNpemU9NEcsbWVtLXBhdGg9L2Rldi9zaG0sc2hhcmU9b24gLW51bWEgDQo+ID4gbm9kZSxtZW1k
+ZXY9bWVtIC1jaGFyZGV2IHNvY2tldCxpZD1jaGFyMCxwYXRoPS90bXAvdmZzZC5zb2NrIC1kZXZp
+Y2UgDQo+ID4gdmhvc3QtdXNlci1mcy1wY2kscXVldWUtc2l6ZT0xMDI0LGNoYXJkZXY9Y2hhcjAs
+dGFnPW15ZnMgLWNoYXJkZXYgDQo+ID4gc3RkaW8sbXV4PW9uLGlkPW1vbiAtbW9uIGNoYXJkZXY9
+bW9uLG1vZGU9cmVhZGxpbmUgLWRldmljZSANCj4gPiB2aXJ0aW8tc2VyaWFsLXBjaSAtZGV2aWNl
+IHZpcnRjb25zb2xlLGNoYXJkZXY9bW9uIC12Z2Egbm9uZSAtZGlzcGxheSANCj4gPiBub25lIC1k
+cml2ZSBpZj12aXJ0aW8sZmlsZT11YnVudHUuaW1nDQo+ID4gDQo+ID4gVGhlIGZhaWxlZCBvbmUg
+d2l0aG91dCBOVU1BIG9wdGlvbnM6IA0KPiA+IA0KPiA+IHFlbXUtc3lzdGVtLXg4Nl82NCAtTSBw
+YyAtY3B1IGhvc3QgLS1lbmFibGUta3ZtIC1zbXAgMiAtbSA0RyAtb2JqZWN0IA0KPiA+IG1lbW9y
+eS1iYWNrZW5kLWZpbGUsaWQ9bWVtLHNpemU9NEcsbWVtLXBhdGg9L2Rldi9zaG0sc2hhcmU9b24g
+DQo+ID4gLW1hY2hpbmUgcTM1LG1lbW9yeS1iYWNrZW5kPW1lbSAtY2hhcmRldiANCj4gPiBzb2Nr
+ZXQsaWQ9Y2hhcjAscGF0aD0vdG1wL3Zmc2Quc29jaw0KPiA+IC1kZXZpY2Ugdmhvc3QtdXNlci1m
+cy1wY2kscXVldWUtc2l6ZT0xMDI0LGNoYXJkZXY9Y2hhcjAsdGFnPW15ZnMNCj4gPiAtY2hhcmRl
+diBzdGRpbyxtdXg9b24saWQ9bW9uIC1tb24gY2hhcmRldj1tb24sbW9kZT1yZWFkbGluZSAtZGV2
+aWNlIA0KPiA+IHZpcnRpby1zZXJpYWwtcGNpIC1kZXZpY2UgdmlydGNvbnNvbGUsY2hhcmRldj1t
+b24gLXZnYSBub25lIC1kaXNwbGF5IA0KPiA+IG5vbmUgLWRyaXZlIGlmPXZpcnRpbyxmaWxlPXVi
+dW50dS5pbWcNCj4gDQo+IFdoYXQgZXJyb3IgZGlkIGl0IGdpdmU/DQo+IA0KPiAyMC4wNCBpcyBx
+dWl0ZSBvbGQsIHdoYXQgcWVtdSB2ZXJzaW9uIGlzIGl0Pw0KPiANCj4gSSdkIGhhdmUgdG8gY2hl
+Y2sgd2hlbiB0aGUgbWVtZGV2PSB3ZW50IGluLg0KPiANCj4gRGF2ZQ0KPiANCj4gPiANCj4gPiBU
+aGFua3MuIA0KPiA+IC0gU2hpcmxleQ0KPiA+IA0KPiA+IC0tLS0tT3JpZ2luYWwgTWVzc2FnZS0t
+LS0tDQo+ID4gRnJvbTogRHIuIERhdmlkIEFsYW4gR2lsYmVydCA8ZGdpbGJlcnRAcmVkaGF0LmNv
+bT4NCj4gPiBTZW50OiBUdWVzZGF5LCBKdWx5IDUsIDIwMjIgNDowNCBQTQ0KPiA+IFRvOiBUaG9t
+YXMgSHV0aCA8dGh1dGhAcmVkaGF0LmNvbT4NCj4gPiBDYzogWmhhbywgU2hpcmxleSA8c2hpcmxl
+eS56aGFvQGludGVsLmNvbT47IHFlbXUtZGV2ZWxAbm9uZ251Lm9yZzsgDQo+ID4gdmlydGlvLWZz
+QHJlZGhhdC5jb207IFN0ZWZhbiBIYWpub2N6aSA8c3RlZmFuaGFAcmVkaGF0LmNvbT4NCj4gPiBT
+dWJqZWN0OiBSZTogW1FlbXVdIGhvdyB0byB1c2UgdmlyaW9mcyBpbiBxZW11IHdpdGhvdXQgTlVN
+QQ0KPiA+IA0KPiA+ICogVGhvbWFzIEh1dGggKHRodXRoQHJlZGhhdC5jb20pIHdyb3RlOg0KPiA+
+ID4gT24gMDUvMDcvMjAyMiAwMy4wMiwgWmhhbywgU2hpcmxleSB3cm90ZToNCj4gPiA+ID4gSGks
+IGFsbCwNCj4gPiA+ID4gDQo+ID4gPiA+IEkgd2FudCB0byB1c2UgdmlydGlvZnMgdG8gc2hhcmUg
+Zm9sZGVyIGJldHdlZW4gaG9zdCBhbmQgZ3Vlc3QuDQo+ID4gPiA+IA0KPiA+ID4gPiAgRnJvbSB0
+aGUgZ3VpZGUsIGl0IG11c3Qgc2V0IHRoZSBOVU1BIG5vZGUuDQo+ID4gPiA+IGh0dHBzOi8vdmly
+dGlvLWZzLmdpdGxhYi5pby9ob3d0by1xZW11Lmh0bWwNCj4gPiA+ID4gDQo+ID4gPiA+IEJ1dCBt
+eSBndWVzdCBkb2VzbuKAmXQgc3VwcG9ydCBOVU1BLg0KPiA+ID4gPiANCj4gPiA+ID4gSXMgdGhl
+cmUgYW55IGd1aWRlIHRvIHVzZSBxZW11ICsgdmlydGlvZnMgd2l0aG91dCBOVU1BPw0KPiA+ID4g
+PiANCj4gPiA+ID4gT3IgZG9lcyBxZW11IGhhdmUgYW55IHBsYW4gdG8gc3VwcG9ydCBpdD8NCj4g
+PiA+IA0KPiA+ID4gIEhpIQ0KPiA+ID4gDQo+ID4gPiBBdCBsZWFzdCBvbiBzMzkweCwgeW91IGNh
+biBhbHNvIHNwZWNpZnkgdGhlIG1lbW9yeSBiYWNrZW5kIHZpYSB0aGUgDQo+ID4gPiAtbWFjaGlu
+ZSBvcHRpb24gaW5zdGVhZCBvZiB1c2luZyB0aGUgLW51bWEgb3B0aW9uLCBlLmcuOg0KPiA+ID4g
+DQo+ID4gPiAgcWVtdS1zeXN0ZW0tczM5MHggLW1hY2hpbmUgbWVtb3J5LWJhY2tlbmQ9bWVtIFwN
+Cj4gPiA+ICAgLW9iamVjdCBtZW1vcnktYmFja2VuZC1maWxlLGlkPW1lbSwuLi4NCj4gPiA+IA0K
+PiA+ID4gTm90IHN1cmUgd2hldGhlciB0aGF0IHdvcmtzIG9uIG90aGVyIGFyY2hpdGVjdHVyZXMs
+IHRvbywgdGhvdWdoLiANCj4gPiA+IFN0ZWZhbiwgRGF2aWQsIGRvIHlvdSBrbm93Pw0KPiA+IA0K
+PiA+IFJpZ2h0LCB0aGF0J3MgdGhlIHdheSBJIGRvIGl0IG9uIHg4Ni4NCj4gPiBXZSB3cm90ZSB2
+aXJ0aW9mcyBiZWZvcmUgdGhlIG1lbW9yeS1iYWNrZW5kIG9wdGlvbiBleGlzdGVkLCB3aGljaCBp
+cyB3aHkgdGhlIG9sZCBkb2NzIHRhbGsgYWJvdXQgdXNpbmcgdGhlIE5VTUEgc3R1ZmYuDQo+ID4g
+DQo+ID4gRGF2ZQ0KPiA+IA0KPiA+ID4gIFRob21hcw0KPiA+ID4gDQo+ID4gLS0NCj4gPiBEci4g
+RGF2aWQgQWxhbiBHaWxiZXJ0IC8gZGdpbGJlcnRAcmVkaGF0LmNvbSAvIE1hbmNoZXN0ZXIsIFVL
+DQo+ID4gDQo+IC0tDQo+IERyLiBEYXZpZCBBbGFuIEdpbGJlcnQgLyBkZ2lsYmVydEByZWRoYXQu
+Y29tIC8gTWFuY2hlc3RlciwgVUsNCj4gDQo+IF9fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fDQo+IFZpcnRpby1mcyBtYWlsaW5nIGxpc3QNCj4gVmlydGlvLWZz
+QHJlZGhhdC5jb20NCj4gaHR0cHM6Ly9saXN0bWFuLnJlZGhhdC5jb20vbWFpbG1hbi9saXN0aW5m
+by92aXJ0aW8tZnMNCg0K
 

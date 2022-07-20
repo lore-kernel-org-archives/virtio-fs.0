@@ -1,12 +1,11 @@
-Return-Path: <liuyd.fnst@fujitsu.com>
-From: Liu Yiding <liuyd.fnst@fujitsu.com>
-Date: Thu, 21 Apr 2022 17:51:51 +0800
-Message-ID: <20220421095151.2231099-1-liuyd.fnst@fujitsu.com>
+Return-Path: <lulu@redhat.com>
+From: Cindy Lu <lulu@redhat.com>
+Date: Wed, 20 Jul 2022 21:11:55 +0800
+Message-Id: <20220720131204.591104-2-lulu@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Content-Type: text/plain
-Subject: [Virtio-fs] [PATCH] virtiofsd: Add docs/helper for
- killpriv_v2/no_killpriv_v2 option
+Subject: [Virtio-fs] [PATCH v13 01/10] virtio: introduce macro
+ VIRTIO_CONFIG_IRQ_IDX
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,50 +14,204 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Vivek Goyal <vgoyal@redhat.com>
-Cc: qemu-devel@nongnu.org, virtio-fs@redhat.com, Liu Yiding <liuyd.fnst@fujitsu.com>
+To: lulu@redhat.com, qemu-devel@nongnu.org
+Cc: Jason Wang <jasowang@redhat.com>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Gerd Hoffmann <kraxel@redhat.com>, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>
 
-virtiofsd has introduced killpriv_v2/no_killpriv_v2 for a while. Add
-description of it to docs/helper.
+To support configure interrupt for vhost-vdpa
+Introduce VIRTIO_CONFIG_IRQ_IDX -1 as configure interrupt's queue index,
+Then we can reuse the functions guest_notifier_mask and guest_notifier_pending.
+Add the check of queue index in these drivers, if the driver does not support
+configure interrupt, the function will just return
 
-Signed-off-by: Liu Yiding <liuyd.fnst@fujitsu.com>
+Signed-off-by: Cindy Lu <lulu@redhat.com>
 ---
- docs/tools/virtiofsd.rst | 5 +++++
- tools/virtiofsd/helper.c | 3 +++
- 2 files changed, 8 insertions(+)
+ hw/display/vhost-user-gpu.c    | 13 +++++++++++++
+ hw/net/virtio-net.c            | 20 ++++++++++++++++++--
+ hw/virtio/vhost-user-fs.c      | 14 ++++++++++++++
+ hw/virtio/vhost-vsock-common.c | 14 ++++++++++++++
+ hw/virtio/virtio-crypto.c      | 14 ++++++++++++++
+ include/hw/virtio/virtio.h     |  3 +++
+ 6 files changed, 76 insertions(+), 2 deletions(-)
 
-diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-index 0c0560203c..85398cce09 100644
---- a/docs/tools/virtiofsd.rst
-+++ b/docs/tools/virtiofsd.rst
-@@ -111,6 +111,11 @@ Options
-     label. Server will try to set that label on newly created file
-     atomically wherever possible.
+diff --git a/hw/display/vhost-user-gpu.c b/hw/display/vhost-user-gpu.c
+index 09818231bd..e956f8c7a3 100644
+--- a/hw/display/vhost-user-gpu.c
++++ b/hw/display/vhost-user-gpu.c
+@@ -485,6 +485,12 @@ vhost_user_gpu_guest_notifier_pending(VirtIODevice *vdev, int idx)
+ {
+     VhostUserGPU *g = VHOST_USER_GPU(vdev);
  
-+  * killpriv_v2|no_killpriv_v2 -
-+    Enable/disable ``FUSE_HANDLE_KILLPRIV_V2`` support. KILLPRIV_V2 is enabled
-+    by default as long as client supports it.  Enabling this option helps with
-+    performance in write path.
-+
- .. option:: --socket-path=PATH
- 
-   Listen on vhost-user UNIX domain socket at PATH.
-diff --git a/tools/virtiofsd/helper.c b/tools/virtiofsd/helper.c
-index e226fc590f..f8981e5bdf 100644
---- a/tools/virtiofsd/helper.c
-+++ b/tools/virtiofsd/helper.c
-@@ -188,6 +188,9 @@ void fuse_cmdline_help(void)
-            "    -o announce_submounts      Announce sub-mount points to the guest\n"
-            "    -o posix_acl/no_posix_acl  Enable/Disable posix_acl. (default: disabled)\n"
-            "    -o security_label/no_security_label  Enable/Disable security label. (default: disabled)\n"
-+           "    -o killpriv_v2/no_killpriv_v2\n"
-+           "                               Enable/Disable FUSE_HANDLE_KILLPRIV_V2.\n"
-+           "                               (default: enabled as long as client supports it)\n"
-            );
++    /* Add the check for configure interrupt, we use VIRTIO_CONFIG_IRQ_IDX -1
++     * as the Marco of configure interrupt, If this driver does not
++     * support, the function will just return false */
++    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
++        return false;
++    }
+     return vhost_virtqueue_pending(&g->vhost->dev, idx);
  }
  
+@@ -493,6 +499,13 @@ vhost_user_gpu_guest_notifier_mask(VirtIODevice *vdev, int idx, bool mask)
+ {
+     VhostUserGPU *g = VHOST_USER_GPU(vdev);
+ 
++    /* Add the check for configure interrupt,Here use VIRTIO_CONFIG_IRQ_IDX -1
++     * as the Marco of configure interrupt, If this driver does not
++     * support, the function will return */
++
++    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
++        return;
++    }
+     vhost_virtqueue_mask(&g->vhost->dev, vdev, idx, mask);
+ }
+ 
+diff --git a/hw/net/virtio-net.c b/hw/net/virtio-net.c
+index 1067e72b39..a566936e5c 100644
+--- a/hw/net/virtio-net.c
++++ b/hw/net/virtio-net.c
+@@ -3172,6 +3172,14 @@ static bool virtio_net_guest_notifier_pending(VirtIODevice *vdev, int idx)
+     VirtIONet *n = VIRTIO_NET(vdev);
+     NetClientState *nc = qemu_get_subqueue(n->nic, vq2q(idx));
+     assert(n->vhost_started);
++
++    /* Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
++     * as the Marco of configure interrupt's IDX, If this driver does not
++     * support, the function will return false */
++
++    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
++        return false;
++    }
+     return vhost_net_virtqueue_pending(get_vhost_net(nc->peer), idx);
+ }
+ 
+@@ -3181,8 +3189,16 @@ static void virtio_net_guest_notifier_mask(VirtIODevice *vdev, int idx,
+     VirtIONet *n = VIRTIO_NET(vdev);
+     NetClientState *nc = qemu_get_subqueue(n->nic, vq2q(idx));
+     assert(n->vhost_started);
+-    vhost_net_virtqueue_mask(get_vhost_net(nc->peer),
+-                             vdev, idx, mask);
++
++    /* Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
++     * as the Marco of configure interrupt's IDX, If this driver does not
++     * support, the function will return */
++
++    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
++        return;
++    }
++
++    vhost_net_virtqueue_mask(get_vhost_net(nc->peer), vdev, idx, mask);
+ }
+ 
+ static void virtio_net_set_config_size(VirtIONet *n, uint64_t host_features)
+diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+index c595957983..f2e52b6446 100644
+--- a/hw/virtio/vhost-user-fs.c
++++ b/hw/virtio/vhost-user-fs.c
+@@ -161,6 +161,13 @@ static void vuf_guest_notifier_mask(VirtIODevice *vdev, int idx,
+ {
+     VHostUserFS *fs = VHOST_USER_FS(vdev);
+ 
++    /* Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
++     * as the Marco of configure interrupt's IDX, If this driver does not
++     * support, the function will return */
++
++    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
++        return;
++    }
+     vhost_virtqueue_mask(&fs->vhost_dev, vdev, idx, mask);
+ }
+ 
+@@ -168,6 +175,13 @@ static bool vuf_guest_notifier_pending(VirtIODevice *vdev, int idx)
+ {
+     VHostUserFS *fs = VHOST_USER_FS(vdev);
+ 
++    /* Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
++     * as the Marco of configure interrupt's IDX, If this driver does not
++     * support, the function will return */
++
++    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
++        return false;
++    }
+     return vhost_virtqueue_pending(&fs->vhost_dev, idx);
+ }
+ 
+diff --git a/hw/virtio/vhost-vsock-common.c b/hw/virtio/vhost-vsock-common.c
+index ed706681ac..1ceeaaf762 100644
+--- a/hw/virtio/vhost-vsock-common.c
++++ b/hw/virtio/vhost-vsock-common.c
+@@ -125,6 +125,13 @@ static void vhost_vsock_common_guest_notifier_mask(VirtIODevice *vdev, int idx,
+ {
+     VHostVSockCommon *vvc = VHOST_VSOCK_COMMON(vdev);
+ 
++    /* Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
++     * as the Marco of configure interrupt's IDX, If this driver does not
++     * support, the function will return */
++
++    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
++        return;
++    }
+     vhost_virtqueue_mask(&vvc->vhost_dev, vdev, idx, mask);
+ }
+ 
+@@ -133,6 +140,13 @@ static bool vhost_vsock_common_guest_notifier_pending(VirtIODevice *vdev,
+ {
+     VHostVSockCommon *vvc = VHOST_VSOCK_COMMON(vdev);
+ 
++    /* Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
++     * as the Marco of configure interrupt's IDX, If this driver does not
++     * support, the function will return */
++
++    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
++        return false;
++    }
+     return vhost_virtqueue_pending(&vvc->vhost_dev, idx);
+ }
+ 
+diff --git a/hw/virtio/virtio-crypto.c b/hw/virtio/virtio-crypto.c
+index dcd80b904d..ec6e4a0a94 100644
+--- a/hw/virtio/virtio-crypto.c
++++ b/hw/virtio/virtio-crypto.c
+@@ -948,6 +948,13 @@ static void virtio_crypto_guest_notifier_mask(VirtIODevice *vdev, int idx,
+ 
+     assert(vcrypto->vhost_started);
+ 
++    /* Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
++     * as the Marco of configure interrupt's IDX, If this driver does not
++     * support, the function will return */
++
++    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
++        return;
++    }
+     cryptodev_vhost_virtqueue_mask(vdev, queue, idx, mask);
+ }
+ 
+@@ -958,6 +965,13 @@ static bool virtio_crypto_guest_notifier_pending(VirtIODevice *vdev, int idx)
+ 
+     assert(vcrypto->vhost_started);
+ 
++    /* Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
++     * as the Marco of configure interrupt's IDX, If this driver does not
++     * support, the function will return */
++
++    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
++        return false;
++    }
+     return cryptodev_vhost_virtqueue_pending(vdev, queue, idx);
+ }
+ 
+diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
+index b31c4507f5..4512205503 100644
+--- a/include/hw/virtio/virtio.h
++++ b/include/hw/virtio/virtio.h
+@@ -67,6 +67,9 @@ typedef struct VirtQueueElement
+ 
+ #define VIRTIO_NO_VECTOR 0xffff
+ 
++/* special index value used internally for config irqs */
++#define VIRTIO_CONFIG_IRQ_IDX -1
++
+ #define TYPE_VIRTIO_DEVICE "virtio-device"
+ OBJECT_DECLARE_TYPE(VirtIODevice, VirtioDeviceClass, VIRTIO_DEVICE)
+ 
 -- 
-2.31.1
-
-
+2.34.3
 

@@ -1,13 +1,30 @@
-Return-Path: <lulu@redhat.com>
-MIME-Version: 1.0
-References: <20220720131204.591104-1-lulu@redhat.com>
-In-Reply-To: <20220720131204.591104-1-lulu@redhat.com>
-From: Cindy Lu <lulu@redhat.com>
-Date: Fri, 22 Jul 2022 15:46:52 +0800
-Message-ID: <CACLfguXo3=h0PsHh+oehVcTjRNSqwOCiG9-VM_o7HjUdZBtxcA@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH v13 00/10] vhost-vdpa: add support for
- configure interrupt
+Return-Path: <virtiofs-bot@sinrega.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+ cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+ :to; s=fm3; t=1658482773; x=1658569173; bh=gU09Li5iTqbaVmkiBRSYi
+ u1qAkG+n2ThJB9shtOjucs=; b=k6UaDZcCHsG0aZiE+CuqTLpDozHWYUzCSbKwE
+ sjw8Rl70vc5GkL4G6uNZzQAFfuwZD5SALNW4+MC0tIJoKCSnlv3HCiE5BAkUwi5+
+ ZOZHTFe5YUnZ+VAi/ctK3iK/VpziVW7G3PXOZVhWkxQFQd23HQK8cNsYt68AfWSM
+ PeYHygXBuogDwT9DS+w/GOigoV6QHzBqsaVNRbFutjknE3w/N0YoOkdMUlBo1IXA
+ 4eIw1Nu/it71RlAJNzPBANeca1pApogy//pw1BYsyHvMujfmUcV83nHTNMjr54Ig
+ FKk2icsZrh1dDiyZSBHdZ3fKu7+7vEQitaIj813HWTbqJScTg==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+ messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
+ :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
+ :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm3; t=
+ 1658482773; x=1658569173; bh=gU09Li5iTqbaVmkiBRSYiu1qAkG+n2ThJB9
+ shtOjucs=; b=2MYEZcoMdMOL7AXlDlQQQV1MZ2skBBvZqCvpMtbzSSJqDQ9DeXe
+ s8Jrjw9OOw3ZgnrLrGDmCTVIdmkIXCi93YVXWOIvRluLuNtFRmS6AsY/3UgAzFQ/
+ 2/0orvhXlhXfqNqp/9rzeNGJxgCKYP25qzHp6htVQWrt4eWHIHLqLxjXqZgzUP+P
+ 2jxjn2PEc6k3ivoVNILPk3iFNuQKvb6Z8T4BlosOkqRwmC50aA1daTl2tzq6vISy
+ 3lMVZByhna7X1Irq9BXKC/2rDWvyOsfSOezlZ4vtxmbS0VNDHeYbWbqDLrwSdZa6
+ 4fvfAPtfdnmfCBMDsGE//KG8JBajtxKEZ4Q==
+From: virtiofs-bot@sinrega.org
+Message-Id: <66295.122072205393300673@us-mta-225.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"; x-default=true
+Date: Fri, 22 Jul 2022 09:39:35 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR merged: sandbox: Move parent process
+ code inside sandbox
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,106 +33,13 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Cindy Lu <lulu@redhat.com>, QEMU Developers <qemu-devel@nongnu.org>
-Cc: Jason Wang <jasowang@redhat.com>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Gerd Hoffmann <kraxel@redhat.com>, =?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>
+To: virtio-fs@redhat.com
 
-Hi Micheal.
-Would you help review these patches, not sure if this is ok to merge?
-Thanks
-Cindy
-
-On Wed, Jul 20, 2022 at 9:12 PM Cindy Lu <lulu@redhat.com> wrote:
->
-> Add support for virtio-mmio bus
-> active the notifier while the backend support configure interrupt
-> misc fixes from v1
->
-> Change in v3
-> fix the coding style problems
->
-> Change in v4
-> misc fixes from v3
-> merge the set_config_notifier to set_guest_notifier
-> when vdpa start, check the feature by VIRTIO_NET_F_STATUS
->
-> Change in v5
-> misc fixes from v4
-> split the code to introduce configure interrupt type and the callback function
-> will init the configure interrupt in all virtio-pci and virtio-mmio bus, but will
-> only active while using vhost-vdpa driver
->
-> Change in v6
-> misc fixes from v5
-> decouple vq from interrupt setting and misc process
-> fix the bug in virtio_net_handle_rx
->
-> Change in v7
-> misc fixes from v6
-> decouple vq from interrupt setting and misc process
-> decouple vq from vector use/release process
-> decouple vq from set notifier fd handler process
-> move config_notifier and masked_config_notifier to VirtIODevice
-> fix the bug in virtio_net_handle_rx, add more information
-> add VIRTIO_CONFIG_IRQ_IDX as the queue number for configure interrupt
->
-> Change in v8
-> misc fixes from v7
-> decouple vq from interrupt setting and misc process
-> decouple vq from vector use/release process
-> decouple vq from set notifier fd handler process
-> move the vhost configure interrupt to vhost_net
->
-> Change in v9
-> misc fixes from v8
-> address the comments from v8
->
-> Change in v10
-> fix the hang issue in qtest
-> address the comments from v9
->
-> Change in v11
-> fix the crash in aarch64 plateform.
-> fix the crash upstream reported
->
-> Changes in v12
-> fix the typo and the comments
->
-> changes in v13
-> re-send the patches by git-publish
->
-> Cindy Lu (10):
->   virtio: introduce macro VIRTIO_CONFIG_IRQ_IDX
->   virtio-pci: decouple notifier from interrupt process
->   virtio-pci: decouple the single vector from the interrupt process
->   vhost: introduce new VhostOps vhost_set_config_call
->   vhost-vdpa: add support for config interrupt
->   virtio: add support for configure interrupt
->   vhost: add support for configure interrupt
->   virtio-net: add support for configure interrupt
->   virtio-mmio: add support for configure interrupt
->   virtio-pci: add support for configure interrupt
->
->  hw/display/vhost-user-gpu.c       |  13 ++
->  hw/net/vhost_net.c                |   9 +
->  hw/net/virtio-net.c               |  20 ++-
->  hw/virtio/trace-events            |   1 +
->  hw/virtio/vhost-user-fs.c         |  14 ++
->  hw/virtio/vhost-vdpa.c            |   8 +
->  hw/virtio/vhost-vsock-common.c    |  14 ++
->  hw/virtio/vhost.c                 |  78 +++++++-
->  hw/virtio/virtio-crypto.c         |  14 ++
->  hw/virtio/virtio-mmio.c           |  27 +++
->  hw/virtio/virtio-pci.c            | 283 +++++++++++++++++++++---------
->  hw/virtio/virtio-pci.h            |   4 +-
->  hw/virtio/virtio.c                |  29 +++
->  include/hw/virtio/vhost-backend.h |   3 +
->  include/hw/virtio/vhost.h         |   4 +
->  include/hw/virtio/virtio.h        |   7 +
->  include/net/vhost_net.h           |   2 +
->  17 files changed, 443 insertions(+), 87 deletions(-)
->
-> --
-> 2.34.3
->
->
+Only the namespace sandbox forks and the parent process
+just waits for the child termination. This commit moves
+the waiting code to a helper function, now the parent
+waits inside the enter_namespace(). This will ease the
+implementation of user namespace uid/gis mapping.
+---
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/118
 

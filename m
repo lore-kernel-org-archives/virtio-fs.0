@@ -1,30 +1,15 @@
-Return-Path: <virtiofs-bot@sinrega.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
- cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm3; t=1658484414; x=1658570814; bh=JJxb8c/26uVLP3RUglAyu
- 5TC4wINLGKiioPdytpjIAc=; b=OUDxTjF7SWV9AOC6U5kd54npCU2nmKICXqGYp
- IKHdb2tNwPyClMr2E2Yy18uzcVBKpdokF7IpfkwvQInco4FJTQwFeoRla8HLTBIl
- uO7lkEe5L9FvC6lPpnWSao3jYzw7287+KZkp+8VanWsCbOdWb+HGXjhCE+8IRTv6
- jPvto/zZbO397zHUPHxPQob5f0g8yolbMU/FZ790MyiPWzUvzsIJan68MkZqC39L
- FzWt5zyXiVAu0Ejrd0cTgYRDlsShtSTS23faHHYztjK4b3Cm7K6zWuN0L/WxnFJ2
- oMMYZaseLv+0WmMf3o52frhQm5bddCUSMqnAOeln6bEFREj7Q==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
- messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
- :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
- :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm3; t=
- 1658484414; x=1658570814; bh=JJxb8c/26uVLP3RUglAyu5TC4wINLGKiioP
- dytpjIAc=; b=VcHSaxA4l2Ba29B/bPB82/reNKMpUAl/5IuqpGnwAJilurgwHci
- q8uIU2ulYvVc+TGkLRS/e/XIfGmLPaCF2Dq4Ghht+oqmyk3RNbuSAU8caPpV2HUP
- mrNf3tLxP1/TgZyNSByxpnMvwJc6QbHRqNAV2A4Ox+UaGen0oUIREFC0KaSw7kEt
- zF7OnaHjrGDnH01He28y6HXb4fKB23MLfwv7mWmE0ghXXHWUAHgA1XOWR2XJ2oHq
- DZyL6g9Smze8/CwJiQYMI5ix3tmLjK78eJXBGQ2+L1PDsREzjsjHkOiaN0YmC8WA
- 0JgWDZImlInjzxsEGoBhdKdvHCjLDrDVuRw==
-From: virtiofs-bot@sinrega.org
-Message-Id: <92059.122072206065500395@us-mta-154.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Fri, 22 Jul 2022 10:07:04 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR opened: Draft: Get ready to release
- v1.4.0
+Return-Path: <mst@redhat.com>
+Date: Fri, 22 Jul 2022 08:21:23 -0400
+From: "Michael S. Tsirkin" <mst@redhat.com>
+Message-ID: <20220722082054-mutt-send-email-mst@kernel.org>
+References: <20220720131204.591104-1-lulu@redhat.com>
+ <CACLfguXo3=h0PsHh+oehVcTjRNSqwOCiG9-VM_o7HjUdZBtxcA@mail.gmail.com>
+MIME-Version: 1.0
+In-Reply-To: <CACLfguXo3=h0PsHh+oehVcTjRNSqwOCiG9-VM_o7HjUdZBtxcA@mail.gmail.com>
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: Re: [Virtio-fs] [PATCH v13 00/10] vhost-vdpa: add support for
+ configure interrupt
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,9 +18,17 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Cindy Lu <lulu@redhat.com>
+Cc: QEMU Developers <qemu-devel@nongnu.org>, Jason Wang <jasowang@redhat.com>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, Gerd Hoffmann <kraxel@redhat.com>, =?iso-8859-1?Q?Marc-Andr=E9?= Lureau <marcandre.lureau@redhat.com>
 
-Updates deps and bump version to 1.4.0
----
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/128
+On Fri, Jul 22, 2022 at 03:46:52PM +0800, Cindy Lu wrote:
+> Hi Micheal.
+> Would you help review these patches, not sure if this is ok to merge?
+> Thanks
+> Cindy
+
+Pls note threading is broken in the patchset. Care to repost?
+
+-- 
+MST
 

@@ -1,30 +1,30 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm3; t=1658482773; x=1658569173; bh=gU09Li5iTqbaVmkiBRSYi
- u1qAkG+n2ThJB9shtOjucs=; b=k6UaDZcCHsG0aZiE+CuqTLpDozHWYUzCSbKwE
- sjw8Rl70vc5GkL4G6uNZzQAFfuwZD5SALNW4+MC0tIJoKCSnlv3HCiE5BAkUwi5+
- ZOZHTFe5YUnZ+VAi/ctK3iK/VpziVW7G3PXOZVhWkxQFQd23HQK8cNsYt68AfWSM
- PeYHygXBuogDwT9DS+w/GOigoV6QHzBqsaVNRbFutjknE3w/N0YoOkdMUlBo1IXA
- 4eIw1Nu/it71RlAJNzPBANeca1pApogy//pw1BYsyHvMujfmUcV83nHTNMjr54Ig
- FKk2icsZrh1dDiyZSBHdZ3fKu7+7vEQitaIj813HWTbqJScTg==
+ :to; s=fm3; t=1658484414; x=1658570814; bh=JJxb8c/26uVLP3RUglAyu
+ 5TC4wINLGKiioPdytpjIAc=; b=OUDxTjF7SWV9AOC6U5kd54npCU2nmKICXqGYp
+ IKHdb2tNwPyClMr2E2Yy18uzcVBKpdokF7IpfkwvQInco4FJTQwFeoRla8HLTBIl
+ uO7lkEe5L9FvC6lPpnWSao3jYzw7287+KZkp+8VanWsCbOdWb+HGXjhCE+8IRTv6
+ jPvto/zZbO397zHUPHxPQob5f0g8yolbMU/FZ790MyiPWzUvzsIJan68MkZqC39L
+ FzWt5zyXiVAu0Ejrd0cTgYRDlsShtSTS23faHHYztjK4b3Cm7K6zWuN0L/WxnFJ2
+ oMMYZaseLv+0WmMf3o52frhQm5bddCUSMqnAOeln6bEFREj7Q==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
  :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
  :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm3; t=
- 1658482773; x=1658569173; bh=gU09Li5iTqbaVmkiBRSYiu1qAkG+n2ThJB9
- shtOjucs=; b=2MYEZcoMdMOL7AXlDlQQQV1MZ2skBBvZqCvpMtbzSSJqDQ9DeXe
- s8Jrjw9OOw3ZgnrLrGDmCTVIdmkIXCi93YVXWOIvRluLuNtFRmS6AsY/3UgAzFQ/
- 2/0orvhXlhXfqNqp/9rzeNGJxgCKYP25qzHp6htVQWrt4eWHIHLqLxjXqZgzUP+P
- 2jxjn2PEc6k3ivoVNILPk3iFNuQKvb6Z8T4BlosOkqRwmC50aA1daTl2tzq6vISy
- 3lMVZByhna7X1Irq9BXKC/2rDWvyOsfSOezlZ4vtxmbS0VNDHeYbWbqDLrwSdZa6
- 4fvfAPtfdnmfCBMDsGE//KG8JBajtxKEZ4Q==
+ 1658484414; x=1658570814; bh=JJxb8c/26uVLP3RUglAyu5TC4wINLGKiioP
+ dytpjIAc=; b=VcHSaxA4l2Ba29B/bPB82/reNKMpUAl/5IuqpGnwAJilurgwHci
+ q8uIU2ulYvVc+TGkLRS/e/XIfGmLPaCF2Dq4Ghht+oqmyk3RNbuSAU8caPpV2HUP
+ mrNf3tLxP1/TgZyNSByxpnMvwJc6QbHRqNAV2A4Ox+UaGen0oUIREFC0KaSw7kEt
+ zF7OnaHjrGDnH01He28y6HXb4fKB23MLfwv7mWmE0ghXXHWUAHgA1XOWR2XJ2oHq
+ DZyL6g9Smze8/CwJiQYMI5ix3tmLjK78eJXBGQ2+L1PDsREzjsjHkOiaN0YmC8WA
+ 0JgWDZImlInjzxsEGoBhdKdvHCjLDrDVuRw==
 From: virtiofs-bot@sinrega.org
-Message-Id: <66295.122072205393300673@us-mta-225.us.mimecast.lan>
+Message-Id: <92059.122072206065500395@us-mta-154.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Fri, 22 Jul 2022 09:39:35 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR merged: sandbox: Move parent process
- code inside sandbox
+Date: Fri, 22 Jul 2022 10:07:04 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR opened: Draft: Get ready to release
+ v1.4.0
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -35,11 +35,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Only the namespace sandbox forks and the parent process
-just waits for the child termination. This commit moves
-the waiting code to a helper function, now the parent
-waits inside the enter_namespace(). This will ease the
-implementation of user namespace uid/gis mapping.
+Updates deps and bump version to 1.4.0
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/118
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/128
 

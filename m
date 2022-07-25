@@ -1,14 +1,33 @@
-Return-Path: <marcandre.lureau@redhat.com>
-From: marcandre.lureau@redhat.com
-Date: Thu, 21 Apr 2022 17:49:15 +0400
-Message-Id: <20220421134940.2887768-6-marcandre.lureau@redhat.com>
-In-Reply-To: <20220421134940.2887768-1-marcandre.lureau@redhat.com>
-References: <20220421134940.2887768-1-marcandre.lureau@redhat.com>
+Return-Path: <jag.raman@oracle.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
+ h=from : to : cc :
+ subject : date : message-id : references : in-reply-to : content-type :
+ content-id : content-transfer-encoding : mime-version; s=corp-2022-7-12;
+ bh=il13Gr2KWiBgO5Sz5phkPhCmvWTAlJUOnYfu2ei8n6g=;
+ b=IefNrcbHkKW1OMvlFVW8EIhWVw96H0Y66lMt0pOgFHDczI2pnk8t4rd24pqGEyDtKeq2
+ p90/pGar3DEI1ptOFeyPlW3L0nBEFBrLFHflT65+Yoqm1KIxthSOggp3RJFGayrJzHr3
+ Y6uj2gfdx15jjFiQZ210mX6WouzpU/WQy+mYR3SnonYfPJnmlGHe7De94yD9sTHTCgpS
+ 9XxfoQUxSJNAo/PDtuv02HbU4T94QzksKkX4JshlmLI8iqTHCmbIW4naa1X/SYY4DCds
+ 6eIAlrVLOtFPZRjPhqg252brC++STJVBwRir3CBff5i3yVhB5/KG/PTfNb2NJGxEdS5k JQ==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=oracle.onmicrosoft.com; s=selector2-oracle-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=il13Gr2KWiBgO5Sz5phkPhCmvWTAlJUOnYfu2ei8n6g=;
+ b=koEtYvQlCVtiHWzzhgTntwSoFsXiHtfwhXuqr1MuI4obo93J3c+BCj+w6+BmTD10gTPw+L39jsf+nXC1xDLsyk8m2Li0mW23z5192S9ELPMaxAHARiKuTAtk3jFarUw19FEOpfPfLER0r85xvKyLb5ZT20vKgEXe+dEinFLXOa8=
+From: Jag Raman <jag.raman@oracle.com>
+Date: Mon, 25 Jul 2022 15:00:30 +0000
+Message-ID: <3D94C789-5F97-4104-8730-02BBA6DF94C0@oracle.com>
+References: <20220615155129.1025811-1-stefanha@redhat.com>
+ <20220615155129.1025811-7-stefanha@redhat.com> <Ytkpiao5Zk8Pj5Lq@redhat.com>
+ <97E1536C-58CF-4DDD-94C9-D44EF63C5AA5@oracle.com>
+ <Yt6tzDw0R/UZL3NF@redhat.com>
+In-Reply-To: <Yt6tzDw0R/UZL3NF@redhat.com>
 MIME-Version: 1.0
+Content-Language: en-US
 Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL 05/30] include: rename qemu-common.h
- qemu/help-texts.h
+Content-ID: <71796D7130DC7246AA0925F4DBF30CE6@namprd10.prod.outlook.com>
+Content-Transfer-Encoding: base64
+Subject: Re: [Virtio-fs] [PULL 06/18] vfio-user: build library
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,178 +36,36 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: richard.henderson@linaro.org, =?UTF-8?q?Marc-Andr=C3=A9=20Lureau?= <marcandre.lureau@redhat.com>, Warner Losh <imp@bsdimp.com>, Kyle Evans <kevans@freebsd.org>, Laurent Vivier <laurent@vivier.eu>, Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, Eric Blake <eblake@redhat.com>, Vladimir Sementsov-Ogievskiy <v.sementsov-og@mail.ru>, Michael Roth <michael.roth@amd.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Peter Maydell <peter.maydell@linaro.org>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <f4bug@amsat.org>, Akihiko Odaki <akihiko.odaki@gmail.com>, Gerd Hoffmann <kraxel@redhat.com>, "open list:Block layer core" <qemu-block@nongnu.org>, "open list:virtiofs" <virtio-fs@redhat.com>
+To: =?utf-8?B?RGFuaWVsIFAuIEJlcnJhbmfDqQ==?= <berrange@redhat.com>
+Cc: Stefan Hajnoczi <stefanha@redhat.com>, qemu-devel <qemu-devel@nongnu.org>, Thomas Huth <thuth@redhat.com>, Aarushi Mehta <mehta.aaru20@gmail.com>, =?utf-8?B?UGhpbGlwcGUgTWF0aGlldS1EYXVkw6k=?= <f4bug@amsat.org>, Elena Ufimtseva <elena.ufimtseva@oracle.com>, Marcel Apfelbaum <marcel.apfelbaum@gmail.com>, Laurent Vivier <lvivier@redhat.com>, "qemu-block@nongnu.org" <qemu-block@nongnu.org>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Richard Henderson <richard.henderson@linaro.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, Hanna Reitz <hreitz@redhat.com>, David Hildenbrand <david@redhat.com>, =?utf-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>, Eric Blake <eblake@redhat.com>, Kevin Wolf <kwolf@redhat.com>, Beraldo Leal <bleal@redhat.com>, Peter Xu <peterx@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Qiuhao Li <Qiuhao.Li@outlook.com>, Paolo Bonzini <pbonzini@redhat.com>, Markus Armbruster <armbru@redhat.com>, Bandan Das <bsd@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>, Alexander Bulekov <alxndr@bu.edu>, Julia Suvorova <jusual@redhat.com>, Darren Kenny <darren.kenny@oracle.com>, Wainer dos Santos Moschetta <wainersm@redhat.com>, John Johnson <john.g.johnson@oracle.com>
 
-From: Marc-André Lureau <marcandre.lureau@redhat.com>
-
-Suggested-by: Peter Maydell <peter.maydell@linaro.org>
-Signed-off-by: Marc-André Lureau <marcandre.lureau@redhat.com>
-Reviewed-by: Warner Losh <imp@bsdimp.com>
-Message-Id: <20220420132624.2439741-7-marcandre.lureau@redhat.com>
----
- include/{qemu-common.h => qemu/help-texts.h} | 0
- bsd-user/main.c                              | 2 +-
- linux-user/main.c                            | 2 +-
- qemu-img.c                                   | 2 +-
- qemu-io.c                                    | 2 +-
- qemu-nbd.c                                   | 2 +-
- qga/main.c                                   | 2 +-
- scsi/qemu-pr-helper.c                        | 2 +-
- softmmu/vl.c                                 | 2 +-
- storage-daemon/qemu-storage-daemon.c         | 2 +-
- tools/virtiofsd/passthrough_ll.c             | 2 +-
- ui/cocoa.m                                   | 2 +-
- 12 files changed, 11 insertions(+), 11 deletions(-)
- rename include/{qemu-common.h => qemu/help-texts.h} (100%)
-
-diff --git a/include/qemu-common.h b/include/qemu/help-texts.h
-similarity index 100%
-rename from include/qemu-common.h
-rename to include/qemu/help-texts.h
-diff --git a/bsd-user/main.c b/bsd-user/main.c
-index 74f2d35a5497..6f09180d6541 100644
---- a/bsd-user/main.c
-+++ b/bsd-user/main.c
-@@ -24,7 +24,7 @@
- #include <sys/sysctl.h>
- 
- #include "qemu/osdep.h"
--#include "qemu-common.h"
-+#include "qemu/help-texts.h"
- #include "qemu/units.h"
- #include "qemu/accel.h"
- #include "qemu-version.h"
-diff --git a/linux-user/main.c b/linux-user/main.c
-index 5fb6ecac3f86..7ca48664e447 100644
---- a/linux-user/main.c
-+++ b/linux-user/main.c
-@@ -18,7 +18,7 @@
-  */
- 
- #include "qemu/osdep.h"
--#include "qemu-common.h"
-+#include "qemu/help-texts.h"
- #include "qemu/units.h"
- #include "qemu/accel.h"
- #include "qemu-version.h"
-diff --git a/qemu-img.c b/qemu-img.c
-index ef3224a9d4a8..6337a63b3b80 100644
---- a/qemu-img.c
-+++ b/qemu-img.c
-@@ -25,7 +25,7 @@
- #include "qemu/osdep.h"
- #include <getopt.h>
- 
--#include "qemu-common.h"
-+#include "qemu/help-texts.h"
- #include "qemu/qemu-progress.h"
- #include "qemu-version.h"
- #include "qapi/error.h"
-diff --git a/qemu-io.c b/qemu-io.c
-index 38321a27a301..d70d3dd4fde5 100644
---- a/qemu-io.c
-+++ b/qemu-io.c
-@@ -15,7 +15,7 @@
- #include <termios.h>
- #endif
- 
--#include "qemu-common.h"
-+#include "qemu/help-texts.h"
- #include "qapi/error.h"
- #include "qemu-io.h"
- #include "qemu/error-report.h"
-diff --git a/qemu-nbd.c b/qemu-nbd.c
-index bf9c5fedceba..397ffa64d768 100644
---- a/qemu-nbd.c
-+++ b/qemu-nbd.c
-@@ -21,7 +21,7 @@
- #include <libgen.h>
- #include <pthread.h>
- 
--#include "qemu-common.h"
-+#include "qemu/help-texts.h"
- #include "qapi/error.h"
- #include "qemu/cutils.h"
- #include "sysemu/block-backend.h"
-diff --git a/qga/main.c b/qga/main.c
-index 1deb0ee2fbfe..e4b22df01dcd 100644
---- a/qga/main.c
-+++ b/qga/main.c
-@@ -18,7 +18,7 @@
- #include <syslog.h>
- #include <sys/wait.h>
- #endif
--#include "qemu-common.h"
-+#include "qemu/help-texts.h"
- #include "qapi/qmp/json-parser.h"
- #include "qapi/qmp/qdict.h"
- #include "qapi/qmp/qjson.h"
-diff --git a/scsi/qemu-pr-helper.c b/scsi/qemu-pr-helper.c
-index 1f2a84c53454..df493e2a503e 100644
---- a/scsi/qemu-pr-helper.c
-+++ b/scsi/qemu-pr-helper.c
-@@ -36,7 +36,7 @@
- #include <mpath_persist.h>
- #endif
- 
--#include "qemu-common.h"
-+#include "qemu/help-texts.h"
- #include "qapi/error.h"
- #include "qemu/cutils.h"
- #include "qemu/main-loop.h"
-diff --git a/softmmu/vl.c b/softmmu/vl.c
-index f679d48d7415..2a38ebe5fbb4 100644
---- a/softmmu/vl.c
-+++ b/softmmu/vl.c
-@@ -23,7 +23,7 @@
-  */
- 
- #include "qemu/osdep.h"
--#include "qemu-common.h"
-+#include "qemu/help-texts.h"
- #include "qemu/datadir.h"
- #include "qemu/units.h"
- #include "exec/cpu-common.h"
-diff --git a/storage-daemon/qemu-storage-daemon.c b/storage-daemon/qemu-storage-daemon.c
-index 1398f0443d76..9b8b17f52e48 100644
---- a/storage-daemon/qemu-storage-daemon.c
-+++ b/storage-daemon/qemu-storage-daemon.c
-@@ -42,7 +42,7 @@
- #include "qapi/qmp/qstring.h"
- #include "qapi/qobject-input-visitor.h"
- 
--#include "qemu-common.h"
-+#include "qemu/help-texts.h"
- #include "qemu-version.h"
- #include "qemu/config-file.h"
- #include "qemu/error-report.h"
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 028dacdd8f5a..b15c631ca512 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -38,7 +38,7 @@
- #include "qemu/osdep.h"
- #include "qemu/timer.h"
- #include "qemu-version.h"
--#include "qemu-common.h"
-+#include "qemu/help-texts.h"
- #include "fuse_virtio.h"
- #include "fuse_log.h"
- #include "fuse_lowlevel.h"
-diff --git a/ui/cocoa.m b/ui/cocoa.m
-index 839ae4f58a69..68bff4ff3796 100644
---- a/ui/cocoa.m
-+++ b/ui/cocoa.m
-@@ -27,7 +27,7 @@
- #import <Cocoa/Cocoa.h>
- #include <crt_externs.h>
- 
--#include "qemu-common.h"
-+#include "qemu/help-texts.h"
- #include "qemu-main.h"
- #include "ui/clipboard.h"
- #include "ui/console.h"
--- 
-2.36.0
+DQoNCj4gT24gSnVsIDI1LCAyMDIyLCBhdCAxMDo1MCBBTSwgRGFuaWVsIFAuIEJlcnJhbmfDqSA8
+YmVycmFuZ2VAcmVkaGF0LmNvbT4gd3JvdGU6DQo+IA0KPiBPbiBNb24sIEp1bCAyNSwgMjAyMiBh
+dCAwMjo0NTowOVBNICswMDAwLCBKYWcgUmFtYW4gd3JvdGU6DQo+PiBIaSBEYW5pZWwsDQo+PiAN
+Cj4+IFdl4oCZdmUgY3JlYXRlZCB0aGUgZm9sbG93aW5nIGlzc3VlIHRvIHVwZGF0ZSBRRU1V4oCZ
+cyBsaWJ2ZmlvLXVzZXIgbWlycm9yDQo+PiB0byB0aGUgbGF0ZXN0Og0KPj4gaHR0cHM6Ly9naXRs
+YWIuY29tL3FlbXUtcHJvamVjdC9saWJ2ZmlvLXVzZXIvLS9pc3N1ZXMvMQ0KPj4gDQo+PiBXaWxs
+IHVwZGF0ZSBRRU1V4oCZcyBzdWJtb2R1bGUgb25jZSB0aGlzIG1pcnJvciBpcyB1cGRhdGVkLg0K
+PiANCj4gVGhhdCBzb3VuZHMgZ29vZCwgdGhhbmsgeW91LiBXZSBzaG91bGQgYmUgZmluZSB0byBn
+ZXQgdGhlDQo+IHN1Ym1vZHVsZSByZWVmcmVzaGVkIGV2ZW4gaW4gc29mdCBmcmVlemUsIGdpdmVu
+IHRoYXQgaXQgaXMNCj4gZml4aW5nIGEgdGVzdCBmYWlsdXJlIGJ1Zy4NCj4gDQo+IE9oIGFuZCBJ
+IGp1c3Qgbm90aWNlZCBJIG1lc3NlZCB1cCB5b3VyIG5hbWUgaW4gbXkgbWVzc2FnZQ0KPiBiZWxv
+dy4gSSdtIHZlcnkgc29ycnkgYWJvdXQgdGhhdC4NCg0KTm8gd29ycmllcy4gOikNCg0KPiANCj4g
+V2l0aCByZWdhcmRzLA0KPiBEYW5pZWwgDQo+IA0KPj4gT24gSnVsIDIxLCAyMDIyLCBhdCA2OjI1
+IEFNLCBEYW5pZWwgUC4gQmVycmFuZ8OpIDxiZXJyYW5nZUByZWRoYXQuY29tPG1haWx0bzpiZXJy
+YW5nZUByZWRoYXQuY29tPj4gd3JvdGU6DQo+PiANCj4+IEhpIEpheSAvIFN0ZWZhbiwNCj4+IA0K
+Pj4gV2UndmUgZ290IGEgbm9uLWRldGVybWluc2l0aWMgaGFuZyBpbiBRRU1VIENJIHNpbmNlIHRo
+aXMgc2VyaWVzDQo+PiBtZXJnZWQsIHdoaWNoIHdlIHRyYWNrZWQgZG93biB0byBhIGxpYnZmaW8t
+dXNlciB0ZXN0IHRoYXQgaXMNCj4+IGZsYWtleToNCj4+IA0KPj4gaHR0cHM6Ly9naXRsYWIuY29t
+L3FlbXUtcHJvamVjdC9xZW11Ly0vaXNzdWVzLzExMTQNCj4+IA0KPj4gSm9obiBMZXZvbiBoYXMg
+cHJvcG9zZWQgYSBQUiB0byBsaWJ2ZmlvLXVzZXIgdG8gdHVybiBvZmYgdGhlDQo+PiB0ZXN0LCBi
+dXQgd2UnbGwgbmVlZCBvbmUgb2YgeW91IHRvIHVwZGF0ZSB0aGUgZ2l0IHN1Ym1vZHVsZQ0KPj4g
+Zm9yIGxpYnZmaW8tdXNlciBvbiB0aGUgUUVNVSBzaWRlLCBhcyBJIGNhbid0IGZpbmQgYSBuaWNl
+IHdheQ0KPj4gdG8gc2VsZWN0aXZlbHkgc2tpcCB0aGUgdGVzdCBmcm9tIFFFTVUgc2lkZSBhbG9u
+ZS4NCj4+IA0KPj4gV2l0aCByZWdhcmRzDQo+PiBEYW5pZWwNCj4+IA0KPiANCj4gV2l0aCByZWdh
+cmRzLA0KPiBEYW5pZWwNCj4gLS0gDQo+IHw6IGh0dHBzOi8vYmVycmFuZ2UuY29tICAgICAgLW8t
+ICAgIGh0dHBzOi8vd3d3LmZsaWNrci5jb20vcGhvdG9zL2RiZXJyYW5nZSA6fA0KPiB8OiBodHRw
+czovL2xpYnZpcnQub3JnICAgICAgICAgLW8tICAgICAgICAgICAgaHR0cHM6Ly9mc3RvcDEzOC5i
+ZXJyYW5nZS5jb20gOnwNCj4gfDogaHR0cHM6Ly9lbnRhbmdsZS1waG90by5vcmcgICAgLW8tICAg
+IGh0dHBzOi8vd3d3Lmluc3RhZ3JhbS5jb20vZGJlcnJhbmdlIDp8DQo+IA0KDQo=
 

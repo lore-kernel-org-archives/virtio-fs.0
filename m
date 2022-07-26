@@ -1,22 +1,17 @@
-Return-Path: <yokada.996@gmail.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
- h=content-transfer-encoding:mime-version:message-id:date:subject:cc
- :to:from:from:to:cc;
- bh=34YSupzvFPGf54q4I719p5ZvNSdYXQRbFLGKQamgoTQ=;
- b=pa9XOzatRzKWuheXDs22T3192JnXjcENdherXX87rgYqIUc+q3zmSW0wf2n40ifpxP
- Kfd5PC4OmcdpnOgwixESMkchmgONHpGlvJ+PVdXZyv/JRyhltKZYVqa5ULKt11y1WCu2
- duXiLQTEZcfu24zFU8hiCO+MrOgCFNKA2ju5scdmcakY+nK/o0Q9rj5hYfrO5CZCqsfc
- AE6tLhsDVjcP5ftTHjqbDcGDi/qtEzu6459LFQKAmdhIVoZMMZo/p+XUJhRlq4Zm8bFR
- fljomqu9UTDcuHJsLLHINDTP5ykXIDrqa/SrBD364+DsTaWV1T1233mKf8qq3EdwVZ+D
- JSkA==
-From: Yusuke Okada <yokada.996@gmail.com>
-Date: Thu, 18 Aug 2022 14:46:19 -0400
-Message-Id: <20220818184618.2205172-1-yokada.996@gmail.com>
+Return-Path: <vgoyal@redhat.com>
+Date: Tue, 26 Jul 2022 11:37:00 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YuAKHEtZBXQmnbK8@redhat.com>
+References: <4f2c71a4-609e-6880-04d0-2eb127c55023@linux.dev>
+ <CAJSP0QUzd7GXK0XN7YBBfEqO6abQSZMdJzW8pEHnz-ZnGetUWA@mail.gmail.com>
+ <Yt/pVXilvkiLgowx@redhat.com>
+ <1d1f7854-209a-a985-e266-633ca14609da@linux.dev>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Subject: [Virtio-fs] [PATCH] virtiofsd: use g_date_time_get_microsecond to
- get subsecond
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <1d1f7854-209a-a985-e266-633ca14609da@linux.dev>
+Subject: Re: [Virtio-fs] Question about performance comparison between
+ virtio-fs and virtio-blk
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,52 +20,77 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: Yusuke Okada <okada.yusuke@jp.fujitsu.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, "open list:virtiofs" <virtio-fs@redhat.com>
+To: Hao Xu <hao.xu@linux.dev>
+Cc: Stefan Hajnoczi <stefanha@gmail.com>, qemu-devel <qemu-devel@nongnu.org>, virtio-fs@redhat.com
 
-From: Yusuke Okada <okada.yusuke@jp.fujitsu.com>
+On Tue, Jul 26, 2022 at 10:41:23PM +0800, Hao Xu wrote:
+> On 7/26/22 21:17, Vivek Goyal wrote:
+> > On Tue, Jul 26, 2022 at 08:55:38AM -0400, Stefan Hajnoczi wrote:
+> > > On Tue, 26 Jul 2022 at 08:24, Hao Xu <hao.xu@linux.dev> wrote:
+> > > > I watched your presentation about virtiofs in 2020,
+> > > > 
+> > > > https://www.youtube.com/watch?v=EIVOzTsGMMI&t=232s
+> > > > 
+> > > > which is really helpful to me, but I have a question about the graph at
+> > > > 3:53, could you give
+> > > > 
+> > > > me more info about the test, like what tool you use for the test, if
+> > > > it's fio, what is the parameters.
+> > > > 
+> > > > I used fio to do randread test in a qemu box, but turns out the iops of
+> > > > virtio-blk and virtio-fs are similar.
+> > > 
+> > 
+> > Hi Hao,
+> > 
+> > My impression in general is that virtio-blk is much faster than virtiofs.
+> 
+> When testing virtio-blk, did you use the device directly or mount it and
+> test against a file.
 
-The "%f" specifier in g_date_time_format() is only available in glib
-2.65.2 or later. If combined with older glib, the function returns null
-and the timestamp displayed as "(null)".
+Frankly speaking, I don't recall any of the details right now. If do
+remember that I ran some kernel compilation tests on virtio-blk and
+that ofcourse needed mounting filesystem on virtio-blk.
 
-For backward compatibility, g_date_time_get_microsecond should be used
-to retrieve subsecond.
+> 
+> > A simple macro test is do a kernel compilation and compare time taken
+> > between the two.
+> 
+> Good idea, I just tested with single file.
 
-In this patch the g_date_time_format() leaves subsecond field as "%06d"
-and let next snprintf to format with g_date_time_get_microsecond.
+single file using fio is good as micro benchmark which primarily
+excercises the data operations. But kernel compilation is a good
+macro benchmark sort of workload which stresses filesystem both for
+data and metadata operations.
 
-Signed-off-by: Yusuke Okada <okada.yusuke@jp.fujitsu.com>
----
- tools/virtiofsd/passthrough_ll.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+Thanks
+Vivek
 
-diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
-index 371a7bead6..20f0f41f99 100644
---- a/tools/virtiofsd/passthrough_ll.c
-+++ b/tools/virtiofsd/passthrough_ll.c
-@@ -4185,6 +4185,7 @@ static void setup_nofile_rlimit(unsigned long rlimit_nofile)
- static void log_func(enum fuse_log_level level, const char *fmt, va_list ap)
- {
-     g_autofree char *localfmt = NULL;
-+    char buf[64];
- 
-     if (current_log_level < level) {
-         return;
-@@ -4197,9 +4198,11 @@ static void log_func(enum fuse_log_level level, const char *fmt, va_list ap)
-                                        fmt);
-         } else {
-             g_autoptr(GDateTime) now = g_date_time_new_now_utc();
--            g_autofree char *nowstr = g_date_time_format(now, "%Y-%m-%d %H:%M:%S.%f%z");
-+            g_autofree char *nowstr = g_date_time_format(now,
-+                                       "%Y-%m-%d %H:%M:%S.%%06d%z");
-+            snprintf(buf, 64, nowstr, g_date_time_get_microsecond(now));
-             localfmt = g_strdup_printf("[%s] [ID: %08ld] %s",
--                                       nowstr, syscall(__NR_gettid), fmt);
-+                                       buf, syscall(__NR_gettid), fmt);
-         }
-         fmt = localfmt;
-     }
--- 
-2.31.1
-
+> 
+> Thanks,
+> Hao
+> 
+> > 
+> > > I have CCed Vivek Goyal, who has done more virtiofs benchmarking and
+> > > might have ideas to share.
+> > > 
+> > > The benchmarking tool was fio with the stated blocksize and I/O
+> > > pattern. The benchmark was probably run with direct=1. Based on the
+> > > virtio-blk numbers I think iodepth was greater than 1 but I don't have
+> > > the exact fio job parameters.
+> > 
+> > I had basically used fio jobs. I wrote some simple wrapper scripts to
+> > run fio and parse and report numbers.
+> > 
+> > https://github.com/rhvgoyal/virtiofs-tests
+> > 
+> > I don't have data for virtio-blk but I do seem to have some comparison
+> > numbers of virtiofs and virtio-9p.
+> > 
+> > https://github.com/rhvgoyal/virtiofs-tests/tree/master/performance-results/feb-23-2021
+> > 
+> > Thanks
+> > Vivek
+> > 
+> > 
+> 

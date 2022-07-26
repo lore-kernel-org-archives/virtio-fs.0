@@ -1,29 +1,22 @@
-Return-Path: <virtiofs-bot@sinrega.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
- cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm3; t=1658826514; x=1658912914; bh=JJxb8c/26uVLP3RUglAyu
- 5TC4wINLGKiioPdytpjIAc=; b=gWWnplf4Klv7oXwWifbac20h415ubM7upQwwN
- iNicgUdxZTjQ3upjzvGk0XoXLJ4tglpt1owcgzjlNoNFHMDUEFlGqc/Aky8AIXfz
- nYJtFyQF7WL3b5ifkhhIbKUD6iE1/7brXJZdqpL7P/sr4kCiNjNUk1nglywuherX
- Ws+2Bv3jqR1SvWrtMwkZTT7E2dHiguN2WWdq4KFgOzEEB26c0xI4cSb4AFoM3hMV
- Bjt8oCt3Oefe/qBD+sp/ONXd2tSJOI3D8vgMfGVf7+FzsE9YCdaPnWiHHG6Z0iUI
- IZAT/hjb2EtNyDPBG8XnihrajaBvv6AvM9PuG6o7KLJ7CvbNg==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
- messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
- :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
- :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm3; t=
- 1658826514; x=1658912914; bh=JJxb8c/26uVLP3RUglAyu5TC4wINLGKiioP
- dytpjIAc=; b=JpdQjuPHgn2vAN9MxgfDjKk/yzdzhDlpQXaWe3SigLAFdVPOJpa
- 6l+1d7rIfGZlPStQBdI1BVfKmNwbBvIYRtMaUDXE95CBdRobQhMPZ4KdfZv0VDvp
- 7JsWhCNUMd3lriTvU5Cib49q5Xltjbvadtp5NqSQjF06hRV+eAllc3l+8Ounsaag
- D8ueveMXSzdcrHJ7Cz4hkRYfSv0v/Sb9Lwifr2u80VWWh0HBrbRLixGswkWmDr+s
- sXjfqwRGRniaaGvnJv1TlCqc6+G6ky6S+6NcVyDNsQwGA3FbfUmqmjL1dZ3Sxn10
- 0d1N1YS6BdtCcfgGZ5ZKwNQQsd2KMZx5SIA==
-From: virtiofs-bot@sinrega.org
-Message-Id: <74316.122072605083500119@us-mta-478.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Tue, 26 Jul 2022 09:09:03 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR merged: Get ready to release v1.4.0
+Return-Path: <stefanha@gmail.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=QG13wto3iMHroDD8BZ6bjMdwyCMa8mGjxQBbHVCJM+o=;
+ b=gwS3xJ8h6RRVPeQ3pFQ/aSKbZ9OJDxhNaAHSDD0gZKxFjyc7zmjQgZMLCdV+bvD+Fq
+ KirNVXvbKZQ62iJ6pV/s0UmyIy3EOnSxM1Q9Ze1o2O27lnWp5CWPE1SVOdxR8h30Ebp3
+ YGhgmxUng9wywcwT8Hez+as4MQZAqu+hInl7bRWoEkVbalvyUZqVVT2N2QzKBym69hFH
+ opM4xo2W0qgFS2elHTdxLey5c1Uxl55YBC7jX+haQLlMB/Wzuj0mvr+80JC6ybFyWlK7
+ rFXVfDTftPPuWeFy2450xlN7uASRuHGZCZG9ZdvRJbNl0TvM61mE6lqJs7ZIkNSl+uP0
+ sPZA==
+MIME-Version: 1.0
+References: <4f2c71a4-609e-6880-04d0-2eb127c55023@linux.dev>
+In-Reply-To: <4f2c71a4-609e-6880-04d0-2eb127c55023@linux.dev>
+From: Stefan Hajnoczi <stefanha@gmail.com>
+Date: Tue, 26 Jul 2022 08:55:38 -0400
+Message-ID: <CAJSP0QUzd7GXK0XN7YBBfEqO6abQSZMdJzW8pEHnz-ZnGetUWA@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] Question about performance comparison between
+ virtio-fs and virtio-blk
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -32,9 +25,30 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Hao Xu <hao.xu@linux.dev>
+Cc: qemu-devel <qemu-devel@nongnu.org>, virtio-fs@redhat.com, Vivek Goyal <vgoyal@redhat.com>
 
-Updates deps and bump version to 1.4.0
----
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/128
+On Tue, 26 Jul 2022 at 08:24, Hao Xu <hao.xu@linux.dev> wrote:
+> I watched your presentation about virtiofs in 2020,
+>
+> https://www.youtube.com/watch?v=EIVOzTsGMMI&t=232s
+>
+> which is really helpful to me, but I have a question about the graph at
+> 3:53, could you give
+>
+> me more info about the test, like what tool you use for the test, if
+> it's fio, what is the parameters.
+>
+> I used fio to do randread test in a qemu box, but turns out the iops of
+> virtio-blk and virtio-fs are similar.
+
+I have CCed Vivek Goyal, who has done more virtiofs benchmarking and
+might have ideas to share.
+
+The benchmarking tool was fio with the stated blocksize and I/O
+pattern. The benchmark was probably run with direct=1. Based on the
+virtio-blk numbers I think iodepth was greater than 1 but I don't have
+the exact fio job parameters.
+
+Stefan
 

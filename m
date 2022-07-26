@@ -1,30 +1,29 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm3; t=1658825401; x=1658911801; bh=LdOjIu8qijiLqcgmVsRia
- ZXOMWEjreLb+q9L7obB4Qg=; b=AKoxwYvYM05gZsEQWKIxH4gFtmk0+aggzNYBW
- xjcnOKknlDlJTpu6vwXzTexZFNYH0ibNy3+o9xH6aZnNe/nFgoSQkw65hbZCbAPE
- hW8ZbRXxz69OtlNSgA7RktzrYvXBUCbBL5BCv0pfiG2DoMUwNNl/KWF+zYkucVLm
- qvVTqOTuH7XChJaa9cjiB6ju81cx6PJIwOEOCFO2ciPRXOLGA9IrKgHupqwBc9bN
- Hopw3fcb6I6Yah+v0OCGSwQ8CPKtBUkxG1ufR3smfEkpVHjr52KOzYPnjTEEVIaf
- qsWRGZF3nWK8712UvtV00iDTtiwIfwGi++Zg7cBb1jKTkio2Q==
+ :to; s=fm3; t=1658826514; x=1658912914; bh=JJxb8c/26uVLP3RUglAyu
+ 5TC4wINLGKiioPdytpjIAc=; b=gWWnplf4Klv7oXwWifbac20h415ubM7upQwwN
+ iNicgUdxZTjQ3upjzvGk0XoXLJ4tglpt1owcgzjlNoNFHMDUEFlGqc/Aky8AIXfz
+ nYJtFyQF7WL3b5ifkhhIbKUD6iE1/7brXJZdqpL7P/sr4kCiNjNUk1nglywuherX
+ Ws+2Bv3jqR1SvWrtMwkZTT7E2dHiguN2WWdq4KFgOzEEB26c0xI4cSb4AFoM3hMV
+ Bjt8oCt3Oefe/qBD+sp/ONXd2tSJOI3D8vgMfGVf7+FzsE9YCdaPnWiHHG6Z0iUI
+ IZAT/hjb2EtNyDPBG8XnihrajaBvv6AvM9PuG6o7KLJ7CvbNg==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
  :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
  :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm3; t=
- 1658825401; x=1658911801; bh=LdOjIu8qijiLqcgmVsRiaZXOMWEjreLb+q9
- L7obB4Qg=; b=a5ENvGk7M3MNQzBfq+qAml/3rrncjuNeuR27covr9lr7kAlTjKK
- ZLVAyDKoAGhKs0bvv6QYUIQkdE2j02MtQ7WaLq7fJPMU1C4QL22w75xtXN5KA9iq
- wMuuRdkpX/3K21iqAflKBUiuJJQcmpt1Y1HuUgj53M1coBzZIfnlnBGCf/H4qKlZ
- NnyOrZH+tvsKgLiY7tV74WqQnwRgTt0cgqoI/QCYv3Incrp6dLGYPSw9vreEi9ce
- VNb285S5j4GMM48FTqbgV1ia0XFX4VUWfRhKb1Yi6b3f/kRinIPDt/LlhIDFHXPq
- 06ZeAtmLZ4T1WR8nUlTZ3X5z2Wd2jQDbJUA==
+ 1658826514; x=1658912914; bh=JJxb8c/26uVLP3RUglAyu5TC4wINLGKiioP
+ dytpjIAc=; b=JpdQjuPHgn2vAN9MxgfDjKk/yzdzhDlpQXaWe3SigLAFdVPOJpa
+ 6l+1d7rIfGZlPStQBdI1BVfKmNwbBvIYRtMaUDXE95CBdRobQhMPZ4KdfZv0VDvp
+ 7JsWhCNUMd3lriTvU5Cib49q5Xltjbvadtp5NqSQjF06hRV+eAllc3l+8Ounsaag
+ D8ueveMXSzdcrHJ7Cz4hkRYfSv0v/Sb9Lwifr2u80VWWh0HBrbRLixGswkWmDr+s
+ sXjfqwRGRniaaGvnJv1TlCqc6+G6ky6S+6NcVyDNsQwGA3FbfUmqmjL1dZ3Sxn10
+ 0d1N1YS6BdtCcfgGZ5ZKwNQQsd2KMZx5SIA==
 From: virtiofs-bot@sinrega.org
-Message-Id: <85213.122072604500200127@us-mta-424.us.mimecast.lan>
+Message-Id: <74316.122072605083500119@us-mta-478.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Tue, 26 Jul 2022 08:50:05 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR merged: Adds safe versions of
- `libc::mount()` and `libc::umount2()`
+Date: Tue, 26 Jul 2022 09:09:03 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR merged: Get ready to release v1.4.0
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -35,9 +34,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-As part of the effort to remove `unsafe` blocks to increase code
-clarity, the wrappers for `libc::mount()` and `libc::umount2()`
-are added and used inside sandbox.
+Updates deps and bump version to 1.4.0
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/127
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/128
 

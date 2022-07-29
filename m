@@ -1,19 +1,30 @@
-Return-Path: <slp@redhat.com>
-Date: Wed, 28 Sep 2022 10:33:40 +0200
-From: Sergio Lopez <slp@redhat.com>
-Message-ID: <20220928083340.eyizwu6mm3cc3bxu@mhamilton>
-References: <4362261a-c762-4666-84e2-03c9daa6c4d9@www.fastmail.com>
- <YzMmu3xfOtQwuFUx@redhat.com> <YzMrYAJQeSP2hDSs@redhat.com>
- <CAJh=p+5rQDBJJC8VNGL10KYgDeq-Hg5WK7avONCti03eJGH+ow@mail.gmail.com>
- <798fe353-9537-44fe-a76a-819e8c93abb5@www.fastmail.com>
- <YzNZnPiUqySu6sGh@fedora>
-MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
- protocol="application/pgp-signature"; boundary="lmyp75irfhdzyuhx"
-Content-Disposition: inline
-In-Reply-To: <YzNZnPiUqySu6sGh@fedora>
-Subject: Re: [Virtio-fs] virtiofsd: Any reason why there's not an "openat2"
- sandbox mode?
+Return-Path: <virtiofs-bot@sinrega.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+ cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+ :to; s=fm3; t=1659112885; x=1659199285; bh=fiZIP2gowrHvZKMF7r0ny
+ VAeaK7/dxkqIhND46lg7GY=; b=VuHdbATC//SCy8/nARo99qv0ytRF42V8OKZrs
+ RmL9ymOFzlj8F4B0sedlyvSzBZMHxccZzLS1l/8wS6SgpC1R0za71SgZoDFfSK8C
+ 1Qo2rbNcVjrEnKvdS/pCZnyj7mezC2brfT0Lb2IOXEUy1kaz6MWF+X4tWr8PnJzL
+ rl+BB7lUAEmnSuc2DJrpGlC2nOw2DVbLGhdQQ73mGeiZD9kXndLdBMx3L8ajDe0Z
+ kWRrpH0EbZVonlb/BD9ToLAon1vCb+vUzTj1KuZONSicSWWgWUA8KKDe1cd0LqZF
+ BVQqz+Wt8hOHGijwqxNM4yODemcpd+XBpqsafSPLboVp08vFA==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+ messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
+ :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
+ :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm3; t=
+ 1659112885; x=1659199285; bh=fiZIP2gowrHvZKMF7r0nyVAeaK7/dxkqIhN
+ D46lg7GY=; b=IGqb4h7F/YZwjucpFCnd4Cnyp8EWfvmJLa8CE7D2C1NcY67OwoM
+ oKeERt/zhaFSfhWG1MrzcGImoleE5KCWrF0dnWto8UBriVCI3sDOgFB3e8aKCgjK
+ bISeP+5vdWDp4y1EhdV/wVZbsTBB0/fvMPSg0TOs7NKC/ZPyBl++5LINb0a5En5d
+ 9hbZpxZ7HjOEnhaBGAP33KSWuaAs+4gOkHyr8rNoRmBYYOUOJv5Vo3Ule3Vmb90i
+ 90ohtsO3z3e45LAIhZgxpKgTNsRgsbqEh/XxzXBN/rlZgR/NC4sf7IjD332D7xqk
+ eY2RvzFlJtKtm+SLeorNxhipw+fWheCfWYw==
+From: virtiofs-bot@sinrega.org
+Message-Id: <54885.122072912412800578@us-mta-474.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"; x-default=true
+Date: Fri, 29 Jul 2022 16:41:30 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR opened: Bump vhost-user-backend and
+ virtio-queue dependencies
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,90 +33,20 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: Colin Walters <walters@verbum.org>, virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org, Vivek Goyal <vgoyal@redhat.com>
+To: virtio-fs@redhat.com
 
+Updating dependencies to:
+- virtio-queue 0.5.0
+- vhost-user-backend 0.6.0
 
---lmyp75irfhdzyuhx
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+This latest virtio-queue version introduces a few breaking changes,
+which is why this patch slightly updates the code.
 
-On Tue, Sep 27, 2022 at 04:14:20PM -0400, Stefan Hajnoczi wrote:
-> On Tue, Sep 27, 2022 at 01:51:41PM -0400, Colin Walters wrote:
-> >=20
-> >=20
-> > On Tue, Sep 27, 2022, at 1:27 PM, German Maglione wrote:
-> > >
-> > >> > Now all the development has moved to rust virtiofsd.
-> >=20
-> > Oh, awesome!!  The code there looks great.
-> >=20
-> > > I could work on this for the next major version and see if anything b=
-reaks.
-> > > But I prefer to add this as a compilation feature, instead of a comma=
-nd line
-> > > option that we will then have to maintain for a while.
-> >=20
-> > Hmm, what would be the issue with having the code there by default?  I =
-think rather than any new command line option, we automatically use `openat=
-2+RESOLVE_IN_ROOT` if the process is run as a nonzero uid.
-> >=20
-> > > Also, I don't see it as a sandbox feature, as Stefan mentioned, a com=
-promised
-> > > process can call openat2() without RESOLVE_IN_ROOT.=20
-> >=20
-> > I'm a bit skeptical honestly about how secure the existing namespace co=
-de is against a compromised virtiofsd process.  The primary worry is guest =
-filesystem traversals, right?  openat2+RESOLVE_IN_ROOT addresses that.  Plu=
-s being in Rust makes this dramatically safer.
-> >=20
-> > > I did some test with
-> > > Landlock to lock virtiofsd inside the shared directory, but IIRC it r=
-equires a
-> > > kernel 5.13
-> >=20
-> > But yes, landlock and other things make sense, I just don't see these t=
-hings as strongly linked.  IOW we shouldn't in my opinion block unprivilege=
-d virtiofsd on more sandboxing than openat2 already gives us.
->=20
-> I think openat2(RESOLVE_IN_ROOT) support should be added unless there is
-> another unprivileged mechanism that is stronger.
->=20
-> The security implications need to be covered in the user documentation
-> so people can decide whether using this mode is appropriate.
->=20
-> We should continue to explain the difference between a voluntary
-> mechanism like openat2(RESOLVE_IN_ROOT) and a mandatory mechanism like
-> mount namespaces with pivot_root(2). Rust programs are not immune to
-> arbitrary code execution, but it's less likely than with a C program.
+The latest vhost-user-backend version relies on the same virtio-queue
+version, but it also contains a fix for proper vring initialization so
+that booting a VM with OVMF firmware works as expected.
 
-I agree. Perhaps we could modify the "none" sandbox mode to use
-openat2, if available, and add an "openat2" mode which does basically
-the same thing, but bailing out if openat2 is not available.
+Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
+---
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/129
 
-And explain this clearly in the docs, of course.
-
-Sergio.
-
---lmyp75irfhdzyuhx
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAABCAAdFiEEvtX891EthoCRQuii9GknjS8MAjUFAmM0BuMACgkQ9GknjS8M
-AjXa9RAAmMn37H5nvrK0KlyhPF0aCUNMuALPhvCLC540vQBIsA6fOI8pNEQmfCuY
-coosqUijnp0kW4Pk+O2JdKCYEa1M1ZhX+t7T0rOOEteCt4lw9S3egpQ0K6plVIfC
-BRVDWJ/igh7OExX7Hb84gPLM4UzHqtDcE9/0Dm1feNuqu0pZUqK7jT5uVbu7fSeD
-dj/+Z8u4SNIxobH0G17IZpTjb6r+P3RrgMplByH4PtqtyMf9oueObrBRm7MQmq8P
-bQexURbGmKunHGtled8Zafuw4EB2vbKmTtnQxkV1l//yYmBCZyj74m70Wb3sHda0
-6jiTlQbJxKgTlycmTBbtbkAUtcahQFmXEKCVOI2sIZz9JZ3rfwOvYENBARX6iGDU
-/c91/fm9jGnmiv7aRTWZNyhlUl/xl7boPFPXe/llF+YzVur/M1UBEdZbFKbpbMj/
-/yICFJ4lJQkBPLjB+mIBzo7gfmTchPQ6W/BP6LVoFvGhvcE6dL26x89/8UtdyxQT
-zYiHvZgntqJ6MqXhW5Up8HFmShbVrCln4E6WaJmpEVjop7xTOBEp2oX6Ix3vbL9k
-yTklajDYWfaRpehNUH9Q5fWOCq79kROEQ3mv75KZTc2ke2kf+x2MUJQwz9T3JRhR
-Uq1+7hnLuiXtdDRDiL5oZ5sCxiEqX+znLPt6ao5sAb4p9ANE66A=
-=yhfj
------END PGP SIGNATURE-----
-
---lmyp75irfhdzyuhx--

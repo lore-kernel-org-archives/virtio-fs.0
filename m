@@ -1,14 +1,11 @@
-Return-Path: <stefanha@redhat.com>
-Date: Tue, 27 Sep 2022 11:04:34 -0400
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YzMRAhiJN0d8W9or@fedora>
-References: <20220922171447.166958-1-stefanha@redhat.com>
+Return-Path: <vgoyal@redhat.com>
+Date: Fri, 29 Jul 2022 09:17:06 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YuPd0itNIAz4tQRt@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
- protocol="application/pgp-signature"; boundary="9mgj/r1alEjyP0IH"
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20220922171447.166958-1-stefanha@redhat.com>
-Subject: Re: [Virtio-fs] [PULL 0/1] Block patches
+Subject: [Virtio-fs] [PATCH] virtiofsd: Disable killpriv_v2 by default
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,31 +14,59 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>
-Cc: qemu-devel@nongnu.org, Stefan Hajnoczi <stefanha@redhat.com>, qemu-block@nongnu.org, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, virtio-fs@redhat.com
+To: virtio-fs-list <virtio-fs@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, qemu-devel <qemu-devel@nongnu.org>
 
+We are having bunch of issues with killpriv_v2 enabled by default. First
+of all it relies on clearing suid/sgid bits as needed by dropping
+capability CAP_FSETID. This does not work for remote filesystems like
+NFS (and possibly others). 
 
---9mgj/r1alEjyP0IH
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
+Secondly, we are noticing other issues related to clearing of SGID
+which leads to failures for xfstests generic/355 and generic/193.
 
-Applied, thanks.
+Thirdly, there are other issues w.r.t caching of metadata (suid/sgid)
+bits in fuse client with killpriv_v2 enabled. Guest can cache that
+data for sometime even if cleared on server.
 
-Please update the changelog at https://wiki.qemu.org/ChangeLog/7.2 for any user-visible changes.
+Second and Third issue are fixable. Just that it might take a little
+while to get it fixed in kernel. First one will probably not see
+any movement for a long time.
 
---9mgj/r1alEjyP0IH
-Content-Type: application/pgp-signature; name="signature.asc"
+Given these issues, killpriv_v2 does not seem to be a good candidate
+for enabling by default. We have already disabled it by default in
+rust version of virtiofsd.
 
------BEGIN PGP SIGNATURE-----
+Hence this patch disabled killpriv_v2 by default. User can choose to
+enable it by passing option "-o killpriv_v2".
 
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmMzEQIACgkQnKSrs4Gr
-c8iq/wf+Nl2IjjUe+MslZPdQRgrkfUp3EXN7ritGI3AQ7PGTrjtaVI7qwI3tr2U/
-garAYbyXEhvSyyd6FXarV3QynB79+KIsJFes/+cr1N/a9nIauWitjV8+V/Wtc1Ot
-TfGV+ABbkAPafvr8DsuT+FFX31JfaXUTOUMsV8kDbCrW+tPszMMK8XpBFOlLsubC
-lsWZjWjAnNvuK+3wek0HuZAYKiWhxDTUInwnYstj1OpB3VRYxAuyfesA2ppFPEOd
-dnAFOwp3xKKYQN22E6PFzi4HIWsz4/W71yaJzi6PdmY6/W8CBSYBTmQj4jJYvQ0i
-eCpYoRnxq7IsM31YyvlNJxR8M+D6Og==
-=up4J
------END PGP SIGNATURE-----
+Signed-off-by: Vivek Goyal <vgoyal@redhat.com>
+---
+ tools/virtiofsd/passthrough_ll.c |   13 ++-----------
+ 1 file changed, 2 insertions(+), 11 deletions(-)
 
---9mgj/r1alEjyP0IH--
+Index: rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c
+===================================================================
+--- rhvgoyal-qemu.orig/tools/virtiofsd/passthrough_ll.c	2022-07-29 08:19:05.925119947 -0400
++++ rhvgoyal-qemu/tools/virtiofsd/passthrough_ll.c	2022-07-29 08:27:08.048049096 -0400
+@@ -767,19 +767,10 @@ static void lo_init(void *userdata, stru
+         fuse_log(FUSE_LOG_DEBUG, "lo_init: enabling killpriv_v2\n");
+         conn->want |= FUSE_CAP_HANDLE_KILLPRIV_V2;
+         lo->killpriv_v2 = 1;
+-    } else if (lo->user_killpriv_v2 == -1 &&
+-               conn->capable & FUSE_CAP_HANDLE_KILLPRIV_V2) {
+-        /*
+-         * User did not specify a value for killpriv_v2. By default enable it
+-         * if connection offers this capability
+-         */
+-        fuse_log(FUSE_LOG_DEBUG, "lo_init: enabling killpriv_v2\n");
+-        conn->want |= FUSE_CAP_HANDLE_KILLPRIV_V2;
+-        lo->killpriv_v2 = 1;
+     } else {
+         /*
+-         * Either user specified to disable killpriv_v2, or connection does
+-         * not offer this capability. Disable killpriv_v2 in both the cases
++         * Either user specified to disable killpriv_v2, or did not
++         * specify anything. Disable killpriv_v2 in both the cases.
+          */
+         fuse_log(FUSE_LOG_DEBUG, "lo_init: disabling killpriv_v2\n");
+         conn->want &= ~FUSE_CAP_HANDLE_KILLPRIV_V2;

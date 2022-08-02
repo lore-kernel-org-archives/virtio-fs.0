@@ -1,29 +1,24 @@
-Return-Path: <borntraeger@linux.ibm.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ibm.com;
- h=message-id : date :
- mime-version : subject : to : cc : references : from : in-reply-to :
- content-type : content-transfer-encoding; s=pp1;
- bh=j0inD2W7mpQlMGHysOuaabyIle0Zfex/rprt99z5/yU=;
- b=eP2RY4t0JmwmMKSidBG3rR8AY0CM716KlZ+FlGOqXhHG9OR6NhGp5TpyhkDADOOl/4fs
- 25aSthqerVdcX0YksOH0/4cWrgX8/v5nmvxyO+dtDlnPxtJyE2YnRqjK8vwNYuHbDWQO
- H+tXtC8uJP0yIzC1/WJVulocBD21ceSNsfh6gBfjxc1IjAd6y4R5mgE0o22EGIp2f40s
- ZIgvrKVFz8kkPggePoJ3U5EpghY6/Bat+zjaXOsvHGH74cjK9O5k6F3xCvHoowTXQv7N
- pnPG3GmKXdcGf2Gz4Iwl3x0AKF+pCJpbaRAHdX0+1QMdsZLCuqDmZeG4hRFL0dhJmeIl pg==
-Message-ID: <f82d0672-00e0-fb6f-fcce-1c9dd605b95d@linux.ibm.com>
-Date: Fri, 14 Oct 2022 13:58:50 +0200
+Return-Path: <alex.bennee@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=content-transfer-encoding:mime-version:references:in-reply-to
+ :message-id:date:subject:cc:to:from:from:to:cc;
+ bh=BeukRfDDjs+xL5noIXV/lsICwMCkD6JOsmbjcLzfdS8=;
+ b=CUwEGBL5C/JqKOJP/LBMM278xBWStj22K4nHZJAPkribGRw5iqexJFwPZBAez6ibLv
+ tNuauOhaPA2UjJQ6D1uvPaeLHajCB3Lgbfawg71HQK7VJAWY+9CMjY82mR0IbUE7vYS6
+ fOYcNr8VdOPJ3eQCQBBA01JYLuIiFyHN2/dw5cauOp9PnvR4prnLwoW2ASx0rZoF5Daf
+ Hb/jvCbdN8YL+ioeD+/Xxy1pcIeyMbelgel1uePoQsxMpQj0IBDykKW6k2fB7ODlvTQQ
+ EtG5wesmUXzLPr49JjyOsEYJf+tuBQKn5w6ykduLhArNfvOOt47S9o6U8/+vbfnZXdVR
+ 2PaA==
+From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
+Date: Tue,  2 Aug 2022 10:49:59 +0100
+Message-Id: <20220802095010.3330793-12-alex.bennee@linaro.org>
+In-Reply-To: <20220802095010.3330793-1-alex.bennee@linaro.org>
+References: <20220802095010.3330793-1-alex.bennee@linaro.org>
 MIME-Version: 1.0
-References: <20221010172813.204597-1-mst@redhat.com>
- <20221010172813.204597-8-mst@redhat.com>
- <3a002a6a-9135-ad45-3fed-7dd270450d0b@linux.ibm.com>
- <1c400131-59f6-f14f-e7e0-3871cc0d1815@linux.ibm.com>
- <87czauoe6y.fsf@linaro.org>
-From: Christian Borntraeger <borntraeger@linux.ibm.com>
-In-Reply-To: <87czauoe6y.fsf@linaro.org>
-Content-Language: en-US
-Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] Regression save/restore of vsock: (was [PULL 07/55]
- hw/virtio: move vm_running check to virtio_device_started)
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v4 11/22] hw/virtio: move vhd->started check
+ into helper and add FIXME
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -32,117 +27,241 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>
-Cc: "Michael S. Tsirkin" <mst@redhat.com>, qemu-devel@nongnu.org, Peter Maydell <peter.maydell@linaro.org>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, virtio-fs@redhat.com
+To: qemu-devel@nongnu.org
+Cc: slp@redhat.com, mst@redhat.com, marcandre.lureau@redhat.com, stefanha@redhat.com, mathieu.poirier@linaro.org, viresh.kumar@linaro.org, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, "open list:Block layer core" <qemu-block@nongnu.org>, "open list:virtiofs" <virtio-fs@redhat.com>
 
+The `started` field is manipulated internally within the vhost code
+except for one place, vhost-user-blk via f5b22d06fb (vhost: recheck
+dev state in the vhost_migration_log routine). Mark that as a FIXME
+because it introduces a potential race. I think the referenced fix
+should be tracking its state locally.
 
+Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
+---
+ include/hw/virtio/vhost.h      | 12 ++++++++++++
+ hw/block/vhost-user-blk.c      | 10 ++++++++--
+ hw/scsi/vhost-scsi.c           |  4 ++--
+ hw/scsi/vhost-user-scsi.c      |  2 +-
+ hw/virtio/vhost-user-fs.c      |  3 ++-
+ hw/virtio/vhost-user-i2c.c     |  4 ++--
+ hw/virtio/vhost-user-rng.c     |  4 ++--
+ hw/virtio/vhost-user-vsock.c   |  2 +-
+ hw/virtio/vhost-vsock-common.c |  3 ++-
+ hw/virtio/vhost-vsock.c        |  2 +-
+ 10 files changed, 33 insertions(+), 13 deletions(-)
 
-Am 14.10.22 um 13:07 schrieb Alex Benn=C3=A9e:
->=20
-> Christian Borntraeger <borntraeger@linux.ibm.com> writes:
->=20
->> Am 14.10.22 um 09:30 schrieb Christian Borntraeger:
->>> Am 10.10.22 um 19:29 schrieb Michael S. Tsirkin:
->>>> From: Alex Benn=C3=A9e <alex.bennee@linaro.org>
->>>>
->>>> All the boilerplate virtio code does the same thing (or should at
->>>> least) of checking to see if the VM is running before attempting to
->>>> start VirtIO. Push the logic up to the common function to avoid
->>>> getting a copy and paste wrong.
->>>>
->>>> Signed-off-by: Alex Benn=C3=A9e <alex.bennee@linaro.org>
->>>> Message-Id: <20220802095010.3330793-11-alex.bennee@linaro.org>
->>>> Reviewed-by: Michael S. Tsirkin <mst@redhat.com>
->>>> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
->>> This results in a regression for our s390x CI when doing
->>> save/restore of guests with vsock:
->>>   =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
-=A0=C2=A0=C2=A0=C2=A0 #1=C2=A0 0x000003ff9a248580 raise (libc.so.6 + 0x4858=
-0)
->>>   =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
-=A0=C2=A0=C2=A0=C2=A0 #2=C2=A0 0x000003ff9a22b5c0 abort (libc.so.6 + 0x2b5c=
-0)
->>>   =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
-=A0=C2=A0=C2=A0=C2=A0 #3=C2=A0 0x000003ff9a2409da __assert_fail_base (libc.=
-so.6 + 0x409da)
->>>   =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
-=A0=C2=A0=C2=A0=C2=A0 #4=C2=A0 0x000003ff9a240a4e __assert_fail (libc.so.6 =
-+ 0x40a4e)
->>>   =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
-=A0=C2=A0=C2=A0=C2=A0 #5=C2=A0 0x000002aa2d69a066 vhost_vsock_common_pre_sa=
-ve (qemu-system-s390x + 0x39a066)
->>>   =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
-=A0=C2=A0=C2=A0=C2=A0 #6=C2=A0 0x000002aa2d55570e vmstate_save_state_v (qem=
-u-system-s390x + 0x25570e)
->>>   =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
-=A0=C2=A0=C2=A0=C2=A0 #7=C2=A0 0x000002aa2d556218 vmstate_save_state (qemu-=
-system-s390x + 0x256218)
->>>   =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
-=A0=C2=A0=C2=A0=C2=A0 #8=C2=A0 0x000002aa2d570ba4
->>> qemu_savevm_state_complete_precopy_non_iterable (qemu-system-s390x +
->>> 0x270ba4)
->>>   =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
-=A0=C2=A0=C2=A0=C2=A0 #9=C2=A0 0x000002aa2d5710b6 qemu_savevm_state_complet=
-e_precopy (qemu-system-s390x + 0x2710b6)
->>>   =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
-=A0=C2=A0=C2=A0=C2=A0 #10 0x000002aa2d564d0e migration_completion (qemu-sys=
-tem-s390x + 0x264d0e)
->>>   =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
-=A0=C2=A0=C2=A0=C2=A0 #11 0x000002aa2d8db25c qemu_thread_start (qemu-system=
--s390x + 0x5db25c)
->>>   =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
-=A0=C2=A0=C2=A0=C2=A0 #12 0x000003ff9a296248 start_thread (libc.so.6 + 0x96=
-248)
->>>   =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=
-=A0=C2=A0=C2=A0=C2=A0 #13 0x000003ff9a31183e thread_start (libc.so.6 + 0x11=
-183e)
->>>
->>
->>
->> Something like
->> diff --git a/hw/virtio/vhost-vsock.c b/hw/virtio/vhost-vsock.c
->> index 7dc3c7393122..b4d056ae6f01 100644
->> --- a/hw/virtio/vhost-vsock.c
->> +++ b/hw/virtio/vhost-vsock.c
->> @@ -73,6 +73,10 @@ static void vhost_vsock_set_status(VirtIODevice *vdev=
-, uint8_t status)
->>       bool should_start =3D virtio_device_started(vdev, status);
->>       int ret;
->>   +    if (!vdev->vm_running) {
->> +        should_start =3D false;
->> +    }
->> +
->>       if (vhost_dev_is_started(&vvc->vhost_dev) =3D=3D should_start) {
->>           return;
->>       }
->>
->> helps.
->>
->> The problem seems to be that virtio_device_started does ignore
->> vm_running when use_start is set.
->=20
-> Wouldn't it make more sense to re-order the check there, something like:
->=20
->    static inline bool virtio_device_started(VirtIODevice *vdev, uint8_t s=
-tatus)
->    {
->        if (!vdev->vm_running) {
->            return false;
->        }
->=20
->        if (vdev->use_started) {
->            return vdev->started;
->        }
->=20
->        return status & VIRTIO_CONFIG_S_DRIVER_OK;
->    }
-
-That does work as well. (and it restores the original ordering so that make=
-s sense).
-
->=20
-> Is the problem that vdev->started gets filled during the migration but
-> because the VM isn't running yet we can never actually run?
-
-I dont know.
+diff --git a/include/hw/virtio/vhost.h b/include/hw/virtio/vhost.h
+index 586c5457e2..61b957e927 100644
+--- a/include/hw/virtio/vhost.h
++++ b/include/hw/virtio/vhost.h
+@@ -94,6 +94,7 @@ struct vhost_dev {
+     uint64_t protocol_features;
+     uint64_t max_queues;
+     uint64_t backend_cap;
++    /* @started: is the vhost device started? */
+     bool started;
+     bool log_enabled;
+     uint64_t log_size;
+@@ -165,6 +166,17 @@ int vhost_dev_enable_notifiers(struct vhost_dev *hdev, VirtIODevice *vdev);
+  */
+ void vhost_dev_disable_notifiers(struct vhost_dev *hdev, VirtIODevice *vdev);
+ 
++/**
++ * vhost_dev_is_started() - report status of vhost device
++ * @hdev: common vhost_dev structure
++ *
++ * Return the started status of the vhost device
++ */
++static inline bool vhost_dev_is_started(struct vhost_dev *hdev)
++{
++    return hdev->started;
++}
++
+ /**
+  * vhost_dev_start() - start the vhost device
+  * @hdev: common vhost_dev structure
+diff --git a/hw/block/vhost-user-blk.c b/hw/block/vhost-user-blk.c
+index 9117222456..2bba42478d 100644
+--- a/hw/block/vhost-user-blk.c
++++ b/hw/block/vhost-user-blk.c
+@@ -229,7 +229,7 @@ static void vhost_user_blk_set_status(VirtIODevice *vdev, uint8_t status)
+         return;
+     }
+ 
+-    if (s->dev.started == should_start) {
++    if (vhost_dev_is_started(&s->dev) == should_start) {
+         return;
+     }
+ 
+@@ -286,7 +286,7 @@ static void vhost_user_blk_handle_output(VirtIODevice *vdev, VirtQueue *vq)
+         return;
+     }
+ 
+-    if (s->dev.started) {
++    if (vhost_dev_is_started(&s->dev)) {
+         return;
+     }
+ 
+@@ -415,6 +415,12 @@ static void vhost_user_blk_event(void *opaque, QEMUChrEvent event)
+              * the vhost migration code. If disconnect was caught there is an
+              * option for the general vhost code to get the dev state without
+              * knowing its type (in this case vhost-user).
++             *
++             * FIXME: this is sketchy to be reaching into vhost_dev
++             * now because we are forcing something that implies we
++             * have executed vhost_dev_stop() but that won't happen
++             * until vhost_user_blk_stop() gets called from the bh.
++             * Really this state check should be tracked locally.
+              */
+             s->dev.started = false;
+         }
+diff --git a/hw/scsi/vhost-scsi.c b/hw/scsi/vhost-scsi.c
+index 3059068175..bdf337a7a2 100644
+--- a/hw/scsi/vhost-scsi.c
++++ b/hw/scsi/vhost-scsi.c
+@@ -120,7 +120,7 @@ static void vhost_scsi_set_status(VirtIODevice *vdev, uint8_t val)
+         start = false;
+     }
+ 
+-    if (vsc->dev.started == start) {
++    if (vhost_dev_is_started(&vsc->dev) == start) {
+         return;
+     }
+ 
+@@ -147,7 +147,7 @@ static int vhost_scsi_pre_save(void *opaque)
+ 
+     /* At this point, backend must be stopped, otherwise
+      * it might keep writing to memory. */
+-    assert(!vsc->dev.started);
++    assert(!vhost_dev_is_started(&vsc->dev));
+ 
+     return 0;
+ }
+diff --git a/hw/scsi/vhost-user-scsi.c b/hw/scsi/vhost-user-scsi.c
+index 1b2f7eed98..bc37317d55 100644
+--- a/hw/scsi/vhost-user-scsi.c
++++ b/hw/scsi/vhost-user-scsi.c
+@@ -49,7 +49,7 @@ static void vhost_user_scsi_set_status(VirtIODevice *vdev, uint8_t status)
+     VHostSCSICommon *vsc = VHOST_SCSI_COMMON(s);
+     bool start = (status & VIRTIO_CONFIG_S_DRIVER_OK) && vdev->vm_running;
+ 
+-    if (vsc->dev.started == start) {
++    if (vhost_dev_is_started(&vsc->dev) == start) {
+         return;
+     }
+ 
+diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+index d2bebba785..ad0f91c607 100644
+--- a/hw/virtio/vhost-user-fs.c
++++ b/hw/virtio/vhost-user-fs.c
+@@ -20,6 +20,7 @@
+ #include "hw/virtio/virtio-bus.h"
+ #include "hw/virtio/virtio-access.h"
+ #include "qemu/error-report.h"
++#include "hw/virtio/vhost.h"
+ #include "hw/virtio/vhost-user-fs.h"
+ #include "monitor/monitor.h"
+ #include "sysemu/sysemu.h"
+@@ -124,7 +125,7 @@ static void vuf_set_status(VirtIODevice *vdev, uint8_t status)
+     VHostUserFS *fs = VHOST_USER_FS(vdev);
+     bool should_start = virtio_device_started(vdev, status);
+ 
+-    if (fs->vhost_dev.started == should_start) {
++    if (vhost_dev_is_started(&fs->vhost_dev) == should_start) {
+         return;
+     }
+ 
+diff --git a/hw/virtio/vhost-user-i2c.c b/hw/virtio/vhost-user-i2c.c
+index b930cf6d5e..bc58b6c0d1 100644
+--- a/hw/virtio/vhost-user-i2c.c
++++ b/hw/virtio/vhost-user-i2c.c
+@@ -95,7 +95,7 @@ static void vu_i2c_set_status(VirtIODevice *vdev, uint8_t status)
+     VHostUserI2C *i2c = VHOST_USER_I2C(vdev);
+     bool should_start = virtio_device_started(vdev, status);
+ 
+-    if (i2c->vhost_dev.started == should_start) {
++    if (vhost_dev_is_started(&i2c->vhost_dev) == should_start) {
+         return;
+     }
+ 
+@@ -174,7 +174,7 @@ static void vu_i2c_disconnect(DeviceState *dev)
+     }
+     i2c->connected = false;
+ 
+-    if (i2c->vhost_dev.started) {
++    if (vhost_dev_is_started(&i2c->vhost_dev)) {
+         vu_i2c_stop(vdev);
+     }
+ }
+diff --git a/hw/virtio/vhost-user-rng.c b/hw/virtio/vhost-user-rng.c
+index a9c1c4bc79..bc1f36c5ac 100644
+--- a/hw/virtio/vhost-user-rng.c
++++ b/hw/virtio/vhost-user-rng.c
+@@ -92,7 +92,7 @@ static void vu_rng_set_status(VirtIODevice *vdev, uint8_t status)
+     VHostUserRNG *rng = VHOST_USER_RNG(vdev);
+     bool should_start = virtio_device_started(vdev, status);
+ 
+-    if (rng->vhost_dev.started == should_start) {
++    if (vhost_dev_is_started(&rng->vhost_dev) == should_start) {
+         return;
+     }
+ 
+@@ -160,7 +160,7 @@ static void vu_rng_disconnect(DeviceState *dev)
+ 
+     rng->connected = false;
+ 
+-    if (rng->vhost_dev.started) {
++    if (vhost_dev_is_started(&rng->vhost_dev)) {
+         vu_rng_stop(vdev);
+     }
+ }
+diff --git a/hw/virtio/vhost-user-vsock.c b/hw/virtio/vhost-user-vsock.c
+index 22c1616ebd..7b67e29d83 100644
+--- a/hw/virtio/vhost-user-vsock.c
++++ b/hw/virtio/vhost-user-vsock.c
+@@ -57,7 +57,7 @@ static void vuv_set_status(VirtIODevice *vdev, uint8_t status)
+     VHostVSockCommon *vvc = VHOST_VSOCK_COMMON(vdev);
+     bool should_start = virtio_device_started(vdev, status);
+ 
+-    if (vvc->vhost_dev.started == should_start) {
++    if (vhost_dev_is_started(&vvc->vhost_dev) == should_start) {
+         return;
+     }
+ 
+diff --git a/hw/virtio/vhost-vsock-common.c b/hw/virtio/vhost-vsock-common.c
+index 7394818e00..29b9ab4f72 100644
+--- a/hw/virtio/vhost-vsock-common.c
++++ b/hw/virtio/vhost-vsock-common.c
+@@ -14,6 +14,7 @@
+ #include "hw/virtio/virtio-access.h"
+ #include "qemu/error-report.h"
+ #include "hw/qdev-properties.h"
++#include "hw/virtio/vhost.h"
+ #include "hw/virtio/vhost-vsock.h"
+ #include "qemu/iov.h"
+ #include "monitor/monitor.h"
+@@ -199,7 +200,7 @@ int vhost_vsock_common_pre_save(void *opaque)
+      * At this point, backend must be stopped, otherwise
+      * it might keep writing to memory.
+      */
+-    assert(!vvc->vhost_dev.started);
++    assert(!vhost_dev_is_started(&vvc->vhost_dev));
+ 
+     return 0;
+ }
+diff --git a/hw/virtio/vhost-vsock.c b/hw/virtio/vhost-vsock.c
+index 8031c164a5..7dc3c73931 100644
+--- a/hw/virtio/vhost-vsock.c
++++ b/hw/virtio/vhost-vsock.c
+@@ -73,7 +73,7 @@ static void vhost_vsock_set_status(VirtIODevice *vdev, uint8_t status)
+     bool should_start = virtio_device_started(vdev, status);
+     int ret;
+ 
+-    if (vvc->vhost_dev.started == should_start) {
++    if (vhost_dev_is_started(&vvc->vhost_dev) == should_start) {
+         return;
+     }
+ 
+-- 
+2.30.2
 

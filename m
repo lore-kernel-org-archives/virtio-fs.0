@@ -1,29 +1,11 @@
-Return-Path: <virtiofs-bot@sinrega.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
- cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; t=1667923264; x=1668009664; bh=iOGxzJMkoElZjdPhiKHx3
- 8InVVPdoOydOU7Ma0CQ5ls=; b=7sN+qUNbHl/1SXHthpDgcGM6STPBp8qM3FUHN
- 6wu6D4tVRFew67VXTepoVbsXXpYSUBfQcM+mqakOMNsNvyJs93+xA5NaiSsz2Y8v
- GAZ90/Zt7YyGTcDu9cUKaeo2gCMMvY4PEMGdjUS8flY4Ha0ZS+iX5PKSPqW+FWs3
- P6OngUlMODUruNwpEupbaW1peedTs2eba5m9uJy387e4HD9LIgvD4s0G4MZTfUU6
- xGrl3yF9qLCTY4O7IFDqbUCOOjvVOOLChs5auCsjFt4gs1Xa34IZV4LoD1Qa+yGE
- hcMrlr5L/I9EMBlmIQX6WKj2dNdKZCMsehYBgDTraA0JeXgkw==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
- messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
- :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
- :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; t=
- 1667923264; x=1668009664; bh=iOGxzJMkoElZjdPhiKHx38InVVPdoOydOU7
- Ma0CQ5ls=; b=HG9OOXFKF+/lOlqJm4dSO1ZzktJ22uqcqxlSmyBaPbj2iBZ0qHY
- Gwx7joYcJIjCqmtwhX2AKMatbtG7PDtV3GjtwpdIHlBWAZMw3MbXC6fx/FaqPJoD
- /+1gmv7EARE4mIkuWjBZIEB9X8JWC2VUHF/TyYr07ravIhUSdU/YtGE283zx3rI4
- AEpnBdNxCQGDk5NY4wpoLUILmW+4DZWBguctMJglyYplHJTdqX3BzkddO3F1lkkm
- JYJGTdFdhOG5Lhuu1zFKV7phIle5/vexkaB8Hf1t9bn/lKGJ+htSqfv23HasOVPD
- PccPdwzyzOexptqduvN1VsktMahwrdOT0Hg==
-From: virtiofs-bot@sinrega.org
-Message-Id: <83408.122110811010501265@us-mta-135.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Tue,  8 Nov 2022 16:01:07 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR merged: Add missing license file header
+Return-Path: <stefanha@redhat.com>
+From: Stefan Hajnoczi <stefanha@redhat.com>
+Date: Thu,  4 Aug 2022 15:02:57 -0400
+Message-Id: <20220804190258.20226-1-stefanha@redhat.com>
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PULL for-7.1 0/1] Block patches
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -32,12 +14,34 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: qemu-devel@nongnu.org
+Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, qemu-block@nongnu.org, Richard Henderson <richard.henderson@linaro.org>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>
 
-Add missing license file header BSD-3-Clause SPDX license identifier
+The following changes since commit 2480f3bbd03814b0651a1f74959f5c6631ee5819:
 
-NOTE:
-There is another file that needs a license header `fs_cache_req_handler.rs`
----
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/133
+  Merge tag 'linux-user-for-7.1-pull-request' of https://gitlab.com/laurent_vivier/qemu into staging (2022-08-03 08:32:44 -0700)
+
+are available in the Git repository at:
+
+  https://gitlab.com/stefanha/qemu.git tags/block-pull-request
+
+for you to fetch changes up to 7b0ca313647532a2c7007379ff800c9a2415c95d:
+
+  virtiofsd: Fix format strings (2022-08-04 14:44:25 -0400)
+
+----------------------------------------------------------------
+Pull request
+
+- Format string portability fix in virtiofsd
+
+----------------------------------------------------------------
+
+Stefan Weil (1):
+  virtiofsd: Fix format strings
+
+ tools/virtiofsd/fuse_lowlevel.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+-- 
+2.37.1
 

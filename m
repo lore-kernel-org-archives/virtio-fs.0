@@ -1,25 +1,24 @@
-Return-Path: <akihiko.odaki@daynix.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=daynix-com.20210112.gappssmtp.com; s=20210112;
- h=content-transfer-encoding:mime-version:references:in-reply-to
- :message-id:date:subject:cc:to:from:from:to:cc:subject:date
- :message-id:reply-to;
- bh=S71uA1qqGC/6TbeUsoWwC8+Ke/IgKE6MHXg9S63X/NM=;
- b=GO8WB5ka6tue1ww5t9EDi25pnB8BMHJzfN5Ib9bNU4FCiwYIQuZJy63ZzDqvmc+u+w
- 4OowzgYlQxV/kHLv9AoLd38HfFV8bWESXF0RYyw1vq35/j/DaqNEMBT+C63zg4baRvqy
- FPJm6AS3v89MwbGwRWe+/LavDZFId/eG03Vwr+RAL5/VxjbtvVSbwRjqnnjdcz3Ofss8
- HWER7E9ImD/h2mb/+dTCZcpWCbfquKpFj63iYFgMD94C3rf+NZlziNIHVQUSpcPK5oZM
- odBb6AatY+CqaFbAuZhnksJC68RgRdPXakeCfQmXBnT++Nfip/Byz1YgpPX3aWj/w0Hh
- XyXw==
-From: Akihiko Odaki <akihiko.odaki@daynix.com>
-Date: Thu, 10 Nov 2022 19:06:20 +0900
-Message-Id: <20221110100629.61496-2-akihiko.odaki@daynix.com>
-In-Reply-To: <20221110100629.61496-1-akihiko.odaki@daynix.com>
-References: <20221110100629.61496-1-akihiko.odaki@daynix.com>
+Return-Path: <richard.henderson@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=message-id:date:mime-version:user-agent:subject:content-language:to
+ :cc:references:from:in-reply-to:content-transfer-encoding;
+ bh=28K+JLIxMAw/ud6crVH6+SBchG8dHL/Ih0iPmrFKUp8=;
+ b=nhZ1kc2lse7ORlH4o7va3TfbnI8sxkJPK4ruS9I2giG+z67v1H1PD96uK7Sa8eu5t0
+ vk11ntVZAxCUGVtep/iJ4ybSC7rVFtUJSbsqrAVPp9fveuJmV2WXnboVvvzl7bEeEZl9
+ BN060jtJC/0C3/PDfxlagBncDXstozM4t75VRg3qIKtDkncOq5Vyct/+WyKTXrHNzFBA
+ KnoOVFN/2qjWf+UwKlfxKnnFmqzExfnMYBY6mfYjJmxuMkYyVDOEBIRDSfJPFuRBrHqy
+ HnsiYBdqrTHhfQAP+19HJclsnUbk/FSqplLrQYNQVO/D5N6GGAFLHGgqLQxxp5RdPexF
+ BIrg==
+Message-ID: <a4688ccf-a8c9-5e7d-f570-001b417a0025@linaro.org>
+Date: Thu, 4 Aug 2022 17:20:19 -0700
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Subject: [Virtio-fs] [PATCH v2 01/10] qga: Remove platform GUID definitions
+References: <20220804190258.20226-1-stefanha@redhat.com>
+From: Richard Henderson <richard.henderson@linaro.org>
+In-Reply-To: <20220804190258.20226-1-stefanha@redhat.com>
+Content-Language: en-US
+Content-Type: text/plain; charset=UTF-8; format=flowed
+Content-Transfer-Encoding: 7bit
+Subject: Re: [Virtio-fs] [PULL for-7.1 0/1] Block patches
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -28,35 +27,41 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-Cc: qemu-devel@nongnu.org, qemu-block@nongnu.org, virtio-fs@redhat.com, Yuval Shaia <yuval.shaia.ml@gmail.com>, Marcel Apfelbaum <marcel.apfelbaum@gmail.com>, Konstantin Kostiuk <kkostiuk@redhat.com>, Michael Roth <michael.roth@amd.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Stefan Weil <sw@weilnetz.de>, Yan Vugenfirer <yan@daynix.com>, Akihiko Odaki <akihiko.odaki@daynix.com>
+To: Stefan Hajnoczi <stefanha@redhat.com>, qemu-devel@nongnu.org
+Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, qemu-block@nongnu.org, virtio-fs@redhat.com
 
-GUID_DEVINTERFACE_DISK and GUID_DEVINTERFACE_STORAGEPORT are already
-defined by MinGW-w64. They are not only unnecessary, but can lead to
-duplicate definition errors at link time with some unknown condition.
+On 8/4/22 12:02, Stefan Hajnoczi wrote:
+> The following changes since commit 2480f3bbd03814b0651a1f74959f5c6631ee5819:
+> 
+>    Merge tag 'linux-user-for-7.1-pull-request' of https://gitlab.com/laurent_vivier/qemu into staging (2022-08-03 08:32:44 -0700)
+> 
+> are available in the Git repository at:
+> 
+>    https://gitlab.com/stefanha/qemu.git tags/block-pull-request
+> 
+> for you to fetch changes up to 7b0ca313647532a2c7007379ff800c9a2415c95d:
+> 
+>    virtiofsd: Fix format strings (2022-08-04 14:44:25 -0400)
+> 
+> ----------------------------------------------------------------
+> Pull request
+> 
+> - Format string portability fix in virtiofsd
 
-Signed-off-by: Akihiko Odaki <akihiko.odaki@daynix.com>
----
- qga/commands-win32.c | 7 -------
- 1 file changed, 7 deletions(-)
 
-diff --git a/qga/commands-win32.c b/qga/commands-win32.c
-index ec9f55b453..dde5d401bb 100644
---- a/qga/commands-win32.c
-+++ b/qga/commands-win32.c
-@@ -506,13 +506,6 @@ static GuestDiskBusType find_bus_type(STORAGE_BUS_TYPE bus)
-     return win2qemu[(int)bus];
- }
- 
--DEFINE_GUID(GUID_DEVINTERFACE_DISK,
--        0x53f56307L, 0xb6bf, 0x11d0, 0x94, 0xf2,
--        0x00, 0xa0, 0xc9, 0x1e, 0xfb, 0x8b);
--DEFINE_GUID(GUID_DEVINTERFACE_STORAGEPORT,
--        0x2accfe60L, 0xc130, 0x11d2, 0xb0, 0x82,
--        0x00, 0xa0, 0xc9, 0x1e, 0xfb, 0x8b);
--
- static void get_pci_address_for_device(GuestPCIAddress *pci,
-                                        HDEVINFO dev_info)
- {
--- 
-2.38.1
+Applied, thanks.  Please update https://wiki.qemu.org/ChangeLog/7.1 as appropriate.
+
+
+r~
+
+
+> 
+> ----------------------------------------------------------------
+> 
+> Stefan Weil (1):
+>    virtiofsd: Fix format strings
+> 
+>   tools/virtiofsd/fuse_lowlevel.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+> 
 

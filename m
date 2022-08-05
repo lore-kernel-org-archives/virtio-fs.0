@@ -1,25 +1,30 @@
-Return-Path: <akihiko.odaki@daynix.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=daynix-com.20210112.gappssmtp.com; s=20210112;
- h=content-transfer-encoding:mime-version:references:in-reply-to
- :message-id:date:subject:cc:to:from:from:to:cc:subject:date
- :message-id:reply-to;
- bh=djQvtbI+5ceah01/E9QXrKDRfdUAtdLN189JgwjzOBQ=;
- b=X7619O6+AdiYwxaT+Q0YWH3poE/y/5bmr5FbkZZd/9sZtKl7M659hX3aOJebhv1yTg
- H24CA6PMegkFkfvXIwXlHtTpNP8NvBiWrUgupsUQHROjhWIqwIKofkIvFdxZh70Blvb1
- YWiHSdSUYGoF3Bmy0h0ajrO4vFrCoaA2KdAj4GWdhiiv8UUmjE74DZ1D59Ky1DnOEZ1L
- jmoBy5AgGa5mu5ZXXi1UuIDb2Cb6zoLaaR7c8O+dJxsb1uBqRnr6Ov+oWigM6Gy9o7wV
- AEV7MG1l1f0FyGRkWf1XFzlpaUhwZ1c9fW4z83U9B8MGTHOIahkADiJBqA19/WsUn2sT
- 3/qQ==
-From: Akihiko Odaki <akihiko.odaki@daynix.com>
-Date: Thu, 10 Nov 2022 19:06:28 +0900
-Message-Id: <20221110100629.61496-10-akihiko.odaki@daynix.com>
-In-Reply-To: <20221110100629.61496-1-akihiko.odaki@daynix.com>
-References: <20221110100629.61496-1-akihiko.odaki@daynix.com>
-MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
+Return-Path: <virtiofs-bot@sinrega.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+ cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+ :to; s=fm3; t=1659685429; x=1659771829; bh=AzQzmtSpF1fUvvEaG6vC5
+ zhl3PEktUZaFJavxCzFY1Q=; b=FAv5WIjI/ssUgPWw/wW2PC3okIaRYxmFMWNYy
+ cvzQ0kslIHFfAgjD22uEsU3xIwKpLViZk0DeQN1ZXsJF7O91BFEOtEAwKcGlu9+t
+ plfnmORRjccDKdJCTcgQk5k8QE8BmWbLxYWD+ZOuWwf8MG9ejjqfiG5OiuiP5P98
+ ZaDkcky6l3VM+Csh6iBnRONpRBAfL/ldKc3Iygasb+3d7ujBroBmLuXqTEeUYL2W
+ bYxEqYUCgCzMtU/GaiG7uwaRllxpa/tRRSMo7rZac7NW3tX5r6Aw/NZce7uqWeVo
+ i7u/7CkiyPm6LC1Q46fV+3eB4/B9Rte8tWIj9PiqH8wWj1csA==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+ messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
+ :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
+ :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm3; t=
+ 1659685429; x=1659771829; bh=AzQzmtSpF1fUvvEaG6vC5zhl3PEktUZaFJa
+ vxCzFY1Q=; b=KH1qcHCIBE0FIhHeYWK46iR/RjYZDfznPcl/MgEuboyawUk7qYU
+ UXUYLG8bLEpLhwgcMlX9wkyUxqkDfLLsK702RzOGi3b1HL/08lneV3bpwd5oc3Fu
+ ZkJovxyt7hP4Rz1OCguCA+vykuw/AoFhOge9URhX5LM4S85hl4kTkkntdCJ9i4lh
+ uPB/1h0dsoVtwscJLGHkPz0LJsT+MaEdMCA9hwvCSh2x8a7mcYOgGxIgJH7ss37B
+ 4Cg/J7IqEYAg9kgOEIP1GweOnzbrp3oYXR+prt096gFCnbQGxvwauzC9U+bB69p/
+ +mHe1Dapuch7hiIgrFywymlyFAH+dBQ4fNA==
+From: virtiofs-bot@sinrega.org
+Message-Id: <04854.122080503435000137@us-mta-60.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Subject: [Virtio-fs] [PATCH v2 09/10] util: Remove qemu_get_local_state_dir()
+Date: Fri,  5 Aug 2022 07:43:52 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] Issue opened: Implement suport for remote
+ POSIX locks
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -28,74 +33,11 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-Cc: qemu-devel@nongnu.org, qemu-block@nongnu.org, virtio-fs@redhat.com, Yuval Shaia <yuval.shaia.ml@gmail.com>, Marcel Apfelbaum <marcel.apfelbaum@gmail.com>, Konstantin Kostiuk <kkostiuk@redhat.com>, Michael Roth <michael.roth@amd.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Stefan Weil <sw@weilnetz.de>, Yan Vugenfirer <yan@daynix.com>, Akihiko Odaki <akihiko.odaki@daynix.com>
+To: virtio-fs@redhat.com
 
-There are no users of the function anymore.
+The C implementation of the daemon has limited support for remote POSIX locks, restricted exclusively to non-blocking operations. We tried to implement the same level of functionality in #2, but we finally decided against it because, in practice most applications will fail if non-blocking operations aren't supported.
 
-Signed-off-by: Akihiko Odaki <akihiko.odaki@daynix.com>
+Implementing support for non-blocking isn't trivial and will probably require extending the kernel interface before we can even start working on the daemon side.
 ---
- include/qemu/osdep.h |  8 --------
- util/oslib-posix.c   |  6 ------
- util/oslib-win32.c   | 10 ----------
- 3 files changed, 24 deletions(-)
-
-diff --git a/include/qemu/osdep.h b/include/qemu/osdep.h
-index 86445aad25..f21ebf2b27 100644
---- a/include/qemu/osdep.h
-+++ b/include/qemu/osdep.h
-@@ -557,14 +557,6 @@ ssize_t qemu_write_full(int fd, const void *buf, size_t count)
- 
- void qemu_set_cloexec(int fd);
- 
--/* Return a dynamically allocated directory path that is appropriate for storing
-- * local state.
-- *
-- * The caller is responsible for releasing the value returned with g_free()
-- * after use.
-- */
--char *qemu_get_local_state_dir(void);
--
- /**
-  * qemu_get_runtime_dir:
-  *
-diff --git a/util/oslib-posix.c b/util/oslib-posix.c
-index 9a0b3913ff..b8d79876b2 100644
---- a/util/oslib-posix.c
-+++ b/util/oslib-posix.c
-@@ -273,12 +273,6 @@ int qemu_socketpair(int domain, int type, int protocol, int sv[2])
-     return ret;
- }
- 
--char *
--qemu_get_local_state_dir(void)
--{
--    return get_relocated_path(CONFIG_QEMU_LOCALSTATEDIR);
--}
--
- char *
- qemu_get_runtime_dir(void)
- {
-diff --git a/util/oslib-win32.c b/util/oslib-win32.c
-index 6ad1bb4bac..a32cc5b1be 100644
---- a/util/oslib-win32.c
-+++ b/util/oslib-win32.c
-@@ -233,16 +233,6 @@ int qemu_get_thread_id(void)
-     return GetCurrentThreadId();
- }
- 
--char *
--qemu_get_local_state_dir(void)
--{
--    const char * const *data_dirs = g_get_system_data_dirs();
--
--    g_assert(data_dirs && data_dirs[0]);
--
--    return g_strdup(data_dirs[0]);
--}
--
- char *
- qemu_get_runtime_dir(void)
- {
--- 
-2.38.1
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/53
 

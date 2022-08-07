@@ -1,15 +1,27 @@
-Return-Path: <vgoyal@redhat.com>
-Date: Tue, 26 Jul 2022 09:17:09 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <Yt/pVXilvkiLgowx@redhat.com>
-References: <4f2c71a4-609e-6880-04d0-2eb127c55023@linux.dev>
- <CAJSP0QUzd7GXK0XN7YBBfEqO6abQSZMdJzW8pEHnz-ZnGetUWA@mail.gmail.com>
+Return-Path: <raphael.norwitz@nutanix.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nutanix.com;
+ h=from : to : cc :
+ subject : date : message-id : references : in-reply-to : content-type :
+ content-id : content-transfer-encoding : mime-version;
+ s=proofpoint20171006; bh=h1NJIbRguLdzUy9OLkiVyJFm0+t+aOHwiSjQ/nd21Nc=;
+ b=hbTfhF9A3pay0flUAninKYUMV/0XdjMGk70famESK8tKjSXcwOXvg96UT5JIhnaejVA8
+ IHEcvupaU7U1EMQLjKQNAHw8LjSqhDqERCpV2C0SRdrJrPEYuhIiPpgkUgd89n209ftk
+ BLVHWTDjk0EpB8DjCHYGbygLBiJGXqSwBIT7T3zMwH76xE3y5Nt2UGvStfZCCEiLiseY
+ 7EIVVTCICbmmsmwOfbMILeLsWMkaAFbZWvRuXVPCQ+kEjSJWhGjItNnjapGu/KulfzSs
+ PZ+X9Plf1x7/xeMPD6BrVUTz93KmSj9dnP4g7uFU3oSwJ92F50jzNgG1GYMhE6N4rboO mg==
+From: Raphael Norwitz <raphael.norwitz@nutanix.com>
+Date: Sun, 7 Aug 2022 20:13:13 +0000
+Message-ID: <20220807201307.GA32495@raphael-debian-dev>
+References: <20220802095010.3330793-1-alex.bennee@linaro.org>
+ <20220802095010.3330793-12-alex.bennee@linaro.org>
+In-Reply-To: <20220802095010.3330793-12-alex.bennee@linaro.org>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <CAJSP0QUzd7GXK0XN7YBBfEqO6abQSZMdJzW8pEHnz-ZnGetUWA@mail.gmail.com>
-Subject: Re: [Virtio-fs] Question about performance comparison between
- virtio-fs and virtio-blk
+Content-Language: en-US
+Content-Type: text/plain; charset=WINDOWS-1252
+Content-ID: <A16D428FCBDC644CACAB231038A848F0@namprd02.prod.outlook.com>
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH v4 11/22] hw/virtio: move vhd->started check
+ into helper and add FIXME
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,48 +30,272 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@gmail.com>
-Cc: Hao Xu <hao.xu@linux.dev>, qemu-devel <qemu-devel@nongnu.org>, virtio-fs@redhat.com
+To: =?iso-8859-1?Q?Alex_Benn=E9e?= <alex.bennee@linaro.org>
+Cc: "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, "slp@redhat.com" <slp@redhat.com>, "mst@redhat.com" <mst@redhat.com>, "marcandre.lureau@redhat.com" <marcandre.lureau@redhat.com>, "stefanha@redhat.com" <stefanha@redhat.com>, "mathieu.poirier@linaro.org" <mathieu.poirier@linaro.org>, "viresh.kumar@linaro.org" <viresh.kumar@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, "open list:Block layer core" <qemu-block@nongnu.org>, "open list:virtiofs" <virtio-fs@redhat.com>
 
-On Tue, Jul 26, 2022 at 08:55:38AM -0400, Stefan Hajnoczi wrote:
-> On Tue, 26 Jul 2022 at 08:24, Hao Xu <hao.xu@linux.dev> wrote:
-> > I watched your presentation about virtiofs in 2020,
-> >
-> > https://www.youtube.com/watch?v=EIVOzTsGMMI&t=232s
-> >
-> > which is really helpful to me, but I have a question about the graph at
-> > 3:53, could you give
-> >
-> > me more info about the test, like what tool you use for the test, if
-> > it's fio, what is the parameters.
-> >
-> > I used fio to do randread test in a qemu box, but turns out the iops of
-> > virtio-blk and virtio-fs are similar.
+On Tue, Aug 02, 2022 at 10:49:59AM +0100, Alex Benn=E9e wrote:
+> The `started` field is manipulated internally within the vhost code
+> except for one place, vhost-user-blk via f5b22d06fb (vhost: recheck
+> dev state in the vhost_migration_log routine). Mark that as a FIXME
+> because it introduces a potential race. I think the referenced fix
+> should be tracking its state locally.
+
+I don't think we can track the state locally. As described in the commit
+message for f5b22d06fb, the state is used by vhost code in the
+vhost_migration_log() function so we probably need something at the
+vhost level. I do agree we shouldn't re-use vdev->started.
+
+Maybe we should add another 'active' variable in vhost_dev? I'm happy
+to send a patch for that.
+
+Until we agree on a better solution I'm happy with the FIXME.
+
+Reviewed-by: Raphael Norwitz <raphael.norwittz@nutanix.com>
+
+>=20
+> Signed-off-by: Alex Benn=E9e <alex.bennee@linaro.org>
+> ---
+>  include/hw/virtio/vhost.h      | 12 ++++++++++++
+>  hw/block/vhost-user-blk.c      | 10 ++++++++--
+>  hw/scsi/vhost-scsi.c           |  4 ++--
+>  hw/scsi/vhost-user-scsi.c      |  2 +-
+>  hw/virtio/vhost-user-fs.c      |  3 ++-
+>  hw/virtio/vhost-user-i2c.c     |  4 ++--
+>  hw/virtio/vhost-user-rng.c     |  4 ++--
+>  hw/virtio/vhost-user-vsock.c   |  2 +-
+>  hw/virtio/vhost-vsock-common.c |  3 ++-
+>  hw/virtio/vhost-vsock.c        |  2 +-
+>  10 files changed, 33 insertions(+), 13 deletions(-)
+>=20
+> diff --git a/include/hw/virtio/vhost.h b/include/hw/virtio/vhost.h
+> index 586c5457e2..61b957e927 100644
+> --- a/include/hw/virtio/vhost.h
+> +++ b/include/hw/virtio/vhost.h
+> @@ -94,6 +94,7 @@ struct vhost_dev {
+>      uint64_t protocol_features;
+>      uint64_t max_queues;
+>      uint64_t backend_cap;
+> +    /* @started: is the vhost device started? */
+>      bool started;
+>      bool log_enabled;
+>      uint64_t log_size;
+> @@ -165,6 +166,17 @@ int vhost_dev_enable_notifiers(struct vhost_dev *hde=
+v, VirtIODevice *vdev);
+>   */
+>  void vhost_dev_disable_notifiers(struct vhost_dev *hdev, VirtIODevice *v=
+dev);
+> =20
+> +/**
+> + * vhost_dev_is_started() - report status of vhost device
+> + * @hdev: common vhost_dev structure
+> + *
+> + * Return the started status of the vhost device
+> + */
+> +static inline bool vhost_dev_is_started(struct vhost_dev *hdev)
+> +{
+> +    return hdev->started;
+> +}
+> +
+>  /**
+>   * vhost_dev_start() - start the vhost device
+>   * @hdev: common vhost_dev structure
+> diff --git a/hw/block/vhost-user-blk.c b/hw/block/vhost-user-blk.c
+> index 9117222456..2bba42478d 100644
+> --- a/hw/block/vhost-user-blk.c
+> +++ b/hw/block/vhost-user-blk.c
+> @@ -229,7 +229,7 @@ static void vhost_user_blk_set_status(VirtIODevice *v=
+dev, uint8_t status)
+>          return;
+>      }
+> =20
+> -    if (s->dev.started =3D=3D should_start) {
+> +    if (vhost_dev_is_started(&s->dev) =3D=3D should_start) {
+>          return;
+>      }
+> =20
+> @@ -286,7 +286,7 @@ static void vhost_user_blk_handle_output(VirtIODevice=
+ *vdev, VirtQueue *vq)
+>          return;
+>      }
+> =20
+> -    if (s->dev.started) {
+> +    if (vhost_dev_is_started(&s->dev)) {
+>          return;
+>      }
+> =20
+> @@ -415,6 +415,12 @@ static void vhost_user_blk_event(void *opaque, QEMUC=
+hrEvent event)
+>               * the vhost migration code. If disconnect was caught there =
+is an
+>               * option for the general vhost code to get the dev state wi=
+thout
+>               * knowing its type (in this case vhost-user).
+> +             *
+> +             * FIXME: this is sketchy to be reaching into vhost_dev
+> +             * now because we are forcing something that implies we
+> +             * have executed vhost_dev_stop() but that won't happen
+> +             * until vhost_user_blk_stop() gets called from the bh.
+> +             * Really this state check should be tracked locally.
+>               */
+>              s->dev.started =3D false;
+>          }
+> diff --git a/hw/scsi/vhost-scsi.c b/hw/scsi/vhost-scsi.c
+> index 3059068175..bdf337a7a2 100644
+> --- a/hw/scsi/vhost-scsi.c
+> +++ b/hw/scsi/vhost-scsi.c
+> @@ -120,7 +120,7 @@ static void vhost_scsi_set_status(VirtIODevice *vdev,=
+ uint8_t val)
+>          start =3D false;
+>      }
+> =20
+> -    if (vsc->dev.started =3D=3D start) {
+> +    if (vhost_dev_is_started(&vsc->dev) =3D=3D start) {
+>          return;
+>      }
+> =20
+> @@ -147,7 +147,7 @@ static int vhost_scsi_pre_save(void *opaque)
+> =20
+>      /* At this point, backend must be stopped, otherwise
+>       * it might keep writing to memory. */
+> -    assert(!vsc->dev.started);
+> +    assert(!vhost_dev_is_started(&vsc->dev));
+> =20
+>      return 0;
+>  }
+> diff --git a/hw/scsi/vhost-user-scsi.c b/hw/scsi/vhost-user-scsi.c
+> index 1b2f7eed98..bc37317d55 100644
+> --- a/hw/scsi/vhost-user-scsi.c
+> +++ b/hw/scsi/vhost-user-scsi.c
+> @@ -49,7 +49,7 @@ static void vhost_user_scsi_set_status(VirtIODevice *vd=
+ev, uint8_t status)
+>      VHostSCSICommon *vsc =3D VHOST_SCSI_COMMON(s);
+>      bool start =3D (status & VIRTIO_CONFIG_S_DRIVER_OK) && vdev->vm_runn=
+ing;
+> =20
+> -    if (vsc->dev.started =3D=3D start) {
+> +    if (vhost_dev_is_started(&vsc->dev) =3D=3D start) {
+>          return;
+>      }
+> =20
+> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+> index d2bebba785..ad0f91c607 100644
+> --- a/hw/virtio/vhost-user-fs.c
+> +++ b/hw/virtio/vhost-user-fs.c
+> @@ -20,6 +20,7 @@
+>  #include "hw/virtio/virtio-bus.h"
+>  #include "hw/virtio/virtio-access.h"
+>  #include "qemu/error-report.h"
+> +#include "hw/virtio/vhost.h"
+>  #include "hw/virtio/vhost-user-fs.h"
+>  #include "monitor/monitor.h"
+>  #include "sysemu/sysemu.h"
+> @@ -124,7 +125,7 @@ static void vuf_set_status(VirtIODevice *vdev, uint8_=
+t status)
+>      VHostUserFS *fs =3D VHOST_USER_FS(vdev);
+>      bool should_start =3D virtio_device_started(vdev, status);
+> =20
+> -    if (fs->vhost_dev.started =3D=3D should_start) {
+> +    if (vhost_dev_is_started(&fs->vhost_dev) =3D=3D should_start) {
+>          return;
+>      }
+> =20
+> diff --git a/hw/virtio/vhost-user-i2c.c b/hw/virtio/vhost-user-i2c.c
+> index b930cf6d5e..bc58b6c0d1 100644
+> --- a/hw/virtio/vhost-user-i2c.c
+> +++ b/hw/virtio/vhost-user-i2c.c
+> @@ -95,7 +95,7 @@ static void vu_i2c_set_status(VirtIODevice *vdev, uint8=
+_t status)
+>      VHostUserI2C *i2c =3D VHOST_USER_I2C(vdev);
+>      bool should_start =3D virtio_device_started(vdev, status);
+> =20
+> -    if (i2c->vhost_dev.started =3D=3D should_start) {
+> +    if (vhost_dev_is_started(&i2c->vhost_dev) =3D=3D should_start) {
+>          return;
+>      }
+> =20
+> @@ -174,7 +174,7 @@ static void vu_i2c_disconnect(DeviceState *dev)
+>      }
+>      i2c->connected =3D false;
+> =20
+> -    if (i2c->vhost_dev.started) {
+> +    if (vhost_dev_is_started(&i2c->vhost_dev)) {
+>          vu_i2c_stop(vdev);
+>      }
+>  }
+> diff --git a/hw/virtio/vhost-user-rng.c b/hw/virtio/vhost-user-rng.c
+> index a9c1c4bc79..bc1f36c5ac 100644
+> --- a/hw/virtio/vhost-user-rng.c
+> +++ b/hw/virtio/vhost-user-rng.c
+> @@ -92,7 +92,7 @@ static void vu_rng_set_status(VirtIODevice *vdev, uint8=
+_t status)
+>      VHostUserRNG *rng =3D VHOST_USER_RNG(vdev);
+>      bool should_start =3D virtio_device_started(vdev, status);
+> =20
+> -    if (rng->vhost_dev.started =3D=3D should_start) {
+> +    if (vhost_dev_is_started(&rng->vhost_dev) =3D=3D should_start) {
+>          return;
+>      }
+> =20
+> @@ -160,7 +160,7 @@ static void vu_rng_disconnect(DeviceState *dev)
+> =20
+>      rng->connected =3D false;
+> =20
+> -    if (rng->vhost_dev.started) {
+> +    if (vhost_dev_is_started(&rng->vhost_dev)) {
+>          vu_rng_stop(vdev);
+>      }
+>  }
+> diff --git a/hw/virtio/vhost-user-vsock.c b/hw/virtio/vhost-user-vsock.c
+> index 22c1616ebd..7b67e29d83 100644
+> --- a/hw/virtio/vhost-user-vsock.c
+> +++ b/hw/virtio/vhost-user-vsock.c
+> @@ -57,7 +57,7 @@ static void vuv_set_status(VirtIODevice *vdev, uint8_t =
+status)
+>      VHostVSockCommon *vvc =3D VHOST_VSOCK_COMMON(vdev);
+>      bool should_start =3D virtio_device_started(vdev, status);
+> =20
+> -    if (vvc->vhost_dev.started =3D=3D should_start) {
+> +    if (vhost_dev_is_started(&vvc->vhost_dev) =3D=3D should_start) {
+>          return;
+>      }
+> =20
+> diff --git a/hw/virtio/vhost-vsock-common.c b/hw/virtio/vhost-vsock-commo=
+n.c
+> index 7394818e00..29b9ab4f72 100644
+> --- a/hw/virtio/vhost-vsock-common.c
+> +++ b/hw/virtio/vhost-vsock-common.c
+> @@ -14,6 +14,7 @@
+>  #include "hw/virtio/virtio-access.h"
+>  #include "qemu/error-report.h"
+>  #include "hw/qdev-properties.h"
+> +#include "hw/virtio/vhost.h"
+>  #include "hw/virtio/vhost-vsock.h"
+>  #include "qemu/iov.h"
+>  #include "monitor/monitor.h"
+> @@ -199,7 +200,7 @@ int vhost_vsock_common_pre_save(void *opaque)
+>       * At this point, backend must be stopped, otherwise
+>       * it might keep writing to memory.
+>       */
+> -    assert(!vvc->vhost_dev.started);
+> +    assert(!vhost_dev_is_started(&vvc->vhost_dev));
+> =20
+>      return 0;
+>  }
+> diff --git a/hw/virtio/vhost-vsock.c b/hw/virtio/vhost-vsock.c
+> index 8031c164a5..7dc3c73931 100644
+> --- a/hw/virtio/vhost-vsock.c
+> +++ b/hw/virtio/vhost-vsock.c
+> @@ -73,7 +73,7 @@ static void vhost_vsock_set_status(VirtIODevice *vdev, =
+uint8_t status)
+>      bool should_start =3D virtio_device_started(vdev, status);
+>      int ret;
+> =20
+> -    if (vvc->vhost_dev.started =3D=3D should_start) {
+> +    if (vhost_dev_is_started(&vvc->vhost_dev) =3D=3D should_start) {
+>          return;
+>      }
+> =20
+> --=20
+> 2.30.2
 > 
 
-Hi Hao,
-
-My impression in general is that virtio-blk is much faster than virtiofs.
-A simple macro test is do a kernel compilation and compare time taken
-between the two.
-
-> I have CCed Vivek Goyal, who has done more virtiofs benchmarking and
-> might have ideas to share.
-> 
-> The benchmarking tool was fio with the stated blocksize and I/O
-> pattern. The benchmark was probably run with direct=1. Based on the
-> virtio-blk numbers I think iodepth was greater than 1 but I don't have
-> the exact fio job parameters.
-
-I had basically used fio jobs. I wrote some simple wrapper scripts to
-run fio and parse and report numbers.
-
-https://github.com/rhvgoyal/virtiofs-tests
-
-I don't have data for virtio-blk but I do seem to have some comparison
-numbers of virtiofs and virtio-9p.
-
-https://github.com/rhvgoyal/virtiofs-tests/tree/master/performance-results/feb-23-2021
-
-Thanks
-Vivek

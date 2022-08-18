@@ -2,16 +2,16 @@ Return-Path: <yokada.996@gmail.com>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
  h=content-transfer-encoding:mime-version:message-id:date:subject:cc
  :to:from:from:to:cc;
- bh=ctjmxHdPwX5iUNLoJVLQAANZs3CSbjHElVZ5F8RwdPg=;
- b=gBx5y3d6QEb8vY141d3Id67dhp4Qvuc4Rqobm9DLjzA35wcCMGtxfg72+mCXizsTWc
- nf6ZJC7WVr1rr+M6ZSYMT8iii2g63U5KmM8bHSC7bMe3f1uumplfRSIU6nITlSlH7jy2
- Z7zK/ZMBetsETx8G65XWlzCFkviRjwhNKVgyEstCRNYAQ4eqb5qWM3XLqZfjnf4CY6Hu
- cl6EaLi8gHq+Gv9GoXRWyaBO2xefFUByVq0qMvMbKsHVOuI8OnUqAXS0uYCMtJXlcvVM
- MoLwWeVhYNm6XjlcrByyavEDcD2fp2JV3XzFn2F1SgHEdSQMzHn2DcWH+0Ra2dT2hXMs
- zYHg==
+ bh=34YSupzvFPGf54q4I719p5ZvNSdYXQRbFLGKQamgoTQ=;
+ b=pa9XOzatRzKWuheXDs22T3192JnXjcENdherXX87rgYqIUc+q3zmSW0wf2n40ifpxP
+ Kfd5PC4OmcdpnOgwixESMkchmgONHpGlvJ+PVdXZyv/JRyhltKZYVqa5ULKt11y1WCu2
+ duXiLQTEZcfu24zFU8hiCO+MrOgCFNKA2ju5scdmcakY+nK/o0Q9rj5hYfrO5CZCqsfc
+ AE6tLhsDVjcP5ftTHjqbDcGDi/qtEzu6459LFQKAmdhIVoZMMZo/p+XUJhRlq4Zm8bFR
+ fljomqu9UTDcuHJsLLHINDTP5ykXIDrqa/SrBD364+DsTaWV1T1233mKf8qq3EdwVZ+D
+ JSkA==
 From: Yusuke Okada <yokada.996@gmail.com>
-Date: Thu, 18 Aug 2022 13:46:51 -0400
-Message-Id: <20220818174650.31360-1-okada.yusuke@jp.fujitsu.com>
+Date: Thu, 18 Aug 2022 14:46:19 -0400
+Message-Id: <20220818184618.2205172-1-yokada.996@gmail.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
@@ -27,6 +27,8 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: qemu-devel@nongnu.org
 Cc: Yusuke Okada <okada.yusuke@jp.fujitsu.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, "open list:virtiofs" <virtio-fs@redhat.com>
+
+From: Yusuke Okada <okada.yusuke@jp.fujitsu.com>
 
 The "%f" specifier in g_date_time_format() is only available in glib
 2.65.2 or later. If combined with older glib, the function returns null

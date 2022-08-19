@@ -1,25 +1,26 @@
-Return-Path: <okada.yusuke@fujitsu.com>
+Return-Path: <liuyd.fnst@fujitsu.com>
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple;
  d=fujitsu.com; i=@fujitsu.com; q=dns/txt; s=fj1;
- t=1660850000; x=1692386000;
+ t=1660873711; x=1692409711;
  h=from:to:cc:subject:date:message-id:references:
- in-reply-to:content-transfer-encoding:mime-version;
- bh=Mwlgz96DBJ1qJPlk26DDpK/DHACm6XkHvPffvu7SZY0=;
- b=F4My8LlrwktkiJ6IJVrQu5KkMsAEYXId7HTxicM2DMCSIe+UQMVD/jB6
- CJu7BipWCx3U/I68bvR87ZOFZj+eu3AeFuNpWthgkE+6vmfNYrmVmkex4
- 8nw8eKINkyN6hZzqXPGLbcMoRHnQWTYj71FX/pCSAYC1DH6zrBcDFIbGX
- O8/XkenT1ivWGI75A0GY7dgCVMhhRfIxdRwl+EAUPi+lyJCHhx3Q8aBpX
- +n0OTElhjiyM0hsf/M9R+mYuQcFmcg6Ut2Rf1mGb+Bq2ohjPy/HDiTuz6
- mJzbU/iASLIirlnmasYEwQVuacwmi7nCPbEpORPTQiEjKed/P19ef1GGa w==
-From: "okada.yusuke@fujitsu.com" <okada.yusuke@fujitsu.com>
-Date: Thu, 18 Aug 2022 19:12:13 +0000
-Message-ID: <TYYPR01MB668335D98A5849C0B759DDB79D6D9@TYYPR01MB6683.jpnprd01.prod.outlook.com>
-References: <20220818184618.2205172-1-yokada.996@gmail.com>
-In-Reply-To: <20220818184618.2205172-1-yokada.996@gmail.com>
+ in-reply-to:content-id:content-transfer-encoding: mime-version;
+ bh=F2dqlpuX9uSwL9HT1M4prubJ0cHBkTpXkUoLlKgRLJU=;
+ b=I0Srp8xzWrJ3xgko1X3mj2XzzvikjKG5TYenmSsBzAjIvIRqdtjEQXLz
+ cRgZ9ycvz5iE7L1ThEegju4/co/VgWJaqB7EVRBTt2XmtmDTblSzJwxaV
+ wqawB0p/2Yl12fIodyysx0J2TrnN2fDQITs66JbbP8Mr1JTE8FeDRRgJG
+ RfO0hQSTZFUe3SCZfW6SoSA0KvIJrEh9epNs5a4Gl09rXORzkxC8+9GZW
+ hYXp8vWv0FsrCQPhDpC9SpN6wXDP3HFuPynJptaMRYA1IhNxNdxDUNEz9
+ dJ+ksbzYPGrhh7Io7U+dMy6Elkd9Yz5BjWqm5TNpxvGU6SM6CUjLikG0N g==
+From: "liuyd.fnst@fujitsu.com" <liuyd.fnst@fujitsu.com>
+Date: Fri, 19 Aug 2022 01:47:21 +0000
+Message-ID: <402e7bce-46de-6d9e-5bad-045a42efa6ba@fujitsu.com>
+References: <20220818174650.31360-1-okada.yusuke@jp.fujitsu.com>
+In-Reply-To: <20220818174650.31360-1-okada.yusuke@jp.fujitsu.com>
 MIME-Version: 1.0
-Content-Language: ja-JP
-Content-Type: text/plain; charset="iso-2022-jp"
-Content-Transfer-Encoding: quoted-printable
+Content-Language: en-US
+Content-Type: text/plain; charset="utf-8"
+Content-ID: <4D8F37ADC2301F4CB805FD37A1CC1C24@jpnprd01.prod.outlook.com>
+Content-Transfer-Encoding: base64
 Subject: Re: [Virtio-fs] [PATCH] virtiofsd: use g_date_time_get_microsecond
  to get subsecond
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -31,8 +32,51 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: Yusuke Okada <yokada.996@gmail.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>
-Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, "open list:virtiofs" <virtio-fs@redhat.com>
+Cc: "open list:virtiofs" <virtio-fs@redhat.com>, "okada.yusuke@fujitsu.com" <okada.yusuke@fujitsu.com>
 
-Hi,=0A=0ABecause the first mail doesn't include "From" line in its body, I =
-sent it again.=0ASorry for bothering.=0A=0ABest Regards,=0AYusuke Okada=0A
+SXQgd29ya3MuIEkgdGVzdGVkIG9uIFJIRUw4DQpCZWZvcmUgdGhpcyBmaXg6DQpgYGANCiMgL3Jv
+b3QvcWVtdS9idWlsZC90b29scy92aXJ0aW9mc2QvdmlydGlvZnNkIC0tc29ja2V0LXBhdGg9L3Rt
+cC9zb2NrIC1vIA0Kc291cmNlPS9ob21lL3Rlc3QgLWQNCg0KWyhudWxsKV0gW0lEOiAwMDEzMzE1
+Ml0gdmlydGlvX3Nlc3Npb25fbW91bnQ6IFdhaXRpbmcgZm9yIHZob3N0LXVzZXIgDQpzb2NrZXQg
+Y29ubmVjdGlvbi4uLg0KDQoNCmBgYA0KDQpBZnRlciBhcHBseWluZyB0aGlzIHBhdGNoDQpgYGAN
+CiMgL3Jvb3QvcWVtdS9idWlsZC90b29scy92aXJ0aW9mc2QvdmlydGlvZnNkIC0tc29ja2V0LXBh
+dGg9L3RtcC9zb2NrIC1vIA0Kc291cmNlPS9ob21lL3Rlc3QgLWQNCg0KWzIwMjItMDgtMTkgMDE6
+NDU6NDEuOTgxNjA4KzAwMDBdIFtJRDogMDAxMzQ1ODddIHZpcnRpb19zZXNzaW9uX21vdW50OiAN
+CldhaXRpbmcgZm9yIHZob3N0LXVzZXIgc29ja2V0IGNvbm5lY3Rpb24uLi4NCg0KYGBgCQ0KDQoN
+Ck9uIDgvMTkvMjIgMDE6NDYsIFl1c3VrZSBPa2FkYSB3cm90ZToNCj4gVGhlICIlZiIgc3BlY2lm
+aWVyIGluIGdfZGF0ZV90aW1lX2Zvcm1hdCgpIGlzIG9ubHkgYXZhaWxhYmxlIGluIGdsaWINCj4g
+Mi42NS4yIG9yIGxhdGVyLiBJZiBjb21iaW5lZCB3aXRoIG9sZGVyIGdsaWIsIHRoZSBmdW5jdGlv
+biByZXR1cm5zIG51bGwNCj4gYW5kIHRoZSB0aW1lc3RhbXAgZGlzcGxheWVkIGFzICIobnVsbCki
+Lg0KPiANCj4gRm9yIGJhY2t3YXJkIGNvbXBhdGliaWxpdHksIGdfZGF0ZV90aW1lX2dldF9taWNy
+b3NlY29uZCBzaG91bGQgYmUgdXNlZA0KPiB0byByZXRyaWV2ZSBzdWJzZWNvbmQuDQo+IA0KPiBJ
+biB0aGlzIHBhdGNoIHRoZSBnX2RhdGVfdGltZV9mb3JtYXQoKSBsZWF2ZXMgc3Vic2Vjb25kIGZp
+ZWxkIGFzICIlMDZkIg0KPiBhbmQgbGV0IG5leHQgc25wcmludGYgdG8gZm9ybWF0IHdpdGggZ19k
+YXRlX3RpbWVfZ2V0X21pY3Jvc2Vjb25kLg0KPiANCj4gU2lnbmVkLW9mZi1ieTogWXVzdWtlIE9r
+YWRhIDxva2FkYS55dXN1a2VAanAuZnVqaXRzdS5jb20+DQo+IC0tLQ0KPiAgIHRvb2xzL3ZpcnRp
+b2ZzZC9wYXNzdGhyb3VnaF9sbC5jIHwgNyArKysrKy0tDQo+ICAgMSBmaWxlIGNoYW5nZWQsIDUg
+aW5zZXJ0aW9ucygrKSwgMiBkZWxldGlvbnMoLSkNCj4gDQo+IGRpZmYgLS1naXQgYS90b29scy92
+aXJ0aW9mc2QvcGFzc3Rocm91Z2hfbGwuYyBiL3Rvb2xzL3ZpcnRpb2ZzZC9wYXNzdGhyb3VnaF9s
+bC5jDQo+IGluZGV4IDM3MWE3YmVhZDYuLjIwZjBmNDFmOTkgMTAwNjQ0DQo+IC0tLSBhL3Rvb2xz
+L3ZpcnRpb2ZzZC9wYXNzdGhyb3VnaF9sbC5jDQo+ICsrKyBiL3Rvb2xzL3ZpcnRpb2ZzZC9wYXNz
+dGhyb3VnaF9sbC5jDQo+IEBAIC00MTg1LDYgKzQxODUsNyBAQCBzdGF0aWMgdm9pZCBzZXR1cF9u
+b2ZpbGVfcmxpbWl0KHVuc2lnbmVkIGxvbmcgcmxpbWl0X25vZmlsZSkNCj4gICBzdGF0aWMgdm9p
+ZCBsb2dfZnVuYyhlbnVtIGZ1c2VfbG9nX2xldmVsIGxldmVsLCBjb25zdCBjaGFyICpmbXQsIHZh
+X2xpc3QgYXApDQo+ICAgew0KPiAgICAgICBnX2F1dG9mcmVlIGNoYXIgKmxvY2FsZm10ID0gTlVM
+TDsNCj4gKyAgICBjaGFyIGJ1Zls2NF07DQo+ICAgDQo+ICAgICAgIGlmIChjdXJyZW50X2xvZ19s
+ZXZlbCA8IGxldmVsKSB7DQo+ICAgICAgICAgICByZXR1cm47DQo+IEBAIC00MTk3LDkgKzQxOTgs
+MTEgQEAgc3RhdGljIHZvaWQgbG9nX2Z1bmMoZW51bSBmdXNlX2xvZ19sZXZlbCBsZXZlbCwgY29u
+c3QgY2hhciAqZm10LCB2YV9saXN0IGFwKQ0KPiAgICAgICAgICAgICAgICAgICAgICAgICAgICAg
+ICAgICAgICAgICAgIGZtdCk7DQo+ICAgICAgICAgICB9IGVsc2Ugew0KPiAgICAgICAgICAgICAg
+IGdfYXV0b3B0cihHRGF0ZVRpbWUpIG5vdyA9IGdfZGF0ZV90aW1lX25ld19ub3dfdXRjKCk7DQo+
+IC0gICAgICAgICAgICBnX2F1dG9mcmVlIGNoYXIgKm5vd3N0ciA9IGdfZGF0ZV90aW1lX2Zvcm1h
+dChub3csICIlWS0lbS0lZCAlSDolTTolUy4lZiV6Iik7DQo+ICsgICAgICAgICAgICBnX2F1dG9m
+cmVlIGNoYXIgKm5vd3N0ciA9IGdfZGF0ZV90aW1lX2Zvcm1hdChub3csDQo+ICsgICAgICAgICAg
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAiJVktJW0tJWQgJUg6JU06JVMuJSUwNmQleiIp
+Ow0KPiArICAgICAgICAgICAgc25wcmludGYoYnVmLCA2NCwgbm93c3RyLCBnX2RhdGVfdGltZV9n
+ZXRfbWljcm9zZWNvbmQobm93KSk7DQo+ICAgICAgICAgICAgICAgbG9jYWxmbXQgPSBnX3N0cmR1
+cF9wcmludGYoIlslc10gW0lEOiAlMDhsZF0gJXMiLA0KPiAtICAgICAgICAgICAgICAgICAgICAg
+ICAgICAgICAgICAgICAgICAgbm93c3RyLCBzeXNjYWxsKF9fTlJfZ2V0dGlkKSwgZm10KTsNCj4g
+KyAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJ1Ziwgc3lzY2FsbChfX05S
+X2dldHRpZCksIGZtdCk7DQo+ICAgICAgICAgICB9DQo+ICAgICAgICAgICBmbXQgPSBsb2NhbGZt
+dDsNCj4gICAgICAgfQ0KDQotLSANClRoYW5rcywNCllpZGluZw==
 

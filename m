@@ -1,29 +1,14 @@
-Return-Path: <virtiofs-bot@sinrega.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
- cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; t=1661246450; x=1661332850; bh=IhA9j+4adVgkTV5WZY8pC
- wzo4FX7XRr1TRkZc229L2E=; b=cumPQnvuLKWnStj8d3bjB4Z6OoFGKDO7H2jVF
- VblmeVS/DHAVMsb1mbjFppEDYiQNhQxtRRjuh2RHZbvEMhcXavcEUX/iouLyRw4v
- sQl9pR05+J5D8fDwu1Ims8uwxrKXNseVbZiXzhGHTnDtjHH6R3nd01w5qAm2+4hE
- UqXORd/CjgZ51z/9JIpD09FtiJ9bPBoPB8vLGFd1UBoCPSp5CwfvZDojMnXVLx0Q
- KfKOT5nl+sfeYZAgnGQ16Ib5nwFs1HZi5aO2zkuhxXTzyUG4jdsfymu1l08BPuOe
- 78KVAoRanOadKXL8PVKAr7PQxorQayZ5wZ4acsiu19XwFfJYw==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
- messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
- :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
- :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; t=
- 1661246450; x=1661332850; bh=IhA9j+4adVgkTV5WZY8pCwzo4FX7XRr1TRk
- Zc229L2E=; b=XPo6y63lAJcdKsFKDSpsmWeFoYyYnKUF8OoqpMr1YSWNe7yFo/A
- 1ydjzK8REYCe1I42skRxkAUAX3hiHqFwjV9hgfW9P2G43IPATXfKBnwEgunM3C3q
- x+/SlDqTFC45KBwoWHP2irKWzDuc4kwQEiJ0hbE+n/TvorzAsRKtKc7qPNDmPn2p
- 9gxfgqGBjIiWlmJS3xO3iqPj+25JevGMjPFws71+JwsWUw3KYMax285bdTGJGXEI
- HIxTKS/4/MRK7u3hTyimHZFvibPFkTdt77FVr1TQJbg0A1byxq3qTNTyu5SAdXKf
- vXl/hwmQ/LTHRzDA/utNW/CysIpfY16QkDA==
-From: virtiofs-bot@sinrega.org
-Message-Id: <14001.122082305205200237@us-mta-203.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Tue, 23 Aug 2022 09:20:54 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR merged: Add ppc64le arch support
+Return-Path: <dgilbert@redhat.com>
+Date: Wed, 24 Aug 2022 12:05:38 +0100
+From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Message-ID: <YwYGAuPjexuazlC2@work-vm>
+References: <20220818184618.2205172-1-yokada.996@gmail.com>
+MIME-Version: 1.0
+In-Reply-To: <20220818184618.2205172-1-yokada.996@gmail.com>
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: use g_date_time_get_microsecond
+ to get subsecond
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -32,9 +17,64 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Yusuke Okada <yokada.996@gmail.com>, berrange@redhat.com, marcandre.lureau@redhat.com
+Cc: qemu-devel@nongnu.org, Yusuke Okada <okada.yusuke@jp.fujitsu.com>, Stefan Hajnoczi <stefanha@redhat.com>, "open list:virtiofs" <virtio-fs@redhat.com>
 
-Running virtiofsd on ppc64le fails due to restricted syscalls. This PR adds support for allowing it.
----
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/130
+* Yusuke Okada (yokada.996@gmail.com) wrote:
+> From: Yusuke Okada <okada.yusuke@jp.fujitsu.com>
+> 
+> The "%f" specifier in g_date_time_format() is only available in glib
+> 2.65.2 or later. If combined with older glib, the function returns null
+> and the timestamp displayed as "(null)".
+
+Well spotted; thanks for the patch.
+I notice there's also a use in rocker and qga (Copying Dan and
+Marc-Andre in who added them)
+
+> For backward compatibility, g_date_time_get_microsecond should be used
+> to retrieve subsecond.
+> 
+> In this patch the g_date_time_format() leaves subsecond field as "%06d"
+> and let next snprintf to format with g_date_time_get_microsecond.
+> 
+> Signed-off-by: Yusuke Okada <okada.yusuke@jp.fujitsu.com>
+
+
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+
+> ---
+>  tools/virtiofsd/passthrough_ll.c | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/tools/virtiofsd/passthrough_ll.c b/tools/virtiofsd/passthrough_ll.c
+> index 371a7bead6..20f0f41f99 100644
+> --- a/tools/virtiofsd/passthrough_ll.c
+> +++ b/tools/virtiofsd/passthrough_ll.c
+> @@ -4185,6 +4185,7 @@ static void setup_nofile_rlimit(unsigned long rlimit_nofile)
+>  static void log_func(enum fuse_log_level level, const char *fmt, va_list ap)
+>  {
+>      g_autofree char *localfmt = NULL;
+> +    char buf[64];
+>  
+>      if (current_log_level < level) {
+>          return;
+> @@ -4197,9 +4198,11 @@ static void log_func(enum fuse_log_level level, const char *fmt, va_list ap)
+>                                         fmt);
+>          } else {
+>              g_autoptr(GDateTime) now = g_date_time_new_now_utc();
+> -            g_autofree char *nowstr = g_date_time_format(now, "%Y-%m-%d %H:%M:%S.%f%z");
+> +            g_autofree char *nowstr = g_date_time_format(now,
+> +                                       "%Y-%m-%d %H:%M:%S.%%06d%z");
+> +            snprintf(buf, 64, nowstr, g_date_time_get_microsecond(now));
+>              localfmt = g_strdup_printf("[%s] [ID: %08ld] %s",
+> -                                       nowstr, syscall(__NR_gettid), fmt);
+> +                                       buf, syscall(__NR_gettid), fmt);
+>          }
+>          fmt = localfmt;
+>      }
+> -- 
+> 2.31.1
+> 
+-- 
+Dr. David Alan Gilbert / dgilbert@redhat.com / Manchester, UK
 

@@ -1,14 +1,30 @@
-Return-Path: <lulu@redhat.com>
-MIME-Version: 1.0
-References: <20220724064454.875882-1-lulu@redhat.com>
- <20220726094357-mutt-send-email-mst@kernel.org>
-In-Reply-To: <20220726094357-mutt-send-email-mst@kernel.org>
-From: Cindy Lu <lulu@redhat.com>
-Date: Wed, 27 Jul 2022 15:01:40 +0800
-Message-ID: <CACLfguXG5yXazYBRq5AGqB2bzuQPf-HyFnnKSx294EFvrGXNkA@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH v15 00/10] vhost-vdpa: add support for
- configure interrupt
+Return-Path: <virtiofs-bot@sinrega.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+ cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+ :to; s=fm1; t=1661538980; x=1661625380; bh=NgDfIdQNuJulhpWUDZ8QO
+ KwhX3EIhT4zkRe/BbSE1Sg=; b=gJo2EGTlApuIGgdLGVh5RU5/p1zUcnEaoYVrC
+ j1aOhwKLIC1fphgDVRSKnjbw0YLrsnbukoj+ddvIKSFUBqLhkLM33H5ptMfnu3Bs
+ YFLL+6okTVHnIvTO+efFqIGS6vUbND4QS4HnexeiFfKe+NmO2o63axUpAWdIAR6R
+ F+W/d5FLs3iSqJ/JzqFKc4BOpUIV3voGTrC1sMoJWMJfqeax6Hr8bHOqXdL0Q0a/
+ MujY2Cwd3ZrvPDCfiy030sAYkpfLJFnFDmTNrk23PafLs6/dtx+u+4uaClBIyF6A
+ VnFxkF2AdGd0Gia23HJhppc2XEryn/sMJgvZUNSfPSCP450rw==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+ messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
+ :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
+ :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; t=
+ 1661538980; x=1661625380; bh=NgDfIdQNuJulhpWUDZ8QOKwhX3EIhT4zkRe
+ /BbSE1Sg=; b=q6/C3XXHMo68SZUzqC3kqNRo/OQjNVWUELlvWd17XchaButRRh8
+ 1PK7RXLhhZMcVJoVST+b8hQyfi2l5xNQyN91+f6hDQis65z/jjbfy5CSF2Bb0uU8
+ ZhVgaAR5Yeu9TRWHU0MyhovyXre41QItFeZVNVklSfnqbJw+ghwcDjuM178iAb8H
+ V6RTk199qDqg5xG5mj2/UI07IyXhzvx1ybifavZDPkevx+rDue2biybSLHE+60cx
+ OMBYNh8HbJ/FZHEQCDPgEtne5WeD6KEezEIw0F5peCZQlZ2OGtg7SgXHjiZLS7uw
+ D8yQY9XERKjBi4Ife/2kwacyo27ZTRLrrNg==
+From: virtiofs-bot@sinrega.org
+Message-Id: <88673.122082614362200701@us-mta-134.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"; x-default=true
+Date: Fri, 26 Aug 2022 18:36:25 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] Issue opened: Fix listxattr() response when
+ name list is empty
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,124 +33,11 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Michael S. Tsirkin" <mst@redhat.com>
-Cc: QEMU Developers <qemu-devel@nongnu.org>, Stefan Hajnoczi <stefanha@redhat.com>, virtio-fs@redhat.com, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Jason Wang <jasowang@redhat.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, =?UTF-8?B?TWFyYy1BbmRyw6kgTHVyZWF1?= <marcandre.lureau@redhat.com>
+To: virtio-fs@redhat.com
 
-On Tue, 26 Jul 2022 at 21:45, Michael S. Tsirkin <mst@redhat.com> wrote:
->
-> Hi!
-> So I don't think this will make it in 7.1.
-> I'll tag this to be merged afterwards, but just to make sure
-> please ping me right after the release.
->
-> Thanks!
->
-Got it, thanks Michael, I will ping you that time.
+FUSE_LISTXATTR returns a xattr name list. It is possible that all xattrs have been filtered out by server and resulting name list is empty. As of now rust version of code writes a null byte to client supplied buffer. This fails the kernel fuse code verification and return -EIO to user space.
 
-Thanks
-Cindy
-
-> On Sun, Jul 24, 2022 at 02:44:44PM +0800, Cindy Lu wrote:
-> > These patches introduced the support for configure interrupt
-> > These codes are tested on x86_64 and aarch64 platforms.
-> > the test scenario is based on vp-vdpa/vdpa_sim /virtio net device, with
-> > the irqfd and without irqfd.
-> > Tested in virtio-pci bus and virtio-mmio bus
-> >
-> > Change in v2:
-> > Add support for virtio-mmio bus
-> > active the notifier while the backend support configure interrupt
-> > misc fixes from v1
-> >
-> > Change in v3
-> > fix the coding style problems
-> >
-> > Change in v4
-> > misc fixes from v3
-> > merge the set_config_notifier to set_guest_notifier
-> > when vdpa start, check the feature by VIRTIO_NET_F_STATUS
-> >
-> > Change in v5
-> > misc fixes from v4
-> > split the code to introduce configure interrupt type and the callback function
-> > will init the configure interrupt in all virtio-pci and virtio-mmio bus, but will
-> > only active while using vhost-vdpa driver
-> >
-> > Change in v6
-> > misc fixes from v5
-> > decouple vq from interrupt setting and misc process
-> > fix the bug in virtio_net_handle_rx
-> >
-> > Change in v7
-> > misc fixes from v6
-> > decouple vq from interrupt setting and misc process
-> > decouple vq from vector use/release process
-> > decouple vq from set notifier fd handler process
-> > move config_notifier and masked_config_notifier to VirtIODevice
-> > fix the bug in virtio_net_handle_rx, add more information
-> > add VIRTIO_CONFIG_IRQ_IDX as the queue number for configure interrupt
-> >
-> > Change in v8
-> > misc fixes from v7
-> > decouple vq from interrupt setting and misc process
-> > decouple vq from vector use/release process
-> > decouple vq from set notifier fd handler process
-> > move the vhost configure interrupt to vhost_net
-> >
-> > Change in v9
-> > misc fixes from v8
-> > address the comments from v8
-> >
-> > Change in v10
-> > fix the hang issue in qtest
-> > address the comments from v9
-> >
-> > Change in v11
-> > fix the crash in aarch64 plateform.
-> > fix the crash upstream reported
-> >
-> > Change in v12
-> > fix the typo and the comments
-> >
-> > changes in v13
-> > re-send the patches by git-publish
-> >
-> > changes in v14
-> > rebased the code based on upstream
-> >
-> > Cindy Lu (10):
-> >   virtio: introduce macro VIRTIO_CONFIG_IRQ_IDX
-> >   virtio-pci: decouple notifier from interrupt process
-> >   virtio-pci: decouple the single vector from the interrupt process
-> >   vhost: introduce new VhostOps vhost_set_config_call
-> >   vhost-vdpa: add support for config interrupt
-> >   virtio: add support for configure interrupt
-> >   vhost: add support for configure interrupt
-> >   virtio-net: add support for configure interrupt
-> >   virtio-mmio: add support for configure interrupt
-> >   virtio-pci: add support for configure interrupt
-> >
-> >  hw/display/vhost-user-gpu.c       |  15 ++
-> >  hw/net/vhost_net.c                |   9 +
-> >  hw/net/virtio-net.c               |  20 ++-
-> >  hw/virtio/trace-events            |   1 +
-> >  hw/virtio/vhost-user-fs.c         |  16 ++
-> >  hw/virtio/vhost-vdpa.c            |   8 +
-> >  hw/virtio/vhost-vsock-common.c    |  16 ++
-> >  hw/virtio/vhost.c                 |  78 +++++++-
-> >  hw/virtio/virtio-crypto.c         |  16 ++
-> >  hw/virtio/virtio-mmio.c           |  27 +++
-> >  hw/virtio/virtio-pci.c            | 283 +++++++++++++++++++++---------
-> >  hw/virtio/virtio.c                |  29 +++
-> >  include/hw/virtio/vhost-backend.h |   3 +
-> >  include/hw/virtio/vhost.h         |   4 +
-> >  include/hw/virtio/virtio-pci.h    |   4 +-
-> >  include/hw/virtio/virtio.h        |   7 +
-> >  include/net/vhost_net.h           |   2 +
-> >  17 files changed, 451 insertions(+), 87 deletions(-)
-> >
-> > --
-> > 2.34.3
-> >
->
+Fix this by not writing a single null byte. Simply send a response back with error code 0 and virtiofs kernel code should be able to handle it and update variable argument size to 0.
+---
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/55
 

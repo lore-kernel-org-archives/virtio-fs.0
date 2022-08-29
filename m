@@ -1,29 +1,30 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; t=1661785813; x=1661872213; bh=4k9SHeRwCLVvtVLegCro4
- d/HDlYKO9kltZzaYzQQAPM=; b=dvN8kFoXL7RH3MQYyvmkXCQpPJsizosrl3LaU
- Y3AaXimnS/UJEg7XMzw8ojh0oDRfLOG/7D19YcyjJBbv0sV0Zf6/1WRUEKzFXnyK
- zMDj8gOKZXRDFVKWt2OZGzrrtbIJ3G32ocJ+3/S03mFEwAKNkN9jBoJEXcoVKCmG
- qzmH/HWEOWnJMaTMXDU/CcCXXdaSZvBXW7CvfeKTNfJ9+6c6BUbYNc4M+q8lp0Vw
- +wDbCrduNArrVQ9AXiq4PPtXc9EdQHqFk8f3sMVD4GiL1UHn5ICiPHLUUdkb/WuT
- GiB+i8lAvUa3A2wZfy2s0U0mw6yd8TqwoPsaYm4EKX1ZsMwyg==
+ :to; s=fm1; t=1661792058; x=1661878458; bh=TlOttof8FQBBJKrrjmUoB
+ 8rq07e82h46qOz43RLlYF4=; b=d8W8AfXAznKaBjYhOo5Ek0ule/4HuQdBpyjow
+ b9yqZK4JSepfwOWAztt7b8IkSWC+VY8S2rxk9L5PnwUJQTC1u5wXgMTMBwmCHwry
+ 6Td/d/CDylO8tazXCDx3/z7HeWvOftQj3fnEsTAxEzqeGWsacU+M5YzhDFEofE6A
+ BTGytnmO9QaOs7/TApaD/EqsRE05gICEKgwbbcmXoTOHJTfoXFzduUhWv1mUvqGq
+ OI+XW4YAbBy8D04awOZHTAHtxZEY4P3jGAzG2OPetSUeTmz7YnRilisCQy4s0uMR
+ q3tSN8ZxP08zf3UMtaMWXC+pjkpXKvH+60eNR++59dsWL5dWw==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
  :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
  :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; t=
- 1661785813; x=1661872213; bh=4k9SHeRwCLVvtVLegCro4d/HDlYKO9kltZz
- aYzQQAPM=; b=458XFZYDEaQUBbeVkAllUWvUi+UI7bDlcW924ey28wa/1g03Ymf
- J7q2IpFLXrMOnCQklfRtDJObAdodrwDuFXG1128DROWe0fkJGBqkFKMdMUSUc+Sh
- xzH5ejbvtTdPjYXWeebzi7fdp+RSnl9wRePXeUzjII85Rc+pFwW0+qPBClqK6GMh
- cmA5Ks89+SQ5wFIK1IqCnu3SQpwzjMaafE1KQ/ToLyi83bMUYkefNIe0WUvtLlkR
- X/NPKEZkzdhdSk29zyWFMbPsihAcFtAp4Z6xm6MyraBPSQ2/a9KHK62VyY9i10CJ
- nrAqmWWZRm7an42UkhAK+fj0agN84ycG3tg==
+ 1661792058; x=1661878458; bh=TlOttof8FQBBJKrrjmUoB8rq07e82h46qOz
+ 43RLlYF4=; b=ZAfcQ/fywAmGthNYIKEIQx04d9ISr20xUO95/+xge4IPF3uvcu1
+ BCo9+DlU0e5aTz+yvahDM2WjdbUD2ADhxu79Vuzg5zkMT3pU6h+sk7eRDv+TZETU
+ sc0rN/PBxvsOOIkQuYruxuuP+7WhZHbxdh/Y676YocgZ+8MXdMcAr0b0aZ7h542i
+ ZM6qJ2xfPN2/zF1+Zgk1wRA1YNJGtilcEJkUGj5/XtuWbi8/4O3oovniCdVP8BQQ
+ 0kxb2CNXUcN8Ii38DlKaOcp9KGarQ0tUyuriSbqRe1cVu2XaLdywfdD6/W/6e9wh
+ 7l0dBX6ZxRVJ9ZYqZx6/HvgYcHJJfKvRlng==
 From: virtiofs-bot@sinrega.org
-Message-Id: <93722.122082911101500231@us-mta-472.us.mimecast.lan>
+Message-Id: <50338.122082912542000799@us-mta-360.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Mon, 29 Aug 2022 15:10:17 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR opened: Add fchdir safe wrapper
+Date: Mon, 29 Aug 2022 16:54:23 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR opened: Fix `listxattr()` response when
+ xattr name list is empty
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -34,10 +35,18 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Continuing with the effort to remove `unsafe` blocks, a safe wrapper
-for `fchdir(2)` is added.
+FUSE_LISTXATTR returns a xattr name list. It is possible that the name
+list is empty, because either there are no xattrs or all xattrs have
+been filtered out by the server.
 
-Signed-off-by: German Maglione <gmaglione@redhat.com>
+As of now rust version of code writes a null byte to client supplied
+buffer. This fails the kernel fuse code verification and return -EIO to
+user space.
+
+We need to send a response back with error code 0 and virtiofs kernel
+code will handle it and update the variable argument size to 0.
+
+Closes #55
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/131
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/132
 

@@ -1,29 +1,30 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; t=1662033255; x=1662119655; bh=iOGxzJMkoElZjdPhiKHx3
- 8InVVPdoOydOU7Ma0CQ5ls=; b=P2dJd1jPi9MsfLyoENV6unrjwK1fW1RmbSafe
- AJ6Zm56QC+xxLAuhRr2SnAjCwCZu6c6QbhVwc+ngMVPw4acpwXrweRo4tEigKu8O
- +yW4k7rhgFOvqySHzKcKyQs9gbccq/nhOSDzH2y6cSfdRct6nIiGSprqt39mpv8+
- vXrqdLlPm8cPR0mlbPpigrXP9NooEqPbuyF3t2GK4uxWIRq/dw1BIuK50+rTCT/r
- Ctwhv+uQfj8NFE/jFy/fPyFSL17qdCwi8cMc/ZX+QVfbCRcOmjsbgNk/NYQ5V5lB
- 4Mz+Q96bzcTjXoBPyA5QXFyW4yWUpgUf1XgtK4tKqOUgFhCBQ==
+ :to; s=fm1; t=1662034257; x=1662120657; bh=9JoygGHduEMC147ibV8wr
+ AQ9axkyZ6wQ+shfNRr3gtw=; b=aHWOS1+Axg+efdDGmeKAlnuNcxgKOLEUGz8QS
+ MWakdJpgiP/T2GQ/OTGn0ahsh4AK5jxpo8Oq7PLOSxxNhtgfiNJ2I86eM7KDI57K
+ i6DgLN0WP8EY5KHtMpVA+0ygrmTFjRDhrtPix9+DWa5OpHc7IiKXeVSQ/VYKefjh
+ Vi56jsKyqJeLJu0WudwFWJnpl4dvXfCCgXj/qWainFnI0QF9rg/InHEz7ozPPbyf
+ cKaMhzVaF5Ky/rp7RscEjze2KibJXiM/wSEUxZw4PdZQt2O7d79AvL5FZucCGRiO
+ 4TCvarCNZ8H4R1BwPFQsaqus0DDV+4ZMaYzHne2xf4m0PAEQg==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
  :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
  :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; t=
- 1662033255; x=1662119655; bh=iOGxzJMkoElZjdPhiKHx38InVVPdoOydOU7
- Ma0CQ5ls=; b=ewWBY3nCEznjbtApnR6d0/g1jh/9bGe4CtNp/43b7yWmOxfCaAL
- ++9BuQw18PSpwjxeOwK7wJCiufq9RW2wcZ6MMl1aj4C+e9rDqxiiIzCViFdL4TDE
- /O/rnTNkVi2EsKnMmaOcXckfvK80qNCobyBhiow3jz3Tetl45hMVPWg9vXdqUDJB
- 2DYjGcuIBLPx9MprF6OuF/4j625b87uBDruTgwLNRiYo7kQFv+2ZXMSzSUI0uhh4
- Q+JlpX/6iSYQovcq5RMaYuLTLZM1YfvxfBgSe7ZoD8O6+EjwpGnn6KB+GC1sd4yX
- h+gKjlVvPqjf0/hZlicS494O1ktcnw6Hcvg==
+ 1662034257; x=1662120657; bh=9JoygGHduEMC147ibV8wrAQ9axkyZ6wQ+sh
+ fNRr3gtw=; b=pii5A+PMBB1NPXFxhnOPDZUka8+FUJ4hu3hqdp1PGztESRLCWiz
+ ZUjMZxGFQhWRrFwaXVk1fmaXmfJEKmbZhZljns96L01w19Onyr0ft7H+hS4eZYCb
+ fKhczcjOvtoiMv2ClVAp+3jLgiJ8s3/JaGyLKyym9MF8+JwJET4qOGCUJOISPp3T
+ EjgL1QtIdUvUhQweYK0zb/T2EW6QqyoaAnlQuy46mxZjSVIMvQ1kFcTLEPFzhAnx
+ F2mC3MHHj6NWj09pntHmzRKQyg+0FjuwwJD5bl6NVu7mBqcxVbJjYbe5cDPg9bEX
+ +gjDXzeXZBTwd3/hLazB35W9h/AJs4yud2A==
 From: virtiofs-bot@sinrega.org
-Message-Id: <80366.122090107541700392@us-mta-629.us.mimecast.lan>
+Message-Id: <29516.122090108110000449@us-mta-294.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Thu,  1 Sep 2022 11:54:19 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR opened: Add missing license file header
+Date: Thu,  1 Sep 2022 12:11:02 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR opened: Add command line documentation
+ details
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -34,10 +35,9 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Add missing license file header BSD-3-Clause SPDX license identifier
+Just adds some details about posix acl and security label flags.
 
-NOTE:
-There is another file that needs a license header `fs_cache_req_handler.rs`
+Signed-off-by: German Maglione <gmaglione@redhat.com>
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/133
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/134
 

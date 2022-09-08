@@ -1,30 +1,30 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm3; t=1659064902; x=1659151302; bh=RwVILZKNbf7njBxnury6S
- yMdchGRDpx2XoBp9zZ3tqQ=; b=Atvn66AJp5BWPbHhgxsdJ2tHi9RIiBSRg4NTb
- 4Sml8S3L60n4WVKI9rShBdp4uuQ+PKCzx4IfroGhYoygFMv0HAlfUvvMQUYfEyHu
- gzoLwHvWe36MX6rjMxlF7F7jPKSSRo2H9QM2TIF4wDIFFpVVpyuZ3OoYE1HtXKdo
- 8xmsKMzPPvnsVA0AicKfdzNALaJaITRZc616IuNd+V2TNpzEndLDffE1bJwR6Dx0
- 8hNGQ6wT1QiBsQ2grcs1tvuA2XKmw1VgtKLIOl10QrfS6vQpvYvcDhCjiqMd0m5Y
- 5My86dqYiEMZRTJkAvVn9j1pRdWwzaUJNq5Zo1VVFoVa3KerQ==
+ :to; s=fm2; t=1662670197; x=1662756597; bh=5wiZ81TA1AjhSfC21Kbmd
+ S5RQ3FFMEL0LhGt39zKVPk=; b=KR83RI/ijcQs9/cSqdr6zrmwlPJtwZqJQEmfI
+ N+Y7EiVqImAoa6PDMA9r0Vq694Xs8oAr7RsCDl2wCePMqpkEtGFO56HhAio3P1u/
+ ZZnUnm+RbItECZHw5ucA8KXjrPYqsVByj36lm9vimPgucxX2oSuGV9UO/L8fRlTH
+ 2XcrA0AHgXO0JtioU/2wVHX8ED9DZwLxrCSa07K2Y/F7nv6Svw7PpM+6w+dlTD+q
+ 6RaE+v47SyjmIW7DURX9AQ6qD6DJ3a5Xzw4qF+0B1UMrT2kkP712QNTCG+JSqp5+
+ nqbgcB3uG9q3GgqNyYok2C3/eWtKkc7NgyR2x+OV+ndHNkmGA==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
  :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
- :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm3; t=
- 1659064902; x=1659151302; bh=RwVILZKNbf7njBxnury6SyMdchGRDpx2XoB
- p9zZ3tqQ=; b=yyy1SACqRAQ/dSHnKg14GnzDwAEYPj0hwtrKTuQ5OTNGo7gHyF/
- 5KPnd19udCAan12XMIA1x+0sJiJFruFc4Opcu2JNGVd85WG6BWi4vfUpnu3GEIKo
- UUK2zz+CaR7be5NB/zhlj57Bdjudqxp/6zwGSvtp0ses24z85TuYYHC178XgwLOU
- FhqYN/KKO7GKs/O8Uxo70FetiTNSragLHZIcqwlZLQu/TZMlKpPVmyST4dJSdcRW
- edx8At72yrZkBXF90cmuHSvBSnujQG0MmkYcw36SWt+NCg60xDG0jwvJMwtISWMz
- 8f0pLwlPZN+ZYchhtRNlJYhX34Wk5uK/lGA==
+ :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm2; t=
+ 1662670197; x=1662756597; bh=5wiZ81TA1AjhSfC21KbmdS5RQ3FFMEL0LhG
+ t39zKVPk=; b=wfgk94iTnWnBUAGiZCMQ37TrmD0ehhWQkXjfgo6r7lotEZOBLW2
+ VXSefjAMNXI9GoMmzIJ5F6HTq/HlcIH79e4nb+lGg4IIay3H8/M1sZwYue9Ix5fz
+ Vc1wnflVA6jOlzjW+lYgj0rHLoodJLFIfrO+rZKQwEhAv3qhoVyyzRD1v/WEwsrS
+ 2Ewa0V4XWyKtBSV8r4Xxx8jJyOySvLUQTFIFgPQzr++dxp9X/zRRibA6d/KR/4F/
+ coapZNu6PnV+yoGYPZanHztivrJY3LgSXDrHDi6DFg5zEgYaaGeHPVh5kcDTUswJ
+ G/2xzzsB4qLr9WvbU1CPQOzn6gTO7DynsOw==
 From: virtiofs-bot@sinrega.org
-Message-Id: <74807.122072823214400239@us-mta-256.us.mimecast.lan>
+Message-Id: <91993.122090816500001879@us-mta-447.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Fri, 29 Jul 2022 03:21:48 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] Issue opened: Number of enabled queues
- lower than min: 1 vs 2
+Date: Thu,  8 Sep 2022 20:50:04 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR opened: Draft: enabling a non-root user
+ to set the UID/GID mappings inside a sandbox
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -35,15 +35,7 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Hello,
-
-I'm hitting an issue that requires virtiofsd to pull the crates mentioned in this cloud hypervisor issue thread:
-https://github.com/cloud-hypervisor/cloud-hypervisor/issues/4314#issuecomment-1198468751
-
-Here is the commit we need from vhost-user-backend:
-https://github.com/rust-vmm/vhost-user-backend/pull/77
-
-It's been tested using a private fork, and we are looking forward to consuming this as part of an official release. I saw you had added a tag for v1.4.0 that pulls v0.5.1 vhost-user-backend, but they have not made a tag for this yet. Do you know which version this will be targeting?
+This patch enables a non-root user to map a set of UID/GID mappings from a namespace to another set outside the namespace. Since unshare is used on the main thread of the virtiofsd, once the thread goes inside a namespace it is not able to map a range of UID/GID other than the current user/group that is running the virtiofsd. This patch enables a non-root user with CAP_SETUID, CAP_SETGID capabilities to set multiple mappings and then drop those capabilities. The UID/GID ranges can be specified using virtiofsd command line parameters.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/52
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/137
 

@@ -1,30 +1,30 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm2; t=1662670197; x=1662756597; bh=5wiZ81TA1AjhSfC21Kbmd
- S5RQ3FFMEL0LhGt39zKVPk=; b=KR83RI/ijcQs9/cSqdr6zrmwlPJtwZqJQEmfI
- N+Y7EiVqImAoa6PDMA9r0Vq694Xs8oAr7RsCDl2wCePMqpkEtGFO56HhAio3P1u/
- ZZnUnm+RbItECZHw5ucA8KXjrPYqsVByj36lm9vimPgucxX2oSuGV9UO/L8fRlTH
- 2XcrA0AHgXO0JtioU/2wVHX8ED9DZwLxrCSa07K2Y/F7nv6Svw7PpM+6w+dlTD+q
- 6RaE+v47SyjmIW7DURX9AQ6qD6DJ3a5Xzw4qF+0B1UMrT2kkP712QNTCG+JSqp5+
- nqbgcB3uG9q3GgqNyYok2C3/eWtKkc7NgyR2x+OV+ndHNkmGA==
+ :to; s=fm2; t=1663054564; x=1663140964; bh=TlOttof8FQBBJKrrjmUoB
+ 8rq07e82h46qOz43RLlYF4=; b=SCAhBHPfgheZMOXY+9MqA8T+Nyl6giKTt3XcX
+ eKQGr5KXJwpQEybkYHw27BpvoirSAOUJ1xI753XnySY/72ZkCbQQbM3Oloy1maT7
+ yLixuOSOb9it6vQbST8k072fyKqErcend/1ftAB/JPXfGPCHr2F4wkHZg/3FblWF
+ rA2qETQsBbWOl7666vBPI31PdhjNXgum8TagNN1tp8D0dPUUNIu0VOvJRpMvvkyp
+ CqGb07AZxL4g0Uc/xIPbSj7wJ87BfzvTzwk2YGQfYrkCRNHtJ2odOgWkcJ6USQA2
+ lh6Jy6za/hIiWS/a95u4Kxa9sObeNP8thnaPDEN8jn5DMf4cg==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
  :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
  :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm2; t=
- 1662670197; x=1662756597; bh=5wiZ81TA1AjhSfC21KbmdS5RQ3FFMEL0LhG
- t39zKVPk=; b=wfgk94iTnWnBUAGiZCMQ37TrmD0ehhWQkXjfgo6r7lotEZOBLW2
- VXSefjAMNXI9GoMmzIJ5F6HTq/HlcIH79e4nb+lGg4IIay3H8/M1sZwYue9Ix5fz
- Vc1wnflVA6jOlzjW+lYgj0rHLoodJLFIfrO+rZKQwEhAv3qhoVyyzRD1v/WEwsrS
- 2Ewa0V4XWyKtBSV8r4Xxx8jJyOySvLUQTFIFgPQzr++dxp9X/zRRibA6d/KR/4F/
- coapZNu6PnV+yoGYPZanHztivrJY3LgSXDrHDi6DFg5zEgYaaGeHPVh5kcDTUswJ
- G/2xzzsB4qLr9WvbU1CPQOzn6gTO7DynsOw==
+ 1663054564; x=1663140964; bh=TlOttof8FQBBJKrrjmUoB8rq07e82h46qOz
+ 43RLlYF4=; b=RzFyy6rTh9EmHnibkrQ/97Acp430DYnTzXZct9NtpiLVHRXcw9c
+ Ic/cwE4lOfOvHvp6/GWMzRNPC4LOeIk+o2kom+10k4GJsUZvcTM9reRwC8AbcTjP
+ IKdaLCK2gP4L5qzklipuucM41AhfEjS2X7uxjakegaRZ+QeLnqgrMgiSbYvHPMs2
+ cqX+N8XHCiCB5KGyO4VdShcv3LXOlK6ljOj83qBHvilJCQtXSGus7hqGhEABqjkJ
+ cxNv+phyi1Et6EFxzb3q5KYHVLJ/aoXR3QIYb96pFk/F9g7D0SpjRKLKoO1Hu0qv
+ plOJdlCqyGrXHyQLiMGsXFj3qbzKvMMgd6Q==
 From: virtiofs-bot@sinrega.org
-Message-Id: <91993.122090816500001879@us-mta-447.us.mimecast.lan>
+Message-Id: <96909.122091303360600320@us-mta-640.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Thu,  8 Sep 2022 20:50:04 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR opened: Draft: enabling a non-root user
- to set the UID/GID mappings inside a sandbox
+Date: Tue, 13 Sep 2022 07:36:09 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR merged: Fix `listxattr()` response when
+ xattr name list is empty
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -35,7 +35,18 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-This patch enables a non-root user to map a set of UID/GID mappings from a namespace to another set outside the namespace. Since unshare is used on the main thread of the virtiofsd, once the thread goes inside a namespace it is not able to map a range of UID/GID other than the current user/group that is running the virtiofsd. This patch enables a non-root user with CAP_SETUID, CAP_SETGID capabilities to set multiple mappings and then drop those capabilities. The UID/GID ranges can be specified using virtiofsd command line parameters.
+FUSE_LISTXATTR returns a xattr name list. It is possible that the name
+list is empty, because either there are no xattrs or all xattrs have
+been filtered out by the server.
+
+As of now rust version of code writes a null byte to client supplied
+buffer. This fails the kernel fuse code verification and return -EIO to
+user space.
+
+We need to send a response back with error code 0 and virtiofs kernel
+code will handle it and update the variable argument size to 0.
+
+Closes #55
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/137
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/132
 

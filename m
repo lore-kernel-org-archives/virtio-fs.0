@@ -1,30 +1,14 @@
-Return-Path: <virtiofs-bot@sinrega.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
- cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm2; t=1664294969; x=1664381369; bh=HYKcR1Lf3nTplrBEA//nY
- NWtxNGhcx7iQ22P+VAJa4M=; b=XspmJ7IugHO8lOTdQPunbW5FA0Q9R148bs27e
- 4VHATwOhcJSJpWtZe8ecXjA9ll8jXsqzxKjOH2yX+Yw3EebtTVU+drq/2lwCMMXI
- zt7Wb9DPS1X37w+lBGpRkz1m22AF1xchHlJkkJf3gvWZa90v8aMP/ljO4l7QFLDp
- a5tLdiyApwefsjHNz/zoGPjre9LcIJ0brwFUFAdkmghZliLG6RtfBzSnaMr0sRqL
- IkF6Y5qCQZlHp94pOrQ+1M0bPQ/TxqPJ8AVIGsTfhh5XW1EjfrUuJeXvQT3bJLB+
- pt3bRvNzX5QHelopXPdROnRPiHxmKy9WozgIDmfSH3fCB5hzg==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
- messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
- :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
- :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm2; t=
- 1664294969; x=1664381369; bh=HYKcR1Lf3nTplrBEA//nYNWtxNGhcx7iQ22
- P+VAJa4M=; b=zC0eKIpY/duVCie9kyMtVI1NP7xR/L7OZcN7v1K5YTOZHMFZTUC
- CObxNcPQDbluzU5EiOmTh8KvMMsKGwPpZR4k4R8iKqfpaAEqhkcEE1SmTBzGFW4H
- 6jH6EpWTglHkCEgijIZyAkWwJwT1jDtrx9qe+A95mFZNFHaIqR1JV7QaoTKrrBoQ
- Ud3U8vXtyzydXS1kX5oriVuep+GFviZr1XwYPZO16NDHUO5bbWhZVPd9bqMpSndZ
- uG3gKcW7Bz3a62Ril+fb6ak8hmw/ZYgYc3rKa0n4Otaoqo3Gu+G8vF4EB7dsjs50
- Q3qoTsy8fi2u5wwOEwelcVwSaylRZl+jNyA==
-From: virtiofs-bot@sinrega.org
-Message-Id: <24382.122092712093001487@us-mta-402.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Tue, 27 Sep 2022 16:09:33 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] Issue closed: Cannot copy files / crash on
- Windows 11 22H2, Server 2019, Server 2022
+Return-Path: <vgoyal@redhat.com>
+Date: Tue, 27 Sep 2022 12:37:15 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YzMmu3xfOtQwuFUx@redhat.com>
+References: <4362261a-c762-4666-84e2-03c9daa6c4d9@www.fastmail.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4362261a-c762-4666-84e2-03c9daa6c4d9@www.fastmail.com>
+Subject: Re: [Virtio-fs] virtiofsd: Any reason why there's not an "openat2"
+ sandbox mode?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,54 +17,60 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Colin Walters <walters@verbum.org>
+Cc: qemu-devel@nongnu.org, virtio-fs-list <virtio-fs@redhat.com>, German Maglione <gmaglione@redhat.com>, Sergio Lopez <slp@redhat.com>
 
-While trying to copy any file from the virtio-fs drive into the local disk, `virtiofs.exe` crashed with:
+On Fri, Sep 09, 2022 at 05:24:03PM -0400, Colin Walters wrote:
+> We previously had a chat here https://lore.kernel.org/all/348d4774-bd5f-4832-bd7e-a21491fdac8d@www.fastmail.com/T/
+> around virtiofsd and privileges and the case of trying to run virtiofsd inside an unprivileged (Kubernetes) container.
+> 
+> Right now we're still using 9p, and it has bugs (basically it seems like the 9p inode flushing callback tries to allocate memory to send an RPC, and this causes OOM problems)
+> https://github.com/coreos/coreos-assembler/issues/1812
+> 
+> Coming back to this...as of lately in Linux, there's support for strongly isolated filesystem access via openat2():
+> https://lwn.net/Articles/796868/
+> 
+> Is there any reason we couldn't do an -o sandbox=openat2 ?  This operates without any privileges at all, and should be usable (and secure enough) in our use case.
 
-```
-Faulting application name: virtiofs.exe, version: 0.0.0.0, time stamp: 0x62887e76
-Faulting module name: virtiofs.exe, version: 0.0.0.0, time stamp: 0x62887e76
-Exception code: 0xc0000005
-Fault offset: 0x0000000000008f70
-Faulting process id: 0x0x10CC
-Faulting application start time: 0x0x1D8D1CAF5E62D04
-Faulting application path: C:\Program Files\Virtio-Win\VioFS\virtiofs.exe
-Faulting module path: C:\Program Files\Virtio-Win\VioFS\virtiofs.exe
-Report Id: 6d921400-ca34-4501-b33e-6d9d8ab87909
-Faulting package full name: 
-Faulting package-relative application ID: 
-```
+[ cc virtio-fs-list, german, sergio ]
 
-![image](https://gitlab.com/virtio-fs/virtiofsd/uploads/5614deedbf07cae5fec26ad36bace46b/image.png)
+Hi Colin,
 
-I'm using:
+Using openat2(RESOLVE_IN_ROOT) (if kernel is new enough), sounds like a
+good idea. We talked about it few times but nobody ever wrote a patch to
+implement it.
 
-1. the drivers bundled in https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.221-1/virtio-win-0.1.221.iso (only `viofs.sys` had a version string. and it is `100.91.104.22100`)
-2. winfsp 1.11.22176
-3. Windows 11 22H2 guest, Windows Server 2019 or 2022 guest.
-4. Ubuntu 22.04 host with packages:
-   1. libvirt 8.0.0-1ubuntu7.1
-   2. qemu-system-x86 6.2+dfsg-2ubuntu6.3
-5. the libvirt virtiofs configuration snippet:
-   ```xml
-    <filesystem type="mount" accessmode="passthrough">
-      <driver type="virtiofs"/>
-      <binary path="/usr/lib/qemu/virtiofsd"/>
-      <source dir="/home/vagrant/Projects/windows-vagrant/example"/>
-      <target dir="9ee5aaf7cf944b385ee3e99881442aa"/>
-      <alias name="fs0"/>
-      <address type="pci" domain="0x0000" bus="0x07" slot="0x00" function="0x0"/>
-    </filesystem>
-    ```
-6. the libvirt shared memory configuration snippet:
-   ```xml
-    <memoryBacking>
-      <source type="memfd"/>
-      <access mode="shared"/>
-    </memoryBacking>
-   ```
+And it probably makes sense with all the sandboxes (chroot(), namespaces).
 
-BTW, It would be useful to include some kind of version information in the `virtiofs.exe` file as its currently reporting its version as `0.0.0.0`.
----
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/57
+I am wondering that it probably should not be a new sandbox mode at all.
+It probably should be the default if kernel offers openat2() syscall.
 
+Now all the development has moved to rust virtiofsd.
+
+https://gitlab.com/virtio-fs/virtiofsd
+
+C version of virtiofsd is just seeing small critical fixes.
+
+And rust version allows running unprivileged (inside a user namespace).
+German is also working on allowing running unprivileged without
+user namespaces but this will not allow arbitrary uid/gid switching.
+
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/136
+
+If one wants to run unprivileged and also do arbitrary uid/gid switching,
+then you need to use user namepsaces and map a range of subuid/subgid
+into the user namepsace virtiofsd is running in.
+
+If possible, please try to use rust virtiofsd for your situation. Its
+already packaged for fedora.
+
+Coming back to original idea of using openat2(), I think we should
+probably give it a try in rust virtiofsd and if it works, it should
+work across all the sandboxing modes.
+
+Thanks
+Vivek
+
+> 
+> I may try a patch if this sounds OK...
+> 

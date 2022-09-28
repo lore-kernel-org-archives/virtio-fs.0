@@ -1,18 +1,30 @@
-Return-Path: <stefanha@redhat.com>
-Date: Tue, 27 Sep 2022 16:14:20 -0400
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <YzNZnPiUqySu6sGh@fedora>
-References: <4362261a-c762-4666-84e2-03c9daa6c4d9@www.fastmail.com>
- <YzMmu3xfOtQwuFUx@redhat.com> <YzMrYAJQeSP2hDSs@redhat.com>
- <CAJh=p+5rQDBJJC8VNGL10KYgDeq-Hg5WK7avONCti03eJGH+ow@mail.gmail.com>
- <798fe353-9537-44fe-a76a-819e8c93abb5@www.fastmail.com>
-MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
- protocol="application/pgp-signature"; boundary="fE1aOEgntkr1nLH8"
-Content-Disposition: inline
-In-Reply-To: <798fe353-9537-44fe-a76a-819e8c93abb5@www.fastmail.com>
-Subject: Re: [Virtio-fs] virtiofsd: Any reason why there's not an "openat2"
- sandbox mode?
+Return-Path: <virtiofs-bot@sinrega.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+ cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+ :to; s=fm2; t=1664348552; x=1664434952; bh=2nyAv5JRuaAxqOlLZLoQJ
+ MbBGMLg3u3QLCSClnrQ1kY=; b=hDFtNXVgk1ba4p1Mc5rCk6bFTF3vk08EyxOTY
+ +/Y+/WklXJ5aWZtl+HZjSaDzZOoGuF4KPUnSPv/+RVPLMRuE/ExEAJ/qWHfaWjSn
+ ptSA47n9Aiz1OWogmXXqtp1BcKt8X7J0nkrpsX9ttcVmdP/vFOf76gK/OkVqVTyI
+ WTUne0mYy5f5x+av0UIF5U71wr2uTvbbvqnLgw5KdGhBGnm0CjYCHrrVc7hbcgK7
+ 0W5cKk2mV4xN55Vpt7VDb2SVQ/cku5LUFIlWk0HokaHwyvw9RpFBiK8sN94cSuxV
+ Mem/4UGhEB3r69J+ILR0KyNbxviq5/dgafSHAr9PgimXyUidg==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+ messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
+ :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
+ :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm2; t=
+ 1664348552; x=1664434952; bh=2nyAv5JRuaAxqOlLZLoQJMbBGMLg3u3QLCS
+ ClnrQ1kY=; b=XfMZEdU5WrCvupcpx1VGQ3x9r9IixY6ID8h6eoL8UrGvdW9nvG+
+ ZpyV2Z4eF8+VEpXyJkk5Ql0pJTbjFLdbpXc+s1EywiVUwOxhqB6LLRtvbAq9Os0p
+ 60BFcbhprPZgO3EzDi8XpwXul0cnrTtKRuhQBQo2aWZRQJ3OKQCD+JWw7HkYOTp1
+ vk1jYuESRevqOmF4wabpf5UGQOEzOLpuiyUY6lL5PDOorz5kwBtfu0XKJxvOmyFg
+ /DeWDU8l4SYDfIpUohOgBmlOBGroF9fs7FZAl3yxYgOXO1wodgB3mab1dlqlhizl
+ 7gV3tMNNmZO64iIiUW1ncGlYPJG/bA7AU/w==
+From: virtiofs-bot@sinrega.org
+Message-Id: <37382.122092803023200217@us-mta-92.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"; x-default=true
+Date: Wed, 28 Sep 2022 07:02:35 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] Issue opened: What does --cache exactly
+ mean?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -21,78 +33,14 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Colin Walters <walters@verbum.org>
-Cc: German Maglione <gmaglione@redhat.com>, Vivek Goyal <vgoyal@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
+To: virtio-fs@redhat.com
 
+What does --cache exactly mean? My understanding is there is no page cache in the guest kernel for virtiofs, so this option is to control the behaviour of host kernel page cache. So does it mean:
+  - never     each time writing to a page cache page, flush it
+  - always    don't flush unless the user asks to do it
+  - auto      flush page cache when close a file.
 
---fE1aOEgntkr1nLH8
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Do I think it in the right way? Here why do we have --cache=never? Seems it doesn't make sense when we are in the passthroughFS case.
+---
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/58
 
-On Tue, Sep 27, 2022 at 01:51:41PM -0400, Colin Walters wrote:
->=20
->=20
-> On Tue, Sep 27, 2022, at 1:27 PM, German Maglione wrote:
-> >
-> >> > Now all the development has moved to rust virtiofsd.
->=20
-> Oh, awesome!!  The code there looks great.
->=20
-> > I could work on this for the next major version and see if anything bre=
-aks.
-> > But I prefer to add this as a compilation feature, instead of a command=
- line
-> > option that we will then have to maintain for a while.
->=20
-> Hmm, what would be the issue with having the code there by default?  I th=
-ink rather than any new command line option, we automatically use `openat2+=
-RESOLVE_IN_ROOT` if the process is run as a nonzero uid.
->=20
-> > Also, I don't see it as a sandbox feature, as Stefan mentioned, a compr=
-omised
-> > process can call openat2() without RESOLVE_IN_ROOT.=20
->=20
-> I'm a bit skeptical honestly about how secure the existing namespace code=
- is against a compromised virtiofsd process.  The primary worry is guest fi=
-lesystem traversals, right?  openat2+RESOLVE_IN_ROOT addresses that.  Plus =
-being in Rust makes this dramatically safer.
->=20
-> > I did some test with
-> > Landlock to lock virtiofsd inside the shared directory, but IIRC it req=
-uires a
-> > kernel 5.13
->=20
-> But yes, landlock and other things make sense, I just don't see these thi=
-ngs as strongly linked.  IOW we shouldn't in my opinion block unprivileged =
-virtiofsd on more sandboxing than openat2 already gives us.
-
-I think openat2(RESOLVE_IN_ROOT) support should be added unless there is
-another unprivileged mechanism that is stronger.
-
-The security implications need to be covered in the user documentation
-so people can decide whether using this mode is appropriate.
-
-We should continue to explain the difference between a voluntary
-mechanism like openat2(RESOLVE_IN_ROOT) and a mandatory mechanism like
-mount namespaces with pivot_root(2). Rust programs are not immune to
-arbitrary code execution, but it's less likely than with a C program.
-
-Stefan
-
---fE1aOEgntkr1nLH8
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmMzWZwACgkQnKSrs4Gr
-c8hsNggAq2b4EiLGdaw/6VKEnOUsLflmhehlNssdGVaRQHdceOt4vB/4XqF39eb6
-ER462uf7KqydVjM8/DVxK5VQY9/p64W1CsSQkx1C4+S1QCwx3R/pbrT3k9UfTjKP
-yFe0+pRDjx9wTwLm/rXPwv8vtkQd0ikKYTrLXgHOlX2gEtj55kFlfAgJIFy3vk8n
-P8P1QikfAhZYOXhuRJBJP7MofCJAJnpkQfn4CnFFpCpogyQwyWWgiRDfl7QfCDdV
-/VwDvBFD7aJ2fEBz5yGhe281D0LtZeGaMeKDeg/visXZu8FZbviLdHy7s7c70Wex
-VvJQDuGJ0NOGbxbwlu4g1gipRZaAXA==
-=uTzR
------END PGP SIGNATURE-----
-
---fE1aOEgntkr1nLH8--

@@ -1,30 +1,19 @@
-Return-Path: <virtiofs-bot@sinrega.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
- cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm3; t=1659112885; x=1659199285; bh=fiZIP2gowrHvZKMF7r0ny
- VAeaK7/dxkqIhND46lg7GY=; b=VuHdbATC//SCy8/nARo99qv0ytRF42V8OKZrs
- RmL9ymOFzlj8F4B0sedlyvSzBZMHxccZzLS1l/8wS6SgpC1R0za71SgZoDFfSK8C
- 1Qo2rbNcVjrEnKvdS/pCZnyj7mezC2brfT0Lb2IOXEUy1kaz6MWF+X4tWr8PnJzL
- rl+BB7lUAEmnSuc2DJrpGlC2nOw2DVbLGhdQQ73mGeiZD9kXndLdBMx3L8ajDe0Z
- kWRrpH0EbZVonlb/BD9ToLAon1vCb+vUzTj1KuZONSicSWWgWUA8KKDe1cd0LqZF
- BVQqz+Wt8hOHGijwqxNM4yODemcpd+XBpqsafSPLboVp08vFA==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
- messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
- :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
- :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm3; t=
- 1659112885; x=1659199285; bh=fiZIP2gowrHvZKMF7r0nyVAeaK7/dxkqIhN
- D46lg7GY=; b=IGqb4h7F/YZwjucpFCnd4Cnyp8EWfvmJLa8CE7D2C1NcY67OwoM
- oKeERt/zhaFSfhWG1MrzcGImoleE5KCWrF0dnWto8UBriVCI3sDOgFB3e8aKCgjK
- bISeP+5vdWDp4y1EhdV/wVZbsTBB0/fvMPSg0TOs7NKC/ZPyBl++5LINb0a5En5d
- 9hbZpxZ7HjOEnhaBGAP33KSWuaAs+4gOkHyr8rNoRmBYYOUOJv5Vo3Ule3Vmb90i
- 90ohtsO3z3e45LAIhZgxpKgTNsRgsbqEh/XxzXBN/rlZgR/NC4sf7IjD332D7xqk
- eY2RvzFlJtKtm+SLeorNxhipw+fWheCfWYw==
-From: virtiofs-bot@sinrega.org
-Message-Id: <54885.122072912412800578@us-mta-474.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Fri, 29 Jul 2022 16:41:30 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR opened: Bump vhost-user-backend and
- virtio-queue dependencies
+Return-Path: <vgoyal@redhat.com>
+Date: Wed, 28 Sep 2022 15:28:56 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YzSgeDdpHOw1hTM0@redhat.com>
+References: <4362261a-c762-4666-84e2-03c9daa6c4d9@www.fastmail.com>
+ <YzMmu3xfOtQwuFUx@redhat.com> <YzMrYAJQeSP2hDSs@redhat.com>
+ <CAJh=p+5rQDBJJC8VNGL10KYgDeq-Hg5WK7avONCti03eJGH+ow@mail.gmail.com>
+ <798fe353-9537-44fe-a76a-819e8c93abb5@www.fastmail.com>
+ <YzNZnPiUqySu6sGh@fedora>
+ <20220928083340.eyizwu6mm3cc3bxu@mhamilton>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20220928083340.eyizwu6mm3cc3bxu@mhamilton>
+Subject: Re: [Virtio-fs] virtiofsd: Any reason why there's not an "openat2"
+ sandbox mode?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,20 +22,60 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Sergio Lopez <slp@redhat.com>
+Cc: Stefan Hajnoczi <stefanha@redhat.com>, Colin Walters <walters@verbum.org>, virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
 
-Updating dependencies to:
-- virtio-queue 0.5.0
-- vhost-user-backend 0.6.0
+On Wed, Sep 28, 2022 at 10:33:40AM +0200, Sergio Lopez wrote:
+> On Tue, Sep 27, 2022 at 04:14:20PM -0400, Stefan Hajnoczi wrote:
+> > On Tue, Sep 27, 2022 at 01:51:41PM -0400, Colin Walters wrote:
+> > > 
+> > > 
+> > > On Tue, Sep 27, 2022, at 1:27 PM, German Maglione wrote:
+> > > >
+> > > >> > Now all the development has moved to rust virtiofsd.
+> > > 
+> > > Oh, awesome!!  The code there looks great.
+> > > 
+> > > > I could work on this for the next major version and see if anything breaks.
+> > > > But I prefer to add this as a compilation feature, instead of a command line
+> > > > option that we will then have to maintain for a while.
+> > > 
+> > > Hmm, what would be the issue with having the code there by default?  I think rather than any new command line option, we automatically use `openat2+RESOLVE_IN_ROOT` if the process is run as a nonzero uid.
+> > > 
+> > > > Also, I don't see it as a sandbox feature, as Stefan mentioned, a compromised
+> > > > process can call openat2() without RESOLVE_IN_ROOT. 
+> > > 
+> > > I'm a bit skeptical honestly about how secure the existing namespace code is against a compromised virtiofsd process.  The primary worry is guest filesystem traversals, right?  openat2+RESOLVE_IN_ROOT addresses that.  Plus being in Rust makes this dramatically safer.
+> > > 
+> > > > I did some test with
+> > > > Landlock to lock virtiofsd inside the shared directory, but IIRC it requires a
+> > > > kernel 5.13
+> > > 
+> > > But yes, landlock and other things make sense, I just don't see these things as strongly linked.  IOW we shouldn't in my opinion block unprivileged virtiofsd on more sandboxing than openat2 already gives us.
+> > 
+> > I think openat2(RESOLVE_IN_ROOT) support should be added unless there is
+> > another unprivileged mechanism that is stronger.
+> > 
+> > The security implications need to be covered in the user documentation
+> > so people can decide whether using this mode is appropriate.
+> > 
+> > We should continue to explain the difference between a voluntary
+> > mechanism like openat2(RESOLVE_IN_ROOT) and a mandatory mechanism like
+> > mount namespaces with pivot_root(2). Rust programs are not immune to
+> > arbitrary code execution, but it's less likely than with a C program.
+> 
+> I agree. Perhaps we could modify the "none" sandbox mode to use
+> openat2, if available, and add an "openat2" mode which does basically
+> the same thing, but bailing out if openat2 is not available.
 
-This latest virtio-queue version introduces a few breaking changes,
-which is why this patch slightly updates the code.
+Sounds reasonable. In fact, we could probably do someting similar
+for "landlock" as well. 
 
-The latest vhost-user-backend version relies on the same virtio-queue
-version, but it also contains a fix for proper vring initialization so
-that booting a VM with OVMF firmware works as expected.
+Vivek
 
-Signed-off-by: Sebastien Boeuf <sebastien.boeuf@intel.com>
----
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/129
+> 
+> And explain this clearly in the docs, of course.
+> 
+> Sergio.
+
 

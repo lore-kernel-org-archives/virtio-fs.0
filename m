@@ -1,16 +1,12 @@
-Return-Path: <vgoyal@redhat.com>
-Date: Wed, 28 Sep 2022 15:26:32 -0400
-From: Vivek Goyal <vgoyal@redhat.com>
-Message-ID: <YzSf6NYs0vJhzPc7@redhat.com>
-References: <4362261a-c762-4666-84e2-03c9daa6c4d9@www.fastmail.com>
- <YzMmu3xfOtQwuFUx@redhat.com> <YzMrYAJQeSP2hDSs@redhat.com>
- <CAJh=p+5rQDBJJC8VNGL10KYgDeq-Hg5WK7avONCti03eJGH+ow@mail.gmail.com>
+Return-Path: <jennifer.manuel@globalzeninfo.com>
+From: Jennifer Manuel <jennifer.manuel@globalzeninfo.com>
+Date: Wed, 28 Sep 2022 19:48:44 +0000
+Message-ID: <BM1PR01MB2913E9B6099597E21CE14AB2E6549@BM1PR01MB2913.INDPRD01.PROD.OUTLOOK.COM>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-In-Reply-To: <CAJh=p+5rQDBJJC8VNGL10KYgDeq-Hg5WK7avONCti03eJGH+ow@mail.gmail.com>
-Subject: Re: [Virtio-fs] virtiofsd: Any reason why there's not an "openat2"
- sandbox mode?
+Content-Language: en-US
+Content-Type: multipart/alternative;
+ boundary="_000_BM1PR01MB2913E9B6099597E21CE14AB2E6549BM1PR01MB2913INDP_"
+Subject: [Virtio-fs] Ubuntu Users List
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,101 +15,104 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: German Maglione <gmaglione@redhat.com>
-Cc: Colin Walters <walters@verbum.org>, qemu-devel@nongnu.org, virtio-fs-list <virtio-fs@redhat.com>, Sergio Lopez <slp@redhat.com>
+To: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
 
-On Tue, Sep 27, 2022 at 07:27:02PM +0200, German Maglione wrote:
-> On Tue, Sep 27, 2022 at 6:57 PM Vivek Goyal <vgoyal@redhat.com> wrote:
-> >
-> > On Tue, Sep 27, 2022 at 12:37:15PM -0400, Vivek Goyal wrote:
-> > > On Fri, Sep 09, 2022 at 05:24:03PM -0400, Colin Walters wrote:
-> > > > We previously had a chat here https://lore.kernel.org/all/348d4774-bd5f-4832-bd7e-a21491fdac8d@www.fastmail.com/T/
-> > > > around virtiofsd and privileges and the case of trying to run virtiofsd inside an unprivileged (Kubernetes) container.
-> > > >
-> > > > Right now we're still using 9p, and it has bugs (basically it seems like the 9p inode flushing callback tries to allocate memory to send an RPC, and this causes OOM problems)
-> > > > https://github.com/coreos/coreos-assembler/issues/1812
-> > > >
-> > > > Coming back to this...as of lately in Linux, there's support for strongly isolated filesystem access via openat2():
-> > > > https://lwn.net/Articles/796868/
-> > > >
-> > > > Is there any reason we couldn't do an -o sandbox=openat2 ?  This operates without any privileges at all, and should be usable (and secure enough) in our use case.
-> > >
-> > > [ cc virtio-fs-list, german, sergio ]
-> > >
-> > > Hi Colin,
-> > >
-> > > Using openat2(RESOLVE_IN_ROOT) (if kernel is new enough), sounds like a
-> > > good idea. We talked about it few times but nobody ever wrote a patch to
-> > > implement it.
-> > >
-> > > And it probably makes sense with all the sandboxes (chroot(), namespaces).
-> > >
-> > > I am wondering that it probably should not be a new sandbox mode at all.
-> > > It probably should be the default if kernel offers openat2() syscall.
-> > >
-> > > Now all the development has moved to rust virtiofsd.
-> > >
-> > > https://gitlab.com/virtio-fs/virtiofsd
-> > >
-> > > C version of virtiofsd is just seeing small critical fixes.
-> > >
-> > > And rust version allows running unprivileged (inside a user namespace).
-> > > German is also working on allowing running unprivileged without
-> > > user namespaces but this will not allow arbitrary uid/gid switching.
-> > >
-> > > https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/136
-> > >
-> > > If one wants to run unprivileged and also do arbitrary uid/gid switching,
-> > > then you need to use user namepsaces and map a range of subuid/subgid
-> > > into the user namepsace virtiofsd is running in.
-> > >
-> > > If possible, please try to use rust virtiofsd for your situation. Its
-> > > already packaged for fedora.
-> > >
-> > > Coming back to original idea of using openat2(), I think we should
-> > > probably give it a try in rust virtiofsd and if it works, it should
-> > > work across all the sandboxing modes.
-> >
-> > Thinking more about it, enabling openat2() usage conditionally based on
-> > some option probably is not a bad idea. I was assuming that using
-> > openat2() by default will not break any of the existing use cases. But
-> > I am not sure. I have burnt my fingers so many times and had to back
-> > out on default settings that enabling usage of openat2() conditionally
-> > will probably be a safer choice. :-)
-> >
-> 
-> I could work on this for the next major version and see if anything breaks.
-> But I prefer to add this as a compilation feature, instead of a command line
-> option that we will then have to maintain for a while.
+--_000_BM1PR01MB2913E9B6099597E21CE14AB2E6549BM1PR01MB2913INDP_
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: quoted-printable
 
-What does compilation feature mean? One can compile it out? If it is
-compiled in, is it enabled by default?
+Hi,
+Hope you are doing well.
+Are you looking for Ubuntu Users List. with email, phone and complete detai=
+ls?
+Titles like - IT Decision Makers, CEO, CFO, IT Engineers and many more.
+Information fields: Names, Title, Email, Phone, Company Name, Company URL, =
+Company physical address, SIC Code, Industry and Specialty (Revenue and Emp=
+loyee).
+Let me know your geography so that I can get back with counts, pricing and =
+more information on your interest.
+Best Regards,
+Jennifer Manuel
+Demand Generation
 
-> 
-> Also, I don't see it as a sandbox feature, as Stefan mentioned, a compromised
-> process can call openat2() without RESOLVE_IN_ROOT. I did some test with
-> Landlock to lock virtiofsd inside the shared directory, but IIRC it requires a
-> kernel 5.13
+--_000_BM1PR01MB2913E9B6099597E21CE14AB2E6549BM1PR01MB2913INDP_
+Content-Type: text/html; charset="us-ascii"
+Content-Transfer-Encoding: quoted-printable
 
-landlock sounds interesting. May be use it by default if kernel offers it.
+<html xmlns:v=3D"urn:schemas-microsoft-com:vml" xmlns:o=3D"urn:schemas-micr=
+osoft-com:office:office" xmlns:w=3D"urn:schemas-microsoft-com:office:word" =
+xmlns:m=3D"http://schemas.microsoft.com/office/2004/12/omml" xmlns=3D"http:=
+//www.w3.org/TR/REC-html40">
+<head>
+<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dus-ascii"=
+>
+<meta name=3D"Generator" content=3D"Microsoft Word 15 (filtered medium)">
+<style><!--
+/* Font Definitions */
+@font-face
+=09{font-family:"Cambria Math";
+=09panose-1:2 4 5 3 5 4 6 3 2 4;}
+@font-face
+=09{font-family:Calibri;
+=09panose-1:2 15 5 2 2 2 4 3 2 4;}
+/* Style Definitions */
+p.MsoNormal, li.MsoNormal, div.MsoNormal
+=09{margin-top:0cm;
+=09margin-right:0cm;
+=09margin-bottom:8.0pt;
+=09margin-left:0cm;
+=09line-height:107%;
+=09font-size:11.0pt;
+=09font-family:"Calibri",sans-serif;
+=09mso-fareast-language:EN-US;}
+.MsoChpDefault
+=09{mso-style-type:export-only;
+=09font-family:"Calibri",sans-serif;
+=09mso-fareast-language:EN-US;}
+.MsoPapDefault
+=09{mso-style-type:export-only;
+=09margin-bottom:8.0pt;
+=09line-height:107%;}
+@page WordSection1
+=09{size:595.3pt 841.9pt;
+=09margin:72.0pt 72.0pt 72.0pt 72.0pt;}
+div.WordSection1
+=09{page:WordSection1;}
+--></style><!--[if gte mso 9]><xml>
+<o:shapedefaults v:ext=3D"edit" spidmax=3D"1026" />
+</xml><![endif]--><!--[if gte mso 9]><xml>
+<o:shapelayout v:ext=3D"edit">
+<o:idmap v:ext=3D"edit" data=3D"1" />
+</o:shapelayout></xml><![endif]-->
+</head>
+<body lang=3D"EN-IN">
+<div class=3D"WordSection1">
+<p class=3D"MsoNormal">Hi,</p>
+<p class=3D"MsoNormal"></p>
+<p class=3D"MsoNormal">Hope you are doing well.</p>
+<p class=3D"MsoNormal"></p>
+<p class=3D"MsoNormal">Are you looking for <b><u>Ubuntu Users List.</u></b>=
+ with email, phone and complete details?</p>
+<p class=3D"MsoNormal"></p>
+<p class=3D"MsoNormal">Titles like - IT Decision Makers, CEO, CFO, IT Engin=
+eers and many more.</p>
+<p class=3D"MsoNormal"></p>
+<p class=3D"MsoNormal">Information fields: Names, Title, Email, Phone, Comp=
+any Name, Company URL, Company physical address, SIC Code, Industry and Spe=
+cialty (Revenue and Employee).</p>
+<p class=3D"MsoNormal"></p>
+<p class=3D"MsoNormal">Let me know your geography so that I can get back wi=
+th counts, pricing and more information on your interest.</p>
+<p class=3D"MsoNormal"></p>
+<p class=3D"MsoNormal">Best Regards,</p>
+<p class=3D"MsoNormal"></p>
+<p class=3D"MsoNormal"><b>Jennifer Manuel</b></p>
+<p class=3D"MsoNormal">Demand Generation</p>
+<p class=3D"MsoNormal"></p>
+<p class=3D"MsoNormal"></p>
+</div>
+</body>
+</html>
 
-Question will be, security mechanisms we are using, how many of these
-are mutually exclusive and how many can be used together.
+--_000_BM1PR01MB2913E9B6099597E21CE14AB2E6549BM1PR01MB2913INDP_--
 
-A. pivot_root()
-B. chroot()
-C. openat2()
-D. landlock
-E. seccomp
-
-Seccomp goes well with everything. 
-landlock probably will go well as well.
-
-pivot_root() and chroot() are currently mutually exlusive.
-
-openat2() is probably redundant if pivot_root()/chroot()/landlock is
-being used. But should work anyway.
-
-Something to document as Stefan suggested.
-
-Vivek

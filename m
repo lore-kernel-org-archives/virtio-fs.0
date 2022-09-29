@@ -1,12 +1,21 @@
-Return-Path: <jennifer.manuel@globalzeninfo.com>
-From: Jennifer Manuel <jennifer.manuel@globalzeninfo.com>
-Date: Wed, 28 Sep 2022 19:48:44 +0000
-Message-ID: <BM1PR01MB2913E9B6099597E21CE14AB2E6549@BM1PR01MB2913.INDPRD01.PROD.OUTLOOK.COM>
+Return-Path: <vgoyal@redhat.com>
+Date: Thu, 29 Sep 2022 10:10:05 -0400
+From: Vivek Goyal <vgoyal@redhat.com>
+Message-ID: <YzWnPZ5Y6ivS8e1v@redhat.com>
+References: <4362261a-c762-4666-84e2-03c9daa6c4d9@www.fastmail.com>
+ <YzMmu3xfOtQwuFUx@redhat.com> <YzMrYAJQeSP2hDSs@redhat.com>
+ <CAJh=p+5rQDBJJC8VNGL10KYgDeq-Hg5WK7avONCti03eJGH+ow@mail.gmail.com>
+ <798fe353-9537-44fe-a76a-819e8c93abb5@www.fastmail.com>
+ <YzNZnPiUqySu6sGh@fedora>
+ <20220928083340.eyizwu6mm3cc3bxu@mhamilton>
+ <YzSgeDdpHOw1hTM0@redhat.com>
+ <b963f623-aa85-4285-9bfa-5fcb4744c354@app.fastmail.com>
 MIME-Version: 1.0
-Content-Language: en-US
-Content-Type: multipart/alternative;
- boundary="_000_BM1PR01MB2913E9B6099597E21CE14AB2E6549BM1PR01MB2913INDP_"
-Subject: [Virtio-fs] Ubuntu Users List
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <b963f623-aa85-4285-9bfa-5fcb4744c354@app.fastmail.com>
+Subject: Re: [Virtio-fs] virtiofsd: Any reason why there's not an "openat2"
+ sandbox mode?
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,104 +24,20 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "virtio-fs@redhat.com" <virtio-fs@redhat.com>
+To: Colin Walters <walters@verbum.org>
+Cc: Sergio Lopez <slp@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
 
---_000_BM1PR01MB2913E9B6099597E21CE14AB2E6549BM1PR01MB2913INDP_
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: quoted-printable
+On Thu, Sep 29, 2022 at 10:04:36AM -0400, Colin Walters wrote:
+> On Wed, Sep 28, 2022, at 3:28 PM, Vivek Goyal wrote:
+> 
+> > Sounds reasonable. In fact, we could probably do someting similar
+> > for "landlock" as well. 
+> 
+> Thanks for the discussion all!  Can someone (vaguely) commit to look into this in say the next few months?  It's not *urgent*, we can live with the 9p flakes and problems short term, just trying to figure out if this needs to be on our medium-term radar or not.  Thanks!
 
-Hi,
-Hope you are doing well.
-Are you looking for Ubuntu Users List. with email, phone and complete detai=
-ls?
-Titles like - IT Decision Makers, CEO, CFO, IT Engineers and many more.
-Information fields: Names, Title, Email, Phone, Company Name, Company URL, =
-Company physical address, SIC Code, Industry and Specialty (Revenue and Emp=
-loyee).
-Let me know your geography so that I can get back with counts, pricing and =
-more information on your interest.
-Best Regards,
-Jennifer Manuel
-Demand Generation
+Hi Colin,
 
---_000_BM1PR01MB2913E9B6099597E21CE14AB2E6549BM1PR01MB2913INDP_
-Content-Type: text/html; charset="us-ascii"
-Content-Transfer-Encoding: quoted-printable
+What's your use case. How do you plan to use virtiofs.
 
-<html xmlns:v=3D"urn:schemas-microsoft-com:vml" xmlns:o=3D"urn:schemas-micr=
-osoft-com:office:office" xmlns:w=3D"urn:schemas-microsoft-com:office:word" =
-xmlns:m=3D"http://schemas.microsoft.com/office/2004/12/omml" xmlns=3D"http:=
-//www.w3.org/TR/REC-html40">
-<head>
-<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dus-ascii"=
->
-<meta name=3D"Generator" content=3D"Microsoft Word 15 (filtered medium)">
-<style><!--
-/* Font Definitions */
-@font-face
-=09{font-family:"Cambria Math";
-=09panose-1:2 4 5 3 5 4 6 3 2 4;}
-@font-face
-=09{font-family:Calibri;
-=09panose-1:2 15 5 2 2 2 4 3 2 4;}
-/* Style Definitions */
-p.MsoNormal, li.MsoNormal, div.MsoNormal
-=09{margin-top:0cm;
-=09margin-right:0cm;
-=09margin-bottom:8.0pt;
-=09margin-left:0cm;
-=09line-height:107%;
-=09font-size:11.0pt;
-=09font-family:"Calibri",sans-serif;
-=09mso-fareast-language:EN-US;}
-.MsoChpDefault
-=09{mso-style-type:export-only;
-=09font-family:"Calibri",sans-serif;
-=09mso-fareast-language:EN-US;}
-.MsoPapDefault
-=09{mso-style-type:export-only;
-=09margin-bottom:8.0pt;
-=09line-height:107%;}
-@page WordSection1
-=09{size:595.3pt 841.9pt;
-=09margin:72.0pt 72.0pt 72.0pt 72.0pt;}
-div.WordSection1
-=09{page:WordSection1;}
---></style><!--[if gte mso 9]><xml>
-<o:shapedefaults v:ext=3D"edit" spidmax=3D"1026" />
-</xml><![endif]--><!--[if gte mso 9]><xml>
-<o:shapelayout v:ext=3D"edit">
-<o:idmap v:ext=3D"edit" data=3D"1" />
-</o:shapelayout></xml><![endif]-->
-</head>
-<body lang=3D"EN-IN">
-<div class=3D"WordSection1">
-<p class=3D"MsoNormal">Hi,</p>
-<p class=3D"MsoNormal"></p>
-<p class=3D"MsoNormal">Hope you are doing well.</p>
-<p class=3D"MsoNormal"></p>
-<p class=3D"MsoNormal">Are you looking for <b><u>Ubuntu Users List.</u></b>=
- with email, phone and complete details?</p>
-<p class=3D"MsoNormal"></p>
-<p class=3D"MsoNormal">Titles like - IT Decision Makers, CEO, CFO, IT Engin=
-eers and many more.</p>
-<p class=3D"MsoNormal"></p>
-<p class=3D"MsoNormal">Information fields: Names, Title, Email, Phone, Comp=
-any Name, Company URL, Company physical address, SIC Code, Industry and Spe=
-cialty (Revenue and Employee).</p>
-<p class=3D"MsoNormal"></p>
-<p class=3D"MsoNormal">Let me know your geography so that I can get back wi=
-th counts, pricing and more information on your interest.</p>
-<p class=3D"MsoNormal"></p>
-<p class=3D"MsoNormal">Best Regards,</p>
-<p class=3D"MsoNormal"></p>
-<p class=3D"MsoNormal"><b>Jennifer Manuel</b></p>
-<p class=3D"MsoNormal">Demand Generation</p>
-<p class=3D"MsoNormal"></p>
-<p class=3D"MsoNormal"></p>
-</div>
-</body>
-</html>
-
---_000_BM1PR01MB2913E9B6099597E21CE14AB2E6549BM1PR01MB2913INDP_--
-
+Thanks
+Vivek

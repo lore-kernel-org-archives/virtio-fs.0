@@ -1,22 +1,29 @@
-Return-Path: <gmaglion@redhat.com>
-MIME-Version: 1.0
-References: <YzMmu3xfOtQwuFUx@redhat.com> <YzMrYAJQeSP2hDSs@redhat.com>
- <CAJh=p+5rQDBJJC8VNGL10KYgDeq-Hg5WK7avONCti03eJGH+ow@mail.gmail.com>
- <798fe353-9537-44fe-a76a-819e8c93abb5@www.fastmail.com>
- <YzNZnPiUqySu6sGh@fedora>
- <20220928083340.eyizwu6mm3cc3bxu@mhamilton> <YzSgeDdpHOw1hTM0@redhat.com>
- <b963f623-aa85-4285-9bfa-5fcb4744c354@app.fastmail.com>
- <YzWnPZ5Y6ivS8e1v@redhat.com>
- <b1cf0d02-cc45-4f5c-bfef-fda3e750bef3@app.fastmail.com>
- <YzXP8XhCG5ta2Dvv@redhat.com>
-In-Reply-To: <YzXP8XhCG5ta2Dvv@redhat.com>
-From: German Maglione <gmaglione@redhat.com>
-Date: Fri, 30 Sep 2022 10:13:59 +0200
-Message-ID: <CAJh=p+651FCpU-c+539cS-0o0bHiKjnbK-g60yW=hmaTH=qXLQ@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] virtiofsd: Any reason why there's not an "openat2"
- sandbox mode?
+Return-Path: <virtiofs-bot@sinrega.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+ cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+ :to; s=fm2; t=1664568193; x=1664654593; bh=H/8SmxuDbeh61Z+xOdW/o
+ jwH5Ghr/kWlMhG4e7lEZzA=; b=An7oxtuf4yXNea08uTpvxXgbDk9qCITWSOpTT
+ 2GVw8DIHx5zBOq9SuAQMLNy2BKAJArsHy92997czxqne0nPhXuQ+oRuh5aB3Fx8J
+ UZyQk6Lx0i7Mu1E+wehbHqz1xK26gA0fJFU1AlDx5UHtIc0zcF5rwMlkUfsY4/um
+ jwrX3EuafRmPWqyzrx5Xm81Q+Mx6G5jgLtF5LwSdpARcZxzkWs7S2t+AMEahIou6
+ HN9XgIJLhBHWumeydqNKTvUUJlbiFr8G25rJm0qTBoTfbd/GmR88TgZ4hPzAeD60
+ wJ9wz2FLGxjJguE3jgLKJC11e00iEMbz0Brbu2X4vHlORHInQ==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+ messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
+ :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
+ :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm2; t=
+ 1664568193; x=1664654593; bh=H/8SmxuDbeh61Z+xOdW/ojwH5Ghr/kWlMhG
+ 4e7lEZzA=; b=qLVDUR2l8iuk9KQ3UaE7jQjXM8mN1aVV5zO6CLytMGaftIscA3U
+ sSGgKVlRsKOfaHc2dFpFu8HcGwEt7N8oCX3FEfkYJu6iWS7nvLv7t9fAdzZFhAPm
+ AvF94p8w0Kg9iApREm5wTAFBNtl5V5xSGGIvQNX30bYKBWSjZ+lLDac0NMCohddY
+ SDWqlNPJThsh3j8KAXUAdWusTvf5rGBhLT8jEZhq8o4KkNK4yPZuStDEBkacZvTG
+ M9r7tM+jOXDYhNPQLCRSZQ/9SQFkF2hfRtAHw8oCSXEwpCuHLOVvVuFOAad8ie1Y
+ rIL3HKOY2Tkel87Q5uBALVgUJf9I8kLKIYg==
+From: virtiofs-bot@sinrega.org
+Message-Id: <98682.122093016031502073@us-mta-104.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"; x-default=true
+Date: Fri, 30 Sep 2022 20:03:18 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] Issue opened: supplementary group support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,72 +32,23 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>
-Cc: Colin Walters <walters@verbum.org>, Sergio Lopez <slp@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, qemu-devel@nongnu.org
+To: virtio-fs@redhat.com
 
-On Thu, Sep 29, 2022 at 7:03 PM Vivek Goyal <vgoyal@redhat.com> wrote:
->
-> On Thu, Sep 29, 2022 at 11:47:32AM -0400, Colin Walters wrote:
-> >
-> >
-> > On Thu, Sep 29, 2022, at 10:10 AM, Vivek Goyal wrote:
-> >
-> > > What's your use case. How do you plan to use virtiofs.
-> >
-> > At the current time, the Kubernetes that we run does not support user n=
-amespaces.  We want to do the production builds of our operating system (Fe=
-dora CoreOS and RHEL CoreOS) today inside an *unprivileged* Kubernetes pod =
-(actually in OpenShift using anyuid, i.e. random unprivileged uid too), jus=
-t with /dev/kvm exposed from the host (which is safe).  Operating system bu=
-ilds *and* tests in qemu are just another workload that can be shared with =
-other tenants.
-> >
-> > qemu works fine in this model, as does 9p.  It's just the virtiofs isol=
-ation requires privileges to be used today.
->
-> [ cc German ]
->
-> Hi Colin,
->
-> So rust version of virtiofsd, already supports running unprivileged
-> (inside a user namespace).
->
-> https://gitlab.com/virtio-fs/virtiofsd/-/blob/main/README.md#running-as-n=
-on-privileged-user
->
-> host$ podman unshare -- virtiofsd --socket-path=3D/tmp/vfsd.sock --shared=
--dir /mnt \
->         --announce-submounts --sandbox chroot &
->
-> I think only privileged operation it needs is assigning a range of
-> subuid/subgid to the uid you are using on host.
->
-> I think that should be usable for you as of now.
->
-> Having said that, openat2() and landlock are interesting improvements,
-> especially when somebody does not want to use user namespaces. Without
-> user namespaces, one will not be able to do arbitrary swithing of uid/gid=
-.
-> IOW, inside guest, you will be limited to one uid/gid.
->
-> I am hoping German or somebody else can have a look openat2() and landloc=
-k
-> improvements in near future.
+C version of virtiofsd has an issue open where client expects supplementary group info will be used to allow file creation in parent dir but virtiofsd/fuse can't handle that. I think rust virtiofsd has same issue. So opening this report.
 
-I will do it.
+Here is the qemu issue.
 
->
-> I am assuming you are fine with using user namespaces on host. And by
-> assigning subuid/subgid range, it will allow you arbitrary swithching
-> of uid/gid inside guest.
->
-> Can you give rust virtiofsd (unprivileged) a try.
->
-> Thanks
-> Vivek
->
+https://gitlab.com/qemu-project/qemu/-/issues/368
 
+Here is a email thread to a discussion about this issue.
 
---=20
-German
+https://listman.redhat.com/archives/virtio-fs/2021-June/msg00001.html
+
+Recently a JIRA issue has been opened by KATA folks who are trying to run mysqldb inside kata container with virtiofs as storage.
+
+https://issues.redhat.com/browse/KATA-1776
+
+I guess it will be nice if we can figure a way out to fix this.
+---
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/59
 

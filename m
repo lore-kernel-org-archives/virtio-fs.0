@@ -1,25 +1,25 @@
-Return-Path: <borntraeger@linux.ibm.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ibm.com;
- h=message-id : date :
- mime-version : subject : from : to : cc : references : in-reply-to :
- content-type : content-transfer-encoding; s=pp1;
- bh=1BigHVh0ekiQB+zoH4A0y1Vd+/8IxMFjqM+hXGysPKM=;
- b=jO0NSWXPSHgJ1iqLzfL9+b1byS0cZ2oy3VESeeLIWwKnIjLEQi5JKceqz4BLhWcKLA3t
- OTL0E6BJ3V1ypt3/XcAdatgGdkn4R8+KlQMtXVaDXTUVD319Ymg0AjN1mjt8dMKjBT8q
- 0C7cFQQI+E7/kYUKSvuIbBgNjMe/8BxESOoUjpOD4B1fNU4GxHl7QPMm6uR8FfRnueYl
- ZVkONwgjOVOdhLodBGU5JWjdnCu8B7r9gMeBDxcqBXusCZr50AyQ/9UFTgJtBUhZwoK1
- LWv/2cBMIQHAH9NT+n5MSdRKwDDH8cq1JKAhaaq+9Jb+X/0pplTzi0aiPidTiRoCvuSv qw==
-Message-ID: <1c400131-59f6-f14f-e7e0-3871cc0d1815@linux.ibm.com>
-Date: Fri, 14 Oct 2022 10:31:17 +0200
-MIME-Version: 1.0
-From: Christian Borntraeger <borntraeger@linux.ibm.com>
+Return-Path: <alex.bennee@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=content-transfer-encoding:mime-version:message-id:in-reply-to:date
+ :subject:cc:to:from:user-agent:references:from:to:cc:subject:date
+ :message-id:reply-to;
+ bh=VWDnWtBs+9ZgC5TTdDxLxwi0yw71TmWvtpz30R9yoNc=;
+ b=ftn0rqBSymuxDxeV2qbNJF7peQNPd21kWxAq9SjM8dwj7UsgKYzQByRVsvhwjxg4qG
+ odOO3TU5PALW+RS1A5ubRIBCIfdEw/1h7lu7ApjuSm6RQlMj1+qpnHq06+0fBQoLvem7
+ c0kqHqr1PnctbvhQUPI9amFkMZfd0A48f3EP+nyQI5NQ4B5kS+P9qN+VK4npOBqx1olB
+ vX3bDmUhkq/QelgAncm9LpVtegkfcFP3tBBJxweEmc+E3GX6rBFzsCsQQINjtpp9GdNC
+ WL1OCv8f6q4JAgOxzN7eLeGTJPmTdZzGkyvuc8+XGv6hijDqbazfOLVJFvyISc+T1xfE
+ 8xoQ==
 References: <20221010172813.204597-1-mst@redhat.com>
  <20221010172813.204597-8-mst@redhat.com>
  <3a002a6a-9135-ad45-3fed-7dd270450d0b@linux.ibm.com>
-In-Reply-To: <3a002a6a-9135-ad45-3fed-7dd270450d0b@linux.ibm.com>
-Content-Language: en-US
-Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: base64
+From: Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>
+Date: Fri, 14 Oct 2022 09:37:00 +0100
+In-reply-to: <3a002a6a-9135-ad45-3fed-7dd270450d0b@linux.ibm.com>
+Message-ID: <87pmeuol2i.fsf@linaro.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
 Subject: Re: [Virtio-fs] Regression save/restore of vsock: (was [PULL 07/55]
  hw/virtio: move vm_running check to virtio_device_started)
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
@@ -30,56 +30,64 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Michael S. Tsirkin" <mst@redhat.com>, qemu-devel@nongnu.org
-Cc: Peter Maydell <peter.maydell@linaro.org>, =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, virtio-fs@redhat.com
+To: Christian Borntraeger <borntraeger@linux.ibm.com>
+Cc: "Michael S. Tsirkin" <mst@redhat.com>, qemu-devel@nongnu.org, Peter Maydell <peter.maydell@linaro.org>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, virtio-fs@redhat.com
 
-QW0gMTQuMTAuMjIgdW0gMDk6MzAgc2NocmllYiBDaHJpc3RpYW4gQm9ybnRyYWVnZXI6DQo+IEFt
-IDEwLjEwLjIyIHVtIDE5OjI5IHNjaHJpZWIgTWljaGFlbCBTLiBUc2lya2luOg0KPj4gRnJvbTog
-QWxleCBCZW5uw6llIDxhbGV4LmJlbm5lZUBsaW5hcm8ub3JnPg0KPj4NCj4+IEFsbCB0aGUgYm9p
-bGVycGxhdGUgdmlydGlvIGNvZGUgZG9lcyB0aGUgc2FtZSB0aGluZyAob3Igc2hvdWxkIGF0DQo+
-PiBsZWFzdCkgb2YgY2hlY2tpbmcgdG8gc2VlIGlmIHRoZSBWTSBpcyBydW5uaW5nIGJlZm9yZSBh
-dHRlbXB0aW5nIHRvDQo+PiBzdGFydCBWaXJ0SU8uIFB1c2ggdGhlIGxvZ2ljIHVwIHRvIHRoZSBj
-b21tb24gZnVuY3Rpb24gdG8gYXZvaWQNCj4+IGdldHRpbmcgYSBjb3B5IGFuZCBwYXN0ZSB3cm9u
-Zy4NCj4+DQo+PiBTaWduZWQtb2ZmLWJ5OiBBbGV4IEJlbm7DqWUgPGFsZXguYmVubmVlQGxpbmFy
-by5vcmc+DQo+PiBNZXNzYWdlLUlkOiA8MjAyMjA4MDIwOTUwMTAuMzMzMDc5My0xMS1hbGV4LmJl
-bm5lZUBsaW5hcm8ub3JnPg0KPj4gUmV2aWV3ZWQtYnk6IE1pY2hhZWwgUy4gVHNpcmtpbiA8bXN0
-QHJlZGhhdC5jb20+DQo+PiBTaWduZWQtb2ZmLWJ5OiBNaWNoYWVsIFMuIFRzaXJraW4gPG1zdEBy
-ZWRoYXQuY29tPg0KPiANCj4gVGhpcyByZXN1bHRzIGluIGEgcmVncmVzc2lvbiBmb3Igb3VyIHMz
-OTB4IENJIHdoZW4gZG9pbmcgc2F2ZS9yZXN0b3JlIG9mIGd1ZXN0cyB3aXRoIHZzb2NrOg0KPiAN
-Cj4gDQo+ICDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgIzHCoCAweDAwMDAwM2ZmOWEy
-NDg1ODAgcmFpc2UgKGxpYmMuc28uNiArIDB4NDg1ODApDQo+ICDCoMKgwqDCoMKgwqDCoMKgwqDC
-oMKgwqDCoMKgwqAgIzLCoCAweDAwMDAwM2ZmOWEyMmI1YzAgYWJvcnQgKGxpYmMuc28uNiArIDB4
-MmI1YzApDQo+ICDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgIzPCoCAweDAwMDAwM2Zm
-OWEyNDA5ZGEgX19hc3NlcnRfZmFpbF9iYXNlIChsaWJjLnNvLjYgKyAweDQwOWRhKQ0KPiAgwqDC
-oMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgICM0wqAgMHgwMDAwMDNmZjlhMjQwYTRlIF9fYXNz
-ZXJ0X2ZhaWwgKGxpYmMuc28uNiArIDB4NDBhNGUpDQo+ICDCoMKgwqDCoMKgwqDCoMKgwqDCoMKg
-wqDCoMKgwqAgIzXCoCAweDAwMDAwMmFhMmQ2OWEwNjYgdmhvc3RfdnNvY2tfY29tbW9uX3ByZV9z
-YXZlIChxZW11LXN5c3RlbS1zMzkweCArIDB4MzlhMDY2KQ0KPiAgwqDCoMKgwqDCoMKgwqDCoMKg
-wqDCoMKgwqDCoMKgICM2wqAgMHgwMDAwMDJhYTJkNTU1NzBlIHZtc3RhdGVfc2F2ZV9zdGF0ZV92
-IChxZW11LXN5c3RlbS1zMzkweCArIDB4MjU1NzBlKQ0KPiAgwqDCoMKgwqDCoMKgwqDCoMKgwqDC
-oMKgwqDCoMKgICM3wqAgMHgwMDAwMDJhYTJkNTU2MjE4IHZtc3RhdGVfc2F2ZV9zdGF0ZSAocWVt
-dS1zeXN0ZW0tczM5MHggKyAweDI1NjIxOCkNCj4gIMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKg
-wqDCoCAjOMKgIDB4MDAwMDAyYWEyZDU3MGJhNCBxZW11X3NhdmV2bV9zdGF0ZV9jb21wbGV0ZV9w
-cmVjb3B5X25vbl9pdGVyYWJsZSAocWVtdS1zeXN0ZW0tczM5MHggKyAweDI3MGJhNCkNCj4gIMKg
-wqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCAjOcKgIDB4MDAwMDAyYWEyZDU3MTBiNiBxZW11
-X3NhdmV2bV9zdGF0ZV9jb21wbGV0ZV9wcmVjb3B5IChxZW11LXN5c3RlbS1zMzkweCArIDB4Mjcx
-MGI2KQ0KPiAgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgICMxMCAweDAwMDAwMmFhMmQ1
-NjRkMGUgbWlncmF0aW9uX2NvbXBsZXRpb24gKHFlbXUtc3lzdGVtLXMzOTB4ICsgMHgyNjRkMGUp
-DQo+ICDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgIzExIDB4MDAwMDAyYWEyZDhkYjI1
-YyBxZW11X3RocmVhZF9zdGFydCAocWVtdS1zeXN0ZW0tczM5MHggKyAweDVkYjI1YykNCj4gIMKg
-wqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCAjMTIgMHgwMDAwMDNmZjlhMjk2MjQ4IHN0YXJ0
-X3RocmVhZCAobGliYy5zby42ICsgMHg5NjI0OCkNCj4gIMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDC
-oMKgwqDCoCAjMTMgMHgwMDAwMDNmZjlhMzExODNlIHRocmVhZF9zdGFydCAobGliYy5zby42ICsg
-MHgxMTE4M2UpDQo+IA0KDQoNClNvbWV0aGluZyBsaWtlDQpkaWZmIC0tZ2l0IGEvaHcvdmlydGlv
-L3Zob3N0LXZzb2NrLmMgYi9ody92aXJ0aW8vdmhvc3QtdnNvY2suYw0KaW5kZXggN2RjM2M3Mzkz
-MTIyLi5iNGQwNTZhZTZmMDEgMTAwNjQ0DQotLS0gYS9ody92aXJ0aW8vdmhvc3QtdnNvY2suYw0K
-KysrIGIvaHcvdmlydGlvL3Zob3N0LXZzb2NrLmMNCkBAIC03Myw2ICs3MywxMCBAQCBzdGF0aWMg
-dm9pZCB2aG9zdF92c29ja19zZXRfc3RhdHVzKFZpcnRJT0RldmljZSAqdmRldiwgdWludDhfdCBz
-dGF0dXMpDQogICAgICBib29sIHNob3VsZF9zdGFydCA9IHZpcnRpb19kZXZpY2Vfc3RhcnRlZCh2
-ZGV2LCBzdGF0dXMpOw0KICAgICAgaW50IHJldDsNCiAgDQorICAgIGlmICghdmRldi0+dm1fcnVu
-bmluZykgew0KKyAgICAgICAgc2hvdWxkX3N0YXJ0ID0gZmFsc2U7DQorICAgIH0NCisNCiAgICAg
-IGlmICh2aG9zdF9kZXZfaXNfc3RhcnRlZCgmdnZjLT52aG9zdF9kZXYpID09IHNob3VsZF9zdGFy
-dCkgew0KICAgICAgICAgIHJldHVybjsNCiAgICAgIH0NCg0KaGVscHMuDQoNClRoZSBwcm9ibGVt
-IHNlZW1zIHRvIGJlIHRoYXQgdmlydGlvX2RldmljZV9zdGFydGVkIGRvZXMgaWdub3JlIHZtX3J1
-bm5pbmcgd2hlbiB1c2Vfc3RhcnQgaXMgc2V0Lg0K
+
+Christian Borntraeger <borntraeger@linux.ibm.com> writes:
+
+> Am 10.10.22 um 19:29 schrieb Michael S. Tsirkin:
+>> From: Alex Benn=C3=A9e <alex.bennee@linaro.org>
+>> All the boilerplate virtio code does the same thing (or should at
+>> least) of checking to see if the VM is running before attempting to
+>> start VirtIO. Push the logic up to the common function to avoid
+>> getting a copy and paste wrong.
+>> Signed-off-by: Alex Benn=C3=A9e <alex.bennee@linaro.org>
+>> Message-Id: <20220802095010.3330793-11-alex.bennee@linaro.org>
+>> Reviewed-by: Michael S. Tsirkin <mst@redhat.com>
+>> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+>
+> This results in a regression for our s390x CI when doing save/restore of =
+guests with vsock:
+>
+>
+>                 #1  0x000003ff9a248580 raise (libc.so.6 + 0x48580)
+>                 #2  0x000003ff9a22b5c0 abort (libc.so.6 + 0x2b5c0)
+>                 #3  0x000003ff9a2409da __assert_fail_base (libc.so.6 + 0x=
+409da)
+>                 #4  0x000003ff9a240a4e __assert_fail (libc.so.6 + 0x40a4e=
+)
+>                 #5  0x000002aa2d69a066 vhost_vsock_common_pre_save (qemu-=
+system-s390x + 0x39a066)
+>                 #6  0x000002aa2d55570e vmstate_save_state_v (qemu-system-=
+s390x + 0x25570e)
+>                 #7  0x000002aa2d556218 vmstate_save_state (qemu-system-s3=
+90x + 0x256218)
+>                 #8 0x000002aa2d570ba4
+> qemu_savevm_state_complete_precopy_non_iterable (qemu-system-s390x +
+> 0x270ba4)
+>                 #9  0x000002aa2d5710b6 qemu_savevm_state_complete_precopy=
+ (qemu-system-s390x + 0x2710b6)
+>                 #10 0x000002aa2d564d0e migration_completion (qemu-system-=
+s390x + 0x264d0e)
+>                 #11 0x000002aa2d8db25c qemu_thread_start (qemu-system-s39=
+0x + 0x5db25c)
+>                 #12 0x000003ff9a296248 start_thread (libc.so.6 + 0x96248)
+>                 #13 0x000003ff9a31183e thread_start (libc.so.6 + 0x11183e=
+)
+
+Which test does this break?
+
+Looking at the change the only thing I can think of is there is a subtle
+change in the order of checks because if the device is set as
+use_started we return the result regardless of vm or config state:
+
+    if (vdev->use_started) {
+        return vdev->started;
+    }
+
+Could some printfs confirm that?
+
+--=20
+Alex Benn=C3=A9e
 

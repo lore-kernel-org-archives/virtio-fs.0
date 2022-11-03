@@ -1,15 +1,16 @@
-Return-Path: <thuth@redhat.com>
-Message-ID: <ba75c126-68ae-5f63-d9c3-b1b4182df5b7@redhat.com>
-Date: Mon, 31 Oct 2022 08:35:32 +0100
+Return-Path: <mst@redhat.com>
+Date: Thu, 3 Nov 2022 12:39:22 -0400
+From: "Michael S. Tsirkin" <mst@redhat.com>
+Message-ID: <20221103123856-mutt-send-email-mst@kernel.org>
+References: <20220802095010.3330793-1-alex.bennee@linaro.org>
+ <20220802095010.3330793-11-alex.bennee@linaro.org>
 MIME-Version: 1.0
-References: <20221030105944.311940-1-sw@weilnetz.de>
-From: Thomas Huth <thuth@redhat.com>
-In-Reply-To: <20221030105944.311940-1-sw@weilnetz.de>
-Content-Language: en-US
-Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PATCH v2] Fix some typos in documentation and
- comments
+In-Reply-To: <20220802095010.3330793-11-alex.bennee@linaro.org>
+Content-Type: text/plain; charset="windows-1252"
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH v4 10/22] hw/virtio: move vm_running check
+ to virtio_device_started
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,185 +19,141 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Weil <sw@weilnetz.de>, qemu-devel@nongnu.org
-Cc: Markus Armbruster <armbru@redhat.com>, Michael Roth <michael.roth@amd.com>, Peter Maydell <peter.maydell@linaro.org>, Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Peter Xu <peterx@redhat.com>, David Hildenbrand <david@redhat.com>, =?UTF-8?Q?Philippe_Mathieu-Daud=c3=a9?= <philmd@linaro.org>, Eric Blake <eblake@redhat.com>, =?UTF-8?Q?Daniel_P_=2e_Berrang=c3=a9?= <berrange@redhat.com>, Eduardo Habkost <eduardo@habkost.net>, Konstantin Kostiuk <kkostiuk@redhat.com>, Laurent Vivier <lvivier@redhat.com>, qemu-arm@nongnu.org, virtio-fs@redhat.com, QEMU Trivial <qemu-trivial@nongnu.org>
+To: Alex =?iso-8859-1?Q?Benn=E9e?= <alex.bennee@linaro.org>
+Cc: qemu-devel@nongnu.org, slp@redhat.com, marcandre.lureau@redhat.com, stefanha@redhat.com, mathieu.poirier@linaro.org, viresh.kumar@linaro.org, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, "open list:virtiofs" <virtio-fs@redhat.com>
 
-On 30/10/2022 11.59, Stefan Weil wrote:
-> Most of them were found and fixed using codespell.
-> 
-> Signed-off-by: Stefan Weil <sw@weilnetz.de>
+On Tue, Aug 02, 2022 at 10:49:58AM +0100, Alex Benn=E9e wrote:
+> All the boilerplate virtio code does the same thing (or should at
+> least) of checking to see if the VM is running before attempting to
+> start VirtIO. Push the logic up to the common function to avoid
+> getting a copy and paste wrong.
+>=20
+> Signed-off-by: Alex Benn=E9e <alex.bennee@linaro.org>
+
+How bad is it if we drop this?
+
 > ---
-> 
-> v2: Fixes from Peter Maydell's comments
-> 
-> My focus was fixing typos which are relevant for the generated documentation.
-> 
-> codespell finds many more typos in source code, and adding it to the continuous
-> integration checks looks more and more like a good idea.
-
-... at least for the docs/ folder, this might indeed be a good idea.
-
-Reviewed-by: Thomas Huth <thuth@redhat.com>
-
-
-
-> 
-> 
->   docs/devel/testing.rst              |  2 +-
->   docs/system/arm/cpu-features.rst    |  2 +-
->   docs/system/loongarch/loongson3.rst |  2 +-
->   docs/tools/virtiofsd.rst            |  2 +-
->   include/exec/memory.h               |  2 +-
->   qapi/qom.json                       |  2 +-
->   qemu-options.hx                     | 10 +++++-----
->   qga/qapi-schema.json                |  2 +-
->   tests/qtest/libqtest.h              |  2 +-
->   9 files changed, 13 insertions(+), 13 deletions(-)
-> 
-> diff --git a/docs/devel/testing.rst b/docs/devel/testing.rst
-> index fbb98faabe..e10c47b5a7 100644
-> --- a/docs/devel/testing.rst
-> +++ b/docs/devel/testing.rst
-> @@ -99,7 +99,7 @@ successfully on various hosts. The following list shows some best practices:
->   * If your test cases uses the blkdebug feature, use relative path to pass
->     the config and image file paths in the command line as Windows absolute
->     path contains the delimiter ":" which will confuse the blkdebug parser.
-> -* Use double quotes in your extra QEMU commmand line in your test cases
-> +* Use double quotes in your extra QEMU command line in your test cases
->     instead of single quotes, as Windows does not drop single quotes when
->     passing the command line to QEMU.
->   * Windows opens a file in text mode by default, while a POSIX compliant
-> diff --git a/docs/system/arm/cpu-features.rst b/docs/system/arm/cpu-features.rst
-> index c2c01ec7d2..00c444042f 100644
-> --- a/docs/system/arm/cpu-features.rst
-> +++ b/docs/system/arm/cpu-features.rst
-> @@ -433,7 +433,7 @@ additional constraints on the set of vector lengths supported by SME.
->   SME User-mode Default Vector Length Property
->   --------------------------------------------
->   
-> -For qemu-aarch64, the cpu propery ``sme-default-vector-length=N`` is
-> +For qemu-aarch64, the cpu property ``sme-default-vector-length=N`` is
->   defined to mirror the Linux kernel parameter file
->   ``/proc/sys/abi/sme_default_vector_length``.  The default length, ``N``,
->   is in units of bytes and must be between 16 and 8192.
-> diff --git a/docs/system/loongarch/loongson3.rst b/docs/system/loongarch/loongson3.rst
-> index 1bdab44e27..68113b6f5e 100644
-> --- a/docs/system/loongarch/loongson3.rst
-> +++ b/docs/system/loongarch/loongson3.rst
-> @@ -41,7 +41,7 @@ can be accessed by following steps.
->   
->     $ qemu-system-loongarch64 -machine virt -m 4G -cpu la464-loongarch-cpu \
->         -smp 1 -bios QEMU_EFI.fd -kernel vmlinuz.efi -initrd initrd.img \
-> -      -append "root=/dev/ram rdinit=/sbin/init consol e=ttyS0,115200" \
-> +      -append "root=/dev/ram rdinit=/sbin/init console=ttyS0,115200" \
->         --nographic
->   
->   Note: The running speed may be a little slow, as the performance of our
-> diff --git a/docs/tools/virtiofsd.rst b/docs/tools/virtiofsd.rst
-> index 5f5ac9dd56..995a754a7b 100644
-> --- a/docs/tools/virtiofsd.rst
-> +++ b/docs/tools/virtiofsd.rst
-> @@ -232,7 +232,7 @@ e.g.:
->   
->     ``:ok:server::security.:``
->   
-> -  will pass 'securty.' xattr's in listxattr from the server
-> +  will pass 'security.' xattr's in listxattr from the server
->     and ignore following rules.
->   
->     ``:ok:all:::``
-> diff --git a/include/exec/memory.h b/include/exec/memory.h
-> index bfb1de8eea..a751c111bd 100644
-> --- a/include/exec/memory.h
-> +++ b/include/exec/memory.h
-> @@ -1970,7 +1970,7 @@ void memory_region_clear_dirty_bitmap(MemoryRegion *mr, hwaddr start,
->    * querying the same page multiple times, which is especially useful for
->    * display updates where the scanlines often are not page aligned.
->    *
-> - * The dirty bitmap region which gets copyed into the snapshot (and
-> + * The dirty bitmap region which gets copied into the snapshot (and
->    * cleared afterwards) can be larger than requested.  The boundaries
->    * are rounded up/down so complete bitmap longs (covering 64 pages on
->    * 64bit hosts) can be copied over into the bitmap snapshot.  Which
-> diff --git a/qapi/qom.json b/qapi/qom.json
-> index 80dd419b39..216b56a4e6 100644
-> --- a/qapi/qom.json
-> +++ b/qapi/qom.json
-> @@ -586,7 +586,7 @@
->   #
->   # @size: size of the memory region in bytes
->   #
-> -# @x-use-canonical-path-for-ramblock-id: if true, the canoncial path is used
-> +# @x-use-canonical-path-for-ramblock-id: if true, the canonical path is used
->   #                                        for ramblock-id. Disable this for 4.0
->   #                                        machine types or older to allow
->   #                                        migration with newer QEMU versions.
-> diff --git a/qemu-options.hx b/qemu-options.hx
-> index eb38e5dc40..1141dc5e58 100644
-> --- a/qemu-options.hx
-> +++ b/qemu-options.hx
-> @@ -1051,7 +1051,7 @@ SRST
->       details on the external interface.
->   
->   ``-device isa-ipmi-kcs,bmc=id[,ioport=val][,irq=val]``
-> -    Add a KCS IPMI interafce on the ISA bus. This also adds a
-> +    Add a KCS IPMI interface on the ISA bus. This also adds a
->       corresponding ACPI and SMBIOS entries, if appropriate.
->   
->       ``bmc=id``
-> @@ -1071,7 +1071,7 @@ SRST
->       is 0xe4 and the default interrupt is 5.
->   
->   ``-device pci-ipmi-kcs,bmc=id``
-> -    Add a KCS IPMI interafce on the PCI bus.
-> +    Add a KCS IPMI interface on the PCI bus.
->   
->       ``bmc=id``
->           The BMC to connect to, one of ipmi-bmc-sim or ipmi-bmc-extern above.
-> @@ -5248,8 +5248,8 @@ SRST
->           read the colo-compare git log.
->   
->       ``-object cryptodev-backend-builtin,id=id[,queues=queues]``
-> -        Creates a cryptodev backend which executes crypto opreation from
-> -        the QEMU cipher APIS. The id parameter is a unique ID that will
-> +        Creates a cryptodev backend which executes crypto operations from
-> +        the QEMU cipher APIs. The id parameter is a unique ID that will
->           be used to reference this cryptodev backend from the
->           ``virtio-crypto`` device. The queues parameter is optional,
->           which specify the queue number of cryptodev backend, the default
-> @@ -5516,7 +5516,7 @@ SRST
->                          file=/etc/qemu/vnc.allow
->   
->           Finally the ``/etc/qemu/vnc.allow`` file would contain the list
-> -        of x509 distingished names that are permitted access
-> +        of x509 distinguished names that are permitted access
->   
->           ::
->   
-> diff --git a/qga/qapi-schema.json b/qga/qapi-schema.json
-> index 026a56f76c..796434ed34 100644
-> --- a/qga/qapi-schema.json
-> +++ b/qga/qapi-schema.json
-> @@ -392,7 +392,7 @@
->   ##
->   # @guest-file-flush:
->   #
-> -# Write file changes bufferred in userspace to disk/kernel buffers
-> +# Write file changes buffered in userspace to disk/kernel buffers
->   #
->   # @handle: filehandle returned by guest-file-open
->   #
-> diff --git a/tests/qtest/libqtest.h b/tests/qtest/libqtest.h
-> index 65c040e504..1a76bae326 100644
-> --- a/tests/qtest/libqtest.h
-> +++ b/tests/qtest/libqtest.h
-> @@ -727,7 +727,7 @@ bool qtest_has_device(const char *device);
->    * qtest_qmp_device_add_qdict:
->    * @qts: QTestState instance to operate on
->    * @drv: Name of the device that should be added
-> - * @arguments: QDict with properties for the device to intialize
-> + * @arguments: QDict with properties for the device to initialize
->    *
->    * Generic hot-plugging test via the device_add QMP command with properties
->    * supplied in form of QDict. Use NULL for empty properties list.
+>  include/hw/virtio/virtio.h   | 5 +++++
+>  hw/virtio/vhost-user-fs.c    | 6 +-----
+>  hw/virtio/vhost-user-i2c.c   | 6 +-----
+>  hw/virtio/vhost-user-rng.c   | 6 +-----
+>  hw/virtio/vhost-user-vsock.c | 6 +-----
+>  hw/virtio/vhost-vsock.c      | 6 +-----
+>  6 files changed, 10 insertions(+), 25 deletions(-)
+>=20
+> diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
+> index 9bb2485415..74e7ad5a92 100644
+> --- a/include/hw/virtio/virtio.h
+> +++ b/include/hw/virtio/virtio.h
+> @@ -100,6 +100,7 @@ struct VirtIODevice
+>      VirtQueue *vq;
+>      MemoryListener listener;
+>      uint16_t device_id;
+> +    /* @vm_running: current VM running state via virtio_vmstate_change()=
+ */
+>      bool vm_running;
+>      bool broken; /* device in invalid state, needs reset */
+>      bool use_disabled_flag; /* allow use of 'disable' flag when needed */
+> @@ -376,6 +377,10 @@ static inline bool virtio_device_started(VirtIODevic=
+e *vdev, uint8_t status)
+>          return vdev->started;
+>      }
+> =20
+> +    if (!vdev->vm_running) {
+> +        return false;
+> +    }
+> +
+>      return status & VIRTIO_CONFIG_S_DRIVER_OK;
+>  }
+> =20
+> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+> index e513e4fdda..d2bebba785 100644
+> --- a/hw/virtio/vhost-user-fs.c
+> +++ b/hw/virtio/vhost-user-fs.c
+> @@ -122,11 +122,7 @@ static void vuf_stop(VirtIODevice *vdev)
+>  static void vuf_set_status(VirtIODevice *vdev, uint8_t status)
+>  {
+>      VHostUserFS *fs =3D VHOST_USER_FS(vdev);
+> -    bool should_start =3D status & VIRTIO_CONFIG_S_DRIVER_OK;
+> -
+> -    if (!vdev->vm_running) {
+> -        should_start =3D false;
+> -    }
+> +    bool should_start =3D virtio_device_started(vdev, status);
+> =20
+>      if (fs->vhost_dev.started =3D=3D should_start) {
+>          return;
+> diff --git a/hw/virtio/vhost-user-i2c.c b/hw/virtio/vhost-user-i2c.c
+> index 6020eee093..b930cf6d5e 100644
+> --- a/hw/virtio/vhost-user-i2c.c
+> +++ b/hw/virtio/vhost-user-i2c.c
+> @@ -93,11 +93,7 @@ static void vu_i2c_stop(VirtIODevice *vdev)
+>  static void vu_i2c_set_status(VirtIODevice *vdev, uint8_t status)
+>  {
+>      VHostUserI2C *i2c =3D VHOST_USER_I2C(vdev);
+> -    bool should_start =3D status & VIRTIO_CONFIG_S_DRIVER_OK;
+> -
+> -    if (!vdev->vm_running) {
+> -        should_start =3D false;
+> -    }
+> +    bool should_start =3D virtio_device_started(vdev, status);
+> =20
+>      if (i2c->vhost_dev.started =3D=3D should_start) {
+>          return;
+> diff --git a/hw/virtio/vhost-user-rng.c b/hw/virtio/vhost-user-rng.c
+> index 3a7bf8e32d..a9c1c4bc79 100644
+> --- a/hw/virtio/vhost-user-rng.c
+> +++ b/hw/virtio/vhost-user-rng.c
+> @@ -90,11 +90,7 @@ static void vu_rng_stop(VirtIODevice *vdev)
+>  static void vu_rng_set_status(VirtIODevice *vdev, uint8_t status)
+>  {
+>      VHostUserRNG *rng =3D VHOST_USER_RNG(vdev);
+> -    bool should_start =3D status & VIRTIO_CONFIG_S_DRIVER_OK;
+> -
+> -    if (!vdev->vm_running) {
+> -        should_start =3D false;
+> -    }
+> +    bool should_start =3D virtio_device_started(vdev, status);
+> =20
+>      if (rng->vhost_dev.started =3D=3D should_start) {
+>          return;
+> diff --git a/hw/virtio/vhost-user-vsock.c b/hw/virtio/vhost-user-vsock.c
+> index 0f8ff99f85..22c1616ebd 100644
+> --- a/hw/virtio/vhost-user-vsock.c
+> +++ b/hw/virtio/vhost-user-vsock.c
+> @@ -55,11 +55,7 @@ const VhostDevConfigOps vsock_ops =3D {
+>  static void vuv_set_status(VirtIODevice *vdev, uint8_t status)
+>  {
+>      VHostVSockCommon *vvc =3D VHOST_VSOCK_COMMON(vdev);
+> -    bool should_start =3D status & VIRTIO_CONFIG_S_DRIVER_OK;
+> -
+> -    if (!vdev->vm_running) {
+> -        should_start =3D false;
+> -    }
+> +    bool should_start =3D virtio_device_started(vdev, status);
+> =20
+>      if (vvc->vhost_dev.started =3D=3D should_start) {
+>          return;
+> diff --git a/hw/virtio/vhost-vsock.c b/hw/virtio/vhost-vsock.c
+> index 0338de892f..8031c164a5 100644
+> --- a/hw/virtio/vhost-vsock.c
+> +++ b/hw/virtio/vhost-vsock.c
+> @@ -70,13 +70,9 @@ static int vhost_vsock_set_running(VirtIODevice *vdev,=
+ int start)
+>  static void vhost_vsock_set_status(VirtIODevice *vdev, uint8_t status)
+>  {
+>      VHostVSockCommon *vvc =3D VHOST_VSOCK_COMMON(vdev);
+> -    bool should_start =3D status & VIRTIO_CONFIG_S_DRIVER_OK;
+> +    bool should_start =3D virtio_device_started(vdev, status);
+>      int ret;
+> =20
+> -    if (!vdev->vm_running) {
+> -        should_start =3D false;
+> -    }
+> -
+>      if (vvc->vhost_dev.started =3D=3D should_start) {
+>          return;
+>      }
+> --=20
+> 2.30.2
 

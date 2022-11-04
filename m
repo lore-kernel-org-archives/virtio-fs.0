@@ -1,20 +1,10 @@
-Return-Path: <mst@redhat.com>
-Date: Fri, 4 Nov 2022 03:18:34 -0400
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20221104031804-mutt-send-email-mst@kernel.org>
-References: <20220802095010.3330793-1-alex.bennee@linaro.org>
- <20220802095010.3330793-11-alex.bennee@linaro.org>
- <20221103123856-mutt-send-email-mst@kernel.org>
- <87o7tnkfqy.fsf@linaro.org>
- <20221103162957-mutt-send-email-mst@kernel.org>
- <20221103173542-mutt-send-email-mst@kernel.org>
+Return-Path: <fweimer@redhat.com>
+From: Florian Weimer <fweimer@redhat.com>
+Date: Fri, 04 Nov 2022 08:50:45 +0100
+Message-ID: <87r0yj17l6.fsf@oldenburg.str.redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20221103173542-mutt-send-email-mst@kernel.org>
-Content-Type: text/plain; charset="windows-1252"
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [PATCH v4 10/22] hw/virtio: move vm_running check
- to virtio_device_started
+Content-Type: text/plain
+Subject: [Virtio-fs] Use of unshare(CLONE_FS) in virtiofsd
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,179 +13,72 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Alex =?iso-8859-1?Q?Benn=E9e?= <alex.bennee@linaro.org>
-Cc: qemu-devel@nongnu.org, slp@redhat.com, marcandre.lureau@redhat.com, stefanha@redhat.com, mathieu.poirier@linaro.org, viresh.kumar@linaro.org, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, "open list:virtiofs" <virtio-fs@redhat.com>
+To: virtio-fs@redhat.com
+Cc: qemu-devel@nongnu.org, Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>, Vivek Goyal <vgoyal@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Miklos Szeredi <mszeredi@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>
 
-On Thu, Nov 03, 2022 at 05:35:57PM -0400, Michael S. Tsirkin wrote:
-> On Thu, Nov 03, 2022 at 04:30:48PM -0400, Michael S. Tsirkin wrote:
-> > On Thu, Nov 03, 2022 at 07:18:30PM +0000, Alex Benn=E9e wrote:
-> > >=20
-> > > "Michael S. Tsirkin" <mst@redhat.com> writes:
-> > >=20
-> > > > On Tue, Aug 02, 2022 at 10:49:58AM +0100, Alex Benn=E9e wrote:
-> > > >> All the boilerplate virtio code does the same thing (or should at
-> > > >> least) of checking to see if the VM is running before attempting to
-> > > >> start VirtIO. Push the logic up to the common function to avoid
-> > > >> getting a copy and paste wrong.
-> > > >>=20
-> > > >> Signed-off-by: Alex Benn=E9e <alex.bennee@linaro.org>
-> > > >
-> > > > How bad is it if we drop this?
-> > >=20
-> > >=20
-> > > I assume it will break gpio. Why do we want to drop this now? It has
-> > > been merged awhile. However there was a follow-up patch which tweaked
-> > > the order of checks in virtio_device_started.
-> >=20
-> > And that follow up patch trips up UBSAN:
-> >=20
-> > https://gitlab.com/mitsirkin/qemu/-/pipelines/684763327
-> >=20
->=20
->=20
-> And more specifically this
->=20
-> https://gitlab.com/mitsirkin/qemu/-/jobs/3269957848
+I've got a proposed extension for glibc's pthread_create which allows
+the creation of threads with a dedicated current working
+directory/umask/chroot:
 
-I'm sorry, I misread the results. Triggers without this
-patch too so it's not to blame. Pls ignore.
+  [PATCH 0/2] Introduce per-thread file system properties on Linux
+  <https://sourceware.org/pipermail/libc-alpha/2022-October/142640.html>
 
+I expect that glibc integration will work around the seccomp issue
+mentioned in a comment (also brought up by the Samba people for their
+use) because glibc will perform the unshare directly during the clone
+system call, and not via a separate system call.
 
-> >=20
-> >=20
-> > > >
-> > > >> ---
-> > > >>  include/hw/virtio/virtio.h   | 5 +++++
-> > > >>  hw/virtio/vhost-user-fs.c    | 6 +-----
-> > > >>  hw/virtio/vhost-user-i2c.c   | 6 +-----
-> > > >>  hw/virtio/vhost-user-rng.c   | 6 +-----
-> > > >>  hw/virtio/vhost-user-vsock.c | 6 +-----
-> > > >>  hw/virtio/vhost-vsock.c      | 6 +-----
-> > > >>  6 files changed, 10 insertions(+), 25 deletions(-)
-> > > >>=20
-> > > >> diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio=
-.h
-> > > >> index 9bb2485415..74e7ad5a92 100644
-> > > >> --- a/include/hw/virtio/virtio.h
-> > > >> +++ b/include/hw/virtio/virtio.h
-> > > >> @@ -100,6 +100,7 @@ struct VirtIODevice
-> > > >>      VirtQueue *vq;
-> > > >>      MemoryListener listener;
-> > > >>      uint16_t device_id;
-> > > >> +    /* @vm_running: current VM running state via virtio_vmstate_c=
-hange() */
-> > > >>      bool vm_running;
-> > > >>      bool broken; /* device in invalid state, needs reset */
-> > > >>      bool use_disabled_flag; /* allow use of 'disable' flag when n=
-eeded */
-> > > >> @@ -376,6 +377,10 @@ static inline bool virtio_device_started(Virt=
-IODevice *vdev, uint8_t status)
-> > > >>          return vdev->started;
-> > > >>      }
-> > > >> =20
-> > > >> +    if (!vdev->vm_running) {
-> > > >> +        return false;
-> > > >> +    }
-> > > >> +
-> > > >>      return status & VIRTIO_CONFIG_S_DRIVER_OK;
-> > > >>  }
-> > > >> =20
-> > > >> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-> > > >> index e513e4fdda..d2bebba785 100644
-> > > >> --- a/hw/virtio/vhost-user-fs.c
-> > > >> +++ b/hw/virtio/vhost-user-fs.c
-> > > >> @@ -122,11 +122,7 @@ static void vuf_stop(VirtIODevice *vdev)
-> > > >>  static void vuf_set_status(VirtIODevice *vdev, uint8_t status)
-> > > >>  {
-> > > >>      VHostUserFS *fs =3D VHOST_USER_FS(vdev);
-> > > >> -    bool should_start =3D status & VIRTIO_CONFIG_S_DRIVER_OK;
-> > > >> -
-> > > >> -    if (!vdev->vm_running) {
-> > > >> -        should_start =3D false;
-> > > >> -    }
-> > > >> +    bool should_start =3D virtio_device_started(vdev, status);
-> > > >> =20
-> > > >>      if (fs->vhost_dev.started =3D=3D should_start) {
-> > > >>          return;
-> > > >> diff --git a/hw/virtio/vhost-user-i2c.c b/hw/virtio/vhost-user-i2c=
-.c
-> > > >> index 6020eee093..b930cf6d5e 100644
-> > > >> --- a/hw/virtio/vhost-user-i2c.c
-> > > >> +++ b/hw/virtio/vhost-user-i2c.c
-> > > >> @@ -93,11 +93,7 @@ static void vu_i2c_stop(VirtIODevice *vdev)
-> > > >>  static void vu_i2c_set_status(VirtIODevice *vdev, uint8_t status)
-> > > >>  {
-> > > >>      VHostUserI2C *i2c =3D VHOST_USER_I2C(vdev);
-> > > >> -    bool should_start =3D status & VIRTIO_CONFIG_S_DRIVER_OK;
-> > > >> -
-> > > >> -    if (!vdev->vm_running) {
-> > > >> -        should_start =3D false;
-> > > >> -    }
-> > > >> +    bool should_start =3D virtio_device_started(vdev, status);
-> > > >> =20
-> > > >>      if (i2c->vhost_dev.started =3D=3D should_start) {
-> > > >>          return;
-> > > >> diff --git a/hw/virtio/vhost-user-rng.c b/hw/virtio/vhost-user-rng=
-.c
-> > > >> index 3a7bf8e32d..a9c1c4bc79 100644
-> > > >> --- a/hw/virtio/vhost-user-rng.c
-> > > >> +++ b/hw/virtio/vhost-user-rng.c
-> > > >> @@ -90,11 +90,7 @@ static void vu_rng_stop(VirtIODevice *vdev)
-> > > >>  static void vu_rng_set_status(VirtIODevice *vdev, uint8_t status)
-> > > >>  {
-> > > >>      VHostUserRNG *rng =3D VHOST_USER_RNG(vdev);
-> > > >> -    bool should_start =3D status & VIRTIO_CONFIG_S_DRIVER_OK;
-> > > >> -
-> > > >> -    if (!vdev->vm_running) {
-> > > >> -        should_start =3D false;
-> > > >> -    }
-> > > >> +    bool should_start =3D virtio_device_started(vdev, status);
-> > > >> =20
-> > > >>      if (rng->vhost_dev.started =3D=3D should_start) {
-> > > >>          return;
-> > > >> diff --git a/hw/virtio/vhost-user-vsock.c b/hw/virtio/vhost-user-v=
-sock.c
-> > > >> index 0f8ff99f85..22c1616ebd 100644
-> > > >> --- a/hw/virtio/vhost-user-vsock.c
-> > > >> +++ b/hw/virtio/vhost-user-vsock.c
-> > > >> @@ -55,11 +55,7 @@ const VhostDevConfigOps vsock_ops =3D {
-> > > >>  static void vuv_set_status(VirtIODevice *vdev, uint8_t status)
-> > > >>  {
-> > > >>      VHostVSockCommon *vvc =3D VHOST_VSOCK_COMMON(vdev);
-> > > >> -    bool should_start =3D status & VIRTIO_CONFIG_S_DRIVER_OK;
-> > > >> -
-> > > >> -    if (!vdev->vm_running) {
-> > > >> -        should_start =3D false;
-> > > >> -    }
-> > > >> +    bool should_start =3D virtio_device_started(vdev, status);
-> > > >> =20
-> > > >>      if (vvc->vhost_dev.started =3D=3D should_start) {
-> > > >>          return;
-> > > >> diff --git a/hw/virtio/vhost-vsock.c b/hw/virtio/vhost-vsock.c
-> > > >> index 0338de892f..8031c164a5 100644
-> > > >> --- a/hw/virtio/vhost-vsock.c
-> > > >> +++ b/hw/virtio/vhost-vsock.c
-> > > >> @@ -70,13 +70,9 @@ static int vhost_vsock_set_running(VirtIODevice=
- *vdev, int start)
-> > > >>  static void vhost_vsock_set_status(VirtIODevice *vdev, uint8_t st=
-atus)
-> > > >>  {
-> > > >>      VHostVSockCommon *vvc =3D VHOST_VSOCK_COMMON(vdev);
-> > > >> -    bool should_start =3D status & VIRTIO_CONFIG_S_DRIVER_OK;
-> > > >> +    bool should_start =3D virtio_device_started(vdev, status);
-> > > >>      int ret;
-> > > >> =20
-> > > >> -    if (!vdev->vm_running) {
-> > > >> -        should_start =3D false;
-> > > >> -    }
-> > > >> -
-> > > >>      if (vvc->vhost_dev.started =3D=3D should_start) {
-> > > >>          return;
-> > > >>      }
-> > > >> --=20
-> > > >> 2.30.2
-> > >=20
-> > >=20
-> > > --=20
-> > > Alex Benn=E9e
+I see that unshare(CLONE_FS) was introduced in this commit:
 
+commit bdfd66788349acc43cd3f1298718ad491663cfcc
+Author: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+Date:   Thu Feb 27 14:59:27 2020 +0900
+
+    virtiofsd: Fix xattr operations
+    
+    Current virtiofsd has problems about xattr operations and
+    they does not work properly for directory/symlink/special file.
+    
+    The fundamental cause is that virtiofsd uses openat() + f...xattr()
+    systemcalls for xattr operation but we should not open symlink/special
+    file in the daemon. Therefore the function is restricted.
+    
+    Fix this problem by:
+     1. during setup of each thread, call unshare(CLONE_FS)
+     2. in xattr operations (i.e. lo_getxattr), if inode is not a regular
+        file or directory, use fchdir(proc_loot_fd) + ...xattr() +
+        fchdir(root.fd) instead of openat() + f...xattr()
+    
+        (Note: for a regular file/directory openat() + f...xattr()
+         is still used for performance reason)
+    
+    With this patch, xfstests generic/062 passes on virtiofs.
+    
+    This fix is suggested by Miklos Szeredi and Stefan Hajnoczi.
+    The original discussion can be found here:
+      https://www.redhat.com/archives/virtio-fs/2019-October/msg00046.html
+    
+    Signed-off-by: Misono Tomohiro <misono.tomohiro@jp.fujitsu.com>
+    Message-Id: <20200227055927.24566-3-misono.tomohiro@jp.fujitsu.com>
+    Acked-by: Vivek Goyal <vgoyal@redhat.com>
+    Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+    Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+
+Now the question has come up on the libc-coord list why the *at
+interfaces are not used in such cases:
+
+  <https://www.openwall.com/lists/libc-coord/2022/10/24/3>
+
+Clearly the kernel lacks support for fgetxattrat today.  The usual
+recommendation for emulating it is to use openat with O_PATH, and then
+use getxattr on the virtual /proc/self/fd path.  This needs an
+additional system call (openat, getxattr, close instead of fchdir,
+getxattr), but it avoids the unshare(CLONE_FS) call behind libc's back.
+The directory entries in /proc/self/fd present as symbolic links, but
+are not implemented as such by the kernel: there is no separate pathname
+lookup for already-open O_PATH descriptors, so there is no race.
+
+Thoughts?
+
+Thanks,
+Florian

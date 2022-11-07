@@ -1,14 +1,27 @@
-Return-Path: <mst@redhat.com>
-Date: Sat, 5 Nov 2022 17:59:40 -0400
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20221105175822-mutt-send-email-mst@kernel.org>
-References: <20221105172453.445049-1-mst@redhat.com>
+Return-Path: <alex.bennee@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=content-transfer-encoding:mime-version:message-id:in-reply-to:date
+ :subject:cc:to:from:user-agent:references:from:to:cc:subject:date
+ :message-id:reply-to;
+ bh=3NaZXVDDvdh3ZdQweFbOyq0/SjShhLBn3jHvrWFLDRs=;
+ b=yZokTe0lNTAKtpC73da0g5wQay1YkwvsEhj+TPd0g8Xa6gsX4nvpoUkBjLS54v5/cF
+ YZRQcMtZKa1dzyKtbf8Ty4lqlFWPIvBdJRO3SUhvY12tRVqmKbk1Lk/ac62PSAgysZdv
+ w8gpWZTtZfKvJv48u4U1kq/XhSz8Yc7GMOjPeDwdJV+JeUtBDlJgfQJ6snN4d9aN4yhF
+ 8EdRwehd1+CZ8qZAkqOBimVq4utPGK+rvOJR4vZRIiEh9qNDn4tRJhyooTIqS7VB3hqh
+ ZRk2MzMQPLM0sdNlh4Y/dTe1cATyXtwkbkmLGlswjq46nGqhztxcBTtIP4hkuv5X51ay
+ Viyw==
+References: <20221010172813.204597-1-mst@redhat.com>
+ <20221010172813.204597-8-mst@redhat.com>
+ <20221105093645-mutt-send-email-mst@kernel.org>
+From: Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>
+Date: Mon, 07 Nov 2022 09:21:49 +0000
+In-reply-to: <20221105093645-mutt-send-email-mst@kernel.org>
+Message-ID: <87y1snglt2.fsf@linaro.org>
 MIME-Version: 1.0
-In-Reply-To: <20221105172453.445049-1-mst@redhat.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH RFC 0/3] virtio fix up started checks
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PULL 07/55] hw/virtio: move vm_running check to
+ virtio_device_started
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,139 +30,173 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Alex =?iso-8859-1?Q?Benn=E9e?= <alex.bennee@linaro.org>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, virtio-fs@redhat.com
-
-On Sat, Nov 05, 2022 at 02:16:29PM -0400, Michael S. Tsirkin wrote:
-> This is an attempt to fix up device started checks.
-> Unfortunately this causes failures in CI
-> and I could not figure it out.
-> 
-> The simplest way to test is to set QEMU_CI to 2
-> on gitlab, then push there.
-> 
-> Alternatively, push to gitlab, then
-> create pipeline while setting QEMU_CI to 1,
-> then run amd64-fedora-container and then clang-system -
-> that slows things down enough to make the failures
-> trigger.
-> 
-> See: https://gitlab.com/mstredhat/qemu/-/jobs/3279537476
-
-And here is a backtrace:
-
-――――――――――――――――――――――――――――――――――――― ✀  ―――――――――――――――――――――――――――――――――――――
-stderr:
-qemu-system-arm: Failed to write msg. Wrote -1 instead of 20.
-qemu-system-arm: vhost VQ 0 ring restore failed: -22: Invalid argument (22)
-qemu-system-arm: Failed to set msg fds.
-qemu-system-arm: vhost VQ 1 ring restore failed: -22: Invalid argument (22)
-qemu-system-arm: -chardev socket,id=chr-reconnect,path=/tmp/vhost-test-PIIDV1/reconnect.sock,server=on: info: QEMU waiting for connection on: disconnected:unix:/tmp/vhost-test-PIIDV1/reconnect.sock,server=on
-qemu-system-arm: Failed to write msg. Wrote -1 instead of 20.
-qemu-system-arm: vhost VQ 0 ring restore failed: -22: Invalid argument (22)
-qemu-system-arm: Failed to set msg fds.
-qemu-system-arm: vhost VQ 1 ring restore failed: -22: Invalid argument (22)
-qemu-system-arm: -chardev socket,id=chr-connect-fail,path=/tmp/vhost-test-U7IGV1/connect-fail.sock,server=on: info: QEMU waiting for connection on: disconnected:unix:/tmp/vhost-test-U7IGV1/connect-fail.sock,server=on
-qemu-system-arm: -netdev vhost-user,id=hs0,chardev=chr-connect-fail,vhostforce=on: Failed to read msg header. Read 0 instead of 12. Original request 1.
-qemu-system-arm: -netdev vhost-user,id=hs0,chardev=chr-connect-fail,vhostforce=on: vhost_backend_init failed: Protocol error
-qemu-system-arm: -netdev vhost-user,id=hs0,chardev=chr-connect-fail,vhostforce=on: failed to init vhost_net for queue 0
-qemu-system-arm: -netdev vhost-user,id=hs0,chardev=chr-connect-fail,vhostforce=on: info: QEMU waiting for connection on: disconnected:unix:/tmp/vhost-test-U7IGV1/connect-fail.sock,server=on
-qemu-system-arm: Failed to write msg. Wrote -1 instead of 20.
-qemu-system-arm: vhost VQ 0 ring restore failed: -22: Invalid argument (22)
-qemu-system-arm: Failed to set msg fds.
-qemu-system-arm: vhost VQ 1 ring restore failed: -22: Invalid argument (22)
-qemu-system-arm: -chardev socket,id=chr-flags-mismatch,path=/tmp/vhost-test-BUYEV1/flags-mismatch.sock,server=on: info: QEMU waiting for connection on: disconnected:unix:/tmp/vhost-test-BUYEV1/flags-mismatch.sock,server=on
-qemu-system-arm: Failed to write msg. Wrote -1 instead of 52.
-qemu-system-arm: vhost_set_mem_table failed: Invalid argument (22)
-qemu-system-arm: unable to start vhost net: 22: falling back on userspace virtio
-vhost lacks feature mask 0x40000000 for backend
-qemu-system-arm: failed to init vhost_net for queue 0
-qemu-system-arm: Failed to set msg fds.
-qemu-system-arm: vhost VQ 0 ring restore failed: -22: Invalid argument (22)
-qemu-system-arm: Failed to set msg fds.
-qemu-system-arm: vhost VQ 1 ring restore failed: -22: Invalid argument (22)
-qemu-system-arm: Failed to write msg. Wrote -1 instead of 20.
-qemu-system-arm: vhost VQ 0 ring restore failed: -22: Invalid argument (22)
-qemu-system-arm: Failed to set msg fds.
-qemu-system-arm: vhost VQ 1 ring restore failed: -22: Invalid argument (22)
-qemu-system-arm: Failed to set msg fds.
-qemu-system-arm: vhost VQ 2 ring restore failed: -22: Invalid argument (22)
-qemu-system-arm: Failed to set msg fds.
-qemu-system-arm: vhost VQ 3 ring restore failed: -22: Invalid argument (22)
-qemu-system-arm: Failed to write msg. Wrote -1 instead of 20.
-qemu-system-arm: vhost VQ 0 ring restore failed: -22: Invalid argument (22)
-qemu-system-arm: Failed to set msg fds.
-qemu-system-arm: vhost VQ 1 ring restore failed: -22: Invalid argument (22)
-qemu-system-arm: Failed to write msg. Wrote -1 instead of 20.
-qemu-system-arm: vhost VQ 0 ring restore failed: -22: Invalid argument (22)
-qemu-system-arm: Failed to set msg fds.
-qemu-system-arm: vhost VQ 1 ring restore failed: -22: Invalid argument (22)
-qemu-system-arm: Failed to set msg fds.
-qemu-system-arm: vhost VQ 0 ring restore failed: -22: Invalid argument (22)
-qemu-system-arm: Failed to set msg fds.
-qemu-system-arm: vhost VQ 1 ring restore failed: -22: Invalid argument (22)
-qemu-system-arm: Failed to set msg fds.
-qemu-system-arm: vhost_set_vring_call failed: Invalid argument (22)
-qemu-system-arm: Failed to set msg fds.
-qemu-system-arm: vhost_set_vring_call failed: Invalid argument (22)
-qemu-system-arm: Failed to write msg. Wrote -1 instead of 20.
-qemu-system-arm: vhost VQ 0 ring restore failed: -5: Input/output error (5)
-UndefinedBehaviorSanitizer:DEADLYSIGNAL
-==8747==ERROR: UndefinedBehaviorSanitizer: SEGV on unknown address 0x0000000000fc (pc 0x55b8ada1276d bp 0x000000000007 sp 0x7ffd127cf5f0 T8747)
-==8747==The signal is caused by a WRITE memory access.
-==8747==Hint: address points to the zero page.
-    #0 0x55b8ada1276d in virtio_bus_release_ioeventfd /builds/mstredhat/qemu/build/../hw/virtio/virtio-bus.c:216:30
-    #1 0x55b8ade97b51 in vu_gpio_set_status /builds/mstredhat/qemu/build/../hw/virtio/vhost-user-gpio.c:172:9
-    #2 0x55b8ade593f9 in virtio_set_status /builds/mstredhat/qemu/build/../hw/virtio/virtio.c:2442:9
-    #3 0x55b8ada4d3d7 in vm_state_notify /builds/mstredhat/qemu/build/../softmmu/runstate.c:334:13
-    #4 0x55b8ada4459a in do_vm_stop /builds/mstredhat/qemu/build/../softmmu/cpus.c:262:9
-    #5 0x55b8ada4e2db in qemu_cleanup /builds/mstredhat/qemu/build/../softmmu/runstate.c:827:5
-    #6 0x55b8ad6054fc in qemu_default_main /builds/mstredhat/qemu/build/../softmmu/main.c:38:5
-    #7 0x7f3da8999eaf in __libc_start_call_main (/lib64/libc.so.6+0x3feaf)
-    #8 0x7f3da8999f5f in __libc_start_main@GLIBC_2.2.5 (/lib64/libc.so.6+0x3ff5f)
-    #9 0x55b8ad5dc094 in _start (/builds/mstredhat/qemu/build/qemu-system-arm+0xc17094)
-UndefinedBehaviorSanitizer can not provide additional info.
-SUMMARY: UndefinedBehaviorSanitizer: SEGV /builds/mstredhat/qemu/build/../hw/virtio/virtio-bus.c:216:30 in virtio_bus_release_ioeventfd
-==8747==ABORTING
-../tests/qtest/libqtest.c:179: kill_qemu() tried to terminate QEMU process but encountered exit status 1 (expected 0)
-**
-ERROR:../tests/qtest/qos-test.c:191:subprocess_run_one_test: child process (/arm/virt/virtio-mmio/virtio-bus/vhost-user-gpio-device/vhost-user-gpio/vhost-user-gpio-tests/read-guest-mem/memfile/subprocess [8737]) failed unexpectedly
-(test program exited with status code -6)
-――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+To: "Michael S. Tsirkin" <mst@redhat.com>
+Cc: qemu-devel@nongnu.org, Peter Maydell <peter.maydell@linaro.org>, "Dr.
+ David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, virtio-fs@redhat.com, Viresh Kumar <viresh.kumar@linaro.org>
 
 
+"Michael S. Tsirkin" <mst@redhat.com> writes:
 
-https://gitlab.com/mstredhat/qemu/-/jobs/3279637541
+> On Mon, Oct 10, 2022 at 01:29:10PM -0400, Michael S. Tsirkin wrote:
+>> From: Alex Benn=C3=A9e <alex.bennee@linaro.org>
+>>=20
+>> All the boilerplate virtio code does the same thing (or should at
+>> least) of checking to see if the VM is running before attempting to
+>> start VirtIO. Push the logic up to the common function to avoid
+>> getting a copy and paste wrong.
+>>=20
+>> Signed-off-by: Alex Benn=C3=A9e <alex.bennee@linaro.org>
+>> Message-Id: <20220802095010.3330793-11-alex.bennee@linaro.org>
+>> Reviewed-by: Michael S. Tsirkin <mst@redhat.com>
+>> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+>
+> So, looking at the resulting code, I missed the fact that this function
+> is also used in virtio core.  So this patch does not do what it's saying
+> it does (just refactor code).
+> Instead it completely changes the meaning for virtio core.
+> I thunk we should revert upstream, however, gpio has grown a
+> dependency on this since then.
+> Alex, could you take a look please?
+
+So I guess we have three choices:
+
+  new function for use by backends
+  new function for use by core
+  parameterise virtio_device_started to ignore vm state
+
+I'll add some usage doc comments whichever way.
+
+Do you have a preference?
+
+>
+>> ---
+>>  include/hw/virtio/virtio.h   | 5 +++++
+>>  hw/virtio/vhost-user-fs.c    | 6 +-----
+>>  hw/virtio/vhost-user-i2c.c   | 6 +-----
+>>  hw/virtio/vhost-user-rng.c   | 6 +-----
+>>  hw/virtio/vhost-user-vsock.c | 6 +-----
+>>  hw/virtio/vhost-vsock.c      | 6 +-----
+>>  6 files changed, 10 insertions(+), 25 deletions(-)
+>>=20
+>> diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
+>> index 9bb2485415..74e7ad5a92 100644
+>> --- a/include/hw/virtio/virtio.h
+>> +++ b/include/hw/virtio/virtio.h
+>> @@ -100,6 +100,7 @@ struct VirtIODevice
+>>      VirtQueue *vq;
+>>      MemoryListener listener;
+>>      uint16_t device_id;
+>> +    /* @vm_running: current VM running state via virtio_vmstate_change(=
+) */
+>>      bool vm_running;
+>>      bool broken; /* device in invalid state, needs reset */
+>>      bool use_disabled_flag; /* allow use of 'disable' flag when needed =
+*/
+>> @@ -376,6 +377,10 @@ static inline bool virtio_device_started(VirtIODevi=
+ce *vdev, uint8_t status)
+>>          return vdev->started;
+>>      }
+>> =20
+>> +    if (!vdev->vm_running) {
+>> +        return false;
+>> +    }
+>> +
+>>      return status & VIRTIO_CONFIG_S_DRIVER_OK;
+>>  }
+>> =20
+>> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+>> index e513e4fdda..d2bebba785 100644
+>> --- a/hw/virtio/vhost-user-fs.c
+>> +++ b/hw/virtio/vhost-user-fs.c
+>> @@ -122,11 +122,7 @@ static void vuf_stop(VirtIODevice *vdev)
+>>  static void vuf_set_status(VirtIODevice *vdev, uint8_t status)
+>>  {
+>>      VHostUserFS *fs =3D VHOST_USER_FS(vdev);
+>> -    bool should_start =3D status & VIRTIO_CONFIG_S_DRIVER_OK;
+>> -
+>> -    if (!vdev->vm_running) {
+>> -        should_start =3D false;
+>> -    }
+>> +    bool should_start =3D virtio_device_started(vdev, status);
+>> =20
+>>      if (fs->vhost_dev.started =3D=3D should_start) {
+>>          return;
+>> diff --git a/hw/virtio/vhost-user-i2c.c b/hw/virtio/vhost-user-i2c.c
+>> index 6020eee093..b930cf6d5e 100644
+>> --- a/hw/virtio/vhost-user-i2c.c
+>> +++ b/hw/virtio/vhost-user-i2c.c
+>> @@ -93,11 +93,7 @@ static void vu_i2c_stop(VirtIODevice *vdev)
+>>  static void vu_i2c_set_status(VirtIODevice *vdev, uint8_t status)
+>>  {
+>>      VHostUserI2C *i2c =3D VHOST_USER_I2C(vdev);
+>> -    bool should_start =3D status & VIRTIO_CONFIG_S_DRIVER_OK;
+>> -
+>> -    if (!vdev->vm_running) {
+>> -        should_start =3D false;
+>> -    }
+>> +    bool should_start =3D virtio_device_started(vdev, status);
+>> =20
+>>      if (i2c->vhost_dev.started =3D=3D should_start) {
+>>          return;
+>> diff --git a/hw/virtio/vhost-user-rng.c b/hw/virtio/vhost-user-rng.c
+>> index 3a7bf8e32d..a9c1c4bc79 100644
+>> --- a/hw/virtio/vhost-user-rng.c
+>> +++ b/hw/virtio/vhost-user-rng.c
+>> @@ -90,11 +90,7 @@ static void vu_rng_stop(VirtIODevice *vdev)
+>>  static void vu_rng_set_status(VirtIODevice *vdev, uint8_t status)
+>>  {
+>>      VHostUserRNG *rng =3D VHOST_USER_RNG(vdev);
+>> -    bool should_start =3D status & VIRTIO_CONFIG_S_DRIVER_OK;
+>> -
+>> -    if (!vdev->vm_running) {
+>> -        should_start =3D false;
+>> -    }
+>> +    bool should_start =3D virtio_device_started(vdev, status);
+>> =20
+>>      if (rng->vhost_dev.started =3D=3D should_start) {
+>>          return;
+>> diff --git a/hw/virtio/vhost-user-vsock.c b/hw/virtio/vhost-user-vsock.c
+>> index 0f8ff99f85..22c1616ebd 100644
+>> --- a/hw/virtio/vhost-user-vsock.c
+>> +++ b/hw/virtio/vhost-user-vsock.c
+>> @@ -55,11 +55,7 @@ const VhostDevConfigOps vsock_ops =3D {
+>>  static void vuv_set_status(VirtIODevice *vdev, uint8_t status)
+>>  {
+>>      VHostVSockCommon *vvc =3D VHOST_VSOCK_COMMON(vdev);
+>> -    bool should_start =3D status & VIRTIO_CONFIG_S_DRIVER_OK;
+>> -
+>> -    if (!vdev->vm_running) {
+>> -        should_start =3D false;
+>> -    }
+>> +    bool should_start =3D virtio_device_started(vdev, status);
+>> =20
+>>      if (vvc->vhost_dev.started =3D=3D should_start) {
+>>          return;
+>> diff --git a/hw/virtio/vhost-vsock.c b/hw/virtio/vhost-vsock.c
+>> index 0338de892f..8031c164a5 100644
+>> --- a/hw/virtio/vhost-vsock.c
+>> +++ b/hw/virtio/vhost-vsock.c
+>> @@ -70,13 +70,9 @@ static int vhost_vsock_set_running(VirtIODevice *vdev=
+, int start)
+>>  static void vhost_vsock_set_status(VirtIODevice *vdev, uint8_t status)
+>>  {
+>>      VHostVSockCommon *vvc =3D VHOST_VSOCK_COMMON(vdev);
+>> -    bool should_start =3D status & VIRTIO_CONFIG_S_DRIVER_OK;
+>> +    bool should_start =3D virtio_device_started(vdev, status);
+>>      int ret;
+>> =20
+>> -    if (!vdev->vm_running) {
+>> -        should_start =3D false;
+>> -    }
+>> -
+>>      if (vvc->vhost_dev.started =3D=3D should_start) {
+>>          return;
+>>      }
+>> --=20
+>> MST
+>>=20
 
 
-gpio attempts to stop backend when notifiers are not enabled.
-
-No clue how that triggers.
-
-
-
-> 
-> Alex, Viresh, need your help here. Thanks!
-> 
-> Alex, pls note that same failures are triggered by your RFC - if we know the
-> root cause we can discuss solutions. So if you prefer pls go ahead and
-> debug that. Thanks!
-> 
-> Michael S. Tsirkin (3):
->   virtio: distinguish between started and running
->   gpio: use virtio_device_running
->   virtio: revert changes to virtio_device_started
-> 
->  include/hw/virtio/virtio.h   | 7 ++++++-
->  hw/virtio/vhost-user-fs.c    | 2 +-
->  hw/virtio/vhost-user-gpio.c  | 4 ++--
->  hw/virtio/vhost-user-i2c.c   | 4 ++--
->  hw/virtio/vhost-user-rng.c   | 4 ++--
->  hw/virtio/vhost-user-vsock.c | 2 +-
->  hw/virtio/vhost-vsock.c      | 2 +-
->  7 files changed, 15 insertions(+), 10 deletions(-)
-> 
-> -- 
-> MST
-> 
+--=20
+Alex Benn=C3=A9e
 

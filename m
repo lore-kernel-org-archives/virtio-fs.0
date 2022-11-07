@@ -1,7 +1,7 @@
 Return-Path: <mst@redhat.com>
-Date: Mon, 7 Nov 2022 07:16:58 -0500
+Date: Mon, 7 Nov 2022 09:31:10 -0500
 From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20221107071516-mutt-send-email-mst@kernel.org>
+Message-ID: <20221107091939-mutt-send-email-mst@kernel.org>
 References: <20221107121407.1010913-1-alex.bennee@linaro.org>
 MIME-Version: 1.0
 In-Reply-To: <20221107121407.1010913-1-alex.bennee@linaro.org>
@@ -26,6 +26,9 @@ On Mon, Nov 07, 2022 at 12:14:07PM +0000, Alex Benn=E9e wrote:
 > use by both the core and the device code. The core code should be able
 > to handle the device "starting" while the VM isn't running to handle
 > the restoration of migration state. To solve this duel use introduce a
+
+dual use ;)
+
 > new helper for use by the vhost-user backends who all use it to feed a
 > should_start variable.
 >=20
@@ -37,8 +40,10 @@ ted)
 > Signed-off-by: Alex Benn=E9e <alex.bennee@linaro.org>
 > Cc: "Michael S. Tsirkin" <mst@redhat.com>
 
-Hi Alex, did you actually check this under gitlab CI?
+Thanks, gitlab ci seems to have passed this.
 
+I think I'll add 27ba7b027f0f06479091bcfbcd308a6b272563a4 to the Fixes
+tag too.
 
 > ---
 >  include/hw/virtio/virtio.h   | 18 ++++++++++++++++++

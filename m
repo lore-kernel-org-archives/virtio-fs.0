@@ -1,14 +1,24 @@
-Return-Path: <mst@redhat.com>
-Date: Mon, 7 Nov 2022 17:54:22 -0500
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20221107224600.934080-83-mst@redhat.com>
-References: <20221107224600.934080-1-mst@redhat.com>
+Return-Path: <alex.bennee@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=content-transfer-encoding:mime-version:references:in-reply-to
+ :message-id:date:subject:cc:to:from:from:to:cc:subject:date
+ :message-id:reply-to;
+ bh=+Mtx8odvHwCV0bf17EfBgIaZ7U3IJZv+eeZfeBwc4UQ=;
+ b=pylU059h9atBQP2HUJ1P2PS5gPhC528RXgxry6KwVPVJPUphbcC7U9294RnSW+1vxy
+ 7G52xLzTQMlkaXzX8tE1ojTe6NDZN91xdDS+96gOQgKvL9qkfRNq/acxVJsmmONzuiwT
+ 0RoBbKFiG2X4WS/ZU2y8NolvEpt/JT4l2Sp2Ny+9LrTDIJsWPk0jUj0hnoCZgUYX/AS+
+ /6OG5xIZXCclbNAfUrIsRvXAzJhVHgJDTKu9LV0dh8F7RNuHbNeVAKvUjDrsnn9OyINP
+ WmKfY4roK69ctfmrPmJipUJocf67Kb9y0GX5kTY3VSM8s/hXHg+EKy1GjV2qJbG1Q3yQ
+ VBLA==
+From: =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>
+Date: Tue,  8 Nov 2022 09:23:04 +0000
+Message-Id: <20221108092308.1717426-6-alex.bennee@linaro.org>
+In-Reply-To: <20221108092308.1717426-1-alex.bennee@linaro.org>
+References: <20221108092308.1717426-1-alex.bennee@linaro.org>
 MIME-Version: 1.0
-In-Reply-To: <20221107224600.934080-1-mst@redhat.com>
 Content-Type: text/plain; charset="utf-8"
-Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PULL v4 82/83] hw/virtio: introduce
+Subject: [Virtio-fs] [PATCH v1 5/9] hw/virtio: introduce
  virtio_device_should_start
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
@@ -19,14 +29,12 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: qemu-devel@nongnu.org
-Cc: Peter Maydell <peter.maydell@linaro.org>, Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, qemu-block@nongnu.org, virtio-fs@redhat.com
-
-From: Alex Bennée <alex.bennee@linaro.org>
+Cc: fam@euphon.net, berrange@redhat.com, f4bug@amsat.org, aurelien@aurel32.net, pbonzini@redhat.com, stefanha@redhat.com, crosa@redhat.com, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, "Michael S. Tsirkin" <mst@redhat.com>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, "open list:Block layer core" <qemu-block@nongnu.org>, "open list:virtiofs" <virtio-fs@redhat.com>
 
 The previous fix to virtio_device_started revealed a problem in its
 use by both the core and the device code. The core code should be able
 to handle the device "starting" while the VM isn't running to handle
-the restoration of migration state. To solve this duel use introduce a
+the restoration of migration state. To solve this dual use introduce a
 new helper for use by the vhost-user backends who all use it to feed a
 should_start variable.
 
@@ -34,9 +42,9 @@ We can also pick up a change vhost_user_blk_set_status while we are at
 it which follows the same pattern.
 
 Fixes: 9f6bcfd99f (hw/virtio: move vm_running check to virtio_device_started)
+Fixes: 27ba7b027f (hw/virtio: add boilerplate for vhost-user-gpio device)
 Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
 Cc: "Michael S. Tsirkin" <mst@redhat.com>
-Message-Id: <20221107121407.1010913-1-alex.bennee@linaro.org>
 ---
  include/hw/virtio/virtio.h   | 18 ++++++++++++++++++
  hw/block/vhost-user-blk.c    |  6 +-----
@@ -49,10 +57,10 @@ Message-Id: <20221107121407.1010913-1-alex.bennee@linaro.org>
  8 files changed, 25 insertions(+), 11 deletions(-)
 
 diff --git a/include/hw/virtio/virtio.h b/include/hw/virtio/virtio.h
-index 1423dba379..141a253a2c 100644
+index f41b4a7e64..3191c618f3 100644
 --- a/include/hw/virtio/virtio.h
 +++ b/include/hw/virtio/virtio.h
-@@ -395,6 +395,24 @@ static inline bool virtio_device_started(VirtIODevice *vdev, uint8_t status)
+@@ -389,6 +389,24 @@ static inline bool virtio_device_started(VirtIODevice *vdev, uint8_t status)
          return vdev->started;
      }
  
@@ -78,10 +86,10 @@ index 1423dba379..141a253a2c 100644
          return false;
      }
 diff --git a/hw/block/vhost-user-blk.c b/hw/block/vhost-user-blk.c
-index 28409c90f7..16ad400889 100644
+index 13bf5cc47a..8feaf12e4e 100644
 --- a/hw/block/vhost-user-blk.c
 +++ b/hw/block/vhost-user-blk.c
-@@ -226,14 +226,10 @@ static void vhost_user_blk_stop(VirtIODevice *vdev)
+@@ -222,14 +222,10 @@ static void vhost_user_blk_stop(VirtIODevice *vdev)
  static void vhost_user_blk_set_status(VirtIODevice *vdev, uint8_t status)
  {
      VHostUserBlk *s = VHOST_USER_BLK(vdev);
@@ -176,5 +184,5 @@ index 7dc3c73931..aa16d584ee 100644
  
      if (vhost_dev_is_started(&vvc->vhost_dev) == should_start) {
 -- 
-MST
+2.34.1
 

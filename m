@@ -1,20 +1,29 @@
-Return-Path: <mst@redhat.com>
-Date: Tue, 8 Nov 2022 10:24:13 -0500
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20221108102011-mutt-send-email-mst@kernel.org>
-References: <20221108092308.1717426-1-alex.bennee@linaro.org>
- <20221108092308.1717426-6-alex.bennee@linaro.org>
- <20221108043249-mutt-send-email-mst@kernel.org>
- <8735atg2vh.fsf@linaro.org>
- <20221108052544-mutt-send-email-mst@kernel.org>
- <87y1slelmw.fsf@linaro.org>
-MIME-Version: 1.0
-In-Reply-To: <87y1slelmw.fsf@linaro.org>
-Content-Type: text/plain; charset="windows-1252"
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [PATCH v1 5/9] hw/virtio: introduce
- virtio_device_should_start
+Return-Path: <virtiofs-bot@sinrega.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
+ cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
+ :to; s=fm1; t=1667923167; x=1668009567; bh=fY8ZBIH+dDj0RoWImf82c
+ LrW1HRf5EVYsLVn+cz6D7M=; b=HyW48qLs1521zG+KImEVOnsZiRquWEdsoajze
+ G4SvVuM+J5BlKJZM/BAPBT4VQDxTugIxwZSoTwxKT/Oc773HqKV1XtvdXurCKlKf
+ 0FYmKe3VdjOZMS8voF5U2K6ePy8MdUzzGN4oGFC9T8p7e3L9XPnrABbx88pVTsRr
+ QESYkcO5dEap8dE3KMqdK95Fuv9rw0nhmrK563jho924GHUlnF2aEfWewxstXl34
+ 7AYRTQhJJV54DXsR1OtVxDju8MPWXv/5Vq78KHoPcEGl6xS/xjGgjDLhc0/MUY3u
+ JV09aqTskfofoio+DrGVhtLOwuL6HX6sHzauNqXW6BRbS62yw==
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
+ messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
+ :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
+ :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; t=
+ 1667923167; x=1668009567; bh=fY8ZBIH+dDj0RoWImf82cLrW1HRf5EVYsLV
+ n+cz6D7M=; b=gnXG9wNQ9efTZN5/TXBogzc1/zrzAGICTa3K5Zh/JpA/VWS/ENy
+ X5xErml4RhvnsubC56uzNVwtRt50E8ANdLs8fe2UHHzGbud8dVz/W7IVv3nVSuNV
+ iVHN4RCWtYC6bGI/X7emwvsa0s5QpWoW8Iy8TQig1hdXmcmjFmrQ6IerON/ZeNWI
+ ZHvjm3HjFQJ9FUAPtSDOjoBqt4mcP2LkZOzwKIkdp1sQupHiPQzxMoaovrUF3HZ6
+ xfZs69/ukuy70NSMpYwF0XueLQkt7CI058BG+aMmI4RsR+9kEPYFFCbOlISvYIQZ
+ 4ochqkVp37CA45sRdRtru4uzzX1zLo37wzw==
+From: virtiofs-bot@sinrega.org
+Message-Id: <64879.122110810592700171@us-mta-133.us.mimecast.lan>
+Content-Type: text/plain; charset="US-ASCII"; x-default=true
+Date: Tue,  8 Nov 2022 15:59:29 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR merged: Bump rust-vmm crates dependencies
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,68 +32,14 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Alex =?iso-8859-1?Q?Benn=E9e?= <alex.bennee@linaro.org>
-Cc: qemu-devel@nongnu.org, fam@euphon.net, berrange@redhat.com, f4bug@amsat.org, aurelien@aurel32.net, pbonzini@redhat.com, stefanha@redhat.com, crosa@redhat.com, Raphael Norwitz <raphael.norwitz@nutanix.com>, Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, "open list:Block layer core" <qemu-block@nongnu.org>, "open list:virtiofs" <virtio-fs@redhat.com>
+To: virtio-fs@redhat.com
 
-On Tue, Nov 08, 2022 at 11:21:26AM +0000, Alex Benn=E9e wrote:
->=20
-> "Michael S. Tsirkin" <mst@redhat.com> writes:
->=20
-> > On Tue, Nov 08, 2022 at 10:23:15AM +0000, Alex Benn=E9e wrote:
-> >>=20
-> >> "Michael S. Tsirkin" <mst@redhat.com> writes:
-> >>=20
-> >> > On Tue, Nov 08, 2022 at 09:23:04AM +0000, Alex Benn=E9e wrote:
-> >> >> The previous fix to virtio_device_started revealed a problem in its
-> >> >> use by both the core and the device code. The core code should be a=
-ble
-> >> >> to handle the device "starting" while the VM isn't running to handle
-> >> >> the restoration of migration state. To solve this dual use introduc=
-e a
-> >> >> new helper for use by the vhost-user backends who all use it to fee=
-d a
-> >> >> should_start variable.
-> >> >>=20
-> >> >> We can also pick up a change vhost_user_blk_set_status while we are=
- at
-> >> >> it which follows the same pattern.
-> >> >>=20
-> >> >> Fixes: 9f6bcfd99f (hw/virtio: move vm_running check to virtio_devic=
-e_started)
-> >> >> Fixes: 27ba7b027f (hw/virtio: add boilerplate for vhost-user-gpio d=
-evice)
-> >> >> Signed-off-by: Alex Benn=E9e <alex.bennee@linaro.org>
-> >> >> Cc: "Michael S. Tsirkin" <mst@redhat.com>
-> >> >
-> >> > why is this in this patchset?
-> >>=20
-> >> As per my cover letter:
-> >>=20
-> >>   Most of these patches have been posted before as single patch RFCs. A
-> >>   couple are already scheduled through other trees so will drop out in
-> >>   due course
-> >>=20
-> >> but I keep them in my tree until they are merged so I can continue to
-> >> soak test them (and have a stable base for my other WIP trees).
-> >
-> > That's fine just pls don't double-post them on list, certainly
-> > not as part of a patchset.
->=20
-> Why not? Is this breaking some tooling?
+Updating dependencies to:
+  - vhost 0.5.0
+  - vhost-user-backend 0.7.0
+  - virtio-queue 0.6.1
 
-Yes patchset breaks git am if you try to apply part of it.
-
-Reposting creates work for reviewers - why should they have to read the same
-patch twice?  In this case it also made me scratch my head trying to
-figure out what to do about it.
-
-But, if you are careful and maintain an ordered changelog after "---"
-and there it says=20
-	changes since rfc:
-		no changes, subject changed=20
-
-then this second part is less of a problem
-
-> --=20
-> Alex Benn=E9e
+Signed-off-by: German Maglione <gmaglione@redhat.com>
+---
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/139
 

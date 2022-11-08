@@ -1,29 +1,29 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; t=1667923167; x=1668009567; bh=fY8ZBIH+dDj0RoWImf82c
- LrW1HRf5EVYsLVn+cz6D7M=; b=HyW48qLs1521zG+KImEVOnsZiRquWEdsoajze
- G4SvVuM+J5BlKJZM/BAPBT4VQDxTugIxwZSoTwxKT/Oc773HqKV1XtvdXurCKlKf
- 0FYmKe3VdjOZMS8voF5U2K6ePy8MdUzzGN4oGFC9T8p7e3L9XPnrABbx88pVTsRr
- QESYkcO5dEap8dE3KMqdK95Fuv9rw0nhmrK563jho924GHUlnF2aEfWewxstXl34
- 7AYRTQhJJV54DXsR1OtVxDju8MPWXv/5Vq78KHoPcEGl6xS/xjGgjDLhc0/MUY3u
- JV09aqTskfofoio+DrGVhtLOwuL6HX6sHzauNqXW6BRbS62yw==
+ :to; s=fm1; t=1667923264; x=1668009664; bh=iOGxzJMkoElZjdPhiKHx3
+ 8InVVPdoOydOU7Ma0CQ5ls=; b=7sN+qUNbHl/1SXHthpDgcGM6STPBp8qM3FUHN
+ 6wu6D4tVRFew67VXTepoVbsXXpYSUBfQcM+mqakOMNsNvyJs93+xA5NaiSsz2Y8v
+ GAZ90/Zt7YyGTcDu9cUKaeo2gCMMvY4PEMGdjUS8flY4Ha0ZS+iX5PKSPqW+FWs3
+ P6OngUlMODUruNwpEupbaW1peedTs2eba5m9uJy387e4HD9LIgvD4s0G4MZTfUU6
+ xGrl3yF9qLCTY4O7IFDqbUCOOjvVOOLChs5auCsjFt4gs1Xa34IZV4LoD1Qa+yGE
+ hcMrlr5L/I9EMBlmIQX6WKj2dNdKZCMsehYBgDTraA0JeXgkw==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
  :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
  :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; t=
- 1667923167; x=1668009567; bh=fY8ZBIH+dDj0RoWImf82cLrW1HRf5EVYsLV
- n+cz6D7M=; b=gnXG9wNQ9efTZN5/TXBogzc1/zrzAGICTa3K5Zh/JpA/VWS/ENy
- X5xErml4RhvnsubC56uzNVwtRt50E8ANdLs8fe2UHHzGbud8dVz/W7IVv3nVSuNV
- iVHN4RCWtYC6bGI/X7emwvsa0s5QpWoW8Iy8TQig1hdXmcmjFmrQ6IerON/ZeNWI
- ZHvjm3HjFQJ9FUAPtSDOjoBqt4mcP2LkZOzwKIkdp1sQupHiPQzxMoaovrUF3HZ6
- xfZs69/ukuy70NSMpYwF0XueLQkt7CI058BG+aMmI4RsR+9kEPYFFCbOlISvYIQZ
- 4ochqkVp37CA45sRdRtru4uzzX1zLo37wzw==
+ 1667923264; x=1668009664; bh=iOGxzJMkoElZjdPhiKHx38InVVPdoOydOU7
+ Ma0CQ5ls=; b=HG9OOXFKF+/lOlqJm4dSO1ZzktJ22uqcqxlSmyBaPbj2iBZ0qHY
+ Gwx7joYcJIjCqmtwhX2AKMatbtG7PDtV3GjtwpdIHlBWAZMw3MbXC6fx/FaqPJoD
+ /+1gmv7EARE4mIkuWjBZIEB9X8JWC2VUHF/TyYr07ravIhUSdU/YtGE283zx3rI4
+ AEpnBdNxCQGDk5NY4wpoLUILmW+4DZWBguctMJglyYplHJTdqX3BzkddO3F1lkkm
+ JYJGTdFdhOG5Lhuu1zFKV7phIle5/vexkaB8Hf1t9bn/lKGJ+htSqfv23HasOVPD
+ PccPdwzyzOexptqduvN1VsktMahwrdOT0Hg==
 From: virtiofs-bot@sinrega.org
-Message-Id: <64879.122110810592700171@us-mta-133.us.mimecast.lan>
+Message-Id: <83408.122110811010501265@us-mta-135.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Tue,  8 Nov 2022 15:59:29 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR merged: Bump rust-vmm crates dependencies
+Date: Tue,  8 Nov 2022 16:01:07 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] MR merged: Add missing license file header
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -34,12 +34,10 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Updating dependencies to:
-  - vhost 0.5.0
-  - vhost-user-backend 0.7.0
-  - virtio-queue 0.6.1
+Add missing license file header BSD-3-Clause SPDX license identifier
 
-Signed-off-by: German Maglione <gmaglione@redhat.com>
+NOTE:
+There is another file that needs a license header `fs_cache_req_handler.rs`
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/139
+https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/133
 

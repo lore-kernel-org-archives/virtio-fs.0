@@ -1,7 +1,7 @@
 Return-Path: <mst@redhat.com>
-Date: Tue, 8 Nov 2022 04:33:55 -0500
+Date: Tue, 8 Nov 2022 04:32:59 -0500
 From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20221108043313-mutt-send-email-mst@kernel.org>
+Message-ID: <20221108043249-mutt-send-email-mst@kernel.org>
 References: <20221108092308.1717426-1-alex.bennee@linaro.org>
  <20221108092308.1717426-6-alex.bennee@linaro.org>
 MIME-Version: 1.0
@@ -39,7 +39,7 @@ ted)
 > Signed-off-by: Alex Benn=E9e <alex.bennee@linaro.org>
 > Cc: "Michael S. Tsirkin" <mst@redhat.com>
 
-is this the same as the RFC?
+why is this in this patchset?
 
 > ---
 >  include/hw/virtio/virtio.h   | 18 ++++++++++++++++++
@@ -184,7 +184,4 @@ int start)
 >      if (vhost_dev_is_started(&vvc->vhost_dev) =3D=3D should_start) {
 > --=20
 > 2.34.1
->=20
->=20
->=20
 

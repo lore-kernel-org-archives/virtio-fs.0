@@ -1,24 +1,22 @@
-Return-Path: <richard.henderson@linaro.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=message-id:date:mime-version:user-agent:subject:content-language:to
- :cc:references:from:in-reply-to:content-transfer-encoding;
- bh=28K+JLIxMAw/ud6crVH6+SBchG8dHL/Ih0iPmrFKUp8=;
- b=nhZ1kc2lse7ORlH4o7va3TfbnI8sxkJPK4ruS9I2giG+z67v1H1PD96uK7Sa8eu5t0
- vk11ntVZAxCUGVtep/iJ4ybSC7rVFtUJSbsqrAVPp9fveuJmV2WXnboVvvzl7bEeEZl9
- BN060jtJC/0C3/PDfxlagBncDXstozM4t75VRg3qIKtDkncOq5Vyct/+WyKTXrHNzFBA
- KnoOVFN/2qjWf+UwKlfxKnnFmqzExfnMYBY6mfYjJmxuMkYyVDOEBIRDSfJPFuRBrHqy
- HnsiYBdqrTHhfQAP+19HJclsnUbk/FSqplLrQYNQVO/D5N6GGAFLHGgqLQxxp5RdPexF
- BIrg==
-Message-ID: <a4688ccf-a8c9-5e7d-f570-001b417a0025@linaro.org>
-Date: Thu, 4 Aug 2022 17:20:19 -0700
+Return-Path: <akihiko.odaki@daynix.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=daynix-com.20210112.gappssmtp.com; s=20210112;
+ h=content-transfer-encoding:mime-version:message-id:date:subject:cc
+ :to:from:from:to:cc:subject:date:message-id:reply-to;
+ bh=iFBtDQl7Zs4QNi/rBhfhxEX7GtO3l+pZOD/IcrlUc2M=;
+ b=b/uAefO6NGS2CX+2zId3rwVAZebhIvJVsMFDQ45kz6dAJSBz77pdqIfUkGxPfgLrPT
+ 3DByaSU1cxS6r5Wp05GTq19P8icgDrWivJJZ+8PKX49JVl9SOtKv4UNRkzcUPuTDtMGd
+ MvTL5Z0eNX7hRfHF1Rp/4/2wKVFhLrqTqwV7+Jlx5CxPUhOojEmZFuCSVBNVajPHMFYj
+ IVvf9fV4SLIvObNEbC1onVNqPICWu6/D3Zxnvn4zZp/DI1yhHNCR3da+ewD7rBmfyK31
+ 5v9KVP2SkYp+23iRkZfh3X9BON40qCxAnwCYgKtbkLMTLwM4yDFaB9hYk3w6qeXJ3lh6
+ zkHQ==
+From: Akihiko Odaki <akihiko.odaki@daynix.com>
+Date: Thu, 10 Nov 2022 19:06:19 +0900
+Message-Id: <20221110100629.61496-1-akihiko.odaki@daynix.com>
 MIME-Version: 1.0
-References: <20220804190258.20226-1-stefanha@redhat.com>
-From: Richard Henderson <richard.henderson@linaro.org>
-In-Reply-To: <20220804190258.20226-1-stefanha@redhat.com>
-Content-Language: en-US
-Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] [PULL for-7.1 0/1] Block patches
+Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset="US-ASCII"; x-default=true
+Subject: [Virtio-fs] [PATCH v2 00/10] util: Introduce qemu_get_runtime_dir()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,41 +25,69 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefan Hajnoczi <stefanha@redhat.com>, qemu-devel@nongnu.org
-Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, qemu-block@nongnu.org, virtio-fs@redhat.com
+Cc: qemu-devel@nongnu.org, qemu-block@nongnu.org, virtio-fs@redhat.com, Yuval Shaia <yuval.shaia.ml@gmail.com>, Marcel Apfelbaum <marcel.apfelbaum@gmail.com>, Konstantin Kostiuk <kkostiuk@redhat.com>, Michael Roth <michael.roth@amd.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Stefan Weil <sw@weilnetz.de>, Yan Vugenfirer <yan@daynix.com>, Akihiko Odaki <akihiko.odaki@daynix.com>
 
-On 8/4/22 12:02, Stefan Hajnoczi wrote:
-> The following changes since commit 2480f3bbd03814b0651a1f74959f5c6631ee5819:
-> 
->    Merge tag 'linux-user-for-7.1-pull-request' of https://gitlab.com/laurent_vivier/qemu into staging (2022-08-03 08:32:44 -0700)
-> 
-> are available in the Git repository at:
-> 
->    https://gitlab.com/stefanha/qemu.git tags/block-pull-request
-> 
-> for you to fetch changes up to 7b0ca313647532a2c7007379ff800c9a2415c95d:
-> 
->    virtiofsd: Fix format strings (2022-08-04 14:44:25 -0400)
-> 
-> ----------------------------------------------------------------
-> Pull request
-> 
-> - Format string portability fix in virtiofsd
+qemu_get_runtime_dir() returns a dynamically allocated directory path
+that is appropriate for storing runtime files. It corresponds to "run"
+directory in Unix.
 
+With a tree-wide search, it was found that there are several cases
+where such a functionality is implemented so let's have one as a common
+utlity function.
 
-Applied, thanks.  Please update https://wiki.qemu.org/ChangeLog/7.1 as appropriate.
+A notable feature of qemu_get_runtime_dir() is that it uses
+$XDG_RUNTIME_DIR if available. While the function is often called by
+executables which requires root privileges, it is still possible that
+they are called from a user without privilege to write the system
+runtime directory. In fact, I decided to write this patch when I ran
+virtiofsd in a Linux namespace created by a normal user and realized
+it tries to write the system runtime directory, not writable in this
+case. $XDG_RUNTIME_DIR should provide a writable directory in such
+cases.
 
+This function does not use qemu_get_local_state_dir() or its logic
+for Windows. Actually the implementation of qemu_get_local_state_dir()
+for Windows seems not right as it calls g_get_system_data_dirs(),
+which refers to $XDG_DATA_DIRS. In Unix terminology, it is basically
+"/usr/share", not "/var", which qemu_get_local_state_dir() is intended
+to provide. Instead, this function try to use the following in order:
+- $XDG_RUNTIME_DIR
+- LocalAppData folder
+- get_relocated_path(CONFIG_QEMU_LOCALSTATEDIR "/run")
 
-r~
+This function does not use g_get_user_runtime_dir() either as it
+falls back to g_get_user_cache_dir() when $XDG_DATA_DIRS is not
+available. In the case, we rather use:
+get_relocated_path(CONFIG_QEMU_LOCALSTATEDIR "/run")
 
+v2: rebased to the current master since Patchew complains.
 
-> 
-> ----------------------------------------------------------------
-> 
-> Stefan Weil (1):
->    virtiofsd: Fix format strings
-> 
->   tools/virtiofsd/fuse_lowlevel.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
-> 
+Akihiko Odaki (10):
+  qga: Remove platform GUID definitions
+  util: Introduce qemu_get_runtime_dir()
+  ivshmem-server: Use qemu_get_runtime_dir()
+  contrib/rdmacm-mux: Use qemu_get_runtime_dir()
+  qga: Use qemu_get_runtime_dir()
+  scsi: Use qemu_get_runtime_dir()
+  virtiofsd: Use qemu_get_runtime_dir()
+  module: Use qemu_get_runtime_dir()
+  util: Remove qemu_get_local_state_dir()
+  spice-app: Use qemu_get_runtime_dir()
+
+ include/qemu/osdep.h           | 10 +++++++---
+ contrib/ivshmem-server/main.c  | 20 ++++++++++++++++----
+ contrib/rdmacm-mux/main.c      | 22 ++++++++++++++--------
+ qga/commands-win32.c           |  7 -------
+ qga/main.c                     |  9 ++++-----
+ scsi/qemu-pr-helper.c          |  6 +++---
+ tools/virtiofsd/fuse_virtio.c  |  6 +++---
+ ui/spice-app.c                 |  4 ++--
+ util/module.c                  |  3 ++-
+ util/oslib-posix.c             |  9 +++++++--
+ util/oslib-win32.c             | 24 ++++++++++++++++++++----
+ contrib/rdmacm-mux/meson.build |  2 +-
+ 12 files changed, 79 insertions(+), 43 deletions(-)
+
+-- 
+2.38.1
 

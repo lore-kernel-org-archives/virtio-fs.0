@@ -4,23 +4,22 @@ DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  h=content-transfer-encoding:mime-version:references:in-reply-to
  :message-id:date:subject:cc:to:from:from:to:cc:subject:date
  :message-id:reply-to;
- bh=dOiLOlAfXAvpXv8rTJ4eJkIEKy86OcSDloeAyKUiv/M=;
- b=p4O24nTxoZ3CUUSHTcoAO0Xc0JFtRN2ngOvoC8pJ2mXgk9QB3Yt/2TTTrfnQJMrarD
- stODQumgHD+q1i3wWdz+iychQ3TxTqT4h0T8b0nqo/4L/TBjcl6c6fNmCNXJl51zGaRD
- 3QDlaq7UfRWnH8UjtfLts9YldBsw5TzqumPHRULhZkyItw0A+Z21+yFiXXHR2jVH6o7d
- YhLwKcFydCyMBPypBBnumrUOmpoq62E3T+7QcjxCupf9+vlY2fVx2IZGl07S8GMSOF7w
- IXCHJUIjSG8+1qHjl78GBHw9pDDKwcuci2ZB1YaWMj3HmzW0GEdDFzh87BLdxw9o+IYv
- QtYQ==
+ bh=X2AW9NaqdulAEV6U7rG6cnfGeNB8asIOOIZhmyN9/Ug=;
+ b=2Sk9AwSSjoJXhw7R+5QsY+j1MeYjLji0TJU2NWuw+LarU3pkAu6e3xJmpscrH3yoTF
+ c6q7tGfc4JZpcdP38HoWDq1kDPg7qiFvWLR1iLDgMZlQnndAlI835b9iwidwNbvEW5yt
+ R8osHiy3v2QGapQxRp1gyeeCgyJHAs6qDqo9A6ZmIA5cqaGmKGhxOSpyOWepxLPMAj8C
+ tp5nsCg+RwaTKQgpH+bgeVKLVwJZZZFQrl5fTCdnM+sf9iANRcyxn8TKsumi2pJWOBcg
+ bclkPzHBUhr5Yi0tqKbh7/K9qNP5gKWBsGzNR3drQ5SvDNrwzgpTximxES8AUE8mRmzu
+ Kp7g==
 From: Akihiko Odaki <akihiko.odaki@daynix.com>
-Date: Thu, 10 Nov 2022 15:23:23 +0900
-Message-Id: <20221110062329.13363-5-akihiko.odaki@daynix.com>
+Date: Thu, 10 Nov 2022 15:23:24 +0900
+Message-Id: <20221110062329.13363-6-akihiko.odaki@daynix.com>
 In-Reply-To: <20221110062329.13363-1-akihiko.odaki@daynix.com>
 References: <20221110062329.13363-1-akihiko.odaki@daynix.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Subject: [Virtio-fs] [PATCH 04/10] contrib/rdmacm-mux: Use
- qemu_get_runtime_dir()
+Subject: [Virtio-fs] [PATCH 05/10] qga: Use qemu_get_runtime_dir()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -31,110 +30,47 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 Cc: qemu-devel@nongnu.org, qemu-block@nongnu.org, virtio-fs@redhat.com, Yuval Shaia <yuval.shaia.ml@gmail.com>, Marcel Apfelbaum <marcel.apfelbaum@gmail.com>, Konstantin Kostiuk <kkostiuk@redhat.com>, Michael Roth <michael.roth@amd.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Stefan Weil <sw@weilnetz.de>, Yan Vugenfirer <yan@daynix.com>, Akihiko Odaki <akihiko.odaki@daynix.com>
 
-qemu_get_runtime_dir() is used to construct the default Unix socket
-path.
+qemu_get_runtime_dir() is used to construct the default state directory.
 
 Signed-off-by: Akihiko Odaki <akihiko.odaki@daynix.com>
 ---
- contrib/rdmacm-mux/main.c      | 22 ++++++++++++++--------
- contrib/rdmacm-mux/meson.build |  2 +-
- 2 files changed, 15 insertions(+), 9 deletions(-)
+ qga/main.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/contrib/rdmacm-mux/main.c b/contrib/rdmacm-mux/main.c
-index 771ca01e03..00c14031ca 100644
---- a/contrib/rdmacm-mux/main.c
-+++ b/contrib/rdmacm-mux/main.c
-@@ -14,6 +14,7 @@
-  */
- 
- #include "qemu/osdep.h"
-+#include "qemu/cutils.h"
- #include <sys/poll.h>
- #include <sys/ioctl.h>
- #include <pthread.h>
-@@ -40,8 +41,6 @@
- #define CM_REQ_DGID_POS      80
- #define CM_SIDR_REQ_DGID_POS 44
- 
--/* The below can be override by command line parameter */
--#define UNIX_SOCKET_PATH "/var/run/rdmacm-mux"
- /* Has format %s-%s-%d" <path>-<rdma-dev--name>-<port> */
- #define SOCKET_PATH_MAX (PATH_MAX - NAME_MAX - sizeof(int) - 2)
- #define RDMA_PORT_NUM 1
-@@ -77,7 +76,13 @@ typedef struct RdmaCmServer {
- 
- static RdmaCMServer server = {0};
- 
--static void usage(const char *progname)
-+static char *get_default_unix_socket_path(void)
-+{
-+    g_autofree char *run = qemu_get_runtime_dir();
-+    return g_build_filename(run, "rdmacm-mux", NULL);
-+}
-+
-+static void usage(const char *progname, const char *default_unix_socket_path)
+diff --git a/qga/main.c b/qga/main.c
+index b3580508fa..dc875079f0 100644
+--- a/qga/main.c
++++ b/qga/main.c
+@@ -46,12 +46,11 @@
+ #define QGA_VIRTIO_PATH_DEFAULT "/dev/virtio-ports/org.qemu.guest_agent.0"
+ #endif /* __FreeBSD__ */
+ #define QGA_SERIAL_PATH_DEFAULT "/dev/ttyS0"
+-#define QGA_STATE_RELATIVE_DIR  "run"
+ #else
+ #define QGA_VIRTIO_PATH_DEFAULT "\\\\.\\Global\\org.qemu.guest_agent.0"
+-#define QGA_STATE_RELATIVE_DIR  "qemu-ga"
+ #define QGA_SERIAL_PATH_DEFAULT "COM1"
+ #endif
++#define QGA_STATE_RELATIVE_DIR  "qemu-ga"
+ #ifdef CONFIG_FSFREEZE
+ #define QGA_FSFREEZE_HOOK_DEFAULT CONFIG_QEMU_CONFDIR "/fsfreeze-hook"
+ #endif
+@@ -128,12 +127,12 @@ static void stop_agent(GAState *s, bool requested);
+ static void
+ init_dfl_pathnames(void)
  {
-     printf("Usage: %s [OPTION]...\n"
-            "Start a RDMA-CM multiplexer\n"
-@@ -86,7 +91,7 @@ static void usage(const char *progname)
-            "\t-d rdma-device-name   Name of RDMA device to register with\n"
-            "\t-s unix-socket-path   Path to unix socket to listen on (default %s)\n"
-            "\t-p rdma-device-port   Port number of RDMA device to register with (default %d)\n",
--           progname, UNIX_SOCKET_PATH, RDMA_PORT_NUM);
-+           progname, default_unix_socket_path, RDMA_PORT_NUM);
+-    g_autofree char *state = qemu_get_local_state_dir();
++    g_autofree char *run = qemu_get_runtime_dir();
+ 
+     g_assert(dfl_pathnames.state_dir == NULL);
+     g_assert(dfl_pathnames.pidfile == NULL);
+-    dfl_pathnames.state_dir = g_build_filename(state, QGA_STATE_RELATIVE_DIR, NULL);
+-    dfl_pathnames.pidfile = g_build_filename(state, QGA_STATE_RELATIVE_DIR, "qemu-ga.pid", NULL);
++    dfl_pathnames.state_dir = g_build_filename(run, QGA_STATE_RELATIVE_DIR, NULL);
++    dfl_pathnames.pidfile = g_build_filename(run, QGA_STATE_RELATIVE_DIR, "qemu-ga.pid", NULL);
  }
  
- static void help(const char *progname)
-@@ -97,16 +102,16 @@ static void help(const char *progname)
- static void parse_args(int argc, char *argv[])
- {
-     int c;
--    char unix_socket_path[SOCKET_PATH_MAX];
-+    g_autofree char *default_unix_socket_path = get_default_unix_socket_path();
-+    char *unix_socket_path = default_unix_socket_path;
- 
-     strcpy(server.args.rdma_dev_name, "");
--    strcpy(unix_socket_path, UNIX_SOCKET_PATH);
-     server.args.rdma_port_num = RDMA_PORT_NUM;
- 
-     while ((c = getopt(argc, argv, "hs:d:p:")) != -1) {
-         switch (c) {
-         case 'h':
--            usage(argv[0]);
-+            usage(argv[0], default_unix_socket_path);
-             exit(0);
- 
-         case 'd':
-@@ -115,7 +120,7 @@ static void parse_args(int argc, char *argv[])
- 
-         case 's':
-             /* This is temporary, final name will build below */
--            strncpy(unix_socket_path, optarg, SOCKET_PATH_MAX - 1);
-+            unix_socket_path = optarg;
-             break;
- 
-         case 'p':
-@@ -811,6 +816,7 @@ int main(int argc, char *argv[])
- {
-     int rc;
- 
-+    qemu_init_exec_dir(argv[0]);
-     memset(&server, 0, sizeof(server));
- 
-     parse_args(argc, argv);
-diff --git a/contrib/rdmacm-mux/meson.build b/contrib/rdmacm-mux/meson.build
-index 36c9c89630..59f60f9cac 100644
---- a/contrib/rdmacm-mux/meson.build
-+++ b/contrib/rdmacm-mux/meson.build
-@@ -1,7 +1,7 @@
- if have_pvrdma
-   # FIXME: broken on big endian architectures
-   executable('rdmacm-mux', files('main.c'), genh,
--             dependencies: [glib, libumad],
-+             dependencies: [glib, libumad, qemuutil],
-              build_by_default: false,
-              install: false)
- endif
+ static void quit_handler(int sig)
 -- 
 2.38.1
 

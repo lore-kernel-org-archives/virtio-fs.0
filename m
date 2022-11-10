@@ -1,27 +1,25 @@
-Return-Path: <hao.xu@linux.dev>
-Message-ID: <1d1f7854-209a-a985-e266-633ca14609da@linux.dev>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linux.dev; s=key1;
- t=1658846492;
- h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
- to:to:cc:cc:mime-version:mime-version:content-type:content-type:
- content-transfer-encoding:content-transfer-encoding:
- in-reply-to:in-reply-to:references:references;
- bh=uM3CH25gIo/Rm3FI9V6Bp39HKdQs8n0Zh5ABXp6DsfA=;
- b=ZLXijxQIARPu8czQTmAusYCAz8xAvtJuHIvV87qpAeRPzKEVxb4cZvqG2jWsOzgmKpv2lT
- 9WeIM92j40c10rEs8p8/d+Prujmw1bRw1T7LP6ePl3gLOipe0GWJmWI8G/f8H1TDBtHgl5
- 6E2ZTGsiqcQtrj2Ra73vL7lYVFLaBVE=
-Date: Tue, 26 Jul 2022 22:41:23 +0800
+Return-Path: <akihiko.odaki@daynix.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=daynix-com.20210112.gappssmtp.com; s=20210112;
+ h=content-transfer-encoding:mime-version:references:in-reply-to
+ :message-id:date:subject:cc:to:from:from:to:cc:subject:date
+ :message-id:reply-to;
+ bh=yAOm4xAwUIMS3nIWuITf2mBCrb5XaCIFaM5bi4ZPZPo=;
+ b=FzX5sSAo1Yghg/9iJmCKRz6A0J0oBZyMFd7GIvtQkSc0AtS+KpbwVYSKQ0JviepakQ
+ dSCZ1fwzZvpS/VyYyQtQBe37/PW7POcjekM7H2TK+YpEpxCpGspq1RwJVwTGQxZ6Z/Im
+ GhWOPYgQbGPIf5Oq/Asbc3faa4temdUQpuUARn5A7CXA0Xio6L6nmI+HJBdtocy5+rMS
+ 5navhqpgfZpgapSPGqmknLkhvDH01TZV6hxW93pfT3vYD3yx/I9e7Khrq9GaRV+0SB1S
+ e+jBx3++sqv8HcX+vta9efK+01F6sMPI8L29yK3U6JNPf8t+BUC2blqIXnDQrz0rtzSC
+ 9lBw==
+From: Akihiko Odaki <akihiko.odaki@daynix.com>
+Date: Thu, 10 Nov 2022 19:06:26 +0900
+Message-Id: <20221110100629.61496-8-akihiko.odaki@daynix.com>
+In-Reply-To: <20221110100629.61496-1-akihiko.odaki@daynix.com>
+References: <20221110100629.61496-1-akihiko.odaki@daynix.com>
 MIME-Version: 1.0
-References: <4f2c71a4-609e-6880-04d0-2eb127c55023@linux.dev>
- <CAJSP0QUzd7GXK0XN7YBBfEqO6abQSZMdJzW8pEHnz-ZnGetUWA@mail.gmail.com>
- <Yt/pVXilvkiLgowx@redhat.com>
-From: Hao Xu <hao.xu@linux.dev>
-In-Reply-To: <Yt/pVXilvkiLgowx@redhat.com>
-Content-Language: en-US
-Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: 7bit
-Subject: Re: [Virtio-fs] Question about performance comparison between
- virtio-fs and virtio-blk
+Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset="US-ASCII"; x-default=true
+Subject: [Virtio-fs] [PATCH v2 07/10] virtiofsd: Use qemu_get_runtime_dir()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -30,62 +28,35 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Vivek Goyal <vgoyal@redhat.com>, Stefan Hajnoczi <stefanha@gmail.com>
-Cc: qemu-devel <qemu-devel@nongnu.org>, virtio-fs@redhat.com
+Cc: qemu-devel@nongnu.org, qemu-block@nongnu.org, virtio-fs@redhat.com, Yuval Shaia <yuval.shaia.ml@gmail.com>, Marcel Apfelbaum <marcel.apfelbaum@gmail.com>, Konstantin Kostiuk <kkostiuk@redhat.com>, Michael Roth <michael.roth@amd.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Stefan Weil <sw@weilnetz.de>, Yan Vugenfirer <yan@daynix.com>, Akihiko Odaki <akihiko.odaki@daynix.com>
 
-On 7/26/22 21:17, Vivek Goyal wrote:
-> On Tue, Jul 26, 2022 at 08:55:38AM -0400, Stefan Hajnoczi wrote:
->> On Tue, 26 Jul 2022 at 08:24, Hao Xu <hao.xu@linux.dev> wrote:
->>> I watched your presentation about virtiofs in 2020,
->>>
->>> https://www.youtube.com/watch?v=EIVOzTsGMMI&t=232s
->>>
->>> which is really helpful to me, but I have a question about the graph at
->>> 3:53, could you give
->>>
->>> me more info about the test, like what tool you use for the test, if
->>> it's fio, what is the parameters.
->>>
->>> I used fio to do randread test in a qemu box, but turns out the iops of
->>> virtio-blk and virtio-fs are similar.
->>
-> 
-> Hi Hao,
-> 
-> My impression in general is that virtio-blk is much faster than virtiofs.
+qemu_get_runtime_dir() is used to construct the path to a lock file.
 
-When testing virtio-blk, did you use the device directly or mount it and
-test against a file.
+Signed-off-by: Akihiko Odaki <akihiko.odaki@daynix.com>
+---
+ tools/virtiofsd/fuse_virtio.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-> A simple macro test is do a kernel compilation and compare time taken
-> between the two.
-
-Good idea, I just tested with single file.
-
-Thanks,
-Hao
-
-> 
->> I have CCed Vivek Goyal, who has done more virtiofs benchmarking and
->> might have ideas to share.
->>
->> The benchmarking tool was fio with the stated blocksize and I/O
->> pattern. The benchmark was probably run with direct=1. Based on the
->> virtio-blk numbers I think iodepth was greater than 1 but I don't have
->> the exact fio job parameters.
-> 
-> I had basically used fio jobs. I wrote some simple wrapper scripts to
-> run fio and parse and report numbers.
-> 
-> https://github.com/rhvgoyal/virtiofs-tests
-> 
-> I don't have data for virtio-blk but I do seem to have some comparison
-> numbers of virtiofs and virtio-9p.
-> 
-> https://github.com/rhvgoyal/virtiofs-tests/tree/master/performance-results/feb-23-2021
-> 
-> Thanks
-> Vivek
-> 
-> 
+diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
+index 9368e292e4..b9eeed85e6 100644
+--- a/tools/virtiofsd/fuse_virtio.c
++++ b/tools/virtiofsd/fuse_virtio.c
+@@ -901,12 +901,12 @@ static bool fv_socket_lock(struct fuse_session *se)
+ {
+     g_autofree gchar *sk_name = NULL;
+     g_autofree gchar *pidfile = NULL;
+-    g_autofree gchar *state = NULL;
++    g_autofree gchar *run = NULL;
+     g_autofree gchar *dir = NULL;
+     Error *local_err = NULL;
+ 
+-    state = qemu_get_local_state_dir();
+-    dir = g_build_filename(state, "run", "virtiofsd", NULL);
++    run = qemu_get_runtime_dir();
++    dir = g_build_filename(run, "virtiofsd", NULL);
+ 
+     if (g_mkdir_with_parents(dir, S_IRWXU) < 0) {
+         fuse_log(FUSE_LOG_ERR, "%s: Failed to create directory %s: %s\n",
+-- 
+2.38.1
 

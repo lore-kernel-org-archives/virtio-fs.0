@@ -4,22 +4,22 @@ DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  h=content-transfer-encoding:mime-version:references:in-reply-to
  :message-id:date:subject:cc:to:from:from:to:cc:subject:date
  :message-id:reply-to;
- bh=X2AW9NaqdulAEV6U7rG6cnfGeNB8asIOOIZhmyN9/Ug=;
- b=2Sk9AwSSjoJXhw7R+5QsY+j1MeYjLji0TJU2NWuw+LarU3pkAu6e3xJmpscrH3yoTF
- c6q7tGfc4JZpcdP38HoWDq1kDPg7qiFvWLR1iLDgMZlQnndAlI835b9iwidwNbvEW5yt
- R8osHiy3v2QGapQxRp1gyeeCgyJHAs6qDqo9A6ZmIA5cqaGmKGhxOSpyOWepxLPMAj8C
- tp5nsCg+RwaTKQgpH+bgeVKLVwJZZZFQrl5fTCdnM+sf9iANRcyxn8TKsumi2pJWOBcg
- bclkPzHBUhr5Yi0tqKbh7/K9qNP5gKWBsGzNR3drQ5SvDNrwzgpTximxES8AUE8mRmzu
- Kp7g==
+ bh=23qHkaFNj9aYRMMJ3RksdGA2UgOinYhFW/VeC2eRFU4=;
+ b=enkwHh5XwmprXeoFG5ZTkA97g22aC3TeIvrWnPkyfWbxlxSwb333AV7Qm8AI5Hq4D8
+ iaRONlga+X58wqtYsCAB+exbOljuGEsZezGPgojcPvpxeLYQVfFpZLvVB23O/Kkz853n
+ KEDv8p8zzyM7suwYvmi93NKflEiJgNkNRhb53IVbpCQxHLAqZ2EQn1OqJRFnnjFUoQQo
+ pIHb8gUlddrQFd06Abzn9rF1e6d6U2Dkh0vHcdrJG0Frau+W0UcA8qHajMPfyESQTLsf
+ 1JdPf91fBv4u+zwsGpnoj3J90uwGSJq77fYZACyD7ncevAVKmi57EoKCTtx34AkjMBBL
+ Vqig==
 From: Akihiko Odaki <akihiko.odaki@daynix.com>
-Date: Thu, 10 Nov 2022 15:23:24 +0900
-Message-Id: <20221110062329.13363-6-akihiko.odaki@daynix.com>
+Date: Thu, 10 Nov 2022 15:23:25 +0900
+Message-Id: <20221110062329.13363-7-akihiko.odaki@daynix.com>
 In-Reply-To: <20221110062329.13363-1-akihiko.odaki@daynix.com>
 References: <20221110062329.13363-1-akihiko.odaki@daynix.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Subject: [Virtio-fs] [PATCH 05/10] qga: Use qemu_get_runtime_dir()
+Subject: [Virtio-fs] [PATCH 06/10] scsi: Use qemu_get_runtime_dir()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -30,47 +30,31 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 Cc: qemu-devel@nongnu.org, qemu-block@nongnu.org, virtio-fs@redhat.com, Yuval Shaia <yuval.shaia.ml@gmail.com>, Marcel Apfelbaum <marcel.apfelbaum@gmail.com>, Konstantin Kostiuk <kkostiuk@redhat.com>, Michael Roth <michael.roth@amd.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Stefan Weil <sw@weilnetz.de>, Yan Vugenfirer <yan@daynix.com>, Akihiko Odaki <akihiko.odaki@daynix.com>
 
-qemu_get_runtime_dir() is used to construct the default state directory.
+qemu_get_runtime_dir() is used to construct the default paths.
 
 Signed-off-by: Akihiko Odaki <akihiko.odaki@daynix.com>
 ---
- qga/main.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+ scsi/qemu-pr-helper.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/qga/main.c b/qga/main.c
-index b3580508fa..dc875079f0 100644
---- a/qga/main.c
-+++ b/qga/main.c
-@@ -46,12 +46,11 @@
- #define QGA_VIRTIO_PATH_DEFAULT "/dev/virtio-ports/org.qemu.guest_agent.0"
- #endif /* __FreeBSD__ */
- #define QGA_SERIAL_PATH_DEFAULT "/dev/ttyS0"
--#define QGA_STATE_RELATIVE_DIR  "run"
- #else
- #define QGA_VIRTIO_PATH_DEFAULT "\\\\.\\Global\\org.qemu.guest_agent.0"
--#define QGA_STATE_RELATIVE_DIR  "qemu-ga"
- #define QGA_SERIAL_PATH_DEFAULT "COM1"
- #endif
-+#define QGA_STATE_RELATIVE_DIR  "qemu-ga"
- #ifdef CONFIG_FSFREEZE
- #define QGA_FSFREEZE_HOOK_DEFAULT CONFIG_QEMU_CONFDIR "/fsfreeze-hook"
- #endif
-@@ -128,12 +127,12 @@ static void stop_agent(GAState *s, bool requested);
- static void
- init_dfl_pathnames(void)
+diff --git a/scsi/qemu-pr-helper.c b/scsi/qemu-pr-helper.c
+index 196b78c00d..adb7baecaa 100644
+--- a/scsi/qemu-pr-helper.c
++++ b/scsi/qemu-pr-helper.c
+@@ -77,10 +77,10 @@ static int gid = -1;
+ 
+ static void compute_default_paths(void)
  {
 -    g_autofree char *state = qemu_get_local_state_dir();
 +    g_autofree char *run = qemu_get_runtime_dir();
  
-     g_assert(dfl_pathnames.state_dir == NULL);
-     g_assert(dfl_pathnames.pidfile == NULL);
--    dfl_pathnames.state_dir = g_build_filename(state, QGA_STATE_RELATIVE_DIR, NULL);
--    dfl_pathnames.pidfile = g_build_filename(state, QGA_STATE_RELATIVE_DIR, "qemu-ga.pid", NULL);
-+    dfl_pathnames.state_dir = g_build_filename(run, QGA_STATE_RELATIVE_DIR, NULL);
-+    dfl_pathnames.pidfile = g_build_filename(run, QGA_STATE_RELATIVE_DIR, "qemu-ga.pid", NULL);
+-    socket_path = g_build_filename(state, "run", "qemu-pr-helper.sock", NULL);
+-    pidfile = g_build_filename(state, "run", "qemu-pr-helper.pid", NULL);
++    socket_path = g_build_filename(run, "qemu-pr-helper.sock", NULL);
++    pidfile = g_build_filename(run, "qemu-pr-helper.pid", NULL);
  }
  
- static void quit_handler(int sig)
+ static void usage(const char *name)
 -- 
 2.38.1
 

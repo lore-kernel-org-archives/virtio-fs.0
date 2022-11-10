@@ -1,30 +1,30 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm3; t=1659685429; x=1659771829; bh=AzQzmtSpF1fUvvEaG6vC5
- zhl3PEktUZaFJavxCzFY1Q=; b=FAv5WIjI/ssUgPWw/wW2PC3okIaRYxmFMWNYy
- cvzQ0kslIHFfAgjD22uEsU3xIwKpLViZk0DeQN1ZXsJF7O91BFEOtEAwKcGlu9+t
- plfnmORRjccDKdJCTcgQk5k8QE8BmWbLxYWD+ZOuWwf8MG9ejjqfiG5OiuiP5P98
- ZaDkcky6l3VM+Csh6iBnRONpRBAfL/ldKc3Iygasb+3d7ujBroBmLuXqTEeUYL2W
- bYxEqYUCgCzMtU/GaiG7uwaRllxpa/tRRSMo7rZac7NW3tX5r6Aw/NZce7uqWeVo
- i7u/7CkiyPm6LC1Q46fV+3eB4/B9Rte8tWIj9PiqH8wWj1csA==
+ :to; s=fm1; t=1668091905; x=1668178305; bh=Q9w6h+UVTIj/h0sRRfmHr
+ 3EI8EEooqKcwJwTMebZEdA=; b=C1MHdC0fMYYgvQitPX/L73OaS1DCHSmoxnKfD
+ nEe4NtL+KgwsbIk50uqt0GOABowQaBoUVf5GDrFJZv3Vtsn48jko/JdY/DfgnvyX
+ qSsNey4WLVUVBgLK435y+b4AoYucWfFHlqtIl3SQlOF/+pEre/dSzjuF/3OwrHaA
+ 7A2YKg140nUlsP+KD+emMmg//Eu2Q/sVF5KCJp1BFatHfE9/ERvpZNZHDFz3hn18
+ QmNz0Vm159Dq4fWiurCfv2owhwoxzOHZiqV/8z9Tlwx+jDDcKKiN+3RGl+6NYqdu
+ q/mm50AG7Cekkt7zBHkEESsmTH6blSzbB1YJWVVHUM+IUT70g==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
  :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
- :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm3; t=
- 1659685429; x=1659771829; bh=AzQzmtSpF1fUvvEaG6vC5zhl3PEktUZaFJa
- vxCzFY1Q=; b=KH1qcHCIBE0FIhHeYWK46iR/RjYZDfznPcl/MgEuboyawUk7qYU
- UXUYLG8bLEpLhwgcMlX9wkyUxqkDfLLsK702RzOGi3b1HL/08lneV3bpwd5oc3Fu
- ZkJovxyt7hP4Rz1OCguCA+vykuw/AoFhOge9URhX5LM4S85hl4kTkkntdCJ9i4lh
- uPB/1h0dsoVtwscJLGHkPz0LJsT+MaEdMCA9hwvCSh2x8a7mcYOgGxIgJH7ss37B
- 4Cg/J7IqEYAg9kgOEIP1GweOnzbrp3oYXR+prt096gFCnbQGxvwauzC9U+bB69p/
- +mHe1Dapuch7hiIgrFywymlyFAH+dBQ4fNA==
+ :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; t=
+ 1668091905; x=1668178305; bh=Q9w6h+UVTIj/h0sRRfmHr3EI8EEooqKcwJw
+ TMebZEdA=; b=AYrYvOylqqzGWk4ja1lUnjDiEgHW2MSZHnpcBXu3aNuG4j/JFov
+ JMcRWiCxmZJLD1R7v0HGIWzLdmwi68Gpvi1rh+dzjZFPYMEgmq4u+V1B76bsAolA
+ TUvQ+ayXODfi8R5vvi5fhL+KP2FjelCNoQbuf1bLnipILtzVWoCCZ1QPKyu3WCEe
+ uJ5dQMZ8Hib4Gi6Y7gFyfAJf0XdIVAmMUXorBpYlWNPGdKJJI2+5KcWy3I5B0veQ
+ APmkZxH50bJoIGJBtp/Ko9iNrsfPWBrxHvlOKnIZd3O5/Xpq50WSuG/Zwr0U9mUb
+ 8QdxHZa5cwmsJnyuZxHJxYxvnCdDWBI44dA==
 From: virtiofs-bot@sinrega.org
-Message-Id: <04854.122080503435000137@us-mta-60.us.mimecast.lan>
+Message-Id: <30170.122111009514800261@us-mta-459.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Fri,  5 Aug 2022 07:43:52 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] Issue opened: Implement suport for remote
- POSIX locks
+Date: Thu, 10 Nov 2022 14:51:55 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] Issue opened: Unexpected behavior observed
+ when using mmap on virtiofs backed paths
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -35,9 +35,25 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-The C implementation of the daemon has limited support for remote POSIX locks, restricted exclusively to non-blocking operations. We tried to implement the same level of functionality in #2, but we finally decided against it because, in practice most applications will fail if non-blocking operations aren't supported.
+When using python and writing to a mmap file, I am seeing with cache mode auto and always that the file is increasing in size each time I write to it.  This is seen with virtiofsd C version ( 6.1.0 ) as well as RS version (1.3.0), and can be reproduced using QEMU (6.2) as well as Cloud Hypervisor (v0.26). When switching to a different vhost-user-fs backend (nydusd), we can no longer reproduce the failure.  
 
-Implementing support for non-blocking isn't trivial and will probably require extending the kernel interface before we can even start working on the daemon side.
+The following python script will show the failure behavior if run on a virtiofs backed path:
+```
+import mmap
+import struct
+l = 1024
+f = open("./test.db", "a+b")
+f.truncate(l)
+m = mmap.mmap(f.fileno(), 1024, access=mmap.ACCESS_WRITE)
+m[0:4] = b"0000"
+m.flush()
+m.size()
+m[0:4] = b"0000"
+m.flush()
+m.size()
+```
+
+See https://github.com/kata-containers/kata-containers/issues/5634 for more details on reproduction.
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/53
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/67
 

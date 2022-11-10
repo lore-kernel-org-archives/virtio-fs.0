@@ -4,22 +4,22 @@ DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  h=content-transfer-encoding:mime-version:references:in-reply-to
  :message-id:date:subject:cc:to:from:from:to:cc:subject:date
  :message-id:reply-to;
- bh=djQvtbI+5ceah01/E9QXrKDRfdUAtdLN189JgwjzOBQ=;
- b=dxs3uNSNJO66VN/n0oFa/UNI60Ugn1Trsz2q1+NuHqy4eZMGW6DpgGBz/x1Ocy6uZV
- zQXs7zeXfARZRZh0kUJDAWvCuUojRH36v1/H3y3KuJmSPbX/azyfxAMry9B2679iTDK9
- el0DC8PwKgwWgmgb1OXq/Y++nVFl/wtcxDnPiv7idKtEOPNI0YmBGp/0uNp3iZZmw7iz
- yvQ+2wBzy/lwA64vS216cv+3ORbsu/PE9FsFZ45SCPpkDUxrAIGhtqws7afeAqqJJgyT
- 6Vmak6US2jvVP/PP6CKVwFqbeC1F9+DGRsCC80tXaLHkPOJNI1KUyMINqLMcDPGpgLTo
- SR+g==
+ bh=AC+ag6DjlMRVYIRoMVgQ7eyLCeIppVPRSyLkAkRwpvs=;
+ b=kK/C+42LsThvwCQFrkDc/mlyygvLhVi9rXrMi4AupdNcFwIL30l3TblGgXUouT65zf
+ kT43Tl9oVyUNICttiAsetLCSC+qT12RAG8HKz7jO7V75tfAIwLD+Re3JQ84qB/an3OtE
+ aJOlIHjJDP/MqI7rlgkn4s2x19IWo1Qrpp26ypAWJMolq12i/gXCby/cUnxuFfBAP332
+ KOz4Ht378jQLub9/0AoTLxVjV8NdOY3CbQAwfPsDzuji/wvn0Hgr516LxD+OQDA616oN
+ EdXwVq9uN1Utc3uH7hACMMEzvWciWyEJC2rVvLgxFTbRw9xaM9hQB6XqDHQ9wFmHlLVj
+ iNwQ==
 From: Akihiko Odaki <akihiko.odaki@daynix.com>
-Date: Thu, 10 Nov 2022 15:23:28 +0900
-Message-Id: <20221110062329.13363-10-akihiko.odaki@daynix.com>
+Date: Thu, 10 Nov 2022 15:23:29 +0900
+Message-Id: <20221110062329.13363-11-akihiko.odaki@daynix.com>
 In-Reply-To: <20221110062329.13363-1-akihiko.odaki@daynix.com>
 References: <20221110062329.13363-1-akihiko.odaki@daynix.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Subject: [Virtio-fs] [PATCH 09/10] util: Remove qemu_get_local_state_dir()
+Subject: [Virtio-fs] [PATCH 10/10] spice-app: Use qemu_get_runtime_dir()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -30,72 +30,29 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 Cc: qemu-devel@nongnu.org, qemu-block@nongnu.org, virtio-fs@redhat.com, Yuval Shaia <yuval.shaia.ml@gmail.com>, Marcel Apfelbaum <marcel.apfelbaum@gmail.com>, Konstantin Kostiuk <kkostiuk@redhat.com>, Michael Roth <michael.roth@amd.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Stefan Weil <sw@weilnetz.de>, Yan Vugenfirer <yan@daynix.com>, Akihiko Odaki <akihiko.odaki@daynix.com>
 
-There are no users of the function anymore.
+qemu_get_runtime_dir() provides QEMU-specific fallback of runtime
+directory.
 
 Signed-off-by: Akihiko Odaki <akihiko.odaki@daynix.com>
 ---
- include/qemu/osdep.h |  8 --------
- util/oslib-posix.c   |  6 ------
- util/oslib-win32.c   | 10 ----------
- 3 files changed, 24 deletions(-)
+ ui/spice-app.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/include/qemu/osdep.h b/include/qemu/osdep.h
-index 86445aad25..f21ebf2b27 100644
---- a/include/qemu/osdep.h
-+++ b/include/qemu/osdep.h
-@@ -557,14 +557,6 @@ ssize_t qemu_write_full(int fd, const void *buf, size_t count)
+diff --git a/ui/spice-app.c b/ui/spice-app.c
+index 7e71e18da9..feb162baa7 100644
+--- a/ui/spice-app.c
++++ b/ui/spice-app.c
+@@ -145,8 +145,8 @@ static void spice_app_display_early_init(DisplayOptions *opts)
+     atexit(spice_app_atexit);
  
- void qemu_set_cloexec(int fd);
- 
--/* Return a dynamically allocated directory path that is appropriate for storing
-- * local state.
-- *
-- * The caller is responsible for releasing the value returned with g_free()
-- * after use.
-- */
--char *qemu_get_local_state_dir(void);
--
- /**
-  * qemu_get_runtime_dir:
-  *
-diff --git a/util/oslib-posix.c b/util/oslib-posix.c
-index 9a0b3913ff..b8d79876b2 100644
---- a/util/oslib-posix.c
-+++ b/util/oslib-posix.c
-@@ -273,12 +273,6 @@ int qemu_socketpair(int domain, int type, int protocol, int sv[2])
-     return ret;
- }
- 
--char *
--qemu_get_local_state_dir(void)
--{
--    return get_relocated_path(CONFIG_QEMU_LOCALSTATEDIR);
--}
--
- char *
- qemu_get_runtime_dir(void)
- {
-diff --git a/util/oslib-win32.c b/util/oslib-win32.c
-index 6ad1bb4bac..a32cc5b1be 100644
---- a/util/oslib-win32.c
-+++ b/util/oslib-win32.c
-@@ -233,16 +233,6 @@ int qemu_get_thread_id(void)
-     return GetCurrentThreadId();
- }
- 
--char *
--qemu_get_local_state_dir(void)
--{
--    const char * const *data_dirs = g_get_system_data_dirs();
--
--    g_assert(data_dirs && data_dirs[0]);
--
--    return g_strdup(data_dirs[0]);
--}
--
- char *
- qemu_get_runtime_dir(void)
- {
+     if (qemu_name) {
+-        app_dir = g_build_filename(g_get_user_runtime_dir(),
+-                                   "qemu", qemu_name, NULL);
++        g_autofree char *run = qemu_get_runtime_dir();
++        app_dir = g_build_filename(run, "qemu", qemu_name, NULL);
+         if (g_mkdir_with_parents(app_dir, S_IRWXU) < -1) {
+             error_report("Failed to create directory %s: %s",
+                          app_dir, strerror(errno));
 -- 
 2.38.1
 

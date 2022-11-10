@@ -4,22 +4,22 @@ DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  h=content-transfer-encoding:mime-version:references:in-reply-to
  :message-id:date:subject:cc:to:from:from:to:cc:subject:date
  :message-id:reply-to;
- bh=yAOm4xAwUIMS3nIWuITf2mBCrb5XaCIFaM5bi4ZPZPo=;
- b=FzX5sSAo1Yghg/9iJmCKRz6A0J0oBZyMFd7GIvtQkSc0AtS+KpbwVYSKQ0JviepakQ
- dSCZ1fwzZvpS/VyYyQtQBe37/PW7POcjekM7H2TK+YpEpxCpGspq1RwJVwTGQxZ6Z/Im
- GhWOPYgQbGPIf5Oq/Asbc3faa4temdUQpuUARn5A7CXA0Xio6L6nmI+HJBdtocy5+rMS
- 5navhqpgfZpgapSPGqmknLkhvDH01TZV6hxW93pfT3vYD3yx/I9e7Khrq9GaRV+0SB1S
- e+jBx3++sqv8HcX+vta9efK+01F6sMPI8L29yK3U6JNPf8t+BUC2blqIXnDQrz0rtzSC
- 9lBw==
+ bh=AC+ag6DjlMRVYIRoMVgQ7eyLCeIppVPRSyLkAkRwpvs=;
+ b=Rg2YfPcHB9D9stGXkj+2qQcpiHgjKDmcb3ss4c6FOkou+38XkDHiFgJFCky6oztAEP
+ t1dHuEGNlAwA9GZV6wru04vjq5kAFU+zqdMrL/UUG3JFptzRX3uhc1RUNewgc8NH7QcO
+ ZL+JEzsP5bMu149evctM+f9NszU+6Dt/0xi45LTD34VhdXQgdqWoBXTHxzq/kEdYevZH
+ qZv7nryajoDvjRGTsJlEsOfZ2RozmWjERANZ0xW1Zmn5qwmxSBbBFsuYWBooVapJTebS
+ 0W0QvqPQ0bjWO9CuyRBQxuw94/fBy4fKfkTM1IqizZXghSe30mXMD+pOSvo6KzpJ0UZP
+ H3MA==
 From: Akihiko Odaki <akihiko.odaki@daynix.com>
-Date: Thu, 10 Nov 2022 19:06:26 +0900
-Message-Id: <20221110100629.61496-8-akihiko.odaki@daynix.com>
+Date: Thu, 10 Nov 2022 19:06:29 +0900
+Message-Id: <20221110100629.61496-11-akihiko.odaki@daynix.com>
 In-Reply-To: <20221110100629.61496-1-akihiko.odaki@daynix.com>
 References: <20221110100629.61496-1-akihiko.odaki@daynix.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Subject: [Virtio-fs] [PATCH v2 07/10] virtiofsd: Use qemu_get_runtime_dir()
+Subject: [Virtio-fs] [PATCH v2 10/10] spice-app: Use qemu_get_runtime_dir()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -30,33 +30,29 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 Cc: qemu-devel@nongnu.org, qemu-block@nongnu.org, virtio-fs@redhat.com, Yuval Shaia <yuval.shaia.ml@gmail.com>, Marcel Apfelbaum <marcel.apfelbaum@gmail.com>, Konstantin Kostiuk <kkostiuk@redhat.com>, Michael Roth <michael.roth@amd.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Stefan Weil <sw@weilnetz.de>, Yan Vugenfirer <yan@daynix.com>, Akihiko Odaki <akihiko.odaki@daynix.com>
 
-qemu_get_runtime_dir() is used to construct the path to a lock file.
+qemu_get_runtime_dir() provides QEMU-specific fallback of runtime
+directory.
 
 Signed-off-by: Akihiko Odaki <akihiko.odaki@daynix.com>
 ---
- tools/virtiofsd/fuse_virtio.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ ui/spice-app.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/tools/virtiofsd/fuse_virtio.c b/tools/virtiofsd/fuse_virtio.c
-index 9368e292e4..b9eeed85e6 100644
---- a/tools/virtiofsd/fuse_virtio.c
-+++ b/tools/virtiofsd/fuse_virtio.c
-@@ -901,12 +901,12 @@ static bool fv_socket_lock(struct fuse_session *se)
- {
-     g_autofree gchar *sk_name = NULL;
-     g_autofree gchar *pidfile = NULL;
--    g_autofree gchar *state = NULL;
-+    g_autofree gchar *run = NULL;
-     g_autofree gchar *dir = NULL;
-     Error *local_err = NULL;
+diff --git a/ui/spice-app.c b/ui/spice-app.c
+index 7e71e18da9..feb162baa7 100644
+--- a/ui/spice-app.c
++++ b/ui/spice-app.c
+@@ -145,8 +145,8 @@ static void spice_app_display_early_init(DisplayOptions *opts)
+     atexit(spice_app_atexit);
  
--    state = qemu_get_local_state_dir();
--    dir = g_build_filename(state, "run", "virtiofsd", NULL);
-+    run = qemu_get_runtime_dir();
-+    dir = g_build_filename(run, "virtiofsd", NULL);
- 
-     if (g_mkdir_with_parents(dir, S_IRWXU) < 0) {
-         fuse_log(FUSE_LOG_ERR, "%s: Failed to create directory %s: %s\n",
+     if (qemu_name) {
+-        app_dir = g_build_filename(g_get_user_runtime_dir(),
+-                                   "qemu", qemu_name, NULL);
++        g_autofree char *run = qemu_get_runtime_dir();
++        app_dir = g_build_filename(run, "qemu", qemu_name, NULL);
+         if (g_mkdir_with_parents(app_dir, S_IRWXU) < -1) {
+             error_report("Failed to create directory %s: %s",
+                          app_dir, strerror(errno));
 -- 
 2.38.1
 

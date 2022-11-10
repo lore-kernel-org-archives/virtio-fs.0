@@ -1,25 +1,13 @@
-Return-Path: <akihiko.odaki@daynix.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=daynix-com.20210112.gappssmtp.com; s=20210112;
- h=content-transfer-encoding:mime-version:references:in-reply-to
- :message-id:date:subject:cc:to:from:from:to:cc:subject:date
- :message-id:reply-to;
- bh=AC+ag6DjlMRVYIRoMVgQ7eyLCeIppVPRSyLkAkRwpvs=;
- b=kK/C+42LsThvwCQFrkDc/mlyygvLhVi9rXrMi4AupdNcFwIL30l3TblGgXUouT65zf
- kT43Tl9oVyUNICttiAsetLCSC+qT12RAG8HKz7jO7V75tfAIwLD+Re3JQ84qB/an3OtE
- aJOlIHjJDP/MqI7rlgkn4s2x19IWo1Qrpp26ypAWJMolq12i/gXCby/cUnxuFfBAP332
- KOz4Ht378jQLub9/0AoTLxVjV8NdOY3CbQAwfPsDzuji/wvn0Hgr516LxD+OQDA616oN
- EdXwVq9uN1Utc3uH7hACMMEzvWciWyEJC2rVvLgxFTbRw9xaM9hQB6XqDHQ9wFmHlLVj
- iNwQ==
-From: Akihiko Odaki <akihiko.odaki@daynix.com>
-Date: Thu, 10 Nov 2022 15:23:29 +0900
-Message-Id: <20221110062329.13363-11-akihiko.odaki@daynix.com>
-In-Reply-To: <20221110062329.13363-1-akihiko.odaki@daynix.com>
-References: <20221110062329.13363-1-akihiko.odaki@daynix.com>
+Return-Path: <kkostiuk@redhat.com>
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Subject: [Virtio-fs] [PATCH 10/10] spice-app: Use qemu_get_runtime_dir()
+References: <20221110062329.13363-1-akihiko.odaki@daynix.com>
+ <20221110062329.13363-2-akihiko.odaki@daynix.com>
+In-Reply-To: <20221110062329.13363-2-akihiko.odaki@daynix.com>
+From: Konstantin Kostiuk <kkostiuk@redhat.com>
+Date: Thu, 10 Nov 2022 10:03:12 +0200
+Message-ID: <CAPMcbCr9xs2iTnN7Be8HUH4FF8uBkJff8Gs+7XzWzUaPJNh6ZQ@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="00000000000009137a05ed193518"
+Subject: Re: [Virtio-fs] [PATCH 01/10] qga: Remove platform GUID definitions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -28,31 +16,103 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-Cc: qemu-devel@nongnu.org, qemu-block@nongnu.org, virtio-fs@redhat.com, Yuval Shaia <yuval.shaia.ml@gmail.com>, Marcel Apfelbaum <marcel.apfelbaum@gmail.com>, Konstantin Kostiuk <kkostiuk@redhat.com>, Michael Roth <michael.roth@amd.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Stefan Weil <sw@weilnetz.de>, Yan Vugenfirer <yan@daynix.com>, Akihiko Odaki <akihiko.odaki@daynix.com>
+To: Akihiko Odaki <akihiko.odaki@daynix.com>
+Cc: qemu-devel@nongnu.org, qemu-block@nongnu.org, virtio-fs@redhat.com, Yuval Shaia <yuval.shaia.ml@gmail.com>, Marcel Apfelbaum <marcel.apfelbaum@gmail.com>, Michael Roth <michael.roth@amd.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Gerd Hoffmann <kraxel@redhat.com>, Stefan Weil <sw@weilnetz.de>, Yan Vugenfirer <yan@daynix.com>
 
-qemu_get_runtime_dir() provides QEMU-specific fallback of runtime
-directory.
+--00000000000009137a05ed193518
+Content-Type: text/plain; charset="UTF-8"
 
-Signed-off-by: Akihiko Odaki <akihiko.odaki@daynix.com>
----
- ui/spice-app.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On Thu, Nov 10, 2022 at 8:25 AM Akihiko Odaki <akihiko.odaki@daynix.com>
+wrote:
 
-diff --git a/ui/spice-app.c b/ui/spice-app.c
-index 7e71e18da9..feb162baa7 100644
---- a/ui/spice-app.c
-+++ b/ui/spice-app.c
-@@ -145,8 +145,8 @@ static void spice_app_display_early_init(DisplayOptions *opts)
-     atexit(spice_app_atexit);
- 
-     if (qemu_name) {
--        app_dir = g_build_filename(g_get_user_runtime_dir(),
--                                   "qemu", qemu_name, NULL);
-+        g_autofree char *run = qemu_get_runtime_dir();
-+        app_dir = g_build_filename(run, "qemu", qemu_name, NULL);
-         if (g_mkdir_with_parents(app_dir, S_IRWXU) < -1) {
-             error_report("Failed to create directory %s: %s",
-                          app_dir, strerror(errno));
--- 
-2.38.1
+> GUID_DEVINTERFACE_DISK and GUID_DEVINTERFACE_STORAGEPORT are already
+> defined by MinGW-w64. They are not only unnecessary, but can lead to
+> duplicate definition errors at link time with some unknown condition.
+>
+
+What version of MinGW-w64 do you use? We have a compilation problem
+in CI and CentOS Stream without this.
+
+
+>
+> Signed-off-by: Akihiko Odaki <akihiko.odaki@daynix.com>
+> ---
+>  qga/commands-win32.c | 7 -------
+>  1 file changed, 7 deletions(-)
+>
+> diff --git a/qga/commands-win32.c b/qga/commands-win32.c
+> index ec9f55b453..dde5d401bb 100644
+> --- a/qga/commands-win32.c
+> +++ b/qga/commands-win32.c
+> @@ -506,13 +506,6 @@ static GuestDiskBusType
+> find_bus_type(STORAGE_BUS_TYPE bus)
+>      return win2qemu[(int)bus];
+>  }
+>
+> -DEFINE_GUID(GUID_DEVINTERFACE_DISK,
+> -        0x53f56307L, 0xb6bf, 0x11d0, 0x94, 0xf2,
+> -        0x00, 0xa0, 0xc9, 0x1e, 0xfb, 0x8b);
+> -DEFINE_GUID(GUID_DEVINTERFACE_STORAGEPORT,
+> -        0x2accfe60L, 0xc130, 0x11d2, 0xb0, 0x82,
+> -        0x00, 0xa0, 0xc9, 0x1e, 0xfb, 0x8b);
+> -
+>  static void get_pci_address_for_device(GuestPCIAddress *pci,
+>                                         HDEVINFO dev_info)
+>  {
+> --
+> 2.38.1
+>
+>
+
+--00000000000009137a05ed193518
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><div dir=3D"ltr"><br></div><br><div class=3D"gmail_quote">=
+<div dir=3D"ltr" class=3D"gmail_attr">On Thu, Nov 10, 2022 at 8:25 AM Akihi=
+ko Odaki &lt;<a href=3D"mailto:akihiko.odaki@daynix.com">akihiko.odaki@dayn=
+ix.com</a>&gt; wrote:<br></div><blockquote class=3D"gmail_quote" style=3D"m=
+argin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left=
+:1ex">GUID_DEVINTERFACE_DISK and GUID_DEVINTERFACE_STORAGEPORT are already<=
+br>
+defined by MinGW-w64. They are not only unnecessary, but can lead to<br>
+duplicate definition errors at link time with some unknown condition.<br></=
+blockquote><div><br></div><div>What version of MinGW-w64 do you use? We hav=
+e a compilation problem</div><div>in CI and CentOS Stream without this.<br>=
+</div><div>=C2=A0</div><blockquote class=3D"gmail_quote" style=3D"margin:0p=
+x 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex">
+<br>
+Signed-off-by: Akihiko Odaki &lt;<a href=3D"mailto:akihiko.odaki@daynix.com=
+" target=3D"_blank">akihiko.odaki@daynix.com</a>&gt;<br>
+---<br>
+=C2=A0qga/commands-win32.c | 7 -------<br>
+=C2=A01 file changed, 7 deletions(-)<br>
+<br>
+diff --git a/qga/commands-win32.c b/qga/commands-win32.c<br>
+index ec9f55b453..dde5d401bb 100644<br>
+--- a/qga/commands-win32.c<br>
++++ b/qga/commands-win32.c<br>
+@@ -506,13 +506,6 @@ static GuestDiskBusType find_bus_type(STORAGE_BUS_TYPE=
+ bus)<br>
+=C2=A0 =C2=A0 =C2=A0return win2qemu[(int)bus];<br>
+=C2=A0}<br>
+<br>
+-DEFINE_GUID(GUID_DEVINTERFACE_DISK,<br>
+-=C2=A0 =C2=A0 =C2=A0 =C2=A0 0x53f56307L, 0xb6bf, 0x11d0, 0x94, 0xf2,<br>
+-=C2=A0 =C2=A0 =C2=A0 =C2=A0 0x00, 0xa0, 0xc9, 0x1e, 0xfb, 0x8b);<br>
+-DEFINE_GUID(GUID_DEVINTERFACE_STORAGEPORT,<br>
+-=C2=A0 =C2=A0 =C2=A0 =C2=A0 0x2accfe60L, 0xc130, 0x11d2, 0xb0, 0x82,<br>
+-=C2=A0 =C2=A0 =C2=A0 =C2=A0 0x00, 0xa0, 0xc9, 0x1e, 0xfb, 0x8b);<br>
+-<br>
+=C2=A0static void get_pci_address_for_device(GuestPCIAddress *pci,<br>
+=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=
+=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0 HDEVINFO=
+ dev_info)<br>
+=C2=A0{<br>
+-- <br>
+2.38.1<br>
+<br>
+</blockquote></div></div>
+
+--00000000000009137a05ed193518--
 

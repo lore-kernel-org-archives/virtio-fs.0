@@ -1,30 +1,26 @@
-Return-Path: <virtiofs-bot@sinrega.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
- cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; t=1668091905; x=1668178305; bh=Q9w6h+UVTIj/h0sRRfmHr
- 3EI8EEooqKcwJwTMebZEdA=; b=C1MHdC0fMYYgvQitPX/L73OaS1DCHSmoxnKfD
- nEe4NtL+KgwsbIk50uqt0GOABowQaBoUVf5GDrFJZv3Vtsn48jko/JdY/DfgnvyX
- qSsNey4WLVUVBgLK435y+b4AoYucWfFHlqtIl3SQlOF/+pEre/dSzjuF/3OwrHaA
- 7A2YKg140nUlsP+KD+emMmg//Eu2Q/sVF5KCJp1BFatHfE9/ERvpZNZHDFz3hn18
- QmNz0Vm159Dq4fWiurCfv2owhwoxzOHZiqV/8z9Tlwx+jDDcKKiN+3RGl+6NYqdu
- q/mm50AG7Cekkt7zBHkEESsmTH6blSzbB1YJWVVHUM+IUT70g==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
- messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
- :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
- :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; t=
- 1668091905; x=1668178305; bh=Q9w6h+UVTIj/h0sRRfmHr3EI8EEooqKcwJw
- TMebZEdA=; b=AYrYvOylqqzGWk4ja1lUnjDiEgHW2MSZHnpcBXu3aNuG4j/JFov
- JMcRWiCxmZJLD1R7v0HGIWzLdmwi68Gpvi1rh+dzjZFPYMEgmq4u+V1B76bsAolA
- TUvQ+ayXODfi8R5vvi5fhL+KP2FjelCNoQbuf1bLnipILtzVWoCCZ1QPKyu3WCEe
- uJ5dQMZ8Hib4Gi6Y7gFyfAJf0XdIVAmMUXorBpYlWNPGdKJJI2+5KcWy3I5B0veQ
- APmkZxH50bJoIGJBtp/Ko9iNrsfPWBrxHvlOKnIZd3O5/Xpq50WSuG/Zwr0U9mUb
- 8QdxHZa5cwmsJnyuZxHJxYxvnCdDWBI44dA==
-From: virtiofs-bot@sinrega.org
-Message-Id: <30170.122111009514800261@us-mta-459.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Thu, 10 Nov 2022 14:51:55 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] Issue opened: Unexpected behavior observed
- when using mmap on virtiofs backed paths
+Return-Path: <borntraeger@linux.ibm.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ibm.com;
+ h=message-id : date :
+ mime-version : subject : to : cc : references : from : in-reply-to :
+ content-type : content-transfer-encoding; s=pp1;
+ bh=NAm2s+uEP4b1diyhZWf0MPGS2Y2i+RzBI2nlcBy+gSc=;
+ b=Egchlb991HSGg8Nk+4nR5R+Iv9N/zt0MqWauzLFUNmnlWZ3GYXuJsRUAVfL0OQ4Bv1H+
+ ZTJDpWTCabqDGKEJc5Lm9K3aDEc6Ot44Da7fEks+PXF1RWvO4D9L5CF7YQkUVQbowpgq
+ N7YNuCwdBcSXkNBUBK39VD4N0we0nLJjGxdwEXkI0XKvsDWVCFg3rXpbVqSqH0pE2VmP
+ JiyKTwvNxVIRhasWVJXsrM0wFwnvd7cOW/NE5OM4RrdiWm2gcZ0RlsIh7BqMBkFrRDqt
+ hqiSHqERjTt5SB7A0CjJbP84X+3CAfeWZien4ftrK10Lmu9/zGW7e/QgQCZOAu78q1WD PA==
+Message-ID: <2277569a-c218-30d1-4d88-9b77d3604513@linux.ibm.com>
+Date: Mon, 14 Nov 2022 17:18:53 +0100
+MIME-Version: 1.0
+References: <20221108092308.1717426-1-alex.bennee@linaro.org>
+ <20221108092308.1717426-6-alex.bennee@linaro.org>
+From: Christian Borntraeger <borntraeger@linux.ibm.com>
+In-Reply-To: <20221108092308.1717426-6-alex.bennee@linaro.org>
+Content-Language: en-US
+Content-Type: text/plain; charset=UTF-8; format=flowed
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH v1 5/9] hw/virtio: introduce
+ virtio_device_should_start
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,27 +29,36 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>, qemu-devel@nongnu.org
+Cc: fam@euphon.net, berrange@redhat.com, f4bug@amsat.org, aurelien@aurel32.net, pbonzini@redhat.com, stefanha@redhat.com, crosa@redhat.com, "Michael S. Tsirkin" <mst@redhat.com>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, "open list:Block layer core" <qemu-block@nongnu.org>, "open list:virtiofs" <virtio-fs@redhat.com>
 
-When using python and writing to a mmap file, I am seeing with cache mode auto and always that the file is increasing in size each time I write to it.  This is seen with virtiofsd C version ( 6.1.0 ) as well as RS version (1.3.0), and can be reproduced using QEMU (6.2) as well as Cloud Hypervisor (v0.26). When switching to a different vhost-user-fs backend (nydusd), we can no longer reproduce the failure.  
+Am 08.11.22 um 10:23 schrieb Alex Benn=C3=A9e:
+> The previous fix to virtio_device_started revealed a problem in its
+> use by both the core and the device code. The core code should be able
+> to handle the device "starting" while the VM isn't running to handle
+> the restoration of migration state. To solve this dual use introduce a
+> new helper for use by the vhost-user backends who all use it to feed a
+> should_start variable.
+>=20
+> We can also pick up a change vhost_user_blk_set_status while we are at
+> it which follows the same pattern.
+>=20
+> Fixes: 9f6bcfd99f (hw/virtio: move vm_running check to virtio_device_star=
+ted)
+> Fixes: 27ba7b027f (hw/virtio: add boilerplate for vhost-user-gpio device)
+> Signed-off-by: Alex Benn=C3=A9e <alex.bennee@linaro.org>
+> Cc: "Michael S. Tsirkin" <mst@redhat.com>
 
-The following python script will show the failure behavior if run on a virtiofs backed path:
-```
-import mmap
-import struct
-l = 1024
-f = open("./test.db", "a+b")
-f.truncate(l)
-m = mmap.mmap(f.fileno(), 1024, access=mmap.ACCESS_WRITE)
-m[0:4] = b"0000"
-m.flush()
-m.size()
-m[0:4] = b"0000"
-m.flush()
-m.size()
-```
+Hmmm, is this
+commit 259d69c00b67c02a67f3bdbeeea71c2c0af76c35
+Author:     Alex Benn=C3=A9e <alex.bennee@linaro.org>
+AuthorDate: Mon Nov 7 12:14:07 2022 +0000
+Commit:     Michael S. Tsirkin <mst@redhat.com>
+CommitDate: Mon Nov 7 14:08:18 2022 -0500
 
-See https://github.com/kata-containers/kata-containers/issues/5634 for more details on reproduction.
----
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/67
+     hw/virtio: introduce virtio_device_should_start
+
+and older version?
+
+This does not seem to fix the regression that I have reported.
 

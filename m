@@ -1,14 +1,32 @@
-Return-Path: <quintela@redhat.com>
-From: Juan Quintela <quintela@redhat.com>
-Date: Mon,  5 Dec 2022 10:51:43 +0100
-Message-Id: <20221205095228.1314-7-quintela@redhat.com>
-In-Reply-To: <20221205095228.1314-1-quintela@redhat.com>
-References: <20221205095228.1314-1-quintela@redhat.com>
+Return-Path: <borntraeger@linux.ibm.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ibm.com;
+ h=message-id : date :
+ subject : to : cc : references : from : in-reply-to : content-type :
+ content-transfer-encoding : mime-version; s=pp1;
+ bh=TOYvz3EB7sMd3H7EZhr6b6EdS8yX7w7WSEaVSIoJZ2Y=;
+ b=VF3qGhgt01AbIfQEJyDPaGXgucSM7ZyxBklzbdLRIkfOZOteuOr3R5UvFKV53I0E5Xbf
+ VkbuQyMgtYmkEZDUpl4VXvhpLdvDI5dHpeUZQKzE9JVGszuZrlt6e4usXgoixgA4Ohjh
+ 6HkqvbN59TSVUl5v8VSVUhsqeNvx2DaX5zY7POqZM+lNNLHhqu9Q4+Xh7xzxaSPoYUdI
+ bSRoO/TibTovkJjykT+BHb3on4lioLibk4/D3tR4wm/wRt2Te2oWyZbNBqC7s/9TqWHv
+ n2h4ZOWcSV4nNhCnm9Gv3HXx1fTEiY1Z7PhwNHy5jLO7e8g6zNVtUH6OR8x33bnBOzP2 wQ==
+Message-ID: <26b4e8d8-784d-d1ce-67a3-b61896701bf7@linux.ibm.com>
+Date: Tue, 15 Nov 2022 16:09:41 +0100
+References: <20221108092308.1717426-1-alex.bennee@linaro.org>
+ <20221108092308.1717426-6-alex.bennee@linaro.org>
+ <2277569a-c218-30d1-4d88-9b77d3604513@linux.ibm.com>
+ <20221114113518-mutt-send-email-mst@kernel.org>
+ <aaae3f2a-c5bb-8e62-09d4-4f6f43efe37b@linux.ibm.com>
+ <20221114115549-mutt-send-email-mst@kernel.org>
+ <2bd5f801-a203-2598-3e6e-ed8f5dad5159@linux.ibm.com>
+ <20221114121959-mutt-send-email-mst@kernel.org> <87tu309tlk.fsf@linaro.org>
+From: Christian Borntraeger <borntraeger@linux.ibm.com>
+In-Reply-To: <87tu309tlk.fsf@linaro.org>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 06/51] hw/display/qxl: Pass requested buffer
- size to qxl_phys2virt()
+Content-Language: en-US
+Content-Type: text/plain; charset=UTF-8; format=flowed
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH v1 5/9] hw/virtio: introduce
+ virtio_device_should_start
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,212 +35,134 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: Fam Zheng <fam@euphon.net>, Thomas Huth <huth@tuxfamily.org>, Viresh Kumar <viresh.kumar@linaro.org>, Kevin Wolf <kwolf@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Laurent Vivier <laurent@vivier.eu>, Eric Blake <eblake@redhat.com>, Richard Henderson <richard.henderson@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Stefan Hajnoczi <stefanha@redhat.com>, Juan Quintela <quintela@redhat.com>, virtio-fs@redhat.com, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, Christian Borntraeger <borntraeger@linux.ibm.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, qemu-block@nongnu.org, Xiaojuan Yang <yangxiaojuan@loongson.cn>, Thomas Huth <thuth@redhat.com>, Ilya Leoshkevich <iii@linux.ibm.com>, Eduardo Habkost <eduardo@habkost.net>, Gerd Hoffmann <kraxel@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Alex Williamson <alex.williamson@redhat.com>, Eric Farman <farman@linux.ibm.com>, Halil Pasic <pasic@linux.ibm.com>, Peter Maydell <peter.maydell@linaro.org>, Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru>, Jason Wang <jasowang@redhat.com>, Laurent Vivier <lvivier@redhat.com>, Song Gao <gaosong@loongson.cn>, qemu-s390x@nongnu.org, Pavel Dovgalyuk <pavel.dovgaluk@ispras.ru>, Klaus Jensen <its@irrelevant.dk>, John Snow <jsnow@redhat.com>, Michael Tokarev <mjt@tls.msk.ru>, qemu-arm@nongnu.org, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Keith Busch <kbusch@kernel.org>, David Hildenbrand <david@redhat.com>, qemu-trivial@nongnu.org, Hanna Reitz <hreitz@redhat.com>, =?UTF-8?q?Philippe=20Mathieu-Daud=C3=A9?= <philmd@linaro.org>
+To: =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>, "Michael S. Tsirkin" <mst@redhat.com>
+Cc: qemu-devel@nongnu.org, fam@euphon.net, berrange@redhat.com, f4bug@amsat.org, aurelien@aurel32.net, pbonzini@redhat.com, stefanha@redhat.com, crosa@redhat.com, Raphael Norwitz <raphael.norwitz@nutanix.com>, Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, "open list:Block layer core" <qemu-block@nongnu.org>, "open list:virtiofs" <virtio-fs@redhat.com>
 
-From: Philippe Mathieu-Daudé <philmd@linaro.org>
 
-Currently qxl_phys2virt() doesn't check for buffer overrun.
-In order to do so in the next commit, pass the buffer size
-as argument.
 
-For QXLCursor in qxl_render_cursor() -> qxl_cursor() we
-verify the size of the chunked data ahead, checking we can
-access 'sizeof(QXLCursor) + chunk->data_size' bytes.
-Since in the SPICE_CURSOR_TYPE_MONO case the cursor is
-assumed to fit in one chunk, no change are required.
-In SPICE_CURSOR_TYPE_ALPHA the ahead read is handled in
-qxl_unpack_chunks().
+Am 15.11.22 um 15:31 schrieb Alex Benn=C3=A9e:
+>=20
+> "Michael S. Tsirkin" <mst@redhat.com> writes:
+>=20
+>> On Mon, Nov 14, 2022 at 06:15:30PM +0100, Christian Borntraeger wrote:
+>>>
+>>>
+>>> Am 14.11.22 um 18:10 schrieb Michael S. Tsirkin:
+>>>> On Mon, Nov 14, 2022 at 05:55:09PM +0100, Christian Borntraeger wrote:
+>>>>>
+>>>>>
+>>>>> Am 14.11.22 um 17:37 schrieb Michael S. Tsirkin:
+>>>>>> On Mon, Nov 14, 2022 at 05:18:53PM +0100, Christian Borntraeger wrot=
+e:
+>>>>>>> Am 08.11.22 um 10:23 schrieb Alex Benn=C3=A9e:
+>>>>>>>> The previous fix to virtio_device_started revealed a problem in it=
+s
+>>>>>>>> use by both the core and the device code. The core code should be =
+able
+>>>>>>>> to handle the device "starting" while the VM isn't running to hand=
+le
+>>>>>>>> the restoration of migration state. To solve this dual use introdu=
+ce a
+>>>>>>>> new helper for use by the vhost-user backends who all use it to fe=
+ed a
+>>>>>>>> should_start variable.
+>>>>>>>>
+>>>>>>>> We can also pick up a change vhost_user_blk_set_status while we ar=
+e at
+>>>>>>>> it which follows the same pattern.
+>>>>>>>>
+>>>>>>>> Fixes: 9f6bcfd99f (hw/virtio: move vm_running check to virtio_devi=
+ce_started)
+>>>>>>>> Fixes: 27ba7b027f (hw/virtio: add boilerplate for vhost-user-gpio =
+device)
+>>>>>>>> Signed-off-by: Alex Benn=C3=A9e <alex.bennee@linaro.org>
+>>>>>>>> Cc: "Michael S. Tsirkin" <mst@redhat.com>
+>>>>>>>
+>>>>>>> Hmmm, is this
+>>>>>>> commit 259d69c00b67c02a67f3bdbeeea71c2c0af76c35
+>>>>>>> Author:     Alex Benn=C3=A9e <alex.bennee@linaro.org>
+>>>>>>> AuthorDate: Mon Nov 7 12:14:07 2022 +0000
+>>>>>>> Commit:     Michael S. Tsirkin <mst@redhat.com>
+>>>>>>> CommitDate: Mon Nov 7 14:08:18 2022 -0500
+>>>>>>>
+>>>>>>>        hw/virtio: introduce virtio_device_should_start
+>>>>>>>
+>>>>>>> and older version?
+>>>>>>
+>>>>>> This is what got merged:
+>>>>>> https://lore.kernel.org/r/20221107121407.1010913-1-alex.bennee%40lin=
+aro.org
+>>>>>> This patch was sent after I merged the RFC.
+>>>>>> I think the only difference is the commit log but I might be missing
+>>>>>> something.
+>>>>>>
+>>>>>>> This does not seem to fix the regression that I have reported.
+>>>>>>
+>>>>>> This was applied on top of 9f6bcfd99f which IIUC does, right?
+>>>>>>
+>>>>>>
+>>>>>
+>>>>> QEMU master still fails for me for suspend/resume to disk:
+>>>>>
+>>>>> #0  0x000003ff8e3980a6 in __pthread_kill_implementation () at /lib64/=
+libc.so.6
+>>>>> #1  0x000003ff8e348580 in raise () at /lib64/libc.so.6
+>>>>> #2  0x000003ff8e32b5c0 in abort () at /lib64/libc.so.6
+>>>>> #3  0x000003ff8e3409da in __assert_fail_base () at /lib64/libc.so.6
+>>>>> #4  0x000003ff8e340a4e in  () at /lib64/libc.so.6
+>>>>> #5 0x000002aa1ffa8966 in vhost_vsock_common_pre_save
+>>>>> (opaque=3D<optimized out>) at
+>>>>> ../hw/virtio/vhost-vsock-common.c:203
+>>>>> #6  0x000002aa1fe5e0ee in vmstate_save_state_v
+>>>>>       (f=3Df@entry=3D0x2aa21bdc170, vmsd=3D0x2aa204ac5f0
+>>>>> <vmstate_virtio_vhost_vsock>, opaque=3D0x2aa21bac9f8,
+>>>>> vmdesc=3Dvmdesc@entry=3D0x3fddc08eb30,
+>>>>> version_id=3Dversion_id@entry=3D0) at ../migration/vmstate.c:329
+>>>>> #7 0x000002aa1fe5ebf8 in vmstate_save_state
+>>>>> (f=3Df@entry=3D0x2aa21bdc170, vmsd=3D<optimized out>,
+>>>>> opaque=3D<optimized out>, vmdesc_id=3Dvmdesc_id@entry=3D0x3fddc08eb30=
+)
+>>>>> at ../migration/vmstate.c:317
+>>>>> #8 0x000002aa1fe75bd0 in vmstate_save (f=3Df@entry=3D0x2aa21bdc170,
+>>>>> se=3Dse@entry=3D0x2aa21bdbe90, vmdesc=3Dvmdesc@entry=3D0x3fddc08eb30)=
+ at
+>>>>> ../migration/savevm.c:908
+>>>>> #9 0x000002aa1fe79584 in
+>>>>> qemu_savevm_state_complete_precopy_non_iterable
+>>>>> (f=3Df@entry=3D0x2aa21bdc170, in_postcopy=3Din_postcopy@entry=3Dfalse=
+,
+>>>>> inactivate_disks=3Dinactivate_disks@entry=3Dtrue)
+>>>>>       at ../migration/savevm.c:1393
+>>>>> #10 0x000002aa1fe79a96 in qemu_savevm_state_complete_precopy
+>>>>> (f=3D0x2aa21bdc170, iterable_only=3Diterable_only@entry=3Dfalse,
+>>>>> inactivate_disks=3Dinactivate_disks@entry=3Dtrue) at
+>>>>> ../migration/savevm.c:1459
+>>>>> #11 0x000002aa1fe6d6ee in migration_completion (s=3D0x2aa218ef600) at=
+ ../migration/migration.c:3314
+>>>>> #12 migration_iteration_run (s=3D0x2aa218ef600) at ../migration/migra=
+tion.c:3761
+>>>>> #13 migration_thread (opaque=3Dopaque@entry=3D0x2aa218ef600) at ../mi=
+gration/migration.c:3989
+>>>>> #14 0x000002aa201f0b8c in qemu_thread_start (args=3D<optimized out>) =
+at ../util/qemu-thread-posix.c:505
+>>>>> #15 0x000003ff8e396248 in start_thread () at /lib64/libc.so.6
+>>>>> #16 0x000003ff8e41183e in thread_start () at /lib64/libc.so.6
+>>>>>
+>>>>> Michael, your previous branch did work if I recall correctly.
+>>>>
+>>>> That one was failing under github CI though (for reasons we didn't
+>>>> really address, such as disconnect during stop causing a recursive
+>>>> call to stop, but there you are).
+>>> Even the double revert of everything?
+>>
+>> I don't remember at this point.
+>>
+>>> So how do we proceed now?
+>>
+>> I'm hopeful Alex will come up with a fix.
+>=20
+> I need to replicate the failing test for that. Which test is failing?
 
-Signed-off-by: Philippe Mathieu-Daudé <philmd@linaro.org>
-Acked-by: Gerd Hoffmann <kraxel@redhat.com>
-Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-Message-Id: <20221128202741.4945-4-philmd@linaro.org>
----
- hw/display/qxl.h        |  4 +++-
- hw/display/qxl-logger.c | 11 ++++++++---
- hw/display/qxl-render.c | 20 ++++++++++++++++----
- hw/display/qxl.c        | 14 +++++++++-----
- 4 files changed, 36 insertions(+), 13 deletions(-)
 
-diff --git a/hw/display/qxl.h b/hw/display/qxl.h
-index 78b3a6c9ba..bf03138ab4 100644
---- a/hw/display/qxl.h
-+++ b/hw/display/qxl.h
-@@ -153,6 +153,7 @@ OBJECT_DECLARE_SIMPLE_TYPE(PCIQXLDevice, PCI_QXL)
-  * @qxl: QXL device
-  * @phys: physical offset of buffer within the VRAM
-  * @group_id: memory slot group
-+ * @size: size of the buffer
-  *
-  * Returns a host pointer to a buffer placed at offset @phys within the
-  * active slot @group_id of the PCI VGA RAM memory region associated with
-@@ -166,7 +167,8 @@ OBJECT_DECLARE_SIMPLE_TYPE(PCIQXLDevice, PCI_QXL)
-  * the incoming ram_addr_t.
-  *
-  */
--void *qxl_phys2virt(PCIQXLDevice *qxl, QXLPHYSICAL phys, int group_id);
-+void *qxl_phys2virt(PCIQXLDevice *qxl, QXLPHYSICAL phys, int group_id,
-+                    size_t size);
- void qxl_set_guest_bug(PCIQXLDevice *qxl, const char *msg, ...)
-     G_GNUC_PRINTF(2, 3);
- 
-diff --git a/hw/display/qxl-logger.c b/hw/display/qxl-logger.c
-index 1bcf803db6..35c38f6252 100644
---- a/hw/display/qxl-logger.c
-+++ b/hw/display/qxl-logger.c
-@@ -106,7 +106,7 @@ static int qxl_log_image(PCIQXLDevice *qxl, QXLPHYSICAL addr, int group_id)
-     QXLImage *image;
-     QXLImageDescriptor *desc;
- 
--    image = qxl_phys2virt(qxl, addr, group_id);
-+    image = qxl_phys2virt(qxl, addr, group_id, sizeof(QXLImage));
-     if (!image) {
-         return 1;
-     }
-@@ -214,7 +214,8 @@ int qxl_log_cmd_cursor(PCIQXLDevice *qxl, QXLCursorCmd *cmd, int group_id)
-                 cmd->u.set.position.y,
-                 cmd->u.set.visible ? "yes" : "no",
-                 cmd->u.set.shape);
--        cursor = qxl_phys2virt(qxl, cmd->u.set.shape, group_id);
-+        cursor = qxl_phys2virt(qxl, cmd->u.set.shape, group_id,
-+                               sizeof(QXLCursor));
-         if (!cursor) {
-             return 1;
-         }
-@@ -236,6 +237,7 @@ int qxl_log_command(PCIQXLDevice *qxl, const char *ring, QXLCommandExt *ext)
- {
-     bool compat = ext->flags & QXL_COMMAND_FLAG_COMPAT;
-     void *data;
-+    size_t datasz;
-     int ret;
- 
-     if (!qxl->cmdlog) {
-@@ -249,15 +251,18 @@ int qxl_log_command(PCIQXLDevice *qxl, const char *ring, QXLCommandExt *ext)
- 
-     switch (ext->cmd.type) {
-     case QXL_CMD_DRAW:
-+        datasz = compat ? sizeof(QXLCompatDrawable) : sizeof(QXLDrawable);
-         break;
-     case QXL_CMD_SURFACE:
-+        datasz = sizeof(QXLSurfaceCmd);
-         break;
-     case QXL_CMD_CURSOR:
-+        datasz = sizeof(QXLCursorCmd);
-         break;
-     default:
-         goto out;
-     }
--    data = qxl_phys2virt(qxl, ext->cmd.data, ext->group_id);
-+    data = qxl_phys2virt(qxl, ext->cmd.data, ext->group_id, datasz);
-     if (!data) {
-         return 1;
-     }
-diff --git a/hw/display/qxl-render.c b/hw/display/qxl-render.c
-index ca217004bf..fcfd40c3ac 100644
---- a/hw/display/qxl-render.c
-+++ b/hw/display/qxl-render.c
-@@ -107,7 +107,9 @@ static void qxl_render_update_area_unlocked(PCIQXLDevice *qxl)
-         qxl->guest_primary.resized = 0;
-         qxl->guest_primary.data = qxl_phys2virt(qxl,
-                                                 qxl->guest_primary.surface.mem,
--                                                MEMSLOT_GROUP_GUEST);
-+                                                MEMSLOT_GROUP_GUEST,
-+                                                qxl->guest_primary.abs_stride
-+                                                * height);
-         if (!qxl->guest_primary.data) {
-             goto end;
-         }
-@@ -228,7 +230,8 @@ static void qxl_unpack_chunks(void *dest, size_t size, PCIQXLDevice *qxl,
-         if (offset == size) {
-             return;
-         }
--        chunk = qxl_phys2virt(qxl, chunk->next_chunk, group_id);
-+        chunk = qxl_phys2virt(qxl, chunk->next_chunk, group_id,
-+                              sizeof(QXLDataChunk) + chunk->data_size);
-         if (!chunk) {
-             return;
-         }
-@@ -295,7 +298,8 @@ fail:
- /* called from spice server thread context only */
- int qxl_render_cursor(PCIQXLDevice *qxl, QXLCommandExt *ext)
- {
--    QXLCursorCmd *cmd = qxl_phys2virt(qxl, ext->cmd.data, ext->group_id);
-+    QXLCursorCmd *cmd = qxl_phys2virt(qxl, ext->cmd.data, ext->group_id,
-+                                      sizeof(QXLCursorCmd));
-     QXLCursor *cursor;
-     QEMUCursor *c;
- 
-@@ -314,7 +318,15 @@ int qxl_render_cursor(PCIQXLDevice *qxl, QXLCommandExt *ext)
-     }
-     switch (cmd->type) {
-     case QXL_CURSOR_SET:
--        cursor = qxl_phys2virt(qxl, cmd->u.set.shape, ext->group_id);
-+        /* First read the QXLCursor to get QXLDataChunk::data_size ... */
-+        cursor = qxl_phys2virt(qxl, cmd->u.set.shape, ext->group_id,
-+                               sizeof(QXLCursor));
-+        if (!cursor) {
-+            return 1;
-+        }
-+        /* Then read including the chunked data following QXLCursor. */
-+        cursor = qxl_phys2virt(qxl, cmd->u.set.shape, ext->group_id,
-+                               sizeof(QXLCursor) + cursor->chunk.data_size);
-         if (!cursor) {
-             return 1;
-         }
-diff --git a/hw/display/qxl.c b/hw/display/qxl.c
-index 5b10f697f1..231d733250 100644
---- a/hw/display/qxl.c
-+++ b/hw/display/qxl.c
-@@ -274,7 +274,8 @@ static void qxl_spice_monitors_config_async(PCIQXLDevice *qxl, int replay)
-                                           QXL_IO_MONITORS_CONFIG_ASYNC));
-     }
- 
--    cfg = qxl_phys2virt(qxl, qxl->guest_monitors_config, MEMSLOT_GROUP_GUEST);
-+    cfg = qxl_phys2virt(qxl, qxl->guest_monitors_config, MEMSLOT_GROUP_GUEST,
-+                        sizeof(QXLMonitorsConfig));
-     if (cfg != NULL && cfg->count == 1) {
-         qxl->guest_primary.resized = 1;
-         qxl->guest_head0_width  = cfg->heads[0].width;
-@@ -459,7 +460,8 @@ static int qxl_track_command(PCIQXLDevice *qxl, struct QXLCommandExt *ext)
-     switch (le32_to_cpu(ext->cmd.type)) {
-     case QXL_CMD_SURFACE:
-     {
--        QXLSurfaceCmd *cmd = qxl_phys2virt(qxl, ext->cmd.data, ext->group_id);
-+        QXLSurfaceCmd *cmd = qxl_phys2virt(qxl, ext->cmd.data, ext->group_id,
-+                                           sizeof(QXLSurfaceCmd));
- 
-         if (!cmd) {
-             return 1;
-@@ -494,7 +496,8 @@ static int qxl_track_command(PCIQXLDevice *qxl, struct QXLCommandExt *ext)
-     }
-     case QXL_CMD_CURSOR:
-     {
--        QXLCursorCmd *cmd = qxl_phys2virt(qxl, ext->cmd.data, ext->group_id);
-+        QXLCursorCmd *cmd = qxl_phys2virt(qxl, ext->cmd.data, ext->group_id,
-+                                          sizeof(QXLCursorCmd));
- 
-         if (!cmd) {
-             return 1;
-@@ -1456,7 +1459,8 @@ static bool qxl_get_check_slot_offset(PCIQXLDevice *qxl, QXLPHYSICAL pqxl,
- }
- 
- /* can be also called from spice server thread context */
--void *qxl_phys2virt(PCIQXLDevice *qxl, QXLPHYSICAL pqxl, int group_id)
-+void *qxl_phys2virt(PCIQXLDevice *qxl, QXLPHYSICAL pqxl, int group_id,
-+                    size_t size)
- {
-     uint64_t offset;
-     uint32_t slot;
-@@ -1964,7 +1968,7 @@ static void qxl_dirty_surfaces(PCIQXLDevice *qxl)
-         }
- 
-         cmd = qxl_phys2virt(qxl, qxl->guest_surfaces.cmds[i],
--                            MEMSLOT_GROUP_GUEST);
-+                            MEMSLOT_GROUP_GUEST, sizeof(QXLSurfaceCmd));
-         assert(cmd);
-         assert(cmd->type == QXL_SURFACE_CMD_CREATE);
-         qxl_dirty_one_surface(qxl, cmd->u.surface_create.data,
--- 
-2.38.1
+Pretty much the same as before. guest with vsock, managedsave and restore.
 

@@ -1,7 +1,7 @@
 Return-Path: <mst@redhat.com>
-Date: Tue, 15 Nov 2022 04:05:05 -0500
+Date: Tue, 15 Nov 2022 06:25:54 -0500
 From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20221115035522-mutt-send-email-mst@kernel.org>
+Message-ID: <20221115062535-mutt-send-email-mst@kernel.org>
 References: <20221108092308.1717426-1-alex.bennee@linaro.org>
  <20221108092308.1717426-6-alex.bennee@linaro.org>
  <2277569a-c218-30d1-4d88-9b77d3604513@linux.ibm.com>
@@ -171,10 +171,9 @@ t status)
 >      return status & VIRTIO_CONFIG_S_DRIVER_OK;
 >  }
 
-Hmm this makes sense to me. And with the new API the
-follout should be minimal. Let's see how it behaves on github.
-It would be nice to fix the recursive stop problem properly
-too but I"m not optimistic on that for this release.
+Triggers failure on gitlab unfortunately:
+
+https://gitlab.com/mstredhat/qemu/-/jobs/3323768122
 
 --=20
 MST

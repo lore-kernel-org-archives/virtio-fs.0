@@ -1,12 +1,23 @@
-Return-Path: <quintela@redhat.com>
-From: Juan Quintela <quintela@redhat.com>
-Date: Mon,  5 Dec 2022 10:52:18 +0100
-Message-Id: <20221205095228.1314-42-quintela@redhat.com>
-In-Reply-To: <20221205095228.1314-1-quintela@redhat.com>
-References: <20221205095228.1314-1-quintela@redhat.com>
+Return-Path: <peter.maydell@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=cc:to:subject:message-id:date:from:in-reply-to:references
+ :mime-version:from:to:cc:subject:date:message-id:reply-to;
+ bh=MF0QvKrp6hOQBtpvzpbZb9Nyv7bn72nzIE9/cJbusOs=;
+ b=gAF9+h1FXftdn93KZTEjjDjaUCyTsHBSfToTrxl4r+YHMi8217bNdmt8rUp15v69yz
+ pJobNxAirgRt/WgG8aM2N9KWOH38GLcekaDFXyvNucTfg3VMCIR1/wW3ZD1A1EQTFOXa
+ HJFiAiKwOwDK2L1loNXFrILdB6Cl+9GipWvvJ4ALhi/BT/LMmi0yoXZzfHbUb2H0Z+0x
+ OyJ+cTLxJi1qhIBIRGnUuNIpd1czWWcgm58y1co5I0A44i9Y5aIgPBhIwo4fdBEp0u0o
+ Lb/JRsVglFquVnJi6KlZXPCmzemQRNxdpoNdo6U7Qng0qy1m+qjI8IFNczK7FKNs1Bva
+ R7AA==
 MIME-Version: 1.0
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 41/51] migration: Add pss_init()
+References: <20221121140121.1079100-1-armbru@redhat.com>
+In-Reply-To: <20221121140121.1079100-1-armbru@redhat.com>
+From: Peter Maydell <peter.maydell@linaro.org>
+Date: Mon, 21 Nov 2022 14:36:56 +0000
+Message-ID: <CAFEAcA_jnbp36Trjd3qJYzbf5-6SNNrirG7q2_-wKXkcX49ptg@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PATCH] cleanup: Tweak and re-run
+ return_directly.cocci
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,51 +26,50 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: Fam Zheng <fam@euphon.net>, Thomas Huth <huth@tuxfamily.org>, Viresh Kumar <viresh.kumar@linaro.org>, Kevin Wolf <kwolf@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Laurent Vivier <laurent@vivier.eu>, Eric Blake <eblake@redhat.com>, Richard Henderson <richard.henderson@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Stefan Hajnoczi <stefanha@redhat.com>, Juan Quintela <quintela@redhat.com>, virtio-fs@redhat.com, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, Christian Borntraeger <borntraeger@linux.ibm.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, qemu-block@nongnu.org, Xiaojuan Yang <yangxiaojuan@loongson.cn>, Thomas Huth <thuth@redhat.com>, Ilya Leoshkevich <iii@linux.ibm.com>, Eduardo Habkost <eduardo@habkost.net>, Gerd Hoffmann <kraxel@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Alex Williamson <alex.williamson@redhat.com>, Eric Farman <farman@linux.ibm.com>, Halil Pasic <pasic@linux.ibm.com>, Peter Maydell <peter.maydell@linaro.org>, Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru>, Jason Wang <jasowang@redhat.com>, Laurent Vivier <lvivier@redhat.com>, Song Gao <gaosong@loongson.cn>, qemu-s390x@nongnu.org, Pavel Dovgalyuk <pavel.dovgaluk@ispras.ru>, Klaus Jensen <its@irrelevant.dk>, John Snow <jsnow@redhat.com>, Michael Tokarev <mjt@tls.msk.ru>, qemu-arm@nongnu.org, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Keith Busch <kbusch@kernel.org>, David Hildenbrand <david@redhat.com>, qemu-trivial@nongnu.org, Hanna Reitz <hreitz@redhat.com>, Peter Xu <peterx@redhat.com>
+To: Markus Armbruster <armbru@redhat.com>
+Cc: qemu-devel@nongnu.org, fam@euphon.net, kwolf@redhat.com, hreitz@redhat.com, groug@kaod.org, qemu_oss@crudebyte.com, Alistair.Francis@wdc.com, bin.meng@windriver.com, palmer@dabbelt.com, marcandre.lureau@redhat.com, pbonzini@redhat.com, yuval.shaia.ml@gmail.com, marcel.apfelbaum@gmail.com, mst@redhat.com, quintela@redhat.com, dgilbert@redhat.com, pavel.dovgaluk@ispras.ru, alex.bennee@linaro.org, peterx@redhat.com, david@redhat.com, philmd@linaro.org, mrolnik@gmail.com, gaosong@loongson.cn, yangxiaojuan@loongson.cn, aurelien@aurel32.net, jiaxun.yang@flygoat.com, aleksandar.rikalo@syrmia.com, jcmvbkbc@gmail.com, berrange@redhat.com, thuth@redhat.com, lvivier@redhat.com, suhang16@mails.ucas.ac.cn, chen.zhang@intel.com, lizhijian@fujitsu.com, stefanha@redhat.com, qemu-block@nongnu.org, qemu-riscv@nongnu.org, qemu-ppc@nongnu.org, virtio-fs@redhat.com
 
-From: Peter Xu <peterx@redhat.com>
+On Mon, 21 Nov 2022 at 14:03, Markus Armbruster <armbru@redhat.com> wrote:
+>
+> Tweak the semantic patch to drop redundant parenthesis around the
+> return expression.
+>
+> Coccinelle drops comments in hw/rdma/vmw/pvrdma_cmd.c; restored
+> manually.
+>
+> Coccinelle messes up vmdk_co_create(), not sure why.  Transformed
+> manually.
+>
+> Line breaks in target/avr/cpu.h and hw/rdma/vmw/pvrdma_cmd.c tidied up
+> manually.
+>
+> Whitespace in fuse_reply_iov() tidied up manually.
+>
+> checkpatch.pl complains "return of an errno should typically be -ve"
+> two times for hw/9pfs/9p-synth.c.  Preexisting, the patch merely makes
+> it visible to checkpatch.pl.
+>
+> checkpatch.pl complains "return is not a function, parentheses are not
+> required" three times for target/mips/tcg/dsp_helper.c.  False
+> positives.
+>
+> Signed-off-by: Markus Armbruster <armbru@redhat.com>
 
-Helper to init PSS structures.
+>  .../user/ase/msa/bit-count/test_msa_nloc_b.c  |   9 +-
+>  .../user/ase/msa/bit-count/test_msa_nloc_d.c  |   9 +-
+[snip long list of other mips test files]
 
-Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
-Signed-off-by: Peter Xu <peterx@redhat.com>
-Reviewed-by: Juan Quintela <quintela@redhat.com>
-Signed-off-by: Juan Quintela <quintela@redhat.com>
----
- migration/ram.c | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+>  328 files changed, 989 insertions(+), 2099 deletions(-)
 
-diff --git a/migration/ram.c b/migration/ram.c
-index 571d780987..d81bf7b183 100644
---- a/migration/ram.c
-+++ b/migration/ram.c
-@@ -542,6 +542,14 @@ static bool do_compress_ram_page(QEMUFile *f, z_stream *stream, RAMBlock *block,
- static void postcopy_preempt_restore(RAMState *rs, PageSearchStatus *pss,
-                                      bool postcopy_requested);
- 
-+/* NOTE: page is the PFN not real ram_addr_t. */
-+static void pss_init(PageSearchStatus *pss, RAMBlock *rb, ram_addr_t page)
-+{
-+    pss->block = rb;
-+    pss->page = page;
-+    pss->complete_round = false;
-+}
-+
- static void *do_data_compress(void *opaque)
- {
-     CompressParam *param = opaque;
-@@ -2650,9 +2658,7 @@ static int ram_find_and_save_block(RAMState *rs)
-         rs->last_page = 0;
-     }
- 
--    pss.block = rs->last_seen_block;
--    pss.page = rs->last_page;
--    pss.complete_round = false;
-+    pss_init(&pss, rs->last_seen_block, rs->last_page);
- 
-     do {
-         again = true;
--- 
-2.38.1
+This patch seems to almost entirely be huge because of these
+mips test case files. Are they specific to QEMU or are they
+effectively a 3rd-party import that it doesn't make sense
+to make local changes to?
+
+I definitely don't think you should put manual tidying changes
+in the same patch as 3000 lines of automated changes: that
+is in my opinion un-reviewable.
+
+thanks
+-- PMM
 

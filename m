@@ -1,15 +1,18 @@
-Return-Path: <stefanha@redhat.com>
-Date: Mon, 21 Nov 2022 11:20:07 -0500
-From: Stefan Hajnoczi <stefanha@redhat.com>
-Message-ID: <Y3ulN5DtIN4YIHy6@fedora>
-References: <20221121101101.29400-1-sgarzare@redhat.com>
+Return-Path: <armbru@redhat.com>
+From: Markus Armbruster <armbru@redhat.com>
+References: <20221121140121.1079100-1-armbru@redhat.com>
+ <CAFEAcA_jnbp36Trjd3qJYzbf5-6SNNrirG7q2_-wKXkcX49ptg@mail.gmail.com>
+ <7875a42b-2776-9d36-5373-78ac75cff89d@linaro.org>
+Date: Mon, 21 Nov 2022 17:32:12 +0100
+In-Reply-To: <7875a42b-2776-9d36-5373-78ac75cff89d@linaro.org> ("Philippe
+ =?utf-8?Q?Mathieu-Daud=C3=A9=22's?= message of "Mon, 21 Nov 2022 17:03:50
+ +0100")
+Message-ID: <87a64ki7zn.fsf@pond.sub.org>
 MIME-Version: 1.0
-Content-Type: multipart/signed; micalg=pgp-sha256;
- protocol="application/pgp-signature"; boundary="yGYzq2s7HGeIQb5G"
-Content-Disposition: inline
-In-Reply-To: <20221121101101.29400-1-sgarzare@redhat.com>
-Subject: Re: [Virtio-fs] [PATCH] vhost: mask VIRTIO_F_RING_RESET for vhost
- and vhost-user devices
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH] cleanup: Tweak and re-run
+ return_directly.cocci
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,87 +21,51 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefano Garzarella <sgarzare@redhat.com>
-Cc: qemu-devel@nongnu.org, qemu-block@nongnu.org, virtio-fs@redhat.com, Alex =?iso-8859-1?Q?Benn=E9e?= <alex.bennee@linaro.org>, Viresh Kumar <viresh.kumar@linaro.org>, "Michael S. Tsirkin" <mst@redhat.com>, Fam Zheng <fam@euphon.net>, Mathieu Poirier <mathieu.poirier@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Kevin Wolf <kwolf@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Hanna Reitz <hreitz@redhat.com>, kangjie.xu@linux.alibaba.com, Jason Wang <jasowang@redhat.com>
+To: Philippe =?utf-8?Q?Mathieu-Daud=C3=A9?= <philmd@linaro.org>
+Cc: Peter Maydell <peter.maydell@linaro.org>, qemu-devel@nongnu.org, fam@euphon.net, kwolf@redhat.com, hreitz@redhat.com, groug@kaod.org, qemu_oss@crudebyte.com, Alistair.Francis@wdc.com, bin.meng@windriver.com, palmer@dabbelt.com, marcandre.lureau@redhat.com, pbonzini@redhat.com, yuval.shaia.ml@gmail.com, marcel.apfelbaum@gmail.com, mst@redhat.com, quintela@redhat.com, dgilbert@redhat.com, pavel.dovgaluk@ispras.ru, alex.bennee@linaro.org, peterx@redhat.com, david@redhat.com, mrolnik@gmail.com, gaosong@loongson.cn, yangxiaojuan@loongson.cn, aurelien@aurel32.net, jiaxun.yang@flygoat.com, aleksandar.rikalo@syrmia.com, jcmvbkbc@gmail.com, berrange@redhat.com, thuth@redhat.com, lvivier@redhat.com, suhang16@mails.ucas.ac.cn, chen.zhang@intel.com, lizhijian@fujitsu.com, stefanha@redhat.com, qemu-block@nongnu.org, qemu-riscv@nongnu.org, qemu-ppc@nongnu.org, virtio-fs@redhat.com
 
+Philippe Mathieu-Daud=C3=A9 <philmd@linaro.org> writes:
 
---yGYzq2s7HGeIQb5G
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+> On 21/11/22 15:36, Peter Maydell wrote:
+>> On Mon, 21 Nov 2022 at 14:03, Markus Armbruster <armbru@redhat.com> wrot=
+e:
+>>>
+>>> Tweak the semantic patch to drop redundant parenthesis around the
+>>> return expression.
+>>>
+>>> Coccinelle drops comments in hw/rdma/vmw/pvrdma_cmd.c; restored
+>>> manually.
+>>>
+>>> Coccinelle messes up vmdk_co_create(), not sure why.  Transformed
+>>> manually.
+>>>
+>>> Line breaks in target/avr/cpu.h and hw/rdma/vmw/pvrdma_cmd.c tidied up
+>>> manually.
+>>>
+>>> Whitespace in fuse_reply_iov() tidied up manually.
+>>>
+>>> checkpatch.pl complains "return of an errno should typically be -ve"
+>>> two times for hw/9pfs/9p-synth.c.  Preexisting, the patch merely makes
+>>> it visible to checkpatch.pl.
+>>>
+>>> checkpatch.pl complains "return is not a function, parentheses are not
+>>> required" three times for target/mips/tcg/dsp_helper.c.  False
+>>> positives.
+>>>
+>>> Signed-off-by: Markus Armbruster <armbru@redhat.com>
+>>=20
+>>>   .../user/ase/msa/bit-count/test_msa_nloc_b.c  |   9 +-
+>>>   .../user/ase/msa/bit-count/test_msa_nloc_d.c  |   9 +-
+>> [snip long list of other mips test files]
+>>=20
+>>>   328 files changed, 989 insertions(+), 2099 deletions(-)
+>> This patch seems to almost entirely be huge because of these
+>> mips test case files. Are they specific to QEMU or are they
+>> effectively a 3rd-party import that it doesn't make sense
+>> to make local changes to?
+>
+> They are imported and will unlikely be modified.
 
-On Mon, Nov 21, 2022 at 11:11:01AM +0100, Stefano Garzarella wrote:
-> Commit 69e1c14aa2 ("virtio: core: vq reset feature negotation support")
-> enabled VIRTIO_F_RING_RESET by default for all virtio devices.
->=20
-> This feature is not currently emulated by QEMU, so for vhost and
-> vhost-user devices we need to make sure it is supported by the offloaded
-> device emulation (in-kernel or in another process).
-> To do this we need to add VIRTIO_F_RING_RESET to the features bitmap
-> passed to vhost_get_features(). This way it will be masked if the device
-> does not support it.
->=20
-> This issue was initially discovered with vhost-vsock and vhost-user-vsock,
-> and then also tested with vhost-user-rng which confirmed the same issue.
-> They fail when sending features through VHOST_SET_FEATURES ioctl or
-> VHOST_USER_SET_FEATURES message, since VIRTIO_F_RING_RESET is negotiated
-> by the guest (Linux >=3D v6.0), but not supported by the device.
->=20
-> Fixes: 69e1c14aa2 ("virtio: core: vq reset feature negotation support")
-> Resolves: https://gitlab.com/qemu-project/qemu/-/issues/1318
-> Signed-off-by: Stefano Garzarella <sgarzare@redhat.com>
-> ---
->=20
-> To prevent this problem in the future, perhaps we should provide a functi=
-on
-> (e.g. vhost_device_get_features) where we go to mask all non-device-speci=
-fic
-> features (e.g VIRTIO_F_*, VIRTIO_RING_F_*) that are not emulated by QEMU =
-but
-> we expect them to be emulated by the vhost or vhost-user devices.
-> Then we can call it in all .get_features callbacks just before return the
-> features.
->=20
-> What do you think?
->=20
-> But maybe better to do that for the next release, I will send an RFC.
+Not obvious to me from git-log.
 
-This patch looks good for 7.2.
-
-I agree that in the long run this needs to be more robust so vhost
-devices don't break every time a new feature bit is added.
-
->=20
-> Thanks,
-> Stefano
-> ---
->  hw/block/vhost-user-blk.c      |  1 +
->  hw/net/vhost_net.c             |  1 +
->  hw/scsi/vhost-scsi.c           |  1 +
->  hw/scsi/vhost-user-scsi.c      |  1 +
->  hw/virtio/vhost-user-fs.c      |  1 +
->  hw/virtio/vhost-user-gpio.c    |  1 +
->  hw/virtio/vhost-user-i2c.c     |  1 +
->  hw/virtio/vhost-user-rng.c     | 11 +++++++++--
->  hw/virtio/vhost-vsock-common.c |  1 +
->  net/vhost-vdpa.c               |  1 +
->  10 files changed, 18 insertions(+), 2 deletions(-)
-
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-
---yGYzq2s7HGeIQb5G
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAEBCAAdFiEEhpWov9P5fNqsNXdanKSrs4Grc8gFAmN7pTcACgkQnKSrs4Gr
-c8gy8gf9GfUs9ASyMEBiAtX7Kr79Btno4bBzs94QMnBUfdCZygUA7V5ROUz5YG6N
-2yklQ1VhUHCV+e1+pmFcZ6DzMbhB1RQ9z+rtSUPG4+FCCLvDTqVG8Gf3ZcPABciE
-8Neau3FnHxI1cPzPNcDqTfseLO8yhnFLAuBTfXRQkLpb5Q6jklsRb+IARNAOBqeK
-wawUXiEJTYJenbRVqmukbNAWVEOh6ciwNKLR70WNdW1AvgQh9cQru2rkuXuQ6Fb6
-mKSCvyiNV8Gp1bxCksN232LsGuAFY2qiFq+ckwqp+kjDoVRfp6dvZ4lEN6NfTPZx
-nHDh+dnM6X886tjkTpvA830JVW1PKQ==
-=2Fm+
------END PGP SIGNATURE-----
-
---yGYzq2s7HGeIQb5G--
+Should I drop the changes to tests/tcg/mips/?

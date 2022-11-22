@@ -1,24 +1,13 @@
-Return-Path: <mst@redhat.com>
-Date: Mon, 21 Nov 2022 17:37:11 -0500
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20221121173656-mutt-send-email-mst@kernel.org>
-References: <20221114113518-mutt-send-email-mst@kernel.org>
- <aaae3f2a-c5bb-8e62-09d4-4f6f43efe37b@linux.ibm.com>
- <20221114115549-mutt-send-email-mst@kernel.org>
- <2bd5f801-a203-2598-3e6e-ed8f5dad5159@linux.ibm.com>
- <20221114121959-mutt-send-email-mst@kernel.org>
- <87tu309tlk.fsf@linaro.org>
- <26b4e8d8-784d-d1ce-67a3-b61896701bf7@linux.ibm.com>
- <87leoc9p98.fsf@linaro.org>
- <471b71ad-1892-8ab4-a94b-c0ec3d34e6b1@linux.ibm.com>
- <1bfc2fee-5972-676e-563e-e245814e54c3@linux.ibm.com>
+Return-Path: <jasowang@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <1bfc2fee-5972-676e-563e-e245814e54c3@linux.ibm.com>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [PATCH v1 5/9] hw/virtio: introduce
- virtio_device_should_start
+References: <20221121101101.29400-1-sgarzare@redhat.com>
+In-Reply-To: <20221121101101.29400-1-sgarzare@redhat.com>
+From: Jason Wang <jasowang@redhat.com>
+Date: Tue, 22 Nov 2022 11:13:00 +0800
+Message-ID: <CACGkMEtZ9C0uhnDZ7iPJSHvPcbwGCLrzj742zzc9xAVWD7EMVA@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PATCH] vhost: mask VIRTIO_F_RING_RESET for vhost
+ and vhost-user devices
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,244 +16,205 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Christian Borntraeger <borntraeger@linux.ibm.com>
-Cc: Alex =?iso-8859-1?Q?Benn=E9e?= <alex.bennee@linaro.org>, qemu-devel@nongnu.org, fam@euphon.net, berrange@redhat.com, f4bug@amsat.org, aurelien@aurel32.net, pbonzini@redhat.com, stefanha@redhat.com, crosa@redhat.com, Raphael Norwitz <raphael.norwitz@nutanix.com>, Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, "open list:Block layer core" <qemu-block@nongnu.org>, "open list:virtiofs" <virtio-fs@redhat.com>
+To: Stefano Garzarella <sgarzare@redhat.com>
+Cc: qemu-devel@nongnu.org, qemu-block@nongnu.org, virtio-fs@redhat.com, =?UTF-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>, Viresh Kumar <viresh.kumar@linaro.org>, "Michael S. Tsirkin" <mst@redhat.com>, Fam Zheng <fam@euphon.net>, Mathieu Poirier <mathieu.poirier@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Kevin Wolf <kwolf@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Hanna Reitz <hreitz@redhat.com>, kangjie.xu@linux.alibaba.com, eperezma <eperezma@redhat.com>
 
-On Tue, Nov 15, 2022 at 05:46:58PM +0100, Christian Borntraeger wrote:
->=20
->=20
-> Am 15.11.22 um 17:40 schrieb Christian Borntraeger:
-> >=20
-> >=20
-> > Am 15.11.22 um 17:05 schrieb Alex Benn=E9e:
-> > >=20
-> > > Christian Borntraeger <borntraeger@linux.ibm.com> writes:
-> > >=20
-> > > > Am 15.11.22 um 15:31 schrieb Alex Benn=E9e:
-> > > > > "Michael S. Tsirkin" <mst@redhat.com> writes:
-> > > > >=20
-> > > > > > On Mon, Nov 14, 2022 at 06:15:30PM +0100, Christian Borntraeger=
- wrote:
-> > > > > > >=20
-> > > > > > >=20
-> > > > > > > Am 14.11.22 um 18:10 schrieb Michael S. Tsirkin:
-> > > > > > > > On Mon, Nov 14, 2022 at 05:55:09PM +0100, Christian Borntra=
-eger wrote:
-> > > > > > > > >=20
-> > > > > > > > >=20
-> > > > > > > > > Am 14.11.22 um 17:37 schrieb Michael S. Tsirkin:
-> > > > > > > > > > On Mon, Nov 14, 2022 at 05:18:53PM +0100, Christian Bor=
-ntraeger wrote:
-> > > > > > > > > > > Am 08.11.22 um 10:23 schrieb Alex Benn=E9e:
-> > > > > > > > > > > > The previous fix to virtio_device_started revealed =
-a problem in its
-> > > > > > > > > > > > use by both the core and the device code. The core =
-code should be able
-> > > > > > > > > > > > to handle the device "starting" while the VM isn't =
-running to handle
-> > > > > > > > > > > > the restoration of migration state. To solve this d=
-ual use introduce a
-> > > > > > > > > > > > new helper for use by the vhost-user backends who a=
-ll use it to feed a
-> > > > > > > > > > > > should_start variable.
-> > > > > > > > > > > >=20
-> > > > > > > > > > > > We can also pick up a change vhost_user_blk_set_sta=
-tus while we are at
-> > > > > > > > > > > > it which follows the same pattern.
-> > > > > > > > > > > >=20
-> > > > > > > > > > > > Fixes: 9f6bcfd99f (hw/virtio: move vm_running check=
- to virtio_device_started)
-> > > > > > > > > > > > Fixes: 27ba7b027f (hw/virtio: add boilerplate for v=
-host-user-gpio device)
-> > > > > > > > > > > > Signed-off-by: Alex Benn=E9e <alex.bennee@linaro.or=
-g>
-> > > > > > > > > > > > Cc: "Michael S. Tsirkin" <mst@redhat.com>
-> > > > > > > > > > >=20
-> > > > > > > > > > > Hmmm, is this
-> > > > > > > > > > > commit 259d69c00b67c02a67f3bdbeeea71c2c0af76c35
-> > > > > > > > > > > Author:=A0=A0=A0=A0 Alex Benn=E9e <alex.bennee@linaro=
-.org>
-> > > > > > > > > > > AuthorDate: Mon Nov 7 12:14:07 2022 +0000
-> > > > > > > > > > > Commit:=A0=A0=A0=A0 Michael S. Tsirkin <mst@redhat.co=
-m>
-> > > > > > > > > > > CommitDate: Mon Nov 7 14:08:18 2022 -0500
-> > > > > > > > > > >=20
-> > > > > > > > > > > =A0=A0=A0=A0=A0=A0=A0 hw/virtio: introduce virtio_dev=
-ice_should_start
-> > > > > > > > > > >=20
-> > > > > > > > > > > and older version?
-> > > > > > > > > >=20
-> > > > > > > > > > This is what got merged:
-> > > > > > > > > > https://lore.kernel.org/r/20221107121407.1010913-1-alex=
-.bennee%40linaro.org
-> > > > > > > > > > This patch was sent after I merged the RFC.
-> > > > > > > > > > I think the only difference is the commit log but I mig=
-ht be missing
-> > > > > > > > > > something.
-> > > > > > > > > >=20
-> > > > > > > > > > > This does not seem to fix the regression that I have =
-reported.
-> > > > > > > > > >=20
-> > > > > > > > > > This was applied on top of 9f6bcfd99f which IIUC does, =
-right?
-> > > > > > > > > >=20
-> > > > > > > > > >=20
-> > > > > > > > >=20
-> > > > > > > > > QEMU master still fails for me for suspend/resume to disk:
-> > > > > > > > >=20
-> > > > > > > > > #0=A0 0x000003ff8e3980a6 in __pthread_kill_implementation=
- () at /lib64/libc.so.6
-> > > > > > > > > #1=A0 0x000003ff8e348580 in raise () at /lib64/libc.so.6
-> > > > > > > > > #2=A0 0x000003ff8e32b5c0 in abort () at /lib64/libc.so.6
-> > > > > > > > > #3=A0 0x000003ff8e3409da in __assert_fail_base () at /lib=
-64/libc.so.6
-> > > > > > > > > #4=A0 0x000003ff8e340a4e in=A0 () at /lib64/libc.so.6
-> > > > > > > > > #5 0x000002aa1ffa8966 in vhost_vsock_common_pre_save
-> > > > > > > > > (opaque=3D<optimized out>) at
-> > > > > > > > > ../hw/virtio/vhost-vsock-common.c:203
-> > > > > > > > > #6=A0 0x000002aa1fe5e0ee in vmstate_save_state_v
-> > > > > > > > > =A0=A0=A0=A0=A0=A0 (f=3Df@entry=3D0x2aa21bdc170, vmsd=3D0=
-x2aa204ac5f0
-> > > > > > > > > <vmstate_virtio_vhost_vsock>, opaque=3D0x2aa21bac9f8,
-> > > > > > > > > vmdesc=3Dvmdesc@entry=3D0x3fddc08eb30,
-> > > > > > > > > version_id=3Dversion_id@entry=3D0) at ../migration/vmstat=
-e.c:329
-> > > > > > > > > #7 0x000002aa1fe5ebf8 in vmstate_save_state
-> > > > > > > > > (f=3Df@entry=3D0x2aa21bdc170, vmsd=3D<optimized out>,
-> > > > > > > > > opaque=3D<optimized out>, vmdesc_id=3Dvmdesc_id@entry=3D0=
-x3fddc08eb30)
-> > > > > > > > > at ../migration/vmstate.c:317
-> > > > > > > > > #8 0x000002aa1fe75bd0 in vmstate_save (f=3Df@entry=3D0x2a=
-a21bdc170,
-> > > > > > > > > se=3Dse@entry=3D0x2aa21bdbe90, vmdesc=3Dvmdesc@entry=3D0x=
-3fddc08eb30) at
-> > > > > > > > > ../migration/savevm.c:908
-> > > > > > > > > #9 0x000002aa1fe79584 in
-> > > > > > > > > qemu_savevm_state_complete_precopy_non_iterable
-> > > > > > > > > (f=3Df@entry=3D0x2aa21bdc170, in_postcopy=3Din_postcopy@e=
-ntry=3Dfalse,
-> > > > > > > > > inactivate_disks=3Dinactivate_disks@entry=3Dtrue)
-> > > > > > > > > =A0=A0=A0=A0=A0=A0 at ../migration/savevm.c:1393
-> > > > > > > > > #10 0x000002aa1fe79a96 in qemu_savevm_state_complete_prec=
-opy
-> > > > > > > > > (f=3D0x2aa21bdc170, iterable_only=3Diterable_only@entry=
-=3Dfalse,
-> > > > > > > > > inactivate_disks=3Dinactivate_disks@entry=3Dtrue) at
-> > > > > > > > > ../migration/savevm.c:1459
-> > > > > > > > > #11 0x000002aa1fe6d6ee in migration_completion (s=3D0x2aa=
-218ef600) at ../migration/migration.c:3314
-> > > > > > > > > #12 migration_iteration_run (s=3D0x2aa218ef600) at ../mig=
-ration/migration.c:3761
-> > > > > > > > > #13 migration_thread (opaque=3Dopaque@entry=3D0x2aa218ef6=
-00) at ../migration/migration.c:3989
-> > > > > > > > > #14 0x000002aa201f0b8c in qemu_thread_start (args=3D<opti=
-mized out>) at ../util/qemu-thread-posix.c:505
-> > > > > > > > > #15 0x000003ff8e396248 in start_thread () at /lib64/libc.=
-so.6
-> > > > > > > > > #16 0x000003ff8e41183e in thread_start () at /lib64/libc.=
-so.6
-> > > > > > > > >=20
-> > > > > > > > > Michael, your previous branch did work if I recall correc=
-tly.
-> > > > > > > >=20
-> > > > > > > > That one was failing under github CI though (for reasons we=
- didn't
-> > > > > > > > really address, such as disconnect during stop causing a re=
-cursive
-> > > > > > > > call to stop, but there you are).
-> > > > > > > Even the double revert of everything?
-> > > > > >=20
-> > > > > > I don't remember at this point.
-> > > > > >=20
-> > > > > > > So how do we proceed now?
-> > > > > >=20
-> > > > > > I'm hopeful Alex will come up with a fix.
-> > > > > I need to replicate the failing test for that. Which test is
-> > > > > failing?
-> > > >=20
-> > > >=20
-> > > > Pretty much the same as before. guest with vsock, managedsave and
-> > > > restore.
-> > >=20
-> > > If this isn't in our test suite I'm going to need exact steps.
-> >=20
-> > Just get any libvirt guest, add
-> >  =A0=A0=A0 <vsock model=3D'virtio'>
-> >  =A0=A0=A0=A0=A0 <cid auto=3D'yes'/>
-> >  =A0=A0=A0 </vsock>
-> >=20
-> > to your libvirt xml. Start the guest (with the new xml).
-> > Run virsh managedsave - qemu crashes. On x86 and s390.
->=20
->=20
-> the libvirt log:
->=20
-> /home/cborntra/REPOS/qemu/build/x86_64-softmmu/qemu-system-x86_64 \
-> -name guest=3Df36,debug-threads=3Don \
-> -S \
-> -object '{"qom-type":"secret","id":"masterKey0","format":"raw","file":"/v=
-ar/lib/libvirt/qemu/domain-1-f36/master-key.aes"}' \
-> -machine pc-i440fx-7.2,usb=3Doff,dump-guest-core=3Doff,memory-backend=3Dp=
-c.ram \
-> -accel kvm \
-> -cpu Cooperlake,ss=3Don,pdcm=3Don,hypervisor=3Don,tsc-adjust=3Don,avx512i=
-fma=3Don,sha-ni=3Don,avx512vbmi=3Don,umip=3Don,avx512vbmi2=3Don,gfni=3Don,v=
-aes=3Don,vpclmulqdq=3Don,avx512bitalg=3Don,avx512-vpopcntdq=3Don,rdpid=3Don=
-,movdiri=3Don,movdir64b=3Don,fsrm=3Don,md-clear=3Don,xsaves=3Don,ibpb=3Don,=
-ibrs=3Don,amd-stibp=3Don,amd-ssbd=3Don,hle=3Doff,rtm=3Doff,avx512-bf16=3Dof=
-f,taa-no=3Doff \
-> -m 2048 \
-> -object '{"qom-type":"memory-backend-ram","id":"pc.ram","size":2147483648=
-}' \
-> -overcommit mem-lock=3Doff \
-> -smp 2,sockets=3D2,cores=3D1,threads=3D1 \
-> -uuid 712590b2-fbd8-4a2f-a8e9-be33cb9ee0da \
-> -display none \
-> -no-user-config \
-> -nodefaults \
-> -chardev socket,id=3Dcharmonitor,fd=3D39,server=3Don,wait=3Doff \
-> -mon chardev=3Dcharmonitor,id=3Dmonitor,mode=3Dcontrol \
-> -rtc base=3Dutc,driftfix=3Dslew \
-> -global kvm-pit.lost_tick_policy=3Ddelay \
-> -no-hpet \
-> -no-shutdown \
-> -global PIIX4_PM.disable_s3=3D1 \
-> -global PIIX4_PM.disable_s4=3D1 \
-> -boot strict=3Don \
-> -device ich9-usb-ehci1,id=3Dusb,bus=3Dpci.0,addr=3D0x3.0x7 \
-> -device ich9-usb-uhci1,masterbus=3Dusb.0,firstport=3D0,bus=3Dpci.0,multif=
-unction=3Don,addr=3D0x3 \
-> -device ich9-usb-uhci2,masterbus=3Dusb.0,firstport=3D2,bus=3Dpci.0,addr=
-=3D0x3.0x1 \
-> -device ich9-usb-uhci3,masterbus=3Dusb.0,firstport=3D4,bus=3Dpci.0,addr=
-=3D0x3.0x2 \
-> -blockdev '{"driver":"file","filename":"/var/lib/libvirt/images/f36.qcow2=
-","node-name":"libvirt-1-storage","auto-read-only":true,"discard":"unmap"}'=
- \
-> -blockdev '{"node-name":"libvirt-1-format","read-only":false,"driver":"qc=
-ow2","file":"libvirt-1-storage","backing":null}' \
-> -device ide-hd,bus=3Dide.0,unit=3D0,drive=3Dlibvirt-1-format,id=3Dide0-0-=
-0,bootindex=3D1 \
-> -netdev user,id=3Dhostnet0 \
-> -device e1000,netdev=3Dhostnet0,id=3Dnet0,mac=3D52:54:00:20:ba:4a,bus=3Dp=
-ci.0,addr=3D0x2 \
-> -chardev pty,id=3Dcharserial0 \
-> -device isa-serial,chardev=3Dcharserial0,id=3Dserial0 \
-> -audiodev '{"id":"audio1","driver":"none"}' \
-> -device virtio-balloon-pci,id=3Dballoon0,bus=3Dpci.0,addr=3D0x4 \
-> -sandbox on,obsolete=3Ddeny,elevateprivileges=3Ddeny,spawn=3Ddeny,resourc=
-econtrol=3Ddeny \
-> -device vhost-vsock-pci,id=3Dvsock0,guest-cid=3D3,vhostfd=3D35,bus=3Dpci.=
-0,addr=3D0x5 \
-> -msg timestamp=3Don
-> char device redirected to /dev/pts/1 (label charserial0)
-> qemu-system-x86_64: ../hw/virtio/vhost-vsock-common.c:203: vhost_vsock_co=
-mmon_pre_save: Assertion `!vhost_dev_is_started(&vvc->vhost_dev)' failed.
-> 2022-11-15 16:38:46.096+0000: shutting down, reason=3Dcrashed
+On Mon, Nov 21, 2022 at 6:11 PM Stefano Garzarella <sgarzare@redhat.com> wrote:
+>
+> Commit 69e1c14aa2 ("virtio: core: vq reset feature negotation support")
+> enabled VIRTIO_F_RING_RESET by default for all virtio devices.
+>
+> This feature is not currently emulated by QEMU, so for vhost and
+> vhost-user devices we need to make sure it is supported by the offloaded
+> device emulation (in-kernel or in another process).
+> To do this we need to add VIRTIO_F_RING_RESET to the features bitmap
+> passed to vhost_get_features(). This way it will be masked if the device
+> does not support it.
+>
+> This issue was initially discovered with vhost-vsock and vhost-user-vsock,
+> and then also tested with vhost-user-rng which confirmed the same issue.
+> They fail when sending features through VHOST_SET_FEATURES ioctl or
+> VHOST_USER_SET_FEATURES message, since VIRTIO_F_RING_RESET is negotiated
+> by the guest (Linux >= v6.0), but not supported by the device.
+>
+> Fixes: 69e1c14aa2 ("virtio: core: vq reset feature negotation support")
+> Resolves: https://gitlab.com/qemu-project/qemu/-/issues/1318
+> Signed-off-by: Stefano Garzarella <sgarzare@redhat.com>
 
-Alex were you able to replicate? Just curious.
+Acked-by: Jason Wang <jasowang@redhat.com>
 
+> ---
+>
+> To prevent this problem in the future, perhaps we should provide a function
+> (e.g. vhost_device_get_features) where we go to mask all non-device-specific
+> features (e.g VIRTIO_F_*, VIRTIO_RING_F_*) that are not emulated by QEMU but
+> we expect them to be emulated by the vhost or vhost-user devices.
 
---=20
-MST
+Adding Eugenio, this might not be true if we want to use shadow
+virtqueue for emulating some features?
+
+Thanks
+
+> Then we can call it in all .get_features callbacks just before return the
+> features.
+>
+> What do you think?
+>
+> But maybe better to do that for the next release, I will send an RFC.
+>
+> Thanks,
+> Stefano
+> ---
+>  hw/block/vhost-user-blk.c      |  1 +
+>  hw/net/vhost_net.c             |  1 +
+>  hw/scsi/vhost-scsi.c           |  1 +
+>  hw/scsi/vhost-user-scsi.c      |  1 +
+>  hw/virtio/vhost-user-fs.c      |  1 +
+>  hw/virtio/vhost-user-gpio.c    |  1 +
+>  hw/virtio/vhost-user-i2c.c     |  1 +
+>  hw/virtio/vhost-user-rng.c     | 11 +++++++++--
+>  hw/virtio/vhost-vsock-common.c |  1 +
+>  net/vhost-vdpa.c               |  1 +
+>  10 files changed, 18 insertions(+), 2 deletions(-)
+>
+> diff --git a/hw/block/vhost-user-blk.c b/hw/block/vhost-user-blk.c
+> index 16ad400889..0d5190accf 100644
+> --- a/hw/block/vhost-user-blk.c
+> +++ b/hw/block/vhost-user-blk.c
+> @@ -52,6 +52,7 @@ static const int user_feature_bits[] = {
+>      VIRTIO_F_NOTIFY_ON_EMPTY,
+>      VIRTIO_F_RING_PACKED,
+>      VIRTIO_F_IOMMU_PLATFORM,
+> +    VIRTIO_F_RING_RESET,
+>      VHOST_INVALID_FEATURE_BIT
+>  };
+>
+> diff --git a/hw/net/vhost_net.c b/hw/net/vhost_net.c
+> index feda448878..26e4930676 100644
+> --- a/hw/net/vhost_net.c
+> +++ b/hw/net/vhost_net.c
+> @@ -75,6 +75,7 @@ static const int user_feature_bits[] = {
+>      VIRTIO_NET_F_MTU,
+>      VIRTIO_F_IOMMU_PLATFORM,
+>      VIRTIO_F_RING_PACKED,
+> +    VIRTIO_F_RING_RESET,
+>      VIRTIO_NET_F_RSS,
+>      VIRTIO_NET_F_HASH_REPORT,
+>
+> diff --git a/hw/scsi/vhost-scsi.c b/hw/scsi/vhost-scsi.c
+> index bdf337a7a2..6a0fd0dfb1 100644
+> --- a/hw/scsi/vhost-scsi.c
+> +++ b/hw/scsi/vhost-scsi.c
+> @@ -38,6 +38,7 @@ static const int kernel_feature_bits[] = {
+>      VIRTIO_RING_F_INDIRECT_DESC,
+>      VIRTIO_RING_F_EVENT_IDX,
+>      VIRTIO_SCSI_F_HOTPLUG,
+> +    VIRTIO_F_RING_RESET,
+>      VHOST_INVALID_FEATURE_BIT
+>  };
+>
+> diff --git a/hw/scsi/vhost-user-scsi.c b/hw/scsi/vhost-user-scsi.c
+> index bc37317d55..b7a71a802c 100644
+> --- a/hw/scsi/vhost-user-scsi.c
+> +++ b/hw/scsi/vhost-user-scsi.c
+> @@ -36,6 +36,7 @@ static const int user_feature_bits[] = {
+>      VIRTIO_RING_F_INDIRECT_DESC,
+>      VIRTIO_RING_F_EVENT_IDX,
+>      VIRTIO_SCSI_F_HOTPLUG,
+> +    VIRTIO_F_RING_RESET,
+>      VHOST_INVALID_FEATURE_BIT
+>  };
+>
+> diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
+> index 1c40f42045..dc4014cdef 100644
+> --- a/hw/virtio/vhost-user-fs.c
+> +++ b/hw/virtio/vhost-user-fs.c
+> @@ -32,6 +32,7 @@ static const int user_feature_bits[] = {
+>      VIRTIO_F_NOTIFY_ON_EMPTY,
+>      VIRTIO_F_RING_PACKED,
+>      VIRTIO_F_IOMMU_PLATFORM,
+> +    VIRTIO_F_RING_RESET,
+>
+>      VHOST_INVALID_FEATURE_BIT
+>  };
+> diff --git a/hw/virtio/vhost-user-gpio.c b/hw/virtio/vhost-user-gpio.c
+> index 677d1c7730..5851cb3bc9 100644
+> --- a/hw/virtio/vhost-user-gpio.c
+> +++ b/hw/virtio/vhost-user-gpio.c
+> @@ -24,6 +24,7 @@ static const int feature_bits[] = {
+>      VIRTIO_RING_F_INDIRECT_DESC,
+>      VIRTIO_RING_F_EVENT_IDX,
+>      VIRTIO_GPIO_F_IRQ,
+> +    VIRTIO_F_RING_RESET,
+>      VHOST_INVALID_FEATURE_BIT
+>  };
+>
+> diff --git a/hw/virtio/vhost-user-i2c.c b/hw/virtio/vhost-user-i2c.c
+> index 864eba695e..1c9f3d20dc 100644
+> --- a/hw/virtio/vhost-user-i2c.c
+> +++ b/hw/virtio/vhost-user-i2c.c
+> @@ -16,6 +16,7 @@
+>
+>  static const int feature_bits[] = {
+>      VIRTIO_I2C_F_ZERO_LENGTH_REQUEST,
+> +    VIRTIO_F_RING_RESET,
+>      VHOST_INVALID_FEATURE_BIT
+>  };
+>
+> diff --git a/hw/virtio/vhost-user-rng.c b/hw/virtio/vhost-user-rng.c
+> index 8b47287875..f9084cde58 100644
+> --- a/hw/virtio/vhost-user-rng.c
+> +++ b/hw/virtio/vhost-user-rng.c
+> @@ -16,6 +16,11 @@
+>  #include "qemu/error-report.h"
+>  #include "standard-headers/linux/virtio_ids.h"
+>
+> +static const int feature_bits[] = {
+> +    VIRTIO_F_RING_RESET,
+> +    VHOST_INVALID_FEATURE_BIT
+> +};
+> +
+>  static void vu_rng_start(VirtIODevice *vdev)
+>  {
+>      VHostUserRNG *rng = VHOST_USER_RNG(vdev);
+> @@ -106,8 +111,10 @@ static void vu_rng_set_status(VirtIODevice *vdev, uint8_t status)
+>  static uint64_t vu_rng_get_features(VirtIODevice *vdev,
+>                                      uint64_t requested_features, Error **errp)
+>  {
+> -    /* No feature bits used yet */
+> -    return requested_features;
+> +    VHostUserRNG *rng = VHOST_USER_RNG(vdev);
+> +
+> +    return vhost_get_features(&rng->vhost_dev, feature_bits,
+> +                              requested_features);
+>  }
+>
+>  static void vu_rng_handle_output(VirtIODevice *vdev, VirtQueue *vq)
+> diff --git a/hw/virtio/vhost-vsock-common.c b/hw/virtio/vhost-vsock-common.c
+> index 29b9ab4f72..a67a275de2 100644
+> --- a/hw/virtio/vhost-vsock-common.c
+> +++ b/hw/virtio/vhost-vsock-common.c
+> @@ -21,6 +21,7 @@
+>
+>  const int feature_bits[] = {
+>      VIRTIO_VSOCK_F_SEQPACKET,
+> +    VIRTIO_F_RING_RESET,
+>      VHOST_INVALID_FEATURE_BIT
+>  };
+>
+> diff --git a/net/vhost-vdpa.c b/net/vhost-vdpa.c
+> index 6811089231..2b4b85d8f8 100644
+> --- a/net/vhost-vdpa.c
+> +++ b/net/vhost-vdpa.c
+> @@ -69,6 +69,7 @@ const int vdpa_feature_bits[] = {
+>      VIRTIO_NET_F_CTRL_VQ,
+>      VIRTIO_F_IOMMU_PLATFORM,
+>      VIRTIO_F_RING_PACKED,
+> +    VIRTIO_F_RING_RESET,
+>      VIRTIO_NET_F_RSS,
+>      VIRTIO_NET_F_HASH_REPORT,
+>      VIRTIO_NET_F_GUEST_ANNOUNCE,
+> --
+> 2.38.1
+>
 

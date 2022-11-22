@@ -1,32 +1,27 @@
-Return-Path: <alex.bennee@linaro.org>
+Return-Path: <philmd@linaro.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=content-transfer-encoding:mime-version:message-id:in-reply-to:date
- :subject:cc:to:from:user-agent:references:from:to:cc:subject:date
- :message-id:reply-to;
- bh=PgVwtIZ7pkX7b6jkS79qHqnp5KPqyhBZAcmOhgJgt6E=;
- b=jnS/W0gxyD/ph1tMAGSKBaAnRGm2BxHsM+Zg8oq6WZ2+kPlq/ERulwcFyS5on/gEJM
- vpAyOodBGBtlsoxl80i5CvDRHIbEKPWDgSE62Pdn7+lsBFbZEKEQBHXr6pBZcFiN/TkN
- S8YbkX+3f2ME8UAt+79iRaQcXV+QKc1RbMPiPhsFstBIvhTR+bYD4NOklxPdb+owu9ov
- rZwX41YtIGuFp0KRSkvHe6yEEL1A1X6wH3wMOuEW9CR+C4Ec2SoAS9tUfvyCk6DmUAtp
- Fd9P2MaGF0qnLaZRsWfr4FnXplBXT/wlmSWGslQB1gZXgcKohGv3AF0qn+BYwN749Ett
- mnPg==
-References: <20221108092308.1717426-1-alex.bennee@linaro.org>
- <20221108092308.1717426-6-alex.bennee@linaro.org>
- <2277569a-c218-30d1-4d88-9b77d3604513@linux.ibm.com>
- <20221114113518-mutt-send-email-mst@kernel.org>
- <aaae3f2a-c5bb-8e62-09d4-4f6f43efe37b@linux.ibm.com>
- <20221114115549-mutt-send-email-mst@kernel.org>
- <2bd5f801-a203-2598-3e6e-ed8f5dad5159@linux.ibm.com>
- <20221114121959-mutt-send-email-mst@kernel.org>
-From: Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>
-Date: Tue, 15 Nov 2022 14:31:51 +0000
-In-reply-to: <20221114121959-mutt-send-email-mst@kernel.org>
-Message-ID: <87tu309tlk.fsf@linaro.org>
+ h=content-transfer-encoding:in-reply-to:from:references:cc:to
+ :content-language:subject:user-agent:mime-version:date:message-id
+ :from:to:cc:subject:date:message-id:reply-to;
+ bh=ThKu+t6irTv73m8p7aEWsbq4mHIbv6ADWuq0AoAEUfY=;
+ b=Y2zgZjUo5IIXlAStEty/liujTidtzswAGZ5IqiU+U7/E+D3agEj/UwiUFi0/rca0ZM
+ m7lDi7hqbhEWBoqw3HoWAZgWH8+rUyY0RQ3GS3emoZibCAjIbZyCQw/mBX9RYzFk6HBV
+ K2uQLSrhyFDlznt906bny1WDB5sHuavB8nd7rElcptClls4iGkqKl7bVst2Fo0V3VI7g
+ dnRtFJQHtuxsOmToh9Bsd2uMIE0x4DjVBB/kR4a2eOSOrPmxIJjouAO/EEqy2jY8dxFe
+ 4ppS15OSmyWBQ5xQaDR+ZicvwdojBRLCABjZh9fmcb7xsnUCqHX6m0xpeHt7YqcmueTF
+ tgow==
+Message-ID: <58463615-23ab-5f08-de12-ccc5587040d6@linaro.org>
+Date: Tue, 22 Nov 2022 16:10:39 +0100
 MIME-Version: 1.0
-Content-Type: text/plain; charset=utf-8
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [PATCH v1 5/9] hw/virtio: introduce
- virtio_device_should_start
+References: <20221122134917.1217307-1-armbru@redhat.com>
+ <20221122134917.1217307-2-armbru@redhat.com>
+From: =?UTF-8?Q?Philippe_Mathieu-Daud=c3=a9?= <philmd@linaro.org>
+In-Reply-To: <20221122134917.1217307-2-armbru@redhat.com>
+Content-Language: en-US
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH v2 1/2] cleanup: Tweak and re-run
+ return_directly.cocci
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -35,132 +30,75 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: "Michael S. Tsirkin" <mst@redhat.com>
-Cc: Christian Borntraeger <borntraeger@linux.ibm.com>, qemu-devel@nongnu.org, fam@euphon.net, berrange@redhat.com, f4bug@amsat.org, aurelien@aurel32.net, pbonzini@redhat.com, stefanha@redhat.com, crosa@redhat.com, Raphael Norwitz <raphael.norwitz@nutanix.com>, Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, "open list:Block layer core" <qemu-block@nongnu.org>, "open list:virtiofs" <virtio-fs@redhat.com>
+To: Markus Armbruster <armbru@redhat.com>, qemu-devel@nongnu.org
+Cc: groug@kaod.org, qemu_oss@crudebyte.com, Alistair.Francis@wdc.com, bin.meng@windriver.com, palmer@dabbelt.com, marcandre.lureau@redhat.com, pbonzini@redhat.com, yuval.shaia.ml@gmail.com, marcel.apfelbaum@gmail.com, mst@redhat.com, quintela@redhat.com, dgilbert@redhat.com, pavel.dovgaluk@ispras.ru, alex.bennee@linaro.org, peterx@redhat.com, david@redhat.com, mrolnik@gmail.com, gaosong@loongson.cn, yangxiaojuan@loongson.cn, aurelien@aurel32.net, jiaxun.yang@flygoat.com, aleksandar.rikalo@syrmia.com, berrange@redhat.com, thuth@redhat.com, lvivier@redhat.com, suhang16@mails.ucas.ac.cn, chen.zhang@intel.com, lizhijian@fujitsu.com, stefanha@redhat.com, qemu-riscv@nongnu.org, qemu-ppc@nongnu.org, virtio-fs@redhat.com
 
+On 22/11/22 14:49, Markus Armbruster wrote:
+> Tweak the semantic patch to drop redundant parenthesis around the
+> return expression.
+> 
+> Coccinelle drops a comment in hw/rdma/vmw/pvrdma_cmd.c; restored
+> manually.
+> 
+> Coccinelle messes up vmdk_co_create(), not sure why.  Change dropped,
+> will be done manually in the next commit.
+> 
+> Line breaks in target/avr/cpu.h and hw/rdma/vmw/pvrdma_cmd.c tidied up
+> manually.
+> 
+> Whitespace in tools/virtiofsd/fuse_lowlevel.c tidied up manually.
+> 
+> checkpatch.pl complains "return of an errno should typically be -ve"
+> two times for hw/9pfs/9p-synth.c.  Preexisting, the patch merely makes
+> it visible to checkpatch.pl.
+> 
+> Signed-off-by: Markus Armbruster <armbru@redhat.com>
+> ---
+>   scripts/coccinelle/return_directly.cocci |  5 +--
+>   include/hw/pci/pci.h                     |  7 +--
+>   target/avr/cpu.h                         |  4 +-
+>   hw/9pfs/9p-synth.c                       | 14 ++----
+>   hw/char/sifive_uart.c                    |  4 +-
+>   hw/ppc/ppc4xx_sdram.c                    |  5 +--
+>   hw/rdma/vmw/pvrdma_cmd.c                 | 57 +++++++++---------------
+>   hw/virtio/vhost-user.c                   |  6 +--
+>   migration/dirtyrate.c                    | 10 +----
+>   migration/tls.c                          |  6 +--
+>   replay/replay-time.c                     |  5 +--
+>   semihosting/console.c                    |  4 +-
+>   softmmu/memory.c                         | 11 +----
+>   softmmu/physmem.c                        |  9 +---
+>   target/loongarch/cpu.c                   |  4 +-
+>   target/mips/tcg/dsp_helper.c             | 15 ++-----
+>   target/riscv/debug.c                     |  6 +--
+>   target/riscv/vector_helper.c             | 28 +++---------
+>   tests/bench/benchmark-crypto-akcipher.c  |  6 +--
+>   tests/qtest/erst-test.c                  |  5 +--
+>   tests/qtest/hexloader-test.c             |  6 +--
+>   tests/qtest/pvpanic-pci-test.c           |  6 +--
+>   tests/qtest/pvpanic-test.c               |  6 +--
+>   tests/qtest/test-filter-mirror.c         |  6 +--
+>   tests/qtest/virtio-ccw-test.c            |  6 +--
+>   tests/tcg/multiarch/sha512.c             |  9 +---
+>   tools/virtiofsd/fuse_lowlevel.c          | 24 +++-------
+>   27 files changed, 70 insertions(+), 204 deletions(-)
+> 
+> diff --git a/scripts/coccinelle/return_directly.cocci b/scripts/coccinelle/return_directly.cocci
+> index 4cf50e75ea..6cb1b3c99a 100644
+> --- a/scripts/coccinelle/return_directly.cocci
+> +++ b/scripts/coccinelle/return_directly.cocci
+> @@ -11,9 +11,8 @@ identifier F;
+>   -    T VAR;
+>        ... when != VAR
+>   
+> --    VAR =
+> -+    return
+> -     E;
+> +-    VAR = (E);
+>   -    return VAR;
+> ++    return E;
+>        ... when != VAR
+>    }
 
-"Michael S. Tsirkin" <mst@redhat.com> writes:
-
-> On Mon, Nov 14, 2022 at 06:15:30PM +0100, Christian Borntraeger wrote:
->>=20
->>=20
->> Am 14.11.22 um 18:10 schrieb Michael S. Tsirkin:
->> > On Mon, Nov 14, 2022 at 05:55:09PM +0100, Christian Borntraeger wrote:
->> > >=20
->> > >=20
->> > > Am 14.11.22 um 17:37 schrieb Michael S. Tsirkin:
->> > > > On Mon, Nov 14, 2022 at 05:18:53PM +0100, Christian Borntraeger wr=
-ote:
->> > > > > Am 08.11.22 um 10:23 schrieb Alex Benn=C3=A9e:
->> > > > > > The previous fix to virtio_device_started revealed a problem i=
-n its
->> > > > > > use by both the core and the device code. The core code should=
- be able
->> > > > > > to handle the device "starting" while the VM isn't running to =
-handle
->> > > > > > the restoration of migration state. To solve this dual use int=
-roduce a
->> > > > > > new helper for use by the vhost-user backends who all use it t=
-o feed a
->> > > > > > should_start variable.
->> > > > > >=20
->> > > > > > We can also pick up a change vhost_user_blk_set_status while w=
-e are at
->> > > > > > it which follows the same pattern.
->> > > > > >=20
->> > > > > > Fixes: 9f6bcfd99f (hw/virtio: move vm_running check to virtio_=
-device_started)
->> > > > > > Fixes: 27ba7b027f (hw/virtio: add boilerplate for vhost-user-g=
-pio device)
->> > > > > > Signed-off-by: Alex Benn=C3=A9e <alex.bennee@linaro.org>
->> > > > > > Cc: "Michael S. Tsirkin" <mst@redhat.com>
->> > > > >=20
->> > > > > Hmmm, is this
->> > > > > commit 259d69c00b67c02a67f3bdbeeea71c2c0af76c35
->> > > > > Author:     Alex Benn=C3=A9e <alex.bennee@linaro.org>
->> > > > > AuthorDate: Mon Nov 7 12:14:07 2022 +0000
->> > > > > Commit:     Michael S. Tsirkin <mst@redhat.com>
->> > > > > CommitDate: Mon Nov 7 14:08:18 2022 -0500
->> > > > >=20
->> > > > >       hw/virtio: introduce virtio_device_should_start
->> > > > >=20
->> > > > > and older version?
->> > > >=20
->> > > > This is what got merged:
->> > > > https://lore.kernel.org/r/20221107121407.1010913-1-alex.bennee%40l=
-inaro.org
->> > > > This patch was sent after I merged the RFC.
->> > > > I think the only difference is the commit log but I might be missi=
-ng
->> > > > something.
->> > > >=20
->> > > > > This does not seem to fix the regression that I have reported.
->> > > >=20
->> > > > This was applied on top of 9f6bcfd99f which IIUC does, right?
->> > > >=20
->> > > >=20
->> > >=20
->> > > QEMU master still fails for me for suspend/resume to disk:
->> > >=20
->> > > #0  0x000003ff8e3980a6 in __pthread_kill_implementation () at /lib64=
-/libc.so.6
->> > > #1  0x000003ff8e348580 in raise () at /lib64/libc.so.6
->> > > #2  0x000003ff8e32b5c0 in abort () at /lib64/libc.so.6
->> > > #3  0x000003ff8e3409da in __assert_fail_base () at /lib64/libc.so.6
->> > > #4  0x000003ff8e340a4e in  () at /lib64/libc.so.6
->> > > #5 0x000002aa1ffa8966 in vhost_vsock_common_pre_save
->> > > (opaque=3D<optimized out>) at
->> > > ../hw/virtio/vhost-vsock-common.c:203
->> > > #6  0x000002aa1fe5e0ee in vmstate_save_state_v
->> > >      (f=3Df@entry=3D0x2aa21bdc170, vmsd=3D0x2aa204ac5f0
->> > > <vmstate_virtio_vhost_vsock>, opaque=3D0x2aa21bac9f8,
->> > > vmdesc=3Dvmdesc@entry=3D0x3fddc08eb30,
->> > > version_id=3Dversion_id@entry=3D0) at ../migration/vmstate.c:329
->> > > #7 0x000002aa1fe5ebf8 in vmstate_save_state
->> > > (f=3Df@entry=3D0x2aa21bdc170, vmsd=3D<optimized out>,
->> > > opaque=3D<optimized out>, vmdesc_id=3Dvmdesc_id@entry=3D0x3fddc08eb3=
-0)
->> > > at ../migration/vmstate.c:317
->> > > #8 0x000002aa1fe75bd0 in vmstate_save (f=3Df@entry=3D0x2aa21bdc170,
->> > > se=3Dse@entry=3D0x2aa21bdbe90, vmdesc=3Dvmdesc@entry=3D0x3fddc08eb30=
-) at
->> > > ../migration/savevm.c:908
->> > > #9 0x000002aa1fe79584 in
->> > > qemu_savevm_state_complete_precopy_non_iterable
->> > > (f=3Df@entry=3D0x2aa21bdc170, in_postcopy=3Din_postcopy@entry=3Dfals=
-e,
->> > > inactivate_disks=3Dinactivate_disks@entry=3Dtrue)
->> > >      at ../migration/savevm.c:1393
->> > > #10 0x000002aa1fe79a96 in qemu_savevm_state_complete_precopy
->> > > (f=3D0x2aa21bdc170, iterable_only=3Diterable_only@entry=3Dfalse,
->> > > inactivate_disks=3Dinactivate_disks@entry=3Dtrue) at
->> > > ../migration/savevm.c:1459
->> > > #11 0x000002aa1fe6d6ee in migration_completion (s=3D0x2aa218ef600) a=
-t ../migration/migration.c:3314
->> > > #12 migration_iteration_run (s=3D0x2aa218ef600) at ../migration/migr=
-ation.c:3761
->> > > #13 migration_thread (opaque=3Dopaque@entry=3D0x2aa218ef600) at ../m=
-igration/migration.c:3989
->> > > #14 0x000002aa201f0b8c in qemu_thread_start (args=3D<optimized out>)=
- at ../util/qemu-thread-posix.c:505
->> > > #15 0x000003ff8e396248 in start_thread () at /lib64/libc.so.6
->> > > #16 0x000003ff8e41183e in thread_start () at /lib64/libc.so.6
->> > >=20
->> > > Michael, your previous branch did work if I recall correctly.
->> >=20
->> > That one was failing under github CI though (for reasons we didn't
->> > really address, such as disconnect during stop causing a recursive
->> > call to stop, but there you are).
->> Even the double revert of everything?
->
-> I don't remember at this point.
->
->> So how do we proceed now?
->
-> I'm hopeful Alex will come up with a fix.
-
-I need to replicate the failing test for that. Which test is failing?
-
---=20
-Alex Benn=C3=A9e
+Reviewed-by: Philippe Mathieu-Daudé <philmd@linaro.org>
 

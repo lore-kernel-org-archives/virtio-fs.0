@@ -1,14 +1,28 @@
-Return-Path: <mst@redhat.com>
-Date: Tue, 22 Nov 2022 05:23:23 -0500
-From: "Michael S. Tsirkin" <mst@redhat.com>
-Message-ID: <20221122102227.6603-2-mst@redhat.com>
-References: <20221122102227.6603-1-mst@redhat.com>
+Return-Path: <peter.maydell@linaro.org>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=cc:to:subject:message-id:date:from:in-reply-to:references
+ :mime-version:from:to:cc:subject:date:message-id:reply-to;
+ bh=JFxsDQv6CSq9GlpH150Z29J2XyCbNQXqprtE7CsKApA=;
+ b=IhQz5NKwo5HSqcfJsohSjWqXDmoKbpH9U5+GYIc3Y95g7VWiYfQuxKHL9nvw88vl1X
+ 4eUE8NeS7WxWrJteQ8znbCRFIbTjtI4BoNIP20YtiqZI2Lm1hKj2x6cote+2SYw49sZn
+ s6f0LXvlYrxZibY97aycRKWWgUiV5/WuAX8Of2Ilv0Ep/fUyC0v+LA3H7zI9aTvlFUJE
+ UNJfN9MRCgxr2a1a1lDjTVSHuc8Wwo6YYoLxijUTwqWzkCH9jbA770ChFM6PeFYAKqnJ
+ VUjQ0j+ud3KiczZGPTpxH6aPaQq7AMFNmiFmV+Ueu8c6MP9+2vLjkuuhWNziAU62xTIq
+ vdmw==
 MIME-Version: 1.0
-In-Reply-To: <20221122102227.6603-1-mst@redhat.com>
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Subject: [Virtio-fs] [PULL 1/8] vhost: mask VIRTIO_F_RING_RESET for vhost
- and vhost-user devices
+References: <20221121140121.1079100-1-armbru@redhat.com>
+ <CAFEAcA_jnbp36Trjd3qJYzbf5-6SNNrirG7q2_-wKXkcX49ptg@mail.gmail.com>
+ <7875a42b-2776-9d36-5373-78ac75cff89d@linaro.org>
+ <87a64ki7zn.fsf@pond.sub.org>
+ <47e0d3d8-607d-5e29-6780-c0a4364993a9@redhat.com>
+ <87h6yrfjr4.fsf@pond.sub.org>
+In-Reply-To: <87h6yrfjr4.fsf@pond.sub.org>
+From: Peter Maydell <peter.maydell@linaro.org>
+Date: Tue, 22 Nov 2022 12:44:37 +0000
+Message-ID: <CAFEAcA-8tyYDMaZgYvhrG5G001HzgkCUoTUMbChDteJ+q-r8yA@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Subject: Re: [Virtio-fs] [PATCH] cleanup: Tweak and re-run
+ return_directly.cocci
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,186 +31,44 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: Peter Maydell <peter.maydell@linaro.org>, Stefano Garzarella <sgarzare@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Jason Wang <jasowang@redhat.com>, Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Fam Zheng <fam@euphon.net>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>, Viresh Kumar <viresh.kumar@linaro.org>, Mathieu Poirier <mathieu.poirier@linaro.org>, qemu-block@nongnu.org, virtio-fs@redhat.com
+To: Markus Armbruster <armbru@redhat.com>
+Cc: Thomas Huth <thuth@redhat.com>, =?UTF-8?Q?Philippe_Mathieu=2DDaud=C3=A9?= <philmd@linaro.org>, qemu-devel@nongnu.org, fam@euphon.net, kwolf@redhat.com, hreitz@redhat.com, groug@kaod.org, qemu_oss@crudebyte.com, Alistair.Francis@wdc.com, bin.meng@windriver.com, palmer@dabbelt.com, marcandre.lureau@redhat.com, pbonzini@redhat.com, yuval.shaia.ml@gmail.com, marcel.apfelbaum@gmail.com, mst@redhat.com, quintela@redhat.com, dgilbert@redhat.com, pavel.dovgaluk@ispras.ru, alex.bennee@linaro.org, peterx@redhat.com, david@redhat.com, mrolnik@gmail.com, gaosong@loongson.cn, yangxiaojuan@loongson.cn, aurelien@aurel32.net, jiaxun.yang@flygoat.com, aleksandar.rikalo@syrmia.com, jcmvbkbc@gmail.com, berrange@redhat.com, lvivier@redhat.com, suhang16@mails.ucas.ac.cn, chen.zhang@intel.com, lizhijian@fujitsu.com, stefanha@redhat.com, qemu-block@nongnu.org, qemu-riscv@nongnu.org, qemu-ppc@nongnu.org, virtio-fs@redhat.com
 
-From: Stefano Garzarella <sgarzare@redhat.com>
+On Tue, 22 Nov 2022 at 08:58, Markus Armbruster <armbru@redhat.com> wrote:
+> I don't think complete detailed review is necessary or even sensible.
+>
+> Review should start with the Coccinelle script:
+>
+>     // replace 'R = X; return R;' with 'return X;'
+>     @@
+>     identifier VAR;
+>     expression E;
+>     type T;
+>     identifier F;
+>     @@
+>      T F(...)
+>      {
+>          ...
+>     -    T VAR;
+>          ... when != VAR
+>
+>     -    VAR = (E);
+>     -    return VAR;
+>     +    return E;
+>          ... when != VAR
+>      }
+>
+> What could go wrong?  Not a rhetorical question!
 
-Commit 69e1c14aa2 ("virtio: core: vq reset feature negotation support")
-enabled VIRTIO_F_RING_RESET by default for all virtio devices.
+The obvious answer is "you might have got your manual tweaking
+wrong". A purely mechanised patch I can review by looking at
+the script and maybe eyeballing a few instances of the change;
+a change that is 99% mechanised and 1% hand-written I need to
+run through to find the hand-written parts.
 
-This feature is not currently emulated by QEMU, so for vhost and
-vhost-user devices we need to make sure it is supported by the offloaded
-device emulation (in-kernel or in another process).
-To do this we need to add VIRTIO_F_RING_RESET to the features bitmap
-passed to vhost_get_features(). This way it will be masked if the device
-does not support it.
+But mostly this patch is hard to review for its sheer size,
+mechanical changes or not. A 3000 line patchmail is so big that
+the UI on my mail client gets pretty unwieldy.
 
-This issue was initially discovered with vhost-vsock and vhost-user-vsock,
-and then also tested with vhost-user-rng which confirmed the same issue.
-They fail when sending features through VHOST_SET_FEATURES ioctl or
-VHOST_USER_SET_FEATURES message, since VIRTIO_F_RING_RESET is negotiated
-by the guest (Linux >= v6.0), but not supported by the device.
-
-Fixes: 69e1c14aa2 ("virtio: core: vq reset feature negotation support")
-Resolves: https://gitlab.com/qemu-project/qemu/-/issues/1318
-Signed-off-by: Stefano Garzarella <sgarzare@redhat.com>
-Message-Id: <20221121101101.29400-1-sgarzare@redhat.com>
-Reviewed-by: Michael S. Tsirkin <mst@redhat.com>
-Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>
-Acked-by: Raphael Norwitz <raphael.norwitz@nutanix.com>
-Acked-by: Jason Wang <jasowang@redhat.com>
----
- hw/block/vhost-user-blk.c      |  1 +
- hw/net/vhost_net.c             |  1 +
- hw/scsi/vhost-scsi.c           |  1 +
- hw/scsi/vhost-user-scsi.c      |  1 +
- hw/virtio/vhost-user-fs.c      |  1 +
- hw/virtio/vhost-user-gpio.c    |  1 +
- hw/virtio/vhost-user-i2c.c     |  1 +
- hw/virtio/vhost-user-rng.c     | 11 +++++++++--
- hw/virtio/vhost-vsock-common.c |  1 +
- net/vhost-vdpa.c               |  1 +
- 10 files changed, 18 insertions(+), 2 deletions(-)
-
-diff --git a/hw/block/vhost-user-blk.c b/hw/block/vhost-user-blk.c
-index 16ad400889..0d5190accf 100644
---- a/hw/block/vhost-user-blk.c
-+++ b/hw/block/vhost-user-blk.c
-@@ -52,6 +52,7 @@ static const int user_feature_bits[] = {
-     VIRTIO_F_NOTIFY_ON_EMPTY,
-     VIRTIO_F_RING_PACKED,
-     VIRTIO_F_IOMMU_PLATFORM,
-+    VIRTIO_F_RING_RESET,
-     VHOST_INVALID_FEATURE_BIT
- };
- 
-diff --git a/hw/net/vhost_net.c b/hw/net/vhost_net.c
-index feda448878..26e4930676 100644
---- a/hw/net/vhost_net.c
-+++ b/hw/net/vhost_net.c
-@@ -75,6 +75,7 @@ static const int user_feature_bits[] = {
-     VIRTIO_NET_F_MTU,
-     VIRTIO_F_IOMMU_PLATFORM,
-     VIRTIO_F_RING_PACKED,
-+    VIRTIO_F_RING_RESET,
-     VIRTIO_NET_F_RSS,
-     VIRTIO_NET_F_HASH_REPORT,
- 
-diff --git a/hw/scsi/vhost-scsi.c b/hw/scsi/vhost-scsi.c
-index bdf337a7a2..6a0fd0dfb1 100644
---- a/hw/scsi/vhost-scsi.c
-+++ b/hw/scsi/vhost-scsi.c
-@@ -38,6 +38,7 @@ static const int kernel_feature_bits[] = {
-     VIRTIO_RING_F_INDIRECT_DESC,
-     VIRTIO_RING_F_EVENT_IDX,
-     VIRTIO_SCSI_F_HOTPLUG,
-+    VIRTIO_F_RING_RESET,
-     VHOST_INVALID_FEATURE_BIT
- };
- 
-diff --git a/hw/scsi/vhost-user-scsi.c b/hw/scsi/vhost-user-scsi.c
-index bc37317d55..b7a71a802c 100644
---- a/hw/scsi/vhost-user-scsi.c
-+++ b/hw/scsi/vhost-user-scsi.c
-@@ -36,6 +36,7 @@ static const int user_feature_bits[] = {
-     VIRTIO_RING_F_INDIRECT_DESC,
-     VIRTIO_RING_F_EVENT_IDX,
-     VIRTIO_SCSI_F_HOTPLUG,
-+    VIRTIO_F_RING_RESET,
-     VHOST_INVALID_FEATURE_BIT
- };
- 
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index 1c40f42045..dc4014cdef 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -32,6 +32,7 @@ static const int user_feature_bits[] = {
-     VIRTIO_F_NOTIFY_ON_EMPTY,
-     VIRTIO_F_RING_PACKED,
-     VIRTIO_F_IOMMU_PLATFORM,
-+    VIRTIO_F_RING_RESET,
- 
-     VHOST_INVALID_FEATURE_BIT
- };
-diff --git a/hw/virtio/vhost-user-gpio.c b/hw/virtio/vhost-user-gpio.c
-index 677d1c7730..5851cb3bc9 100644
---- a/hw/virtio/vhost-user-gpio.c
-+++ b/hw/virtio/vhost-user-gpio.c
-@@ -24,6 +24,7 @@ static const int feature_bits[] = {
-     VIRTIO_RING_F_INDIRECT_DESC,
-     VIRTIO_RING_F_EVENT_IDX,
-     VIRTIO_GPIO_F_IRQ,
-+    VIRTIO_F_RING_RESET,
-     VHOST_INVALID_FEATURE_BIT
- };
- 
-diff --git a/hw/virtio/vhost-user-i2c.c b/hw/virtio/vhost-user-i2c.c
-index 864eba695e..1c9f3d20dc 100644
---- a/hw/virtio/vhost-user-i2c.c
-+++ b/hw/virtio/vhost-user-i2c.c
-@@ -16,6 +16,7 @@
- 
- static const int feature_bits[] = {
-     VIRTIO_I2C_F_ZERO_LENGTH_REQUEST,
-+    VIRTIO_F_RING_RESET,
-     VHOST_INVALID_FEATURE_BIT
- };
- 
-diff --git a/hw/virtio/vhost-user-rng.c b/hw/virtio/vhost-user-rng.c
-index 8b47287875..f9084cde58 100644
---- a/hw/virtio/vhost-user-rng.c
-+++ b/hw/virtio/vhost-user-rng.c
-@@ -16,6 +16,11 @@
- #include "qemu/error-report.h"
- #include "standard-headers/linux/virtio_ids.h"
- 
-+static const int feature_bits[] = {
-+    VIRTIO_F_RING_RESET,
-+    VHOST_INVALID_FEATURE_BIT
-+};
-+
- static void vu_rng_start(VirtIODevice *vdev)
- {
-     VHostUserRNG *rng = VHOST_USER_RNG(vdev);
-@@ -106,8 +111,10 @@ static void vu_rng_set_status(VirtIODevice *vdev, uint8_t status)
- static uint64_t vu_rng_get_features(VirtIODevice *vdev,
-                                     uint64_t requested_features, Error **errp)
- {
--    /* No feature bits used yet */
--    return requested_features;
-+    VHostUserRNG *rng = VHOST_USER_RNG(vdev);
-+
-+    return vhost_get_features(&rng->vhost_dev, feature_bits,
-+                              requested_features);
- }
- 
- static void vu_rng_handle_output(VirtIODevice *vdev, VirtQueue *vq)
-diff --git a/hw/virtio/vhost-vsock-common.c b/hw/virtio/vhost-vsock-common.c
-index 29b9ab4f72..a67a275de2 100644
---- a/hw/virtio/vhost-vsock-common.c
-+++ b/hw/virtio/vhost-vsock-common.c
-@@ -21,6 +21,7 @@
- 
- const int feature_bits[] = {
-     VIRTIO_VSOCK_F_SEQPACKET,
-+    VIRTIO_F_RING_RESET,
-     VHOST_INVALID_FEATURE_BIT
- };
- 
-diff --git a/net/vhost-vdpa.c b/net/vhost-vdpa.c
-index 6811089231..2b4b85d8f8 100644
---- a/net/vhost-vdpa.c
-+++ b/net/vhost-vdpa.c
-@@ -69,6 +69,7 @@ const int vdpa_feature_bits[] = {
-     VIRTIO_NET_F_CTRL_VQ,
-     VIRTIO_F_IOMMU_PLATFORM,
-     VIRTIO_F_RING_PACKED,
-+    VIRTIO_F_RING_RESET,
-     VIRTIO_NET_F_RSS,
-     VIRTIO_NET_F_HASH_REPORT,
-     VIRTIO_NET_F_GUEST_ANNOUNCE,
--- 
-MST
+-- PMM
 

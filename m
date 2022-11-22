@@ -1,31 +1,19 @@
-Return-Path: <raphael.norwitz@nutanix.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nutanix.com;
- h=from : to : cc :
- subject : date : message-id : references : in-reply-to : content-type :
- content-id : content-transfer-encoding : mime-version;
- s=proofpoint20171006; bh=7BFK3S5sCKK6ERyllcHh76eGRzcvh5tyUrB8Ywwd0WQ=;
- b=TbMjkxrVrzaNGuTsDKY8f1MwH0bQKihyxPKpdrd2p3dv0QUp5zM/2sXUD1MG+d6PENjM
- sOrcEsZNFLXnfHff7Xmtb6YM8xis4S8pNFMHQEgOOGqMGeK3vsjKBH0t406f9rbOtvlk
- QZTQiusN4swZIA5+sJkGjYcaUGlIzONvx7OD51dweEGQDY2zpAWyGpfBsOr9jgiY6jO2
- JTdIKIGLEXNBDdTwFXMKbWTjeePyoXFYFwDjTv1t0xZzRdgRneq532vKIgWGYXQ3j3P/
- EgHftMrqms6ZSoHWoBREVwycqC362zHYyZW5Pi9tMNllwlb7OW6NuGT1xyy/AkUq0/QZ OA==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nutanix.com;
- s=selector1;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=7BFK3S5sCKK6ERyllcHh76eGRzcvh5tyUrB8Ywwd0WQ=;
- b=a/HC7JQc24jZjvqaeoPGlrs+KpzES9ME1mL94NJ3GLU+CDvhTsSdDRcy6OR5lBEsv/x9hlbb8dTfExP2ntk2wa+T2dZJ46LTu5oVhffrnCoOGGW/s8bAaPh9FKaDsfPoU6NXK37ITjaCJZgAiC6TVBrN5zaY90xW2OIROLMGMRCqA7CHE8bYRmeqSBmnMeZ5w2Qek9fON62hAHpQOFQ9H+d108R4hpdBjwl1GUZkaYlqaaUzopNyWLJls6LjJ9ZMvM6SiQX2/4fzN+zLRP55P2CIX3LhMNJ+NBbhwv3VhgejtAPivTtZCVOCedt+DkXvDejhhBceDh3X7/WN0Wif6A==
-From: Raphael Norwitz <raphael.norwitz@nutanix.com>
-Date: Tue, 22 Nov 2022 04:27:18 +0000
-Message-ID: <287332EC-DDF6-4D2D-BFBC-34BE65C3AE8E@nutanix.com>
-References: <20221121101101.29400-1-sgarzare@redhat.com>
-In-Reply-To: <20221121101101.29400-1-sgarzare@redhat.com>
+Return-Path: <armbru@redhat.com>
+From: Markus Armbruster <armbru@redhat.com>
+References: <20221121140121.1079100-1-armbru@redhat.com>
+ <CAFEAcA_jnbp36Trjd3qJYzbf5-6SNNrirG7q2_-wKXkcX49ptg@mail.gmail.com>
+ <7875a42b-2776-9d36-5373-78ac75cff89d@linaro.org>
+ <87a64ki7zn.fsf@pond.sub.org>
+ <47e0d3d8-607d-5e29-6780-c0a4364993a9@redhat.com>
+Date: Tue, 22 Nov 2022 09:58:39 +0100
+In-Reply-To: <47e0d3d8-607d-5e29-6780-c0a4364993a9@redhat.com> (Thomas Huth's
+ message of "Mon, 21 Nov 2022 17:34:15 +0100")
+Message-ID: <87h6yrfjr4.fsf@pond.sub.org>
 MIME-Version: 1.0
-Content-Language: en-US
-Content-Type: text/plain; charset="iso-8859-1"
-Content-ID: <C5DD2EA36525C34FB45249A8B6ADD50C@namprd02.prod.outlook.com>
+Content-Type: text/plain; charset=utf-8
 Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [PATCH] vhost: mask VIRTIO_F_RING_RESET for vhost
- and vhost-user devices
+Subject: Re: [Virtio-fs] [PATCH] cleanup: Tweak and re-run
+ return_directly.cocci
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -34,36 +22,121 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Stefano Garzarella <sgarzare@redhat.com>
-Cc: "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, "qemu-block@nongnu.org" <qemu-block@nongnu.org>, "virtio-fs@redhat.com" <virtio-fs@redhat.com>, =?iso-8859-1?Q?Alex_Benn=E9e?= <alex.bennee@linaro.org>, Viresh Kumar <viresh.kumar@linaro.org>, "Michael S. Tsirkin" <mst@redhat.com>, Fam Zheng <fam@euphon.net>, Mathieu Poirier <mathieu.poirier@linaro.org>, Kevin Wolf <kwolf@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Hanna Reitz <hreitz@redhat.com>, "kangjie.xu@linux.alibaba.com" <kangjie.xu@linux.alibaba.com>, Jason Wang <jasowang@redhat.com>
+To: Thomas Huth <thuth@redhat.com>
+Cc: Philippe =?utf-8?Q?Mathieu-Daud=C3=A9?= <philmd@linaro.org>, Peter Maydell <peter.maydell@linaro.org>, qemu-devel@nongnu.org, fam@euphon.net, kwolf@redhat.com, hreitz@redhat.com, groug@kaod.org, qemu_oss@crudebyte.com, Alistair.Francis@wdc.com, bin.meng@windriver.com, palmer@dabbelt.com, marcandre.lureau@redhat.com, pbonzini@redhat.com, yuval.shaia.ml@gmail.com, marcel.apfelbaum@gmail.com, mst@redhat.com, quintela@redhat.com, dgilbert@redhat.com, pavel.dovgaluk@ispras.ru, alex.bennee@linaro.org, peterx@redhat.com, david@redhat.com, mrolnik@gmail.com, gaosong@loongson.cn, yangxiaojuan@loongson.cn, aurelien@aurel32.net, jiaxun.yang@flygoat.com, aleksandar.rikalo@syrmia.com, jcmvbkbc@gmail.com, berrange@redhat.com, lvivier@redhat.com, suhang16@mails.ucas.ac.cn, chen.zhang@intel.com, lizhijian@fujitsu.com, stefanha@redhat.com, qemu-block@nongnu.org, qemu-riscv@nongnu.org, qemu-ppc@nongnu.org, virtio-fs@redhat.com
 
+Thomas Huth <thuth@redhat.com> writes:
 
+> On 21/11/2022 17.32, Markus Armbruster wrote:
+>> Philippe Mathieu-Daud=C3=A9 <philmd@linaro.org> writes:
+>>=20
+>>> On 21/11/22 15:36, Peter Maydell wrote:
+>>>> On Mon, 21 Nov 2022 at 14:03, Markus Armbruster <armbru@redhat.com> wr=
+ote:
+>>>>>
+>>>>> Tweak the semantic patch to drop redundant parenthesis around the
+>>>>> return expression.
+>>>>>
+>>>>> Coccinelle drops comments in hw/rdma/vmw/pvrdma_cmd.c; restored
+>>>>> manually.
+>>>>>
+>>>>> Coccinelle messes up vmdk_co_create(), not sure why.  Transformed
+>>>>> manually.
+>>>>>
+>>>>> Line breaks in target/avr/cpu.h and hw/rdma/vmw/pvrdma_cmd.c tidied up
+>>>>> manually.
+>>>>>
+>>>>> Whitespace in fuse_reply_iov() tidied up manually.
+>>>>>
+>>>>> checkpatch.pl complains "return of an errno should typically be -ve"
+>>>>> two times for hw/9pfs/9p-synth.c.  Preexisting, the patch merely makes
+>>>>> it visible to checkpatch.pl.
+>>>>>
+>>>>> checkpatch.pl complains "return is not a function, parentheses are not
+>>>>> required" three times for target/mips/tcg/dsp_helper.c.  False
+>>>>> positives.
+>>>>>
+>>>>> Signed-off-by: Markus Armbruster <armbru@redhat.com>
+>>>>
+>>>>>    .../user/ase/msa/bit-count/test_msa_nloc_b.c  |   9 +-
+>>>>>    .../user/ase/msa/bit-count/test_msa_nloc_d.c  |   9 +-
+>>>> [snip long list of other mips test files]
+>>>>
+>>>>>    328 files changed, 989 insertions(+), 2099 deletions(-)
+>>>> This patch seems to almost entirely be huge because of these
+>>>> mips test case files. Are they specific to QEMU or are they
+>>>> effectively a 3rd-party import that it doesn't make sense
+>>>> to make local changes to?
+>>>
+>>> They are imported and will unlikely be modified.
+>>=20
+>> Not obvious to me from git-log.
+>>=20
+>> Should I drop the changes to tests/tcg/mips/?
+>
+> I'd say yes. At least move them to a separate patch.
 
-> On Nov 21, 2022, at 5:11 AM, Stefano Garzarella <sgarzare@redhat.com> wro=
-te:
->=20
-> Commit 69e1c14aa2 ("virtio: core: vq reset feature negotation support")
-> enabled VIRTIO_F_RING_RESET by default for all virtio devices.
->=20
-> This feature is not currently emulated by QEMU, so for vhost and
-> vhost-user devices we need to make sure it is supported by the offloaded
-> device emulation (in-kernel or in another process).
-> To do this we need to add VIRTIO_F_RING_RESET to the features bitmap
-> passed to vhost_get_features(). This way it will be masked if the device
-> does not support it.
->=20
-> This issue was initially discovered with vhost-vsock and vhost-user-vsock=
-,
-> and then also tested with vhost-user-rng which confirmed the same issue.
-> They fail when sending features through VHOST_SET_FEATURES ioctl or
-> VHOST_USER_SET_FEATURES message, since VIRTIO_F_RING_RESET is negotiated
-> by the guest (Linux >=3D v6.0), but not supported by the device.
->=20
-> Fixes: 69e1c14aa2 ("virtio: core: vq reset feature negotation support")
-> Resolves: https://gitlab.com/qemu-project/qemu/-/issues/1318
-> Signed-off-by: Stefano Garzarella <sgarzare@redhat.com>
+Possible status of tests/tcg/mips/:
 
-Looks good. For vhost-user-blk and vhost-user-scsi:
+1. Imported, should not be modified
 
-Acked-by: Raphael Norwitz <raphael.norwitz@nutanix.com>
+   Drop from the patch.
 
+2. Not imported, should be modified
+
+2a. To be reviewed separately from the remainder of the patch
+
+    Split off.
+
+2b. Likewise, but nobody will care to review, realistically
+
+    Split off and merge anyway, or drop.  I'd go for the latter.
+
+2c. To be reviewed together with the remainder of the patch
+
+    Keep as is.
+
+Which one is it?
+
+>                                                      Otherwise reviewing=
+=20
+> this patch here is no fun at all.
+
+I don't think complete detailed review is necessary or even sensible.
+
+Review should start with the Coccinelle script:
+
+    // replace 'R =3D X; return R;' with 'return X;'
+    @@
+    identifier VAR;
+    expression E;
+    type T;
+    identifier F;
+    @@
+     T F(...)
+     {
+         ...
+    -    T VAR;
+         ... when !=3D VAR
+
+    -    VAR =3D (E);
+    -    return VAR;
+    +    return E;
+         ... when !=3D VAR
+     }
+
+What could go wrong?  Not a rhetorical question!
+
+The simple part is executing the rule.  It'll *delete* variable VAR, and
+*preserve* expression E.
+
+The tricky part is deciding whether the rule matches, in particular
+proving that there are no other uses of VAR.  If Coccinelle gets that
+wrong, the code no longer compiles *unless* there is another, global VAR
+of suitable type.
+
+Turns out Coccinelle does get it wrong for vmdk_co_create(), and the
+compiler duly rejects it.  I don't understand why it gets it wrong.
+
+To help understand the script, and as a sanity check, reviewing some of
+its patches is advisable.  Reviewing all of them feels impractical.

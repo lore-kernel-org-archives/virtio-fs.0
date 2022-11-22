@@ -1,24 +1,31 @@
-Return-Path: <peter.maydell@linaro.org>
+Return-Path: <philmd@linaro.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=cc:to:subject:message-id:date:from:in-reply-to:references
- :mime-version:from:to:cc:subject:date:message-id:reply-to;
- bh=xbzPrvxw2h7QjvfNhdzgLlnm6lp5QdzEPwm67XjpXOk=;
- b=KzxzDmjt3znUwalezP3CogqSzCZmmSdieXsuEUbDMNJQ9BxfDXUwc+Jjh1RAQGzk0D
- M7x9r/SjnqM10pYpZuCABWbQ7V1g5C6osSxkT6Br6avxn8juEptKc8jM4Zvy97pWqkze
- a8IhFy6/udMHHmWkgjN3UJLA59FPoimJ6EvSnpSku0EgcjhXX5wga4zyoA5osPg4IxXg
- wVpMsJvg3h7CXeilGTVRazsQaWbmJ5LcklLQYwA14AMp07Y8iYKTwh29nF/HOjAPjHse
- OWfDTIDIxGNoLOhSEHOa0Kb9Q07dZKa6Ol7dw0NPlaAlaBB7hX9CWrCoZ9w5z7seAnKb
- m/1Q==
+ h=content-transfer-encoding:in-reply-to:from:references:cc:to
+ :content-language:subject:user-agent:mime-version:date:message-id
+ :from:to:cc:subject:date:message-id:reply-to;
+ bh=XosywobY+VobbvvsDv13aF4tfeAQ+wLW1u+COqdwmpk=;
+ b=zGpNsA3gr2rzhCCq966xlAoLRkZZpsLcsewetNZujNtJNKMK+zhSBE4+hwN4HWxvgz
+ XGqBNEATbE9DDwenQtMagLOw9zxGWrcs42Ozawu7DmgiqPJbW5y3acTAJ7dnHTlODN69
+ 0VhDlJ3yWwnuY5hAYYdUZAhvA+khI9c9f+nCMxLRrhWAMjddTQJ94JNmMENQY4u/wc2b
+ nAexSfFwug1SHVrB9F/VWD9c39aCfysIRMh/WJQjm5VekVy47/exVqJ8r36x0mw8SDhI
+ W+OugBIQpv2/B7YkNwUT5pmtYi7OeDzxf7GEC0s2rxD4shNCP3d4AvtzhuppYuVDIa0L
+ pk4g==
+Message-ID: <73b7e755-412f-e1c2-a6b0-28063c0084b8@linaro.org>
+Date: Tue, 22 Nov 2022 15:51:24 +0100
 MIME-Version: 1.0
-References: <20221122134917.1217307-1-armbru@redhat.com>
- <20221122134917.1217307-3-armbru@redhat.com>
-In-Reply-To: <20221122134917.1217307-3-armbru@redhat.com>
-From: Peter Maydell <peter.maydell@linaro.org>
-Date: Tue, 22 Nov 2022 13:52:58 +0000
-Message-ID: <CAFEAcA9q=zAL-PrpRpmpv-4wyobdbFGLzYeWdjvkDoSQLwktOw@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH v2 2/2] block/vmdk: Simplify
- vmdk_co_create() to return directly
+References: <20221121140121.1079100-1-armbru@redhat.com>
+ <CAFEAcA_jnbp36Trjd3qJYzbf5-6SNNrirG7q2_-wKXkcX49ptg@mail.gmail.com>
+ <7875a42b-2776-9d36-5373-78ac75cff89d@linaro.org>
+ <87a64ki7zn.fsf@pond.sub.org>
+ <47e0d3d8-607d-5e29-6780-c0a4364993a9@redhat.com>
+ <87h6yrfjr4.fsf@pond.sub.org>
+From: =?UTF-8?Q?Philippe_Mathieu-Daud=c3=a9?= <philmd@linaro.org>
+In-Reply-To: <87h6yrfjr4.fsf@pond.sub.org>
+Content-Language: en-US
+Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Transfer-Encoding: 8bit
+Subject: Re: [Virtio-fs] [PATCH] cleanup: Tweak and re-run
+ return_directly.cocci
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -27,23 +34,81 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Markus Armbruster <armbru@redhat.com>
-Cc: qemu-devel@nongnu.org, groug@kaod.org, qemu_oss@crudebyte.com, Alistair.Francis@wdc.com, bin.meng@windriver.com, palmer@dabbelt.com, marcandre.lureau@redhat.com, pbonzini@redhat.com, yuval.shaia.ml@gmail.com, marcel.apfelbaum@gmail.com, mst@redhat.com, quintela@redhat.com, dgilbert@redhat.com, pavel.dovgaluk@ispras.ru, alex.bennee@linaro.org, peterx@redhat.com, david@redhat.com, philmd@linaro.org, mrolnik@gmail.com, gaosong@loongson.cn, yangxiaojuan@loongson.cn, aurelien@aurel32.net, jiaxun.yang@flygoat.com, aleksandar.rikalo@syrmia.com, berrange@redhat.com, thuth@redhat.com, lvivier@redhat.com, suhang16@mails.ucas.ac.cn, chen.zhang@intel.com, lizhijian@fujitsu.com, stefanha@redhat.com, qemu-riscv@nongnu.org, qemu-ppc@nongnu.org, virtio-fs@redhat.com, Fam Zheng <fam@euphon.net>, Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, qemu-block@nongnu.org
+To: Markus Armbruster <armbru@redhat.com>, Thomas Huth <thuth@redhat.com>
+Cc: Peter Maydell <peter.maydell@linaro.org>, qemu-devel@nongnu.org, fam@euphon.net, kwolf@redhat.com, hreitz@redhat.com, groug@kaod.org, qemu_oss@crudebyte.com, Alistair.Francis@wdc.com, bin.meng@windriver.com, palmer@dabbelt.com, marcandre.lureau@redhat.com, pbonzini@redhat.com, yuval.shaia.ml@gmail.com, marcel.apfelbaum@gmail.com, mst@redhat.com, quintela@redhat.com, dgilbert@redhat.com, pavel.dovgaluk@ispras.ru, alex.bennee@linaro.org, peterx@redhat.com, david@redhat.com, mrolnik@gmail.com, gaosong@loongson.cn, yangxiaojuan@loongson.cn, aurelien@aurel32.net, jiaxun.yang@flygoat.com, aleksandar.rikalo@syrmia.com, jcmvbkbc@gmail.com, berrange@redhat.com, lvivier@redhat.com, suhang16@mails.ucas.ac.cn, chen.zhang@intel.com, lizhijian@fujitsu.com, stefanha@redhat.com, qemu-block@nongnu.org, qemu-riscv@nongnu.org, qemu-ppc@nongnu.org, virtio-fs@redhat.com
 
-On Tue, 22 Nov 2022 at 13:51, Markus Armbruster <armbru@redhat.com> wrote:
->
-> Cc: Fam Zheng <fam@euphon.net>
-> Cc: Kevin Wolf <kwolf@redhat.com>
-> Cc: Hanna Reitz <hreitz@redhat.com>
-> Cc: qemu-block@nongnu.org
-> Signed-off-by: Markus Armbruster <armbru@redhat.com>
-> ---
->  block/vmdk.c | 28 +++++++++++-----------------
->  1 file changed, 11 insertions(+), 17 deletions(-)
->
+On 22/11/22 09:58, Markus Armbruster wrote:
+> Thomas Huth <thuth@redhat.com> writes:
+> 
+>> On 21/11/2022 17.32, Markus Armbruster wrote:
+>>> Philippe Mathieu-Daudé <philmd@linaro.org> writes:
+>>>
+>>>> On 21/11/22 15:36, Peter Maydell wrote:
+>>>>> On Mon, 21 Nov 2022 at 14:03, Markus Armbruster <armbru@redhat.com> wrote:
+>>>>>>
+>>>>>> Tweak the semantic patch to drop redundant parenthesis around the
+>>>>>> return expression.
+>>>>>>
+>>>>>> Coccinelle drops comments in hw/rdma/vmw/pvrdma_cmd.c; restored
+>>>>>> manually.
+>>>>>>
+>>>>>> Coccinelle messes up vmdk_co_create(), not sure why.  Transformed
+>>>>>> manually.
+>>>>>>
+>>>>>> Line breaks in target/avr/cpu.h and hw/rdma/vmw/pvrdma_cmd.c tidied up
+>>>>>> manually.
+>>>>>>
+>>>>>> Whitespace in fuse_reply_iov() tidied up manually.
+>>>>>>
+>>>>>> checkpatch.pl complains "return of an errno should typically be -ve"
+>>>>>> two times for hw/9pfs/9p-synth.c.  Preexisting, the patch merely makes
+>>>>>> it visible to checkpatch.pl.
+>>>>>>
+>>>>>> checkpatch.pl complains "return is not a function, parentheses are not
+>>>>>> required" three times for target/mips/tcg/dsp_helper.c.  False
+>>>>>> positives.
+>>>>>>
+>>>>>> Signed-off-by: Markus Armbruster <armbru@redhat.com>
+>>>>>
+>>>>>>     .../user/ase/msa/bit-count/test_msa_nloc_b.c  |   9 +-
+>>>>>>     .../user/ase/msa/bit-count/test_msa_nloc_d.c  |   9 +-
+>>>>> [snip long list of other mips test files]
+>>>>>
+>>>>>>     328 files changed, 989 insertions(+), 2099 deletions(-)
+>>>>> This patch seems to almost entirely be huge because of these
+>>>>> mips test case files. Are they specific to QEMU or are they
+>>>>> effectively a 3rd-party import that it doesn't make sense
+>>>>> to make local changes to?
+>>>>
+>>>> They are imported and will unlikely be modified.
+>>>
+>>> Not obvious to me from git-log.
+>>>
+>>> Should I drop the changes to tests/tcg/mips/?
+>>
+>> I'd say yes. At least move them to a separate patch.
+> 
+> Possible status of tests/tcg/mips/:
+> 
+> 1. Imported, should not be modified
+> 
+>     Drop from the patch.
+> 
+> 2. Not imported, should be modified
+> 
+> 2a. To be reviewed separately from the remainder of the patch
+> 
+>      Split off.
+> 
+> 2b. Likewise, but nobody will care to review, realistically
+> 
+>      Split off and merge anyway, or drop.  I'd go for the latter.
+> 
+> 2c. To be reviewed together with the remainder of the patch
+> 
+>      Keep as is.
+> 
+> Which one is it?
 
-Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
-
-thanks
--- PMM
+"1. Imported, should not be modified" please :)
 

@@ -1,16 +1,20 @@
-Return-Path: <armbru@redhat.com>
-From: Markus Armbruster <armbru@redhat.com>
-References: <20221122134917.1217307-1-armbru@redhat.com>
- <20221122134917.1217307-2-armbru@redhat.com>
- <20221124161511.73b50353@bahia> <20221124162403.7d45f4fb@bahia>
-Date: Thu, 24 Nov 2022 19:41:14 +0100
-In-Reply-To: <20221124162403.7d45f4fb@bahia> (Greg Kurz's message of "Thu, 24
- Nov 2022 16:24:03 +0100")
-Message-ID: <878rk019h1.fsf@pond.sub.org>
+Return-Path: <honey.domainpartner@gmail.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
+ h=to:subject:message-id:date:from:mime-version:from:to:cc:subject
+ :date:message-id:reply-to;
+ bh=0hKEZwqqwsrEXBjQ4d4I2eP5lnvehzcHhnNoMzQZoRQ=;
+ b=JHBdSqFTNO2zCm6qUiUijxUOkqnfWrliBglF13O9louRhLCvwpGTuE2LMB1Qd7dRO+
+ brfxp9nFDDNFmIoL7B6iYUH5IAvQmRD7LzkuZX2Mn5AgCz//hLMR2UnKQJuXUkapaZFb
+ nF/YT3Iu5lOAHKbCf2Yll+cyEQGxOJBvDeP54jR+LQ1R79u1Wj1z65xsN1s15ovgW1hT
+ v4KN9nOodSjODqY2slvi5nwX5tsRQ7Hccfz39P705pcxZPuRws8xT9XFgFoQPdqTfReA
+ G820Qztr03fegGurTp0hyZQLcyWA9qRKKKi11y6JQk9OF2J+P6lQkI493Syl7dy1A+pu
+ hkUg==
 MIME-Version: 1.0
-Content-Type: text/plain
-Subject: Re: [Virtio-fs] [PATCH v2 1/2] cleanup: Tweak and re-run
- return_directly.cocci
+From: Honey Grace Lacson <honey.domainpartner@gmail.com>
+Date: Fri, 25 Nov 2022 14:02:05 +0800
+Message-ID: <CAG7ROrO1v11MiFGR9uV2O=8m+ZVZ-a5MkS35uQp44t4wjt41Qw@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="0000000000009ebbdb05ee4543b1"
+Subject: [Virtio-fs] Applicative.net
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,56 +23,212 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Greg Kurz <groug@kaod.org>
-Cc: qemu-devel@nongnu.org, qemu_oss@crudebyte.com, Alistair.Francis@wdc.com, bin.meng@windriver.com, palmer@dabbelt.com, marcandre.lureau@redhat.com, pbonzini@redhat.com, yuval.shaia.ml@gmail.com, marcel.apfelbaum@gmail.com, mst@redhat.com, quintela@redhat.com, dgilbert@redhat.com, pavel.dovgaluk@ispras.ru, alex.bennee@linaro.org, peterx@redhat.com, david@redhat.com, philmd@linaro.org, mrolnik@gmail.com, gaosong@loongson.cn, yangxiaojuan@loongson.cn, aurelien@aurel32.net, jiaxun.yang@flygoat.com, aleksandar.rikalo@syrmia.com, berrange@redhat.com, thuth@redhat.com, lvivier@redhat.com, suhang16@mails.ucas.ac.cn, chen.zhang@intel.com, lizhijian@fujitsu.com, stefanha@redhat.com, qemu-riscv@nongnu.org, qemu-ppc@nongnu.org, virtio-fs@redhat.com
+To: virtio-fs@redhat.com
 
-Greg Kurz <groug@kaod.org> writes:
+--0000000000009ebbdb05ee4543b1
+Content-Type: text/plain; charset="UTF-8"
 
-> On Thu, 24 Nov 2022 16:15:11 +0100
-> Greg Kurz <groug@kaod.org> wrote:
->
->> On Tue, 22 Nov 2022 14:49:16 +0100
->> Markus Armbruster <armbru@redhat.com> wrote:
->> 
->> > Tweak the semantic patch to drop redundant parenthesis around the
->> > return expression.
->> > 
->> > Coccinelle drops a comment in hw/rdma/vmw/pvrdma_cmd.c; restored
->> > manually.
->> > 
->> > Coccinelle messes up vmdk_co_create(), not sure why.  Change dropped,
->> > will be done manually in the next commit.
->> > 
->> > Line breaks in target/avr/cpu.h and hw/rdma/vmw/pvrdma_cmd.c tidied up
->> > manually.
->> > 
->> > Whitespace in tools/virtiofsd/fuse_lowlevel.c tidied up manually.
->> > 
->> > checkpatch.pl complains "return of an errno should typically be -ve"
->> > two times for hw/9pfs/9p-synth.c.  Preexisting, the patch merely makes
->> > it visible to checkpatch.pl.
->> > 
->> 
->> Hi Markus,
->> 
->> Yeah these positive errno values have been sitting there since the
->> beginning. It was dead code until I hijacked the synth backend to
->> implement qtest for 9p. I didn't care much about the return value
->> of the two culprits at the time since both are passed to assert(!ret)
->> right away. For this reason, changing the sign should be easy :-)
->> 
->> I see that checkpatch.pl considers this as an error. I'll post
->> a fix. I guess you'll need to rebase on this fix for your patches
->> to pass CI.
->> 
->
-> Or maybe I can fix the issues detected by coccinelle as well and
-> you can just drop the 9p bits from this patch ?
+Hello, my name is Honey Grace from TDS. We have a domain that is currently
+on sale that you might be interested in -  *Applicative.net *
 
-Up to you!
+Anytime someone types Applicative, Applicative Online, or any other phrase
+with these keywords into their browser, your site could be the first they
+see!
 
->> Anyway, for 9p:
->> 
->> Reviewed-by: Greg Kurz <groug@kaod.org>
+The internet is the most efficient way to acquire new customers
 
-Thanks!
+Avg Google Search Results for this domain is: *7,620,000*
+You can easily redirect all the traffic this domain gets to your current
+site!
+
+EstiBot.com appraises this domain at $1,800.
+
+*Priced at only $398* for a limited time! If interested please go to
+*Applicative.net <https://applicative.net/> *and select Buy Now, or purchase
+directly at  GoDaddy.
+Act Fast! First person to select Buy Now gets it!
+
+Thank you very much for your time.
+Best Regards,
+Honey Grace Lacson
+
+--0000000000009ebbdb05ee4543b1
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><div dir=3D"ltr"><span style=3D"font-size:12.8px;font-fami=
+ly:&quot;helvetica neue&quot;"><span style=3D"font-size:13px"><span style=
+=3D"font-family:helvetica,arial,sans-serif"><span style=3D"font-size:16px">=
+Hello,=C2=A0</span></span></span></span><span style=3D"font-size:12.8px;fon=
+t-family:&quot;helvetica neue&quot;"><span style=3D"font-size:13px"><span s=
+tyle=3D"font-family:helvetica,arial,sans-serif"><span style=3D"font-size:16=
+px">my name is Honey Grace from</span></span></span></span><span style=3D"f=
+ont-size:12.8px;font-family:&quot;helvetica neue&quot;"><span style=3D"font=
+-size:13px"><span style=3D"font-family:helvetica,arial,sans-serif"><span st=
+yle=3D"font-size:16px">=C2=A0</span></span></span></span><span style=3D"fon=
+t-family:helvetica,arial,sans-serif;font-size:16px">TDS</span><span style=
+=3D"font-size:12.8px;font-family:&quot;helvetica neue&quot;"><span style=3D=
+"font-size:13px"><span style=3D"font-family:helvetica,arial,sans-serif"><sp=
+an style=3D"font-size:16px">.=C2=A0</span></span></span></span><span style=
+=3D"font-family:helvetica,arial,sans-serif;font-size:16px">We have a domain=
+ that is currently on sale that you might be interested in</span><span styl=
+e=3D"font-size:12.8px;font-family:&quot;helvetica neue&quot;"><span style=
+=3D"font-size:13px"><span style=3D"font-family:helvetica,arial,sans-serif">=
+<span style=3D"font-size:16px">=C2=A0-</span></span></span></span><span sty=
+le=3D"font-family:sans-serif;font-size:12.8px">=C2=A0</span>=C2=A0<b style=
+=3D"font-family:helvetica,arial,sans-serif;font-size:16px;white-space:pre-w=
+rap">Applicative.net </b><br></div><div style=3D"font-family:sans-serif;fon=
+t-size:12.8px">=C2=A0<br></div><div><div dir=3D"ltr"><span style=3D"font-fa=
+mily:sans-serif;font-size:16px">Anytime someone types Applicative, Applicat=
+ive Online</span><font face=3D"helvetica, arial, sans-serif"><span style=3D=
+"font-size:16px">,=C2=A0</span></font><span style=3D"font-family:helvetica,=
+arial,sans-serif;font-size:16px">o</span><span style=3D"font-family:helveti=
+ca,arial,sans-serif;font-size:16px">r=C2=A0any other phrase with these keyw=
+ords</span>=C2=A0<span style=3D"font-family:helvetica,arial,sans-serif;font=
+-size:16px">into their browser, your site could=C2=A0be=C2=A0the=C2=A0first=
+ they see!</span></div><div style=3D"font-family:sans-serif;font-size:12.8p=
+x"><span style=3D"font-family:helvetica,arial,sans-serif;font-size:16px"><b=
+r></span></div><div style=3D"font-family:sans-serif;font-size:12.8px"><font=
+ face=3D"helvetica, arial, sans-serif"><span style=3D"font-size:16px">The i=
+nternet is the most efficient way to acquire new customers</span></font></d=
+iv><div style=3D"font-family:sans-serif;font-size:12.8px"><br></div><div st=
+yle=3D"font-family:sans-serif;font-size:12.8px"><div><span style=3D"font-fa=
+mily:helvetica,arial,sans-serif;font-size:16px">Avg Google Search Results f=
+or this domain is:=C2=A0</span><b style=3D"font-family:helvetica,arial,sans=
+-serif;font-size:16px;white-space:pre-wrap">7,620,000</b><br></div><div><sp=
+an style=3D"font-size:16px;font-family:helvetica,arial,sans-serif">You can =
+easily redirect all the traffic this domain gets to your current site!</spa=
+n></div><div><div><span style=3D"font-size:13.3333px;font-family:helvetica,=
+arial,sans-serif"><br></span></div><div><span style=3D"font-family:helvetic=
+a,arial,sans-serif;font-size:16px;white-space:pre-wrap">EstiBot.com</span><=
+span style=3D"font-size:13.3333px;font-family:helvetica,arial,sans-serif"><=
+span style=3D"font-size:16px">=C2=A0appraises this domain at $1,800.</span>=
+</span><span style=3D"font-family:Arial,Helvetica,sans-serif;font-size:smal=
+l">=C2=A0</span><span style=3D"font-size:13.3333px;font-family:helvetica,ar=
+ial,sans-serif"><br></span></div><div><span style=3D"font-family:Arial,Helv=
+etica,sans-serif;font-size:small"><br></span></div><div dir=3D"ltr"><span s=
+tyle=3D"white-space:pre-wrap;font-family:helvetica,arial,sans-serif;font-si=
+ze:16px"><b>Priced at only $398</b> for a limited time!</span><span style=
+=3D"white-space:pre-wrap;font-family:helvetica,arial,sans-serif;font-size:1=
+6px">=C2=A0</span><span style=3D"white-space:pre-wrap;font-family:helvetica=
+,arial,sans-serif;font-size:16px">If interested please go to <b><a href=3D"=
+https://applicative.net/" target=3D"_blank">Applicative.net</a> <br></b></s=
+pan><span style=3D"font-family:helvetica,arial,sans-serif;font-size:16px">a=
+</span><span style=3D"font-family:helvetica,arial,sans-serif;font-size:16px=
+">nd</span><span style=3D"font-family:helvetica,arial,sans-serif;font-size:=
+16px">=C2=A0</span><span style=3D"font-family:helvetica,arial,sans-serif;fo=
+nt-size:16px">select Buy Now,=C2=A0</span><span style=3D"font-family:helvet=
+ica,arial,sans-serif;font-size:16px">or=C2=A0purchase directly at</span>=C2=
+=A0=C2=A0<span style=3D"font-family:helvetica,arial,sans-serif;font-size:16=
+px;white-space:pre-wrap">GoDaddy.</span>=C2=A0=C2=A0=C2=A0<br></div><div st=
+yle=3D"font-family:arial,sans-serif"><span style=3D"font-family:helvetica,a=
+rial,sans-serif;font-size:16px">Act Fast! First person to select Buy Now ge=
+ts it!</span>=C2=A0=C2=A0</div><div style=3D"font-family:arial,sans-serif">=
+<br></div></div></div><div style=3D"font-family:sans-serif;font-size:12.8px=
+"><div><span style=3D"font-family:&quot;helvetica neue&quot;"><span style=
+=3D"font-size:13px"><span style=3D"font-family:verdana,arial,helvetica,sans=
+-serif"><span style=3D"font-size:13.3333px"><span style=3D"font-family:helv=
+etica,arial,sans-serif"><span style=3D"font-size:16px">Thank you very much =
+for your time.</span></span></span></span></span></span><br></div><div><fon=
+t color=3D"#000000" face=3D"Helvetica, Arial, sans-serif"><span style=3D"fo=
+nt-size:16px">Best Regards,</span></font></div></div><font color=3D"#888888=
+"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><=
+font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><fon=
+t color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font c=
+olor=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font colo=
+r=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=
+=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D=
+"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#8=
+88888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#8888=
+88"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"=
+><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><f=
+ont color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font=
+ color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font co=
+lor=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=
+=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D=
+"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#8=
+88888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#8888=
+88"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"=
+><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><f=
+ont color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font=
+ color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font co=
+lor=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=
+=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D=
+"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#8=
+88888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#8888=
+88"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"=
+><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><f=
+ont color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font=
+ color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font co=
+lor=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=
+=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D=
+"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#8=
+88888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#8888=
+88"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"=
+><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><f=
+ont color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font=
+ color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font co=
+lor=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=
+=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D=
+"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#8=
+88888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#8888=
+88"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"=
+><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><f=
+ont color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font=
+ color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font co=
+lor=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=
+=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D=
+"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#8=
+88888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#8888=
+88"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"=
+><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><f=
+ont color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font=
+ color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font co=
+lor=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=
+=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D=
+"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#8=
+88888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#8888=
+88"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"=
+><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><f=
+ont color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font=
+ color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font co=
+lor=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=
+=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D=
+"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#8=
+88888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#8888=
+88"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"=
+><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><f=
+ont color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font=
+ color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font co=
+lor=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=
+=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D=
+"#888888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#8=
+88888"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#8888=
+88"><font color=3D"#888888"><font color=3D"#888888"><font color=3D"#888888"=
+><font color=3D"#000000" face=3D"Helvetica, Arial, sans-serif"><span style=
+=3D"font-size:16px">Honey Grace Lacson</span></font></font></font></font></=
+font></font></font></font></font></font></font></font></font></font></font>=
+</font></font></font></font></font></font></font></font></font></font></fon=
+t></font></font></font></font></font></font></font></font></font></font></f=
+ont></font></font></font></font></font></font></font></font></font></font><=
+/font></font></font></font></font></font></font></font></font></font></font=
+></font></font></font></font></font></font></font></font></font></font></fo=
+nt></font></font></font></font></font></font></font></font></font></font></=
+font></font></font></font></font></font></font></font></font></font></font>=
+</font></font></font></font></font></font></font></font></font></font></fon=
+t></font></font></font></font></font></font></font></font></font></font></f=
+ont></font></font></font></font></font></font></font></font></font></font><=
+/font></font></font></font></font></font></font></font></font></font></font=
+></font></font></font></font></font></font></font></font></font></font></fo=
+nt></font></font></font></font></font></font></font></font></font></font></=
+font></font></font></font></font></font></font></font></font></font></font>=
+</font></font></font></font></font></font></font></font></font></font></fon=
+t></font></font></font></font></font></font></font></font></font></font></f=
+ont></font></font></font></font></font></font></font></font></font></font><=
+/font></font></font></font></font></font></font></font></font></font></font=
+></font></font></font></font></font></font></font></font></font></font></fo=
+nt></font></font></font></font></font></font></font></font></font></font></=
+font></div></div>
+
+--0000000000009ebbdb05ee4543b1--
+

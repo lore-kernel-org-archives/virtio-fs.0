@@ -1,25 +1,14 @@
-Return-Path: <mhartmay@linux.ibm.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ibm.com;
- h=from : to : cc : subject
- : in-reply-to : references : date : message-id : content-type :
- content-transfer-encoding : mime-version; s=pp1;
- bh=frS9Zh18JIFRLV3k0NYVkamO7NVNX+oTphRcy/+WDJc=;
- b=dGTkuRPU6p+Fxav92R6AaBOqNuaF5up9tLJ77JGBIv4lG6Hpvmkf7EP0XvWdl0J84vDR
- +Ihp3Nw6wjWYME4VLi5i9Dk2qmJZFE0WVjVkgrNMP7pJKa0ZLJTYe8OuyvlMOtRS/JA8
- KVM5PEutucHGQE9qPvd3UYcMPA1yeQE+Q9hpX10c9WiLnosZOkEZ2L3Nai2KgC/dLF/y
- H1zzWiDAHtcufC/iNN5KXOMbJsYRCJWBfs+zVfCjsp6zPPc9iYiojZo9WunJTYtM8hZ0
- eKOsenp+jUJyQMcES1TuJG7F5yhcgrg342l72uxhqkOzkNMIMooE41xrudr02+m+pFub GA==
-From: Marc Hartmayer <mhartmay@linux.ibm.com>
-In-Reply-To: <CAJh=p+7igBB9CMTUi--HCpcuxdHgveqgkw5dY7frE7Wqf==04w@mail.gmail.com>
-References: <20221125143946.27717-1-mhartmay@linux.ibm.com>
- <CAJh=p+7igBB9CMTUi--HCpcuxdHgveqgkw5dY7frE7Wqf==04w@mail.gmail.com>
-Date: Mon, 28 Nov 2022 10:00:03 +0100
-Message-ID: <87lenvjvxo.fsf@linux.ibm.com>
+Return-Path: <armbru@redhat.com>
+From: Markus Armbruster <armbru@redhat.com>
+Date: Mon, 28 Nov 2022 10:41:37 +0100
+Message-Id: <20221128094138.2824623-3-armbru@redhat.com>
+In-Reply-To: <20221128094138.2824623-1-armbru@redhat.com>
+References: <20221128094138.2824623-1-armbru@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=utf-8
-Content-Transfer-Encoding: quoted-printable
-Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Add `sigreturn` to the seccomp
- whitelist
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v3 2/3] block/vmdk: Simplify vmdk_co_create() to
+ return directly
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -28,71 +17,68 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: German Maglione <gmaglione@redhat.com>
-Cc: qemu-devel@nongnu.org, Stefan Liebler <stli@linux.ibm.com>, virtio-fs@redhat.com, Christian Borntraeger <borntraeger@de.ibm.com>, qemu-s390x <qemu-s390x@nongnu.org>, Sven Schnelle <svens@linux.ibm.com>, Stefan Hajnoczi <stefanha@redhat.com>
+To: qemu-devel@nongnu.org
+Cc: Alistair.Francis@wdc.com, bin.meng@windriver.com, palmer@dabbelt.com, marcandre.lureau@redhat.com, pbonzini@redhat.com, yuval.shaia.ml@gmail.com, marcel.apfelbaum@gmail.com, mst@redhat.com, quintela@redhat.com, dgilbert@redhat.com, pavel.dovgaluk@ispras.ru, alex.bennee@linaro.org, peterx@redhat.com, david@redhat.com, philmd@linaro.org, mrolnik@gmail.com, gaosong@loongson.cn, yangxiaojuan@loongson.cn, aurelien@aurel32.net, jiaxun.yang@flygoat.com, aleksandar.rikalo@syrmia.com, berrange@redhat.com, thuth@redhat.com, lvivier@redhat.com, suhang16@mails.ucas.ac.cn, chen.zhang@intel.com, lizhijian@fujitsu.com, stefanha@redhat.com, qemu-riscv@nongnu.org, qemu-ppc@nongnu.org, virtio-fs@redhat.com, Fam Zheng <fam@euphon.net>, Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, qemu-block@nongnu.org, Peter Maydell <peter.maydell@linaro.org>
 
-German Maglione <gmaglione@redhat.com> writes:
+Cc: Fam Zheng <fam@euphon.net>
+Cc: Kevin Wolf <kwolf@redhat.com>
+Cc: Hanna Reitz <hreitz@redhat.com>
+Cc: qemu-block@nongnu.org
+Signed-off-by: Markus Armbruster <armbru@redhat.com>
+Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
+Reviewed-by: Philippe Mathieu-Daudé <philmd@linaro.org>
+---
+ block/vmdk.c | 28 +++++++++++-----------------
+ 1 file changed, 11 insertions(+), 17 deletions(-)
 
-> On Fri, Nov 25, 2022 at 3:40 PM Marc Hartmayer <mhartmay@linux.ibm.com> w=
-rote:
->>
->> The virtiofsd currently crashes on s390x. This is because of a
->> `sigreturn` system call. See audit log below:
->>
->> type=3DSECCOMP msg=3Daudit(1669382477.611:459): auid=3D4294967295 uid=3D=
-0 gid=3D0 ses=3D4294967295 subj=3Dsystem_u:system_r:virtd_t:s0-s0:c0.c1023 =
-pid=3D6649 comm=3D"virtiofsd" exe=3D"/usr/libexec/virtiofsd" sig=3D31 arch=
-=3D80000016 syscall=3D119 compat=3D0 ip=3D0x3fff15f748a code=3D0x80000000AU=
-ID=3D"unset" UID=3D"root" GID=3D"root" ARCH=3Ds390x SYSCALL=3Dsigreturn
->>
->> Signed-off-by: Marc Hartmayer <mhartmay@linux.ibm.com>
->> ---
->>  tools/virtiofsd/passthrough_seccomp.c | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/pas=
-sthrough_seccomp.c
->> index 888295c073de..0033dab4939e 100644
->> --- a/tools/virtiofsd/passthrough_seccomp.c
->> +++ b/tools/virtiofsd/passthrough_seccomp.c
->> @@ -110,6 +110,7 @@ static const int syscall_allowlist[] =3D {
->>  #endif
->>      SCMP_SYS(set_robust_list),
->>      SCMP_SYS(setxattr),
->> +    SCMP_SYS(sigreturn),
->>      SCMP_SYS(symlinkat),
->>      SCMP_SYS(syncfs),
->>      SCMP_SYS(time), /* Rarely needed, except on static builds */
->> --
->> 2.34.1
->>
->> _______________________________________________
->> Virtio-fs mailing list
->> Virtio-fs@redhat.com
->> https://listman.redhat.com/mailman/listinfo/virtio-fs
->>
->
-> Reviewed-by:  German Maglione <gmaglione@redhat.com>
-
-Thanks.
-
->
-> Should we add this also in the rust version?, I see we don't have it
-> enabled either.
-
-Yep - thanks.
-
->
-> --=20
-> German
->
---=20
-Kind regards / Beste Gr=C3=BC=C3=9Fe
-   Marc Hartmayer
-
-IBM Deutschland Research & Development GmbH
-Vorsitzender des Aufsichtsrats: Gregor Pillen=20
-Gesch=C3=A4ftsf=C3=BChrung: David Faller
-Sitz der Gesellschaft: B=C3=B6blingen
-Registergericht: Amtsgericht Stuttgart, HRB 243294
+diff --git a/block/vmdk.c b/block/vmdk.c
+index 26376352b9..bac3d8db50 100644
+--- a/block/vmdk.c
++++ b/block/vmdk.c
+@@ -2821,7 +2821,6 @@ static BlockBackend *vmdk_co_create_cb(int64_t size, int idx,
+ static int coroutine_fn vmdk_co_create(BlockdevCreateOptions *create_options,
+                                        Error **errp)
+ {
+-    int ret;
+     BlockdevCreateOptionsVmdk *opts;
+ 
+     opts = &create_options->u.vmdk;
+@@ -2829,24 +2828,19 @@ static int coroutine_fn vmdk_co_create(BlockdevCreateOptions *create_options,
+     /* Validate options */
+     if (!QEMU_IS_ALIGNED(opts->size, BDRV_SECTOR_SIZE)) {
+         error_setg(errp, "Image size must be a multiple of 512 bytes");
+-        ret = -EINVAL;
+-        goto out;
++        return -EINVAL;
+     }
+ 
+-    ret = vmdk_co_do_create(opts->size,
+-                            opts->subformat,
+-                            opts->adapter_type,
+-                            opts->backing_file,
+-                            opts->hwversion,
+-                            opts->toolsversion,
+-                            false,
+-                            opts->zeroed_grain,
+-                            vmdk_co_create_cb,
+-                            opts, errp);
+-    return ret;
+-
+-out:
+-    return ret;
++    return vmdk_co_do_create(opts->size,
++                             opts->subformat,
++                             opts->adapter_type,
++                             opts->backing_file,
++                             opts->hwversion,
++                             opts->toolsversion,
++                             false,
++                             opts->zeroed_grain,
++                             vmdk_co_create_cb,
++                             opts, errp);
+ }
+ 
+ static void vmdk_close(BlockDriverState *bs)
+-- 
+2.37.3
 

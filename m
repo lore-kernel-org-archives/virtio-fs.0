@@ -1,30 +1,16 @@
-Return-Path: <virtiofs-bot@sinrega.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
- cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; t=1669630136; x=1669716536; bh=ilZ9G9P4XQvbU5ZiQLGt2
- gFYnbvCKFBPGhhDaUc9jgg=; b=SbxPptg9h3lBck3l1MmLzrOwxg5ah+aQTvRnK
- 9c0lH64GIfVbRR/6teJL3/o8fWBMeoSP/kt/kvDWpJFMR7qEtOG7Nko8Yz6Vry5K
- FKslAOpHhXX2GhbOKdBm4zUeofL1LCiT/WM4m+i+uR1p8FXyqq7E4M/K8N6OwKlg
- QGWcvXzSE0yA5B83jIX1dkzQr8V+B14JbPTOpq7CHtQ4MAkGFQh0LK48tXS9Er0i
- BPK7c4MICDvP4x4FddoYAlFVWhIRLz9T0CAEsxYGVUZT85jHmhpR9HtUwEjIg261
- Kg+HZsc1Iq17b9YZeIhodUtEA1jWoUL6BVMn6vMWyESILafdw==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
- messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
- :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
- :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; t=
- 1669630136; x=1669716536; bh=ilZ9G9P4XQvbU5ZiQLGt2gFYnbvCKFBPGhh
- DaUc9jgg=; b=dJGFx3U2+38pzF1GsM6TwP0KFJfJb/Adp44GH0v3dudcKpmaGeU
- aSjWqr6pfbsMYW9jtskjz9cycxyd92Hi6cT8VDU+4Ytf5YjLzPIxLI+TtAQJif2m
- maSVYO4rPjwLRwT/0QsaB5sqN3aEL4sAu+HwPc/baV37ZyvrqgUUNxzTU0XkbD/g
- sN5+t9Hnzv8yXcc8e8tWY764o7BTwDXrITBhiRHhF0xV2TCQNFsvJkTQTxrW8dVp
- nbTF2KsWkYxQuOoPAlcmS09uLrajW6ukkKZ/ghB9hJvgGESRDgmu8e4KNFtfQs8e
- tJbSTlqmGuUpmZypJZff1GthoBiPzoh8Zkg==
-From: virtiofs-bot@sinrega.org
-Message-Id: <98354.122112805085900373@us-mta-638.us.mimecast.lan>
-Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Mon, 28 Nov 2022 10:09:02 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] MR opened: seccomp: Allow `SYS_sigreturn`
- for s390x
+Return-Path: <gmaglion@redhat.com>
+MIME-Version: 1.0
+References: <20221125143946.27717-1-mhartmay@linux.ibm.com>
+ <CAJh=p+7igBB9CMTUi--HCpcuxdHgveqgkw5dY7frE7Wqf==04w@mail.gmail.com>
+ <87lenvjvxo.fsf@linux.ibm.com>
+In-Reply-To: <87lenvjvxo.fsf@linux.ibm.com>
+From: German Maglione <gmaglione@redhat.com>
+Date: Mon, 28 Nov 2022 11:17:11 +0100
+Message-ID: <CAJh=p+6ZoUD7788GewpvAPq2mc=QDEA89B3QMMcAynTqs9szxQ@mail.gmail.com>
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Add `sigreturn` to the seccomp
+ whitelist
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -33,16 +19,68 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Marc Hartmayer <mhartmay@linux.ibm.com>
+Cc: qemu-devel@nongnu.org, Stefan Liebler <stli@linux.ibm.com>, virtio-fs@redhat.com, Christian Borntraeger <borntraeger@de.ibm.com>, qemu-s390x <qemu-s390x@nongnu.org>, Sven Schnelle <svens@linux.ibm.com>, Stefan Hajnoczi <stefanha@redhat.com>
 
-The virtiofsd currently crashes on s390x. This is because of a `sigreturn` system call.
+On Mon, Nov 28, 2022 at 10:00 AM Marc Hartmayer <mhartmay@linux.ibm.com> wr=
+ote:
+>
+> German Maglione <gmaglione@redhat.com> writes:
+>
+> > On Fri, Nov 25, 2022 at 3:40 PM Marc Hartmayer <mhartmay@linux.ibm.com>=
+ wrote:
+> >>
+> >> The virtiofsd currently crashes on s390x. This is because of a
+> >> `sigreturn` system call. See audit log below:
+> >>
+> >> type=3DSECCOMP msg=3Daudit(1669382477.611:459): auid=3D4294967295 uid=
+=3D0 gid=3D0 ses=3D4294967295 subj=3Dsystem_u:system_r:virtd_t:s0-s0:c0.c10=
+23 pid=3D6649 comm=3D"virtiofsd" exe=3D"/usr/libexec/virtiofsd" sig=3D31 ar=
+ch=3D80000016 syscall=3D119 compat=3D0 ip=3D0x3fff15f748a code=3D0x80000000=
+AUID=3D"unset" UID=3D"root" GID=3D"root" ARCH=3Ds390x SYSCALL=3Dsigreturn
+> >>
+> >> Signed-off-by: Marc Hartmayer <mhartmay@linux.ibm.com>
+> >> ---
+> >>  tools/virtiofsd/passthrough_seccomp.c | 1 +
+> >>  1 file changed, 1 insertion(+)
+> >>
+> >> diff --git a/tools/virtiofsd/passthrough_seccomp.c b/tools/virtiofsd/p=
+assthrough_seccomp.c
+> >> index 888295c073de..0033dab4939e 100644
+> >> --- a/tools/virtiofsd/passthrough_seccomp.c
+> >> +++ b/tools/virtiofsd/passthrough_seccomp.c
+> >> @@ -110,6 +110,7 @@ static const int syscall_allowlist[] =3D {
+> >>  #endif
+> >>      SCMP_SYS(set_robust_list),
+> >>      SCMP_SYS(setxattr),
+> >> +    SCMP_SYS(sigreturn),
+> >>      SCMP_SYS(symlinkat),
+> >>      SCMP_SYS(syncfs),
+> >>      SCMP_SYS(time), /* Rarely needed, except on static builds */
+> >> --
+> >> 2.34.1
+> >>
+> >> _______________________________________________
+> >> Virtio-fs mailing list
+> >> Virtio-fs@redhat.com
+> >> https://listman.redhat.com/mailman/listinfo/virtio-fs
+> >>
+> >
+> > Reviewed-by:  German Maglione <gmaglione@redhat.com>
+>
+> Thanks.
+>
+> >
+> > Should we add this also in the rust version?, I see we don't have it
+> > enabled either.
+>
+> Yep - thanks.
 
-This was originally reported and fixed, for the C version, by Marc Hartmayer <mhartmay@linux.ibm.com>
-https://listman.redhat.com/archives/virtio-fs/2022-November/005292.html
-
-
-Reported-by: Marc Hartmayer <mhartmay@linux.ibm.com>
-Signed-off-by: German Maglione <gmaglione@redhat.com>
----
+Could you test this MR to see if it is ok?
 https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/144
+
+Thanks,
+
+--=20
+German
 

@@ -1,14 +1,14 @@
 Return-Path: <armbru@redhat.com>
 From: Markus Armbruster <armbru@redhat.com>
-Date: Mon, 28 Nov 2022 10:41:37 +0100
-Message-Id: <20221128094138.2824623-3-armbru@redhat.com>
+Date: Mon, 28 Nov 2022 10:41:38 +0100
+Message-Id: <20221128094138.2824623-4-armbru@redhat.com>
 In-Reply-To: <20221128094138.2824623-1-armbru@redhat.com>
 References: <20221128094138.2824623-1-armbru@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v3 2/3] block/vmdk: Simplify vmdk_co_create() to
- return directly
+Subject: [Virtio-fs] [PATCH v3 3/3] ppc4xx_sdram: Simplify sdram_ddr_size()
+ to return directly
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -18,67 +18,41 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: qemu-devel@nongnu.org
-Cc: Alistair.Francis@wdc.com, bin.meng@windriver.com, palmer@dabbelt.com, marcandre.lureau@redhat.com, pbonzini@redhat.com, yuval.shaia.ml@gmail.com, marcel.apfelbaum@gmail.com, mst@redhat.com, quintela@redhat.com, dgilbert@redhat.com, pavel.dovgaluk@ispras.ru, alex.bennee@linaro.org, peterx@redhat.com, david@redhat.com, philmd@linaro.org, mrolnik@gmail.com, gaosong@loongson.cn, yangxiaojuan@loongson.cn, aurelien@aurel32.net, jiaxun.yang@flygoat.com, aleksandar.rikalo@syrmia.com, berrange@redhat.com, thuth@redhat.com, lvivier@redhat.com, suhang16@mails.ucas.ac.cn, chen.zhang@intel.com, lizhijian@fujitsu.com, stefanha@redhat.com, qemu-riscv@nongnu.org, qemu-ppc@nongnu.org, virtio-fs@redhat.com, Fam Zheng <fam@euphon.net>, Kevin Wolf <kwolf@redhat.com>, Hanna Reitz <hreitz@redhat.com>, qemu-block@nongnu.org, Peter Maydell <peter.maydell@linaro.org>
+Cc: Alistair.Francis@wdc.com, bin.meng@windriver.com, palmer@dabbelt.com, marcandre.lureau@redhat.com, pbonzini@redhat.com, yuval.shaia.ml@gmail.com, marcel.apfelbaum@gmail.com, mst@redhat.com, quintela@redhat.com, dgilbert@redhat.com, pavel.dovgaluk@ispras.ru, alex.bennee@linaro.org, peterx@redhat.com, david@redhat.com, philmd@linaro.org, mrolnik@gmail.com, gaosong@loongson.cn, yangxiaojuan@loongson.cn, aurelien@aurel32.net, jiaxun.yang@flygoat.com, aleksandar.rikalo@syrmia.com, berrange@redhat.com, thuth@redhat.com, lvivier@redhat.com, suhang16@mails.ucas.ac.cn, chen.zhang@intel.com, lizhijian@fujitsu.com, stefanha@redhat.com, qemu-riscv@nongnu.org, qemu-ppc@nongnu.org, virtio-fs@redhat.com, BALATON Zoltan <balaton@eik.bme.hu>
 
-Cc: Fam Zheng <fam@euphon.net>
-Cc: Kevin Wolf <kwolf@redhat.com>
-Cc: Hanna Reitz <hreitz@redhat.com>
-Cc: qemu-block@nongnu.org
+Suggested-by: BALATON Zoltan <balaton@eik.bme.hu>
 Signed-off-by: Markus Armbruster <armbru@redhat.com>
-Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
+Reviewed-by: BALATON Zoltan <balaton@eik.bme.hu>
 Reviewed-by: Philippe Mathieu-Daudé <philmd@linaro.org>
 ---
- block/vmdk.c | 28 +++++++++++-----------------
- 1 file changed, 11 insertions(+), 17 deletions(-)
+ hw/ppc/ppc4xx_sdram.c | 10 +++-------
+ 1 file changed, 3 insertions(+), 7 deletions(-)
 
-diff --git a/block/vmdk.c b/block/vmdk.c
-index 26376352b9..bac3d8db50 100644
---- a/block/vmdk.c
-+++ b/block/vmdk.c
-@@ -2821,7 +2821,6 @@ static BlockBackend *vmdk_co_create_cb(int64_t size, int idx,
- static int coroutine_fn vmdk_co_create(BlockdevCreateOptions *create_options,
-                                        Error **errp)
- {
--    int ret;
-     BlockdevCreateOptionsVmdk *opts;
+diff --git a/hw/ppc/ppc4xx_sdram.c b/hw/ppc/ppc4xx_sdram.c
+index 54bf9a2b44..a24c80b1d2 100644
+--- a/hw/ppc/ppc4xx_sdram.c
++++ b/hw/ppc/ppc4xx_sdram.c
+@@ -192,17 +192,13 @@ static inline hwaddr sdram_ddr_base(uint32_t bcr)
  
-     opts = &create_options->u.vmdk;
-@@ -2829,24 +2828,19 @@ static int coroutine_fn vmdk_co_create(BlockdevCreateOptions *create_options,
-     /* Validate options */
-     if (!QEMU_IS_ALIGNED(opts->size, BDRV_SECTOR_SIZE)) {
-         error_setg(errp, "Image size must be a multiple of 512 bytes");
--        ret = -EINVAL;
--        goto out;
-+        return -EINVAL;
+ static hwaddr sdram_ddr_size(uint32_t bcr)
+ {
+-    hwaddr size;
+-    int sh;
++    int sh = (bcr >> 17) & 0x7;
+ 
+-    sh = (bcr >> 17) & 0x7;
+     if (sh == 7) {
+-        size = -1;
+-    } else {
+-        size = (4 * MiB) << sh;
++        return -1;
      }
  
--    ret = vmdk_co_do_create(opts->size,
--                            opts->subformat,
--                            opts->adapter_type,
--                            opts->backing_file,
--                            opts->hwversion,
--                            opts->toolsversion,
--                            false,
--                            opts->zeroed_grain,
--                            vmdk_co_create_cb,
--                            opts, errp);
--    return ret;
--
--out:
--    return ret;
-+    return vmdk_co_do_create(opts->size,
-+                             opts->subformat,
-+                             opts->adapter_type,
-+                             opts->backing_file,
-+                             opts->hwversion,
-+                             opts->toolsversion,
-+                             false,
-+                             opts->zeroed_grain,
-+                             vmdk_co_create_cb,
-+                             opts, errp);
+-    return size;
++    return (4 * MiB) << sh;
  }
  
- static void vmdk_close(BlockDriverState *bs)
+ static uint32_t sdram_ddr_dcr_read(void *opaque, int dcrn)
 -- 
 2.37.3
 

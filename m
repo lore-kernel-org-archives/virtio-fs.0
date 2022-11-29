@@ -1,30 +1,29 @@
 Return-Path: <virtiofs-bot@sinrega.org>
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=sinrega.org; h=
  cc:date:from:from:in-reply-to:reply-to:sender:subject:subject:to
- :to; s=fm1; t=1669740571; x=1669826971; bh=RI8wyk7wGpID4/2rsLOlM
- fYLd5h5iXp6IxaWSAsBAdg=; b=18/zPY3Up1tD08yjERRC6skPa+UeYWgkPMnWY
- JgVtKZrCQkKZ94qQfYH/UJ3jE+w0hzlKPfj1DZSg2FCN53b3MHCVeHaQWg5yZ/oL
- Uf//mWTOHUt905QFx9VPtW3Jyo7xRUqaXUS9y9lzwp0is6q9GYpPrrvmuoesUWrB
- pA+hZGrrkemiY9qpzHOw+DdxYWP99n2sx4tDV64mbw4R5sperzkc6SdXWXVk8Fnr
- o114bLUl1/RPzn6Khy833qBlKr9iFRyeT7sBsjbpRXGo9k6vgnDxaVe0u7rt5fT0
- iI+TT5F2uF/yRjdfpD8taq0s+2qOl5+y9m/aG4VCvDNqIWw2w==
+ :to; s=fm1; t=1669740800; x=1669827200; bh=8aT1wdMR96I+waviPrZu/
+ fEJDh2PmXtPfepHqI0a500=; b=DRXKI+Wy2Et6aLBQm/Euqhq5t1iaW5+OFwVSi
+ /7w/KvYut93LVYN7iqKBs2LRSAOGbukHPYmyRJOh+JYOJhcwJJD1G8X4QsJmy/u9
+ qs05Hw6dllZ7VQB/W8+fJNN9d1Y2bJRvqyAJiSSDRFOIrE1tYGpKrILEA11efEWY
+ Hu0apJ8RjYYe/AYQFse6KUQKK3BNasaeoB9r82U+phVKk1Td3SAiv7+xiz2dajQl
+ cXlq0obfzyX2o6kLcUaTCGuNq/CXe7wwVLjgFWlHwMMAuqI48nuWbyv51zXeMI2L
+ Ee2reWjB58VsZCiNyZPsnYcFy2yrPsCrdtybGIKQ329DqfOTw==
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
  messagingengine.com; h=cc:date:feedback-id:feedback-id:from:from
  :in-reply-to:reply-to:sender:subject:subject:to:to:x-me-proxy
  :x-me-proxy:x-me-sender:x-me-sender:x-sasl-enc; s=fm1; t=
- 1669740571; x=1669826971; bh=RI8wyk7wGpID4/2rsLOlMfYLd5h5iXp6Ixa
- WSAsBAdg=; b=Lr+m8gkJucXbU1dEZUodz5bFQCtBZ4ZAQ1ItwTsc5jcsas3XU0h
- E12UHdWFerZA2qKv1SuQiv010PIjQXdYjoOyQKYMXGXF1N7F1d0fxw7JmXplaNLr
- vkGsV+WaeQ9Jx4ROAuY3vyHmOMrLBA1HPgJrgFcoivLIx6c98gV6pRZ+YPwq75+f
- yrLk2K1RDZWJgN5zTH30qD0Kjii0sgvImpwwg8DhOfI9A8OyufoMQJONkUt6hG7b
- f9TvyYaAr4ALqxKX/aE9LnElxlg4AP1krdW/6BiEln8QiF3b+XhJc6CFfIk2xv7v
- 7y3HEHDt/dzgdgY3IVTofmUhPN9wz2J+jPQ==
+ 1669740800; x=1669827200; bh=8aT1wdMR96I+waviPrZu/fEJDh2PmXtPfep
+ HqI0a500=; b=KoImzCdnQOrt5C12WbUMvz3BGVFJ9ZnwWqB7WaG2sbkY2Elmlq8
+ 78M2+Yv15o0QzAKLXZO42G2pM7Y4We0RC/SxL1n6AskG5CWq8gK61rX3AHgKDYaN
+ EyEsh7Il6cRcB6UPP9b/ac3GLzLFQa4Toln6UyGLhrED9zy8vNkQtD9SKwgk792R
+ Mgar+MNc2libnA6yu3wQJ0irqQpVsbYnr3ic/Fg6JVw+vZKk5Kcaft1SeQ27lS80
+ S0IUIz5iGqJXGU6m6LAsIXfZ97KO9WEW1r3H3M8D6G/eW+71vRyvNlys8jyrwrPc
+ TfRCmz5H2GWu66HRpMTywRjf5GHTTSR5Jsg==
 From: virtiofs-bot@sinrega.org
-Message-Id: <42663.122112911493102330@us-mta-581.us.mimecast.lan>
+Message-Id: <44568.122112911532001137@us-mta-290.us.mimecast.lan>
 Content-Type: text/plain; charset="US-ASCII"; x-default=true
-Date: Tue, 29 Nov 2022 16:49:34 +0000 (UTC)
-Subject: [Virtio-fs] [virtiofsd] Issue closed: remove file from host doesn't
- free up the disk space.
+Date: Tue, 29 Nov 2022 16:53:23 +0000 (UTC)
+Subject: [Virtio-fs] [virtiofsd] Issue opened: Add viommu support
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -35,15 +34,15 @@ List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: virtio-fs@redhat.com
 
-Hi guys,
-we are using qemu to create some sandboxes and use virtiofs to share some folders between the host and the guest. This is the command that we start the virtiofsd
-`virtiofsd --syslog -o cache=auto -o no_posix_lock -o source={some path} --fd=3 -f --thread-pool-size=1`
+We don't support viommu, so the guest kernel hung when trying to access the virtiofs-mount directory with viommu enabled.
 
-We find out that with such settings, when we creating some file inside guest and then delete those file in the host. The disk space will not be freed until we run the `rm {file}` inside guest again and guest will report  `no such file or directory` but the space is freed.
+Libkrun seems to have a patch. Sergio is planning to propose it to upstream linux kernel. That will use iommu if available, otherwise it falls back to swiommu in case of confidential computing setup.
 
-We also find out that once we change the option to `cache=none`, this wierd behavior disappears. 
+Tracking:
+https://bugzilla.redhat.com/show_bug.cgi?id=1976676
 
-Is this expected. Is there a way that we can enable the cache while make the scenario that I mentioned above work?
+Related:
+https://bugzilla.redhat.com/show_bug.cgi?id=1812886
 ---
-https://gitlab.com/virtio-fs/virtiofsd/-/issues/64
+https://gitlab.com/virtio-fs/virtiofsd/-/issues/68
 

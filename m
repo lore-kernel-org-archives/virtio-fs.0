@@ -1,12 +1,28 @@
-Return-Path: <sgarzare@redhat.com>
-From: Stefano Garzarella <sgarzare@redhat.com>
-Date: Mon, 21 Nov 2022 11:11:01 +0100
-Message-Id: <20221121101101.29400-1-sgarzare@redhat.com>
+Return-Path: <mhartmay@linux.ibm.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ibm.com;
+ h=from : to : cc : subject
+ : in-reply-to : references : date : message-id : content-type :
+ content-transfer-encoding : mime-version; s=pp1;
+ bh=Z6bYehhqZZtobMu+v574NMN2Bnl7X83wkx2tH7UB0H4=;
+ b=VI0z7weRj3Bg/kBwbaYaykcC+sw73JW5GuG1w2+B221e983nYaayLeQGMOcKfHlmk845
+ xVJTw6vhmocRMwTGHsJHqniQpzzzsyXnjrTyhEp2S/cSORwVLm0oluFlPhQRccEOc6oB
+ PFe3EH0LzRdcWHOTtilup8GSKoY7liGFQRZeJ1CALAjyR9KOQK16spjHyFQAaHtj0fGz
+ ybMdi2uPXOo8o5sTn1iQ1anAF+Gq3OVoB/Th9IwZnV8U2IC6yqzXNzQzdcYJBoDN2GN2
+ y2XHpiHOAMyK1BGDH9YM8bD0mEC+5Oyx3aWOJGjIWCy7sDatdSKYnrVf1tX/wOWrn5tj Vw==
+From: Marc Hartmayer <mhartmay@linux.ibm.com>
+In-Reply-To: <618edde1-31d8-9db8-48d9-137fe81b788b@de.ibm.com>
+References: <20221125143946.27717-1-mhartmay@linux.ibm.com>
+ <Y4UCPQ0E2ZY15aEq@work-vm> <87wn7ef6cm.fsf@linux.ibm.com>
+ <Y4XT/ZxuyU7F5h1n@work-vm>
+ <1a94f96b-d9b6-44af-cedb-aa17eb1a3a84@de.ibm.com>
+ <618edde1-31d8-9db8-48d9-137fe81b788b@de.ibm.com>
+Date: Tue, 29 Nov 2022 11:16:47 +0100
+Message-ID: <87sfi2f4kw.fsf@linux.ibm.com>
 MIME-Version: 1.0
-Content-type: text/plain
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH] vhost: mask VIRTIO_F_RING_RESET for vhost and
- vhost-user devices
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH] virtiofsd: Add `sigreturn` to the seccomp
+ whitelist
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -15,193 +31,111 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: qemu-block@nongnu.org, virtio-fs@redhat.com, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, Viresh Kumar <viresh.kumar@linaro.org>, "Michael S. Tsirkin" <mst@redhat.com>, Fam Zheng <fam@euphon.net>, Mathieu Poirier <mathieu.poirier@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Kevin Wolf <kwolf@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Hanna Reitz <hreitz@redhat.com>, kangjie.xu@linux.alibaba.com, Jason Wang <jasowang@redhat.com>, Stefano Garzarella <sgarzare@redhat.com>
+To: Christian Borntraeger <borntraeger@de.ibm.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>
+Cc: qemu-devel@nongnu.org, qemu-s390x <qemu-s390x@nongnu.org>, virtio-fs@redhat.com, Stefan Hajnoczi <stefanha@redhat.com>, Sven Schnelle <svens@linux.ibm.com>, Stefan Liebler <stli@linux.ibm.com>
 
-Commit 69e1c14aa2 ("virtio: core: vq reset feature negotation support")
-enabled VIRTIO_F_RING_RESET by default for all virtio devices.
+Christian Borntraeger <borntraeger@de.ibm.com> writes:
 
-This feature is not currently emulated by QEMU, so for vhost and
-vhost-user devices we need to make sure it is supported by the offloaded
-device emulation (in-kernel or in another process).
-To do this we need to add VIRTIO_F_RING_RESET to the features bitmap
-passed to vhost_get_features(). This way it will be masked if the device
-does not support it.
+> Am 29.11.22 um 10:52 schrieb Christian Borntraeger:
+>>=20
+>>=20
+>> Am 29.11.22 um 10:42 schrieb Dr. David Alan Gilbert:
+>>> * Marc Hartmayer (mhartmay@linux.ibm.com) wrote:
+>>>> "Dr. David Alan Gilbert" <dgilbert@redhat.com> writes:
+>>>>
+>>>>> * Marc Hartmayer (mhartmay@linux.ibm.com) wrote:
+>>>>>> The virtiofsd currently crashes on s390x. This is because of a
+>>>>>> `sigreturn` system call. See audit log below:
+>>>>>>
+>>>>>> type=3DSECCOMP msg=3Daudit(1669382477.611:459): auid=3D4294967295 ui=
+d=3D0 gid=3D0 ses=3D4294967295 subj=3Dsystem_u:system_r:virtd_t:s0-s0:c0.c1=
+023 pid=3D6649 comm=3D"virtiofsd" exe=3D"/usr/libexec/virtiofsd" sig=3D31 a=
+rch=3D80000016 syscall=3D119 compat=3D0 ip=3D0x3fff15f748a code=3D0x8000000=
+0AUID=3D"unset" UID=3D"root" GID=3D"root" ARCH=3Ds390x SYSCALL=3Dsigreturn
+>>>>>
+>>>>> I'm curious; doesn't that mean that some signal is being delivered an=
+d
+>>>>> you're returning?=C2=A0 Which one?
+>>>>
+>>>> code=3D0x80000000 means that the seccomp action SECCOMP_RET_KILL_PROCE=
+SS
+>>>> is taken =3D> process is killed by a SIGSYS signal (31) [1].
+>>>>
+>>>> At least, that=E2=80=99s my understanding of this log message.
+>>>>
+>>>> [1] https://man7.org/linux/man-pages/man2/seccomp.2.html
+>>>
+>>> But isn't that the fallout rather than the cause ? i.e. seccomp
+>>> is sending a SIGSYS because the process used sigreturn, my question
+>>> is why did the process call sigreturn in the first place - it must
+>>> have received a signal to return from?
+>>=20
+>> Good question. virtiofsd seems to prepare itself for
+>>=20
+>> int fuse_set_signal_handlers(struct fuse_session *se)
+>> {
+>>  =C2=A0=C2=A0=C2=A0 /*
+>>  =C2=A0=C2=A0=C2=A0=C2=A0 * If we used SIG_IGN instead of the do_nothing=
+ function,
+>>  =C2=A0=C2=A0=C2=A0=C2=A0 * then we would be unable to tell if we set SI=
+G_IGN (and
+>>  =C2=A0=C2=A0=C2=A0=C2=A0 * thus should reset to SIG_DFL in fuse_remove_=
+signal_handlers)
+>>  =C2=A0=C2=A0=C2=A0=C2=A0 * or if it was already set to SIG_IGN (and sho=
+uld be left
+>>  =C2=A0=C2=A0=C2=A0=C2=A0 * untouched.
+>>  =C2=A0=C2=A0=C2=A0=C2=A0 */
+>>  =C2=A0=C2=A0=C2=A0 if (set_one_signal_handler(SIGHUP, exit_handler, 0) =
+=3D=3D -1 ||
+>>  =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 set_one_signal_handler(SIGIN=
+T, exit_handler, 0) =3D=3D -1 ||
+>>  =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 set_one_signal_handler(SIGTE=
+RM, exit_handler, 0) =3D=3D -1 ||
+>>  =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 set_one_signal_handler(SIGPI=
+PE, do_nothing, 0) =3D=3D -1) {
+>>  =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 return -1;
+>>  =C2=A0=C2=A0=C2=A0 }
+>>=20
+>>=20
+>>=20
+>> Given that rt_sigreturn was already on the seccomp list it seems
+>> to be expected that those handlers are called.
+>
+> For me, it seems to happen on shutdown:
+>                  Stack trace of thread 1:
+>                  #0  0x000003ffc06f348a __kernel_sigreturn (linux-vdso64.=
+so.1 + 0x48a)
+>                  #1  0x000003ffc06f3488 __kernel_sigreturn (linux-vdso64.=
+so.1 + 0x488)
+>                  #2  0x000003ff9af1be96 __GI___futex_abstimed_wait_cancel=
+able64 (libc.so.6 + 0x9be96)
+>                  #3  0x000003ff9af211b4 __pthread_clockjoin_ex (libc.so.6=
+ + 0xa11b4)
+>                  #4  0x000003ff9af2106e pthread_join@GLIBC_2.2 (libc.so.6=
+ + 0xa106e)
+>                  #5  0x000002aa35d2fe36 fv_queue_cleanup_thread (virtiofs=
+d + 0x2fe36)
+>                  #6  0x000002aa35d3152c stop_all_queues (virtiofsd + 0x31=
+52c)
+>                  #7  0x000002aa35d2869c main (virtiofsd + 0x2869c)
+>                  #8  0x000003ff9aeb4872 __libc_start_call_main (libc.so.6=
+ + 0x34872)
+>                  #9  0x000003ff9aeb4950 __libc_start_main@@GLIBC_2.34 (li=
+bc.so.6 + 0x34950)
+>                  #10 0x000002aa35d290a0 .annobin_libvhost_user.c_end.star=
+tup (virtiofsd + 0x290a0)
+>
+>
 
-This issue was initially discovered with vhost-vsock and vhost-user-vsock,
-and then also tested with vhost-user-rng which confirmed the same issue.
-They fail when sending features through VHOST_SET_FEATURES ioctl or
-VHOST_USER_SET_FEATURES message, since VIRTIO_F_RING_RESET is negotiated
-by the guest (Linux >= v6.0), but not supported by the device.
+That=E2=80=99s also what I see.
 
-Fixes: 69e1c14aa2 ("virtio: core: vq reset feature negotation support")
-Resolves: https://gitlab.com/qemu-project/qemu/-/issues/1318
-Signed-off-by: Stefano Garzarella <sgarzare@redhat.com>
----
+--
+Kind regards / Beste Gr=C3=BC=C3=9Fe
+   Marc Hartmayer
 
-To prevent this problem in the future, perhaps we should provide a function
-(e.g. vhost_device_get_features) where we go to mask all non-device-specific
-features (e.g VIRTIO_F_*, VIRTIO_RING_F_*) that are not emulated by QEMU but
-we expect them to be emulated by the vhost or vhost-user devices.
-Then we can call it in all .get_features callbacks just before return the
-features.
-
-What do you think?
-
-But maybe better to do that for the next release, I will send an RFC.
-
-Thanks,
-Stefano
----
- hw/block/vhost-user-blk.c      |  1 +
- hw/net/vhost_net.c             |  1 +
- hw/scsi/vhost-scsi.c           |  1 +
- hw/scsi/vhost-user-scsi.c      |  1 +
- hw/virtio/vhost-user-fs.c      |  1 +
- hw/virtio/vhost-user-gpio.c    |  1 +
- hw/virtio/vhost-user-i2c.c     |  1 +
- hw/virtio/vhost-user-rng.c     | 11 +++++++++--
- hw/virtio/vhost-vsock-common.c |  1 +
- net/vhost-vdpa.c               |  1 +
- 10 files changed, 18 insertions(+), 2 deletions(-)
-
-diff --git a/hw/block/vhost-user-blk.c b/hw/block/vhost-user-blk.c
-index 16ad400889..0d5190accf 100644
---- a/hw/block/vhost-user-blk.c
-+++ b/hw/block/vhost-user-blk.c
-@@ -52,6 +52,7 @@ static const int user_feature_bits[] = {
-     VIRTIO_F_NOTIFY_ON_EMPTY,
-     VIRTIO_F_RING_PACKED,
-     VIRTIO_F_IOMMU_PLATFORM,
-+    VIRTIO_F_RING_RESET,
-     VHOST_INVALID_FEATURE_BIT
- };
- 
-diff --git a/hw/net/vhost_net.c b/hw/net/vhost_net.c
-index feda448878..26e4930676 100644
---- a/hw/net/vhost_net.c
-+++ b/hw/net/vhost_net.c
-@@ -75,6 +75,7 @@ static const int user_feature_bits[] = {
-     VIRTIO_NET_F_MTU,
-     VIRTIO_F_IOMMU_PLATFORM,
-     VIRTIO_F_RING_PACKED,
-+    VIRTIO_F_RING_RESET,
-     VIRTIO_NET_F_RSS,
-     VIRTIO_NET_F_HASH_REPORT,
- 
-diff --git a/hw/scsi/vhost-scsi.c b/hw/scsi/vhost-scsi.c
-index bdf337a7a2..6a0fd0dfb1 100644
---- a/hw/scsi/vhost-scsi.c
-+++ b/hw/scsi/vhost-scsi.c
-@@ -38,6 +38,7 @@ static const int kernel_feature_bits[] = {
-     VIRTIO_RING_F_INDIRECT_DESC,
-     VIRTIO_RING_F_EVENT_IDX,
-     VIRTIO_SCSI_F_HOTPLUG,
-+    VIRTIO_F_RING_RESET,
-     VHOST_INVALID_FEATURE_BIT
- };
- 
-diff --git a/hw/scsi/vhost-user-scsi.c b/hw/scsi/vhost-user-scsi.c
-index bc37317d55..b7a71a802c 100644
---- a/hw/scsi/vhost-user-scsi.c
-+++ b/hw/scsi/vhost-user-scsi.c
-@@ -36,6 +36,7 @@ static const int user_feature_bits[] = {
-     VIRTIO_RING_F_INDIRECT_DESC,
-     VIRTIO_RING_F_EVENT_IDX,
-     VIRTIO_SCSI_F_HOTPLUG,
-+    VIRTIO_F_RING_RESET,
-     VHOST_INVALID_FEATURE_BIT
- };
- 
-diff --git a/hw/virtio/vhost-user-fs.c b/hw/virtio/vhost-user-fs.c
-index 1c40f42045..dc4014cdef 100644
---- a/hw/virtio/vhost-user-fs.c
-+++ b/hw/virtio/vhost-user-fs.c
-@@ -32,6 +32,7 @@ static const int user_feature_bits[] = {
-     VIRTIO_F_NOTIFY_ON_EMPTY,
-     VIRTIO_F_RING_PACKED,
-     VIRTIO_F_IOMMU_PLATFORM,
-+    VIRTIO_F_RING_RESET,
- 
-     VHOST_INVALID_FEATURE_BIT
- };
-diff --git a/hw/virtio/vhost-user-gpio.c b/hw/virtio/vhost-user-gpio.c
-index 677d1c7730..5851cb3bc9 100644
---- a/hw/virtio/vhost-user-gpio.c
-+++ b/hw/virtio/vhost-user-gpio.c
-@@ -24,6 +24,7 @@ static const int feature_bits[] = {
-     VIRTIO_RING_F_INDIRECT_DESC,
-     VIRTIO_RING_F_EVENT_IDX,
-     VIRTIO_GPIO_F_IRQ,
-+    VIRTIO_F_RING_RESET,
-     VHOST_INVALID_FEATURE_BIT
- };
- 
-diff --git a/hw/virtio/vhost-user-i2c.c b/hw/virtio/vhost-user-i2c.c
-index 864eba695e..1c9f3d20dc 100644
---- a/hw/virtio/vhost-user-i2c.c
-+++ b/hw/virtio/vhost-user-i2c.c
-@@ -16,6 +16,7 @@
- 
- static const int feature_bits[] = {
-     VIRTIO_I2C_F_ZERO_LENGTH_REQUEST,
-+    VIRTIO_F_RING_RESET,
-     VHOST_INVALID_FEATURE_BIT
- };
- 
-diff --git a/hw/virtio/vhost-user-rng.c b/hw/virtio/vhost-user-rng.c
-index 8b47287875..f9084cde58 100644
---- a/hw/virtio/vhost-user-rng.c
-+++ b/hw/virtio/vhost-user-rng.c
-@@ -16,6 +16,11 @@
- #include "qemu/error-report.h"
- #include "standard-headers/linux/virtio_ids.h"
- 
-+static const int feature_bits[] = {
-+    VIRTIO_F_RING_RESET,
-+    VHOST_INVALID_FEATURE_BIT
-+};
-+
- static void vu_rng_start(VirtIODevice *vdev)
- {
-     VHostUserRNG *rng = VHOST_USER_RNG(vdev);
-@@ -106,8 +111,10 @@ static void vu_rng_set_status(VirtIODevice *vdev, uint8_t status)
- static uint64_t vu_rng_get_features(VirtIODevice *vdev,
-                                     uint64_t requested_features, Error **errp)
- {
--    /* No feature bits used yet */
--    return requested_features;
-+    VHostUserRNG *rng = VHOST_USER_RNG(vdev);
-+
-+    return vhost_get_features(&rng->vhost_dev, feature_bits,
-+                              requested_features);
- }
- 
- static void vu_rng_handle_output(VirtIODevice *vdev, VirtQueue *vq)
-diff --git a/hw/virtio/vhost-vsock-common.c b/hw/virtio/vhost-vsock-common.c
-index 29b9ab4f72..a67a275de2 100644
---- a/hw/virtio/vhost-vsock-common.c
-+++ b/hw/virtio/vhost-vsock-common.c
-@@ -21,6 +21,7 @@
- 
- const int feature_bits[] = {
-     VIRTIO_VSOCK_F_SEQPACKET,
-+    VIRTIO_F_RING_RESET,
-     VHOST_INVALID_FEATURE_BIT
- };
- 
-diff --git a/net/vhost-vdpa.c b/net/vhost-vdpa.c
-index 6811089231..2b4b85d8f8 100644
---- a/net/vhost-vdpa.c
-+++ b/net/vhost-vdpa.c
-@@ -69,6 +69,7 @@ const int vdpa_feature_bits[] = {
-     VIRTIO_NET_F_CTRL_VQ,
-     VIRTIO_F_IOMMU_PLATFORM,
-     VIRTIO_F_RING_PACKED,
-+    VIRTIO_F_RING_RESET,
-     VIRTIO_NET_F_RSS,
-     VIRTIO_NET_F_HASH_REPORT,
-     VIRTIO_NET_F_GUEST_ANNOUNCE,
--- 
-2.38.1
+IBM Deutschland Research & Development GmbH
+Vorsitzender des Aufsichtsrats: Gregor Pillen=20
+Gesch=C3=A4ftsf=C3=BChrung: David Faller
+Sitz der Gesellschaft: B=C3=B6blingen
+Registergericht: Amtsgericht Stuttgart, HRB 243294
 

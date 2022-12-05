@@ -1,23 +1,13 @@
-Return-Path: <peter.maydell@linaro.org>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=cc:to:subject:message-id:date:from:in-reply-to:references
- :mime-version:from:to:cc:subject:date:message-id:reply-to;
- bh=MF0QvKrp6hOQBtpvzpbZb9Nyv7bn72nzIE9/cJbusOs=;
- b=gAF9+h1FXftdn93KZTEjjDjaUCyTsHBSfToTrxl4r+YHMi8217bNdmt8rUp15v69yz
- pJobNxAirgRt/WgG8aM2N9KWOH38GLcekaDFXyvNucTfg3VMCIR1/wW3ZD1A1EQTFOXa
- HJFiAiKwOwDK2L1loNXFrILdB6Cl+9GipWvvJ4ALhi/BT/LMmi0yoXZzfHbUb2H0Z+0x
- OyJ+cTLxJi1qhIBIRGnUuNIpd1czWWcgm58y1co5I0A44i9Y5aIgPBhIwo4fdBEp0u0o
- Lb/JRsVglFquVnJi6KlZXPCmzemQRNxdpoNdo6U7Qng0qy1m+qjI8IFNczK7FKNs1Bva
- R7AA==
+Return-Path: <quintela@redhat.com>
+From: Juan Quintela <quintela@redhat.com>
+Date: Mon,  5 Dec 2022 10:52:19 +0100
+Message-Id: <20221205095228.1314-43-quintela@redhat.com>
+In-Reply-To: <20221205095228.1314-1-quintela@redhat.com>
+References: <20221205095228.1314-1-quintela@redhat.com>
 MIME-Version: 1.0
-References: <20221121140121.1079100-1-armbru@redhat.com>
-In-Reply-To: <20221121140121.1079100-1-armbru@redhat.com>
-From: Peter Maydell <peter.maydell@linaro.org>
-Date: Mon, 21 Nov 2022 14:36:56 +0000
-Message-ID: <CAFEAcA_jnbp36Trjd3qJYzbf5-6SNNrirG7q2_-wKXkcX49ptg@mail.gmail.com>
-Content-Type: text/plain; charset="UTF-8"
-Subject: Re: [Virtio-fs] [PATCH] cleanup: Tweak and re-run
- return_directly.cocci
+Content-Transfer-Encoding: 8bit
+Subject: [Virtio-fs] [PATCH v2 42/51] migration: Make PageSearchStatus part
+ of RAMState
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -26,50 +16,216 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Markus Armbruster <armbru@redhat.com>
-Cc: qemu-devel@nongnu.org, fam@euphon.net, kwolf@redhat.com, hreitz@redhat.com, groug@kaod.org, qemu_oss@crudebyte.com, Alistair.Francis@wdc.com, bin.meng@windriver.com, palmer@dabbelt.com, marcandre.lureau@redhat.com, pbonzini@redhat.com, yuval.shaia.ml@gmail.com, marcel.apfelbaum@gmail.com, mst@redhat.com, quintela@redhat.com, dgilbert@redhat.com, pavel.dovgaluk@ispras.ru, alex.bennee@linaro.org, peterx@redhat.com, david@redhat.com, philmd@linaro.org, mrolnik@gmail.com, gaosong@loongson.cn, yangxiaojuan@loongson.cn, aurelien@aurel32.net, jiaxun.yang@flygoat.com, aleksandar.rikalo@syrmia.com, jcmvbkbc@gmail.com, berrange@redhat.com, thuth@redhat.com, lvivier@redhat.com, suhang16@mails.ucas.ac.cn, chen.zhang@intel.com, lizhijian@fujitsu.com, stefanha@redhat.com, qemu-block@nongnu.org, qemu-riscv@nongnu.org, qemu-ppc@nongnu.org, virtio-fs@redhat.com
+To: qemu-devel@nongnu.org
+Cc: Fam Zheng <fam@euphon.net>, Thomas Huth <huth@tuxfamily.org>, Viresh Kumar <viresh.kumar@linaro.org>, Kevin Wolf <kwolf@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Laurent Vivier <laurent@vivier.eu>, Eric Blake <eblake@redhat.com>, Richard Henderson <richard.henderson@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Stefan Hajnoczi <stefanha@redhat.com>, Juan Quintela <quintela@redhat.com>, virtio-fs@redhat.com, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, Christian Borntraeger <borntraeger@linux.ibm.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, qemu-block@nongnu.org, Xiaojuan Yang <yangxiaojuan@loongson.cn>, Thomas Huth <thuth@redhat.com>, Ilya Leoshkevich <iii@linux.ibm.com>, Eduardo Habkost <eduardo@habkost.net>, Gerd Hoffmann <kraxel@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Alex Williamson <alex.williamson@redhat.com>, Eric Farman <farman@linux.ibm.com>, Halil Pasic <pasic@linux.ibm.com>, Peter Maydell <peter.maydell@linaro.org>, Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru>, Jason Wang <jasowang@redhat.com>, Laurent Vivier <lvivier@redhat.com>, Song Gao <gaosong@loongson.cn>, qemu-s390x@nongnu.org, Pavel Dovgalyuk <pavel.dovgaluk@ispras.ru>, Klaus Jensen <its@irrelevant.dk>, John Snow <jsnow@redhat.com>, Michael Tokarev <mjt@tls.msk.ru>, qemu-arm@nongnu.org, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Keith Busch <kbusch@kernel.org>, David Hildenbrand <david@redhat.com>, qemu-trivial@nongnu.org, Hanna Reitz <hreitz@redhat.com>, Peter Xu <peterx@redhat.com>
 
-On Mon, 21 Nov 2022 at 14:03, Markus Armbruster <armbru@redhat.com> wrote:
->
-> Tweak the semantic patch to drop redundant parenthesis around the
-> return expression.
->
-> Coccinelle drops comments in hw/rdma/vmw/pvrdma_cmd.c; restored
-> manually.
->
-> Coccinelle messes up vmdk_co_create(), not sure why.  Transformed
-> manually.
->
-> Line breaks in target/avr/cpu.h and hw/rdma/vmw/pvrdma_cmd.c tidied up
-> manually.
->
-> Whitespace in fuse_reply_iov() tidied up manually.
->
-> checkpatch.pl complains "return of an errno should typically be -ve"
-> two times for hw/9pfs/9p-synth.c.  Preexisting, the patch merely makes
-> it visible to checkpatch.pl.
->
-> checkpatch.pl complains "return is not a function, parentheses are not
-> required" three times for target/mips/tcg/dsp_helper.c.  False
-> positives.
->
-> Signed-off-by: Markus Armbruster <armbru@redhat.com>
+From: Peter Xu <peterx@redhat.com>
 
->  .../user/ase/msa/bit-count/test_msa_nloc_b.c  |   9 +-
->  .../user/ase/msa/bit-count/test_msa_nloc_d.c  |   9 +-
-[snip long list of other mips test files]
+We used to allocate PSS structure on the stack for precopy when sending
+pages.  Make it static, so as to describe per-channel ram migration status.
 
->  328 files changed, 989 insertions(+), 2099 deletions(-)
+Here we declared RAM_CHANNEL_MAX instances, preparing for postcopy to use
+it, even though this patch has not yet to start using the 2nd instance.
 
-This patch seems to almost entirely be huge because of these
-mips test case files. Are they specific to QEMU or are they
-effectively a 3rd-party import that it doesn't make sense
-to make local changes to?
+This should not have any functional change per se, but it already starts to
+export PSS information via the RAMState, so that e.g. one PSS channel can
+start to reference the other PSS channel.
 
-I definitely don't think you should put manual tidying changes
-in the same patch as 3000 lines of automated changes: that
-is in my opinion un-reviewable.
+Always protect PSS access using the same RAMState.bitmap_mutex.  We already
+do so, so no code change needed, just some comment update.  Maybe we should
+consider renaming bitmap_mutex some day as it's going to be a more commonly
+and big mutex we use for ram states, but just leave it for later.
 
-thanks
--- PMM
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Signed-off-by: Peter Xu <peterx@redhat.com>
+Reviewed-by: Juan Quintela <quintela@redhat.com>
+Signed-off-by: Juan Quintela <quintela@redhat.com>
+---
+ migration/ram.c | 112 ++++++++++++++++++++++++++----------------------
+ 1 file changed, 61 insertions(+), 51 deletions(-)
+
+diff --git a/migration/ram.c b/migration/ram.c
+index d81bf7b183..3194997738 100644
+--- a/migration/ram.c
++++ b/migration/ram.c
+@@ -85,6 +85,46 @@
+ 
+ XBZRLECacheStats xbzrle_counters;
+ 
++/* used by the search for pages to send */
++struct PageSearchStatus {
++    /* The migration channel used for a specific host page */
++    QEMUFile    *pss_channel;
++    /* Current block being searched */
++    RAMBlock    *block;
++    /* Current page to search from */
++    unsigned long page;
++    /* Set once we wrap around */
++    bool         complete_round;
++    /*
++     * [POSTCOPY-ONLY] Whether current page is explicitly requested by
++     * postcopy.  When set, the request is "urgent" because the dest QEMU
++     * threads are waiting for us.
++     */
++    bool         postcopy_requested;
++    /*
++     * [POSTCOPY-ONLY] The target channel to use to send current page.
++     *
++     * Note: This may _not_ match with the value in postcopy_requested
++     * above. Let's imagine the case where the postcopy request is exactly
++     * the page that we're sending in progress during precopy. In this case
++     * we'll have postcopy_requested set to true but the target channel
++     * will be the precopy channel (so that we don't split brain on that
++     * specific page since the precopy channel already contains partial of
++     * that page data).
++     *
++     * Besides that specific use case, postcopy_target_channel should
++     * always be equal to postcopy_requested, because by default we send
++     * postcopy pages via postcopy preempt channel.
++     */
++    bool         postcopy_target_channel;
++    /* Whether we're sending a host page */
++    bool          host_page_sending;
++    /* The start/end of current host page.  Invalid if host_page_sending==false */
++    unsigned long host_page_start;
++    unsigned long host_page_end;
++};
++typedef struct PageSearchStatus PageSearchStatus;
++
+ /* struct contains XBZRLE cache and a static page
+    used by the compression */
+ static struct {
+@@ -319,6 +359,11 @@ typedef struct {
+ struct RAMState {
+     /* QEMUFile used for this migration */
+     QEMUFile *f;
++    /*
++     * PageSearchStatus structures for the channels when send pages.
++     * Protected by the bitmap_mutex.
++     */
++    PageSearchStatus pss[RAM_CHANNEL_MAX];
+     /* UFFD file descriptor, used in 'write-tracking' migration */
+     int uffdio_fd;
+     /* Last block that we have visited searching for dirty pages */
+@@ -362,7 +407,12 @@ struct RAMState {
+     uint64_t target_page_count;
+     /* number of dirty bits in the bitmap */
+     uint64_t migration_dirty_pages;
+-    /* Protects modification of the bitmap and migration dirty pages */
++    /*
++     * Protects:
++     * - dirty/clear bitmap
++     * - migration_dirty_pages
++     * - pss structures
++     */
+     QemuMutex bitmap_mutex;
+     /* The RAMBlock used in the last src_page_requests */
+     RAMBlock *last_req_rb;
+@@ -451,46 +501,6 @@ void dirty_sync_missed_zero_copy(void)
+     ram_counters.dirty_sync_missed_zero_copy++;
+ }
+ 
+-/* used by the search for pages to send */
+-struct PageSearchStatus {
+-    /* The migration channel used for a specific host page */
+-    QEMUFile    *pss_channel;
+-    /* Current block being searched */
+-    RAMBlock    *block;
+-    /* Current page to search from */
+-    unsigned long page;
+-    /* Set once we wrap around */
+-    bool         complete_round;
+-    /*
+-     * [POSTCOPY-ONLY] Whether current page is explicitly requested by
+-     * postcopy.  When set, the request is "urgent" because the dest QEMU
+-     * threads are waiting for us.
+-     */
+-    bool         postcopy_requested;
+-    /*
+-     * [POSTCOPY-ONLY] The target channel to use to send current page.
+-     *
+-     * Note: This may _not_ match with the value in postcopy_requested
+-     * above. Let's imagine the case where the postcopy request is exactly
+-     * the page that we're sending in progress during precopy. In this case
+-     * we'll have postcopy_requested set to true but the target channel
+-     * will be the precopy channel (so that we don't split brain on that
+-     * specific page since the precopy channel already contains partial of
+-     * that page data).
+-     *
+-     * Besides that specific use case, postcopy_target_channel should
+-     * always be equal to postcopy_requested, because by default we send
+-     * postcopy pages via postcopy preempt channel.
+-     */
+-    bool         postcopy_target_channel;
+-    /* Whether we're sending a host page */
+-    bool          host_page_sending;
+-    /* The start/end of current host page.  Only valid if host_page_sending==true */
+-    unsigned long host_page_start;
+-    unsigned long host_page_end;
+-};
+-typedef struct PageSearchStatus PageSearchStatus;
+-
+ CompressionStats compression_counters;
+ 
+ struct CompressParam {
+@@ -2637,7 +2647,7 @@ static int ram_save_host_page(RAMState *rs, PageSearchStatus *pss)
+  */
+ static int ram_find_and_save_block(RAMState *rs)
+ {
+-    PageSearchStatus pss;
++    PageSearchStatus *pss = &rs->pss[RAM_CHANNEL_PRECOPY];
+     int pages = 0;
+     bool again, found;
+ 
+@@ -2658,11 +2668,11 @@ static int ram_find_and_save_block(RAMState *rs)
+         rs->last_page = 0;
+     }
+ 
+-    pss_init(&pss, rs->last_seen_block, rs->last_page);
++    pss_init(pss, rs->last_seen_block, rs->last_page);
+ 
+     do {
+         again = true;
+-        found = get_queued_page(rs, &pss);
++        found = get_queued_page(rs, pss);
+ 
+         if (!found) {
+             /*
+@@ -2670,27 +2680,27 @@ static int ram_find_and_save_block(RAMState *rs)
+              * preempted precopy.  Otherwise find the next dirty bit.
+              */
+             if (postcopy_preempt_triggered(rs)) {
+-                postcopy_preempt_restore(rs, &pss, false);
++                postcopy_preempt_restore(rs, pss, false);
+                 found = true;
+             } else {
+                 /* priority queue empty, so just search for something dirty */
+-                found = find_dirty_block(rs, &pss, &again);
++                found = find_dirty_block(rs, pss, &again);
+             }
+         }
+ 
+         if (found) {
+             /* Update rs->f with correct channel */
+             if (postcopy_preempt_active()) {
+-                postcopy_preempt_choose_channel(rs, &pss);
++                postcopy_preempt_choose_channel(rs, pss);
+             }
+             /* Cache rs->f in pss_channel (TODO: remove rs->f) */
+-            pss.pss_channel = rs->f;
+-            pages = ram_save_host_page(rs, &pss);
++            pss->pss_channel = rs->f;
++            pages = ram_save_host_page(rs, pss);
+         }
+     } while (!pages && again);
+ 
+-    rs->last_seen_block = pss.block;
+-    rs->last_page = pss.page;
++    rs->last_seen_block = pss->block;
++    rs->last_page = pss->page;
+ 
+     return pages;
+ }
+-- 
+2.38.1
 

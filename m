@@ -1,12 +1,12 @@
 Return-Path: <quintela@redhat.com>
 From: Juan Quintela <quintela@redhat.com>
-Date: Mon,  5 Dec 2022 10:51:57 +0100
-Message-Id: <20221205095228.1314-21-quintela@redhat.com>
+Date: Mon,  5 Dec 2022 10:51:58 +0100
+Message-Id: <20221205095228.1314-22-quintela@redhat.com>
 In-Reply-To: <20221205095228.1314-1-quintela@redhat.com>
 References: <20221205095228.1314-1-quintela@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 20/51] hw/nvme: fix aio cancel in dsm
+Subject: [Virtio-fs] [PATCH v2 21/51] hw/nvme: remove copy bh scheduling
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,126 +20,191 @@ Cc: Fam Zheng <fam@euphon.net>, Thomas Huth <huth@tuxfamily.org>, Viresh Kumar <
 
 From: Klaus Jensen <k.jensen@samsung.com>
 
-When the DSM operation is cancelled asynchronously, we set iocb->ret to
--ECANCELED. However, the callback function only checks the return value
-of the completed aio, which may have completed succesfully prior to the
-cancellation and thus the callback ends up continuing the dsm operation
-instead of bailing out. Fix this.
+Fix a potential use-after-free by removing the bottom half and enqueuing
+the completion directly.
 
-Secondly, fix a potential use-after-free by removing the bottom half and
-enqueuing the completion directly.
-
-Fixes: d7d1474fd85d ("hw/nvme: reimplement dsm to allow cancellation")
+Fixes: 796d20681d9b ("hw/nvme: reimplement the copy command to allow aio cancellation")
 Reviewed-by: Keith Busch <kbusch@kernel.org>
 Signed-off-by: Klaus Jensen <k.jensen@samsung.com>
 ---
- hw/nvme/ctrl.c | 34 ++++++++--------------------------
- 1 file changed, 8 insertions(+), 26 deletions(-)
+ hw/nvme/ctrl.c | 63 +++++++++++---------------------------------------
+ 1 file changed, 14 insertions(+), 49 deletions(-)
 
 diff --git a/hw/nvme/ctrl.c b/hw/nvme/ctrl.c
-index bf4abf73f7..e847b89461 100644
+index e847b89461..e54276dc1d 100644
 --- a/hw/nvme/ctrl.c
 +++ b/hw/nvme/ctrl.c
-@@ -2329,7 +2329,6 @@ typedef struct NvmeDSMAIOCB {
+@@ -2552,7 +2552,6 @@ typedef struct NvmeCopyAIOCB {
      BlockAIOCB common;
      BlockAIOCB *aiocb;
      NvmeRequest *req;
 -    QEMUBH *bh;
      int ret;
  
-     NvmeDsmRange *range;
-@@ -2351,7 +2350,7 @@ static void nvme_dsm_cancel(BlockAIOCB *aiocb)
-     } else {
-         /*
-          * We only reach this if nvme_dsm_cancel() has already been called or
--         * the command ran to completion and nvme_dsm_bh is scheduled to run.
-+         * the command ran to completion.
-          */
-         assert(iocb->idx == iocb->nr);
-     }
-@@ -2362,17 +2361,6 @@ static const AIOCBInfo nvme_dsm_aiocb_info = {
-     .cancel_async = nvme_dsm_cancel,
+     void *ranges;
+@@ -2590,9 +2589,8 @@ static const AIOCBInfo nvme_copy_aiocb_info = {
+     .cancel_async = nvme_copy_cancel,
  };
  
--static void nvme_dsm_bh(void *opaque)
--{
--    NvmeDSMAIOCB *iocb = opaque;
--
--    iocb->common.cb(iocb->common.opaque, iocb->ret);
--
+-static void nvme_copy_bh(void *opaque)
++static void nvme_copy_done(NvmeCopyAIOCB *iocb)
+ {
+-    NvmeCopyAIOCB *iocb = opaque;
+     NvmeRequest *req = iocb->req;
+     NvmeNamespace *ns = req->ns;
+     BlockAcctStats *stats = blk_get_stats(ns->blkconf.blk);
+@@ -2604,9 +2602,6 @@ static void nvme_copy_bh(void *opaque)
+     qemu_iovec_destroy(&iocb->iov);
+     g_free(iocb->bounce);
+ 
 -    qemu_bh_delete(iocb->bh);
 -    iocb->bh = NULL;
--    qemu_aio_unref(iocb);
--}
 -
- static void nvme_dsm_cb(void *opaque, int ret);
+     if (iocb->ret < 0) {
+         block_acct_failed(stats, &iocb->acct.read);
+         block_acct_failed(stats, &iocb->acct.write);
+@@ -2619,7 +2614,7 @@ static void nvme_copy_bh(void *opaque)
+     qemu_aio_unref(iocb);
+ }
  
- static void nvme_dsm_md_cb(void *opaque, int ret)
-@@ -2384,16 +2372,10 @@ static void nvme_dsm_md_cb(void *opaque, int ret)
+-static void nvme_copy_cb(void *opaque, int ret);
++static void nvme_do_copy(NvmeCopyAIOCB *iocb);
+ 
+ static void nvme_copy_source_range_parse_format0(void *ranges, int idx,
+                                                  uint64_t *slba, uint32_t *nlb,
+@@ -2731,7 +2726,7 @@ static void nvme_copy_out_completed_cb(void *opaque, int ret)
+     iocb->idx++;
+     iocb->slba += nlb;
+ out:
+-    nvme_copy_cb(iocb, iocb->ret);
++    nvme_do_copy(iocb);
+ }
+ 
+ static void nvme_copy_out_cb(void *opaque, int ret)
+@@ -2743,16 +2738,8 @@ static void nvme_copy_out_cb(void *opaque, int ret)
+     size_t mlen;
+     uint8_t *mbounce;
+ 
+-    if (ret < 0) {
+-        iocb->ret = ret;
++    if (ret < 0 || iocb->ret < 0 || !ns->lbaf.ms) {
+         goto out;
+-    } else if (iocb->ret < 0) {
+-        goto out;
+-    }
+-
+-    if (!ns->lbaf.ms) {
+-        nvme_copy_out_completed_cb(iocb, 0);
+-        return;
+     }
+ 
+     nvme_copy_source_range_parse(iocb->ranges, iocb->idx, iocb->format, NULL,
+@@ -2771,7 +2758,7 @@ static void nvme_copy_out_cb(void *opaque, int ret)
+     return;
+ 
+ out:
+-    nvme_copy_cb(iocb, ret);
++    nvme_copy_out_completed_cb(iocb, ret);
+ }
+ 
+ static void nvme_copy_in_completed_cb(void *opaque, int ret)
+@@ -2865,15 +2852,9 @@ static void nvme_copy_in_completed_cb(void *opaque, int ret)
+ 
+ invalid:
+     req->status = status;
+-    iocb->aiocb = NULL;
+-    if (iocb->bh) {
+-        qemu_bh_schedule(iocb->bh);
+-    }
+-
+-    return;
+-
++    iocb->ret = -1;
+ out:
+-    nvme_copy_cb(iocb, ret);
++    nvme_do_copy(iocb);
+ }
+ 
+ static void nvme_copy_in_cb(void *opaque, int ret)
+@@ -2884,16 +2865,8 @@ static void nvme_copy_in_cb(void *opaque, int ret)
      uint64_t slba;
      uint32_t nlb;
  
 -    if (ret < 0) {
 -        iocb->ret = ret;
 +    if (ret < 0 || iocb->ret < 0 || !ns->lbaf.ms) {
-         goto done;
-     }
- 
--    if (!ns->lbaf.ms) {
--        nvme_dsm_cb(iocb, 0);
--        return;
+         goto out;
+-    } else if (iocb->ret < 0) {
+-        goto out;
 -    }
 -
-     range = &iocb->range[iocb->idx - 1];
-     slba = le64_to_cpu(range->slba);
-     nlb = le32_to_cpu(range->nlb);
-@@ -2406,7 +2388,6 @@ static void nvme_dsm_md_cb(void *opaque, int ret)
-     ret = nvme_block_status_all(ns, slba, nlb, BDRV_BLOCK_ZERO);
-     if (ret) {
-         if (ret < 0) {
--            iocb->ret = ret;
-             goto done;
-         }
+-    if (!ns->lbaf.ms) {
+-        nvme_copy_in_completed_cb(iocb, 0);
+-        return;
+     }
  
-@@ -2420,8 +2401,7 @@ static void nvme_dsm_md_cb(void *opaque, int ret)
+     nvme_copy_source_range_parse(iocb->ranges, iocb->idx, iocb->format, &slba,
+@@ -2909,12 +2882,11 @@ static void nvme_copy_in_cb(void *opaque, int ret)
      return;
  
- done:
--    iocb->aiocb = NULL;
--    qemu_bh_schedule(iocb->bh);
-+    nvme_dsm_cb(iocb, ret);
+ out:
+-    nvme_copy_cb(iocb, iocb->ret);
++    nvme_copy_in_completed_cb(iocb, ret);
  }
  
- static void nvme_dsm_cb(void *opaque, int ret)
-@@ -2434,7 +2414,9 @@ static void nvme_dsm_cb(void *opaque, int ret)
+-static void nvme_copy_cb(void *opaque, int ret)
++static void nvme_do_copy(NvmeCopyAIOCB *iocb)
+ {
+-    NvmeCopyAIOCB *iocb = opaque;
+     NvmeRequest *req = iocb->req;
+     NvmeNamespace *ns = req->ns;
      uint64_t slba;
-     uint32_t nlb;
+@@ -2922,10 +2894,7 @@ static void nvme_copy_cb(void *opaque, int ret)
+     size_t len;
+     uint16_t status;
  
 -    if (ret < 0) {
+-        iocb->ret = ret;
+-        goto done;
+-    } else if (iocb->ret < 0) {
 +    if (iocb->ret < 0) {
-+        goto done;
-+    } else if (ret < 0) {
-         iocb->ret = ret;
          goto done;
      }
-@@ -2468,7 +2450,8 @@ next:
  
+@@ -2972,14 +2941,11 @@ static void nvme_copy_cb(void *opaque, int ret)
+ 
+ invalid:
+     req->status = status;
++    iocb->ret = -1;
  done:
-     iocb->aiocb = NULL;
--    qemu_bh_schedule(iocb->bh);
-+    iocb->common.cb(iocb->common.opaque, iocb->ret);
-+    qemu_aio_unref(iocb);
+-    iocb->aiocb = NULL;
+-    if (iocb->bh) {
+-        qemu_bh_schedule(iocb->bh);
+-    }
++    nvme_copy_done(iocb);
  }
  
- static uint16_t nvme_dsm(NvmeCtrl *n, NvmeRequest *req)
-@@ -2486,7 +2469,6 @@ static uint16_t nvme_dsm(NvmeCtrl *n, NvmeRequest *req)
-                                          nvme_misc_cb, req);
+-
+ static uint16_t nvme_copy(NvmeCtrl *n, NvmeRequest *req)
+ {
+     NvmeNamespace *ns = req->ns;
+@@ -3049,7 +3015,6 @@ static uint16_t nvme_copy(NvmeCtrl *n, NvmeRequest *req)
+     }
  
-         iocb->req = req;
--        iocb->bh = qemu_bh_new(nvme_dsm_bh, iocb);
-         iocb->ret = 0;
-         iocb->range = g_new(NvmeDsmRange, nr);
-         iocb->nr = nr;
+     iocb->req = req;
+-    iocb->bh = qemu_bh_new(nvme_copy_bh, iocb);
+     iocb->ret = 0;
+     iocb->nr = nr;
+     iocb->idx = 0;
+@@ -3066,7 +3031,7 @@ static uint16_t nvme_copy(NvmeCtrl *n, NvmeRequest *req)
+                      BLOCK_ACCT_WRITE);
+ 
+     req->aiocb = &iocb->common;
+-    nvme_copy_cb(iocb, 0);
++    nvme_do_copy(iocb);
+ 
+     return NVME_NO_COMPLETE;
+ 
 -- 
 2.38.1
 

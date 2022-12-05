@@ -1,14 +1,14 @@
 Return-Path: <quintela@redhat.com>
 From: Juan Quintela <quintela@redhat.com>
-Date: Mon,  5 Dec 2022 10:51:51 +0100
-Message-Id: <20221205095228.1314-15-quintela@redhat.com>
+Date: Mon,  5 Dec 2022 10:51:52 +0100
+Message-Id: <20221205095228.1314-16-quintela@redhat.com>
 In-Reply-To: <20221205095228.1314-1-quintela@redhat.com>
 References: <20221205095228.1314-1-quintela@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 14/51] hw/virtio: add started_vu status field
- to vhost-user-gpio
+Subject: [Virtio-fs] [PATCH v2 15/51] hw/virtio: generalise CHR_EVENT_CLOSED
+ handling
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,73 +22,240 @@ Cc: Fam Zheng <fam@euphon.net>, Thomas Huth <huth@tuxfamily.org>, Viresh Kumar <
 
 From: Alex Bennée <alex.bennee@linaro.org>
 
-As per the fix to vhost-user-blk in f5b22d06fb (vhost: recheck dev
-state in the vhost_migration_log routine) we really should track the
-connection and starting separately.
+..and use for both virtio-user-blk and virtio-user-gpio. This avoids
+the circular close by deferring shutdown due to disconnection until a
+later point. virtio-user-blk already had this mechanism in place so
+generalise it as a vhost-user helper function and use for both blk and
+gpio devices.
+
+While we are at it we also fix up vhost-user-gpio to re-establish the
+event handler after close down so we can reconnect later.
 
 Signed-off-by: Alex Bennée <alex.bennee@linaro.org>
 Reviewed-by: Michael S. Tsirkin <mst@redhat.com>
-Message-Id: <20221130112439.2527228-4-alex.bennee@linaro.org>
+Reviewed-by: Raphael Norwitz <raphael.norwitz@nutanix.com>
+Message-Id: <20221130112439.2527228-5-alex.bennee@linaro.org>
 Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
 ---
- include/hw/virtio/vhost-user-gpio.h | 10 ++++++++++
- hw/virtio/vhost-user-gpio.c         | 11 ++++-------
- 2 files changed, 14 insertions(+), 7 deletions(-)
+ include/hw/virtio/vhost-user.h | 18 +++++++++
+ hw/block/vhost-user-blk.c      | 41 +++-----------------
+ hw/virtio/vhost-user-gpio.c    | 11 +++++-
+ hw/virtio/vhost-user.c         | 71 ++++++++++++++++++++++++++++++++++
+ 4 files changed, 104 insertions(+), 37 deletions(-)
 
-diff --git a/include/hw/virtio/vhost-user-gpio.h b/include/hw/virtio/vhost-user-gpio.h
-index 4fe9aeecc0..a9305c5e6c 100644
---- a/include/hw/virtio/vhost-user-gpio.h
-+++ b/include/hw/virtio/vhost-user-gpio.h
-@@ -28,7 +28,17 @@ struct VHostUserGPIO {
-     VhostUserState vhost_user;
-     VirtQueue *command_vq;
-     VirtQueue *interrupt_vq;
-+    /**
-+     * There are at least two steps of initialization of the
-+     * vhost-user device. The first is a "connect" step and
-+     * second is a "start" step. Make a separation between
-+     * those initialization phases by using two fields.
-+     *
-+     * @connected: see vu_gpio_connect()/vu_gpio_disconnect()
-+     * @started_vu: see vu_gpio_start()/vu_gpio_stop()
-+     */
-     bool connected;
-+    bool started_vu;
-     /*< public >*/
- };
+diff --git a/include/hw/virtio/vhost-user.h b/include/hw/virtio/vhost-user.h
+index c6e693cd3f..191216a74f 100644
+--- a/include/hw/virtio/vhost-user.h
++++ b/include/hw/virtio/vhost-user.h
+@@ -68,4 +68,22 @@ bool vhost_user_init(VhostUserState *user, CharBackend *chr, Error **errp);
+  */
+ void vhost_user_cleanup(VhostUserState *user);
  
++/**
++ * vhost_user_async_close() - cleanup vhost-user post connection drop
++ * @d: DeviceState for the associated device (passed to callback)
++ * @chardev: the CharBackend associated with the connection
++ * @vhost: the common vhost device
++ * @cb: the user callback function to complete the clean-up
++ *
++ * This function is used to handle the shutdown of a vhost-user
++ * connection to a backend. We handle this centrally to make sure we
++ * do all the steps and handle potential races due to VM shutdowns.
++ * Once the connection is disabled we call a backhalf to ensure
++ */
++typedef void (*vu_async_close_fn)(DeviceState *cb);
++
++void vhost_user_async_close(DeviceState *d,
++                            CharBackend *chardev, struct vhost_dev *vhost,
++                            vu_async_close_fn cb);
++
+ #endif
+diff --git a/hw/block/vhost-user-blk.c b/hw/block/vhost-user-blk.c
+index 1177064631..aff4d2b8cb 100644
+--- a/hw/block/vhost-user-blk.c
++++ b/hw/block/vhost-user-blk.c
+@@ -369,17 +369,10 @@ static void vhost_user_blk_disconnect(DeviceState *dev)
+     vhost_user_blk_stop(vdev);
+ 
+     vhost_dev_cleanup(&s->dev);
+-}
+ 
+-static void vhost_user_blk_chr_closed_bh(void *opaque)
+-{
+-    DeviceState *dev = opaque;
+-    VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+-    VHostUserBlk *s = VHOST_USER_BLK(vdev);
+-
+-    vhost_user_blk_disconnect(dev);
++    /* Re-instate the event handler for new connections */
+     qemu_chr_fe_set_handlers(&s->chardev, NULL, NULL, vhost_user_blk_event,
+-                             NULL, opaque, NULL, true);
++                             NULL, dev, NULL, true);
+ }
+ 
+ static void vhost_user_blk_event(void *opaque, QEMUChrEvent event)
+@@ -398,33 +391,9 @@ static void vhost_user_blk_event(void *opaque, QEMUChrEvent event)
+         }
+         break;
+     case CHR_EVENT_CLOSED:
+-        if (!runstate_check(RUN_STATE_SHUTDOWN)) {
+-            /*
+-             * A close event may happen during a read/write, but vhost
+-             * code assumes the vhost_dev remains setup, so delay the
+-             * stop & clear.
+-             */
+-            AioContext *ctx = qemu_get_current_aio_context();
+-
+-            qemu_chr_fe_set_handlers(&s->chardev, NULL, NULL, NULL, NULL,
+-                    NULL, NULL, false);
+-            aio_bh_schedule_oneshot(ctx, vhost_user_blk_chr_closed_bh, opaque);
+-
+-            /*
+-             * Move vhost device to the stopped state. The vhost-user device
+-             * will be clean up and disconnected in BH. This can be useful in
+-             * the vhost migration code. If disconnect was caught there is an
+-             * option for the general vhost code to get the dev state without
+-             * knowing its type (in this case vhost-user).
+-             *
+-             * FIXME: this is sketchy to be reaching into vhost_dev
+-             * now because we are forcing something that implies we
+-             * have executed vhost_dev_stop() but that won't happen
+-             * until vhost_user_blk_stop() gets called from the bh.
+-             * Really this state check should be tracked locally.
+-             */
+-            s->dev.started = false;
+-        }
++        /* defer close until later to avoid circular close */
++        vhost_user_async_close(dev, &s->chardev, &s->dev,
++                               vhost_user_blk_disconnect);
+         break;
+     case CHR_EVENT_BREAK:
+     case CHR_EVENT_MUX_IN:
 diff --git a/hw/virtio/vhost-user-gpio.c b/hw/virtio/vhost-user-gpio.c
-index 0b40ebd15a..be9be08b4c 100644
+index be9be08b4c..b7b82a1099 100644
 --- a/hw/virtio/vhost-user-gpio.c
 +++ b/hw/virtio/vhost-user-gpio.c
-@@ -86,6 +86,7 @@ static int vu_gpio_start(VirtIODevice *vdev)
-         error_report("Error starting vhost-user-gpio: %d", ret);
-         goto err_guest_notifiers;
-     }
-+    gpio->started_vu = true;
+@@ -233,6 +233,8 @@ static int vu_gpio_connect(DeviceState *dev, Error **errp)
+     return 0;
+ }
  
-     /*
-      * guest_notifier_mask/pending not used yet, so just unmask
-@@ -126,16 +127,12 @@ static void vu_gpio_stop(VirtIODevice *vdev)
-     struct vhost_dev *vhost_dev = &gpio->vhost_dev;
-     int ret;
++static void vu_gpio_event(void *opaque, QEMUChrEvent event);
++
+ static void vu_gpio_disconnect(DeviceState *dev)
+ {
+     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
+@@ -245,6 +247,11 @@ static void vu_gpio_disconnect(DeviceState *dev)
  
--    if (!k->set_guest_notifiers) {
-+    if (!gpio->started_vu) {
-         return;
-     }
-+    gpio->started_vu = false;
+     vu_gpio_stop(vdev);
+     vhost_dev_cleanup(&gpio->vhost_dev);
++
++    /* Re-instate the event handler for new connections */
++    qemu_chr_fe_set_handlers(&gpio->chardev,
++                             NULL, NULL, vu_gpio_event,
++                             NULL, dev, NULL, true);
+ }
  
--    /*
--     * We can call vu_gpio_stop multiple times, for example from
--     * vm_state_notify and the final object finalisation. Check we
--     * aren't already stopped before doing so.
--     */
--    if (!vhost_dev_is_started(vhost_dev)) {
-+    if (!k->set_guest_notifiers) {
-         return;
-     }
+ static void vu_gpio_event(void *opaque, QEMUChrEvent event)
+@@ -262,7 +269,9 @@ static void vu_gpio_event(void *opaque, QEMUChrEvent event)
+         }
+         break;
+     case CHR_EVENT_CLOSED:
+-        vu_gpio_disconnect(dev);
++        /* defer close until later to avoid circular close */
++        vhost_user_async_close(dev, &gpio->chardev, &gpio->vhost_dev,
++                               vu_gpio_disconnect);
+         break;
+     case CHR_EVENT_BREAK:
+     case CHR_EVENT_MUX_IN:
+diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
+index abe23d4ebe..8f635844af 100644
+--- a/hw/virtio/vhost-user.c
++++ b/hw/virtio/vhost-user.c
+@@ -21,6 +21,7 @@
+ #include "qemu/error-report.h"
+ #include "qemu/main-loop.h"
+ #include "qemu/sockets.h"
++#include "sysemu/runstate.h"
+ #include "sysemu/cryptodev.h"
+ #include "migration/migration.h"
+ #include "migration/postcopy-ram.h"
+@@ -2670,6 +2671,76 @@ void vhost_user_cleanup(VhostUserState *user)
+     user->chr = NULL;
+ }
  
++
++typedef struct {
++    vu_async_close_fn cb;
++    DeviceState *dev;
++    CharBackend *cd;
++    struct vhost_dev *vhost;
++} VhostAsyncCallback;
++
++static void vhost_user_async_close_bh(void *opaque)
++{
++    VhostAsyncCallback *data = opaque;
++    struct vhost_dev *vhost = data->vhost;
++
++    /*
++     * If the vhost_dev has been cleared in the meantime there is
++     * nothing left to do as some other path has completed the
++     * cleanup.
++     */
++    if (vhost->vdev) {
++        data->cb(data->dev);
++    }
++
++    g_free(data);
++}
++
++/*
++ * We only schedule the work if the machine is running. If suspended
++ * we want to keep all the in-flight data as is for migration
++ * purposes.
++ */
++void vhost_user_async_close(DeviceState *d,
++                            CharBackend *chardev, struct vhost_dev *vhost,
++                            vu_async_close_fn cb)
++{
++    if (!runstate_check(RUN_STATE_SHUTDOWN)) {
++        /*
++         * A close event may happen during a read/write, but vhost
++         * code assumes the vhost_dev remains setup, so delay the
++         * stop & clear.
++         */
++        AioContext *ctx = qemu_get_current_aio_context();
++        VhostAsyncCallback *data = g_new0(VhostAsyncCallback, 1);
++
++        /* Save data for the callback */
++        data->cb = cb;
++        data->dev = d;
++        data->cd = chardev;
++        data->vhost = vhost;
++
++        /* Disable any further notifications on the chardev */
++        qemu_chr_fe_set_handlers(chardev,
++                                 NULL, NULL, NULL, NULL, NULL, NULL,
++                                 false);
++
++        aio_bh_schedule_oneshot(ctx, vhost_user_async_close_bh, data);
++
++        /*
++         * Move vhost device to the stopped state. The vhost-user device
++         * will be clean up and disconnected in BH. This can be useful in
++         * the vhost migration code. If disconnect was caught there is an
++         * option for the general vhost code to get the dev state without
++         * knowing its type (in this case vhost-user).
++         *
++         * Note if the vhost device is fully cleared by the time we
++         * execute the bottom half we won't continue with the cleanup.
++         */
++        vhost->started = false;
++    }
++}
++
+ static int vhost_user_dev_start(struct vhost_dev *dev, bool started)
+ {
+     if (!virtio_has_feature(dev->protocol_features,
 -- 
 2.38.1
 

@@ -1,14 +1,14 @@
 Return-Path: <quintela@redhat.com>
 From: Juan Quintela <quintela@redhat.com>
-Date: Mon,  5 Dec 2022 10:51:41 +0100
-Message-Id: <20221205095228.1314-5-quintela@redhat.com>
+Date: Mon,  5 Dec 2022 10:51:42 +0100
+Message-Id: <20221205095228.1314-6-quintela@redhat.com>
 In-Reply-To: <20221205095228.1314-1-quintela@redhat.com>
 References: <20221205095228.1314-1-quintela@redhat.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 04/51] hw/display/qxl: Have qxl_log_command
- Return early if no log_cmd handler
+Subject: [Virtio-fs] [PATCH v2 05/51] hw/display/qxl: Document
+ qxl_phys2virt()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -22,47 +22,44 @@ Cc: Fam Zheng <fam@euphon.net>, Thomas Huth <huth@tuxfamily.org>, Viresh Kumar <
 
 From: Philippe Mathieu-Daudé <philmd@linaro.org>
 
-Only 3 command types are logged: no need to call qxl_phys2virt()
-for the other types. Using different cases will help to pass
-different structure sizes to qxl_phys2virt() in a pair of commits.
-
 Reviewed-by: Marc-André Lureau <marcandre.lureau@redhat.com>
 Signed-off-by: Philippe Mathieu-Daudé <philmd@linaro.org>
 Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
-Message-Id: <20221128202741.4945-2-philmd@linaro.org>
+Message-Id: <20221128202741.4945-3-philmd@linaro.org>
 ---
- hw/display/qxl-logger.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ hw/display/qxl.h | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/hw/display/qxl-logger.c b/hw/display/qxl-logger.c
-index 68bfa47568..1bcf803db6 100644
---- a/hw/display/qxl-logger.c
-+++ b/hw/display/qxl-logger.c
-@@ -247,6 +247,16 @@ int qxl_log_command(PCIQXLDevice *qxl, const char *ring, QXLCommandExt *ext)
-             qxl_name(qxl_type, ext->cmd.type),
-             compat ? "(compat)" : "");
+diff --git a/hw/display/qxl.h b/hw/display/qxl.h
+index e74de9579d..78b3a6c9ba 100644
+--- a/hw/display/qxl.h
++++ b/hw/display/qxl.h
+@@ -147,6 +147,25 @@ OBJECT_DECLARE_SIMPLE_TYPE(PCIQXLDevice, PCI_QXL)
+ #define QXL_DEFAULT_REVISION (QXL_REVISION_STABLE_V12 + 1)
  
-+    switch (ext->cmd.type) {
-+    case QXL_CMD_DRAW:
-+        break;
-+    case QXL_CMD_SURFACE:
-+        break;
-+    case QXL_CMD_CURSOR:
-+        break;
-+    default:
-+        goto out;
-+    }
-     data = qxl_phys2virt(qxl, ext->cmd.data, ext->group_id);
-     if (!data) {
-         return 1;
-@@ -269,6 +279,7 @@ int qxl_log_command(PCIQXLDevice *qxl, const char *ring, QXLCommandExt *ext)
-         qxl_log_cmd_cursor(qxl, data, ext->group_id);
-         break;
-     }
-+out:
-     fprintf(stderr, "\n");
-     return 0;
- }
+ /* qxl.c */
++/**
++ * qxl_phys2virt: Get a pointer within a PCI VRAM memory region.
++ *
++ * @qxl: QXL device
++ * @phys: physical offset of buffer within the VRAM
++ * @group_id: memory slot group
++ *
++ * Returns a host pointer to a buffer placed at offset @phys within the
++ * active slot @group_id of the PCI VGA RAM memory region associated with
++ * the @qxl device. If the slot is inactive, or the offset is out
++ * of the memory region, returns NULL.
++ *
++ * Use with care; by the time this function returns, the returned pointer is
++ * not protected by RCU anymore.  If the caller is not within an RCU critical
++ * section and does not hold the iothread lock, it must have other means of
++ * protecting the pointer, such as a reference to the region that includes
++ * the incoming ram_addr_t.
++ *
++ */
+ void *qxl_phys2virt(PCIQXLDevice *qxl, QXLPHYSICAL phys, int group_id);
+ void qxl_set_guest_bug(PCIQXLDevice *qxl, const char *msg, ...)
+     G_GNUC_PRINTF(2, 3);
 -- 
 2.38.1
 

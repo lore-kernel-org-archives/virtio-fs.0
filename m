@@ -1,12 +1,12 @@
 Return-Path: <quintela@redhat.com>
 From: Juan Quintela <quintela@redhat.com>
-Date: Mon,  5 Dec 2022 10:51:56 +0100
-Message-Id: <20221205095228.1314-20-quintela@redhat.com>
+Date: Mon,  5 Dec 2022 10:51:57 +0100
+Message-Id: <20221205095228.1314-21-quintela@redhat.com>
 In-Reply-To: <20221205095228.1314-1-quintela@redhat.com>
 References: <20221205095228.1314-1-quintela@redhat.com>
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 19/51] hw/nvme: fix aio cancel in zone reset
+Subject: [Virtio-fs] [PATCH v2 20/51] hw/nvme: fix aio cancel in dsm
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -20,41 +20,50 @@ Cc: Fam Zheng <fam@euphon.net>, Thomas Huth <huth@tuxfamily.org>, Viresh Kumar <
 
 From: Klaus Jensen <k.jensen@samsung.com>
 
-If the zone reset operation is cancelled but the block unmap operation
-completes normally, the callback will continue resetting the next zone
-since it neglects to check iocb->ret which will have been set to
--ECANCELED. Make sure that this is checked and bail out if an error is
-present.
+When the DSM operation is cancelled asynchronously, we set iocb->ret to
+-ECANCELED. However, the callback function only checks the return value
+of the completed aio, which may have completed succesfully prior to the
+cancellation and thus the callback ends up continuing the dsm operation
+instead of bailing out. Fix this.
 
 Secondly, fix a potential use-after-free by removing the bottom half and
 enqueuing the completion directly.
 
-Fixes: 63d96e4ffd71 ("hw/nvme: reimplement zone reset to allow cancellation")
+Fixes: d7d1474fd85d ("hw/nvme: reimplement dsm to allow cancellation")
 Reviewed-by: Keith Busch <kbusch@kernel.org>
 Signed-off-by: Klaus Jensen <k.jensen@samsung.com>
 ---
- hw/nvme/ctrl.c | 36 +++++++++++-------------------------
- 1 file changed, 11 insertions(+), 25 deletions(-)
+ hw/nvme/ctrl.c | 34 ++++++++--------------------------
+ 1 file changed, 8 insertions(+), 26 deletions(-)
 
 diff --git a/hw/nvme/ctrl.c b/hw/nvme/ctrl.c
-index fede5af6af..bf4abf73f7 100644
+index bf4abf73f7..e847b89461 100644
 --- a/hw/nvme/ctrl.c
 +++ b/hw/nvme/ctrl.c
-@@ -3712,7 +3712,6 @@ typedef struct NvmeZoneResetAIOCB {
+@@ -2329,7 +2329,6 @@ typedef struct NvmeDSMAIOCB {
      BlockAIOCB common;
      BlockAIOCB *aiocb;
      NvmeRequest *req;
 -    QEMUBH *bh;
      int ret;
  
-     bool all;
-@@ -3741,17 +3740,6 @@ static const AIOCBInfo nvme_zone_reset_aiocb_info = {
-     .cancel_async = nvme_zone_reset_cancel,
+     NvmeDsmRange *range;
+@@ -2351,7 +2350,7 @@ static void nvme_dsm_cancel(BlockAIOCB *aiocb)
+     } else {
+         /*
+          * We only reach this if nvme_dsm_cancel() has already been called or
+-         * the command ran to completion and nvme_dsm_bh is scheduled to run.
++         * the command ran to completion.
+          */
+         assert(iocb->idx == iocb->nr);
+     }
+@@ -2362,17 +2361,6 @@ static const AIOCBInfo nvme_dsm_aiocb_info = {
+     .cancel_async = nvme_dsm_cancel,
  };
  
--static void nvme_zone_reset_bh(void *opaque)
+-static void nvme_dsm_bh(void *opaque)
 -{
--    NvmeZoneResetAIOCB *iocb = opaque;
+-    NvmeDSMAIOCB *iocb = opaque;
 -
 -    iocb->common.cb(iocb->common.opaque, iocb->ret);
 -
@@ -63,39 +72,48 @@ index fede5af6af..bf4abf73f7 100644
 -    qemu_aio_unref(iocb);
 -}
 -
- static void nvme_zone_reset_cb(void *opaque, int ret);
+ static void nvme_dsm_cb(void *opaque, int ret);
  
- static void nvme_zone_reset_epilogue_cb(void *opaque, int ret)
-@@ -3762,14 +3750,8 @@ static void nvme_zone_reset_epilogue_cb(void *opaque, int ret)
-     int64_t moff;
-     int count;
+ static void nvme_dsm_md_cb(void *opaque, int ret)
+@@ -2384,16 +2372,10 @@ static void nvme_dsm_md_cb(void *opaque, int ret)
+     uint64_t slba;
+     uint32_t nlb;
  
 -    if (ret < 0) {
--        nvme_zone_reset_cb(iocb, ret);
+-        iocb->ret = ret;
++    if (ret < 0 || iocb->ret < 0 || !ns->lbaf.ms) {
+         goto done;
+     }
+ 
+-    if (!ns->lbaf.ms) {
+-        nvme_dsm_cb(iocb, 0);
 -        return;
 -    }
 -
--    if (!ns->lbaf.ms) {
--        nvme_zone_reset_cb(iocb, 0);
--        return;
-+    if (ret < 0 || iocb->ret < 0 || !ns->lbaf.ms) {
-+        goto out;
-     }
+     range = &iocb->range[iocb->idx - 1];
+     slba = le64_to_cpu(range->slba);
+     nlb = le32_to_cpu(range->nlb);
+@@ -2406,7 +2388,6 @@ static void nvme_dsm_md_cb(void *opaque, int ret)
+     ret = nvme_block_status_all(ns, slba, nlb, BDRV_BLOCK_ZERO);
+     if (ret) {
+         if (ret < 0) {
+-            iocb->ret = ret;
+             goto done;
+         }
  
-     moff = nvme_moff(ns, iocb->zone->d.zslba);
-@@ -3779,6 +3761,9 @@ static void nvme_zone_reset_epilogue_cb(void *opaque, int ret)
-                                         BDRV_REQ_MAY_UNMAP,
-                                         nvme_zone_reset_cb, iocb);
+@@ -2420,8 +2401,7 @@ static void nvme_dsm_md_cb(void *opaque, int ret)
      return;
-+
-+out:
-+    nvme_zone_reset_cb(iocb, ret);
+ 
+ done:
+-    iocb->aiocb = NULL;
+-    qemu_bh_schedule(iocb->bh);
++    nvme_dsm_cb(iocb, ret);
  }
  
- static void nvme_zone_reset_cb(void *opaque, int ret)
-@@ -3787,7 +3772,9 @@ static void nvme_zone_reset_cb(void *opaque, int ret)
-     NvmeRequest *req = iocb->req;
-     NvmeNamespace *ns = req->ns;
+ static void nvme_dsm_cb(void *opaque, int ret)
+@@ -2434,7 +2414,9 @@ static void nvme_dsm_cb(void *opaque, int ret)
+     uint64_t slba;
+     uint32_t nlb;
  
 -    if (ret < 0) {
 +    if (iocb->ret < 0) {
@@ -104,27 +122,24 @@ index fede5af6af..bf4abf73f7 100644
          iocb->ret = ret;
          goto done;
      }
-@@ -3835,9 +3822,9 @@ static void nvme_zone_reset_cb(void *opaque, int ret)
+@@ -2468,7 +2450,8 @@ next:
  
  done:
      iocb->aiocb = NULL;
--    if (iocb->bh) {
--        qemu_bh_schedule(iocb->bh);
--    }
-+
+-    qemu_bh_schedule(iocb->bh);
 +    iocb->common.cb(iocb->common.opaque, iocb->ret);
 +    qemu_aio_unref(iocb);
  }
  
- static uint16_t nvme_zone_mgmt_send_zrwa_flush(NvmeCtrl *n, NvmeZone *zone,
-@@ -3942,7 +3929,6 @@ static uint16_t nvme_zone_mgmt_send(NvmeCtrl *n, NvmeRequest *req)
-                            nvme_misc_cb, req);
+ static uint16_t nvme_dsm(NvmeCtrl *n, NvmeRequest *req)
+@@ -2486,7 +2469,6 @@ static uint16_t nvme_dsm(NvmeCtrl *n, NvmeRequest *req)
+                                          nvme_misc_cb, req);
  
          iocb->req = req;
--        iocb->bh = qemu_bh_new(nvme_zone_reset_bh, iocb);
+-        iocb->bh = qemu_bh_new(nvme_dsm_bh, iocb);
          iocb->ret = 0;
-         iocb->all = all;
-         iocb->idx = zone_idx;
+         iocb->range = g_new(NvmeDsmRange, nr);
+         iocb->nr = nr;
 -- 
 2.38.1
 

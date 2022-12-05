@@ -1,16 +1,13 @@
-Return-Path: <thuth@redhat.com>
-Message-ID: <27da4d93-38e6-1c40-4a60-92f3343f380f@redhat.com>
-Date: Thu, 29 Dec 2022 10:34:55 +0100
+Return-Path: <quintela@redhat.com>
+From: Juan Quintela <quintela@redhat.com>
+Date: Mon,  5 Dec 2022 10:52:28 +0100
+Message-Id: <20221205095228.1314-52-quintela@redhat.com>
+In-Reply-To: <20221205095228.1314-1-quintela@redhat.com>
+References: <20221205095228.1314-1-quintela@redhat.com>
 MIME-Version: 1.0
-References: <20221219130205.687815-1-berrange@redhat.com>
- <20221219130205.687815-6-berrange@redhat.com>
-From: Thomas Huth <thuth@redhat.com>
-In-Reply-To: <20221219130205.687815-6-berrange@redhat.com>
-Content-Language: en-US
-Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 5/6] tests: add G_GNUC_PRINTF for various
- functions
+Subject: [Virtio-fs] [PATCH v2 51/51] migration: simplify
+ migration_iteration_run()
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,57 +16,55 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: =?UTF-8?Q?Daniel_P=2e_Berrang=c3=a9?= <berrange@redhat.com>, qemu-devel@nongnu.org
-Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, qemu-ppc@nongnu.org, xen-devel@lists.xenproject.org, Laurent Vivier <lvivier@redhat.com>, Markus Armbruster <armbru@redhat.com>, Daniel Henrique Barboza <danielhb413@gmail.com>, virtio-fs@redhat.com, Michael Roth <michael.roth@amd.com>, =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>, qemu-block@nongnu.org, Peter Maydell <peter.maydell@linaro.org>, qemu-arm@nongnu.org, Paul Durrant <paul@xen.org>, Anthony Perard <anthony.perard@citrix.com>, David Gibson <david@gibson.dropbear.id.au>, =?UTF-8?Q?C=c3=a9dric_Le_Goater?= <clg@kaod.org>, John Snow <jsnow@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Stefano Stabellini <sstabellini@kernel.org>, Gerd Hoffmann <kraxel@redhat.com>, Greg Kurz <groug@kaod.org>
+To: qemu-devel@nongnu.org
+Cc: Fam Zheng <fam@euphon.net>, Thomas Huth <huth@tuxfamily.org>, Viresh Kumar <viresh.kumar@linaro.org>, Kevin Wolf <kwolf@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Laurent Vivier <laurent@vivier.eu>, Eric Blake <eblake@redhat.com>, Richard Henderson <richard.henderson@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Stefan Hajnoczi <stefanha@redhat.com>, Juan Quintela <quintela@redhat.com>, virtio-fs@redhat.com, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, Christian Borntraeger <borntraeger@linux.ibm.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, qemu-block@nongnu.org, Xiaojuan Yang <yangxiaojuan@loongson.cn>, Thomas Huth <thuth@redhat.com>, Ilya Leoshkevich <iii@linux.ibm.com>, Eduardo Habkost <eduardo@habkost.net>, Gerd Hoffmann <kraxel@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Alex Williamson <alex.williamson@redhat.com>, Eric Farman <farman@linux.ibm.com>, Halil Pasic <pasic@linux.ibm.com>, Peter Maydell <peter.maydell@linaro.org>, Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru>, Jason Wang <jasowang@redhat.com>, Laurent Vivier <lvivier@redhat.com>, Song Gao <gaosong@loongson.cn>, qemu-s390x@nongnu.org, Pavel Dovgalyuk <pavel.dovgaluk@ispras.ru>, Klaus Jensen <its@irrelevant.dk>, John Snow <jsnow@redhat.com>, Michael Tokarev <mjt@tls.msk.ru>, qemu-arm@nongnu.org, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Keith Busch <kbusch@kernel.org>, David Hildenbrand <david@redhat.com>, qemu-trivial@nongnu.org, Hanna Reitz <hreitz@redhat.com>
 
-On 19/12/2022 14.02, Daniel P. Berrangé wrote:
-> Signed-off-by: Daniel P. Berrangé <berrange@redhat.com>
-> ---
->   tests/qtest/ahci-test.c           |  3 +++
->   tests/qtest/arm-cpu-features.c    |  1 +
->   tests/qtest/erst-test.c           |  2 +-
->   tests/qtest/ide-test.c            |  3 ++-
->   tests/qtest/ivshmem-test.c        |  4 ++--
->   tests/qtest/libqmp.c              |  2 +-
->   tests/qtest/libqos/libqos-pc.h    |  6 ++++--
->   tests/qtest/libqos/libqos-spapr.h |  6 ++++--
->   tests/qtest/libqos/libqos.h       |  6 ++++--
->   tests/qtest/libqos/virtio-9p.c    |  1 +
->   tests/qtest/migration-helpers.h   |  1 +
->   tests/qtest/rtas-test.c           |  2 +-
->   tests/qtest/usb-hcd-uhci-test.c   |  4 ++--
->   tests/unit/test-qmp-cmds.c        | 13 +++++++++----
->   14 files changed, 36 insertions(+), 18 deletions(-)
-...
-> diff --git a/tests/unit/test-qmp-cmds.c b/tests/unit/test-qmp-cmds.c
-> index 2373cd64cb..6d52b4e5d8 100644
-> --- a/tests/unit/test-qmp-cmds.c
-> +++ b/tests/unit/test-qmp-cmds.c
-> @@ -138,6 +138,7 @@ void qmp___org_qemu_x_command(__org_qemu_x_EnumList *a,
->   }
->   
->   
-> +G_GNUC_PRINTF(2, 3)
->   static QObject *do_qmp_dispatch(bool allow_oob, const char *template, ...)
->   {
->       va_list ap;
-> @@ -160,6 +161,7 @@ static QObject *do_qmp_dispatch(bool allow_oob, const char *template, ...)
->       return ret;
->   }
->   
-> +G_GNUC_PRINTF(3, 4)
->   static void do_qmp_dispatch_error(bool allow_oob, ErrorClass cls,
->                                     const char *template, ...)
->   {
-> @@ -269,7 +271,7 @@ static void test_dispatch_cmd_io(void)
->   
->   static void test_dispatch_cmd_deprecated(void)
->   {
-> -    const char *cmd = "{ 'execute': 'test-command-features1' }";
-> +    #define cmd "{ 'execute': 'test-command-features1' }"
->       QDict *ret;
+Signed-off-by: Juan Quintela <quintela@redhat.com>
+Reviewed-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+---
+ migration/migration.c | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
-That looks weird, why is this required?
-
-  Thomas
+diff --git a/migration/migration.c b/migration/migration.c
+index b54e4657ce..b2c974f166 100644
+--- a/migration/migration.c
++++ b/migration/migration.c
+@@ -3769,23 +3769,23 @@ static MigIterateState migration_iteration_run(MigrationState *s)
+         trace_migrate_pending_exact(pending_size, s->threshold_size, pend_pre, pend_post);
+     }
+ 
+-    if (pending_size && pending_size >= s->threshold_size) {
+-        /* Still a significant amount to transfer */
+-        if (!in_postcopy && pend_pre <= s->threshold_size &&
+-            qatomic_read(&s->start_postcopy)) {
+-            if (postcopy_start(s)) {
+-                error_report("%s: postcopy failed to start", __func__);
+-            }
+-            return MIG_ITERATE_SKIP;
+-        }
+-        /* Just another iteration step */
+-        qemu_savevm_state_iterate(s->to_dst_file, in_postcopy);
+-    } else {
++    if (pending_size < s->threshold_size) {
+         trace_migration_thread_low_pending(pending_size);
+         migration_completion(s);
+         return MIG_ITERATE_BREAK;
+     }
+ 
++    /* Still a significant amount to transfer */
++    if (!in_postcopy && pend_pre <= s->threshold_size &&
++        qatomic_read(&s->start_postcopy)) {
++        if (postcopy_start(s)) {
++            error_report("%s: postcopy failed to start", __func__);
++        }
++        return MIG_ITERATE_SKIP;
++    }
++
++    /* Just another iteration step */
++    qemu_savevm_state_iterate(s->to_dst_file, in_postcopy);
+     return MIG_ITERATE_RESUME;
+ }
+ 
+-- 
+2.38.1
 

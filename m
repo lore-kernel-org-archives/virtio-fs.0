@@ -1,23 +1,25 @@
-Return-Path: <quintela@redhat.com>
-From: Juan Quintela <quintela@redhat.com>
-In-Reply-To: <ed9832ec-eaf0-68a4-b7c1-9f1691ab149e@yandex-team.ru> (Anton
- Kuchin's message of "Thu, 2 Feb 2023 02:54:40 +0200")
-References: <20230115170903.3416105-1-antonkuchin@yandex-team.ru>
- <CAJSP0QVKUKgkBMw1PiN8-L8Ykhq=gfvNTTs4sf1tuzoqHu+GXw@mail.gmail.com>
- <0d57cc40-693b-b36c-a135-fdac60dd00ec@yandex-team.ru>
- <CAJSP0QUXB0kgsCSsmi8dpnJFYho2cR_2Liep=pGmp6WzDZ_7pw@mail.gmail.com>
- <d6bf0b9a-a167-817d-2c17-c2e472961155@yandex-team.ru>
- <CAJSP0QXXe6KgLN2PJvi-5GqcELhUKJPB2pUARL2ktO9TQYAq=g@mail.gmail.com>
- <2fb6efb4-9155-99ad-3acd-c274783436ed@yandex-team.ru>
- <87h6w5ea1m.fsf@secure.mitica>
- <ed9832ec-eaf0-68a4-b7c1-9f1691ab149e@yandex-team.ru>
-Reply-To: quintela@redhat.com
-Date: Thu, 02 Feb 2023 10:59:22 +0100
-Message-ID: <874js4v151.fsf@secure.mitica>
+Return-Path: <chloe@b2bdigitalbiz.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=b2bdigitalbiz-com.20210112.gappssmtp.com; s=20210112;
+ h=content-language:thread-index:mime-version:message-id:date:subject
+ :in-reply-to:references:to:from:from:to:cc:subject:date:message-id
+ :reply-to; bh=2GrzjSAG5mLaB/iirpyVw1RQTwNTjvpLEG3aLiEDquI=;
+ b=ckK2PMON276suzQ2seisnreD7U6rnfKnI+ScQQGqJjQ+xKBSOUSkt8OrZUrSrkQr6M
+ 6EQr7y2ShVeU6263Kk0SXTXOz3XQZLXZL+TEQlGsxWMeJWX8Eis/Q4Tvmx3AIimqjbzt
+ rIIFibQ1CeFlavZBtBDw03/lF270dT8deEMzC723qRwso+KLpp4P6Za6P286hrU1uHQL
+ orM2MJgr9Ekvk152LOdDfd5sMvW2528d0yJ369Zyw3Kr9Tb2SQNaJQGAWq2WYnzSw9cR
+ m/1Mn0dNUy2JWqWW+qMuK5jlBHUWVXPHsB7xhDnFLRzxOraU8SPK0/alFN0ZlfeY2MVM
+ uWQA==
+From: "Chloe" <chloe@b2bdigitalbiz.com>
+References: 
+In-Reply-To: 
+Date: Wed, 14 Dec 2022 09:45:48 -0500
+Message-ID: <03b801d90fca$c196db80$44c49280$@b2bdigitalbiz.com>
 MIME-Version: 1.0
-Content-Type: text/plain
-Subject: Re: [Virtio-fs] [PATCH] vhost-user-fs: add capability to allow
- migration
+Content-Type: multipart/alternative;
+ boundary="----=_NextPart_000_03B9_01D90FA0.D8C34480"
+Content-Language: en-us
+Subject: Re: [Virtio-fs] Fortinet Users List
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -26,146 +28,202 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: Anton Kuchin <antonkuchin@yandex-team.ru>
-Cc: Stefan Hajnoczi <stefanha@gmail.com>, qemu-devel@nongnu.org, virtio-fs@redhat.com, Markus Armbruster <armbru@redhat.com>, Eric Blake <eblake@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, yc-core@yandex-team.ru, "Michael
- S. Tsirkin" <mst@redhat.com>
+To: virtio-fs@redhat.com
 
-Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
-> On 01/02/2023 16:26, Juan Quintela wrote:
->> Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
->>> On 19/01/2023 18:02, Stefan Hajnoczi wrote:
->>>> On Thu, 19 Jan 2023 at 10:29, Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
->>>>> On 19/01/2023 16:30, Stefan Hajnoczi wrote:
->>>>>> On Thu, 19 Jan 2023 at 07:43, Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
->>>>>>> On 18/01/2023 17:52, Stefan Hajnoczi wrote:
->>>>>>>> On Sun, 15 Jan 2023 at 12:21, Anton Kuchin <antonkuchin@yandex-team.ru> wrote:
->> Once told that, I think that you are making your live harder in the
->> future when you add the other migratable devices.
->>
->> I am assuming here that your "underlying device" is:
->>
->> enum VhostUserFSType {
->>      VHOST_USER_NO_MIGRATABLE = 0,
->>      // The one we are doing here
->>      VHOST_USER_EXTERNAL_MIGRATABLE,
->>      // The one you describe for the future
->>      VHOST_USER_INTERNAL_MIGRATABLE,
->> };
->>
->> struct VHostUserFS {
->>      /*< private >*/
->>      VirtIODevice parent;
->>      VHostUserFSConf conf;
->>      struct vhost_virtqueue *vhost_vqs;
->>      struct vhost_dev vhost_dev;
->>      VhostUserState vhost_user;
->>      VirtQueue **req_vqs;
->>      VirtQueue *hiprio_vq;
->>      int32_t bootindex;
->>      enum migration_type;
->>      /*< public >*/
->> };
->>
->>
->> static int vhost_user_fs_pre_save(void *opaque)
->> {
->>      VHostUserFS *s = opaque;
->>
->>      if (s->migration_type == VHOST_USER_NO_MIGRATABLE)) {
->>          error_report("Migration of vhost-user-fs devices requires internal FUSE "
->>                       "state of backend to be preserved. If orchestrator can "
->>                       "guarantee this (e.g. dst connects to the same backend "
->>                       "instance or backend state is migrated) set 'vhost-user-fs' "
->>                       "migration capability to true to enable migration.");
->>          return -1;
->>      }
->>      if (s->migration_type == VHOST_USER_EXTERNAL_MIGRATABLE) {
->>          return 0;
->>      }
->>      if (s->migration_type == VHOST_USER_INTERNAL_MIGRATABLE) {
->>          error_report("still not implemented");
->>          return -1;
->>      }
->>      assert("we don't reach here");
->> }
->>
->> Your initial vmstateDescription
->>
->> static const VMStateDescription vuf_vmstate = {
->>      .name = "vhost-user-fs",
->>      .unmigratable = 1,
->>      .minimum_version_id = 0,
->>      .version_id = 0,
->>      .fields = (VMStateField[]) {
->>          VMSTATE_INT8(migration_type, struct VHostUserFS),
->>          VMSTATE_VIRTIO_DEVICE,
->>          VMSTATE_END_OF_LIST()
->>      },
->>      .pre_save = vhost_user_fs_pre_save,
->> };
->>
->> And later you change it to something like:
->>
->> static bool vhost_fs_user_internal_state_needed(void *opaque)
->> {
->>      VHostUserFS *s = opaque;
->>
->>      return s->migration_type == VMOST_USER_INTERNAL_MIGRATABLE;
->> }
->>
->> static const VMStateDescription vmstate_vhost_user_fs_internal_sub = {
->>      .name = "vhost-user-fs/internal",
->>      .version_id = 1,
->>      .minimum_version_id = 1,
->>      .needed = &vhost_fs_user_internal_state_needed,
->>      .fields = (VMStateField[]) {
->>          .... // Whatever
->>          VMSTATE_END_OF_LIST()
->>      }
->> };
->>
->> static const VMStateDescription vuf_vmstate = {
->>      .name = "vhost-user-fs",
->>      .minimum_version_id = 0,
->>      .version_id = 0,
->>      .fields = (VMStateField[]) {
->>          VMSTATE_INT8(migration_type, struct VHostUserFS),
->>          VMSTATE_VIRTIO_DEVICE,
->>          VMSTATE_END_OF_LIST()
->>      },
->>      .pre_save = vhost_user_fs_pre_save,
->>      .subsections = (const VMStateDescription*[]) {
->>          &vmstate_vhost_user_fs_internal_sub,
->>          NULL
->>      }
->> };
->>
->> And you are done.
->>
->> I will propose to use a property to set migration_type, but I didn't
->> want to write the code right now.
->>
->> I think that this proposal will make Stephan happy, and it is just
->> adding and extra uint8_t that is helpul to implement everything.
->
-> That is exactly the approach I'm trying to implement it right now. Single
-> flag can be convenient for orchestrator but makes it too hard to account in
-> all cases for all devices on qemu side without breaking future
-> compatibility.
-> So I'm rewriting it with properties.
+This is a multipart message in MIME format.
+------=_NextPart_000_03B9_01D90FA0.D8C34480
+Content-Type: text/plain;
+	charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 
-Nice.  That would be my proposal.  Just a bit complicated for a proof of concetp.
+Hi,
 
-> BTW do you think each vhost-user device should have its own enum of
-> migration
-> types or maybe we could make them common for all device types?
+            
 
-I will put it for vhost-user, because as far as I know nobody else is
-asking for this functionality.
+I hope all going well over there.
 
-The most similar device that I can think of right now is vfio devices.
-But they are implemeting callbacks to save hardware device state, and
-they go device by device, i.e. there is nothing general there.
+            
 
-Later, Juan.
+I was just wondering if you had a chance to take a look at our email that I
+sent you on December 13th 2022. It would be really great if you could review
+the email and share your thoughts, so that we can proceed further.
+
+ 
+
+Please share your thoughts.
+
+ 
+
+Warm Regards
+
+ 
+
+From: Chloe [mailto:chloe@b2bdigitalbiz.com] 
+Sent: Tuesday, December 13, 2022 1:36 PM
+To: 'virtio-fs@redhat.com'
+Subject: RE: Fortinet Users List
+
+ 
+
+Hi,
+
+ 
+
+Would you like to reach Fortinet Users List Worldwide with Social Media
+Reference?
+
+ 
+
+Data fields : Company Name, Contact Name, First Name, Last Name, Job Title,
+Website, Mailing Address, City, State, Zip Code, Country, Email Address,
+Phone Number, Fax Number, Industry, Employee Size, Revenue Size, Industry,
+Technology Name, SIC Code, LinkedIn and many more..
+
+ 
+
+Kindly let me know your target criteria to send you more info.
+
+ 
+
+Thank you and look forward hearing from you.
+
+--
+
+Regards,
+
+Chloe
+
+____________________________________________________________________________
+____________________________________________________________________________
+____________________
+
+Disclaimer: If you're not interested, Please reply with "Remove" in the
+subject line..
+
+ 
+
+
+------=_NextPart_000_03B9_01D90FA0.D8C34480
+Content-Type: text/html;
+	charset="us-ascii"
+Content-Transfer-Encoding: quoted-printable
+
+<html xmlns:v=3D"urn:schemas-microsoft-com:vml" xmlns:o=3D"urn:schemas-micr=
+osoft-com:office:office" xmlns:w=3D"urn:schemas-microsoft-com:office:word" =
+xmlns:m=3D"http://schemas.microsoft.com/office/2004/12/omml" xmlns=3D"http:=
+//www.w3.org/TR/REC-html40"><head><META HTTP-EQUIV=3D"Content-Type" CONTENT=
+=3D"text/html; charset=3Dus-ascii"><meta name=3DGenerator content=3D"Micros=
+oft Word 15 (filtered medium)"><style><!--
+/* Font Definitions */
+@font-face
+=09{font-family:"Cambria Math";
+=09panose-1:2 4 5 3 5 4 6 3 2 4;}
+@font-face
+=09{font-family:Calibri;
+=09panose-1:2 15 5 2 2 2 4 3 2 4;}
+@font-face
+=09{font-family:Verdana;
+=09panose-1:2 11 6 4 3 5 4 4 2 4;}
+/* Style Definitions */
+p.MsoNormal, li.MsoNormal, div.MsoNormal
+=09{margin:0in;
+=09margin-bottom:.0001pt;
+=09font-size:11.0pt;
+=09font-family:"Calibri","sans-serif";}
+a:link, span.MsoHyperlink
+=09{mso-style-priority:99;
+=09color:#0563C1;
+=09text-decoration:underline;}
+a:visited, span.MsoHyperlinkFollowed
+=09{mso-style-priority:99;
+=09color:#954F72;
+=09text-decoration:underline;}
+span.EmailStyle17
+=09{mso-style-type:personal;
+=09font-family:"Calibri","sans-serif";
+=09color:windowtext;}
+span.EmailStyle19
+=09{mso-style-type:personal-reply;
+=09font-family:"Calibri","sans-serif";
+=09color:#1F497D;}
+.MsoChpDefault
+=09{mso-style-type:export-only;
+=09font-size:10.0pt;}
+@page WordSection1
+=09{size:8.5in 11.0in;
+=09margin:1.0in 1.0in 1.0in 1.0in;}
+div.WordSection1
+=09{page:WordSection1;}
+--></style><!--[if gte mso 9]><xml>
+<o:shapedefaults v:ext=3D"edit" spidmax=3D"1026" />
+</xml><![endif]--><!--[if gte mso 9]><xml>
+<o:shapelayout v:ext=3D"edit">
+<o:idmap v:ext=3D"edit" data=3D"1" />
+</o:shapelayout></xml><![endif]--></head><body lang=3DEN-US link=3D"#0563C1=
+" vlink=3D"#954F72"><div class=3DWordSection1><p class=3DMsoNormal style=3D=
+'text-autospace:none'><span style=3D'font-size:9.0pt;font-family:"Verdana",=
+"sans-serif"'>Hi,<o:p></o:p></span></p><p class=3DMsoNormal style=3D'text-a=
+utospace:none'><span style=3D'font-size:9.0pt;font-family:"Verdana","sans-s=
+erif"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <=
+o:p></o:p></span></p><p class=3DMsoNormal style=3D'text-autospace:none'><sp=
+an style=3D'font-size:9.0pt;font-family:"Verdana","sans-serif"'>I hope all =
+going well over there.<o:p></o:p></span></p><p class=3DMsoNormal style=3D't=
+ext-autospace:none'><span style=3D'font-size:9.0pt;font-family:"Verdana","s=
+ans-serif"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nb=
+sp; <o:p></o:p></span></p><p class=3DMsoNormal style=3D'text-autospace:none=
+'><span style=3D'font-size:9.0pt;font-family:"Verdana","sans-serif"'>I was =
+just wondering if you had a chance to take a look at our email that I sent =
+you on December 13<sup>th </sup>2022. It would be really great if you could=
+ review the email and share your thoughts, so that we can proceed further.<=
+o:p></o:p></span></p><p class=3DMsoNormal style=3D'text-autospace:none'><sp=
+an style=3D'font-size:9.0pt;font-family:"Verdana","sans-serif"'><o:p>&nbsp;=
+</o:p></span></p><p class=3DMsoNormal style=3D'text-autospace:none'><span s=
+tyle=3D'font-size:9.0pt;font-family:"Verdana","sans-serif"'>Please share yo=
+ur thoughts.<o:p></o:p></span></p><p class=3DMsoNormal style=3D'text-autosp=
+ace:none'><span style=3D'font-size:9.0pt;font-family:"Verdana","sans-serif"=
+'><o:p>&nbsp;</o:p></span></p><p class=3DMsoNormal><span style=3D'font-size=
+:9.0pt;font-family:"Verdana","sans-serif"'>Warm Regards</span><span style=
+=3D'color:#1F497D'><o:p></o:p></span></p><p class=3DMsoNormal><span style=
+=3D'color:#1F497D'><o:p>&nbsp;</o:p></span></p><div><div style=3D'border:no=
+ne;border-top:solid #E1E1E1 1.0pt;padding:3.0pt 0in 0in 0in'><p class=3DMso=
+Normal><b>From:</b> Chloe [mailto:chloe@b2bdigitalbiz.com] <br><b>Sent:</b>=
+ Tuesday, December 13, 2022 1:36 PM<br><b>To:</b> 'virtio-fs@redhat.com'<br=
+><b>Subject:</b> RE: Fortinet Users List<o:p></o:p></p></div></div><p class=
+=3DMsoNormal><o:p>&nbsp;</o:p></p><p class=3DMsoNormal style=3D'text-autosp=
+ace:none'><span style=3D'color:#222A35'>Hi,<o:p></o:p></span></p><p class=
+=3DMsoNormal style=3D'text-autospace:none'><span style=3D'color:#222A35'><o=
+:p>&nbsp;</o:p></span></p><p class=3DMsoNormal style=3D'text-autospace:none=
+'><span style=3D'color:#222A35'>Would you like to reach</span><strong><span=
+ style=3D'font-family:"Calibri","sans-serif"'> Fortinet Users List</span></=
+strong><b><span style=3D'font-size:9.0pt;font-family:"Verdana","sans-serif"=
+'> </span></b><span style=3D'color:#222A35'>Worldwide with Social Media Ref=
+erence?</span><span style=3D'font-size:9.0pt;font-family:"Verdana","sans-se=
+rif"'><o:p></o:p></span></p><p class=3DMsoNormal style=3D'text-autospace:no=
+ne'><span style=3D'color:#222A35'><o:p>&nbsp;</o:p></span></p><p class=3DMs=
+oNormal style=3D'text-autospace:none'><b><u><span style=3D'color:#222A35'>D=
+ata fields </span></u></b><span style=3D'color:#222A35'>:<b> </b>Company Na=
+me, Contact Name, First Name, Last Name, Job Title, Website, Mailing Addres=
+s, City, State, Zip Code, Country, Email Address, Phone Number, Fax Number,=
+ Industry, Employee Size, Revenue Size, Industry, Technology Name, SIC Code=
+, LinkedIn and many more..<o:p></o:p></span></p><p class=3DMsoNormal style=
+=3D'text-autospace:none'><span style=3D'color:#222A35'><o:p>&nbsp;</o:p></s=
+pan></p><p class=3DMsoNormal style=3D'text-autospace:none'><span style=3D'c=
+olor:#222A35'>Kindly let me know your target criteria to send you more info=
+.<o:p></o:p></span></p><p class=3DMsoNormal style=3D'text-autospace:none'><=
+span style=3D'color:#222A35'><o:p>&nbsp;</o:p></span></p><p class=3DMsoNorm=
+al style=3D'text-autospace:none'><span style=3D'color:#222A35'>Thank you an=
+d look forward hearing from you.<o:p></o:p></span></p><p class=3DMsoNormal =
+style=3D'text-autospace:none'><span style=3D'color:#222A35'>--<o:p></o:p></=
+span></p><p class=3DMsoNormal><span style=3D'color:#222A35'>Regards,<o:p></=
+o:p></span></p><p class=3DMsoNormal><span style=3D'color:#222A35'>Chloe<o:p=
+></o:p></span></p><p class=3DMsoNormal><span style=3D'color:#222A35'>______=
+___________________________________________________________________________=
+___________________________________________________________________________=
+________________<o:p></o:p></span></p><p class=3DMsoNormal><b><span style=
+=3D'font-size:9.0pt;color:#222A35'>Disclaimer</span></b><span style=3D'font=
+-size:9.0pt;color:#222A35'>: If you&#8217;re not interested, Please reply w=
+ith &quot;Remove&quot; in the subject line.</span><span style=3D'color:#222=
+A35'>.</span><o:p></o:p></p><p class=3DMsoNormal><o:p>&nbsp;</o:p></p></div=
+></body></html>
+------=_NextPart_000_03B9_01D90FA0.D8C34480--
 

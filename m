@@ -1,20 +1,16 @@
-Return-Path: <abdulwahabseo12@gmail.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
- h=to:subject:message-id:date:from:mime-version:from:to:cc:subject
- :date:message-id:reply-to;
- bh=ubkxswpfP3ZykkmXZIsLT5+4fDcU3U5kqf1XQ9rFqUU=;
- b=L9X+2sMqNaso+lOBMIz9Vw69anOatMv6x84s/nPjeuXZQxEbFRrAEjhRuUYaZ8zNxf
- ippcOZPY2HNX+nYQmAKGFn4DfYj0t2Cg4YK2eBIKo9fk4qsrofRPI+ZzvazOJJ0scYyA
- R65Xi/L4foSrleThpByp0mJzB04M5EgRhmyg948cxvPH1RYk+3oQtbSKVpidSBNH/iQb
- k7/Aw8oL379xFNZCngSZVEfnjpAHZ1zOz8g0pxfFcM/pqGHYLgSojmwek6Xvahu5x9ar
- 7SM/4qrbDMWEE8MFZ7m/sOiyd8ZF11+z10V9uDFkVrF3MTSOTB5Mqtr8fLTcuyQRFuiz
- XOPg==
+Return-Path: <sw@weilnetz.de>
+Message-ID: <2d829bf0-7804-8c67-61a4-4ae8f7ddd9ca@weilnetz.de>
+Date: Mon, 19 Dec 2022 21:43:50 +0100
 MIME-Version: 1.0
-From: Abdul Wahab <abdulwahabseo12@gmail.com>
-Date: Mon, 19 Dec 2022 21:59:37 +0500
-Message-ID: <CAO-NAofaWJU_oWO+W3PQUaNucLg_6KMhv7m2Q=DWo=VA+kVewg@mail.gmail.com>
-Content-Type: multipart/alternative; boundary="00000000000034592405f0313c80"
-Subject: [Virtio-fs] Customers Attraction to your Website
+References: <20221219130205.687815-1-berrange@redhat.com>
+ <20221219130205.687815-2-berrange@redhat.com>
+From: Stefan Weil <sw@weilnetz.de>
+In-Reply-To: <20221219130205.687815-2-berrange@redhat.com>
+Content-Type: multipart/signed; micalg=pgp-sha256;
+ protocol="application/pgp-signature";
+ boundary="------------0b04BHHYMlAgxOL9rhUtBaN9"
+Subject: Re: [Virtio-fs] [PATCH 1/6] disas: add G_GNUC_PRINTF to
+ gstring_printf
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -23,230 +19,192 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: =?UTF-8?Q?Daniel_P=2e_Berrang=c3=a9?= <berrange@redhat.com>, qemu-devel@nongnu.org
+Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, qemu-ppc@nongnu.org, xen-devel@lists.xenproject.org, Laurent Vivier <lvivier@redhat.com>, Markus Armbruster <armbru@redhat.com>, Daniel Henrique Barboza <danielhb413@gmail.com>, virtio-fs@redhat.com, Michael Roth <michael.roth@amd.com>, =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>, qemu-block@nongnu.org, Peter Maydell <peter.maydell@linaro.org>, qemu-arm@nongnu.org, Paul Durrant <paul@xen.org>, Anthony Perard <anthony.perard@citrix.com>, David Gibson <david@gibson.dropbear.id.au>, =?UTF-8?Q?C=c3=a9dric_Le_Goater?= <clg@kaod.org>, John Snow <jsnow@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Stefano Stabellini <sstabellini@kernel.org>, Gerd Hoffmann <kraxel@redhat.com>, Greg Kurz <groug@kaod.org>, Thomas Huth <thuth@redhat.com>
 
---00000000000034592405f0313c80
-Content-Type: text/plain; charset="UTF-8"
+This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
+--------------0b04BHHYMlAgxOL9rhUtBaN9
+Content-Type: multipart/mixed; boundary="------------yTpA0PFAROE5nCpoBfE6sOO7";
+ protected-headers="v1"
+From: Stefan Weil <sw@weilnetz.de>
+To: =?UTF-8?Q?Daniel_P=2e_Berrang=c3=a9?= <berrange@redhat.com>,
+ qemu-devel@nongnu.org
+Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, qemu-ppc@nongnu.org,
+ xen-devel@lists.xenproject.org, Laurent Vivier <lvivier@redhat.com>,
+ Markus Armbruster <armbru@redhat.com>,
+ Daniel Henrique Barboza <danielhb413@gmail.com>, virtio-fs@redhat.com,
+ Michael Roth <michael.roth@amd.com>, =?UTF-8?Q?Alex_Benn=c3=a9e?=
+ <alex.bennee@linaro.org>, qemu-block@nongnu.org,
+ Peter Maydell <peter.maydell@linaro.org>, qemu-arm@nongnu.org,
+ Paul Durrant <paul@xen.org>, Anthony Perard <anthony.perard@citrix.com>,
+ David Gibson <david@gibson.dropbear.id.au>, =?UTF-8?Q?C=c3=a9dric_Le_Goater?=
+ <clg@kaod.org>, John Snow <jsnow@redhat.com>,
+ Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>,
+ Stefano Stabellini <sstabellini@kernel.org>,
+ Gerd Hoffmann <kraxel@redhat.com>, Greg Kurz <groug@kaod.org>,
+ Thomas Huth <thuth@redhat.com>
+Message-ID: <2d829bf0-7804-8c67-61a4-4ae8f7ddd9ca@weilnetz.de>
+Subject: Re: [PATCH 1/6] disas: add G_GNUC_PRINTF to gstring_printf
+References: <20221219130205.687815-1-berrange@redhat.com>
+ <20221219130205.687815-2-berrange@redhat.com>
+In-Reply-To: <20221219130205.687815-2-berrange@redhat.com>
+
+--------------yTpA0PFAROE5nCpoBfE6sOO7
+Content-Type: multipart/mixed; boundary="------------AequN11irnsmEWddWGWlHvb9"
+
+--------------AequN11irnsmEWddWGWlHvb9
+Content-Type: text/plain; charset=UTF-8; format=flowed
+Content-Transfer-Encoding: base64
+
+QW0gMTkuMTIuMjIgdW0gMTQ6MDIgc2NocmllYiBEYW5pZWwgUC4gQmVycmFuZ8OpOg0KPiBT
+aWduZWQtb2ZmLWJ5OiBEYW5pZWwgUC4gQmVycmFuZ8OpIDxiZXJyYW5nZUByZWRoYXQuY29t
+Pg0KPiAtLS0NCj4gICBkaXNhcy5jIHwgMSArDQo+ICAgMSBmaWxlIGNoYW5nZWQsIDEgaW5z
+ZXJ0aW9uKCspDQo+IA0KPiBkaWZmIC0tZ2l0IGEvZGlzYXMuYyBiL2Rpc2FzLmMNCj4gaW5k
+ZXggOTRkM2I0NTA0Mi4uMzFkZjhmNWI4OSAxMDA2NDQNCj4gLS0tIGEvZGlzYXMuYw0KPiAr
+KysgYi9kaXNhcy5jDQo+IEBAIC0yMzksNiArMjM5LDcgQEAgdm9pZCB0YXJnZXRfZGlzYXMo
+RklMRSAqb3V0LCBDUFVTdGF0ZSAqY3B1LCB0YXJnZXRfdWxvbmcgY29kZSwNCj4gICAgICAg
+fQ0KPiAgIH0NCj4gICANCj4gK0dfR05VQ19QUklOVEYoMiwgMykNCj4gICBzdGF0aWMgaW50
+IGdzdHJpbmdfcHJpbnRmKEZJTEUgKnN0cmVhbSwgY29uc3QgY2hhciAqZm10LCAuLi4pDQo+
+ICAgew0KPiAgICAgICAvKiBXZSBhYnVzZSB0aGUgRklMRSBwYXJhbWV0ZXIgdG8gcGFzcyBh
+IEdTdHJpbmcuICovDQoNClRoZSBjdXJyZW50IGNvZGUgdXNlcyBhIGRpZmZlcmVudCBwYXR0
+ZXJuOg0KDQpzdGF0aWMgUkVUVVJOX1RZUEUgR19HTlVDX1BSSU5URigyLCAzKSBmdW5jdGlv
+bihhcmd1bWVudCBsaXN0KQ0KDQpTbyBJIHdvdWxkIGhhdmUgZXhwZWN0ZWQNCg0Kc3RhdGlj
+IGludCBHX0dOVUNfUFJJTlRGKDIsIDMpDQpnc3RyaW5nX3ByaW50ZihGSUxFICpzdHJlYW0s
+IGNvbnN0IGNoYXIgKmZtdCwgLi4uKQ0KDQpEb2VzIHRoYXQgbWF0dGVyPyBEbyB3ZSBjYXJl
+IGZvciBkaWZmZXJlbnQgcGF0dGVybnM/DQoNClN0ZWZhbg0K
+--------------AequN11irnsmEWddWGWlHvb9
+Content-Type: application/pgp-keys; name="OpenPGP_0xE08C21D5677450AD.asc"
+Content-Disposition: attachment; filename="OpenPGP_0xE08C21D5677450AD.asc"
+Content-Description: OpenPGP public key
 Content-Transfer-Encoding: quoted-printable
 
-Congratulations!!!
+-----BEGIN PGP PUBLIC KEY BLOCK-----
 
-You have a chance to increase your site www.redhat.com Traffic, DA,DR and
-your Revenue from your site .
+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
+T7uiC0aTwAsniiln1XFlGBISNLB1HL/gUc9FJj8qmYgvUBZIzUjmm56up6er8ca9
+2tARdBylQF3E9MJ/E4dVrmTyvOlddAb/MG1Ge425mjt0dRfOx8Qc7Pxs+d3UNVSu
+Bm+WtuSgk+JNIT08c+WSXec8mE4hVdrKbAvCo9dcT5Gal2r6FSvRVY5kba3t280x
+utLSp470k3+DO+AgVigbHr3scXlJXZe1m4luqBSkEBDNH2sAQoBrNVwVaCZqZRTN
+TFN0ZWZhbiBXZWlsIChVbml2ZXJzaXTDpHRzYmlibGlvdGhlayBNYW5uaGVpbSkg
+PHN0ZWZhbi53ZWlsQHVuaS1tYW5uaGVpbS5kZT7CwY4EEwEIADgWIQRJI2/qdcld
+aY7Ct4rgjCHVZ3RQrQUCYlMdZAIbAwULCQgHAwUVCgkICwUWAgMBAAIeBQIXgAAK
+CRDgjCHVZ3RQrRo6D/9MSqnSGOjWrcsiXbUsQmNKzI1JZOuabam3P9V/rILU7K4/
+b9E6Bk5Vjo/6A4xMtC9y6L244Upn4MTdUofkBdd9dMG8eZ2oofsMGIeEmr4EFfKb
+/LoZtIUJaNfiwvd3YakEmaAfd+AWIEAVYlVSxWHeCMowTNYxbSW+/M0ExGw1BErt
+oFiz3Ti8iYNfgz2l9cwrKhQEnzZlHUq06AIbzch/nXFFcc3EBDz+J6x//DCclb6Y
+8oLJRerrOJqpcpTYrwr+UDbh8JOqiUWUQ1BrbIZb+J5rU+DghBmNAWpd6yTbxX0T
+I7g2Hu7gPdzhrLLRO+rQsDK3T+JdVQ9xyoWugFIw4YepAad5uo/2e+q38a+h57EK
+Vsy4xfAEV/Mr4hl9KCY2hkiQYMKHvN1EZp72crAiPgDZxh6wTJZ979RHY2apq8XM
+Y41uP5mwdHxFA1Al/5+syajNlTzsNdYB5Ucx5TwNU0TifM13exHw8lQZOaWbDZS4
+QYwzeFWuEFse9ESmCQX5Pggw+ABFXOtPeqEfIO8v3QbT1vFlJ57iFBUiem967/JV
+a0RQyEvAKj0T5124N8Hi1oa8TPk5oSe8id5jSgGD9twbS0HX2KcmwAF/A5MgP7hx
+0X4EfhsJtDxFDy5PnoC8ADE2wcKDsTgqfDS/EQc6OeQCKceR45wyOT0Y3kbEa87B
+TQRV3J49ARAAt9nArtjFnqmRHL0oY5KCrF5ONph6xm3rof74lZ/CTkG0zu9OhmbW
+s6MMNsHgM7lRGIcKou7vUQE8/TEXh3+0eRdCiEYXP9jYTTXosU/+y/hOY33x9Sw/
+tCEHXiz6M+rp74O1P+zqXSlmx8zzNy33dDdXUT+bF1C6Y7WEChIIjlOfLHOBeazN
+dCqDxRDM/CKeI/UWx/wm0z1DNEuD8crUXIgdxY3dBAm1bBK041+3GXP8gYLN4qew
+T1VoG35Ya3PrrTC/zMAumagjiF3/1NCAmH6eSOzw21EloDBR76K1noDGCfRM2dp0
+78rS/BO+QtlN4+UWQLkB+crHxqXWk0u+gka2A7ZBHFYky/oUVIK1/ar6swnTRHj2
+0Ga+rukzcdxQRJ2kwGeRrqLH1JO8p72ptvswMyzVPhk8sE2S9llPrbznj6fc9f5m
+y5x9i5Fh4Mt2z7u+wBSdck2wV5eThEPz7UziXgtbq74Hja7tuoQxUhcpOIBXKl8b
+MLtjxlO7VmH312VzfiBYqQku9fHg3E/Hi+uon2fJaifFbuViZqfZq9bKT/UWG0+0
+cKc2d4os+3uwGcjraUjCFSXmGU27YqiW8jeM7pIa03QoAhWIH9ApAOVBqWF6drFz
+6/oFcSl9qbY/4IneJ/eb0eyjHllegydGEuIShrXYZLiQqSX4yj/3vE8AEQEAAcLB
+XwQYAQgACQUCVdyePQIbDAAKCRDgjCHVZ3RQrWEaEACTrt0WUxL1AT6BarJ3fOPV
+ZjiioO+3LPhw98ci7afeScEK84cGv+KLgxawvOo7dbwEX6VceQvJ0LTZ1oYPuYeZ
+MjiG7Qdf9uwgk3VwHf4S9pNxsqyVxHPotN9RPWwqoH9ihmO/ml7uC3gH0SFiU/RR
+lc3c9X/u+6SbkSEUZrUrPFQKJ3dpfjnA3RCPTI3fTKr8jycA5A5A77Daba3L+MXj
+c71/tn6MZCZmK7unSfpXq4rbGrIgMWnFKMBgeRONUWRFIOm5lReEjLHiABCli8t4
+Txr2ATswA4atmC4JzP8J/WPWe2xDMvsOXu+bGgW5BSO053MQz1JyJf1ExClNTkYu
+Vlm712JFE7Xzc2cg9P796KI3CKGbytTpaTrVx3ZajqHY1xfZy3vHolR8pfGZ8xcY
+XhFtkD71/BSyqpkrPVvbGkLZOm4b/SzWCGCDYx9xBB//m25lfpZ+Du2u91pvC97Z
+6Qty5nRp9kZvAeidmSunItU0Q4jKQlFnn6ZyLhPk4mwuVSUec8dGIdda8cQRaG/J
+lpLUZi2cnhKAnGaAaLGycQ/NEMVjtN8z6ZHCe3eAa1bEPwSZAbRHuCZ+Iqh6gPzn
+K88LhGUr/vzHYKKn25QWYQ7rJi2H1cu8BQ3lQpRunkCIithJ5gwoS0ZFSEM25FdI
+hvjSVVSRyxiu/zrDuO/s6g=3D=3D
+=3DumGL
+-----END PGP PUBLIC KEY BLOCK-----
 
-I'm an Off Page SEO  and Link builder Expert .I am an owner of  a Digital
-Marketing Agency where we have our experienced team working in this field
-for more than 2 years .We have outreached thousands of sites where we do
-guest posting .As I was observing that you are looking for good sites to
-attract traffic or clients to your site  because I have seen your article
-at www.completeconnection.ca
-And I decided to send some high quality sites attached below.
-We are providing Backlinks and do-follow links by posting your articles in
-high quality sites with great traffic and DA. This would provide more
-traffic to your website too.It would also increase  your Domain Authority
-and you will get more clients through backlinks and increase your revenue.
-I have many quality sites, some of them I'm mentioning, if you are
-interested in them then let me know.
+--------------AequN11irnsmEWddWGWlHvb9--
 
-Check the sites sample here=F0=9F=91=87=F0=9F=8F=BB
-1    <https://www.seventech.org/>www.Seventech.org
-<https://www.seventech.org/>
-2    <https://www.dashtech.org/>www.Dashtech.org <https://www.dashtech.org/=
->
-3   <https://www.hubtech.org/>www.Hubtech.org <https://www.hubtech.org/>
-4  technonguide.com
+--------------yTpA0PFAROE5nCpoBfE6sOO7--
 
-LINK TYPE: do-follow links and permanent
+--------------0b04BHHYMlAgxOL9rhUtBaN9
+Content-Type: application/pgp-signature; name="OpenPGP_signature.asc"
+Content-Description: OpenPGP digital signature
+Content-Disposition: attachment; filename="OpenPGP_signature"
 
-If your budget is low then I'm having that one too.
-We have different categories such as fashion, technology, digital
-marketing, health and many others.
-You can ask me anything if you have any questions regarding this.
-Regards,
+-----BEGIN PGP SIGNATURE-----
 
+wsF5BAABCAAjFiEESSNv6nXJXWmOwreK4Iwh1Wd0UK0FAmOgzQcFAwAAAAAACgkQ4Iwh1Wd0UK2P
+Uw//RNyFVXLdC39KN7OaIzrQncTJkdpko0HYjw0AEhwDHlK5979OQh9Z7FfgiXb0u+C9J9IXXgSM
+4pFg1snv6G8o/QxI9/J9TU0FKZ+sOHK/I8mLSOXwDsHtV9kVc7yudPUur0r5Py+/5cB3P0S9fqf2
+jHT9e3mA6Mo9/9bLu4nhbMbn99Ct+nKldwr3+707k9JCeLh43+vQsz01JYOshlbUa7uKfhjrjjwD
+MbmOaDjsp9jBcIXXsvTnEUwCcrI+ZaZ4nfWxKg0foBFwelLrR+EQb2j5/UfMe00ItfNaqTMw4Enw
+PZ2Cf7AD4T3kzZcEfdMsGuR4bmAPsiSZQeasOAzDTtYOs3cTVS8NCIOLl2I5sOfJqxldDbXab3BK
+ziPJWo/mXtGfttLoJgrl9RWnWqmcg7UJd3/Ui3vcJi6jeG0z/ELgpX4Kaec7XsDGbdsP38GjZ6tZ
+9w00miHVq3JPfE2/9Hrjh/nyBrb11FoEOv4VIYsumN5rMYl1MYNelZwGT7YaVS8PEtEXlhJjJYHa
+wStt22NLJkzUvjOUQwxwQYnQvi1dm3kx4Y44/1BePHfBP4OGqypMTxd30FOzetizeEpzMEy/qDfm
+V+DkUhxNHLd3B39kYxcFhsUmPktLkxA3ixdHDEdhWH3PsF0rAjnxbkJ6x0B1mI7B7ZawRdV0Vpwh
+xC8=
+=cSlU
+-----END PGP SIGNATURE-----
 
-https://docs.google.com/spreadsheets/d/1PDHYrxa0EggTatbeDGLjtxXALp3kxsYizuk=
-HnfeYulc/edit?usp=3Dsharing
-
-If you are interested in any site feel free to contact me.
-
-
---=20
-Abdul Wahab Zia
-SEO LINK BUILDER EXPERT
-
-[image: Photo]
-
-T: +923229644969
-
-E: alwahabzia21@gmail.com
-
-A: AW Digital marketing Agency, Q Block Johar Town, Lahore
-
-[image: facebook icon]
-<https://www.facebook.com/profile.php?id=3D100085420509214>  [image: twitte=
-r
-icon] <https://twitter.com/alwahabzia21>  [image: linkedin icon]
-<https://www.linkedin.com/in/abdul-wahab-off-page-seo-expert/>
-
-Hi Dear! I am Abdul Wahab. I am Off Page SEO & Link Building Expert. We run
-an agency where we do link building for sites to grow their traffic and
-there business. We have a great expert members in our team. We have helped
-many new sites to get much traffic and high domain authority. Our first
-priority is to satisfy our client and help him /her to grow their sites or
-business. Thank you have a good day.
-
-[image: Mailtrack]
-<https://mailtrack.io?utm_source=3Dgmail&utm_medium=3Dsignature&utm_campaig=
-n=3Dsignaturevirality11&>
-Sender
-notified by
-Mailtrack
-<https://mailtrack.io?utm_source=3Dgmail&utm_medium=3Dsignature&utm_campaig=
-n=3Dsignaturevirality11&>
-12/19/22,
-09:59:15 PM
-
---00000000000034592405f0313c80
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-<div dir=3D"ltr"><div dir=3D"ltr"><div dir=3D"ltr"><div dir=3D"ltr"><div di=
-r=3D"ltr"><div dir=3D"ltr"><div dir=3D"ltr"><div dir=3D"ltr"><div dir=3D"lt=
-r"><div dir=3D"ltr"><div dir=3D"ltr"><div><div>Congratulations!!!=C2=A0=C2=
-=A0</div><div><br></div><div>You have a chance to increase your site=C2=A0<=
-a class=3D"gmail-in-cell-link" href=3D"http://www.redhat.com" target=3D"_bl=
-ank" style=3D"font-family:Arial;font-size:10pt">www.redhat.com</a>=C2=A0Tra=
-ffic, DA,DR and your Revenue from your site .</div><br>I&#39;m an Off Page =
-SEO=C2=A0 and Link builder Expert .I am an owner of=C2=A0 a Digital Marketi=
-ng Agency where we have our experienced team working in this field for more=
- than 2 years .We have outreached thousands of sites where we do guest post=
-ing .As I was observing that you are looking for good sites to attract traf=
-fic or clients to your=C2=A0site=C2=A0 because I have=C2=A0seen your articl=
-e at=C2=A0<span style=3D"color:rgb(17,85,204);font-family:Arial;font-size:1=
-0pt;font-weight:bold;text-decoration-line:underline"><a href=3D"http://www.=
-completeconnection.ca" target=3D"_blank">www.completeconnection.ca</a></spa=
-n></div><div><div><div>And I decided to send some high quality sites attach=
-ed below.<br>We are providing Backlinks and do-follow links by posting your=
- articles in high quality sites with great traffic and DA. This would provi=
-de more traffic to your website too.It would also increase=C2=A0 your Domai=
-n Authority and you=C2=A0will get more clients through backlinks and increa=
-se your revenue.=C2=A0 I have many quality sites, some of them I&#39;m ment=
-ioning, if you are interested in them then let me know.<br><br>Check the si=
-tes sample here=F0=9F=91=87=F0=9F=8F=BB<br>1=C2=A0 =C2=A0<span style=3D"tex=
-t-decoration-line:underline;font-size:10pt;font-family:Roboto,Arial;font-we=
-ight:bold;color:rgb(17,85,204)"><a href=3D"https://www.seventech.org/" targ=
-et=3D"_blank"><span style=3D"font-size:10pt"></span></a><a href=3D"https://=
-www.seventech.org/" target=3D"_blank">www.Seventech.org</a></span><br>2=C2=
-=A0 =C2=A0<span style=3D"text-decoration-line:underline;font-size:10pt;font=
--family:Roboto,Arial;font-weight:bold;color:rgb(17,85,204)"><a href=3D"http=
-s://www.dashtech.org/" target=3D"_blank"><span style=3D"font-size:10pt"></s=
-pan></a><a href=3D"https://www.dashtech.org/" target=3D"_blank">www.Dashtec=
-h.org</a></span><div>3=C2=A0=C2=A0<span style=3D"font-size:10pt;font-family=
-:Roboto,Arial;font-weight:bold;text-decoration-line:underline;color:rgb(17,=
-85,204)"><a href=3D"https://www.hubtech.org/" target=3D"_blank"><span style=
-=3D"font-size:10pt"></span></a><a href=3D"https://www.hubtech.org/" target=
-=3D"_blank">www.Hubtech.org</a></span></div><div>4=C2=A0=C2=A0<a href=3D"ht=
-tp://technonguide.com/" style=3D"font-family:Arial;font-size:10pt;font-weig=
-ht:bold" target=3D"_blank">technonguide.com</a></div><div><br>LINK TYPE: do=
--follow links and permanent<br><br>If your budget is low then I&#39;m havin=
-g that one too.<br>We have different categories such as fashion, technology=
-, digital marketing, health and many others.<br>You can ask me anything if =
-you have any questions regarding this.<br>Regards,<br clear=3D"all"><div><b=
-r></div><div><br></div><div><a href=3D"https://docs.google.com/spreadsheets=
-/d/1PDHYrxa0EggTatbeDGLjtxXALp3kxsYizukHnfeYulc/edit?usp=3Dsharing" target=
-=3D"_blank">https://docs.google.com/spreadsheets/d/1PDHYrxa0EggTatbeDGLjtxX=
-ALp3kxsYizukHnfeYulc/edit?usp=3Dsharing</a><br></div></div><div><br></div><=
-div>If you are interested in any site feel free to contact me.</div></div><=
-/div></div></div></div></div></div><div dir=3D"ltr"><div dir=3D"ltr"><br></=
-div></div></div></div></div></div></div></div><div><br></div>-- <br><div di=
-r=3D"ltr" class=3D"gmail_signature" data-smartmail=3D"gmail_signature"><div=
- dir=3D"ltr"><table cellspacing=3D"0" cellpadding=3D"0" border=3D"0" style=
-=3D"border-spacing:0px;border-collapse:collapse;font-size:14px;font-family:=
-Arial,sans-serif;color:rgb(46,154,164);max-width:500px"><tbody><tr><td cols=
-pan=3D"2" width=3D"500" style=3D"padding:0px 0px 4px;border-bottom:1px soli=
-d rgb(47,154,163)"><span style=3D"font-size:18pt;color:rgb(0,62,77);font-fa=
-mily:Arial,sans-serif"><span style=3D"font-weight:700">Abdul Wahab Zia</spa=
-n></span><span><br></span><span style=3D"font-size:10pt">SEO LINK BUILDER E=
-XPERT</span></td></tr><tr><td width=3D"120" style=3D"padding:22px 0px 0px">=
-<p style=3D"margin:0px;padding:0px"><img border=3D"0" alt=3D"Photo" width=
-=3D"90" src=3D"https://docs.google.com/drawings/d/e/2PACX-1vR47w5Fj8cFvJocb=
-NKKga9Ls67a7H2gOF4382ISRGRUdgreGg7qFDwUVmwqgvz1OhTMQyImD54u_pW_/pub?w=3D258=
-&amp;h=3D348" style=3D"border:0px;vertical-align:middle;max-width:90px;heig=
-ht:auto"></p></td><td style=3D"padding:25px 0px 0px"><p style=3D"margin:0px=
-;padding-bottom:2px;padding-top:0px;line-height:10pt"><span style=3D"font-s=
-ize:9pt;line-height:10pt;font-weight:bold">T:</span>=C2=A0<span style=3D"fo=
-nt-size:9pt;line-height:10pt;color:rgb(16,16,16)">+923229644969</span></p><=
-p style=3D"margin:0px;padding-bottom:2px;padding-top:0px;line-height:10pt">=
-<span style=3D"font-size:9pt;line-height:10pt;font-weight:bold">E:</span>=
-=C2=A0<a href=3D"mailto:alwahabzia21@gmail.com" style=3D"background-color:t=
-ransparent;color:rgb(16,16,16);font-size:9pt;line-height:10pt" target=3D"_b=
-lank">alwahabzia21@gmail.com</a></p><p style=3D"margin:0px;line-height:10pt=
-;padding-bottom:2px;padding-top:0px"><span style=3D"font-size:9pt;line-heig=
-ht:10pt;font-weight:bold">A:</span>=C2=A0<span style=3D"font-size:9pt;line-=
-height:10pt;color:rgb(16,16,16)">AW Digital marketing Agency<span>,</span><=
-/span>=C2=A0<span style=3D"font-size:9pt;line-height:10pt;color:rgb(16,16,1=
-6)">Q Block Johar Town</span><span style=3D"font-size:9pt;line-height:10pt;=
-color:rgb(16,16,16)">,=C2=A0</span><span style=3D"font-size:9pt;line-height=
-:10pt;color:rgb(16,16,16)">Lahore</span></p><p style=3D"margin:4px 0px 0px;=
-padding-bottom:0px;padding-top:0px"><span><a href=3D"https://www.facebook.c=
-om/profile.php?id=3D100085420509214" rel=3D"noopener" style=3D"background-c=
-olor:transparent;color:rgb(51,122,183)" target=3D"_blank"><img border=3D"0"=
- width=3D"20" alt=3D"facebook icon" src=3D"https://www.mail-signatures.com/=
-signature-generator/img/templates/brands-voice/fb.png" style=3D"border:0px;=
-vertical-align:middle;height:20px;width:20px"></a>=C2=A0</span>=C2=A0<span>=
-<a href=3D"https://twitter.com/alwahabzia21" rel=3D"noopener" style=3D"back=
-ground-color:transparent;color:rgb(51,122,183)" target=3D"_blank"><img bord=
-er=3D"0" width=3D"20" alt=3D"twitter icon" src=3D"https://www.mail-signatur=
-es.com/signature-generator/img/templates/brands-voice/tt.png" style=3D"bord=
-er:0px;vertical-align:middle;height:20px;width:20px"></a>=C2=A0</span>=C2=
-=A0<span><a href=3D"https://www.linkedin.com/in/abdul-wahab-off-page-seo-ex=
-pert/" rel=3D"noopener" style=3D"background-color:transparent;color:rgb(51,=
-122,183)" target=3D"_blank"><img border=3D"0" width=3D"20" alt=3D"linkedin =
-icon" src=3D"https://www.mail-signatures.com/signature-generator/img/templa=
-tes/brands-voice/ln.png" style=3D"border:0px;vertical-align:middle;height:2=
-0px;width:20px"></a>=C2=A0</span></p></td></tr><tr><td colspan=3D"2" style=
-=3D"padding:10px 0px 0px"><p style=3D"margin:0px 0px 10px;font-size:7pt;lin=
-e-height:8pt;color:rgb(149,149,149);font-family:Arial,sans-serif;text-align=
-:justify">Hi Dear! I am Abdul Wahab. I am Off Page SEO &amp; Link Building =
-Expert. We run an agency where we do link building for sites to grow their =
-traffic and there business. We have a great expert members in our team. We =
-have helped many new sites to get much traffic and high domain authority. O=
-ur first priority is to satisfy our client and help him /her to grow their =
-sites or business. Thank you have a good day.</p></td></tr></tbody></table>=
-</div></div><br><div id=3D"mt-signature">
-        <table border=3D"0" cellpadding=3D"8" cellspacing=3D"0" style=3D"us=
-er-select: none;">
-            <tbody><tr>
-                <td>
-                    <a id=3D"signatureLink-logo" href=3D"https://mailtrack.=
-io?utm_source=3Dgmail&amp;utm_medium=3Dsignature&amp;utm_campaign=3Dsignatu=
-revirality11&amp;" class=3D"" style=3D"text-decoration:none">
-                        <img src=3D"https://s3.amazonaws.com/mailtrack-sign=
-ature/sender-notified-72.gif" alt=3D"Mailtrack" class=3D"" width=3D"32" hei=
-ght=3D"32">
-                    </a>
-                </td>
-                <td>
-                    <span style=3D"color:#777">Sender notified by</span> <b=
-r>
-                    <a id=3D"signatureLink-text" href=3D"https://mailtrack.=
-io?utm_source=3Dgmail&amp;utm_medium=3Dsignature&amp;utm_campaign=3Dsignatu=
-revirality11&amp;" class=3D"mt-install" style=3D"color:#4374f7">Mailtrack</=
-a>
-                   =20
-    </td><td><span style=3D"color:transparent;font-size:0">12/19/22, 09:59:=
-15 PM</span></td>
-
-               =20
-                <td>
-                   =20
-                </td>
-            </tr>
-        </tbody></table>
-    </div><img width=3D"0" height=3D"0" class=3D"mailtrack-img" alt=3D"" st=
-yle=3D"display:flex" src=3D"https://mailtrack.io/trace/mail/893858321fd577c=
-a81526154bbc3ceda729781e4.png?u=3D8953581"></div>
-
---00000000000034592405f0313c80--
+--------------0b04BHHYMlAgxOL9rhUtBaN9--
 

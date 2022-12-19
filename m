@@ -1,13 +1,24 @@
-Return-Path: <berrange@redhat.com>
-From: =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>
-Date: Mon, 19 Dec 2022 08:02:05 -0500
-Message-Id: <20221219130205.687815-7-berrange@redhat.com>
-In-Reply-To: <20221219130205.687815-1-berrange@redhat.com>
+Return-Path: <prvs=3454adc0d=anthony.perard@citrix.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple;
+ d=citrix.com; s=securemail; t=1671459078;
+ h=date:from:to:cc:subject:message-id:references:
+ mime-version:content-transfer-encoding:in-reply-to;
+ bh=bkhL5i1Zpu2u0dNJ8rDflE68+bM9GeYGaMZ8cE7WyBg=;
+ b=ag3EWW/3hJfp0gZaKf1a8UVazwN+m1snTDjJaO+MERKNY/iQm/q3ydmF
+ GaDoO3Xv7ibnFluc34nD5H6/XkdiTxDOyxFRAEwPm4SvET+DLVdewGPut
+ kG64kyQ++HMDKYhGIz4Wnjrp3HGDmXhgzYCQOjVj8F9ZaImsaCUYWQMPs E=
+Date: Mon, 19 Dec 2022 14:10:04 +0000
+From: Anthony PERARD <anthony.perard@citrix.com>
+Message-ID: <Y6BwvATqB0ka7qys@perard.uk.xensource.com>
 References: <20221219130205.687815-1-berrange@redhat.com>
+ <20221219130205.687815-3-berrange@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH 6/6] enforce use of G_GNUC_PRINTF attributes
+In-Reply-To: <20221219130205.687815-3-berrange@redhat.com>
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+Subject: Re: [Virtio-fs] [PATCH 2/6] hw/xen: use G_GNUC_PRINTF/SCANF for
+ various functions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -16,42 +27,18 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org
-Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, qemu-ppc@nongnu.org, xen-devel@lists.xenproject.org, Laurent Vivier <lvivier@redhat.com>, Markus Armbruster <armbru@redhat.com>, Daniel Henrique Barboza <danielhb413@gmail.com>, virtio-fs@redhat.com, Michael Roth <michael.roth@amd.com>, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, qemu-block@nongnu.org, Peter Maydell <peter.maydell@linaro.org>, qemu-arm@nongnu.org, Paul Durrant <paul@xen.org>, Anthony Perard <anthony.perard@citrix.com>, David Gibson <david@gibson.dropbear.id.au>, =?UTF-8?q?C=C3=A9dric=20Le=20Goater?= <clg@kaod.org>, John Snow <jsnow@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Stefano Stabellini <sstabellini@kernel.org>, Gerd Hoffmann <kraxel@redhat.com>, Greg Kurz <groug@kaod.org>, Thomas Huth <thuth@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>
+To: Daniel =?iso-8859-1?Q?P=2E_Berrang=E9?= <berrange@redhat.com>
+Cc: qemu-devel@nongnu.org, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, qemu-ppc@nongnu.org, xen-devel@lists.xenproject.org, Laurent Vivier <lvivier@redhat.com>, Markus Armbruster <armbru@redhat.com>, Daniel Henrique
+ Barboza <danielhb413@gmail.com>, virtio-fs@redhat.com, Michael Roth <michael.roth@amd.com>, Alex =?iso-8859-1?Q?Benn=E9e?= <alex.bennee@linaro.org>, qemu-block@nongnu.org, Peter Maydell <peter.maydell@linaro.org>, qemu-arm@nongnu.org, Paul Durrant <paul@xen.org>, David Gibson <david@gibson.dropbear.id.au>, =?iso-8859-1?Q?C=E9dric?= Le Goater <clg@kaod.org>, John Snow <jsnow@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Stefano Stabellini <sstabellini@kernel.org>, Gerd
+ Hoffmann <kraxel@redhat.com>, Greg Kurz <groug@kaod.org>, Thomas Huth <thuth@redhat.com>
 
-We've been very gradually adding G_GNUC_PRINTF annotations
-to functions over years. This has been useful in detecting
-certain malformed printf strings, or cases where we pass
-user data as the printf format which is a potential security
-flaw.
+On Mon, Dec 19, 2022 at 08:02:01AM -0500, Daniel P. Berrang=E9 wrote:
+> Signed-off-by: Daniel P. Berrang=E9 <berrange@redhat.com>
 
-Given the inherant memory corruption danger in use of format
-strings vs mis-matched variadic arguments, it is worth applying
-G_GNUC_PRINTF to all functions using printf, even if we know
-they are safe.
+Acked-by: Anthony PERARD <anthony.perard@citrix.com>
 
-The compilers can reasonably reliably identify such places
-with the -Wsuggest-attribute=format / -Wmissing-format-attribute
-flags.
+Thanks,
 
-Signed-off-by: Daniel P. Berrangé <berrange@redhat.com>
----
- configure | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/configure b/configure
-index 26c7bc5154..b9abe19e16 100755
---- a/configure
-+++ b/configure
-@@ -1208,6 +1208,8 @@ add_to warn_flags -Wnested-externs
- add_to warn_flags -Wendif-labels
- add_to warn_flags -Wexpansion-to-defined
- add_to warn_flags -Wimplicit-fallthrough=2
-+add_to warn_flags -Wsuggest-attribute=format
-+add_to warn_flags -Wmissing-format-attribute
- 
- nowarn_flags=
- add_to nowarn_flags -Wno-initializer-overrides
--- 
-2.38.1
+--=20
+Anthony PERARD
 

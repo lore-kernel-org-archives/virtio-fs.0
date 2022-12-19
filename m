@@ -1,14 +1,14 @@
-Return-Path: <dgilbert@redhat.com>
-From: "Dr. David Alan Gilbert (git)" <dgilbert@redhat.com>
-Date: Wed, 15 Feb 2023 18:43:10 +0000
-Message-Id: <20230215184310.161283-5-dgilbert@redhat.com>
-In-Reply-To: <20230215184310.161283-1-dgilbert@redhat.com>
-References: <20230215184310.161283-1-dgilbert@redhat.com>
+Return-Path: <berrange@redhat.com>
+From: =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>
+Date: Mon, 19 Dec 2022 08:02:01 -0500
+Message-Id: <20221219130205.687815-3-berrange@redhat.com>
+In-Reply-To: <20221219130205.687815-1-berrange@redhat.com>
+References: <20221219130205.687815-1-berrange@redhat.com>
 MIME-Version: 1.0
-Content-type: text/plain
+Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 4/4] virtiofsd: Swing deprecated message to
- removed-features
+Subject: [Virtio-fs] [PATCH 2/6] hw/xen: use G_GNUC_PRINTF/SCANF for various
+ functions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,69 +17,74 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: qemu-devel@nongnu.org, stefanha@redhat.com, vgoyal@redhat.com, hczenczek@redhat.com, gmaglione@redhat.com, virtio-fs@redhat.com
-Cc: pbonzini@redhat.com, alex.bennee@linaro.org
+To: qemu-devel@nongnu.org
+Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, qemu-ppc@nongnu.org, xen-devel@lists.xenproject.org, Laurent Vivier <lvivier@redhat.com>, Markus Armbruster <armbru@redhat.com>, Daniel Henrique Barboza <danielhb413@gmail.com>, virtio-fs@redhat.com, Michael Roth <michael.roth@amd.com>, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, qemu-block@nongnu.org, Peter Maydell <peter.maydell@linaro.org>, qemu-arm@nongnu.org, Paul Durrant <paul@xen.org>, Anthony Perard <anthony.perard@citrix.com>, David Gibson <david@gibson.dropbear.id.au>, =?UTF-8?q?C=C3=A9dric=20Le=20Goater?= <clg@kaod.org>, John Snow <jsnow@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Stefano Stabellini <sstabellini@kernel.org>, Gerd Hoffmann <kraxel@redhat.com>, Greg Kurz <groug@kaod.org>, Thomas Huth <thuth@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>
 
-From: "Dr. David Alan Gilbert" <dgilbert@redhat.com>
-
-Move the deprecation message, since it's now gone.
-
-Signed-off-by: Dr. David Alan Gilbert <dgilbert@redhat.com>
+Signed-off-by: Daniel P. Berrangé <berrange@redhat.com>
 ---
- docs/about/deprecated.rst       | 18 ------------------
- docs/about/removed-features.rst | 13 +++++++++++++
- 2 files changed, 13 insertions(+), 18 deletions(-)
+ hw/xen/xen-bus.c                | 1 +
+ hw/xen/xen_pvdev.c              | 1 +
+ include/hw/xen/xen-bus-helper.h | 6 ++++--
+ include/hw/xen/xen-bus.h        | 3 ++-
+ 4 files changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/docs/about/deprecated.rst b/docs/about/deprecated.rst
-index da2e6fe63d..9a749b342c 100644
---- a/docs/about/deprecated.rst
-+++ b/docs/about/deprecated.rst
-@@ -325,24 +325,6 @@ versions, aliases will point to newer CPU model versions
- depending on the machine type, so management software must
- resolve CPU model aliases before starting a virtual machine.
+diff --git a/hw/xen/xen-bus.c b/hw/xen/xen-bus.c
+index 645a29a5a0..df3f6b9ae0 100644
+--- a/hw/xen/xen-bus.c
++++ b/hw/xen/xen-bus.c
+@@ -561,6 +561,7 @@ void xen_device_backend_printf(XenDevice *xendev, const char *key,
+     }
+ }
  
--Tools
-------
--
--virtiofsd
--'''''''''
--
--There is a new Rust implementation of ``virtiofsd`` at
--``https://gitlab.com/virtio-fs/virtiofsd``;
--since this is now marked stable, new development should be done on that
--rather than the existing C version in the QEMU tree.
--The C version will still accept fixes and patches that
--are already in development for the moment, but will eventually
--be deleted from this tree.
--New deployments should use the Rust version, and existing systems
--should consider moving to it.  The command line and feature set
--is very close and moving should be simple.
--
--
- QEMU guest agent
- ----------------
++G_GNUC_SCANF(3, 4)
+ static int xen_device_backend_scanf(XenDevice *xendev, const char *key,
+                                     const char *fmt, ...)
+ {
+diff --git a/hw/xen/xen_pvdev.c b/hw/xen/xen_pvdev.c
+index 037152f063..1a5177b354 100644
+--- a/hw/xen/xen_pvdev.c
++++ b/hw/xen/xen_pvdev.c
+@@ -196,6 +196,7 @@ const char *xenbus_strstate(enum xenbus_state state)
+  *  2 == noisy debug messages (logfile only).
+  *  3 == will flood your log (logfile only).
+  */
++G_GNUC_PRINTF(3, 0)
+ static void xen_pv_output_msg(struct XenLegacyDevice *xendev,
+                               FILE *f, const char *fmt, va_list args)
+ {
+diff --git a/include/hw/xen/xen-bus-helper.h b/include/hw/xen/xen-bus-helper.h
+index 629a904d1a..8782f30550 100644
+--- a/include/hw/xen/xen-bus-helper.h
++++ b/include/hw/xen/xen-bus-helper.h
+@@ -31,10 +31,12 @@ void xs_node_printf(struct xs_handle *xsh,  xs_transaction_t tid,
+ /* Read from node/key unless node is empty, in which case read from key */
+ int xs_node_vscanf(struct xs_handle *xsh,  xs_transaction_t tid,
+                    const char *node, const char *key, Error **errp,
+-                   const char *fmt, va_list ap);
++                   const char *fmt, va_list ap)
++    G_GNUC_SCANF(6, 0);
+ int xs_node_scanf(struct xs_handle *xsh,  xs_transaction_t tid,
+                   const char *node, const char *key, Error **errp,
+-                  const char *fmt, ...);
++                  const char *fmt, ...)
++    G_GNUC_SCANF(6, 7);
  
-diff --git a/docs/about/removed-features.rst b/docs/about/removed-features.rst
-index a17d0554d6..8b69ab1674 100644
---- a/docs/about/removed-features.rst
-+++ b/docs/about/removed-features.rst
-@@ -872,3 +872,16 @@ The VXHS code did not compile since v2.12.0. It was removed in 5.1.
- The corresponding upstream server project is no longer maintained.
- Users are recommended to switch to an alternative distributed block
- device driver such as RBD.
-+
-+Tools
-+-----
-+
-+virtiofsd (removed in 8.0)
-+''''''''''''''''''''''''''
-+
-+There is a newer Rust implementation of ``virtiofsd`` at
-+``https://gitlab.com/virtio-fs/virtiofsd``; this has been
-+stable for some time and is now widely used.
-+The command line and feature set is very close to the removed
-+C implementation.
-+
+ /* Watch node/key unless node is empty, in which case watch key */
+ void xs_node_watch(struct xs_handle *xsh, const char *node, const char *key,
+diff --git a/include/hw/xen/xen-bus.h b/include/hw/xen/xen-bus.h
+index 713e763348..4d966a2dbb 100644
+--- a/include/hw/xen/xen-bus.h
++++ b/include/hw/xen/xen-bus.h
+@@ -94,7 +94,8 @@ void xen_device_frontend_printf(XenDevice *xendev, const char *key,
+     G_GNUC_PRINTF(3, 4);
+ 
+ int xen_device_frontend_scanf(XenDevice *xendev, const char *key,
+-                              const char *fmt, ...);
++                              const char *fmt, ...)
++    G_GNUC_SCANF(3, 4);
+ 
+ void xen_device_set_max_grant_refs(XenDevice *xendev, unsigned int nr_refs,
+                                    Error **errp);
 -- 
-2.39.1
+2.38.1
 

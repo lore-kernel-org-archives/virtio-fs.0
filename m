@@ -1,16 +1,11 @@
-Return-Path: <hreitz@redhat.com>
-Message-ID: <ec3a9cf9-1e43-f91a-b64d-9bd57b93fc16@redhat.com>
-Date: Tue, 7 Feb 2023 10:35:30 +0100
+Return-Path: <berrange@redhat.com>
+From: =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>
+Date: Mon, 19 Dec 2022 08:01:59 -0500
+Message-Id: <20221219130205.687815-1-berrange@redhat.com>
 MIME-Version: 1.0
-References: <fb523956-7a8c-608b-6db1-961686b73e9c@redhat.com>
- <CAJSP0QWnq6av7j6x_n-C2mLSPMYBhMeEthr6ayPN-cmsEB3UnA@mail.gmail.com>
- <87mt5qv76d.fsf@secure.mitica>
-From: Hanna Czenczek <hreitz@redhat.com>
-In-Reply-To: <87mt5qv76d.fsf@secure.mitica>
-Content-Language: en-US
-Content-Type: text/plain; charset="utf-8"; format="flowed"
+Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] vhost-user (virtio-fs) migration: back end state
+Subject: [Virtio-fs] [PATCH 0/6] enforce use of G_GNUC_PRINTF annotations
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,71 +14,64 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: quintela@redhat.com, Stefan Hajnoczi <stefanha@gmail.com>
-Cc: Stefan Hajnoczi <stefanha@redhat.com>, virtio-fs-list <virtio-fs@redhat.com>, "qemu-devel@nongnu.org" <qemu-devel@nongnu.org>, =?UTF-8?Q?Marc-Andr=c3=a9_Lureau?= <marcandre.lureau@redhat.com>, =?UTF-8?Q?Eugenio_P=c3=a9rez?= <eperezma@redhat.com>, Jason Wang <jasowang@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Dave Gilbert <dgilbert@redhat.com>
+To: qemu-devel@nongnu.org
+Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, qemu-ppc@nongnu.org, xen-devel@lists.xenproject.org, Laurent Vivier <lvivier@redhat.com>, Markus Armbruster <armbru@redhat.com>, Daniel Henrique Barboza <danielhb413@gmail.com>, virtio-fs@redhat.com, Michael Roth <michael.roth@amd.com>, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, qemu-block@nongnu.org, Peter Maydell <peter.maydell@linaro.org>, qemu-arm@nongnu.org, Paul Durrant <paul@xen.org>, Anthony Perard <anthony.perard@citrix.com>, David Gibson <david@gibson.dropbear.id.au>, =?UTF-8?q?C=C3=A9dric=20Le=20Goater?= <clg@kaod.org>, John Snow <jsnow@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Stefano Stabellini <sstabellini@kernel.org>, Gerd Hoffmann <kraxel@redhat.com>, Greg Kurz <groug@kaod.org>, Thomas Huth <thuth@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>
 
-On 06.02.23 22:02, Juan Quintela wrote:
-> Stefan Hajnoczi <stefanha@gmail.com> wrote:
->> On Mon, 6 Feb 2023 at 07:36, Hanna Czenczek <hreitz@redhat.com> wrote:
->>> Hi Stefan,
->>>
->>> For true virtio-fs migration, we need to migrate the daemon’s (back
->>> end’s) state somehow.  I’m addressing you because you had a talk on this
->>> topic at KVM Forum 2021. :)
->>>
->>> As far as I understood your talk, the only standardized way to migrate a
->>> vhost-user back end’s state is via dbus-vmstate.  I believe that
->>> interface is unsuitable for our use case, because we will need to
->>> migrate more than 1 MB of state.  Now, that 1 MB limit has supposedly
->>> been chosen arbitrarily, but the introducing commit’s message says that
->>> it’s based on the idea that the data must be supplied basically
->>> immediately anyway (due to both dbus and qemu migration requirements),
->>> and I don’t think we can meet that requirement.
->> Yes, dbus-vmstate is the available today. It's independent of
->> vhost-user and VIRTIO.
-> Once that we are here:
-> - typical size of your starte (either vhost-user or whatever)
+We've been very gradually adding G_GNUC_PRINTF annotations
+to functions over years. This has been useful in detecting
+certain malformed printf strings, or cases where we pass
+user data as the printf format which is a potential security
+flaw.
 
-Difficult to say, completely depends on the use case.  When identifying 
-files by path and organizing them in a tree structure, probably ~48 
-bytes per indexed file, plus, say, 16 bytes per open file.
+Given the inherant memory corruption danger in use of format
+strings vs mis-matched variadic arguments, it is worth applying
+G_GNUC_PRINTF to all functions using printf, even if we know
+they are safe.
 
-So for a small shared filesystem, the state can be very small, but we’ll 
-also have to prepare for cases where it is in the range of several MB.
+The compilers can reasonably reliably identify such places
+with the -Wsuggest-attribute=format / -Wmissing-format-attribute
+flags.
 
-The main problem isn’t size but that (when identifying files by path) 
-we’ll probably want to construct the paths when migrating, which won’t 
-be done instantaneously.
+This series adds G_GNUC_PRINTF / G_GNUC_SCANF to allow the code
+locations that the compilers highlight. Then it adds the above
+warning flags to the build flags, to catch any future additions
+of functions that take printf/scanf format strings.
 
-> - what are the posibilities that you can enter the iterative stage
->    negotiation (i.e. that you can create a dirty bitmap about your state)
+Daniel P. Berrangé (6):
+  disas: add G_GNUC_PRINTF to gstring_printf
+  hw/xen: use G_GNUC_PRINTF/SCANF for various functions
+  tools/virtiofsd: add G_GNUC_PRINTF for logging functions
+  util/error: add G_GNUC_PRINTF for various functions
+  tests: add G_GNUC_PRINTF for various functions
+  enforce use of G_GNUC_PRINTF attributes
 
-Very good.  We should know when parts of the state (information about a 
-specific indexed or open file) changes.  (Exceptions apply, but they 
-mostly come down to whether indexed files are identified by path or file 
-handle, which is a choice the user will probably need to make.  Either 
-one comes with caveats.)
+ configure                         |  2 ++
+ disas.c                           |  1 +
+ hw/xen/xen-bus.c                  |  1 +
+ hw/xen/xen_pvdev.c                |  1 +
+ include/hw/xen/xen-bus-helper.h   |  6 ++++--
+ include/hw/xen/xen-bus.h          |  3 ++-
+ tests/qtest/ahci-test.c           |  3 +++
+ tests/qtest/arm-cpu-features.c    |  1 +
+ tests/qtest/erst-test.c           |  2 +-
+ tests/qtest/ide-test.c            |  3 ++-
+ tests/qtest/ivshmem-test.c        |  4 ++--
+ tests/qtest/libqmp.c              |  2 +-
+ tests/qtest/libqos/libqos-pc.h    |  6 ++++--
+ tests/qtest/libqos/libqos-spapr.h |  6 ++++--
+ tests/qtest/libqos/libqos.h       |  6 ++++--
+ tests/qtest/libqos/virtio-9p.c    |  1 +
+ tests/qtest/migration-helpers.h   |  1 +
+ tests/qtest/rtas-test.c           |  2 +-
+ tests/qtest/usb-hcd-uhci-test.c   |  4 ++--
+ tests/unit/test-qmp-cmds.c        | 13 +++++++++----
+ tools/virtiofsd/fuse_log.c        |  1 +
+ tools/virtiofsd/fuse_log.h        |  6 ++++--
+ tools/virtiofsd/passthrough_ll.c  |  1 +
+ util/error-report.c               |  1 +
+ util/error.c                      |  1 +
+ 25 files changed, 55 insertions(+), 23 deletions(-)
 
-[...]
-
->>> Of course, we could use a channel that completely bypasses qemu, but I
->>> think we’d like to avoid that if possible.  First, this would require
->>> adding functionality to virtiofsd to configure this channel.  Second,
->>> not storing the state in the central VM state means that migrating to
->>> file doesn’t work (well, we could migrate to a dedicated state file,
->>> but...).
-> How much is migration to file used in practice?
-> I would like to have some information here.
-> It could be necessary probably to be able to encrypt it.  And that is a
-> (different) whole can of worms.
-
-I don’t think virtio-fs state needs to be encrypted any more than any 
-other state.  It’ll basically just map FUSE inode IDs to a file in the 
-shared directory, either via path or file handle; and then also track 
-open(2) flags for opened files.  (At least that’s what’s currently on my 
-radar.)  That information should actually be replicated in the guest, 
-too (because it too will have mapped the filesystem paths to FUSE inode 
-IDs), so isn’t more security relevant than guest memory.
-
-Hanna
+-- 
+2.38.1
 

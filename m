@@ -1,13 +1,14 @@
-Return-Path: <quintela@redhat.com>
-From: Juan Quintela <quintela@redhat.com>
-Date: Mon,  5 Dec 2022 10:52:24 +0100
-Message-Id: <20221205095228.1314-48-quintela@redhat.com>
-In-Reply-To: <20221205095228.1314-1-quintela@redhat.com>
-References: <20221205095228.1314-1-quintela@redhat.com>
+Return-Path: <berrange@redhat.com>
+From: =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>
+Date: Mon, 19 Dec 2022 08:02:04 -0500
+Message-Id: <20221219130205.687815-6-berrange@redhat.com>
+In-Reply-To: <20221219130205.687815-1-berrange@redhat.com>
+References: <20221219130205.687815-1-berrange@redhat.com>
 MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Subject: [Virtio-fs] [PATCH v2 47/51] migration: Remove res_compatible
- parameter
+Subject: [Virtio-fs] [PATCH 5/6] tests: add G_GNUC_PRINTF for various
+ functions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -17,288 +18,300 @@ List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
 To: qemu-devel@nongnu.org
-Cc: Fam Zheng <fam@euphon.net>, Thomas Huth <huth@tuxfamily.org>, Viresh Kumar <viresh.kumar@linaro.org>, Kevin Wolf <kwolf@redhat.com>, Mathieu Poirier <mathieu.poirier@linaro.org>, Laurent Vivier <laurent@vivier.eu>, Eric Blake <eblake@redhat.com>, Richard Henderson <richard.henderson@linaro.org>, Raphael Norwitz <raphael.norwitz@nutanix.com>, Stefan Hajnoczi <stefanha@redhat.com>, Juan Quintela <quintela@redhat.com>, virtio-fs@redhat.com, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, Christian Borntraeger <borntraeger@linux.ibm.com>, "Gonglei (Arei)" <arei.gonglei@huawei.com>, qemu-block@nongnu.org, Xiaojuan Yang <yangxiaojuan@loongson.cn>, Thomas Huth <thuth@redhat.com>, Ilya Leoshkevich <iii@linux.ibm.com>, Eduardo Habkost <eduardo@habkost.net>, Gerd Hoffmann <kraxel@redhat.com>, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, Alex Williamson <alex.williamson@redhat.com>, Eric Farman <farman@linux.ibm.com>, Halil Pasic <pasic@linux.ibm.com>, Peter Maydell <peter.maydell@linaro.org>, Vladimir Sementsov-Ogievskiy <vsementsov@yandex-team.ru>, Jason Wang <jasowang@redhat.com>, Laurent Vivier <lvivier@redhat.com>, Song Gao <gaosong@loongson.cn>, qemu-s390x@nongnu.org, Pavel Dovgalyuk <pavel.dovgaluk@ispras.ru>, Klaus Jensen <its@irrelevant.dk>, John Snow <jsnow@redhat.com>, Michael Tokarev <mjt@tls.msk.ru>, qemu-arm@nongnu.org, Paolo Bonzini <pbonzini@redhat.com>, "Michael S. Tsirkin" <mst@redhat.com>, Keith Busch <kbusch@kernel.org>, David Hildenbrand <david@redhat.com>, qemu-trivial@nongnu.org, Hanna Reitz <hreitz@redhat.com>
+Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, qemu-ppc@nongnu.org, xen-devel@lists.xenproject.org, Laurent Vivier <lvivier@redhat.com>, Markus Armbruster <armbru@redhat.com>, Daniel Henrique Barboza <danielhb413@gmail.com>, virtio-fs@redhat.com, Michael Roth <michael.roth@amd.com>, =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>, qemu-block@nongnu.org, Peter Maydell <peter.maydell@linaro.org>, qemu-arm@nongnu.org, Paul Durrant <paul@xen.org>, Anthony Perard <anthony.perard@citrix.com>, David Gibson <david@gibson.dropbear.id.au>, =?UTF-8?q?C=C3=A9dric=20Le=20Goater?= <clg@kaod.org>, John Snow <jsnow@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Stefano Stabellini <sstabellini@kernel.org>, Gerd Hoffmann <kraxel@redhat.com>, Greg Kurz <groug@kaod.org>, Thomas Huth <thuth@redhat.com>, =?UTF-8?q?Daniel=20P=2E=20Berrang=C3=A9?= <berrange@redhat.com>
 
-It was only used for RAM, and in that case, it means that this amount
-of data was sent for memory.  Just delete the field in all callers.
-
-Signed-off-by: Juan Quintela <quintela@redhat.com>
+Signed-off-by: Daniel P. Berrangé <berrange@redhat.com>
 ---
- include/migration/register.h   | 20 ++++++++++----------
- migration/savevm.h             |  4 +---
- hw/s390x/s390-stattrib.c       |  6 ++----
- hw/vfio/migration.c            | 10 ++++------
- migration/block-dirty-bitmap.c |  7 +++----
- migration/block.c              |  7 +++----
- migration/migration.c          |  9 ++++-----
- migration/ram.c                |  8 +++-----
- migration/savevm.c             | 14 +++++---------
- hw/vfio/trace-events           |  2 +-
- migration/trace-events         |  2 +-
- 11 files changed, 37 insertions(+), 52 deletions(-)
+ tests/qtest/ahci-test.c           |  3 +++
+ tests/qtest/arm-cpu-features.c    |  1 +
+ tests/qtest/erst-test.c           |  2 +-
+ tests/qtest/ide-test.c            |  3 ++-
+ tests/qtest/ivshmem-test.c        |  4 ++--
+ tests/qtest/libqmp.c              |  2 +-
+ tests/qtest/libqos/libqos-pc.h    |  6 ++++--
+ tests/qtest/libqos/libqos-spapr.h |  6 ++++--
+ tests/qtest/libqos/libqos.h       |  6 ++++--
+ tests/qtest/libqos/virtio-9p.c    |  1 +
+ tests/qtest/migration-helpers.h   |  1 +
+ tests/qtest/rtas-test.c           |  2 +-
+ tests/qtest/usb-hcd-uhci-test.c   |  4 ++--
+ tests/unit/test-qmp-cmds.c        | 13 +++++++++----
+ 14 files changed, 36 insertions(+), 18 deletions(-)
 
-diff --git a/include/migration/register.h b/include/migration/register.h
-index c1dcff0f90..1950fee6a8 100644
---- a/include/migration/register.h
-+++ b/include/migration/register.h
-@@ -48,18 +48,18 @@ typedef struct SaveVMHandlers {
-     int (*save_setup)(QEMUFile *f, void *opaque);
-     void (*save_live_pending)(QEMUFile *f, void *opaque,
-                               uint64_t threshold_size,
--                              uint64_t *res_precopy_only,
--                              uint64_t *res_compatible,
--                              uint64_t *res_postcopy_only);
-+                              uint64_t *rest_precopy,
-+                              uint64_t *rest_postcopy);
-     /* Note for save_live_pending:
--     * - res_precopy_only is for data which must be migrated in precopy phase
--     *     or in stopped state, in other words - before target vm start
--     * - res_compatible is for data which may be migrated in any phase
--     * - res_postcopy_only is for data which must be migrated in postcopy phase
--     *     or in stopped state, in other words - after source vm stop
-+     * - res_precopy is for data which must be migrated in precopy
-+     *     phase or in stopped state, in other words - before target
-+     *     vm start
-+     * - res_postcopy is for data which must be migrated in postcopy
-+     *     phase or in stopped state, in other words - after source vm
-+     *     stop
-      *
--     * Sum of res_postcopy_only, res_compatible and res_postcopy_only is the
--     * whole amount of pending data.
-+     * Sum of res_precopy and res_postcopy is the whole amount of
-+     * pending data.
-      */
- 
- 
-diff --git a/migration/savevm.h b/migration/savevm.h
-index 6461342cb4..9bd55c336c 100644
---- a/migration/savevm.h
-+++ b/migration/savevm.h
-@@ -41,9 +41,7 @@ void qemu_savevm_state_complete_postcopy(QEMUFile *f);
- int qemu_savevm_state_complete_precopy(QEMUFile *f, bool iterable_only,
-                                        bool inactivate_disks);
- void qemu_savevm_state_pending(QEMUFile *f, uint64_t max_size,
--                               uint64_t *res_precopy_only,
--                               uint64_t *res_compatible,
--                               uint64_t *res_postcopy_only);
-+                               uint64_t *res_precopy, uint64_t *res_postcopy);
- void qemu_savevm_send_ping(QEMUFile *f, uint32_t value);
- void qemu_savevm_send_open_return_path(QEMUFile *f);
- int qemu_savevm_send_packaged(QEMUFile *f, const uint8_t *buf, size_t len);
-diff --git a/hw/s390x/s390-stattrib.c b/hw/s390x/s390-stattrib.c
-index 9eda1c3b2a..ee60b53da4 100644
---- a/hw/s390x/s390-stattrib.c
-+++ b/hw/s390x/s390-stattrib.c
-@@ -183,16 +183,14 @@ static int cmma_save_setup(QEMUFile *f, void *opaque)
- }
- 
- static void cmma_save_pending(QEMUFile *f, void *opaque, uint64_t max_size,
--                              uint64_t *res_precopy_only,
--                              uint64_t *res_compatible,
--                              uint64_t *res_postcopy_only)
-+                              uint64_t *res_precopy, uint64_t *res_postcopy)
- {
-     S390StAttribState *sas = S390_STATTRIB(opaque);
-     S390StAttribClass *sac = S390_STATTRIB_GET_CLASS(sas);
-     long long res = sac->get_dirtycount(sas);
- 
-     if (res >= 0) {
--        *res_precopy_only += res;
-+        *res_precopy += res;
-     }
- }
- 
-diff --git a/hw/vfio/migration.c b/hw/vfio/migration.c
-index c74453e0b5..d03681678d 100644
---- a/hw/vfio/migration.c
-+++ b/hw/vfio/migration.c
-@@ -458,9 +458,8 @@ static void vfio_save_cleanup(void *opaque)
- 
- static void vfio_save_pending(QEMUFile *f, void *opaque,
-                               uint64_t threshold_size,
--                              uint64_t *res_precopy_only,
--                              uint64_t *res_compatible,
--                              uint64_t *res_postcopy_only)
-+                              uint64_t *res_precopy,
-+                              uint64_t *res_postcopy)
- {
-     VFIODevice *vbasedev = opaque;
-     VFIOMigration *migration = vbasedev->migration;
-@@ -471,10 +470,9 @@ static void vfio_save_pending(QEMUFile *f, void *opaque,
-         return;
-     }
- 
--    *res_precopy_only += migration->pending_bytes;
-+    *res_precopy += migration->pending_bytes;
- 
--    trace_vfio_save_pending(vbasedev->name, *res_precopy_only,
--                            *res_postcopy_only, *res_compatible);
-+    trace_vfio_save_pending(vbasedev->name, *res_precopy, *res_postcopy);
- }
- 
- static int vfio_save_iterate(QEMUFile *f, void *opaque)
-diff --git a/migration/block-dirty-bitmap.c b/migration/block-dirty-bitmap.c
-index 9aba7d9c22..dfea546330 100644
---- a/migration/block-dirty-bitmap.c
-+++ b/migration/block-dirty-bitmap.c
-@@ -763,9 +763,8 @@ static int dirty_bitmap_save_complete(QEMUFile *f, void *opaque)
- 
- static void dirty_bitmap_save_pending(QEMUFile *f, void *opaque,
-                                       uint64_t max_size,
--                                      uint64_t *res_precopy_only,
--                                      uint64_t *res_compatible,
--                                      uint64_t *res_postcopy_only)
-+                                      uint64_t *res_precopy,
-+                                      uint64_t *res_postcopy)
- {
-     DBMSaveState *s = &((DBMState *)opaque)->save;
-     SaveBitmapState *dbms;
-@@ -785,7 +784,7 @@ static void dirty_bitmap_save_pending(QEMUFile *f, void *opaque,
- 
-     trace_dirty_bitmap_save_pending(pending, max_size);
- 
--    *res_postcopy_only += pending;
-+    *res_postcopy += pending;
- }
- 
- /* First occurrence of this bitmap. It should be created if doesn't exist */
-diff --git a/migration/block.c b/migration/block.c
-index 4347da1526..593754c38c 100644
---- a/migration/block.c
-+++ b/migration/block.c
-@@ -863,9 +863,8 @@ static int block_save_complete(QEMUFile *f, void *opaque)
- }
- 
- static void block_save_pending(QEMUFile *f, void *opaque, uint64_t max_size,
--                               uint64_t *res_precopy_only,
--                               uint64_t *res_compatible,
--                               uint64_t *res_postcopy_only)
-+                               uint64_t *res_precopy,
-+                               uint64_t *res_postcopy)
- {
-     /* Estimate pending number of bytes to send */
-     uint64_t pending;
-@@ -886,7 +885,7 @@ static void block_save_pending(QEMUFile *f, void *opaque, uint64_t max_size,
- 
-     trace_migration_block_save_pending(pending);
-     /* We don't do postcopy */
--    *res_precopy_only += pending;
-+    *res_precopy += pending;
- }
- 
- static int block_load(QEMUFile *f, void *opaque, int version_id)
-diff --git a/migration/migration.c b/migration/migration.c
-index c3490c495d..6b8a6dd74e 100644
---- a/migration/migration.c
-+++ b/migration/migration.c
-@@ -3756,15 +3756,14 @@ typedef enum {
+diff --git a/tests/qtest/ahci-test.c b/tests/qtest/ahci-test.c
+index 66652fed04..1967cd5898 100644
+--- a/tests/qtest/ahci-test.c
++++ b/tests/qtest/ahci-test.c
+@@ -154,6 +154,7 @@ static void ahci_migrate(AHCIQState *from, AHCIQState *to, const char *uri)
+ /**
+  * Start a Q35 machine and bookmark a handle to the AHCI device.
   */
- static MigIterateState migration_iteration_run(MigrationState *s)
++G_GNUC_PRINTF(1, 0)
+ static AHCIQState *ahci_vboot(const char *cli, va_list ap)
  {
--    uint64_t pending_size, pend_pre, pend_compat, pend_post;
-+    uint64_t pending_size, pend_pre, pend_post;
-     bool in_postcopy = s->state == MIGRATION_STATUS_POSTCOPY_ACTIVE;
- 
-     qemu_savevm_state_pending(s->to_dst_file, s->threshold_size, &pend_pre,
--                              &pend_compat, &pend_post);
--    pending_size = pend_pre + pend_compat + pend_post;
-+                              &pend_post);
-+    pending_size = pend_pre + pend_post;
- 
--    trace_migrate_pending(pending_size, s->threshold_size,
--                          pend_pre, pend_compat, pend_post);
-+    trace_migrate_pending(pending_size, s->threshold_size, pend_pre, pend_post);
- 
-     if (pending_size && pending_size >= s->threshold_size) {
-         /* Still a significant amount to transfer */
-diff --git a/migration/ram.c b/migration/ram.c
-index 334309f1c6..640839dcee 100644
---- a/migration/ram.c
-+++ b/migration/ram.c
-@@ -3393,9 +3393,7 @@ static int ram_save_complete(QEMUFile *f, void *opaque)
+     AHCIQState *s;
+@@ -171,6 +172,7 @@ static AHCIQState *ahci_vboot(const char *cli, va_list ap)
+ /**
+  * Start a Q35 machine and bookmark a handle to the AHCI device.
+  */
++G_GNUC_PRINTF(1, 2)
+ static AHCIQState *ahci_boot(const char *cli, ...)
+ {
+     AHCIQState *s;
+@@ -209,6 +211,7 @@ static void ahci_shutdown(AHCIQState *ahci)
+  * Boot and fully enable the HBA device.
+  * @see ahci_boot, ahci_pci_enable and ahci_hba_enable.
+  */
++G_GNUC_PRINTF(1, 2)
+ static AHCIQState *ahci_boot_and_enable(const char *cli, ...)
+ {
+     AHCIQState *ahci;
+diff --git a/tests/qtest/arm-cpu-features.c b/tests/qtest/arm-cpu-features.c
+index 5a14527386..8691802950 100644
+--- a/tests/qtest/arm-cpu-features.c
++++ b/tests/qtest/arm-cpu-features.c
+@@ -32,6 +32,7 @@ static QDict *do_query_no_props(QTestState *qts, const char *cpu_type)
+                           QUERY_TAIL, cpu_type);
  }
  
- static void ram_save_pending(QEMUFile *f, void *opaque, uint64_t max_size,
--                             uint64_t *res_precopy_only,
--                             uint64_t *res_compatible,
--                             uint64_t *res_postcopy_only)
-+                             uint64_t *res_precopy, uint64_t *res_postcopy)
++G_GNUC_PRINTF(3, 4)
+ static QDict *do_query(QTestState *qts, const char *cpu_type,
+                        const char *fmt, ...)
  {
-     RAMState **temp = opaque;
-     RAMState *rs = *temp;
-@@ -3415,9 +3413,9 @@ static void ram_save_pending(QEMUFile *f, void *opaque, uint64_t max_size,
+diff --git a/tests/qtest/erst-test.c b/tests/qtest/erst-test.c
+index 974e8bcfe5..c45bee7f05 100644
+--- a/tests/qtest/erst-test.c
++++ b/tests/qtest/erst-test.c
+@@ -98,7 +98,7 @@ static void setup_vm_cmd(ERSTState *s, const char *cmd)
+     const char *arch = qtest_get_arch();
  
-     if (migrate_postcopy_ram()) {
-         /* We can do postcopy, and all the data is postcopiable */
--        *res_compatible += remaining_size;
-+        *res_postcopy += remaining_size;
+     if (strcmp(arch, "i386") == 0 || strcmp(arch, "x86_64") == 0) {
+-        s->qs = qtest_pc_boot(cmd);
++        s->qs = qtest_pc_boot("%s", cmd);
      } else {
--        *res_precopy_only += remaining_size;
-+        *res_precopy += remaining_size;
-     }
- }
+         g_printerr("erst-test tests are only available on x86\n");
+         exit(EXIT_FAILURE);
+diff --git a/tests/qtest/ide-test.c b/tests/qtest/ide-test.c
+index dbe1563b23..dcb050bf9b 100644
+--- a/tests/qtest/ide-test.c
++++ b/tests/qtest/ide-test.c
+@@ -125,6 +125,7 @@ static QGuestAllocator guest_malloc;
+ static char *tmp_path[2];
+ static char *debug_path;
  
-diff --git a/migration/savevm.c b/migration/savevm.c
-index a0cdb714f7..4d02887f25 100644
---- a/migration/savevm.c
-+++ b/migration/savevm.c
-@@ -1472,16 +1472,13 @@ flush:
-  * for units that can't do postcopy.
-  */
- void qemu_savevm_state_pending(QEMUFile *f, uint64_t threshold_size,
--                               uint64_t *res_precopy_only,
--                               uint64_t *res_compatible,
--                               uint64_t *res_postcopy_only)
-+                               uint64_t *res_precopy,
-+                               uint64_t *res_postcopy)
++G_GNUC_PRINTF(1, 2)
+ static QTestState *ide_test_start(const char *cmdline_fmt, ...)
  {
-     SaveStateEntry *se;
+     QTestState *qts;
+@@ -788,7 +789,7 @@ static void test_flush_nodev(void)
+     QPCIDevice *dev;
+     QPCIBar bmdma_bar, ide_bar;
  
--    *res_precopy_only = 0;
--    *res_compatible = 0;
--    *res_postcopy_only = 0;
--
-+    *res_precopy = 0;
-+    *res_postcopy = 0;
+-    qts = ide_test_start("");
++    qts = ide_test_start("%s", "");
  
-     QTAILQ_FOREACH(se, &savevm_state.handlers, entry) {
-         if (!se->ops || !se->ops->save_live_pending) {
-@@ -1493,8 +1490,7 @@ void qemu_savevm_state_pending(QEMUFile *f, uint64_t threshold_size,
-             }
-         }
-         se->ops->save_live_pending(f, se->opaque, threshold_size,
--                                   res_precopy_only, res_compatible,
--                                   res_postcopy_only);
-+                                   res_precopy, res_postcopy);
-     }
+     dev = get_pci_device(qts, &bmdma_bar, &ide_bar);
+ 
+diff --git a/tests/qtest/ivshmem-test.c b/tests/qtest/ivshmem-test.c
+index cd550c8935..9bf8e78df6 100644
+--- a/tests/qtest/ivshmem-test.c
++++ b/tests/qtest/ivshmem-test.c
+@@ -109,9 +109,9 @@ static void setup_vm_cmd(IVState *s, const char *cmd, bool msix)
+     const char *arch = qtest_get_arch();
+ 
+     if (strcmp(arch, "i386") == 0 || strcmp(arch, "x86_64") == 0) {
+-        s->qs = qtest_pc_boot(cmd);
++        s->qs = qtest_pc_boot("%s", cmd);
+     } else if (strcmp(arch, "ppc64") == 0) {
+-        s->qs = qtest_spapr_boot(cmd);
++        s->qs = qtest_spapr_boot("%s", cmd);
+     } else {
+         g_printerr("ivshmem-test tests are only available on x86 or ppc64\n");
+         exit(EXIT_FAILURE);
+diff --git a/tests/qtest/libqmp.c b/tests/qtest/libqmp.c
+index 2b08382e5d..a89cab03c3 100644
+--- a/tests/qtest/libqmp.c
++++ b/tests/qtest/libqmp.c
+@@ -134,7 +134,7 @@ static void socket_send_fds(int socket_fd, int *fds, size_t fds_num,
+  * in the case that they choose to discard all replies up until
+  * a particular EVENT is received.
+  */
+-static void
++static G_GNUC_PRINTF(4, 0) void
+ _qmp_fd_vsend_fds(int fd, int *fds, size_t fds_num,
+                   const char *fmt, va_list ap)
+ {
+diff --git a/tests/qtest/libqos/libqos-pc.h b/tests/qtest/libqos/libqos-pc.h
+index 1a9923ead4..a2e4209a49 100644
+--- a/tests/qtest/libqos/libqos-pc.h
++++ b/tests/qtest/libqos/libqos-pc.h
+@@ -3,8 +3,10 @@
+ 
+ #include "libqos.h"
+ 
+-QOSState *qtest_pc_vboot(const char *cmdline_fmt, va_list ap);
+-QOSState *qtest_pc_boot(const char *cmdline_fmt, ...);
++QOSState *qtest_pc_vboot(const char *cmdline_fmt, va_list ap)
++    G_GNUC_PRINTF(1, 0);
++QOSState *qtest_pc_boot(const char *cmdline_fmt, ...)
++    G_GNUC_PRINTF(1, 2);
+ void qtest_pc_shutdown(QOSState *qs);
+ 
+ #endif
+diff --git a/tests/qtest/libqos/libqos-spapr.h b/tests/qtest/libqos/libqos-spapr.h
+index c61338917a..e4483c14f8 100644
+--- a/tests/qtest/libqos/libqos-spapr.h
++++ b/tests/qtest/libqos/libqos-spapr.h
+@@ -3,8 +3,10 @@
+ 
+ #include "libqos.h"
+ 
+-QOSState *qtest_spapr_vboot(const char *cmdline_fmt, va_list ap);
+-QOSState *qtest_spapr_boot(const char *cmdline_fmt, ...);
++QOSState *qtest_spapr_vboot(const char *cmdline_fmt, va_list ap)
++    G_GNUC_PRINTF(1, 0);
++QOSState *qtest_spapr_boot(const char *cmdline_fmt, ...)
++    G_GNUC_PRINTF(1, 2);
+ void qtest_spapr_shutdown(QOSState *qs);
+ 
+ /* List of capabilities needed to silence warnings with TCG */
+diff --git a/tests/qtest/libqos/libqos.h b/tests/qtest/libqos/libqos.h
+index 9b4dd509f0..12d05b2365 100644
+--- a/tests/qtest/libqos/libqos.h
++++ b/tests/qtest/libqos/libqos.h
+@@ -21,8 +21,10 @@ struct QOSState {
+     QOSOps *ops;
+ };
+ 
+-QOSState *qtest_vboot(QOSOps *ops, const char *cmdline_fmt, va_list ap);
+-QOSState *qtest_boot(QOSOps *ops, const char *cmdline_fmt, ...);
++QOSState *qtest_vboot(QOSOps *ops, const char *cmdline_fmt, va_list ap)
++    G_GNUC_PRINTF(2, 0);
++QOSState *qtest_boot(QOSOps *ops, const char *cmdline_fmt, ...)
++    G_GNUC_PRINTF(2, 3);
+ void qtest_common_shutdown(QOSState *qs);
+ void qtest_shutdown(QOSState *qs);
+ bool have_qemu_img(void);
+diff --git a/tests/qtest/libqos/virtio-9p.c b/tests/qtest/libqos/virtio-9p.c
+index 7f21028256..186fcc1141 100644
+--- a/tests/qtest/libqos/virtio-9p.c
++++ b/tests/qtest/libqos/virtio-9p.c
+@@ -211,6 +211,7 @@ static void *virtio_9p_pci_create(void *pci_bus, QGuestAllocator *t_alloc,
+  *                      variable arguments of this function to this
+  *                      replacement string
+  */
++G_GNUC_PRINTF(3, 4)
+ static void regex_replace(GString *haystack, const char *pattern,
+                           const char *replace_fmt, ...)
+ {
+diff --git a/tests/qtest/migration-helpers.h b/tests/qtest/migration-helpers.h
+index db0684de48..a188b62787 100644
+--- a/tests/qtest/migration-helpers.h
++++ b/tests/qtest/migration-helpers.h
+@@ -25,6 +25,7 @@ QDict *wait_command_fd(QTestState *who, int fd, const char *command, ...);
+ G_GNUC_PRINTF(2, 3)
+ QDict *wait_command(QTestState *who, const char *command, ...);
+ 
++G_GNUC_PRINTF(2, 3)
+ QDict *qmp_command(QTestState *who, const char *command, ...);
+ 
+ G_GNUC_PRINTF(3, 4)
+diff --git a/tests/qtest/rtas-test.c b/tests/qtest/rtas-test.c
+index 50df60e5b2..1ba42b37d2 100644
+--- a/tests/qtest/rtas-test.c
++++ b/tests/qtest/rtas-test.c
+@@ -13,7 +13,7 @@ static void run_test_rtas_get_time_of_day(const char *machine)
+     uint64_t ret;
+     time_t t1, t2;
+ 
+-    qs = qtest_spapr_boot(machine);
++    qs = qtest_spapr_boot("%s", machine);
+ 
+     t1 = time(NULL);
+     ret = qrtas_get_time_of_day(qs->qts, &qs->alloc, &tm, &ns);
+diff --git a/tests/qtest/usb-hcd-uhci-test.c b/tests/qtest/usb-hcd-uhci-test.c
+index 7a117b64d9..f264d2bf73 100644
+--- a/tests/qtest/usb-hcd-uhci-test.c
++++ b/tests/qtest/usb-hcd-uhci-test.c
+@@ -72,9 +72,9 @@ int main(int argc, char **argv)
+     qtest_add_func("/uhci/pci/hotplug/usb-storage", test_usb_storage_hotplug);
+ 
+     if (strcmp(arch, "i386") == 0 || strcmp(arch, "x86_64") == 0) {
+-        qs = qtest_pc_boot(cmd);
++        qs = qtest_pc_boot("%s", cmd);
+     } else if (strcmp(arch, "ppc64") == 0) {
+-        qs = qtest_spapr_boot(cmd);
++        qs = qtest_spapr_boot("%s", cmd);
+     } else {
+         g_printerr("usb-hcd-uhci-test tests are only "
+                    "available on x86 or ppc64\n");
+diff --git a/tests/unit/test-qmp-cmds.c b/tests/unit/test-qmp-cmds.c
+index 2373cd64cb..6d52b4e5d8 100644
+--- a/tests/unit/test-qmp-cmds.c
++++ b/tests/unit/test-qmp-cmds.c
+@@ -138,6 +138,7 @@ void qmp___org_qemu_x_command(__org_qemu_x_EnumList *a,
  }
  
-diff --git a/hw/vfio/trace-events b/hw/vfio/trace-events
-index 73dffe9e00..a21cbd2a56 100644
---- a/hw/vfio/trace-events
-+++ b/hw/vfio/trace-events
-@@ -157,7 +157,7 @@ vfio_save_cleanup(const char *name) " (%s)"
- vfio_save_buffer(const char *name, uint64_t data_offset, uint64_t data_size, uint64_t pending) " (%s) Offset 0x%"PRIx64" size 0x%"PRIx64" pending 0x%"PRIx64
- vfio_update_pending(const char *name, uint64_t pending) " (%s) pending 0x%"PRIx64
- vfio_save_device_config_state(const char *name) " (%s)"
--vfio_save_pending(const char *name, uint64_t precopy, uint64_t postcopy, uint64_t compatible) " (%s) precopy 0x%"PRIx64" postcopy 0x%"PRIx64" compatible 0x%"PRIx64
-+vfio_save_pending(const char *name, uint64_t precopy, uint64_t postcopy) " (%s) precopy 0x%"PRIx64" postcopy 0x%"PRIx64
- vfio_save_iterate(const char *name, int data_size) " (%s) data_size %d"
- vfio_save_complete_precopy(const char *name) " (%s)"
- vfio_load_device_config_state(const char *name) " (%s)"
-diff --git a/migration/trace-events b/migration/trace-events
-index 57003edcbd..f2a873fd6c 100644
---- a/migration/trace-events
-+++ b/migration/trace-events
-@@ -150,7 +150,7 @@ migrate_fd_cleanup(void) ""
- migrate_fd_error(const char *error_desc) "error=%s"
- migrate_fd_cancel(void) ""
- migrate_handle_rp_req_pages(const char *rbname, size_t start, size_t len) "in %s at 0x%zx len 0x%zx"
--migrate_pending(uint64_t size, uint64_t max, uint64_t pre, uint64_t compat, uint64_t post) "pending size %" PRIu64 " max %" PRIu64 " (pre = %" PRIu64 " compat=%" PRIu64 " post=%" PRIu64 ")"
-+migrate_pending(uint64_t size, uint64_t max, uint64_t pre, uint64_t post) "pending size %" PRIu64 " max %" PRIu64 " (pre = %" PRIu64 " post=%" PRIu64 ")"
- migrate_send_rp_message(int msg_type, uint16_t len) "%d: len %d"
- migrate_send_rp_recv_bitmap(char *name, int64_t size) "block '%s' size 0x%"PRIi64
- migration_completion_file_err(void) ""
+ 
++G_GNUC_PRINTF(2, 3)
+ static QObject *do_qmp_dispatch(bool allow_oob, const char *template, ...)
+ {
+     va_list ap;
+@@ -160,6 +161,7 @@ static QObject *do_qmp_dispatch(bool allow_oob, const char *template, ...)
+     return ret;
+ }
+ 
++G_GNUC_PRINTF(3, 4)
+ static void do_qmp_dispatch_error(bool allow_oob, ErrorClass cls,
+                                   const char *template, ...)
+ {
+@@ -269,7 +271,7 @@ static void test_dispatch_cmd_io(void)
+ 
+ static void test_dispatch_cmd_deprecated(void)
+ {
+-    const char *cmd = "{ 'execute': 'test-command-features1' }";
++    #define cmd "{ 'execute': 'test-command-features1' }"
+     QDict *ret;
+ 
+     memset(&compat_policy, 0, sizeof(compat_policy));
+@@ -287,12 +289,13 @@ static void test_dispatch_cmd_deprecated(void)
+ 
+     compat_policy.deprecated_input = COMPAT_POLICY_INPUT_REJECT;
+     do_qmp_dispatch_error(false, ERROR_CLASS_COMMAND_NOT_FOUND, cmd);
++    #undef cmd
+ }
+ 
+ static void test_dispatch_cmd_arg_deprecated(void)
+ {
+-    const char *cmd = "{ 'execute': 'test-features0',"
+-        " 'arguments': { 'fs1': { 'foo': 42 } } }";
++    #define cmd "{ 'execute': 'test-features0'," \
++        " 'arguments': { 'fs1': { 'foo': 42 } } }"
+     QDict *ret;
+ 
+     memset(&compat_policy, 0, sizeof(compat_policy));
+@@ -310,11 +313,12 @@ static void test_dispatch_cmd_arg_deprecated(void)
+ 
+     compat_policy.deprecated_input = COMPAT_POLICY_INPUT_REJECT;
+     do_qmp_dispatch_error(false, ERROR_CLASS_GENERIC_ERROR, cmd);
++    #undef cmd
+ }
+ 
+ static void test_dispatch_cmd_ret_deprecated(void)
+ {
+-    const char *cmd = "{ 'execute': 'test-features0' }";
++    #define cmd "{ 'execute': 'test-features0' }"
+     QDict *ret;
+ 
+     memset(&compat_policy, 0, sizeof(compat_policy));
+@@ -334,6 +338,7 @@ static void test_dispatch_cmd_ret_deprecated(void)
+     ret = qobject_to(QDict, do_qmp_dispatch(false, cmd));
+     assert(ret && qdict_size(ret) == 0);
+     qobject_unref(ret);
++    #undef cmd
+ }
+ 
+ /* test generated dealloc functions for generated types */
 -- 
 2.38.1
 

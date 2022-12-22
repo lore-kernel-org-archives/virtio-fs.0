@@ -1,16 +1,20 @@
-Return-Path: <sw@weilnetz.de>
-Message-ID: <2d829bf0-7804-8c67-61a4-4ae8f7ddd9ca@weilnetz.de>
-Date: Mon, 19 Dec 2022 21:43:50 +0100
+Return-Path: <zbiarbaza@gmail.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
+ h=to:subject:message-id:date:from:mime-version:from:to:cc:subject
+ :date:message-id:reply-to;
+ bh=f+8F5JYjl85nZpGBaYxRnlJY5OD9UdOWWgR7uzZyqmY=;
+ b=pB1W5/X9Eyl1n6y0BvydoOAVGgzV1cIKDvKPn2K7hQniIQJmb0fZttPup8Qcuj78+p
+ hu9QlOsVth7Cx1bPLVhnPdBe2O4UmuTpSVW80UYJd+2yV8SLBqBtDH6XxFYEfeqXWf0F
+ X/E//5pwn80eHEXS07XyJCRf0QOf9SxPIiFwDWtpasMsH19mU0Ztbd8pPOJn1LHpKY2Q
+ q/fQJdhByqVn5bIiOUnULqLmPHl5SItr9TAPtJLmlcbCCRGCiHr661qe6DqkZmKQxg0v
+ XI2oP49ZMdJ0p8ouR7YkPgoVoRjBOOReGHa7gqhffgNIWeaTH3h3qnOcNzf4/+iNsW/5
+ /4CQ==
 MIME-Version: 1.0
-References: <20221219130205.687815-1-berrange@redhat.com>
- <20221219130205.687815-2-berrange@redhat.com>
-From: Stefan Weil <sw@weilnetz.de>
-In-Reply-To: <20221219130205.687815-2-berrange@redhat.com>
-Content-Type: multipart/signed; micalg=pgp-sha256;
- protocol="application/pgp-signature";
- boundary="------------0b04BHHYMlAgxOL9rhUtBaN9"
-Subject: Re: [Virtio-fs] [PATCH 1/6] disas: add G_GNUC_PRINTF to
- gstring_printf
+From: zbiarbaz arbaz <zbiarbaza@gmail.com>
+Date: Thu, 22 Dec 2022 13:02:34 +0500
+Message-ID: <CABH3=L70+Du91neqzkofzh7gRU_ew6QpmWyjdC_E1-vh-TvOmA@mail.gmail.com>
+Content-Type: multipart/alternative; boundary="00000000000045ecce05f06623c5"
+Subject: [Virtio-fs] Please check my sites
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -19,192 +23,112 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: =?UTF-8?Q?Daniel_P=2e_Berrang=c3=a9?= <berrange@redhat.com>, qemu-devel@nongnu.org
-Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, qemu-ppc@nongnu.org, xen-devel@lists.xenproject.org, Laurent Vivier <lvivier@redhat.com>, Markus Armbruster <armbru@redhat.com>, Daniel Henrique Barboza <danielhb413@gmail.com>, virtio-fs@redhat.com, Michael Roth <michael.roth@amd.com>, =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>, qemu-block@nongnu.org, Peter Maydell <peter.maydell@linaro.org>, qemu-arm@nongnu.org, Paul Durrant <paul@xen.org>, Anthony Perard <anthony.perard@citrix.com>, David Gibson <david@gibson.dropbear.id.au>, =?UTF-8?Q?C=c3=a9dric_Le_Goater?= <clg@kaod.org>, John Snow <jsnow@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Stefano Stabellini <sstabellini@kernel.org>, Gerd Hoffmann <kraxel@redhat.com>, Greg Kurz <groug@kaod.org>, Thomas Huth <thuth@redhat.com>
+To: virtio-fs@redhat.com
 
-This is an OpenPGP/MIME signed message (RFC 4880 and 3156)
---------------0b04BHHYMlAgxOL9rhUtBaN9
-Content-Type: multipart/mixed; boundary="------------yTpA0PFAROE5nCpoBfE6sOO7";
- protected-headers="v1"
-From: Stefan Weil <sw@weilnetz.de>
-To: =?UTF-8?Q?Daniel_P=2e_Berrang=c3=a9?= <berrange@redhat.com>,
- qemu-devel@nongnu.org
-Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, qemu-ppc@nongnu.org,
- xen-devel@lists.xenproject.org, Laurent Vivier <lvivier@redhat.com>,
- Markus Armbruster <armbru@redhat.com>,
- Daniel Henrique Barboza <danielhb413@gmail.com>, virtio-fs@redhat.com,
- Michael Roth <michael.roth@amd.com>, =?UTF-8?Q?Alex_Benn=c3=a9e?=
- <alex.bennee@linaro.org>, qemu-block@nongnu.org,
- Peter Maydell <peter.maydell@linaro.org>, qemu-arm@nongnu.org,
- Paul Durrant <paul@xen.org>, Anthony Perard <anthony.perard@citrix.com>,
- David Gibson <david@gibson.dropbear.id.au>, =?UTF-8?Q?C=c3=a9dric_Le_Goater?=
- <clg@kaod.org>, John Snow <jsnow@redhat.com>,
- Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>,
- Stefano Stabellini <sstabellini@kernel.org>,
- Gerd Hoffmann <kraxel@redhat.com>, Greg Kurz <groug@kaod.org>,
- Thomas Huth <thuth@redhat.com>
-Message-ID: <2d829bf0-7804-8c67-61a4-4ae8f7ddd9ca@weilnetz.de>
-Subject: Re: [PATCH 1/6] disas: add G_GNUC_PRINTF to gstring_printf
-References: <20221219130205.687815-1-berrange@redhat.com>
- <20221219130205.687815-2-berrange@redhat.com>
-In-Reply-To: <20221219130205.687815-2-berrange@redhat.com>
+--00000000000045ecce05f06623c5
+Content-Type: text/plain; charset="UTF-8"
 
---------------yTpA0PFAROE5nCpoBfE6sOO7
-Content-Type: multipart/mixed; boundary="------------AequN11irnsmEWddWGWlHvb9"
+HI.
 
---------------AequN11irnsmEWddWGWlHvb9
-Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: base64
+PLEASE CHECK MY UK  WEBSITES
 
-QW0gMTkuMTIuMjIgdW0gMTQ6MDIgc2NocmllYiBEYW5pZWwgUC4gQmVycmFuZ8OpOg0KPiBT
-aWduZWQtb2ZmLWJ5OiBEYW5pZWwgUC4gQmVycmFuZ8OpIDxiZXJyYW5nZUByZWRoYXQuY29t
-Pg0KPiAtLS0NCj4gICBkaXNhcy5jIHwgMSArDQo+ICAgMSBmaWxlIGNoYW5nZWQsIDEgaW5z
-ZXJ0aW9uKCspDQo+IA0KPiBkaWZmIC0tZ2l0IGEvZGlzYXMuYyBiL2Rpc2FzLmMNCj4gaW5k
-ZXggOTRkM2I0NTA0Mi4uMzFkZjhmNWI4OSAxMDA2NDQNCj4gLS0tIGEvZGlzYXMuYw0KPiAr
-KysgYi9kaXNhcy5jDQo+IEBAIC0yMzksNiArMjM5LDcgQEAgdm9pZCB0YXJnZXRfZGlzYXMo
-RklMRSAqb3V0LCBDUFVTdGF0ZSAqY3B1LCB0YXJnZXRfdWxvbmcgY29kZSwNCj4gICAgICAg
-fQ0KPiAgIH0NCj4gICANCj4gK0dfR05VQ19QUklOVEYoMiwgMykNCj4gICBzdGF0aWMgaW50
-IGdzdHJpbmdfcHJpbnRmKEZJTEUgKnN0cmVhbSwgY29uc3QgY2hhciAqZm10LCAuLi4pDQo+
-ICAgew0KPiAgICAgICAvKiBXZSBhYnVzZSB0aGUgRklMRSBwYXJhbWV0ZXIgdG8gcGFzcyBh
-IEdTdHJpbmcuICovDQoNClRoZSBjdXJyZW50IGNvZGUgdXNlcyBhIGRpZmZlcmVudCBwYXR0
-ZXJuOg0KDQpzdGF0aWMgUkVUVVJOX1RZUEUgR19HTlVDX1BSSU5URigyLCAzKSBmdW5jdGlv
-bihhcmd1bWVudCBsaXN0KQ0KDQpTbyBJIHdvdWxkIGhhdmUgZXhwZWN0ZWQNCg0Kc3RhdGlj
-IGludCBHX0dOVUNfUFJJTlRGKDIsIDMpDQpnc3RyaW5nX3ByaW50ZihGSUxFICpzdHJlYW0s
-IGNvbnN0IGNoYXIgKmZtdCwgLi4uKQ0KDQpEb2VzIHRoYXQgbWF0dGVyPyBEbyB3ZSBjYXJl
-IGZvciBkaWZmZXJlbnQgcGF0dGVybnM/DQoNClN0ZWZhbg0K
---------------AequN11irnsmEWddWGWlHvb9
-Content-Type: application/pgp-keys; name="OpenPGP_0xE08C21D5677450AD.asc"
-Content-Disposition: attachment; filename="OpenPGP_0xE08C21D5677450AD.asc"
-Content-Description: OpenPGP public key
+ https://greenrecord.co.uk
+<https://atsitesi.com/click?redirect=https%3A%2F%2Fgreenrecord.co.uk%2F&dID=1671696154410&linkName=https://greenrecord.co.uk>
+https://news.clickdo.co.uk/
+<https://atsitesi.com/click?redirect=https%3A%2F%2Fnews.clickdo.co.uk%2F&dID=1671696154410&linkName=https://news.clickdo.co.uk/>
+  https://www.thewatchtower.uk/
+<https://atsitesi.com/click?redirect=https%3A%2F%2Fwww.thewatchtower.uk%2F&dID=1671696154410&linkName=https://www.thewatchtower.uk/>
+   https://uktechnews.co.uk/
+<https://atsitesi.com/click?redirect=https%3A%2F%2Fuktechnews.co.uk%2F&dID=1671696154410&linkName=https://uktechnews.co.uk/>
+
+https://www.laliganews.co.uk/
+<https://atsitesi.com/click?redirect=https%3A%2F%2Fwww.laliganews.co.uk%2F&dID=1671696154410&linkName=https://www.laliganews.co.uk/>
+
+https://gamingarticles.co.uk/
+<https://atsitesi.com/click?redirect=https%3A%2F%2Fgamingarticles.co.uk%2F&dID=1671696154410&linkName=https://gamingarticles.co.uk/>
+https://technologyandgadgets.co.
+<https://atsitesi.com/click?redirect=https%3A%2F%2Ftechnologyandgadgets.co.uk%2F&dID=1671696154410&linkName=https://technologyandgadgets.co.>
+
+
+I AM WAITING FOR YOUR REPLY
+
+THANKS
+
+--00000000000045ecce05f06623c5
+Content-Type: text/html; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 
------BEGIN PGP PUBLIC KEY BLOCK-----
+<div dir=3D"ltr"><div><font size=3D"4" color=3D"#000000">HI.</font></div><d=
+iv><font size=3D"4" color=3D"#000000"><br></font></div><div><font size=3D"4=
+" color=3D"#000000">PLEASE CHECK MY UK=C2=A0 WEBSITES</font></div><div><br>=
+</div><div>=C2=A0<a href=3D"https://atsitesi.com/click?redirect=3Dhttps%3A%=
+2F%2Fgreenrecord.co.uk%2F&amp;dID=3D1671696154410&amp;linkName=3Dhttps://gr=
+eenrecord.co.uk" target=3D"_blank">https://greenrecord.co.uk</a></div><div>=
+<a rel=3D"noopener" href=3D"https://atsitesi.com/click?redirect=3Dhttps%3A%=
+2F%2Fnews.clickdo.co.uk%2F&amp;dID=3D1671696154410&amp;linkName=3Dhttps://n=
+ews.clickdo.co.uk/" target=3D"_blank" style=3D"box-sizing:inherit;font-size=
+:14px;background-color:rgba(0,0,0,0.08);font-family:-apple-system,system-ui=
+,BlinkMacSystemFont,&quot;Segoe UI&quot;,Roboto,&quot;Helvetica Neue&quot;,=
+&quot;Fira Sans&quot;,Ubuntu,Oxygen,&quot;Oxygen Sans&quot;,Cantarell,&quot=
+;Droid Sans&quot;,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;,=
+&quot;Segoe UI Emoji&quot;,&quot;Segoe UI Symbol&quot;,&quot;Lucida Grande&=
+quot;,Helvetica,Arial,sans-serif;white-space:pre-line">https://news.clickdo=
+.co.uk/</a>=C2=A0 =C2=A0<span style=3D"color:rgba(0,0,0,0.9);font-family:-a=
+pple-system,system-ui,BlinkMacSystemFont,&quot;Segoe UI&quot;,Roboto,&quot;=
+Helvetica Neue&quot;,&quot;Fira Sans&quot;,Ubuntu,Oxygen,&quot;Oxygen Sans&=
+quot;,Cantarell,&quot;Droid Sans&quot;,&quot;Apple Color Emoji&quot;,&quot;=
+Segoe UI Emoji&quot;,&quot;Segoe UI Emoji&quot;,&quot;Segoe UI Symbol&quot;=
+,&quot;Lucida Grande&quot;,Helvetica,Arial,sans-serif;font-size:14px;white-=
+space:pre-line;background-color:rgba(0,0,0,0.08)">
+</span><a rel=3D"noopener" href=3D"https://atsitesi.com/click?redirect=3Dht=
+tps%3A%2F%2Fwww.thewatchtower.uk%2F&amp;dID=3D1671696154410&amp;linkName=3D=
+https://www.thewatchtower.uk/" target=3D"_blank" style=3D"box-sizing:inheri=
+t;font-size:14px;background-color:rgba(0,0,0,0.08);font-family:-apple-syste=
+m,system-ui,BlinkMacSystemFont,&quot;Segoe UI&quot;,Roboto,&quot;Helvetica =
+Neue&quot;,&quot;Fira Sans&quot;,Ubuntu,Oxygen,&quot;Oxygen Sans&quot;,Cant=
+arell,&quot;Droid Sans&quot;,&quot;Apple Color Emoji&quot;,&quot;Segoe UI E=
+moji&quot;,&quot;Segoe UI Emoji&quot;,&quot;Segoe UI Symbol&quot;,&quot;Luc=
+ida Grande&quot;,Helvetica,Arial,sans-serif;white-space:pre-line">https://w=
+ww.thewatchtower.uk/</a>=C2=A0 =C2=A0=C2=A0<span style=3D"color:rgba(0,0,0,=
+0.9);font-family:-apple-system,system-ui,BlinkMacSystemFont,&quot;Segoe UI&=
+quot;,Roboto,&quot;Helvetica Neue&quot;,&quot;Fira Sans&quot;,Ubuntu,Oxygen=
+,&quot;Oxygen Sans&quot;,Cantarell,&quot;Droid Sans&quot;,&quot;Apple Color=
+ Emoji&quot;,&quot;Segoe UI Emoji&quot;,&quot;Segoe UI Emoji&quot;,&quot;Se=
+goe UI Symbol&quot;,&quot;Lucida Grande&quot;,Helvetica,Arial,sans-serif;fo=
+nt-size:14px;white-space:pre-line;background-color:rgba(0,0,0,0.08)">
+</span><a rel=3D"noopener" href=3D"https://atsitesi.com/click?redirect=3Dht=
+tps%3A%2F%2Fuktechnews.co.uk%2F&amp;dID=3D1671696154410&amp;linkName=3Dhttp=
+s://uktechnews.co.uk/" target=3D"_blank" style=3D"box-sizing:inherit;font-s=
+ize:14px;background-color:rgba(0,0,0,0.08);font-family:-apple-system,system=
+-ui,BlinkMacSystemFont,&quot;Segoe UI&quot;,Roboto,&quot;Helvetica Neue&quo=
+t;,&quot;Fira Sans&quot;,Ubuntu,Oxygen,&quot;Oxygen Sans&quot;,Cantarell,&q=
+uot;Droid Sans&quot;,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quo=
+t;,&quot;Segoe UI Emoji&quot;,&quot;Segoe UI Symbol&quot;,&quot;Lucida Gran=
+de&quot;,Helvetica,Arial,sans-serif;white-space:pre-line">https://uktechnew=
+s.co.uk/</a>=C2=A0 =C2=A0 =C2=A0 =C2=A0 =C2=A0</div><div><a rel=3D"noopener=
+" href=3D"https://atsitesi.com/click?redirect=3Dhttps%3A%2F%2Fwww.laliganew=
+s.co.uk%2F&amp;dID=3D1671696154410&amp;linkName=3Dhttps://www.laliganews.co=
+.uk/" target=3D"_blank" style=3D"box-sizing:inherit;font-size:14px;backgrou=
+nd-color:rgba(0,0,0,0.08);font-family:-apple-system,system-ui,BlinkMacSyste=
+mFont,&quot;Segoe UI&quot;,Roboto,&quot;Helvetica Neue&quot;,&quot;Fira San=
+s&quot;,Ubuntu,Oxygen,&quot;Oxygen Sans&quot;,Cantarell,&quot;Droid Sans&qu=
+ot;,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;,&quot;Segoe UI=
+ Emoji&quot;,&quot;Segoe UI Symbol&quot;,&quot;Lucida Grande&quot;,Helvetic=
+a,Arial,sans-serif;white-space:pre-line">https://www.laliganews.co.uk/</a>=
+=C2=A0=C2=A0</div><div><div><a href=3D"https://atsitesi.com/click?redirect=
+=3Dhttps%3A%2F%2Fgamingarticles.co.uk%2F&amp;dID=3D1671696154410&amp;linkNa=
+me=3Dhttps://gamingarticles.co.uk/" target=3D"_blank" style=3D"font-size:1r=
+em;word-spacing:1px">https://gamingarticles.co.uk/</a><br style=3D"color:rg=
+b(49,49,49);font-size:16px;word-spacing:1px"></div><div><div><a href=3D"htt=
+ps://atsitesi.com/click?redirect=3Dhttps%3A%2F%2Ftechnologyandgadgets.co.uk=
+%2F&amp;dID=3D1671696154410&amp;linkName=3Dhttps://technologyandgadgets.co.=
+" target=3D"_blank">https://technologyandgadgets.co.</a>=C2=A0=C2=A0</div><=
+/div></div><div>=C2=A0=C2=A0</div><div><div><div></div></div></div><div><fo=
+nt size=3D"4" color=3D"#000000">I AM WAITING FOR YOUR REPLY</font></div><di=
+v><font size=3D"4" color=3D"#000000"><br></font></div><div><font size=3D"4"=
+ color=3D"#000000">THANKS</font></div><br class=3D"gmail-Apple-interchange-=
+newline"><img id=3D"snvTrackImg" src=3D"https://atsitesi.com/track/16716961=
+54410.png?eId=3D2042983625" width=3D"1" height=3D"1" alt=3D""></div>
 
-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
-T7uiC0aTwAsniiln1XFlGBISNLB1HL/gUc9FJj8qmYgvUBZIzUjmm56up6er8ca9
-2tARdBylQF3E9MJ/E4dVrmTyvOlddAb/MG1Ge425mjt0dRfOx8Qc7Pxs+d3UNVSu
-Bm+WtuSgk+JNIT08c+WSXec8mE4hVdrKbAvCo9dcT5Gal2r6FSvRVY5kba3t280x
-utLSp470k3+DO+AgVigbHr3scXlJXZe1m4luqBSkEBDNH2sAQoBrNVwVaCZqZRTN
-TFN0ZWZhbiBXZWlsIChVbml2ZXJzaXTDpHRzYmlibGlvdGhlayBNYW5uaGVpbSkg
-PHN0ZWZhbi53ZWlsQHVuaS1tYW5uaGVpbS5kZT7CwY4EEwEIADgWIQRJI2/qdcld
-aY7Ct4rgjCHVZ3RQrQUCYlMdZAIbAwULCQgHAwUVCgkICwUWAgMBAAIeBQIXgAAK
-CRDgjCHVZ3RQrRo6D/9MSqnSGOjWrcsiXbUsQmNKzI1JZOuabam3P9V/rILU7K4/
-b9E6Bk5Vjo/6A4xMtC9y6L244Upn4MTdUofkBdd9dMG8eZ2oofsMGIeEmr4EFfKb
-/LoZtIUJaNfiwvd3YakEmaAfd+AWIEAVYlVSxWHeCMowTNYxbSW+/M0ExGw1BErt
-oFiz3Ti8iYNfgz2l9cwrKhQEnzZlHUq06AIbzch/nXFFcc3EBDz+J6x//DCclb6Y
-8oLJRerrOJqpcpTYrwr+UDbh8JOqiUWUQ1BrbIZb+J5rU+DghBmNAWpd6yTbxX0T
-I7g2Hu7gPdzhrLLRO+rQsDK3T+JdVQ9xyoWugFIw4YepAad5uo/2e+q38a+h57EK
-Vsy4xfAEV/Mr4hl9KCY2hkiQYMKHvN1EZp72crAiPgDZxh6wTJZ979RHY2apq8XM
-Y41uP5mwdHxFA1Al/5+syajNlTzsNdYB5Ucx5TwNU0TifM13exHw8lQZOaWbDZS4
-QYwzeFWuEFse9ESmCQX5Pggw+ABFXOtPeqEfIO8v3QbT1vFlJ57iFBUiem967/JV
-a0RQyEvAKj0T5124N8Hi1oa8TPk5oSe8id5jSgGD9twbS0HX2KcmwAF/A5MgP7hx
-0X4EfhsJtDxFDy5PnoC8ADE2wcKDsTgqfDS/EQc6OeQCKceR45wyOT0Y3kbEa87B
-TQRV3J49ARAAt9nArtjFnqmRHL0oY5KCrF5ONph6xm3rof74lZ/CTkG0zu9OhmbW
-s6MMNsHgM7lRGIcKou7vUQE8/TEXh3+0eRdCiEYXP9jYTTXosU/+y/hOY33x9Sw/
-tCEHXiz6M+rp74O1P+zqXSlmx8zzNy33dDdXUT+bF1C6Y7WEChIIjlOfLHOBeazN
-dCqDxRDM/CKeI/UWx/wm0z1DNEuD8crUXIgdxY3dBAm1bBK041+3GXP8gYLN4qew
-T1VoG35Ya3PrrTC/zMAumagjiF3/1NCAmH6eSOzw21EloDBR76K1noDGCfRM2dp0
-78rS/BO+QtlN4+UWQLkB+crHxqXWk0u+gka2A7ZBHFYky/oUVIK1/ar6swnTRHj2
-0Ga+rukzcdxQRJ2kwGeRrqLH1JO8p72ptvswMyzVPhk8sE2S9llPrbznj6fc9f5m
-y5x9i5Fh4Mt2z7u+wBSdck2wV5eThEPz7UziXgtbq74Hja7tuoQxUhcpOIBXKl8b
-MLtjxlO7VmH312VzfiBYqQku9fHg3E/Hi+uon2fJaifFbuViZqfZq9bKT/UWG0+0
-cKc2d4os+3uwGcjraUjCFSXmGU27YqiW8jeM7pIa03QoAhWIH9ApAOVBqWF6drFz
-6/oFcSl9qbY/4IneJ/eb0eyjHllegydGEuIShrXYZLiQqSX4yj/3vE8AEQEAAcLB
-XwQYAQgACQUCVdyePQIbDAAKCRDgjCHVZ3RQrWEaEACTrt0WUxL1AT6BarJ3fOPV
-ZjiioO+3LPhw98ci7afeScEK84cGv+KLgxawvOo7dbwEX6VceQvJ0LTZ1oYPuYeZ
-MjiG7Qdf9uwgk3VwHf4S9pNxsqyVxHPotN9RPWwqoH9ihmO/ml7uC3gH0SFiU/RR
-lc3c9X/u+6SbkSEUZrUrPFQKJ3dpfjnA3RCPTI3fTKr8jycA5A5A77Daba3L+MXj
-c71/tn6MZCZmK7unSfpXq4rbGrIgMWnFKMBgeRONUWRFIOm5lReEjLHiABCli8t4
-Txr2ATswA4atmC4JzP8J/WPWe2xDMvsOXu+bGgW5BSO053MQz1JyJf1ExClNTkYu
-Vlm712JFE7Xzc2cg9P796KI3CKGbytTpaTrVx3ZajqHY1xfZy3vHolR8pfGZ8xcY
-XhFtkD71/BSyqpkrPVvbGkLZOm4b/SzWCGCDYx9xBB//m25lfpZ+Du2u91pvC97Z
-6Qty5nRp9kZvAeidmSunItU0Q4jKQlFnn6ZyLhPk4mwuVSUec8dGIdda8cQRaG/J
-lpLUZi2cnhKAnGaAaLGycQ/NEMVjtN8z6ZHCe3eAa1bEPwSZAbRHuCZ+Iqh6gPzn
-K88LhGUr/vzHYKKn25QWYQ7rJi2H1cu8BQ3lQpRunkCIithJ5gwoS0ZFSEM25FdI
-hvjSVVSRyxiu/zrDuO/s6g=3D=3D
-=3DumGL
------END PGP PUBLIC KEY BLOCK-----
-
---------------AequN11irnsmEWddWGWlHvb9--
-
---------------yTpA0PFAROE5nCpoBfE6sOO7--
-
---------------0b04BHHYMlAgxOL9rhUtBaN9
-Content-Type: application/pgp-signature; name="OpenPGP_signature.asc"
-Content-Description: OpenPGP digital signature
-Content-Disposition: attachment; filename="OpenPGP_signature"
-
------BEGIN PGP SIGNATURE-----
-
-wsF5BAABCAAjFiEESSNv6nXJXWmOwreK4Iwh1Wd0UK0FAmOgzQcFAwAAAAAACgkQ4Iwh1Wd0UK2P
-Uw//RNyFVXLdC39KN7OaIzrQncTJkdpko0HYjw0AEhwDHlK5979OQh9Z7FfgiXb0u+C9J9IXXgSM
-4pFg1snv6G8o/QxI9/J9TU0FKZ+sOHK/I8mLSOXwDsHtV9kVc7yudPUur0r5Py+/5cB3P0S9fqf2
-jHT9e3mA6Mo9/9bLu4nhbMbn99Ct+nKldwr3+707k9JCeLh43+vQsz01JYOshlbUa7uKfhjrjjwD
-MbmOaDjsp9jBcIXXsvTnEUwCcrI+ZaZ4nfWxKg0foBFwelLrR+EQb2j5/UfMe00ItfNaqTMw4Enw
-PZ2Cf7AD4T3kzZcEfdMsGuR4bmAPsiSZQeasOAzDTtYOs3cTVS8NCIOLl2I5sOfJqxldDbXab3BK
-ziPJWo/mXtGfttLoJgrl9RWnWqmcg7UJd3/Ui3vcJi6jeG0z/ELgpX4Kaec7XsDGbdsP38GjZ6tZ
-9w00miHVq3JPfE2/9Hrjh/nyBrb11FoEOv4VIYsumN5rMYl1MYNelZwGT7YaVS8PEtEXlhJjJYHa
-wStt22NLJkzUvjOUQwxwQYnQvi1dm3kx4Y44/1BePHfBP4OGqypMTxd30FOzetizeEpzMEy/qDfm
-V+DkUhxNHLd3B39kYxcFhsUmPktLkxA3ixdHDEdhWH3PsF0rAjnxbkJ6x0B1mI7B7ZawRdV0Vpwh
-xC8=
-=cSlU
------END PGP SIGNATURE-----
-
---------------0b04BHHYMlAgxOL9rhUtBaN9--
+--00000000000045ecce05f06623c5--
 

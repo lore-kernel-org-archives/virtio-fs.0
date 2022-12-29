@@ -1,16 +1,16 @@
 Return-Path: <thuth@redhat.com>
-Message-ID: <20f8ff01-8240-5c53-99ad-c75d37f6639c@redhat.com>
-Date: Thu, 29 Dec 2022 10:29:02 +0100
+Message-ID: <27da4d93-38e6-1c40-4a60-92f3343f380f@redhat.com>
+Date: Thu, 29 Dec 2022 10:34:55 +0100
 MIME-Version: 1.0
 References: <20221219130205.687815-1-berrange@redhat.com>
- <20221219130205.687815-5-berrange@redhat.com>
+ <20221219130205.687815-6-berrange@redhat.com>
 From: Thomas Huth <thuth@redhat.com>
-In-Reply-To: <20221219130205.687815-5-berrange@redhat.com>
+In-Reply-To: <20221219130205.687815-6-berrange@redhat.com>
 Content-Language: en-US
 Content-Type: text/plain; charset="utf-8"; format="flowed"
 Content-Transfer-Encoding: 8bit
-Subject: Re: [Virtio-fs] [PATCH 4/6] util/error: add G_GNUC_PRINTF for
- various functions
+Subject: Re: [Virtio-fs] [PATCH 5/6] tests: add G_GNUC_PRINTF for various
+ functions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,34 +25,51 @@ Cc: "Dr. David Alan Gilbert" <dgilbert@redhat.com>, qemu-ppc@nongnu.org, xen-dev
 On 19/12/2022 14.02, Daniel P. Berrangé wrote:
 > Signed-off-by: Daniel P. Berrangé <berrange@redhat.com>
 > ---
->   util/error-report.c | 1 +
->   util/error.c        | 1 +
->   2 files changed, 2 insertions(+)
-> 
-> diff --git a/util/error-report.c b/util/error-report.c
-> index 5edb2e6040..6e44a55732 100644
-> --- a/util/error-report.c
-> +++ b/util/error-report.c
-> @@ -193,6 +193,7 @@ real_time_iso8601(void)
->    * a single phrase, with no newline or trailing punctuation.
->    * Prepend the current location and append a newline.
->    */
-> +G_GNUC_PRINTF(2, 0)
->   static void vreport(report_type type, const char *fmt, va_list ap)
->   {
->       gchar *timestr;
-> diff --git a/util/error.c b/util/error.c
-> index b6c89d1412..1e7af665b8 100644
-> --- a/util/error.c
-> +++ b/util/error.c
-> @@ -45,6 +45,7 @@ static void error_handle_fatal(Error **errp, Error *err)
->       }
+>   tests/qtest/ahci-test.c           |  3 +++
+>   tests/qtest/arm-cpu-features.c    |  1 +
+>   tests/qtest/erst-test.c           |  2 +-
+>   tests/qtest/ide-test.c            |  3 ++-
+>   tests/qtest/ivshmem-test.c        |  4 ++--
+>   tests/qtest/libqmp.c              |  2 +-
+>   tests/qtest/libqos/libqos-pc.h    |  6 ++++--
+>   tests/qtest/libqos/libqos-spapr.h |  6 ++++--
+>   tests/qtest/libqos/libqos.h       |  6 ++++--
+>   tests/qtest/libqos/virtio-9p.c    |  1 +
+>   tests/qtest/migration-helpers.h   |  1 +
+>   tests/qtest/rtas-test.c           |  2 +-
+>   tests/qtest/usb-hcd-uhci-test.c   |  4 ++--
+>   tests/unit/test-qmp-cmds.c        | 13 +++++++++----
+>   14 files changed, 36 insertions(+), 18 deletions(-)
+...
+> diff --git a/tests/unit/test-qmp-cmds.c b/tests/unit/test-qmp-cmds.c
+> index 2373cd64cb..6d52b4e5d8 100644
+> --- a/tests/unit/test-qmp-cmds.c
+> +++ b/tests/unit/test-qmp-cmds.c
+> @@ -138,6 +138,7 @@ void qmp___org_qemu_x_command(__org_qemu_x_EnumList *a,
 >   }
 >   
-> +G_GNUC_PRINTF(6, 0)
->   static void error_setv(Error **errp,
->                          const char *src, int line, const char *func,
->                          ErrorClass err_class, const char *fmt, va_list ap,
+>   
+> +G_GNUC_PRINTF(2, 3)
+>   static QObject *do_qmp_dispatch(bool allow_oob, const char *template, ...)
+>   {
+>       va_list ap;
+> @@ -160,6 +161,7 @@ static QObject *do_qmp_dispatch(bool allow_oob, const char *template, ...)
+>       return ret;
+>   }
+>   
+> +G_GNUC_PRINTF(3, 4)
+>   static void do_qmp_dispatch_error(bool allow_oob, ErrorClass cls,
+>                                     const char *template, ...)
+>   {
+> @@ -269,7 +271,7 @@ static void test_dispatch_cmd_io(void)
+>   
+>   static void test_dispatch_cmd_deprecated(void)
+>   {
+> -    const char *cmd = "{ 'execute': 'test-command-features1' }";
+> +    #define cmd "{ 'execute': 'test-command-features1' }"
+>       QDict *ret;
 
-Reviewed-by: Thomas Huth <thuth@redhat.com>
+That looks weird, why is this required?
+
+  Thomas
 

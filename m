@@ -1,22 +1,18 @@
-Return-Path: <dianedyer600@gmail.com>
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20210112;
- h=content-language:thread-index:mime-version:message-id:date:subject
- :to:from:from:to:cc:subject:date:message-id:reply-to;
- bh=MZ80LJtgwoT4wrrJXY8kpzbcPJIbEBnw/pA3yIZtle4=;
- b=CDWFeHlRKjQpyD7pGx7z/Z89BHyNDJAjmXy4HsJc6EbWl7zGFTFs6pAmlGaxwVfD3E
- Nve1sxh0TasOXDsyhBisGAOqs5eXgDAaQpMiLRPbkL/A7RssvXRuZ0Mk8ffo5tzU//dk
- s0WWf431ARcAcSEY6HVkwryBYncX5Z5YuSF7uwEVuIoxkQSgdBNNuwfSw7Y5aDUoLkBY
- EC2PDY4cQOoCM+g/jK9oMaTRm3Hji64YI7zPsS9+FvkbyPd7QvCZngJaH1eT/FtD4lv6
- smLrud27ZVQqLHwwN1QspLiU799+N8dYEzCG2f91T5ZINYbGKXfdxkUOeZRfL8kBGiIq
- 3G0w==
-From: Diane Dyer <dianedyer600@gmail.com>
-Date: Thu, 5 Jan 2023 19:19:50 +0530
-Message-ID: <0a4601d9210c$ce24c260$6a6e4720$@com>
+Return-Path: <berrange@redhat.com>
+Date: Mon, 9 Jan 2023 11:55:00 +0000
+From: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+Message-ID: <Y7wAlHEIafbNzsdf@redhat.com>
+Reply-To: Daniel =?utf-8?B?UC4gQmVycmFuZ8Op?= <berrange@redhat.com>
+References: <20221219130205.687815-1-berrange@redhat.com>
+ <20221219130205.687815-6-berrange@redhat.com>
+ <27da4d93-38e6-1c40-4a60-92f3343f380f@redhat.com>
 MIME-Version: 1.0
-Content-Type: multipart/alternative;
- boundary="----=_NextPart_000_0A47_01D9213A.E7DCFE60"
-Content-Language: en-us
-Subject: [Virtio-fs] Website Modification
+Content-Type: text/plain; charset="utf-8"
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <27da4d93-38e6-1c40-4a60-92f3343f380f@redhat.com>
+Subject: Re: [Virtio-fs] [PATCH 5/6] tests: add G_GNUC_PRINTF for various
+ functions
 List-Id: Development discussions about virtio-fs <virtio-fs.redhat.com>
 List-Unsubscribe: <https://listman.redhat.com/mailman/options/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=unsubscribe>
@@ -25,132 +21,68 @@ List-Post: <mailto:virtio-fs@redhat.com>
 List-Help: <mailto:virtio-fs-request@redhat.com?subject=help>
 List-Subscribe: <https://listman.redhat.com/mailman/listinfo/virtio-fs>,
  <mailto:virtio-fs-request@redhat.com?subject=subscribe>
-To: virtio-fs@redhat.com
+To: Thomas Huth <thuth@redhat.com>
+Cc: qemu-devel@nongnu.org, "Dr. David Alan Gilbert" <dgilbert@redhat.com>, qemu-ppc@nongnu.org, xen-devel@lists.xenproject.org, Laurent Vivier <lvivier@redhat.com>, Markus Armbruster <armbru@redhat.com>, Daniel Henrique Barboza <danielhb413@gmail.com>, virtio-fs@redhat.com, Michael Roth <michael.roth@amd.com>, Alex =?utf-8?Q?Benn=C3=A9e?= <alex.bennee@linaro.org>, qemu-block@nongnu.org, Peter Maydell <peter.maydell@linaro.org>, qemu-arm@nongnu.org, Paul Durrant <paul@xen.org>, Anthony Perard <anthony.perard@citrix.com>, David Gibson <david@gibson.dropbear.id.au>, =?utf-8?Q?C=C3=A9dric?= Le Goater <clg@kaod.org>, John Snow <jsnow@redhat.com>, Stefan Hajnoczi <stefanha@redhat.com>, Paolo Bonzini <pbonzini@redhat.com>, Stefano Stabellini <sstabellini@kernel.org>, Gerd Hoffmann <kraxel@redhat.com>, Greg Kurz <groug@kaod.org>
 
-This is a multipart message in MIME format.
-------=_NextPart_000_0A47_01D9213A.E7DCFE60
-Content-Type: text/plain;
-	charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+On Thu, Dec 29, 2022 at 10:34:55AM +0100, Thomas Huth wrote:
+> On 19/12/2022 14.02, Daniel P. Berrangé wrote:
+> > Signed-off-by: Daniel P. Berrangé <berrange@redhat.com>
+> > ---
+> >   tests/qtest/ahci-test.c           |  3 +++
+> >   tests/qtest/arm-cpu-features.c    |  1 +
+> >   tests/qtest/erst-test.c           |  2 +-
+> >   tests/qtest/ide-test.c            |  3 ++-
+> >   tests/qtest/ivshmem-test.c        |  4 ++--
+> >   tests/qtest/libqmp.c              |  2 +-
+> >   tests/qtest/libqos/libqos-pc.h    |  6 ++++--
+> >   tests/qtest/libqos/libqos-spapr.h |  6 ++++--
+> >   tests/qtest/libqos/libqos.h       |  6 ++++--
+> >   tests/qtest/libqos/virtio-9p.c    |  1 +
+> >   tests/qtest/migration-helpers.h   |  1 +
+> >   tests/qtest/rtas-test.c           |  2 +-
+> >   tests/qtest/usb-hcd-uhci-test.c   |  4 ++--
+> >   tests/unit/test-qmp-cmds.c        | 13 +++++++++----
+> >   14 files changed, 36 insertions(+), 18 deletions(-)
+> ...
+> > diff --git a/tests/unit/test-qmp-cmds.c b/tests/unit/test-qmp-cmds.c
+> > index 2373cd64cb..6d52b4e5d8 100644
+> > --- a/tests/unit/test-qmp-cmds.c
+> > +++ b/tests/unit/test-qmp-cmds.c
+> > @@ -138,6 +138,7 @@ void qmp___org_qemu_x_command(__org_qemu_x_EnumList *a,
+> >   }
+> > +G_GNUC_PRINTF(2, 3)
+> >   static QObject *do_qmp_dispatch(bool allow_oob, const char *template, ...)
+> >   {
+> >       va_list ap;
+> > @@ -160,6 +161,7 @@ static QObject *do_qmp_dispatch(bool allow_oob, const char *template, ...)
+> >       return ret;
+> >   }
+> > +G_GNUC_PRINTF(3, 4)
+> >   static void do_qmp_dispatch_error(bool allow_oob, ErrorClass cls,
+> >                                     const char *template, ...)
+> >   {
+> > @@ -269,7 +271,7 @@ static void test_dispatch_cmd_io(void)
+> >   static void test_dispatch_cmd_deprecated(void)
+> >   {
+> > -    const char *cmd = "{ 'execute': 'test-command-features1' }";
+> > +    #define cmd "{ 'execute': 'test-command-features1' }"
+> >       QDict *ret;
+> 
+> That looks weird, why is this required?
 
-Hi,
+This means that the compiler can see we're passing a constant string
+into the API call a few lines lower. Without it, the compiler can't
+see that 'cmd' doesn't contain any printf format specifiers, and thus
+it would force us to use  func('%s', cmd)... except that's not actually
+possible since our crazy json printf formatter doesn't allow arbitrary
+'%s', the '%s' can only occur at well defined points in the JSON doc.
 
- 
+Using a constant string via #define was the easiest way to give the
+compiler visibility of the safety.
 
-I'm just checking with you to see if you're interested in redesigning or
-upgrading your site, or if you're interested in building a whole new site
-completely.
-
- 
-
- If so, I'd love to tell you a little bit more about my abilities and show
-you some of my work. I am a very skilled web designer with various abilities
-and can develop anything.
-
- 
-
-Let me know what you think.
-
- 
-
-Regard
-
- 
-
-Diane Dyer
-
-
-------=_NextPart_000_0A47_01D9213A.E7DCFE60
-Content-Type: text/html;
-	charset="us-ascii"
-Content-Transfer-Encoding: quoted-printable
-
-<html xmlns:o=3D"urn:schemas-microsoft-com:office:office" xmlns:w=3D"urn:sc=
-hemas-microsoft-com:office:word" xmlns:m=3D"http://schemas.microsoft.com/of=
-fice/2004/12/omml" xmlns=3D"http://www.w3.org/TR/REC-html40">
-
-<head>
-<META HTTP-EQUIV=3D"Content-Type" CONTENT=3D"text/html; charset=3Dus-ascii"=
->
-<meta name=3DGenerator content=3D"Microsoft Word 12 (filtered medium)">
-<style>
-<!--
- /* Font Definitions */
- @font-face
-=09{font-family:"Cambria Math";
-=09panose-1:2 4 5 3 5 4 6 3 2 4;}
-@font-face
-=09{font-family:Calibri;
-=09panose-1:2 15 5 2 2 2 4 3 2 4;}
- /* Style Definitions */
- p.MsoNormal, li.MsoNormal, div.MsoNormal
-=09{margin-top:0in;
-=09margin-right:0in;
-=09margin-bottom:10.0pt;
-=09margin-left:0in;
-=09line-height:115%;
-=09font-size:11.0pt;
-=09font-family:"Calibri","sans-serif";}
-p.MsoNoSpacing, li.MsoNoSpacing, div.MsoNoSpacing
-=09{mso-style-priority:1;
-=09margin:0in;
-=09margin-bottom:.0001pt;
-=09font-size:11.0pt;
-=09font-family:"Calibri","sans-serif";}
-.MsoChpDefault
-=09{mso-style-type:export-only;}
-.MsoPapDefault
-=09{mso-style-type:export-only;
-=09margin-bottom:10.0pt;
-=09line-height:115%;}
-@page Section1
-=09{size:8.5in 11.0in;
-=09margin:1.0in 1.0in 1.0in 1.0in;}
-div.Section1
-=09{page:Section1;}
--->
-</style>
-
-</head>
-
-<body lang=3DEN-US>
-
-<div class=3DSection1>
-
-<p class=3DMsoNoSpacing>Hi,</p>
-
-<p class=3DMsoNoSpacing>&nbsp;</p>
-
-<p class=3DMsoNoSpacing>I&#8217;m just checking with you to see if you&#821=
-7;re
-interested in redesigning or upgrading your site, or if you&#8217;re intere=
-sted
-in building a whole new site completely.</p>
-
-<p class=3DMsoNoSpacing><o:p>&nbsp;</o:p></p>
-
-<p class=3DMsoNoSpacing>&nbsp;If so, I&#8217;d love to tell you a little bi=
-t more
-about my abilities and show you some of my work. I am a very skilled web
-designer with various abilities and can develop anything.</p>
-
-<p class=3DMsoNoSpacing><o:p>&nbsp;</o:p></p>
-
-<p class=3DMsoNoSpacing>Let me know what you think.</p>
-
-<p class=3DMsoNoSpacing><o:p>&nbsp;</o:p></p>
-
-<p class=3DMsoNoSpacing>Regard</p>
-
-<p class=3DMsoNoSpacing><o:p>&nbsp;</o:p></p>
-
-<p class=3DMsoNoSpacing>Diane Dyer</p>
-
-</div>
-
-</body>
-
-</html>
-
-------=_NextPart_000_0A47_01D9213A.E7DCFE60--
-
+With regards,
+Daniel
+-- 
+|: https://berrange.com      -o-    https://www.flickr.com/photos/dberrange :|
+|: https://libvirt.org         -o-            https://fstop138.berrange.com :|
+|: https://entangle-photo.org    -o-    https://www.instagram.com/dberrange :|
